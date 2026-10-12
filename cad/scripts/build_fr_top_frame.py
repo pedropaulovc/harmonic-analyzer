@@ -41,11 +41,11 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   bottoms 6.3 below it and the hub boss and V-gussets 8.0 below stay off
   it. 999.7 is the FINISHED plane: the cut comes out of casting allowance,
   so the model, its bands and every stack read from it unchanged. It is
-  faced first, and in the same setup the #6 clearance holes are drilled
-  through from it with the dowel slip holes and slots: the three share the
-  knife-mount seat as their entry face, so the drill's drift is nil where
-  they meet the seat and grows toward the top. The frame is then flipped
-  and each counterbore is cut from the top, piloted on its drilled hole.
+  faced first. The slip holes and slots are cut blind from it and located
+  from the #6 clearance hole's axis where that hole meets it (sheet 6
+  dimensions them in the underside view). So whichever face the #6 hole is
+  drilled from, each axis is true at the knife-mount seat, and its drift
+  grows toward the top. The counterbores open on the top face.
   Their depths are judged from the faced plane, and a later facing cut
   would shorten the 30.0 grip and the 12.0 slip depth one for one against
   the 0.01 #6 tip clearance and the 0.596 dowel slip margin.
@@ -500,12 +500,13 @@ if STUD_Z_REAR + HANGER_CBORE_DIA / 2.0 >= INNER_Z + GUSSET:
 # largest drilled screw clearance hole with the round hole's station at its
 # .XXX limit and the slot's at that plus its zone radius off the BASIC 14.200
 # (0.155); their blind floors stay below the counterbore floor, so neither
-# meets the screw's bearing face.  The #6 holes, the slip holes and the slots
-# are all cut from the faced underside in one setup, so each one's drift is
-# nil at that face and greatest at the blind floors: every wall is judged at
-# the deepest printed floor, less the drift of each hole on either side of
-# it (the #6 hole's and the slip hole's or slot's, toward each other).  All
-# four meet the 2.0 target.
+# meets the screw's bearing face.  The slip holes and slots are cut blind
+# from the faced underside and located from the #6 hole's axis at that face,
+# whichever face the #6 hole was drilled from (sheet 6 dimensions them in
+# the underside view).  So each axis's drift is nil at the seat and greatest
+# at the blind floors: every wall is judged at the deepest printed floor,
+# less the drift of each hole on either side of it (the #6 hole's and the
+# slip hole's or slot's, toward each other).  All four meet the 2.0 target.
 _PIN_HOLE_MAX_R = (HANGER_PIN_HOLE_DIA + max(HANGER_PIN_HOLE_DIA_BAND)) / 2.0
 _CLEARANCE_MAX_R = (HANGER_CLEARANCE_DIA + DRILL_OVERSIZE) / 2.0
 _SLOT_MAX_HALF_L = (HANGER_SLOT_LENGTH + HANGER_SLOT_LENGTH_TOL) / 2.0
@@ -562,8 +563,8 @@ for _label, _value in (
 # keeps its wall in z with the station at its .X band from the socket axis,
 # each pocket end a full band of its printed .X length out (the length's
 # band, then as much again for the pocket's centring), the largest printed
-# hole and the 0.3 deg drill drift from the faced underside, where every
-# hanger hole enters: the #6 hole's at the pocket roof (y +10.25), the
+# hole and the 0.3 deg drill drift from the faced underside, where the
+# hanger holes are located: the #6 hole's at the pocket roof (y +10.25), the
 # counterbore's at the top face, where it is piloted on that hole, and the
 # slip hole's and slot's over their depth. The counterbore wall is taken in
 # plan although its floor (y +11.75) stands above the pocket roof.

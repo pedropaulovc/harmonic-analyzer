@@ -175,12 +175,13 @@ HANGER_SCREW_MISMATCH_Z = (
     + _KNIFE_DOWEL_PAIR_SHIFT / 2.0
 )  # 0.239
 HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATCH_Z)
-# The crossbar's #6 hole is drilled from the faced underside, in the dowel
-# holes' setup, and the counterbore is piloted on it from the top: its axis
-# is true at the underside and wanders by the deep-drill allowance up the
-# longest .X grip, tan 0.3 deg x 30.8 = 0.161 at the head end.  The screw
-# axis is the knife mount's tap, so the mismatch and that drift together
-# must stay inside the 0.597 float: 0.376 + 0.161 = 0.537, 0.059 spare.
+# The crossbar's #6 hole is located at the faced underside, where the dowel
+# holes are located from it, and the counterbore is piloted on it from the
+# top: its axis is true at the underside and wanders by the deep-drill
+# allowance up the longest .X grip, tan 0.3 deg x 30.8 = 0.161 at the head
+# end.  The screw axis is the knife mount's tap, so the mismatch and that
+# drift together must stay inside the 0.597 float: 0.376 + 0.161 = 0.537,
+# 0.059 spare.
 HANGER_SCREW_DRIFT = top_frame.DRILL_DRIFT_PER_MM * (
     top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL
 )

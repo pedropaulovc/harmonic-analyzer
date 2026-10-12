@@ -301,14 +301,6 @@ INK_CLEARANCE = 0.002
 ROUND_OUT = 0.0001
 # The native arrowhead is 0.762 mm across (b49e1 dump, IDisplayData arrows).
 ARROW_HALF_WIDTH = 0.000381
-# The #6 hanger holes are drilled through from the faced underside, in the
-# setup that cuts the dowel slip holes and slots, and each counterbore is
-# then cut from the top, piloted on its hole (build_fr_top_frame's wall
-# stack charges the drift from that entry).  The callout says both entries:
-# "DRILL FROM UNDERSIDE" alone read as the counterbore's side too (codex
-# review of 59f405ab).  The trailing newline puts the native size and
-# counterbore rows round it: four rows in all.
-HANGER_DRILL_CALLOUT = "DRILL FROM UNDERSIDE;\nC'BORE FROM TOP:\n"
 # Transfer fit-up owns these locations; the nominal model holes and their
 # sheet coordinates are references, not independent inspection requirements.
 # The trailing newline keeps the native thread/drill/depth on separate rows
@@ -2481,12 +2473,10 @@ async def build(adapter: Any) -> dict[str, str]:
         detail_top,
         edge_xy=stud_edge,
         # Right of the 182.0 hanger-X row's end, so the leader reaches the
-        # hole past that row instead of across it (codex round 5).  Centred
-        # on this point, three rows printed 265.3..250.6 mm (59f405ab); four
-        # need it 3.5 mm lower to keep under the frame's 266.7 top.
-        callout_xy=(0.262, 0.2545),
+        # hole past that row instead of across it (codex round 5).
+        callout_xy=(0.262, 0.258),
         label="2X #6 SHCS hanger counterbores",
-        process=HANGER_DRILL_CALLOUT,
+        process="HANGER DRILL",
     )
     # #946: RD4 reads off the rear keeper tap, from the rail's outer side.
     rear_keeper = (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR)

@@ -156,7 +156,7 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
     assert asm.HANGER_SCREW_MISMATCH_X == pytest.approx(0.29123)
     assert asm.HANGER_SCREW_MISMATCH_Z == pytest.approx(0.238730)
     assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.3766, abs=5e-4)
-    # The hole is drilled from the underside, so its axis wanders up the
+    # The hole is located at the underside, so its axis wanders up the
     # longest .X grip: tan 0.3 deg x 30.8 at the head end.
     assert asm.HANGER_SCREW_DRIFT == pytest.approx(
         math.tan(math.radians(top_frame.KEEPER_TAP_DRILL_WANDER_DEG))
@@ -199,7 +199,7 @@ def test_the_crossbar_webs_hold_round_the_hole_and_the_slot() -> None:
     assert build_fr_top_frame.SLOT_X == pytest.approx(-22.1)
     assert build_fr_top_frame.PIN_HOLE_X == pytest.approx(-7.9)
     # Every wall at its print-worst less the drill drift each hole takes up
-    # its depth (both are drilled from the underside): rule 12's 2.0 holds.
+    # its depth (both are located at the underside): rule 12's 2.0 holds.
     assert build_fr_top_frame.PIN_HOLE_BAR_WALL == pytest.approx(3.068, abs=5e-4)
     assert build_fr_top_frame.PIN_HOLE_SCREW_WALL == pytest.approx(2.801, abs=5e-4)
     # The longest .XX slot (4.71) with its station at the round hole's .XXX

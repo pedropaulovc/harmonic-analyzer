@@ -1862,11 +1862,12 @@ def test_dowel_slot_contract() -> None:
 
 
 def test_hanger_walls_meet_the_target_after_drift() -> None:
-    """Q7 option C: the #6 holes, the slip holes and the slots are cut from
-    the faced underside in one setup, so each hole's 0.3 deg drift is nil at
-    the seat and largest at the blind floors.  Every wall round a slip hole
-    or slot, at the print-worst bands and the deepest printed floor, less the
-    drift of each hole either side of it, meets rule 12's 2.0 target."""
+    """Q7 option C: the slip holes and slots are cut from the faced
+    underside and located from the #6 hole's axis there, so each hole's
+    0.3 deg drift is nil at the seat and largest at the blind floors.  Every
+    wall round a slip hole or slot, at the print-worst bands and the deepest
+    printed floor, less the drift of each hole either side of it, meets rule
+    12's 2.0 target."""
     per_mm = math.tan(math.radians(spec.KEEPER_TAP_DRILL_WANDER_DEG))
     assert spec.DRILL_DRIFT_PER_MM == pytest.approx(per_mm)
     drift = per_mm * (spec.HANGER_PIN_HOLE_DEPTH + spec.PRINTED_LINEAR_BAND_MM[1])
@@ -2514,39 +2515,6 @@ def test_build_places_the_hanger_section_on_the_underside_sheet() -> None:
     underside = source[source.index('ddoc.ActivateSheet("UNDERSIDE")') :]
     assert "_hanger_section(adapter, hub_bottom_parent)" in underside
     assert "imported_annotations += hanger_dimensions" in underside
-
-
-def test_hanger_drill_callout_states_the_drilling_direction() -> None:
-    """The wall stack charges the #6 hole's drift from the faced underside,
-    so the sheet-3 callout says the hole is drilled from there and the
-    counterbore cut from the top (F-F draws it there); the native size and
-    counterbore rows follow on their own rows (rule 6: four rows at most)."""
-    import ast
-
-    import _drawing_hole_callout
-
-    native = "<hw-hole-dia> THRU ALL\n<hw-cbore-dia> <hw-cbore-depth>"
-    prefixed = _drawing_hole_callout.compose_hole_callout_prefix(
-        drawing.HANGER_DRILL_CALLOUT, native
-    )
-    assert prefixed == "DRILL FROM UNDERSIDE;\nC'BORE FROM TOP:\n" + native
-    assert len(prefixed.splitlines()) <= 4
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    (callout,) = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "add_native_hole_callout"
-        and any(
-            keyword.arg == "label"
-            and isinstance(keyword.value, ast.Constant)
-            and keyword.value.value == "2X #6 SHCS hanger counterbores"
-            for keyword in node.keywords
-        )
-    ]
-    process = next(keyword.value for keyword in callout.keywords if keyword.arg == "process")
-    assert isinstance(process, ast.Name) and process.id == "HANGER_DRILL_CALLOUT"
 
 
 def test_keeper_transfer_prefix_preserves_the_native_hole_definition() -> None:
