@@ -84,16 +84,21 @@ DEDENDUM_FACTOR = (
 PITCH_DIA = TEETH * MODULE_MM
 # The #8 form is translated s outward along each gap bisector. At 0.210
 # (printed limits 0.19992..0.22002) the rack mesh at the loose 0.14 datum and
-# the 11.48 minimum OD has contact ratio 1.245 by the closed form in
+# the 11.40 minimum OD has contact ratio 1.215 by the closed form in
 # paper_drive_mesh_check (translation treated as the untranslated involute
-# with rack and tip moved in by s*cos(pi/N)) and 1.248 by stepping the
-# generated flank through mesh (test_paper_drive_mesh_check). Both clear 1.2;
-# the interference margin is 0.070 mm. A smaller s raises contact ratio but
+# with rack and tip moved in by s*cos(pi/N)), and stepping the generated flank
+# through mesh agrees (test_paper_drive_mesh_check). Both clear 1.2; the
+# interference margin is 0.070 mm. A smaller s raises contact ratio but
 # brings the rack crest nearer the pinion's interference point.
 RADIAL_SETTING = 0.210
 _SPAN_DESIGN_SETTING_BAND = (0.010, -0.010)
 OUTSIDE_DIA = 11.50
-GEAR_CONTACT_CLASS = "contact_critical"
+# Standard tip grade, +0/-0.10 (machinist review, stack6: +0/-0.02 on Ø11.500
+# was over-specified). The tip only shortens the path of contact. At the
+# 11.48 MIN of the old grade the rack mesh had CR 1.245, at 11.45 it has 1.234
+# and at 11.40 it has 1.215: still above the 1.2 floor. Backlash, root air
+# (0.499 against 0.25) and the interference margin do not depend on the tip.
+GEAR_CONTACT_CLASS = "standard"
 OUTSIDE_DIA_BAND = gear_tip_band_mm(GEAR_CONTACT_CLASS)
 STOCK_PROFILE = StockFormProfile(
     TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0, RADIAL_SETTING

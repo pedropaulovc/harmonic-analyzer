@@ -68,7 +68,7 @@ def test_bands_come_from_named_spec_constants() -> None:
         ("SleeveProfile", "OutsideDia"): "*OUTSIDE_DIA_DEVIATIONS",
     }
     # A band tighter than its printed row needs a functional reason (rule 12):
-    # stations' ±0.05, the contact-critical tip class, boss h6 and flat
+    # stations' ±0.05, the tip class, boss h6 and flat
     # 0/-0.015 bands have functional reasons tighter than their printed rows.
     assert spec.STATION_TOL < printed_band_mm(spec.STATION_PLACES)
     by_name = spec.DRAWING_PRECISION_BY_NAME
@@ -627,7 +627,7 @@ def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
     assert "MESH_PINION_TEETH" not in source
     assert "PROFILE_SHIFT" not in source
     assert spec.TEETH == spec.CUTTER_TEMPLATE.reference_teeth == 12
-    assert spec.OUTSIDE_DIA_BAND == gear_tip_band_mm("contact_critical")
+    assert spec.OUTSIDE_DIA_BAND == gear_tip_band_mm("standard")
     assert part.STOCK_PROFILE is spec.STOCK_PROFILE
     assert (part.TEETH, part.DP, part.PRESSURE_ANGLE_DEG) == (
         spec.TEETH, spec.DIAMETRAL_PITCH, spec.PRESSURE_ANGLE_DEG
