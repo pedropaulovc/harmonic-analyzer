@@ -34,14 +34,17 @@ fixture's cost is charged to its first consumer. Collection and session overhead
 remain part of the suite wall time. Telemetry appends to that worktree's ignored
 `cad/out/reports/telemetry`, and the root conftest isolates the buildgraph facts
 cache in a temporary directory. Keep `NOSW_GUARD` enabled and leave
-`HARMONIC_BUILDGRAPH_CACHE` unset. With the guard on, a test fails if it starts
-SolidWorks, binds `SldWorks.Application`, starts a child whose command line
-names a COM script (`build_*.py`, `draw_*.py`, `verify.py`, `export_models.py`,
-`package_native.py`, `release_seat_documents.py`) unless the program is a known
-reader (`git`, `ruff`, `certutil`, `python -m py_compile`), or reaches dodo's
-`_exec_com` with its real subprocess runner. Fake the runner instead. The
-vendored `SolidworksMCP-python` tests are excluded because they can take the
-farm's SolidWorks licence.
+`HARMONIC_BUILDGRAPH_CACHE` unset. With the guard on (Windows only), a test
+fails if it starts SolidWorks or its 3DEXPERIENCE launchers, binds
+`SldWorks.Application`, or reaches dodo's `_exec_com` with its real subprocess
+runner. Fake the runner instead. The guard covers every Python child too: the
+conftest puts `tests/_child_guard` first on `PYTHONPATH` and sets
+`HARMONIC_TEST_FORBID_SOLIDWORKS`, so `python -m doit`, `build.py`, a git diff
+helper or a build script started by a test loads the same refusals through
+`sitecustomize`, exits 97 on one, and fails the test that started it. A child
+run with `-I`, `-E` or `-S`, or with an environment that drops `PYTHONPATH`,
+skips that guard. The vendored `SolidworksMCP-python` tests are excluded
+because they can take the farm's SolidWorks licence.
 
 Reuse source facts only within an unchanged-source scan, or immutable baseline
 bytes for private mutation fixtures. Keep each case's writable checkout, task

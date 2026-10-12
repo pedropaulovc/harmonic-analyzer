@@ -1,8 +1,9 @@
-"""The root conftest refuses every SolidWorks start from a test process.
+"""The root conftest refuses every SolidWorks start from a test process and,
+through ``tests/_child_guard``, from every Python child it starts.
 
-Each refused call names a path that does not exist, and each assertion is on
-the guard's own message, so a guard regression fails here instead of reaching
-a real launch.
+Each refused call names a path that does not exist, or reaches only an entry
+point the guard has replaced, and each assertion is on the guard's own
+message, so a guard regression fails here instead of reaching a real launch.
 """
 
 import contextlib
@@ -15,6 +16,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from harmonic_solidworks_guard import MARKER, REFUSED_EXIT
 
 # SolidWorks runs only on Windows, and the root conftest guards only there.
 pytestmark = pytest.mark.skipif(
@@ -23,6 +25,7 @@ pytestmark = pytest.mark.skipif(
 
 BLOCKED = "SolidWorks launch blocked"
 MISSING_SHORTCUT = r"X:\launch-guard-test\never-exists\SOLIDWORKS Design.lnk"
+MISSING_SOLIDWORKS = r"X:\launch-guard-test\never-exists\SLDWORKS.exe"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 # A COM build script that does not exist: were the guard broken, the child
 # python would only fail to open it.
@@ -213,47 +216,80 @@ def test_swallowed_autostart_launch_still_fails_the_test(
     solidworks_launch_refusals.clear()
 
 
-@pytest.mark.parametrize(
-    "argv,cwd",
-    [
-        ([sys.executable, str(MISSING_BUILD)], None),
-        (
-            [sys.executable, "cad/scripts/draw_tripwire_probe_never_exists.py"],
-            str(REPO_ROOT),
-        ),
-        (
-            [sys.executable, "build_tripwire_probe_never_exists.py"],
-            str(MISSING_BUILD.parent),
-        ),
-        # verify.py exists in this checkout, so name one on a drive that does not.
-        (f'"{sys.executable}" "X:\\never-exists\\cad\\scripts\\verify.py"', None),
-    ],
-    ids=["absolute", "relative-to-cwd", "bare-in-scripts", "command-line"],
-)
-def test_com_build_script_child_is_refused(solidworks_launch_refusals, argv, cwd):
-    """The child every dodo COM task launches: python on a ``cad/scripts`` script."""
+def test_isolated_python_child_naming_solidworks_is_refused(
+    solidworks_launch_refusals,
+):
+    """``-I`` skips the children's guard; the command line still meets this one."""
+    argv = [sys.executable, "-I", "-c", "raise SystemExit('SldWorks.Application')"]
     _expect_blocked(
-        solidworks_launch_refusals,
-        lambda: subprocess.run(argv, cwd=cwd, check=False, capture_output=True),
+        solidworks_launch_refusals, lambda: subprocess.run(argv, check=False)
     )
 
 
-def test_com_build_script_in_os_system_is_refused(solidworks_launch_refusals):
-    command = subprocess.list2cmdline([sys.executable, str(MISSING_BUILD)])
-    _expect_blocked(solidworks_launch_refusals, lambda: os.system(command))
+# What a Python child of this session runs. Each binds or launches only through
+# an entry point its guard has replaced: unguarded, it says so and exits rather
+# than reach a real COM server or process. "SldWorks" is split so the parent's
+# argv check does not refuse the child before its own guard is exercised.
+_CHILD_BINDS_SOLIDWORKS = """\
+import sys
+import win32com.client
+
+bind = win32com.client.GetActiveObject
+if not getattr(bind, "solidworks_guard", False):
+    print("UNGUARDED: the real win32com.client.GetActiveObject")
+    sys.exit(3)
+bind("SldWo" + "rks.Application")
+print("NOT REFUSED")
+sys.exit(4)
+"""
+_CHILD_LAUNCHES_SOLIDWORKS = """\
+import subprocess
+
+subprocess.run([r"X:\\launch-guard-test\\never-exists\\SLDWo" + "rks.exe"])
+print("NOT REFUSED")
+"""
+# A dodo whose COM task reaches a stand-in ``_exec_com``.
+_DODO_WITH_A_COM_TASK = """\
+def _run_subprocess(cmd, label, log_stem=None, *, task=None):
+    raise AssertionError("unreached")
 
 
-@pytest.mark.skipif(shutil.which("git") is None, reason="git is not on PATH")
-def test_a_program_that_only_reads_a_build_script_passes(solidworks_launch_refusals):
-    """git hashes the file: a known reader may name a COM script."""
-    result = subprocess.run(
-        ["git", "hash-object", "--stdin", "--path", str(MISSING_BUILD)],
-        input=b"probe\n",
-        capture_output=True,
-        check=False,
+def _exec_com(cmd, label, log_stem=None, *, task=None):
+    print("UNGUARDED: the stand-in _exec_com ran")
+
+
+def task_probe():
+    return {"actions": [lambda: _exec_com(["probe"], "part:probe")], "verbosity": 2}
+"""
+
+
+def _expect_child_refused(child_refusals, result, route):
+    output = f"exit {result.returncode}\n{result.stdout}\n{result.stderr}"
+    assert BLOCKED in result.stderr, output
+    assert f"via {route}" in result.stderr, output
+    assert MARKER in result.stderr, output
+    recorded = "".join(child_refusals())
+    assert f"via {route}" in recorded, recorded
+
+
+def _run_child(argv, **kwargs):
+    return subprocess.run(
+        argv, capture_output=True, text=True, check=False, timeout=120, **kwargs
     )
-    assert result.returncode == 0, result.stderr
-    assert solidworks_launch_refusals == []
+
+
+def test_python_child_binding_solidworks_is_refused(solidworks_child_refusals):
+    result = _run_child([sys.executable, "-c", _CHILD_BINDS_SOLIDWORKS])
+    _expect_child_refused(
+        solidworks_child_refusals, result, "win32com.client.GetActiveObject"
+    )
+    assert result.returncode == REFUSED_EXIT
+
+
+def test_python_child_launching_solidworks_is_refused(solidworks_child_refusals):
+    result = _run_child([sys.executable, "-c", _CHILD_LAUNCHES_SOLIDWORKS])
+    _expect_child_refused(solidworks_child_refusals, result, "subprocess.Popen")
+    assert result.returncode == REFUSED_EXIT
 
 
 def _root_conftest(request):
@@ -264,66 +300,80 @@ def _root_conftest(request):
     raise LookupError(root)
 
 
-_BUILD = str(MISSING_BUILD)
-_SPACED = "C:\\never exists\\cad\\scripts\\build_tripwire_probe_never_exists.py"
+def test_a_child_refusal_the_test_ignores_still_fails_it(
+    solidworks_child_refusals, request
+):
+    """The autouse check reads the children's log, whatever their exit codes."""
+    result = _run_child([sys.executable, "-c", _CHILD_LAUNCHES_SOLIDWORKS])
+    assert result.returncode == REFUSED_EXIT, result.stderr
+    taken = _root_conftest(request)._take_refusals()
+    assert any("via subprocess.Popen" in entry for entry in taken), taken
 
 
-@pytest.mark.parametrize(
-    "args,executable",
-    [
-        ([_BUILD], None),
-        (["python", _BUILD], None),
-        (["python", "-X", "utf8", "-u", _BUILD], None),
-        (["worker", _BUILD], sys.executable),
-        (["git", _BUILD], sys.executable),  # the executable, not argv[0], runs
-        (["git", "hash-object", _BUILD], sys.executable),
-        (["probe"], _BUILD),
-        (["python", "-m", "runpy", _BUILD], None),
-        # codex: `git -c alias.x="!python …build_x.py" x` runs the script.
-        (["git", "-c", f'alias.x="!python {_BUILD}"', "x"], None),
-        (["git", "-c", f"core.pager=python {_BUILD}", "log"], None),
-        (["git", "--config-env=core.pager=PROBE", "log", _BUILD], None),
-        (["git", "x", f"!python {_BUILD}"], None),
-        (["git", "status", _BUILD], None),  # not a read-only subcommand here
-        (["git", "-C", "repo", "-c", "core.pager=x", "show", _BUILD], None),
-        (subprocess.list2cmdline(["echo", "probe"]) + " & python " + _BUILD, None),
-        ("git hash-object x & python " + _BUILD, None),  # a chained second program
-        (["cmd", "/c", subprocess.list2cmdline(["python", _BUILD, "--x"])], None),
-        (["cmd", "/c", "python", _BUILD], None),
-        (["cmd", "/c", f'"python" "{_SPACED}"'], None),
-        (["cmd", "/c", "python", _SPACED], None),
-        (f'cmd /c python "{_SPACED}"', None),
-        (["uv", "run", "--with", "x", "python", _BUILD], None),
-        (["uv", "run", "-w", "probe", "python", _BUILD], None),
-        (["uv", "run", "--directory", "cad/scripts", "python", "build_x.py"], None),
-        (["uv", "run", _BUILD], None),
-        (["uv", "run", "ruff", "check", _BUILD], None),  # uv, not ruff, is first
-        (["pwsh", "-NoProfile", "-File", _BUILD], None),
-        (["pwsh", "-Command", f"& python '{_SPACED}'"], None),
-        (["python", "-c", "import runpy; runpy.run_path('verify.py')"], None),
-        (["python", "other.py", "--then", "VERIFY.PY"], None),
-    ],
-)
-def test_a_command_naming_a_com_script_counts(request, args, executable):
-    assert _root_conftest(request)._com_script(args, executable)
+def test_doit_child_running_a_com_task_is_refused(solidworks_child_refusals, tmp_path):
+    """``python -m doit part:x`` runs dodo's ``_exec_com`` in the child."""
+    dodo = tmp_path / "dodo.py"
+    dodo.write_text(_DODO_WITH_A_COM_TASK, encoding="utf-8")
+    result = _run_child(
+        [
+            sys.executable,
+            "-m",
+            "doit",
+            "-f",
+            str(dodo),
+            "--db-file",
+            str(tmp_path / "doit.db"),
+            "probe",
+        ],
+        cwd=tmp_path,
+    )
+    _expect_child_refused(solidworks_child_refusals, result, "dodo._exec_com")
+    assert result.returncode == REFUSED_EXIT
 
 
-@pytest.mark.parametrize(
-    "args",
-    [
-        ["git", "hash-object", "--path", _BUILD],
-        "git hash-object --path " + _BUILD,
-        ["git", "-C", "repo", "ls-files", _BUILD],
-        ["C:\\Program Files\\Git\\cmd\\git.exe", "show", f"HEAD:{_BUILD}"],
-        ["certutil", "-hashfile", _BUILD, "SHA256"],
-        ["ruff", "check", _BUILD],
-        ["python", "-m", "py_compile", _BUILD],
-        ["python", "-m", "pytest", "cad/scripts/test_build_probe.py"],
-        ["python", "rebuild_x.py", "verify.pyc"],
-    ],
-)
-def test_a_known_reader_or_no_com_script_does_not_count(request, args):
-    assert _root_conftest(request)._com_script(args) is None
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is not on PATH")
+def test_git_external_diff_binding_solidworks_is_refused(
+    solidworks_child_refusals, tmp_path
+):
+    """git runs ``diff.external`` (or a textconv filter) as a child of its own."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    helper = tmp_path / "external_diff.py"
+    helper.write_text(_CHILD_BINDS_SOLIDWORKS, encoding="utf-8")
+    git = ["git", "-C", str(repo), "-c", "core.autocrlf=false"]
+    subprocess.run([*git, "init", "-q"], check=True)
+    (repo / "probe.txt").write_text("before\n", encoding="utf-8")
+    subprocess.run([*git, "add", "probe.txt"], check=True)
+    (repo / "probe.txt").write_text("after\n", encoding="utf-8")
+    external = f'"{Path(sys.executable).as_posix()}" "{helper.as_posix()}"'
+    result = _run_child([*git, "-c", f"diff.external={external}", "diff", "--ext-diff"])
+    _expect_child_refused(
+        solidworks_child_refusals, result, "win32com.client.GetActiveObject"
+    )
+    assert result.returncode != 0
+
+
+def test_child_guard_runs_the_sitecustomize_it_shadows(
+    solidworks_child_refusals, monkeypatch, tmp_path
+):
+    shadowed = tmp_path / "shadowed"
+    shadowed.mkdir()
+    (shadowed / "sitecustomize.py").write_text(
+        "import os\nos.environ['SHADOWED_SITECUSTOMIZE_RAN'] = '1'\n", encoding="utf-8"
+    )
+    monkeypatch.setenv(
+        "PYTHONPATH", os.pathsep.join([os.environ["PYTHONPATH"], str(shadowed)])
+    )
+    result = _run_child(
+        [
+            sys.executable,
+            "-c",
+            "import os, sys; print(os.environ.get('SHADOWED_SITECUSTOMIZE_RAN'),"
+            " 'harmonic_solidworks_guard' in sys.modules)",
+        ]
+    )
+    assert result.stdout.split() == ["1", "True"], result.stderr
+    assert solidworks_child_refusals() == []
 
 
 def test_create_process_below_popen_is_refused(solidworks_launch_refusals):
@@ -331,7 +381,7 @@ def test_create_process_below_popen_is_refused(solidworks_launch_refusals):
     import _winapi
 
     assert _winapi.CreateProcess.__name__ == "guarded_create_process"
-    command = subprocess.list2cmdline([sys.executable, str(MISSING_BUILD)])
+    command = subprocess.list2cmdline([MISSING_SOLIDWORKS])
     with pytest.raises(RuntimeError, match=BLOCKED):
         _winapi.CreateProcess(None, command, None, None, False, 0, None, None, None)
     assert len(solidworks_launch_refusals) == 1
@@ -343,7 +393,7 @@ def test_pywin32_process_creation_is_refused(solidworks_launch_refusals):
     import win32process
 
     assert win32process.CreateProcess.__name__ == "guarded_create_process"
-    command = subprocess.list2cmdline([sys.executable, str(MISSING_BUILD)])
+    command = subprocess.list2cmdline([MISSING_SOLIDWORKS])
     with pytest.raises(RuntimeError, match=BLOCKED):
         win32process.CreateProcess(
             None, command, None, None, False, 0, None, None, win32process.STARTUPINFO()
@@ -352,7 +402,7 @@ def test_pywin32_process_creation_is_refused(solidworks_launch_refusals):
     solidworks_launch_refusals.clear()
     for attribute, args in (
         ("ShellExecute", (0, "open", MISSING_SHORTCUT, None, None, 1)),
-        ("WinExec", (f'"{sys.executable}" "{MISSING_BUILD}"',)),
+        ("WinExec", (f'"{MISSING_SOLIDWORKS}"',)),
     ):
         _require_refuser(win32api, attribute, "refuse_solidworks_launch")
         _expect_blocked(
@@ -362,15 +412,15 @@ def test_pywin32_process_creation_is_refused(solidworks_launch_refusals):
 
 
 @pytest.mark.parametrize("entry", ["os.spawnv", "os.spawnl", "nt.spawnv"])
-def test_spawn_of_a_com_build_script_is_refused(solidworks_launch_refusals, entry):
+def test_spawn_of_solidworks_is_refused(solidworks_launch_refusals, entry):
     """Every spawn entry point meets the ``os.spawn`` audit event in ``nt``."""
     import nt
 
-    argv = [sys.executable, str(MISSING_BUILD)]
+    argv = [MISSING_SOLIDWORKS]
     calls = {
-        "os.spawnv": lambda: os.spawnv(os.P_WAIT, sys.executable, argv),
-        "os.spawnl": lambda: os.spawnl(os.P_WAIT, sys.executable, *argv),
-        "nt.spawnv": lambda: nt.spawnv(os.P_WAIT, sys.executable, argv),
+        "os.spawnv": lambda: os.spawnv(os.P_WAIT, MISSING_SOLIDWORKS, argv),
+        "os.spawnl": lambda: os.spawnl(os.P_WAIT, MISSING_SOLIDWORKS, *argv),
+        "nt.spawnv": lambda: nt.spawnv(os.P_WAIT, MISSING_SOLIDWORKS, argv),
     }
     _expect_blocked(solidworks_launch_refusals, calls[entry])
 
@@ -441,23 +491,18 @@ def test_dodo_part_build_with_a_real_runner_is_refused(
         assert not (tmp_path / "logs").exists()
         solidworks_launch_refusals.clear()
 
+        command = [sys.executable, str(MISSING_BUILD)]
         with pytest.raises(RuntimeError, match=BLOCKED):
-            dodo._run_subprocess(
-                [sys.executable, str(MISSING_BUILD)], "part:ch_pivot_shaft"
-            )
-        assert "dodo._run_subprocess" in solidworks_launch_refusals[0]
+            dodo._exec_com(command, "part:ch_pivot_shaft")
+        assert "dodo._exec_com" in solidworks_launch_refusals[0]
         solidworks_launch_refusals.clear()
 
         # Faking only ``run`` leaves the logged path's real ``Popen``.
         with pytest.MonkeyPatch.context() as patch:
             patch.setattr(dodo.subprocess, "run", lambda *_a, **_kw: None)
             with pytest.raises(RuntimeError, match=BLOCKED):
-                dodo._run_subprocess(
-                    [sys.executable, str(MISSING_BUILD)],
-                    "part:ch_pivot_shaft",
-                    "part-ch_pivot_shaft",
-                )
-        assert "dodo._run_subprocess" in solidworks_launch_refusals[0]
+                dodo._exec_com(command, "part:ch_pivot_shaft", "part-ch_pivot_shaft")
+        assert "dodo._exec_com" in solidworks_launch_refusals[0]
         assert not (tmp_path / "logs").exists()
         solidworks_launch_refusals.clear()
 
@@ -486,6 +531,6 @@ def test_dodo_com_paths_with_a_faked_runner_still_run(
         monkeypatch.setattr(dodo, "LOGS", tmp_path / "logs")
         monkeypatch.setattr(dodo.subprocess, "Popen", FakePopen)
         command = [sys.executable, str(MISSING_BUILD)]
-        assert dodo._run_subprocess(command, "part:ch_pivot_shaft", "part-x") == 0
+        dodo._exec_com(command, "part:ch_pivot_shaft", "part-x")
         assert ran[-1] == command
     assert solidworks_launch_refusals == []
