@@ -411,7 +411,7 @@ PLATE_Z0 = ARM_Z0 + ARM.THICKNESS  # -116.4625
 PLATE_SCREW_XY = tuple(_on_arm(station) for station in ARM.PLATE_TAP_STATIONS)
 PLATE_SCREW_Z0 = PLATE_Z0 + ARM_PLATE.REAR_FACE_Z  # -111.4625: oval heads flush
 LOCATING_PIN_XY = tuple(_on_arm(x, y) for x, y in ARM.LOCATOR_SITES_MM)
-# Dowels MHA-VN-054 (Rx-90 rows: local +Y to -Z, into the arm). The origin
+# Dowels MHA-VN-056 (Rx-90 rows: local +Y to -Z, into the arm). The origin
 # end is the PROUD end, 1.70 into the plate, so the 6.0 body runs 4.30 into
 # the arm's 4.80 blind ream. Run 9 put the origin at the buried end: the body
 # then ran out of the arm's front face (9.86 mm^3 of solid arm per dowel).
