@@ -10,7 +10,11 @@ from typing import Any, Iterable, Literal
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.solidworks.drawing import TOL_BASIC, dimension_name, view_name
+from solidworks_mcp.adapters.solidworks.drawing import (
+    TOL_BASIC,
+    dimension_name,
+    view_name,
+)
 
 from _com import _early_bound
 from _drawing_common import rebuild_drawing
@@ -38,8 +42,12 @@ def move_model_dimension(
     if not selection_name or not draw.Extension.SelectByID2(
         selection_name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
     ):
-        raise RuntimeError(f"failed to select model dimension {name}: {selection_name!r}")
-    drawing.DragModelDimension(view_name(adapter, target), 2, text_xy[0], text_xy[1], 0.0)
+        raise RuntimeError(
+            f"failed to select model dimension {name}: {selection_name!r}"
+        )
+    drawing.DragModelDimension(
+        view_name(adapter, target), 2, text_xy[0], text_xy[1], 0.0
+    )
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     matches = [

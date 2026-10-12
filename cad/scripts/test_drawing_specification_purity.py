@@ -410,7 +410,7 @@ def test_declaration_boundary_requires_module_level_api_and_sourced_data(
 def test_declarations_do_not_exempt_outside_strings_or_native_drawing_code() -> None:
     source = """
 from _feature_requirements import requirement, part_metadata
-from _drawing_common import add_attached_note
+from _drawing_leader_notes import add_attached_note
 from _gtol_cylinder import CylinderFace
 import sample_spec as part_spec
 

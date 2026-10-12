@@ -668,7 +668,6 @@ def sanitize_pdf_metadata(pdf: Path, *, title: str, expected_pages: int = 1) -> 
             raise RuntimeError(f"PDF metadata {key} did not sanitize")
 
 
-
 @_telemetry.traced("drawing.rebuild", label_param="label")
 def rebuild_drawing(adapter: Any, *, label: str) -> None:
     """The one ``EditRebuild3`` chokepoint for drawing recipes.

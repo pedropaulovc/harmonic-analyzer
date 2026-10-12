@@ -37,7 +37,6 @@ OUT = REPO / "cad" / "out"
 UNKNOWN = "unknown"
 
 
-
 def _stem(stem: str) -> str:
     normalized = stem.replace("-", "_")
     if normalized not in SUPPORTED_PARTS:

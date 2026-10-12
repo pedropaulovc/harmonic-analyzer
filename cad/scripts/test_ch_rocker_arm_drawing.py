@@ -107,6 +107,14 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
 
 def test_native_gdt_and_finish_present() -> None:
     """Native print arguments retain the part-owned limit and A-B-C frame."""
+    from _drawing_hole_callout import add_native_hole_callout
+
+    assert drawing.add_native_hole_callout is add_native_hole_callout
+    assert drawing.ROD_HOLE.fields["dia"][1] == (
+        "ROD_HOLE_SPEC",
+        ("_hole_spec", "NUMBER_DRILL_MM"),
+        ("_drawing_hole_callout", "add_native_hole_callout"),
+    )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     # A = pivot bore axis, B = broad face (right end view), C = rod-side tip
     # face; the rod-pin position frame references all three.

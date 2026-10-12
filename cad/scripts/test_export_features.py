@@ -139,7 +139,7 @@ def test_import_bound_api_in_module_control_flow_discovers_a_part(tmp_path: Path
 
 
 def test_source_paths_never_import_draw_spec_or_citation_modules(monkeypatch) -> None:
-    import _buildgraph
+    importlib.import_module("_buildgraph")
 
     original_import = builtins.__import__
 

@@ -58,6 +58,9 @@ colocation alone is not a printed-callout drift check.
 `requirements` preserves the ordered acceptance-field names, including explicit
 unknowns. Each `fields` entry is `(value, sources)`: a string source names a
 symbol in `<stem>_spec`, while `(module, NAME)` cites a symbol in another module.
+Shared-helper sources name their defining module, such as
+`("_drawing_hole_callout", "add_native_hole_callout")`; the lifecycle-only
+`_drawing_common` module is not the authority for helpers extracted from it.
 Part-level fields, geometry frames and drawing datums use colocated
 `part_metadata` declarations with the same `(value, sources)` pairs; explicit
 `model_sources` and `precision_sources` cite the shared frame and displayed

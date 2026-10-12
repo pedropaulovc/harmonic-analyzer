@@ -41,7 +41,6 @@ from _check import check
 from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
-
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -88,7 +87,6 @@ from ch_rocker_arm_spec import (
     TOP_END_X,
     TOP_END_Y,
 )
-
 
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm"]
