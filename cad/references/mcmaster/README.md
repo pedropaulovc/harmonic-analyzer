@@ -20,6 +20,7 @@ recipes:
 | 6793K4 | `pd-transgear-removable` T12 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 12 Teeth |
 | 6793K11 | `pd-transgear-removable` T18 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 18 Teeth |
 | 6793K17 | `pd-transgear-removable` T24 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 24 Teeth |
+| 90114A124 | `vn-ms-stop-plate-screw` (catalogue-only; no vendor model) | Brass Fillister Head Slotted Screw |
 | 90114A511 | `vn-fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `vn-foot-screw`, `vn-swing-stop-screw`, `vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -615,7 +616,7 @@ Catalog specifications checked on September 10, 2026:
 
 - [92671A005](https://www.mcmaster.com/92671A005/) (`vn-wheel-axle-nut`,
   MHA-VN-025, two), [92916A480](https://www.mcmaster.com/92916A480/)
-  (`vn-wheel-axle-back-washer`, MHA-VN-054, one) and
+  (`vn-wheel-axle-back-washer`, MHA-VN-057, one) and
   [92916A250](https://www.mcmaster.com/92916A250/)
   (`vn-wheel-axle-front-washer`, MHA-VN-056, one) carry the magnifying wheel
   on the 3/16 mg-wheel-axle (mg wheel rev 10). The back washer sits between
@@ -632,6 +633,22 @@ Catalog specifications checked on September 10, 2026:
   the ID x OD annulus at the range's nominal thickness. No vendor model was
   fetched, so all three are catalogue-only: no replica gate, and their
   standalone diagnostics are catalog-only runs.
+- [90114A124](https://www.mcmaster.com/90114A124/)
+  (`vn-ms-stop-plate-screw`, MHA-VN-054, two) retains the MHA-MS-003 plate
+  on MHA-MS-002. The product table and 2-D PDF were read live on October 9,
+  2026: brass, slotted fillister, #2-56 UNC-2A, fully threaded, flat tip;
+  length 1/4 in, head diameter 0.140 in, head height 0.083 in, major diameter
+  0.086 in, ASME B18.6.3, 50,000 psi, Rockwell B40, pack of 100 at $7.61.
+  The brass fillister series starts at #2-56 (near M2); the existing brass
+  90114A511 has a larger #4-40 / Ø0.183 in head, while the existing #0-80
+  91794A055 is stainless, so neither meets this small brass joint.
+  `_mcmaster_90114a124.py` owns the stated dimensions and the per-SKU size
+  passed to the native fillister author, whose local `@stock_recipe` declaration
+  identifies the threaded SKU without a shared recipe registry.
+  `diag_build_90114A124.py` follows the existing catalogue-only
+  `91794A077` fillister-family recipe: its dome, slot and thread/runout
+  details are family assumptions, not measurements of a vendor solid.
+  No vendor solid was downloaded and no replica equivalence is claimed.
 
 - [3606T118](https://www.mcmaster.com/3606T118/) (`vn-keeper-chain`, MHA-VN-035)
   and [3606T811](https://www.mcmaster.com/3606T811/) (`vn-keeper-chain-link`,

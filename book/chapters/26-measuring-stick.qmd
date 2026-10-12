@@ -5,7 +5,7 @@ status: stub
 
 # The measuring stick {#sec-measuring-stick}
 
-The gauge that sets the coefficients. Ten divisions, hand stamped.
+The gauge that sets the coefficients. Ten divisions, hand stamped, with a thumbscrew stop clamped on the stick.
 
 ::: {.callout-note appearance="simple"}
 **TODO** — stub. Nothing here has been written yet.
@@ -15,7 +15,11 @@ The gauge that sets the coefficients. Ten divisions, hand stamped.
 
 | part | qty | material | stock |
 |---|---|---|---|
-| `ha-measuring-stick` | TODO | TODO | TODO |
+| `ms-stick` | 1 | C26000 brass, half-hard | TODO |
+| `ms-stop-block` | 1 | brass, blackened | TODO |
+| `ms-stop-plate` | 1 | brass, blackened | TODO |
+| `vn-ms-stop-plate-screw` | 2 | brass (McMaster-Carr 90114A124) | #2-56 x 1/4 fillister |
+| `vn-thumb-screw` | 1 | steel (McMaster-Carr 91882A221) | #4-40 thumb screw |
 
 : {tbl-colwidths="[40,10,25,25]"}
 
