@@ -471,19 +471,19 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         second_number=2,
     ),
     # MHA-VN-046 guide-lock screws (R9-31, R9-48): seeds -1/-2, then the grid
-    # -3..-8; each 9.525 shank passes the 2.0 lock plate into the guide's
-    # rear through tap.
+    # -3..-8; each 9.525 shank passes the 1.5875 (1/16 sheet) lock plate into
+    # the guide's rear through tap.
     **_numbered_pairs(
         "vn-guide-lock-screw",
         (1, 2, 4, 7),
         "pd-platen-guide",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 7.525),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 7.9375),
     ),
     **_numbered_pairs(
         "vn-guide-lock-screw",
         (3, 5, 6, 8),
         "pd-platen-guide",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 7.525),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 7.9375),
         second_number=2,
     ),
     # MHA-VN-040 #8-32 x 5/8 (vn_transgear_arm_plate_screw_spec; from the top of the

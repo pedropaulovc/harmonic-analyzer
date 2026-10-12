@@ -299,14 +299,15 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
             (f"vn-fillister-screw-{screw_number}", f"pd-platen-guide-{guide_number}")
         )
         assert paper_drive[pair] == pytest.approx(limit)
-    # R9-31: the lock-plate screws are MHA-VN-046 button heads, not fillisters;
-    # R9-48: 3/8 long, 7.525 of each in the guide's through tap.
+    # R9-31: the lock-plate screws are MHA-VN-046 slotted pan heads, not
+    # fillisters; R9-48: 3/8 long through the 1/16 lock sheet, so 7.9375 of
+    # each sits in the guide's through tap.
     lock_receivers = {1: 1, 2: 1, 3: 2, 4: 1, 5: 2, 6: 2, 7: 1, 8: 2}
     for screw_number, guide_number in lock_receivers.items():
         pair = frozenset(
             (f"vn-guide-lock-screw-{screw_number}", f"pd-platen-guide-{guide_number}")
         )
-        assert paper_drive[pair] == pytest.approx(19.378357354767928)
+        assert paper_drive[pair] == pytest.approx(20.440626113418)
 
     summing = _interference_contracts.allowed_interference_pairs("sm-summing")
     assert summing == pytest.approx(
@@ -555,7 +556,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "pd-platen-guide",
                 2.8448,
                 2.261,
-                7.525,
+                7.9375,
             ),
             **_expected_numbered_pairs(
                 "vn-guide-lock-screw",
@@ -563,7 +564,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "pd-platen-guide",
                 2.8448,
                 2.261,
-                7.525,
+                7.9375,
                 second_number=2,
             ),
             # Round 10 transgear: stock #8-32 / #4-40 / #0-80 screws, the

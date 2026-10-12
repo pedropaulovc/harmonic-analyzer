@@ -119,6 +119,32 @@ def test_the_hole_y_text_stays_inside_the_border_and_under_the_plate() -> None:
     assert x + half < drawing.LEFT_EDGE_X  # clear of Hole1X's extension
 
 
+def test_the_plate_is_1_16_sheet_under_its_own_mill_band() -> None:
+    """2026-10-11 (user): the lock is 1/16 in sheet as supplied, McMaster
+    1388K196 (+/-0.005 in); the band is native on Depth@Lock, printed at
+    .XXX with the stock callout above it, and the registry names the sheet."""
+    import inspect
+
+    import _config
+
+    assert pd_guide_lock_spec.LOCK_THICK == pytest.approx(25.4 / 16.0)
+    assert pd_guide_lock_spec.LOCK_THICK_BAND == pytest.approx(0.005 * 25.4)
+    assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Depth"] == 3
+    assert (
+        'set_dimension_symmetric_tolerance(adapter, "Lock", "Depth", LOCK_THICK_BAND)'
+        in inspect.getsource(lock.build)
+    )
+    assert drawing.DIMENSION_CALLOUTS == {
+        "Depth": pd_guide_lock_spec.LOCK_STOCK_CALLOUT
+    }
+    assert "AS SUPPLIED" in pd_guide_lock_spec.LOCK_STOCK_CALLOUT
+    # An above-callout with a line break never prints.
+    assert "\n" not in pd_guide_lock_spec.LOCK_STOCK_CALLOUT
+    spec = _config.parts("pd-guide-lock")
+    assert pd_guide_lock_spec.LOCK_STOCK_SKU in spec["material_specification"]
+    assert "1/16" in spec["material"]
+
+
 def test_part_registry_row_carries_the_title_block_facts() -> None:
     """Stock, finish and quantity live in the title block, not in notes."""
     import _config

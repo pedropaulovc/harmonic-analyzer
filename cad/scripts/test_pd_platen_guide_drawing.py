@@ -201,8 +201,8 @@ def test_front_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
 # can starve the 3/8 lock screws. Recomputed here from the catalogue and the
 # printed bands, not from the build's derived constants.
 _IN = 25.4
-_LOCK_SCREW_LEN_MAX = 0.375 * _IN  # 91255A108; B18.6.3 band +0/-0.03 in
-_LOCK_THICK_MIN = 2.0 - 0.13  # 2.000 at 3 places: title block +/-0.13
+_LOCK_SCREW_LEN_MAX = 0.375 * _IN  # 91792A108; B18.6.3 band +0/-0.03 in
+_LOCK_THICK_MIN = (1.0 / 16.0 - 0.005) * _IN  # 1/16 sheet as supplied, +/-0.005 in
 _GUIDE_DEPTH_MIN = 10.0 - 0.50  # 10.00 +0/-0.50 on the guide sheet
 _BAR_DEPTH_MIN = 9.0 - 0.13  # MHA-PD-007 9.00 +/-0.13
 _LOCK_GAP_FIT_MIN = 0.05  # the faced lock seats (R9-47)
@@ -214,7 +214,7 @@ def test_lock_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
     assert spec.depth_mm == 0.0 and not spec.overrides_mm
     seat_min = min(_GUIDE_DEPTH_MIN, _BAR_DEPTH_MIN + _LOCK_GAP_FIT_MIN)
     tip_reach_max = _LOCK_SCREW_LEN_MAX - _LOCK_THICK_MIN
-    assert seat_min - tip_reach_max == pytest.approx(1.265, abs=1e-9)
+    assert seat_min - tip_reach_max == pytest.approx(0.8555, abs=1e-9)
     assert guide.LOCK_SCREW_TIP_INSIDE_MIN == pytest.approx(seat_min - tip_reach_max)
 
 
