@@ -959,8 +959,7 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         currentModel=Draw(), _attempt=lambda operation, **kwargs: operation()
     )
     monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
-    for helper in (drawing_edge_dimensions, drawing_dimensions):
-        monkeypatch.setattr(helper, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing_edge_dimensions, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(
         drawing_edge_dimensions._sw_type_info, "early_bound_or_flag",
         lambda value, *args: value,
