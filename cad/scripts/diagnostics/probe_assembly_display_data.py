@@ -568,7 +568,9 @@ def preserve_normal_pn_build_inputs(normal_path: str | Path):
         (normal_path.parent / SOURCE_HISTORY_FILENAMES[0]).read_text(encoding="utf-8")
     )
     if not history["complete"]:
-        raise RuntimeError("normal pn source history is incomplete before independent build")
+        raise RuntimeError(
+            "normal pn source history is incomplete before independent build"
+        )
     paths = {
         normal_path,
         dof_manifest_path("pn-pen"),
@@ -709,8 +711,7 @@ async def capture_independent_pn_first_reconcile(
     trial = INDEPENDENT_PN_TRIALS[capture_mode]
     stages = trial.stages
     paths = {
-        stage: normal_path.parent / f"pn-pen-display-{stage}.SLDASM"
-        for stage in stages
+        stage: normal_path.parent / f"pn-pen-display-{stage}.SLDASM" for stage in stages
     }
     manifest = normal_path.parent / trial.history_filename
     model, initial = _untitled_pn_state(adapter)
