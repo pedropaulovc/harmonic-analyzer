@@ -6,7 +6,8 @@ Python descendant (``python -m doit``, ``build.py``, a git textconv or external
 diff helper, a ``cmd /c`` chain, ``uv run``) imports ``sitecustomize`` here at
 startup and refuses the same acts: COM activation of, or binding to,
 ``SldWorks.Application``; a process whose argv or image names SolidWorks or
-its 3DEXPERIENCE launchers; ``os.startfile``, ``ShellExecute`` and the
+its 3DEXPERIENCE launchers; ``os.startfile``, ``ShellExecute``, a ctypes
+binding of a native process launcher (:data:`NATIVE_LAUNCHERS`) and the
 SolidworksMCP start/stop/launch entry points; and dodo's ``_exec_com``. A
 refused child records the refusal in the session log :data:`MARKER` names,
 says why on stderr and exits :data:`REFUSED_EXIT` at once, so no caller can
@@ -67,6 +68,24 @@ LAUNCH_ENTRY_POINTS = {
 }
 # Each takes (application, command line, ...) first.
 PROCESS_CREATORS = {"win32process": ("CreateProcess",)}
+# ctypes symbols that start a process or open a document (a part opens
+# SolidWorks). Resolving one is refused: the call it enables is past every
+# Python-level check.
+NATIVE_LAUNCHERS = frozenset(
+    {
+        "CreateProcessA",
+        "CreateProcessW",
+        "CreateProcessAsUserA",
+        "CreateProcessAsUserW",
+        "CreateProcessWithLogonW",
+        "CreateProcessWithTokenW",
+        "ShellExecuteA",
+        "ShellExecuteW",
+        "ShellExecuteExA",
+        "ShellExecuteExW",
+        "WinExec",
+    }
+)
 
 
 def program(args):
@@ -204,6 +223,10 @@ _AUDITED = frozenset({"subprocess.Popen", "os.system", "os.spawn", "os.exec"})
 def _child_audit(event, args):
     if event == "os.startfile":
         _child_refuse(event, args[0])
+    if event == "ctypes.dlsym":
+        if args[1] in NATIVE_LAUNCHERS:
+            _child_refuse("ctypes", args[1])
+        return
     if event not in _AUDITED:
         return
     if event == "subprocess.Popen":

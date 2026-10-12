@@ -248,6 +248,14 @@ import subprocess
 subprocess.run([r"X:\\launch-guard-test\\never-exists\\SLDWo" + "rks.exe"])
 print("NOT REFUSED")
 """
+# Resolving the symbol is the refused step; the child never calls it, so an
+# unguarded child only prints and exits.
+_CHILD_RESOLVES_A_LAUNCHER = """\
+import ctypes
+
+ctypes.WinDLL("kernel32")["Create" + "ProcessW"]
+print("NOT REFUSED")
+"""
 # A dodo whose COM task reaches a stand-in ``_exec_com``.
 _DODO_WITH_A_COM_TASK = """\
 def _run_subprocess(cmd, label, log_stem=None, *, task=None):
@@ -289,6 +297,15 @@ def test_python_child_binding_solidworks_is_refused(solidworks_child_refusals):
 def test_python_child_launching_solidworks_is_refused(solidworks_child_refusals):
     result = _run_child([sys.executable, "-c", _CHILD_LAUNCHES_SOLIDWORKS])
     _expect_child_refused(solidworks_child_refusals, result, "subprocess.Popen")
+    assert result.returncode == REFUSED_EXIT
+
+
+def test_python_child_resolving_a_process_launcher_is_refused(
+    solidworks_child_refusals,
+):
+    """A name built at runtime meets no argv check; the binding itself is refused."""
+    result = _run_child([sys.executable, "-c", _CHILD_RESOLVES_A_LAUNCHER])
+    _expect_child_refused(solidworks_child_refusals, result, "ctypes")
     assert result.returncode == REFUSED_EXIT
 
 

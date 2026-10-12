@@ -37,22 +37,6 @@ def _load_shared_guard():
 
 
 _guard = _load_shared_guard()
-# ctypes symbols that start a process or open a document (a part opens SolidWorks).
-_NATIVE_LAUNCHERS = frozenset(
-    {
-        "CreateProcessA",
-        "CreateProcessW",
-        "CreateProcessAsUserA",
-        "CreateProcessAsUserW",
-        "CreateProcessWithLogonW",
-        "CreateProcessWithTokenW",
-        "ShellExecuteA",
-        "ShellExecuteW",
-        "ShellExecuteExA",
-        "ShellExecuteExW",
-        "WinExec",
-    }
-)
 _REAL_POPEN = subprocess.Popen
 _REAL_RUN = subprocess.run
 _refused: list[str] = []
@@ -96,7 +80,7 @@ def _audit(event, args):
     and a ctypes binding of a native process or shell launcher.
     """
     if event == "ctypes.dlsym":
-        if args[1] in _NATIVE_LAUNCHERS:
+        if args[1] in _guard.NATIVE_LAUNCHERS:
             _refuse("ctypes", args[1])
     elif event == "os.startfile":
         _refuse("os.startfile", args[0])
