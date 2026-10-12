@@ -16,6 +16,7 @@ import ch_rocker_arm_spec
 import draw_ch_rocker_arm as drawing
 import build_ch_rocker_arm as arm
 from _drawing_layout_check import DrawableRegion
+from _layout_geometry import AnnotationGeometry, Box, Segment, segment_box_distance, text_overlap
 from _drawing_registry import DRAWINGS_BY_NAME
 from dt_cone_pivot_post_installation import MECHANISM_X_SHIFT
 from _hole_spec import blind_cut_dia_mm
@@ -332,11 +333,14 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         return edges[diameter]
 
     monkeypatch.setattr(drawing, "visible_circle_edge", circle_edge)
-    monkeypatch.setattr(
-        drawing, "add_feature_control_frame",
-        lambda *args, **kwargs: frames.append((args, kwargs)),
-    )
-    drawing._add_arc_profiles(adapter, front)
+    native_frames = {"TopRadius": object(), "BottomRadius": object()}
+
+    def add_frame(*args, **kwargs):
+        frames.append((args, kwargs))
+        return native_frames[("TopRadius", "BottomRadius")[len(frames) - 1]]
+
+    monkeypatch.setattr(drawing, "add_feature_control_frame", add_frame)
+    assert drawing._add_arc_profiles(adapter, front) == native_frames
     assert picks == [1600.0, 1632.0]
     assert len(frames) == 2
     scale = drawing._S / 1000.0
@@ -345,7 +349,7 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         ("TopRadius", "BottomRadius"),
         (800.0, 816.0),
         (-110.0, -100.0),
-        ((0.114, 0.228), (0.040, 0.105)),
+        ((0.114, 0.228), (0.020, 0.134)),
         ("0.5", "0"),
     ):
         assert args == (adapter, front)
@@ -367,16 +371,329 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         assert math.hypot(x, y - ch_rocker_arm_spec.CENTER_Y) == pytest.approx(radius)
 
 
-def test_lower_profile_leader_clears_native_ream_callout_corridor() -> None:
-    # R6 native ink: the REAM pivot row spans x104.0..156.1 at y144.4..148.0.
-    # The native frame leader starts 6.4mm left and 3.5mm below its placement.
-    frame = drawing.ARC_PROFILE_FRAME_XY["BottomRadius"]
-    start = (frame[0] - 0.0064, frame[1] - 0.0035)
-    end = drawing._arc_profile_point("BottomRadius")
-    for y in (0.1444, 0.1480):
-        fraction = (y - start[1]) / (end[1] - start[1])
-        x = start[0] + fraction * (end[0] - start[0])
-        assert x < 0.1040 - 0.0017
+_REAM_ROW = Box(0.1040, 0.1444, 0.1561, 0.1480)
+
+
+@pytest.mark.parametrize("junction", [(0.1056, 0.1185), (0.0937, 0.1015)])
+def test_observed_r6_r7_profile_junctions_intersect_ream_row(junction) -> None:
+    """Recorded native junctions, not a side inferred from the frame request."""
+    segment = Segment(*junction, 0.1300, 0.1708, "leader")
+    target = AnnotationGeometry("REAM +0.03", "hole-callout", "front")
+    assert segment_box_distance(segment, _REAM_ROW) == 0.0
+    penetration, _span = text_overlap(segment, target, _REAM_ROW)
+    assert penetration > 0.0036
+
+
+def test_r7_cannot_be_proved_clear_from_a_guessed_left_junction() -> None:
+    guessed = Segment(0.040 - 0.0064, 0.105 - 0.0035, 0.130, 0.1708, "leader")
+    observed = Segment(0.0937, 0.1015, 0.130, 0.1708, "leader")
+    assert segment_box_distance(guessed, _REAM_ROW) > drawing.ARC_PROFILE_TEXT_CLEARANCE_M
+    assert segment_box_distance(observed, _REAM_ROW) == 0.0
+
+
+def test_lower_profile_candidate_predicted_right_junction_clears_ream_row() -> None:
+    """Offline corridor prediction only; R8 must read the actual native route."""
+    assert drawing.ARC_PROFILE_TEXT_CLEARANCE_M == 0.001
+    assert drawing.ARC_PROFILE_FRAME_XY["BottomRadius"] == (0.020, 0.134)
+    assert drawing.ARC_PROFILE_PICK_X_MM["BottomRadius"] == -100.0
+    predicted = Segment(0.0737, 0.1305, 0.1300, 0.1708, "leader")
+    assert segment_box_distance(predicted, _REAM_ROW) > drawing.ARC_PROFILE_TEXT_CLEARANCE_M
+
+
+def _native_line(x0, y0, x1, y1):
+    return [0, 0, 0, 0, x0, y0, 0, x1, y1, 0]
+
+
+class _ClearanceDisplayData:
+    """Method-shaped native reads; the real dump/parser are NOT replaced."""
+
+    def __init__(self, texts, lines):
+        self.texts, self.lines = texts, lines
+
+    def GetLineCount(self):  # noqa: N802
+        return len(self.lines)
+
+    def GetLineAtIndex3(self, index):  # noqa: N802
+        return self.lines[index]
+
+    def GetTextCount(self):  # noqa: N802
+        return len(self.texts)
+
+    def GetTextAtIndex(self, index):  # noqa: N802
+        return self.texts[index]["t"]
+
+    def GetTextPositionAtIndex(self, index):  # noqa: N802
+        return self.texts[index]["pos"]
+
+    def GetTextHeightAtIndex(self, index):  # noqa: N802
+        return self.texts[index]["h"]
+
+    def GetTextRefPositionAtIndex(self, index):  # noqa: N802
+        return self.texts[index].get("ref", 1)
+
+    def GetTextAngleAtIndex(self, index):  # noqa: N802
+        return self.texts[index].get("ang", 0.0)
+
+    def GetTextFontAtIndex(self, index):  # noqa: N802
+        return "Arial"
+
+    def GetTextLineSpacingAtIndex(self, index):  # noqa: N802
+        return 0.0
+
+    def GetTextInBoxWidthAtIndex(self, index):  # noqa: N802
+        return 0.0
+
+    def __getattr__(self, name):
+        # Unused primitive classes have an authoritative zero count, not None.
+        if name in {
+            "GetArcCount", "GetArrowHeadCount", "GetPolyLineCount",
+            "GetPolygonCount", "GetTriangleCount", "GetEllipseCount",
+        }:
+            return lambda: 0
+        raise AttributeError(name)
+
+
+class _ClearanceAnnotation:
+    OwnerType, Visible, Layer = 0, 1, ""
+
+    def __init__(self, name, position, data, *, leaders=(), kind=5):
+        self.name, self.position, self.data = name, position, data
+        self.leaders, self.kind = list(leaders), kind
+
+    def GetName(self):  # noqa: N802
+        return self.name
+
+    def GetType(self):  # noqa: N802
+        return self.kind
+
+    def GetPosition(self):  # noqa: N802
+        return self.position
+
+    def GetDisplayData(self):  # noqa: N802
+        return self.data
+
+    def GetLeaderCount(self):  # noqa: N802
+        return len(self.leaders)
+
+    def GetLeaderPointsAtIndex(self, index):  # noqa: N802
+        return self.leaders[index]
+
+    def GetSpecificAnnotation(self):  # noqa: N802
+        return SimpleNamespace(IsHoleCallout=lambda: True)
+
+
+@pytest.fixture
+def native_profile_clearance(monkeypatch):
+    import _drawing_layout_audit
+
+    monkeypatch.setattr(_drawing_layout_audit, "_early_bound", lambda obj, _iface: obj)
+    logs = []
+    monkeypatch.setattr(drawing._telemetry, "info", logs.append)
+
+    def frame(name, xy, points):
+        x, y = xy
+        corners = [(x, y), (x + 0.050, y), (x + 0.050, y - 0.007), (x, y - 0.007)]
+        lines = [_native_line(*a, *b) for a, b in zip(corners, corners[1:] + corners[:1])]
+        data = _ClearanceDisplayData(
+            [{"t": "PROFILE", "pos": [x + 0.001, y - 0.004, 0.0], "h": 0.002}],
+            lines,
+        )
+        return _ClearanceAnnotation(name, (*xy, 0.0), data, leaders=[points])
+
+    top = frame(
+        "DetailTop", (0.114, 0.228),
+        [0.114, 0.2245, 0, 0.1076, 0.2245, 0, 0.125, 0.184, 0],
+    )
+    bottom = frame(
+        "DetailBottom", (0.020, 0.134),
+        [0.070, 0.1305, 0, 0.0737, 0.1305, 0, 0.130, 0.1708, 0],
+    )
+    ream = _ClearanceAnnotation(
+        "PivotReam", (0.13005, 0.1462, 0),
+        _ClearanceDisplayData(
+            [{"t": "REAM +0.03", "pos": [0.104, 0.1444, 0], "h": 0.0036}],
+            [_native_line(0.104, 0.1444, 0.1561, 0.1444)],
+        ),
+        kind=4,
+    )
+    annotations = [top, bottom, ream]
+    front = SimpleNamespace(GetAnnotations=lambda: annotations)
+    profiles = {
+        "TopRadius": SimpleNamespace(GetAnnotation=lambda: top),
+        "BottomRadius": SimpleNamespace(GetAnnotation=lambda: bottom),
+    }
+    return SimpleNamespace(
+        adapter=object(), front=front, profiles=profiles, top=top, bottom=bottom,
+        ream=ream, annotations=annotations, logs=logs,
+    )
+
+
+def test_native_profile_guard_logs_actual_position_frame_and_leaders(native_profile_clearance):
+    case = native_profile_clearance
+    case.bottom.position = (0.021, 0.135, 0.0)  # request != native readback
+    drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
+    text = "\n".join(case.logs)
+    assert "requested_frame_mm=(20.0, 134.0)" in text
+    assert "actual_GetPosition_mm=(21.0, 135.0, 0.0)" in text
+    assert "native_frame_ink_bbox_mm=" in text
+    assert "native_leader_points_mm=" in text
+    assert "landing_mm=[(130.0, 170.8, 0.0)]" in text
+    assert "minimum_clearance_mm=" in text
+    assert "required_clearance_mm=1.000" in text
+    assert "PivotReam" in text
+
+
+@pytest.mark.parametrize("frame_request,junction", [
+    ((0.112, 0.122), (0.1056, 0.1185)),
+    ((0.040, 0.105), (0.0937, 0.1015)),
+])
+def test_native_profile_guard_refuses_observed_crossings(
+    native_profile_clearance, monkeypatch, frame_request, junction,
+):
+    case = native_profile_clearance
+    monkeypatch.setitem(drawing.ARC_PROFILE_FRAME_XY, "BottomRadius", frame_request)
+    case.bottom.position = (*frame_request, 0)
+    case.bottom.leaders = [[
+        junction[0] - 0.003, junction[1], 0, *junction, 0, 0.130, 0.1708, 0,
+    ]]
+    with pytest.raises(RuntimeError) as exc:
+        drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
+    message = str(exc.value)
+    for evidence in (
+        "BottomRadius", "PivotReam", "requested_frame_mm=", "actual_GetPosition_mm=",
+        "native_leader_points_mm=", "bbox_mm=[104.0,144.4]..[156.1,148.0]mm",
+        "minimum_clearance_mm=0.000", "penetration_mm=", "native_segment=",
+    ):
+        assert evidence in message
+    assert any("native_frame_ink_bbox_mm=" in log for log in case.logs)
+
+
+@pytest.mark.parametrize("gap,passes", [(0.001, True), (0.000999, False), (0.001001, True)])
+def test_native_profile_guard_enforces_one_mm_minimum(native_profile_clearance, gap, passes):
+    case = native_profile_clearance
+    # Horizontal native route below a real foreign callout: no intersection.
+    y = 0.1444 - gap
+    case.bottom.leaders = [[0.100, y, 0, 0.103, y, 0, 0.160, y, 0]]
+    if passes:
+        drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
+    else:
+        with pytest.raises(RuntimeError, match="minimum_clearance_mm=0.999"):
+            drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
+    assert any("penetration_mm=0.000" in log for log in case.logs)
+
+
+def test_native_profile_guard_checks_non_ream_foreign_callout(native_profile_clearance):
+    case = native_profile_clearance
+    case.ream.name = "NativeRodCallout"
+    case.ream.data.texts = [{"t": "DRILL", "pos": [0.108, 0.156, 0], "h": 0.003}]
+    case.ream.data.lines = [_native_line(0.108, 0.156, 0.125, 0.156)]
+    with pytest.raises(RuntimeError, match="NativeRodCallout"):
+        drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
+
+
+@pytest.mark.parametrize("defect", [
+    "missing-frame", "missing-annotation", "empty-view", "refused-view",
+    "missing-leader", "refused-leader", "short-leader", "nonfinite-leader",
+    "zero-segment", "missing-position", "invalid-position", "missing-frame-lines",
+    "missing-other-text", "invalid-other-height", "invalid-other-position",
+    "unknown-other-anchor", "invalid-other-line", "refused-other-display",
+    "refused-position", "wrong-frame-kind", "wrong-frame-owner", "hidden-frame",
+    "duplicate-frame-name", "zero-frame-lines",
+])
+def test_native_profile_guard_fails_closed(native_profile_clearance, defect):
+    case = native_profile_clearance
+    if defect == "missing-frame":
+        del case.profiles["BottomRadius"]
+    elif defect == "missing-annotation":
+        case.profiles["BottomRadius"].GetAnnotation = lambda: None
+    elif defect == "empty-view":
+        case.front.GetAnnotations = lambda: []
+    elif defect == "refused-view":
+        case.front.GetAnnotations = lambda: None
+    elif defect == "missing-leader":
+        case.bottom.leaders = []
+    elif defect == "refused-leader":
+        case.bottom.GetLeaderPointsAtIndex = lambda _index: None
+    elif defect == "short-leader":
+        case.bottom.leaders = [[0.02, 0.134, 0, 0.03]]
+    elif defect == "nonfinite-leader":
+        case.bottom.leaders[0][3] = float("nan")
+    elif defect == "zero-segment":
+        case.bottom.leaders[0][:3] = case.bottom.leaders[0][3:6]
+    elif defect == "missing-position":
+        case.bottom.position = None
+    elif defect == "invalid-position":
+        case.bottom.position = (float("inf"), 0.134, 0)
+    elif defect == "missing-frame-lines":
+        case.bottom.data.lines = []
+    elif defect == "missing-other-text":
+        case.ream.data.texts = []
+    elif defect == "invalid-other-height":
+        case.ream.data.texts[0]["h"] = 0.0
+    elif defect == "invalid-other-position":
+        case.ream.data.texts[0]["pos"] = [float("nan"), 0.1444, 0]
+    elif defect == "unknown-other-anchor":
+        case.ream.data.texts[0]["ref"] = -1
+    elif defect == "invalid-other-line":
+        case.ream.data.lines = [[1, 2]]
+    elif defect == "refused-other-display":
+        case.ream.GetDisplayData = lambda: None
+    elif defect == "refused-position":
+        def refused_position():
+            raise RuntimeError("native COM refused GetPosition")
+        case.bottom.GetPosition = refused_position
+    elif defect == "wrong-frame-kind":
+        case.bottom.kind = 7
+    elif defect == "wrong-frame-owner":
+        case.bottom.OwnerType = 1
+    elif defect == "hidden-frame":
+        case.bottom.Visible = 3
+    elif defect == "duplicate-frame-name":
+        case.bottom.name = case.top.name
+    elif defect == "zero-frame-lines":
+        case.bottom.data.lines = [_native_line(0.020, 0.134, 0.020, 0.134)]
+    with pytest.raises(RuntimeError, match="rocker arc-profile native clearance failed") as exc:
+        drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
+    assert "BottomRadius" in str(exc.value)
+    assert case.logs or defect in ("empty-view", "refused-view")
+
+
+def test_native_profile_guard_excludes_only_its_own_frame_text(native_profile_clearance):
+    case = native_profile_clearance
+    case.bottom.data.texts[0]["pos"] = [0.070, 0.1305, 0]
+    drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
+    case.bottom.leaders = [[0.110, 0.224, 0, 0.113, 0.224, 0, 0.130, 0.224, 0]]
+    with pytest.raises(RuntimeError, match="DetailTop"):
+        drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
+
+
+@pytest.mark.parametrize("read,answer", [
+    ("GetName", ""),
+    ("GetName", lambda: "method-shaped answer"),
+    ("GetPosition", [0.02, 0.134]),
+    ("GetLeaderCount", -1),
+])
+def test_native_profile_guard_refuses_invalid_native_scalar_contracts(
+    native_profile_clearance, read, answer,
+):
+    case = native_profile_clearance
+    setattr(case.bottom, read, lambda: answer)
+    with pytest.raises(RuntimeError, match="rocker arc-profile native clearance failed"):
+        drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
+
+
+def test_native_profile_guard_is_after_rebuild_and_before_export() -> None:
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    calls = [
+        (node.func.id, node.lineno)
+        for node in ast.walk(build)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    ]
+    guard = next(line for name, line in calls if name == "_require_arc_profile_clearance")
+    layout = next(line for name, line in calls if name == "check_drawing_layout")
+    export = next(line for name, line in calls if name == "finalize_drawing")
+    assert max(line for name, line in calls if name == "rebuild_drawing") < guard < layout < export
 
 
 def test_profile_zone_mirror_station_envelopes_and_template_aim() -> None:

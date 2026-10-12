@@ -180,6 +180,25 @@ frames and no datums.
    acceptance about the 8.25-height aim is separate from the part's 0.5 zone.
    This is a drawing-tolerance cutover; model geometry remains unchanged.
 
+   Frame placement is a sheet-layout decision, not part tolerance. The lower
+   frame is requested at (20, 134) sheet mm, keeping its −100 mm model pick
+   and the upper frame unchanged. The native bent leader uses `SIDE_SMART`:
+   its junction may be on either side, so a requested frame origin or guessed
+   frame width does not prove a clear route. After all front-view callouts and
+   the final rebuild, the recipe reads the retained native frames and every
+   other front-view callout through the existing PDF-free audit readers.
+   It logs requested/actual `GetPosition`, the native frame-body ink box,
+   leader points and landing, and the measured minimum segment-to-text-box
+   clearance on success as well as failure. Every profile leader must have
+   at least **1 mm of sheet-space air** to every other callout's text box;
+   its own frame text is excluded. Missing, refused or invalid necessary
+   geometry fails closed before export, as does a crossing or sub-1 mm gap,
+   with the offending callout, box, segment and penetration in sheet mm.
+   These boxes reuse the audit's native text positions/heights and row-width
+   model; they are not exact exported glyph extents. The final enforced PDF
+   ink audit remains in force. Offline R6/R7 geometry regressions establish
+   the detector, and the new corridor prediction is not native-seat proof.
+
    The same scoped exception puts the outline on the views: native overall
    width, radial end-land length and angle, and taper-to-lower-arc intersection,
    read back against the existing spec geometry. The model dimensions

@@ -64,6 +64,7 @@ from _drawing_gdt import add_datum_feature, add_feature_control_frame
 # view that imports its dimension.
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
+from _drawing_layout_audit import _Reader, _dump_annotation
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
@@ -73,6 +74,12 @@ from _drawing_selection import _select_view_entity
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _gear_drawing_entities import visible_circle_edge
+from _layout_audit import (
+    _registered_leaders,
+    annotation_geometry,
+    calibrate_sheet_advance,
+)
+from _layout_geometry import segment_box_distance, text_overlap, union_boxes
 from _hole_spec import blind_cut_dia_mm, drill_process
 from _paths import CAD_ROOT
 from _session import run_build
@@ -184,16 +191,20 @@ ARC_PROFILE_OUTSIDE_MM = {
 # would put one of the zones on the wrong side of its basic arc.
 ARC_PROFILE_FRAME_XY = {
     "TopRadius": (0.114, 0.228),
-    "BottomRadius": (0.040, 0.105),
+    "BottomRadius": (0.020, 0.134),
 }
 ARC_PROFILE_PICK_X_MM = {"TopRadius": -110.0, "BottomRadius": -100.0}
+# Sheet-layout clearance, NOT a manufacturing tolerance. SIDE_SMART may put
+# the native junction on either frame edge; prove its rebuilt route, not a
+# junction inferred from the requested top-left or a fixed frame width.
+ARC_PROFILE_TEXT_CLEARANCE_M = 0.001
 
 # General notes. The linked block renders ~4.1 mm a line, so its 18 lines run
 # ~75 mm. Anchored by its top at y 0.082, the last two ran past the bottom
 # border into the zone band (r743-p1s-B2 render). The block is now seated from
 # its MEASURED extent: rendered bottom NOTES_BORDER_CLEARANCE above the
 # sheet's drawable region, left edge on NOTES_LEFT. A block that then reaches
-# NOTES_CEILING, under the front view's O6.50 text (y ~0.117), fails the build.
+# NOTES_CEILING, reserved below the front-view callouts, fails the build.
 NOTES_LEFT = 0.020
 NOTES_BORDER_CLEARANCE = 0.003
 NOTES_CEILING = 0.110
@@ -943,11 +954,12 @@ def _arc_profile_point(name: str) -> tuple[float, float]:
     return _sheet_xy(x, centre_y - math.sqrt(radius**2 - x**2))
 
 
-def _add_arc_profiles(adapter: Any, front: Any) -> None:
-    """Attach separate native frames: Ⓤ0.5 top, Ⓤ0 bottom, total zone 0.5."""
+def _add_arc_profiles(adapter: Any, front: Any) -> dict[str, Any]:
+    """Attach and retain native frames: Ⓤ0.5 top, Ⓤ0 bottom, total zone 0.5."""
+    profiles = {}
     for name, radius in (("TopRadius", R_TOP), ("BottomRadius", R_BOTTOM)):
         edge = visible_circle_edge(adapter, front, 2.0 * radius)
-        add_feature_control_frame(
+        profiles[name] = add_feature_control_frame(
             adapter,
             front,
             edge_entity=edge,
@@ -959,7 +971,190 @@ def _add_arc_profiles(adapter: Any, front: Any) -> None:
             datums=("A", "B", "C"),
             label=f"arc-system {name} profile",
         )
+    return profiles
 
+
+def _arc_callout_geometry(record: dict[str, Any], advance: float) -> Any:
+    """Validate required native data before the audit's tolerant geometry parser."""
+    position = record.get("pos", ())
+    if len(position) != 3 or not all(math.isfinite(v) for v in position):
+        raise ValueError(f"invalid native GetPosition={position!r}")
+    display = record.get("display") or {}
+    texts = display.get("texts", ())
+    if not texts or not any(item["t"].strip() for item in texts):
+        raise ValueError("missing native callout text")
+    for item in texts:
+        if (
+            len(item["pos"]) != 3
+            or not all(math.isfinite(v) for v in item["pos"])
+            or not math.isfinite(item["h"]) or item["h"] <= 0.0
+            or not math.isfinite(item["ang"])
+            or item["ref"] not in range(6)
+        ):
+            raise ValueError(f"invalid native text geometry={item!r}")
+    for key, rows in display.items():
+        if key == "texts":
+            continue
+        for row in rows:
+            if not all(math.isfinite(v) for v in row):
+                raise ValueError(f"invalid native {key} geometry={row!r}")
+            if key == "lines" and len(row) != 10:
+                raise ValueError(f"invalid native line geometry={row!r}")
+    geometry = annotation_geometry(record, owner="front", advance=advance)
+    if geometry is None or not geometry.text_boxes:
+        raise ValueError("missing native callout text bbox")
+    for box in geometry.text_boxes:
+        if (
+            not all(math.isfinite(v) for v in (box.xmin, box.ymin, box.xmax, box.ymax))
+            or box.xmin >= box.xmax or box.ymin >= box.ymax
+        ):
+            raise ValueError(f"invalid native callout text bbox={box!r}")
+    return geometry
+
+
+def _require_arc_profile_clearance(
+    adapter: Any, front: Any, profiles: dict[str, Any]
+) -> None:
+    """After the final rebuild, prove native profile leaders clear other callouts.
+
+    This is PDF-free: the final enforced ink audit remains authoritative for
+    printed glyphs. Native text positions/heights and the audit's existing row
+    width model give an early refusal, not a claim of exact PDF text widths.
+    """
+    reader = _Reader(adapter)
+    records = []
+    profile_names = {}
+    problems = []
+    for name in ARC_PROFILE_FRAME_XY:
+        try:
+            gtol = reader.bind(profiles.get(name), "IGtol")
+            if gtol is None:
+                raise ValueError("missing native IGtol")
+            annotation = reader.bind(reader.need(lambda: gtol.GetAnnotation()), "IAnnotation")
+            if annotation is None:
+                raise ValueError("missing native IAnnotation")
+            native_name = reader.need(lambda: annotation.GetName(), "")
+            if type(native_name) is not str or not native_name:
+                raise ValueError(f"invalid native annotation name={native_name!r}")
+            profile_names[name] = native_name
+        except (TypeError, ValueError) as exc:
+            problems.append(f"arc-system {name} profile: {exc}")
+    if len(set(profile_names.values())) != len(profile_names):
+        problems.append("native arc-profile frames have duplicate annotation names")
+    try:
+        view = reader.bind(front, "IView")
+        raw_annotations = reader.need(lambda: view.GetAnnotations(), ())
+        for raw in raw_annotations:
+            try:
+                record = _dump_annotation(reader, raw)
+                if record is None:
+                    problems.append("front-view annotation could not be read")
+                else:
+                    records.append(record)
+            except (TypeError, ValueError, OverflowError) as exc:
+                bound = reader.bind(raw, "IAnnotation")
+                label = reader.need(lambda: bound.GetName(), "<unreadable>")
+                problems.append(f"front-view callout {label!r}: invalid native readback: {exc}")
+    except (TypeError, ValueError, OverflowError) as exc:
+        problems.append(f"invalid native front-view readback: {exc}")
+
+    def mm(values: Any) -> tuple[float, ...]:
+        return tuple(round(value * 1000.0, 3) for value in values)
+
+    # Log every available native read before any refusal, on success too.
+    for name in ARC_PROFILE_FRAME_XY:
+        matches = [r for r in records if r.get("name") == profile_names.get(name)]
+        if len(matches) != 1:
+            problems.append(f"arc-system {name} profile: expected one native front-view frame, got {len(matches)}")
+        for record in matches:
+            _telemetry.info(
+                f"arc-system {name} profile native readback: "
+                f"requested_frame_mm={mm(ARC_PROFILE_FRAME_XY[name])!r}, "
+                f"actual_GetPosition_mm={mm(record.get('pos', ()))!r}, "
+                f"native_leader_points_mm={[mm(p) for p in record.get('leaders', ())]!r}, "
+                f"landing_mm={[mm(p[-3:]) for p in record.get('leaders', ())]!r}"
+            )
+    refused = reader.take_errors()
+    if refused:
+        problems.append(f"native COM reads refused: {refused!r}")
+    geometries = {}
+    try:
+        advance = calibrate_sheet_advance(records)
+        for record in records:
+            if record.get("owner_type") == 2 or record.get("visible") in (2, 3):
+                continue
+            # Construction marks carry no callout text; every other annotation
+            # must be measurable, rather than quietly dropping a foreign box.
+            if record.get("type") in (1, 13, 15):
+                continue
+            try:
+                geometries[id(record)] = _arc_callout_geometry(record, advance)
+            except (KeyError, TypeError, ValueError, OverflowError) as exc:
+                problems.append(f"front-view callout {record.get('name')!r}: {exc}")
+    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+        problems.append(f"invalid native text calibration: {exc}")
+    measured = []
+    for name in ARC_PROFILE_FRAME_XY:
+        matches = [r for r in records if r.get("name") == profile_names.get(name)]
+        if len(matches) != 1:
+            continue
+        record = matches[0]
+        source = geometries.get(id(record))
+        context = (
+            f"arc-system {name} profile requested_frame_mm={mm(ARC_PROFILE_FRAME_XY[name])!r}, "
+            f"actual_GetPosition_mm={mm(record.get('pos', ()))!r}, "
+            f"native_leader_points_mm={[mm(p) for p in record.get('leaders', ())]!r}"
+        )
+        leaders = record.get("leaders", ())
+        if (
+            record.get("type") != 5 or record.get("owner_type") != 0
+            or source is None or len(leaders) != 1
+            or any(len(p) != 9 or not all(math.isfinite(v) for v in p) for p in leaders)
+        ):
+            problems.append(f"{context}: missing/invalid native bent-profile geometry")
+            continue
+        segments = _registered_leaders(record)
+        if any(segment.length <= 0.0 for segment in segments):
+            problems.append(f"{context}: invalid zero-length native leader segment")
+            continue
+        frame_lines = [
+            s for s in source.segments
+            if s.role not in ("leader", "arrow") and s.length > 0.0
+        ]
+        frame_box = union_boxes([*source.text_boxes, *(s.box() for s in frame_lines)])
+        if not frame_lines or frame_box is None:
+            problems.append(f"{context}: missing native frame ink bbox")
+            continue
+        context += f", native_frame_ink_bbox_mm={frame_box.format_mm()}"
+        _telemetry.info(context)
+        distances = [
+            (segment_box_distance(segment, box), target, box, segment)
+            for other in records if other is not record
+            for target in (geometries.get(id(other)),) if target is not None
+            for box in target.text_boxes for segment in segments
+        ]
+        if not distances:
+            problems.append(f"{context}: missing other native front-view callout bboxes")
+            continue
+        distance, target, box, segment = min(distances, key=lambda item: item[0])
+        penetration, _span = text_overlap(segment, target, box)
+        detail = (
+            f"{context}, minimum_clearance_mm={distance * 1000.0:.3f}, "
+            f"required_clearance_mm={ARC_PROFILE_TEXT_CLEARANCE_M * 1000.0:.3f}, "
+            f"offending_callout={target.label!r}, bbox_mm={box.format_mm()}, "
+            f"native_segment={segment.format_mm()}, penetration_mm={penetration * 1000.0:.3f}"
+        )
+        _telemetry.info(detail)
+        measured.append(detail)
+        if distance < ARC_PROFILE_TEXT_CLEARANCE_M and not math.isclose(
+            distance, ARC_PROFILE_TEXT_CLEARANCE_M, rel_tol=0.0, abs_tol=1e-12
+        ):
+            problems.append(detail)
+    if problems:
+        raise RuntimeError(
+            "rocker arc-profile native clearance failed:\n"
+            + "\n".join(problems + [d for d in measured if d not in problems])
+        )
 
 
 def _note_extent(adapter: Any, note: Any) -> tuple[float, float, float, float]:
@@ -1228,7 +1423,7 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         label="rod-pin hole position",
     )
-    _add_arc_profiles(adapter, front)
+    arc_profiles = _add_arc_profiles(adapter, front)
 
     notes = add_property_linked_note(
         adapter, "Manufacturing Notes", NOTES_LEFT, NOTES_CEILING
@@ -1237,6 +1432,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", *ISO_CAPTION_XY)
     # The shared gate: no overlaps, border crossings or leader crossings.
     rebuild_drawing(adapter, label="rocker-arm layout audit")
+    _require_arc_profile_clearance(adapter, front, arc_profiles)
     check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
 
     return await finalize_drawing(
