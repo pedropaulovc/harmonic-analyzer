@@ -1628,13 +1628,26 @@ def test_missing_config_points_at_credentials_issue(tmp_path):
 @pytest.mark.parametrize(
     "admission",
     [
-        None, "", "{not json", "null", "true", "42", '"part:pen_rod"',
-        '{"part:pen_rod": true}', "[]", '["part:other"]',
-        '["part:pen_rod:child"]', '["part:*"]',
-        '["part:pen_rod", null]', '["part:pen_rod", 1]',
-        '["part:pen_rod", true]', '["part:pen_rod", []]',
-        '["part:pen_rod", {}]', '["part:pen_rod", ""]',
-        '["part:pen_rod", " \\t"]', '[" part:pen_rod "]',
+        None,
+        "",
+        "{not json",
+        "null",
+        "true",
+        "42",
+        '"part:pen_rod"',
+        '{"part:pen_rod": true}',
+        "[]",
+        '["part:other"]',
+        '["part:pen_rod:child"]',
+        '["part:*"]',
+        '["part:pen_rod", null]',
+        '["part:pen_rod", 1]',
+        '["part:pen_rod", true]',
+        '["part:pen_rod", []]',
+        '["part:pen_rod", {}]',
+        '["part:pen_rod", ""]',
+        '["part:pen_rod", " \\t"]',
+        '[" part:pen_rod "]',
     ],
 )
 def test_run_leaf_without_exact_preflight_admission_is_locally_refused(
@@ -1651,9 +1664,17 @@ def test_run_leaf_without_exact_preflight_admission_is_locally_refused(
         pytest.fail("unadmitted leaf touched the farm boundary")
 
     for name in (
-        "_dispatch", "_record_request", "_record_json", "_rpc_update",
-        "_connect_client", "load_config", "submitter", "_required_build_id",
-        "leaf_timeout_s", "workflow_id", "LeafRequest",
+        "_dispatch",
+        "_record_request",
+        "_record_json",
+        "_rpc_update",
+        "_connect_client",
+        "load_config",
+        "submitter",
+        "_required_build_id",
+        "leaf_timeout_s",
+        "workflow_id",
+        "LeafRequest",
     ):
         monkeypatch.setattr(_farm, name, forbidden)
     monkeypatch.setattr(_farm._telemetry, "span", forbidden)
@@ -1688,7 +1709,9 @@ def test_run_leaf_reads_current_admission_in_nested_environment(monkeypatch):
         assert _farm.run_leaf("check:math", None) is result
     assert _farm.run_leaf("part:pen_rod", "k" * 64) is result
     assert [task for task, _ in dispatched] == [
-        "part:pen_rod", "check:math", "part:pen_rod",
+        "part:pen_rod",
+        "check:math",
+        "part:pen_rod",
     ]
 
 

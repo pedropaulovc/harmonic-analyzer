@@ -214,10 +214,28 @@ explicit way to stop a run, `-Cancel` (see
   any uncommitted change, untracked file or moved submodule in `-Worktree`
   (`Worktree has uncommitted changes; …`, listing the paths) rather than
   silently leave it out of the build.
-- **A protocol-compatible pool checkout** at `-PoolHome`, holding `farm.py`, and
-  Azure credentials for the cache (`az login`; `off` is refused).
-  Preflight checks every would-be leaf in the requested closure with that checkout's
-  `agent.protocol.leaf_admitted`; refused tasks and prefixes exit 2 before joining the FIFO.
+- **A protocol- and identity-compatible pool checkout** at `-PoolHome`, holding
+  `farm.py`, `pyproject.toml` and `agent/protocol.py`, plus Azure credentials for
+  the cache (`az login`; `off` is refused).
+  Preflight checks every would-be leaf in the entire requested closure with
+  that checkout's authoritative `agent.protocol.leaf_admitted`; refused tasks
+  and prefixes exit 2 before joining the FIFO. Preflight normalizes PoolHome's
+  full `agent_identity` with the pool's own `agent_identity_tag` and compares
+  every current worker's reported `agent_version` tag in the existing fleet
+  query. Mixed, missing or mismatching tags also exit 2; check out the deployed
+  pool release at PoolHome, or finish the rollout before submitting.
+  This is deliberately conservative for doit `-s`/`--single` and cache hits:
+  the entire requested closure is prechecked, even when some leaves would not
+  execute.
+  After successful preflight, the parent exports the admitted label set as
+  `HARMONIC_FARM_ADMITTED_LEAVES` only while executing the doit command in its
+  producer context, restores the prior value afterward, and lets workers
+  inherit it. Actual `run_leaf(task, cache_key)` dispatch checks that set before
+  any request, span/config/identity lookup or reservation. A missing or invalid
+  set, or a task absent from it, raises a local `RuntimeError` naming the task
+  and its lack of preflight admission; the guard uses no copied prefix list.
+  The worker independently limits its exported graph to the build/release
+  closure; preflight admission does not enforce that restriction.
 - **A log directory outside every Git worktree.** An explicit
   `HARMONIC_AGENT_SCRATCHPAD` uses
   `<root>\harmonic-analyzer\farm-runs`. For an OMP persistent process, when

@@ -443,6 +443,16 @@ def _require_leaf_admission(
     if not tasks:
         return [], None
     pool = _pool_home().resolve()
+    missing = [
+        str(path.relative_to(pool))
+        for path in (pool / "agent" / "protocol.py", pool / "pyproject.toml")
+        if not path.is_file()
+    ]
+    if missing:
+        raise FarmPreflightError(
+            f"PoolHome {pool} is missing required admission files: "
+            + ", ".join(missing)
+        )
     # Load the selected checkout's exact file in the pool's environment: its
     # namespace package must not lose to an unrelated installed ``agent`` package.
     program = (
@@ -466,14 +476,26 @@ def _require_leaf_admission(
         "}))\n"
     )
     argv = [
-        "uv", "run", "--frozen", "--project", str(pool),
-        "python", "-c", program, str(pool),
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        str(pool),
+        "python",
+        "-c",
+        program,
+        str(pool),
     ]
     env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
     try:
         result = subprocess.run(
-            argv, cwd=REPO_ROOT, env=env, input=json.dumps(tasks),
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            argv,
+            cwd=pool,
+            env=env,
+            input=json.dumps(tasks),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
         )
     except OSError as exc:
         raise FarmPreflightError(
@@ -498,8 +520,10 @@ def _require_leaf_admission(
     if (
         not isinstance(refused, list)
         or any(not isinstance(task, str) or task not in tasks for task in refused)
-        or not isinstance(identity, str) or not identity
-        or not isinstance(version, str) or not version
+        or not isinstance(identity, str)
+        or not identity
+        or not isinstance(version, str)
+        or not version
     ):
         raise FarmPreflightError("pool leaf admission returned an invalid response")
     if refused:

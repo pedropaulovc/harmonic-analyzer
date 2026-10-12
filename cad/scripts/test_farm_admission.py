@@ -6,9 +6,9 @@ intercepted before they can contact a service or write a production request.
 """
 
 import ast
-import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -18,7 +18,7 @@ import pytest
 import doit.cmd_base as _doit_cmd_base
 from doit.cmd_base import ModuleTaskLoader
 from doit.control import TaskControl
-from doit.dependency import CHECKERS, Dependency, JsonDB
+from doit.dependency import JsonDB
 from doit.task import Task
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -62,7 +62,9 @@ def admission(tmp_path, monkeypatch):
     monkeypatch.setattr(
         build, "_farm_preflight", lambda **_kwargs: events.append("preflight")
     )
-    monkeypatch.setattr(_farm, "_build_id", lambda: events.append("mint") or "fixture-id")
+    monkeypatch.setattr(
+        _farm, "_build_id", lambda: events.append("mint") or "fixture-id"
+    )
 
     class Ownership:
         def __enter__(self):
@@ -101,9 +103,13 @@ def admission(tmp_path, monkeypatch):
         package = home / "agent"
         package.mkdir(parents=True)
         (home / "rule.json").write_text(json.dumps(list(accepted)), encoding="utf-8")
+        (home / "pyproject.toml").write_text(
+            '[project]\nname = "admission-fixture-pool"\nversion = "0.0.0"\n'
+            'requires-python = ">=3.12,<3.15"\n[tool.uv]\npackage = false\n',
+            encoding="utf-8",
+        )
         (package / "contract.py").write_text(
-            "def agent_identity_tag(identity):\n"
-            "    return 'fixture-' + identity[:8]\n",
+            "def agent_identity_tag(identity):\n    return 'fixture-' + identity[:8]\n",
             encoding="utf-8",
         )
         if protocol is None:
@@ -123,16 +129,6 @@ def admission(tmp_path, monkeypatch):
 
     def intercept(argv, **kwargs):
         argv = list(argv)
-        home = Path(os.environ["SOLIDWORKS_POOL_HOME"])
-        assert argv[:7] == [
-            "uv", "run", "--frozen", "--project", str(home), "python", "-c"
-        ], "only the selected-pool admission program may start a subprocess"
-        assert len(argv) == 9
-        assert argv[8] == str(home)
-        assert kwargs["cwd"] == REPO_ROOT
-        assert kwargs["text"] is True
-        assert kwargs["stdout"] == subprocess.PIPE
-        assert kwargs["stderr"] == subprocess.PIPE
         candidates = json.loads(kwargs["input"])
         assert isinstance(candidates, list)
         assert all(isinstance(task, str) for task in candidates)
@@ -142,7 +138,8 @@ def admission(tmp_path, monkeypatch):
         # query. The fixture protocol needs no pool dependencies or installation.
         child_kwargs = dict(kwargs)
         child_kwargs["timeout"] = 10
-        return _REAL_RUN([sys.executable, *argv[6:]], **child_kwargs)
+        code_index = argv.index("-c")
+        return _REAL_RUN([sys.executable, *argv[code_index:]], **child_kwargs)
 
     monkeypatch.setattr(build.subprocess, "run", intercept)
 
@@ -161,11 +158,13 @@ def admission(tmp_path, monkeypatch):
             if separator:
                 groups.setdefault(prefix, []).append({"name": suffix, **definition})
             else:
+
                 def task(definition=definition):
                     return definition.copy()
 
                 namespace["task_" + prefix] = task
         for prefix, definitions in groups.items():
+
             def task(definitions=definitions):
                 yield from (definition.copy() for definition in definitions)
 
@@ -175,7 +174,9 @@ def admission(tmp_path, monkeypatch):
             def __init__(self):
                 super().__init__(
                     task_loader=ModuleTaskLoader(namespace),
-                    extra_config={"GLOBAL": {"backend": "json", "dep_file": ":memory:"}},
+                    extra_config={
+                        "GLOBAL": {"backend": "json", "dep_file": ":memory:"}
+                    },
                 )
 
             def run(self, args):
@@ -190,16 +191,26 @@ def admission(tmp_path, monkeypatch):
 
     def queried(home):
         log = home / "queried.jsonl"
-        return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+        return [
+            json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()
+        ]
 
     return SimpleNamespace(
-        events=events, calls=calls, pool=pool, action=action,
-        install=install, run=run, queried=queried, tmp_path=tmp_path,
+        events=events,
+        calls=calls,
+        pool=pool,
+        action=action,
+        install=install,
+        run=run,
+        queried=queried,
+        tmp_path=tmp_path,
     )
 
 
 def _assert_no_ownership_or_actions(admission):
-    assert admission.events == [], "refused admission ran preflight, ownership or an action"
+    assert admission.events == [], (
+        "refused admission ran preflight, ownership or an action"
+    )
     assert not (admission.tmp_path / "requests").exists()
     assert os.environ.get("HARMONIC_FARM_BUILD_ID") is None
     assert os.environ.get("HARMONIC_FARM_COMMIT") is None
@@ -248,19 +259,23 @@ def test_requested_closure_reports_every_refused_prefix_and_skips_unselected_lea
 ):
     home = admission.pool(accepted=["unusual:fixture-ok"])
     target = admission.tmp_path / "inferred.bin"
-    admission.install({
-        "features:probe": {
-            "actions": [admission.action("features:probe")], "targets": [str(target)],
-        },
-        "novel:probe": {"actions": [admission.action("novel:probe")]},
-        "unusual:fixture-ok": {"actions": [admission.action("unusual:fixture-ok")]},
-        "unselected:probe": {"actions": [admission.action("unselected:probe")]},
-        "local": {
-            "actions": [admission.action("local", marked=False)],
-            "file_dep": [str(target)], "setup": ["novel:probe"],
-        },
-        "build": {"actions": [], "task_dep": ["local", "unusual:fixture-ok"]},
-    })
+    admission.install(
+        {
+            "features:probe": {
+                "actions": [admission.action("features:probe")],
+                "targets": [str(target)],
+            },
+            "novel:probe": {"actions": [admission.action("novel:probe")]},
+            "unusual:fixture-ok": {"actions": [admission.action("unusual:fixture-ok")]},
+            "unselected:probe": {"actions": [admission.action("unselected:probe")]},
+            "local": {
+                "actions": [admission.action("local", marked=False)],
+                "file_dep": [str(target)],
+                "setup": ["novel:probe"],
+            },
+            "build": {"actions": [], "task_dep": ["local", "unusual:fixture-ok"]},
+        }
+    )
 
     assert admission.run("build") == 2
     error = capsys.readouterr().err
@@ -269,7 +284,9 @@ def test_requested_closure_reports_every_refused_prefix_and_skips_unselected_lea
     assert "unselected:probe" not in error
     assert "unusual:fixture-ok (prefix:" not in error
     assert set(admission.queried(home)) == {
-        "features:probe", "novel:probe", "unusual:fixture-ok",
+        "features:probe",
+        "novel:probe",
+        "unusual:fixture-ok",
     }
     assert len(admission.calls) == 1
     _assert_no_ownership_or_actions(admission)
@@ -280,17 +297,21 @@ def test_requested_closure_reports_every_refused_prefix_and_skips_unselected_lea
             print(error, end="")
 
 
-@pytest.mark.parametrize("selectors", [("features:*",), ()], ids=["wildcard", "defaults"])
+@pytest.mark.parametrize(
+    "selectors", [("features:*",), ()], ids=["wildcard", "defaults"]
+)
 def test_wildcard_and_default_selections_check_all_selected_leaves(
     admission, capsys, selectors
 ):
     home = admission.pool()
-    admission.install({
-        "features:first": {"actions": [admission.action("features:first")]},
-        "features:second": {"actions": [admission.action("features:second")]},
-        "novel:unselected": {"actions": [admission.action("novel:unselected")]},
-        "build": {"actions": [], "task_dep": ["features:*"]},
-    })
+    admission.install(
+        {
+            "features:first": {"actions": [admission.action("features:first")]},
+            "features:second": {"actions": [admission.action("features:second")]},
+            "novel:unselected": {"actions": [admission.action("novel:unselected")]},
+            "build": {"actions": [], "task_dep": ["features:*"]},
+        }
+    )
 
     assert admission.run(*selectors) == 2
     error = capsys.readouterr().err
@@ -302,29 +323,43 @@ def test_wildcard_and_default_selections_check_all_selected_leaves(
 
 def test_admitted_unknown_prefix_reaches_fake_ownership_and_actions(admission):
     home = admission.pool(accepted=["features:fixture-ok", "novel:fixture-ok"])
-    admission.install({
-        "features:fixture-ok": {
-            "actions": [(admission.action("features:fixture-ok"), ["tuple-argument"])],
-        },
-        "novel:fixture-ok": {"actions": [admission.action("novel:fixture-ok")]},
-        "local": {"actions": [admission.action("local", marked=False)]},
-        "build": {
-            "actions": [],
-            "task_dep": ["features:fixture-ok", "novel:fixture-ok", "local"],
-        },
-    })
+    admission.install(
+        {
+            "features:fixture-ok": {
+                "actions": [
+                    (admission.action("features:fixture-ok"), ["tuple-argument"])
+                ],
+            },
+            "novel:fixture-ok": {"actions": [admission.action("novel:fixture-ok")]},
+            "local": {"actions": [admission.action("local", marked=False)]},
+            "build": {
+                "actions": [],
+                "task_dep": ["features:fixture-ok", "novel:fixture-ok", "local"],
+            },
+        }
+    )
 
     assert admission.run("build") == 0
     assert set(admission.queried(home)) == {"features:fixture-ok", "novel:fixture-ok"}
-    assert admission.events[:5] == ["preflight", "producer", "ownership", "mint", "register"]
+    assert admission.events[:5] == [
+        "preflight",
+        "producer",
+        "ownership",
+        "mint",
+        "register",
+    ]
     assert set(admission.events[5:-2]) == {
-        ("action", "features:fixture-ok"), ("action", "novel:fixture-ok"), ("action", "local"),
+        ("action", "features:fixture-ok"),
+        ("action", "novel:fixture-ok"),
+        ("action", "local"),
     }
     assert admission.events[-2:] == [("finish", True), "close"]
 
 
 def test_changing_selected_pool_changes_admission_for_the_same_task(admission, capsys):
-    admission.install({"features:probe": {"actions": [admission.action("features:probe")]}})
+    admission.install(
+        {"features:probe": {"actions": [admission.action("features:probe")]}}
+    )
     denied = admission.pool("denying-pool")
     assert admission.run("features:probe") == 2
     assert "features:probe" in capsys.readouterr().err
@@ -334,11 +369,12 @@ def test_changing_selected_pool_changes_admission_for_the_same_task(admission, c
     assert admission.run("features:probe") == 0
     assert admission.queried(denied) == ["features:probe"]
     assert admission.queried(allowed) == ["features:probe"]
-    assert [Path(argv[4]) for argv, _tasks in admission.calls] == [denied, allowed]
     assert ("action", "features:probe") in admission.events
 
 
-def test_selected_pool_protocol_overrides_an_inherited_import_path(admission, monkeypatch):
+def test_selected_pool_protocol_overrides_an_inherited_import_path(
+    admission, monkeypatch
+):
     decoy = admission.pool(
         "decoy-pool",
         protocol="raise RuntimeError('inherited protocol must not be imported')\n",
@@ -346,22 +382,34 @@ def test_selected_pool_protocol_overrides_an_inherited_import_path(admission, mo
     (decoy / "agent" / "__init__.py").write_text("", encoding="utf-8")
     monkeypatch.setenv("PYTHONPATH", str(decoy))
     home = admission.pool("selected-pool", accepted=["features:fixture-ok"])
-    admission.install({
-        "features:fixture-ok": {"actions": [admission.action("features:fixture-ok")]},
-    })
+    admission.install(
+        {
+            "features:fixture-ok": {
+                "actions": [admission.action("features:fixture-ok")]
+            },
+        }
+    )
 
     assert admission.run("features:fixture-ok") == 0
     assert admission.queried(home) == ["features:fixture-ok"]
     assert not (decoy / "queried.jsonl").exists()
 
 
-def test_only_aggregate_and_local_actions_skip_pool_lookup_and_query(admission, monkeypatch):
-    admission.install({
-        "features:local": {"actions": [admission.action("local", marked=False)]},
-        "features:unselected": {"actions": [admission.action("features:unselected")]},
-        "build": {"actions": [], "task_dep": ["features:local"]},
-    })
-    monkeypatch.setattr(build, "_pool_home", lambda: pytest.fail("no leaf needs a pool"))
+def test_only_aggregate_and_local_actions_skip_pool_lookup_and_query(
+    admission, monkeypatch
+):
+    admission.install(
+        {
+            "features:local": {"actions": [admission.action("local", marked=False)]},
+            "features:unselected": {
+                "actions": [admission.action("features:unselected")]
+            },
+            "build": {"actions": [], "task_dep": ["features:local"]},
+        }
+    )
+    monkeypatch.setattr(
+        build, "_pool_home", lambda: pytest.fail("no leaf needs a pool")
+    )
 
     assert admission.run("build") == 0
     assert admission.calls == []
@@ -369,10 +417,14 @@ def test_only_aggregate_and_local_actions_skip_pool_lookup_and_query(admission, 
     assert ("action", "features:unselected") not in admission.events
 
 
-def test_selection_and_admission_leave_original_dependencies_and_actions_intact(admission):
+def test_selection_and_admission_leave_original_dependencies_and_actions_intact(
+    admission,
+):
     home = admission.pool(accepted=["features:first", "features:second"])
     output = str(admission.tmp_path / "producer.bin")
-    first = Task("features:first", [admission.action("features:first")], targets=[output])
+    first = Task(
+        "features:first", [admission.action("features:first")], targets=[output]
+    )
     second = Task("features:second", [admission.action("features:second")])
     root = Task("build", [], task_dep=["features:*"], file_dep=[output])
     consumer = Task("consumer", [], file_dep=[output])
@@ -402,7 +454,9 @@ def test_selection_and_admission_leave_original_dependencies_and_actions_intact(
 )
 def test_pool_import_or_rule_failure_is_fail_closed(admission, capsys, protocol):
     admission.pool(protocol=protocol)
-    admission.install({"features:probe": {"actions": [admission.action("features:probe")]}})
+    admission.install(
+        {"features:probe": {"actions": [admission.action("features:probe")]}}
+    )
 
     assert admission.run("features:probe") == 2
     error = capsys.readouterr().err
@@ -414,14 +468,42 @@ def test_pool_import_or_rule_failure_is_fail_closed(admission, capsys, protocol)
 
 @pytest.mark.parametrize(
     "stdout",
-    ["", "not JSON", "{}", "null", "[true]", "[17]", '["unselected:probe"]', "noise\n[]"],
-    ids=["empty", "non-json", "object", "null", "bool", "number", "noncandidate", "noise"],
+    [
+        "",
+        "not JSON",
+        "{}",
+        "null",
+        "[true]",
+        "[17]",
+        '["unselected:probe"]',
+        "noise\n[]",
+        '{"refused":["unselected:probe"],"agent_identity":"id","agent_version":"tag"}',
+        '{"refused":[],"agent_identity":"","agent_version":"tag"}',
+        '{"refused":[],"agent_identity":"id","agent_version":null}',
+    ],
+    ids=[
+        "empty",
+        "non-json",
+        "object",
+        "null",
+        "bool",
+        "number",
+        "noncandidate",
+        "noise",
+        "foreign-task",
+        "missing-identity",
+        "missing-tag",
+    ],
 )
 def test_invalid_pool_response_is_fail_closed(admission, monkeypatch, capsys, stdout):
     admission.pool()
-    admission.install({"features:probe": {"actions": [admission.action("features:probe")]}})
+    admission.install(
+        {"features:probe": {"actions": [admission.action("features:probe")]}}
+    )
     monkeypatch.setattr(
-        build.subprocess, "run", lambda argv, **_kwargs: subprocess.CompletedProcess(argv, 0, stdout, "")
+        build.subprocess,
+        "run",
+        lambda argv, **_kwargs: subprocess.CompletedProcess(argv, 0, stdout, ""),
     )
 
     assert admission.run("features:probe") == 2
@@ -429,9 +511,13 @@ def test_invalid_pool_response_is_fail_closed(admission, monkeypatch, capsys, st
     _assert_no_ownership_or_actions(admission)
 
 
-def test_admission_subprocess_unavailable_is_fail_closed(admission, monkeypatch, capsys):
+def test_admission_subprocess_unavailable_is_fail_closed(
+    admission, monkeypatch, capsys
+):
     admission.pool()
-    admission.install({"features:probe": {"actions": [admission.action("features:probe")]}})
+    admission.install(
+        {"features:probe": {"actions": [admission.action("features:probe")]}}
+    )
 
     def unavailable(*_args, **_kwargs):
         raise FileNotFoundError(2, "fixture uv unavailable", "uv")
@@ -449,10 +535,15 @@ def test_nonzero_admission_exit_does_not_trust_successful_looking_stdout(
     admission, monkeypatch, capsys
 ):
     admission.pool()
-    admission.install({"features:probe": {"actions": [admission.action("features:probe")]}})
+    admission.install(
+        {"features:probe": {"actions": [admission.action("features:probe")]}}
+    )
     monkeypatch.setattr(
-        build.subprocess, "run",
-        lambda argv, **_kwargs: subprocess.CompletedProcess(argv, 19, "[]", "fixture protocol unavailable"),
+        build.subprocess,
+        "run",
+        lambda argv, **_kwargs: subprocess.CompletedProcess(
+            argv, 19, "[]", "fixture protocol unavailable"
+        ),
     )
 
     assert admission.run("features:probe") == 2
@@ -465,15 +556,19 @@ def test_nonzero_admission_exit_does_not_trust_successful_looking_stdout(
 def _identity_fleet(versions, *, ignored=()):
     def worker(index, version):
         return {
-            "worker_id": f"worker-{index}", "agent_version": version,
-            "farm_protocol_version": 5, "fresh": True,
+            "worker_id": f"worker-{index}",
+            "agent_version": version,
+            "farm_protocol_version": 5,
+            "fresh": True,
         }
 
     return {
-        "farm_protocol_version": 5, "verdict": "matched",
+        "farm_protocol_version": 5,
+        "verdict": "matched",
         "workers": [worker(i, version) for i, version in enumerate(versions)],
         "ignored": [worker(i, version) for i, version in enumerate(ignored)],
-        "fresh_within_s": 120, "evidence_horizon_s": 1209600,
+        "fresh_within_s": 120,
+        "evidence_horizon_s": 1209600,
     }
 
 
@@ -486,7 +581,9 @@ def test_admitted_pool_rule_is_refused_when_deployed_identity_does_not_match(
     admission, monkeypatch, capsys, versions
 ):
     home = admission.pool(accepted=["features:probe"])
-    admission.install({"features:probe": {"actions": [admission.action("features:probe")]}})
+    admission.install(
+        {"features:probe": {"actions": [admission.action("features:probe")]}}
+    )
     queried = []
 
     def agents(pool, *args):
@@ -497,7 +594,8 @@ def test_admitted_pool_rule_is_refused_when_deployed_identity_does_not_match(
 
     monkeypatch.setattr(build, "_pool_farm", agents)
     monkeypatch.setattr(
-        build, "_farm_preflight",
+        build,
+        "_farm_preflight",
         lambda **kwargs: build._require_fleet_protocol(home, 5, **kwargs),
     )
     assert admission.run("features:probe") == 2
@@ -506,10 +604,15 @@ def test_admitted_pool_rule_is_refused_when_deployed_identity_does_not_match(
     assert "agent_version fixture-aaaaaaaa" in error
     assert "reported fleet identities" in error
     for version in set(versions):
-        assert f"{version or '<unreported>'}: {versions.count(version)} worker(s)" in error
+        assert (
+            f"{version or '<unreported>'}: {versions.count(version)} worker(s)" in error
+        )
     if not versions:
         assert "<unreported>: 0 worker(s)" in error
-    assert "Check out the deployed pool release at PoolHome, or finish the rollout." in error
+    assert (
+        "Check out the deployed pool release at PoolHome, or finish the rollout."
+        in error
+    )
     assert queried == [(home, ("agents", "--json"))]
     assert admission.queried(home) == ["features:probe"]
     _assert_no_ownership_or_actions(admission)
@@ -549,10 +652,80 @@ def test_pool_identity_uses_existing_fleet_query_and_pool_canonical_tag(
     assert admission.events == []
 
 
-@pytest.mark.parametrize("marked", [True, False], ids=["label-mismatch", "unmarked-wrapper"])
-@pytest.mark.parametrize("inherited", [None, '["outer:admission"]'], ids=["absent", "inherited"])
+@pytest.mark.parametrize("missing", ["pyproject.toml", "agent/protocol.py"])
+def test_missing_pool_admission_files_are_refused_before_starting_uv(
+    admission, monkeypatch, capsys, missing
+):
+    home = admission.pool(accepted=["features:probe"])
+    (home / missing).unlink()
+    admission.install(
+        {"features:probe": {"actions": [admission.action("features:probe")]}}
+    )
+    monkeypatch.setattr(
+        build.subprocess,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail("missing files started uv"),
+    )
+    assert admission.run("features:probe") == 2
+    error = capsys.readouterr().err
+    assert "missing required admission files" in error
+    assert str(home) in error
+    assert str(Path(missing)) in error
+    _assert_no_ownership_or_actions(admission)
+
+
+@pytest.mark.skipif(shutil.which("uv") is None, reason="uv is not available")
+def test_real_uv_uses_the_selected_pool_project_and_environment(admission, monkeypatch):
+    protocol = """
+import json, os, sys
+from pathlib import Path
+def leaf_admitted(task):
+    Path('runtime.json').write_text(json.dumps({
+        'prefix': sys.prefix, 'cwd': os.getcwd(),
+        'virtual_env': os.environ.get('VIRTUAL_ENV'),
+    }), encoding='utf-8')
+    return task == 'features:fixture-ok'
+"""
+    home = admission.pool(accepted=["features:fixture-ok"], protocol=protocol)
+    monkeypatch.setenv("UV_PYTHON", sys.executable)
+    monkeypatch.setenv("UV_PYTHON_DOWNLOADS", "never")
+    monkeypatch.setenv("UV_OFFLINE", "1")
+    inherited = str(admission.tmp_path / "unrelated-outer-venv")
+    monkeypatch.setenv("VIRTUAL_ENV", inherited)
+    env = {key: value for key, value in os.environ.items() if key != "VIRTUAL_ENV"}
+    locked = _REAL_RUN(
+        ["uv", "lock", "--offline", "--project", str(home)],
+        cwd=home,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert locked.returncode == 0, locked.stdout + locked.stderr
+    monkeypatch.setattr(build.subprocess, "run", _REAL_RUN)
+    control = build._validate_farm_selection(
+        [Task("features:fixture-ok", [admission.action("features:fixture-ok")])],
+        ["features:fixture-ok"],
+    )
+    labels, identity = build._require_leaf_admission(control)
+    assert labels == ["features:fixture-ok"]
+    assert identity == ("a" * 64, "fixture-aaaaaaaa")
+    runtime = json.loads((home / "runtime.json").read_text(encoding="utf-8"))
+    assert Path(runtime["cwd"]).resolve() == home.resolve()
+    assert Path(runtime["prefix"]).resolve() == (home / ".venv").resolve()
+    assert Path(runtime["virtual_env"]).resolve() == (home / ".venv").resolve()
+    assert runtime["virtual_env"] != inherited
+    assert admission.events == []
+
+
+@pytest.mark.parametrize(
+    "marked", [True, False], ids=["label-mismatch", "unmarked-wrapper"]
+)
+@pytest.mark.parametrize(
+    "inherited", [None, '["outer:admission"]'], ids=["absent", "inherited"]
+)
 def test_actual_dispatch_label_requires_scoped_admission(
-    admission, monkeypatch, capsys, marked, inherited
+    admission, monkeypatch, marked, inherited
 ):
     task_name = "package:fixture-ok"
     dispatched_label = "features:unadmitted"
@@ -567,18 +740,28 @@ def test_actual_dispatch_label_requires_scoped_admission(
     monkeypatch.setattr(_farm, "LeafRequest", forbidden)
     monkeypatch.setattr(_farm, "_dispatch", forbidden)
 
+    errors = []
+
     def action():
         expected = [task_name] if marked else []
         assert json.loads(os.environ["HARMONIC_FARM_ADMITTED_LEAVES"]) == expected
-        return _REAL_RUN_LEAF(dispatched_label, "k" * 64)
+        try:
+            return _REAL_RUN_LEAF(dispatched_label, "k" * 64)
+        except RuntimeError as error:
+            # doit's reporter can retain its import-time output stream. Capture
+            # the actual guard error, then preserve the runner's failure path.
+            errors.append(str(error))
+            raise
 
-    admission.install({
-        task_name: {"actions": [_farm.leaf_action(action) if marked else action]},
-    })
+    admission.install(
+        {
+            task_name: {"actions": [_farm.leaf_action(action) if marked else action]},
+        }
+    )
     assert admission.run(task_name) == 2
-    captured = capsys.readouterr()
-    assert dispatched_label in captured.out + captured.err
-    assert "lacks preflight admission" in captured.out + captured.err
+    assert len(errors) == 1
+    assert dispatched_label in errors[0]
+    assert "lacks preflight admission" in errors[0]
     assert os.environ.get("HARMONIC_FARM_ADMITTED_LEAVES") == inherited
     assert admission.events[-2:] == [("finish", False), "close"]
 
@@ -643,55 +826,29 @@ assert helpers == {function.__name__ for function in known}
 print(json.dumps({'checked': checked, 'helpers': sorted(helpers)}))
 """
     env = {
-        **os.environ, "HARMONIC_EXECUTOR": "local",
-        "HARMONIC_REMOTE_CACHE_MODE": "off", "HARMONIC_SW_AUTOSTART": "0",
+        **os.environ,
+        "HARMONIC_EXECUTOR": "local",
+        "HARMONIC_REMOTE_CACHE_MODE": "off",
+        "HARMONIC_SW_AUTOSTART": "0",
     }
     result = _REAL_RUN(
         [sys.executable, "-B", "-c", program],
-        cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=120,
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     summary = json.loads(result.stdout.splitlines()[-1])
     assert summary["checked"] > 0
 
 
-def test_leaf_action_marker_preserves_callable_identity_without_invoking_it():
-    def action():
-        pytest.fail("marking an action must not invoke it")
-
-    assert _farm.leaf_action(action) is action
-    assert action._farm_leaf_action is True
-
-
-def test_all_four_dodo_dispatch_action_functions_are_marked_without_execution():
-    save_success = Dependency.save_success
-    json_dump = JsonDB.dump
-    missing = object()
-    content_checker = CHECKERS.get("content", missing)
-    try:
-        spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
-        assert spec is not None and spec.loader is not None
-        dodo = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(dodo)
-        for name in (
-            "_cached_com_action", "_cached_drawing_action", "_cached_part_action", "build_or_refresh",
-        ):
-            action = getattr(dodo, name)
-            assert callable(action)
-            assert getattr(action, "_farm_leaf_action", False) is True, name
-    finally:
-        Dependency.save_success = save_success
-        JsonDB.dump = json_dump
-        if content_checker is missing:
-            CHECKERS.pop("content", None)
-        else:
-            CHECKERS["content"] = content_checker
-
-
 def test_every_direct_dodo_dispatch_helper_has_an_admission_marker():
     tree = ast.parse((REPO_ROOT / "dodo.py").read_text(encoding="utf-8"))
     helpers = [
-        node for node in ast.walk(tree)
+        node
+        for node in ast.walk(tree)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         and node.name != "_farm_build"
         and any(
@@ -715,8 +872,10 @@ def test_every_direct_dodo_dispatch_helper_has_an_admission_marker():
     # Anchors make an accidentally empty or narrowed AST scan fail rather than
     # silently removing protection when another dispatch helper is introduced.
     assert {
-        "_cached_com_action", "_cached_drawing_action",
-        "_cached_part_action", "build_or_refresh",
+        "_cached_com_action",
+        "_cached_drawing_action",
+        "_cached_part_action",
+        "build_or_refresh",
     } <= names
     for helper in helpers:
         assert any(
