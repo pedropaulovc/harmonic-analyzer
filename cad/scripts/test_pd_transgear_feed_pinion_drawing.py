@@ -595,6 +595,18 @@ def test_finish_leader_climbs_clear_of_its_own_text() -> None:
     assert ink_left > drawing.SHEET_INNER_BORDER[0]
 
 
+def test_finish_leader_stays_above_the_span_extension_lines() -> None:
+    """Stack6 review: the finish leader, landing at -135°, crossed the
+    two-tooth span's upper extension line. That line runs along the lower-left
+    diagonal, 2.7 mm above-left of the bore centre (stack6 render). Both
+    leader ends must stand farther above-left of that diagonal."""
+    cx, cy = drawing.FRONT_CENTER
+    sx, sy = drawing.FINISH_SYMBOL
+    for x, y in ((sx + _FINISH_SHOULDER_DX, sy), drawing.FINISH_ATTACH):
+        # Signed distance above-left of the 45° line through the centre.
+        assert ((y - cy) - (x - cx)) / math.sqrt(2.0) > 0.0027 + 0.001
+
+
 def test_bore_fit_leader_passes_clear_of_the_finish() -> None:
     """Run 20261002T153039266Z's bore fit leader ran through the finish's "Ra
     1.6" (leader-through-text).  The note stands above its landing, so its
