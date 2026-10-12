@@ -186,6 +186,19 @@ _TAP_THREAD_TEXT = f"{TAP_SPEC.size.lstrip('#')} UNC"
 # A band on either depth: the thread's is REF (the notes), the drill's is the
 # title block's .X.
 _BAND_MARKS = ("<MOD-PM>", "±", "+/-")
+# SolidWorks' own descriptive "#4-40 Tapped Hole" note: the native callout
+# states the thread, so none may reach the print.  How many SolidWorks pins
+# is the tap's, measured, not derived: with the same three views, the same
+# sketch-only targeted imports (the tap is never imported) and the same
+# centre-mark recipe, the up-to-next tap (TAP TO BORE 4-40 UNC - 2B THRU)
+# brought one on swmaker000005 and on swmaker000009 (farm runs
+# 20261012T025810090Z, 20261012T064524082Z: "removed 1 redundant final
+# drawing notes"), and the blind tap that replaced it brings none (retry08,
+# 20261012T111849499Z on swmaker000005: "removed 0 ..., expected 1").
+# finalize_drawing still sweeps every sheet for the note, so one that comes
+# back fails the census instead of printing beside the callout.
+TAPPED_HOLE_NOTE = "Tapped Hole"
+AUTO_TAPPED_HOLE_NOTES = 0
 
 
 def _states_depth(text: str, depth_mm: float) -> bool:
@@ -389,10 +402,10 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Output Fixture Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        # SolidWorks pins its own "#4-40 Tapped Hole" note once the tap
-        # carries a hole callout; the callout already states the thread.
-        redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=1,
+        # The blind tap pins no descriptive note (``AUTO_TAPPED_HOLE_NOTES``);
+        # the sweep proves none reached any sheet.
+        redundant_note_substrings=(TAPPED_HOLE_NOTE,),
+        expected_redundant_notes=AUTO_TAPPED_HOLE_NOTES,
     )
 
 

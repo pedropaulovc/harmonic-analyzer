@@ -29,6 +29,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -41,7 +42,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import set_dimension_callouts, set_reference_dimensions
+from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
 from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
 from _drawing_hole_callout import add_native_hole_callout
@@ -87,11 +88,15 @@ ISO_CENTER = (0.340, 0.130)
 # reads above the collar, its witnesses 4 mm long: below the view (v41) they
 # ran the full height of the part and crossed the arm's 54.30.  That text
 # slides to below the arm's end (its dimension line moves right with it, to
-# x 147 mm), clear of the flange width's witness at x 139 mm, and the flange
-# width's text moves left so the collar length's outside arrows clear it.
+# x 142 mm, 3 mm clear of the flange width's witness at x 139 mm), and the
+# flange width's text moves left so the collar length's outside arrows clear
+# it.  Text requested beyond a vertical dimension's span hangs off its column
+# on the side away from the witnesses (see RIGHT_SECTION_KEEP): the 54.30's
+# two rows print RIGHT of x 142 mm, over x ~142..171 mm, y 136..147 mm, so
+# that column is the left bound of the right view's arm-section texts.
 TOP_KEEP = {
     "ArmWidth": (0.088, 0.170),
-    "ArmDepth": (0.147, 0.141),
+    "ArmDepth": (0.142, 0.141),
     "FlangeWidth": (0.104, 0.216),
     "FlangeDepth": (0.089, 0.205),
     "CollarLen": (0.155, 0.224),
@@ -122,21 +127,44 @@ RIGHT_KEEP = {
 }
 # The arm's section, from the part's ArmSection witness (shown in this view
 # by curate_hidden_dimensions).  Its dimensions take the arm's END corners
-# (x 207.85 mm, y 177/184.5 mm) and the bore-axis centerline's end on that
-# same station, so their witnesses run left, away from the part, sharing the
-# arm's lower-face witness: the thickness in the outer column (x 187 mm, text
-# above the view), the lower face from the bore axis in the inner column
-# (x 205 mm, text below the view) and the reference offset from the
-# hole-datum flange face further left (x 167 mm, text below, beside -- never
-# under -- the 3.00's rows; its witness along the flange's lower face crosses
-# the 3.00's dimension line 3 mm above that text, the one crossing three
-# stacked offsets cannot avoid).  The seat face from the bore axis runs above
-# the view, its two callout rows hanging between the thickness text and the
-# collar OD's, its dimension line ~7 mm clear of the flange's top edge.
+# (x 207.85 mm, y 177/184.5 mm), the bore-axis centerline's end on that same
+# station and the seat face's corners (x 210.96 mm, y 173.65/186.35 mm), so
+# the three vertical ones' witnesses run left, away from the part, sharing
+# the arm's lower-face witness.  Text requested beyond such a dimension's
+# span is NOT centred on its column: SolidWorks runs the dimension line on to
+# the baseline of the text's lowest row (a lone value row 2.78 mm under the
+# requested y; with a callout row, the value row at the requested y and the
+# callout row 5.56 mm under it) and hangs the rows off the column on the side
+# away from the witnesses -- here to the LEFT -- over a shoulder as wide as
+# the widest row plus ~2 mm each end
+# (retry08 native audit: "FROM BORE AXIS" requested at x 205 mm printed over
+# x 167.6..204.7 mm; the reference offset requested at x 167 mm reached
+# x 146.6 mm, and its shoulder cut the top view's 54.30 column at x 147 mm,
+# the enforced finding).  Each column therefore clears, by its own text
+# width, every line left of it:
+#   - the thickness in the outer column (x 187 mm): "7.50 / ARM THICKNESS"
+#     above the view, rows over x ~151..187 mm, y 192..203 mm, the shoulder
+#     at y 192.4 mm; its dimension line ends there, under the seat-face text;
+#   - the lower face from the bore axis in the inner column (x 205 mm): rows
+#     below the view, x ~167..205 mm, y 161..171 mm, the shoulder at y 160.4
+#     mm, 5 mm over the bore callout's block;
+#   - the reference offset from the hole-datum flange face beside those rows,
+#     never under them (x 164 mm): "(3.35)" over x ~151..162 mm, y 163..168
+#     mm, 5 mm of air to the 3.00's rows and 7 mm right of the 54.30 column;
+#     its dimension line ends at y 163.2 mm, above the 3.00's shoulder, and
+#     its witness along the hole-datum face crosses the 3.00's dimension line
+#     3 mm above that text, the one crossing three stacked offsets cannot
+#     avoid.
+# The seat face from the bore axis runs above the view, its three rows
+# (value over two callout rows) between the thickness text and the collar
+# OD's, its dimension line under the lowest row (y 194.7 mm) 8 mm clear of
+# the flange's top edge; its witness from the origin runs through the
+# collar's centre, where both diameters' lines cross it (advisory, inherent
+# to dimensioning to the axis).
 RIGHT_SECTION_KEEP = {
     "ArmThickness": (0.187, 0.198),
     "ArmBelowAxis": (0.205, 0.166),
-    "ArmOffset": (0.167, 0.165),
+    "ArmOffset": (0.164, 0.166),
     "SeatToAxis": (0.2385, 0.203),
 }
 # Blind-review round 1: the four plan values read unattached at a glance --
@@ -161,7 +189,10 @@ SECTION_CALLOUTS = {
 }
 # ArmOffset prints in parentheses: the arm is controlled from the bore axis,
 # and its offset from the hole-datum face is that same position, read as
-# reference against the flange the machinist can measure.
+# reference against the flange the machinist can measure.  It is a LINEAR
+# reference, so it takes the singular set_reference_dimension: the plural
+# helper prefixes every name with the diameter glyph, which printed it as
+# "(Ø3.35)" on retry08.
 SECTION_REFERENCE = ("ArmOffset",)
 
 
@@ -233,13 +264,31 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, back)
     set_hidden_lines_removed(adapter, front)
 
+    # Targeted imports: each view selects only the features owning its keep
+    # map (the entire-model fallback warned on every view and imported the
+    # whole marked set to delete most of it).  The back view keeps no model
+    # dimension -- its mounting coordinates arrive with curate_hidden_dimensions
+    # below -- so it imports nothing.
     top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="top"
+        adapter,
+        top,
+        keep=TOP_KEEP,
+        view_label="top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    curate_view_dimensions(adapter, back, keep={}, view_label="back")
+    curate_view_dimensions(
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="right",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_callouts(adapter, top_annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, right_annotations, RIGHT_CALLOUTS)
@@ -255,24 +304,42 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_callouts(adapter, section_annotations, SECTION_CALLOUTS)
-    set_reference_dimensions(adapter, section_annotations, SECTION_REFERENCE)
+    # ArmOffset is a LINEAR reference: the plural set_reference_dimensions
+    # forces the diameter glyph, printing "(Ø3.35)" (retry08 native audit).
+    for name in SECTION_REFERENCE:
+        matches = [
+            a for a in section_annotations if dimension_name(adapter, a) == name
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"expected one arm section {name} reference dimension, "
+                f"found {len(matches)}"
+            )
+        set_reference_dimension(adapter, matches[0], label=f"arm section {name}")
     rims = _mounting_rims(back)
 
     add_native_hole_callout(
         adapter,
         back,
         edge=rims[0].edge,
-        # AddHoleCallout2 centres the ~120 mm-wide text on x and the leader
-        # lands on the text end nearer the hole (263.6, 96.3 mm). Centred at
-        # 300 mm, below the back view, the near end is the text's left end
-        # (x 240 mm), so the leader drops left from the hole, out through
-        # the flange's lower edge between the two counterbores, clear of
-        # every back-view dimension line: at (0.330, 0.160) it rose through
-        # the 4.00 and 17.70 dimension lines (machinist review). The text
-        # sits above the title block (y >= 66 mm) and below the isometric
-        # note (y 95 mm). (0.205, 0.064) printed over the title block;
-        # x = 0.150 and 0.270 both led through '17.70'.
-        callout_xy=(0.300, 0.078),
+        # AddHoleCallout2 centres the ~117 mm-wide text on x and the leader
+        # runs from the hole's counterbore rim (centre (265, 95) mm, r 1.9) to
+        # an elbow 2 mm before the text end nearer the hole.  Below the back
+        # view the near end is the text's left end, at x_c - 60.6 mm; the
+        # leader must leave the elbow UP-LEFT, so the hole must be left of it
+        # (centred at 300 mm the elbow sat at x 239.5 mm, the leader came
+        # down-left from the hole, cut 3.3 mm of its own bottom row and
+        # crossed the 6.35's lower witness, (202..264, 88.65) mm: retry08
+        # native audit), and it must thread between the 4.00's witnesses at
+        # x 265 and 269 mm, which reach down to y 89.6 mm.  Centred at 337 mm
+        # the elbow is at (276.4, 70.7) mm and the leader climbs to the rim at
+        # (265.8, 93.3) mm, at x 267.5 mm where those witnesses end: 1.5 mm
+        # from either, 4 mm right of the 6.35 witness' end.  At (0.330, 0.160)
+        # it rose through the 4.00 and 17.70 dimension lines (machinist
+        # review); the text sits above the title block (y >= 66 mm) and 7 mm
+        # under the isometric note (y 91.4 mm).  (0.205, 0.064) printed over
+        # the title block; x = 0.150 and 0.270 both led through '17.70'.
+        callout_xy=(0.337, 0.078),
         label="two bracket counterbores",
         process="DRILL / COUNTERBORE",
     )

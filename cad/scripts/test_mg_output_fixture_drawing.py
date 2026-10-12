@@ -268,6 +268,16 @@ def test_the_rod_bore_ends_the_thread_and_its_depth_is_ref() -> None:
             },
             True,
         ),
+        # Retry08's native reading (20261012T111849499Z, swmaker000005).
+        (
+            {
+                1: "TAP INTO BORE 4-40 UNC - 2B <HOLE-DEPTH> 10.1",
+                2: "",
+                3: "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7",
+                4: "",
+            },
+            True,
+        ),
         # The old ambiguous callout: THRU on both rows.
         (
             {
@@ -324,6 +334,42 @@ def test_tap_callout_states_its_depths_and_extent(
     resolved: dict[int, str], reads: bool
 ) -> None:
     assert drawing._tap_callout_resolved(resolved) is reads
+
+
+def test_final_sheet_census_expects_no_tapped_hole_note_from_the_blind_tap() -> None:
+    # Two passing runs of the up-to-next tap each swept one "#4-40 Tapped
+    # Hole" note; retry08's blind tap, on the same views and imports, swept
+    # none and failed the stale census of one.  The census is the tap's.
+    assert drawing.AUTO_TAPPED_HOLE_NOTES == 0
+    # The topology it was measured on: a blind tap no targeted import selects.
+    assert geom.TAP_SPEC.end == "blind"
+    assert set(spec.DRAWING_DIMENSIONS) == {
+        "TurnedProfile",
+        "GrooveProfile",
+        "HexProfile",
+        "RodBoreProfile",
+    }
+    build = _build_function(ast.parse(Path(drawing.__file__).read_text(encoding="utf-8")))
+    finalizes = [
+        node
+        for node in ast.walk(build)
+        if isinstance(node, ast.Call) and _call_name(node) == "finalize_drawing"
+    ]
+    assert len(finalizes) == 1
+    keywords = {kw.arg: ast.unparse(kw.value) for kw in finalizes[0].keywords}
+    # A literal count is what went stale: the call names the measured census,
+    # and the sweep stays on so a note that comes back fails it.
+    assert keywords["expected_redundant_notes"] == "AUTO_TAPPED_HOLE_NOTES"
+    assert keywords["redundant_note_substrings"] == "(TAPPED_HOLE_NOTE,)"
+    # The sweep (a case-blind substring) reaches the note SolidWorks pins and
+    # never the native callout that states the tap.
+    note = drawing.TAPPED_HOLE_NOTE.lower()
+    assert note in f"{geom.TAP_SPEC.size} Tapped Hole".lower()
+    native_callout = (
+        "TAP INTO BORE 4-40 UNC - 2B <HOLE-DEPTH> 10.1\n"
+        "<MOD-DIAM> 2.26 <HOLE-DEPTH> 12.7"
+    )
+    assert note not in native_callout.lower()
 
 
 # The groove lips, the spigot's clean-up inside the thinnest flats and the

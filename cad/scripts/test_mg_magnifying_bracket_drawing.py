@@ -214,10 +214,32 @@ def test_counterbore_entry_view_callout_and_feature_origin() -> None:
     assert "set_hidden_lines_removed(adapter, back)" in source
     assert '"MountingCoordinates": ("MountingX0", "MountingX1", "MountingY0")' in source
     assert "curate_hidden_dimensions(" in source
-    # The callout sits below the back view, so its leader leaves the hole
-    # downward, clear of the 4.00 and 17.70 dimension lines it rose through.
-    assert "callout_xy=(0.300, 0.078)" in source
-    assert drawing.BACK_KEEP["MountingX0"][1] > 0.107 > 0.078
+    # The callout hangs below the back view.  AddHoleCallout2 centres its
+    # ~117 mm bottom row on x and runs the leader from the counterbore rim to
+    # an elbow 2 mm before the row end nearer the hole: below the view that is
+    # the row's LEFT end, so the hole must sit left of the elbow for the leader
+    # to leave it up-left, outside its own row (retry08 native audit, centred
+    # at x 300 mm: the leader cut 3.3 mm of its own row and crossed the 6.35's
+    # lower witness, which ends 1 mm left of the hole), and the leader must
+    # thread between the 4.00's witnesses at the hole and the flange end,
+    # which reach 5.4 mm below the hole centre, on its way to the rim.
+    import magnifying_bracket_joint_layout as joint
+    assert "callout_xy=(0.337, 0.078)" in source
+    callout_x, callout_y = 0.337, 0.078
+    # Back mirrors X about the flange's mid-X: sheet x = centre - (X - mid).
+    flange_mid_x = (part.FLANGE_X[0] + part.FLANGE_X[1]) / 2.0 / 1000.0
+    hole_x = drawing.BACK_CENTER[0] - (joint.BRACKET_HOLE_POINTS[0][0] / 1000.0 - flange_mid_x)
+    flange_end_x = drawing.BACK_CENTER[0] - (part.FLANGE_X[0] / 1000.0 - flange_mid_x)
+    hole_y = drawing.BACK_CENTER[1]
+    assert abs(hole_x - 0.265) < 1e-9 and abs(flange_end_x - 0.269) < 1e-9
+    elbow = (callout_x - 0.0606, callout_y - 0.0073)
+    assert elbow[0] > hole_x + 0.005  # the leader climbs up-left from the elbow
+    witness_bottom = hole_y - 0.0054
+    dx, dy = hole_x - elbow[0], hole_y - elbow[1]
+    leader_x = elbow[0] + dx * (witness_bottom - elbow[1]) / dy
+    assert hole_x + 0.001 < leader_x < flange_end_x - 0.001
+    assert leader_x > hole_x - 0.001 + 0.002  # right of the 6.35 witness' end
+    assert drawing.BACK_KEEP["MountingX0"][1] > 0.107 > callout_y
 
 
 def test_coordinates_and_hole_dimensions_are_owned_by_model() -> None:
@@ -276,6 +298,16 @@ def test_arm_section_is_native_and_locates_the_bore_axis() -> None:
     assert "await adapter.add_centerline(end_u, 0.0, 0.0, 0.0)" in source
     assert 'f"{axis}.start", f"{end}.start", "vertical_points"' in source
     assert 'f"{end}.start", f"{axis}.start", "vertical_distance"' in source
+    # Each seat piece's arm-side corner sits on the arm face it was drawn at:
+    # the piece below the arm ends on the arm's LOWER face (end.start), the
+    # piece above starts on its upper face (end.end).  Same-named pairing
+    # (below.end with end.end) dragged the lower piece up to the arm's top and
+    # ArmOffset re-solved its seat-face witness to Y +0.35, above the bore
+    # axis (retry08 native audit: extension line at sheet y 180.4 mm).
+    assert '(below, "end", "start"),' in source
+    assert '(above, "start", "end"),' in source
+    assert 'f"{piece}.{corner}", f"{end}.{arm_corner}", "horizontal_points"' in source
+    assert 'f"{piece}.{corner}", f"{end}.{corner}"' not in source
     assert """section.record("ArmThickness", '"ArmY1" - "ArmY0"')""" in source
     assert """section.record("ArmBelowAxis", '-"ArmY0"')""" in source
     assert """section.record("ArmOffset", '"ArmY0" - "FlangeY0"')""" in source
@@ -292,9 +324,16 @@ def test_arm_section_is_native_and_locates_the_bore_axis() -> None:
         "ArmThickness", "ArmBelowAxis", "ArmOffset", "SeatToAxis",
     }
     assert "keep=RIGHT_SECTION_KEEP" in drawing_source
-    assert "dimensions_by_feature=DRAWING_DIMENSIONS" in drawing_source
+    # Every import is targeted (the entire-model fallback warned on four
+    # views); the back view keeps no model dimension, so it imports none.
+    assert drawing_source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 4
+    assert "keep={}" not in drawing_source
     assert "set_dimension_callouts(adapter, section_annotations, SECTION_CALLOUTS)" in drawing_source
-    assert "set_reference_dimensions(adapter, section_annotations, SECTION_REFERENCE)" in drawing_source
+    # ArmOffset is a LINEAR reference: the plural helper's "(<MOD-DIAM>"
+    # prefix printed it as "(Ø3.35)" on retry08.
+    assert "set_reference_dimensions(" not in drawing_source
+    assert "for name in SECTION_REFERENCE:" in drawing_source
+    assert 'set_reference_dimension(adapter, matches[0], label=f"arm section {name}")' in drawing_source
     assert drawing.SECTION_REFERENCE == ("ArmOffset",)
     assert drawing.SECTION_CALLOUTS["ArmThickness"] == "ARM THICKNESS"
     assert "BORE AXIS" in drawing.SECTION_CALLOUTS["ArmBelowAxis"]
@@ -308,6 +347,48 @@ def test_arm_section_is_native_and_locates_the_bore_axis() -> None:
     assert right["ArmThickness"][1] > 0.1919 and right["SeatToAxis"][1] > 0.1919
     assert right["ArmBelowAxis"][1] < 0.1681 and right["ArmOffset"][1] < 0.1681
     assert right["ArmOffset"][0] < right["ArmThickness"][0] < right["ArmBelowAxis"][0]
+    # Hung text (retry08 native audit): rows requested beyond a vertical
+    # dimension's span print LEFT of its column, as wide as the widest row,
+    # on a shoulder at the lowest row's baseline (the value row at the
+    # requested y, a callout row 5.56 mm under it; a lone row 2.78 mm under).
+    # "FROM BORE AXIS" printed over x 167.6..204.7 mm from its x 205 column;
+    # "(Ø3.35)" ran a 20.4 mm shoulder from x 167 to 146.6 mm, across the top
+    # view's 54.30 column at x 147 mm (enforced shoulder-crosses-line), its
+    # text 2.5 mm from the 3.00's rows (text-separation).
+    row = 0.00556
+    text = 0.0035
+    below_axis_row = 0.0378  # "FROM BORE AXIS", shoulder width
+    offset_row = 0.0152  # "(3.35)": the 20.4 mm "(Ø3.35)" shoulder less the Ø glyph
+    thickness_x, thickness_y = right["ArmThickness"]
+    below_x, below_y = right["ArmBelowAxis"]
+    offset_x, offset_y = right["ArmOffset"]
+    arm_depth_column = drawing.TOP_KEEP["ArmDepth"][0]
+    # The reference offset's shoulder clears the 54.30 column by a text height,
+    # and by a line weight even if the Ø glyph's 5.3 mm were not saved.
+    assert offset_x - offset_row > arm_depth_column + text
+    assert offset_x - (offset_row + 0.0053) > arm_depth_column + 0.0005
+    # and its text clears the 3.00's rows by one (its box ends 1.9 mm before
+    # its shoulder's end; the rows' box starts 0.4 mm after theirs).
+    assert (below_x - below_axis_row + 0.0004) - (offset_x - 0.0019) > text
+    # Its dimension line ends at its single row, above the 3.00's shoulder, so
+    # neither can cross the other, and its text sits a text height and more
+    # under its own witness along the hole-datum face (y 173.65 mm).
+    assert offset_y - row / 2.0 > below_y - row + 0.002
+    assert offset_y - row / 2.0 + 0.0045 < 0.17365 - text
+    # Its column stands clear of the 3.00's rows by the 2 mm arrow-to-text
+    # clearance and left of the thickness' witnesses (which end 1 mm past
+    # its column), so the offset's outside-arrow tail (6.35 mm past y 177 mm)
+    # crosses neither.
+    assert offset_x < below_x - below_axis_row + 0.0004 - 0.002
+    assert offset_x < thickness_x - 0.001 - 0.002
+    # The thickness' shoulder (lowest row's baseline) sits above every other
+    # column's reach: the offset's tail ends 6.35 mm over the arm's lower face.
+    assert thickness_y - row > 0.177 + 0.00635 + 0.002
+    # The 54.30's column clears the arm's x 139 mm edge and the rows it hangs
+    # right of it (x ~142..171 mm, y 135.4..146.5 mm) stay a text height and
+    # more under the offset's text.
+    assert arm_depth_column > 0.139 + 0.0025
+    assert offset_y - row / 2.0 > drawing.TOP_KEEP["ArmDepth"][1] + 0.0045 + text
     # The bore's three-row callout (rows ~65 mm wide, x ~198..263 mm) keeps
     # its v41 column below-left of the collar: its block must clear the
     # collar's x (266.15 mm) on one side or the leader from the bore's rim to

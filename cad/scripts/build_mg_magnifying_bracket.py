@@ -463,7 +463,17 @@ async def build(adapter) -> dict[str, str]:
         ARM_Z[1], "arm section ArmEndFromAxis",
     )
     section.record("ArmEndFromAxis", '"ArmZ1"')
-    for piece, corner in ((below, "end"), (above, "start")):
+    # Each seat piece's arm-side corner sits on the arm face it was drawn at:
+    # below.end on the arm's LOWER face (end.start), above.start on its upper
+    # face (end.end).  Pairing same-named corners (below.end with end.end)
+    # dragged the piece below the arm up to the arm's top, and ArmOffset's
+    # 3.35 then re-solved its seat-face witness to Y +0.35, above the bore
+    # axis (retry08 native layout audit: that extension line printed at sheet
+    # y 180.4 mm instead of on the hole-datum face at 173.65 mm).
+    for piece, corner, arm_corner in (
+        (below, "end", "start"),
+        (above, "start", "end"),
+    ):
         check(
             f"arm section {piece} vertical",
             await adapter.add_sketch_constraint(piece, None, "vertical"),
@@ -471,7 +481,7 @@ async def build(adapter) -> dict[str, str]:
         check(
             f"arm section {piece}.{corner} on the arm's face",
             await adapter.add_sketch_constraint(
-                f"{piece}.{corner}", f"{end}.{corner}", "horizontal_points"
+                f"{piece}.{corner}", f"{end}.{arm_corner}", "horizontal_points"
             ),
         )
     check(
