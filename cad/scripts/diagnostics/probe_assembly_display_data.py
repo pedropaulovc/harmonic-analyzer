@@ -10,7 +10,7 @@ All snapshots are siblings of pn-pen.SLDASM, preserving its reference directory
 layout. No part build is dispatched; no part file is saved, copied, or
 reference-rewritten by the probe.
 Every minimal multi-config trial starts from the same single-config copy, not
-the previous trial. Four final normal-assembly trials each start from the
+the previous trial. Four normal-assembly trials each start from the
 untouched normal snapshot and retain its real referenced-part configurations.
 Save9 vs Save1 differs only in AvoidRebuildOnSave; the switch trial adds
 ShowConfiguration2/EditRebuild3/AddRebuildSaveMark for derived then Default;
@@ -20,6 +20,28 @@ trial (OverrideSaveEmodel, 32). Nothing changes global SOLIDWORKS preferences.
 Original assembly and referenced input bytes are hashed
 before/after. A failed native operation aborts the leaf; parser observations never
 act as a production visibility gate.
+
+Follow-on reference trials use a separate single-Default baseline with two
+hangers and one cached vn-pen-set-screw. They change references only when a real
+part Default Simplified configuration exists, requiring a genuine switch.
+A/B/C isolate no explicit rebuild, derived deep rebuild, then Default deep
+rebuild before Copy11. Final D controls use the same C operation sequence:
+Save3(1) removes both Copy and AvoidRebuildOnSave, while Save3(9) removes only
+Copy and retains AvoidRebuildOnSave. They run last to contain dirty-child risk.
+E reconciles an independent copy of C using the existing production helper.
+F freshly reopens an independent E copy and Save3(1)-saves without explicit
+switches/rebuilds/mark writes; G repeats the derived/Default EditRebuild3 and
+AddRebuildSaveMark loop on another E copy before Save3(1). F still performs the
+explicitly logged _state inspections (including GetComponents) before save.
+Native GetSaveFlag is recorded immediately before every direct diagnostic
+Save3; E records only its pre-reconcile flag, not its helper's internal Save3.
+Two initial-C-copy variants add only Default/both LDR marks after C's rebuilds.
+Two fresh-untitled controls reuse the same fixture creation and C operations
+before ANY assembly save, differing only in a Default LDR mark before Copy11.
+Their initial native Default state is logged, but source path/hash/display flags
+are null because no baseline assembly file exists. They do not use an
+intermediate single-config save or a baseline-only rebuild.
+These are differential observations, not a production fix or root-cause claim.
 
 The manifest and stdout retain native config/mark/rebuild state before save,
 after save and on a fresh reopen, save results, input hashes, snapshot hashes,
@@ -32,6 +54,8 @@ this reproduction module may remain as requested evidence.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import StrEnum
 import hashlib
 import json
 import mmap
@@ -57,7 +81,157 @@ TRIALS = (
     ("normal-mark-second-save1", 1, True, ("Default Simplified",), "normal"),
     ("normal-mark-both-save1", 1, True, ("Default", "Default Simplified"), "normal"),
 )
-STAGES = ("normal", "single-copy11", *(trial[0] for trial in TRIALS))
+
+
+class ReferenceSource(StrEnum):
+    THREADED_SINGLE = "single-threaded-copy11"
+    BOTH_REBUILT_COPY = "refcfg-c-both-rebuild-copy11"
+    RECONCILED_COPY = "refcfg-e-reconcile-save1"
+    FRESH_THREADED = "fresh-untitled-threaded"
+
+
+class ReferenceOperation(StrEnum):
+    ADD_DERIVED = "add-derived-no-rebuild"
+    ACTIVATE_DERIVED = "activate-derived"
+    SELECT_SIMPLIFIED_REFERENCES = "select-available-simplified-references"
+    REBUILD_DERIVED = "derived-ForceRebuild3(False)"
+    RESTORE_DEFAULT = "restore-Default"
+    REBUILD_DEFAULT = "Default-ForceRebuild3(False)"
+    RECONCILE = "reconcile_saved_rebuild_state"
+    REBUILD_SAVE_MARKS = "derived-Default-EditRebuild3-AddRebuildSaveMark"
+    MARK_DEFAULT = "LDR-mark-Default-only"
+    MARK_BOTH = "LDR-mark-both"
+
+
+class ReferenceSave(StrEnum):
+    COPY = "IModelDoc2.SaveAs3"
+    IN_PLACE = "IModelDoc2.Save3"
+    RECONCILE = "reconcile_saved_rebuild_state (conditional IModelDoc2.Save3)"
+
+
+@dataclass(frozen=True)
+class ReferenceTrial:
+    stage: str
+    source: ReferenceSource
+    operations: tuple[ReferenceOperation, ...]
+    save_api: ReferenceSave
+    save_options: int
+    comparison: str | None = None
+
+
+_REFERENCE_SETUP = (
+    ReferenceOperation.ADD_DERIVED,
+    ReferenceOperation.ACTIVATE_DERIVED,
+    ReferenceOperation.SELECT_SIMPLIFIED_REFERENCES,
+)
+_REFERENCE_A = (*_REFERENCE_SETUP, ReferenceOperation.RESTORE_DEFAULT)
+_REFERENCE_B = (
+    *_REFERENCE_SETUP,
+    ReferenceOperation.REBUILD_DERIVED,
+    ReferenceOperation.RESTORE_DEFAULT,
+)
+_REFERENCE_C = (*_REFERENCE_B, ReferenceOperation.REBUILD_DEFAULT)
+REFERENCE_TRIALS = (
+    ReferenceTrial(
+        "refcfg-a-no-rebuild-copy11",
+        ReferenceSource.THREADED_SINGLE,
+        _REFERENCE_A,
+        ReferenceSave.COPY,
+        11,
+    ),
+    ReferenceTrial(
+        "refcfg-b-child-rebuild-copy11",
+        ReferenceSource.THREADED_SINGLE,
+        _REFERENCE_B,
+        ReferenceSave.COPY,
+        11,
+    ),
+    ReferenceTrial(
+        "refcfg-c-both-rebuild-copy11",
+        ReferenceSource.THREADED_SINGLE,
+        _REFERENCE_C,
+        ReferenceSave.COPY,
+        11,
+    ),
+    ReferenceTrial(
+        "refcfg-c-mark-default-copy11",
+        ReferenceSource.THREADED_SINGLE,
+        (*_REFERENCE_C, ReferenceOperation.MARK_DEFAULT),
+        ReferenceSave.COPY,
+        11,
+    ),
+    ReferenceTrial(
+        "refcfg-c-mark-both-copy11",
+        ReferenceSource.THREADED_SINGLE,
+        (*_REFERENCE_C, ReferenceOperation.MARK_BOTH),
+        ReferenceSave.COPY,
+        11,
+    ),
+    ReferenceTrial(
+        "refcfg-e-reconcile-save1",
+        ReferenceSource.BOTH_REBUILT_COPY,
+        (ReferenceOperation.RECONCILE,),
+        ReferenceSave.RECONCILE,
+        1,
+    ),
+    ReferenceTrial(
+        "refcfg-f-fresh-resave-save1",
+        ReferenceSource.RECONCILED_COPY,
+        (),
+        ReferenceSave.IN_PLACE,
+        1,
+    ),
+    ReferenceTrial(
+        "refcfg-g-repeat-rebuild-mark-save1",
+        ReferenceSource.RECONCILED_COPY,
+        (ReferenceOperation.REBUILD_SAVE_MARKS,),
+        ReferenceSave.IN_PLACE,
+        1,
+    ),
+    ReferenceTrial(
+        "fresh-refcfg-c-copy11",
+        ReferenceSource.FRESH_THREADED,
+        _REFERENCE_C,
+        ReferenceSave.COPY,
+        11,
+    ),
+    ReferenceTrial(
+        "fresh-refcfg-c-mark-default-copy11",
+        ReferenceSource.FRESH_THREADED,
+        (*_REFERENCE_C, ReferenceOperation.MARK_DEFAULT),
+        ReferenceSave.COPY,
+        11,
+    ),
+    ReferenceTrial(
+        "refcfg-d-both-rebuild-save9",
+        ReferenceSource.THREADED_SINGLE,
+        _REFERENCE_C,
+        ReferenceSave.IN_PLACE,
+        9,
+        comparison=(
+            "Copy versus in-place comparison against C Copy11: removes only "
+            "Copy (2), retaining AvoidRebuildOnSave (8)."
+        ),
+    ),
+    ReferenceTrial(
+        "refcfg-d-both-rebuild-save1",
+        ReferenceSource.THREADED_SINGLE,
+        _REFERENCE_C,
+        ReferenceSave.IN_PLACE,
+        1,
+        comparison=(
+            "Two-variable comparison against C Copy11: removes Copy (2) "
+            "and AvoidRebuildOnSave (8)."
+        ),
+    ),
+)
+STAGES = (
+    "normal",
+    "single-copy11",
+    *(trial[0] for trial in TRIALS),
+    "single-threaded-copy11",
+    *(trial.stage for trial in REFERENCE_TRIALS),
+)
 OUTPUT_FILENAMES = (
     *(f"pn-pen-display-{stage}.SLDASM" for stage in STAGES),
     "pn-pen-display-matrix.json",
@@ -206,6 +380,7 @@ def _state(model: Any) -> dict[str, Any]:
         components.append(
             {
                 "path": path,
+                "name": str(component.Name2),
                 "referenced_configuration": str(component.ReferencedConfiguration),
             }
         )
@@ -232,11 +407,68 @@ def _set_marks(model: Any, ldr_names: tuple[str, ...]) -> None:
             raise RuntimeError(f"display matrix LDR mark assignment refused for {name}")
 
 
+def _select_available_simplified_references(
+    adapter: Any, model: Any
+) -> list[dict[str, Any]]:
+    """Change only genuinely available part configs; re-query handles after each set."""
+    from _com import _early_bound
+
+    assembly = _early_bound(model, "IAssemblyDoc")
+    # ReferencedConfiguration assignments invalidate an enumerated component array.
+    # Retain names only, release that inventory, and obtain each handle afresh.
+    names = []
+    for raw in assembly.GetComponents(True) or ():
+        component = _early_bound(raw, "IComponent2")
+        names.append(str(component.Name2))
+    raw = component = None
+    if not names:
+        raise RuntimeError("reference trial has no top-level components")
+    known: dict[str, set[str]] = {}
+    rows = []
+    switched = 0
+    for name in names:
+        component = _early_bound(assembly.GetComponentByName(name), "IComponent2")
+        if component is None:
+            raise RuntimeError(f"reference trial lost component {name!r}")
+        path = str(component.GetPathName())
+        if path not in known:
+            known[path] = {
+                str(config)
+                for config in adapter.swApp.GetConfigurationNames(path) or ()
+            }
+        before = str(component.ReferencedConfiguration)
+        wanted = "Default Simplified" if "Default Simplified" in known[path] else before
+        if wanted != before:
+            component.ReferencedConfiguration = wanted
+            switched += 1
+        after = str(component.ReferencedConfiguration)
+        if after != wanted:
+            raise RuntimeError(
+                f"reference trial refused {name}: {before!r} -> {wanted!r}"
+            )
+        rows.append(
+            {
+                "component": name,
+                "path": path,
+                "available_configurations": sorted(known[path]),
+                "before": before,
+                "after": after,
+                "changed": before != after,
+            }
+        )
+        component = None
+    if switched == 0:
+        raise RuntimeError(
+            "reference trial made no genuine simplified-reference switch"
+        )
+    return rows
+
+
 async def probe_assembly_display_data(
     adapter: Any, normal_path: str | Path
 ) -> dict[str, str]:
     """Collect cache-published snapshots using the already-admitted pn farm seat."""
-    from _assembly import place_component
+    from _assembly import place_component, reconcile_saved_rebuild_state
     from _check import check
     from _com import _early_bound
     from _rebuild import active_configuration_name
@@ -251,6 +483,12 @@ async def probe_assembly_display_data(
         )
     directory = normal_path.parent
     paths = {stage: directory / f"pn-pen-display-{stage}.SLDASM" for stage in STAGES}
+    scratch_paths = {
+        trial.stage: directory / f".pn-pen-display-source-{trial.stage}.SLDASM"
+        for trial in REFERENCE_TRIALS
+        if trial.save_api == ReferenceSave.COPY
+        and trial.source != ReferenceSource.FRESH_THREADED
+    }
     manifest = directory / OUTPUT_FILENAMES[-1]
     normal_state = _state(_model(adapter))
     inputs = {normal_path, *(Path(path) for path in normal_state["references"])}
@@ -269,6 +507,26 @@ async def probe_assembly_display_data(
     def discard() -> None:
         discard_open_documents(adapter)
         adapter.currentModel = None
+
+    async def create_threaded_fixture() -> Any:
+        """Create the shared fixture, without rebuilding or saving its assembly."""
+        check(
+            "display matrix create threaded single assembly",
+            await adapter.create_assembly(),
+        )
+        for part, position in (
+            ("pn-pen-hanger", [0.0, 0.0, 0.0]),
+            ("pn-pen-hanger", [50.0, 0.0, 0.0]),
+            ("vn-pen-set-screw", [100.0, 0.0, 0.0]),
+        ):
+            await place_component(adapter, part, position, [0.0, 0.0, 0.0], IDENTITY)
+        model = _model(adapter)
+        names = tuple(str(name) for name in model.GetConfigurationNames() or ())
+        if names != ("Default",):
+            raise RuntimeError(
+                f"threaded display baseline needs only Default, got {names!r}"
+            )
+        return model
 
     async def capture(
         stage: str, row: dict[str, Any], expected_references: list[str]
@@ -327,6 +585,7 @@ async def probe_assembly_display_data(
             }
             report["stages"].append(row)
             await capture("normal", row, normal_state["references"])
+            protected[paths["normal"]] = protected[normal_path]
 
             check(
                 "display matrix create single assembly", await adapter.create_assembly()
@@ -370,6 +629,7 @@ async def probe_assembly_display_data(
                 "single-copy11": _digest(paths["single-copy11"]),
                 "normal": protected[normal_path],
             }
+            protected[paths["single-copy11"]] = source_hashes["single-copy11"]
             source_references = {
                 "single-copy11": single_refs,
                 "normal": normal_state["references"],
@@ -438,6 +698,7 @@ async def probe_assembly_display_data(
                             config = None
                             row["configuration_switches"].append(_state(model))
                     row["before_save"] = _state(model)
+                    row["get_save_flag_before_save3"] = bool(model.GetSaveFlag())
                     result = model.Save3(options, 0, 0)
                     row["save_result"] = result
                     if not isinstance(result, tuple) or len(result) != 3:
@@ -454,6 +715,287 @@ async def probe_assembly_display_data(
                         )
                     model = None
                     await capture(stage, row, source_references[source_stage])
+                    protected[paths[stage]] = _digest(paths[stage])
+            # Keep every prior stage unchanged. This separate baseline contains a
+            # real threaded part; the original hanger/rod baseline remains intact.
+            stage = ReferenceSource.THREADED_SINGLE.value
+            model = await create_threaded_fixture()
+            if not model.ForceRebuild3(False):
+                raise RuntimeError(
+                    "threaded display baseline ForceRebuild3(False) failed"
+                )
+            threaded_state = _state(model)
+            threaded_refs = threaded_state["references"]
+            if not set(threaded_refs).issubset({str(path) for path in protected}):
+                raise RuntimeError(
+                    "threaded display baseline references inputs outside normal pn"
+                )
+            row = {
+                "stage": stage,
+                "source_stage": "cached-normal-pn-parts",
+                "save_api": ReferenceSave.COPY.value,
+                "save_options": 11,
+                "before_save": threaded_state,
+            }
+            report["stages"].append(row)
+            row["save_result"] = model.SaveAs3(str(paths[stage]), 0, 11)
+            model = None
+            await capture(stage, row, threaded_refs)
+            protected[paths[stage]] = _digest(paths[stage])
+
+            for trial in REFERENCE_TRIALS:
+                stage = trial.stage
+                source_stage = trial.source.value
+                with span("probe.assembly_display_data.references", stage=stage):
+                    row = {
+                        "stage": stage,
+                        "source_stage": source_stage,
+                        "source_sha256": None,
+                        "baseline_display_data": None,
+                        "save_api": trial.save_api.value,
+                        "save_options": trial.save_options,
+                        "comparison": trial.comparison,
+                        "operations": [
+                            operation.value for operation in trial.operations
+                        ],
+                        "operation_states": [],
+                        "configuration_switches": [],
+                        "pre_save_instrumentation": {
+                            "opened_source": "_state reads native configuration/mark/rebuild properties and GetComponents(True)",
+                            "operation_states": "_state before and after each listed operation",
+                            "before_save": "_state repeats these reads immediately before save; not an uninstrumented open/save",
+                        },
+                    }
+                    report["stages"].append(row)
+                    if trial.source == ReferenceSource.FRESH_THREADED:
+                        # No baseline assembly file, intermediate save, or source
+                        # byte hash exists for this independent untitled fixture.
+                        working_path = None
+                        row["working_source_path"] = None
+                        row["baseline_display_data_note"] = (
+                            "No assembly file exists before this first native save."
+                        )
+                        model = await create_threaded_fixture()
+                        if model.GetPathName():
+                            raise RuntimeError(
+                                "fresh threaded fixture is already saved"
+                            )
+                        initial = _state(model)
+                        row["initial_native_default_state"] = initial
+                        row["opened_source"] = initial
+                        if initial["references"] != threaded_refs:
+                            raise RuntimeError(
+                                "fresh threaded fixture changed cached references"
+                            )
+                    else:
+                        source_row = next(
+                            saved_row
+                            for saved_row in report["stages"]
+                            if saved_row["stage"] == source_stage
+                        )
+                        row["source_sha256"] = _digest(paths[source_stage])
+                        row["baseline_display_data"] = source_row["display_data"]
+                        if row["source_sha256"] != protected[paths[source_stage]]:
+                            raise RuntimeError(
+                                f"reference trial source changed: {source_stage}"
+                            )
+                        # Saved-source Copy11 edits a separate temporary sibling;
+                        # in-place/reconcile stages open their own output copy.
+                        working_path = scratch_paths.get(stage, paths[stage])
+                        if stage in scratch_paths:
+                            working_path.unlink(missing_ok=True)
+                        shutil.copy2(paths[source_stage], working_path)
+                        if _digest(working_path) != row["source_sha256"]:
+                            raise RuntimeError(
+                                f"reference trial {stage} did not start from source bytes"
+                            )
+                        row["working_source_path"] = str(working_path)
+                        check(
+                            f"reference trial open {stage}",
+                            await adapter.open_model(str(working_path)),
+                        )
+                        model = _model(adapter)
+                        row["opened_source"] = _state(model)
+                    for operation in trial.operations:
+                        evidence = {
+                            "operation": operation.value,
+                            "before": _state(model),
+                        }
+                        row["operation_states"].append(evidence)
+                        if operation == ReferenceOperation.ADD_DERIVED:
+                            manager = _early_bound(
+                                model.ConfigurationManager, "IConfigurationManager"
+                            )
+                            child = manager.AddConfiguration2(
+                                "Default Simplified", "", "", 0, "Default", "", False
+                            )
+                            if (
+                                child is None
+                                or not _early_bound(child, "IConfiguration").IsDerived()
+                            ):
+                                raise RuntimeError(
+                                    f"reference trial {stage}: derived configuration creation failed"
+                                )
+                            child = manager = None
+                        elif operation in (
+                            ReferenceOperation.ACTIVATE_DERIVED,
+                            ReferenceOperation.RESTORE_DEFAULT,
+                        ):
+                            name = (
+                                "Default Simplified"
+                                if operation == ReferenceOperation.ACTIVATE_DERIVED
+                                else "Default"
+                            )
+                            if active_configuration_name(
+                                adapter, model
+                            ) != name and not model.ShowConfiguration2(name):
+                                raise RuntimeError(
+                                    f"reference trial {stage}: refused activation {name}"
+                                )
+                        elif (
+                            operation == ReferenceOperation.SELECT_SIMPLIFIED_REFERENCES
+                        ):
+                            if (
+                                active_configuration_name(adapter, model)
+                                != "Default Simplified"
+                            ):
+                                raise RuntimeError(
+                                    "reference selection requires the derived configuration"
+                                )
+                            evidence["reference_selection"] = (
+                                _select_available_simplified_references(adapter, model)
+                            )
+                        elif operation in (
+                            ReferenceOperation.REBUILD_DERIVED,
+                            ReferenceOperation.REBUILD_DEFAULT,
+                        ):
+                            expected = (
+                                "Default Simplified"
+                                if operation == ReferenceOperation.REBUILD_DERIVED
+                                else "Default"
+                            )
+                            if active_configuration_name(
+                                adapter, model
+                            ) != expected or not model.ForceRebuild3(False):
+                                raise RuntimeError(
+                                    f"reference trial {stage}: deep rebuild failed in {expected}"
+                                )
+                        elif operation == ReferenceOperation.REBUILD_SAVE_MARKS:
+                            evidence["configuration_states"] = []
+                            for name in ("Default Simplified", "Default"):
+                                if (
+                                    active_configuration_name(adapter, model) != name
+                                    and not model.ShowConfiguration2(name)
+                                ) or not model.EditRebuild3():
+                                    raise RuntimeError(
+                                        f"reference trial {stage}: repeat switch/rebuild refused {name}"
+                                    )
+                                config = _configuration(model, name)
+                                config.AddRebuildSaveMark = True
+                                if not config.AddRebuildSaveMark:
+                                    raise RuntimeError(
+                                        f"reference trial {stage}: repeat rebuild/save mark refused {name}"
+                                    )
+                                config = None
+                                state = _state(model)
+                                evidence["configuration_states"].append(state)
+                                row["configuration_switches"].append(
+                                    {
+                                        "operation": operation.value,
+                                        **state,
+                                    }
+                                )
+                        elif operation in (
+                            ReferenceOperation.MARK_DEFAULT,
+                            ReferenceOperation.MARK_BOTH,
+                        ):
+                            if active_configuration_name(adapter, model) != "Default":
+                                raise RuntimeError(
+                                    "initial-C LDR marks require active Default"
+                                )
+                            marks = (
+                                ("Default",)
+                                if operation == ReferenceOperation.MARK_DEFAULT
+                                else ("Default", "Default Simplified")
+                            )
+                            _set_marks(model, marks)
+                            evidence["requested_ldr_marks"] = marks
+                        elif operation == ReferenceOperation.RECONCILE:
+                            row["before_save"] = evidence["before"]
+                            row["reconcile_input_sha256"] = _digest(paths[stage])
+                            row["pre_reconcile_get_save_flag"] = bool(
+                                model.GetSaveFlag()
+                            )
+                            row["internal_save3_get_save_flag"] = None
+                            row["internal_save3_flag_observation"] = (
+                                "Unobserved; existing helper runs with the original adapter."
+                            )
+                            model = None
+                            discard()
+                            await reconcile_saved_rebuild_state(
+                                adapter, stage, paths[stage]
+                            )
+                            model = _model(adapter)
+                            row["reconcile_changed_bytes"] = (
+                                _digest(paths[stage]) != row["reconcile_input_sha256"]
+                            )
+                        else:
+                            raise RuntimeError(
+                                f"unsupported reference operation {operation}"
+                            )
+                        evidence["after"] = _state(model)
+                        if operation in (
+                            ReferenceOperation.ACTIVATE_DERIVED,
+                            ReferenceOperation.REBUILD_DERIVED,
+                            ReferenceOperation.RESTORE_DEFAULT,
+                            ReferenceOperation.REBUILD_DEFAULT,
+                        ):
+                            row["configuration_switches"].append(
+                                {
+                                    "operation": operation.value,
+                                    **evidence["after"],
+                                }
+                            )
+                        checkpoint()
+                    if trial.save_api != ReferenceSave.RECONCILE:
+                        row["before_save"] = _state(model)
+                    if trial.save_api == ReferenceSave.COPY:
+                        native_source_path = str(model.GetPathName() or "")
+                        row["native_source_path"] = native_source_path or None
+                        if working_path == paths[stage] or (
+                            native_source_path
+                            and Path(native_source_path).resolve() == paths[stage]
+                        ):
+                            raise RuntimeError(
+                                "reference Copy11 source must differ from destination"
+                            )
+                        row["save_result"] = model.SaveAs3(
+                            str(paths[stage]), 0, trial.save_options
+                        )
+                    elif trial.save_api == ReferenceSave.IN_PLACE:
+                        row["get_save_flag_before_save3"] = bool(model.GetSaveFlag())
+                        result = model.Save3(trial.save_options, 0, 0)
+                        row["save_result"] = result
+                        if not isinstance(result, tuple) or len(result) != 3:
+                            raise RuntimeError(
+                                f"reference trial {stage}: Save3 missing native outputs: {result!r}"
+                            )
+                        saved, errors, warnings = result
+                        row.update(
+                            saved=bool(saved),
+                            errors=int(errors),
+                            warnings=int(warnings),
+                        )
+                        if not saved or errors:
+                            raise RuntimeError(
+                                f"reference trial {stage}: Save3 failed: {result!r}"
+                            )
+                    # Reconcile owns its conditional Save3; don't add a save here.
+                    model = None
+                    await capture(stage, row, threaded_refs)
+                    if stage in scratch_paths:
+                        working_path.unlink()
+                    protected[paths[stage]] = _digest(paths[stage])
             report["complete"] = True
         except Exception as error:
             report["error"] = repr(error)
@@ -467,6 +1009,17 @@ async def probe_assembly_display_data(
             try:
                 discard()
             finally:
+                cleanup_errors = []
+                for scratch in scratch_paths.values():
+                    try:
+                        scratch.unlink(missing_ok=True)
+                    except OSError as error:
+                        cleanup_errors.append(
+                            {"path": str(scratch), "error": repr(error)}
+                        )
+                if cleanup_errors:
+                    report["complete"] = False
+                    report["scratch_cleanup_errors"] = cleanup_errors
                 report["protected_inputs"] = []
                 changed = []
                 for path, before in sorted(protected.items()):
@@ -500,6 +1053,10 @@ async def probe_assembly_display_data(
                 if changed:
                     raise RuntimeError(
                         f"display matrix changed protected input bytes: {changed}"
+                    )
+                if cleanup_errors:
+                    raise RuntimeError(
+                        f"display matrix failed to remove transient source files: {cleanup_errors}"
                     )
 
     return {f"display_{stage}": str(paths[stage]) for stage in STAGES} | {
