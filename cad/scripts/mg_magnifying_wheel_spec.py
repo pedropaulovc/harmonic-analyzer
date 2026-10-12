@@ -116,10 +116,14 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
 ROUND_TEXT_SUFFIX = " MAX"
 
 # Rule 6: the notes say only what no callout can.  The spigot's press fit and
-# the bore's running fit print on their own diameter callouts.
+# the bore's running fit print on their own diameter callouts.  The spokes'
+# clocking is a 0 deg relation no dimension can show: the seed spoke lies on
+# local +X, so two spokes lie on the face view's horizontal centerline, the
+# one TIE 2's angle is measured from, and TIE 1 on the vertical one falls
+# midway between two (both asserted below).
 DRAWING_NOTES = "\n".join(
     (
-        f"{SPOKE_COUNT} TAPERED SPOKES, EQUALLY SPACED.",
+        f"{SPOKE_COUNT} TAPERED SPOKES EQUALLY SPACED, TWO ON THE HORIZONTAL CENTERLINE.",
         "TIE 1: LEVER-WIRE TIE HOLE THROUGH THE BOSS.",
         "TIE 2: PEN-WIRE TIE HOLE, GROOVE BOTTOM TO RIM BORE.",
     )
@@ -162,6 +166,8 @@ _CAST_ROUND_MAX = CAST_ROUND_R
 _HUB_DIA = (HUB_DIA + HUB_DIA_BAND[1], HUB_DIA + HUB_DIA_BAND[0])
 _TIE_R_MAX = (TIE_HOLE_DIA + TIE_HOLE_BAND[0]) / 2.0 + TIE_POSITION_TOL
 _SPOKE_PITCH = 360.0 / SPOKE_COUNT
+if clock_to_local_deg(0.0) % _SPOKE_PITCH or TIE1_CLOCK_DEG % 180.0 != 90.0:
+    raise AssertionError("the spokes no longer lie on the horizontal centerline")
 
 # TIE 1 to the boss OD (12.45 - 9.85 - 0.575 = 2.025).
 TIE1_HUB_WALL = _HUB_DIA[0] / 2.0 - TIE1_R - _TIE_R_MAX

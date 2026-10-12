@@ -164,6 +164,9 @@ def test_linked_notes_specify_the_spokes_and_ties() -> None:
     assert len(lines) <= 4
     assert all(len(line) <= 80 for line in lines)
     assert "6 TAPERED SPOKES" in notes and "CAST" not in notes
+    # The spokes' clocking to the ties: two on the centerline TIE 2's angle
+    # is measured from (the model's seed spoke on local +X).
+    assert "TWO ON THE HORIZONTAL CENTERLINE" in notes.splitlines()[0]
     assert "TIE 1" in notes and "TIE 2" in notes
     # The bore's REAM THRU callout carries the process; the notes do not.
     assert "REAMED" not in notes

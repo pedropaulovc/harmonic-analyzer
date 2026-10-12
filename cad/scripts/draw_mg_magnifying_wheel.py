@@ -444,10 +444,12 @@ SECTION_KEEP = {
     ),
     # The groove's R up right, its leader down-left onto the groove at run
     # 13's 35 deg, so the stub it draws past the arc leaves the rim's back
-    # face above the rim width's extension line; its shoulder 4.3 mm over
+    # face above the rim width's extension line; its shoulder 5.8 mm over
     # the top of the rim-bore round's R block (ROUND_TEXT_XY), moved up and
-    # right along that bearing.
-    "GrooveR": (SECTION_CENTER[0] + 0.0293, SECTION_CENTER[1] + 0.0665),
+    # right along that bearing.  Run 16's 4.3 mm left its stacked -0.1 only
+    # 1.43 mm over the "R0.8 MAX" (text-clearance needs 1.78 mm): 1.5 mm
+    # more, 2.1 mm right on the bearing.
+    "GrooveR": (SECTION_CENTER[0] + 0.0314, SECTION_CENTER[1] + 0.0680),
 }
 # The rim-bore round's R is a sheet radial on its cut arc: A-A cannot import
 # a fillet radius whose arc IS the cut (round-12 farm leaves: neither the
