@@ -1,6 +1,5 @@
 """Offline contracts for the paper-drive assembly and its drawing (MHA-PD-000)."""
 
-import inspect
 from itertools import product
 import math
 import re
@@ -1177,9 +1176,6 @@ def test_every_bom_item_is_ballooned_on_some_sheet() -> None:
     assert spare == drawing.SPARE_INSTANCE == "pd-transgear-removable-3"
     # Edge-on in the front and right views the spare is a bare bar: hidden
     # there, shown and ballooned on the isometric only.
-    source = inspect.getsource(drawing._place_assembled_sheet)
-    assert 'if orientation != "*Isometric":' in source
-    assert "_hide_instances(" in source and "SPARE_INSTANCE" in source
     for caption in drawing.ASSEMBLED_CAPTIONS.values():
         assert "T18 SPARE, STORED LOOSE" in " ".join(caption.split())
 

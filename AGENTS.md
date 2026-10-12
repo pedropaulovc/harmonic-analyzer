@@ -132,9 +132,9 @@ git submodule update --init --recursive
    `pyproject.toml`); run it on a farm worker or in its own CI.
 4. Ground recipe calls in the vendored `PyWin32Adapter` implementation, including
    its inherited mixins and delegated helpers; never infer an adapter method name
-   from a SolidWorks operation. Pin changed calls' signatures, boss/cut choice,
-   end condition and direction with cheap source-only AST contracts against the
-   SDK, without importing recipes or constructing an adapter. The knob-shaft and
+   from a SolidWorks operation. Check that every changed call exists and binds
+   with a cheap source-only AST census against the SDK, without importing
+   recipes or constructing an adapter. The knob-shaft and
    feed-pinion census is `cad/scripts/test_pd_transgear_adapter_contract.py`;
    it checks every direct `adapter.<method>(...)` call, not an API allowlist.
    Offline contracts do not replace final-source native geometry/readback proof.

@@ -262,13 +262,15 @@ _DETAIL_TOP = DETAIL_CENTER[1] + DETAIL_CROP_RADIUS
 _DETAIL_BOTTOM = DETAIL_CENTER[1] - DETAIL_CROP_RADIUS
 # The neck frame's leader lands on the straight floor 0.15 from F and climbs
 # the neck's air to a frame left of it, 1 mm right of the corner R's arrow.
-# A frame prints 31.3 mm wide with a 6.3 mm shoulder (stack PDF: box x
-# 0.1884-0.2197, shoulder to 0.2260), so its right edge stands one shoulder
-# left of the landing and the leader climbs plumb.  Its row clears the
-# crop's top by 5 mm.
+# A frame prints 31.3 mm wide and 7 mm tall with a 6.3 mm shoulder at
+# mid-height (stack PDF: box x 0.1884-0.2197, shoulder to 0.2260), so its
+# right edge stands one shoulder left of the landing and the leader climbs
+# plumb.  Its row sits low, 8.3 mm over the crop's top: the box's corner
+# nearest the crop (x 0.0982, y 0.2513) stands 2.1 mm off the circle.
 _FRAME_WIDTH = 0.0313
+_FRAME_HEIGHT = 0.007
 _FRAME_SHOULDER = 0.0063
-_FRAME_ROW_TOP = _DETAIL_TOP + 0.012
+_FRAME_ROW_TOP = _DETAIL_TOP + 0.0083
 NECK_LANDING_Z_MM = -0.15
 NECK_RUNOUT_LANDING = _detail_xy(NECK_LANDING_Z_MM, _NECK_FLOOR_R)
 NECK_RUNOUT_FRAME = (
@@ -276,9 +278,14 @@ NECK_RUNOUT_FRAME = (
 )
 DETAIL_KEEP: dict[str, tuple[float, float]] = {
     # Its line rises through the neck's air 0.30 from F, 1.5 mm right of the
-    # frame's leader, to a shoulder level with the frame; the text hangs
-    # right of the line (stack PDF: from 3 to 18 mm right of it).
-    "FrontReliefDia": (_detail_xy(-0.30, 0.0)[0], _FRAME_ROW_TOP - 0.0035),
+    # frame's leader, past the frame's row to text over it.  The text hangs
+    # LEFT of the line (3f50160d9 full build: [87.8, 256.6]..[104.6, 260.2]
+    # mm for a keep at (106.0, 258.5), right edge 1.4 mm short of the line),
+    # so level with the frame the frame's shoulder ran 6.35 mm through it.
+    # Over the frame the shoulder and the plumb leader both stay under the
+    # text: centred 4.6 mm over the frame's top, the 3.6 mm text clears the
+    # frame by 2.8 mm and the border (0.2667) by 2.0 mm on either side.
+    "FrontReliefDia": (_detail_xy(-0.30, 0.0)[0], _FRAME_ROW_TOP + 0.0046),
     # Under the crop, the text right of the step's witness line: centred on
     # the 4 mm span it would sit on both witness lines.
     "FrontReliefWidth": (_STEP_X + 0.0078, _DETAIL_BOTTOM - 0.007),

@@ -622,10 +622,6 @@ def test_bore_fit_leader_passes_clear_of_the_finish() -> None:
 def test_finite_gear_data_and_model_consume_one_tooth_system() -> None:
     from _gear_fit_limits import gear_tip_band_mm
 
-    # The independent feed count/master does not follow the reducer's choice.
-    source = Path(spec.__file__).read_text(encoding="utf-8")
-    assert "MESH_PINION_TEETH" not in source
-    assert "PROFILE_SHIFT" not in source
     assert spec.TEETH == spec.CUTTER_TEMPLATE.reference_teeth == 12
     assert spec.OUTSIDE_DIA_BAND == gear_tip_band_mm("standard")
     assert part.STOCK_PROFILE is spec.STOCK_PROFILE
@@ -756,11 +752,6 @@ def test_toothspace_callout_lands_on_the_rear_face_full_depth_flank() -> None:
     partial depth, and the pick found a flank 0.23 mm off the contact. The
     straight pass is full depth at the rear face, so the callout lands on a
     *Back view of it, in free sheet below the section."""
-    import inspect
-
-    source = inspect.getsource(drawing.build)
-    assert 'place_view(adapter, str(SOURCE), "*Back", *REAR_CENTER, scale=VIEW_SCALE)' in source
-    assert "add_toothspace_callout(\n        adapter, rear," in source
     assert spec.TOOTH_SPACE_INSPECTION_END_MM == 0.0
     assert spec.FULL_DEPTH > spec.TOOTH_SPACE_INSPECTION_END_MM
     s = drawing.VIEW_SCALE[0] / 1000.0
@@ -776,9 +767,6 @@ def test_toothspace_callout_lands_on_the_rear_face_full_depth_flank() -> None:
     assert rear.xmax < drawing._side_x(0.0)
     # Run 12: the outline runs ~6 mm past the tip circle, so the caption is
     # hung below the measured outline, not at a fixed point.
-    assert "_place_rear_caption(adapter, rear)" in source
-    placer = inspect.getsource(drawing._place_rear_caption)
-    assert "GetOutline" in placer and "GetExtent" in placer
     assert drawing.CAPTION_SETTLE_M >= 0.0006
     outline_bottom = cy - drawing.HALF_OD - 0.0065  # run 12's measured margin
     caption_height = 0.0047

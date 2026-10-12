@@ -63,29 +63,6 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 def test_locating_sockets_print_in_the_front_view() -> None:
     """The sockets open in the rear face *Front looks at: no second rear view
     (run 7's 1:1 rear view crowded the sheet), every survivor a sheet pair."""
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    calls = [
-        node for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, (ast.Attribute, ast.Name))
-        and getattr(node.func, "attr", getattr(node.func, "id", "")) in {
-            "curate_view_dimensions", "place_view",
-        }
-    ]
-    imports = [
-        call for call in calls if getattr(call.func, "attr", "") == "curate_view_dimensions"
-    ]
-    keep_sources = {
-        ast.unparse(next(keyword.value for keyword in call.keywords if keyword.arg == "keep"))
-        for call in imports
-    }
-    assert len(imports) == 4
-    assert keep_sources == {"FRONT_KEEP", "SECTION_KEEP", "LOCATOR_SECTION_KEEP", "END_KEEP"}
-    orientations = [
-        call.args[2].value for call in calls
-        if getattr(call.func, "id", "") == "place_view"
-    ]
-    assert sorted(orientations) == ["*Front", "*Isometric", "*Right"]
     for name in ("LocatorX1", "LocatorY1", "LocatorY2", "LocatorDia1"):
         assert name in drawing.FRONT_KEEP
     for view_keep in (

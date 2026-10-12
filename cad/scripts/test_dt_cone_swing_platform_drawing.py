@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import inspect
+import asyncio
 import math
 import sys
 import types
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import _config
 import cone_line
@@ -229,8 +230,48 @@ def test_corner_arc_station_is_the_fillet_centre_in_model_space() -> None:
         for _n, nx, nz, _r in (corners[index - 1], corners[(index + 1) % len(corners)]):
             cross = (nx - x) * (cz - z) - (nz - z) * (cx - x)
             assert abs(cross) / math.hypot(nx - x, nz - z) == pytest.approx(radius)
-    source = inspect.getsource(drawing._assert_corner_radius_attachment)
-    assert "station_xy" not in source and "corner_fillet_centre_mm" in source
+
+
+@pytest.mark.parametrize("stale", [False, True])
+def test_corner_attachment_owns_only_the_arc_at_the_model_fillet_centre(monkeypatch, stale):
+    """The gate's real arc search: an owned visible arc of the right radius
+    counts only at the fillet's model-space centre; a stale centre finds 0."""
+    ns = types.SimpleNamespace
+    radius_m = 0.005
+    cx, cz = drawing.corner_fillet_centre_mm("SW")
+    if stale:
+        cx += 1.0
+    owner = ns(Name="CornerSW")
+    curve = ns(IsCircle=lambda: True, CircleParams=(cx / 1000, 0.00635, cz / 1000, 0, 1, 0, radius_m))
+    edge = ns(GetCurve=lambda: curve)
+    face = ns(GetFeature=lambda: owner, GetEdges=lambda: [edge])
+    owner.GetFaces = lambda: [face]
+    dimension = ns(GetFeatureOwner=lambda: owner)
+    annotation = ns(
+        GetAttachedEntities3=lambda: None, GetAttachedEntityTypes=lambda: None,
+        IsDangling=lambda: False,
+        GetSpecificAnnotation=lambda: ns(GetDimension2=lambda _i: dimension),
+        GetDisplayData=lambda: ns(
+            GetArrowHeadCount=lambda: 1, GetArrowHeadAtIndex2=lambda _i: (0.0, 0.0, 0.0),
+        ),
+    )
+
+    class Reached(Exception):
+        pass
+
+    def projected(_adapter, _view, point, *, label):
+        raise Reached(point)
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, _item: "CornerSWR")
+    monkeypatch.setattr(drawing, "visible_view_entities", lambda *_a, **_k: [edge])
+    monkeypatch.setattr(drawing, "model_point_in_view", projected)
+    adapter = ns(swApp=ns(IsSame=lambda a, b: int(a is b)))
+    with pytest.raises(RuntimeError if stale else Reached, match="found 0" if stale else None):
+        drawing._assert_corner_radius_attachment(
+            adapter, object(), [annotation],
+            name="CornerSWR", feature_name="CornerSW", radius_m=radius_m,
+        )
 
 
 def test_r12_corner_arrow_lands_at_its_arc_middle() -> None:
@@ -879,11 +920,10 @@ def test_unrelieved_plate_preflight_refuses_below_floor(monkeypatch, air) -> Non
     monkeypatch.setattr(part, "crank_gear_platform_clearance", lambda: air)
     with pytest.raises(AssertionError, match="unrelieved platform air"):
         part.require_crank_gear_platform_clearance()
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    build = source.split("async def build(adapter)", 1)[1]
-    assert build.index("require_crank_gear_platform_clearance()") < build.index(
-        'check("create_part"'
-    )
+    adapter = types.SimpleNamespace(create_part=AsyncMock())
+    with pytest.raises(AssertionError, match="unrelieved platform air"):
+        asyncio.run(part.build(adapter))
+    adapter.create_part.assert_not_awaited()
 
 
 def test_lower_journal_and_larger_tip_close_air_without_changing_bands(monkeypatch) -> None:

@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import ast
 import math
 import re
 import runpy
-from pathlib import Path
 
 import pytest
 
@@ -326,20 +324,11 @@ def test_tip_grade_is_spec_owned_native_pmi_not_a_toleranced_note() -> None:
     assert drawing.FRONT_KEEP.keys() | drawing.RIGHT_KEEP.keys() == set(
         spec.DRAWING_PRECISION_BY_NAME
     )
-    source = Path(spec.__file__).with_name("build_dt_alignment_pinion.py")
-    calls = [
-        node
-        for node in ast.walk(ast.parse(source.read_text(encoding="utf-8")))
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "set_dimension_bilateral_tolerance"
-    ]
-    assert any(
-        len(call.args) == 4
-        and ast.literal_eval(call.args[1]) == "GearBlankProfile"
-        and ast.literal_eval(call.args[2]) == "OutsideDia"
-        and ast.unparse(call.args[3]) == "*deviations(OUTSIDE_DIA_BAND)"
-        for call in calls
+    import build_dt_alignment_pinion as part
+    from _drawing_contract import model_toleranced_dimensions
+
+    assert model_toleranced_dimensions(part)[("GearBlankProfile", "OutsideDia")] == (
+        "*deviations(OUTSIDE_DIA_BAND)"
     )
     assert "OUTSIDE DIAMETER" not in spec.GEAR_DATA
 

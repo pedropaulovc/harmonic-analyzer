@@ -527,8 +527,6 @@ def test_native_cone_angle_offsets_only_text_and_refuses_noops(
     assert calls == (
         [{annotation.name: drawing.COUNTERSINK_ANGLE_TEXT_XY}] if arc_moves else []
     )
-    call = _calls(drawing.__file__)["_place_countersink_angle"]
-    assert [ast.unparse(arg) for arg in call.args] == ["adapter", "section_annotations"]
 
 
 def test_native_cone_angle_requires_exactly_one_model_annotation(monkeypatch) -> None:

@@ -317,6 +317,78 @@ def test_drawing_refuses_a_lost_max_type(monkeypatch, expected):
         types[name] = expected[name]
 
 
+class _Sheet:
+    """One sheet: a sheet view plus drawing views holding named notes and
+    dimensions; EditDelete removes the selected note."""
+
+    def __init__(self, notes, callouts):
+        self.selected = None
+        self.views = {"sheet": [], "Drawing View3": []}
+        for owner, name, text in notes:
+            self.views[owner].append(self._note(name, text))
+        self.callouts = callouts
+        self.sheet_view = SimpleNamespace(GetAnnotations=lambda: self.views["sheet"])
+        self.tap_view = SimpleNamespace(
+            name="Drawing View3",
+            GetAnnotations=lambda: self.views["Drawing View3"],
+            GetDisplayDimensions=lambda: self.callouts,
+        )
+
+    def _note(self, name, text):
+        note = SimpleNamespace(GetType=lambda: 6, OwnerType=1, GetName=lambda: name)
+        note.GetSpecificAnnotation = lambda: SimpleNamespace(GetText=lambda: text)
+        note.Select2 = lambda _append, _mark: setattr(self, "selected", note) or True
+        return note
+
+    def GetViews(self):
+        return [[self.sheet_view, self.tap_view]]
+
+    def ClearSelection2(self, _all):
+        self.selected = None
+
+    def EditDelete(self):
+        for notes in self.views.values():
+            if self.selected in notes:
+                notes.remove(self.selected)
+
+
+def _callout(name, *texts, hole=True):
+    data = SimpleNamespace(GetTextCount=lambda: len(texts), GetTextAtIndex=lambda i: texts[i])
+    return SimpleNamespace(
+        IsHoleCallout=lambda: hole, GetDisplayData=lambda: data,
+        GetAnnotation=lambda: SimpleNamespace(GetName=lambda: name),
+    )
+
+
+def test_collar_deletes_only_the_notes_it_did_not_place(monkeypatch):
+    """Run 8087fd13c: one unplaced note, DetailItem348, sat across CollarWidth
+    and CollarDia. It goes by not being ours, whatever its text says."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.name)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    sheet = _Sheet(
+        [("sheet", "DetailItem1", "CHECK TAPPED HOLE"),
+         ("Drawing View3", "DetailItem2", "RADIAL TAP VIEW SCALE 2:1"),
+         ("Drawing View3", "DetailItem348", "2-56 Tapped Hole")],
+        [_callout("RD1", "2-56 UNC - 2B", "THRU"), _callout("RD9", "x", hole=False)],
+    )
+    adapter = SimpleNamespace(currentModel=sheet)
+    placed = frozenset({"DetailItem1", "DetailItem2"})
+    with pytest.raises(RuntimeError, match="not settled|after the last rebuild"):
+        drawing._assert_settled_annotations(adapter, placed, "RD1")
+    drawing._delete_unplaced_notes(adapter, placed)
+    assert set(drawing._sheet_notes(adapter)) == placed
+    drawing._assert_settled_annotations(adapter, placed, "RD1")
+    with pytest.raises(RuntimeError, match="not every placed note"):
+        drawing._delete_unplaced_notes(adapter, placed | {"DetailItem7"})
+    sheet.callouts = [_callout("RD1", "2-56 UNC - 2B", "6.80 DEEP")]
+    with pytest.raises(RuntimeError, match="not settled"):
+        drawing._assert_settled_annotations(adapter, placed, "RD1")
+    sheet.callouts = []
+    with pytest.raises(RuntimeError, match="not settled"):
+        drawing._assert_settled_annotations(adapter, placed, "RD1")
+
+
 def test_shoulder_root_prints_max_and_the_air_stack_books_it():
     """Machinist review of the r3 build asked about R0.25 0.00/-0.25: it is a
     tool-nose root, sharp to 0.25 all good, so it prints R0.25 MAX."""

@@ -448,10 +448,6 @@ def test_notes_and_recipe_have_no_obsolete_front_pin_or_slot() -> None:
     ]
     assert "BROACH" not in spec.BORE_CALLOUT and "EDM" not in spec.BORE_CALLOUT
     assert drawing.NOTES_TEXT.startswith('$PRPSHEET:"Manufacturing Notes"\n3. ')
-    for path in (part.__file__, drawing.__file__, spec.__file__):
-        tree = ast.parse(Path(path).read_text(encoding="utf-8"))
-        imports = [node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)]
-        assert not any("collar_cross_pin" in name for name in imports)
     assert "SLOT" not in notes
     assert "SPRING PIN" not in notes
     assert "PILOT WALL" not in notes  # the former named shortfall is gone

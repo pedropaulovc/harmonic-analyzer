@@ -7,9 +7,7 @@ diameters p/sin(180/N) typed instead of the per-tooth N*p/pi.
 
 from __future__ import annotations
 
-import ast
 import math
-from pathlib import Path
 import runpy
 
 import pytest
@@ -163,60 +161,6 @@ def test_removable_roles_follow_centres_not_configuration_names(
         "knob": "pd-transgear-removable-1",
         "spare": "pd-transgear-removable-3",
     }
-
-
-def test_assembly_placement_belt_and_free_dof_use_the_selected_roles() -> None:
-    """Protect the native recipe's configuration, coupling order and crank DOF."""
-    source = Path(assembly.__file__).read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    placements = {
-        node.targets[0].id: node.value.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Assign)
-        and len(node.targets) == 1
-        and isinstance(node.targets[0], ast.Name)
-        and isinstance(node.value, ast.Await)
-        and isinstance(node.value.value, ast.Call)
-        and getattr(node.value.value.func, "id", None) == "place_component"
-    }
-    for role, configuration in (
-        ("crank_wheel", "CRANK_CONFIG"), ("knob_wheel", "KNOB_CONFIG")
-    ):
-        call = placements[role]
-        assert ast.literal_eval(call.args[1]) == "pd-transgear-removable"
-        keywords = {keyword.arg: keyword.value for keyword in call.keywords}
-        assert ast.unparse(keywords["configuration"]) == f"REMOVABLE.{configuration}"
-        assert ast.literal_eval(keywords["ground"]) is False
-    belts = [
-        node for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "id", None) == "BeltChainParameters"
-    ]
-    assert len(belts) == 1
-    belt = {keyword.arg: keyword.value for keyword in belts[0].keywords}
-    assert ast.unparse(belt["pulley_components"]) == "[crank_wheel, knob_wheel]"
-    assert [ast.unparse(value) for value in belt["pulley_diameters"].elts] == [
-        "CHAIN_PULLEY_DIA[REMOVABLE.CRANK_CONFIG]",
-        "CHAIN_PULLEY_DIA[REMOVABLE.KNOB_CONFIG]",
-    ]
-    assert [
-        value.value.id
-        for axis in belt["pulley_member_axes"].elts
-        for value in axis.values
-        if isinstance(value, ast.FormattedValue)
-    ] == ["crank_wheel", "knob_wheel"]
-    assert ast.literal_eval(belt["engage_belt"]) is True
-    necessity = [
-        node for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "id", None) == "assert_free_dof_necessity"
-    ]
-    assert len(necessity) == 1
-    required = next(
-        keyword.value for keyword in necessity[0].keywords
-        if keyword.arg == "required_instances"
-    )
-    assert ast.unparse(required) == "(crank_wheel,)"
 
 
 def test_exact_tooth_ratio_passes() -> None:

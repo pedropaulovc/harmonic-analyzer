@@ -1,13 +1,17 @@
 """Pure supplier inputs for platform/shaft/global-pose readers, without CAD.
 
 Scalar regressions preserve the harvested model, not an inferred stock grade.
-Native recipes are inspected as source only; they are never imported here.
+Whether a spec is pure is read from what importing it loads, in a fresh
+interpreter, so native recipes are never imported into this process.
 """
 
 from __future__ import annotations
 
-import ast
+import functools
 import importlib
+import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -22,87 +26,54 @@ PURE_SPECS = (
     "vn_fillister_screw_spec",
     "vn_transgear_latch_pin_spec",
 )
+NATIVE_ROOTS = frozenset({
+    "diagnostics",
+    "_com",
+    "_session",
+    "_visibility",
+    "_telemetry",
+    "_watchdog",
+    "_holes",
+    "_assembly",
+    "_drawing_common",
+    "_stock_fastener",
+    "solidworks_mcp",
+    "win32com",
+    "pythoncom",
+    "comtypes",
+    "cadquery",
+    "ctypes",
+})
+_LOADED_ROOTS = (
+    "import importlib, json, sys; importlib.import_module(sys.argv[1]); "
+    "print(json.dumps(sorted({name.split('.', 1)[0] for name in sys.modules})))"
+)
 
 
-def _source_tree(module_name: str) -> ast.Module:
-    path = SCRIPTS / f"{module_name.replace('.', '/')}.py"
-    return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+@functools.cache
+def _loaded_roots(module_name: str) -> frozenset[str]:
+    """Top-level modules a fresh interpreter holds after importing ``module_name``."""
+    result = subprocess.run(
+        [sys.executable, "-c", _LOADED_ROOTS, module_name],
+        cwd=SCRIPTS, capture_output=True, text=True, check=True,
+    )
+    return frozenset(json.loads(result.stdout))
 
 
-def _imports(tree: ast.Module) -> set[str]:
-    modules = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            modules.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            modules.add(node.module)
-    return modules
-
-
-def _pure_local_closure(module_name: str) -> set[str]:
-    """Inspect every local import edge before allowing a runtime fact read."""
-    pending = {module_name}
-    visited = set()
-    forbidden_roots = {
-        "diagnostics",
-        "_com",
-        "_session",
-        "_visibility",
-        "_telemetry",
-        "_watchdog",
-        "_holes",
-        "_assembly",
-        "_drawing_common",
-        "_stock_fastener",
-        "solidworks_mcp",
-        "win32com",
-        "pythoncom",
-        "comtypes",
-        "cadquery",
-        "ctypes",
+def _native_roots(module_name: str) -> set[str]:
+    return {
+        root for root in _loaded_roots(module_name)
+        if root in NATIVE_ROOTS or root.startswith(("build_", "draw_", "diag_"))
     }
-    while pending:
-        current = pending.pop()
-        if current in visited:
-            continue
-        visited.add(current)
-        for imported in _imports(_source_tree(current)):
-            root = imported.split(".", 1)[0]
-            assert root not in forbidden_roots and not root.startswith(
-                ("build_", "draw_", "diag_")
-            ), f"native import in pure closure: {current} -> {imported}"
-            local = SCRIPTS / f"{imported.replace('.', '/')}.py"
-            if local.is_file():
-                pending.add(imported)
-    return visited
 
 
 def _pure_spec(module_name: str):
-    _pure_local_closure(module_name)
     return importlib.import_module(module_name)
 
 
-def _top_level_assignments(tree: ast.Module) -> dict[str, ast.expr]:
-    declarations = {}
-    for node in tree.body:
-        if isinstance(node, ast.Assign):
-            targets, value = node.targets, node.value
-        elif isinstance(node, ast.AnnAssign):
-            targets, value = [node.target], node.value
-        else:
-            continue
-        for target in targets:
-            if isinstance(target, ast.Name):
-                assert target.id not in declarations, f"duplicate authority {target.id}"
-                declarations[target.id] = value
-    return declarations
-
-
 @pytest.mark.parametrize("module_name", PURE_SPECS)
-def test_pose_vendor_specs_have_no_native_import_closure(module_name: str) -> None:
-    closure = _pure_local_closure(module_name)
-    assert module_name in closure
-    assert _pure_spec(module_name).__name__ == module_name
+def test_pose_vendor_specs_load_no_native_module(module_name: str) -> None:
+    assert not _native_roots(module_name)
 
 
 @pytest.mark.parametrize(
@@ -114,11 +85,8 @@ def test_pose_vendor_specs_have_no_native_import_closure(module_name: str) -> No
         "diagnostics.diag_mcmaster_dowel",
     ),
 )
-def test_pure_closure_guard_has_a_real_native_positive_control(
-    module_name: str,
-) -> None:
-    with pytest.raises(AssertionError, match="native import in pure closure"):
-        _pure_local_closure(module_name)
+def test_native_load_probe_has_a_real_native_positive_control(module_name: str) -> None:
+    assert "diagnostics" in _native_roots(module_name)
 
 
 @pytest.mark.parametrize(
@@ -187,24 +155,71 @@ def test_pure_closure_guard_has_a_real_native_positive_control(
         ),
     ],
 )
-def test_native_recipes_consume_one_preserved_scalar_authority(
+def test_native_recipes_load_the_vendor_scalars(
     spec_name: str, recipe_name: str, scalars: dict[str, float]
 ) -> None:
     spec = _pure_spec(spec_name)
-    recipe = _source_tree(recipe_name)
-    imports = [
-        node
-        for node in recipe.body
-        if isinstance(node, ast.ImportFrom) and node.module == spec_name
-    ]
-    assert len(imports) == 1
-    imported = {alias.name for alias in imports[0].names}
-    declared = _top_level_assignments(_source_tree(spec_name)).keys()
-    assert imported <= declared
-    assert not set(scalars) & _top_level_assignments(recipe).keys()
-    assert set(scalars) <= declared
     for name, expected in scalars.items():
         assert getattr(spec, name) == pytest.approx(expected, rel=0.0, abs=1e-12)
+    shared = _perturbed_recipe_values(spec_name, recipe_name)
+    assert set(scalars) & set(shared), "the recipe reads none of the harvested scalars"
+    for name, (used, authority) in shared.items():
+        assert used == authority, f"{recipe_name} holds its own {name}"
+
+
+# Every public number of the supplier spec is moved before the native recipe
+# is imported, in a fresh interpreter; each one the recipe holds must follow.
+_PERTURBED_VALUES = """
+import importlib, json, numbers, sys
+spec = importlib.import_module(sys.argv[1])
+moved = {}
+for name, value in list(vars(spec).items()):
+    if name.isupper() and isinstance(value, numbers.Real) and not isinstance(value, bool):
+        moved[name] = value + (1 if isinstance(value, int) else 0.5)
+        setattr(spec, name, moved[name])
+recipe = importlib.import_module(sys.argv[2])
+print(json.dumps({n: [getattr(recipe, n), v] for n, v in moved.items() if hasattr(recipe, n)}))
+"""
+
+
+def _perturbed_recipe_values(spec_name: str, recipe_name: str) -> dict[str, list[float]]:
+    result = subprocess.run(
+        [sys.executable, "-c", _PERTURBED_VALUES, spec_name, recipe_name],
+        cwd=SCRIPTS, capture_output=True, text=True, check=True,
+    )
+    return json.loads(result.stdout.splitlines()[-1])
+
+
+_RECORDED_CUP = """
+import asyncio, contextlib, json, sys
+from unittest.mock import AsyncMock, MagicMock
+import _mcmaster_94025a164 as spec
+spec.SS_TIP_R += 0.5
+import _sketch
+import diagnostics.diag_build_94025A164 as recipe
+chains = []
+async def add_line_chain(_adapter, points, close=True):
+    chains.append(points)
+_sketch.add_line_chain = add_line_chain
+for name in ("check", "name_last_feature", "insert_helix", "offset_plane", "thread_sweep_cut_modern"):
+    setattr(recipe, name, MagicMock())
+recipe.no_sketch_inference = lambda _adapter: contextlib.nullcontext()
+recipe.volume_check = AsyncMock(side_effect=lambda _a, _l, expected, _t: expected)
+recipe.bodies = lambda _adapter: [object()]
+asyncio.run(recipe.build_94025A164(AsyncMock(currentSketchManager=MagicMock())))
+print(json.dumps({"tip": spec.SS_TIP_R, "half": spec.SS_HALF, "profile": chains[0]}))
+"""
+
+
+def test_the_native_cup_recipe_draws_the_spec_tip_radius() -> None:
+    """The real 94025A164 recipe, with recording doubles and a moved SS_TIP_R:
+    its revolve profile's cup rim lands on the moved value."""
+    result = subprocess.run(
+        [sys.executable, "-c", _RECORDED_CUP], cwd=SCRIPTS,
+        capture_output=True, text=True, check=True,
+    )
+    recorded = json.loads(result.stdout.splitlines()[-1])
+    assert [recorded["tip"], -recorded["half"]] in recorded["profile"]
 
 
 def test_same_sku_fillister_row_has_one_pure_authority() -> None:
@@ -283,35 +298,13 @@ def test_public_nominals_and_unknown_supplier_grades_are_not_conflated() -> None
             assert getattr(spec, name) is None, f"unprovided supplier grade: {name}"
 
 
-def test_adjuster_data_consumers_do_not_read_the_native_wrapper() -> None:
-    consumers = {
-        "build_dt_drive_train_assembly": {"BODY_LEN", "CUP_DEPTH", "CUP_DIA", "THREAD"},
-        "test_drive_train_tip_adjuster_seat": {"CUP_DEPTH", "CUP_DIA"},
-    }
-    for consumer, expected_names in consumers.items():
-        tree = _source_tree(consumer)
-        assert "build_vn_cone_tip_adjuster" not in _imports(tree)
-        actual = {
-            alias.name
-            for node in tree.body
-            if isinstance(node, ast.ImportFrom)
-            and node.module == "_mcmaster_94025a164"
-            for alias in node.names
-        }
-        assert expected_names <= actual
-    wrapper = _source_tree("build_vn_cone_tip_adjuster")
-    native_imports = [
-        node
-        for node in wrapper.body
-        if isinstance(node, ast.ImportFrom)
-        and node.module == "diagnostics.diag_build_94025A164"
-    ]
-    assert len(native_imports) == 1
-    assert {alias.name for alias in native_imports[0].names} == {"build_94025A164"}
-    assert "_mcmaster_94025a164" in _imports(wrapper)
-    assert not {"BODY_LEN", "BODY_DIA", "CUP_DEPTH", "CUP_DIA", "THREAD"} & (
-        _top_level_assignments(wrapper).keys()
-    )
+@pytest.mark.parametrize(
+    "consumer", ("build_dt_drive_train_assembly", "test_drive_train_tip_adjuster_seat"),
+)
+def test_adjuster_data_consumers_do_not_load_the_native_wrapper(consumer: str) -> None:
+    loaded = _loaded_roots(consumer)
+    assert "_mcmaster_94025a164" in loaded
+    assert "build_vn_cone_tip_adjuster" not in loaded
 
 
 def test_adjuster_thread_limits_are_qualified_separately_from_its_cup() -> None:

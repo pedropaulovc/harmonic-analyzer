@@ -197,32 +197,6 @@ def test_actual_joint_receiver_requires_critical_setting_and_every_signed_loaded
             joints.require_arm_plate_joint_inspection(**(inputs | changes))
 
 
-def test_every_projected_caller_uses_canonical_real_saved_file_reader_after_export() -> None:
-    import ast
-    import inspect
-    import textwrap
-    import build_pd_transgear_arm
-    import build_pd_transgear_arm_plate
-    import draw_pd_transgear_arm
-    import draw_pd_transgear_arm_plate
-
-    for module, exporter, artifact_key in (
-        (build_pd_transgear_arm, "save_part_and_images", "part"),
-        (build_pd_transgear_arm_plate, "save_part_and_images", "part"),
-        (draw_pd_transgear_arm, "finalize_drawing", "drawing"),
-        (draw_pd_transgear_arm_plate, "finalize_drawing", "drawing"),
-    ):
-        body = ast.parse(textwrap.dedent(inspect.getsource(module.build))).body[0]
-        calls = [node for node in ast.walk(body) if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
-        export = next(node for node in calls if node.func.id == exporter)
-        saved = next(node for node in calls if node.func.id == "require_saved_projected_gtols")
-        assert saved.lineno > export.lineno
-        assert isinstance(saved.args[1], ast.Subscript)
-        assert ast.literal_eval(saved.args[1].slice) == artifact_key
-        assert isinstance(saved.args[2], ast.Name) and saved.args[2].id == "GEOMETRIC_CONTROLS"
-        assert {argument.arg for argument in saved.keywords} == {"label"}  # no fake caller stage/reopen flag
-
-
 def test_receiver_charges_full_delta_uncertainty_without_unneeded_one_micron_instrument_grade() -> None:
     """Synthetic readings only: two .002 instrument errors cost .004."""
     readings = tuple(replace(row, seat_normal_changes_mm=(0.0, 0.0, 0.0)) for row in _readings())

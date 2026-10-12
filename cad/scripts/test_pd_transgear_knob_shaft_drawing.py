@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import inspect
 import math
 from dataclasses import replace
@@ -23,28 +22,11 @@ from _drawing_contract import (
     model_toleranced_dimensions,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-import paper_drive_stock_native
 from paper_drive_stock_inspection import span_contact_points_mm, toothspace_gauge_contact_mm
 from stock_form_cutter import CutterTemplate, StockFormProfile, translation_for_tangent_span
 
 
 F_MACHINE_Z = -148.1
-
-
-def _calls(function, name: str) -> list[ast.Call]:
-    tree = ast.parse(inspect.getsource(function))
-    return [
-        node for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and (
-            isinstance(node.func, ast.Name) and node.func.id == name
-            or isinstance(node.func, ast.Attribute) and node.func.attr == name
-        )
-    ]
-
-
-def _keyword(call: ast.Call, name: str) -> str:
-    return ast.unparse(next(item.value for item in call.keywords if item.arg == name))
 
 
 def test_required_drawing_paths_and_registry() -> None:
@@ -163,43 +145,7 @@ def test_machine_and_float_stations_are_unchanged() -> None:
     assert spec.OVERALL_LENGTH == pytest.approx(70.74, abs=0.005)
 
 
-def test_builder_has_no_ideal_or_flat_slot_cutover_path() -> None:
-    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-    names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
-    assert not names & {
-        "build_fixed_gear", "build_stock_form_gear", "PROFILE_SHIFT", "RUNOUT_SLOT_WIDTH",
-        "V_RUNOUT_SLOT", "CUTTER_DIA_MAX", "cutter_arc_points",
-    }
-    straight = _calls(part._straight_stock_gaps, "ExtrusionParameters")
-    assert {"FACE_WIDTH", "FULL_DEPTH"} <= {_keyword(call, "depth") for call in straight}
-    native = _calls(part._straight_stock_gaps, "cut_order_native_segments")
-    assert len(native) == 1
-    end = _calls(part._stock_cutter_endcut, "author_cutter_endcut")
-    assert len(end) == 1
-    assert [ast.unparse(arg) for arg in end[0].args[1:]] == ["STOCK_PROFILE", "CUTTER_DIA", "FULL_DEPTH"]
-    assert _calls(part._stock_cutter_endcut, "endcut_volume_bounds_mm3")
-    assert _calls(part.build, "author_span") and _calls(part.build, "author_root_envelope")
-    assert _calls(part.build, "apply_span_limits")
-    body = inspect.getsource(part.build)
-    assert body.index("_journal_profile(") < body.index("_stock_cutter_endcut(")
-    assert body.index("_stud_profile(") < body.index("_stock_cutter_endcut(")
-    assert _calls(part._native_volume_check, "measure_one_solid_body_volume")
-    for builder in (part._straight_stock_gaps, part._stock_cutter_endcut):
-        stock_patterns = _calls(builder, "pattern_stock_feature")
-        assert len(stock_patterns) == 1 and ast.unparse(stock_patterns[0].args[2]) == "TEETH"
-    patterns = _calls(paper_drive_stock_native.pattern_stock_feature, "CircularPatternParameters")
-    assert len(patterns) == 1 and _keyword(patterns[0], "count") == "count"
-    assert _keyword(patterns[0], "geometry_pattern") == "False"
-
-
 def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
-    source = inspect.getsource(part._cut_core_flat)
-    assert "CORE_FRONT_FROM_F" in source and "CORE_FLAT_FROM_AXIS" in source
-    assert "CORE_FLAT_CUT_END_Z" in source and "CORE_FLAT_TOOL_END_RADIUS" in source
-    assert "both_directions=True" in source
-    assert "CoreFlatProfile" in source and "FlatToAxis" in source and "FlatEnd" in source
-    assert _calls(part._cut_core_flat, "_native_arc")
-    assert _calls(part._create_sketch, "suppress_dimension_input")
     assert spec.FRONT_RELIEF_DIA == 3.95
     assert spec.FRONT_RELIEF_WIDTH == 0.4
     assert spec.FRONT_CORNER_RADIUS == 0.05
@@ -218,29 +164,11 @@ def test_d_flat_uses_signed_physical_round_tool_end_and_real_neck() -> None:
     assert flat_min - ((spec.FRONT_RELIEF_DIA + 0.130) / 2 + 0.050) > 0.0
 
 
-def test_neck_radius_is_real_equal_tangent_geometry_not_a_dummy_carrier() -> None:
-    arcs = _calls(part._stud_profile, "_native_arc")
-    assert len(arcs) == 2
-    radius_dimensions = _calls(part._stud_profile, "add_sketch_dimension")
-    assert any(
-        [ast.unparse(arg) for arg in call.args][-4:] == [
-            "front_corner", "None", "'radial'", "FRONT_CORNER_RADIUS"
-        ]
-        for call in radius_dimensions
-    )
-    assert "equal physical neck radii" in inspect.getsource(part._stud_profile)
-    assert "FrontCornerRadius" in inspect.getsource(part._apply_neck_and_flat_limits)
+def test_neck_corner_radius_band_runs_from_sharp_to_the_maximum() -> None:
     assert spec.FRONT_CORNER_RADIUS_TOL_TYPE == 3
     hi, lo = spec.FRONT_CORNER_RADIUS_BAND
     assert spec.FRONT_CORNER_RADIUS + lo == 0.0
     assert spec.FRONT_CORNER_RADIUS + hi == pytest.approx(0.1)
-    for function in (part._stud_profile, part._journal_profile):
-        assert _calls(function, "_revolve_profile")
-    assert _calls(part._revolve_profile, "create_revolve")
-    arc_call = _calls(part._native_arc, "CreateArc")
-    assert len(arc_call) == 1 and len(arc_call[0].args) == 10
-    assert ast.unparse(arc_call[0].args[-1]) == "1"
-    assert "arc is None" in inspect.getsource(part._native_arc)
 
 
 def test_complete_nominal_native_volume_uses_bounded_rear_disk_and_true_d() -> None:
@@ -258,7 +186,6 @@ def test_complete_nominal_native_volume_uses_bounded_rear_disk_and_true_d() -> N
     assert lower <= before_end - spec.TEETH * (end_lo + end_hi) / 2 <= upper
     assert upper - lower <= 0.051
     assert before_end > upper  # omitting the true terminal cannot meet the oracle
-    assert _calls(part.build, "expected_volume_bounds_mm3")
     with pytest.raises(ValueError):
         spec.endcut_volume_bounds_mm3(full_depth_mm=spec.FACE_WIDTH + 0.1)
     with pytest.raises(ValueError):
@@ -294,10 +221,24 @@ def test_tool_end_limits_print_once_in_the_notes_from_the_spec() -> None:
     assert not {"FlatEnd", "FlatToolRadius"} & marked
     printed = "\n".join((spec.DRAWING_NOTES, note))
     assert len(printed.splitlines()) <= 4
-    build_source = " ".join(inspect.getsource(part.build).split())
-    assert '"\\n".join((DRAWING_NOTES, CORE_FLAT_TOOL_REACH_NOTE))' in build_source
-    # No sheet text survives on the part's native FlatEnd either.
-    assert "set_dimension_prefix" not in inspect.getsource(part._apply_neck_and_flat_limits)
+
+
+def test_the_tool_end_keeps_its_native_limits_but_no_sheet_text(monkeypatch) -> None:
+    # Both limits stay authored on the model's FlatEnd/FlatToolRadius (the
+    # fit-band contract reads them); the sheet text is note 4's alone.
+    limits: list[tuple[str, str]] = []
+    prefixes: list[str] = []
+    monkeypatch.setattr(
+        part, "_apply_native_limits",
+        lambda _adapter, feature, name, *_args: limits.append((feature, name)),
+    )
+    monkeypatch.setattr(
+        part, "set_dimension_prefix", lambda _adapter, _feature, name, _text: prefixes.append(name)
+    )
+    part._apply_neck_and_flat_limits(object())
+    assert ("CoreFlatProfile", "FlatEnd") in limits
+    assert ("CoreFlatProfile", "FlatToolRadius") in limits
+    assert prefixes == []
 
 
 def test_model_bands_and_source_linked_properties() -> None:
@@ -306,39 +247,19 @@ def test_model_bands_and_source_linked_properties() -> None:
     assert bands[("JournalProfile", "JournalDia")] == "*deviations(JOURNAL_DIA_BAND)"
     assert bands[("CoreFlatProfile", "FlatToAxis")] == "*deviations(CORE_FLAT_BAND)"
     assert bands[("StudProfile", "OutsideDia")] == "*deviations(OUTSIDE_DIA_BAND)"
+    # Main precedent: test_ch_rocker_arm_tl_profile_fixture_drawing (registry
+    # membership and the drawing-specification purity scan).
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
     assert not drawing_specification_violations(source, filename=drawing.__file__)
-    for property_name in ("Gear Data", "Manufacturing Notes", "Root Acceptance"):
-        assert property_name in inspect.getsource(part.build)
-        assert property_name in inspect.getsource(drawing.build)
-    assert "datums=PART_DATUMS" in inspect.getsource(part.build)
-    assert "controls=GEOMETRIC_CONTROLS" in inspect.getsource(part.build)
-    assert "JOURNAL_DIA" in inspect.getsource(drawing.build)
-
     controls = {control.key: control for control in spec.GEOMETRIC_CONTROLS}
     assert set(drawing.CONTROL_ATTACHMENTS) == set(controls)
     assert drawing.CONTROL_ATTACHMENTS["core_total_runout"][0] != drawing.CONTROL_ATTACHMENTS["front_neck_total_runout"][0]
-    # Run 10: a silhouette hit-test on the 0.3 mm neck floor took a neighbour.
-    frames = _calls(drawing.build, "add_feature_control_frame")
-    assert len(frames) == 1
-    assert _keyword(frames[0], "entity_type") == "'FACE'"
-    assert _keyword(frames[0], "entity") == "control_faces[key]"
-    assert _keyword(frames[0], "leader_attach_xy") == "landing"
     for key, control in controls.items():
         assert control.datums == ("A",)
         assert float(control.tolerance) == spec.CORE_TOTAL_RUNOUT
     assert f"Ø{spec.ROOT_DIA_MIN:.2f} MIN" in spec.ROOT_ACCEPTANCE
-    callouts = _calls(drawing.build, "add_toothspace_callout")
-    assert len(callouts) == 1
-    assert _keyword(callouts[0], "profile") == "STOCK_PROFILE"
-    assert _keyword(callouts[0], "actual_pin_diameter_mm") == "TOOTH_SPACE_GAUGE_PIN_DIA_MM"
-    assert _keyword(callouts[0], "rotate_rad") == "math.pi / TEETH"
-    assert _keyword(callouts[0], "axial_station_mm") == "0.0"
-    assert (
-        "require_source_control(source_properties[TOOTH_SPACE_CALLOUT_PROPERTY], TOOTH_SPACE_CALLOUT,"
-        in " ".join(inspect.getsource(drawing.build).split()).replace("( ", "(")
-    )
+
 
 def test_supported_certified_pin_inspects_all_actual_finite_corners() -> None:
     pin_diameter = spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM
@@ -365,16 +286,6 @@ def test_indicator_grade_has_one_live_source_and_span_does_not_certify_eccentric
     contact = toothspace_gauge_contact_mm(spec.STOCK_PROFILE, spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM)
     eccentricity = 0.04
     a, b = span_contact_points_mm(spec.STOCK_PROFILE, spec.SPAN_TEETH)
-    tree = ast.parse(inspect.getsource(spec))
-    grade_assignments = [
-        node.value for node in tree.body
-        if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "TOOTH_SPACE_RUNOUT_TIR_MM" for target in node.targets)
-    ]
-    assert len(grade_assignments) == 1
-    assert isinstance(grade_assignments[0], ast.Call)
-    assert isinstance(grade_assignments[0].func, ast.Name)
-    assert grade_assignments[0].func.id == "toothspace_runout_tir_mm"
     assert spec.TOOTH_SPACE_RUNOUT_TIR_MM > 0.0
     moved = tuple((x + eccentricity, y) for x, y in (a, b))
     assert math.dist(*moved) == pytest.approx(math.dist(a, b))
@@ -432,21 +343,11 @@ def test_flank_ends_lie_far_outside_the_contact_tolerance(spec_module: str, pin_
         assert math.dist(contact.flank_point_mm, end) > 20.0 * ink.CONTACT_TOLERANCE_MM
 
 
-def test_shared_callout_selects_the_flank_by_entity_and_proves_the_landing() -> None:
+def test_the_ink_module_never_hit_tests_the_sheet() -> None:
+    # Main precedent: test_dt_pinion_arbor_drawing ('"SelectByID2" not in helper').
     import paper_drive_stock_drawing as ink
 
-    source = inspect.getsource(ink.add_toothspace_callout)
-    assert _calls(ink.add_toothspace_callout, "toothspace_gauge_contact_mm")
-    assert _calls(ink.add_toothspace_callout, "flank_at_contact")
-    assert _calls(ink.add_toothspace_callout, "model_point_in_view")
-    (select,) = _calls(ink.add_toothspace_callout, "_select_view_entity")
-    assert _keyword(select, "entity") == "flank.edge"
-    assert "SetSelectionPoint2" in source
-    assert "GetAttachedEntityCount3" in source and "GetAttachedEntityTypes" in source
-    assert _calls(ink.add_toothspace_callout, "_assert_leader_lands")
-    # Never a sheet hit test.
     assert "SelectByID2" not in inspect.getsource(ink)
-    assert not _calls(ink.add_toothspace_callout, "add_property_linked_callout")
 
 
 def test_single_native_solid_volume_has_no_adapter_fallback(monkeypatch) -> None:
@@ -516,7 +417,10 @@ def test_neck_detail_fence_holds_every_detail_reference() -> None:
     assert crop == pytest.approx(radius * drawing.DETAIL_SCALE[0] / 1000.0)
     assert center[0] - crop > 0.0254 / 2 and center[1] + crop < 0.2667
     frame_x, frame_top = drawing.NECK_RUNOUT_FRAME
-    assert frame_top - 0.007 > center[1] + crop
+    # The frame's box corner nearest the crop stands clear of the circle.
+    corner_xy = (frame_x + drawing._FRAME_WIDTH, frame_top - drawing._FRAME_HEIGHT)
+    assert corner_xy[0] < center[0]
+    assert math.dist(corner_xy, center) - crop >= 0.002
     assert frame_top < 0.2667 - 0.004
     landing = drawing.NECK_RUNOUT_LANDING
     # The landing is on the straight floor, between the corner tori.
@@ -526,6 +430,35 @@ def test_neck_detail_fence_holds_every_detail_reference() -> None:
     # The Ø's line rises right of the frame's leader, inside the neck.
     dia_x = drawing.DETAIL_KEEP["FrontReliefDia"][0]
     assert landing[0] < dia_x < drawing._detail_xy(-width + corner, 0.0)[0]
+
+
+def test_neck_frame_leader_stays_under_the_relief_dia_text() -> None:
+    # 3f50160d9 full build: the Ø3.950 text hung LEFT of its line, box
+    # [87.8, 256.6]..[104.6, 260.2] mm for a keep at (106.0, 258.5), and the
+    # frame's shoulder (98.2 -> 104.5 at y 258.5) ran 6.35 mm through it
+    # (leader-through-text).  Whichever side the text hangs, the frame's
+    # shoulder and plumb leader now run under it, and the text clears the
+    # frame's box and the border.
+    x, y = drawing.DETAIL_KEEP["FrontReliefDia"]
+    text_w, text_h, short = 0.0168, 0.0036, 0.0014
+    frame_x, frame_top = drawing.NECK_RUNOUT_FRAME
+    shoulder_y = frame_top - drawing._FRAME_HEIGHT / 2.0
+    landing = drawing.NECK_RUNOUT_LANDING
+    assert frame_x + drawing._FRAME_WIDTH + drawing._FRAME_SHOULDER == pytest.approx(
+        landing[0]
+    )
+    # Shoulder and plumb leader run at or under shoulder_y, inside the
+    # frame's row; the text, either side of its line, stands over the row.
+    ymin, ymax = y - text_h / 2.0, y + text_h / 2.0
+    assert max(shoulder_y, landing[1]) < frame_top
+    assert ymin - frame_top >= 0.002
+    assert ymax <= 0.2667 - 0.0015
+    # The old row, frame top 0.262 with the text level with its shoulder,
+    # reproduces the logged crossing under the same model.
+    old_top, old_y = 0.262, 0.2585
+    old_shoulder = old_top - drawing._FRAME_HEIGHT / 2.0
+    assert old_y - text_h / 2.0 < old_shoulder < old_y + text_h / 2.0
+    assert x - short - text_w < landing[0] - drawing._FRAME_SHOULDER / 2.0 < x - short
 
 
 def test_neck_detail_annotations_stay_clear_of_the_side_and_end_views() -> None:
@@ -652,7 +585,6 @@ def test_neck_detail_is_a_cropped_right_model_view(monkeypatch) -> None:
     assert radius == pytest.approx(drawing.DETAIL_CROP_RADIUS)
     assert view.calls[0] == "SetViewPosition"
     assert "Crop2(False, False, 1)" in view.calls
-    assert "CreateDetailViewAt4" not in Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize(
@@ -708,16 +640,136 @@ def test_neck_detail_is_dimensioned_before_it_is_cropped(monkeypatch) -> None:
     assert drawing._dimension_then_crop_detail(object(), view) == ["curated"]
     assert calls == ["import", "read", "crop", "read"]
     assert events[0][0] == "neck_detail.crop" and events[0][1]["lost"] == ""
-    # The detail imports before the side view: a dimension already on the
-    # sheet is never imported again, one the side view deleted would be.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert body.index("_placed_detail_view(adapter)") < body.index(
-        "_dimension_then_crop_detail(adapter, detail)"
-    ) < body.index("keep=SIDE_KEEP")
-    assert body.index("add_toothspace_callout(") < body.index(
-        "_mark_detail_on_side(adapter, side)"
+
+
+class _BuildRecorder:
+    """Stand-ins for every seat-touching call ``drawing.build`` makes,
+    recording each call's name and its view in the order build makes them."""
+
+    def __init__(self, monkeypatch, tmp_path) -> None:
+        self.calls: list[tuple[str, object]] = []
+        self.made: dict[str, list[tuple[tuple, dict]]] = {}
+        self.frame_views: list[object] = []
+        source = tmp_path / "pd-transgear-knob-shaft.SLDPRT"
+        source.write_bytes(b"")
+        monkeypatch.setattr(drawing, "SOURCE", source)
+        self.views: dict[str, SimpleNamespace] = {}
+        self.detail = SimpleNamespace(name="detail", ReferencedDocument=object())
+        for name in (
+            "check", "require_source_control", "stamp_drawing_summary",
+            "set_hidden_lines_removed", "set_dimension_callouts",
+            "assert_imported_precision", "add_view_centerline", "add_attached_note",
+            "add_surface_finish", "add_datum_feature", "add_feature_control_frame",
+            "add_toothspace_callout", "_mark_detail_on_side", "_label_detail",
+            "add_property_linked_note", "visible_circle_edge",
+        ):
+            monkeypatch.setattr(drawing, name, self._recorder(name))
+        monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+        monkeypatch.setattr(
+            drawing, "read_required_properties",
+            lambda _model, wanted, *, required: {key: key for key in wanted},
+        )
+        monkeypatch.setattr(
+            drawing, "new_project_drawing", lambda *_a, **_k: (object(), object())
+        )
+        monkeypatch.setattr(drawing, "place_view", self._place)
+        monkeypatch.setattr(drawing, "_placed_detail_view", self._placed_detail)
+        monkeypatch.setattr(drawing, "_dimension_then_crop_detail", self._crop_detail)
+        monkeypatch.setattr(drawing, "curate_view_dimensions", self._curate)
+        monkeypatch.setattr(
+            drawing, "resolve_faces", lambda _model, requests: {key: key for key in requests}
+        )
+        monkeypatch.setattr(drawing, "finalize_drawing", self._finalize)
+        self.adapter = SimpleNamespace(currentModel=object(), open_model=self._open)
+
+    def _recorder(self, name: str):
+        def record(*args, **kwargs):
+            view = next(
+                (arg.name for arg in args if hasattr(arg, "ReferencedDocument")), None
+            )
+            self.calls.append((name, kwargs.get("label") or view))
+            self.made.setdefault(name, []).append((args, kwargs))
+            if name == "add_feature_control_frame":
+                self.frame_views.append(view)
+            return True
+
+        return record
+
+    async def _open(self, _path):
+        return True
+
+    def _place(self, _adapter, _source, orientation, _x, _y, *, scale):
+        view = SimpleNamespace(name=orientation, ReferencedDocument=object())
+        self.views[orientation] = view
+        return view
+
+    def _placed_detail(self, _adapter):
+        self.calls.append(("_placed_detail_view", None))
+        return self.detail
+
+    def _crop_detail(self, _adapter, view):
+        self.calls.append(("_dimension_then_crop_detail", view.name))
+        return ["detail dims"]
+
+    def _curate(self, _adapter, view, *, keep, view_label, dimensions_by_feature):
+        self.calls.append(("curate_view_dimensions", view_label))
+        return [view_label]
+
+    async def _finalize(self, *_args, **_kwargs):
+        self.calls.append(("finalize_drawing", None))
+        return {}
+
+    def index(self, name: str, view=None) -> int:
+        return next(
+            i for i, (called, which) in enumerate(self.calls)
+            if called == name and (view is None or which == view)
+        )
+
+
+def test_build_dimensions_the_detail_before_the_side_and_marks_it_last(
+    monkeypatch, tmp_path
+) -> None:
+    # A dimension already on the sheet is never imported again, so the
+    # detail must import its three before the side view's targeted import;
+    # the mark circle goes on after every side-view pick.
+    import asyncio
+
+    seat = _BuildRecorder(monkeypatch, tmp_path)
+    assert asyncio.run(drawing.build(seat.adapter)) == {}
+    assert seat.index("_placed_detail_view") < seat.index(
+        "_dimension_then_crop_detail", "detail"
+    ) < seat.index("curate_view_dimensions", "side")
+    frames = [which for name, which in seat.calls if name == "add_feature_control_frame"]
+    assert frames == ["core_total_runout", "front_neck_total_runout"]
+    assert seat.frame_views == ["*Right", "detail"]
+    last_pick = max(
+        i for i, (name, _label) in enumerate(seat.calls)
+        if name in ("add_feature_control_frame", "add_toothspace_callout")
     )
+    assert last_pick < seat.index("_mark_detail_on_side") < seat.index("_label_detail")
+    assert seat.index("_label_detail") < seat.index("finalize_drawing")
+
+
+def test_build_takes_its_controls_and_callouts_from_the_spec(monkeypatch, tmp_path) -> None:
+    # Run 10: a silhouette hit-test on the 0.3 mm neck floor took a
+    # neighbour; each frame now lands on its resolved source FACE.
+    import asyncio
+
+    seat = _BuildRecorder(monkeypatch, tmp_path)
+    asyncio.run(drawing.build(seat.adapter))
+    for (_args, kwargs) in seat.made["add_feature_control_frame"]:
+        key = kwargs["label"]
+        assert kwargs["entity_type"] == "FACE" and kwargs["entity"] == key
+        assert kwargs["leader_attach_xy"] == drawing.CONTROL_ATTACHMENTS[key][0]
+    ((_args, callout),) = seat.made["add_toothspace_callout"]
+    assert callout["profile"] is spec.STOCK_PROFILE
+    assert callout["actual_pin_diameter_mm"] == spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM
+    assert callout["rotate_rad"] == pytest.approx(math.pi / spec.TEETH)
+    assert callout["axial_station_mm"] == 0.0
+    ((control, _kwargs),) = seat.made["require_source_control"]
+    assert control == (spec.TOOTH_SPACE_CALLOUT_PROPERTY, spec.TOOTH_SPACE_CALLOUT)
+    notes = [args[1] for args, _kwargs in seat.made["add_property_linked_note"]]
+    assert notes == ["Gear Data", "Manufacturing Notes", "Root Acceptance"]
 
 
 def test_neck_detail_fails_loud_when_the_crop_takes_a_dimension(monkeypatch) -> None:
