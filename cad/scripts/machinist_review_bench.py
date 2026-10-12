@@ -8,10 +8,14 @@ continues to serve frozen-PNG calibration and human assessments.
 from __future__ import annotations
 
 import argparse
+import base64
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 import hashlib
+from html import escape
+import importlib.util
+from io import BytesIO
 import json
 import math
 import os
@@ -1007,29 +1011,302 @@ def run_iteration(
     return iteration
 
 
+_SHEET_LINK_SCRIPT = """
+<script>
+for (const link of document.querySelectorAll(".sheet-link")) {
+  link.addEventListener("click", () => {
+    const prefix = "data:image/jpeg;base64,";
+    const href = link.getAttribute("href");
+    if (!href || !href.startsWith(prefix)) return;
+    const bytes = Uint8Array.from(atob(href.slice(prefix.length)), char => char.charCodeAt(0));
+    link.href = URL.createObjectURL(new Blob([bytes], {type: "image/jpeg"}));
+  });
+}
+</script>
+"""
+
+
+_RULE_CITATION = re.compile(
+    r"\brule\s+\d+\s*\((?:[^()\r\n]|\([^()\r\n]*\))+\)", re.IGNORECASE
+)
+
+
+def _finding_text(value: str) -> str:
+    """Highlight citations only after escaping every untrusted text fragment."""
+    pieces = []
+    end = 0
+    for match in _RULE_CITATION.finditer(value):
+        pieces.append(escape(value[end : match.start()]))
+        pieces.append(f'<mark class="rule-citation">{escape(match.group())}</mark>')
+        end = match.end()
+    pieces.append(escape(value[end:]))
+    return "".join(pieces)
+
+
+def render_review_html(report: dict[str, Any], sheets: Sequence[str] = ()) -> str:
+    """Pure, self-contained report visualization; sheet inputs are JPEG data URIs."""
+    verdict = mr.validate_verdict(report["verdict"])
+    labels = {
+        "blockers": "Blockers",
+        "over_specification": "Over-specification",
+        "clarity": "Clarity",
+        "minor": "Minor",
+    }
+    sections = []
+    for category, label in labels.items():
+        cards = []
+        for finding in verdict[category]:
+            cards.append(
+                '<article class="finding">'
+                f"<h3>{_finding_text(finding['where'])}</h3>"
+                f'<p class="issue">{_finding_text(finding["issue"])}</p>'
+                '<div class="fix"><strong>Fix</strong>'
+                f"<p>{_finding_text(finding['fix'])}</p></div></article>"
+            )
+        body = "".join(cards) or '<p class="empty">No findings.</p>'
+        sections.append(
+            f'<section id="{category}"><h2>{label}'
+            f'<span class="count">{len(verdict[category])}</span></h2>{body}</section>'
+        )
+    sheet_figures = []
+    for number, uri in enumerate(sheets, 1):
+        if not isinstance(uri, str) or not re.fullmatch(
+            r"data:image/jpeg;base64,[A-Za-z0-9+/]*={0,2}", uri
+        ):
+            raise ValueError("review sheets must be self-contained JPEG data URIs")
+        sheet_figures.append(
+            "<figure>"
+            f'<a class="sheet-link" href="{uri}" target="_blank" rel="noopener noreferrer"'
+            f' aria-label="Open sheet {number} at full size">'
+            f'<img src="{uri}" alt="Reviewed sheet {number}" loading="lazy"></a>'
+            f"<figcaption>Sheet {number} · Open full size</figcaption></figure>"
+        )
+    if sheet_figures:
+        sections.append(
+            '<section id="sheets"><h2>Reviewed sheets'
+            f'<span class="count">{len(sheets)}</span></h2>'
+            '<p class="sheet-note">Release PDF rendered at up to 120 dpi (maximum 1600 px wide). Select a sheet to open its full-size image.</p>'
+            f'<div class="sheets">{"".join(sheet_figures)}</div></section>'
+        )
+    counts = "".join(
+        f"<div><strong>{len(verdict[category])}</strong>{label}</div>"
+        for category, label in labels.items()
+    )
+    metadata = [
+        ("Reviewer", report.get("reviewer", "—")),
+        ("Model", report.get("model", "—")),
+        ("Effort", report.get("effort", "—")),
+        ("Prompt SHA-256", str(report.get("prompt_sha256", "—"))[:12]),
+        ("Duration", f"{report.get('duration_s', '—')} s"),
+    ]
+    provenance = "".join(
+        f"<div><dt>{label}</dt><dd>{escape(str(value))}</dd></div>"
+        for label, value in metadata
+    )
+    badge = verdict["verdict"]
+    title = escape(str(report.get("name", "Machinist review")))
+    return (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f"<title>{title} · Machinist review</title><style>"
+        """
+/* Hallmark · pre-emit critique: P4 H5 E4 S5 R5 V4
+ * macrostructure: Long Document · tone: technical editorial · anchor hue: rust */
+:root {
+  color-scheme: light dark;
+  --bg: oklch(98% .008 85); --surface: oklch(100% 0 0);
+  --text: oklch(23% .01 75); --muted: oklch(48% .018 75);
+  --border: oklch(87% .016 85); --accent: oklch(49% .13 40);
+  --ship: oklch(36% .10 145); --ship-bg: oklch(94% .03 145);
+  --fix: oklch(43% .17 25); --fix-bg: oklch(96% .025 25);
+  --rule: oklch(92% .055 80); --rule-text: oklch(30% .04 65);
+  --font-body: "Segoe UI", system-ui, sans-serif;
+  --font-display: Georgia, "Times New Roman", serif;
+  --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --space-xl: 32px;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: oklch(18% .008 85); --surface: oklch(23% .008 85);
+    --text: oklch(94% .012 85); --muted: oklch(74% .018 75);
+    --border: oklch(37% .016 85); --accent: oklch(79% .105 40);
+    --ship: oklch(85% .10 145); --ship-bg: oklch(28% .04 145);
+    --fix: oklch(86% .09 25); --fix-bg: oklch(29% .05 25);
+    --rule: oklch(36% .055 80); --rule-text: oklch(94% .035 80);
+  }
+}
+* { box-sizing: border-box; }
+html, body { overflow-x: clip; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.6 var(--font-body); overflow-wrap: anywhere; }
+main { max-width: 1024px; margin: auto; padding: var(--space-lg); }
+header { padding-bottom: var(--space-lg); border-bottom: 1px solid var(--border); }
+.heading { display: flex; align-items: baseline; gap: var(--space-md); flex-wrap: wrap; }
+h1, h2 { font-family: var(--font-display); font-style: normal; font-weight: 600; }
+h1 { font-size: clamp(24px, 4vw, 34px); line-height: 1.2; margin: 0; min-width: 0; }
+h2 { font-size: 23px; display: flex; align-items: center; gap: var(--space-sm);
+  margin: 0 0 var(--space-md); }
+h3 { font-size: 15px; margin: 0 0 var(--space-sm); font-weight: 650; }
+.verdict { display: inline-block; border-radius: var(--radius); padding: 4px 12px;
+  font-size: 15px; font-weight: 750; letter-spacing: .04em; }
+.verdict-ship { color: var(--ship); background: var(--ship-bg); }
+.verdict-fix { color: var(--fix); background: var(--fix-bg); }
+.summary { font-size: 17px; line-height: 1.7; white-space: pre-wrap; margin: var(--space-md) 0; }
+.metadata { display: flex; flex-wrap: wrap; gap: var(--space-md) var(--space-lg); margin: 0; }
+dt { font-size: 12px; color: var(--muted); } dd { margin: 0; font-size: 13px; }
+.totals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-sm); margin: var(--space-lg) 0 var(--space-xl); }
+.totals div { color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-md);
+  font-size: 12px; white-space: nowrap; }
+.totals strong { display: block; font-size: 26px; line-height: 1.2; }
+section { margin: var(--space-xl) 0; scroll-margin-top: var(--space-md); }
+.count { font: 13px var(--font-body); color: var(--muted); }
+.finding { background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: var(--space-md); padding: var(--space-md); }
+.finding p { white-space: pre-wrap; margin: 0; }
+.fix { border-top: 1px solid var(--border); padding-top: var(--space-sm); margin-top: var(--space-md); }
+.fix > strong { display: block; font-size: 12px; color: var(--accent); margin-bottom: 4px; }
+.rule-citation { background: var(--rule); color: var(--rule-text); border-radius: 3px; padding: 1px 3px; }
+.empty, .sheet-note, figcaption { color: var(--muted); font-size: 13px; }
+.empty { padding: var(--space-md); border: 1px dashed var(--border); border-radius: var(--radius); }
+.sheets { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
+figure { margin: 0; min-width: 0; }
+.sheet-link { display: block; border: 1px solid var(--border); border-radius: var(--radius); overflow: clip; }
+.sheet-link img { display: block; width: 100%; height: auto; }
+figcaption { margin-top: var(--space-sm); }
+a:hover { outline: 1px solid var(--accent); }
+a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+a:active { outline: 2px solid var(--accent); }
+@media (max-width: 600px) {
+  main { padding: var(--space-md); }
+  .totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  h2 { flex-wrap: wrap; }
+}
+"""
+        '</style></head><body><main><header><div class="heading">'
+        f'<span class="verdict verdict-{badge.lower()}">{badge}</span><h1>{title}</h1>'
+        f'</div><p class="summary">{escape(verdict["summary"])}</p>'
+        f'<dl class="metadata">{provenance}</dl></header><div class="totals" aria-label="Finding counts">'
+        f"{counts}</div>{''.join(sections)}</main>"
+        + (_SHEET_LINK_SCRIPT if sheets else "")
+        + "</body></html>"
+    )
+
+
+def _sheet_jpegs(pdf: Path) -> tuple[str, ...]:
+    import pypdfium2 as pdfium
+
+    sheets = []
+    with mr._PDFIUM_LOCK:
+        document = pdfium.PdfDocument(str(pdf))
+        try:
+            for number in range(len(document)):
+                page = document[number]
+                try:
+                    scale = min(120.0 / 72.0, 1600.0 / page.get_width())
+                    bitmap = page.render(scale=scale)
+                    try:
+                        image = bitmap.to_pil()
+                        try:
+                            rgb = image.convert("RGB")
+                            try:
+                                stream = BytesIO()
+                                rgb.save(
+                                    stream, format="JPEG", quality=70, optimize=True
+                                )
+                                sheets.append(
+                                    "data:image/jpeg;base64,"
+                                    + base64.b64encode(stream.getvalue()).decode(
+                                        "ascii"
+                                    )
+                                )
+                            finally:
+                                rgb.close()
+                        finally:
+                            image.close()
+                    finally:
+                        bitmap.close()
+                finally:
+                    page.close()
+        finally:
+            document.close()
+    return tuple(sheets)
+
+
+# Chromium blocks iframe data-URL navigations above about 2 MiB. Keep upstream's
+# embedded payload/type intact, but load only our rich HTML previews via srcdoc.
+_RICH_FRAME_SCRIPT = """
+<script>
+(() => {
+  const prefix = "data:text/html;base64,";
+  const promoteReviews = () => {
+    for (const frame of document.querySelectorAll("iframe[src]")) {
+      const src = frame.getAttribute("src");
+      if (!src || !src.startsWith(prefix)) continue;
+      const binary = atob(src.slice(prefix.length));
+      const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+      frame.srcdoc = new TextDecoder().decode(bytes);
+      frame.removeAttribute("src");
+    }
+  };
+  new MutationObserver(promoteReviews).observe(document.body, {childList: true, subtree: true});
+  promoteReviews();
+})();
+</script>
+"""
+
+
 def view_iteration(iteration: Path, static: Path, skill_creator: Path) -> Path:
     manifest = _json(iteration / "iteration.json")
     static = _outside_worktree(static)
-    command = [
-        sys.executable,
-        str(skill_creator / "eval-viewer" / "generate_review.py"),
-        str(iteration),
-        "--skill-name",
-        manifest["skill_name"],
-        "--static",
-        str(static),
-        "--benchmark",
-        str(iteration / "benchmark.json"),
-    ]
+    source = skill_creator / "eval-viewer" / "generate_review.py"
+    spec = importlib.util.spec_from_file_location("_machinist_eval_viewer", source)
+    if spec is None or spec.loader is None:
+        raise ValueError(f"cannot import skill-creator viewer: {source}")
+    viewer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(viewer)
+    original_embed = viewer.embed_file
+    pdf_cache: dict[str, Path] = {}
+    sheet_cache: dict[Path, tuple[str, ...]] = {}
+
+    def embed_file(path: Path) -> dict[str, Any]:
+        if path.name != "review.json" or path.parent.name != "outputs":
+            return original_embed(path)
+        case = _json(path.parent.parent / "eval_metadata.json")
+        report = _read_review(path, case)
+        release = case["release"]
+        if release not in pdf_cache:
+            pdf_cache[release] = release_pdfs(release, iteration.parent)
+        filename = mr.DRAWINGS_BY_NAME[case["package"]].outputs["pdf"].name
+        pdf = pdf_cache[release] / filename
+        if report.get("source_sha256") != [mr._sha256(pdf)]:
+            raise ValueError(f"{path}: review does not match the cached release PDF")
+        if pdf not in sheet_cache:
+            sheet_cache[pdf] = _sheet_jpegs(pdf)
+        page = render_review_html(report, sheet_cache[pdf])
+        return {
+            "name": "review.json",
+            "type": "pdf",
+            "data_uri": "data:text/html;base64,"
+            + base64.b64encode(page.encode("utf-8")).decode("ascii"),
+        }
+
     with telemetry.span("machinist-bench.view"):
-        subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            check=True,
-            env={**telemetry.inject_env(), "PYTHONUTF8": "1"},
-        )
+        viewer.embed_file = embed_file
+        try:
+            runs = viewer.find_runs(iteration)
+            if not runs:
+                raise ValueError(f"no review runs in {iteration}")
+            benchmark = _json(iteration / "benchmark.json")
+            html = viewer.generate_html(
+                runs, manifest["skill_name"], benchmark=benchmark
+            )
+            html = html.replace("</body>", _RICH_FRAME_SCRIPT + "</body>")
+            static.parent.mkdir(parents=True, exist_ok=True)
+            static.write_text(html, encoding="utf-8")
+        finally:
+            viewer.embed_file = original_embed
     telemetry.info(f"Static eval viewer: {static}")
     return static
 

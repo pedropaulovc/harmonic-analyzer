@@ -181,7 +181,9 @@ an `iteration-N` outside Git, with descriptive eval names and per-configuration
 Codex (defaults: `gpt-6.1-sol`, medium); `--grader-model`, `--grader-effort`,
 `--grader-timeout` and `--jobs` control grading. Then run
 `view <iteration-directory> --static <output.html>` for the skill-creator
-viewer; `--skill-creator-path <checkout>` selects its installation. Omit
+viewer; `--skill-creator-path <checkout>` selects its installation. The bench
+viewer includes formatted findings with highlighted rule citations and the
+release drawing sheets, with links to full-size sheet images. Omit
 `--workspace` to use `$HARMONIC_AGENT_SCRATCHPAD/harmonic-analyzer/machinist-review-evals`,
 or, when unset,
 `%LOCALAPPDATA%/harmonic-analyzer-agent-scratchpad/harmonic-analyzer/machinist-review-evals`.

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from html import escape
+from html.parser import HTMLParser
 import hashlib
 import json
 from pathlib import Path
@@ -21,6 +23,240 @@ def _verdict(value: str = "SHIP") -> dict:
         "clarity": [],
         "minor": [],
     }
+
+
+class _ReviewHTML(HTMLParser):
+    """Collect rendered elements and their visible text without a browser."""
+
+    def __init__(self, source: str) -> None:
+        super().__init__(convert_charrefs=True)
+        self.elements: list[dict] = []
+        self.stack: list[dict] = []
+        self.feed(source)
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        element = {"tag": tag, "attrs": dict(attrs), "text": ""}
+        self.elements.append(element)
+        if tag not in {"img", "meta", "link", "br", "hr", "input"}:
+            self.stack.append(element)
+
+    def handle_endtag(self, tag: str) -> None:
+        for index in range(len(self.stack) - 1, -1, -1):
+            if self.stack[index]["tag"] == tag:
+                del self.stack[index:]
+                break
+
+    def handle_data(self, data: str) -> None:
+        for element in self.stack:
+            element["text"] += data
+
+    def matching(self, tag: str, class_name: str | None = None) -> list[dict]:
+        return [
+            element
+            for element in self.elements
+            if element["tag"] == tag
+            and (
+                class_name is None
+                or class_name in element["attrs"].get("class", "").split()
+            )
+        ]
+
+
+def _viewer_report(verdict: str = "SHIP") -> dict:
+    return {
+        "verdict": _verdict(verdict),
+        "reviewer": "claude",
+        "model": "offline-model",
+        "effort": "medium",
+        "prompt_sha256": "0123456789abcdef" * 4,
+        "duration_s": 1.25,
+    }
+
+
+@pytest.mark.parametrize("verdict", ["SHIP", "FIX"])
+def test_review_html_verdict_badge(verdict: str) -> None:
+    parsed = _ReviewHTML(evaluation.render_review_html(_viewer_report(verdict)))
+    badges = [
+        element
+        for element in parsed.elements
+        if f"verdict-{verdict.lower()}" in element["attrs"].get("class", "").split()
+    ]
+    assert len(badges) == 1
+    assert badges[0]["text"].strip() == verdict
+    assert "verdict" in badges[0]["attrs"]["class"].split()
+    visible = "".join(element["text"] for element in parsed.matching("body"))
+    for value in (
+        "Ready for manufacture.",
+        "claude",
+        "offline-model",
+        "medium",
+        "0123456789ab",
+        "1.25",
+    ):
+        assert value in visible
+
+
+def test_review_html_findings_escape_text_and_highlight_whole_citations() -> None:
+    report = _viewer_report("FIX")
+    citation = 'rUlE 18 (<script>alert("rule")</script> & unsafe)'
+    finding = {
+        "where": '<img src=x onerror="alert(1)"> & Sheet 1',
+        "issue": f"Before {citation} after.",
+        "fix": '<a href="javascript:alert(2)">replace</a> & verify',
+    }
+    report["verdict"]["summary"] = '<script>alert("summary")</script> & review'
+    report["verdict"]["blockers"] = [finding]
+    source = evaluation.render_review_html(report)
+    parsed = _ReviewHTML(source)
+    cards = parsed.matching("article", "finding")
+    assert len(cards) == 1
+    for value in finding.values():
+        assert value in cards[0]["text"]
+    assert escape(finding["where"]) in source
+    assert escape(finding["fix"]) in source
+    assert escape(report["verdict"]["summary"]) in source
+    marks = parsed.matching("mark", "rule-citation")
+    assert [mark["text"] for mark in marks] == [citation]
+    assert f'<mark class="rule-citation">{escape(citation)}</mark>' in source
+    assert not parsed.matching("script")
+    assert not parsed.matching("img")
+    assert not parsed.matching("a")
+    assert not any(
+        key.lower().startswith("on")
+        for element in parsed.elements
+        for key in element["attrs"]
+    )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "rule 5 (avoid excessive GD&T)",
+        "RULE 18 (fully defined features)",
+        "Rule 21 (shop-ready sheets)",
+    ],
+)
+def test_review_html_rule_citations_are_case_insensitive(text: str) -> None:
+    report = _viewer_report()
+    report["verdict"]["minor"] = [{"where": text, "issue": text, "fix": text}]
+    marks = _ReviewHTML(evaluation.render_review_html(report)).matching(
+        "mark", "rule-citation"
+    )
+    assert [mark["text"] for mark in marks] == [text, text, text]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "rule 5 without a title",
+        "rule five (avoid excessive GD&T)",
+        "rule 5 (unclosed",
+        "rule (avoid excessive GD&T)",
+        "misrule 5 (not a citation)",
+    ],
+)
+def test_review_html_does_not_mark_non_citations(text: str) -> None:
+    report = _viewer_report()
+    report["verdict"]["clarity"] = [{"where": text, "issue": text, "fix": text}]
+    parsed = _ReviewHTML(evaluation.render_review_html(report))
+    assert not parsed.matching("mark", "rule-citation")
+    assert text in parsed.matching("article", "finding")[0]["text"]
+
+
+def test_review_html_all_category_counts_and_cards() -> None:
+    report = _viewer_report("FIX")
+    categories = ("blockers", "over_specification", "clarity", "minor")
+    for count, category in enumerate(categories, start=1):
+        report["verdict"][category] = [
+            {
+                "where": f"{category} location {index}",
+                "issue": f"{category} issue {index}",
+                "fix": f"{category} fix {index}",
+            }
+            for index in range(count)
+        ]
+    parsed = _ReviewHTML(evaluation.render_review_html(report))
+    assert len(parsed.matching("article", "finding")) == 10
+    assert not parsed.matching("p", "empty")
+    for count, category in enumerate(categories, start=1):
+        section = next(
+            element
+            for element in parsed.elements
+            if element["attrs"].get("id") == category
+        )
+        assert str(count) in section["text"]
+        for finding in report["verdict"][category]:
+            for value in finding.values():
+                assert value in section["text"]
+
+
+def test_review_html_empty_categories_are_explicit() -> None:
+    parsed = _ReviewHTML(evaluation.render_review_html(_viewer_report()))
+    assert [element["text"].strip() for element in parsed.matching("p", "empty")] == [
+        "No findings."
+    ] * 4
+    for category in ("blockers", "over_specification", "clarity", "minor"):
+        section = next(
+            element
+            for element in parsed.elements
+            if element["attrs"].get("id") == category
+        )
+        assert "0" in section["text"]
+        assert "No findings." in section["text"]
+
+
+def test_review_html_metadata_is_visible_shortened_and_escaped() -> None:
+    report = _viewer_report()
+    for key in ("reviewer", "model", "effort", "duration_s"):
+        report[key] = f'<script>{key}</script> & "value"'
+    report["prompt_sha256"] = '<sha&"bad>123' + "z" * 52
+    source = evaluation.render_review_html(report)
+    parsed = _ReviewHTML(source)
+    visible = "".join(element["text"] for element in parsed.matching("body"))
+    for key in ("reviewer", "model", "effort", "duration_s"):
+        assert report[key] in visible
+        assert escape(report[key]) in source
+    short_sha = report["prompt_sha256"][:12]
+    assert short_sha in visible
+    assert escape(short_sha) in source
+    assert report["prompt_sha256"] not in source
+    assert not parsed.matching("script")
+
+
+def test_review_html_embeds_jpeg_sheets_and_full_size_links() -> None:
+    sheets = ("data:image/jpeg;base64,/9j/AA==", "data:image/jpeg;base64,/9j/BB==")
+    source = evaluation.render_review_html(_viewer_report(), sheets=sheets)
+    parsed = _ReviewHTML(source)
+    assert [image["attrs"]["src"] for image in parsed.matching("img")] == list(sheets)
+    links = parsed.matching("a", "sheet-link")
+    assert [link["attrs"]["href"] for link in links] == list(sheets)
+    for link in links:
+        assert link["attrs"]["target"] == "_blank"
+        assert "noopener" in link["attrs"]["rel"].split()
+    assert parsed.matching("style")
+    assert "prefers-color-scheme" in source
+    scripts = parsed.matching("script")
+    assert len(scripts) == 1
+    assert "src" not in scripts[0]["attrs"]
+    assert "URL.createObjectURL" in scripts[0]["text"]
+    assert "image/jpeg" in scripts[0]["text"]
+    assert not parsed.matching("link")
+
+
+@pytest.mark.parametrize(
+    "sheet", ["https://example.invalid/sheet.jpg", 'javascript:alert("sheet")']
+)
+def test_review_html_rejects_non_jpeg_data_sheets(sheet: str) -> None:
+    with pytest.raises(ValueError):
+        evaluation.render_review_html(_viewer_report(), sheets=(sheet,))
+
+
+@pytest.mark.parametrize("invalid", ["UNKNOWN", None, {"verdict": "SHIP"}])
+def test_review_html_validates_verdict_schema(invalid: object) -> None:
+    report = _viewer_report()
+    report["verdict"] = invalid
+    with pytest.raises(ValueError):
+        evaluation.render_review_html(report)
 
 
 def _expectation(check: dict) -> dict:
