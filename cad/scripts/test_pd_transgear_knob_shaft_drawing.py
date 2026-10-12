@@ -950,13 +950,15 @@ def test_straight_stock_pass_bosses_the_blank_then_cuts_one_patterned_gap(
     )
     curves = [f"Curve{k}" for k in range(1, len(segments) + 1)]
     assert seat.ensure_fully_defined.call_args_list[1].kwargs["fix_entities"] == curves
-    # A blind boss of the face width, then a blind cut of the full depth:
-    # one direction, solid, merged, each result checked.
+    # A blind boss of the face width, then a blind cut of the full depth,
+    # both from the sketch plane (F): one direction, solid, merged, each
+    # result checked.
     boss = adapter.create_extrusion.await_args.args[0]
     cut = adapter.create_cut_extrude.await_args.args[0]
     assert (boss.depth, cut.depth) == (module.FACE_WIDTH, module.FULL_DEPTH)
     for feature in (boss, cut):
         assert feature.end_condition == "Blind"
+        assert feature.start_offset == 0.0
         assert not (feature.reverse_direction or feature.both_directions or feature.thin_feature)
         assert feature.merge_result
     checked = [id(call.args[1]) for call in seat.check.call_args_list]
@@ -1008,7 +1010,8 @@ def test_cutter_end_is_authored_after_the_turned_profiles_within_its_volume_boun
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seat = stub_seat(
-        monkeypatch, part, spy=("_stud_profile", "_journal_profile", "_stock_cutter_endcut")
+        monkeypatch, part,
+        spy=("_stud_profile", "_journal_profile", "_revolve_profile", "_stock_cutter_endcut"),
     )
     seat._straight_stock_gaps.return_value = part.ToothedDisc(
         1000.0, ("StraightToothGap", "StraightToothPattern")
@@ -1021,6 +1024,7 @@ def test_cutter_end_is_authored_after_the_turned_profiles_within_its_volume_boun
     endcut = SimpleNamespace(plane="ToolEndPlane", cut="ToolEndCut")
     seat.author_cutter_endcut.return_value = endcut
     adapter = offline_adapter()
+    seat.attach_mock(adapter, "adapter")
     asyncio.run(part.build(adapter))
 
     names = [name for name, _args, _kwargs in seat.mock_calls]
@@ -1047,3 +1051,29 @@ def test_cutter_end_is_authored_after_the_turned_profiles_within_its_volume_boun
         if name == "pattern_stock_feature"
     ]
     assert patterned[1:3] == (endcut.cut, part.TEETH)
+    # Each turned profile is revolved a full turn as its sketch closes, the
+    # body named for the profile handed over.
+    revolves = []
+    for name, args, _kwargs in seat.mock_calls:
+        if name == "_revolve_profile":
+            revolves.append(("handoff", args[1:]))
+        elif name == "adapter.create_revolve":
+            revolves.append(("revolve", args[0].angle))
+        elif name == "name_last_feature" and args[1] in (
+            "StudProfile", "Stud", "JournalProfile", "Journal"
+        ):
+            revolves.append(("named", args[1]))
+    assert revolves == [
+        ("named", "StudProfile"), ("handoff", ("stud", "Stud")),
+        ("revolve", 360.0), ("named", "Stud"),
+        ("named", "JournalProfile"), ("handoff", ("journal", "Journal")),
+        ("revolve", 360.0), ("named", "Journal"),
+    ]
+    # The last native volume check is the complete part against the spec's
+    # finished-shaft bounds, after the drive equations' final rebuild.
+    volume_checks = [k for k, name in enumerate(names) if name == "_native_volume_check"]
+    last_rebuild = len(names) - 1 - names[::-1].index("force_rebuild")
+    assert volume_checks[-1] > last_rebuild
+    assert seat.mock_calls[volume_checks[-1]].args[2:4] == pytest.approx(
+        spec.expected_volume_bounds_mm3()
+    )
