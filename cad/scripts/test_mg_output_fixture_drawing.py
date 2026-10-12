@@ -221,9 +221,11 @@ def test_a_plug_tap_reaches_full_thread_through_the_wall_and_stops_short() -> No
     assert spec.PLUG_TAP_LEAD == pytest.approx(5.0 * pitch, abs=1e-9)
     # Face to bore axis at the printed worst case: 17.70 +0.05 less 5.00 -0.05.
     face_to_axis_max, face_to_axis_min = 12.8, 12.6
-    # The thread's widest reach off the bore axis: the oversize-cut major and
-    # all the off-centre the stated wall accepts, inside the smallest bore.
-    reach_off_axis = 0.112 * 25.4 / 2.0 + 0.025 + 0.2575
+    # The thread's widest reach off the bore axis: the library's conservative
+    # metric basic major Ø2.845 (rather than the vendor's exact 0.112 in),
+    # tap oversize and all the off-centre the stated wall accepts.
+    assert spec.THREAD_MAJOR == 2.845
+    reach_off_axis = 2.845 / 2.0 + 0.025 + 0.2575
     half_chord = math.sqrt(2.6**2 - reach_off_axis**2)
     deepest_wall = face_to_axis_max - half_chord
     assert spec.TAP_WALL_DEEPEST == pytest.approx(deepest_wall, abs=1e-9)

@@ -832,22 +832,22 @@ def test_normalisation_uses_only_observable_units():
     assert np.allclose(measured, eb.ideal_coefficients(x), atol=1e-12)
 
 
+@pytest.mark.parametrize("name", ("all_ones", "rect_half", "alternating"))
 def test_scaled_trial_needs_the_division_to_keep_step_4_a_small_known_vector(
-    report, nom
+    report, nom, name
 ):
     """On a trial the pen forced to scale f < 1, the operator sets bars at
     f x_i d_max, reads the pen, and looks up TABLE ordinates at those stations.
     READOUT.md says: divide each by f and use the quotient everywhere. Executed
-    literally on the nominal Gaussian trial that matches the model and recovers
-    the unscaled coefficients. The raw table ordinates ALSO recover them on a
+    literally on each scaled broad trial that matches the model and recovers
+    the unscaled coefficients (the Gaussian now fits without scaling). The raw
+    table ordinates ALSO recover them on a
     perfect machine -- the read-vs-set vector absorbs (f - 1) x -- but that
     vector is then (1 - f) of the answer, computed from the answer (circular),
     and a real channel-gain error comes out understated by f. With the
     division the vector is the lift-sized known deviation the budget scores."""
-    x = eb.reference_inputs()["gaussian_a0p1"]
-    f = report["closed_form"]["mg-magnifier"]["per_input"]["gaussian_a0p1"][
-        "ordinate_scale"
-    ]
+    x = eb.reference_inputs()[name]
+    f = report["closed_form"]["mg-magnifier"]["per_input"][name]["ordinate_scale"]
     assert 0.0 < f < 1.0
     trial = eb.NominalTrial(nom)
     stations = f * x * nom.d_max

@@ -98,7 +98,16 @@ def test_press_zone_is_a_native_band_from_the_config_free_press_contract() -> No
         node for node in ast.parse(press_source).body
         if isinstance(node, (ast.Import, ast.ImportFrom))
     ]
-    assert [node.module for node in imported] == ["__future__"], (
+    modules = {
+        name
+        for node in imported
+        for name in (
+            [node.module]
+            if isinstance(node, ast.ImportFrom)
+            else [alias.name for alias in node.names]
+        )
+    }
+    assert modules == {"__future__", "math"}, (
         "the press contract must stay config-free (no _config/output.yaml closure)"
     )
     assert press.PRESS_ZONE_DIA == press.ROD_DIA == 6.0
