@@ -173,13 +173,22 @@ Use `uv run cad/scripts/machinist_review_bench.py run --workspace <outside-git-r
 release-package reviews with the working-tree skill (`with_skill`) and the
 baseline skill (`old_skill`); `--ref <git-ref>` pins `with_skill` instead.
 Review model and reasoning controls are `--model` and `--effort`.
+Use `--baseline-ref none` to run only `with_skill`, without loading or reviewing
+the baseline prompt.
 Alternatively, `import --workspace <outside-git-root> --evals <id-or-name>...
 --config with_skill=<review-directory> --config old_skill=<review-directory>`
-enrolls existing reviews without running another reviewer. Both commands create
+enrolls existing reviews without running another reviewer.
+A single `--config with_skill=<review-directory>` or
+`--config old_skill=<review-directory>` is also allowed; only the supplied
+configuration is graded and displayed, with no comparison or delta columns.
+Both commands create
 an `iteration-N` outside Git, with descriptive eval names and per-configuration
 `run-K/outputs/review.json`. Run `grade <iteration-directory>` to grade it with
 Codex (defaults: `gpt-6.1-sol`, medium); `--grader-model`, `--grader-effort`,
-`--grader-timeout` and `--jobs` control grading. Then run
+`--grader-timeout` and `--jobs` control grading. Aggregation writes
+`benchmark.json`, `benchmark.md`, and `failures.json`; failed assertions retain
+their rule, polarity, confidence and grader evidence, with unknown legacy rule
+or confidence recorded as `null`. Then run
 `view <iteration-directory> --static <output.html>` for the skill-creator
 viewer; `--skill-creator-path <checkout>` selects its installation. The bench
 viewer includes formatted findings with highlighted rule citations and the

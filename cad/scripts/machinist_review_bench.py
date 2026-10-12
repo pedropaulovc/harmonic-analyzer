@@ -228,6 +228,12 @@ def _metadata(case: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _configuration_names(configurations: Mapping[str, Any]) -> tuple[str, ...]:
+    if not configurations or set(configurations) - set(CONFIGURATIONS):
+        raise ValueError("provide a non-empty subset of with_skill and old_skill")
+    return tuple(config for config in CONFIGURATIONS if config in configurations)
+
+
 def create_iteration(
     workspace: Path,
     evals: Sequence[dict[str, Any]],
@@ -236,6 +242,7 @@ def create_iteration(
     skill_name: str = "machinist-review",
 ) -> Path:
     workspace = _outside_worktree(workspace)
+    _configuration_names(configurations)
     workspace.mkdir(parents=True, exist_ok=True)
     numbers = [
         int(path.name.removeprefix("iteration-"))
@@ -352,17 +359,22 @@ def import_iteration(
 ) -> Path:
     """Import sparse report directories, numbering actual runs within each eval."""
     workspace = _outside_worktree(workspace)
-    sources: dict[str, list[Path]] = {config: [] for config in CONFIGURATIONS}
+    sources: dict[str, list[Path]] = {}
     for value in configs:
         config, separator, directory = value.partition("=")
-        if not separator or config not in sources or not Path(directory).is_dir():
+        if (
+            not separator
+            or config not in CONFIGURATIONS
+            or not Path(directory).is_dir()
+        ):
             raise ValueError(
                 "--config must be with_skill=DIR or old_skill=DIR, with an existing directory"
             )
-        sources[config].append(Path(directory).resolve())
+        sources.setdefault(config, []).append(Path(directory).resolve())
+    present = _configuration_names(sources)
     matches = {}
     for case in evals:
-        for config in CONFIGURATIONS:
+        for config in present:
             reports = [
                 directory / f"{case['package']}.json"
                 for directory in sources[config]
@@ -382,7 +394,7 @@ def import_iteration(
     for case in evals:
         filename = mr.DRAWINGS_BY_NAME[case["package"]].outputs["pdf"].name
         expected_hashes = [mr._sha256(pdfs[case["release"]] / filename)]
-        for config in CONFIGURATIONS:
+        for config in present:
             for path, report in matches[case["name"], config]:
                 if report.get("source_sha256") != expected_hashes:
                     raise ValueError(
@@ -400,13 +412,13 @@ def import_iteration(
                 for case in evals
             },
         }
-        for config in CONFIGURATIONS
+        for config in present
     }
     iteration = create_iteration(
         workspace, evals, configurations, skill_name=skill_name
     )
     for case in evals:
-        for config in CONFIGURATIONS:
+        for config in present:
             for number, (source, report) in enumerate(matches[case["name"], config], 1):
                 directory = run_directory(iteration, case, config, number)
                 shutil.copyfile(source, directory / "outputs" / "review.json")
@@ -727,13 +739,16 @@ def grade_iteration(
     effort: str = "medium",
     timeout: float = 600,
 ) -> dict[str, Any]:
+    present = _configuration_names(
+        _json(iteration / "iteration.json")["configurations"]
+    )
     with ThreadPoolExecutor(max_workers=jobs) as pool:
         futures = [
             pool.submit(
                 grade_run, directory, case, model=model, effort=effort, timeout=timeout
             )
             for case in _selected_cases(iteration, selectors)
-            for config in CONFIGURATIONS
+            for config in present
             for directory in sorted((iteration / case["name"] / config).glob("run-*"))
             if (directory / "outputs" / "review.json").is_file()
         ]
@@ -757,6 +772,68 @@ def _stats(values: Sequence[float]) -> dict[str, float]:
     )
 
 
+def failure_records(
+    manifest: dict[str, Any], benchmark: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Export every failed assertion without inventing legacy confidence/rules."""
+    cases = {case["id"]: case for case in manifest["evals"]}
+    failures = []
+    for run in benchmark["runs"]:
+        case = cases[run["eval_id"]]
+        for expectation, grade in zip(
+            case["expectations"], run["expectations"], strict=True
+        ):
+            if grade["text"] != expectation["text"]:
+                raise ValueError("graded expectation text differs from the eval")
+            if grade["passed"]:
+                continue
+            operation, value = _check_spec(expectation)
+            explicit_rule = re.search(
+                r"\brule\s+(\d+)\b", expectation["text"], re.IGNORECASE
+            )
+            rule = expectation.get("rule")
+            rule_source = "expectation" if rule is not None else "missing"
+            if rule is None and explicit_rule:
+                rule, rule_source = int(explicit_rule[1]), "text"
+            polarity = expectation.get("polarity")
+            polarity_source = "expectation"
+            if polarity is None:
+                polarity = (
+                    "negative"
+                    if operation == "category"
+                    or (operation == "verdict" and value == "FIX")
+                    else "positive"
+                )
+                polarity_source = "check"
+            if polarity not in ("negative", "positive"):
+                raise ValueError(f"unknown expectation polarity: {polarity}")
+            failures.append(
+                {
+                    "eval_id": case["id"],
+                    "eval_name": case["name"],
+                    "package": case["package"],
+                    "configuration": run["configuration"],
+                    "run_number": run["run_number"],
+                    "rule": rule,
+                    "polarity": polarity,
+                    "reviewer_error": "false_negative"
+                    if polarity == "negative"
+                    else "false_positive",
+                    "confidence": expectation.get("confidence"),
+                    "expectation_text": expectation["text"],
+                    "grader_evidence": grade["evidence"],
+                    "metadata_sources": {
+                        "rule": rule_source,
+                        "polarity": polarity_source,
+                        "confidence": "expectation"
+                        if "confidence" in expectation
+                        else "missing",
+                    },
+                }
+            )
+    return failures
+
+
 def aggregate_iteration(iteration: Path) -> dict[str, Any]:
     """Exact skill-creator schema; upstream loader assumes eval-* directory names.
 
@@ -764,9 +841,10 @@ def aggregate_iteration(iteration: Path) -> dict[str, Any]:
     its hardcoded placeholders. Zero token metrics explicitly mean unmeasured.
     """
     manifest = _json(iteration / "iteration.json")
+    present = _configuration_names(manifest["configurations"])
     runs, models, counts, missing = [], set(), defaultdict(list), []
     grader_models: set[str] = set()
-    for config in CONFIGURATIONS:
+    for config in present:
         for case in manifest["evals"]:
             for directory in sorted((iteration / case["name"] / config).glob("run-*")):
                 if not (directory / "grading.json").is_file():
@@ -822,12 +900,17 @@ def aggregate_iteration(iteration: Path) -> dict[str, Any]:
             )
             for metric in ("pass_rate", "time_seconds", "tokens")
         }
-        for config in CONFIGURATIONS
+        for config in present
     }
-    summaries["delta"] = {
-        metric: f"{summaries['with_skill'][metric]['mean'] - summaries['old_skill'][metric]['mean']:+.{precision}f}"
-        for metric, precision in (("pass_rate", 2), ("time_seconds", 1), ("tokens", 0))
-    }
+    if len(present) == 2:
+        summaries["delta"] = {
+            metric: f"{summaries['with_skill'][metric]['mean'] - summaries['old_skill'][metric]['mean']:+.{precision}f}"
+            for metric, precision in (
+                ("pass_rate", 2),
+                ("time_seconds", 1),
+                ("tokens", 0),
+            )
+        }
     run_counts = {len(numbers) for numbers in counts.values()}
     notes = [
         "Inputs are frozen release PDFs; this evaluates prompts, not changed CAD or merge-gate evidence."
@@ -856,6 +939,9 @@ def aggregate_iteration(iteration: Path) -> dict[str, Any]:
         "notes": notes,
     }
     _write_json(iteration / "benchmark.json", benchmark)
+    _write_json(iteration / "failures.json", failure_records(manifest, benchmark))
+    labels = [config.replace("_", " ").title() for config in present]
+    summary_headers = ["Metric", *labels, *(["Delta"] if "delta" in summaries else [])]
     lines = [
         f"# Skill Benchmark: {manifest['skill_name']}",
         "",
@@ -864,8 +950,8 @@ def aggregate_iteration(iteration: Path) -> dict[str, Any]:
         "",
         "## Summary",
         "",
-        "| Metric | With Skill | Old Skill | Delta |",
-        "|---|---|---|---|",
+        "| " + " | ".join(summary_headers) + " |",
+        "|" + "---|" * len(summary_headers),
     ]
     for metric, label, scale in (
         ("pass_rate", "Pass Rate (%)", 100),
@@ -874,21 +960,21 @@ def aggregate_iteration(iteration: Path) -> dict[str, Any]:
     ):
         cells = [
             f"{summaries[config][metric]['mean'] * scale:.2f} ± {summaries[config][metric]['stddev'] * scale:.2f}"
-            for config in CONFIGURATIONS
+            for config in present
         ]
-        lines.append(
-            f"| {label} | {' | '.join(cells)} | {summaries['delta'][metric]} |"
-        )
+        if "delta" in summaries:
+            cells.append(summaries["delta"][metric])
+        lines.append(f"| {label} | {' | '.join(cells)} |")
     lines += [
         "",
         "## Per-eval pass rates",
         "",
-        "| Eval | With Skill | Old Skill |",
-        "|---|---|---|",
+        "| " + " | ".join(["Eval", *labels]) + " |",
+        "|" + "---|" * (len(labels) + 1),
     ]
     for case in manifest["evals"]:
         cells = []
-        for config in CONFIGURATIONS:
+        for config in present:
             selected = [
                 run
                 for run in runs
@@ -913,9 +999,12 @@ def run_iteration(
 ) -> Path:
     workspace = _outside_worktree(args.workspace or default_workspace())
     kinds = {case["kind"] for case in cases}
+    refs = {"with_skill": args.ref}
+    if args.baseline_ref != "none":
+        refs["old_skill"] = args.baseline_ref
     prompts = {
         config: {kind: compose_prompt(kind, ref) for kind in kinds}
-        for config, ref in (("with_skill", args.ref), ("old_skill", args.baseline_ref))
+        for config, ref in refs.items()
     }
     configurations = {
         config: {
@@ -924,7 +1013,7 @@ def run_iteration(
                 kind: _sha(text) for kind, text in prompts[config].items()
             },
         }
-        for config, ref in (("with_skill", args.ref), ("old_skill", args.baseline_ref))
+        for config, ref in refs.items()
     }
     iteration = create_iteration(
         workspace, cases, configurations, skill_name=skill_name
@@ -933,7 +1022,7 @@ def run_iteration(
         release: release_pdfs(release, workspace)
         for release in sorted({case["release"] for case in cases})
     }
-    for config in CONFIGURATIONS:
+    for config in refs:
         for kind, text in prompts[config].items():
             path = iteration / "inputs" / config / f"{kind}.md"
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -996,7 +1085,7 @@ def run_iteration(
         futures = [
             pool.submit(review, case, config, number)
             for case in cases
-            for config in CONFIGURATIONS
+            for config in refs
             for number in range(1, args.runs + 1)
         ]
         for future in as_completed(futures):
@@ -1257,8 +1346,30 @@ _RICH_FRAME_SCRIPT = """
 """
 
 
+_SINGLE_CONFIG_SCRIPT = """
+<script>
+(() => {
+  // The upstream summary always renders two configurations and a delta.
+  // Adapt only this generated page; its per-eval tables already discover configs.
+  const container = document.getElementById("benchmark-content");
+  if (!container) return;
+  const trimSummary = () => {
+    const table = container.querySelector(".benchmark-table");
+    if (!table) return;
+    for (const row of table.rows) {
+      while (row.cells.length > 2) row.deleteCell(-1);
+    }
+  };
+  new MutationObserver(trimSummary).observe(container, {childList: true});
+  trimSummary();
+})();
+</script>
+"""
+
+
 def view_iteration(iteration: Path, static: Path, skill_creator: Path) -> Path:
     manifest = _json(iteration / "iteration.json")
+    present = _configuration_names(manifest["configurations"])
     static = _outside_worktree(static)
     source = skill_creator / "eval-viewer" / "generate_review.py"
     spec = importlib.util.spec_from_file_location("_machinist_eval_viewer", source)
@@ -1302,7 +1413,10 @@ def view_iteration(iteration: Path, static: Path, skill_creator: Path) -> Path:
             html = viewer.generate_html(
                 runs, manifest["skill_name"], benchmark=benchmark
             )
-            html = html.replace("</body>", _RICH_FRAME_SCRIPT + "</body>")
+            scripts = _RICH_FRAME_SCRIPT
+            if len(present) == 1:
+                scripts += _SINGLE_CONFIG_SCRIPT
+            html = html.replace("</body>", scripts + "</body>")
             static.parent.mkdir(parents=True, exist_ok=True)
             static.write_text(html, encoding="utf-8")
         finally:
@@ -1335,7 +1449,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     subcommands = parser.add_subparsers(dest="command", required=True)
     run = subcommands.add_parser("run", parents=[common, grading])
     run.add_argument("--ref")
-    run.add_argument("--baseline-ref", default="origin/main")
+    run.add_argument(
+        "--baseline-ref",
+        default="origin/main",
+        help="baseline Git ref; use none to run with_skill only",
+    )
     run.add_argument("--reviewer", choices=mr.REVIEWERS, default="claude")
     run.add_argument("--model")
     run.add_argument("--effort")

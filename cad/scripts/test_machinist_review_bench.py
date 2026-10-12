@@ -570,15 +570,16 @@ def test_import_sparse_sources_number_runs_per_eval(tmp_path: Path) -> None:
     assert not (iteration / cases[0]["name"] / "with_skill" / "run-3").exists()
 
 
-def test_missing_import_configuration_does_not_allocate_iteration(
-    tmp_path: Path,
+@pytest.mark.parametrize("configuration", ["with_skill", "old_skill"])
+def test_given_import_configuration_missing_package_does_not_allocate_iteration(
+    tmp_path: Path, configuration: str
 ) -> None:
-    _, cases = evaluation.load_evals(selectors=("1",))
+    _, cases = evaluation.load_evals(selectors=("1", "2"))
     source = tmp_path / "source"
     _report(source, cases[0])
     workspace = tmp_path / "workspace"
-    with pytest.raises(ValueError, match="old_skill"):
-        evaluation.import_iteration(workspace, cases, [f"with_skill={source}"])
+    with pytest.raises(ValueError, match=configuration):
+        evaluation.import_iteration(workspace, cases, [f"{configuration}={source}"])
     assert not workspace.exists()
 
 
@@ -846,3 +847,249 @@ def test_grade_iteration_excludes_uncompleted_review_runs(
         "Ungraded runs excluded" in note and "run-2" in note
         for note in benchmark["notes"]
     )
+
+
+@pytest.mark.parametrize("configuration", ["with_skill", "old_skill"])
+def test_single_configuration_import_grade_and_benchmark(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, configuration: str
+) -> None:
+    _, cases = evaluation.load_evals(selectors=("1",))
+    case = {**cases[0], "expectations": [_expectation({"verdict": "SHIP"})]}
+    source = tmp_path / "source"
+    _report(source, case)
+    iteration = evaluation.import_iteration(
+        tmp_path / "workspace", [case], [f"{configuration}={source}"]
+    )
+    manifest = json.loads((iteration / "iteration.json").read_text(encoding="utf-8"))
+    assert list(manifest["configurations"]) == [configuration]
+    omitted = "old_skill" if configuration == "with_skill" else "with_skill"
+    assert not (iteration / case["name"] / omitted).exists()
+    assert not (iteration / "inputs" / omitted).exists()
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Deterministic grading must not invoke a model")
+
+    monkeypatch.setattr(evaluation, "semantic_grade", forbidden)
+    benchmark = evaluation.grade_iteration(iteration, jobs=1)
+    assert [run["configuration"] for run in benchmark["runs"]] == [configuration]
+    assert benchmark["runs"][0]["result"]["pass_rate"] == 1.0
+    assert list(benchmark["run_summary"]) == [configuration]
+    assert "delta" not in benchmark["run_summary"]
+    markdown = (iteration / "benchmark.md").read_text(encoding="utf-8")
+    label = "With Skill" if configuration == "with_skill" else "Old Skill"
+    omitted_label = "Old Skill" if configuration == "with_skill" else "With Skill"
+    assert f"| Metric | {label} |" in markdown
+    assert f"| Eval | {label} |" in markdown
+    assert omitted_label not in markdown
+    assert "Delta" not in markdown
+    assert "ungraded" not in markdown
+    assert json.loads((iteration / "failures.json").read_text(encoding="utf-8")) == []
+
+
+def test_empty_import_configurations_do_not_allocate_iteration(tmp_path: Path) -> None:
+    _, cases = evaluation.load_evals(selectors=("1",))
+    workspace = tmp_path / "workspace"
+    with pytest.raises(ValueError):
+        evaluation.import_iteration(workspace, cases, [])
+    assert not workspace.exists()
+
+
+def test_run_without_baseline_never_loads_or_reviews_old_skill(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    _, cases = evaluation.load_evals(selectors=("1",))
+    case = cases[0]
+    composed = []
+    reviewed = []
+    graded = []
+
+    def compose(kind, ref=None):
+        composed.append((kind, ref))
+        assert ref is None
+        return "offline working prompt"
+
+    def review(command, **kwargs):
+        prompt = Path(command[command.index("--prompt-file") + 1])
+        assert prompt.parent.name == "with_skill"
+        assert prompt.read_text(encoding="utf-8") == "offline working prompt"
+        reviewed.append(command)
+        _report(Path(command[command.index("--report-dir") + 1]), case)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    def grade(iteration, **kwargs):
+        graded.append((iteration, kwargs))
+        return {}
+
+    monkeypatch.setattr(evaluation, "compose_prompt", compose)
+    monkeypatch.setattr(evaluation.subprocess, "run", review)
+    monkeypatch.setattr(evaluation, "grade_iteration", grade)
+    args = evaluation._parse_args(
+        [
+            "run",
+            "--workspace",
+            str(tmp_path / "workspace"),
+            "--baseline-ref",
+            "none",
+            "--runs",
+            "1",
+            "--jobs",
+            "1",
+        ]
+    )
+    iteration = evaluation.run_iteration(args, [case])
+    assert composed == [(case["kind"], None)]
+    assert len(reviewed) == 1
+    assert len(graded) == 1
+    assert graded[0][0] == iteration
+    manifest = json.loads((iteration / "iteration.json").read_text(encoding="utf-8"))
+    assert list(manifest["configurations"]) == ["with_skill"]
+    assert not (iteration / "inputs" / "old_skill").exists()
+    assert not (iteration / case["name"] / "old_skill").exists()
+
+
+def test_failure_records_preserve_metadata_and_exclude_passing_entries() -> None:
+    expectations = [
+        {
+            **_expectation({"category": "blockers"}),
+            "text": "Find omitted dimension.",
+            "rule": 18,
+            "polarity": "negative",
+            "confidence": "high",
+        },
+        {**_expectation({"verdict": "SHIP"}), "text": "Passing control."},
+    ]
+    case = {
+        "id": 1,
+        "name": "known-case",
+        "package": "known-package",
+        "expectations": expectations,
+    }
+    benchmark = {
+        "runs": [
+            {
+                "eval_id": 1,
+                "eval_name": "known-case",
+                "configuration": "with_skill",
+                "run_number": 2,
+                "expectations": [
+                    {
+                        "text": expectations[0]["text"],
+                        "passed": False,
+                        "evidence": "Missed it.",
+                    },
+                    {
+                        "text": expectations[1]["text"],
+                        "passed": True,
+                        "evidence": "Correct.",
+                    },
+                ],
+            }
+        ]
+    }
+    assert evaluation.failure_records({"evals": [case]}, benchmark) == [
+        {
+            "eval_id": 1,
+            "eval_name": "known-case",
+            "package": "known-package",
+            "configuration": "with_skill",
+            "run_number": 2,
+            "rule": 18,
+            "polarity": "negative",
+            "reviewer_error": "false_negative",
+            "confidence": "high",
+            "expectation_text": "Find omitted dimension.",
+            "grader_evidence": "Missed it.",
+            "metadata_sources": {
+                "rule": "expectation",
+                "polarity": "expectation",
+                "confidence": "expectation",
+            },
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    "check,polarity,error",
+    [
+        ({"category": "blockers"}, "negative", "false_negative"),
+        ({"verdict": "FIX"}, "negative", "false_negative"),
+        ({"absent_from": "blockers"}, "positive", "false_positive"),
+        ({"max_count": {"blockers": 0}}, "positive", "false_positive"),
+        ({"verdict": "SHIP"}, "positive", "false_positive"),
+    ],
+)
+@pytest.mark.parametrize(
+    "text,rule,origin",
+    [
+        ("Apply rule 18 (fully defined features).", 18, "text"),
+        ("No numbered rule is known.", None, "missing"),
+    ],
+)
+def test_failure_records_derive_legacy_metadata(
+    check: dict, polarity: str, error: str, text: str, rule: int | None, origin: str
+) -> None:
+    expectation = {**_expectation(check), "text": text}
+    case = {
+        "id": 1,
+        "name": "legacy",
+        "package": "legacy-package",
+        "expectations": [expectation],
+    }
+    benchmark = {
+        "runs": [
+            {
+                "eval_id": 1,
+                "eval_name": "legacy",
+                "configuration": "old_skill",
+                "run_number": 1,
+                "expectations": [
+                    {"text": text, "passed": False, "evidence": "Wrong finding."}
+                ],
+            }
+        ]
+    }
+    records = evaluation.failure_records({"evals": [case]}, benchmark)
+    assert len(records) == 1
+    record = records[0]
+    assert record["rule"] == rule
+    assert record["polarity"] == polarity
+    assert record["reviewer_error"] == error
+    assert record["confidence"] is None
+    assert record["metadata_sources"] == {
+        "rule": origin,
+        "polarity": "check",
+        "confidence": "missing",
+    }
+
+
+def test_aggregate_writes_failed_expectations_export(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, cases = evaluation.load_evals(selectors=("1",))
+    case = {
+        **cases[0],
+        "expectations": [
+            {**_expectation({"verdict": "FIX"}), "text": "Apply rule 18."},
+            {**_expectation({"verdict": "SHIP"}), "text": "Passing control."},
+        ],
+    }
+    source = tmp_path / "source"
+    _report(source, case)
+    iteration = evaluation.import_iteration(
+        tmp_path / "workspace", [case], [f"with_skill={source}"]
+    )
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Deterministic grading must not invoke a model")
+
+    monkeypatch.setattr(evaluation, "semantic_grade", forbidden)
+    benchmark = evaluation.grade_iteration(iteration, jobs=1)
+    manifest = json.loads((iteration / "iteration.json").read_text(encoding="utf-8"))
+    failures = json.loads((iteration / "failures.json").read_text(encoding="utf-8"))
+    assert failures == evaluation.failure_records(manifest, benchmark)
+    assert len(failures) == 1
+    assert failures[0]["expectation_text"] == "Apply rule 18."
+    assert failures[0]["rule"] == 18
+    assert failures[0]["reviewer_error"] == "false_negative"
