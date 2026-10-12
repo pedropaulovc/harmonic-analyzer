@@ -169,7 +169,8 @@ frames and no datums.
    existing reachable A (pivot bore), B (strap face), C (+X land) datums.
    Top Ⓤ0.5 puts the entire zone outside material; bottom Ⓤ0 puts it inside.
    The material sides oppose, so a single frame cannot specify both zones.
-   At the mirror-axis station the upper edge remains 8.00..8.50 above the
+   At the nominal mirror plane through datum axis A, normal to the arm's
+   length (`x = 0` in the CAD), the upper edge remains 8.00..8.50 above the
    pivot and the lower edge 0.00..0.50 above the model bottom origin,
    preserving the model's `TOP_EDGE_BAND` and derived concentric-arc placement.
    Away from that station the zone follows the surface normal, not a rigid
@@ -180,47 +181,42 @@ frames and no datums.
    acceptance about the 8.25-height aim is separate from the part's 0.5 zone.
    This is a drawing-tolerance cutover; model geometry remains unchanged.
 
-   Frame placement is a sheet-layout decision, not part tolerance. The lower
-   frame is requested at (20, 129) sheet mm, keeping its −100 mm model pick
-   and the upper frame unchanged. The native bent leader uses `SIDE_SMART`:
-   its junction may be on either side, so a requested frame origin or guessed
-   frame width does not prove a clear route. After all front-view callouts and
-   the final rebuild, the recipe reads the retained native frames and every
-   other front-view callout through the existing PDF-free audit readers.
-   It logs requested/actual `GetPosition`, the native frame-body ink box,
-   leader points and landing, and the measured minimum segment-to-text-box
-   clearance on success as well as failure. Every profile leader must have
-   at least **1 mm of sheet-space air** to every other callout's text box;
-   its own frame text is excluded. Missing, refused or invalid necessary
-   geometry fails closed before export, as does a crossing or sub-1 mm gap,
-   with the offending callout, box, segment and penetration in sheet mm.
-   These boxes reuse the audit's native text positions/heights and row-width
-   model; they are not exact exported glyph extents. The final enforced PDF
-   ink audit remains in force. R8 proved that (20, 134) placed the frame
-   exactly as requested: its native width was 47.339 mm and the right-hand
-   shoulder added 6.350 mm; it was not a reanchoring failure. That route
-   cleared the REAM row but crossed the actual BASIC R816 text box at
-   (81.5, 151.2)..(103.2, 154.7) sheet mm. Moving only the lower request
-   5 mm down predicts about 1.448 mm to REAM and 1.547 mm to R816 using
-   those observed boxes, width, shoulder and landing. Offline R6/R7/R8
-   regressions establish the detector and this two-box corridor prediction;
-   the next native run must still prove the changed route and final ink.
+   Frame placement is a sheet-layout decision, not part tolerance. Requested
+   positions and guessed frame widths do not prove a clear native bent-leader
+   route. After final view curation and rebuild, the recipe reads back native
+   positions, frame-body ink boxes, leader points and physical landings.
+   Every profile leader must have at least **1 mm of sheet-space air** to
+   every other callout's text box, excluding its own frame text. Missing or
+   invalid required geometry, crossings and sub-1 mm gaps fail closed before
+   export. The native row-width model is not exact exported glyph geometry;
+   the final PDF ink audit and blind rendered-sheet review remain required.
+   Layout-run forensics belong in the PR history, not this tolerance policy.
 
-   The same scoped exception puts the outline on the views: native overall
-   width, radial end-land length and angle, and taper-to-lower-arc intersection,
-   read back against the existing spec geometry. The model dimensions
-   `RodTipLen@StrapProfile` and `HubDia@HubProfile` are marked for import;
-   hub OD retains its two-place general tolerance class. The side-view strap
-   offset from the hub end face is a measured, parenthesized REFERENCE at
-   normal sheet precision, checked against `(HUB_LENGTH - ARM_THICKNESS) / 2`
-   in [`ch_rocker_arm_spec.py`](../scripts/ch_rocker_arm_spec.py); it adds no
-   acceptance band. It spans the projected end planes, not a hub-radius endpoint.
-   Native hole callouts carry REAM/DRILL and through condition, replacing the
-   duplicated arc-length, end-shape and hole-process notes.
-   Integral hub **length**, not OD, sets channel pitch (the spec's `HUB_LENGTH`
-   and the hub-face stack in `build_ch_channel_assembly.py`). The inherited
-   strap-to-hub symmetry 0.10, hub coaxiality Ø0.50 and one-setup wording remain
-   pending [#1391](https://github.com/pedropaulovc/harmonic-analyzer/issues/1391).
+   The same scoped exception puts the outline on native views: overall width,
+   radial end-land length and BASIC clocking from the nominal mirror plane,
+   and taper-to-lower-arc intersection, read back against existing spec
+   geometry. The BASIC clock angle is the spec's `_ALPHA_TOP`, fixing datum C's
+   radial-land orientation in A|B|C. The main front view carries BASIC
+   R800/R816/8.00 and both BASIC pin-axis coordinates from physical datum A.
+   Parent-linked DETAIL D owns native `PivotDia@PivotHoleProfile` and
+   `HubDia@HubProfile`, the pivot-bore datum A and bore finish; DETAIL E owns
+   `RodTipLen@StrapProfile`, the BASIC land clock, datum C, DRILL THRU callout
+   and unchanged rod-pin position frame. Hub OD retains its two-place general
+   tolerance class. The side-view strap offset from the hub end face is a
+   measured, parenthesized REFERENCE at normal sheet precision, checked
+   against `(HUB_LENGTH - ARM_THICKNESS) / 2` in
+   [`ch_rocker_arm_spec.py`](../scripts/ch_rocker_arm_spec.py); it adds no
+   acceptance band and spans the projected end planes, not a radius endpoint.
+   Native REAM/DRILL callouts state through condition, replacing duplicated
+   arc-length, end-shape and hole-process notes. Integral hub **length**, not
+   OD, sets channel pitch (`HUB_LENGTH` and the hub-face assembly stack).
+   Hub coaxiality is now Ø0.10 from the authoritative spec; the named hub-wall
+   exception below records that ruling. The inherited strap-to-hub symmetry
+   0.10 and one-setup wording remain pending
+   [#1391](https://github.com/pedropaulovc/harmonic-analyzer/issues/1391), as do
+   the other deferred over-specification questions; no retained control is
+   removed here. Notes describe nominal mirror symmetry about that plane and
+   nominal concentric arcs on it, not mirror symmetry about the pivot axis.
    Brief functional context distinguishes upper-arc amplitude-bar contact,
    lower-arc moving envelope and rod-pin connecting-rod geometry; this is not
    a whole-sheet policy migration or a new lower-arc gain/contact claim.
@@ -259,6 +255,7 @@ recorded on the same issues.
 
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|
+
 
 ## The gate
 

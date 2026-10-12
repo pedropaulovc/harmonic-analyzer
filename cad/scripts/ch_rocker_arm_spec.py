@@ -78,7 +78,7 @@ PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 
 # The amplitude bar's foot rides the top edge, and at d = 0 its cheeks pass
 # over this arm's hub, so the print controls the edge's height over the pivot
-# axis directly, on the mirror axis, one-sided: the edge may only come out
+# axis directly, on the nominal mirror plane, one-sided: the edge may only come out
 # high (user ruling 2026-09-26). The 808.00 centre distance is then REF, and
 # the R800 governs only the curvature. With the amplitude bar's one-sided
 # notch (ch_amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND) a bar can rest at most
@@ -102,18 +102,26 @@ TOP_EDGE_BAND = (0.50, 0.0)  # (upper, lower)
 # pitch -- there are no loose spacer bushings (the 19 `pivot-bushing` parts
 # are retired).
 #
-# The OD's floor is the hub wall: drawing-guidelines.md rule 17 (walls and webs)'s 1.5
-# over the reamed bore at its largest, with the OD at the bottom of the
-# title block's .XX band (machinist review, MHA-CH-006 round 1: O10.00 left
-# 1.48). The MHA-CH-009 thrust washer's own floor is higher, so the two share
-# one O10.20 (ch_rocker_thrust_washer_spec). The ceiling is the amplitude bar's
-# foot cheeks, which pass over the hub at d = 0 (channel_kinematics
-# ``bar_bottom``); test_rocker_bank_layout pins the slack.
+# The OD's floor includes both the largest reamed bore and the bore-to-OD
+# eccentricity (PR #1354, R9 machinist review: the old Ø0.50 coaxiality left
+# only 1.33 wall at the printed OD minimum). Main's 2026-10-12 option-A ruling
+# tightens coaxiality to Ø0.10 without changing the nominal hub. A radial
+# eccentricity of coaxiality / 2 consumes wall on one side, so the required
+# diameter must add twice that eccentricity to twice rule 17's 1.5 floor.
+# The hub and MHA-CH-009 thrust washer retain their shared O10.20 above both
+# floors. The OD ceiling is the amplitude bar's foot cheeks at d = 0
+# (channel_kinematics ``bar_bottom``); test_rocker_bank_layout pins the slack.
 PIVOT_HOLE_BAND = (0.03, 0.0)  # (upper, lower): reamed; native on PivotDia
 RULE12_WALL_FLOOR = 1.5  # drawing-guidelines.md rule 17 (walls and webs)
-LINEAR_2PL = 0.508  # title-block .XX band (pinned to _config by the tests)
-_HUB_FLOOR = PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0] + 2.0 * RULE12_WALL_FLOOR + LINEAR_2PL
-HUB_DIA_MIN = math.ceil(round(_HUB_FLOOR * 100.0, 9)) / 100.0  # 10.04
+HUB_COAXIALITY_DIA = 0.10  # authoritative diametral zone; notes print this source
+LINEAR_2PL = 0.508  # raw .XX class; notes judge the actual printed ±0.51
+_HUB_FLOOR = (
+    PIVOT_HOLE_DIA
+    + PIVOT_HOLE_BAND[0]
+    + 2.0 * (RULE12_WALL_FLOOR + HUB_COAXIALITY_DIA / 2.0)
+    + LINEAR_2PL
+)
+HUB_DIA_MIN = math.ceil(round(_HUB_FLOOR * 100.0, 9)) / 100.0  # 10.14
 HUB_DIA = 10.2
 if HUB_DIA < HUB_DIA_MIN:
     raise AssertionError(

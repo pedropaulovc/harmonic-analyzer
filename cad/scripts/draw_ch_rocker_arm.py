@@ -6,9 +6,9 @@ sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
 The strap is a long thin curved seesaw (~292 mm tip to tip, 16 mm deep, 2.5 mm
-thick). The print shows the profile (front), with BASIC radii and height feeding
-two unequally disposed surface-profile frames, a 1:1 end view carrying the
-strap's thickness and hub length natively, and a 1:4 isometric. Sheet scale 1:2.
+thick). The front carries the BASIC arc system and A-to-pin coordinates;
+parent-linked D (4:1) and E (2:1) carry the hub and rod-end controls. The
+1:1 side carries thickness/hub length; the 1:4 isometric supplements them.
 
 Run with SolidWorks open::
 
@@ -66,10 +66,10 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_layout_audit import _Reader, _dump_annotation
 from _drawing_layout_collect import check_drawing_layout
+from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _drawing_projection import model_points_in_view
-from _drawing_scan import _zoomed_on
 from _drawing_selection import _select_view_entity
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
@@ -79,7 +79,7 @@ from _layout_audit import (
     annotation_geometry,
     calibrate_sheet_advance,
 )
-from _layout_geometry import segment_box_distance, text_overlap, union_boxes
+from _layout_geometry import Box, segment_box_distance, text_overlap, union_boxes
 from _hole_spec import blind_cut_dia_mm, drill_process
 from _paths import CAD_ROOT
 from _session import run_build
@@ -131,11 +131,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 2.0)  # 1:2
-_S = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm (0.5)
 
-# Front-view model bbox: X symmetric about 0, Y from the centre bottom (0) up to
-# the top-arc tip (TOP_END_Y).
-_PIVOT_MID_Y = PIVOT_MID_Y
 _ROD_HOLE_DIA = blind_cut_dia_mm(ROD_HOLE_SPEC)
 
 _P = rocker_notes.DEFAULT_DRAWING_PRECISION
@@ -150,15 +146,10 @@ part_metadata(
     model_sources=("ARM_THICKNESS", "HUB_LENGTH"),
     precision_sources=(("ch_rocker_arm_notes", "DRAWING_PRECISION"), ("ch_rocker_arm_notes", "DEFAULT_DRAWING_PRECISION"), ("ch_rocker_arm_notes", "DRAWING_NOTES"), ("_surface_finish", "ra")),
 )
-_BBOX_CY = TOP_END_Y / 2.0
 
 FRONT_CENTER = (0.180, 0.175)
 RIGHT_CENTER = (0.300, 0.165)
 ISO_CENTER = (0.345, 0.205)
-# The rod-pin frame approaches the upper-right rim, opposite the drilled-hole
-# callout's upper-left approach. Short angular witnesses leave its path clear.
-FCF_XY = (0.300, 0.232)
-
 ROD_HOLE = requirement(
     "rod_hole", kind="hole", faces=(CylinderFace(blind_cut_dia_mm(rocker.ROD_HOLE_SPEC)),),
     requirements=("at", "dia", "thru", "position_dia"), fields={
@@ -172,6 +163,14 @@ ROD_HOLE = requirement(
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "build"),)),
     }, precision={"at": "unknown", "dia": _P, "position_dia": _P},
 )
+HUB_CENTER = (0.180, 0.095)
+END_CENTER = (0.330, 0.110)
+HUB_SCALE = (4.0, 1.0)
+END_SCALE = (2.0, 1.0)
+DETAIL_LETTER_XY = {"D": (0.167, 0.155), "E": (0.264, 0.148)}
+# The rod-pin FCF lands on the southeast rim, clear of the acute land angle.
+FCF_XY = (0.365, 0.090)
+ROD_CALLOUT_XY = (0.270, 0.145)
 # The iso caption's top-left, under the iso's right half and right of the end
 # view. Beside the end view (0.315, 0.150) it read as that
 # view's label, 0.4 mm from HubLength's "+0.05" (r743-p1s-B2 render).
@@ -190,10 +189,10 @@ ARC_PROFILE_OUTSIDE_MM = {
 # sides differ: top outside is +Y, bottom inside is +Y. A single shared frame
 # would put one of the zones on the wrong side of its basic arc.
 ARC_PROFILE_FRAME_XY = {
-    "TopRadius": (0.114, 0.228),
-    "BottomRadius": (0.020, 0.129),
+    "TopRadius": (0.130, 0.207),
+    "BottomRadius": (0.020, 0.160),
 }
-ARC_PROFILE_PICK_X_MM = {"TopRadius": -110.0, "BottomRadius": -100.0}
+ARC_PROFILE_PICK_X_MM = {"TopRadius": -130.0, "BottomRadius": -110.0}
 # Sheet-layout clearance, NOT a manufacturing tolerance. SIDE_SMART may put
 # the native junction on either frame edge; prove its rebuilt route, not a
 # junction inferred from the requested top-left or a fixed frame width.
@@ -220,11 +219,11 @@ _TIP_FACE_MID_Y = TOP_END_Y - (TIP_FACE / 2.0) * math.cos(TOP_ARC_LEN / 2.0 / R_
 _ROD_TIP_Y = TOP_END_Y - TIP_FACE * math.cos(_ALPHA_TOP)
 _BOT_END_Y = CENTER_Y - math.sqrt(R_BOTTOM**2 - BOT_END_X**2)
 
-# Keep the overall witnesses short and above the callouts: full-height tip
-# witnesses would cut datum C's outward-normal leader and the local land angle.
-OVERALL_WIDTH_TEXT_XY = (FRONT_CENTER[0], 0.250)
-OVERALL_WITNESS_LENGTH = 0.012
-TAPER_INTERSECTION_TEXT_XY = (0.219, 0.124)
+# Full witnesses connect the overall row to the actual physical tips.
+OVERALL_WIDTH_TEXT_XY = (FRONT_CENTER[0], 0.215)
+TAPER_INTERSECTION_TEXT_XY = (0.219, 0.132)
+PIN_X_TEXT_XY = (0.219, 0.197)
+PIN_Y_TEXT_XY = (0.267, 0.162)
 LAND_ANGLE_TEXT_REACH = 0.032
 LAND_ANGLE_WITNESS_LENGTH = 0.008
 LAND_DATUM_STANDOFF = 0.014
@@ -273,47 +272,219 @@ part_metadata(datums={
 })
 
 
-def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model point in the bbox-centred front view (1:2)."""
-    return (
-        FRONT_CENTER[0] + mx * _S / 1000.0,
-        FRONT_CENTER[1] + (my - _BBOX_CY) * _S / 1000.0,
+
+
+def _project(adapter: Any, view: Any, points: Any, *, label: str) -> list[tuple[float, float]]:
+    """Native geometry barrier precedes every detail-centre/attachment projection."""
+    _early_bound(view, "IView").UpdateViewDisplayGeometry()  # VT_VOID
+    projected = model_points_in_view(adapter, view, points, label=label)
+    if (len(projected) != len(points)
+            or any(len(xy) != 2 or not all(math.isfinite(v) for v in xy) for xy in projected)):
+        raise RuntimeError(f"{label}: invalid native projected points: {projected!r}")
+    return projected
+
+
+def _outline(view: Any, *, label: str) -> tuple[float, float, float, float]:
+    outline = tuple(float(v) for v in (_early_bound(view, "IView").GetOutline() or ()))
+    if (len(outline) != 4 or not all(math.isfinite(v) for v in outline)
+            or outline[0] >= outline[2] or outline[1] >= outline[3]):
+        raise RuntimeError(f"{label} has invalid native outline: {outline!r}")
+    return outline
+
+
+def _create_detail(
+    adapter: Any, parent: Any, *, centre: tuple[float, float, float],
+    radius_mm: float, target: tuple[float, float], scale: tuple[float, float], label: str,
+) -> Any:
+    """Rocker-private cone-gear-shaft native circle/barrier/settling pattern."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(parent, "IView")
+    if drawing.ActivateView(view_name(adapter, parent)) is not True:
+        raise RuntimeError(f"detail {label}: cannot activate parent")
+    draw.ClearSelection2(True)
+    rim = (centre[0] + radius_mm / 1000.0, centre[1], centre[2])
+    sheet_points = _project(adapter, parent, (centre, rim), label=f"detail {label} fence")
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    mapped = []
+    for x, y in sheet_points:
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        mapped.append(tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        circle = manager.CreateCircle(*mapped[0], *mapped[1])
+    finally:
+        manager.AddToDB = previous
+    if circle is None:
+        raise RuntimeError(f"detail {label}: native fence creation failed")
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    data = _early_bound(selection.CreateSelectData(), "ISelectData")
+    data.View = parent
+    if _early_bound(circle, "ISketchSegment").Select4(False, data) is not True:
+        raise RuntimeError(f"detail {label}: cannot select parent fence")
+    native = drawing.CreateDetailViewAt4(
+        *target, 0.0, 0, *scale, label, 1, True, False, False, 5,
     )
+    draw.ClearSelection2(True)
+    if native is None:
+        raise RuntimeError(f"detail {label}: CreateDetailViewAt4 returned no view")
+    detail = _early_bound(native, "IView")
+    detail.UseParentScale = False
+    detail.UseSheetScale = 0
+    detail.ScaleRatio = double_array(list(scale))
+    set_hidden_lines_removed(adapter, detail)
+    rebuild_drawing(adapter, label=f"create detail {label}")
+    base = detail.GetBaseView()
+    if base is None or int(adapter.swApp.IsSame(base, parent)) != 1:
+        raise RuntimeError(f"detail {label}: native parent link is not the front")
+    for attempt in range(4):
+        ratio = tuple(float(v) for v in (detail.ScaleRatio or ()))
+        if (len(ratio) != 2 or not all(math.isfinite(v) and v > 0 for v in ratio)
+                or not math.isclose(ratio[0] / ratio[1], scale[0] / scale[1], abs_tol=1e-10)
+                or bool(detail.UseParentScale) or int(detail.UseSheetScale) != 0):
+            raise RuntimeError(f"detail {label}: native scale is {ratio}, not {scale}")
+        outline = _outline(detail, label=f"detail {label}")
+        landed = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
+        (physical,) = _project(adapter, detail, (centre,), label=f"detail {label} centre {attempt}")
+        _telemetry.info(f"detail {label}: pass={attempt}, outline={outline}, physical_centre={physical}, scale={ratio}")
+        if math.dist(landed, target) <= 0.00005 and math.dist(physical, target) <= 0.0005:
+            break
+        anchor = tuple(float(v) for v in detail.Position)
+        if len(anchor) != 2 or not all(math.isfinite(v) for v in anchor):
+            raise RuntimeError(f"detail {label}: invalid Position={anchor!r}")
+        if math.dist(landed, target) > 0.00005:
+            move = [anchor[i] + target[i] - landed[i] for i in range(2)]
+            if detail.SetViewPosition(double_array(move), False) is not True:
+                raise RuntimeError(f"detail {label}: native position refused")
+        rebuild_drawing(adapter, label=f"settle detail {label}")
+    else:
+        raise RuntimeError(f"detail {label}: unsettled native crop/physical centre: outline={outline}, projected={physical}, target={target}")
+    diameter = 2.0 * radius_mm / 1000.0 * scale[0] / scale[1]
+    if any(abs(outline[i + 2] - outline[i] - diameter) > 0.001 for i in range(2)):
+        raise RuntimeError(f"detail {label}: full circular crop is not its native scaled diameter: {outline}, diameter={diameter}")
+    return detail
 
 
-# Datum A on the pivot bore. Three leaders land on that 3.25 mm circle, one
-# per quadrant (r743-1RC eye pass: they converged): datum A from the upper
-# left, the O6.50 dimension from the lower left (its line runs on through the
-# centre to the upper-right rim), the Ra from the lower right.
-#
-# The tag is COORDINATE-picked, because only a coordinate-picked tag puts its
-# frame box where it is asked: r743-4D printed it up-left of the pivot, clear
-# above the strap, and channel_lever's datum B reads 0.002 mm off its request.
-# An entity-attached tag drops its box at SolidWorks' default instead: r743-1RC
-# printed it on the strap beside the bore, and the vm2 datum probe measured
-# the same behaviour 34.7 mm off its request.
-#
-# A coordinate pick hit-tests with a PIXEL aperture mapped through the current
-# zoom (see new_project_drawing), and at fit-to-sheet that aperture spans the
-# 0.875 mm (sheet) between the O6.5 bore and the concentric O10 hub rims:
-# r743-4D's pick, exactly on the bore rim, put the triangle on the hub. Its
-# render has the pivot centre within 0.05 mm of _sheet_xy, so the mapping is
-# not the cause. The pick is therefore made zoomed in on the pivot, checked
-# against the diameter-picked bore edge before the tag goes in, and the tag's
-# attachment is checked again after it does. The triangle then re-attaches at
-# the bore point nearest the box, on the 135-degree ray (see
-# draw_platen_guide's datum C note).
+def _place_detail_letters(adapter: Any, front: Any) -> None:
+    circles = tuple(_early_bound(front, "IView").GetDetailCircles() or ())
+    labels = [_early_bound(circle, "IDetailCircle").GetLabel() for circle in circles]
+    if len(circles) != 2 or sorted(labels) != ["D", "E"]:
+        raise RuntimeError(f"rocker requires exactly D/E native parent circles, got {labels!r}")
+    for label, xy in DETAIL_LETTER_XY.items():
+        circle = _early_bound(circles[labels.index(label)], "IDetailCircle")
+        circle.SetLabelPosition(*xy)  # VT_VOID; getter returns two out doubles
+        rebuild_drawing(adapter, label=f"place detail {label} parent letter")
+        actual = tuple(float(v) for v in circle.GetLabelPosition())
+        if len(actual) != 2 or not all(math.isfinite(v) for v in actual) or math.dist(actual, xy) > 1e-8:
+            raise RuntimeError(f"detail {label}: native letter stayed at {actual!r}, requested {xy}")
+
+
+def _pin_sheet_scale(adapter: Any, sheet: Any) -> None:
+    sheet = _early_bound(sheet, "ISheet")
+    if sheet.SetScale(*SHEET_SCALE, False, False) is not True:
+        raise RuntimeError("cannot pin rocker sheet scale before native captions")
+    properties = tuple(float(v) for v in (sheet.GetProperties2() or ()))
+    if len(properties) < 4 or tuple(properties[2:4]) != SHEET_SCALE:
+        raise RuntimeError(f"rocker sheet scale did not persist: {properties!r}")
+
+
+def _title_block_top(adapter: Any, sheet: Any) -> float:
+    """Read the actual template's top rule; registry coordinates identify its span."""
+    sketch = _early_bound(_early_bound(sheet, "ISheet").GetTemplateSketch(), "ISketch")
+    if sketch is None:
+        raise RuntimeError("detail E: cannot read native title-block sketch")
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    tops = []
+    for raw in sketch.GetSketchSegments() or ():
+        segment = _early_bound(raw, "ISketchSegment")
+        if int(segment.GetType()) != 0:  # swSketchLINE
+            continue
+        line = _early_bound(raw, "ISketchLine")
+        a = _early_bound(line.GetStartPoint2(), "ISketchPoint")
+        b = _early_bound(line.GetEndPoint2(), "ISketchPoint")
+        values = (float(a.X), float(a.Y), float(b.X), float(b.Y))
+        if not all(math.isfinite(v) for v in values):
+            raise RuntimeError("detail E: invalid native title-block rule")
+        x0, x1 = sorted((values[0], values[2]))
+        if (abs(values[1] - values[3]) < 1e-8
+                and abs(x0 - template.title_block_left_m) < 0.001
+                and x1 > template.width_m - 0.020
+                and 0.0 < values[1] < NOTES_CEILING):
+            tops.append(values[1])
+    if not tops:
+        raise RuntimeError("detail E: native title-block top rule could not be measured")
+    return max(tops)
+
+
+def _seat_detail_caption(adapter: Any, view: Any, sheet: Any, *, label: str) -> None:
+    """Seat native linked caption INK, not an assumed insertion point or height."""
+    _pin_sheet_scale(adapter, sheet)
+    notes = tuple(_early_bound(view, "IView").GetNotes() or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"detail {label}: expected one native caption, got {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    linked = note.PropertyLinkedText
+    if type(linked) is not str or not linked:
+        raise RuntimeError(f"detail {label}: caption has no native linked fields")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    crop = _outline(view, label=f"detail {label}")
+    ceiling = crop[1] - 0.003
+    floor = (_title_block_top(adapter, sheet) if label == "E"
+             else float(_early_bound(sheet, "ISheet").GetZoneMargin(1))) + 0.003
+    if not math.isfinite(floor) or floor >= ceiling:
+        raise RuntimeError(f"detail {label}: invalid native caption slot floor={floor}, ceiling={ceiling}, required_air_mm=3.000")
+    for attempt in range(4):
+        box = _note_extent(adapter, note)
+        context = (f"detail {label}: actual_caption_ink={box}, native_crop={crop}, "
+                   f"actual_crop_air_mm={(crop[1] - box[3]) * 1000.0:.3f}, "
+                   f"actual_lower_air_mm={(box[1] - floor + 0.003) * 1000.0:.3f}, required_air_mm=3.000")
+        _telemetry.info(context)
+        if box[3] - box[1] > ceiling - floor:
+            raise RuntimeError(f"{context}: actual caption cannot fit between crop and lower boundary")
+        error = ((crop[0] + crop[2] - box[0] - box[2]) / 2.0, ceiling - 0.00005 - box[3])
+        if max(abs(v) for v in error) <= 0.00005:
+            break
+        position = tuple(float(v) for v in (annotation.GetPosition() or ()))
+        if len(position) != 3 or not all(math.isfinite(v) for v in position):
+            raise RuntimeError(f"detail {label}: invalid native caption position")
+        if annotation.SetPosition2(position[0] + error[0], position[1] + error[1], position[2]) is not True:
+            raise RuntimeError(f"detail {label}: native caption placement refused")
+        rebuild_drawing(adapter, label=f"seat detail {label} caption {attempt}")
+    else:
+        raise RuntimeError(f"{context}: caption ink did not settle")
+    if note.PropertyLinkedText != linked or box[1] < floor - 1e-9 or box[3] > ceiling + 1e-9:
+        raise RuntimeError(f"{context}: native caption lost links or required air")
+    if label == "D" and box[2] > DRAWING_TEMPLATES[SPEC.layout].title_block_left_m - 0.003:
+        air = DRAWING_TEMPLATES[SPEC.layout].title_block_left_m - box[2]
+        raise RuntimeError(f"{context}: caption must stay left of title block: actual_horizontal_air_mm={air * 1000.0:.3f}, required_air_mm=3.000")
+    _telemetry.info(f"detail {label} caption native ink={box}, crop={crop}, lower_limit={floor}")
+
+
+def _require_dimension_census(adapter: Any, views: Any) -> None:
+    marked = set().union(*DRAWING_DIMENSIONS.values())
+    total = []
+    for label, view, keep in views:
+        names = [dimension_name(adapter, ann)
+                 for ann in (_early_bound(view, "IView").GetAnnotations() or ())]
+        names = [name for name in names if name in marked]
+        _telemetry.info(f"rocker {label} native marked-dimension census={names!r}")
+        if sorted(names) != sorted(keep):
+            raise RuntimeError(f"rocker {label}: native dimension owners {names!r}, expected {sorted(keep)!r}")
+        total.extend(names)
+    if len(total) != len(marked) or set(total) != marked:
+        raise RuntimeError(f"rocker native marked-dimension union is not exact: {total!r}")
+
+
+
+
+# Detail D makes the two concentric rims distinguishable at their actual 4:1
+# projection. A coordinate pick must still resolve to the diameter-picked bore.
 PIVOT_DATUM_STANDOFF = 0.020
 PIVOT_DATUM_ANGLE = math.radians(135.0)
-PIVOT_BORE_SHEET_R = PIVOT_HOLE_DIA / 2.0 * _S / 1000.0
-PIVOT_HUB_SHEET_R = HUB_DIA / 2.0 * _S / 1000.0
-# The zoomed pick window's half-span: the hub and a hub radius of margin. That
-# is ~40x the fit-to-sheet scale (432 mm across), so an aperture that reached
-# the hub 0.875 mm off now covers about 0.02 mm.
-PIVOT_PICK_ZOOM_HALF = 2.0 * PIVOT_HUB_SHEET_R
-# Pick candidates on the 135-degree ray as fractions of the bore radius: the
-# rim first, then a point further from the hub rim. Each result is recorded,
-# and a pick that never resolves to the bore fails the build.
 PIVOT_PICK_FRACTIONS = (1.0, 0.6)
 
 PIVOT_BORE = requirement(
@@ -395,9 +566,9 @@ def _assert_pivot_precision(
     )
 
 
-def _pivot_datum_request(centre: tuple[float, float]) -> tuple[float, float]:
-    """The sheet point datum A's leader meets its frame, on the 135-degree ray."""
-    reach = PIVOT_BORE_SHEET_R + PIVOT_DATUM_STANDOFF
+def _pivot_datum_request(centre: tuple[float, float], radius: float) -> tuple[float, float]:
+    """Detail-space junction on the upper-left ray, using its projected bore."""
+    reach = radius + PIVOT_DATUM_STANDOFF
     return (
         centre[0] + reach * math.cos(PIVOT_DATUM_ANGLE),
         centre[1] + reach * math.sin(PIVOT_DATUM_ANGLE),
@@ -405,15 +576,15 @@ def _pivot_datum_request(centre: tuple[float, float]) -> tuple[float, float]:
 
 
 def _pick_pivot_bore(
-    adapter: Any, view: Any, bore_edge: Any, centre: tuple[float, float]
+    adapter: Any, view: Any, bore_edge: Any, centre: tuple[float, float], radius: float,
 ) -> tuple[float, float]:
-    """Return a sheet point whose EDGE pick resolves to the pivot bore."""
+    """Return a detail-space point whose EDGE pick resolves to the bore."""
     results = []
     for fraction in PIVOT_PICK_FRACTIONS:
-        radius = PIVOT_BORE_SHEET_R * fraction
+        radius_at_pick = radius * fraction
         xy = (
-            centre[0] + radius * math.cos(PIVOT_DATUM_ANGLE),
-            centre[1] + radius * math.sin(PIVOT_DATUM_ANGLE),
+            centre[0] + radius_at_pick * math.cos(PIVOT_DATUM_ANGLE),
+            centre[1] + radius_at_pick * math.sin(PIVOT_DATUM_ANGLE),
         )
         try:
             picked = _select_view_entity(
@@ -453,57 +624,31 @@ def _require_datum_on_bore(app: Any, tag: Any, bore_edge: Any) -> None:
         raise RuntimeError("datum A is dangling")
 
 
-# Pivot-bore Ra. The symbol's body always draws up-right of its leader end
-# (r743-p1s-B2: from the 7:30 rim the leader ran up through the body). It
-# lands on the rim at 4:30 -- oblique to both centre-mark axes, in the one
-# quadrant no other pivot leader uses -- from a symbol down-right of it, below
-# the strap. At 1:30 it met the O6.50 dimension line where that runs on past
-# the centre (r743-1RC). Note text height, as on the other part sheets.
+# Bore finish in D's lower-right quadrant; never either hub end face.
 PIVOT_FINISH_ANGLE = math.radians(-45.0)
 PIVOT_FINISH_OFFSET = (0.012, -0.013)
 PIVOT_FINISH_CHAR_HEIGHT = 0.0025
 
 
-def _pivot_finish_placement() -> tuple[tuple[float, float], tuple[float, float]]:
-    """Sheet (rim, symbol) points of the pivot-bore finish leader."""
+def _pivot_finish_placement(
+    adapter: Any, hub: Any,
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Project the real bore rim through D's native transform."""
     radius = PIVOT_HOLE_DIA / 2.0
-    rim = _sheet_xy(
-        radius * math.cos(PIVOT_FINISH_ANGLE),
-        _PIVOT_MID_Y + radius * math.sin(PIVOT_FINISH_ANGLE),
+    (rim,) = _project(
+        adapter, hub,
+        [(radius * math.cos(PIVOT_FINISH_ANGLE) / 1000.0,
+          (PIVOT_MID_Y + radius * math.sin(PIVOT_FINISH_ANGLE)) / 1000.0, 0.0)],
+        label="detail D bore finish rim",
     )
     return rim, (rim[0] + PIVOT_FINISH_OFFSET[0], rim[1] + PIVOT_FINISH_OFFSET[1])
 
 
-# The native BASIC radii feed the arc-system profile frames. Suppress their
-# off-sheet centre witnesses and dimension-line tails, retaining the radial
-# arrow/leader (drawing-layout-tuning refusal a), rather than typing values in
-# the manufacturing notes.
-# The O6.50 text sits down-left of the pivot, left of the rod-pin X location
-# dimension (pivot to rod-pin hole, its line at y 0.138): from (0.180, 0.120),
-# straight below the bore, its leader crossed that dimension's line and ran up
-# its extension line (r743-4D render).
-# The top edge's BASIC height over the pivot axis runs up the mirror axis from
-# the pivot centre, feeding the profile zone that preserves the former +0.50/0;
-# text straight above the strap, left of the rod-pin frame and datum C. It
-# prints LEFT of the axis, so it rides above datum A's box (top y ~0.1905):
-# at a 10 mm rise its rows sat on datum A's 135-degree leader
-# (leader-through-text, 5.12 mm); at 22 mm its underline clears the box by
-# ~2.7 mm.
-TOP_ABOVE_PIVOT_TEXT_RISE = 0.022
+# Every marked model dimension has exactly one face-view owner.
 FRONT_KEEP = {
-    "PivotDia": (0.130, 0.148),
-    "HubDia": (0.157, 0.139),
-    "RodTipLen": (0.280, 0.188),
-    # A radius text box inside this large parent circle still printed a
-    # centre-directed line off-sheet, even with the outside-arrow flags.
-    # Keep its exterior leader to the right of the pivot-bore finish callout.
-    "TopRadius": (0.235, 0.157),
-    "BottomRadius": (0.090, 0.154),
-    "TopAbovePivot": (
-        _sheet_xy(0.0, _PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT)[0],
-        _sheet_xy(0.0, _PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT)[1]
-        + TOP_ABOVE_PIVOT_TEXT_RISE,
-    ),
+    "TopRadius": (0.145, 0.136),
+    "BottomRadius": (0.170, 0.128),
+    "TopAbovePivot": (0.165, 0.191),
 }
 
 _TOP_P = rocker_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"]
@@ -549,6 +694,11 @@ HUB_OD = requirement(
         "coaxial_to": ("pivot_bore", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
     }, precision={"dia": _P, "coaxiality_dia": _P},
 )
+HUB_KEEP = {
+    "PivotDia": (0.120, 0.086),
+    "HubDia": (0.210, 0.122),
+}
+END_KEEP = {"RodTipLen": (0.377, 0.130)}
 # The hub length (+0.05/0, #743 PR2) under the end view, where the hub shows
 # its full length (the end view is 1:1, centred on the pivot mid-depth).
 # The strap thickness (+/-0.025, ARM_THICKNESS_BAND, Main ruling 2026-10
@@ -558,7 +708,7 @@ HUB_OD = requirement(
 # the iso caption (top y 0.183) and right of the end view.
 STRAP_THICKNESS_TEXT_XY = (RIGHT_CENTER[0] + 0.017, RIGHT_CENTER[1] + 0.010)
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
-    "HubLength": (RIGHT_CENTER[0], RIGHT_CENTER[1] - (_PIVOT_MID_Y + 12.0) / 1000.0),
+    "HubLength": (RIGHT_CENTER[0], RIGHT_CENTER[1] - (PIVOT_MID_Y + 12.0) / 1000.0),
     "StrapThickness": STRAP_THICKNESS_TEXT_XY,
 }
 
@@ -630,9 +780,12 @@ def _basic_profile_dimensions(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"arc-system BASIC dimensions missing: {sorted(remaining)}")
 
 
-def _dress_front_dimensions(adapter: Any, annotations: list[Any]) -> None:
-    """Read imported land/OD sizes and add process without replacing any nominal."""
-    remaining = {"RodTipLen": TIP_FACE, "HubDia": HUB_DIA, "PivotDia": PIVOT_HOLE_DIA}
+def _dress_detail_dimensions(
+    adapter: Any, annotations: list[Any], *, keep: dict[str, tuple[float, float]],
+) -> None:
+    """Read D/E imported sizes; preserve the native pivot size and ream band."""
+    expected = {"RodTipLen": TIP_FACE, "HubDia": HUB_DIA, "PivotDia": PIVOT_HOLE_DIA}
+    remaining = {name: expected[name] for name in keep}
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
         if name not in remaining:
@@ -672,7 +825,7 @@ def _dress_front_dimensions(adapter: Any, annotations: list[Any]) -> None:
         # A custom prefix replaces the automatic diameter glyph, so retain its
         # native symbol token when the original prefix compartment is empty.
         ream_prefix = "REAM " + (prefix if prefix else "<MOD-DIAM>")
-        through_suffix = suffix + (" " if suffix else "") + "THRU"
+        through_suffix = suffix.rstrip() + " THRU"
         display.SetText(1, ream_prefix)
         display.SetText(2, through_suffix)
         if (
@@ -685,10 +838,11 @@ def _dress_front_dimensions(adapter: Any, annotations: list[Any]) -> None:
         ):
             raise RuntimeError("pivot ream/through text did not preserve its native dimension")
     if remaining:
-        raise RuntimeError(f"front source dimensions missing: {sorted(remaining)}")
-    assert_imported_precision(
-        adapter, annotations, {"HubDia": DEFAULT_DRAWING_PRECISION}
-    )
+        raise RuntimeError(f"detail source dimensions missing: {sorted(remaining)}")
+    if any(dimension_name(adapter, ann) == "HubDia" for ann in annotations):
+        assert_imported_precision(
+            adapter, annotations, {"HubDia": DEFAULT_DRAWING_PRECISION}
+        )
 
 
 def _require_native_angle(
@@ -717,8 +871,8 @@ def _require_native_angle(
     return math.degrees(radians)
 
 
-def _land_vertical(adapter: Any, front: Any, points: list[tuple[float, float]]) -> Any:
-    """A short view-owned vertical ray through F, parallel to the mirror axis.
+def _land_vertical(adapter: Any, view: Any, points: list[tuple[float, float]]) -> Any:
+    """A short view-owned vertical ray through F, parallel to the mirror plane.
 
     The upper endpoint has the CAD land's top height; no model dimension or
     nominal is introduced. Map sheet points into the active view sketch as in
@@ -727,10 +881,10 @@ def _land_vertical(adapter: Any, front: Any, points: list[tuple[float, float]]) 
     """
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, front)):
-        raise RuntimeError("failed to activate front view for the land angle")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the land-angle detail view")
     draw.ClearSelection2(True)
-    sketch = _early_bound(front.GetSketch(), "ISketch")
+    sketch = _early_bound(view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     mapped = []
@@ -750,7 +904,7 @@ def _land_vertical(adapter: Any, front: Any, points: list[tuple[float, float]]) 
         manager.AddToDB = old_add_to_db
         manager.DisplayWhenAdded = old_display
     if centerline is None:
-        raise RuntimeError("failed to create the front-view land angle ray")
+        raise RuntimeError("failed to create the detail-view land angle ray")
     segment = _early_bound(centerline, "ISketchSegment")
     segment.Color = 0
     if int(segment.Color) != 0:
@@ -759,20 +913,20 @@ def _land_vertical(adapter: Any, front: Any, points: list[tuple[float, float]]) 
     return segment
 
 
-def _add_land_angle(adapter: Any, front: Any, land: ViewEdge) -> Any:
-    """Measure the CAD radial land against a local parallel to the mirror axis.
+def _add_land_angle(adapter: Any, view: Any, land: ViewEdge) -> Any:
+    """Measure the CAD radial land against a local parallel to the mirror plane.
 
     Use the outer endpoint F, not the top-arc endpoint T: the upward acute
     sector at F is outside the material. The actual mirror-axis line intersects
     this land at the off-sheet R800 parent centre, so it is not a usable witness.
     """
     outer, upper = sorted(land.line, key=lambda point: point[0], reverse=True)
-    outer_xy, upper_xy = model_points_in_view(
-        adapter, front, [tuple(v / 1000.0 for v in point) for point in (outer, upper)],
+    outer_xy, upper_xy = _project(
+        adapter, view, [tuple(v / 1000.0 for v in point) for point in (outer, upper)],
         label="rod land angular endpoints",
     )
     vertical_end = (outer_xy[0], upper_xy[1])
-    vertical = _land_vertical(adapter, front, [outer_xy, vertical_end])
+    vertical = _land_vertical(adapter, view, [outer_xy, vertical_end])
     dx, dy = upper_xy[0] - outer_xy[0], upper_xy[1] - outer_xy[1]
     length = math.hypot(dx, dy)
     bisector = (dx / length, dy / length + 1.0)
@@ -782,7 +936,7 @@ def _add_land_angle(adapter: Any, front: Any, land: ViewEdge) -> Any:
         outer_xy[1] + bisector[1] * reach,
     )
     display = add_edge_dimension(
-        adapter, front,
+        adapter, view,
         p0=((outer_xy[0] + upper_xy[0]) / 2.0, (outer_xy[1] + upper_xy[1]) / 2.0),
         p1=((outer_xy[0] + vertical_end[0]) / 2.0, (outer_xy[1] + vertical_end[1]) / 2.0),
         text_xy=text_xy, label="radial land angle to mirror axis",
@@ -801,31 +955,29 @@ def _add_land_angle(adapter: Any, front: Any, land: ViewEdge) -> Any:
         )
     ):
         raise RuntimeError("land angle is not attached to its exact land and local vertical")
+    set_basic_dimension(adapter, display, label="radial land angle")
+    if int(_early_bound(display.GetDimension2(0), "IDimension").GetToleranceType()) != 1:
+        raise RuntimeError("radial land angle did not retain BASIC tolerance")
     _require_native_angle(
         display, expected_degrees=math.degrees(_ALPHA_TOP), label="radial land angle"
     )
     display.MaxWitnessLineLength = LAND_ANGLE_WITNESS_LENGTH
     if abs(float(display.MaxWitnessLineLength) - LAND_ANGLE_WITNESS_LENGTH) > 1e-9:
         raise RuntimeError("land angle retained crossing full-height witnesses")
-    display.SetText(4, "TO MIRROR AXIS")
-    if str(display.GetText(4) or "") != "TO MIRROR AXIS":
+    display.SetText(4, "TO MIRROR PLANE")
+    if str(display.GetText(4) or "") != "TO MIRROR PLANE":
         raise RuntimeError("land angle direction callout did not persist")
     return display
 
 
-def _add_rocker_outline_dimensions(adapter: Any, front: Any) -> ViewEdge:
-    """Import the part-owned sizes and measure the remaining actual CAD outline."""
+def _add_rocker_outline_dimensions(adapter: Any, front: Any) -> None:
+    """Import profile nominals and measure the remaining actual CAD outline."""
     annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _basic_profile_dimensions(adapter, annotations)
-    _dress_front_dimensions(adapter, annotations)
     edges = scan_view_edges(front, label="rocker front outline")
-    land = edges.exact_line_through(
-        (_TIP_FACE_MID_X, _TIP_FACE_MID_Y, ARM_THICKNESS / 2.0),
-        label="+Z rod-side radial land",
-    )
     width_points = (
         (-ROD_TIP_X, _ROD_TIP_Y, ARM_THICKNESS / 2.0),
         (ROD_TIP_X, _ROD_TIP_Y, ARM_THICKNESS / 2.0),
@@ -847,11 +999,6 @@ def _add_rocker_outline_dimensions(adapter: Any, front: Any) -> ViewEdge:
         adapter, width, expected_mm=2.0 * ROD_TIP_X, label="rocker overall width",
         entities=vertices, entity_types=("VERTEX", "VERTEX"),
     )
-    width = _early_bound(width, "IDisplayDimension")
-    width.MaxWitnessLineLength = OVERALL_WITNESS_LENGTH
-    if abs(float(width.MaxWitnessLineLength) - OVERALL_WITNESS_LENGTH) > 1e-9:
-        raise RuntimeError("overall width retained crossing full-height witnesses")
-    _add_land_angle(adapter, front, land)
     pivot = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
     taper_point = (BOT_END_X, _BOT_END_Y, ARM_THICKNESS / 2.0)
     taper = edges.exact_vertex_at(taper_point, label="+Z taper/lower-arc intersection")
@@ -871,7 +1018,133 @@ def _add_rocker_outline_dimensions(adapter: Any, front: Any) -> ViewEdge:
         adapter, taper_dimension, expected_mm=BOT_END_X, label="taper intersection X",
         entities=(pivot, taper), entity_types=("EDGE", "VERTEX"),
     )
-    return land
+    taper_dimension = _early_bound(taper_dimension, "IDisplayDimension")
+    taper_dimension.SetText(4, "R816/TAPER")
+    if str(taper_dimension.GetText(4) or "") != "R816/TAPER":
+        raise RuntimeError("taper endpoint identity label did not persist")
+
+
+def _add_pin_coordinates(adapter: Any, front: Any) -> None:
+    """Two centred native circular endpoints locate the pin from physical A."""
+    pivot_bore_edge = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
+    rod_hole_edge = visible_circle_edge(adapter, front, _ROD_HOLE_DIA)
+    pivot_xy, rod_xy = _project(
+        adapter, front,
+        ((0.0, PIVOT_MID_Y / 1000.0, 0.0),
+         (ROD_HOLE_X / 1000.0, ROD_HOLE_Y / 1000.0, 0.0)),
+        label="physical A and rod-pin axes",
+    )
+    for axis, orientation, expected, text_xy in (
+        ("X", "horizontal", ROD_HOLE_X, PIN_X_TEXT_XY),
+        ("Y", "vertical", ROD_HOLE_Y - PIVOT_MID_Y, PIN_Y_TEXT_XY),
+    ):
+        label = f"rod-pin {axis} location"
+        dimension = add_edge_dimension(
+            adapter, front, p0=pivot_xy, p1=rod_xy, text_xy=text_xy,
+            label=label, orientation=orientation, entities=(pivot_bore_edge, rod_hole_edge),
+        )
+        set_arc_endpoints_to_center(adapter, dimension, label=label)
+        model = _early_bound(_early_bound(dimension, "IDisplayDimension").GetDimension2(0), "IDimension")
+        if any(int(model.GetArcEndCondition(index)) != 1 for index in (1, 2)):
+            raise RuntimeError(f"{label}: both physical bore endpoints must be centred")
+        assert_dimension_measures(
+            adapter, dimension, expected_mm=expected, label=label,
+            entities=(pivot_bore_edge, rod_hole_edge),
+        )
+        set_basic_dimension(adapter, dimension, label=label)
+        display = _early_bound(dimension, "IDisplayDimension")
+        display.SetText(4, "PIN AXIS")
+        if str(display.GetText(4) or "") != "PIN AXIS":
+            raise RuntimeError(f"{label}: native PIN AXIS label did not persist")
+
+
+def _require_ream_clearance(
+    adapter: Any, hub: Any, notes_box: tuple[float, float, float, float],
+) -> None:
+    """Prove actual native REAM text clears D and the seated notes by 1 mm."""
+    reader = _Reader(adapter)
+    annotations = tuple(_early_bound(hub, "IView").GetAnnotations() or ())
+    matches = [ann for ann in annotations if dimension_name(adapter, ann) == "PivotDia"]
+    if len(matches) != 1:
+        raise RuntimeError("detail D: expected one native pivot REAM dimension")
+    record = _dump_annotation(reader, matches[0])
+    errors = reader.take_errors()
+    if record is None or errors:
+        raise RuntimeError(f"detail D: cannot measure native REAM text: {errors!r}")
+    geometry = _arc_callout_geometry(record, calibrate_sheet_advance([record]))
+    crop = Box(*_outline(hub, label="detail D"))
+    notes = Box(*notes_box)
+    for box in geometry.text_boxes:
+        for label, obstacle in (("D crop", crop), ("seated notes", notes)):
+            gap = _box_air(box, obstacle)
+            detail = f"detail D REAM: requested_xy_mm={tuple(v * 1000.0 for v in HUB_KEEP['PivotDia'])}, actual_GetPosition={record.get('pos')}, text_ink={box.format_mm()}, obstacle={label}:{obstacle.format_mm()}, actual_air_mm={gap * 1000.0:.3f}, required_air_mm=1.000"
+            _telemetry.info(detail)
+            if gap < 0.001 - 1e-12:
+                raise RuntimeError(detail)
+
+
+def _box_air(box: Box, obstacle: Box) -> float:
+    return math.hypot(
+        max(obstacle.xmin - box.xmax, box.xmin - obstacle.xmax, 0.0),
+        max(obstacle.ymin - box.ymax, box.ymin - obstacle.ymax, 0.0),
+    )
+
+
+def _require_front_detail_air(adapter: Any, front: Any, hub: Any, end: Any) -> None:
+    """Every actual front-callout text box clears both settled detail crops."""
+    reader = _Reader(adapter)
+    records = [_dump_annotation(reader, ann)
+               for ann in (_early_bound(front, "IView").GetAnnotations() or ())]
+    errors = reader.take_errors()
+    if not records or any(record is None for record in records) or errors:
+        raise RuntimeError(f"front/detail text air cannot be measured: {errors!r}")
+    advance = calibrate_sheet_advance(records)
+    obstacles = (("D", Box(*_outline(hub, label="D"))), ("E", Box(*_outline(end, label="E"))))
+    for record in records:
+        if record.get("visible") in (2, 3) or record.get("type") in (13, 15):
+            continue
+        geometry = _arc_callout_geometry(record, advance)
+        for box in geometry.text_boxes:
+            for label, obstacle in obstacles:
+                air = _box_air(box, obstacle)
+                detail = f"front {record.get('name')!r}: actual_GetPosition={record.get('pos')}, native_text_bbox_mm={box.format_mm()}, detail_{label}_crop_mm={obstacle.format_mm()}, actual_air_mm={air * 1000.0:.3f}, required_air_mm=1.000"
+                _telemetry.info(detail)
+                if air < 0.001 - 1e-12:
+                    raise RuntimeError(detail)
+
+
+def _require_radius_exterior(adapter: Any, front: Any) -> None:
+    """Native projected parent circles, not front-only scale predictions."""
+    reader = _Reader(adapter)
+    annotations = tuple(_early_bound(front, "IView").GetAnnotations() or ())
+    centre, top_rim, bottom_rim = _project(
+        adapter, front,
+        ((0.0, CENTER_Y / 1000.0, 0.0),
+         (R_TOP / 1000.0, CENTER_Y / 1000.0, 0.0),
+         (R_BOTTOM / 1000.0, CENTER_Y / 1000.0, 0.0)),
+        label="BASIC radius parent circles",
+    )
+    for name, rim in (("TopRadius", top_rim), ("BottomRadius", bottom_rim)):
+        matches = [ann for ann in annotations if dimension_name(adapter, ann) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"{name}: expected one native BASIC radius")
+        record = _dump_annotation(reader, matches[0])
+        errors = reader.take_errors()
+        if record is None or errors:
+            raise RuntimeError(f"{name}: cannot measure native BASIC radius ink: {errors!r}")
+        radius = math.dist(centre, rim)
+        if not math.isfinite(radius) or radius <= 0.0:
+            raise RuntimeError(f"{name}: invalid native projected circle radius={radius!r}")
+        geometry = _arc_callout_geometry(record, calibrate_sheet_advance([record]))
+        for box in geometry.text_boxes:
+            distance = math.hypot(
+                max(box.xmin - centre[0], centre[0] - box.xmax, 0.0),
+                max(box.ymin - centre[1], centre[1] - box.ymax, 0.0),
+            )
+            detail = f"{name}: requested_xy_mm={tuple(v * 1000.0 for v in FRONT_KEEP[name])}, actual_GetPosition={record.get('pos')}, native_text_bbox_mm={box.format_mm()}, native_circle_centre={centre}, native_circle_radius_mm={radius * 1000.0:.3f}, actual_exterior_air_mm={(distance - radius) * 1000.0:.3f}, required_exterior_air_mm=0.000"
+            _telemetry.info(detail)
+            if distance <= radius:
+                raise RuntimeError(detail)
 
 
 def _add_strap_offset_dimension(adapter: Any, right: Any) -> Any:
@@ -929,7 +1202,7 @@ def _add_land_datum(adapter: Any, front: Any, land: ViewEdge) -> Any:
         or abs(land.length_mm - TIP_FACE) > 1e-5
     ):
         raise RuntimeError("datum C needs the exact +Z radial land edge")
-    start, end = model_points_in_view(
+    start, end = _project(
         adapter, front, [tuple(v / 1000.0 for v in point) for point in land.line],
         label="datum C exact land endpoints",
     )
@@ -946,12 +1219,14 @@ def _add_land_datum(adapter: Any, front: Any, land: ViewEdge) -> Any:
     )
 
 
-def _arc_profile_point(name: str) -> tuple[float, float]:
-    """A point on each nominal arc, away from bores, datums and radius leaders."""
+def _arc_profile_point(name: str) -> tuple[float, float, float]:
+    """Real model point on a supported arc, away from the taper vertex."""
     radius = {"TopRadius": R_TOP, "BottomRadius": R_BOTTOM}[name]
+    limit = {"TopRadius": TOP_END_X, "BottomRadius": BOT_END_X}[name]
     x = ARC_PROFILE_PICK_X_MM[name]
-    centre_y = _PIVOT_MID_Y + TOP_EDGE_ABOVE_PIVOT + R_TOP
-    return _sheet_xy(x, centre_y - math.sqrt(radius**2 - x**2))
+    if abs(x) >= limit:
+        raise RuntimeError(f"{name}: profile landing lies outside the actual arc domain")
+    return (x / 1000.0, (CENTER_Y - math.sqrt(radius**2 - x**2)) / 1000.0, 0.0)
 
 
 def _add_arc_profiles(adapter: Any, front: Any) -> dict[str, Any]:
@@ -959,11 +1234,12 @@ def _add_arc_profiles(adapter: Any, front: Any) -> dict[str, Any]:
     profiles = {}
     for name, radius in (("TopRadius", R_TOP), ("BottomRadius", R_BOTTOM)):
         edge = visible_circle_edge(adapter, front, 2.0 * radius)
+        (landing,) = _project(adapter, front, (_arc_profile_point(name),), label=f"{name} profile landing")
         profiles[name] = add_feature_control_frame(
             adapter,
             front,
             edge_entity=edge,
-            leader_attach_xy=_arc_profile_point(name),
+            leader_attach_xy=landing,
             frame_xy=ARC_PROFILE_FRAME_XY[name],
             characteristic="profile_surface",
             tolerance=ARC_PROFILE_ZONE_MM,
@@ -1127,6 +1403,24 @@ def _require_arc_profile_clearance(
             continue
         context += f", native_frame_ink_bbox_mm={frame_box.format_mm()}"
         _telemetry.info(context)
+        native_segments = [
+            LeaderSegment(source.label, source.kind, s.x0, s.y0, s.x1, s.y1, "front")
+            for s in segments
+        ]
+        for other in records:
+            target = geometries.get(id(other))
+            if other is record or target is None:
+                continue
+            native_segments.extend(
+                LeaderSegment(target.label, target.kind, s.x0, s.y0, s.x1, s.y1, "front")
+                for s in target.leader_segments()
+            )
+        for crossing in find_leader_leader_crossings(native_segments):
+            if source.label not in (crossing.a.label, crossing.b.label):
+                continue
+            detail = f"{context}: actual native leader crossing: {crossing.describe()}, intersection_mm={(crossing.x * 1000.0, crossing.y * 1000.0)}"
+            _telemetry.info(detail)
+            problems.append(detail)
         distances = [
             (segment_box_distance(segment, box), target, box, segment)
             for other in records if other is not record
@@ -1163,7 +1457,8 @@ def _note_extent(adapter: Any, note: Any) -> tuple[float, float, float, float]:
     extent = tuple(
         float(value) for value in (_early_bound(note, "INote").GetExtent() or ())
     )
-    if len(extent) != 6 or extent[3] <= extent[0] or extent[4] <= extent[1]:
+    if (len(extent) != 6 or not all(math.isfinite(v) for v in extent)
+            or extent[3] <= extent[0] or extent[4] <= extent[1]):
         raise RuntimeError(f"manufacturing notes have no rendered extent: {extent!r}")
     return (extent[0], extent[1], extent[3], extent[4])
 
@@ -1273,7 +1568,40 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Import the source radii and top height too: these are the BASIC nominal
     # geometry of the profile zone, not independent radius/height bands.
-    rod_land = _add_rocker_outline_dimensions(adapter, front)
+    _add_rocker_outline_dimensions(adapter, front)
+    hub = _create_detail(
+        adapter, front, centre=(0.0, PIVOT_MID_Y / 1000.0, 0.0),
+        radius_mm=HUB_DIA / 2.0 + PIVOT_HOLE_DIA / 4.0,
+        target=HUB_CENTER, scale=HUB_SCALE, label="D",
+    )
+    end_centre_mm = ((BOT_END_X + ROD_TIP_X) / 2.0, (_BOT_END_Y + TOP_END_Y) / 2.0)
+    end_radius_mm = max(
+        math.dist(end_centre_mm, point)
+        for point in ((BOT_END_X, _BOT_END_Y), (ROD_TIP_X, _ROD_TIP_Y),
+                      (TOP_END_X, TOP_END_Y))
+    )
+    end_radius_mm = max(
+        end_radius_mm, math.dist(end_centre_mm, (ROD_HOLE_X, ROD_HOLE_Y)) + _ROD_HOLE_DIA / 2.0,
+    ) + 0.5  # Cosmetic crop air, not a feature dimension.
+    end = _create_detail(
+        adapter, front, centre=(*[v / 1000.0 for v in end_centre_mm], 0.0),
+        radius_mm=end_radius_mm, target=END_CENTER, scale=END_SCALE, label="E",
+    )
+    hub_annotations = curate_view_dimensions(
+        adapter, hub, keep=HUB_KEEP, view_label="detail D",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    _dress_detail_dimensions(adapter, hub_annotations, keep=HUB_KEEP)
+    end_annotations = curate_view_dimensions(
+        adapter, end, keep=END_KEEP, view_label="detail E",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    _dress_detail_dimensions(adapter, end_annotations, keep=END_KEEP)
+    rod_land = scan_view_edges(end, label="detail E rod land").exact_line_through(
+        (_TIP_FACE_MID_X, _TIP_FACE_MID_Y, ARM_THICKNESS / 2.0),
+        label="+Z rod-side radial land",
+    )
+    _add_land_angle(adapter, end, rod_land)
     # The hub length and the strap thickness only show in the end view; the
     # front looks down their direction. Codex #936 (PRRT_kwDOPHDy386mRk__):
     # RIGHT_KEEP was declared but never curated, so the +0.05/0 band that sets
@@ -1286,7 +1614,9 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="right",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    imported_annotations = [*front_annotations, *right_annotations]
+    imported_annotations = [
+        *front_annotations, *hub_annotations, *end_annotations, *right_annotations,
+    ]
     _assert_pivot_precision(adapter, drawing_model, imported_annotations)
     assert_imported_precision(
         adapter,
@@ -1299,87 +1629,48 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _add_strap_offset_dimension(adapter, right)
 
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to front view")
+    for label, view in (("front", front), ("detail D", hub), ("detail E", end)):
+        if auto_center_marks(adapter, view, holes=True, size=0.0025) is not True:
+            raise RuntimeError(f"failed to add ASME center marks to {label}")
 
-    # Rod-pin hole native callout (the #47 wizard hole near the +X tip).
-    # Both bores are picked by DIAMETER (the visible-entity walk), never by a
-    # rim coordinate: r743-p1s-B's coordinate pick on the #47 rim resolved to
-    # the strap's tapered end-face line 1.6 mm (sheet) away, so AddHoleCallout2
-    # had no hole to call out; the pivot bore's rim pick already had the same
-    # fate against the concentric hub (see its finish below).
-    rod_rim = _sheet_xy(ROD_HOLE_X, ROD_HOLE_Y - _ROD_HOLE_DIA / 2.0)
-    rod_hole_edge = visible_circle_edge(adapter, front, _ROD_HOLE_DIA)
-    pivot_bore_edge = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
-    add_native_hole_callout(
+    # E's native wizard-hole callout keeps the source through condition.
+    rod_hole_edge = visible_circle_edge(adapter, end, _ROD_HOLE_DIA)
+    rod_callout = add_native_hole_callout(
         adapter,
-        front,
+        end,
         edge=rod_hole_edge,
-        # Above the strap, up-left of the hole: from (0.300, 0.128) below it
-        # the leader crossed the rod-pin Y location's pivot-rim extension
-        # line (y 0.1717, leader-crosses-line). The leader now drops ~57 deg
-        # onto the rim from above, >= 3.3 mm off every line bar the landing.
-        callout_xy=(0.216, 0.194),
+        callout_xy=ROD_CALLOUT_XY,
         label="rod-pin hole",
         process=drill_process(ROD_HOLE_SPEC) + "\n",
     )
+    rod_callout = _early_bound(rod_callout, "IDisplayDimension")
+    native_rod_text = " ".join(str(rod_callout.GetText(part) or "") for part in (1, 2, 3, 4))
+    if "THRU" not in native_rod_text.upper():
+        raise RuntimeError(f"detail E rod-pin callout lost its native through condition: {native_rod_text!r}")
 
-    # Locate the rod-pin hole from the pivot bore with X and Y BASIC coordinate
-    # components.  The rod-pin centre is NOT collinear with the pivot (7.30 mm
-    # above its mid-height), so a single slant centre distance would leave the
-    # angular component uninspectable; two component dimensions fully define
-    # the true position the FCF below controls.
-    pivot_rim = _sheet_xy(0.0, _PIVOT_MID_Y - PIVOT_HOLE_DIA / 2.0)
-    rod_location_x = add_edge_dimension(
-        adapter,
-        front,
-        p0=pivot_rim,
-        p1=rod_rim,
-        text_xy=(0.180, 0.138),
-        label="rod-pin X location",
-        orientation="horizontal",
-        entities=(pivot_bore_edge, rod_hole_edge),
-    )
-    set_basic_dimension(adapter, rod_location_x, label="rod-pin X location")
-    rod_location_y = add_edge_dimension(
-        adapter,
-        front,
-        p0=pivot_rim,
-        p1=rod_rim,
-        text_xy=(0.267, 0.162),
-        label="rod-pin Y location",
-        orientation="vertical",
-        entities=(pivot_bore_edge, rod_hole_edge),
-    )
-    set_basic_dimension(adapter, rod_location_y, label="rod-pin Y location")
+    _add_pin_coordinates(adapter, front)
 
-    # Datum A identifies the pivot bore's cylindrical surface.  Keep its leader
-    # oblique to both centre-mark axes so the triangle unmistakably terminates
-    # on the circumference rather than appearing to identify the bore centre.
-    # Picked by coordinate under a zoom and proven against the bore edge picked
-    # by DIAMETER (see PIVOT_DATUM_STANDOFF's note).
-    pivot_centre = _sheet_xy(0.0, _PIVOT_MID_Y)
-    with _zoomed_on(adapter, pivot_centre, PIVOT_PICK_ZOOM_HALF):
-        pivot_datum_pick = _pick_pivot_bore(
-            adapter, front, pivot_bore_edge, pivot_centre
-        )
-        datum_a = add_datum_feature(
-            adapter,
-            front,
-            edge_xy=pivot_datum_pick,
-            symbol_xy=_pivot_datum_request(pivot_centre),
-            datum=PIVOT_BORE.fields["datum"][0],
-            label="pivot bore cylindrical datum feature",
-            shoulder=True,
-        )
+    pivot_bore_edge = visible_circle_edge(adapter, hub, PIVOT_HOLE_DIA)
+    pivot_centre, bore_right = _project(
+        adapter, hub,
+        ((0.0, PIVOT_MID_Y / 1000.0, 0.0),
+         (PIVOT_HOLE_DIA / 2000.0, PIVOT_MID_Y / 1000.0, 0.0)),
+        label="detail D bore centre and radius",
+    )
+    projected_radius = math.dist(pivot_centre, bore_right)
+    pivot_datum_pick = _pick_pivot_bore(
+        adapter, hub, pivot_bore_edge, pivot_centre, projected_radius,
+    )
+    datum_a = add_datum_feature(
+        adapter, hub, edge_xy=pivot_datum_pick,
+        symbol_xy=_pivot_datum_request(pivot_centre, projected_radius),
+        datum="A", label="pivot bore cylindrical datum feature", shoulder=True,
+    )
     _require_datum_on_bore(adapter.swApp, datum_a, pivot_bore_edge)
-    # The bore circle picked by DIAMETER above (the visible-entity walk the
-    # cone-gear drawing uses): a coordinate pick on the concentric O6.5 / O10
-    # rims resolves to the hub's outer circle within SolidWorks' tolerance.
-    pivot_finish_rim, pivot_finish_symbol = _pivot_finish_placement()
+    pivot_finish_rim, pivot_finish_symbol = _pivot_finish_placement(adapter, hub)
     add_surface_finish(
         adapter,
-        front,
+        hub,
         edge_entity=pivot_bore_edge,
         symbol_xy=pivot_finish_symbol,
         leader_attach_xy=pivot_finish_rim,
@@ -1393,11 +1684,11 @@ async def build(adapter: Any) -> dict[str, str]:
     # coordinates above have an inspectable direction.
     # Datum B on the strap's broad face in the end view, picked ABOVE the hub
     # band (the O10 hub hides the flank over y 3..13 since 2026-09-02); the
-    # end view is centred on the strap's mid-depth (_PIVOT_MID_Y).
+    # end view is centred on the strap's mid-depth (PIVOT_MID_Y).
     broad_face = (
         RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0,
         RIGHT_CENTER[1]
-        + (ARM_DEPTH - 1.0 - _PIVOT_MID_Y) / 1000.0,  # right view is 1:1,
+        + (ARM_DEPTH - 1.0 - PIVOT_MID_Y) / 1000.0,  # right view is 1:1,
     )
     add_datum_feature(
         adapter,
@@ -1407,15 +1698,18 @@ async def build(adapter: Any) -> dict[str, str]:
         datum=STRAP_DATUM_B.fields["datum"][0],
         label="broad face",
     )
-    _add_land_datum(adapter, front, rod_land)
+    _add_land_datum(adapter, end, rod_land)
+    (rod_position_landing,) = _project(
+        adapter, end,
+        ((ROD_HOLE_X / 1000.0 + _ROD_HOLE_DIA / (2000.0 * math.sqrt(2.0)),
+          ROD_HOLE_Y / 1000.0 - _ROD_HOLE_DIA / (2000.0 * math.sqrt(2.0)), 0.0),),
+        label="detail E southeast rod-hole position landing",
+    )
     add_feature_control_frame(
         adapter,
-        front,
+        end,
         edge_entity=rod_hole_edge,
-        leader_attach_xy=_sheet_xy(
-            ROD_HOLE_X + _ROD_HOLE_DIA / (2.0 * math.sqrt(2.0)),
-            ROD_HOLE_Y + _ROD_HOLE_DIA / (2.0 * math.sqrt(2.0)),
-        ),
+        leader_attach_xy=rod_position_landing,
         frame_xy=FCF_XY,
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["rod-pin hole position"],
@@ -1428,10 +1722,21 @@ async def build(adapter: Any) -> dict[str, str]:
     notes = add_property_linked_note(
         adapter, "Manufacturing Notes", NOTES_LEFT, NOTES_CEILING
     )
-    _seat_notes_on_border(adapter, notes, sheet)
+    notes_box = _seat_notes_on_border(adapter, notes, sheet)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_CAPTION_XY)
+    _pin_sheet_scale(adapter, sheet)
+    _place_detail_letters(adapter, front)
+    _seat_detail_caption(adapter, hub, sheet, label="D")
+    _seat_detail_caption(adapter, end, sheet, label="E")
     # The shared gate: no overlaps, border crossings or leader crossings.
     rebuild_drawing(adapter, label="rocker-arm layout audit")
+    _require_dimension_census(adapter, (
+        ("front", front, FRONT_KEEP), ("detail D", hub, HUB_KEEP),
+        ("detail E", end, END_KEEP), ("right", right, RIGHT_KEEP), ("iso", iso, {}),
+    ))
+    _require_ream_clearance(adapter, hub, notes_box)
+    _require_front_detail_air(adapter, front, hub, end)
+    _require_radius_exterior(adapter, front)
     _require_arc_profile_clearance(adapter, front, arc_profiles)
     check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
 

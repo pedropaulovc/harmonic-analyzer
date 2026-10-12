@@ -2556,20 +2556,24 @@ def test_a_retried_pivot_bore_pick_can_succeed_without_an_error_log(
 
     class _SheetView:
         def UpdateViewDisplayGeometry(self):  # noqa: N802
-            return True
+            return None  # Native UpdateViewDisplayGeometry is VT_VOID.
 
     spans, logs = capture_telemetry
     drawing = _Drawing()
-    centre = (0.2, 0.15)
+    centre = draw_ch_rocker_arm.HUB_CENTER
+    projected_bore_radius = (
+        draw_ch_rocker_arm.PIVOT_HOLE_DIA / 2000.0
+        * draw_ch_rocker_arm.HUB_SCALE[0] / draw_ch_rocker_arm.HUB_SCALE[1]
+    )
     monkeypatch.setattr(_drawing_selection, "view_name", lambda adapter, view: "Drawing View2")
     monkeypatch.setattr(_seat_forensics, "_frame_geometry", lambda adapter: {})
     with _telemetry.span("drawing.pivot_datum"):
         xy = draw_ch_rocker_arm._pick_pivot_bore(
-            _Adapter(sw=_PickSeat(), model=drawing), _SheetView(), bore, centre
+            _Adapter(sw=_PickSeat(), model=drawing), _SheetView(), bore, centre, projected_bore_radius
         )
     picked_xy = [args[2:4] for args in drawing.picks]
     assert [
-        math.dist(point, centre) / draw_ch_rocker_arm.PIVOT_BORE_SHEET_R for point in picked_xy
+        math.dist(point, centre) / projected_bore_radius for point in picked_xy
     ] == pytest.approx(draw_ch_rocker_arm.PIVOT_PICK_FRACTIONS)
     assert xy == picked_xy[-1]
     events = [e for s in spans.get_finished_spans() for e in s.events]

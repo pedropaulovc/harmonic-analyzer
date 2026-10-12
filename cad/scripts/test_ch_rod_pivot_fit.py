@@ -13,8 +13,10 @@ floors and the swing it designs for are pinned to their sources here.
 
 from __future__ import annotations
 
+import ast
 import itertools
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -33,6 +35,7 @@ import ch_rod_pivot_pin_spec as pin
 import dt_cylinder_gear_spec as gear
 import draw_ch_rocker_arm as arm_drawing
 import rocker_bank_layout as bank
+from _drawing_hidden_sketches import curate_view_dimensions
 from _hole_spec import NUMBER_DRILL_MM
 
 
@@ -272,8 +275,32 @@ def test_printed_profile_controls_are_their_sources() -> None:
     assert arm_drawing.BASIC_PROFILE_DIMENSIONS == {
         "TopRadius", "BottomRadius", "TopAbovePivot"
     }
-    assert arm_drawing.BASIC_PROFILE_DIMENSIONS <= arm_drawing.FRONT_KEEP.keys()
-    assert "RodTipLen" in arm_drawing.FRONT_KEEP
+    assert arm_drawing.BASIC_PROFILE_DIMENSIONS == arm_drawing.FRONT_KEEP.keys()
+    assert set(arm_drawing.END_KEEP) == {"RodTipLen"}
+    assert "RodTipLen" not in arm_drawing.HUB_KEEP
+    assert "RodTipLen" not in arm_drawing.RIGHT_KEEP
+    assert arm_drawing._ALPHA_TOP == arm._ALPHA_TOP
+    assert arm_drawing.DRAWING_DIMENSIONS is arm_notes.DRAWING_DIMENSIONS
+    assert arm_drawing.curate_view_dimensions is curate_view_dimensions
+    # A non-empty owner map alone does not prove the native dimension prints.
+    # Require the strict targeted importer to consume it and its marked source.
+    tree = ast.parse(Path(arm_drawing.__file__).read_text(encoding="utf-8"))
+    end_imports = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "curate_view_dimensions"
+        and any(
+            keyword.arg == "keep" and ast.unparse(keyword.value) == "END_KEEP"
+            for keyword in node.keywords
+        )
+    ]
+    assert len(end_imports) == 1
+    assert ast.unparse(end_imports[0].args[1]) == "end"
+    keywords = {
+        keyword.arg: ast.unparse(keyword.value) for keyword in end_imports[0].keywords
+    }
+    assert keywords["dimensions_by_feature"] == "DRAWING_DIMENSIONS"
     assert (arm_drawing.R_TOP, arm_drawing.R_BOTTOM, arm_drawing.CENTER_Y) == (
         arm.R_TOP, arm.R_BOTTOM, arm.CENTER_Y
     )
@@ -331,7 +358,7 @@ def _profile_endpoints(
 
 def test_profile_limits_move_independently_and_bound_only_the_arcs() -> None:
     top, bottom = _printed_profile_limits()
-    angle = arm.TOP_ARC_LEN / (2.0 * arm.R_TOP)
+    angle = arm_drawing._ALPHA_TOP
     nominal_args = (arm.ROD_TIP_X, arm.TIP_FACE, angle, arm.BOT_END_X)
     nominal = _profile_endpoints(0.0, 0.0, *nominal_args)
     assert nominal == pytest.approx(np.array([
@@ -347,22 +374,23 @@ def test_profile_limits_move_independently_and_bound_only_the_arcs() -> None:
     assert bottom_only[2, 1] > nominal[2, 1]
 
     two_place = arm.LINEAR_2PL
-    angular = math.radians(_config.title_block("angular")["value_deg"])
     # Mirror symmetry splits the overall-width band between the two tips.
-    # These independent corners are a superset: no correlation between the
-    # four printed outline controls is used to gain clearance.
+    # C clocking defines the nominal orientation in the A|B|C DRF: the land
+    # angle is BASIC, not subject to the title block's general angular band.
+    # The remaining independent corners are a superset: no correlation between
+    # the printed outline controls is used to gain clearance.
     for top_d, bottom_d, tip_x, length, land_angle, taper_x in itertools.product(
         top,
         bottom,
         (arm.ROD_TIP_X - two_place / 2.0, arm.ROD_TIP_X + two_place / 2.0),
         (arm.TIP_FACE - two_place, arm.TIP_FACE + two_place),
-        (angle - angular, angle + angular),
+        (angle,),
         (arm.BOT_END_X - two_place, arm.BOT_END_X + two_place),
     ):
         endpoints = _profile_endpoints(top_d, bottom_d, tip_x, length, land_angle, taper_x)
         radius = arm.R_BOTTOM + bottom_d
-        # Triangle inequality bounds even intermediate lengths/land angles;
-        # convexity of the circle's disc then bounds the whole straight taper.
+        # Triangle inequality bounds even intermediate lengths at the BASIC
+        # land angle; disc convexity then bounds the whole straight taper.
         assert arm.R_TOP - top_d + length < radius
         assert np.all(np.linalg.norm(endpoints - (0.0, arm.CENTER_Y), axis=1) <= radius + 1e-9)
         assert np.all(endpoints[:, 1] < arm.CENTER_Y)
@@ -444,8 +472,9 @@ def test_crotch_clears_the_arm_through_the_whole_swing() -> None:
     PIVOT_MID_Y+BASIC height+R_TOP. The top zone controls that height at the mirror
     station; the bottom U0 zone only removes material. Straight end faces are
     covered by endpoint/convex-disc containment using the printed land length,
-    overall width, land angle and taper-intersection X. This is a planar fit
-    bound, not a new taper-form, datum-error, or channel-closure tolerance model.
+    overall width, BASIC C-clocked land angle and taper-intersection X in the
+    A|B|C DRF. This is a planar fit bound, not a new taper-form, datum-error,
+    or channel-closure tolerance model.
 
     Legacy containment is geometric: its low-height/short-top-radius corner
     moves the centre down t=.508 and grows the lower radius by t. The current

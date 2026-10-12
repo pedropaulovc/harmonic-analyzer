@@ -10,16 +10,20 @@ the offline drawing test.
 
 from __future__ import annotations
 
-from ch_rocker_arm_spec import STRAP_HUB_SYMMETRY
+import math
 
-# The top edge's one-sided height over the pivot is a model dimension with
-# its band on the part (rocker_arm_spec.TOP_EDGE_BAND, drawing-simplicity-policy.md `How the repository implements the guidelines`), so no
-# note carries it. The hub is the other end of that chain: an OD off the bore
-# axis by e lifts its top e toward the cheeks, and nothing else relates the two features. A
-# plain note, not a frame (Main 2026-09-26); turning the hub and reaming the
-# bore in one setup meets it without measuring. Its radius comes off the
-# cheek-over-hub air in test_rocker_bank_layout.
-HUB_COAXIALITY_DIA = 0.50
+from _printed_tolerance import printed_band_mm
+from ch_rocker_arm_spec import (
+    HUB_COAXIALITY_DIA,
+    HUB_DIA,
+    PIVOT_HOLE_BAND,
+    PIVOT_HOLE_DIA,
+    STRAP_HUB_SYMMETRY,
+)
+
+# Coaxiality is owned by the spec, including its eccentricity in the hub's OD
+# floor. This plain note prints that same source; turning the hub and reaming
+# the bore in one setup is the retained manufacturing instruction.
 
 
 # True free-text instructions only; geometry / datum structure / roughness live
@@ -56,16 +60,33 @@ DRAWING_PRECISION = {
     "Strap": {"StrapThickness": 3},
 }
 
+# Judge the minimum wall against the metric band the shop actually reads,
+# not the underlying 0.508 mm inch class: title_block.yaml prints ±0.51.
+_HUB_WALL_WORST = (
+    round(HUB_DIA, DEFAULT_DRAWING_PRECISION)
+    - printed_band_mm(DEFAULT_DRAWING_PRECISION)
+    - (round(PIVOT_HOLE_DIA, DEFAULT_DRAWING_PRECISION) + PIVOT_HOLE_BAND[0])
+) / 2.0 - HUB_COAXIALITY_DIA / 2.0
+# Round DOWN at the sheet's normal precision; never overstate the minimum.
+HUB_WALL_MIN = (
+    math.floor(_HUB_WALL_WORST * 10**DEFAULT_DRAWING_PRECISION + 1e-9)
+    / 10**DEFAULT_DRAWING_PRECISION
+)
+# Named exception: MHA-CH-006 hub wall
+HUB_WALL_NOTE = f"MIN HUB WALL {HUB_WALL_MIN:.{DEFAULT_DRAWING_PRECISION}f}"
+
 # BUILT_UP_PERMISSION_NOTE may be supplied only as exact explicit permission
 # text in DRAWING_NOTES. None/absence means one_piece, never inferred permission.
 BUILT_UP_PERMISSION_NOTE = None
 
 DRAWING_NOTES = "\n".join(
     (
-        # Outline dimensions and hole callouts carry geometry and process.
-        "1. MIRROR-SYMMETRIC ABOUT THE PIVOT AXIS;",
+        # Nominal CAD mirror plane is x=0: through the physical pivot axis A,
+        # normal to the arm's length. It is not symmetry about the bore axis.
+        "1. NOMINAL MIRROR SYMMETRY ABOUT PLANE",
+        "   THROUGH DATUM AXIS A, NORMAL TO LENGTH;",
         "   ROD-PIN HOLE (1X) AT THE END SHOWN.",
-        "2. NOMINAL ARCS CONCENTRIC ON MIRROR AXIS.",
+        "2. NOMINAL ARCS CONCENTRIC ON THAT PLANE.",
         # #948 ruling R: the rod's float on the arm is taken from the hub's
         # mid-plane, so the strap's offset from it is held.
         "3. STRAP SYMMETRIC TO HUB WITHIN "
@@ -74,6 +95,7 @@ DRAWING_NOTES = "\n".join(
         "   (NO SPACERS). HUB OD COAXIAL WITH PIVOT",
         f"   BORE WITHIN Ø{HUB_COAXIALITY_DIA:.{DEFAULT_DRAWING_PRECISION}f} (TURN HUB AND REAM",
         "   BORE IN ONE SETUP).",
+        f"   {HUB_WALL_NOTE}.",
         # Source context: channel_kinematics.arc_geometry/solve_state and
         # build_ch_rocker_arm's chapter-30 profile reconstruction. The lower
         # arc is not a second amplitude-bar contact or independent gain control.

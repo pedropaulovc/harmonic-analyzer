@@ -22,6 +22,21 @@ from dt_cone_pivot_post_installation import MECHANISM_X_SHIFT
 from _hole_spec import blind_cut_dia_mm
 
 
+def _front_xy(mx: float, my: float) -> tuple[float, float]:
+    """Offline projection fixture, never production or native layout evidence."""
+    scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
+    return (drawing.FRONT_CENTER[0] + mx * scale,
+            drawing.FRONT_CENTER[1] + (my - drawing.TOP_END_Y / 2.0) * scale)
+
+
+def _end_xy(mx: float, my: float) -> tuple[float, float]:
+    scale = drawing.END_SCALE[0] / drawing.END_SCALE[1] / 1000.0
+    cx = (drawing.BOT_END_X + drawing.ROD_TIP_X) / 2.0
+    cy = (drawing._BOT_END_Y + drawing.TOP_END_Y) / 2.0
+    return (drawing.END_CENTER[0] + (mx - cx) * scale,
+            drawing.END_CENTER[1] + (my - cy) * scale)
+
+
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/ch-rocker-arm.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/ch-rocker-arm.pdf")
@@ -34,8 +49,11 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     # exactly its union across the per-view keep-maps.
     assert arm.DRAWING_DIMENSIONS is ch_rocker_arm_notes.DRAWING_DIMENSIONS
     marked = set().union(*ch_rocker_arm_notes.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
+    keeps = (drawing.FRONT_KEEP, drawing.HUB_KEEP, drawing.END_KEEP, drawing.RIGHT_KEEP)
+    kept = set().union(*keeps)
     assert kept == marked
+    assert sum(map(len, keeps)) == len(marked)
+    assert not hasattr(drawing, "TOP_KEEP")
 
 
 def test_draw_view_math_matches_the_spec() -> None:
@@ -78,7 +96,7 @@ def test_sheet_runs_at_1_to_2() -> None:
 def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
     notes = ch_rocker_arm_notes.DRAWING_NOTES
     # Concentricity applies to nominal arcs, not independent profile deviations.
-    assert "NOMINAL ARCS CONCENTRIC ON MIRROR AXIS." in notes
+    assert "NOMINAL ARCS CONCENTRIC ON THAT PLANE." in notes
     assert "R800" not in notes
     assert "R816" not in notes
     # Processes and through conditions belong to the native size callouts.
@@ -98,7 +116,7 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "LOWER ARC: MOVING STRAP ENVELOPE." in notes
     assert "ROD-PIN SETS CONNECTING-ROD GEOMETRY." in notes
     assert (
-        "HUB OD COAXIAL WITH PIVOT BORE WITHIN Ø0.50 (TURN HUB AND REAM BORE IN ONE SETUP)"
+        f"HUB OD COAXIAL WITH PIVOT BORE WITHIN Ø{ch_rocker_arm_spec.HUB_COAXIALITY_DIA:.2f} (TURN HUB AND REAM BORE IN ONE SETUP)"
         in " ".join(line.strip() for line in notes.splitlines())
     )
     assert "11.5 IN" not in notes
@@ -199,31 +217,32 @@ def test_profile_nominals_are_kept_natively_without_note_only_duplicates() -> No
 def test_basic_radius_text_positions_are_outside_their_parent_circles() -> None:
     """Inside-circle R800 placement retained a centre tail on the native sheet."""
     centre_model_y = (
-        drawing._PIVOT_MID_Y + drawing.TOP_EDGE_ABOVE_PIVOT + drawing.R_TOP
+        drawing.PIVOT_MID_Y + drawing.TOP_EDGE_ABOVE_PIVOT + drawing.R_TOP
     )
-    centre = drawing._sheet_xy(0.0, centre_model_y)
+    centre = _front_xy(0.0, centre_model_y)
     for name, radius in (
         ("TopRadius", drawing.R_TOP),
         ("BottomRadius", drawing.R_BOTTOM),
     ):
         rendered_radius = math.dist(
-            centre, drawing._sheet_xy(0.0, centre_model_y + radius)
+            centre, _front_xy(0.0, centre_model_y + radius)
         )
         assert math.dist(centre, drawing.FRONT_KEEP[name]) > rendered_radius
     # Negative control: the former top label lay inside the same nominal circle.
     top_rendered_radius = math.dist(
-        centre, drawing._sheet_xy(0.0, centre_model_y + drawing.R_TOP)
+        centre, _front_xy(0.0, centre_model_y + drawing.R_TOP)
     )
     assert math.dist(centre, (0.130, 0.218)) < top_rendered_radius
 
 
-def test_top_radius_text_uses_corridor_right_of_pivot_finish() -> None:
-    """Keep the R800 leader right of the existing pivot-bore finish text."""
-    pivot_x, _pivot_y = drawing._sheet_xy(0.0, drawing._PIVOT_MID_Y)
-    corridor_left = pivot_x + 0.050  # sheet placement clearance, not a tolerance
-    assert drawing.FRONT_KEEP["TopRadius"][0] > corridor_left
-    # Negative control: the first outside-circle placement crossed Ra 1.6.
-    assert 0.215 <= corridor_left
+def test_radius_text_and_profile_requests_use_the_approved_clearance_corridors() -> None:
+    """Source placement hypotheses, NOT current native clearance evidence."""
+    assert drawing.FRONT_KEEP["TopRadius"] == (0.145, 0.136)
+    assert drawing.FRONT_KEEP["BottomRadius"] == (0.170, 0.128)
+    assert drawing.ARC_PROFILE_FRAME_XY == {
+        "TopRadius": (0.130, 0.207), "BottomRadius": (0.020, 0.160),
+    }
+    assert drawing.ARC_PROFILE_PICK_X_MM == {"TopRadius": -130.0, "BottomRadius": -110.0}
 
 
 class _ProfileDisplay:
@@ -323,6 +342,9 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     adapter, front = object(), object()
+    monkeypatch.setattr(drawing, "_project", lambda _adapter, _view, points, **_kwargs: [
+        _front_xy(x * 1000.0, y * 1000.0) for x, y, _z in points
+    ])
     edges = {1600.0: object(), 1632.0: object()}
     picks, frames = [], []
 
@@ -343,13 +365,13 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
     assert drawing._add_arc_profiles(adapter, front) == native_frames
     assert picks == [1600.0, 1632.0]
     assert len(frames) == 2
-    scale = drawing._S / 1000.0
+    scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
     for (args, kwargs), name, radius, model_x, frame_xy, outside in zip(
         frames,
         ("TopRadius", "BottomRadius"),
         (800.0, 816.0),
-        (-110.0, -100.0),
-        ((0.114, 0.228), (0.020, 0.129)),
+        (-130.0, -110.0),
+        ((0.130, 0.207), (0.020, 0.160)),
         ("0.5", "0"),
     ):
         assert args == (adapter, front)
@@ -365,7 +387,7 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         assert kwargs["frame_xy"] == frame_xy
         sheet_x, sheet_y = kwargs["leader_attach_xy"]
         x = (sheet_x - drawing.FRONT_CENTER[0]) / scale
-        y = (sheet_y - drawing.FRONT_CENTER[1]) / scale + drawing._BBOX_CY
+        y = (sheet_y - drawing.FRONT_CENTER[1]) / scale + drawing.TOP_END_Y / 2.0
         assert x == pytest.approx(model_x)
         assert y < ch_rocker_arm_spec.CENTER_Y
         assert math.hypot(x, y - ch_rocker_arm_spec.CENTER_Y) == pytest.approx(radius)
@@ -405,12 +427,10 @@ def test_observed_r8_profile_route_intersects_actual_basic_r816_row() -> None:
     assert segment_box_distance(observed, _REAM_ROW) > drawing.ARC_PROFILE_TEXT_CLEARANCE_M
 
 
-def test_lower_profile_candidate_predicted_native_route_clears_both_callout_rows() -> None:
-    """R8-grounded Y-only prediction; the next native run must prove its route."""
+def test_historical_r9_prediction_clears_both_r8_rows_independent_of_r10() -> None:
+    """Historical observed-algorithm regression, not proof of current placement."""
     assert drawing.ARC_PROFILE_TEXT_CLEARANCE_M == 0.001
-    assert drawing.ARC_PROFILE_FRAME_XY["BottomRadius"] == (0.020, 0.129)
-    assert drawing.ARC_PROFILE_PICK_X_MM["BottomRadius"] == -100.0
-    frame_x, frame_y = drawing.ARC_PROFILE_FRAME_XY["BottomRadius"]
+    frame_x, frame_y = (0.020, 0.129)
     head = (frame_x + _R8_LOWER_FRAME_WIDTH_M, frame_y - 0.0035)
     elbow = (head[0] + _R8_RIGHT_SHOULDER_M, head[1])
     assert head == pytest.approx((0.067339, 0.125500))
@@ -507,6 +527,7 @@ class _ClearanceAnnotation:
 
 @pytest.fixture
 def native_profile_clearance(monkeypatch):
+    # Historical native records intentionally stay independent of R10 anchors.
     import _drawing_layout_audit
 
     monkeypatch.setattr(_drawing_layout_audit, "_early_bound", lambda obj, _iface: obj)
@@ -571,7 +592,7 @@ def test_native_profile_guard_logs_actual_position_frame_and_leaders(native_prof
     case.bottom.position = (0.021, 0.130, 0.00125)  # request != native readback
     drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
     text = "\n".join(case.logs)
-    assert "requested_frame_mm=(20.0, 129.0)" in text
+    assert "requested_frame_mm=(20.0, 160.0)" in text
     assert "actual_GetPosition_mm=(21.0, 130.0, 1.25)" in text
     assert "native_frame_ink_bbox_mm=" in text
     assert "native_leader_points_mm=" in text
@@ -835,7 +856,8 @@ def test_every_view_keep_map_is_curated_on_its_own_view() -> None:
     for keep_name, view in (
         ("FRONT_KEEP", "front"),
         ("RIGHT_KEEP", "right"),
-        ("TOP_KEEP", "top"),
+        ("HUB_KEEP", "hub"),
+        ("END_KEEP", "end"),
     ):
         if not getattr(drawing, keep_name):
             continue
@@ -896,7 +918,7 @@ def test_strap_thickness_text_clears_datum_b_the_frame_and_the_iso_caption() -> 
     assert x - drawing.RIGHT_CENTER[0] > ch_rocker_arm_spec.HUB_LENGTH / 2000.0 + 0.010
     # Its line runs above datum B's attachment on the broad face ...
     datum_b_y = drawing.RIGHT_CENTER[1] + (
-        ch_rocker_arm_spec.ARM_DEPTH - 1.0 - drawing._PIVOT_MID_Y
+        ch_rocker_arm_spec.ARM_DEPTH - 1.0 - drawing.PIVOT_MID_Y
     ) / 1000.0
     assert y >= datum_b_y + 0.003
     # ... and inside the strap's height above the hub, so it crosses no hub line.
@@ -904,7 +926,7 @@ def test_strap_thickness_text_clears_datum_b_the_frame_and_the_iso_caption() -> 
     assert y < view_top
     # Under the iso caption and the rod-pin frame.
     assert y < drawing.ISO_CAPTION_XY[1] - 0.006
-    assert y < drawing.FCF_XY[1] - 0.007 - 0.010
+    assert y < drawing.ISO_CENTER[1]
 
 
 def test_top_edge_model_band_is_unchanged_by_the_basic_drawing_override() -> None:
@@ -942,7 +964,7 @@ def test_pivot_bore_ream_band_rides_its_diameter_not_a_note() -> None:
     assert model_toleranced_dimensions(arm)[("PivotHoleProfile", "PivotDia")] == (
         "*deviations(PIVOT_HOLE_BAND)"
     )
-    assert "PivotDia" in drawing.FRONT_KEEP
+    assert "PivotDia" in drawing.HUB_KEEP
     joined = " ".join(
         line.strip() for line in ch_rocker_arm_notes.DRAWING_NOTES.splitlines()
     )
@@ -975,23 +997,18 @@ def test_top_edge_reference_is_saved_hidden_and_imported_per_view() -> None:
     assert "    curate_view_dimensions,\n" not in source
 
 
-def test_top_edge_height_text_stands_clear_above_the_strap() -> None:
-    """The dimension runs up the mirror axis from the pivot centre; its text
-    sits over the strap, right of datum A's box and left of the rod-pin
-    frame."""
-    pivot = drawing._sheet_xy(0.0, ch_rocker_arm_spec.PIVOT_MID_Y)
-    edge = drawing._sheet_xy(
-        0.0, ch_rocker_arm_spec.PIVOT_MID_Y + ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT
-    )
-    text = drawing.FRONT_KEEP["TopAbovePivot"]
-    assert text[0] == pytest.approx(pivot[0])
-    assert text[1] > edge[1] + 0.005
-    datum_a = drawing._pivot_datum_request(pivot)
-    assert datum_a[0] < text[0] - 0.012
-    assert text[0] + 0.012 < drawing.FCF_XY[0]
+def test_top_basic_height_is_off_the_pin_x_witness() -> None:
+    assert drawing.FRONT_KEEP["TopAbovePivot"] == (0.165, 0.191)
+    assert drawing.FRONT_KEEP["TopAbovePivot"][0] != drawing.FRONT_CENTER[0]
+    assert drawing.PIN_X_TEXT_XY[1] == 0.197
+    assert drawing.TAPER_INTERSECTION_TEXT_XY[1] == 0.132
+    assert drawing.OVERALL_WIDTH_TEXT_XY[1] == 0.215
 
 
-_PIVOT_CENTRE = drawing._sheet_xy(0.0, ch_rocker_arm_spec.PIVOT_MID_Y)
+_PIVOT_CENTRE = drawing.HUB_CENTER
+_DETAIL_BORE_R = ch_rocker_arm_spec.PIVOT_HOLE_DIA / 2000.0 * (
+    drawing.HUB_SCALE[0] / drawing.HUB_SCALE[1]
+)
 
 
 class _Tag:
@@ -1230,7 +1247,7 @@ def _picker(monkeypatch: pytest.MonkeyPatch, resolve) -> list:
 
     def select(_adapter, _view, entity_type, xy, *, label):
         assert entity_type == "EDGE" and xy is not None
-        fraction = round(math.dist(xy, _PIVOT_CENTRE) / drawing.PIVOT_BORE_SHEET_R, 6)
+        fraction = round(math.dist(xy, _PIVOT_CENTRE) / _DETAIL_BORE_R, 6)
         picks.append((fraction, xy))
         return resolve(fraction)
 
@@ -1247,18 +1264,18 @@ def test_pivot_pick_takes_the_bore_rim_on_the_datum_ray(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     picks = _picker(monkeypatch, lambda _fraction: _BORE)
-    xy = drawing._pick_pivot_bore(_ADAPTER, object(), _BORE, _PIVOT_CENTRE)
+    xy = drawing._pick_pivot_bore(_ADAPTER, object(), _BORE, _PIVOT_CENTRE, _DETAIL_BORE_R)
     assert [fraction for fraction, _ in picks] == [1.0]
     bearing = math.atan2(xy[1] - _PIVOT_CENTRE[1], xy[0] - _PIVOT_CENTRE[0])
     assert bearing == pytest.approx(drawing.PIVOT_DATUM_ANGLE)
-    assert math.dist(xy, _PIVOT_CENTRE) == pytest.approx(drawing.PIVOT_BORE_SHEET_R)
+    assert math.dist(xy, _PIVOT_CENTRE) == pytest.approx(_DETAIL_BORE_R)
 
 
 def test_pivot_pick_moves_inward_when_the_rim_resolves_to_the_hub(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     picks = _picker(monkeypatch, lambda fraction: _HUB if fraction == 1.0 else _BORE)
-    xy = drawing._pick_pivot_bore(_ADAPTER, object(), _BORE, _PIVOT_CENTRE)
+    xy = drawing._pick_pivot_bore(_ADAPTER, object(), _BORE, _PIVOT_CENTRE, _DETAIL_BORE_R)
     assert [fraction for fraction, _ in picks] == list(drawing.PIVOT_PICK_FRACTIONS)
     assert xy == picks[-1][1]
     # Inward points stay inside the bore, further from the hub rim.
@@ -1275,110 +1292,30 @@ def test_pivot_pick_that_never_finds_the_bore_fails(
 
     _picker(monkeypatch, resolve)
     with pytest.raises(RuntimeError, match="no pick on datum A's ray"):
-        drawing._pick_pivot_bore(_ADAPTER, object(), _BORE, _PIVOT_CENTRE)
+        drawing._pick_pivot_bore(_ADAPTER, object(), _BORE, _PIVOT_CENTRE, _DETAIL_BORE_R)
 
 
-class _Window:
-    def __init__(self) -> None:
-        self.calls: list = []
-
-    def ViewZoomTo2(self, *box: float) -> None:
-        self.calls.append(("zoom", box))
-
-    def ViewZoomtofit2(self) -> None:
-        self.calls.append(("fit",))
 
 
-def test_pivot_pick_zoom_frames_the_hub_and_restores_fit() -> None:
-    window = _Window()
-    adapter = SimpleNamespace(currentModel=window)
-    half = drawing.PIVOT_PICK_ZOOM_HALF
-    with pytest.raises(ValueError):
-        with drawing._zoomed_on(adapter, _PIVOT_CENTRE, half):
-            raise ValueError("pick failed")
-    x, y = _PIVOT_CENTRE
-    assert window.calls == [
-        ("zoom", (x - half, y - half, 0.0, x + half, y + half, 0.0)),
-        ("fit",),
+def test_detail_d_leaders_use_four_separate_quadrants(bound, monkeypatch) -> None:
+    def project(_adapter, _view, points, **_kwargs):
+        return [(drawing.HUB_CENTER[0] + x * 4.0,
+                 drawing.HUB_CENTER[1] + (y - drawing.PIVOT_MID_Y / 1000.0) * 4.0)
+                for x, y, _z in points]
+
+    monkeypatch.setattr(drawing, "_project", project)
+    rim, symbol = drawing._pivot_finish_placement(object(), object())
+    datum = drawing._pivot_datum_request(_PIVOT_CENTRE, _DETAIL_BORE_R)
+    points = [drawing.HUB_KEEP["HubDia"], datum, drawing.HUB_KEEP["PivotDia"], symbol]
+    quadrants = [
+        int((math.atan2(y - _PIVOT_CENTRE[1], x - _PIVOT_CENTRE[0]) % math.tau) // (math.pi / 2.0))
+        for x, y in points
     ]
-    # The window holds the hub with margin, so the pick point is on screen.
-    assert half > drawing.PIVOT_HUB_SHEET_R
-
-
-# Datum A's frame as r743-4D printed it (coordinate pick, request 20 mm out on
-# the 135-degree ray; 5100x3300 px render on 431.8x279.4 mm): the box spans
-# 13.40..6.46 mm left of the requested point and 3.5 mm either side of it.
-DATUM_BOX_LEFT = 0.01340
-DATUM_BOX_RIGHT = 0.00646
-DATUM_BOX_HALF_HEIGHT = 0.0035
-
-
-def _strap_top_sheet_y(sheet_x: float) -> float:
-    scale = drawing._S / 1000.0
-    model_x = (sheet_x - drawing.FRONT_CENTER[0]) / scale
-    return drawing._sheet_xy(
-        model_x,
-        ch_rocker_arm_spec.CENTER_Y - math.sqrt(ch_rocker_arm_spec.R_TOP**2 - model_x**2),
-    )[1]
-
-
-def test_datum_a_frame_box_sits_off_the_part_outline() -> None:
-    """r743-1RC: the entity-attached tag printed its frame on the strap. The
-    coordinate-picked frame sits above the strap's top edge across its whole
-    width, clear of the O6.50 text and above the notes."""
-    rx, ry = drawing._pivot_datum_request(_PIVOT_CENTRE)
-    box = (
-        rx - DATUM_BOX_LEFT,
-        ry - DATUM_BOX_HALF_HEIGHT,
-        rx - DATUM_BOX_RIGHT,
-        ry + DATUM_BOX_HALF_HEIGHT,
-    )
-    # r743-4D's measured frame for this same request: the fixture is that print.
-    assert box == pytest.approx((0.15131, 0.18347, 0.15825, 0.19047), abs=2e-4)
-    # The top edge is concave up, so its highest point under the box is at
-    # one of the box's ends.
-    strap_top = max(_strap_top_sheet_y(box[0]), _strap_top_sheet_y(box[2]))
-    assert box[1] > strap_top + DATUM_BOX_HALF_HEIGHT
-    _text_x, text_y = drawing.FRONT_KEEP["PivotDia"]
-    assert box[1] > text_y + 0.010
-    assert box[1] > drawing.NOTES_CEILING
-
-
-def test_pivot_leaders_take_separate_quadrants() -> None:
-    """r743-1RC: datum A, the Ra and the O6.50 converged on the bore. The
-    O6.50 line runs through the centre, so it takes its text's quadrant and
-    the opposite one; datum A and the Ra take the other two."""
-
-    def quadrant(bearing: float) -> int:
-        return int((bearing % math.tau) // (math.pi / 2.0))
-
-    text = drawing.FRONT_KEEP["PivotDia"]
-    dimension = math.atan2(text[1] - _PIVOT_CENTRE[1], text[0] - _PIVOT_CENTRE[0])
-    rim, _symbol = drawing._pivot_finish_placement()
-    finish = math.atan2(rim[1] - _PIVOT_CENTRE[1], rim[0] - _PIVOT_CENTRE[0])
-    used = [
-        quadrant(drawing.PIVOT_DATUM_ANGLE),
-        quadrant(finish),
-        quadrant(dimension),
-        quadrant(dimension + math.pi),
-    ]
-    assert sorted(used) == [0, 1, 2, 3]
-    # Datum A and the Ra land oblique to the centre-mark axes, not on them.
-    for bearing in (drawing.PIVOT_DATUM_ANGLE, finish):
-        assert math.degrees(bearing) % 90.0 == pytest.approx(45.0)
-
-
-def test_pivot_diameter_text_is_clear_of_the_rod_pin_x_dimension() -> None:
-    """r743-4D: the O6.50 leader, from text straight below the bore, crossed
-    the rod-pin X location dimension. Its text now sits left of that
-    dimension's span (pivot to rod-pin hole) and below the strap."""
-    text_x, text_y = drawing.FRONT_KEEP["PivotDia"]
-    pivot_x, pivot_y = drawing._sheet_xy(0.0, ch_rocker_arm_spec.PIVOT_MID_Y)
-    # Diameter text runs ~2.6 mm a character from its anchor: "O6.50" is 5.
-    assert text_x + 5 * 0.0026 < pivot_x - ch_rocker_arm_spec.HUB_DIA / 2000.0
-    assert text_y < pivot_y - ch_rocker_arm_spec.ARM_DEPTH / 2000.0
-    # Above the notes band.
-    assert text_y > drawing.NOTES_CEILING + 0.010
+    assert quadrants == [0, 1, 2, 3]
+    assert math.dist(rim, _PIVOT_CENTRE) == pytest.approx(_DETAIL_BORE_R)
+    assert symbol[0] > rim[0] and symbol[1] < rim[1]
+    assert drawing.HUB_KEEP["PivotDia"] == (0.120, 0.086)
+    assert drawing.HUB_KEEP["HubDia"] == (0.210, 0.122)
 
 
 def test_both_bores_are_picked_by_diameter_not_by_a_rim_coordinate() -> None:
@@ -1399,11 +1336,13 @@ def test_both_bores_are_picked_by_diameter_not_by_a_rim_coordinate() -> None:
                 picks[node.targets[0].id] = ast.unparse(call.args[2])
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             keywords = {k.arg: ast.unparse(k.value) for k in node.keywords}
-            if keywords.get("label", "").startswith("'rod-pin") or keywords.get(
-                "label", ""
-            ).startswith('"rod-pin'):
-                if node.func.id != "set_basic_dimension":
-                    uses.append((node.func.id, keywords))
+            if (
+                node.func.id in {"add_native_hole_callout", "add_edge_dimension", "add_feature_control_frame"}
+                and ("rod_hole_edge" in keywords.get("edge", "")
+                     or "rod_hole_edge" in keywords.get("edge_entity", "")
+                     or "rod_hole_edge" in keywords.get("entities", ""))
+            ):
+                uses.append((node.func.id, keywords))
     assert picks["rod_hole_edge"] == "_ROD_HOLE_DIA"
     assert picks["pivot_bore_edge"] == "PIVOT_HOLE_DIA"
     kinds = {name for name, _ in uses}
@@ -1546,57 +1485,13 @@ def test_iso_caption_sits_under_the_iso_clear_of_the_frame_and_end_view() -> Non
     caption = ch_rocker_arm_notes.ISOMETRIC_VIEW_NOTE
     left, top = drawing.ISO_CAPTION_XY
     right = left + len(caption) * CAPTION_CHAR_WIDTH
-    fcf_bottom = drawing.FCF_XY[1] - 0.007
-    assert top < fcf_bottom - 0.003
+    assert top < drawing.ISO_CENTER[1] - 0.003
     assert left > drawing.RIGHT_CENTER[0] + 0.015  # the end view and its +0.05
     assert right < RIGHT_BORDER - 0.005
     # Under the iso: the caption's span overlaps the iso's.
     assert left < drawing.ISO_CENTER[0] < right
 
 
-# The Ra symbol as r743-1RC printed it at note text height: its ink runs
-# 7.2 mm above and 14.7 mm right of its anchor (the leader end).
-FINISH_SYMBOL_HEIGHT = 0.0072
-FINISH_SYMBOL_WIDTH = 0.0147
-
-
-def _strap_bottom_sheet_y(sheet_x: float) -> float:
-    scale = drawing._S / 1000.0
-    model_x = (sheet_x - drawing.FRONT_CENTER[0]) / scale
-    return drawing._sheet_xy(
-        model_x,
-        ch_rocker_arm_spec.CENTER_Y
-        - math.sqrt(ch_rocker_arm_spec.R_BOTTOM**2 - model_x**2),
-    )[1]
-
-
-def test_pivot_finish_leader_runs_up_left_from_a_symbol_below_the_strap() -> None:
-    """r743-p1s-B2: from the 7:30 rim the leader ran up through the symbol,
-    whose body draws up-right of its leader end. r743-1RC: at 1:30 it met the
-    O6.50 line. At 4:30 the symbol sits down-right of its rim point, its whole
-    body below the strap's bottom edge, at note text height."""
-    rim, symbol = drawing._pivot_finish_placement()
-    scale = drawing._S / 1000.0
-    assert math.dist(rim, _PIVOT_CENTRE) == pytest.approx(
-        ch_rocker_arm_spec.PIVOT_HOLE_DIA / 2.0 * scale
-    )
-    # Oblique to both centre-mark axes.
-    assert abs(rim[0] - _PIVOT_CENTRE[0]) > 0.0005
-    assert abs(rim[1] - _PIVOT_CENTRE[1]) > 0.0005
-    assert symbol[0] > rim[0] and symbol[1] < rim[1]
-    assert math.dist(symbol, _PIVOT_CENTRE) > ch_rocker_arm_spec.HUB_DIA / 2.0 * scale + 0.005
-    # The bottom edge is concave up: its lowest point under the body is at
-    # the body's left end.
-    body_top = symbol[1] + FINISH_SYMBOL_HEIGHT
-    assert body_top < _strap_bottom_sheet_y(symbol[0]) - 0.002
-    # Right of the rod-pin X location's extension line through the pivot, and
-    # above that dimension's line and text (y 0.138).
-    assert rim[0] > _PIVOT_CENTRE[0]
-    assert symbol[1] > 0.138 + 0.010
-    assert symbol[0] + FINISH_SYMBOL_WIDTH < drawing._sheet_xy(
-        ch_rocker_arm_spec.ROD_HOLE_X, 0.0
-    )[0]
-    assert drawing.PIVOT_FINISH_CHAR_HEIGHT <= 0.0025
 
 
 def test_land_and_hub_sizes_are_marked_model_dimensions_at_normal_precision() -> None:
@@ -1604,8 +1499,9 @@ def test_land_and_hub_sizes_are_marked_model_dimensions_at_normal_precision() ->
         "TopRadius", "BottomRadius", "RodTipLen",
     }
     assert ch_rocker_arm_notes.DRAWING_DIMENSIONS["HubProfile"] == {"HubDia"}
-    assert {"RodTipLen", "HubDia"} <= set(drawing.FRONT_KEEP)
-    assert not {"RodTipLen", "HubDia"} & set(drawing.RIGHT_KEEP)
+    assert set(drawing.END_KEEP) == {"RodTipLen"}
+    assert set(drawing.HUB_KEEP) == {"PivotDia", "HubDia"}
+    assert not {"RodTipLen", "HubDia"} & set(drawing.FRONT_KEEP)
     assert ch_rocker_arm_notes.DRAWING_PRECISION["HubProfile"]["HubDia"] == 2
     assert ch_rocker_arm_notes.DEFAULT_DRAWING_PRECISION == 2
     assert ch_rocker_arm_spec.LINEAR_2PL == pytest.approx(0.508)
@@ -1939,7 +1835,7 @@ class _NativeQuantity:
         self.model = SimpleNamespace(
             SystemValue=mm / 1000.0,
             Type2=6 if name in {"PivotDia", "HubDia"} else 1,
-            SetToleranceType=lambda kind: True,
+            SetToleranceType=self._set_tolerance_type,
             GetToleranceType=lambda: self.tolerance_type,
             Tolerance=SimpleNamespace(
                 GetMaxValue=lambda: self.band[0],
@@ -1948,6 +1844,10 @@ class _NativeQuantity:
             GetArcEndCondition=lambda index: self.arc_conditions[index],
             SetArcEndCondition=self._set_arc_condition,
         )
+
+    def _set_tolerance_type(self, kind):
+        self.tolerance_type = kind
+        return True
 
     def GetSpecificAnnotation(self):
         return self
@@ -2011,7 +1911,7 @@ def _imported_native_quantities(monkeypatch: pytest.MonkeyPatch):
         "HubDia": _NativeQuantity("HubDia", ch_rocker_arm_spec.HUB_DIA),
     }
     adapter = SimpleNamespace(
-        _attempt=lambda fn: fn(), swApp=_APP,
+        _attempt=lambda fn, **_kwargs: fn(), swApp=_APP,
         currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None),
     )
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, *_: obj)
@@ -2029,11 +1929,11 @@ def test_front_native_process_keeps_the_nominal_token_and_model_bore_band(
 ) -> None:
     adapter, displays = _imported_native_quantities(monkeypatch)
     before = {name: display.model.SystemValue for name, display in displays.items()}
-    drawing._dress_front_dimensions(adapter, list(displays.values()))
+    drawing._dress_detail_dimensions(adapter, list(displays.values()), keep={**drawing.HUB_KEEP, **drawing.END_KEEP})
     pivot = displays["PivotDia"]
     assert pivot.text[1].startswith("REAM ")
     assert "<MOD-DIAM>" in pivot.text[1]
-    assert "THRU" in pivot.text[2]
+    assert pivot.text[2] == " THRU"
     assert not any(part == 0 for part, _text in pivot.writes)
     assert not any(nominal in text for _part, text in pivot.writes for nominal in (
         "6.50", "5.588", "10.20", "+0.03",
@@ -2046,7 +1946,7 @@ def test_front_native_process_keeps_the_nominal_token_and_model_bore_band(
     assert (pivot.text[3], pivot.text[4]) == ("<native-upper>", "<native-lower>")
 
 
-@pytest.mark.parametrize("name", ["RodTipLen", "HubDia"])
+@pytest.mark.parametrize("name", ["PivotDia", "RodTipLen", "HubDia"])
 @pytest.mark.parametrize("defect", ["missing", "wrong", "nan", "inf", "no_value"])
 def test_imported_front_sizes_require_each_sourced_native_readback(
     monkeypatch: pytest.MonkeyPatch, name: str, defect: str,
@@ -2062,7 +1962,7 @@ def test_imported_front_sizes_require_each_sourced_native_readback(
             else float(defect)
         )
     with pytest.raises(RuntimeError):
-        drawing._dress_front_dimensions(adapter, list(displays.values()))
+        drawing._dress_detail_dimensions(adapter, list(displays.values()), keep={**drawing.HUB_KEEP, **drawing.END_KEEP})
 
 
 @pytest.mark.parametrize("ignored", ["prefix", "suffix", "hub_precision"])
@@ -2075,7 +1975,7 @@ def test_front_native_dressing_rejects_ignored_text_or_lost_hub_precision(
     else:
         displays["PivotDia"].ignored_text = 1 if ignored == "prefix" else 2
     with pytest.raises(RuntimeError):
-        drawing._dress_front_dimensions(adapter, list(displays.values()))
+        drawing._dress_detail_dimensions(adapter, list(displays.values()), keep=drawing.HUB_KEEP)
 
 
 @pytest.fixture
@@ -2110,8 +2010,9 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
         defect_label=None, defect=None,
     )
 
-    def project(_adapter, _view, points, **_kwargs):
-        return [drawing._sheet_xy(x * 1000.0, y * 1000.0) for x, y, _z in points]
+    def project(_adapter, _view, points, *, label):
+        mapper = _end_xy if label.startswith("datum C") or label == "rod land angular endpoints" else _front_xy
+        return [mapper(x * 1000.0, y * 1000.0) for x, y, _z in points]
 
     def vertical(_adapter, _front, points):
         entity = object()
@@ -2147,6 +2048,10 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
                 display.model.SystemValue = None
             elif state.defect == "attachment":
                 display.attached = (entities[0], object())
+            elif state.defect == "basic":
+                display.model.SetToleranceType = lambda _kind: True
+            elif state.defect == "text":
+                display.ignored_text = 4
         state.displays[label] = display
         return display
 
@@ -2157,6 +2062,7 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
     )
     monkeypatch.setattr(drawing, "scan_view_edges", lambda *_a, **_k: scan)
     monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(drawing, "_project", project)
     monkeypatch.setattr(drawing, "_land_vertical", vertical)
     monkeypatch.setattr(drawing, "visible_circle_edge", lambda *_: pivot)
     monkeypatch.setattr(drawing, "add_edge_dimension", create)
@@ -2171,7 +2077,8 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
     native_front,
 ) -> None:
     state = native_front
-    assert drawing._add_rocker_outline_dimensions(state.adapter, object()) is state.land
+    drawing._add_rocker_outline_dimensions(state.adapter, object())
+    drawing._add_land_angle(state.adapter, object(), state.land)
     assert state.basic_calls
     assert all(point[2] == ch_rocker_arm_spec.ARM_THICKNESS / 2.0 for point in state.land.line)
     expected = {
@@ -2182,7 +2089,7 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
     assert {
         label: display.model.SystemValue for label, display in state.displays.items()
     } == pytest.approx(expected)
-    width, angle, taper = state.calls
+    width, taper, angle = state.calls
     assert width["entity_type"] == "VERTEX"
     assert angle["entities"] == (state.land.edge, state.verticals[0][0])
     assert angle["entity_types"] == ("EDGE", "SKETCHSEGMENT")
@@ -2195,7 +2102,9 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
         DRAWABLE.xmin <= x <= DRAWABLE.xmax and DRAWABLE.ymin <= y <= DRAWABLE.ymax
         for x, y in vertical_points
     )
-    assert state.displays["radial land angle to mirror axis"].text[4] == "TO MIRROR AXIS"
+    assert state.displays["radial land angle to mirror axis"].text[4] == "TO MIRROR PLANE"
+    assert state.displays["radial land angle to mirror axis"].model.GetToleranceType() == 1
+    assert state.displays["taper intersection X"].text[4] == "R816/TAPER"
 
 
 @pytest.mark.parametrize("label", [
@@ -2206,7 +2115,10 @@ def test_each_new_outline_measurement_fails_closed(native_front, label, defect) 
     native_front.defect_label = label
     native_front.defect = defect
     with pytest.raises(RuntimeError):
-        drawing._add_rocker_outline_dimensions(native_front.adapter, object())
+        if label == "radial land angle to mirror axis":
+            drawing._add_land_angle(native_front.adapter, object(), native_front.land)
+        else:
+            drawing._add_rocker_outline_dimensions(native_front.adapter, object())
 
 
 @pytest.mark.parametrize("source", ["ROD_TIP_X", "TIP_FACE", "_ALPHA_TOP", "BOT_END_X", "HUB_DIA"])
@@ -2215,7 +2127,14 @@ def test_source_geometry_change_invalidates_stale_front_measurements(
 ) -> None:
     monkeypatch.setattr(drawing, source, getattr(drawing, source) + 0.1)
     with pytest.raises(RuntimeError):
-        drawing._add_rocker_outline_dimensions(native_front.adapter, object())
+        if source == "TIP_FACE":
+            drawing._add_land_datum(native_front.adapter, object(), native_front.land)
+        elif source == "_ALPHA_TOP":
+            drawing._add_land_angle(native_front.adapter, object(), native_front.land)
+        elif source == "HUB_DIA":
+            drawing._dress_detail_dimensions(native_front.adapter, list(native_front.imported.values()), keep=drawing.HUB_KEEP)
+        else:
+            drawing._add_rocker_outline_dimensions(native_front.adapter, object())
 
 
 def test_datum_c_owns_the_named_positive_z_land_and_midpoint_landing(
@@ -2237,7 +2156,7 @@ def test_datum_c_owns_the_named_positive_z_land_and_midpoint_landing(
     assert call["edge_entity"] is native_front.land.edge
     assert "edge_xy" not in call and "expected_entity" not in call
     a, b = native_front.land.line
-    expected = drawing._sheet_xy((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
+    expected = _end_xy((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
     assert call["leader_attach_xy"] == pytest.approx(expected)
     assert math.dist(call["symbol_xy"], expected) == pytest.approx(drawing.LAND_DATUM_STANDOFF)
     assert call["symbol_xy"][0] > expected[0]
@@ -2368,3 +2287,449 @@ def test_offset_formula_change_invalidates_stale_native_measurement(
     monkeypatch.setattr(drawing, source, getattr(drawing, source) + delta)
     with pytest.raises(RuntimeError, match="strap offset from hub end measures"):
         drawing._add_strap_offset_dimension(native_offset.adapter, object())
+
+
+def test_projection_barrier_is_void_and_precedes_native_math(bound, monkeypatch):
+    events = []
+    view = SimpleNamespace(UpdateViewDisplayGeometry=lambda: events.append("barrier"))
+    def project(_adapter, actual, points, **_kwargs):
+        assert actual is view and events == ["barrier"]
+        return [(0.180, 0.095)]
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    assert drawing._project(object(), view, [(0, 0, 0)], label="D physical centre") == [(0.180, 0.095)]
+
+
+class _DetailCircle:
+    """Native method-shaped labels, void setter, two out-double getter."""
+    def __init__(self, label, *, ignored=False):
+        self.label, self.ignored = label, ignored
+        self.xy = (0.0, 0.0)
+
+    def GetLabel(self):
+        return self.label
+
+    def SetLabelPosition(self, x, y):
+        if not self.ignored:
+            self.xy = (x, y)
+
+    def GetLabelPosition(self):
+        return self.xy
+
+
+@pytest.mark.parametrize("labels", [("E", "D"), ("D",), ("D", "D"), ("D", "E", "F")])
+def test_detail_letters_bind_by_exact_native_label_not_enumeration(bound, monkeypatch, labels):
+    circles = [_DetailCircle(label) for label in labels]
+    front = SimpleNamespace(GetDetailCircles=lambda: circles)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    if labels == ("E", "D"):
+        drawing._place_detail_letters(object(), front)
+        assert {circle.label: circle.xy for circle in circles} == drawing.DETAIL_LETTER_XY
+    else:
+        with pytest.raises(RuntimeError, match="exactly D/E"):
+            drawing._place_detail_letters(object(), front)
+
+
+def test_detail_letter_refuses_a_silently_ignored_void_setter(bound, monkeypatch):
+    circles = [_DetailCircle("D"), _DetailCircle("E", ignored=True)]
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    with pytest.raises(RuntimeError, match="native letter stayed"):
+        drawing._place_detail_letters(object(), SimpleNamespace(GetDetailCircles=lambda: circles))
+
+
+class _DetailView:
+    """An outline can move while its transform lags until the native barrier."""
+    __slots__ = ("parent", "radius", "defect", "Position", "physical",
+                 "_scale_ratio", "UseParentScale", "UseSheetScale", "events")
+
+    def __init__(self, parent, *, radius=0.0269, defect=None):
+        self.parent, self.radius, self.defect = parent, radius, defect
+        self.Position = (0.210, 0.110)
+        self.physical = self.Position
+        self._scale_ratio = (4.0, 1.0)
+        self.UseParentScale = False
+        self.UseSheetScale = 0
+        self.events = []
+
+    @property
+    def ScaleRatio(self):
+        return self._scale_ratio
+
+    @ScaleRatio.setter
+    def ScaleRatio(self, value):
+        # Native property puts receive VARIANT; getters expose a SAFEARRAY tuple.
+        ratio = tuple(value.value)
+        assert len(ratio) == 2
+        self._scale_ratio = (1.0, 2.0) if self.defect == "scale" else ratio
+
+    def GetBaseView(self):
+        return object() if self.defect == "parent" else self.parent
+
+    def GetOutline(self):
+        x, y = self.Position
+        return (x - self.radius, y - self.radius, x + self.radius, y + self.radius)
+
+    def SetViewPosition(self, xy, _children):
+        position = tuple(xy.value)
+        assert len(position) == 2
+        self.events.append("move")
+        if self.defect == "move":
+            return False
+        if self.defect != "ignored-move":
+            self.Position = position
+        return True
+
+    def UpdateViewDisplayGeometry(self):
+        self.events.append("barrier")
+        if self.defect != "stale":
+            self.physical = self.Position
+
+
+@pytest.mark.parametrize("defect", [None, "activation", "parent", "scale", "move", "ignored-move", "stale", "fence", "selection", "creation"])
+def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, monkeypatch, defect):
+    parent = SimpleNamespace(
+        GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=object()),
+        UpdateViewDisplayGeometry=lambda: None,
+    )
+    detail = _DetailView(parent, defect=defect)
+    class Point:
+        def __init__(self, values):
+            self.ArrayData = tuple(values.value)
+            assert len(self.ArrayData) == 3
+        def MultiplyTransform(self, _transform):
+            return self
+    circle = SimpleNamespace(Select4=lambda *_a: defect != "selection")
+    class Manager:
+        __slots__ = ("AddToDB",)
+        def __init__(self):
+            self.AddToDB = False
+        def CreateCircle(self, *_args):
+            return None if defect == "fence" else circle
+    class SelectData:
+        __slots__ = ("View",)
+    manager = Manager()
+    calls = []
+    def create(*args):
+        calls.append(args)
+        return None if defect == "creation" else detail
+    doc = SimpleNamespace(
+        ActivateView=lambda _name: defect != "activation", ClearSelection2=lambda _all: None,
+        SketchManager=manager,
+        SelectionManager=SimpleNamespace(CreateSelectData=SelectData),
+        CreateDetailViewAt4=create,
+    )
+    adapter = SimpleNamespace(
+        currentModel=doc, swApp=SimpleNamespace(
+            IsSame=_APP.IsSame, GetMathUtility=lambda: SimpleNamespace(CreatePoint=Point),
+        ),
+    )
+    def project(_adapter, view, points, **_kwargs):
+        if view is parent:
+            return [(0.18 + p[0] / 2, 0.175 + p[1] / 2) for p in points]
+        assert detail.events[-1] == "barrier"
+        return [detail.physical for _point in points]
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(drawing, "view_name", lambda *_a: "front")
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_a: None)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    kwargs = dict(centre=(0.0, drawing.PIVOT_MID_Y / 1000.0, 0.0),
+                  radius_mm=drawing.HUB_DIA / 2 + drawing.PIVOT_HOLE_DIA / 4,
+                  target=drawing.HUB_CENTER, scale=drawing.HUB_SCALE, label="D")
+    if defect is None:
+        assert drawing._create_detail(adapter, parent, **kwargs) is detail
+        assert detail.Position == pytest.approx(drawing.HUB_CENTER, rel=0.0, abs=1e-12)
+        assert detail.physical == pytest.approx(drawing.HUB_CENTER, rel=0.0, abs=1e-12)
+        assert tuple(detail.ScaleRatio) == drawing.HUB_SCALE
+        assert detail.events == ["barrier", "move", "barrier"]
+        assert calls[0][7:] == (1, True, False, False, 5)
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._create_detail(adapter, parent, **kwargs)
+    assert manager.AddToDB is False
+
+
+def _native_sheet(*, top=0.066, scale_retained=True, rule=True):
+    template = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout]
+    def line(y):
+        return SimpleNamespace(
+            GetType=lambda: 0,
+            GetStartPoint2=lambda: SimpleNamespace(X=template.title_block_left_m, Y=y),
+            GetEndPoint2=lambda: SimpleNamespace(X=template.width_m - 0.0127, Y=y),
+        )
+    state = {"scale": (1.0, 1.0)}
+    def set_scale(numerator, denominator, _position, _text):
+        if scale_retained:
+            state["scale"] = (numerator, denominator)
+        return True
+    return SimpleNamespace(
+        SetScale=set_scale,
+        GetProperties2=lambda: (0, 0, *state["scale"], 0, 0.4318, 0.2794, 0),
+        GetTemplateSketch=lambda: SimpleNamespace(GetSketchSegments=lambda: [line(top), line(top / 2)] if rule else []),
+    )
+
+
+@pytest.mark.parametrize("top", [0.066, 0.070])
+def test_end_caption_seats_actual_ink_between_crop_and_actual_title_rule(bound, monkeypatch, top):
+    note = _FakeNote((0.30, 0.07), 0.007)
+    note.PropertyLinkedText = "$PRPVIEW:DETAIL E SCALE"
+    note.annotation.SetPosition2 = note.annotation.SetPosition
+    view = SimpleNamespace(
+        GetNotes=lambda: [note],
+        GetOutline=lambda: (0.300, 0.084, 0.360, 0.136),
+    )
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    drawing._seat_detail_caption(adapter, view, _native_sheet(top=top), label="E")
+    box = drawing._note_extent(adapter, note)
+    assert box[3] <= 0.084 - 0.003
+    assert box[1] >= top + 0.003
+    assert (box[0] + box[2]) / 2 == pytest.approx(0.330)
+    assert note.PropertyLinkedText == "$PRPVIEW:DETAIL E SCALE"
+
+
+@pytest.mark.parametrize("defect", ["height", "title-rule", "scale", "missing", "unlinked", "ignored-position", "nan", "missing-extent", "missing-position"])
+def test_end_caption_fails_closed_without_real_ink_and_three_mm_air(bound, monkeypatch, defect):
+    note = _FakeNote((0.30, 0.07), 0.020 if defect == "height" else 0.007,
+                     tracking=0.0 if defect == "ignored-position" else 1.0)
+    note.PropertyLinkedText = "" if defect == "unlinked" else "$PRPVIEW:DETAIL E SCALE"
+    note.annotation.SetPosition2 = note.annotation.SetPosition
+    if defect == "nan":
+        note.GetExtent = lambda: (float("nan"), 0.1, 0, 0.2, 0.11, 0)
+    elif defect == "missing-extent":
+        note.GetExtent = lambda: None
+    elif defect == "missing-position":
+        note.annotation.GetPosition = lambda: None
+    view = SimpleNamespace(
+        GetNotes=lambda: [] if defect == "missing" else [note],
+        GetOutline=lambda: (0.300, 0.084, 0.360, 0.136),
+    )
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    with pytest.raises(RuntimeError):
+        drawing._seat_detail_caption(
+            adapter, view, _native_sheet(rule=defect != "title-rule", scale_retained=defect != "scale"), label="E",
+        )
+
+
+@pytest.mark.parametrize("defect", [None, "missing", "duplicate", "wrong-owner"])
+def test_actual_per_view_dimension_census_is_an_exact_marked_union(bound, monkeypatch, defect):
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, ann: ann)
+    keeps = [drawing.FRONT_KEEP, drawing.HUB_KEEP, drawing.END_KEEP, drawing.RIGHT_KEEP]
+    names = [list(keep) for keep in keeps]
+    if defect == "missing":
+        names[1].remove("PivotDia")
+    elif defect == "duplicate":
+        names[2].append("RodTipLen")
+    elif defect == "wrong-owner":
+        names[0].append(names[2].pop())
+    views = [(str(i), SimpleNamespace(GetAnnotations=lambda row=row: row), keep)
+             for i, (row, keep) in enumerate(zip(names, keeps))]
+    if defect is None:
+        drawing._require_dimension_census(object(), views)
+    else:
+        with pytest.raises(RuntimeError, match="native dimension owners"):
+            drawing._require_dimension_census(object(), views)
+
+
+@pytest.mark.parametrize("axis", ["X", "Y"])
+@pytest.mark.parametrize("defect", [None, "wrong", "attachment", "uncentred", "basic", "text"])
+def test_pin_coordinates_are_native_centred_basic_with_labels_after_boxing(monkeypatch, axis, defect):
+    import _drawing_edge_dimensions
+    adapter, _imported = _imported_native_quantities(monkeypatch)
+    pivot, rod = object(), object()
+    displays = {}
+    monkeypatch.setattr(drawing, "_project", lambda *_a, **_k: [(0.18, 0.172), (0.246, 0.176)])
+    monkeypatch.setattr(drawing, "visible_circle_edge", lambda _a, _v, diameter: pivot if diameter == drawing.PIVOT_HOLE_DIA else rod)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_is_same_attachment", lambda _a, actual, wanted, _kind: actual is wanted)
+    def create(_adapter, _view, **kwargs):
+        current_axis = "X" if kwargs["orientation"] == "horizontal" else "Y"
+        mm = drawing.ROD_HOLE_X if current_axis == "X" else drawing.ROD_HOLE_Y - drawing.PIVOT_MID_Y
+        display = _NativeQuantity(current_axis, mm)
+        display.attached = (pivot, rod)
+        display.arc_conditions = {1: 2, 2: 2}
+        if current_axis == axis:
+            if defect == "wrong":
+                display.model.SystemValue += 0.0001
+            elif defect == "attachment":
+                display.attached = (pivot, object())
+            elif defect == "uncentred":
+                display.model.SetArcEndCondition = lambda *_a: 0
+            elif defect == "basic":
+                display.model.SetToleranceType = lambda _kind: True
+            elif defect == "text":
+                display.ignored_text = 4
+        displays[current_axis] = display
+        return display
+    monkeypatch.setattr(drawing, "add_edge_dimension", create)
+    if defect is None:
+        drawing._add_pin_coordinates(adapter, object())
+        for display in displays.values():
+            assert display.arc_conditions == {1: 1, 2: 1}
+            assert display.model.GetToleranceType() == 1
+            assert display.text[4] == "PIN AXIS"
+            assert display.writes[-2:] == [(4, ""), (4, "PIN AXIS")]
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._add_pin_coordinates(adapter, object())
+
+
+@pytest.mark.parametrize("air,passes", [(0.001, True), (0.0009, False)])
+def test_every_front_native_text_row_is_guarded_against_detail_crops(native_profile_clearance, bound, air, passes):
+    case = native_profile_clearance
+    # Native records are historical detector inputs, not a current-coordinate proof.
+    case.front.GetAnnotations = lambda: [case.r816]
+    case.r816.data.texts = [{"t": "R816", "pos": [0.170, 0.128, 0], "h": 0.0035}]
+    hub = SimpleNamespace(GetOutline=lambda: (0.160, 0.068, 0.200, 0.128 - air))
+    end = SimpleNamespace(GetOutline=lambda: (0.300, 0.080, 0.360, 0.140))
+    if passes:
+        drawing._require_front_detail_air(case.adapter, case.front, hub, end)
+    else:
+        with pytest.raises(RuntimeError, match="required_air_mm=1.000"):
+            drawing._require_front_detail_air(case.adapter, case.front, hub, end)
+    assert any("actual_air_mm=" in log for log in case.logs)
+
+
+def test_native_profile_guard_diagnoses_actual_radius_leader_crossing(native_profile_clearance):
+    case = native_profile_clearance
+    case.r816.leaders = [[0.050, 0.143, 0, 0.080, 0.143, 0, 0.120, 0.143, 0]]
+    with pytest.raises(RuntimeError, match="actual native leader crossing"):
+        drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
+
+
+def test_details_keep_native_scale_source_census_and_unclipped_overall_contract():
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    definitions = {node.name: node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    build_calls = [node for node in ast.walk(definitions["build"])
+                   if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
+    details = [node for node in build_calls if node.func.id == "_create_detail"]
+    assert len(details) == 2
+    assert [next(ast.unparse(k.value) for k in node.keywords if k.arg == "scale")
+            for node in details] == ["HUB_SCALE", "END_SCALE"]
+    assert drawing.HUB_SCALE == (4.0, 1.0) and drawing.END_SCALE == (2.0, 1.0)
+    assert "create_detail_view" not in Path(drawing.__file__).read_text(encoding="utf-8")
+    for required in ("_place_detail_letters", "_require_dimension_census", "_require_front_detail_air", "_require_radius_exterior"):
+        assert sum(node.func.id == required for node in build_calls) == 1
+    outline = ast.unparse(definitions["_add_rocker_outline_dimensions"])
+    assert "MaxWitnessLineLength" not in outline
+    assert not hasattr(drawing, "OVERALL_WITNESS_LENGTH")
+    assert not hasattr(drawing, "PIVOT_PICK_ZOOM_HALF")
+    assert set(drawing.FRONT_KEEP) == drawing.BASIC_PROFILE_DIMENSIONS
+    assert not hasattr(drawing, "_sheet_xy")
+
+
+@pytest.mark.parametrize("defect", ["basic", "text"])
+def test_end_clocking_refuses_lost_basicness_or_unretained_direction(native_front, defect):
+    native_front.defect_label = "radial land angle to mirror axis"
+    native_front.defect = defect
+    with pytest.raises(RuntimeError):
+        drawing._add_land_angle(native_front.adapter, object(), native_front.land)
+
+
+def test_d_caption_uses_left_of_title_block_space_not_global_title_top(bound, monkeypatch):
+    note = _FakeNote((0.16, 0.04), 0.007)
+    note.PropertyLinkedText = "$PRPVIEW:DETAIL D SCALE"
+    note.annotation.SetPosition2 = note.annotation.SetPosition
+    original_extent = note.GetExtent
+    def narrow_caption():
+        values = list(original_extent())
+        values[3] = values[0] + 0.035
+        return values
+    note.GetExtent = narrow_caption
+    view = SimpleNamespace(
+        GetNotes=lambda: [note],
+        GetOutline=lambda: (0.1531, 0.0681, 0.2069, 0.1219),
+    )
+    sheet = _native_sheet()
+    sheet.GetZoneMargin = lambda _side: 0.0127
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    drawing._seat_detail_caption(adapter, view, sheet, label="D")
+    box = drawing._note_extent(adapter, note)
+    assert box[3] < 0.066
+    assert box[2] < drawing.DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_left_m - 0.003
+    assert box[1] >= 0.0127 + 0.003
+
+
+@pytest.mark.parametrize("defect", [None, "crop", "notes", "missing", "invalid-text"])
+def test_ream_native_text_clears_actual_detail_and_seated_notes(native_profile_clearance, bound, monkeypatch, defect):
+    case = native_profile_clearance
+    case.ream.data.texts = [{"t": "REAM +0.03", "pos": [0.094, 0.082, 0], "h": 0.0036}]
+    case.ream.position = (0.120, 0.086, 0)
+    if defect == "invalid-text":
+        case.ream.data.texts[0]["h"] = 0.0
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, ann: "PivotDia")
+    crop_left = 0.110 if defect == "crop" else 0.1531
+    hub = SimpleNamespace(
+        GetAnnotations=lambda: [] if defect == "missing" else [case.ream],
+        GetOutline=lambda: (crop_left, 0.0681, 0.2069, 0.1219),
+    )
+    notes = (0.020, 0.016, 0.150, 0.082 if defect == "notes" else 0.070)
+    if defect is None:
+        drawing._require_ream_clearance(case.adapter, hub, notes)
+        assert any("required_air_mm=1.000" in log for log in case.logs)
+    else:
+        with pytest.raises((RuntimeError, ValueError)):
+            drawing._require_ream_clearance(case.adapter, hub, notes)
+
+
+@pytest.mark.parametrize("defect", ["empty-view", "invalid-crop", "invalid-text"])
+def test_front_detail_text_guard_cannot_pass_missing_native_geometry(native_profile_clearance, bound, defect):
+    case = native_profile_clearance
+    case.front.GetAnnotations = lambda: [] if defect == "empty-view" else [case.r816]
+    if defect == "invalid-text":
+        case.r816.data.texts[0]["pos"][1] = float("nan")
+    hub = SimpleNamespace(GetOutline=lambda: (0.160, 0.068, 0.200, float("nan") if defect == "invalid-crop" else 0.122))
+    end = SimpleNamespace(GetOutline=lambda: (0.300, 0.080, 0.360, 0.140))
+    with pytest.raises((RuntimeError, ValueError)):
+        drawing._require_front_detail_air(case.adapter, case.front, hub, end)
+
+
+@pytest.mark.parametrize("points", [[], [(0.18,)], [(0.18, float("nan"))], [(0.18, float("inf"))]])
+def test_native_projection_fails_closed_on_missing_or_invalid_coordinates(bound, monkeypatch, points):
+    events = []
+    view = SimpleNamespace(UpdateViewDisplayGeometry=lambda: events.append("barrier"))
+    monkeypatch.setattr(drawing, "model_points_in_view", lambda *_a, **_k: points)
+    with pytest.raises(RuntimeError, match="invalid native projected points"):
+        drawing._project(object(), view, [(0.0, 0.008, 0.0)], label="detail D pivot")
+    assert events == ["barrier"]
+
+
+@pytest.mark.parametrize("defect", [None, "inside-circle", "missing-radius", "zero-projection", "invalid-position"])
+def test_basic_radius_ink_uses_native_parent_circle_projection(native_profile_clearance, bound, monkeypatch, defect):
+    case = native_profile_clearance
+    annotations = []
+    for name in ("TopRadius", "BottomRadius"):
+        xy = drawing.FRONT_KEEP[name]
+        text = _ClearanceDisplayData([{"t": "R800" if name == "TopRadius" else "R816",
+                                      "pos": [*xy, 0.0], "h": 0.0035}], [])
+        annotations.append(_ClearanceAnnotation(name, (*xy, 0.0), text, kind=4, hole_callout=False))
+    if defect == "inside-circle":
+        annotations[0].data.texts[0]["pos"][:2] = [0.130, 0.218]
+    elif defect == "missing-radius":
+        annotations.pop(0)
+    elif defect == "invalid-position":
+        annotations[0].position = (float("nan"), 0.136, 0.0)
+    case.front.GetAnnotations = lambda: annotations
+    events = []
+    case.front.UpdateViewDisplayGeometry = lambda: events.append("barrier")
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, ann: ann.name)
+    def native_project(_adapter, _view, points, **_kwargs):
+        assert events == ["barrier"]
+        return [_front_xy(0.0 if defect == "zero-projection" else x * 1000.0, y * 1000.0)
+                for x, y, _z in points]
+    monkeypatch.setattr(drawing, "model_points_in_view", native_project)
+    if defect is None:
+        drawing._require_radius_exterior(case.adapter, case.front)
+        logs = "\n".join(case.logs)
+        assert "native_circle_radius_mm=400.000" in logs
+        assert "native_circle_radius_mm=408.000" in logs
+        assert logs.count("actual_exterior_air_mm=") == 2
+    else:
+        with pytest.raises((RuntimeError, ValueError)):
+            drawing._require_radius_exterior(case.adapter, case.front)
+
+
+@pytest.mark.parametrize("properties", [None, (), (0.0, 0.0, 1.0)])
+def test_sheet_scale_cannot_claim_success_without_native_properties(bound, properties):
+    sheet = SimpleNamespace(SetScale=lambda *_args: True, GetProperties2=lambda: properties)
+    with pytest.raises(RuntimeError, match="sheet scale did not persist"):
+        drawing._pin_sheet_scale(object(), sheet)
