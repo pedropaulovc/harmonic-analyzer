@@ -42,6 +42,20 @@ bytes for private mutation fixtures. Keep each case's writable checkout, task
 state and invalidation checks isolated. Error-budget timings must retain the
 configured draws, seeds, reference cases and numerical acceptance checks.
 
+The isolated children in `tests/test_farm_fifo_lifecycle.py` acknowledge readiness
+after imports and fake Temporal setup, then wait for the parent's `run` reply.
+Their execution deadlines start at that handshake, not interpreter creation:
+on a saturated Windows host, cold `_farm` and Temporal imports alone exceeded
+the old 10-second SIGINT deadline. A separate 120-second startup hang guard
+still catches a child that never becomes ready. SIGINT is raised only after the
+fake coordinator has accepted registration (or returned waiting ownership) and
+the main thread has reached the producer's entry wait; cancellation releases
+the pending registration reply through the producer's stop event, not a sleep.
+The active lease-outage test likewise waits for local entry and a failed renewal
+retry before advancing the producer's private monotonic clock past lease expiry.
+It does not spend a half-second test lease on thread startup, and leaves asyncio's
+real timeout clock untouched.
+
 ## Supervised farm launches
 
 A farm build outlives every agent turn and every harness deadline: a cold

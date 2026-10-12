@@ -16,6 +16,7 @@ import textwrap
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import doit.cmd_base as _doit_cmd_base
 import pytest
@@ -34,6 +35,49 @@ DISPLAY_NAME = "FIFO lifecycle test"
 INHERITED_BUILD_ID = "20261010T190000.000000Z-" + "a" * 32
 FARM_RUN = "launcher-run-is-not-the-build-id"
 WAIT_S = 5
+# Cold isolated interpreters import telemetry and Temporal before exercising the
+# lifecycle. This is a startup hang guard, not part of the signal/cleanup budget.
+CHILD_STARTUP_GUARD_S = 120
+
+
+def _run_ready_child(command, *, cwd, timeout):
+    """Start the probe's deadline only after its imports and fakes are ready."""
+    child = subprocess.Popen(
+        command,
+        cwd=cwd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    startup = []
+    ready = threading.Event()
+
+    def read_ready():
+        try:
+            startup.append(child.stdout.readline())
+        finally:
+            ready.set()
+
+    reader = threading.Thread(target=read_ready, daemon=True)
+    reader.start()
+    try:
+        assert ready.wait(CHILD_STARTUP_GUARD_S), "isolated child startup hung"
+        assert startup == ["ready\n"], f"isolated child exited before readiness: {startup!r}"
+        stdout, stderr = child.communicate(input="run\n", timeout=timeout)
+        if child.returncode:
+            raise subprocess.CalledProcessError(
+                child.returncode, command, output=stdout, stderr=stderr
+            )
+        return subprocess.CompletedProcess(command, child.returncode, stdout, stderr)
+    finally:
+        if child.poll() is None:
+            child.kill()
+        child.communicate()
+        reader.join()
+        child.stdin.close()
+        child.stdout.close()
+        child.stderr.close()
 
 
 def _deadline(seconds=60):
@@ -379,6 +423,7 @@ def test_windows_sigint_while_entering_closes_accepted_build_and_restores_enviro
         import os
         import signal
         import sys
+        import threading
         from datetime import datetime, timedelta, timezone
 
         sys.path.insert(0, sys.argv[1])
@@ -398,6 +443,23 @@ def test_windows_sigint_while_entering_closes_accepted_build_and_restores_enviro
         previous_id = os.environ["HARMONIC_FARM_BUILD_ID"]
         owner = _farm.producer_build("Windows SIGINT test")
         updates = []
+        entering = threading.Event()
+        signal_sent = threading.Event()
+
+        class EnteringEvent(threading.Event):
+            def wait(self, timeout=None):
+                entering.set()
+                return super().wait(timeout)
+
+        owner._ready = EnteringEvent()
+
+        async def interrupt_entering():
+            # Registration/query acceptance and the main thread's entry wait
+            # must both be observed; scheduling speed is not a readiness signal.
+            if not signal_sent.is_set():
+                await asyncio.to_thread(entering.wait)
+                signal_sent.set()
+                signal.raise_signal(signal.SIGINT)
 
         class Control:
             def status(self, state="open"):
@@ -411,14 +473,11 @@ def test_windows_sigint_while_entering_closes_accepted_build_and_restores_enviro
                 updates.append((name, getattr(arg, "reason", None)))
                 assert arg.build_id == owner.build_id
                 if name == "register_build":
-                    asyncio.get_running_loop().call_later(
-                        0.05, signal.raise_signal, signal.SIGINT
-                    )
                     if sys.argv[2] == "accepted-reply-pending":
                         # The fake accepted registration, but withholds its reply
                         # until the real producer's cancellation cleanup starts.
-                        while not owner._stop.is_set():
-                            await asyncio.sleep(0.002)
+                        await interrupt_entering()
+                        await asyncio.to_thread(owner._stop.wait)
                     return self.status()
                 assert name == "close_build", "signal probe unexpectedly renewed"
                 return self.status("closed")
@@ -426,6 +485,7 @@ def test_windows_sigint_while_entering_closes_accepted_build_and_restores_enviro
             async def query(self, name, arg, **options):
                 assert name == "build_status"
                 assert arg == _farm.BuildKey(owner.build_id)
+                await interrupt_entering()
                 return self.status()
 
             async def cancel(self):
@@ -448,6 +508,8 @@ def test_windows_sigint_while_entering_closes_accepted_build_and_restores_enviro
             return FakeClient()
 
         _farm._connect_client = connect
+        print("ready", flush=True)
+        assert sys.stdin.readline() == "run\\n"
         entered = False
         interrupted = False
         try:
@@ -465,7 +527,7 @@ def test_windows_sigint_while_entering_closes_accepted_build_and_restores_enviro
         }))
         """
     )
-    child = subprocess.run(
+    child = _run_ready_child(
         [
             sys.executable,
             "-I",
@@ -475,9 +537,6 @@ def test_windows_sigint_while_entering_closes_accepted_build_and_restores_enviro
             registration,
         ],
         cwd=tmp_path,
-        capture_output=True,
-        text=True,
-        check=True,
         timeout=WAIT_S + 5,
     )
     outcome = json.loads(child.stdout)
@@ -509,19 +568,18 @@ def test_active_local_action_gap_renews_and_spawned_child_inherits_only_build_id
     assert control.queries == [], "active renewal should not depend on a dispatched leaf"
 
     # Safe probe only: no repository imports, COM, shell, credentials or workload.
-    child = subprocess.run(
+    child = _run_ready_child(
         [
             sys.executable,
             "-I",
             "-c",
-            "import json, os, threading; print(json.dumps({"
+            "import json, os, sys, threading; "
+            "print('ready', flush=True); assert sys.stdin.readline() == 'run\\n'; "
+            "print(json.dumps({"
             "'build_id': os.environ.get('HARMONIC_FARM_BUILD_ID'), "
             "'threads': [t.name for t in threading.enumerate()]}))",
         ],
         cwd=tmp_path,
-        capture_output=True,
-        text=True,
-        check=True,
         timeout=WAIT_S,
     )
     inherited = json.loads(child.stdout)
@@ -707,17 +765,35 @@ def test_close_transport_warning_cannot_mask_prior_ownership_loss(
      "past-deadline", "foreign-build", "waiting", "drained"],
 )
 def test_active_renewal_fault_fails_closed_and_interrupts_only_mocked_parent(
-    control, start_parent, _guarded_process, fault
+    control, start_parent, _guarded_process, monkeypatch, fault
 ):
     # Gate the first renewal until local execution has actually started.
     control.heartbeat_gate = _AsyncGate()
+    lease_expired = threading.Event()
     if fault == "lease-expiring-outage":
-        control.lease_deadline = _deadline(0.5)
+        # Advance only the producer's clock, not asyncio's timeout clock.
+        # No lease lifetime is spent racing interpreter/thread startup.
+        real_time = _farm.time
+        monkeypatch.setattr(
+            _farm,
+            "time",
+            SimpleNamespace(
+                monotonic=lambda: real_time.monotonic()
+                + (120 if lease_expired.is_set() else 0)
+            ),
+        )
     parent = start_parent()
     _wait(parent.entered, "producer did not enter action")
     _wait(control.heartbeat_gate.entered, "heartbeat did not reach fake boundary")
     if fault == "lease-expiring-outage":
-        control.heartbeat_response = ConnectionError("control unavailable")
+        def outage(_status):
+            # First prove a retry under the acknowledged lease; only then
+            # expire it, while local execution is known to have started.
+            if len(control.calls("heartbeat_build")) >= 2:
+                lease_expired.set()
+            raise ConnectionError("control unavailable")
+
+        control.heartbeat_response = outage
     elif fault == "update-refusal":
         from temporalio.client import WorkflowUpdateFailedError
         from temporalio.exceptions import ApplicationError
