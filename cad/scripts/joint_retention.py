@@ -682,8 +682,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "vn_knife_mount_dowel",  # MHA-VN-051 1/8 dowels, two pressed into each knife mount's reamed top-seat holes, slip in the crossbar hole and slot
         "pd_latch_hook",  # MHA-PD-014 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
         "mg_lever_wire",  # wire, wrapped in the fixture's spigot groove; no thread
-        "mg_magnifying_bracket",  # two counterbored normal #2 clearance holes in its front mounting flange; no thread
-        "mg_magnifying_lever",  # plain Ø6 domed rod
+        "mg_magnifying_bracket",  # 1018 steel MHA-MG-003 collar light-press seat with Loctite 638; flange has two counterbored normal #2 clearance holes, no thread
+        "mg_magnifying_lever",  # Ø6 domed brass lever; press MHA-MG-001 collar onto its east cylinder while holding the rod near its end, then retain with Loctite 638
         "mg_magnifying_vertical_rod",  # plain Ø5 domed rod
         "mg_magnifying_wheel",  # reamed .1890 running bore + two Ø1 wire-tie holes; no thread
         "mg_wheel_drum",  # MHA-MG-010 brass drum pressed on the wheel's spigot; no thread

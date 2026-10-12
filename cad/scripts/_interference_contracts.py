@@ -62,14 +62,6 @@ from dt_pinion_pivot_block_geometry import BLOCK_HEIGHT as _PINION_BLOCK_HEIGHT
 from vn_slotted_screw_spec import SHANK_DIA as _BLOCK_SCREW_DIA
 from vn_slotted_screw_spec import SHANK_LEN as _BLOCK_SCREW_LENGTH
 from vn_slotted_screw_spec import THREAD as _BLOCK_SCREW_THREAD
-from mg_lever_press_fit_geom import (
-    COLLAR_BORE_DIA as _MG_COLLAR_BORE_DIA,
-    COLLAR_ENGAGEMENT as _MG_COLLAR_ENGAGEMENT,
-    PRESS_ZONE_DIA as _MG_LEVER_PRESS_DIA,
-)
-from mg_output_fixture_geom import SPIGOT_FACE_X as _MG_FIXTURE_FACE_X
-from mg_magnifying_vertical_rod_geom import ROD_DIA as _MG_VERTICAL_ROD_DIA
-from _mcmaster_91882a221 import SHANK_DIA as _MG_THUMB_SHANK_DIA
 
 
 def _smooth_annulus_limit_mm3(
@@ -287,19 +279,23 @@ _FRAME_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(2.8448, 2.261, 4.85),
     ),
 }
+# Independent runtime oracles: importing the magnifier's fit/pose modules here
+# would re-key every assembly for an unrelated fixture station or groove edit.
+# test_mg_fixture_installation pins these triples to their geometry owners.
+# Keep the ruled light-press triple in one place; tests pin it to the band owner.
+_MG_LEVER_PRESS_TRIPLE_MM = (6.0, 5.986, 7.0)
+_MG_FIXTURE_THREAD_TRIPLE_MM = (2.8448, 2.261, 10.1)
+
 # Bound the print-worst press annulus over the actual straight cylinder:
 # the last three millimetres of the lever are a hemispherical end, not full
 # diameter engagement. Both diameter maxima/minima are nominal for these bands.
 _MG_LEVER_PRESS_LIMIT = _smooth_annulus_limit_mm3(
-    _MG_LEVER_PRESS_DIA, _MG_COLLAR_BORE_DIA, _MG_COLLAR_ENGAGEMENT
+    *_MG_LEVER_PRESS_TRIPLE_MM
 )
-# The fixture screw is backed out until its tip touches the vertical rod,
-# leaving the collar off the spigot. Only its major/thread-drill annulus in
-# the spigot/body axial receiver is permitted, never screw/rod overlap.
+# Only the major/thread-drill annulus from the spigot face to the rod-bore
+# breakout (10.1 mm), not the tangent screw tip or screw/rod overlap, is allowed.
 _MG_FIXTURE_THREAD_LIMIT = _smooth_annulus_limit_mm3(
-    _MG_THUMB_SHANK_DIA,
-    TAP_DRILL_MM["#4-40"],
-    _MG_FIXTURE_FACE_X - _MG_VERTICAL_ROD_DIA / 2.0,
+    *_MG_FIXTURE_THREAD_TRIPLE_MM
 )
 
 _MAGNIFIER_ALLOWED_PAIRS = {

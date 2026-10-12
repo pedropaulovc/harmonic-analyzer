@@ -9,8 +9,19 @@ plate centreline (machine y 979.7, after the 2026-08-02 Cascade-A drop). The
 flange seats flush on the summing lever's installed front face and carries
 two native #2 counterbores entering -Z. Joint geometry and hole
 specifications are owned by magnifying_bracket_joint_layout, independently
-of assemblies; the press fit (bore nominal, band, engagement, budget) by the
-config-free mg_lever_press_fit_geom, which the lever print and this one share.
+of assemblies; the press fit (bore nominal, band, engagement, budget,
+installation notes) by the config-free mg_lever_press_fit_geom, which the
+lever print and this one share.
+
+``ArmSection`` (blanked, on the Right plane): the arm's section in the
+profile the RIGHT view prints -- its thickness, its lower face from the bore
+axis and from the flange's hole-datum face, and the seat face from the bore
+axis -- as native dimensions (machinist review: the thickness was a note and
+nothing located the bore axis). Its three construction lines lie on the arm's
+end face and the seat face's visible edge pieces, so the sketch, shown in
+that view to import its dimensions, prints nothing the model does not
+already draw but the bore axis: a centerline from the collar's centre to the
+arm's end station, the axis extended for dimensioning.
 
 Run (SolidWorks already open)::
 
@@ -37,7 +48,11 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    anchor_point_to_point,
+    blank_reference_sketches,
+    dimension_between,
     ensure_fully_defined,
+    set_sketch_direct_db,
 )
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
@@ -88,6 +103,15 @@ ARM_Z = (4.0, 58.3)
 async def _volume(adapter) -> float:
     res = await adapter.get_mass_properties()
     return res.data.volume if res.is_success else float("nan")
+
+
+def _make_construction(adapter, entity: str) -> None:
+    """Turn one sketch segment into construction geometry, and prove it."""
+    from _com import _early_bound
+    segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity}: failed to become construction geometry")
 
 
 def _resolve_native_mounting_dimensions(adapter) -> dict[str, str]:
@@ -144,7 +168,6 @@ def _apply_native_mounting_annotations(adapter, native_names: dict[str, str]) ->
 
 async def _mounting_coordinate_dimensions(adapter) -> None:
     """Own mounting coordinates from the real west edge and lower face."""
-    from _sketch import anchor_point_to_point
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
     check("mounting coordinate sketch", await adapter.create_sketch("Front"))
     dimensions = SketchDims()
@@ -192,9 +215,9 @@ async def build(adapter) -> dict[str, str]:
     # CollarOD or FlangeX0 -- never an auto "D3@Sketch2". The mm suffix is
     # load-bearing: this is an INCH document and the equation manager reads BARE
     # numbers in document units, so an unsuffixed "200" would be read as 200 in
-    # and blow the part up 25.4x. The arm/flange Y bounds drive only the extrude
-    # DEPTH/OFFSET (feature params, not sketch dims), so they are knobs with
-    # nothing in the deferred drive batch -- matches the exemplars.
+    # and blow the part up 25.4x. The arm/flange Y bounds drive the extrude
+    # DEPTH/OFFSET (feature params, not sketch dims) and the ArmSection witness
+    # dimensions the RIGHT view prints -- matches the exemplars.
     await set_global(adapter, "CollarOD", f"{COLLAR_OD}mm")
     await set_global(adapter, "CollarBore", f"{COLLAR_BORE_DIA}mm")
     await set_global(adapter, "CollarHalfLen", f"{COLLAR_HALF_LEN}mm")
@@ -368,6 +391,115 @@ async def build(adapter) -> dict[str, str]:
         adapter, "bracket mounting counterbores", expected, 0.02 * cut_volume
     )
 
+    # 4. Arm section witness (ArmSection, blanked; Right plane, sketch (u, v)
+    # -> model (-Z, Y)): the RIGHT view shows the arm in profile between the
+    # flange's seat face and the collar, and policy rule 2 wants its 7.5 and
+    # its station across the flange as native dimensions (machinist review:
+    # the thickness was a note, and nothing located the bore axis). Three
+    # construction lines, each on an edge the view already draws: the arm's
+    # end face (its full thickness, past the seat face) and the seat face's
+    # two visible pieces -- below the arm, from the flange's lower (hole-datum)
+    # face up to the arm; above it, from the arm up to the flange's top -- so
+    # the sketch, shown in that view to import its dimensions, prints nothing
+    # new but the bore axis: a centerline from the arm's end station to the
+    # collar's centre, the axis extended for dimensioning (ASME Y14.5), so the
+    # arm's 3.00 from the axis reads off the centerline's end at the arm's end
+    # face, its two witnesses 3 mm long, not 60 mm back through the arm to the
+    # collar's centre. The dimensions the print keeps all take the arm's END
+    # corners, so their extension lines run away from the part instead of
+    # along the arm's faces. Six dimensions in creation order: the thickness
+    # (ArmThickness), the arm's lower face from the bore axis (ArmBelowAxis)
+    # and the arm end from the axis (unmarked), the arm's lower face from the
+    # hole-datum flange face (ArmOffset, printed in parentheses as reference),
+    # the flange above the arm (unmarked) and the seat face from the bore axis
+    # (SeatToAxis, the flange's top corner to the origin).
+    section = SketchDims()
+    check("create_sketch arm section", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    seat_u = -FLANGE_Z[1]
+    end_u = -ARM_Z[1]
+    axis = check(
+        "arm section bore axis",
+        await adapter.add_centerline(end_u, 0.0, 0.0, 0.0),
+    )
+    end = check(
+        "arm section end face",
+        await adapter.add_line(end_u, ARM_Y[0], end_u, ARM_Y[1]),
+    )
+    below = check(
+        "arm section seat face below the arm",
+        await adapter.add_line(seat_u, FLANGE_Y[0], seat_u, ARM_Y[0]),
+    )
+    above = check(
+        "arm section seat face above the arm",
+        await adapter.add_line(seat_u, ARM_Y[1], seat_u, FLANGE_Y[1]),
+    )
+    set_sketch_direct_db(adapter, False)
+    for line in (end, below, above):
+        _make_construction(adapter, line)
+    check(
+        "arm section bore axis horizontal",
+        await adapter.add_sketch_constraint(axis, None, "horizontal"),
+    )
+    await anchor_point_to_origin(adapter, f"{axis}.end", 0.0, 0.0, "arm section bore axis end")
+    check(
+        "arm section bore axis from the arm's end station",
+        await adapter.add_sketch_constraint(
+            f"{axis}.start", f"{end}.start", "vertical_points"
+        ),
+    )
+    await anchor_point_to_point(
+        adapter, f"{end}.start", f"{end}.end",
+        0.0, ARM_Y[1] - ARM_Y[0], "arm section ArmThickness",
+    )
+    section.record("ArmThickness", '"ArmY1" - "ArmY0"')
+    await dimension_between(
+        adapter, f"{end}.start", f"{axis}.start", "vertical_distance",
+        -ARM_Y[0], "arm section ArmBelowAxis",
+    )
+    section.record("ArmBelowAxis", '-"ArmY0"')
+    await dimension_between(
+        adapter, f"{end}.start", "origin", "horizontal_distance",
+        ARM_Z[1], "arm section ArmEndFromAxis",
+    )
+    section.record("ArmEndFromAxis", '"ArmZ1"')
+    for piece, corner in ((below, "end"), (above, "start")):
+        check(
+            f"arm section {piece} vertical",
+            await adapter.add_sketch_constraint(piece, None, "vertical"),
+        )
+        check(
+            f"arm section {piece}.{corner} on the arm's face",
+            await adapter.add_sketch_constraint(
+                f"{piece}.{corner}", f"{end}.{corner}", "horizontal_points"
+            ),
+        )
+    check(
+        "arm section seat pieces on one station",
+        await adapter.add_sketch_constraint(
+            f"{below}.end", f"{above}.start", "vertical_points"
+        ),
+    )
+    await dimension_between(
+        adapter, f"{below}.start", f"{end}.start", "vertical_distance",
+        ARM_Y[0] - FLANGE_Y[0], "arm section ArmOffset",
+    )
+    section.record("ArmOffset", '"ArmY0" - "FlangeY0"')
+    await dimension_between(
+        adapter, f"{above}.start", f"{above}.end", "vertical_distance",
+        FLANGE_Y[1] - ARM_Y[1], "arm section FlangeAboveArm",
+    )
+    section.record("FlangeAboveArm", '"FlangeY1" - "ArmY1"')
+    await dimension_between(
+        adapter, f"{above}.end", "origin", "horizontal_distance",
+        FLANGE_Z[1], "arm section SeatToAxis",
+    )
+    section.record("SeatToAxis", '"FlangeZ1"')
+    await ensure_fully_defined(adapter, "arm section sketch")
+    check("exit_sketch arm section", await adapter.exit_sketch())
+    name_last_feature(adapter, "ArmSection")
+    drive_jobs += section.apply(adapter, "ArmSection")
+
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so the geometry must not move -- the re-check below is the proof.
@@ -412,6 +544,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    blank_reference_sketches(adapter, ("ArmSection",))
     # Annotation changes must preserve the cut holes through the final rebuild,
     # not merely at the earlier, pre-annotation equation check.
     await force_rebuild(adapter)

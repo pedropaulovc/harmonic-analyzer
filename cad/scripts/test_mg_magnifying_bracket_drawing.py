@@ -22,13 +22,18 @@ def test_required_drawing_paths() -> None:
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is mg_magnifying_bracket_spec.DRAWING_DIMENSIONS
+    assert drawing.DRAWING_DIMENSIONS is mg_magnifying_bracket_spec.DRAWING_DIMENSIONS
     marked = set().union(*mg_magnifying_bracket_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.TOP_KEEP) | set(drawing.FRONT_KEEP) | set(drawing.BACK_KEEP) | set(drawing.RIGHT_KEEP)
+    kept = (
+        set(drawing.TOP_KEEP) | set(drawing.FRONT_KEEP) | set(drawing.BACK_KEEP)
+        | set(drawing.RIGHT_KEEP) | set(drawing.RIGHT_SECTION_KEEP)
+    )
     assert kept == marked
     assert marked == {
         "CollarOd", "CollarBore", "CollarLen",
         "ArmWidth", "ArmDepth", "FlangeWidth", "FlangeDepth", "FlangeHeight",
         "MountingX0", "MountingX1", "MountingY0",
+        "ArmThickness", "ArmBelowAxis", "ArmOffset", "SeatToAxis",
     }
 
 
@@ -53,19 +58,20 @@ def test_bracket_is_uncoupled_from_the_assembly_nominals() -> None:
 
 
 def test_notes_carry_only_what_no_marked_dim_shows() -> None:
+    import mg_lever_press_fit_geom as press
     notes = mg_magnifying_bracket_spec.DRAWING_NOTES
     # The collar's OD, length and bore (with its band), the arm section and the
     # mounting pattern are native dimensions now; the notes carry the press and
-    # its retention (the assembly print has no notes) plus the floor exception.
+    # its retention -- the press contract's own three lines, shared with the
+    # lever print -- plus the floor exception.
     assert "Ø12" not in notes and "Ø6.2" not in notes and "Ø5.9" not in notes
     assert "SLIP" not in notes and "GUIDE" not in notes
     assert "ARM 10" not in notes and "SEAT ON SUMMING" not in notes
     lines = notes.splitlines()
-    assert lines[:3] == [
-        "PRESS LEVER INTO COLLAR, END FLUSH WITH OUTER FACE.",
-        "RETAIN WITH LOCTITE 638.",
-        "ALTERNATIVE: SOFT SOLDER OR BRAZE.",
-    ]
+    assert lines[:3] == press.PRESS_INSTALLATION_NOTES.splitlines()
+    assert "LOCTITE 638" in notes and "SOFT SOLDER OR BRAZE" in notes
+    assert f"{press.PRESS_FORCE_MAX_KN:.1f} kN MAX" in notes
+    assert "LEVER" in notes
     assert "AISI 1018" not in notes
     assert "BLACK-OXIDE" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
@@ -74,7 +80,7 @@ def test_notes_carry_only_what_no_marked_dim_shows() -> None:
     assert "THICKNESS" not in notes
     assert "#4" not in notes and "CENTRES" not in notes
     assert "UNDRILLED" not in notes and "DO NOT RELEASE" not in notes
-    assert len(lines) <= 4
+    assert len(lines) == 4
 
 
 def test_collar_press_seat_is_native_and_reads_the_press_contract() -> None:
@@ -107,7 +113,13 @@ def test_collar_press_seat_is_native_and_reads_the_press_contract() -> None:
     assert drawing.RIGHT_KEEP.keys() == {"CollarOd", "CollarBore"}
     assert "CollarLen" in drawing.TOP_KEEP
     assert drawing.RIGHT_CALLOUTS.keys() == {"CollarOd", "CollarBore"}
-    assert "MHA-MG-003" in drawing.RIGHT_CALLOUTS["CollarBore"]
+    # Policy rule 6: the fit bore names its process; the mate is the lever
+    # part, by number and name (machinist review: "rod" read as another part).
+    bore_callout = drawing.RIGHT_CALLOUTS["CollarBore"]
+    assert "REAM OR BORE" in bore_callout
+    assert "MHA-MG-003 LEVER" in bore_callout
+    assert "ROD" not in bore_callout
+    assert all(len(row) <= 24 for row in bore_callout.splitlines())
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_dimension_callouts(adapter, right_annotations, RIGHT_CALLOUTS)" in drawing_source
 
@@ -139,11 +151,16 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("mg-magnifying-bracket")
+    # One stock, both keys (parent ruling): the collar's press budget is
+    # computed for 1018 cold-drawn (mg_lever_press_fit_geom.COLLAR_YIELD_MPA).
     assert config["material"] == config["material_specification"]
+    assert config["material"] == "LOW-CARBON STEEL (1018, COLD-DRAWN)"
     assert config["finish"]
     assert int(config["quantity"]) == 1
     # The collar is a press seat, not a running fit (user ruling 2026-10-11).
     assert "fit_class" not in config
+    assert "1018 cold-drawn solid stock" in config["process"]
+    assert "reamed or bored" in config["process"]
     assert "press seat for the MHA-MG-003 lever rod" in config["process"]
 
 
@@ -197,6 +214,10 @@ def test_counterbore_entry_view_callout_and_feature_origin() -> None:
     assert "set_hidden_lines_removed(adapter, back)" in source
     assert '"MountingCoordinates": ("MountingX0", "MountingX1", "MountingY0")' in source
     assert "curate_hidden_dimensions(" in source
+    # The callout sits below the back view, so its leader leaves the hole
+    # downward, clear of the 4.00 and 17.70 dimension lines it rose through.
+    assert "callout_xy=(0.300, 0.078)" in source
+    assert drawing.BACK_KEEP["MountingX0"][1] > 0.107 > 0.078
 
 
 def test_coordinates_and_hole_dimensions_are_owned_by_model() -> None:
@@ -226,6 +247,91 @@ def test_flange_height_is_native_and_primary_views_stay_aligned() -> None:
     assert drawing.BACK_CENTER[0] != drawing.FRONT_CENTER[0]
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"*Front", *FRONT_CENTER' in drawing_source
+
+
+def test_arm_section_is_native_and_locates_the_bore_axis() -> None:
+    """The arm's thickness and its position across the flange print from a
+    blanked ArmSection witness on the Right plane (sketch (u, v) -> model
+    (-Z, Y)), not from a note; the bore axis is located from the seat face.
+    Offline source contract only: the native import still wants farm proof."""
+    import pytest
+    import magnifying_bracket_joint_layout as joint
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # Model directions the dimensions rely on: the arm sits 3.00 below the bore
+    # axis and 3.35 above the flange's hole-datum (lower) face, 7.50 thick; the
+    # seat face is the flange's +Z face, the summing installation's seat plane.
+    assert part.ARM_Y == (-3.0, 4.5)
+    assert -part.ARM_Y[0] == 3.0
+    assert part.ARM_Y[1] - part.ARM_Y[0] == 7.5
+    assert part.ARM_Y[0] - part.FLANGE_Y[0] == pytest.approx(3.35)
+    assert part.FLANGE_Z[1] == joint.SIDE_PLATE_Z[1]
+    assert part.ARM_Z[1] > part.FLANGE_Z[1]  # the arm's end stands past the seat
+    assert "seat_u = -FLANGE_Z[1]" in source
+    assert "end_u = -ARM_Z[1]" in source
+    assert "_make_construction(adapter, line)" in source
+    # The bore axis, extended to the arm's end station as a centerline, so the
+    # 3.00 reads off its end there with short witnesses (not back to the
+    # collar's centre through the arm).
+    assert "await adapter.add_centerline(end_u, 0.0, 0.0, 0.0)" in source
+    assert 'f"{axis}.start", f"{end}.start", "vertical_points"' in source
+    assert 'f"{end}.start", f"{axis}.start", "vertical_distance"' in source
+    assert """section.record("ArmThickness", '"ArmY1" - "ArmY0"')""" in source
+    assert """section.record("ArmBelowAxis", '-"ArmY0"')""" in source
+    assert """section.record("ArmOffset", '"ArmY0" - "FlangeY0"')""" in source
+    assert """section.record("SeatToAxis", '"FlangeZ1"')""" in source
+    assert 'name_last_feature(adapter, "ArmSection")' in source
+    assert 'blank_reference_sketches(adapter, ("ArmSection",))' in source
+    assert mg_magnifying_bracket_spec.DRAWING_DIMENSIONS["ArmSection"] == {
+        "ArmThickness", "ArmBelowAxis", "ArmOffset", "SeatToAxis",
+    }
+    assert part.DRAWING_PRECISION["ArmSection"] == {
+        "ArmThickness": 2, "ArmBelowAxis": 2, "ArmOffset": 2, "SeatToAxis": 2,
+    }
+    assert drawing.RIGHT_SECTION_KEEP.keys() == {
+        "ArmThickness", "ArmBelowAxis", "ArmOffset", "SeatToAxis",
+    }
+    assert "keep=RIGHT_SECTION_KEEP" in drawing_source
+    assert "dimensions_by_feature=DRAWING_DIMENSIONS" in drawing_source
+    assert "set_dimension_callouts(adapter, section_annotations, SECTION_CALLOUTS)" in drawing_source
+    assert "set_reference_dimensions(adapter, section_annotations, SECTION_REFERENCE)" in drawing_source
+    assert drawing.SECTION_REFERENCE == ("ArmOffset",)
+    assert drawing.SECTION_CALLOUTS["ArmThickness"] == "ARM THICKNESS"
+    assert "BORE AXIS" in drawing.SECTION_CALLOUTS["ArmBelowAxis"]
+    assert "SEAT FACE" in drawing.SECTION_CALLOUTS["SeatToAxis"]
+    assert "ArmOffset" not in drawing.SECTION_CALLOUTS
+    # The section's witnesses run left of the arm's end (x 207.85 mm), its
+    # texts outside the view: the thickness and seat-face dimensions above
+    # (y > 191.9 mm), the two from the arm's lower face below (y < 168.1 mm).
+    right = drawing.RIGHT_SECTION_KEEP
+    assert all(right[name][0] < 0.20785 for name in ("ArmThickness", "ArmBelowAxis", "ArmOffset"))
+    assert right["ArmThickness"][1] > 0.1919 and right["SeatToAxis"][1] > 0.1919
+    assert right["ArmBelowAxis"][1] < 0.1681 and right["ArmOffset"][1] < 0.1681
+    assert right["ArmOffset"][0] < right["ArmThickness"][0] < right["ArmBelowAxis"][0]
+    # The bore's three-row callout (rows ~65 mm wide, x ~198..263 mm) keeps
+    # its v41 column below-left of the collar: its block must clear the
+    # collar's x (266.15 mm) on one side or the leader from the bore's rim to
+    # the shoulder's near end cuts through its own rows (layout audit
+    # leader-through-text), and right of the collar is the isometric.  Its
+    # top stays a text height and more under the 3.00's rows.
+    bore_x, bore_y = drawing.RIGHT_KEEP["CollarBore"]
+    assert bore_x + 0.0325 < 0.26615
+    assert bore_y + 0.008 < right["ArmBelowAxis"][1] - 0.0045 - 0.0035
+    assert bore_y - 0.008 > 0.13375 + 0.0035  # above the back view's 36.00
+
+
+def test_collar_length_and_arm_length_read_on_their_own_features() -> None:
+    """Machinist review: 10.00 vs Ø12 read as one feature, and the 54.30 sat
+    under two foreign witness lines.  The collar's length reads above the
+    collar it measures (top view +Z runs down: collar top at y 212.1 mm),
+    named along the bore axis; the arm's length text slides below the arm's
+    end (y 147.8 mm) and its column right of the x 139 mm witnesses."""
+    assert "ALONG BORE AXIS" in drawing.DIMENSION_CALLOUTS["CollarLen"]
+    assert drawing.TOP_KEEP["CollarLen"][1] > 0.2121
+    assert drawing.TOP_KEEP["CollarLen"][0] > 0.139
+    assert drawing.TOP_KEEP["ArmDepth"][1] < 0.1478
+    assert drawing.TOP_KEEP["ArmDepth"][0] > 0.139 + 0.00175
+    assert drawing.TOP_KEEP["FlangeWidth"][0] < drawing.TOP_KEEP["CollarLen"][0]
 
 
 def test_native_counterbore_dimensions_keep_names_and_route_annotations(monkeypatch) -> None:
@@ -356,6 +462,7 @@ def test_final_forced_volume_guard_follows_annotations_before_publication() -> N
         "clear_dimensions_for_drawing",
         "mark_dimensions_for_drawing",
         "apply_drawing_properties",
+        "blank_reference_sketches",
     ):
         calls = [
             node for node in ast.walk(build)

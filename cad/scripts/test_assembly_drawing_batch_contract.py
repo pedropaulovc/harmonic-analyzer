@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import _config
+import pytest
 import _assembly_drawing
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS, DrawingLayout
@@ -271,8 +272,9 @@ def test_shared_builder_places_named_views_without_per_script_visual_overrides()
         assert token not in source
 
 
+@pytest.mark.parametrize("with_annotations", (False, True))
 def test_shared_builder_places_exactly_front_right_and_isometric(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, with_annotations: bool
 ) -> None:
     source = tmp_path / "assembly.SLDASM"
     source.touch()
@@ -321,6 +323,10 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
 
     monkeypatch.setattr(_assembly_drawing, "finalize_drawing", finalize)
 
+    def annotate(actual_adapter):
+        assert actual_adapter is adapter
+        calls.append(("annotations", len(views)))
+
     result = asyncio.run(
         _assembly_drawing.build_simple_three_view_drawing(
             adapter,
@@ -332,6 +338,7 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
             right_center=(0.2, 0.2),
             iso_center=(0.3, 0.2),
             pdf_title="Assembly Drawing",
+            annotate=annotate if with_annotations else None,
         )
     )
 
@@ -344,6 +351,12 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
     ]
     assert all(call[5] == (1.0, 4.0) for call in view_calls)
     assert result == {"pdf": str(outputs.pdf)}
+    annotation_calls = [call for call in calls if call[0] == "annotations"]
+    assert annotation_calls == ([("annotations", 3)] if with_annotations else [])
+    if with_annotations:
+        assert calls.index(("annotations", 3)) < next(
+            index for index, call in enumerate(calls) if call[0] == "finalize"
+        )
     assert ("new", DrawingLayout.PORTRAIT, (1.0, 4.0)) in calls
     assert (
         "finalize",

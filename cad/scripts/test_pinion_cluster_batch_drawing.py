@@ -21,9 +21,6 @@ import dt_pinion_lever_spec
 import dt_pinion_pivot_shaft_spec
 import dt_pinion_pivot_block_geometry
 import dt_pinion_spring_spec
-import mg_lever_press_fit_geom
-import mg_magnifying_vertical_rod_geom
-import mg_output_fixture_geom
 import vn_post_mount_screw_spec
 import vn_slotted_screw_spec
 from _buildgraph import module_deps_of
@@ -464,17 +461,12 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 4.7625, 4.7371, 9.0
             ),
             frozenset(("vn-thumb-screw-2", "mg-output-fixture-1")): _annulus_limit(
-                2.8448,
-                2.261,
-                mg_output_fixture_geom.SPIGOT_FACE_X
-                - mg_magnifying_vertical_rod_geom.ROD_DIA / 2.0,
+                2.8448, 2.261, 10.1
             ),
             frozenset(
                 ("mg-magnifying-lever-1", "mg-magnifying-bracket-1")
             ): _annulus_limit(
-                mg_lever_press_fit_geom.PRESS_ZONE_DIA,
-                mg_lever_press_fit_geom.COLLAR_BORE_DIA,
-                mg_lever_press_fit_geom.COLLAR_ENGAGEMENT,
+                6.0, 5.986, 7.0
             ),
         },
         "sm-summing": {

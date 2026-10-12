@@ -47,6 +47,7 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_hidden_sketches import _show_base_view_sketches
+from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_configuration import (
@@ -77,6 +78,17 @@ SHEET_SCALE = (1.0, 4.0)
 FRONT_CENTER = (0.070, 0.150)
 RIGHT_CENTER = (0.150, 0.150)
 ISO_CENTER = (0.225, 0.140)
+PRESS_NOTE_XY = (0.018, 0.064)
+PRESS_NOTE_CHAR_HEIGHT = 0.0028
+
+
+def _annotate_collar_press(adapter: Any) -> None:
+    add_property_linked_note(
+        adapter,
+        "Drawing Notes",
+        *PRESS_NOTE_XY,
+        char_height=PRESS_NOTE_CHAR_HEIGHT,
+    )
 
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
@@ -414,6 +426,7 @@ async def build(adapter: Any) -> dict[str, str]:
         apply_view_configuration(adapter, view, role=role, label=f"{PDF_TITLE} {name}")
     assert_full_detail_view(adapter, label=PDF_TITLE)
     settled = _stack_dimensions(adapter)
+    _annotate_collar_press(adapter)
     return await finalize_drawing(
         adapter,
         OUTPUTS,

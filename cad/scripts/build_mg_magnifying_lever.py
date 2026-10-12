@@ -16,15 +16,24 @@ the p.46/p.48 insets show the CLAMP sliding, not a 310 rod.
 Layout: rod axis along +X from the origin (tip of the pivot-end dome at
 x=0), profile revolved 360 deg about a centerline on the axis.
 
-``PressZone`` (blanked, on the Front plane): the last
-mg_lever_press_fit_geom.PRESS_ZONE_LENGTH of the rod, which is PRESSED into
-the MHA-MG-001 bracket collar and retained with Loctite 638 (user ruling
-2026-10-11). The rod is modelled at its nominal Ø6 end to end -- the zone is a
+``PressZone`` (blanked, on the Front plane): the STRAIGHT rod the MHA-MG-001
+bracket collar grips -- mg_lever_press_fit_geom.COLLAR_ENGAGEMENT, from the
+collar's inner face to where the east dome starts -- PRESSED in and retained
+with Loctite 638 (user ruling 2026-10-11). The collar's full
+PRESS_ZONE_LENGTH from the dome tip includes that R3 dome, whose shrinking
+diameter is not banded engagement, so the banded zone stops at the dome
+tangent. The rod is modelled at its nominal Ø6 end to end -- the zone is a
 band, not a step -- so no model edge bounds it; a construction witness along
 the rod's top outline over the zone, with the axis under it, carries the
-zone's length from the dome tip and its diameter with the press band natively
-(policy rule 2: the model, not a note, owns it; ch_rod_pivot_pin's
-``BlankReference``). The front view shows it.
+zone's length and its diameter with the press band natively (policy rule 2:
+the model, not a note, owns it; ch_rod_pivot_pin's ``BlankReference``).
+
+``RodStock`` (blanked, on the Front plane): the rod's stock diameter, printed
+once at mid-length, away from the press zone (machinist review: the Ø6 was a
+note). The revolve profile cannot carry it -- its top line's height is already
+the dome radius's, so a second diameter over-defines the capsule -- hence a
+construction witness from the axis to the top outline, doubled off a short
+centerline on the axis, the PressZone idiom. The front view shows both.
 
 Run (SolidWorks already open)::
 
@@ -65,6 +74,7 @@ from _drawing_precision import apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from mg_lever_press_fit_geom import (
+    COLLAR_ENGAGEMENT,
     PRESS_ZONE_DIA,
     PRESS_ZONE_DIA_BAND,
     PRESS_ZONE_LENGTH,
@@ -90,6 +100,20 @@ MATERIAL = "Brass"  # see _appearance.apply_material docstring
 R = ROD_DIA / 2.0
 if PRESS_ZONE_DIA != ROD_DIA:
     raise AssertionError("the press zone is the modelled rod, not a step")
+# The banded zone ends where the east dome starts: the straight engagement.
+PRESS_ZONE_END = ROD_LENGTH - R
+if PRESS_ZONE_END - PRESS_ZONE_X[0] != COLLAR_ENGAGEMENT:
+    raise AssertionError("the press zone witness is not the collar engagement")
+# Where the stock diameter prints: mid-length, under the clamp's travel.
+ROD_DIA_STATION = ROD_LENGTH / 2.0
+
+
+def _make_construction(adapter, entity: str) -> None:
+    """Turn one sketch segment into construction geometry, and prove it."""
+    segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity}: failed to become construction geometry")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -98,13 +122,13 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
     # Editable knobs (Tools > Equations): the rod length and diameter, and the
-    # press zone's length (the bracket collar's). The mm suffix is
-    # load-bearing -- this is an INCH document and the equation manager
-    # reads BARE numbers in document units (an unsuffixed 165 = 165 in, blowing
-    # the part up 25.4x).
+    # collar's length from the dome tip (the press zone's reach). The mm
+    # suffix is load-bearing -- this is an INCH document and the equation
+    # manager reads BARE numbers in document units (an unsuffixed 165 = 165
+    # in, blowing the part up 25.4x).
     await set_global(adapter, "RodLength", f"{ROD_LENGTH}mm")
     await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
-    await set_global(adapter, "PressZoneLen", f"{PRESS_ZONE_LENGTH}mm")
+    await set_global(adapter, "CollarLen", f"{PRESS_ZONE_LENGTH}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -195,29 +219,27 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "rod", v_rod, 0.005 * v_rod)
 
     # REFERENCE sketch (blanked before save): the press zone -- see the module
-    # docstring. Witness along the rod's top outline over the zone (made
-    # construction, so the shown sketch prints no outline of its own), the
-    # axis segment under it carrying only relations. Three display dims, in
-    # creation order: the zone length between the witness's ends, the zone's
-    # end station from the origin (the dome tip; unmarked, the overall length
-    # is the note's), then the diameter to the witness's start -- doubled off
-    # the axis, the way the pivot pins print theirs.
+    # docstring. Witness along the rod's top outline over the straight
+    # engagement (made construction, so the shown sketch prints no outline of
+    # its own), the axis segment under it carrying only relations. Three
+    # display dims, in creation order: the zone length between the witness's
+    # ends, the zone's end station from the origin (the dome tangent;
+    # unmarked, the far dome centre is the profile's), then the diameter to
+    # the witness's start -- doubled off the axis, the way the pivot pins
+    # print theirs.
     zone = SketchDims()
     check("create_sketch press zone", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     zone_axis = check(
         "press zone axis",
-        await adapter.add_centerline(PRESS_ZONE_X[0], 0.0, PRESS_ZONE_X[1], 0.0),
+        await adapter.add_centerline(PRESS_ZONE_X[0], 0.0, PRESS_ZONE_END, 0.0),
     )
     zone_witness = check(
         "press zone witness",
-        await adapter.add_line(PRESS_ZONE_X[0], R, PRESS_ZONE_X[1], R),
+        await adapter.add_line(PRESS_ZONE_X[0], R, PRESS_ZONE_END, R),
     )
     set_sketch_direct_db(adapter, False)
-    segment = _early_bound(adapter._sketch_entities[zone_witness], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{zone_witness}: failed to become construction geometry")
+    _make_construction(adapter, zone_witness)
     for line in (zone_axis, zone_witness):
         check(
             f"press zone {line} horizontal",
@@ -241,24 +263,24 @@ async def build(adapter) -> dict[str, str]:
         f"{zone_witness}.start",
         f"{zone_witness}.end",
         "horizontal_distance",
-        PRESS_ZONE_LENGTH,
+        COLLAR_ENGAGEMENT,
         "press zone PressZoneLen",
     )
-    zone.record("PressZoneLen", '"PressZoneLen"')
+    zone.record("PressZoneLen", '"CollarLen" - "RodDia" / 2')
     await dimension_between(
         adapter,
         f"{zone_witness}.end",
         "origin",
         "horizontal_distance",
-        PRESS_ZONE_X[1],
+        PRESS_ZONE_END,
         "press zone PressZoneEnd",
     )
-    zone.record("PressZoneEnd", '"RodLength"')
+    zone.record("PressZoneEnd", '"RodLength" - "RodDia" / 2')
     await add_diametric_linear_dimension(
         adapter,
         zone_axis,
         f"{zone_witness}.start",
-        ((PRESS_ZONE_X[0] + PRESS_ZONE_X[1]) / 2.0, R + 6.0),
+        ((PRESS_ZONE_X[0] + PRESS_ZONE_END) / 2.0, R + 6.0),
         "PressZoneDia",
     )
     zone.record("PressZoneDia", '"RodDia"')
@@ -266,6 +288,78 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch press zone", await adapter.exit_sketch())
     name_last_feature(adapter, "PressZone")
     drive_jobs += zone.apply(adapter, "PressZone")
+
+    # REFERENCE sketch (blanked before save): the stock diameter -- see the
+    # module docstring. A short centerline on the axis, the construction
+    # witness rising from its midpoint to the top outline. Three display dims,
+    # in creation order: the witness's station from the origin and the
+    # centerline's length (both unmarked), then the diameter to the witness's
+    # top, doubled off the centerline.
+    stock = SketchDims()
+    check("create_sketch rod stock", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    stock_axis = check(
+        "rod stock axis",
+        await adapter.add_centerline(
+            ROD_DIA_STATION - R, 0.0, ROD_DIA_STATION + R, 0.0
+        ),
+    )
+    stock_witness = check(
+        "rod stock witness",
+        await adapter.add_line(ROD_DIA_STATION, 0.0, ROD_DIA_STATION, R),
+    )
+    set_sketch_direct_db(adapter, False)
+    _make_construction(adapter, stock_witness)
+    check(
+        "rod stock axis horizontal",
+        await adapter.add_sketch_constraint(stock_axis, None, "horizontal"),
+    )
+    check(
+        "rod stock witness vertical",
+        await adapter.add_sketch_constraint(stock_witness, None, "vertical"),
+    )
+    check(
+        "rod stock axis on the rod axis",
+        await adapter.add_sketch_constraint(
+            f"{stock_axis}.start", "origin", "horizontal_points"
+        ),
+    )
+    check(
+        "rod stock witness foot at the axis midpoint",
+        await adapter.add_sketch_constraint(
+            f"{stock_witness}.start", stock_axis, "midpoint"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{stock_witness}.start",
+        "origin",
+        "horizontal_distance",
+        ROD_DIA_STATION,
+        "rod stock RodDiaStation",
+    )
+    stock.record("RodDiaStation", '"RodLength" / 2')
+    await dimension_between(
+        adapter,
+        f"{stock_axis}.start",
+        f"{stock_axis}.end",
+        "horizontal_distance",
+        ROD_DIA,
+        "rod stock RodStockAxis",
+    )
+    stock.record("RodStockAxis", '"RodDia"')
+    await add_diametric_linear_dimension(
+        adapter,
+        stock_axis,
+        f"{stock_witness}.end",
+        (ROD_DIA_STATION, R + 6.0),
+        "RodDia",
+    )
+    stock.record("RodDia", '"RodDia"')
+    await ensure_fully_defined(adapter, "rod stock sketch")
+    check("exit_sketch rod stock", await adapter.exit_sketch())
+    name_last_feature(adapter, "RodStock")
+    drive_jobs += stock.apply(adapter, "RodStock")
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
@@ -295,14 +389,15 @@ async def build(adapter) -> dict[str, str]:
     # geom's (upper, lower) stock band natively (policy rule 2), places come
     # from the spec, then mark exactly the print's dimensions (the drawing
     # recipe imports the marked set and must find every one of these) and
-    # stamp the make-critical title-block properties. The reference sketch is
-    # blanked for the assembly renders; the front view shows it per view.
+    # stamp the make-critical title-block properties. The reference sketches
+    # are blanked for the assembly renders; the front view shows them per view.
     set_dimension_bilateral_tolerance(
         adapter, "PressZone", "PressZoneDia", *deviations(PRESS_ZONE_DIA_BAND)
     )
     # A diametric linear dimension on a side-view sketch prints no Ø by itself
     # (build_dt_pinion_arbor's journals; the v41 sheet read "6.000 0/-0.008").
     set_dimension_prefix(adapter, "PressZone", "PressZoneDia", "<MOD-DIAM>")
+    set_dimension_prefix(adapter, "RodStock", "RodDia", "<MOD-DIAM>")
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -316,7 +411,7 @@ async def build(adapter) -> dict[str, str]:
             "Iso View Note": ISO_VIEW_NOTE,
         },
     )
-    blank_reference_sketches(adapter, ("PressZone",))
+    blank_reference_sketches(adapter, ("PressZone", "RodStock"))
     # Annotation changes must leave the rod intact through the final rebuild,
     # not merely at the earlier, pre-annotation equation check.
     await force_rebuild(adapter)

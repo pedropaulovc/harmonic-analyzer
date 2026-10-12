@@ -112,6 +112,7 @@ from _assembly_patterns import (
     PatternDirection,
 )
 from _interference_contracts import allowed_interference_pairs
+from mg_lever_press_fit_geom import PRESS_INSTALLATION_NOTES
 from _transforms import (
     IDENTITY,
     ROT_X_NEG90,
@@ -255,8 +256,13 @@ from mg_output_fixture_geom import (  # noqa: E402
     SPIGOT_FACE_X,
     HEX_AF,
     ROD_STATION,
+    VROD_Z as FIXTURE_VROD_Z,
 )
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA  # noqa: E402
+
+assert math.isclose(
+    VROD_Z, FIXTURE_VROD_Z, rel_tol=0.0, abs_tol=1e-9
+), f"fixture vertical-rod Z datum {FIXTURE_VROD_Z} drifted from clamp datum {VROD_Z}"
 
 # Local +X runs through the spigot toward the bracket, slightly back (+Z);
 # local +Z is the machine-front groove tangent. No chirality shim is applied.
@@ -650,12 +656,10 @@ async def build(adapter) -> dict[str, str]:
         verify=(ml, ml_o),
         free_dof_key="lever_rock",
     )
-    # Bracket: the fitting that AFFIXES the lever rod to the (rocking) summing
-    # bar -- it rides the lever, not the frame, so it is LOCKED to the lever
-    # like the clamp chain below (grounding it made the free lever rock clip
-    # the collar: the rod sweeps ~0.7 mm at the collar over the ~1.6 deg rock,
-    # far past the 0.1 radial slack). Its collar stays the rod's snug carrier
-    # (Ø6.2 over Ø6), now exactly concentric at every rock angle.
+    # The bracket affixes the lever to the rocking summing bar, not the frame.
+    # Its collar is press-fitted and bonded to MHA-MG-003 (mg_lever_press_fit_geom),
+    # so it is locked to the lever and stays concentric through the rock.
+    # Grounding this moving fitting would constrain the mechanism incorrectly.
     bracket = await place_component(
         adapter,
         "mg-magnifying-bracket",
@@ -1004,6 +1008,7 @@ async def build(adapter) -> dict[str, str]:
             "Material Specification": "SEE COMPONENT DRAWINGS",
             "Finish": "SEE COMPONENT DRAWINGS",
             "Quantity": "1",
+            "Drawing Notes": PRESS_INSTALLATION_NOTES,
             "Drawn By": DRAWN_BY,
         },
     )
