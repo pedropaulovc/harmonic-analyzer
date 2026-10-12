@@ -2276,12 +2276,14 @@ def test_keeper_facing_note_is_the_part_property_carrying_the_keeper_budget() ->
     assert spec.KEEPER_SEAT_FLATNESS_BUDGET_MM is budget
     assert "fr_top_frame_spec" not in Path(keeper.__file__).read_text(encoding="utf-8")
     # One requirement on one face: the whole keeper-rail top between its
-    # bosses, named as the print names that rail.  No region size, no edge
-    # margin, no setup method (machinist review r13).
+    # bosses, named as the print names that rail, with the function that
+    # needs it.  No region size, no edge margin, no setup method (machinist
+    # review r13); rule 6's four rows at most.
     assert spec.DRAWING_NOTES_B.splitlines() == [
         "RIGHT RAIL TOP BETWEEN BOSSES",
         "(MHA-CH-007 KEEPER SEATS):",
-        "FLAT WITHIN 0.04, Ra 3.2 UM.",
+        "FLAT WITHIN 0.04, Ra 3.2 UM,",
+        "SO BOTH KEEPER BORES ALIGN.",
     ]
     tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
     (notes,) = [

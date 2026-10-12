@@ -443,9 +443,12 @@ DRAWING_NOTES = (
 # User ruling 2026-10-11: the whole right (west) rail top between the two
 # corner bosses is faced, so both keeper feet land on one flat face wherever
 # fit-up puts them; no split-line regions, no underside facing.  Its own
-# property, placed beside the keeper callout on HOLES-SOCKETS.
+# property, placed beside the keeper callout on HOLES-SOCKETS.  The last row
+# states why the flatness is held: the two keepers' lug bores carry one
+# fulcrum shaft in a running fit (blind machinist review, farm 0fbfc4d75).
 DRAWING_NOTES_B = (
     "RIGHT RAIL TOP BETWEEN BOSSES\n"
     "(MHA-CH-007 KEEPER SEATS):\n"
-    f"FLAT WITHIN {KEEPER_SEAT_FLATNESS_BUDGET_MM:.2f}, Ra {SEAT_UM:.1f} UM."
+    f"FLAT WITHIN {KEEPER_SEAT_FLATNESS_BUDGET_MM:.2f}, Ra {SEAT_UM:.1f} UM,\n"
+    "SO BOTH KEEPER BORES ALIGN."
 )
