@@ -86,7 +86,6 @@ from mg_magnifying_wheel_spec import (
     ROUND_TEXT_SUFFIX,
     SPIGOT_DIA,
     SURFACE_FINISHES,
-    TIE1_CALLOUT,
     TIE1_CLOCK_DEG,
     TIE1_R,
     TIE2_CLOCK_DEG,
@@ -502,7 +501,7 @@ DIMENSION_CALLOUTS = {
     "SpokeTipWidth": "6X TIP",
     "HubFilletR": "12X",
     "RimFilletR": "12X",
-    "Tie1HoleDia": TIE1_CALLOUT,
+    "Tie1HoleDia": "TIE 1",
     "Tie2HoleDia": "TIE 2",
 }
 # The tie holes' operation stands over their Ø, keeping each block as narrow
