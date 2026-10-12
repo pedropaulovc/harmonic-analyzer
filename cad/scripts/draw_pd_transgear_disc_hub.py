@@ -19,40 +19,45 @@ circle.
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import math
 import sys
-from dataclasses import dataclass
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    ViewEdge,
-    ViewEdges,
-    add_feature_control_frame,
-    add_property_linked_note,
-    assert_imported_precision,
-    curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
-    model_points_in_view,
     new_project_drawing,
     read_required_properties,
-    scan_view_edges,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
+from _drawing_gdt import add_feature_control_frame
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
 from _native_axis_datum import add_native_axis_datum
-from _gtol_face_read import face_geometry
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
 from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_disc_hub_spec import (
     BORE_DATUM,
@@ -74,10 +79,6 @@ from pd_transgear_disc_hub_spec import (
     SPIGOT_CALLOUT_BELOW,
     SPIGOT_DIA,
     SPIGOT_LENGTH,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
 )
 
 

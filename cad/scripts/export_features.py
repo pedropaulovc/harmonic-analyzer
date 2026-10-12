@@ -77,7 +77,7 @@ SOURCE_MAP = {
         (("add_native_hole_callout", 'label="rod-pin hole"'),),
     ),
     "hole_callout": (
-        "harmonic-analyzer/cad/scripts/_drawing_common.py:1860-1874,1901,1949-1966",
+        "harmonic-analyzer/cad/scripts/_drawing_hole_callout.py:50-56,83,136-153",
         (("dia_tolerance_mm",), ("AddHoleCallout2",), ("compose_hole_callout_prefix",)),
     ),
     "rocker_position": (
@@ -125,7 +125,7 @@ SOURCE_MAP = {
         (("RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0", 'datum="B"'),),
     ),
     "right_view_frame": (
-        "harmonic-analyzer/cad/scripts/draw_ch_pivot_shaft.py:59-61",
+        "harmonic-analyzer/cad/scripts/draw_ch_pivot_shaft.py:63-64",
         (('"*Right"', "Model -Z runs to the sheet's right"),),
     ),
     "rocker_datum_c": (

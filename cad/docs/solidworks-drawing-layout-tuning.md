@@ -77,7 +77,7 @@ display mode, and every annotation's text box, `GetPosition`, and line segments.
 | Inner border keep-out | `ISheet::GetZoneMargin(swZoneMargin_e)` — **takes the side as an argument** (top 0, bottom 1, right 2, left 3) | `types/ISheet/GetZoneMargin.md`, `enums/swZoneMargin_e.md` |
 | Every sheet, without activating any | `IDrawingDoc::GetSheetNames` + `IDrawingDoc::Sheet(name)` -> `ISheet`, then `ISheet::GetViews` | `types/IDrawingDoc/GetSheetNames.md`, `types/ISheet/GetViews.md` |
 | Dimensions on an INACTIVE sheet | `IView::GetFirstDisplayDimension6` | `types/IView/GetFirstDisplayDimension6.md` ("obsoletes ...5 by supporting inactive sheets") |
-| Where a datum tag REALLY went after `SetPosition2` | `IAnnotation::GetPosition` — the leader/symbol junction, not the symbol centre: reads 0–5 mm from the request on a straight attachment, 17 mm on an OD-attached tag whose attachment re-solved along the edge (bearing swung 4.7°). `IAnnotation::GetLeaderCount` is 0 for every datum tag, and in the authoring session `IDatumTag::GetLineCount/GetLineAtIndex` stay frozen at the INSERTION geometry through a rebuild — useless as a readback. | `drawing:pinion_cam` datums A–D, 2026-09-16, two seats; `_drawing_common.add_datum_feature` |
+| Where a datum tag REALLY went after `SetPosition2` | `IAnnotation::GetPosition` — the leader/symbol junction, not the symbol centre: reads 0–5 mm from the request on a straight attachment, 17 mm on an OD-attached tag whose attachment re-solved along the edge (bearing swung 4.7°). `IAnnotation::GetLeaderCount` is 0 for every datum tag, and in the authoring session `IDatumTag::GetLineCount/GetLineAtIndex` stay frozen at the INSERTION geometry through a rebuild — useless as a readback. | `drawing:pinion_cam` datums A–D, 2026-09-16, two seats; `_drawing_gdt.add_datum_feature` |
 
 All of it is **sheet space, metres**, origin at the sheet's lower-left — for
 view-owned annotations too (measured: a dimension inside a view 102 mm from the
@@ -136,7 +136,7 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   run 20260928T141421973Z, swmaker000008). Read at fit after the rebuild on
   swmaker000005 (run 20260928T142458776Z), the same SetPosition gave
   (92.85, 249.98), 1.14 mm off. Place and check a ring zoomed
-  (`_drawing_common._zoomed_on`; `draw_fr_frame_assembly._short_frame_balloon`
+  (`_drawing_scan._zoomed_on`; `draw_fr_frame_assembly._short_frame_balloon`
   re-zooms after its fit rebuild); at fit, check only model values such as
   `GetPosition`. On 1024x640 seats the leader start COM reports is 0.15 to
   0.78 mm from where the PDF starts that leader, on the printed ring; the
@@ -191,7 +191,7 @@ Do: pass `UseParent = False` and assert the RESULT, not the return value:
 `GetUseParentDisplayMode()` must read False and `GetDisplayMode2()` must read the
 mode you asked for (`types/IView/GetUseParentDisplayMode.md`,
 `types/IView/GetDisplayMode2.md`). This is what
-`_drawing_common.set_hidden_lines_visible` does: `SetDisplayMode4(False, HLR,
+`_drawing_view_display.set_hidden_lines_visible` does: `SetDisplayMode4(False, HLR,
 ...)`, verify, then `SetDisplayMode4(False, HLV, ...)`, verify. There is no
 `UseParentSettings` property — not found in the bundle; the flag is the first
 argument of `SetDisplayMode4`. Modes are `swViewDisplayMode_e`: 1 wireframe
@@ -231,7 +231,7 @@ Obsolete in favour of `IModelView::GraphicsRedraw`
 (`types/IModelDoc2/GraphicsRedraw2.md`).
 Do: re-assert the display mode AFTER the last annotation on that view, with a
 real mode CHANGE (HLR then HLV), then verify with `GetDisplayMode2` —
-`_drawing_common.set_hidden_lines_visible` exists for exactly this and is
+`_drawing_view_display.set_hidden_lines_visible` exists for exactly this and is
 idempotent by design.
 
 **f. A partial section view printing olive with no hatch.**
@@ -251,7 +251,7 @@ give the line's actual extent to compare against `IView::GetOutline`.
 `GraphicsOnlySection` — not the drawing section; do not reach for it here.)
 When a short line is what you WANT — an ASME removed section through one rail
 of a symmetric frame, not that rail and its unannotated twin — ask for it:
-`_drawing_common.create_section_view(..., partial=True)` passes
+`_drawing_sections.create_section_view(..., partial=True)` passes
 `swCreateSectionView_Partial` (0x10) to `CreateSectionViewAt5`, SolidWorks
 sections just the span, the cut closes, and `GetPartialSection()` reads True by
 design (top-frame B-B/E-E; the recipe's `_assert_section_display(removed=True)`
@@ -296,7 +296,7 @@ obsolete `IModelDoc2::SelectByRay`, re-selects "the original entity ...
 regardless of the viewing transform". In a DRAWING, "use model space view to
 determine the selection vector" — project through `IView::ModelToViewTransform`
 (get-only, `types/IView/ModelToViewTransform.md`), which is what
-`_drawing_common.model_point_in_view` wraps.
+`_drawing_projection.model_point_in_view` wraps.
 
 **h. A datum tag that will not leave its attachment.**
 Don't: attach a datum tag to a bore by selecting the edge OBJECT
@@ -329,7 +329,7 @@ Do: select the entity, call `ISelectionMgr::SetSelectionPoint2(1, -1, x, y,
 `InsertGtol`); after the rebuild require `GetAttachedEntities3`,
 `GetAttachedEntityCount3` and `GetAttachedEntityTypes` to agree on ONE entity
 of the selected kind, and require that entity to BE the selected one
-(`_drawing_common._assert_attached_to`). `ISldWorks::IsSame` proves an edge or
+(`_drawing_attachment._assert_attached_to`). `ISldWorks::IsSame` proves an edge or
 face; it reads 0 for every silhouette, so a silhouette is proved through
 `ISilhouetteEdge::GetFace` — the selected and attached silhouettes' faces
 passed IsSame on all 16 silhouette finishes and frames of farm run
@@ -397,7 +397,7 @@ sheet printed no B, while the tap and bore frames referenced A|B. The API
 help (`types/IGtol/SetDatumIdentifier.md`) says only that it "sets the name
 of the datum being defined"; the frame XML schema has no node for it.
 Do: insert a real datum tag on the selected frame
-(`_drawing_common.add_frame_datum_feature`) and require the tag's attachment
+(`_drawing_gdt.add_frame_datum_feature`) and require the tag's attachment
 to be that frame by annotation name. Select the frame with
 `IAnnotation::Select2(False, 0)`: on farm run 20261009T182549169Z it
 attached the knife mount's datum B to DetailItem354 (one entity, type 13),

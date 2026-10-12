@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the pen v-block.
 
 The SLDPRT remains authoritative.  This recipe supplies only the pen-v-block
-views, dimension layout, hole callouts, and manufacturing notes; every shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+views, dimension layout, hole callouts, and manufacturing notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The sheet runs at 4:1 (the block is 32 mm end to end); the isometric carries an
 explicit 2:1 override so it stays clear of the title block.
@@ -19,45 +19,42 @@ import argparse
 import sys
 from typing import Any
 
-from pn_pen_v_block_spec import GEOMETRIC_TOLERANCES_MM
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
 
-import _telemetry
 from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_edge_dimension,
-    add_feature_control_frame,
-    add_property_linked_note,
-    add_surface_finish,
-    curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_basic_dimension,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import set_basic_dimension, set_dimension_callouts
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from pn_pen_v_block_spec import (
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
     BLOCK_LENGTH,
     BORE_X,
     CHAMFER,
-    SCREW_HOLE_XY,
+    GEOMETRIC_TOLERANCES_MM,
     GROOVE_Z0,
+    SCREW_HOLE_XY,
     SURFACE_FINISHES,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
 )
 
 

@@ -1987,11 +1987,12 @@ def test_build_places_the_hanger_section_on_the_underside_sheet() -> None:
 
 def test_keeper_transfer_prefix_preserves_the_native_hole_definition() -> None:
     import ast
-    import _drawing_common
+
+    import _drawing_hole_callout
 
     native = "<hw-threaddesc>\n<hw-threaddepth>\n<hw-tapdrldia> <hw-tapdrldepth>"
     assert (
-        _drawing_common.compose_hole_callout_prefix(
+        _drawing_hole_callout.compose_hole_callout_prefix(
             drawing.TRANSFER_KEEPER_CALLOUT,
             native,
         )
@@ -2016,7 +2017,7 @@ def test_keeper_transfer_prefix_preserves_the_native_hole_definition() -> None:
         keyword.value for keyword in callouts[0].keywords if keyword.arg == "process"
     )
     assert isinstance(process, ast.Name) and process.id == "TRANSFER_KEEPER_CALLOUT"
-    helper_tree = ast.parse(Path(_drawing_common.__file__).read_text(encoding="utf-8"))
+    helper_tree = ast.parse(Path(_drawing_hole_callout.__file__).read_text(encoding="utf-8"))
     helper = next(
         node
         for node in helper_tree.body
@@ -2446,7 +2447,7 @@ def test_keeper_facing_note_hangs_under_the_keeper_callout_clear_of_all_ink() ->
 
 
 def test_socket_bore_circle_pick_is_exact_about_the_axis() -> None:
-    from _drawing_common import ViewEdge, ViewEdges
+    from _drawing_edges import ViewEdge, ViewEdges
 
     def circle(x, y, z, radius, tag, axis=(0.0, 1.0, 0.0)):
         return ViewEdge(

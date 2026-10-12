@@ -4,10 +4,10 @@ A frozen point is on an edge of the family's lowest-named shown instance
 (or its pinned one), in that part's own millimetres, so view scale,
 placement and explode distance do not move it. The build projects it onto
 the sheet, hit-tests the sheet there and refuses the balloon unless the
-edge it finds is that instance's (``_drawing_common._select_balloon_anchor``).
+edge it finds is that instance's (``_drawing_balloons._select_balloon_anchor``).
 
 ``BalloonAnchor()`` walks: it hit-tests the first instance's body extreme
-points along fixed directions (``_drawing_common._walk_points``), ranked by
+points along fixed directions (``_drawing_balloons._walk_points``), ranked by
 geometry, and takes the first the hit test gives back to that exact
 instance, else the first so claimed of the points along the edges that
 instance's hidden-line pass lists as drawn; with neither, the sheet fails.
@@ -56,7 +56,7 @@ hangs beyond the plate.
 
 from __future__ import annotations
 
-from _drawing_common import BalloonAnchor
+from _drawing_balloons import BalloonAnchor
 
 FRAME_BALLOON_ANCHORS: dict[str, BalloonAnchor] = {
     "fr-harmonic-base": BalloonAnchor((90.360, 50.800, -62.873)),

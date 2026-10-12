@@ -7,35 +7,36 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    place_view,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    _edge_endpoint_key,
-    PmiDrawingPlacement,
-    add_edge_dimension,
-    add_native_hole_callout,
-    add_property_linked_note,
-    add_surface_finish,
-    curate_view_dimensions,
     finalize_drawing,
-    project_part_pmi,
     new_project_drawing,
     read_required_properties,
-    set_arc_endpoints_to_center,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
-    visible_view_entities,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import set_arc_endpoints_to_center, set_dimension_callouts
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edges import _edge_endpoint_key, visible_view_entities
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_notes import add_property_linked_note
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _gear_drawing_entities import visible_circle_edge
 from _hole_spec import blind_cut_dia_mm
-from _drawing_registry import DRAWINGS_BY_NAME
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from pn_pen_rod_spec import (
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
@@ -44,10 +45,6 @@ from pn_pen_rod_spec import (
     SURFACE_FINISHES,
     WIRE_HOLE_SPEC,
     WIRE_HOLE_Y,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
 )
 
 

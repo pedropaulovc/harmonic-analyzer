@@ -267,7 +267,7 @@ def section_line_segments(adapter: Any, view: Any) -> list[Segment]:
     """The cutting-plane strokes a view carries, all in sheet metres.
 
     The chain points are mapped through ``IView.ModelToViewTransform`` (the
-    same model-to-sheet projection ``_drawing_common.model_point_in_view``
+    same model-to-sheet projection ``_drawing_projection.model_point_in_view``
     uses, with SolidWorks doing the matrix product); the arrows already come
     back on the sheet. ``view`` is the view that CARRIES the section line
     (the parent), whose model space the chain is in.

@@ -17,42 +17,41 @@ import math
 import sys
 from typing import Any
 
-from dt_pinion_pivot_shaft_spec import GEOMETRIC_TOLERANCES_MM
-
-import _telemetry
-from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
-from _drawing_annotation_extent import gdt_box, place_callout_clear
-from _drawing_common import (
-    DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
-    add_property_linked_note,
-    add_surface_finish,
-    curate_view_dimensions,
-    finalize_drawing,
-    new_project_drawing,
-    read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    stamp_drawing_summary,
-)
-from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import surface_finish_by_key
-from dt_drive_train_steps import step_ref
-from dt_pinion_pivot_shaft_spec import (
-    CAP_RADIUS,
-    CAP_SAG,
-    PIN_HOLE_CALLOUT,
-    SHAFT_DIA as SHAFT_DIA,
-    SHAFT_LEN,
-    SURFACE_FINISHES,
-)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+)
+
+from _check import check
+from _drawing_annotation_extent import gdt_box, place_callout_clear
+from _drawing_common import (
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    stamp_drawing_summary,
+)
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import set_dimension_callouts
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_notes import add_property_linked_note
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
+from _surface_finish import surface_finish_by_key
+import _telemetry
+from dt_drive_train_steps import step_ref
+from dt_pinion_pivot_shaft_spec import (
+    CAP_RADIUS,
+    CAP_SAG,
+    GEOMETRIC_TOLERANCES_MM,
+    PIN_HOLE_CALLOUT,
+    SHAFT_DIA as SHAFT_DIA,
+    SHAFT_LEN,
+    SURFACE_FINISHES,
 )
 
 

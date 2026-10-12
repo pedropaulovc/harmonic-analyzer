@@ -36,11 +36,13 @@ from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
 from _simplified_part import save_simplified_part
+from _drawing_precision import _named_dimension
 from _drawing_marks import (
-    _named_dimension,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+)
+from _drawing_tolerances import (
     set_dimension_symmetric_tolerance,
     set_dimension_symmetric_angular_tolerance,
 )

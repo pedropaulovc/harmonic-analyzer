@@ -1,8 +1,9 @@
 r"""Create the curated machinist drawing for the amplitude bar.
 
 The SLDPRT remains authoritative.  This recipe supplies only the amplitude-bar
-views, dimension layout, and manufacturing notes; every shared sheet/template,
-import, curation, and export behavior lives in ``_drawing_common``.
+views, dimension layout, and manufacturing notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The bar is ~808 mm long but only 6.35 mm square, so the print shows a 1:4
 full-length front view (overall length only), a 4:1 top end view for the square
@@ -18,47 +19,52 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import math
 import sys
-from dataclasses import dataclass
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    dimension_name,
+    place_view,
+    view_name,
+)
+
 from _check import check
 from _com import _early_bound, _read_member
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_imported_precision,
-    curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
-    visible_view_entities,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision
+from _drawing_edges import visible_view_entities
+from _drawing_finish import add_surface_finish
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from ch_amplitude_bar_drawing_spec import SURFACE_FINISHES
 from ch_amplitude_bar_spec import (
     BAR_DEPTH,
     BAR_LENGTH,
     BAR_WIDTH,
     BOTTOM_NOTCH_HEIGHT,
+    BOTTOM_NOTCH_OFFSET,
     BOTTOM_NOTCH_WIDTH,
     DRAWING_DIMENSIONS,
-    BOTTOM_NOTCH_OFFSET,
     DRAWING_PRECISION,
     TOP_NOTCH_HEIGHT,
 )
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
 
 
 SPEC = DRAWINGS_BY_NAME["ch_amplitude_bar"]

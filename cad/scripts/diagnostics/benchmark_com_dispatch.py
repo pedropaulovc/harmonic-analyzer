@@ -146,12 +146,12 @@ async def _run(
             with _telemetry.span("benchmark.collect"):
                 started = time.perf_counter()
                 if workload == "layout":
-                    import _drawing_common
+                    import _drawing_layout_collect
                     from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 
                     layout = DrawingLayout(layout_name)
                     elements, _leaders, _region = (
-                        _drawing_common.collect_layout_elements(
+                        _drawing_layout_collect.collect_layout_elements(
                             adapter, layout=layout
                         )
                     )

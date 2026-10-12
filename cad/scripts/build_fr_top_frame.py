@@ -110,13 +110,13 @@ from _sketch import (
 from _sketch_chains import define_polygon_chain, define_rectilinear_chain
 from _sketch_circle import define_circle
 from _sketch_rectangle import define_centered_rectangle
+from _drawing_precision import apply_drawing_precision
 from _drawing_marks import (
-    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
 )
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _visibility import blank_reference_geometry
 from _holes import (
     DRILL_POINT_H,

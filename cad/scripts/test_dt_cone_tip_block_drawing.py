@@ -224,7 +224,7 @@ def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
     hold-down tap's two stations) always do; the adjuster elevation
     (AxisHeight/PassageCenter) opts in at build time; the plan, left and the
     base front keep only solid-feature dimensions and stay on
-    _drawing_common's import.
+    _drawing_dimension_import's targeted import.
     """
 
     def hidden_owners(keep) -> set[str]:

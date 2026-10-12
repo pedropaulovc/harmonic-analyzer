@@ -37,14 +37,10 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, ensure_fully_defined, set_sketch_direct_db
 from _sketch_circle import define_circle
-from _drawing_marks import (
-    apply_drawing_precision,
-    apply_drawing_properties,
-    clear_dimensions_for_drawing,
-    mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
-    set_dimension_prefix,
-)
+from _drawing_precision import apply_drawing_precision
+from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
+from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_prefix import set_dimension_prefix
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from dt_pinion_lever_geometry import PIN_HOLE_DIA, ROD_PIN_HOLE_FROM_END

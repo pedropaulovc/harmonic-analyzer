@@ -15,10 +15,11 @@ from dataclasses import dataclass
 import math
 from typing import Any
 
-from _com import _early_bound, _read_member
-from _drawing_common import dimension_name, model_point_in_view
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import view_name
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
+
+from _com import _early_bound, _read_member
+from _drawing_projection import model_point_in_view
 
 
 @dataclass(frozen=True)

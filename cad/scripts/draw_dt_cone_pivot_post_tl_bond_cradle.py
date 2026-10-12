@@ -8,32 +8,36 @@ import sys
 import textwrap
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import place_view
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_imported_precision,
-    create_section_view,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_reference_dimensions,
     stamp_drawing_summary,
-    visible_view_entities,
 )
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimensions,
+)
+from _drawing_edges import visible_view_entities
+from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
+from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_read import face_geometry
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from dt_cone_pivot_post_tl_bond_cradle_spec import (
     BODY_SADDLE_THICK,
     BODY_SADDLE_Y,
@@ -48,7 +52,6 @@ from dt_cone_pivot_post_tl_bond_cradle_spec import (
     TAIL_SEAT_CALLOUT,
     TAIL_SECTION_Y,
 )
-from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 SPEC = DRAWINGS_BY_NAME["dt_cone_pivot_post_tl_bond_cradle"]
 PART_STEM = SPEC.artifact_stem

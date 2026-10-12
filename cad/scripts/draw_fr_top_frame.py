@@ -1,9 +1,10 @@
 r"""Create the curated machinist drawing for the green-painted top-frame casting.
 
 The SLDPRT remains authoritative.  This recipe supplies only native model
-dimensions, associative hole callouts, and the views of the casting; shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``. GEOMETRY defines the frame windows and T-rail section;
+dimensions, associative hole callouts, and the views of the casting;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
+GEOMETRY defines the frame windows and T-rail section;
 HOLES-SOCKETS carries the hole/station plan; CROSS-TAPS carries the front
 cross-tap elevation with section A-A through a corner boss; HUB-SET-SCREW
 holds the hub location, true-axis side view and the removed set-pocket
@@ -28,114 +29,123 @@ import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    auto_center_marks,
+    dimension_name,
+    place_view,
+    view_name,
+)
 
-import _telemetry
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
-from solidworks_mcp.adapters.com_variant import double_array
 from _drawing_common import (
     DrawingOutputs,
-    FaceLabel,
-    add_datum_feature,
-    add_feature_control_frame,
-    PictorialView,
-    place_pictorial_sheet,
-    add_native_hole_callout,
-    assert_imported_precision,
-    add_edge_dimension,
-    add_surface_finish,
-    dimension_name,
-    set_arc_endpoints_to_center,
-    set_arc_endpoints_to_max,
-    set_reference_dimension,
-    set_basic_dimension,
-    add_property_linked_note,
-    create_section_view,
-    create_blank_drawing_sheets,
-    curate_view_dimensions,
     finalize_drawing,
-    model_point_in_view,
-    offset_dimension_text,
-    _select_view_entity,
-    _zoomed_on,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
-    set_hole_callout_precision,
-    view_name,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
-    ViewEdges,
     rebuild_drawing,
-    scan_view_edges,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_arc_endpoints_to_center,
+    set_arc_endpoints_to_max,
+    set_basic_dimension,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edges import ViewEdges, scan_view_edges
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_scan import _zoomed_on
+from _drawing_sections import create_section_view
+from _drawing_selection import _select_view_entity
+from _drawing_sheets import (
+    FaceLabel,
+    PictorialView,
+    create_blank_drawing_sheets,
+    place_pictorial_sheet,
+)
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _gtol_face_resolve import resolve_faces
+from _mcmaster_90280a837 import (
+    SHANK_DIA as CROSS_SCREW_SHANK_DIA,
+    SHANK_LEN as CROSS_SCREW_SHANK_LEN,
+)
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from build_fr_top_frame import (
     BAR_POCKET_Z,
     BAR_WEB_X0,
     BAR_WEB_X1,
     BAR_X0,
     BAR_X1,
-    BORE_DIA,
     BORE_CHAMFER,
-    COUNTERBORE_MAX_FLOOR_OFFSET,
-    CAP_RECESS_DIAMETER,
-    CAP_RECESS_FLOOR_Y,
+    BORE_DIA,
     BOSS_ABOVE,
     BOSS_BELOW,
+    BOSS_DIA,
+    CAP_RECESS_DIAMETER,
+    CAP_RECESS_FLOOR_Y,
+    COLUMN_X,
+    COUNTERBORE_DIA,
+    COUNTERBORE_MAX_FLOOR_OFFSET,
+    EDGE_CHAMFER,
     FLANGE,
     FLANGE_BOT_Y,
-    GUSSET,
-    EDGE_CHAMFER,
-    ROOT_FILLET_R,
-    OUTER_Z,
-    RAIL_W_FR,
-    RAIL_W_SIDE,
-    INNER_X,
-    INNER_Z,
-    LAND_X0,
-    LAND_X1,
-    RING_HEIGHT,
-    WEB_T,
-    WEB_IN_X,
-    WEB_OUT_X,
-    WEB_IN_Z,
-    WEB_OUT_Z,
-    REAR_COLUMN_Z,
-    BOSS_DIA,
-    COLUMN_X,
     FRONT_COLUMN_Z,
     GOOSENECK_BORE_DIA,
     GOOSENECK_X,
     GOOSENECK_Z,
+    GUSSET,
     HALF_H,
+    HANGER_X,
     HUB_BOSS_DIA,
     HUB_BOSS_DROP,
-    HUB_GUSSET_T,
     HUB_GUSSET_HALF_IN,
     HUB_GUSSET_HALF_OUT,
+    HUB_GUSSET_T,
+    INNER_X,
+    INNER_Z,
     KEEPER_TAP_SPEC,
     KEEPER_TAP_X,
     KEEPER_TAP_Z_FRONT,
     KEEPER_TAP_Z_REAR,
+    LAND_X0,
+    LAND_X1,
     OUTER_X,
+    OUTER_Z,
+    PIN_HOLE_X,
+    RAIL_W_FR,
+    RAIL_W_SIDE,
+    REAR_COLUMN_Z,
+    RING_HEIGHT,
+    ROOT_FILLET_R,
     SET_POCKET_DEPTH,
-    COUNTERBORE_DIA,
     SET_TAP_SPEC,
     SIDE_TAP_DRILL_DIA,
-    HANGER_X,
-    PIN_HOLE_X,
     SLOT_FLAT,
     SLOT_X,
     STUD_Z_FRONT,
     STUD_Z_REAR,
     TAP_DRILL_MM,
     TOP_SCREW_SEAT_Z,
+    WEB_IN_X,
+    WEB_IN_Z,
+    WEB_OUT_X,
+    WEB_OUT_Z,
+    WEB_T,
 )
 from fr_top_frame_spec import (
     DRAWING_DIMENSIONS,
@@ -159,15 +169,6 @@ from fr_top_frame_spec import (
     KEEPER_TAP_CALLOUT_PRECISION,
     PRINTED_LINEAR_BAND_MM,
     SURFACE_FINISHES,
-)
-from _mcmaster_90280a837 import (
-    SHANK_DIA as CROSS_SCREW_SHANK_DIA,
-    SHANK_LEN as CROSS_SCREW_SHANK_LEN,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
-    auto_center_marks,
-    place_view,
 )
 
 SPEC = DRAWINGS_BY_NAME["fr_top_frame"]
@@ -301,7 +302,7 @@ ARROW_HALF_WIDTH = 0.000381
 # Transfer fit-up owns these locations; the nominal model holes and their
 # sheet coordinates are references, not independent inspection requirements.
 # The trailing newline keeps the native thread/drill/depth on separate rows
-# through _drawing_common.compose_hole_callout_prefix.
+# through _drawing_hole_callout.compose_hole_callout_prefix.
 TRANSFER_KEEPER_CALLOUT = "TRANSFER FROM MHA-CH-007\nAT ASSEMBLY;\n"
 # Historical RD4 envelope measured on b49e1, NOT a measurement of the new
 # transfer callout. Expand its width for a conservative 3.5 mm per prefix

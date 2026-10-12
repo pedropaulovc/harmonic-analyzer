@@ -27,26 +27,26 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_name,
+    place_view,
+    view_name,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_imported_precision,
-    create_section_view,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leaders import (
     assert_leaders_clear,
@@ -55,27 +55,27 @@ from _drawing_leaders import (
     section_line_segments,
     set_near_side_diameter,
 )
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
+from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
-from dt_crank_drive_gear_spec import BORE_DIAMETRAL_CLEARANCE
+import _telemetry
 from dt_crank_drive_gear_notes import GEAR_DATA, SHAFT_MATE_NUMBER
-from gear_seat_fit import FLAT_AF_CLEARANCE
 from dt_crank_drive_gear_spec import (
     BORE_DIA,
+    BORE_DIAMETRAL_CLEARANCE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     OUTSIDE_DIA,
     SURFACE_FINISHES,
 )
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.solidworks.drawing import (
-    dimension_name,
-    place_view,
-    view_name,
-)
+from gear_seat_fit import FLAT_AF_CLEARANCE
 
 
 SPEC = DRAWINGS_BY_NAME["dt_crank_drive_gear"]
