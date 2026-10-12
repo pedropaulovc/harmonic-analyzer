@@ -168,6 +168,26 @@ the package kind (`cad/scripts/prompts/machinist_review_part.md` or
 - A review counts as a merge gate's visual check only on the exact drawing
   version being merged.
 
+Use `uv run cad/scripts/machinist_review_bench.py run --workspace <outside-git-root>
+--evals <id-or-name>... --reviewer claude --baseline-ref origin/main` to compare
+release-package reviews with the working-tree skill (`with_skill`) and the
+baseline skill (`old_skill`); `--ref <git-ref>` pins `with_skill` instead.
+Review model and reasoning controls are `--model` and `--effort`.
+Alternatively, `import --workspace <outside-git-root> --evals <id-or-name>...
+--config with_skill=<review-directory> --config old_skill=<review-directory>`
+enrolls existing reviews without running another reviewer. Both commands create
+an `iteration-N` outside Git, with descriptive eval names and per-configuration
+`run-K/outputs/review.json`. Run `grade <iteration-directory>` to grade it with
+Codex (defaults: `gpt-6.1-sol`, medium); `--grader-model`, `--grader-effort`,
+`--grader-timeout` and `--jobs` control grading. Then run
+`view <iteration-directory> --static <output.html>` for the skill-creator
+viewer; `--skill-creator-path <checkout>` selects its installation. Omit
+`--workspace` to use `$HARMONIC_AGENT_SCRATCHPAD/harmonic-analyzer/machinist-review-evals`,
+or, when unset,
+`%LOCALAPPDATA%/harmonic-analyzer-agent-scratchpad/harmonic-analyzer/machinist-review-evals`.
+The benchmark measures release-package/LLM review regressions; the separate
+`machinist_review_eval.py` remains the frozen-PNG/human calibration tool.
+
 Regression tests defend observable manufacturing contracts and plausible
 failures, not note wording, line counts or mocked API-call sequences. Native
 drawing generation verifies persisted dimension values, tolerances, reference

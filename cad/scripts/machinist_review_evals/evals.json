@@ -1,0 +1,103 @@
+{
+  "skill_name": "machinist-review",
+  "evals": [
+    {
+      "id": 1,
+      "name": "drive-train-thread-locks",
+      "package": "dt_drive_train_assembly",
+      "kind": "assembly",
+      "release": "v40",
+      "prompt": "Blind machinist review of the dt-drive-train assembly package (11 sheets).",
+      "expected_output": "FIX. Both swinging/turning joints that ride on an unlocked screw are blockers under rule 23, including the cone-platform pivot listed only as an external interface; disclosed engagement shortfalls stay minor.",
+      "expectations": [
+        {"text": "Verdict is FIX", "check": {"verdict": "FIX"}},
+        {"text": "A blocker says the MHA-VN-014 cone-platform pivot shoulder screw has no mechanical lock or locking step (rule 23)", "check": {"category": "blockers"}},
+        {"text": "A blocker says the MHA-DT-032 crank handle pivot screw relies only on thread locker and a seated shoulder (rule 23)", "check": {"category": "blockers"}},
+        {"text": "The stated engagement shortfalls on MHA-VN-031 (0.90D) and MHA-VN-017 (1.0D) are not reported as blockers", "check": {"absent_from": "blockers"}}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "pivot-shaft-end-callout",
+      "package": "ch_pivot_shaft",
+      "kind": "part",
+      "release": "v40",
+      "prompt": "Blind machinist review of the ch-pivot-shaft part package.",
+      "expected_output": "FIX. '1.5 BOTH ENDS' contradicts 'PLAIN END UNCUT' and defines no end form; the stub left of the collar has no diameter.",
+      "expectations": [
+        {"text": "Verdict is FIX", "check": {"verdict": "FIX"}},
+        {"text": "A blocker says '1.5 BOTH ENDS' contradicts the note 'SUPPLY 175 LONG, PLAIN END UNCUT' (rule 25)", "check": {"category": "blockers"}},
+        {"text": "A blocker says the '1.5' end callout defines no form (no angle, radius or chamfer designation)", "check": {"category": "blockers"}},
+        {"text": "A blocker says the short stub outboard of the Ø10 collar has no diameter", "check": {"category": "blockers"}}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "rocker-arm-hub-and-mate",
+      "package": "ch_rocker_arm",
+      "kind": "part",
+      "release": "v40",
+      "prompt": "Blind machinist review of the ch-rocker-arm part package.",
+      "expected_output": "FIX. Worst-case hub wall is about 1.33 mm once the note-7 Ø0.50 coaxiality is counted; the Ø6.50 +0.03/0 reamed pivot bore names no mate.",
+      "expectations": [
+        {"text": "Verdict is FIX", "check": {"verdict": "FIX"}},
+        {"text": "A blocker gives a worst-case hub wall of about 1.33 mm, counting the Ø0.50 coaxiality offset, below the 1.5 mm floor (rule 17)", "check": {"category": "blockers"}},
+        {"text": "A blocker says the Ø6.50 +0.03/0 pivot bore's tight band names no mating part or fit (rule 4)", "check": {"category": "blockers"}},
+        {"text": "Some finding says the Ø1.99 rod-pin hole callout gives no process (DRILL or REAM)", "check": {"category": "any"}}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "cone-pivot-post-boss-and-frame",
+      "package": "dt_cone_pivot_post",
+      "kind": "part",
+      "release": "v40",
+      "prompt": "Blind machinist review of the dt-cone-pivot-post part package.",
+      "expected_output": "FIX. The Ø17.2 cone journal boss faces sit 42.01 apart on a Ø42.0 body and nearly vanish; the crank-bore angularity frame cannot be set up from the shown datums/basic.",
+      "expectations": [
+        {"text": "Verdict is FIX", "check": {"verdict": "FIX"}},
+        {"text": "A blocker says the Ø17.2 cone journal boss faces (42.01 apart on the Ø42.0 body) vanish or cannot exist within tolerance", "check": {"category": "blockers"}},
+        {"text": "A blocker says the crank-bore geometric control (angularity/perpendicularity to A and B with the 12.52° basic) contradicts the views or cannot be set up", "check": {"category": "blockers"}}
+      ]
+    },
+    {
+      "id": 5,
+      "name": "frame-assembly-engagement-not-blocking",
+      "package": "fr_frame_assembly",
+      "kind": "assembly",
+      "release": "v40",
+      "prompt": "Blind machinist review of the fr-frame assembly package (3 sheets).",
+      "expected_output": "Unverifiable thread engagement is recorded in minor, never as a blocker.",
+      "expectations": [
+        {"text": "No blocker is about thread engagement depth being unverifiable", "check": {"absent_from": "blockers"}},
+        {"text": "A minor finding says full-thread engagement is not verifiable from the package", "check": {"category": "minor"}}
+      ]
+    },
+    {
+      "id": 6,
+      "name": "rocker-arm-support-ships",
+      "package": "fr_rocker_arm_support",
+      "kind": "part",
+      "release": "v40",
+      "prompt": "Blind machinist review of the fr-rocker-arm-support part package.",
+      "expected_output": "SHIP (user expectation, 2026-10-12).",
+      "expectations": [
+        {"text": "Verdict is SHIP", "check": {"verdict": "SHIP"}},
+        {"text": "No blockers", "check": {"max_count": {"blockers": 0}}}
+      ]
+    },
+    {
+      "id": 7,
+      "name": "pinion-arbor-ships",
+      "package": "dt_pinion_arbor",
+      "kind": "part",
+      "release": "v40",
+      "prompt": "Blind machinist review of the dt-pinion-arbor part package.",
+      "expected_output": "SHIP (user expectation, 2026-10-12).",
+      "expectations": [
+        {"text": "Verdict is SHIP", "check": {"verdict": "SHIP"}},
+        {"text": "No blockers", "check": {"max_count": {"blockers": 0}}}
+      ]
+    }
+  ]
+}

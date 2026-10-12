@@ -3175,6 +3175,9 @@ def task_check():
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
         SCRIPTS_DIR / "test_machinist_review.py",
+        # Release-package prompt benchmarks: deterministic grading and workspace
+        # contracts run offline, without reviewer/model or SolidWorks activity.
+        SCRIPTS_DIR / "test_machinist_review_bench.py",
         # The settings-independence contracts this PR adds.  All three are
         # pure Python (no COM), and unenrolled they would be exactly the
         # "green gate that checks nothing" the comments above warn about: the

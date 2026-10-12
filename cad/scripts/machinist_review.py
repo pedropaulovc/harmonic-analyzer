@@ -35,11 +35,12 @@ prior context. The verdict JSON's attempt records name the session id and a
 ready-to-run resume command (``claude --resume <id>`` / ``codex resume <id>``)
 so a completed review's reasoning can be reopened offline.
 
-Usage (SolidWorks-free; needs the native PDFs under ``cad/out/pdf``)::
+Usage (SolidWorks-free; PDFs in ``cad/out/pdf`` or ``--pdf-dir``)::
 
     uv run cad/scripts/machinist_review.py crank_arm pivot_shaft
     uv run cad/scripts/machinist_review.py --all --jobs 4
     uv run cad/scripts/machinist_review.py --png sheet-1.png --png sheet-2.png --kind assembly
+    uv run cad/scripts/machinist_review.py ch_pivot_shaft --pdf-dir release/pdf --reviewer codex
     uv run cad/scripts/machinist_review.py --index      # rebuild index.md only
 
 Exit status is 0 only when every reviewed package passes (``SHIP`` with no
@@ -900,6 +901,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="review an arbitrary PNG; repeat to form one part or assembly package",
     )
     parser.add_argument("--kind", choices=("part", "assembly"), default="part")
+    parser.add_argument(
+        "--pdf-dir",
+        type=Path,
+        help="read registry-named PDFs from this directory instead of cad/out/pdf",
+    )
     parser.add_argument("--reviewer", choices=REVIEWERS)
     parser.add_argument(
         "--model",
@@ -956,6 +962,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"unknown drawing names: {unknown}", file=sys.stderr)
             return 2
         packages = [package_for(n) for n in args.names]
+    if args.pdf_dir is not None:
+        if args.png:
+            raise ValueError("--pdf-dir cannot be combined with --png")
+        packages = [
+            ReviewPackage(
+                package.name,
+                package.kind,
+                (args.pdf_dir / DRAWINGS_BY_NAME[package.name].outputs["pdf"].name,),
+            )
+            for package in packages
+        ]
     if args.missing_ok:
         skipped = [
             package.name
