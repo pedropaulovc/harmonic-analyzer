@@ -53,6 +53,7 @@ class GeometricControl:
     face: FaceSpec
     datums: tuple[str, ...] = ()
     tolerance_zone: ToleranceZone = "linear"
+    projected_zone_height_mm: float | None = None
 
     def __post_init__(self) -> None:
         if self.characteristic not in GTOL_SYMBOLS:
@@ -81,6 +82,7 @@ class GeometricControl:
             self.tolerance,
             datums=self.datums,
             diameter=self.tolerance_zone == "diametral",
+            projected_zone_height_mm=self.projected_zone_height_mm,
         )
 
 

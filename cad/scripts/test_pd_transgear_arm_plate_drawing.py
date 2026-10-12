@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import runpy
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ import build_pd_paper_drive_assembly as assembly
 import build_pd_transgear_arm_plate as part
 import draw_pd_transgear_arm_plate as drawing
 import pd_transgear_arm_geometry as arm
+import pd_rack_pinion_spec as disc
 import pd_transgear_arm_plate_geometry as geometry
 import vn_transgear_arm_plate_screw_spec as screw
 import pd_transgear_arm_plate_spec as spec
@@ -45,20 +47,74 @@ def test_every_marked_dimension_has_one_view() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
 
 
+def test_the_plate_bore_and_printed_hole_stations_follow_the_reducer_geometry() -> None:
+    theta = math.radians(disc.MESH_ANGLE_DEG) - math.radians(arm.ARM_ANGLE_DEG)
+    bore_station = arm.PIN_STATION + disc.CENTRE_DISTANCE * math.cos(theta)
+    bore_offset = disc.CENTRE_DISTANCE * math.sin(theta)
+    assert geometry.BORE_STATION == pytest.approx(bore_station)
+    assert geometry.BORE_OFFSET == pytest.approx(bore_offset)
+    bore_xy = tuple(
+        assembly.PIVOT_XY[axis]
+        + bore_station * arm.ARM_U[axis]
+        + bore_offset * arm.ARM_N[axis]
+        for axis in (0, 1)
+    )
+    assert assembly.KNOB_SHAFT_XY == pytest.approx(bore_xy)
+    assert math.dist(assembly.STUD_XY, bore_xy) == pytest.approx(disc.CENTRE_DISTANCE)
+    for index, (x, y) in enumerate(geometry.SCREW_HOLES, start=1):
+        # Transform the bore-origin plate coordinates back to the arm's pivot
+        # origin: both holes must meet the real taps, on the arm centreline.
+        assert x + bore_station == pytest.approx(arm.PLATE_TAP_STATIONS[index - 1])
+        assert y + bore_offset == pytest.approx(0.0)
+        assert part.SCREW_HOLES[index - 1] == pytest.approx((x, y))
+        assert drawing.PLAN_KEEP[f"ScrewHoleX{index}"][0] == pytest.approx(x / 2.0)
+    assert part.SCREW_HOLE_Y == pytest.approx(-bore_offset)
+    assert drawing.PLAN_KEEP["ScrewHoleY"][1] == pytest.approx(-bore_offset / 2.0)
+    for corner, edge_x in (
+        (geometry.TOP_LEFT, geometry.EDGE_MINUS_X),
+        (geometry.TOP_RIGHT, geometry.EDGE_PLUS_X),
+    ):
+        assert corner[1] == pytest.approx(
+            arm.edge_half_width(edge_x + bore_station) - bore_offset
+        )
+
+
+@pytest.mark.parametrize("centre_change", (-0.5, 0.5))
+def test_plate_outline_notch_and_holes_follow_the_physical_bore_source(
+    monkeypatch: pytest.MonkeyPatch, centre_change: float
+) -> None:
+    # Source mutation only: these deltas are not a manufacturing acceptance band.
+    monkeypatch.setattr(disc, "CENTRE_DISTANCE", disc.CENTRE_DISTANCE + centre_change)
+    fresh_arm = runpy.run_path(arm.__file__)
+    for name in (
+        "KNOB_BORE_STATION", "KNOB_BORE_OFFSET", "PLATE_SCREW_MID_STATION",
+        "PLATE_TAP_STATIONS", "LOCATOR_SITES_MM",
+    ):
+        monkeypatch.setattr(arm, name, fresh_arm[name])
+    fresh = runpy.run_path(geometry.__file__)
+    assert fresh["BORE_STATION"] == fresh_arm["KNOB_BORE_STATION"]
+    assert fresh["BORE_OFFSET"] == fresh_arm["KNOB_BORE_OFFSET"]
+    assert fresh["SCREW_HOLES"][0][1] == pytest.approx(-fresh["BORE_OFFSET"])
+    assert fresh["SCREW_HOLES"] != geometry.SCREW_HOLES
+    assert fresh["TOP_LEFT"] != geometry.TOP_LEFT
+    assert fresh["NOTCH_LEFT"] != geometry.NOTCH_LEFT
+    for name in ("HUB_FACE_Z", "BOSS_FACE_Z", "FRONT_FACE_Z", "REAR_FACE_Z"):
+        assert fresh[name] == getattr(geometry, name)
+    assert all(worst >= geometry.WALL_TARGET for _, worst in fresh["WALLS"].values())
+
+
 def test_the_explicit_bands_are_the_bore_the_knob_float_and_the_hole_positions() -> (
     None
 ):
     assert model_toleranced_dimensions(part) == {
-        ("ScrewHoleProfile", "ScrewHoleX1"): "HOLE_POSITION_TOLERANCE",
-        ("ScrewHoleProfile", "ScrewHoleX2"): "HOLE_POSITION_TOLERANCE",
-        ("ScrewHoleProfile", "ScrewHoleY"): "HOLE_POSITION_TOLERANCE",
+        ("LocatorProfile", "f'LocatorDia{index}'"): "*deviations(LOCATOR_HOLE_BAND_MM)",
         ("BearingProfile", "HubToBoss"): "HUB_TO_BOSS_TOLERANCE",
         ("BoreProfile", "BoreDia"): "*deviations(BORE_BAND)",
     }
-    # The running bore prints the geometry's clearance limits over Ø8.5.
+    # The H7 bore prints its sourced limits; zero lower deviation is intentional.
     lower, upper = deviations(spec.BORE_BAND)
     assert (lower, upper) == geometry.BORE_DIA_LIMITS
-    assert 0.0 < lower < upper
+    assert 0.0 <= lower < upper
 
 
 def test_every_printed_band_is_no_wider_than_the_arithmetic_assumed() -> None:
@@ -90,7 +146,7 @@ def test_the_worst_case_walls_hold_at_the_printed_bands() -> None:
         geometry.HUB_DIA - _band(spec.DRAWING_PRECISION_BY_NAME["HubDia"])
     ) / 2.0 - bore_r_max
     assert hub_wall >= geometry.WALL_TARGET
-    position = spec.HOLE_POSITION_TOLERANCE * math.sqrt(2.0)
+    position = spec.REDUCER_POSITION_RADIUS
     for x, y in geometry.SCREW_HOLES:
         centre_gap = math.hypot(x, y) - position
         hole_wall = centre_gap - bore_r_max - (geometry.SCREW_HOLE_DIA + drill) / 2.0
@@ -139,45 +195,64 @@ _CONE = math.tan(math.radians(geometry.CSK_ANGLE_DEG / 2.0))
 
 
 def _screw_seat(csk_places: int, thickness_places: int) -> tuple[float, float]:
-    """(shortest stock screw's stand past the arm, land under the cone) with
-    the countersink Ø and the thickness over the arm at the deviations their
-    printed (rounded) values allow, the head riding its eccentric seat."""
-    csk_low, csk_high = printed_deviations(geometry.CSK_DIA, csk_places)
-    thick_low, thick_high = printed_deviations(
-        geometry.THICKNESS_OVER_ARM, thickness_places
-    )
+    """Actual rounded print rows: published stock bound and true cone floor."""
+    _csk_low, csk_high = printed_deviations(geometry.CSK_DIA, csk_places)
+    thick_low, thick_high = printed_deviations(geometry.THICKNESS_OVER_ARM, thickness_places)
+    angle = joints.PLATE_SCREW_AXIS_TILT_MAX_RAD
     proud = (
-        screw.STOCK_LENGTH
-        - screw.STOCK_LENGTH_BAND[1]
-        - (geometry.THICKNESS_OVER_ARM + thick_high)
-        - (-csk_low) / 2.0 / _CONE  # a small seat holds the head proud
-        - joints.PLATE_SCREW_ECCENTRIC_LIFT
-        - (arm.THICKNESS + arm.THICKNESS_BAND)
+        (screw.STOCK_OVERALL_LENGTH_MIN_MM - screw.HEAD_WHOLE_METAL_HEIGHT_MAX_MM) * math.cos(angle)
+        - (screw.HEAD_RADIUS_FROM_THREAD_AXIS_MAX_MM + screw.THREAD_MAJOR / 2.0
+           + screw.STOCK_BODY_STRAIGHTNESS_MAX_MM) * math.sin(angle)
+        - (geometry.THICKNESS_OVER_ARM + thick_high) - arm.THICKNESS - arm.THICKNESS_BAND
+        - joints.PLATE_SCREW_SEAT_HEIGHT_DEBIT_MM
     )
-    land = (
-        geometry.THICKNESS_OVER_ARM
-        + thick_low
-        - (geometry.CSK_DIA + csk_high - geometry.SCREW_HOLE_DIA) / 2.0 / _CONE
-    )
+    cone_radius = (geometry.CSK_DIA + csk_high) / 2.0
+    alpha = math.atan(geometry.REDUCER_POSITION_DIAMETER / geometry.CLAMP_PLATE_PROJECTED_HEIGHT_MM)
+    depth = ((cone_radius - geometry.SCREW_HOLE_DIA / 2.0 + geometry.REDUCER_POSITION_DIAMETER)
+             / math.tan(geometry.CSK_HALF_ANGLE_LIMITS_RAD[0] - alpha)
+             + cone_radius * math.sin(alpha))
+    land = geometry.THICKNESS_OVER_ARM + thick_low - depth
     return proud, land
 
 
 def _seat_holds(csk_places: int, thickness_places: int) -> bool:
     proud, land = _screw_seat(csk_places, thickness_places)
     return (
-        proud >= joints.PLATE_SCREW_CUT_PROUD_MAX + screw.FIRST_THREAD_LOSS
+        proud >= joints.PLATE_SCREW_CUT_PROUD_MAX + screw.POINT_CHAMFER_LENGTH_MAX_MM
         and land >= geometry.WALL_TARGET
     )
 
 
 def test_the_countersink_and_the_thickness_print_the_loosest_seat_rows() -> None:
-    """The cut-to-fit oval head: a small countersink or a thick plate holds it
-    proud (the shortest stock screw must still stand past its cut), a large
-    countersink on a thin plate leaves too little land under the cone."""
+    """Loosest rows retain the actual cone floor and published stock cut.
+    No incoming crown/length acceptance or cone-centering premise."""
     csk = spec.DRAWING_PRECISION_BY_NAME["CskDia"]
     thickness = spec.DRAWING_PRECISION_BY_NAME["ThicknessOverArm"]
     assert _loosest_row(csk, lambda places: _seat_holds(places, thickness))
-    assert _loosest_row(thickness, lambda places: _seat_holds(csk, places))
+    # The seat alone would accept .X thickness, but the locator dowels'
+    # full-cylinder span (LOCATOR_FULL_CYLINDER_SPAN_MIN_MM, hence the S-K
+    # mouth position radius) is judged at the .XX band, so the seat only
+    # has to hold at the printed row.
+    assert _seat_holds(csk, thickness)
+
+
+def test_floor_pays_independent_projected_cone_and_hole_axes_and_actual_rim_tilt() -> None:
+    alpha = math.atan(geometry.REDUCER_POSITION_DIAMETER / geometry.CLAMP_PLATE_PROJECTED_HEIGHT_MM)
+    radius = geometry.CSK_DIA_LIMITS_MM[1] / 2.0
+    depth = ((radius - geometry.SCREW_HOLE_DIA / 2.0 + geometry.REDUCER_POSITION_DIAMETER)
+             / math.tan(geometry.CSK_HALF_ANGLE_LIMITS_RAD[0] - alpha) + radius * math.sin(alpha))
+    floor = geometry.THICKNESS_OVER_ARM - geometry.THICKNESS_OVER_ARM_BAND - depth
+    assert geometry.WALLS["under the countersinks"][1] == pytest.approx(floor)
+    assert floor > geometry.WALL_TARGET
+    assert spec.DRAWING_PRECISION_BY_NAME["ThicknessOverArm"] == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["CskDia"] == 1
+    # With the source fillet-clearance drill, the ordinary CSK row now
+    # retains the true floor. The old smaller hole required needless precision.
+    old_hole_floor = (geometry.THICKNESS_OVER_ARM - geometry.THICKNESS_OVER_ARM_BAND
+                      - ((2.0 * radius - 4.5) / 2.0 + geometry.REDUCER_POSITION_DIAMETER)
+                      / math.tan(geometry.CSK_HALF_ANGLE_LIMITS_RAD[0] - alpha)
+                      - radius * math.sin(alpha))
+    assert old_hole_floor < geometry.WALL_TARGET
 
 
 def _notch_air(places: int) -> float:
@@ -188,11 +263,9 @@ def _notch_air(places: int) -> float:
         for corner in (geometry.NOTCH_LEFT, geometry.NOTCH_RIGHT)
     )
     return (
-        geometry.NOTCH_RELIEF
-        - rise
-        - geometry.HOLE_POSITION_BAND
-        - joints._NOTCH_LEVER * joints._NOTCH_FLOAT
-    ) * math.cos(arm.EDGE_LEAN) - arm.BAND_X
+        (geometry.NOTCH_RELIEF - rise) * math.cos(arm.EDGE_LEAN)
+        - arm.BAND_X
+    )
 
 
 def test_the_notch_corner_heights_print_the_loosest_row_that_clears_the_arm() -> None:
@@ -225,7 +298,7 @@ def test_the_notch_depth_prints_the_loosest_row_the_lock_sweep_clears(
 def test_the_hub_station_prints_the_loosest_row_the_disc_platen_air_holds() -> None:
     """The disc-to-platen air was judged at HUB_STATION_PLACES' row."""
     printed = spec.DRAWING_PRECISION_BY_NAME["HubFaceToMounting"]
-    judged = _band(spec.HUB_STATION_PLACES)
+    judged = _band(geometry.HUB_STATION_PLACES)
 
     def holds(places: int) -> bool:
         return assembly.DISC_PLATEN_AIR_WORST - (_band(places) - judged) >= 0.0
@@ -233,21 +306,13 @@ def test_the_hub_station_prints_the_loosest_row_the_disc_platen_air_holds() -> N
     assert _loosest_row(printed, holds)
 
 
-def test_the_explicit_bands_are_tighter_only_where_the_title_block_row_fails() -> None:
-    """The hole positions keep the two shanks inside their float over the
-    arm's taps.  The knob's end float no longer rides on the hub-to-boss
-    band: the cup is pinned on a feeler at fit-up (R9-70 K-1), so the float
-    holds at its set tolerance whatever band the hub-to-boss prints at."""
-    row = _band(3)
-    float_min = knob_shaft.END_FLOAT - knob_shaft.END_FLOAT_SET_TOL
-    assert float_min > 0.0
-
-    def pitch_margin(band: float) -> float:
-        mismatch = 2.0 * arm.HOLE_POSITION_BAND + 2.0 * band
-        return joints.PLATE_SCREW_PITCH_FLOAT - mismatch
-
-    assert pitch_margin(spec.HOLE_POSITION_TOLERANCE) > 0.0
-    assert pitch_margin(row) <= 0.0
+def test_clamp_availability_is_paid_after_dowel_location() -> None:
+    """Reference datum-pose clearance only; actual critical setting is inspected."""
+    assert joints.PLATE_SCREW_REFERENCE_ENTRY_MARGIN_MM > 0.0
+    assert joints.PLATE_SCREW_STOCK_LEAD_MARGIN_MM > 0.0
+    assert knob_shaft.END_FLOAT - knob_shaft.END_FLOAT_SET_TOL > 0.0
+    assert all(control.tolerance == f"{spec.REDUCER_POSITION_DIAMETER:.3f}"
+               for control in spec.GEOMETRIC_CONTROLS if control.characteristic == "position")
 
 
 def test_the_drill_and_countersink_leaders_lead_to_different_holes() -> None:
@@ -275,7 +340,19 @@ _SECTION_LABEL_MODEL = 2.1
 _CAPTION_CLEAR_MODEL = 6.0
 _INNER_BORDER_X = 0.4191  # ASME B landscape inner border, right
 _TITLE_BLOCK_LEFT_X = 0.216  # the title block's left edge, below y 0.066
+_NOTE_CHAR_MM = 2.5  # a sheet note's character pitch (measured on the r3 sheet)
+_CAPTION_HEIGHT = 0.0035
+# The 1:1 isometric's half extents, sheet m: 44 x 52 measured on the r3
+# sheet for the 31.75 bar, plus its widening to 38.1 foreshortened (cos 30
+# across, sin 30 up).
+_ISO_HALF_WIDTH_SHEET = (44.0 + 6.35 * math.cos(math.radians(30.0))) / 2.0 / 1000.0
+_ISO_HALF_HEIGHT_SHEET = (52.0 + 6.35 * 0.5) / 2.0 / 1000.0
+# The plan and back views centre on the plate's model y extent.
+_PLAN_MID_Y = (geometry.TOP_LEFT[1] - geometry.END_R) / 2.0
 _GAP = 0.004  # sheet m between neighbouring texts
+# The locator callout's leader leaves its text block's lower right, this far
+# (model mm) from the kept text point (measured on the r3 sheet).
+_LOCATOR_LEADER_START_MODEL = (7.0, -5.5)
 
 
 def _half_width_model(text: str) -> float:
@@ -308,10 +385,22 @@ def test_the_thrust_face_finishes_clear_their_face_and_the_diameters() -> None:
         assert text_near > far, key
 
 
+def test_each_thrust_face_finish_lands_on_its_own_face_annulus() -> None:
+    """Each leader meets its face between the bore and the face's diameter,
+    with the symbol level with that point, so it reads as the face's."""
+    for key, face_z, face_dia in (
+        ("hub_face", geometry.HUB_FACE_Z, geometry.HUB_DIA),
+        ("boss_face", geometry.BOSS_FACE_Z, geometry.BOSS_DIA),
+    ):
+        pick, symbol = drawing.FACE_FINISHES[key]
+        assert pick[2] == face_z, key
+        assert geometry.BORE_DIA / 2.0 + 0.5 < abs(pick[1]) < face_dia / 2.0 - 0.5, key
+        assert symbol[1] == pick[1], key
+
+
 def test_the_hole_height_text_stands_between_the_edge_and_the_corner_height() -> None:
     centre = drawing.PLAN_KEEP["ScrewHoleY"][0]
-    tol = spec.HOLE_POSITION_TOLERANCE
-    text = f"{_printed(geometry.SCREW_HOLES[0][1], 'ScrewHoleY')} \u00b1{tol:.3f}"
+    text = f"[{_printed(geometry.SCREW_HOLES[0][1], 'ScrewHoleY')}]"
     half = _half_width_model(text)
     assert geometry.EDGE_PLUS_X < centre - half
     assert centre + half < drawing.PLAN_KEEP["TopRightY"][0]
@@ -363,12 +452,23 @@ def test_the_views_texts_clear_their_neighbours_and_the_border() -> None:
         drawing.SECTION_KEEP["BossDia"][2] + _half_width_model(boss_text)
     )
     assert _INNER_BORDER_X - boss_right >= 0.002
-    # The isometric's caption, right of the view under the plan, ends short of
-    # the title block.
-    caption_left = drawing.ISO_NOTE_XY[0]
-    caption_right = caption_left + len(spec.ISOMETRIC_VIEW_NOTE) * _CHAR_MM / 1000.0
-    assert caption_left > drawing.ISO_CENTER[0]
-    assert _TITLE_BLOCK_LEFT_X - caption_right >= _GAP
+    # The isometric stands between the notes and the title block, its
+    # caption above it and below the back view's edge dimensions.
+    notes_right = drawing.NOTES_XY[0] + drawing.NOTES_WIDTH * _NOTE_CHAR_MM / 1000.0
+    iso_left = drawing.ISO_CENTER[0] - _ISO_HALF_WIDTH_SHEET
+    assert iso_left - notes_right >= _GAP
+    assert _TITLE_BLOCK_LEFT_X - (drawing.ISO_CENTER[0] + _ISO_HALF_WIDTH_SHEET) >= _GAP
+    assert all(
+        len(line) <= drawing.NOTES_WIDTH for line in drawing.NOTES_TEXT.splitlines()
+    )
+    edge_text_bottom = (
+        drawing.PLAN_CENTER[1]
+        + (drawing.BACK_KEEP["EdgeLeftX"][1] - _PLAN_MID_Y) * drawing.SHEET_SCALE[0] / 1000.0
+        - _TEXT_BELOW_KEEP_MODEL * drawing.SHEET_SCALE[0] / 1000.0
+    )
+    caption_y = drawing.ISO_NOTE_XY[1]
+    assert edge_text_bottom - caption_y >= 0.002
+    assert caption_y - _CAPTION_HEIGHT - (drawing.ISO_CENTER[1] + _ISO_HALF_HEIGHT_SHEET) >= 0.0
 
 
 def test_the_first_plan_row_clears_the_cutting_line_arrow() -> None:
@@ -379,9 +479,35 @@ def test_the_first_plan_row_clears_the_cutting_line_arrow() -> None:
     )
     nearest_row = min(
         drawing.PLAN_KEEP[name][1]
-        for name in ("ScrewHoleX1", "ScrewHoleX2", "EdgeLeftX")
+        for name in ("ScrewHoleX1", "ScrewHoleX2", "LocatorX1")
     )
     assert nearest_row - _TEXT_BELOW_KEEP_MODEL - arrow_top >= 1.0
+
+
+def test_the_reamed_hole_leader_crosses_no_plan_dimension_line() -> None:
+    """The locator callout's leader runs from its text to locator 1 without
+    crossing a location or size dimension line standing above the plan."""
+    spans = {
+        "ScrewHoleX1": (geometry.SCREW_HOLES[0][0], 0.0),
+        "ScrewHoleX2": (geometry.SCREW_HOLES[1][0], 0.0),
+        "LocatorX1": (geometry.LOCATOR_SITES_MM[0][0], 0.0),
+        "EdgeLeftX": (geometry.EDGE_MINUS_X, 0.0),
+        "EdgeRightX": (0.0, geometry.EDGE_PLUS_X),
+    }
+    text_x, text_y, _ = drawing.PLAN_KEEP["LocatorDia1"]
+    start_x = text_x + _LOCATOR_LEADER_START_MODEL[0]
+    start_y = text_y + _LOCATOR_LEADER_START_MODEL[1]
+    site_x, site_y = geometry.LOCATOR_SITES_MM[0]
+    checked = 0
+    for name, (x0, x1) in spans.items():
+        if name not in drawing.PLAN_KEEP:
+            continue
+        row = drawing.PLAN_KEEP[name][1]
+        assert site_y < row < start_y, name
+        leader_x = start_x + (site_x - start_x) * (start_y - row) / (start_y - site_y)
+        assert not min(x0, x1) <= leader_x <= max(x0, x1), name
+        checked += 1
+    assert checked
 
 
 def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
@@ -402,3 +528,44 @@ def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
     below = [name for name, point in keep.items() if point[1] < -geometry.END_R]
     assert below == ["HubToBoss"]
     assert -geometry.END_R - keep["HubToBoss"][1] < _CAPTION_CLEAR_MODEL
+
+
+def test_matched_pair_and_projected_zone_notes_state_their_values() -> None:
+    """Both sheets state the setting and acceptance, and every zone's origin."""
+    import draw_pd_transgear_arm as arm_drawing
+    import pd_rack_pinion_spec as disc
+
+    numbers = {
+        key: _config.parts(key)["number"]
+        for key in ("pd-transgear-arm", "pd-transgear-arm-plate")
+    }
+    for text, mate in (
+        (arm_drawing.NOTES_TEXT, numbers["pd-transgear-arm-plate"]),
+        (drawing.NOTES_TEXT, numbers["pd-transgear-arm"]),
+    ):
+        flat = " ".join(line.strip() for line in text.splitlines())
+        assert f"MATCH-DRILLED WITH {mate}," in flat
+        tol = f"\u00b1{disc.CENTRE_DISTANCE_SET_TOL:.3f}"
+        assert f"KNOB BORE CLAMPED {disc.CENTRE_DISTANCE:.3f} {tol} FROM" in flat
+        assert f"CENTRES STILL WITHIN {tol}" in flat
+        assert "NO SHAKE, NO DAYLIGHT" in flat
+        assert "ACCEPTANCE" not in flat
+        assert "PROJECTED ZONES START AT" in flat
+    plate_notes = " ".join(line.strip() for line in drawing.NOTES_TEXT.splitlines())
+    projected = [
+        control for control in drawing.GEOMETRIC_CONTROLS
+        if control.projected_zone_height_mm is not None
+    ]
+    assert projected
+    for control in projected:
+        assert f"{control.projected_zone_height_mm:.1f}" in plate_notes
+    assert "LEFT VIEW: REAR FACE;" in plate_notes
+    assert f"CSK COAXIAL WITH ITS \u00d8{geometry.SCREW_HOLE_DIA:.1f} HOLE." in plate_notes
+    assert "CENTRE VIEW: MOUNTING FACE A." in plate_notes
+    for feature in ("HOLE BORES (CENTRE VIEW)", "KNOB BORE"):
+        assert feature in plate_notes
+    assert "CSK CONES" not in plate_notes
+    # The countersinks are cut from the rear face, which *Front (the left
+    # view) looks at; *Back (the centre view) looks at face A.
+    assert geometry.REAR_FACE_Z > 0.0
+    assert drawing.PLAN_CENTER[0] < drawing.BACK_CENTER[0] < drawing.SECTION_CENTER[0]

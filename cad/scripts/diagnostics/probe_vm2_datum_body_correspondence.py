@@ -23,10 +23,6 @@ def main():
         raise ValueError("requires own witness and new own receipt")
     if Path(sys.prefix).resolve() != ROOT / ".venv" or os.environ.get("HARMONIC_SW_AUTOSTART") != "0":
         raise RuntimeError("own uv and attach-only mode required")
-    if __package__:
-        from . import _script_paths  # noqa: F401
-    else:
-        import _script_paths  # noqa: F401
     from _com import _early_bound
     from _gear_drawing_entities import visible_circle_edge
     from diagnostics._owned_native_session import run_owned_diagnostic

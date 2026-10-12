@@ -130,6 +130,14 @@ git submodule update --init --recursive
    SolidWorks, which takes the licence farm worker w15 shares. A bare `pytest` or
    `pytest .` at the root skips it (`testpaths`/`norecursedirs` in
    `pyproject.toml`); run it on a farm worker or in its own CI.
+4. Ground recipe calls in the vendored `PyWin32Adapter` implementation, including
+   its inherited mixins and delegated helpers; never infer an adapter method name
+   from a SolidWorks operation. Check that every changed call exists and binds
+   with a cheap source-only AST census against the SDK, without importing
+   recipes or constructing an adapter. The knob-shaft and
+   feed-pinion census is `cad/scripts/test_pd_transgear_adapter_contract.py`;
+   it checks every direct `adapter.<method>(...)` call, not an API allowlist.
+   Offline contracts do not replace final-source native geometry/readback proof.
 
 ## Minimum merge gate (every PR)
 
@@ -822,7 +830,8 @@ come from the model/spec, not separate text renderers.
 **Per-assembly contracts — `cad/config/assemblies/<dashed-stem>.yaml`.** Data
 that belongs to ONE assembly (its learned `flip_invert` seeds and its free-DOF
 contract: `free_dof`/`free_dof_per_active_channel`, `required_free_stems`,
-`allowed_free_stems`) lives in its own file, read through
+`allowed_free_stems`; and `carries_chain`, which hands the soundness
+interference gate the chain's wheel mounts) lives in its own file, read through
 `_assembly_contract.py` — never as a stem-keyed table in `_assembly.py` (on every
 assembly's recipe: one drive-train seed there used to re-key all eight
 assemblies and every gate behind them) or `verify.py` (on every soundness

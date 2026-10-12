@@ -1,4 +1,4 @@
-"""Offline contracts for the MHA-VN-056 wheel-axle front washer (McMaster 92916A250)."""
+"""Offline contracts for the MHA-VN-058 wheel-axle front washer (McMaster 92916A250)."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from diagnostics import diag_build_92916A250 as recipe
 
 STEM = "vn-wheel-axle-front-washer"
 SHEET = "vn_wheel_axle_front_washer"
-NUMBER = "MHA-VN-056"
+NUMBER = "MHA-VN-058"
 STOCK_NAME = "Brass Washer for Number 4 Screw Size"
 BUILD = "build_92916A250"
 IN = 25.4

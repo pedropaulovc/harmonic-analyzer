@@ -11,7 +11,7 @@ driven by two MHA-VN-044 dowels pressed into blind reamed holes in its face
 the far end, the 1/8 in
 straight-pin cross-hole keys the 16T pinion's hub boss to the shaft (ch12
 p.19 page002_img02; dt_crank_pinion_spec owns the pin), its entry turned
-PIN_CLOCKING_DEG from -X toward -Z about the shaft axis so it meets the
+by the qualified selected retention clock from -X toward -Z about the shaft axis so it meets the
 pinion's own -X hole once the assembly seats the pinion rot_z(-seed).
 
 Run (SolidWorks already open)::
@@ -677,7 +677,7 @@ async def build(adapter) -> dict[str, str]:
     # mid-length, match-drilled at assembly with the pinion on its seat -- so
     # this print's callout says MATCH DRILL WITH THE PINION and the hole is
     # modelled here only so the assembly is the truth and the shaft's drawing
-    # can show it. Its entry point is turned PIN_CLOCKING_DEG from -X toward
+    # can show it. Its entry point is turned by the qualified retention clock from -X toward
     # -Z about the shaft axis: the assembly seats the pinion rot_z(-seed) with
     # its own hole on its local -X, and this shaft is placed ROT_X_POS90
     # (local z = machine -y), so the pinion's machine (-cos s, +sin s, 0)

@@ -1,9 +1,11 @@
 r"""Shared recipe for the McMaster 90280A* narrow fillister head screws, and
-the 91794A112 stainless fillister screw on the same #4-40 head.
+the 91794A112 stainless fillister screw on the same #4-40 head, plus the
+catalog-only MSC 40923906 model.
 
-The vendor drives every derived number off 5 named dims via equations,
-reproduced here. The 90280A837, 91794A112 and 91794A080 extensions have no
-completed native comparison:
+The McMaster vendor drives every derived number off 5 named dims via
+equations, reproduced here and reused as modeling conventions for the MSC
+row. The 90280A837, 91794A112 and 91794A080 extensions have no completed
+native comparison:
 
 - slot width = HeadDia*0.135, slot depth = width*1.5 (from the dome apex)
 - head cylinder band = HeadHeight*0.8; dome = spherical cap (centre on
@@ -21,7 +23,10 @@ completed native comparison:
 Frame: head UP, under-head junction at y = 0 (the stock Top Plane plays
 the vendor Plane1's three roles: split plane, helix seed, runout).
 
-Per-part entry points: ``diag_build_90280A*.py``.
+Per-part entry points: ``diag_build_90280A*.py``, ``diag_build_40923906.py``.
+
+Each SKU's dimensions live in its pure ``_mcmaster_<sku>``/``_msc_<sku>``
+module; the per-part entry point passes them to ``build_fillister``.
 """
 
 from __future__ import annotations

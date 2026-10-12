@@ -5,12 +5,14 @@ from __future__ import annotations
 import math
 import re
 
+import pytest
 import _config
 import draw_dt_cone_pivot_post_tl_bond_cradle as drawing
 import dt_cone_pivot_post_spec as post
 import dt_cone_pivot_post_tl_bond_cradle_spec as spec
 import export_features
 from _printed_tolerance import angular_band_deg, printed_band_mm
+from _surface_finish import surface_finish_by_key
 from prechips.model import TOLERANCE_REQUIREMENTS
 
 STEM = "dt_cone_pivot_post_tl_bond_cradle"
@@ -76,8 +78,8 @@ def test_seats_are_matched_fits_without_a_hidden_diameter_band() -> None:
 
 def test_pin_tops_print_from_the_post_axis_within_a_quarter_of_the_post_band() -> None:
     features = _features()
-    crank_band = 0.51  # CrankBossStartZ at .XX
-    cone_band = 0.51 / 2.0  # the north cap: half the .XX ConeBossLen
+    crank_band = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["CrankBossStartZ"])
+    cone_band = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0
     for name, nominal, post_band in (
         ("crank_pin_west", post.CRANK_BOSS_NORTH_FACE, crank_band),
         ("crank_pin_east", post.CRANK_BOSS_NORTH_FACE, crank_band),
@@ -94,7 +96,7 @@ def test_pin_tops_print_from_the_post_axis_within_a_quarter_of_the_post_band() -
         assert pin["height_nominal"] == printed
         assert math.isclose((low + high) / 2.0, printed)
         assert [round(low, spec.PIN_TOP_PLACES), round(high, spec.PIN_TOP_PLACES)] == [low, high]
-        assert 0.0 < (high - low) / 2.0 <= 0.25 * post_band + 1e-12
+        assert 0.0 < (high - low) / 2.0 <= spec.FIXTURE_SHARE * post_band + 1e-12
 
 
 def test_crank_pins_carry_the_crank_sleeve_north_face() -> None:
@@ -102,10 +104,16 @@ def test_crank_pins_carry_the_crank_sleeve_north_face() -> None:
         pin = _features()[name]
         assert abs(pin["at"][2] + post.CRANK_BOSS_NORTH_FACE) <= spec.PIN_TOP_ROUNDING
         assert math.isclose(pin["at"][1], post.CRANK_BORE_HEIGHT)
+        places = spec.DRAWING_PRECISION_BY_NAME["CrankPinY"]
+        assert pin["station_nominal"] == round(
+            _config.machine("gear_train", "crank_axis_height_mm"), places
+        )
 
 
-def test_cone_pin_tops_bear_on_the_north_cap_annulus_either_side_of_the_journal() -> None:
-    cap = post.SURFACE_FINISHES[3].face
+def test_cone_pin_tops_bear_on_the_north_cap_annulus_either_side_of_the_journal() -> (
+    None
+):
+    cap = surface_finish_by_key(post.SURFACE_FINISHES, "cone_boss_north_face").face
     across = []
     for name in ("cone_pin_east", "cone_pin_west"):
         pin = _features()[name]
@@ -125,6 +133,35 @@ def test_cone_pin_tops_bear_on_the_north_cap_annulus_either_side_of_the_journal(
         across.append(radial)
     # Opposite sides, equally: the tops straddle the journal axis.
     assert all(math.isclose(e, -w, abs_tol=1e-9) for e, w in zip(*across, strict=True))
+
+
+def test_cone_pin_station_guard_follows_the_actual_post_plane() -> None:
+    cap = surface_finish_by_key(post.SURFACE_FINISHES, "cone_boss_north_face").face
+    for pin in spec.CONE_PINS.values():
+        expected = tuple(
+            origin + cap.offset_mm * normal + pin.side * spec.CONE_PIN_SPREAD * across
+            for origin, normal, across in zip(
+                (0.0, post.BORE_HEIGHT, 0.0),
+                cap.normal,
+                spec.CONE_PIN_ACROSS,
+                strict=True,
+            )
+        )
+        actual = (pin.top_x, spec.CONE_PIN_Y, pin.top_z)
+        assert all(
+            abs(a - b) <= spec.PIN_TOP_ROUNDING
+            for a, b in zip(actual, expected, strict=True)
+        )
+        spec.require_cone_pin_top_station(actual, pin.side)
+        # Reject axial drift, a wrong journal station, and tangential drift.
+        # These are recipe-coordinate checks, not tighter printed pin bands.
+        for direction in (spec.CONE_PIN_AXIS, (0.0, 1.0, 0.0), spec.CONE_PIN_ACROSS):
+            displaced = tuple(
+                a + 4.0 * spec.PIN_TOP_ROUNDING * d
+                for a, d in zip(actual, direction, strict=True)
+            )
+            with pytest.raises(AssertionError, match="north-cap station"):
+                spec.require_cone_pin_top_station(displaced, pin.side)
 
 
 def test_cone_pin_tops_carry_their_mutual_match() -> None:
@@ -208,7 +245,12 @@ def test_cone_pin_tilt_and_seat_finishes_are_requirements() -> None:
     for name in ("cone_pin_east", "cone_pin_west"):
         pin = features[name]
         assert "land_angle_deg" in pin["requirements"]
-        assert pin["land_angle_deg"] == [12.5 - tol, 12.5 + tol]
+        nominal = round(
+            _config.machine("cone_incline", "derived_incline_deg"),
+            spec.DRAWING_PRECISION_BY_NAME["ConePinTilt"],
+        )
+        assert pin["land_angle_nominal_deg"] == nominal
+        assert pin["land_angle_deg"] == [nominal - tol, nominal + tol]
         assert "angle_deg" not in pin["requirements"]
     for control in spec.SURFACE_FINISHES:
         seat = features[control.key]

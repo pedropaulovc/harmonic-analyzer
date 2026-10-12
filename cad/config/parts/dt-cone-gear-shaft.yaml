@@ -2,9 +2,9 @@ dt-cone-gear-shaft:
   title: Cone Gear Shaft
   number: MHA-DT-004
   material: AISI 1018 cold-finished steel shafting
-  material_specification: AISI 1018 cold-finished steel shafting
+  material_specification: ASTM A108 1018
   finish: oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "turned stepped shaft with integral bearing journal and thrust collar (steel)"
+  process: "turned stepped shaft with integral bearing journal and thrust collar (steel); 5/8 in cold-finished round bar, collar OD as supplied"

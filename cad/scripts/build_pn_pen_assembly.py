@@ -97,17 +97,20 @@ from _mcmaster_99607a213 import SHANK_LEN as PEN_SET_SHANK_LEN
 from _mcmaster_99607a213 import SHANK_DIA as PEN_SET_SHANK_DIA
 from _mcmaster_99607a213 import TIP_CHAMFER as PEN_SET_TIP_CHAMFER
 from mg_magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
+from paper_drive_geom import (
+    PAPER_FRONT_Z,
+    PEN_BLOCK_YAW_DEG,
+    PEN_PAPER_CLEARANCE_MM,
+    PEN_ROD_X,
+    PEN_Z_MID,
+)
 
 ASM_NAME = "pn-pen"
 
 # --- machine anchors ---------------------------------------------------------
-PAPER_FRONT_Z = -143.25  # recording paper front face (build_pd_paper_drive_assembly:
-# platen front -142.75 on the 3.85 plate, the sheet planted 0.5 proud)
 CLEARANCE = 0.25  # interference-gate margin convention
 
 # --- pen rod line -------------------------------------------------------------
-PEN_ROD_X = 3.0
-PEN_Z_MID = -157.0  # pen-rod axis plane (was -151.5: see the module docstring)
 ROD_SECTION = 5.0  # pn_pen_rod_spec.ROD_SECTION (asserted below)
 HANGER_POS = (PEN_ROD_X, 505.0, PEN_Z_MID)
 # The rod's bottom end sits 13 into the v-block's 18-tall rod bore -- its end
@@ -144,9 +147,8 @@ from build_pn_pen_frame import (  # noqa: E402
     RAIL_SIDE,
 )
 
-BLOCK_YAW_DEG = 45.0  # v4_t00603: the nib meets the paper at 45 degrees
-_C = math.cos(math.radians(BLOCK_YAW_DEG))
-_S = math.sin(math.radians(BLOCK_YAW_DEG))
+_C = math.cos(math.radians(PEN_BLOCK_YAW_DEG))
+_S = math.sin(math.radians(PEN_BLOCK_YAW_DEG))
 # Images of the block's local axes (rows convention of place_component):
 BLOCK_ROWS = [[_S, 0.0, -_C], [0.0, 1.0, 0.0], [_C, 0.0, _S]]
 BLOCK_ROT = euler_from_rows(BLOCK_ROWS)  # [0, 45, 0]
@@ -185,7 +187,8 @@ assert GROOVE_WIDTH >= BARREL_DIA + 2 * CLEARANCE
 # Solve the nib's block-local x from the paper stand-off: machine z of a
 # local (x, ., 8) point is VBLOCK_POS.z - x*cos + 8*sin.
 MARKER_TIP_LOCAL_X = (
-    -((PAPER_FRONT_Z - CLEARANCE) - VBLOCK_POS[2] - (BLOCK_DEPTH / 2.0) * _S) / _C
+    -((PAPER_FRONT_Z - PEN_PAPER_CLEARANCE_MM) - VBLOCK_POS[2]
+      - (BLOCK_DEPTH / 2.0) * _S) / _C
 )
 assert MARKER_TIP_LOCAL_X < 0.0 < MARKER_TIP_LOCAL_X + BARREL_TOP_Y - BLOCK_LENGTH, (
     "marker must pass right through the block: nib past the rear face, body past the front"

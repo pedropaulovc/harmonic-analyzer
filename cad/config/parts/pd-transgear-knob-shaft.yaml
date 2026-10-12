@@ -7,4 +7,10 @@ pd-transgear-knob-shaft:
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "turned; 12T cut with a form cutter; 1/4-20 die-cut; #8-32 tapped"
+  # Selected stock cutter: TTC 10-289-488, 48DP PA20 #8 (12–13T).
+  # https://www.travers.com/product/ttc-10-289-488-involute-style-gear-cutter-10-289-488
+  # StockForm uses the lower-count 12T master; rigid template translation is not x.
+  # Verified cutter body OD 44.45 mm and arbor bore 22.225 mm; grind depth/form
+  # accuracy are unpublished. Main's 2.25-module depth is a model premise,
+  # provisional for physical admission, not published vendor ground geometry.
+  process: "turned from bar, including the front neck and limited corner radius; integral 12T 48DP PA20 teeth cut with stock #8 form cutter (12T master), with radial setting, tooth-span and all-space angular-index acceptance from the part specification; mill the front D-core flat to its specified physical rounded-tool-end limits; #8-32 die-cut; rear cup/journal spring-pin hole match-drilled at assembly"

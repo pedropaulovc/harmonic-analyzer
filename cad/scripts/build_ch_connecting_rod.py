@@ -6,12 +6,10 @@ eccentric cam (cast integral with each cylinder gear), a thin flat shank, and a
 U-shaped FORK (clevis; the Y-shaped upper end of the ch14 fan photo) whose two
 tines straddle the rocker arm's 2.500 strap and carry the pressed pivot pin
 (MHA-CH-010, ch_rod_pivot_pin_spec) through the arm's rod-pin hole near its
-rod-side tip. Centre distance 163.10103: the rod hangs PLUMB with the arm
-LEVEL after the fixed-post photos show every rod dropping vertically from the
-arm tip onto its cam, the ch14 end views show the 0-crank tip row dead level
-(cos-mode home = top of stroke, cam lobe UP), so the pin (127.37 out from the
-mid-seesaw pivot) sits directly above the phased lobe centre at machine
-(-54.474, 99.155) and the rod length closes that vertical link.
+rod-side tip. The centre distance follows the actual phased cam centre and the
+level rocker's pin, including the common raised drive-axis height. The ch14
+end views show the 0-crank tip row level (cos-mode home = top of stroke, cam
+lobe UP); the rod length closes that link without moving the rocker bank.
 
 The rod is FLAT: ring, shank and fork share one mid-plane, which is the cam
 plane and the arm plane (rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ), so the
@@ -106,8 +104,8 @@ MATERIAL = "Plain Carbon Steel"
 
 # Cam ring centre -> rocker pin, VERTICAL rod: the
 # pin rides the arm's rod-pin hole 133.067 out from the pivot -- directly
-# above the phased cam LOBE (installed machine centre (-60.167, 99.155) =
-# drum (-60.394, 90.518) + ECC 8.64 rotated by the +1.5 deg tooth phase,
+# above the phased cam LOBE (shared drive height plus the eccentricity
+# rotated by the configured tooth phase),
 # lobe UP at the cos-mode home; the Ry180 axial flip preserves local +Y;
 # ch30 photos + GT rocker-corner triangulation put the arm's rod-side end over
 # the drum). Solved so the rocker rests LEVEL (arm tilt 0 -- the ch14 end views

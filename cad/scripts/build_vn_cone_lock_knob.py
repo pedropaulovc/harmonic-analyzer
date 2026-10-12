@@ -1,4 +1,8 @@
-r"""Purchased cone lock knob: McMaster 93585A190 in its stock local frame."""
+r"""Purchased cone lock knob: McMaster 93585A190 in its stock local frame.
+
+At assembly the knob locks the swing platform where the tightest cone meets
+a feeler/backlash; it sets the cone-to-drum mesh.
+"""
 
 from __future__ import annotations
 

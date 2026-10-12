@@ -68,6 +68,7 @@ from _assembly import (
 )
 from _transforms import IDENTITY, euler_from_rows, rows_from_euler
 from _interference_contracts import allowed_interference_pairs
+from _chain_mounts import mounted_wheels
 
 import _telemetry
 
@@ -199,6 +200,7 @@ async def build(adapter) -> dict[str, str]:
     check_no_interference(
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        chain_mounts=mounted_wheels(),
     )
 
     # Title-block identity for the top assembly drawing

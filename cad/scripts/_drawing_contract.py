@@ -81,6 +81,7 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_dt_pinion_spring.py",
         "draw_ch_pivot_shaft.py",
         "draw_vn_post_mount_screw.py",
+        "draw_pd_platen_rack.py",
         "draw_pd_rack_pinion.py",
         "draw_ch_rocker_thrust_washer.py",
         "draw_ch_bar_pivot_pin.py",
@@ -230,6 +231,10 @@ def _simple_assignments(tree: ast.AST) -> dict[str, ast.expr]:
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
             if node.value is not None:
                 assignments[node.target.id] = node.value
+        elif isinstance(node, ast.For) and isinstance(node.target, ast.Name):
+            # A loop element has its iterable's provenance: selecting one row
+            # of a spec-owned tuple is the same as indexing it.
+            assignments[node.target.id] = node.iter
     return assignments
 
 
@@ -839,21 +844,22 @@ def drawing_specification_violations(
                     )
 
             if _call_is(node, "add_feature_control_frame", gtol_direct, gtol_modules):
-                tolerance = next(
-                    (kw.value for kw in node.keywords if kw.arg == "tolerance"),
-                    None,
-                )
-                if tolerance is not None and not _part_spec_sourced(
-                    tolerance,
-                    direct=part_spec_direct,
-                    modules=part_spec_modules,
-                    assignments=assignments,
-                ):
-                    add(
-                        tolerance,
-                        "drawing-gdt-provenance",
-                        f"tolerance={ast.unparse(tolerance)} is not part-spec-sourced",
+                for field in ("tolerance", "projected_zone_height_mm"):
+                    value = next(
+                        (kw.value for kw in node.keywords if kw.arg == field),
+                        None,
                     )
+                    if value is not None and not _part_spec_sourced(
+                        value,
+                        direct=part_spec_direct,
+                        modules=part_spec_modules,
+                        assignments=assignments,
+                    ):
+                        add(
+                            value,
+                            "drawing-gdt-provenance",
+                            f"{field}={ast.unparse(value)} is not part-spec-sourced",
+                        )
 
             if _call_is(node, "add_attached_note", note_direct, note_modules):
                 text = next(

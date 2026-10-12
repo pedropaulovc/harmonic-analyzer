@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -206,8 +207,21 @@ def test_pedestals_anchor_on_the_bank_strap_faces() -> None:
     assert bank.BACK_PEDESTAL_ORIGIN_Z == pytest.approx(
         bank.BACK_STRAP_INNER_Z + ped.STRAP_INNER_Z
     )
-    assert bank.FRONT_STRAP_INNER_Z == pytest.approx(-72.019, abs=5e-4)
-    assert bank.BACK_STRAP_INNER_Z == pytest.approx(73.062, abs=5e-4)
+    # Both faces follow the configured station grid, not rounded world-z
+    # coordinates from the retired train. Reconstruct the same stack at each
+    # end: cam face / washer / set spring at the front, tooth face / washer at back.
+    station_z0 = _config.machine("channels", "station_z0_mm")
+    seat = _config.machine("cone_incline", "drum_seat_nominal_mm")
+    radius_step = 3.0 * MM_PER_IN / _config.machine("gear_train", "diametral_pitch")
+    pitch = seat * math.cos(math.asin(radius_step / seat))
+    front_cam_face = station_z0 + gear.FACE_WIDTH / 2.0 - gear.OVERALL_THICKNESS
+    back_tooth_face = station_z0 + (bank.COUNT - 1) * pitch + gear.FACE_WIDTH / 2.0
+    assert bank.FRONT_STRAP_INNER_Z == pytest.approx(
+        front_cam_face - bank.WASHER_THICK - bank.BANK_SPRING_SET, abs=1e-9
+    )
+    assert bank.BACK_STRAP_INNER_Z == pytest.approx(
+        back_tooth_face + bank.WASHER_THICK, abs=1e-9
+    )
     # The apex set screws sit at each strap's mid-depth.
     assert bank.FRONT_SET_SCREW_Z == pytest.approx(
         bank.FRONT_PEDESTAL_ORIGIN_Z + ped.SET_SCREW_Z

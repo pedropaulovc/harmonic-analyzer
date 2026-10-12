@@ -8,8 +8,8 @@ sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
 The casting has two axes and they are not parallel: the crank journal runs
-along part +Z and the cone journal is yawed 12.5182 degrees about the vertical
-body axis.  The part therefore persists a named view looking exactly down the
+along part +Z and the cone journal follows the configured cone-line incline
+about the vertical body axis. The part persists a view looking exactly down the
 cone axis.  That view retains the boss end face and shows its Ø17.2 OD and
 Ø12.281 bore as separate true-shape circles.  A native section in the
 horizontal cone-bore plane removes the head from the projection and exposes
@@ -1302,9 +1302,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="foot seat finish",
         char_height=0.0025,
     )
-    # The crank-bore Ra stands left of the head, between the (72.70)'s witness
-    # and the 86.0's top witness: above the view its leader crossed the 86.0's
-    # top witness (leader-crosses-line, ha-perf-parts audit).
+    # The crank-bore Ra stands left of the head, between the crank-height
+    # reference and the body's top witness: a symbol above the view crossed
+    # that top witness (leader-crosses-line, ha-perf-parts audit).
     add_surface_finish(
         adapter,
         front,
@@ -1387,15 +1387,18 @@ async def build(adapter: Any) -> dict[str, str]:
                 ),
             ),
             # The frame sits right of the head between HeadHt's extension
-            # lines, its leader landing on the bore rim at -28 degrees,
-            # between the CRANK BOSS diameter line and the centre-mark arm:
+            # lines, 3.7 mm below the crank axis, so it rides with the head
+            # when the post's height moves (a fixed y=0.138 met HeadHt's lower
+            # witness once the inch-train body grew to 94.7). Its leader lands
+            # on the bore rim at -28 degrees, between the CRANK BOSS diameter
+            # line and the centre-mark arm:
             # from (0.160, 0.128) to the natural lower-left landing it
             # crossed HeadHt's and CrankBossDia's lines (leader-crosses-line,
             # af13).  A sheet-point pick sets the landing; explicit leader
             # placement detached a GTol from its edge (fulcrum 1149f227f).
             "crank_bore_angularity": PmiDrawingPlacement(
                 view=front,
-                position=(0.124, 0.138),
+                position=(0.124, _front_y(CRANK_BORE_HEIGHT) - 0.0037),
                 attachment_xy=(
                     _front_x(CRANK_BORE_DIA / 2.0 * math.cos(math.radians(-28.0))),
                     _front_y(
