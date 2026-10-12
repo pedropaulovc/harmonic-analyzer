@@ -130,14 +130,16 @@ def test_cross_screw_head_stays_below_the_counterbore_mouth_at_every_printed_ban
         assert recess == pytest.approx(part.COUNTERBORE_PRINTED_HEAD_RECESS)
 
 
-def test_counterbore_floor_keeps_rule_12_target_to_the_cap_recess() -> None:
+def test_counterbore_floor_keeps_an_allowance_to_the_cap_recess() -> None:
     # Codex review of 67d8b2c6 (sheet 4, A-A): at .X the floor's outboard
-    # limit left 1.518 to the cap recess's deepest, widest corner.  The
-    # floor's station prints .XXX; every printed corner keeps 2.0.
+    # limit left 1.518 to the cap recess's deepest, widest corner, no
+    # allowance over rule 12's 1.5; .XXX read as over-precision (codex review
+    # of 63d4b5d6).  The floor's station prints .XX: every printed corner
+    # keeps 1.797.
     floor_places = spec.DRAWING_REFERENCE_PRECISION["counterbore floor from socket axis"]
     axis_places = spec.DRAWING_REFERENCE_PRECISION["cross screw axis from boss top"]
     seat_places = spec.DRAWING_PRECISION["CounterboreRearProfile"]["CB1Dia"]
-    assert floor_places == 3
+    assert floor_places == 2
     floor_offset = (
         round(part.COUNTERBORE_FLOOR - abs(part.FRONT_COLUMN_Z), floor_places)
         - spec.PRINTED_LINEAR_BAND_MM[floor_places]
@@ -149,8 +151,8 @@ def test_counterbore_floor_keeps_rule_12_target_to_the_cap_recess() -> None:
     ) / 2.0
     ligament = math.hypot(floor_offset - recess_radius, recess_floor - rim)
     assert ligament == pytest.approx(part.COUNTERBORE_PRINTED_CAP_LIGAMENT)
-    assert ligament == pytest.approx(2.167, abs=5e-4)
-    assert ligament >= 2.0
+    assert ligament == pytest.approx(1.797, abs=5e-4)
+    assert ligament >= 1.75
 
 
 def test_cross_tap_ends_stay_in_the_real_boss_and_side_web_union() -> None:

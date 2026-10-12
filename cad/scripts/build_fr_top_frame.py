@@ -733,7 +733,7 @@ COUNTERBORE_MIN_FLOOR_OFFSET = (
 )
 COUNTERBORE_PRINTED_HEAD_RECESS = math.sqrt(
     COUNTERBORE_MIN_BOSS_RADIUS**2 - COUNTERBORE_MAX_RADIUS**2
-) - (COUNTERBORE_MAX_FLOOR_OFFSET + CROSS_SCREW_HEAD_H)  # 0.748
+) - (COUNTERBORE_MAX_FLOOR_OFFSET + CROSS_SCREW_HEAD_H)  # 0.368
 COUNTERBORE_PRINTED_HEAD_CLEARANCE = (
     COUNTERBORE_MIN_RADIUS - CROSS_SCREW_HEAD_DIA / 2.0
 )  # 0.125 radial
@@ -755,12 +755,14 @@ COUNTERBORE_PRINTED_NEAR_WALL = (
         + PRINTED_LINEAR_BAND_MM[DRAWING_PRECISION["BoreProfile"]["B0Dia"]]
     )
     / 2.0
-)  # 2.82
+)  # 2.44
 # Cap recess to counterbore ligament: the recess's deepest, widest printed
 # corner against the counterbore's outboard-most floor rim, with the tap
 # axis at the high end of its .X station below the boss top.  The floor's
-# station prints .XXX so this meets rule 12's 2.0 target: 2.167 (1.518 at
-# .X, codex review of 67d8b2c6; nominal 3.05).
+# station prints .XX: 1.797, 0.30 over rule 12's 1.5 floor (nominal 3.05).
+# At .X it left 1.518, no allowance (codex review of 67d8b2c6); .XXX
+# reached the 2.0 target but read as precision a recessed seat does not
+# need (codex review of 63d4b5d6).
 _AXIS_PLACES = DRAWING_REFERENCE_PRECISION["cross screw axis from boss top"]
 COUNTERBORE_PRINTED_CAP_LIGAMENT = math.hypot(
     COUNTERBORE_MIN_FLOOR_OFFSET
@@ -768,9 +770,9 @@ COUNTERBORE_PRINTED_CAP_LIGAMENT = math.hypot(
     (CAP_RECESS_FLOOR_Y - CAP_RECESS_DEPTH_BAND[0])
     - (PRINTED_LINEAR_BAND_MM[_AXIS_PLACES] + COUNTERBORE_MAX_RADIUS),
 )
-if min(COUNTERBORE_PRINTED_NEAR_WALL, COUNTERBORE_PRINTED_CAP_LIGAMENT) < 2.0:
+if min(COUNTERBORE_PRINTED_NEAR_WALL, COUNTERBORE_PRINTED_CAP_LIGAMENT) < 1.75:
     raise AssertionError(
-        "top cross-screw counterbore leaves under 2.0 mm to the bore or cap recess"
+        "top cross-screw counterbore leaves under 1.75 mm to the bore or cap recess"
     )
 SIDE_TAP_THREAD_MAJOR_DIA = THREAD_MAJOR_MM[SIDE_TAP_SPEC.size]
 SIDE_TAP_THREAD_END_Z = COUNTERBORE_FLOOR - CASTING_FULL_THREAD_DEPTH
