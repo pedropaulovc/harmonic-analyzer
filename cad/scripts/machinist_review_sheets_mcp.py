@@ -2,14 +2,18 @@
 
 PDFs are rendered from vectors; PNG zooms sample the original image, not the
 thumbnail. PNG physical resolution comes from valid DPI metadata, otherwise
-300 dpi is assumed and explicitly reported. Neither filenames nor image metadata
-are exposed to the reviewer. One process owns one SheetStore and its crop budget.
+300 dpi is assumed and explicitly reported. A crop's reported effective dpi is
+its information resolution: PNG display upsampling adds pixels, not detail, so
+PNG crops report min(display dpi, source dpi) per axis. Neither filenames nor
+image metadata are exposed to the reviewer. One process owns one SheetStore and
+its crop budget.
 """
 
 from __future__ import annotations
 
 import io
 import math
+import os
 import sys
 import threading
 from dataclasses import dataclass
@@ -97,9 +101,12 @@ def render_sheet(
     """Return metadata-free L PNG and short text for a PDF page or original PIL image.
 
     Rectangles are half-open, top-left-origin pixels in the fitted view. Output
-    always fits VIEW_BOX; crops magnify that view by at most MAX_SCALE. PDF DPI
-    is the native render scale times 72, including any subpixel rounding of the
-    fitted bitmap. The caller retains ownership of the input page/image.
+    always fits VIEW_BOX; crops magnify that view by at most MAX_SCALE. Reported
+    effective dpi is information resolution. PDF DPI is the native render scale
+    times 72, including any subpixel rounding of the fitted bitmap. PNG DPI is
+    min(display, source) per axis: display dpi is output pixels per source inch,
+    and upsampling beyond source pixels interpolates without adding detail.
+    The caller retains ownership of the input page/image.
     """
     with PDFIUM_LOCK:
         is_png = isinstance(page_or_original_image, PILImage.Image)
@@ -144,14 +151,20 @@ def render_sheet(
             finally:
                 if gray is not original:
                     gray.close()
-            effective_dpi = (
+            display_dpi = (
                 dpi[0] * output_size[0] / (source_box[2] - source_box[0]),
                 dpi[1] * output_size[1] / (source_box[3] - source_box[1]),
             )
-            dpi_note = (
-                " (PNG 300 dpi assumed; no valid source DPI metadata)"
+            effective_dpi = (min(display_dpi[0], dpi[0]), min(display_dpi[1], dpi[1]))
+            source_note = (
+                "PNG 300 dpi assumed; no valid source DPI metadata"
                 if assumed
-                else " (PNG source DPI metadata)"
+                else "PNG source DPI metadata"
+            )
+            dpi_note = (
+                f" (information resolution = min(display "
+                f"{display_dpi[0]:.2f}×{display_dpi[1]:.2f}, source "
+                f"{dpi[0]:.2f}×{dpi[1]:.2f}); {source_note})"
             )
         else:
             scale = base_scale * magnification
@@ -392,7 +405,8 @@ def create_server(store: SheetStore) -> FastMCP:
             "0 <= x1 < x2 <= view width and 0 <= y1 < y2 <= view height; "
             "right/bottom edges are exclusive. Output fits 1976×1280 grayscale pixels, "
             "at most 8× the view scale. PDF crops render vectors; PNG crops use the "
-            "original image (valid source DPI metadata, otherwise 300 dpi assumed). "
+            "original image (valid source DPI metadata, otherwise 300 dpi assumed); "
+            "PNG effective dpi never exceeds source dpi, as upsampling adds no detail. "
             "Budget: 40 attempted crop calls per process, including invalid calls "
             "and repeats; repeated valid crops reuse a memoized rendering."
         ),
@@ -408,6 +422,9 @@ def create_server(store: SheetStore) -> FastMCP:
 
 def main() -> None:
     with SheetStore([Path(source) for source in sys.argv[1:]]) as store:
+        # Sources are resolved and open now. Leave the inherited per-attempt cwd
+        # so an orphaned server cannot lock it against Windows rename/delete.
+        os.chdir(Path(__file__).resolve().anchor)
         create_server(store).run(transport="stdio")
 
 
