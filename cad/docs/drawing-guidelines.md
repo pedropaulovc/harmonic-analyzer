@@ -92,10 +92,16 @@ and its bore, a press or sweat fit, a slide, a knife edge and its seat, a gear
 centre distance. A pass-through hole, a clearance bore, an outside profile or
 a chamfer gets the loosest title-block band that serves it.
 
-- **Every tight band has a reason the sheet shows.** The reason is the mating
-  part. A fit callout names the mate ("SLIDING FIT ON SHAFT, ITEM 4" or the
-  mate's name and drawing or part number) and the fit it needs. The shop can
-  then make the hole to the shaft instead of chasing a number.
+- **Every tight band names its mate.** A tight band is an explicit band
+  narrower than the title-block band for its decimal places, or any
+  three-place size. The reason for it is the mating part, so the callout, or
+  a flagged note attached to it (rule 7), names the mate ("SLIDING FIT ON
+  SHAFT, ITEM 4", or the mate's name and drawing or part number) and the fit
+  it needs: running, sliding, press or locating. A gear centre distance names
+  the mesh; a width that sets a stack names the stack. The shop can then make
+  the hole to the shaft instead of chasing a number. A tight band whose mate
+  appears nowhere in the package is a blocker. Either name the mate or loosen
+  the band.
 - **Matched or selectively fitted pairs.** For a one-off pair, the callout
   identifies the mate by name and assigned drawing or part number, and states
   the required clearance, interference or an unambiguous functional
@@ -416,13 +422,20 @@ A three-view orientation sheet without these is a placeholder, not a package.
 
 ### Rule 23 — Lock threaded joints exposed to operating loads
 
-For every threaded joint, identify what is fixed and what turns, rocks or
-reverses, and whether drag, torque reversal, vibration or loss of preload can
-turn the threaded member or unload its seat. Such a joint shows its mechanical
-anti-loosening means in a view or detail and the step that engages it: a jam
-nut, a nut locked by a pin or tab, a cross-pin, a key or flat with axial
-capture, a pinch clamp across a slit thread, or a staked or peened end.
+For every threaded joint the package shows or depends on, identify what is
+fixed and what turns, rocks, swings or reverses, and whether drag, torque
+reversal, vibration or loss of preload can turn the threaded member or unload
+its seat. A screw that a part pivots, swings or turns on is always exposed.
+Such a joint shows its mechanical anti-loosening means in a view or detail and
+the step that engages it: a jam nut, a nut locked by a pin or tab, a
+cross-pin, a key or flat with axial capture, a pinch clamp across a slit
+thread, or a staked or peened end.
 
+- The duty does not lapse at the package boundary. A joint listed as an
+  external interface, installed "at final assembly" or left to another
+  package still needs its lock and locking step here, or a reference to the
+  drawing and step that give them. A swinging or turning part in this package
+  that rides on an unlocked screw is a defect of this package.
 - A plain seated thread, shoulder, shim, unspecified tightening, lubricant or
   thread locker alone does not lock such a joint.
 - A cap or nut that retains a rotating cluster axially does not lock a
@@ -440,10 +453,18 @@ note rather than per screw.
 ### Rule 25 — Every sheet agrees with every other
 
 A package is reviewed as a whole. A dimension supplied on another sheet is not
-missing, but a contradiction between sheets, between a view and a note, or
-between title blocks is a defect. On an assembly, item numbers, quantities and
-descriptions agree across every BOM, every balloon matches its row, and setup
-and assembly steps agree across sheet boundaries.
+missing, but any contradiction is a blocker, because the builder cannot tell
+which statement to obey. That includes:
+
+- two views that cannot both be true of one part, such as a projection that
+  disagrees with its neighbour;
+- a callout, note, table or step that disagrees with the views or with
+  another statement, for example "BOTH ENDS" against "PLAIN END UNCUT", or a
+  station table ordered opposite to the views;
+- conflicting title blocks;
+- on an assembly, item numbers, quantities or descriptions that disagree
+  across BOMs and balloons, and setup or assembly steps that disagree across
+  sheet boundaries.
 
 ## Sources and departures
 

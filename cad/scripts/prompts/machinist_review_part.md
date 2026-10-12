@@ -46,8 +46,10 @@ say the fix):
   with no questions and it carries nothing it does not need; otherwise FIX.
 - summary: one sentence.
 - blockers: what stops you making or checking the part. A feature with no
-  size or location anywhere in the package; a contradiction within or across
-  sheets; incompatible controlled fit ranges; a missing mate or acceptance on a
+  size or location anywhere in the package; any contradiction within or across
+  sheets, between views, or between a view and a callout, note or table (rule
+  25); a tight band whose mate appears nowhere in the package (rule 4);
+  incompatible controlled fit ranges; a missing mate or acceptance on a
   matched fit, or missing essential interchangeable-fit limits (rule 4); an
   unbuildable or geometrically impossible feature or callout (rules 16, 21); a
   mid-air location origin (rule 10); a worst-case wall under 1.5 mm or
@@ -68,8 +70,9 @@ say the fix):
   dimension to a hidden line, an internal shape defined only by hidden lines,
   or hidden lines cluttering a view (rule 9); a missing or noncompliant
   isometric (rule 8); a turned part dimensioned against rule 11; a view choice
-  that hides a feature; an otherwise identifiable matched-fit mate missing its
-  name or number (rule 4).
+  that hides a feature; a mate named in the package but not at the tight
+  callout it serves (rules 4, 7). A contradiction is never clarity; it is a
+  blocker.
 - minor: taste and polish that would not change how you make the part; walls
   between 1.5 and 2.0 mm at the worst case; any shortfall the sheet states as
   a plain fact (rule 20), each quoted with its stated value.

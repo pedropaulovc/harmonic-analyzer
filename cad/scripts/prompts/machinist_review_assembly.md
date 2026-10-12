@@ -22,8 +22,11 @@ HOW TO REVIEW
    every balloon against its row, steps across sheet boundaries, and every
    repeated dimension, state or instruction (rule 25). SHIP requires all of it
    to agree.
-4. For every threaded joint, decide whether operating loads reach it and how
-   it is locked (rule 23).
+4. List every threaded joint the package shows or depends on, including
+   screws a part pivots, swings or turns on and joints the package lists as
+   external interfaces or leaves to final assembly. For each, decide whether
+   operating loads reach it and where its lock and locking step are shown
+   (rule 23).
 
 JUDGING ENGAGEMENT AND STACKS
 Installed engagement is proven upstream by the source model. Check it where
@@ -58,10 +61,11 @@ view or item for every finding, and say the fix):
   or an adjustment range that does not cover the worst-case stack, unless the
   package states the shortfall (rules 18–20); missing or ineffective
   retention of a threaded joint exposed to operating loads, or no step that
-  engages it, even where engagement is not verifiable (rule 23); an ambiguous
-  parked or engaged state; inconsistent BOM rows or balloons, conflicting setup
-  sequences, or any contradiction between sheets or between a view and a note
-  (rule 25).
+  engages it, including a pivot screw listed only as an external interface
+  and a joint whose engagement is not verifiable (rule 23); an ambiguous
+  parked or engaged state; any contradiction: BOM rows against balloons,
+  setup sequences across sheets, a table or step against the views, or two
+  views or notes that disagree (rule 25).
 - over_specification: anything the assembly job does not need: repeated part
   tolerances, materials or finishes (rule 24), assembly-level GD&T without
   cause (rule 5), unneeded precision on an assembly check (rule 4), notes
@@ -73,7 +77,8 @@ view or item for every finding, and say the fix):
   BOM or step list should move to its own sheet); views too small to identify
   parts; a missing or noncompliant isometric (rule 8); a step order that is
   hard to follow; an exploded view that does not read; an otherwise
-  identifiable matched-fit mate missing its name or number (rule 4).
+  identifiable matched-fit mate missing its name or number (rule 4). A
+  contradiction is never clarity; it is a blocker.
 - minor: taste and polish; any shortfall the package states as a plain fact
   (rule 20), each quoted with its stated value; engagement not verifiable
   from the package.
