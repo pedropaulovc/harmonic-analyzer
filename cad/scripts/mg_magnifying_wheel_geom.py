@@ -53,32 +53,32 @@ SPIGOT_LEN = DRUM_LEN  # nominally flush with the drum's front face
 HUB_STEP_Z = round(HUB_BACK_Z - (HUB_LEN - SPIGOT_LEN), 6)  # -3.51, boss front face
 HUB_FRONT_Z = round(HUB_BACK_Z - HUB_LEN, 6)  # -12.51, spigot front face
 DRUM_MID_Z = round((HUB_STEP_Z + HUB_FRONT_Z) / 2.0, 6)  # -8.01, where the drum sits
-BORE_DIA = round(0.1890 * 25.4, 6)  # 4.8006, reamed: runs on the 3/16 pin
+# Reamed to a stated running clearance on the finished axle (mg_wheel_group
+# HUB_RUNNING), so the Ø prints as a reference nominal.
+BORE_DIA = round(0.1890 * 25.4, 6)  # 4.8006
 
 # Printed bands, (upper, lower) deviations.
 HUB_DIA_BAND = (0.10, -0.10)
 HUB_LEN_BAND = (0.10, -0.10)
-# r6: press fit under the drum's H7 bore. p6 (+0.029/+0.018) met H7's top at
-# its bottom, so the worst pair was line-to-line; r6 grips at every corner.
-SPIGOT_BAND = (0.034, 0.023)
 # Spigot length plus-only against the drum's minus-only length: the drum,
 # pressed to the boss, never stands proud of the spigot face, so the front
 # washer bears on the spigot (the iron), never on the drum.
 SPIGOT_LEN_BAND = (0.10, 0.0)
-BORE_BAND = (0.010, 0.0)
 DRUM_RECESS = (
     SPIGOT_LEN + SPIGOT_LEN_BAND[1] - (DRUM_LEN + DRUM_LEN_BAND[0]),
     SPIGOT_LEN + SPIGOT_LEN_BAND[0] - (DRUM_LEN + DRUM_LEN_BAND[1]),
 )  # 0.0 .. 0.2: the drum face below the spigot face
 if DRUM_RECESS[0] < 0.0:
     raise AssertionError(f"the drum can stand proud of the spigot: {DRUM_RECESS}")
-# Diametral interference of the drum on the spigot, (min, max).
-DRUM_PRESS = (
-    SPIGOT_DIA + SPIGOT_BAND[1] - (DRUM_BORE + DRUM_BORE_BAND[0]),
-    SPIGOT_DIA + SPIGOT_BAND[0] - (DRUM_BORE + DRUM_BORE_BAND[1]),
-)  # 0.005 .. 0.034
+# Matched fit (policy rule 2): the drum is made first to its H7 bore, and the
+# spigot is turned to this diametral interference in that finished bore, so
+# the spigot's Ø prints as a reference nominal.  The range is r6's against H7
+# (the user's round-6 ruling), stated rather than banded on the spigot.
+DRUM_PRESS = (0.005, 0.034)
 if DRUM_PRESS[0] <= 0.0:
     raise AssertionError(f"the drum is not a press fit on the spigot: {DRUM_PRESS}")
+# The finished spigot over every H7 bore: its smallest in the smallest bore.
+SPIGOT_DIA_MIN = DRUM_BORE + DRUM_BORE_BAND[1] + DRUM_PRESS[0]  # 14.005
 
 # --- spokes ------------------------------------------------------------------------
 SPOKE_COUNT = 6  # counted on the p.51 full-page photo; 0 and 180 deg on the bar
@@ -93,8 +93,8 @@ HUB_FILLET_R = 3.0
 RIM_FILLET_R = 4.0
 # The rim bore's two edges (the spoke faces stay sharp). TIE 2 breaks into the
 # bore at mid-width, so a bigger round eats its ligament to the rim side faces
-# (mg_magnifying_wheel_spec): R0.80 prints at three places, so the title
-# block's .XXX row (R0.67-0.93) keeps that wall over 2.0; no model band.
+# (mg_magnifying_wheel_spec): the R prints as a single limit, R0.8 MAX, so no
+# round is larger and a sharp edge falls under the title block's edge break.
 # Section A-A cannot import a fillet radius whose arc is the cut, so the R is
 # a sheet radial on the cut arc (user, option (a), 2026-10-12).
 CAST_ROUND_R = 0.80

@@ -128,11 +128,11 @@ BAR_PRESS = (
     _PIN[0] - (_bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[0]),
     _PIN[1] - (_bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[1]),
 )  # 0.010 .. 0.030
-# Running fit in the wheel's reamed bore (clearance, both corners > 0).
-HUB_RUNNING = (
-    _wheel.BORE_DIA + _wheel.BORE_BAND[1] - _PIN[1],
-    _wheel.BORE_DIA + _wheel.BORE_BAND[0] - _PIN[0],
-)  # 0.033 .. 0.053
+# Matched running fit (policy rule 2): the wheel's bore is reamed to this
+# diametral clearance on its finished axle, the range the round-15 band gave.
+HUB_RUNNING = (0.033, 0.053)
+# The largest finished bore: the loosest clearance on the largest pin.
+WHEEL_BORE_MAX = _PIN[1] + HUB_RUNNING[1]  # 4.8205
 if min(BAR_PRESS) <= 0.0:
     raise AssertionError(f"pin is not a press fit in the bar: {BAR_PRESS}")
 if min(HUB_RUNNING) <= 0.0:

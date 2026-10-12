@@ -39,6 +39,7 @@ from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
     set_dimension_callouts,
+    set_reference_dimensions,
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdges, scan_view_edges
@@ -77,10 +78,12 @@ from mg_magnifying_wheel_spec import (
     DRAWING_REFERENCE_PRECISION,
     HUB_DIA,
     HUB_FILLET_R,
+    REFERENCE_DIMENSIONS,
     RIM_AXIAL,
     RIM_FILLET_R,
     RIM_INNER_DIA,
     RIM_OUTER_DIA,
+    ROUND_TEXT_SUFFIX,
     SPIGOT_DIA,
     SURFACE_FINISHES,
     TIE1_CLOCK_DEG,
@@ -378,11 +381,11 @@ _RIM_WIDTH_ROW = _SPOKE_ROW + 0.010
 # through a text (run 7: four extension-through-own-text findings).
 # Nearest the part the spigot length ("9.00 +0.10/0"), whose band keeps the
 # drum from standing proud (DRUM_RECESS); then the web's centre plane
-# ("12.51"), which the rim and its groove share, its extension line rising
+# ("12.5"), which the rim and its groove share, its extension line rising
 # from the axis left of the spigot step's, so the row above stops short of
 # it; last the overall ("19.60 ±0.10"), which holds the axle's nut stack,
 # left of the back face above the A-A caption.  Each band's need, and the
-# plane the 12.51 locates, stands over its value (CALLOUTS_ABOVE), its text
+# plane the 12.5 locates, stands over its value (CALLOUTS_ABOVE), its text
 # centred clear of the face it leaves.  The two right-hand sizes keep their
 # arrows inside their spans, so no tail reaches a neighbouring extension
 # line (run 11).
@@ -394,7 +397,7 @@ _RIM_WIDTH_ROW = _SPOKE_ROW + 0.010
 # caption; the plane's runs 5.4 mm above it; the spigot length's clears the
 # plane's two-line block (value and callout, 9.1 mm over its row) by the
 # layout audit's text separation, so its line no longer runs through the
-# 12.51 (run 14's text-on-line finding).
+# plane's value (run 14's text-on-line finding).
 _ABOVE_UP = _TEXT_LINE / 2.0
 _HUB_ROWS = tuple(
     SECTION_CENTER[1] - _RIM_R - drop for drop in (0.0065, 0.0184, 0.0238)
@@ -411,11 +414,11 @@ SECTION_KEEP = {
     "HubDia": (_HUB_DIA_X, SECTION_CENTER[1]),
     "GrooveBottomDia": (_GROOVE_DIA_X, SECTION_CENTER[1] + 0.035),
     # Right of the view only the spigot's Ø, its line 7.2 mm past the spigot
-    # end and its text under the spigot, so the press-fit callout lines
+    # end and its text under the spigot, so the matched-fit callout lines
     # stack down toward the spigot length's row: ISO_CLEAR off the
-    # isometric, proven at build (_assert_text_off_iso).  Its point stands
-    # half a line over run 14's, so the fifth callout line ends no lower
-    # than half a line under run 14's foot.
+    # isometric, proven at build (_assert_text_off_iso), so no line is wider
+    # than "INTERFERENCE IN".  Its point stands half a line over run 14's, so
+    # the fourth callout line ends a line and a half over run 14's foot.
     "SpigotDia": (
         _section_x(HUB_FRONT_Z) + 0.0072,
         SECTION_CENTER[1] - SPIGOT_DIA / 2000.0 - 0.012 + _TEXT_LINE / 2.0,
@@ -469,23 +472,25 @@ _ROUND_ARC_CENTER = (
 )
 _CUT_NORMAL = (1.0, 0.0, 0.0)
 ROUND_TEXT_XY = (SECTION_CENTER[0] + 0.0292, SECTION_CENTER[1] + 0.0542)
-# The R's .XXX band holds TIE 2's 2.0 wall to the rim's side faces
+# The R's single limit holds TIE 2's 2.0 wall to the rim's side faces
 # (mg_magnifying_wheel_spec.TIE2_FACE_WALL), so the callout says so.
 ROUND_CALLOUT = "2X RIM BORE EDGES\nHOLDS TIE 2 WALL"
 
 
-# The two fits print on their own diameters (policy rule 6), each stating the
-# diametral fit its band holds with the mate (mg_wheel_group.HUB_RUNNING,
-# mg_magnifying_wheel_geom.DRUM_PRESS): the axle's 3/16 drill rod runs in
-# the reamed bore; the spigot is pressed into the drum's H7 bore.
+# The two fits print on their own diameters (policy rule 6) as matched fits
+# (policy rule 2): each Ø is a reference nominal (REFERENCE_DIMENSIONS), and
+# its callout names the mate and states the diametral fit the finished pair
+# must make (mg_wheel_group.HUB_RUNNING, mg_magnifying_wheel_geom.DRUM_PRESS):
+# the bore is reamed to run on the finished axle, and the spigot turned to
+# press into the drum's finished H7 bore.
 DIMENSION_CALLOUTS = {
     "BoreDiaDim": (
-        "REAM THRU\nRUNS ON MG-WHEEL-AXLE\n"
-        f"{HUB_RUNNING[0]:.3f}-{HUB_RUNNING[1]:.3f}\nDIAMETRAL CLEARANCE"
+        f"REAM THRU\n{HUB_RUNNING[0]:.3f}-{HUB_RUNNING[1]:.3f} DIAMETRAL\n"
+        "CLEARANCE ON\nMG-WHEEL-AXLE"
     ),
     "SpigotDia": (
-        "PRESS FIT IN\nMG-WHEEL-DRUM\n"
-        f"{DRUM_PRESS[0]:.3f}-{DRUM_PRESS[1]:.3f}\nDIAMETRAL\nINTERFERENCE"
+        f"{DRUM_PRESS[0]:.3f}-{DRUM_PRESS[1]:.3f}\nDIAMETRAL\n"
+        "INTERFERENCE IN\nMG-WHEEL-DRUM"
     ),
     # The OD's .XX floor keeps the groove deeper than the pen wire
     # (mg_magnifying_wheel_spec.GROOVE_DEPTH_MIN).
@@ -498,7 +503,7 @@ DIMENSION_CALLOUTS = {
     "Tie2HoleDia": "TIE 2",
 }
 # The tie holes' operation stands over their Ø, keeping each block as narrow
-# as its stacked Ø; each axial band's need, and the plane the 12.51
+# as its stacked Ø; each axial band's need, and the plane the 12.5
 # locates, stands over its value.
 CALLOUTS_ABOVE = {
     "Tie1HoleDia": "DRILL THRU",
@@ -821,8 +826,8 @@ def _line_through(
 
 def _pass_through_places(display: Any, label: str) -> None:
     """Give a sheet-added dimension the places the spec owns for it
-    (DRAWING_REFERENCE_PRECISION), so its title-block row is the one the
-    spec's walls are proved against."""
+    (DRAWING_REFERENCE_PRECISION), so it prints the value the spec's walls
+    are proved against."""
     display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
     places = DRAWING_REFERENCE_PRECISION[label]
     if int(display.GetPrimaryPrecision2()) != places:
@@ -835,9 +840,10 @@ def _add_round_radius(adapter: Any, section: Any, edges: ViewEdges) -> Any:
 
     The arc is picked as a native entity from the section's edge scan, so a
     moved round fails loud in ``circle_at``; the radial must attach to that
-    arc alone and measure the spec's R (``assert_dimension_measures``).  No
-    band is drawn: the spec's three places put it under the title block's
-    .XXX row, which ``TIE2_FACE_WALL`` is proved against.
+    arc alone and measure the spec's R (``assert_dimension_measures``).  It
+    prints a single limit, R0.8 MAX (one place and the spec's suffix), the
+    largest R ``TIE2_FACE_WALL`` is proved against; a sharp edge falls under
+    the title block's edge break.
     """
     label = "rim bore round"
     try:
@@ -863,6 +869,10 @@ def _add_round_radius(adapter: Any, section: Any, edges: ViewEdges) -> Any:
         entity_types=("EDGE",),
     )
     _pass_through_places(display, label)
+    display.SetText(2, ROUND_TEXT_SUFFIX)  # swDimensionTextSuffix
+    suffix = str(display.GetText(2) or "")
+    if suffix != ROUND_TEXT_SUFFIX:
+        raise RuntimeError(f"{label}: suffix {suffix!r} did not persist")
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     set_dimension_callouts(
         adapter, [annotation], {dimension_name(adapter, annotation): ROUND_CALLOUT}
@@ -950,6 +960,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    # The matched fits' Ø are reference nominals: "(Ø14.00)", "(Ø4.80)".
+    set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     offset_dimension_text(adapter, annotations, {"SpokeRootWidth": SPOKE_ROOT_TEXT_XY})
     _set_arrows_inside(adapter, annotations)

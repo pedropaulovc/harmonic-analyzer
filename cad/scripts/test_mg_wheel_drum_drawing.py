@@ -59,7 +59,7 @@ def test_every_size_carries_its_band_on_the_model() -> None:
 
 
 def test_drum_presses_on_the_wheel_spigot_never_proud() -> None:
-    # H7 bore on the r6 spigot: interference at every band corner.
+    # H7 bore, made first; the spigot is turned to the stated interference in it.
     assert spec.DRUM_BORE == wheel_geom.SPIGOT_DIA
     assert wheel_geom.DRUM_PRESS == pytest.approx((0.005, 0.034))
     # Nominally flush; the drum's minus-only length against the spigot's

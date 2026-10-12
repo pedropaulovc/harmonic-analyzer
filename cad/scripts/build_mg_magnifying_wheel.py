@@ -62,7 +62,6 @@ from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from mg_magnifying_wheel_geom import (
-    BORE_BAND,
     BORE_DIA,
     CAST_ROUND_R,
     GROOVE_BOTTOM_BAND,
@@ -82,7 +81,6 @@ from mg_magnifying_wheel_geom import (
     RIM_INNER_DIA,
     RIM_OUTER_DIA,
     RIM_RING_RADIAL,
-    SPIGOT_BAND,
     SPIGOT_DIA,
     SPIGOT_LEN,
     SPIGOT_LEN_BAND,
@@ -847,15 +845,13 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
 
     # Drawing-simplicity rule 2: the tight bands sit on the model dimensions,
-    # the places on every marked one.
+    # the places on every marked one.  The spigot and the bore are matched
+    # fits (mg_magnifying_wheel_spec.REFERENCE_DIMENSIONS): no band.
     set_dimension_bilateral_tolerance(
         adapter, "HubProfile", "HubDia", *deviations(HUB_DIA_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "HubProfile", "HubLength", *deviations(HUB_LEN_BAND)
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "HubProfile", "SpigotDia", *deviations(SPIGOT_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "HubProfile", "SpigotLength", *deviations(SPIGOT_LEN_BAND)
@@ -865,9 +861,6 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "GrooveProfile", "GrooveBottomDia", *deviations(GROOVE_BOTTOM_BAND)
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDiaDim", *deviations(BORE_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "Tie1Profile", "Tie1HoleDia", *deviations(TIE_HOLE_BAND)

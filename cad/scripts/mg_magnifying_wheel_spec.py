@@ -22,8 +22,8 @@ import math
 from _gtol_cylinder import CylinderFace
 from _printed_tolerance import angular_band_deg, printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
+import mg_lever_wire_geom as _lever
 from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
-    BORE_BAND,
     BORE_DIA,
     CAST_ROUND_R,
     GROOVE_BOTTOM_BAND,
@@ -34,13 +34,14 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     HUB_DIA,
     HUB_DIA_BAND,
     HUB_FILLET_R,
+    HUB_FRONT_Z,
     PEN_WIRE_DIA,
     RIM_AXIAL,
     RIM_FILLET_R,
     RIM_INNER_DIA,
     RIM_OUTER_DIA,
-    SPIGOT_BAND,
     SPIGOT_DIA,
+    SPIGOT_DIA_MIN,
     SPOKE_AXIAL,
     SPOKE_COUNT,
     SPOKE_ROOT_WIDTH,
@@ -54,6 +55,7 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     clock_to_local_deg,
     fillet,
 )
+from mg_wheel_group import WHEEL_BORE_MAX
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The face view carries the rim, bore, spoke, fillet and tie
@@ -73,36 +75,45 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Tie2Profile": {"Tie2HoleDia", "Tie2Angle"},
 }
 # Decimal places per marked dimension (drawing-simplicity rule 2): the cast
-# shapes at one place, the turned and drilled sizes at two, the press-fit
-# spigot and the reamed bore at three.  The rim's OD keeps two: at .X its
-# Ø99.2 floor leaves the groove 0.75 deep under the 0.8 pen wire
-# (GROOVE_DEPTH_MIN), so its callout says what the band holds.
+# shapes at one place, the turned and drilled sizes at two.  The rim's OD
+# keeps two: at .X its Ø99.2 floor leaves the groove 0.75 deep under the 0.8
+# pen wire (GROOVE_DEPTH_MIN), so its callout says what the band holds.  The
+# web's plane prints at .X: the lever wire clears the rim and spokes with
+# the web moved the whole row (LEVER_WIRE_WEB_GAP below).  The spigot and the
+# bore are matched fits, their two places a reference nominal.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RimProfile": {"RimOuterDiaDim": 2, "RimInnerDiaDim": 1},
     "SpokeProfile": {"SpokeRootWidth": 1, "SpokeTipWidth": 1},
     "Spoke": {"SpokeAxial": 1},
     "HubProfile": {
         "HubDia": 2,
-        "SpigotDia": 3,
+        "SpigotDia": 2,
         "HubLength": 2,
         "SpigotLength": 2,
-        "HubFrontZ": 2,
+        "HubFrontZ": 1,
     },
-    "BoreProfile": {"BoreDiaDim": 3},
+    "BoreProfile": {"BoreDiaDim": 2},
     "HubFillets": {"HubFilletR": 1},
     "RimFillets": {"RimFilletR": 1},
     "GrooveProfile": {"GrooveR": 2, "GrooveBottomDia": 2},
     "Tie1Profile": {"Tie1Y": 2, "Tie1HoleDia": 2},
     "Tie2Profile": {"Tie2HoleDia": 2, "Tie2Angle": 0},
 }
+# Matched fits (policy rule 2): the spigot is turned to the stated
+# interference in the finished drum's bore and the bore reamed to the stated
+# clearance on the finished axle, so each Ø is a reference nominal and its
+# callout names the mate and the acceptance.
+REFERENCE_DIMENSIONS = frozenset({"SpigotDia", "BoreDiaDim"})
 # Places of the sheet-added dimensions (policy rule 2: the spec owns them,
-# the sheet only passes them through).  The rim-bore round takes three, so
-# the title block's .XXX row bounds it (R0.67-0.93 for TIE2_FACE_WALL); the
-# rim's axial width one, its .X row the coarsest the walls admit.
+# the sheet only passes them through).  The rim-bore round is a single
+# limit, R0.8 MAX at one place: TIE2_FACE_WALL takes the R at that limit,
+# and a sharp edge falls under the title block's edge break.  The rim's
+# axial width takes one, its .X row the coarsest the walls admit.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
-    "rim bore round": 3,
+    "rim bore round": 1,
     "rim axial width": 1,
 }
+ROUND_TEXT_SUFFIX = " MAX"
 
 # Rule 6: the notes say only what no callout can.  The spigot's press fit and
 # the bore's running fit print on their own diameter callouts.
@@ -146,9 +157,8 @@ _RIM_FILLET = _printed(RIM_FILLET_R, "RimFilletR")
 _RIM_AXIAL_MIN = RIM_AXIAL - printed_band_mm(
     DRAWING_REFERENCE_PRECISION["rim axial width"]
 )
-_CAST_ROUND_MAX = CAST_ROUND_R + printed_band_mm(
-    DRAWING_REFERENCE_PRECISION["rim bore round"]
-)
+# R0.8 MAX: the R's single limit is its nominal.
+_CAST_ROUND_MAX = CAST_ROUND_R
 _HUB_DIA = (HUB_DIA + HUB_DIA_BAND[1], HUB_DIA + HUB_DIA_BAND[0])
 _TIE_R_MAX = (TIE_HOLE_DIA + TIE_HOLE_BAND[0]) / 2.0 + TIE_POSITION_TOL
 _SPOKE_PITCH = 360.0 / SPOKE_COUNT
@@ -170,8 +180,8 @@ TIE1_FILLET_WALL = (
     )
     - _TIE_R_MAX
 )
-# TIE 1 to the bore it runs beside.
-TIE1_BORE_WALL = TIE1_R - _TIE_R_MAX - (BORE_DIA + BORE_BAND[0]) / 2.0
+# TIE 1 to the bore it runs beside, at the largest finished bore.
+TIE1_BORE_WALL = TIE1_R - _TIE_R_MAX - WHEEL_BORE_MAX / 2.0
 # TIE 2 to the nearest rim-fillet foot, where the hole breaks out at the rim
 # ID: its angle off the nearest spoke, less the printed angular band.
 _tie2_local = clock_to_local_deg(TIE2_CLOCK_DEG)
@@ -198,24 +208,43 @@ TIE2_SPOKE_WALL = (
     - _TIE_R_MAX
 )
 # TIE 2 to the rim's side faces: it breaks into the bore at mid-width, where
-# the faces end at the rim-bore rounds' tangent line (the largest printed R).
+# the faces end at the rim-bore rounds' tangent line (R0.8 MAX: 3.6 - 0.8 -
+# 0.575 = 2.225).
 TIE2_FACE_WALL = _RIM_AXIAL_MIN / 2.0 - _CAST_ROUND_MAX - _TIE_R_MAX
-# Spigot to bore, and the groove floor to the rim ID.
-SPIGOT_WALL = (SPIGOT_DIA + SPIGOT_BAND[1] - BORE_DIA - BORE_BAND[0]) / 2.0
+# Spigot to bore at the smallest finished spigot and the largest finished
+# bore, and the groove floor to the rim ID.
+SPIGOT_WALL = (SPIGOT_DIA_MIN - WHEEL_BORE_MAX) / 2.0
 GROOVE_FLOOR_WALL = (GROOVE_BOTTOM_DIA + GROOVE_BOTTOM_BAND[1] - _RIM_ID[1]) / 2.0
 
 WALLS = {
     "tie1_to_hub_od": TIE1_HUB_WALL,  # 2.025
     "tie1_to_hub_fillet": TIE1_FILLET_WALL,  # 2.088
-    "tie1_to_bore": TIE1_BORE_WALL,  # 6.870
+    "tie1_to_bore": TIE1_BORE_WALL,  # 6.865
     "tie2_to_rim_fillet": TIE2_SPOKE_WALL,  # 2.706
-    "tie2_to_rim_faces": TIE2_FACE_WALL,  # 2.095
-    "spigot_to_bore": SPIGOT_WALL,  # 4.606
+    "tie2_to_rim_faces": TIE2_FACE_WALL,  # 2.225
+    "spigot_to_bore": SPIGOT_WALL,  # 4.592
     "groove_floor": GROOVE_FLOOR_WALL,  # 4.350
 }
 for _name, _wall in WALLS.items():
     if _wall < MIN_WALL:
         raise AssertionError(f"wheel wall {_name} {_wall:.3f} < {MIN_WALL}")
+
+# The web and rim locate off the spigot face at .X (HubFrontZ).  Moved the
+# whole row (and the 12.51 printed as 12.5) toward the pen side, the rim's
+# and the spokes' pen faces still clear the lever wire's run; the boss, the
+# spigot and the drum lane are hub stations the row does not move.  The pen
+# wire leaves the groove plumb, so the groove's shift only leans it.
+_WEB_PLACES = DRAWING_PRECISION["HubProfile"]["HubFrontZ"]
+_WEB_SHIFT_MAX = printed_band_mm(_WEB_PLACES) + abs(
+    round(HUB_FRONT_Z, _WEB_PLACES) - HUB_FRONT_Z
+)  # 0.81
+LEVER_WIRE_WEB_GAP = (
+    min(_lever.RUN_GAPS["rim"], _lever.RUN_GAPS["spokes"]) - _WEB_SHIFT_MAX
+)  # 0.417
+if LEVER_WIRE_WEB_GAP < _lever.CLEARANCE:
+    raise AssertionError(
+        f"lever wire {LEVER_WIRE_WEB_GAP:.3f} off the shifted web < {_lever.CLEARANCE}"
+    )
 
 # The pen wire seats in the groove at every printed corner: the narrowest
 # groove is wider than the wire, the shallowest buries it below the rim OD,

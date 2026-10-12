@@ -10,6 +10,7 @@ import pytest
 
 import build_mg_magnifying_wheel as part
 import draw_mg_magnifying_wheel as drawing
+import mg_lever_wire_geom
 import mg_magnifying_wheel_geom as geom
 import mg_magnifying_wheel_spec
 from _drawing_contract import model_toleranced_dimensions
@@ -61,20 +62,23 @@ def test_every_marked_dimension_has_model_places() -> None:
         for names in spec.DRAWING_PRECISION.values()
         for name, digits in names.items()
     }
-    # The press-fit spigot and the reamed bore print their microns.
-    assert spec.DRAWING_PRECISION["HubProfile"]["SpigotDia"] == 3
-    assert spec.DRAWING_PRECISION["BoreProfile"]["BoreDiaDim"] == 3
+    # The spigot and the bore are matched fits: a reference nominal at two
+    # places, the acceptance on the callout.  The web's plane prints at .X.
+    assert spec.DRAWING_PRECISION["HubProfile"]["SpigotDia"] == 2
+    assert spec.DRAWING_PRECISION["BoreProfile"]["BoreDiaDim"] == 2
+    assert spec.REFERENCE_DIMENSIONS == {"SpigotDia", "BoreDiaDim"}
+    assert spec.DRAWING_PRECISION["HubProfile"]["HubFrontZ"] == 1
+    assert spec.LEVER_WIRE_WEB_GAP == pytest.approx(0.417, abs=1e-3)
+    assert spec.LEVER_WIRE_WEB_GAP >= mg_lever_wire_geom.CLEARANCE
 
 
 def test_tight_bands_sit_on_the_model_dimensions() -> None:
     assert model_toleranced_dimensions(part) == {
         ("HubProfile", "HubDia"): "*deviations(HUB_DIA_BAND)",
         ("HubProfile", "HubLength"): "*deviations(HUB_LEN_BAND)",
-        ("HubProfile", "SpigotDia"): "*deviations(SPIGOT_BAND)",
         ("HubProfile", "SpigotLength"): "*deviations(SPIGOT_LEN_BAND)",
         ("GrooveProfile", "GrooveR"): "*deviations(GROOVE_R_BAND)",
         ("GrooveProfile", "GrooveBottomDia"): "*deviations(GROOVE_BOTTOM_BAND)",
-        ("BoreProfile", "BoreDiaDim"): "*deviations(BORE_BAND)",
         ("Tie1Profile", "Tie1HoleDia"): "*deviations(TIE_HOLE_BAND)",
         ("Tie2Profile", "Tie2HoleDia"): "*deviations(TIE_HOLE_BAND)",
         ("Tie1Profile", "Tie1Y"): "TIE_POSITION_TOL",
@@ -87,15 +91,20 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     assert spec.WALLS["tie2_to_rim_fillet"] == pytest.approx(2.706, abs=1e-3)
     assert spec.WALLS["tie1_to_hub_fillet"] == pytest.approx(2.088, abs=1e-3)
     # TIE 2 breaks into the bore at mid-width: its ligament ends at the
-    # rim-bore rounds, R0.80 printed at .XXX (R0.93 at most), no model band,
-    # on a rim 8.0 wide at .X (7.2 at least).
-    assert spec.WALLS["tie2_to_rim_faces"] == pytest.approx(2.095, abs=1e-3)
+    # rim-bore rounds, R0.8 MAX (no model band), on a rim 8.0 wide at .X
+    # (7.2 at least).
+    assert spec.WALLS["tie2_to_rim_faces"] == pytest.approx(2.225, abs=1e-3)
     assert geom.CAST_ROUND_R == 0.80
     assert not hasattr(geom, "CAST_ROUND_BAND")
     assert spec.DRAWING_REFERENCE_PRECISION == {
-        "rim bore round": 3,
+        "rim bore round": 1,
         "rim axial width": 1,
     }
+    assert spec.ROUND_TEXT_SUFFIX == " MAX"
+    # The matched fits' worst pair: the smallest spigot over the largest bore.
+    assert spec.WALLS["spigot_to_bore"] == pytest.approx(
+        (14.0 + 0.005 - (4.7625 + 0.005 + 0.053)) / 2.0
+    )
     assert "RimRounds" not in spec.DRAWING_DIMENSIONS
     # At 4:30 (-45) the worst printed casting leaves TIE 2 about a 1.2 wall.
     assert geom.TIE2_CLOCK_DEG == -43.0
@@ -158,13 +167,13 @@ def test_linked_notes_specify_the_spokes_and_ties() -> None:
     assert "TIE 1" in notes and "TIE 2" in notes
     # The bore's REAM THRU callout carries the process; the notes do not.
     assert "REAMED" not in notes
-    # Each fit prints on its own diameter, stating what its band holds.
+    # Each fit prints on its own diameter: the mate and the stated fit.
     assert "PRESS FIT" not in notes and "RUNS ON" not in notes
-    assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"].endswith(
-        "0.033-0.053\nDIAMETRAL CLEARANCE"
+    assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"] == (
+        "REAM THRU\n0.033-0.053 DIAMETRAL\nCLEARANCE ON\nMG-WHEEL-AXLE"
     )
-    assert drawing.DIMENSION_CALLOUTS["SpigotDia"].endswith(
-        "0.005-0.034\nDIAMETRAL\nINTERFERENCE"
+    assert drawing.DIMENSION_CALLOUTS["SpigotDia"] == (
+        "0.005-0.034\nDIAMETRAL\nINTERFERENCE IN\nMG-WHEEL-DRUM"
     )
     assert drawing.ROUND_CALLOUT.endswith("\nHOLDS TIE 2 WALL")
     assert drawing.CALLOUTS_ABOVE["HubLength"] == "LOCKNUT ON FULL THREAD"
