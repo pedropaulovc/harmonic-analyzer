@@ -43,12 +43,8 @@ from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 
 import _telemetry
-from _drawing_marks import (
-    apply_drawing_precision,
-    apply_drawing_properties,
-    clear_dimensions_for_drawing,
-    mark_dimensions_for_drawing,
-)
+from _drawing_precision import apply_drawing_precision
+from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from dt_crank_arm_spec import (

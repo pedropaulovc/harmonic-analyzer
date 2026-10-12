@@ -19,7 +19,7 @@ def deviations(band: tuple[float, float]) -> tuple[float, float]:
 
     The named bands are written ``(upper, lower)`` because that is how a fit is
     quoted on a print (upper deviation first, ASME Y14.5 §2.3.2), but
-    ``_drawing_marks.set_dimension_bilateral_tolerance`` takes
+    ``_drawing_tolerances.set_dimension_bilateral_tolerance`` takes
     ``(lower_deviation_mm, upper_deviation_mm)``.  BOTH orderings type-check and
     a silent swap INVERTS the band, so no call site is allowed to transpose by
     hand — splat this instead::

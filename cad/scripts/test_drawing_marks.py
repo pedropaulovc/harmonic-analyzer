@@ -9,6 +9,9 @@ from typing import Any
 import pytest
 
 import _drawing_marks
+import _drawing_precision
+import _drawing_prefix
+import _drawing_tolerances
 from _fit_ream_slide import REAM_SLIDE
 from dt_pinion_cam_pin_spec import PIN_DIA_BAND
 from dt_pinion_cam_spec import BORE_BAND as CAM_BORE_BAND
@@ -94,10 +97,10 @@ def test_angular_tolerance_helper_has_an_operation_span(
         spans.append((name, attributes))
         yield
 
-    monkeypatch.setattr(_drawing_marks._telemetry, "span", capture_span)
+    monkeypatch.setattr(_drawing_tolerances._telemetry, "span", capture_span)
 
     with pytest.raises(ValueError, match="angular tolerance must be positive"):
-        _drawing_marks.set_dimension_symmetric_angular_tolerance(
+        _drawing_tolerances.set_dimension_symmetric_angular_tolerance(
             object(), "RodProfile", "GripAngle", 0.0
         )
 
@@ -121,16 +124,16 @@ def test_dimension_prefix_uses_native_readback_after_void_setter(
 
     display = PrefixDisplay()
     monkeypatch.setattr(
-        _drawing_marks, "_named_dimension", lambda *_args: (display, object())
+        _drawing_prefix, "_named_dimension", lambda *_args: (display, object())
     )
-    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_drawing_prefix, "_early_bound", lambda value, _type: value)
 
     if accepts_write:
-        _drawing_marks.set_dimension_prefix(object(), "CapProfile", "CapR", "SR")
+        _drawing_prefix.set_dimension_prefix(object(), "CapProfile", "CapR", "SR")
         assert display.GetText(1) == "SR"
     else:
         with pytest.raises(RuntimeError, match="prefix did not persist"):
-            _drawing_marks.set_dimension_prefix(object(), "CapProfile", "CapR", "SR")
+            _drawing_prefix.set_dimension_prefix(object(), "CapProfile", "CapR", "SR")
 
 
 @pytest.mark.parametrize(
@@ -144,14 +147,14 @@ def test_dimension_prefix_uses_native_readback_after_void_setter(
 def test_sub_hundredth_model_bands_get_exact_tolerance_precision(
     band: tuple[float, float], expected: int
 ) -> None:
-    assert _drawing_marks._tolerance_places(*band) == expected
+    assert _drawing_tolerances._tolerance_places(*band) == expected
 
 
 @pytest.mark.parametrize("band", [PIN_DIA_BAND, CAM_BORE_BAND])
 def test_u27_slip_fit_bands_print_at_two_places(band: tuple[float, float]) -> None:
     # U27 (Main, 2026-09-23): the cam bore and cam pin moved from micron press
     # and slide bands to hundredth slip-fit bands a novice can hold.
-    assert _drawing_marks._tolerance_places(*band) == 2
+    assert _drawing_tolerances._tolerance_places(*band) == 2
 
 
 def test_display_precision_times_each_com_step_on_its_own_span(
@@ -173,14 +176,16 @@ def test_display_precision_times_each_com_step_on_its_own_span(
     annotated: list[dict[str, Any]] = []
     display = PrecisionDisplay()
     monkeypatch.setattr(
-        _drawing_marks, "_named_dimension", lambda *_args: (display, object())
+        _drawing_precision, "_named_dimension", lambda *_args: (display, object())
     )
-    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_drawing_precision, "_early_bound", lambda value, _type: value)
     monkeypatch.setattr(
-        _drawing_marks._telemetry, "annotate", lambda **attrs: annotated.append(attrs)
+        _drawing_precision._telemetry,
+        "annotate",
+        lambda **attrs: annotated.append(attrs),
     )
 
-    _drawing_marks.set_dimension_display_precision(object(), "Boss", "D1", 3)
+    _drawing_precision.set_dimension_display_precision(object(), "Boss", "D1", 3)
 
     (timings,) = annotated
     assert set(timings) == {"lookup_ms", "bind_ms", "set_ms", "readback_ms"}
@@ -227,13 +232,13 @@ def test_bilateral_tolerance_sets_and_verifies_display_precision(
     display = PrecisionDisplay()
     dimension = SimpleNamespace(Tolerance=tolerance)
     monkeypatch.setattr(
-        _drawing_marks,
+        _drawing_tolerances,
         "_named_dimension",
         lambda *_args: (display, dimension),
     )
-    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_drawing_tolerances, "_early_bound", lambda value, _type: value)
 
-    _drawing_marks.set_dimension_bilateral_tolerance(
+    _drawing_tolerances.set_dimension_bilateral_tolerance(
         object(), "RodProfile", "RodDia", -0.0025, 0.0025
     )
 
@@ -276,11 +281,11 @@ def test_angular_tolerance_prints_every_place_of_its_band(
     display = PrecisionDisplay()
     dimension = SimpleNamespace(Tolerance=Tolerance(), DrivenState=1)
     monkeypatch.setattr(
-        _drawing_marks, "_named_dimension", lambda *_args: (display, dimension)
+        _drawing_tolerances, "_named_dimension", lambda *_args: (display, dimension)
     )
-    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_drawing_tolerances, "_early_bound", lambda value, _type: value)
 
-    _drawing_marks.set_dimension_symmetric_angular_tolerance(
+    _drawing_tolerances.set_dimension_symmetric_angular_tolerance(
         object(), "BoreProfile", "BoreFlatClock", tolerance_deg, require_driven=True
     )
 
@@ -294,10 +299,10 @@ def test_tolerance_precision_rejects_silent_com_failure(
         SetPrecision3=lambda *_args: -1,
         GetPrimaryTolPrecision2=lambda: 2,
     )
-    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_drawing_tolerances, "_early_bound", lambda value, _type: value)
 
     with pytest.raises(RuntimeError, match="requested 3 decimals.*reports 2"):
-        _drawing_marks._set_tolerance_precision(
+        _drawing_tolerances._set_tolerance_precision(
             display, (-0.004, 0.004), label="PinDia@PinProfile"
         )
 
@@ -320,10 +325,10 @@ def test_tolerance_prints_at_the_nominals_places_when_asked(
 ) -> None:
     # Farm run 20261009T171439353Z: the knife mount's Ø3.175 ream band
     # 0/-0.010 printed "0.00 / -0.01" at the band's fewest places.
-    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_drawing_tolerances, "_early_bound", lambda value, _type: value)
     display = _PrecisionDisplay()
     assert (
-        _drawing_marks._set_tolerance_precision(
+        _drawing_tolerances._set_tolerance_precision(
             display, (-0.010, 0.0), label="PinHoleDia@PinHoleProfile", places=3
         )
         == display.tolerance_precision
@@ -331,7 +336,7 @@ def test_tolerance_prints_at_the_nominals_places_when_asked(
     )
     # By default the band keeps its fewest places (U27's hundredth bands).
     assert (
-        _drawing_marks._set_tolerance_precision(
+        _drawing_tolerances._set_tolerance_precision(
             display, (-0.010, 0.0), label="PinHoleDia@PinHoleProfile"
         )
         == 2
@@ -341,9 +346,9 @@ def test_tolerance_prints_at_the_nominals_places_when_asked(
 def test_tolerance_places_never_round_a_band(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_drawing_tolerances, "_early_bound", lambda value, _type: value)
     with pytest.raises(ValueError, match="2 tolerance places would round"):
-        _drawing_marks._set_tolerance_precision(
+        _drawing_tolerances._set_tolerance_precision(
             _PrecisionDisplay(), (-0.004, 0.004), label="PinDia@PinProfile", places=2
         )
 
@@ -362,11 +367,11 @@ def test_tolerance_precision_has_dimension_labeled_operation_span(
         SetPrecision3=lambda *_args: 0,
         GetPrimaryTolPrecision2=lambda: 3,
     )
-    monkeypatch.setattr(_drawing_marks._telemetry, "span", capture_span)
-    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_drawing_tolerances._telemetry, "span", capture_span)
+    monkeypatch.setattr(_drawing_tolerances, "_early_bound", lambda value, _type: value)
 
     assert (
-        _drawing_marks._set_tolerance_precision(
+        _drawing_tolerances._set_tolerance_precision(
             display, (-0.004, 0.004), label="PinDia@PinProfile"
         )
         == 3

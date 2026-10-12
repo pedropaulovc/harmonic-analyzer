@@ -38,7 +38,7 @@ class PreparationBoundary(Exception):
 
 
 def manufacturing_state(dimension, early_bound, read_member):
-    """Read nominal and tolerance using the same accessors as _drawing_marks."""
+    """Read nominal and tolerance using the same accessors as _drawing_tolerances."""
     tolerance = early_bound(dimension.Tolerance, "IDimensionTolerance")
     if tolerance is None:
         raise RuntimeError("BoreDia has no tolerance interface")
@@ -125,7 +125,7 @@ def main():
         import _script_paths  # noqa: F401
     from _com import _early_bound, _read_member
     import _drawing_common as common
-    from _drawing_marks import _named_dimension
+    from _drawing_precision import _named_dimension
     import draw_pd_rack_pinion as recipe
     from diagnostics._owned_native_session import run_owned_diagnostic
 
