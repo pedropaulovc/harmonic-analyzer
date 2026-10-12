@@ -1050,6 +1050,7 @@ def run_iteration(
             ("--model", args.model),
             ("--effort", args.effort),
             ("--timeout", args.timeout),
+            ("--retries", args.retries),
         ):
             if value is not None:
                 command.extend((flag, str(value)))
@@ -1458,6 +1459,12 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     run.add_argument("--model")
     run.add_argument("--effort")
     run.add_argument("--timeout", type=float, default=1800)
+    run.add_argument(
+        "--retries",
+        type=int,
+        default=3,
+        help="reviewer attempts per review after the first (transient CLI exits)",
+    )
     run.add_argument("--runs", type=int, default=2)
     grade = subcommands.add_parser("grade", parents=[common, grading])
     grade.add_argument("iteration", type=Path)
