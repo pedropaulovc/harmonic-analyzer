@@ -276,8 +276,8 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    `DrawingSpec` records the choice explicitly. The layout audit
    (`_drawing_layout_check`) checks the selected template's border and
    title-block keep-out; the machinist review judges every visible
-   element's containment, balance, and fit (an eye pass stands in only where
-   no machinist review covers the sheet's version).
+   element's containment, balance, and fit. An eye pass never substitutes for
+   it (merge gate 3 in the root `AGENTS.md`).
 9. **Assembly drawings are judged as complete assembly packages.** Every PDF
    sheet is rendered at full resolution and attached to one blind-review
    invocation. Acceptance cross-checks BOM rows, balloons, setup and assembly
@@ -405,8 +405,13 @@ tagged emitter for every row, printing the shortfall it names.
 `uv run cad/scripts/machinist_review.py <name>... --reviewer <claude|codex>` (or
 `--all`) renders the verdict a blind senior machinist gives each drawing package
 under the calibrated prompt in `cad/scripts/prompts/`. **The reviewer MUST be a
-different model family from whoever authored or last edited the drawing
-script.** An agent running on a Claude model (Fable, Opus, Sonnet) reviews with
+different model family from whoever authored the PR's render-affecting
+change** — the drawing script or spec edit, or, for a sheet changed only
+indirectly, the geometry/config/helper edit that moved its render. Earlier
+editors of an untouched drawing script do not pick the family. When both
+families authored render-affecting commits in the PR, no cross-family reviewer
+exists: use the last-resort rule below (Astra or Fable at high reasoning).
+An agent running on a Claude model (Fable, Opus, Sonnet) reviews with
 `--reviewer codex`; an agent running on a Codex/GPT model reviews with
 `--reviewer claude`. A same-family review shares the author's blind spots and
 does not count as the gate, even when it returns `SHIP`. If the cross-family
@@ -415,6 +420,13 @@ verdict counts: work authored by Sol or Opus is reviewed by a stronger model
 (Astra or Fable), and work authored by Astra or Fable is reviewed by Astra or
 Fable at high reasoning. `--reviewer claude` defaults to `claude-fable-5-1` at
 medium effort, which is the Opus fallback.
+The gate covers every sheet whose rendered output a PR changes, including a
+sheet that changes only because CAD geometry, config or a helper it reads
+changed. A sheet the PR's own drawing script or spec edits must pass as below.
+A sheet changed only indirectly passes when its review adds no gating finding
+beyond a review of `main`'s version of the same sheet run with the same
+reviewer, model, effort and prompt (the report records each); the PR records
+both verdicts and the finding diff.
 Part and assembly packages render every native PDF page at 300 dpi and submit
 all sheet images to one review, using the rubric for that package kind. A
 downscaled contact-sheet preview is not a substitute for reviewing every page.

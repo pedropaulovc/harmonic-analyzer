@@ -156,11 +156,18 @@ not mergeable until ALL THREE hold — no partial credit:
    read; move the camera off the standard axes when needed). The CAD gates
    prove volumes and mates, not that the geometry LOOKS like the machine —
    a shape can pass every check and still be visibly wrong.
-   **Drawing sheets:** where a cross-family machinist review
-   (`cad/scripts/machinist_review.py`) runs on a sheet's exact version, that
-   review is its visual check, and a separate eye pass over the sheet is not
-   required. Eye-pass a drawing only when no machinist review covers the
-   version being merged.
+   **Drawing sheets need a machinist review; an eye pass does not count.**
+   Every drawing sheet whose rendered output the PR changes — because the PR
+   edits its drawing script or spec, or because it changes CAD geometry,
+   config or a helper the sheet depends on — needs a cross-family
+   `cad/scripts/machinist_review.py` verdict on the exact version being
+   merged (reviewer family rules: `cad/docs/drawing-simplicity-policy.md`,
+   "The gate"). A sheet whose drawing script or spec the PR edits must reach
+   `SHIP` (or `FIX` whose only gating findings are blockers matching a named
+   exception, cited in the PR). A sheet changed only indirectly passes when
+   its review adds no gating finding beyond a baseline review of `main`'s
+   version of that sheet run with the same reviewer, model, effort and prompt;
+   post both verdicts and the finding diff on the PR.
 
 **Stacked PRs share gates 1 and 3.** A successful build at the TOP of a stack
 covers every PR in that stack, and so does the visual inspection of the renders
