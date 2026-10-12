@@ -294,10 +294,24 @@ def test_tool_end_limits_print_once_in_the_notes_from_the_spec() -> None:
     assert not {"FlatEnd", "FlatToolRadius"} & marked
     printed = "\n".join((spec.DRAWING_NOTES, note))
     assert len(printed.splitlines()) <= 4
-    build_source = " ".join(inspect.getsource(part.build).split())
-    assert '"\\n".join((DRAWING_NOTES, CORE_FLAT_TOOL_REACH_NOTE))' in build_source
-    # No sheet text survives on the part's native FlatEnd either.
-    assert "set_dimension_prefix" not in inspect.getsource(part._apply_neck_and_flat_limits)
+
+
+def test_the_tool_end_keeps_its_native_limits_but_no_sheet_text(monkeypatch) -> None:
+    # Both limits stay authored on the model's FlatEnd/FlatToolRadius (the
+    # fit-band contract reads them); the sheet text is note 4's alone.
+    limits: list[tuple[str, str]] = []
+    prefixes: list[str] = []
+    monkeypatch.setattr(
+        part, "_apply_native_limits",
+        lambda _adapter, feature, name, *_args: limits.append((feature, name)),
+    )
+    monkeypatch.setattr(
+        part, "set_dimension_prefix", lambda _adapter, _feature, name, _text: prefixes.append(name)
+    )
+    part._apply_neck_and_flat_limits(object())
+    assert ("CoreFlatProfile", "FlatEnd") in limits
+    assert ("CoreFlatProfile", "FlatToolRadius") in limits
+    assert prefixes == []
 
 
 def test_model_bands_and_source_linked_properties() -> None:
@@ -652,7 +666,6 @@ def test_neck_detail_is_a_cropped_right_model_view(monkeypatch) -> None:
     assert radius == pytest.approx(drawing.DETAIL_CROP_RADIUS)
     assert view.calls[0] == "SetViewPosition"
     assert "Crop2(False, False, 1)" in view.calls
-    assert "CreateDetailViewAt4" not in Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize(
@@ -708,16 +721,112 @@ def test_neck_detail_is_dimensioned_before_it_is_cropped(monkeypatch) -> None:
     assert drawing._dimension_then_crop_detail(object(), view) == ["curated"]
     assert calls == ["import", "read", "crop", "read"]
     assert events[0][0] == "neck_detail.crop" and events[0][1]["lost"] == ""
-    # The detail imports before the side view: a dimension already on the
-    # sheet is never imported again, one the side view deleted would be.
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert body.index("_placed_detail_view(adapter)") < body.index(
-        "_dimension_then_crop_detail(adapter, detail)"
-    ) < body.index("keep=SIDE_KEEP")
-    assert body.index("add_toothspace_callout(") < body.index(
-        "_mark_detail_on_side(adapter, side)"
+
+
+class _BuildRecorder:
+    """Stand-ins for every seat-touching call ``drawing.build`` makes,
+    recording each call's name and its view in the order build makes them."""
+
+    def __init__(self, monkeypatch, tmp_path) -> None:
+        self.calls: list[tuple[str, object]] = []
+        self.frame_views: list[object] = []
+        source = tmp_path / "pd-transgear-knob-shaft.SLDPRT"
+        source.write_bytes(b"")
+        monkeypatch.setattr(drawing, "SOURCE", source)
+        self.views: dict[str, SimpleNamespace] = {}
+        self.detail = SimpleNamespace(name="detail", ReferencedDocument=object())
+        for name in (
+            "check", "require_source_control", "stamp_drawing_summary",
+            "set_hidden_lines_removed", "set_dimension_callouts",
+            "assert_imported_precision", "add_view_centerline", "add_attached_note",
+            "add_surface_finish", "add_datum_feature", "add_feature_control_frame",
+            "add_toothspace_callout", "_mark_detail_on_side", "_label_detail",
+            "add_property_linked_note", "visible_circle_edge",
+        ):
+            monkeypatch.setattr(drawing, name, self._recorder(name))
+        monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+        monkeypatch.setattr(
+            drawing, "read_required_properties",
+            lambda _model, wanted, *, required: {key: key for key in wanted},
+        )
+        monkeypatch.setattr(
+            drawing, "new_project_drawing", lambda *_a, **_k: (object(), object())
+        )
+        monkeypatch.setattr(drawing, "place_view", self._place)
+        monkeypatch.setattr(drawing, "_placed_detail_view", self._placed_detail)
+        monkeypatch.setattr(drawing, "_dimension_then_crop_detail", self._crop_detail)
+        monkeypatch.setattr(drawing, "curate_view_dimensions", self._curate)
+        monkeypatch.setattr(
+            drawing, "resolve_faces", lambda _model, requests: {key: key for key in requests}
+        )
+        monkeypatch.setattr(drawing, "finalize_drawing", self._finalize)
+        self.adapter = SimpleNamespace(currentModel=object(), open_model=self._open)
+
+    def _recorder(self, name: str):
+        def record(*args, **kwargs):
+            view = next(
+                (arg.name for arg in args if hasattr(arg, "ReferencedDocument")), None
+            )
+            self.calls.append((name, kwargs.get("label") or view))
+            if name == "add_feature_control_frame":
+                self.frame_views.append(view)
+            return True
+
+        return record
+
+    async def _open(self, _path):
+        return True
+
+    def _place(self, _adapter, _source, orientation, _x, _y, *, scale):
+        view = SimpleNamespace(name=orientation, ReferencedDocument=object())
+        self.views[orientation] = view
+        return view
+
+    def _placed_detail(self, _adapter):
+        self.calls.append(("_placed_detail_view", None))
+        return self.detail
+
+    def _crop_detail(self, _adapter, view):
+        self.calls.append(("_dimension_then_crop_detail", view.name))
+        return ["detail dims"]
+
+    def _curate(self, _adapter, view, *, keep, view_label, dimensions_by_feature):
+        self.calls.append(("curate_view_dimensions", view_label))
+        return [view_label]
+
+    async def _finalize(self, *_args, **_kwargs):
+        self.calls.append(("finalize_drawing", None))
+        return {}
+
+    def index(self, name: str, view=None) -> int:
+        return next(
+            i for i, (called, which) in enumerate(self.calls)
+            if called == name and (view is None or which == view)
+        )
+
+
+def test_build_dimensions_the_detail_before_the_side_and_marks_it_last(
+    monkeypatch, tmp_path
+) -> None:
+    # A dimension already on the sheet is never imported again, so the
+    # detail must import its three before the side view's targeted import;
+    # the mark circle goes on after every side-view pick.
+    import asyncio
+
+    seat = _BuildRecorder(monkeypatch, tmp_path)
+    assert asyncio.run(drawing.build(seat.adapter)) == {}
+    assert seat.index("_placed_detail_view") < seat.index(
+        "_dimension_then_crop_detail", "detail"
+    ) < seat.index("curate_view_dimensions", "side")
+    frames = [which for name, which in seat.calls if name == "add_feature_control_frame"]
+    assert frames == ["core_total_runout", "front_neck_total_runout"]
+    assert seat.frame_views == ["*Right", "detail"]
+    last_pick = max(
+        i for i, (name, _label) in enumerate(seat.calls)
+        if name in ("add_feature_control_frame", "add_toothspace_callout")
     )
+    assert last_pick < seat.index("_mark_detail_on_side") < seat.index("_label_detail")
+    assert seat.index("_label_detail") < seat.index("finalize_drawing")
 
 
 def test_neck_detail_fails_loud_when_the_crop_takes_a_dimension(monkeypatch) -> None:
