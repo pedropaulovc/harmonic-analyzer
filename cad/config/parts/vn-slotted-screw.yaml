@@ -3,11 +3,14 @@ vn-slotted-screw:
   number: MHA-VN-019
   stock_name: Steel Narrow Fillister Head Slotted Screw
   supplier: McMaster-Carr
-  supplier_skus: [90280A201]
+  supplier_skus: [90280A203]
   material: Plain Carbon Steel
-  material_specification: Steel, McMaster-Carr 90280A201
+  material_specification: Steel, McMaster-Carr 90280A203
   finish: zinc plated
   quantity: 4
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased
+# McMaster 90280A203 is #8-32 x 1-1/2 in (38.1 mm) stock, not the former
+# 31.75 mm model length. It clamps the current 25.232 mm raised pinion block:
+# nominal insertion 12.868 mm; the base owns the matched thread/drill depths.

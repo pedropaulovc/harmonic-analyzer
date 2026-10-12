@@ -3006,6 +3006,8 @@ def task_check():
         SCRIPTS_DIR / "test_export_features.py",
         SCRIPTS_DIR / "test_export_feature_faces.py",
         SCRIPTS_DIR / "test_features_bound.py",
+        # Shared native gear-gap authoring/status contracts use bounded fakes.
+        SCRIPTS_DIR / "test_gear.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_release_diff.py",
@@ -3092,6 +3094,7 @@ def task_check():
         SCRIPTS_DIR / "test_drawing_specification_purity.py",
         SCRIPTS_DIR / "test_drawing_surface_finish_validation.py",
         SCRIPTS_DIR / "test_gtol_contracts.py",
+        SCRIPTS_DIR / "test_native_projected_zone.py",
         SCRIPTS_DIR / "test_part_owned_geometric_tolerances.py",
         SCRIPTS_DIR / "test_probe_surface_finish_pmi_telemetry.py",
         SCRIPTS_DIR / "test_surface_finish.py",
@@ -3108,6 +3111,9 @@ def task_check():
         # attributes the sheet no longer defines, and every check:* gate stayed
         # green (codex #416). Enrolled so the cross-sheet contracts are covered.
         SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
+        # Intended chain mesh follows the actual mounted instance pose, not
+        # configuration labels that may also name the loose spare.
+        SCRIPTS_DIR / "test_assembly_chain_mesh.py",
         # The ms-measuring-stick sub-assembly contract (2026-10-09): parked
         # pose, retention pairs, BOM numbers and the fully-fixed contract file.
         # Its YAML reads ride the gate's _CONFIG_YAMLS deps; its module imports
@@ -3116,6 +3122,8 @@ def task_check():
         # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
         # its three drive-train support pins red with every gate green.
         SCRIPTS_DIR / "test_dt_drive_train_support_layout.py",
+        # Native-STL gravity seam welding remains strict about holes and winding.
+        SCRIPTS_DIR / "test_dt_swing_gravity_collector.py",
         # The cone tip block's hold-down, embed-window and collar-air contracts
         # (I20/I22/I24/I31; prism ruling 2026-09-29) that
         # build_drive_train_assembly asserts at import.
@@ -3137,11 +3145,15 @@ def task_check():
         # (cascade -> integ merge, Main's restricted review).
         SCRIPTS_DIR / "test_module_constants_assigned_once.py",
         # Integ-branch tests that guard caught un-enrolled at #877 round 4.
-        SCRIPTS_DIR / "test_dt_cone_gear_mesh_design.py",
+        SCRIPTS_DIR / "test_standard_mesh_checks.py",
         SCRIPTS_DIR / "test_dt_cone_gear_seat_fit.py",
+        # Finite stock-cutter geometry is a production design contract.
+        SCRIPTS_DIR / "test_stock_form_cutter.py",
         SCRIPTS_DIR / "test_drawing_hidden_sketches.py",
         SCRIPTS_DIR / "test_dt_drive_train_steps.py",
         SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
+        # Supplier pose facts must stay independent of native replica recipes.
+        SCRIPTS_DIR / "test_vn_cone_pose_specs.py",
         SCRIPTS_DIR / "test_fit_bands.py",
         SCRIPTS_DIR / "test_printed_text_rulings.py",
         # ... and the #857 re-merge: its leader-geometry and replica-driver pins.
@@ -3149,9 +3161,6 @@ def task_check():
         SCRIPTS_DIR / "test_mcmaster_replica_driver.py",
         # ... and #906: the crank native-acceptance record pins.
         SCRIPTS_DIR / "test_crank_native_acceptance.py",
-        # ... and the fixed-centre 16T:64T crank mesh clearance.
-        SCRIPTS_DIR / "test_crank_mesh_stack.py",
-        SCRIPTS_DIR / "test_crank_mesh_studies_band.py",
         SCRIPTS_DIR / "test_crank_boss_rim.py",
         # ... and #937: the cylinder-bank layout bands and MHA-VN-034's set screw.
         SCRIPTS_DIR / "test_vn_arbor_set_screw.py",

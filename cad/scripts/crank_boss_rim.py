@@ -3,9 +3,10 @@ r"""The 64T against MHA-DT-005's north side, at print-worst.
 SolidWorks-free.  The 64T (MHA-DT-007) turns on the inclined cone shaft just
 north of MHA-DT-005, and its south face and tip sweep past everything on the
 post's north side: the crank boss's north face and rim, the Ø42.75 head,
-the turned Ø42 body and the cone boss's north end face.  The post is
-the v36 casting (user ruling 2026-09-28): the crank boss's north face is the
-head's tangent plane, uncut, and the crank bore carries no bushing. The 64T
+the turned Ø42 body and the cone boss's north end face.  The post retains
+the v36 datums (user ruling 2026-09-28), with its body/head raised for the
+normal-24DP crank. The crank boss starts on the head's tangent plane, uncut,
+and the crank bore carries no bushing. The 64T
 stands on the unchanged MHA-DT-004 collar; its south face is fixed there, while
 the solid gear stack grows its north face to touch T120. The collar and boss
 bands, not the gear face-width band, govern clearance to MHA-DT-005.
@@ -50,8 +51,13 @@ def _row(places: int) -> float:
 SIN_I = math.sin(math.radians(post.INCLINE_DEG))
 COS_I = math.cos(math.radians(post.INCLINE_DEG))
 CRANK_AXIS_Y = post.CRANK_ABOVE_CONE
-HEAD_Y = (post.HEAD_BASE_Y - post.BORE_HEIGHT, post.BLOCK_HEIGHT - post.BORE_HEIGHT)
-BODY_Y = (-post.BORE_HEIGHT, HEAD_Y[0])
+HEAD_Y = (
+    post.HEAD_BASE_Y - post.BORE_HEIGHT,
+    post.HEAD_BASE_Y + post.HEAD_HEIGHT - post.BORE_HEIGHT,
+)
+# The body occupies the full native MainBody extrusion, including the core
+# inside the larger head.  Use its actual height, not a truncated surrogate.
+BODY_Y = (-post.BORE_HEIGHT, post.BLOCK_HEIGHT - post.BORE_HEIGHT)
 
 # --- The print-worst terms ----------------------------------------------------
 # Each moves a surface toward the other.
@@ -197,7 +203,7 @@ def clearances(
     measures: dict[str, Callable[[Point], float]] = {
         "crank boss": lambda p: min(_crank_boss(p, boss_r, boss_z, y) for y in axes),
         "head": lambda p: _post_cylinder(p, (head_low, HEAD_Y[1]), head_r),
-        "body": lambda p: _post_cylinder(p, (BODY_Y[0], head_low), body_r),
+        "body": lambda p: _post_cylinder(p, BODY_Y, body_r),
         "cone boss end": lambda p: _cone_boss_end(p, boss_end, cone_r),
     }
     return {name: _least(gear, measure) for name, measure in measures.items()}

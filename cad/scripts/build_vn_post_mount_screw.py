@@ -1,9 +1,9 @@
-r"""Modified purchased cone pivot post mount screw: MSC 40923898, cut to length.
+r"""Modified purchased cone pivot post mount screw: MSC 40923906, cut to length.
 
 Head up, under-head junction at the origin: the head seats on the MHA-DT-005
 counterbore floor and the shank runs down through the post into the
 MHA-DT-020 tap.  Modelled at the cut-to-fit nominal (U37c;
-vn_post_mount_screw_spec.CUT_LENGTH_MM, 86.2: flush less half the allowance).
+vn_post_mount_screw_spec.CUT_LENGTH_MM: flush less half the allowance).
 
 The cut is the one modification, so the part owns its length: a hidden
 construction sketch whose single driving dimension is the cut length
@@ -13,13 +13,13 @@ plate (``vn_post_mount_screw_spec``'s U27 check), so the sheet prints it as a
 reference and each screw is cut to its own hole at assembly.  The build
 proves the dimension and the solid's cut end agree.
 
-A second hidden sketch carries the cut end's deburr break, 0.1 +0/-0.1
-(Main's engagement ruling), the thread the 0.90D worst case counts on.
+The deburr cutter's own profile carries the cut-end break as a native
+MAX-limit dimension; the retained 0.90D engagement stack spends that maximum.
 
 The solid carries the modification too (Main's ruling on the cut end):
 cutting to fit removes the factory-chamfered tip, so the break is this
-part's own feature, not the fillister family's.  The shared recipe
-(untouched) builds the stock screw at its SUPPLIED 3-1/2 in length; this
+part's own feature, not the fillister family's.  The shared catalog-only
+recipe builds the stock screw at its SUPPLIED 4 in length; this
 builder then trims it at CutLength (``CutToLength``) and breaks the new end
 45 deg with CutEndBreak (``CutEndDeburr``), both cutters driven by equations
 from those two model dimensions.  Analytic volume checks prove the cuts,
@@ -53,8 +53,8 @@ from _fastener_catalog import fastener
 from _fit_deviations import deviations
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from _simplified_part import save_simplified_part
-from diagnostics.diag_build_40923898 import build_40923898
-from _msc_40923898 import FILLISTER_SIZE
+from diagnostics.diag_build_40923906 import build_40923906
+from _msc_40923906 import FILLISTER_SIZE
 from diagnostics.diag_mcmaster_lib import no_sketch_inference
 from vn_post_mount_screw_spec import (
     CUT_END_BREAK_BAND,
@@ -72,8 +72,8 @@ from vn_post_mount_screw_spec import (
     DRAWING_PRECISION,
     MAJOR_RADIUS_MM,
     MANUFACTURING_NOTES,
+    SKU,
     STOCK_LENGTH_MM,
-    THREAD,
     TRIM_REMOVED_MM3,
 )
 
@@ -520,10 +520,10 @@ def _manufacturing_controls(adapter) -> None:
     )
 
 
-@wraps(build_40923898)
+@wraps(build_40923906)
 async def _cut_to_length(adapter, truth=None, **parameters):
     # The shared recipe builds the supplied screw; the trim cuts it to fit.
-    receipt = await build_40923898(adapter, truth, **parameters)
+    receipt = await build_40923906(adapter, truth, **parameters)
     await _author_cut_controls(adapter)
     await _modify_stock(adapter)
     _manufacturing_controls(adapter)
@@ -536,7 +536,7 @@ async def build(adapter) -> dict[str, str]:
         part_name=PART_NAME,
         components=(
             StockComponent(
-                sku="40923898",
+                sku=SKU,
                 author=_cut_to_length,
                 transform=RigidTransform(),
             ),

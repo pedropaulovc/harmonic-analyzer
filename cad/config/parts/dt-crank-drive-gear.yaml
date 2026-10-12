@@ -6,4 +6,7 @@ dt-crank-drive-gear:
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
-  process: "gear cutting (hob/shaper)"
+  process: "gear cutting: normal-24DP PA20 right-hand helical milling with the finite 55T normal stock form and mechanically lead-geared universal dividing head"
+  # Beta follows the 13.001107-degree cone incline; lead 945.862339 mm/rev.
+  # Cutter #2 uses its actual 55T stock form, not an ideal 69.185T virtual flank.
+  # No compatible low-angle stock 64T helical gear is verified.

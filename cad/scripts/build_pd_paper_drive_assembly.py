@@ -127,6 +127,7 @@ from _assembly_patterns import (
     grid_component_pattern,
     PatternDirection,
 )
+from _chain_mounts import mounted_wheels
 from _interference_contracts import allowed_interference_pairs
 from _visibility import blank_reference_geometry, visible_reference_geometry
 from _transforms import (  # noqa: E402
@@ -592,7 +593,7 @@ DISC_PLATEN_NOMINAL = PLATE_FRONT_Z - KNOB_SHAFT_Z0 - DISC_SPEC.FACE_WIDTH  # 2.
 DISC_PLATEN_BAND = (
     SPACER.LENGTH_BAND
     + ARM.THICKNESS_BAND
-    + printed_band_mm(ARM_PLATE_SPEC.HUB_STATION_PLACES)
+    + ARM_PLATE.HUB_FACE_TO_MOUNTING_BAND
     + RING.LENGTH_TOL
     + printed_band_mm(KNOB_SPEC.FACE_WIDTH_PLACES)
     + (DISC_SPEC.FACE_WIDTH_MAX - DISC_SPEC.FACE_WIDTH)
@@ -2987,6 +2988,7 @@ async def build(adapter) -> dict[str, str]:
     check_no_interference(
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        chain_mounts=mounted_wheels(),
     )
     # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
     # renders the machine BACK (chain and transgear cluster mirrored). Re-base the

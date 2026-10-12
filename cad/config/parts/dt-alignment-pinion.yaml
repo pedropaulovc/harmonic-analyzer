@@ -7,4 +7,7 @@ dt-alignment-pinion:
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
-  process: "gear cutting (hob/shaper)"
+  process: "gear cutting: 32T 48DP PA20 with the finite 26T stock form cutter; custom long drum"
+  # SDP/SI S1066Z-048S032 / S1066Z-048A032 are short pitch/count candidates,
+  # not equivalents of the selected cutter-native flank or drop-in 143.2 mm drums.
+  # Contact-critical OutsideDia uses the shared +0/-0.02 mm tip grade at .XX.

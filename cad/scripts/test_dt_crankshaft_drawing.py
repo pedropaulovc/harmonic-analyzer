@@ -43,6 +43,17 @@ def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
     assert "draw_dt_crankshaft.py" in PRECISION_MIGRATED_DRAWINGS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
+    assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) == marked
+    assert {
+        "Depth",
+        "PinionSeatStation",
+        "JournalInboardStation",
+        "ReliefInboardStation",
+        "ReliefOutboardStation",
+        "JournalOutboardStation",
+        "CollarRearStation",
+        "CollarSeatStation",
+    } <= marked - spec.REFERENCE_DIMENSIONS
     # Running/seat fits print at three places; the seat collar's functional
     # bands (rule 12) at the places that hold them; the rest at one.
     functional_places = {
@@ -67,12 +78,15 @@ def test_far_end_stations_restate_the_modelled_geometry() -> None:
     # The StationReference sketch drives each printed station from the same
     # globals as the features; these are the values the equations evaluate to.
     far = spec.SHAFT_LENGTH
-    assert far - spec.SEAT_STEP == pytest.approx(25.9)
+    assert far - spec.SEAT_STEP == pytest.approx(spec.PINION_SEAT_STATION)
     # The station the spec chose prints exactly at its places.
     assert spec.PINION_SEAT_STATION == round(spec.PINION_SEAT_STATION, spec.STATION_PLACES)
     assert set(part._STATIONS) == set(part._STATION_DRIVES)
     assert set(part._STATIONS) <= spec.DRAWING_DIMENSIONS["StationReference"]
-    assert part.DOME_SPHERE_R == pytest.approx(6.6710, abs=1e-3)
+    assert part.DOME_SPHERE_R == pytest.approx(
+        (spec.SHAFT_DIA**2 / 4.0 + spec.SHAFT_DOME_HEIGHT**2)
+        / (2.0 * spec.SHAFT_DOME_HEIGHT)
+    )
 
 
 def test_notes_stay_within_rule_six() -> None:
@@ -444,7 +458,9 @@ def test_integral_lands_run_in_the_restored_post_at_every_size_limit() -> None:
     bore_max = post.CRANK_BORE_DIA + post.RUNNING_BORE_BAND[0]
     shaft_min = spec.JOURNAL_DIA + spec.JOURNAL_DIA_BAND[1]
     shaft_max = spec.JOURNAL_DIA + spec.JOURNAL_DIA_BAND[0]
-    assert (bore_min - shaft_max, bore_max - shaft_min) == pytest.approx((0.025, 0.075))
+    assert (bore_min - shaft_max, bore_max - shaft_min) == pytest.approx(
+        spec._RUNNING_CLEARANCE
+    )
     assert spec.JOURNAL_START < spec.RELIEF_START < spec.RELIEF_END < spec.JOURNAL_END
     assert min(spec.JOURNAL_LANDS_WORST) >= spec.JOURNAL_DIA
     assert spec.JOURNAL_END + spec.STATION_ROW < spec.POST_BORE_END

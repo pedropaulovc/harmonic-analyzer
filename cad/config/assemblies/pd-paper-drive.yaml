@@ -56,3 +56,6 @@ required_free_stems:
 # The freed crank (T12) spin; the knob T24 is belt-coupled and the platen is
 # rack-coupled (no DOF of their own).
 free_dof: 1
+# carries_chain: wraps the roller chain, so verify:soundness's interference
+#   gate gets the authored wheel mounts, as the assembly build does (541011de0).
+carries_chain: true

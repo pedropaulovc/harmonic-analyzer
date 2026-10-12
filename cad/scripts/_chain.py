@@ -154,14 +154,19 @@ def _loop_length(sag: float) -> float:
 # --- integer-link closure -----------------------------------------------------
 # A roller chain has a FIXED standard pitch and closes only on an EVEN link
 # count (inner/outer must alternate back to the seam), so the loop length is
-# QUANTISED: pick the even count nearest the nominal-droop loop, then solve the
+# QUANTISED: pick the feasible even count nearest the nominal-droop loop, then solve the
 # SAG so the centreline lands EXACTLY on count * pitch. The sag -- not the
 # pitch -- absorbs the slack, exactly like a real chain (move an axle and the
 # droop responds).
 LINK_PITCH = _removable.CHAIN_PITCH  # ANSI #25 pitch (1/4 in), EXACT: the link
 # parts and the chain-pattern spacing carry this standard pitch; closure comes
 # from the sag.
-LINK_COUNT = 2 * round(_loop_length(SAG_NOMINAL) / (2.0 * LINK_PITCH))
+# Relocating an axle can make the nearest even count shorter than the taut
+# loop. Droop absorbs only positive slack; preserve the standard link pitch.
+LINK_COUNT = max(
+    2 * round(_loop_length(SAG_NOMINAL) / (2.0 * LINK_PITCH)),
+    2 * math.ceil(_loop_length(0.5) / (2.0 * LINK_PITCH)),
+)
 CENTRELINE_LEN = LINK_COUNT * LINK_PITCH
 
 # The EVEN count moves the target length by up to one LINK_PITCH (6.35 mm)

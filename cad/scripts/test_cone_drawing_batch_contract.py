@@ -6,6 +6,7 @@ import _config
 import dt_arbor_pedestal_spec
 import dt_cone_gear_notes
 import dt_cone_gear_shaft_spec
+import dt_cone_gear_spec
 import dt_cone_pivot_post_spec
 import dt_cone_tip_block_spec
 import dt_cone_swing_platform_spec
@@ -51,3 +52,29 @@ def test_finish_field_does_not_repeat_generic_edge_break_instruction() -> None:
         assert "DEBUR" not in finish, part_name
         assert "REMOVE BURR" not in finish, part_name
         assert "BREAK SHARP" not in finish, part_name
+
+
+def test_every_cone_sheet_names_the_actual_finite_cutting_system() -> None:
+    spec = dt_cone_gear_spec
+    assert spec.DIAMETRAL_PITCH == _config.machine("gear_train", "diametral_pitch")
+    assert spec.PRESSURE_ANGLE_DEG == _config.machine(
+        "gear_train", "pressure_angle_deg"
+    )
+    assert len(spec.CONFIGURATION_TEETH) == 20
+    for teeth in spec.CONFIGURATION_TEETH:
+        data = dt_cone_gear_notes.gear_data(teeth)
+        assert f"T{teeth:03d}" in data
+        assert (
+            f"DIAMETRAL PITCH / PRESSURE ANGLE:  "
+            f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f} DEG"
+        ) in data
+        assert "CUTTER:" in data
+        assert "PLUNGE" in data
+        assert "WHOLE DEPTH" in data
+        assert "TOOTH FORM:" in data
+        assert "CONTACT RATIO" not in data
+        assert "RANGE ONLY" not in data
+        assert "MATCH FLANKS" not in data
+        assert "APPROVED" not in data
+        assert "EXCEPTION" not in data
+        assert "RULING" not in data

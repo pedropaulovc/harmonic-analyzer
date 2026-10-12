@@ -33,6 +33,7 @@ from _gtol_face_read import face_geometry
 from _gtol_face_resolve import resolve_faces
 from _gtol_frame import gtol_frame_signature
 from _gtol_symbols import GTOL_SYMBOLS
+from _native_projected_zone import capture_projected_gtol
 from _surface_finish import SurfaceFinishControl
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
@@ -146,9 +147,9 @@ def author_part_pmi(
                     "",
                     "",
                 )
-                if not gtol.SetFrameValues2(1, control.tolerance, "", *datum_values):
+                if gtol.SetFrameValues2(1, control.tolerance, "", *datum_values) is not True:
                     raise RuntimeError(f"{control.key}: SetFrameValues2 failed")
-                if not gtol.CanConvertFormat():
+                if gtol.CanConvertFormat() is not True:
                     raise RuntimeError(
                         f"{control.key}: gtol cannot convert to current format"
                     )
@@ -162,7 +163,7 @@ def author_part_pmi(
 
             frame_count = int(gtol.GetFrameCount() or 0)
             if frame_count == 0:
-                if not gtol.AddFrame():
+                if gtol.AddFrame() is not True:
                     raise RuntimeError(f"{control.key}: failed to add current frame")
                 frame_count = int(gtol.GetFrameCount() or 0)
             if frame_count != 1:
@@ -173,12 +174,24 @@ def author_part_pmi(
             if frame is None:
                 raise RuntimeError(f"{control.key}: gtol has no frame")
             frame = _early_bound(frame, "IGtolFrame")
-            if not migrated and not frame.SetSymbolXml(control.frame_xml):
+            # A migrated ordinary frame already carries its seeded semantics.
+            # A projected frame additionally needs FeatureInfo in the current
+            # XML format; legacy PTZ setters are invalid after conversion.
+            if not migrated or control.projected_zone_height_mm is not None:
+                if frame.SetSymbolXml(control.frame_xml) is not True:
+                    raise RuntimeError(
+                        f"{control.key}: SOLIDWORKS rejected current frame XML"
+                    )
+            applied = frame.GetSymbolXml()
+            if type(applied) is not str:
+                raise RuntimeError(f"{control.key}: frame XML readback is not a string")
+            try:
+                applied_signature = gtol_frame_signature(applied)
+            except ValueError as exc:
                 raise RuntimeError(
-                    f"{control.key}: SOLIDWORKS rejected current frame XML"
-                )
-            applied = str(frame.GetSymbolXml() or "")
-            if gtol_frame_signature(applied) != gtol_frame_signature(control.frame_xml):
+                    f"{control.key}: invalid frame XML readback: {exc}"
+                ) from exc
+            if applied_signature != gtol_frame_signature(control.frame_xml):
                 raise RuntimeError(
                     f"{control.key}: frame did not persist the spec "
                     f"(read back {applied[:120]!r})"
@@ -195,9 +208,17 @@ def author_part_pmi(
                     f"attached={bool(gtol.IsAttached())}, "
                     f"leaders={gtol.GetLeaderCount()}"
                 )
+            projection_evidence = (
+                capture_projected_gtol(
+                    model, gtol, expected_xml=control.frame_xml, key=control.key,
+                    phase="model_authored", migrated=migrated,
+                )
+                if control.projected_zone_height_mm is not None
+                else {}
+            )
             _telemetry.event(
                 "pmi.gtol",
-                key=control.key,
+                **{"key": control.key, **projection_evidence},
                 characteristic=control.characteristic,
                 tolerance=control.tolerance,
             )

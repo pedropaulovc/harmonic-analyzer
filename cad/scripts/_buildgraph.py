@@ -2323,9 +2323,15 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "dt_cone_swing_platform_geometry",
         "dt_cone_swing_platform_spec",
         "dt_cone_tip_block_spec",
+        # Drilled-hole and angular rows size the collar-to-bank air stack.
+        "dt_tip_collar_air",
+        # Angular row sets the through tap's angle in the screw landing gate.
+        "vn_cone_tip_collar_spec",
         "crank_boss_rim",
         "dt_crank_hub_geometry",
         "dt_crank_pinion_spec",
+        # Drilled-hole row sets the bore band and worst journal-pass clearance.
+        "dt_crank_seat_washer_spec",
         "dt_crankshaft_spec",
         "error_budget",
         "export_features",

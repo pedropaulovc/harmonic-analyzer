@@ -20,6 +20,24 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
+def test_mounted_selections_read_registered_configuration_counts() -> None:
+    assert spec.CRANK_TEETH == spec.configuration_teeth(spec.CRANK_CONFIG)
+    assert spec.KNOB_TEETH == spec.configuration_teeth(spec.KNOB_CONFIG)
+
+
+@pytest.mark.parametrize("configuration,teeth", spec.CONFIGS)
+def test_configuration_count_reader_uses_the_registered_family(
+    configuration: str, teeth: int
+) -> None:
+    assert spec.configuration_teeth(configuration) == teeth
+
+
+@pytest.mark.parametrize("configuration", ["t12", "T13", "T012", "", " T12 "])
+def test_unregistered_or_nonexact_configuration_is_refused(configuration: str) -> None:
+    with pytest.raises(ValueError, match="unknown removable sprocket configuration"):
+        spec.configuration_teeth(configuration)
+
+
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/pd-transgear-removable.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/pd-transgear-removable.pdf")

@@ -225,7 +225,7 @@ def test_the_notch_depth_prints_the_loosest_row_the_lock_sweep_clears(
 def test_the_hub_station_prints_the_loosest_row_the_disc_platen_air_holds() -> None:
     """The disc-to-platen air was judged at HUB_STATION_PLACES' row."""
     printed = spec.DRAWING_PRECISION_BY_NAME["HubFaceToMounting"]
-    judged = _band(spec.HUB_STATION_PLACES)
+    judged = _band(geometry.HUB_STATION_PLACES)
 
     def holds(places: int) -> bool:
         return assembly.DISC_PLATEN_AIR_WORST - (_band(places) - judged) >= 0.0
