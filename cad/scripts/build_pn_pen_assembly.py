@@ -97,6 +97,7 @@ from _mcmaster_99607a213 import SHANK_LEN as PEN_SET_SHANK_LEN
 from _mcmaster_99607a213 import SHANK_DIA as PEN_SET_SHANK_DIA
 from _mcmaster_99607a213 import TIP_CHAMFER as PEN_SET_TIP_CHAMFER
 from mg_magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
+from diagnostics.probe_assembly_display_data import probe_assembly_display_data
 
 ASM_NAME = "pn-pen"
 
@@ -490,7 +491,11 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    artefacts = await save_assembly_and_images(adapter, ASM_NAME)
+    # Temporary farm-native investigation: run only after the unchanged normal
+    # save/render/reconcile/fingerprint tail; never alter its published assembly.
+    artefacts.update(await probe_assembly_display_data(adapter, artefacts["assembly"]))
+    return artefacts
 
 
 if __name__ == "__main__":

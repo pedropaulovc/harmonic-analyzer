@@ -1757,6 +1757,12 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
         outs += _channel_spring_variants()
     if stem == "ha_harmonic_analyzer":
         outs.append(CAD_OUT / "ha-harmonic-analyzer-bom.csv")
+    if stem == "pn_pen":
+        # Temporary native display-data investigation; explicit sibling snapshots
+        # preserve the existing reference layout and ride the admitted pn leaf.
+        from diagnostics.probe_assembly_display_data import OUTPUT_FILENAMES
+
+        outs.extend(sldasm.parent / name for name in OUTPUT_FILENAMES)
     return outs
 
 

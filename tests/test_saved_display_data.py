@@ -46,7 +46,7 @@ def _string(text: str) -> bytes:
 
 
 def _record(path: str = r"C:\parts\pin.SLDPRT", flag: int = 1) -> bytes:
-    return _string(path) + b"\x00" * 20 + struct.pack("<I", flag)
+    return _string(path) + b"\x00" * 8 + struct.pack("<IdI", 6, 1000.0, flag)
 
 
 def _save(tmp_path: Path, data: bytes) -> Path:
@@ -64,12 +64,29 @@ def _reject(tmp_path: Path, data: bytes, message: str) -> None:
     assert path.read_bytes() == data
 
 
-@pytest.mark.parametrize("flag", [1, 2, 0xFFFFFFFF])
-def test_accepts_nonzero_observed_flags_without_modifying_file(tmp_path, flag):
-    data = _stream(_record(flag=flag))
+def test_accepts_observed_visible_flag_without_modifying_file(tmp_path):
+    data = _stream(_record())
     path = _save(tmp_path, data)
     assert gate.assert_saved_display_data(path) is None
     assert path.read_bytes() == data
+
+
+@pytest.mark.parametrize("flag", [2, 0xFFFFFFFF])
+def test_unsupported_flags_fail_closed(tmp_path, flag):
+    _reject(tmp_path, _stream(_record(flag=flag)), "unsupported display flag")
+
+
+@pytest.mark.parametrize("prefix_offset", [0, 8])
+def test_unsupported_record_prefix_fails_closed(tmp_path, prefix_offset):
+    data = bytearray(_record())
+    end = len(_string(r"C:\parts\pin.SLDPRT"))
+    data[end + prefix_offset] = 7
+    _reject(tmp_path, _stream(bytes(data)), "unsupported part record prefix")
+
+
+def test_legitimate_zero_flag_subassembly_is_excluded(tmp_path):
+    data = _record(r"C:\parts\frame.SLDASM", 0) + _record()
+    gate.assert_saved_display_data(_save(tmp_path, _stream(data)))
 
 
 def test_reports_hidden_component_path(tmp_path):
@@ -95,12 +112,22 @@ def test_unicode_paths_count_utf16_units_not_python_characters(tmp_path, name):
     _reject(tmp_path, _stream(_record(name, 0)), "flag=0")
 
 
-@pytest.mark.parametrize("data", [b"", b"not a native container", _stream(_record(), "Other")])
+@pytest.mark.parametrize(
+    "data", [b"", b"not a native container", _stream(_record(), "Other")]
+)
 def test_missing_display_streams_fail_closed(tmp_path, data):
     _reject(tmp_path, data, "display-data gate failed")
 
 
-@pytest.mark.parametrize("data", [b"", b"arbitrary content", _string("not a part"), _record().replace(b"\xff\xfe\xff", b"\x00\x00\x00")])
+@pytest.mark.parametrize(
+    "data",
+    [
+        b"",
+        b"arbitrary content",
+        _string("not a part"),
+        _record().replace(b"\xff\xfe\xff", b"\x00\x00\x00"),
+    ],
+)
 def test_missing_component_records_fail_closed(tmp_path, data):
     _reject(tmp_path, _stream(data), "no recognizable part records")
 
@@ -128,7 +155,9 @@ def test_malformed_container_and_compression_fail_closed(tmp_path, data, message
 
 
 def test_damaged_secondary_stream_is_not_ignored(tmp_path):
-    _reject(tmp_path, _stream(_record()) + _envelope(b"invalid"), "Contents/DisplayLists")
+    _reject(
+        tmp_path, _stream(_record()) + _envelope(b"invalid"), "Contents/DisplayLists"
+    )
 
 
 @pytest.mark.parametrize(
@@ -140,7 +169,10 @@ def test_damaged_secondary_stream_is_not_ignored(tmp_path):
         (b"\xff\xfe\xff\x01\x00\xd8", "invalid UTF-16 string"),
         (_string("pin.SLDPRT") + b"\x00" * 23, "truncated display flag"),
         (_record("pin\x00.SLDPRT"), "invalid part path"),
-        (_string("pin.SLDPRT") + _string("x") + b"\x00" * 24, "overlapping string/flag"),
+        (
+            _string("pin.SLDPRT") + _string("x") + b"\x00" * 24,
+            "overlapping string/flag",
+        ),
     ],
 )
 def test_malformed_record_data_fail_closed(tmp_path, data, message):
@@ -152,13 +184,17 @@ def test_truncated_trailing_string_is_not_ignored_after_good_record(tmp_path):
 
 
 def test_untagged_utf16_part_path_is_not_a_component_record(tmp_path):
-    _reject(tmp_path, _stream("pin.SLDPRT".encode("utf-16le") + b"\x00" * 24), "no recognizable part records")
+    _reject(
+        tmp_path,
+        _stream("pin.SLDPRT".encode("utf-16le") + b"\x00" * 24),
+        "no recognizable part records",
+    )
 
 
-def test_nested_string_marker_is_not_independently_scanned(tmp_path):
-    inner = _string("hidden.SLDPRT") + b"\x00" * 24
+def test_nested_hidden_record_fails_closed(tmp_path):
+    inner = _record("hidden.SLDPRT", 0)
     outer = b"\xff\xfe\xff" + bytes([len(inner) // 2]) + inner
-    gate.assert_saved_display_data(_save(tmp_path, _stream(outer + _record())))
+    _reject(tmp_path, _stream(outer + _record()), "nested or overlapping")
 
 
 def test_container_markers_inside_stored_payload_are_not_entries(tmp_path):
@@ -189,14 +225,20 @@ def test_relevant_checksum_and_expanded_size_are_validated(tmp_path, field):
 def _decoy(size: int = 450, remainder: int = 0) -> bytes:
     name = bytes(((b << 4) & 0xF0) | (b >> 4) for b in DISPLAY_LISTS.encode("latin1"))
     return (
-        MARKER + b"\x00" * 4
-        + struct.pack("<4I", 4 * size + remainder, size, 2 * size + remainder // 2, len(name))
-        + name + b"observed nondeflate decoy filler"
+        MARKER
+        + b"\x00" * 4
+        + struct.pack(
+            "<4I", 4 * size + remainder, size, 2 * size + remainder // 2, len(name)
+        )
+        + name
+        + b"observed nondeflate decoy filler"
     )
 
 
 @pytest.mark.parametrize(("size", "remainder"), [(450, 0), (232, 2)])
-def test_observed_decoy_envelopes_do_not_hide_true_display_stream(tmp_path, size, remainder):
+def test_observed_decoy_envelopes_do_not_hide_true_display_stream(
+    tmp_path, size, remainder
+):
     data = _decoy(size, remainder) + _stream(_record() * 20) + b"\x00" * size
     gate.assert_saved_display_data(_save(tmp_path, data))
 
@@ -217,8 +259,11 @@ def test_arithmetic_header_without_nested_marker_is_not_silently_skipped(tmp_pat
 def _directory_copy(local: bytes, reference: int = 0) -> bytes:
     name_size = struct.unpack_from("<I", local, 22)[0]
     return (
-        b"\x00\x00" + local[:26] + b"\x00" * 10
-        + struct.pack("<I", reference) + local[26 : 26 + name_size]
+        b"\x00\x00"
+        + local[:26]
+        + b"\x00" * 10
+        + struct.pack("<I", reference)
+        + local[26 : 26 + name_size]
     )
 
 
