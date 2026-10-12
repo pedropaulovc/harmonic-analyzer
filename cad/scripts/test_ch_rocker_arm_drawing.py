@@ -3549,3 +3549,464 @@ def test_sheet_scale_cannot_claim_success_without_native_properties(bound, prope
     sheet = SimpleNamespace(SetScale=lambda *_args: True, GetProperties2=lambda: properties)
     with pytest.raises(RuntimeError, match="sheet scale did not persist"):
         drawing._pin_sheet_scale(object(), sheet)
+
+
+class _StyleTextFormat:
+    """Native get/put properties; CharHeight switches authority to metres."""
+
+    def __init__(self, height=0.00635, *, points=False):
+        self._height, self.points = height, points
+
+    CharHeight = property(
+        lambda self: self._height,
+        lambda self, value: (setattr(self, "_height", value), setattr(self, "points", False)),
+    )
+    CharHeightInPts = property(lambda self: 24)
+    TypeFaceName = property(lambda self: "Arial")
+
+    def IsHeightSpecifiedInPts(self):
+        return self.points
+
+
+class _StyleNote(_CaptionNote):
+    """Two-step rich text, method-shaped format calls, linked native fields."""
+
+    def __init__(self, label, *, ordinary_height=None):
+        super().__init__(label, height=0.0166799)
+        self.rich = ordinary_height is None
+        self.use_doc = True
+        self.font_height = 0.00635  # inherited format, NOT actual normal-note ink
+        self.writes, self.events = [], []
+        self.reset_result = self.write_result = True
+        self.on_write = lambda: None
+        self.readback_delta = 0.0
+        self._linked = (
+            "<VLNAME> <FONT size=3.5><VLLABEL>\r\n"
+            "<VLSCALE><FONT size=6.35> <FONT size=3.5><VLSCALEV><FONT size=6.35>"
+            if self.rich else '$PRPSHEET:"Manufacturing Notes"'
+        )
+        runs = [
+            ("DETAIL ", 0.00635), (label + "\r\n", 0.0035),
+            ("SCALE", 0.0035), (" ", 0.00635),
+            ("4:1" if label == "D" else "2:1", 0.0035),
+        ] if self.rich else [("1. TURN HUB\r\n", ordinary_height), ("2. REAM BORE", ordinary_height)]
+        self.data = _ClearanceDisplayData([
+            {"t": text, "h": height, "pos": [0.30, 0.07, 0.0]}
+            for text, height in runs
+        ], [])
+        self.annotation.GetDisplayData = lambda: self.data
+        self.annotation.GetTextFormat = self.get_format
+        self.annotation.GetUseDocTextFormat = lambda _index: self.use_doc
+        self.annotation.SetTextFormat = self.set_format
+
+    HasMultipleFonts = property(lambda self: self.rich)
+
+    def GetText(self):
+        return " \r\n "  # Not resolved native view-field glyphs.
+
+    def get_format(self, index):
+        assert index == 0
+        self.events.append("get-format")
+        return _StyleTextFormat(self.font_height)
+
+    def set_format(self, index, use_doc, text_format):
+        assert index == 0
+        self.writes.append((index, use_doc, None if text_format is None else text_format.CharHeight))
+        self.events.append("reset" if use_doc else "local")
+        result = self.reset_result if use_doc else self.write_result
+        if result is not True:
+            return result
+        if use_doc:
+            assert text_format is None
+            self.rich, self.use_doc = False, True
+            self._linked = re.sub(r"<FONT[^>]*>", "", self._linked)
+        else:
+            if self.rich:
+                return False  # Official specific-format refusal for inline fonts.
+            self.font_height, self.use_doc = text_format.CharHeight, False
+            for fragment in self.data.texts:
+                fragment["h"] = self.font_height + self.readback_delta
+            self.height = self.font_height * 2.0
+            self.on_write()
+        return True
+
+
+class _StyleCircle(_DetailCircle):
+    """Local native circle formatting; a refused setter leaves format unmoved."""
+
+    def __init__(self, label, front, view):
+        super().__init__(label)
+        self.xy = drawing.DETAIL_LETTER_XY[label]
+        self.front, self.view = front, view
+        self.font_height, self.use_doc, self.points = 0.00635, True, True
+        self.result = True
+        self.delta = self.display_delta = 0.0
+        self.writes = []
+        self.on_write = lambda: None
+
+    def GetView(self):
+        return self.front
+
+    def GetDetailView(self):
+        return self.view
+
+    def GetTextFormat(self):
+        return _StyleTextFormat(self.font_height, points=self.points)
+
+    def GetUseDocTextFormat(self):
+        return self.use_doc
+
+    def SetTextFormat(self, use_doc, text_format):
+        self.writes.append((use_doc, text_format.CharHeight))
+        if self.result is True:
+            self.font_height = text_format.CharHeight + self.delta
+            self.use_doc, self.points = use_doc, text_format.IsHeightSpecifiedInPts()
+            self.on_write()
+        return self.result
+
+
+@pytest.fixture
+def native_caption_style(bound, monkeypatch):
+    import _drawing_notes
+
+    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda obj, _interface: obj)
+    front = SimpleNamespace()
+    notes = {label: _StyleNote(label) for label in ("D", "E")}
+    views = {
+        label: SimpleNamespace(
+            GetNotes=lambda label=label: [notes[label]], GetBaseView=lambda: front,
+            Position=drawing.HUB_CENTER if label == "D" else drawing.END_CENTER,
+            ScaleRatio=drawing.HUB_SCALE if label == "D" else drawing.END_SCALE,
+            UseParentScale=False, UseSheetScale=0,
+        ) for label in ("D", "E")
+    }
+    circles = {label: _StyleCircle(label, front, views[label]) for label in ("D", "E")}
+    front.GetDetailCircles = lambda: [circles["E"], circles["D"]]
+
+    def circle_info():
+        # Deliberately different from GetDetailCircles enumeration. Position,
+        # not unverified array order, binds the independent displayed height.
+        values = [2.0]
+        for label in ("D", "E"):
+            circle = circles[label]
+            values.extend([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                *circle.xy, 0, circle.font_height + circle.display_delta, 0,
+            ])
+        return tuple(values)
+
+    front.GetDetailCircleInfo2 = circle_info
+    events, captures = [], []
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GraphicsRedraw2=lambda: events.append("redraw")),
+        swApp=_APP,
+    )
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: events.append("rebuild"))
+    monkeypatch.setattr(
+        drawing._seat_forensics, "capture_com_failure",
+        lambda *_args, **context: captures.append(context["exception"]),
+    )
+    return SimpleNamespace(
+        adapter=adapter, front=front, notes=notes, views=views, circles=circles,
+        source=_StyleNote("source", ordinary_height=0.0035), events=events, captures=captures,
+    )
+
+
+def _normalize_style(case):
+    drawing._normalize_detail_caption_styles(
+        case.adapter, case.front, case.views["D"], case.views["E"], case.source,
+    )
+
+
+@pytest.mark.parametrize("height", [0.0035, 0.0042])
+def test_normal_note_native_fragments_drive_both_captions_and_source_circle_fonts(native_caption_style, height):
+    case = native_caption_style
+    for fragment in case.source.data.texts:
+        fragment["h"] = height
+    _normalize_style(case)
+    assert case.source.font_height == 0.00635  # Never adopt inherited source format.
+    assert case.source.writes == []
+    for label in ("D", "E"):
+        note, circle, view = case.notes[label], case.circles[label], case.views[label]
+        assert note.writes == [(0, True, None), (0, False, height)]
+        assert note.events == ["reset", "get-format", "local"]
+        assert re.findall(r"<VL[^>]*>", note.PropertyLinkedText) == list(drawing._CAPTION_FIELDS)
+        assert "<FONT" not in note.PropertyLinkedText
+        assert [fragment["h"] for fragment in note.data.texts] == [height] * 5
+        assert circle.writes == [(False, height)]
+        assert circle.GetLabel() == label and circle.xy == drawing.DETAIL_LETTER_XY[label]
+        assert circle.font_height == height and circle.GetUseDocTextFormat() is False
+        assert view.Position == (drawing.HUB_CENTER if label == "D" else drawing.END_CENTER)
+    assert case.events.count("rebuild") == 4 and case.events.count("redraw") == 5
+    assert case.captures == []
+
+
+@pytest.mark.parametrize("char_height", [None, 0.0041])
+def test_ordinary_linked_note_factory_keeps_no_height_and_single_write_paths(native_caption_style, monkeypatch, char_height):
+    import _drawing_notes
+
+    note = _StyleNote("ordinary", ordinary_height=0.0035)
+    calls = []
+    def add_note(adapter, text, x, y):
+        calls.append((adapter, text, x, y))
+        return note
+    monkeypatch.setattr(_drawing_notes, "add_note", add_note)
+    returned = _drawing_notes.add_property_linked_note(
+        native_caption_style.adapter, "Manufacturing Notes", 0.02, 0.08, char_height=char_height,
+    )
+    assert returned is note
+    assert calls == [(native_caption_style.adapter, '$PRPSHEET:"Manufacturing Notes"', 0.02, 0.08)]
+    assert note.PropertyLinkedText == '$PRPSHEET:"Manufacturing Notes"'
+    assert note.writes == ([] if char_height is None else [(0, False, char_height)])
+    assert "reset" not in note.events
+
+
+@pytest.mark.parametrize("defect", [
+    "missing-display", "missing-annotation", "no-fragments", "blank-text", "mixed-height",
+    "mixed-font", "zero", "nan", "infinite", "missing-height", "missing-font", "bad-count",
+])
+def test_unavailable_mixed_or_invalid_normal_note_height_is_fatal_and_captured(native_caption_style, defect):
+    case = native_caption_style
+    source = case.source
+    if defect == "missing-display":
+        source.annotation.GetDisplayData = lambda: None
+    elif defect == "missing-annotation":
+        source.GetAnnotation = lambda: None
+    elif defect == "no-fragments":
+        source.data.texts.clear()
+    elif defect == "blank-text":
+        for fragment in source.data.texts:
+            fragment["t"] = " \r\n "
+    elif defect == "mixed-height":
+        source.data.texts[-1]["h"] = 0.00635
+    elif defect == "mixed-font":
+        source.data.GetTextFontAtIndex = lambda index: "Arial" if index == 0 else "Century Gothic"
+    elif defect == "missing-font":
+        source.data.GetTextFontAtIndex = lambda _index: None
+    elif defect == "bad-count":
+        source.data.GetTextCount = lambda: True
+    else:
+        source.data.texts[0]["h"] = {
+            "zero": 0.0, "nan": float("nan"), "infinite": float("inf"), "missing-height": None,
+        }[defect]
+    with pytest.raises(RuntimeError) as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+    assert all(note.writes == [] for note in case.notes.values())
+
+
+@pytest.mark.parametrize("target", ["reset", "caption", "circle"])
+@pytest.mark.parametrize("result", [False, None, 1, "true"])
+def test_native_font_setters_require_actual_true(native_caption_style, target, result):
+    case = native_caption_style
+    if target == "reset":
+        case.notes["D"].reset_result = result
+    elif target == "caption":
+        case.notes["D"].write_result = result
+    else:
+        case.circles["D"].result = result
+    with pytest.raises(RuntimeError, match="reset|text height|setter refused") as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+
+
+@pytest.mark.parametrize("defect", [
+    "drop-name", "drop-label", "drop-scale", "drop-ratio", "reorder", "duplicate",
+    "stale-height", "missing-fragment", "multiple-fonts", "mixed-font",
+    "lost-owner", "moved-view", "scale-changed", "replaced-note",
+])
+def test_caption_reset_rejects_lost_fields_heights_fragments_and_native_ownership(native_caption_style, defect):
+    case = native_caption_style
+    note, view = case.notes["D"], case.views["D"]
+    def mutate():
+        if defect.startswith("drop-"):
+            field = {
+                "drop-name": "<VLNAME>", "drop-label": "<VLLABEL>",
+                "drop-scale": "<VLSCALE>", "drop-ratio": "<VLSCALEV>",
+            }[defect]
+            note._linked = note._linked.replace(field, "")
+        elif defect == "reorder":
+            note._linked = "<VLLABEL><VLNAME><VLSCALE><VLSCALEV>"
+        elif defect == "duplicate":
+            note._linked += "<VLLABEL>"
+        elif defect == "stale-height":
+            note.data.texts[0]["h"] = 0.00635
+        elif defect == "missing-fragment":
+            note.data.texts.pop(1)
+        elif defect == "multiple-fonts":
+            note.rich = True
+        elif defect == "mixed-font":
+            note.data.GetTextFontAtIndex = lambda index: "Arial" if index == 0 else "Century Gothic"
+        elif defect == "lost-owner":
+            view.GetBaseView = lambda: object()
+        elif defect == "moved-view":
+            view.Position = (0.0, 0.0)
+        elif defect == "scale-changed":
+            view.ScaleRatio = (1.0, 1.0)
+        elif defect == "replaced-note":
+            view.GetNotes = lambda: [object()]
+    note.on_write = mutate
+    with pytest.raises(RuntimeError) as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+
+
+@pytest.mark.parametrize("label", ["D", "E"])
+@pytest.mark.parametrize("defect", [
+    "format-height", "display-height", "label", "position", "owner", "detail-owner",
+    "doc-authority", "point-authority", "missing-info", "truncated-info", "invalid-info",
+])
+def test_source_circle_readbacks_are_independent_and_preserve_native_identity(native_caption_style, label, defect):
+    case = native_caption_style
+    circle = case.circles[label]
+    if defect == "format-height":
+        circle.delta = 0.001
+    elif defect == "display-height":
+        circle.display_delta = 0.001
+    elif defect in {"missing-info", "truncated-info", "invalid-info"}:
+        original = case.front.GetDetailCircleInfo2
+        refused_info = (
+            (lambda: None) if defect == "missing-info" else
+            (lambda: original()[:-1]) if defect == "truncated-info" else
+            (lambda: (float("nan"), *original()[1:]))
+        )
+        circle.on_write = lambda: setattr(case.front, "GetDetailCircleInfo2", refused_info)
+    else:
+        def mutate():
+            if defect == "label":
+                circle.label = "X"
+            elif defect == "position":
+                circle.xy = (0.0, 0.0)
+            elif defect == "owner":
+                circle.front = object()
+            elif defect == "detail-owner":
+                circle.view = object()
+            elif defect == "doc-authority":
+                circle.use_doc = True
+            elif defect == "point-authority":
+                circle.points = True
+        circle.on_write = mutate
+    with pytest.raises(RuntimeError) as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+
+
+@pytest.mark.parametrize("delta", [0.0, 0.00000005, 0.0002])
+def test_native_font_quantization_is_small_not_a_pixel_or_point_fallback(native_caption_style, delta):
+    case = native_caption_style
+    for note in case.notes.values():
+        note.readback_delta = delta
+    for circle in case.circles.values():
+        circle.delta = circle.display_delta = delta / 2
+    if delta > drawing._NOTE_HEIGHT_READBACK_TOL_M:
+        with pytest.raises(RuntimeError, match="readback mismatch"):
+            _normalize_style(case)
+    else:
+        _normalize_style(case)
+        assert case.captures == []
+
+
+@pytest.mark.parametrize("phase", ["source", "caption", "circle"])
+@pytest.mark.parametrize("capture_fails", [False, True])
+def test_style_refusals_preserve_original_exception_and_forensics_before_seat_close(native_caption_style, monkeypatch, phase, capture_fails):
+    case = native_caption_style
+    events, warnings = [], []
+    original = RuntimeError("native style read refused")
+    def refuse(*_args, **_kwargs):
+        events.append("refusal")
+        raise original
+    if phase == "source":
+        case.source.annotation.GetDisplayData = refuse
+    elif phase == "caption":
+        case.notes["D"].annotation.SetTextFormat = refuse
+    else:
+        case.circles["D"].GetTextFormat = refuse
+    def capture(adapter, _label, message, **context):
+        events.append("capture")
+        assert adapter is case.adapter and message == str(original)
+        assert context["exception"] is original and context["sheet_png"] is True
+        if capture_fails:
+            raise OSError("disk refused")
+        raise original
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    monkeypatch.setattr(drawing._telemetry, "warn", warnings.append)
+    with pytest.raises(RuntimeError) as caught:
+        try:
+            _normalize_style(case)
+        finally:
+            events.append("seat-close")
+    assert caught.value is original
+    assert events == ["refusal", "capture", "seat-close"]
+    assert bool(warnings) is capture_fails
+
+
+def test_style_normalization_precedes_settled_link_capture_and_both_final_probes():
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
+    (normalize,) = [node for node in calls if node.func.id == "_normalize_detail_caption_styles"]
+    (letters,) = [node for node in calls if node.func.id == "_place_detail_letters"]
+    probes = [node for node in calls if node.func.id == "_record_detail_caption"]
+    seats = [node for node in calls if node.func.id == "_seat_detail_caption"]
+    assert tuple(ast.unparse(arg) for arg in normalize.args) == ("adapter", "front", "hub", "end", "notes")
+    assert letters.lineno < normalize.lineno < min(node.lineno for node in probes)
+    assert max(node.lineno for node in probes) < min(node.lineno for node in seats)
+    seat = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_seat_detail_caption")
+    assert "note.PropertyLinkedText != linked" in ast.unparse(seat)
+    assert drawing.END_CENTER[1] == 0.110
+    assert drawing._DETAIL_CAPTION_TARGET_AIR_M == 0.004
+    assert "crop[1] - 0.003" in ast.unparse(seat)
+    assert "lower_boundary + 0.003" in ast.unparse(seat)
+
+
+def test_native_rich_reset_may_merge_runs_without_detaching_fields(native_caption_style):
+    case = native_caption_style
+    for note in case.notes.values():
+        def merge(note=note):
+            text = "".join(fragment["t"] for fragment in note.data.texts)
+            note.data.texts[:] = [{"t": text, "h": note.font_height, "pos": [0.30, 0.07, 0.0]}]
+        note.on_write = merge
+    _normalize_style(case)
+    assert all(len(note.data.texts) == 1 for note in case.notes.values())
+    assert all(drawing._caption_fields(note, label=label) == drawing._CAPTION_FIELDS
+               for label, note in case.notes.items())
+
+
+@pytest.mark.parametrize("label", ["D", "E"])
+def test_dropped_fields_during_rebuild_are_fatal_before_seat_close(native_caption_style, monkeypatch, label):
+    case = native_caption_style
+    note = case.notes[label]
+    def rebuild(_adapter, *, label: str):
+        if label == f"normalize detail {note.label} caption font":
+            note._linked = note._linked.replace("<VLSCALEV>", "")
+    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
+    with pytest.raises(RuntimeError, match="field identities/order/counts") as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+
+
+@pytest.mark.parametrize("label", ["D", "E"])
+def test_source_height_normalization_then_quantized_native_caption_seating_keeps_air(native_caption_style, monkeypatch, label):
+    case = native_caption_style
+    _normalize_style(case)
+    note = case.notes[label]
+    pixel = 0.06535530434782608 - 0.06487873578595318
+    original_extent = note.GetExtent
+    def quantized_extent():
+        values = list(original_extent())
+        for index in (0, 1, 3, 4):
+            values[index] = round(values[index] / pixel) * pixel
+        return tuple(values)
+    note.GetExtent = quantized_extent
+    crop = (0.14, 0.070, 0.22, 0.150) if label == "D" else (0.29, 0.084, 0.37, 0.164)
+    monkeypatch.setattr(drawing, "_detail_crop", lambda *_args, **_kwargs: crop)
+    sheet = _native_sheet()
+    sheet.GetZoneMargin = lambda _index: BORDER_BOTTOM
+    linked = note.PropertyLinkedText
+    drawing._seat_detail_caption(case.adapter, case.views[label], sheet, label=label)
+    box = drawing._note_extent(case.adapter, note)
+    assert note.PropertyLinkedText == linked
+    assert crop[1] - box[3] >= 0.003
+    assert box[1] - (BORDER_BOTTOM if label == "D" else 0.066) >= 0.003
+    assert case.views["E"].Position[1] == 0.110
+    assert case.captures == []

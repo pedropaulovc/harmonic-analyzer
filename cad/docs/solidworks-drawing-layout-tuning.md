@@ -155,6 +155,28 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   1.59 and 1.89 px high (2026-10-01; run 20261010T073339590Z). Bring a ring
   inside the zoomed window (place it at fit first) before reading the
   anchor-to-ring offset zoomed.
+- **Native view-caption rich text can mix inherited and inline font heights.**
+  [`IAnnotation.GetTextFormat`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IAnnotation~GetTextFormat.html)
+  explicitly warns that its format may not represent embedded rich text.
+  Source the normal height from uniform, positive native
+  [`IDisplayData.GetTextHeightAtIndex`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IDisplayData~GetTextHeightAtIndex.html)
+  fragments of the sheet's existing ordinary note, not an inherited format,
+  a copied font-size literal, or an unverified document default. The documented
+  [`IAnnotation.SetTextFormat`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IAnnotation~SetTextFormat.html)
+  sequence is `(0, True, None)` to remove embedded fonts, then
+  `(0, False, text_format)` with the sourced `CharHeight`; both calls must
+  return `True`. Reuse `_drawing_notes.set_note_text_height` for that writer,
+  redraw/rebuild, and verify every native fragment height plus
+  `<VLNAME>/<VLLABEL>/<VLSCALE>/<VLSCALEV>` identities, order, and counts.
+  Preserve native view ownership, scales, positions, and linked captions;
+  `INote.GetText` returning spaces for view fields is not resolved glyph proof.
+  Parent-circle letters use their existing
+  [`IDetailCircle.SetTextFormat`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IDetailCircle~SetTextFormat.html)
+  and independent `GetDetailCircleInfo2` height readback, not free-text labels
+  or document-wide preferences. Normalize before capturing the settled linked
+  string, retain later whole-string stability and clearance guards, and capture
+  fatal style refusals before closing the seat. The rocker keeps E at Y110,
+  the fatal 3 mm air requirement, and its 4 mm caption target.
 
 ## Refusal catalogue — do / don't
 
