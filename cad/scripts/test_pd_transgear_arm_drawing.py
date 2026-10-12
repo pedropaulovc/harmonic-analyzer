@@ -92,10 +92,6 @@ def test_locating_sockets_print_in_the_front_view() -> None:
         drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.LOCATOR_SECTION_KEEP, drawing.END_KEEP,
     ):
         assert all(len(xy) == 2 for xy in view_keep.values())
-    # One frame per socket side, each landing on its own socket's rim.
-    assert {int(math.copysign(1.0, y)) for _x, y in geometry.LOCATOR_SITES_MM} == set(
-        drawing._LOCATOR_FRAMES
-    )
 
 
 def test_plate_tap_stations_follow_the_current_reducer_bore() -> None:
@@ -556,6 +552,56 @@ def test_the_tap_callouts_stand_inside_the_upper_border() -> None:
         # Drill and thread lines, then the qualifier's.
         lines = ["\u00d83.45 THRU ALL", "8-32 UNC THRU ALL", *qualifier.splitlines()]
         assert _centred_box(lines, xy)[3] + 0.001 < sheet_top - 0.003, label
+
+
+# "\u2316 \u00d80.050 A B C" as rendered on the stack sheet (1c103499e).
+_POSITION_FRAME_WIDTH = 0.0446
+_POSITION_FRAME_HEIGHT = 0.0069
+
+
+def _front_station(sheet_x: float) -> float:
+    return (sheet_x - drawing.FRONT_CENTER[0]) * 1000.0 / drawing._S + drawing._BBOX_CENTER_X
+
+
+def test_the_socket_offsets_and_frames_stand_outside_the_arm() -> None:
+    """Machinist review of the stack sheet: both 6.850 basics and both
+    socket position frames sat inside the front view's silhouette, crowding
+    the sockets and section line B."""
+    for name, (_x, offset) in zip(("LocatorY1", "LocatorY2"), geometry.LOCATOR_SITES_MM):
+        side = math.copysign(1.0, offset)
+        box = _centred_box(["6.850"], drawing.FRONT_KEEP[name])
+        # Between plate tap 1's and the sockets' station witness lines.
+        assert drawing._front_x(geometry.PLATE_TAP_STATIONS[0]) < box[0], name
+        assert box[2] < drawing._LOCATOR_X, name
+        edges = [
+            drawing._front_y(side * geometry.edge_half_width(_front_station(x)))
+            for x in (box[0], box[2])
+        ]
+        if side > 0:
+            assert box[1] > max(edges) + 0.002, name
+        else:
+            assert box[3] < min(edges) - 0.002, name
+    sheet_right = DRAWING_TEMPLATES[drawing.SPEC.layout].width_m - _BORDER
+    mouth = drawing.LOCATOR_SECTION_CENTER[0] + geometry.THICKNESS * drawing._S / 2000.0
+    radius = geometry.LOCATOR_HOLE_DIA_MM * drawing._S / 2000.0
+    depth_text_top = drawing.LOCATOR_SECTION_KEEP["LocatorDepth"][1] + _LINE_PITCH / 2.0
+    for _x, offset in geometry.LOCATOR_SITES_MM:
+        side = math.copysign(1.0, offset)
+        left, top = drawing._locator_frame_xy(offset)
+        centre_y = top - _POSITION_FRAME_HEIGHT / 2.0
+        axis_y = drawing.LOCATOR_SECTION_CENTER[1] + offset * drawing._S / 1000.0
+        # Right of section B-B and inside the border, on its socket's side.
+        assert mouth + 0.004 < left
+        assert left + _POSITION_FRAME_WIDTH < sheet_right - 0.002
+        assert side * (centre_y - axis_y) > 0.0
+        assert top - _POSITION_FRAME_HEIGHT > depth_text_top + 0.002
+        # The leader from the frame's near end to the inner wall 1 mm in
+        # crosses the mouth inside the socket's opening.
+        land = (mouth - 1.0 * drawing._S / 1000.0, axis_y - side * radius)
+        at_mouth = land[1] + (centre_y - land[1]) * (mouth - land[0]) / (left - land[0])
+        assert abs(at_mouth - axis_y) < radius
+    frames = [drawing._locator_frame_xy(offset) for _x, offset in geometry.LOCATOR_SITES_MM]
+    assert abs(frames[0][1] - frames[1][1]) > _POSITION_FRAME_HEIGHT + 0.002
 
 
 def test_the_overall_reference_spans_the_pivot_round_to_the_square_end() -> None:

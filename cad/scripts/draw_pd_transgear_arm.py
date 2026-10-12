@@ -145,8 +145,10 @@ NOTES_TEXT = "\n".join((
     ),
     PROJECTED_ZONE_NOTE,
 ))
-# Under the end view's pin callout; its label clears the title block.
-LOCATOR_SECTION_CENTER = (0.370, 0.120)
+# Under the end view's pin callout and on its axis; its label clears the
+# title block and section A-A's 8.50.  The socket mouths face right, and the
+# column right of them holds the sockets' position frames inside the border.
+LOCATOR_SECTION_CENTER = (END_CENTER[0], 0.120)
 # The front view centres on the outline's bounding box (x -R .. tip).
 _BBOX_CENTER_X = (TIP_STATION - PIVOT_END_R) / 2.0
 
@@ -190,6 +192,8 @@ def _station_row(index: int) -> float:
 
 
 _LOCATOR_X = _front_x(LOCATOR_SITES_MM[0][0])
+# Midway between plate tap 1's and the sockets' station witness lines.
+_LOCATOR_OFFSET_X = (_front_x(PLATE_TAP_STATIONS[0]) + _LOCATOR_X) / 2.0
 FRONT_KEEP = {
     # Lower left of the pivot round, clear of datum B's tag above it.
     "PivotEndR": (0.025, FRONT_CENTER[1] + 0.010),
@@ -204,10 +208,13 @@ FRONT_KEEP = {
     "PlateTapStation2": (_front_x(PLATE_TAP_STATIONS[1] / 2.0), _station_row(2)),
     "PinStation": (_front_x(PIN_STATION / 2.0), _station_row(3)),
     "TipStation": (_front_x(TIP_STATION / 2.0), _station_row(4)),
-    # The socket offsets read either side of section line B, each between
-    # the centreline and its socket, clear of the position frames.
-    "LocatorY1": (_LOCATOR_X - 0.0075, _front_y(LOCATOR_SITES_MM[0][1]) - 0.006),
-    "LocatorY2": (_LOCATOR_X + 0.00725, _front_y(LOCATOR_SITES_MM[1][1]) + 0.006),
+    # The socket offsets share one dimension line left of section line B,
+    # their texts outside the arm: above its top edge, under the tap
+    # callout's shelf, and below its bottom edge, between the plate tap's and
+    # the socket's station witness lines (machinist review: inside the
+    # silhouette they crowded the sockets and line B).
+    "LocatorY1": (_LOCATOR_OFFSET_X, _front_y(PIVOT_END_R) + 0.0045),
+    "LocatorY2": (_LOCATOR_OFFSET_X, _front_y(-PIVOT_END_R) - 0.0045),
     "LocatorDia1": (0.245, _front_y(PIVOT_END_R) + 0.021),
 }
 # The true overall (review of 19e33c6c2: the 128.90 from the bore axis read
@@ -236,7 +243,7 @@ SECTION_KEEP = {
 # its view (run 20261010T001620278Z: inside them, the witness lines and the
 # view edges struck the text).
 LOCATOR_SECTION_KEEP = {
-    "LocatorDepth": (0.396, 0.094),
+    "LocatorDepth": (LOCATOR_SECTION_CENTER[0] + 0.027, 0.0935),
 }
 END_KEEP = {
     "Depth": (END_CENTER[0], _end_y(PIVOT_END_R) + 0.017),
@@ -371,10 +378,24 @@ def _wall_point(
     )
 
 
-# Position frames on the locating sockets, landing on each socket's rim on
-# the side away from section line B: the upper socket's frame right of B
-# above line A, the lower one's left of B below it.
-_LOCATOR_FRAMES = {1: ((0.165, 0.2185), -30.0), -1: ((0.092, 0.196), 190.0)}
+# Position frames on the locating sockets stand in section B-B, which cuts
+# both on their axes, right of the socket mouths and each on its socket's side
+# of the arm's centre (machinist review: in the front view they sat inside
+# the silhouette).  Each leader enters its socket's mouth and lands on the
+# wall nearer the centre 1 mm in, as section A-A's tap frames do.
+_LOCATOR_MOUTH_X = LOCATOR_SECTION_CENTER[0] + THICKNESS / 2.0 * _S / 1000.0
+_LOCATOR_FRAME_GAP = 0.006
+_LOCATOR_FRAME_RISE = 0.0025
+_FRAME_HALF_HEIGHT = 0.00345
+
+
+def _locator_frame_xy(offset_mm: float) -> tuple[float, float]:
+    """Top-left of a socket's position frame in section B-B."""
+    side = math.copysign(1.0, offset_mm)
+    centre_y = (
+        LOCATOR_SECTION_CENTER[1] + offset_mm * _S / 1000.0 + side * _LOCATOR_FRAME_RISE
+    )
+    return (_LOCATOR_MOUTH_X + _LOCATOR_FRAME_GAP, centre_y + _FRAME_HALF_HEIGHT)
 
 
 def tap_callout_definitions(
@@ -625,12 +646,15 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         **{
             f"arm_locator_{index}_position": PmiDrawingPlacement(
-                front, _LOCATOR_FRAMES[int(math.copysign(1.0, y))][0],
-                attachment_xy=_rim_point(
-                    adapter, front, station_mm=x, offset_mm=y,
-                    radius_mm=LOCATOR_HOLE_DIA_MM / 2.0,
-                    bearing_deg=_LOCATOR_FRAMES[int(math.copysign(1.0, y))][1],
-                    label=f"arm locator {index} rim",
+                locator_section, _locator_frame_xy(y),
+                attachment_xy=model_point_in_view(
+                    adapter, locator_section,
+                    (
+                        x / 1000.0,
+                        (y - math.copysign(LOCATOR_HOLE_DIA_MM / 2.0, y)) / 1000.0,
+                        (THICKNESS - 1.0) / 1000.0,
+                    ),
+                    label=f"arm locator {index} inner wall",
                 ),
             ) for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1)
         },
