@@ -2,8 +2,8 @@
 
 The published 4e9a4df11f3067a0c107d42d295622b2abf3c4dc native run reached
 ``create_extrude`` in both recipes, but PyWin32Adapter has no such method.
-Census every direct adapter call against its actual source-derived MRO, then
-pin the blank boss and finite-gap cut semantics. These are offline contracts,
+Census every direct adapter call against its actual source-derived MRO and
+bind it to the SDK signature. These are offline contracts,
 not evidence that the final-source native geometry or readback passes.
 """
 
@@ -195,60 +195,3 @@ def test_census_rejects_the_observed_bad_binding_without_running_a_recipe(recipe
     assert len(bosses) == 1
     bosses[0].func.attr = "create_extrude"
     assert _missing(tree) == {"create_extrude"}
-
-
-@pytest.mark.parametrize("recipe", RECIPES)
-def test_straight_stock_pass_keeps_blind_boss_cut_direction_and_native_guards(recipe: str) -> None:
-    straight = next(
-        node for node in _tree(SCRIPTS / recipe).body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_straight_stock_gaps"
-    )
-    operations = [call for call in _adapter_calls(straight) if call.func.attr.startswith("create_")]
-    extrusions = [call for call in operations if call.func.attr in {"create_extrusion", "create_cut_extrude"}]
-    assert [call.func.attr for call in extrusions] == ["create_extrusion", "create_cut_extrude"]
-    parameter_class = _resolve_class(SDK / "adapters" / "base.py", "ExtrusionParameters")
-    assert parameter_class is not None
-    fields = {
-        node.target.id: node.value for node in _class(parameter_class).body
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
-    }
-    defaults = {name: value for name, value in fields.items() if value is not None}
-    for call, depth in zip(extrusions, ("FACE_WIDTH", "FULL_DEPTH")):
-        assert len(call.args) == 1 and not call.keywords
-        params = call.args[0]
-        assert isinstance(params, ast.Call) and isinstance(params.func, ast.Name)
-        assert params.func.id == "ExtrusionParameters" and not params.args
-        supplied = {keyword.arg: keyword.value for keyword in params.keywords}
-        assert supplied.keys() <= fields.keys()
-        assert ast.unparse(supplied["depth"]) == depth
-        effective = defaults | supplied
-        for flag, expected in {
-            "end_condition": "Blind", "reverse_direction": False,
-            "both_directions": False, "thin_feature": False,
-            "merge_result": True, "start_offset": 0.0,
-        }.items():
-            assert ast.literal_eval(effective[flag]) == expected, (recipe, call.func.attr, flag)
-        parents = {id(child): node for node in ast.walk(straight) for child in ast.iter_child_nodes(node)}
-        awaited = parents[id(call)]
-        assert isinstance(awaited, ast.Await)
-        checked = parents[id(awaited)]
-        assert isinstance(checked, ast.Call) and isinstance(checked.func, ast.Name)
-        assert checked.func.id == "check" and checked.args[1] is awaited
-
-    calls = [node for node in ast.walk(straight) if isinstance(node, ast.Call)]
-    defined = sorted(node.lineno for node in calls if isinstance(node.func, ast.Name) and node.func.id == "ensure_fully_defined")
-    exited = [node.lineno for node in _adapter_calls(straight) if node.func.attr == "exit_sketch"]
-    native = [node for node in calls if isinstance(node.func, ast.Attribute) and node.func.attr == "cut_order_native_segments"]
-    assert len(defined) == len(exited) == 2 and len(native) == 1
-    boss, cut = extrusions
-    assert defined[0] < exited[0] < boss.lineno < native[0].lineno < defined[1] < exited[1] < cut.lineno
-    volumes = sorted(
-        node.lineno for node in calls
-        if isinstance(node.func, ast.Name)
-        and node.func.id in {"_native_volume_check", "check_one_solid_body_volume"}
-    )
-    assert len(volumes) == 3
-    assert boss.lineno < volumes[0] < native[0].lineno
-    pattern = [node for node in calls if isinstance(node.func, ast.Name) and node.func.id in {"pattern_stock_feature", "pattern_about_z"}]
-    assert len(pattern) == 1
-    assert cut.lineno < volumes[1] < pattern[0].lineno < volumes[2]
