@@ -103,16 +103,16 @@ BAR_BORE_LIMITS = (
     _bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[1],
     _bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[0],
 )
-# Rule 6: the notes say only the press gauge no view can, and why its band
-# is tight: the gauge's 0.10 is spent inside the thread-end window
-# (mg_wheel_group: full thread under the locknut at the thick-stack corner).
+# Rule 6: the note says only that the axle presses to the gauge and why. The
+# gauge itself is a model dimension of the mg-magnifier assembly, printed on
+# MHA-MG-000's AXLE AS PRESSED detail (mg_magnifier_assembly_spec): its 0.10
+# is spent inside the thread-end window (mg_wheel_group: full thread under the
+# locknut at the thick-stack corner).
 # The back end's window, now loose, rides the bar's depth callout.
 DRAWING_NOTES = "\n".join(
     (
-        "PRESS INTO MG-WHEEL-BAR UNTIL THE SHANK STEP STANDS",
-        f"{PRESS_GAUGE:.2f} +/-{PRESS_GAUGE_TOL:.2f} FROM THE BAR FRONT FACE, "
-        "SO THE LOCKNUT SITS ON FULL THREAD;",
-        "RED LOCTITE 271 OPTIONAL.",
+        "PRESS INTO MG-WHEEL-BAR TO THE GAUGE ON MHA-MG-000 (AXLE AS PRESSED),",
+        "SO THE LOCKNUT SITS ON FULL THREAD; RED LOCTITE 271 OPTIONAL.",
     )
 )
 # Rule 5: the magnifying wheel runs on the shank, a shaft-in-bushing journal,

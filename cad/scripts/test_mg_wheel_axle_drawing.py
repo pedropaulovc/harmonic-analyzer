@@ -128,7 +128,8 @@ def test_thread_callout_and_notes() -> None:
     notes = spec.DRAWING_NOTES
     assert 1 <= len(notes.splitlines()) <= 4
     flat = " ".join(notes.splitlines())
-    assert "UNTIL THE SHANK STEP STANDS 19.50 +/-0.05 FROM THE BAR FRONT FACE" in flat
+    assert "TO THE GAUGE ON MHA-MG-000 (AXLE AS PRESSED)" in flat
+    assert not re.search(r"\d+\.\d|\+/-|±|Ø|MAX|MIN", notes)
     assert all(len(line) <= 80 for line in notes.splitlines())
     assert "REAMED BORE" not in notes
     assert drawing.DIMENSION_CALLOUTS["PinDia"] == (
