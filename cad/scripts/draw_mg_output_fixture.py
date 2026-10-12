@@ -33,6 +33,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -45,6 +46,7 @@ from _drawing_dimensions import assert_imported_precision, set_dimension_callout
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_selection import _select_view_entity
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
@@ -109,41 +111,60 @@ def _side_y(sketch_v_mm: float) -> float:
 
 _SIDE_TOP = _side_y(_HALF_AF)
 _SIDE_BOTTOM = _side_y(-_HALF_AF)
-# The hex and groove stations stack over the side view, each text mid-span,
-# their extension lines rising from the free end, the shoulder and the
-# groove's centre.  The overall length runs under the view, outermost, so no
-# extension line rises from the spigot face: the groove's radius (its sketch
-# sits on the upper side, sketch +v) reads beyond the face, just over the
-# spigot's top edge, its shoulder clear.  The bore's station (a 20 mm span
-# under a 22 mm text) reads outside, left of the free end, so the overall
-# length's extension line from the free end never runs through it.  The
-# groove's root Ø hangs under the groove, between the two.
+# Printed text extents on the 2026-10-12 farm sheet (the layout audit's
+# boxes), used to hold each text clear of the witnesses beside it.
+SPIGOT_DIA_TEXT_HALF_WIDTH = 0.0135  # Ø9.00 and its band: 27.0 mm
+STATION_TEXT_HALF_WIDTH = 0.0123  # 5.00 or 4.76 and its band: 24.5 mm
+BORE_CALLOUT_HALF_WIDTH = 0.0138  # Ø5.20 +0.03/0.00 over REAM THRU: 27.5 mm
+BORE_CALLOUT_HALF_HEIGHT = 0.0073  # shoulder to the +0.03 row's top: 14.6 mm
+# Every station on the side view is witnessed from the free end's mid point,
+# the ridge between the two hex faces the view looks across: the hex and
+# groove stations rise from it, the bore's station and the overall length
+# hang from it, so witnesses cover the free end's whole height bar the ridge
+# and fence the bore in from the left.  The bore's Ø therefore reads over
+# the hex, mid-span between the free end's and the shoulder's witnesses, its
+# leader rising from the bore's upper rim across the hex's top edge alone;
+# the hex and groove stations stack over it, each text mid-span.  The
+# overall length runs under the view, outermost; its witness hangs from the
+# spigot face's top corner down the face, so the spigot's Ø reads right of
+# the face, its text clear of that witness, and the groove's radius (its
+# sketch sits on the upper side, sketch +v) reads beyond the face, just over
+# the spigot's top edge, its shoulder clear.  The bore's station (a 20 mm
+# span under a 22 mm text) reads outside, left of the free end; the groove's
+# root Ø hangs under the groove.
+_HEX_MID_X = _side_x((FREE_END_X + SHOULDER_X) / 2.0)
 SIDE_KEEP = {
-    "HexLength": (_side_x((FREE_END_X + SHOULDER_X) / 2.0), _SIDE_TOP + 0.010),
-    "GrooveStation": (_side_x((FREE_END_X + GROOVE_X) / 2.0), _SIDE_TOP + 0.020),
+    "RodBoreDia": (_HEX_MID_X, _SIDE_TOP + 0.011),
+    "HexLength": (_HEX_MID_X, _SIDE_TOP + 0.025),
+    "GrooveStation": (_side_x((FREE_END_X + GROOVE_X) / 2.0), _SIDE_TOP + 0.035),
     "OverallLength": (_side_x(_AXIAL_MID), _SIDE_BOTTOM - 0.032),
     "RodStation": (_side_x(FREE_END_X) - 0.015, _SIDE_BOTTOM - 0.010),
     "GrooveRootDia": (_side_x(GROOVE_X), _SIDE_BOTTOM - 0.012),
-    "SpigotDia": (_side_x(SPIGOT_FACE_X) + 0.012, SIDE_CENTER[1]),
+    "SpigotDia": (_side_x(SPIGOT_FACE_X) + 0.018, SIDE_CENTER[1]),
     "GrooveRadius": (_side_x(SPIGOT_FACE_X) + 0.012, _SIDE_TOP + 0.006),
-    "RodBoreDia": (_side_x(FREE_END_X) - 0.022, SIDE_CENTER[1] + 0.012),
 }
 # The end view stands the flats vertical (``*Right`` looks along -X, sheet
-# right is model -Z): across them above the hex, the bore's location from one
-# of them below it.
+# right is model -Z).  Both of its dimensions witness the near (right) flat
+# from its top corner, so both stack above the hex and nothing hangs down
+# that flat where the tap's leader crosses it: the bore's location
+# innermost, its text outside the 19 mm span right of the flat's witness
+# (the bore station's precedent on the side view), so the bore axis'
+# witness stops under the flats' line; across the flats outermost, mid-span.
 _END_HALF_HEIGHT = HEX_CORNER_RADIUS * _S / 1000.0
+_END_HALF_WIDTH = HEX_AF / 2.0 * _S / 1000.0
 END_KEEP = {
-    "HexAf": (END_CENTER[0], END_CENTER[1] + _END_HALF_HEIGHT + 0.010),
-    "BoreFromFlat": (END_CENTER[0], END_CENTER[1] - _END_HALF_HEIGHT - 0.010),
+    "BoreFromFlat": (
+        END_CENTER[0] + _END_HALF_WIDTH + 0.015,
+        END_CENTER[1] + _END_HALF_HEIGHT + 0.012,
+    ),
+    "HexAf": (END_CENTER[0], END_CENTER[1] + _END_HALF_HEIGHT + 0.022),
 }
 # The tap callout reads right of the end view at the hole's height: its
 # leader leaves the drill circle a few degrees above the horizontal centre
-# mark, crosses only the near flat, and stays between the flats' extension
-# lines (rising from the flats' tops) and the bore's location (hanging from
-# their bottoms).  ``callout_xy`` is the text's centre; the two rows run
+# mark and crosses only the near flat, below the witnesses rising from the
+# flat's top corner.  ``callout_xy`` is the text's centre; the two rows run
 # ~76 mm with the shoulder under the bottom row, ~5.6 mm below the centre
 # (the v1 sheet's ink: centre (292, 134), shoulder end (254.0, 128.4)).
-_END_HALF_WIDTH = HEX_AF / 2.0 * _S / 1000.0
 _TAP_CALLOUT_HALF_WIDTH = 0.038
 _TAP_CALLOUT_SHOULDER_DROP = 0.0056
 TAP_CALLOUT_XY = (
@@ -169,6 +190,35 @@ def _check_tap_callout(display: Any) -> None:
             f"{_TAP_THREAD_TEXT}-{TAP_SPEC.thread_class}: {resolved!r}"
         )
     _telemetry.success(f"thumb-screw tap callout reads {thread[0]!r}")
+
+
+# swCenterMarkStyle_e.swCenterMark_Single.  AutoInsertCenterMarks2 marks the
+# spigot's O.D. and the tap drill, concentric on the end view, separately:
+# one mark printed over the other (DetailItem347/350, 2026-10-12 farm sheet).
+CENTER_MARK_SINGLE = 2
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+
+
+def _mark_tap_axis(adapter: Any, view: Any, drill_edge: Any) -> None:
+    """One centre mark on the tap, picked on its drill circle, and proof the
+    end view carries no other."""
+    _select_view_entity(
+        adapter, view, "EDGE", None, label="thumb-screw tap drill", entity=drill_edge
+    )
+    draw = adapter.currentModel
+    mark = _early_bound(draw, "IDrawingDoc").InsertCenterMark3(
+        CENTER_MARK_SINGLE, False, False
+    )
+    draw.ClearSelection2(True)
+    if mark is None:
+        raise RuntimeError("failed to centre-mark the thumb-screw tap")
+    marks = (
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
+    if len(marks) != 1:
+        raise RuntimeError(
+            f"expected one tap centre mark on the end view, found {len(marks)}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -238,15 +288,16 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, side_annotations, {"RodBoreDia": ROD_BORE_CALLOUT})
     if not auto_center_marks(adapter, side, holes=True, size=0.0025):
         raise RuntimeError("failed to add the rod bore's center mark to the side view")
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
-        raise RuntimeError("failed to add the tap's center mark to the end view")
     # The tap drill's edge on the spigot face: the one visible circle of the
-    # Hole Wizard feature from the end.  The native callout prints the drill
-    # row and, under it, the process on the thread row.
+    # Hole Wizard feature from the end.  It takes the view's one centre mark,
+    # and the native callout prints the drill row and, under it, the process
+    # on the thread row.
+    tap_drill = visible_circle_edge(adapter, end, TAP_DRILL_DIA)
+    _mark_tap_axis(adapter, end, tap_drill)
     tap_callout = add_native_hole_callout(
         adapter,
         end,
-        edge=visible_circle_edge(adapter, end, TAP_DRILL_DIA),
+        edge=tap_drill,
         callout_xy=TAP_CALLOUT_XY,
         label="#4-40 thumb-screw tap",
         process=TAP_PROCESS,

@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -210,6 +211,155 @@ def test_sheet_reads_places_and_bands_from_the_part() -> None:
     assert "tolerance" not in source.lower()
     for gdt in ("gtol", "datum"):
         assert gdt not in source.lower(), gdt
+
+
+# A dimension's text centre sits ~2.8 mm over its line (2026-10-12 farm
+# sheet: HexLength's text at 209.05 mm over its line at 206.27 mm).
+_TEXT_OVER_LINE = 0.0028
+_TEXT_HEIGHT = 0.0035
+
+
+def test_spigot_dia_text_clears_the_overall_length_witness() -> None:
+    # 2026-10-12 farm sheet: the overall length's witness hangs down the
+    # spigot face and ran through the Ø9.00 text centred 12 mm off the face.
+    face_x = drawing._side_x(geom.SPIGOT_FACE_X)
+    x, _y = drawing.SIDE_KEEP["SpigotDia"]
+    assert x - drawing.SPIGOT_DIA_TEXT_HALF_WIDTH > face_x + 0.003
+    # The overall length stays under the view, the groove's radius over it.
+    assert drawing.SIDE_KEEP["OverallLength"][1] < drawing._SIDE_BOTTOM
+    assert drawing.SIDE_KEEP["GrooveRadius"][1] > drawing._SIDE_TOP
+
+
+def test_bore_callout_reads_over_the_hex_between_its_witnesses() -> None:
+    # The free end carries witnesses over its whole height, so the bore's Ø
+    # reads over the hex, inside the hex length's span, under its line.
+    x, y = drawing.SIDE_KEEP["RodBoreDia"]
+    half_width = drawing.BORE_CALLOUT_HALF_WIDTH
+    half_height = drawing.BORE_CALLOUT_HALF_HEIGHT
+    assert x - half_width > drawing._side_x(geom.FREE_END_X) + 0.005
+    assert x + half_width < drawing._side_x(geom.SHOULDER_X) - 0.005
+    assert y - half_height > drawing._SIDE_TOP + 0.003
+    hex_line = drawing.SIDE_KEEP["HexLength"][1] - _TEXT_OVER_LINE
+    assert hex_line > y + half_height + _TEXT_HEIGHT
+    hex_y = drawing.SIDE_KEEP["HexLength"][1]
+    assert drawing.SIDE_KEEP["GrooveStation"][1] - hex_y > 0.0099
+
+
+def test_end_view_dimensions_stack_above_the_hex_clear_of_the_tap_leader() -> None:
+    scale = drawing._S / 1000.0
+    centre_x, centre_y = drawing.END_CENTER
+    flat_x = centre_x + geom.HEX_AF / 2.0 * scale
+    flat_top = centre_y + geom.HEX_CORNER_RADIUS / 2.0 * scale
+    hex_top = centre_y + geom.HEX_CORNER_RADIUS * scale
+    bore_x, bore_y = drawing.END_KEEP["BoreFromFlat"]
+    af_x, af_y = drawing.END_KEEP["HexAf"]
+    # Both witness the near flat from its top corner: above the hex, the
+    # bore's location inside the flats' line, so the bore axis' witness
+    # stops short of the flats' text.
+    assert hex_top < bore_y - _TEXT_OVER_LINE < af_y - _TEXT_OVER_LINE - 0.008
+    assert af_x == centre_x
+    # 2026-10-12 farm sheet: the 4.76 text centred on the bore axis carried
+    # that witness through itself; it reads outside the span, right of the
+    # flat.
+    assert bore_x - drawing.STATION_TEXT_HALF_WIDTH > flat_x + 0.002
+    # The tap's shoulder runs under the flat's top corner, where no witness
+    # hangs any longer.
+    shoulder_y = drawing.TAP_CALLOUT_XY[1] - drawing._TAP_CALLOUT_SHOULDER_DROP
+    assert shoulder_y < flat_top - 0.004
+
+
+def test_end_view_tap_takes_one_single_centre_mark() -> None:
+    # 2026-10-12 farm sheet: AutoInsertCenterMarks2 marked the spigot's O.D.
+    # and the concentric tap drill, one mark over the other.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "auto_center_marks(adapter, end" not in source
+    assert drawing.CENTER_MARK_SINGLE == 2
+    assert "CENTER_MARK_SINGLE, False, False" in source
+    assert "expected one tap centre mark on the end view" in source
+    assert "_mark_tap_axis(adapter, end, tap_drill)" in source
+    assert "edge=tap_drill," in source
+
+
+class _MarkDrawing:
+    """IDrawingDoc as the mark sees it: InsertCenterMark3 is a dispatch-
+    returning method, ClearSelection2 a void one."""
+
+    def __init__(self, calls: list[tuple], mark: object | None) -> None:
+        self._calls = calls
+        self._mark = mark
+
+    def InsertCenterMark3(self, style: int, propagate: bool, slot: bool) -> object | None:
+        self._calls.append(("InsertCenterMark3", style, propagate, slot))
+        return self._mark
+
+    def ClearSelection2(self, all_selections: bool) -> None:
+        self._calls.append(("ClearSelection2", all_selections))
+
+
+class _MarkView:
+    """IView's annotation census: a VARIANT array, or None when empty."""
+
+    def __init__(self, calls: list[tuple], marks: tuple | None) -> None:
+        self._calls = calls
+        self._marks = marks
+
+    def GetAnnotationsByType(self, annotation_type: int) -> tuple | None:
+        self._calls.append(("GetAnnotationsByType", annotation_type))
+        return self._marks
+
+
+def _mark_tap(
+    monkeypatch: pytest.MonkeyPatch, *, mark: object | None, marks: tuple | None
+) -> list[tuple]:
+    calls: list[tuple] = []
+    drill = object()
+    view = _MarkView(calls, marks)
+    model = _MarkDrawing(calls, mark)
+
+    def select(adapter, selected_view, entity_type, xy, *, label, entity):
+        assert selected_view is view and entity is drill
+        calls.append(("select", entity_type, xy))
+        return entity
+
+    def early_bound(obj, interface):
+        calls.append(("bind", interface))
+        return obj
+
+    monkeypatch.setattr(drawing, "_select_view_entity", select)
+    monkeypatch.setattr(drawing, "_early_bound", early_bound)
+    drawing._mark_tap_axis(SimpleNamespace(currentModel=model), view, drill)
+    return calls
+
+
+def test_tap_mark_is_one_single_mark_on_the_selected_drill_circle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = _mark_tap(monkeypatch, mark=object(), marks=(object(),))
+    assert calls == [
+        ("select", "EDGE", None),
+        ("bind", "IDrawingDoc"),
+        ("InsertCenterMark3", 2, False, False),
+        ("ClearSelection2", True),
+        ("bind", "IView"),
+        ("GetAnnotationsByType", 13),
+    ]
+
+
+def test_tap_mark_refuses_a_refused_insert(monkeypatch: pytest.MonkeyPatch) -> None:
+    with pytest.raises(RuntimeError, match="failed to centre-mark the thumb-screw tap"):
+        _mark_tap(monkeypatch, mark=None, marks=(object(),))
+
+
+@pytest.mark.parametrize(
+    ("marks", "found"), [(None, 0), ((), 0), ((object(), object()), 2)]
+)
+def test_tap_mark_refuses_any_census_but_one(
+    monkeypatch: pytest.MonkeyPatch, marks: tuple | None, found: int
+) -> None:
+    with pytest.raises(
+        RuntimeError, match=f"expected one tap centre mark on the end view, found {found}"
+    ):
+        _mark_tap(monkeypatch, mark=object(), marks=marks)
 
 
 def test_notes_are_short() -> None:
