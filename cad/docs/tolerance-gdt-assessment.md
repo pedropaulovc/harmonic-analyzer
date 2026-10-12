@@ -342,7 +342,7 @@ Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loos
 | **Magnifier & pen** `mg-magnifying-wheel`, `mg-magnifying-lever`, `mg-magnifying-bracket/clamp`, `mg-magnifying-vertical-rod`, pen parts | **T2** | wheel/lever bores `precision` + runout on the wheel; linkage pivots squareness. Amplifies output, so play here is visible — but downstream of the sum. |
 | **Frame** `fr-harmonic-base`, `fr-top-frame` (one casting: ring + integral crossbar + gooseneck hub — absorbed the former `top-crossbar` and `gooseneck-clamp`, 2026-08-02), pedestals, clamps, columns, `gooseneck` | **T3** | mating-face flatness "as-machined" + bolt-pattern location; column slip fits (Ø25.4 in 25.5–25.6) already fine. Cast-iron castings stay forgiving. |
 | **Springs** `vn-channel-spring-installed`, `vn-counter-spring` | **T2** | **match rate + free length across the 20 channels** (consistency, not absolute rate); counter spring is the **coarse tare** — leave loose. |
-| **Measuring stick** `ha-measuring-stick` | **T3** | leave loose — original was hand-stamped & uneven; what matters is **one stick sets all 20 bars**. |
+| **Measuring stick** `ms-stick` (+ its clamped stop `ms-stop-block` / `ms-stop-plate`) | **T3** | leave loose — original was hand-stamped & uneven; what matters is **one stick sets all 20 bars**. |
 | **Fasteners / misc** `vn-hex-bolt`, `vn-lag-screw`, `vn-hanger-screw`, `vn-fillister-screw`, `vn-thumb-screw`, `nameplate`, knobs | **T3** | `fastener_clearance` close/normal as-is; no additions. |
 
 ---

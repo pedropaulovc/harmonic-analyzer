@@ -9,7 +9,11 @@ import json
 import os
 import subprocess
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import doit.cmd_base as _doit_cmd_base
@@ -725,7 +729,7 @@ def test_farm_build_refuses_a_dirty_tree_before_contacting_the_fleet(
     assert executed == []
 
 
-PROTOCOL = 5
+PROTOCOL = 6
 AGENT_TAG = "7" * 16
 
 
@@ -742,7 +746,7 @@ def _worker(*, protocol=PROTOCOL, fresh=True, age_s=30, worker_id="swmaker000004
 
 
 def _agents_summary(**overrides):
-    """``farm.py agents --json``: one worker freshly reporting protocol 5."""
+    """``farm.py agents --json``: one worker freshly reporting protocol 6."""
     summary = {
         "farm_protocol_version": PROTOCOL,
         "verdict": "matched",
@@ -829,7 +833,7 @@ def test_successful_preflight_stamps_only_committed_head_without_mutating_refs(
         ["agents", "--json"]
     ]
     assert capsys.readouterr().out.splitlines()[:2] == [
-        "farm: protocol 5 on 1 worker(s)",
+        "farm: protocol 6 on 1 worker(s)",
         "farm: every SolidWorks task runs on the farm (parts, assemblies, "
         "drawings, verify:*, preflight, export, package:release)",
     ]
@@ -1001,12 +1005,12 @@ def test_default_build_target_carries_the_verify_gates_under_every_executor(
             "farm: agents printed no JSON summary; last line: not json at all",
         ),
         (
-            _agents_summary(farm_protocol_version="5"),
-            "farm: agents summary farm_protocol_version is not an integer: '5'",
+            _agents_summary(farm_protocol_version="6"),
+            "farm: agents summary farm_protocol_version is not an integer: '6'",
         ),
         (
             _agents_summary(farm_protocol_version=3),
-            "farm: pool CLI supports farm protocol 3, but this client requires 5",
+            "farm: pool CLI supports farm protocol 3, but this client requires 6",
         ),
         (
             _agents_summary(workers={"swmaker000004@4": "ready"}),
@@ -1066,7 +1070,7 @@ def test_an_unknown_fleet_verdict_blocks_with_the_invalid_token(
 
 def test_an_incompatible_fleet_stops_before_actions(monkeypatch, capsys):
     report = (
-        "farm protocol 5 is required, but the fleet reports:\n"
+        "farm protocol 6 is required, but the fleet reports:\n"
         "  protocol 3: swmaker000004@4 (3h 0m ago)\n"
         "Deploy a protocol-compatible agent."
     )
@@ -1146,7 +1150,7 @@ def test_current_compatible_worker_allows_an_aged_retired_unreadable_report(
 
     assert build.main(["--executor", "farm", "assembly:x"]) == 0
     assert executed
-    assert "protocol 5" in capsys.readouterr().out.splitlines()[0]
+    assert "protocol 6" in capsys.readouterr().out.splitlines()[0]
 
 
 def test_a_sleeping_compatible_fleet_says_so(monkeypatch, capsys):
@@ -1160,7 +1164,7 @@ def test_a_sleeping_compatible_fleet_says_so(monkeypatch, capsys):
 
     assert build.main(["--executor", "farm", "assembly:x"]) == 0
     status = capsys.readouterr().out.splitlines()[0]
-    assert "protocol 5" in status
+    assert "protocol 6" in status
     assert "no worker has reported within 120s" in status
     assert "last report of 1 worker(s)" in status
     assert "supports it" in status
@@ -1176,7 +1180,7 @@ def test_a_fleet_that_never_reported_says_compatibility_is_unconfirmed(
 
     assert build.main(["--executor", "farm", "assembly:x"]) == 0
     status = capsys.readouterr().out.splitlines()[0]
-    assert "protocol 5" in status
+    assert "protocol 6" in status
     assert "no worker has ever reported" in status
     assert "unconfirmed" in status
 
@@ -1202,7 +1206,7 @@ def test_aged_out_compatible_reports_are_not_called_silence(monkeypatch, capsys)
 
     assert build.main(["--executor", "farm", "assembly:x"]) == 0
     status = capsys.readouterr().out.splitlines()[0]
-    assert "protocol 5" in status
+    assert "protocol 6" in status
     assert "2 worker(s)" in status
     assert "more than 14d ago" in status
     assert "too old to prove the fleet is up" in status
@@ -1215,7 +1219,7 @@ def test_aged_out_compatible_reports_are_not_called_silence(monkeypatch, capsys)
         (3, False, "protocol 3"),
         (None, True, "protocol unreadable"),
         (None, False, "protocol unreadable"),
-        ("5", False, "protocol unreadable"),
+        ("6", False, "protocol unreadable"),
         (True, False, "protocol unreadable"),
     ],
 )
@@ -1631,9 +1635,13 @@ def temporal_boundary(tmp_path, monkeypatch):
     monkeypatch.delenv("HARMONIC_FARM_RUN", raising=False)
     monkeypatch.delenv("HARMONIC_FARM_REQUESTS", raising=False)
     calls = {"connect": [], "start": [], "submit": [], "handles": [], "queries": []}
+    calls["workflow_type"] = _farm.WORKFLOW_BUILD_FIFO
     outcome = {}
 
     class Handle:
+        async def describe(self, **options):
+            return SimpleNamespace(workflow_type=calls["workflow_type"])
+
         async def result(self, *, follow_runs):
             assert follow_runs is False, "result must not follow a replacement run"
             if isinstance(outcome["result"], BaseException):
@@ -1645,7 +1653,7 @@ def temporal_boundary(tmp_path, monkeypatch):
             calls["submit"].append((arg, options))
             request = arg.request
             key = _farm.LeafKey(request.build_id, _farm.workflow_id(
-                request.task, request.cache_key, request.commit,
+                request.build_id, request.task, request.cache_key, request.commit,
                 request.leaf_timeout_s or 900))
             return _farm.LeafStatus(key, "reserved", None, [])
 
@@ -1657,7 +1665,7 @@ def temporal_boundary(tmp_path, monkeypatch):
 
     class FakeClient:
         async def start_workflow(self, workflow, **options):
-            assert workflow == "BuildFifo", "producer must never start BuildLeaf"
+            assert workflow == _farm.WORKFLOW_BUILD_FIFO, "producer must never start a leaf"
             calls["start"].append((workflow, options))
             return Handle()
 
@@ -1675,6 +1683,29 @@ def temporal_boundary(tmp_path, monkeypatch):
         outcome["result"] = result
 
     return calls, resolve
+
+
+def test_run_leaf_rejects_wrong_type_before_submission_or_request_record(
+    temporal_boundary, tmp_path, monkeypatch
+):
+    calls, resolve = temporal_boundary
+    # A usable protocol-6 result cannot make an old coordinator type safe.
+    resolve(_leaf_result())
+    calls["workflow_type"] = "BuildFifo"
+    requests = tmp_path / "run.requests"
+    requests.mkdir()
+    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(requests))
+
+    with pytest.raises(RuntimeError) as failure:
+        _farm.run_leaf("part:pen_rod", "k" * 64)
+
+    message = str(failure.value)
+    assert f"expected workflow type {_farm.WORKFLOW_BUILD_FIFO!r}" in message
+    assert "found 'BuildFifo'" in message
+    assert "coordinated producer/pool/worker cutover" in message
+    assert calls["submit"] == []
+    assert calls["queries"] == []
+    assert list(requests.iterdir()) == []
 
 
 def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
@@ -1695,7 +1726,7 @@ def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
         lambda name, **fields: records.append(("event", name, fields)),
     )
     request = _farm.LeafRequest(
-        farm_protocol_version=5,
+        farm_protocol_version=PROTOCOL,
         commit=SHA,
         task="part:pen_rod",
         cache_key="k" * 64,
@@ -1703,7 +1734,7 @@ def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
         submitter="test@submitter",
         build_id=BUILD_ID,
     )
-    wf_id = "leaf:part:pen_rod:" + "k" * 64 + ":900s"
+    wf_id = f"leaf:{BUILD_ID}:part:pen_rod:" + "k" * 64 + ":900s"
     cancellations = []
 
     async def exercise():
@@ -1713,6 +1744,9 @@ def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
         release_result = asyncio.Event()
 
         class Handle:
+            async def describe(self, **options):
+                return SimpleNamespace(workflow_type=_farm.WORKFLOW_BUILD_FIFO)
+
             async def execute_update(self, name, arg, **options):
                 assert name == "submit_leaf"
                 submit_entered.set()
@@ -1733,7 +1767,7 @@ def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
 
         class FakeClient:
             async def start_workflow(self, *_args, **_kwargs):
-                assert _args == ("BuildFifo",)
+                assert _args == (_farm.WORKFLOW_BUILD_FIFO,)
                 return Handle()
 
             def get_workflow_handle(self, workflow_id, **options):
@@ -1773,7 +1807,6 @@ def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
 
 
 def test_run_leaf_submits_to_coordinator_and_waits_exact_binding(temporal_boundary):
-    from temporalio.common import WorkflowIDConflictPolicy, WorkflowIDReusePolicy
 
     calls, resolve = temporal_boundary
     resolve(_leaf_result(worker_id="sw-02@7", attempt=2))
@@ -1795,7 +1828,7 @@ def test_run_leaf_submits_to_coordinator_and_waits_exact_binding(temporal_bounda
     request = submission.request
     assert submission.farm_run is None
     assert request == _farm.LeafRequest(
-        farm_protocol_version=5,
+        farm_protocol_version=PROTOCOL,
         commit=SHA,
         task="part:pen_rod",
         cache_key="k" * 64,
@@ -1805,20 +1838,166 @@ def test_run_leaf_submits_to_coordinator_and_waits_exact_binding(temporal_bounda
         leaf_timeout_s=None,
     )
     assert request.traceparent is None or request.traceparent.startswith("00-")
-    [(workflow, options)] = calls["start"]
-    assert workflow == "BuildFifo"
-    assert options["id"] == "solidworks-build-fifo"
-    assert options["task_queue"] == "solidworks-control"
-    assert options["id_conflict_policy"] is WorkflowIDConflictPolicy.USE_EXISTING
-    assert options["id_reuse_policy"] is WorkflowIDReusePolicy.REJECT_DUPLICATE
-    assert "memo" not in options
     assert calls["handles"][-1] == (
-        "leaf:part:pen_rod:" + "k" * 64 + ":900s",
+        f"leaf:{BUILD_ID}:part:pen_rod:" + "k" * 64 + ":900s",
         {"run_id": "exact-run", "result_type": _farm.LeafResult},
     )
-    assert calls["handles"][0] == ("solidworks-build-fifo", {})
+    assert calls["handles"][0] == ("solidworks-build-fifo-6", {})
     assert calls["queries"]
     assert update_options["id"]
+
+
+@pytest.mark.parametrize("same_build", [False, True], ids=["separate-builds", "same-build"])
+def test_concurrent_identical_leaves_have_build_scoped_identity(
+    temporal_boundary, monkeypatch, same_build
+):
+    calls, resolve = temporal_boundary
+    resolve(_leaf_result())
+    other_build_id = BUILD_ID if same_build else "20261010T190001.000000Z-" + "d" * 32
+    build_ids = (BUILD_ID, other_build_id)
+    current_build = threading.local()
+    monkeypatch.setattr(_farm, "_required_build_id", lambda: current_build.build_id)
+    submitted = threading.Barrier(2)
+    original_update = _farm._rpc_update
+    bindings = {}
+    lock = threading.Lock()
+
+    async def concurrent_update(handle, name, arg, result_type, operation):
+        assert name == "submit_leaf"
+        status = await original_update(handle, name, arg, result_type, operation)
+        with lock:
+            bindings.setdefault(
+                status.key,
+                _farm.LeafBinding(
+                    status.key.build_id, status.key.workflow_id, f"exact-run-{len(bindings)}"
+                ),
+            )
+        submitted.wait(timeout=5)
+        return status
+
+    async def exact_binding(handle, name, key, result_type):
+        assert name == "leaf_status"
+        with lock:
+            binding = bindings[key]
+        return _farm.LeafStatus(key, "bound", binding, [])
+
+    monkeypatch.setattr(_farm, "_rpc_update", concurrent_update)
+    monkeypatch.setattr(_farm, "_rpc_query", exact_binding)
+
+    def run(build_id):
+        current_build.build_id = build_id
+        return _farm.run_leaf("part:pen_rod", "k" * 64)
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        results = list(workers.map(run, build_ids))
+
+    assert results == [_leaf_result(), _leaf_result()]
+    assert len(calls["submit"]) == 2
+    assert {submission.request.build_id for submission, _options in calls["submit"]} == set(build_ids)
+    expected_ids = {
+        f"leaf:{build_id}:part:pen_rod:" + "k" * 64 + ":900s"
+        for build_id in build_ids
+    }
+    attached = [(workflow_id, options) for workflow_id, options in calls["handles"]
+                if workflow_id != "solidworks-build-fifo-6"]
+    assert len(attached) == 2
+    assert {workflow_id for workflow_id, _options in attached} == expected_ids
+    assert len(bindings) == (1 if same_build else 2)
+    assert len({options["id"] for _submission, options in calls["submit"]}) == len(bindings)
+    assert len({options["run_id"] for _workflow_id, options in attached}) == len(bindings)
+    for binding in bindings.values():
+        assert (binding.workflow_id, {
+            "run_id": binding.run_id, "result_type": _farm.LeafResult,
+        }) in attached
+
+
+def test_ready_leaf_is_submitted_with_zero_reserved_capacity(
+    temporal_boundary, monkeypatch
+):
+    from temporalio.client import Client
+
+    calls, resolve = temporal_boundary
+    resolve(_leaf_result())
+    monkeypatch.setattr(_farm, "FIFO_HEARTBEAT_INTERVAL_S", 0.01)
+    monkeypatch.setattr(_farm, "STATUS_POLL_INTERVAL_S", 0.002)
+    monkeypatch.setattr(_farm, "FIFO_RPC_TIMEOUT_S", 0.5)
+    interrupts = []
+    monkeypatch.setattr(_farm._thread, "interrupt_main", lambda: interrupts.append("interrupt"))
+    heartbeat = threading.Event()
+    updates = []
+    fake_connect = Client.connect
+
+    def status(build_id, *, closed=False):
+        return _farm.BuildStatus(
+            build_id=build_id,
+            fifo_ordinal=2,
+            producer_state="closed" if closed else "open",
+            ownership_state="waiting",
+            lease_deadline=(datetime.now(timezone.utc) + timedelta(seconds=60)).isoformat(),
+            outstanding_leaf_count=0,
+            unconfirmed_attempt_count=0,
+            reserved_capacity=0,
+            occupied_capacity=0,
+        )
+
+    async def guarded_connect(*args, **kwargs):
+        client = await fake_connect(*args, **kwargs)
+        coordinator = client.get_workflow_handle("solidworks-build-fifo-6")
+        submit = coordinator.execute_update
+        query_leaf = coordinator.query
+
+        async def execute_update(name, arg, **options):
+            updates.append((name, arg))
+            if name == "register_build":
+                assert isinstance(arg, _farm.RegisterBuild)
+                return status(arg.build_id)
+            if name == "heartbeat_build":
+                assert isinstance(arg, _farm.HeartbeatBuild)
+                heartbeat.set()
+                return status(arg.build_id)
+            if name == "close_build":
+                assert isinstance(arg, _farm.CloseBuild)
+                return status(arg.build_id, closed=True)
+            assert name == "submit_leaf", "producer must not start or grant a leaf"
+            assert any(method == "register_build" for method, _arg in updates)
+            return await submit(name, arg, **options)
+
+        async def query(name, arg, **options):
+            assert name == "leaf_status", "scheduler must not wait for build capacity or ownership"
+            # Waiting for a leaf binding must not stop the independent lease thread.
+            deadline = asyncio.get_running_loop().time() + 0.25
+            while not heartbeat.is_set():
+                assert asyncio.get_running_loop().time() < deadline, "producer stopped renewing"
+                await asyncio.sleep(0.002)
+            return await query_leaf(name, arg, **options)
+
+        coordinator.execute_update = execute_update
+        coordinator.query = query
+        get_handle = client.get_workflow_handle
+        client.get_workflow_handle = lambda workflow_id, **options: (
+            coordinator if workflow_id == "solidworks-build-fifo-6"
+            else get_handle(workflow_id, **options)
+        )
+        return client
+
+    monkeypatch.setattr(Client, "connect", guarded_connect)
+    # Bypass the autouse fake context to exercise registration and renewal.
+    ownership = _farm._ProducerBuild(DISPLAY_NAME)
+    with ownership:
+        assert _farm.run_leaf("part:pen_rod", "k" * 64) == _leaf_result()
+        ownership.finish(True)
+
+    assert heartbeat.is_set()
+    assert interrupts == []
+    assert len(calls["submit"]) == 1
+    submission, _options = calls["submit"][0]
+    assert submission.request.build_id == ownership.build_id
+    assert calls["handles"][-1] == (
+        f"leaf:{ownership.build_id}:part:pen_rod:" + "k" * 64 + ":900s",
+        {"run_id": "exact-run", "result_type": _farm.LeafResult},
+    )
+    assert [arg.reason for method, arg in updates if method == "close_build"] == ["finished"]
+    assert os.environ["HARMONIC_FARM_BUILD_ID"] == BUILD_ID
 
 
 def test_a_launcher_run_is_supplied_to_coordinator(temporal_boundary, monkeypatch):
@@ -1872,7 +2051,7 @@ def test_dispatch_preserves_valid_display_name(temporal_boundary, monkeypatch, l
     [(submission, _options)] = calls["submit"]
     assert submission.request.task == "part:pen_rod"
     assert submission.request.cache_key == "k" * 64
-    assert calls["handles"][-1][0] == "leaf:part:pen_rod:" + "k" * 64 + ":900s"
+    assert calls["handles"][-1][0] == f"leaf:{BUILD_ID}:part:pen_rod:" + "k" * 64 + ":900s"
 
 
 def test_a_launcher_run_names_each_workflow_before_creating_it(
@@ -1892,7 +2071,7 @@ def test_a_launcher_run_names_each_workflow_before_creating_it(
 
     async def observing_connect(*args, **kwargs):
         client = await fake_connect(*args, **kwargs)
-        handle = client.get_workflow_handle("solidworks-build-fifo")
+        handle = client.get_workflow_handle("solidworks-build-fifo-6")
         submit = handle.execute_update
 
         async def execute_update(*update_args, **update_options):
@@ -1905,7 +2084,7 @@ def test_a_launcher_run_names_each_workflow_before_creating_it(
         handle.execute_update = execute_update
         get_handle = client.get_workflow_handle
         client.get_workflow_handle = lambda workflow_id, **options: (
-            handle if workflow_id == "solidworks-build-fifo" else get_handle(workflow_id, **options)
+            handle if workflow_id == "solidworks-build-fifo-6" else get_handle(workflow_id, **options)
         )
         return client
 
@@ -1913,7 +2092,7 @@ def test_a_launcher_run_names_each_workflow_before_creating_it(
 
     _farm.run_leaf("part:pen_rod", "k" * 64)
 
-    wf_id = "leaf:part:pen_rod:" + "k" * 64 + ":900s"
+    wf_id = f"leaf:{BUILD_ID}:part:pen_rod:" + "k" * 64 + ":900s"
     assert named_at_start == [{
         "task": "part:pen_rod", "workflow_id": wf_id,
         "build_id": BUILD_ID, "farm_run": None,
@@ -1943,7 +2122,7 @@ def test_a_keyless_leaf_uses_the_commit_in_its_workflow_identity(temporal_bounda
 
     [(submission, _options)] = calls["submit"]
     assert submission.request.commit == SHA
-    assert calls["handles"][-1][0] == f"leaf:check:math:{SHA[:16]}:900s"
+    assert calls["handles"][-1][0] == f"leaf:{BUILD_ID}:check:math:{SHA[:16]}:900s"
 
 
 def test_a_run_can_raise_the_per_leaf_budget(temporal_boundary, monkeypatch):
@@ -1981,11 +2160,11 @@ def test_uncertain_submission_preserves_request_for_reconciliation(
     records = [json.loads(path.read_text(encoding="utf-8")) for path in requests.iterdir()]
     assert records == [{
         "task": "part:pen_rod",
-        "workflow_id": "leaf:part:pen_rod:" + "k" * 64 + ":900s",
+        "workflow_id": f"leaf:{BUILD_ID}:part:pen_rod:" + "k" * 64 + ":900s",
         "build_id": BUILD_ID,
         "farm_run": None,
     }]
-    assert calls["handles"][-1] == ("solidworks-build-fifo", {})
+    assert calls["handles"][-1] == ("solidworks-build-fifo-6", {})
 
 
 def test_dispatch_without_build_ownership_never_connects(temporal_boundary, monkeypatch):
@@ -2058,7 +2237,7 @@ def test_foreign_binding_fails_closed_before_result(
     monkeypatch.setattr(_farm, "STATUS_POLL_INTERVAL_S", 0)
     with pytest.raises(_farm.BuildOwnershipError, match="foreign leaf binding"):
         _farm.run_leaf("part:pen_rod", "k" * 64)
-    assert calls["handles"] == [("solidworks-build-fifo", {})]
+    assert calls["handles"] == [("solidworks-build-fifo-6", {})]
 
 
 def test_mismatched_child_build_id_is_refused_before_connection(
@@ -2066,12 +2245,12 @@ def test_mismatched_child_build_id_is_refused_before_connection(
 ):
     calls, _resolve = temporal_boundary
     request = _farm.LeafRequest(
-        farm_protocol_version=5, commit=SHA, task="part:pen_rod",
+        farm_protocol_version=PROTOCOL, commit=SHA, task="part:pen_rod",
         cache_key="k" * 64, traceparent=None, submitter="child",
         build_id="foreign",
     )
     with pytest.raises(_farm.BuildOwnershipError, match="does not match"):
-        asyncio.run(_farm._dispatch(request, "leaf:part:pen_rod:" + "k" * 64 + ":900s"))
+        asyncio.run(_farm._dispatch(request, "leaf:foreign:part:pen_rod:" + "k" * 64 + ":900s"))
     assert calls["connect"] == []
 
 
@@ -2101,7 +2280,7 @@ def test_reservation_recovery_failure_stops_dispatch_before_attaching(
         _farm.run_leaf("part:pen_rod", "k" * 64)
 
     assert len(calls["submit"]) == 1
-    assert calls["handles"] == [("solidworks-build-fifo", {})]
+    assert calls["handles"] == [("solidworks-build-fifo-6", {})]
 
 
 @pytest.mark.parametrize("state", ["missing_closed", "drained"])
@@ -2118,4 +2297,4 @@ def test_settled_unbound_reply_cannot_be_used_as_a_leaf_result(
     with pytest.raises(_farm.BuildOwnershipError, match="closed without a proven run binding"):
         _farm.run_leaf("part:pen_rod", "k" * 64)
 
-    assert calls["handles"] == [("solidworks-build-fifo", {})]
+    assert calls["handles"] == [("solidworks-build-fifo-6", {})]

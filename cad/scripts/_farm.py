@@ -29,20 +29,18 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Literal
 from uuid import uuid4
 
 import _telemetry
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-FARM_PROTOCOL_VERSION = 5
+FARM_PROTOCOL_VERSION = 6
 
-TASK_QUEUE_CONTROL = "solidworks-control"  # coordinator and BuildLeaf workflows
+TASK_QUEUE_CONTROL = "solidworks-control"  # coordinator and parked leaf workflows
 TASK_QUEUE_COM = "solidworks-com"  # build_leaf activity tasks
-WORKFLOW_BUILD_LEAF = "BuildLeaf"
-WORKFLOW_BUILD_FIFO = "BuildFifo"
-WORKFLOW_BUILD_FIFO_ID = "solidworks-build-fifo"
+WORKFLOW_BUILD_FIFO = "BuildFifo6"
+WORKFLOW_BUILD_FIFO_ID = "solidworks-build-fifo-6"
 ACTIVITY_BUILD_LEAF = "build_leaf"
 NAMESPACE = "solidworks"
 
@@ -51,6 +49,7 @@ DEFAULT_CONFIG_PATH = Path.home() / ".solidworks-pool" / "config.json"
 FIFO_HEARTBEAT_INTERVAL_S = 15
 FIFO_PRODUCER_LEASE_S = 120
 FIFO_RPC_TIMEOUT_S = 10
+FIFO_RPC_RETRY_INTERVAL_S = 1
 STATUS_POLL_INTERVAL_S = 1
 # Consecutive read-outage budget only; this never acknowledges producer ownership.
 FIFO_LEAF_STATUS_RETRY_S = 120
@@ -108,11 +107,6 @@ class CloseBuild:
 
 
 @dataclass(frozen=True)
-class BuildKey:
-    build_id: str
-
-
-@dataclass(frozen=True)
 class BuildStatus:
     build_id: str
     fifo_ordinal: int
@@ -121,6 +115,8 @@ class BuildStatus:
     lease_deadline: str
     outstanding_leaf_count: int
     unconfirmed_attempt_count: int
+    reserved_capacity: int
+    occupied_capacity: int
 
 
 @dataclass(frozen=True)
@@ -148,12 +144,7 @@ class LeafAttempt:
     activity_id: str
     attempt: int
     worker_id: str
-
-
-@dataclass(frozen=True)
-class AttemptAdmission:
-    state: Literal["admitted", "drained", "denied"]
-    reason: str | None
+    slot_id: str
 
 
 @dataclass(frozen=True)
@@ -164,27 +155,6 @@ class LeafStatus:
     unconfirmed_attempts: list[LeafAttempt]
     error_code: str | None = None
     error: str | None = None
-
-
-@dataclass(frozen=True)
-class ConfirmAttemptDrained:
-    attempt: LeafAttempt
-    evidence: str
-
-
-@dataclass(frozen=True)
-class ConfirmReservationDrained:
-    key: LeafKey
-    evidence: str
-    run_id: str | None = None
-
-
-@dataclass(frozen=True)
-class FifoStatus:
-    active: BuildStatus | None
-    waiting: list[BuildStatus]
-    draining: list[BuildStatus]
-    capacity_error: str | None = None
 
 
 def clamp_leaf_timeout_s(requested: int | None) -> int:
@@ -200,8 +170,10 @@ def clamp_leaf_timeout_s(requested: int | None) -> int:
     return max(LEAF_TIMEOUT_MIN_S, min(LEAF_TIMEOUT_MAX_S, requested))
 
 
-def workflow_id(task: str, cache_key: str | None, commit: str, timeout_s: int) -> str:
-    return f"leaf:{task}:{cache_key or commit[:16]}:{timeout_s}s"
+def workflow_id(
+    build_id: str, task: str, cache_key: str | None, commit: str, timeout_s: int
+) -> str:
+    return f"leaf:{build_id}:{task}:{cache_key or commit[:16]}:{timeout_s}s"
 
 
 def enabled() -> bool:
@@ -450,7 +422,19 @@ async def _fifo_handle(client):
         timeout=FIFO_RPC_TIMEOUT_S,
     )
     # Deliberately no coordinator run pin: continue-as-new preserves ownership.
-    return client.get_workflow_handle(WORKFLOW_BUILD_FIFO_ID)
+    handle = client.get_workflow_handle(WORKFLOW_BUILD_FIFO_ID)
+    description = await asyncio.wait_for(
+        handle.describe(rpc_timeout=timedelta(seconds=FIFO_RPC_TIMEOUT_S)),
+        timeout=FIFO_RPC_TIMEOUT_S,
+    )
+    if description.workflow_type != WORKFLOW_BUILD_FIFO:
+        raise RuntimeError(
+            f"farm coordinator {WORKFLOW_BUILD_FIFO_ID}: expected workflow type "
+            f"{WORKFLOW_BUILD_FIFO!r}, found {description.workflow_type!r}; "
+            "a coordinated producer/pool/worker cutover to an idle, physically "
+            "drained fleet is required; do not invoke the legacy coordinator"
+        )
+    return handle
 
 
 async def _rpc_update(handle, name: str, arg, result_type, operation: str):
@@ -529,7 +513,7 @@ async def _reserved_leaf_status(handle, key: LeafKey) -> LeafStatus:
 
 
 def producer_build(display_name: str):
-    """The parent-only ownership seam, entered only after valid preflight."""
+    """Register the parent producer before scheduling or cache checks."""
     return _ProducerBuild(_display_name(display_name))
 
 
@@ -538,8 +522,8 @@ class _ProducerBuild:
 
     Spawned doit workers inherit only the build ID, never the renewal thread.
     Lease-bounded transient retries keep the same registration and update ID.
-    Ownership loss stops local scheduling; accepted reservations still drain
-    under the coordinator rather than being cancelled by this context.
+    Lease loss stops local scheduling; capacity changes do not. Accepted
+    reservations remain under the coordinator's grant and physical-drain fences.
     """
 
     def __init__(self, display_name: str):
@@ -571,7 +555,7 @@ class _ProducerBuild:
                     f"build {self.build_id} ownership failed: {self._failure}"
                 ) from self._failure
             self._executing = True
-            # A failure can race the transition from waiting to task execution.
+            # A failure can race registration acknowledgement and task execution.
             self.check()
             return self
         except BaseException as exc:
@@ -636,9 +620,7 @@ class _ProducerBuild:
             raise BuildOwnershipError("producer's acknowledged lease expired")
         return remaining
 
-    def _accept_status(
-        self, status: BuildStatus, *, active: bool, renewed: bool = False
-    ) -> bool:
+    def _accept_status(self, status: BuildStatus, *, renewed: bool = False) -> None:
         if self._lease_deadline is not None:
             self._lease_remaining()
         deadline = datetime.fromisoformat(status.lease_deadline.replace("Z", "+00:00"))
@@ -646,7 +628,6 @@ class _ProducerBuild:
             status.build_id != self.build_id
             or status.producer_state != "open"
             or status.ownership_state not in {"waiting", "active"}
-            or (active and status.ownership_state != "active")
             or deadline.tzinfo is None
             or deadline <= datetime.now(timezone.utc)
         ):
@@ -659,9 +640,8 @@ class _ProducerBuild:
             self._lease_deadline = time.monotonic() + (
                 deadline - datetime.now(timezone.utc)
             ).total_seconds()
-        # Polls and duplicate heartbeats never extend the acknowledged lease.
+        # Duplicate heartbeats never extend the acknowledged lease.
         self._lease_remaining()
-        return status.ownership_state == "active"
 
     async def _leased_rpc(self, call, *args) -> BuildStatus | None:
         """Retry uncertain transport results, never a coordinator refusal.
@@ -678,7 +658,7 @@ class _ProducerBuild:
                     raise
                 remaining = self._lease_remaining()
                 if not self._stop.is_set():
-                    await asyncio.sleep(min(STATUS_POLL_INTERVAL_S, remaining))
+                    self._stop.wait(min(FIFO_RPC_RETRY_INTERVAL_S, remaining))
         return None
 
     async def _serve(self) -> None:
@@ -695,7 +675,7 @@ class _ProducerBuild:
                 BuildStatus,
                 f"register:{self.build_id}",
             )
-            active = self._accept_status(status, active=False)
+            self._accept_status(status)
             _telemetry.info(
                 f"Farm build registered: {self.build_id}",
                 build_id=self.build_id,
@@ -703,11 +683,12 @@ class _ProducerBuild:
                 ownership_state=status.ownership_state,
             )
             heartbeat_due = time.monotonic() + FIFO_HEARTBEAT_INTERVAL_S
+            # The renewer owns a valid lease before scheduler/cache work starts.
+            # Ready native leaves park at the coordinator until a slot is granted.
+            self._ready.set()
             sequence = 0
             while not self._stop.is_set():
                 self._lease_remaining()
-                if active:
-                    self._ready.set()
                 if time.monotonic() >= heartbeat_due:
                     sequence += 1
                     status = await self._leased_rpc(
@@ -720,21 +701,15 @@ class _ProducerBuild:
                     )
                     if status is None:
                         break
-                    active = self._accept_status(status, active=active, renewed=True)
+                    self._accept_status(status, renewed=True)
                     heartbeat_due = time.monotonic() + FIFO_HEARTBEAT_INTERVAL_S
-                elif not active:
-                    status = await self._leased_rpc(
-                        _rpc_query,
-                        handle,
-                        "build_status",
-                        BuildKey(self.build_id),
-                        BuildStatus,
+                # This loop owns its dedicated thread. Wait for the next
+                # renewal (or lease expiry), waking immediately on producer close.
+                self._stop.wait(
+                    min(
+                        max(0, heartbeat_due - time.monotonic()),
+                        self._lease_remaining(),
                     )
-                    if status is None:
-                        break
-                    active = self._accept_status(status, active=False)
-                await asyncio.sleep(
-                    min(STATUS_POLL_INTERVAL_S, self._lease_remaining())
                 )
         except BaseException as exc:
             self._reason = "failed"
@@ -783,10 +758,11 @@ def leaf_timeout_s() -> int | None:
 def run_leaf(task: str, cache_key: str | None) -> LeafResult:
     """Run ``task`` on the farm and return its result once the workflow closes.
 
-    Shares the workflow with any other submitter of the same leaf
-    (``USE_EXISTING``), so Ctrl-C here never cancels it -- the interrupt just
-    propagates. A workflow cancelled through ``farm.py cancel`` comes back as a
-    failed result with ``failure_category="cancelled"``; every other failure
+    Duplicate submissions within this build attach to its exact coordinator
+    binding. Other builds have distinct workflow IDs even for identical keys.
+    Ctrl-C propagates without cancelling accepted work. A workflow cancelled
+    through ``farm.py cancel`` returns a failed result with
+    ``failure_category="cancelled"``; every other failure
     (connection, protocol) propagates as-is: it is a local fault, not a build
     outcome.
     """
@@ -804,7 +780,7 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
             leaf_timeout_s=leaf_timeout_s(),
         )
         budget = clamp_leaf_timeout_s(request.leaf_timeout_s)
-        wf_id = workflow_id(task, cache_key, request.commit, budget)
+        wf_id = workflow_id(request.build_id, task, cache_key, request.commit, budget)
         sp.set_attribute("workflow_id", wf_id)
         sp.set_attribute("leaf_timeout_s", budget)
         result = asyncio.run(_dispatch(request, wf_id))
