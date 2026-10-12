@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 import _telemetry
@@ -36,7 +35,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+)
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_finish import add_surface_finish
@@ -60,6 +63,7 @@ from _section_axis import position_section_caption
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 from mg_magnifying_wheel_geom import (
+    DRUM_PRESS,
     HUB_BACK_Z,
     HUB_FRONT_Z,
     HUB_STEP_Z,
@@ -86,8 +90,7 @@ from mg_magnifying_wheel_spec import (
     clock_to_local_deg,
     fillet,
 )
-from mg_wheel_axle_spec import PIN_DIA, PIN_DIA_TOL
-from mg_wheel_drum_geom import DRUM_BORE, DRUM_BORE_BAND
+from mg_wheel_group import HUB_RUNNING
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
@@ -134,13 +137,12 @@ DRAWING_PRECISION_BY_NAME = {
 # Face view.  The sheet's front view is the model's XY plane at 1:1 (sheet x
 # = model x), so each text point below is derived from the feature it names.
 # Every text and finish symbol stands outside the Ø100 silhouette (policy
-# rule 8) except the spoke-root width, whose vertical dimension line would
-# otherwise run across the next spoke and the rim, and no leader or shoulder
-# may cross another's line.  Farm run 7 (396077c3e) failed on exactly that:
-# the native Ø100 and Ø88 lines ran rim to rim through the centre, so the
-# shoulders under them crossed them.  The three diameters take one arrow on
-# their near rim (set_near_side_diameter), so only the bore's leader and its
-# finish's cross the face.  The A-A cutting line stands on the axis
+# rule 8), and no leader or shoulder may cross another's line.  Farm run 7
+# (396077c3e) failed on exactly that: the native Ø100 and Ø88 lines ran rim
+# to rim through the centre, so the shoulders under them crossed them.  The
+# three diameters take one arrow on their near rim (set_near_side_diameter),
+# so only the bore's leader, its finish's and the spoke root's offset-text
+# leader cross the face.  The A-A cutting line stands on the axis
 # (x = 0): its arrows point left (the section looks along -X) with their
 # letters beyond the tips, so every leader leaves its feature away from it.
 #
@@ -235,12 +237,11 @@ FRONT_KEEP = {
         (_HUB_FILLET_SHOULDER[0] + _RADIUS_SHOULDER_LEFT, _HUB_FILLET_SHOULDER[1]), 2
     ),
     "RimFilletR": _over(_polar(_RIM_FILLET_CENTRE, -3.0, 26.0), 2),
-    # Each spoke width beside its own end, its text down into the 300-360
-    # window: the root's line inside the hub fillets' feet, the tip's outside
-    # the rim, so neither's extension lines reach the other's line.  The
-    # root's text stays inside the silhouette: outside, its vertical line
-    # would run 45 mm across the 300 deg spoke and the rim.
-    "SpokeRootWidth": _over((SPOKE_X0 + 4.5, -22.0), 2),
+    # Each spoke width's line beside its own end: the root's inside the hub
+    # fillets' feet, its text off on a leader (SPOKE_ROOT_TEXT_XY); the
+    # tip's outside the rim, its text below the line beside the OD, so
+    # neither's extension lines reach the other's line.
+    "SpokeRootWidth": _face(SPOKE_X0 + 4.5, 0.0),
     "SpokeTipWidth": _over((RIM_OUTER_DIA / 2.0 + 3.0, -22.0), 2),
     # TIE 1's 9.85 between its own extension lines, which run left from the
     # bore's and the hole's centres past the OD: the text breaks its line
@@ -273,6 +274,17 @@ FRONT_KEEP = {
         *_polar(_polar((0.0, 0.0), _TIE2_OUTWARD, 75.0), _TIE2_OUTWARD + 90.0, 25.0)
     ),
 }
+# The spoke root's text hangs off its dimension line on an OffsetText leader
+# (draw_sm_gooseneck_spring_screw): the leader runs down-right across the
+# 300-360 window and the rim to the LEFT end of the callout line, one text
+# line under the point the value centres on (the pivot screw's readback).
+# That end stands under the tip width's line, 14 mm below its block's foot:
+# the block sits outside the OD, right of TIE 1's block and left of A-A.
+_ROOT_CALLOUT = "6X ROOT"
+SPOKE_ROOT_TEXT_XY = _face(
+    RIM_OUTER_DIA / 2.0 + 3.0 + len(_ROOT_CALLOUT) * 2.45 / 2.0,
+    -36.0 + _TEXT_LINE * 1000.0,
+)
 # Near-side leaders: no segment of these comes nearer the axis than half the
 # circle's radius, and each ends on its own circle (sheet metres; a reading
 # outside the band means the ink is not in sheet space).
@@ -359,17 +371,26 @@ _GROOVE_DIA_X = _HUB_DIA_X - _DIA_TEXT_HALF - _TEXT_OFF_LINE
 # text, above the hub's extension lines and under the rim bore.
 _SPOKE_ROW = SECTION_CENTER[1] + HUB_DIA / 2000.0 + 0.0055
 _RIM_WIDTH_ROW = _SPOKE_ROW + 0.010
-# The hub's three axial sizes below the rim, one row each, all from the hub's
-# faced back end (policy rule 7) except the spigot's own length, which the
-# drum's length must match (DRUM_RECESS); each text OUTSIDE its span so no
-# extension line runs through a text (run 7: four extension-through-own-text
-# findings): HubBackZ ("7.09") left of the back face, its arrows inside its
-# span so no tail crosses the spigot step's extension line (run 11);
-# SpigotLength ("9.00 +0.10/0") right of the spigot end; the overall
-# HubLength ("19.60 ±0.10") left of the back face under HubBackZ, above the
-# A-A caption.
+# The hub's three axial sizes below the rim, one row each, all from the
+# spigot's faced front end (policy rule 7) and all texts right of it except
+# the overall's; each text OUTSIDE its span so no extension line runs
+# through a text (run 7: four extension-through-own-text findings).
+# Nearest the part the spigot length ("9.00 +0.10/0"), whose band keeps the
+# drum from standing proud (DRUM_RECESS); then the spokes' mid-plane
+# ("12.51"), its extension line rising from the axis left of the spigot
+# step's, so the row above stops short of it; last the overall ("19.60
+# ±0.10"), which holds the axle's nut stack, left of the back face above
+# the A-A caption.  Each band's need stands over its value (CALLOUTS_ABOVE),
+# its text centred clear of the face it leaves.  The two right-hand sizes
+# keep their arrows inside their spans, so no tail reaches a neighbouring
+# extension line (run 11).
 _HUB_ROWS = tuple(SECTION_CENTER[1] - _RIM_R - 0.007 * row for row in (1, 2, 3))
-ARROWS_INSIDE = ("HubBackZ",)
+SPIGOT_LENGTH_CALLOUT = "DRUM NOT PROUD"
+HUB_LENGTH_CALLOUT = "LOCKNUT ON FULL THREAD"
+# Capitals print wider than _TEXT_CHAR (run 13: "2X RIM BORE EDGES" measured
+# 2.6 mm a character), so a callout's span is estimated two characters wide.
+_CALLOUT_MARGIN_CHARS = 2
+ARROWS_INSIDE = ("SpigotLength", "HubFrontZ")
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 SECTION_KEEP = {
     "HubDia": (_HUB_DIA_X, SECTION_CENTER[1]),
@@ -383,13 +404,24 @@ SECTION_KEEP = {
         SECTION_CENTER[1] - SPIGOT_DIA / 2000.0 - 0.012,
     ),
     "SpokeAxial": _beside(_section_x(HUB_BACK_Z), -1, 3, _SPOKE_ROW + _ONE_LINE_UP),
-    "HubBackZ": _beside(_section_x(HUB_BACK_Z), -1, 4, _HUB_ROWS[0] + _ONE_LINE_UP),
-    "SpigotLength": _beside(_section_x(HUB_FRONT_Z), 1, 12, _HUB_ROWS[1] + _STACK_UP),
-    "HubLength": _beside(_section_x(HUB_BACK_Z), -1, 11, _HUB_ROWS[2] + _STACK_UP),
-    # The groove's R up right, its leader down-left onto the groove clear of
-    # the rim's front corner, so the Ø97.6's extension line, which leaves the
-    # groove bottom leftward, runs nowhere near its arrow.
-    "GrooveR": (SECTION_CENTER[0] + 0.020, SECTION_CENTER[1] + 0.060),
+    "SpigotLength": _beside(
+        _section_x(HUB_FRONT_Z),
+        1,
+        len(SPIGOT_LENGTH_CALLOUT) + _CALLOUT_MARGIN_CHARS,
+        _HUB_ROWS[0] + _STACK_UP,
+    ),
+    "HubFrontZ": _beside(_section_x(HUB_FRONT_Z), 1, 5, _HUB_ROWS[1] + _ONE_LINE_UP),
+    "HubLength": _beside(
+        _section_x(HUB_BACK_Z),
+        -1,
+        len(HUB_LENGTH_CALLOUT) + _CALLOUT_MARGIN_CHARS,
+        _HUB_ROWS[2] + _STACK_UP,
+    ),
+    # The groove's R up right, its leader down-left onto the groove at run
+    # 13's 35 deg, so the stub it draws past the arc leaves the rim's back
+    # face above the rim width's extension line; its shoulder 7 mm over the
+    # rim-bore round's R block (ROUND_TEXT_XY).
+    "GrooveR": (SECTION_CENTER[0] + 0.0257, SECTION_CENTER[1] + 0.064),
 }
 # The rim-bore round's R is a sheet radial on its cut arc: A-A cannot import
 # a fillet radius whose arc IS the cut (round-12 farm leaves: neither the
@@ -399,38 +431,37 @@ SECTION_KEEP = {
 # the cut plane, so its axis is the cut's normal (model X); the round's
 # tangent circles beyond the cut keep the wheel's Z (run 13's scan read the
 # r = 44.8 one so), and the axis keeps the pick off them.
-# Its callout stands right, between the spigot's finish and the groove's R,
-# its shoulder 10 mm under the rim bore: the Ø97.6 holds the left.
+# Its callout stands right, between the spigot's finish and the groove's R.
+# Its shoulder (5.6 mm under the text point and starting 23.8 mm left of it,
+# run 13 readback) runs 1.8 mm under the arc's centre, so the radial leader
+# lands on the arc 20 deg below the side face's tangent and crosses the
+# rim's front face 0.7 mm above the top of the rim width's extension line
+# (run 13's farm audit: landing 61 deg below, it crossed that line).  The
+# Ø97.6 holds the left.
 _ROUND_ARC_CENTER = (
     0.0,
     RIM_INNER_DIA / 2.0 + CAST_ROUND_R,
     -(RIM_AXIAL / 2.0 - CAST_ROUND_R),
 )
 _CUT_NORMAL = (1.0, 0.0, 0.0)
-ROUND_TEXT_XY = (SECTION_CENTER[0] + 0.0292, SECTION_CENTER[1] + 0.0413)
+ROUND_TEXT_XY = (SECTION_CENTER[0] + 0.0292, SECTION_CENTER[1] + 0.0486)
 ROUND_CALLOUT = "2X RIM BORE EDGES"
 
 
-def _band_mm(low: float, high: float) -> str:
-    """``low-high`` to the .XXX place, rounded half up: a float's 4.7575 is
-    4.75749..., which ``:.3f`` prints 4.757."""
-    return "-".join(
-        str(Decimal(repr(round(value, 6))).quantize(Decimal("0.001"), ROUND_HALF_UP))
-        for value in (low, high)
-    )
-
-
-# The two fits print on their own diameters (policy rule 6), every limit read
-# from the mate's spec: the axle's 3/16 drill rod runs in the reamed bore;
-# the spigot is pressed into the drum's H7 bore.
-_AXLE_LIMITS = _band_mm(PIN_DIA - PIN_DIA_TOL, PIN_DIA + PIN_DIA_TOL)
-_DRUM_BORE_LIMITS = _band_mm(
-    DRUM_BORE + DRUM_BORE_BAND[1], DRUM_BORE + DRUM_BORE_BAND[0]
-)
+# The two fits print on their own diameters (policy rule 6), each stating the
+# fit its band holds with the mate (mg_wheel_group.HUB_RUNNING,
+# mg_magnifying_wheel_geom.DRUM_PRESS): the axle's 3/16 drill rod runs in
+# the reamed bore; the spigot is pressed into the drum's H7 bore.
 DIMENSION_CALLOUTS = {
-    "BoreDiaDim": f"REAM THRU\nRUNS ON MG-WHEEL-AXLE\n<MOD-DIAM>{_AXLE_LIMITS}",
-    "SpigotDia": f"PRESS FIT IN\nMG-WHEEL-DRUM\n<MOD-DIAM>{_DRUM_BORE_LIMITS}\nBORE",
-    "SpokeRootWidth": "6X ROOT",
+    "BoreDiaDim": (
+        "REAM THRU\nRUNS ON MG-WHEEL-AXLE\n"
+        f"{HUB_RUNNING[0]:.3f}-{HUB_RUNNING[1]:.3f} CLEARANCE"
+    ),
+    "SpigotDia": (
+        "PRESS FIT IN\nMG-WHEEL-DRUM\n"
+        f"{DRUM_PRESS[0]:.3f}-{DRUM_PRESS[1]:.3f}\nINTERFERENCE"
+    ),
+    "SpokeRootWidth": _ROOT_CALLOUT,
     "SpokeTipWidth": "6X TIP",
     "HubFilletR": "12X",
     "RimFilletR": "12X",
@@ -438,10 +469,12 @@ DIMENSION_CALLOUTS = {
     "Tie2HoleDia": "TIE 2",
 }
 # The tie holes' operation stands over their Ø, keeping each block as narrow
-# as its stacked Ø.
+# as its stacked Ø; each axial band's need stands over its value.
 CALLOUTS_ABOVE = {
     "Tie1HoleDia": "DRILL THRU",
     "Tie2HoleDia": "DRILL THRU",
+    "SpigotLength": SPIGOT_LENGTH_CALLOUT,
+    "HubLength": HUB_LENGTH_CALLOUT,
 }
 # Three note lines, top-left anchored, under the two tie blocks and left of
 # the title block.
@@ -880,6 +913,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+    offset_dimension_text(adapter, annotations, {"SpokeRootWidth": SPOKE_ROOT_TEXT_XY})
     _set_arrows_inside(adapter, annotations)
     axis, tie1, bore_landing = model_points_in_view(
         adapter,

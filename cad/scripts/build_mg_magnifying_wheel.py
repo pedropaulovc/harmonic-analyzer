@@ -310,7 +310,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "RimInnerDia", '"RimOuterDia" - 2 * "RimRingRadial"')
     await set_global(adapter, "HubDia", f"{HUB_DIA}mm")
     await set_global(adapter, "HubLength", f"{HUB_LEN}mm")
-    await set_global(adapter, "HubBackZ", f"{HUB_BACK_Z}mm")
+    await set_global(adapter, "HubFrontZ", f"{-HUB_FRONT_Z}mm")
     await set_global(adapter, "SpigotDia", f"{SPIGOT_DIA}mm")
     await set_global(adapter, "SpigotLength", f"{SPIGOT_LEN}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
@@ -476,9 +476,13 @@ async def build(adapter) -> dict[str, str]:
             f"hub {direction} {line}",
             await adapter.add_sketch_constraint(line, None, direction),
         )
-    # The back face sits HUB_BACK_Z above the spokes' mid-plane (the origin).
-    await anchor_point_to_origin(adapter, f"{back}.start", back_x, 0.0, "hub back face")
-    hub_sd.record("HubBackZ", '"HubBackZ"')
+    # The spigot's front face sits HUB_FRONT_Z below the spokes' mid-plane
+    # (the origin): every axial size reads from that one faced end (policy
+    # rule 7), the spigot length the drum's recess needs among them.
+    await anchor_point_to_origin(
+        adapter, f"{front}.end", front_x, 0.0, "hub spigot front face"
+    )
+    hub_sd.record("HubFrontZ", '"HubFrontZ"')
     await dimension_between(
         adapter,
         f"{back}.start",

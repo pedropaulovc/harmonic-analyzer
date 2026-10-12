@@ -154,10 +154,12 @@ def test_linked_notes_specify_the_spokes_and_ties() -> None:
     assert "TIE 1" in notes and "TIE 2" in notes
     # The bore's REAM THRU callout carries the process; the notes do not.
     assert "REAMED" not in notes
-    # The two fits print on their own diameters, limits read from the mates.
+    # Each fit prints on its own diameter, stating what its band holds.
     assert "PRESS FIT" not in notes and "RUNS ON" not in notes
-    assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"].endswith("<MOD-DIAM>4.758-4.768")
-    assert "<MOD-DIAM>14.000-14.018" in drawing.DIMENSION_CALLOUTS["SpigotDia"]
+    assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"].endswith("0.033-0.053 CLEARANCE")
+    assert drawing.DIMENSION_CALLOUTS["SpigotDia"].endswith("0.005-0.034\nINTERFERENCE")
+    assert drawing.CALLOUTS_ABOVE["HubLength"] == "LOCKNUT ON FULL THREAD"
+    assert drawing.CALLOUTS_ABOVE["SpigotLength"] == "DRUM NOT PROUD"
     assert "DO NOT" not in notes and "RELEASE" not in notes
     assert "GRAY-IRON" not in notes and "BLACK" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
