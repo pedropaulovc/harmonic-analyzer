@@ -53,6 +53,7 @@ from _session import run_build
 from _sketch import (
     SketchDims,
     anchor_point_to_origin,
+    blank_sketch,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
@@ -60,7 +61,6 @@ from _sketch import (
 from _sketch_rectangle import define_centered_rectangle
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
-import _config
 from vn_hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA
 from _drawing_marks import (
     apply_drawing_properties,
@@ -68,7 +68,10 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _fit_deviations import deviations
 from mg_wheel_bar_geom import (
     AXLE_BORE_BAND,
@@ -79,9 +82,15 @@ from mg_wheel_bar_geom import (
     BAR_LENGTH,
     BAR_SIDE,
     BAR_SIDE_BAND,
+    BORE_ROW_HEIGHT,
+    BORE_ROW_HEIGHT_TOL,
     CLAMP_HOLE_DIA,
     CLAMP_HOLE_SPEC,
     CLAMP_HOLE_X,
+    CLAMP_STATIONS,
+    DRILLED_HOLE_PLUS,
+    HANGER_STATION,
+    LEFT_END_X,
     PEN_HANGER_HOLE_DIA,
     PEN_HANGER_HOLE_SPEC,
     SCREW_HOLE_X,
@@ -102,10 +111,93 @@ MATERIAL = "Plain Carbon Steel"
 PEN_HANGER_DIAMETRAL_CLEARANCE = PEN_HANGER_HOLE_DIA - HANGER_SCREW_DIA
 if PEN_HANGER_DIAMETRAL_CLEARANCE <= 0.0:
     raise AssertionError("standard #8 hanger clearance binds on the stock screw")
-PEN_HANGER_HOLE_DIA_TOL = float(_config.title_block("drilled_hole")["plus_mm"])
+PEN_HANGER_HOLE_DIA_TOL = DRILLED_HOLE_PLUS
 PEN_HANGER_END_WALL = require_hanger_end_wall(
     SCREW_HOLE_X, PEN_HANGER_HOLE_DIA, PEN_HANGER_HOLE_DIA_TOL
 )
+
+
+def _as_construction(adapter, entity_id: str, label: str) -> None:
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{label} did not take the construction flag")
+
+
+async def _author_bore_row(adapter) -> list[tuple[str, str]]:
+    """The bore row as model dimensions (the dt_cone_tip_block reference-sketch
+    pattern): a Hole Wizard placement sketch cannot dimension from the bar's end
+    or bottom face, so one construction chain on the row carries the printed
+    stations from the left end and a rise at the right end carries the row's
+    height from the bottom face. The stations drive from the same globals as
+    the Hole Wizard placement points, so each print dimension moves with its
+    hole."""
+    right_end_x = BAR_LENGTH / 2.0
+    bottom_y = -BAR_SIDE / 2.0
+    row_xs = (LEFT_END_X, SCREW_HOLE_X, *CLAMP_HOLE_X, right_end_x)
+    row = SketchDims()
+    check("create_sketch bore row", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    rise = check(
+        "bore row rise",
+        await adapter.add_line(right_end_x, bottom_y, right_end_x, 0.0),
+    )
+    legs = [
+        check(f"bore row leg {index}", await adapter.add_line(x0, 0.0, x1, 0.0))
+        for index, (x0, x1) in enumerate(zip(row_xs, row_xs[1:]))
+    ]
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, rise, "bore row rise")
+    check(
+        "bore row rise vertical",
+        await adapter.add_sketch_constraint(rise, None, "vertical"),
+    )
+    for index, leg in enumerate(legs):
+        _as_construction(adapter, leg, f"bore row leg {index}")
+        check(
+            f"bore row leg {index} horizontal",
+            await adapter.add_sketch_constraint(leg, None, "horizontal"),
+        )
+    for index, (leg, after) in enumerate(zip(legs, [*legs[1:], None])):
+        end = f"{rise}.end" if after is None else f"{after}.start"
+        check(
+            f"bore row leg {index} chained",
+            await adapter.add_sketch_constraint(f"{leg}.end", end, "coincident"),
+        )
+    await anchor_point_to_origin(
+        adapter, f"{rise}.start", right_end_x, bottom_y, "bar bottom right corner"
+    )
+    row.record("RowEndX", '"BarLength" / 2')
+    row.record("RowBottomY", '"BarSide" / 2')
+    await dimension_between(
+        adapter,
+        f"{rise}.start",
+        f"{rise}.end",
+        "vertical_distance",
+        BORE_ROW_HEIGHT,
+        "bore row height",
+    )
+    row.record("BoreRowHeight", '"BarSide" / 2')
+    start = f"{legs[0]}.start"
+    await dimension_between(
+        adapter, start, "origin", "horizontal_distance", -LEFT_END_X, "bar left end"
+    )
+    row.record("RowStartX", '"BarLength" / 2')
+    # Each hole ends one leg; the last leg runs on to the rise.
+    for leg, station, name in zip(
+        legs[:-1],
+        (HANGER_STATION, *CLAMP_STATIONS),
+        ("HangerStation", "ClampStation1", "ClampStation2"),
+        strict=True,
+    ):
+        await dimension_between(
+            adapter, start, f"{leg}.end", "horizontal_distance", station, name
+        )
+        row.record(name, f'"{name}"')
+    await ensure_fully_defined(adapter, "bore row sketch")
+    check("exit_sketch bore row", await adapter.exit_sketch())
+    name_last_feature(adapter, "BoreRowReference")
+    return row.apply(adapter, "BoreRowReference")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -120,11 +212,13 @@ async def build(adapter) -> dict[str, str]:
     # extrude's depth, a named feature dimension the drawing prints.
     # (The old ScrewHoleDia/ScrewHoleX/ClampHoleDia knobs are gone: the holes are
     # now native Hole Wizard features whose diameters come from the clearance
-    # tables and whose positions are the literal photo stations.)
+    # tables and whose points are driven from the stations below.)
     await set_global(adapter, "BarSide", f"{BAR_SIDE}mm")
     await set_global(adapter, "BarDepth", f"{BAR_DEPTH}mm")
     await set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
-    await set_global(adapter, "ScrewHoleX", f"{SCREW_HOLE_X}mm")
+    await set_global(adapter, "HangerStation", f"{HANGER_STATION}mm")
+    await set_global(adapter, "ClampStation1", f"{CLAMP_STATIONS[0]}mm")
+    await set_global(adapter, "ClampStation2", f"{CLAMP_STATIONS[1]}mm")
     await set_global(adapter, "AxleBoreDia", f"{AXLE_BORE_DIA}mm")
     await set_global(adapter, "AxleBoreStation", f"{AXLE_BORE_STATION}mm")
 
@@ -169,7 +263,7 @@ async def build(adapter) -> dict[str, str]:
     # ONE pen-hanger #8 close-clearance hole + ONE 2-instance #8 normal-clearance
     # clamp feature (the support-bar stack: heads on the bar front face, shanks
     # through the bar + front arc, threading into the back arc). Positions are
-    # the photo layout.
+    # the photo layout; each point drives from its station off the left end.
     front_z = -BAR_DEPTH / 2.0
     screw_dia = blind_cut_dia_mm(PEN_HANGER_HOLE_SPEC)
     clamp_dia = blind_cut_dia_mm(CLAMP_HOLE_SPEC)
@@ -181,13 +275,15 @@ async def build(adapter) -> dict[str, str]:
         "pen-hanger screw hole (#8 clearance)",
         name="ScrewHole",
         expect_dia_mm=PEN_HANGER_HOLE_DIA,
-        placement_dims=[(("ScrewHoleCx", '-"ScrewHoleX"'), (None, None))],
+        placement_dims=[
+            (("ScrewHoleCx", '"BarLength" / 2 - "HangerStation"'), (None, None))
+        ],
     )
     drive_jobs += screw_cut.placement_drive_jobs
     expected -= math.pi * (screw_dia / 2.0) ** 2 * BAR_DEPTH
     await volume_check(adapter, "bar with screw hole", expected, 1.0)
 
-    wizard_holes(
+    clamp_cut = wizard_holes(
         adapter,
         CLAMP_HOLE_SPEC,
         [[x, 0.0, front_z] for x in CLAMP_HOLE_X],
@@ -195,7 +291,12 @@ async def build(adapter) -> dict[str, str]:
         "clamp-screw clearance holes (#8)",
         name="ClampHoles",
         expect_dia_mm=CLAMP_HOLE_DIA,
+        placement_dims=[
+            (("ClampHole1Cx", '"ClampStation1" - "BarLength" / 2'), (None, None)),
+            (("ClampHole2Cx", '"ClampStation2" - "BarLength" / 2'), (None, None)),
+        ],
     )
+    drive_jobs += clamp_cut.placement_drive_jobs
     expected -= 2.0 * math.pi * (clamp_dia / 2.0) ** 2 * BAR_DEPTH
     await volume_check(adapter, "bar with clamp holes", expected, 1.0)
 
@@ -263,6 +364,8 @@ async def build(adapter) -> dict[str, str]:
     expected -= math.pi * (AXLE_BORE_DIA / 2.0) ** 2 * BAR_DEPTH
     await volume_check(adapter, "bar with axle bore", expected, 1.0)
 
+    drive_jobs += await _author_bore_row(adapter)
+
     # Deferred drive equations after the model + a rebuild exists, then re-check:
     # each equation evaluates to the as-built value, so geometry must not move.
     await force_rebuild(adapter)
@@ -285,10 +388,24 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "AxleBoreProfile", "AxleBoreDia", *deviations(AXLE_BORE_BAND)
     )
+    set_dimension_symmetric_tolerance(
+        adapter, "BoreRowReference", "BoreRowHeight", BORE_ROW_HEIGHT_TOL
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    # Hidden in the part so no assembly instance renders the row; the drawing
+    # shows it in the front view (_drawing_hidden_sketches).
+    blank_sketch(adapter, "BoreRowReference")
+    row_feature = _early_bound(
+        _early_bound(adapter.currentModel, "IPartDoc").FeatureByName(
+            "BoreRowReference"
+        ),
+        "IFeature",
+    )
+    if int(row_feature.Visible) != 1:  # swVisibilityStateHide
+        raise RuntimeError("BoreRowReference still visible after BlankSketch")
     apply_drawing_properties(
         adapter,
         PART_NAME,

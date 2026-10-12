@@ -170,9 +170,9 @@ for _label, _left in (
 # rest, so either turn brings it toward the bar. The tail envelope is the wire
 # plus one twisted turn beside it (1.5 wire dia from the hole centre).
 TAIL_ENVELOPE_R = 1.5 * _lever.WIRE_DIA + _wheel.TIE_POSITION_TOL
-BAR_BAND_HALF = (
-    (_bar.BAR_SIDE + _bar.BAR_SIDE_BAND[0]) / 2.0 + _bar.AXLE_BORE_POSITION_TOL
-)  # 5.10: the bar's far face from the bore at its worst
+# The bar's far face from the bore at its worst (the row reads from the
+# bottom face, mg_wheel_bar_geom).
+BAR_BAND_HALF = _bar.BORE_ROW_FAR_FACE  # 5.10
 TAIL_BAR_CLEARANCE = (
     _wheel.TIE1_R * math.cos(math.radians(max(CW_MAX_DEG, CCW_MAX_DEG)))
     - TAIL_ENVELOPE_R
