@@ -9,6 +9,7 @@ import math
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -24,6 +25,7 @@ from _drawing_contract import (
     model_toleranced_dimensions,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_notes import property_link
 from paper_drive_stock_inspection import span_contact_points_mm, toothspace_gauge_contact_mm
 from stock_form_cutter import CutterTemplate, StockFormProfile, translation_for_tangent_span
 from _test_stubbed_build import offline_adapter, stub_seat
@@ -321,6 +323,124 @@ def test_shared_callout_takes_the_one_formed_edge_through_the_contact() -> None:
         ink.flank_at_contact([flank, twin], contact)
     with pytest.raises(RuntimeError, match="matched 0 of 0 drawn edges; nearest: none"):
         ink.flank_at_contact([], contact)
+
+
+class _DrawnEdge:
+    """A view edge as COM answers it: closest point (m) and curve kind."""
+
+    def __init__(self, closest_mm, *, straight: bool = False) -> None:
+        self.closest_m = tuple(value / 1000.0 for value in closest_mm)
+        self.curve = SimpleNamespace(IsLine=lambda: straight, IsCircle=lambda: False)
+
+    def GetClosestPointOn(self, *_point):
+        return self.closest_m
+
+    def GetCurve(self):
+        return self.curve
+
+
+_LANDING = (0.120, 0.080)
+
+
+def _callout_seat(monkeypatch: pytest.MonkeyPatch, *, landed=_LANDING, attached=(1,)):
+    """Run the shared callout on a recording sheet; return its parts and the contact (mm)."""
+    import paper_drive_stock_drawing as ink
+
+    kwargs = dict(
+        profile=spec.STOCK_PROFILE,
+        actual_pin_diameter_mm=spec.TOOTH_SPACE_GAUGE_PIN_DIA_MM,
+        rotate_rad=0.3,
+        axial_station_mm=spec.FACE_WIDTH,
+        property_name=spec.TOOTH_SPACE_CALLOUT_PROPERTY,
+        note_xy=(0.150, 0.100),
+    )
+    contact = toothspace_gauge_contact_mm(spec.STOCK_PROFILE, kwargs["actual_pin_diameter_mm"])
+    x, y = ink._rotate(contact.flank_point_mm, kwargs["rotate_rad"])
+    edges = {
+        "neighbour": _DrawnEdge((x + 0.2, y, spec.FACE_WIDTH)),
+        "root line": _DrawnEdge((x, y, spec.FACE_WIDTH), straight=True),
+        "flank": _DrawnEdge((x, y + 0.004, spec.FACE_WIDTH)),
+        "far face": _DrawnEdge((x, y, 0.0)),
+    }
+    seat = MagicMock()
+    draw = seat.adapter.currentModel
+    draw.SelectionManager.SetSelectionPoint2.return_value = True
+    annotation = draw.InsertNote.return_value.GetAnnotation.return_value
+    annotation.SetLeader3.return_value = 0
+    annotation.SetPosition2.return_value = True
+    annotation.GetAttachedEntityCount3.return_value = len(attached)
+    annotation.GetAttachedEntityTypes.return_value = attached
+    annotation.GetLeaderCount.return_value = 1
+    annotation.IsDangling.return_value = False
+    annotation.GetLeaderPointsAtIndex.return_value = (0.15, 0.10, 0.0, *landed, 0.0)
+    monkeypatch.setattr(ink, "visible_view_entities", lambda _view, _kind, label: list(edges.values()))
+    monkeypatch.setattr(
+        ink, "_com_invoke", lambda obj, _interface, method, *args: getattr(obj, method)(*args)
+    )
+    monkeypatch.setattr(ink, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(ink, "model_point_in_view", seat.model_point_in_view)
+    seat.model_point_in_view.return_value = _LANDING
+    monkeypatch.setattr(ink, "_select_view_entity", seat._select_view_entity)
+    monkeypatch.setattr(ink, "rebuild_drawing", seat.rebuild_drawing)
+    return ink, seat, edges, kwargs, (x, y)
+
+
+def test_shared_callout_attaches_one_leader_to_the_flank_at_the_gauge_contact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ink, seat, edges, kwargs, (x, y) = _callout_seat(monkeypatch)
+    view = object()
+    note = ink.add_toothspace_callout(seat.adapter, view, **kwargs)
+
+    draw = seat.adapter.currentModel
+    assert note is draw.InsertNote.return_value
+    # The contact is projected at the inspected end face, in metres.
+    projected = seat.model_point_in_view.call_args
+    assert projected.args[1] is view
+    assert projected.args[2] == pytest.approx((x / 1e3, y / 1e3, spec.FACE_WIDTH / 1e3))
+    # The formed flank through it is selected by entity, the landing is that
+    # selection's point, and the note linked to the part's control rides it.
+    selected = seat._select_view_entity.call_args
+    assert selected.args[1:3] == (view, "EDGE") and selected.kwargs["entity"] is edges["flank"]
+    names = [name for name, _args, _kwargs in seat.mock_calls]
+    order = [
+        names.index("_select_view_entity"),
+        names.index("adapter.currentModel.SelectionManager.SetSelectionPoint2"),
+        names.index("adapter.currentModel.InsertNote"),
+        names.index("rebuild_drawing"),
+        names.index("adapter.currentModel.ClearSelection2"),
+    ]
+    assert order == sorted(order)
+    draw.SelectionManager.SetSelectionPoint2.assert_called_once_with(1, -1, *_LANDING, 0.0)
+    draw.InsertNote.assert_called_once_with(property_link(spec.TOOTH_SPACE_CALLOUT_PROPERTY))
+    annotation = note.GetAnnotation.return_value
+    annotation.SetPosition2.assert_called_once_with(*kwargs["note_xy"], 0.0)
+
+
+@pytest.mark.parametrize(
+    ("readback", "message"),
+    [
+        ({"landed": (_LANDING[0] + 0.002, _LANDING[1])}, "leader attachment moved"),
+        ({"attached": (1, 1)}, "exactly one EDGE attachment"),
+        ({"attached": (2,)}, "exactly one EDGE attachment"),
+    ],
+)
+def test_shared_callout_fails_on_a_wrong_attachment_or_a_moved_landing(
+    monkeypatch: pytest.MonkeyPatch, readback: dict, message: str
+) -> None:
+    ink, seat, _edges, kwargs, _contact = _callout_seat(monkeypatch, **readback)
+    with pytest.raises(RuntimeError, match=message):
+        ink.add_toothspace_callout(seat.adapter, object(), **kwargs)
+
+
+def test_shared_callout_refuses_a_landing_the_sheet_did_not_take(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ink, seat, _edges, kwargs, _contact = _callout_seat(monkeypatch)
+    seat.adapter.currentModel.SelectionManager.SetSelectionPoint2.return_value = False
+    with pytest.raises(RuntimeError, match="failed to set the flank landing"):
+        ink.add_toothspace_callout(seat.adapter, object(), **kwargs)
+    seat.adapter.currentModel.InsertNote.assert_not_called()
 
 
 @pytest.mark.parametrize(
