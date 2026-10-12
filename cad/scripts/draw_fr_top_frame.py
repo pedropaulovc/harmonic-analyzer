@@ -653,10 +653,20 @@ def hanger_datum_pick(
 HANGER_SLOT_FRAME_TEXT_BOX = (0.0009, -0.0053, 0.0325, -0.0008)
 HANGER_SLOT_FRAME_OUTLINE = (0.0, -0.0070, 0.0391, 0.0)
 HANGER_SLOT_FRAME_SHOULDER = 0.00635
-# Both frames' tops 10.2 mm under the sheet frame and their outlines 4.7 over
-# the plan's top (y 244.8 mm): the rear 3.2 right of the pocket length's
-# block, the front 16.7 right of datum C's tag.
-HANGER_SLOT_FRAME_XY = {"front": (0.160, 0.2565), "rear": (0.052, 0.2565)}
+# Each frame names its feature below it: at 1:3 the slot and the round hole
+# (datum B or C) beside it stand 4.7 mm apart, and a reader took the frames
+# for the round holes' own (codex review of 0d75ada1, sheet 6).  The
+# below-frame text prints left-aligned 1.1 mm under the outline, 3.4 tall,
+# 2.6 mm a glyph ("2X" under pn-pen-v-block's frame at (198, 196) mm printed
+# [198.1, 184.5]..[203.3, 187.9]).  Both frames' tops 5.7 mm under the
+# sheet frame, their names' 4.6 over the plan's top (y 244.8 mm): the rear
+# 3.3 right of the pocket length's block, the front 16.7 right of datum C's
+# tag.
+HANGER_SLOT_FRAME_QUANTITY = "DOWEL SLOT"
+HANGER_SLOT_FRAME_QUANTITY_BOX = (
+    0.0, -0.0116, 0.0026 * len(HANGER_SLOT_FRAME_QUANTITY), -0.0080
+)
+HANGER_SLOT_FRAME_XY = {"front": (0.160, 0.261), "rear": (0.052, 0.261)}
 
 
 def hanger_slot_frame_knee(
@@ -3185,6 +3195,7 @@ async def build(adapter: Any) -> dict[str, str]:
             tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"],
             datums=datums,
             translated=datums[1:],
+            quantity=HANGER_SLOT_FRAME_QUANTITY,
             label=f"knife-hanger {station} dowel slot position",
         )
     slot_dimensions = curate_view_dimensions(

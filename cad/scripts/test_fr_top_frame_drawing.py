@@ -2005,6 +2005,8 @@ def test_slots_are_positioned_to_the_round_holes_with_translation() -> None:
     assert '("front", STUD_Z_FRONT, ("B", "C"))' in underside
     assert '("rear", STUD_Z_REAR, ("C", "B"))' in underside
     assert "translated=datums[1:]" in underside
+    assert "quantity=HANGER_SLOT_FRAME_QUANTITY," in underside
+    assert drawing.HANGER_SLOT_FRAME_QUANTITY == "DOWEL SLOT"
     assert 'GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"]' in underside
     assert '"HangerSlotWidth": HANGER_SLOT_WIDTH_TEXT_XY' in underside
     for name, (x, y) in {
@@ -2107,7 +2109,7 @@ def test_hanger_datum_leaders_run_clear_of_the_slot_frames() -> None:
     }
     front = frames["front"]
     assert (front.xmin, front.ymin, front.xmax, front.ymax) == pytest.approx(
-        (0.1609, 0.2512, 0.1925, 0.2557)
+        (0.1609, 0.2557, 0.1925, 0.2602)
     )
     centre = drawing.HUB_BOTTOM_CENTER
     m_per_mm = drawing._HUB_BOTTOM_M_PER_MM
@@ -2239,11 +2241,26 @@ def test_slot_frames_stand_above_the_plan_clear_of_every_line() -> None:
     radius = drawing.HANGER_SLOT_WIDTH / 2.0 * m_per_mm
     # The front leader lands on its slot's inner end, the rear on its outer.
     assert {station: entry[1] for station, entry in layout.items()} == {"front": 1.0, "rear": -1.0}
+    qx0, qy0, qx1, qy1 = drawing.HANGER_SLOT_FRAME_QUANTITY_BOX
     for station, (outline, end, end_centre, landing, runs) in layout.items():
+        # Codex review of 0d75ada1: each frame names its slot below it.
+        fx, fy = drawing.HANGER_SLOT_FRAME_XY[station]
+        name_box = Box(fx + qx0, fy + qy0, fx + qx1, fy + qy1)
+        assert name_box.ymax < outline.ymin and name_box.xmax < outline.xmax, station
         # Above the plan, inside the sheet frame.
-        assert outline.ymin >= plan_top + ink, station
+        assert name_box.ymin >= plan_top + ink, station
         assert sheet[0] + ink <= outline.xmin and outline.xmax <= sheet[2] - ink, station
         assert outline.ymax <= sheet[3] - ink, station
+        for name, box in boxes.items():
+            assert _box_box_gap(
+                (name_box.xmin, name_box.ymin, name_box.xmax, name_box.ymax),
+                (box.xmin, box.ymin, box.xmax, box.ymax),
+            ) >= ink, (station, name)
+        for name, line in lines.items():
+            assert segment_box_distance(line, name_box) >= ink, (station, name)
+        for other in layout.values():
+            for run in other[4]:
+                assert segment_box_distance(run, name_box) >= ink, station
         # On the end arc's half facing away from the slot's flats.
         assert math.dist(landing, end_centre) == pytest.approx(radius), station
         assert (landing[0] - end_centre[0]) * end > 0.0, station
