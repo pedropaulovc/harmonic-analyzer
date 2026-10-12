@@ -20,6 +20,7 @@ import pd_transgear_knob_thrust_ring_spec as RING
 import pd_transgear_removable_spec as WHEEL
 from _gear_quality import (
     arm_opposite_face_parallelism_mm,
+    arm_plate_loaded_normal_change_mm,
     reducer_axis_projected_zone_diameter_mm,
     reducer_position_diameter_mm,
 )
@@ -43,7 +44,7 @@ LOCATOR_COORDINATE_TRAVEL_MAX_MM = math.floor(
     LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM / math.sqrt(2.0) * 1e4
 ) / 1e4  # inward printed acceptance, not a looser unprinted threshold
 ARM_SEAT_SPAN_MIN_MM = 13.7  # drawn indicator support requirement, not a stock-pin contact span
-ARM_PLATE_LOADED_NORMAL_CHANGE_MAX_MM = arm_opposite_face_parallelism_mm()
+ARM_PLATE_LOADED_NORMAL_CHANGE_MAX_MM = arm_plate_loaded_normal_change_mm()
 ARM_SEAT_NORMAL_WITNESS_XY_MM = (
     (ARM.PLATE_SCREW_MID_STATION - 13.0, -7.0),
     (ARM.PLATE_SCREW_MID_STATION + 13.0, -7.0),

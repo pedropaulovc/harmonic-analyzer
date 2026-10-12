@@ -50,6 +50,11 @@ def arm_opposite_face_parallelism_mm() -> float:
     return _positive_limit_mm("arm_opposite_face_parallelism_mm")
 
 
+def arm_plate_loaded_normal_change_mm() -> float:
+    """Assembled arm-plate seat: loaded-minus-snug indicator change limit."""
+    return _positive_limit_mm("arm_plate_loaded_normal_change_mm")
+
+
 def recording_paper_width_deviation_mm() -> float:
     """Maximum absolute cut-paper width error; reject outside this band."""
     return _positive_limit_mm("recording_paper_width_deviation_mm")

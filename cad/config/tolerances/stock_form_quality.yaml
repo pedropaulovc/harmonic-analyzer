@@ -10,7 +10,15 @@ stock_form_quality:
   reducer_position_diameter_mm: 0.050
   shaft_turned_runout_mm: 0.050
   reducer_axis_projected_zone_diameter_mm: 0.050
-  arm_opposite_face_parallelism_mm: 0.005
+  # Arm rear face parallel to front face A: the shop's ordinary 0.05
+  # (machinist review, stack6: 0.005 was over-specified). It tilts the plate
+  # seat. The governing gate is the MHA-VN-040 plate screw's worst thread
+  # engagement, >= 1.5D: 1.565D at 0.005 and 1.520D at 0.050 (with the 0.005
+  # loaded seat change below), failing at about 0.070.
+  arm_opposite_face_parallelism_mm: 0.050
+  # Assembly acceptance, a separate grade: each three-indicator seat reading,
+  # loaded minus snug, stays within this (paper_drive_arm_registration).
+  arm_plate_loaded_normal_change_mm: 0.005
   recording_paper_width_deviation_mm: 0.100
   recording_paper_left_inset_deviation_mm: 0.100
   recording_pen_x_deviation_mm: 0.100
