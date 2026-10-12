@@ -54,7 +54,7 @@ DIMENSION_TOLERANCES = {
 # prints none of the callout (run 20261012T185729782Z). The endshake's
 # prints below, where line breaks print.
 DIMENSION_CALLOUTS = {
-    PRESS_GAUGE_DIMENSION: "PRESS GAUGE: LOCKNUT ON FULL THREAD",
+    PRESS_GAUGE_DIMENSION: "PRESS GAUGE: KEEPS WHEEL LOCKNUT ON FULL THREAD",
     ENDSHAKE_DIMENSION: "\n".join(
         (
             "WHEEL FREE, NO RATTLE;",

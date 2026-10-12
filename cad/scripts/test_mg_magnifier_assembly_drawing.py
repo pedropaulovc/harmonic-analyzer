@@ -96,11 +96,21 @@ def test_each_detail_sits_in_the_free_field_with_its_label_under_its_ink(
     # Just under the detail's lowest printed edge, not under its unprinted
     # crop circle.
     assert 0.002 <= ink_bottom - label_top <= 0.005
-    # Two label lines, about 4.5 mm each, clear the title block.
-    assert label_top - 0.009 > TITLE_BLOCK_TOP
+    # Its lines, about 4.5 mm each, clear the title block.
+    lines = detail.label_text.splitlines()
+    assert label_top - 0.0045 * len(lines) > TITLE_BLOCK_TOP
     assert left <= label_x
-    assert detail.label_text.splitlines()[1] == (
-        f"SCALE {detail.scale[0]} : {detail.scale[1]}"
+    assert lines[0] == detail.title
+    assert lines[-1] == f"SCALE {detail.scale[0]} : {detail.scale[1]}"
+
+
+def test_the_gauge_detail_names_what_it_presses_into_what() -> None:
+    label = drawing.PRESSED.label_text
+    assert "MG-WHEEL-AXLE" in label and "MG-WHEEL-BAR" in label
+    # The pressed detail's three-line label still clears the endshake crop.
+    lines = len(label.splitlines())
+    assert (
+        drawing.PRESSED.label_xy[1] - 0.0045 * lines > _circle_box(drawing.ENDSHAKE)[3]
     )
 
 

@@ -105,6 +105,9 @@ class StackDetail:
     centre: tuple[float, float]
     stems: frozenset[str]
     ink_drop_mm: float
+    # The parts the detail sets, named under its title (a blind reviewer of
+    # run 20261012T192552713Z could not tell what the gauge presses).
+    parts: str = ""
 
     @property
     def mm(self) -> float:
@@ -132,7 +135,8 @@ class StackDetail:
 
     @property
     def label_text(self) -> str:
-        return f"{self.title}\nSCALE {self.scale[0]} : {self.scale[1]}"
+        lines = (self.title, self.parts, f"SCALE {self.scale[0]} : {self.scale[1]}")
+        return "\n".join(line for line in lines if line)
 
     @property
     def label_xy(self) -> tuple[float, float]:
@@ -155,6 +159,7 @@ PRESSED = StackDetail(
     (0.330, 0.200),
     frozenset({"mg-wheel-bar", "mg-wheel-axle"}),
     BORE_ROW_HEIGHT,
+    "MG-WHEEL-AXLE PRESSED\nINTO MG-WHEEL-BAR",
 )
 _ENDSHAKE_CENTRE_D = (stack.HUB_FRONT_D + TIP_Y) / 2.0
 _ENDSHAKE_RADIUS = 7.0
