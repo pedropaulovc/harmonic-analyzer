@@ -59,7 +59,6 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
-import hashlib
 import math
 import sys
 
@@ -77,7 +76,6 @@ from _assembly import (
     coincident_mate,
     component_origin,
     distance_driver,
-    dof_manifest_path,
     lock_mate,
     named_ref,
     parallel_mate,
@@ -101,6 +99,7 @@ from _mcmaster_99607a213 import TIP_CHAMFER as PEN_SET_TIP_CHAMFER
 from mg_magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
 from diagnostics.probe_assembly_display_data import (
     independent_pn_capture,
+    preserve_normal_pn_build_inputs,
     probe_assembly_display_data,
 )
 
@@ -501,27 +500,15 @@ async def _build_pen(adapter) -> dict[str, str]:
 
 async def build(adapter) -> dict[str, str]:
     artefacts = await _build_pen(adapter)
-    # Temporary matrix: construct an independent source using cached parts only,
-    # without building or saving any part. Preserve the normal published assembly.
-    discard_open_documents(adapter)
-    adapter.currentModel = None
-    normal_dof_path = dof_manifest_path(ASM_NAME)
-    with normal_dof_path.open("rb") as source:
-        normal_dof_before = hashlib.file_digest(source, "sha256").hexdigest()
-    try:
-        with independent_pn_capture():
-            artefacts.update(await _build_pen(adapter))
-    finally:
-        # The independent builder rewrites this normal output too. Never silently
-        # publish a changed or missing manifest beside the untouched normal model.
-        with normal_dof_path.open("rb") as source:
-            normal_dof_after = hashlib.file_digest(source, "sha256").hexdigest()
-        if normal_dof_after != normal_dof_before:
-            raise RuntimeError(
-                f"independent pn construction changed {normal_dof_path}: "
-                f"{normal_dof_before} -> {normal_dof_after}"
-            )
-    # Compare only after both constructions and their first reconciles complete.
+    # Temporary matrix: construct two independent sources using cached parts only,
+    # without building or saving any part. Preserve all normal published inputs.
+    for capture_mode in ("independent-default", "independent-both"):
+        with preserve_normal_pn_build_inputs(artefacts["assembly"]):
+            discard_open_documents(adapter)
+            adapter.currentModel = None
+            with independent_pn_capture(capture_mode):
+                artefacts.update(await _build_pen(adapter))
+    # Compare only after all three constructions and their first reconciles complete.
     artefacts.update(await probe_assembly_display_data(adapter, artefacts["assembly"]))
     return artefacts
 

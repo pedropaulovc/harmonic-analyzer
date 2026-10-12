@@ -2514,8 +2514,8 @@ async def save_assembly_and_images(
     sidecar = _massprops_sidecar(asm_name)
     # A full build replaces the assembly bytes. Strictly retire proof for the
     # previous bytes before replacement; an unlink failure aborts the save.
-    # The temporary independent pn capture must leave the normal proof intact.
-    if display_capture_mode != "independent":
+    # Temporary independent pn constructions must leave the normal proof intact.
+    if display_capture_mode == "normal":
         _invalidate_massprops_proof(sidecar)
         if dof_manifest:
             dof_manifest_path(asm_name).unlink(missing_ok=True)
@@ -2531,10 +2531,12 @@ async def save_assembly_and_images(
     # save (_run_solved_gates leaves the model clean or raises).
     if rebuild_if_needed_before_save(adapter, asm_name) and solved_gates is not None:
         _run_solved_gates(adapter, asm_name, solved_gates, trigger="save_rebuild")
-    if display_capture_mode == "independent":
-        # Diagnostic-only second construction: first Copy11 targets its separate
+    if display_capture_mode != "normal":
+        # Diagnostic-only independent constructions: first Copy11 targets each
         # marked artifact; no normal save/render/fingerprint tail runs here.
-        return await capture_independent_pn_first_reconcile(adapter, asm_path)
+        return await capture_independent_pn_first_reconcile(
+            adapter, asm_path, display_capture_mode
+        )
     _save_new_assembly_as_copy(adapter, asm_path)
     if asm_name == "pn-pen":
         # Diagnostic-only matrix hook: normal bytes are already saved; the helper

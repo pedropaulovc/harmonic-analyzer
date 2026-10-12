@@ -3,8 +3,8 @@
 The normal pn build retains its original Copy11/reconcile/render/fingerprint
 tail. After its initial Copy11, two extra copies of the still-untitled source
 compare unmarked and Default-only marked serialization before any reconcile.
-A second, independent pn construction sets only Default's LDR mark before its
-first-ever serialization. Both builds use cached parts, never part builds.
+Two independent pn constructions set Default-only or both configurations' LDR
+marks before their first-ever serialization. All use cached parts, never part builds.
 
 All snapshots are siblings of pn-pen.SLDASM, preserving its reference directory
 layout. No part build is dispatched; no part file is saved, copied, or
@@ -39,9 +39,9 @@ Preserved C-mark-Default and C-mark-both copies each undergo their FIRST origina
 reconcile on a separate byte-identical output copy. Fresh untitled fixtures
 explicitly clear both marks or mark only Default before their first-ever Copy11,
 then undergo the same original first reconcile. These primary controls exclude
-reopening-to-set-mark and prior serialization confounds. The actual independent
-pn construction supplies a production-builder counterpart; extra same-source pn
-copies remain secondary because their serialization ordinals differ.
+reopening-to-set-mark and prior serialization confounds. Actual independent pn
+constructions supply Default-only and both-config production-builder counterparts;
+extra same-source pn copies remain secondary because their serialization ordinals differ.
 These are differential observations, not a production fix or root-cause claim.
 
 The manifest and stdout retain native config/mark/rebuild/GetSaveFlag state,
@@ -288,13 +288,42 @@ EXTRA_COPY_STAGES = (
     "normal-extra-unmarked-copy11",
     "normal-extra-mark-default-copy11",
 )
-INDEPENDENT_STAGES = (
-    "independent-normal-mark-default-copy11",
-    "independent-normal-mark-default-first-reconcile-save1",
+
+
+@dataclass(frozen=True)
+class IndependentPenTrial:
+    marks: tuple[str, ...]
+    stages: tuple[str, str]
+    history_filename: str
+    history_key: str
+
+
+INDEPENDENT_PN_TRIALS = {
+    "independent-default": IndependentPenTrial(
+        marks=("Default",),
+        stages=(
+            "independent-normal-mark-default-copy11",
+            "independent-normal-mark-default-first-reconcile-save1",
+        ),
+        history_filename="pn-pen-display-independent-normal-mark-default.json",
+        history_key="display_independent_source_history",
+    ),
+    "independent-both": IndependentPenTrial(
+        marks=("Default", "Default Simplified"),
+        stages=(
+            "independent-normal-mark-both-copy11",
+            "independent-normal-mark-both-first-reconcile-save1",
+        ),
+        history_filename="pn-pen-display-independent-normal-mark-both.json",
+        history_key="display_independent_both_source_history",
+    ),
+}
+INDEPENDENT_STAGES = tuple(
+    stage for trial in INDEPENDENT_PN_TRIALS.values() for stage in trial.stages
 )
 SOURCE_HISTORY_FILENAMES = (
     "pn-pen-display-normal-extra-copy11.json",
-    "pn-pen-display-independent-normal-mark-default.json",
+    *(trial.history_filename for trial in INDEPENDENT_PN_TRIALS.values()),
 )
 STAGES = (
     "normal",
@@ -486,9 +515,11 @@ def _set_marks(model: Any, ldr_names: tuple[str, ...]) -> None:
 
 
 @contextmanager
-def independent_pn_capture():
-    """Select only the second pn construction's diagnostic save path."""
-    token = _PN_CAPTURE_MODE.set("independent")
+def independent_pn_capture(capture_mode: str):
+    """Select one independent construction's mark/stage/history contract."""
+    if capture_mode not in INDEPENDENT_PN_TRIALS:
+        raise ValueError(f"unknown independent pn capture mode: {capture_mode!r}")
+    token = _PN_CAPTURE_MODE.set(capture_mode)
     try:
         yield
     finally:
@@ -525,6 +556,29 @@ def _require_preserved(records: list[dict[str, Any]]) -> None:
     changed = [row["path"] for row in records if not row["unchanged"]]
     if changed:
         raise RuntimeError(f"display matrix changed protected input bytes: {changed}")
+
+
+@contextmanager
+def preserve_normal_pn_build_inputs(normal_path: str | Path):
+    """Guard normal assembly, cached parts and DOF around each entire construction."""
+    from _assembly import dof_manifest_path
+
+    normal_path = Path(normal_path).resolve()
+    history = json.loads(
+        (normal_path.parent / SOURCE_HISTORY_FILENAMES[0]).read_text(encoding="utf-8")
+    )
+    if not history["complete"]:
+        raise RuntimeError("normal pn source history is incomplete before independent build")
+    paths = {
+        normal_path,
+        dof_manifest_path("pn-pen"),
+        *(Path(row["path"]) for row in history["protected_inputs"]),
+    }
+    protected = {path: _digest(path) for path in paths}
+    try:
+        yield
+    finally:
+        _require_preserved(_protected_records(protected))
 
 
 def _untitled_pn_state(adapter: Any) -> tuple[Any, dict[str, Any]]:
@@ -638,7 +692,7 @@ def capture_pn_marked_copy(adapter: Any, normal_path: Path) -> None:
 
 
 async def capture_independent_pn_first_reconcile(
-    adapter: Any, normal_path: Path
+    adapter: Any, normal_path: Path, capture_mode: str
 ) -> dict[str, str]:
     """Mark an independently constructed pn before its first-ever assembly save."""
     from _assembly import (
@@ -652,11 +706,13 @@ async def capture_independent_pn_first_reconcile(
     from _telemetry import info
 
     normal_path = Path(normal_path).resolve()
+    trial = INDEPENDENT_PN_TRIALS[capture_mode]
+    stages = trial.stages
     paths = {
         stage: normal_path.parent / f"pn-pen-display-{stage}.SLDASM"
-        for stage in INDEPENDENT_STAGES
+        for stage in stages
     }
-    manifest = normal_path.parent / SOURCE_HISTORY_FILENAMES[1]
+    manifest = normal_path.parent / trial.history_filename
     model, initial = _untitled_pn_state(adapter)
     protected = {
         path: _digest(path)
@@ -664,12 +720,14 @@ async def capture_independent_pn_first_reconcile(
     }
     report: dict[str, Any] = {
         "complete": False,
+        "capture_mode": capture_mode,
+        "requested_ldr_marks": trial.marks,
         "normal_assembly_sha256": protected[normal_path],
         "initial_native_untitled_state": initial,
         "source_save_history": (
-            "Independent second construction through the unchanged pn builder "
+            "Independent construction through the unchanged pn builder "
             "using cached parts. No assembly serialization, reopen or reconcile "
-            "precedes the Default-only mark and initial Copy11."
+            "precedes the requested LDR marks and initial Copy11."
         ),
         "stages": [],
     }
@@ -678,33 +736,33 @@ async def capture_independent_pn_first_reconcile(
         _ensure_assembly_identity(adapter, "pn-pen", model)
         _ensure_assembly_title(adapter, "pn-pen", model)
         row = {
-            "stage": INDEPENDENT_STAGES[0],
+            "stage": stages[0],
             "source_stage": "independent-fresh-untitled-normal-pn-build",
             "assembly_serialization_ordinal": 1,
             "source_sha256": None,
             "before_mark_assignment": _state(model),
-            "requested_ldr_marks": ("Default",),
+            "requested_ldr_marks": trial.marks,
             "mark_first_set": "Before the independent source's FIRST-ever Copy11.",
         }
         report["stages"].append(row)
-        _set_marks(model, ("Default",))
+        _set_marks(model, trial.marks)
         row["after_mark_assignment"] = _state(model)
-        _capture_copy11(model, paths[INDEPENDENT_STAGES[0]], row)
+        _capture_copy11(model, paths[stages[0]], row)
         _discard_copy_source(adapter)
         model = None
         check(
             "display matrix reopen independent initial copy",
-            await adapter.open_model(str(paths[INDEPENDENT_STAGES[0]])),
+            await adapter.open_model(str(paths[stages[0]])),
         )
         row["after_save"] = _state(_model(adapter))
         row["reopened"] = row["after_save"]
         if row["reopened"]["references"] != initial["references"]:
             raise RuntimeError("independent pn copy changed cached references")
-        protected[paths[INDEPENDENT_STAGES[0]]] = row["sha256"]
+        protected[paths[stages[0]]] = row["sha256"]
         discard_open_documents(adapter)
         adapter.currentModel = None
-        source = paths[INDEPENDENT_STAGES[0]]
-        destination = paths[INDEPENDENT_STAGES[1]]
+        source = paths[stages[0]]
+        destination = paths[stages[1]]
         shutil.copy2(source, destination)
         if _digest(destination) != row["sha256"]:
             raise RuntimeError(
@@ -715,8 +773,8 @@ async def capture_independent_pn_first_reconcile(
             await adapter.open_model(str(destination)),
         )
         row = {
-            "stage": INDEPENDENT_STAGES[1],
-            "source_stage": INDEPENDENT_STAGES[0],
+            "stage": stages[1],
+            "source_stage": stages[0],
             "source_sha256": _digest(source),
             "baseline_display_data": report["stages"][0]["display_data"],
             "before_save": _state(_model(adapter)),
@@ -730,7 +788,7 @@ async def capture_independent_pn_first_reconcile(
         adapter.currentModel = None
         await reconcile_saved_rebuild_state(
             adapter,
-            INDEPENDENT_STAGES[1],
+            stages[1],
             destination,
             diagnostic_save=row["native_reconcile_save"],
         )
@@ -760,7 +818,7 @@ async def capture_independent_pn_first_reconcile(
         info("display matrix independent pn " + json.dumps(report))
         _require_preserved(report["protected_inputs"])
     return {f"display_{stage}": str(path) for stage, path in paths.items()} | {
-        "display_independent_source_history": str(manifest)
+        trial.history_key: str(manifest)
     }
 
 
@@ -1483,7 +1541,8 @@ async def probe_assembly_display_data(
         "display_extra_copy_source_history": str(
             directory / SOURCE_HISTORY_FILENAMES[0]
         ),
-        "display_independent_source_history": str(
-            directory / SOURCE_HISTORY_FILENAMES[1]
-        ),
+        **{
+            trial.history_key: str(directory / trial.history_filename)
+            for trial in INDEPENDENT_PN_TRIALS.values()
+        },
     }
