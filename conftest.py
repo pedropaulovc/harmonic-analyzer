@@ -73,26 +73,6 @@ def _refuse(route, detail):
     raise SolidWorksLaunchBlocked(message)
 
 
-def _audit(event, args):
-    """Refuse what the patched Python entry points cannot see.
-
-    ``nt.spawn*``/``nt.exec*``/``nt.system``/``nt.startfile`` called directly,
-    and a ctypes binding of a native process or shell launcher.
-    """
-    if event == "ctypes.dlsym":
-        if args[1] in _guard.NATIVE_LAUNCHERS:
-            _refuse("ctypes", args[1])
-    elif event == "os.startfile":
-        _refuse("os.startfile", args[0])
-    elif event in ("os.spawn", "os.exec"):
-        path, argv = (args[1], args[2]) if event == "os.spawn" else args[:2]
-        if _guard.launches_solidworks(list(argv), path):
-            _refuse(event, argv)
-    elif event == "os.system":
-        if _guard.launches_solidworks(args[0]):
-            _refuse(event, args[0])
-
-
 def _install_launch_guard():
     original_init = subprocess.Popen.__init__
 
@@ -118,29 +98,23 @@ def _install_launch_guard():
         return original_system(command)
 
     os.system = guarded_system
-
-    import _winapi
-
-    _winapi.CreateProcess = _guard.refuse_create_process(
-        "_winapi", _winapi.CreateProcess, _refuse
-    )
-    sys.addaudithook(_audit)
+    # Below these: ``nt.spawn*``/``exec*``/``system``/``startfile``, the shell
+    # ``cmd /c`` line Popen and os.system compose, and a ctypes binding of a
+    # native process or shell launcher.
+    sys.addaudithook(_guard.make_audit_hook(_refuse))
 
 
 def _install_activation_guard():
-    """COM activation and the SolidWorks launch entry points, for the session.
+    """Every entry point in the shared tables, for the session.
 
-    The process guard above cannot see these: ``SldWorks.Application``'s
-    LocalServer32 is SLDWORKS.exe itself, so a Dispatch starts SolidWorks
-    without any Popen, and ``sw_recovery``'s connector launch only reaches
-    Popen after a registry walk a test can fake. Collection is covered too.
+    COM activation, the native process creators (``_winapi``/``win32process``
+    ``CreateProcess``, below ``Popen``), shell command runners and the launch
+    entry points refused outright. The process guard above cannot see most of
+    these: ``SldWorks.Application``'s LocalServer32 is SLDWORKS.exe itself, so
+    a Dispatch starts SolidWorks without any Popen. Collection is covered too.
     """
-    class_ids = _guard.solidworks_class_ids()
-    for module_name in (
-        *_guard.COM_ACTIVATORS,
-        *_guard.LAUNCH_ENTRY_POINTS,
-        *_guard.PROCESS_CREATORS,
-    ):
+    class_ids = _guard.launcher_class_ids()
+    for module_name in _guard.GUARDED_MODULES:
         try:
             module = importlib.import_module(module_name)
         except ImportError:
@@ -240,18 +214,20 @@ def pytest_configure(config):
     Tests therefore never read or write the real store. An explicit setting
     (``off`` or a path) is respected.
 
-    Refuse every SolidWorks start from this process: ``subprocess`` argv
-    (down to ``_winapi``/``win32process`` ``CreateProcess``) naming
-    ``os.startfile``, a ``.lnk`` or a SolidWorks/3DEXPERIENCE launcher image
-    (``tasklist`` still reads the process table); in-process ``os.startfile``,
-    ``os.system``, ``os.spawn*``/``exec*``, ``ShellExecute`` and ctypes
-    process launchers; COM activation of, or binding to,
-    ``SldWorks.Application``; the SolidworksMCP start/stop/launch entry
-    points; and dodo's ``_exec_com`` with a real runner. A refusal raises with
-    the caller's stack and fails the test even if the code under test
-    swallowed it. Every Python child loads the same refusals through
-    ``tests/_child_guard/sitecustomize.py`` and exits on one, which fails the
-    test that started it.
+    Refuse every SolidWorks start from this process, as
+    ``tests/_child_guard/harmonic_solidworks_guard.py`` defines it: a process
+    (``subprocess`` down to ``_winapi``/``win32process`` ``CreateProcess``,
+    ``os.system``, ``os.spawn*``/``exec*``, ``win32pipe.popen``) whose command
+    line names SolidWorks or its launchers, is a shell-open helper or is a
+    shell told to open something (``tasklist`` still reads the process
+    table); ``os.startfile``, ``ShellExecute(Ex)``, ``WinExec``, services,
+    other-user processes and ctypes process launchers; COM activation of, or
+    binding to, SolidWorks, a SolidWorks document or a launcher class; the
+    SolidworksMCP start/stop/launch entry points; and dodo's ``_exec_com``
+    with a real runner. A refusal raises with the caller's stack and fails the
+    test even if the code under test swallowed it. Every Python child loads
+    the same refusals through ``tests/_child_guard/sitecustomize.py`` and
+    exits on one, which fails the test that started it.
     """
     if "HARMONIC_BUILDGRAPH_CACHE" not in os.environ:
         os.environ["HARMONIC_BUILDGRAPH_CACHE"] = tempfile.mkdtemp(

@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from harmonic_solidworks_guard import MARKER, REFUSED_EXIT
+from harmonic_solidworks_guard import MARKER, REFUSED_EXIT, launches_solidworks
 
 # SolidWorks runs only on Windows, and the root conftest guards only there.
 pytestmark = pytest.mark.skipif(
@@ -26,6 +26,7 @@ pytestmark = pytest.mark.skipif(
 BLOCKED = "SolidWorks launch blocked"
 MISSING_SHORTCUT = r"X:\launch-guard-test\never-exists\SOLIDWORKS Design.lnk"
 MISSING_SOLIDWORKS = r"X:\launch-guard-test\never-exists\SLDWORKS.exe"
+MISSING_PART = r"X:\launch-guard-test\never-exists\part.SLDPRT"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 # A COM build script that does not exist: were the guard broken, the child
 # python would only fail to open it.
@@ -106,8 +107,12 @@ def _require_refuser(module, attribute, name):
         ("win32com.client.dynamic", "Dispatch"),
         ("win32com.client.gencache", "EnsureDispatch"),
         ("pythoncom", "GetActiveObject"),
+        ("pythoncom", "Connect"),
+        ("pythoncom", "CoGetObject"),
+        ("comtypes", "CoGetClassObject"),
         ("comtypes.client", "CreateObject"),
         ("comtypes.client", "GetActiveObject"),
+        ("comtypes.client", "GetClassObject"),
     ],
 )
 def test_com_activation_of_solidworks_is_refused(
@@ -119,6 +124,32 @@ def test_com_activation_of_solidworks_is_refused(
     _expect_blocked(
         solidworks_launch_refusals,
         lambda: getattr(module, attribute)("SldWorks.Application"),
+    )
+
+
+@pytest.mark.parametrize(
+    "module_name,attribute,target",
+    [
+        # Classes that start any program: ShellExecute, Run/Exec, ExecuteShellCommand.
+        ("win32com.client", "Dispatch", "Shell.Application"),
+        ("win32com.client", "Dispatch", "WScript.Shell"),
+        ("comtypes.client", "CreateObject", "MMC20.Application"),
+        ("win32com.client", "Dispatch", "Schedule.Service"),
+        ("win32com.client", "GetObject", "winmgmts:"),
+        # ShellWindows has no ProgID.
+        ("pythoncom", "CoCreateInstance", "{9BA05972-F6A8-11CF-A442-00A0C90A8F39}"),
+        # A moniker naming a document activates the class that opens it.
+        ("win32com.client", "GetObject", MISSING_PART),
+        ("pythoncom", "MkParseDisplayName", MISSING_PART),
+    ],
+)
+def test_com_activation_of_a_launcher_or_document_is_refused(
+    solidworks_launch_refusals, module_name, attribute, target
+):
+    module = importlib.import_module(module_name)
+    _require_refuser(module, attribute, "refuse_solidworks_activation")
+    _expect_blocked(
+        solidworks_launch_refusals, lambda: getattr(module, attribute)(target)
     )
 
 
@@ -172,9 +203,15 @@ def test_unrelated_com_activation_passes(solidworks_launch_refusals):
             "launch_via_platform_shortcut",
             (MISSING_SHORTCUT,),
         ),
+        ("win32com.shell.shell", "ShellExecuteEx", ()),
+        ("win32process", "CreateProcessAsUser", ()),
+        ("win32service", "CreateService", ()),
+        ("win32service", "StartService", ()),
+        ("win32service", "ChangeServiceConfig", ()),
+        ("win32service", "ChangeServiceConfig2", ()),
     ],
 )
-def test_solidworks_mcp_launch_entry_points_are_refused(
+def test_launch_entry_points_are_refused(
     solidworks_launch_refusals, module_name, attribute, args
 ):
     module = importlib.import_module(module_name)
@@ -256,6 +293,40 @@ import ctypes
 ctypes.WinDLL("kernel32")["Create" + "ProcessW"]
 print("NOT REFUSED")
 """
+# Each checks the entry point is the guard's wrapper first, and builds every
+# name the parent's command-line check knows at runtime, so the child's own
+# guard is what refuses.
+_CHILD_SHELL_EXECUTES = """\
+import sys
+from win32com.shell import shell
+
+if not getattr(shell.ShellExecuteEx, "solidworks_guard", False):
+    print("UNGUARDED: the real ShellExecuteEx")
+    sys.exit(3)
+shell.ShellExecuteEx(lpFile="X:\\\\never-exists\\\\p.SLD" + "PRT")
+print("NOT REFUSED")
+"""
+_CHILD_CREATES_A_SHELL_OPEN = """\
+import _winapi
+import sys
+
+if not getattr(_winapi.CreateProcess, "solidworks_guard", False):
+    print("UNGUARDED: the real _winapi.CreateProcess")
+    sys.exit(3)
+command = "c" + "md /c echo X:\\\\never-exists\\\\p.SLD" + "PRT"
+_winapi.CreateProcess(None, command, None, None, False, 0, None, None, None)
+print("NOT REFUSED")
+"""
+_CHILD_ACTIVATES_A_LAUNCHER = """\
+import sys
+import win32com.client
+
+if not getattr(win32com.client.Dispatch, "solidworks_guard", False):
+    print("UNGUARDED: the real win32com.client.Dispatch")
+    sys.exit(3)
+win32com.client.Dispatch("Shell.Appl" + "ication")
+print("NOT REFUSED")
+"""
 # A dodo whose COM task reaches a stand-in ``_exec_com``.
 _DODO_WITH_A_COM_TASK = """\
 def _run_subprocess(cmd, label, log_stem=None, *, task=None):
@@ -306,6 +377,21 @@ def test_python_child_resolving_a_process_launcher_is_refused(
     """A name built at runtime meets no argv check; the binding itself is refused."""
     result = _run_child([sys.executable, "-c", _CHILD_RESOLVES_A_LAUNCHER])
     _expect_child_refused(solidworks_child_refusals, result, "ctypes")
+    assert result.returncode == REFUSED_EXIT
+
+
+@pytest.mark.parametrize(
+    "script,route",
+    [
+        (_CHILD_SHELL_EXECUTES, "win32com.shell.shell.ShellExecuteEx"),
+        (_CHILD_CREATES_A_SHELL_OPEN, "_winapi.CreateProcess"),
+        (_CHILD_ACTIVATES_A_LAUNCHER, "win32com.client.Dispatch"),
+    ],
+    ids=["shell-execute-ex", "winapi-shell-open", "launcher-class"],
+)
+def test_python_child_shell_open_is_refused(solidworks_child_refusals, script, route):
+    result = _run_child([sys.executable, "-c", script])
+    _expect_child_refused(solidworks_child_refusals, result, route)
     assert result.returncode == REFUSED_EXIT
 
 
@@ -449,6 +535,96 @@ def test_startfile_below_os_is_refused(solidworks_launch_refusals):
     _expect_blocked(
         solidworks_launch_refusals,
         lambda: nt.startfile(MISSING_SHORTCUT, "tripwire-no-such-verb"),
+    )
+
+
+_RUNTIME_TARGET = "('X:\\never-exists\\' + 'p.SLD' + 'PRT')"
+
+
+@pytest.mark.parametrize(
+    "args,shell",
+    [
+        (["cmd", "/c", "start", "", MISSING_PART], False),
+        ('cmd.exe /c start "" probe', False),
+        ("start probe", True),  # os.system / popen run it under cmd /c
+        (["explorer.exe", MISSING_PART], False),
+        ([r"C:\Windows\explorer.exe", "/select,probe"], False),
+        (["rundll32.exe", "shell32.dll,ShellExec_RunDLL", "probe"], False),
+        (["cmd", "/c", "rundll32", "url.dll,FileProtocolHandler", "probe"], False),
+        (
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                f"Start-Process {_RUNTIME_TARGET}",
+            ],
+            False,
+        ),
+        (["pwsh", "-c", f"saps {_RUNTIME_TARGET}"], False),
+        (["pwsh", "-c", f"ii {_RUNTIME_TARGET}"], False),
+        (["pwsh", "-c", f"Invoke-Item -Path {_RUNTIME_TARGET}"], False),
+        (["pwsh", "-c", f"start {_RUNTIME_TARGET}"], False),
+        (["pwsh", "-c", "iex $env:PROBE"], False),
+        (["pwsh", "-c", "[Diagnostics.Process]::Start($env:PROBE)"], False),
+        (["pwsh", "-c", "(New-Object -ComObject $env:PROBE).Run(1)"], False),
+        (["pwsh", "-c", "Invoke-CimMethod Win32_Process -MethodName Create"], False),
+        (["cmd", "/c", MISSING_PART], False),  # a document as a command opens it
+        (f'cmd /c "{MISSING_PART}"', False),
+        ("probe.SLDASM", True),
+        (["uv", "run", "pwsh", "-c", "saps probe"], False),
+    ],
+)
+def test_a_shell_told_to_open_something_counts(args, shell):
+    """A verb is refused whatever its target, so a target built at runtime is too."""
+    assert launches_solidworks(args, shell=shell)
+
+
+@pytest.mark.parametrize(
+    "args,shell",
+    [
+        (["python", "script.py", MISSING_PART], False),
+        (["git", "add", "cad/out/part.SLDPRT"], False),
+        (["cmd", "/c", "echo", "hello"], False),
+        ("echo hello", True),
+        (["pwsh", "-NoProfile", "-File", "scripts/farm-run.ps1", "-Status"], False),
+        (["pwsh", "-c", "(Get-CimInstance Win32_Process).ParentProcessId"], False),
+        (["python", "-m", "pytest", "-k", "start"], False),
+        (["tasklist", "/FI", "IMAGENAME eq SLDWORKS.exe"], False),
+    ],
+)
+def test_an_ordinary_command_does_not_count(args, shell):
+    assert not launches_solidworks(args, shell=shell)
+
+
+# Each would only print were the guard broken.
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda: subprocess.run(["cmd", "/c", "echo", MISSING_PART], check=False),
+        lambda: subprocess.run(f"echo {MISSING_PART}", shell=True, check=False),
+        lambda: subprocess.run(
+            ["powershell", "-NoProfile", "-Command", "Write-Output 'Start-Process'"],
+            check=False,
+        ),
+        lambda: os.system(f"echo {MISSING_PART}"),
+        lambda: __import__("nt").system(f"echo {MISSING_PART}"),
+    ],
+    ids=["cmd-document", "shell-true", "powershell-verb", "os.system", "nt.system"],
+)
+def test_a_shell_open_through_a_real_entry_point_is_refused(
+    solidworks_launch_refusals, call
+):
+    _expect_blocked(solidworks_launch_refusals, call)
+
+
+@pytest.mark.parametrize("attribute", ["popen", "popen2", "popen3", "popen4"])
+def test_shell_command_runners_are_refused(solidworks_launch_refusals, attribute):
+    import win32pipe
+
+    _require_refuser(win32pipe, attribute, "guarded_command")
+    _expect_blocked(
+        solidworks_launch_refusals,
+        lambda: getattr(win32pipe, attribute)(f"echo {MISSING_PART}", "r"),
     )
 
 
