@@ -839,6 +839,16 @@ GEOMETRY_CALLOUTS = {
 CROSSBAR_FLANGE_TEXT_OFFSET_XY = (0.1085, 0.1080)
 GUSSET_RUN_TEXT_OFFSET_XY = (0.1145, 0.2205)
 
+# The plan's rail outlines -- the 428.2 x 262.0 flange extents and the
+# 359.8 x 186.0 windows inside them -- are symmetric about the four
+# sockets' pattern centre (the model's +/-OuterX, +/-InnerX, ...), but no
+# dimension tied them to the socket axes (codex review of 4d11a94e, sheets
+# 2-3), so a note states it.  It parks in the free corner under the 269.0
+# extension line (y 123.7), left of the 153.9 line (x 85.0) and over the
+# front view (top 97.5); ink measured on the 4d11a94e render.
+PLAN_CENTRING_NOTE = "RAIL FLANGE EXTENTS\nAND WINDOWS CENTRED\nON 4X SOCKET PATTERN"
+PLAN_CENTRING_NOTE_XY = (0.016, 0.118)
+
 # The boss/socket diameters leave the socket they qualify in opposite
 # directions so neither leader crosses the other's text.  The hole STATIONS
 # are not imported: the model's Hole Wizard placement dims measure from the
@@ -2093,6 +2103,8 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter, geometry_top_dimensions, {"GussetRunE": GUSSET_RUN_TEXT_OFFSET_XY}
     )
+    if add_note(adapter, PLAN_CENTRING_NOTE, *PLAN_CENTRING_NOTE_XY) is None:
+        raise RuntimeError("failed to centre the plan's rail outlines on the sockets")
     # Every imported dimension's places are the part's; the whole print's
     # imports are collected here and read back once, before export.
     imported_annotations = [*geometry_annotations]

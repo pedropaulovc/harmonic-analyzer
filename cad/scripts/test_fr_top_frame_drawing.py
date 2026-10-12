@@ -2270,6 +2270,32 @@ def test_section_note_states_the_far_wall_print_worst_engagement() -> None:
     assert bottom > drawing.SHEET_FRAME[1] + drawing.INK_CLEARANCE
 
 
+def test_plan_note_centres_the_rail_outlines_on_the_socket_pattern() -> None:
+    # The note's claim is the model's: every plan outline is +/- about the
+    # socket pattern centre, which sits on the part origin.
+    assert part.FRONT_COLUMN_Z == -part.REAR_COLUMN_Z
+    assert part.OUTER_X - part.COLUMN_X == pytest.approx(part.COLUMN_X - part.INNER_X)
+    assert part.OUTER_Z - abs(part.FRONT_COLUMN_Z) == pytest.approx(
+        abs(part.FRONT_COLUMN_Z) - part.INNER_Z
+    )
+    note = drawing.PLAN_CENTRING_NOTE
+    assert "CENTRED" in note and "4X SOCKET" in note
+    lines = note.splitlines()
+    x, y = drawing.PLAN_CENTRING_NOTE_XY
+    # Rule 6: a short note.  Rule 8: clear of the sheet-2 ink round it
+    # (4d11a94e render, metres): the frame's left edge, the 269.0 extension
+    # line at y 0.12365, the 153.9 extension line at x 0.08502 and the front
+    # view, whose top is y 0.09747.  Characters print 2.87 mm wide ("CROSSBAR
+    # FLANGE", 15 of them over 43.1 mm), rows 5.56 mm apart.
+    assert len(lines) <= 4
+    right = x + 0.00287 * max(len(line) for line in lines)
+    bottom = y - 0.00556 * len(lines)
+    assert x > drawing.SHEET_FRAME[0] + drawing.INK_CLEARANCE
+    assert y + drawing.INK_CLEARANCE < 0.12365
+    assert right + drawing.INK_CLEARANCE < 0.08502
+    assert bottom > 0.09747 + drawing.INK_CLEARANCE
+
+
 def _segments_apart(a, b) -> bool:
     """True when two segments neither cross nor touch."""
 
