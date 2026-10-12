@@ -276,6 +276,8 @@ such build:
   Farm preflight also runs the same `check:undefined_names` Ruff scan before
   querying the fleet, so an undefined CAD/build-script name cannot dispatch a
   COM leaf even when the stamped checks would run later in the doit graph.
+  It also checks every would-be leaf in the selected closure with `-PoolHome`'s
+  `agent.protocol.leaf_admitted`, naming refused tasks/prefixes before FIFO registration (exit 2).
 - The build runs from a private snapshot of the pushed HEAD under
   `-LogDirectory` (which must sit outside every Git worktree). The default root
   is `$env:HARMONIC_AGENT_SCRATCHPAD` when set; otherwise, an OMP persistent

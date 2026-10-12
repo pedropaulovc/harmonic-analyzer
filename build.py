@@ -47,7 +47,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
-from doit.cmd_base import get_loader
+from doit.cmd_base import get_loader, tasks_and_deps_iter
 from doit.cmdparse import CmdParseError
 from doit.control import TaskControl
 from doit.doit_cmd import DoitMain
@@ -226,12 +226,13 @@ def _isolated_tasks(task_list):
 
 def _validate_farm_selection(
     task_list, selection, *, auto_delayed_regex: bool = False
-) -> None:
+) -> TaskControl:
     """Parse farm selections exactly as doit will, without consuming real tasks."""
     control = TaskControl(
         _isolated_tasks(task_list), auto_delayed_regex=auto_delayed_regex
     )
     control.process(selection)
+    return control
 
 
 def _farm_command(command_class, display_name: str | None = None):
@@ -243,7 +244,7 @@ def _farm_command(command_class, display_name: str | None = None):
         @functools.wraps(command_class._execute)
         def _execute(self, *args, **kwargs):
             try:
-                _validate_farm_selection(
+                control = _validate_farm_selection(
                     self.task_list,
                     self.sel_tasks,
                     auto_delayed_regex=kwargs.get("auto_delayed_regex", False),
@@ -257,6 +258,7 @@ def _farm_command(command_class, display_name: str | None = None):
                     raise FarmPreflightError(str(exc)) from None
                 if display_name is not None:
                     os.environ["HARMONIC_FARM_DISPLAY_NAME"] = label
+                _require_leaf_admission(control)
                 _farm_preflight()
                 # No producer registration or build ID exists until preflight passes.
             except BaseException as problem:
@@ -411,6 +413,72 @@ def _pool_home() -> Path:
     return Path(
         os.environ.get("SOLIDWORKS_POOL_HOME", REPO_ROOT.parent / "solidworks-pool")
     )
+
+
+def _require_leaf_admission(control: TaskControl) -> None:
+    """Check would-be leaves, not local/aggregate tasks, against the selected pool."""
+    tasks = sorted(
+        task.name
+        for task in tasks_and_deps_iter(control.tasks, control.selected_tasks)
+        if any(
+            getattr(getattr(action, "py_callable", None), "_farm_leaf_action", False)
+            for action in task.actions
+        )
+    )
+    if not tasks:
+        return
+    pool = _pool_home().resolve()
+    # Load the selected checkout's exact file in the pool's environment: its
+    # namespace package must not lose to an unrelated installed ``agent`` package.
+    program = (
+        "import importlib.util, json, sys; "
+        "from pathlib import Path; "
+        "spec = importlib.util.spec_from_file_location("
+        "'pool_protocol', Path(sys.argv[1]) / 'agent' / 'protocol.py'); "
+        "protocol = importlib.util.module_from_spec(spec); "
+        "sys.modules[spec.name] = protocol; "
+        "spec.loader.exec_module(protocol); "
+        "tasks = json.load(sys.stdin); "
+        "print(json.dumps([task for task in tasks if not protocol.leaf_admitted(task)]))"
+    )
+    argv = [
+        "uv", "run", "--frozen", "--project", str(pool),
+        "python", "-c", program, str(pool),
+    ]
+    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+    try:
+        result = subprocess.run(
+            argv, cwd=REPO_ROOT, env=env, input=json.dumps(tasks),
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+    except OSError as exc:
+        raise FarmPreflightError(
+            f"pool leaf admission could not start: {exc}"
+        ) from None
+    if result.returncode != 0:
+        raise FarmPreflightError(
+            f"pool leaf admission could not be read (exit {result.returncode})"
+            + _tail(result.stderr)
+        )
+    try:
+        refused = json.loads(result.stdout)
+    except (TypeError, ValueError):
+        raise FarmPreflightError(
+            "pool leaf admission returned an invalid response"
+        ) from None
+    if (
+        not isinstance(refused, list)
+        or any(not isinstance(task, str) or task not in tasks for task in refused)
+    ):
+        raise FarmPreflightError("pool leaf admission returned an invalid response")
+    if refused:
+        raise FarmPreflightError(
+            f"unsupported farm leaf targets in requested closure (pool {pool}):\n"
+            + "\n".join(
+                f"  {task} (prefix: {task.partition(':')[0]})"
+                for task in sorted(set(refused))
+            )
+        )
 
 
 def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:

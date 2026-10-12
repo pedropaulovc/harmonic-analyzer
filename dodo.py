@@ -2224,6 +2224,7 @@ def _reprobe_under_seat(
         released = True
 
 
+@_farm.leaf_action
 def _cached_com_action(
     label: str,
     cmd: list[str],
@@ -2286,6 +2287,7 @@ def _cached_com_action(
         store.set_attribute("cache", _cache.store(key, outputs, label))
 
 
+@_farm.leaf_action
 def _cached_drawing_action(stem: str) -> None:
     """Restore a matched part+drawing pair or build and publish the drawing."""
     spec = DRAWINGS_BY_NAME[stem]
@@ -2395,6 +2397,7 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
         restore.set_attribute("cache", "hit")
 
 
+@_farm.leaf_action
 def _cached_part_action(stem: str, script: Path) -> None:
     """Part action with a remote-cache shortcut: on a HIT the .SLDPRT (+ renders)
     are downloaded and the SolidWorks build is skipped; otherwise build, then push.
@@ -2653,6 +2656,7 @@ def _assembly_run_mode(
     return "refresh", "referenced artefact changed"
 
 
+@_farm.leaf_action
 def build_or_refresh(stem, dependencies, changed, targets):
     """FULL rebuild vs cheap REFRESH for one assembly stem.
 
@@ -2997,6 +3001,7 @@ def task_check():
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
+        SCRIPTS_DIR / "test_farm_admission.py",
         # Per-assembly contracts stay per-assembly (no stem-keyed tables in
         # _assembly.py; each recipe carries its own contract only).
         SCRIPTS_DIR / "test_assembly_contract.py",
@@ -3413,6 +3418,7 @@ def task_check():
             # (codex review #361).
             "file_dep": [
                 str((REPO_ROOT / "dodo.py").resolve()),
+                str((REPO_ROOT / "build.py").resolve()),
                 *recipe_test_deps,
                 *_CONFIG_YAMLS,
                 *sorted(

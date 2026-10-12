@@ -176,6 +176,12 @@ def workflow_id(
     return f"leaf:{build_id}:{task}:{cache_key or commit[:16]}:{timeout_s}s"
 
 
+def leaf_action(function):
+    """Mark a doit action that dispatches its task as a farm leaf on a miss."""
+    function._farm_leaf_action = True
+    return function
+
+
 def enabled() -> bool:
     return os.environ.get("HARMONIC_EXECUTOR", "local") == "farm"
 

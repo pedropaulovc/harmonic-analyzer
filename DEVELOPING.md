@@ -216,6 +216,8 @@ explicit way to stop a run, `-Cancel` (see
   silently leave it out of the build.
 - **A protocol-compatible pool checkout** at `-PoolHome`, holding `farm.py`, and
   Azure credentials for the cache (`az login`; `off` is refused).
+  Preflight checks every would-be leaf in the requested closure with that checkout's
+  `agent.protocol.leaf_admitted`; refused tasks and prefixes exit 2 before joining the FIFO.
 - **A log directory outside every Git worktree.** An explicit
   `HARMONIC_AGENT_SCRATCHPAD` uses
   `<root>\harmonic-analyzer\farm-runs`. For an OMP persistent process, when
