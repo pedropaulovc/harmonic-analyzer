@@ -90,6 +90,7 @@ def add_datum_feature(
     position_tolerance_m: float = 0.02,
     callout_below: str = "",
     expected_entity: Any | None = None,
+    leader_attach_xy: tuple[float, float] | None = None,
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
 
@@ -120,6 +121,11 @@ def add_datum_feature(
     rejects good placements; and in the authoring session
     ``IDatumTag::GetLineAtIndex`` stays frozen at the insertion geometry through
     a rebuild, so it cannot serve as a readback here.
+
+    ``leader_attach_xy`` sets the selected entity's insertion point, never a
+    coordinate hit-test or a post-insertion attachment setter. Its rendered
+    landing is read back through ``IAnnotation::GetDisplayData`` after rebuild:
+    datum-feature triangles are not registered leaders (GetLeaderCount is 0).
     """
     draw = adapter.currentModel
     selected = _select_annotation_entity(
@@ -139,6 +145,12 @@ def add_datum_feature(
         what=f"datum {datum}",
         label=label,
     )
+    if leader_attach_xy is not None:
+        manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        if manager.SetSelectionPoint2(
+            1, -1, leader_attach_xy[0], leader_attach_xy[1], 0.0
+        ) is not True:
+            raise RuntimeError(f"failed to set datum {datum} landing ({label})")
     tag = draw.InsertDatumTag2()
     if tag is None:
         raise RuntimeError(f"failed to insert datum {datum} ({label})")
@@ -220,7 +232,59 @@ def add_datum_feature(
         label=label,
         expected_leaders=0,
     )
+    if leader_attach_xy is not None:
+        assert_datum_landing(
+            adapter, tag, expected_xy=leader_attach_xy, label=label
+        )
     return tag
+
+
+def assert_datum_landing(
+    adapter: Any,
+    tag: Any,
+    *,
+    expected_xy: tuple[float, float],
+    label: str,
+    tolerance_m: float = 0.00005,
+) -> tuple[float, float]:
+    """Prove a datum triangle's explicit sheet-space landing from rendered ink.
+
+    Reuse the layout audit's documented GetDisplayData decoder, not the frozen
+    IDatumTag primitives or GetLeaderPointsAtIndex (datum tags have no registered
+    leaders). SOLIDWORKS exposes the triangle as an arrowhead, triangle, or line
+    vertices; each representation includes the actual feature-side tip.
+    """
+    from _drawing_layout_audit import annotation_display
+
+    annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    if annotation.IsDangling():
+        raise RuntimeError(f"datum landing is dangling ({label})")
+    display, refused = annotation_display(adapter, annotation)
+    if refused or not display:
+        raise RuntimeError(f"datum landing has no readable display data ({label}): {refused}")
+    points = []
+    for raw in display.get("arrows", ()):
+        if len(raw) >= 3:
+            points.append((float(raw[0]), float(raw[1])))
+    for raw in display.get("triangles", ()):
+        if len(raw) >= 9:
+            points.extend((float(raw[i]), float(raw[i + 1])) for i in (0, 3, 6))
+    # Datum tags can draw their open triangle as line primitives instead.
+    for raw in display.get("lines", ()):
+        if len(raw) >= 8:
+            points.extend(
+                ((float(raw[-6]), float(raw[-5])), (float(raw[-3]), float(raw[-2])))
+            )
+    if not points or not all(math.isfinite(v) for point in points for v in point):
+        raise RuntimeError(f"datum landing has no finite rendered tip ({label})")
+    actual = min(points, key=lambda point: math.dist(point, expected_xy))
+    error = math.dist(actual, expected_xy)
+    if not math.isfinite(error) or error > tolerance_m:
+        raise RuntimeError(
+            f"datum landing moved ({label}): actual={actual}, requested={expected_xy}, "
+            f"error={error:g} m, limit={tolerance_m:g} m"
+        )
+    return actual
 
 
 @_telemetry.traced("drawing.feature_control_frame", label_param="label")

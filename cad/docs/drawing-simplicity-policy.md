@@ -180,6 +180,24 @@ frames and no datums.
    acceptance about the 8.25-height aim is separate from the part's 0.5 zone.
    This is a drawing-tolerance cutover; model geometry remains unchanged.
 
+   The same scoped exception puts the outline on the views: native overall
+   width, radial end-land length and angle, and taper-to-lower-arc intersection,
+   read back against the existing spec geometry. The model dimensions
+   `RodTipLen@StrapProfile` and `HubDia@HubProfile` are marked for import;
+   hub OD retains its two-place general tolerance class. The side-view strap
+   offset from the hub end face is a measured, parenthesized REFERENCE at
+   normal sheet precision, checked against `(HUB_LENGTH - ARM_THICKNESS) / 2`
+   in [`ch_rocker_arm_spec.py`](../scripts/ch_rocker_arm_spec.py); it adds no
+   acceptance band. Native hole callouts carry REAM/DRILL and through condition,
+   replacing the duplicated arc-length, end-shape and hole-process notes.
+   Integral hub **length**, not OD, sets channel pitch (the spec's `HUB_LENGTH`
+   and the hub-face stack in `build_ch_channel_assembly.py`). The inherited
+   strap-to-hub symmetry 0.10, hub coaxiality Ø0.50 and one-setup wording remain
+   pending [#1391](https://github.com/pedropaulovc/harmonic-analyzer/issues/1391).
+   Brief functional context distinguishes upper-arc amplitude-bar contact,
+   lower-arc moving envelope and rod-pin connecting-rod geometry; this is not
+   a whole-sheet policy migration or a new lower-arc gain/contact claim.
+
 A new entry needs a user ruling.
 
 ## Named exceptions

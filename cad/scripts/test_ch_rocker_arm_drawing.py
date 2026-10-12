@@ -77,19 +77,25 @@ def test_sheet_runs_at_1_to_2() -> None:
 def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
     notes = ch_rocker_arm_notes.DRAWING_NOTES
     # Concentricity applies to nominal arcs, not independent profile deviations.
-    assert "3. NOMINAL ARCS CONCENTRIC ON MIRROR AXIS." in notes
+    assert "NOMINAL ARCS CONCENTRIC ON MIRROR AXIS." in notes
     assert "R800" not in notes
     assert "R816" not in notes
-    # The rod hole rides its native Ø1.99 THRU ALL callout; the notes state
-    # count and process only, never a second copy of a sheet dimension.
+    # Processes and through conditions belong to the native size callouts.
     assert "(1X)" in notes
     assert "#47" not in notes
-    assert "6. PIVOT HOLE: REAM." in notes
+    assert "PIVOT HOLE: REAM" not in notes
     assert "16.00 REF" not in notes
-    assert "2. ALL HOLES THRU." in notes
+    assert "ALL HOLES THRU" not in notes
     # Profile nominals print once, as native BASIC dimensions, not as prose.
     assert "808.00 REF FROM THE PIVOT" not in notes
-    assert f"INTEGRAL HUB DIA {ch_rocker_arm_spec.HUB_DIA:.2f}" in notes
+    assert "INTEGRAL HUB DIA" not in notes
+    assert "HUB LENGTH SETS THE PITCH" in " ".join(notes.split())
+    assert "ARC LENGTHS" not in notes
+    assert "EACH END:" not in notes
+    assert re.findall(r"^(\d+)\.", notes, re.MULTILINE) == ["1", "2", "3", "4"]
+    assert "UPPER ARC: AMPLITUDE-BAR CONTACT." in notes
+    assert "LOWER ARC: MOVING STRAP ENVELOPE." in notes
+    assert "ROD-PIN SETS CONNECTING-ROD GEOMETRY." in notes
     assert (
         "HUB OD COAXIAL WITH PIVOT BORE WITHIN Ø0.50 (TURN HUB AND REAM BORE IN ONE SETUP)"
         in " ".join(line.strip() for line in notes.splitlines())
@@ -98,7 +104,7 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "0.22 IN" not in notes
     # General tolerances live in the title block ONLY.
     assert "LINEAR +/-" not in notes
-    assert "BA" not in notes
+    assert not re.search(r"\b(?:\d+\s*)?BA\b", notes)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert re.search(
         r'add_property_linked_note\(\s*adapter, "Manufacturing Notes"', source
@@ -170,7 +176,22 @@ def test_profile_nominals_are_kept_natively_without_note_only_duplicates() -> No
     assert names <= drawing.FRONT_KEEP.keys()
     assert not hasattr(drawing, "NOTE_ONLY_DIMENSIONS")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_basic_profile_dimensions(adapter, front_annotations)" in source
+    definitions = {
+        node.name: node for node in ast.parse(source).body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    for caller, callee, arguments in (
+        ("build", "_add_rocker_outline_dimensions", ("adapter", "front")),
+        ("_add_rocker_outline_dimensions", "_basic_profile_dimensions", ("adapter", "annotations")),
+    ):
+        calls = [
+            node for node in ast.walk(definitions[caller])
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == callee
+        ]
+        assert len(calls) == 1
+        assert tuple(ast.unparse(arg) for arg in calls[0].args) == arguments
     assert "_add_arc_profiles(adapter, front)" in source
 
 
@@ -324,7 +345,7 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         ("TopRadius", "BottomRadius"),
         (800.0, 816.0),
         (-110.0, -100.0),
-        ((0.025, 0.225), (0.025, 0.135)),
+        ((0.114, 0.228), (0.112, 0.122)),
         ("0.5", "0"),
     ):
         assert args == (adapter, front)
@@ -470,7 +491,7 @@ def test_strap_thickness_prints_its_band_natively() -> None:
     joined = " ".join(
         line.strip() for line in ch_rocker_arm_notes.DRAWING_NOTES.splitlines()
     )
-    assert "2. ALL HOLES THRU." in joined
+    assert "ALL HOLES THRU" not in joined
     assert "STRAP 2.50" not in joined
     assert "THICK" not in joined
     assert "GROUND" not in joined  # the strap faces are milled (plan op 20)
@@ -1183,3 +1204,771 @@ def test_pivot_finish_leader_runs_up_left_from_a_symbol_below_the_strap() -> Non
         ch_rocker_arm_spec.ROD_HOLE_X, 0.0
     )[0]
     assert drawing.PIVOT_FINISH_CHAR_HEIGHT <= 0.0025
+
+
+def test_land_and_hub_sizes_are_marked_model_dimensions_at_normal_precision() -> None:
+    assert ch_rocker_arm_notes.DRAWING_DIMENSIONS["StrapProfile"] == {
+        "TopRadius", "BottomRadius", "RodTipLen",
+    }
+    assert ch_rocker_arm_notes.DRAWING_DIMENSIONS["HubProfile"] == {"HubDia"}
+    assert {"RodTipLen", "HubDia"} <= set(drawing.FRONT_KEEP)
+    assert not {"RodTipLen", "HubDia"} & set(drawing.RIGHT_KEEP)
+    assert ch_rocker_arm_notes.DRAWING_PRECISION["HubProfile"]["HubDia"] == 2
+    assert ch_rocker_arm_notes.DEFAULT_DRAWING_PRECISION == 2
+    assert ch_rocker_arm_spec.LINEAR_2PL == pytest.approx(0.508)
+    assert ch_rocker_arm_spec.STRAP_HUB_SYMMETRY == pytest.approx(0.10)
+    joined = " ".join(ch_rocker_arm_notes.DRAWING_NOTES.split())
+    assert "STRAP SYMMETRIC TO HUB WITHIN 0.10" in joined
+
+
+def test_new_measured_quantities_follow_the_source_geometry_equations() -> None:
+    spec = ch_rocker_arm_spec
+    alpha = spec.TOP_ARC_LEN / (2.0 * spec.CURVE_RADIUS)
+    assert spec._ALPHA_TOP == pytest.approx(alpha)
+    assert 2.0 * spec.ROD_TIP_X == pytest.approx(
+        2.0 * (spec.CURVE_RADIUS + spec.TIP_FACE) * math.sin(alpha),
+    )
+    assert spec.BOT_END_X == pytest.approx(
+        (spec.CURVE_RADIUS + spec.ARM_DEPTH)
+        * math.sin(spec.BOT_ARC_LEN / (2.0 * (spec.CURVE_RADIUS + spec.ARM_DEPTH))),
+    )
+    assert spec.TIP_FACE == pytest.approx(5.588)
+    assert spec.HUB_DIA == pytest.approx(10.2)
+    assert (spec.HUB_LENGTH - spec.ARM_THICKNESS) / 2.0 == pytest.approx(2.27825)
+
+
+@pytest.mark.parametrize("ignored_part", [None, 1, 2])
+def test_native_reference_parentheses_never_replace_the_measured_nominal(
+    monkeypatch: pytest.MonkeyPatch, ignored_part: int | None,
+) -> None:
+    import _drawing_dimensions
+    from solidworks_mcp.adapters import sw_type_info
+
+    text = {1: "", 2: ""}
+    writes = []
+    model = SimpleNamespace(SystemValue=0.00227825)
+
+    def set_text(part, value):
+        writes.append((part, value))
+        if part != ignored_part:
+            text[part] = value
+
+    display = SimpleNamespace(
+        SetText=set_text, GetText=lambda part: text[part],
+        GetDimension2=lambda _index: model,
+    )
+    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    adapter = SimpleNamespace(_attempt=lambda fn: fn())
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda obj, *_: obj)
+    monkeypatch.setattr(_drawing_dimensions, "rebuild_drawing", lambda *_a, **_k: None)
+    if ignored_part is None:
+        assert _drawing_dimensions.set_reference_dimension(
+            adapter, annotation, label="strap offset",
+        ) is display
+        assert text == {1: "(", 2: ")"}
+    else:
+        with pytest.raises(RuntimeError, match="failed to parenthesize"):
+            _drawing_dimensions.set_reference_dimension(
+                adapter, annotation, label="strap offset",
+            )
+    assert writes == [(1, "("), (2, ")")]
+    assert model.SystemValue == 0.00227825
+
+
+def test_rod_drill_identifier_and_native_callout_process_share_the_hole_spec() -> None:
+    from _hole_spec import drill_process
+
+    assert ch_rocker_arm_spec.ROD_HOLE_SPEC.kind == "drilled_number"
+    assert ch_rocker_arm_spec.ROD_HOLE_SPEC.size == "#47"
+    assert drill_process(ch_rocker_arm_spec.ROD_HOLE_SPEC) == "#47 DRILL"
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "add_native_hole_callout"
+    ]
+    assert len(calls) == 1
+    keywords = {keyword.arg: ast.unparse(keyword.value) for keyword in calls[0].keywords}
+    assert keywords["process"] == "drill_process(ROD_HOLE_SPEC) + '\\n'"
+    assert drawing.ROD_HOLE_SPEC is ch_rocker_arm_spec.ROD_HOLE_SPEC
+
+
+@pytest.mark.parametrize("quantity,expected", [
+    ("overall", 2.0 * ch_rocker_arm_spec.ROD_TIP_X),
+    ("land", ch_rocker_arm_spec.TIP_FACE),
+    ("taper", ch_rocker_arm_spec.BOT_END_X),
+    ("hub", ch_rocker_arm_spec.HUB_DIA),
+    ("offset", (ch_rocker_arm_spec.HUB_LENGTH - ch_rocker_arm_spec.ARM_THICKNESS) / 2.0),
+])
+@pytest.mark.parametrize("defect", [
+    None, "wrong", "missing", "neighbour", "dangling", "nan", "inf", "no_value",
+])
+def test_native_linear_measurement_reads_the_model_and_named_attachments(
+    monkeypatch: pytest.MonkeyPatch, quantity: str, expected: float, defect: str | None,
+) -> None:
+    import _drawing_edge_dimensions
+    from solidworks_mcp.adapters import sw_type_info
+
+    first, second, neighbour = object(), object(), object()
+    model = None if defect == "missing" else SimpleNamespace(
+        SystemValue=(expected + (0.1 if defect == "wrong" else 0.0)) / 1000.0,
+    )
+    if defect in {"nan", "inf", "no_value"}:
+        model.SystemValue = None if defect == "no_value" else float(defect)
+    attached = (first, neighbour if defect == "neighbour" else second)
+    annotation = SimpleNamespace(
+        GetAttachedEntities3=lambda: attached,
+        GetAttachedEntityTypes=lambda: (1, 1),
+        IsDangling=lambda: defect == "dangling",
+    )
+    display = SimpleNamespace(
+        GetDimension2=lambda _index: model, GetAnnotation=lambda: annotation,
+    )
+    adapter = SimpleNamespace(swApp=_APP)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda obj, *_: obj)
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda obj, *_: obj)
+    monkeypatch.setattr(
+        _drawing_edge_dimensions, "_is_same_attachment",
+        lambda _adapter, actual, wanted, _kind: actual is wanted,
+    )
+    kwargs = dict(expected_mm=expected, label=quantity, entities=(first, second))
+    if defect is None:
+        assert _drawing_edge_dimensions.assert_dimension_measures(
+            adapter, display, **kwargs,
+        ) == pytest.approx(expected)
+    else:
+        with pytest.raises((RuntimeError, AttributeError)):
+            _drawing_edge_dimensions.assert_dimension_measures(adapter, display, **kwargs)
+
+
+@pytest.mark.parametrize("retained", [True, False])
+def test_native_reference_precision_reads_back_normal_two_places(
+    monkeypatch: pytest.MonkeyPatch, retained: bool,
+) -> None:
+    import _drawing_dimensions
+    from solidworks_mcp.adapters import sw_type_info
+
+    state = {"precision": 3}
+    calls = []
+
+    def set_precision(primary, dual, tolerance, dual_tolerance):
+        calls.append((primary, dual, tolerance, dual_tolerance))
+        if retained:
+            state["precision"] = primary
+        return True
+
+    display = SimpleNamespace(
+        SetPrecision3=set_precision, GetPrimaryPrecision2=lambda: state["precision"],
+    )
+    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    adapter = SimpleNamespace(_attempt=lambda fn: fn())
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda obj, *_: obj)
+    monkeypatch.setattr(_drawing_dimensions, "dimension_name", lambda *_: "offset")
+    monkeypatch.setattr(_drawing_dimensions, "rebuild_drawing", lambda *_a, **_k: None)
+    kwargs = {"offset": ch_rocker_arm_notes.DEFAULT_DRAWING_PRECISION}
+    if retained:
+        _drawing_dimensions.set_dimension_precision(adapter, [annotation], kwargs)
+        assert state["precision"] == 2
+    else:
+        with pytest.raises(RuntimeError, match="did not take"):
+            _drawing_dimensions.set_dimension_precision(adapter, [annotation], kwargs)
+    assert calls == [(2, -1, -1, -1)]
+
+
+def test_rocker_native_helpers_use_the_extracted_owners() -> None:
+    import _drawing_edge_dimensions
+    import _drawing_gdt
+    import _drawing_hole_callout
+
+    assert drawing.add_edge_dimension is _drawing_edge_dimensions.add_edge_dimension
+    assert drawing.add_datum_feature is _drawing_gdt.add_datum_feature
+    assert drawing.add_feature_control_frame is _drawing_gdt.add_feature_control_frame
+    assert drawing.add_native_hole_callout is _drawing_hole_callout.add_native_hole_callout
+
+
+@pytest.mark.parametrize("defect", [None, "one_place", "missing", "no_display"])
+def test_imported_hub_diameter_cannot_lose_the_model_two_place_size_band(
+    monkeypatch: pytest.MonkeyPatch, defect: str | None,
+) -> None:
+    import _drawing_dimensions
+    from solidworks_mcp.adapters import sw_type_info
+
+    display = SimpleNamespace(
+        GetPrimaryPrecision2=lambda: 1 if defect == "one_place" else 2,
+        SetPrecision3=lambda *_: pytest.fail("imported hub precision is part-owned"),
+    )
+    annotation = SimpleNamespace(
+        GetSpecificAnnotation=lambda: None if defect == "no_display" else display,
+    )
+    adapter = SimpleNamespace(_attempt=lambda fn: fn())
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda obj, *_: obj)
+    monkeypatch.setattr(_drawing_dimensions, "dimension_name", lambda *_: "HubDia")
+    annotations = [] if defect == "missing" else [annotation]
+    precision = ch_rocker_arm_notes.DRAWING_PRECISION["HubProfile"]
+    if defect is None:
+        _drawing_dimensions.assert_imported_precision(adapter, annotations, precision)
+    else:
+        with pytest.raises(RuntimeError):
+            _drawing_dimensions.assert_imported_precision(adapter, annotations, precision)
+
+
+@pytest.mark.parametrize("defect", [None, "selection", "landing", "creation"])
+def test_native_angular_dimension_keeps_named_entities_and_explicit_pick_points(
+    monkeypatch: pytest.MonkeyPatch, defect: str | None,
+) -> None:
+    import _drawing_edge_dimensions
+
+    selected = []
+    events = []
+    view = object()
+    display = object()
+
+    def select(entity, append, data):
+        assert data.View is view
+        if not append:
+            selected.clear()
+        selected.append(entity)
+        events.append(("select", entity))
+        return defect != "selection"
+
+    first = SimpleNamespace(Select4=lambda append, data: select("land", append, data))
+    second = SimpleNamespace(Select4=lambda append, data: select("mirror", append, data))
+
+    def landing(index, mark, x, y, z):
+        events.append(("landing", index, mark, x, y, z))
+        return defect != "landing"
+
+    def create(x, y, z, kind, options):
+        events.append(("create", x, y, z, kind, options))
+        return (None if defect == "creation" else display), 0
+
+    draw = SimpleNamespace(
+        ActivateView=lambda _name: True,
+        ClearSelection2=lambda _all: selected.clear(),
+        SelectionManager=SimpleNamespace(
+            CreateSelectData=SimpleNamespace,
+            GetSelectedObjectCount2=lambda _mark: len(selected),
+            SetSelectionPoint2=landing,
+        ),
+        Extension=SimpleNamespace(
+            AddSpecificDimension=create,
+            SelectByID2=lambda *_: pytest.fail("native angle must not coordinate hit-test"),
+        ),
+    )
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda obj, *_: obj)
+    monkeypatch.setattr(_drawing_edge_dimensions, "view_name", lambda *_: "front")
+    kwargs = dict(
+        p0=(0.22, 0.2), p1=(0.13, 0.2), text_xy=(0.24, 0.21),
+        entities=(first, second), orientation="angular", label="end-land angle",
+    )
+    if defect is None:
+        assert _drawing_edge_dimensions.add_edge_dimension(
+            SimpleNamespace(currentModel=draw), view, **kwargs,
+        ) is display
+        assert events[-1] == ("create", 0.24, 0.21, 0.0, 3, 0)
+        assert events[1] == ("landing", 1, -1, 0.22, 0.2, 0.0)
+        assert events[3] == ("landing", 2, -1, 0.13, 0.2, 0.0)
+    else:
+        with pytest.raises(RuntimeError):
+            _drawing_edge_dimensions.add_edge_dimension(
+                SimpleNamespace(currentModel=draw), view, **kwargs,
+            )
+        if defect != "creation":
+            assert not any(event[0] == "create" for event in events)
+
+
+@pytest.mark.parametrize("defect", [
+    None, "wrong", "degrees_as_radians", "supplementary", "wrong_type",
+    "missing", "no_value", "nan", "inf",
+])
+def test_native_land_angle_measures_source_angle_in_radians_and_fails_closed(
+    monkeypatch: pytest.MonkeyPatch, defect: str | None,
+) -> None:
+    expected = math.degrees(ch_rocker_arm_spec._ALPHA_TOP)
+    radians = ch_rocker_arm_spec._ALPHA_TOP
+    values = {
+        "wrong": radians + math.radians(0.1),
+        "degrees_as_radians": expected,
+        "supplementary": math.pi - radians,
+        "no_value": None,
+        "nan": float("nan"),
+        "inf": float("inf"),
+    }
+    model = SimpleNamespace(
+        SystemValue=values.get(defect, radians),
+        Type2=1 if defect == "wrong_type" else 3,
+    )
+    display = SimpleNamespace(
+        Type2=1 if defect == "wrong_type" else 3,
+        GetDimension2=lambda _index: None if defect == "missing" else model,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, *_: obj)
+    kwargs = dict(expected_degrees=expected, label="end-land angle")
+    if defect is None:
+        assert drawing._require_native_angle(display, **kwargs) == pytest.approx(expected)
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._require_native_angle(display, **kwargs)
+
+
+@pytest.mark.parametrize("name", [
+    "ROD_TIP_X", "TIP_FACE", "_ALPHA_TOP", "BOT_END_X", "HUB_DIA",
+    "HUB_LENGTH", "ARM_THICKNESS",
+])
+def test_measured_dimension_expectations_import_the_geometry_source(name: str) -> None:
+    assert getattr(drawing, name) == getattr(ch_rocker_arm_spec, name)
+
+
+class _NativeQuantity:
+    """A native display/model pair, retaining independent text and size bands."""
+
+    def __init__(self, name: str, mm: float, *, precision: int = 2) -> None:
+        self.name = name
+        self.precision = precision
+        self.text = {
+            1: "<MOD-DIAM>" if name in {"PivotDia", "HubDia"} else "", 2: "",
+            3: "<native-upper>", 4: "<native-lower>",
+        }
+        self.writes = []
+        self.ignored_text = None
+        self.ignored_precision = False
+        self.ShowDimensionValue = True
+        self.SolidLeader = True
+        self.ArrowSide = 0
+        self.second_arrow = (True, True)
+        self.Type2 = 6 if name in {"PivotDia", "HubDia"} else 1
+        self.band = tuple(v / 1000.0 for v in ch_rocker_arm_spec.PIVOT_HOLE_BAND)
+        self.tolerance_type = 4 if name == "PivotDia" else 0
+        self.attached = ()
+        self.dangling = False
+        self.arc_conditions = {1: 2, 2: 0}
+        self.model = SimpleNamespace(
+            SystemValue=mm / 1000.0,
+            Type2=6 if name in {"PivotDia", "HubDia"} else 1,
+            SetToleranceType=lambda kind: True,
+            GetToleranceType=lambda: self.tolerance_type,
+            Tolerance=SimpleNamespace(
+                GetMaxValue=lambda: self.band[0],
+                GetMinValue=lambda: self.band[1],
+            ),
+            GetArcEndCondition=lambda index: self.arc_conditions[index],
+            SetArcEndCondition=self._set_arc_condition,
+        )
+
+    def GetSpecificAnnotation(self):
+        return self
+
+    def GetAnnotation(self):
+        return self
+
+    def GetDimension2(self, _index):
+        return self.model
+
+    def GetDimension(self):
+        return self.model
+
+    def _set_arc_condition(self, index, condition):
+        self.arc_conditions[index] = condition
+        return 0
+
+    def GetAttachedEntities3(self):
+        return self.attached
+
+    def GetAttachedEntityTypes(self):
+        return tuple(1 for _ in self.attached)
+
+    def IsDangling(self):
+        return self.dangling
+
+    def GetText(self, part):
+        return self.text[{5: 1, 6: 2, 7: 3, 8: 4}.get(part, part)]
+
+    def SetText(self, part, value):
+        self.writes.append((part, value))
+        if part != self.ignored_text:
+            self.text[part] = value
+
+    def SetPrecision3(self, primary, *_rest):
+        if not self.ignored_precision:
+            self.precision = primary
+        return True
+
+    def GetPrimaryPrecision2(self):
+        return self.precision
+
+    def SetSecondArrow(self, use_doc, enabled):
+        self.second_arrow = (use_doc, enabled)
+
+    def GetUseDocSecondArrow(self):
+        return self.second_arrow[0]
+
+    def GetSecondArrow(self):
+        return self.second_arrow[1]
+
+
+def _imported_native_quantities(monkeypatch: pytest.MonkeyPatch):
+    from solidworks_mcp.adapters import sw_type_info
+    import _drawing_dimensions
+    import _drawing_edge_dimensions
+
+    displays = {
+        "PivotDia": _NativeQuantity("PivotDia", ch_rocker_arm_spec.PIVOT_HOLE_DIA),
+        "RodTipLen": _NativeQuantity("RodTipLen", ch_rocker_arm_spec.TIP_FACE),
+        "HubDia": _NativeQuantity("HubDia", ch_rocker_arm_spec.HUB_DIA),
+    }
+    adapter = SimpleNamespace(
+        _attempt=lambda fn: fn(), swApp=_APP,
+        currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, *_: obj)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda obj, *_: obj)
+    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda obj, *_: obj)
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda obj, *_: obj)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, ann: ann.name)
+    monkeypatch.setattr(_drawing_dimensions, "dimension_name", lambda _adapter, ann: ann.name)
+    monkeypatch.setattr(_drawing_dimensions, "rebuild_drawing", lambda *_a, **_k: None)
+    return adapter, displays
+
+
+def test_front_native_process_keeps_the_nominal_token_and_model_bore_band(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter, displays = _imported_native_quantities(monkeypatch)
+    before = {name: display.model.SystemValue for name, display in displays.items()}
+    drawing._dress_front_dimensions(adapter, list(displays.values()))
+    pivot = displays["PivotDia"]
+    assert pivot.text[1].startswith("REAM ")
+    assert "<MOD-DIAM>" in pivot.text[1]
+    assert "THRU" in pivot.text[2]
+    assert not any(part == 0 for part, _text in pivot.writes)
+    assert not any(nominal in text for _part, text in pivot.writes for nominal in (
+        "6.50", "5.588", "10.20", "+0.03",
+    ))
+    assert {name: display.model.SystemValue for name, display in displays.items()} == before
+    assert displays["HubDia"].precision == 2
+    assert pivot.band == tuple(v / 1000.0 for v in ch_rocker_arm_spec.PIVOT_HOLE_BAND)
+    assert pivot.model.GetToleranceType() == 4
+    assert pivot.ShowDimensionValue is True
+    assert (pivot.text[3], pivot.text[4]) == ("<native-upper>", "<native-lower>")
+
+
+@pytest.mark.parametrize("name", ["RodTipLen", "HubDia"])
+@pytest.mark.parametrize("defect", ["missing", "wrong", "nan", "inf", "no_value"])
+def test_imported_front_sizes_require_each_sourced_native_readback(
+    monkeypatch: pytest.MonkeyPatch, name: str, defect: str,
+) -> None:
+    adapter, displays = _imported_native_quantities(monkeypatch)
+    if defect == "missing":
+        del displays[name]
+    else:
+        model = displays[name].model
+        model.SystemValue = (
+            model.SystemValue + 0.0001 if defect == "wrong"
+            else None if defect == "no_value"
+            else float(defect)
+        )
+    with pytest.raises(RuntimeError):
+        drawing._dress_front_dimensions(adapter, list(displays.values()))
+
+
+@pytest.mark.parametrize("ignored", ["prefix", "suffix", "hub_precision"])
+def test_front_native_dressing_rejects_ignored_text_or_lost_hub_precision(
+    monkeypatch: pytest.MonkeyPatch, ignored: str,
+) -> None:
+    adapter, displays = _imported_native_quantities(monkeypatch)
+    if ignored == "hub_precision":
+        displays["HubDia"].precision = 1
+    else:
+        displays["PivotDia"].ignored_text = 1 if ignored == "prefix" else 2
+    with pytest.raises(RuntimeError):
+        drawing._dress_front_dimensions(adapter, list(displays.values()))
+
+
+@pytest.fixture
+def native_front(monkeypatch: pytest.MonkeyPatch):
+    """CAD-owned endpoints feed fake creation; real selectors/readback stay live."""
+    import _drawing_edge_dimensions
+    from _drawing_edges import ViewEdge, ViewEdges
+
+    adapter, imported = _imported_native_quantities(monkeypatch)
+    vertex_points = {}
+    rows = []
+    for z in (-drawing.ARM_THICKNESS / 2.0, drawing.ARM_THICKNESS / 2.0):
+        for sign in (-1, 1):
+            upper = (sign * drawing.TOP_END_X, drawing.TOP_END_Y, z)
+            outer = (sign * drawing.ROD_TIP_X, drawing._ROD_TIP_Y, z)
+            lower = (sign * drawing.BOT_END_X, drawing._BOT_END_Y, z)
+            vertices = [object() for _ in range(3)]
+            vertex_points.update(zip(vertices, (upper, outer, lower)))
+            rows.extend((
+                ViewEdge(object(), (upper, outer), None, tuple(vertices[:2])),
+                ViewEdge(object(), (outer, lower), None, tuple(vertices[1:])),
+            ))
+    scan = ViewEdges("front native CAD", tuple(rows))
+    land = scan.exact_line_through(
+        (drawing._TIP_FACE_MID_X, drawing._TIP_FACE_MID_Y, drawing.ARM_THICKNESS / 2.0),
+        label="fixture front radial land",
+    )
+    pivot = object()
+    state = SimpleNamespace(
+        adapter=adapter, imported=imported, scan=scan, land=land,
+        displays={}, calls=[], verticals=[], basic_calls=[],
+        defect_label=None, defect=None,
+    )
+
+    def project(_adapter, _view, points, **_kwargs):
+        return [drawing._sheet_xy(x * 1000.0, y * 1000.0) for x, y, _z in points]
+
+    def vertical(_adapter, _front, points):
+        entity = object()
+        state.verticals.append((entity, points))
+        return entity
+
+    def create(_adapter, _front, **kwargs):
+        state.calls.append(kwargs)
+        label = kwargs["label"]
+        entities = kwargs["entities"]
+        if label == "rocker overall width":
+            value_mm = abs(vertex_points[entities[1]][0] - vertex_points[entities[0]][0])
+        elif label == "taper intersection X":
+            value_mm = abs(vertex_points[entities[1]][0])
+        elif label == "radial land angle to mirror axis":
+            a, b = land.line
+            radians = math.atan2(abs(a[0] - b[0]), abs(a[1] - b[1]))
+            value_mm = radians * 1000.0
+        else:
+            pytest.fail(f"unowned native dimension {label}")
+        display = _NativeQuantity(label, value_mm)
+        display.attached = entities
+        if kwargs["orientation"] == "angular":
+            display.Type2 = 3
+        if state.defect_label == label:
+            if state.defect == "creation":
+                raise RuntimeError(f"native dimension refused: {label}")
+            if state.defect == "wrong":
+                display.model.SystemValue += 0.0001
+            elif state.defect in {"nan", "inf"}:
+                display.model.SystemValue = float(state.defect)
+            elif state.defect == "missing":
+                display.model.SystemValue = None
+            elif state.defect == "attachment":
+                display.attached = (entities[0], object())
+        state.displays[label] = display
+        return display
+
+    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *_a, **_k: list(imported.values()))
+    monkeypatch.setattr(
+        drawing, "_basic_profile_dimensions",
+        lambda _adapter, annotations: state.basic_calls.append(annotations),
+    )
+    monkeypatch.setattr(drawing, "scan_view_edges", lambda *_a, **_k: scan)
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(drawing, "_land_vertical", vertical)
+    monkeypatch.setattr(drawing, "visible_circle_edge", lambda *_: pivot)
+    monkeypatch.setattr(drawing, "add_edge_dimension", create)
+    monkeypatch.setattr(
+        _drawing_edge_dimensions, "_is_same_attachment",
+        lambda _adapter, actual, expected, _kind: actual is expected,
+    )
+    return state
+
+
+def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_land(
+    native_front,
+) -> None:
+    state = native_front
+    assert drawing._add_rocker_outline_dimensions(state.adapter, object()) is state.land
+    assert state.basic_calls
+    assert all(point[2] == ch_rocker_arm_spec.ARM_THICKNESS / 2.0 for point in state.land.line)
+    expected = {
+        "rocker overall width": 2.0 * ch_rocker_arm_spec.ROD_TIP_X / 1000.0,
+        "taper intersection X": ch_rocker_arm_spec.BOT_END_X / 1000.0,
+        "radial land angle to mirror axis": ch_rocker_arm_spec._ALPHA_TOP,
+    }
+    assert {
+        label: display.model.SystemValue for label, display in state.displays.items()
+    } == pytest.approx(expected)
+    width, angle, taper = state.calls
+    assert width["entity_type"] == "VERTEX"
+    assert angle["entities"] == (state.land.edge, state.verticals[0][0])
+    assert angle["entity_types"] == ("EDGE", "SKETCHSEGMENT")
+    assert taper["entity_types"] == ("EDGE", "VERTEX")
+    assert state.displays["taper intersection X"].arc_conditions[1] == 1
+    vertical_points = state.verticals[0][1]
+    assert vertical_points[0][0] == vertical_points[1][0]
+    # Local ray stays on the sheet instead of reaching the off-sheet R800 centre.
+    assert all(
+        DRAWABLE.xmin <= x <= DRAWABLE.xmax and DRAWABLE.ymin <= y <= DRAWABLE.ymax
+        for x, y in vertical_points
+    )
+    assert state.displays["radial land angle to mirror axis"].text[4] == "TO MIRROR AXIS"
+
+
+@pytest.mark.parametrize("label", [
+    "rocker overall width", "radial land angle to mirror axis", "taper intersection X",
+])
+@pytest.mark.parametrize("defect", ["creation", "wrong", "missing", "nan", "inf", "attachment"])
+def test_each_new_outline_measurement_fails_closed(native_front, label, defect) -> None:
+    native_front.defect_label = label
+    native_front.defect = defect
+    with pytest.raises(RuntimeError):
+        drawing._add_rocker_outline_dimensions(native_front.adapter, object())
+
+
+@pytest.mark.parametrize("source", ["ROD_TIP_X", "TIP_FACE", "_ALPHA_TOP", "BOT_END_X", "HUB_DIA"])
+def test_source_geometry_change_invalidates_stale_front_measurements(
+    native_front, monkeypatch: pytest.MonkeyPatch, source: str,
+) -> None:
+    monkeypatch.setattr(drawing, source, getattr(drawing, source) + 0.1)
+    with pytest.raises(RuntimeError):
+        drawing._add_rocker_outline_dimensions(native_front.adapter, object())
+
+
+def test_datum_c_owns_the_named_positive_z_land_and_midpoint_landing(
+    native_front, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+    tag = object()
+
+    def insert(_adapter, _front, **kwargs):
+        calls.append(kwargs)
+        return tag
+
+    monkeypatch.setattr(drawing, "add_datum_feature", insert)
+    assert drawing._add_land_datum(
+        native_front.adapter, object(), native_front.land,
+    ) is tag
+    (call,) = calls
+    assert call["datum"] == "C"
+    assert call["edge_entity"] is native_front.land.edge
+    assert "edge_xy" not in call and "expected_entity" not in call
+    a, b = native_front.land.line
+    expected = drawing._sheet_xy((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
+    assert call["leader_attach_xy"] == pytest.approx(expected)
+    assert math.dist(call["symbol_xy"], expected) == pytest.approx(drawing.LAND_DATUM_STANDOFF)
+    assert call["symbol_xy"][0] > expected[0]
+
+
+@pytest.mark.parametrize("defect", ["rear_face", "wrong_length", "not_a_line"])
+def test_datum_c_refuses_a_nonland_owner_before_insertion(
+    native_front, monkeypatch: pytest.MonkeyPatch, defect: str,
+) -> None:
+    from dataclasses import replace
+
+    a, b = native_front.land.line
+    if defect == "rear_face":
+        line = ((a[0], a[1], -a[2]), (b[0], b[1], -b[2]))
+    elif defect == "wrong_length":
+        line = (a, (b[0] + 1.0, b[1], b[2]))
+    else:
+        line = None
+    monkeypatch.setattr(
+        drawing, "add_datum_feature", lambda *_a, **_k: pytest.fail("invalid C owner inserted"),
+    )
+    with pytest.raises(RuntimeError):
+        drawing._add_land_datum(
+            native_front.adapter, object(), replace(native_front.land, line=line),
+        )
+
+
+@pytest.fixture
+def native_offset(monkeypatch: pytest.MonkeyPatch):
+    import _drawing_edge_dimensions
+    from _drawing_edges import ViewEdge, ViewEdges
+
+    adapter, _imported = _imported_native_quantities(monkeypatch)
+    a = (drawing.TOP_END_X, drawing.TOP_END_Y, drawing.ARM_THICKNESS / 2.0)
+    b = (drawing.ROD_TIP_X, drawing._ROD_TIP_Y, drawing.ARM_THICKNESS / 2.0)
+    strap = ViewEdge(object(), (a, b), None, (object(), object()))
+    rear = ViewEdge(
+        object(), ((a[0], a[1], -a[2]), (b[0], b[1], -b[2])), None,
+        (object(), object()),
+    )
+    hub = ViewEdge(
+        object(), None,
+        (0.0, drawing.PIVOT_MID_Y, drawing.HUB_LENGTH / 2.0, 0.0, 0.0, 1.0, drawing.HUB_DIA / 2.0),
+        None,
+    )
+    back_hub = ViewEdge(
+        object(), None,
+        (0.0, drawing.PIVOT_MID_Y, -drawing.HUB_LENGTH / 2.0, 0.0, 0.0, 1.0, drawing.HUB_DIA / 2.0),
+        None,
+    )
+    scan = ViewEdges("right native CAD", (rear, back_hub, strap, hub))
+    state = SimpleNamespace(adapter=adapter, scan=scan, strap=strap, hub=hub, display=None, defect=None)
+
+    def create(_adapter, _view, **kwargs):
+        assert kwargs["entities"] == (hub.edge, strap.edge)
+        assert kwargs["orientation"] == "horizontal"
+        mm = hub.circle[2] - strap.midpoint_mm[2]
+        display = _NativeQuantity("offset", mm, precision=3)
+        display.attached = kwargs["entities"]
+        if state.defect == "creation":
+            raise RuntimeError("offset native creation refused")
+        if state.defect == "wrong":
+            display.model.SystemValue += 0.0001
+        elif state.defect in {"nan", "inf"}:
+            display.model.SystemValue = float(state.defect)
+        elif state.defect == "missing":
+            display.model.SystemValue = None
+        elif state.defect == "attachment":
+            display.attached = (hub.edge, object())
+        elif state.defect == "band":
+            display.tolerance_type = 2
+        elif state.defect == "precision":
+            display.ignored_precision = True
+        elif state.defect in {"prefix", "suffix"}:
+            display.ignored_text = 1 if state.defect == "prefix" else 2
+        state.display = display
+        return display
+
+    monkeypatch.setattr(drawing, "scan_view_edges", lambda *_a, **_k: scan)
+    monkeypatch.setattr(
+        drawing, "model_points_in_view",
+        lambda _adapter, _view, points, **_kwargs: [
+            (drawing.RIGHT_CENTER[0] - z, drawing.RIGHT_CENTER[1] + y)
+            for _x, y, z in points
+        ],
+    )
+    monkeypatch.setattr(drawing, "add_edge_dimension", create)
+    monkeypatch.setattr(
+        _drawing_edge_dimensions, "_is_same_attachment",
+        lambda _adapter, actual, wanted, _kind: actual is wanted,
+    )
+    return state
+
+
+def test_offset_is_the_measured_hub_end_to_strap_face_reference(native_offset) -> None:
+    display = drawing._add_strap_offset_dimension(native_offset.adapter, object())
+    assert display is native_offset.display
+    assert display.model.SystemValue * 1000.0 == pytest.approx(
+        (ch_rocker_arm_spec.HUB_LENGTH - ch_rocker_arm_spec.ARM_THICKNESS) / 2.0,
+    )
+    assert display.model.GetToleranceType() == 0
+    assert display.precision == 2
+    assert display.text[1] == "(" and display.text[2] == ")"
+    assert display.arc_conditions[1] == 1
+    assert display.writes == [(1, "("), (2, ")")]
+    assert ch_rocker_arm_spec.STRAP_HUB_SYMMETRY == 0.10
+
+
+@pytest.mark.parametrize("defect", [
+    "creation", "wrong", "missing", "nan", "inf", "attachment",
+    "band", "precision", "prefix", "suffix",
+])
+def test_offset_cannot_ship_a_wrong_or_unchecked_reference(native_offset, defect) -> None:
+    native_offset.defect = defect
+    with pytest.raises(RuntimeError):
+        drawing._add_strap_offset_dimension(native_offset.adapter, object())
+
+
+@pytest.mark.parametrize("source,delta", [("HUB_LENGTH", 0.001), ("ARM_THICKNESS", 0.0001)])
+def test_offset_formula_change_invalidates_stale_native_measurement(
+    native_offset, monkeypatch: pytest.MonkeyPatch, source: str, delta: float,
+) -> None:
+    # Both changed picks remain within exact/circle selector tolerances; it is
+    # the formula readback, not a missing entity, that must reject the stale CAD.
+    monkeypatch.setattr(drawing, source, getattr(drawing, source) + delta)
+    with pytest.raises(RuntimeError, match="strap offset from hub end measures"):
+        drawing._add_strap_offset_dimension(native_offset.adapter, object())

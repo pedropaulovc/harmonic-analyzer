@@ -10,13 +10,7 @@ the offline drawing test.
 
 from __future__ import annotations
 
-from ch_rocker_arm_spec import (
-    BOT_ARC_LEN,
-    STRAP_HUB_SYMMETRY,
-    TIP_FACE,
-    TOP_ARC_LEN,
-    HUB_DIA,
-)
+from ch_rocker_arm_spec import STRAP_HUB_SYMMETRY
 
 # The top edge's one-sided height over the pivot is a model dimension with
 # its band on the part (rocker_arm_spec.TOP_EDGE_BAND, drawing-simplicity-policy.md `How the repository implements the guidelines`), so no
@@ -29,15 +23,16 @@ HUB_COAXIALITY_DIA = 0.50
 
 
 # True free-text instructions only; geometry / datum structure / roughness live
-# in native dimensions / datum tags / FCFs / surface symbols.  Hole sizes ride
-# their native callouts (Ø6.50 dim, Ø1.99 THRU ALL) -- the notes state process,
-# fit and count, never a second copy of a sheet dimension. BASIC radii and
-# top height now feed the arc-system profile frames directly.
+# in native dimensions / datum tags / FCFs / surface symbols. Hole process,
+# size and through condition ride the native callouts; outline dimensions
+# define the ends. BASIC radii and top height feed the arc-system profile
+# frames directly.
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_rocker_arm marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "StrapProfile": {"TopRadius", "BottomRadius"},
+    "StrapProfile": {"TopRadius", "BottomRadius", "RodTipLen"},
     "PivotHoleProfile": {"PivotDia"},
+    "HubProfile": {"HubDia"},
     # #743 PR2: the hub length carries its +0.05/0 band natively; the 20-arm
     # stack acceptance (rocker_bank_layout) caps the sum.
     "Hub": {"HubLength"},
@@ -56,6 +51,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DEFAULT_DRAWING_PRECISION = 2
 DRAWING_PRECISION = {
     "Hub": {"HubLength": 3},
+    "HubProfile": {"HubDia": DEFAULT_DRAWING_PRECISION},
     "TopEdgeReference": {"TopAbovePivot": DEFAULT_DRAWING_PRECISION},
     "Strap": {"StrapThickness": 3},
 }
@@ -66,28 +62,24 @@ BUILT_UP_PERMISSION_NOTE = None
 
 DRAWING_NOTES = "\n".join(
     (
-        # Retain the legacy sheet's other requirements; the profile nominals
-        # now live in native BASIC dimensions, not in this prose.
+        # Outline dimensions and hole callouts carry geometry and process.
         "1. MIRROR-SYMMETRIC ABOUT THE PIVOT AXIS;",
         "   ROD-PIN HOLE (1X) AT THE END SHOWN.",
-        "2. ALL HOLES THRU.",
-        "3. NOMINAL ARCS CONCENTRIC ON MIRROR AXIS.",
-        f"4. ARC LENGTHS {TOP_ARC_LEN:.{DEFAULT_DRAWING_PRECISION}f} TOP / "
-        f"{BOT_ARC_LEN:.{DEFAULT_DRAWING_PRECISION}f} BOTTOM",
-        "   DEFINE THE ARC ENDPOINTS.",
-        f"5. EACH END: {TIP_FACE:.{DEFAULT_DRAWING_PRECISION}f} RADIAL LAND PERP TO",
-        "   TOP EDGE; STRAIGHT TAPER TO BOTTOM ARC.",
-        # REAM is the fit bore's process requirement (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); its
-        # +0.03/0 band rides the O6.50 natively and its Ra the bore's symbol.
-        "6. PIVOT HOLE: REAM.",
+        "2. NOMINAL ARCS CONCENTRIC ON MIRROR AXIS.",
         # #948 ruling R: the rod's float on the arm is taken from the hub's
         # mid-plane, so the strap's offset from it is held.
-        "7. STRAP SYMMETRIC TO HUB WITHIN "
+        "3. STRAP SYMMETRIC TO HUB WITHIN "
         f"{STRAP_HUB_SYMMETRY:.{DEFAULT_DRAWING_PRECISION}f};",
-        f"   INTEGRAL HUB DIA {HUB_DIA:.{DEFAULT_DRAWING_PRECISION}f} SETS THE PITCH",
+        "   INTEGRAL HUB LENGTH SETS THE PITCH",
         "   (NO SPACERS). HUB OD COAXIAL WITH PIVOT",
         f"   BORE WITHIN Ø{HUB_COAXIALITY_DIA:.{DEFAULT_DRAWING_PRECISION}f} (TURN HUB AND REAM",
         "   BORE IN ONE SETUP).",
+        # Source context: channel_kinematics.arc_geometry/solve_state and
+        # build_ch_rocker_arm's chapter-30 profile reconstruction. The lower
+        # arc is not a second amplitude-bar contact or independent gain control.
+        "4. UPPER ARC: AMPLITUDE-BAR CONTACT.",
+        "   LOWER ARC: MOVING STRAP ENVELOPE.",
+        "   ROD-PIN SETS CONNECTING-ROD GEOMETRY.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

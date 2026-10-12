@@ -845,3 +845,107 @@ def test_native_rejects_boolean_or_string_positions(harness, stage, value):
         harness.on_rebuild = lambda: setattr(harness.annotation, "position", position)
     with pytest.raises(RuntimeError, match="invalid position"):
         native(harness)
+
+
+@pytest.mark.parametrize("accepted", [True, False])
+def test_named_datum_landing_sets_selection_point_before_insertion(
+    harness, monkeypatch, accepted,
+):
+    """A C-land triangle has an exact edge owner, never a coordinate hit test."""
+    requested = (0.21, 0.167)
+    events = []
+
+    def selection_point(index, mark, x, y, z):
+        events.append(("landing", index, mark, x, y, z))
+        return accepted
+
+    harness.adapter.currentModel.SelectionManager.SetSelectionPoint2 = selection_point
+    harness.on_insert = lambda: events.append(("insert",))
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda obj, *_: obj)
+    monkeypatch.setattr(
+        _drawing_gdt, "assert_datum_landing",
+        lambda _adapter, _tag, **kwargs: events.append(("readback", kwargs["expected_xy"])),
+    )
+    kwargs = dict(
+        edge_entity=harness.edge, leader_attach_xy=requested,
+        symbol_xy=(0.2, 0.25), datum="C", label="rod-side radial land",
+    )
+    if accepted:
+        assert _drawing_gdt.add_datum_feature(
+            harness.adapter, harness.view, **kwargs,
+        ) is harness.tag
+        assert events == [
+            ("landing", 1, -1, *requested, 0.0),
+            ("insert",),
+            ("readback", requested),
+        ]
+        assert harness.rebuild_calls == 1
+    else:
+        with pytest.raises(RuntimeError, match="landing"):
+            _drawing_gdt.add_datum_feature(harness.adapter, harness.view, **kwargs)
+        assert events == [("landing", 1, -1, *requested, 0.0)]
+        assert harness.insert_calls == 0
+    assert harness.selection_calls[0]["edge_entity"] is harness.edge
+    assert harness.selection_calls[0]["edge_xy"] is None
+
+
+@pytest.mark.parametrize("representation", ["arrow", "triangle", "line"])
+@pytest.mark.parametrize("defect", [
+    None, "missing_display", "missing_ink", "wrong_landing", "nonfinite", "read_error", "dangling",
+])
+def test_datum_landing_reads_native_display_ink_even_without_registered_leaders(
+    monkeypatch, defect, representation,
+):
+    import _drawing_layout_audit
+
+    expected = (0.21, 0.167)
+    tip = (
+        (expected[0] + 0.001, expected[1]) if defect == "wrong_landing"
+        else (float("nan"), expected[1]) if defect == "nonfinite"
+        else expected
+    )
+
+    rows = {
+        "arrow": (*tip, 0.0, 1.0, 0.0, 0.0, 0.002, 0.001, 0.0),
+        "triangle": (*tip, 0.0, tip[0] + 0.002, tip[1], 0.0, tip[0] + 0.002, tip[1] + 0.001, 0.0),
+        "line": (0.0, 0.0, 0.0, 0.0, *tip, 0.0, tip[0] + 0.002, tip[1], 0.0),
+    }
+    count_name = {
+        "arrow": "GetArrowHeadCount", "triangle": "GetTriangleCount", "line": "GetLineCount",
+    }[representation]
+    getters = {
+        "arrow": ("GetArrowHeadAtIndex2",),
+        "triangle": ("GetTriangleAtIndex",),
+        "line": ("GetLineAtIndex3", "GetLineAtIndex2"),
+    }[representation]
+
+    class Data:
+        def __getattr__(self, name):
+            if name.endswith("Count"):
+                return lambda: int(name == count_name and defect != "missing_ink")
+            if name in getters:
+                def row(_index):
+                    if defect == "read_error":
+                        raise RuntimeError("unreadable datum display primitive")
+                    return rows[representation]
+                return row
+            raise AttributeError(name)
+
+    annotation = SimpleNamespace(
+        GetLeaderCount=lambda: 0,
+        IsDangling=lambda: defect == "dangling",
+        GetDisplayData=lambda: None if defect == "missing_display" else Data(),
+    )
+    tag = SimpleNamespace(GetAnnotation=lambda: annotation)
+    adapter = SimpleNamespace(_attempt=lambda fn, **_kwargs: fn())
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda obj, *_: obj)
+    monkeypatch.setattr(_drawing_layout_audit, "_early_bound", lambda obj, *_: obj)
+    monkeypatch.setattr(
+        solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag", lambda obj, *_: obj,
+    )
+    kwargs = dict(expected_xy=expected, label="rod-side radial land")
+    if defect is None:
+        assert _drawing_gdt.assert_datum_landing(adapter, tag, **kwargs) == expected
+    else:
+        with pytest.raises(RuntimeError):
+            _drawing_gdt.assert_datum_landing(adapter, tag, **kwargs)

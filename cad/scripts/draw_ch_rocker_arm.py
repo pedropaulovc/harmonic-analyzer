@@ -22,10 +22,12 @@ import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 import _config
@@ -47,8 +49,14 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision, set_basic_dimension
-from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_arc_endpoints_to_center,
+    set_basic_dimension,
+    set_reference_dimension,
+)
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_edges import ViewEdge, scan_view_edges
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 
@@ -59,28 +67,39 @@ from _drawing_hole_callout import add_native_hole_callout
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_projection import model_points_in_view
 from _drawing_scan import _zoomed_on
 from _drawing_selection import _select_view_entity
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _gear_drawing_entities import visible_circle_edge
-from _hole_spec import blind_cut_dia_mm
+from _hole_spec import blind_cut_dia_mm, drill_process
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from ch_rocker_arm_notes import DRAWING_DIMENSIONS, DRAWING_NOTES
+from ch_rocker_arm_notes import (
+    DEFAULT_DRAWING_PRECISION,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+)
 from ch_rocker_arm_spec import (
     ARM_DEPTH,
     ARM_THICKNESS,
+    BOT_END_X,
+    CENTER_Y,
     GEOMETRIC_TOLERANCES_MM,
     HUB_DIA,
+    HUB_LENGTH,
     PIVOT_HOLE_DIA,
+    PIVOT_HOLE_BAND,
+    PIVOT_MID_Y,
     R_TOP,
     R_BOTTOM,
     ROD_HOLE_SPEC,
     ROD_HOLE_X,
     ROD_HOLE_Y,
+    ROD_TIP_X,
     SURFACE_FINISHES,
     TIP_FACE,
     TOP_ARC_LEN,
@@ -88,6 +107,7 @@ from ch_rocker_arm_spec import (
     TOP_EDGE_BAND,
     TOP_END_X,
     TOP_END_Y,
+    _ALPHA_TOP,
 )
 
 
@@ -108,7 +128,7 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm (0.5)
 
 # Front-view model bbox: X symmetric about 0, Y from the centre bottom (0) up to
 # the top-arc tip (TOP_END_Y).
-_PIVOT_MID_Y = 8.0  # pivot bore centre = ArmDepth / 2
+_PIVOT_MID_Y = PIVOT_MID_Y
 _ROD_HOLE_DIA = blind_cut_dia_mm(ROD_HOLE_SPEC)
 
 _P = rocker_notes.DEFAULT_DRAWING_PRECISION
@@ -128,8 +148,9 @@ _BBOX_CY = TOP_END_Y / 2.0
 FRONT_CENTER = (0.180, 0.175)
 RIGHT_CENTER = (0.300, 0.165)
 ISO_CENTER = (0.345, 0.205)
-# The rod-pin position frame's top-left corner; it draws 7 mm tall.
-FCF_XY = (0.300, 0.195)
+# The rod-pin frame approaches the upper-right rim, opposite the drilled-hole
+# callout's upper-left approach. Short angular witnesses leave its path clear.
+FCF_XY = (0.300, 0.232)
 
 ROD_HOLE = requirement(
     "rod_hole", kind="hole", faces=(CylinderFace(blind_cut_dia_mm(rocker.ROD_HOLE_SPEC)),),
@@ -138,14 +159,14 @@ ROD_HOLE = requirement(
         "axis": _AXIS, "drill": (rocker.ROD_HOLE_SPEC.size, ("ROD_HOLE_SPEC",)),
         "dia": (_drilled_band(blind_cut_dia_mm(rocker.ROD_HOLE_SPEC), _P), ("ROD_HOLE_SPEC", ("_hole_spec", "NUMBER_DRILL_MM"), ("_drawing_hole_callout", "add_native_hole_callout"))),
         "nominal_dia": (blind_cut_dia_mm(rocker.ROD_HOLE_SPEC), ("ROD_HOLE_SPEC", ("_hole_spec", "NUMBER_DRILL_MM"))),
-        "thru": (rocker.ROD_HOLE_SPEC.end == "through_all", ("ROD_HOLE_SPEC", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
+        "thru": (rocker.ROD_HOLE_SPEC.end == "through_all", ("ROD_HOLE_SPEC", ("_drawing_hole_callout", "add_native_hole_callout"))),
         "position_dia": (float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]), ("GEOMETRIC_TOLERANCES_MM",)),
         "position_datums": (["A", "B", "C"], (("draw_ch_rocker_arm", "build"),)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "build"),)),
     }, precision={"at": "unknown", "dia": _P, "position_dia": _P},
 )
-# The iso caption's top-left, under the iso's right half: below the FCF and
-# right of the end view. Beside the end view (0.315, 0.150) it read as that
+# The iso caption's top-left, under the iso's right half and right of the end
+# view. Beside the end view (0.315, 0.150) it read as that
 # view's label, 0.4 mm from HubLength's "+0.05" (r743-p1s-B2 render).
 ISO_CAPTION_XY = (0.325, 0.183)
 
@@ -162,8 +183,8 @@ ARC_PROFILE_OUTSIDE_MM = {
 # sides differ: top outside is +Y, bottom inside is +Y. A single shared frame
 # would put one of the zones on the wrong side of its basic arc.
 ARC_PROFILE_FRAME_XY = {
-    "TopRadius": (0.025, 0.225),
-    "BottomRadius": (0.025, 0.135),
+    "TopRadius": (0.114, 0.228),
+    "BottomRadius": (0.112, 0.122),
 }
 ARC_PROFILE_PICK_X_MM = {"TopRadius": -110.0, "BottomRadius": -100.0}
 
@@ -185,6 +206,19 @@ NOTES_MIN_LINE_PITCH = 0.0025
 # outward along the end radius -- where datum C (clocking) attaches.
 _TIP_FACE_MID_X = TOP_END_X + (TIP_FACE / 2.0) * (TOP_END_X / R_TOP)
 _TIP_FACE_MID_Y = TOP_END_Y - (TIP_FACE / 2.0) * math.cos(TOP_ARC_LEN / 2.0 / R_TOP)
+_ROD_TIP_Y = TOP_END_Y - TIP_FACE * math.cos(_ALPHA_TOP)
+_BOT_END_Y = CENTER_Y - math.sqrt(R_BOTTOM**2 - BOT_END_X**2)
+
+# Keep the overall witnesses short and above the callouts: full-height tip
+# witnesses would cut datum C's outward-normal leader and the local land angle.
+OVERALL_WIDTH_TEXT_XY = (FRONT_CENTER[0], 0.250)
+OVERALL_WITNESS_LENGTH = 0.012
+TAPER_INTERSECTION_TEXT_XY = (0.219, 0.124)
+LAND_ANGLE_TEXT_REACH = 0.032
+LAND_ANGLE_WITNESS_LENGTH = 0.008
+LAND_DATUM_STANDOFF = 0.014
+STRAP_OFFSET_TEXT_XY = (RIGHT_CENTER[0] - 0.018, RIGHT_CENTER[1] + 0.030)
+STRAP_OFFSET_WITNESS_LENGTH = 0.010
 
 
 def _plane_between(
@@ -447,6 +481,8 @@ def _pivot_finish_placement() -> tuple[tuple[float, float], tuple[float, float]]
 TOP_ABOVE_PIVOT_TEXT_RISE = 0.022
 FRONT_KEEP = {
     "PivotDia": (0.130, 0.148),
+    "HubDia": (0.157, 0.139),
+    "RodTipLen": (0.280, 0.188),
     # A radius text box inside this large parent circle still printed a
     # centre-directed line off-sheet, even with the outside-arrow flags.
     # Keep its exterior leader to the right of the pivot-bore finish callout.
@@ -581,6 +617,320 @@ def _basic_profile_dimensions(adapter: Any, annotations: list[Any]) -> None:
         remaining.remove(name)
     if remaining:
         raise RuntimeError(f"arc-system BASIC dimensions missing: {sorted(remaining)}")
+
+
+def _dress_front_dimensions(adapter: Any, annotations: list[Any]) -> None:
+    """Read imported land/OD sizes and add process without replacing any nominal."""
+    remaining = {"RodTipLen": TIP_FACE, "HubDia": HUB_DIA, "PivotDia": PIVOT_HOLE_DIA}
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        assert_dimension_measures(
+            adapter, display, expected_mm=remaining.pop(name), label=f"imported {name}"
+        )
+        if name == "RodTipLen":
+            continue
+        # Single exterior arrows, not diametral lines through both concentric
+        # circles: otherwise the new hub OD and pivot bore leaders intersect.
+        display.ArrowSide = 1  # swDimArrowsOutside
+        display.SetSecondArrow(False, False)
+        display.SolidLeader = False
+        if (
+            int(display.ArrowSide) != 1
+            or display.GetUseDocSecondArrow()
+            or display.GetSecondArrow()
+            or display.SolidLeader
+        ):
+            raise RuntimeError(f"{name} retained a centre-crossing diameter leader")
+        if name != "PivotDia":
+            continue
+        model_dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        tolerance = _early_bound(model_dimension.Tolerance, "IDimensionTolerance")
+        band = (float(tolerance.GetMaxValue()), float(tolerance.GetMinValue()))
+        if not all(math.isfinite(value) for value in band) or any(
+            abs(actual - expected / 1000.0) > 1e-9
+            for actual, expected in zip(band, PIVOT_HOLE_BAND)
+        ):
+            raise RuntimeError(f"pivot bore lost its part-owned ream tolerance: {band}")
+        tolerance_type = int(model_dimension.GetToleranceType())
+        prefix = str(display.GetText(5) or "")  # native prefix definition
+        suffix = str(display.GetText(6) or "")  # native suffix definition
+        callouts = (str(display.GetText(7) or ""), str(display.GetText(8) or ""))
+        # A custom prefix replaces the automatic diameter glyph, so retain its
+        # native symbol token when the original prefix compartment is empty.
+        ream_prefix = "REAM " + (prefix if prefix else "<MOD-DIAM>")
+        through_suffix = suffix + (" " if suffix else "") + "THRU"
+        display.SetText(1, ream_prefix)
+        display.SetText(2, through_suffix)
+        if (
+            str(display.GetText(5) or "") != ream_prefix
+            or str(display.GetText(6) or "") != through_suffix
+            or (str(display.GetText(7) or ""), str(display.GetText(8) or "")) != callouts
+            or not display.ShowDimensionValue
+            or int(model_dimension.GetToleranceType()) != tolerance_type
+            or (float(tolerance.GetMaxValue()), float(tolerance.GetMinValue())) != band
+        ):
+            raise RuntimeError("pivot ream/through text did not preserve its native dimension")
+    if remaining:
+        raise RuntimeError(f"front source dimensions missing: {sorted(remaining)}")
+    assert_imported_precision(
+        adapter, annotations, {"HubDia": DEFAULT_DRAWING_PRECISION}
+    )
+
+
+def _require_native_angle(
+    display: Any, *, expected_degrees: float, label: str
+) -> float:
+    """Read native radians, never a formatted text value or a supplementary guess."""
+    if display is None:
+        raise RuntimeError(f"{label} has no native angular display dimension")
+    display = _early_bound(display, "IDisplayDimension")
+    if display.Type2 != 3:  # swAngularDimension
+        raise RuntimeError(f"{label} is not a native angular dimension")
+    native_dimension = display.GetDimension2(0)
+    if native_dimension is None:
+        raise RuntimeError(f"{label} has no native model dimension")
+    dimension = _early_bound(native_dimension, "IDimension")
+    value = dimension.SystemValue
+    if value is None:
+        raise RuntimeError(f"{label} has no measured native angle")
+    radians = abs(float(value))
+    expected = math.radians(expected_degrees)
+    if not math.isfinite(radians) or abs(radians - expected) > 1e-8:
+        raise RuntimeError(
+            f"{label} measures {math.degrees(radians):g} degrees, "
+            f"expected {expected_degrees:g} degrees"
+        )
+    return math.degrees(radians)
+
+
+def _land_vertical(adapter: Any, front: Any, points: list[tuple[float, float]]) -> Any:
+    """A short view-owned vertical ray through F, parallel to the mirror axis.
+
+    The upper endpoint has the CAD land's top height; no model dimension or
+    nominal is introduced. Map sheet points into the active view sketch as in
+    draw_dt_cone_tip_block._add_adjuster_axis, never feed raw sheet coordinates
+    to a view-owned CreateCenterLine.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, front)):
+        raise RuntimeError("failed to activate front view for the land angle")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(front.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    mapped = []
+    for x, y in points:
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        mapped.append(
+            tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData)
+        )
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    old_add_to_db = bool(manager.AddToDB)
+    old_display = bool(manager.DisplayWhenAdded)
+    manager.AddToDB = True
+    manager.DisplayWhenAdded = True
+    try:
+        centerline = manager.CreateCenterLine(*mapped[0], *mapped[1])
+    finally:
+        manager.AddToDB = old_add_to_db
+        manager.DisplayWhenAdded = old_display
+    if centerline is None:
+        raise RuntimeError("failed to create the front-view land angle ray")
+    segment = _early_bound(centerline, "ISketchSegment")
+    segment.Color = 0
+    if int(segment.Color) != 0:
+        raise RuntimeError("land angle centreline colour did not persist")
+    draw.ClearSelection2(True)
+    return segment
+
+
+def _add_land_angle(adapter: Any, front: Any, land: ViewEdge) -> Any:
+    """Measure the CAD radial land against a local parallel to the mirror axis.
+
+    Use the outer endpoint F, not the top-arc endpoint T: the upward acute
+    sector at F is outside the material. The actual mirror-axis line intersects
+    this land at the off-sheet R800 parent centre, so it is not a usable witness.
+    """
+    outer, upper = sorted(land.line, key=lambda point: point[0], reverse=True)
+    outer_xy, upper_xy = model_points_in_view(
+        adapter, front, [tuple(v / 1000.0 for v in point) for point in (outer, upper)],
+        label="rod land angular endpoints",
+    )
+    vertical_end = (outer_xy[0], upper_xy[1])
+    vertical = _land_vertical(adapter, front, [outer_xy, vertical_end])
+    dx, dy = upper_xy[0] - outer_xy[0], upper_xy[1] - outer_xy[1]
+    length = math.hypot(dx, dy)
+    bisector = (dx / length, dy / length + 1.0)
+    reach = LAND_ANGLE_TEXT_REACH / math.hypot(*bisector)
+    text_xy = (
+        outer_xy[0] + bisector[0] * reach,
+        outer_xy[1] + bisector[1] * reach,
+    )
+    display = add_edge_dimension(
+        adapter, front,
+        p0=((outer_xy[0] + upper_xy[0]) / 2.0, (outer_xy[1] + upper_xy[1]) / 2.0),
+        p1=((outer_xy[0] + vertical_end[0]) / 2.0, (outer_xy[1] + vertical_end[1]) / 2.0),
+        text_xy=text_xy, label="radial land angle to mirror axis",
+        orientation="angular", entities=(land.edge, vertical),
+        entity_types=("EDGE", "SKETCHSEGMENT"),
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    attached = list(annotation.GetAttachedEntities3() or ())
+    if (
+        len(attached) != 2
+        or annotation.IsDangling()
+        or not all(
+            any(int(adapter.swApp.IsSame(actual, entity)) == 1 for actual in attached)
+            for entity in (land.edge, vertical)
+        )
+    ):
+        raise RuntimeError("land angle is not attached to its exact land and local vertical")
+    _require_native_angle(
+        display, expected_degrees=math.degrees(_ALPHA_TOP), label="radial land angle"
+    )
+    display.MaxWitnessLineLength = LAND_ANGLE_WITNESS_LENGTH
+    if abs(float(display.MaxWitnessLineLength) - LAND_ANGLE_WITNESS_LENGTH) > 1e-9:
+        raise RuntimeError("land angle retained crossing full-height witnesses")
+    display.SetText(4, "TO MIRROR AXIS")
+    if str(display.GetText(4) or "") != "TO MIRROR AXIS":
+        raise RuntimeError("land angle direction callout did not persist")
+    return display
+
+
+def _add_rocker_outline_dimensions(adapter: Any, front: Any) -> ViewEdge:
+    """Import the part-owned sizes and measure the remaining actual CAD outline."""
+    annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    _basic_profile_dimensions(adapter, annotations)
+    _dress_front_dimensions(adapter, annotations)
+    edges = scan_view_edges(front, label="rocker front outline")
+    land = edges.exact_line_through(
+        (_TIP_FACE_MID_X, _TIP_FACE_MID_Y, ARM_THICKNESS / 2.0),
+        label="+Z rod-side radial land",
+    )
+    width_points = (
+        (-ROD_TIP_X, _ROD_TIP_Y, ARM_THICKNESS / 2.0),
+        (ROD_TIP_X, _ROD_TIP_Y, ARM_THICKNESS / 2.0),
+    )
+    vertices = tuple(
+        edges.exact_vertex_at(point, label=f"overall width tip {index}")
+        for index, point in enumerate(width_points)
+    )
+    width_xy = model_points_in_view(
+        adapter, front, [tuple(v / 1000.0 for v in point) for point in width_points],
+        label="overall width vertices",
+    )
+    width = add_edge_dimension(
+        adapter, front, p0=width_xy[0], p1=width_xy[1],
+        text_xy=OVERALL_WIDTH_TEXT_XY, label="rocker overall width",
+        orientation="horizontal", entities=vertices, entity_type="VERTEX",
+    )
+    assert_dimension_measures(
+        adapter, width, expected_mm=2.0 * ROD_TIP_X, label="rocker overall width",
+        entities=vertices, entity_types=("VERTEX", "VERTEX"),
+    )
+    width = _early_bound(width, "IDisplayDimension")
+    width.MaxWitnessLineLength = OVERALL_WITNESS_LENGTH
+    if abs(float(width.MaxWitnessLineLength) - OVERALL_WITNESS_LENGTH) > 1e-9:
+        raise RuntimeError("overall width retained crossing full-height witnesses")
+    _add_land_angle(adapter, front, land)
+    pivot = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
+    taper_point = (BOT_END_X, _BOT_END_Y, ARM_THICKNESS / 2.0)
+    taper = edges.exact_vertex_at(taper_point, label="+Z taper/lower-arc intersection")
+    taper_xy, pivot_xy = model_points_in_view(
+        adapter, front,
+        [tuple(v / 1000.0 for v in taper_point), (0.0, PIVOT_MID_Y / 1000.0, 0.0)],
+        label="taper intersection and pivot mirror axis",
+    )
+    taper_dimension = add_edge_dimension(
+        adapter, front, p0=pivot_xy, p1=taper_xy,
+        text_xy=TAPER_INTERSECTION_TEXT_XY, label="taper intersection X",
+        orientation="horizontal", entities=(pivot, taper),
+        entity_types=("EDGE", "VERTEX"),
+    )
+    set_arc_endpoints_to_center(adapter, taper_dimension, label="taper mirror-axis origin")
+    assert_dimension_measures(
+        adapter, taper_dimension, expected_mm=BOT_END_X, label="taper intersection X",
+        entities=(pivot, taper), entity_types=("EDGE", "VERTEX"),
+    )
+    return land
+
+
+def _add_strap_offset_dimension(adapter: Any, right: Any) -> Any:
+    """Measure hub +Z end to strap +Z face, as a band-free parenthesized reference."""
+    edges = scan_view_edges(right, label="rocker right offset")
+    strap = edges.exact_line_through(
+        (_TIP_FACE_MID_X, _TIP_FACE_MID_Y, ARM_THICKNESS / 2.0),
+        label="+Z strap face at radial land",
+    )
+    hub = edges.circle_at(
+        (0.0, PIVOT_MID_Y, HUB_LENGTH / 2.0), HUB_DIA / 2.0,
+        axis=(0.0, 0.0, 1.0), label="+Z hub end rim",
+    )
+    points = model_points_in_view(
+        adapter, right,
+        [
+            (0.0, (PIVOT_MID_Y + HUB_DIA / 2.0) / 1000.0, HUB_LENGTH / 2000.0),
+            tuple(v / 1000.0 for v in strap.midpoint_mm),
+        ],
+        label="hub end and strap face offset",
+    )
+    dimension = add_edge_dimension(
+        adapter, right, p0=points[0], p1=points[1],
+        text_xy=STRAP_OFFSET_TEXT_XY, label="strap offset from hub end",
+        orientation="horizontal", entities=(hub.edge, strap.edge),
+    )
+    set_arc_endpoints_to_center(adapter, dimension, label="hub end-plane offset origin")
+    assert_dimension_measures(
+        adapter, dimension, expected_mm=(HUB_LENGTH - ARM_THICKNESS) / 2.0,
+        label="strap offset from hub end", entities=(hub.edge, strap.edge),
+    )
+    display = _early_bound(dimension, "IDisplayDimension")
+    model_dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    if int(model_dimension.GetToleranceType()) != 0:  # swTolNONE
+        raise RuntimeError("strap offset reference acquired an acceptance band")
+    display.SetPrecision3(DEFAULT_DRAWING_PRECISION, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != DEFAULT_DRAWING_PRECISION:
+        raise RuntimeError("strap offset reference lost normal drawing precision")
+    display.MaxWitnessLineLength = STRAP_OFFSET_WITNESS_LENGTH
+    if abs(float(display.MaxWitnessLineLength) - STRAP_OFFSET_WITNESS_LENGTH) > 1e-9:
+        raise RuntimeError("strap offset retained crossing full-height witnesses")
+    set_reference_dimension(
+        adapter, display.GetAnnotation(), label="strap offset from hub end"
+    )
+    return display
+
+
+def _add_land_datum(adapter: Any, front: Any, land: ViewEdge) -> Any:
+    """Attach C to the exact +Z radial land, with its triangle on the midpoint."""
+    if (
+        land.line is None
+        or any(abs(point[2] - ARM_THICKNESS / 2.0) > 1e-5 for point in land.line)
+        or abs(land.length_mm - TIP_FACE) > 1e-5
+    ):
+        raise RuntimeError("datum C needs the exact +Z radial land edge")
+    start, end = model_points_in_view(
+        adapter, front, [tuple(v / 1000.0 for v in point) for point in land.line],
+        label="datum C exact land endpoints",
+    )
+    midpoint = ((start[0] + end[0]) / 2.0, (start[1] + end[1]) / 2.0)
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    nx, ny = -dy, dx
+    if nx < 0.0:
+        nx, ny = -nx, -ny
+    reach = LAND_DATUM_STANDOFF / math.hypot(nx, ny)
+    return add_datum_feature(
+        adapter, front, edge_entity=land.edge, leader_attach_xy=midpoint,
+        symbol_xy=(midpoint[0] + nx * reach, midpoint[1] + ny * reach),
+        datum="C", label="+Z rod-side radial land",
+    )
 
 
 def _arc_profile_point(name: str) -> tuple[float, float]:
@@ -726,14 +1076,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Import the source radii and top height too: these are the BASIC nominal
     # geometry of the profile zone, not independent radius/height bands.
-    front_annotations = curate_view_dimensions(
-        adapter,
-        front,
-        keep=FRONT_KEEP,
-        view_label="front",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    _basic_profile_dimensions(adapter, front_annotations)
+    rod_land = _add_rocker_outline_dimensions(adapter, front)
     # The hub length and the strap thickness only show in the end view; the
     # front looks down their direction. Codex #936 (PRRT_kwDOPHDy386mRk__):
     # RIGHT_KEEP was declared but never curated, so the +0.05/0 band that sets
@@ -757,6 +1100,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "StrapThickness": STRAP_DATUM_B.precision["thickness"],
         },
     )
+    _add_strap_offset_dimension(adapter, right)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -780,6 +1124,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # onto the rim from above, >= 3.3 mm off every line bar the landing.
         callout_xy=(0.216, 0.194),
         label="rod-pin hole",
+        process=drill_process(ROD_HOLE_SPEC) + "\n",
     )
 
     # Locate the rod-pin hole from the pivot bore with X and Y BASIC coordinate
@@ -865,19 +1210,15 @@ async def build(adapter: Any) -> dict[str, str]:
         datum=STRAP_DATUM_B.fields["datum"][0],
         label="broad face",
     )
-    tip_face = _sheet_xy(_TIP_FACE_MID_X, _TIP_FACE_MID_Y)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=tip_face,
-        symbol_xy=(tip_face[0] + 0.012, tip_face[1] + 0.012),
-        datum="C",
-        label="rod-side tip face",
-    )
+    _add_land_datum(adapter, front, rod_land)
     add_feature_control_frame(
         adapter,
         front,
         edge_entity=rod_hole_edge,
+        leader_attach_xy=_sheet_xy(
+            ROD_HOLE_X + _ROD_HOLE_DIA / (2.0 * math.sqrt(2.0)),
+            ROD_HOLE_Y + _ROD_HOLE_DIA / (2.0 * math.sqrt(2.0)),
+        ),
         frame_xy=FCF_XY,
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["rod-pin hole position"],
