@@ -120,17 +120,18 @@ ROUND_TEXT_SUFFIX = " MAX"
 # local +X, so two spokes lie on the face view's horizontal centerline, the
 # one TIE 2's angle is measured from, and TIE 1 on the vertical one falls
 # midway between two (both asserted below).  TIE 1's 9.85 keeps a tight
-# band for the boss wall (TIE1_HUB_WALL); the need rides TIE 1's note, as
-# no callout line fits between that dimension's extension lines 9.85 apart.
+# band for the boss wall (TIE1_HUB_WALL); the need rides TIE 1's hole
+# callout (TIE1_CALLOUT), as no callout line fits between that dimension's
+# extension lines 9.85 apart, and a note never carries a dimension (rule 5).
 MIN_WALL = 2.0  # drawing-simplicity rule 12 target
 DRAWING_NOTES = "\n".join(
     (
         f"{SPOKE_COUNT} TAPERED SPOKES EQUALLY SPACED, TWO ON THE HORIZONTAL CENTERLINE.",
-        f"TIE 1: LEVER-WIRE TIE HOLE THRU BOSS; {TIE1_R:.2f} BAND HOLDS "
-        f"{MIN_WALL:.1f} BOSS WALL.",
+        "TIE 1: LEVER-WIRE TIE HOLE THRU BOSS.",
         "TIE 2: PEN-WIRE TIE HOLE, GROOVE BOTTOM TO RIM BORE.",
     )
 )
+TIE1_CALLOUT = f"TIE 1\nPOSITION HOLDS\n{MIN_WALL:.1f} BOSS WALL"
 # Rule 5: the bore is a running journal on the axle; the spigot is the static
 # seat the drum is pressed onto.  The boss step the drum butts against is a
 # register face and carries no symbol.
