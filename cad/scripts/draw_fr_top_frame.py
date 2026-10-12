@@ -508,15 +508,21 @@ UNDERSIDE_FACING_NOTE_XY = (0.330, 0.098)
 # The slot position frames' basics, stated for both stations: F-F cuts only
 # the rear one, and its bare 12.700 box carries no text (a BASIC keeps none),
 # so the front slot's basic and the frames' 90 degrees to the B-C line went
-# unstated (codex review of a3735691, sheet 6).  The note takes the band
-# between F-F's 6.350 block (top 113.3 mm) and the 70.0 block's underline
-# (136.6), left of detail C's fence (r 76 about the detail centre: x 236.7
-# at y 132); top-left point, rows 5.56 mm apart, 2.87 mm a glyph.
+# unstated (codex review of a3735691, sheet 6).  A plain position frame on a
+# slot holds only its width's median plane, which left the basic 12.700
+# along the slot untoleranced and the slot-to-screw-hole wall unbounded
+# (codex review of 87d93d70).  The spec's wall stack already charges the
+# zone along the slot (HANGER_SLOT_STATION_TOL), so the note says it holds
+# both ways.  It takes the band between F-F's 6.350 block (top 113.3 mm)
+# and the 70.0 block's underline (136.6), left of detail C's fence (r 76
+# about the detail centre); top-left point, rows 4.6 mm apart and 3.6 tall,
+# 2.45 mm a glyph (87d93d70 render).
 SLOT_BASIC_NOTE = (
     f"SLOTS: BASIC {HANGER_SLOT_FROM_ROUND:.{HANGER_SLOT_FROM_ROUND_PLACES}f} FROM\n"
-    "B (FRONT), C (REAR), AT\nBASIC 90 DEG TO B-C LINE"
+    "B (FRONT), C (REAR), AT\nBASIC 90 DEG TO B-C LINE;\n"
+    f"{GEOMETRIC_TOLERANCES_MM['knife-hanger slot position']} POSITION ALONG AND ACROSS"
 )
-SLOT_BASIC_NOTE_XY = (0.150, 0.1325)
+SLOT_BASIC_NOTE_XY = (0.150, 0.1345)
 # Sheet 6, removed section F-F through the REAR knife-hanger station: the
 # #6 SHCS counterbore, its floor above the crossbar underside (the screw's
 # grip, closing RingHeight with the callout's counterbore depth), the round

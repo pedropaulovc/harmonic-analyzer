@@ -2375,21 +2375,31 @@ def test_slot_station_is_basic_from_its_round_hole() -> None:
 def test_slot_basic_note_completes_both_stations_frames() -> None:
     # Codex review of a3735691 (sheet 6): F-F's bare box located the rear
     # slot only and left the frames' orientation to the B-C line implied.
-    # The note states both stations' basic and the 90 degrees, with the
-    # 12.700 the spec owns; the 6.350 names the round holes it locates.
+    # Codex review of 87d93d70: a slot's plain position frame holds only its
+    # width's median plane, leaving the basic along the slot untoleranced.
+    # The note states both stations' basic, the 90 degrees and the zone both
+    # ways, with the values the spec owns -- the zone along the slot is what
+    # the spec's slot-to-screw wall stack charges; the 6.350 names the round
+    # holes it locates.
     note = drawing.SLOT_BASIC_NOTE
+    zone = spec.GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"]
     assert f"BASIC {spec.HANGER_SLOT_FROM_ROUND:.3f} FROM" in note
     assert "B (FRONT), C (REAR)" in note and "90 DEG TO B-C LINE" in note
+    assert f"{zone} POSITION ALONG AND ACROSS" in note
+    assert spec.HANGER_SLOT_STATION_TOL == pytest.approx(
+        spec.HANGER_PIN_X_TOL + float(zone) / 2.0
+    )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'suffix="2X ROUND HOLE\\nFROM SCREW AXIS"' in source
     # Rule 6, and rule 8 against the a3735691 sheet-6 ink (metres): F-F's
     # 6.350 block top 0.1133, the 70.0 block's underline 0.13663, detail C's
     # fence (r 0.076 about its centre) at its nearest over the note's rows.
+    # Rows print 4.6 mm apart and 3.6 tall, 2.45 mm a glyph (87d93d70).
     lines = note.splitlines()
     x, y = drawing.SLOT_BASIC_NOTE_XY
     assert len(lines) <= 4
-    right = x + 0.00287 * max(len(line) for line in lines)
-    bottom = y - 0.00556 * len(lines)
+    right = x + 0.00245 * max(len(line) for line in lines)
+    bottom = y - 0.0046 * (len(lines) - 1) - 0.0036
     ink = drawing.INK_CLEARANCE
     assert y + ink < 0.13663
     assert bottom > 0.1133 + ink
