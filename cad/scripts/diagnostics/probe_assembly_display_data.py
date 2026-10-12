@@ -313,7 +313,9 @@ OUTPUT_FILENAMES = (
 _STREAM_MARKER = bytes.fromhex("140006000800")
 _STRING_MARKER = b"\xff\xfe\xff"
 _MAX_DISPLAY_BYTES = 64 * 1024 * 1024
-_PN_CAPTURE_MODE: ContextVar[str] = ContextVar("pn_display_capture_mode", default="normal")
+_PN_CAPTURE_MODE: ContextVar[str] = ContextVar(
+    "pn_display_capture_mode", default="normal"
+)
 
 
 def _digest(path: Path) -> str:
