@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the connecting rod.
 
 The SLDPRT remains authoritative.  This recipe supplies only the connecting-rod
-views, dimension layout, callout text, and manufacturing notes; every shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+views, dimension layout, callout text, and manufacturing notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The rod is a tall thin lollipop (~190 mm ring-bottom to fork crown), so the
 sheet runs at 1:1 with a 1:2 isometric.
@@ -19,32 +19,35 @@ import argparse
 import sys
 from typing import Any
 
-from ch_connecting_rod_spec import GEOMETRIC_TOLERANCES_MM
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    place_view,
+)
 
-import _telemetry
 from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_edge_dimension,
-    add_feature_control_frame,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_imported_precision,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_basic_dimension,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_basic_dimension,
+    set_dimension_callouts,
+)
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_finish import add_surface_finish
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from ch_connecting_rod_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
@@ -52,14 +55,11 @@ from ch_connecting_rod_spec import (
     FORK_CROTCH_Y,
     FORK_THICKNESS,
     FORK_TOP_Y,
+    GEOMETRIC_TOLERANCES_MM,
     PIN_HOLE_DIA,
     RING_BORE_DIA,
     RING_BOTTOM_Y,
     SURFACE_FINISHES,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
 )
 
 

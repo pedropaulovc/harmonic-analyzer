@@ -323,7 +323,7 @@ reproduced with exactly the same requested and returned positions:
 | `rack_pinion`, bore axis | `(0.22, 0.20099999999999998)` | `(0.21999999999999942, 0.20083662770023045)` | 163.372 / 100 micrometres |
 
 These errors compare datum-symbol sheet positions after `SetPosition2` and
-`GetPosition` in `_drawing_common.add_datum_feature`. They are not measurements
+`GetPosition` in `add_datum_feature` (now `_drawing_gdt.add_datum_feature`). They are not measurements
 of manufacturing geometry. The two drawing scripts, the common drawing helper,
 both part builders, configuration and templates have no diff against main.
 The retry's before/after source hashes, head and adapter remain unchanged.

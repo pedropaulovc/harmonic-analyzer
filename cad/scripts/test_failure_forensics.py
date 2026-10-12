@@ -1025,7 +1025,7 @@ def test_a_load_that_finishes_before_the_flag_is_asked_is_re_read(monkeypatch):
     import _drawing_common
 
     monkeypatch.setattr(
-        _drawing_common.time, "sleep", lambda _s: pytest.fail("waited on a loaded source")
+        time, "sleep", lambda _s: pytest.fail("waited on a loaded source")
     )
     part = _SourcePart(
         {name: "x" for name in _TITLE_BLOCK}, loading_reads=0, empty_reads=len(_TITLE_BLOCK)
@@ -2041,13 +2041,13 @@ class _DrawingAdapter(_Adapter):
 
 
 def _refuse_rod_pin_callout(tmp_path: Path) -> None:
-    import _drawing_common
+    import _drawing_hole_callout
 
     adapter = _DrawingAdapter(sw=_Seat(), model=_Drawing(tmp_path, _RimEdge()))
     with pytest.raises(
         RuntimeError, match=r"^failed to insert native hole callout \(rod-pin hole\)$"
     ):
-        _drawing_common.add_native_hole_callout(
+        _drawing_hole_callout.add_native_hole_callout(
             adapter,
             _DrawingView(),
             edge_xy=(0.3, 0.1),
@@ -2118,9 +2118,9 @@ def test_hole_callout_refusal_survives_an_exploding_telemetry_sink(tmp_path, mon
     snapshot. The span event is let through so the ``debug`` call after it is
     actually reached (the two share one guarded block); the sink records which
     names it blew up on, so the test proves both sites were exercised. Scoped to
-    the drawing module's telemetry handle -- the span machinery and
+    ``_drawing_hole_callout._telemetry`` -- the span machinery and
     ``capture_com_failure``'s own guarded record keep working."""
-    import _drawing_common
+    import _drawing_hole_callout
 
     exploded: list[str] = []
 
@@ -2135,7 +2135,7 @@ def test_hole_callout_refusal_survives_an_exploding_telemetry_sink(tmp_path, mon
                 return explode
             return getattr(_telemetry, name)
 
-    monkeypatch.setattr(_drawing_common, "_telemetry", _ExplodingSink())
+    monkeypatch.setattr(_drawing_hole_callout, "_telemetry", _ExplodingSink())
 
     _refuse_rod_pin_callout(tmp_path)
 
@@ -2152,9 +2152,9 @@ def test_selection_description_never_raises_for_an_unreadable_entity():
     """Every read is guarded: an entity no probe can read reports each failure
     by key and still returns, because the before snapshot runs on the success
     path of every hole callout."""
-    import _drawing_common
+    import _drawing_hole_callout
 
-    bag = _drawing_common.describe_selected_entity(
+    bag = _drawing_hole_callout.describe_selected_entity(
         _DrawingAdapter(model=object()),
         object(),
         object(),
@@ -2521,7 +2521,8 @@ def test_a_retried_pivot_bore_pick_can_succeed_without_an_error_log(
     capture_telemetry, monkeypatch
 ):
     import math
-    import _drawing_common
+
+    import _drawing_selection
     import draw_ch_rocker_arm
 
     bore = object()
@@ -2560,7 +2561,7 @@ def test_a_retried_pivot_bore_pick_can_succeed_without_an_error_log(
     spans, logs = capture_telemetry
     drawing = _Drawing()
     centre = (0.2, 0.15)
-    monkeypatch.setattr(_drawing_common, "view_name", lambda adapter, view: "Drawing View2")
+    monkeypatch.setattr(_drawing_selection, "view_name", lambda adapter, view: "Drawing View2")
     monkeypatch.setattr(_seat_forensics, "_frame_geometry", lambda adapter: {})
     with _telemetry.span("drawing.pivot_datum"):
         xy = draw_ch_rocker_arm._pick_pivot_bore(

@@ -4545,12 +4545,13 @@ def test_a_leadered_notes_zero_length_attach_stub_is_no_finding():
 
 
 def test_every_auto_center_marks_call_records_its_counts(monkeypatch):
-    """#913 (2): _drawing_common registers the submodule's observer, and each
+    """#913 (2): _drawing_common registers the adapter's observer, and each
     call lands as a center_marks.auto_insert span event."""
-    import _drawing_common
-    import _telemetry
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
     from solidworks_mcp.adapters.solidworks import drawing as sw_drawing
+
+    import _drawing_common
+    import _telemetry
 
     assert sw_drawing.CENTER_MARK_OBSERVER is _drawing_common._record_center_marks
     events = []

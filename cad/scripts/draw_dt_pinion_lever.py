@@ -19,26 +19,31 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
-from _check import check
-from _com import _early_bound, _read_member
-from _paths import CAD_ROOT
-from _session import run_build
-from _drawing_common import (
-    DrawingOutputs,
-    add_property_linked_note,
-    assert_imported_precision,
-    finalize_drawing,
-    model_point_in_view,
-    new_project_drawing,
-    read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    stamp_drawing_summary,
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    place_view,
     view_name,
 )
+
+from _check import check
+from _com import _early_bound, _read_member
+from _drawing_common import (
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    stamp_drawing_summary,
+)
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
 from dt_drive_train_steps import step_ref
 from dt_pinion_lever_spec import (
     DRAWING_DIMENSIONS,
@@ -48,11 +53,6 @@ from dt_pinion_lever_spec import (
     PIN_HOLE_CALLOUT,
     REFERENCE_SKETCHES,
     ROD_LEN,
-)
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
 )
 
 

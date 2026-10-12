@@ -3,7 +3,7 @@
 The PART build calls :func:`author_part_pmi` with the ``PartDatum`` /
 ``GeometricControl`` rows from its ``<part>_spec.py`` right before the final
 save, so the shipped ``.SLDPRT`` carries its GD&T natively and the drawing
-projects the same typed rows (``_drawing_common.project_part_pmi``) instead
+projects the same typed rows (``_drawing_gdt.project_part_pmi``) instead
 of typing frozen per-sheet strings.
 
 The annotations are ORDINARY model gtols / datum tags

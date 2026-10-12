@@ -17,34 +17,37 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    place_view,
+)
+
 from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
-    add_leader_note,
-    add_native_hole_callout,
-    add_property_linked_note,
-    assert_imported_precision,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leader_notes import add_leader_note
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _native_axis_datum import add_native_axis_datum
+from _paths import CAD_ROOT
 from _rack_bore_finish import add_rack_bore_finish
+from _session import run_build
+import _telemetry
 from pd_rack_pinion_spec import (
     BORE_CALLOUT,
-    BORE_FIT_CALLOUT,
     BORE_DIA,
+    BORE_FIT_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
@@ -54,10 +57,6 @@ from pd_rack_pinion_spec import (
     TAP_CALLOUT_QUALIFIER,
     TAP_CENTRES,
     TAP_DRILL_DIA,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
 )
 
 

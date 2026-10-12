@@ -13,36 +13,44 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+    view_name,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_dimension_measures,
-    assert_imported_precision,
-    curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
-    offset_dimension_text,
     read_required_properties,
+    stamp_drawing_summary,
+)
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
     set_dimension_callouts,
-    set_hidden_lines_visible,
     set_reference_dimension,
     set_reference_dimensions,
-    stamp_drawing_summary,
-    view_name,
-    visible_view_entities,
 )
+from _drawing_edge_dimensions import assert_dimension_measures
+from _drawing_edges import visible_view_entities
+from _drawing_finish import add_surface_finish
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_visible
 from _gear_drawing_entities import visible_circle_edge
 from _gtol_face_read import face_geometry
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from dt_cylinder_gear_notes import BORE_FIT_CALLOUT, STACK_FIT_CALLOUT
 from dt_cylinder_gear_spec import (
     BORE_DIA,
@@ -59,8 +67,6 @@ from dt_cylinder_gear_spec import (
     SURFACE_FINISHES,
     TIP_RADIUS,
 )
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 
 SPEC = DRAWINGS_BY_NAME["dt_cylinder_gear"]

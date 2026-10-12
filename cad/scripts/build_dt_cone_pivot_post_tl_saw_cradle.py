@@ -50,12 +50,8 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_chains import define_rectilinear_chain
-from _drawing_marks import (
-    apply_drawing_precision,
-    apply_drawing_properties,
-    clear_dimensions_for_drawing,
-    mark_dimensions_for_drawing,
-)
+from _drawing_precision import apply_drawing_precision
+from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _hole_spec import blind_cut_dia_mm
 from _holes import SharedCoordinate, wizard_holes
 from _saved_part_guard import require_saved_drawing_properties

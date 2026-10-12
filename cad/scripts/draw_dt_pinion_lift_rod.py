@@ -18,29 +18,35 @@ import math
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+    view_name,
+)
+
 from _check import check
 from _com import _early_bound, _read_member
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_annotation_extent import place_callout_clear
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
-    add_surface_finish,
-    assert_imported_precision,
-    curate_view_dimensions,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
-    view_name,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_finish import add_surface_finish
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from dt_drive_train_steps import step_ref
 from dt_pinion_lever_geometry import ROD_PIN_HOLE_FROM_END
 from dt_pinion_lift_rod_spec import (
@@ -51,12 +57,6 @@ from dt_pinion_lift_rod_spec import (
     ROD_DIA,
     ROD_LEN,
     SURFACE_FINISHES,
-)
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    dimension_name,
-    place_view,
 )
 
 

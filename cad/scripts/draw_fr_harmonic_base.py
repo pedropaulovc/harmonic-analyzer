@@ -2,8 +2,9 @@ r"""Create the curated machinist drawing for the two-plate harmonic base.
 
 The SLDPRT remains authoritative.  This recipe supplies only the base's views,
 native footprint/socket dimensions, the ordinary-coordinate mounting-hole table,
-and manufacturing notes; every shared sheet/template, import, curation, and
-export behavior lives in ``_drawing_common``.
+and manufacturing notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The base is a stepped gray-iron frame: a raised black deck stands 3.0 proud of
 a green land on the pad, four column sockets open on that land, blind tapped
@@ -30,50 +31,56 @@ import math
 import sys
 from typing import Any
 
-from win32com.client.dynamic import Dispatch as dynamic_dispatch
-
-import _telemetry
-from _check import check
-from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
-from _drawing_common import (
-    DrawingOutputs,
-    add_leader_note,
-    add_native_hole_callout,
-    add_surface_finish,
-    create_blank_drawing_sheets,
-    create_section_view,
-    create_view_theoretical_datum,
-    assert_imported_precision,
-    curate_view_dimensions,
-    finalize_drawing,
+from solidworks_mcp.adapters.com_variant import dispatch_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    _note_text,
+    add_note,
+    auto_center_marks,
     dimension_name,
-    insert_hole_table,
-    import_cosmetic_threads,
-    model_point_in_view,
-    model_points_in_view,
-    new_project_drawing,
-    read_required_properties,
-    rebuild_drawing,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_hole_callout_precision,
-    set_reference_dimension,
-    stamp_drawing_summary,
-    visible_view_entities,
+    iter_views,
+    place_view,
     view_name,
     visible_component_entities,
 )
+from win32com.client.dynamic import Dispatch as dynamic_dispatch
 
-from _drawing_common import _iter_tables, _iter_view_annotations, sheet_drawable_region
+from _check import check
+from _com import _early_bound
+from _drawing_common import (
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    rebuild_drawing,
+    stamp_drawing_summary,
+)
+from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edges import visible_view_entities
+from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
 )
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_layout_check import DrawableRegion
+from _drawing_layout_collect import _iter_tables, _iter_view_annotations
+from _drawing_leader_notes import add_leader_note
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
+from _drawing_sheet_region import sheet_drawable_region
+from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_tables import create_view_theoretical_datum, insert_hole_table
+from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from build_fr_harmonic_base import (
     BASE_CROSS_TAP_DRILL_DIA,
     BASE_CROSS_TAP_SPEC,
@@ -96,17 +103,18 @@ from build_fr_harmonic_base import (
     PEDESTAL_PAD_SHAPES,
     PEDESTAL_SCREW_HOLE_DIA,
     PEDESTAL_SCREW_XZ,
+    PIVOT_SCREW_HOLE_DIA,
+    PIVOT_SCREW_XZ,
     SERIAL_HEIGHT_MM,
     SERIAL_TEXT,
     SERIAL_XZ,
     SHALLOW_BOSS_CENTRES,
     SHALLOW_BOSS_SHAPES,
     SOCKET_BOSS_SHAPES,
-    PIVOT_SCREW_HOLE_DIA,
-    PIVOT_SCREW_XZ,
     STOP_SCREW_HOLE_DIA,
     STOP_SCREW_XZ,
 )
+from fr_frame_attachment_spec import BASE_SCREW_SEAT_Z, BASE_SCREW_Y
 from fr_harmonic_base_spec import (
     BOTTOM_FRONT_Z,
     BOTTOM_LENGTH,
@@ -124,16 +132,7 @@ from fr_harmonic_base_spec import (
     STACK_HEIGHT,
     socket_bore_finish_key,
 )
-from fr_frame_attachment_spec import BASE_SCREW_SEAT_Z, BASE_SCREW_Y
 from pinion_rig_fitup import RIG_SET_STEP, TRANSFER_AFTER_RIG_SET
-from solidworks_mcp.adapters.com_variant import dispatch_array
-from solidworks_mcp.adapters.solidworks.drawing import (
-    _note_text,
-    add_note,
-    auto_center_marks,
-    iter_views,
-    place_view,
-)
 
 
 SPEC = DRAWINGS_BY_NAME["fr_harmonic_base"]
@@ -766,7 +765,7 @@ TRANSFER_PEDESTAL_HOLES = tuple(
 # line: side by side, two "AT ASSEMBLY; 8-32 UNC - 2B" lines ran into each
 # other (hb-notes-2 eye pass). The spring callout keeps the semicolon joining
 # the locating instruction to its "4-40 UNC - 2B" line. The trailing line
-# break reaches the sheet through _drawing_common.compose_hole_callout_prefix.
+# break reaches the sheet through _drawing_hole_callout.compose_hole_callout_prefix.
 TRANSFER_BLOCK_CALLOUT = f"TRANSFER FROM MHA-DT-018\n{TRANSFER_AFTER_RIG_SET}\n"
 TRANSFER_SPRING_CALLOUT = f"TRANSFER FROM MHA-DT-024\n{TRANSFER_AFTER_RIG_SET}"
 TRANSFER_PEDESTAL_CALLOUT = "TRANSFER FROM MHA-DT-002\nAT ASSEMBLY;\n"

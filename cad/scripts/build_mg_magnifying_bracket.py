@@ -39,15 +39,9 @@ from _sketch import (
 from _sketch_chains import define_rectilinear_chain
 
 import _telemetry
-from _drawing_marks import (
-    apply_drawing_properties,
-    clear_dimensions_for_drawing,
-    mark_dimensions_for_drawing,
-    apply_drawing_precision,
-    set_dimension_symmetric_tolerance,
-    set_dimension_bilateral_tolerance,
-    set_dimension_display_precision,
-)
+from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
+from _drawing_precision import apply_drawing_precision, set_dimension_display_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance, set_dimension_bilateral_tolerance
 from mg_magnifying_bracket_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,

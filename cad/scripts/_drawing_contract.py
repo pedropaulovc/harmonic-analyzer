@@ -744,13 +744,13 @@ def drawing_specification_violations(
         tree, "_surface_finish", frozenset({"surface_finish_by_key"})
     )
     surface_direct, surface_modules = _imported_functions(
-        tree, "_drawing_common", frozenset({"add_surface_finish"})
+        tree, "_drawing_finish", frozenset({"add_surface_finish"})
     )
     gtol_direct, gtol_modules = _imported_functions(
-        tree, "_drawing_common", frozenset({"add_feature_control_frame"})
+        tree, "_drawing_gdt", frozenset({"add_feature_control_frame"})
     )
     note_direct, note_modules = _imported_functions(
-        tree, "_drawing_common", frozenset({"add_attached_note"})
+        tree, "_drawing_leader_notes", frozenset({"add_attached_note"})
     )
     tolerance_names = _tolerance_names(tree)
     violations: list[DrawingSpecificationViolation] = []

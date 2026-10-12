@@ -52,13 +52,9 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_rectangle import define_centered_rectangle
-from _drawing_marks import (
-    apply_drawing_precision,
-    apply_drawing_properties,
-    clear_dimensions_for_drawing,
-    mark_dimensions_for_drawing,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_precision import apply_drawing_precision
+from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from dt_cone_tip_block_spec import (
     ADJUSTER_BORE_SPEC,
     ADJUSTER_BORE_DIA,

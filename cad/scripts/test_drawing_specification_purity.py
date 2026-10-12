@@ -68,7 +68,7 @@ def test_detector_does_not_treat_unbanded_f_strings_as_tolerances(value: str) ->
 
 def test_detector_rejects_literal_and_local_surface_finish_grades() -> None:
     source = """
-from _drawing_common import add_surface_finish as finish
+from _drawing_finish import add_surface_finish as finish
 
 LOCAL_GRADE = "1.6"
 finish(adapter, view, symbol_xy=(0.1, 0.2), roughness_ra="0.8", label="first")
@@ -79,7 +79,7 @@ finish(adapter, view, symbol_xy=(0.2, 0.2), roughness_ra=LOCAL_GRADE, label="sec
 
 def test_detector_allows_catalog_surface_finish_grades_and_local_aliases() -> None:
     source = """
-from _drawing_common import add_surface_finish
+from _drawing_finish import add_surface_finish
 from _surface_finish import MACHINED as CATALOG_GRADE
 import _surface_finish as finish_catalog
 
@@ -109,7 +109,7 @@ add_surface_finish(
 
 def test_detector_requires_surface_finish_controls_from_a_part_spec() -> None:
     local_control = """
-from _drawing_common import add_surface_finish
+from _drawing_finish import add_surface_finish
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -126,7 +126,7 @@ add_surface_finish(
     assert _rules(local_control) == ["drawing-surface-finish-provenance"]
 
     imported_controls = """
-from _drawing_common import add_surface_finish
+from _drawing_finish import add_surface_finish
 from _surface_finish import surface_finish_by_key
 from ch_connecting_rod_spec import SURFACE_FINISHES
 import ch_connecting_rod_spec as rod_spec
@@ -151,8 +151,8 @@ add_surface_finish(
 
 def test_detector_finds_drawing_owned_feature_control_frame_tolerances() -> None:
     source = """
-from _drawing_common import add_feature_control_frame as fcf
-import _drawing_common as drawing
+from _drawing_gdt import add_feature_control_frame as fcf
+import _drawing_gdt as drawing
 
 LOCAL_TOLERANCE = "0.10"
 fcf(adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
@@ -174,8 +174,8 @@ drawing.add_feature_control_frame(
 
 def test_detector_finds_drawing_owned_projected_zone_heights() -> None:
     source = """
-from _drawing_common import add_feature_control_frame as fcf
-import _drawing_common as drawing
+from _drawing_gdt import add_feature_control_frame as fcf
+import _drawing_gdt as drawing
 from dt_pinion_lever_spec import HUB_RUNOUT_TOLERANCE
 
 LOCAL_HEIGHT = 31.3
@@ -200,7 +200,7 @@ drawing.add_feature_control_frame(
 
 def test_detector_allows_feature_control_frame_values_from_part_contracts() -> None:
     source = """
-from _drawing_common import add_feature_control_frame
+from _drawing_gdt import add_feature_control_frame
 from dt_pinion_lever_spec import (
     GEOMETRIC_CONTROLS, HUB_RUNOUT_TOLERANCE, PROJECTED_ZONE_HEIGHT_MM,
 )
@@ -234,7 +234,7 @@ add_feature_control_frame(
 
 def test_detector_does_not_let_spec_text_mask_a_local_fcf_number() -> None:
     source = """
-from _drawing_common import add_feature_control_frame
+from _drawing_gdt import add_feature_control_frame
 from dt_pinion_lever_spec import LABEL
 
 add_feature_control_frame(
@@ -246,8 +246,8 @@ add_feature_control_frame(
 
 def test_detector_finds_bare_within_limits_only_in_attached_notes() -> None:
     source = """
-from _drawing_common import add_attached_note as attached
-import _drawing_common as drawing
+from _drawing_leader_notes import add_attached_note as attached
+import _drawing_leader_notes as drawing
 from dt_pinion_lever_spec import LABEL
 
 NOTE = "TIP FACE FLAT WITHIN 0.05\\nPERPENDICULAR TO AXIS WITHIN 0.10"
@@ -283,7 +283,7 @@ unrelated(text="WITHIN 0.40")
 
 def test_detector_allows_attached_note_limits_from_part_contracts() -> None:
     source = """
-from _drawing_common import add_attached_note
+from _drawing_leader_notes import add_attached_note
 from dt_pinion_lever_spec import (
     GEOMETRIC_TOLERANCES_MM,
     GRIP_FLATNESS,
@@ -373,7 +373,7 @@ def test_drawing_fleet_owns_placement_not_manufacturing_values() -> None:
 
 def test_detector_flags_render_time_precision_but_not_tolerance_places() -> None:
     source = """
-from _drawing_common import set_dimension_precision
+from _drawing_dimensions import set_dimension_precision
 
 set_dimension_precision(adapter, dims, {"HubDia": 1})
 display.SetPrecision3(1, -1, -1, -1)

@@ -10,53 +10,62 @@ presentation definitions.
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import hashlib
 import math
-import sys
-from dataclasses import dataclass
 from pathlib import Path
+import sys
 from typing import Any, Callable, Sequence
 
-import _telemetry
-from _check import check
-from _com import _early_bound
-from _session import run_build
-from _drawing_common import (
-    ASSEMBLY_VIEW_CONFIGURATION,
-    SIMPLIFIED_VIEW_CONFIGURATION,
-    DrawingOutputs,
-    ViewRole,
-    BalloonLanding,
-    _BALLOON_LANDING_TOLERANCE_M,
-    _balloon_item_number,
-    _edge_endpoint_key,
-    _spread_balloons,
-    _zoomed_on,
-    add_component_bom_balloons,
-    apply_view_configuration,
-    assert_balloon_landings,
-    assert_full_detail_view,
-    create_section_view,
-    finalize_drawing,
-    insert_bom_table,
-    model_point_in_view,
-    model_points_in_view,
-    position_bom_balloon,
-    rendered_balloon_circle,
-    drawing_viewport_pixel_size,
-    new_project_drawing,
-    read_required_properties,
-    set_arc_endpoints_to_center,
-    set_reference_dimension,
-    set_hidden_lines_visible,
-    set_high_quality_shaded_with_edges,
-    set_view_exploded_state,
-    sheet_drawable_region,
+from solidworks_mcp.adapters.com_variant import dispatch_array
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    place_view,
     visible_component_entities,
 )
-from _simplified_names import simplified_name
+
+from _check import check
+from _com import _early_bound
+from _drawing_balloon_display import rendered_balloon_circle
+from _drawing_balloons import (
+    _BALLOON_LANDING_TOLERANCE_M,
+    BalloonLanding,
+    _balloon_item_number,
+    _spread_balloons,
+    add_component_bom_balloons,
+    assert_balloon_landings,
+    drawing_viewport_pixel_size,
+    position_bom_balloon,
+)
+from _drawing_common import (
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    set_high_quality_shaded_with_edges,
+)
+from _drawing_dimensions import set_arc_endpoints_to_center, set_reference_dimension
+from _drawing_edges import _edge_endpoint_key
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_scan import _zoomed_on
+from _drawing_sections import create_section_view
+from _drawing_sheet_region import sheet_drawable_region
+from _drawing_tables import insert_bom_table
+from _drawing_view_configuration import (
+    ASSEMBLY_VIEW_CONFIGURATION,
+    SIMPLIFIED_VIEW_CONFIGURATION,
+    ViewRole,
+    apply_view_configuration,
+    assert_full_detail_view,
+    set_view_exploded_state,
+)
+from _drawing_view_display import set_hidden_lines_visible
 from _fr_frame_balloon_anchors import FRAME_BALLOON_ANCHORS
+from _session import run_build
+from _simplified_names import simplified_name
+import _telemetry
 from fr_frame_attachment_spec import (
     BASE_SCREW_Y,
     CAP_TOP_Y,
@@ -70,9 +79,6 @@ from vn_frame_cross_screw_spec import (
     SHANK_LEN as CROSS_SCREW_SHANK_LEN,
     THREAD as CROSS_SCREW_THREAD,
 )
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.com_variant import dispatch_array
 
 
 SPEC = DRAWINGS_BY_NAME["fr_frame_assembly"]

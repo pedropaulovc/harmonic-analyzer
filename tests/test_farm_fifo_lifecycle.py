@@ -1,4 +1,4 @@
-"""Real FIFO producer ownership with a fake, guarded Temporal boundary.
+"""Producer lease lifecycle with a fake, guarded Temporal boundary.
 
 No native work, credentials, live service, or parent interrupt is allowed here.
 Child processes probe inheritance and deliver SIGINT only inside their own PID.
@@ -16,6 +16,7 @@ import textwrap
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import doit.cmd_base as _doit_cmd_base
 import pytest
@@ -34,6 +35,7 @@ DISPLAY_NAME = "FIFO lifecycle test"
 INHERITED_BUILD_ID = "20261010T190000.000000Z-" + "a" * 32
 FARM_RUN = "launcher-run-is-not-the-build-id"
 WAIT_S = 5
+SIGINT_STARTUP_GUARD_S = 60
 
 
 def _deadline(seconds=60):
@@ -80,12 +82,14 @@ class _Control:
         self.active = threading.Event()
         if active:
             self.active.set()
+        self.reserved_capacity = 4 if active else 0
+        self.occupied_capacity = 1 if active else 0
+        self.outstanding_leaf_count = 2
+        self.unconfirmed_attempt_count = 1
         self.registered = threading.Event()
-        self.queried = threading.Event()
         self.closed = threading.Event()
         self.heartbeat_seen = {sequence: threading.Event() for sequence in range(1, 5)}
         self.updates = []
-        self.queries = []
         self.connections = []
         self.starts = []
         self.handles = []
@@ -93,9 +97,10 @@ class _Control:
         self.warnings = []
         self.registration_records = []
         self.start_error = None
+        self.workflow_type = _farm.WORKFLOW_BUILD_FIFO
         self.register_response = None
+        self.registration_gate = None
         self.heartbeat_response = None
-        self.query_response = None
         self.close_response = None
         self.heartbeat_gate = None
         self.heartbeat_gate_sequence = None
@@ -109,8 +114,10 @@ class _Control:
             producer_state="open",
             ownership_state="active" if self.active.is_set() else "waiting",
             lease_deadline=self.lease_deadline,
-            outstanding_leaf_count=2,
-            unconfirmed_attempt_count=1,
+            outstanding_leaf_count=self.outstanding_leaf_count,
+            unconfirmed_attempt_count=self.unconfirmed_attempt_count,
+            reserved_capacity=self.reserved_capacity,
+            occupied_capacity=self.occupied_capacity,
         )
 
     async def connect(self, identity):
@@ -119,6 +126,10 @@ class _Control:
         self.connections.append((identity, record, threading.get_ident()))
         assert record["build_id"] == os.environ["HARMONIC_FARM_BUILD_ID"]
         return _Client(self)
+
+    async def describe(self, **options):
+        assert options["rpc_timeout"] == timedelta(seconds=_farm.FIFO_RPC_TIMEOUT_S)
+        return SimpleNamespace(workflow_type=self.workflow_type)
 
     async def execute_update(self, name, arg, **options):
         self.updates.append((name, arg, options, threading.get_ident()))
@@ -131,6 +142,8 @@ class _Control:
                 json.loads((self.requests / "build.json").read_text("utf-8"))
             )
             self.registered.set()
+            if self.registration_gate is not None:
+                await self.registration_gate.wait()
             if isinstance(self.register_response, BaseException):
                 raise self.register_response
             return self.register_response(self.status()) if self.register_response else self.status()
@@ -157,17 +170,6 @@ class _Control:
         if isinstance(self.close_response, BaseException):
             raise self.close_response
         return replace(self.status(), producer_state="closed")
-
-    async def query(self, name, arg, **options):
-        assert name == "build_status"
-        assert arg == _farm.BuildKey(self.build_id)
-        assert options["result_type"] is _farm.BuildStatus
-        assert options["rpc_timeout"] == timedelta(seconds=_farm.FIFO_RPC_TIMEOUT_S)
-        self.queries.append((name, arg, options))
-        self.queried.set()
-        if isinstance(self.query_response, BaseException):
-            raise self.query_response
-        return self.query_response(self.status()) if self.query_response else self.status()
 
     async def cancel(self):
         self.cancellations.append("coordinator.cancel")
@@ -253,6 +255,7 @@ def _guarded_process(tmp_path, monkeypatch):
     monkeypatch.setenv("HARMONIC_FARM_BUILD_ID", INHERITED_BUILD_ID)
     monkeypatch.setattr(_farm, "FIFO_HEARTBEAT_INTERVAL_S", 0.01)
     monkeypatch.setattr(_farm, "STATUS_POLL_INTERVAL_S", 0.002)
+    monkeypatch.setattr(_farm, "FIFO_RPC_RETRY_INTERVAL_S", 0.002)
     monkeypatch.setattr(_farm, "FIFO_RPC_TIMEOUT_S", 0.5)
     monkeypatch.setattr(_farm, "submitter", lambda: "test@submitter")
     monkeypatch.setattr(_farm._telemetry, "info", lambda *_args, **_kwargs: None)
@@ -289,6 +292,8 @@ def control(_guarded_process, monkeypatch):
         lambda message, **fields: fake.warnings.append((message, fields)),
     )
     yield fake
+    if fake.registration_gate is not None:
+        fake.registration_gate.release()
     if fake.heartbeat_gate is not None:
         fake.heartbeat_gate.release()
 
@@ -309,6 +314,8 @@ def start_parent(control):
         parent.release.set()
         parent.ownership._stop.set()
         parent.ownership._ready.set()
+        if control.registration_gate is not None:
+            control.registration_gate.release()
         if control.heartbeat_gate is not None:
             control.heartbeat_gate.release()
         parent.thread.join(WAIT_S)
@@ -324,16 +331,45 @@ def _assert_close(control, build_id, reason):
     assert control.cancellations == []
 
 
-def test_waiting_registration_renews_without_entering_scheduler_then_activation_enters(
-    control, start_parent, _guarded_process
+def test_wrong_type_existing_coordinator_is_rejected_before_registration(
+    control, _guarded_process,
+):
+    control.workflow_type = "BuildFifo"
+    owner = _farm.producer_build(DISPLAY_NAME)
+    with pytest.raises(RuntimeError) as failure:
+        with owner:
+            pytest.fail("wrong-type coordinator admitted the local scheduler")
+
+    message = str(failure.value)
+    assert _farm.WORKFLOW_BUILD_FIFO_ID in message
+    assert f"expected workflow type {_farm.WORKFLOW_BUILD_FIFO!r}" in message
+    assert "found 'BuildFifo'" in message
+    assert "coordinated producer/pool/worker cutover" in message
+    assert control.updates == []
+    assert control.cancellations == []
+    assert not control.registered.is_set()
+    assert not owner._thread.is_alive()
+    assert not _guarded_process[1].is_set()
+    assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
+
+
+def test_registration_precedes_scheduler_and_renewal_is_independent_of_capacity(
+    control, start_parent, _guarded_process,
 ):
     control.active.clear()
+    control.reserved_capacity = 0
+    control.occupied_capacity = 0
+    control.registration_gate = _AsyncGate()
+    control.heartbeat_gate = _AsyncGate()
+    control.heartbeat_gate_sequence = 3
     parent = start_parent()
-    _wait(control.registered, "build was not registered")
-    _wait(control.queried, "waiting ownership was not polled")
-    _wait(control.heartbeat_seen[2], "waiting producer did not independently renew")
-
-    assert not parent.entered.is_set(), "waiting build entered its native scheduler"
+    _wait(control.registration_gate.entered, "build was not registered")
+    assert not parent.entered.is_set(), "scheduler entered before registration acknowledgement"
+    assert control.calls("heartbeat_build") == []
+    control.registration_gate.release()
+    _wait(parent.entered, "open producer did not enter scheduler")
+    _wait(control.heartbeat_gate.entered, "producer did not independently renew")
+    assert not parent.done.is_set(), "renewal completed the blocked local scheduler"
     assert control.calls("close_build") == []
     assert control.connections[0][0] == "test@submitter"
     [(registration, registration_options)] = control.calls("register_build")
@@ -342,8 +378,7 @@ def test_waiting_registration_renews_without_entering_scheduler_then_activation_
         f"register:{registration.build_id}".encode()
     ).hexdigest()
 
-    control.active.set()
-    _wait(parent.entered, "active ownership did not release scheduler entry")
+    control.heartbeat_gate.release()
     assert parent.action_build_id == registration.build_id
     heartbeat_calls = control.calls("heartbeat_build")
     sequences = [heartbeat.sequence for heartbeat, _options in heartbeat_calls]
@@ -364,9 +399,34 @@ def test_waiting_registration_renews_without_entering_scheduler_then_activation_
     assert not _guarded_process[1].is_set()
 
 
+def test_active_to_waiting_zero_allocation_keeps_scheduler_and_lease_open(
+    control, start_parent, _guarded_process
+):
+    control.heartbeat_gate = _AsyncGate()
+    parent = start_parent()
+    _wait(parent.entered, "producer did not enter scheduler")
+    _wait(control.heartbeat_gate.entered, "heartbeat did not reach fake boundary")
+    control.active.clear()
+    control.reserved_capacity = 0
+    control.occupied_capacity = 0
+    control.heartbeat_gate.release()
+    _wait(control.heartbeat_seen[2], "zero-allocation transition stopped renewal")
+
+    parent.ownership.check()
+    assert parent.ownership._failure is None
+    assert parent.entered.is_set()
+    assert not parent.done.is_set()
+    assert not _guarded_process[1].is_set()
+    assert control.calls("close_build") == []
+
+    parent.finish()
+    assert parent.errors == []
+    _assert_close(control, parent.ownership.build_id, "finished")
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows lock waits have distinct signal behavior")
-@pytest.mark.parametrize("registration", ["waiting", "accepted-reply-pending"])
-def test_windows_sigint_while_entering_closes_accepted_build_and_restores_environment(
+@pytest.mark.parametrize("registration", ["zero-capacity-scheduler", "accepted-reply-pending"])
+def test_windows_sigint_closes_accepted_build_and_restores_environment(
     _guarded_process, tmp_path, registration
 ):
     # A real Python SIGINT is queued from the isolated child's background thread.
@@ -379,7 +439,10 @@ def test_windows_sigint_while_entering_closes_accepted_build_and_restores_enviro
         import os
         import signal
         import sys
+        import threading
+        import time
         from datetime import datetime, timedelta, timezone
+        from types import SimpleNamespace
 
         sys.path.insert(0, sys.argv[1])
         import _farm
@@ -392,7 +455,6 @@ def test_windows_sigint_while_entering_closes_accepted_build_and_restores_enviro
         _farm.load_config = refuse
         _farm.FIFO_RPC_TIMEOUT_S = 4
         _farm.FIFO_HEARTBEAT_INTERVAL_S = 60
-        _farm.STATUS_POLL_INTERVAL_S = 0.002
         _farm._telemetry.info = lambda *args, **kwargs: None
         _farm._telemetry.warn = lambda *args, **kwargs: None
         previous_id = os.environ["HARMONIC_FARM_BUILD_ID"]
@@ -400,21 +462,24 @@ def test_windows_sigint_while_entering_closes_accepted_build_and_restores_enviro
         updates = []
 
         class Control:
+            async def describe(self, **options):
+                return SimpleNamespace(workflow_type=_farm.WORKFLOW_BUILD_FIFO)
+
             def status(self, state="open"):
                 return _farm.BuildStatus(
                     owner.build_id, 7, state, "waiting",
                     (datetime.now(timezone.utc) + timedelta(seconds=120)).isoformat(),
-                    2, 1,
+                    2, 1, 0, 0,
                 )
 
             async def execute_update(self, name, arg, **options):
                 updates.append((name, getattr(arg, "reason", None)))
                 assert arg.build_id == owner.build_id
                 if name == "register_build":
-                    asyncio.get_running_loop().call_later(
-                        0.05, signal.raise_signal, signal.SIGINT
-                    )
                     if sys.argv[2] == "accepted-reply-pending":
+                        asyncio.get_running_loop().call_later(
+                            0.05, signal.raise_signal, signal.SIGINT
+                        )
                         # The fake accepted registration, but withholds its reply
                         # until the real producer's cancellation cleanup starts.
                         while not owner._stop.is_set():
@@ -422,11 +487,6 @@ def test_windows_sigint_while_entering_closes_accepted_build_and_restores_enviro
                     return self.status()
                 assert name == "close_build", "signal probe unexpectedly renewed"
                 return self.status("closed")
-
-            async def query(self, name, arg, **options):
-                assert name == "build_status"
-                assert arg == _farm.BuildKey(owner.build_id)
-                return self.status()
 
             async def cancel(self):
                 raise AssertionError("local SIGINT cancelled remote work")
@@ -448,11 +508,18 @@ def test_windows_sigint_while_entering_closes_accepted_build_and_restores_enviro
             return FakeClient()
 
         _farm._connect_client = connect
+        # Imports and all live-farm guards are ready before the parent starts
+        # the separate, unchanged SIGINT-and-close behavior deadline.
+        print("ready", flush=True)
+        assert sys.stdin.readline() == "start\\n"
         entered = False
         interrupted = False
         try:
             with owner:
                 entered = True
+                threading.Timer(0.05, signal.raise_signal, args=(signal.SIGINT,)).start()
+                while True:
+                    time.sleep(0.002)
         except KeyboardInterrupt:
             interrupted = True
         print(json.dumps({
@@ -465,7 +532,7 @@ def test_windows_sigint_while_entering_closes_accepted_build_and_restores_enviro
         }))
         """
     )
-    child = subprocess.run(
+    child = subprocess.Popen(
         [
             sys.executable,
             "-I",
@@ -475,14 +542,53 @@ def test_windows_sigint_while_entering_closes_accepted_build_and_restores_enviro
             registration,
         ],
         cwd=tmp_path,
-        capture_output=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        check=True,
-        timeout=WAIT_S + 5,
     )
-    outcome = json.loads(child.stdout)
+    startup_ready = threading.Event()
+    startup_lines = []
+    startup_errors = []
+
+    def read_startup():
+        try:
+            startup_lines.append(child.stdout.readline())
+        except BaseException as exc:
+            startup_errors.append(exc)
+        finally:
+            startup_ready.set()
+
+    reader = threading.Thread(target=read_startup, name="sigint-probe-startup", daemon=True)
+    reader.start()
+    try:
+        if not startup_ready.wait(SIGINT_STARTUP_GUARD_S):
+            child.kill()
+            reader.join(timeout=WAIT_S + 5)
+            stdout, stderr = child.communicate(timeout=WAIT_S + 5)
+            raise AssertionError(
+                f"SIGINT probe imports/guards exceeded {SIGINT_STARTUP_GUARD_S}s "
+                f"startup guard: stdout={stdout!r} stderr={stderr!r}"
+            )
+        reader.join()
+        if startup_errors:
+            raise startup_errors[0]
+        assert startup_lines == ["ready\n"], startup_lines
+        # Starting the behavior only after readiness preserves the 10s budget;
+        # slow cold imports cannot spend that signal/close safety window.
+        stdout, stderr = child.communicate(input="start\n", timeout=WAIT_S + 5)
+        assert child.returncode == 0, (stdout, stderr)
+    finally:
+        # Only this captured synthetic child is stopped; no console broadcast,
+        # parent interrupt or native worker process is involved.
+        if child.poll() is None:
+            child.kill()
+        reader.join(timeout=WAIT_S + 5)
+        child.communicate(timeout=WAIT_S + 5)
+        assert not reader.is_alive(), "SIGINT startup pipe reader leaked"
+    outcome = json.loads(stdout)
     assert outcome["interrupted"]
-    assert not outcome["entered"], "cancelled waiting build entered the scheduler"
+    assert outcome["entered"] is (registration == "zero-capacity-scheduler")
     assert not outcome["thread_alive"], "cancelled producer left a renewal thread"
     assert outcome["restored"]
     assert outcome["updates"] == [["register_build", None], ["close_build", "cancelled"]]
@@ -506,7 +612,6 @@ def test_active_local_action_gap_renews_and_spawned_child_inherits_only_build_id
     assert parent.ownership._lease_wall > original_deadline
     control.heartbeat_gate.release()
     assert not parent.done.is_set()
-    assert control.queries == [], "active renewal should not depend on a dispatched leaf"
 
     # Safe probe only: no repository imports, COM, shell, credentials or workload.
     child = subprocess.run(
@@ -556,8 +661,6 @@ def test_finally_closes_group_without_cancelling_shared_remote_work(
 
     assert parent.errors == ([] if action_error is None else [action_error])
     _assert_close(control, parent.ownership.build_id, reason)
-    assert control.status().outstanding_leaf_count == 2
-    assert control.status().unconfirmed_attempt_count == 1
     assert control.handles == [(_farm.WORKFLOW_BUILD_FIFO_ID, {})]
     assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
     assert not _guarded_process[1].is_set()
@@ -602,47 +705,6 @@ def test_transient_heartbeat_retries_same_lease_sequence_and_update_id(
     assert not _guarded_process[1].is_set()
     assert len(control.calls("register_build")) == 1
     assert control.calls("close_build") == []
-
-    control.heartbeat_gate.release()
-    parent.finish()
-    assert parent.errors == []
-    _assert_close(control, parent.ownership.build_id, "finished")
-
-
-@pytest.mark.parametrize("fault", ["connection", "frontend-unavailable"])
-def test_transient_waiting_status_query_retries_without_new_registration_or_lease(
-    control, start_parent, _guarded_process, fault
-):
-    control.active.clear()
-    original_deadline = control.lease_deadline
-    attempts = []
-    from temporalio.service import RPCError, RPCStatusCode
-
-    outage = (
-        ConnectionError("temporary frontend outage") if fault == "connection"
-        else RPCError("frontend restarting", RPCStatusCode.UNAVAILABLE, b"")
-    )
-
-    def query_response(status):
-        attempts.append(status)
-        if len(attempts) == 1:
-            raise outage
-        control.active.set()
-        return control.status()
-
-    control.query_response = query_response
-    control.heartbeat_gate = _AsyncGate()
-    parent = start_parent()
-    _wait(parent.entered, "recovered waiting query did not activate producer")
-    _wait(control.heartbeat_gate.entered, "active producer did not begin renewal")
-
-    assert len(control.queries) == 2
-    assert control.queries[0] == control.queries[1]
-    assert control.lease_deadline == original_deadline
-    assert parent.ownership._lease_wall == datetime.fromisoformat(original_deadline)
-    assert len(control.calls("register_build")) == 1
-    assert parent.ownership._failure is None
-    assert not _guarded_process[1].is_set()
 
     control.heartbeat_gate.release()
     parent.finish()
@@ -704,7 +766,8 @@ def test_close_transport_warning_cannot_mask_prior_ownership_loss(
 @pytest.mark.parametrize(
     "fault",
     ["lease-expiring-outage", "update-refusal", "rpc-refusal", "closed", "expired",
-     "past-deadline", "foreign-build", "waiting", "drained"],
+     "drained", "malformed-ownership", "missing-ownership", "empty-ownership",
+     "past-deadline", "missing-deadline", "malformed-deadline", "foreign-build"],
 )
 def test_active_renewal_fault_fails_closed_and_interrupts_only_mocked_parent(
     control, start_parent, _guarded_process, fault
@@ -733,10 +796,14 @@ def test_active_renewal_fault_fails_closed_and_interrupts_only_mocked_parent(
         changes = {
             "closed": {"producer_state": "closed"},
             "expired": {"producer_state": "expired"},
-            "past-deadline": {"lease_deadline": _deadline(-1)},
-            "foreign-build": {"build_id": "another-build"},
-            "waiting": {"ownership_state": "waiting"},
             "drained": {"ownership_state": "drained"},
+            "malformed-ownership": {"ownership_state": "not-an-ownership-state"},
+            "missing-ownership": {"ownership_state": None},
+            "empty-ownership": {"ownership_state": ""},
+            "past-deadline": {"lease_deadline": _deadline(-1)},
+            "missing-deadline": {"lease_deadline": None},
+            "malformed-deadline": {"lease_deadline": "not-a-deadline"},
+            "foreign-build": {"build_id": "another-build"},
         }[fault]
         control.heartbeat_response = lambda status: replace(status, **changes)
     control.heartbeat_gate.release()
@@ -761,14 +828,33 @@ def test_active_renewal_fault_fails_closed_and_interrupts_only_mocked_parent(
     assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
 
 
-@pytest.mark.parametrize("state", ["closed", "expired"])
-def test_waiting_status_failure_never_enters_or_interrupts_scheduler(
-    control, start_parent, _guarded_process, state
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"producer_state": "closed"},
+        {"producer_state": "expired"},
+        {"ownership_state": "drained"},
+        {"ownership_state": "not-an-ownership-state"},
+        {"ownership_state": None},
+        {"ownership_state": ""},
+        {"lease_deadline": _deadline(-1)},
+        {"lease_deadline": None},
+        {"lease_deadline": "not-a-deadline"},
+        {"build_id": "another-build"},
+    ],
+    ids=["closed", "expired", "drained", "malformed-ownership", "missing-ownership",
+         "empty-ownership", "past-deadline", "missing-deadline", "malformed-deadline",
+         "foreign-build"],
+)
+def test_registration_without_valid_open_lease_never_enters_or_interrupts_scheduler(
+    control, start_parent, _guarded_process, changes
 ):
     control.active.clear()
-    control.query_response = lambda status: replace(status, producer_state=state)
+    control.reserved_capacity = 0
+    control.occupied_capacity = 0
+    control.register_response = lambda status: replace(status, **changes)
     parent = start_parent()
-    _wait(parent.done, "waiting producer did not fail closed")
+    _wait(parent.done, "invalid registration did not fail closed")
 
     assert not parent.entered.is_set()
     assert len(parent.errors) == 1
@@ -800,24 +886,6 @@ def test_unanswered_heartbeat_cannot_extend_last_acknowledged_lease(
         parent.ownership.check()
     parent.finish()
     _assert_close(control, parent.ownership.build_id, "failed")
-
-
-def test_waiting_status_queries_do_not_renew_acknowledged_lease(
-    control, start_parent, _guarded_process, monkeypatch
-):
-    control.active.clear()
-    control.lease_deadline = _deadline(0.5)
-    monkeypatch.setattr(_farm, "FIFO_HEARTBEAT_INTERVAL_S", 10)
-    control.query_response = lambda status: replace(status, lease_deadline=_deadline(60))
-    parent = start_parent()
-    _wait(control.queried, "waiting producer did not query status")
-    _wait(parent.done, "status query incorrectly extended producer lease", timeout=2)
-
-    assert not parent.entered.is_set()
-    assert isinstance(parent.errors[0], _farm.BuildOwnershipError)
-    assert control.calls("heartbeat_build") == []
-    _assert_close(control, parent.ownership.build_id, "failed")
-    assert not _guarded_process[1].is_set()
 
 
 def test_accepted_registration_response_loss_leaves_durable_id_and_closes_group(
@@ -879,7 +947,7 @@ def test_build_that_cannot_be_recorded_never_connects_or_registers(
     assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
 
 
-def _install_serial_build(monkeypatch, action):
+def _install_serial_build(monkeypatch, action, *, uptodate=None):
     """Keep the real build/main/doit wrapper, but never a real graph or DB."""
 
     class MemoryJsonDB(JsonDB):
@@ -892,7 +960,15 @@ def _install_serial_build(monkeypatch, action):
             pass
 
     monkeypatch.setattr(_doit_cmd_base, "JsonDB", MemoryJsonDB)
-    namespace = {"task_local_gap": lambda: {"actions": [action]}}
+    def task_local_gap():
+        # doit annotates each loaded dictionary; every invocation needs a fresh
+        # top-level task, not the previous load's synthesized ``name`` field.
+        task = {"actions": [action]}
+        if uptodate is not None:
+            task["uptodate"] = [uptodate]
+        return task
+
+    namespace = {"task_local_gap": task_local_gap}
     config = {"GLOBAL": {"backend": "json", "dep_file": ":memory:"}}
 
     class FixtureFarmDoit(_RealFarmDoitMain):
@@ -908,6 +984,35 @@ def _install_serial_build(monkeypatch, action):
             return super().run(serial)
 
     monkeypatch.setattr(build, "_FarmDoitMain", FixtureFarmDoit)
+
+
+def test_cache_only_zero_capacity_build_closes_safely_without_native_dispatch(
+    control, monkeypatch, _guarded_process
+):
+    control.active.clear()
+    control.reserved_capacity = 0
+    control.occupied_capacity = 0
+    control.outstanding_leaf_count = 0
+    control.unconfirmed_attempt_count = 0
+    monkeypatch.setattr(build, "_farm_preflight", lambda: None)
+
+    def refuse_native_work():
+        raise AssertionError("cache-only task executed native work")
+
+    _install_serial_build(monkeypatch, refuse_native_work, uptodate=True)
+    assert build.main(
+        ["--executor", "farm", "--display-name", DISPLAY_NAME, "local_gap"]
+    ) == 0
+
+    [(registration, _options)] = control.calls("register_build")
+    _assert_close(control, registration.build_id, "finished")
+    assert len(control.starts) == 1
+    assert json.loads((control.requests / "build.json").read_text("utf-8")) == {
+        "build_id": registration.build_id, "farm_run": FARM_RUN,
+    }
+    assert control.warnings == []
+    assert not _guarded_process[1].is_set()
+    assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
 
 
 def test_real_build_wrapper_mints_fresh_ids_only_after_successful_preflight(
@@ -1062,7 +1167,7 @@ class _LeafControl:
     def __init__(self, requests):
         self.requests = requests
         self.request = _farm.LeafRequest(
-            farm_protocol_version=5,
+            farm_protocol_version=6,
             commit="c" * 40,
             task="part:pen_rod",
             cache_key="k" * 64,
@@ -1071,7 +1176,11 @@ class _LeafControl:
             build_id=INHERITED_BUILD_ID,
         )
         self.workflow_id = _farm.workflow_id(
-            self.request.task, self.request.cache_key, self.request.commit, 900
+            self.request.build_id, self.request.task, self.request.cache_key,
+            self.request.commit, 900,
+        )
+        assert self.workflow_id == (
+            f"leaf:{self.request.build_id}:{self.request.task}:{self.request.cache_key}:900s"
         )
         self.key = _farm.LeafKey(self.request.build_id, self.workflow_id)
         self.binding = _farm.LeafBinding(self.request.build_id, self.workflow_id, "exact-run")
@@ -1094,6 +1203,9 @@ class _LeafControl:
     async def connect(self, identity):
         assert identity == self.request.submitter
         return _LeafClient(self)
+
+    async def describe(self, **options):
+        return SimpleNamespace(workflow_type=_farm.WORKFLOW_BUILD_FIFO)
 
     async def execute_update(self, name, arg, **options):
         assert name == "submit_leaf"

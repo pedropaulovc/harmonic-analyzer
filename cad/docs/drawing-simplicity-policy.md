@@ -43,7 +43,7 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 2. **Decimal places carry the tolerance, and the MODEL owns both.** A
    dimension with no explicit band is governed by its decimal places. A
    tighter band goes ON that dimension as a native model tolerance
-   (`_drawing_marks.set_dimension_*_tolerance`), never in a note and never
+   (`_drawing_tolerances.set_dimension_*_tolerance`), never in a note and never
    as a frame. Three decimals mean "hold it"; two mean "routine". Do not
    print three decimals on a routine feature. The decimal places are
    likewise a property of the model dimension: the part build authors them

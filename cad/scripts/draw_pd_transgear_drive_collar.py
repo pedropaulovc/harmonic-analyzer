@@ -17,26 +17,33 @@ import argparse
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    place_view,
+)
+
 from _check import check
 from _com import _early_bound
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
-    add_property_linked_note,
-    assert_imported_precision,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
 from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_drive_collar_spec import (
     BORE_CALLOUT,
@@ -52,10 +59,6 @@ from pd_transgear_drive_collar_spec import (
     PIN_CIRCLE_RADIUS,
     PIN_HOLE_CALLOUT,
     SLOT_CALLOUT,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
 )
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_drive_collar"]

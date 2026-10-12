@@ -564,7 +564,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 #
 # Policy rule 2: the places a dimension prints are part of the tolerance it
 # claims, and the model owns both. ``build_dt_crank_pinion`` applies this table
-# natively (``_drawing_marks.apply_drawing_precision``) right after the drawing
+# natively (``_drawing_precision.apply_drawing_precision``) right after the drawing
 # marks, so ``draw_dt_crank_pinion`` imports each dimension verbatim and only reads
 # ``GetPrimaryPrecision2()`` back off the sheet.
 #

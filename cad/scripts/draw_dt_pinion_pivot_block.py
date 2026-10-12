@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the pinion pivot block.
 
 The SLDPRT remains authoritative.  This recipe supplies only the block's
-views, dimension layout, hole callouts, and manufacturing notes; every shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+views, dimension layout, hole callouts, and manufacturing notes;
+sheet/template and export behavior lives in ``_drawing_common``.
+Dimension import and curation live in ``_drawing_dimension_import``.
 
 The sheet runs at 3:1 with the raised envelope from the spec; the isometric carries an
 explicit 2:1 override so it stays clear of the title block.
@@ -19,26 +19,31 @@ import argparse
 import sys
 from typing import Any
 
-import _telemetry
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    place_view,
+)
+
 from _check import check
-from _paths import CAD_ROOT
-from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
-    add_native_hole_callout,
-    add_property_linked_note,
-    add_surface_finish,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import set_dimension_callouts
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_finish import add_surface_finish
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
+from _paths import CAD_ROOT
+from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _telemetry
 from dt_pinion_pivot_block_spec import (
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
@@ -53,10 +58,6 @@ from dt_pinion_pivot_block_spec import (
     SCREW_HALF_SPACING,
     SCREW_HOLE_DIA,
     SURFACE_FINISHES,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
 )
 
 
