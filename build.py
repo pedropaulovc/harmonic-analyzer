@@ -258,7 +258,7 @@ def _farm_command(command_class, display_name: str | None = None):
                     raise FarmPreflightError(str(exc)) from None
                 if display_name is not None:
                     os.environ["HARMONIC_FARM_DISPLAY_NAME"] = label
-                _admitted, pool_identity = _require_leaf_admission(control)
+                admitted, pool_identity = _require_leaf_admission(control)
                 if pool_identity is None:
                     _farm_preflight()
                 else:
@@ -271,6 +271,8 @@ def _farm_command(command_class, display_name: str | None = None):
                     print(f"farm: {problem}", file=sys.stderr)
                     return 2
                 raise
+            previous_admission = os.environ.get("HARMONIC_FARM_ADMITTED_LEAVES")
+            os.environ["HARMONIC_FARM_ADMITTED_LEAVES"] = json.dumps(admitted)
             try:
                 with _farm.producer_build(label) as producer:
                     print(
@@ -285,6 +287,11 @@ def _farm_command(command_class, display_name: str | None = None):
                 self.dep_manager.close()
                 print(f"farm: {problem}", file=sys.stderr)
                 return 2
+            finally:
+                if previous_admission is None:
+                    os.environ.pop("HARMONIC_FARM_ADMITTED_LEAVES", None)
+                else:
+                    os.environ["HARMONIC_FARM_ADMITTED_LEAVES"] = previous_admission
 
     return FarmCommand
 

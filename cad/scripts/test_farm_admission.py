@@ -30,6 +30,7 @@ import build  # noqa: E402
 
 _REAL_RUN = subprocess.run
 _REAL_FARM_DOIT = build._FarmDoitMain
+_REAL_RUN_LEAF = _farm.run_leaf
 _LABEL = "Offline selected-pool admission regression"
 
 
@@ -46,6 +47,7 @@ def admission(tmp_path, monkeypatch):
         "HARMONIC_FARM_PARALLELISM",
         "HARMONIC_FARM_LEAF_TIMEOUT_S",
         "HARMONIC_VERBOSITY",
+        "HARMONIC_FARM_ADMITTED_LEAVES",
     ):
         # Track originally absent keys too: build.main writes executor state
         # directly, so a plain delenv on an absent key would not restore it.
@@ -545,6 +547,112 @@ def test_pool_identity_uses_existing_fleet_query_and_pool_canonical_tag(
     build._require_fleet_protocol(home, 5, pool_identity=identity)
     assert queries == [(home, ("agents", "--json"))]
     assert admission.events == []
+
+
+@pytest.mark.parametrize("marked", [True, False], ids=["label-mismatch", "unmarked-wrapper"])
+@pytest.mark.parametrize("inherited", [None, '["outer:admission"]'], ids=["absent", "inherited"])
+def test_actual_dispatch_label_requires_scoped_admission(
+    admission, monkeypatch, capsys, marked, inherited
+):
+    task_name = "package:fixture-ok"
+    dispatched_label = "features:unadmitted"
+    admission.pool(accepted=[task_name])
+    if inherited is not None:
+        monkeypatch.setenv("HARMONIC_FARM_ADMITTED_LEAVES", inherited)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("unadmitted label reached a request, span or reservation")
+
+    monkeypatch.setattr(_farm._telemetry, "span", forbidden)
+    monkeypatch.setattr(_farm, "LeafRequest", forbidden)
+    monkeypatch.setattr(_farm, "_dispatch", forbidden)
+
+    def action():
+        expected = [task_name] if marked else []
+        assert json.loads(os.environ["HARMONIC_FARM_ADMITTED_LEAVES"]) == expected
+        return _REAL_RUN_LEAF(dispatched_label, "k" * 64)
+
+    admission.install({
+        task_name: {"actions": [_farm.leaf_action(action) if marked else action]},
+    })
+    assert admission.run(task_name) == 2
+    captured = capsys.readouterr()
+    assert dispatched_label in captured.out + captured.err
+    assert "lacks preflight admission" in captured.out + captured.err
+    assert os.environ.get("HARMONIC_FARM_ADMITTED_LEAVES") == inherited
+    assert admission.events[-2:] == [("finish", False), "close"]
+
+
+def test_real_graph_every_marked_action_dispatches_its_task_name():
+    # A fresh child avoids dodo's process-wide doit patches. Every native/cache
+    # effect is intercepted, and capturing the label aborts before post-build
+    # stamps or recipe sidecars can be written.
+    program = """
+import json
+from contextlib import nullcontext
+from types import SimpleNamespace
+from doit.loader import load_tasks
+import dodo
+
+def forbidden(*args, **kwargs):
+    raise AssertionError('native or remote work escaped the graph invariant')
+
+class CapturedLabel(Exception):
+    pass
+
+def capture(label, *args):
+    raise CapturedLabel(label)
+
+dodo._farm_build = capture
+dodo._farm.enabled = lambda: True
+dodo._farm.run_leaf = forbidden
+dodo._com_seat = forbidden
+dodo._exec_com = forbidden
+dodo._sw_ensure_once = forbidden
+dodo._cache_key = lambda *args: 'k' * 64
+dodo._digest_files = lambda *args: 'fixture-digest'
+dodo._probe_cache = lambda *args, **kwargs: 'miss'
+dodo._telemetry.span = lambda *args, **kwargs: nullcontext(
+    SimpleNamespace(set_attribute=lambda *args: None)
+)
+known = {
+    dodo._cached_com_action, dodo._cached_drawing_action,
+    dodo._cached_part_action, dodo.build_or_refresh,
+}
+checked = 0
+helpers = set()
+for task in load_tasks(vars(dodo), [], allow_delayed=False):
+    for action in task.actions:
+        function = getattr(action, 'py_callable', None)
+        if not getattr(function, '_farm_leaf_action', False):
+            continue
+        assert function in known, (task.name, function)
+        kwargs = dict(action.kwargs)
+        if function is dodo.build_or_refresh:
+            kwargs.update(dependencies=[], changed=[], targets=task.targets)
+        try:
+            function(*action.args, **kwargs)
+        except CapturedLabel as captured:
+            assert captured.args[0] == task.name, (task.name, captured.args[0])
+        else:
+            raise AssertionError((task.name, 'marked action did not dispatch'))
+        checked += 1
+        helpers.add(function.__name__)
+assert checked > 0
+assert helpers == {function.__name__ for function in known}
+print(json.dumps({'checked': checked, 'helpers': sorted(helpers)}))
+"""
+    env = {
+        **os.environ, "HARMONIC_EXECUTOR": "local",
+        "HARMONIC_REMOTE_CACHE_MODE": "off", "HARMONIC_SW_AUTOSTART": "0",
+    }
+    result = _REAL_RUN(
+        [sys.executable, "-B", "-c", program],
+        cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=120,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    summary = json.loads(result.stdout.splitlines()[-1])
+    assert summary["checked"] > 0
 
 
 def test_leaf_action_marker_preserves_callable_identity_without_invoking_it():
