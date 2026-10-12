@@ -2471,7 +2471,11 @@ async def save_assembly_and_images(
     ``dof_manifest`` publishes the recorded free-DOF manifest only once the
     assembly it describes is saved and fingerprinted; the previous manifest is
     retired with the previous mass-property proof, so a failed build never
-    leaves a manifest beside an assembly it does not describe."""
+    leaves a manifest beside an assembly it does not describe.
+
+    Temporary pn-only diagnostic capture saves a marked copy from the still-
+    untitled source immediately after the normal copy save, before any reopen
+    or first reconcile; it is not a fresh-save repair."""
     if asm_name in ("ch-channel", "sm-summing") and native_contact_check is None:
         raise ValueError(f"{asm_name} assembly requires native_contact_check")
     # The drawings' views at 1:2 and smaller print this derived configuration
@@ -2499,12 +2503,22 @@ async def save_assembly_and_images(
     assert_reference_geometry_hidden(adapter, asm_name)
     OUT_SLDASM.mkdir(parents=True, exist_ok=True)
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
+    independent_display_probe = False
+    if asm_name == "pn-pen":
+        from diagnostics.probe_assembly_display_data import (
+            capture_independent_pn_first_reconcile,
+            independent_pn_capture_requested,
+        )
+
+        independent_display_probe = independent_pn_capture_requested()
     sidecar = _massprops_sidecar(asm_name)
     # A full build replaces the assembly bytes. Strictly retire proof for the
     # previous bytes before replacement; an unlink failure aborts the save.
-    _invalidate_massprops_proof(sidecar)
-    if dof_manifest:
-        dof_manifest_path(asm_name).unlink(missing_ok=True)
+    # The temporary independent pn capture must leave the normal proof intact.
+    if not independent_display_probe:
+        _invalidate_massprops_proof(sidecar)
+        if dof_manifest:
+            dof_manifest_path(asm_name).unlink(missing_ok=True)
     # Save on isometric so the .SLDASM opens isometric; runs AFTER any
     # remap_front_to_machine_front (which re-bases the standard views) so the
     # re-based Front/Back/etc. used by the gallery stay correct.
@@ -2517,7 +2531,17 @@ async def save_assembly_and_images(
     # save (_run_solved_gates leaves the model clean or raises).
     if rebuild_if_needed_before_save(adapter, asm_name) and solved_gates is not None:
         _run_solved_gates(adapter, asm_name, solved_gates, trigger="save_rebuild")
+    if independent_display_probe:
+        # Diagnostic-only second construction: first Copy11 targets its separate
+        # marked artifact; no normal save/render/fingerprint tail runs here.
+        return await capture_independent_pn_first_reconcile(adapter, asm_path)
     _save_new_assembly_as_copy(adapter, asm_path)
+    if asm_name == "pn-pen":
+        # Diagnostic-only matrix hook: normal bytes are already saved; the helper
+        # captures a marked Copy11, restores source LDR marks, and checks part hashes.
+        from diagnostics.probe_assembly_display_data import capture_pn_marked_copy
+
+        capture_pn_marked_copy(adapter, asm_path)
     try:
         artefacts = {"assembly": str(asm_path)}
         artefacts.update(await _export_assembly_images(adapter, asm_name, views))
@@ -2705,7 +2729,11 @@ def final_rebuild_before_save(adapter: Any, label: str, model: Any = None) -> No
 
 
 async def reconcile_saved_rebuild_state(
-    adapter: Any, asm_name: str, asm_path: Any
+    adapter: Any,
+    asm_name: str,
+    asm_path: Any,
+    *,
+    diagnostic_save: dict[str, Any] | None = None,
 ) -> None:
     """Reopen a just-saved assembly and, if it loads needing a rebuild, rebuild
     each configuration + in-place Save3 so the persisted artifact reopens clean
@@ -2737,7 +2765,18 @@ async def reconcile_saved_rebuild_state(
     ``Save3``. The saved file is then reopened the way that gate opens it and
     must read clean, so an artifact that would fail it is never cached; a dirty
     reopen raises naming each configuration's saved state.
+
+    ``diagnostic_save`` is temporary matrix-only observation: when supplied,
+    record whether the existing Save3 is attempted, its immediate pre-save
+    GetSaveFlag, and its full returned value. Clean skips retain False/None/None;
+    baseline callers add no native reads or save/rebuild operations.
     """
+    if diagnostic_save is not None:
+        diagnostic_save.update(
+            save_performed=False,
+            get_save_flag_before_save3=None,
+            save_result=None,
+        )
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     with _telemetry.span("assembly.reconcile_rebuild", asm=asm_name) as sp:
         await adapter.open_model(str(asm_path))
@@ -2767,9 +2806,14 @@ async def reconcile_saved_rebuild_state(
             configuration.AddRebuildSaveMark = True
             if not bool(configuration.AddRebuildSaveMark):
                 raise RuntimeError(f"{asm_name}: {name!r} rebuild-save mark did not set")
+        if diagnostic_save is not None:
+            diagnostic_save["get_save_flag_before_save3"] = bool(model.GetSaveFlag())
+            diagnostic_save["save_performed"] = True
         result = adapter._attempt(
             lambda: model.Save3(1, 0, 0), default=None
         )  # Silent, in place
+        if diagnostic_save is not None:
+            diagnostic_save["save_result"] = result
         in_mem = saved_rebuild_status(adapter, model)
         if in_mem != 0:
             raise RuntimeError(

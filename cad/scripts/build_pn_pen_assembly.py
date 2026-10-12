@@ -64,7 +64,7 @@ import sys
 
 from _check import check
 from _custom_properties import apply_custom_properties
-from _session import run_build
+from _session import discard_open_documents, run_build
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     activate_assembly_contract,
@@ -97,7 +97,10 @@ from _mcmaster_99607a213 import SHANK_LEN as PEN_SET_SHANK_LEN
 from _mcmaster_99607a213 import SHANK_DIA as PEN_SET_SHANK_DIA
 from _mcmaster_99607a213 import TIP_CHAMFER as PEN_SET_TIP_CHAMFER
 from mg_magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
-from diagnostics.probe_assembly_display_data import probe_assembly_display_data
+from diagnostics.probe_assembly_display_data import (
+    independent_pn_capture,
+    probe_assembly_display_data,
+)
 
 ASM_NAME = "pn-pen"
 
@@ -304,7 +307,7 @@ if HANGER_TIP_TO_RIM <= 0.0:
     raise AssertionError("stock hanger screw tip reaches the magnifying-wheel rim")
 
 
-async def build(adapter) -> dict[str, str]:
+async def _build_pen(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
@@ -491,9 +494,18 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    artefacts = await save_assembly_and_images(adapter, ASM_NAME)
-    # Temporary farm-native investigation: run only after the unchanged normal
-    # save/render/reconcile/fingerprint tail; never alter its published assembly.
+    return await save_assembly_and_images(adapter, ASM_NAME)
+
+
+async def build(adapter) -> dict[str, str]:
+    artefacts = await _build_pen(adapter)
+    # Temporary matrix: construct an independent source using cached parts only,
+    # without building or saving any part. Preserve the normal published assembly.
+    discard_open_documents(adapter)
+    adapter.currentModel = None
+    with independent_pn_capture():
+        artefacts.update(await _build_pen(adapter))
+    # Compare only after both constructions and their first reconciles complete.
     artefacts.update(await probe_assembly_display_data(adapter, artefacts["assembly"]))
     return artefacts
 

@@ -1,10 +1,10 @@
-"""Temporary display-data save matrix, invoked AFTER the normal pn assembly build.
+"""Temporary display-data first-reconcile matrix on the existing pn farm leaf.
 
-Run through the existing farm leaf ``assembly:pn_pen``; this module deliberately
-has no standalone entry point that could start a local SOLIDWORKS seat. The pn
-builder first finishes its unchanged save/reconcile/render/fingerprint tail.
-Only then does this probe byte-copy its saved result and create an independent
-three-component assembly from cached pn-pen-hanger and pn-pen-rod inputs.
+The normal pn build retains its original Copy11/reconcile/render/fingerprint
+tail. After its initial Copy11, two extra copies of the still-untitled source
+compare unmarked and Default-only marked serialization before any reconcile.
+A second, independent pn construction sets only Default's LDR mark before its
+first-ever serialization. Both builds use cached parts, never part builds.
 
 All snapshots are siblings of pn-pen.SLDASM, preserving its reference directory
 layout. No part build is dispatched; no part file is saved, copied, or
@@ -33,28 +33,31 @@ F freshly reopens an independent E copy and Save3(1)-saves without explicit
 switches/rebuilds/mark writes; G repeats the derived/Default EditRebuild3 and
 AddRebuildSaveMark loop on another E copy before Save3(1). F still performs the
 explicitly logged _state inspections (including GetComponents) before save.
-Native GetSaveFlag is recorded immediately before every direct diagnostic
-Save3; E records only its pre-reconcile flag, not its helper's internal Save3.
-Two initial-C-copy variants add only Default/both LDR marks after C's rebuilds.
-Two fresh-untitled controls reuse the same fixture creation and C operations
-before ANY assembly save, differing only in a Default LDR mark before Copy11.
-Their initial native Default state is logged, but source path/hash/display flags
-are null because no baseline assembly file exists. They do not use an
-intermediate single-config save or a baseline-only rebuild.
+Native GetSaveFlag is recorded in each state snapshot and immediately before
+every diagnostic Save3, including the original helper's conditional first save.
+Preserved C-mark-Default and C-mark-both copies each undergo their FIRST original
+reconcile on a separate byte-identical output copy. Fresh untitled fixtures
+explicitly clear both marks or mark only Default before their first-ever Copy11,
+then undergo the same original first reconcile. These primary controls exclude
+reopening-to-set-mark and prior serialization confounds. The actual independent
+pn construction supplies a production-builder counterpart; extra same-source pn
+copies remain secondary because their serialization ordinals differ.
 These are differential observations, not a production fix or root-cause claim.
 
-The manifest and stdout retain native config/mark/rebuild state before save,
-after save and on a fresh reopen, save results, input hashes, snapshot hashes,
-and exploratory swfile-style raw display flags. The undocumented flag reader is
-NOT proof of component visibility, config association or format completeness.
-Parent must compare these native snapshots in eDrawings before choosing any fix.
-Remove the temporary builder hook and cache declaration after collecting proof;
-this reproduction module may remain as requested evidence.
+The manifest and stdout retain native config/mark/rebuild/GetSaveFlag state,
+save results, input hashes, snapshot hashes, and exploratory swfile-style raw
+display flags. The original reconcile's optional diagnostic dictionary observes
+only its pre-Save3 GetSaveFlag and returned native tuple; it adds no repair save.
+The undocumented flag reader is NOT proof of component visibility, config
+association or format completeness. Parent must compare snapshots in eDrawings.
+All native snapshots and source-history JSON are declared pn-only cache outputs.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from contextlib import contextmanager
+from contextvars import ContextVar
 from enum import StrEnum
 import hashlib
 import json
@@ -87,6 +90,12 @@ class ReferenceSource(StrEnum):
     THREADED_SINGLE = "single-threaded-copy11"
     BOTH_REBUILT_COPY = "refcfg-c-both-rebuild-copy11"
     RECONCILED_COPY = "refcfg-e-reconcile-save1"
+    MARKED_DEFAULT_COPY = "refcfg-c-mark-default-copy11"
+    MARKED_BOTH_COPY = "refcfg-c-mark-both-copy11"
+    FRESH_UNMARKED_COPY = "fresh-refcfg-c-unmarked-copy11"
+    FRESH_MARKED_DEFAULT_COPY = "fresh-refcfg-c-mark-default-copy11"
+    NORMAL_EXTRA_UNMARKED_COPY = "normal-extra-unmarked-copy11"
+    NORMAL_EXTRA_MARKED_DEFAULT_COPY = "normal-extra-mark-default-copy11"
     FRESH_THREADED = "fresh-untitled-threaded"
 
 
@@ -99,6 +108,7 @@ class ReferenceOperation(StrEnum):
     REBUILD_DEFAULT = "Default-ForceRebuild3(False)"
     RECONCILE = "reconcile_saved_rebuild_state"
     REBUILD_SAVE_MARKS = "derived-Default-EditRebuild3-AddRebuildSaveMark"
+    CLEAR_MARKS = "LDR-clear-both"
     MARK_DEFAULT = "LDR-mark-Default-only"
     MARK_BOTH = "LDR-mark-both"
 
@@ -175,6 +185,34 @@ REFERENCE_TRIALS = (
         1,
     ),
     ReferenceTrial(
+        "refcfg-e-mark-default-first-reconcile-save1",
+        ReferenceSource.MARKED_DEFAULT_COPY,
+        (ReferenceOperation.RECONCILE,),
+        ReferenceSave.RECONCILE,
+        1,
+    ),
+    ReferenceTrial(
+        "refcfg-e-mark-both-first-reconcile-save1",
+        ReferenceSource.MARKED_BOTH_COPY,
+        (ReferenceOperation.RECONCILE,),
+        ReferenceSave.RECONCILE,
+        1,
+    ),
+    ReferenceTrial(
+        "normal-extra-unmarked-first-reconcile-save1",
+        ReferenceSource.NORMAL_EXTRA_UNMARKED_COPY,
+        (ReferenceOperation.RECONCILE,),
+        ReferenceSave.RECONCILE,
+        1,
+    ),
+    ReferenceTrial(
+        "normal-extra-mark-default-first-reconcile-save1",
+        ReferenceSource.NORMAL_EXTRA_MARKED_DEFAULT_COPY,
+        (ReferenceOperation.RECONCILE,),
+        ReferenceSave.RECONCILE,
+        1,
+    ),
+    ReferenceTrial(
         "refcfg-f-fresh-resave-save1",
         ReferenceSource.RECONCILED_COPY,
         (),
@@ -203,6 +241,27 @@ REFERENCE_TRIALS = (
         11,
     ),
     ReferenceTrial(
+        "fresh-refcfg-c-unmarked-copy11",
+        ReferenceSource.FRESH_THREADED,
+        (*_REFERENCE_C, ReferenceOperation.CLEAR_MARKS),
+        ReferenceSave.COPY,
+        11,
+    ),
+    ReferenceTrial(
+        "fresh-refcfg-e-unmarked-first-reconcile-save1",
+        ReferenceSource.FRESH_UNMARKED_COPY,
+        (ReferenceOperation.RECONCILE,),
+        ReferenceSave.RECONCILE,
+        1,
+    ),
+    ReferenceTrial(
+        "fresh-refcfg-e-mark-default-first-reconcile-save1",
+        ReferenceSource.FRESH_MARKED_DEFAULT_COPY,
+        (ReferenceOperation.RECONCILE,),
+        ReferenceSave.RECONCILE,
+        1,
+    ),
+    ReferenceTrial(
         "refcfg-d-both-rebuild-save9",
         ReferenceSource.THREADED_SINGLE,
         _REFERENCE_C,
@@ -225,8 +284,22 @@ REFERENCE_TRIALS = (
         ),
     ),
 )
+EXTRA_COPY_STAGES = (
+    "normal-extra-unmarked-copy11",
+    "normal-extra-mark-default-copy11",
+)
+INDEPENDENT_STAGES = (
+    "independent-normal-mark-default-copy11",
+    "independent-normal-mark-default-first-reconcile-save1",
+)
+SOURCE_HISTORY_FILENAMES = (
+    "pn-pen-display-normal-extra-copy11.json",
+    "pn-pen-display-independent-normal-mark-default.json",
+)
 STAGES = (
     "normal",
+    *EXTRA_COPY_STAGES,
+    *INDEPENDENT_STAGES,
     "single-copy11",
     *(trial[0] for trial in TRIALS),
     "single-threaded-copy11",
@@ -234,11 +307,13 @@ STAGES = (
 )
 OUTPUT_FILENAMES = (
     *(f"pn-pen-display-{stage}.SLDASM" for stage in STAGES),
+    *SOURCE_HISTORY_FILENAMES,
     "pn-pen-display-matrix.json",
 )
 _STREAM_MARKER = bytes.fromhex("140006000800")
 _STRING_MARKER = b"\xff\xfe\xff"
 _MAX_DISPLAY_BYTES = 64 * 1024 * 1024
+_INDEPENDENT_PN_CAPTURE = ContextVar("independent_pn_display_capture", default=False)
 
 
 def _digest(path: Path) -> str:
@@ -388,6 +463,7 @@ def _state(model: Any) -> dict[str, Any]:
         "active_configuration": str(active.Name),
         "configurations": configs,
         "ldr_mark_applicable": len(names) > 1,
+        "get_save_flag": bool(model.GetSaveFlag()),
         "needs_rebuild2": int(
             _early_bound(model.Extension, "IModelDocExtension").NeedsRebuild2
         ),
@@ -405,6 +481,279 @@ def _set_marks(model: Any, ldr_names: tuple[str, ...]) -> None:
         config.LargeDesignReviewMark = name in ldr_names
         if bool(config.LargeDesignReviewMark) != (name in ldr_names):
             raise RuntimeError(f"display matrix LDR mark assignment refused for {name}")
+
+
+@contextmanager
+def independent_pn_capture():
+    """Select only the second pn construction's diagnostic save path."""
+    token = _INDEPENDENT_PN_CAPTURE.set(True)
+    try:
+        yield
+    finally:
+        _INDEPENDENT_PN_CAPTURE.reset(token)
+
+
+def independent_pn_capture_requested() -> bool:
+    return _INDEPENDENT_PN_CAPTURE.get()
+
+
+def _protected_records(protected: dict[Path, str]) -> list[dict[str, Any]]:
+    records = []
+    for path, before in sorted(protected.items()):
+        try:
+            after = _digest(path)
+        except OSError as error:
+            after = None
+            evidence = {"error": repr(error)}
+        else:
+            evidence = {}
+        records.append(
+            {
+                "path": str(path),
+                "before_sha256": before,
+                "after_sha256": after,
+                "unchanged": before == after,
+                **evidence,
+            }
+        )
+    return records
+
+
+def _require_preserved(records: list[dict[str, Any]]) -> None:
+    changed = [row["path"] for row in records if not row["unchanged"]]
+    if changed:
+        raise RuntimeError(f"display matrix changed protected input bytes: {changed}")
+
+
+def _untitled_pn_state(adapter: Any) -> tuple[Any, dict[str, Any]]:
+    model = _model(adapter)
+    if model.GetPathName():
+        raise RuntimeError("pre-copy pn display probe requires the untitled build source")
+    state = _state(model)
+    if set(state["configurations"]) != {"Default", "Default Simplified"}:
+        raise RuntimeError("pre-copy pn display probe requires both native configurations")
+    if state["active_configuration"] != "Default":
+        raise RuntimeError("pre-copy pn display probe requires active Default")
+    return model, state
+
+
+def _display_observation(path: Path) -> dict[str, Any]:
+    try:
+        return _exploratory_flags(path)
+    except (OSError, ValueError, zlib.error) as error:
+        return {"parser_error": repr(error), "parser": "exploratory, not a gate"}
+
+
+def _capture_copy11(
+    model: Any, path: Path, row: dict[str, Any]
+) -> None:
+    path.unlink(missing_ok=True)
+    row["save_api"] = ReferenceSave.COPY.value
+    row["save_options"] = 11
+    row["before_save"] = _state(model)
+    row["native_source_path"] = str(model.GetPathName() or "") or None
+    row["save_result"] = model.SaveAs3(str(path), 0, 11)
+    if not path.is_file() or path.stat().st_size <= 0:
+        raise RuntimeError(f"display matrix Copy11 produced no snapshot: {path}")
+    row.update(
+        path=str(path),
+        filename=path.name,
+        sha256=_digest(path),
+        bytes=path.stat().st_size,
+        untitled_after_copy=_state(model),
+        display_data=_display_observation(path),
+    )
+
+
+def capture_pn_marked_copy(adapter: Any, normal_path: Path) -> None:
+    """Capture two extra copies; neither is an independent first serialization."""
+    from _telemetry import info
+
+    normal_path = Path(normal_path).resolve()
+    model, source_state = _untitled_pn_state(adapter)
+    protected = {
+        path: _digest(path)
+        for path in {normal_path, *(Path(p) for p in source_state["references"])}
+    }
+    original_marks = tuple(
+        name
+        for name, config in source_state["configurations"].items()
+        if config["large_design_review_mark"]
+    )
+    report: dict[str, Any] = {
+        "complete": False,
+        "normal_assembly_sha256": protected[normal_path],
+        "source_before_extra_copies": source_state,
+        "source_save_history": (
+            "Same live untitled pn source: unchanged normal Copy11 is serialization "
+            "1, explicitly unmarked extra Copy11 is 2, Default-only marked extra "
+            "Copy11 is 3. No reopen or reconcile precedes either extra copy. "
+            "Serialization count/order remains a confound; use fresh/independent "
+            "first-serialization controls for the primary conclusion."
+        ),
+        "stages": [],
+    }
+    try:
+        for ordinal, stage, marks in (
+            (2, EXTRA_COPY_STAGES[0], ()),
+            (3, EXTRA_COPY_STAGES[1], ("Default",)),
+        ):
+            row = {
+                "stage": stage,
+                "source_stage": "same-untitled-normal-pn-source",
+                "assembly_serialization_ordinal": ordinal,
+                "source_sha256": None,
+                "before_mark_assignment": _state(model),
+                "requested_ldr_marks": marks,
+                "mark_first_set": (
+                    "After baseline normal Copy11, before this extra Copy11; "
+                    "before any source discard/reopen/first reconcile."
+                ),
+            }
+            report["stages"].append(row)
+            _set_marks(model, marks)
+            row["after_mark_assignment"] = _state(model)
+            _capture_copy11(
+                model, normal_path.parent / f"pn-pen-display-{stage}.SLDASM", row
+            )
+        report["complete"] = True
+    except Exception as error:
+        report["error"] = repr(error)
+        raise
+    finally:
+        _set_marks(model, original_marks)
+        report["restored_source_state"] = _state(model)
+        report["protected_inputs"] = _protected_records(protected)
+        if any(not row["unchanged"] for row in report["protected_inputs"]):
+            report["complete"] = False
+        (normal_path.parent / SOURCE_HISTORY_FILENAMES[0]).write_text(
+            json.dumps(report, indent=2), encoding="utf-8"
+        )
+        info("display matrix extra pn copies " + json.dumps(report))
+        _require_preserved(report["protected_inputs"])
+
+
+async def capture_independent_pn_first_reconcile(
+    adapter: Any, normal_path: Path
+) -> dict[str, str]:
+    """Mark an independently constructed pn before its first-ever assembly save."""
+    from _assembly import (
+        _discard_copy_source,
+        _ensure_assembly_identity,
+        _ensure_assembly_title,
+        reconcile_saved_rebuild_state,
+    )
+    from _check import check
+    from _session import discard_open_documents
+    from _telemetry import info
+
+    normal_path = Path(normal_path).resolve()
+    paths = {
+        stage: normal_path.parent / f"pn-pen-display-{stage}.SLDASM"
+        for stage in INDEPENDENT_STAGES
+    }
+    manifest = normal_path.parent / SOURCE_HISTORY_FILENAMES[1]
+    model, initial = _untitled_pn_state(adapter)
+    protected = {
+        path: _digest(path)
+        for path in {normal_path, *(Path(p) for p in initial["references"])}
+    }
+    report: dict[str, Any] = {
+        "complete": False,
+        "normal_assembly_sha256": protected[normal_path],
+        "initial_native_untitled_state": initial,
+        "source_save_history": (
+            "Independent second construction through the unchanged pn builder "
+            "using cached parts. No assembly serialization, reopen or reconcile "
+            "precedes the Default-only mark and initial Copy11."
+        ),
+        "stages": [],
+    }
+    try:
+        # Match the original copy-save's metadata without changing diagnostic filenames.
+        _ensure_assembly_identity(adapter, "pn-pen", model)
+        _ensure_assembly_title(adapter, "pn-pen", model)
+        row = {
+            "stage": INDEPENDENT_STAGES[0],
+            "source_stage": "independent-fresh-untitled-normal-pn-build",
+            "assembly_serialization_ordinal": 1,
+            "source_sha256": None,
+            "before_mark_assignment": _state(model),
+            "requested_ldr_marks": ("Default",),
+            "mark_first_set": "Before the independent source's FIRST-ever Copy11.",
+        }
+        report["stages"].append(row)
+        _set_marks(model, ("Default",))
+        row["after_mark_assignment"] = _state(model)
+        _capture_copy11(model, paths[INDEPENDENT_STAGES[0]], row)
+        _discard_copy_source(adapter)
+        model = None
+        check(
+            "display matrix reopen independent initial copy",
+            await adapter.open_model(str(paths[INDEPENDENT_STAGES[0]])),
+        )
+        row["after_save"] = _state(_model(adapter))
+        row["reopened"] = row["after_save"]
+        if row["reopened"]["references"] != initial["references"]:
+            raise RuntimeError("independent pn copy changed cached references")
+        protected[paths[INDEPENDENT_STAGES[0]]] = row["sha256"]
+        discard_open_documents(adapter)
+        adapter.currentModel = None
+        source = paths[INDEPENDENT_STAGES[0]]
+        destination = paths[INDEPENDENT_STAGES[1]]
+        shutil.copy2(source, destination)
+        if _digest(destination) != row["sha256"]:
+            raise RuntimeError("independent pn first reconcile did not start from source bytes")
+        check(
+            "display matrix inspect independent reconcile input",
+            await adapter.open_model(str(destination)),
+        )
+        row = {
+            "stage": INDEPENDENT_STAGES[1],
+            "source_stage": INDEPENDENT_STAGES[0],
+            "source_sha256": _digest(source),
+            "baseline_display_data": report["stages"][0]["display_data"],
+            "before_save": _state(_model(adapter)),
+            "save_api": ReferenceSave.RECONCILE.value,
+            "save_options": 1,
+            "operations": [ReferenceOperation.RECONCILE.value],
+            "native_reconcile_save": {},
+        }
+        report["stages"].append(row)
+        discard_open_documents(adapter)
+        adapter.currentModel = None
+        await reconcile_saved_rebuild_state(
+            adapter, INDEPENDENT_STAGES[1], destination,
+            diagnostic_save=row["native_reconcile_save"],
+        )
+        row.update(
+            path=str(destination),
+            filename=destination.name,
+            sha256=_digest(destination),
+            bytes=destination.stat().st_size,
+            after_save=_state(_model(adapter)),
+            display_data=_display_observation(destination),
+        )
+        row["reopened"] = row["after_save"]
+        if row["reopened"]["references"] != initial["references"]:
+            raise RuntimeError("independent pn reconcile changed cached references")
+        protected[destination] = row["sha256"]
+        report["complete"] = True
+    except Exception as error:
+        report["error"] = repr(error)
+        raise
+    finally:
+        discard_open_documents(adapter)
+        adapter.currentModel = None
+        report["protected_inputs"] = _protected_records(protected)
+        if any(not row["unchanged"] for row in report["protected_inputs"]):
+            report["complete"] = False
+        manifest.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        info("display matrix independent pn " + json.dumps(report))
+        _require_preserved(report["protected_inputs"])
+    return {f"display_{stage}": str(path) for stage, path in paths.items()} | {
+        "display_independent_source_history": str(manifest)
+    }
 
 
 def _select_available_simplified_references(
@@ -490,15 +839,40 @@ async def probe_assembly_display_data(
         and trial.source != ReferenceSource.FRESH_THREADED
     }
     manifest = directory / OUTPUT_FILENAMES[-1]
+    # Independent capture discarded its source; reload the untouched normal result.
+    discard_open_documents(adapter)
+    adapter.currentModel = None
+    check("display matrix reload normal", await adapter.open_model(str(normal_path)))
     normal_state = _state(_model(adapter))
     inputs = {normal_path, *(Path(path) for path in normal_state["references"])}
     protected = {path: _digest(path) for path in inputs}
+    source_histories = [
+        json.loads((directory / filename).read_text(encoding="utf-8"))
+        for filename in SOURCE_HISTORY_FILENAMES
+    ]
+    for history in source_histories:
+        if not history["complete"]:
+            raise RuntimeError("display matrix pre-copy source history is incomplete")
+        for evidence in history["protected_inputs"]:
+            path = Path(evidence["path"])
+            # The extra-copy hook protects the initial NORMAL Copy11 only while
+            # branching; its normal build intentionally reconciles those bytes
+            # afterward. Independent capture protects the final normal instead.
+            if path == normal_path and history is source_histories[0]:
+                continue
+            if _digest(path) != evidence["before_sha256"]:
+                raise RuntimeError(f"display matrix pre-copy protected input changed: {path}")
+            protected[path] = evidence["before_sha256"]
+    for filename in SOURCE_HISTORY_FILENAMES:
+        path = directory / filename
+        protected[path] = _digest(path)
     report: dict[str, Any] = {
         "leaf": "assembly:pn_pen",
         "solidworks_revision": str(adapter.swApp.RevisionNumber()),
         "normal_assembly": str(normal_path),
         "complete": False,
         "stages": [],
+        "source_histories": source_histories,
     }
 
     def checkpoint() -> None:
@@ -564,10 +938,15 @@ async def probe_assembly_display_data(
 
     with span("probe.assembly_display_data", asm="pn-pen"):
         try:
-            # The normal build has already finished. No probe operation precedes it.
+            # Normal and independent pn captures have finished; preserve their files.
             discard()
+            early_outputs = {
+                *SOURCE_HISTORY_FILENAMES,
+                *(paths[stage].name for stage in (*EXTRA_COPY_STAGES, *INDEPENDENT_STAGES)),
+            }
             for filename in OUTPUT_FILENAMES:
-                (directory / filename).unlink(missing_ok=True)
+                if filename not in early_outputs:
+                    (directory / filename).unlink(missing_ok=True)
             checkpoint()
             shutil.copy2(normal_path, paths["normal"])
             if _digest(paths["normal"]) != protected[normal_path]:
@@ -586,6 +965,20 @@ async def probe_assembly_display_data(
             report["stages"].append(row)
             await capture("normal", row, normal_state["references"])
             protected[paths["normal"]] = protected[normal_path]
+
+            for history in source_histories:
+                for saved_row in history["stages"]:
+                    stage = saved_row["stage"]
+                    row = dict(saved_row)
+                    if _digest(paths[stage]) != row["sha256"]:
+                        raise RuntimeError(f"display matrix early snapshot changed: {stage}")
+                    report["stages"].append(row)
+                    check(
+                        f"display matrix open early snapshot {stage}",
+                        await adapter.open_model(str(paths[stage])),
+                    )
+                    await capture(stage, row, normal_state["references"])
+                    protected[paths[stage]] = row["sha256"]
 
             check(
                 "display matrix create single assembly", await adapter.create_assembly()
@@ -783,6 +1176,7 @@ async def probe_assembly_display_data(
                         initial = _state(model)
                         row["initial_native_default_state"] = initial
                         row["opened_source"] = initial
+                        trial_references = threaded_refs
                         if initial["references"] != threaded_refs:
                             raise RuntimeError(
                                 "fresh threaded fixture changed cached references"
@@ -795,6 +1189,7 @@ async def probe_assembly_display_data(
                         )
                         row["source_sha256"] = _digest(paths[source_stage])
                         row["baseline_display_data"] = source_row["display_data"]
+                        trial_references = source_row["reopened"]["references"]
                         if row["source_sha256"] != protected[paths[source_stage]]:
                             raise RuntimeError(
                                 f"reference trial source changed: {source_stage}"
@@ -906,6 +1301,7 @@ async def probe_assembly_display_data(
                                     }
                                 )
                         elif operation in (
+                            ReferenceOperation.CLEAR_MARKS,
                             ReferenceOperation.MARK_DEFAULT,
                             ReferenceOperation.MARK_BOTH,
                         ):
@@ -913,27 +1309,30 @@ async def probe_assembly_display_data(
                                 raise RuntimeError(
                                     "initial-C LDR marks require active Default"
                                 )
-                            marks = (
-                                ("Default",)
-                                if operation == ReferenceOperation.MARK_DEFAULT
-                                else ("Default", "Default Simplified")
-                            )
+                            marks = {
+                                ReferenceOperation.CLEAR_MARKS: (),
+                                ReferenceOperation.MARK_DEFAULT: ("Default",),
+                                ReferenceOperation.MARK_BOTH: ("Default", "Default Simplified"),
+                            }[operation]
                             _set_marks(model, marks)
                             evidence["requested_ldr_marks"] = marks
+                            evidence["mark_first_set"] = (
+                                "Before FIRST-ever serialization of this fresh untitled fixture."
+                                if trial.source == ReferenceSource.FRESH_THREADED
+                                else "After independent source reopen and C rebuilds, before initial Copy11."
+                            )
                         elif operation == ReferenceOperation.RECONCILE:
                             row["before_save"] = evidence["before"]
                             row["reconcile_input_sha256"] = _digest(paths[stage])
                             row["pre_reconcile_get_save_flag"] = bool(
                                 model.GetSaveFlag()
                             )
-                            row["internal_save3_get_save_flag"] = None
-                            row["internal_save3_flag_observation"] = (
-                                "Unobserved; existing helper runs with the original adapter."
-                            )
+                            row["native_reconcile_save"] = {}
                             model = None
                             discard()
                             await reconcile_saved_rebuild_state(
-                                adapter, stage, paths[stage]
+                                adapter, stage, paths[stage],
+                                diagnostic_save=row["native_reconcile_save"],
                             )
                             model = _model(adapter)
                             row["reconcile_changed_bytes"] = (
@@ -992,7 +1391,7 @@ async def probe_assembly_display_data(
                             )
                     # Reconcile owns its conditional Save3; don't add a save here.
                     model = None
-                    await capture(stage, row, threaded_refs)
+                    await capture(stage, row, trial_references)
                     if stage in scratch_paths:
                         working_path.unlink()
                     protected[paths[stage]] = _digest(paths[stage])
@@ -1060,5 +1459,7 @@ async def probe_assembly_display_data(
                     )
 
     return {f"display_{stage}": str(paths[stage]) for stage in STAGES} | {
-        "display_matrix": str(manifest)
+        "display_matrix": str(manifest),
+        "display_extra_copy_source_history": str(directory / SOURCE_HISTORY_FILENAMES[0]),
+        "display_independent_source_history": str(directory / SOURCE_HISTORY_FILENAMES[1]),
     }
