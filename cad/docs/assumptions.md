@@ -22,8 +22,13 @@ On conflict, the book wins over any derivative file.
 
 - **Cylinder gear tooth count = 120**, derived: the 1/4 input reduction and the per-channel
   ratio `[120 − 6j : 120]` force `T = 120` for a unit-fundamental channel.
-- **Cone incline 21.0976°**, derived from exact tracking `sin i = 2.54 / 7.0568` (not the naive
-  `arcsin(2.54/7.5) = 19.8°`).
+- **Cone incline 13.0011°**, derived from exact tracking `sin i = 3m / 7.0565`: each 6-tooth
+  step adds 3m of pitch radius per 7.0565 mm channel pitch, with the 48DP module
+  `m = 25.4 / 48` mm.
+- **Gear standard: 48DP / 20° train, normal 24DP / 20° crank pair, 48DP and 32DP / 20° paper
+  drive.** A deliberate anachronism. The original's pitch and pressure angle are not recorded;
+  the earlier DP 49.82 was back-calculated from a scaled photo and the 14.5° was assumed. See
+  [`gear-standard.md`](./gear-standard.md).
 - **Amplitude-bar positions (aⱼ)** are the channel coefficients; nominal demo settings are
   config presets, not historical fact.
 - Several dimensions were **scaled from photos** at low/medium confidence and re-measured during

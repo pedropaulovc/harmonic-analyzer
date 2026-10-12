@@ -58,11 +58,11 @@ Each chapter ends with **"Now make:"** — a real part from the machine.
 | 9 | Turning: facing, OD, shoulders | `dt-crank-pin`, `ch-pivot-shaft` blanks |
 | 10 | Drilling, boring, reaming | `pivot-bushing` bore (Ø6.5 on Ø6.35, 0.15 mm clearance) |
 | 11 | Parting off to a length tolerance | the 19 `pivot-bushing` + 19 `lever-bushing` sets — **length sets the 7.0565 mm channel pitch** |
-| 12 | Slender work: steadies and followers | `dt-cone-gear-shaft` (Ø1.5875 mm slender terminal land; mill four co-clocked gear-land flats, with the smallest continuing through the tip) |
+| 12 | Slender work: steadies and followers | `dt-cone-gear-shaft` (Ø0.79375 mm (1/32 in) slender terminal land; mill four co-clocked gear-land flats, with the smallest continuing through the tip) |
 | 13 | Milling: squaring, profiling, edges | `ch-rocker-arm` (R800 concave top edge as a 2D profile, ×20) |
 | 14 | Hole patterns and tapping | `fr-rocker-arm-support` (4× 1/2-13 UNC-2B, `cad/scripts/build_fr_rocker_arm_support.py`), the 20 Ø2.0 spring holes |
 | 15 | Indexing and the dividing head | `dt-cylinder-gear` 0.4 mm alignment notches, co-phased |
-| 16 | **Making your own gear cutters** | Eureka-method form cutters for DP 49.82 — **off-the-shelf cutters for this pitch do not exist** |
+| 16 | **Making your own gear cutters** | the DT6-FORM1 ground form tool for the `dt-cone-gear` T006, the one gear outside the stock 48DP 20° cutter ranges; Law's button-tool method (ch. 12) for shop-made form cutters |
 | 17 | **Cutting the gears** | first `dt-cone-gear` (T120, the easy end) |
 | 18 | Fitting D-bores and a solid gear stack | Gauge the MHA-DT-004 flats and mating gear D-bores; fit 64T and twenty touching cone gears, then lock the stack collar on a 0.45 mm feeler |
 | 19 | Finishing | Draw filing, stoning, polishing, blacking; matching the original's finishes |
@@ -76,7 +76,7 @@ stock, setups, operations, inspection, and what went wrong the first time.
 |---|---|---|
 | 20 | Frame and base | `fr-harmonic-base`, `fr-tube-frame`, `fr-top-frame`, `pd-support-bar`, `fr-rocker-arm-support`, feet |
 | 21 | The crank and drive train | `dt-crank-arm`, `dt-crank-handle`, `dt-crank-pin`, `dt-crankshaft`, `dt-crank-drive-gear`, `dt-crank-pinion` |
-| 22 | **The cone gear set** | `dt-cone-gear` ×20 (T006–T120), `dt-cone-gear-shaft`, the swing platform and its pivot, tip collar, tip block and adjuster. **The hardest chapter in the book** — the T006 gear has a 0.621 mm minimum root-to-bore wall on its Ø1.5875 mm round bore. |
+| 22 | **The cone gear set** | `dt-cone-gear` ×20 (T006–T120), `dt-cone-gear-shaft`, the swing platform and its pivot, tip collar, tip block and adjuster. **The hardest chapter in the book** — the T006 gear has a 0.64 mm minimum root-to-bore web on its 1/32 in (Ø0.794 mm) bore. |
 | 23 | The cylinder gear set | `dt-cylinder-gear` ×20 with integral eccentric cam and 0.4 mm index notch; `dt-cylinder-gear-shaft`, `dt-arbor-pedestal` |
 | 24 | The alignment pinion | `dt-alignment-pinion`, `dt-pinion-arbor`, bracket, lever, cam and lift rod — the sine/cosine setup mechanism |
 | 25 | A channel, twenty times | `ch-connecting-rod`, `ch-rocker-arm`, `ch-amplitude-bar`, `ch-channel-lever`, `pivot-bushing`, `lever-bushing`, springs. Batch strategy: how to make twenty identical things by hand without drift. |

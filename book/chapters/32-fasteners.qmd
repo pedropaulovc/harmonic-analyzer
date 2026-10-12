@@ -31,7 +31,6 @@ The screws, and the small parts that do not belong anywhere else.
 | `vn-transgear-latch-pin` | TODO | TODO | TODO |
 | `vn-latch-hook-bracket-screw` | TODO | TODO | TODO |
 | `vn-transgear-disc-screw` | TODO | TODO | TODO |
-| `vn-transgear-collar-cross-pin` | TODO | TODO | TODO |
 | `vn-transgear-knob-drive-pin` | TODO | TODO | TODO |
 | `vn-transgear-knob-cup-pin` | TODO | TODO | TODO |
 | `vn-gooseneck-set-screw` | TODO | TODO | TODO |
