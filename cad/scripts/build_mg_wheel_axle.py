@@ -12,8 +12,8 @@ d = 0); back end y = BACK_Y (-9), shank to STEP_Y (the gauge), thread to
 THREAD_END_Y, dome to TIP_Y. The assembly mates Axis1 and the Front Plane.
 
 Built as ONE Front-plane revolve (PinProfile -> Pin): every printed diameter
-and length is a named dimension in that sketch, the axial ones from the back
-end, so the drawing inserts them as model items
+and length is a named dimension in that sketch, the shank from the back end
+and the thread from the gauged step, so the drawing inserts them as model items
 (mg_wheel_axle_spec.DRAWING_DIMENSIONS). The #4-40 end carries a cosmetic
 thread so the pictorial matches the callout.
 
@@ -73,10 +73,9 @@ from mg_wheel_axle_spec import (
     STEP_Y,
     SURFACE_FINISHES,
     THREAD,
-    THREAD_END,
-    THREAD_END_BAND,
     THREAD_END_Y,
     THREAD_LEN,
+    THREAD_LEN_BAND,
     THREAD_MAJOR,
     TIP_Y,
 )
@@ -104,7 +103,7 @@ async def build(adapter) -> dict[str, str]:
         ("PinDia", PIN_DIA),
         ("ShankLength", SHANK_LEN),
         ("ThreadDia", THREAD_MAJOR),
-        ("ThreadEnd", THREAD_END),
+        ("ThreadLength", THREAD_LEN),
         ("DomeHeight", DOME_H),
         ("PressGauge", PRESS_GAUGE),
     ):
@@ -170,17 +169,13 @@ async def build(adapter) -> dict[str, str]:
         "ThreadDia",
     )
     profile.record("ThreadDia", '"ThreadDia"')
-    # The thread end from the back end's outer corner, like the shank: one
-    # faced end carries every axial station (policy rule 7).
-    await dimension_between(
-        adapter,
-        f"{shank}.start",
-        f"{thread}.end",
-        "vertical_distance",
-        THREAD_END,
-        "thread end",
+    # The thread from the step: the gauged face the nut stack hangs off
+    # (policy rule 7's functional datum, mg_wheel_axle_spec.THREAD_LEN).
+    check(
+        "thread length",
+        await adapter.add_sketch_dimension(thread, None, "linear", THREAD_LEN),
     )
-    profile.record("ThreadEnd", '"ThreadEnd"')
+    profile.record("ThreadLength", '"ThreadLength"')
     # Overall from the back end's outer corner (where the drawing's extension
     # lines rise).
     await dimension_between(
@@ -191,7 +186,7 @@ async def build(adapter) -> dict[str, str]:
         PIN_LEN,
         "pin length",
     )
-    profile.record("PinLength", '"ThreadEnd" + "DomeHeight"')
+    profile.record("PinLength", '"ShankLength" + "ThreadLength" + "DomeHeight"')
     check(
         "dome radius",
         await adapter.add_sketch_dimension(dome, None, "radial", DOME_R),
@@ -247,7 +242,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "PinProfile", "ShankLength", *deviations(SHANK_LEN_BAND)
     )
     set_dimension_bilateral_tolerance(
-        adapter, "PinProfile", "ThreadEnd", *deviations(THREAD_END_BAND)
+        adapter, "PinProfile", "ThreadLength", *deviations(THREAD_LEN_BAND)
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

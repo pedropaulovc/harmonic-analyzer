@@ -52,7 +52,7 @@ from mg_wheel_axle_spec import (
     THREAD_MAJOR,
     TIP_Y,
 )
-from mg_wheel_group import BACK_END_PROUD_MAX, BACK_END_SUNK_MAX, THREAD_END_CALLOUT
+from mg_wheel_group import BACK_END_PROUD_MAX, BACK_END_SUNK_MAX, THREAD_LENGTH_CALLOUT
 
 
 SPEC = DRAWINGS_BY_NAME["mg_wheel_axle"]
@@ -68,7 +68,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # Every view prints at the sheet scale, so none needs a caption. 4:1 lays the
-# 37.2 pin 149 mm long and its 3/16 shank 19 mm across.
+# 37.4 pin 149 mm long and its 3/16 shank 19 mm across.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -91,17 +91,22 @@ STEP_X = _sheet_x(STEP_Y)
 THREAD_END_X = _sheet_x(THREAD_END_Y)
 TIP_X = _sheet_x(TIP_Y)
 
-# Baseline rows below the profile, all from the back end (policy rule 7): the
-# step, the thread end, then the overall as a reference. Each linear
-# dimension's text block (stacked band plus its callout lines) stands above
-# its own line, so each row drops by the block over it plus 4 mm of air (the
-# audit asks 3.57 between blocks): the step's and the thread end's four lines
-# (~19 mm each), the one-line reference under them.
-_ROW_Y = (SIDE_CENTER[1] - 0.035, SIDE_CENTER[1] - 0.0588, SIDE_CENTER[1] - 0.074)
+# Rows below the profile (policy rule 7): the shank from the back end, the
+# thread from the gauged step (its functional datum, named on its callout),
+# then the overall as a reference. Each linear dimension's value stands on
+# its line and its callout lines hang under it, so each row drops by the
+# block under the row above plus ~4.4 mm of air (the audit asks 3.57): the
+# thread length's three callout lines push the reference 5.6 mm lower than
+# the thread end's two did (run 16: rows -35 / -58.8 / -74).
+_ROW_Y = (SIDE_CENTER[1] - 0.035, SIDE_CENTER[1] - 0.0588, SIDE_CENTER[1] - 0.0800)
+# The thread length spans 32.7 mm of sheet, its ~63 mm callout block wider:
+# the block stands wholly left of the step's extension line (2 mm air), clear
+# of the overall's extension line dropping from the tip on the right.
+_THREAD_BLOCK_HALF = 0.0317
 # Diameters on the profile.
 SIDE_KEEP = {
     "ShankLength": ((BACK_X + STEP_X) / 2.0, _ROW_Y[0]),
-    "ThreadEnd": ((BACK_X + THREAD_END_X) / 2.0, _ROW_Y[1]),
+    "ThreadLength": (STEP_X - 0.002 - _THREAD_BLOCK_HALF, _ROW_Y[1]),
     "PinLength": ((BACK_X + TIP_X) / 2.0, _ROW_Y[2]),
     # The shank's dimension line crosses the shank near the step; its text
     # runs left from the line, the fit callout's two lines under it, so the
@@ -127,8 +132,8 @@ THREAD_PICK = (
 THREAD_NOTE_XY = (THREAD_END_X + 0.012, SIDE_CENTER[1] + 0.042)
 # Each band states its need on its own callout (policy rule 2): the pin's
 # press fit with the bar bore's limits read from the bar's geom, the step's
-# station where the back end lands, the thread end's two limits, the
-# locknut's full thread and the most thread past it (mg_wheel_group).
+# station where the back end lands, the thread length's datum, the locknut's
+# full thread and the most thread past it (mg_wheel_group).
 DIMENSION_CALLOUTS = {
     "PinDia": (
         "PRESS FIT IN MG-WHEEL-BAR\n"
@@ -138,7 +143,7 @@ DIMENSION_CALLOUTS = {
         "PRESSED TO GAUGE: BACK END\n"
         f"{BACK_END_PROUD_MAX:.2f} PROUD TO {BACK_END_SUNK_MAX:.2f} SUNK IN BAR"
     ),
-    "ThreadEnd": THREAD_END_CALLOUT,
+    "ThreadLength": THREAD_LENGTH_CALLOUT,
 }
 # The journal's finish (policy rule 5) lands on the shank's top silhouette
 # between the Ø line and the step, where the wheel runs; the symbol stands
@@ -159,7 +164,7 @@ def _view_center_delta(
 
     ``place_view`` anchors on the model origin's projection, not the geometry
     box center, so a part that is not origin-symmetric (this pin spans
-    y -8.9..28.32) lands its geometry offset from the requested center. Every
+    y -8.9..28.47) lands its geometry offset from the requested center. Every
     layout constant in this recipe is authored about the intended geometry
     center; shifting by this delta makes the edge picks and text positions
     track wherever SolidWorks actually put the geometry.

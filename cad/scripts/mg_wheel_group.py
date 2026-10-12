@@ -66,19 +66,19 @@ _SHANK = (
     _pin.SHANK_LEN + _pin.SHANK_LEN_BAND[1],
     _pin.SHANK_LEN + _pin.SHANK_LEN_BAND[0],
 )
-# Step to thread end: both stations print from the back end, so their bands
-# add (±0.09).
-_STEP_TO_THREAD_END = (
-    _pin.THREAD_END + _pin.THREAD_END_BAND[1] - _SHANK[1],
-    _pin.THREAD_END + _pin.THREAD_END_BAND[0] - _SHANK[0],
-)  # 7.93 .. 8.11
+# Step to thread end: printed from the gauged step itself, so its own band
+# is the whole of it (the shank's band only places the back end).
+_THREAD = (
+    _pin.THREAD_LEN + _pin.THREAD_LEN_BAND[1],
+    _pin.THREAD_LEN + _pin.THREAD_LEN_BAND[0],
+)  # 7.92 .. 8.42
 _FRONT = (_front.THICKNESS_MIN, _front.THICKNESS_MAX)
 _NUTS = (2.0 * _nut.THICKNESS_MIN, 2.0 * _nut.THICKNESS_MAX)
 
 # The back end: at most the bar's depth band proud of its back face, at most
 # 0.30 sunk in it.
-BACK_END_PROUD_MAX = _SHANK[1] - _GAUGE[0] - _BAR_DEPTH[0]  # 0.09
-BACK_END_SUNK_MAX = _BAR_DEPTH[1] - (_SHANK[0] - _GAUGE[1])  # 0.29
+BACK_END_PROUD_MAX = _SHANK[1] - _GAUGE[0] - _BAR_DEPTH[0]  # 0.10
+BACK_END_SUNK_MAX = _BAR_DEPTH[1] - (_SHANK[0] - _GAUGE[1])  # 0.30
 if BACK_END_PROUD_MAX > _bar.BAR_DEPTH_BAND[0] + 1e-9:
     raise AssertionError(f"pin back end {BACK_END_PROUD_MAX:.3f} proud of the bar")
 if BACK_END_SUNK_MAX > 0.30 + 1e-9:
@@ -89,19 +89,21 @@ STEP_INSIDE_HUB = (_BACK[0] + _HUB[0]) - _GAUGE[1]  # 0.687
 # (b) The locknut sits on FULL thread (rule 12 counts full threads only): the
 # thread less the incomplete pitch the dome cuts runs past its outer face,
 # and the first nut's inner face sits past the die's run-out at the step.
-LOCKNUT_THREAD_MARGIN = (_GAUGE[0] + _STEP_TO_THREAD_END[0] - _pin.TIP_INCOMPLETE) - (
+LOCKNUT_THREAD_MARGIN = (_GAUGE[0] + _THREAD[0] - _pin.TIP_INCOMPLETE) - (
     _BACK[1] + _HUB[1] + ENDSHAKE_MAX + _FRONT[1] + _NUTS[1]
-)  # 0.012
+)  # 0.002
 NUT_RUNOUT_MARGIN = (_BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0]) - (
     _GAUGE[1] + _pin.DIE_RUNOUT
 )  # 0.241
-# (c) Only the dome and the thread the full-thread margin needs stand past the
-# locknut: the worst geometric thread end, incomplete pitch included.
-THREAD_PAST_LOCKNUT_LIMIT = 2.5
-THREAD_PAST_LOCKNUT_MAX = (_GAUGE[1] + _STEP_TO_THREAD_END[1]) - (
+# (c) At most 2.9 of thread, incomplete pitch included, stands past the
+# locknut: the user's option (c) of 2026-10-12, superseding the rev-10
+# "dome + 1.3 at every corner" (the washers' and nuts' catalogue bands alone
+# put the floor at 2.305 with the thread length exact) and the ~1.46 nominal.
+THREAD_PAST_LOCKNUT_LIMIT = 2.9
+THREAD_PAST_LOCKNUT_MAX = (_GAUGE[1] + _THREAD[1]) - (
     _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0] + _NUTS[0]
-)  # 2.497
-THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # 1.507
+)  # 2.807
+THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # 1.657
 if STEP_INSIDE_HUB <= 0.0:
     raise AssertionError(f"pin step clears the hub front face: {STEP_INSIDE_HUB:.4f}")
 if LOCKNUT_THREAD_MARGIN < 0.0:
@@ -115,10 +117,12 @@ if THREAD_PAST_LOCKNUT_MAX > THREAD_PAST_LOCKNUT_LIMIT:
         f"{THREAD_PAST_LOCKNUT_MAX:.4f} of thread past the locknut "
         f"> {THREAD_PAST_LOCKNUT_LIMIT}"
     )
-# The thread end's band holds both: its callout on the axle's drawing states
-# them (policy rule 2), the lower and the upper need.
-THREAD_END_CALLOUT = (
-    f"LOCKNUT ON FULL THREAD,\nEND {THREAD_PAST_LOCKNUT_LIMIT:.1f} MAX PAST LOCKNUT"
+# The thread length's band holds both: its callout on the axle's drawing
+# names the gauged step it reads from and states the lower and the upper
+# need (policy rules 2 and 7).
+THREAD_LENGTH_CALLOUT = (
+    "FROM SHANK STEP;\nLOCKNUT ON FULL THREAD,\n"
+    f"END {THREAD_PAST_LOCKNUT_LIMIT:.1f} MAX PAST LOCKNUT"
 )
 
 # --- fits on the pin ------------------------------------------------------------------
