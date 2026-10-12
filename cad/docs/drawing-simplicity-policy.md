@@ -242,8 +242,8 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    `DrawingSpec` records the choice explicitly. The layout audit
    (`_drawing_layout_check`) checks the selected template's border and
    title-block keep-out; the machinist review judges every visible
-   element's containment, balance, and fit (an eye pass stands in only where
-   no machinist review covers the sheet's version).
+   element's containment, balance, and fit. An eye pass never substitutes for
+   it (merge gate 3 in the root `AGENTS.md`).
 9. **Assembly drawings are judged as complete assembly packages.** Every PDF
    sheet is rendered at full resolution and attached to one blind-review
    invocation. Acceptance cross-checks BOM rows, balloons, setup and assembly
@@ -387,6 +387,12 @@ verdict counts: work authored by Sol or Opus is reviewed by a stronger model
 (Astra or Fable), and work authored by Astra or Fable is reviewed by Astra or
 Fable at high reasoning. `--reviewer claude` defaults to `claude-fable-5-1` at
 medium effort, which is the Opus fallback.
+The gate covers every sheet whose rendered output a PR changes, including a
+sheet that changes only because CAD geometry, config or a helper it reads
+changed. A sheet the PR's own drawing script or spec edits must pass as below.
+A sheet changed only indirectly passes when its review adds no gating finding
+beyond a review of `main`'s version of the same sheet by the same reviewer and
+model; the PR records both verdicts and the finding diff.
 Part and assembly packages render every native PDF page at 300 dpi and submit
 all sheet images to one review, using the rubric for that package kind. A
 downscaled contact-sheet preview is not a substitute for reviewing every page.
