@@ -94,7 +94,10 @@ def test_tolerances_are_native_on_the_model() -> None:
     assert drawing.DIMENSION_CALLOUTS["ShankLength"].endswith(
         "0.09 PROUD TO 0.29 SUNK IN BAR"
     )
-    assert drawing.DIMENSION_CALLOUTS["ThreadEnd"] == "LOCKNUT ON FULL THREAD"
+    assert drawing.DIMENSION_CALLOUTS["ThreadEnd"] == (
+        "LOCKNUT ON FULL THREAD,\nSTEP TO THREAD END 7.93-8.11"
+    )
+    assert group.STEP_TO_THREAD_END == pytest.approx((7.93, 8.11))
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
 
