@@ -12,6 +12,7 @@ import re
 import sys
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import contextmanager
+from enum import StrEnum
 from typing import Any
 
 import _config
@@ -26,7 +27,7 @@ from _part_save import set_isometric_view
 from _source_identity import _git_commit_year, _git_sha
 from _paths import DEFAULT_VIEWS, OUT_PNG, OUT_SLDASM, OUT_SLDPRT, _CHAIN_LINK_PREFIXES
 from _rebuild import _FEATURE_ERROR, active_configuration_name, whats_wrong
-from _saved_display_data import IncompleteSavedDisplayData, assert_saved_display_data
+from _saved_display_data import assert_saved_display_data
 from _simplified_identity import components_identity
 from _simplified_names import (
     SIMPLIFIED_COMMENT,
@@ -2676,6 +2677,44 @@ def _run_solved_gates(
             )
 
 
+class _DisplayDataMarkOutcome(StrEnum):
+    MARKED = "marked"
+    NOT_APPLICABLE = "single_configuration"
+    FAILED = "failed"
+
+
+def _mark_assembly_display_data(adapter: Any, model: Any, asm_name: str) -> None:
+    """Request saved display data in every existing multi-config assembly pose.
+
+    IConfiguration.LargeDesignReviewMark is valid only with multiple
+    configurations. It stores a save request, not a geometry change; do not
+    activate configurations or rebuild while marking them.
+    """
+    with _telemetry.span("assembly.mark_all_configuration_display_data", asm=asm_name) as sp:
+        sp.set_attribute("outcome", _DisplayDataMarkOutcome.FAILED.value)
+        model = _early_bound(model, "IModelDoc2")
+        names = [str(name) for name in (model.GetConfigurationNames() or ())]
+        sp.set_attribute("configuration_count", len(names))
+        sp.set_attribute("configuration_names", names)
+        rest = active_configuration_name(adapter, model)
+        if not names or rest not in names:
+            raise RuntimeError(f"{asm_name}: active configuration {rest!r} not in {names}")
+        if len(names) == 1:
+            sp.set_attribute("outcome", _DisplayDataMarkOutcome.NOT_APPLICABLE.value)
+            return
+        for name in names:
+            configuration = _early_bound(model.GetConfigurationByName(name), "IConfiguration")
+            if configuration is None:
+                raise RuntimeError(f"{asm_name}: display-data configuration {name!r} is unavailable")
+            if configuration.LargeDesignReviewMark is not True:
+                configuration.LargeDesignReviewMark = True
+                if configuration.LargeDesignReviewMark is not True:
+                    raise RuntimeError(f"{asm_name}: {name!r} display-data mark did not set")
+        if active_configuration_name(adapter, model) != rest:
+            raise RuntimeError(f"{asm_name}: display-data marking changed active configuration {rest!r}")
+        sp.set_attribute("outcome", _DisplayDataMarkOutcome.MARKED.value)
+
+
 @_telemetry.traced("assembly.save_copy")
 def _save_new_assembly_as_copy(adapter: Any, asm_path: Any) -> None:
     """Save a freshly built assembly without rewriting referenced artifacts.
@@ -2697,6 +2736,7 @@ def _save_new_assembly_as_copy(adapter: Any, asm_path: Any) -> None:
     _ensure_assembly_title(adapter, asm_path.stem)
     options = 1 | 2 | 8
     model = adapter.currentModel
+    _mark_assembly_display_data(adapter, model, asm_path.stem)
     if asm_path.exists():
         adapter._attempt(lambda: adapter.swApp.CloseDoc(str(asm_path)), default=None)
         asm_path.unlink()
@@ -2799,6 +2839,7 @@ def _save_native_assembly(
     adapter: Any, model: Any, asm_name: str, options: int
 ) -> tuple[bool, int, int]:
     """Consume makepy's Save3 retval/errors/warnings, never a truthy failure tuple."""
+    _mark_assembly_display_data(adapter, model, asm_name)
     result = adapter._attempt(lambda: model.Save3(options, 0, 0), default=None)
     if (
         not isinstance(result, tuple)
@@ -2824,8 +2865,8 @@ async def reconcile_saved_rebuild_state(
 ) -> None:
     """Prove saved rebuild state and part display flags without writing children.
 
-    Clean, complete artifacts remain byte-identical. Supported zero flags need
-    one fresh-active-configuration Save3(1), not another configuration cycle.
+    Clean, complete artifacts remain byte-identical. Display data is requested
+    before native serialization; supported zero flags fail the saved-data gate.
 
     Root cause (proven by ``diagnostics/probe_rebuild_matrix.py`` /
     ``probe_child_dirty.py``): ``final_rebuild_before_save`` and the deep health
@@ -2849,100 +2890,70 @@ async def reconcile_saved_rebuild_state(
     build's reconcile held. So every other configuration is shown and
     ``EditRebuild3``-ed first and the rest configuration last, each marked for
     rebuild-save and read back (the part-side finalization,
-    ``_simplified_part.persist_configurations_in_place``), before the first
+    ``_simplified_part.persist_configurations_in_place``), before the one
     ``Save3``. The saved file is then reopened the way that gate opens it and
     must read clean, so an artifact that would fail it is never cached; a dirty
     reopen raises naming each configuration's saved state.
-
-    Native C->E->F probes show that this configuration reconciliation can leave
-    zero part-display flags despite NeedsRebuild2=0. Only when the strict saved
-    display parser finds supported zeros, save the fresh reopened active model
-    once, without switching configurations, rebuilding, or changing marks.
-    Reopen again to prove persisted NeedsRebuild2 and inspect the saved flags.
-    Unsupported native data is never eligible for this serialization phase.
     """
-    incomplete = False
-    try:
-        assert_saved_display_data(asm_path)
-    except IncompleteSavedDisplayData:
-        incomplete = True
+    assert_saved_display_data(asm_path)
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     with _telemetry.span("assembly.reconcile_rebuild", asm=asm_name) as sp:
         await adapter.open_model(str(asm_path))
         model = _early_bound(adapter.currentModel, "IModelDoc2")
         status = saved_rebuild_status(adapter, model)
         sp.set_attribute("needs_rebuild_on_open", status)
-        if status == 0 and not incomplete:
+        if status == 0:
             _telemetry.success(
                 f"saved artifact already clean and display-complete, no reconcile ({asm_name})"
             )
             return
         rest = active_configuration_name(adapter, model)
         _invalidate_massprops_proof(_massprops_sidecar(asm_name))
-        if status != 0:
-            names = [str(name) for name in (model.GetConfigurationNames() or ())]
-            if rest not in names:
-                raise RuntimeError(f"{asm_name}: active configuration {rest!r} not in {names}")
-            for name in [name for name in names if name != rest] + [rest]:
-                if active_configuration_name(adapter, model) != name and not bool(
-                    model.ShowConfiguration2(name)
-                ):
-                    raise RuntimeError(f"{asm_name}: reconcile ShowConfiguration2({name!r}) refused")
-                rebuilt = adapter._attempt(lambda: model.EditRebuild3(), default=None)
-                if rebuilt is False or rebuilt is None:
-                    raise RuntimeError(
-                        f"{asm_name}: reconcile EditRebuild3 in {name!r} returned {rebuilt!r}"
-                    )
-                configuration = _early_bound(model.GetConfigurationByName(name), "IConfiguration")
-                configuration.AddRebuildSaveMark = True
-                if not bool(configuration.AddRebuildSaveMark):
-                    raise RuntimeError(f"{asm_name}: {name!r} rebuild-save mark did not set")
-            result = _save_native_assembly(adapter, model, asm_name, 1)
-            in_mem = saved_rebuild_status(adapter, model)
-            if in_mem != 0:
+        names = [str(name) for name in (model.GetConfigurationNames() or ())]
+        if rest not in names:
+            raise RuntimeError(f"{asm_name}: active configuration {rest!r} not in {names}")
+        for name in [name for name in names if name != rest] + [rest]:
+            if active_configuration_name(adapter, model) != name and not bool(
+                model.ShowConfiguration2(name)
+            ):
+                raise RuntimeError(f"{asm_name}: reconcile ShowConfiguration2({name!r}) refused")
+            rebuilt = adapter._attempt(lambda: model.EditRebuild3(), default=None)
+            if rebuilt is False or rebuilt is None:
                 raise RuntimeError(
-                    f"{asm_name}: reconcile left NeedsRebuild2={in_mem} after EditRebuild3+Save3 "
-                    f"(save result={result!r})"
+                    f"{asm_name}: reconcile EditRebuild3 in {name!r} returned {rebuilt!r}"
                 )
-            adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-            await adapter.open_model(str(asm_path))
-            model = _early_bound(adapter.currentModel, "IModelDoc2")
-            if active_configuration_name(adapter, model) != rest:
-                raise RuntimeError(f"{asm_name}: reconciled saved active configuration changed from {rest!r}")
-            status_on_reopen = saved_rebuild_status(adapter, model)
-            sp.set_attribute("needs_rebuild_on_reopen", status_on_reopen)
-            if status_on_reopen != 0:
-                states = "; ".join(
-                    f"{name}: NeedsRebuild={bool(configuration.NeedsRebuild)}, "
-                    f"AddRebuildSaveMark={bool(configuration.AddRebuildSaveMark)}"
-                    for name in names
-                    for configuration in [
-                        _early_bound(model.GetConfigurationByName(name), "IConfiguration")
-                    ]
-                )
-                raise RuntimeError(
-                    f"{asm_name}: reconciled .SLDASM still opens with "
-                    f"NeedsRebuild2={status_on_reopen} ({states})"
-                )
-            incomplete = False
-            try:
-                assert_saved_display_data(asm_path)
-            except IncompleteSavedDisplayData:
-                incomplete = True
-        if incomplete:
-            # This model was freshly opened on its saved active configuration.
-            # Do not switch/rebuild it: that is the observed incomplete-save state.
-            with _telemetry.span("assembly.serialize_display_data", asm=asm_name) as display_sp:
-                _save_native_assembly(adapter, model, asm_name, 1)
-                adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-                await adapter.open_model(str(asm_path))
-                if active_configuration_name(adapter) != rest:
-                    raise RuntimeError(f"{asm_name}: serialized saved active configuration changed from {rest!r}")
-                assert_saved_display_data(asm_path)
-                persisted_status = saved_rebuild_status(adapter)
-                display_sp.set_attribute("needs_rebuild_on_reopen", persisted_status)
-                assert_saved_rebuild_clean(adapter, asm_name)
-                _telemetry.event("assembly.saved_display_data_regenerated", asm=asm_name)
+            configuration = _early_bound(model.GetConfigurationByName(name), "IConfiguration")
+            configuration.AddRebuildSaveMark = True
+            if not bool(configuration.AddRebuildSaveMark):
+                raise RuntimeError(f"{asm_name}: {name!r} rebuild-save mark did not set")
+        result = _save_native_assembly(adapter, model, asm_name, 1)
+        in_mem = saved_rebuild_status(adapter, model)
+        if in_mem != 0:
+            raise RuntimeError(
+                f"{asm_name}: reconcile left NeedsRebuild2={in_mem} after EditRebuild3+Save3 "
+                f"(save result={result!r})"
+            )
+        adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+        await adapter.open_model(str(asm_path))
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        if active_configuration_name(adapter, model) != rest:
+            raise RuntimeError(f"{asm_name}: reconciled saved active configuration changed from {rest!r}")
+        status_on_reopen = saved_rebuild_status(adapter, model)
+        sp.set_attribute("needs_rebuild_on_reopen", status_on_reopen)
+        if status_on_reopen != 0:
+            states = "; ".join(
+                f"{name}: NeedsRebuild={bool(configuration.NeedsRebuild)}, "
+                f"AddRebuildSaveMark={bool(configuration.AddRebuildSaveMark)}"
+                for name in names
+                for configuration in [
+                    _early_bound(model.GetConfigurationByName(name), "IConfiguration")
+                ]
+            )
+            raise RuntimeError(
+                f"{asm_name}: reconciled .SLDASM still opens with "
+                f"NeedsRebuild2={status_on_reopen} ({states})"
+            )
+        assert_saved_display_data(asm_path)
         _telemetry.success(
             f"saved rebuild state and display data complete ({asm_name}, was {status})"
         )
@@ -3352,10 +3363,7 @@ def save_assembly_in_place(
         )
         return False
 
-    try:
-        assert_saved_display_data(sldasm)
-    except IncompleteSavedDisplayData:
-        pass
+    assert_saved_display_data(sldasm)
     # This is the shared last-mile chokepoint for refreshes, config hooks, and
     # verify --auto-repair. The caller may already have deep-rebuilt and then run
     # read-only gates; trust that resolved state while NeedsRebuild2 stays clean,
@@ -3377,6 +3385,7 @@ def save_assembly_in_place(
             f"{sldasm.name} mtime unchanged after Save3(Silent) "
             f"(ret={ret}, err={err}, warn={warn})"
         )
+    assert_saved_display_data(sldasm)
     log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err}, warn={warn})")
     return True
 
@@ -3421,12 +3430,8 @@ async def refresh_assembly(
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
     if not asm_path.exists():
         raise RuntimeError(f"missing assembly {asm_path}; build it from scratch first")
-    # Refuse unknown/damaged persisted data before any native rewrite. Supported
-    # zeros may be regenerated after a changed save; a no-op still fails below.
-    try:
-        assert_saved_display_data(asm_path)
-    except IncompleteSavedDisplayData:
-        pass
+    # Refuse incomplete, unknown or damaged persisted data before any native write.
+    assert_saved_display_data(asm_path)
     with _telemetry.span("open", asm=asm_name):
         check(f"open {asm_name}", await adapter.open_model(str(asm_path)))
         opened_rebuild_status = saved_rebuild_status(adapter)

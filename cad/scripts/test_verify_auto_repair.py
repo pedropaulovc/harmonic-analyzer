@@ -326,12 +326,14 @@ def test_unchanged_channel_refresh_refuses_invalid_display_or_contact_and_never_
             )
         )
 
-    assert saves == ([] if flag == 2 else [False])
+    assert saves == ([False] if flag == 1 else [])
     assert contacts == ([True] if flag == 1 else [])
     assert renders == []
     assert assembly_path.read_bytes() == original
-    if flag != 2:  # Unsupported preflight refuses before touching the old proof.
+    if flag == 1:
         assert not proof.exists()
+    else:  # Invalid preflight refuses before touching the old proof.
+        assert proof.read_text(encoding="utf-8") == "same-digest\n"
 
 
 @pytest.mark.parametrize(

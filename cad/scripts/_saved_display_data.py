@@ -160,13 +160,13 @@ def assert_saved_display_data(path: Path) -> None:
     Success proves flag=1 on recognized .SLDPRT records only. A standalone tagged
     part-path string with the same observed record prefix remains indistinguishable
     from a component record; absent configurations and rendering are not proven.
-    Native good v37 saves contain flag=0 .SLDASM records, so those are excluded:
-    their nested parts have their own .SLDPRT records in the same display list.
+    Native good v37 saves contain flag=0 .SLDASM records, so those are excluded.
+    The gate does not validate nested assembly containers or their visibility.
     Nested/overlapping serialized strings and unknown layouts/extended lengths
     are refused. Markers inside stored container payloads are not separate entries.
     Supported zero flags raise ``IncompleteSavedDisplayData`` only after every
-    stream and record passes structural validation; other failures are not
-    eligible for native regeneration.
+    stream and record passes structural validation. Both zero flags and malformed
+    data fail publication; neither authorizes an automatic repair save.
     """
     try:
         incomplete = None

@@ -3016,6 +3016,7 @@ def task_check():
         # read AFTER it, cost no second rebuild, and still block the save.
         SCRIPTS_DIR / "test_assembly_save_solved_gates.py",
         # Persisted display data must fail closed before assembly publication.
+        SCRIPTS_DIR / "test_assembly_save.py",
         REPO_ROOT / "tests" / "test_saved_display_data.py",
         # The copied-mate safeguard must keep failing CLOSED: an unreadable
         # GetErrorCode2 or a truncated MateGroup scan has to raise/re-walk, never

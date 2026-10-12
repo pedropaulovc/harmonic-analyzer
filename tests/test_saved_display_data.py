@@ -64,7 +64,6 @@ def _reject(
     expected = gate.IncompleteSavedDisplayData if incomplete else RuntimeError
     assert type(failure.value) is expected
     assert str(path) in str(failure.value)
-    assert "Regenerate and save" in str(failure.value)
     assert path.read_bytes() == data
 
 
@@ -211,9 +210,9 @@ def test_expansion_limit_fails_closed(tmp_path, monkeypatch):
     _reject(tmp_path, _stream(_record()), "inspection limit")
 
 
-def test_unreadable_saved_file_has_actionable_error(tmp_path):
+def test_unreadable_saved_file_fails_closed(tmp_path):
     path = tmp_path / "missing.SLDASM"
-    with pytest.raises(RuntimeError, match="Regenerate and save") as failure:
+    with pytest.raises(RuntimeError) as failure:
         gate.assert_saved_display_data(path)
     assert str(path) in str(failure.value)
 
