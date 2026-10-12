@@ -351,8 +351,8 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 # recipe's own dimension label.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # Sheet 1, GEOMETRY: envelope, windows, T-rail section B-B and side
-    # section E-E with the crossbar T -- cast stock under the title block's
-    # general band.
+    # section E-E with the crossbar T and its pockets -- cast stock under the
+    # title block's general band.
     "overall casting width": 1,
     "overall casting depth": 1,
     "side flange width": 1,
@@ -367,6 +367,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "side rail web thickness": 1,
     "crossbar web thickness": 1,
     "crossbar flange thickness": FLANGE_THICKNESS_PLACES,
+    "crossbar pocket depth": 1,
     # Sheet 2, HOLES-SOCKETS: the socket pitches are the setup datums the
     # column plan is drilled from, and MHA-FR-001 states them to 0.01, so they
     # are the one pair of sheet-derived numbers that earns a second place.

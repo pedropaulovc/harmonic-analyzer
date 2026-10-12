@@ -374,6 +374,26 @@ KEEPER_TRANSFER_PLAN_SHIFT = (
     + KEEPER_TRANSFER_EXTRA_WIDTH
 )
 DETAIL_TOP_CENTER = (0.215 - KEEPER_TRANSFER_PLAN_SHIFT, 0.160)
+# HOLES-SOCKETS' left lanes, outside in: 202.1 REAR HANGER Z at x 27 mm, the
+# 224.00 socket pitch at x 40.5, 28.0 FRONT HANGER Z at x 62.  28.0's text
+# (42.9..81.3 mm on the 40d9d030e render) leaves the pitch line 2.4 mm of
+# air, and 202.1's three rows (22.4 mm wide) end 2.3 short of it.  The
+# pitch's value and qualifier park on a leader right of its line, in the
+# band between the plan, 28.0's extension line and the rear hanger's:
+# centred on the line they crossed the left rail and the x 92.6 baseline
+# extension line (machinist review).  The rear hanger's extension line
+# crosses the pitch line; outermost, the pitch's own three rows (25.6 mm
+# wide) would need 0.7 mm more than the sheet margin and 28.0's text leave.
+SOCKET_VERTICAL_PITCH_LINE_XY = (0.0405, DETAIL_TOP_CENTER[1])
+SOCKET_VERTICAL_PITCH_TEXT_XY = (0.0615, 0.140)
+REAR_HANGER_Z_TEXT_XY = (0.027, 0.165)
+# (29.2) FRONT KEEPER Z centres between its extension lines, 2.7 mm inside
+# each: at y 205 mm its qualifier row sat on the keeper's line.
+FRONT_KEEPER_Z_TEXT_XY = (
+    0.350,
+    DETAIL_TOP_CENTER[1]
+    - (FRONT_COLUMN_Z + KEEPER_TAP_Z_FRONT) / 2.0 * DETAIL_VIEW_SCALE / 1000.0,
+)
 
 # The cap seat symbol's ink right of its leader's bend: "CAP SEAT FLOORS, 4X"
 # and the rule over it end 4.64 mm past the bend (b49e1: bend at x 210.00,
@@ -528,24 +548,20 @@ HANGER_SECTION_CALLOUTS = {
 HANGER_SECTION_CAPTION_XY = (0.070, 0.040)
 # Sheet 6, UNDERSIDE locator (1:3, model x right and z up from the view
 # centre): datum B is the front round dowel hole, its tag low in the window
-# right of the crossbar, past the front slot frame's right end and under its
-# bottom, so its leader runs clear of that frame's text (at (122, 185) mm it
-# ran 7.9 mm through it, farm run 20261009T171439353Z); datum C the rear
-# one, its tag above the rear rail so its leader climbs away from F-F's
-# right arrow.  Each slot's position
+# right of the crossbar; datum C the rear one, its tag above the rear rail so
+# its leader climbs away from F-F's right arrow.  Each slot's position
 # frame, B|C> in front and C|B> at the rear (the translation modifier frees
-# the slot along the line to the other station's round hole).  The front
-# frame stands in the window left of the crossbar, between its junction
-# gussets and right of detail C's fence.  The rear one stands in the window
-# right of the crossbar, under F-F's right label: left of the crossbar its
-# text sat under both F labels and F-F's left arrow (farm run
-# 20261009T174542021Z: text-clearance 3.87 mm, text-on-line 3.05 mm), and
-# above the labels its leader would cross F-F's cutting line to the slot.
-# Its leader drops from the frame's left end, between the crossbar's right
-# edge and the right arrow, to the slot rim under the cutting line.  The
-# FRONT slot's width (the rear slot lies on F-F's cutting line) runs left of the front gusset, its text on a leader into
-# the band under the front rail, between the locator's label and the
-# land's dimension line.
+# the slot along the line to the other station's round hole), stands above
+# the plan, outside its silhouette, as the machinist review asked: the rear
+# one left of datum C's tag, its leader dropping from its right end to the
+# rear slot's outer end arc, above F-F's cutting line and left of datum C's
+# rim pick; the front one right of that tag, its leader dropping from its
+# left end, right of datum C's leader and F-F's right letter, to the front
+# slot's inner end arc, left of datum B's rim pick and right of the pocket
+# length's extension lines.  The FRONT slot's width (the rear slot lies on
+# F-F's cutting line) runs left of the front gusset, its text on a leader
+# into the band under the front rail that passes left of the land's
+# dimension line.
 _HUB_BOTTOM_M_PER_MM = HUB_BOTTOM_SCALE[0] / HUB_BOTTOM_SCALE[1] / 1000.0
 HANGER_DATUM_SYMBOL_XY = {"B": (0.136, 0.176), "C": (0.130, 0.257)}
 # Each round hole is 1.06 mm across at 1:3, its rim 1.0 mm (sheet) inside
@@ -567,37 +583,74 @@ def hanger_datum_pick(
     reach = math.hypot(dx, dy)
     radius = HANGER_PIN_HOLE_DIA / 2.0 * _HUB_BOTTOM_M_PER_MM
     return (centre[0] + radius * dx / reach, centre[1] + radius * dy / reach)
-HANGER_SLOT_FRAME_XY = {"front": (0.078, 0.185), "rear": (0.116, 0.2075)}
 # Each slot frame's printed text box and outline from its frame_xy (sheet m),
 # as farm run 20261009T204136744Z measured them with the translation modifier
 # inline (no vector): rear DetailItem507 at (116, 207.5) mm printed its text
 # [116.9, 202.2]..[148.5, 206.7] mm and a 39.1 x 7.0 mm outline.  The front
 # DetailItem506 prints the same outline and the same first and last text
 # items (only its middle divider sits 1.1 mm left, B being narrower than C),
-# so the same boxes.  Its leader
-# leaves the outline's left end at mid height on a 6.35 mm shoulder.
+# so the same boxes.  Its leader leaves the outline's end facing its slot at
+# mid height on a 6.35 mm shoulder.
 HANGER_SLOT_FRAME_TEXT_BOX = (0.0009, -0.0053, 0.0325, -0.0008)
 HANGER_SLOT_FRAME_OUTLINE = (0.0, -0.0070, 0.0391, 0.0)
 HANGER_SLOT_FRAME_SHOULDER = 0.00635
+# Both frames' tops 10.2 mm under the sheet frame and their outlines 4.7 over
+# the plan's top (y 244.8 mm): the rear 3.2 right of the pocket length's
+# block, the front 16.7 right of datum C's tag.
+HANGER_SLOT_FRAME_XY = {"front": (0.160, 0.2565), "rear": (0.052, 0.2565)}
+
+
+def hanger_slot_frame_knee(
+    frame_xy: tuple[float, float], target: tuple[float, float]
+) -> tuple[float, float]:
+    """Where a slot frame's leader leaves its shoulder, toward ``target``.
+
+    The leader runs from the outline's end facing the target, at mid height.
+    """
+    left, bottom, right, top = HANGER_SLOT_FRAME_OUTLINE
+    y = frame_xy[1] + (bottom + top) / 2.0
+    if frame_xy[0] + left > target[0]:
+        return (frame_xy[0] + left - HANGER_SLOT_FRAME_SHOULDER, y)
+    return (frame_xy[0] + right + HANGER_SLOT_FRAME_SHOULDER, y)
+
+
+def hanger_slot_landing(
+    end_centre: tuple[float, float], knee: tuple[float, float]
+) -> tuple[float, float]:
+    """The sheet point on a dowel slot's end arc facing its frame's knee.
+
+    The view looks along the slot's depth, so each end prints as a half
+    circle of the slot's half width at the view's scale about its centre.
+    """
+    dx, dy = knee[0] - end_centre[0], knee[1] - end_centre[1]
+    reach = math.hypot(dx, dy)
+    radius = HANGER_SLOT_WIDTH / 2.0 * _HUB_BOTTOM_M_PER_MM
+    return (end_centre[0] + radius * dx / reach, end_centre[1] + radius * dy / reach)
+
+
 HANGER_SLOT_WIDTH_TEXT_XY = (
-    HUB_BOTTOM_CENTER[0] + (BAR_X0 - 24.0) * _HUB_BOTTOM_M_PER_MM,
+    HUB_BOTTOM_CENTER[0] + (BAR_X0 - 40.0) * _HUB_BOTTOM_M_PER_MM,
     HUB_BOTTOM_CENTER[1] + STUD_Z_FRONT * _HUB_BOTTOM_M_PER_MM,
 )
-HANGER_SLOT_WIDTH_OFFSET_XY = (0.060, 0.137)
+# The block left of the land's dimension line: the leader from the width's
+# line at x 88 mm passes 3.2 mm left of that line's left end (x 87.0 mm).
+HANGER_SLOT_WIDTH_OFFSET_XY = (0.058, 0.137)
 # The crossbar pockets' length stands outside the plan, so nothing inside
 # the frame reads as part of it: its dimension line at model x -256, 12.2
 # left of the Ø45 barrels, 7.0 left of detail C's fence (r 38 about the
 # gooseneck) and 12.0 inside the sheet frame; its extension lines run at
 # y 177 / 223, under and over that fence and between the corner bosses.
-# The block (three rows, 24.6 x 17.5 mm as farm c75ac06 printed it) parks
-# on an offset leader above the plan's top-left corner: 3.0 inside the
-# sheet frame's left edge, 2.45 under its top, 1.9 over the plan's top and
-# 2.7 off the top-left boss.
+# The block (three rows: the value, "2X POCKET, E-E" naming the section that
+# cuts the T, "CENTRED ON T"; 17.5 mm tall as farm c75ac06 printed it, its
+# widest row 33.9 mm by the 40d9d030e render's glyphs) parks on an offset
+# leader above the plan's top-left corner: 2.4 inside the sheet frame's left
+# edge, 2.45 under its top, 1.9 over the plan's top and its top-left boss,
+# and 3.0 left of the rear slot frame.
 POCKET_LENGTH_TEXT_XY = (
     HUB_BOTTOM_CENTER[0] - 256.0 * _HUB_BOTTOM_M_PER_MM,
     HUB_BOTTOM_CENTER[1],
 )
-POCKET_LENGTH_OFFSET_XY = (0.028, 0.2555)
+POCKET_LENGTH_OFFSET_XY = (0.0320, 0.2555)
 
 # Sheet 1, Section E-E: the side rails and the crossbar T, cut inside the
 # crossbar pockets (|z| <= 69, where the crossbar is a T) and clear of every hole
@@ -617,12 +670,13 @@ RAIL_SECTION_NOTE_XY = (0.270, 0.1525)
 SIDE_SECTION_CENTER = (0.3183, 0.106)
 SIDE_SECTION_SCALE = (1, 4)
 SIDE_SECTION_CAPTION_XY = (0.3183, 0.0915)
-# The E-E note sits 2.0 above where it was so the side web's 13.0 (its top
-# at 124.5 mm) keeps 2.1 of air under the note's last line, and the web
-# text sits 8 mm left so its 37.5 mm qualifier row ends at 345.8 mm, 4.1
-# short of the crossbar flange's 8.0 dimension line at 349.9 (farm
-# 30394c1da: the row ran 3.8 mm past that line, text-on-line).
-SIDE_SECTION_NOTE_XY = (0.290, 0.135)
+# The E-E note's last line keeps 2.1 mm of air over the side web's 13.0 (its
+# top at 124.5 mm); its third line, the crossbar web's centring, lifts the
+# first to 139.8, 4.6 under B-B's note.  The web text sits 8 mm left so its
+# 37.5 mm qualifier row ends at 345.8 mm, 4.1 short of the crossbar flange's
+# 8.0 dimension line at 349.9 (farm 30394c1da: the row ran 3.8 mm past that
+# line, text-on-line).
+SIDE_SECTION_NOTE_XY = (0.290, 0.1398)
 SIDE_WEB_TEXT_XY = (0.327, 0.120)
 # Where each removed section prints the rail centreline it cuts, sheet x:
 # B-B at z 112 and E-E / D-D at x -197, as on b49e1, the #946 layout-audit
@@ -632,10 +686,16 @@ SIDE_WEB_TEXT_XY = (0.327, 0.120)
 RAIL_SECTION_PROFILE_X = 0.35643
 SIDE_SECTION_PROFILE_X = 0.29666
 HUB_SECTION_PROFILE_X = 0.33198
-# E-E's crossbar T dimensions: each dimension line stands one 5 mm gap off
-# the T (the web's below its underside, the flange's right of its +X face)
-# and its text parks on a leader at the right of the section, under the side
-# rail web's text and right of the caption.
+# E-E's crossbar T dimensions: the web's and the flange's dimension lines
+# stand one 5 mm gap off the T (the web's below its underside, the flange's
+# right of its +X face) and their text parks on a leader at the right of the
+# section, under the side rail web's text and right of the caption.  The
+# pockets' depth (flange underside to the T's underside) stands 2 mm left of
+# the flange's -X face, its arrows inside: outside, their tails would cross
+# the side web's dimension line above and the web's arrow tail below.  Its
+# two rows (24.4 x 9.2 mm) park low between the side rail and the T, 2.3 mm
+# right of the rail and 3.0 under the side web's line, so the leader runs
+# shallow, 2.9 mm off its lower extension line's end.
 _SIDE_SECTION_M_PER_MM = SIDE_SECTION_SCALE[0] / SIDE_SECTION_SCALE[1] / 1000.0
 
 
@@ -651,6 +711,10 @@ CROSSBAR_WEB_LINE_XY = _side_section_xy(HANGER_X, -HALF_H - 20.0)
 CROSSBAR_WEB_TEXT_XY = (0.382, 0.094)
 CROSSBAR_FLANGE_LINE_XY = _side_section_xy(BAR_X1 + 20.0, (HALF_H + FLANGE_BOT_Y) / 2.0)
 CROSSBAR_FLANGE_TEXT_XY = (0.382, 0.108)
+CROSSBAR_POCKET_DEPTH_LINE_XY = _side_section_xy(BAR_X0 - 8.0, (FLANGE_BOT_Y - HALF_H) / 2.0)
+CROSSBAR_POCKET_DEPTH_TEXT_XY = (0.3155, 0.1068)
+# swDimensionArrowsSide_e: swDimArrowsInside (draw_dt_cone_tip_block's precedent).
+_DIM_ARROWS_INSIDE = 0
 
 # #955 (layoutcheck on b49e1): three cutting-plane letters printed on ink.
 # B's outer letter sat on the +Z rail's outer edge and the 183.9, E's outer
@@ -2143,9 +2207,24 @@ async def build(adapter: Any) -> dict[str, str]:
             expected_mm=expected, orientation=orientation, exact_linear=True,
             suffix=qualifier, offset_text=offset, edges=side_section_edges,
         )
+    # The pockets either side of the web, as the underside's 138.0 names
+    # them: their depth from the flange underside's flat to the T's underside.
+    pocket_depth = _checked_dimension(
+        adapter, side_section,
+        p0=(flange_flat_x, FLANGE_BOT_Y, SIDE_SECTION_Z), p1=(HANGER_X, -HALF_H, SIDE_SECTION_Z),
+        text_xy=CROSSBAR_POCKET_DEPTH_LINE_XY, label="crossbar pocket depth",
+        expected_mm=FLANGE_BOT_Y + HALF_H, orientation="vertical", exact_linear=True,
+        suffix="2X POCKET", offset_text=CROSSBAR_POCKET_DEPTH_TEXT_XY,
+        edges=side_section_edges,
+    )
+    pocket_depth.ArrowSide = _DIM_ARROWS_INSIDE
+    if int(pocket_depth.ArrowSide) != _DIM_ARROWS_INSIDE:
+        raise RuntimeError("crossbar pocket depth did not keep its arrows inside")
     _position_view_caption(adapter, side_section, SIDE_SECTION_CAPTION_XY)
     if add_note(
-        adapter, "E-E: LEFT SIDE RAIL AND CROSSBAR T\nRIGHT RAIL IDENTICAL; T FLANGE UNDERSIDE SHARP",
+        adapter,
+        "E-E: LEFT SIDE RAIL AND CROSSBAR T\nRIGHT RAIL IDENTICAL; T FLANGE UNDERSIDE SHARP\n"
+        "T WEB CENTRED UNDER FLANGE",
         *SIDE_SECTION_NOTE_XY,
     ) is None:
         raise RuntimeError("failed to identify the cut side rail and crossbar T")
@@ -2228,13 +2307,13 @@ async def build(adapter: Any) -> dict[str, str]:
     _checked_dimension(
         adapter, detail_top,
         # Left sockets, not right (clears leader-crosses-line HANGER DRILL x
-        # 224.00): extension lines x 312.5->82 at y 216/104 become 115.5->82.
+        # 224.00): extension lines run from the left bores to the x 40.5 lane.
         p0=(-COLUMN_X - BORE_DIA/2, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z),
         p1=(-COLUMN_X - BORE_DIA/2, HALF_H + BOSS_ABOVE, REAR_COLUMN_Z),
-        text_xy=(0.083, 0.168), label="socket vertical pitch",
+        text_xy=SOCKET_VERTICAL_PITCH_LINE_XY, label="socket vertical pitch",
         expected_mm=REAR_COLUMN_Z-FRONT_COLUMN_Z, orientation="vertical",
-        center=True,
-        suffix="MATCHES MHA-FR-001",
+        center=True, suffix="MATCHES\nMHA-FR-001",
+        offset_text=SOCKET_VERTICAL_PITCH_TEXT_XY,
     )
     # The counterbore rim (the top-face edge of the wizard feature), not the
     # clearance hole visible at its floor: the native callout then reads the
@@ -2333,13 +2412,13 @@ async def build(adapter: Any) -> dict[str, str]:
          STUD_Z_FRONT - FRONT_COLUMN_Z, (0.062, 0.209), "vertical",
          "front hanger z from upper sockets", "FRONT HANGER Z", False),
         (upper_left_rim, (hanger_x, HALF_H, STUD_Z_REAR + HANGER_CBORE_DIA/2),
-         STUD_Z_REAR - FRONT_COLUMN_Z, (0.040, 0.165), "vertical",
-         "rear hanger z from upper sockets", "REAR HANGER Z", False),
+         STUD_Z_REAR - FRONT_COLUMN_Z, REAR_HANGER_Z_TEXT_XY, "vertical",
+         "rear hanger z from upper sockets", "REAR\nHANGER Z", False),
         (upper_left_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_FRONT + keeper_drill_r),
          KEEPER_TAP_X + COLUMN_X, (0.150, 0.0745), "horizontal",
          "keeper x from left sockets", "KEEPER X", True),
         (upper_right_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_FRONT + keeper_drill_r),
-         KEEPER_TAP_Z_FRONT - FRONT_COLUMN_Z, (0.350, 0.205), "vertical",
+         KEEPER_TAP_Z_FRONT - FRONT_COLUMN_Z, FRONT_KEEPER_Z_TEXT_XY, "vertical",
          "front keeper z from upper sockets", "FRONT KEEPER Z", True),
         (upper_right_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR + keeper_drill_r),
          KEEPER_TAP_Z_REAR - FRONT_COLUMN_Z, (0.372, 0.160), "vertical",
@@ -2926,7 +3005,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=POCKET_LENGTH_TEXT_XY, label="crossbar pocket length",
         expected_mm=2*BAR_POCKET_Z, orientation="vertical",
         exact_linear=True, edges=hub_bottom_edges,
-        suffix="2X POCKET\nCENTRED", offset_text=POCKET_LENGTH_OFFSET_XY,
+        suffix="2X POCKET, E-E\nCENTRED ON T", offset_text=POCKET_LENGTH_OFFSET_XY,
     )
     # The knife-hanger dowel pattern: datum B the front round hole, datum C
     # the rear one; each slot located to the near round hole, free along the
@@ -2954,17 +3033,33 @@ async def build(adapter: Any) -> dict[str, str]:
                 symbol_xy=HANGER_DATUM_SYMBOL_XY[datum], datum=datum,
                 label=f"knife-hanger round dowel hole datum {datum}",
             )
+    # Each frame's leader lands on the slot's end arc facing the frame's
+    # knee, so it runs straight down from above the plan.
     for station, station_z, datums in (
         ("front", STUD_Z_FRONT, ("B", "C")),
         ("rear", STUD_Z_REAR, ("C", "B")),
     ):
+        slot_centre = model_point_in_view(
+            adapter, hub_bottom_parent,
+            (SLOT_X/1000.0, -HALF_H/1000.0, station_z/1000.0),
+            label=f"underside locator {station} dowel slot centre",
+        )
+        knee = hanger_slot_frame_knee(HANGER_SLOT_FRAME_XY[station], slot_centre)
+        end, end_name = (1.0, "inner") if knee[0] > slot_centre[0] else (-1.0, "outer")
+        end_x = SLOT_X + end * SLOT_FLAT / 2.0
+        end_centre = model_point_in_view(
+            adapter, hub_bottom_parent,
+            (end_x/1000.0, -HALF_H/1000.0, station_z/1000.0),
+            label=f"underside locator {station} dowel slot {end_name} end centre",
+        )
         add_feature_control_frame(
             adapter, hub_bottom_parent,
             edge_entity=hub_bottom_edges.circle_at(
-                (SLOT_X-SLOT_FLAT/2, -HALF_H, station_z), HANGER_SLOT_WIDTH/2,
+                (end_x, -HALF_H, station_z), HANGER_SLOT_WIDTH/2,
                 axis=(0.0, 1.0, 0.0),
-                label=f"underside locator {station} dowel slot outer end",
+                label=f"underside locator {station} dowel slot {end_name} end",
             ).edge,
+            leader_attach_xy=hanger_slot_landing(end_centre, knee),
             frame_xy=HANGER_SLOT_FRAME_XY[station],
             characteristic="position",
             tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"],

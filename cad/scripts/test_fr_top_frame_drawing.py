@@ -1728,7 +1728,7 @@ def test_hanger_datum_leaders_run_clear_of_the_slot_frames() -> None:
     }
     front = frames["front"]
     assert (front.xmin, front.ymin, front.xmax, front.ymax) == pytest.approx(
-        (0.0789, 0.1797, 0.1105, 0.1842)
+        (0.1609, 0.2512, 0.1925, 0.2557)
     )
     centre = drawing.HUB_BOTTOM_CENTER
     m_per_mm = drawing._HUB_BOTTOM_M_PER_MM
@@ -1756,76 +1756,179 @@ def test_hanger_datum_leaders_run_clear_of_the_slot_frames() -> None:
     assert by > centre[1] - part.INNER_Z * m_per_mm
 
 
-def test_rear_slot_frame_stands_clear_of_section_f_f() -> None:
-    # Farm run 20261009T174542021Z: the rear frame at (78, 218) mm printed
-    # its text [78.9, 212.1]..[128.6, 217.2] under both F labels and F-F's
-    # left arrow (text-clearance 3.87 mm short of 1.78 mm air; text-on-line
-    # 3.05 mm), which REPORT mode on fr-top-frame does not enforce.
-    from _layout_geometry import Box, Segment, segment_box_distance
+def _slot_frame_layout():
+    """Each slot frame's (outline, end, end centre, landing, leader runs)."""
+    from _layout_geometry import Box, Segment
 
     centre, m_per_mm = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
+    ox0, oy0, ox1, oy1 = drawing.HANGER_SLOT_FRAME_OUTLINE
+    layout = {}
+    for station, station_z in (("front", part.STUD_Z_FRONT), ("rear", part.STUD_Z_REAR)):
+        fx, fy = drawing.HANGER_SLOT_FRAME_XY[station]
+        outline = Box(fx + ox0, fy + oy0, fx + ox1, fy + oy1)
+        slot = (centre[0] + part.SLOT_X * m_per_mm, centre[1] + station_z * m_per_mm)
+        knee = drawing.hanger_slot_frame_knee((fx, fy), slot)
+        end = 1.0 if knee[0] > slot[0] else -1.0
+        end_centre = (slot[0] + end * part.SLOT_FLAT / 2.0 * m_per_mm, slot[1])
+        landing = drawing.hanger_slot_landing(end_centre, knee)
+        shoulder_x = outline.xmin if knee[0] < outline.xmin else outline.xmax
+        runs = [Segment(shoulder_x, knee[1], *knee), Segment(*knee, *landing)]
+        layout[station] = (outline, end, end_centre, landing, runs)
+    return layout
+
+
+def _segment_gap(a, b) -> float:
+    """Distance between two segments; 0 when they cross or touch."""
+    from _layout_geometry import point_segment_distance
+
+    gap = min(
+        point_segment_distance((a.x0, a.y0), b),
+        point_segment_distance((a.x1, a.y1), b),
+        point_segment_distance((b.x0, b.y0), a),
+        point_segment_distance((b.x1, b.y1), a),
+    )
+    # Collinear runs (two shoulders on one row) neither cross nor separate
+    # each other's ends; their endpoint distance is the gap.
+    collinear = all(
+        abs((a.x1 - a.x0) * (y - a.y0) - (a.y1 - a.y0) * (x - a.x0)) < 1e-12
+        for x, y in ((b.x0, b.y0), (b.x1, b.y1))
+    )
+    return gap if collinear or _segments_apart(a, b) else 0.0
+
+
+def test_slot_frames_stand_above_the_plan_clear_of_every_line() -> None:
+    # Machinist review of 11783475: inside the plan the frames and their
+    # leaders crossed F-F, the datum leaders and the land's dimension.  Both
+    # now stand above the plan, each leader running from its outline's end
+    # to the slot's end arc facing it.
+    from _layout_geometry import Box, Segment, segment_box_distance
+
+    ink = drawing.INK_CLEARANCE
+    centre, m_per_mm = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
+    layout = _slot_frame_layout()
+    # F-F as run 20261009T174542021Z printed it: arrows x 91.33 / 118.67 from
+    # the cutting line at y 230.05 mm, each running 12 mm sheet-down, its
+    # letter [-1.2, +1.8] x [-20.25, -14.15] mm about the line's end.
     cut_y = centre[1] + drawing.HANGER_SECTION_Z * m_per_mm
     arrows = [centre[0] + x * m_per_mm for x in drawing.HANGER_SECTION_CUT_X]
-    # Each F-F arrow runs 12 mm sheet-down from the cutting line; its letter
-    # prints [-1.2, +1.8] x [-20.25, -14.15] mm about the line's end (run
-    # 20261009T174542021Z: arrows x 91.33 / 118.67 from y 230.05, letters
-    # [90.1, 209.8]..[93.1, 215.9] and [117.4, 209.8]..[120.4, 215.9]).
     assert arrows == pytest.approx([0.09133, 0.11867], abs=5e-5)
     assert cut_y == pytest.approx(0.23005, abs=5e-5)
-    section_ink: dict[str, Box | Segment] = {
-        "cutting line": Segment(arrows[0], cut_y, arrows[1], cut_y),
-    }
+    lines = {"F-F cutting line": Segment(arrows[0], cut_y, arrows[1], cut_y)}
+    boxes = {}
     for side, x in zip(("left", "right"), arrows):
-        section_ink[f"{side} arrow"] = Segment(x, cut_y, x, cut_y - 0.012)
-        section_ink[f"{side} F"] = Box(
-            x - 0.0012, cut_y - 0.02025, x + 0.0018, cut_y - 0.01415
+        lines[f"F-F {side} arrow"] = Segment(x, cut_y, x, cut_y - 0.012)
+        boxes[f"F-F {side} letter"] = Box(x - 0.0012, cut_y - 0.02025, x + 0.0018, cut_y - 0.01415)
+    # The pocket length's extension lines, from its line to the pocket ends'
+    # pick, and its block (see test_pocket_length_dimension_stands_outside_the_plan).
+    line_x, _ = drawing.POCKET_LENGTH_TEXT_XY
+    pick_x = centre[0] + (part.BAR_X0 + part.EDGE_CHAMFER + part.BAR_WEB_X0) / 2.0 * m_per_mm
+    for sz in (-1.0, 1.0):
+        y = centre[1] + sz * part.BAR_POCKET_Z * m_per_mm
+        lines[f"138.0 extension {sz:+.0f}"] = Segment(line_x - 0.001, y, pick_x, y)
+    tx, ty = drawing.POCKET_LENGTH_OFFSET_XY
+    boxes["138.0 text"] = Box(tx - 0.0170, ty - 0.00875, tx + 0.0170, ty + 0.00875)
+    # The land's 70.0: extension lines from y 143.97 to 163.83 mm and its line
+    # at y 145 with 6.35 mm arrow tails outside them (40d9d030e render).
+    land = [centre[0] + x * m_per_mm for x in (part.LAND_X0, part.LAND_X1)]
+    lines["70.0 line"] = Segment(land[0] - 0.00635, 0.145, land[1] + 0.00635, 0.145)
+    for x in land:
+        lines[f"70.0 extension {x:.4f}"] = Segment(x, 0.14397, x, 0.16383)
+    # The slot width's extension lines, from the front slot's flats to its line.
+    width_x, width_y = drawing.HANGER_SLOT_WIDTH_TEXT_XY
+    half_w = drawing.HANGER_SLOT_WIDTH / 2.0 * m_per_mm
+    inner_end = centre[0] + (part.SLOT_X + part.SLOT_FLAT / 2.0) * m_per_mm
+    for sy in (-1.0, 1.0):
+        lines[f"3.240 extension {sy:+.0f}"] = Segment(
+            width_x - 0.001, width_y + sy * half_w, inner_end, width_y + sy * half_w
         )
-    fx, fy = drawing.HANGER_SLOT_FRAME_XY["rear"]
-    ox0, oy0, ox1, oy1 = drawing.HANGER_SLOT_FRAME_OUTLINE
-    outline = Box(fx + ox0, fy + oy0, fx + ox1, fy + oy1)
-    # The leader: the shoulder off the outline's left end at mid height, then
-    # to the outer end of the rear slot (its arc's bottom, under the line).
-    knee = (outline.xmin - drawing.HANGER_SLOT_FRAME_SHOULDER, (outline.ymin + outline.ymax) / 2)
-    slot_end = (
-        centre[0] + (part.SLOT_X - part.SLOT_FLAT / 2) * m_per_mm,
-        centre[1] + (part.STUD_Z_REAR - drawing.HANGER_SLOT_WIDTH / 2) * m_per_mm,
-    )
-    leader = [
-        Segment(outline.xmin, knee[1], *knee),
-        Segment(*knee, *slot_end),
-    ]
-    for name, ink in section_ink.items():
-        if isinstance(ink, Box):
+    lines["3.240 line"] = Segment(width_x, width_y - half_w - 0.00635, width_x, width_y + half_w + 0.00635)
+    # Datum tags: each leader from its rim pick to the tag point, then a 6.35
+    # mm shoulder right to the letter box (C printed [136.35, 253.47]..[143.33,
+    # 260.49] mm about its point (130, 257) on the 40d9d030e render), with the
+    # 7 mm letter box above the point the frame test allows for as well.
+    picks = {}
+    for datum, station_z in (("B", part.STUD_Z_FRONT), ("C", part.STUD_Z_REAR)):
+        hole = (centre[0] + part.PIN_HOLE_X * m_per_mm, centre[1] + station_z * m_per_mm)
+        tag = drawing.HANGER_DATUM_SYMBOL_XY[datum]
+        picks[datum] = drawing.hanger_datum_pick(hole, tag)
+        lines[f"datum {datum} leader"] = Segment(*picks[datum], *tag)
+        boxes[f"datum {datum} tag"] = Box(tag[0] - 0.0035, tag[1] - 0.0036, tag[0] + 0.0134, tag[1] + 0.007)
+    plan_top = centre[1] + drawing.PLAN_HALF_Z * m_per_mm
+    sheet = drawing.SHEET_FRAME
+    radius = drawing.HANGER_SLOT_WIDTH / 2.0 * m_per_mm
+    # The front leader lands on its slot's inner end, the rear on its outer.
+    assert {station: entry[1] for station, entry in layout.items()} == {"front": 1.0, "rear": -1.0}
+    for station, (outline, end, end_centre, landing, runs) in layout.items():
+        # Above the plan, inside the sheet frame.
+        assert outline.ymin >= plan_top + ink, station
+        assert sheet[0] + ink <= outline.xmin and outline.xmax <= sheet[2] - ink, station
+        assert outline.ymax <= sheet[3] - ink, station
+        # On the end arc's half facing away from the slot's flats.
+        assert math.dist(landing, end_centre) == pytest.approx(radius), station
+        assert (landing[0] - end_centre[0]) * end > 0.0, station
+        for datum, pick in picks.items():
+            assert math.dist(landing, pick) >= ink, (station, datum)
+        for name, box in boxes.items():
             gap = max(
-                ink.ymin - outline.ymax, outline.ymin - ink.ymax,
-                ink.xmin - outline.xmax, outline.xmin - ink.xmax,
+                box.xmin - outline.xmax, outline.xmin - box.xmax,
+                box.ymin - outline.ymax, outline.ymin - box.ymax,
             )
-            # The audit asked for 1.78 mm of air between the two texts.
-            assert gap >= 0.00178, name
-            for run in leader:
-                assert segment_box_distance(run, ink) >= 0.00178, name
-        else:
-            assert segment_box_distance(ink, outline) >= 0.00178, name
-            for run in leader:
-                assert _segments_apart(run, ink), name
-    # The frame stays in the window right of the crossbar, its leader's knee
-    # right of the crossbar's edge, and its print inside the rail.
-    bar_right = centre[0] + part.BAR_X1 * m_per_mm
-    assert knee[0] > bar_right
-    assert outline.xmax < centre[0] + part.INNER_X * m_per_mm
-    assert outline.ymin > max(drawing.HANGER_SLOT_FRAME_XY["front"][1], drawing.HANGER_DATUM_SYMBOL_XY["B"][1] + 0.007)
+            assert gap >= ink, (station, name)
+            for run in runs:
+                assert segment_box_distance(run, box) >= ink, (station, name)
+        for name, line in lines.items():
+            assert segment_box_distance(line, outline) >= ink, (station, name)
+            for run in runs:
+                if name == "F-F cutting line" or name.startswith("3.240 extension"):
+                    # The leader lands on a slot that F-F cuts, or whose
+                    # width's extension lines start on it: it must not cross.
+                    assert _segments_apart(run, line), (station, name)
+                else:
+                    assert _segment_gap(run, line) >= ink, (station, name)
+    front, rear = layout["front"], layout["rear"]
+    assert _box_box_gap(
+        (front[0].xmin, front[0].ymin, front[0].xmax, front[0].ymax),
+        (rear[0].xmin, rear[0].ymin, rear[0].xmax, rear[0].ymax),
+    ) >= ink
+    for a in front[4]:
+        for b in rear[4]:
+            assert _segment_gap(a, b) >= ink
+    # The rear leader lands above F-F's cutting line, not on it.
+    assert rear[3][1] > cut_y
+
+
+def test_slot_width_leader_passes_left_of_the_land_dimension() -> None:
+    # Machinist review of 11783475: the 3.240's leader crossed 70.0
+    # FULL-THICKNESS LAND.  The leader runs from the width's line midpoint
+    # to its block's underline right end, (+22.44, -12.89) mm off the offset
+    # point as the 40d9d030e render printed it.
+    from _layout_geometry import Box, Segment, segment_box_distance
+
+    ink = drawing.INK_CLEARANCE
+    centre, m_per_mm = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
+    tx, ty = drawing.HANGER_SLOT_WIDTH_OFFSET_XY
+    leader = Segment(*drawing.HANGER_SLOT_WIDTH_TEXT_XY, tx + 0.02244, ty - 0.01289)
+    land = [centre[0] + x * m_per_mm for x in (part.LAND_X0, part.LAND_X1)]
+    assert _segment_gap(leader, Segment(land[0] - 0.00635, 0.145, land[1] + 0.00635, 0.145)) >= ink
+    for x in land:
+        assert _segment_gap(leader, Segment(x, 0.14397, x, 0.16383)) >= ink
+    # UNDERSIDE LOCATOR printed [60.4, 111.5]..[146.1, 120.0] mm.
+    assert segment_box_distance(leader, Box(0.0604, 0.1115, 0.1461, 0.1200)) >= ink
+    # The width's line stays left of the slot and the crossbar's outer face.
+    assert drawing.HANGER_SLOT_WIDTH_TEXT_XY[0] < centre[0] + part.BAR_X0 * m_per_mm - ink
 
 
 def test_pocket_length_dimension_stands_outside_the_plan() -> None:
     # The 138.0 line, its extension lines and its text stay out of the plan
-    # silhouette and detail C's fence; the text block is 24.6 x 17.5 mm as
-    # farm c75ac06 printed it.
+    # silhouette and detail C's fence; the text block is 17.5 mm tall as farm
+    # c75ac06 printed it, its widest row (CENTRED ON T) 33.9 mm by the
+    # 40d9d030e render's glyphs.
     from _layout_geometry import Box, Segment, segment_box_distance
 
     centre, m_per_mm = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
     line_x, _ = drawing.POCKET_LENGTH_TEXT_XY
     text_x, text_y = drawing.POCKET_LENGTH_OFFSET_XY
-    text = Box(text_x - 0.0123, text_y - 0.00875, text_x + 0.0123, text_y + 0.00875)
+    text = Box(text_x - 0.0170, text_y - 0.00875, text_x + 0.0170, text_y + 0.00875)
     clearance = 0.00178
     plan_left = centre[0] - drawing.PLAN_HALF_X * m_per_mm
     plan_top = centre[1] + drawing.PLAN_HALF_Z * m_per_mm
@@ -2114,8 +2217,8 @@ def test_keeper_locations_are_reference_but_hanger_locations_remain_manufacturin
         ),
         (
             "rear hanger z from upper sockets",
-            "REAR HANGER Z",
-            (0.040, 0.165),
+            "REAR\nHANGER Z",
+            drawing.REAR_HANGER_Z_TEXT_XY,
             part.STUD_Z_REAR - part.FRONT_COLUMN_Z,
         ),
     )
@@ -2263,6 +2366,118 @@ def test_transfer_plan_and_station_fields_remain_inside_the_hole_sheet() -> None
         * drawing.KEEPER_TRANSFER_CHARACTER_WIDTH
         <= left + right + 1e-12
     )
+
+
+def test_socket_pitch_parks_outside_the_plan_between_the_hanger_lanes() -> None:
+    # Machinist review of 11783475: centred on its line at x 83 mm, 224.00
+    # MATCHES MHA-FR-001 ran across the left rail and the extension lines.
+    # Text as the 40d9d030e render's glyphs measure it: 28.0 FRONT HANGER Z
+    # printed [42.9, 204.4]..[81.3, 213.5] mm about (62, 209); three rows
+    # stand 14.7 mm tall, MHA-FR-001 25.6 wide and HANGER Z 22.4; an offset
+    # value's underline runs 1.0 under its block and 0.1 past each side.
+    from _layout_geometry import Box, Segment, segment_box_distance, segment_box_overlap_length
+
+    ink = drawing.INK_CLEARANCE
+    stations = {label: xy for _p0, _p1, _e, xy, _o, label, _s, _r in _hole_sheet_stations()}
+    front_xy = stations["front hanger z from upper sockets"]
+    rear_xy = stations["rear hanger z from upper sockets"]
+    assert rear_xy == drawing.REAR_HANGER_Z_TEXT_XY
+    front_text = Box(front_xy[0] - 0.0192, front_xy[1] - 0.00455, front_xy[0] + 0.0192, front_xy[1] + 0.00455)
+    rear_text = Box(rear_xy[0] - 0.01122, rear_xy[1] - 0.00735, rear_xy[0] + 0.01122, rear_xy[1] + 0.00735)
+    line_x, mid_y = drawing.SOCKET_VERTICAL_PITCH_LINE_XY
+    upper = _plan(0.0, part.FRONT_COLUMN_Z)[1]
+    lower = _plan(0.0, part.REAR_COLUMN_Z)[1]
+    assert mid_y == pytest.approx((upper + lower) / 2.0)
+    tx, ty = drawing.SOCKET_VERTICAL_PITCH_TEXT_XY
+    text = Box(tx - 0.0128, ty - 0.00735, tx + 0.0128, ty + 0.00735)
+    leader = Segment(line_x, mid_y, text.xmin - 0.0001, text.ymin - 0.001)
+    hanger_x = _plan((part.BAR_X0 + part.BAR_X1) / 2, 0.0)[0]
+    socket_x = _plan(-part.COLUMN_X, 0.0)[0]
+    front_y = _plan(0.0, part.STUD_Z_FRONT)[1]
+    rear_y = _plan(0.0, part.STUD_Z_REAR)[1]
+    # Lanes outside in: 202.1, the pitch, 28.0, each line clear of the next
+    # lane's text; 28.0's extension line stops short of the pitch line.
+    assert drawing.SHEET_FRAME[0] + ink <= rear_text.xmin
+    assert rear_text.xmax + ink <= line_x <= front_text.xmin - ink
+    assert front_xy[0] - 0.001 > line_x
+    # The parked value and qualifier stand outside the plan, clear of every
+    # line and text round them; the leader runs clear of the hanger texts.
+    assert text.xmax + ink <= _plan(-drawing.PLAN_HALF_X, 0.0)[0]
+    for name, segment in {
+        "pitch line": Segment(line_x, lower, line_x, upper),
+        "pitch upper extension": Segment(line_x - 0.001, upper, socket_x, upper),
+        "pitch lower extension": Segment(line_x - 0.001, lower, socket_x, lower),
+        "28.0 line": Segment(front_xy[0], front_y, front_xy[0], upper),
+        "28.0 extension": Segment(front_xy[0] - 0.001, front_y, hanger_x, front_y),
+        "202.1 line": Segment(rear_xy[0], rear_y, rear_xy[0], upper),
+        "202.1 extension": Segment(rear_xy[0] - 0.001, rear_y, hanger_x, rear_y),
+    }.items():
+        assert segment_box_distance(segment, text) >= ink, name
+    for name, box in {"28.0": front_text, "202.1": rear_text}.items():
+        assert _box_box_gap(
+            (text.xmin, text.ymin, text.xmax, text.ymax), (box.xmin, box.ymin, box.xmax, box.ymax)
+        ) >= ink, name
+        assert segment_box_distance(leader, box) >= ink, name
+    assert segment_box_overlap_length(leader, text) == 0.0
+
+
+def test_front_keeper_z_text_stands_between_its_extension_lines() -> None:
+    # Machinist review of 11783475: at y 205 mm the keeper's extension line
+    # ran through (29.2) FRONT KEEPER Z, 34.8 x 9.2 mm as the 40d9d030e
+    # render printed it.
+    ink = drawing.INK_CLEARANCE
+    stations = {label: xy for _p0, _p1, _e, xy, _o, label, _s, _r in _hole_sheet_stations()}
+    x, y = stations["front keeper z from upper sockets"]
+    assert (x, y) == drawing.FRONT_KEEPER_Z_TEXT_XY
+    text = (x - 0.0174, y - 0.0046, x + 0.0174, y + 0.0046)
+    assert _plan(0.0, part.FRONT_COLUMN_Z)[1] - text[3] >= ink
+    assert text[1] - _plan(0.0, part.KEEPER_TAP_Z_FRONT)[1] >= ink
+    assert text[0] - _plan(drawing.PLAN_HALF_X, 0.0)[0] >= ink
+    assert stations["rear keeper z from upper sockets"][0] - text[2] >= ink
+    _callout, callout_box = _keeper_callout_placed()
+    assert _box_box_gap(text, callout_box) >= ink
+
+
+def test_crossbar_pocket_depth_stands_between_the_side_rail_and_the_t() -> None:
+    # The underside's 138.0 names the pockets and the section through them;
+    # E-E prints their depth, flange underside to the T's underside, arrows
+    # inside.  Its two rows print 24.4 x 9.2 mm (2X POCKET by the 40d9d030e
+    # render's glyphs), the underline 1.0 under the block and 0.1 past each
+    # side; extension lines overshoot their line 1.03 mm (the 8.0's there).
+    from _layout_geometry import Box, Segment, segment_box_distance, segment_box_overlap_length
+
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'suffix="2X POCKET, E-E\\nCENTRED ON T"' in source
+    assert 'label="crossbar pocket depth"' in source
+    assert "pocket_depth.ArrowSide = _DIM_ARROWS_INSIDE" in source
+    assert "crossbar pocket depth" in spec.DRAWING_REFERENCE_PRECISION
+    ink = drawing.INK_CLEARANCE
+    xy = drawing._side_section_xy
+    line_x = drawing.CROSSBAR_POCKET_DEPTH_LINE_XY[0]
+    top_y = xy(0.0, part.FLANGE_BOT_Y)[1]
+    bottom_y = xy(0.0, -part.HALF_H)[1]
+    t_left = xy(part.BAR_X0, 0.0)[0]
+    assert t_left - line_x >= ink
+    tx, ty = drawing.CROSSBAR_POCKET_DEPTH_TEXT_XY
+    text = Box(tx - 0.01225, ty - 0.0046, tx + 0.01225, ty + 0.0046)
+    leader = Segment(line_x, (top_y + bottom_y) / 2.0, text.xmax + 0.0001, text.ymin - 0.001)
+    extensions = {
+        "upper extension": Segment(line_x - 0.00103, top_y, t_left, top_y),
+        "lower extension": Segment(line_x - 0.00103, bottom_y, xy(part.HANGER_X, 0.0)[0], bottom_y),
+    }
+    # The 13.0 crossbar web's left arrow tail, 6.35 mm out from its extension line.
+    web_x0 = xy(part.BAR_WEB_X0, 0.0)[0]
+    web_y = drawing.CROSSBAR_WEB_LINE_XY[1]
+    extensions["13.0 left tail"] = Segment(web_x0 - 0.00635, web_y, web_x0, web_y)
+    for name, segment in extensions.items():
+        assert _segment_gap(leader, segment) >= ink, name
+        assert segment_box_distance(segment, text) >= ink, name
+    assert segment_box_overlap_length(leader, text) == 0.0
+    # Between the side rail's inner face and the T, under the side web's line
+    # (printed 5.56 mm under its text point) and over E-E's caption.
+    assert text.xmin - xy(-part.INNER_X, 0.0)[0] >= ink
+    assert drawing.SIDE_WEB_TEXT_XY[1] - 0.00556 - text.ymax >= ink
+    assert leader.y1 - drawing.SIDE_SECTION_CAPTION_XY[1] >= ink
 
 
 # --- The faced keeper-rail top (user ruling 2026-10-11) ---------------------
