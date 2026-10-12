@@ -7,9 +7,12 @@ Only then does this probe byte-copy its saved result and create an independent
 three-component assembly from cached pn-pen-hanger and pn-pen-rod inputs.
 
 All snapshots are siblings of pn-pen.SLDASM, preserving its reference directory
-layout. No part is rebuilt, saved, copied, or reference-rewritten by the probe.
-Every multi-config trial starts from the same single-config copy, not the previous
-trial. Save9 vs Save1 differs only in AvoidRebuildOnSave; the switch trial adds
+layout. No part build is dispatched; no part file is saved, copied, or
+reference-rewritten by the probe.
+Every minimal multi-config trial starts from the same single-config copy, not
+the previous trial. Four final normal-assembly trials each start from the
+untouched normal snapshot and retain its real referenced-part configurations.
+Save9 vs Save1 differs only in AvoidRebuildOnSave; the switch trial adds
 ShowConfiguration2/EditRebuild3/AddRebuildSaveMark for derived then Default;
 the controls preserve inherited native marks. The clear-both trial supplies an
 explicitly unmarked comparator for the three selected-LDR trials and emodel
@@ -41,14 +44,18 @@ import zlib
 
 # One inventory shared with dodo's temporary pn-only cache-output declaration.
 TRIALS = (
-    ("add-second-save9", 9, False, None),
-    ("add-second-save1", 1, False, None),
-    ("switch-second-default-save1", 1, True, None),
-    ("clear-both-save1", 1, True, ()),
-    ("mark-default-save1", 1, True, ("Default",)),
-    ("mark-second-save1", 1, True, ("Default Simplified",)),
-    ("mark-both-save1", 1, True, ("Default", "Default Simplified")),
-    ("override-emodel-save33", 33, True, ()),
+    ("add-second-save9", 9, False, None, "single-copy11"),
+    ("add-second-save1", 1, False, None, "single-copy11"),
+    ("switch-second-default-save1", 1, True, None, "single-copy11"),
+    ("clear-both-save1", 1, True, (), "single-copy11"),
+    ("mark-default-save1", 1, True, ("Default",), "single-copy11"),
+    ("mark-second-save1", 1, True, ("Default Simplified",), "single-copy11"),
+    ("mark-both-save1", 1, True, ("Default", "Default Simplified"), "single-copy11"),
+    ("override-emodel-save33", 33, True, (), "single-copy11"),
+    ("normal-resave-inherited", 1, True, None, "normal"),
+    ("normal-mark-default-save1", 1, True, ("Default",), "normal"),
+    ("normal-mark-second-save1", 1, True, ("Default Simplified",), "normal"),
+    ("normal-mark-both-save1", 1, True, ("Default", "Default Simplified"), "normal"),
 )
 STAGES = ("normal", "single-copy11", *(trial[0] for trial in TRIALS))
 OUTPUT_FILENAMES = (
@@ -186,6 +193,7 @@ def _state(model: Any) -> dict[str, Any]:
         }
     assembly = _early_bound(model, "IAssemblyDoc")
     references = []
+    components = []
     for raw in assembly.GetComponents(True) or ():
         component = _early_bound(raw, "IComponent2")
         path = str(component.GetPathName() or "")
@@ -193,7 +201,14 @@ def _state(model: Any) -> dict[str, Any]:
             raise RuntimeError(
                 "display matrix found a component with no external reference"
             )
-        references.append(str(Path(path).resolve()))
+        path = str(Path(path).resolve())
+        references.append(path)
+        components.append(
+            {
+                "path": path,
+                "referenced_configuration": str(component.ReferencedConfiguration),
+            }
+        )
     return {
         "active_configuration": str(active.Name),
         "configurations": configs,
@@ -202,6 +217,9 @@ def _state(model: Any) -> dict[str, Any]:
             _early_bound(model.Extension, "IModelDocExtension").NeedsRebuild2
         ),
         "references": sorted(references),
+        "components": sorted(
+            components, key=lambda row: (row["path"], row["referenced_configuration"])
+        ),
     }
 
 
@@ -347,23 +365,30 @@ async def probe_assembly_display_data(
             row["save_result"] = model.SaveAs3(str(paths["single-copy11"]), 0, 11)
             model = None
             await capture("single-copy11", row, single_refs)
-            single_hash = _digest(paths["single-copy11"])
+            source_hashes = {
+                "single-copy11": _digest(paths["single-copy11"]),
+                "normal": protected[normal_path],
+            }
+            source_references = {
+                "single-copy11": single_refs,
+                "normal": normal_state["references"],
+            }
 
-            for stage, options, switches, marks in TRIALS:
+            for stage, options, switches, marks, source_stage in TRIALS:
                 with span("probe.assembly_display_data.stage", stage=stage):
                     row = {
                         "stage": stage,
-                        "source_stage": "single-copy11",
+                        "source_stage": source_stage,
                         "save_api": "IModelDoc2.Save3",
                         "save_options": options,
                         "switch_rebuild_and_mark": switches,
                         "requested_ldr_marks": marks,
                     }
                     report["stages"].append(row)
-                    shutil.copy2(paths["single-copy11"], paths[stage])
-                    if _digest(paths[stage]) != single_hash:
+                    shutil.copy2(paths[source_stage], paths[stage])
+                    if _digest(paths[stage]) != source_hashes[source_stage]:
                         raise RuntimeError(
-                            f"display matrix {stage} did not start from the single-copy bytes"
+                            f"display matrix {stage} did not start from the {source_stage} bytes"
                         )
                     check(
                         f"display matrix open {stage}",
@@ -371,24 +396,30 @@ async def probe_assembly_display_data(
                     )
                     model = _model(adapter)
                     row["opened_source"] = _state(model)
-                    manager = _early_bound(
-                        model.ConfigurationManager, "IConfigurationManager"
-                    )
-                    child = manager.AddConfiguration2(
-                        "Default Simplified", "", "", 0, "Default", "", False
-                    )
-                    if (
-                        child is None
-                        or not _early_bound(child, "IConfiguration").IsDerived()
-                    ):
-                        raise RuntimeError(
-                            f"display matrix {stage}: AddConfiguration2 failed to create derived config"
+                    if source_stage == "single-copy11":
+                        manager = _early_bound(
+                            model.ConfigurationManager, "IConfigurationManager"
                         )
-                    child = None
-                    manager = None
+                        child = manager.AddConfiguration2(
+                            "Default Simplified", "", "", 0, "Default", "", False
+                        )
+                        if (
+                            child is None
+                            or not _early_bound(child, "IConfiguration").IsDerived()
+                        ):
+                            raise RuntimeError(
+                                f"display matrix {stage}: AddConfiguration2 failed to create derived config"
+                            )
+                        child = None
+                        manager = None
+                    elif not _configuration(model, "Default Simplified").IsDerived():
+                        raise RuntimeError(
+                            f"display matrix {stage}: normal snapshot lacks its derived configuration"
+                        )
                     if marks is not None:
                         _set_marks(model, marks)
                     if switches:
+                        row["configuration_switches"] = []
                         for name in ("Default Simplified", "Default"):
                             if (
                                 not model.ShowConfiguration2(name)
@@ -404,6 +435,7 @@ async def probe_assembly_display_data(
                                     f"display matrix {stage}: rebuild/save mark refused {name}"
                                 )
                             config = None
+                            row["configuration_switches"].append(_state(model))
                     row["before_save"] = _state(model)
                     result = model.Save3(options, 0, 0)
                     row["save_result"] = result
@@ -420,7 +452,7 @@ async def probe_assembly_display_data(
                             f"display matrix {stage}: Save3 failed: {result!r}"
                         )
                     model = None
-                    await capture(stage, row, single_refs)
+                    await capture(stage, row, source_references[source_stage])
             report["complete"] = True
         except Exception as error:
             report["error"] = repr(error)
