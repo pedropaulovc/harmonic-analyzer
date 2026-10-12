@@ -16,9 +16,7 @@ def _inflate(data: mmap.mmap, start: int, end: int) -> bytes:
     result = bytearray()
     for offset in range(start, end, 65536):
         chunk = data[offset : min(offset + 65536, end)]
-        result.extend(
-            inflater.decompress(chunk, _MAX_DISPLAY_BYTES + 1 - len(result))
-        )
+        result.extend(inflater.decompress(chunk, _MAX_DISPLAY_BYTES + 1 - len(result)))
         if len(result) > _MAX_DISPLAY_BYTES or inflater.unconsumed_tail:
             raise ValueError("DisplayLists exceeds the 64 MiB inspection limit")
         if inflater.unused_data or (inflater.eof and offset + len(chunk) != end):
@@ -92,8 +90,9 @@ def _assert_flags(data: bytes, stream_offset: int) -> None:
     """Recognize the observed short UTF-16 string form, not arbitrary UTF-16 bytes.
 
     The encoded length counts UTF-16 code units (not Python characters). A part
-    path's uint32 flag is 20 bytes after its encoded end. No undocumented record
-    prefix, configuration mapping, or semantics of other nonzero flags is assumed.
+    path's uint32 flag is 20 bytes after its encoded end. Native v37/v40 part
+    records have eight zero bytes, uint32 6, eight uninterpreted bytes, then a
+    flag of 0 or 1. Refuse unsupported prefixes/flags rather than infer semantics.
     """
     cursor = 0
     records = 0
@@ -107,6 +106,8 @@ def _assert_flags(data: bytes, stream_offset: int) -> None:
         end = offset + 4 + 2 * units
         if end > len(data):
             raise ValueError(f"{context}: truncated UTF-16 string")
+        if data.find(_STRING_MARKER, offset + 1, end) != -1:
+            raise ValueError(f"{context}: nested or overlapping serialized string")
         try:
             text = data[offset + 4 : end].decode("utf-16le")
         except UnicodeDecodeError as exc:
@@ -120,7 +121,14 @@ def _assert_flags(data: bytes, stream_offset: int) -> None:
             raise ValueError(f"{context}: truncated display flag for {text!r}")
         if data.find(_STRING_MARKER, end, end + 24) != -1:
             raise ValueError(f"{context}: overlapping string/flag data for {text!r}")
+        if (
+            data[end : end + 8] != b"\x00" * 8
+            or struct.unpack_from("<I", data, end + 8)[0] != 6
+        ):
+            raise ValueError(f"{context}: unsupported part record prefix for {text!r}")
         flag = struct.unpack_from("<I", data, end + 20)[0]
+        if flag not in (0, 1):
+            raise ValueError(f"{context}: unsupported display flag={flag} for {text!r}")
         if flag == 0:
             raise ValueError(f"{context}: saved display flag=0 for {text!r}")
         records += 1
@@ -143,12 +151,13 @@ def assert_saved_display_data(path: Path) -> None:
     guarantee against damaged data sharing that signature. Inspection ends at
     a verified directory-copy reference; the remaining footer is not audited.
 
-    Success proves nonzero flags on recognized .SLDPRT records only. The observed
-    layout cannot distinguish a standalone tagged part-path string from a real
-    component record, identify absent configurations, validate .SLDASM records,
-    or prove rendering/visibility. Nested tagged strings inside another string
-    or stored container payload are not independently interpreted. Unknown
-    layouts/extended string lengths must be investigated rather than accepted.
+    Success proves flag=1 on recognized .SLDPRT records only. A standalone tagged
+    part-path string with the same observed record prefix remains indistinguishable
+    from a component record; absent configurations and rendering are not proven.
+    Native good v37 saves contain flag=0 .SLDASM records, so those are excluded:
+    their nested parts have their own .SLDPRT records in the same display list.
+    Nested/overlapping serialized strings and unknown layouts/extended lengths
+    are refused. Markers inside stored container payloads are not separate entries.
     """
     try:
         with path.open("rb") as source:
