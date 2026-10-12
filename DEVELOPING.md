@@ -1114,7 +1114,7 @@ isolated. A scoped drawing build need not regenerate the rest of the fleet.
 
 Feature declarations remain colocated in `draw_<stem>.py`. Static AST discovery
 and source-path construction do not import those modules while loading the task
-graph, but each `features:<stem>` source key includes its **entire own draw-module
+graph, but each `package:features:<stem>` source key includes its **entire own draw-module
 closure**, not just declaration expressions. An own-draw edit re-keys only that
 feature leaf; shared `_drawing_common`, layout-audit, `_pdf_ink` and drawing-helper
 edits re-key all 18 enrolled feature leaves, not native part/assembly recipes.
@@ -1123,7 +1123,7 @@ STEP bytes; its recipe consumes bundle outputs rather than draw closures
 directly. An enrolled `prechips:<stem>` depends only on its own feature leaf.
 Feature leaves retain `uptodate: [False]`, so every invocation reaches the cache
 probe even if local manifest and STEP targets exist. `cache_status` reports
-individual `features:<stem>` keys, not an aggregate `package:features` COM key.
+individual `package:features:<stem>` keys, not an aggregate `package:features` COM key.
 See [drawing requirements and travelers](cad/docs/pipeline/features-travelers.md)
 for sourced precision, printed-literal authority and explicit descriptor consumption.
 The declaration migration's spec edits cause a one-time native part/assembly
@@ -1182,7 +1182,7 @@ bump or dirty local edit changes only the tiers that include the affected source
 while SolidWorks-free `check:*` tasks stay off these digests. See
 [the three-tier source rules](AGENTS.md#three-tier-submodule-digest-part-vs-assembly-vs-drawing).
 `check:recipe` (`test_dodo_recipe.py`) guards the dependency construction.
-Scoped `features:<stem>` and full neutral export use the assembly tier (whole
+Scoped `package:features:<stem>` and full neutral export use the assembly tier (whole
 submodule minus `drawing.py`): face naming and `SaveAs3` do not call drawing-doc
 helpers. This excludes only submodule drawing code, not the feature source
 key's entire main-repo draw-module closure.
@@ -1200,7 +1200,7 @@ without reconstructing build history from terminal scrollback (none can fail a
 build):
 
 - **`doit cache_status`** — the one-command answer to *"why did this miss?"*. For
-  every cacheable COM task (part, assembly, drawing, gate, `features:<stem>`,
+  every cacheable COM task (part, assembly, drawing, gate, `package:features:<stem>`,
   `export`, `package:release`) it prints `HIT`/`MISS` (a backend presence probe — a
   HEAD,
   not a download) + the 12-char key, and for a miss the full `(digest, relpath)`

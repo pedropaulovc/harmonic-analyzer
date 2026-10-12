@@ -17,7 +17,7 @@ Task groups (the prefix says whether SolidWorks is required):
   part:<stem>        build one part            (COM -- needs SolidWorks)
   assembly:<stem>    build/refresh one assembly (COM)
   drawing:<stem>     build one manufacturing drawing (COM)
-  features:<stem>    isolated STEP/requirements bundle (COM)
+  package:features:<stem> isolated STEP/requirements bundle (COM)
   package:features   aggregate every feature bundle (NO SolidWorks)
   verify:<suite>     soundness/subsystems/kinematics gates (COM)
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
@@ -634,7 +634,7 @@ def _stage_name(label: str) -> str:
         return "preflight"
     if label == "gallery":
         return "gallery"
-    if label.startswith(("export", "features:")):
+    if label.startswith(("export", "package:features:")):
         return "export"
     return "harmonic-analyzer"
 
@@ -3840,7 +3840,7 @@ def task_prechips():
                 str((SCRIPTS_DIR / "_telemetry.py").resolve()),
                 *_executed_closure(cmd),
             }),
-            "task_dep": [f"features:{stem}"] if diagnostic is None else [],
+            "task_dep": [f"package:features:{stem}"] if diagnostic is None else [],
             "targets": [
                 stamp, str(directory / "plan.toml"),
                 str(directory / "report.json"), str(directory / "traveler.html"),
@@ -3985,34 +3985,11 @@ def task_preflight():
     }
 
 
-def task_features():
-    """One cache-keyed COM leaf for each part's isolated requirement bundle."""
-    from export_features import SUPPORTED_PARTS
-
-    for stem in SUPPORTED_PARTS:
-        deps = _feature_export_file_deps(stem)
-        outputs = _feature_export_outputs(stem)
-        yield {
-            "name": stem,
-            "file_dep": deps,
-            "targets": [str(path) for path in outputs],
-            # Always probe the cache so existing but tampered/partial bundles repair.
-            "uptodate": [False],
-            "actions": [(_cached_com_action, [
-                f"features:{stem}",
-                [sys.executable, str(EXPORT_PY), "--features", stem],
-                deps, outputs, f"features-{stem.replace('_', '-')}",
-            ])],
-            "clean": True,
-            "verbosity": 2,
-        }
-
-
 def task_package():
     """Feature aggregation and cache-keyed native release packaging.
 
     ``package:features`` is action-free and seat-free. Its explicit task edges
-    include every ``features:<stem>`` leaf in the packaged farm graph; file edges
+    include every ``package:features:<stem>`` leaf in the packaged farm graph; file edges
     require each leaf's complete adjacent STEP/manifest bundle.
 
     ``package:release`` is the COM half of a release: SolidWorks Pack-and-Go of
@@ -4026,9 +4003,28 @@ def task_package():
     """
     from export_features import SUPPORTED_PARTS
 
+    for stem in SUPPORTED_PARTS:
+        deps = _feature_export_file_deps(stem)
+        outputs = _feature_export_outputs(stem)
+        yield {
+            "name": f"features:{stem}",
+            "file_dep": deps,
+            "targets": [str(path) for path in outputs],
+            # Always probe the cache so existing but tampered/partial bundles repair.
+            "uptodate": [False],
+            "actions": [(_cached_com_action, [
+                f"package:features:{stem}",
+                [sys.executable, str(EXPORT_PY), "--features", stem],
+                deps, outputs, f"features-{stem.replace('_', '-')}",
+            ])],
+            "clean": True,
+            "verbosity": 2,
+        }
+
+
     yield {
         "name": "features",
-        "task_dep": [f"features:{stem}" for stem in SUPPORTED_PARTS],
+        "task_dep": [f"package:features:{stem}" for stem in SUPPORTED_PARTS],
         "file_dep": [str(path) for path in _feature_bundle_outputs()],
         "actions": [],
         "verbosity": 2,
@@ -4183,7 +4179,7 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
     from export_features import SUPPORTED_PARTS
 
     for stem in SUPPORTED_PARTS:
-        rows.append((f"features:{stem}", _feature_export_file_deps(stem)))
+        rows.append((f"package:features:{stem}", _feature_export_file_deps(stem)))
     rows.append(("package:release", _package_file_deps()))
     return rows
 

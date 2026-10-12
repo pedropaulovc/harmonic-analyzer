@@ -1913,7 +1913,7 @@ def test_task_span_carries_its_pipeline_stage_resource():
     assert dodo._stage_name("part:pn_pen_rod") == "part-build"
     assert dodo._stage_name("assembly:pn_pen") == "assembly-build"
     assert dodo._stage_name("drawing:pn_pen_rod") == "drawing-export"
-    assert dodo._stage_name("features:ch_rocker_arm") == "export"
+    assert dodo._stage_name("package:features:ch_rocker_arm") == "export"
     assert dodo._stage_name("package:features") == "harmonic-analyzer"
     assert dodo._stage_name("verify soundness") == "verify-soundness"
     assert dodo._stage_name("nothing recognisable") == "harmonic-analyzer"
@@ -2065,8 +2065,9 @@ def test_com_tasks_carry_no_inter_com_task_dep():
         assert not t.get("task_dep"), (
             f"verify_soundness:{t['name']} has a stray task_dep"
         )
-    for t in dodo.task_features():
-        assert not t.get("task_dep"), f"features:{t['name']} has a stray task_dep"
+    for t in dodo.task_package():
+        if t["name"].startswith("features:"):
+            assert not t.get("task_dep"), f"package:{t['name']} has a stray task_dep"
     aggregated = {
         "soundness": [f"verify_soundness:{stem}" for stem in dodo.ASSEMBLY_ORDER]
     }
@@ -3429,7 +3430,7 @@ def test_feature_cache_and_status_share_the_parsed_yaml_key(tmp_path, monkeypatc
     source = tmp_path / "drawing.yaml"
     source.write_text("diameter: 6.5\n", encoding="utf-8")
     deps = [str(source)]
-    label = "features:ch_rocker_arm"
+    label = "package:features:ch_rocker_arm"
     probes = []
     messages = []
     monkeypatch.setattr(dodo, "_cache_rows", lambda: [(label, deps)])
@@ -3527,7 +3528,7 @@ def test_prechips_task_shape_and_complete_dependency_closure(synthetic_prechips_
     dodo, plans, exporter, stem, source, spec, helper = synthetic_prechips_task
     task = next(dodo.task_prechips())
     assert task["name"] == stem
-    assert task["task_dep"] == [f"features:{stem}"]
+    assert task["task_dep"] == [f"package:features:{stem}"]
     deps = {str(path) for path in task["file_dep"]}
     expected = {
         str(source), *(str(path) for path in plans.shop_paths()),
@@ -3590,17 +3591,21 @@ def test_feature_failure_blocks_full_export_but_not_another_traveler(
         # No task action executes: model one failed feature leaf in doit's real
         # scheduler, and propagate its failure through consumer dependency nodes.
         node.run_status = (
-            "failure" if node.task.name == f"features:{failing}" or node.bad_deps
+            "failure" if node.task.name == f"package:features:{failing}" or node.bad_deps
             else "done"
         )
         scheduled[node.task.name] = node.run_status
         processed = node
-    feature_leaves = {name for name in scheduled if name.startswith("features:")}
+    feature_leaves = {
+        name for name in scheduled if name.startswith("package:features:")
+    }
     if consumer == "traveler":
-        assert feature_leaves == {f"features:{stem}"}
+        assert feature_leaves == {f"package:features:{stem}"}
         assert scheduled[selected] == "done"
     else:
-        assert feature_leaves == {f"features:{part}" for part in exporter.SUPPORTED_PARTS}
+        assert feature_leaves == {
+            f"package:features:{part}" for part in exporter.SUPPORTED_PARTS
+        }
         assert scheduled[selected] == "failure"
 
 
@@ -3855,14 +3860,18 @@ def isolated_feature_keys(isolated_assembly_helper_keys, monkeypatch):
 
     def snapshot():
         result = native_snapshot()
-        tasks = {task["name"]: task for task in dodo.task_features()}
+        tasks = {
+            task["name"].removeprefix("features:"): task
+            for task in dodo.task_package()
+            if task["name"].startswith("features:")
+        }
         for stem, task in tasks.items():
             assert all(
                 Path(path).resolve().is_relative_to(root.resolve())
                 for path in task["file_dep"]
             ), stem
         result["features"] = {
-            stem: dodo._cache_key(task["file_dep"], f"features:{stem}")
+            stem: dodo._cache_key(task["file_dep"], f"package:features:{stem}")
             for stem, task in tasks.items()
         }
         return result

@@ -2,11 +2,12 @@
 
 ## Scoped producers and full-export consumers
 
-`features:<stem>` is one scoped COM leaf per part whose `draw_<stem>.py`
+`package:features:<stem>` is one scoped COM leaf per part whose `draw_<stem>.py`
 declares requirement features. `export_features.SUPPORTED_PARTS` is derived by
 an import-free AST scan of those draw scripts; adding a declaration enrolls the
 part without editing a central exporter list. `package:features` is a seat-free
-aggregator depending on every `features:<stem>` leaf, not a COM export action.
+aggregator depending on every `package:features:<stem>` leaf, not a COM export action.
+This namespace is interim until `solidworks-pool` admits top-level `features` targets; no pool change is included.
 Each leaf's native dependency is its own part, not assemblies or drawing
 artefacts. The three machine parts have legacy committed process plans; they
 are not enrolled travelers yet. Fixture bundles expose drawing requirements too.
@@ -157,7 +158,7 @@ Release staging copies the verified scoped STEP and manifest under `features/`,
 separately from the existing full neutral inventory. Each face reference remains
 bound only to the adjacent STEP whose digest the manifest records.
 
-Each `features:<stem>` cache key includes the **entire** closure of its own
+Each `package:features:<stem>` cache key includes the **entire** closure of its own
 draw module, symbol-citation module closures, registry/config dependencies,
 release revision and native part artefact identity/execution token, plus shared
 exporter/helper sources. Declaration discovery and source-path construction
@@ -224,7 +225,7 @@ uv run --frozen python -m doit prechips:<stem>
 ```
 
 Every enrolled traveler is required by both `build` and `release`. Its task
-depends only on its own `features:<stem>` leaf, its scoped bundle and tracked plan, the shop
+depends only on its own `package:features:<stem>` leaf, its scoped bundle and tracked plan, the shop
 files, CAD-tagged fixture spec modules, the locked consumer and executed wrapper
 closure. It runs locally on the submitter without a SolidWorks seat, including
 under the farm executor, and needs FreeCAD 1.1 (see

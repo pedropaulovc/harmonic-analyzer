@@ -45,7 +45,7 @@ export above can run on a SolidWorks farm worker that has no renderer:
     uv run python cad\\scripts\\export_models.py --comparisons
 
 ``--features <stem> ...`` is the separate feature-bundle producer
-(the doit ``features:<stem>`` leaves, aggregated by ``package:features``).
+(the doit ``package:features:<stem>`` leaves, aggregated by ``package:features``).
 For each supported part it writes ONLY ``cad/out/features/<stem>/<dashed>.STEP``
 (the named, default-configuration ``SaveAs3`` export full export consumes) and an
 adjacent ``features.toml`` bound to those raw STEP bytes by ``export_features.write_manifest``.
@@ -55,7 +55,7 @@ It never touches the global STEP/STL/PNG, colour, source-digest or release-neutr
 
 Full export requires every enrolled bundle to exist and validate before copying
 any STEP. Missing or unbound bundles fail loudly; run the corresponding
-``features:<stem>`` tasks first. Full export never regenerates their manifests.
+``package:features:<stem>`` tasks first. Full export never regenerates their manifests.
 """
 
 from __future__ import annotations

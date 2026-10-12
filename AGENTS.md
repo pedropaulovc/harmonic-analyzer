@@ -337,7 +337,7 @@ such build:
 | `part:<stem>`, `assembly:<stem>`, `drawing:<stem>` | yes | yes | yes |
 | `verify_soundness:<stem>`, `verify:kinematics` | yes | yes | yes |
 | `preflight`, `export`, `package:release` | yes | yes | yes |
-| `features:<stem>` (one isolated STEP/requirements bundle) | yes | yes | yes |
+| `package:features:<stem>` (one isolated STEP/requirements bundle) | yes | yes | yes |
 | `package:features` | no (aggregator) | no | — (its leaves are) |
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
 | `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
@@ -348,7 +348,7 @@ such build:
 | `cache_status` | **no** | no (diagnostic) | no |
 | `build` (default), `build_bare`, `release` | meta | — | no (`release` publishes) |
 
-`features:<stem>` exports each part whose `draw_<stem>.py` has module-level
+`package:features:<stem>` exports each part whose `draw_<stem>.py` has module-level
 `_feature_requirements.requirement(...)` declarations beside its printed drawing
 requirements. `export_features.SUPPORTED_PARTS` is derived by import-free AST
 discovery, not a maintained part list. Source-path construction is also static:
@@ -375,7 +375,7 @@ not draw closures directly. The release-only `check:features_bound` validates
 scoped recorded face refs, requires two rocker pivot-bore patches and identical
 scoped/full STEP bytes, and reports both digests. Release staging copies the
 verified scoped bundles under `features/`. Each enrolled `prechips:<stem>` task
-depends only on its own `features:<stem>` leaf, not `package:features`, and uses
+depends only on its own `package:features:<stem>` leaf, not `package:features`, and uses
 pinned prechips 0.1 and `cad/process/` with a strict **exit 0 only** policy:
 bad input, machining blockers and required unknowns all fail without a stamp.
 Build and release include every stem in `_process_plans.TRAVELER_STEMS`.
@@ -942,7 +942,7 @@ the modules that tier's build scripts never call:
 
 - **drawing tasks fold the WHOLE tree** (`_submodule_digest` — the only tier with
   `drawing.py`);
-- **assemblies, `features:<stem>` and full `export` fold the tree MINUS `drawing.py`**
+- **assemblies, `package:features:<stem>` and full `export` fold the tree MINUS `drawing.py`**
   (`_submodule_assembly_digest` — see `_ASSEMBLY_DIGEST_EXCLUDE_FILES`);
 - **parts fold the tree MINUS `{assembly.py, motion.py, drawing.py}`**
   (`_submodule_part_digest` — see `_PART_DIGEST_EXCLUDE_FILES`).

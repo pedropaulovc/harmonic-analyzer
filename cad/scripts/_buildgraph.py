@@ -2079,7 +2079,7 @@ def config_files_of(script: Path) -> frozenset[str]:
     skipping a real change.
 
     Runtime-loaded requirement declarations are deliberately not discovered here:
-    features:<stem> callers enumerate only source_paths(stem) and analyze each
+    package:features:<stem> callers enumerate only source_paths(stem) and analyze each
     Python source's closure. Full export reads produced bundles instead of these
     declarations. Following every discovered drawing from the generic exporter
     would make one declaration edit invalidate every feature leaf.
