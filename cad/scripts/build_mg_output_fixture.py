@@ -10,8 +10,10 @@ centre, the hex axis local +X from the free end (x = FREE_END_X) to the
 spigot face (x = SPIGOT_FACE_X), flats facing +/-Z, corners on +/-Y.
 
 * ``HexProfile``: the 3/8 hex on the ``FreeEnd`` plane, extruded to the
-  shoulder.  It carries the flats (``HexAf``) and the rod bore's location
-  from one flat (``BoreFromFlat``), the sketch origin being the bore axis.
+  shoulder.  It carries the flats (``HexAf``); its corners sit on the
+  vertical through the sketch origin (the bore axis) and its two flats are
+  equal, so the rod bore is centred between the flats with no dimension to
+  either one.
 * ``TurnedProfile``: the spigot as a Top-plane rectangle from the free end to
   the spigot face, revolved about local X (inside the hex it adds nothing:
   its Ø is under the flats).  It carries every axial station from the free
@@ -22,8 +24,9 @@ spigot face (x = SPIGOT_FACE_X), flats facing +/-Z, corners on +/-Y.
   sizes it and ``GrooveRootDia`` is the diametric dimension from the axis to
   the root point.
 * ``RodBoreProfile``: the reamed Ø5.20 cross bore along local Y.
-* ``AxialTap``: one Hole Wizard #4-40 tap from the spigot face, up to the
-  rod bore (the thumb screw's receiver).
+* ``AxialTap``: one blind Hole Wizard #4-40 tap from the spigot face (the
+  thumb screw's receiver): full thread to where its axis breaks into the
+  rod bore, the tap drill on to the bore axis, its point in the bore.
 * ``HookAnchorPoint``: the lever wire's hook at the groove root's +Z side.
 
 Run (SolidWorks already open)::
@@ -73,7 +76,6 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 from mg_output_fixture_geom import (
-    BORE_FROM_FLAT,
     FREE_END_X,
     GROOVE_CENTRE_R,
     GROOVE_RADIUS,
@@ -143,9 +145,11 @@ def _bore_volume() -> float:
 
 
 def _tap_volume() -> float:
-    """The tap drill from the spigot face up to the bore's surface: the full
-    drill cylinder to the bore axis less the drill's share of the bore's
-    half on the face side (half the perpendicular cross-hole volume)."""
+    """The tap drill from the spigot face into the rod bore: the full drill
+    cylinder to the bore axis less the drill's share of the bore's half on
+    the face side (half the perpendicular cross-hole volume).  The drill
+    stops at the bore axis, its point in the bore's air short of the far wall
+    (``mg_output_fixture_spec`` proves it), so the point removes nothing."""
     return (
         math.pi * DRILL_R**2 * SPIGOT_FACE_X
         - cross_hole_volume_mm3(TAP_DRILL_DIA, ROD_BORE_DIA) / 2.0
@@ -172,7 +176,6 @@ async def build(adapter) -> dict[str, str]:
     # document units.
     for name, value in (
         ("HexAf", HEX_AF),
-        ("BoreFromFlat", BORE_FROM_FLAT),
         ("RodStation", ROD_STATION),
         ("HexLength", HEX_LENGTH),
         ("OverallLength", OVERALL_LENGTH),
@@ -262,13 +265,13 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "RodBore")
     volume = await volume_check(adapter, "rod bore", volume - V_BORE, 0.01 * V_BORE)
 
-    # --- Thumb-screw tap: from the spigot face up to the rod bore ---------------
+    # --- Thumb-screw tap: from the spigot face into the rod bore ----------------
     tap = wizard_holes(
         adapter,
         TAP_SPEC,
         [[SPIGOT_FACE_X, 0.0, 0.0]],
         (1.0, 0.0, 0.0),
-        f"thumb-screw tap ({TAP_SPEC.size} to the rod bore)",
+        f"thumb-screw tap ({TAP_SPEC.size} into the rod bore)",
         name="AxialTap",
         expect_dia_mm=TAP_DRILL_DIA,
         placement_dims=[((None, None), (None, None))],
@@ -324,11 +327,13 @@ async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
     """The 3/8 hex on ``FreeEnd``, corners on the sketch's vertical axis.
 
     On the negative-offset Right plane sketch x is model -Z (build_fr_top_frame
-    module docstring); the hex is symmetric in it, so either flat may carry
-    ``BoreFromFlat``.  Both corners sit on the vertical through the origin
-    (the bore axis), each a corner radius off it; each flat is vertical and
-    two equal sides on each side of it make the section regular.  The flats
-    are dimensioned point to point across the hex.
+    module docstring).  Both corners sit on the vertical through the origin
+    (the bore axis), each a corner radius off it; each flat is vertical, with
+    equal sides either side of it.  The two flats equal make the two halves
+    the same width, so the origin is centred between the flats and the rod
+    bore needs no location from either; the corner radius tied to the flats
+    makes the section regular.  The flats are dimensioned point to point
+    across the hex.
     """
     half_af, corner = HEX_AF / 2.0, HEX_CORNER_RADIUS
     points = [
@@ -354,6 +359,11 @@ async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
             f"hex sides {first}={second}",
             await adapter.add_sketch_constraint(lines[first], lines[second], "equal"),
         )
+    # Equal flats, equal halves: the bore axis centred between the flats.
+    check(
+        "hex flats equal (bore centred)",
+        await adapter.add_sketch_constraint(lines[1], lines[4], "equal"),
+    )
     corner_drive = f'"HexAf" * {_CORNER_PER_AF!r}'
     await anchor_point_to_origin(adapter, f"{lines[0]}.start", 0.0, corner, "hex top corner")
     hexd.record("HexCornerTop", corner_drive)
@@ -368,15 +378,6 @@ async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
         "hex across the flats",
     )
     hexd.record("HexAf", '"HexAf"')
-    await dimension_between(
-        adapter,
-        f"{lines[1]}.start",
-        "origin",
-        "horizontal_distance",
-        BORE_FROM_FLAT,
-        "rod bore axis from the flat",
-    )
-    hexd.record("BoreFromFlat", '"BoreFromFlat"')
     await ensure_fully_defined(adapter, "hex profile")
     check("exit_sketch hex", await adapter.exit_sketch())
     name_last_feature(adapter, "HexProfile")

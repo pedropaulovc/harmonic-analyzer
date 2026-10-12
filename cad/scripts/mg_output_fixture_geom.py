@@ -1,10 +1,11 @@
 r"""MHA-MG-006 output fixture: drawing-free geometry and installed pose.
 
 PURE DATA, no SolidWorks/COM imports and no drawing spec, title block or
-registry in its import closure, so the assembly, the lever wire, the
-interference contracts and the web exporters read the fixture's shape and
-pose without re-keying on a sheet edit.  Bands, places, worst-case walls and
-sheet text live in ``mg_output_fixture_spec``.
+registry in its import closure, so the assembly, the lever wire and the
+interference contracts read the fixture's shape and pose, and the release
+exporters will read it (issue #1351), without re-keying on a sheet edit.
+Bands, places, worst-case walls and sheet text live in
+``mg_output_fixture_spec``.
 
 The fixture (book ch. 20 p. 48, the photographed small hex block on the
 vertical rod) is a 3/8 brass hex bar: the Ø5 vertical rod slides through a
@@ -13,10 +14,11 @@ full-radius groove the lever wire hooks into, and an axial #4-40 tap from
 the spigot face down to the rod bore takes the thumb screw that locks the
 fixture to the rod.
 
-Part frame: the origin is the rod-bore centre.  The hex axis is local +X,
-from the free end (x = FREE_END_X) through the shoulder (x = SHOULDER_X) to
-the spigot face (x = SPIGOT_FACE_X).  The flats face +/-Z and the corners
-lie on +/-Y; the rod bore runs along local Y through the corners.  The hook
+Part frame: the origin is the rod-bore centre, on the hex axis.  The hex axis
+is local +X, from the free end (x = FREE_END_X) through the shoulder
+(x = SHOULDER_X) to the spigot face (x = SPIGOT_FACE_X).  The flats face
++/-Z and the corners lie on +/-Y; the rod bore runs along local Y through the
+corners, centred between the flats.  The hook
 point is the groove's +Z tangent station: the wire's centre where it sits in
 the groove root with its running clearance.
 
@@ -48,10 +50,10 @@ SPIGOT_LENGTH = 6.7
 SPIGOT_FACE_X = SHOULDER_X + SPIGOT_LENGTH
 OVERALL_LENGTH = HEX_LENGTH + SPIGOT_LENGTH
 
-# --- Rod bore: across the corners, along local Y --------------------------------
+# --- Rod bore: across the corners, along local Y, through the hex axis --------
+# Centred between the flats: the sheet states the centring and the wall it
+# must leave (mg_output_fixture_spec), not a location from one flat.
 ROD_BORE_DIA = 5.2  # a slip fit on the Ø5 vertical rod
-# The bore centre from the flat the sheet locates it from: half the flats.
-BORE_FROM_FLAT = HEX_AF / 2.0
 
 # --- Spigot and its full-radius wire groove ------------------------------------
 SPIGOT_DIA = 9.0
@@ -68,12 +70,26 @@ GROOVE_MOUTHS = (GROOVE_X - GROOVE_HALF_OPENING, GROOVE_X + GROOVE_HALF_OPENING)
 
 # --- Thumb-screw tap: axial #4-40 from the spigot face into the rod bore --------
 THREAD = "#4-40"
-TAP_SPEC = HoleSpec("tapped", THREAD, end="through_next")
-TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]
-# Where the tap drill's axis breaks into the rod bore.
+# Where the tap's axis breaks into the rod bore.
 TAP_BREAKOUT_X = ROD_BORE_DIA / 2.0
+# Full thread from the spigot face to that breakout: the callout's thread
+# depth, its nominal (REF on the sheet: the rod bore ends the thread).
 TAP_LENGTH = SPIGOT_FACE_X - TAP_BREAKOUT_X
+# The tap drill runs on to the bore axis: its full Ø clears the near wall and
+# its point stops in the bore, short of the far wall (the spec proves both at
+# the printed worst case).  A blind tap, not up-to-next: the callout states
+# the drill depth and the REF thread depth instead of a THRU the far wall
+# would contradict.
+TAP_DRILL_DEPTH = SPIGOT_FACE_X
+TAP_SPEC = HoleSpec(
+    "tapped",
+    THREAD,
+    end="blind",
+    depth_mm=TAP_DRILL_DEPTH,
+    overrides_mm={"ThreadDepth": TAP_LENGTH},
+)
+TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 
 # --- Lever wire hook ------------------------------------------------------------
 WIRE_DIA = 0.8
@@ -121,10 +137,12 @@ if not SHOULDER_X < GROOVE_MOUTHS[0] < GROOVE_MOUTHS[1] < SPIGOT_FACE_X:
     raise AssertionError("MHA-MG-006 groove runs off the spigot")
 if not SPIGOT_DIA < HEX_AF:
     raise AssertionError("MHA-MG-006 spigot leaves no shoulder inside the flats")
-if not ROD_BORE_DIA / 2.0 < BORE_FROM_FLAT:
+if not ROD_BORE_DIA < HEX_AF:
     raise AssertionError("MHA-MG-006 rod bore breaks through a flat")
 if not TAP_DRILL_DIA < ROD_BORE_DIA:
     raise AssertionError("MHA-MG-006 tap drill does not end inside the rod bore")
+if not 0.0 < TAP_LENGTH < TAP_DRILL_DEPTH:
+    raise AssertionError("MHA-MG-006 tap drill stops short of the thread it carries")
 if not THREAD_MAJOR < GROOVE_ROOT_DIA:
     raise AssertionError("MHA-MG-006 thread breaks into the groove")
 if not VROD_DIA < ROD_BORE_DIA:

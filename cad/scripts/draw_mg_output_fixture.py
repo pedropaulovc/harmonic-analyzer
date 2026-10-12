@@ -12,9 +12,12 @@ horizontal, looking straight down the reamed rod bore, the flats edge-on top
 and bottom.  It carries every axial station from the free end, the spigot
 and groove sizes and the bore's Ø.  The end view is the ``*Right``
 projection, looking at the spigot face with the flats standing vertical; it
-carries the flats, the bore's location from one flat (its origin is the tap,
-on the bore axis) and the #4-40 tap's native callout.  Hidden lines stay
-off: the tap is a standard hole its callout states.
+carries the flats as a stock reference, (9.525), and the #4-40 tap's native
+callout: the drill and its depth, then the thread and its nominal depth,
+INTO BORE.  The notes name the plug tap and make the thread depth REF: the
+rod bore ends the thread.  The rod bore is centred on the hex axis (a note),
+so nothing locates it from a flat.  Hidden lines stay off: the tap is a
+standard hole its callout states.
 
 Run with SolidWorks open::
 
@@ -25,11 +28,13 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -43,8 +48,12 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_projection import model_point_in_view
@@ -60,12 +69,17 @@ from mg_output_fixture_geom import (
     HEX_CORNER_RADIUS,
     SHOULDER_X,
     SPIGOT_FACE_X,
+    TAP_DRILL_DEPTH,
     TAP_DRILL_DIA,
+    TAP_LENGTH,
 )
 from mg_output_fixture_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    REFERENCE_DIMENSIONS,
     ROD_BORE_CALLOUT,
+    TAP_CALLOUT_PRECISION,
+    TAP_DEPTH_PLACES,
     TAP_PROCESS,
     TAP_SPEC,
 )
@@ -115,7 +129,6 @@ _SIDE_BOTTOM = _side_y(-_HALF_AF)
 # Printed text extents on the 2026-10-12 farm sheet (the layout audit's
 # boxes), used to hold each text clear of the witnesses beside it.
 SPIGOT_DIA_TEXT_HALF_WIDTH = 0.0135  # Ø9.00 and its band: 27.0 mm
-STATION_TEXT_HALF_WIDTH = 0.0123  # 5.00 or 4.76 and its band: 24.5 mm
 BORE_CALLOUT_HALF_WIDTH = 0.0138  # Ø5.20 +0.03/0.00 over REAM THRU: 27.5 mm
 BORE_CALLOUT_HALF_HEIGHT = 0.0073  # shoulder to the +0.03 row's top: 14.6 mm
 # Every station on the side view is witnessed from the free end's mid point,
@@ -145,28 +158,24 @@ SIDE_KEEP = {
     "GrooveRadius": (_side_x(SPIGOT_FACE_X) + 0.012, _SIDE_TOP + 0.006),
 }
 # The end view stands the flats vertical (``*Right`` looks along -X, sheet
-# right is model -Z).  Both of its dimensions witness the near (right) flat
-# from its top corner, so both stack above the hex and nothing hangs down
-# that flat where the tap's leader crosses it: the bore's location
-# innermost, its text outside the 19 mm span right of the flat's witness
-# (the bore station's precedent on the side view), so the bore axis'
-# witness stops under the flats' line; across the flats outermost, mid-span.
+# right is model -Z).  Its one dimension, the flats' stock reference,
+# witnesses the near (right) flat from its top corner and reads above the
+# hex, mid-span, so nothing hangs down that flat where the tap's leader
+# crosses it.
 _END_HALF_HEIGHT = HEX_CORNER_RADIUS * _S / 1000.0
 _END_HALF_WIDTH = HEX_AF / 2.0 * _S / 1000.0
 END_KEEP = {
-    "BoreFromFlat": (
-        END_CENTER[0] + _END_HALF_WIDTH + 0.015,
-        END_CENTER[1] + _END_HALF_HEIGHT + 0.012,
-    ),
     "HexAf": (END_CENTER[0], END_CENTER[1] + _END_HALF_HEIGHT + 0.022),
 }
 # The tap callout reads right of the end view at the hole's height: its
 # leader leaves the drill circle a few degrees above the horizontal centre
-# mark and crosses only the near flat, below the witnesses rising from the
-# flat's top corner.  ``callout_xy`` is the text's centre; the two rows run
-# ~76 mm with the shoulder under the bottom row, ~5.6 mm below the centre
-# (the v1 sheet's ink: centre (292, 134), shoulder end (254.0, 128.4)).
-_TAP_CALLOUT_HALF_WIDTH = 0.038
+# mark and crosses only the near flat, below the witness rising from the
+# flat's top corner.  ``callout_xy`` is the text's centre; the shoulder sits
+# under the bottom row, ~5.6 mm below the centre (the v1 sheet's ink: centre
+# (292, 134), shoulder end (254.0, 128.4)).  The v1 sheet's 28-glyph thread
+# row, TAP TO BORE 4-40 UNC-2B THRU, ran ~76 mm; its 32-glyph successor,
+# TAP INTO BORE 4-40 UNC-2B (depth) 10.1, runs ~87 mm.
+_TAP_CALLOUT_HALF_WIDTH = 0.0435
 _TAP_CALLOUT_SHOULDER_DROP = 0.0056
 TAP_CALLOUT_XY = (
     END_CENTER[0] + _END_HALF_WIDTH + 0.006 + _TAP_CALLOUT_HALF_WIDTH,
@@ -174,23 +183,49 @@ TAP_CALLOUT_XY = (
 )
 # What the native callout must print: the thread itself, not just the drill.
 _TAP_THREAD_TEXT = f"{TAP_SPEC.size.lstrip('#')} UNC"
+# A band on either depth: the thread's is REF (the notes), the drill's is the
+# title block's .X.
+_BAND_MARKS = ("<MOD-PM>", "±", "+/-")
+
+
+def _states_depth(text: str, depth_mm: float) -> bool:
+    """Whether ``text`` prints ``depth_mm`` at the tap's depth places, as a
+    whole number (10.1 is not 110.1 or 10.15)."""
+    printed = re.escape(f"{depth_mm:.{TAP_DEPTH_PLACES}f}")
+    return re.search(rf"(?<![\d.]){printed}(?!\d)", text) is not None
+
+
+def _tap_callout_resolved(resolved_parts: dict[int, str]) -> bool:
+    """Whether the thumb-screw tap's callout reads as a blind tap into the
+    bore: one thread row carries the process, the thread, its class and its
+    nominal thread depth (REF per the notes, so unbanded); the drill row its
+    depth; and nothing says THRU (the tap stops in the bore, short of its far
+    wall)."""
+    lines = [text for text in resolved_parts.values() if text.strip()]
+    thread = [text for text in lines if _TAP_THREAD_TEXT in text]
+    drill = [text for text in lines if _TAP_THREAD_TEXT not in text]
+    return (
+        not any("THRU" in text for text in lines)
+        and not any(mark in text for text in lines for mark in _BAND_MARKS)
+        and len(thread) == 1
+        and TAP_PROCESS in thread[0]
+        and TAP_SPEC.thread_class in thread[0]
+        and _states_depth(thread[0], TAP_LENGTH)
+        and any(_states_depth(text, TAP_DRILL_DEPTH) for text in drill)
+    )
 
 
 def _check_tap_callout(display: Any) -> None:
-    """Prove the callout states the tap: one resolved row carries the process,
-    the thread and its class (the drill row alone would ask for a hole)."""
-    resolved = [str(display.GetText(part) or "") for part in (1, 2, 3, 4)]
-    thread = [text for text in resolved if _TAP_THREAD_TEXT in text]
-    if (
-        len(thread) != 1
-        or TAP_SPEC.thread_class not in thread[0]
-        or TAP_PROCESS not in thread[0]
-    ):
+    """Prove the callout states the tap, its depths and its process."""
+    resolved = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
+    if not _tap_callout_resolved(resolved):
         raise RuntimeError(
             f"thumb-screw tap callout does not state {TAP_PROCESS} "
-            f"{_TAP_THREAD_TEXT}-{TAP_SPEC.thread_class}: {resolved!r}"
+            f"{_TAP_THREAD_TEXT}-{TAP_SPEC.thread_class} to "
+            f"{TAP_LENGTH:.{TAP_DEPTH_PLACES}f} (REF) over a "
+            f"{TAP_DRILL_DEPTH:.{TAP_DEPTH_PLACES}f} drill: {resolved!r}"
         )
-    _telemetry.success(f"thumb-screw tap callout reads {thread[0]!r}")
+    _telemetry.success(f"thumb-screw tap callout reads {resolved!r}")
 
 
 # The template centre-marks every hole as each view is placed (the knife
@@ -319,12 +354,19 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*side_annotations, *end_annotations], DRAWING_PRECISION_BY_NAME
     )
     set_dimension_callouts(adapter, side_annotations, {"RodBoreDia": ROD_BORE_CALLOUT})
+    # The flats are the bar's as supplied: a stock reference, not a size the
+    # shop holds to three places.
+    end_by_name = {dimension_name(adapter, a): a for a in end_annotations}
+    for name in sorted(REFERENCE_DIMENSIONS):
+        set_reference_dimension(
+            adapter, end_by_name[name], label=f"MHA-MG-006 {name} stock reference"
+        )
     if not auto_center_marks(adapter, side, holes=True, size=0.0025):
         raise RuntimeError("failed to add the rod bore's center mark to the side view")
     # The tap drill's edge on the spigot face: the one visible circle of the
     # Hole Wizard feature from the end.  Its axis carries the view's one
     # centre mark, and the native callout prints the drill row and, under
-    # it, the process on the thread row.
+    # it, the process on the thread row; both depths print at one place.
     tap_drill = visible_circle_edge(adapter, end, TAP_DRILL_DIA)
     _prove_tap_centre_mark(adapter, end, tap_drill)
     tap_callout = add_native_hole_callout(
@@ -334,6 +376,9 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=TAP_CALLOUT_XY,
         label="#4-40 thumb-screw tap",
         process=TAP_PROCESS,
+    )
+    set_hole_callout_precision(
+        tap_callout, TAP_CALLOUT_PRECISION, label="#4-40 thumb-screw tap depths"
     )
     _check_tap_callout(tap_callout)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
