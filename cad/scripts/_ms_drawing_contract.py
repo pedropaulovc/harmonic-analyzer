@@ -8,7 +8,8 @@ from typing import Any
 
 import _telemetry
 from _com import _early_bound
-from _drawing_common import assert_imported_precision, dimension_name
+from _drawing_dimensions import assert_imported_precision
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 
 
 @_telemetry.traced("drawing.ms_dimension_contract")

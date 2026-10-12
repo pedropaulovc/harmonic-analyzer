@@ -28,31 +28,34 @@ from _check import check
 from _com import _early_bound
 from _session import run_build
 from _drawing_common import (
-    ASSEMBLY_VIEW_CONFIGURATION,
-    SIMPLIFIED_VIEW_CONFIGURATION,
-    BalloonAnchor,
     DrawingOutputs,
-    ViewRole,
-    _edge_endpoint_key,
-    curate_view_dimensions,
-    add_component_bom_balloons,
-    add_edge_dimension,
-    apply_view_configuration,
-    assert_balloon_landings,
-    assert_full_detail_view,
-    create_section_view,
     finalize_drawing,
-    insert_bom_table,
-    model_point_in_view,
-    model_points_in_view,
     new_project_drawing,
     read_required_properties,
-    set_hidden_lines_removed,
     set_high_quality_shaded_with_edges,
-    set_reference_dimension,
-    set_view_exploded_state,
-    visible_component_entities,
 )
+from _drawing_balloons import (
+    BalloonAnchor,
+    add_component_bom_balloons,
+    assert_balloon_landings,
+)
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import set_reference_dimension
+from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edges import _edge_endpoint_key
+from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_sections import create_section_view
+from _drawing_tables import insert_bom_table
+from _drawing_view_configuration import (
+    ASSEMBLY_VIEW_CONFIGURATION,
+    SIMPLIFIED_VIEW_CONFIGURATION,
+    ViewRole,
+    apply_view_configuration,
+    assert_full_detail_view,
+    set_view_exploded_state,
+)
+from _drawing_view_display import set_hidden_lines_removed
+from solidworks_mcp.adapters.solidworks.drawing import visible_component_entities
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _simplified_names import simplified_name

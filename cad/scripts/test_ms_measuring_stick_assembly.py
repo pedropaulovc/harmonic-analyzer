@@ -16,7 +16,9 @@ import pytest
 import yaml
 
 import _config
-import _drawing_common as drawing_common
+import _drawing_dimensions as drawing_dimensions
+import _drawing_edge_dimensions as drawing_edge_dimensions
+import _drawing_projection as drawing_projection
 import _hole_spec
 import _interference_contracts as contracts
 import build_ha_harmonic_analyzer_assembly as top
@@ -957,19 +959,20 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         currentModel=Draw(), _attempt=lambda operation, **kwargs: operation()
     )
     monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, interface: value)
+    for helper in (drawing_edge_dimensions, drawing_dimensions):
+        monkeypatch.setattr(helper, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(
-        drawing_common._sw_type_info, "early_bound_or_flag",
+        drawing_edge_dimensions._sw_type_info, "early_bound_or_flag",
         lambda value, *args: value,
     )
     monkeypatch.setattr(
         drawing, "visible_component_entities",
         lambda view, component, kind: component.edges,
     )
-    monkeypatch.setattr(drawing_common, "view_name", lambda adapter, view: "Front")
-    monkeypatch.setattr(drawing_common, "rebuild_drawing", lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing_edge_dimensions, "view_name", lambda adapter, view: "Front")
+    monkeypatch.setattr(drawing_dimensions, "rebuild_drawing", lambda *args, **kwargs: None)
     monkeypatch.setattr(
-        drawing_common, "_projection_frame", lambda adapter, view: (None, None)
+        drawing_projection, "_projection_frame", lambda adapter, view: (None, None)
     )
 
     def project(utility, transform, xyz, **kwargs):
@@ -981,7 +984,7 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         )
         return drawing.FRONT_CENTER[0] + xyz[0], drawing.FRONT_CENTER[1] + xyz[1]
 
-    monkeypatch.setattr(drawing_common, "_project_through", project)
+    monkeypatch.setattr(drawing_projection, "_project_through", project)
     monkeypatch.setattr(drawing, "_assert_dimension_ink_on_sheet", lambda *a, **kw: None)
     shown = []
     monkeypatch.setattr(

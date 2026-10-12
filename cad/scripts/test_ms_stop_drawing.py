@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import _drawing_common as drawing_common
+import _drawing_projection as drawing_projection
 import _drawing_marks as drawing_marks
 import _dimensions as dimensions
 import _sketch as sketch
@@ -341,7 +341,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
 
     # Leave model_point_in_view, _projection_frame and _project_through intact.
     # Only replace their raw dispatch boundary with the fake object's members.
-    monkeypatch.setattr(drawing_common, "_com_invoke", invoke)
+    monkeypatch.setattr(drawing_projection, "_com_invoke", invoke)
     monkeypatch.setattr(drawing, "place_view", place_view)
     monkeypatch.setattr(drawing, "new_project_drawing", lambda *a, **kw: (object(), object()))
     for name in (

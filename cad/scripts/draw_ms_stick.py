@@ -33,12 +33,21 @@ from _com import _early_bound
 from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
-    DrawingOutputs, add_note, add_property_linked_note,
-    create_blank_drawing_sheets, create_section_view, finalize_drawing,
-    model_point_in_view, new_project_drawing,
-    read_required_properties, set_dimension_callouts, set_hidden_lines_removed,
-    rebuild_drawing, stamp_drawing_summary, view_name, property_link,
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    rebuild_drawing,
+    stamp_drawing_summary,
+    view_name,
 )
+from _drawing_dimensions import set_dimension_callouts
+from _drawing_notes import add_property_linked_note, property_link
+from _drawing_projection import model_point_in_view
+from _drawing_sections import create_section_view
+from _drawing_sheets import create_blank_drawing_sheets
+from _drawing_view_display import set_hidden_lines_removed
+from solidworks_mcp.adapters.solidworks.drawing import add_note
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_registry import DRAWINGS_BY_NAME
 from _ms_drawing_contract import assert_manufacturing_dimensions

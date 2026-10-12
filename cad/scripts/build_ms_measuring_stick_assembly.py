@@ -47,10 +47,11 @@ from _check import check
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
 from _session import run_build
-from _drawing_marks import (
-    DRAWN_BY, apply_drawing_precision, mark_dimensions_for_drawing,
+from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
+from _drawing_precision import apply_drawing_precision, _named_dimension
+from _drawing_tolerances import (
     set_dimension_symmetric_tolerance,
-    _named_dimension, _set_tolerance_precision,
+    _set_tolerance_precision,
 )
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature

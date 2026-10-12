@@ -15,7 +15,7 @@ from _sketch import (
     ensure_fully_defined, set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
-from _drawing_marks import set_dimension_display_precision
+from _drawing_precision import set_dimension_display_precision
 from _visibility import blank_sketch_feature
 
 

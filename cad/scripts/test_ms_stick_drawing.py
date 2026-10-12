@@ -15,7 +15,7 @@ import yaml
 
 import _sketch as sketch
 
-import _drawing_common as drawing_common
+import _drawing_projection as drawing_projection
 import build_ms_stick as builder
 import draw_ms_stick as drawing
 import ms_stick_spec as spec
@@ -478,7 +478,7 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
         value = getattr(obj, member)
         return value(*args) if callable(value) else value
 
-    monkeypatch.setattr(drawing_common, "_com_invoke", invoke)
+    monkeypatch.setattr(drawing_projection, "_com_invoke", invoke)
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
     # The fake has no COM property marshaller: store the SAFEARRAY payload.
     monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))

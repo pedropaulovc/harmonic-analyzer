@@ -27,10 +27,12 @@ from _session import run_build
 from _sketch import SketchDims, add_line_chain, ensure_fully_defined
 from _sketch_chains import define_rectilinear_chain
 from _drawing_marks import (
-    _named_dimension, apply_drawing_precision, apply_drawing_properties,
-    clear_dimensions_for_drawing, mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
 )
+from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _holes import wizard_holes
 from ms_stop_geom import (
     author_hole_precision, hide_location_references, location_reference,

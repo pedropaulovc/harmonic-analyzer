@@ -62,11 +62,11 @@ from _sketch import (
 )
 from _drawing_marks import (
     apply_drawing_properties,
-    apply_drawing_precision,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_symmetric_tolerance,
 )
+from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from ms_stick_geom import (
     DIVISION_COUNT,
     DIVISION_SPACING,
