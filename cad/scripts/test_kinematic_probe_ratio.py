@@ -7,10 +7,13 @@ diameters p/sin(180/N) typed instead of the per-tooth N*p/pi.
 
 from __future__ import annotations
 
+import asyncio
 import math
 import runpy
 
 import pytest
+
+from _test_stubbed_build import offline_adapter, stub_seat
 
 import pd_transgear_removable_spec as removable
 import _chain as chain
@@ -129,6 +132,50 @@ def test_mounted_chain_radii_and_coupling_diameters_share_the_counts() -> None:
         removable.chain_plate_inner_radius(removable.KNOB_TEETH, height)
         for height in (chain.PLATE_HEIGHT, removable.ANSI_PLATE_HEIGHT)
     ))
+
+
+def test_assembly_couples_the_free_mounted_wheels_at_their_tooth_diameters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The real assembly build, seat stubbed: the crank and knob wheels are
+    # the selected removable configurations, both left free, and the one
+    # belt/chain feature couples crank -> knob at the per-tooth diameters
+    # about each wheel's own axis.  The certified free DOF is that crank.
+    assert removable.CRANK_CONFIG != removable.KNOB_CONFIG
+    seat = stub_seat(monkeypatch, assembly)
+    seat.place_component.side_effect = (
+        lambda _adapter, part, *_args, **_kwargs:
+        f"{part}-{seat.place_component.call_count}"
+    )
+    seat.component_transform.return_value = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    adapter = offline_adapter()
+    asyncio.run(assembly.build(adapter))
+
+    wheels = {}
+    for index, placed in enumerate(seat.place_component.call_args_list, 1):
+        if placed.args[1] != "pd-transgear-removable":
+            continue
+        configuration = placed.kwargs.get("configuration")
+        if configuration in (removable.CRANK_CONFIG, removable.KNOB_CONFIG):
+            assert configuration not in wheels
+            assert placed.kwargs["ground"] is False
+            wheels[configuration] = f"pd-transgear-removable-{index}"
+    crank, knob = wheels[removable.CRANK_CONFIG], wheels[removable.KNOB_CONFIG]
+
+    adapter.insert_belt_chain.assert_awaited_once()
+    (belt,) = adapter.insert_belt_chain.await_args.args
+    assert belt.pulley_components == [crank, knob]
+    assert belt.pulley_diameters == [
+        assembly.CHAIN_PULLEY_DIA[removable.CRANK_CONFIG],
+        assembly.CHAIN_PULLEY_DIA[removable.KNOB_CONFIG],
+    ]
+    assert belt.pulley_member_axes == [f"Axis1@{crank}", f"Axis1@{knob}"]
+    assert belt.engage_belt is True
+
+    seat.assert_free_dof_necessity.assert_called_once()
+    certified = seat.assert_free_dof_necessity.call_args
+    assert certified.args[1:] == (1,)
+    assert certified.kwargs["required_instances"] == (crank,)
 
 
 def test_knob_clearance_checks_the_selected_wheel_envelope(
