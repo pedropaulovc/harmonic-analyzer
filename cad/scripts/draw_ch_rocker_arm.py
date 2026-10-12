@@ -690,7 +690,7 @@ HUB_OD = requirement(
         "at": _CENTRE, "axis": _AXIS,
         "dia": (_band(rocker.HUB_DIA, _P), ("HUB_DIA",)),
         "dia_nominal": (rocker.HUB_DIA, ("HUB_DIA",)),
-        "coaxiality_dia": (rocker_notes.HUB_COAXIALITY_DIA, (("ch_rocker_arm_notes", "HUB_COAXIALITY_DIA"),)),
+        "coaxiality_dia": (rocker.HUB_COAXIALITY_DIA, ("HUB_COAXIALITY_DIA", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
         "coaxial_to": ("pivot_bore", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
     }, precision={"dia": _P, "coaxiality_dia": _P},
 )
