@@ -611,8 +611,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout,
-        decimals=PIVOT_BORE.precision["dia"],
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
         adapter,
@@ -661,11 +660,15 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     imported_annotations = [*front_annotations, *right_annotations]
     _assert_pivot_precision(adapter, drawing_model, imported_annotations)
-    assert_imported_precision(adapter, imported_annotations, {
-        "TopAbovePivot": TOP_EDGE.precision["height_above_pivot"],
-        "HubLength": HUB_FACES.precision["length"],
-        "StrapThickness": STRAP_DATUM_B.precision["thickness"],
-    })
+    assert_imported_precision(
+        adapter,
+        imported_annotations,
+        {
+            "TopAbovePivot": TOP_EDGE.precision["height_above_pivot"],
+            "HubLength": HUB_FACES.precision["length"],
+            "StrapThickness": STRAP_DATUM_B.precision["thickness"],
+        },
+    )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

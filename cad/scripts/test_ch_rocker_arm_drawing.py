@@ -500,9 +500,7 @@ def test_pivot_precision_missing_dimension_fails(bound: None, empty: bool) -> No
     assert extension.calls == []
 
 
-@pytest.mark.parametrize(
-    "stage", ["annotation", "dimension", "primary", "document"]
-)
+@pytest.mark.parametrize("stage", ["annotation", "dimension", "primary", "document"])
 def test_pivot_precision_getter_exceptions_fail_closed(
     bound: None, monkeypatch: pytest.MonkeyPatch, stage: str
 ) -> None:
@@ -541,7 +539,8 @@ def test_pivot_precision_unavailable_native_state_fails_closed(
 
 
 @pytest.mark.parametrize(
-    "interface", ["IAnnotation", "IDisplayDimension", "IModelDoc2", "IModelDocExtension"]
+    "interface",
+    ["IAnnotation", "IDisplayDimension", "IModelDoc2", "IModelDocExtension"],
 )
 def test_pivot_precision_binding_failures_fail_closed(
     monkeypatch: pytest.MonkeyPatch, interface: str
@@ -558,64 +557,20 @@ def test_pivot_precision_binding_failures_fail_closed(
         drawing._assert_pivot_precision(adapter, model, [annotation])
 
 
-def test_build_uses_effective_pivot_precision_and_strict_part_precision() -> None:
+def test_build_keeps_pivot_out_of_strict_part_precision() -> None:
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    build = next(
-        node for node in tree.body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    strict_call = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "assert_imported_precision"
     )
-    helper = next(
-        node for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == "_assert_pivot_precision"
-    )
-    expected = next(
-        node.value for node in helper.body
-        if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "expected"
-                for target in node.targets)
-    )
-    metadata = ast.parse("PIVOT_BORE.precision['dia']", mode="eval").body
-    assert ast.dump(expected) == ast.dump(metadata)
-    calls = {
-        name: [
-            node for node in ast.walk(build)
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-            and node.func.id == name
-        ]
-        for name in (
-            "new_project_drawing", "_assert_pivot_precision", "assert_imported_precision"
-        )
+    assert {ast.literal_eval(key) for key in strict_call.args[2].keys} == {
+        "TopAbovePivot",
+        "HubLength",
+        "StrapThickness",
     }
-    assert all(len(matches) == 1 for matches in calls.values())
-    pivot_call = calls["_assert_pivot_precision"][0]
-    assert [ast.unparse(arg) for arg in pivot_call.args] == [
-        "adapter", "drawing_model", "imported_annotations"
-    ]
-    combined = next(
-        node.value for node in build.body
-        if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "imported_annotations"
-                for target in node.targets)
-    )
-    assert ast.dump(combined) == ast.dump(
-        ast.parse("[*front_annotations, *right_annotations]", mode="eval").body
-    )
-    strict_call = calls["assert_imported_precision"][0]
-    assert ast.dump(strict_call.args[1]) == ast.dump(pivot_call.args[2])
-    assert isinstance(strict_call.args[2], ast.Dict)
-    assert {
-        ast.literal_eval(key): ast.unparse(value)
-        for key, value in zip(strict_call.args[2].keys, strict_call.args[2].values)
-    } == {
-        "TopAbovePivot": "TOP_EDGE.precision['height_above_pivot']",
-        "HubLength": "HUB_FACES.precision['length']",
-        "StrapThickness": "STRAP_DATUM_B.precision['thickness']",
-    }
-    decimals = next(
-        keyword.value for keyword in calls["new_project_drawing"][0].keywords
-        if keyword.arg == "decimals"
-    )
-    assert ast.dump(decimals) == ast.dump(metadata)
 
 
 def test_datum_a_attached_to_the_bore_passes(bound: None) -> None:

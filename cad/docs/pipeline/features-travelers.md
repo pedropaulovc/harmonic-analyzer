@@ -48,9 +48,8 @@ against descriptor values. Its local `PivotDia` guard accepts explicit primary
 precision or resolves `swPrecisionFollowsDocumentSetting` (`-2`) through the
 drawing's `IModelDocExtension.GetUserPreferenceInteger(swDetailingLinearDimPrecision,
 swDetailingDiameterDimension)`. The effective value must match
-`PIVOT_BORE.precision["dia"]`; missing or unreadable values fail closed. Passing
-that metadata as the drawing's units-decimal setting is not proof of its
-document detailing precision: the guard reads that preference back. The other
+`PIVOT_BORE.precision["dia"]`; missing or unreadable values fail closed.
+The guard does not change the sheet-wide units-decimal setting. The other
 three dimensions (`TopAbovePivot`, `HubLength`, `StrapThickness`) retain the
 strict explicit part-owned precision assertion; none of these guards rewrites
 the imported dimension. Other return values may remain inspection-only;
