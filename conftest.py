@@ -237,25 +237,9 @@ def _install_launch_guard():
 
     os.system = guarded_system
 
-    # On POSIX ``os.spawn*`` fork and exec in Python, so the child (not the test)
-    # meets the ``os.exec`` audit event; refuse at the entry points instead.
-    def guard_spawn(original):
-        @functools.wraps(original)
-        def guarded_spawn(mode, file, args, *rest):
-            if _acts_on_host(list(args), file):
-                _refuse(f"os.{original.__name__}", args)
-            return original(mode, file, args, *rest)
+    import _winapi
 
-        return guarded_spawn
-
-    for name in ("spawnv", "spawnve", "spawnvp", "spawnvpe"):
-        if hasattr(os, name):
-            setattr(os, name, guard_spawn(getattr(os, name)))
-
-    if sys.platform == "win32":
-        import _winapi
-
-        _winapi.CreateProcess = _refuse_create_process("_winapi", _winapi.CreateProcess)
+    _winapi.CreateProcess = _refuse_create_process("_winapi", _winapi.CreateProcess)
     sys.addaudithook(_audit)
 
 
@@ -438,7 +422,8 @@ def pytest_configure(config):
         os.environ["HARMONIC_BUILDGRAPH_CACHE"] = tempfile.mkdtemp(
             prefix="buildgraph-facts-"
         )
-    if not _guard_disabled():
+    # SolidWorks runs only on Windows; elsewhere there is nothing to start.
+    if sys.platform == "win32" and not _guard_disabled():
         _install_launch_guard()
         _install_activation_guard()
         _install_dodo_guard()

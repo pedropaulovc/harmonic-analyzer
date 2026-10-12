@@ -16,6 +16,11 @@ from pathlib import Path
 
 import pytest
 
+# SolidWorks runs only on Windows, and the root conftest guards only there.
+pytestmark = pytest.mark.skipif(
+    sys.platform != "win32", reason="SolidWorks runs only on Windows"
+)
+
 BLOCKED = "SolidWorks launch blocked"
 MISSING_SHORTCUT = r"X:\launch-guard-test\never-exists\SOLIDWORKS Design.lnk"
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -67,7 +72,6 @@ def test_os_system_is_refused(solidworks_launch_refusals):
     _expect_blocked(solidworks_launch_refusals, lambda: os.system(command))
 
 
-@pytest.mark.skipif(not hasattr(os, "startfile"), reason="os.startfile is Windows-only")
 def test_in_process_startfile_is_refused(solidworks_launch_refusals):
     # Never call the real os.startfile, even on a guard regression.
     assert os.startfile.__name__ == "refuse_startfile"
@@ -90,7 +94,6 @@ def _require_refuser(module, attribute, name):
     assert getattr(module, attribute).__name__ == name, (module, attribute)
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="pywin32 is Windows-only")
 @pytest.mark.parametrize(
     "module_name,attribute",
     [
@@ -116,7 +119,6 @@ def test_com_activation_of_solidworks_is_refused(
     )
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="pywin32 is Windows-only")
 def test_com_activation_by_class_id_is_refused(solidworks_launch_refusals):
     import pythoncom
     import winreg
@@ -145,7 +147,6 @@ def test_com_activation_by_class_id_is_refused(solidworks_launch_refusals):
     )
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="pywin32 is Windows-only")
 def test_unrelated_com_activation_passes(solidworks_launch_refusals):
     import win32com.client
 
@@ -325,7 +326,6 @@ def test_a_known_reader_or_no_com_script_does_not_count(request, args):
     assert _root_conftest(request)._com_script(args) is None
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="_winapi is Windows-only")
 def test_create_process_below_popen_is_refused(solidworks_launch_refusals):
     """A ``Popen`` subclass or direct caller still meets ``_winapi.CreateProcess``."""
     import _winapi
@@ -338,7 +338,6 @@ def test_create_process_below_popen_is_refused(solidworks_launch_refusals):
     solidworks_launch_refusals.clear()
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="pywin32 is Windows-only")
 def test_pywin32_process_creation_is_refused(solidworks_launch_refusals):
     import win32api
     import win32process
@@ -362,32 +361,20 @@ def test_pywin32_process_creation_is_refused(solidworks_launch_refusals):
         )
 
 
-@pytest.mark.skipif(not hasattr(os, "spawnv"), reason="os.spawnv is unavailable")
-@pytest.mark.parametrize("entry", ["spawnv", "spawnl"])
+@pytest.mark.parametrize("entry", ["os.spawnv", "os.spawnl", "nt.spawnv"])
 def test_spawn_of_a_com_build_script_is_refused(solidworks_launch_refusals, entry):
-    """Refused at ``os.spawnv`` itself: on POSIX it forks before any exec event."""
-    assert os.spawnv.__code__.co_name == "guarded_spawn"
-    argv = [sys.executable, str(MISSING_BUILD)]
-    if entry == "spawnv":
-        call = lambda: os.spawnv(os.P_WAIT, sys.executable, argv)  # noqa: E731
-    else:
-        call = lambda: os.spawnl(os.P_WAIT, sys.executable, *argv)  # noqa: E731
-    _expect_blocked(solidworks_launch_refusals, call)
-
-
-@pytest.mark.skipif(sys.platform != "win32", reason="nt.spawnv is Windows-only")
-def test_spawn_below_os_is_refused(solidworks_launch_refusals):
+    """Every spawn entry point meets the ``os.spawn`` audit event in ``nt``."""
     import nt
 
-    _expect_blocked(
-        solidworks_launch_refusals,
-        lambda: nt.spawnv(
-            os.P_WAIT, sys.executable, [sys.executable, str(MISSING_BUILD)]
-        ),
-    )
+    argv = [sys.executable, str(MISSING_BUILD)]
+    calls = {
+        "os.spawnv": lambda: os.spawnv(os.P_WAIT, sys.executable, argv),
+        "os.spawnl": lambda: os.spawnl(os.P_WAIT, sys.executable, *argv),
+        "nt.spawnv": lambda: nt.spawnv(os.P_WAIT, sys.executable, argv),
+    }
+    _expect_blocked(solidworks_launch_refusals, calls[entry])
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="nt.startfile is Windows-only")
 def test_startfile_below_os_is_refused(solidworks_launch_refusals):
     import nt
 
@@ -398,7 +385,6 @@ def test_startfile_below_os_is_refused(solidworks_launch_refusals):
     )
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="kernel32 is Windows-only")
 @pytest.mark.parametrize(
     "library,symbol", [("kernel32", "CreateProcessW"), ("shell32", "ShellExecuteW")]
 )
