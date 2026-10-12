@@ -112,7 +112,11 @@ def test_physical_flat_terminal_has_two_actual_end_limits():
     # Rounding is already INCLUDED in the physical foremost-point dimension.
     assert shaft.CORE_FLAT_GEAR_AIR_MIN == pytest.approx(0.050)
     assert shaft.CORE_FLAT_REACH_PAST_SHOULDER_MIN == pytest.approx(0.100)
-    assert {"FlatEnd", "FlatToolRadius"} <= shaft.DRAWING_DIMENSIONS["CoreFlatProfile"]
+    # The tool end lies in air: its limits print once, in the notes, from
+    # these constants, not as dimensions on invisible geometry.
+    assert not {"FlatEnd", "FlatToolRadius"} & shaft.DRAWING_DIMENSIONS["CoreFlatProfile"]
+    assert "TOOL END 0.05-0.17 FROM 12T FRONT FACE" in shaft.CORE_FLAT_TOOL_REACH_NOTE
+    assert "R0.100 MAX" in shaft.CORE_FLAT_TOOL_REACH_NOTE
     assert shaft.FRONT_RELIEF_WIDTH_MIN > 2.0 * shaft.FRONT_CORNER_RADIUS_MAX
 
 

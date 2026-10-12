@@ -309,20 +309,25 @@ CORE_FLAT_CUT_END_BAND = (
     CORE_FLAT_CUT_END_LIMITS[1] - CORE_FLAT_CUT_END_FROM_F,
     CORE_FLAT_CUT_END_LIMITS[0] - CORE_FLAT_CUT_END_FROM_F,
 )
-CORE_FLAT_CUT_END_PLACES = 3
 CORE_FLAT_CUT_END_TOL_TYPE = 3
 CORE_FLAT_TOOL_END_RADIUS = 0.100
 CORE_FLAT_TOOL_END_RADIUS_MAX = 0.100
-CORE_FLAT_TOOL_END_RADIUS_PLACES = 3
 CORE_FLAT_TOOL_END_RADIUS_BAND = (0.0, -CORE_FLAT_TOOL_END_RADIUS)
 CORE_FLAT_TOOL_END_RADIUS_TOL_TYPE = 6
 CORE_FLAT_GEAR_AIR_MIN = min(CORE_FLAT_CUT_END_LIMITS)
 CORE_FLAT_REACH_PAST_SHOULDER_MIN = (
     FRONT_RELIEF_WIDTH_MIN - max(CORE_FLAT_CUT_END_LIMITS)
 )
+# The tool's rounded end lies in air under the neck floor, so it has no
+# visible edge to dimension: note 4 is the one printed owner of both of its
+# limits, read from the same constants as the part's native FlatEnd and
+# FlatToolRadius limits.  Its reach past the core shoulder needs no words:
+# the narrowest printed neck (FRONT_RELIEF_WIDTH_MIN) less the farthest
+# allowed tool end is CORE_FLAT_REACH_PAST_SHOULDER_MIN, asserted below.
 CORE_FLAT_TOOL_REACH_NOTE = (
-    "FLAT TOOL REACH .10 MIN PAST ACTUAL CORE SHOULDER;\n"
-    ".05 MIN SHORT OF 12T FRONT FACE."
+    f"D-CORE FLAT TOOL END {min(CORE_FLAT_CUT_END_LIMITS):.2f}-"
+    f"{max(CORE_FLAT_CUT_END_LIMITS):.2f} FROM 12T FRONT FACE; "
+    f"END RADIUS R{CORE_FLAT_TOOL_END_RADIUS_MAX:.3f} MAX."
 )
 FRONT_RELIEF_AREA_MIN = math.pi * FRONT_RELIEF_DIA_MIN**2 / 4.0
 if (
@@ -763,7 +768,7 @@ GEOMETRIC_CONTROLS = (
 # ``GearBlank`` owns the face width.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
-    "CoreFlatProfile": {"FlatToAxis", "FlatEnd", "FlatToolRadius"},
+    "CoreFlatProfile": {"FlatToAxis"},
     "RootInspectionProfile": {"RootEnvelope"},
     "SpanProfile": {"ToothSpan"},
     "StudProfile": {
@@ -785,11 +790,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
-    "CoreFlatProfile": {
-        "FlatToAxis": CORE_FLAT_PLACES,
-        "FlatEnd": CORE_FLAT_CUT_END_PLACES,
-        "FlatToolRadius": CORE_FLAT_TOOL_END_RADIUS_PLACES,
-    },
+    "CoreFlatProfile": {"FlatToAxis": CORE_FLAT_PLACES},
     "RootInspectionProfile": {"RootEnvelope": ROOT_DIA_PLACES},
     "SpanProfile": {"ToothSpan": SPAN_PLACES},
     "StudProfile": {

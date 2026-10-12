@@ -267,15 +267,37 @@ def test_complete_nominal_native_volume_uses_bounded_rear_disk_and_true_d() -> N
 
 def test_every_native_dimension_is_placed_once_with_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert not set(drawing.SIDE_KEEP) & set(drawing.END_KEEP)
-    assert set(drawing.SIDE_KEEP) | set(drawing.END_KEEP) == marked
+    keeps = (drawing.SIDE_KEEP, drawing.END_KEEP, drawing.DETAIL_KEEP)
+    assert sum(len(keep) for keep in keeps) == len(marked)
+    assert set().union(*keeps) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert spec.DRAWING_DIMENSIONS["CoreFlatProfile"] == {"FlatToAxis", "FlatEnd", "FlatToolRadius"}
+    assert spec.DRAWING_DIMENSIONS["CoreFlatProfile"] == {"FlatToAxis"}
     assert spec.DRAWING_DIMENSIONS["SpanProfile"] == {"ToothSpan"}
     assert spec.DRAWING_DIMENSIONS["RootInspectionProfile"] == {"RootEnvelope"}
     assert {"FullDepth", "CutterRunout"} <= spec.DRAWING_DIMENSIONS["StudProfile"]
     assert "RootEnvelope" in drawing.END_KEEP and "ToothSpan" in drawing.END_KEEP
     assert "FlatToAxis" in drawing.SIDE_KEEP
+    assert set(drawing.DETAIL_KEEP) == {
+        "FrontReliefDia", "FrontReliefWidth", "FrontCornerRadius",
+    }
+
+
+def test_tool_end_limits_print_once_in_the_notes_from_the_spec() -> None:
+    # The D-flat tool's end lies in air under the neck: no edge carries a
+    # dimension, so note 4 is the one printed owner of both limits.
+    lo, hi = spec.CORE_FLAT_CUT_END_LIMITS
+    note = spec.CORE_FLAT_TOOL_REACH_NOTE
+    assert f"TOOL END {lo:.2f}-{hi:.2f} FROM 12T FRONT FACE" in note
+    assert f"R{spec.CORE_FLAT_TOOL_END_RADIUS_MAX:.3f} MAX" in note
+    assert "\n" not in note
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert not {"FlatEnd", "FlatToolRadius"} & marked
+    printed = "\n".join((spec.DRAWING_NOTES, note))
+    assert len(printed.splitlines()) <= 4
+    build_source = " ".join(inspect.getsource(part.build).split())
+    assert '"\\n".join((DRAWING_NOTES, CORE_FLAT_TOOL_REACH_NOTE))' in build_source
+    # No sheet text survives on the part's native FlatEnd either.
+    assert "set_dimension_prefix" not in inspect.getsource(part._apply_neck_and_flat_limits)
 
 
 def test_model_bands_and_source_linked_properties() -> None:
@@ -466,3 +488,241 @@ def test_part_record_and_running_finishes() -> None:
     assert faces["core"].diameter_mm == spec.CORE_DIA
     assert spec.CORE_FRONT_Z < faces["core"].contains_z_mm < spec.CORE_REAR_Z
     assert drawing.DIMENSION_CALLOUTS_BELOW == {"TipChamfer": spec.CHAMFER_CALLOUT}
+
+
+def _inside(point_mm, focus_mm, radius_mm) -> bool:
+    return math.dist(point_mm, focus_mm) < radius_mm
+
+
+def test_neck_detail_fence_holds_every_detail_reference() -> None:
+    # A crop drops a dimension whose reference it cuts away: FrontReliefDia
+    # measures from the axis to the floor, FrontReliefWidth from F's origin
+    # to the step, the corner R is its arc; both floors carry the Ø's arrows.
+    focus, radius = drawing.DETAIL_FOCUS_MM, drawing.DETAIL_RADIUS_MM
+    floor = spec.FRONT_RELIEF_DIA / 2.0
+    width = spec.FRONT_RELIEF_WIDTH
+    corner = spec.FRONT_CORNER_RADIUS
+    references = [
+        (0.0, 0.0),
+        (-width, 0.0),
+        (-corner, floor + corner),
+        (-width, spec.CORE_DIA / 2.0),
+        *((-z, sign * floor) for z in (corner, width - corner) for sign in (1, -1)),
+    ]
+    for point in references:
+        assert _inside(point, focus, radius), point
+    # Sheet: the crop is inside the sheet border, the frame row under it.
+    center, crop = drawing.DETAIL_CENTER, drawing.DETAIL_CROP_RADIUS
+    assert crop == pytest.approx(radius * drawing.DETAIL_SCALE[0] / 1000.0)
+    assert center[0] - crop > 0.0254 / 2 and center[1] + crop < 0.2667
+    frame_x, frame_top = drawing.NECK_RUNOUT_FRAME
+    assert frame_top - 0.007 > center[1] + crop
+    assert frame_top < 0.2667 - 0.004
+    landing = drawing.NECK_RUNOUT_LANDING
+    # The landing is on the straight floor, between the corner tori.
+    assert -width + corner < drawing.NECK_LANDING_Z_MM < -corner
+    assert math.dist(landing, center) < crop
+    assert frame_x + drawing._FRAME_WIDTH < landing[0]
+    # The Ø's line rises right of the frame's leader, inside the neck.
+    dia_x = drawing.DETAIL_KEEP["FrontReliefDia"][0]
+    assert landing[0] < dia_x < drawing._detail_xy(-width + corner, 0.0)[0]
+
+
+def test_neck_detail_annotations_stay_clear_of_the_side_and_end_views() -> None:
+    # The detail, its frame, label and kept texts sit left of the journal
+    # Ø's witness line (x 0.1353) and over its text (top 0.193); the gear
+    # data dropped to the lower left, between the datum A box (bottom 0.140)
+    # and the notes (top 0.070).
+    center, crop = drawing.DETAIL_CENTER, drawing.DETAIL_CROP_RADIUS
+    assert center[0] + crop < 0.1353
+    assert center[1] - crop > 0.193
+    for x, y in drawing.DETAIL_KEEP.values():
+        assert x < 0.1353 - 0.005 and y > 0.193 - 0.010
+    assert drawing.DETAIL_LABEL_XY[0] + 0.030 < center[0] - crop
+    gear_top = drawing.GEAR_DATA_XY[1]
+    lines = len(spec.GEAR_DATA.splitlines())
+    assert gear_top < 0.140 - 0.010
+    assert gear_top - lines * 1.4 * drawing.GEAR_DATA_CHAR_HEIGHT > drawing.NOTES_XY[1]
+
+
+def test_root_envelope_text_stands_right_of_the_end_view() -> None:
+    # mr-stack6: left of the view, REFERENCE ROOT ran into the side view's
+    # tip witness line and the axial rows.  Right of it, the text clears the
+    # root acceptance note (top 0.105) and the ToothSpan text (bottom 0.187).
+    x, y = drawing.END_KEEP["RootEnvelope"]
+    assert x - drawing.FRONT_CENTER[0] > 2.0 * drawing.HALF_OD
+    assert 0.105 + 0.010 < y < 0.187 - 0.010
+    assert x + 0.026 < 0.4191
+
+
+class _NeckView:
+    """A recording IView double for detail B's place-move-crop."""
+
+    def __init__(
+        self, *, crop_status: int = 1, crops: bool = True, moves: bool = True,
+        mirrored: bool = False,
+    ) -> None:
+        self.ScaleRatio = (10.0, 1.0)
+        self.Position = (0.300, 0.100)
+        self.crop_status = crop_status
+        self.crops = crops
+        self.moves = moves
+        self.mirrored = mirrored
+        self.cropped = False
+        self.calls: list[str] = []
+        self.CropViewJaggedOutline = False
+        self.CropViewNoOutline = False
+
+    def SetViewPosition(self, target, _update) -> bool:  # noqa: N802
+        self.calls.append("SetViewPosition")
+        if self.moves:
+            self.Position = tuple(float(value) for value in target)
+        return True
+
+    def GetOutline(self):  # noqa: N802
+        if self.cropped:
+            return (0.078, 0.196, 0.132, 0.250)
+        return (-0.100, 0.150, 0.610, 0.300)
+
+    def Crop2(self, jagged, no_outline, intensity) -> int:  # noqa: N802
+        self.calls.append(f"Crop2({jagged}, {no_outline}, {intensity})")
+        self.cropped = self.crops
+        return self.crop_status
+
+    def IsCropped(self) -> bool:  # noqa: N802
+        return self.cropped
+
+    def UpdateViewDisplayGeometry(self) -> None:  # noqa: N802
+        self.calls.append("UpdateViewDisplayGeometry")
+
+
+class _NeckModel:
+    def ClearSelection2(self, _all) -> None:  # noqa: N802
+        pass
+
+    def EditRebuild3(self) -> None:  # noqa: N802
+        pass
+
+
+def _neck_seat(monkeypatch, view: _NeckView) -> list[tuple]:
+    """Point the drawing's COM helpers at ``view``: a *Right projection at
+    10:1 (model +Z runs left) a fixed offset from the view's position."""
+    log: list[tuple] = []
+    offset = (-0.050, 0.070)
+
+    def place(_adapter, _source, orientation, x, y, *, scale):
+        log.append(("place", orientation, (x, y), scale))
+        return view
+
+    def model_point(_adapter, _view, point, *, label):
+        handing = 1.0 if view.mirrored else -1.0
+        return (
+            view.Position[0] + offset[0] + handing * 10.0 * point[2],
+            view.Position[1] + offset[1] + 10.0 * point[1],
+        )
+
+    def circle(_adapter, _view, center, radius, *, label, add_to_db=False):
+        log.append(("circle", center, radius, add_to_db))
+        return object()
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "model_point_in_view", model_point)
+    monkeypatch.setattr(drawing, "_sketch_circle", circle)
+    monkeypatch.setattr(drawing, "_activate_view", lambda *_a, **_k: "Drawing View5")
+    return log
+
+
+def _crop_neck(monkeypatch, view: _NeckView) -> list[tuple]:
+    adapter = SimpleNamespace(currentModel=_NeckModel())
+    log = _neck_seat(monkeypatch, view)
+    assert drawing._placed_detail_view(adapter) is view
+    drawing._crop_detail_view(adapter, view)
+    return log
+
+
+def test_neck_detail_is_a_cropped_right_model_view(monkeypatch) -> None:
+    view = _NeckView()
+    log = _crop_neck(monkeypatch, view)
+    assert log[0] == ("place", "*Right", drawing.DETAIL_CENTER, drawing.DETAIL_SCALE)
+    kind, center, radius, add_to_db = log[1]
+    assert kind == "circle" and not add_to_db
+    assert center == pytest.approx(drawing.DETAIL_CENTER, abs=1e-12)
+    assert radius == pytest.approx(drawing.DETAIL_CROP_RADIUS)
+    assert view.calls[0] == "SetViewPosition"
+    assert "Crop2(False, False, 1)" in view.calls
+    assert "CreateDetailViewAt4" not in Path(drawing.__file__).read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"crop_status": 0}, "not cropped"),
+        ({"crops": False}, "not cropped"),
+        ({"moves": False}, "neck detail focus sits at"),
+        ({"mirrored": True}, "neck runout landing sits at"),
+    ],
+)
+def test_neck_detail_fails_loud_when_the_seat_does_not_obey(
+    monkeypatch, kwargs, message
+) -> None:
+    with pytest.raises(RuntimeError, match=message):
+        _crop_neck(monkeypatch, _NeckView(**kwargs))
+
+
+class _DimensionedView:
+    def __init__(self) -> None:
+        self.names: list[str] = []
+
+
+def _order_seat(monkeypatch, view: _DimensionedView, *, crop_drops: tuple[str, ...]):
+    calls: list[str] = []
+    events: list[tuple[str, dict]] = []
+
+    def curate(_adapter, _view, *, keep, view_label, dimensions_by_feature):
+        calls.append("import")
+        view.names = sorted(keep)
+        return ["curated"]
+
+    def crop(_adapter, _view):
+        calls.append("crop")
+        view.names = [name for name in view.names if name not in crop_drops]
+
+    def names(_adapter, _view):
+        calls.append("read")
+        return sorted(view.names)
+
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "_crop_detail_view", crop)
+    monkeypatch.setattr(drawing, "_view_dimension_names", names)
+    monkeypatch.setattr(
+        drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
+    )
+    return calls, events
+
+
+def test_neck_detail_is_dimensioned_before_it_is_cropped(monkeypatch) -> None:
+    view = _DimensionedView()
+    calls, events = _order_seat(monkeypatch, view, crop_drops=())
+    assert drawing._dimension_then_crop_detail(object(), view) == ["curated"]
+    assert calls == ["import", "read", "crop", "read"]
+    assert events[0][0] == "neck_detail.crop" and events[0][1]["lost"] == ""
+    # The detail imports before the side view: a dimension already on the
+    # sheet is never imported again, one the side view deleted would be.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build(") :]
+    assert body.index("_placed_detail_view(adapter)") < body.index(
+        "_dimension_then_crop_detail(adapter, detail)"
+    ) < body.index("keep=SIDE_KEEP")
+    assert body.index("add_toothspace_callout(") < body.index(
+        "_mark_detail_on_side(adapter, side)"
+    )
+
+
+def test_neck_detail_fails_loud_when_the_crop_takes_a_dimension(monkeypatch) -> None:
+    view = _DimensionedView()
+    _calls, events = _order_seat(monkeypatch, view, crop_drops=("FrontReliefDia",))
+    with pytest.raises(RuntimeError, match=r"lost \['FrontReliefDia'\] to its crop"):
+        drawing._dimension_then_crop_detail(object(), view)
+    assert events[0][1]["lost"] == "FrontReliefDia"
