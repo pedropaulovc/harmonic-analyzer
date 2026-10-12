@@ -20,7 +20,7 @@ recipes:
 | 6793K4 | `pd-transgear-removable` T12 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 12 Teeth |
 | 6793K11 | `pd-transgear-removable` T18 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 18 Teeth |
 | 6793K17 | `pd-transgear-removable` T24 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 24 Teeth |
-| 90114A124 | `vn-ms-stop-plate-screw` (catalogue-only; no vendor model) | Brass Fillister Head Slotted Screw |
+| 90114A124 | `vn-ms-stop-plate-screw`, `vn-platen-clip-screw` (catalogue-only; no vendor model) | Brass Fillister Head Slotted Screw |
 | 90114A511 | `vn-fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `vn-foot-screw`, `vn-swing-stop-screw`, `vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -76,6 +76,30 @@ recipes:
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_vn_cone_lock_knob.py`
 and `cad/scripts/build_vn_swing_stop_screw.py`.
+
+Live catalog verification on October 11, 2026:
+
+- [90114A124](https://www.mcmaster.com/90114A124/), selected for the four
+  MHA-VN-059 platen-clip screws, is titled “Brass Fillister Head Slotted
+  Screws, 2-56 Thread Size, 1/4" Long”. The live page and
+  [technical drawing](https://www.mcmaster.com/mvD/Library/CAD2/20260619/961C5808/90114A124_Brass%20Fillister%20Head%20Slotted%20ScrewsS.GIF)
+  were viewed on October 11, 2026: brass, Rockwell B40, 50,000 psi tensile
+  strength, #2-56 UNC class 2A, fully threaded, flat tip, ASME B18.6.3,
+  high narrow slotted fillister head. Under-head length is 0.25 in
+  (6.35 mm), screw size decimal 0.086 in (2.1844 mm), head diameter
+  0.14 in (3.556 mm), and head height 0.083 in (2.1082 mm). The drawing
+  states no dimensional tolerances. Brass matches the book photograph's
+  brass clip screws, so the same-size 18-8 stainless 91794A077 (MHA-VN-050's
+  stock) is rejected for appearance; no brass #2-56 shorter than 1/4 in was
+  found live. The shared #4-40 MHA-VN-006 brass fillister 90114A511 is
+  rejected for the clip: its 4.65 mm head overhangs the clip's 4.23 mm rail,
+  and it stays selected for the other fleet deployments. Through the 0.8 mm
+  clip sheet the 6.35 mm shank leaves 5.55 mm of engagement in the platen's
+  3.85 mm plate and 1.70 mm boss, 2.54D (at least 1.5D), with the tip flush.
+  `diagnostics.diag_build_90114A124` reuses the native fillister family
+  recipe; its derived slot, dome, thread/runout and vendor-frame mapping are
+  family assumptions, not verified vendor geometry. No vendor model is
+  harvested.
 
 Live catalogue verification on October 9, 2026:
 

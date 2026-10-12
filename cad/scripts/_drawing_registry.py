@@ -887,6 +887,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_platen_clip_screw",
+        part="vn_platen_clip_screw",
+        artifact_stem="vn-platen-clip-screw",
+        script_name="draw_vn_platen_clip_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="vn_foot_screw",
         part="vn_foot_screw",
         artifact_stem="vn-foot-screw",

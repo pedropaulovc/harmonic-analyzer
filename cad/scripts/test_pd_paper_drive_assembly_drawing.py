@@ -61,6 +61,7 @@ UNCHANGED_FAMILIES = {
     "pd-platen-clip",
     "pd-platen-paper",
     "vn-fillister-screw",
+    "vn-platen-clip-screw",  # the four #2-56 clip screws leave MHA-VN-006
     "vn-guide-lock-screw",  # R9-31: the eight lock screws leave MHA-VN-006
     "vn-chain-inner-link",
     "vn-chain-outer-link",
@@ -1195,6 +1196,7 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
         "pd-platen-clip",
         "pd-platen-paper",
         "vn-fillister-screw",
+        "vn-platen-clip-screw",
         "vn-guide-lock-screw",
     }
     assert set(drawing.PLATEN_BALLOON_ANCHORS) == platen_group
@@ -1202,21 +1204,9 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
     assert drawing.SHEET_NAMES[2] == "PLATEN AND SUPPORT"
 
 
-def _platen_instances(**overrides) -> list[explode.Instance]:
-    instances = [
-        explode.Instance(f"{stem}-1", stem)
-        for stem in explode.SHOWN_STEMS - explode.ROLE_STEMS
-    ]
-    instances += [
-        explode.Instance(f"vn-fillister-screw-{n}", "vn-fillister-screw", role)
-        for n, role in (
-            (1, explode.GUIDE_SCREW_ROLE),
-            (2, explode.CLIP_SCREW_ROLE),
-        )
-    ]
+def _platen_instances() -> list[explode.Instance]:
+    instances = [explode.Instance(f"{stem}-1", stem) for stem in explode.SHOWN_STEMS]
     instances.append(explode.Instance("pd-rack-pinion-1", "pd-rack-pinion"))
-    for name, instance in overrides.items():
-        instances = [i for i in instances if i.name != name] + [instance]
     return instances
 
 
@@ -1229,18 +1219,15 @@ def test_the_explode_moves_only_the_platen_group_and_keeps_the_platen() -> None:
         explode.SHOWN_STEMS - explode.STATIONARY_STEMS
     )
     # The guide screws leave with the guides' step, the clip screws with the
-    # clips': a role mix-up would move a screw with the wrong part.
-    by_label = {step.label: names for step, names in plan}
-    assert any("vn-fillister-screw-1" in names for names in by_label.values())
-    assert any("vn-fillister-screw-2" in names for names in by_label.values())
-    for names in by_label.values():
-        assert not {"vn-fillister-screw-1", "vn-fillister-screw-2"} <= set(names)
+    # clips': the two fillister families never share a step.
+    for _step, names in plan:
+        assert not {"vn-fillister-screw-1", "vn-platen-clip-screw-1"} <= set(names)
 
 
-def test_the_explode_refuses_an_untagged_fillister_screw() -> None:
-    untagged = explode.Instance("vn-fillister-screw-1", "vn-fillister-screw")
-    with pytest.raises(ValueError, match="role tags"):
-        explode.plan_explode(_platen_instances(**{"vn-fillister-screw-1": untagged}))
+def test_the_explode_refuses_a_model_missing_a_shown_family() -> None:
+    instances = [i for i in _platen_instances() if i.stem != "vn-platen-clip-screw"]
+    with pytest.raises(ValueError, match="vn-platen-clip-screw"):
+        explode.plan_explode(instances)
 
 
 def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:

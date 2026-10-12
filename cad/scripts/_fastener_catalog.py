@@ -187,6 +187,14 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "99607A213",
         material="AISI 304",
     ),
+    # The four platen-clip screws: brass #2-56 x 1/4, whose 0.14 head stays
+    # inside the clip's rail where the MHA-VN-006 #4-40 head would overhang.
+    "vn-platen-clip-screw": _stock(
+        "vn-platen-clip-screw",
+        "Brass Fillister Head Slotted Screw",
+        "90114A124",
+        material="Brass",
+    ),
     # MSC 40923906: 1/4-20 x 4 in (101.6 mm) supplied stock. Only the
     # MHA-VN-031 modification applies vn_post_mount_screw_spec.CUT_LENGTH_MM
     # as a reference trim, then matched-hole cut-to-fit/deburr acceptance.

@@ -154,7 +154,6 @@ from _transforms import (  # noqa: E402
 from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
 from fr_harmonic_base_spec import STACK_HEIGHT as BASE_DECK_Y
 from _pd_paper_drive_explode import create_paper_drive_explode
-from pd_paper_drive_explode_spec import CLIP_SCREW_ROLE, GUIDE_SCREW_ROLE
 
 ASM_NAME = "pd-paper-drive"
 
@@ -262,6 +261,13 @@ from vn_fillister_screw_spec import (  # noqa: E402
     HEAD_H as FILLISTER_HEAD_H,
     SHANK_DIA as FILLISTER_SHANK_DIA,
     SHANK_LEN as FILLISTER_SHANK_LEN,
+)
+from vn_platen_clip_screw_spec import (  # noqa: E402
+    HEAD_DIA as CLIP_SCREW_HEAD_DIA,
+    HEAD_H as CLIP_SCREW_HEAD_H,
+    SHANK_DIA as CLIP_SCREW_SHANK_DIA,
+    SHANK_LEN as CLIP_SCREW_SHANK_LEN,
+    THREAD as CLIP_SCREW_THREAD,
 )
 
 # The guide-lock screws alone are low button heads (R9-31): a fillister head
@@ -891,8 +897,8 @@ assert math.isclose(
 SPARE_GEAR_POS = (140.0, BASE_DECK_Y, -75.0)
 
 # --- fasteners ----------------------------------------------------------------
-# Platen-clip screws: through the clips' integral outer seats and #4 clearance
-# holes into full-thickness #4-40 through receivers in the platen.
+# Platen-clip screws (vn-platen-clip-screw): heads on the clips' flat sheet,
+# shanks through #2 clearance holes into #2-56 through receivers in the platen.
 CLIP_SCREW_XY = tuple((PLATE_X0 + sx, PLATE_Y0 + sy) for sx, sy in PLATEN_SOCKET_XY)
 # The clips run from the platen's top edge down; their end holes (inset
 # CLIP_HOLE_INSET) must land exactly on the platen's edge sockets.
@@ -1031,7 +1037,7 @@ CHAIN_PLANE_ENVELOPES = (
         "platen-clip screw heads (the platen group's frontmost)",
         None,
         0.0,
-        PLATE_FRONT_Z - CLIP_THICKNESS - FILLISTER_HEAD_H,
+        PLATE_FRONT_Z - CLIP_THICKNESS - CLIP_SCREW_HEAD_H,
         PLATE_FRONT_Z,
     ),
 )
@@ -1137,25 +1143,29 @@ def _assert_fastener_stacks() -> None:
     # 5.55 mm of shank, and the tip is flush with the boss.
     if (PLATEN_SOCKET_SPEC.kind, PLATEN_SOCKET_SPEC.size, PLATEN_SOCKET_SPEC.end) != (
         "tapped",
-        "#4-40",
+        CLIP_SCREW_THREAD,
         "through_all",
     ):
-        raise AssertionError("clip receiver is not a through #4-40 tap")
+        raise AssertionError(f"clip receiver is not a through {CLIP_SCREW_THREAD} tap")
     nonnegative(
-        "clip shank radial clearance", (CLIP_HOLE_DIA - FILLISTER_SHANK_DIA) / 2.0
+        "clip shank radial clearance", (CLIP_HOLE_DIA - CLIP_SCREW_SHANK_DIA) / 2.0
     )
     valid_engagement(
-        "clip #4-40 engagement", PLATEN_SOCKET_ENGAGEMENT, FILLISTER_SHANK_DIA
+        f"clip {CLIP_SCREW_THREAD} engagement",
+        PLATEN_SOCKET_ENGAGEMENT,
+        CLIP_SCREW_SHANK_DIA,
     )
-    clip_tip_clearance = CLIP_THICKNESS + PLATEN_SOCKET_ENGAGEMENT - FILLISTER_SHANK_LEN
+    clip_tip_clearance = (
+        CLIP_THICKNESS + PLATEN_SOCKET_ENGAGEMENT - CLIP_SCREW_SHANK_LEN
+    )
     nonnegative("clip screw rear protrusion clearance", clip_tip_clearance)
     if abs(clip_tip_clearance) > 1e-9:
         raise AssertionError("clip screw tip is not flush with the socket boss")
 
     # The raised heads remain wholly outside the recording-paper side margins.
     paper_side_margin = (PLATE_WIDTH - PAPER_GEOMETRY.RECORDING_PAPER_WIDTH_MM) / 2.0
-    left_head_extent = PLATEN_SOCKET_XY[0][0] + FILLISTER_HEAD_DIA / 2.0
-    right_head_extent = PLATE_WIDTH - PLATEN_SOCKET_XY[2][0] + FILLISTER_HEAD_DIA / 2.0
+    left_head_extent = PLATEN_SOCKET_XY[0][0] + CLIP_SCREW_HEAD_DIA / 2.0
+    right_head_extent = PLATE_WIDTH - PLATEN_SOCKET_XY[2][0] + CLIP_SCREW_HEAD_DIA / 2.0
     nonnegative(
         "left clip head-to-paper clearance", paper_side_margin - left_head_extent
     )
@@ -2563,13 +2573,13 @@ async def build(adapter) -> dict[str, str]:
     )
     clip_seed = await place_component(
         adapter,
-        "vn-fillister-screw",
+        "vn-platen-clip-screw",
         clip_seed_target,
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
         label=(
-            f"fillister-screw clip seed "
+            f"platen-clip screw seed "
             f"(x{clip_seed_target[0]:+.0f} y{clip_seed_target[1]:.0f})"
         ),
     )
@@ -2643,12 +2653,6 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         "platen guide-screw grid",
     )
-    # The exploded sheet moves the guide and clip screws apart: tag each
-    # fillister screw with the joint it makes.
-    fillister_roles = {
-        **{name: CLIP_SCREW_ROLE for name in (clip_seed, *clip_instances)},
-        **{name: GUIDE_SCREW_ROLE for name in (guide_seed, *guide_instances)},
-    }
 
     # Two seeds at the right-hand station reproduce at the left-hand station;
     # under-head planes sit on the real 2-mm lock back faces.
@@ -3273,9 +3277,7 @@ async def build(adapter) -> dict[str, str]:
     author_in_drawing_configurations(
         adapter,
         ASM_NAME,
-        lambda configuration: create_paper_drive_explode(
-            adapter, fillister_roles, configuration
-        ),
+        lambda configuration: create_paper_drive_explode(adapter, configuration),
     )
     return await save_assembly_and_images(adapter, ASM_NAME)
 

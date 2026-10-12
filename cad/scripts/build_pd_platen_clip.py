@@ -52,7 +52,7 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _hole_spec import THREAD_MAJOR_MM
 from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
-from vn_fillister_screw_spec import HEAD_DIA, SHANK_DIA, SHANK_LEN
+from vn_platen_clip_screw_spec import HEAD_DIA, SHANK_DIA, SHANK_LEN, THREAD
 from pd_platen_spec import PLATE_THICKNESS, SOCKET_BOSS_H, SOCKET_THREAD_ENGAGEMENT
 
 PART_NAME = "pd-platen-clip"
@@ -87,14 +87,15 @@ SCREW_RAIL_END_RADIUS = 2.5
 SCREW_RAIL_SLIT_RADIUS = 0.75
 ARCH_RISE = 1.5  # shallow outward bow; editable as ArchRise in Tools > Equations
 
-# The brass fillister screws retain their lengthwise stations in the flat
-# rail, centred across it.  The stock #4 head is wider than the rail: it
-# overhangs the outer edge (over the bare platen) and the slit, and still
-# clears the spring rail in plan.
+# The brass #2-56 fillister screws (vn-platen-clip-screw; img03's heads read
+# ~2.6-3.0 mm) retain their lengthwise stations in the flat rail, centred
+# across it; each head lies wholly on the rail.
 HOLE_INSET = 7.1904  # ch30-p002 Pose Studio: 8 * 0.8988 from each end
 HOLE_Y = SCREW_RAIL_WIDTH / 2.0
-HOLE_DIA = CLEARANCE_MM[("#4", "normal")]
+CLEARANCE_SIZE = THREAD.split("-")[0]  # "#2"
+HOLE_DIA = CLEARANCE_MM[(CLEARANCE_SIZE, "normal")]
 HEAD_TO_SPRING_RAIL = SPRING_RAIL_Y0 - (HOLE_Y + HEAD_DIA / 2.0)
+HEAD_RAIL_MARGIN = (SCREW_RAIL_WIDTH - HEAD_DIA) / 2.0
 
 # Spring rail section (local X, Z) as its sheet MID-SURFACE: the free tip lies
 # flat from its end-round centre out to the screw station, then each free half
@@ -154,6 +155,8 @@ if HOLE_Y - HOLE_DIA / 2.0 <= 0.0 or HOLE_Y + HOLE_DIA / 2.0 >= SCREW_RAIL_WIDTH
     )
 if HEAD_TO_SPRING_RAIL <= 0.0:
     raise AssertionError("platen clip screw heads must clear the spring rail in plan")
+if HEAD_RAIL_MARGIN <= 0.0:
+    raise AssertionError("platen clip screw heads must lie wholly on the screw rail")
 if HOLE_INSET - HEAD_DIA / 2.0 <= SCREW_RAIL_END_RADIUS:
     raise AssertionError("platen clip screw heads must sit clear of the rounded ends")
 if SCREW_RAIL_END_RADIUS + SCREW_RAIL_SLIT_RADIUS >= SCREW_RAIL_WIDTH:
@@ -172,9 +175,9 @@ if abs(CLIP_THICKNESS + SOCKET_THREAD_ENGAGEMENT - SHANK_LEN) > 1e-9:
     raise AssertionError("clip/platen stack no longer finishes at the screw tip")
 if abs(SOCKET_THREAD_ENGAGEMENT - (PLATE_THICKNESS + SOCKET_BOSS_H)) > 1e-9:
     raise AssertionError("clip screw receiver no longer runs through plate and boss")
-if SOCKET_THREAD_ENGAGEMENT + 1e-9 < 1.5 * THREAD_MAJOR_MM["#4-40"]:
+if SOCKET_THREAD_ENGAGEMENT + 1e-9 < 1.5 * THREAD_MAJOR_MM[THREAD]:
     raise AssertionError(
-        f"clip #4-40 engagement {SOCKET_THREAD_ENGAGEMENT:.4f} < 1.5D (rule 12)"
+        f"clip {THREAD} engagement {SOCKET_THREAD_ENGAGEMENT:.4f} < 1.5D (rule 12)"
     )
 if HOLE_DIA < SHANK_DIA:
     raise AssertionError("stock fillister shank does not clear the clip")
@@ -620,17 +623,17 @@ async def build(adapter) -> dict[str, str]:
     volume += V_ROUNDED_ENDS
     await volume_check(adapter, "rounded spring ends", volume, 0.005 * volume)
 
-    # End screw holes: ONE native Hole Wizard #4 clearance feature (2 points)
+    # End screw holes: ONE native Hole Wizard #2 clearance feature (2 points)
     # from the screw rail's outer face at local z = 0, where the heads seat.
     hole_cut = wizard_holes(
         adapter,
-        HoleSpec("clearance", "#4"),
+        HoleSpec("clearance", CLEARANCE_SIZE),
         [
             [HOLE_INSET, HOLE_Y, 0.0],
             [CLIP_LENGTH - HOLE_INSET, HOLE_Y, 0.0],
         ],
         (0.0, 0.0, -1.0),
-        "flat-rail screw holes (#4 clearance)",
+        f"flat-rail screw holes ({CLEARANCE_SIZE} clearance)",
         name="ScrewHoles",
         placement_dims=[
             (("LeftX", '"HoleInset"'), ("LeftZ", '"HoleY"')),

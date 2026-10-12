@@ -27,6 +27,7 @@ flip_invert:
   - reducer disc axial
 allowed_free_stems:
   - vn-fillister-screw
+  - vn-platen-clip-screw  # MHA-VN-059 clip screws ride the platen
   - pd-guide-lock
   - vn-guide-lock-screw  # MHA-VN-046 lock screws ride the platen (R9-31)
   - pd-platen

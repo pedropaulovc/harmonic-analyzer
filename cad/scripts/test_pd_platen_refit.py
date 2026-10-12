@@ -17,6 +17,7 @@ import paper_drive_geom as paper_geometry
 import pd_platen_rack_spec as rack
 import build_pd_support_bar as support
 import vn_fillister_screw_spec as fillister
+import vn_platen_clip_screw_spec as clip_screw
 from _printed_tolerance import printed_deviations
 
 
@@ -117,10 +118,16 @@ def test_platen_clip_free_halves_bow_smoothly_and_return_to_sheet_plane() -> Non
 
 
 def test_platen_clip_screws_seat_on_the_flat_sheet_with_full_engagement() -> None:
+    # The user's #2-56 brass fillister (90114A124): its head lies wholly on the
+    # 4.23 screw rail, and the platen's through tap is the same thread.
+    assert clip_screw.SKU == "90114A124" and clip_screw.THREAD == "#2-56"
+    assert (platen.SOCKET_SPEC.kind, platen.SOCKET_SPEC.size) == ("tapped", "#2-56")
+    assert clip.HOLE_DIA == clip.CLEARANCE_MM[("#2", "normal")]
+    assert clip_screw.HEAD_DIA < clip.SCREW_RAIL_WIDTH
     assert clip.CLIP_THICKNESS + platen.SOCKET_THREAD_ENGAGEMENT == pytest.approx(
-        fillister.SHANK_LEN
+        clip_screw.SHANK_LEN
     )
-    assert platen.SOCKET_THREAD_ENGAGEMENT >= 1.5 * clip.THREAD_MAJOR_MM["#4-40"]
+    assert platen.SOCKET_THREAD_ENGAGEMENT >= 1.5 * clip.THREAD_MAJOR_MM["#2-56"]
     assert platen.SOCKET_BOSS_H == pytest.approx(1.70)
 
 
