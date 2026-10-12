@@ -67,8 +67,8 @@ _SHANK = (
     _pin.SHANK_LEN + _pin.SHANK_LEN_BAND[0],
 )
 # Step to thread end: both stations print from the back end, so their bands
-# add (±0.09).  The axle's drawing prints these limits on both stations.
-STEP_TO_THREAD_END = (
+# add (±0.09).
+_STEP_TO_THREAD_END = (
     _pin.THREAD_END + _pin.THREAD_END_BAND[1] - _SHANK[1],
     _pin.THREAD_END + _pin.THREAD_END_BAND[0] - _SHANK[0],
 )  # 7.93 .. 8.11
@@ -89,7 +89,7 @@ STEP_INSIDE_HUB = (_BACK[0] + _HUB[0]) - _GAUGE[1]  # 0.687
 # (b) The locknut sits on FULL thread (rule 12 counts full threads only): the
 # thread less the incomplete pitch the dome cuts runs past its outer face,
 # and the first nut's inner face sits past the die's run-out at the step.
-LOCKNUT_THREAD_MARGIN = (_GAUGE[0] + STEP_TO_THREAD_END[0] - _pin.TIP_INCOMPLETE) - (
+LOCKNUT_THREAD_MARGIN = (_GAUGE[0] + _STEP_TO_THREAD_END[0] - _pin.TIP_INCOMPLETE) - (
     _BACK[1] + _HUB[1] + ENDSHAKE_MAX + _FRONT[1] + _NUTS[1]
 )  # 0.012
 NUT_RUNOUT_MARGIN = (_BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0]) - (
@@ -98,7 +98,7 @@ NUT_RUNOUT_MARGIN = (_BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0]) - (
 # (c) Only the dome and the thread the full-thread margin needs stand past the
 # locknut: the worst geometric thread end, incomplete pitch included.
 THREAD_PAST_LOCKNUT_LIMIT = 2.5
-THREAD_PAST_LOCKNUT_MAX = (_GAUGE[1] + STEP_TO_THREAD_END[1]) - (
+THREAD_PAST_LOCKNUT_MAX = (_GAUGE[1] + _STEP_TO_THREAD_END[1]) - (
     _BACK[0] + _HUB[0] + ENDSHAKE_MIN + _FRONT[0] + _NUTS[0]
 )  # 2.497
 THREAD_PAST_LOCKNUT_NOMINAL = _pin.THREAD_END_Y - LOCKNUT_FACE_D  # 1.507
@@ -115,6 +115,11 @@ if THREAD_PAST_LOCKNUT_MAX > THREAD_PAST_LOCKNUT_LIMIT:
         f"{THREAD_PAST_LOCKNUT_MAX:.4f} of thread past the locknut "
         f"> {THREAD_PAST_LOCKNUT_LIMIT}"
     )
+# The thread end's band holds both: its callout on the axle's drawing states
+# them (policy rule 2), the lower and the upper need.
+THREAD_END_CALLOUT = (
+    f"LOCKNUT ON FULL THREAD,\nEND {THREAD_PAST_LOCKNUT_LIMIT:.1f} MAX PAST LOCKNUT"
+)
 
 # --- fits on the pin ------------------------------------------------------------------
 _PIN = (_pin.PIN_DIA - _pin.PIN_DIA_TOL, _pin.PIN_DIA + _pin.PIN_DIA_TOL)

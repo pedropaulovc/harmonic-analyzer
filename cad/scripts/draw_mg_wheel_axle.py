@@ -52,7 +52,7 @@ from mg_wheel_axle_spec import (
     THREAD_MAJOR,
     TIP_Y,
 )
-from mg_wheel_group import BACK_END_PROUD_MAX, BACK_END_SUNK_MAX, STEP_TO_THREAD_END
+from mg_wheel_group import BACK_END_PROUD_MAX, BACK_END_SUNK_MAX, THREAD_END_CALLOUT
 
 
 SPEC = DRAWINGS_BY_NAME["mg_wheel_axle"]
@@ -127,10 +127,8 @@ THREAD_PICK = (
 THREAD_NOTE_XY = (THREAD_END_X + 0.012, SIDE_CENTER[1] + 0.042)
 # Each band states its need on its own callout (policy rule 2): the pin's
 # press fit with the bar bore's limits read from the bar's geom, the step's
-# station where the back end lands, the thread end's full thread under the
-# locknut. The two stations' bands add on the thread from the step, which
-# the locknut's full thread and the past-locknut cap pin to the
-# mg_wheel_group limits printed under it.
+# station where the back end lands, the thread end's two limits, the
+# locknut's full thread and the most thread past it (mg_wheel_group).
 DIMENSION_CALLOUTS = {
     "PinDia": (
         "PRESS FIT IN MG-WHEEL-BAR\n"
@@ -140,10 +138,7 @@ DIMENSION_CALLOUTS = {
         "PRESSED TO GAUGE: BACK END\n"
         f"{BACK_END_PROUD_MAX:.2f} PROUD TO {BACK_END_SUNK_MAX:.2f} SUNK IN BAR"
     ),
-    "ThreadEnd": (
-        "LOCKNUT ON FULL THREAD,\n"
-        f"STEP TO THREAD END {STEP_TO_THREAD_END[0]:.2f}-{STEP_TO_THREAD_END[1]:.2f}"
-    ),
+    "ThreadEnd": THREAD_END_CALLOUT,
 }
 # The journal's finish (policy rule 5) lands on the shank's top silhouette
 # between the Ø line and the step, where the wheel runs; the symbol stands
@@ -155,28 +150,6 @@ FINISH_CHAR_HEIGHT = 0.0025
 CENTERLINE_PICK = (BACK_X + 0.020, SIDE_CENTER[1] + 0.003)
 # Bottom-left, above the title-block line.
 NOTES_XY = (0.020, 0.048)
-# swUserPreferenceToggle_e, read from the installed SOLIDWORKS 3DEXPERIENCE
-# R2026x swconst.tlb (2026-10-12): Display filter > Cosmetic threads and
-# Shaded cosmetic threads, set on the drawing with swDetailingNoOptionSpecified.
-SW_DISPLAY_COSMETIC_THREADS = 41
-SW_DISPLAY_SHADED_COSMETIC_THREADS = 230
-
-
-def _show_cosmetic_threads(adapter: Any) -> None:
-    """Turn on the drawing's cosmetic-thread display filter.
-
-    Run 20261012T084447505Z read the thread annotation in both views, yet the
-    side view printed the #4-40 end plain, with no minor-diameter lines, and
-    the isometric unshaded: set the filter on the document rather than rely
-    on the template's default.
-    """
-    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
-    for toggle in (SW_DISPLAY_COSMETIC_THREADS, SW_DISPLAY_SHADED_COSMETIC_THREADS):
-        extension.SetUserPreferenceToggle(toggle, 0, True)
-        if not extension.GetUserPreferenceToggle(toggle, 0):
-            raise RuntimeError(
-                f"wheel-axle drawing refused thread display toggle {toggle}"
-            )
 
 
 def _view_center_delta(
@@ -308,11 +281,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # x=0.020: a note is left-aligned on its anchor, so the ink starts here,
     # clear of the 12.7 mm zone margin.
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
-    # The side view draws the #4-40's minor-diameter lines and the shaded
-    # isometric the thread the callout names; imported before finalize's
-    # note cleanup, so its label is counted rather than first appearing at
-    # the native save (draw_pn_pen_hanger).
-    _show_cosmetic_threads(adapter)
+    # The shaded isometric shows the #4-40 the callout names; imported before
+    # finalize's note cleanup, so its label is counted rather than first
+    # appearing at the native save (draw_pn_pen_hanger).
     thread_seeds, thread_instances = import_cosmetic_threads(adapter, iso)
     if (thread_seeds, thread_instances) != (1, 1):
         raise RuntimeError(
