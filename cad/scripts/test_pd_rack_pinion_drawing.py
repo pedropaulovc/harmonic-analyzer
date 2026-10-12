@@ -359,13 +359,15 @@ def test_single_pin_contacts_every_actual_finite_corner_on_the_running_datum() -
     assert drawing.TOOTH_SPACE_CALLOUT_PROPERTY == spec.TOOTH_SPACE_CALLOUT_PROPERTY
     assert spec.TOOTH_SPACE_CALLOUT_PROPERTY == "Tooth Space Inspection"
     assert inspection.splitlines()[0] == (
-        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO "
-        "MHA-PD-010 BORE, ASSEMBLED"
+        f"TOOTH SPACE RUNOUT {spec.TOOTH_SPACE_RUNOUT_TIR_MM:.2f} TIR TO A, "
+        "ACCEPT AT CUTTING SETUP"
     )
     assert len(inspection.splitlines()) == 2
     assert "INDEX" not in inspection
     assert max(map(len, inspection.splitlines())) <= 70
-    assert "TO A" not in inspection  # local part A is only the 13.1 pilot
+    # The part sheet names only its own datum; the assembled axis is the
+    # assembly's transfer step (test_pd_paper_drive_assembly_drawing).
+    assert "MHA-" not in inspection and "ASSEMBLED" not in inspection
     # The sheet states the requirement; the method and history stay off it.
     assert not any(word in inspection + spec.GEAR_DATA for word in ("CERTIFIED", "PREMISE"))
     assert not any(word in inspection for word in ("TRANSFER", "LOCK", "MATCH-MARK"))

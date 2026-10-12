@@ -291,9 +291,8 @@ async def build(adapter: Any) -> dict[str, str]:
         shoulder=True,
         stability_tolerance_m=0.0001,
     )
-    # Part datum A above remains the 13.1 pilot. The feature-local inspection
-    # property explicitly names the ASSEMBLED feed pinion's running bore;
-    # no fake local axis carrier or tooth-tip runout frame substitutes for it.
+    # The tooth-space control reads datum A above, the 13.1 pilot, at the
+    # cutting setup; the assembled control is MHA-PD-000's transfer step.
     add_toothspace_callout(
         adapter,
         front,
