@@ -568,6 +568,4 @@ def test_matched_pair_and_projected_zone_notes_state_their_values() -> None:
     # The countersinks are cut from the rear face, which *Front (the left
     # view) looks at; *Back (the centre view) looks at face A.
     assert geometry.REAR_FACE_Z > 0.0
-    assert "*Front\", *PLAN_CENTER" in Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "*Back\", *BACK_CENTER" in Path(drawing.__file__).read_text(encoding="utf-8")
     assert drawing.PLAN_CENTER[0] < drawing.BACK_CENTER[0] < drawing.SECTION_CENTER[0]

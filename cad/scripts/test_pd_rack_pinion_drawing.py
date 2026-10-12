@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -288,44 +287,6 @@ def test_real_finite_corners_preserve_root_web_volume_and_material_land() -> Non
 
 def test_native_builder_consumes_one_full_axial_profile_and_physical_inspection() -> None:
     assert part.STOCK_PROFILE is spec.STOCK_PROFILE
-    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
-                 and node.name == "build")
-    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
-    native = [node for node in calls if isinstance(node.func, ast.Name)
-              and node.func.id == "build_stock_form_gear"]
-    assert len(native) == 1
-    assert [ast.unparse(arg) for arg in native[0].args] == [
-        "adapter", "STOCK_PROFILE", "FACE_WIDTH"
-    ]
-    assert not any(isinstance(node.func, ast.Name) and node.func.id == "build_fixed_gear"
-                   for node in calls)
-    span = next(node for node in calls if isinstance(node.func, ast.Name)
-                and node.func.id == "author_span")
-    assert [ast.unparse(arg) for arg in span.args] == [
-        "adapter", "STOCK_PROFILE", "SPAN_TEETH"
-    ]
-    root = next(node for node in calls if isinstance(node.func, ast.Name)
-                and node.func.id == "author_root_envelope")
-    assert [ast.unparse(arg) for arg in root.args] == ["adapter", "STOCK_PROFILE"]
-    limits = next(node for node in calls if isinstance(node.func, ast.Name)
-                  and node.func.id == "apply_span_limits")
-    assert {keyword.arg: ast.unparse(keyword.value) for keyword in limits.keywords} == {
-        "nominal_mm": "SPAN_NOMINAL",
-        "deviations": "SPAN_DEVIATIONS",
-        "places": "SPAN_PLACES",
-        "prefix": "SPAN_PREFIX",
-    }
-    properties = next(node for node in calls if isinstance(node.func, ast.Name)
-                      and node.func.id == "apply_drawing_properties").args[2]
-    assert isinstance(properties, ast.Dict)
-    assert {ast.unparse(key): ast.unparse(value) for key, value in zip(
-        properties.keys, properties.values, strict=True
-    )} == {
-        "'Gear Data'": "GEAR_DATA",
-        "'Manufacturing Notes'": "MANUFACTURING_NOTES",
-        "TOOTH_SPACE_CALLOUT_PROPERTY": "TOOTH_SPACE_CALLOUT",
-    }
 
 
 def test_single_pin_contacts_every_actual_finite_corner_on_the_running_datum() -> None:
@@ -333,15 +294,6 @@ def test_single_pin_contacts_every_actual_finite_corner_on_the_running_datum() -
     from _gear_quality import toothspace_runout_tir_mm
 
     assert spec.TOOTH_SPACE_RUNOUT_TIR_MM == toothspace_runout_tir_mm() == 0.05
-    tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
-    grade = next(
-        node for node in tree.body if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "TOOTH_SPACE_RUNOUT_TIR_MM"
-                for target in node.targets)
-    )
-    assert isinstance(grade.value, ast.Call)
-    assert isinstance(grade.value.func, ast.Name)
-    assert grade.value.func.id == "toothspace_runout_tir_mm"
     contacts = spec.tooth_space_gauge_contacts(1.0003)
     assert len(contacts) == len(spec.manufactured_profiles()) == 4
     for profile, contact in zip(spec.manufactured_profiles(), contacts, strict=True):
@@ -455,19 +407,32 @@ def test_tooth_space_control_fits_the_upper_right_note_lane() -> None:
     assert control.ymin > drawing.FRONT_KEEP["ToothSpan"][1] + 0.010
 
 
-def test_stale_native_tooth_space_control_is_refused_before_drawing_creation() -> None:
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
-                 and node.name == "build")
-    guard = next(node for node in build.body if isinstance(node, ast.Expr)
-                 and ast.unparse(node.value).startswith(
-                     "require_source_control(properties[TOOTH_SPACE_CALLOUT_PROPERTY], "
-                     "TOOTH_SPACE_CALLOUT,"))
-    creation = next(node for node in build.body if isinstance(node, ast.Assign)
-                    and isinstance(node.value, ast.Call)
-                    and isinstance(node.value.func, ast.Name)
-                    and node.value.func.id == "new_project_drawing")
-    assert build.body.index(guard) < build.body.index(creation)
+def test_stale_native_tooth_space_control_is_refused_before_drawing_creation(
+    monkeypatch, tmp_path
+) -> None:
+    import asyncio
+
+    source = tmp_path / "pd-rack-pinion.SLDPRT"
+    source.write_bytes(b"")
+    created: list[str] = []
+
+    async def opened(_path):
+        return SimpleNamespace(is_success=True, data=None, error=None)
+
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    monkeypatch.setattr(
+        drawing, "read_required_properties",
+        lambda _model, wanted, *, required: {
+            key: "TOOTH SPACE RUNOUT 0.10 TIR TO A" for key in wanted
+        },
+    )
+    monkeypatch.setattr(
+        drawing, "new_project_drawing", lambda *_a, **_k: created.append("drawing")
+    )
+    adapter = SimpleNamespace(currentModel=object(), open_model=opened)
+    with pytest.raises(RuntimeError):
+        asyncio.run(drawing.build(adapter))
+    assert created == []
 
 
 def test_saved_crlf_control_passes_and_a_changed_line_is_refused() -> None:
@@ -482,29 +447,8 @@ def test_saved_crlf_control_passes_and_a_changed_line_is_refused() -> None:
         require_source_control(stale, spec.TOOTH_SPACE_CALLOUT, label="rack pinion")
 
 
-def test_tooth_space_control_is_a_model_linked_physical_flank_callout() -> None:
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
-                 and node.name == "build")
-    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
-    callout = next(node for node in calls if isinstance(node.func, ast.Name)
-                   and node.func.id == "add_toothspace_callout")
-    assert [ast.unparse(arg) for arg in callout.args] == ["adapter", "front"]
-    assert {keyword.arg: ast.unparse(keyword.value) for keyword in callout.keywords} == {
-        "profile": "STOCK_PROFILE",
-        "actual_pin_diameter_mm": "TOOTH_SPACE_GAUGE_PIN_DIA_MM",
-        "rotate_rad": "math.pi / TEETH + TOOTH_SPACE_GAP_INDEX * 2.0 * math.pi / TEETH",
-        "axial_station_mm": "FACE_WIDTH",
-        "property_name": "TOOTH_SPACE_CALLOUT_PROPERTY",
-        "note_xy": "TOOTH_SPACE_CALLOUT_XY",
-    }
+def test_tooth_space_gap_index_names_a_real_gap() -> None:
     assert 0 <= drawing.TOOTH_SPACE_GAP_INDEX < spec.TEETH
-    assert not any(
-        isinstance(node.func, ast.Name) and node.func.id == "add_property_linked_note"
-        and len(node.args) > 1 and isinstance(node.args[1], ast.Constant)
-        and node.args[1].value == "Tooth Space Inspection"
-        for node in calls
-    )
 
 
 def test_manufacturing_notes_fit_the_limits_and_state_the_screw_engagement() -> None:

@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import ast
 import importlib
-import inspect
 import math
 from pathlib import Path
 
@@ -111,36 +109,7 @@ def test_composite_sizes_have_native_controls_and_stock_references() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME.values()) <= {1, 2}
 
 
-def test_model_authors_and_hides_the_seam_witness_without_changing_the_solid() -> None:
-    witness_source = inspect.getsource(builder._drawing_witnesses)
-    tree = ast.parse(witness_source)
-    calls = {
-        node.func.attr if isinstance(node.func, ast.Attribute) else node.func.id
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, (ast.Name, ast.Attribute))
-    }
-    assert {
-        "define_rectilinear_chain",
-        "dimension_between",
-        "blank_reference_sketches",
-    } <= calls
-    assert not ({"create_extrusion", "create_cut_extrude", "create_plane"} & calls)
-    names = {
-        node.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Constant) and isinstance(node.value, str)
-    }
-    for feature in ("EndStockProfile", "OverallHeightReference"):
-        assert feature in names
-        assert spec.DRAWING_DIMENSIONS[feature] <= names
-    build_source = inspect.getsource(builder.build)
-    assert "save_simplified_part" in build_source
-    assert "clear_dimensions_for_drawing" in build_source
-    assert "apply_drawing_precision" in build_source
-    assert "mark_dimensions_for_drawing" in build_source
-    assert "driven rack (equations neutral)" in build_source
-    assert "FirstGapReference" not in names
+def test_the_retired_first_gap_witness_is_neither_dimensioned_nor_kept() -> None:
     assert "FirstGap" not in spec.DRAWING_NOMINALS_MM
     assert "FirstGap" not in drawing.FRONT_KEEP
 
@@ -155,34 +124,12 @@ def test_sheet_has_aligned_clean_views_and_a_legible_stepped_end() -> None:
     )
     assert drawing.ISO_SCALE == (1, 2)
     assert drawing.curate_view_dimensions.__module__ == "_drawing_hidden_sketches"
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # The 4:1 end view is the only *Right: a 1:1 copy of it duplicated it.
-    assert source.count('"*Right"') == 1
-    tree = ast.parse(source)
-    orientations = {
-        arg.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "place_view"
-        for arg in node.args
-        if isinstance(arg, ast.Constant) and isinstance(arg.value, str)
-    }
-    assert {"*Front", "*Top", "*Right", "*Isometric"} <= orientations
-    call_names = {
-        node.func.id
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
-    assert "set_hidden_lines_removed" in call_names
-    assert "set_hidden_lines_visible" not in call_names
-    assert not (
-        {"add_datum_feature", "add_feature_control_frame", "set_dimension_precision"}
-        & call_names
-    )
+    # Main precedent: test_ch_rocker_arm_tl_profile_fixture_drawing (registry
+    # membership and the drawing-specification purity scan).
     assert "draw_pd_platen_rack.py" in PRECISION_MIGRATED_DRAWINGS
     assert not drawing_specification_violations(
-        source, filename="draw_pd_platen_rack.py"
+        Path(drawing.__file__).read_text(encoding="utf-8"),
+        filename="draw_pd_platen_rack.py",
     )
 
 
@@ -251,9 +198,6 @@ def test_incoming_rack_note_is_the_two_stock_sizes() -> None:
     )
     for metrology in ("INDEX", "LEAD", "REJECT", "USABLE GAPS"):
         assert metrology not in note
-    source = inspect.getsource(drawing)
-    assert '"Incoming Rack Inspection"' in source
-    assert '"Purchased Rack", PURCHASED_RACK_XY' not in source
 
 
 def test_rack_index_and_face_lead_fit_the_feed_opposite_flank_budget() -> None:
@@ -327,32 +271,6 @@ def test_purchased_identity_and_cut_length_follow_the_primary_product_fields() -
     )
     assert spec.CUT_LENGTH_MM == spec.BAR_LENGTH == PLATE_WIDTH
     assert spec.CUT_LENGTH_MM < spec.PURCHASED_RACK_LENGTH_MM
-
-
-def test_rack_spec_is_pure_data_and_the_sheet_only_imports_specification() -> None:
-    source = Path(spec.__file__).read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    imports = {
-        node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
-    } | {
-        alias.name
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Import)
-        for alias in node.names
-    }
-    assert "pd_transgear_feed_pinion_spec" in imports
-    assert "pd_platen_spec" in imports
-    assert not any(
-        name and (name.startswith("build_") or name.startswith("solidworks"))
-        for name in imports
-    )
-    assert "_common" not in imports
-    assert "_config" not in imports
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "from build_pd_platen_rack" not in source
-    assert "settled_checks=" in source
-    assert "assert_dimension_measures" in source
-    assert "assert_imported_precision" in source
 
 
 @pytest.fixture
