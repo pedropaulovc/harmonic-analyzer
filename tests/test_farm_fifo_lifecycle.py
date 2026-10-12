@@ -887,10 +887,15 @@ def _install_serial_build(monkeypatch, action, *, uptodate=None):
             pass
 
     monkeypatch.setattr(_doit_cmd_base, "JsonDB", MemoryJsonDB)
-    task = {"actions": [action]}
-    if uptodate is not None:
-        task["uptodate"] = [uptodate]
-    namespace = {"task_local_gap": lambda: task}
+    def task_local_gap():
+        # doit annotates each loaded dictionary; every invocation needs a fresh
+        # top-level task, not the previous load's synthesized ``name`` field.
+        task = {"actions": [action]}
+        if uptodate is not None:
+            task["uptodate"] = [uptodate]
+        return task
+
+    namespace = {"task_local_gap": task_local_gap}
     config = {"GLOBAL": {"backend": "json", "dep_file": ":memory:"}}
 
     class FixtureFarmDoit(_RealFarmDoitMain):

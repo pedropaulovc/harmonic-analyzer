@@ -202,7 +202,7 @@ surviving workers are occupied by younger builds, its floor remains explicitly
 unsatisfied until physical release; zero usable capacity is also explicit.
 Closing or expiry releases idle reservations, not occupied/drain obligations.
 
-`build-status <build_id>` exposes `reserved_capacity` and `occupied_capacity`;
+`build-status --build-id <build_id>` exposes `reserved_capacity` and `occupied_capacity`;
 `fifo-status` exposes an active-build list, `head_build_id`, `usable_capacity`,
 `occupied_capacity`,
 `reserved_idle_capacity`, `capacity_observed_at` and any `capacity_error`.

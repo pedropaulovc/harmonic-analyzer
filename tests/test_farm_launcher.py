@@ -572,6 +572,40 @@ def _wait_for(
     )
 
 
+def _read_watch_line(watch: subprocess.Popen[str]) -> str:
+    """Bound pipe reads while a synthetic launcher is held awaiting release."""
+    observed = []
+    errors = []
+    ready = threading.Event()
+
+    def read():
+        try:
+            observed.append(watch.stdout.readline())
+        except BaseException as exc:
+            errors.append(exc)
+        finally:
+            ready.set()
+
+    reader = threading.Thread(target=read, name="fixture-watch-line", daemon=True)
+    reader.start()
+    if not ready.wait(HANG_GUARD_S):
+        # This is the exact watcher created by the test, never a farm process.
+        # Closing it unblocks the reader before communicate touches the pipe.
+        if watch.poll() is None:
+            watch.kill()
+        reader.join(timeout=HANG_GUARD_S)
+        assert not reader.is_alive(), "synthetic watcher pipe reader did not stop"
+        remaining, stderr = watch.communicate(timeout=HANG_GUARD_S)
+        raise AssertionError(
+            f"watch emitted no line after the {HANG_GUARD_S} s hang guard; "
+            f"exit={watch.returncode}; stdout={observed!r}{remaining!r}; stderr={stderr!r}"
+        )
+    reader.join()
+    if errors:
+        raise errors[0]
+    return observed[0]
+
+
 def _observe_held_launch(
     process: subprocess.Popen[str],
     fixture: dict[str, object],
@@ -1612,7 +1646,7 @@ def test_status_and_watch_follow_a_live_run_to_its_outcome(tmp_path: Path) -> No
             stderr=subprocess.PIPE,
             text=True,
         )
-        first = watch.stdout.readline()
+        first = _read_watch_line(watch)
         assert "watching tag=live" in first and "state=running" in first, first
         release.touch()
         rest, errors = watch.communicate(timeout=HANG_GUARD_S)
@@ -2459,7 +2493,7 @@ def test_watch_prints_a_request_record_that_sorts_ahead_of_printed_ones(
         )
         printed = []
         while not any(LEAF_NUT in line for line in printed):
-            line = watch.stdout.readline()
+            line = _read_watch_line(watch)
             assert line, "watch ended before printing the recorded request"
             printed.append(line)
         # A dispatch the log has not caught up with, named to sort first.

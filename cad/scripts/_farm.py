@@ -150,6 +150,7 @@ class LeafAttempt:
     activity_id: str
     attempt: int
     worker_id: str
+    slot_id: str
 
 
 @dataclass(frozen=True)
