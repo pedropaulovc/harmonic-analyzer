@@ -94,8 +94,10 @@ Heartbeats do not reset idle timers, and occupied workers are never preempted.
 Lost capacity can leave that floor explicitly unsatisfied until a worker is
 physically released.
 
-The parent independently renews its 120-second producer lease every 15 seconds.
-That lease and the 180-second idle-capacity timer are different clocks. Closure
+The parent independently renews its 120-second producer lease every 15 seconds
+from acknowledged registration through closure, without polling build status
+or waiting for allocation. That lease and the 180-second idle-capacity timer are
+different clocks. Closure
 or lease expiry releases idle reservations but preserves accepted work and
 physical-drain obligations. Protocol 6 requires paired producer/pool/worker
 deployment to an idle, physically drained fleet; protocol-5 coordinator state
@@ -271,10 +273,12 @@ category, exit code and log blob. The workflow id is
 `leaf:<build_id>:<task>:<64-hex cache key>:<timeout_s>s`
 (`_farm.workflow_id(build_id, task, cache_key, commit, timeout_s)`; for a keyless
 `check:` leaf the key slot is the first 16 characters of the requested commit).
-Protocol 6 scopes executions to the owning `build_id`, distinct from a supervised
-launch's `farm_run`: equal task/cache/budget inputs in another build reuse artifacts,
-not the workflow execution. Resolve the coordinator reservation before inspecting
-an execution. From the pool checkout:
+Protocol 6 scopes executions to the owning `build_id`
+(`YYYYMMDDTHHMMSS.ffffffZ-32hex`), distinct from a supervised launch's `farm_run`.
+Equal task/cache/budget inputs in another build reuse artifacts, not the workflow
+execution. The native ID describes its build scope directly, but only the
+coordinator's immutable exact-run binding authorizes inspection or cancellation;
+launcher metadata never supplies ownership. From the pool checkout:
 
 ```powershell
 uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py leaf-status --build-id "<build-id>" --workflow-id "leaf:<build-id>:part:dt_cone_gear:<64hex>:900s" --json

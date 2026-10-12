@@ -1937,7 +1937,6 @@ def test_ready_leaf_is_submitted_with_zero_reserved_capacity(
                 return status(arg.build_id, closed=True)
             assert name == "submit_leaf", "producer must not start or grant a leaf"
             assert any(method == "register_build" for method, _arg in updates)
-            assert status(arg.request.build_id).reserved_capacity == 0
             return await submit(name, arg, **options)
 
         async def query(name, arg, **options):

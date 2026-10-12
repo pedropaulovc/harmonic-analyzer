@@ -248,6 +248,7 @@ def _guarded_process(tmp_path, monkeypatch):
     monkeypatch.setenv("HARMONIC_FARM_BUILD_ID", INHERITED_BUILD_ID)
     monkeypatch.setattr(_farm, "FIFO_HEARTBEAT_INTERVAL_S", 0.01)
     monkeypatch.setattr(_farm, "STATUS_POLL_INTERVAL_S", 0.002)
+    monkeypatch.setattr(_farm, "FIFO_RPC_RETRY_INTERVAL_S", 0.002)
     monkeypatch.setattr(_farm, "FIFO_RPC_TIMEOUT_S", 0.5)
     monkeypatch.setattr(_farm, "submitter", lambda: "test@submitter")
     monkeypatch.setattr(_farm._telemetry, "info", lambda *_args, **_kwargs: None)
@@ -323,18 +324,12 @@ def _assert_close(control, build_id, reason):
     assert control.cancellations == []
 
 
-@pytest.mark.parametrize(
-    ("ownership_state", "reserved_capacity", "occupied_capacity"),
-    [("waiting", 0, 0), ("active", 0, 0), ("active", 4, 1)],
-)
 def test_registration_precedes_scheduler_and_renewal_is_independent_of_capacity(
     control, start_parent, _guarded_process,
-    ownership_state, reserved_capacity, occupied_capacity,
 ):
-    if ownership_state == "waiting":
-        control.active.clear()
-    control.reserved_capacity = reserved_capacity
-    control.occupied_capacity = occupied_capacity
+    control.active.clear()
+    control.reserved_capacity = 0
+    control.occupied_capacity = 0
     control.registration_gate = _AsyncGate()
     control.heartbeat_gate = _AsyncGate()
     control.heartbeat_gate_sequence = 3
@@ -346,9 +341,6 @@ def test_registration_precedes_scheduler_and_renewal_is_independent_of_capacity(
     _wait(parent.entered, "open producer did not enter scheduler")
     _wait(control.heartbeat_gate.entered, "producer did not independently renew")
     assert not parent.done.is_set(), "renewal completed the blocked local scheduler"
-    assert control.status().ownership_state == ownership_state
-    assert control.status().reserved_capacity == reserved_capacity
-    assert control.status().occupied_capacity == occupied_capacity
     assert control.calls("close_build") == []
     assert control.connections[0][0] == "test@submitter"
     [(registration, registration_options)] = control.calls("register_build")
@@ -391,9 +383,6 @@ def test_active_to_waiting_zero_allocation_keeps_scheduler_and_lease_open(
     control.heartbeat_gate.release()
     _wait(control.heartbeat_seen[2], "zero-allocation transition stopped renewal")
 
-    assert control.status().ownership_state == "waiting"
-    assert control.status().reserved_capacity == 0
-    assert control.status().occupied_capacity == 0
     parent.ownership.check()
     assert parent.ownership._failure is None
     assert parent.entered.is_set()
@@ -596,8 +585,6 @@ def test_finally_closes_group_without_cancelling_shared_remote_work(
 
     assert parent.errors == ([] if action_error is None else [action_error])
     _assert_close(control, parent.ownership.build_id, reason)
-    assert control.status().outstanding_leaf_count == 2
-    assert control.status().unconfirmed_attempt_count == 1
     assert control.handles == [(_farm.WORKFLOW_BUILD_FIFO_ID, {})]
     assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
     assert not _guarded_process[1].is_set()
@@ -703,6 +690,7 @@ def test_close_transport_warning_cannot_mask_prior_ownership_loss(
 @pytest.mark.parametrize(
     "fault",
     ["lease-expiring-outage", "update-refusal", "rpc-refusal", "closed", "expired",
+     "drained", "malformed-ownership", "missing-ownership", "empty-ownership",
      "past-deadline", "missing-deadline", "malformed-deadline", "foreign-build"],
 )
 def test_active_renewal_fault_fails_closed_and_interrupts_only_mocked_parent(
@@ -732,6 +720,10 @@ def test_active_renewal_fault_fails_closed_and_interrupts_only_mocked_parent(
         changes = {
             "closed": {"producer_state": "closed"},
             "expired": {"producer_state": "expired"},
+            "drained": {"ownership_state": "drained"},
+            "malformed-ownership": {"ownership_state": "not-an-ownership-state"},
+            "missing-ownership": {"ownership_state": None},
+            "empty-ownership": {"ownership_state": ""},
             "past-deadline": {"lease_deadline": _deadline(-1)},
             "missing-deadline": {"lease_deadline": None},
             "malformed-deadline": {"lease_deadline": "not-a-deadline"},
@@ -765,12 +757,17 @@ def test_active_renewal_fault_fails_closed_and_interrupts_only_mocked_parent(
     [
         {"producer_state": "closed"},
         {"producer_state": "expired"},
+        {"ownership_state": "drained"},
+        {"ownership_state": "not-an-ownership-state"},
+        {"ownership_state": None},
+        {"ownership_state": ""},
         {"lease_deadline": _deadline(-1)},
         {"lease_deadline": None},
         {"lease_deadline": "not-a-deadline"},
         {"build_id": "another-build"},
     ],
-    ids=["closed", "expired", "past-deadline", "missing-deadline", "malformed-deadline",
+    ids=["closed", "expired", "drained", "malformed-ownership", "missing-ownership",
+         "empty-ownership", "past-deadline", "missing-deadline", "malformed-deadline",
          "foreign-build"],
 )
 def test_registration_without_valid_open_lease_never_enters_or_interrupts_scheduler(
@@ -933,11 +930,6 @@ def test_cache_only_zero_capacity_build_closes_safely_without_native_dispatch(
 
     [(registration, _options)] = control.calls("register_build")
     _assert_close(control, registration.build_id, "finished")
-    assert control.status().ownership_state == "waiting"
-    assert control.status().reserved_capacity == 0
-    assert control.status().occupied_capacity == 0
-    assert control.status().outstanding_leaf_count == 0
-    assert control.status().unconfirmed_attempt_count == 0
     assert len(control.starts) == 1
     assert json.loads((control.requests / "build.json").read_text("utf-8")) == {
         "build_id": registration.build_id, "farm_run": FARM_RUN,

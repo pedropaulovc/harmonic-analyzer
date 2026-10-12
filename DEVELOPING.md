@@ -181,8 +181,9 @@ task still leaves the run nonzero.
 ### FIFO capacity reservations
 
 After successful preflight, the parent build creates a fresh timestamp-and-GUID
-`build_id`, ignoring any inherited `HARMONIC_FARM_BUILD_ID`, and registers with
-the protocol-6 singleton `solidworks-build-fifo-6` coordinator. After registration
+`build_id` (`YYYYMMDDTHHMMSS.ffffffZ-32hex`), ignoring any inherited
+`HARMONIC_FARM_BUILD_ID`, and registers with the protocol-6 singleton
+`solidworks-build-fifo-6` coordinator. After registration
 is acknowledged with an open, valid producer lease, its doit scheduler starts
 immediately, even with zero reserved capacity or ownership reported as waiting.
 Local/cache work and dependency preparation can progress in every build; native-ready
@@ -215,9 +216,10 @@ even if registration's reply was still uncertain, and restores the inherited
 build-ID environment. A producer whose registration was not acknowledged never
 enters the scheduler.
 
-Only the parent renews ownership, every 15 seconds on an independent background
-thread, while waiting and while active. Spawned action processes inherit
-`HARMONIC_FARM_BUILD_ID` but do not renew the lease. The coordinator's 120-second
+Only the parent renews its producer lease, every 15 seconds on an independent
+background thread, from acknowledged registration through closure. Renewal does
+not poll `build-status` or wait for capacity or exclusive ownership. Spawned action
+processes inherit `HARMONIC_FARM_BUILD_ID` but do not renew the lease. The coordinator's 120-second
 producer lease expires after a killed or disconnected parent. This 120-second
 lease is distinct from the 180-second idle-capacity transfer timer. Transient
 heartbeat RPC failures are retried only while the last acknowledged lease remains
@@ -474,9 +476,12 @@ from stale identity data. Corrupt or conflicting metadata may still make
   with `{build_id, farm_run}`; `_farm._dispatch` atomically writes one
   `{task, workflow_id, build_id, farm_run}` file before submitting a reservation
   (a failed write fails the leaf before submission). Status also reports
-  `build_id`, recovered from this record or the registration log and persisted
-  in the run record. Stopping the launcher can drop a logged request line but
-  cannot erase the durable request.
+  `build_id`, recovered from durable registration metadata or the registration
+  log and persisted in the run record. Native IDs encode their exact protocol-6
+  build scope and task directly; task parsing never needs registration metadata.
+  Before registration, a run has no `build_id` or native leaves and remains
+  inspectable. Stopping the launcher can drop a logged request line but cannot
+  erase the durable request.
 - **`-Watch`** is the required watcher for an agent-launched build. It prints a
   line per leaf state change (`requested`, `attached`, `succeeded`, `failed`,
   each with its workflow id — follow one leaf with `farm.py watch <id>`) and per
@@ -486,8 +491,7 @@ from stale identity data. Corrupt or conflicting metadata may still make
   (`LAUNCHER DIED` on the summary line), **22** cancelled. Run it under the
   same kind of persistent supervisor as the launch, with `progress: "wake"`.
 - **`-List`** prints one JSON line per run, newest first, filtered by `-Tag`,
-  `-State` and `-MaxAgeHours`. Both `-Status` and `-List` report `display_name`
-  as `null` for historical runs recorded before labels were required.
+  `-State` and `-MaxAgeHours`.
 - **`-Cancel -Why <reason>`** stops the launcher and every process it started,
   including a build a dead launcher left behind. The launcher joins a named
   Windows job object (`job` in the run record) before it starts anything, so
@@ -495,16 +499,15 @@ from stale identity data. Corrupt or conflicting metadata may still make
   not take its python with it, and a build whose launcher and uv are both gone
   has no parent chain back to the run. The job's name lives while a process
   holds a handle to it; the launcher's handle is inheritable, so uv, the venv
-  python and the build each hold one. A record from a launcher that predates
-  run jobs falls back to the parent chain (a process under a dead
-  launcher's PID counts only if its command line names the run: the recorded
-  build command, the run's snapshot — git worktree add/remove, submodule
-  update, uv sync — or its private uv staging environment).
+  python and the build each hold one. A process under a dead launcher's PID
+  counts only if its command line names the run: the recorded build command,
+  the run's snapshot — git worktree add/remove, submodule update, uv sync —
+  or its private uv staging environment.
   It rescans until a scan finds no process started since the last (at most
   10 rounds, else an error). Each process is stopped through a handle whose
   start time matches the scan's, so a PID reused after the scan is never
   killed, and a stopped process still running 60 s later is an error, since it
-  may still be dispatching. For protocol 6 it then closes producer ownership
+  may still be dispatching. It then closes registered producer ownership
   with `farm.py close-build <build_id> --reason cancelled`, blocking new
   admissions while retaining accepted reservations. It reconciles each request
   with `farm.py leaf-status --build-id <id> --workflow-id <wf> --json`.
@@ -516,14 +519,10 @@ from stale identity data. Corrupt or conflicting metadata may still make
   Status and cancellation of a bound leaf use `--run-id <run>` so a later
   execution with the same canonical workflow ID cannot be cancelled by mistake.
 
-  Protocol-6 cancellation trusts the validated coordinator binding for the
-  owning build and cancels only that exact run; `farm_run` is launcher metadata,
-  not an additional ownership or shared-execution gate. Historical records
-  without `build_id` retain creator-memo and sibling protections: a foreign
-  creator is `kept-foreign`, and a live sibling in the same `-LogDirectory`
-  waiting on a historical shared ID is `kept-shared`. Historical siblings are
-  checked immediately before cancellation; those outside the log directory
-  are not visible to this launcher.
+  Cancellation trusts the validated coordinator binding for the owning build
+  and cancels only that exact run; `farm_run` is launcher metadata, never an
+  ownership or shared-execution gate. There is no legacy shared-ID cancellation
+  path. A run stopped before registration has no native work to reconcile.
 
   The typed `missing_closed` coordinator reply is `settled-untracked`: producer
   ownership is fenced closed and no retained reservation remains to reconcile.
@@ -537,9 +536,6 @@ from stale identity data. Corrupt or conflicting metadata may still make
   not erase the request or infer drain from error text.
   A successful remote cancellation still does not prove native worker cleanup:
   capacity reassignment waits for the worker's physical-drain acknowledgement.
-  Historical runs without `build_id` retain the legacy settle query after
-  `-SettleSeconds` (30) and may report `not-found`; this is not a protocol-6
-  reservation outcome.
   If any leaf cannot be accounted for (`farm.py` failed on
   authentication, network or CLI), `-Cancel` exits 1 and changes nothing
   else: no `.done`, the snapshot kept, the run still `launcher-died`. Retry the
@@ -547,7 +543,8 @@ from stale identity data. Corrupt or conflicting metadata may still make
   outputs moved to `<run-id>.out`, snapshot removed — and writes `.done` with
   `state: "cancelled"`, `exit_code: null` and a `cancel` block recording who,
   why, the stopped PIDs and each workflow's outcome (`cancelled`,
-  `already-closed`, `settled-untracked`, `not-found`, `kept-shared`, `kept-foreign`). A cleanup
+  `already-closed`, `settled-untracked`). An unresolved or failed reconciliation
+  is reported without authorizing cleanup. A cleanup
   failure still writes `.done` (with `cleanup_errors`) and exits 1.
   On a run that already finished, `-Cancel` stops nothing and leaves `.done`
   as the launcher wrote it; it only cancels that run's leaves still

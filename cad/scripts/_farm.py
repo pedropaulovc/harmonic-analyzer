@@ -29,7 +29,6 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Literal
 from uuid import uuid4
 
 import _telemetry
@@ -51,6 +50,7 @@ DEFAULT_CONFIG_PATH = Path.home() / ".solidworks-pool" / "config.json"
 FIFO_HEARTBEAT_INTERVAL_S = 15
 FIFO_PRODUCER_LEASE_S = 120
 FIFO_RPC_TIMEOUT_S = 10
+FIFO_RPC_RETRY_INTERVAL_S = 1
 STATUS_POLL_INTERVAL_S = 1
 # Consecutive read-outage budget only; this never acknowledges producer ownership.
 FIFO_LEAF_STATUS_RETRY_S = 120
@@ -108,11 +108,6 @@ class CloseBuild:
 
 
 @dataclass(frozen=True)
-class BuildKey:
-    build_id: str
-
-
-@dataclass(frozen=True)
 class BuildStatus:
     build_id: str
     fifo_ordinal: int
@@ -154,12 +149,6 @@ class LeafAttempt:
 
 
 @dataclass(frozen=True)
-class AttemptAdmission:
-    state: Literal["admitted", "drained", "denied"]
-    reason: str | None
-
-
-@dataclass(frozen=True)
 class LeafStatus:
     key: LeafKey
     state: str
@@ -167,32 +156,6 @@ class LeafStatus:
     unconfirmed_attempts: list[LeafAttempt]
     error_code: str | None = None
     error: str | None = None
-
-
-@dataclass(frozen=True)
-class ConfirmAttemptDrained:
-    attempt: LeafAttempt
-    evidence: str
-
-
-@dataclass(frozen=True)
-class ConfirmReservationDrained:
-    key: LeafKey
-    evidence: str
-    run_id: str | None = None
-
-
-@dataclass(frozen=True)
-class FifoStatus:
-    active: list[BuildStatus]
-    waiting: list[BuildStatus]
-    draining: list[BuildStatus]
-    head_build_id: str | None
-    usable_capacity: int
-    occupied_capacity: int
-    reserved_idle_capacity: int
-    capacity_observed_at: str | None
-    capacity_error: str | None = None
 
 
 def clamp_leaf_timeout_s(requested: int | None) -> int:
@@ -653,7 +616,7 @@ class _ProducerBuild:
         if (
             status.build_id != self.build_id
             or status.producer_state != "open"
-            # Capacity and ownership state never gate an open producer's DAG.
+            or status.ownership_state not in {"waiting", "active"}
             or deadline.tzinfo is None
             or deadline <= datetime.now(timezone.utc)
         ):
@@ -684,7 +647,7 @@ class _ProducerBuild:
                     raise
                 remaining = self._lease_remaining()
                 if not self._stop.is_set():
-                    await asyncio.sleep(min(STATUS_POLL_INTERVAL_S, remaining))
+                    self._stop.wait(min(FIFO_RPC_RETRY_INTERVAL_S, remaining))
         return None
 
     async def _serve(self) -> None:
@@ -729,8 +692,13 @@ class _ProducerBuild:
                         break
                     self._accept_status(status, renewed=True)
                     heartbeat_due = time.monotonic() + FIFO_HEARTBEAT_INTERVAL_S
-                await asyncio.sleep(
-                    min(STATUS_POLL_INTERVAL_S, self._lease_remaining())
+                # This loop owns its dedicated thread. Wait for the next
+                # renewal (or lease expiry), waking immediately on producer close.
+                self._stop.wait(
+                    min(
+                        max(0, heartbeat_due - time.monotonic()),
+                        self._lease_remaining(),
+                    )
                 )
         except BaseException as exc:
             self._reason = "failed"
