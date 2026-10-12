@@ -45,9 +45,7 @@ from _drawing_common import (
     scan_view_edges,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
-    view_name,
 )
 from _drawing_leaders import (
     assert_leaders_clear,
@@ -61,7 +59,6 @@ from _gear_drawing_entities import visible_circle_edge
 from _layout_geometry import Box, estimate_text_box
 from _section_axis import position_section_caption
 from _surface_finish import surface_finish_by_key
-from draw_dt_cone_pivot_post_tl_cap_jaw_button import _move_dimension
 from mg_magnifying_wheel_geom import (
     HUB_BACK_Z,
     HUB_FRONT_Z,
@@ -90,12 +87,7 @@ from mg_magnifying_wheel_spec import (
 from mg_wheel_axle_spec import PIN_DIA, PIN_DIA_TOL
 from mg_wheel_drum_geom import DRUM_BORE, DRUM_BORE_BAND
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import (
-    delete_view,
-    dimension_name,
-    iter_views,
-    place_view,
-)
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_wheel"]
@@ -383,23 +375,11 @@ SECTION_KEEP = {
     # the rim's front corner, so the Ø97.6's extension line, which leaves the
     # groove bottom leftward, runs nowhere near its arrow.
     "GrooveR": (SECTION_CENTER[0] + 0.020, SECTION_CENTER[1] + 0.060),
-}
-# The rim-bore round's R cannot import into A-A: SolidWorks hangs a fillet's
-# radius on an edge that shows the round's arc, and on the Right plane the
-# arc is the torus's silhouette, which the cut replaces with its own section
-# edge (round-12 farm leaf: RimRounds selected for A-A delivered nothing; the
-# face view never selects it).  The retired side view drew that silhouette as
-# a hidden line and took the R, so a hidden-line *Right donor imports it and
-# DragModelDimension carries it onto A-A (the cap jaw button's diameter
-# donor), and the donor is deleted.  Its callout stands right, between the
-# spigot's finish and the groove's R, its shoulder 10 mm under the rim bore:
-# the Ø97.6 holds the left (run 8 hung it there).
-ROUND_ON_SECTION = {
+    # The rim-bore round's callout right, between the spigot's finish and the
+    # groove's R, its shoulder 10 mm under the rim bore: the Ø97.6 holds the
+    # left (run 8 hung it there).
     "CastRoundR": (SECTION_CENTER[0] + 0.0292, SECTION_CENTER[1] + 0.0413),
 }
-# Right of the isometric, inside the border; deleted once the R has moved.
-ROUND_DONOR_CENTER = (0.405, 0.170)
-_ROUND_DONOR_KEEP = {"CastRoundR": (ROUND_DONOR_CENTER[0], 0.240)}
 
 
 def _band_mm(low: float, high: float) -> str:
@@ -690,35 +670,6 @@ def _assert_face_leaders_clear(
     )
 
 
-def _carry_round_onto_section(adapter: Any, section: Any) -> Any:
-    """Import the rim-bore round's R through a hidden-line *Right donor, move
-    it onto A-A and delete the donor (ROUND_ON_SECTION says why); fails loud
-    if the donor does not take it or A-A refuses it."""
-    donor = place_view(
-        adapter, str(SOURCE), "*Right", *ROUND_DONOR_CENTER, scale=(1, 1)
-    )
-    set_hidden_lines_visible(adapter, donor)
-    (donated,) = curate_view_dimensions(
-        adapter,
-        donor,
-        keep=_ROUND_DONOR_KEEP,
-        view_label="rim-round donor",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    moved = _move_dimension(
-        adapter,
-        donated,
-        section,
-        ROUND_ON_SECTION["CastRoundR"],
-        source_view=donor,
-    )
-    donor_name = view_name(adapter, donor)
-    delete_view(adapter, donor)
-    if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
-        raise RuntimeError("failed to delete the rim-round donor view")
-    return moved
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -794,7 +745,6 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label="section",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
-        _carry_round_onto_section(adapter, section),
     ]
     # Decimal places (and so the general-tolerance row each dimension claims)
     # are authored on the part; the sheet only proves the import kept them.

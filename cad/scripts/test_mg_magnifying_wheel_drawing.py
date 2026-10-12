@@ -39,11 +39,9 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is mg_magnifying_wheel_spec.DRAWING_DIMENSIONS
     marked = set().union(*mg_magnifying_wheel_spec.DRAWING_DIMENSIONS.values())
-    placed = (drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.ROUND_ON_SECTION)
-    kept = set().union(*placed)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
     assert kept == marked
-    assert sum(len(keep) for keep in placed) == len(kept)
-    assert set(drawing._ROUND_DONOR_KEEP) == set(drawing.ROUND_ON_SECTION)
+    assert not set(drawing.FRONT_KEEP) & set(drawing.SECTION_KEEP)
     assert set(drawing.DIMENSION_CALLOUTS) | set(drawing.CALLOUTS_ABOVE) <= kept
 
 
