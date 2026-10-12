@@ -1,11 +1,12 @@
 """Test-only: run a real PD ``build`` offline with its seat helpers stubbed.
 
 The general form of ``_stubbed_build`` in ``test_dt_cone_gear_shaft_drawing``:
-every helper a module imports from a seat-touching module, and every local
-coroutine or adapter-first function, is replaced by a recording mock attached
-to one parent, so ``seat.mock_calls`` is the build's seat traffic in order.
-Pure modules (specs, geometry, gear maths, adapter parameter types) stay real,
-as do the local functions a test names in ``keep``.
+every helper a module imports from a seat-touching module, its own coroutines
+and COM-first functions, and a pure module's coroutines and adapter-first
+functions are replaced by recording mocks attached to one parent, so
+``seat.mock_calls`` is the build's seat traffic in order.  Pure modules
+(specs, geometry, gear maths, adapter parameter types) otherwise stay real,
+as do the functions a test names in ``keep``.
 """
 
 from __future__ import annotations
@@ -46,22 +47,28 @@ def _pure(value: Any) -> bool:
     )
 
 
-def _takes_seat(value: Any) -> bool:
+def _takes_seat(value: Any, parameters: frozenset[str] = _SEAT_PARAMETERS) -> bool:
     try:
-        parameters = list(inspect.signature(value).parameters)
+        names = list(inspect.signature(value).parameters)
     except (TypeError, ValueError):
         return False
-    return bool(parameters) and parameters[0] in _SEAT_PARAMETERS
+    return bool(names) and names[0] in parameters
 
 
 def stub_seat(
-    monkeypatch: pytest.MonkeyPatch, module: ModuleType, *, keep: Iterable[str] = ("build",)
+    monkeypatch: pytest.MonkeyPatch,
+    module: ModuleType,
+    *,
+    keep: Iterable[str] = ("build",),
+    spy: Iterable[str] = (),
 ) -> MagicMock:
     """Stub ``module``'s seat helpers; return the parent recording them in order.
 
-    ``add_line_chain`` answers one line name per segment, as on a seat.
+    Each name in ``spy`` keeps its real body but is recorded in that order
+    too.  ``add_line_chain`` answers one line name per segment, as on a seat.
     """
     kept = set(keep)
+    spied = set(spy)
     seat = MagicMock()
     stubbed: set[str] = set()
     for name, value in list(vars(module).items()):
@@ -69,15 +76,23 @@ def stub_seat(
             continue
         if not (inspect.isfunction(value) or inspect.isclass(value)):
             continue
-        local = getattr(value, "__module__", "") == module.__name__
-        if local and not (inspect.iscoroutinefunction(value) or _takes_seat(value)):
-            continue
-        if not local and _pure(value):
-            continue
-        stub = AsyncMock() if inspect.iscoroutinefunction(value) else MagicMock()
+        mock = AsyncMock if inspect.iscoroutinefunction(value) else MagicMock
+        if name in spied:
+            stub = mock(side_effect=value)
+        else:
+            local = getattr(value, "__module__", "") == module.__name__
+            if local or not _pure(value):
+                seat_shaped = not local or inspect.iscoroutinefunction(value) or _takes_seat(value)
+            else:  # a pure module's own seat helpers (``_gear.pattern_about_z``)
+                seat_shaped = inspect.iscoroutinefunction(value) or _takes_seat(value, frozenset({"adapter"}))
+            if not seat_shaped:
+                continue
+            stub = mock()
+            stubbed.add(name)
         monkeypatch.setattr(module, name, stub)
         seat.attach_mock(stub, name)
-        stubbed.add(name)
+    if spied - set(vars(module)):
+        raise AttributeError(f"{module.__name__} has no {sorted(spied - set(vars(module)))}")
     if "add_line_chain" in stubbed:
         seat.add_line_chain.side_effect = lambda _adapter, points, close=True: [
             f"Line{k}" for k in range(len(points) if close else len(points) - 1)

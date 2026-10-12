@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import math
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -19,6 +21,7 @@ from _drawing_contract import (
     PRECISION_MIGRATED_DRAWINGS,
     drawing_specification_violations,
 )
+from _test_stubbed_build import offline_adapter, stub_seat
 from _drawing_registry import DrawingLayout
 from _printed_tolerance import printed_band_mm
 from pd_platen_spec import PLATE_WIDTH
@@ -112,6 +115,105 @@ def test_composite_sizes_have_native_controls_and_stock_references() -> None:
 def test_the_retired_first_gap_witness_is_neither_dimensioned_nor_kept() -> None:
     assert "FirstGap" not in spec.DRAWING_NOMINALS_MM
     assert "FirstGap" not in drawing.FRONT_KEEP
+
+
+_SOLID_FEATURES = (
+    "create_extrusion", "create_cut_extrude", "create_plane", "create_revolve",
+    "linear_pattern_feature",
+)
+
+
+def test_end_and_overall_witnesses_carry_the_sheet_sizes_and_add_no_solid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The real _drawing_witnesses, seat stubbed: the end-stock rectangle and
+    # the overall-height line are sketches whose dimensions are the ones the
+    # sheet imports, named on their features, then blanked; nothing solid.
+    seat = stub_seat(monkeypatch, builder, keep=("_drawing_witnesses",))
+    sketches: list = []
+
+    class Dims:
+        def __init__(self) -> None:
+            self.names: list[str] = []
+            self.feature = None
+            sketches.append(self)
+
+        def record(self, name, _drive=None) -> None:
+            self.names.append(name)
+
+        def apply(self, _adapter, feature):
+            self.feature = feature
+            return []
+
+    monkeypatch.setattr(builder, "SketchDims", Dims)
+    seat.define_rectilinear_chain.side_effect = (
+        lambda *_args, dims, names, **_kwargs: dims.names.extend(names)
+    )
+    seat.name_last_feature.side_effect = lambda _adapter, name: name
+    adapter = offline_adapter()
+    asyncio.run(builder._drawing_witnesses(adapter))
+
+    witnesses = ("EndStockProfile", "OverallHeightReference")
+    assert {sketch.feature: set(sketch.names) for sketch in sketches} == {
+        feature: set(spec.DRAWING_DIMENSIONS[feature]) for feature in witnesses
+    }
+    (between,) = seat.dimension_between.call_args_list
+    start, end = between.args[1:3]
+    assert start.endswith(".start") and end == start.removesuffix(".start") + ".end"
+    assert between.args[3:5] == ("vertical_distance", builder.BAR_HEIGHT)
+    names = [name for name, _args, _kwargs in seat.mock_calls]
+    (blanked,) = seat.blank_reference_sketches.call_args_list
+    assert set(blanked.args[1]) == set(witnesses)
+    named = [
+        args[1] for name, args, _kwargs in seat.mock_calls if name == "name_last_feature"
+    ]
+    assert named == list(witnesses)
+    assert names.index("blank_reference_sketches") > max(
+        k for k, name in enumerate(names) if name == "name_last_feature"
+    )
+    for method in _SOLID_FEATURES:
+        getattr(adapter, method).assert_not_awaited()
+
+
+def test_build_marks_the_sheet_dimensions_and_saves_a_simplified_plain_bar(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seat = stub_seat(monkeypatch, builder)
+    seat.name_last_feature.side_effect = lambda _adapter, name: name
+    seat._named_dimension.side_effect = lambda *_args: (MagicMock(), MagicMock())
+    adapter = offline_adapter()
+    seat.attach_mock(adapter, "adapter")
+    saved = asyncio.run(builder.build(adapter))
+
+    calls = seat.mock_calls
+    names = [name for name, _args, _kwargs in calls]
+
+    def named_after(method: str) -> str:
+        at = len(names) - 1 - names[::-1].index(f"adapter.{method}")
+        return next(args[1] for name, args, _ in calls[at:] if name == "name_last_feature")
+
+    # The witnesses follow the patterned teeth; the driven model is re-checked.
+    assert names.index("_drawing_witnesses") > names.index("adapter.linear_pattern_feature")
+    last_rebuild = len(names) - 1 - names[::-1].index("force_rebuild")
+    assert "volume_check" in names[last_rebuild:]
+    # Drawing precision, then a clean slate, then exactly the sheet's marks.
+    precision = names.index("apply_drawing_precision")
+    cleared = names.index("clear_dimensions_for_drawing")
+    marks = [k for k, name in enumerate(names) if name == "mark_dimensions_for_drawing"]
+    assert precision < cleared < min(marks)
+    assert {
+        (calls[k].args[1], frozenset(calls[k].args[2])) for k in marks
+    } == {
+        (feature, frozenset(dimensions))
+        for feature, dimensions in spec.DRAWING_DIMENSIONS.items()
+    }
+    # The simplified configuration suppresses the seed gap and its pattern.
+    (simplified,) = seat.save_simplified_part.await_args_list
+    assert simplified.args[1] == builder.PART_NAME
+    assert tuple(simplified.args[2]) == (
+        named_after("create_cut_extrude"), named_after("linear_pattern_feature")
+    )
+    assert saved is seat.save_simplified_part.return_value
 
 
 def test_sheet_has_aligned_clean_views_and_a_legible_stepped_end() -> None:

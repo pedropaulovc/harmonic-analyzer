@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import importlib
 import inspect
 import math
 from dataclasses import replace
@@ -24,6 +26,7 @@ from _drawing_contract import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from paper_drive_stock_inspection import span_contact_points_mm, toothspace_gauge_contact_mm
 from stock_form_cutter import CutterTemplate, StockFormProfile, translation_for_tangent_span
+from _test_stubbed_build import offline_adapter, stub_seat
 
 
 F_MACHINE_Z = -148.1
@@ -778,3 +781,149 @@ def test_neck_detail_fails_loud_when_the_crop_takes_a_dimension(monkeypatch) -> 
     with pytest.raises(RuntimeError, match=r"lost \['FrontReliefDia'\] to its crop"):
         drawing._dimension_then_crop_detail(object(), view)
     assert events[0][1]["lost"] == "FrontReliefDia"
+
+
+# The stock-gear part builds, run offline with their seat stubbed
+# (_test_stubbed_build): what each authors, in what order, checked on the
+# recorded calls of the real functions.
+
+
+@pytest.mark.parametrize(
+    ("module_name", "volume_check", "pattern"),
+    [
+        ("build_pd_transgear_knob_shaft", "_native_volume_check", "pattern_stock_feature"),
+        ("build_pd_transgear_feed_pinion", "check_one_solid_body_volume", "pattern_about_z"),
+    ],
+)
+def test_straight_stock_pass_bosses_the_blank_then_cuts_one_patterned_gap(
+    monkeypatch: pytest.MonkeyPatch, module_name: str, volume_check: str, pattern: str
+) -> None:
+    module = importlib.import_module(module_name)
+    seat = stub_seat(monkeypatch, module, keep=("_straight_stock_gaps",))
+    seat.placed_ground_curve.side_effect = (
+        lambda _adapter, _segment, _phase: f"Curve{seat.placed_ground_curve.call_count}"
+    )
+    seat.name_last_feature.side_effect = lambda _adapter, name: name
+    adapter = offline_adapter()
+    seat.attach_mock(adapter, "adapter")
+    asyncio.run(module._straight_stock_gaps(adapter, []))
+
+    watched = {
+        "ensure_fully_defined", "adapter.exit_sketch", "adapter.create_extrusion",
+        "adapter.create_cut_extrude", volume_check, "placed_ground_curve", pattern,
+    }
+    order = [name for name, _args, _kwargs in seat.mock_calls if name in watched]
+    order = [name for k, name in enumerate(order) if k == 0 or name != order[k - 1]]
+    assert order == [
+        "ensure_fully_defined", "adapter.exit_sketch", "adapter.create_extrusion",
+        volume_check,
+        "placed_ground_curve", "ensure_fully_defined", "adapter.exit_sketch",
+        "adapter.create_cut_extrude", volume_check,
+        pattern, volume_check,
+    ]
+    # The gap is the stock profile's native segments in cut order, each
+    # FIXed as created, at clearance past the blank.
+    profile = module.STOCK_PROFILE
+    segments = [placed.args[1] for placed in seat.placed_ground_curve.call_args_list]
+    assert segments == list(
+        profile.cut_order_native_segments(clearance_radius_mm=profile.blank_radius_mm + 1.0)
+    )
+    curves = [f"Curve{k}" for k in range(1, len(segments) + 1)]
+    assert seat.ensure_fully_defined.call_args_list[1].kwargs["fix_entities"] == curves
+    # A blind boss of the face width, then a blind cut of the full depth:
+    # one direction, solid, merged, each result checked.
+    boss = adapter.create_extrusion.await_args.args[0]
+    cut = adapter.create_cut_extrude.await_args.args[0]
+    assert (boss.depth, cut.depth) == (module.FACE_WIDTH, module.FULL_DEPTH)
+    for feature in (boss, cut):
+        assert feature.end_condition == "Blind"
+        assert not (feature.reverse_direction or feature.both_directions or feature.thin_feature)
+        assert feature.merge_result
+    checked = [id(call.args[1]) for call in seat.check.call_args_list]
+    assert id(adapter.create_extrusion.return_value) in checked
+    assert id(adapter.create_cut_extrude.return_value) in checked
+    # One pattern of the cut gap seed, one instance per tooth.
+    names = [name for name, _args, _kwargs in seat.mock_calls]
+    cut_at = names.index("adapter.create_cut_extrude")
+    seed = next(
+        args[1] for name, args, _kwargs in seat.mock_calls[cut_at:]
+        if name == "name_last_feature"
+    )
+    (patterned,) = getattr(seat, pattern).call_args_list
+    assert patterned.args[1] == seed
+    assert patterned.args[2] == module.TEETH
+
+
+def test_neck_corners_are_equal_tangent_quarter_arcs_with_a_radial_size(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seat = stub_seat(monkeypatch, part, keep=("_stud_profile",))
+    arcs: list[tuple[str, tuple[float, ...]]] = []
+
+    def native_arc(_adapter, _label, *points):
+        arcs.append((f"Arc{len(arcs) + 1}", points))
+        return arcs[-1][0]
+
+    seat._native_arc.side_effect = native_arc
+    adapter = offline_adapter()
+    asyncio.run(part._stud_profile(adapter))
+
+    radius = part.FRONT_CORNER_RADIUS
+    assert len(arcs) == 2
+    for _name, (cx, cy, sx, sy, ex, ey) in arcs:
+        assert math.dist((cx, cy), (sx, sy)) == pytest.approx(radius)
+        assert math.dist((cx, cy), (ex, ey)) == pytest.approx(radius)
+        assert math.dist((sx, sy), (ex, ey)) == pytest.approx(radius * math.sqrt(2.0))
+        assert min(sy, ey) == pytest.approx(part._R_NECK)
+    front, core = (name for name, _points in arcs)
+    constraints = [call.args for call in adapter.add_sketch_constraint.await_args_list]
+    for arc in (front, core):
+        assert sum(1 for c in constraints if arc in c[:2] and c[2] == "tangent") == 2
+    assert (front, core, "equal") in constraints
+    dimensions = [call.args for call in adapter.add_sketch_dimension.await_args_list]
+    assert (front, None, "radial", radius) in dimensions
+
+
+def test_cutter_end_is_authored_after_the_turned_profiles_within_its_volume_bounds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seat = stub_seat(
+        monkeypatch, part, spy=("_stud_profile", "_journal_profile", "_stock_cutter_endcut")
+    )
+    seat._straight_stock_gaps.return_value = part.ToothedDisc(
+        1000.0, ("StraightToothGap", "StraightToothPattern")
+    )
+    seat._cut_core_flat.side_effect = lambda _adapter, _jobs, volume: volume
+    seat._native_volume_check.side_effect = (
+        lambda _adapter, _label, lower, upper, _allowance: (lower + upper) / 2.0
+    )
+    seat._native_arc.side_effect = lambda _adapter, label, *_points: label
+    endcut = SimpleNamespace(plane="ToolEndPlane", cut="ToolEndCut")
+    seat.author_cutter_endcut.return_value = endcut
+    adapter = offline_adapter()
+    asyncio.run(part.build(adapter))
+
+    names = [name for name, _args, _kwargs in seat.mock_calls]
+    authored = names.index("author_cutter_endcut")
+    assert names.index("_stud_profile") < authored
+    assert names.index("_journal_profile") < authored
+    assert seat.author_cutter_endcut.await_args.args[1:] == (
+        part.STOCK_PROFILE, part.CUTTER_DIA, part.FULL_DEPTH
+    )
+    # The seed removes one tooth's end and the pattern TEETH of them, each
+    # within the spec's resolved removal bounds of the volume before it.
+    lower, upper = spec.endcut_volume_bounds_mm3()
+    before = seat._stock_cutter_endcut.call_args.args[1]
+    checks = [
+        args[2:4] for name, args, _kwargs in seat.mock_calls[authored:]
+        if name == "_native_volume_check"
+    ]
+    assert checks[0] == pytest.approx((before - upper, before - lower))
+    assert checks[1] == pytest.approx(
+        (before - part.TEETH * upper, before - part.TEETH * lower)
+    )
+    (patterned,) = [
+        args for name, args, _kwargs in seat.mock_calls[authored:]
+        if name == "pattern_stock_feature"
+    ]
+    assert patterned[1:3] == (endcut.cut, part.TEETH)
