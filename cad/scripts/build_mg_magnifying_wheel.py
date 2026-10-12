@@ -543,8 +543,8 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "bore", volume - V_BORE, 0.02 * V_BORE)
 
     # Cast fillets where each spoke side meets the boss (R3) and the rim (R4),
-    # picked mid-height on every junction edge; then the R1 rounds on the rim
-    # bore's two edges, picked between the 0 and 60 deg spokes.
+    # picked mid-height on every junction edge; then the R0.80 rounds on the
+    # rim bore's two edges, picked between the 0 and 60 deg spokes.
     await _fillet(
         adapter, HUB_FILLET_R, _spoke_edge_picks(_HUB_R), "HubFillets", "HubFilletR"
     )

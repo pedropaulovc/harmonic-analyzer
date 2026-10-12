@@ -395,7 +395,10 @@ SECTION_KEEP = {
 # a fillet radius whose arc IS the cut (round-12 farm leaves: neither the
 # targeted import nor DragModelDimension landed CastRoundR there).  It takes
 # the arc at the rim's front (sheet-right, model -Z) top corner, the circle's
-# centre one R in from the bore and the side face, normal to the cut plane.
+# centre one R in from the bore and the side face.  A cut-face arc lies in
+# the cut plane, so its axis is the cut's normal (model X); the round's
+# tangent circles beyond the cut keep the wheel's Z (run 13's scan read the
+# r = 44.8 one so), and the axis keeps the pick off them.
 # Its callout stands right, between the spigot's finish and the groove's R,
 # its shoulder 10 mm under the rim bore: the Ø97.6 holds the left.
 _ROUND_ARC_CENTER = (
@@ -444,11 +447,20 @@ CALLOUTS_ABOVE = {
 # the title block.
 NOTES_XY = (0.020, 0.062)
 
-# The rim's axial width spans its two OD corner circles (r = RIM_OUTER_DIA/2 at
-# z = +/-RIM_AXIAL/2; the rim is extruded both ways off the mid-plane). Edge-on
-# in the section each is a vertical line beyond the cut, picked as a native
-# entity.
-_RIM_AXIS = (0.0, 0.0, 1.0)
+# The rim's axial width spans its two side faces where A-A cuts them: at the
+# rim's top each is a straight cut-face line at z = +/-RIM_AXIAL/2, running
+# from the rim-bore round's tangent (r = RIM_INNER_DIA/2 + CAST_ROUND_R) to
+# the OD, picked through its midpoint as a native entity.  Farm run 13
+# (c09670314) found no OD corner circle (r = 50, z = +/-4) in the section's
+# scan: edge-on, each lies under the cut face's boundary and the round's
+# tangent circle, which A-A draws instead.  The OD is no single line to
+# measure either: the groove splits it into two lands.
+_RIM_SIDE_Y = (RIM_INNER_DIA / 2.0 + CAST_ROUND_R + RIM_OUTER_DIA / 2.0) / 2.0
+_RIM_SIDE_POINTS = tuple(
+    (0.0, _RIM_SIDE_Y, z) for z in (RIM_AXIAL / 2.0, -RIM_AXIAL / 2.0)
+)
+# A failed section pick names every scanned edge passing this near its point.
+_PICK_INVENTORY_MM = 6.0
 # The bore's finish symbol stands outside the OD up the 0-60 window, 45 deg,
 # between the R3's shoulder and the Ø88's text; its leader lands on the bore
 # on that bearing, right of the A-A line.
@@ -695,6 +707,54 @@ def _assert_face_leaders_clear(
     )
 
 
+def _mm(values: Any) -> str:
+    return "(" + ", ".join(f"{value:.3f}" for value in values) + ")"
+
+
+def _edge_inventory(edges: ViewEdges, point_mm: tuple[float, float, float]) -> str:
+    """Every scanned line and circle passing within _PICK_INVENTORY_MM of
+    ``point_mm`` (model mm; a circle by its full curve), so a missed section
+    pick names what the scan does hold there."""
+    rows = []
+    for item in edges.edges:
+        if item.line is not None:
+            start, end = item.line
+            vector = [b - a for a, b in zip(start, end)]
+            length_sq = sum(value * value for value in vector)
+            t = 0.0
+            if length_sq > 0.0:
+                along = sum((p - a) * v for p, a, v in zip(point_mm, start, vector))
+                t = min(1.0, max(0.0, along / length_sq))
+            reach = math.dist(point_mm, [a + t * v for a, v in zip(start, vector)])
+            text = f"line {_mm(start)}-{_mm(end)}"
+        elif item.circle is not None:
+            cx, cy, cz, nx, ny, nz, radius = item.circle
+            offset = [p - c for p, c in zip(point_mm, (cx, cy, cz))]
+            height = sum(o * n for o, n in zip(offset, (nx, ny, nz)))
+            in_plane = math.sqrt(max(sum(o * o for o in offset) - height**2, 0.0))
+            reach = math.hypot(height, in_plane - radius)
+            text = f"circle c={_mm((cx, cy, cz))} n={_mm((nx, ny, nz))} r={radius:.3f}"
+        else:
+            continue
+        if reach <= _PICK_INVENTORY_MM:
+            rows.append(f"{text} {reach:.2f} off")
+    return (
+        f"{len(rows)} of {len(edges.edges)} scanned edges within "
+        f"{_PICK_INVENTORY_MM:g} mm of {_mm(point_mm)}: {'; '.join(rows) or 'none'}"
+    )
+
+
+def _line_through(
+    edges: ViewEdges, point_mm: tuple[float, float, float], *, label: str
+) -> Any:
+    """The section's cut-face line through ``point_mm``, its edge inventory
+    on a miss."""
+    try:
+        return edges.exact_line_through(point_mm, label=label).edge
+    except RuntimeError as error:
+        raise RuntimeError(f"{error}; {_edge_inventory(edges, point_mm)}") from error
+
+
 def _add_round_radius(adapter: Any, section: Any, edges: ViewEdges) -> Any:
     """Dimension the rim-bore round on its A-A cut arc (the T rail root radius
     pattern of draw_fr_top_frame) and return its annotation.
@@ -706,9 +766,13 @@ def _add_round_radius(adapter: Any, section: Any, edges: ViewEdges) -> Any:
     .XXX row, which ``TIE2_FACE_WALL`` is proved against.
     """
     label = "rim bore round"
-    arc = edges.circle_at(
-        _ROUND_ARC_CENTER, CAST_ROUND_R, axis=_CUT_NORMAL, label=label
-    ).edge
+    try:
+        arc = edges.circle_at(
+            _ROUND_ARC_CENTER, CAST_ROUND_R, axis=_CUT_NORMAL, label=label
+        ).edge
+    except RuntimeError as error:
+        inventory = _edge_inventory(edges, _ROUND_ARC_CENTER)
+        raise RuntimeError(f"{error}; {inventory}") from error
     draw = adapter.currentModel
     _select_view_entity(adapter, section, "EDGE", None, label=label, entity=arc)
     display = draw.AddRadialDimension2(*ROUND_TEXT_XY, 0.0)
@@ -847,31 +911,25 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _assert_face_leaders_clear(adapter, front, annotations, bore_finish, axis=axis)
 
-    # The rim's axial width across the section, its text left of the rim's
-    # back face on its own row (above). The two OD corner circles are
-    # selected as native entities: a coordinate hit-test at the corner where
-    # each edge-on circle ends on the OD silhouette found no edge on farm run
-    # 4 (85a5d462d).  One sweep serves them and the spigot's cut line.
+    # The rim's axial width across the section between its side faces' cut
+    # lines (_RIM_SIDE_POINTS), its text left of the rim's back face on its
+    # own row (above).  Each line is selected as a native entity: a
+    # coordinate hit-test found no edge on farm run 4 (85a5d462d).  One sweep
+    # serves them, the spigot's cut line and the rim-bore round's arc.
     section_edges = scan_view_edges(section, label="wheel section edges")
-    rim_corners = tuple(
-        section_edges.circle_at(
-            (0.0, 0.0, z),
-            RIM_OUTER_DIA / 2.0,
-            axis=_RIM_AXIS,
-            label=f"rim OD corner at z={z:+g}",
-        ).edge
-        for z in (RIM_AXIAL / 2.0, -RIM_AXIAL / 2.0)
+    rim_sides = tuple(
+        _line_through(section_edges, point, label=f"rim side cut line z={point[2]:+g}")
+        for point in _RIM_SIDE_POINTS
     )
     rim_back, rim_front, spigot_landing = model_points_in_view(
         adapter,
         section,
-        (
-            (0.0, RIM_OUTER_DIA / 2000.0, RIM_AXIAL / 2000.0),
-            (0.0, RIM_OUTER_DIA / 2000.0, -RIM_AXIAL / 2000.0),
-            tuple(value / 1000.0 for value in _SPIGOT_FINISH_POINT),
+        tuple(
+            tuple(value / 1000.0 for value in point)
+            for point in (*_RIM_SIDE_POINTS, _SPIGOT_FINISH_POINT)
         ),
         label="wheel section picks",
-        names=("rim back corner", "rim front corner", "spigot finish landing"),
+        names=("rim back side", "rim front side", "spigot finish landing"),
     )
     rim_width = add_edge_dimension(
         adapter,
@@ -883,21 +941,21 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         label="rim axial width",
         orientation="horizontal",
-        entities=rim_corners,
+        entities=rim_sides,
     )
     assert_dimension_measures(
         adapter,
         rim_width,
         expected_mm=RIM_AXIAL,
         label="rim axial width",
-        entities=rim_corners,
+        entities=rim_sides,
     )
     add_surface_finish(
         adapter,
         section,
-        edge_entity=section_edges.exact_line_through(
-            _SPIGOT_FINISH_POINT, label="spigot upper cut line"
-        ).edge,
+        edge_entity=_line_through(
+            section_edges, _SPIGOT_FINISH_POINT, label="spigot upper cut line"
+        ),
         symbol_xy=(
             spigot_landing[0] + _SPIGOT_FINISH_OFFSET[0],
             spigot_landing[1] + _SPIGOT_FINISH_OFFSET[1],
