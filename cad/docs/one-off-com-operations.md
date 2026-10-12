@@ -102,6 +102,15 @@ or lease expiry releases idle reservations but preserves accepted work and
 physical-drain obligations. Protocol 6 requires paired producer/pool/worker
 deployment to an idle, physically drained fleet; protocol-5 coordinator state
 is not replayed into the new protocol-6 singleton.
+The coordinator and leaf workflow types are versioned as `BuildFifo6` and
+`BuildLeaf6`, without legacy aliases. Fresh protocol-6 histories cannot execute
+on an old controller, even though the control queue is unchanged. Before any
+registration or leaf submission/observation, the producer describes the current
+`solidworks-build-fifo-6` coordinator under its RPC deadline and requires
+`BuildFifo6`; a wrong-type existing ID is refused without updating, terminating
+or replaying it. Do not invoke an old coordinator with new tools. This check
+also protects direct API callers, but does not replace CLI preflight or the
+coordinated idle-fleet cutover.
 
 Old-protocol native logs are unsupported by the new launcher. Finish or cancel
 their runs with matched old tools **before** that coordinated idle-fleet

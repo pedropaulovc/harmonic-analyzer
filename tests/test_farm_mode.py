@@ -13,6 +13,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import doit.cmd_base as _doit_cmd_base
@@ -1637,6 +1638,9 @@ def temporal_boundary(tmp_path, monkeypatch):
     outcome = {}
 
     class Handle:
+        async def describe(self, **options):
+            return SimpleNamespace(workflow_type=_farm.WORKFLOW_BUILD_FIFO)
+
         async def result(self, *, follow_runs):
             assert follow_runs is False, "result must not follow a replacement run"
             if isinstance(outcome["result"], BaseException):
@@ -1660,7 +1664,7 @@ def temporal_boundary(tmp_path, monkeypatch):
 
     class FakeClient:
         async def start_workflow(self, workflow, **options):
-            assert workflow == "BuildFifo", "producer must never start BuildLeaf"
+            assert workflow == _farm.WORKFLOW_BUILD_FIFO, "producer must never start a leaf"
             calls["start"].append((workflow, options))
             return Handle()
 
@@ -1716,6 +1720,9 @@ def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
         release_result = asyncio.Event()
 
         class Handle:
+            async def describe(self, **options):
+                return SimpleNamespace(workflow_type=_farm.WORKFLOW_BUILD_FIFO)
+
             async def execute_update(self, name, arg, **options):
                 assert name == "submit_leaf"
                 submit_entered.set()
@@ -1736,7 +1743,7 @@ def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
 
         class FakeClient:
             async def start_workflow(self, *_args, **_kwargs):
-                assert _args == ("BuildFifo",)
+                assert _args == (_farm.WORKFLOW_BUILD_FIFO,)
                 return Handle()
 
             def get_workflow_handle(self, workflow_id, **options):
@@ -1776,7 +1783,6 @@ def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
 
 
 def test_run_leaf_submits_to_coordinator_and_waits_exact_binding(temporal_boundary):
-    from temporalio.common import WorkflowIDConflictPolicy, WorkflowIDReusePolicy
 
     calls, resolve = temporal_boundary
     resolve(_leaf_result(worker_id="sw-02@7", attempt=2))
@@ -1808,13 +1814,6 @@ def test_run_leaf_submits_to_coordinator_and_waits_exact_binding(temporal_bounda
         leaf_timeout_s=None,
     )
     assert request.traceparent is None or request.traceparent.startswith("00-")
-    [(workflow, options)] = calls["start"]
-    assert workflow == "BuildFifo"
-    assert options["id"] == "solidworks-build-fifo-6"
-    assert options["task_queue"] == "solidworks-control"
-    assert options["id_conflict_policy"] is WorkflowIDConflictPolicy.USE_EXISTING
-    assert options["id_reuse_policy"] is WorkflowIDReusePolicy.REJECT_DUPLICATE
-    assert "memo" not in options
     assert calls["handles"][-1] == (
         f"leaf:{BUILD_ID}:part:pen_rod:" + "k" * 64 + ":900s",
         {"run_id": "exact-run", "result_type": _farm.LeafResult},

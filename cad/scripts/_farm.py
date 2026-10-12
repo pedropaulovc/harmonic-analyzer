@@ -39,8 +39,8 @@ FARM_PROTOCOL_VERSION = 6
 
 TASK_QUEUE_CONTROL = "solidworks-control"  # coordinator and BuildLeaf workflows
 TASK_QUEUE_COM = "solidworks-com"  # build_leaf activity tasks
-WORKFLOW_BUILD_LEAF = "BuildLeaf"
-WORKFLOW_BUILD_FIFO = "BuildFifo"
+WORKFLOW_BUILD_LEAF = "BuildLeaf6"
+WORKFLOW_BUILD_FIFO = "BuildFifo6"
 WORKFLOW_BUILD_FIFO_ID = "solidworks-build-fifo-6"
 ACTIVITY_BUILD_LEAF = "build_leaf"
 NAMESPACE = "solidworks"
@@ -423,7 +423,19 @@ async def _fifo_handle(client):
         timeout=FIFO_RPC_TIMEOUT_S,
     )
     # Deliberately no coordinator run pin: continue-as-new preserves ownership.
-    return client.get_workflow_handle(WORKFLOW_BUILD_FIFO_ID)
+    handle = client.get_workflow_handle(WORKFLOW_BUILD_FIFO_ID)
+    description = await asyncio.wait_for(
+        handle.describe(rpc_timeout=timedelta(seconds=FIFO_RPC_TIMEOUT_S)),
+        timeout=FIFO_RPC_TIMEOUT_S,
+    )
+    if description.workflow_type != WORKFLOW_BUILD_FIFO:
+        raise RuntimeError(
+            f"farm coordinator {WORKFLOW_BUILD_FIFO_ID}: expected workflow type "
+            f"{WORKFLOW_BUILD_FIFO!r}, found {description.workflow_type!r}; "
+            "a coordinated producer/pool/worker cutover to an idle, physically "
+            "drained fleet is required; do not invoke the legacy coordinator"
+        )
+    return handle
 
 
 async def _rpc_update(handle, name: str, arg, result_type, operation: str):

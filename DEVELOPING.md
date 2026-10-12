@@ -294,8 +294,18 @@ obligations. Recovery requires physical-drain evidence and a reviewed,
 snapshot-aware recovery or history reset, not another producer launch.
 
 Protocol 6 is a clean cutover, not a rolling upgrade over protocol 5 histories.
-The protocol-5 coordinator state is not replayed as protocol 6; the new singleton
-is `solidworks-build-fifo-6`. Paired producer, pool coordinator and worker deployment
+The protocol-5 coordinator state is not replayed as protocol 6. The singleton
+`solidworks-build-fifo-6` uses workflow type `BuildFifo6`, and native leaf workflows
+use `BuildLeaf6`; neither old type is registered as an alias. A fresh protocol-6
+history requests the new type, so an old controller cannot execute its logic,
+even on the shared `solidworks-control` queue. Before registering a build or
+submitting/observing a leaf, the producer describes the current coordinator
+under the bounded RPC deadline and requires exactly `BuildFifo6`. A reused ID
+with any other workflow type is refused without updates, termination or replay;
+do not invoke it with new tools. The handle remains unpinned across
+continue-as-new. This identity check does not replace normal CLI protocol
+preflight or the required coordinated cutover.
+Paired producer, pool coordinator and worker deployment
 requires an idle fleet with all old physical work drained, no outstanding
 reservations and no unconfirmed attempts. The matching pool commit is a required
 external paired dependency, not a compatibility shim or implicit source pin.

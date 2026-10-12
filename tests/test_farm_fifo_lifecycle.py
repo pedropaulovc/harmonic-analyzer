@@ -16,6 +16,7 @@ import textwrap
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import doit.cmd_base as _doit_cmd_base
 import pytest
@@ -96,6 +97,7 @@ class _Control:
         self.warnings = []
         self.registration_records = []
         self.start_error = None
+        self.workflow_type = _farm.WORKFLOW_BUILD_FIFO
         self.register_response = None
         self.registration_gate = None
         self.heartbeat_response = None
@@ -124,6 +126,10 @@ class _Control:
         self.connections.append((identity, record, threading.get_ident()))
         assert record["build_id"] == os.environ["HARMONIC_FARM_BUILD_ID"]
         return _Client(self)
+
+    async def describe(self, **options):
+        assert options["rpc_timeout"] == timedelta(seconds=_farm.FIFO_RPC_TIMEOUT_S)
+        return SimpleNamespace(workflow_type=self.workflow_type)
 
     async def execute_update(self, name, arg, **options):
         self.updates.append((name, arg, options, threading.get_ident()))
@@ -325,6 +331,28 @@ def _assert_close(control, build_id, reason):
     assert control.cancellations == []
 
 
+def test_wrong_type_existing_coordinator_is_rejected_before_registration(
+    control, _guarded_process,
+):
+    control.workflow_type = "BuildFifo"
+    owner = _farm.producer_build(DISPLAY_NAME)
+    with pytest.raises(RuntimeError) as failure:
+        with owner:
+            pytest.fail("wrong-type coordinator admitted the local scheduler")
+
+    message = str(failure.value)
+    assert _farm.WORKFLOW_BUILD_FIFO_ID in message
+    assert f"expected workflow type {_farm.WORKFLOW_BUILD_FIFO!r}" in message
+    assert "found 'BuildFifo'" in message
+    assert "coordinated producer/pool/worker cutover" in message
+    assert control.updates == []
+    assert control.cancellations == []
+    assert not control.registered.is_set()
+    assert not owner._thread.is_alive()
+    assert not _guarded_process[1].is_set()
+    assert os.environ["HARMONIC_FARM_BUILD_ID"] == INHERITED_BUILD_ID
+
+
 def test_registration_precedes_scheduler_and_renewal_is_independent_of_capacity(
     control, start_parent, _guarded_process,
 ):
@@ -414,6 +442,7 @@ def test_windows_sigint_closes_accepted_build_and_restores_environment(
         import threading
         import time
         from datetime import datetime, timedelta, timezone
+        from types import SimpleNamespace
 
         sys.path.insert(0, sys.argv[1])
         import _farm
@@ -433,6 +462,9 @@ def test_windows_sigint_closes_accepted_build_and_restores_environment(
         updates = []
 
         class Control:
+            async def describe(self, **options):
+                return SimpleNamespace(workflow_type=_farm.WORKFLOW_BUILD_FIFO)
+
             def status(self, state="open"):
                 return _farm.BuildStatus(
                     owner.build_id, 7, state, "waiting",
