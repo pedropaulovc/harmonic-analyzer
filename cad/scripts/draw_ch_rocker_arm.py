@@ -294,6 +294,12 @@ def _outline(view: Any, *, label: str) -> tuple[float, float, float, float]:
 
 
 _DETAIL_GEOMETRY_TOL_M = 0.00005
+# R12 native caption air read 22.761 -> 3.221 -> 3.221 -> 2.745 mm:
+# GetExtent moved by 0.476569 mm, one pixel at the logged 2.098 px/mm.
+# Aim at 4 mm so that readback quantization cannot chase the 3 mm hard guard.
+# Half the extra 1 mm permits one-pixel ink settling, not less required air.
+_DETAIL_CAPTION_TARGET_AIR_M = 0.004
+_DETAIL_CAPTION_SETTLE_M = (_DETAIL_CAPTION_TARGET_AIR_M - 0.003) / 2.0
 
 
 def _detail_fence(label: str) -> tuple[tuple[float, float, float], float]:
@@ -625,8 +631,9 @@ def _seat_detail_caption(adapter: Any, view: Any, sheet: Any, *, label: str) -> 
         _telemetry.info(context)
         if box[3] - box[1] > ceiling - floor:
             raise RuntimeError(f"{context}: actual caption cannot fit between crop and lower boundary")
-        error = ((crop[0] + crop[2] - box[0] - box[2]) / 2.0, ceiling - 0.00005 - box[3])
-        if max(abs(v) for v in error) <= 0.00005:
+        error = ((crop[0] + crop[2] - box[0] - box[2]) / 2.0,
+                 crop[1] - _DETAIL_CAPTION_TARGET_AIR_M - box[3])
+        if max(abs(v) for v in error) <= _DETAIL_CAPTION_SETTLE_M:
             break
         position = tuple(float(v) for v in (annotation.GetPosition() or ()))
         if len(position) != 3 or not all(math.isfinite(v) for v in position):

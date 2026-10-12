@@ -2831,6 +2831,49 @@ def test_end_caption_seats_actual_ink_between_crop_and_actual_title_rule(bound, 
     assert note.PropertyLinkedText == "$PRPVIEW:DETAIL E SCALE"
 
 
+@pytest.mark.parametrize("label", ["D", "E"])
+def test_native_caption_target_has_margin_for_r12_one_pixel_extents(bound, monkeypatch, label):
+    # R12's last two GetExtent upper Y values differ by exactly this much;
+    # the active display reported 2.098 px/mm. Fifty microns cannot settle it.
+    pixel = 0.06535530434782608 - 0.06487873578595318
+    assert pixel * 1000.0 == pytest.approx(1.0 / 2.098, abs=0.0001)
+    assert drawing._DETAIL_CAPTION_TARGET_AIR_M == 0.004
+    assert drawing._DETAIL_CAPTION_SETTLE_M >= pixel
+    note = _FakeNote((0.16 if label == "D" else 0.30, 0.04), 0.007)
+    note.PropertyLinkedText = f"$PRPVIEW:DETAIL {label} SCALE"
+    note.annotation.SetPosition2 = note.annotation.SetPosition
+    original_extent = note.GetExtent
+    def quantized_extent():
+        values = list(original_extent())
+        values[3] = values[0] + 0.0324
+        for index in (0, 1, 3, 4):
+            values[index] = math.ceil(values[index] / pixel) * pixel
+        return values
+    note.GetExtent = quantized_extent
+    adapter, view = _native_crop_fixture(monkeypatch, label)
+    if label == "E":
+        view.Position = view.physical = (0.330, 0.084 + view.radius)
+    view.notes = [note]
+    sheet = _native_sheet()
+    sheet.GetZoneMargin = lambda _side: 0.0127
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    drawing._seat_detail_caption(adapter, view, sheet, label=label)
+    box = drawing._note_extent(adapter, note)
+    crop = drawing._detail_crop(adapter, view, label=label)
+    assert crop[1] - box[3] >= 0.003
+    floor = 0.0127 if label == "D" else 0.066
+    assert box[1] - floor >= 0.003
+    assert abs((box[0] + box[2] - crop[0] - crop[2]) / 2.0) <= pixel
+    assert note.PropertyLinkedText == f"$PRPVIEW:DETAIL {label} SCALE"
+    if label == "D":
+        # The same causal native pixel grid rejects the old near-boundary
+        # target / 50-micron convergence rule; do not fix it by weakening air.
+        monkeypatch.setattr(drawing, "_DETAIL_CAPTION_TARGET_AIR_M", 0.00305)
+        monkeypatch.setattr(drawing, "_DETAIL_CAPTION_SETTLE_M", 0.00005)
+        with pytest.raises(RuntimeError, match="caption ink did not settle"):
+            drawing._seat_detail_caption(adapter, view, sheet, label=label)
+
+
 @pytest.mark.parametrize("defect", ["height", "title-rule", "scale", "missing", "unlinked", "ignored-position", "nan", "missing-extent", "missing-position"])
 def test_end_caption_fails_closed_without_real_ink_and_three_mm_air(bound, monkeypatch, defect):
     note = _FakeNote((0.30, 0.07), 0.020 if defect == "height" else 0.007,
