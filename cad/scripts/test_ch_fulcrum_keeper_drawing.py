@@ -64,7 +64,7 @@ def test_crown_set_screw_tap_stops_at_the_bore() -> None:
 
 
 def test_rule_12_worst_case_walls_and_thread() -> None:
-    # Worst case of the printed bands (policy rule 12): >= 1.5D of full
+    # Worst case of the printed bands (drawing-guidelines.md rule 18 (thread engagement)): >= 1.5D of full
     # crown thread and of foot-screw engagement in the frame, >= 1.5 web from
     # the crown thread major to each lug face and from the foot counterbore
     # to the foot tip and sides.

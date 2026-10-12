@@ -15,7 +15,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 
 
 def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
-    # Rule 5: the follower rides the cam OD; the set-screwed bore never moves
+    # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the follower rides the cam OD; the set-screwed bore never moves
     # on the rod, so the one roughness symbol sits on the OD.
     (control,) = dt_pinion_cam_spec.SURFACE_FINISHES
     assert control.key == "cam_od"
@@ -161,7 +161,7 @@ def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
 
 
 def test_the_part_owns_every_printed_decimal_place() -> None:
-    """Policy rule 2: the .SLDPRT owns places for every imported nominal.
+    """drawing-simplicity-policy.md `How the repository implements the guidelines`: the .SLDPRT owns places for every imported nominal.
 
     Two places serve the critical trio (the reamed running bore, the cam OD
     and the eccentricity that IS the lift) and the M2.5 tap drill, whose size

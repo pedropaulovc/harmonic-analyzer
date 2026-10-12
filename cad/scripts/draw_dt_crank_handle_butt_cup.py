@@ -3,7 +3,7 @@ r"""Create the curated machinist drawing for MHA-DT-035, the crank handle butt c
 A plain steel cup (user rulings 2026-09-29 and 2026-09-30, ch11 p.14/p.15 and
 ch30 eight-views-4).  The end view
 carries only its centre mark and the cutting plane; the longitudinal section
-A-A is the cup's length view (policy rule 7) and takes every dimension, so
+A-A is the cup's length view (drawing-guidelines.md rule 9 (show internal shape in solid lines)) and takes every dimension, so
 the pocket and the floor hole read on cut edges rather than hidden lines (the
 MHA-DT-035 machinist review).  The body diameter is the one band; the pocket is
 bored to suit the MHA-DT-032 head (a reference size, the note says how), and

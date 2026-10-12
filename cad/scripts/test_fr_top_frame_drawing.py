@@ -874,7 +874,7 @@ def test_printed_keeper_seat_flange_minimum_keeps_the_receiver_wall(stack) -> No
 
 
 def test_every_imported_drawing_dimension_has_part_authored_places() -> None:
-    # Rule 2: the part owns the decimal places, so a kept model dimension
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`: the part owns the decimal places, so a kept model dimension
     # nobody authored places for prints SolidWorks' template default and the
     # sheet has nowhere left to say otherwise.
     kept = set().union(
@@ -1484,7 +1484,7 @@ def test_knife_hanger_is_a_6_shcs_counterbore_on_the_knife_line() -> None:
     assert drawing.HANGER_X == part.HANGER_X
     # The counterbore stays inside the junction material at the rear station.
     assert part.STUD_Z_REAR + spec.HANGER_CBORE_DIA / 2.0 < part.INNER_Z + part.GUSSET
-    # Print-worst head checks (rule 12).
+    # Print-worst head checks (drawing-guidelines.md rule 17 (walls and webs)).
     assert spec.HANGER_CBORE_HEAD_CLEARANCE == pytest.approx(0.7496)
     assert spec.HANGER_HEAD_RECESS == pytest.approx(2.4848)
     assert spec.HANGER_HEAD_BEARING == pytest.approx(0.6612)
@@ -1512,7 +1512,7 @@ def test_dowel_slip_hole_contract() -> None:
     assert spec.HANGER_PIN_SLIP_CLEARANCE_MIN == pytest.approx(0.02738)
     assert spec.HANGER_PIN_SLIP_CLEARANCE_MAX == pytest.approx(0.09246)
     assert 0.02 <= spec.HANGER_PIN_SLIP_CLEARANCE_MIN < spec.HANGER_PIN_SLIP_CLEARANCE_MAX <= 0.10
-    # Rule 12 walls and floor, print-worst (the station at its .XXX limit).
+    # drawing-guidelines.md rule 17 (walls and webs) walls and floor, print-worst (the station at its .XXX limit).
     assert part.PIN_HOLE_BAR_WALL == pytest.approx(2.885)
     assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.376)
     assert part.PIN_HOLE_FLOOR_MARGIN == pytest.approx(18.0)
@@ -1541,7 +1541,7 @@ def test_dowel_slot_contract() -> None:
     # it carries the round hole's .XXX band plus its zone radius.
     assert spec.HANGER_SLOT_FROM_ROUND == pytest.approx(12.7)
     assert spec.HANGER_SLOT_STATION_TOL == pytest.approx(0.155)
-    # Rule 12 walls and floor, print-worst: the screw-side wall under the
+    # drawing-guidelines.md rule 17 (walls and webs) walls and floor, print-worst: the screw-side wall under the
     # 2.0 target, over the 1.5 floor.
     assert part.SLOT_BAR_WALL == pytest.approx(2.09)
     assert part.SLOT_SCREW_WALL == pytest.approx(1.581)
@@ -1612,7 +1612,7 @@ def test_dowel_slot_stadium_closes_counter_clockwise(along_u: bool) -> None:
 
 
 def test_slots_are_positioned_to_the_round_holes_with_translation() -> None:
-    # Policy rule 3 (knife-edge system): datum B the front round hole, C the
+    # drawing-guidelines.md rule 5 (avoid excessive GD&T) (knife-edge system): datum B the front round hole, C the
     # rear; each slot 0.05 to its own station's hole, the other translated.
     assert spec.GEOMETRIC_TOLERANCES_MM == {"knife-hanger slot position": "0.05"}
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -1861,12 +1861,12 @@ def test_section_note_states_the_far_wall_print_worst_engagement() -> None:
     from _mcmaster_90280a837 import SHANK_DIA
 
     engagement = drawing.CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT
-    # Rule 12: the printed bands only shorten the far-wall engagement, and
+    # drawing-guidelines.md rule 17 (walls and webs): the printed bands only shorten the far-wall engagement, and
     # the shortest still holds 1.5D.
     assert 1.5 * SHANK_DIA <= engagement < assembly.TOP_FAR_CASTING_ENGAGEMENT
     note = drawing.CROSS_TAP_SECTION_NOTE
     assert f"{engagement:.1f} FULL THREAD" in note
-    # Rule 6: short notes, short of the title block and inside the frame.
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): short notes, short of the title block and inside the frame.
     lines = note.splitlines()
     x, y = drawing.CROSS_TAP_SECTION_NOTE_XY
     assert len(lines) <= 4
@@ -1890,7 +1890,7 @@ def test_slip_hole_callout_states_process_and_purpose_briefly() -> None:
     text = spec.HANGER_PIN_HOLE_CALLOUT
     assert text.startswith("2X ") and "REAM" in text and "MHA-VN-051" in text
     assert "BLIND" in text and "FLAT-BOTTOM" in text
-    # Rule 6: short notes.
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): short notes.
     assert len(text.splitlines()) <= 2
     assert max(len(line) for line in text.splitlines()) <= 26
     assert drawing.HANGER_SECTION_CALLOUTS["HangerPinHoleDia"] == text
@@ -1953,7 +1953,7 @@ def test_slot_station_is_basic_from_its_round_hole() -> None:
 
 
 def test_slip_hole_callout_is_parked_clear_of_the_section() -> None:
-    # Rule 8 (dda9a33a8 render): the four-line callout stood across the hole's
+    # drawing-guidelines.md rule 14 (keep text off the part) (dda9a33a8 render): the four-line callout stood across the hole's
     # own extension lines and the underside edge.  It now rides a leader to a
     # block wholly below the section, right of the size's extension lines and
     # left of the title block.

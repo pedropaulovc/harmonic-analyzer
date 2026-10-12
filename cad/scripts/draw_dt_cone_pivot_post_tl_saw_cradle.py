@@ -178,7 +178,7 @@ RIGHT_KEEP = {
     "SeatDia": SEAT_DIA_XY,
 }
 # The far tap shares the near tap's X station by a model relation, so the one
-# printed station locates both. The pad top is a matched fit (policy rule 2):
+# printed station locates both. The pad top is a matched fit (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)):
 # its height is a reference size, and the callout names the mate and states
 # the acceptance.
 _PREFIX, _SUFFIX = 1, 2  # swDimensionTextPrefix, swDimensionTextSuffix

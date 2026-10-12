@@ -7,11 +7,11 @@ the tooth root, a little over half a face long, edge rounded, the crankshaft
 end recessed inside it, and the small head of a radial retention pin on its
 side. The pin is what keeps the "removable" pinion on the shaft.
 
-Recreated under ``cad/docs/drawing-simplicity-policy.md``. The sizes a
+Recreated under ``cad/docs/drawing-guidelines.md``. The sizes a
 machinist turns, bores and drills -- outside diameter, face width, bore, boss
 diameter, overall length, pin station -- are NATIVE model dimensions carrying
 their own decimal places and bands (rules 1, 2, 4); the tooth system that a
-cut-gear print cannot express as dimensions stays in the gear-data block rule 6
+cut-gear print cannot express as dimensions stays in the gear-data block drawing-guidelines.md rule 7 (notes: few, flagged, never a method)
 allows, with cutter inputs and derived diameters marked REF and the circular
 tooth thickness carrying its own functional limit; nothing here restates the
 title block.
@@ -133,9 +133,9 @@ TURNED_LENGTH = FACE_WIDTH - SHOULDER_LENGTH
 # Fit-up of the 16T under T120 (user, 2026-09-30, #1154).  With every fit
 # offset and axis pose of the drive train summed at its worst, the shoulder
 # and the turned band can close on T120 by these clearances (negative: an
-# overlap), rounded down to 0.01 -- the policy's Named exceptions row
-# "MHA-DT-010 ... T120"; build_dt_drive_train_assembly derives them and fails if
-# they are not its figures.  Both sheets state them.
+# overlap), rounded down to 0.01 -- pending ruling #1374 for
+# MHA-DT-010 T120; build_dt_drive_train_assembly derives them and fails if
+# they are not its figures. Both sheets state them.
 T120_SHOULDER_AIR_WORST = -0.10
 T120_TURNED_BAND_RADIAL_WORST = -0.12
 # So the pair is checked on a feeler at fit-up instead of by a tighter
@@ -162,7 +162,7 @@ SHOULDER_LENGTH_FITUP_MIN = SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[0]
 # north face and leaves its end recessed inside the boss as photographed; its
 # length is derived below (W15). The boss is
 # extruded from the SAME faced end as the teeth, so the print carries one
-# overall length from that end (rule 7: lengths from one faced end, the overall
+# overall length from that end (drawing-guidelines.md rule 11 (turned parts read like the lathe): lengths from one faced end, the overall
 # length real and conspicuous), and the toothed length is FaceWidth.
 ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN  # 13.21
 BOSS_DIA = ROOT_DIA
@@ -371,7 +371,7 @@ BORE_FIT_CALLOUT = "\n".join(
 # a sheet stands alone, so each carries all four facts --
 # match drill at assembly, ream to fit the named pin, the fit's acceptance,
 # flush -- with the other part and where on this one the hole runs.
-# Four lines, no dimensions (rule 6); MHA-DT-000 step 4 reads the shaft's.
+# Four lines, no dimensions (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); MHA-DT-000 step 4 reads the shaft's.
 PIN_FIT_LINES = (
     f"REAM TO FIT PIN {PIN_NUMBER}, LIGHT HAMMER FIT",
     "NOT REMOVABLE BY HAND, FLUSH BOTH SIDES",
@@ -393,7 +393,7 @@ CRANKSHAFT_PIN_HOLE_PROCESS = pin_hole_note(
 # a size-toleranced fit onto the crankshaft, and a fit lives on the peaks as
 # much as on the limits, so the bore carries the project's general machined
 # grade. Nothing runs on the teeth or the faces -- they are as the title
-# block's process row states (cad/docs/drawing-simplicity-policy.md rule 5).
+# block's process row states (cad/docs/drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
     SurfaceFinishControl("crank_pinion_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
 )
@@ -406,7 +406,7 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 # turned diameters/lengths on the side view without changing the solid:
 # ``BossDia`` and ``OverallLength`` drive the revolve, while ``OutsideDia`` and
 # ``BoreDia`` are equation-driven native reference dimensions attached to the
-# matching axial extents (rule 2's reference-sketch allowance and rule 7's
+# matching axial extents (drawing-simplicity-policy.md `How the repository implements the guidelines`'s reference-sketch allowance and drawing-guidelines.md rule 11 (turned parts read like the lathe)'s
 # turned-part layout). The ``TurnedBandProfile`` is the Right-plane revolve
 # cut that turns the teeth down north of the shoulder; its shoulder length
 # (from the same faced end) and turned diameter drive it. ---
@@ -418,7 +418,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # --- Decimal places, authored ON THE PART ------------------------------------
 #
-# Policy rule 2: the places a dimension prints are part of the tolerance it
+# drawing-simplicity-policy.md `How the repository implements the guidelines`: the places a dimension prints are part of the tolerance it
 # claims, and the model owns both. ``build_dt_crank_pinion`` applies this table
 # natively (``_drawing_precision.apply_drawing_precision``) right after the drawing
 # marks, so ``draw_dt_crank_pinion`` imports each dimension verbatim and only reads
@@ -473,14 +473,14 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 # The pair's worst-case contact ratio, rounded down, as the MHA-DT-007 sheet
-# prints it (dt_crank_drive_gear_notes owns the one value; user ruling 2026-09-30).
-# Named exception: MHA-DT-010 contact ratio (drawing-simplicity-policy.md, "Named exceptions").
+# prints it (dt_crank_drive_gear_notes owns the one value; pending ruling #1374).
+# Pending exception ruling: MHA-DT-010 contact ratio (#1374).
 CONTACT_RATIO_ROW = (
     "CONTACT RATIO WITH MHA-DT-007, WORST CASE (REF)",
     f"{dt_crank_drive_gear_notes.WORST_CONTACT_RATIO:.2f}",
 )
 
-# Rule 6's gear-data block: the tooth system a cut-gear drawing cannot express
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)'s gear-data block: the tooth system a cut-gear drawing cannot express
 # as ordinary view dimensions. Cutter inputs and derived diameters are REF;
 # circular tooth thickness is the shop's controlling acceptance and carries
 # the explicit one-sided pair-derived limit above.
@@ -513,9 +513,8 @@ GEAR_DATA = gear_data_note(
 # it needs no duplicate method prohibition.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
 # The sheet states the thin boss wall as a plain fact, rounded down so it
-# never claims more wall; its acceptance (user, option C, 2026-09-25) lives in
-# the policy's Named exceptions table.
-# Named exception: MHA-DT-010 boss wall (drawing-simplicity-policy.md, "Named exceptions").
+# never claims more wall; its pending ruling is tracked in #1374.
+# Pending exception ruling: MHA-DT-010 boss wall (#1374).
 BOSS_WALL_NOTE = (
     f"BOSS WALL {math.floor(BOSS_WALL_WORST * 100.0) / 100.0:.2f} MIN AT BORE."
 )
@@ -527,7 +526,7 @@ BOSS_WALL_NOTE = (
 # clearances to T120 that the check is there for.  Codex P1 on #1154
 # (review 3).  The note names the check, not its step number: a part never
 # reads the step registry (Main's TbPB ruling 2; test_part_isolation).
-# Named exception: MHA-DT-010 turned band (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-DT-010 turned band (#1374).
 TURNED_BAND_FITUP_NOTE = "\n".join(
     (
         "TURNED BAND MAY BE TURNED DOWN PER MHA-DT-000 T120 CHECK, "
@@ -547,7 +546,7 @@ DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, BOSS_WALL_NOTE, TURNED_BAND_FITUP_NO
 # it), so the check always closes.  Its last line is short: the step carries
 # on after it on the same line.
 T120_FITUP_PUSHED = (PINION_NUMBER, "T120")
-# Named exception: MHA-DT-010 turned band (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-DT-010 turned band (#1374).
 T120_FITUP_ASSEMBLY_CHECK = "\n".join(
     (
         f"   WORST-CASE T120 CLEARANCE: TURNED BAND {T120_TURNED_BAND_RADIAL_WORST:.2f}, "

@@ -25,7 +25,7 @@ def test_every_marked_model_dimension_is_shown() -> None:
 
 
 def test_shaft_carries_no_frames_or_datums() -> None:
-    # Policy rule 3: shafts carry no frames and no datums; the domed ends
+    # drawing-guidelines.md rule 5 (avoid excessive GD&T): shafts carry no frames and no datums; the domed ends
     # leave no end face to square anyway.
     assert not hasattr(ch_fulcrum_shaft_spec, "GEOMETRIC_CONTROLS")
     assert not hasattr(ch_fulcrum_shaft_spec, "PART_DATUMS")
@@ -93,7 +93,7 @@ def _station_window(spec) -> float:
 def test_no_station_dimension_can_drop_a_place(monkeypatch) -> None:
     # Machinist review r8 asked for .X on 161.35 and .XX on 4.925 / 148.000.
     # Band sensitivity at unchanged nominals: each one-place loosening, alone,
-    # closes the flat-station window (policy rule 12). Rounding the printed
+    # closes the flat-station window (drawing-guidelines.md rule 17 (walls and webs)). Rounding the printed
     # nominal to fewer places does not reopen it, so all three keep their places.
     spec = ch_fulcrum_shaft_spec
     assert math.isclose(_station_window(spec), spec.FLAT_STATION_WINDOW_MM)

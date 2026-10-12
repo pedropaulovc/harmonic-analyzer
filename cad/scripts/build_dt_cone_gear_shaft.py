@@ -33,11 +33,11 @@ south of the north face of the last gear on the larger land
 * 1/16 in to 139.734 -- T012 and T006 seats and the MHA-VN-016 set-screw
   collar (locked on this land's flat one 0.45 feeler off T006); its end
   contacts the exact McMaster 94025A164 conical cup apex at the 8.17 mm
-  nominal embed in the tip block (rule-12 E11, with the adjuster's 1.0D
+  nominal embed in the tip block (drawing-guidelines.md rule 18 (thread engagement) E11, with the adjuster's 1.0D
   engagement exception, user ruling 2026-09-29).  The land runs at L/D 15.9
   and is turned with tailstock support (a drawing note).  The 1/16 in step
-  leaves T006 the 0.621 mm worst-case web accepted as its named exception
-  (U40) -- see dt_cone_gear_shaft_spec.SECTIONS.
+  leaves T006 the 0.621 mm worst-case web pending ruling #971
+  -- see dt_cone_gear_shaft_spec.SECTIONS.
 
 Every gear land's flat (SECTION_FLAT_AF, across flat) runs the whole land;
 the terminal land's runs out through the tip, so its end face is a D.
@@ -410,13 +410,13 @@ async def build(adapter) -> dict[str, str]:
             f"Sec{land}AF",
             *deviations(FLAT_AF_BAND),
         )
-    # Display precision is model-owned too (drawing-simplicity policy rule 2).
+    # Display precision is model-owned too (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     # The two lands that RUN carry a roughness symbol.  No datums and no
-    # feature-control frames (drawing-simplicity policy rule 3).
+    # feature-control frames (drawing-guidelines.md rule 5 (avoid excessive GD&T)).
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_part_and_images(adapter, PART_NAME)

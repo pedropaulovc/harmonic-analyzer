@@ -65,7 +65,7 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 # One orthographic view: a plain rod is fully defined by its side view plus a
-# diameter, and policy rule 7 puts that diameter ON the side view.  The arbor is
+# diameter, and drawing-guidelines.md rule 11 (turned parts read like the lathe) puts that diameter ON the side view.  The arbor is
 # modelled axis-along-+Y (its assembly pose), so the side view is "*Front"
 # rotated -90 deg (IView.Angle) -- axis horizontal, as the bar sits in the
 # lathe.  An end view would carry nothing but the diameter it is not allowed to

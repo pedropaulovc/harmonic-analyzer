@@ -462,7 +462,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "Right Plane", 0.0, "Top Plane", _mid_y(0.0), "pivot bore"
     )
 
-    # REFERENCE sketch (policy rule 2, Codex #936 PRRT_kwDOPHDy386mV3AO): the
+    # REFERENCE sketch (drawing-simplicity-policy.md `How the repository implements the guidelines`, Codex #936 PRRT_kwDOPHDy386mV3AO): the
     # sheet prints the top edge's height over the pivot axis with a one-sided
     # band, yet no strap dimension carries it (the arcs are placed by their
     # shared centre). A construction line on the mirror axis, from the pivot
@@ -580,7 +580,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "TopEdgeReference", "TopAbovePivot", *deviations(TOP_EDGE_BAND)
     )
-    # The reamed pivot bore's band rides its O6.50 natively (policy rule 2);
+    # The reamed pivot bore's band rides its O6.50 natively (drawing-guidelines.md rule 3 (decimal places carry the tolerance));
     # note 6 keeps only the REAM process word.
     set_dimension_bilateral_tolerance(
         adapter, "PivotHoleProfile", "PivotDia", *deviations(PIVOT_HOLE_BAND)

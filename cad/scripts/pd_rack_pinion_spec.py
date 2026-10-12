@@ -187,7 +187,7 @@ BORE_FIT_CALLOUT = "\n".join(
 SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),)
 
 # Marked model dimensions and the places the model authors on them (policy
-# rule 2): the disc thickness (the gear blank's extrude depth) and the bore.
+# drawing-simplicity-policy.md `How the repository implements the guidelines`): the disc thickness (the gear blank's extrude depth) and the bore.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "BoreProfile": {"BoreDia"},

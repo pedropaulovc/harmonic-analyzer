@@ -83,11 +83,11 @@ def test_the_drum_bond_is_the_fitup_step_not_a_note() -> None:
     import dt_pinion_arbor_spec as arbor_spec
 
     notes = spec.DRAWING_NOTES
-    # Rule 6 (R3): one note.  The drum is symmetric, so no orientation note;
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (R3): one note.  The drum is symmetric, so no orientation note;
     # its axial station is stated once, on MHA-DT-022.  The MHA-DT-022 bond-zone
     # band is MHA-DT-022's own native dimension (Codex P1 on #814), the hand
     # slide rides the bore callout (Codex P2 on #832), and the bond itself is
-    # the pinion fit-up step MHA-DT-022's spec owns (Main's rule-6 sweep).
+    # the pinion fit-up step MHA-DT-022's spec owns (Main's drawing-guidelines.md rule 7 (notes: few, flagged, never a method) sweep).
     assert notes == "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND."
     assert "BOND ZONE" not in notes
     assert "ARBOR JOURNAL" not in notes
@@ -173,7 +173,7 @@ def test_fit_bore_callout_names_its_process() -> None:
 
 
 def test_hand_slide_fit_rides_the_bore_callout_not_a_note() -> None:
-    """Rule 6: a matched-fit acceptance belongs on the feature callout or an
+    """drawing-guidelines.md rule 7 (notes: few, flagged, never a method): a matched-fit acceptance belongs on the feature callout or an
     assembly step, never in a general note (Codex P2 on #832)."""
     import draw_dt_alignment_pinion as draw
 
@@ -227,7 +227,7 @@ def test_od_at_the_general_band_keeps_tip_clearance_and_contact() -> None:
 
 
 def test_no_note_line_carries_a_dimension() -> None:
-    """Rule 6: once part numbers and the named retaining compound are set
+    """drawing-guidelines.md rule 7 (notes: few, flagged, never a method): once part numbers and the named retaining compound are set
     aside, no note line carries a digit (Codex P1 on #814)."""
     for line in spec.DRAWING_NOTES.splitlines():
         text = re.sub(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", "", line).replace(spec.RETAINING_COMPOUND, "")

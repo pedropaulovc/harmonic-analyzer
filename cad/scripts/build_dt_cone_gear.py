@@ -305,7 +305,7 @@ async def _author_gap_floor_reference(adapter: Any) -> SketchDims:
     modelled floor, its diameter driven by the configuration-scoped FloorDia.
 
     The floor itself is the gap profile's feet chord bowed by FloorDip, with
-    no diameter of its own to import, so policy rule 2's authoring-reference
+    no diameter of its own to import, so drawing-guidelines.md rule 3 (decimal places carry the tolerance)'s authoring-reference
     sketch pattern carries the printed limits.
     """
     floor = SketchDims()
@@ -574,7 +574,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Blank")
     # The face width is a size the turner sets, so it prints as a NATIVE model
-    # dimension (drawing-simplicity-policy.md rules 1-2): name the extrude
+    # dimension (drawing-simplicity-policy.md `How the repository implements the guidelines`): name the extrude
     # depth so it can be marked and given its decimal places like the two
     # circle dims. It stays a literal (no drive job): FACE_WIDTH is one value
     # across all 20 configurations.
@@ -898,7 +898,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Native tooth-system acceptance size.  The involute is generated from the
     # gear equations and exposes no stable feature dimension for circular tooth
-    # thickness, so policy rule 2's authoring-reference-sketch pattern gives the
+    # thickness, so drawing-simplicity-policy.md `How the repository implements the guidelines`'s authoring-reference-sketch pattern gives the
     # print one DRIVING model dimension.  The vertical witness is the +X
     # tooth's pitch chord, a tooth for every even count: the imported
     # extension lines start on that tooth's flanks.  The construction chord is

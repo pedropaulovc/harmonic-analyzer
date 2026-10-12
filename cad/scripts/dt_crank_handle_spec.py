@@ -316,7 +316,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "PivotBoreProfile": {"PivotBoreDia"},
 }
-# Decimal places are the tolerance (policy rule 2): the reamed bore prints its
+# Decimal places are the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the reamed bore prints its
 # band at two places; every other size is routine (.X), the fitted tenon and
 # counterbore as references under their to-suit callouts.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -352,7 +352,7 @@ def _e(x: float) -> float:
     return x - TENON_X0
 
 
-# Named exception: MHA-DT-008 oak feathers (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-DT-008 oak feathers (#1373).
 DRAWING_NOTES = "\n".join(
     (
         "AXIAL STATIONS ARE FROM THE TENON END FACE.",

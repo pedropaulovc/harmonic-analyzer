@@ -79,7 +79,7 @@ def set_dimension_display_precision(
 ) -> None:
     """Author the decimal places of one model dimension ON THE PART.
 
-    Decimal places carry the tolerance (drawing-simplicity policy rule 2), so
+    Decimal places carry the tolerance (drawing-simplicity-policy.md `How the repository implements the guidelines`), so
     they are a property of the model dimension, not of the sheet: the part
     build applies ``<part>_spec.DRAWING_PRECISION`` here, the .SLDPRT stores
     the per-dimension override, and the drawing that imports the dimension

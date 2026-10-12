@@ -21,7 +21,7 @@ This spec cannot import the layout, which reads the flats from here.
 Part frame: axis along Z, origin on the axis at the NORTH end of the cylinder,
 the body running toward -Z, the flats facing +Y. It is modelled as one
 Right-plane half-profile revolved (sketch +x -> model -Z), so the diameter
-and length import into the side view (policy rule 7), one revolved crown at
+and length import into the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe)), one revolved crown at
 each end, and one Right-plane cut for both flats, whose length, across-flat
 and stations import into the same view.
 """
@@ -97,7 +97,7 @@ FLAT_LENGTH_RANGE = (FLAT_LENGTH - LINEAR_2PL, FLAT_LENGTH + LINEAR_2PL)
 # north flat.
 BODY_PROBE_Z_MM = -(EAR_T + 10.0)
 
-# Rule 3: a shaft carries no frames and no datums. Rule 5: roughness only on
+# drawing-guidelines.md rule 5 (avoid excessive GD&T): a shaft carries no frames and no datums. drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): roughness only on
 # the running face -- the round the 20 hubs rock on and the two ears journal.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -119,7 +119,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FlatProfile": {"FlatLength", "FlatAF", "NorthFlatStation", "SouthFlatStation"},
 }
 
-# Decimal places are the tolerance (policy rule 2). The O.D. carries the
+# Decimal places are the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)). The O.D. carries the
 # running band at three places (1/4 in = 6.350 exactly), the across-flat the
 # depth band its sizing above assumes. The dome only has to read as a dome
 # and the flat's length is checked at .XX. The stations hold each flat under
@@ -151,7 +151,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# Part-specific facts a machinist cannot read off the views (policy rule 6).
+# Part-specific facts a machinist cannot read off the views (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 # A 159:6.35 slender bar is turned between centres; both flats face the same
 # way, because one screw on each ear sets the shaft's roll; the plain end is
 # cut and domed at assembly, so the shop supplies it long.

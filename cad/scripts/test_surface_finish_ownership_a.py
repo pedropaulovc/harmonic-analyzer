@@ -126,7 +126,7 @@ CASES = (
         ),
     ),
     # crank_arm: no finish controls -- the arm is pinned to its shaft, nothing
-    # runs on the bore (drawing-simplicity-policy.md rule 5); its empty tuple is
+    # runs on the bore (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)); its empty tuple is
     # pinned by test_crank_arm_drawing.
     (
         dt_crank_drive_gear_spec,

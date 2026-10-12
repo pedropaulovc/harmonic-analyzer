@@ -50,7 +50,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"RodTipY", "RodDia"},
     "CapProfile": {"CapR"},
     "PinHoleProfile": {"PinHoleDia"},
-    # Rule 2 reference sketches: the grip axis and the pin-hole station are
+    # drawing-simplicity-policy.md `How the repository implements the guidelines` reference sketches: the grip axis and the pin-hole station are
     # printed from face B (the flat mouth face), but neither is any feature's
     # own dimension, so each gets a one-line construction sketch whose single
     # driving dimension IS the value.
@@ -61,7 +61,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # while the part shows them (_drawing_hidden_sketches.part_sketches_shown).
 REFERENCE_SKETCHES = ("GripStationReference", "PinHoleStationReference")
 
-# Decimal places ARE the tolerance statement (policy rule 2); the part authors
+# Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the part authors
 # them and the drawing reads them back.  Three on the banded bore; two on the
 # end wall (own band) and the grip station (the old +/-0.10 note, now the .XX
 # row); one everywhere a turned or hand-finished feature is routine.
@@ -86,11 +86,11 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-# Rule 5: nothing on the lever runs or slides any more -- the pinned hub is a
+# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): nothing on the lever runs or slides any more -- the pinned hub is a
 # static slip fit -- so no surface carries a roughness symbol.
 SURFACE_FINISHES = ()
 
-# The match-drill requirement rides the pin hole's own callout (rule 6: matched
+# The match-drill requirement rides the pin hole's own callout (drawing-guidelines.md rule 7 (notes: few, flagged, never a method): matched
 # fits belong on the feature), so the note block keeps only the crown break.
 # The callout is the hole specification only: the grip-parked pose and the
 # drive and peen are dt_pinion_lever_pin_spec.ASSEMBLY_STEP (LEVER PIN SET).

@@ -72,7 +72,7 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 _S = VIEW_SCALE[0] / 1000.0  # sheet metres per model millimetre
-# Turned part, laid as it sits in the lathe (policy rule 7): the *Right view
+# Turned part, laid as it sits in the lathe (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the *Right view
 # rotated a quarter turn so the axis is horizontal, inboard end on the left
 # and the faced outboard end on the right.  +90 degrees sends model +Y to
 # paper-left and model +Z (the six-o'clock MHA-VN-029 seam) to paper-down.  The
@@ -114,7 +114,7 @@ BARREL_BOTTOM = _sheet_y(HUB_BARREL_DIA / 2.0)
 BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0.015)
 # Every size and callout sits outside the silhouettes.
 # - Lengths: the seat from the faced outboard end, the MHA-DT-009 station from
-#   the arm shoulder (policy rule 12) and the relief from the rear face on
+#   the arm shoulder (drawing-guidelines.md rule 17 (walls and webs)) and the relief from the rear face on
 #   one row below the profile; the toleranced overall, front face to rear
 #   face, on the row below it.  The barrel is the remainder, not printed.
 #   The two banded lengths carry the mate they serve under their text.

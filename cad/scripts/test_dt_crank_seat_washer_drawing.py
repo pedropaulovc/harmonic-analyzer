@@ -56,7 +56,7 @@ def test_only_the_bore_carries_a_model_band() -> None:
 
 
 def test_the_bore_callout_names_its_drilled_process() -> None:
-    """Rule 7: a hole callout states its process.  The +0.10/0 bore is the
+    """drawing-guidelines.md rule 12 (hole and slot callouts say what to do): a hole callout states its process.  The +0.10/0 bore is the
     title block's DRILLED HOLES class, so it is drilled, not reamed."""
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "DRILL THRU"
     assert spec.ID_BAND == (0.10, 0.0)
@@ -139,7 +139,7 @@ def test_smallest_bore_passes_the_largest_journal_land() -> None:
     bore_min = spec.ID + min(spec.ID_BAND)
     journal_max = dt_crankshaft_spec.JOURNAL_DIA + max(dt_crankshaft_spec.JOURNAL_DIA_BAND)
     assert bore_min - journal_max > 0.0
-    # Rule 12 wall at the O.D.'s one-place title-block band.
+    # drawing-guidelines.md rule 17 (walls and webs) wall at the O.D.'s one-place title-block band.
     od_min = spec.OD - _config.title_block("linear_1pl")["value_in"] * 25.4
     assert (od_min - (spec.ID + max(spec.ID_BAND))) / 2.0 >= 2.0
 

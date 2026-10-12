@@ -8,7 +8,7 @@ the MHA-PD-000 step that sets it.  The profile lies as it sits in the lathe
 LEFT and the nose face (z 0) is the profile's right end, the chamfered ring
 face its left end.  Each end face carries its running finish, the length
 sits under the profile, the chamfer's leg above its corner and the O.D.
-moves onto the profile (rule 7: diameters on the side view).  The end view
+moves onto the profile (drawing-guidelines.md rule 11 (turned parts read like the lathe): diameters on the side view).  The end view
 to its left (third angle, looking along -Z from the +Z end) keeps the bore,
 a solid circle only end-on.
 
@@ -110,7 +110,7 @@ _PROFILE_BOTTOM = PROFILE_CENTER[1] - OD * _S / 2.0
 FIT_STEP_KEY = "front-bushing-faced-to-fit"
 
 # The bore stays on the end view, where it is a circle: a reamed through
-# hole, fully defined by its callout (rule 7), it needs no section, and the
+# hole, fully defined by its callout (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)), it needs no section, and the
 # profile is hidden-lines-removed (a dimension never lands on a hidden line).
 # The O.D. arrives there too and is moved onto the profile below.
 END_KEEP = {
@@ -154,7 +154,7 @@ FACE_FINISHES = {
         (_PROFILE_NOSE_X + 0.014, PROFILE_CENTER[1] - 0.008),
     ),
 }
-# The bore runs on the pin (rule 5): its finish sits on the end view, where
+# The bore runs on the pin (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): its finish sits on the end view, where
 # the bore is a circle.  The leader lands on the bore circle at -135 deg,
 # away from the Ø callout's landing upper right; the symbol stands left of
 # the O.D. below the horizontal centre line, its ink growing up and right

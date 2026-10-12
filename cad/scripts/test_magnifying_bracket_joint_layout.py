@@ -146,7 +146,7 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
         ("THREAD_DEPTH = 4.95", "bottoms"),
         ("RIB_DEPTH = 5.08", "beyond the front rib"),
         ("DRILL_DEPTH = 6.05", "bottoming-tap lead"),
-        ("LEVER_PLATE_THICKNESS_BAND = 0.05", "rule-12 wall"),
+        ("LEVER_PLATE_THICKNESS_BAND = 0.05", r"drawing-guidelines\.md rule 17 \(walls and webs\) wall"),
         ("COUNTERBORE_DIA = 3.8", "head float"),
     ),
 )

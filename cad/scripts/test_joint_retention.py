@@ -289,7 +289,7 @@ def test_the_knife_hanger_is_a_threadlocked_clamp_keyed_by_its_dowel() -> None:
 
 def test_the_channel_apex_set_screws_are_waived_only_by_their_ruling() -> None:
     """PR #1317 Codex review: the MHA-VN-034 cups hold the rocked MHA-CH-005
-    shaft, an exposed joint. The user waived rule 9 for it (2026-10-10): snug
+    shaft, an exposed joint. The user waived drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) for it (2026-10-10): snug
     with Loctite 222, the step that drives them says so."""
     import draw_ch_channel_assembly as channel
 

@@ -41,7 +41,7 @@ BORE_DIA = JOURNAL_DIA  # 8.5
 # a slide over the journal's running fit, 0.028 .. 0.075 diametral.
 BORE_BAND = (max(PLATE_BORE_LIMITS), min(PLATE_BORE_LIMITS))  # (+0.040, +0.015)
 
-# Places each printed dimension carries (policy rule 12): the O.D. and the
+# Places each printed dimension carries (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the O.D. and the
 # length are routine at .X -- the walls and the pin hold at that row; the bore
 # prints .XXX under its own band.
 OD_PLACES = 1
@@ -70,7 +70,7 @@ PIN_HOLE_FROM_FRONT = 3.0
 PIN_HOLE_STATION_TOL = 0.10
 _PIN_HOLE_R_MAX = PIN_HOLE_MAX / 2.0  # 0.825
 
-# --- Walls at the printed worst case (contract §8, policy rule 12) -------------
+# --- Walls at the printed worst case (contract §8, drawing-guidelines.md rule 17 (walls and webs)) -------------
 # Journal beside the hole: (8.465 - 1.65) / 2 = 3.41.
 JOURNAL_PIN_WALL = (JOURNAL_DIA - PIN_HOLE_MAX) / 2.0
 JOURNAL_PIN_WALL_WORST = (JOURNAL_DIA_MIN - PIN_HOLE_MAX) / 2.0
@@ -139,7 +139,7 @@ SURFACE_FINISHES = (
 )
 
 # Marked model dimensions and the places the model authors on them
-# (drawing-simplicity policy rule 2).  The turned profile carries the O.D.
+# (drawing-simplicity-policy.md `How the repository implements the guidelines`).  The turned profile carries the O.D.
 # and the length; the bore is its own feature.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CupProfile": {"CupDia", "CupLength"},

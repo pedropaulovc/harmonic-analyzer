@@ -1,6 +1,6 @@
 """Threaded-joint operational retention: the joint table and its audit.
 
-drawing-simplicity-policy.md rule 9 (operational retention): every threaded
+drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) (operational retention): every threaded
 support or fastener exposed to a rotating member's drag, torque reversal or
 loss of preload has a mechanical anti-loosening means, installed by a stated
 assembly step. A plain seated thread, shoulder, shim or threadlocker alone is
@@ -205,12 +205,12 @@ class Ruling:
 
 
 # Keyed by the ``exception`` a row cites. Only the user grants one (policy
-# rule 9).
+# drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)).
 RULINGS: dict[str, Ruling] = {
     "U-MHA-VN-041-threadlocker": Ruling(
         joint="pd-paper-drive/pivot-screw-in-bar",
         granted=(
-            "user, 2026-10-02, joint-specific rule-9 ruling relayed with R9-70: keep the "
+            "user, 2026-10-02, joint-specific drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) ruling relayed with R9-70: keep the "
             "low-strength threadlocker on the MHA-VN-041 shoulder screw. The cross-pin ligament "
             "would be 0.77, a jam nut cannot reach the bar's blind tap, and a pinch slit in "
             "the bar misses the 2.0 wall target with no entry face, so no mechanical lock "
@@ -220,7 +220,7 @@ RULINGS: dict[str, Ruling] = {
     "U-MHA-PD-013-no-lock": Ruling(
         joint="pd-paper-drive/thumbnut-on-knob-shaft",
         granted=(
-            "user, 2026-10-03, joint-specific rule-9 ruling on the machinist review of "
+            "user, 2026-10-03, joint-specific drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) ruling on the machinist review of "
             "6c385465d: no lock on the MHA-PD-013 thumbnut. The T24 floats 0.05-0.15 under the "
             "flange and turns against it only by its drive-pin backlash, ±0.9° per reversal "
             "((Ø2.5 +0.10 hole - Ø2.381 pin) / 2 on the R7 circle). Any drag it passes is "
@@ -234,7 +234,7 @@ RULINGS: dict[str, Ruling] = {
     "U-MHA-VN-034-channel-threadlocker": Ruling(
         joint="ch-channel/pivot-bracket-apex-set-screw",
         granted=(
-            "user, 2026-10-10, joint-specific rule-9 ruling relayed on PR #1317's Codex review: "
+            "user, 2026-10-10, joint-specific drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) ruling relayed on PR #1317's Codex review: "
             "waived; light spring preload and small hub drag; Loctite 222. Each MHA-VN-034 goes "
             "in snug on its flat with Loctite 222 (removable threadlocker), as the MHA-VN-041 "
             "pivot screw keeps its low-strength threadlocker"
@@ -521,7 +521,7 @@ def summary(data: Mapping[str, object], findings: list[Finding]) -> str:
         "",
         f"Enforcement: {data['enforcement']}. Rows: {data['rows']}. "
         f"Findings: {len(findings)} on {len(data['failing_joints'])} joints "
-        f"(policy: cad/docs/drawing-simplicity-policy.md rule 9).",
+        f"(policy: cad/docs/drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)).",
         "",
         "| assembly | rows | instances | findings |",
         "|---|---:|---:|---:|",
@@ -833,8 +833,8 @@ JOINTS: tuple[Joint, ...] = (
         ),
         axial_capture=(
             "fillister head on the MHA-DT-005 counterbore floor; thread through the MHA-DT-020 1/4-20 "
-            "through-tap, cut flush to 0.3 short of the underside (0.90D min, named exception "
-            "MHA-VN-031, engagement only); left loose at post-and-tip-block, tightened at "
+            "through-tap, cut flush to 0.3 short of the underside (0.90D min, pending ruling "
+            "#1019 MHA-VN-031, engagement only); left loose at post-and-tip-block, tightened at "
             "tip-adjuster-set"
         ),
         lock=Lock.NONE,
@@ -844,7 +844,7 @@ JOINTS: tuple[Joint, ...] = (
             "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 2 (post-and-tip-block) and 3 "
             "(tip-adjuster-set 'TIGHTEN BOTH MHA-VN-031'), 4 (crank-mesh-checked 'FIT MHA-DT-011 "
             "DIRECTLY IN THE MHA-DT-005 CRANK BORE'); vn_post_mount_screw_spec.THREAD; "
-            "dt_cone_swing_platform_spec.POST_MOUNT_SPEC; policy Named exceptions MHA-VN-031"
+            "dt_cone_swing_platform_spec.POST_MOUNT_SPEC; pending exception ruling #1019 MHA-VN-031"
         ),
     ),
     Joint(
@@ -894,7 +894,7 @@ JOINTS: tuple[Joint, ...] = (
         ),
         axial_capture=(
             "thread engagement only: headless cup-tip set screw in the block's #10-32 "
-            "through-tap, 1.0D min (named exception MHA-VN-017); cup bears on the shaft tip"
+            "through-tap, 1.0D min (pending ruling #975 MHA-VN-017); cup bears on the shaft tip"
         ),
         lock=Lock.PINCH_CLAMP,
         lock_part="vn_cone_tip_pinch_screw",
@@ -905,7 +905,7 @@ JOINTS: tuple[Joint, ...] = (
             "BACK OFF 1/8 TURN; TIGHTEN MHA-VN-018 ACROSS THE SLIT'); cone_tip_block_spec "
             "SLIT_FLOOR / WORST_SLIT_BREAKTHROUGH_MM (slit opens into the adjuster thread), "
             "PINCH_THREAD; build_dt_drive_train_assembly.py parallel_mate 'adjuster anti-spin "
-            "(pinch-locked)'; policy Named exceptions MHA-VN-017 ('the pinch screw across the slit "
+            "(pinch-locked)'; pending exception ruling #975 MHA-VN-017 ('the pinch screw across the slit "
             "locks it'); cone_stack_end_play.SHAFT_END_PLAY"
         ),
     ),
@@ -991,7 +991,7 @@ JOINTS: tuple[Joint, ...] = (
             "MHA-DT-006 WITH LOCTITE 222, SHOULDER TIGHT; ... FILE THE TIP FLUSH'), CONSUMABLES_NOTES; "
             "build_dt_drive_train_assembly.py handle_screw placement and 'MHA-DT-032 shoulder seated' "
             "mates; crank_handle_pivot_screw_spec THREAD_SIZE; crank_arm_spec "
-            "HANDLE_PIVOT_HOLE_SPEC; policy Named exceptions MHA-DT-035 ('the head bears on the floor')"
+            "HANDLE_PIVOT_HOLE_SPEC; pending exception ruling #1375 MHA-DT-035 ('the head bears on the floor')"
         ),
     ),
     Joint(
@@ -1480,7 +1480,7 @@ JOINTS: tuple[Joint, ...] = (
             "draw_sm_gooseneck_spring_screw) and repeated in the summing "
             "assembly's Manufacturing Notes property (UPPER_EYE_CLAMP_NOTES; the "
             "legacy three-view summing sheet prints no notes until built out, "
-            "policy rule 9); _assert_counter_spring_top_hang"
+            "drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)); _assert_counter_spring_top_hang"
         ),
     ),
     Joint(

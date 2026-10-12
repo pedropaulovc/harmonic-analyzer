@@ -464,7 +464,7 @@ def test_machined_faces_are_called_out_on_the_casting() -> None:
 
 
 def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
-    """#906 (USER RULING 2026-09-26, option ii): rule 3's crank-mesh entry.
+    """#906 (USER RULING 2026-09-26, option ii): drawing-simplicity-policy.md `GD&T allowlist (rule 5)`'s crank-mesh entry.
 
     One diametral angularity frame on the crank bore to datum A, the cone
     journal bore, clocked by datum B, the foot seat; its value is the spec
@@ -496,7 +496,7 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
     policy = (
         Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
     ).read_text(encoding="utf-8")
-    assert "**crank mesh** — MHA-DT-005's crank bore" in policy
+    assert "**Crank mesh.** MHA-DT-005's crank bore" in policy
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "datums=PART_DATUMS" in source
     assert "controls=GEOMETRIC_CONTROLS" in source
@@ -513,8 +513,8 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
 def test_manufacturing_notes_do_not_restate_dimensions() -> None:
     # A note may state the axis relationship, but it may not restate a size, a
     # band or a finish: those remain dimensions and native symbols under
-    # drawing-simplicity-policy.md rules 1 and 6.
-    # drawing-simplicity-policy.md rule 6: at most four short lines.
+    # drawing-guidelines.md rule 2 (the title block is the general specification) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method).
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): at most four short lines.
     lines = spec.DRAWING_NOTES.splitlines()
     assert len(lines) <= 4
     assert max(len(line) for line in lines) <= 64
@@ -697,7 +697,7 @@ def test_cone_boss_end_faces_are_located_by_symmetry() -> None:
 
 
 def test_collar_thrust_face_adds_no_setup_note() -> None:
-    """#914: the collar face gets a finish symbol, not a method note (rule 6).
+    """#914: the collar face gets a finish symbol, not a method note (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 
     Squareness of the north boss end is not functional (the journal locates
     the shaft), so no note may prescribe facing it or a setup for it; the one
@@ -712,7 +712,7 @@ def test_collar_thrust_face_adds_no_setup_note() -> None:
 
 
 def test_north_cone_boss_end_carries_the_running_finish() -> None:
-    """#914: the shaft collar runs on the north boss end face (rule 5)."""
+    """#914: the shaft collar runs on the north boss end face (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates))."""
     import math
 
     from _gtol_planar import PlanarFace
@@ -738,7 +738,7 @@ def test_north_cone_boss_end_carries_the_running_finish() -> None:
 
 
 def test_plan_angle_is_basic_and_prints_the_model_angle() -> None:
-    """#906: the plan angle feeds the crank bore's angularity frame (rule 4),
+    """#906: the plan angle feeds the crank bore's angularity frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)),
     so it is boxed BASIC and prints the model's 12.5182 exactly."""
     assert spec.BASIC_DIMENSIONS == frozenset({"InclineAngle"})
     assert spec.DRAWING_PRECISION_BY_NAME["InclineAngle"] == 4
@@ -861,7 +861,7 @@ def test_crank_bore_is_located_from_the_cone_bore_and_never_binds() -> None:
     assert 'label="crank axis height reference"' in drawing_source
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert """set_global(adapter, "CrankAxisY", '"JournalAxisY" + "CrankAboveCone"')""" in source
-    # Rule 6: the spacing band is a dimension, never a setup method.
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the spacing band is a dimension, never a setup method.
     assert "ONE SETUP" not in spec.DRAWING_NOTES
     assert "BORE-TO-BORE" not in spec.DRAWING_NOTES
 

@@ -1,7 +1,7 @@
 """Offline contract: the rod fork straddles its rocker arm in one plane, and
 the MHA-CH-010 pin is pressed into the fork's reamed tines and runs in the
-arm, with every fit held at the worst case of its printed bands (policy rule
-12). Press fit, ends dressed flush: the user's ruling (2026-10-09, PR #1292
+arm, with every fit held at the worst case of its printed bands (drawing-guidelines.md rule 17 (walls and webs)
+). Press fit, ends dressed flush: the user's ruling (2026-10-09, PR #1292
 review F1), the MHA-CH-011 bar pin's joint (``test_ch_bar_pivot_fit``).
 
 ``ch_rod_pivot_pin_spec`` reads only the two parts it joins; the restated
@@ -104,7 +104,7 @@ def test_worst_case_joint_budget() -> None:
 def test_the_pin_bears_on_the_whole_tine() -> None:
     """PR #1292 review F1: the land the pin bears on in each tine is the
     thinnest tine itself, built here from the fork's printed bands, and it
-    holds rule 12's 1.5 floor. Positive control: the withdrawn 90-degree
+    holds drawing-guidelines.md rule 17 (walls and webs)'s 1.5 floor. Positive control: the withdrawn 90-degree
     Ø3.2 countersink sunk into each tine mouth, on the #47's largest drill,
     left under that floor."""
     w_min = rod.FORK_THICKNESS + rod.FORK_THICKNESS_BAND[1]

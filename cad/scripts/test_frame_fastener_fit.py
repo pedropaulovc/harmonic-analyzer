@@ -44,7 +44,7 @@ def test_upper_stock_screw_keeps_casting_engagement_at_the_printed_bands() -> No
         + top_frame_spec.PRINTED_LINEAR_BAND_MM[bore_places]
     ) / 2.0
     minimum_engagement = cross_screw.SHANK_LEN - max_floor_offset - max_bore_radius
-    # Rule 12: the flush counterbore floor still leaves 1.5D of far thread.
+    # drawing-guidelines.md rule 17 (walls and webs): the flush counterbore floor still leaves 1.5D of far thread.
     assert minimum_engagement >= 1.5 * cross_screw.SHANK_DIA
     full_thread = frame.TOP_CROSS_TAP_SPEC.overrides_mm["ThreadDepth"]
     minimum_thread_reserve = (

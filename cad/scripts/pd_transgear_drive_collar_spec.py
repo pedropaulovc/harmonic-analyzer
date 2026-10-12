@@ -160,7 +160,7 @@ PIN_OFFSET_TOL = DRIVE_PIN_OFFSET_TOL  # ±0.025 each centre
 PIN_OFFSET_PLACES = DRIVE_PIN_OFFSET_PLACES
 PIN_HOLE_DEPTH = LENGTH  # through the body
 
-# --- Decimal places ARE the tolerance (policy rule 2) --------------------------
+# --- Decimal places ARE the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)) --------------------------
 # .XXX: the length (the rearward travel) and the pin-centre offsets (±0.025);
 # the fits carry their own bands; the pilot length reads .XX.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -530,11 +530,11 @@ FIT_UP_NOTE = "\n".join(
     )
 )
 
-# The sheet states the approved shortfalls (contract §10.1); the ruling IDs
-# stay here.
-# Named exception: MHA-PD-022 collar rim (drawing-simplicity-policy.md, "Named exceptions").
-# Named exception: MHA-PD-022 pilot wall (drawing-simplicity-policy.md, "Named exceptions").
-# Named exception: MHA-PD-022 slot floor to front face (drawing-simplicity-policy.md, "Named exceptions").
+# The sheet states the shortfalls (contract §10.1); their pending ruling
+# is tracked in #1381, never on the sheet.
+# Pending exception ruling: MHA-PD-022 collar rim (#1381).
+# Pending exception ruling: MHA-PD-022 pilot wall (#1381).
+# Pending exception ruling: MHA-PD-022 slot floor to front face (#1381).
 DRAWING_NOTES = "\n".join(
     (
         f"DRIVE-PIN HOLE TO COLLAR RIM {DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN.",

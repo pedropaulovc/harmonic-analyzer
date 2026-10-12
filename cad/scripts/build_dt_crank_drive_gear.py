@@ -199,7 +199,7 @@ async def build(adapter) -> dict[str, str]:
     # build_fixed_gear is shared by five recipes, so it leaves the blank under
     # the adapter's default names. Name the boss here: the face width is a size
     # the turner sets, so it prints as a NATIVE model dimension
-    # (drawing-simplicity-policy.md rules 1-2), which means it must be named,
+    # (drawing-simplicity-policy.md `How the repository implements the guidelines`), which means it must be named,
     # driven, marked and given its decimal places like any other. Driving it is
     # also the guard on the default name: a rename that resolved the wrong
     # feature would move the blank and the equation-neutral volume gate below
@@ -330,7 +330,7 @@ async def build(adapter) -> dict[str, str]:
     # off a ROOT cylinder blank (_gear.build_fixed_gear), so no solid feature
     # owns the outside diameter -- yet the OD is the first size the turner sets
     # and the print must carry it as a model dimension, not as text in the data
-    # block (policy rule 2's "model it, even if that takes a hidden reference
+    # block (drawing-simplicity-policy.md `How the repository implements the guidelines`'s "model it, even if that takes a hidden reference
     # sketch whose one driving dimension IS the value"). Construction geometry:
     # its dimension imports onto the sheet, the circle itself is never drawn.
     check("create_sketch tip reference", await adapter.create_sketch("Front"))

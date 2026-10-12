@@ -33,7 +33,7 @@ OD_PLACES = 1
 BORE_DIA = PIN.DIA
 BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower), the sleeve's running band
 BORE_PLACES = 3
-# The running fit on the pin, named on the bore callout (policy rule 2).
+# The running fit on the pin, named on the bore callout (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)).
 BORE_CALLOUT = (
     "REAM THRU\n"
     f"({FIT.BORE_DIAMETRAL_CLEARANCE[0]:.3f}-{FIT.BORE_DIAMETRAL_CLEARANCE[1]:.3f}"
@@ -91,7 +91,7 @@ DRAWING_NOTES = "\n".join(
     )
 )
 
-# Rule 5: the bore runs on the pin and both faces bear, so all three carry
+# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore runs on the pin and both faces bear, so all three carry
 # the machined grade, the bore as the sleeve's bore on the same pin does.
 SURFACE_FINISHES = (
     SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),

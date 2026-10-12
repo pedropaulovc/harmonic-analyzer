@@ -94,7 +94,7 @@ KEEPER_SEAT_BOUNDS_XZ = tuple(
 # HANGER_PIN_X either side of the screw axis along X, key the block against
 # turning about the screw: the +X dowel slips into a round blind hole (the
 # block's locator), the -X dowel into a blind slot of the same slip width
-# whose length absorbs the pair's spacing mismatch (rule 12).
+# whose length absorbs the pair's spacing mismatch (drawing-guidelines.md rule 19 (absorb stacks at fit-up, not with tighter bands)).
 _X = float(str(_config.title_block("linear_1pl")["display"]).lstrip("\u00b1"))
 _XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("\u00b1"))
 _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
@@ -119,7 +119,7 @@ HANGER_HOLE_SPEC = HoleSpec(
 HANGER_GRIP = RING_HEIGHT - HANGER_CBORE_DEPTH  # 30.0
 HANGER_GRIP_PLACES = 1
 HANGER_GRIP_TOL = _X  # 0.8
-# Print-worst checks (rule 12), the dt_cone_swing_platform hold-down's: the
+# Print-worst checks (drawing-guidelines.md rule 17 (walls and webs)), the dt_cone_swing_platform hold-down's: the
 # head clears the smallest counterbore and stays under the crossbar top, and
 # bears beyond the largest drilled clearance hole.
 HANGER_CBORE_HEAD_CLEARANCE = HANGER_CBORE_DIA - _XX - HANGER_SCREW.HEAD_DIA  # 0.75
@@ -304,7 +304,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # KeeperFrontX ...) are NOT marked: a Hole Wizard placement sketch
     # measures from the origin -- mid-air on the print -- so sheet 3
     # dimensions those stations from the socket bore axes with sheet-derived
-    # dimensions (DRAWING_REFERENCE_PRECISION below, policy rule 7).  The
+    # dimensions (DRAWING_REFERENCE_PRECISION below, drawing-guidelines.md rule 10 (dimension from a real feature)).  The
     # dowel slip holes' and slots' stations from the screw axis and the slot
     # length are sheet-derived the same way; the round hole's size and depth
     # are the model's, printed on section F-F, and the slot's width the
@@ -319,7 +319,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # --- Decimal places, authored ON THE PART -------------------------------------
 #
-# Policy rule 2: the places a dimension prints are part of the tolerance it
+# drawing-simplicity-policy.md `How the repository implements the guidelines`: the places a dimension prints are part of the tolerance it
 # claims, and the model owns both.  ``build_fr_top_frame`` applies this table
 # natively (``_drawing_precision.apply_drawing_precision``) right after the drawing
 # marks, so ``draw_fr_top_frame`` imports each dimension verbatim and only reads
@@ -373,7 +373,7 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 
 # --- Decimal places for the dimensions the SHEET derives ----------------------
 #
-# Rule 2's one exception.  Some numbers on this print are distances between two
+# drawing-simplicity-policy.md `How the repository implements the guidelines`'s one exception.  Some numbers on this print are distances between two
 # model faces that no single model dimension expresses: a web thickness that is
 # the difference of two profile offsets, a flange thickness between two extrude
 # extents, a boss stack that sums three, a chamfer leg, a counterbore-floor
@@ -459,7 +459,7 @@ KEEPER_TAP_CALLOUT_PRECISION = {
     "hw-tapdrldepth": 1,
     "hw-threaddepth": 1,
 }
-# Rule 12 receiver-wall stack: realistic angular drift through the FULL
+# drawing-guidelines.md rule 17 (walls and webs) receiver-wall stack: realistic angular drift through the FULL
 # printed cylindrical pilot depth, without relying on a precision drill jig.
 KEEPER_TAP_DRILL_WANDER_DEG = 0.3
 
@@ -472,7 +472,7 @@ KEEPER_TAP_DRILL_WANDER_DEG = 0.3
 # the "UNLESS NOTED": section E-E's note names the crossbar flange underside,
 # the hub side view's note the hub rib bottoms, V-gussets and set-screw
 # pocket rim, the underside locator's the bar and gusset bottoms at the knife
-# seats; they keep the title block break.  Rule 6 caps this block at four
+# seats; they keep the title block break.  drawing-guidelines.md rule 7 (notes: few, flagged, never a method) caps this block at four
 # lines of at most 70 characters.
 DRAWING_NOTES = (
     "MATCH EACH SOCKET TO ITS ASSIGNED ACTUAL MHA-FR-003 TUBE.\n"

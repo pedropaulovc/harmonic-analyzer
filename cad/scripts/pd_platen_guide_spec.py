@@ -30,7 +30,7 @@ GUIDE_DEPTH_PLACES = 2
 
 # The print's dimensions, by owning feature (the build marks exactly these and
 # the sheet imports only these), and the places each carries, authored on the
-# model (policy rule 2). The height prints at the depth's places (the
+# model (drawing-simplicity-policy.md `How the repository implements the guidelines`). The height prints at the depth's places (the
 # lock-station sweep reads it so). The length prints .X: the rail ends only
 # meet the platen's edges, and the holes locate from the left end at basic
 # stations, so no stack reads its band.
@@ -67,7 +67,7 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "guide hole-pattern position": "0.20",
 }
 
-# The one running surface (policy rule 5): the platen HANGS by the top rail's
+# The one running surface (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): the platen HANGS by the top rail's
 # bottom face (local y 0, datum B) on the support bar's top edge and slides
 # along it across the feed. Both rails are this part, so the face is cut on
 # both. Every other face is cast/machined per the title block.

@@ -51,7 +51,7 @@ def test_every_marked_dimension_prints_in_exactly_one_view() -> None:
 
 
 def test_turned_diameters_and_lengths_print_on_the_side_view() -> None:
-    # Rule 7: the turned O.D. and pilot sit on the profile the side view
+    # drawing-guidelines.md rule 11 (turned parts read like the lathe): the turned O.D. and pilot sit on the profile the side view
     # looks at, beside both lengths; the end view keeps only the holes.
     body = spec.DRAWING_DIMENSIONS["BodyProfile"]
     assert body == {"CollarDia", "CollarLength", "PilotDia", "PilotLength"}

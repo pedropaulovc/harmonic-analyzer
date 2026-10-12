@@ -394,7 +394,7 @@ async def build(adapter) -> dict[str, str]:
     await bbox_extent_check(adapter, "head Ø (x)", "x", HEAD_DIA, 0.01)
     await bbox_extent_check(adapter, "head Ø (y)", "y", HEAD_DIA, 0.01)
 
-    # Model-owned bands (policy rule 2): the ground shank (the running fit and
+    # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the ground shank (the running fit and
     # the press in the arm) and the ring groove's catalogue Ø and width.  The
     # groove station and the front land print .XXX and the title block governs
     # them.

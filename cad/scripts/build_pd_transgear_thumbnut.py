@@ -518,7 +518,7 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
     # Every printed dimension is governed by its places (the spec's
     # DRAWING_PRECISION): no model band.  No roughness symbol: the seat face
-    # is a clamp face (policy rule 5).
+    # is a clamp face (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

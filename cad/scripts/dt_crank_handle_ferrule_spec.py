@@ -66,7 +66,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # The OD is the rod as supplied: a reference, not a turned size.
 REFERENCE_DIMENSIONS = frozenset({"OuterDia"})
 
-# The mating part, quoted only to identify it (rule 6).  Written here rather
+# The mating part, quoted only to identify it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).  Written here rather
 # than read from _config.parts so dt-crank-handle.yaml is not a rebuild input; the
 # offline test checks it against the registry.
 HANDLE_NUMBER = "MHA-DT-008"

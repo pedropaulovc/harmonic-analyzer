@@ -87,7 +87,7 @@ def test_screw_holes_keep_the_ligament_floor_at_the_printed_worst_case() -> None
 
 
 def test_hole_coordinates_print_from_the_corner_without_a_frame() -> None:
-    """Rule 3: no frame on this plate; each hole coordinate prints from the
+    """drawing-guidelines.md rule 5 (avoid excessive GD&T): no frame on this plate; each hole coordinate prints from the
     plate's corner at .XXX under its own band, and the shared Y once, 2X."""
     holes = pd_guide_lock_spec.DRAWING_DIMENSIONS["ScrewHoles"]
     assert holes == {"Hole1X", "Hole2X", "Hole1Y"} <= set(drawing.FRONT_KEEP)

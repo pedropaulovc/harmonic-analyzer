@@ -23,12 +23,12 @@ PLATE_THICKNESS = 3.85
 # Clip-screw receivers: the stock 90114A511 shank reaches through the clip's
 # integral seat into a #4-40 tap through the plate and a Ø7 boss standing
 # SOCKET_BOSS_H proud of the back face at each station, so the thread engages
-# >= 1.5D (rule 12) and the screw tip finishes flush with the boss's rear face.
+# >= 1.5D (drawing-guidelines.md rule 18 (thread engagement)) and the screw tip finishes flush with the boss's rear face.
 # These must be through taps: no blind receiver here can accept the exact
 # 6.35-mm under-head length without bottoming. The bosses stand above the top
 # guide rail's band, where nothing but the clip-screw tips rides the back.
 SOCKET_SPEC = HoleSpec("tapped", "#4-40")
-SOCKET_BOSS_DIA = 7.0  # 2.08 wall around the #4-40 major (rule 12: 2.0)
+SOCKET_BOSS_DIA = 7.0  # 2.08 wall around the #4-40 major (drawing-guidelines.md rule 17 (walls and webs): 2.0)
 SOCKET_BOSS_H = 0.65
 SOCKET_THREAD_ENGAGEMENT = PLATE_THICKNESS + SOCKET_BOSS_H
 SOCKET_XY = (

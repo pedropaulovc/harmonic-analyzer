@@ -194,8 +194,8 @@ def chord_floor_radius_mm(
 #
 # * T006, T012: the thicker tooth's chord would sit in the drum tip's path
 #   (+0.030 at T006), so the floor bows below the feet chord to the printed
-#   MIN.  MIN is the web limit: T006 keeps the 0.621 web the user ruled on as
-#   its named exception (U40); T012 trades its web from 2.12 down to 2.05,
+#   MIN. MIN is the web limit: T006 keeps the 0.621 web pending ruling
+#   #971; T012 trades its web from 2.12 down to 2.05,
 #   still over the 2.0 target, for a 0.25 window instead of 0.11.
 # * T018-T042: the chord between the flank feet on the base circle.
 # * T048-T120: the flanks start at ``GAP_FLOOR_TMIN`` above the base circle,
@@ -318,13 +318,13 @@ def material_specification(teeth: int) -> str:
 
 FAMILY_BORES_MM = {teeth: bore_dia_mm(teeth) for teeth in CONFIGURATION_TEETH}
 
-# Policy rule 12: machined webs target >= 2.0 mm with a hard floor of 1.5 mm,
+# drawing-guidelines.md rule 17 (walls and webs): machined webs target >= 2.0 mm with a hard floor of 1.5 mm,
 # between the printed MIN floor diameter and the maximum bore.  The D-flat
 # only adds material inside the round bore, so the thinnest web stays on the
 # round side and these values are the round bore's.  U40 (user, 2026-09-23):
 # T012, T018 and T024 each drop one shaft land so their webs meet the target;
 # T006 has no compliant construction (its floor sits at r 1.44) and its web
-# is the one named exception (book fidelity).
+# is pending exception ruling #971 (book fidelity).
 MACHINED_WEB_FLOOR_MM = 1.5
 MACHINED_WEB_TARGET_MM = 2.0
 WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.621}
@@ -452,7 +452,7 @@ REFERENCE_SKETCHES = (TOOTH_REFERENCE_SKETCH, GAP_FLOOR_SKETCH)
 
 # The three blank sizes, the tooth-system acceptance size and the gap-floor
 # limits.  ToothThickness and FloorDia are DRIVING dimensions in
-# construction-only authoring sketches: policy rule 2 permits that pattern
+# construction-only authoring sketches: drawing-simplicity-policy.md `How the repository implements the guidelines` permits that pattern
 # when the printed value is not itself a solid feature dimension (the gap
 # floor is an involute-profile chord bowed by FloorDip, with no diameter of
 # its own).  Neither is a reference-status drawing dimension, so their native
@@ -490,7 +490,7 @@ def configuration_number(part_number: str, teeth: int) -> str:
 
 # --- Decimal places, authored ON THE PART ------------------------------------
 #
-# Policy rule 2: places and bands are model properties.  Three places belong
+# drawing-simplicity-policy.md `How the repository implements the guidelines`: places and bands are model properties.  Three places belong
 # on the fit dimensions (the bore, its across-flat and circular tooth
 # thickness) and on the gap-floor limits, whose T006 window is 0.049 wide.
 # Tip diameter prints two places with its own BLANK_DIA_BAND (below); face

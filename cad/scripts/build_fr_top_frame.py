@@ -450,7 +450,7 @@ if abs(FRONT_COLUMN_Z + REAR_COLUMN_Z) > 1e-12 or abs(FRAME_CENTER_Z) > 1e-12:
     raise AssertionError("top-frame assumes a symmetric column span about z 0")
 if STUD_Z_REAR + HANGER_CBORE_DIA / 2.0 >= INNER_Z + GUSSET:
     raise AssertionError("rear hanger counterbore escapes the junction material")
-# Dowel slip holes and slots (rule 12, print-worst): the largest reamed hole
+# Dowel slip holes and slots (drawing-guidelines.md rule 17 (walls and webs), print-worst): the largest reamed hole
 # and the longest slot keep a wall to the crossbar's +X / -X face and to the
 # largest drilled screw clearance hole with the round hole's station at its
 # .XXX limit and the slot's at that plus its zone radius off the BASIC 12.700
@@ -480,7 +480,7 @@ for _label, _value in (
 ):
     if _value <= 0.0:
         raise AssertionError(f"knife-mount dowel slip {_label}: {_value:.3f}")
-# Crossbar pockets (rule 12, print-worst): every hanger hole stays in the
+# Crossbar pockets (drawing-guidelines.md rule 17 (walls and webs), print-worst): every hanger hole stays in the
 # full-depth junction beyond the pocket end. The nearer (front) station
 # keeps its wall in z with the station at its .X band from the socket axis,
 # each pocket end a full band of its printed .X length out (the length's
@@ -518,7 +518,7 @@ for _label, _value in BAR_POCKET_HOLE_WALLS.items():
         )
 
 
-# Knife-mount top seats (rule 12, print-worst): each block's footprint on
+# Knife-mount top seats (drawing-guidelines.md rule 17 (walls and webs), print-worst): each block's footprint on
 # the crossbar underside, (x, z), is the convex hull of its corners over
 # every printed extreme -- its round dowel hole at the hanger's .X x and z
 # stations from the sockets, the .XXX dowel-hole offset from the hanger
@@ -613,7 +613,7 @@ KEEPER_TAP_THREAD_MAJOR_DIA = max(
 )
 if abs(KEEPER_TAP_X - COLUMN_X) + KEEPER_TAP_THREAD_MAJOR_DIA / 2.0 > WEB_T / 2.0:
     raise AssertionError("keeper taps break out of the west-rail web")
-# Flush counterbore (rule 12, print-worst). The mouth's lowest point on the
+# Flush counterbore (drawing-guidelines.md rule 17 (walls and webs), print-worst). The mouth's lowest point on the
 # Y-axis barrel is at its widest |x| = Dcb/2, so the head top must stay below
 # |Zcol| + sqrt(R^2 - (Dcb/2)^2). Boss diameter, counterbore diameter and the
 # floor offset from the socket axis all print .X: the shallowest recess takes
@@ -876,7 +876,7 @@ KEEPER_MAX_TAP_DRILL_DEPTH = (
     round(KEEPER_TAP_SPEC.depth_mm, KEEPER_TAP_CALLOUT_PRECISION["hw-tapdrldepth"])
     + PRINTED_LINEAR_BAND_MM[KEEPER_TAP_CALLOUT_PRECISION["hw-tapdrldepth"]]
 )
-# Rule 12: budget realistic deep-drill wander over the FULL allowed
+# drawing-guidelines.md rule 17 (walls and webs): budget realistic deep-drill wander over the FULL allowed
 # cylindrical depth, not only the shorter threaded region. Its displacement
 # disk conservatively covers every pilot/thread section and every direction;
 # subtracting its radius from the normal wall distance handles the T-root
@@ -3007,7 +3007,7 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     # The decimal places travel WITH the dimension: the drawing imports each
     # marked dimension and only reads its precision back, so the part is the
-    # single place a place count is authored (drawing-simplicity rule 2).
+    # single place a place count is authored (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _qualify_machined_faces(adapter)
     _qualify_keeper_seat_faces(adapter)

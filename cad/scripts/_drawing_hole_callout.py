@@ -237,7 +237,7 @@ def add_native_hole_callout(
     ``process`` is the shop instruction a machinist reads first -- ``"DRILL"``,
     ``"15/64 DRILL"``, ``"REAM"`` -- written into the callout's PREFIX
     compartment so the sheet reads ``15/64 DRILL <MOD-DIAM>5.95 THRU ALL``
-    (Harvey #13: say drill or ream; drawing-simplicity-policy.md rule 7).  The
+    (Harvey #13: say drill or ream; drawing-guidelines.md rule 12 (hole and slot callouts say what to do)).  The
     size and depth stay native and associative; only the prefix is text.
 
     The callout DISPLAYS the part's hole tolerance; it does not own one. Set the

@@ -39,10 +39,10 @@ def root_to_bore_web_min_mm(teeth: int) -> float:
 
 # The named shortfalls print as plain facts on the sheets they affect, so a
 # blind reviewer reads them off the package; the governance lives in the
-# policy's Named exceptions table and in these tags, never on the sheet.  The
+# pending ruling issue #971 and in these tags, never on the sheet. The
 # row says HOLE, not BORE: the bore is a native dimension, and GEAR DATA
 # carries no parallel BORE row.
-# Named exception: MHA-DT-003 web (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-DT-003 web (#971).
 def web_row(teeth: int) -> tuple[str, str]:
     """Return the GEAR DATA row stating one gear's thinnest web as a MIN."""
     # rounded DOWN: the sheet never states more web than the limits give
@@ -50,7 +50,7 @@ def web_row(teeth: int) -> tuple[str, str]:
     return ("WEB, GAP FLOOR TO HOLE (mm, REF)", f"{web:.2f} MIN")
 
 
-# Named exception: MHA-DT-003 contact ratio (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-DT-003 contact ratio (#971).
 def contact_ratio_row(teeth: int) -> tuple[str, str]:
     """Return the GEAR DATA row stating one gear's worst-case contact ratio."""
     return (
@@ -90,7 +90,7 @@ def gear_data(teeth: int) -> str:
             f"BACKLASH WITH {CYLINDER_MATE_NUMBER}, ACCEPT AT ASSEMBLY (mm)",
             f"{minimum:.2f} TO {maximum:.2f}",
         ),
-        # Rule 6: the sheet states results, never how to cut them.  TOOTH
+        # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the sheet states results, never how to cut them.  TOOTH
         # FORM (floor any shape, not below the floor diameter), the floor
         # limits, the tooth-thickness band and the assembly backlash are the
         # whole acceptance for the thickened tooth's narrow gap.

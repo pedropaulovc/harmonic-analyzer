@@ -560,7 +560,7 @@ def _label_kink_detail(
 def _hole_locations(adapter: Any, top: Any) -> None:
     """Locate the pad hole from the foot's free end and the pad's lower edge.
 
-    The Hole Wizard placement sketch cannot carry a datum point (rule 7), so the
+    The Hole Wizard placement sketch cannot carry a datum point (drawing-guidelines.md rule 10 (dimension from a real feature)), so the
     print dimensions the hole from the blank's own edges with driven sheet
     dimensions picked on both features; they print at the .XX row.
     """
@@ -676,7 +676,7 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    # Rule 7: nothing on this part is communicated by a hidden line -- the
+    # drawing-guidelines.md rule 9 (show internal shape in solid lines): nothing on this part is communicated by a hidden line -- the
     # hole is defined by its callout -- so every view is hidden-lines-removed.
     for view in (front, top, iso):
         set_hidden_lines_removed(adapter, view)

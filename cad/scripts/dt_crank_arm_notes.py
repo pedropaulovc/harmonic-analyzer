@@ -10,8 +10,8 @@ from dt_crank_hub_notes import seam_callout, seat_bore_callout
 
 # Short lines: the callout is centred under the diameter, so its widest line
 # sets how close to the left border the hub-end dimension can stand.  The
-# hub's press fit is stated here, on the feature (policy rule 6).
+# hub's press fit is stated here, on the feature (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 HUB_SEAT_CALLOUT = seat_bore_callout("MHA-DT-031 HUB")
 # The MHA-VN-029 seam is match-drilled with the hub at assembly; its callout sits
-# on the seam itself (policy rule 6) with the pin's nominal size and depth.
+# on the seam itself (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)) with the pin's nominal size and depth.
 SEAM_CALLOUT = seam_callout("MHA-DT-031", pin="MHA-VN-029 AXIAL PIN")

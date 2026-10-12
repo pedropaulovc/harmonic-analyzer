@@ -1,7 +1,7 @@
 """Offline contract: the amplitude bar's top notch straddles its channel lever,
 and the MHA-CH-011 pin is pressed into both notch cheeks and runs in the
 lever, with every fit held at the worst case of its printed bands (policy
-rule 12).
+drawing-guidelines.md rule 17 (walls and webs)).
 
 ``ch_bar_pivot_pin_spec`` reads only the two parts it joins; the restated
 floors and bands are pinned to their sources here.
@@ -61,7 +61,7 @@ def test_worst_case_joint_budget() -> None:
 
 
 def test_the_cheeks_the_pin_presses_into_are_the_1038_shortfall_unchanged() -> None:
-    """The printed ledge cheek holds the rule-12 floor; the far cheek, derived
+    """The printed ledge cheek holds the drawing-guidelines.md rule 17 (walls and webs) floor; the far cheek, derived
     from the widest notch on the narrowest stock, is the pre-existing #1038
     shortfall. The pin fills the hole it presses into and changes neither."""
     b = pin.BUDGET

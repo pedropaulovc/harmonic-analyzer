@@ -109,7 +109,7 @@ REFERENCE_SKETCHES = (
 # from the same values the print annotates (BLOCK_X/BLOCK_Z/BLOCK_HEIGHT,
 # threads, pinch height, slit width).
 # --- adjuster + pinch lock (item 5, v4_t00471 / 7:49) ------------------------
-# Native #10-32 adjuster thread tapped THROUGH the block (rule-12 E11/W1). Its
+# Native #10-32 adjuster thread tapped THROUGH the block (drawing-guidelines.md rule 18 (thread engagement) E11/W1). Its
 # tap-drill diameter is manufacturing geometry, distinct from the purchased
 # screw's true major-diameter solid.  The shaft tip enters through the same
 # thread from the south face.
@@ -292,7 +292,7 @@ async def build(adapter) -> dict[str, str]:
     v_block = BLOCK_X * BLOCK_Z * BLOCK_HEIGHT
     volume = await volume_check(adapter, "block", v_block, 0.005 * v_block)
 
-    # Adjuster interface (v4_t00471 / 7:49; rule-12 E11/W1): ONE native Hole
+    # Adjuster interface (v4_t00471 / 7:49; drawing-guidelines.md rule 18 (thread engagement) E11/W1): ONE native Hole
     # Wizard #10-32 TAPPED hole THROUGH the block on the cone axis.  The
     # slotted cup-point adjuster threads in from the north face and the shaft
     # tip enters from the south face into its cup (axial end-play takeup).

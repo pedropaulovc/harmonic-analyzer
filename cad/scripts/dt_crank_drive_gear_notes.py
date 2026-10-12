@@ -60,11 +60,11 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 
-# Named exception: MHA-DT-007 contact ratio (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-DT-007 contact ratio (#1372).
 CONTACT_RATIO_ROW = ("CONTACT RATIO WITH MHA-DT-010, WORST CASE (REF)", f"{WORST_CONTACT_RATIO:.2f}")
 
 
-# Rule 6's gear-data block: the tooth system a cut-gear drawing cannot express
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)'s gear-data block: the tooth system a cut-gear drawing cannot express
 # as dimensions. The cutter is named first, in the NORMAL plane it cuts in
 # (#906: one cutter for the pair, set over at the helix angle); every number
 # that follows from it is REF -- the cutter, its depth of cut and the helix
@@ -113,14 +113,14 @@ GEAR_DATA = gear_data_note(
 
 # The local +X flat and the paired shaft seat are defined by the native
 # BoreAF and BoreDia dimensions; the assembly's stack locates this gear.
-# The seat's owner, quoted only to identify the mate (rule 6). Hard-coded
+# The seat's owner, quoted only to identify the mate (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). Hard-coded
 # rather than read from ``_config.parts``: this module is in the part's
 # rebuild closure, and a cross-part config read would make cone-gear-shaft.yaml
 # a rebuild dependency of this gear. ``test_crank_drive_gear_drawing`` checks
 # it against the registry offline, where a cross-check costs nothing.
 SHAFT_MATE_NUMBER = "MHA-DT-004"
 
-# Rule 6's only note: the standard title-block edge break would erase too
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)'s only note: the standard title-block edge break would erase too
 # much of these fine teeth. The D-bore, its AF band and its shaft mate are
 # defined by the model dimensions and fit callout, not by another note.
 DRAWING_NOTES = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."

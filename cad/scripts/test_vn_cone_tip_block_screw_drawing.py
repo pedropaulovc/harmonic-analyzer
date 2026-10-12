@@ -293,7 +293,7 @@ _DIMENSION = re.compile(r"\d")
 
 def test_sheet_carries_no_installation_note_and_no_dimension_in_a_note() -> None:
     """Main (I31): MHA-VN-030's sheet has no INSTALLATION note and no dimension in
-    any note (Rule 6).  The purchased sheet prints only the registry's stock
+    any note (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).  The purchased sheet prints only the registry's stock
     name, supplier and SKU besides its fixed footer, so none of those may
     carry a size."""
     row = _config.parts(part.PART_NAME)

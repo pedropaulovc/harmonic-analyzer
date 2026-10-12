@@ -42,7 +42,7 @@ from pd_transgear_arm_plate_geometry import (
 )
 
 # The general-tolerance band each printed place count claims (the title-block
-# rows the geometry module hard-codes, policy rule 12).
+# rows the geometry module hard-codes, drawing-guidelines.md rule 3 (decimal places carry the tolerance)).
 BAND_BY_PLACES: dict[int, float] = {1: BAND_X, 2: BAND_XX, 3: BAND_XXX}
 
 # Places each printed dimension carries (contract §12):
@@ -99,7 +99,7 @@ HUB_TO_BOSS_TOLERANCE = HUB_TO_BOSS_BAND
 # The screw-hole positions from the bore, the band the arm's taps carry.
 HOLE_POSITION_TOLERANCE = HOLE_POSITION_BAND
 
-# The bore is the knob shaft's running surface (policy rule 5): MACHINED, on
+# The bore is the knob shaft's running surface (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MACHINED, on
 # the exact native Ø8.5 face the part build resolves.  The hub face and the
 # boss face are the knob stack's running thrust faces (the MHA-PD-015 thrust
 # ring and the MHA-PD-016 cup), MACHINED as the crankshaft journals are (R9-13).
@@ -116,7 +116,7 @@ SURFACE_FINISHES = (
 )
 
 # --- Printed text -------------------------------------------------------------
-# The bore is a fit: REAM is the requirement (policy rule 7).  The screw
+# The bore is a fit: REAM is the requirement (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)).  The screw
 # holes are clearance, drilled; both countersinks take the oval heads.
 BORE_CALLOUT = "REAM THRU"
 SCREW_HOLE_CALLOUT = "DRILL THRU"
@@ -127,7 +127,7 @@ ISO_VIEW_SCALE = (1, 1)
 ISOMETRIC_VIEW_NOTE = f"ISOMETRIC VIEW SCALE {ISO_VIEW_SCALE[0]}:{ISO_VIEW_SCALE[1]}"
 
 # Marked model dimensions and the places the model authors on them
-# (drawing-simplicity policy rule 2).  The bearing profile is the revolved
+# (drawing-simplicity-policy.md `How the repository implements the guidelines`).  The bearing profile is the revolved
 # hub and boss, sketched in the section plane; the countersink Ø lives in the
 # blanked ``CountersinkReference`` sketch on the rear face (the revolved cuts
 # that model the cones are sketched edge-on to the plan).  The boss height is

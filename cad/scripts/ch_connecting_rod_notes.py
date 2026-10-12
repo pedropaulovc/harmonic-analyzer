@@ -21,12 +21,12 @@ from ch_connecting_rod_spec import (
 # The strap-bore fit rides the Ø30.80 dimension callout (+0.10/0); the ring
 # centre-to-pin distance is a BASIC sheet dimension; the fork thickness and
 # slot carry their 3-place model bands; the reamed pin hole prints its size
-# and band from the PinHoleDia model dimension at three places (policy rules
-# 2 and 6, PR #1292 review N1), so note 5 names only the press and its pin.
+# and band from the PinHoleDia model dimension at three places (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method)
+# , PR #1292 review N1), so note 5 names only the press and its pin.
 # Notes carry only what the sheet does not dimension natively, so no number
 # appears in both places.  The
 # material (1018 plate) and the black finish are title-block rows, never
-# restated here (simplicity policy rule 1).  Lines stay within 40 characters:
+# restated here (drawing-guidelines.md rule 2 (the title block is the general specification)).  Lines stay within 40 characters:
 # the block sits in the column between the front view's pin annotations and
 # the isometric view.
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the

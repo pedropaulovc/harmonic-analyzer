@@ -52,7 +52,7 @@ recipes:
 | 92865A585 | `vn-hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 93075A194 | `vn-hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93585A190 | `vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
-| 94025A150 | — (diagnostic recipe; `vn-cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
+| 94025A150 | — (diagnostic recipe; `vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 9714K24 | `vn-rocker-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9714K392 | `vn-cylinder-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
@@ -86,9 +86,9 @@ Live catalogue verification on October 9, 2026:
   **ASTM F912**. The 2-D PDF gives major diameter **0.073 in**, length
   **0.156 in** and the **0.035 in** hex; it gives no cup dimension, so the
   cup diameter is the ASME B18.3 #1 maximum, 0.040 in. The #1-72 thread
-  follows the keeper's crown tap (rule 12). 5/32 supersedes the 1/8 in
+  follows the keeper's crown tap (drawing-guidelines.md rule 18 (thread engagement)). 5/32 supersedes the 1/8 in
   91375A753 (same family row, $9.31/10), whose installed engagement fell
-  to 1.40D at the worst case, under rule 12 (Main ruling A, 2026-10-10);
+  to 1.40D at the worst case, under drawing-guidelines.md rule 17 (walls and webs) (Main ruling A, 2026-10-10);
   the superseded #6-32 candidate was 91375A182 (#6-32 x 5/32). No vendor
   model is harvested: `diagnostics.diag_build_91375A942` scales the
   91375A106 recipe's laws to the #1-72 pitch and the catalogue hex, family
@@ -105,7 +105,7 @@ Live catalogue verification on October 10, 2026:
   **0.14 in**, head height **0.083 in**, **Fully Threaded**, tensile strength
   **70,000 psi**, package quantity **100**. The 90280A steel family has no
   #2-56 size. The smaller thread follows the transferred top-frame tap: the
-  #4-40 tap left too thin a rule-12 ligament under the keeper foot. The head
+  #4-40 tap left too thin a drawing-guidelines.md rule 17 (walls and webs) ligament under the keeper foot. The head
   and thread are the 91794A077 row's, so the shared fillister recipe builds it
   from the length alone; no vendor SLDPRT has been harvested for it.
   `diagnostics.diag_build_90280A194` stays as a diagnostic recipe.
@@ -268,7 +268,7 @@ Catalog specifications checked on September 10, 2026:
   this length yet.
 - [91255A148](https://www.mcmaster.com/91255A148/) is the #6-32 x 1/2 in
   black-oxide alloy steel button head hex drive screw that held the cone tip
-  block under U30 (rule-12 W22). `vn-cone-tip-block-screw` is now
+  block under U30 (drawing-guidelines.md rule 17 (walls and webs) W22). `vn-cone-tip-block-screw` is now
   91251A108 (below); this entry stays as the replica recipe's provenance and
   is no longer a machine part. Source: the McMaster product page, supplied by
   the user on September 24, 2026 (an agent fetch that day was refused, HTTP

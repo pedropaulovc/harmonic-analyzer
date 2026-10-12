@@ -22,7 +22,7 @@ if PIN_LENGTH != BOSS_DIA:
 PIN_LEN = PIN_LENGTH  # 13.51
 
 # Marked model dimensions: the two the print carries, both on the revolve's
-# half-profile so both import into the side view (rule 7: a turned part's
+# half-profile so both import into the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe): a turned part's
 # diameter sits beside its length). The diameter is a routine turned / cut
 # size at the title block's .XX general grade -- the match-drilled hole sets
 # the fit (a drill-size pin in its own drill's hole is a light drive fit).
@@ -32,7 +32,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "PinLen"},
 }
 
-# Decimal places, authored ON THE PART (drawing-simplicity-policy.md rule 2);
+# Decimal places, authored ON THE PART (drawing-simplicity-policy.md `How the repository implements the guidelines`);
 # ``build_dt_crank_pinion_pin`` applies this natively and ``draw_dt_crank_pinion_pin``
 # reads it back.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -52,6 +52,6 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 ):
     raise AssertionError("every marked pin dimension needs authored places")
 
-# No manufacturing note (rule 6): the title-block MATERIAL "AISI 1018 CF or
+# No manufacturing note (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the title-block MATERIAL "AISI 1018 CF or
 # drill rod, 1/8 in" is the one statement of the stock, and the faced ends are
 # the depicted geometry.

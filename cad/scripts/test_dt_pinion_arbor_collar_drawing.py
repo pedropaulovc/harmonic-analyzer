@@ -214,7 +214,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 def test_only_the_pin_hole_carries_a_band() -> None:
     """The Ø8 bore is a plain drilled hole: the title block's DRILLED HOLES
     row governs it, and restating that row on the dimension is what policy
-    rule 1 forbids (Codex on #860).  Only the pin hole's tighter band rides."""
+    drawing-guidelines.md rule 2 (the title block is the general specification) forbids (Codex on #860).  Only the pin hole's tighter band rides."""
     assert model_toleranced_dimensions(collar) == {
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_BAND)",
     }
@@ -236,7 +236,7 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
 
 
 def test_turned_part_views_follow_the_machinist() -> None:
-    # Rule 7: the OD and the pin station go on the lathe-oriented profile;
+    # drawing-guidelines.md rule 11 (turned parts read like the lathe): the OD and the pin station go on the lathe-oriented profile;
     # only the bore, a solid circle end-on, keeps its callout there.
     assert set(drawing.PROFILE_KEEP) == {"Depth", "PinHoleCz", "PinHoleDia"}
     assert set(drawing.END_KEEP) == {"BoreDia", "CollarOd"}

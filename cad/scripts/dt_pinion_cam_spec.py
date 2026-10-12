@@ -48,7 +48,7 @@ if SLIP_CLEARANCE_MIN < 0.02 or SLIP_CLEARANCE_MAX > 0.10:
 COLLAR_OD_TOLERANCE_MM = 0.05
 COLLAR_AXIS_TOLERANCE_MM = 0.05
 
-# Rule 5: the roughness goes on the surface that runs.  The follower pin rides
+# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the roughness goes on the surface that runs.  The follower pin rides
 # the cam OD; the set-screwed bore never moves on the rod, so it carries none.
 SURFACE_FINISHES = (
     SurfaceFinishControl(

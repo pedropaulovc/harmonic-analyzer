@@ -34,8 +34,8 @@ ARBOR_BEARING_PROBE_Y_MM = 10.0
 # diameter alone.  The 20 cylinder gears and both thrust washers run on that
 # single O.D., which also
 # journals in the two arbor pedestals -- one running surface, one roughness
-# control (drawing-simplicity policy rule 5).  No datums and no feature control
-# frames: rule 3 keeps GD&T for the cast frame members and the gear blanks, and
+# control (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).  No datums and no feature control
+# frames: drawing-guidelines.md rule 5 (avoid excessive GD&T) keeps GD&T for the cast frame members and the gear blanks, and
 # a plain rod's size limits plus the title-block general grade already state
 # everything a lathe hand can hold on it.
 SURFACE_FINISHES = (
@@ -59,7 +59,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "DomeReference": {"DomeHeight"},
 }
 
-# Decimal places are the tolerance (policy rule 2), so the MODEL owns them and
+# Decimal places are the tolerance (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL owns them and
 # the sheet only asserts what it imported.  3/8 in = 9.525 exactly: two places
 # would print 9.525 as 9.53 and contradict the bore mates built on the exact
 # inch conversion, and the O.D. carries the running band anyway.  The overall
@@ -88,7 +88,7 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
 # Three part-specific facts a machinist cannot read off the views (policy
-# rule 6). The O.D. IS a catalog stock size, so the 20 um running band is a
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). The O.D. IS a catalog stock size, so the 20 um running band is a
 # stock buy rather than a grind between centres, and a 162:9.5 slender bar is
 # turned between centres -- saying the centre holes may stay saves a phone
 # call (each dome is turned on its centre, which may stay).

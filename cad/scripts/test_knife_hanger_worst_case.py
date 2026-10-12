@@ -1,9 +1,9 @@
-"""Rule-12 worst case of the #6-32 knife hanger (MHA-VN-024 in MHA-SM-002,
+"""drawing-guidelines.md rule 17 (walls and webs) worst case of the #6-32 knife hanger (MHA-VN-024 in MHA-SM-002,
 keyed by MHA-VN-051), read from the real spec and assembly constants.
 
 The retired 1/2-13 hanger broke its tap-drill point into the knife bore crown
 and needed a drawing exception; every number here is judged at the printed
-bands (cad/docs/drawing-simplicity-policy.md rule 12), and the old geometry is
+bands (cad/docs/drawing-guidelines.md rule 17 (walls and webs)), and the old geometry is
 run through the same web formula to prove it discriminates.  SolidWorks-free.
 """
 

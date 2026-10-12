@@ -885,7 +885,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Manufacturing drawing support: the bore's running fit, the knob-float
     # length and the screw-hole positions carry explicit bands; everything
-    # else is governed by its places (policy rule 2).
+    # else is governed by its places (drawing-guidelines.md rule 3 (decimal places carry the tolerance)).
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(BORE_BAND)
     )

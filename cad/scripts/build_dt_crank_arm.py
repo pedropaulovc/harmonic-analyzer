@@ -346,7 +346,7 @@ async def build(adapter) -> dict[str, str]:
             f"{before_axial_groove - vol:.2f} mm^3, expected {expected_arm_groove:.2f}"
         )
 
-    # REFERENCE sketches (policy rule 2): the sheet prints the pivot and anchor
+    # REFERENCE sketches (drawing-simplicity-policy.md `How the repository implements the guidelines`): the sheet prints the pivot and anchor
     # stations from the hub-seat axis, the anchor's offset from the top long
     # edge and the stock width, yet no feature dimension carries any of them --
     # the Hole Wizard placement sketches measure from the origin and the
@@ -533,7 +533,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Manufacturing drawing support: mark exactly the print's dimensions (the
     # drawing recipe imports the marked set and must find every one of these),
-    # author their decimal places on the part (policy rule 2: the places are
+    # author their decimal places on the part (drawing-simplicity-policy.md `How the repository implements the guidelines`: the places are
     # the tolerance, so the sheet reads them back instead of rewriting them),
     # and stamp the make-critical title-block properties.
     clear_dimensions_for_drawing(adapter)

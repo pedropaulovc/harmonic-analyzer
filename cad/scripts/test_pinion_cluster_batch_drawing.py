@@ -55,7 +55,7 @@ TITLE_BLOCK_OWNED_NOTE_TEXT = (
 
 def test_notes_do_not_repeat_title_block_metadata() -> None:
     for part_name, spec in SHEETS:
-        # A sheet with no notes (MHA-DT-030, rule 6) has nothing to repeat.
+        # A sheet with no notes (MHA-DT-030, drawing-guidelines.md rule 7 (notes: few, flagged, never a method)) has nothing to repeat.
         notes = getattr(spec, "DRAWING_NOTES", "").upper()
         for duplicate in TITLE_BLOCK_OWNED_NOTE_TEXT:
             assert duplicate not in notes, f"{part_name}: {duplicate}"
@@ -669,7 +669,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "fr-frame-1/fr-harmonic-base",
                 4.1656,
                 3.454,
-                11.25,  # rule 12 E10: #8-32 x 1-1/4 through the 20.5 block
+                11.25,  # drawing-guidelines.md rule 18 (thread engagement) E10: #8-32 x 1-1/4 through the 20.5 block
             ),
             **_expected_numbered_pairs(
                 "dt-drive-train-1/vn-foot-screw",

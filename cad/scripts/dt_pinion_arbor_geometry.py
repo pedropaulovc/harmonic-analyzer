@@ -43,7 +43,7 @@ SHAFT_DIA_BAND = (-0.010, -0.100)
 # MHA-DT-014 REAM_SLIDE bores (8.010-8.025) the running clearance is 0.020-0.055.
 JOURNAL_DIA_BAND = (-0.010, -0.030)
 
-# Former handle-body envelope, turned integrally with the arbor.  Rule 12
+# Former handle-body envelope, turned integrally with the arbor.  drawing-guidelines.md rule 17 (walls and webs)
 # (audit W6, 2026-09-23): the Ø6 crossrod hole left 1.50 of wall to each face
 # of the 9.0 head at nominal and -0.10 at the printed worst case (HeadLen and
 # the hole station both .X).  The head grew to 10.5 about the unchanged
@@ -233,7 +233,7 @@ BACK_RIM_FROM_HEAD_REAR = SHAFT_LEN - HEAD_REAR_Z
 FRONT_JOURNAL_Z = HEAD_REAR_Z + FRONT_JOURNAL_FROM_HEAD_REAR
 BACK_JOURNAL_Z = HEAD_REAR_Z + BACK_JOURNAL_FROM_HEAD_REAR
 
-# Rule 12 worst-case web from the centred crossrod hole to either head face:
+# drawing-guidelines.md rule 17 (walls and webs) worst-case web from the centred crossrod hole to either head face:
 # the .X HeadLen band split over both sides, the hole at its upper limit.
 HEAD_LEN_PLACES = 1  # HeadLen
 HEAD_CAP_SAG_PLACES = 1  # HeadCapSagDim

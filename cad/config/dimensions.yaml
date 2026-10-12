@@ -656,12 +656,12 @@ sections:
         - McMaster-Carr 9414T1 (stock); v4_t00471 / 7:49 (collar between the smallest gear and the tip block); user ruling 2026-09-29
         - high (stock dimensions exact; role by user ruling)
       - - '`vn-cone-tip-adjuster` (axial end-play screw, partially hollow)'
-        - McMaster-Carr 94025A164 slotted 18-8 stainless #10-32 × 3/8 cup-tip set screw (rule-12 E11); vendor 45° conical cup depth 1.2065 from the cup rim to its apex (Sketch2 Line7)
+        - McMaster-Carr 94025A164 slotted 18-8 stainless #10-32 × 3/8 cup-tip set screw (drawing-guidelines.md rule 18 (thread engagement) E11); vendor 45° conical cup depth 1.2065 from the cup rim to its apex (Sketch2 Line7)
         - 'threaded into the tip block''s north face (through #10-32 tap) to 7.38 mm nominal engagement, never under 1.0D of full thread at print-worst (user-ruled exception to 1.5D: it carries only the shaft''s end-play thrust), its cup seating the shaft tip at cone-axis station 139.734; run in until the shaft just stops shuttling, back off 1/8 turn for 0.05–0.25 mm shaft end play, then lock with the block''s slit and pinch screw. The stack''s 0.35–0.55 mm float is the MHA-VN-016 collar''s, set by its 0.45 feeler.'
         - v4_t00471 / 7:49 (t00147: hollow slotted screw the cone shaft rests in)
         - med (role high, dims low)
       - - '`vn-cone-tip-pinch-screw` (locks the adjuster)'
-        - 'McMaster-Carr 91794A112 18-8 stainless fillister-head slotted screw: head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 15.875 (rule-12 E1: 6.26 = 2.20D of far-jaw thread, from the slit''s far wall, at the printed worst case; tip 0.995 inside the -X face at the width minimum).'
+        - 'McMaster-Carr 91794A112 18-8 stainless fillister-head slotted screw: head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 15.875 (drawing-guidelines.md rule 17 (walls and webs) E1: 6.26 = 2.20D of far-jaw thread, from the slit''s far wall, at the printed worst case; tip 0.995 inside the -X face at the width minimum).'
         - 'across the tip block''s top slit (head on the +X (west) face, y 110.35): the near jaw is normal-clearance and the far jaw is native #4-40 UNC-2B; tightening pinches the slit closed around the #10-32 adjuster so its end-play setting cannot back off.'
         - McMaster-Carr 91794A112 recipe + v4_t00471 / 7:49 (small perpendicular screw at the block top)
         - high (stock dimensions exact; function photo-derived)
@@ -710,7 +710,7 @@ sections:
       - - Fork (Y-shaped upper end)
         - 10 wide, full-round crown R5 on the pin, root step 13 below the pin; slot 2.625 +0.127/0 with its floor 9.75 below the pin; Ø1.968 +0.010/0 pin hole reamed through both tines
         - —
-        - 'ch14 fan photo (0.114 mm/px via the 16 mm arm-depth callout): two rod cheeks round each rocker, width ≈10, crown below the arm top edge. The slot floor clears the arm''s curved bottom edge by 1.21 at the print-worst case of both parts (3.30 nominal) through the solved −8.60..+1.01° arm-to-rod swing, with a 2.23 MIN bridge under the floor. Pin MHA-CH-010 (5/64 drill rod) runs in the rocker''s #47 rod-pin hole at +127.37 from the pivot and is pressed into both reamed tines, ends dressed flush, as the MHA-CH-011 bar pin (user ruling 2026-10-09, PR #1292 review F1: a countersink for a peened end left 0.92 of tine land, under the rule-12 1.5 floor; reverses the issue #746 peening choice): a RECONSTRUCTION choice, not the original fastener. Supersedes the 2.5-thick tombstone head pinned beside the arm'
+        - 'ch14 fan photo (0.114 mm/px via the 16 mm arm-depth callout): two rod cheeks round each rocker, width ≈10, crown below the arm top edge. The slot floor clears the arm''s curved bottom edge by 1.21 at the print-worst case of both parts (3.30 nominal) through the solved −8.60..+1.01° arm-to-rod swing, with a 2.23 MIN bridge under the floor. Pin MHA-CH-010 (5/64 drill rod) runs in the rocker''s #47 rod-pin hole at +127.37 from the pivot and is pressed into both reamed tines, ends dressed flush, as the MHA-CH-011 bar pin (user ruling 2026-10-09, PR #1292 review F1: a countersink for a peened end left 0.92 of tine land, under the drawing-guidelines.md rule 17 (walls and webs) 1.5 floor; reverses the issue #746 peening choice): a RECONSTRUCTION choice, not the original fastener. Supersedes the 2.5-thick tombstone head pinned beside the arm'
         - measured/derived
         - med
   - prose: |2
@@ -1628,7 +1628,7 @@ sections:
         - standard + scaled + vendor CAD
         - med
       - - Removable gear plate / bore / pins
-        - 'Bought plate faces as supplied: vendor STEP thickness 2.794 (0.110 in), represented by the 2.8 +0/−0.10 plate band; turn the supplied hub off flush with the plate, then bore Ø10.3 through (13/32, 0.39 radial over the Ø9.525 pilot), then drill 2 × Ø2.5 through holes on Ø14 BC at ±Y, over two Ø3/32 drive pins standing 2.4 proud of each shaft''s seat face; bore/pin-hole web 0.60 nominal, 0.47 MIN at the printed bands (photo-faithful, below the 1.5 floor; accepted by the user 2026-09-30, drawing-simplicity-policy.md exception table)'
+        - 'Bought plate faces as supplied: vendor STEP thickness 2.794 (0.110 in), represented by the 2.8 +0/−0.10 plate band; turn the supplied hub off flush with the plate, then bore Ø10.3 through (13/32, 0.39 radial over the Ø9.525 pilot), then drill 2 × Ø2.5 through holes on Ø14 BC at ±Y, over two Ø3/32 drive pins standing 2.4 proud of each shaft''s seat face; bore/pin-hole web 0.60 nominal, 0.47 MIN at the printed bands (photo-faithful, below the 1.5 floor; accepted by the user 2026-09-30, drawing-guidelines.md exception table)'
         - —
         - 'ch23 p.56 catalog shot (the pin holes nearly touch the bore) + `v4_transgear_020/025/030`; CQ sketch CONTRACT-crank; purchased-blank ruling 2026-10-08 and supplied STEP plate/hub/bore measurements in `cad/references/mcmaster/README.md`'
         - scaled + derived + vendor CAD
@@ -1870,7 +1870,7 @@ sections:
         - scaled
         - med
       - - Pinion grip head and crossrod (2026-09 re-derive)
-        - Integral MHA-DT-022 turned head Ø15 × 11.5 (SR10.9 crown; rule 12 W6 was × 9 → 10.5, machinist review of 7f7fc1717 → 11.5 for a 2.30 worst-case crossrod web), neck Ø10.5 × 10.5 (shoulder 0.25 forward so every turned length prints .X), reamed Ø6.00 +0.10/0 for the separate MHA-DT-015 Ø6 crossrod, bonded with Loctite 638, 65 overall (32 down / 33 up)
+        - Integral MHA-DT-022 turned head Ø15 × 11.5 (SR10.9 crown; drawing-guidelines.md rule 17 (walls and webs) W6 was × 9 → 10.5, machinist review of 7f7fc1717 → 11.5 for a 2.30 worst-case crossrod web), neck Ø10.5 × 10.5 (shoulder 0.25 forward so every turned length prints .X), reamed Ø6.00 +0.10/0 for the separate MHA-DT-015 Ø6 crossrod, bonded with Loctite 638, 65 overall (32 down / 33 up)
         - —
         - 'ch25 p.68: a ~Ø15 ball on a ~65 rod. The one-piece arbor/head and separate crossrod are an approved photo-derived reconstruction choice, not proof of the historical joint detail. SUPERSEDES the Ø23 × 14 drum on an 85 rod and the unsupported socket / radial-retention-pin reconstruction.'
         - scaled

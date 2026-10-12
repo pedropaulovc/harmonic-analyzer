@@ -100,7 +100,7 @@ def test_fillister_stock_is_shared_across_the_fleet() -> None:
             if sku in spec.skus
         )
 
-    # Rule 12 (E10): the four pinion-block screws moved from the #8-32 x 1 to
+    # drawing-guidelines.md rule 18 (thread engagement) (E10): the four pinion-block screws moved from the #8-32 x 1 to
     # the clamp screws' #8-32 x 1-1/4; the swing stop then left the x 1 for
     # the foot screw's #4-40 x 3/8 (2026-09-29), retiring 90280A199; the
     # paper drive's latch hook takes two more (MHA-VN-043, ruling 2),

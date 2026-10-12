@@ -93,7 +93,7 @@ FOLLOWER_SEAT_LIGAMENT = abs(PIN_DROP) - HOLE_MAX / 2.0 - PIN_BORE / 2.0
 # B18.8.2 size (1/16), and the hole band is already B18.8.2's recommended
 # window.  With no lever, the loosest band that clears the 1.5 floor governs:
 # no print tolerance tighter than the title block, and no position frame,
-# which rule 3 bars on a bracket.  A V-block set-up holding 0.25 leaves
+# which drawing-guidelines.md rule 5 (avoid excessive GD&T) bars on a bracket.  A V-block set-up holding 0.25 leaves
 # SHAFT_LIGAMENT_QUARTER.
 # The MHA-DT-019 shaft is the pivot bore's own nominal (a lockstep test pins it).
 SHAFT_LIGAMENT_FLOOR = 1.5

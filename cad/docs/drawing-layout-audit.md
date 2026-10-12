@@ -4,7 +4,7 @@
 
 > Design and contract for the unified layout audit that every manufacturing
 > drawing runs from `finalize_drawing`. It enforces the machine-checkable part
-> of [drawing-simplicity-policy.md](drawing-simplicity-policy.md) rule 8. Code:
+> of [drawing-guidelines.md](drawing-guidelines.md) rules 13 (stay inside the border), 14 (keep text off the part) and 15 (balance the sheet; add a sheet before cramming). Code:
 > `cad/scripts/_layout_audit.py` (SolidWorks-free),
 > `cad/scripts/_drawing_layout_audit.py` (live collection),
 > `cad/scripts/_pdf_ink.py` (the exported PDF's text and strokes) and
@@ -264,7 +264,7 @@ datum-origin case replay from the calibration run's dumps.
 
 Not checked:
 
-* text inside a part silhouette without crossing a line (rule 8's
+* text inside a part silhouette without crossing a line (drawing-guidelines.md rule 14 (keep text off the part)'s
   default-exterior preference). An advisory class needs the view's OUTER
   silhouette loop. Ray-crossing parity against every visible edge is the
   cheap test, but it is wrong wherever a view draws interior step or tangent

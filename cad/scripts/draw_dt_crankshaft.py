@@ -1,7 +1,7 @@
-r"""Create the crankshaft MHA-DT-011 manufacturing drawing under the simplicity policy.
+r"""Create the crankshaft MHA-DT-011 manufacturing drawing under drawing-guidelines.md.
 
 The SLDPRT remains authoritative.  A shaft carries no datum and no
-geometric-control frame (policy rule 3): the three running/seat diameters keep
+geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the three running/seat diameters keep
 their native size bands, the journal keeps one bearing-surface finish, and
 every length is an ordinary model dimension at its part-authored places.
 
@@ -171,7 +171,7 @@ JOURNAL_FLANK_Y = _sheet_y(JOURNAL_DIA / 2.0)
 _ROW_PITCH = 0.0095
 _ROW_Y = tuple(round(0.162 - k * _ROW_PITCH, 4) for k in range(10))
 # The six diameters are authored in end-profile sketches; the end view
-# receives them first and they are then dragged onto the profile (rule 7:
+# receives them first and they are then dragged onto the profile (drawing-guidelines.md rule 11 (turned parts read like the lathe):
 # diameters on the side view).  Their temporary end-view spots are clear of
 # everything else on the sheet.
 END_DIAMETERS = {
@@ -927,7 +927,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     # The end view's hidden lines show the cross-hole running across the
-    # dome end, which clocks the punched fiducial to it (rule 7: a cross-hole
+    # dome end, which clocks the punched fiducial to it (drawing-guidelines.md rule 9 (show internal shape in solid lines): a cross-hole
     # through a turned part).  Re-asserted last so the export regenerates the
     # dashed edges after every annotation (layout-tuning refusal e).
     set_hidden_lines_visible(adapter, end)

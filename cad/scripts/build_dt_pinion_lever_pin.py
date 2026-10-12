@@ -11,7 +11,7 @@ Layout: pin axis along local X, centred on the origin (x +-PIN_LEN/2), so the
 assembly seats it on the lift rod's "lever pin" axis with its Right Plane on
 the rod's Right Plane.  The pin is a Front-plane half-profile revolved about
 that axis (the crank-pinion-pin idiom), so its diameter and length both
-import into the *Front side view (rule 7, turned parts).
+import into the *Front side view (drawing-guidelines.md rule 11 (turned parts read like the lathe), turned parts).
 
 Run (SolidWorks already open)::
 

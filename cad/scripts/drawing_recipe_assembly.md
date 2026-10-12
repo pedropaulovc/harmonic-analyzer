@@ -5,7 +5,7 @@
 The shared `_assembly_drawing.py` recipe produces one ASME B sheet with
 `*Front`, `*Right`, and `*Isometric` views. These overview sheets are not complete
 manufacturing assembly packages. New or recreated packages must follow
-[`drawing-simplicity-policy.md`](../docs/drawing-simplicity-policy.md), including
+[`drawing-guidelines.md`](../docs/drawing-guidelines.md), including
 the assembly information needed to build and inspect the mechanism.
 
 `_drawing_common.finalize_drawing` enforces the project-wide isometric contract:

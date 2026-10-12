@@ -244,7 +244,7 @@ async def build(adapter: Any) -> dict[str, str]:
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(1, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    # Rule 7: the pin hole shows true in the side view and its detail, and the
+    # drawing-guidelines.md rule 11 (turned parts read like the lathe): the pin hole shows true in the side view and its detail, and the
     # blind bore's depth and wall are dimensioned there to its visible end
     # faces -- no feature needs a hidden line.
     for view in (front, side, top, iso):

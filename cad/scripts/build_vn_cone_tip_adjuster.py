@@ -1,4 +1,4 @@
-r"""McMaster 94025A164 #10-32 cup-point adjuster (rule-12 E11); its conical apex is the thrust contact."""
+r"""McMaster 94025A164 #10-32 cup-point adjuster (drawing-guidelines.md rule 18 (thread engagement) E11); its conical apex is the thrust contact."""
 
 from __future__ import annotations
 

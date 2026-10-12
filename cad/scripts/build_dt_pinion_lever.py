@@ -187,7 +187,7 @@ async def _station_reference(
     drive: str,
 ) -> list[tuple[str, str]]:
     """One construction line on the Right Plane whose ONE driving dimension
-    is a station measured from face B (policy rule 2: a printed value no
+    is a station measured from face B (drawing-simplicity-policy.md `How the repository implements the guidelines`: a printed value no
     feature carries is modelled, never typed on the sheet).  Right-plane
     sketch u is model -z, v is model y."""
     check(f"create_sketch {feature}", await adapter.create_sketch("Right"))

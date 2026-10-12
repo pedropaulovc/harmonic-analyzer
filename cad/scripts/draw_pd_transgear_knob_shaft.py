@@ -2,7 +2,7 @@ r"""Create the manufacturing drawing for the transgear knob shaft (MHA-PD-008).
 
 A side view, the rear end view and an isometric.  The side view (``*Right``,
 model +Z running left) carries every turned size beside its axial extent
-(rule 7): the tooth-tip, core, relief, thread-blank and journal diameters
+(drawing-guidelines.md rule 11 (turned parts read like the lathe)): the tooth-tip, core, relief, thread-blank and journal diameters
 above the shaft, and the lengths below it baselined from F, the 12T's front
 face (the stud stations) and from the 12T's rear face (the journal).  The
 1/4-20 thread is a callout on the Ø6.22 blank; its full-thread end is the
@@ -260,7 +260,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="MHA-PD-008 stud thread callout",
     )
 
-    # The two running surfaces, authored on the part and read back (rule 5).
+    # The two running surfaces, authored on the part and read back (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
     add_surface_finish(
         adapter,
         end,

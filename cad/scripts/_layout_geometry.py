@@ -587,7 +587,7 @@ def find_text_on_line(
 ) -> list[Finding]:
     """Every text box a line segment runs through that is not its own ink.
 
-    Policy rule 8's "no text sits on a line", enforced at last: each
+    drawing-guidelines.md rule 14 (keep text off the part)'s "no text sits on a line", enforced at last: each
     annotation's dimension line, witness lines and leader come back from
     ``IDisplayDimension::GetDisplayData`` as real rendered segments, so a
     callout parked on a neighbour's extension line is a measurable overlap
@@ -728,7 +728,7 @@ def find_border_breaches(sheet: SheetGeometry) -> list[Finding]:
 def find_view_crowding(sheet: SheetGeometry) -> list[Finding]:
     """Two views whose callouts are squeezed together -- the ADD-A-SHEET signal.
 
-    Policy rule 8 names this exact diagnostic: "callouts, dimensions, or notes
+    drawing-guidelines.md rule 15 (balance the sheet; add a sheet before cramming) names this exact diagnostic: "callouts, dimensions, or notes
     belonging to one view or section overlapping, or being squeezed against,
     those of another".  The remedy is a new sheet, not a smaller scale, so this
     is reported apart from an ordinary box collision.

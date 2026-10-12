@@ -103,7 +103,7 @@ THREAD_PD_2A_MIN_IN = 0.2127
 # diameter, 4.578, below the table's 2A minor maximum 0.1876 in (4.765).
 THREAD_ROOT_2A_MIN = (THREAD_PD_2A_MIN_IN - 0.649519 / THREADS_PER_IN) * MM_PER_IN
 # R9-54: the die cuts on a blank turned inside the 2A major limits, a step
-# under the Ø6.35 core.  The model owns the ±0.10 band (rule 2).
+# under the Ø6.35 core.  The model owns the ±0.10 band (drawing-simplicity-policy.md `How the repository implements the guidelines`).
 THREAD_BLANK_DIA = 6.22
 THREAD_BLANK_DIA_BAND = (0.10, -0.10)  # (upper, lower)
 THREAD_BLANK_DIA_PLACES = 2
@@ -356,7 +356,7 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
 
 DISC_NUMBER = "MHA-PD-006"
 DISC_TEETH = 120
-# Rule 6's gear-data block: the tooth system the view dimensions cannot state.
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)'s gear-data block: the tooth system the view dimensions cannot state.
 # Cutter inputs and derived diameters are REF; the outside diameter and face
 # width are native dimensions on the views.
 GEAR_DATA = gear_data_note(
@@ -392,7 +392,7 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 # ``StudProfile`` is the Right-plane revolve in front of F (the core, the
 # thread relief, the thread blank and the tip chamfer); it also carries
 # construction-only witnesses, the tooth-tip blank across the face (OutsideDia,
-# rule 2's reference-sketch allowance) and the cutter's full-depth station and
+# drawing-simplicity-policy.md `How the repository implements the guidelines`'s reference-sketch allowance) and the cutter's full-depth station and
 # run-out limit from F (R9-21), so every turned size imports natively beside
 # its axial extent.  ``JournalProfile`` is the revolve behind the teeth.
 # ``GearBlank`` owns the face width.

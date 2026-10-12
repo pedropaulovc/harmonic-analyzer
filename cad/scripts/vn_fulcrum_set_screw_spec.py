@@ -22,7 +22,7 @@ from ch_fulcrum_keeper_spec import SET_SCREW_THREAD
 
 MM_PER_IN = 25.4
 
-# 5/32 chosen over 1/8 for rule-12 installed engagement: >= 1.52D worst (1/8
+# 5/32 chosen over 1/8 for drawing-guidelines.md rule 18 (thread engagement) installed engagement: >= 1.52D worst (1/8
 # gave 1.40D). The socket face sits 0.156 below the keeper crown apex at
 # nominal. At the worst case (CrownDia .X min + shallowest flat) it stands up
 # to 0.374 proud, in free air above the crown (Main ruling A, 2026-10-10).

@@ -7,7 +7,7 @@ turned a quarter turn, so model +Z runs LEFT and the bar-side front face
 (z 0) is the profile's right end, the rear face (on the arm) its left end.
 Each end face carries its running finish and its perpendicularity to the
 bore, the length sits under the profile and the O.D. moves onto the profile
-(rule 7: diameters on the side view).  The end view to its left (third
+(drawing-guidelines.md rule 11 (turned parts read like the lathe): diameters on the side view).  The end view to its left (third
 angle, looking along -Z from the +Z end) keeps the bore, a solid circle only
 end-on, and its axis is datum A.
 
@@ -107,7 +107,7 @@ _PROFILE_TOP = PROFILE_CENTER[1] + OD * _S / 2.0
 _PROFILE_BOTTOM = PROFILE_CENTER[1] - OD * _S / 2.0
 
 # The bore stays on the end view, where it is a circle: a reamed through
-# hole, fully defined by its callout (rule 7), it needs no section, and the
+# hole, fully defined by its callout (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)), it needs no section, and the
 # profile is hidden-lines-removed (a dimension never lands on a hidden line).
 # The O.D. arrives there too and is moved onto the profile below.
 END_KEEP = {

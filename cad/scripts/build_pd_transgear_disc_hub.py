@@ -12,7 +12,7 @@ and disc forward; the D-flat drives (``pd_transgear_disc_hub_spec``,
 Layout (the spec's frame): the spigot, flange and hub body are one turned
 profile on the Top plane, (u, v) = model (X, -Z), revolved about the gear
 axis, so the sheet's edge view carries all three turned diameters (policy
-rule 7).  The spigot runs z = 0..SPIGOT_LENGTH, the flange
+drawing-guidelines.md rule 11 (turned parts read like the lathe)).  The spigot runs z = 0..SPIGOT_LENGTH, the flange
 z = -FLANGE_THICK..0 and the hub body forward to the hub front face, so
 ``Front Plane`` (z = 0) is the flange's rear face, the one that clamps the
 disc, and the spigot's and flange's printed lengths run from it.  The

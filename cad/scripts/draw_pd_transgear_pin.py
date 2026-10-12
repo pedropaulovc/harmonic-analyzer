@@ -1,7 +1,7 @@
 r"""Create the MHA-PD-023 transgear pin manufacturing drawing.
 
 The SLDPRT remains authoritative.  A turned pin carries no datum and no
-geometric-control frame (policy rule 3): the ground shank keeps its native
+geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the ground shank keeps its native
 fit band and one bearing-surface finish, the MHA-VN-047 ring groove its
 catalogue Ø and width bands, and every other size is an ordinary model
 dimension at its part-authored places.

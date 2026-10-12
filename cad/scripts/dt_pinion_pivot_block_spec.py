@@ -55,7 +55,7 @@ from dt_pinion_pivot_block_geometry import (
 # bore that must turn or slide by hand.
 BORE_DIA_BAND = REAM_SLIDE
 
-# Both reamed bores are running faces (rule 5): MHA-DT-019 turns in the pivot
+# Both reamed bores are running faces (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MHA-DT-019 turns in the pivot
 # bore and MHA-DT-017 in the lift bore (Main, MHA-DT-018 eye pass: the lift bore
 # had none).  They share a diameter.  The harvested pivot-bore cylinder
 # spans y=-BORE_DIA/2..+BORE_DIA/2, while the raised lift bore does not reach
@@ -108,18 +108,18 @@ PIVOT_SHAFT_NAME = _registry_name(_config.parts("dt-pinion-pivot-shaft"))
 LIFT_ROD_NAME = _registry_name(_config.parts("dt-pinion-lift-rod"))
 
 # True free-text instructions only. Geometry lives in native dimensions and
-# the two running-bore surface symbols (policy rule 3: a block carries no
+# the two running-bore surface symbols (drawing-guidelines.md rule 5 (avoid excessive GD&T): a block carries no
 # frames or datums). The part
 # build stamps these strings into the SLDPRT; the drawing displays only
 # $PRPSHEET links, so the print cannot silently diverge from its source model.
 DRAWING_NOTES = "\n".join(
     (
-        # Fable review r4 (rule 2): name each running bore's mate and state the
+        # Fable review r4 (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): name each running bore's mate and state the
         # functional acceptance; the REAM and hold-down callouts are not repeated.
         f"PIVOT BORE RUNS ON {PIVOT_SHAFT_NAME},",
         f"  LIFT BORE ON {LIFT_ROD_NAME};",
         "  EACH SHAFT TURNS FREELY BY HAND.",
-        # Assembly operations are never part notes (rule 6): the front
+        # Assembly operations are never part notes (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the front
         # block's feeler setting is on the drive-train assembly step list
         # (ruling (c), Codex #854), and spotting the base seats through the
         # block holes is RIG_SET_STEP plus the harmonic base's

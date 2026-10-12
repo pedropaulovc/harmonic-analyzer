@@ -11,7 +11,7 @@ may import it; no part build does.
   the shoulder's end face leaves full thread only below FULL_THREAD_START;
   worst = that - one pitch (first thread).  The tap's entry countersink lies
   inside the neck zone and costs nothing more (contract §7, ruling R9-7).
-  Approved below 1.5 D (the named exception).
+  Below 1.5 D, pending exception ruling #1385.
 * MHA-VN-040 plate screws (5/8 stock, cut to fit) in the MHA-PD-018 arm's through
   #8-32 taps: the bevel top sits flush with the MHA-PD-019 plate's rear face and
   each tip is cut at assembly flush with the arm's front face, so the thread
@@ -525,7 +525,7 @@ def latch_pinion_drop(slack_along: float) -> float:
 # --- The MHA-VN-041 sheet's installation line ------------------------------------
 # The purchased sheet prints the registry's ``installation_notes``; the
 # drawing test holds that field equal to this text.
-# Named exception: MHA-VN-041 engagement (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-VN-041 engagement (#1385).
 PIVOT_SCREW_INSTALLATION_NOTES = (
     "INSTALLATION - THROUGH MHA-PD-020 AND MHA-PD-018 INTO THE MHA-PD-007 BLIND TAP.\n"
     f"{PIVOT.THREAD} THREAD ENGAGEMENT {PIVOT_ENGAGEMENT_NOMINAL_D:.2f}D NOMINAL, "

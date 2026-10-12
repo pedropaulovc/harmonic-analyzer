@@ -21,7 +21,7 @@ import it.
   FRONT_COLLAR_LEAF off the front block, the back collar's back face
   BACK_COLLAR_LEAF_F off the back block (COLLAR_SET_STEP).  Nothing is cut
   there, so it is a drive-train assembly step, never an MHA-DT-023 note (policy
-  rule 6, as MHA-DT-018 keeps its feeler off its own print).
+  drawing-guidelines.md rule 7 (notes: few, flagged, never a method), as MHA-DT-018 keeps its feeler off its own print).
 - The MHA-DT-024 foot pad's aft edge, flush with the strip's, is set
   SPRING_PAD_LEAF off the back block before its seat is transferred (the
   same RIG SET note).  The foot lies east of the block's east end, so the
@@ -29,7 +29,7 @@ import it.
   end to meet the pad.
 - ASSEMBLY_SEQUENCE orders the rig's assembly steps.  The MHA-DT-033 collar's
   install, the bonds and the MHA-DT-030 drive-through are each part spec's
-  ASSEMBLY_STEP (policy rule 6 moved them off the part sheets, #814),
+  ASSEMBLY_STEP (drawing-guidelines.md rule 7 (notes: few, flagged, never a method) moved them off the part sheets, #814),
   imported here, never retyped.
 """
 
@@ -134,7 +134,7 @@ COLLAR_SET_STEP = (
 # pc-858x928b eye pass; it supersedes the #858 restricted review's rulings 2
 # and 3 that printed it on MHA-DT-019): the fitter match-drills the shaft
 # working from MHA-DT-000, and the machinist making MHA-DT-019 never drills those
-# holes, so the pose is printed where it is performed, once (policy rule 6,
+# holes, so the pose is printed where it is performed, once (drawing-guidelines.md rule 7 (notes: few, flagged, never a method),
 # as #857's shim note).  MHA-DT-019's callout keeps the hole specification; its
 # "SEE MHA-DT-000 STEP n" pointer lands at integration, generated from the
 # assembly step registry, never a hand-typed step name or number.  The pose

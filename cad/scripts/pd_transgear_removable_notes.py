@@ -32,9 +32,9 @@ if BORE_PIN_WEB_WORST <= 0.0:
 if abs(BORE_PIN_WEB_WORST - 0.47) > 1e-9:
     raise AssertionError("bore/pin-hole web moved off its 0.47 worst case")
 
-# The shortfall prints as a plain fact; its governance is the policy's Named
-# exceptions row and this tag, never the sheet.
-# Named exception: MHA-PD-009 web (drawing-simplicity-policy.md, "Named exceptions").
+# The shortfall prints as a plain fact; its governance is the
+# pending ruling issue #1377 and this tag, never the sheet.
+# Pending exception ruling: MHA-PD-009 web (#1377).
 BORE_PIN_WEB_NOTE = f"BORE TO DRIVE-PIN HOLE WEB {BORE_PIN_WEB_WORST:.2f} MIN."
 
 CRANKSHAFT_NUMBER = "MHA-DT-011"

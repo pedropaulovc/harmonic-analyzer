@@ -290,7 +290,7 @@ async def build(adapter) -> dict[str, str]:
         f"{final_volume:.1f} mm^3"
     )
     # Drawing-only station reference on the hub axis, printing the MHA-DT-009
-    # station from the arm shoulder it must not break into (policy rule 12).
+    # station from the arm shoulder it must not break into (drawing-guidelines.md rule 17 (walls and webs)).
     # Keeping the construction line under the view centreline avoids extra
     # printed geometry while giving targeted model-item import a real sketch
     # owner.  It sits on the Right plane because the *Right side view prints

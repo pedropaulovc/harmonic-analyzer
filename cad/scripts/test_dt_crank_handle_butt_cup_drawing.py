@@ -58,10 +58,6 @@ def test_the_floor_holds_1_5_and_the_wall_its_named_exception() -> None:
     assert spec.POCKET_WALL_MIN == pytest.approx(0.8)
     assert screw.CUP_POCKET_WALL_MIN == pytest.approx(0.8)
     assert screw.POCKET_MAX <= spec.POCKET_DIA_MAX
-    policy = (Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md")
-    assert "| MHA-DT-035 crank handle butt cup, pocket bored to suit" in policy.read_text(
-        encoding="utf-8"
-    )
     # 3/8-in stock clears the Ø8.20 body at its upper limit.
     assert "3/8 in" in _config.parts("dt-crank-handle-butt-cup")["material"]
     assert spec.BODY_DIA + spec.BODY_DIA_TOL < 0.375 * 25.4
@@ -97,7 +93,7 @@ def test_notes_name_the_mates_and_the_band_reason() -> None:
     assert f"{spec.SCREW_NUMBER} {spec.SCREW_NAME}" in notes
     assert "TO SUIT" in notes
     assert "MIN POCKET WALL 0.8; MIN FLOOR 1.5; CORNERS EXCEPTED." in notes
-    # Codex P1 on #1139 (c81d97280): policy rule 6 forbids narrating why a
+    # Codex P1 on #1139 (c81d97280): drawing-guidelines.md rule 7 (notes: few, flagged, never a method) forbids narrating why a
     # band exists, so the depth band's reason stays in the spec, not on the
     # sheet.
     assert "DEPTH BAND" not in notes

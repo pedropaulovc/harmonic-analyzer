@@ -1,6 +1,6 @@
 """Turning-axis centerline and caption placement for a turned part's section.
 
-The longitudinal section is a turned part's length view (policy rule 7): its
+The longitudinal section is a turned part's length view (drawing-guidelines.md rule 11 (turned parts read like the lathe)): its
 explicit centerline says which edges are the faced ends, and the cut exposes
 the bores so their diameters never land on hidden lines.  Lifted from
 ``draw_crank_pinion`` for the small turned parts that share the layout

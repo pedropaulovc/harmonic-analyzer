@@ -22,7 +22,7 @@ is drilled through the hub wall and the sleeve's boss in one operation at
 assembly (R9-8), centred on the hub body (R9-60), so the sheet carries a
 match-drill note, not a free drilled hole.
 
-Sizes (policy rule 12): the body is the smallest .XXX diameter that keeps
+Sizes (drawing-guidelines.md rule 17 (walls and webs)): the body is the smallest .XXX diameter that keeps
 2.0 of wall over the bore and its flat, the circle the smallest that keeps
 the screw heads 1.0 clear of the body and the disc's taps 2.0 from its bore,
 and the flange the smallest .XXX diameter that keeps 2.0 from the holes to
@@ -74,7 +74,7 @@ from pd_transgear_disc_hub_geometry import (
     SPIGOT_LENGTH_PLACES,
 )
 
-# The mating parts the sheet names, by name and number (policy rule 2): the
+# The mating parts the sheet names, by name and number (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the
 # feed pinion whose Ø9 boss and flat the hub's bore slides on, the disc that
 # pilots on the spigot, and the disc screws.
 SLEEVE_NUMBER = "MHA-PD-010"
@@ -309,7 +309,7 @@ OIL_HOLE_SLEEVE_Z = SLEEVE.FACE_WIDTH + HUB_LENGTH - OIL_HOLE_STATION  # 23.475
 
 _BAND = {places: printed_band_mm(places) for places in (1, 2, 3)}
 
-# --- worst-case walls (policy rule 12) ----------------------------------------
+# --- worst-case walls (drawing-guidelines.md rule 17 (walls and webs)) ----------------------------------------
 _FLAT_MAX = FLAT_TO_AXIS + FLAT_TO_AXIS_BAND[0]
 _SCREW_HOLE_MAX_R = (SCREW_HOLE_DIA + DRILL_OVERSIZE) / 2.0
 _OIL_HOLE_MAX_R = (OIL_HOLE_DIA + DRILL_OVERSIZE) / 2.0
@@ -440,9 +440,9 @@ OIL_HOLE_CALLOUT_BELOW = "\n".join(
 )
 
 # Marked model dimensions and the places the model authors on them (policy
-# rule 2).  Edge view: the turned profile's three diameters, the spigot's and
+# drawing-simplicity-policy.md `How the repository implements the guidelines`).  Edge view: the turned profile's three diameters, the spigot's and
 # flange's lengths from the flange's rear face, the overall, and the oil
-# hole's size (rule 7); face view: the bore and its flat, which only show
+# hole's size (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)); face view: the bore and its flat, which only show
 # there, and the screw holes on their bolt circle.  The overall is faced to
 # fit, so it prints as a reference.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

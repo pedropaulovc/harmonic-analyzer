@@ -8,7 +8,7 @@ drawing scripts (the arm through ``crank_arm_notes``) and their offline tests,
 so a prose edit re-keys drawings, never a part.
 
 Callouts read in the order the work is done: the size and process line
-first, the matched-fit prose after it (drawing-simplicity policy rule 6).
+first, the matched-fit prose after it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from dt_crank_hub_geometry import (
 def seat_callout(mate: str) -> str:
     """Hub-seat fit on MHA-DT-031, turned second to press into ``mate``'s bore.
 
-    Four lines (policy rule 6). FACES FLUSH is the acceptance; how the hub
+    Four lines (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). FACES FLUSH is the acceptance; how the hub
     gets there (an arbor press) is a method, so the sheet does not say it.
     """
     low, high = SEAT_PRESS_INTERFERENCE
@@ -91,7 +91,7 @@ CROSS_HOLE_CALLOUT = "\n".join(
 )
 
 # The two axial bands state the mate they serve, under their dimensions
-# (rule 2): the overall places the rear face against the removable sprocket
+# (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the overall places the rear face against the removable sprocket
 # (stack B below), the relief places the barrel's rear shoulder ahead of the
 # #25 chain wrapping it (stack A).
 HUB_LENGTH_CALLOUT = "REAR FACE CLEARS\nSPROCKET MHA-PD-009"

@@ -44,8 +44,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "TopEndBreak": {"TopChamfer"},
 }
 
-# Decimal places ARE the tolerance statement (drawing-simplicity policy rule
-# 2), so the MODEL owns them: build_fr_tube_frame applies this map to the .SLDPRT
+# Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`
+# ), so the MODEL owns them: build_fr_tube_frame applies this map to the .SLDPRT
 # and draw_fr_tube_frame only reads it back. Two places on the cross-hole trio
 # because all three are MATCH-DRILLED from the assembled frame and the sheet's
 # stations are what the fitter sets up to -- 12.70 and 992.55 are exact

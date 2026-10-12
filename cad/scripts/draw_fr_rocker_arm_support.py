@@ -725,7 +725,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         label="rocker-arm-support lower-left theoretical corner",
     )
-    # No position frame on this part (simplicity policy rule 3/4), so the hole
+    # No position frame on this part (drawing-guidelines.md rule 5 (avoid excessive GD&T)), so the hole
     # coordinates are ordinary two-place dimensions under the title block's
     # ±0.51 — NOT basic: a basic dimension is toleranced only by the frame it
     # feeds, and without one it has no tolerance at all.

@@ -429,7 +429,7 @@ def _cell_number(cell: str) -> str:
 
 def _require_schedules(adapter, hole_dias: dict[str, float]) -> None:
     """Every number in the printed schedules is a model dimension's own value,
-    places and native band (policy rule 2), and every row is geometry of the
+    places and native band (drawing-simplicity-policy.md `How the repository implements the guidelines`), and every row is geometry of the
     built model: pocket floors (centre, length, width, depth), hole axes
     (centre, at the cut diameter ``hole_dias`` gives per feature), bonded-part
     tops and undersides (length, width, height, centred in their pockets) and
@@ -707,7 +707,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "RodPinHoleProfile", "RodPinHoleDia", *deviations(ROD_PIN_HOLE_BAND)
     )
-    # The schedule's banded cells are model tolerances (policy rule 2).
+    # The schedule's banded cells are model tolerances (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     for (feature_name, dimension_name), plus in EXPLICIT_SYMMETRIC_TOLERANCES_MM.items():
         set_dimension_symmetric_tolerance(adapter, feature_name, dimension_name, plus)
     apply_drawing_precision(adapter, DRAWING_PRECISION)

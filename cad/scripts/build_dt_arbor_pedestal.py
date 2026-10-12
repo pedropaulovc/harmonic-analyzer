@@ -122,7 +122,7 @@ DOME_DRIVES = {"DomeCy": '"BoreHeight"', "DomeRadius": '"TopRadius"'}
 # are sketch coordinates -- the Top plane's sketch y is machine -Z, the Front
 # plane's is machine +Y. Every line lies on the part outline, so the view
 # that shows its sketch prints no extra line, and each starts on a FEATURE
-# (policy rule 7): the far face / strap root for the depths, the west side
+# (drawing-guidelines.md rule 10 (dimension from a real feature)): the far face / strap root for the depths, the west side
 # face for the lateral locations. ``drives`` binds, in creation order, the
 # value dimension and then the start point's origin anchors (two for a
 # general point, one for a point on a sketch axis) to the part's globals, so
@@ -523,7 +523,7 @@ async def build(adapter) -> dict[str, str]:
     )
     _hide_reference_sketches(adapter)
     # Decimal places are the tolerance statement, so the PART carries them
-    # (policy rule 2); the drawing reads them back instead of rewriting them.
+    # (drawing-simplicity-policy.md `How the repository implements the guidelines`); the drawing reads them back instead of rewriting them.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)

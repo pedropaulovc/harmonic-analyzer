@@ -32,9 +32,9 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked crossrod dimension needs authored places")
 
 SURFACE_FINISHES = ()
-# Rule 6: notes never carry a dimension.  The bar size is the registry's
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): notes never carry a dimension.  The bar size is the registry's
 # material specification and the imported RodDia.
-# Rule 6: assembly requirements belong on the feature callout or the
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): assembly requirements belong on the feature callout or the
 # assembly step, never in a part's general notes.  ASSEMBLY_STEP is the
 # pinion fit-up step text (pinion_rig_fitup) that owns this joint.
 DRAWING_NOTES = "USE COLD-FINISHED BAR AS RECEIVED."

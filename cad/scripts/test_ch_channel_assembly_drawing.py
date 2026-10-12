@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from _assembly_contract import assembly_contract
 import _config
@@ -169,7 +168,7 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
 def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> None:
     """#948 ruling R (PR #1292): the south bracket is set off the MHA-CH-009
     washer by the spring's set blade, beside the MHA-VN-053 spring, which is
-    first run along the shaft (its catalogue ID can bind). Rule 6: the blade
+    first run along the shaft (its catalogue ID can bind). drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the blade
     comes from rocker_bank_layout, never typed; the acceptance is the preload."""
     spring = _config.parts("vn-rocker-bank-spring")["number"]
     shaft = _config.parts("ch-pivot-shaft")["number"]
@@ -221,7 +220,7 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     spacing, feet on one flat; the actual shaft gauges that line in the
     clamped setup. The pair is then set on the top frame by DRO with the
     shaft through both, and each crown tap's mouth is staked over its set
-    screw (rule 9's lock). The keeper print points at these steps."""
+    screw (drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)'s lock). The keeper print points at these steps."""
     import ch_fulcrum_keeper_spec as keeper
     import draw_ch_fulcrum_keeper as keeper_drawing
     from channel_frame_geom import LEVER_FULCRUM_XY
@@ -374,14 +373,6 @@ def test_the_set_screws_go_in_after_the_cut_and_print_the_engagement_fact() -> N
         if other != key:
             assert set_screw not in _step_body(other)
     assert drawing.FITUP_STEPS.count("ENGAGEMENT") == 1
-    source = Path(drawing.__file__).read_text(encoding="utf-8").splitlines()
-    emit = next(
-        i for i, line in enumerate(source) if "{SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}" in line
-    )
-    assert source[emit - 1].strip() == (
-        "# Named exception: MHA-CH-008 set-screw engagement "
-        '(drawing-simplicity-policy.md, "Named exceptions").'
-    )
 
 
 def test_the_set_screw_interference_allowance_is_the_ear_tap() -> None:

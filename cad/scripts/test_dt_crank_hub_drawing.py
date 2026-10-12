@@ -90,7 +90,7 @@ def test_mha024_ream_ligaments_meet_rule_12_at_the_printed_bands() -> None:
     assert geometry.SERVICE_PIN_FROM_SHOULDER - ream_r == pytest.approx(2.63, abs=0.01)
     # The ream ends at the relief shoulder, not the rear face.
     assert rear_from_shoulder - ream_r == pytest.approx(4.78, abs=0.01)
-    # Worst case at the printed bands (rule 12): the shoulder side governs.
+    # Worst case at the printed bands (drawing-guidelines.md rule 17 (walls and webs)): the shoulder side governs.
     # Behind the ream the relief shoulder is placed from the front face by
     # the .XX overall less the .XX relief, the ream by the .X seat length and
     # the .XX station: 21.25 - 8.8 - 6.11 - 2.97.
@@ -122,7 +122,7 @@ def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefLength"] == 2
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["HubLength"] == 2
     assert dt_crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefDia"] == 2
-    # Rule 12 wall over the bore: Ø15.99 against the Ø9.580 bore, edges broken.
+    # drawing-guidelines.md rule 17 (walls and webs) wall over the bore: Ø15.99 against the Ø9.580 bore, edges broken.
     assert geometry.RELIEF_WALL_WORST_MM == pytest.approx(2.705, abs=1e-3)
     assert geometry.RELIEF_WALL_WORST_MM >= geometry.WALL_TARGET_MM
     # The MHA-DT-009 ream stays on the full barrel.
@@ -250,7 +250,7 @@ def test_drawing_registry_and_marks_are_complete() -> None:
 
 
 def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None:
-    # Policy rule 6: no general notes; each matched fit sits on its feature.
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): no general notes; each matched fit sits on its feature.
     assert not hasattr(dt_crank_hub_spec, "DRAWING_NOTES")
     seat = dt_crank_hub_notes.SEAT_CALLOUT
     # B1 (Main 2026-09-25): turned to suit the MHA-DT-006 bore, with the press
@@ -349,8 +349,8 @@ def test_side_view_lies_as_in_the_lathe_with_one_outboard_baseline() -> None:
     assert drawing._sheet_y(geometry.AXIAL_PIN_RADIUS_FROM_AXIS) < drawing.SIDE_CENTER[1]
     assert drawing.END_CENTER[0] > drawing.OUTBOARD_X  # third-angle right view
     assert drawing.END_CENTER[1] == drawing.SIDE_CENTER[1]
-    # Seat from the faced end, the pin station from the shoulder (policy rule
-    # 12), the relief from the rear face on one row; the toleranced overall,
+    # Seat from the faced end, the pin station from the shoulder (drawing-guidelines.md rule 11 (turned parts read like the lathe)
+    # ), the relief from the rear face on one row; the toleranced overall,
     # front face to rear face, on the row below.  No chained barrel length.
     seat_row = drawing.SIDE_KEEP["SeatLength"][1]
     assert drawing.SIDE_KEEP["ServicePinFromShoulder"][1] == seat_row
@@ -466,7 +466,7 @@ def test_callout_prose_stays_out_of_every_part_recipe() -> None:
     assert "dt_crankshaft_notes" in reached("draw_dt_crankshaft")
 
 
-# Drawing-simplicity policy rule 6: at most four short lines. Codex #892
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): at most four short lines. Codex #892
 # (PRRT_kwDOPHDy386mMQpe): the generated seat callout printed five.
 CALLOUT_LINE_CAP = 4
 

@@ -120,7 +120,7 @@ def _schedule_cells() -> dict[tuple[str, str, str], str]:
 
 
 def test_every_schedule_number_is_a_model_dimension_at_its_places() -> None:
-    """Policy rule 2: a schedule cell prints its owners' value at their
+    """drawing-simplicity-policy.md `How the repository implements the guidelines`: a schedule cell prints its owners' value at their
     authored places; nothing in a dimension column is unowned."""
     cells = _schedule_cells()
     owned = set(spec.SCHEDULE_CELL_DIMENSIONS)

@@ -51,7 +51,7 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
 
 
 def test_integral_arbor_keeps_the_released_stations_around_a_longer_head() -> None:
-    # Rule 12 (audit W6) grew the head 9.0 -> 10.5, and the machinist review of
+    # drawing-guidelines.md rule 17 (walls and webs) (audit W6) grew the head 9.0 -> 10.5, and the machinist review of
     # 7f7fc1717 (Main's option 2) to 11.5, each time about the released
     # crossrod station; the shaft and back crown stay put.  The neck shoulder
     # moves 0.25 forward so every length but the drum station prints at .X.
@@ -593,7 +593,7 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
 def test_drum_station_is_a_model_dimension_the_fitup_step_names() -> None:
     """Codex P1 on #814: notes never carry dimensions.  The drum station is
     the model's own reference dimension from the Ø15 head rear face, printed
-    at .X with the "DRUM STATION" callout.  Rule 6 (Main's eye pass): the
+    at .X with the "DRUM STATION" callout.  drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main's eye pass): the
     drum bond is the pinion fit-up step, so the part note keeps only the
     journal fact."""
     assert spec.DRAWING_NOTES == "JOURNALS RUN IN MHA-DT-014 REAMED BORES."

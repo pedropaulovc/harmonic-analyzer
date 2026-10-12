@@ -32,7 +32,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 
 def test_bearing_is_the_only_band_and_finish() -> None:
-    # Rule 1-5: the rod turns in the blocks, so its diameter carries the shaft
+    # drawing-guidelines.md rule 2 (the title block is the general specification) and drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the rod turns in the blocks, so its diameter carries the shaft
     # band and its flank the one roughness symbol; everything else rides the
     # title block at the part-authored places.
     assert model_toleranced_dimensions(part) == {

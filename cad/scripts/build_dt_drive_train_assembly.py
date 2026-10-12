@@ -445,7 +445,7 @@ _DY16 = Y_CRANK - Y_DRIVE  # vertical leg in both gear planes
 if _DX16 <= 0.0:
     raise AssertionError("the 64T no longer lies +x of the crank (crank_mesh_stack premise)")
 CRANK_ACTUAL_C2C = math.hypot(_DX16, _DY16)
-# The pair's contact ratio (user ruling 2026-09-30: under rule 12's 1.1 and
+# The pair's contact ratio (user ruling 2026-09-30: under drawing-guidelines.md rule 20 (state a known shortfall as a plain fact)'s 1.1 and
 # printed on both gear sheets as a plain fact). Nominal at the modelled centre
 # and tips; worst at crank_mesh_stack's open corner with both tips at their
 # printed lower limits. Each sheet prints the worst rounded down.
@@ -972,7 +972,7 @@ for _got, _want, _what in (
 if min(vn_keeper_chain_spec.clearance_report().values()) < 0.0:
     raise AssertionError("keeper chain touches a part it must clear")
 ANCHOR_THREAD_ENGAGEMENT = ANCHOR_HEAD_Z + ANCHOR_SCREW_SHANK_LEN - CRANK_ARM_Z0
-# The #4-40 is tapped THRU the arm (rule 12, W7): nothing to bottom on; the
+# The #4-40 is tapped THRU the arm (drawing-guidelines.md rule 17 (walls and webs), W7): nothing to bottom on; the
 # screw tip must stay short of the inboard face.
 ANCHOR_TIP_RESERVE = ARM_THICKNESS - ANCHOR_THREAD_ENGAGEMENT
 if ANCHOR_HOLE_SPEC.end != "through_all":
@@ -1483,7 +1483,7 @@ if any(
     )
 # U30 post mount (I22): each MHA-VN-031 seats on the MHA-DT-005 counterbore floor and
 # is cut to fit into the MHA-DT-020 tap: never proud of the plate underside, and
-# at least 0.90D of thread (U37c/U41's named exception to rule 12) both at the
+# at least 0.90D of thread (pending exception ruling #1019) both at the
 # modelled cut length and at the platform spec's printed worst case.
 _require_tapped_thread("cone-post mount", POST_SCREW_THREAD, POST_MOUNT_SPEC)
 POST_SCREW_SEAT = POST_BLOCK_HEIGHT - POST_CBORE_DEPTH  # above PlateTop
@@ -1651,7 +1651,7 @@ if abs(SHAFT_FRONT_STATION + SHAFT_COLLAR_END - _GEAR64_SOUTH_STATION) > 1e-9:
 # Along the axis, south to north: T006 gear | feeler gap | MHA-VN-016 stack
 # collar, locked on the Sec4 D-flat | air | block | shaft tip | the 94025A164
 # adjuster's conical cup, its #10-32 thread tapped through the block
-# (rule-12 E11/W1). The shaft's flat 1/16-in end cannot reach the cup apex: it
+# (drawing-guidelines.md rule 18 (thread engagement) E11/W1). The shaft's flat 1/16-in end cannot reach the cup apex: it
 # seats on the ring where its end edge meets the cone wall, ADJ_SEAT_DEPTH
 # short of the apex (end radius / tan of the vendor cup's half-angle). The
 # adjuster therefore backs out from the nominal ADJ_EMBED by that depth (Main
@@ -2362,8 +2362,8 @@ if PINION_T120_CONCENTRIC["turned band radial"] < T120_TURNED_BAND_RADIAL_FLOOR:
         "inside the T120 rim on its nominal axis, below the "
         f"{T120_TURNED_BAND_RADIAL_FLOOR:.2f}-mm radial floor"
     )
-# Named exception: MHA-DT-010 T120 clearance (drawing-simplicity-policy.md, the
-# MHA-DT-010 turned band and shoulder row; user, 2026-09-30, #1154).  With every
+# Pending exception ruling: MHA-DT-010 T120 clearance (#1374).
+# With every
 # fit offset and axis pose summed at its worst (T120_POSE_TERMS) the shoulder
 # air and the band's radial clearance fall under their floors, so the pair is
 # feeler-checked at fit-up (draw_dt_drive_train_assembly).  Both sheets and the
@@ -4170,7 +4170,7 @@ if abs(HANDLE_ROD_DIA - ARBOR_CROSS_HOLE_DIA) > 1e-9:
 if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
     raise AssertionError("strap pivot bore no longer rides the O6.35 shaft")
 # Block screws: exact 90280A201 #8-32 x 31.75 stock screws pass through normal
-# #8 clearance holes and engage 11.25 mm (2.7D; 2.58D worst case, rule 12
+# #8 clearance holes and engage 11.25 mm (2.7D; 2.58D worst case, drawing-guidelines.md rule 18 (thread engagement)
 # audit E10) in the base's #8-32 UNC-2B seats.
 BLOCK_TOP_Y = PIVOT_Y + (BLOCK_HEIGHT - BLOCK_BORE_UP)
 _require_clearance_size("pinion block", BSCREW_THREAD, BLOCK_SCREW_HOLE_SPEC)
@@ -4396,7 +4396,7 @@ _require_tapped_thread(
     BASE_PEDESTAL_SEAT_SPEC,
     kind="tapped_bottoming",
 )
-# Rule 12 (audit E15): at the printed worst case (flange 5.0 +-0.8, screw
+# drawing-guidelines.md rule 18 (thread engagement) (audit E15): at the printed worst case (flange 5.0 +-0.8, screw
 # 19.05 +0/-0.76, seat depths +-0.8) the screw keeps >= 1.5D of thread and
 # never reaches the incomplete threads at the bottom of the seat.
 _HDSCREW_MIN_ENGAGEMENT = (HDSCREW_SHANK_LEN - 0.76) - (ARBOR_PED_FLANGE_T + 0.8)

@@ -20,14 +20,14 @@ LIFT_ROD_NUMBER = "MHA-DT-017"
 # peened heads, not by an interference: the band only says "use the stock".
 PIN_DIA_BAND = (0.0, -0.03)
 
-# Rule 7 (turned parts): both dimensions live on the revolved half-profile, so
+# drawing-guidelines.md rule 11 (turned parts read like the lathe) (turned parts): both dimensions live on the revolved half-profile, so
 # the diameter prints on the side view beside the length, not on the end view
 # (machinist review of 7f7fc1717).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "PinLen"},
 }
 
-# Decimal places ARE the tolerance statement (policy rule 2).  Three on the
+# Decimal places ARE the tolerance statement (drawing-guidelines.md rule 3 (decimal places carry the tolerance)).  Three on the
 # 1/16 in stock diameter so the printed nominal is the drill rod's own 1.588;
 # one on the overlength cut, which assembly trims and peens flush anyway.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -41,7 +41,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-# Rule 6: the pin sheet carries no notes, and the MHA-DT-016 and MHA-DT-017 hole
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the pin sheet carries no notes, and the MHA-DT-016 and MHA-DT-017 hole
 # callouts carry only the hole specification (Main, 2026-09-26, as MHA-DT-019's).
 # The grip-parked drilling pose and the drive, trim and peen sequence are
 # performed at assembly, so they print once, on this pinion fit-up step,

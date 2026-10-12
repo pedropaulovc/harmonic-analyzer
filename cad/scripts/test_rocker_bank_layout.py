@@ -170,7 +170,7 @@ def test_shaft_is_a_plain_rod_spanning_both_ears() -> None:
 
 
 def test_hub_and_washer_share_one_od_over_each_wall_floor() -> None:
-    """Main 2026-09-26: hub and washer share O10.20; each part's own rule-12
+    """Main 2026-09-26: hub and washer share O10.20; each part's own drawing-guidelines.md rule 17 (walls and webs)
     floor is derived in its spec (10.04 hub, 10.11 washer), never typed."""
     assert arm.LINEAR_2PL == pytest.approx(_BAND_2PL)
     assert washer.OD == arm.HUB_DIA

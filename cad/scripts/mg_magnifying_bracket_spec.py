@@ -53,8 +53,7 @@ DRAWING_NOTES = "\n".join(
         "SLIP GUIDE ON THE Ø6 LEVER ROD.",
         "ARM 10 WIDE x 7.5 THICK.",
         "SEAT ON SUMMING-LEVER FRONT.",
-        # Named exception: MHA-MG-001 counterbore floor 1.525 MIN
-        # (drawing-simplicity-policy.md, "Named exceptions").
+        # Pending exception ruling: MHA-MG-001 counterbore floor 1.525 MIN (#1294).
         f"COUNTERBORE FLOOR {GRIP_MIN:.3f} MIN.",
     )
 )

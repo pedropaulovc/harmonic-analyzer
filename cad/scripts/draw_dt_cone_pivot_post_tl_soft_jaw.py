@@ -4,7 +4,7 @@ A flat plate needs only the gripping-face view (front, which shows the
 counterbores as circles), the plan above it (third angle: the thickness)
 and the shaded isometric. The plate's length, height and both bolt stations
 print from its bottom-left corner; the counterbored holes ship as the native
-wizard callout. No frames and no datums (fixtures are off the rule-3
+wizard callout. No frames and no datums (fixtures are off the drawing-guidelines.md rule 5 (avoid excessive GD&T)
 allowlist).
 """
 

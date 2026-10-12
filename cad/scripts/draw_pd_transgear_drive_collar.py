@@ -5,10 +5,10 @@ it carries the reamed bore and the two reamed drive-pin holes with their
 offsets from the axis.  The side view is ``*Right``, looking along the rear
 slot, so the slot shows as a notch in the rear face: the turned diameters,
 both lengths from the seat face, the reference overall and the slot's width,
-depth and centring print on it (policy rule 7); the end view's pin-hole
+depth and centring print on it (drawing-guidelines.md rule 11 (turned parts read like the lathe)); the end view's pin-hole
 callout squares the slot to the pin-hole line.  Every feature is a plain
 through bore, a turned step or the open slot, so no section is needed.  No
-roughness symbol: the seat face is a clamp face (policy rule 5).
+roughness symbol: the seat face is a clamp face (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
 """
 
 from __future__ import annotations
@@ -148,7 +148,7 @@ def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
 
 
 def _overall_reference(adapter: Any, side: Any) -> None:
-    """The (6.9) overall, pilot front face to rear face (rule 7)."""
+    """The (6.9) overall, pilot front face to rear face (drawing-guidelines.md rule 10 (dimension from a real feature))."""
     label = "drive-collar overall length reference"
     display = add_edge_dimension(
         adapter,

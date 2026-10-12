@@ -2,7 +2,7 @@ r"""Create the curated machinist drawing for the pinion cam-follower pin.
 
 A short Ø4 drill-rod stud with a shallow domed outer end, bonded into the
 MHA-DT-014 strap's follower seat.  The sheet runs at 8:1 so the 20.8-long pin
-reads at arm's length.  The side view lies as the pin is turned (rule 7) and
+reads at arm's length.  The side view lies as the pin is turned (drawing-guidelines.md rule 11 (turned parts read like the lathe)) and
 carries every dimension: the diameter, the length, the crown radius and a
 reference overall.  The end view projects to its left (third angle), and a
 4:1 isometric sits clear of the title block.
@@ -153,7 +153,7 @@ def _crown_face(view: Any) -> Any:
 
 
 def _overall_reference(adapter: Any, right: Any) -> None:
-    """The (20.80) overall, seated end to crown apex (rule 7, Harvey #25)."""
+    """The (20.80) overall, seated end to crown apex (drawing-guidelines.md rule 10 (dimension from a real feature), Harvey #25)."""
     label = "cam-pin overall length reference"
     seated_end = model_point_in_view(
         adapter, right, (0.0, PIN_DIA / 4000.0, 0.0), label="cam-pin seated end"
@@ -256,7 +256,7 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.004),
         label="pinion cam-pin shank axis centerline",
     )
-    # Rule 5: the crown rides the cam, so it carries the one roughness symbol.
+    # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the crown rides the cam, so it carries the one roughness symbol.
     # Its leader meets the crown's lower flank near the apex from the lower
     # left, above the CapR leader (which lands further round the crown).
     crown_finish_point = model_point_in_view(

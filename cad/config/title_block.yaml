@@ -28,8 +28,8 @@ linear_3pl: { value_in: 0.005, display: "±0.13" }   # .XXX (= ±.005 in)
 angular:    { value_deg: 1.0,  display: "±1°" }
 # Surface row is a PROCESS statement, not a roughness number: every surface that
 # needs a grade carries its own symbol (_surface_finish: MACHINED_UM 1.6 on
-# journals/bores, GROUND_UM 0.8 on knife edges — drawing-simplicity-policy.md
-# rule 5), so the block only ever governed non-functional faces, where "as
+# journals/bores, GROUND_UM 0.8 on knife edges — drawing-guidelines.md
+# rule 6 (roughness symbols only where a surface runs, slides or locates)), so the block only ever governed non-functional faces, where "as
 # machined" on a manual mill/lathe lands at Ra 1.6-6.3 without trying and
 # as-cast skin (Ra 12.5-25 sand) could never meet a number anyway. Parts may be
 # cast OR cut from bar (material_families in parts/_defaults.yaml), so the

@@ -21,7 +21,7 @@ WASHER_THICK_TOLERANCE_MM = 0.05
 WASHER_BORE_BAND = (0.10, 0.0)  # (upper, lower) deviations
 
 # Marked model dimensions and the places the model authors on them
-# (drawing-simplicity policy rule 2): the thickness is held, the rest routine.
+# (drawing-simplicity-policy.md `How the repository implements the guidelines`): the thickness is held, the rest routine.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {"DiscDia", "BoreDia"},
     "Disc": {"DiscThick"},

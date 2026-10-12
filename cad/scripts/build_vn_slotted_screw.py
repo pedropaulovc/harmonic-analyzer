@@ -1,6 +1,6 @@
 """Build the pinion-block hold-down slotted screw from McMaster 90280A201.
 
-Rule 12 (audit E10): U28 raised the pivot block to 20.5, which left the
+drawing-guidelines.md rule 18 (thread engagement) (audit E10): U28 raised the pivot block to 20.5, which left the
 former #8-32 x 1 (90280A199) only 4.39 mm = 1.05D of worst-case thread in
 the base.  The #8-32 x 1-1/4 of the same family engages 11.25 nominal,
 10.74 = 2.58D worst case.

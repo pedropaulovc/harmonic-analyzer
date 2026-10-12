@@ -66,7 +66,7 @@ ISO_CENTER = (0.345, 0.195)
 
 # Printed half-diameter in sheet metres, which the diameter is placed clear of.
 HALF_DIA = PIN_DIA * SHEET_SCALE[0] / 2000.0
-# Rule 7 (turned parts): both dimensions sit on the side view, the diameter
+# drawing-guidelines.md rule 11 (turned parts read like the lathe) (turned parts): both dimensions sit on the side view, the diameter
 # above it -- its dimension line left of centre so the axis-centerline pick at
 # the view's middle lands on bare face -- and the cut length below.  The end
 # view is a bare circle with its center mark (machinist review of 7f7fc1717).

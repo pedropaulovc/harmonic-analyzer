@@ -53,7 +53,7 @@ def test_spring_hole_column_rides_the_channel_arm_plane() -> None:
         assert hole_z + SUMMING_Z == pytest.approx(rocker_bank_layout.hub_mid_z(j))
     assert spec.HOLE_END_OFFSET_FIRST == pytest.approx(5.572, abs=5e-4)
     assert spec.HOLE_END_OFFSET_LAST == pytest.approx(12.755, abs=5e-4)
-    # Rule-12: the j=0 tap keeps a 2.0 wall to the -Z plate end.
+    # drawing-guidelines.md rule 17 (walls and webs): the j=0 tap keeps a 2.0 wall to the -Z plate end.
     tap_r = blind_cut_dia_mm(spec.HOLE_SPEC) / 2.0
     assert spec.HOLE_END_OFFSET_FIRST - tap_r >= 2.0
 

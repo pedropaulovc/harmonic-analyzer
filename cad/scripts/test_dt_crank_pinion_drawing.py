@@ -1,6 +1,6 @@
 """Offline contracts for the crank-pinion drawing.
 
-The print is recreated under ``cad/docs/drawing-simplicity-policy.md``: a
+The print is recreated under ``cad/docs/drawing-guidelines.md``: a
 removable 16T stock pinion with a hub boss and a match-drilled retention pin
 carries no datums or frames, its turned sizes and lengths are native model
 dimensions whose places and bands the PART owns, the pin hole is governed by
@@ -86,7 +86,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 
 def test_the_blank_sizes_are_native_model_dimensions() -> None:
-    # Rule 1: the outside diameter and the face width are turned before a
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`: the outside diameter and the face width are turned before a
     # cutter touches the part, so they are model dimensions of the gear blank
     # the shared helper builds -- named, driven and toleranced HERE, never
     # retyped into the gear-data block as text.
@@ -110,7 +110,7 @@ def test_the_blank_sizes_are_native_model_dimensions() -> None:
 
 
 def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
-    # Rule 2: the places a dimension prints are part of the tolerance it
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`: the places a dimension prints are part of the tolerance it
     # claims, so the model owns them. The overall length is a look (the shaft
     # end recessed inside the boss), not a fit: one place like the face width.
     assert spec.DRAWING_PRECISION_BY_NAME == {
@@ -172,7 +172,7 @@ def test_the_boss_is_the_root_circle_and_the_pin_hole_stays_in_its_wall() -> Non
 
 
 def _assert_four_fact_note(note: str, mate_number: str) -> None:
-    """Rule 6 (Main, 2026-09-25): at most four lines, no dimensions, and --
+    """drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main, 2026-09-25): at most four lines, no dimensions, and --
     because each sheet stands alone -- all four facts of the matched fit:
     match drill at assembly with the named mate (and where it runs), ream to
     fit the named pin, the fit's acceptance, flush both sides."""
@@ -302,7 +302,7 @@ def test_bore_finish_lands_lower_right_clear_of_the_cutting_line() -> None:
 
 
 def test_the_bore_fit_is_the_only_three_place_dimension() -> None:
-    # Policy rule 2: the places a dimension prints select its band. Only the
+    # drawing-guidelines.md rule 3 (decimal places carry the tolerance): the places a dimension prints select its band. Only the
     # fit over the crankshaft needs three, and the native Right-plane
     # dimension carrying it is the one the sheet keeps.
     assert "BoreDia" in spec.DRAWING_DIMENSIONS["BossProfile"]
@@ -372,7 +372,7 @@ def test_callouts_add_only_what_the_number_cannot_carry() -> None:
 def test_print_carries_no_gdt_or_basic_dimensions() -> None:
     # Rules 3-4: a removable stock pinion clamped to its crankshaft is not on
     # the GD&T allowlist, so no datum, frame or basic dimension survives. The
-    # ONE roughness it keeps is rule 5's exception -- the bore is a
+    # ONE roughness it keeps is drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)'s exception -- the bore is a
     # size-toleranced fit, and a fit depends on the peaks as well as the size.
     source = _source()
     for helper in (
@@ -430,9 +430,9 @@ def test_notes_carry_the_tooth_edge_override_and_the_boss_wall_fact() -> None:
     # The gear-data table already defines the nonstandard tooth system. One
     # note overrides the title block's destructive edge break; the other
     # states the option-C thin boss wall as a plain fact from the spec's own
-    # worst case, rounded down. The policy requires the sheet to state its
-    # named exception (Codex #857 P2), but exception and ruling labels never
-    # print (fleet ruling, 2026-09-26); the policy row keeps the provenance.
+    # worst case, rounded down. Rule 20 requires the sheet to state its
+    # shortfall, but exception and ruling labels never print; pending
+    # ruling #1374 keeps the provenance.
     assert spec.TOOTH_EDGE_NOTE in lines
     wall = f"{math.floor(spec.BOSS_WALL_WORST * 100.0) / 100.0:.2f}"
     assert wall == "1.67"
@@ -446,14 +446,6 @@ def test_notes_carry_the_tooth_edge_override_and_the_boss_wall_fact() -> None:
     assert not hasattr(spec, "BOSS_WALL_EXCEPTION")
     for internal in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "RULE "):
         assert internal not in spec.DRAWING_NOTES
-    policy = (
-        Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
-    ).read_text(encoding="utf-8")
-    row = next(
-        line for line in policy.splitlines()
-        if line.startswith("| MHA-DT-010 crank pinion boss |")
-    )
-    assert f"wall {math.floor(spec.BOSS_WALL_WORST * 1000.0) / 1000.0:.3f}" in row
     notes = spec.DRAWING_NOTES
     assert spec.PIN_NUMBER not in notes
     assert "LIGHT DRIVE FIT" not in notes
@@ -577,7 +569,7 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material_specification"] == material
     # The FINISH field states the surface condition only: how the teeth are
     # made is the PROCESS row's job, and saying it twice is the
-    # over-specification rule 4 bans (codex machinist review, 2026-09-20).
+    # over-specification drawing-guidelines.md rule 5 (avoid excessive GD&T) bans (codex machinist review, 2026-09-20).
     assert config["finish"] == "oiled"
     assert not any(
         word in config["finish"].lower() for word in ("cut", "hob", "shaper", "machin")
@@ -996,24 +988,10 @@ def test_t120_radial_carries_every_fit_offset_and_axis_pose() -> None:
     assert bdt.T120_TURNED_BAND_RADIAL <= concentric(spec.TURNED_DIA) - budget + 1e-9
 
 
-def _t120_policy_row() -> str:
-    policy = (
-        Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
-    ).read_text(encoding="utf-8")
-    rows = [
-        line
-        for line in policy.split("\n## Named exceptions", 1)[1].splitlines()
-        if line.startswith("| MHA-DT-010") and "T120" in line.split("|")[1]
-    ]
-    assert len(rows) == 1
-    return rows[0]
-
-
-def test_t120_shortfall_is_the_named_exception_the_policy_states() -> None:
-    # User ruling 2026-09-30 on Codex P1 (#1154): the band stays Ø16.21 and
-    # the shoulder 8.5.  At the arithmetic worst of every fit offset and axis
-    # pose the pair can close on T120 by the row's figures (worst case and
-    # RSS), and the sheets state the build's figures rounded down.
+def test_t120_shortfall_is_the_build_clearance_the_sheets_state() -> None:
+    # Pending ruling #1374: the band stays Ø16.21 and the shoulder 8.5.
+    # At the arithmetic worst of every fit offset and axis pose the pair
+    # can close on T120; the sheets state the build's figures rounded down.
     import build_dt_drive_train_assembly as bdt
 
     air, radial = bdt.T120_SHOULDER_AIR, bdt.T120_TURNED_BAND_RADIAL
@@ -1035,21 +1013,6 @@ def test_t120_shortfall_is_the_named_exception_the_policy_states() -> None:
     assert wider["turned band radial"] < bdt.T120_TURNED_BAND_RADIAL_STATED_WORST
     longer = bdt.pinion_t120_clearances(shoulder_length=spec.SHOULDER_LENGTH + 0.1)
     assert longer["shoulder air"] < bdt.T120_SHOULDER_AIR_STATED_WORST
-    # The row states the build's figures, the fit-up feeler and its limits.
-    row = _t120_policy_row()
-    concentric = bdt.PINION_T120_CONCENTRIC
-    for figure in (
-        f"air −{-air:.3f}",
-        f"radial −{-radial:.3f}",
-        f"−{-bdt.T120_SHOULDER_AIR_STATED_WORST:.2f} / "
-        f"−{-bdt.T120_TURNED_BAND_RADIAL_STATED_WORST:.2f}",
-        f"+{rss['shoulder air']:.2f} / +{rss['turned band radial']:.2f}",
-        f"+{concentric['shoulder air']:.3f} / +{concentric['turned band radial']:.3f}",
-        f"{spec.T120_FITUP_FEELER_MM:.2f} feeler",
-        f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN",
-        f"{spec.SHOULDER_LENGTH_FITUP_MIN:.1f} MIN",
-    ):
-        assert figure in row, figure
 
 
 def test_t120_shoulder_air_is_no_higher_than_a_point_between_rim_samples() -> None:
@@ -1377,7 +1340,7 @@ def test_crank_step_runs_free_only_after_the_t120_check_closes() -> None:
 
 
 def test_both_gear_sheets_print_the_worst_contact_ratio_rounded_down() -> None:
-    # User ruling 2026-09-30: the 16T:64T contact ratio is under rule 12's
+    # User ruling 2026-09-30: the 16T:64T contact ratio is under drawing-guidelines.md rule 20 (state a known shortfall as a plain fact)'s
     # 1.1 at the open corner, and both GEAR DATA blocks state it, never
     # claiming more than the mesh gives.
     import build_dt_drive_train_assembly as bdt

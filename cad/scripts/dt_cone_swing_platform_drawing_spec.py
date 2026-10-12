@@ -43,8 +43,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CornerSE": {"CornerSER"},
 }
 
-# Decimal places ARE the tolerance statement (drawing-simplicity policy rule
-# 2), so the MODEL owns them: build_dt_cone_swing_platform applies this map to the
+# Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`
+# ), so the MODEL owns them: build_dt_cone_swing_platform applies this map to the
 # .SLDPRT and draw_dt_cone_swing_platform only reads it back. The whole plate
 # outline prints one place (+/-0.8): the east edge at the swing stop and the
 # west edge at the notch mouth spend the disengaged lock-knob head margin,

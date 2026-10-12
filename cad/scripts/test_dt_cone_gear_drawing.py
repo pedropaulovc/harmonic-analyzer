@@ -187,7 +187,7 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
         assert "INVOLUTE FLANKS" in data
         assert f"CYLINDER GEAR {notes.CYLINDER_MATE_NUMBER}" in data
         # The tooth form and the floor's native limit dimension state the
-        # result, so no row says how to cut it (rule 6).
+        # result, so no row says how to cut it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
         for method in ("CUTTING", "CUTTER", "PLUNGE", "INDEXING", "SINKING"):
             assert method not in data
         assert spec.TOOTH_FORM in data
@@ -266,7 +266,7 @@ def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> 
 
 
 def test_notes_state_no_bore_joint_method_or_review_record() -> None:
-    # Rule 6: the D-bore and its fit print as native dimensions in the bore
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the D-bore and its fit print as native dimensions in the bore
     # view; no joint, keyway or retaining method is named.  The U42/U40
     # shortfalls print once each, as GEAR DATA rows (test_named_shortfalls_
     # print_as_facts_on_their_sheets), so the notes never repeat them.  Every
@@ -724,7 +724,7 @@ def test_invalid_family_member_is_rejected() -> None:
 
 
 def test_root_to_bore_webs_meet_rule_12_except_the_named_t006() -> None:
-    # Policy rule 12 at the worst case: the printed MIN floor diameter against
+    # drawing-guidelines.md rule 17 (walls and webs) at the worst case: the printed MIN floor diameter against
     # the maximum bore.  The D-flat only adds material on +X, so the round
     # side is the thinnest web.  U40 (user): T012/T018/T024 moved one shaft
     # land down to meet the target; T006 is the one named exception.

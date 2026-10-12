@@ -2,7 +2,7 @@
 
 The MHA-PD-008 knob shaft's stud, the MHA-PD-022 drive collar's rear slot, the
 MHA-VN-037 spring pin across it and the MHA-PD-013 thumbnut, each pair judged at the
-printed worst case (policy rule 12).  Every corner is recomputed here from the
+printed worst case (drawing-guidelines.md rule 17 (walls and webs)).  Every corner is recomputed here from the
 printed values and places and from the catalogue limits, not read back from the
 specs' derived constants; the reloads prove each import-time assert fires.
 """

@@ -11,7 +11,7 @@ views: the side profile (front), the plan (top, which carries the foot
 screw's stations and the counterbored screw-hole and crown set-screw tap
 callouts), the end view (right, which carries the width / shaft-axis-height /
 crown / bore stack), and the isometric.  A bracket carries no frames and no
-datums (drawing-simplicity-policy.md): every location is a plain coordinate
+datums (drawing-guidelines.md): every location is a plain coordinate
 dimension off a named face.
 
 Run with SolidWorks open::
@@ -114,7 +114,7 @@ TAP_R_SHEET = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) * SHEET_SCALE[0] / 2000.0
 # of the front view's crown stack (x <= 108) and foot below.
 FOOT_HOLE_CALLOUT_XY = (0.126, 0.202)
 # The tap is cut at the bench; its mouth is staked over the seated set screw
-# at the channel assembly (policy rule 9's lock, joint_retention), so the
+# at the channel assembly (drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)'s lock, joint_retention), so the
 # callout says so ahead of the native size row.  Machinist review r13: as two
 # 86 mm rows centred at x 50 the block ran 5.7 mm past the left inner border
 # (x 12.7).  Three rows of at most 24 characters (~61 mm printed, 2.56 mm a

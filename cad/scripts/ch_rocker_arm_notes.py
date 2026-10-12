@@ -24,7 +24,7 @@ from ch_rocker_arm_spec import (
 )
 
 # The top edge's one-sided height over the pivot is a model dimension with
-# its band on the part (rocker_arm_spec.TOP_EDGE_BAND, policy rule 2), so no
+# its band on the part (rocker_arm_spec.TOP_EDGE_BAND, drawing-simplicity-policy.md `How the repository implements the guidelines`), so no
 # note carries it. The hub is the other end of that chain: an OD off the bore
 # axis by e lifts its top e toward the cheeks, and nothing else relates the two features. A
 # plain note, not a frame (Main 2026-09-26); turning the hub and reaming the
@@ -86,7 +86,7 @@ DRAWING_NOTES = "\n".join(
         "   DEFINE THE ARC ENDPOINTS.",
         f"5. EACH END: {TIP_FACE:.{DEFAULT_DRAWING_PRECISION}f} RADIAL LAND PERP TO",
         "   TOP EDGE; STRAIGHT TAPER TO BOTTOM ARC.",
-        # REAM is the fit bore's process requirement (policy rule 6); its
+        # REAM is the fit bore's process requirement (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); its
         # +0.03/0 band rides the O6.50 natively and its Ra the bore's symbol.
         "6. PIVOT HOLE: REAM.",
         # #948 ruling R: the rod's float on the arm is taken from the hub's

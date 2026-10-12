@@ -189,7 +189,7 @@ def test_advance_ratio_ignores_a_leader_polluted_extent():
 
 
 def test_dimension_line_through_a_neighbours_text_is_reported_with_coordinates():
-    """Policy rule 8: "no text sits on a line" -- the defect the PDF used to reveal."""
+    """drawing-guidelines.md rule 14 (keep text off the part): "no text sits on a line" -- the defect the PDF used to reveal."""
     victim = _text("D1", Box(0.100, 0.100, 0.120, 0.104))
     offender = AnnotationGeometry(
         label="D2",
@@ -257,7 +257,7 @@ def test_annotation_inside_the_title_block_keep_out_is_reported():
 
 
 def test_callouts_of_two_views_within_a_text_height_mean_add_a_sheet():
-    """Rule 8's diagnostic symptom, which no box-vs-box audit was watching for.
+    """drawing-guidelines.md rule 14 (keep text off the part)'s diagnostic symptom, which no box-vs-box audit was watching for.
 
     Each view's callouts may legitimately crowd THAT view; the defect is one
     view's callout squeezed against another view's callout.

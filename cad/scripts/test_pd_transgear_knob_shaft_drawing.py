@@ -140,7 +140,7 @@ def test_the_end_view_stands_clear_of_the_side_views_rear_end() -> None:
 
 
 def test_sheet_authors_no_manufacturing_value() -> None:
-    # Rule 2: places and bands come from the part; the sheet reads them back.
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`: places and bands come from the part; the sheet reads them back.
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert not drawing_specification_violations(source, filename=drawing.__file__)
@@ -235,7 +235,7 @@ def test_run_out_limit_refuses_a_ring_that_brings_the_hub_bore_in(
 def test_cutter_stations_are_native_banded_model_dimensions() -> None:
     """Codex P2 on R9-21/R9-67: the full-depth window and the run-out limit
     print as the model's own dimensions, band and places on the part, not as
-    numbers frozen into note text (policy rules 2 and 7)."""
+    numbers frozen into note text (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 12 (hole and slot callouts say what to do))."""
     assert {"FullDepth", "CutterRunout"} <= spec.DRAWING_DIMENSIONS["StudProfile"]
     places = spec.DRAWING_PRECISION_BY_NAME
     assert places["FullDepth"] == spec.FULL_DEPTH_PLACES == 3

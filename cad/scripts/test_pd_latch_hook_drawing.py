@@ -585,7 +585,7 @@ def _overall_lines() -> dict[str, tuple[tuple[float, float], tuple[float, float]
 
 
 def test_the_overall_height_is_a_conspicuous_reference_clear_of_every_text() -> None:
-    """Rule 7: the formed overall, ear top to round tip, printed in its own
+    """drawing-guidelines.md rule 10 (dimension from a real feature): the formed overall, ear top to round tip, printed in its own
     right and distinct from the 70.4 to the pin, its lines through no text."""
     lines = _overall_lines()
     top, tip = lines["Overall ext top"][0], lines["Overall ext tip"][0]

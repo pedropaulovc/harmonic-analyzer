@@ -274,7 +274,7 @@ OIL_HOLE_TOOTH_OFFSET_DEG = (
 if abs(OIL_HOLE_TOOTH_OFFSET_DEG - GAP_CENTRE_PHASE_DEG) > 1e-9:
     raise AssertionError("the +Y oil hole is no longer on a tooth centre")
 
-# --- walls (rule 12: target 2.0, floor 1.5, at the printed bands) --------------
+# --- walls (drawing-guidelines.md rule 17 (walls and webs): target 2.0, floor 1.5, at the printed bands) --------------
 WALL_TARGET = 2.0
 WALL_FLOOR = 1.5
 _BORE_MAX = BORE_DIA + BORE_DIA_BAND[0]  # 3.930
@@ -292,7 +292,7 @@ for _name, _nominal, _worst in WALLS:
     if _worst < WALL_TARGET:
         raise AssertionError(f"sleeve wall {_name} {_worst:.3f} under {WALL_TARGET}")
 # Under the flat: 3.5 − 1.95 = 1.55 nominal; 3.485 − 1.965 = 1.52 at the
-# worst case, under the 2.0 target (the Named exceptions row): it is judged
+# worst case, under the 2.0 target (pending ruling #1378): it is judged
 # against the 1.5 floor and printed as a MIN, floored at two places.
 FLAT_WALL = FLAT_TO_AXIS - BORE_DIA / 2.0
 FLAT_WALL_WORST = round(FLAT_TO_AXIS + FLAT_TO_AXIS_BAND[1] - _BORE_MAX / 2.0, 6)
@@ -371,7 +371,7 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 
-# Rule 6's gear-data block: the tooth system the views cannot dimension.  The
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)'s gear-data block: the tooth system the views cannot dimension.  The
 # tip, root and tooth length print as native dimensions on the section.
 GEAR_DATA = gear_data_note(
     [
@@ -389,6 +389,6 @@ GEAR_DATA = gear_data_note(
 # The title block's 0.25 edge break is 14% of this fine tooth's whole depth,
 # and the tooth ends seat the hub's spigot.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-# Named exception: MHA-PD-010 flat wall (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-PD-010 flat wall (#1378).
 FLAT_WALL_NOTE = f"D-FLAT WALL TO BORE {FLAT_WALL_PRINTED:.2f} MIN."
 DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, CUTTER_NOTE, FLAT_WALL_NOTE))

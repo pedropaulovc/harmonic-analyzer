@@ -1,6 +1,6 @@
 """Offline contracts for the bar pivot pin (MHA-CH-011) part and drawing.
 
-The installed pressed pin under ``cad/docs/drawing-simplicity-policy.md``: two
+The installed pressed pin under ``cad/docs/drawing-guidelines.md``: two
 native model dimensions whose places (and the diameter's grind band) the PART
 owns, the installed length as REFERENCE, no GD&T, no roughness symbol, and at
 most four note lines: the blank, the press, the flush ends, the running fit.
@@ -104,7 +104,7 @@ def test_print_carries_no_gdt_roughness_or_callouts() -> None:
 
 def test_notes_state_blank_press_flush_ends_and_running_fit() -> None:
     lines = notes.DRAWING_NOTES.splitlines()
-    assert len(lines) <= 4  # policy rule 6
+    assert len(lines) <= 4  # drawing-guidelines.md rule 7 (notes: few, flagged, never a method)
     assert lines == [
         "1. CUT BLANK 6.60 \u00b10.13 LONG; INSTALLED STATE SHOWN.",
         "2. PRESS IN; REMOVABLE WITH PUNCH.",

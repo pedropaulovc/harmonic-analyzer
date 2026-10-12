@@ -52,8 +52,8 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 def test_the_length_and_the_bore_carry_their_bands_on_the_model() -> None:
     """The MHA-VN-049 spring's room rides the length and the shoulder press the
     bore, so each band is a native model tolerance from the spec (policy
-    rule 2).  The O.D. prints at .XXX and the title block's row governs it;
-    restating that row on the dimension is what policy rule 1 forbids."""
+    drawing-simplicity-policy.md `How the repository implements the guidelines`).  The O.D. prints at .XXX and the title block's row governs it;
+    restating that row on the dimension is what drawing-guidelines.md rule 2 (the title block is the general specification) forbids."""
     assert model_toleranced_dimensions(part) == {
         ("Ring", "RingLength"): "LENGTH_BAND",
         ("RingProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
@@ -82,7 +82,7 @@ def test_the_bore_holds_a_light_press_on_the_shoulder_at_every_limit() -> None:
 def test_wall_bands_cover_the_printed_xxx_row() -> None:
     """The wall stack charges the O.D. at least the .XXX row it prints under
     and the bore its largest ream, and the MIN the sheet states never rounds
-    the worst case up (policy rule 12)."""
+    the worst case up (drawing-guidelines.md rule 17 (walls and webs))."""
     row = _config.title_block("linear_3pl")["value_in"] * 25.4
     assert spec.OD_BAND >= row
     worst_at_row = (spec.OD - row - spec.BORE_DIA_MAX) / 2.0
@@ -423,7 +423,7 @@ def test_face_landing_puts_the_leader_at_its_model_x_on_the_projected_line(
 
 
 def test_turned_part_diameters_follow_the_machinist() -> None:
-    # Rule 7: the O.D. is moved onto the lathe profile; the bore, a solid
+    # drawing-guidelines.md rule 11 (turned parts read like the lathe): the O.D. is moved onto the lathe profile; the bore, a solid
     # circle only end-on, keeps the end view.
     assert set(drawing.PROFILE_KEEP) == {"RingLength"}
     assert set(drawing.END_KEEP) == {"BoreDia", "RingOd"}
@@ -437,7 +437,7 @@ def test_turned_part_diameters_follow_the_machinist() -> None:
 
 def test_the_bore_callout_names_ream_for_the_shoulder_press() -> None:
     """The bore is a light press on the MHA-VN-041 shoulder: a fit bore, so it
-    is reamed (rule 7) and its one-sided band holds the press; its callout
+    is reamed (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)) and its one-sided band holds the press; its callout
     rides the end-view diameter, the hole's defining view."""
     drilled_growth = _config.title_block("drilled_hole")["plus_mm"]
     # The press band is tighter than a drill's oversize: only a reamer holds it.

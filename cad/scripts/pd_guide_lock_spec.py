@@ -43,7 +43,7 @@ LOCK_THICK = 2.0  # extruded +Z
 # (vn_guide_lock_screw_spec.LOCK_SET_OFFSET); the #4 close Ø3.048 left too little.
 HOLE_XY = ((4.0, RAIL_EDGE_LIP + 2.5), (18.0, RAIL_EDGE_LIP + 2.5))
 HOLE_SPEC = HoleSpec("drilled_fractional", "1/8")
-# ± on each printed hole coordinate (rule 3: no frame on this plate). Its
+# ± on each printed hole coordinate (drawing-guidelines.md rule 5 (avoid excessive GD&T): no frame on this plate). Its
 # radial reach, hypot(0.035, 0.035) = 0.0495, is what the set window spends.
 HOLE_LOCATION_BAND = 0.035
 HOLE_LOCATION_PLACES = 3
@@ -61,7 +61,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 HOLE_LOCATION_DIMENSIONS = DRAWING_DIMENSIONS["ScrewHoles"]
 
 # Places and explicit bands the print carries on those dimensions, the ones the
-# paper-drive lock-station sweep judges the plate at (policy rule 12). Each
+# paper-drive lock-station sweep judges the plate at (drawing-guidelines.md rule 17 (walls and webs)). Each
 # plate's far edge passes 0.142 from the floating pivot spacer, set and skewed
 # on its screws (R9-61), and its back face carries the button heads past the
 # hanger arm and arm plate. So the height never runs over 15.65 (+0/-0.50),
