@@ -64,6 +64,7 @@ from mg_output_fixture_spec import (
     DRAWING_PRECISION_BY_NAME,
     ROD_BORE_CALLOUT,
     TAP_PROCESS,
+    TAP_SPEC,
 )
 
 
@@ -86,7 +87,9 @@ ISO_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
 SIDE_CENTER = (0.125, 0.180)
 END_CENTER = (0.262, SIDE_CENTER[1])
-ISO_CENTER = (0.365, 0.195)
+# Low right, over the title block: the end view's tap callout runs out to
+# the right at the hole's height, above it.
+ISO_CENTER = (0.372, 0.115)
 NOTES_XY = (0.016, 0.078)
 # The side view is centred on the part's axial extent.
 _AXIAL_MID = (FREE_END_X + SPIGOT_FACE_X) / 2.0
@@ -106,20 +109,23 @@ def _side_y(sketch_v_mm: float) -> float:
 
 _SIDE_TOP = _side_y(_HALF_AF)
 _SIDE_BOTTOM = _side_y(-_HALF_AF)
-# The axial stations stack over the side view, each text mid-span, from the
-# free end out; the stations' extension lines rise from the spigot's top
-# edge.  The bore's station hangs below, with the groove's root Ø clear of it
-# to the right.  The spigot's Ø stands off the face; the groove's radius
-# (its sketch sits on the upper side, sketch +v) reads beyond the face,
-# just over the spigot's top edge.
+# The hex and groove stations stack over the side view, each text mid-span,
+# their extension lines rising from the free end, the shoulder and the
+# groove's centre.  The overall length runs under the view, outermost, so no
+# extension line rises from the spigot face: the groove's radius (its sketch
+# sits on the upper side, sketch +v) reads beyond the face, just over the
+# spigot's top edge, its shoulder clear.  The bore's station (a 20 mm span
+# under a 22 mm text) reads outside, left of the free end, so the overall
+# length's extension line from the free end never runs through it.  The
+# groove's root Ø hangs under the groove, between the two.
 SIDE_KEEP = {
     "HexLength": (_side_x((FREE_END_X + SHOULDER_X) / 2.0), _SIDE_TOP + 0.010),
     "GrooveStation": (_side_x((FREE_END_X + GROOVE_X) / 2.0), _SIDE_TOP + 0.020),
-    "OverallLength": (_side_x(_AXIAL_MID), _SIDE_TOP + 0.030),
-    "RodStation": (_side_x(FREE_END_X / 2.0), _SIDE_BOTTOM - 0.010),
+    "OverallLength": (_side_x(_AXIAL_MID), _SIDE_BOTTOM - 0.032),
+    "RodStation": (_side_x(FREE_END_X) - 0.015, _SIDE_BOTTOM - 0.010),
     "GrooveRootDia": (_side_x(GROOVE_X), _SIDE_BOTTOM - 0.012),
     "SpigotDia": (_side_x(SPIGOT_FACE_X) + 0.012, SIDE_CENTER[1]),
-    "GrooveRadius": (_side_x(SPIGOT_FACE_X) + 0.012, _SIDE_TOP + 0.004),
+    "GrooveRadius": (_side_x(SPIGOT_FACE_X) + 0.012, _SIDE_TOP + 0.006),
     "RodBoreDia": (_side_x(FREE_END_X) - 0.022, SIDE_CENTER[1] + 0.012),
 }
 # The end view stands the flats vertical (``*Right`` looks along -X, sheet
@@ -130,8 +136,39 @@ END_KEEP = {
     "HexAf": (END_CENTER[0], END_CENTER[1] + _END_HALF_HEIGHT + 0.010),
     "BoreFromFlat": (END_CENTER[0], END_CENTER[1] - _END_HALF_HEIGHT - 0.010),
 }
-# Below and right of the end view, clear of the flats' dimension and the iso.
-TAP_CALLOUT_XY = (END_CENTER[0] + 0.030, END_CENTER[1] - _END_HALF_HEIGHT - 0.024)
+# The tap callout reads right of the end view at the hole's height: its
+# leader leaves the drill circle a few degrees above the horizontal centre
+# mark, crosses only the near flat, and stays between the flats' extension
+# lines (rising from the flats' tops) and the bore's location (hanging from
+# their bottoms).  ``callout_xy`` is the text's centre; the two rows run
+# ~76 mm with the shoulder under the bottom row, ~5.6 mm below the centre
+# (the v1 sheet's ink: centre (292, 134), shoulder end (254.0, 128.4)).
+_END_HALF_WIDTH = HEX_AF / 2.0 * _S / 1000.0
+_TAP_CALLOUT_HALF_WIDTH = 0.038
+_TAP_CALLOUT_SHOULDER_DROP = 0.0056
+TAP_CALLOUT_XY = (
+    END_CENTER[0] + _END_HALF_WIDTH + 0.006 + _TAP_CALLOUT_HALF_WIDTH,
+    END_CENTER[1] + 0.004 + _TAP_CALLOUT_SHOULDER_DROP,
+)
+# What the native callout must print: the thread itself, not just the drill.
+_TAP_THREAD_TEXT = f"{TAP_SPEC.size.lstrip('#')} UNC"
+
+
+def _check_tap_callout(display: Any) -> None:
+    """Prove the callout states the tap: one resolved row carries the process,
+    the thread and its class (the drill row alone would ask for a hole)."""
+    resolved = [str(display.GetText(part) or "") for part in (1, 2, 3, 4)]
+    thread = [text for text in resolved if _TAP_THREAD_TEXT in text]
+    if (
+        len(thread) != 1
+        or TAP_SPEC.thread_class not in thread[0]
+        or TAP_PROCESS not in thread[0]
+    ):
+        raise RuntimeError(
+            f"thumb-screw tap callout does not state {TAP_PROCESS} "
+            f"{_TAP_THREAD_TEXT}-{TAP_SPEC.thread_class}: {resolved!r}"
+        )
+    _telemetry.success(f"thumb-screw tap callout reads {thread[0]!r}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -204,8 +241,9 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add the tap's center mark to the end view")
     # The tap drill's edge on the spigot face: the one visible circle of the
-    # Hole Wizard feature from the end.
-    add_native_hole_callout(
+    # Hole Wizard feature from the end.  The native callout prints the drill
+    # row and, under it, the process on the thread row.
+    tap_callout = add_native_hole_callout(
         adapter,
         end,
         edge=visible_circle_edge(adapter, end, TAP_DRILL_DIA),
@@ -213,6 +251,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="#4-40 thumb-screw tap",
         process=TAP_PROCESS,
     )
+    _check_tap_callout(tap_callout)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
