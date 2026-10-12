@@ -2318,7 +2318,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "vn_boss_hook_spec",
         "build_dt_drive_train_assembly",
         "build_fr_harmonic_base",
-        "build_mg_wheel_bar",
         "dt_cone_pivot_post_spec",
         "dt_cone_swing_platform_geometry",
         "dt_cone_swing_platform_spec",

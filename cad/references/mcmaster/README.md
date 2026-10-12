@@ -50,9 +50,12 @@ recipes:
 | 91882A221 | `vn-thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | — (diagnostic recipe; `vn-cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `vn-tube-frame-cap` | Metal Round Cap |
+| 92671A005 | `vn-wheel-axle-nut` (catalogue-only; no vendor model) | Brass Hex Nut |
 | 9414T1 | — (historical MHA-VN-016 until the 2026-10-08 terminal redesign) | Set Screw Shaft Collar for 1/16" Diameter |
 | 94355A213 | `vn-cone-tip-collar` set screw, fitted as supplied | 18-8 Stainless Steel Flat-Tip Set Screw, #2-56 x 5/16" |
 | 92865A585 | `vn-hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
+| 92916A250 | `vn-wheel-axle-front-washer` (catalogue-only; no vendor model) | Brass Washer for Number 4 Screw Size |
+| 92916A480 | `vn-wheel-axle-back-washer` (catalogue-only; no vendor model) | Brass Washer for Number 10 Screw Size |
 | 93075A194 | `vn-hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93585A190 | `vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `vn-cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
@@ -677,6 +680,25 @@ Catalog specifications checked on September 10, 2026:
   here, so both are catalogue-only: no replica gate, and their standalone
   diagnostics are catalog-only runs.
 
+- [92671A005](https://www.mcmaster.com/92671A005/) (`vn-wheel-axle-nut`,
+  MHA-VN-025, two), [92916A480](https://www.mcmaster.com/92916A480/)
+  (`vn-wheel-axle-back-washer`, MHA-VN-057, one) and
+  [92916A250](https://www.mcmaster.com/92916A250/)
+  (`vn-wheel-axle-front-washer`, MHA-VN-058, one) carry the magnifying wheel
+  on the 3/16 mg-wheel-axle (mg wheel rev 10). The back washer sits between
+  the mg-wheel-bar's front face and the hub; the front washer sits on the
+  #4-40 end against the spigot face, the first nut is run down until the
+  wheel turns free without rattle (0.05-0.15 endshake) and the second jams
+  it. All three pages were checked live on October 10, 2026: 92671A005 is a
+  brass hex nut, ASME B18.2.2, #4-40, 1/4 in across flats, 3/32 in thick;
+  92916A480 is a brass washer for #10, ID 0.200 in, OD 0.438 in, thickness
+  0.029-0.043 in; 92916A250 is a brass washer for #4, ID 0.120 in, OD
+  0.281 in, thickness 0.018-0.032 in. `diag_build_92671A005.py` extrudes the
+  hexagon with a plain bore at the #4-40 basic major (the thread is not
+  modelled); `diag_build_92916A480.py` and `diag_build_92916A250.py` extrude
+  the ID x OD annulus at the range's nominal thickness. No vendor model was
+  fetched, so all three are catalogue-only: no replica gate, and their
+  standalone diagnostics are catalog-only runs.
 - [90114A124](https://www.mcmaster.com/90114A124/)
   (`vn-ms-stop-plate-screw`, MHA-VN-054, two) retains the MHA-MS-003 plate
   on MHA-MS-002. The product table and 2-D PDF were read live on October 9,

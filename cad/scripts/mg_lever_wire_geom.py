@@ -10,33 +10,39 @@ therefore rebuilds only the lever-wire part + its drawing, never the wheel or
 the assembly (codex #360: the old ``from build_mg_lever_wire import ...`` edges
 pulled the spec into both closures).
 
-The derivation (see the inline comments, moved verbatim from
-``build_lever_wire``): the wire runs from the output fixture's hook to the
-XY-tangent point on the magnifying wheel's hub, ducking behind the rim into the
-hub's back groove band; the YokePlane offset linearizes the inextensible-wire
-coupling at the rest pose.
+The derivation: the wire runs from the output fixture's hook to the XY-tangent
+point on the brass drum (``mg_wheel_drum_geom``) pressed on the wheel's
+front spigot; the YokePlane offset linearizes the inextensible-wire coupling
+at the rest pose. The run is a straight rest-pose line (no wrap modelling).
 """
 
 from __future__ import annotations
 
 import math
 
-WIRE_DIA = 0.8  # hair-thin in the photos; renderable stand-in (low)
+from mg_magnifying_wheel_geom import (
+    DRUM_MID_Z as _DRUM_MID_LOCAL_Z,
+    HUB_DIA as _BOSS_DIA,
+    HUB_FRONT_Z as _SPIGOT_FRONT_LOCAL_Z,
+    HUB_STEP_Z as _BOSS_FRONT_LOCAL_Z,
+    RIM_AXIAL as _RIM_AXIAL,
+    RIM_INNER_DIA as _RIM_INNER_DIA,
+    RIM_OUTER_DIA as _RIM_OUTER_DIA,
+    SPOKE_AXIAL as _SPOKE_AXIAL,
+)
+from mg_wheel_drum_geom import DRUM_OD, DRUM_WIRE_R, LEVER_WIRE_DIA
+
+WIRE_DIA = LEVER_WIRE_DIA  # hair-thin in the photos; renderable stand-in (low)
 CLEARANCE = 0.25  # surface stand-off (interference-gate margin convention)
 
 # --- endpoint anchors (magnifier frame; asserted by build_mg_magnifier_assembly)
 #
 # DEPTH RE-ANCHOR (2026-07-04, ch30 p.4): the side view shows the whole output
 # line -- this wire, the wheel, the rim wire, the pen rod -- as ONE plumb
-# vertical at the machine front. The old lever depth (z -85) hung the hook 50
-# behind the wheel plane, an ~8 deg lean the photo refutes. A PERFECTLY planar
-# wire is impossible (the rim ring z -142.9..-150.9 blocks every straight
-# in-band approach, and the hub pokes only 1.0 past the rim per side), so the
-# real wire leans SLIGHTLY, ducking behind the rim's back face into the hub's
-# back groove band. Solving the clearance system (>= 0.25 surface everywhere;
-# rim back-face bound at radius 43.35, axle-flange bound inside radius 17.9,
-# spoke fronts at -144.9) gives the hook/hub-end pair below: a 10 mm z drop
-# over the ~353 run = 1.6 deg, visually plumb.
+# vertical at the machine front. The hook hangs just behind the wheel bar's
+# front face; the wire drops to the drum on the wheel's pen side, crossing the
+# rim's axial band only outside the rim (``run_gaps``): ~17 mm of z over the
+# ~350 run = 2.8 deg, visually plumb.
 CLAMP_X = 150.0  # sliding clamp / vertical rod / fixture line
 # The wire TIES through the fixture's cross hole and hangs beside the vertical
 # rod, just under the collar's bottom face: wire r + 0.25 below it in y, and
@@ -45,51 +51,100 @@ CLAMP_X = 150.0  # sliding clamp / vertical rod / fixture line
 # (LEVER_ROD_Z -128.3 -- depth window RE-SOLVED 2026-08-02 for the one-piece
 # top-frame casting): build_mg_magnifier_assembly derives and asserts the
 # thumb-screw rail clearance from the exact 91882A221 stock reach, so the rail
-# imposes NO depth bound. Pushing the head band past the rail outer face -131
-# would instead go beyond the rim-duck floor. Remaining window: the
-# front column surface -124.7 forces the rod deeper than -127.95, while the
-# wire's rim-duck feasibility caps the hook at ~-137.96 => rod >= -128.31).
+# imposes NO depth bound.
 HOOK_Y = 915.05  # FIXTURE_Y0 915.7 - wire r 0.4 - 0.25 (under the collar bottom)
 HOOK_Z = -137.95
 WHEEL_X = 53.0  # magnifying-wheel centre
 WHEEL_BAR_Y = 575.7  # ch30 p002 re-anchor (was 565.0)
-HUB_DIA = 20.0  # ch. 21 annotated (build_mg_magnifying_wheel.HUB_DIA)
-# Hub-end Z: in the hub's back groove band, between the rim-duck bound
-# (z >= -142.25 while the run is radially inside the rim ring) and the
-# axle-flange bound (<= -142.55 wherever radius < 17.9).
-HUB_END_Z = -142.77
+WHEEL_MID_Z = -146.9  # wheel mid-plane (build_mg_magnifier_assembly.WHEEL_MID_Z)
+DRUM_DIA = DRUM_OD
+# Drum-end Z: the drum's axial middle, so the tangency sits mid-lane.
+DRUM_END_Z = round(WHEEL_MID_Z + _DRUM_MID_LOCAL_Z, 6)  # -154.91
 
-# XY tangent from the hook to the hub circle inflated by wire r + clearance,
-# on the west (hook) side: the wire grazes the groove and the wrap is implied.
-# (-acos picks the tangent whose contact point faces the hook at machine +x;
-# the pre-#151 mirrored frame used +acos for the reflected tangent.)
-_R_EFF = HUB_DIA / 2.0 + WIRE_DIA / 2.0 + CLEARANCE
-_VX, _VY = CLAMP_X - WHEEL_X, HOOK_Y - WHEEL_BAR_Y  # hub centre -> hook (2D)
-_THETA = math.atan2(_VY, _VX) - math.acos(_R_EFF / math.hypot(_VX, _VY))
+# XY tangent from the hook to the drum circle inflated by wire r + clearance.
+# +acos picks the tangent on the drum's right seen from the front (~2:25):
+# the wire wraps clockwise from there, down the drum's side to TIE 1 at
+# 6 o'clock (mg_magnifying_wheel_geom).
+_R_EFF = DRUM_DIA / 2.0 + WIRE_DIA / 2.0 + CLEARANCE  # 10.1
+
+
+def tangent_theta(hook_x: float, hook_y: float) -> float:
+    """Machine-XY azimuth (rad, from +x about the wheel centre) of the drum
+    tangent point the straight run from the hook touches."""
+    vx, vy = hook_x - WHEEL_X, hook_y - WHEEL_BAR_Y
+    return math.atan2(vy, vx) + math.acos(_R_EFF / math.hypot(vx, vy))
+
+
+def tangent_end(hook_x: float, hook_y: float) -> tuple[float, float, float]:
+    """The drum end of the straight run from a hook at (hook_x, hook_y)."""
+    theta = tangent_theta(hook_x, hook_y)
+    return (
+        WHEEL_X + _R_EFF * math.cos(theta),
+        WHEEL_BAR_Y + _R_EFF * math.sin(theta),
+        DRUM_END_Z,
+    )
+
+
+_THETA = tangent_theta(CLAMP_X, HOOK_Y)
+# Front-view clock angle of the tangency (CCW from 3 o'clock; machine +x is
+# the front view's left).
+TANGENT_CLOCK_DEG = 180.0 - math.degrees(_THETA)  # ~17.7
 
 WIRE_START = (CLAMP_X, HOOK_Y, HOOK_Z)  # hook end
-WIRE_END = (
-    WHEEL_X + _R_EFF * math.cos(_THETA),
-    WHEEL_BAR_Y + _R_EFF * math.sin(_THETA),
-    HUB_END_Z,
-)  # hub end = the PART ORIGIN (local +Y runs hub -> hook)
+WIRE_END = tangent_end(CLAMP_X, HOOK_Y)  # drum end = the PART ORIGIN
 WIRE_LEN = round(math.dist(WIRE_START, WIRE_END), 3)
 
+
+def run_gaps(
+    start: tuple[float, float, float], end: tuple[float, float, float], n: int = 4001
+) -> dict[str, float]:
+    """Surface gaps from a straight run to the wheel's pen-side faces it passes:
+    the rim ring, the spokes and the Ø25 boss (each where the run is radially
+    over it, wire r + clearance widened), and the drum lane's two ends at the
+    drum end. Positive = clear."""
+    face = {
+        "rim": WHEEL_MID_Z - _RIM_AXIAL / 2.0,
+        "spokes": WHEEL_MID_Z - _SPOKE_AXIAL / 2.0,
+        "boss": WHEEL_MID_Z + _BOSS_FRONT_LOCAL_Z,
+    }
+    band = {
+        "rim": (_RIM_INNER_DIA / 2.0, _RIM_OUTER_DIA / 2.0),
+        "spokes": (_BOSS_DIA / 2.0, _RIM_INNER_DIA / 2.0),
+        "boss": (0.0, _BOSS_DIA / 2.0),
+    }
+    margin = WIRE_DIA / 2.0 + CLEARANCE
+    gaps = {key: math.inf for key in face}
+    for i in range(n):
+        t = i / (n - 1)
+        p = [s + t * (e - s) for s, e in zip(start, end, strict=True)]
+        radial = math.hypot(p[0] - WHEEL_X, p[1] - WHEEL_BAR_Y)
+        for key, (r_in, r_out) in band.items():
+            if r_in - margin <= radial <= r_out + margin:
+                gaps[key] = min(gaps[key], face[key] - p[2] - WIRE_DIA / 2.0)
+    gaps["drum_back"] = WHEEL_MID_Z + _BOSS_FRONT_LOCAL_Z - end[2] - WIRE_DIA / 2.0
+    gaps["drum_front"] = end[2] - (WHEEL_MID_Z + _SPIGOT_FRONT_LOCAL_Z) - WIRE_DIA / 2.0
+    return gaps
+
+
+RUN_GAPS = run_gaps(WIRE_START, WIRE_END)
+for _key, _gap in RUN_GAPS.items():
+    if _gap < CLEARANCE:
+        raise AssertionError(f"lever wire run: {_key} gap {_gap:.3f} < {CLEARANCE}")
+
 # --- WIRE-1 yoke (the coupling mate's geometry) -------------------------------
-# The wheel-side yoke point: on the hub PITCH circle (groove radius + wire
+# The wheel-side yoke point: on the drum PITCH circle (drum radius + wire
 # radius -- where the wire centreline rides) at the SAME tangency azimuth, in
-# the wheel's mid-plane (machine z -146.9). Its XY radial offset from the wire
-# end is perpendicular to the wire axis by tangency, so only the z step feeds
-# the YokePlane offset below.
-WHEEL_MID_Z = -146.9  # wheel mid-plane (build_mg_magnifier_assembly.WHEEL_MID_Z)
-YOKE_PITCH_R = HUB_DIA / 2.0 + WIRE_DIA / 2.0  # 10.4: wire-centreline pitch
+# the wheel's mid-plane (the wheel part's Front plane). Its XY radial offset
+# from the wire end is perpendicular to the wire axis by tangency, so only the
+# z step feeds the YokePlane offset below.
+YOKE_PITCH_R = DRUM_WIRE_R  # 9.85: wire-centreline pitch
 YOKE_POINT = (
     WHEEL_X + YOKE_PITCH_R * math.cos(_THETA),
     WHEEL_BAR_Y + YOKE_PITCH_R * math.sin(_THETA),
     WHEEL_MID_Z,
 )
 # YokePlane: parallel to the part's Top plane (perpendicular to the wire axis)
-# through YOKE_POINT. Signed offset along local +Y (= the hub->hook direction).
+# through YOKE_POINT. Signed offset along local +Y (= the drum->hook direction).
 _Y_LOCAL = [(s - e) / WIRE_LEN for s, e in zip(WIRE_START, WIRE_END, strict=True)]
 YOKE_PLANE_OFFSET = round(
     sum((q - e) * y for q, e, y in zip(YOKE_POINT, WIRE_END, _Y_LOCAL, strict=True)), 4

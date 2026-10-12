@@ -1,9 +1,9 @@
 mg-wheel-axle:
   number: MHA-MG-007
-  material: Plain Carbon Steel
-  material_specification: AISI 1018 cold-finished steel bar
-  finish: turned, deburred, oiled
+  material: AISI O1 or W1 drill rod, 3/16 in
+  material_specification: "AISI O1 or W1 drill rod, 3/16 in, ground, as supplied (annealed)"
+  finish: bright, oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "machined (steel)"
+  process: "cut from 3/16 drill rod; thread and domed tip turned; pressed into the wheel bar to its gauge from the front face at assembly"

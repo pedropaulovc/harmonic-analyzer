@@ -56,7 +56,9 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
     # The channel sheet left the shared builder when it gained the rocker
     # bank's fit-up steps (#743, Codex PRRT_kwDOPHDy386mRSOK); the paper-drive
     # sheet left it when it became three sheets with its own fit-up steps; the
-    # measuring-stick sheet is a full fitter package (BOM, explode, steps).
+    # measuring-stick sheet is a full fitter package (BOM, explode, steps); the
+    # magnifier sheet left it when it gained the axle-stack details that print
+    # the press gauge and the endshake (Codex PR #1330).
     if drawing
     not in (
         draw_fr_frame_assembly,
@@ -64,6 +66,7 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
         draw_ch_channel_assembly,
         draw_pd_paper_drive_assembly,
         draw_ms_measuring_stick_assembly,
+        draw_mg_magnifier_assembly,
     )
 )
 
@@ -157,6 +160,15 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                     "_mcmaster_91882a221.py",
                     "_mcmaster_90114a124.py",
                 )
+            } <= set(deps)
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        elif drawing is draw_mg_magnifier_assembly:
+            scripts_dir = Path(draw_mg_magnifier_assembly.__file__).resolve().parent
+            # The stack spec whose settings the details print, and the axle
+            # spec that places the endshake detail.
+            assert {
+                str(scripts_dir / name)
+                for name in ("mg_magnifier_assembly_spec.py", "mg_wheel_axle_spec.py")
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         else:

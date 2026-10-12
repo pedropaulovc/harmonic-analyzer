@@ -8,6 +8,8 @@ Only numeric JSON is emitted. CAD stays read-only; no COM, native build, source
 images, or generated GLB modifications. This is not the website acceptance gate.
 The control constructs a circle tangent by bisection of the perpendicularity
 constraint, independently of magnifier.ts's analytic acos tangent expression.
+The release's own visual wire end selects the tangent branch; the wrap sense
+and winding law follow from that branch's geometry, never from a fixed sign.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ from native_identity_source import (
     magnifier_installation,
     project_model_paths,
     validate_release_pair,
+    wheel_wire_pitch_radii,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -78,45 +81,64 @@ def main() -> None:
             parser.error(f"Cannot use the approved native identity projection: {error}")
         sys.path.insert(0, str(scripts))
         wire = identity_map.import_module(cad, "mg_lever_wire_geom")
-        wheel = identity_map.import_module(cad, "mg_magnifying_wheel_geom")
         pen = identity_map.import_module(cad, "pn_pen_wire_geom")
         lever = identity_map.import_module(cad, "mg_magnifying_lever_geom")
         clamp = identity_map.import_module(cad, "mg_magnifying_clamp_geom")
         spring = identity_map.import_module(cad, "spring_mount_geom")
         cx, cy = wire.WHEEL_X, wire.WHEEL_BAR_Y
-        radius = wheel.HUB_DIA / 2 + wire.WIRE_DIA / 2
+        radius, rim = wheel_wire_pitch_radii(wire, pen)
         vertical = identity_map.import_module(cad, "mg_magnifying_vertical_rod_spec")
         fixture = identity_map.import_module(cad, "mg_output_fixture_spec")
-        rim = wheel.RIM_OUTER_DIA / 2 + pen.WIRE_DIA / 2
         installation = magnifier_installation(
             identity_map.source_file(cad, "scripts/build_mg_magnifier_assembly.py")
+        )
+        rest = tuple(wire.WIRE_START)
+        # The release's visual wire end is its contact lane (hub or drum end
+        # station) and fixes which of the two hook tangents it rides. Machine
+        # +1 is the side counter-clockwise (about +Z) of the hook bearing.
+        contact_z = wire.WIRE_END[2]
+        branch = math.copysign(
+            1.0,
+            math.sin(
+                math.atan2(wire.WIRE_END[1] - cy, wire.WIRE_END[0] - cx)
+                - math.atan2(rest[1] - cy, rest[0] - cx)
+            ),
         )
 
         def tangent(
             hook: tuple[float, float, float],
         ) -> tuple[float, list[float], float]:
             hx, hy, _hz = hook
-            # Dot((H - contact), contact - centre) = 0, source +X tangent.
-            # The installed hook is above the circle; [-pi/2, pi/2] brackets
-            # this tangent without taking acos or assuming a fixed contact.
-            lo, hi = -math.pi / 2, math.pi / 2
+            # Dot((H - centre), unit(a)) - r = 0. At the hook bearing it is
+            # |H - centre| - r > 0, and half a turn toward the branch side it is
+            # -|H - centre| - r < 0, monotone between, so bisection finds the
+            # tangent without acos or assuming a fixed contact.
+            near = math.atan2(hy - cy, hx - cx)
+            far = near + branch * math.pi
             for _ in range(70):
-                a = (lo + hi) / 2
+                a = (near + far) / 2
                 dot = (hx - cx) * math.cos(a) + (hy - cy) * math.sin(a) - radius
                 if dot > 0:
-                    hi = a
+                    near = a
                 else:
-                    lo = a
-            a = (lo + hi) / 2
+                    far = a
+            a = (near + far) / 2
             point = [
                 cx + radius * math.cos(a),
                 cy + radius * math.sin(a),
-                wire.HUB_END_Z,
+                contact_z,
             ]
             return a, point, math.dist(hook, point)
 
-        rest = tuple(wire.WIRE_START)
         a0, contact0, length0 = tangent(rest)
+        # The wire reaches the contact travelling from the hook and wraps on
+        # around the wheel the same way: +1 counter-clockwise about +Z. Taut
+        # no-slip conservation, L + wrap * r * (wheelAngle - a) = constant,
+        # gives the winding law below.
+        wrap = math.copysign(
+            1.0,
+            (contact0[1] - rest[1]) * math.cos(a0) - (contact0[0] - rest[0]) * math.sin(a0),
+        )
         controls = []
         for angle in (-0.01, 0.01):
             kx, ky = spring.KNIFE[0], spring.KNIFE_CONTACT_Y
@@ -127,7 +149,7 @@ def main() -> None:
                 rest[2],
             )
             a, point, length = tangent(hook)
-            wheel_angle = (length - length0) / radius + a - a0
+            wheel_angle = a - a0 - wrap * (length - length0) / radius
             controls.append(
                 {
                     "summingAngleRad": angle,
@@ -136,8 +158,8 @@ def main() -> None:
                     "wheelAngleRad": wheel_angle,
                     "penTravelMm": -rim * wheel_angle,
                     "wireLengthResidualMm": length
-                    + radius * (a - wheel_angle)
-                    - (length0 + radius * a0),
+                    + wrap * radius * (wheel_angle - a)
+                    - (length0 - wrap * radius * a0),
                 }
             )
         names = (
@@ -180,6 +202,10 @@ def main() -> None:
                     "visualClearanceMm": wire.CLEARANCE,
                     "hubPitchRadiusMm": radius,
                     "rimPitchRadiusMm": rim,
+                    # +1: counter-clockwise about machine +Z from the hook
+                    # bearing (tangent) / around the wheel (wrap).
+                    "tangentBranch": branch,
+                    "wrapSense": wrap,
                     "clampRadiusBandMm": lever.clamp_radius_band(clamp.BLOCK_DEPTH),
                     "rest": {
                         "hookMm": rest,

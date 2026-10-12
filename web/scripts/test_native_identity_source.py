@@ -1,5 +1,6 @@
 """Refusal boundaries for exact-source CAD/native identity projection."""
 import copy
+import types
 from pathlib import Path
 import tempfile
 import unittest
@@ -10,6 +11,7 @@ from native_identity_source import (
     magnifier_installation,
     validate_path_projection,
     validate_release_pair,
+    wheel_wire_pitch_radii,
 )
 
 
@@ -186,6 +188,33 @@ class MagnifierInstallationTests(unittest.TestCase):
                 path.write_text(source)
                 with self.subTest(source=source), self.assertRaisesRegex(ValueError, "magnifier installation datum"):
                     magnifier_installation(path)
+
+
+class WheelWirePitchRadiiTests(unittest.TestCase):
+    @staticmethod
+    def module(**values):
+        module = types.ModuleType("pen_wire_fixture")
+        module.__dict__.update(values)
+        return module
+
+    def test_plain_rim_and_grooved_rim_releases(self):
+        lever = types.SimpleNamespace(YOKE_PITCH_R=10.4)
+        self.assertEqual(
+            wheel_wire_pitch_radii(lever, self.module(RIM_DIA=100.0, WIRE_DIA=0.8)), (10.4, 50.4)
+        )
+        lever = types.SimpleNamespace(YOKE_PITCH_R=9.85)
+        self.assertEqual(
+            wheel_wire_pitch_radii(lever, self.module(RIM_WIRE_R=49.2, WIRE_DIA=0.4)), (9.85, 49.2)
+        )
+
+    def test_ambiguous_or_missing_rim_schema_is_refused(self):
+        lever = types.SimpleNamespace(YOKE_PITCH_R=9.85)
+        for pen in (
+            self.module(WIRE_DIA=0.4),
+            self.module(RIM_WIRE_R=49.2, RIM_DIA=100.0, WIRE_DIA=0.4),
+        ):
+            with self.subTest(pen=sorted(vars(pen))), self.assertRaisesRegex(ValueError, "exactly one"):
+                wheel_wire_pitch_radii(lever, pen)
 
 
 if __name__ == "__main__":
