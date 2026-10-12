@@ -2518,9 +2518,9 @@ def test_build_places_the_hanger_section_on_the_underside_sheet() -> None:
 
 def test_hanger_drill_callout_states_the_drilling_direction() -> None:
     """The wall stack charges the #6 hole's drift from the faced underside,
-    so the sheet-3 callout says the hole is drilled from there; the native
-    size and counterbore rows follow on their own rows (rule 6: four rows at
-    most)."""
+    so the sheet-3 callout says the hole is drilled from there and the
+    counterbore cut from the top (F-F draws it there); the native size and
+    counterbore rows follow on their own rows (rule 6: four rows at most)."""
     import ast
 
     import _drawing_hole_callout
@@ -2529,7 +2529,7 @@ def test_hanger_drill_callout_states_the_drilling_direction() -> None:
     prefixed = _drawing_hole_callout.compose_hole_callout_prefix(
         drawing.HANGER_DRILL_CALLOUT, native
     )
-    assert prefixed == "HANGER: DRILL FROM UNDERSIDE\n" + native
+    assert prefixed == "DRILL FROM UNDERSIDE;\nC'BORE FROM TOP:\n" + native
     assert len(prefixed.splitlines()) <= 4
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     (callout,) = [

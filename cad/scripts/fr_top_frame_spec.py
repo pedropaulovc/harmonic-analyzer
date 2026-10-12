@@ -204,10 +204,11 @@ HANGER_SCREW_FLOAT = (HANGER_CLEARANCE_DIA - HANGER_SCREW.SHANK_DIA) / 2.0  # 0.
 # share (rules 6 and 7: count, process and purpose; the size and its band
 # print natively): section F-F carries the round holes' size, the depth of
 # all four (both holes and both slots floor at one height) and the slots'
-# length; the underside locator the slots' width.
-HANGER_PIN_HOLE_CALLOUT = "2X BLIND FLAT-BOTTOM REAM\nSLIP FIT MHA-VN-051"
+# length; the underside locator the slots' width.  Each names its mate by
+# number and name (codex review of 59f405ab).
+HANGER_PIN_HOLE_CALLOUT = "2X BLIND FLAT-BOTTOM REAM\nSLIP FIT MHA-VN-051 DOWEL"
 HANGER_PIN_DEPTH_CALLOUT = "4X"
-HANGER_SLOT_WIDTH_CALLOUT = "2X BLIND SLOT\nREAMED WIDTH\nSLIP FIT MHA-VN-051"
+HANGER_SLOT_WIDTH_CALLOUT = "2X BLIND SLOT\nREAMED WIDTH, SLIP FIT\nMHA-VN-051 DOWEL"
 HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH"
 
 # Full thread in the hub at the printed worst case (dt_arbor_pedestal_spec's
