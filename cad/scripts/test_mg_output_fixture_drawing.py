@@ -268,98 +268,187 @@ def test_end_view_dimensions_stack_above_the_hex_clear_of_the_tap_leader() -> No
     assert shoulder_y < flat_top - 0.004
 
 
-def test_end_view_tap_takes_one_single_centre_mark() -> None:
-    # 2026-10-12 farm sheet: AutoInsertCenterMarks2 marked the spigot's O.D.
-    # and the concentric tap drill, one mark over the other.
+def test_end_view_tap_keeps_the_template_centre_mark_alone() -> None:
+    # The template marks the tap as the view is placed: AutoInsertCenterMarks2
+    # (2026-10-12 farm sheet, DetailItem347/350) and InsertCenterMark3 (run05)
+    # each printed a second mark over it.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "auto_center_marks(adapter, end" not in source
-    assert drawing.CENTER_MARK_SINGLE == 2
-    assert "CENTER_MARK_SINGLE, False, False" in source
-    assert "expected one tap centre mark on the end view" in source
-    assert "_mark_tap_axis(adapter, end, tap_drill)" in source
+    assert "InsertCenterMark" not in source
+    assert "_prove_tap_centre_mark(adapter, end, tap_drill)" in source
     assert "edge=tap_drill," in source
 
 
-class _MarkDrawing:
-    """IDrawingDoc as the mark sees it: InsertCenterMark3 is a dispatch-
-    returning method, ClearSelection2 a void one."""
+_AXIS_ON_SHEET = (0.262, 0.180)
+_DRILL_CENTRE = (0.0, 0.0011, -0.0023)
 
-    def __init__(self, calls: list[tuple], mark: object | None) -> None:
-        self._calls = calls
-        self._mark = mark
 
-    def InsertCenterMark3(self, style: int, propagate: bool, slot: bool) -> object | None:
-        self._calls.append(("InsertCenterMark3", style, propagate, slot))
-        return self._mark
+class _MarkData:
+    """IDisplayData: GetLineCount and GetLineAtIndex2 are methods, each line
+    (colour, line type, unused, unused, start xyz, end xyz)."""
 
-    def ClearSelection2(self, all_selections: bool) -> None:
-        self._calls.append(("ClearSelection2", all_selections))
+    def __init__(self, lines: list[tuple[float, float, float, float]]) -> None:
+        self._lines = lines
+
+    def GetLineCount(self) -> int:
+        return len(self._lines)
+
+    def GetLineAtIndex2(self, index: int) -> tuple[float, ...]:
+        x0, y0, x1, y1 = self._lines[index]
+        return (0.0, 0.0, 0.0, 0.0, x0, y0, 0.0, x1, y1, 0.0)
+
+
+class _MarkAnnotation:
+    """IAnnotation.GetDisplayData: a method returning a dispatch, or None."""
+
+    def __init__(self, data: _MarkData | None) -> None:
+        self._data = data
+
+    def GetDisplayData(self) -> _MarkData | None:
+        return self._data
+
+
+def _single_mark(dx: float = 0.0, dy: float = 0.0) -> _MarkAnnotation:
+    """A single mark's ink: 10 mm arms and extended lines 20..28 mm out."""
+    x, y = _AXIS_ON_SHEET[0] + dx, _AXIS_ON_SHEET[1] + dy
+    return _MarkAnnotation(
+        _MarkData(
+            [
+                (x - 0.010, y, x + 0.010, y),
+                (x, y - 0.010, x, y + 0.010),
+                (x, y - 0.028, x, y - 0.020),
+                (x, y + 0.020, x, y + 0.028),
+                (x - 0.028, y, x - 0.020, y),
+                (x + 0.020, y, x + 0.028, y),
+            ]
+        )
+    )
 
 
 class _MarkView:
-    """IView's annotation census: a VARIANT array, or None when empty."""
+    """IView.GetAnnotationsByType: a method returning a VARIANT array, or
+    None when the view carries none of the type."""
 
-    def __init__(self, calls: list[tuple], marks: tuple | None) -> None:
-        self._calls = calls
+    def __init__(self, marks: tuple | None) -> None:
         self._marks = marks
+        self.types: list[int] = []
 
     def GetAnnotationsByType(self, annotation_type: int) -> tuple | None:
-        self._calls.append(("GetAnnotationsByType", annotation_type))
+        self.types.append(annotation_type)
         return self._marks
 
 
-def _mark_tap(
-    monkeypatch: pytest.MonkeyPatch, *, mark: object | None, marks: tuple | None
-) -> list[tuple]:
-    calls: list[tuple] = []
-    drill = object()
-    view = _MarkView(calls, marks)
-    model = _MarkDrawing(calls, mark)
+class _DrillCurve:
+    """ICurve.CircleParams: a property, (centre xyz, axis xyz, radius)."""
 
-    def select(adapter, selected_view, entity_type, xy, *, label, entity):
-        assert selected_view is view and entity is drill
-        calls.append(("select", entity_type, xy))
-        return entity
+    def __init__(self, params: tuple | None) -> None:
+        self.CircleParams = params
 
-    def early_bound(obj, interface):
-        calls.append(("bind", interface))
+
+class _DrillEdge:
+    """IEdge.GetCurve: a method returning a dispatch, or None."""
+
+    def __init__(self, curve: _DrillCurve | None) -> None:
+        self._curve = curve
+
+    def GetCurve(self) -> _DrillCurve | None:
+        return self._curve
+
+
+class _NoInsertDrawing:
+    """The drawing document: the sheet must never add a centre mark."""
+
+    def InsertCenterMark3(self, *_args: object) -> object:
+        raise AssertionError("the sheet added a centre mark")
+
+    def AutoInsertCenterMarks2(self, *_args: object) -> object:
+        raise AssertionError("the sheet added a centre mark")
+
+
+_DRILL_CIRCLE = (*_DRILL_CENTRE, 1.0, 0.0, 0.0, 0.00113)
+
+
+def _prove_mark(
+    monkeypatch: pytest.MonkeyPatch,
+    marks: tuple | None,
+    *,
+    edge: _DrillEdge | None = None,
+) -> _MarkView:
+    view = _MarkView(marks)
+    bound: list[str] = []
+
+    def early_bound(obj: object, interface: str) -> object:
+        bound.append(interface)
         return obj
 
-    monkeypatch.setattr(drawing, "_select_view_entity", select)
+    def project(adapter, projected_view, xyz, *, label):
+        assert projected_view is view
+        assert tuple(xyz) == _DRILL_CENTRE, label
+        return _AXIS_ON_SHEET
+
     monkeypatch.setattr(drawing, "_early_bound", early_bound)
-    drawing._mark_tap_axis(SimpleNamespace(currentModel=model), view, drill)
-    return calls
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    drawing._prove_tap_centre_mark(
+        SimpleNamespace(currentModel=_NoInsertDrawing()),
+        view,
+        edge or _DrillEdge(_DrillCurve(_DRILL_CIRCLE)),
+    )
+    assert {"IEdge", "ICurve", "IView"} <= set(bound)
+    return view
 
 
-def test_tap_mark_is_one_single_mark_on_the_selected_drill_circle(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize(("dx", "dy"), [(0.0, 0.0), (0.0004, 0.0), (0.0, -0.0004)])
+def test_tap_centre_mark_on_the_drill_axis_passes_untouched(
+    monkeypatch: pytest.MonkeyPatch, dx: float, dy: float
 ) -> None:
-    calls = _mark_tap(monkeypatch, mark=object(), marks=(object(),))
-    assert calls == [
-        ("select", "EDGE", None),
-        ("bind", "IDrawingDoc"),
-        ("InsertCenterMark3", 2, False, False),
-        ("ClearSelection2", True),
-        ("bind", "IView"),
-        ("GetAnnotationsByType", 13),
-    ]
-
-
-def test_tap_mark_refuses_a_refused_insert(monkeypatch: pytest.MonkeyPatch) -> None:
-    with pytest.raises(RuntimeError, match="failed to centre-mark the thumb-screw tap"):
-        _mark_tap(monkeypatch, mark=None, marks=(object(),))
+    view = _prove_mark(monkeypatch, (_single_mark(dx, dy),))
+    assert view.types == [13]
 
 
 @pytest.mark.parametrize(
-    ("marks", "found"), [(None, 0), ((), 0), ((object(), object()), 2)]
+    ("marks", "found"),
+    [(None, 0), ((), 0), ((_single_mark(), _single_mark()), 2)],
 )
-def test_tap_mark_refuses_any_census_but_one(
+def test_tap_centre_mark_refuses_any_census_but_one(
     monkeypatch: pytest.MonkeyPatch, marks: tuple | None, found: int
 ) -> None:
     with pytest.raises(
         RuntimeError, match=f"expected one tap centre mark on the end view, found {found}"
     ):
-        _mark_tap(monkeypatch, mark=object(), marks=marks)
+        _prove_mark(monkeypatch, marks)
+
+
+@pytest.mark.parametrize(("dx", "dy"), [(0.0008, 0.0), (0.0, 0.0006), (0.0045, 0.0)])
+def test_tap_centre_mark_off_the_drill_axis_fails(
+    monkeypatch: pytest.MonkeyPatch, dx: float, dy: float
+) -> None:
+    with pytest.raises(RuntimeError, match="mm off the tap axis"):
+        _prove_mark(monkeypatch, (_single_mark(dx, dy),))
+
+
+@pytest.mark.parametrize(
+    ("marks", "edge", "message"),
+    [
+        ((_MarkAnnotation(None),), None, "has no display data"),
+        ((_MarkAnnotation(_MarkData([])),), None, "draws no line"),
+        ((_single_mark(),), _DrillEdge(None), "has no curve"),
+        ((_single_mark(),), _DrillEdge(_DrillCurve(None)), "reports no circle centre"),
+        ((_single_mark(),), _DrillEdge(_DrillCurve(())), "reports no circle centre"),
+        (
+            (_single_mark(),),
+            _DrillEdge(_DrillCurve(_DRILL_CENTRE[:2])),
+            "reports no circle centre",
+        ),
+    ],
+)
+def test_tap_centre_mark_unmeasured_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    marks: tuple,
+    edge: _DrillEdge | None,
+    message: str,
+) -> None:
+    with pytest.raises(RuntimeError, match=message):
+        _prove_mark(monkeypatch, marks, edge=edge)
 
 
 def test_notes_are_short() -> None:

@@ -24,6 +24,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -46,7 +47,7 @@ from _drawing_dimensions import assert_imported_precision, set_dimension_callout
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_selection import _select_view_entity
+from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
@@ -192,32 +193,64 @@ def _check_tap_callout(display: Any) -> None:
     _telemetry.success(f"thumb-screw tap callout reads {thread[0]!r}")
 
 
-# swCenterMarkStyle_e.swCenterMark_Single.  AutoInsertCenterMarks2 marks the
-# spigot's O.D. and the tap drill, concentric on the end view, separately:
-# one mark printed over the other (DetailItem347/350, 2026-10-12 farm sheet).
-CENTER_MARK_SINGLE = 2
+# The template centre-marks every hole as each view is placed (the knife
+# mount's convention, #913), so the end view arrives with its tap marked:
+# AutoInsertCenterMarks2 printed a second mark over it (DetailItem347/350,
+# 2026-10-12 farm sheet), and so did an explicit InsertCenterMark3 on the
+# drill circle (run05: found 2).  The sheet adds none; it proves the one.
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+# How far the mark's ink centre may sit from the tap's axis on the sheet.
+CENTER_MARK_AXIS_SLOP = 0.0005
 
 
-def _mark_tap_axis(adapter: Any, view: Any, drill_edge: Any) -> None:
-    """One centre mark on the tap, picked on its drill circle, and proof the
-    end view carries no other."""
-    _select_view_entity(
-        adapter, view, "EDGE", None, label="thumb-screw tap drill", entity=drill_edge
+def _ink_centre(annotation: Any, label: str) -> tuple[float, float]:
+    """The centre of the box of every line an annotation draws, in sheet
+    metres: a single mark's arms and extended lines are symmetric about its
+    axis."""
+    data = _early_bound(annotation, "IAnnotation").GetDisplayData()
+    if data is None:
+        raise RuntimeError(f"{label} has no display data")
+    data = _early_bound(data, "IDisplayData")
+    lines = [
+        tuple(float(value) for value in data.GetLineAtIndex2(index))
+        for index in range(int(data.GetLineCount()))
+    ]
+    if not lines:
+        raise RuntimeError(f"{label} draws no line")
+    # GetLineAtIndex2: (colour, line type, unused, unused, start xyz, end xyz).
+    xs = [value for line in lines for value in (line[4], line[7])]
+    ys = [value for line in lines for value in (line[5], line[8])]
+    return ((min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0)
+
+
+def _prove_tap_centre_mark(adapter: Any, view: Any, drill_edge: Any) -> None:
+    """Prove the end view carries exactly one centre mark, on the tap's axis
+    (the drill circle's centre projected to the sheet)."""
+    curve = _early_bound(drill_edge, "IEdge").GetCurve()
+    if curve is None:
+        raise RuntimeError("the thumb-screw tap drill edge has no curve")
+    circle = _early_bound(curve, "ICurve").CircleParams
+    if circle is None or len(circle) < 3:
+        raise RuntimeError("the thumb-screw tap drill edge reports no circle centre")
+    axis = model_point_in_view(
+        adapter,
+        view,
+        (float(circle[0]), float(circle[1]), float(circle[2])),
+        label="thumb-screw tap axis",
     )
-    draw = adapter.currentModel
-    mark = _early_bound(draw, "IDrawingDoc").InsertCenterMark3(
-        CENTER_MARK_SINGLE, False, False
-    )
-    draw.ClearSelection2(True)
-    if mark is None:
-        raise RuntimeError("failed to centre-mark the thumb-screw tap")
-    marks = (
+    marks = tuple(
         _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
     )
     if len(marks) != 1:
         raise RuntimeError(
             f"expected one tap centre mark on the end view, found {len(marks)}"
+        )
+    centre = _ink_centre(marks[0], "thumb-screw tap centre mark")
+    offset = math.hypot(centre[0] - axis[0], centre[1] - axis[1])
+    if offset > CENTER_MARK_AXIS_SLOP:
+        raise RuntimeError(
+            f"the end view's centre mark sits {offset * 1000.0:.2f} mm off the tap "
+            f"axis: mark {centre}, axis {axis}"
         )
 
 
@@ -289,11 +322,11 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, side, holes=True, size=0.0025):
         raise RuntimeError("failed to add the rod bore's center mark to the side view")
     # The tap drill's edge on the spigot face: the one visible circle of the
-    # Hole Wizard feature from the end.  It takes the view's one centre mark,
-    # and the native callout prints the drill row and, under it, the process
-    # on the thread row.
+    # Hole Wizard feature from the end.  Its axis carries the view's one
+    # centre mark, and the native callout prints the drill row and, under
+    # it, the process on the thread row.
     tap_drill = visible_circle_edge(adapter, end, TAP_DRILL_DIA)
-    _mark_tap_axis(adapter, end, tap_drill)
+    _prove_tap_centre_mark(adapter, end, tap_drill)
     tap_callout = add_native_hole_callout(
         adapter,
         end,
