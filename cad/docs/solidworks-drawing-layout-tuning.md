@@ -155,28 +155,68 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   1.59 and 1.89 px high (2026-10-01; run 20261010T073339590Z). Bring a ring
   inside the zoomed window (place it at fit first) before reading the
   anchor-to-ring offset zoomed.
-- **Native view-caption rich text can mix inherited and inline font heights.**
+- **Generated native caption separators inherit document font sources.**
+  The rocker R15 native failure (artifact 3130) retained a standalone space
+  between `SCALE` and its ratio at **0.00635 m**, despite the documented
+  annotation rich-text reset and a successful local 3.5 mm write. Its existing
+  Manufacturing Notes displayed uniformly at **0.0035 m in Century Gothic**;
+  `GetTextFormat(0)` agreed, with `GetUseDocTextFormat(0) == True` and
+  `IsHeightSpecifiedInPts() == False`. A local caption-format write therefore
+  does not prove that generated separators changed.
   [`IAnnotation.GetTextFormat`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IAnnotation~GetTextFormat.html)
-  explicitly warns that its format may not represent embedded rich text.
-  Source the normal height from uniform, positive native
+  also warns that its format may not represent embedded rich text.
+
+  Source the height and face from **every** uniform, positive native
   [`IDisplayData.GetTextHeightAtIndex`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IDisplayData~GetTextHeightAtIndex.html)
-  fragments of the sheet's existing ordinary note, not an inherited format,
-  a copied font-size literal, or an unverified document default. The documented
-  [`IAnnotation.SetTextFormat`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IAnnotation~SetTextFormat.html)
-  sequence is `(0, True, None)` to remove embedded fonts, then
-  `(0, False, text_format)` with the sourced `CharHeight`; both calls must
-  return `True`. Reuse `_drawing_notes.set_note_text_height` for that writer,
-  redraw/rebuild, and verify every native fragment height plus
-  `<VLNAME>/<VLLABEL>/<VLSCALE>/<VLSCALEV>` identities, order, and counts.
-  Preserve native view ownership, scales, positions, and linked captions;
-  `INote.GetText` returning spaces for view fields is not resolved glyph proof.
-  Parent-circle letters use their existing
+  and `GetTextFontAtIndex` fragment of the existing Manufacturing Notes.
+  Only then obtain its actual `ITextFormat`, require matching metre height,
+  face, and native height authority, and pass that **unmodified format** to
+  the drawing's
+  [`IModelDocExtension.SetUserPreferenceTextFormat`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IModelDocExtension~SetUserPreferenceTextFormat.html).
+  Create and seat that same linked source note at its existing coordinates
+  after the front/property view exists, and pin the inherited defaults
+  **before creating D/E's native detail views and circles**. Existing generated
+  runs are not documented to re-read changed defaults; do not rely on a late
+  font write to repair them.
+
+  The official **Document Properties > Views** table scopes
+  `swDetailingViewTextFormat` **18** to `swDetailingNoOptionSpecified` **0**.
+  **Document Properties > Views > Detail** scopes
+  `swDetailingDetailTextFormat` **3** and
+  `swDetailingDetailView_Name/Label/Scale/DelimiterTextFormat` **42/43/44/45**
+  to `swDetailingDetailView` **301**. Pin and read back exactly those six
+  `(preference, option)` pairs. Do not substitute option 0 for detail-specific
+  slots or use legacy `swDetailingDetailLabelTextFormat` 9, whose document
+  scope is not documented. Numeric values come from installed SW2026 Interop
+  enum literal metadata (34.4.0.78), not a claim about an exact worker seat.
+
+  Each setter must return actual `True`; immediately obtain a fresh
+  [`IModelDocExtension.GetUserPreferenceTextFormat`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IModelDocExtension~GetUserPreferenceTextFormat.html)
+  and check its height, face, and `IsHeightSpecifiedInPts()` authority.
+  Repeat readbacks after rebuild/redraw and after creation/normalization.
+  Document formats do not expose annotation `useDoc` authority; do not invent
+  that boolean. The audited generated SW2026 bindings make `Extension` a
+  read-only dispatch property and Get/Set methods (DISPID 166/167), with
+  `(I4, I4)` and `(I4, I4, DISPATCH)` inputs and no out parameters; the setter
+  returns BOOL. No application/seat-global preference is changed.
+
+  Require the resulting native caption's actual `GetUseDocTextFormat(0)` to
+  be `True`, `HasMultipleFonts` to be `False`, and **every native fragment**
+  (including blank spaces) to match the source height and face. Preserve the
+  complete linked string, `<VLNAME>/<VLLABEL>/<VLSCALE>/<VLSCALEV>` identities,
+  order and counts, resolved native glyphs, caption identity, native view
+  ownership, scales, and view/caption positions. `INote.GetText` returning
+  spaces is not resolved glyph proof. Source note format/content/position
+  must remain unchanged; never replace it with a fixed size or app default.
+  Parent-circle letters retain their existing local
   [`IDetailCircle.SetTextFormat`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IDetailCircle~SetTextFormat.html)
-  and independent `GetDetailCircleInfo2` height readback, not free-text labels
-  or document-wide preferences. Normalize before capturing the settled linked
-  string, retain later whole-string stability and clearance guards, and capture
-  fatal style refusals before closing the seat. The rocker keeps E at Y110,
-  the fatal 3 mm air requirement, and its 4 mm caption target.
+  normalization and independent `GetDetailCircleInfo2` height readback after
+  both writes, with native label/position/ownership guards. Uniform caption
+  inheritance, especially the generated separator, still requires farm
+  proof; passing preference readbacks alone is not success. Retain later
+  whole-string stability and fatal clearance guards, and capture refusals
+  before closing the seat. The rocker keeps E at Y110, the fatal 3 mm air
+  requirement, and its 4 mm caption target.
 
 ## Refusal catalogue — do / don't
 

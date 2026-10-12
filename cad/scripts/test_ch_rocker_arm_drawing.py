@@ -3554,52 +3554,56 @@ def test_sheet_scale_cannot_claim_success_without_native_properties(bound, prope
 class _StyleTextFormat:
     """Native get/put properties; CharHeight switches authority to metres."""
 
-    def __init__(self, height=0.00635, *, points=False):
-        self._height, self.points = height, points
+    def __init__(self, height=0.00635, *, points=False, font="Century Gothic"):
+        self._height, self.points, self.font = height, points, font
 
     CharHeight = property(
         lambda self: self._height,
         lambda self, value: (setattr(self, "_height", value), setattr(self, "points", False)),
     )
     CharHeightInPts = property(lambda self: 24)
-    TypeFaceName = property(lambda self: "Arial")
+    TypeFaceName = property(lambda self: self.font)
 
     def IsHeightSpecifiedInPts(self):
         return self.points
 
 
 class _StyleNote(_CaptionNote):
-    """Two-step rich text, method-shaped format calls, linked native fields."""
+    """R15 local formatting cannot resize the generated SCALE/ratio space."""
 
     def __init__(self, label, *, ordinary_height=None):
         super().__init__(label, height=0.0166799)
         self.rich = ordinary_height is None
+        self.has_multiple = False  # Exercise height guards independently of this flag.
         self.use_doc = True
-        self.font_height = 0.00635  # inherited format, NOT actual normal-note ink
+        self.text_format = _StyleTextFormat(0.00635 if self.rich else ordinary_height)
+        self.font_height = self.text_format.CharHeight
         self.writes, self.events = [], []
         self.reset_result = self.write_result = True
         self.on_write = lambda: None
         self.readback_delta = 0.0
+        self.document_applied = False
         self._linked = (
             "<VLNAME> <FONT size=3.5><VLLABEL>\r\n"
             "<VLSCALE><FONT size=6.35> <FONT size=3.5><VLSCALEV><FONT size=6.35>"
             if self.rich else '$PRPSHEET:"Manufacturing Notes"'
         )
         runs = [
-            ("DETAIL ", 0.00635), (label + "\r\n", 0.0035),
+            ("DETAIL ", 0.0035), (label + "\r\n", 0.0035),
             ("SCALE", 0.0035), (" ", 0.00635),
             ("4:1" if label == "D" else "2:1", 0.0035),
         ] if self.rich else [("1. TURN HUB\r\n", ordinary_height), ("2. REAM BORE", ordinary_height)]
         self.data = _ClearanceDisplayData([
-            {"t": text, "h": height, "pos": [0.30, 0.07, 0.0]}
+            {"t": text, "h": height, "font": "Century Gothic", "pos": [0.30, 0.07, 0.0]}
             for text, height in runs
         ], [])
+        self.data.GetTextFontAtIndex = lambda index: self.data.texts[index]["font"]
         self.annotation.GetDisplayData = lambda: self.data
         self.annotation.GetTextFormat = self.get_format
         self.annotation.GetUseDocTextFormat = lambda _index: self.use_doc
         self.annotation.SetTextFormat = self.set_format
 
-    HasMultipleFonts = property(lambda self: self.rich)
+    HasMultipleFonts = property(lambda self: self.has_multiple)
 
     def GetText(self):
         return " \r\n "  # Not resolved native view-field glyphs.
@@ -3607,7 +3611,7 @@ class _StyleNote(_CaptionNote):
     def get_format(self, index):
         assert index == 0
         self.events.append("get-format")
-        return _StyleTextFormat(self.font_height)
+        return self.text_format
 
     def set_format(self, index, use_doc, text_format):
         assert index == 0
@@ -3622,13 +3626,68 @@ class _StyleNote(_CaptionNote):
             self._linked = re.sub(r"<FONT[^>]*>", "", self._linked)
         else:
             if self.rich:
-                return False  # Official specific-format refusal for inline fonts.
+                return False
             self.font_height, self.use_doc = text_format.CharHeight, False
             for fragment in self.data.texts:
-                fragment["h"] = self.font_height + self.readback_delta
+                if fragment["t"] != " ":  # Actual R15 standalone separator stays 6.35 mm.
+                    fragment["h"] = self.font_height + self.readback_delta
             self.height = self.font_height * 2.0
             self.on_write()
         return True
+
+    def apply_document_font(self, preferences):
+        if not self.rich or self.document_applied:
+            return
+        # Generated native runs inherit distinct document detail-font families.
+        for fragment, preference in zip(self.data.texts, ((42, 301), (43, 301), (44, 301), (18, 0), (45, 301)), strict=True):
+            text_format = preferences[preference]
+            fragment["h"] = text_format.CharHeight + self.readback_delta
+            fragment["font"] = text_format.TypeFaceName
+        self.font_height = self.data.texts[0]["h"]
+        self.height = self.font_height * 2.0
+        self.document_applied = True
+        self.on_write()
+
+
+class _StyleDocExtension:
+    """Document-only native preference methods with detached fresh readbacks."""
+
+    def __init__(self, notes, circles):
+        self.notes, self.circles = notes, circles
+        self.preferences = {
+            pair: _StyleTextFormat(font="Arial")
+            for pair in ((18, 0), (3, 301), (42, 301), (43, 301), (44, 301), (45, 301))
+        }
+        self.writes, self.reads = [], []
+        self.result = True
+        self.on_write = lambda _preference: None
+        self.on_read = lambda _preference, text_format: text_format
+
+    def SetUserPreferenceTextFormat(self, preference, option, text_format):
+        self.writes.append((preference, option, text_format))
+        if self.result is True:
+            self.preferences[preference, option] = _StyleTextFormat(
+                text_format.CharHeight, points=text_format.IsHeightSpecifiedInPts(),
+                font=text_format.TypeFaceName,
+            )
+            self.on_write(preference)
+        return self.result
+
+    def GetUserPreferenceTextFormat(self, preference, option):
+        self.reads.append((preference, option))
+        installed = self.preferences[preference, option]
+        return self.on_read(preference, _StyleTextFormat(
+            installed.CharHeight, points=installed.IsHeightSpecifiedInPts(), font=installed.TypeFaceName,
+        ))
+
+    def create_details(self):
+        assert len(self.writes) == 6
+        for note in self.notes.values():
+            note.apply_document_font(self.preferences)
+        text_format = self.preferences[3, 301]
+        for circle in self.circles.values():
+            circle.font_height, circle.font = text_format.CharHeight, text_format.TypeFaceName
+            circle.use_doc, circle.points = True, text_format.IsHeightSpecifiedInPts()
 
 
 class _StyleCircle(_DetailCircle):
@@ -3642,6 +3701,7 @@ class _StyleCircle(_DetailCircle):
         self.arrows = []
         self.front, self.view = front, view
         self.font_height, self.use_doc, self.points = 0.00635, True, True
+        self.font = "Century Gothic"
         self.result = True
         self.delta = self.display_delta = 0.0
         self.writes = []
@@ -3654,7 +3714,7 @@ class _StyleCircle(_DetailCircle):
         return self.view
 
     def GetTextFormat(self):
-        return _StyleTextFormat(self.font_height, points=self.points)
+        return _StyleTextFormat(self.font_height, points=self.points, font=self.font)
 
     def GetUseDocTextFormat(self):
         return self.use_doc
@@ -3664,6 +3724,7 @@ class _StyleCircle(_DetailCircle):
         if self.result is True:
             self.font_height = text_format.CharHeight + self.delta
             self.use_doc, self.points = use_doc, text_format.IsHeightSpecifiedInPts()
+            self.font = text_format.TypeFaceName
             self.on_write()
         return self.result
 
@@ -3703,9 +3764,12 @@ def native_caption_style(bound, monkeypatch):
 
     front.GetDetailCircleInfo2 = circle_info
     events, captures = [], []
+    extension = _StyleDocExtension(notes, circles)
+    def redraw():
+        events.append("redraw")
     adapter = SimpleNamespace(
-        currentModel=SimpleNamespace(GraphicsRedraw2=lambda: events.append("redraw")),
-        swApp=_APP,
+        currentModel=SimpleNamespace(Extension=extension, GraphicsRedraw2=redraw),
+        swApp=SimpleNamespace(IsSame=_APP.IsSame),  # No application preferences exist.
     )
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: events.append("rebuild"))
     monkeypatch.setattr(
@@ -3715,41 +3779,104 @@ def native_caption_style(bound, monkeypatch):
     return SimpleNamespace(
         adapter=adapter, front=front, notes=notes, views=views, circles=circles,
         source=_StyleNote("source", ordinary_height=0.0035), events=events, captures=captures,
-        display_order=display_order, display_reads=display_reads,
+        extension=extension, display_order=display_order, display_reads=display_reads,
     )
 
 
 def _normalize_style(case):
+    font_source = drawing._pin_detail_caption_font_source(case.adapter, case.source)
+    case.extension.create_details()  # Native creation happens only AFTER the source pin.
     drawing._normalize_detail_caption_styles(
-        case.adapter, case.front, case.views["D"], case.views["E"], case.source,
+        case.adapter, case.front, case.views["D"], case.views["E"], font_source,
     )
 
 
 @pytest.mark.parametrize("height", [0.0035, 0.0042])
+@pytest.mark.parametrize("font", ["Century Gothic", "Arial"])
 @pytest.mark.parametrize("display_order", [("D", "E"), ("E", "D")])
-def test_normal_note_native_fragments_drive_both_captions_and_source_circle_fonts(native_caption_style, height, display_order):
+def test_normal_note_native_font_drives_document_captions_and_source_circles(native_caption_style, height, font, display_order):
     case = native_caption_style
     case.display_order[:] = display_order
+    case.source.text_format.CharHeight = height
+    case.source.text_format.font = font
     for fragment in case.source.data.texts:
-        fragment["h"] = height
+        fragment["h"], fragment["font"] = height, font
+    source_format = dict(vars(case.source.text_format))
+    source_linked = case.source.PropertyLinkedText
+    linked = {label: note.PropertyLinkedText for label, note in case.notes.items()}
+    positions = {label: note.annotation.GetPosition() for label, note in case.notes.items()}
     _normalize_style(case)
-    assert case.source.font_height == 0.00635  # Never adopt inherited source format.
+    assert vars(case.source.text_format) == source_format
+    assert case.source.PropertyLinkedText == source_linked
     assert case.source.writes == []
+    assert [(preference, option) for preference, option, _format in case.extension.writes] == [
+        (18, 0), (3, 301), (42, 301), (43, 301), (44, 301), (45, 301)
+    ]
+    assert all(text_format is case.source.text_format for _pref, _option, text_format in case.extension.writes)
+    assert case.extension.reads == [(18, 0), (3, 301), (42, 301), (43, 301), (44, 301), (45, 301)] * 3
     for label in ("D", "E"):
         note, circle, view = case.notes[label], case.circles[label], case.views[label]
-        assert note.writes == [(0, True, None), (0, False, height)]
-        assert note.events == ["reset", "get-format", "local"]
-        assert re.findall(r"<VL[^>]*>", note.PropertyLinkedText) == list(drawing._CAPTION_FIELDS)
-        assert "<FONT" not in note.PropertyLinkedText
+        assert note.writes == [] and note.events == []
+        assert note.PropertyLinkedText == linked[label]
+        assert note.annotation.GetPosition() == positions[label]
+        assert note.annotation.GetUseDocTextFormat(0) is True
         assert [fragment["h"] for fragment in note.data.texts] == [height] * 5
+        assert [fragment["font"] for fragment in note.data.texts] == [font] * 5
+        assert note.data.texts[3]["t"] == " "  # Generated separator is not skipped.
         assert circle.writes == [(False, height)]
         assert circle.GetLabel() == label and circle.xy == drawing.DETAIL_LETTER_XY[label]
         assert math.dist(circle.display_xy, circle.GetLabelPosition()) > 1e-8
         assert circle.font_height == height and circle.GetUseDocTextFormat() is False
+        assert circle.GetTextFormat().TypeFaceName == font
         assert view.Position == (drawing.HUB_CENTER if label == "D" else drawing.END_CENTER)
-    assert case.events.count("rebuild") == 4 and case.events.count("redraw") == 5
+    assert case.events.count("rebuild") == 3 and case.events.count("redraw") == 6
     assert case.display_reads == [{label: ((False, height),) for label in ("D", "E")}]
     assert case.captures == []
+
+
+def test_r15_local_reset_leaves_native_scale_space_but_document_source_pin_fixes_it(native_caption_style):
+    local_note = _StyleNote("D")
+    annotation = local_note.annotation
+    assert annotation.SetTextFormat(0, True, None) is True
+    text_format = annotation.GetTextFormat(0)
+    text_format.CharHeight = 0.0035
+    assert annotation.SetTextFormat(0, False, text_format) is True
+    assert local_note.data.texts[3]["t"] == " "
+    assert local_note.data.texts[3]["h"] == 0.00635
+    assert all(fragment["h"] == 0.0035 for index, fragment in enumerate(local_note.data.texts) if index != 3)
+    case = native_caption_style
+    assert case.notes["D"].data.texts[3]["h"] == 0.00635
+    _normalize_style(case)
+    assert case.notes["D"].data.texts[3]["h"] == 0.0035
+    assert case.notes["D"].writes == []
+
+
+@pytest.mark.parametrize("defect", ["height", "font"])
+def test_generated_space_must_inherit_source_even_when_all_document_preferences_read_back(native_caption_style, defect):
+    case = native_caption_style
+    create = case.extension.create_details
+    def create_with_stale_separator():
+        create()
+        separator = case.notes["D"].data.texts[3]
+        separator["h" if defect == "height" else "font"] = 0.00635 if defect == "height" else "Arial"
+    case.extension.create_details = create_with_stale_separator
+    with pytest.raises(RuntimeError, match="caption font/content readback mismatch") as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+    assert len(case.extension.reads) == 12
+    assert all(circle.writes == [] for circle in case.circles.values())
+    assert case.notes["D"].writes == []
+
+
+@pytest.mark.parametrize("has_multiple", [True, None, 1, "false"])
+def test_uniform_native_fragments_do_not_relax_multiple_fonts_guard(native_caption_style, has_multiple):
+    case = native_caption_style
+    case.notes["D"].has_multiple = has_multiple
+    with pytest.raises(RuntimeError, match="caption font/content readback mismatch") as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+    assert all(fragment["h"] == 0.0035 for fragment in case.notes["D"].data.texts)
+    assert all(circle.writes == [] for circle in case.circles.values())
 
 
 @pytest.mark.parametrize("char_height", [None, 0.0041])
@@ -3770,6 +3897,7 @@ def test_ordinary_linked_note_factory_keeps_no_height_and_single_write_paths(nat
     assert note.PropertyLinkedText == '$PRPSHEET:"Manufacturing Notes"'
     assert note.writes == ([] if char_height is None else [(0, False, char_height)])
     assert "reset" not in note.events
+    assert native_caption_style.extension.writes == []
 
 
 @pytest.mark.parametrize("defect", [
@@ -3806,27 +3934,123 @@ def test_unavailable_mixed_or_invalid_normal_note_height_is_fatal_and_captured(n
     assert all(note.writes == [] for note in case.notes.values())
 
 
-@pytest.mark.parametrize("target", ["reset", "caption", "circle"])
+@pytest.mark.parametrize("defect", [
+    "missing-format", "getter-refusal", "stale-height", "zero-height", "nan-height", "bool-height",
+    "missing-font", "wrong-font", "blank-font", "point-authority", "invalid-authority", "invalid-use-doc",
+])
+def test_source_format_must_match_actual_normal_note_ink_without_mutating_it(native_caption_style, defect):
+    case = native_caption_style
+    source = case.source
+    if defect == "missing-format":
+        source.annotation.GetTextFormat = lambda _index: None
+    elif defect == "getter-refusal":
+        def refuse(_index):
+            raise RuntimeError("source format getter refused")
+        source.annotation.GetTextFormat = refuse
+    elif defect == "invalid-use-doc":
+        source.use_doc = 1
+    elif defect.endswith("height"):
+        source.text_format._height = {
+            "stale-height": 0.00635, "zero-height": 0.0, "nan-height": float("nan"), "bool-height": True,
+        }[defect]
+    elif defect.endswith("font"):
+        source.text_format.font = {"missing-font": None, "wrong-font": "Arial", "blank-font": " "}[defect]
+    else:
+        source.text_format.points = True if defect == "point-authority" else 1
+    before = dict(vars(source.text_format))
+    with pytest.raises(RuntimeError) as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+    assert case.extension.writes == []
+    assert vars(source.text_format) == before
+    assert source.writes == []
+
+
+@pytest.mark.parametrize("preference", [18, 3, 42, 43, 44, 45])
+@pytest.mark.parametrize("phase", ["immediate", "after-rebuild"])
+@pytest.mark.parametrize("defect", [
+    "missing-format", "stale-height", "zero-height", "nan-height", "bool-height",
+    "missing-font", "wrong-font", "point-authority", "invalid-authority",
+])
+def test_every_document_font_requires_fresh_native_source_readback(native_caption_style, preference, phase, defect):
+    case = native_caption_style
+    def corrupt(pref, text_format):
+        if pref != preference or (phase == "after-rebuild" and len(case.extension.reads) <= 6):
+            return text_format
+        if defect == "missing-format":
+            return None
+        if defect.endswith("height"):
+            text_format._height = {
+                "stale-height": 0.00635, "zero-height": 0.0,
+                "nan-height": float("nan"), "bool-height": True,
+            }[defect]
+        elif defect.endswith("font"):
+            text_format.font = None if defect == "missing-font" else "Arial"
+        else:
+            text_format.points = True if defect == "point-authority" else 1
+        return text_format
+    case.extension.on_read = corrupt
+    with pytest.raises(RuntimeError) as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+    assert all(note.writes == [] for note in case.notes.values())
+    assert case.source.writes == []
+
+
+@pytest.mark.parametrize("preference", [18, 3, 42, 43, 44, 45])
+def test_each_document_preference_setter_refusal_is_fatal(native_caption_style, preference):
+    case = native_caption_style
+    original = case.extension.SetUserPreferenceTextFormat
+    def refuse(pref, option, text_format):
+        if pref == preference:
+            return False
+        return original(pref, option, text_format)
+    case.extension.SetUserPreferenceTextFormat = refuse
+    with pytest.raises(RuntimeError, match="document font setter refused") as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+
+
+@pytest.mark.parametrize("defect", ["format", "content", "position", "use-doc"])
+def test_source_note_stays_unchanged_through_document_font_pin(native_caption_style, defect):
+    case = native_caption_style
+    def mutate(pref):
+        if pref != 45:
+            return
+        if defect == "format":
+            case.source.text_format.font = "Arial"
+        elif defect == "content":
+            case.source._linked += " DETACHED"
+        elif defect == "position":
+            case.source.annotation.position = (0.0, 0.0)
+        else:
+            case.source.use_doc = not case.source.use_doc
+    case.extension.on_write = mutate
+    with pytest.raises(RuntimeError) as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+
+
+@pytest.mark.parametrize("target", ["document", "circle"])
 @pytest.mark.parametrize("result", [False, None, 1, "true"])
 def test_native_font_setters_require_actual_true(native_caption_style, target, result):
     case = native_caption_style
-    if target == "reset":
-        case.notes["D"].reset_result = result
-    elif target == "caption":
-        case.notes["D"].write_result = result
+    if target == "document":
+        case.extension.result = result
     else:
         case.circles["D"].result = result
-    with pytest.raises(RuntimeError, match="reset|text height|setter refused") as caught:
+    with pytest.raises(RuntimeError, match="setter refused") as caught:
         _normalize_style(case)
     assert case.captures == [caught.value]
 
 
 @pytest.mark.parametrize("defect", [
-    "drop-name", "drop-label", "drop-scale", "drop-ratio", "reorder", "duplicate",
-    "stale-height", "missing-fragment", "multiple-fonts", "mixed-font",
-    "lost-owner", "moved-view", "scale-changed", "replaced-note",
+    "drop-name", "drop-label", "drop-scale", "drop-ratio", "reorder", "duplicate", "linked-content",
+    "stale-height", "missing-fragment", "multiple-fonts", "bad-font-authority", "mixed-font", "wrong-uniform-font",
+    "stale-space", "space-font", "missing-space", "lost-owner", "moved-view", "moved-caption",
+    "scale-changed", "parent-scale-changed", "sheet-scale-changed", "replaced-note", "local-authority",
 ])
-def test_caption_reset_rejects_lost_fields_heights_fragments_and_native_ownership(native_caption_style, defect):
+def test_document_source_pin_rejects_lost_fields_fragments_fonts_and_native_state(native_caption_style, defect):
     case = native_caption_style
     note, view = case.notes["D"], case.views["D"]
     def mutate():
@@ -3840,23 +4064,44 @@ def test_caption_reset_rejects_lost_fields_heights_fragments_and_native_ownershi
             note._linked = "<VLLABEL><VLNAME><VLSCALE><VLSCALEV>"
         elif defect == "duplicate":
             note._linked += "<VLLABEL>"
+        elif defect == "linked-content":
+            note._linked += " DETACHED TEXT"
         elif defect == "stale-height":
             note.data.texts[0]["h"] = 0.00635
         elif defect == "missing-fragment":
             note.data.texts.pop(1)
         elif defect == "multiple-fonts":
-            note.rich = True
+            note.has_multiple = True
+        elif defect == "bad-font-authority":
+            note.has_multiple = None
         elif defect == "mixed-font":
             note.data.GetTextFontAtIndex = lambda index: "Arial" if index == 0 else "Century Gothic"
+        elif defect == "wrong-uniform-font":
+            note.data.GetTextFontAtIndex = lambda _index: "Arial"
+        elif defect == "stale-space":
+            note.data.texts[3]["h"] = 0.00635
+        elif defect == "space-font":
+            note.data.texts[3]["font"] = "Arial"
+        elif defect == "missing-space":
+            note.data.texts.pop(3)
         elif defect == "lost-owner":
             view.GetBaseView = lambda: object()
         elif defect == "moved-view":
             view.Position = (0.0, 0.0)
+        elif defect == "moved-caption":
+            note.annotation.position = (0.0, 0.0)
         elif defect == "scale-changed":
             view.ScaleRatio = (1.0, 1.0)
+        elif defect == "parent-scale-changed":
+            view.UseParentScale = True
+        elif defect == "sheet-scale-changed":
+            view.UseSheetScale = 1
         elif defect == "replaced-note":
-            view.GetNotes = lambda: [object()]
-    note.on_write = mutate
+            replacement = _StyleNote("D")
+            view.GetNotes = lambda: [replacement]
+        elif defect == "local-authority":
+            note.use_doc = False
+    case.circles["D"].on_write = mutate
     with pytest.raises(RuntimeError) as caught:
         _normalize_style(case)
     assert case.captures == [caught.value]
@@ -3865,7 +4110,7 @@ def test_caption_reset_rejects_lost_fields_heights_fragments_and_native_ownershi
 @pytest.mark.parametrize("label", ["D", "E"])
 @pytest.mark.parametrize("defect", [
     "format-height", "label", "position", "owner", "detail-owner",
-    "doc-authority", "point-authority",
+    "doc-authority", "point-authority", "font",
 ])
 def test_source_circle_readbacks_are_independent_and_preserve_native_identity(native_caption_style, label, defect):
     case = native_caption_style
@@ -3886,6 +4131,8 @@ def test_source_circle_readbacks_are_independent_and_preserve_native_identity(na
                 circle.use_doc = True
             elif defect == "point-authority":
                 circle.points = True
+            elif defect == "font":
+                circle.font = "Arial"
         circle.on_write = mutate
     with pytest.raises(RuntimeError) as caught:
         _normalize_style(case)
@@ -4013,7 +4260,7 @@ def test_native_font_quantization_is_small_not_a_pixel_or_point_fallback(native_
         assert case.captures == []
 
 
-@pytest.mark.parametrize("phase", ["source", "caption", "circle", "circle-display-batch"])
+@pytest.mark.parametrize("phase", ["source", "document-get", "document-set", "caption", "circle", "circle-display-batch"])
 @pytest.mark.parametrize("capture_fails", [False, True])
 def test_style_refusals_preserve_original_exception_and_forensics_before_seat_close(native_caption_style, monkeypatch, phase, capture_fails):
     case = native_caption_style
@@ -4024,8 +4271,12 @@ def test_style_refusals_preserve_original_exception_and_forensics_before_seat_cl
         raise original
     if phase == "source":
         case.source.annotation.GetDisplayData = refuse
+    elif phase == "document-get":
+        case.extension.GetUserPreferenceTextFormat = refuse
+    elif phase == "document-set":
+        case.extension.SetUserPreferenceTextFormat = refuse
     elif phase == "caption":
-        case.notes["D"].annotation.SetTextFormat = refuse
+        case.notes["D"].annotation.GetDisplayData = refuse
     elif phase == "circle":
         case.circles["D"].GetTextFormat = refuse
     else:
@@ -4057,9 +4308,19 @@ def test_style_normalization_precedes_settled_link_capture_and_both_final_probes
     calls = [node for node in ast.walk(build) if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
     (normalize,) = [node for node in calls if node.func.id == "_normalize_detail_caption_styles"]
     (letters,) = [node for node in calls if node.func.id == "_place_detail_letters"]
+    (pin_source,) = [node for node in calls if node.func.id == "_pin_detail_caption_font_source"]
+    detail_creations = [node for node in calls if node.func.id == "_create_detail"]
+    (source_note,) = [
+        node for node in calls if node.func.id == "add_property_linked_note"
+        and len(node.args) > 1 and ast.literal_eval(node.args[1]) == "Manufacturing Notes"
+    ]
+    (source_seat,) = [node for node in calls if node.func.id == "_seat_notes_on_border"]
+    assert source_note.lineno < source_seat.lineno < pin_source.lineno < min(node.lineno for node in detail_creations)
+    assert tuple(ast.unparse(arg) for arg in source_note.args) == ("adapter", "'Manufacturing Notes'", "NOTES_LEFT", "NOTES_CEILING")
+    assert tuple(ast.unparse(arg) for arg in pin_source.args) == ("adapter", "notes")
     probes = [node for node in calls if node.func.id == "_record_detail_caption"]
     seats = [node for node in calls if node.func.id == "_seat_detail_caption"]
-    assert tuple(ast.unparse(arg) for arg in normalize.args) == ("adapter", "front", "hub", "end", "notes")
+    assert tuple(ast.unparse(arg) for arg in normalize.args) == ("adapter", "front", "hub", "end", "caption_font_source")
     assert letters.lineno < normalize.lineno < min(node.lineno for node in probes)
     assert max(node.lineno for node in probes) < min(node.lineno for node in seats)
     seat = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_seat_detail_caption")
@@ -4068,15 +4329,26 @@ def test_style_normalization_precedes_settled_link_capture_and_both_final_probes
     assert drawing._DETAIL_CAPTION_TARGET_AIR_M == 0.004
     assert "crop[1] - 0.003" in ast.unparse(seat)
     assert "lower_boundary + 0.003" in ast.unparse(seat)
+    source_creation_guard = next(
+        node for node in ast.walk(build) if isinstance(node, ast.Try)
+        and any(call is source_note for call in ast.walk(node))
+    )
+    assert "_capture_caption_failure(adapter, 'styles', exc)" in ast.unparse(source_creation_guard)
+    source_pin = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_pin_detail_caption_font_source")
+    assert "_capture_caption_failure(adapter, 'styles', exc)" in ast.unparse(source_pin)
+    caption_check = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_require_detail_caption_style")
+    assert "SetTextFormat" not in ast.unparse(caption_check)
+    import _drawing_notes
+    assert not hasattr(_drawing_notes, "set_note_text_height")
 
 
-def test_native_rich_reset_may_merge_runs_without_detaching_fields(native_caption_style):
+def test_native_document_font_regeneration_may_merge_runs_without_detaching_fields(native_caption_style):
     case = native_caption_style
     for note in case.notes.values():
         def merge(note=note):
             text = "".join(fragment["t"] for fragment in note.data.texts)
-            note.data.texts[:] = [{"t": text, "h": note.font_height, "pos": [0.30, 0.07, 0.0]}]
-        note.on_write = merge
+            note.data.texts[:] = [{"t": text, "h": note.font_height, "font": "Century Gothic", "pos": [0.30, 0.07, 0.0]}]
+        case.circles[note.label].on_write = merge
     _normalize_style(case)
     assert all(len(note.data.texts) == 1 for note in case.notes.values())
     assert all(drawing._caption_fields(note, label=label) == drawing._CAPTION_FIELDS
@@ -4088,7 +4360,7 @@ def test_dropped_fields_during_rebuild_are_fatal_before_seat_close(native_captio
     case = native_caption_style
     note = case.notes[label]
     def rebuild(_adapter, *, label: str):
-        if label == f"normalize detail {note.label} caption font":
+        if label == f"normalize detail {note.label} source-circle font":
             note._linked = note._linked.replace("<VLSCALEV>", "")
     monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
     with pytest.raises(RuntimeError, match="field identities/order/counts") as caught:

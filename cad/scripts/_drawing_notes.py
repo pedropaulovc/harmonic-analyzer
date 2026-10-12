@@ -21,33 +21,6 @@ def property_link(property_name: str) -> str:
     return f'$PRPSHEET:"{property_name}"'
 
 
-def set_note_text_height(
-    note: Any, height: float, *, label: str, remove_rich_text: bool = False,
-) -> Any:
-    """Format an existing note without replacing its property/view fields.
-
-    IAnnotation.SetTextFormat cannot override embedded rich-text fonts.
-    Its documented two-step route first removes those fonts with UseDoc=True,
-    then applies the requested local format. The temporary document default
-    is NOT the height source. Callers must redraw and verify native readbacks.
-    Ordinary linked notes keep the original single-write path.
-    """
-    note = _early_bound(note, "INote")
-    annotation = note.GetAnnotation()
-    if annotation is None:
-        raise RuntimeError(f"{label} has no annotation")
-    annotation = _early_bound(annotation, "IAnnotation")
-    if remove_rich_text and annotation.SetTextFormat(0, True, None) is not True:
-        raise RuntimeError(f"failed to reset {label} rich-text fonts")
-    text_format = annotation.GetTextFormat(0)
-    if text_format is None:
-        raise RuntimeError(f"{label} has no text format")
-    text_format.CharHeight = float(height)
-    if annotation.SetTextFormat(0, False, text_format) is not True:
-        raise RuntimeError(f"failed to set {label} text height")
-    return note
-
-
 @_telemetry.traced("drawing.linked_note", label_param="property_name")
 def add_property_linked_note(
     adapter: Any,
@@ -64,9 +37,20 @@ def add_property_linked_note(
     if char_height is None:
         return note
 
-    return set_note_text_height(
-        note, char_height, label=f"linked drawing note {property_name!r}",
-    )
+    note = _early_bound(note, "INote")
+    annotation = note.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"linked drawing note {property_name!r} has no annotation")
+    annotation = _early_bound(annotation, "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"linked drawing note {property_name!r} has no text format")
+    text_format.CharHeight = float(char_height)
+    if annotation.SetTextFormat(0, False, text_format) is not True:
+        raise RuntimeError(
+            f"failed to set linked drawing note {property_name!r} text height"
+        )
+    return note
 
 
 def draw_note_table(

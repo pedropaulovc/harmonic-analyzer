@@ -70,7 +70,7 @@ from _drawing_hole_callout import add_native_hole_callout
 from _drawing_layout_audit import _Reader, _dump_annotation, _dump_display
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
-from _drawing_notes import add_property_linked_note, set_note_text_height
+from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _drawing_projection import model_points_in_view
 from _drawing_selection import _select_view_entity
@@ -723,6 +723,17 @@ def _record_detail_caption(adapter: Any, view: Any, sheet: Any, *, label: str, s
 # numeric quantization, not a pixel-sized or point-sized font mismatch.
 _NOTE_HEIGHT_READBACK_TOL_M = 1e-7
 _CAPTION_FIELDS = ("<VLNAME>", "<VLLABEL>", "<VLSCALE>", "<VLSCALEV>")
+# Document Properties > Views and > Views > Detail scope these font families.
+# Values are installed SW2026 swconst 34.4.0.78 enum literals (no COM activation),
+# not application preferences or an assumed shared option-0 detail slot.
+_DETAIL_DOCUMENT_TEXT_FORMATS = (
+    ("swDetailingViewTextFormat", 18, 0),  # swDetailingNoOptionSpecified
+    ("swDetailingDetailTextFormat", 3, 301),  # swDetailingDetailView
+    ("swDetailingDetailView_NameTextFormat", 42, 301),
+    ("swDetailingDetailView_LabelTextFormat", 43, 301),
+    ("swDetailingDetailView_ScaleTextFormat", 44, 301),
+    ("swDetailingDetailView_DelimiterTextFormat", 45, 301),
+)
 
 
 def _caption_fields(note: Any, *, label: str) -> tuple[str, ...]:
@@ -753,7 +764,7 @@ def _native_note_fragments(note: Any, *, label: str) -> tuple[tuple[str, float, 
         font = data.GetTextFontAtIndex(index)
         if (type(text) is not str or type(height) not in (float, int)
                 or not math.isfinite(height) or height <= 0.0
-                or type(font) is not str or not font):
+                or type(font) is not str or not font.strip()):
             raise RuntimeError(f"{label}: invalid native fragment {index}: {(text, height, font)!r}")
         fragments.append((text, float(height), font))
     if not any(text.strip() for text, _height, _font in fragments):
@@ -761,44 +772,82 @@ def _native_note_fragments(note: Any, *, label: str) -> tuple[tuple[str, float, 
     return tuple(fragments)
 
 
-def _native_font_authority(text_format: Any, use_doc: Any, *, label: str) -> dict[str, Any]:
-    if text_format is None or type(use_doc) is not bool:
-        raise RuntimeError(f"{label}: missing native font/format authority")
+def _native_text_format_authority(text_format: Any, *, label: str) -> dict[str, Any]:
+    if text_format is None:
+        raise RuntimeError(f"{label}: missing native text format")
     text_format = _early_bound(text_format, "ITextFormat")
     in_points = text_format.IsHeightSpecifiedInPts()
     if type(in_points) is not bool:
         raise RuntimeError(f"{label}: unavailable native height authority={in_points!r}")
     return {
-        "use_doc": use_doc, "is_height_specified_in_pts": in_points,
+        "is_height_specified_in_pts": in_points,
         "char_height_m": text_format.CharHeight,
         "char_height_pts": text_format.CharHeightInPts,
         "font": text_format.TypeFaceName,
     }
 
 
-def _ordinary_note_height(adapter: Any, note: Any) -> float:
-    """Source this sheet's normal size from its existing Manufacturing Notes."""
+def _native_font_authority(text_format: Any, use_doc: Any, *, label: str) -> dict[str, Any]:
+    if type(use_doc) is not bool:
+        raise RuntimeError(f"{label}: missing native font/format authority")
+    return {"use_doc": use_doc, **_native_text_format_authority(text_format, label=label)}
+
+
+def _require_sourced_font(authority: dict[str, Any], height: float, font: str, *, label: str) -> None:
+    actual = authority["char_height_m"]
+    if (authority["is_height_specified_in_pts"] is not False
+            or type(actual) not in (int, float) or not math.isfinite(actual) or actual <= 0.0
+            or abs(actual - height) > _NOTE_HEIGHT_READBACK_TOL_M
+            or type(authority["font"]) is not str or authority["font"] != font):
+        raise RuntimeError(f"{label}: native source-font readback mismatch: source_height_m={height}, source_font={font!r}, authority={authority!r}")
+
+
+def _ordinary_note_font(adapter: Any, note: Any) -> tuple[Any, float, str, dict[str, Any], tuple[Any, ...]]:
+    """Use the existing normal note's unmodified format, proved by native ink."""
     adapter.currentModel.GraphicsRedraw2()  # VT_VOID; native reads carry signal.
     note = _early_bound(note, "INote")
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    if annotation is None:
-        raise RuntimeError("Manufacturing Notes: missing native annotation")
-    authority = _native_font_authority(
-        annotation.GetTextFormat(0), annotation.GetUseDocTextFormat(0),
-        label="Manufacturing Notes",
-    )
+    if note is None:
+        raise RuntimeError("Manufacturing Notes: missing native source note")
     fragments = _native_note_fragments(note, label="Manufacturing Notes")
-    height = fragments[0][1]
-    _telemetry.info(
-        f"Manufacturing Notes native height source: font_authority={authority!r}, "
-        f"display_fragments={fragments!r}, source=IDisplayData.GetTextHeightAtIndex"
-    )
-    if (any(abs(actual - height) > _NOTE_HEIGHT_READBACK_TOL_M
-            for _text, actual, _font in fragments)
-            or len({font for _text, _height, font in fragments}) != 1):
+    height, font = fragments[0][1:]
+    if any(abs(actual - height) > _NOTE_HEIGHT_READBACK_TOL_M or actual_font != font
+           for _text, actual, actual_font in fragments):
         raise RuntimeError(f"Manufacturing Notes: mixed native source fragments={fragments!r}")
-    # GetTextFormat can describe inherited rich text, not these native fragments.
-    return height
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    text_format = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
+    authority = _native_font_authority(
+        text_format, annotation.GetUseDocTextFormat(0), label="Manufacturing Notes",
+    )
+    _require_sourced_font(authority, height, font, label="Manufacturing Notes")
+    _telemetry.info(
+        f"Manufacturing Notes native font source: font_authority={authority!r}, "
+        f"display_fragments={fragments!r}, source=existing ITextFormat verified against IDisplayData"
+    )
+    return text_format, height, font, authority, fragments
+
+
+def _pin_detail_document_font(adapter: Any, text_format: Any, height: float, font: str) -> Any:
+    """Pin the inherited source, never the native caption's rich-text runs."""
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    if extension is None:
+        raise RuntimeError("detail styles: missing native document extension")
+    for name, preference, option in _DETAIL_DOCUMENT_TEXT_FORMATS:
+        if extension.SetUserPreferenceTextFormat(preference, option, text_format) is not True:
+            raise RuntimeError(f"detail styles: document font setter refused for {name}, option={option}")
+        authority = _native_text_format_authority(
+            extension.GetUserPreferenceTextFormat(preference, option), label=f"document {name}",
+        )
+        _require_sourced_font(authority, height, font, label=f"document {name}, option={option}")
+        _telemetry.info(f"detail styles: document font pinned: preference={name}, option={option}, authority={authority!r}")
+    return extension
+
+
+def _require_detail_document_fonts(extension: Any, height: float, font: str) -> None:
+    for name, preference, option in _DETAIL_DOCUMENT_TEXT_FORMATS:
+        authority = _native_text_format_authority(
+            extension.GetUserPreferenceTextFormat(preference, option), label=f"document {name} after rebuild",
+        )
+        _require_sourced_font(authority, height, font, label=f"document {name} after rebuild, option={option}")
 
 
 def _caption_view_state(adapter: Any, view: Any, front: Any, *, label: str) -> tuple[Any, ...]:
@@ -812,49 +861,54 @@ def _caption_view_state(adapter: Any, view: Any, front: Any, *, label: str) -> t
             view.UseParentScale, view.UseSheetScale)
 
 
-def _normalize_detail_caption(
-    adapter: Any, view: Any, front: Any, height: float, *, label: str,
-) -> None:
+def _caption_style_state(adapter: Any, view: Any, front: Any, *, label: str) -> dict[str, Any]:
     view = _early_bound(view, "IView")
     notes = tuple(view.GetNotes() or ())
     if len(notes) != 1:
         raise RuntimeError(f"detail {label}: expected one native caption, got {len(notes)}")
     note = _early_bound(notes[0], "INote")
     fields = _caption_fields(note, label=label)
-    before_view = _caption_view_state(adapter, view, front, label=label)
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     if annotation is None:
         raise RuntimeError(f"detail {label}: missing native caption annotation")
-    before = _native_note_fragments(note, label=f"detail {label} caption before reset")
-    set_note_text_height(note, height, label=f"detail {label} caption", remove_rich_text=True)
-    if _caption_fields(note, label=label) != fields:
-        raise RuntimeError(f"detail {label}: native caption lost fields during rich-text reset")
-    rebuild_drawing(adapter, label=f"normalize detail {label} caption font")
-    adapter.currentModel.GraphicsRedraw2()
-    after = _native_note_fragments(note, label=f"detail {label} caption after reset")
-    read_notes = tuple(view.GetNotes() or ())
-    if (len(read_notes) != 1 or read_notes[0] is None
-            or int(adapter.swApp.IsSame(read_notes[0], note)) != 1
-            or _caption_view_state(adapter, view, front, label=label) != before_view):
-        raise RuntimeError(f"detail {label}: native caption/view ownership or position changed during font reset")
-    if _caption_fields(note, label=label) != fields:
-        raise RuntimeError(f"detail {label}: native caption lost fields after rebuild")
-    # Rich-text removal can merge runs; compare the actual native run content,
-    # not GetText (which returns spaces/newlines for view fields on the seat).
-    before_text = re.sub(r"\s+", "", "".join(text for text, _height, _font in before))
-    after_text = re.sub(r"\s+", "", "".join(text for text, _height, _font in after))
-    if (after_text != before_text or note.HasMultipleFonts is not False
-            or annotation.GetUseDocTextFormat(0) is not False
-            or len({font for _text, _height, font in after}) != 1
-            or any(abs(actual - height) > _NOTE_HEIGHT_READBACK_TOL_M
-                   for _text, actual, _font in after)):
-        raise RuntimeError(f"detail {label}: native caption font/content readback mismatch: source_height_m={height}, before={before!r}, after={after!r}")
-    _telemetry.info(f"detail {label}: native caption font normalized from Manufacturing Notes: source_height_m={height}, fields={fields!r}, native_fragments={after!r}")
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    if len(position) != 3 or not all(math.isfinite(value) for value in position):
+        raise RuntimeError(f"detail {label}: invalid native caption position={position!r}")
+    return {
+        "note": note, "fields": fields, "linked": note.PropertyLinkedText,
+        "view": _caption_view_state(adapter, view, front, label=label),
+        "position": position,
+        "fragments": _native_note_fragments(note, label=f"detail {label} caption"),
+    }
 
 
-def _normalize_detail_circle(
-    adapter: Any, front: Any, view: Any, height: float, *, label: str,
+def _require_detail_caption_style(
+    adapter: Any, view: Any, front: Any, height: float, font: str,
+    before: dict[str, Any], *, label: str,
 ) -> None:
+    """Verify inherited native caption ink without editing its linked string."""
+    after = _caption_style_state(adapter, view, front, label=label)
+    note = after["note"]
+    if (int(adapter.swApp.IsSame(note, before["note"])) != 1
+            or any(after[key] != before[key] for key in ("fields", "linked", "view", "position"))):
+        raise RuntimeError(f"detail {label}: native caption links/identity/view/position changed during document font pin")
+    # Native run boundaries can merge; preserve the actual resolved glyphs,
+    # including the generated SCALE/ratio separator, not INote.GetText blanks.
+    before_text = "".join(text for text, _height, _font in before["fragments"])
+    after_text = "".join(text for text, _height, _font in after["fragments"])
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    has_multiple = note.HasMultipleFonts
+    if (after_text != before_text or has_multiple is not False
+            or annotation.GetUseDocTextFormat(0) is not True
+            or any(abs(actual - height) > _NOTE_HEIGHT_READBACK_TOL_M or actual_font != font
+                   for _text, actual, actual_font in after["fragments"])):
+        raise RuntimeError(f"detail {label}: native caption font/content readback mismatch: source_height_m={height}, source_font={font!r}, before={before['fragments']!r}, after={after['fragments']!r}, has_multiple_fonts={has_multiple!r}")
+    _telemetry.info(f"detail {label}: native caption inherited document font verified: source_height_m={height}, source_font={font!r}, fields={after['fields']!r}, native_fragments={after['fragments']!r}, has_multiple_fonts={has_multiple!r}")
+
+
+def _detail_circle_style_state(
+    adapter: Any, front: Any, view: Any, *, label: str,
+) -> tuple[Any, tuple[float, ...]]:
     front = _early_bound(front, "IView")
     circles = tuple(front.GetDetailCircles() or ())
     bound = [_early_bound(circle, "IDetailCircle") for circle in circles]
@@ -868,6 +922,16 @@ def _normalize_detail_circle(
     for owner, expected in ((circle.GetView(), front), (circle.GetDetailView(), view)):
         if owner is None or int(adapter.swApp.IsSame(owner, expected)) != 1:
             raise RuntimeError(f"detail {label}: native source-circle ownership mismatch")
+    return circle, position
+
+
+def _normalize_detail_circle(
+    adapter: Any, front: Any, view: Any, height: float, font: str,
+    original: tuple[Any, tuple[float, ...]], *, label: str,
+) -> None:
+    circle, position = _detail_circle_style_state(adapter, front, view, label=label)
+    if int(adapter.swApp.IsSame(circle, original[0])) != 1 or position != original[1]:
+        raise RuntimeError(f"detail {label}: native source-circle identity/position changed during document font pin")
     text_format = _early_bound(circle.GetTextFormat(), "ITextFormat")
     before = _native_font_authority(text_format, circle.GetUseDocTextFormat(), label=f"detail {label} circle")
     # Both labels take the same sheet-sourced size, including a changed normal
@@ -883,7 +947,8 @@ def _normalize_detail_circle(
     if (after["use_doc"] is not False or after["is_height_specified_in_pts"] is not False
             or type(after["char_height_m"]) not in (int, float)
             or not math.isfinite(after["char_height_m"])
-            or abs(after["char_height_m"] - height) > _NOTE_HEIGHT_READBACK_TOL_M):
+            or abs(after["char_height_m"] - height) > _NOTE_HEIGHT_READBACK_TOL_M
+            or type(after["font"]) is not str or after["font"] != font):
         raise RuntimeError(f"detail {label}: native source-circle format/height mismatch: source_height_m={height}, before={before!r}, after={after!r}")
     if circle.GetLabel() != label or tuple(circle.GetLabelPosition()) != position:
         raise RuntimeError(f"detail {label}: source-circle label/position changed during font normalization")
@@ -937,16 +1002,61 @@ def _capture_caption_failure(adapter: Any, label: str, exc: Exception) -> None:
                 _telemetry.warn(f"detail {label} caption secondary capture failure: {capture_exc!r}")
 
 
+def _require_ordinary_note_unchanged(adapter: Any, font_source: dict[str, Any]) -> None:
+    note = font_source["note"]
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    source_after = _ordinary_note_font(adapter, note)
+    if (source_after[1:] != font_source["font"][1:]
+            or (note.PropertyLinkedText, tuple(annotation.GetPosition())) != font_source["state"]):
+        raise RuntimeError("Manufacturing Notes: source format/content/position changed during document font pin")
+
+
+def _pin_detail_caption_font_source(adapter: Any, source_note: Any) -> dict[str, Any]:
+    """Establish inherited defaults before creating native detail views/circles."""
+    try:
+        source = _ordinary_note_font(adapter, source_note)
+        source_note = _early_bound(source_note, "INote")
+        annotation = _early_bound(source_note.GetAnnotation(), "IAnnotation")
+        font_source = {
+            "note": source_note, "font": source,
+            "state": (source_note.PropertyLinkedText, tuple(annotation.GetPosition())),
+            "extension": _pin_detail_document_font(adapter, *source[:3]),
+        }
+        rebuild_drawing(adapter, label="pin native detail document fonts")
+        adapter.currentModel.GraphicsRedraw2()
+        _require_detail_document_fonts(font_source["extension"], source[1], source[2])
+        _require_ordinary_note_unchanged(adapter, font_source)
+        return font_source
+    except Exception as exc:
+        _capture_caption_failure(adapter, "styles", exc)
+        raise
+
+
 def _normalize_detail_caption_styles(
-    adapter: Any, front: Any, hub: Any, end: Any, source_note: Any,
+    adapter: Any, front: Any, hub: Any, end: Any, font_source: dict[str, Any],
 ) -> None:
-    """Normalize BOTH linked captions/parent letters before seating diagnostics."""
+    """Verify inherited captions and normalize parent letters before seating."""
     label = "styles"
     try:
-        height = _ordinary_note_height(adapter, source_note)
-        for label, view in (("D", hub), ("E", end)):
-            _normalize_detail_caption(adapter, view, front, height, label=label)
-            _normalize_detail_circle(adapter, front, view, height, label=label)
+        _text_format, height, font = font_source["font"][:3]
+        views = (("D", hub), ("E", end))
+        captions = {
+            name: _caption_style_state(adapter, view, front, label=name) for name, view in views
+        }
+        circles = {
+            name: _detail_circle_style_state(adapter, front, view, label=name) for name, view in views
+        }
+        for label, view in views:
+            _require_detail_caption_style(adapter, view, front, height, font, captions[label], label=label)
+            _normalize_detail_circle(adapter, front, view, height, font, circles[label], label=label)
+        label = "styles"
+        _require_detail_document_fonts(font_source["extension"], height, font)
+        _require_ordinary_note_unchanged(adapter, font_source)
+        for label, view in views:
+            _require_detail_caption_style(adapter, view, front, height, font, captions[label], label=label)
+            circle, position = _detail_circle_style_state(adapter, front, view, label=label)
+            if int(adapter.swApp.IsSame(circle, circles[label][0])) != 1 or position != circles[label][1]:
+                raise RuntimeError(f"detail {label}: native source-circle identity/position changed after font normalization")
         label = "styles"
         _require_detail_circle_display_heights(front, height)
     except Exception as exc:
@@ -2144,6 +2254,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # Import the source radii and top height too: these are the BASIC nominal
     # geometry of the profile zone, not independent radius/height bands.
     _add_rocker_outline_dimensions(adapter, front)
+    try:
+        notes = add_property_linked_note(
+            adapter, "Manufacturing Notes", NOTES_LEFT, NOTES_CEILING
+        )
+        notes_box = _seat_notes_on_border(adapter, notes, sheet)
+    except Exception as exc:
+        _capture_caption_failure(adapter, "styles", exc)
+        raise
+    caption_font_source = _pin_detail_caption_font_source(adapter, notes)
     hub_centre, hub_radius_mm = _detail_fence("D")
     hub = _create_detail(
         adapter, front, centre=hub_centre, radius_mm=hub_radius_mm,
@@ -2289,13 +2408,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     arc_profiles = _add_arc_profiles(adapter, front)
 
-    notes = add_property_linked_note(
-        adapter, "Manufacturing Notes", NOTES_LEFT, NOTES_CEILING
-    )
-    notes_box = _seat_notes_on_border(adapter, notes, sheet)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_CAPTION_XY)
     _place_detail_letters(adapter, front)
-    _normalize_detail_caption_styles(adapter, front, hub, end, notes)
+    _normalize_detail_caption_styles(adapter, front, hub, end, caption_font_source)
     # Record BOTH native labels before D can abort and discard E's evidence.
     _record_detail_caption(adapter, hub, sheet, label="D", stage="before either caption guard")
     _record_detail_caption(adapter, end, sheet, label="E", stage="before either caption guard")
