@@ -64,8 +64,8 @@ GOOSENECK_BORE_DIA = 17.0  # O16 post slides through
 HUB_SET_SPOT_FROM_AXIS = 21.0  # .X
 HUB_SET_SPOT_PLACES = 1
 HUB_SET_BOSS_FROM_AXIS = 22.0  # cast face: 1.0 stock over the spot face
-HUB_SET_SPOT_DIA = 12.0  # clears the 1/4 square head's 8.98 diagonal
-HUB_SET_BOSS_W = 18.0  # along the rail, centred on the tap: spot + 2 x (C2 + 1.0)
+HUB_SET_SPOT_DIA = 10.0  # clears the 1/4 square head's 8.98 diagonal at its .X minimum
+HUB_SET_BOSS_W = 18.0  # along the rail, centred on the tap (spot land: build)
 SET_SCREW_THREAD = "1/4-20"
 SET_SCREW_MAJOR_DIA = THREAD_MAJOR_MM[SET_SCREW_THREAD]  # 6.350
 SET_SCREW_PITCH = 25.4 / 20.0
@@ -75,7 +75,6 @@ SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # rule 12: >= 1.5D of full thread
 def _sag(radius: float) -> float:
     """A circle's sag across the set screw's major diameter."""
     return radius - sqrt(radius**2 - (SET_SCREW_MAJOR_DIA / 2.0) ** 2)
-
 
 
 # --- Knife-hanger screw counterbores and dowel slip holes (crossbar) ---------

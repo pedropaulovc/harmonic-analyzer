@@ -789,19 +789,20 @@ SECTION_LETTER_TEXT_GAP = (
 # prints at (146.5, 95.9) mm and the boss's sides at x 142.0 / 151.0.  The
 # 18.0 width stands over the rail, its extension lines up from the boss's
 # top corners (y 101.0) through the flange, its three rows straight over
-# it, 6.2 under the HUB LOCATION note (139.9).  Every leader that leaves the
-# boss passes UNDER those extension lines' feet, so each side holds one: the
-# tap callout's leader keeps the right (2.3 off that foot), and the Ø12.0
-# spot face takes the left, leaving the spot circle at 151 deg 2.3 off the
-# left foot.  Steeper, either would cross an extension line; shallower,
-# either would run along the rail (leader-over-part detour, 10 mm gate: the
-# spot's is 6.0, its 16.0 over the part against 9.9 from the spot's rim to
-# the view's top).  Its two rows land right, 4.8 over the left barrel's top
-# (107.2) and 10.4 left of the width's rows
-# (test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink).
+# it, 6.2 under the HUB LOCATION note (139.9).  The last row puts the boss's
+# top on the flange underside (codex review of 4faacfab: its shoulder had no
+# height).  Every leader that leaves the boss passes UNDER those extension
+# lines' feet, so each side holds one: the tap callout's leader keeps the
+# right (2.3 off that foot), and the Ø10.0 spot face takes the left, at 153
+# deg, 2.5 off the left foot.  Steeper, either would cross an extension
+# line; shallower, either would run along the rail (leader-over-part detour,
+# 10 mm gate: the spot's is 7.2, its 17.5 over the part against 10.2 from
+# the spot's rim to the view's top).  Its two rows land right, 4.8 over the
+# left barrel's top (107.2) and, estimated, 2.6 left of the width's wider
+# rows (test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink).
 SET_BOSS_WIDTH_LINE_XY = (0.1465, 0.1150)
 SET_BOSS_WIDTH_TEXT_XY = (0.1465, 0.1264)
-SET_SPOT_DIA_TEXT_XY = (0.0978, 0.1177)
+SET_SPOT_DIA_TEXT_XY = (0.0958, 0.1177)
 
 # The first sheet contains only the frame/window and T-rail definition.
 GEOMETRY_TOP_KEEP = {
@@ -879,7 +880,7 @@ HUB_LEFT_KEEP = {
     "SetSpotDia": SET_SPOT_DIA_TEXT_XY,
 }
 HUB_LEFT_CALLOUTS = {
-    "SetBossWidth": "BOSS WIDTH\nCENTRED ON SET TAP",
+    "SetBossWidth": "BOSS WIDTH CENTRED ON TAP\nTOP AT FLANGE UNDERSIDE",
     "SetSpotDia": "SPOT FACE",
 }
 HUB_TOP_CALLOUTS = {
@@ -2932,7 +2933,7 @@ async def build(adapter: Any) -> dict[str, str]:
         detail_left,
         edge=set_tap_edge,
         # Up-right of the tap: the boss width's extension lines leave one
-        # leader per side under their feet, and the spot face's Ø12.0 takes
+        # leader per side under their feet, and the spot face's Ø10.0 takes
         # the left (SET_SPOT_DIA_TEXT_XY).  (0.2294, 0.1306) elbows at (199.4,
         # 125.0) mm and drops at 0.55 through the tap centre (146.5, 95.9),
         # passing 2.3 mm right of the right extension line's foot (151.0,

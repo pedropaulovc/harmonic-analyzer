@@ -1406,16 +1406,20 @@ def test_hub_set_screw_keeps_one_and_a_half_diameters_of_full_thread() -> None:
 def test_set_screw_boss_carries_the_spot_face_proud_of_the_rail() -> None:
     """The boss face stands 1.0 of stock over the spot face, both outboard
     of the rail's outer face; the spot clears the 1/4 square head's
-    diagonal (91410A540, Head Wd 1/4 in) and the boss carries the spot
-    plus a C2 and a 1.0 land a side."""
+    diagonal (91410A540, Head Wd 1/4 in) at its .X minimum, and keeps a land
+    inside the boss face's C2 breaks at the print-worst corner (local codex
+    review of 4faacfab: the O12 spot broke 0.4 into them)."""
     assert part.SET_SPOT_FACE_X == part.GOOSENECK_X - spec.HUB_SET_SPOT_FROM_AXIS == -218.0
     assert part.SET_BOSS_FACE_X == part.GOOSENECK_X - spec.HUB_SET_BOSS_FROM_AXIS == -219.0
     assert part.SET_BOSS_FACE_X < part.SET_SPOT_FACE_X < -part.OUTER_X
     assert spec.HUB_SET_SPOT_PLACES == spec.DRAWING_REFERENCE_PRECISION[
         "set-screw spot face from bore axis"
     ] == 1
-    assert spec.HUB_SET_SPOT_DIA > 6.35 * math.sqrt(2.0)
-    assert spec.HUB_SET_BOSS_W == spec.HUB_SET_SPOT_DIA + 2.0 * (part.EDGE_CHAMFER + 1.0)
+    assert spec.HUB_SET_SPOT_DIA - part.PRINTED_LINEAR_BAND_MM[1] > 6.35 * math.sqrt(2.0)
+    assert part.SET_SPOT_LAND_MIN == pytest.approx(
+        {"across the boss": 0.6, "under the flange": 0.65}
+    )
+    assert min(part.SET_SPOT_LAND_MIN.values()) >= part.C2_SLIVER_MIN
     assert spec.HUB_SET_BOSS_W < part.HUB_RIB_W
 
 
@@ -1427,7 +1431,7 @@ def test_set_screw_pocket_is_retired_for_the_boss() -> None:
         assert not any(retired in source for source in sources), retired
     assert "hub_section = _hub_boss_section(adapter, hub_top)" in sources[2]
     assert drawing.HUB_LEFT_CALLOUTS == {
-        "SetBossWidth": "BOSS WIDTH\nCENTRED ON SET TAP",
+        "SetBossWidth": "BOSS WIDTH CENTRED ON TAP\nTOP AT FLANGE UNDERSIDE",
         "SetSpotDia": "SPOT FACE",
     }
     # Rule 6: short callouts that state the feature, not the process.
@@ -1610,7 +1614,7 @@ def _layout_box(box):
 def test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink() -> None:
     """Q5: the 1:2 side view sees the boss face on.  The 18.0 width's rows
     stand straight over it; the tap callout's leader leaves under the right
-    extension line's foot and the Ø12.0 spot face's under the left one, each
+    extension line's foot and the Ø10.0 spot face's under the left one, each
     an ink clearance off, and the spot leader's run over the part stays
     inside the leader-over-part detour gate."""
     from _layout_audit import LEADER_DETOUR_PROVISIONAL_M
@@ -1628,7 +1632,9 @@ def test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink() -> None:
     extensions = {
         side: Segment(x, y, x, line_y + _EXTENSION_OVERSHOOT) for side, (x, y) in feet.items()
     }
-    width = _dimension_block(drawing.SET_BOSS_WIDTH_TEXT_XY, "18.0\nBOSS WIDTH\nCENTRED ON SET TAP")
+    width = _dimension_block(
+        drawing.SET_BOSS_WIDTH_TEXT_XY, "18.0\n" + drawing.HUB_LEFT_CALLOUTS["SetBossWidth"]
+    )
     width_line = Segment(tap[0] - half_w, line_y, tap[0] + half_w, line_y)
     # The tap callout: unchanged, its leader dropping from the elbow
     # through the tap centre to the tap circle.
@@ -1644,9 +1650,9 @@ def test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink() -> None:
     run = math.dist(tap, elbow)
     tap_tip = tuple(c + (e - c) * tap_r / run for c, e in zip(tap, elbow))
     tap_leader = Segment(*elbow, *tap_tip)
-    # The Ø12.0: a bent leader from its underline's right end, radial from
+    # The Ø10.0: a bent leader from its underline's right end, radial from
     # the shoulder's bend to the spot circle.
-    spot = _dimension_block(drawing.SET_SPOT_DIA_TEXT_XY, "Ø12.0\nSPOT FACE")
+    spot = _dimension_block(drawing.SET_SPOT_DIA_TEXT_XY, "Ø10.0\nSPOT FACE")
     bend = (spot[2] + _BENT_SHOULDER, spot[1])
     spot_r = spec.HUB_SET_SPOT_DIA / 2.0 * s
     run = math.dist(tap, bend)
@@ -1663,12 +1669,12 @@ def test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink() -> None:
         leader = leaders[name]
         t = (x - leader.x0) / (leader.x1 - leader.x0)
         assert leader.y0 + t * (leader.y1 - leader.y0) < boss_top, name
-    texts = {"18.0": width, "Ø12.0": spot, "tap callout": callout, "HUB LOCATION": _HUB_LOCATION_NOTE}
+    texts = {"18.0": width, "Ø10.0": spot, "tap callout": callout, "HUB LOCATION": _HUB_LOCATION_NOTE}
     for name, box in texts.items():
         for other, other_box in texts.items():
             if other != name:
                 assert _box_box_gap(box, other_box) >= ink, (name, other)
-        own = {"Ø12.0": {"spot shoulder"}, "tap callout": {"tap"}}.get(name, set())
+        own = {"Ø10.0": {"spot shoulder"}, "tap callout": {"tap"}}.get(name, set())
         for leader_name, leader in leaders.items():
             if leader_name not in own:
                 assert segment_box_distance(leader, _layout_box(box)) >= ink, (name, leader_name)
@@ -1676,11 +1682,11 @@ def test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink() -> None:
             assert segment_box_distance(width_line, _layout_box(box)) >= ink, name
             for side, extension in extensions.items():
                 assert segment_box_distance(extension, _layout_box(box)) >= ink, (name, side)
-    # The Ø12.0's rows stand over the left barrel's top, the view's top.
+    # The Ø10.0's rows stand over the left barrel's top, the view's top.
     view_top = tap[1] + (part.HALF_H + part.BOSS_ABOVE) * s
     assert spot[1] - view_top >= ink
     frame = drawing.SHEET_FRAME
-    for name, box in {"18.0": width, "Ø12.0": spot}.items():
+    for name, box in {"18.0": width, "Ø10.0": spot}.items():
         assert frame[0] + ink <= box[0] and box[2] <= frame[2] - ink, name
         assert box[3] <= frame[3] - ink, name
     # Leader over the part: from its rail-top crossing to the spot rim,

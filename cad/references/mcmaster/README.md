@@ -76,7 +76,7 @@ Live catalogue verification on October 12, 2026:
 
 - [91410A540](https://www.mcmaster.com/91410A540/) replaces 91410A538 as the
   MHA-VN-023 gooseneck set screw, per the user's Q5 ruling of October 12,
-  2026: the top frame's hub now carries a cast square-sided boss with a Ø12
+  2026: the top frame's hub now carries a cast square-sided boss with a Ø10
   spot face 21.0 from the bore axis, and the longer screw keeps at least 1.5D
   of full thread in it. The square-head cup-point family row was read live in
   a browser on October 12, 2026 (screenshot

@@ -457,6 +457,33 @@ _EDGE_LOCATION_BAND = 2.0 * PRINTED_LINEAR_BAND_MM[1]
 _C2_LEG_BAND = PRINTED_LINEAR_BAND_MM[1]
 KNIFE_SEAT_C2_MIN_CLEARANCE = 0.5
 BORE_CHAMFER = 1.0  # note 9: C1 x 45 TOP-end bore breaks; low ends stay sharp
+# The set boss's spot face keeps a land inside its cast face's C2 breaks at
+# the print-worst corner (rule 12): the shallowest spot (its .X station
+# against the cast face) leaves the most of each break's leg, at its loosest
+# row, on the spot's floor; the widest .X spot then stands that far inside
+# the narrowest .X boss and, up the boss, under the flange underside with the
+# 18.2 tap axis high and the 8.0 flange thick.  The O12 spot's 0.4 breakout
+# (local codex review of 4faacfab) is what this rejects.
+_SET_SPOT_BREAK_REACH = (
+    EDGE_CHAMFER
+    + _C2_LEG_BAND
+    - (HUB_SET_BOSS_FROM_AXIS - HUB_SET_SPOT_FROM_AXIS - PRINTED_LINEAR_BAND_MM[1])
+)  # 2.6
+_SET_SPOT_R_MAX = (HUB_SET_SPOT_DIA + PRINTED_LINEAR_BAND_MM[1]) / 2.0  # 5.4
+SET_SPOT_LAND_MIN = {
+    "across the boss": (HUB_SET_BOSS_W - PRINTED_LINEAR_BAND_MM[1]) / 2.0
+    - _SET_SPOT_BREAK_REACH
+    - _SET_SPOT_R_MAX,  # 0.6
+    "under the flange": (HALF_H - PRINTED_LINEAR_BAND_MM[1])
+    - (FLANGE + PRINTED_LINEAR_BAND_MM[1])
+    - _SET_SPOT_BREAK_REACH
+    - _SET_SPOT_R_MAX,  # 0.65
+}
+for _label, _land in SET_SPOT_LAND_MIN.items():
+    if _land < C2_SLIVER_MIN:
+        raise AssertionError(
+            f"set-screw spot face breaks into the boss C2 {_label}: land {_land:.3f}"
+        )
 
 if abs(FRONT_COLUMN_Z + REAR_COLUMN_Z) > 1e-12 or abs(FRAME_CENTER_Z) > 1e-12:
     raise AssertionError("top-frame assumes a symmetric column span about z 0")
@@ -1652,8 +1679,8 @@ def _external_edge_breaks() -> tuple[
     start("HubSetBossBreaks")
     # The set-screw boss proud of the rib's outer face: the four edges of its
     # cast face and its four runs back to the rib, meeting at the face's
-    # corners. The breaks leave the O12 spot face a 1.0 land across the
-    # boss and 2.25 under the flange.
+    # corners. The breaks leave the O10 spot face a 2.0 land across the
+    # boss and 3.25 under the flange (SET_SPOT_LAND_MIN: print-worst).
     boss_lo = GOOSENECK_Z - HUB_SET_BOSS_W / 2.0
     boss_hi = GOOSENECK_Z + HUB_SET_BOSS_W / 2.0
     for z_side in (boss_lo, boss_hi):
@@ -1819,7 +1846,7 @@ def _qualify_machined_faces(adapter) -> None:
     _paint_machined_faces_black precedent). Expectations are the full analytic
     wall/annulus areas; the 5% band absorbs the cross-screw and set-screw tap
     windows that break into the bores (~1% each) and the C1 bore-top breaks.
-    The spot face is the annulus between its O12 and the tap drill.
+    The spot face is the annulus between its O10 and the tap drill.
     """
     faces = resolve_faces(
         adapter.currentModel,
@@ -1829,8 +1856,8 @@ def _qualify_machined_faces(adapter) -> None:
     hub_wall = (
         math.pi * GOOSENECK_BORE_DIA * (HUB_BOSS_DROP + 2.0 * HALF_H - BORE_CHAMFER)
     )
-    spot_face = math.pi / 4.0 * (
-        HUB_SET_SPOT_DIA**2 - TAP_DRILL_MM[SET_SCREW_THREAD] ** 2
+    spot_face = (
+        math.pi / 4.0 * (HUB_SET_SPOT_DIA**2 - TAP_DRILL_MM[SET_SCREW_THREAD] ** 2)
     )
     for key, face in faces.items():
         if key == "hub_bore":
