@@ -47,14 +47,15 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_every_size_carries_its_band_on_the_model() -> None:
-    # The O.D. has no fit: it takes the title block's .XX row.
+    # The O.D. has no fit: it takes the title block's .X row.
     assert model_toleranced_dimensions(part) == {
         ("RingProfile", "DrumBore"): "*deviations(DRUM_BORE_BAND)",
         ("Drum", "DrumLen"): "*deviations(DRUM_LEN_BAND)",
     }
-    assert spec.DRAWING_PRECISION["RingProfile"] == {"DrumOd": 2, "DrumBore": 3}
-    # Rule 12 at the worst printed corner: the .XX O.D. on the H7 bore.
-    assert mg_wheel_drum_geom.WALL_WORST == pytest.approx(2.186)
+    assert spec.DRAWING_PRECISION["RingProfile"] == {"DrumOd": 1, "DrumBore": 3}
+    # Rule 12 at the worst printed corner: the .X O.D. on the H7 bore.
+    assert mg_wheel_drum_geom.WALL_WORST == pytest.approx((18.1 - 14.018) / 2.0)
+    assert mg_wheel_drum_geom.WALL_WORST >= mg_wheel_drum_geom.MIN_WALL
 
 
 def test_drum_presses_on_the_wheel_spigot_never_proud() -> None:
@@ -83,7 +84,7 @@ def test_each_band_states_its_need_on_its_callout() -> None:
         "REAM THRU",
         "PRESS ON MG-MAGNIFYING-WHEEL",
         "SPIGOT, HARD AGAINST BOSS",
-        "0.005-0.034 INTERFERENCE",
+        "0.005-0.034 DIAMETRAL INTERFERENCE",
     ]
     assert drawing.DIMENSION_CALLOUTS["DrumLen"].splitlines() == [
         "FRONT FACE 0.00-0.20 BELOW",

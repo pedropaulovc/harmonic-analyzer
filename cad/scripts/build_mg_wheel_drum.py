@@ -124,7 +124,7 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # The O.D. takes the title block's .XX row (DRAWING_PRECISION); the bore
+    # The O.D. takes the title block's .X row (DRAWING_PRECISION); the bore
     # and the length carry their fit bands.
     set_dimension_bilateral_tolerance(
         adapter, "RingProfile", "DrumBore", *deviations(DRUM_BORE_BAND)

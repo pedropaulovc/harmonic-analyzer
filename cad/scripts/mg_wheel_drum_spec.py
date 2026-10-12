@@ -22,7 +22,7 @@ from mg_wheel_drum_geom import (  # noqa: F401 (re-export)
 
 # Marked model dimensions and the places the model authors on them
 # (drawing-simplicity rule 2): the press-fit bore at three places, the O.D.
-# on the title block's .XX row.
+# on the title block's .X row (the geom's WALL_WORST holds 2.0 under it).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {"DrumOd", "DrumBore"},
     "Drum": {"DrumLen"},
@@ -33,14 +33,15 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 }
 
 # Each band's need, printed on its own callout (policy rules 2 and 6): the
-# bore's interference on the wheel spigot (the geom refuses a minimum that is
-# not positive) with the seating stop, and how far the length leaves the
-# drum's front face under the spigot's, so the front washer bears on the iron
-# (DRUM_RECESS refuses a drum proud of the spigot). No general note.
+# bore's diametral interference on the wheel spigot, which is turned to it
+# (the bore keeps its H7 band: the drum is made first), with the seating
+# stop, and how far the length leaves the drum's front face under the
+# spigot's, so the front washer bears on the iron (DRUM_RECESS refuses a drum
+# proud of the spigot). No general note.
 PRESS_CALLOUT = (
     "PRESS ON MG-MAGNIFYING-WHEEL\n"
     "SPIGOT, HARD AGAINST BOSS\n"
-    f"{DRUM_PRESS[0]:.3f}-{DRUM_PRESS[1]:.3f} INTERFERENCE"
+    f"{DRUM_PRESS[0]:.3f}-{DRUM_PRESS[1]:.3f} DIAMETRAL INTERFERENCE"
 )
 RECESS_CALLOUT = (
     f"FRONT FACE {DRUM_RECESS[0]:.2f}-{DRUM_RECESS[1]:.2f} BELOW\nWHEEL SPIGOT FACE"
