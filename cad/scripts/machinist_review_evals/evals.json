@@ -800,26 +800,38 @@
     },
     {
       "id": 6,
-      "name": "rocker-arm-support-ships",
+      "name": "rocker-arm-support-blocked",
       "package": "fr_rocker_arm_support",
       "kind": "part",
       "release": "v40",
       "prompt": "Blind machinist review of the fr-rocker-arm-support part package.",
-      "expected_output": "SHIP (user expectation, 2026-10-12).",
+      "expected_output": "FIX (user ruling 2026-10-12: keep blocked). The 127.0 cavity, 165.1 pocket and 6.35 web are sized but never located from a real feature.",
       "expectations": [
         {
-          "text": "Verdict is SHIP",
+          "text": "Verdict is FIX",
           "check": {
-            "verdict": "SHIP"
+            "verdict": "FIX"
           }
         },
         {
-          "text": "No blockers",
+          "text": "A blocker says the 127.0 SQ CAVITY THRU and/or the 165.1 pocket have no location from a real edge or face (only implied centring)",
           "check": {
-            "max_count": {
-              "blockers": 0
-            }
-          }
+            "category": "blockers"
+          },
+          "rule": 10,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "User ruling 2026-10-12; Fable and Astra 2/2 on v40."
+        },
+        {
+          "text": "A blocker says the 6.35 web in section A-A is sized but not located through the 63.5 depth, so pocket depth cannot be set",
+          "check": {
+            "category": "blockers"
+          },
+          "rule": 10,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "User ruling 2026-10-12; Fable and Astra 2/2 on v40."
         },
         {
           "text": "No finding asks for a specific material grade or flags 'LOW-CARBON STEEL OR GRAY IRON' as ambiguous; the explicit family alternatives are the specification",
@@ -860,16 +872,6 @@
           "polarity": "positive",
           "confidence": "high",
           "evidence": "MHA-FR-005 sheet 1: a green shaded-with-edges isometric of the trapezoidal frame, upper right, with no 'ISOMETRIC' label. Rule 8 requires the pictorial, not a label. User expects SHIP."
-        },
-        {
-          "text": "Does not raise a blocker that the 127.0 SQ CAVITY THRU or the 165.1 pocket lacks a location or is located from a mid-air origin.",
-          "check": {
-            "absent_from": "blockers"
-          },
-          "rule": 10,
-          "polarity": "positive",
-          "confidence": "high",
-          "evidence": "v40 fr-rocker-arm-support sheet 1: cast cavity and pocket on a CAST/MACHINED casting. Prior pass-codex-1/2 reports flagged these as rule-10 blockers; the user's SHIP expectation (evals.json eval 6) overrules that."
         },
         {
           "text": "Does not raise a blocker against '4X Ø3.45 ↧18.00 TRANSFER FROM MHA-CH-008 AT ASSEMBLY; 8-32 UNC-2B ↧14.70'; it gives full-thread depth and a deeper tap-drill depth.",
@@ -935,26 +937,68 @@
     },
     {
       "id": 7,
-      "name": "pinion-arbor-ships",
+      "name": "pinion-arbor-blocked",
       "package": "dt_pinion_arbor",
       "kind": "part",
       "release": "v40",
       "prompt": "Blind machinist review of the dt-pinion-arbor part package.",
-      "expected_output": "SHIP (user expectation, 2026-10-12).",
+      "expected_output": "FIX (user ruling 2026-10-12: keep blocked). Bond-zone and Ø6 ream bands name no mate; 61.05 DRUM STATION ends on no feature; plain Ø8 segments carry no diameter.",
       "expectations": [
         {
-          "text": "Verdict is SHIP",
+          "text": "Verdict is FIX",
           "check": {
-            "verdict": "SHIP"
+            "verdict": "FIX"
           }
         },
         {
-          "text": "No blockers",
+          "text": "A blocker says the 'Ø8.00 -0.01/-0.10 BOND ZONE' band names no mating part or fit",
           "check": {
-            "max_count": {
-              "blockers": 0
-            }
-          }
+            "category": "blockers"
+          },
+          "rule": 4,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "User ruling 2026-10-12; Fable and Astra 2/2 on v40."
+        },
+        {
+          "text": "A blocker says the 'Ø6.00 +0.1/0 REAM THRU' cross-hole band names no mating part or fit",
+          "check": {
+            "category": "blockers"
+          },
+          "rule": 4,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "User ruling 2026-10-12; Fable and Astra 2/2 on v40."
+        },
+        {
+          "text": "A blocker says '61.05 ±0.8 DRUM STATION' terminates on plain shaft where no physical feature exists",
+          "check": {
+            "category": "blockers"
+          },
+          "rule": 10,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "User ruling 2026-10-12; Fable and Astra 2/2 on v40."
+        },
+        {
+          "text": "A blocker says some plain Ø8 shaft segments (outside the JOURNAL and BOND ZONE callouts) carry no diameter",
+          "check": {
+            "category": "blockers"
+          },
+          "rule": 1,
+          "polarity": "negative",
+          "confidence": "high",
+          "evidence": "User ruling 2026-10-12; Fable and Astra 2/2 on v40."
+        },
+        {
+          "text": "No blocker or clarity finding objects to 'Ø1.59 +0.06/0.00 1/16 DRILL THRU FOR MHA-VN-033 SPRING PIN' for lacking a process or a mate",
+          "check": {
+            "absent_from": "blockers"
+          },
+          "rule": 12,
+          "polarity": "positive",
+          "confidence": "medium",
+          "evidence": "Callout gives decimal size, DRILL and the mate MHA-VN-033."
         },
         {
           "text": "No finding objects to '61.05 ±0.8 DRUM STATION' because it is printed at two places with a one-place-width band; the explicit band governs",
@@ -1017,16 +1061,6 @@
           "evidence": "v40 dt-pinion-arbor sheet 1: both holes are through holes with complete callouts (size, tolerance, process, THRU). Rule 9: 'A standard hole is fully defined by its callout and needs neither hidden lines nor a section.' User expectation for this package is SHIP (evals.json eval 7)."
         },
         {
-          "text": "Does not raise a blocker that '61.05 ±0.8 DRUM STATION' or the head-face baseline lengths (199.0, 46.3, 38.0 COLLAR PIN, 10.5, 227.0) are mid-air; they run from the Ø15 head rear face, with '(242.7) OVERALL' as reference.",
-          "check": {
-            "absent_from": "blockers"
-          },
-          "rule": 10,
-          "polarity": "positive",
-          "confidence": "high",
-          "evidence": "v40 dt-pinion-arbor sheet 1: baseline lengths from the head rear face (a real faced shoulder) and a reference overall. pass-codex-1 called the drum station mid-air; user expectation is SHIP (evals.json eval 7)."
-        },
-        {
           "text": "Does not report a rule-11 layout defect: diameters are on the side view and lengths run from the Ø15 head rear face.",
           "check": {
             "absent_from": "clarity"
@@ -1035,16 +1069,6 @@
           "polarity": "positive",
           "confidence": "high",
           "evidence": "v40 dt-pinion-arbor sheet 1 side view carries all diameters; lengths baseline from the head rear face. User expectation is SHIP (evals.json eval 7)."
-        },
-        {
-          "text": "Does not raise a blocker or clarity finding against 'Ø6.00 +0.1/0.0 REAM THRU, CENTRED ON Ø15 CYLINDER LENGTH' or 'Ø1.59 +0.06/0.00 1/16 DRILL THRU FOR MHA-VN-033 SPRING PIN'; both give decimal Ø and process, and the 'FOR …' names the mate alongside the size rather than replacing it.",
-          "check": {
-            "absent_from": "blockers"
-          },
-          "rule": 12,
-          "polarity": "positive",
-          "confidence": "high",
-          "evidence": "v40 dt-pinion-arbor sheet 1 callouts as quoted. Rule 12 forbids 'FOR 1/4-20 SHCS' instead of a size, not a mate name after a sized callout. User expectation SHIP (evals.json eval 7)."
         },
         {
           "text": "No clarity finding reports the 'SOLIDWORKS Maker Product. For Personal Use Only.' watermark below the border as content outside the border",
