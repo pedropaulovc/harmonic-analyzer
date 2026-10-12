@@ -18,6 +18,8 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import contextlib
+import json
 import math
 import sys
 from typing import Any
@@ -64,7 +66,7 @@ from _drawing_gdt import add_datum_feature, add_feature_control_frame
 # view that imports its dimension.
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
-from _drawing_layout_audit import _Reader, _dump_annotation
+from _drawing_layout_audit import _Reader, _dump_annotation, _dump_display
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_notes import add_property_linked_note
@@ -84,6 +86,7 @@ from _hole_spec import blind_cut_dia_mm, drill_process
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
+import _seat_forensics
 import _telemetry
 from ch_rocker_arm_notes import (
     DEFAULT_DRAWING_PRECISION,
@@ -606,49 +609,180 @@ def _title_block_top(adapter: Any, sheet: Any) -> float:
     return max(tops)
 
 
+def _record_detail_caption(adapter: Any, view: Any, sheet: Any, *, label: str, stage: str) -> None:
+    """Read-only R14 probe; decoder boxes are estimates, NEVER a guard fallback.
+
+    GetExtent documents a note box, not individual printed glyph bounds. Keep
+    its native six coordinates separate from DisplayData's native fragments
+    and the existing layout decoder's estimated text boxes until a failure
+    sheet shows what actually printed. Refused reads remain explicit errors.
+    """
+    report: dict[str, Any] = {"label": label, "stage": stage}
+    reader = _Reader(adapter)
+    try:
+        bound_view = reader.bind(view, "IView")
+        raw_notes = reader.call(lambda: bound_view.GetNotes())
+        notes = tuple(raw_notes or ())
+        report["native_note_count"] = (
+            len(notes) if not {"GetNotes", "bind IView"}.intersection(reader.errors) else None
+        )
+        report["native_title_rule_top_m"] = reader.need(lambda: _title_block_top(adapter, sheet))
+        report["notes"] = []
+        for raw_note in notes:
+            note = reader.bind(raw_note, "INote")
+            text = reader.need(lambda: note.GetText())
+            lines = (text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+                     if type(text) is str and text else [] if text == "" else None)
+            entry: dict[str, Any] = {
+                "native_property_linked_text": reader.need(lambda: note.PropertyLinkedText),
+                "native_get_text": text,
+                "resolved_lines": lines,
+                "resolved_line_count": len(lines) if lines is not None else None,
+                "native_note_get_extent": reader.need(lambda: note.GetExtent()),
+                "native_note_get_height": reader.need(lambda: note.GetHeight()),
+                "native_note_get_height_in_points": reader.need(lambda: note.GetHeightInPoints()),
+                "native_has_multiple_fonts": reader.need(lambda: note.HasMultipleFonts),
+            }
+            report["notes"].append(entry)
+            annotation = reader.bind(reader.need(lambda: note.GetAnnotation()), "IAnnotation")
+            count = reader.need(lambda: annotation.GetTextFormatCount())
+            entry["native_text_format_count"] = count
+            formats = []
+            entry["native_text_formats"] = formats
+            for index in range(count if type(count) is int and count >= 0 else 0):
+                text_format = reader.bind(
+                    reader.need(lambda i=index: annotation.GetTextFormat(i)), "ITextFormat"
+                )
+                formats.append({
+                    "index": index,
+                    "use_doc_text_format": reader.need(lambda i=index: annotation.GetUseDocTextFormat(i)),
+                    "char_height_m": reader.need(lambda: text_format.CharHeight),
+                    "char_height_pts": reader.need(lambda: text_format.CharHeightInPts),
+                    "is_height_specified_in_pts": reader.need(lambda: text_format.IsHeightSpecifiedInPts()),
+                    "type_face_name": reader.need(lambda: text_format.TypeFaceName),
+                    "line_spacing": reader.need(lambda: text_format.LineSpacing),
+                })
+            data = reader.need(lambda: annotation.GetDisplayData())
+            before_display = dict(reader.errors)
+            display = _dump_display(reader, data)
+            # Font/spacing are optional to the shared audit, but native fields
+            # in THIS probe must not turn a None answer into "" or zero.
+            bound_data = reader.bind(data, "IDisplayData")
+            for index, fragment in enumerate(display.get("texts", [])):
+                fragment["font"] = reader.need(lambda i=index: bound_data.GetTextFontAtIndex(i))
+                fragment["ls"] = reader.need(lambda i=index: bound_data.GetTextLineSpacingAtIndex(i))
+            display_errors = {
+                name: count - before_display.get(name, 0)
+                for name, count in reader.errors.items() if count > before_display.get(name, 0)
+            }
+            # The shared tolerant reader uses audit defaults after a refusal.
+            # Do not present those defaults as native observations in this probe.
+            refused_fields = {
+                "GetTextAtIndex": "t", "GetTextPositionAtIndex": "pos",
+                "GetTextHeightAtIndex": "h", "GetTextRefPositionAtIndex": "ref",
+                "GetTextAngleAtIndex": "ang", "GetTextFontAtIndex": "font",
+                "GetTextLineSpacingAtIndex": "ls",
+            }
+            fragments = display.get("texts", [])
+            for accessor, field in refused_fields.items():
+                if accessor in display_errors:
+                    for fragment in fragments:
+                        fragment[field] = None
+            entry["native_display_data"] = display
+            entry["native_display_read_errors"] = display_errors
+            entry["display_fragment_count"] = (
+                len(fragments) if data is not None and not {
+                    "GetTextCount", "bind IDisplayData"
+                }.intersection(display_errors) else None
+            )
+            entry["native_display_fragment_positions"] = [fragment["pos"] for fragment in fragments]
+            entry["native_display_position_basis"] = "offsets from DisplayData origin per API; not measured sheet glyph bounds"
+            # Deliberately omit note.GetExtent from the decoder input: otherwise
+            # the free-note branch would just echo it as an "exact" text box.
+            record = {"type": 6, "name": f"detail {label} caption", "display": display}
+            advance = calibrate_sheet_advance((record,)) if not display_errors else None
+            geometry = (annotation_geometry(record, owner=f"detail {label}", advance=advance)
+                        if advance is not None else None)
+            boxes = list(geometry.text_boxes) if geometry is not None else []
+            estimated = union_boxes(boxes)
+            entry["display_decoder_estimate"] = {
+                "coordinate_basis": "existing decoder interpretation of native DisplayData; not printed glyph ink",
+                "advance_ratio": advance,
+                "text_boxes_m": [(box.xmin, box.ymin, box.xmax, box.ymax) for box in boxes],
+                "extent_m": ((estimated.xmin, estimated.ymin, estimated.xmax, estimated.ymax)
+                             if estimated is not None else None),
+            }
+    except Exception as exc:  # noqa: BLE001 - instrumentation cannot replace the guard
+        report["diagnostic_error"] = f"{type(exc).__name__}: {exc}"
+    report["native_read_errors"] = reader.take_errors()
+    with contextlib.suppress(Exception):
+        _telemetry.info(f"detail {label} caption native diagnostics: {json.dumps(report, default=str, sort_keys=True)}")
+
+
 def _seat_detail_caption(adapter: Any, view: Any, sheet: Any, *, label: str) -> None:
-    """Seat native linked caption INK, not an assumed insertion point or height."""
-    _pin_sheet_scale(adapter, sheet)
-    notes = tuple(_early_bound(view, "IView").GetNotes() or ())
-    if len(notes) != 1:
-        raise RuntimeError(f"detail {label}: expected one native caption, got {len(notes)}")
-    note = _early_bound(notes[0], "INote")
-    linked = note.PropertyLinkedText
-    if type(linked) is not str or not linked:
-        raise RuntimeError(f"detail {label}: caption has no native linked fields")
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    crop = _detail_crop(adapter, view, label=label)
-    ceiling = crop[1] - 0.003
-    floor = (_title_block_top(adapter, sheet) if label == "E"
-             else float(_early_bound(sheet, "ISheet").GetZoneMargin(1))) + 0.003
-    if not math.isfinite(floor) or floor >= ceiling:
-        raise RuntimeError(f"detail {label}: invalid native caption slot floor={floor}, ceiling={ceiling}, required_air_mm=3.000")
-    for attempt in range(4):
-        box = _note_extent(adapter, note)
-        context = (f"detail {label}: actual_caption_ink={box}, native_crop={crop}, "
-                   f"actual_crop_air_mm={(crop[1] - box[3]) * 1000.0:.3f}, "
-                   f"actual_lower_air_mm={(box[1] - floor + 0.003) * 1000.0:.3f}, required_air_mm=3.000")
-        _telemetry.info(context)
-        if box[3] - box[1] > ceiling - floor:
-            raise RuntimeError(f"{context}: actual caption cannot fit between crop and lower boundary")
-        error = ((crop[0] + crop[2] - box[0] - box[2]) / 2.0,
-                 crop[1] - _DETAIL_CAPTION_TARGET_AIR_M - box[3])
-        if max(abs(v) for v in error) <= _DETAIL_CAPTION_SETTLE_M:
-            break
-        position = tuple(float(v) for v in (annotation.GetPosition() or ()))
-        if len(position) != 3 or not all(math.isfinite(v) for v in position):
-            raise RuntimeError(f"detail {label}: invalid native caption position")
-        if annotation.SetPosition2(position[0] + error[0], position[1] + error[1], position[2]) is not True:
-            raise RuntimeError(f"detail {label}: native caption placement refused")
-        rebuild_drawing(adapter, label=f"seat detail {label} caption {attempt}")
-    else:
-        raise RuntimeError(f"{context}: caption ink did not settle")
-    if note.PropertyLinkedText != linked or box[1] < floor - 1e-9 or box[3] > ceiling + 1e-9:
-        raise RuntimeError(f"{context}: native caption lost links or required air")
-    if label == "D" and box[2] > DRAWING_TEMPLATES[SPEC.layout].title_block_left_m - 0.003:
-        air = DRAWING_TEMPLATES[SPEC.layout].title_block_left_m - box[2]
-        raise RuntimeError(f"{context}: caption must stay left of title block: actual_horizontal_air_mm={air * 1000.0:.3f}, required_air_mm=3.000")
-    _telemetry.info(f"detail {label} caption native ink={box}, crop={crop}, lower_limit={floor}")
+    """Seat the native note box; any refusal preserves the active failed sheet."""
+    try:
+        _record_detail_caption(adapter, view, sheet, label=label, stage="before guards")
+        _pin_sheet_scale(adapter, sheet)
+        notes = tuple(_early_bound(view, "IView").GetNotes() or ())
+        if len(notes) != 1:
+            raise RuntimeError(f"detail {label}: expected one native caption, got {len(notes)}")
+        note = _early_bound(notes[0], "INote")
+        linked = note.PropertyLinkedText
+        if type(linked) is not str or not linked:
+            raise RuntimeError(f"detail {label}: caption has no native linked fields")
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        crop = _detail_crop(adapter, view, label=label)
+        ceiling = crop[1] - 0.003
+        lower_boundary = (_title_block_top(adapter, sheet) if label == "E"
+                          else float(_early_bound(sheet, "ISheet").GetZoneMargin(1)))
+        floor = lower_boundary + 0.003
+        slot = (f"detail {label}: native_crop={crop}, native_lower_boundary_m={lower_boundary!r}, "
+                f"native_title_rule_top_m={lower_boundary if label == 'E' else None!r}, "
+                f"floor_m={floor!r}, ceiling_m={ceiling!r}, slot_height_mm={(ceiling - floor) * 1000.0:.6f}, "
+                "required_air_mm=3.000")
+        _telemetry.info(slot)
+        if not math.isfinite(floor) or floor >= ceiling:
+            raise RuntimeError(f"{slot}: invalid native caption slot")
+        for attempt in range(4):
+            _record_detail_caption(adapter, view, sheet, label=label, stage=f"placement {attempt}")
+            box = _note_extent(adapter, note, label=f"detail {label} caption")
+            context = (f"{slot}, native_caption_get_extent_box={box}, "
+                       f"actual_crop_air_mm={(crop[1] - box[3]) * 1000.0:.3f}, "
+                       f"actual_lower_air_mm={(box[1] - lower_boundary) * 1000.0:.3f}")
+            _telemetry.info(context)
+            if box[3] - box[1] > ceiling - floor:
+                raise RuntimeError(f"{context}: actual caption cannot fit between crop and lower boundary")
+            error = ((crop[0] + crop[2] - box[0] - box[2]) / 2.0,
+                     crop[1] - _DETAIL_CAPTION_TARGET_AIR_M - box[3])
+            if max(abs(v) for v in error) <= _DETAIL_CAPTION_SETTLE_M:
+                break
+            position = tuple(float(v) for v in (annotation.GetPosition() or ()))
+            if len(position) != 3 or not all(math.isfinite(v) for v in position):
+                raise RuntimeError(f"detail {label}: invalid native caption position")
+            if annotation.SetPosition2(position[0] + error[0], position[1] + error[1], position[2]) is not True:
+                raise RuntimeError(f"detail {label}: native caption placement refused")
+            rebuild_drawing(adapter, label=f"seat detail {label} caption {attempt}")
+        else:
+            raise RuntimeError(f"{context}: caption ink did not settle")
+        if note.PropertyLinkedText != linked or box[1] < floor - 1e-9 or box[3] > ceiling + 1e-9:
+            raise RuntimeError(f"{context}: native caption lost links or required air")
+        if label == "D" and box[2] > DRAWING_TEMPLATES[SPEC.layout].title_block_left_m - 0.003:
+            air = DRAWING_TEMPLATES[SPEC.layout].title_block_left_m - box[2]
+            raise RuntimeError(f"{context}: caption must stay left of title block: actual_horizontal_air_mm={air * 1000.0:.3f}, required_air_mm=3.000")
+        _telemetry.info(f"detail {label} caption native GetExtent box={box}, crop={crop}, lower_limit={floor}")
+    except Exception as exc:
+        try:
+            _seat_forensics.capture_com_failure(
+                adapter, f"{PART_STEM}-detail-{label}-caption", str(exc),
+                api="rocker native caption guard", exception=exc, sheet_png=True,
+                detail_label=label,
+            )
+        except Exception as capture_exc:  # noqa: BLE001 - always retain the original guard
+            if capture_exc is not exc:
+                with contextlib.suppress(Exception):
+                    _telemetry.warn(f"detail {label} caption secondary capture failure: {capture_exc!r}")
+        raise
 
 
 def _require_dimension_census(adapter: Any, views: Any) -> None:
@@ -1665,15 +1799,15 @@ def _require_arc_profile_clearance(
         )
 
 
-def _note_extent(adapter: Any, note: Any) -> tuple[float, float, float, float]:
-    """The rendered sheet-space box (x0, y0, x1, y1) of a free note."""
+def _note_extent(adapter: Any, note: Any, *, label: str = "manufacturing notes") -> tuple[float, float, float, float]:
+    """Native GetExtent sheet-space note BOX, not proven printed glyph ink."""
     adapter.currentModel.GraphicsRedraw2()
     extent = tuple(
         float(value) for value in (_early_bound(note, "INote").GetExtent() or ())
     )
     if (len(extent) != 6 or not all(math.isfinite(v) for v in extent)
             or extent[3] <= extent[0] or extent[4] <= extent[1]):
-        raise RuntimeError(f"manufacturing notes have no rendered extent: {extent!r}")
+        raise RuntimeError(f"{label} have no rendered extent: {extent!r}")
     return (extent[0], extent[1], extent[3], extent[4])
 
 
@@ -1933,7 +2067,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     notes_box = _seat_notes_on_border(adapter, notes, sheet)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_CAPTION_XY)
-    _pin_sheet_scale(adapter, sheet)
+    # Record BOTH native labels before D can abort and discard E's evidence.
+    _record_detail_caption(adapter, hub, sheet, label="D", stage="before either caption guard")
+    _record_detail_caption(adapter, end, sheet, label="E", stage="before either caption guard")
     _place_detail_letters(adapter, front)
     _seat_detail_caption(adapter, hub, sheet, label="D")
     _seat_detail_caption(adapter, end, sheet, label="E")

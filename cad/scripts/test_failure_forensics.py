@@ -161,6 +161,31 @@ class _Model:
         return True
 
 
+class _FailureDrawing(_Model):
+    """Native drawing save/export contract, without a SolidWorks seat."""
+
+    def __init__(self, tmp_path, *, unsaved=False, refuse=None):
+        super().__init__(tmp_path)
+        self.unsaved, self.refuse = unsaved, refuse
+        self.events = []
+
+    def GetPathName(self):
+        return "" if self.unsaved else str(self._root / "ch-rocker-arm.SLDDRW")
+
+    def GetType(self):
+        return 3
+
+    def SaveAs3(self, path, version, options):
+        assert options == _seat_forensics._SAVE_AS_SILENT_COPY
+        self.saved.append((path, version, options))
+        suffix = Path(path).suffix
+        self.events.append(suffix)
+        if suffix == self.refuse:
+            raise OSError(f"{suffix} capture refused")
+        Path(path).write_bytes(b"\x89PNG\r\n\x1a\n" if suffix == ".png" else b"SLDDRW")
+        return 0
+
+
 class _View:
     """An ``IModelView``: a zoom scale, a visible box and screen projection.
 
@@ -417,6 +442,79 @@ def test_artefacts_land_beside_the_report(tmp_path):
         _seat_forensics._SAVE_AS_CURRENT_VERSION,
         _seat_forensics._SAVE_AS_SILENT_COPY,
     )
+
+
+@pytest.mark.parametrize("unsaved", [False, True])
+def test_failed_caption_capture_saves_native_drawing_and_sheet_png_as_failure_artefacts(
+    tmp_path, dodo_failures, unsaved,
+):
+    label = "ch-rocker-arm-detail-e-caption"
+    model = _FailureDrawing(tmp_path, unsaved=unsaved)
+    adapter = _Adapter(model=model)
+    original = RuntimeError("detail E: actual caption cannot fit")
+    before_path = model.GetPathName()
+    with pytest.raises(RuntimeError) as caught:
+        try:
+            _seat_forensics.capture_com_failure(
+                adapter, label, str(original), exception=original, sheet_png=True,
+            )
+        finally:
+            model.events.append("seat-close")
+    assert caught.value is original
+    assert model.events == [".SLDDRW", ".png", "seat-close"]
+    assert model.GetPathName() == before_path
+    out = _failure_dir(tmp_path, label)
+    report = json.loads((out / "capture.json").read_text())
+    native = Path(report["document_copy"]["document_copy"])
+    png = Path(report["sheet_png"]["sheet_png"])
+    assert native == out / f"{label}.SLDDRW"
+    assert png == out / f"{label}.png"
+    assert native.read_bytes() == b"SLDDRW"
+    assert png.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    # The real task-failure manifest classifies BOTH produced paths by the
+    # failure namespace, never as approved drawing/png task outputs.
+    failures = set(dodo_failures._failure_artefacts(0.0))
+    assert {native, png, out / "capture.json"} <= failures
+    assert all(path.is_relative_to(dodo_failures.FAILURES) for path in failures)
+    assert all(version == 0 and options == 3 for _path, version, options in model.saved)
+
+
+@pytest.mark.parametrize("refuse", [".png", ".SLDDRW"])
+def test_one_failed_drawing_export_does_not_mask_guard_or_stop_other_evidence(tmp_path, refuse):
+    label = "ch-rocker-arm-detail-e-caption"
+    model = _FailureDrawing(tmp_path, refuse=refuse)
+    original = ValueError("caption native extent refused")
+    with pytest.raises(ValueError) as caught:
+        _seat_forensics.capture_com_failure(
+            _Adapter(model=model), label, str(original), exception=original, sheet_png=True,
+        )
+    assert caught.value is original
+    report = json.loads((_failure_dir(tmp_path, label) / "capture.json").read_text())
+    if refuse == ".png":
+        assert "failure sheet PNG SaveAs3 produced no file" in report["sheet_png"]["capture_error"]
+        assert Path(report["document_copy"]["document_copy"]).is_file()
+    else:
+        assert report["document_copy"]["document_copy"] is None
+        assert Path(report["sheet_png"]["sheet_png"]).is_file()
+    assert Path(report["seat_image"]["seat_image"]).is_file()
+
+
+def test_sheet_png_is_opt_in_and_cannot_export_a_part_as_a_drawing(tmp_path):
+    adapter = _unmerged_profile(tmp_path)
+    with pytest.raises(RuntimeError):
+        _seat_forensics.capture_com_failure(adapter, "default-capture", "original")
+    report = json.loads((_failure_dir(tmp_path, "default-capture") / "capture.json").read_text())
+    assert "sheet_png" not in report
+    assert [Path(path).suffix for path, _version, _options in adapter.currentModel.saved] == [".SLDPRT"]
+    original = RuntimeError("caption guard")
+    with pytest.raises(RuntimeError) as caught:
+        _seat_forensics.capture_com_failure(
+            adapter, "wrong-active-model", str(original), exception=original, sheet_png=True,
+        )
+    assert caught.value is original
+    report = json.loads((_failure_dir(tmp_path, "wrong-active-model") / "capture.json").read_text())
+    assert report["sheet_png"]["capture_error"] == "RuntimeError: failure sheet PNG requires an active drawing"
+    assert not list(_failure_dir(tmp_path, "wrong-active-model").glob("*.png"))
 
 
 def test_unmerged_endpoints_are_visible_in_the_capture(tmp_path):

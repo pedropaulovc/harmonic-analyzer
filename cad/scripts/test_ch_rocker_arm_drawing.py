@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import math
 import re
 from pathlib import Path
@@ -1030,6 +1031,13 @@ _APP = SimpleNamespace(IsSame=lambda a, b: 1 if a is b else 0)
 def bound(monkeypatch: pytest.MonkeyPatch) -> None:
     """Bypass native wrapping for offline logic only, not native-binding proof."""
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    import _drawing_layout_audit
+
+    monkeypatch.setattr(_drawing_layout_audit, "_early_bound", lambda obj, _interface: obj)
+    # Caption refusals must never probe this host's real seat in an offline test.
+    def capture(_adapter, _label, _message, *, exception, **_context):
+        raise exception
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
 
 
 class _PrecisionAdapter:
@@ -2814,6 +2822,189 @@ def test_title_block_rule_refuses_null_native_endpoint(bound, endpoint):
         drawing._title_block_top(SimpleNamespace(), _native_sheet(missing_endpoint=endpoint))
 
 
+class _CaptionTextFormat:
+    """Read-only test surface for the native properties the probe reads."""
+
+    CharHeight = property(lambda self: 0.0035)
+    CharHeightInPts = property(lambda self: 10)
+    TypeFaceName = property(lambda self: "Arial")
+    LineSpacing = property(lambda self: 1.0)
+
+    def IsHeightSpecifiedInPts(self):
+        return False
+
+
+class _CaptionNote(_FakeNote):
+    def __init__(self, label, *, height=0.007):
+        super().__init__((0.16 if label == "D" else 0.30, 0.07), height)
+        self.label = label
+        self._linked = "<VLNAME> <VLLABEL>\r\nSCALE <VLSCALE>"
+        self.annotation.SetPosition2 = self.annotation.SetPosition
+        self.annotation.GetTextFormatCount = lambda: 1
+        self.annotation.GetTextFormat = lambda index: _CaptionTextFormat() if index == 0 else None
+        self.annotation.GetUseDocTextFormat = lambda index: index == 0
+        self.data = _ClearanceDisplayData([
+            {"t": f"DETAIL {label}", "pos": [0.30, 0.07, 0.0], "h": 0.0035},
+            {"t": "SCALE 2:1", "pos": [0.30, 0.065, 0.0], "h": 0.0035},
+        ], [])
+        self.annotation.GetDisplayData = lambda: self.data
+
+    PropertyLinkedText = property(lambda self: self._linked, lambda self, value: setattr(self, "_linked", value))
+    HasMultipleFonts = property(lambda self: False)
+
+    def GetText(self):
+        return f"DETAIL {self.label}\r\nSCALE 2:1"
+
+    def GetHeight(self):
+        return 0.0035
+
+    def GetHeightInPoints(self):
+        return 10
+
+    def GetExtent(self):
+        extent = list(super().GetExtent())
+        extent[3] = extent[0] + 0.03145
+        return tuple(extent)
+
+
+def test_both_caption_diagnostics_log_native_text_formats_and_display_geometry(bound, monkeypatch):
+    redraws = []
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(GraphicsRedraw2=lambda: redraws.append("redraw")))
+    sheet = _native_sheet()
+    logs = []
+    monkeypatch.setattr(drawing._telemetry, "info", logs.append)
+    for label in ("D", "E"):
+        note = _CaptionNote(label)
+        view = SimpleNamespace(GetNotes=lambda: (note,))
+        drawing._record_detail_caption(adapter, view, sheet, label=label, stage="before guards")
+    assert len(logs) == 2
+    assert redraws == []
+    for label, log in zip(("D", "E"), logs, strict=True):
+        report = json.loads(log.split("native diagnostics: ", 1)[1])
+        assert report["label"] == label and report["native_note_count"] == 1
+        assert report["native_title_rule_top_m"] == 0.066
+        assert report["native_read_errors"] == {}
+        (note,) = report["notes"]
+        assert note["native_property_linked_text"] == "<VLNAME> <VLLABEL>\r\nSCALE <VLSCALE>"
+        assert note["native_get_text"] == f"DETAIL {label}\r\nSCALE 2:1"
+        assert note["resolved_line_count"] == 2
+        assert note["native_has_multiple_fonts"] is False
+        assert note["native_text_format_count"] == 1
+        assert note["native_text_formats"] == [{
+            "index": 0, "use_doc_text_format": True, "char_height_m": 0.0035,
+            "char_height_pts": 10, "is_height_specified_in_pts": False, "type_face_name": "Arial",
+            "line_spacing": 1.0,
+        }]
+        assert len(note["native_note_get_extent"]) == 6
+        assert note["native_note_get_height"] == 0.0035
+        assert note["native_note_get_height_in_points"] == 10
+        assert note["display_fragment_count"] == 2
+        assert note["native_display_fragment_positions"] == [[0.30, 0.07, 0.0], [0.30, 0.065, 0.0]]
+        assert [fragment["h"] for fragment in note["native_display_data"]["texts"]] == [0.0035, 0.0035]
+        assert [fragment["font"] for fragment in note["native_display_data"]["texts"]] == ["Arial", "Arial"]
+        assert note["display_decoder_estimate"]["extent_m"] is not None
+        assert "not printed glyph ink" in note["display_decoder_estimate"]["coordinate_basis"]
+
+
+@pytest.mark.parametrize("accessor,field", [
+    ("GetTextHeightAtIndex", "h"), ("GetTextFontAtIndex", "font"),
+    ("GetTextLineSpacingAtIndex", "ls"),
+])
+def test_caption_probe_never_reports_reader_defaults_as_native_fields(bound, monkeypatch, accessor, field):
+    note = _CaptionNote("E")
+    setattr(note.data, accessor, lambda _index: None)
+    adapter, view = _native_crop_fixture(monkeypatch, "E")
+    view.Position = view.physical = (0.330, 0.084 + view.radius)
+    view.notes = [note]
+    logs, captures = [], []
+    monkeypatch.setattr(drawing._telemetry, "info", logs.append)
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", lambda *args, **kwargs: captures.append((args, kwargs)))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    drawing._seat_detail_caption(adapter, view, _native_sheet(), label="E")
+    assert captures == []  # A diagnostic refusal cannot fail a valid native box.
+    report = json.loads(next(log for log in logs if "native diagnostics: " in log).split("native diagnostics: ", 1)[1])
+    (entry,) = report["notes"]
+    assert entry["native_display_read_errors"][accessor] > 0
+    assert all(fragment[field] is None for fragment in entry["native_display_data"]["texts"])
+    assert entry["display_decoder_estimate"]["extent_m"] is None
+
+
+def test_both_caption_probes_precede_the_first_caption_guard_in_build():
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
+    probes = [node for node in calls if node.func.id == "_record_detail_caption"]
+    seats = [node for node in calls if node.func.id == "_seat_detail_caption"]
+    assert len(probes) == len(seats) == 2
+    assert [next(k.value.value for k in node.keywords if k.arg == "label") for node in probes] == ["D", "E"]
+    assert max(node.lineno for node in probes) < min(node.lineno for node in seats)
+
+
+@pytest.mark.parametrize("capture_fails", [False, True])
+def test_caption_failure_retains_original_exception_and_captures_before_close(bound, monkeypatch, capture_fails):
+    adapter, view = _native_crop_fixture(monkeypatch, "E")
+    view.Position = view.physical = (0.330, 0.084 + view.radius)
+    view.notes = [_CaptionNote("E")]
+    original = RuntimeError("native extent refused")
+    events, warnings = [], []
+    def extent(*_args, **_kwargs):
+        events.append("guard")
+        raise original
+    def capture(current_adapter, label, message, **context):
+        events.append("capture")
+        assert current_adapter is adapter
+        assert label == "ch-rocker-arm-detail-E-caption"
+        assert message == str(original) and context["exception"] is original
+        assert context["sheet_png"] is True
+        if capture_fails:
+            raise OSError("forensic disk refused")
+        raise original
+    monkeypatch.setattr(drawing, "_note_extent", extent)
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    monkeypatch.setattr(drawing._telemetry, "warn", warnings.append)
+    with pytest.raises(RuntimeError) as caught:
+        try:
+            drawing._seat_detail_caption(adapter, view, _native_sheet(), label="E")
+        finally:
+            events.append("seat-close")
+    assert caught.value is original
+    assert events == ["guard", "capture", "seat-close"]
+    assert bool(warnings) is capture_fails
+    if capture_fails:
+        assert "secondary capture failure" in warnings[0]
+
+
+def test_valid_caption_never_captures_failure(bound, monkeypatch):
+    adapter, view = _native_crop_fixture(monkeypatch, "E")
+    view.Position = view.physical = (0.330, 0.084 + view.radius)
+    view.notes = [_CaptionNote("E")]
+    captures = []
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", lambda *args, **kwargs: captures.append((args, kwargs)))
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    drawing._seat_detail_caption(adapter, view, _native_sheet(), label="E")
+    assert captures == []
+
+
+def test_caption_probe_failures_are_explicit_and_cannot_replace_guard(bound, monkeypatch):
+    note = _CaptionNote("E")
+    note.GetText = lambda: None
+    note.GetExtent = lambda: None
+    note.annotation.GetDisplayData = lambda: None
+    adapter, view = _native_crop_fixture(monkeypatch, "E")
+    view.Position = view.physical = (0.330, 0.084 + view.radius)
+    view.notes = [note]
+    logs = []
+    monkeypatch.setattr(drawing._telemetry, "info", logs.append)
+    with pytest.raises(RuntimeError, match="detail E caption have no rendered extent"):
+        drawing._seat_detail_caption(adapter, view, _native_sheet(), label="E")
+    report = json.loads(next(log for log in logs if "native diagnostics: " in log).split("native diagnostics: ", 1)[1])
+    assert {"GetText", "GetExtent", "GetDisplayData"} <= report["native_read_errors"].keys()
+    (entry,) = report["notes"]
+    assert entry["native_get_text"] is entry["native_note_get_extent"] is None
+    assert entry["resolved_line_count"] is entry["display_fragment_count"] is None
+    assert entry["display_decoder_estimate"]["extent_m"] is None
+
+
 @pytest.mark.parametrize("top", [0.066, 0.070])
 def test_end_caption_seats_actual_ink_between_crop_and_actual_title_rule(bound, monkeypatch, top):
     note = _FakeNote((0.30, 0.07), 0.007)
@@ -2874,7 +3065,7 @@ def test_native_caption_target_has_margin_for_r12_one_pixel_extents(bound, monke
             drawing._seat_detail_caption(adapter, view, sheet, label=label)
 
 
-@pytest.mark.parametrize("defect", ["height", "title-rule", "scale", "missing", "unlinked", "ignored-position", "nan", "missing-extent", "missing-position"])
+@pytest.mark.parametrize("defect", ["height", "title-rule", "scale", "missing", "multiple", "unlinked", "slot", "ignored-position", "refused-position", "nan", "missing-extent", "missing-position", "lost-links", "air"])
 def test_end_caption_fails_closed_without_real_ink_and_three_mm_air(bound, monkeypatch, defect):
     note = _FakeNote((0.30, 0.07), 0.020 if defect == "height" else 0.007,
                      tracking=0.0 if defect == "ignored-position" else 1.0)
@@ -2886,14 +3077,31 @@ def test_end_caption_fails_closed_without_real_ink_and_three_mm_air(bound, monke
         note.GetExtent = lambda: None
     elif defect == "missing-position":
         note.annotation.GetPosition = lambda: None
+    elif defect == "refused-position":
+        note.annotation.SetPosition2 = lambda *_args: False
+    elif defect == "lost-links":
+        def move_and_unlink(*args):
+            result = note.annotation.SetPosition(*args)
+            note.PropertyLinkedText = "lost link"
+            return result
+        note.annotation.SetPosition2 = move_and_unlink
+    elif defect == "air":
+        monkeypatch.setattr(drawing, "_DETAIL_CAPTION_TARGET_AIR_M", 0.0025)
     adapter, view = _native_crop_fixture(monkeypatch, "E")
     view.Position = view.physical = (0.330, 0.084 + view.radius)
-    view.notes = [] if defect == "missing" else [note]
+    view.notes = [] if defect == "missing" else [note, note] if defect == "multiple" else [note]
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
-    with pytest.raises(RuntimeError):
+    captures = []
+    def capture(current_adapter, _label, _message, **context):
+        assert current_adapter is adapter and context["sheet_png"] is True
+        captures.append(context["exception"])
+        raise context["exception"]
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    with pytest.raises(RuntimeError) as caught:
         drawing._seat_detail_caption(
-            adapter, view, _native_sheet(rule=defect != "title-rule", scale_retained=defect != "scale"), label="E",
+            adapter, view, _native_sheet(top=0.084 if defect == "slot" else 0.066, rule=defect != "title-rule", scale_retained=defect != "scale"), label="E",
         )
+    assert captures == [caught.value]
 
 
 @pytest.mark.parametrize("defect", [None, "missing", "duplicate", "wrong-owner"])
