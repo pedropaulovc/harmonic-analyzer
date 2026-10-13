@@ -279,6 +279,31 @@ _FRAME_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(2.8448, 2.261, 4.85),
     ),
 }
+# Independent runtime oracles: importing the magnifier's fit/pose modules here
+# would re-key every assembly for an unrelated fixture station or groove edit.
+# test_mg_fixture_installation pins these triples to their geometry owners.
+# Keep the ruled light-press triple in one place; tests pin it to the band owner.
+# Its third value is the conservative WHOLE-CONTACT envelope, not the nominal
+# 7 mm straight cylinder (mg_lever_press_fit_geom.COLLAR_ENGAGEMENT): the longest
+# straight cylinder, 10.00 - 2.997 = 7.003, plus the part of the R3 hemisphere
+# still outside the smallest bore, sqrt(3.000**2 - 2.993**2) = 0.2048.
+# The two corners are chosen independently on purpose (the smallest dome sets
+# the longest cylinder; the largest dome sets the deepest penetration). This is
+# an envelope, not one physical part: its coupled tight corner is 7.204819 mm.
+_MG_LEVER_PRESS_TRIPLE_MM = (6.0, 5.986, 7.2078194326718075)
+_MG_FIXTURE_THREAD_TRIPLE_MM = (2.8448, 2.261, 10.1)
+
+# Bound the press annulus over that whole conservative contact envelope (the
+# straight cylinder plus the partial dome: the triple's third value).
+# Both diameter maxima/minima are nominal for these bands.
+_MG_LEVER_PRESS_LIMIT = _smooth_annulus_limit_mm3(
+    *_MG_LEVER_PRESS_TRIPLE_MM
+)
+# Only the major/thread-drill annulus from the spigot face to the rod-bore
+# breakout (10.1 mm), not the tangent screw tip or screw/rod overlap, is allowed.
+_MG_FIXTURE_THREAD_LIMIT = _smooth_annulus_limit_mm3(
+    *_MG_FIXTURE_THREAD_TRIPLE_MM
+)
 
 _MAGNIFIER_ALLOWED_PAIRS = {
     **_numbered_pairs(
@@ -296,6 +321,10 @@ _MAGNIFIER_ALLOWED_PAIRS = {
     frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): _smooth_annulus_limit_mm3(
         4.7625, 4.7371, 9.0
     ),
+    frozenset(("vn-thumb-screw-2", "mg-output-fixture-1")): _MG_FIXTURE_THREAD_LIMIT,
+    frozenset(
+        ("mg-magnifying-lever-1", "mg-magnifying-bracket-1")
+    ): _MG_LEVER_PRESS_LIMIT,
 }
 
 _COUNTER_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(
@@ -598,6 +627,15 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
 # envelope. Bound its exact nested tap engagement by the same conservative
 # smooth-annulus contract as every other migrated stock thread.
 _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
+    frozenset(
+        ("mg-magnifier-1/vn-thumb-screw-2", "mg-magnifier-1/mg-output-fixture-1")
+    ): _MG_FIXTURE_THREAD_LIMIT,
+    frozenset(
+        (
+            "mg-magnifier-1/mg-magnifying-lever-1",
+            "mg-magnifier-1/mg-magnifying-bracket-1",
+        )
+    ): _MG_LEVER_PRESS_LIMIT,
     # Two #2-56 x 1/4 screws seat on the shallow counterbore floors.
     # Only thread/lever overlap is allowed; the bracket must remain clear.
     **_numbered_pairs(

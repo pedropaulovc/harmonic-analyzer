@@ -2,18 +2,15 @@ r"""Magnifying vertical-rod dimensional contract -- the single source of truth
 shared by the part build (``build_mg_magnifying_vertical_rod.py``) and its
 manufacturing drawing (``draw_mg_magnifying_vertical_rod.py``).
 
-PURE DATA, no SolidWorks/COM imports.  Nothing else consumes this rod's
-nominals (unlike the magnifying LEVER rod, whose knife-axis station an assembly
-imports and so needs a ``_geom`` split), so one ``_spec`` module is right here.
-The offline lockstep test asserts the part marks and the drawing keeps EXACTLY
-``DRAWING_DIMENSIONS``.
+PURE DATA, no SolidWorks/COM imports. Sizes live in the drawing-free geometry
+module because fixture installation also consumes the rod diameter; drawing
+notes and marks stay out of the magnifier assembly recipe closure.
+The offline lockstep test asserts part marks and drawing keeps.
 """
 
 from __future__ import annotations
 
-# --- rod nominals (DIMENSIONS.md ch20; ~half the Ø6 lever rod, low) -----------
-ROD_LENGTH = 150.0
-ROD_DIA = 5.0
+from mg_magnifying_vertical_rod_geom import ROD_DIA, ROD_LENGTH
 
 # The rod is a REVOLVED capsule (hemispherical ends): a smooth tangent-continuous
 # body with NO flat face, no end-face circle and no pickable silhouette edge, so

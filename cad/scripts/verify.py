@@ -1427,7 +1427,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     shipped free model is untouched.
     """
     import build_mg_magnifier_assembly as _mag
-    from build_mg_output_fixture import HOOK_ANCHOR_LOCAL
+    from mg_output_fixture_geom import HOOK_LOCAL
     import mg_lever_wire_geom as _wire
 
     name = "mg-magnifier"
@@ -1482,9 +1482,9 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
         frows, fpos = _xform("mg-output-fixture-1")
         anchor = [
             fpos[k]
-            + HOOK_ANCHOR_LOCAL[0] * frows[0][k]
-            + HOOK_ANCHOR_LOCAL[1] * frows[1][k]
-            + HOOK_ANCHOR_LOCAL[2] * frows[2][k]
+            + HOOK_LOCAL[0] * frows[0][k]
+            + HOOK_LOCAL[1] * frows[1][k]
+            + HOOK_LOCAL[2] * frows[2][k]
             for k in range(3)
         ]
         d_hook = math.dist(hook, anchor)

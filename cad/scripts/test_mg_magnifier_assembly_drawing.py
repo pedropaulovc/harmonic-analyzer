@@ -1,15 +1,21 @@
 """Offline contract for the magnifier assembly drawing and its stack settings."""
 
+import ast
+import asyncio
 import math
 import re
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+import build_mg_magnifier_assembly as assembly
 import draw_mg_magnifier_assembly as drawing
 import mg_magnifier_assembly_spec as stack
 import mg_wheel_axle_spec
 import mg_wheel_group
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from mg_lever_press_fit_geom import PRESS_INSTALLATION_NOTES
 
 # The LANDSCAPE sheet's free field right of the isometric: inside the border
 # (about 13 mm in from the trim) and above the title block (sheet metres).
@@ -328,3 +334,70 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
         (feature, name, band) for name, band in stack.DIMENSION_TOLERANCES.items()
     ]
     assert blanked == [feature]
+
+
+
+def test_press_note_is_model_owned_and_inserted_before_native_finalization(
+    monkeypatch, tmp_path
+) -> None:
+    # The assembly stamps the same drawing-free instruction as the bracket,
+    # not a copied caption that can drift from the force or safe pressing setup.
+    tree = ast.parse(Path(assembly.__file__).read_text(encoding="utf-8"))
+    values = [
+        value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Dict)
+        for key, value in zip(node.keys, node.values, strict=True)
+        if isinstance(key, ast.Constant) and key.value == "Drawing Notes"
+    ]
+    assert len(values) == 1
+    assert isinstance(values[0], ast.Name) and values[0].id == "PRESS_INSTALLATION_NOTES"
+    assert "COLLAR ONTO LEVER; HOLD ROD NEAR END" in PRESS_INSTALLATION_NOTES
+    assert "WITH OUTER FACE" in PRESS_INSTALLATION_NOTES
+    assert "LOCTITE 638" in PRESS_INSTALLATION_NOTES
+    assert "SOFT SOLDER OR BRAZE" in PRESS_INSTALLATION_NOTES
+    note_calls = []
+    events = []
+    source = tmp_path / "magnifier.SLDASM"
+    source.write_bytes(b"source-presence fixture; native opening is faked")
+
+    async def open_model(path):
+        assert path == str(source)
+        events.append("open")
+        return SimpleNamespace(is_success=True, data=None, error=None)
+
+    adapter = SimpleNamespace(currentModel=object(), open_model=open_model)
+
+    def linked_note(actual_adapter, name, x, y, *, char_height):
+        events.append("press-note")
+        note_calls.append((actual_adapter, name, x, y, char_height))
+
+    def stack_dimensions(actual_adapter):
+        assert actual_adapter is adapter
+        events.append("stack")
+        return settled
+
+    def settled():
+        events.append("settled")
+
+    async def finalize(actual_adapter, outputs, **kwargs):
+        assert actual_adapter is adapter
+        assert outputs is drawing.OUTPUTS
+        assert kwargs["settled_checks"] == (settled,)
+        events.append("finalize")
+        return {"pdf": "finalized"}
+
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    monkeypatch.setattr(drawing, "read_required_properties", lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing, "new_project_drawing", lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing, "place_view", lambda *args, **kwargs: object())
+    monkeypatch.setattr(drawing, "apply_view_configuration", lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing, "assert_full_detail_view", lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing, "_stack_dimensions", stack_dimensions)
+    monkeypatch.setattr(drawing, "add_property_linked_note", linked_note)
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    assert asyncio.run(drawing.build(adapter)) == {"pdf": "finalized"}
+    assert events == ["open", "stack", "press-note", "finalize"]
+    assert note_calls == [
+        (adapter, "Drawing Notes", *drawing.PRESS_NOTE_XY, drawing.PRESS_NOTE_CHAR_HEIGHT)
+    ]

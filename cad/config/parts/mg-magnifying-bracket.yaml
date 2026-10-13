@@ -1,8 +1,13 @@
 mg-magnifying-bracket:
   number: MHA-MG-001
-  material_family: ferrous_noncritical
+  # The light-press strength budget uses 1018 cold-drawn yield, not brittle
+  # class-30 gray iron. Keep the condition on the print, not just in code.
+  material: LOW-CARBON STEEL (1018, COLD-DRAWN)
+  material_specification: LOW-CARBON STEEL (1018, COLD-DRAWN)
   finish: machined
   quantity: 1
   tolerance_class: machined_block
-  fit_class: shaft_in_bushing
-  process: "machined from solid stock or casting"
+  # No fit_class: the collar is a light PRESS seat for the MHA-MG-003 lever rod
+  # (user ruling; limits and Lamé strength in mg_lever_press_fit_geom), not a
+  # running fit; the screwed seat on the summing lever remains static.
+  process: "machined from 1018 cold-drawn solid stock; collar bore reamed or bored as the press seat for the MHA-MG-003 lever rod; press the collar onto the rod held near its end and retain with Loctite 638 at assembly"

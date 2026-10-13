@@ -90,6 +90,26 @@ export const BINDINGS: readonly Binding[] = [
   group('magnifierFixture', magnifier, 'mg-output-fixture-1', 'magnifier-fixture', 1),
 ]
 
+/**
+ * Every magnifier thumb-screw instance the model actually contains must ride a
+ * declared motion. The output fixture's axial screw (vn-thumb-screw-2, placed by
+ * build_mg_magnifier_assembly as 'thumb-screw (output fixture)') is absent from
+ * release 39; binding it needs the refreshed GLB census, so until then a model
+ * that carries it is reported unverified rather than drawn permanently fixed.
+ */
+export const UNBOUND_THUMB_SCREW_ISSUE = 'web: bind magnifier fixture thumb-screw-2 to the output fixture at next GLB refresh (https://github.com/pedropaulovc/harmonic-analyzer/issues/1351)'
+const MAGNIFIER_THUMB_SCREW = new RegExp(`^${magnifier}vn-thumb-screw-\\d+$`)
+
+/** Present magnifier thumb-screw paths no binding resolves, as unverified-binding messages. */
+export function unboundThumbScrewFailures(paths: Iterable<string>): string[] {
+  const failures: string[] = []
+  for (const path of paths) {
+    if (!MAGNIFIER_THUMB_SCREW.test(path) || BINDINGS.some(binding => binding.pattern.test(path))) continue
+    failures.push(`${path}: present thumb-screw instance has no motion binding (${UNBOUND_THUMB_SCREW_ISSUE})`)
+  }
+  return failures
+}
+
 /** Physical station number, not harmonic number (instance 1 is harmonic 20). */
 export function instanceIndex(name: string, pattern: RegExp): number {
   const captured = name.match(pattern)?.[1]

@@ -460,6 +460,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): _annulus_limit(
                 4.7625, 4.7371, 9.0
             ),
+            frozenset(("vn-thumb-screw-2", "mg-output-fixture-1")): _annulus_limit(
+                2.8448, 2.261, 10.1
+            ),
+            frozenset(
+                ("mg-magnifying-lever-1", "mg-magnifying-bracket-1")
+            ): _annulus_limit(
+                # Whole-contact envelope, independent corners (see
+                # _interference_contracts._MG_LEVER_PRESS_TRIPLE_MM).
+                6.0, 5.986, 7.2078194326718075
+            ),
         },
         "sm-summing": {
             # Stock 91251A157: #6-32 major, #36 drill, 8.10 nominal reach.
@@ -730,6 +740,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
         },
     }
+    # The new magnifier joints are also checked across the top assembly.
+    # Qualify the independent leaf oracles instead of duplicating their budgets.
+    for pair in (
+        frozenset(("vn-thumb-screw-2", "mg-output-fixture-1")),
+        frozenset(("mg-magnifying-lever-1", "mg-magnifying-bracket-1")),
+    ):
+        qualified = frozenset(f"mg-magnifier-1/{part}" for part in pair)
+        threaded_by_assembly["ha-harmonic-analyzer"][qualified] = (
+            threaded_by_assembly["mg-magnifier"][pair]
+        )
     # U27 (Main, 2026-09-23): the follower studs slip line-to-line into
     # their H7 seats and are bonded, so the drive train allows them NO
     # overlap -- the former press allowance is gone.

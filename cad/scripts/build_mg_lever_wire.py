@@ -6,9 +6,9 @@ vertical rod and wraps the brass drum (MHA-MG-010, Ø18.9) pressed on the
 magnifying wheel's front spigot (ch. 20 p. 48: "the output fixture rides on
 it and the wire to the magnifying wheel hooks below"; ch. 21 p. 51 shows it
 riding the hub). Modeled as the
-STRAIGHT REST-POSE RUN only -- a plain cylinder from the fixture's cross-hole
-mouth to the XY-tangent point on the drum. The drum wrap, the hook/knot
-at the fixture and the wire's compliance are NOT modeled (the kinematic
+STRAIGHT REST-POSE RUN only -- a plain cylinder from the fixture's
+spigot-groove front tangent to the XY-tangent point on the drum. The
+fixture/drum wraps, the tie-off and the wire's compliance are NOT modeled (the kinematic
 coupling stays a Motion-study gear mate -- cad/docs/motion-policy.md); every
 surface stands >= 0.25 off its neighbour so the interference gate reads zero
 (mg_lever_wire_geom.RUN_GAPS: the run vs the rim, spoke and boss pen-side

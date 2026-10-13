@@ -252,7 +252,7 @@ _WEB_SHIFT_MAX = printed_band_mm(_WEB_PLACES) + abs(
 )  # 0.81
 LEVER_WIRE_WEB_GAP = (
     min(_lever.RUN_GAPS["rim"], _lever.RUN_GAPS["spokes"]) - _WEB_SHIFT_MAX
-)  # 0.417
+)  # follows the current fixture hook and drum route
 if LEVER_WIRE_WEB_GAP < _lever.CLEARANCE:
     raise AssertionError(
         f"lever wire {LEVER_WIRE_WEB_GAP:.3f} off the shifted web < {_lever.CLEARANCE}"

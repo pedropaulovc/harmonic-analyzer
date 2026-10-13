@@ -5,7 +5,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { MeshoptDecoder } from 'meshoptimizer'
 import modelRepresentation from '../content/model-representation.json'
 import { assertModelRepresentationBytes, REPRESENTATION_KIND, REPRESENTATION_PATH } from '../model-representation.mjs'
-import { BINDINGS, instanceIndex, type Binding } from './bindings'
+import { BINDINGS, instanceIndex, unboundThumbScrewFailures, type Binding } from './bindings'
 import { createMechanismInput, createMechanismPose, solveMechanism, MECHANISM_DATA, type MechanismInput, type MechanismPose } from './mechanics'
 import { PAPER_FEED_MULTIPLIER } from './kinematics'
 import { captureNativePrimitives, diagnosticNativePrimitiveMetadata, inspectNativeTargetSurfaceTarget, nativeCaptureModels, nativeInputSnapshot, prepareNativeTargetSurfaceAssociation, sealNativeDrawState, nativeRenderSubmissions, trackNativePrimitiveSubmissions, unavailableNativePrimitiveSnapshot, type NativeCaptureModel, type NativeDrawStateToken, type NativeInputSnapshot, type NativeObject, type NativePrimitiveDraw, type NativePrimitiveModelSnapshot, type NativePrimitiveSnapshot, type NativePrimitiveSubmission, type NativePrimitiveSubmissionMetadata, type NativeSpringEvaluator, type NativeTargetSurfaceAssociation, type NativeTargetSurfaceInspection, type NativeTargetSurfacePass, type NativeTargetSurfaceRequest } from './native-primitive-snapshot'
@@ -2463,6 +2463,9 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
           }
         }
       }
+      // A present thumb-screw instance outside every binding would otherwise be
+      // drawn permanently fixed; refuse verification instead (bindings.ts).
+      missing.push(...unboundThumbScrewFailures(paths))
       scene.add(loaded)
       root = loaded
       availability = 'available'

@@ -183,7 +183,9 @@ def readout_report(
                 "wheel_ratio": nom.wheel_ratio,
                 "pen_mm_per_full_scale_bar_at_min": pen_per_bar_at_min,
                 "pen_mm_per_full_scale_bar_at_built": (
-                    pen_per_bar_at_min * nom.lever_r_built / nom.lever_r_min
+                    pen_per_bar_at_min
+                    * error_budget.wire_moment_arm(nom, nom.lever_r_built)
+                    / error_budget.wire_moment_arm(nom, nom.lever_r_min)
                 ),
             },
             "readout": {

@@ -14,6 +14,7 @@ import mg_lever_wire_geom
 import mg_magnifying_wheel_geom as geom
 import mg_magnifying_wheel_spec
 from _drawing_contract import model_toleranced_dimensions
+from _printed_tolerance import printed_band_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED_UM, SEAT_UM
 
@@ -68,7 +69,15 @@ def test_every_marked_dimension_has_model_places() -> None:
     assert spec.DRAWING_PRECISION["BoreProfile"]["BoreDiaDim"] == 2
     assert spec.REFERENCE_DIMENSIONS == {"SpigotDia", "BoreDiaDim"}
     assert spec.DRAWING_PRECISION["HubProfile"]["HubFrontZ"] == 1
-    assert spec.LEVER_WIRE_WEB_GAP == pytest.approx(0.417, abs=1e-3)
+    places = spec.DRAWING_PRECISION["HubProfile"]["HubFrontZ"]
+    print_shift = printed_band_mm(places) + abs(
+        round(geom.HUB_FRONT_Z, places) - geom.HUB_FRONT_Z
+    )
+    route_gaps = mg_lever_wire_geom.run_gaps(
+        mg_lever_wire_geom.WIRE_START, mg_lever_wire_geom.WIRE_END
+    )
+    expected_gap = min(route_gaps["rim"], route_gaps["spokes"]) - print_shift
+    assert spec.LEVER_WIRE_WEB_GAP == pytest.approx(expected_gap, abs=1e-9)
     assert spec.LEVER_WIRE_WEB_GAP >= mg_lever_wire_geom.CLEARANCE
 
 

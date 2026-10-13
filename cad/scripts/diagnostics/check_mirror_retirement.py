@@ -217,8 +217,8 @@ expect(
 expect(
     "mg-magnifier",
     "mg-output-fixture-1",
-    [m.CLAMP_X, m.FIXTURE_Y0, m.VROD_Z],
-    IDENTITY,
+    list(m.FIXTURE_POSITION),
+    m.FIXTURE_ROWS,
     "mg-output-fixture",
 )
 expect(

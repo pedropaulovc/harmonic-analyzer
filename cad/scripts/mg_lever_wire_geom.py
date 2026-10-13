@@ -31,9 +31,17 @@ from mg_magnifying_wheel_geom import (
     SPOKE_AXIAL as _SPOKE_AXIAL,
 )
 from mg_wheel_drum_geom import DRUM_OD, DRUM_WIRE_R, LEVER_WIRE_DIA
+from mg_output_fixture_geom import (
+    FIXTURE_AXIS_Y,
+    HOOK_OFFSET_X,
+    HOOK_TARGET_Z,
+    WIRE_DIA,
+    WIRE_CLEARANCE as CLEARANCE,
+)
 
-WIRE_DIA = LEVER_WIRE_DIA  # hair-thin in the photos; renderable stand-in (low)
-CLEARANCE = 0.25  # surface stand-off (interference-gate margin convention)
+assert math.isclose(WIRE_DIA, LEVER_WIRE_DIA, abs_tol=1e-12), (
+    "fixture groove and wheel drum must carry the same lever wire diameter"
+)
 
 # --- endpoint anchors (magnifier frame; asserted by build_mg_magnifier_assembly)
 #
@@ -44,16 +52,13 @@ CLEARANCE = 0.25  # surface stand-off (interference-gate margin convention)
 # rim's axial band only outside the rim (``run_gaps``): ~17 mm of z over the
 # ~350 run = 2.8 deg, visually plumb.
 CLAMP_X = 150.0  # sliding clamp / vertical rod / fixture line
-# The wire TIES through the fixture's cross hole and hangs beside the vertical
-# rod, just under the collar's bottom face: wire r + 0.25 below it in y, and
-# off the rod axis in -z by rod r 2.5 + wire r 0.4 + 0.25 = 3.15 (the front
-# face of the rod). So HOOK_Z = VROD_Z - 3.15 with VROD_Z = -134.8
-# (LEVER_ROD_Z -128.3 -- depth window RE-SOLVED 2026-08-02 for the one-piece
-# top-frame casting): build_mg_magnifier_assembly derives and asserts the
-# thumb-screw rail clearance from the exact 91882A221 stock reach, so the rail
-# imposes NO depth bound.
-HOOK_Y = 915.05  # FIXTURE_Y0 915.7 - wire r 0.4 - 0.25 (under the collar bottom)
-HOOK_Z = -137.95
+# The wire wraps the output fixture's turned spigot groove and leaves its
+# front tangent at screw-axis height. The fixture yaws about the vertical rod
+# to retain the accepted hook depth while moving the hook toward the bracket.
+# Geometry and yaw share one drawing-free owner with the fixture part build.
+HOOK_X = CLAMP_X + HOOK_OFFSET_X
+HOOK_Y = FIXTURE_AXIS_Y
+HOOK_Z = HOOK_TARGET_Z
 WHEEL_X = 53.0  # magnifying-wheel centre
 WHEEL_BAR_Y = 575.7  # ch30 p002 re-anchor (was 565.0)
 WHEEL_MID_Z = -146.9  # wheel mid-plane (build_mg_magnifier_assembly.WHEEL_MID_Z)
@@ -85,13 +90,13 @@ def tangent_end(hook_x: float, hook_y: float) -> tuple[float, float, float]:
     )
 
 
-_THETA = tangent_theta(CLAMP_X, HOOK_Y)
+_THETA = tangent_theta(HOOK_X, HOOK_Y)
 # Front-view clock angle of the tangency (CCW from 3 o'clock; machine +x is
 # the front view's left).
-TANGENT_CLOCK_DEG = 180.0 - math.degrees(_THETA)  # ~17.7
+TANGENT_CLOCK_DEG = 180.0 - math.degrees(_THETA)
 
-WIRE_START = (CLAMP_X, HOOK_Y, HOOK_Z)  # hook end
-WIRE_END = tangent_end(CLAMP_X, HOOK_Y)  # drum end = the PART ORIGIN
+WIRE_START = (HOOK_X, HOOK_Y, HOOK_Z)  # groove front tangent, hook end
+WIRE_END = tangent_end(HOOK_X, HOOK_Y)  # drum end = the PART ORIGIN
 WIRE_LEN = round(math.dist(WIRE_START, WIRE_END), 3)
 
 
