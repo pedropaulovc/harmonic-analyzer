@@ -101,14 +101,15 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Steel Narrow Fillister Head Slotted Screw",
         "90280A108",
     ),
-    # R9-31: the eight platen-riding guide-lock screws; a button head clears
-    # the hanger arm where the MHA-VN-006 fillister head would not. R9-48: 3/8
-    # long, so the guide's through tap holds 1.5D at the worst case.
+    # R9-31: the eight platen-riding guide-lock screws; a low slotted pan head
+    # (2026-10-11, as the book's lock plates show) clears the hanger arm where
+    # the MHA-VN-006 fillister head would not. R9-48: 3/8 long, so the guide's
+    # through tap holds 1.5D at the worst case.
     "vn-guide-lock-screw": _stock(
         "vn-guide-lock-screw",
-        "Black-Oxide Alloy Steel Button Head Hex Drive Screw",
-        "91255A108",
-        material="Alloy Steel",
+        "18-8 Stainless Steel Pan Head Slotted Screw",
+        "91792A108",
+        material="AISI 304",
     ),
     "vn-latch-hook-bracket-screw": _stock(
         "vn-latch-hook-bracket-screw",
@@ -186,6 +187,14 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Stainless Steel Flared-Collar Knurled-Head Thumb Screw",
         "99607A213",
         material="AISI 304",
+    ),
+    # The four platen-clip screws: brass #2-56 x 1/4, whose 0.14 head stays
+    # inside the clip's rail where the MHA-VN-006 #4-40 head would overhang.
+    "vn-platen-clip-screw": _stock(
+        "vn-platen-clip-screw",
+        "Brass Fillister Head Slotted Screw",
+        "90114A124",
+        material="Brass",
     ),
     # MSC 40923906: 1/4-20 x 4 in (101.6 mm) supplied stock. Only the
     # MHA-VN-031 modification applies vn_post_mount_screw_spec.CUT_LENGTH_MM

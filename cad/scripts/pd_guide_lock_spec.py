@@ -34,7 +34,20 @@ RAIL_EDGE_LIP = 1.0
 # skewed plate clears the floating pivot spacer, and the bottom station
 # overlaps the bar 2.65 (2.15 at the -0.50 band).
 LOCK_HEIGHT = 15.65
-LOCK_THICK = 2.0  # extruded +Z
+# 2026-10-11 (user): 1/16 in steel sheet, thickness as supplied: A36
+# precision-ground sheet, McMaster-Carr 1388K196, 1/16 in -0.005 to +0.005 in
+# (read live 2026-10-11; the family's +/-0.003 and +/-0.001 grades sit inside
+# that band).  It replaced R9-31's machined 2.0 strip, whose slotted pan heads
+# (MHA-VN-046) stood too proud for the arm plate, and a 0.25 head spot face,
+# which left no wall at the 3.5-from-edge holes.  The thickness prints .XXX
+# under the sheet's own band, which the lock-station sweep and the screw's
+# engagement spend, with LOCK_STOCK_CALLOUT above it.
+LOCK_THICK = 1.5875  # extruded +Z
+LOCK_THICK_BAND = 0.127  # +/-, native on Depth@Lock: the sheet's mill tolerance
+LOCK_STOCK_SKU = "1388K196"
+# One line: SolidWorks keeps a line-broken above-callout but never prints it
+# (draw_pd_transgear_drive_collar; farm run 20261012T002237965Z here).
+LOCK_STOCK_CALLOUT = "1/16 SHEET AS SUPPLIED"
 
 # Screw-hole layout on the guide-side band (matches the guide's hole pitch:
 # the two stations sit x +-7 about the plate centre, on the rail's 2.5
@@ -63,11 +76,11 @@ HOLE_LOCATION_DIMENSIONS = DRAWING_DIMENSIONS["ScrewHoles"]
 # Places and explicit bands the print carries on those dimensions, the ones the
 # paper-drive lock-station sweep judges the plate at (policy rule 12). Each
 # plate's far edge passes 0.142 from the floating pivot spacer, set and skewed
-# on its screws (R9-61), and its back face carries the button heads past the
-# hanger arm and arm plate. So the height never runs over 15.65 (+0/-0.50),
-# and the strip thickness prints .XXX (±0.13; at .XX the heads reach the arm
-# plate). The width prints .X: its +0.8 lengthens the overhang the skew swings
-# (vn_guide_lock_screw_spec.CORNER_OVERHANG_MAX).
+# on its screws (R9-61), and its back face carries the slotted pan heads past
+# the hanger arm and arm plate. So the height never runs over 15.65
+# (+0/-0.50), and the sheet's thickness prints .XXX under its ±0.127 mill
+# band (LOCK_THICK_BAND). The width prints .X: its +0.8 lengthens the
+# overhang the skew swings (vn_guide_lock_screw_spec.CORNER_OVERHANG_MAX).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LockProfile": {"Width": 1, "Height": 2},
     "Lock": {"Depth": 3},

@@ -55,6 +55,7 @@ from pd_guide_lock_spec import (
     LOCK_HEIGHT,
     LOCK_HEIGHT_BAND,
     LOCK_THICK,
+    LOCK_THICK_BAND,
     LOCK_WIDTH,
 )
 from vn_guide_lock_screw_spec import SHANK_DIA as LOCK_SCREW_SHANK_DIA
@@ -76,10 +77,11 @@ MATERIAL = "Plain Carbon Steel"
 # overlaps the bar by 9.65 there. (2026-07-07 field report: a 12-tall plate
 # topped out AT the bar's bottom edge and retained nothing at the bottom
 # stations.)
-# Stock 91255A108 button head shanks (MHA-VN-046, rulings R9-31, R9-48) pass
-# through the lock plates before threading into the guide's rear-face #4-40
-# through taps. The part-owned 1/8 drill (R9-49) carries both printed hole
-# positions over the screw majors (vn_guide_lock_screw_spec.LOCK_SET_OFFSET).
+# Stock 91792A108 slotted pan head shanks (MHA-VN-046, rulings R9-31, R9-48)
+# pass through the 1/16 sheet plates before threading into the guide's
+# rear-face #4-40 through taps. The part-owned 1/8 drill (R9-49) carries both
+# printed hole positions over the screw majors
+# (vn_guide_lock_screw_spec.LOCK_SET_OFFSET).
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
 if HOLE_DIA < LOCK_SCREW_SHANK_DIA:
     raise AssertionError("stock guide-lock screw shank does not clear the guide lock")
@@ -170,15 +172,17 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven lock (equations neutral)", v_final, 0.005 * v_plate
     )
 
-    # Manufacturing drawing support: the height's and the hole coordinates'
-    # explicit bands and every printed dimension's places live on the model
-    # (policy rule 2; the paper-drive lock-station sweep and the screw set
-    # window read the same constants), then mark exactly the print's
-    # dimensions (the drawing recipe imports the marked set and must find
-    # every one of these), and stamp the make-critical title-block properties.
+    # Manufacturing drawing support: the height's, the sheet thickness's and
+    # the hole coordinates' explicit bands and every printed dimension's
+    # places live on the model (policy rule 2; the paper-drive lock-station
+    # sweep and the screw set window read the same constants), then mark
+    # exactly the print's dimensions (the drawing recipe imports the marked
+    # set and must find every one of these), and stamp the make-critical
+    # title-block properties.
     set_dimension_bilateral_tolerance(
         adapter, "LockProfile", "Height", *deviations(LOCK_HEIGHT_BAND)
     )
+    set_dimension_symmetric_tolerance(adapter, "Lock", "Depth", LOCK_THICK_BAND)
     for dimension_name in sorted(HOLE_LOCATION_DIMENSIONS):
         set_dimension_symmetric_tolerance(
             adapter, "ScrewHoles", dimension_name, HOLE_LOCATION_BAND

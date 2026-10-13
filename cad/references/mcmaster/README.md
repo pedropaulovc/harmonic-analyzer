@@ -20,7 +20,7 @@ recipes:
 | 6793K4 | `pd-transgear-removable` T12 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 12 Teeth |
 | 6793K11 | `pd-transgear-removable` T18 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 18 Teeth |
 | 6793K17 | `pd-transgear-removable` T24 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 24 Teeth |
-| 90114A124 | `vn-ms-stop-plate-screw` (catalogue-only; no vendor model) | Brass Fillister Head Slotted Screw |
+| 90114A124 | `vn-ms-stop-plate-screw`, `vn-platen-clip-screw` (catalogue-only; no vendor model) | Brass Fillister Head Slotted Screw |
 | 90114A511 | `vn-fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `vn-foot-screw`, `vn-swing-stop-screw`, `vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -34,13 +34,13 @@ recipes:
 | 91251A108 | `vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A157 | `vn-knife-hanger-stud` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91255A106 | — (diagnostic recipe; a former `vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
-| 91255A108 | `vn-guide-lock-screw` (catalogue-only; no vendor model; SKU not yet read live) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91375A106 | `vn-arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
 | 91375A942 | `vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | — (diagnostic recipe; `vn-gooseneck-set-screw` until 2026-10-12) | Steel Square-Head Cup-Point Set Screw |
 | 91410A540 | `vn-gooseneck-set-screw` (catalogue-only; no vendor model) | Steel Square-Head Cup-Point Set Screw |
 | 91790A199 | `vn-transgear-arm-plate-screw` (catalogue-only; populated live SKU verified; 2-D PDF offered, CAD requires login) | 18-8 Stainless Steel Oval Head Slotted Screw |
+| 91792A108 | `vn-guide-lock-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Pan Head Slotted Screw |
 | 91794A112 | `vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A055 | `vn-transgear-disc-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A077 | `vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
@@ -100,6 +100,30 @@ Live catalogue verification on October 12, 2026:
   with the law it shares with 91410A538
   (`diag_mcmaster_square_set_screw.py`). It is catalogue-only: no replica
   gate. `diagnostics.diag_build_91410A538` stays as a diagnostic recipe.
+
+Live catalog verification on October 11, 2026:
+
+- [90114A124](https://www.mcmaster.com/90114A124/), selected for the four
+  MHA-VN-059 platen-clip screws, is titled “Brass Fillister Head Slotted
+  Screws, 2-56 Thread Size, 1/4" Long”. The live page and
+  [technical drawing](https://www.mcmaster.com/mvD/Library/CAD2/20260619/961C5808/90114A124_Brass%20Fillister%20Head%20Slotted%20ScrewsS.GIF)
+  were viewed on October 11, 2026: brass, Rockwell B40, 50,000 psi tensile
+  strength, #2-56 UNC class 2A, fully threaded, flat tip, ASME B18.6.3,
+  high narrow slotted fillister head. Under-head length is 0.25 in
+  (6.35 mm), screw size decimal 0.086 in (2.1844 mm), head diameter
+  0.14 in (3.556 mm), and head height 0.083 in (2.1082 mm). The drawing
+  states no dimensional tolerances. Brass matches the book photograph's
+  brass clip screws, so the same-size 18-8 stainless 91794A077 (MHA-VN-050's
+  stock) is rejected for appearance; no brass #2-56 shorter than 1/4 in was
+  found live. The shared #4-40 MHA-VN-006 brass fillister 90114A511 is
+  rejected for the clip: its 4.65 mm head overhangs the clip's 4.23 mm rail,
+  and it stays selected for the other fleet deployments. Through the 0.8 mm
+  clip sheet the 6.35 mm shank leaves 5.55 mm of engagement in the platen's
+  3.85 mm plate and 1.70 mm boss, 2.54D (at least 1.5D), with the tip flush.
+  `diagnostics.diag_build_90114A124` reuses the native fillister family
+  recipe; its derived slot, dome, thread/runout and vendor-frame mapping are
+  family assumptions, not verified vendor geometry. No vendor model is
+  harvested.
 
 Live catalogue verification on October 9, 2026:
 
@@ -466,20 +490,17 @@ Catalog specifications checked on September 10, 2026:
   `_button_head_dimensions.py` carry the 91255A148 vendor-measured laws over
   in proportion: flat top 7/5 of the hex, band 0.15 of the head height at
   10 deg, fillets 0.05, socket floor 0.55, the 60 deg countersink.
-  `_mcmaster_91255a106.py` and `_mcmaster_91255a108.py` hold their separate
-  SKU dimensions. It is catalogue-only: no vendor model is downloaded or
-  kept here, so it has no replica gate, and its standalone diagnostic is a
-  catalog-only run. Lost: 91255A105 (3/16 in; shortens the lock stack) and
+  `_mcmaster_91255a106.py` holds its SKU dimensions. It is catalogue-only: no
+  vendor model is downloaded or kept here, so it has no replica gate, and its
+  standalone diagnostic is a catalog-only run. Lost: 91255A105 (3/16 in;
+  shortens the lock stack) and
   18-8 stainless 92949A106 (same head and length, 70 ksi, Rockwell B55;
   the alloy screw matches the 91255A148 family whose laws the recipe uses).
-- [91255A108](https://www.mcmaster.com/91255A108/) (`vn-guide-lock-screw`)
-  replaces 91255A106 per ruling R9-48: the 1/4 in screw engaged only 1.26D
-  of the guide's blind tap at the worst case, so the guide's lock receivers
-  became through taps and the screw 3/8 in under the head (2.02D at the
-  worst case). [INFERENCE] 91255A108 is the 3/8 in length of the same
-  91255A series; its page has not been read live. `_mcmaster_91255a108.py`
-  carries that size, and `diag_mcmaster_button_head.py` builds it with the
-  shared laws at that length; it is catalogue-only.
+- 91255A108 (`vn-guide-lock-screw` from ruling R9-48 until October 11, 2026)
+  replaced 91255A106: the 1/4 in screw engaged only 1.26D of the guide's
+  blind tap at the worst case, so the guide's lock receivers became through
+  taps and the screw 3/8 in under the head. 91792A108 replaced it; its
+  recipe module was retired with it.
 - [98296A027](https://www.mcmaster.com/98296A027/) was read live on
   September 25, 2026: 1050-1095 spring steel slotted spring pin, 1/16 in
   diameter, 1/2 in long, 0.012 in wall, for a 0.062-0.065 in hole,
@@ -635,6 +656,28 @@ Catalog specifications checked on September 10, 2026:
   here, so this is catalogue-only with no replica gate.
   `diag_build_91790A199.py` is its supplied-stock diagnostic; production
   geometry is cut to the same installed shape.
+- [91792A108](https://www.mcmaster.com/91792A108/) (`vn-guide-lock-screw`,
+  MHA-VN-046, eight) replaces 91255A108 on October 11, 2026: the book's
+  guide-lock plates (ch22 img05) show slotted heads, not hex sockets. The
+  4-40 slotted family table was read live on October 11, 2026 (the product
+  page needs a login): 18-8 stainless steel pan head slotted screw, #4-40 UNC
+  class 2A, right hand, 3/8 in under the head, fully threaded, flat tip, head
+  Ø0.219 in x 0.068 in, 100 ksi, ASME B18.6.3. The family table has no finish
+  column and the product detail still needs a login on October 13, 2026, so
+  the finish comes from two resellers that mirror McMaster's 91792A108 spec
+  table (reli-tool.com and lily-bearing.com, read October 13, 2026): passivated,
+  as for the other 18-8 slotted screws here. The 0.068 in head stands
+  0.009 in prouder than the button head, so the guide lock is 1/16 in sheet
+  as supplied rather than a 2.0 strip, which keeps the lock-station
+  sweep clear of the transgear arm plate. The page gives no head profile, slot or tip, so
+  `diag_build_91792A108.py` builds it on the shared slotted-head laws of
+  `diag_mcmaster_fillister.py` (cylinder band 0.8 of the head height under a
+  spherical-cap dome, slot 0.135 of the head Ø wide and 1.5 widths deep)
+  [INFERENCE]; `_mcmaster_91792a108.py` holds its size. It is
+  catalogue-only: no vendor model is downloaded or kept here, so it has no
+  replica gate, and its standalone diagnostic is a catalog-only run. Lost:
+  316 stainless 93923A353 (same head and length, 80 ksi, three times the
+  price).
 - [97431A260](https://www.mcmaster.com/97431A260/) (`vn-transgear-retaining-ring`,
   MHA-VN-047, R9-68) is pushed sideways into the MHA-PD-023 pin's groove in front
   of the MHA-PD-025 front bushing and closes the disc cluster's float. Its page

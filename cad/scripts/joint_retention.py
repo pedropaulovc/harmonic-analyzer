@@ -592,7 +592,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_cone_tip_pinch_screw",  # #4-40 fillister (91794A112), member into cone_tip_block far jaw; lock of cone_tip_adjuster
         "dt_crank_arm",  # #4-40 through-taps, receiver of crank_handle_pivot_screw and fillister_screw (MHA-VN-006)
         "dt_crank_handle_pivot_screw",  # #4-40 made shoulder screw (MHA-DT-032), member into crank_arm
-        "vn_fillister_screw",  # #4-40 brass fillister (90114A511): nameplate into harmonic_base, keeper eye into crank_arm, paper-drive clip and guide screws
+        "vn_fillister_screw",  # #4-40 brass fillister (90114A511): nameplate into harmonic_base, keeper eye into crank_arm, paper-drive guide screws
         "vn_foot_screw",  # #4-40 fillister (90280A108), member into harmonic_base via pinion_spring foot (top level)
         "vn_frame_cross_screw",  # #10-32 UNF-2A x 1-3/4 (McMaster 90280A837), member: 4 into harmonic_base, 4 into top_frame
         "vn_frame_side_screw",  # #2-56 fillister (McMaster 91794A080, MHA-VN-022); member, x2 into top_frame KeeperTaps (top-level row)
@@ -601,7 +601,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "sm_gooseneck",  # receiver: through-tapped brazed end plug; also the post gripped by the frame's set screw
         "sm_gooseneck_spring_screw",  # made MHA-SM-004 fillister: clamps the counter-spring upper eye to the plug
         "vn_gooseneck_set_screw",  # 1/4-20 UNC x 3/4 square-head cup point (91410A540), member: into top_frame hub boss tap, grips summing gooseneck
-        "vn_guide_lock_screw",  # #4-40 button head (McMaster 91255A108, MHA-VN-046, R9-31), member: 8 into the platen_guide rear through taps
+        "vn_guide_lock_screw",  # #4-40 slotted pan head (McMaster 91792A108, MHA-VN-046, R9-31), member: 8 into the platen_guide rear through taps
         "vn_hanger_screw",  # #8-32 UNC x 1/2 hex head (McMaster 93075A194), member into the pen-hanger strap tap
         "fr_harmonic_base",  # receiver: #10-32 cross taps, 1/4-20 hold-down seats, #4-40 nameplate seats, and the drive_train screws' seats (top-level rows)
         "vn_knife_hanger_stud",  # #6-32 UNC (McMaster 91251A157 socket head cap screw x 2), member into the knife-mount top tap
@@ -609,6 +609,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_lag_screw",  # 1/4-20 UNC-2A x 3/4 hex head (92240A540), member: through rocker_arm_support foot into harmonic_base
         "vn_latch_hook_bracket_screw",  # #4-40 narrow fillister (McMaster 90280A108, MHA-VN-043), member: 2 into the support_bar's #4-40 through taps
         "vn_magnifying_bracket_screw",  # #2-56 fillister, member: two in bracket counterbores into summing_lever (top-level row)
+        "vn_platen_clip_screw",  # #2-56 brass fillister (90114A124, MHA-VN-059), member: 4 into the platen's through taps, clamping the paper clips
         "mg_magnifying_clamp",  # #4-40 UNC-2B tapped ScrewHole (Hole Wizard), receiver of thumb_screw
         "ms_stop_block",  # MHA-MS-002: #4-40 UNC-2B tapped through the floor (receiver of vn_thumb_screw) + 2x #2-56 UNC blind taps (receiver of vn_ms_stop_plate_screw)
         "vn_ms_stop_plate_screw",  # #2-56 x 1/4 brass fillister (McMaster 90114A124, MHA-VN-054), member: 2 into ms_stop_block through the cover plate
@@ -619,7 +620,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_pen_set_screw",  # #4-40 UNC (McMaster 99607A213 knurled thumb screw), member into the pen-frame rail
         "pn_pen_v_block",  # receiver: Ø2.5 rod set-screw hole drilled thru, "THREAD/FIT TO SUIT SET SCREW AT ASSEMBLY"; the screw is not modelled
         "dt_pinion_cam",  # M2.5 x 0.45 6H tap + supplied ISO 4026 M2.5 x 5 flat-point set screw, member (collar) gripping pinion_lift_rod
-        "pd_platen",  # #4-40 tapped through (pd_platen_spec.SOCKET_SPEC), receiver of the 4 clip screws
+        "pd_platen",  # #2-56 tapped through (pd_platen_spec.SOCKET_SPEC), receiver of the 4 clip screws
         "pd_platen_guide",  # #4-40 front bottoming taps (guide screws) + rear through taps (guide-lock screws, R9-48), receiver
         "vn_post_mount_screw",  # 1/4-20 (MSC 40923906 fillister, 4 in stock cut to fit), member into cone_swing_platform
         "pd_rack_pinion",  # 120T disc (MHA-PD-006): 3x #0-80 through taps drilled and tapped at assembly (A06 disc-taps-transferred), receiver of the disc screws
@@ -705,7 +706,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_pinion_spring",  # #4 clearance foot hole; clamped by foot_screw MHA-VN-020 (top-level row)
         "vn_pinion_strap_pin",  # 1/16 spring pin
         "ch_pivot_shaft",  # plain Ø6.35 rod, domed both ends, two set-screw flats; no thread
-        "pd_platen_clip",  # #4 clearance holes only (build_pd_platen_clip); clamped by fillister_screw
+        "pd_platen_clip",  # #2 clearance holes only (build_pd_platen_clip); clamped by platen_clip_screw
         "pd_platen_paper",  # paper sheet, no thread
         "pd_platen_rack",  # soft-soldered to the platen back (A06 rack-soldered); no holes, no thread
         "ch_rocker_arm",  # reamed pivot hub bore + #47 rod-pin hole
@@ -1846,16 +1847,16 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="pd-paper-drive/clip-screw-in-platen",
         assembly="pd_paper_drive",
-        member="vn_fillister_screw",
+        member="vn_platen_clip_screw",
         receiver="pd_platen",
-        thread="#4-40 UNC",
+        thread="#2-56 UNC",
         quantity=4,
         installed_at="clips-fitted",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="clamps each brass paper clip to the platen, and both travel together as one body. The clip's spring-rail reaction acts along the screw axis (preload only), and two screws per clip stop the clip turning, so no operating torque acts about either screw axis",
-        axial_capture="fillister head on the clip's integral seat boss (SCREW_SEAT_STACK); shank through the clip #4 clearance into the platen's through #4-40 tap, 4.0 mm engagement, tip flush with the platen back",
+        axial_capture="fillister head directly on the clip's flat 0.8 brass sheet (no seat boss); shank through the clip #2 clearance into the platen's through #2-56 tap and rear boss, 5.55 mm engagement (pd_platen_spec.SOCKET_THREAD_ENGAGEMENT, 2.54D), tip flush with the boss",
         lock=Lock.NONE,
-        evidence="build_pd_paper_drive_assembly.py:build ('platen clip-screw grid') and _assert_fastener_stacks (clip #4-40 engagement, tip flush); draw_pd_paper_drive_assembly._step_text 'clips-fitted'; pd_platen_spec.SOCKET_SPEC tapped #4-40 through; build_pd_platen_clip.SCREW_SEAT_STACK",
+        evidence="build_pd_paper_drive_assembly.py:build ('platen clip-screw grid') and _assert_fastener_stacks (clip #2-56 engagement, tip flush); draw_pd_paper_drive_assembly._step_text 'clips-fitted'; pd_platen_spec.SOCKET_SPEC tapped #2-56 through; build_pd_platen_clip.CLIP_THICKNESS",
     ),
     Joint(
         id="pd-paper-drive/guide-screw-in-guide",
@@ -1881,7 +1882,7 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="platen-hung",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="clamps each guide-lock plate to the back of its guide rail, and both travel with the platen as one body. The plate stands the fitted lock gap (0.05-0.25, R9-47) off the bar's back face and only touches if the platen is pulled forward, a load along the screw axis. Two screws per plate stop it turning, so no operating torque acts about either screw axis",
-        axial_capture="button head on the 2-mm guide_lock back face; shank through the lock's 1/8 drilled hole into the guide's rear #4-40 tap (through, R9-48), tip stopping inside the rail",
+        axial_capture="slotted pan head on the 1/16-sheet guide_lock back face; shank through the lock's 1/8 drilled hole into the guide's rear #4-40 tap (through, R9-48), tip stopping inside the rail",
         lock=Lock.NONE,
         evidence="build_pd_paper_drive_assembly.py:build ('platen lock-screw grid', LOCK_SCREW_XY); draw_pd_paper_drive_assembly._step_text 'platen-hung' (fitted loose) and 'guide-locks-set' (snug, push, tighten); vn_guide_lock_screw_spec.ENGAGEMENT_WORST; build_pd_platen_guide.HOLE_X/LOCK_SCREW_THREAD_ENGAGEMENT (4 per rail x 2 rails); pd_guide_lock_spec.HOLE_SPEC; pd_platen_guide_spec.LOCK_GAP_FIT",
     ),

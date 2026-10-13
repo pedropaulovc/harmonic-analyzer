@@ -1,12 +1,12 @@
 vn-guide-lock-screw:
   title: Guide Lock Screw
   number: MHA-VN-046
-  stock_name: Black-Oxide Alloy Steel Button Head Hex Drive Screw
+  stock_name: 18-8 Stainless Steel Pan Head Slotted Screw
   supplier: McMaster-Carr
-  supplier_skus: [91255A108]
-  material: Alloy Steel
-  material_specification: "Alloy steel, black oxide, ASTM F835, Rockwell C39; McMaster-Carr 91255A108"
-  finish: black oxide
+  supplier_skus: [91792A108]
+  material: AISI 304
+  material_specification: "18-8 stainless steel, slotted pan head, fully threaded, ASME B18.6.3; McMaster-Carr 91792A108"
+  finish: passivated
   quantity: 8
   tolerance_class: machined_block
   fit_class: fastener_clearance

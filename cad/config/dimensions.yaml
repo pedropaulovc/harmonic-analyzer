@@ -1551,7 +1551,7 @@ sections:
       - - Plate thickness
         - 3.85 mm
         - '0.152'
-        - 'p.55 top edge-on photo read ~4; thinned to 3.85 (R9-68) with the back face held on the bar front, opening the disc-to-platen air 0.15; four Ø7 × 0.65 clip-screw bosses on the back face'
+        - 'p.55 top edge-on photo read ~4; thinned to 3.85 (R9-68) with the back face held on the bar front, opening the disc-to-platen air 0.15; four Ø7 × 1.70 clip-screw bosses on the back face'
         - scaled
         - low
       - - Rack and backer (current model)
@@ -1567,21 +1567,21 @@ sections:
         - scaled + derived
         - med
       - - Platen guides + locks (rework E3, NEW)
-        - 'two black rails 269.64 × 5 × 10 screwed across the FULL platen back (bottom y 283.734..288.734, top 317.734..322.734 — the platen HANGS by the top rail''s underside on the bar''s top edge 317.734), each by 5 fillister screws whose heads show on the platen front (rows y 286.234/320.234, x −6.7001..+209.0119 step 53.928), seated in Ø6.5 × 2.9178 counterbores (stock 2.7178 heads 0.2 sub-flush so the paper lies flat) with the 6.35 shanks passing the 0.9322 web left in the 3.85 plate and threading 5.4178 into #4-40 through taps on the rail fronts (R9-64; tips 3.5022 inside the shallowest seat); 4 black lock plates 22 × 15.65 × 2 (2 per rail, inboard 30/70% stations x 47.2279/155.0839, 2 #4-40 × 3/8 button-head socket cap screws `vn-guide-lock-screw` each — MHA-VN-046, McMaster 91255A108 into through taps (R9-48), whose low head clears the transgear hanger arm, R9-31) on the rail backs (z −128.9..−126.9), lapping 1.0 past each rail''s outer edge (R9-59), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 2.65 (R9-61), the top pair hangs 9.65 over it — so the platen cannot fall off without colliding with the east column clamp'
+        - 'two black rails 269.64 × 5 × 10 screwed across the FULL platen back (bottom y 283.734..288.734, top 317.734..322.734 — the platen HANGS by the top rail''s underside on the bar''s top edge 317.734), each by 5 fillister screws whose heads show on the platen front (rows y 286.234/320.234, x −6.7001..+209.0119 step 53.928), seated in Ø6.5 × 2.9178 counterbores (stock 2.7178 heads 0.2 sub-flush so the paper lies flat) with the 6.35 shanks passing the 0.9322 web left in the 3.85 plate and threading 5.4178 into #4-40 through taps on the rail fronts (R9-64; tips 3.5022 inside the shallowest seat); 4 black lock plates 22 × 15.65 × 1/16 sheet (1.5875, 2 per rail, inboard 30/70% stations x 47.2279/155.0839, 2 #4-40 × 3/8 slotted pan-head screws `vn-guide-lock-screw` each — MHA-VN-046, McMaster 91792A108 (2026-10-11), on the plate backs, into through taps (R9-48), whose low head clears the transgear hanger arm, R9-31) on the rail backs (z −128.9..−127.3125), lapping 1.0 past each rail''s outer edge (R9-59), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 2.65 (R9-61), the top pair hangs 9.65 over it — so the platen cannot fall off without colliding with the east column clamp'
         - —
         - 'ch22 p.54-55 back photo (rails + bright wear band + lock plates) + front photo (two rows of 5 screw heads)'
         - scaled + derived
         - med
       - - Guide lock plates (2026-09-02)
-        - '22 × 15.65 × 2 (was 19 tall): 1.0 lip (R9-59) + 5 rail + 7 channel + 2.65 bar overlap (R9-61: the book read''s 3 less 0.35 so the set plate clears the pivot spacer)'
+        - '22 × 15.65 × 1/16 sheet (A36 ground, McMaster 1388K196, ±0.005 in, as supplied; 2026-10-11, was 2.0) (was 19 tall): 1.0 lip (R9-59) + 5 rail + 7 channel + 2.65 bar overlap (R9-61: the book read''s 3 less 0.35 so the set plate clears the pivot spacer)'
         - —
         - 'ch22 p.54: the locks read low against the rail (`pd_guide_lock_spec.py`)'
         - scaled
         - low
       - - Paper holder springs (×2)
-        - 'ONE formed brass sheet per holder, 83.5 × 8.988 × 0.8: a 4.0-wide flat rail carries the two #4 clearance holes; opposed 39.25-long open-ended notches, 0.6 wide, stop at a 5.0 intact centre bridge and free the adjacent 4.388-wide spring rail; each centre-to-end half bows 1.5 away from the platen and returns at its rounded free end to clamp the paper'
+        - 'ONE formed brass sheet per holder, 83.5 × 8.988 × 0.8: a 4.2296-wide flat screw rail carries the two #2 clearance holes; opposed open-ended slits, 0.5287 wide with full half-round ends, stop at an 11.2164 intact centre bridge (tangent-point span) and free the adjacent 4.2296-wide spring rail; each centre-to-end half lies flat from its end out to the screw station, then lifts 1.5 away from the platen in one smooth bow (three tangent R35.30 bends, no creases) and lies flat again over the bridge; spring ends full half-rounds, screw-rail corners R2.5 outer / R0.75 slit side'
         - —
-        - 'ch22 p.54 page001_img02/03: one slotted sheet with the middle left intact; user topology clarification 2026-09-03; hole stations retain the ch30-p002 scale fit'
+        - 'ch22 p.54 page001_img02/03: one slotted sheet with the middle left intact; img03 pixel read (603 × 68 px clip) gives 32/4/32 px rail/slit/rail, the 77-px slit-centreline bridge and the corner rounds; user topology clarification 2026-09-03; hole stations retain the ch30-p002 scale fit'
         - scaled + derived
         - low
       - - Material
@@ -1597,15 +1597,15 @@ sections:
         - derived
         - med
       - - Paper holder positions (rework E4)
-        - 'two handed vertical holders from y 324.554..408.054: left origin (−30.2713288, 408.054), Rz −90°, envelope x −30.2713288..−21.2833288; right origin (+232.5830712, 324.554), Rz +90°, envelope x +223.5950712..+232.5830712. The flat rails seat at z −143.55..−142.75 against the platen; each local +Y spring rail points inward over the paper and bows to z −145.05 at peak'
+        - 'two handed vertical holders from y 324.554..408.054: left origin (−30.3861523, 408.054), Rz −90°, envelope x −30.3861523..−21.3981523; right origin (+232.6978948, 324.554), Rz +90°, envelope x +223.7098948..+232.6978948. The flat rails seat at z −143.55..−142.75 against the platen; each local +Y spring rail points inward over the paper and bows to z −145.05 at peak'
         - —
-        - 'ch22 front photo: bright holders hug opposite platen edges with their spring lanes inward; #4 holes remain on the platen socket rows, while opposite handed rotations preserve the asymmetric one-sheet topology'
+        - 'ch22 front photo: bright holders hug opposite platen edges with their spring lanes inward; #2 holes remain on the platen socket rows, while opposite handed rotations preserve the asymmetric one-sheet topology'
         - scaled + derived
         - med
       - - Clip screws ×4 + platen sockets
-        - stock 90114A511 brass fillister (Ø4.6482 × 2.7178 head, 6.35 shank) through each clip's #4 clearance end holes (machine x −28.2713288/+230.5830712, y 331.7444/400.8636) into #4-40 taps through the 3.85 platen and its Ø7 × 0.65 rear bosses (4.5 engaged, 1.58D; tips flush with the boss rear faces); under-head faces on the clip seats (z −144.6); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
+        - stock 90114A124 #2-56 × 1/4 brass fillister `vn-platen-clip-screw` (MHA-VN-059; Ø3.556 × 2.1082 head, 6.35 shank; user ruling 2026-10-11 — img03's heads read ~2.6–3.0, and the Ø3.556 head lies wholly on the 4.23 screw rail) through each clip's #2 clearance end holes (machine x −28.2713288/+230.5830712, y 331.7444/400.8636) into #2-56 taps through the 3.85 platen and its Ø7 × 1.70 rear bosses (5.55 engaged, 2.54D; tips flush with the boss rear faces); under-head faces directly on the flat clip sheet (z −143.55, no seat boss — ch22 img03); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
         - —
-        - p.55 front photo (clip end screws)
+        - p.55 front photo (clip end screws); McMaster 90114A124 product page and technical drawing read live 2026-10-11
         - scaled + derived
         - low
   - prose: |2

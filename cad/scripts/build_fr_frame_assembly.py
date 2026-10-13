@@ -340,10 +340,9 @@ if any(
 # ROT_X_POS90 (euler [90,0,0]) turns local +Z -> -Y. The stock shank passes
 # through NAMEPLATE_THICKNESS into the existing base threads; the head sits
 # above the decorated face.
-# The under-head plane seats FLUSH on the plate face, exactly as the
-# paper-drive seats the same screw on its clips. The stock external thread
-# engages the matching #4-40 base seat rather than using a tap-drill-sized
-# simplified shank.
+# The under-head plane seats FLUSH on the plate face. The stock external
+# thread engages the matching #4-40 base seat rather than using a
+# tap-drill-sized simplified shank.
 NAMEPLATE_SCREW_EULER = [90.0, 0.0, 0.0]
 NAMEPLATE_SCREW_ROWS = ROT_X_POS90
 if NAMEPLATE_SCREW_STATIONS != NAMEPLATE_SCREW_XZ:

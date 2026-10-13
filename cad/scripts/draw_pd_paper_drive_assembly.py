@@ -290,6 +290,7 @@ BOM_PART_NUMBERS = {
     "pd-platen-clip": _config.parts("pd-platen-clip")["number"],
     "pd-platen-paper": _config.parts("pd-platen-paper")["number"],
     "vn-fillister-screw": _config.parts("vn-fillister-screw")["number"],
+    "vn-platen-clip-screw": _config.parts("vn-platen-clip-screw")["number"],
     "vn-guide-lock-screw": _config.parts("vn-guide-lock-screw")["number"],
     "vn-chain-inner-link": _config.parts("vn-chain-inner-link")["number"],
     "vn-chain-outer-link": _config.parts("vn-chain-outer-link")["number"],
@@ -326,6 +327,7 @@ BOM_PART_NUMBERS = {
 _SKU = {
     "vn-clamp-screw": _config.parts("vn-clamp-screw")["supplier_skus"][0],
     "vn-fillister-screw": _config.parts("vn-fillister-screw")["supplier_skus"][0],
+    "vn-platen-clip-screw": _config.parts("vn-platen-clip-screw")["supplier_skus"][0],
     "vn-guide-lock-screw": _config.parts("vn-guide-lock-screw")["supplier_skus"][0],
     "vn-transgear-arm-plate-screw": _config.parts("vn-transgear-arm-plate-screw")[
         "supplier_skus"
@@ -368,7 +370,10 @@ BOM_DESCRIPTIONS = {
     "pd-platen-clip": "PLATEN PAPER CLIP",
     "pd-platen-paper": "PLATEN PAPER",
     "vn-fillister-screw": f"BRASS FILLISTER SCREW, MCMASTER {_SKU['vn-fillister-screw']}",
-    "vn-guide-lock-screw": f"BUTTON HEAD SCREW, MCMASTER {_SKU['vn-guide-lock-screw']}",
+    "vn-platen-clip-screw": (
+        f"BRASS FILLISTER SCREW, MCMASTER {_SKU['vn-platen-clip-screw']}"
+    ),
+    "vn-guide-lock-screw": f"PAN HEAD SCREW, MCMASTER {_SKU['vn-guide-lock-screw']}",
     "vn-chain-inner-link": "ANSI #25 CHAIN INNER LINK",
     "vn-chain-outer-link": "ANSI #25 CHAIN OUTER LINK",
     # Grouped: its configurations' BOM description wins over a written cell,
@@ -1008,7 +1013,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "clips-fitted": (
             f"SCREW THE {_N['pd-platen-clip']} CLIPS TO THE PLATEN FRONT WITH "
-            f"{CLIP_SCREWS} {_N['vn-fillister-screw']} SCREWS; SLIP THE "
+            f"{CLIP_SCREWS} {_N['vn-platen-clip-screw']} SCREWS; SLIP THE "
             f"{_N['pd-platen-paper']} PAPER UNDER THEIR SPRING RAILS."
         ),
         "platen-hung": (

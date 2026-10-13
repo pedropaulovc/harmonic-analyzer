@@ -524,10 +524,10 @@ def test_every_registered_joint_cites_a_live_source_occurrence() -> None:
 def test_deleting_a_row_whose_parts_other_rows_name_is_omitted(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The guide screws' stems stay named without their row: fillister_screw
-    # as the clip screws' member, platen_guide as the lock screws' receiver.
-    # Only the registry notices the guide-screw joint is gone.
-    gone = "pd-paper-drive/guide-screw-in-guide"
+    # The cross screws' stems stay named without their base row:
+    # frame_cross_screw as the top-frame row's member, harmonic_base as the
+    # receiver of other frame rows. Only the registry notices the joint is gone.
+    gone = "fr-frame/cross-screw-in-base"
     table = tuple(j for j in jr.JOINTS if j.id != gone)
     findings = jr.audit(
         table,

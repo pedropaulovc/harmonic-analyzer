@@ -12,7 +12,6 @@ import importlib.util
 import itertools
 import math
 import re
-from dataclasses import replace
 
 import pytest
 
@@ -23,14 +22,15 @@ import pd_transgear_pivot_spacer_spec as spacer
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 
 IN = 25.4
-# #4-40 UNC (ASME B1.1): basic major (the class-3A max) and the class-2A min.
+# #4-40 UNC (ASME B1.1): the basic major (above the class-2A max) and the class-2A min.
 MAJOR_MAX = 0.112 * IN
 MAJOR_MIN = 0.1061 * IN
 PITCH = IN / 40.0
-# Title block: 3-place linear +/-0.13; drilled holes +0.10/-0; edge break 0.25.
-THREE_PLACE = 0.13
+# Title block: drilled holes +0.10/-0; edge break 0.25.
 DRILLED_PLUS = 0.10
 EDGE_BREAK = 0.25
+# The lock: 1/16 in sheet as supplied, +/-0.005 in (McMaster 1388K196).
+SHEET_MAX = (1.0 / 16.0 + 0.005) * IN
 
 
 def _reload_screw_spec() -> None:
@@ -42,23 +42,24 @@ def _reload_screw_spec() -> None:
 
 
 def test_lock_screw_engages_1_5d_in_the_guide_at_the_worst_case() -> None:
-    """R9-48: the shortest 3/8 screw (B18.6.3 +0/-0.03 in) under the thickest
-    2.000 strip, less one pitch for the first thread and the tap mouth's
-    break, in the guide's through tap."""
+    """R9-48: the shortest 3/8 screw (B18.6.3 +0/-0.03 in) through the
+    thickest 1/16 sheet, less one pitch for the first thread and the tap
+    mouth's break, in the guide's through tap."""
     length_min = 0.375 * IN - 0.03 * IN
-    strip_max = 2.0 + THREE_PLACE
-    worst = length_min - strip_max - PITCH - EDGE_BREAK
-    assert worst == pytest.approx(5.748, abs=1e-3)
-    assert worst / MAJOR_MAX == pytest.approx(2.02, abs=5e-3)
+    worst = length_min - SHEET_MAX - PITCH - EDGE_BREAK
+    assert worst == pytest.approx(6.1635, abs=1e-3)
+    assert worst / MAJOR_MAX == pytest.approx(2.17, abs=5e-3)
     assert worst >= 1.5 * MAJOR_MAX
     assert screw.SHANK_LEN == pytest.approx(0.375 * IN)
     assert screw.ENGAGEMENT_WORST == pytest.approx(worst)
 
 
 def test_the_quarter_inch_screw_is_refused(monkeypatch) -> None:
-    import _mcmaster_91255a108 as recipe
+    import _mcmaster_91792a108 as recipe
 
-    monkeypatch.setattr(recipe, "DIMS", replace(recipe.DIMS, length=0.25 * IN))
+    size = list(recipe.PAN_HEAD_SIZE)
+    size[1] = 0.25 * IN
+    monkeypatch.setattr(recipe, "PAN_HEAD_SIZE", tuple(size))
     with pytest.raises(AssertionError, match="MHA-VN-046 guide-lock screw"):
         _reload_screw_spec()
 

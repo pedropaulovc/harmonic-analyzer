@@ -33,11 +33,11 @@ real receiving and loaded-inspection data remain separately required.
   semi-arc pair closed by two long screws whose heads show on the bar front
   (ch30 p002).
 * Platen group (HANGS on the bar): platen + two full-width back guide rails
-  (above/below the bar band) + 4 lock plates bridging behind the bar (held by
-  low button-head guide-lock screws) + the teeth-down rack at the bottom edge
-  (crest drop derived from the shifted feed mesh) + two bright-brass edge clips + the paper
-  sheet + ALL its screws -- everything lock-mated to the platen so the whole
-  group feeds together.
+  (above/below the bar band) + 4 1/16-sheet lock plates bridging behind the
+  bar (held by low slotted pan-head guide-lock screws) + the teeth-down rack
+  at the bottom edge (crest drop derived from the shifted feed mesh) + two
+  bright-brass edge clips + the paper sheet + ALL its screws -- everything
+  lock-mated to the platen so the whole group feeds together.
 * Transgear hanger (behind the bar): the arm stands on the pivot spacer and
   swings on the shoulder pivot screw in the bar's tap; the stepped stud in the
   arm carries the feed sleeve (12T 32DP PA20), the 120T disc and its brass hub,
@@ -154,7 +154,6 @@ from _transforms import (  # noqa: E402
 from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
 from fr_harmonic_base_spec import STACK_HEIGHT as BASE_DECK_Y
 from _pd_paper_drive_explode import create_paper_drive_explode
-from pd_paper_drive_explode_spec import CLIP_SCREW_ROLE, GUIDE_SCREW_ROLE
 
 ASM_NAME = "pd-paper-drive"
 
@@ -201,6 +200,8 @@ from pd_platen_spec import (  # noqa: E402
     PLATE_HEIGHT,
     PLATE_THICKNESS,
     PLATE_WIDTH,
+    SOCKET_BOSS_DIA as PLATEN_SOCKET_BOSS_DIA,
+    SOCKET_BOSS_H as PLATEN_BOSS_H,
     SOCKET_SPEC as PLATEN_SOCKET_SPEC,
     SOCKET_THREAD_ENGAGEMENT as PLATEN_SOCKET_ENGAGEMENT,
     SOCKET_XY as PLATEN_SOCKET_XY,
@@ -235,6 +236,7 @@ from pd_guide_lock_spec import (  # noqa: E402
     DRAWING_PRECISION_BY_NAME as LOCK_PRECISION,
     HOLE_XY as LOCK_HOLE_XY,
     LOCK_HEIGHT_BAND,
+    LOCK_THICK_BAND,
     RAIL_EDGE_LIP as LOCK_RAIL_LIP,
 )
 from pd_platen_guide_spec import (  # noqa: E402
@@ -248,9 +250,6 @@ from build_pd_platen_clip import (  # noqa: E402
     HOLE_INSET as CLIP_HOLE_INSET,
     HOLE_Y as CLIP_HOLE_Y,
     HOLE_DIA as CLIP_HOLE_DIA,
-    SCREW_SEAT_BOSS_H,
-    SCREW_SEAT_DIA,
-    SCREW_SEAT_STACK,
 )
 from vn_clamp_screw_spec import (  # noqa: E402
     HEAD_DIA as CLAMP_SCREW_HEAD_DIA,
@@ -264,9 +263,16 @@ from vn_fillister_screw_spec import (  # noqa: E402
     SHANK_DIA as FILLISTER_SHANK_DIA,
     SHANK_LEN as FILLISTER_SHANK_LEN,
 )
+from vn_platen_clip_screw_spec import (  # noqa: E402
+    HEAD_DIA as CLIP_SCREW_HEAD_DIA,
+    HEAD_H as CLIP_SCREW_HEAD_H,
+    SHANK_DIA as CLIP_SCREW_SHANK_DIA,
+    SHANK_LEN as CLIP_SCREW_SHANK_LEN,
+    THREAD as CLIP_SCREW_THREAD,
+)
 
-# The guide-lock screws alone are low button heads (R9-31): a fillister head
-# on the lock back would sweep into the hanger arm as the platen feeds
+# The guide-lock screws alone are low slotted pan heads (R9-31): a fillister
+# head on the lock back would sweep into the hanger arm as the platen feeds
 # (_assert_lock_station_sweep).
 from vn_guide_lock_screw_spec import (  # noqa: E402
     HEAD_DIA as LOCK_SCREW_HEAD_DIA,
@@ -892,8 +898,8 @@ assert math.isclose(
 SPARE_GEAR_POS = (140.0, BASE_DECK_Y, -75.0)
 
 # --- fasteners ----------------------------------------------------------------
-# Platen-clip screws: through the clips' integral outer seats and #4 clearance
-# holes into full-thickness #4-40 through receivers in the platen.
+# Platen-clip screws (vn-platen-clip-screw): heads on the clips' flat sheet,
+# shanks through #2 clearance holes into #2-56 through receivers in the platen.
 CLIP_SCREW_XY = tuple((PLATE_X0 + sx, PLATE_Y0 + sy) for sx, sy in PLATEN_SOCKET_XY)
 # The clips run from the platen's top edge down; their end holes (inset
 # CLIP_HOLE_INSET) must land exactly on the platen's edge sockets.
@@ -1032,7 +1038,7 @@ CHAIN_PLANE_ENVELOPES = (
         "platen-clip screw heads (the platen group's frontmost)",
         None,
         0.0,
-        PLATE_FRONT_Z - SCREW_SEAT_STACK - FILLISTER_HEAD_H,
+        PLATE_FRONT_Z - CLIP_THICKNESS - CLIP_SCREW_HEAD_H,
         PLATE_FRONT_Z,
     ),
 )
@@ -1113,9 +1119,9 @@ def _assert_fastener_stacks() -> None:
     )
     nonnegative("guide screw blind-bottom clearance", GUIDE_SCREW_BOTTOM_CLEARANCE)
 
-    # The low button-head guide-lock screws (R9-31, R9-48) take the real 2-mm
-    # plate and 9.525-mm under-head length; the guide's through tap receives
-    # the remaining 7.525 mm and the tip stops inside the rail.
+    # The low slotted pan-head guide-lock screws (R9-31, R9-48) take the real
+    # 1/16-sheet plate and 9.525-mm under-head length; the guide's through tap
+    # receives the remaining 7.9375 mm and the tip stops inside the rail.
     nonnegative(
         "lock shank radial clearance", (LOCK_HOLE_DIA - LOCK_SCREW_SHANK_DIA) / 2.0
     )
@@ -1133,30 +1139,25 @@ def _assert_fastener_stacks() -> None:
     )
     nonnegative("lock screw tip inside the guide", LOCK_SCREW_TIP_INSIDE_MIN)
 
-    # Clip bosses use exactly the non-threaded remainder of the shank; the
-    # platen and its rear socket bosses are through-tapped for 4.5 mm
-    # engagement, and the tip is flush with the boss.
+    # Clip heads sit directly on the flat 0.8 brass sheet (no seat boss); the
+    # platen and its rear socket bosses are through-tapped for the remaining
+    # 5.55 mm of shank, and the tip is flush with the boss.
     if (PLATEN_SOCKET_SPEC.kind, PLATEN_SOCKET_SPEC.size, PLATEN_SOCKET_SPEC.end) != (
         "tapped",
-        "#4-40",
+        CLIP_SCREW_THREAD,
         "through_all",
     ):
-        raise AssertionError("clip receiver is not a through #4-40 tap")
+        raise AssertionError(f"clip receiver is not a through {CLIP_SCREW_THREAD} tap")
     nonnegative(
-        "clip shank radial clearance", (CLIP_HOLE_DIA - FILLISTER_SHANK_DIA) / 2.0
+        "clip shank radial clearance", (CLIP_HOLE_DIA - CLIP_SCREW_SHANK_DIA) / 2.0
     )
-    nonnegative(
-        "clip head seat radial margin", (SCREW_SEAT_DIA - FILLISTER_HEAD_DIA) / 2.0
-    )
-    if abs(CLIP_THICKNESS + SCREW_SEAT_BOSS_H - SCREW_SEAT_STACK) > 1e-9:
-        raise AssertionError(
-            "clip boss no longer provides the derived screw seat stack"
-        )
     valid_engagement(
-        "clip #4-40 engagement", PLATEN_SOCKET_ENGAGEMENT, FILLISTER_SHANK_DIA
+        f"clip {CLIP_SCREW_THREAD} engagement",
+        PLATEN_SOCKET_ENGAGEMENT,
+        CLIP_SCREW_SHANK_DIA,
     )
     clip_tip_clearance = (
-        SCREW_SEAT_STACK + PLATEN_SOCKET_ENGAGEMENT - FILLISTER_SHANK_LEN
+        CLIP_THICKNESS + PLATEN_SOCKET_ENGAGEMENT - CLIP_SCREW_SHANK_LEN
     )
     nonnegative("clip screw rear protrusion clearance", clip_tip_clearance)
     if abs(clip_tip_clearance) > 1e-9:
@@ -1164,8 +1165,8 @@ def _assert_fastener_stacks() -> None:
 
     # The raised heads remain wholly outside the recording-paper side margins.
     paper_side_margin = (PLATE_WIDTH - PAPER_GEOMETRY.RECORDING_PAPER_WIDTH_MM) / 2.0
-    left_head_extent = PLATEN_SOCKET_XY[0][0] + FILLISTER_HEAD_DIA / 2.0
-    right_head_extent = PLATE_WIDTH - PLATEN_SOCKET_XY[2][0] + FILLISTER_HEAD_DIA / 2.0
+    left_head_extent = PLATEN_SOCKET_XY[0][0] + CLIP_SCREW_HEAD_DIA / 2.0
+    right_head_extent = PLATE_WIDTH - PLATEN_SOCKET_XY[2][0] + CLIP_SCREW_HEAD_DIA / 2.0
     nonnegative(
         "left clip head-to-paper clearance", paper_side_margin - left_head_extent
     )
@@ -1367,8 +1368,8 @@ def _latch_hook_sections() -> list[tuple[str, tuple[float, float, float, float]]
 # grown toward its neighbours, and each pair must keep LOCK_SWEEP_FLOOR of
 # running clearance. The bar's back face is the datum the hanger stands on and
 # the platen rides its front face, so the thinnest bar carries the whole lock
-# stack rearward toward the hanger, and the deepest rail and thickest strip
-# stand the button heads further back again. The arm sits on the shortest
+# stack rearward toward the hanger, and the deepest rail and thickest sheet
+# stand the pan heads further back again. The arm sits on the shortest
 # spacer, its plate's lower section on the thinnest arm stock and the deepest
 # notch. Deviations are (lower, upper) from the model, read from the specs the
 # parts author on their model dimensions, so the sheets and the sweep agree.
@@ -1383,7 +1384,7 @@ _GUIDE_DEPTH_DEV = printed_deviations(
 )
 # The rail's sheet prints its other sizes at the same document places.
 _GUIDE_HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES)
-_LOCK_THICK_DEV = printed_deviations(LOCK_THICK, LOCK_PRECISION["Depth"])
+_LOCK_THICK_DEV = (-LOCK_THICK_BAND, LOCK_THICK_BAND)  # the sheet's mill band
 _LOCK_HEIGHT_DEV = printed_deviations(
     LOCK_HEIGHT, LOCK_PRECISION["Height"], deviations(LOCK_HEIGHT_BAND)
 )
@@ -1405,13 +1406,13 @@ def _grown(
 
 
 def _assert_lock_station_sweep() -> None:
-    """Conservatively sweep each guide-lock section unbounded in x; this is
-    stricter than the separately enforced finite engaged-feed domain. Its
-    (y, z) section must clear every fixed part behind the bar at every platen
-    position, and the plates the bar's
-    back face, by LOCK_SWEEP_FLOOR at the printed worst case (contract lock
-    sweep; R9-31 fits the low guide-lock screw heads so they pass the hanger
-    arm)."""
+    """Conservatively sweep each guide-lock section and clip-screw boss
+    unbounded in x; this is stricter than the separately enforced finite
+    engaged-feed domain. Its (y, z) section must clear every fixed part
+    behind the bar at every platen position, the plates the bar's back face
+    and the bosses its top edge, by LOCK_SWEEP_FLOOR at the printed worst case
+    (contract lock sweep; R9-31 fits the low guide-lock screw heads so they
+    pass the hanger arm)."""
     # How far the lock stack's faces can stand from the model: forward (the
     # thickest bar, the shallowest rail, the thinnest strip) and rearward.
     front_forward = _BAR_DEPTH_DEV[1] - _GUIDE_DEPTH_DEV[0]
@@ -1471,6 +1472,25 @@ def _assert_lock_station_sweep() -> None:
                 ),
             ),
         ]
+    # The clip-screw socket bosses ride the platen back too, SOCKET_BOSS_H
+    # proud of it, their screw tips flush in them; the thinnest bar carries
+    # the back rearward. The undrawn platen takes .XXX on the boss Ø and
+    # station, and twice it rearward: the tallest boss, or the tip left proud
+    # of the shortest one by a thin plate.
+    boss_r = PLATEN_SOCKET_BOSS_DIA / 2.0
+    bosses = [
+        (
+            f"clip-screw boss y{y:.1f}",
+            _grown(
+                (y - boss_r, y + boss_r, BAR_FRONT_Z, BAR_FRONT_Z + PLATEN_BOSS_H),
+                2.0 * _PLATEN_THICKNESS_BAND,
+                0.0,
+                -_BAR_DEPTH_DEV[0] + 2.0 * _PLATEN_THICKNESS_BAND,
+            ),
+        )
+        for y in sorted({y for _, y in CLIP_SCREW_XY})
+    ]
+    moving += bosses
     tip_y = _on_arm(ARM.TIP_STATION)[1]
     plate_corner_y = max(
         _on_arm(ARM_PLATE.BORE_STATION + u, ARM_PLATE.BORE_OFFSET + v)[1]
@@ -1596,6 +1616,10 @@ def _assert_lock_station_sweep() -> None:
                     f" < {LOCK_SWEEP_FLOOR})"
                 )
             minima[fixed_label] = min(minima.get(fixed_label, math.inf), gap)
+            if moving_label.startswith("clip-screw boss"):
+                minima["clip-screw bosses"] = min(
+                    minima.get("clip-screw bosses", math.inf), gap
+                )
     # The plates bridge behind the bar: the thickest bar and the shallowest
     # rail bring their front faces closest to its back face.
     bar_gap = LOCK_Z0 - front_forward - BAR_BACK_Z
@@ -1620,6 +1644,21 @@ def _assert_lock_station_sweep() -> None:
             f" (worst-case gap {rack_gap:.3f} < {LOCK_SWEEP_FLOOR})"
         )
     minima["platen rack"] = rack_gap
+    # The bosses stand inside the bar's depth, so they must pass above its top
+    # edge; a top rail printed short drops the hung platen toward it.
+    bar = _grown(
+        (BAR_TOP_Y - BAR_HEIGHT, BAR_TOP_Y, BAR_FRONT_Z, BAR_BACK_Z),
+        -min(_GUIDE_HEIGHT_DEV[0], 0.0),
+        0.0,
+        0.0,
+    )
+    boss_bar_gap = min(_section_gap(section, bar) for _, section in bosses)
+    if boss_bar_gap < LOCK_SWEEP_FLOOR:
+        raise AssertionError(
+            "the platen's clip-screw bosses would sweep into the bar"
+            f" (worst-case gap {boss_bar_gap:.3f} < {LOCK_SWEEP_FLOOR})"
+        )
+    minima["clip-screw bosses on the bar"] = boss_bar_gap
     log(
         "guide-lock station sweep clears the hanger at the printed worst case: "
         + ", ".join(f"{label} {gap:.3f}" for label, gap in minima.items())
@@ -2527,10 +2566,7 @@ async def build(adapter) -> dict[str, str]:
     # The platen owns the feed DOF, so each seed stays lock-mated to that moving
     # body. Native X patterns replicate the regular grids and remain driven by
     # their seeds as the platen travels.
-    clip_targets = [
-        [x, y, PLATE_FRONT_Z - CLIP_THICKNESS - SCREW_SEAT_BOSS_H]
-        for x, y in CLIP_SCREW_XY
-    ]
+    clip_targets = [[x, y, PLATE_FRONT_Z - CLIP_THICKNESS] for x, y in CLIP_SCREW_XY]
     clip_max_x = max(target[0] for target in clip_targets)
     clip_seed_target = min(
         (target for target in clip_targets if target[0] == clip_max_x),
@@ -2538,13 +2574,13 @@ async def build(adapter) -> dict[str, str]:
     )
     clip_seed = await place_component(
         adapter,
-        "vn-fillister-screw",
+        "vn-platen-clip-screw",
         clip_seed_target,
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
         label=(
-            f"fillister-screw clip seed "
+            f"platen-clip screw seed "
             f"(x{clip_seed_target[0]:+.0f} y{clip_seed_target[1]:.0f})"
         ),
     )
@@ -2618,15 +2654,9 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         "platen guide-screw grid",
     )
-    # The exploded sheet moves the guide and clip screws apart: tag each
-    # fillister screw with the joint it makes.
-    fillister_roles = {
-        **{name: CLIP_SCREW_ROLE for name in (clip_seed, *clip_instances)},
-        **{name: GUIDE_SCREW_ROLE for name in (guide_seed, *guide_instances)},
-    }
 
     # Two seeds at the right-hand station reproduce at the left-hand station;
-    # under-head planes sit on the real 2-mm lock back faces.
+    # under-head planes sit on the real 1/16-sheet lock back faces.
     lock_targets = [[x, y, LOCK_Z0 + LOCK_THICK] for x, y in LOCK_SCREW_XY]
     lock_min_y = min(target[1] for target in lock_targets)
     plate_mid_x = PLATE_X0 + PLATE_WIDTH / 2.0
@@ -3248,9 +3278,7 @@ async def build(adapter) -> dict[str, str]:
     author_in_drawing_configurations(
         adapter,
         ASM_NAME,
-        lambda configuration: create_paper_drive_explode(
-            adapter, fillister_roles, configuration
-        ),
+        lambda configuration: create_paper_drive_explode(adapter, configuration),
     )
     return await save_assembly_and_images(adapter, ASM_NAME)
 
