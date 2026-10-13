@@ -818,7 +818,6 @@ def test_side_view_axis_chain_reads_once_with_its_sum_as_reference() -> None:
     model dimension stood, and the arithmetic closes exactly."""
     import pytest
     flange_x = (SIDE_OX - part.FLANGE_Y[1], SIDE_OX - part.FLANGE_Y[0])
-    arm_x = (SIDE_OX - part.ARM_Y[1], SIDE_OX - part.ARM_Y[0])
     arm_end = SIDE_OY - part.ARM_Z[1]
     face = SIDE_OY - part.FLANGE_Z[1]
     text, lone, tail = 3.5, 2.78, 6.4

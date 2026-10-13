@@ -171,14 +171,13 @@ LEVER_ROD_Y = 979.7
 # for the one-piece top-frame casting (front rail z -93..-131, band
 # y 999.7..1036.2): the exact-stock thumb-screw reach, derived and asserted
 # below, keeps its outer head face beyond the required casting clearance, so
-# the rail imposes NO depth bound at all (the z escape would need the whole
-# head band past the rail outer face -131, far beyond the rim-duck floor
-# -128.31 -- infeasible). Surviving bounds: the
-# lever rod (Ø6) must clear the front column surface -124.7 by 0.25
-# (=> <= -127.95, actual surface gap 0.6) and the lever-wire's rim-duck
-# route caps the hook at ~-137.96 (=> >= -128.31). -128.3 stands unchanged.
-# VROD_Z = -134.8 (clamp's 6.5 skew bore); wire hook -137.95; the bracket arm
-# reaches back to the unchanged plate flange (build_mg_magnifying_bracket).
+# the rail imposes NO depth bound at all. The lever rod (Ø6) must clear the
+# front column surface -124.7 by 0.25 (axis <= -127.95); the retained -128.3
+# axis gives a 0.6 surface gap. Keep the accepted lever, vertical-rod and hook
+# datums while the current drum route proves its own rim/spoke/boss clearance
+# through mg_lever_wire_geom.RUN_GAPS; the old hub-lane rim-depth cap no longer
+# describes that route. VROD_Z = -134.8 (clamp's 6.5 skew bore); hook -137.95;
+# the bracket arm reaches back to the unchanged plate flange.
 LEVER_ROD_Z = -128.3
 LEVER_X0 = 200.0  # lever part origin (rod west dome tip; rod spans +35..+200,
 # placed Ry(180) so the part's local +x runs east toward the summing knife)

@@ -1428,9 +1428,9 @@ sections:
       exact stock reach is derived from McMaster 91882A221; its tip is tangent
       to the lever top. The casting underside is y 999.7, and the screw head
       clears it without forcing the output line farther forward. The front
-      column surface −127.95 (gap 0.6) and rim-duck −128.31 constrain the
-      retained lever depth z −128.3. Vertical rod z −134.8 (skew bore 6.5,
-      top y 984.7); the fixture screw axis is y 919.7, with the hex body
+      column face is z −124.7; a lever axis at or forward of −127.95 gives the
+      0.25 clearance, and the retained z −128.3 gives 0.6. Vertical rod z −134.8
+      (skew bore 6.5, top y 984.7); the fixture screw axis is y 919.7, with the hex body
       spanning approximately 914.2..925.2. Both thumb screws are installed
       backed out to tip/rod tangency so nominal CAD solids do not overlap.
 
@@ -1438,11 +1438,12 @@ sections:
       the spigot groove then leaves its front tangent at screw-axis height.
       Its yaw about the vertical rod is solved from the groove station and
       groove-root radius plus wire radius and 0.25 stand-off, preserving
-      HOOK_Z −137.95 exactly (the wheel rim-duck clearance cap). Hook X,
-      yaw, wire length, hub tangent and yoke offset are derived in
-      cad/scripts/mg_output_fixture_geom.py and mg_lever_wire_geom.py; no
-      cross-hole wire tie or omitted fixture screw remains. The hub end
-      remains z −142.77 in the back groove lane. The straight rest wire
+      HOOK_Z −137.95 exactly as the accepted installation datum. Hook X,
+      yaw, wire length, drum tangent and yoke offset are derived in
+      cad/scripts/mg_output_fixture_geom.py and mg_lever_wire_geom.py.
+      The drum end is at z −154.91 in the pressed brass drum's middle.
+      The drawing-free route checks clearance behind the rim, spokes and boss.
+      The straight rest wire
       clears the fixture groove flanks, spigot and screw head numerically,
       and the farm assembly interference gate checks the installed solids.
       Wraps, tie-offs and wire compliance remain unmodeled.
@@ -1503,9 +1504,9 @@ sections:
   - prose: |2
 
       Notes: wheel body is black-painted cast metal with a bright machined rim
-      (wire groove on the outer circumference); the inner hub is a grooved brass
-      drum (wire from magnifying lever wraps the hub, wire to pen mechanism leaves
-      the outer rim → 5× motion magnification). Six straight spokes. Hex-nut axle on
+      (wire groove on the outer circumference); the front brass drum is pressed
+      on the cast spigot (wire from magnifying lever wraps the plain drum; pen wire leaves
+      the rim groove → 5× motion magnification). Six tapered spokes. Hex-nut axle on
       a horizontal support bar. The two annotated diameters self-validate against
       the stated magnification — strongest-sourced part in chapters 18–21.
       M6.4 placement: wheel at machine x −53 on the y-575.7 bar, wheel mid-plane
