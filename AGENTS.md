@@ -269,13 +269,31 @@ such build:
   attaching with `USE_EXISTING` retains that creator's label and `farm_run`,
   rather than transferring ownership to the attaching session. The label does
   not change the leaf request, workflow ID or cache key.
-- Task names use prefixed underscores (`part:pn_pen_rod`). An unknown or dashed target is
-  refused with doit's invalid-command exit 3, naming the target, before any
-  fleet query or workflow submission; a failed farm preflight exits 2. Neither
-  runs an action.
+- Task names use prefixed underscores (`part:pn_pen_rod`). An unknown or dashed
+  target is refused with doit's invalid-command exit 3, naming the target,
+  before any fleet query or workflow submission; a failed farm preflight
+  exits 2. Neither runs an action.
   Farm preflight also runs the same `check:undefined_names` Ruff scan before
   querying the fleet, so an undefined CAD/build-script name cannot dispatch a
   COM leaf even when the stamped checks would run later in the doit graph.
+  It also checks every would-be leaf in the entire requested closure with
+  `-PoolHome`'s authoritative `agent.protocol.leaf_admitted`, naming refused
+  tasks/prefixes before FIFO registration (exit 2). The selected pool admission
+  rule must match the deployed fleet identity: PoolHome's full `agent_identity`
+  is normalized by the pool's own `agent_identity_tag` and compared with
+  reported worker `agent_version` tags. Mixed, missing or mismatching tags exit
+  2; check out the deployed pool release at PoolHome, or finish the rollout.
+  This deliberately over-refuses for doit `-s`/`--single` and cache hits: the
+  entire requested closure is prechecked, even if some leaves would not run.
+  After successful preflight, the parent exports the admitted label set as
+  `HARMONIC_FARM_ADMITTED_LEAVES` only while executing the doit command in its
+  producer context, then restores the previous value; workers inherit it.
+  Actual `run_leaf(task, cache_key)` dispatch checks that set before any
+  request, span/config/identity lookup or reservation. A missing or invalid set,
+  or a task absent from it, raises a local `RuntimeError` naming the task and
+  its lack of preflight admission; never copy a prefix list into this guard.
+  Independently, the worker's exported graph is limited to the build/release
+  closure. Preflight admission does not enforce that worker restriction.
 - The build runs from a private snapshot of the pushed HEAD under
   `-LogDirectory` (which must sit outside every Git worktree). The default root
   is `$env:HARMONIC_AGENT_SCRATCHPAD` when set; otherwise, an OMP persistent

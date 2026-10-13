@@ -68,7 +68,7 @@ Nothing reaches the fleet until the requested task names are known-good.
 underscore. No fleet query, no workflow and no action happen on that path.
 
 Then, once per run and still before the first action, `build.py`'s farm
-preflight (`_farm_preflight`) refuses to start unless:
+preflight refuses to start unless:
 
 - the local project inputs are clean, **including submodules** (`git status
   --porcelain=v1 --untracked-files=all` plus `git submodule status
@@ -76,8 +76,10 @@ preflight (`_farm_preflight`) refuses to start unless:
   those local files;
 - the remote cache is `ro` or `rw` (`_artifact_cache.enabled()`) — the farm
   hands results back **through the cache**, so `off` cannot work;
-- `farm.py agents --json` reports farm protocol 6 and no known worker reports
-  an incompatible or unreadable protocol.
+- `farm.py agents --json` reports the client's required farm protocol (currently
+  6) and no known worker reports an incompatible or unreadable protocol;
+- would-be leaves pass the selected pool's `agent.protocol.leaf_admitted`, and
+  that pool's canonical identity tag matches the reported fleet identities.
 
 A preflight failure prints `farm: <reason>` and exits 2, also before any action
 runs.
@@ -152,12 +154,20 @@ throw away afterwards. Non-negotiable shape:
 
 1. **Route it through `_cached_com_action(label, cmd, file_deps, outputs,
    log_stem, stamp=None)`.** It is the only way in (§2).
-2. **Name it under an admitted prefix.** The worker rejects anything else
-   (`execute_rejected`): `part:`, `assembly:`, `drawing:`, `verify:`,
-   `verify_soundness:`, `check:`, `package:`, or the bare names `export` /
-   `preflight`. `build` and `release` may exist in the prepared graph but are
-   never admitted as leaf actions. Widening that set requires a worker-agent
-   rollout — pick a name inside it instead.
+2. **Choose a name admitted by the selected pool's
+   `agent.protocol.leaf_admitted`.** That function in the `-PoolHome` checkout
+   is authoritative; do not copy its prefix list here or into a dispatch guard.
+   Preflight refuses an unadmitted leaf with exit 2 before FIFO registration.
+   PoolHome's full identity, normalized by its own `agent_identity_tag`, must
+   match the fleet's reported `agent_version` tags. Mixed, missing or mismatching
+   tags exit 2: check out the deployed pool release, or finish the rollout.
+   Preflight conservatively checks the entire requested closure, including
+   leaves skipped by doit `-s`/`--single` or satisfied by cache hits.
+   Actual dispatch must find the task in the
+   preflight-exported admitted label set before any request or reservation,
+   otherwise it raises a local `RuntimeError` naming the task and its lack of
+   preflight admission. Independently, the worker's exported graph is limited
+   to the build/release closure; preflight does not enforce that restriction.
 3. **Declare machine-stable `file_dep`s and put every output under
    `cad/out/`.** The cache refuses to extract anything else, and an absolute
    local path or a timestamp in the dep list makes the submitter and the worker

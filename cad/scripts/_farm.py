@@ -176,6 +176,12 @@ def workflow_id(
     return f"leaf:{build_id}:{task}:{cache_key or commit[:16]}:{timeout_s}s"
 
 
+def leaf_action(function):
+    """Mark a doit action that dispatches its task as a farm leaf on a miss."""
+    function._farm_leaf_action = True
+    return function
+
+
 def enabled() -> bool:
     return os.environ.get("HARMONIC_EXECUTOR", "local") == "farm"
 
@@ -765,7 +771,25 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
     ``failure_category="cancelled"``; every other failure
     (connection, protocol) propagates as-is: it is a local fault, not a build
     outcome.
+    Admission is the parent's successful full preflight label set, inherited by
+    action workers through ``HARMONIC_FARM_ADMITTED_LEAVES``. Refuse locally
+    before constructing a request or touching telemetry or farm identity.
     """
+    raw_admission = os.environ.get("HARMONIC_FARM_ADMITTED_LEAVES")
+    try:
+        admitted = json.loads(raw_admission) if raw_admission is not None else None
+    except (ValueError, RecursionError):
+        admitted = None
+    if (
+        not isinstance(admitted, list)
+        or any(not isinstance(label, str) or not label.strip() for label in admitted)
+        or task not in admitted
+    ):
+        raise RuntimeError(
+            f"farm leaf {task!r} lacks preflight admission: "
+            "HARMONIC_FARM_ADMITTED_LEAVES must be a JSON list of non-empty "
+            "labels containing this task"
+        )
     with _telemetry.span(
         f"farm.run {task}", label=task, service=_telemetry.BUILD_INFRA_SERVICE
     ) as sp:
