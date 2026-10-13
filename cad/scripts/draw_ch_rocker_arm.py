@@ -996,6 +996,20 @@ def _capture_caption_failure(adapter: Any, label: str, exc: Exception) -> None:
                 _telemetry.warn(f"detail {label} caption secondary capture failure: {capture_exc!r}")
 
 
+def _capture_layout_failure(adapter: Any, phase: str, exc: Exception) -> None:
+    """Use the existing drawing/PNG capture before any R24 refusal closes it."""
+    try:
+        _seat_forensics.capture_com_failure(
+            adapter, f"{PART_STEM}-post-caption-finalize", str(exc),
+            api="rocker post-caption audit/finalize", exception=exc, sheet_png=True,
+            phase=phase,
+        )
+    except Exception as capture_exc:  # noqa: BLE001 - always retain the original guard
+        if capture_exc is not exc:
+            with contextlib.suppress(Exception):
+                _telemetry.warn(f"rocker post-caption/finalize secondary capture failure: phase={phase}, {capture_exc!r}")
+
+
 def _require_ordinary_note_unchanged(adapter: Any, font_source: dict[str, Any]) -> None:
     note = font_source["note"]
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
@@ -2832,40 +2846,22 @@ def _offset_land_angle(adapter: Any, display: Any) -> dict[str, Any]:
     return fixed
 
 
-def _place_rod_tip_witnesses(adapter: Any, annotations: list[Any]) -> None:
-    """Zero native gap reveals both actual end-face corners; no attachment edit."""
-    matches = [ann for ann in annotations if dimension_name(adapter, ann) == "RodTipLen"]
-    if len(matches) != 1:
-        raise RuntimeError("detail E: expected one native RodTipLen")
-    annotation = _early_bound(matches[0], "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    before = tuple(annotation.GetAttachedEntities3() or ())
-    if not before or any(entity is None for entity in before):
-        raise RuntimeError("detail E 5.59: missing native attachments")
-    # Official SetWitnessLineGap example uses indices 0 and 1; generated
-    # typelib DISPID105 takes VT_I2, VT_BOOL, VT_R8 and returns VT_BOOL.
-    for index in (0, 1):
-        if display.SetWitnessLineGap(index, False, 0.0) is not True:
-            raise RuntimeError(f"detail E 5.59: SetWitnessLineGap refused index {index}")
-    adapter.currentModel.GraphicsRedraw2()
-    rebuild_drawing(adapter, label="detail E visible end-face witnesses")
-    _require_rod_tip_witness_gaps(display)
-    after = tuple(annotation.GetAttachedEntities3() or ())
-    if (len(before) != len(after) or any(entity is None for entity in after) or annotation.IsDangling()
-            or any(not any(int(adapter.swApp.IsSame(a, b)) == 1 for a in after) for b in before)):
-        raise RuntimeError("detail E 5.59: witness gap changed native attachments")
 
-
-def _require_rod_tip_witness_gaps(display: Any) -> None:
+def _rod_tip_witness_gaps(display: Any) -> tuple[float, float]:
+    """Read the effective gaps, including a standard-controlled document gap."""
     display = _early_bound(display, "IDisplayDimension")
+    gaps = []
     for index in (0, 1):
-        # Generated DISPID104 has two FOUT placeholders; makepy returns
-        # (BOOL status, BOOL UseDoc, R8 Gap), not a one-argument scalar getter.
+        # Official GetWitnessLineGap returns the document gap when UseDoc is
+        # true. Generated DISPID104 returns (BOOL status, BOOL UseDoc, R8 Gap).
+        # SP4 can retain (True, True, .001); C5 does not require a local zero.
         result = display.GetWitnessLineGap(index, False, 0.0)
         if (type(result) not in (list, tuple) or len(result) != 3
-                or result[0] is not True or result[1] is not False
-                or not _native_finite_scalar(result[2]) or result[2] != 0.0):
-            raise RuntimeError(f"detail E 5.59: native witness gap {index} did not stay zero: {result!r}")
+                or result[0] is not True or type(result[1]) is not bool
+                or not _native_finite_scalar(result[2]) or result[2] < 0.0):
+            raise RuntimeError(f"detail E 5.59: unreadable native witness gap {index}: {result!r}")
+        gaps.append(result[2])
+    return tuple(gaps)
 
 
 def _rod_position_frame_signature(gtol: Any) -> Any:
@@ -2939,28 +2935,103 @@ def _require_rod_position_dot(adapter: Any, gtol: Any, edge: Any, landing: tuple
 
 def _require_rod_tip_endpoints(
     adapter: Any, end: Any, land: ViewEdge, annotation: Any,
-) -> None:
-    record, _geometry = _r24_record(adapter, annotation, label="detail E 5.59")
-    _require_rod_tip_witness_gaps(_early_bound(annotation, "IAnnotation").GetSpecificAnnotation())
+    *, expected_attachments: tuple[Any, ...] | None = None,
+) -> tuple[Any, ...]:
+    """Prove real corners and their native gap/line/arrow routes, not zero gap.
+
+    A normal extension-line gap is blank paper, not a missing manufactured
+    corner. Its outward projection must agree with the effective native gap,
+    and the SAME line must remain visible in E and reach its dimension arrow.
+    No global standard change, attachment edit or substitute line is allowed.
+    """
+    annotation = _early_bound(annotation, "IAnnotation")
+    if annotation is None:
+        raise RuntimeError("detail E 5.59: missing native annotation")
+    kind = annotation.GetType()
+    if type(kind) is not int or kind != 4:
+        raise RuntimeError("detail E 5.59: annotation is not a native display dimension")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if display is None:
+        raise RuntimeError("detail E 5.59: missing native display dimension")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    if not attached or any(entity is None for entity in attached) or annotation.IsDangling() is not False:
+        raise RuntimeError("detail E 5.59: missing/dangling native attachments")
+    if expected_attachments is not None:
+        remaining = list(attached)
+        for expected in expected_attachments:
+            index = next((i for i, actual in enumerate(remaining)
+                          if type(status := adapter.swApp.IsSame(actual, expected)) is int and status == 1), None)
+            if index is None:
+                raise RuntimeError("detail E 5.59: native attachments changed")
+            remaining.pop(index)
+        if remaining:
+            raise RuntimeError("detail E 5.59: native attachments changed")
+    assert_dimension_measures(adapter, display, expected_mm=TIP_FACE, label="imported RodTipLen")
+    gaps = _rod_tip_witness_gaps(display)
+    record, geometry = _r24_record(adapter, annotation, label="detail E 5.59")
     crop = _detail_crop(adapter, end, label="E")
     circle = ((crop[0] + crop[2]) / 2.0, (crop[1] + crop[3]) / 2.0,
               (crop[2] - crop[0]) / 2.0)
     endpoints = _project(adapter, end, [tuple(v / 1000.0 for v in p) for p in land.line],
                          label="detail E exact 5.59 end-face endpoints")
-    ink = _r24_straight_ink(record)
+    dx, dy = endpoints[1][0] - endpoints[0][0], endpoints[1][1] - endpoints[0][1]
+    length = math.hypot(dx, dy)
+    if length <= 0.0:
+        raise RuntimeError("detail E 5.59: missing actual end-face span")
+    normal = (-dy / length, dx / length)
+    if normal[0] < 0.0:
+        normal = (-normal[0], -normal[1])
+    ink = [Segment(row[4], row[5], row[7], row[8]) for row in record["display"].get("lines", ())]
+    arrows = record["display"].get("arrows", ())
+    if len(arrows) != 2:
+        raise RuntimeError("detail E 5.59: missing native dimension arrow pair")
+    if any(row[6] <= 0.0 or row[7] <= 0.0 or math.hypot(row[3], row[4]) == 0.0 for row in arrows):
+        raise RuntimeError("detail E 5.59: unreadable native arrow footprint")
+    observed_gaps, used_arrows, witnesses = [], set(), []
     for index, point in enumerate(endpoints):
         # Exact persisted circle containment; NO display-census ULP here.
         if math.dist(point, circle[:2]) > circle[2]:
             raise RuntimeError(f"detail E 5.59: actual end-face endpoint {index} outside unchanged crop")
-        witnesses = [s for s in ink if min(math.dist(point, (s.x0, s.y0)),
-                                           math.dist(point, (s.x1, s.y1))) <= 5e-5]
-        visible = [s.length * (span[1] - span[0]) for s in witnesses
-                   if (span := clip_segment_to_circle(s, circle)) is not None]
-        if not visible or max(visible) <= 0.0:
+        candidates = []
+        for segment in ink:
+            start, finish = sorted(((segment.x0, segment.y0), (segment.x1, segment.y1)),
+                                   key=lambda p: math.dist(p, point))
+            start_offset = (start[0] - point[0], start[1] - point[1])
+            finish_offset = (finish[0] - point[0], finish[1] - point[1])
+            gap = start_offset[0] * normal[0] + start_offset[1] * normal[1]
+            reach = finish_offset[0] * normal[0] + finish_offset[1] * normal[1]
+            if (gap < 0.0 or reach <= gap
+                    or any(abs(offset[0] * normal[1] - offset[1] * normal[0]) > DETAIL_GEOMETRY_TOL_M
+                           for offset in (start_offset, finish_offset))):
+                continue
+            matches = [i for i, arrow in enumerate(arrows)
+                       if point_segment_distance(tuple(arrow[:2]), segment) <= DETAIL_GEOMETRY_TOL_M
+                       and math.dist(point, tuple(arrow[:2])) > gap]
+            if len(matches) == 1:
+                candidates.append((segment, gap, matches[0]))
+        if len(candidates) != 1 or candidates[0][2] in used_arrows:
+            raise RuntimeError(f"detail E 5.59: endpoint {index} has no unambiguous native witness-to-arrow route")
+        witness, gap, arrow_index = candidates[0]
+        span = clip_segment_to_circle(witness, circle)
+        visible = 0.0 if span is None else witness.length * (span[1] - span[0])
+        if visible <= 0.0:
             raise RuntimeError(f"detail E 5.59: endpoint {index} has no visible native witness")
+        if any(segment_box_distance(witness, box) <= 0.0 for box in geometry.text_boxes):
+            raise RuntimeError(f"detail E 5.59: endpoint {index} native witness crosses its text")
+        used_arrows.add(arrow_index)
+        observed_gaps.append(gap)
+        witnesses.append(witness)
         _telemetry.info(f"detail E 5.59 endpoint {index}: projected_endpoint={point}, "
-                        f"persisted_crop={circle}, native_witnesses={witnesses!r}, "
-                        f"visible_witness_mm={max(visible) * 1000.0:.6f}")
+                        f"persisted_crop={circle}, effective_native_gaps={gaps!r}, "
+                        f"native_witness={witness!r}, projected_gap_mm={gap * 1000.0:.6f}, "
+                        f"visible_witness_mm={visible * 1000.0:.6f}")
+    # Native display/edge enumeration order need not be witness-index order.
+    # Both measured gaps must consume the complete effective native gap pair.
+    if any(abs(actual - expected) > DETAIL_GEOMETRY_TOL_M
+           for actual, expected in zip(sorted(observed_gaps), sorted(gaps), strict=True)):
+        raise RuntimeError("detail E 5.59: native witness lines disagree with effective gap readback")
+    _r24_no_crossings(witnesses[:1], witnesses[1:], label="detail E 5.59 own witnesses")
+    return attached
 
 
 def _require_rod_dot_route(adapter: Any, end: Any, gtol: Any, landing: tuple[float, float]) -> None:
@@ -3219,7 +3290,8 @@ def _require_r24_detail_layout(
             or sum(r["type"] == 2 for r, _g in cluster) != 1
             or sum(r["type"] == 6 for r, _g in cluster) != 1):
         raise RuntimeError("R24: missing native 5.59/C/caption cluster")
-    _require_rod_tip_endpoints(adapter, end, land, tip_annotations[0])
+    _require_rod_tip_endpoints(adapter, end, land, tip_annotations[0],
+                               expected_attachments=fixed["rod_tip_attached"])
     thickness = [ann for ann in _bound_view_annotations(right, label="R24 thickness")
                  if dimension_name(adapter, ann) == "StrapThickness"]
     if len(thickness) != 1:
@@ -3565,18 +3637,28 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _dress_detail_dimensions(adapter, hub_annotations, keep=HUB_KEEP)
-    end_annotations = curate_view_dimensions(
-        adapter, end, keep=END_KEEP, view_label="detail E",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    _dress_detail_dimensions(adapter, end_annotations, keep=END_KEEP)
-    rod_land = scan_view_edges(end, label="detail E rod land").exact_line_through(
-        (_TIP_FACE_MID_X, _TIP_FACE_MID_Y, ARM_THICKNESS / 2.0),
-        label="+Z rod-side radial land",
-    )
-    _place_rod_tip_witnesses(adapter, end_annotations)
-    land_angle = _add_land_angle(adapter, end, rod_land)
-    land_angle_fixed = _offset_land_angle(adapter, land_angle)
+    try:
+        phase = "R24 detail E dimension import"
+        end_annotations = curate_view_dimensions(
+            adapter, end, keep=END_KEEP, view_label="detail E",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
+        _dress_detail_dimensions(adapter, end_annotations, keep=END_KEEP)
+        phase = "R24 native 5.59 witnesses"
+        rod_land = scan_view_edges(end, label="detail E rod land").exact_line_through(
+            (_TIP_FACE_MID_X, _TIP_FACE_MID_Y, ARM_THICKNESS / 2.0),
+            label="+Z rod-side radial land",
+        )
+        (rod_tip,) = [ann for ann in end_annotations if dimension_name(adapter, ann) == "RodTipLen"]
+        rod_tip_attached = _require_rod_tip_endpoints(adapter, end, rod_land, rod_tip)
+        phase = "R24 native angular authoring"
+        land_angle = _add_land_angle(adapter, end, rod_land)
+        phase = "R24 native angular offset"
+        land_angle_fixed = _offset_land_angle(adapter, land_angle)
+        land_angle_fixed["rod_tip_attached"] = rod_tip_attached
+    except Exception as exc:  # noqa: BLE001 - the imported native drawing still exists
+        _capture_layout_failure(adapter, phase, exc)
+        raise
     # The hub length and the strap thickness only show in the end view; the
     # front looks down their direction. Codex #936 (PRRT_kwDOPHDy386mRk__):
     # RIGHT_KEEP was declared but never curated, so the +0.05/0 band that sets
@@ -3704,9 +3786,13 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         label="rod-pin hole position",
     )
-    rod_position_signature = _configure_rod_position_dot(
-        adapter, rod_position_gtol, rod_hole_edge, rod_position_landing,
-    )
+    try:
+        rod_position_signature = _configure_rod_position_dot(
+            adapter, rod_position_gtol, rod_hole_edge, rod_position_landing,
+        )
+    except Exception as exc:  # noqa: BLE001 - capture native DOT readback failures too
+        _capture_layout_failure(adapter, "R24 native DOT configuration", exc)
+        raise
     arc_profiles = _add_arc_profiles(adapter, front)
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_CAPTION_XY)
@@ -3754,16 +3840,7 @@ async def build(adapter: Any) -> dict[str, str]:
             layout=SPEC.layout,
         )
     except Exception as exc:  # noqa: BLE001 - capture before the native seat closes
-        try:
-            _seat_forensics.capture_com_failure(
-                adapter, f"{PART_STEM}-post-caption-finalize", str(exc),
-                api="rocker post-caption audit/finalize", exception=exc, sheet_png=True,
-                phase=phase,
-            )
-        except Exception as capture_exc:  # noqa: BLE001 - always retain the original guard
-            if capture_exc is not exc:
-                with contextlib.suppress(Exception):
-                    _telemetry.warn(f"rocker post-caption/finalize secondary capture failure: phase={phase}, {capture_exc!r}")
+        _capture_layout_failure(adapter, phase, exc)
         raise
 
 

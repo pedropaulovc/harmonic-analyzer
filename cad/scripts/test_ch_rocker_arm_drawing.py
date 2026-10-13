@@ -5657,9 +5657,11 @@ def post_caption_block():
         and any(isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
                 and call.func.id == "finalize_drawing" for call in ast.walk(node))
     ]
+    capture = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                   and node.name == "_capture_layout_failure")
     function = ast.parse("async def run_post_caption():\n    pass\n").body[0]
     function.body = [guard]
-    code = compile(ast.fix_missing_locations(ast.Module(body=[function], type_ignores=[])),
+    code = compile(ast.fix_missing_locations(ast.Module(body=[capture, function], type_ignores=[])),
                    drawing.__file__, "exec")
     events, calls, captures, warnings = [], [], [], []
     original = RuntimeError("post-caption refusal")
@@ -5795,6 +5797,144 @@ def test_post_caption_success_keeps_order_arguments_result_and_skips_capture(pos
             "scale": ns["SHEET_SCALE"], "layout": ns["SPEC"].layout,
         }),
     ]
+
+
+@pytest.fixture
+def early_r24_block():
+    """Execute the real pre-caption R24 guards and existing phase capture."""
+    import asyncio
+    import contextlib
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    capture = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                   and node.name == "_capture_layout_failure")
+    guards = {
+        key: next(node for node in build.body if isinstance(node, ast.Try)
+                  and any(isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+                          and call.func.id == member for call in ast.walk(node)))
+        for key, member in (
+            ("detail", "_require_rod_tip_endpoints"),
+            ("dot", "_configure_rod_position_dot"),
+        )
+    }
+    events, captures, warnings = [], [], []
+    state = SimpleNamespace(failure_step=None, capture_mode="success", seat_open=True)
+    original = RuntimeError("early R24 native refusal")
+    secondary = OSError("native drawing/PNG capture refused")
+    tip, land, angle, attached = object(), object(), object(), (object(), object())
+    fixed = {}
+    namespace = {
+        "contextlib": contextlib, "PART_STEM": "ch-rocker-arm",
+        "adapter": object(), "end": object(), "END_KEEP": drawing.END_KEEP,
+        "DRAWING_DIMENSIONS": drawing.DRAWING_DIMENSIONS,
+        "_TIP_FACE_MID_X": drawing._TIP_FACE_MID_X,
+        "_TIP_FACE_MID_Y": drawing._TIP_FACE_MID_Y,
+        "ARM_THICKNESS": drawing.ARM_THICKNESS,
+        "rod_position_gtol": object(), "rod_hole_edge": object(),
+        "rod_position_landing": object(),
+        "dimension_name": lambda adapter, annotation: "RodTipLen",
+    }
+
+    def step(name, result):
+        def call(*args, **kwargs):
+            assert state.seat_open
+            events.append(name)
+            if state.failure_step == name:
+                raise original
+            return result
+        return call
+
+    namespace.update(
+        curate_view_dimensions=step("import", [tip]),
+        _dress_detail_dimensions=step("dress", None),
+        scan_view_edges=lambda *_args, **_kwargs: SimpleNamespace(
+            exact_line_through=step("land", land)),
+        _require_rod_tip_endpoints=step("witnesses", attached),
+        _add_land_angle=step("angle", angle),
+        _offset_land_angle=step("offset", fixed),
+        _configure_rod_position_dot=step("dot", object()),
+    )
+
+    def capture_native(adapter, label, message, **context):
+        assert state.seat_open
+        assert adapter is namespace["adapter"]
+        events.append("capture")
+        captures.append((label, message, context))
+        if state.capture_mode == "rethrow original":
+            raise original
+        if state.capture_mode in ("different error", "telemetry error"):
+            raise secondary
+
+    def warn(message):
+        warnings.append(message)
+        if state.capture_mode == "telemetry error":
+            raise RuntimeError("telemetry refused")
+
+    namespace.update(
+        _seat_forensics=SimpleNamespace(capture_com_failure=capture_native),
+        _telemetry=SimpleNamespace(warn=warn),
+    )
+
+    def run(block):
+        function = ast.parse("async def run_early():\n    pass\n").body[0]
+        function.body = [guards[block]]
+        code = compile(ast.fix_missing_locations(ast.Module(body=[capture, function], type_ignores=[])),
+                       drawing.__file__, "exec")
+        exec(code, namespace)
+        try:
+            asyncio.run(namespace["run_early"]())
+        finally:
+            state.seat_open = False
+            events.append("seat-close")
+
+    return SimpleNamespace(run=run, state=state, events=events, captures=captures,
+                           warnings=warnings, original=original, secondary=secondary,
+                           fixed=fixed, attached=attached)
+
+
+@pytest.mark.parametrize("step,phase", [
+    ("import", "R24 detail E dimension import"),
+    ("dress", "R24 detail E dimension import"),
+    ("land", "R24 native 5.59 witnesses"),
+    ("witnesses", "R24 native 5.59 witnesses"),
+    ("angle", "R24 native angular authoring"),
+    ("offset", "R24 native angular offset"),
+    ("dot", "R24 native DOT configuration"),
+])
+@pytest.mark.parametrize("capture_mode", [
+    "success", "rethrow original", "different error", "telemetry error",
+])
+def test_early_r24_native_refusals_capture_actual_drawing_and_png_before_close(
+    early_r24_block, step, phase, capture_mode,
+):
+    case = early_r24_block
+    case.state.failure_step, case.state.capture_mode = step, capture_mode
+    with pytest.raises(RuntimeError) as caught:
+        case.run("dot" if step == "dot" else "detail")
+    assert caught.value is case.original
+    assert case.events[-2:] == ["capture", "seat-close"]
+    assert case.captures == [(
+        "ch-rocker-arm-post-caption-finalize", str(case.original),
+        {"api": "rocker post-caption audit/finalize", "exception": case.original,
+         "sheet_png": True, "phase": phase},
+    )]
+    if capture_mode in ("different error", "telemetry error"):
+        assert len(case.warnings) == 1
+        assert repr(case.secondary) in case.warnings[0]
+    else:
+        assert case.warnings == []
+
+
+@pytest.mark.parametrize("block", ["detail", "dot"])
+def test_early_r24_native_success_keeps_attachment_snapshot_and_skips_capture(early_r24_block, block):
+    case = early_r24_block
+    case.run(block)
+    assert case.captures == []
+    assert case.events == (["dot", "seat-close"] if block == "dot" else
+                           ["import", "dress", "land", "witnesses", "angle", "offset", "seat-close"])
+    if block == "detail":
+        assert case.fixed["rod_tip_attached"] is case.attached
 
 
 @pytest.mark.parametrize("guard", ["front-detail", "arc-profile"])
@@ -7712,91 +7852,203 @@ def test_r24_native_ink_refuses_bad_scalar_row_and_interface_contracts(r24_angle
 
 @pytest.fixture
 def r24_tip(bound, monkeypatch):
+    """R23 actual native primitives, with the effective SP4 document gap."""
     from _drawing_edges import ViewEdge
 
     attached = (object(), object())
     top = (drawing.TOP_END_X, drawing.TOP_END_Y, drawing.ARM_THICKNESS / 2.0)
     bottom = (drawing.ROD_TIP_X, drawing._ROD_TIP_Y, drawing.ARM_THICKNESS / 2.0)
     land = ViewEdge(object(), (top, bottom), None, (object(), object()))
-    endpoints = [_end_xy(x, y) for x, y, _z in land.line]
     data = _ClearanceDisplayData(
-        [_r24_text("5.59", (0.371, 0.127), width=0.0116375)],
-        [_native_line(*point, point[0] + 0.035, point[1] + 0.006) for point in endpoints],
+        [_r24_text(" 5.59 ", (0.3711812, 0.1272219), width=0.0116375)],
+        [_native_line(0.3424517, 0.1286044, 0.3770938, 0.135),
+         _native_line(0.3444807, 0.1176142, 0.3791228, 0.1240097),
+         _native_line(0.3761104, 0.1348185, 0.3749576, 0.1410629),
+         _native_line(0.3781394, 0.1238282, 0.3792923, 0.1175837)],
+        primitives={"arrows": [
+            [0.3761104, 0.1348185, 0.0002, -0.1815501, 0.9833817, 0,
+             0.003556, 0.000762, 0, 0, 0, 1],
+            [0.3781394, 0.1238282, 0.0002, 0.1815501, -0.9833817, 0,
+             0.003556, 0.000762, 0, 0, 0, 1],
+        ]},
     )
-    ann = _R24Annotation("RodTipLen", (0.377, 0.130, 0.0), data, attached=attached)
-    state = SimpleNamespace(annotation=ann, data=data, land=land, calls=[], gaps=[0.001, 0.001], defect=None)
+    ann = _R24Annotation("RodTipLen", (0.377, 0.130, 0.0002), data, attached=attached)
+    state = SimpleNamespace(annotation=ann, data=data, land=land, calls=[],
+                            gaps=[0.001, 0.001], use_doc=[True, True])
 
-    def set_gap(index, use_doc, gap):
+    def get_gap(index, use_doc, gap):
         state.calls.append((index, use_doc, gap))
-        if state.defect != "ignored-gap":
-            state.gaps[index] = gap
-        if state.defect == "attachment":
-            ann.attached = (attached[0], object())
-        return False if state.defect == "setter-refused" else True
+        assert index in (0, 1) and use_doc is False and gap == 0.0
+        return True, state.use_doc[index], state.gaps[index]
 
-    display = _native("IDisplayDimension", SetWitnessLineGap=set_gap,
-                      GetWitnessLineGap=lambda index, use_doc, gap: (True, False, state.gaps[index]))
+    model = _native("IDimension", SystemValue=drawing.TIP_FACE / 1000.0)
+    display = _native("IDisplayDimension", GetWitnessLineGap=get_gap,
+                      GetDimension2=lambda index: model if index == 0 else None)
     ann.display = display
-    state.adapter = SimpleNamespace(
-        swApp=_APP, currentModel=_native("IModelDoc2", GraphicsRedraw2=lambda: None),
-    )
+    state.adapter = SimpleNamespace(swApp=_APP)
+    state.model = model
     _centre, radius_mm = drawing._detail_fence("E")
     radius = radius_mm * drawing.END_SCALE[0] / drawing.END_SCALE[1] / 1000.0
     state.crop = (drawing.END_CENTER[0] - radius, drawing.END_CENTER[1] - radius,
                   drawing.END_CENTER[0] + radius, drawing.END_CENTER[1] + radius)
     monkeypatch.setattr(drawing, "dimension_name", lambda _a, a: _bind_owner(a, "IAnnotation").name)
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
     monkeypatch.setattr(drawing, "_detail_crop", lambda *_a, **_k: state.crop)
     monkeypatch.setattr(drawing, "_project", lambda _a, _v, points, **_k: [_end_xy(x * 1000, y * 1000) for x, y, _z in points])
+    state.invoke = lambda **kwargs: drawing._require_rod_tip_endpoints(
+        state.adapter, object(), state.land, state.annotation, **kwargs,
+    )
     return state
 
 
-def test_r24_5_point_59_sets_both_official_gap_indices_and_proves_actual_endpoints(r24_tip):
+def _r24_tip_effective_gaps(case, gaps, use_doc):
+    """A different legitimate native gap must change the actual line starts."""
+    case.gaps[:], case.use_doc[:] = gaps, use_doc
+    normal = (math.cos(ch_rocker_arm_spec._ALPHA_TOP), math.sin(ch_rocker_arm_spec._ALPHA_TOP))
+    for index, (x, y, _z) in enumerate(case.land.line):
+        point = _end_xy(x, y)
+        case.data.lines[index][4:6] = (point[0] + normal[0] * gaps[index],
+                                     point[1] + normal[1] * gaps[index])
+
+
+def test_r24_5_point_59_observed_sp4_true_true_one_mm_gap_has_real_visible_corner_routes(r24_tip):
     case = r24_tip
     before = case.annotation.attached
-    drawing._place_rod_tip_witnesses(case.adapter, [case.annotation])
-    drawing._require_rod_tip_endpoints(case.adapter, object(), case.land, case.annotation)
+    assert case.invoke() == before
     assert case.calls == [(0, False, 0.0), (1, False, 0.0)]
     assert case.annotation.attached == before
+    assert case.model.SystemValue == drawing.TIP_FACE / 1000.0
+    assert not hasattr(case.annotation.display, "SetWitnessLineGap")
+    assert drawing.END_KEEP == {"RodTipLen": (0.377, 0.130)}
 
 
-@pytest.mark.parametrize("defect", ["ignored-gap", "setter-refused", "attachment"])
-def test_r24_5_point_59_gap_noops_and_attachment_changes_refuse(r24_tip, defect):
-    r24_tip.defect = defect
-    with pytest.raises(RuntimeError):
-        drawing._place_rod_tip_witnesses(r24_tip.adapter, [r24_tip.annotation])
-
-
-@pytest.mark.parametrize("result", [None, True, (True, False), (1, False, 0.0),
-                                    (True, 0, 0.0), (True, False, True), (True, False, float("nan")),
-                                    (True, False, 0.001)])
-def test_r24_5_point_59_readback_uses_generated_out_tuple_and_refuses_wrong_contract(r24_tip, result):
-    def get_gap(index, use_doc, gap):
-        assert index in (0, 1) and use_doc is False and gap == 0.0
-        return result
-    r24_tip.annotation.display.GetWitnessLineGap = get_gap
-    with pytest.raises(RuntimeError):
-        drawing._require_rod_tip_witness_gaps(r24_tip.annotation.display)
+@pytest.mark.parametrize("gaps,use_doc", [
+    ((0.0015, 0.0015), (False, False)),
+    ((0.001, 0.0015), (True, False)),
+])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_r24_5_point_59_normal_native_gap_and_display_enumeration_do_not_require_zero(r24_tip, gaps, use_doc, reverse):
+    case = r24_tip
+    _r24_tip_effective_gaps(case, gaps, use_doc)
+    if reverse:
+        case.data.lines.reverse()
+        case.data.primitives["arrows"].reverse()
+        case.land = replace(case.land, line=tuple(reversed(case.land.line)))
+    case.invoke()
 
 
 @pytest.mark.parametrize("index", [0, 1])
-def test_r24_5_point_59_each_actual_witness_requires_visible_corner(r24_tip, index):
+@pytest.mark.parametrize("gap", [0.0, 0.002])
+def test_r24_5_point_59_sp4_readback_cannot_pass_by_ignoring_effective_gap(r24_tip, index, gap):
+    r24_tip.gaps[index] = gap  # Leave the actual R23 1mm-gap primitives unmoved.
+    with pytest.raises(RuntimeError, match="disagree with effective gap readback"):
+        r24_tip.invoke()
+
+
+@pytest.mark.parametrize("result", [
+    None, True, (True, True), (False, True, 0.001), (1, True, 0.001),
+    (True, 0, 0.001), (True, True, True), (True, True, float("nan")),
+    (True, True, float("inf")), (True, True, -0.001),
+])
+def test_r24_5_point_59_effective_gap_refuses_false_and_malformed_generated_out_tuples(r24_tip, result):
+    r24_tip.annotation.display.GetWitnessLineGap = lambda index, use_doc, gap: result
+    with pytest.raises(RuntimeError, match="unreadable native witness gap"):
+        r24_tip.invoke()
+
+
+@pytest.mark.parametrize("defect", [
+    "missing-witness", "off-corner", "inward-witness", "duplicate-witness",
+    "missing-arrow", "wrong-arrow", "own-text",
+])
+@pytest.mark.parametrize("index", [0, 1])
+def test_r24_5_point_59_valid_default_gap_never_waives_actual_native_route_defects(r24_tip, defect, index):
     case = r24_tip
-    case.gaps = [0.0, 0.0]
-    case.data.lines[index][4] += 0.001  # The former default gap hides the physical corner.
-    with pytest.raises(RuntimeError, match=f"endpoint {index}.*visible native witness"):
-        drawing._require_rod_tip_endpoints(case.adapter, object(), case.land, case.annotation)
+    if defect == "missing-witness":
+        case.data.lines.pop(index)
+    elif defect == "off-corner":
+        case.data.lines[index][5] += 0.001
+    elif defect == "inward-witness":
+        row = case.data.lines[index]
+        row[7:9] = (row[4] - 0.01, row[5] - 0.01)
+    elif defect == "duplicate-witness":
+        case.data.lines.append(list(case.data.lines[index]))
+    elif defect == "missing-arrow":
+        case.data.primitives["arrows"].pop(index)
+    elif defect == "wrong-arrow":
+        case.data.primitives["arrows"][index][0] += 0.001
+    elif defect == "own-text":
+        row = case.data.lines[index]
+        case.data.texts[0]["pos"][:2] = ((row[4] + row[7]) / 2.0,
+                                      (row[5] + row[8]) / 2.0)
+    with pytest.raises(RuntimeError):
+        case.invoke()
+
+
+@pytest.mark.parametrize("defect", ["null", "dangling", "replaced", "duplicate", "extra", "bool-same"])
+def test_r24_5_point_59_actual_native_attachments_survive_to_final_guard(r24_tip, defect):
+    case = r24_tip
+    before = case.invoke()
+    if defect == "null":
+        case.annotation.attached = (None,)
+    elif defect == "dangling":
+        case.annotation.dangling = True
+    elif defect == "replaced":
+        case.annotation.attached = (before[0], object())
+    elif defect == "duplicate":
+        case.annotation.attached = (before[0], before[0])
+    elif defect == "extra":
+        case.annotation.attached += (object(),)
+    elif defect == "bool-same":
+        case.adapter.swApp = _native("ISldWorks", IsSame=lambda a, b: True)
+    with pytest.raises(RuntimeError, match="native attachments"):
+        case.invoke(expected_attachments=before)
+
+
+@pytest.mark.parametrize("value", [None, math.nan, math.inf, drawing.TIP_FACE / 1000.0 + 0.0001])
+def test_r24_5_point_59_final_native_model_dimension_still_measures_imported_end_face(r24_tip, value):
+    r24_tip.model.SystemValue = value
+    with pytest.raises(RuntimeError, match="imported RodTipLen"):
+        r24_tip.invoke()
 
 
 def test_r24_5_point_59_exact_circle_containment_has_no_census_precision_allowance(r24_tip):
     case = r24_tip
-    case.gaps = [0.0, 0.0]
     top = _end_xy(case.land.line[0][0], case.land.line[0][1])
     radius = math.dist(top, drawing.END_CENTER) - 1e-10
     case.crop = (drawing.END_CENTER[0] - radius, drawing.END_CENTER[1] - radius,
                  drawing.END_CENTER[0] + radius, drawing.END_CENTER[1] + radius)
     with pytest.raises(RuntimeError, match="endpoint 0 outside unchanged crop"):
-        drawing._require_rod_tip_endpoints(case.adapter, object(), case.land, case.annotation)
+        case.invoke()
+
+
+@pytest.mark.parametrize("beyond", [False, True])
+def test_r24_5_point_59_native_witness_start_must_leave_visible_crop_ink_without_new_minimum(r24_tip, beyond):
+    case = r24_tip
+    start = tuple(case.data.lines[0][4:6])
+    radius = math.dist(start, drawing.END_CENTER) + (-1e-10 if beyond else 1e-10)
+    case.crop = (drawing.END_CENTER[0] - radius, drawing.END_CENTER[1] - radius,
+                 drawing.END_CENTER[0] + radius, drawing.END_CENTER[1] + radius)
+    if beyond:
+        with pytest.raises(RuntimeError, match="endpoint 0.*no visible native witness"):
+            case.invoke()
+    else:
+        case.invoke()
+
+
+@pytest.mark.parametrize("field", [3, 6, 7])
+def test_r24_5_point_59_native_dimension_arrow_requires_a_visible_footprint(r24_tip, field):
+    row = r24_tip.data.primitives["arrows"][0]
+    row[field] = 0.0
+    if field == 3:
+        row[4] = 0.0
+    with pytest.raises(RuntimeError, match="arrow footprint"):
+        r24_tip.invoke()
+
+
+@pytest.mark.parametrize("kind", [None, True, 2, 6])
+def test_r24_5_point_59_specific_annotation_requires_the_native_dimension_owner(r24_tip, kind):
+    r24_tip.annotation.kind = kind
+    with pytest.raises(RuntimeError, match="not a native display dimension"):
+        r24_tip.invoke()
 
 
 class _R24DotAnnotation(_R24Annotation):
@@ -8002,11 +8254,14 @@ def test_r24_production_wires_all_native_local_guards_without_banned_fcf_setter_
     definitions = {node.name: node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
     calls = [node.func.id for node in ast.walk(definitions["build"])
              if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
-    for name in ("_offset_land_angle", "_place_rod_tip_witnesses", "_configure_rod_position_dot",
+    for name in ("_offset_land_angle", "_require_rod_tip_endpoints", "_configure_rod_position_dot",
                  "_require_r24_detail_layout", "_require_rod_position_dot", "_require_rod_dot_route", "_require_radius_routes"):
         assert calls.count(name) == 1
     assert "SetLeaderAttachmentPointAtIndex" not in source
     assert "STEM_ENFORCED_KINDS" not in source
+    assert "SetWitnessLineGap" not in source
+    assert "_place_rod_tip_witnesses" not in definitions
+    assert "_require_rod_tip_witness_gaps" not in definitions
     assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 13
     assert "COMMON ARC CENTRE ABOVE A" in ch_rocker_arm_notes.DRAWING_NOTES
     assert ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT == 8.0
@@ -8262,8 +8517,13 @@ def test_r24_planning_gaps_are_diagnostics_not_additional_fatal_thresholds(r24_a
 def r24_final_layout(r24_angle, r24_tip, r24_taper, monkeypatch):
     """Run the complete recipe-local post-regeneration predicate with native owners."""
     angle, tip, taper = r24_angle, r24_tip, r24_taper
+    # native_front (via r24_taper) installs a front-view projection. Bind the
+    # combined fixture's actual E projection/crop BEFORE its initial witness
+    # readback, not only before the final predicate.
+    monkeypatch.setattr(drawing, "_project", lambda _a, _v, points, **_k: [_end_xy(x * 1000, y * 1000) for x, y, _z in points])
+    monkeypatch.setattr(drawing, "_detail_crop", lambda *_a, **_k: tip.crop)
     fixed = drawing._offset_land_angle(angle.adapter, angle.display)
-    drawing._place_rod_tip_witnesses(angle.adapter, [tip.annotation])
+    fixed["rod_tip_attached"] = tip.invoke()
     datum = _R24Annotation("C", (0.355, 0.126, 0),
                            _ClearanceDisplayData([_r24_text("C", (0.356, 0.122), width=0.0035)],
                                                  [_native_line(0.3425, 0.1229, 0.356, 0.1255)]), kind=2)
@@ -8281,7 +8541,6 @@ def r24_final_layout(r24_angle, r24_tip, r24_taper, monkeypatch):
     state.iso_box = (0.280, 0.180, 0.317, 0.197)
     state.iso = _native("IView", GetOutline=lambda: state.iso_box)
     monkeypatch.setattr(drawing, "dimension_name", lambda _a, ann: _bind_owner(ann, "IAnnotation").name)
-    monkeypatch.setattr(drawing, "_project", lambda _a, _v, points, **_k: [_end_xy(x * 1000, y * 1000) for x, y, _z in points])
     state.invoke = lambda: drawing._require_r24_detail_layout(
         angle.adapter, state.end, state.right, state.iso, angle.display, fixed,
         taper.taper, taper.entities, tip.land,
@@ -8293,9 +8552,20 @@ def test_r24_final_native_layout_rechecks_offset_cluster_endpoints_caption_iso_a
     r24_final_layout.invoke()
 
 
+@pytest.mark.parametrize("gaps,use_doc", [
+    ((0.001, 0.001), (False, False)),
+    ((0.0015, 0.0015), (False, False)),
+    ((0.001, 0.0015), (True, False)),
+])
+def test_r24_final_native_layout_accepts_legitimate_effective_gap_regeneration(r24_final_layout, gaps, use_doc):
+    case = r24_final_layout
+    _r24_tip_effective_gaps(case.tip, gaps, use_doc)
+    case.invoke()
+
+
 @pytest.mark.parametrize("defect", ["offset-reset", "attachment", "nominal", "basic", "bool-basic",
                                     "iso-under-three", "caption-under-three", "missing-c",
-                                    "missing-tip", "witness-gap-reset"])
+                                    "missing-tip", "witness-gap-mismatch"])
 def test_r24_final_native_regeneration_cannot_bypass_approved_local_guards(r24_final_layout, defect):
     case = r24_final_layout
     if defect == "offset-reset":
@@ -8316,9 +8586,10 @@ def test_r24_final_native_regeneration_cannot_bypass_approved_local_guards(r24_f
         case.end_annotations[:] = [ann for ann in case.end_annotations if ann.GetType() != 2]
     elif defect == "missing-tip":
         case.end_annotations.remove(case.tip.annotation)
-    elif defect == "witness-gap-reset":
-        case.tip.gaps[1] = 0.001
-    with pytest.raises(RuntimeError):
+    elif defect == "witness-gap-mismatch":
+        case.tip.gaps[1] = 0.002  # Readback moves; actual 1mm native line start does not.
+    match = "disagree with effective gap readback" if defect == "witness-gap-mismatch" else None
+    with pytest.raises(RuntimeError, match=match):
         case.invoke()
 
 
@@ -8526,10 +8797,16 @@ def test_r24_final_cluster_self_exclusion_does_not_require_unproven_annotation_i
 
 def test_r24_actual_visible_5_point_59_witness_does_not_add_an_unapproved_one_mm_minimum(r24_tip):
     case = r24_tip
-    drawing._place_rod_tip_witnesses(case.adapter, [case.annotation])
-    case.data.lines = [_native_line(*p, p[0] + 0.0003, p[1])
-                       for p in (_end_xy(x, y) for x, y, _z in case.land.line)]
-    drawing._require_rod_tip_endpoints(case.adapter, object(), case.land, case.annotation)
+    start = tuple(case.data.lines[0][4:6])
+    radius = math.dist(start, drawing.END_CENTER) + 0.0001
+    case.crop = (drawing.END_CENTER[0] - radius, drawing.END_CENTER[1] - radius,
+                 drawing.END_CENTER[0] + radius, drawing.END_CENTER[1] + radius)
+    case.invoke()
+    row = case.data.lines[0]
+    witness = Segment(row[4], row[5], row[7], row[8])
+    span = drawing.clip_segment_to_circle(witness, (*drawing.END_CENTER, radius))
+    assert span is not None
+    assert 0.0 < witness.length * (span[1] - span[0]) < 0.001
 
 
 def test_r24_taper_parent_circle_clearance_is_nonintersection_not_a_new_one_mm_threshold(r24_taper):

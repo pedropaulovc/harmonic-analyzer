@@ -211,8 +211,18 @@ and top-height basic; its arrow terminates inside the finite top-arc span.
 R816 retains its complete-circle exterior check and stays clear of the
 taper-dimension and D corridors.
 The 5.59 land dimension retains both real corner attachments and the unchanged
-E crop, with both witness starts visible. The parent taper witness must miss
-E's source circle without changing its value or endpoints. Note 2 states
+E crop, with both actual native witnesses visible. A standard extension-line
+gap is not a missing attachment: validate the authoritative native gap and
+the outward, collinear witness start from each projected corner, its arrow
+connection and positive visible portion inside the crop. R24 on SP4 returned
+True from `SetWitnessLineGap(index, False, 0.0)` but then read
+`(True, True, 0.001)` after rebuild; the requested zero override did not persist.
+Zero itself is not the readability requirement. Do not change the document-wide
+gap or ignore
+that readback. R23's measured 1 mm gap leaves visible upper/lower witness ink
+of approximately 1.47/7.47 mm. Readability still needs the rendered-sheet review.
+The parent taper witness must miss E's source circle without changing its value
+or endpoints. Note 2 states
 explicitly that the top basic is **ABOVE A** and the common arc centre is
 above A. The approved B2-1 reference clarification defines the mirror plane
 through datum axis A, perpendicular to datum B and at the source-derived
