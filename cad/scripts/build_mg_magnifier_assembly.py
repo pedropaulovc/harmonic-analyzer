@@ -55,6 +55,9 @@ constrained by mates; transforms asserted by read-back; zero interference.
 
 Dimensions: cad/DIMENSIONS.md ch. 20-21.
 
+Assembly render artifacts are produced by the shared save_assembly_and_images
+path, using its standard reproducible views.
+
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_mg_magnifier_assembly.py
@@ -70,7 +73,6 @@ from _check import check
 from _com import _early_bound, _read_member
 from _custom_properties import apply_custom_properties
 from _dimensions import drive_dimension, set_global
-from _paths import OUT_PNG
 from _session import run_build
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision, _named_dimension
@@ -253,8 +255,6 @@ from mg_output_fixture_geom import (  # noqa: E402
     FIXTURE_YAW_DEG,
     HOOK_LOCAL,
     SPIGOT_FACE_X,
-    HEX_AF,
-    ROD_STATION,
     VROD_Z as FIXTURE_VROD_Z,
 )
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA  # noqa: E402
@@ -1012,43 +1012,6 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     artefacts = await save_assembly_and_images(adapter, ASM_NAME)
-    # The whole assembly is too tall to judge the tiny groove and wire
-    # departure. Capture one farm-native front close-up in the existing render
-    # directory; the assembly cache carries that directory without extra tasks.
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    centre_station = (FIXTURE_SCREW_OUTER_X - ROD_STATION) / 2.0
-    centre = [
-        origin + centre_station * FIXTURE_ROWS[0][axis]
-        for axis, origin in enumerate(FIXTURE_POSITION)
-    ]
-    half = (FIXTURE_SCREW_OUTER_X + ROD_STATION) / 2.0 + HEX_AF / 2.0
-    detail = OUT_PNG / ASM_NAME / f"{ASM_NAME}_fixture-detail.png"
-    model.ShowNamedView2("", 1)  # swFrontView, remapped to the machine front
-    model.ViewZoomTo2(
-        X1=(centre[0] - half) / 1000.0,
-        Y1=(centre[1] - half) / 1000.0,
-        Z1=(centre[2] - half) / 1000.0,
-        X2=(centre[0] + half) / 1000.0,
-        Y2=(centre[1] + half) / 1000.0,
-        Z2=(centre[2] + half) / 1000.0,
-    )
-    model.GraphicsRedraw2()
-    try:
-        check(
-            "export_image fixture detail",
-            await adapter.export_image(
-                {
-                    "file_path": str(detail),
-                    "format_type": "png",
-                    "width": 1600,
-                    "height": 1000,
-                    "view_orientation": "current",
-                }
-            ),
-        )
-    finally:
-        adapter._zoom_to_fit(model)
-    artefacts["fixture_detail"] = str(detail)
     return artefacts
 
 
