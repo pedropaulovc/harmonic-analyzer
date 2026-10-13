@@ -61,6 +61,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
 from _drawing_edge_dimensions import add_edge_dimension
@@ -806,10 +807,11 @@ def _create_tip_detail(adapter: Any, side: Any, sign: int) -> Any:
     and its projection must catch up before any cut is projected through it.
 
     The projection is read only behind UpdateViewDisplayGeometry, the view
-    barrier draw_dt_cylinder_gear takes: a rebuild leaves the regenerated view
-    pending until Windows repaints the sheet.  Rebuilds alone caught the
-    transform up within one settle on all 28 earlier leaves that read it (26
-    of them stale at the first read), but on leaf
+    barrier draw_dt_cylinder_gear takes (through
+    _drawing_detail_projection.settle_detail_projection): a rebuild leaves the
+    regenerated view pending until Windows repaints the sheet.  Rebuilds alone
+    caught the transform up within one settle on all 28 earlier leaves that
+    read it (26 of them stale at the first read), but on leaf
     20261009T165136Z-1-acbeda8d (swmaker000004) three never did: the centre
     projected to (-0.04756, 0.236), the ink centre moved by exactly
     TIP_DETAIL_CENTER - Position, so the transform still stood where
@@ -882,24 +884,14 @@ def _create_tip_detail(adapter: Any, side: Any, sign: int) -> Any:
         raise RuntimeError(
             f"tip detail outline centre stayed at {landed}, requested {TIP_DETAIL_CENTER}"
         )
-    for attempt in range(3):
-        _early_bound(detail, "IView").UpdateViewDisplayGeometry()
-        (projected,) = model_points_in_view(
-            adapter, detail, (centre,), label=f"tip detail centre, read {attempt}"
-        )
-        if (
-            abs(projected[0] - landed[0]) <= TIP_DETAIL_CLIP_SLACK
-            and abs(projected[1] - landed[1]) <= 0.0005
-        ):
-            break
-        rebuild_drawing(adapter, label="settle tip detail")
-    else:
-        raise RuntimeError(
-            f"tip detail projects its centre to {projected} while its outline is "
-            f"centred on {landed}; it now reads outline "
-            f"{tuple(float(value) for value in detail.GetOutline())}, Position "
-            f"{tuple(float(value) for value in detail.Position)}"
-        )
+    projected = settle_detail_projection(
+        adapter,
+        detail,
+        centre,
+        ink_xy=landed,
+        tolerance_xy=(TIP_DETAIL_CLIP_SLACK, 0.0005),
+        label="tip detail",
+    )
     _telemetry.info(
         f"tip detail: parent circle centre {sheet[0]}, detail centre {projected}, "
         f"outline {tuple(float(value) for value in detail.GetOutline())}"

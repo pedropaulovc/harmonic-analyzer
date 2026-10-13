@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 import _config
+import _drawing_detail_projection
 import cone_line
 import dt_crank_drive_gear_spec as gear64
 import dt_cone_swing_platform_crank_axis as crank_axis
@@ -1033,3 +1034,134 @@ def test_detail_label_is_placed_and_read_zoomed_onto_its_box(monkeypatch) -> Non
     assert x1 > target[0] + label.size[0] and y1 > target[1] + label.size[1]
     assert all(px >= 5000.0 for px in label.read_px_per_m[1:])
     assert window.px_per_m == window.FIT_PX_PER_M
+
+
+class _SeatDetailB:
+    """Detail B as leaf 20261013T033510Z-1-11767ee6 read it.
+
+    The outline and Position readbacks are the leaf's own; SetViewPosition
+    moves both by the requested shift.  The transform stays in the frame the
+    view had before it was recentred, through any number of rebuilds, until
+    UpdateViewDisplayGeometry refreshes it (``barrier_refreshes``)."""
+
+    STALE = (0.07792919217322382, -0.05755193679034118)
+    CURRENT = (0.08349998709459218, 0.04499996678531765)
+
+    def __init__(self, *, barrier_refreshes: bool) -> None:
+        self.barrier_refreshes = barrier_refreshes
+        self.Position = (0.09059908135529601, 0.14789132832482269)
+        self.outline = (
+            0.06439455575742567,
+            0.02535145368125846,
+            0.10243332384123646,
+            0.06532739581706931,
+        )
+        self.current = False
+        self.reads: list[tuple[float, float]] = []
+
+    def GetOutline(self):
+        return self.outline
+
+    def SetViewPosition(self, moved, _keep) -> bool:
+        dx, dy = moved[0] - self.Position[0], moved[1] - self.Position[1]
+        x0, y0, x1, y1 = self.outline
+        self.outline = (x0 + dx, y0 + dy, x1 + dx, y1 + dy)
+        self.Position = tuple(moved)
+        self.current = False
+        return True
+
+    def UpdateViewDisplayGeometry(self) -> None:
+        self.current = self.current or self.barrier_refreshes
+
+    def project(self) -> tuple[float, float]:
+        self.reads.append(self.CURRENT if self.current else self.STALE)
+        return self.reads[-1]
+
+
+def _detail_b_on_seat(monkeypatch, *, barrier_refreshes: bool):
+    detail = _SeatDetailB(barrier_refreshes=barrier_refreshes)
+    parent = types.SimpleNamespace(
+        GetSketch=lambda: types.SimpleNamespace(ModelToSketchTransform=None)
+    )
+    selection = types.SimpleNamespace(View=None)
+    draw = types.SimpleNamespace(
+        ActivateView=lambda _name: True,
+        ClearSelection2=lambda _all: None,
+        SketchManager=types.SimpleNamespace(
+            AddToDB=False,
+            CreateCircle=lambda *_points: types.SimpleNamespace(
+                Select4=lambda _append, _data: True
+            ),
+        ),
+        SelectionManager=types.SimpleNamespace(CreateSelectData=lambda: selection),
+        CreateDetailViewAt4=lambda *_args: detail,
+    )
+    math_utility = types.SimpleNamespace(
+        CreatePoint=lambda xyz: types.SimpleNamespace(
+            MultiplyTransform=lambda _transform: types.SimpleNamespace(ArrayData=xyz)
+        )
+    )
+    adapter = types.SimpleNamespace(
+        currentModel=draw,
+        swApp=types.SimpleNamespace(GetMathUtility=lambda: math_utility),
+    )
+    clock = [0.0]
+
+    def rebuild(_adapter, *, label):
+        clock[0] += 0.15
+
+    def point_in_view(_adapter, view, xyz, *, label):
+        if view is detail:
+            return detail.project()
+        return (0.1768110126543147 + xyz[0], 0.13872403990850002)
+
+    for module in (drawing, _drawing_detail_projection):
+        monkeypatch.setattr(module, "_early_bound", lambda obj, _interface: obj)
+        monkeypatch.setattr(module, "model_point_in_view", point_in_view)
+        monkeypatch.setattr(module, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(
+        drawing,
+        "_sw_type_info",
+        types.SimpleNamespace(early_bound_or_flag=lambda obj, *_members: obj),
+    )
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "Drawing View1")
+    monkeypatch.setattr(drawing, "double_array", list)
+    monkeypatch.setattr(
+        _drawing_detail_projection,
+        "time",
+        types.SimpleNamespace(perf_counter=lambda: clock[0]),
+    )
+    built = drawing._create_detail_view(
+        adapter,
+        parent,
+        model_center_mm=(0.0, spec.PLATE_THICKNESS, drawing.DETAIL_MODEL_Z),
+        radius_mm=drawing.DETAIL_RADIUS_MM,
+        view_xy=drawing.DETAIL_CENTER,
+        detail_label="B",
+        scale=drawing.DETAIL_SCALE,
+        label="hold-down station detail",
+    )
+    return built, detail
+
+
+def test_detail_b_projects_behind_the_display_barrier_on_the_failing_seat(
+    monkeypatch,
+) -> None:
+    """#1336: on 4 of 41 leaves three settle rebuilds left detail B's transform
+    in its pre-recentre frame, projecting the centre 102.55 mm below the ink.
+    Read behind UpdateViewDisplayGeometry, the same seat settles at once."""
+    built, detail = _detail_b_on_seat(monkeypatch, barrier_refreshes=True)
+    assert built is detail
+    assert detail.reads == [_SeatDetailB.STALE, _SeatDetailB.CURRENT]
+    assert detail.Position == pytest.approx((0.09068514155596494, 0.1475519035756588))
+
+
+def test_a_detail_b_transform_that_never_refreshes_still_fails(monkeypatch) -> None:
+    with pytest.raises(RuntimeError) as failure:
+        _detail_b_on_seat(monkeypatch, barrier_refreshes=False)
+    message = str(failure.value)
+    assert message.startswith(
+        "detail B projects its centre to (0.07792919217322382, -0.05755193679034118) "
+        "while its outline is centred on (0.08349999999999999, 0.04500000000000001)"
+    )
+    assert "34 rebuilds and 5.10 s" in message

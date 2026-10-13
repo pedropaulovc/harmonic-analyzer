@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 import _config
+import _drawing_detail_projection
 import _fit_shaft_h
 import build_dt_cone_gear_shaft as part
 import build_dt_drive_train_assembly as drive
@@ -890,10 +891,28 @@ def _tip_detail_on_seat(monkeypatch, *, refreshes: bool):
         lambda _adapter, _parent, sheet: [(x, y, 0.0) for x, y in sheet],
     )
     monkeypatch.setattr(drawing, "double_array", list)
+    clock = [0.0]
+
+    def rebuild(_adapter, *, label):
+        events.append(f"rebuild {label}")
+        clock[0] += 0.15
+
+    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(_drawing_detail_projection, "rebuild_drawing", rebuild)
     monkeypatch.setattr(
-        drawing,
-        "rebuild_drawing",
-        lambda _adapter, *, label: events.append(f"rebuild {label}"),
+        _drawing_detail_projection, "_early_bound", lambda obj, _interface: obj
+    )
+    monkeypatch.setattr(
+        _drawing_detail_projection,
+        "model_point_in_view",
+        lambda _adapter, view, _xyz, *, label: points_in_view(
+            _adapter, view, (_xyz,), label=label
+        )[0],
+    )
+    monkeypatch.setattr(
+        _drawing_detail_projection,
+        "time",
+        SimpleNamespace(perf_counter=lambda: clock[0]),
     )
     adapter = SimpleNamespace(currentModel=draw)
     return drawing._create_tip_detail(adapter, side, -1), detail, events
@@ -902,23 +921,26 @@ def _tip_detail_on_seat(monkeypatch, *, refreshes: bool):
 def test_the_tip_detail_projects_only_behind_the_display_barrier(monkeypatch) -> None:
     """Leaf 20261009T165136Z-1-acbeda8d: three settle rebuilds left the tip
     detail's transform where CreateDetailViewAt4 first put the view, so the
-    centre read (-0.0476, 0.236) under ink centred on (0.1, 0.236).  Every
-    projection read is now taken behind UpdateViewDisplayGeometry, so a seat
-    whose rebuilds never refresh the transform reads it current."""
+    centre read (-0.0476, 0.236) under ink centred on (0.1, 0.236).  The
+    settled projection is read behind UpdateViewDisplayGeometry, so a seat
+    whose rebuilds never refresh the transform reads it current; the one read
+    before the barrier is the span's stale control."""
     built, detail, events = _tip_detail_on_seat(monkeypatch, refreshes=True)
     assert built is detail
     reads = [
         index for index, event in enumerate(events) if event == "project tip centre"
     ]
-    assert reads == [events.index("rebuild place tip detail") + 2]
-    assert events[reads[0] - 1] == "update display geometry"
+    placed = events.index("rebuild place tip detail")
+    assert reads == [placed + 1, placed + 3]
+    assert events[placed + 2] == "update display geometry"
     assert "rebuild settle tip detail" not in events
     assert detail.project_centre() == pytest.approx(drawing.TIP_DETAIL_CENTER, abs=1e-7)
 
 
 def test_a_tip_detail_transform_that_never_catches_up_still_fails(monkeypatch) -> None:
     """The check is not loosened: a transform the barrier cannot refresh
-    reproduces the farm's numbers and fails, naming the ink it disagrees with."""
+    reproduces the farm's numbers and fails once the settle budget has run
+    out, naming the ink it disagrees with."""
     with pytest.raises(RuntimeError) as failure:
         _tip_detail_on_seat(monkeypatch, refreshes=False)
     message = str(failure.value)
@@ -927,6 +949,7 @@ def test_a_tip_detail_transform_that_never_catches_up_still_fails(monkeypatch) -
     assert float(projected[1]) == pytest.approx(-0.04755932565095955, abs=1e-15)
     assert float(projected[2]) == pytest.approx(0.236, abs=1e-12)
     assert "outline (0.0728120098" in message and "Position (0.2475593000" in message
+    assert "rebuilds and 5.10 s" in message
 
 
 def test_stacked_tip_diameters_never_run_a_line_through_a_text() -> None:
