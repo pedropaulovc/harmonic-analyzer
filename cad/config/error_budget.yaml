@@ -82,14 +82,13 @@ reserved:
     # distance to wire 1's rest run (error_budget.wire_moment_arm): the output
     # fixture's groove hook sits its signed HOOK_OFFSET_X (~9.7 mm toward the
     # knife) from the clamp station and below the knife, and the wire leans
-    # toward the wheel, so the arm is ~51.9 mm with the clamp against the
-    # collar (66 mm from the knife) and ~165.7 mm at the as-built 165 mm
-    # station (~209.6 at the 209 mm rod tip) -- not proportional to the
+    # toward the wheel, so the arm is ~55.89 mm with the clamp against the
+    # collar (66 mm from the knife) and ~166.97 mm at the as-built 165 mm
+    # station (~208.81 at the 209 mm rod tip) -- not proportional to the
     # station. The k=0 (greatest) term is made to span the stroke,
     # Michelson's normalisation, book p. 99: where the arm that does it is
     # below the collar station's the operator scales the ordinates down
-    # instead (the machine's ORDINATE CAPACITY, ~9.1 full-scale bars -- the
-    # all-ones and half-rectangle inputs run at 0.44-0.87 of full scale), and
+    # instead (the machine's ORDINATE CAPACITY, computed in the report), and
     # where it is above the as-built station's the reading falls short and
     # the term grows by the shortfall.
     # Only the as-built pose is CAD-gated (build_mg_magnifier_assembly): no
@@ -100,10 +99,9 @@ reserved:
     # ITEM (#748), not a budget assumption: check:budget fails on it unless
     # waived here, and the waiver is the record that the closure is
     # conditional on that pose being buildable. The report prints an offline
-    # straight-wire estimate beside the waiver (hook at x 41, same 0.3 mm
-    # ring / 1.7 mm spoke z clearance as the built pose -- the wire's z run
-    # is x-independent); it is not a proof, and it says nothing about the
-    # clamp, rod or collar.
+    # straight-wire estimate beside the waiver (including the signed hook
+    # offset and the current rim, spoke and boss surface gaps). Those
+    # computed estimates are not a proof of the clamp, rod or collar.
     # TODO(#748): CAD-gate the magnifier's minimum pose, then drop this waiver.
     waive_minimum_pose: true
     allowance_pct: 0.30            # scored as the MAE the benchmark uses: every coefficient
