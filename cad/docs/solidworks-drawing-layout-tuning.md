@@ -583,16 +583,14 @@ The arm's 3.11 extension lies beside the lever across a 5.55 mm X gap.
 Label that short extension `ARM PAST MOUNTING FACE`, not merely 3.11.
 Across the flange, the lower edge is Y=-6.35, the arm spans -3.00..+4.50
 and the far edge is +6.35: 3.35 edge-to-arm plus 7.50 arm width leaves
-1.85, not a contradictory 12.70 chain. The lower edge-to-bore axis is
-6.35 REF, closing the existing 3.35 and 3.00 controls. Attach the native
-REF to the real west/lower flange vertex and existing bore-circle centre
-sketch point, both selected in BOTTOM. Map the native centre point into that
-view and prove its model origin and source identity; never combine a SIDE
-rim with a BOTTOM edge. Require both selected objects to belong to BOTTOM,
-native linear type 2/11/12, the measured 6.35 mm value and exact annotation
-owner/attachments. Angular type 3 is wrong geometry, not a guard exception.
-Check its rebuilt witness ink with the complete mounting-coordinate stack;
-a floating "(6.35)" note cannot locate the axis.
+1.85, not a contradictory 12.70 chain. The existing 3.35 edge-to-arm and
+3.00 arm-to-bore controls locate the bore axis 6.35 from the flange edge;
+do not duplicate that sum with an optional reference dimension. The required
+short overhang remains labelled `ARM PAST MOUNTING FACE`. A SIDE-view rim
+combined with a BOTTOM edge made an angle, and a subsequent mapped sketch
+centre could not prove its source identity: neither justifies relaxed
+dimension-type or identity guards. The optional REF and its exclusive
+selection code are removed; the complete mounting-coordinate ink guard stays.
 
 Put the junction's 7.50 width and 3.35 edge location on the bottom view,
 where its footprint is visible, without a second controlling copy in the
@@ -638,6 +636,15 @@ centre-side witness a 3 mm local gap, not the root-diameter witnesses,
 and prove the rebuilt radius arrow lies on the groove arc with at least
 2 mm separation from that station witness. A flag readback alone does not
 prove where SOLIDWORKS drew the leader.
+Check the entire radius shoulder, not only its elbow: the native 29 mm
+shoulder at y196 crossed the OverallLength face-side witness at x160.4.
+Keep that proven material-arc leader and give only OverallLength's face-side
+extension a local gap derived from the y198 face corner, y196 shoulder,
+2 mm clearance and 0.4 mm ink readback allowance (4.4 mm here). Its expected
+start moves to y193.6, retaining 68.4 mm of witness. After rebuild require
+one complete witness at each length endpoint and at least 2 mm measured
+separation from every radius stroke to both witnesses; the readback allowance
+does not discount that minimum. Do not suppress the final layout audit.
 
 ## The sheet-split rule
 

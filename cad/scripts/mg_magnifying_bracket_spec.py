@@ -74,13 +74,12 @@ DRAWING_PRECISION = {
     "ArmSection": {"ArmBelowAxis": 2, "SeatToAxis": 2, "ArmPastSeat": 2},
     "ArmFootprint": {"FootprintThickness": 2, "FootprintOffset": 2},
 }
-# Pure SHEET-derived references, with no band or duplicate model control:
-# SeatToAxis + ArmPastSeat (arm end), and FootprintOffset + ArmBelowAxis
-# (lower flange edge to bore axis).  Both read actual model entities and
-# print in parentheses; their places remain spec-owned under policy rule 2.
+# The pure SHEET-derived reference is SeatToAxis + ArmPastSeat (arm end).
+# It reads actual model entities and prints in parentheses; its places remain
+# spec-owned under policy rule 2.  FootprintOffset + ArmBelowAxis already
+# locate the bore axis from the lower flange edge without a duplicate REF.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "arm end from bore axis": 2,
-    "flange edge to bore axis": 2,
 }
 # The collar's length band, like the bore's, is read by the build straight
 # from mg_lever_press_fit_geom (COLLAR_LENGTH_BAND) onto the extrude's CollarLen.

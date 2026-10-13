@@ -159,10 +159,11 @@ BORE_CALLOUT_HALF_HEIGHT = 0.0073  # shoulder to the +0.03 row's top: 14.6 mm
 # leader rising from the bore's upper rim across the hex's top edge alone;
 # the hex and groove stations stack over it, each text mid-span.  The
 # overall length runs under the view, outermost; its witness hangs from the
-# spigot face's top corner down the face.  The groove's radius reads beyond
-# the face, with its elbow BELOW the arc centre so the arrow meets the
-# material arc, never its extension in air.  The bore's station (a 20 mm
-# span under a 22 mm text) reads outside, left of the free end.
+# spigot face's top corner down the face, with a local gap below the radius
+# shoulder.  The groove's radius reads beyond the face, with its elbow BELOW
+# the arc centre so the arrow meets the material arc, never its extension in
+# air.  The bore's station (a 20 mm span under a 22 mm text) reads outside,
+# left of the free end.
 #
 # The two turned Ø stack right of the face, the smaller inside: the groove
 # root's extension lines run from the two roots across the face-side lip to
@@ -285,6 +286,18 @@ RADIUS_STATION_CLEARANCE = 0.002
 # Only GrooveStation's centre-side witness gets this local gap.  The root Ø
 # retains EXTENSION_START_GAP and its strict root-to-root ink proof.
 GROOVE_STATION_GAP = 0.003
+# Native14's complete radius shoulder ran (157.1, 196.0)->(186.1, 196.0)
+# mm, 2.8 mm below its keep, across the overall face witness at x160.4 mm.
+# Keep that proven material-arc leader unchanged.  Only the OverallLength
+# face-side witness's native gap changes: its start moves from y197.0 to
+# y193.6 mm, 2 mm clear of the shoulder plus the existing 0.4 mm ink slop.
+RADIUS_SHOULDER_DROP = 0.0028
+OVERALL_FACE_WITNESS_GAP = (
+    _side_y(SPIGOT_DIA / 2.0)
+    - (SIDE_KEEP["GrooveRadius"][1] - RADIUS_SHOULDER_DROP)
+    + RADIUS_STATION_CLEARANCE
+    + RADIUS_INK_SLOP
+)
 
 
 def _axis_direction(
@@ -440,7 +453,48 @@ def _groove_radius_ink_problem(
     return None
 
 
-def _place_groove_radius(adapter: Any, radius: Any, station: Any) -> None:
+def _radius_overall_witness_ink_problem(
+    segments: list[Segment], overall: list[Segment]
+) -> str | None:
+    """Measure the complete rebuilt shoulder/leader against both witnesses."""
+    slop = RADIUS_INK_SLOP
+    shoulders = [
+        stroke for stroke in segments
+        if abs(stroke[1][1] - stroke[0][1]) <= slop
+        and abs(stroke[1][0] - stroke[0][0]) > slop
+    ]
+    if len(shoulders) != 1:
+        return "radius has no unique rebuilt horizontal shoulder"
+    witnesses: list[Segment] = []
+    for x in (_side_x(FREE_END_X), _FACE_SHEET_X):
+        matching = [
+            stroke for stroke in overall
+            if all(abs(point[0] - x) <= slop for point in stroke)
+            and abs(stroke[1][1] - stroke[0][1]) > slop
+        ]
+        if len(matching) != 1:
+            return "overall length has no unique witness at each end"
+        witness = matching[0]
+        if min(point[1] for point in witness) > SIDE_KEEP["OverallLength"][1]:
+            return "overall length witness does not reach its dimension line"
+        witnesses.append(witness)
+    expected_start = _side_y(SPIGOT_DIA / 2.0) - OVERALL_FACE_WITNESS_GAP
+    if abs(max(point[1] for point in witnesses[1]) - expected_start) > slop:
+        return "overall length's face-side gap did not reach the rebuilt ink"
+    # The 0.4 mm slop bounds the readback above; it never reduces the 2 mm
+    # measured clearance.  Use every complete stroke, including the entire
+    # shoulder under the text, not a short elbow stub.
+    for witness in witnesses:
+        for stroke in segments:
+            if segments_cross(stroke, witness) or min(
+                *(distance_to_point(witness, point) for point in stroke),
+                *(distance_to_point(stroke, point) for point in witness),
+            ) < RADIUS_STATION_CLEARANCE:
+                return "radius shoulder/leader is not clear of an overall length witness"
+    return None
+
+
+def _place_groove_radius(adapter: Any, radius: Any, station: Any, overall: Any) -> None:
     display = _model_display(radius, "GrooveRadius", "GrooveProfile", GROOVE_RADIUS)
     if int(display.Type2) != 5 or display.Diametric is not False:  # swRadialDimension
         raise RuntimeError("GrooveRadius is not the model's genuine radial dimension")
@@ -455,10 +509,20 @@ def _place_groove_radius(adapter: Any, radius: Any, station: Any) -> None:
     )
     if station_display.SetWitnessLineGap(1, False, GROOVE_STATION_GAP) is not True:
         raise RuntimeError("GrooveStation refused its centre-side witness gap")
+    # TurnedProfile dimensions free_end -> spigot face top corner: witness
+    # 1 is the face side.  Its still-associated extension remains downward;
+    # shortening only its start cannot put new ink across another annotation.
+    overall_display = _model_display(
+        overall, "OverallLength", "TurnedProfile", SPIGOT_FACE_X - FREE_END_X
+    )
+    if overall_display.SetWitnessLineGap(1, False, OVERALL_FACE_WITNESS_GAP) is not True:
+        raise RuntimeError("OverallLength refused its face-side witness gap")
     rebuild_drawing(adapter, label="place fixture material-arc radius")
 
 
-def _prove_groove_radius(adapter: Any, view: Any, radius: Any, station: Any) -> None:
+def _prove_groove_radius(
+    adapter: Any, view: Any, radius: Any, station: Any, overall: Any
+) -> None:
     annotation = _early_bound(radius, "IAnnotation")
     if annotation.IsDangling() is not False or int(annotation.OwnerType) != 0:
         raise RuntimeError("GrooveRadius is dangling or not owned by its drawing view")
@@ -482,15 +546,23 @@ def _prove_groove_radius(adapter: Any, view: Any, radius: Any, station: Any) -> 
         adapter, view, (GROOVE_X / 1000.0, 0.0, -GROOVE_CENTRE_R / 1000.0),
         label="groove material-arc centre",
     )
+    radius_ink = dimension_segments(radius)
     problem = _groove_radius_ink_problem(
-        dimension_segments(radius), (arrow[0], arrow[1]), dimension_segments(station), centre
+        radius_ink, (arrow[0], arrow[1]), dimension_segments(station), centre
     )
     if problem is not None:
         raise RuntimeError(f"GrooveRadius does not land clear on material: {problem}")
+    _model_display(
+        overall, "OverallLength", "TurnedProfile", SPIGOT_FACE_X - FREE_END_X
+    )
+    problem = _radius_overall_witness_ink_problem(radius_ink, dimension_segments(overall))
+    if problem is not None:
+        raise RuntimeError(f"GrooveRadius does not clear the overall length: {problem}")
     _telemetry.success(
         f"genuine GrooveRadius material-arc tip {(arrow[0], arrow[1])}; "
         f"station witness gap {GROOVE_STATION_GAP * 1000:g} mm, "
-        f"leader clearance >= {RADIUS_STATION_CLEARANCE * 1000:g} mm"
+        f"leader clearance >= {RADIUS_STATION_CLEARANCE * 1000:g} mm "
+        "from the station and both overall length witnesses"
     )
 
 
@@ -987,7 +1059,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     side_by_name = {dimension_name(adapter, a): a for a in side_annotations}
     _place_groove_radius(
-        adapter, side_by_name["GrooveRadius"], side_by_name["GrooveStation"]
+        adapter, side_by_name["GrooveRadius"], side_by_name["GrooveStation"],
+        side_by_name["OverallLength"],
     )
     # Rebuilt, final frame/ink: these proofs never exempt the root Ø or tap.
     _prove_end_stock_reference(adapter, end, end_by_name["HexAf"])
@@ -995,7 +1068,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _prove_rod_bore_axis(adapter, end, bore_axis, bore_face, tap_mark)
     _check_tap_callout(tap_callout)
     _prove_groove_radius(
-        adapter, side, side_by_name["GrooveRadius"], side_by_name["GrooveStation"]
+        adapter, side, side_by_name["GrooveRadius"], side_by_name["GrooveStation"],
+        side_by_name["OverallLength"],
     )
     _prove_groove_root_diameter(side_by_name["GrooveRootDia"])
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)

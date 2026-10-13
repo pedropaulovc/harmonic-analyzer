@@ -1483,15 +1483,24 @@ def _station_display(**options) -> _NativeDisplay:
     return _NativeDisplay("GrooveStation", "GrooveProfile", spec.GROOVE_STATION, **options)
 
 
-def test_native_radius_style_and_only_station_witness_one_are_written(
+def _overall_display(**options) -> _NativeDisplay:
+    return _NativeDisplay(
+        "OverallLength", "TurnedProfile", geom.OVERALL_LENGTH, kind=2, **options
+    )
+
+
+def test_native_radius_style_and_only_named_witness_gaps_are_written(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     rebuilds = _projection_fakes(monkeypatch)
-    radius, station = _radial_display(), _station_display()
-    drawing._place_groove_radius(object(), _RootAnnotation(radius), _RootAnnotation(station))
+    radius, station, overall = _radial_display(), _station_display(), _overall_display()
+    drawing._place_groove_radius(
+        object(), _RootAnnotation(radius), _RootAnnotation(station), _RootAnnotation(overall)
+    )
     assert radius.ArcExtensionLineOrOppositeSide is False
     assert radius.gaps == []
     assert station.gaps == [(1, False, drawing.GROOVE_STATION_GAP)]
+    assert overall.gaps == [(1, False, drawing.OVERALL_FACE_WITNESS_GAP)]
     assert drawing.EXTENSION_START_GAP == 0.001
     assert rebuilds == ["place fixture material-arc radius"]
 
@@ -1505,6 +1514,7 @@ def test_station_witness_gap_requires_native_bool_success(
         drawing._place_groove_radius(
             object(), _RootAnnotation(_radial_display()),
             _RootAnnotation(_station_display(gap_result=result)),
+            _RootAnnotation(_overall_display()),
         )
 
 
@@ -1515,7 +1525,8 @@ def test_native_radius_style_refuses_nonradius_or_ignored_false_property(
     _projection_fakes(monkeypatch)
     with pytest.raises(RuntimeError):
         drawing._place_groove_radius(
-            object(), _RootAnnotation(_radial_display(**options)), _RootAnnotation(_station_display())
+            object(), _RootAnnotation(_radial_display(**options)),
+            _RootAnnotation(_station_display()), _RootAnnotation(_overall_display()),
         )
 
 
@@ -1536,16 +1547,156 @@ def test_native_radius_identity_refuses_equal_ink_from_another_model_dimension(
         drawing._model_display(annotation, "GrooveRadius", "GrooveProfile", geom.GROOVE_RADIUS)
 
 
+@pytest.mark.parametrize("result", [False, None, 1])
+def test_overall_face_witness_gap_requires_native_bool_success(
+    monkeypatch: pytest.MonkeyPatch, result: object,
+) -> None:
+    _projection_fakes(monkeypatch)
+    with pytest.raises(RuntimeError, match="refused its face-side witness gap"):
+        drawing._place_groove_radius(
+            object(), _RootAnnotation(_radial_display()), _RootAnnotation(_station_display()),
+            _RootAnnotation(_overall_display(gap_result=result)),
+        )
+
+
+# Actual native14 task.log: the full 29 mm shoulder, not the old test's
+# 1.6 mm elbow stub, crosses the face witness at (160.4, 196.0) mm.
+_NATIVE14_RADIUS_SHOULDER = ((0.1571, 0.1960), (0.1861, 0.1960))
+_NATIVE14_OVERALL_FACE_WITNESS = ((0.1604, 0.1970), (0.1604, 0.1252))
+_NATIVE14_RADIUS_TIP = (0.1516288709508015, 0.19752974314855273)
+
+
 def _material_radius_ink() -> tuple[list, tuple[float, float], list, tuple[float, float]]:
     centre = (drawing._side_x(geom.GROOVE_X), drawing._side_y(geom.GROOVE_CENTRE_R))
-    radius = geom.GROOVE_RADIUS * drawing._S / 1000.0
-    tip = (centre[0] + radius * math.cos(-0.28), centre[1] + radius * math.sin(-0.28))
-    elbow = (centre[0] + 0.01012, centre[1] - 0.0028)
-    ink = [(centre, tip), (tip, elbow), (elbow, (elbow[0] + 0.0016, elbow[1]))]
+    tip = _NATIVE14_RADIUS_TIP
+    elbow = _NATIVE14_RADIUS_SHOULDER[0]
+    ink = [(centre, tip), (tip, elbow), _NATIVE14_RADIUS_SHOULDER]
     station = [
-        ((centre[0], centre[1] + drawing.GROOVE_STATION_GAP), (centre[0], 0.23227))
+        (
+            (centre[0], centre[1] + drawing.GROOVE_STATION_GAP),
+            (centre[0], drawing.SIDE_KEEP["GrooveStation"][1] - _TEXT_OVER_LINE),
+        )
     ]
     return ink, tip, station, centre
+
+
+def _overall_witness_ink() -> list:
+    """Keep native14's lower endpoint; derive the two starts from the model."""
+    end_y = _NATIVE14_OVERALL_FACE_WITNESS[1][1]
+    free_x = drawing._side_x(geom.FREE_END_X)
+    face_x = drawing._side_x(geom.SPIGOT_FACE_X)
+    return [
+        (
+            (free_x, drawing.SIDE_CENTER[1] - drawing.EXTENSION_START_GAP),
+            (free_x, end_y),
+        ),
+        (
+            (
+                face_x,
+                drawing._side_y(geom.SPIGOT_DIA / 2.0) - drawing.OVERALL_FACE_WITNESS_GAP,
+            ),
+            (face_x, end_y),
+        ),
+    ]
+
+
+def test_native14_full_radius_shoulder_clears_both_overall_witnesses() -> None:
+    ink, tip, station, centre = _material_radius_ink()
+    shoulder = ink[-1]
+    old = _NATIVE14_OVERALL_FACE_WITNESS
+    assert drawing.segments_cross(shoulder, old)
+    # Both endpoints are outside x160.4: an elbow-only assertion missed it.
+    assert shoulder[0][0] < old[0][0] < shoulder[1][0]
+    assert math.dist(*shoulder) == pytest.approx(0.029)
+    assert shoulder[0][1] == pytest.approx(
+        drawing.SIDE_KEEP["GrooveRadius"][1] - drawing.RADIUS_SHOULDER_DROP
+    )
+    assert old[0] == pytest.approx((
+        drawing._side_x(geom.SPIGOT_FACE_X),
+        drawing._side_y(geom.SPIGOT_DIA / 2.0) - drawing.EXTENSION_START_GAP,
+    ))
+    witnesses = _overall_witness_ink()
+    face = witnesses[1]
+    assert drawing.OVERALL_FACE_WITNESS_GAP == pytest.approx(0.0044)
+    assert face[0][1] == pytest.approx(0.1936)
+    assert face[1] == pytest.approx(old[1])
+    assert old[1][1] < face[0][1] < old[0][1]
+    # New ink is a strict subset of the old witness, so this local gap
+    # cannot add a collision with another dimension or text.
+    for point in face:
+        assert drawing.distance_to_point(old, point) == pytest.approx(0.0)
+    assert math.dist(*face) == pytest.approx(0.0684)
+    measured_clearance = drawing.distance_to_point(shoulder, face[0])
+    assert measured_clearance == pytest.approx(
+        drawing.RADIUS_STATION_CLEARANCE + drawing.RADIUS_INK_SLOP
+    )
+    assert measured_clearance >= drawing.RADIUS_STATION_CLEARANCE
+    for witness in witnesses:
+        assert not any(drawing.segments_cross(stroke, witness) for stroke in ink)
+    assert drawing._radius_overall_witness_ink_problem(ink, witnesses) is None
+    # The proven native14 associative material landing and station proof stay.
+    assert tip == _NATIVE14_RADIUS_TIP
+    assert ink[-1] == _NATIVE14_RADIUS_SHOULDER
+    assert drawing.SIDE_KEEP["GrooveRadius"] == pytest.approx((
+        drawing._side_x(geom.SPIGOT_FACE_X) + 0.012,
+        drawing._side_y(geom.GROOVE_CENTRE_R),
+    ))
+    assert drawing._groove_radius_ink_problem(ink, tip, station, centre) is None
+    assert drawing.GROOVE_STATION_GAP == 0.003
+    assert drawing.RADIUS_STATION_CLEARANCE == 0.002
+    assert drawing.RADIUS_INK_SLOP == 0.0004
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    [
+        ("missing-shoulder", "no unique rebuilt horizontal shoulder"),
+        ("missing-face", "no unique witness"),
+        ("duplicate-free", "no unique witness"),
+        ("short-witness", "does not reach its dimension line"),
+        ("native14-gap", "gap did not reach the rebuilt ink"),
+        ("cross-free", "not clear"),
+    ],
+)
+def test_overall_witness_ink_requires_both_full_witnesses_and_clear_radius(
+    case: str, message: str,
+) -> None:
+    ink, _tip, _station, _centre = _material_radius_ink()
+    witnesses = _overall_witness_ink()
+    if case == "missing-shoulder":
+        ink.pop()
+    elif case == "missing-face":
+        witnesses.pop()
+    elif case == "duplicate-free":
+        witnesses.append(witnesses[0])
+    elif case == "short-witness":
+        witnesses[1] = (witnesses[1][0], (witnesses[1][1][0], drawing._SIDE_BOTTOM))
+    elif case == "native14-gap":
+        witnesses[1] = _NATIVE14_OVERALL_FACE_WITNESS
+    else:
+        elbow = (witnesses[0][0][0] - 0.002, drawing._SIDE_BOTTOM + 0.010)
+        ink[-2] = (ink[-2][0], elbow)
+        ink[-1] = (elbow, (ink[-1][1][0], elbow[1]))
+        assert drawing.segments_cross(ink[-1], witnesses[0])
+    problem = drawing._radius_overall_witness_ink_problem(ink, witnesses)
+    assert problem is not None and message in problem
+
+
+@pytest.mark.parametrize("clearance", [0.0019, 0.0021])
+def test_overall_witness_measured_clearance_does_not_spend_the_ink_slop(
+    clearance: float,
+) -> None:
+    ink, _tip, _station, _centre = _material_radius_ink()
+    witnesses = _overall_witness_ink()
+    y = witnesses[1][0][1] + clearance
+    elbow = (ink[-1][0][0], y)
+    ink[-2] = (ink[-2][0], elbow)
+    ink[-1] = (elbow, (ink[-1][1][0], y))
+    problem = drawing._radius_overall_witness_ink_problem(ink, witnesses)
+    if clearance < drawing.RADIUS_STATION_CLEARANCE:
+        assert problem is not None and "not clear" in problem
+    else:
+        assert problem is None
 
 
 def test_material_radius_ink_and_separate_station_foot_pass() -> None:
@@ -1621,27 +1772,63 @@ class _RadialAnnotation(_RootAnnotation):
 
 def _radius_readback_fakes(
     monkeypatch: pytest.MonkeyPatch, *, count: int = 1, complete: bool = True
-) -> tuple[_RootAnnotation, _RootAnnotation]:
+) -> tuple[_RootAnnotation, _RootAnnotation, _RootAnnotation]:
     ink, tip, station_ink, centre = _material_radius_ink()
     display = _radial_display()
     display.ArcExtensionLineOrOppositeSide = False
     display.data = _ArrowData(tip, count=count, complete=complete)
     radius, station = _RadialAnnotation(display), _RootAnnotation(_station_display())
+    overall = _RootAnnotation(_overall_display())
+    overall.ink = _overall_witness_ink()
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
     monkeypatch.setattr(
         drawing, "model_point_in_view", lambda adapter, view, xyz, *, label: centre
     )
-    monkeypatch.setattr(
-        drawing, "dimension_segments", lambda annotation: ink if annotation is radius else station_ink
-    )
-    return radius, station
+
+    def segments(annotation: _RootAnnotation) -> list:
+        if annotation is radius:
+            return ink
+        if annotation is station:
+            return station_ink
+        assert annotation is overall
+        return overall.ink
+
+    monkeypatch.setattr(drawing, "dimension_segments", segments)
+    return radius, station, overall
 
 
 def test_rebuilt_radius_proof_reads_native_arrow_tip_and_model_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    radius, station = _radius_readback_fakes(monkeypatch)
-    drawing._prove_groove_radius(object(), object(), radius, station)
+    radius, station, overall = _radius_readback_fakes(monkeypatch)
+    drawing._prove_groove_radius(object(), object(), radius, station, overall)
+
+
+def test_rebuilt_radius_proof_refuses_native14_full_shoulder_crossing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    radius, station, overall = _radius_readback_fakes(monkeypatch)
+    overall.ink[1] = _NATIVE14_OVERALL_FACE_WITNESS
+    with pytest.raises(RuntimeError, match="does not clear the overall length"):
+        drawing._prove_groove_radius(object(), object(), radius, station, overall)
+
+
+@pytest.mark.parametrize(
+    ("name", "feature", "value"),
+    [
+        ("OtherLength", "TurnedProfile", geom.OVERALL_LENGTH),
+        ("OverallLength", "OtherSketch", geom.OVERALL_LENGTH),
+        ("OverallLength", "TurnedProfile", geom.OVERALL_LENGTH + 2e-5),
+    ],
+)
+def test_rebuilt_overall_witness_proof_requires_the_genuine_model_dimension(
+    monkeypatch: pytest.MonkeyPatch, name: str, feature: str, value: float,
+) -> None:
+    radius, station, overall = _radius_readback_fakes(monkeypatch)
+    overall.display.dimension.FullName = f"{name}@{feature}@mg-output-fixture.SLDPRT"
+    overall.display.dimension.SystemValue = value / 1000.0
+    with pytest.raises(RuntimeError, match="wrong model dimension"):
+        drawing._prove_groove_radius(object(), object(), radius, station, overall)
 
 
 @pytest.mark.parametrize(
@@ -1651,9 +1838,11 @@ def test_rebuilt_radius_proof_reads_native_arrow_tip_and_model_identity(
 def test_rebuilt_radius_proof_refuses_missing_extra_or_unreadable_arrow(
     monkeypatch: pytest.MonkeyPatch, count: int, complete: bool, message: str
 ) -> None:
-    radius, station = _radius_readback_fakes(monkeypatch, count=count, complete=complete)
+    radius, station, overall = _radius_readback_fakes(
+        monkeypatch, count=count, complete=complete
+    )
     with pytest.raises(RuntimeError, match=message):
-        drawing._prove_groove_radius(object(), object(), radius, station)
+        drawing._prove_groove_radius(object(), object(), radius, station, overall)
 
 
 _Y_BORE_CYLINDER = (0.0, 0.004, 0.0, 0.0, 1.0, 0.0, geom.ROD_BORE_DIA / 2000.0)
@@ -1945,7 +2134,7 @@ def test_bore_axis_insertion_reuses_native_face_helper_and_shortens_existing_mar
 def test_radius_readback_refuses_floating_ink_and_lost_native_style(
     monkeypatch: pytest.MonkeyPatch, case: str,
 ) -> None:
-    radius, station = _radius_readback_fakes(monkeypatch)
+    radius, station, overall = _radius_readback_fakes(monkeypatch)
     if case == "dangling":
         radius.dangling = True
     elif case == "sheet-owned":
@@ -1955,7 +2144,7 @@ def test_radius_readback_refuses_floating_ink_and_lost_native_style(
     else:
         radius.display.data = None
     with pytest.raises(RuntimeError):
-        drawing._prove_groove_radius(object(), object(), radius, station)
+        drawing._prove_groove_radius(object(), object(), radius, station, overall)
 
 
 @pytest.mark.parametrize("brackets", [("(", ")"), ("", ""), ("(<MOD-DIAM>", ")")])
@@ -2023,7 +2212,8 @@ def test_radius_arc_property_requires_measured_bool_false_after_write(
     display._arc = readback
     with pytest.raises(RuntimeError, match="still attaches"):
         drawing._place_groove_radius(
-            object(), _RootAnnotation(display), _RootAnnotation(_station_display())
+            object(), _RootAnnotation(display), _RootAnnotation(_station_display()),
+            _RootAnnotation(_overall_display()),
         )
 
 
@@ -2036,7 +2226,8 @@ def test_radius_diametric_property_requires_measured_bool_false_before_write(
     display.Diametric = readback
     with pytest.raises(RuntimeError, match="genuine radial dimension"):
         drawing._place_groove_radius(
-            object(), _RootAnnotation(display), _RootAnnotation(_station_display())
+            object(), _RootAnnotation(display), _RootAnnotation(_station_display()),
+            _RootAnnotation(_overall_display()),
         )
 
 
@@ -2045,7 +2236,7 @@ def test_radius_diametric_property_requires_measured_bool_false_before_write(
 def test_rebuilt_radius_bool_readbacks_refuse_none_integer_boundmethod_and_object(
     monkeypatch: pytest.MonkeyPatch, readback: object, member: str,
 ) -> None:
-    radius, station = _radius_readback_fakes(monkeypatch)
+    radius, station, overall = _radius_readback_fakes(monkeypatch)
     if member == "Diametric":
         radius.display.Diametric = readback
     elif member == "ArcExtensionLineOrOppositeSide":
@@ -2053,7 +2244,7 @@ def test_rebuilt_radius_bool_readbacks_refuse_none_integer_boundmethod_and_objec
     else:
         radius.dangling = readback
     with pytest.raises(RuntimeError):
-        drawing._prove_groove_radius(object(), object(), radius, station)
+        drawing._prove_groove_radius(object(), object(), radius, station, overall)
 
 
 @pytest.mark.parametrize("readback", _NON_BOOL_READBACKS)
