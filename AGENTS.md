@@ -163,8 +163,11 @@ not mergeable until ALL THREE hold — no partial credit:
    edits its drawing script or spec, or because it changes CAD geometry,
    config or a helper the sheet depends on — needs a
    `cad/scripts/machinist_review.py` verdict on the exact version being
-   merged (reviewer rules: `cad/docs/drawing-simplicity-policy.md`,
-   "The gate"). A sheet whose drawing script or spec the PR edits must reach
+   merged. The reviewer defaults to Claude Opus 5.5 whichever model authored
+   the change; another reviewer family is allowed. The machinist review is
+   exempt from the cross-family rule for code review
+   (`cad/docs/drawing-simplicity-policy.md`, "The gate"). A sheet whose
+   drawing script or spec the PR edits must reach
    `SHIP` (or `FIX` whose only gating findings are blockers matching a named
    exception, cited in the PR). A sheet changed only indirectly passes when
    its review adds no gating finding beyond a baseline review of `main`'s

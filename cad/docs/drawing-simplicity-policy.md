@@ -180,10 +180,10 @@ recorded on the same issues.
 
 ## The gate
 
-`uv run cad/scripts/machinist_review.py <name>... --reviewer <claude|codex>` (or
-`--all`) renders each package's verdict from a blind senior machinist. The
-prompt is `drawing-guidelines.md` followed by the reviewer instructions for
-the package kind (`cad/scripts/prompts/machinist_review_part.md` or
+`uv run cad/scripts/machinist_review.py <name>...` (or `--all`) renders each
+package's verdict from a blind senior machinist. The prompt is
+`drawing-guidelines.md` followed by the reviewer instructions for the package
+kind (`cad/scripts/prompts/machinist_review_part.md` or
 `machinist_review_assembly.md`).
 
 The gate covers every sheet whose rendered output a PR changes, including a
@@ -194,15 +194,15 @@ beyond a review of `main`'s version of the same sheet run with the same
 reviewer, model, effort and prompt (the report records each); the PR records
 both verdicts and the finding diff.
 
-- **The reviewer MUST be a different model family from whoever authored or
-  last edited the drawing script.** An agent on a Claude model (Fable, Opus,
-  Sonnet) reviews with `--reviewer codex`; an agent on a Codex/GPT model
-  reviews with `--reviewer claude`. A same-family review does not count, even
-  when it returns `SHIP`. If the cross-family reviewer is over quota, the
-  user's standing last-resort rule applies: work authored by Sol or Opus is
-  reviewed by Astra or Fable, and work authored by Astra or Fable by Astra or
-  Fable at high reasoning. Defaults: `claude-fable-5-1` at medium effort,
-  `gpt-6-astra` at low.
+- **Review with Claude Opus 5.5 by default** (`--reviewer claude`,
+  `claude-opus-5-5` at medium effort). The machinist review does not follow
+  the cross-family rule for code review: Opus may review every drawing,
+  whichever model authored it. Another reviewer (`--reviewer codex`, or
+  `--model claude-fable-5-1`) is allowed, for example when Opus is over
+  quota; record the reviewer and model in the PR. On the 80-case benchmark
+  (2026-10-13, vector zoom tool, same rubric) Opus met 340/410 expectations
+  with 62 misses, Fable 5.1 332 with 73, Astra 322 with 84, and Opus cost
+  about a third of Fable.
 - Every native PDF page is rendered at 300 dpi and all sheets go to one
   review. A downscaled contact sheet is not a substitute.
 - A package passes on `SHIP` with no blocker, over-specification or clarity

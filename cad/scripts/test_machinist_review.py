@@ -1,14 +1,31 @@
-"""Offline contracts for the blind machinist review runner."""
+"""Offline contracts for the blind machinist review runner and its sheet server."""
 
 from __future__ import annotations
 
+import asyncio
+import base64
+import io
 import json
+import os
+import re
+import shutil
+import struct
+import sys
+import threading
+import tomllib
+import uuid
 from pathlib import Path
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, Sequence
 
 import pytest
+from mcp.server.fastmcp.exceptions import ToolError
+from PIL import Image, ImageDraw
 
 import machinist_review as mr
+import machinist_review_sheets_mcp as sheets
+
+SHEET_TOOLS = {"mcp__sheets__view_sheet", "mcp__sheets__crop"}
 
 
 def _clean_verdict(verdict: str = "SHIP") -> dict[str, Any]:
@@ -20,6 +37,538 @@ def _clean_verdict(verdict: str = "SHIP") -> dict[str, Any]:
         "clarity": [],
         "minor": [],
     }
+
+
+# --- source fixtures -------------------------------------------------------
+
+
+def _draw(
+    size: tuple[int, int], squares: Sequence[tuple[int, int, int, int]], mode: str
+) -> Image.Image:
+    image = Image.new(mode, size, "white")
+    draw = ImageDraw.Draw(image)
+    for left, top, right, bottom in squares:
+        # Half-open boxes: (600, 200, 700, 300) is exactly 100 x 100 pixels.
+        draw.rectangle((left, top, right - 1, bottom - 1), fill="black")
+    return image
+
+
+def _pdf_source(
+    path: Path,
+    pages: Sequence[tuple[int, int]],
+    squares: Sequence[tuple[int, int, int, int]] = (),
+) -> Path:
+    """A PDF whose pages are ``pages`` points; 72 dpi makes 1 px == 1 pt."""
+    images = [_draw(size, squares, "L") for size in pages]
+    images[0].save(
+        path, "PDF", resolution=72.0, save_all=True, append_images=images[1:]
+    )
+    return path
+
+
+def _png_source(
+    path: Path,
+    size: tuple[int, int] = (10, 10),
+    squares: Sequence[tuple[int, int, int, int]] = (),
+    mode: str = "RGB",
+    **save: Any,
+) -> Path:
+    _draw(size, squares, mode).save(path, format="PNG", **save)
+    return path
+
+
+def _image(png: bytes) -> Image.Image:
+    image = Image.open(io.BytesIO(png))
+    image.load()
+    return image
+
+
+def _png_chunk_types(png: bytes) -> list[str]:
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
+    types: list[str] = []
+    offset = 8
+    while offset < len(png):
+        (length,) = struct.unpack(">I", png[offset : offset + 4])
+        types.append(png[offset + 4 : offset + 8].decode("ascii"))
+        offset += 12 + length
+    return types
+
+
+def _dark_bbox(image: Image.Image) -> tuple[int, int, int, int] | None:
+    return image.point(lambda value: 255 if value < 128 else 0).getbbox()
+
+
+def _call(server: Any, name: str, arguments: dict[str, Any]) -> list[Any]:
+    result = asyncio.run(server.call_tool(name, arguments))
+    if isinstance(result, tuple):
+        result = result[0]
+    return list(getattr(result, "content", result))
+
+
+def _image_and_text(content: list[Any]) -> tuple[bytes, str]:
+    images = [block for block in content if block.type == "image"]
+    texts = [block for block in content if block.type == "text"]
+    assert len(images) == 1 and len(texts) == 1
+    assert images[0].mimeType == "image/png"
+    return base64.b64decode(images[0].data), texts[0].text
+
+
+# --- event fixtures (shapes captured from claude 2.1.286 / codex 0.159.1) ----
+
+
+def _claude_tool_use(name: str, tool_input: Any, tool_id: str) -> dict[str, Any]:
+    return {
+        "type": "assistant",
+        "message": {
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": tool_id,
+                    "name": name,
+                    "input": tool_input,
+                    "caller": {"type": "direct"},
+                }
+            ]
+        },
+    }
+
+
+def _claude_tool_result(tool_id: str, *, is_error: bool = False) -> dict[str, Any]:
+    block: dict[str, Any] = {"tool_use_id": tool_id, "type": "tool_result"}
+    if is_error:
+        block["content"] = [{"type": "text", "text": "Error executing tool"}]
+        block["is_error"] = True
+    else:
+        block["content"] = [
+            {
+                "type": "image",
+                "source": {"type": "base64", "media_type": "image/png", "data": ""},
+            },
+            {"type": "text", "text": "sheet 1 of 1, 1976×1280 px"},
+        ]
+    return {"type": "user", "message": {"role": "user", "content": [block]}}
+
+
+def _claude_call(
+    tool: str, tool_input: Any, tool_id: str, *, is_error: bool = False
+) -> list[dict[str, Any]]:
+    name = tool if tool.startswith("mcp__") or tool[0].isupper() else f"mcp__sheets__{tool}"
+    return [
+        _claude_tool_use(name, tool_input, tool_id),
+        _claude_tool_result(tool_id, is_error=is_error),
+    ]
+
+
+def _codex_call(
+    tool: str,
+    arguments: Any,
+    item_id: str,
+    *,
+    server: str = "sheets",
+    status: str = "completed",
+) -> list[dict[str, Any]]:
+    item = {
+        "id": item_id,
+        "type": "mcp_tool_call",
+        "server": server,
+        "tool": tool,
+        "arguments": arguments,
+    }
+    started = {
+        "type": "item.started",
+        "item": {**item, "result": None, "error": None, "status": "in_progress"},
+    }
+    if status == "in_progress":
+        return [started]
+    if status == "completed":
+        outcome = {
+            "result": {
+                "content": [{"type": "image", "data": "", "mimeType": "image/png"}],
+                "structured_content": None,
+            },
+            "error": None,
+        }
+    else:
+        outcome = {"result": None, "error": {"message": "tool failed"}}
+    return [started, {"type": "item.completed", "item": {**item, **outcome, "status": status}}]
+
+
+def _call_events(
+    reviewer: str, tool: str, arguments: Any, call_id: str, *, ok: bool = True
+) -> list[dict[str, Any]]:
+    if reviewer == "claude":
+        return _claude_call(tool, arguments, call_id, is_error=not ok)
+    return _codex_call(tool, arguments, call_id, status="completed" if ok else "failed")
+
+
+def _views(reviewer: str, sheets_to_view: Sequence[int]) -> list[dict[str, Any]]:
+    return [
+        event
+        for sheet in sheets_to_view
+        for event in _call_events(reviewer, "view_sheet", {"sheet": sheet}, f"view_{sheet}")
+    ]
+
+
+def _claude_stdout(sheet_count: int, verdict: dict[str, Any]) -> str:
+    events = [
+        *_views("claude", range(1, sheet_count + 1)),
+        {"type": "result", "structured_output": verdict},
+    ]
+    return "\n".join(json.dumps(event) for event in events)
+
+
+def _codex_events(sheet_count: int, thread_id: str | None = None) -> list[dict[str, Any]]:
+    started = [{"type": "thread.started", "thread_id": thread_id}] if thread_id else []
+    return [
+        *started,
+        {"type": "turn.started"},
+        *_views("codex", range(1, sheet_count + 1)),
+        {"type": "turn.completed"},
+    ]
+
+
+def _codex_stdout(sheet_count: int, thread_id: str | None = None) -> str:
+    return "\n".join(json.dumps(event) for event in _codex_events(sheet_count, thread_id))
+
+
+def _flag(command: list[str], flag: str) -> str:
+    assert command.count(flag) == 1, flag
+    return command[command.index(flag) + 1]
+
+
+def _codex_overrides(command: list[str]) -> dict[str, Any]:
+    overrides: dict[str, Any] = {}
+    for index, value in enumerate(command):
+        if value != "-c":
+            continue
+        key, _, raw = command[index + 1].partition("=")
+        try:
+            overrides[key] = tomllib.loads(f"value = {raw}")["value"]
+        except tomllib.TOMLDecodeError:
+            overrides[key] = raw
+    return overrides
+
+
+# --- Codex rollout fixtures (shapes recorded from codex 0.159.1 rollouts) ------
+#
+# The --json stream is a projection: code-mode exec cells and injected context
+# never appear in it. The rollout under CODEX_HOME is the authoritative record.
+
+_FIRST_REQUEST_USAGE = {
+    "input_tokens": 22232,
+    "cached_input_tokens": 21248,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 66,
+    "reasoning_output_tokens": 0,
+    "total_tokens": 22298,
+}
+_LATER_REQUEST_USAGE = {**_FIRST_REQUEST_USAGE, "input_tokens": 25700, "cached_input_tokens": 22272}
+_AUTH_SENTINEL = "auth-sentinel-must-never-reach-reports"
+
+
+def _rollout_row(kind: str, payload: Any) -> dict[str, Any]:
+    return {"timestamp": "2026-10-12T17:28:27.735Z", "type": kind, "payload": payload}
+
+
+def _rollout_message(role: str, text: str) -> dict[str, Any]:
+    part = "output_text" if role == "assistant" else "input_text"
+    return _rollout_row(
+        "response_item",
+        {
+            "type": "message",
+            "id": f"msg_{role}_{len(text)}",
+            "role": role,
+            "content": [{"type": part, "text": text}],
+        },
+    )
+
+
+# Recorded before the rubric when --ignore-user-config still loaded the
+# operator's home (rollout 01a13102, lines 3-5); identities redacted.
+_SKILLS_CONTEXT = _rollout_message(
+    "developer",
+    "<skills_instructions>\n## Skills\nA skill is a set of local instructions to "
+    "follow that is stored in a `SKILL.md` file.\n### Skill roots\n"
+    "- `r0` = `C:/Users/operator/.agents/skills`\n</skills_instructions>",
+)
+_AGENTS_MD_TEXT = "## User info\nFull name: Operator\n\n## Git workflow\n- Push early."
+_AGENTS_CONTEXT = _rollout_message(
+    "user", f"# AGENTS.md instructions\n\n<INSTRUCTIONS>\n{_AGENTS_MD_TEXT}\n</INSTRUCTIONS>"
+)
+
+
+def _rollout_call(
+    thread_id: str, tool: str, arguments: Any, call_id: str, *, ok: bool = True
+) -> list[dict[str, Any]]:
+    """Direct tool mode: function_call, the MCP item, then the model-visible output."""
+    if ok:
+        result = {
+            "content": [{"type": "image", "data": "", "mimeType": "image/png"}],
+            "isError": False,
+        }
+        output = [
+            {"type": "input_text", "text": "Wall time: 0.0115 seconds\nOutput:"},
+            {"type": "input_image", "image_url": "data:image/png;base64,", "detail": "high"},
+        ]
+    else:
+        # Failure output is not recorded; it mirrors the success layout, with
+        # the server's own error text in place of the image.
+        result = {
+            "content": [{"type": "text", "text": "Error executing tool crop"}],
+            "isError": True,
+        }
+        output = [
+            {"type": "input_text", "text": "Wall time: 0.0021 seconds\nOutput:"},
+            {"type": "input_text", "text": "Error executing tool crop"},
+        ]
+    return [
+        _rollout_row(
+            "response_item",
+            {
+                "type": "function_call",
+                "id": f"fc_{call_id}",
+                "name": tool,
+                "namespace": "mcp__sheets",
+                "arguments": json.dumps(arguments, separators=(",", ":")),
+                "call_id": call_id,
+            },
+        ),
+        _rollout_row(
+            "event_msg",
+            {
+                "type": "item_completed",
+                "thread_id": thread_id,
+                "turn_id": "turn_1",
+                "item": {
+                    "type": "McpToolCall",
+                    "id": call_id,
+                    "server": "sheets",
+                    "tool": tool,
+                    "arguments": arguments,
+                    "status": "completed",
+                    "result": result,
+                },
+            },
+        ),
+        _rollout_row(
+            "response_item",
+            {"type": "function_call_output", "id": f"fco_{call_id}", "call_id": call_id, "output": output},
+        ),
+    ]
+
+
+def _rollout_exec_cell(call_id: str, source: str) -> list[dict[str, Any]]:
+    """Code mode (rollout 01a13102, lines 11/13): absent from the --json stream."""
+    return [
+        _rollout_row(
+            "response_item",
+            {
+                "type": "custom_tool_call",
+                "id": f"ctc_{call_id}",
+                "status": "completed",
+                "call_id": call_id,
+                "name": "exec",
+                "input": source,
+            },
+        ),
+        _rollout_row(
+            "response_item",
+            {
+                "type": "custom_tool_call_output",
+                "id": f"ctco_{call_id}",
+                "call_id": call_id,
+                "output": [{"type": "input_text", "text": "Script completed\nWall time 0.0 seconds\nOutput:\n"}],
+            },
+        ),
+    ]
+
+
+def _rollout_usage(thread_id: str, usage: dict[str, Any]) -> dict[str, Any]:
+    return _rollout_row(
+        "token_usage_record",
+        {
+            "thread_id": thread_id,
+            "session_id": thread_id,
+            "turn_id": "turn_1",
+            "response_id": f"resp_{usage['input_tokens']}",
+            "usage": usage,
+            "turn_token_usage": usage,
+        },
+    )
+
+
+def _codex_rollout(
+    prompt: str,
+    *,
+    thread_id: str,
+    cwd: str,
+    views: Sequence[int] = (1,),
+    crops: Sequence[dict[str, Any]] = (),
+    before: Sequence[dict[str, Any]] = (),
+    after: Sequence[dict[str, Any]] = (),
+    agents_md: dict[str, Any] | None = None,
+    skills: bool = False,
+    newline: str = "\r\n",
+    verdict: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """A complete direct-mode rollout; ``newline`` mimics Windows text-mode stdin."""
+    recorded_prompt = prompt.replace("\n", newline)
+    rows = [
+        _rollout_row(
+            "session_meta",
+            {
+                "session_id": thread_id,
+                "id": thread_id,
+                "cwd": cwd,
+                "originator": "codex_exec",
+                "cli_version": "0.159.1",
+                "source": "exec",
+            },
+        ),
+        _rollout_row("event_msg", {"type": "task_started", "turn_id": "turn_1"}),
+        _rollout_row(
+            "world_state",
+            {
+                "full": True,
+                "state": {
+                    "agents_md": agents_md or {},
+                    "apps_instructions": False,
+                    "host_skills": {"includeInstructions": skills},
+                    "managed_developer_instructions": {},
+                    "plugins_instructions": False,
+                    "skills": {"includeInstructions": skills},
+                },
+            },
+        ),
+        _rollout_row(
+            "turn_context",
+            {
+                "turn_id": "turn_1",
+                "cwd": cwd,
+                "approval_policy": "never",
+                "sandbox_policy": {"type": "read-only"},
+            },
+        ),
+        *before,
+        _rollout_message("user", recorded_prompt),
+        _rollout_row(
+            "event_msg",
+            {
+                "type": "item_completed",
+                "thread_id": thread_id,
+                "turn_id": "turn_1",
+                "item": {
+                    "type": "UserMessage",
+                    "id": "user_1",
+                    "content": [{"type": "text", "text": recorded_prompt, "text_elements": []}],
+                },
+            },
+        ),
+    ]
+    calls = [
+        *(
+            _rollout_call(thread_id, "view_sheet", {"sheet": sheet}, f"call_view_{sheet}")
+            for sheet in views
+        ),
+        *(
+            _rollout_call(thread_id, "crop", crop, f"call_crop_{index}")
+            for index, crop in enumerate(crops, start=1)
+        ),
+    ]
+    usage = [_rollout_usage(thread_id, _FIRST_REQUEST_USAGE)]
+    for index, call in enumerate(calls):
+        rows += call
+        rows += usage if index == 0 else [_rollout_usage(thread_id, _LATER_REQUEST_USAGE)]
+    if not calls:
+        rows += usage
+    rows += after
+    text = json.dumps(verdict or _clean_verdict())
+    rows += [
+        _rollout_message("assistant", text),
+        _rollout_row("event_msg", {"type": "task_complete", "turn_id": "turn_1", "last_agent_message": text}),
+    ]
+    return rows
+
+
+def _write_rollout(
+    codex_home: Path, thread_id: str, rows: Sequence[dict[str, Any]], *, archived: bool = False
+) -> Path:
+    folder = codex_home / ("archived_sessions" if archived else "sessions/2026/10/12")
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"rollout-2026-10-12T17-28-24-{thread_id}.jsonl"
+    path.write_text("".join(f"{json.dumps(row)}\n" for row in rows), encoding="utf-8")
+    return path
+
+
+def _codex_reply(
+    command: list[str],
+    kwargs: dict[str, Any],
+    *,
+    sheet_count: int,
+    verdict: dict[str, Any] | None = None,
+    thread_id: str | None = None,
+    rollout: bool = True,
+    rollout_views: Sequence[int] | None = None,
+    before: Sequence[dict[str, Any]] = (),
+    after: Sequence[dict[str, Any]] = (),
+    agents_md: dict[str, Any] | None = None,
+    skills: bool = False,
+) -> Any:
+    """Act as ``codex exec``: verdict file, --json stdout, rollout in CODEX_HOME."""
+    thread_id = thread_id or str(uuid.uuid4())
+    verdict = verdict or _clean_verdict()
+    Path(_flag(command, "-o")).write_text(json.dumps(verdict), encoding="utf-8")
+    if rollout:
+        rows = _codex_rollout(
+            kwargs["input"],
+            thread_id=thread_id,
+            cwd=str(kwargs["cwd"]),
+            views=range(1, sheet_count + 1) if rollout_views is None else rollout_views,
+            before=before,
+            after=after,
+            agents_md=agents_md,
+            skills=skills,
+            verdict=verdict,
+        )
+        # The rollout lands wherever the harness pointed the CLI's home.
+        _write_rollout(Path(kwargs["env"]["CODEX_HOME"]), thread_id, rows)
+    return mr.subprocess.CompletedProcess(
+        command, 0, stdout=_codex_stdout(sheet_count, thread_id), stderr=""
+    )
+
+
+_REAL_CODEX_HOME = mr.CODEX_HOME
+_REAL_PREPARE_CODEX_ENVIRONMENT = mr.prepare_codex_environment
+_REAL_RELINK_CODEX_AUTH = mr.relink_codex_auth
+
+
+@pytest.fixture(autouse=True)
+def isolated_codex(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
+    """Keep tests off the real isolated home; never run ``codex debug models``."""
+    state = SimpleNamespace(home=tmp_path / "codex-isolated-home", prepared=[], relinked=[])
+    monkeypatch.setattr(mr, "CODEX_HOME", state.home)
+    # Never resolve the operator's own login, even if a test reaches the real relink.
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-main-home"))
+    monkeypatch.setattr(mr, "relink_codex_auth", lambda home: state.relinked.append(Path(home)))
+
+    def fake_prepare(
+        *, codex_home: Path, attempt_dir: Path, model: str, codex: str
+    ) -> dict[str, str]:
+        codex_home = Path(codex_home)
+        codex_home.mkdir(parents=True, exist_ok=True)
+        (codex_home / "auth.json").write_text(
+            json.dumps({"tokens": {"access_token": _AUTH_SENTINEL}}), encoding="utf-8"
+        )
+        catalog = {"models": [{"slug": model, "tool_mode": "direct", "supports_search_tool": False}]}
+        (Path(attempt_dir) / "codex-models.json").write_text(json.dumps(catalog), encoding="utf-8")
+        state.prepared.append({"codex_home": codex_home, "attempt_dir": Path(attempt_dir), "codex": codex})
+        return {**os.environ, "CODEX_HOME": str(codex_home)}
+
+    monkeypatch.setattr(mr, "prepare_codex_environment", fake_prepare)
+    return state
+
+
+# --- schema, commands and prompt ---------------------------------------------
 
 
 def test_schema_is_strict_structured_output() -> None:
@@ -37,118 +586,1285 @@ def test_schema_is_strict_structured_output() -> None:
     )
 
 
-def test_command_references_only_the_neutral_workdir(tmp_path: Path) -> None:
-    images = [tmp_path / "sheet-1.png", tmp_path / "sheet-2.png"]
-    schema = tmp_path / "schema.json"
+def test_claude_command_owns_only_attempt_dir_configuration(tmp_path: Path) -> None:
+    attempt_dir = tmp_path / "attempt"
+    attempt_dir.mkdir()
+    schema = attempt_dir / "schema.json"
     schema.write_text(json.dumps(mr.load_schema()), encoding="utf-8")
+    mcp_config = attempt_dir / "mcp.json"
+    mcp_config.write_text("{}", encoding="utf-8")
     session_id = "2f4a6c8e-1111-4222-8333-444455556666"
-    command = mr.build_claude_command(
-        workdir=tmp_path,
-        images=images,
-        schema=schema,
-        model="fable",
-        effort="high",
-        session_id=session_id,
+
+    def build(**overrides: Any) -> list[str]:
+        arguments = {
+            "workdir": attempt_dir,
+            "mcp_config": mcp_config,
+            "schema": schema,
+            "model": "fable",
+            "effort": "high",
+            "session_id": session_id,
+        }
+        return mr.build_claude_command(**{**arguments, **overrides})
+
+    command = build()
+    # The schema travels inline; the only file the CLI reads is the retained config.
+    assert json.loads(_flag(command, "--json-schema")) == mr.load_schema()
+    assert (attempt_dir / _flag(command, "--mcp-config")).resolve() == mcp_config.resolve()
+    assert _flag(command, "--session-id") == session_id
+    start = command.index("--allowedTools") + 1
+    end = next(
+        (i for i in range(start, len(command)) if command[i].startswith("--")),
+        len(command),
     )
-    schema_json = json.dumps(mr.load_schema(), separators=(",", ":"))
-    assert command == [
-        "claude",
-        "-p",
-        "--model",
-        "fable",
-        "--effort",
-        "high",
-        "--input-format",
-        "text",
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--json-schema",
-        schema_json,
-        "--tools",
-        "Read",
-        "--allowedTools",
-        "Read(sheet-1.png)",
-        "Read(sheet-2.png)",
-        "--restricted",
-        "--safe-mode",
-        "--session-id",
-        session_id,
-        "--permission-mode",
-        "dontAsk",
-        "--permission-prompts",
-        "none",
-        "--strict-mcp-config",
-        "--no-chrome",
-    ]
+    allowed = {name for value in command[start:end] for name in value.split(",") if name}
+    assert allowed == SHEET_TOOLS
+    # Sources reach only the sheet server's config, never the reviewer's argv.
+    assert not any(".png" in value or ".pdf" in value for value in command)
     assert mr.CAD_ROOT.parent.as_posix() not in " ".join(command).replace("\\", "/")
 
+    stray = tmp_path / "stray.json"
+    stray.write_text("{}", encoding="utf-8")
+    for misplaced in ({"mcp_config": stray}, {"schema": stray}):
+        with pytest.raises(ValueError):
+            build(**misplaced)
 
-def test_codex_command_is_exact_and_neutral(tmp_path: Path) -> None:
-    image = tmp_path / "sheet.png"
-    schema = tmp_path / "schema.json"
-    output = tmp_path / "verdict.json"
-    command = mr.build_codex_command(
-        workdir=tmp_path,
-        schema=schema,
-        images=(image,),
-        output=output,
-        model="gpt-5.6-sol",
-        effort="high",
-    )
-    assert command == [
-        "codex",
-        "exec",
-        "--ignore-user-config",
-        "--ignore-rules",
-        "--skip-git-repo-check",
-        "--sandbox",
-        "read-only",
-        "-C",
-        str(tmp_path),
-        "-m",
-        "gpt-5.6-sol",
-        "-c",
-        "model_reasoning_effort=high",
-        "-i",
-        str(image),
-        "--output-schema",
-        str(schema),
-        "-o",
-        str(output),
-        "--json",
-        "-",
+
+def test_codex_command_keeps_cwd_and_attempt_files_independent(
+    tmp_path: Path,
+) -> None:
+    # Production runs in the attempt dir; the builder still owns each path itself.
+    workdir = tmp_path / "workdir"
+    attempt_dir = tmp_path / "attempt"
+    workdir.mkdir()
+    attempt_dir.mkdir()
+    sources = (tmp_path / "drawing.pdf", tmp_path / "sheet.png")
+
+    def build(**overrides: Any) -> list[str]:
+        arguments = {
+            "workdir": workdir,
+            "attempt_dir": attempt_dir,
+            "sources": sources,
+            "schema": attempt_dir / "schema.json",
+            "output": attempt_dir / "verdict.json",
+            "model": "gpt-6-astra",
+            "effort": "low",
+        }
+        return mr.build_codex_command(**{**arguments, **overrides})
+
+    command = build()
+    assert _flag(command, "-C") == str(workdir)
+    assert [value for value in command if str(workdir) in value] == [str(workdir)]
+    assert Path(_flag(command, "--output-schema")) == attempt_dir / "schema.json"
+    assert Path(_flag(command, "-o")) == attempt_dir / "verdict.json"
+    overrides = _codex_overrides(command)
+    assert Path(overrides["model_catalog_json"]) == attempt_dir / "codex-models.json"
+    script, *server_sources = overrides["mcp_servers.sheets.args"]
+    assert Path(script).resolve() == Path(sheets.__file__).resolve()
+    assert [Path(value) for value in server_sources] == [
+        source.resolve() for source in sources
     ]
-    assert mr.CAD_ROOT.parent.as_posix() not in " ".join(command).replace("\\", "/")
+    # Relative paths would resolve against the cwd, not the attempt dir.
+    assert all(Path(value).is_absolute() for value in (script, *server_sources))
+    assert "-i" not in command  # sheets arrive only through the MCP server
+    assert not any(
+        key.startswith("mcp_servers.") and not key.startswith("mcp_servers.sheets.")
+        for key in overrides
+    )
+
+    # Attempt files belong to the attempt dir, never the cwd or a relative path.
+    for misplaced in (
+        {"output": workdir / "verdict.json"},
+        {"schema": workdir / "schema.json"},
+        {"output": tmp_path / "verdict.json"},
+        {"output": Path("verdict.json")},
+    ):
+        with pytest.raises(ValueError):
+            build(**misplaced)
+
+
+def test_codex_home_is_isolated_outside_repository_and_reports() -> None:
+    home = _REAL_CODEX_HOME
+    assert home.is_absolute()
+    # Codex walks up for project AGENTS.md; a git parent would be a leak.
+    assert not home.is_relative_to(mr.CAD_ROOT.parent)
+    assert not any((parent / ".git").exists() for parent in (home, *home.parents))
+    assert not home.is_relative_to(mr.REPORT_DIR)
+
+
+def test_prepare_codex_environment_links_auth_and_pins_direct_tool_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(mr, "relink_codex_auth", _REAL_RELINK_CODEX_AUTH)
+    main_home = tmp_path / "main-home"
+    main_home.mkdir()
+    auth = main_home / "auth.json"
+    auth.write_text(json.dumps({"tokens": {"access_token": _AUTH_SENTINEL}}), encoding="utf-8")
+    monkeypatch.setenv("CODEX_HOME", str(main_home))
+    home = tmp_path / "isolated-home"
+    selected = {
+        "slug": "gpt-6-astra",
+        "tool_mode": "code_mode_only",
+        "supports_search_tool": True,
+        "base_instructions": "You are Codex.",
+        "input_modalities": ["text", "image"],
+        "multi_agent_version": "v2",
+    }
+    catalog = {"models": [{"slug": "gpt-6-luna", "tool_mode": "code_mode_only"}, selected]}
+    calls: list[list[str]] = []
+
+    def fake_run(command: list[str], **kwargs: Any):
+        calls.append(command[1:])
+        assert command[1:] == ["debug", "models"]
+        # The catalog is fetched as the isolated home, already holding the link.
+        assert kwargs["env"]["CODEX_HOME"] == str(home)
+        assert (home / "auth.json").samefile(auth)
+        return mr.subprocess.CompletedProcess(command, 0, stdout=json.dumps(catalog), stderr="")
+
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    for attempt in ("attempt-1", "attempt-2"):
+        attempt_dir = tmp_path / attempt
+        attempt_dir.mkdir()
+        env = _REAL_PREPARE_CODEX_ENVIRONMENT(
+            codex_home=home, attempt_dir=attempt_dir, model="gpt-6-astra", codex="codex-test"
+        )
+
+        assert env["CODEX_HOME"] == str(home)
+        assert env["PATH"] == os.environ["PATH"]  # a full environment, not a fragment
+        # A hardlink, never a copy: token refreshes land in the user's own file.
+        assert (home / "auth.json").samefile(auth)
+        assert auth.stat().st_nlink == 2
+        written = json.loads((attempt_dir / "codex-models.json").read_text(encoding="utf-8"))
+        assert written == {
+            "models": [{**selected, "tool_mode": "direct", "supports_search_tool": False}]
+        }
+        assert not any(
+            _AUTH_SENTINEL in path.read_text(encoding="utf-8")
+            for path in attempt_dir.rglob("*")
+            if path.is_file()
+        )
+    assert calls == [["debug", "models"]] * 2
+
+
+@pytest.mark.parametrize("failure", ["unknown_model", "missing_auth"])
+def test_prepare_codex_environment_refuses_unverified_setups(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    monkeypatch.setattr(mr, "relink_codex_auth", _REAL_RELINK_CODEX_AUTH)
+    main_home = tmp_path / "main-home"
+    main_home.mkdir()
+    if failure != "missing_auth":
+        (main_home / "auth.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("CODEX_HOME", str(main_home))
+    slug = "gpt-6-luna" if failure == "unknown_model" else "gpt-6-astra"
+
+    def fake_run(command: list[str], **_kwargs: Any):
+        stdout = json.dumps({"models": [{"slug": slug, "tool_mode": "code_mode_only"}]})
+        return mr.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    attempt_dir = tmp_path / "attempt"
+    attempt_dir.mkdir()
+    expected = FileNotFoundError if failure == "missing_auth" else RuntimeError
+    with pytest.raises(expected):
+        _REAL_PREPARE_CODEX_ENVIRONMENT(
+            codex_home=tmp_path / "isolated-home",
+            attempt_dir=attempt_dir,
+            model="gpt-6-astra",
+            codex="codex-test",
+        )
+    assert not (attempt_dir / "codex-models.json").exists()
+
+
+def _split_auth_link(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+    """A login whose isolated link a write-then-rename save has split."""
+    main_home = tmp_path / "main-home"
+    main_home.mkdir()
+    main_auth = main_home / "auth.json"
+    main_auth.write_text('{"refresh_token": "old"}', encoding="utf-8")
+    monkeypatch.setenv("CODEX_HOME", str(main_home))
+    home = tmp_path / "isolated-home"
+    home.mkdir()
+    linked = home / "auth.json"
+    linked.hardlink_to(main_auth)
+    staged = home / "auth.json.tmp"
+    staged.write_text('{"refresh_token": "rotated"}', encoding="utf-8")
+    os.replace(staged, linked)
+    assert not linked.samefile(main_auth)
+    return main_auth, linked
+
+
+def test_relink_codex_auth_returns_a_refreshed_login_to_the_user(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    main_auth, linked = _split_auth_link(tmp_path, monkeypatch)
+    os.utime(main_auth, ns=(1, 1))  # the user's file predates the refresh
+
+    warning = _REAL_RELINK_CODEX_AUTH(linked.parent)
+
+    assert warning is not None and "copied the refreshed login back" in warning
+    assert main_auth.read_text(encoding="utf-8") == '{"refresh_token": "rotated"}'
+    assert linked.samefile(main_auth)
+    assert not list(main_auth.parent.glob("auth.json.*.tmp"))
+    assert _REAL_RELINK_CODEX_AUTH(linked.parent) is None  # whole again
+
+
+def test_relink_codex_auth_never_overwrites_a_newer_user_login(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    main_auth, linked = _split_auth_link(tmp_path, monkeypatch)
+    os.utime(linked, ns=(1, 1))  # the user logged in again after the split
+
+    warning = _REAL_RELINK_CODEX_AUTH(linked.parent)
+
+    assert warning is not None and "copied" not in warning
+    assert main_auth.read_text(encoding="utf-8") == '{"refresh_token": "old"}'
+    assert linked.samefile(main_auth)
+
+
+def test_prompts_share_the_static_load_prompt_prefix_for_every_package() -> None:
+    packages = [
+        (mr.ReviewPackage("crank_arm", "part", ()), 1),
+        (mr.ReviewPackage("pivot_shaft", "part", ()), 2),
+        (mr.ReviewPackage("gearbox", "assembly", ()), 3),
+        (mr.ReviewPackage("base_frame", "assembly", ()), 1),
+    ]
+    tails: dict[str, set[str]] = {}
+    for package, sheet_count in packages:
+        prefix = mr.load_prompt(package.kind)
+        for reviewer in mr.REVIEWERS:
+            prompt = mr._review_prompt(package, sheet_count, reviewer=reviewer)
+            assert prompt.startswith(prefix)
+            tail = prompt[len(prefix) :]
+            assert "PACKAGE INPUT" in tail
+            assert f"Sheet count: {sheet_count}" in tail
+            assert f"view_sheet for sheets 1..{sheet_count}" in tail
+            # Codex's resource helpers are neutral; the prompt still names the tools.
+            lines = tail.splitlines()
+            assert lines.count("Use only view_sheet and crop.") == 1
+            view_line = next(i for i, line in enumerate(lines) if "view_sheet for sheets" in line)
+            assert lines[view_line + 1] == "Use only view_sheet and crop."
+            assert lines[-1] == "Return one verdict for the package as a whole."
+            assert package.name not in tail
+            tails.setdefault(package.kind, set()).add(tail)
+    # The tail varies only with sheet count, never with name or reviewer.
+    assert len(tails["part"]) == 2 and len(tails["assembly"]) == 2
+
+    override = "custom rubric\n"
+    package = mr.ReviewPackage("crank_arm", "part", ())
+    assert mr._review_prompt(package, 2, prompt_text=override).startswith(override)
+
+
+# --- blind evidence ----------------------------------------------------------
+
+
+@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+def test_evidence_accepts_in_range_views_and_crops(reviewer: str) -> None:
+    events = [
+        *_views(reviewer, (1, 2, 3)),
+        *_call_events(reviewer, "crop", {"sheet": 2, "x1": 10, "y1": 20, "x2": 300, "y2": 400}, "crop_a"),
+        *_call_events(reviewer, "crop", {"sheet": 2, "x1": 10, "y1": 20, "x2": 300, "y2": 400}, "crop_b"),
+        # A crop the server refused still counts as an attempted crop call.
+        *_call_events(reviewer, "crop", {"sheet": 3, "x1": 0, "y1": 0, "x2": 5, "y2": 5}, "crop_c", ok=False),
+    ]
+    if reviewer == "claude":
+        events.append(_claude_tool_use("StructuredOutput", {}, "structured"))
+
+    evidence = mr.evaluate_sheet_evidence(events, reviewer=reviewer, sheet_count=3)
+
+    assert evidence == {
+        "tool_events": 0,
+        "sheets_viewed": [1, 2, 3],
+        "crop_calls": 3,
+        "crops": [
+            {"sheet": 2, "rect": [10, 20, 300, 400]},
+            {"sheet": 2, "rect": [10, 20, 300, 400]},
+            {"sheet": 3, "rect": [0, 0, 5, 5]},
+        ],
+        "neutral_calls": [],
+        "inspection_proven": True,
+    }
+
+
+_REJECTED_CALLS: dict[str, dict[str, list[dict[str, Any]]]] = {
+    "claude": {
+        "read": _claude_call("Read", {"file_path": "sheet-1.png"}, "bad"),
+        "shell": _claude_call("Bash", {"command": "dir"}, "bad"),
+        "unknown_sheets_tool": _claude_call("mcp__sheets__list_files", {}, "bad"),
+        "unknown_server": _claude_call("mcp__files__view_sheet", {"sheet": 1}, "bad"),
+    },
+    "codex": {
+        "read": [
+            {
+                "type": "item.completed",
+                "item": {"id": "bad", "type": "tool_use", "name": "Read"},
+            }
+        ],
+        "shell": [
+            {
+                "type": "item.started",
+                "item": {"id": "bad", "type": "command_execution", "command": "type sheet.png"},
+            },
+            {
+                "type": "item.completed",
+                "item": {"id": "bad", "type": "command_execution", "command": "type sheet.png"},
+            },
+        ],
+        # Code-mode cells reach every tool in ALL_TOOLS without their own item.
+        "code_mode_exec": [
+            {
+                "type": "item.completed",
+                "item": {
+                    "id": "call_exec",
+                    "type": "custom_tool_call",
+                    "name": "exec",
+                    "input": "const r = await tools.mcp__sheets__view_sheet({sheet:1});",
+                },
+            }
+        ],
+        "unknown_sheets_tool": _codex_call("list_files", {}, "bad"),
+        "unknown_server": _codex_call("view_sheet", {"sheet": 1}, "bad", server="files"),
+    },
+}
+
+
+@pytest.mark.parametrize(
+    ("reviewer", "case"),
+    [(reviewer, case) for reviewer, cases in _REJECTED_CALLS.items() for case in cases],
+)
+def test_evidence_rejects_every_tool_outside_the_sheet_server(
+    reviewer: str, case: str
+) -> None:
+    events = [*_views(reviewer, (1, 2, 3)), *_REJECTED_CALLS[reviewer][case]]
+
+    evidence = mr.evaluate_sheet_evidence(events, reviewer=reviewer, sheet_count=3)
+
+    assert evidence["tool_events"] == 1
+    assert evidence["sheets_viewed"] == [1, 2, 3]
+    assert evidence["crop_calls"] == 0 and evidence["crops"] == []
+
+
+# Malformed calls to a known sheet tool reach only the sheet server, which
+# refuses them; they are failed inspections, never proof and never a leak.
+_MALFORMED_VIEWS = {
+    "below_range": {"sheet": 0},
+    "above_range": {"sheet": 4},
+    "string_sheet": {"sheet": "1"},
+    "float_sheet": {"sheet": 2.0},
+    "extra_key": {"sheet": 2, "zoom": 2},
+    "not_an_object": "sheet 2",
+}
+_MALFORMED_CROPS: dict[str, tuple[Any, dict[str, Any]]] = {
+    "above_range": (
+        {"sheet": 4, "x1": 0, "y1": 0, "x2": 9, "y2": 9},
+        {"sheet": 4, "rect": [0, 0, 9, 9]},
+    ),
+    "float_corner": (
+        {"sheet": 1, "x1": 990.0, "y1": 0, "x2": 1920, "y2": 9},
+        {"sheet": 1, "rect": [990.0, 0, 1920, 9]},
+    ),
+    "missing_corner": (
+        {"sheet": 1, "x1": 0, "y1": 0, "x2": 9},
+        {"sheet": 1, "rect": [0, 0, 9, None]},
+    ),
+    "not_an_object": ("crop sheet 1", {"sheet": None, "rect": [None] * 4}),
+}
+
+
+@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("case", sorted(_MALFORMED_VIEWS))
+def test_malformed_view_is_authorized_but_never_proves_a_sheet(
+    reviewer: str, case: str
+) -> None:
+    # The fake result even carries an image: invalid arguments still prove nothing.
+    events = [
+        *_views(reviewer, (1, 3)),
+        *_call_events(reviewer, "view_sheet", _MALFORMED_VIEWS[case], "malformed"),
+    ]
+
+    evidence = mr.evaluate_sheet_evidence(events, reviewer=reviewer, sheet_count=3)
+
+    assert evidence["tool_events"] == 0
+    assert evidence["sheets_viewed"] == [1, 3]
+    assert not evidence["inspection_proven"]
+
+
+@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+def test_every_named_crop_call_counts_once_with_its_raw_arguments(
+    reviewer: str,
+) -> None:
+    events = _views(reviewer, (1, 2, 3))
+    for case in sorted(_MALFORMED_CROPS):
+        events += _call_events(reviewer, "crop", _MALFORMED_CROPS[case][0], case, ok=False)
+
+    evidence = mr.evaluate_sheet_evidence(events, reviewer=reviewer, sheet_count=3)
+
+    assert evidence["tool_events"] == 0
+    assert evidence["inspection_proven"]
+    # The server charges refused crops to the budget, so the record does too.
+    assert evidence["crop_calls"] == len(_MALFORMED_CROPS)
+    assert evidence["crops"] == [_MALFORMED_CROPS[case][1] for case in sorted(_MALFORMED_CROPS)]
+
+
+@pytest.mark.parametrize(
+    ("kind", "unauthorized"),
+    [
+        ("todo_list", 1),
+        ("unrecognized_builtin", 1),
+        ("agent_message", 0),
+        ("reasoning", 0),
+        ("error", 0),
+    ],
+)
+def test_codex_item_gate_rejects_unmarked_tools(kind: str, unauthorized: int) -> None:
+    item = {"id": "builtin", "type": kind, "items": []}
+    evidence = mr.evaluate_sheet_evidence(
+        [
+            *_views("codex", (1,)),
+            {"type": "item.started", "item": item},
+            {"type": "item.completed", "item": item},
+        ],
+        reviewer="codex",
+        sheet_count=1,
+    )
+    assert evidence["tool_events"] == unauthorized
+    assert evidence["inspection_proven"]
+
+
+def test_codex_started_and_completed_call_counts_once() -> None:
+    crop = _codex_call("crop", {"sheet": 1, "x1": 0, "y1": 0, "x2": 9, "y2": 9}, "c")
+    shell = _REJECTED_CALLS["codex"]["shell"]
+    evidence = mr.evaluate_sheet_evidence(
+        [*_views("codex", (1,)), *crop, *shell], reviewer="codex", sheet_count=1
+    )
+    assert evidence["crop_calls"] == 1
+    assert evidence["tool_events"] == 1
+
+
+@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+def test_inspection_requires_a_successful_image_view_of_every_sheet(
+    reviewer: str,
+) -> None:
+    def evaluate(events: list[dict[str, Any]]) -> dict[str, Any]:
+        return mr.evaluate_sheet_evidence(events, reviewer=reviewer, sheet_count=3)
+
+    assert evaluate(_views(reviewer, (3, 1, 2)))["inspection_proven"]
+
+    missing = evaluate(_views(reviewer, (1, 3)))
+    assert missing["sheets_viewed"] == [1, 3]
+    assert missing["tool_events"] == 0
+    assert not missing["inspection_proven"]
+
+    failed = evaluate(
+        [
+            *_views(reviewer, (1, 3)),
+            *_call_events(reviewer, "view_sheet", {"sheet": 2}, "failed", ok=False),
+        ]
+    )
+    assert failed["sheets_viewed"] == [1, 3]
+    assert not failed["inspection_proven"]
+
+    unanswered = (
+        [_claude_tool_use("mcp__sheets__view_sheet", {"sheet": 2}, "pending")]
+        if reviewer == "claude"
+        else _codex_call("view_sheet", {"sheet": 2}, "pending", status="in_progress")
+    )
+    started_only = evaluate([*_views(reviewer, (1, 3)), *unanswered])
+    assert started_only["sheets_viewed"] == [1, 3]
+    assert started_only["tool_events"] == 0
+    assert not started_only["inspection_proven"]
+
+
+def test_codex_blindness_fails_closed_on_every_tool_or_command() -> None:
+    passive = {"type": "agent_message", "text": "review complete"}
+    tool = {"type": "item.completed", "item": {"type": "tool_use", "name": "Read"}}
+    command = {
+        "type": "item.completed",
+        "item": {"type": "command_execution", "command": "type sheet.png"},
+    }
+    assert mr.count_codex_tool_events([passive]) == 0
+    assert mr.count_codex_tool_events([tool]) == 1
+    assert mr.count_codex_tool_events([command]) == 1
+    # The text-only grader has no sheets, so even the sheet server is a tool,
+    # including calls whose arguments the server would refuse.
+    assert mr.count_codex_tool_events(_views("codex", (1,))) == 1
+    assert mr.count_codex_tool_events(_codex_call("view_sheet", {"sheet": 0}, "v")) == 1
+
+
+_ROLLOUT_PROMPT = "# Drawing guidelines\n\nRule 1.\n\nPACKAGE INPUT\nSheet count: 2\n"
+_ROLLOUT_THREAD = "01a13128-90e1-72d3-97c1-51bb37cf5996"
+
+
+def _rollout_evidence(rows: list[dict[str, Any]], prompt: str = _ROLLOUT_PROMPT) -> dict[str, Any]:
+    return mr.codex_rollout_evidence(rows, prompt)
+
+
+def _rollout(**kwargs: Any) -> list[dict[str, Any]]:
+    return _codex_rollout(
+        _ROLLOUT_PROMPT, thread_id=_ROLLOUT_THREAD, cwd=r"C:\attempt", **kwargs
+    )
+
+
+@pytest.mark.parametrize("newline", ["\r\n", "\n"])
+def test_rollout_evidence_normalizes_direct_sheet_calls(newline: str) -> None:
+    crop = {"sheet": 2, "x1": 990, "y1": 970, "x2": 1920, "y2": 1225}
+    result = _rollout_evidence(_rollout(views=(1, 2), crops=[crop], newline=newline))
+
+    assert result["context_errors"] == []
+    assert result["first_turn_usage"]["input_tokens"] == _FIRST_REQUEST_USAGE["input_tokens"]
+    assert result["first_turn_usage"]["cached_input_tokens"] == (
+        _FIRST_REQUEST_USAGE["cached_input_tokens"]
+    )
+    items = [event["item"] for event in result["events"]]
+    assert {item["type"] for item in items} == {"mcp_tool_call"}
+    assert {item["id"] for item in items} == {"call_view_1", "call_view_2", "call_crop_1"}
+    assert mr.evaluate_sheet_evidence(result["events"], reviewer="codex", sheet_count=2) == {
+        "tool_events": 0,
+        "sheets_viewed": [1, 2],
+        "crop_calls": 1,
+        "crops": [{"sheet": 2, "rect": [990, 970, 1920, 1225]}],
+        "neutral_calls": [],
+        "inspection_proven": True,
+    }
+
+
+def test_rollout_evidence_keeps_failed_and_malformed_sheet_calls_non_proving() -> None:
+    rows = _rollout(views=(1,))
+    final = len(rows) - 2
+    rows[final:final] = [
+        *_rollout_call(_ROLLOUT_THREAD, "view_sheet", {"sheet": 2}, "call_failed", ok=False),
+        *_rollout_call(_ROLLOUT_THREAD, "view_sheet", {"sheet": 2.0}, "call_float"),
+    ]
+    result = _rollout_evidence(rows)
+
+    assert result["context_errors"] == []
+    evidence = mr.evaluate_sheet_evidence(result["events"], reviewer="codex", sheet_count=2)
+    assert evidence["tool_events"] == 0
+    assert evidence["sheets_viewed"] == [1]
+    assert not evidence["inspection_proven"]
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        # Rollout 01a13102 line 11: tool discovery, no MCP item at all.
+        'text(ALL_TOOLS.filter(x => /view_sheet|crop/i.test(x.name+" "+x.description)));\n',
+        # Line 15: a sheet view routed through the code-mode sandbox.
+        "const r = await tools.mcp__sheets__view_sheet({sheet:1}); image(r.content[0]);\n",
+    ],
+)
+def test_rollout_evidence_exposes_code_mode_exec_cells(cell: str) -> None:
+    result = _rollout_evidence(_rollout(views=(1, 2), after=_rollout_exec_cell("call_exec", cell)))
+
+    exec_items = [
+        event["item"] for event in result["events"]
+        if event["item"]["type"] == "custom_tool_call"
+    ]
+    assert exec_items and all(item["name"] == "exec" for item in exec_items)
+    evidence = mr.evaluate_sheet_evidence(result["events"], reviewer="codex", sheet_count=2)
+    assert evidence["tool_events"] == 1
+    # The same cell was invisible to the --json gate the harness used to trust.
+    stdout_events = _codex_events(2, _ROLLOUT_THREAD)
+    assert mr.evaluate_sheet_evidence(stdout_events, reviewer="codex", sheet_count=2)[
+        "tool_events"
+    ] == 0
+
+
+def _rollout_foreign_call(
+    thread_id: str,
+    name: str,
+    call_id: str,
+    output: str,
+    *,
+    completion: bool,
+    arguments: dict[str, Any] | None = None,
+    native: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Codex builtins (smoke codex-b rollout 01a1313b, ordinals 36-43): no namespace.
+
+    ``list_mcp_resources`` was recorded again in final-smoke rollout 01a13147
+    (ordinals 21/22/24): declaration ``{}``, native item under server "codex"
+    with the same text, then the identical model-visible output string.
+    """
+    arguments = {} if arguments is None else arguments
+    rows = [
+        _rollout_row(
+            "response_item",
+            {
+                "type": "function_call",
+                "id": f"fc_{call_id}",
+                "name": name,
+                "arguments": json.dumps(arguments, separators=(",", ":")),
+                "call_id": call_id,
+            },
+        )
+    ]
+    if completion:
+        # The CLI's own MCP surface reports the builtin under server "codex".
+        rows.append(
+            _rollout_row(
+                "event_msg",
+                {
+                    "type": "item_completed",
+                    "thread_id": thread_id,
+                    "turn_id": "turn_1",
+                    "item": {
+                        "type": "McpToolCall",
+                        "id": call_id,
+                        "server": "codex",
+                        "tool": name,
+                        "arguments": arguments,
+                        "status": "completed",
+                        "result": {"content": [{"type": "text", "text": output}], "isError": False},
+                        **(native or {}),
+                    },
+                },
+            )
+        )
+    rows.append(
+        _rollout_row(
+            "response_item",
+            {"type": "function_call_output", "id": f"fco_{call_id}", "call_id": call_id, "output": output},
+        )
+    )
+    return rows
+
+
+# Codex resource helpers (core/src/tools/handlers/mcp_resource): the native item
+# names args.server, else "codex"; list payloads echo a named server and omit
+# an absent nextCursor; a resources/read failure leaves result None and the
+# message as both the native error and the model-visible output; a read
+# without "server" fails argument parsing before any native item is emitted.
+_MISSING_RESOURCE = "resources/read failed: Mcp error: 0: Unknown resource: sheets://1"
+_RESOURCE_PARSE_ERROR = "failed to parse function arguments: missing field `server`"
+_FAILED_READ = {"status": "failed", "result": None, "error": {"message": _MISSING_RESOURCE}}
+_SHEETS_NATIVE = {"server": "sheets"}
+
+
+def _resource_case(
+    name: str,
+    arguments: dict[str, Any],
+    output: str,
+    *,
+    completion: bool = True,
+    native: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "name": name, "arguments": arguments, "output": output,
+        "completion": completion, "native": native,
+    }
+
+
+def _resource_rows(
+    case: dict[str, Any], call_id: str = "call_resource", *, thread_id: str = _ROLLOUT_THREAD
+) -> list[dict[str, Any]]:
+    return _rollout_foreign_call(
+        thread_id, case["name"], call_id, case["output"],
+        completion=case["completion"], arguments=case["arguments"], native=case["native"],
+    )
+
+
+# Empty catalogue answers from a sole ``sheets`` server: discovery, not inspection.
+_NEUTRAL_RESOURCE_CASES: dict[str, dict[str, Any]] = {
+    "list": _resource_case("list_mcp_resources", {}, '{"resources":[]}'),
+    "list_sheets": _resource_case(
+        "list_mcp_resources", {"server": "sheets"}, '{"server":"sheets","resources":[]}',
+        native=_SHEETS_NATIVE,
+    ),
+    "list_templates": _resource_case("list_mcp_resource_templates", {}, '{"resourceTemplates":[]}'),
+    "list_templates_sheets": _resource_case(
+        "list_mcp_resource_templates", {"server": "sheets"},
+        '{"server":"sheets","resourceTemplates":[]}', native=_SHEETS_NATIVE,
+    ),
+    "read_sheets": _resource_case(
+        "read_mcp_resource", {"server": "sheets", "uri": "sheets://1"}, _MISSING_RESOURCE,
+        native={**_FAILED_READ, **_SHEETS_NATIVE},
+    ),
+    "read_unspecified": _resource_case(
+        "read_mcp_resource", {"uri": "sheets://1"}, _RESOURCE_PARSE_ERROR, completion=False
+    ),
+}
+
+
+def _neutral_rollout(
+    rows: list[dict[str, Any]], *, sheet_count: int = 2
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    result = mr.codex_rollout_evidence(rows, _ROLLOUT_PROMPT, neutral_resources=True)
+    evidence = mr.evaluate_sheet_evidence(
+        result["events"], reviewer="codex", sheet_count=sheet_count, neutral_resources=True
+    )
+    return result, evidence
+
+
+@pytest.mark.parametrize(
+    ("name", "output", "completion"),
+    [
+        ("list_mcp_resources", '{"resources":[]}', True),
+        ("list_mcp_resource_templates", '{"resourceTemplates":[]}', True),
+        ("get_goal", '{"goal":null,"remainingTokens":null,"completionBudgetReport":null}', False),
+    ],
+)
+def test_rollout_evidence_forbids_foreign_builtin_calls_even_with_empty_results(
+    name: str, output: str, completion: bool
+) -> None:
+    # Default strictness: without the harness's sole-sheets permission nothing is neutral.
+    foreign = _rollout_foreign_call(_ROLLOUT_THREAD, name, "call_foreign", output, completion=completion)
+    result = _rollout_evidence(_rollout(views=(1, 2), after=foreign))
+
+    evidence = mr.evaluate_sheet_evidence(result["events"], reviewer="codex", sheet_count=2)
+    assert evidence["tool_events"] >= 1  # no empty-result whitelist
+    assert evidence["sheets_viewed"] == [1, 2]
+    assert evidence["neutral_calls"] == []
+    # A builtin is not a sheet call, so lacking server/tool fields is no disagreement.
+    assert not any("disagree" in error for error in result["context_errors"])
+
+
+@pytest.mark.parametrize("case", sorted(_NEUTRAL_RESOURCE_CASES))
+def test_neutral_resource_call_is_recorded_once_but_never_proves_a_view(case: str) -> None:
+    spec = _NEUTRAL_RESOURCE_CASES[case]
+    rows = _rollout(views=(1,), after=_resource_rows(spec))
+
+    strict = _rollout_evidence(rows)
+    strict_evidence = mr.evaluate_sheet_evidence(strict["events"], reviewer="codex", sheet_count=2)
+    assert strict_evidence["tool_events"] >= 1  # default stays fail-closed
+
+    result, evidence = _neutral_rollout(rows)
+    assert result["context_errors"] == []
+    # Declaration and native completion share one call id: one normalized call.
+    resource_items = [
+        event["item"] for event in result["events"] if event["item"].get("id") == "call_resource"
+    ]
+    assert len(resource_items) == 1
+    assert evidence["neutral_calls"] == [{"tool": spec["name"], "arguments": spec["arguments"]}]
+    assert evidence["tool_events"] == 0
+    assert evidence["sheets_viewed"] == [1]  # sheets://1 or not, only view_sheet proves
+    assert not evidence["inspection_proven"]
+    assert evidence["crop_calls"] == 0 and evidence["crops"] == []
+    # Opt-in is per caller: the evaluator default and the text-only grader stay strict.
+    assert mr.evaluate_sheet_evidence(result["events"], reviewer="codex", sheet_count=2)[
+        "tool_events"
+    ] >= 1
+    assert mr.count_codex_tool_events(result["events"]) >= 1
+
+
+def test_every_neutral_resource_call_counts_once_beside_complete_inspection() -> None:
+    after = [
+        row
+        for index, case in enumerate(sorted(_NEUTRAL_RESOURCE_CASES))
+        for row in _resource_rows(_NEUTRAL_RESOURCE_CASES[case], f"call_resource_{index}")
+    ]
+    result, evidence = _neutral_rollout(_rollout(views=(1, 2), after=after))
+
+    assert result["context_errors"] == []
+    assert evidence["tool_events"] == 0
+    assert evidence["sheets_viewed"] == [1, 2] and evidence["inspection_proven"]
+    assert evidence["neutral_calls"] == [
+        {"tool": spec["name"], "arguments": spec["arguments"]}
+        for spec in (_NEUTRAL_RESOURCE_CASES[case] for case in sorted(_NEUTRAL_RESOURCE_CASES))
+    ]
+
+
+_NONEMPTY_RESOURCE_CASES: dict[str, dict[str, Any]] = {
+    "list_entries": _resource_case(
+        "list_mcp_resources", {},
+        '{"resources":[{"server":"sheets","uri":"sheets://1","name":"sheet-1"}]}',
+    ),
+    "list_next_cursor": _resource_case(
+        "list_mcp_resources", {}, '{"resources":[],"nextCursor":"2"}'
+    ),
+    "list_template_entries": _resource_case(
+        "list_mcp_resource_templates", {},
+        '{"resourceTemplates":[{"server":"sheets","uriTemplate":"sheets://{sheet}","name":"sheet"}]}',
+    ),
+    "read_content": _resource_case(
+        "read_mcp_resource", {"server": "sheets", "uri": "sheets://1"},
+        '{"server":"sheets","uri":"sheets://1","contents":'
+        '[{"uri":"sheets://1","mimeType":"text/plain","text":"Rule 1: ship it."}]}',
+        native=_SHEETS_NATIVE,
+    ),
+}
+_FOREIGN_RESOURCE_CASES: dict[str, list[dict[str, Any]]] = {
+    "read_other_server": _resource_rows(
+        _resource_case(
+            "read_mcp_resource", {"server": "files", "uri": "file:///C:/drawing.pdf"},
+            "resources/read failed: unknown MCP server 'files'",
+            native={**_FAILED_READ, "server": "files"},
+        )
+    ),
+    "get_goal": _rollout_foreign_call(
+        _ROLLOUT_THREAD, "get_goal", "call_resource",
+        '{"goal":null,"remainingTokens":null,"completionBudgetReport":null}', completion=False,
+    ),
+    "exec": _rollout_exec_cell("call_resource", "text(await tools.list_mcp_resources({}));\n"),
+}
+_MISMATCHED_RESOURCE_CASES: dict[str, list[dict[str, Any]]] = {
+    # The model declared a neutral helper; the CLI executed something else.
+    "native_tool": _resource_rows(
+        _resource_case(
+            "list_mcp_resources", {}, '{"resources":[]}', native={"tool": "get_goal"}
+        )
+    ),
+    "native_server": _resource_rows(
+        _resource_case(
+            "list_mcp_resources", {}, '{"resources":[]}', native={"server": "files"}
+        )
+    ),
+    # A native "sheets" item is the CLI's own record only of a sheets-targeted call.
+    "native_sheets_untargeted": _resource_rows(
+        _resource_case(
+            "list_mcp_resources", {}, '{"resources":[]}', native=_SHEETS_NATIVE
+        )
+    ),
+}
+
+
+@pytest.mark.parametrize("case", sorted(_NONEMPTY_RESOURCE_CASES))
+def test_neutral_mode_rejects_resource_output_beyond_the_empty_manifest(case: str) -> None:
+    rows = _rollout(views=(1, 2), after=_resource_rows(_NONEMPTY_RESOURCE_CASES[case]))
+    result, evidence = _neutral_rollout(rows)
+
+    assert any("resource" in error for error in result["context_errors"])
+    assert evidence["sheets_viewed"] == [1, 2]
+
+
+@pytest.mark.parametrize("case", sorted(_FOREIGN_RESOURCE_CASES))
+def test_neutral_mode_still_forbids_foreign_tools_and_read_targets(case: str) -> None:
+    result, evidence = _neutral_rollout(_rollout(views=(1, 2), after=_FOREIGN_RESOURCE_CASES[case]))
+
+    assert evidence["tool_events"] >= 1
+    assert evidence["neutral_calls"] == []
+    assert evidence["sheets_viewed"] == [1, 2]
+
+
+@pytest.mark.parametrize("case", sorted(_MISMATCHED_RESOURCE_CASES))
+def test_neutral_mode_rejects_a_native_call_that_disagrees_with_its_declaration(
+    case: str,
+) -> None:
+    result, evidence = _neutral_rollout(
+        _rollout(views=(1, 2), after=_MISMATCHED_RESOURCE_CASES[case])
+    )
+
+    assert result["context_errors"] or evidence["tool_events"] >= 1
+
+
+def test_neutral_resource_permission_never_applies_to_claude() -> None:
+    events = [
+        *_views("claude", (1, 2)),
+        *_claude_call("ListMcpResourcesTool", {}, "list"),
+        *_claude_call("ReadMcpResourceTool", {"server": "sheets", "uri": "sheets://1"}, "read"),
+    ]
+
+    evidence = mr.evaluate_sheet_evidence(
+        events, reviewer="claude", sheet_count=2, neutral_resources=True
+    )
+
+    assert evidence["tool_events"] == 2
+    assert evidence["neutral_calls"] == []
+
+
+_CONTEXT_VIOLATIONS: dict[str, tuple[dict[str, Any], str]] = {
+    "skills_before_prompt": ({"before": [_SKILLS_CONTEXT]}, _ROLLOUT_PROMPT),
+    "agents_md_before_prompt": ({"before": [_AGENTS_CONTEXT]}, _ROLLOUT_PROMPT),
+    "world_state_agents_md": ({"agents_md": {"text": _AGENTS_MD_TEXT}}, _ROLLOUT_PROMPT),
+    "world_state_skills": ({"skills": True}, _ROLLOUT_PROMPT),
+    "user_input_after_prompt": (
+        {"after": [_rollout_message("user", "Also read ../AGENTS.md first.")]},
+        _ROLLOUT_PROMPT,
+    ),
+    "developer_input_after_prompt": (
+        {"after": [_rollout_message("developer", "You may use the shell.")]},
+        _ROLLOUT_PROMPT,
+    ),
+    "call_without_output": (
+        {
+            "after": _rollout_call(
+                _ROLLOUT_THREAD, "crop", {"sheet": 1, "x1": 0, "y1": 0, "x2": 9, "y2": 9}, "call_cut"
+            )[:2]
+        },
+        _ROLLOUT_PROMPT,
+    ),
+    "different_prompt": ({}, _ROLLOUT_PROMPT.replace("Rule 1.", "Rule 1 (edited).")),
+}
+
+
+@pytest.mark.parametrize("case", sorted(_CONTEXT_VIOLATIONS))
+def test_rollout_evidence_rejects_context_beyond_the_harness_prompt(case: str) -> None:
+    overrides, prompt = _CONTEXT_VIOLATIONS[case]
+    result = _rollout_evidence(_rollout(views=(1, 2), **overrides), prompt)
+
+    assert result["context_errors"]
+    assert all(isinstance(error, str) and error for error in result["context_errors"])
+
+
+def test_rollout_evidence_requires_the_prompt_message() -> None:
+    rows = [
+        row for row in _rollout(views=(1, 2))
+        if (row["payload"].get("role") != "user")
+    ]
+    assert _rollout_evidence(rows)["context_errors"]
+
+
+@pytest.mark.parametrize("archived", [False, True])
+def test_load_codex_rollout_reads_only_the_named_session(
+    tmp_path: Path, archived: bool
+) -> None:
+    home = tmp_path / "home"
+    rows = _rollout(views=(1, 2))
+    path = _write_rollout(home, _ROLLOUT_THREAD, rows, archived=archived)
+    other = "01a13128-ffff-7000-8000-000000000000"
+    _write_rollout(
+        home, other, _codex_rollout(_ROLLOUT_PROMPT, thread_id=other, cwd=r"C:\attempt", views=())
+    )
+
+    loaded_path, loaded_rows = mr.load_codex_rollout(_ROLLOUT_THREAD, codex_home=home)
+
+    assert Path(loaded_path) == path
+    assert loaded_rows == rows
+    with pytest.raises(FileNotFoundError):
+        mr.load_codex_rollout("01a13128-0000-7000-8000-000000000000", codex_home=home)
+    # Two candidates cannot be told apart; neither is authoritative.
+    _write_rollout(home, other, _rollout(views=()), archived=True)
+    with pytest.raises(ValueError):
+        mr.load_codex_rollout(other, codex_home=home)
+    with pytest.raises(ValueError):
+        mr.load_codex_rollout("*", codex_home=home)  # never a glob
+
+
+def test_usage_parsing_for_both_reviewers() -> None:
+    claude_events = [
+        {
+            "type": "assistant",
+            "message": {
+                "content": [{"type": "tool_use", "id": "t", "name": "mcp__sheets__view_sheet", "input": {"sheet": 1}}],
+                "usage": {
+                    "input_tokens": 2,
+                    "cache_creation_input_tokens": 6274,
+                    "cache_read_input_tokens": 0,
+                    "output_tokens": 32,
+                },
+            },
+        },
+        {
+            "type": "assistant",
+            "message": {
+                "content": [{"type": "text", "text": "done"}],
+                "usage": {
+                    "input_tokens": 2,
+                    "cache_creation_input_tokens": 3491,
+                    "cache_read_input_tokens": 6274,
+                    "output_tokens": 7,
+                },
+            },
+        },
+        {
+            "type": "result",
+            "subtype": "success",
+            "num_turns": 2,
+            "total_cost_usd": 0.0807108,
+            "usage": {
+                "input_tokens": 4,
+                "cache_creation_input_tokens": 9765,
+                "cache_read_input_tokens": 6274,
+                "output_tokens": 66,
+                "service_tier": "standard",
+            },
+        },
+    ]
+    usage = mr._usage(claude_events, "claude")
+    assert {key: usage[key] for key in (
+        "input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens",
+        "output_tokens", "num_turns",
+    )} == {
+        "input_tokens": 4,
+        "cache_creation_input_tokens": 9765,
+        "cache_read_input_tokens": 6274,
+        "output_tokens": 66,
+        "num_turns": 2,
+    }
+    assert usage["total_cost_usd"] == pytest.approx(0.0807108)
+    assert usage["first_turn"] == {
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 6274,
+    }
+
+    codex_events = [
+        {"type": "thread.started", "thread_id": "01a130f2-307e-7c22-b936-5b65caa165d4"},
+        {"type": "turn.completed", "usage": {
+            "input_tokens": 41015, "cached_input_tokens": 25856,
+            "cache_write_input_tokens": 0, "output_tokens": 112,
+            "reasoning_output_tokens": 0,
+        }},
+        {"type": "turn.completed", "usage": {
+            "input_tokens": 1000, "cached_input_tokens": 900, "output_tokens": 50,
+        }},
+    ]
+    # Codex's --json stream has no per-request split; the rollout supplies it.
+    first_request = {
+        "input_tokens": 22232, "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0, "output_tokens": 66,
+        "reasoning_output_tokens": 0, "total_tokens": 22298,
+    }
+    usage = mr._usage(codex_events, "codex", first_turn_usage=first_request)
+    assert {key: usage[key] for key in (
+        "input_tokens", "cached_input_tokens", "output_tokens"
+    )} == {"input_tokens": 42015, "cached_input_tokens": 26756, "output_tokens": 162}
+    assert usage["first_turn"]["input_tokens"] == 22232
+    assert usage["first_turn"]["cached_input_tokens"] == 0
+
+
+def _claude_turn(cache_read: int, cache_creation: int) -> dict[str, Any]:
+    return {
+        "type": "assistant",
+        "message": {
+            "content": [{"type": "text", "text": "turn"}],
+            "usage": {
+                "input_tokens": 1,
+                "cache_creation_input_tokens": cache_creation,
+                "cache_read_input_tokens": cache_read,
+                "output_tokens": 1,
+            },
+        },
+    }
+
+
+def _claude_result(input_tokens: int, cost: float, *, is_error: bool = False) -> dict[str, Any]:
+    return {
+        "type": "result",
+        "is_error": is_error,
+        "num_turns": 1,
+        "total_cost_usd": cost,
+        "usage": {
+            "input_tokens": input_tokens,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+            "output_tokens": 0,
+        },
+    }
+
+
+def test_usage_bills_every_attempt_but_first_turn_is_the_verdict_attempt() -> None:
+    failed = [_claude_turn(0, 20000), _claude_result(5, 0.10, is_error=True)]
+    succeeded = [_claude_turn(19000, 1000), _claude_result(7, 0.02)]
+    events = [*mr._tag_events(1, failed), *mr._tag_events(2, succeeded)]
+
+    usage = mr._usage(events, "claude", success_events=mr._tag_events(2, succeeded))
+
+    assert usage["input_tokens"] == 12
+    assert usage["num_turns"] == 2
+    assert usage["total_cost_usd"] == pytest.approx(0.12)
+    # A retry must not report the failed attempt's cold-cache first turn.
+    assert usage["first_turn"] == {
+        "cache_read_input_tokens": 19000,
+        "cache_creation_input_tokens": 1000,
+    }
+
+
+def _review(reviewer: str, extra: dict[str, Any]) -> mr.Review:
+    return mr.Review(
+        name="dt_crank_arm",
+        kind="part",
+        sources=["x.png"],
+        source_sha256=["b" * 64],
+        verdict=_clean_verdict(),
+        passed=True,
+        blind=True,
+        tool_events=0,
+        reviewer=reviewer,
+        model="model",
+        effort="low",
+        prompt_sha256="a" * 64,
+        sheet_count=1,
+        duration_s=1.0,
+        reviewed_at="now",
+        extra=extra,
+    )
+
+
+@pytest.mark.parametrize(
+    ("reviewer", "crop_calls", "usage", "share"),
+    [
+        (
+            "claude",
+            3,
+            {
+                "input_tokens": 4,
+                "cache_creation_input_tokens": 9765,
+                "cache_read_input_tokens": 6274,
+                "output_tokens": 66,
+                "total_cost_usd": 0.08,
+                "num_turns": 2,
+                "first_turn": {"cache_read_input_tokens": 0, "cache_creation_input_tokens": 6274},
+            },
+            "39.1%",  # 6274 / (4 + 6274 + 9765)
+        ),
+        (
+            "codex",
+            2,
+            {"input_tokens": 41015, "cached_input_tokens": 25856, "output_tokens": 112},
+            "63.0%",  # 25856 / 41015
+        ),
+        (
+            "codex",
+            0,
+            {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0},
+            "0.0%",
+        ),
+    ],
+)
+def test_markdown_reports_crop_count_and_cache_read_share(
+    reviewer: str, crop_calls: int, usage: dict[str, Any], share: str
+) -> None:
+    markdown = mr.render_markdown(
+        _review(reviewer, {"crop_calls": crop_calls, "usage": usage})
+    )
+    assert f", crops {crop_calls}, cache-read {share}" in markdown
+
+
+# --- review runs -------------------------------------------------------------
+
+
+@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+def test_attempt_dir_is_the_cwd_then_retained_without_sheet_images(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    isolated_codex: SimpleNamespace,
+    reviewer: str,
+) -> None:
+    sources = (
+        _pdf_source(tmp_path / "drawing.pdf", [(144, 72), (72, 144)]),
+        _png_source(tmp_path / "detail.png"),
+    )
+    report_dir = tmp_path / "reports"
+    seen: dict[str, Any] = {}
+
+    def fake_run(command: list[str], **kwargs: Any):
+        cwd = Path(kwargs["cwd"])
+        seen["cwd"] = cwd
+        # Every input the CLI may see sits in its own fresh attempt dir.
+        seen["files"] = sorted(path.name for path in cwd.rglob("*"))
+        seen["command"] = command
+        if reviewer == "claude":
+            config_path = cwd / _flag(command, "--mcp-config")
+            seen["config"] = json.loads(config_path.read_text(encoding="utf-8"))
+            return mr.subprocess.CompletedProcess(
+                command, 0, stdout=_claude_stdout(3, _clean_verdict()), stderr=""
+            )
+        assert Path(_flag(command, "-C")) == cwd
+        assert Path(_flag(command, "-o")).parent == cwd
+        seen["overrides"] = _codex_overrides(command)
+        reply = _codex_reply(command, kwargs, sheet_count=3)
+        seen["rollout"] = next(
+            (isolated_codex.home / "sessions").rglob("rollout-*.jsonl")
+        ).read_text(encoding="utf-8")
+        return reply
+
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    package = mr.ReviewPackage("package", "assembly", sources)
+    review = mr.review_package(
+        package, reviewer=reviewer, report_dir=report_dir, retries=0,
+        claude="claude-test", codex="codex-test",
+    )
+
+    assert review.passed and review.blind
+    assert review.sheet_count == 3
+    assert review.extra["sheets_viewed"] == [1, 2, 3]
+    assert review.extra["inspection_proven"] is True
+    assert review.extra["crop_calls"] == 0 and review.extra["crops"] == []
+    assert review.extra["context_errors"] == []
+    assert review.extra["neutral_calls"] == []
+    # The real SDK catalogue of these exact sources, recorded for both reviewers.
+    assert review.extra["evidence"]["mcp_catalog"] == {
+        "servers": ["sheets"], "resources": 0, "resource_templates": 0,
+    }
+    attempt_dir = seen["cwd"]
+    assert not attempt_dir.is_relative_to(report_dir)
+    assert not attempt_dir.is_relative_to(mr.CAD_ROOT.parent)
+    assert not isolated_codex.home.is_relative_to(attempt_dir)
+    expected_inputs = (
+        {"schema.json", "mcp.json"} if reviewer == "claude"
+        else {"schema.json", "codex-models.json"}
+    )
+    assert set(seen["files"]) == expected_inputs  # no sheet PNGs, no stray context
+    server_sources = [str(source.resolve()) for source in sources]
+    if reviewer == "claude":
+        assert seen["config"] == {
+            "mcpServers": {
+                "sheets": {
+                    "command": sys.executable,
+                    "args": [str(mr.SHEETS_SERVER), *server_sources],
+                }
+            }
+        }
+    else:
+        assert seen["overrides"]["mcp_servers.sheets.args"] == [
+            str(mr.SHEETS_SERVER),
+            *server_sources,
+        ]
+
+    saved_text = (report_dir / "package.json").read_text(encoding="utf-8")
+    saved = json.loads(saved_text)
+    (record,) = saved["extra"]["evidence"]["attempts"]
+    assert record["cwd"] == record["attempt_dir"]
+    assert Path(record["attempt_dir"]) == attempt_dir
+    assert not attempt_dir.exists()
+    assert record["retention_warning"] is None
+    retained = Path(record["retained_dir"])
+    assert retained.is_dir()
+    assert retained.parent == report_dir / "package.attempts"
+    assert retained.name == attempt_dir.name and retained.name.startswith("machrev-")
+    assert expected_inputs <= {path.name for path in retained.iterdir()}
+    assert not list(retained.rglob("*.png"))
+    assert Path(record["stdout_file"]).parent == retained
+    assert record["sources"] == server_sources
+    # Inspection argv only: retained paths substituted, provenance stays in command.
+    argv = record["retained_argv"]
+    assert record["command"] == seen["command"]
+    assert len(argv) == len(record["command"])
+    assert not any(str(attempt_dir) in argument for argument in argv)
+    if reviewer == "claude":
+        assert record["codex_home"] is None and record["rollout_file"] is None
+        assert Path(_flag(argv, "--mcp-config")) == retained / "mcp.json"
+        assert record["artifacts"] == []
+    else:
+        assert record["codex_home"] == str(mr.CODEX_HOME)
+        assert Path(record["rollout_file"]) == retained / "rollout.jsonl"
+        assert [json.loads(line) for line in seen["rollout"].splitlines()] == [
+            json.loads(line)
+            for line in Path(record["rollout_file"]).read_text(encoding="utf-8").splitlines()
+        ]
+        assert Path(_flag(argv, "-C")) == retained  # cwd was the attempt dir
+        assert Path(_flag(argv, "-o")) == retained / "verdict.json"
+        assert Path(_flag(argv, "--output-schema")) == retained / "schema.json"
+        assert Path(_codex_overrides(argv)["model_catalog_json"]) == retained / "codex-models.json"
+        assert [Path(path) for path in record["artifacts"]] == [
+            retained / "codex-models.json",
+            retained / "verdict.json",
+        ]
+    # The linked login never reaches a report or retained attempt.
+    assert _AUTH_SENTINEL not in saved_text
+    assert not any(
+        _AUTH_SENTINEL in path.read_text(encoding="utf-8", errors="replace")
+        for path in report_dir.rglob("*") if path.is_file()
+    )
 
 
 def test_attempt_records_carry_session_id_and_resume_command(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import uuid
-
-    source = tmp_path / "page.png"
-    source.write_bytes(b"png")
+    source = _png_source(tmp_path / "page.png")
     verdict = _clean_verdict()
     thread_id = "0199c0de-1234-4abc-9def-0123456789ab"
     calls = 0
 
-    def fake_run(command: list[str], **_kwargs: object):
+    def fake_run(command: list[str], **kwargs: Any):
         nonlocal calls
         calls += 1
         if command[0] == "codex-test":
-            output = Path(command[command.index("-o") + 1])
-            output.write_text(json.dumps(verdict), encoding="utf-8")
-            stdout = "\n".join(
-                [
-                    json.dumps({"type": "thread.started", "thread_id": thread_id}),
-                    json.dumps({"type": "turn.completed"}),
-                ]
+            return _codex_reply(
+                command, kwargs, sheet_count=1, verdict=verdict, thread_id=thread_id
             )
-            return mr.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
         if calls == 1:
             return mr.subprocess.CompletedProcess(command, 1, stdout="", stderr="failed")
-        stdout = json.dumps({"type": "result", "structured_output": verdict})
+        stdout = _claude_stdout(1, verdict)
         return mr.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
 
     monkeypatch.setattr(mr.subprocess, "run", fake_run)
@@ -226,73 +1942,13 @@ def test_verdict_validation_rejects_every_schema_violation() -> None:
         assert not mr.is_pass(value)
 
 
-def test_tool_events_allow_only_neutral_package_image_reads(tmp_path: Path) -> None:
-    images = [tmp_path / "sheet-1.png", tmp_path / "sheet-2.png"]
-    expected = {
-        "type": "assistant",
-        "message": {
-            "content": [
-                {
-                    "type": "tool_use",
-                    "name": "Read",
-                    "input": {"file_path": "sheet-1.png"},
-                }
-            ]
-        },
-    }
-    assert mr.count_tool_events([expected], allowed_images=images) == 0
-    assert mr.count_tool_events([expected]) == 1
-    structured = {
-        "type": "assistant",
-        "message": {
-            "content": [{"type": "tool_use", "name": "StructuredOutput", "input": {}}]
-        },
-    }
-    assert mr.count_tool_events([expected, structured], allowed_images=images) == 0
-    unexpected = {
-        "type": "assistant",
-        "message": {
-            "content": [
-                {"type": "tool_use", "name": "Bash", "input": {"command": "dir"}}
-            ]
-        },
-    }
-    assert mr.count_tool_events([unexpected], allowed_images=images) == 1
-
-
-def test_tool_events_are_detected_at_any_depth() -> None:
-    assert mr.count_tool_events([{"type": "agent_message", "text": "{}"}]) == 0
-    assert (
-        mr.count_tool_events(
-            [
-                {
-                    "type": "item.completed",
-                    "item": {"type": "command_execution", "command": "ls"},
-                }
-            ]
-        )
-        == 1
-    )
-    assert (
-        mr.count_tool_events([{"type": "turn.started"}, {"type": "mcp_tool_call"}]) == 1
-    )
-
-
 def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
     tmp_path: Path, monkeypatch
 ) -> None:
     import subprocess
 
-    png = tmp_path / "source.png"
-    png.write_bytes(b"image")
-    verdict = {
-        "verdict": "SHIP",
-        "summary": "ready",
-        "blockers": [],
-        "over_specification": [],
-        "clarity": [],
-        "minor": [],
-    }
+    png = _png_source(tmp_path / "source.png")
+    verdict = _clean_verdict()
     calls = 0
 
     def fake_run(command, **_kwargs):
@@ -314,9 +1970,8 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
             return subprocess.CompletedProcess(
                 command, 1, stdout=json.dumps(event), stderr="failed"
             )
-        event = {"type": "result", "structured_output": verdict}
         return subprocess.CompletedProcess(
-            command, 0, stdout=json.dumps(event), stderr=""
+            command, 0, stdout=_claude_stdout(1, verdict), stderr=""
         )
 
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -330,52 +1985,71 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
     )
     assert review.attempts == 2
     assert review.tool_events == 1
+    # The successful attempt inspected every sheet; only the hidden tool fails it.
+    assert review.extra["sheets_viewed"] == [1]
     assert not review.blind
     assert not review.passed
     records = [
         json.loads(line)
         for line in (report_dir / "part.events.jsonl").read_text().splitlines()
     ]
-    assert [record["attempt"] for record in records] == [1, 2]
+    assert records[0]["attempt"] == 1
+    assert {record["attempt"] for record in records} == {1, 2}
 
 
 @pytest.mark.parametrize("failure", ["nonzero_exit", "invalid_verdict", "timeout"])
 def test_retry_retains_failure_outputs_and_artifacts_after_success(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    isolated_codex: SimpleNamespace,
+    failure: str,
 ) -> None:
-    png = tmp_path / "source.png"
-    png.write_bytes(b"image")
+    png = _png_source(tmp_path / "source.png")
     report_dir = tmp_path / "reports"
     calls = 0
-    failed_stdout = 'diagnostic before JSON\n{"type": "turn.failed"}\n'
+    failed_thread = "01a13128-aaaa-7000-8000-000000000001"
+    success_thread = "01a13128-bbbb-7000-8000-000000000002"
+    failed_stdout = (
+        "diagnostic before JSON\n"
+        f'{{"type": "thread.started", "thread_id": "{failed_thread}"}}\n'
+        '{"type": "turn.failed"}\n'
+    )
     failed_stderr = "reviewer diagnostic: interrupted response\n"
     invalid_verdict = "incomplete response, not JSON"
+    success_events = _codex_events(1, success_thread)
+    replies: list[Any] = []
 
     def fake_run(command: list[str], **kwargs: Any):
         nonlocal calls
         calls += 1
-        output = Path(command[command.index("-o") + 1])
-        if calls == 1:
-            output.write_text(invalid_verdict, encoding="utf-8")
-            session = Path(kwargs["cwd"]) / "session"
-            session.mkdir()
-            (session / "trace.txt").write_text("failed attempt trace", encoding="utf-8")
-            if failure == "timeout":
-                raise mr.subprocess.TimeoutExpired(
-                    command,
-                    kwargs["timeout"],
-                    output=failed_stdout.encode("utf-8"),
-                    stderr=failed_stderr.encode("utf-8"),
-                )
-            return mr.subprocess.CompletedProcess(
-                command,
-                17 if failure == "nonzero_exit" else 0,
-                stdout=failed_stdout,
-                stderr=failed_stderr,
+        if calls > 1:
+            replies.append(
+                _codex_reply(command, kwargs, sheet_count=1, thread_id=success_thread)
             )
-        output.write_text(json.dumps(_clean_verdict()), encoding="utf-8")
+            return replies[-1]
+        output = Path(_flag(command, "-o"))
+        # A started session always leaves an authoritative (here: tool-free) rollout.
+        _write_rollout(
+            Path(kwargs["env"]["CODEX_HOME"]),
+            failed_thread,
+            _codex_rollout(kwargs["input"], thread_id=failed_thread, cwd=str(kwargs["cwd"]), views=()),
+        )
+        output.write_text(invalid_verdict, encoding="utf-8")
+        session = output.parent / "session"
+        session.mkdir()
+        (session / "trace.txt").write_text("failed attempt trace", encoding="utf-8")
+        if failure == "timeout":
+            raise mr.subprocess.TimeoutExpired(
+                command,
+                kwargs["timeout"],
+                output=failed_stdout.encode("utf-8"),
+                stderr=failed_stderr.encode("utf-8"),
+            )
         return mr.subprocess.CompletedProcess(
-            command, 0, stdout='{"type": "turn.completed"}\n', stderr=""
+            command,
+            17 if failure == "nonzero_exit" else 0,
+            stdout=failed_stdout,
+            stderr=failed_stderr,
         )
 
     monkeypatch.setattr(mr.subprocess, "run", fake_run)
@@ -389,6 +2063,7 @@ def test_retry_retains_failure_outputs_and_artifacts_after_success(
 
     assert review.passed and review.blind
     assert review.error is None
+    assert review.extra["context_errors"] == []
     saved = json.loads((report_dir / "part.json").read_text(encoding="utf-8"))
     failed, succeeded = saved["extra"]["evidence"]["attempts"]
     assert failed["outcome"] == ("timed_out" if failure == "timeout" else "failed")
@@ -405,9 +2080,11 @@ def test_retry_retains_failure_outputs_and_artifacts_after_success(
         "invalid_verdict": "final message is not JSON",
         "timeout": "TimeoutExpired",
     }[failure] in failed["error"]
+    assert failed["session_id"] == failed_thread
     assert Path(failed["stdout_file"]).read_text(encoding="utf-8") == failed_stdout
     assert Path(failed["stderr_file"]).read_text(encoding="utf-8") == failed_stderr
     artifacts = {Path(path).name: Path(path) for path in failed["artifacts"]}
+    assert set(artifacts) == {"codex-models.json", "session", "verdict.json"}
     assert artifacts["verdict.json"].read_text(encoding="utf-8") == invalid_verdict
     assert (artifacts["session"] / "trace.txt").read_text(encoding="utf-8") == (
         "failed attempt trace"
@@ -415,38 +2092,44 @@ def test_retry_retains_failure_outputs_and_artifacts_after_success(
     assert succeeded["outcome"] == "succeeded"
     assert succeeded["error"] is None
     assert succeeded["exit_code"] == 0
-    assert Path(succeeded["stdout_file"]).read_text(encoding="utf-8") == (
-        '{"type": "turn.completed"}\n'
-    )
+    assert Path(succeeded["stdout_file"]).read_text(encoding="utf-8") == replies[0].stdout
     assert Path(succeeded["stderr_file"]).read_bytes() == b""
     success_artifacts = {Path(path).name: Path(path) for path in succeeded["artifacts"]}
+    assert set(success_artifacts) == {"codex-models.json", "verdict.json"}
     assert json.loads(
         success_artifacts["verdict.json"].read_text(encoding="utf-8")
     ) == (_clean_verdict())
+    assert failed["retained_dir"] != succeeded["retained_dir"]
+    assert failed["attempt_dir"] != succeeded["attempt_dir"]
     for record in (failed, succeeded):
-        assert not Path(record["cwd"]).exists()
+        assert not Path(record["attempt_dir"]).exists()
+        assert record["retention_warning"] is None
+        retained = Path(record["retained_dir"])
+        assert retained.is_dir() and retained.is_relative_to(report_dir)
         for path in (
             record["stdout_file"],
             record["stderr_file"],
+            record["rollout_file"],
             *record["artifacts"],
         ):
-            assert Path(path).is_relative_to(report_dir)
+            assert Path(path).parent == retained
             assert Path(path).exists()
+    # events.jsonl keeps the CLI's own --json stream; the rollouts sit beside it.
     events = [
         json.loads(line)
         for line in Path(review.events_file).read_text(encoding="utf-8").splitlines()
     ]
     assert events == [
+        {"attempt": 1, "event": {"type": "thread.started", "thread_id": failed_thread}},
         {"attempt": 1, "event": {"type": "turn.failed"}},
-        {"attempt": 2, "event": {"type": "turn.completed"}},
+        *({"attempt": 2, "event": event} for event in success_events),
     ]
 
 
-def test_retry_requires_image_reads_from_the_successful_attempt(
+def test_retry_requires_sheet_views_from_the_successful_attempt(
     tmp_path: Path, monkeypatch
 ) -> None:
-    png = tmp_path / "source.png"
-    png.write_bytes(b"image")
+    png = _png_source(tmp_path / "source.png")
     verdict = _clean_verdict()
     calls = 0
 
@@ -454,20 +2137,9 @@ def test_retry_requires_image_reads_from_the_successful_attempt(
         nonlocal calls
         calls += 1
         if calls == 1:
-            read = {
-                "type": "assistant",
-                "message": {
-                    "content": [
-                        {
-                            "type": "tool_use",
-                            "name": "Read",
-                            "input": {"file_path": "sheet-1.png"},
-                        }
-                    ]
-                },
-            }
+            stdout = "\n".join(json.dumps(event) for event in _views("claude", (1,)))
             return mr.subprocess.CompletedProcess(
-                command, 1, stdout=json.dumps(read), stderr="failed"
+                command, 1, stdout=stdout, stderr="failed"
             )
         result = {"type": "result", "structured_output": verdict}
         return mr.subprocess.CompletedProcess(
@@ -485,21 +2157,10 @@ def test_retry_requires_image_reads_from_the_successful_attempt(
 
     assert review.attempts == 2
     assert review.tool_events == 0
-    assert review.extra["images_read"] == []
+    assert review.extra["sheets_viewed"] == []
+    assert review.extra["inspection_proven"] is False
     assert not review.blind
     assert not review.passed
-
-
-def test_codex_blindness_fails_closed_on_every_tool_or_command() -> None:
-    passive = {"type": "agent_message", "text": "review complete"}
-    tool = {"type": "item.completed", "item": {"type": "tool_use", "name": "Read"}}
-    command = {
-        "type": "item.completed",
-        "item": {"type": "command_execution", "command": "type sheet.png"},
-    }
-    assert mr.count_codex_tool_events([passive]) == 0
-    assert mr.count_codex_tool_events([tool]) == 1
-    assert mr.count_codex_tool_events([command]) == 1
 
 
 def test_both_structured_verdict_parsers(tmp_path: Path) -> None:
@@ -520,27 +2181,16 @@ def test_arbitrary_png_reports_with_same_basename_do_not_collide(
     import subprocess
     from concurrent.futures import ThreadPoolExecutor
 
-    verdict = {
-        "verdict": "SHIP",
-        "summary": "ready",
-        "blockers": [],
-        "over_specification": [],
-        "clarity": [],
-        "minor": [],
-    }
+    verdict = _clean_verdict()
 
-    def fake_run(command, **_kwargs):
-        output = Path(command[command.index("-o") + 1])
-        output.write_text(json.dumps(verdict), encoding="utf-8")
-        return subprocess.CompletedProcess(
-            command, 0, stdout=json.dumps({"type": "turn.completed"}), stderr=""
-        )
+    def fake_run(command, **kwargs):
+        return _codex_reply(command, kwargs, sheet_count=1, verdict=verdict)
 
     monkeypatch.setattr(subprocess, "run", fake_run)
     inputs = [tmp_path / "left" / "part.png", tmp_path / "right" / "part.png"]
     for index, image in enumerate(inputs):
         image.parent.mkdir()
-        image.write_bytes(f"png-{index}".encode())
+        _png_source(image, (10 + index, 10))
     packages = [mr._package_for_pngs([image], "part") for image in inputs]
     assert packages[0].name != packages[1].name
 
@@ -570,107 +2220,6 @@ def test_arbitrary_png_reports_with_same_basename_do_not_collide(
     assert all(f"]({name}.md)" in index for name in names)
 
 
-def test_pdfium_operations_share_one_module_lock(tmp_path: Path, monkeypatch) -> None:
-    import sys
-    import threading
-    import types
-    from concurrent.futures import ThreadPoolExecutor
-
-    class ObservedLock:
-        def __init__(self) -> None:
-            self._lock = threading.Lock()
-            self._state_lock = threading.Lock()
-            self.owner: int | None = None
-            self.active = 0
-            self.max_active = 0
-            self.acquisitions = 0
-
-        def __enter__(self):
-            self._lock.acquire()
-            with self._state_lock:
-                self.owner = threading.get_ident()
-                self.active += 1
-                self.max_active = max(self.max_active, self.active)
-                self.acquisitions += 1
-            return self
-
-        def __exit__(self, *_args) -> None:
-            with self._state_lock:
-                self.active -= 1
-                self.owner = None
-            self._lock.release()
-
-        def assert_held(self, operation: str) -> None:
-            assert self.owner == threading.get_ident(), (
-                f"PDFium operation escaped the shared lock: {operation}"
-            )
-
-    observed_lock = ObservedLock()
-
-    class FakeImage:
-        def save(self, path: Path, **_kwargs) -> None:
-            path.write_bytes(b"png")
-
-    class FakeBitmap:
-        def to_pil(self) -> FakeImage:
-            observed_lock.assert_held("bitmap.to_pil")
-            return FakeImage()
-
-    class FakePage:
-        def render(self, **_kwargs) -> FakeBitmap:
-            observed_lock.assert_held("page.render")
-            return FakeBitmap()
-
-        def close(self) -> None:
-            observed_lock.assert_held("page.close")
-
-    class FakeDocument:
-        def __init__(self, _path: str) -> None:
-            observed_lock.assert_held("PdfDocument")
-
-        def __len__(self) -> int:
-            observed_lock.assert_held("document length")
-            return 2
-
-        def __getitem__(self, _index: int) -> FakePage:
-            observed_lock.assert_held("document page")
-            return FakePage()
-
-        def close(self) -> None:
-            observed_lock.assert_held("document.close")
-
-    monkeypatch.setattr(mr, "_PDFIUM_LOCK", observed_lock)
-    monkeypatch.setitem(
-        sys.modules, "pypdfium2", types.SimpleNamespace(PdfDocument=FakeDocument)
-    )
-    # The barrier is a rendezvous, not a stopwatch: both threads must be inside
-    # the lock's reach at once. The deadline only stops a real deadlock from
-    # hanging the suite, so it is generous -- a 5 s budget failed this gate when
-    # the machine was busy with a parallel `doit -n 4` and a review subprocess.
-    barrier = threading.Barrier(2, timeout=120)
-    source = tmp_path / "assembly.pdf"
-    package = mr.ReviewPackage("assembly", "assembly", (source,))
-    workdir = tmp_path / "images"
-    workdir.mkdir()
-
-    def page_count() -> int:
-        barrier.wait()
-        return mr._pdf_page_count(source)
-
-    def materialize() -> list[Path]:
-        barrier.wait()
-        return mr._materialize_images(package, workdir)
-
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        page_count_future = pool.submit(page_count)
-        materialize_future = pool.submit(materialize)
-        assert page_count_future.result() == 2
-        assert len(materialize_future.result()) == 2
-
-    assert observed_lock.acquisitions == 2
-    assert observed_lock.max_active == 1
-
-
 def test_multi_sheet_assembly_is_one_cross_sheet_review(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -698,22 +2247,12 @@ def test_multi_sheet_assembly_is_one_cross_sheet_review(
         ],
         "minor": [],
     }
-    captured: list[tuple[list[Path], str, list[bytes]]] = []
+    captured: list[tuple[list[str], str]] = []
 
     def fake_run(command, **kwargs):
-        attachments = [
-            Path(command[index + 1])
-            for index, value in enumerate(command)
-            if value == "-i"
-        ]
-        prompt = kwargs["input"]
-        signatures = [path.read_bytes()[:4] for path in attachments]
-        captured.append((attachments, prompt, signatures))
-        output = Path(command[command.index("-o") + 1])
-        output.write_text(json.dumps(verdict), encoding="utf-8")
-        return subprocess.CompletedProcess(
-            command, 0, stdout=json.dumps({"type": "turn.completed"}), stderr=""
-        )
+        assert not list(Path(kwargs["cwd"]).rglob("*.png"))
+        captured.append((command, kwargs["input"]))
+        return _codex_reply(command, kwargs, sheet_count=2, verdict=verdict)
 
     monkeypatch.setattr(subprocess, "run", fake_run)
     package = mr.ReviewPackage("gearbox", "assembly", (source,))
@@ -728,24 +2267,24 @@ def test_multi_sheet_assembly_is_one_cross_sheet_review(
     assert review.error is None
     assert review.verdict == verdict
     assert len(captured) == 1
-    attachments, prompt, signatures = captured[0]
-    assert len(attachments) == 2
-    assert len(signatures) == 2
-    assert all(signature == b"\x89PNG" for signature in signatures)
+    command, prompt = captured[0]
+    assert _codex_overrides(command)["mcp_servers.sheets.args"][1:] == [
+        str(source.resolve())
+    ]
+    assert "Sheet count: 2" in prompt
     assert review.sheet_count == 2
+    assert review.extra["sheets_viewed"] == [1, 2]
+    assert review.blind
     assert review.sources == [str(source)]
     assert len(review.source_sha256) == 1
     assert not review.passed
 
 
-def test_registry_part_pdf_reviews_every_page_at_print_resolution(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_registry_part_pdf_reviews_every_page(tmp_path: Path, monkeypatch) -> None:
     import hashlib
     import subprocess
     from types import SimpleNamespace
 
-    from PIL import Image
     from pypdf import PdfWriter
 
     source = tmp_path / "part.pdf"
@@ -759,7 +2298,6 @@ def test_registry_part_pdf_reviews_every_page_at_print_resolution(
         "two-sheet-part",
         SimpleNamespace(source_kind="part", outputs={"pdf": source}),
     )
-    dimensions = []
     prompts = []
     verdict = _clean_verdict("FIX")
     verdict["blockers"] = [
@@ -771,22 +2309,9 @@ def test_registry_part_pdf_reviews_every_page_at_print_resolution(
     ]
 
     def fake_run(command, **kwargs):
-        attachments = [
-            Path(command[index + 1])
-            for index, value in enumerate(command)
-            if value == "-i"
-        ]
-        for path in attachments:
-            with Image.open(path) as image:
-                dimensions.append(image.size)
-                assert image.info["dpi"] == pytest.approx((300, 300), abs=0.01)
         assert kwargs["input"].startswith(mr.load_prompt("part"))
         prompts.append(kwargs["input"])
-        output = Path(command[command.index("-o") + 1])
-        output.write_text(json.dumps(verdict), encoding="utf-8")
-        return subprocess.CompletedProcess(
-            command, 0, stdout=json.dumps({"type": "turn.completed"}), stderr=""
-        )
+        return _codex_reply(command, kwargs, sheet_count=2, verdict=verdict)
 
     monkeypatch.setattr(subprocess, "run", fake_run)
     report_dir = tmp_path / "reports"
@@ -799,9 +2324,9 @@ def test_registry_part_pdf_reviews_every_page_at_print_resolution(
     )
 
     assert review.error is None
-    assert dimensions == [(300, 600), (600, 300)]
     assert review.kind == "part"
     assert review.sheet_count == 2
+    assert review.blind
     assert review.sources == [str(source)]
     assert review.source_sha256 == [hashlib.sha256(source.read_bytes()).hexdigest()]
     assert (
@@ -815,19 +2340,17 @@ def test_registry_part_pdf_reviews_every_page_at_print_resolution(
 
 
 def test_explicit_part_png_package_accepts_multiple_sheets(tmp_path: Path) -> None:
-    from PIL import Image
-
-    sheets = (tmp_path / "part-a.png", tmp_path / "part-b.png")
-    for sheet in sheets:
-        Image.new("RGB", (10, 10), "white").save(sheet)
-    package = mr._package_for_pngs(sheets, "part")
+    sources = (
+        _png_source(tmp_path / "part-a.png", (40, 20)),
+        _png_source(tmp_path / "part-b.png", (20, 40)),
+    )
+    package = mr._package_for_pngs(sources, "part")
     assert mr._validate_package(package) == 2
-    workdir = tmp_path / "images"
-    workdir.mkdir()
-    images = mr._materialize_images(package, workdir)
-    assert [image.read_bytes() for image in images] == [
-        sheet.read_bytes() for sheet in sheets
-    ]
+    with sheets.SheetStore(package.sources) as store:
+        assert store.sheet_count == 2
+        # Whole-sheet PNG views only ever downscale; small originals stay native.
+        assert [store.view_size(sheet) for sheet in (1, 2)] == [(40, 20), (20, 40)]
+        assert _image(store.view_sheet(1)[0]).size == (40, 20)
 
 
 @pytest.mark.parametrize("contents", [b"", b"not a PDF"])
@@ -936,7 +2459,7 @@ def test_review_serialises_and_indexes(tmp_path: Path) -> None:
 def test_main_distinguishes_missing_and_unknown_names(capsys) -> None:
     assert mr.main([]) == 2
     assert capsys.readouterr().err == (
-        "--reviewer is required for review runs (choose claude or codex)\n"
+        "no drawing names given; use --all, --png or a name\n"
     )
 
     assert mr.main(["--reviewer", "codex"]) == 2
@@ -952,39 +2475,17 @@ def test_both_reviewers_receive_one_complete_package_invocation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     verdict = _clean_verdict()
-    sources = (tmp_path / "page-a.png", tmp_path / "page-b.png")
-    for source in sources:
-        source.write_bytes(b"png")
+    sources = (
+        _png_source(tmp_path / "page-a.png"),
+        _png_source(tmp_path / "page-b.png"),
+    )
     commands: list[list[str]] = []
 
-    def fake_run(command: list[str], **kwargs: object):
+    def fake_run(command: list[str], **kwargs: Any):
         commands.append(command)
         if command[0] == "codex-test":
-            output = Path(command[command.index("-o") + 1])
-            output.write_text(json.dumps(verdict), encoding="utf-8")
-            stdout = json.dumps({"type": "turn.completed"})
-        else:
-            reads = [
-                {
-                    "type": "assistant",
-                    "message": {
-                        "content": [
-                            {
-                                "type": "tool_use",
-                                "name": "Read",
-                                "input": {"file_path": f"sheet-{index}.png"},
-                            }
-                        ]
-                    },
-                }
-                for index in (1, 2)
-            ]
-            stdout = "\n".join(
-                [
-                    *(json.dumps(event) for event in reads),
-                    json.dumps({"type": "result", "structured_output": verdict}),
-                ]
-            )
+            return _codex_reply(command, kwargs, sheet_count=2, verdict=verdict)
+        stdout = _claude_stdout(2, verdict)
         return mr.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
 
     monkeypatch.setattr(mr.subprocess, "run", fake_run)
@@ -1004,9 +2505,748 @@ def test_both_reviewers_receive_one_complete_package_invocation(
         codex="codex-test",
     )
 
-    assert (claude_review.model, claude_review.effort) == ("claude-fable-5-1", "medium")
+    assert (claude_review.model, claude_review.effort) == ("claude-opus-5-5", "medium")
     assert (codex_review.model, codex_review.effort) == ("gpt-6-astra", "low")
     assert claude_review.blind and codex_review.blind
-    assert claude_review.extra["images_read"] == ["sheet-1.png", "sheet-2.png"]
+    assert claude_review.passed and codex_review.passed
+    assert claude_review.extra["sheets_viewed"] == [1, 2]
+    assert codex_review.extra["sheets_viewed"] == [1, 2]
     assert len(commands) == 2
-    assert sum(value == "-i" for value in commands[1]) == 2
+    assert "-i" not in commands[1]
+
+
+def _codex_review(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    replies: Sequence[Any],
+    *,
+    sheet_count: int = 2,
+    retries: int = 0,
+) -> Any:
+    """Run one Codex review whose invocations are answered by ``replies`` in order."""
+    sources = tuple(
+        _png_source(tmp_path / f"page-{index}.png") for index in range(1, sheet_count + 1)
+    )
+    pending = list(replies)
+
+    def fake_run(command: list[str], **kwargs: Any):
+        return pending.pop(0)(command, kwargs)
+
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    review = mr.review_package(
+        mr.ReviewPackage("package", "assembly", sources),
+        reviewer="codex",
+        report_dir=tmp_path / "reports",
+        retries=retries,
+        codex="codex-test",
+    )
+    assert pending == []
+    return review
+
+
+def test_codex_rollout_overrides_a_clean_json_stream_with_hidden_exec(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def reply(command: list[str], kwargs: dict[str, Any]):
+        # --json shows two clean views; the rollout also holds a code-mode cell.
+        cell = _rollout_exec_cell("call_exec", 'text(await tools.shell({"command": "dir"}))')
+        return _codex_reply(command, kwargs, sheet_count=2, after=cell)
+
+    review = _codex_review(tmp_path, monkeypatch, [reply])
+
+    assert review.tool_events >= 1
+    assert not review.blind and not review.passed
+
+
+@pytest.mark.parametrize(
+    "injection",
+    [
+        {"before": [_SKILLS_CONTEXT]},
+        {"before": [_AGENTS_CONTEXT]},
+        {"agents_md": {"text": _AGENTS_MD_TEXT}},
+        {"skills": True},
+    ],
+    ids=["skills_message", "agents_message", "world_state_agents_md", "world_state_skills"],
+)
+def test_codex_rollout_context_beyond_the_prompt_is_never_blind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, injection: dict[str, Any]
+) -> None:
+    def reply(command: list[str], kwargs: dict[str, Any]):
+        return _codex_reply(command, kwargs, sheet_count=2, **injection)
+
+    review = _codex_review(tmp_path, monkeypatch, [reply])
+
+    assert review.extra["context_errors"]
+    assert not review.blind and not review.passed
+    assert review.extra["sheets_viewed"] == []
+
+
+def test_codex_views_are_proven_by_the_rollout_not_the_json_stream(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def reply(command: list[str], kwargs: dict[str, Any]):
+        # --json claims both sheets; the authoritative rollout shows only sheet 1.
+        return _codex_reply(command, kwargs, sheet_count=2, rollout_views=(1,))
+
+    review = _codex_review(tmp_path, monkeypatch, [reply])
+
+    assert review.extra["context_errors"] == []
+    assert review.extra["sheets_viewed"] == [1]
+    assert review.extra["inspection_proven"] is False
+    assert not review.blind and not review.passed
+
+
+def _neutral_reply(
+    *cases: str, rollout_views: Sequence[int] | None = None, exit_code: int = 0
+) -> Any:
+    """A Codex attempt that also used neutral resource helpers in its own session."""
+    thread_id = str(uuid.uuid4())
+    after = [
+        row
+        for index, case in enumerate(cases)
+        for row in _resource_rows(
+            _NEUTRAL_RESOURCE_CASES[case], f"call_resource_{index}", thread_id=thread_id
+        )
+    ]
+
+    def reply(command: list[str], kwargs: dict[str, Any]):
+        completed = _codex_reply(
+            command, kwargs, sheet_count=2, thread_id=thread_id,
+            rollout_views=rollout_views, after=after,
+        )
+        completed.returncode = exit_code
+        return completed
+
+    return reply
+
+
+def _neutral_entries(*cases: str) -> list[dict[str, Any]]:
+    return [
+        {"tool": _NEUTRAL_RESOURCE_CASES[case]["name"],
+         "arguments": _NEUTRAL_RESOURCE_CASES[case]["arguments"]}
+        for case in cases
+    ]
+
+
+def test_codex_review_records_neutral_resource_calls_across_attempts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    replies = [
+        _neutral_reply("list", exit_code=1),
+        _neutral_reply("list_templates_sheets", "read_sheets", "read_unspecified"),
+    ]
+    review = _codex_review(tmp_path, monkeypatch, replies, retries=1)
+
+    assert review.attempts == 2 and review.error is None
+    assert review.extra["context_errors"] == []
+    assert review.tool_events == 0
+    assert review.blind and review.passed
+    assert review.extra["sheets_viewed"] == [1, 2]
+    assert review.extra["neutral_calls"] == _neutral_entries(
+        "list", "list_templates_sheets", "read_sheets", "read_unspecified"
+    )
+    assert review.extra["evidence"]["mcp_catalog"] == {
+        "servers": ["sheets"], "resources": 0, "resource_templates": 0,
+    }
+
+
+def test_codex_neutral_resource_calls_never_stand_in_for_views(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reply = _neutral_reply("read_sheets", "list", rollout_views=(1,))
+    review = _codex_review(tmp_path, monkeypatch, [reply])
+
+    assert review.tool_events == 0 and review.extra["context_errors"] == []
+    assert review.extra["neutral_calls"] == _neutral_entries("read_sheets", "list")
+    assert review.extra["sheets_viewed"] == [1]
+    assert review.extra["inspection_proven"] is False
+    assert not review.blind and not review.passed
+
+
+@pytest.mark.parametrize(
+    "after",
+    [
+        _FOREIGN_RESOURCE_CASES["read_other_server"],
+        _FOREIGN_RESOURCE_CASES["get_goal"],
+        _resource_rows(_NONEMPTY_RESOURCE_CASES["list_entries"]),
+        _resource_rows(_NONEMPTY_RESOURCE_CASES["read_content"]),
+    ],
+    ids=["read_other_server", "get_goal", "list_entries", "read_content"],
+)
+def test_codex_review_neutral_permission_stays_scoped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, after: list[dict[str, Any]]
+) -> None:
+    def reply(command: list[str], kwargs: dict[str, Any]):
+        return _codex_reply(
+            command, kwargs, sheet_count=2, thread_id=_ROLLOUT_THREAD, after=after
+        )
+
+    review = _codex_review(tmp_path, monkeypatch, [reply])
+
+    assert review.tool_events >= 1 or review.extra["context_errors"]
+    assert not review.blind and not review.passed
+
+
+@pytest.mark.parametrize("retries", [0, 1])
+def test_codex_missing_rollout_after_session_start_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, retries: int
+) -> None:
+    def missing(command: list[str], kwargs: dict[str, Any]):
+        return _codex_reply(command, kwargs, sheet_count=2, rollout=False)
+
+    def complete(command: list[str], kwargs: dict[str, Any]):
+        return _codex_reply(command, kwargs, sheet_count=2)
+
+    replies = [missing, complete][: retries + 1]
+    review = _codex_review(tmp_path, monkeypatch, replies, retries=retries)
+
+    records = review.extra["evidence"]["attempts"]
+    assert review.attempts == len(records) == retries + 1
+    assert records[0]["outcome"] == "failed"
+    assert records[0]["session_id"] and records[0]["rollout_file"] is None
+    assert Path(records[0]["stdout_file"]).exists()
+    # An unverifiable session is a context failure, never a provider blackout.
+    assert any(error.startswith("attempt 1:") for error in review.extra["context_errors"])
+    assert not review.blind and not review.passed
+    if retries:
+        assert records[1]["outcome"] == "succeeded"
+        assert review.error is None
+        assert review.extra["sheets_viewed"] == [1, 2]
+    else:
+        assert review.error is not None
+        assert review.extra["sheets_viewed"] == []
+
+
+@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+def test_provider_failures_stay_blind_but_never_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str
+) -> None:
+    def fake_run(command: list[str], **kwargs: Any):
+        if reviewer == "claude":
+            event = {"type": "result", "is_error": True, "result": "quota exhausted"}
+            return mr.subprocess.CompletedProcess(
+                command, 1, stdout=json.dumps(event), stderr=""
+            )
+        # The provider refused before any session existed: nothing to audit.
+        return mr.subprocess.CompletedProcess(command, 1, stdout="", stderr="quota exhausted")
+
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    review = mr.review_package(
+        mr.ReviewPackage("package", "part", (_png_source(tmp_path / "page.png"),)),
+        reviewer=reviewer,
+        report_dir=tmp_path / "reports",
+        retries=1,
+        claude="claude-test",
+        codex="codex-test",
+    )
+
+    assert review.attempts == 2
+    assert "quota exhausted" in review.error
+    assert review.tool_events == 0 and review.extra["context_errors"] == []
+    assert review.extra["neutral_calls"] == []
+    assert review.blind and not review.passed
+    assert review.verdict is None
+    row = next(line for line in mr.render_index([review]).splitlines() if "[package]" in line)
+    cells = [cell.strip() for cell in row.strip().strip("|").split("|")]
+    assert cells[3:5] == ["FAIL", "ERROR"]
+    assert cells[-2] == "yes"  # blind; the last column is the review time
+
+
+def test_retention_falls_back_to_copy_when_windows_holds_the_attempt_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_rmtree = shutil.rmtree
+    held: list[Path] = []
+    calls = 0
+
+    def held_move(source: str, destination: str) -> None:
+        raise PermissionError(13, "The process cannot access the file", source)
+
+    def held_rmtree(path: Any, *args: Any, **kwargs: Any) -> None:
+        if any(Path(path) == attempt for attempt in held):
+            raise PermissionError(32, "being used by another process", str(path))
+        real_rmtree(path, *args, **kwargs)
+
+    def fake_run(command: list[str], **kwargs: Any):
+        nonlocal calls
+        calls += 1
+        held.append(Path(kwargs["cwd"]))
+        if calls == 1:
+            return mr.subprocess.CompletedProcess(command, 3, stdout="partial", stderr="crashed")
+        return mr.subprocess.CompletedProcess(
+            command, 0, stdout=_claude_stdout(1, _clean_verdict()), stderr=""
+        )
+
+    monkeypatch.setattr(mr.shutil, "move", held_move)
+    monkeypatch.setattr(mr.shutil, "rmtree", held_rmtree)
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    report_dir = tmp_path / "reports"
+    try:
+        review = mr.review_package(
+            mr.ReviewPackage("package", "part", (_png_source(tmp_path / "page.png"),)),
+            reviewer="claude",
+            report_dir=report_dir,
+            retries=1,
+            claude="claude-test",
+        )
+    finally:
+        for attempt in held:
+            real_rmtree(attempt, ignore_errors=True)
+
+    # A locked original costs a warning, never the report or the retry.
+    assert review.attempts == 2 and review.passed
+    assert Path(review.events_file).exists()
+    assert (report_dir / "package.json").exists()
+    records = review.extra["evidence"]["attempts"]
+    assert [record["outcome"] for record in records] == ["failed", "succeeded"]
+    for record, attempt in zip(records, held, strict=True):
+        assert record["attempt_dir"] == str(attempt)
+        assert "PermissionError" in record["retention_warning"]
+        retained = Path(record["retained_dir"])
+        assert retained.is_dir() and retained.is_relative_to(report_dir)
+        assert (retained / "mcp.json").exists()
+        assert Path(record["stdout_file"]).parent == retained
+        assert Path(record["stderr_file"]).exists()
+    assert Path(records[0]["stderr_file"]).read_text(encoding="utf-8") == "crashed"
+
+
+# --- sheet server --------------------------------------------------------------
+
+
+def test_views_are_deterministic_grayscale_fits_for_pdf_and_png(
+    tmp_path: Path,
+) -> None:
+    sources = [
+        _pdf_source(tmp_path / "landscape.pdf", [(792, 612), (792, 612)]),
+        _pdf_source(tmp_path / "portrait.pdf", [(612, 792)]),
+        _png_source(tmp_path / "wide.png", (3000, 2000), squares=[(10, 10, 50, 50)]),
+        # Transparent PNG with DPI metadata: composited, metadata stripped.
+        _png_source(tmp_path / "tall.png", (1500, 2400), mode="RGBA", dpi=(150, 150)),
+    ]
+    source_sizes = [(792, 612), (792, 612), (612, 792), (3000, 2000), (1500, 2400)]
+    box_width, box_height = sheets.VIEW_BOX
+
+    with sheets.SheetStore(sources) as first, sheets.SheetStore(sources) as second:
+        assert first.sheet_count == len(source_sizes)  # PDF pages expand in order
+        for sheet, (width, height) in enumerate(source_sizes, start=1):
+            png, text = first.view_sheet(sheet)
+            image = _image(png)
+            assert image.mode == "L"
+            assert image.size == first.view_size(sheet)
+            view_width, view_height = image.size
+            assert view_width <= box_width and view_height <= box_height
+            assert view_width >= box_width - 1 or view_height >= box_height - 1
+            assert view_width == pytest.approx(view_height * width / height, abs=1.5)
+            assert set(_png_chunk_types(png)) <= {"IHDR", "IDAT", "IEND"}
+            assert text.startswith(
+                f"sheet {sheet} of {len(source_sizes)}, {view_width}×{view_height} px"
+            )
+            assert second.view_sheet(sheet) == (png, text)  # fresh store, same bytes
+            assert first.view_sheet(sheet)[0] == png
+        with pytest.raises(ValueError):
+            first.view_sheet(0)
+        with pytest.raises(ValueError):
+            first.view_sheet(len(source_sizes) + 1)
+
+
+@pytest.mark.parametrize("kind", ["pdf", "png"])
+def test_crop_maps_top_left_view_pixels_to_the_source_region(
+    tmp_path: Path, kind: str
+) -> None:
+    if kind == "pdf":
+        size, square, window = (1000, 800), (600, 200, 700, 300), (560, 160, 740, 340)
+        source = _pdf_source(tmp_path / "square.pdf", [size], squares=[square])
+    else:
+        size, square, window = (3000, 2000), (1800, 600, 2100, 900), (1700, 500, 2200, 1000)
+        source = _png_source(tmp_path / "square.png", size, squares=[square])
+    box_width, box_height = sheets.VIEW_BOX
+
+    with sheets.SheetStore([source]) as store:
+        view_width, view_height = store.view_size(1)
+        scale = view_width / size[0]
+        assert view_height == pytest.approx(size[1] * scale, abs=1)
+        view = _image(store.view_sheet(1)[0])
+        assert _dark_bbox(view) == pytest.approx(
+            tuple(value * scale for value in square), abs=3
+        )
+
+        rect = [round(value * scale) for value in window]
+        png, text = store.crop(1, *rect)
+        crop = _image(png)
+        assert crop.mode == "L"
+        assert set(_png_chunk_types(png)) <= {"IHDR", "IDAT", "IEND"}
+        rect_width, rect_height = rect[2] - rect[0], rect[3] - rect[1]
+        magnification = min(
+            sheets.MAX_SCALE, box_width / rect_width, box_height / rect_height
+        )
+        assert crop.size == pytest.approx(
+            (rect_width * magnification, rect_height * magnification), abs=2
+        )
+        expected = (
+            (square[0] * scale - rect[0]) / rect_width * crop.width,
+            (square[1] * scale - rect[1]) / rect_height * crop.height,
+            (square[2] * scale - rect[0]) / rect_width * crop.width,
+            (square[3] * scale - rect[1]) / rect_height * crop.height,
+        )
+        assert _dark_bbox(crop) == pytest.approx(
+            expected, abs=0.015 * max(crop.size) + 2
+        )
+        assert text.startswith(f"sheet 1, rect {tuple(rect)}, {crop.width}×{crop.height} px")
+        assert "effective dpi" in text
+
+        # A bottom-left origin would put the square in the mirrored window.
+        mirrored = (window[0], size[1] - window[3], window[2], size[1] - window[1])
+        mirrored_rect = [round(value * scale) for value in mirrored]
+        assert _dark_bbox(_image(store.crop(1, *mirrored_rect)[0])) is None
+
+        # Magnification is capped: a 20-pixel region is at most 8x, not box-filling.
+        x, y = round(square[0] * scale), round(square[1] * scale)
+        tiny = _image(store.crop(1, x, y, x + 20, y + 20)[0])
+        assert max(tiny.size) <= 20 * sheets.MAX_SCALE
+        assert min(tiny.size) >= 20 * sheets.MAX_SCALE - 2
+
+
+def _crop_dpi(text: str) -> tuple[float, float]:
+    match = re.search(r"effective dpi ([\d.]+)×([\d.]+)", text)
+    assert match, text
+    return float(match[1]), float(match[2])
+
+
+@pytest.mark.parametrize(
+    ("save", "source_dpi"),
+    [({"dpi": (300, 300)}, (300, 300)), ({"dpi": (300, 150)}, (300, 150)), ({}, (300, 300))],
+    ids=["metadata", "anisotropic", "assumed"],
+)
+def test_png_crop_dpi_never_exceeds_the_source_resolution(
+    tmp_path: Path, save: dict[str, Any], source_dpi: tuple[int, int]
+) -> None:
+    # 200x100 fits the view unscaled, so a 20-pixel crop is displayed at 8x.
+    source = _png_source(tmp_path / "small.png", (200, 100), mode="L", **save)
+    with sheets.SheetStore([source]) as store:
+        png, text = store.crop(1, 40, 40, 60, 60)
+
+    assert _image(png).size == (20 * sheets.MAX_SCALE, 20 * sheets.MAX_SCALE)
+    # Display dpi is 8x the source, but interpolated pixels carry no detail.
+    assert _crop_dpi(text) == pytest.approx(source_dpi, abs=0.5)
+    assert "min(display" in text
+    assert ("assumed" in text) == (not save)
+
+
+def test_png_downsampled_crop_reports_display_dpi(tmp_path: Path) -> None:
+    source = _png_source(tmp_path / "large.png", (6000, 4000), mode="L", dpi=(600, 600))
+    with sheets.SheetStore([source]) as store:
+        width, height = store.view_size(1)
+        png, text = store.crop(1, 0, 0, width, height)
+
+    crop = _image(png)
+    expected = 600 * crop.width / 6000
+    assert expected < 600
+    assert _crop_dpi(text) == pytest.approx((expected, 600 * crop.height / 4000), abs=0.5)
+
+
+# View-pixel bboxes measured with pypdfium2 for a 1000x800 pt page holding the
+# square (600, 200, 700, 300) pt from the top-left; /Rotate is clockwise.
+@pytest.mark.parametrize(
+    ("rotate", "cropbox", "view_size", "square"),
+    [
+        (0, None, (1600, 1280), (960, 320, 1120, 480)),
+        (90, None, (1024, 1280), (640, 768, 768, 896)),
+        (270, None, (1024, 1280), (256, 384, 384, 512)),
+        (0, (100, 50, 900, 750), (1463, 1280), (914, 274, 1097, 457)),
+        (90, (100, 50, 900, 750), (1120, 1280), (720, 800, 880, 960)),
+    ],
+    ids=["plain", "rotate90", "rotate270", "cropbox", "rotate90_cropbox"],
+)
+def test_pdf_views_and_crops_follow_rotation_and_cropbox(
+    tmp_path: Path,
+    rotate: int,
+    cropbox: tuple[int, int, int, int] | None,
+    view_size: tuple[int, int],
+    square: tuple[int, int, int, int],
+) -> None:
+    from pypdf import PdfReader, PdfWriter
+    from pypdf.generic import RectangleObject
+
+    base = _pdf_source(tmp_path / "base.pdf", [(1000, 800)], squares=[(600, 200, 700, 300)])
+    writer = PdfWriter()
+    writer.append(PdfReader(base))
+    page = writer.pages[0]
+    if rotate:
+        page.rotate(rotate)
+    if cropbox:
+        page.cropbox = RectangleObject(cropbox)
+    source = tmp_path / "sheet.pdf"
+    with source.open("wb") as stream:
+        writer.write(stream)
+
+    with sheets.SheetStore([source]) as store:
+        assert store.view_size(1) == pytest.approx(view_size, abs=1)
+        assert _dark_bbox(_image(store.view_sheet(1)[0])) == pytest.approx(square, abs=3)
+
+        # Crops use the same displayed frame as the view, not the unrotated page.
+        rect = (square[0] - 40, square[1] - 40, square[2] + 40, square[3] + 40)
+        crop = _image(store.crop(1, *rect)[0])
+    rect_width, rect_height = rect[2] - rect[0], rect[3] - rect[1]
+    expected = (
+        (square[0] - rect[0]) / rect_width * crop.width,
+        (square[1] - rect[1]) / rect_height * crop.height,
+        (square[2] - rect[0]) / rect_width * crop.width,
+        (square[3] - rect[1]) / rect_height * crop.height,
+    )
+    assert _dark_bbox(crop) == pytest.approx(expected, abs=0.015 * max(crop.size) + 2)
+
+
+
+def test_crop_rejects_degenerate_and_out_of_frame_rects(tmp_path: Path) -> None:
+    source = _pdf_source(tmp_path / "sheet.pdf", [(1000, 800)])
+    with sheets.SheetStore([source]) as store:
+        width, height = store.view_size(1)
+        invalid = [
+            (1, 10, 10, 10, 50),
+            (1, 10, 10, 50, 10),
+            (1, 50, 10, 10, 50),
+            (1, -1, 0, 10, 10),
+            (1, 0, -1, 10, 10),
+            (1, 0, 0, width + 1, 10),
+            (1, 0, 0, 10, height + 1),
+            (0, 0, 0, 10, 10),
+            (2, 0, 0, 10, 10),
+        ]
+        for arguments in invalid:
+            with pytest.raises(ValueError):
+                store.crop(*arguments)
+        full = _image(store.crop(1, 0, 0, width, height)[0])
+        assert full.size == (width, height)
+
+        server = sheets.create_server(store)
+        with pytest.raises(ToolError):
+            _call(server, "crop", {"sheet": 1, "x1": 10, "y1": 10, "x2": 10, "y2": 50})
+        with pytest.raises(ToolError):
+            _call(server, "crop", {"sheet": 1, "x1": 0, "y1": 0, "x2": width + 1, "y2": 9})
+        with pytest.raises(ToolError):
+            _call(server, "view_sheet", {"sheet": 2})
+        with pytest.raises(ToolError):
+            _call(server, "view_sheet", {"sheet": "1"})
+        # Tool errors leave the server usable.
+        png, text = _image_and_text(_call(server, "view_sheet", {"sheet": 1}))
+        assert (png, text) == store.view_sheet(1)
+
+
+def test_renders_are_memoized_and_byte_identical(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _pdf_source(tmp_path / "sheet.pdf", [(1000, 800)], squares=[(600, 200, 700, 300)])
+    rendered: list[Any] = []
+    render_sheet = sheets.render_sheet
+
+    def counting_render(*args: Any, **kwargs: Any) -> tuple[bytes, str]:
+        rendered.append(kwargs.get("rect"))
+        return render_sheet(*args, **kwargs)
+
+    monkeypatch.setattr(sheets, "render_sheet", counting_render)
+    with sheets.SheetStore([source]) as store:
+        view = store.view_sheet(1)
+        views_rendered = len(rendered)
+        assert store.view_sheet(1) == view
+        assert len(rendered) == views_rendered
+
+        crop = store.crop(1, 900, 260, 1180, 540)
+        crops_rendered = len(rendered)
+        assert crops_rendered == views_rendered + 1
+        assert store.crop(1, 900, 260, 1180, 540) == crop
+        assert len(rendered) == crops_rendered
+
+        server = sheets.create_server(store)
+        assert _image_and_text(_call(server, "view_sheet", {"sheet": 1})) == view
+        assert _image_and_text(
+            _call(server, "crop", {"sheet": 1, "x1": 900, "y1": 260, "x2": 1180, "y2": 540})
+        ) == crop
+        assert len(rendered) == crops_rendered
+
+
+def test_tool_list_and_schemas_are_static_across_servers(tmp_path: Path) -> None:
+    pdf = _pdf_source(tmp_path / "gearbox-assembly.pdf", [(792, 612), (612, 792)])
+    png = _png_source(tmp_path / "crank-arm.png", (300, 200))
+    with sheets.SheetStore([pdf]) as two_sheets, sheets.SheetStore([png]) as one_sheet:
+        servers = [sheets.create_server(store) for store in (two_sheets, one_sheet)]
+        dumps = [
+            [tool.model_dump(mode="json") for tool in asyncio.run(server.list_tools())]
+            for server in servers
+        ]
+
+    assert all(server.name == "sheets" for server in servers)
+    assert dumps[0] == dumps[1]
+    text = json.dumps(dumps[0])
+    for leaked in ("gearbox", "crank", tmp_path.name, "maximum"):
+        assert leaked not in text
+    tools = {tool["name"]: tool for tool in dumps[0]}
+    assert set(tools) == {"view_sheet", "crop"}
+    expected_arguments = {"view_sheet": {"sheet"}, "crop": {"sheet", "x1", "y1", "x2", "y2"}}
+    for name, tool in tools.items():
+        schema = tool["inputSchema"]
+        assert set(schema["properties"]) == expected_arguments[name]
+        assert set(schema["required"]) == expected_arguments[name]
+        assert all(value["type"] == "integer" for value in schema["properties"].values())
+        assert tool["annotations"]["readOnlyHint"] is True
+    description = tools["crop"]["description"]
+    assert re.search(r"\b40\b", description)  # budget
+    assert re.search(r"\b8\s*×", description)  # magnification cap
+    assert "top-left" in description  # coordinate origin
+
+
+def test_sheet_servers_expose_no_resources_or_templates(tmp_path: Path) -> None:
+    # Codex's list/read resource helpers are neutral only because this is empty.
+    pdf = _pdf_source(tmp_path / "gearbox-assembly.pdf", [(792, 612), (612, 792)])
+    png = _png_source(tmp_path / "crank-arm.png", (300, 200))
+    with sheets.SheetStore([pdf]) as two_sheets, sheets.SheetStore([png, pdf]) as mixed:
+        for store in (two_sheets, mixed):
+            server = sheets.create_server(store)
+            assert asyncio.run(server.list_resources()) == []
+            assert asyncio.run(server.list_resource_templates()) == []
+            for uri in ("sheets://1", pdf.as_uri(), png.as_uri()):
+                with pytest.raises(Exception, match="Unknown resource"):
+                    asyncio.run(server.read_resource(uri))
+    assert mr._sheet_resource_manifest((pdf,)) == mr._sheet_resource_manifest((png, pdf)) == {
+        "servers": ["sheets"], "resources": 0, "resource_templates": 0,
+    }
+
+
+def test_crop_budget_counts_every_attempt_per_store(tmp_path: Path) -> None:
+    source = _png_source(tmp_path / "sheet.png", (300, 200))
+    rect = {"sheet": 1, "x1": 0, "y1": 0, "x2": 50, "y2": 50}
+
+    with sheets.SheetStore([source]) as store:
+        server = sheets.create_server(store)
+        first = _image_and_text(_call(server, "crop", rect))
+        for _ in range(sheets.CROP_BUDGET - 1):
+            assert _image_and_text(_call(server, "crop", rect)) == first
+        with pytest.raises(ToolError, match="budget"):
+            _call(server, "crop", rect)
+        assert _image_and_text(_call(server, "view_sheet", {"sheet": 1}))  # views are free
+
+    with sheets.SheetStore([source]) as store:
+        for _ in range(sheets.CROP_BUDGET - 1):
+            with pytest.raises(ValueError):
+                store.crop(1, 10, 10, 10, 10)
+        store.crop(1, 0, 0, 50, 50)
+        with pytest.raises(ValueError, match="budget"):
+            store.crop(1, 0, 0, 50, 50)
+
+    with sheets.SheetStore([source]) as store:  # budgets never leak across stores
+        store.crop(1, 0, 0, 50, 50)
+
+
+def test_harness_shares_the_server_lock_and_source_lifecycle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import types
+    from concurrent.futures import ThreadPoolExecutor
+
+    assert isinstance(sheets.PDFIUM_LOCK, type(threading.RLock()))
+
+    class ObservedLock:
+        def __init__(self) -> None:
+            self._lock = threading.RLock()
+            self._state = threading.Lock()
+            self.owner: int | None = None
+            self.depth = 0
+            self.acquisitions = 0
+
+        def __enter__(self):
+            self._lock.acquire()
+            with self._state:
+                if self.depth == 0:
+                    self.owner = threading.get_ident()
+                    self.acquisitions += 1
+                self.depth += 1
+            return self
+
+        def __exit__(self, *_args) -> None:
+            with self._state:
+                self.depth -= 1
+                if self.depth == 0:
+                    self.owner = None
+            self._lock.release()
+
+        def assert_held(self, operation: str) -> None:
+            assert self.owner == threading.get_ident(), (
+                f"PDFium operation escaped the shared lock: {operation}"
+            )
+
+    observed_lock = ObservedLock()
+    lifecycle = {"documents": 0, "documents_closed": 0, "pages": 0, "pages_closed": 0}
+
+    class FakeBitmap:
+        def to_pil(self) -> Image.Image:
+            observed_lock.assert_held("bitmap.to_pil")
+            return Image.new("L", (10, 10), 255)
+
+        def close(self) -> None:
+            observed_lock.assert_held("bitmap.close")
+
+    class FakePage:
+        def __init__(self) -> None:
+            lifecycle["pages"] += 1
+
+        def get_size(self) -> tuple[float, float]:
+            observed_lock.assert_held("page.get_size")
+            return (612.0, 792.0)
+
+        def render(self, **_kwargs) -> FakeBitmap:
+            observed_lock.assert_held("page.render")
+            return FakeBitmap()
+
+        def close(self) -> None:
+            observed_lock.assert_held("page.close")
+            lifecycle["pages_closed"] += 1
+
+    class FakeDocument:
+        def __init__(self, _path: str) -> None:
+            observed_lock.assert_held("PdfDocument")
+            lifecycle["documents"] += 1
+
+        def __len__(self) -> int:
+            observed_lock.assert_held("document length")
+            return 2
+
+        def __getitem__(self, _index: int) -> FakePage:
+            observed_lock.assert_held("document page")
+            return FakePage()
+
+        def close(self) -> None:
+            observed_lock.assert_held("document.close")
+            lifecycle["documents_closed"] += 1
+
+    monkeypatch.setattr(sheets, "PDFIUM_LOCK", observed_lock)
+    monkeypatch.setitem(
+        sys.modules, "pypdfium2", types.SimpleNamespace(PdfDocument=FakeDocument)
+    )
+    # The barrier is a rendezvous, not a stopwatch: both threads must be inside
+    # the lock's reach at once. The deadline only stops a real deadlock from
+    # hanging the suite, so it is generous -- a 5 s budget failed this gate when
+    # the machine was busy with a parallel `doit -n 4` and a review subprocess.
+    barrier = threading.Barrier(2, timeout=120)
+    source = tmp_path / "assembly.pdf"
+    source.write_bytes(b"%PDF fake")
+    package = mr.ReviewPackage("assembly", "assembly", (source,))
+
+    def validate() -> int:
+        barrier.wait()
+        return mr._validate_package(package)
+
+    def serve() -> int:
+        barrier.wait()
+        with sheets.SheetStore([source]) as store:
+            store.view_sheet(1)
+            store.crop(2, 0, 0, 10, 10)
+            return store.sheet_count
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        validate_future = pool.submit(validate)
+        serve_future = pool.submit(serve)
+        assert validate_future.result() == 2
+        assert serve_future.result() == 2
+
+    assert observed_lock.acquisitions >= 2
+    assert lifecycle["documents"] == lifecycle["documents_closed"] == 2  # opened once each
+    assert lifecycle["pages"] == lifecycle["pages_closed"] > 0

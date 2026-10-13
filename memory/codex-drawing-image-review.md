@@ -11,9 +11,17 @@ metadata:
 > Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
 
 
-Pedro's flow for validating manufacturing drawings: render the sheet PNG, then have
+**Current reviewer (2026-10-13): Claude Opus 5.5 by default**, the script's
+default (`--reviewer claude`, `claude-opus-5-5`, medium). The machinist review is
+exempt from the cross-family rule for code review: Opus may review every drawing
+whatever model authored it; another family (`--reviewer codex`, `--model`)
+stays allowed. Chosen on the 80-case benchmark with the vector zoom tool:
+Opus 340/410, Fable 332, Astra 322, at about a third of Fable's cost. The Codex
+mechanics below are history from when Codex was the reviewer.
+
+Pedro's original flow (2026-09-02): render the sheet PNG, then have
 Codex (gpt-5.6-sol, high) review the IMAGE with zero repo context as a senior
-machinist. 2026-09-02: the two review modes are explicit commands:
+machinist. The two review modes are explicit commands:
 `uv run cad/scripts/machinist_review.py dt_crank_arm ch_pivot_shaft` for named sheets,
 or `uv run cad/scripts/machinist_review.py --all --jobs 4` for the whole fleet.
 Prompts live in `cad/scripts/prompts/`; reports go under
