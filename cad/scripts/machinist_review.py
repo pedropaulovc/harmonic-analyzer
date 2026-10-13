@@ -6,11 +6,11 @@ A private stdio MCP server supplies grayscale whole-sheet views fitting
 1976×1280 pixels (about 118 dpi on 11×17 sheets) and vector-PDF region crops.
 The cached prompt prefix is the shared drawing standard followed by the kind's
 reviewer instructions; package-specific instructions come last.
-``--reviewer`` is mandatory
-and MUST name a different model family from the agent that authored or last
-edited the drawing script: a Claude-driven session (Fable, Opus, Sonnet)
-reviews with ``--reviewer codex``, a Codex/GPT-driven session with
-``--reviewer claude``. A same-family verdict is not the gate, even a ``SHIP``.
+The reviewer is Claude Opus 5.5 by default (``--reviewer claude``), whoever
+authored the drawing: the machinist review is exempt from the cross-family rule
+that governs code review. An 80-case benchmark scored Opus with the zoom tool
+above Fable and Astra at about a third of Fable's cost. ``--reviewer codex``
+and ``--model`` remain for benchmarking.
 PDF pages and PNG inputs are supplied in sheet order through ``view_sheet``;
 ``crop`` confirms fine details, with 8× magnification and 40 calls per attempt.
 The schema-validated verdict and provenance are written under
@@ -104,7 +104,7 @@ CODEX_HOME = Path(tempfile.gettempdir()) / "machinist-review-codex-home"
 _CODEX_AUTH_LOCK = threading.Lock()
 
 DEFAULT_MODELS = {
-    "claude": "claude-fable-5-1",
+    "claude": "claude-opus-5-5",
     "codex": "gpt-6-astra",
 }
 DEFAULT_EFFORTS = {
@@ -1801,12 +1801,12 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=Path,
         help="read registry-named PDFs from this directory instead of cad/out/pdf",
     )
-    parser.add_argument("--reviewer", choices=REVIEWERS)
+    parser.add_argument("--reviewer", choices=REVIEWERS, default="claude")
     parser.add_argument(
         "--model",
         help=(
             f"reviewer model (defaults: {DEFAULT_MODELS}; "
-            "claude also takes claude-opus-5-5)"
+            "claude also takes claude-fable-5-1)"
         ),
     )
     parser.add_argument(
@@ -1839,12 +1839,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.index:
         print(write_index(report_dir))
         return 0
-    if args.reviewer is None:
-        print(
-            "--reviewer is required for review runs (choose claude or codex)",
-            file=sys.stderr,
-        )
-        return 2
 
     packages: list[ReviewPackage]
     if args.png:

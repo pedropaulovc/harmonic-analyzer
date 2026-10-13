@@ -143,22 +143,20 @@ Reset rows are recorded on issues #967, #968, #971, #974, #975, #976, #986,
 
 ## The gate
 
-`uv run cad/scripts/machinist_review.py <name>... --reviewer <claude|codex>` (or
-`--all`) renders each package's verdict from a blind senior machinist. The
-prompt is `drawing-guidelines.md` followed by the reviewer instructions for
-the package kind (`cad/scripts/prompts/machinist_review_part.md` or
+`uv run cad/scripts/machinist_review.py <name>...` (or `--all`) renders each
+package's verdict from a blind senior machinist. The prompt is
+`drawing-guidelines.md` followed by the reviewer instructions for the package
+kind (`cad/scripts/prompts/machinist_review_part.md` or
 `machinist_review_assembly.md`).
 
-- **The reviewer MUST be a different model family from whoever authored or
-  last edited the drawing script.** An agent on a Claude model (Fable, Opus,
-  Sonnet) reviews with `--reviewer codex`; an agent on a Codex/GPT model
-  reviews with `--reviewer claude`. A same-family review does not count, even
-  when it returns `SHIP`. If the cross-family reviewer is over quota, the
-  user's standing last-resort rule applies: work authored by Sol or Opus is
-  reviewed by Astra or Fable, and work authored by Astra or Fable by Astra or
-  Fable at high reasoning. Defaults: `claude-fable-5-1` at medium effort,
-  `gpt-6-astra` at low. `--reviewer claude --model claude-opus-5-5` runs
-  Opus 5.5 instead of Fable, e.g. when Fable is over quota.
+- **Always review with Claude Opus 5.5**, the default (`--reviewer claude`,
+  `claude-opus-5-5` at medium effort). The machinist review does not follow
+  the cross-family rule for code review: Opus reviews every drawing, whichever
+  model authored it, and an Opus `SHIP` is the gate. On the 80-case benchmark
+  (2026-10-13, vector zoom tool, same rubric) Opus met 340/410 expectations
+  with 62 misses, Fable 5.1 332 with 73, Astra 322 with 84, and Opus cost
+  about a third of Fable. `--reviewer codex` and `--model` exist for
+  benchmarking only.
 - Every native PDF page is rendered at 300 dpi and all sheets go to one
   review. A downscaled contact sheet is not a substitute.
 - A package passes on `SHIP` with no blocker, over-specification or clarity

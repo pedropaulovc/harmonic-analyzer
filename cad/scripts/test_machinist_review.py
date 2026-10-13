@@ -2459,7 +2459,7 @@ def test_review_serialises_and_indexes(tmp_path: Path) -> None:
 def test_main_distinguishes_missing_and_unknown_names(capsys) -> None:
     assert mr.main([]) == 2
     assert capsys.readouterr().err == (
-        "--reviewer is required for review runs (choose claude or codex)\n"
+        "no drawing names given; use --all, --png or a name\n"
     )
 
     assert mr.main(["--reviewer", "codex"]) == 2
@@ -2505,7 +2505,7 @@ def test_both_reviewers_receive_one_complete_package_invocation(
         codex="codex-test",
     )
 
-    assert (claude_review.model, claude_review.effort) == ("claude-fable-5-1", "medium")
+    assert (claude_review.model, claude_review.effort) == ("claude-opus-5-5", "medium")
     assert (codex_review.model, codex_review.effort) == ("gpt-6-astra", "low")
     assert claude_review.blind and codex_review.blind
     assert claude_review.passed and codex_review.passed

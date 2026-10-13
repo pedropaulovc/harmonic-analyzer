@@ -150,11 +150,13 @@ not mergeable until ALL THREE hold — no partial credit:
    read; move the camera off the standard axes when needed). The CAD gates
    prove volumes and mates, not that the geometry LOOKS like the machine —
    a shape can pass every check and still be visibly wrong.
-   **Drawing sheets:** where a cross-family machinist review
-   (`cad/scripts/machinist_review.py`) runs on a sheet's exact version, that
-   review is its visual check, and a separate eye pass over the sheet is not
-   required. Eye-pass a drawing only when no machinist review covers the
-   version being merged.
+   **Drawing sheets:** where an Opus 5.5 machinist review
+   (`cad/scripts/machinist_review.py`, its default reviewer) runs on a sheet's
+   exact version, that review is its visual check, and a separate eye pass over
+   the sheet is not required. The machinist review is exempt from the
+   cross-family rule for code review: Opus reviews every drawing, whichever
+   model authored it. Eye-pass a drawing only when no machinist review covers
+   the version being merged.
 
 **Stacked PRs share gates 1 and 3.** A successful build at the TOP of a stack
 covers every PR in that stack, and so does the visual inspection of the renders
