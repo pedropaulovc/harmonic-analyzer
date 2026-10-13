@@ -104,8 +104,8 @@ DRAWING_NOTES = "\n".join(
         # intent in one line. The removed rod-pin geometry sentence repeated
         # note 1's identified hole plus its native basics/callout/position FCF.
         "4. UPPER BAR CONTACT; LOWER STRAP ENVELOPE",
-        f"5. DETAIL E: {math.degrees(_ALPHA_TOP):.2f}° BASIC IS MEASURED",
-        "   FROM THE DATUM-DEFINED MIRROR PLANE.",
+        "5. DATUM C: STRAP END LAND IN DETAIL E.",
+        "   MIRROR PLANE IS DEFINED BY NOTE 1.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

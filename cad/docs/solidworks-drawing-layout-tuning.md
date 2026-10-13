@@ -132,11 +132,12 @@ keeping the attachment on its actual broad face; move E's letter clear of both
 drill rows; place the **whole** HubLength value/stack to the left, outside both
 witnesses and clear of the drill and arrow tail. A rightward move is not a
 clearance proof: an above-callout row can reflow the lower tolerance into E's
-full circle. Removing the land-angle dimension's inline MIRROR row left its
-numeric BASIC box on the witness and arc in R23. R24 uses the text-only
-angular offset convention below; the actual angle remains explicitly bound
-to DETAIL E and MIRROR PLANE in Manufacturing Notes. Move R816 away from the
-taper arrow. Remove automatic
+full circle. R23's numeric angular BASIC box still crossed its witness and
+arc. Pedro's superseding R27 ruling removes that angular dimension entirely:
+Manufacturing Note 1 carries **AT 10.46° BASIC TO DATUM C**, and note 5 refers
+to that datum-defined mirror plane. Do not replace the removed dimension
+with another offset, seed or route mechanism. Retain R23's R800/R816 positions;
+their C1/C2 clarity findings remain open. Remove automatic
 centre-mark reinsertion on front/D/E while strictly retaining the native
 2/1/1 **printed** centre-mark census, rather than counting every allocated
 annotation or merely deleting the observed front pair.
@@ -482,46 +483,15 @@ dimension: `ArcExtensionLineOrOppositeSide` (radial only,
 Broken)` (`types/IDisplayDimension/SetBrokenLeader2.md`). Re-read the geometry
 from `GetDisplayData` afterwards; the render is not the evidence.
 
-For an **angular** dimension, the native OffsetText leader retains its
-**pre-offset text anchor**, not the radial projection of the moved text.
-Four native linear samples and the thumbnut's native extension-arc end
-establish this attachment model. Use the complete thumbnut sequence: seed
-`OffsetText = False` with `IAnnotation::SetPosition2` on the original roughly
-32 mm circle beyond the left arrow's footprint (about 108–110 degrees here),
-rebuild and read the actual extension-arc ink, then use the existing
-`offset_dimension_text` mechanism to place the text at 327/166.1 mm.
-SOLIDWORKS can clamp the extension end: the requested seed is not a readback.
-This is native annotation layout, not a model-geometry or tolerance change.
-
-The rocker's local contract preserves the geometric circle, both actual arrow
-tips, capped 8 mm witnesses, native attachments and value across the seed and
-offset. A cap property readback is not proof of the drawn witness lengths.
-Account for the actual connector polyline and refuse every crossing of its
-own witnesses, arcs, arrowhead footprint or the 5.59/datum-C cluster. A terminal
-inside its own arrowhead is not a clean landing (the 104-degree native-row
-refusal control proves this). Keep at least 3 mm air to the isometric caption.
-Certify membership analytically from each current native arc's radius and
-sweep, not distance to a sampled chord or an assumed radial projection.
-Only a classified degree-one terminal may join its own actual finite arc
-within the existing 50 um attachment tolerance; all other crossings remain
-strict. The opposite terminal joins the actual native text-frame border, not
-an estimated glyph box. Empty, truncated or unclassified primitives cannot
-certify a route, and neither a seed nor an offset setter's success certifies it.
-
-Automatic inside/outside-arrow changes can alter the displayed arc segments.
-Keep the circle, arrow tips, witnesses, attachments and value invariant, but
-certify against the current native arc ink rather than frozen stub angles or
-an earlier span envelope. Both fixed arrow tips must remain supported by that
-current finite arc ink.
-
-Do not infer arc ink across native display gaps from the circle or arrow-tip
-envelope: the terminal must join a genuinely displayed finite arc segment.
-R25 refused that terminal after both native witnesses had passed. Its early
-failure bundle held only the phase and a 1024 x 598 bitmap; at the logged
-2.098 px/mm, 50 um is 0.105 pixel and the bitmap cannot resolve the attachment
-contract. Preserve the actual pre/post native primitive rows and the pure route
-classification in the existing failure-capture context, before a fatal check.
-This uses already-read data, not new COM probes or a weaker geometric predicate.
+The rocker's abandoned angular-offset attempt is not a reusable placement
+contract. R26's false-offset 109-degree seed did not determine its final
+connector: offset restored the old stubs and landed at 105.690091123 degrees,
+inside its own arrowhead. Its boxed BASIC carrier also overhung the lower
+border, unlike the native thumbnut's unboxed carrier. Pedro's R27 ruling
+removes the rocker angular dimension and its dedicated offset/seed/route
+guards instead of adding another layout mechanism. The source-derived
+10.46° BASIC remains in Manufacturing Note 1; no datum, geometry or tolerance
+changes accompany that presentation-only removal.
 
 **b. `IView::SetDisplayMode4` refusing HLR on a native detail view.**
 Don't: read `False` as "detail views can't do HLR". Two causes, both documented

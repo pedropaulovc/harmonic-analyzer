@@ -193,14 +193,15 @@ frames and no datums.
    Layout-run forensics belong in the PR history, not this tolerance policy.
 
    The same scoped exception puts the outline on native views: overall width,
-   radial end-land length and BASIC clocking from the nominal mirror plane,
-   and taper-to-lower-arc intersection, read back against existing spec
-   geometry. The BASIC clock angle is the spec's `_ALPHA_TOP`, fixing datum C's
-   radial-land orientation in A|B|C. The main front view carries BASIC
-   R800/R816/8.00 and both BASIC pin-axis coordinates from physical datum A.
-   Parent-linked DETAIL D owns native `PivotDia@PivotHoleProfile` and
+   radial end-land length and taper-to-lower-arc intersection, read back against
+   existing spec geometry. Manufacturing Note 1 alone carries the BASIC clock
+   angle from the spec's `_ALPHA_TOP`, relating the datum-defined mirror plane
+   to datum C. Pedro's superseding ruling removes the angular dimension from
+   DETAIL E rather than adding another layout mechanism. The main front view
+   carries BASIC R800/R816/8.00 and both BASIC pin-axis coordinates from physical
+   datum A. Parent-linked DETAIL D owns native `PivotDia@PivotHoleProfile` and
    `HubDia@HubProfile`, the pivot-bore datum A and bore finish; DETAIL E owns
-   `RodTipLen@StrapProfile`, the BASIC land clock, datum C, DRILL THRU callout
+   `RodTipLen@StrapProfile`, datum C, DRILL THRU callout
    and unchanged rod-pin position frame. Hub OD retains its two-place general
    tolerance class. The side-view strap offset from the hub end face is a
    measured, parenthesized REFERENCE at normal sheet precision, checked
