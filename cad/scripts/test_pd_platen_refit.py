@@ -235,8 +235,8 @@ def test_guide_lock_stations_sweep_clear_of_the_hanger(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # The lock stations ride the platen across its whole feed; R9-31's low
-    # button heads pass under the hanger arm's front face at the printed
-    # worst case.
+    # slotted pan heads, on the 1/16-sheet lock backs, pass under the hanger
+    # arm's front face at the printed worst case.
     assembly._assert_lock_station_sweep()
     # Negative control: the stock fillister head stands into the arm.
     monkeypatch.setattr(assembly, "LOCK_SCREW_HEAD_H", fillister.HEAD_H)
@@ -271,7 +271,7 @@ def test_clip_screw_bosses_sweep_clear_of_the_bar_and_hanger(
             printed_deviations(assembly.GUIDE_DEPTH, 2),
             "heads .* into the arm plate as",
         ),
-        # So does a lock plate whose strip thickness prints .XX...
+        # So does a lock plate whose thickness prints .XX, not its sheet band...
         (
             "_LOCK_THICK_DEV",
             printed_deviations(assembly.LOCK_THICK, 2),

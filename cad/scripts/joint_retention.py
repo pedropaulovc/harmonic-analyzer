@@ -592,7 +592,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "sm_gooseneck",  # receiver: through-tapped brazed end plug; also the post gripped by the frame's set screw
         "sm_gooseneck_spring_screw",  # made MHA-SM-004 fillister: clamps the counter-spring upper eye to the plug
         "vn_gooseneck_set_screw",  # 1/4-20 UNC square-head cup point (91410A538), member: into top_frame hub tap, grips summing gooseneck
-        "vn_guide_lock_screw",  # #4-40 button head (McMaster 91255A108, MHA-VN-046, R9-31), member: 8 into the platen_guide rear through taps
+        "vn_guide_lock_screw",  # #4-40 slotted pan head (McMaster 91792A108, MHA-VN-046, R9-31), member: 8 into the platen_guide rear through taps
         "vn_hanger_screw",  # #8-32 UNC x 1/2 hex head (McMaster 93075A194), member into the pen-hanger strap tap
         "fr_harmonic_base",  # receiver: #10-32 cross taps, 1/4-20 hold-down seats, #4-40 nameplate seats, and the drive_train screws' seats (top-level rows)
         "vn_knife_hanger_stud",  # #6-32 UNC (McMaster 91251A157 socket head cap screw x 2), member into the knife-mount top tap
@@ -1872,7 +1872,7 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="platen-hung",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="clamps each guide-lock plate to the back of its guide rail, and both travel with the platen as one body. The plate stands the fitted lock gap (0.05-0.25, R9-47) off the bar's back face and only touches if the platen is pulled forward, a load along the screw axis. Two screws per plate stop it turning, so no operating torque acts about either screw axis",
-        axial_capture="button head on the 2-mm guide_lock back face; shank through the lock's 1/8 drilled hole into the guide's rear #4-40 tap (through, R9-48), tip stopping inside the rail",
+        axial_capture="slotted pan head on the 1/16-sheet guide_lock back face; shank through the lock's 1/8 drilled hole into the guide's rear #4-40 tap (through, R9-48), tip stopping inside the rail",
         lock=Lock.NONE,
         evidence="build_pd_paper_drive_assembly.py:build ('platen lock-screw grid', LOCK_SCREW_XY); draw_pd_paper_drive_assembly._step_text 'platen-hung' (fitted loose) and 'guide-locks-set' (snug, push, tighten); vn_guide_lock_screw_spec.ENGAGEMENT_WORST; build_pd_platen_guide.HOLE_X/LOCK_SCREW_THREAD_ENGAGEMENT (4 per rail x 2 rails); pd_guide_lock_spec.HOLE_SPEC; pd_platen_guide_spec.LOCK_GAP_FIT",
     ),

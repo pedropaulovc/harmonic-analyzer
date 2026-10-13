@@ -926,7 +926,7 @@ for i, (x, y) in enumerate(p.GUIDE_SCREW_XY):
         f"guide screw {i + 1}",
         **_SOLV,
     )
-# R9-31: the guide-lock screws are their own button-head stem (MHA-VN-046).
+# R9-31: the guide-lock screws are their own slotted pan-head stem (MHA-VN-046).
 for i, (x, y) in enumerate(p.LOCK_SCREW_XY):
     expect(
         PD,

@@ -33,11 +33,11 @@ real receiving and loaded-inspection data remain separately required.
   semi-arc pair closed by two long screws whose heads show on the bar front
   (ch30 p002).
 * Platen group (HANGS on the bar): platen + two full-width back guide rails
-  (above/below the bar band) + 4 lock plates bridging behind the bar (held by
-  low button-head guide-lock screws) + the teeth-down rack at the bottom edge
-  (crest drop derived from the shifted feed mesh) + two bright-brass edge clips + the paper
-  sheet + ALL its screws -- everything lock-mated to the platen so the whole
-  group feeds together.
+  (above/below the bar band) + 4 1/16-sheet lock plates bridging behind the
+  bar (held by low slotted pan-head guide-lock screws) + the teeth-down rack
+  at the bottom edge (crest drop derived from the shifted feed mesh) + two
+  bright-brass edge clips + the paper sheet + ALL its screws -- everything
+  lock-mated to the platen so the whole group feeds together.
 * Transgear hanger (behind the bar): the arm stands on the pivot spacer and
   swings on the shoulder pivot screw in the bar's tap; the stepped stud in the
   arm carries the feed sleeve (12T 32DP PA20), the 120T disc and its brass hub,
@@ -236,6 +236,7 @@ from pd_guide_lock_spec import (  # noqa: E402
     DRAWING_PRECISION_BY_NAME as LOCK_PRECISION,
     HOLE_XY as LOCK_HOLE_XY,
     LOCK_HEIGHT_BAND,
+    LOCK_THICK_BAND,
     RAIL_EDGE_LIP as LOCK_RAIL_LIP,
 )
 from pd_platen_guide_spec import (  # noqa: E402
@@ -270,8 +271,8 @@ from vn_platen_clip_screw_spec import (  # noqa: E402
     THREAD as CLIP_SCREW_THREAD,
 )
 
-# The guide-lock screws alone are low button heads (R9-31): a fillister head
-# on the lock back would sweep into the hanger arm as the platen feeds
+# The guide-lock screws alone are low slotted pan heads (R9-31): a fillister
+# head on the lock back would sweep into the hanger arm as the platen feeds
 # (_assert_lock_station_sweep).
 from vn_guide_lock_screw_spec import (  # noqa: E402
     HEAD_DIA as LOCK_SCREW_HEAD_DIA,
@@ -1118,9 +1119,9 @@ def _assert_fastener_stacks() -> None:
     )
     nonnegative("guide screw blind-bottom clearance", GUIDE_SCREW_BOTTOM_CLEARANCE)
 
-    # The low button-head guide-lock screws (R9-31, R9-48) take the real 2-mm
-    # plate and 9.525-mm under-head length; the guide's through tap receives
-    # the remaining 7.525 mm and the tip stops inside the rail.
+    # The low slotted pan-head guide-lock screws (R9-31, R9-48) take the real
+    # 1/16-sheet plate and 9.525-mm under-head length; the guide's through tap
+    # receives the remaining 7.9375 mm and the tip stops inside the rail.
     nonnegative(
         "lock shank radial clearance", (LOCK_HOLE_DIA - LOCK_SCREW_SHANK_DIA) / 2.0
     )
@@ -1367,8 +1368,8 @@ def _latch_hook_sections() -> list[tuple[str, tuple[float, float, float, float]]
 # grown toward its neighbours, and each pair must keep LOCK_SWEEP_FLOOR of
 # running clearance. The bar's back face is the datum the hanger stands on and
 # the platen rides its front face, so the thinnest bar carries the whole lock
-# stack rearward toward the hanger, and the deepest rail and thickest strip
-# stand the button heads further back again. The arm sits on the shortest
+# stack rearward toward the hanger, and the deepest rail and thickest sheet
+# stand the pan heads further back again. The arm sits on the shortest
 # spacer, its plate's lower section on the thinnest arm stock and the deepest
 # notch. Deviations are (lower, upper) from the model, read from the specs the
 # parts author on their model dimensions, so the sheets and the sweep agree.
@@ -1383,7 +1384,7 @@ _GUIDE_DEPTH_DEV = printed_deviations(
 )
 # The rail's sheet prints its other sizes at the same document places.
 _GUIDE_HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES)
-_LOCK_THICK_DEV = printed_deviations(LOCK_THICK, LOCK_PRECISION["Depth"])
+_LOCK_THICK_DEV = (-LOCK_THICK_BAND, LOCK_THICK_BAND)  # the sheet's mill band
 _LOCK_HEIGHT_DEV = printed_deviations(
     LOCK_HEIGHT, LOCK_PRECISION["Height"], deviations(LOCK_HEIGHT_BAND)
 )
@@ -2655,7 +2656,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Two seeds at the right-hand station reproduce at the left-hand station;
-    # under-head planes sit on the real 2-mm lock back faces.
+    # under-head planes sit on the real 1/16-sheet lock back faces.
     lock_targets = [[x, y, LOCK_Z0 + LOCK_THICK] for x, y in LOCK_SCREW_XY]
     lock_min_y = min(target[1] for target in lock_targets)
     plate_mid_x = PLATE_X0 + PLATE_WIDTH / 2.0

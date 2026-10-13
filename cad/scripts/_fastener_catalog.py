@@ -101,14 +101,15 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Steel Narrow Fillister Head Slotted Screw",
         "90280A108",
     ),
-    # R9-31: the eight platen-riding guide-lock screws; a button head clears
-    # the hanger arm where the MHA-VN-006 fillister head would not. R9-48: 3/8
-    # long, so the guide's through tap holds 1.5D at the worst case.
+    # R9-31: the eight platen-riding guide-lock screws; a low slotted pan head
+    # (2026-10-11, as the book's lock plates show) clears the hanger arm where
+    # the MHA-VN-006 fillister head would not. R9-48: 3/8 long, so the guide's
+    # through tap holds 1.5D at the worst case.
     "vn-guide-lock-screw": _stock(
         "vn-guide-lock-screw",
-        "Black-Oxide Alloy Steel Button Head Hex Drive Screw",
-        "91255A108",
-        material="Alloy Steel",
+        "18-8 Stainless Steel Pan Head Slotted Screw",
+        "91792A108",
+        material="AISI 304",
     ),
     "vn-latch-hook-bracket-screw": _stock(
         "vn-latch-hook-bracket-screw",

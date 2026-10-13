@@ -177,7 +177,7 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "seat-cone corners; not a size fit"
     ),
     ("vn_guide_lock_screw_spec", "SHANK_LEN_BAND"): (
-        "the button-head screw's B18.6.3 length tolerance (plus, minus): "
+        "the pan-head screw's B18.6.3 length tolerance (plus, minus): "
         "indexed for the shortest reach into the platen guide's through tap"
     ),
     ("vn_cylinder_bank_spring_spec", "ID_BAND"): (

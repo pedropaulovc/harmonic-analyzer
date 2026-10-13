@@ -373,7 +373,7 @@ BOM_DESCRIPTIONS = {
     "vn-platen-clip-screw": (
         f"BRASS FILLISTER SCREW, MCMASTER {_SKU['vn-platen-clip-screw']}"
     ),
-    "vn-guide-lock-screw": f"BUTTON HEAD SCREW, MCMASTER {_SKU['vn-guide-lock-screw']}",
+    "vn-guide-lock-screw": f"PAN HEAD SCREW, MCMASTER {_SKU['vn-guide-lock-screw']}",
     "vn-chain-inner-link": "ANSI #25 CHAIN INNER LINK",
     "vn-chain-outer-link": "ANSI #25 CHAIN OUTER LINK",
     # Grouped: its configurations' BOM description wins over a written cell,
