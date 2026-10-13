@@ -128,13 +128,15 @@ if (
 # enforces ``union(marks) == union(keeps)``. The set-screw tap and lightening
 # bore are Hole Wizard features: their sizes print as native hole callouts,
 # their stations as the marked placement dimensions (SetScrewX repeats the
-# pivot station on the face the tap is drilled from). ---
+# pivot station on the face the tap is drilled from).  The V's length prints as
+# the relief's start station (ReliefX0, the same "ReliefX0" global): the
+# V-groove cut's own depth dimension projects off the paper end in the bottom
+# view, away from the brass it measures. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OutlineProfile": {"Length", "Height", "Chamfer2dx"},
     "Block": {"Depth"},
     "VGrooveProfile": {"VApexY", "VMouth"},
-    "VGroove": {"VLength"},
-    "ReliefProfile": {"ReliefWidth"},
+    "ReliefProfile": {"ReliefWidth", "ReliefX0"},
     "Relief": {"ReliefHeight"},
     "PivotBoreProfile": {"PivotX", "PivotDia"},
     "SetScrewHole": {"SetScrewX", "SetScrewY"},
@@ -148,8 +150,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutlineProfile": {"Length": 1, "Height": 1, "Chamfer2dx": 1},
     "Block": {"Depth": 1},
     "VGrooveProfile": {"VApexY": 2, "VMouth": 2},
-    "VGroove": {"VLength": 1},
-    "ReliefProfile": {"ReliefWidth": 2},
+    "ReliefProfile": {"ReliefWidth": 2, "ReliefX0": 1},
     "Relief": {"ReliefHeight": 1},
     "PivotBoreProfile": {"PivotX": 2, "PivotDia": 3},
     "SetScrewHole": {"SetScrewX": 2, "SetScrewY": 1},

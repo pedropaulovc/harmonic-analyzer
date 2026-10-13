@@ -153,12 +153,13 @@ def _ry(model_y_mm: float) -> float:
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.
-# Front: overall length on top over the free-end chamfer leg, height left; the
-# tap's coordinates from the paper-end/bottom corner sit right of and below the
-# view, the station clear of section A-A's cutting-line end.
+# Front: overall length on top over the free-end chamfer leg, whose wide
+# callout sits right of the leg so the length's end extension line clears it;
+# height left; the tap's coordinates from the paper-end/bottom corner sit right
+# of and below the view, the station clear of section A-A's cutting-line end.
 FRONT_KEEP = {
     "Length": (_fx(_CX), _fy(BLOCK_HEIGHT) + 0.028),
-    "Chamfer2dx": (_fx(BLOCK_LENGTH - CHAMFER / 2.0), _fy(BLOCK_HEIGHT) + 0.012),
+    "Chamfer2dx": (_fx(BLOCK_LENGTH - CHAMFER) + 0.023, _fy(BLOCK_HEIGHT) + 0.012),
     "Height": (_fx(BLOCK_LENGTH) - 0.014, _fy(_CY)),
     "SetScrewY": (_fx(0.0) + 0.010, _fy(SET_SCREW_Y / 2.0)),
     "SetScrewX": (_fx(PIVOT_BORE_X / 4.0), _fy(0.0) - 0.012),
@@ -171,14 +172,15 @@ RIGHT_KEEP = {
     "VApexY": (_rz(BLOCK_DEPTH) + 0.012, _ry(V_APEX_Y / 2.0)),
 }
 # Bottom: the bore station above the view (the gap under the front view), the
-# V length and lightening station stacked below, the relief width left, the
-# reamed diameter right of the view.
+# V's length (the relief's start station) and the lightening station stacked
+# below, the relief width left, the reamed diameter's wide callout wholly right
+# of the paper end so the stations' extension lines there clear it.
 BOTTOM_KEEP = {
     "PivotX": (_fx(PIVOT_BORE_X / 2.0), _bz(0.0) + 0.008),
-    "VLength": (_fx(RELIEF_X0 / 2.0), _bz(BLOCK_DEPTH) - 0.012),
+    "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BLOCK_DEPTH) - 0.012),
     "LighteningX": (_fx(LIGHTENING_X / 2.0), _bz(BLOCK_DEPTH) - 0.024),
     "ReliefWidth": (_fx(BLOCK_LENGTH) - 0.014, BOTTOM_CENTER[1]),
-    "PivotDia": (_fx(0.0) + 0.016, _bz(0.0) - 0.008),
+    "PivotDia": (_fx(0.0) + 0.048, _bz(0.0) - 0.008),
 }
 # Section A-A: the relief height right of the cut.
 SECTION_KEEP = {

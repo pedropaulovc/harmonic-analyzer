@@ -57,7 +57,6 @@ from pn_pen_hanger_spec import (
     PLATE_FRONT_Z,
     SCREW_HOLE_XY,
     SCREW_TAP_SPEC,
-    SLOT_BOTTOM_Z,
     STRAP_BOT_X,
     STRAP_BOT_Y,
     STRAP_TOP_X,
@@ -92,14 +91,15 @@ _CZ = (_Z[0] + _Z[1]) / 2.0
 
 # Sheet layout (meters).  The tall front view hugs the left margin (its
 # stacked top dimensions under the border); the tap callout sits in the gap
-# between it and the top view; the notes under the top view; the isometric to
-# the right.
+# between it and the top view, clear of the upper plate's drop dimension; the
+# notes under the top view's label; the isometric to the right.  The top view
+# sits low enough for the U's three width rows above its plate front.
 FRONT_CENTER = (0.075, 0.140)
-TOP_CENTER = (0.205, 0.215)
+TOP_CENTER = (0.205, 0.200)
 ISO_CENTER = (0.330, 0.175)
 NOTES_XY = (0.130, 0.140)
-CALLOUT_XY = (0.118, 0.200)
-TOP_NOTE_XY = (0.185, 0.262)
+CALLOUT_XY = (0.140, 0.200)
+TOP_NOTE_XY = (0.168, 0.166)
 
 
 def _fx(model_x_mm: float) -> float:
@@ -119,34 +119,42 @@ def _tx(model_x_mm: float) -> float:
 
 
 def _tz(model_z_mm: float) -> float:
-    # Third-angle top view: the part's front (-Z) faces the sheet bottom.
-    return TOP_CENTER[1] + (model_z_mm - _CZ) * TOP_SCALE[0] / TOP_SCALE[1] / 1000.0
+    # *Top looks down -Y with model -Z up the sheet: the plate front (the U's
+    # open slot) prints at the top, the strap's back face at the bottom.
+    return TOP_CENTER[1] - (model_z_mm - _CZ) * TOP_SCALE[0] / TOP_SCALE[1] / 1000.0
 
 
 _UPPER_TOP_Y = GUIDE_PLATE_YS[1] + GUIDE_PLATE_T
 
-# Front view: the strap outline around the view, the tap station above it from
-# the origin corner, the upper plate's drop/thickness to the right.
+# Front view: the strap outline around the view; the tap station and the
+# strap's top run/taper stacked above it, shortest first, each value clear of
+# the longer rows' extension lines; the upper plate's drop and its thickness
+# (value under the plate) to the right.
 FRONT_KEEP = {
-    "StrapTopRun": (_fx((STRAP_TOP_X[0] + STRAP_TOP_X[1]) / 2.0), _fy(0.0) + 0.010),
+    "ScrewX": (_fx(0.0) + 0.006, _fy(0.0) + 0.010),
     "StrapTaperDx": (_fx((STRAP_TOP_X[0] + STRAP_BOT_X[0]) / 2.0), _fy(0.0) + 0.020),
-    "ScrewX": (_fx(SCREW_HOLE_XY[0] / 2.0), _fy(0.0) + 0.030),
+    "StrapTopRun": (_fx(STRAP_TOP_X[0] / 2.0), _fy(0.0) + 0.030),
     "ScrewY": (_fx(_X[1]) + 0.008, _fy(SCREW_HOLE_XY[1] / 2.0)),
     "StrapRise": (_fx(_X[0]) - 0.012, _fy(_CY)),
     "UpperPlateDrop": (_fx(_X[1]) + 0.020, _fy(_UPPER_TOP_Y / 2.0)),
-    "PlateThick": (_fx(_X[1]) + 0.008, _fy(_UPPER_TOP_Y - GUIDE_PLATE_T / 2.0)),
+    "PlateThick": (_fx(_X[1]) + 0.008, _fy(GUIDE_PLATE_YS[1]) - 0.006),
     "StrapBotWidth": (_fx(0.0), _fy(STRAP_BOT_Y) - 0.010),
 }
-# Top view: the U's widths below the plate, its depths to the right, the strap
-# stock thickness left.
+# Top view: the U's widths stacked above its plate front (the arm nearest, its
+# value and the plate width's right of the U; the slot width outermost, its
+# fit callout above the value so its extension lines stop short of it); the
+# plate reach right of the U, the slot depth outside it with its value and
+# callout under the view; the strap stock thickness left.
 TOP_KEEP = {
-    "SlotWidth": (_tx(0.0), _tz(PLATE_FRONT_Z) - 0.010),
-    "PlateWidth": (_tx(0.0), _tz(PLATE_FRONT_Z) - 0.030),
-    "ArmWidth": (_tx(_X[0]), _tz(PLATE_FRONT_Z) + 0.004),
+    "ArmWidth": (_tx(_X[1]) + 0.006, _tz(PLATE_FRONT_Z) + 0.006),
+    "PlateWidth": (_tx(_X[1]) + 0.006, _tz(PLATE_FRONT_Z) + 0.014),
+    "SlotWidth": (_tx(0.0), _tz(PLATE_FRONT_Z) + 0.022),
     "PlateReach": (_tx(_X[1]) + 0.010, _tz((STRAP_Z[0] + PLATE_FRONT_Z) / 2.0)),
-    "SlotBottom": (_tx(_X[1]) + 0.026, _tz(SLOT_BOTTOM_Z / 2.0)),
+    "SlotBottom": (_tx(_X[1]) + 0.036, _tz(STRAP_Z[1]) - 0.014),
     "StrapThick": (_tx(_X[0]) - 0.010, _tz((STRAP_Z[0] + STRAP_Z[1]) / 2.0)),
 }
+# The slot width's fit callout reads above its value (farther from the U).
+CALLOUTS_ABOVE = ("SlotWidth",)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -219,7 +227,17 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(
+        adapter,
+        annotations,
+        {k: v for k, v in DIMENSION_CALLOUTS.items() if k in CALLOUTS_ABOVE},
+        location="above",
+    )
+    set_dimension_callouts(
+        adapter,
+        annotations,
+        {k: v for k, v in DIMENSION_CALLOUTS.items() if k not in CALLOUTS_ABOVE},
+    )
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
