@@ -60,7 +60,7 @@ def _collected_by_check_gates() -> dict[str, list[str]]:
     for task in _load_dodo().task_check():
         _run, (cmd, *_rest) = task["actions"][0]
         for arg in cmd:
-            path = Path(str(arg))
+            path = REPO_ROOT / str(arg)
             if path.suffix != ".py" or not path.name.startswith("test_"):
                 continue
             if path.resolve().parent != SCRIPTS:

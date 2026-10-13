@@ -2665,9 +2665,53 @@ def test_recipe_gate_enrolls_component_pattern_contract_once():
     dodo = _load_dodo()
     recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
     contract = str(dodo.SCRIPTS_DIR / "test_component_patterns.py")
-    assert recipe["actions"][0][1][0].count(contract) == 1
+    command_contract = str(Path(contract).relative_to(dodo.REPO_ROOT))
+    assert recipe["actions"][0][1][0].count(command_contract) == 1
     assert recipe["file_dep"].count(contract) == 1
     assert str(dodo.SCRIPTS_DIR / "_assembly_patterns.py") in recipe["file_dep"]
+
+
+def test_check_pytest_commands_use_relative_paths_from_repo_root(monkeypatch):
+    """A long farm snapshot root must not multiply across the explicit test list."""
+    import subprocess
+
+    dodo = _load_dodo()
+    tasks = list(dodo.task_check())
+    long_root = dodo.REPO_ROOT / ("snapshot-" + "x" * 180)
+    recipe = next(task for task in tasks if task["name"] == "recipe")
+    recipe_cmd = recipe["actions"][0][1][0]
+    absolute_cmd = [
+        *recipe_cmd[:4],
+        *(str(long_root / arg) for arg in recipe_cmd[4:]),
+    ]
+    assert len(subprocess.list2cmdline(absolute_cmd)) > 32767
+    relative_cmd = [
+        str(long_root / ".venv" / "Scripts" / "python.exe"),
+        *recipe_cmd[1:],
+    ]
+    assert len(subprocess.list2cmdline(relative_cmd)) < 32767
+
+    calls = []
+    monkeypatch.setattr(dodo, "REPO_ROOT", long_root)
+
+    def run(cmd, *, cwd, env):
+        calls.append((cmd, cwd))
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(dodo.subprocess, "run", run)
+    for task in tasks:
+        command = task["actions"][0][1][0]
+        if command[1:3] != ["-m", "pytest"]:
+            continue
+        assert all(not Path(arg).is_absolute() for arg in command[4:])
+        assert all(str(REPO_ROOT / arg) in task["file_dep"] for arg in command[4:]), (
+            f"check:{task['name']} changed its explicit test selection"
+        )
+        assert all((REPO_ROOT / arg).is_file() for arg in command[4:])
+        dodo._run_subprocess(
+            command, f"check {task['name']}", task=f"check:{task['name']}"
+        )
+        assert calls[-1] == (command, str(long_root))
 
 
 def test_recipe_gate_tracks_sources_imported_by_its_tests():
@@ -3048,7 +3092,7 @@ def test_check_gates_depend_on_everything_they_execute():
     for task in dodo.task_check():
         declared = {str(Path(dep).resolve()) for dep in task["file_dep"]}
         command = task["actions"][0][1][0]
-        entries = [Path(arg) for arg in command if str(arg).endswith(".py")]
+        entries = [REPO_ROOT / arg for arg in command if str(arg).endswith(".py")]
         assert entries, f"check:{task['name']} runs no .py entry point: {command}"
         executed = {
             path
