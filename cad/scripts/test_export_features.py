@@ -298,28 +298,39 @@ def test_feature_precision_without_explicit_printed_sources_fails(monkeypatch, s
         exporter.requirement_manifest("ch_rocker_arm")
 
 
-def _assert_rocker_literal_print_authority() -> None:
+def _assert_rocker_print_authority() -> None:
     features = exporter.requirement_manifest("ch_rocker_arm")["features"]
     pivot = features["pivot_bore"]
-    assert f"PIVOT HOLE: {pivot['process'].upper()}." in rocker_notes.DRAWING_NOTES, "pivot process drifted from its printed note"
-    assert pivot["thru"] and "ALL HOLES THRU." in rocker_notes.DRAWING_NOTES, "hole end drifted from its printed note"
-    assert features["profile_outer"]["mirror_symmetric"] and "MIRROR-SYMMETRIC" in rocker_notes.DRAWING_NOTES, "profile symmetry drifted from its printed note"
-    printed_notes = set(exporter._cite(rocker_notes, "DRAWING_NOTES"))
-    for feature, field in ((pivot, "process"), (pivot, "thru"), (features["profile_outer"], "mirror_symmetric")):
-        assert printed_notes <= set(feature["cite"][field])
+    draw = importlib.import_module("draw_ch_rocker_arm")
+    tree = source_tree(Path(draw.__file__))
+    dressing = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_dress_detail_dimensions")
+    assignments = {
+        target.id: node.value
+        for node in ast.walk(dressing) if isinstance(node, ast.Assign)
+        for target in node.targets if isinstance(target, ast.Name)
+    }
+    prefix = eval(compile(ast.Expression(assignments["ream_prefix"]), draw.__file__, "eval"), {}, {"prefix": ""})
+    suffix = eval(compile(ast.Expression(assignments["through_suffix"]), draw.__file__, "eval"), {}, {"suffix": ""})
+    assert prefix.split()[0] == pivot["process"].upper(), "pivot process drifted from its native dimension text"
+    assert pivot["thru"] and "THRU" in suffix, "hole end drifted from its native dimension text"
+    assert features["profile_outer"]["mirror_symmetric"] and "MIRROR PLANE:" in rocker_notes.DRAWING_NOTES
+    native_text = set(exporter._cite(draw, "_dress_detail_dimensions"))
+    for field in ("process", "thru"):
+        assert native_text <= set(pivot["cite"][field])
+    assert set(exporter._cite(rocker_notes, "DRAWING_NOTES")) <= set(features["profile_outer"]["cite"]["mirror_symmetric"])
 
 
-def test_rocker_literal_requirements_match_the_printed_notes() -> None:
-    _assert_rocker_literal_print_authority()
+def test_rocker_requirements_match_their_current_printed_authorities() -> None:
+    _assert_rocker_print_authority()
 
 
-def test_changed_printed_process_is_detected_instead_of_accepting_stale_literal(monkeypatch) -> None:
-    original = rocker_notes.DRAWING_NOTES
-    changed = original.replace("PIVOT HOLE: REAM.", "PIVOT HOLE: HONE.")
-    assert changed != original
-    monkeypatch.setattr(rocker_notes, "DRAWING_NOTES", changed)
+def test_changed_process_is_detected_instead_of_accepting_stale_native_text(monkeypatch) -> None:
+    draw = importlib.import_module("draw_ch_rocker_arm")
+    declared = requirements_for(draw)["pivot_bore"]
+    _value, sources = declared.fields["process"]
+    monkeypatch.setitem(declared.fields, "process", ("hone", sources))
     with pytest.raises(AssertionError, match="pivot process drifted"):
-        _assert_rocker_literal_print_authority()
+        _assert_rocker_print_authority()
 
 
 def test_ground_finish_keeps_its_declared_authority_without_a_seat_grade_citation() -> None:
@@ -338,18 +349,16 @@ def test_draw_import_registers_declarations_without_starting_solidworks(monkeypa
     assert callable(module.build)
 
 
-def test_rocker_land_angle_band_centres_the_printed_zero_place_nominal(monkeypatch) -> None:
-    nominal = 89.6
+def test_rocker_land_clock_is_the_printed_two_place_basic_nominal(monkeypatch) -> None:
+    nominal = 10.516
     monkeypatch.setattr(math, "degrees", lambda _value: nominal)
     _fresh_draw(monkeypatch, "ch_rocker_arm")
     features = exporter.requirement_manifest("ch_rocker_arm")["features"]
-    tolerance = float(exporter._config.title_block("angular")["value_deg"])
-    printed = round(nominal, 0)
     for name in ("tip_land_pos_x", "tip_land_neg_x"):
         assert features[name]["land_angle_nominal_deg"] == nominal
-        assert features[name]["precision"]["land_angle_deg"] == 0
-        assert features[name]["land_angle_deg"] == [printed - tolerance, printed + tolerance]
-        assert features[name]["land_angle_deg"] != [nominal - tolerance, nominal + tolerance]
+        assert features[name]["precision"]["land_angle_deg"] == 2
+        assert features[name]["land_angle_deg"] == round(nominal, 2)
+        assert features[name]["dimension_type"] == "basic"
 
 
 def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> None:
@@ -363,12 +372,16 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
     assert features["hub_faces"]["length_nominal"] == 7.0565
     for name in ("tip_land_pos_x", "tip_land_neg_x"):
         assert features[name]["tip_land"] == [5.08, 6.10]
-        assert features[name]["land_angle_deg"] == [89.0, 91.0]
-        assert features[name]["precision"]["land_angle_deg"] == 0
+        assert features[name]["land_angle_deg"] == round(math.degrees(rocker._ALPHA_TOP), 2)
+        assert features[name]["precision"]["land_angle_deg"] == 2
+        assert features[name]["dimension_type"] == "basic"
         citations = features[name]["cite"]["land_angle_deg"]
-        assert "harmonic-analyzer/cad/config/title_block.yaml:angular.value_deg" in citations
+        assert "harmonic-analyzer/cad/config/title_block.yaml:angular.value_deg" not in citations
         assert not any("linear_" in citation for citation in citations)
-        assert set(exporter._cite(rocker, "TIP_FACE", "TOP_END_X", "TOP_END_Y", "ROD_TIP_X", "R_TOP", "CENTER_Y")) <= set(citations)
+        assert set(exporter._cite(rocker, "_ALPHA_TOP")) <= set(citations)
+        assert set(exporter._cite(rocker_notes, "DRAWING_NOTES")) <= set(citations)
+    assert features["tip_land_pos_x"]["station"] == rocker.ROD_TIP_X
+    assert set(exporter._cite(importlib.import_module("draw_ch_rocker_arm"), "_add_rocker_outline_dimensions")) <= set(features["tip_land_pos_x"]["cite"]["station"])
     assert manifest["material"]["thickness"] == 2.5
     assert exporter._cite(rocker, "ARM_THICKNESS")[0] in manifest["material"]["cite"]
     # The strap's native 2.500 +/-0.025 (Main ruling 2026-10, option b).
@@ -385,8 +398,20 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
 def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -> None:
     features = exporter.requirement_manifest("ch_rocker_arm")["features"]
     for name in ("tip_land_pos_x", "tip_land_neg_x"):
-        assert features[name]["requirements"] == ["tip_land", "land_angle_deg"]
-    assert features["profile_outer"]["requirements"] == ["bottom_radius", "bottom_arc_len", "mirror_symmetric"]
+        assert features[name]["requirements"] == ["tip_land", "land_angle_deg"] + (["station"] if name == "tip_land_pos_x" else [])
+    assert features["profile_outer"]["requirements"] == ["bottom_radius", "mirror_symmetric", "unknown"]
+    assert "bottom_arc_len" not in features["profile_outer"]["requirements"]
+    assert "arc_len" not in features["top_edge"]["requirements"]
+    assert features["top_edge"]["radius"] == rocker.R_TOP
+    assert features["top_edge"]["height_above_pivot"] == rocker.TOP_EDGE_ABOVE_PIVOT
+    assert features["profile_outer"]["bottom_radius"] == rocker.R_BOTTOM
+    assert features["top_edge"]["arc_len"] == rocker.TOP_ARC_LEN
+    assert features["profile_outer"]["bottom_arc_len"] == rocker.BOT_ARC_LEN
+    for name, outside in (("top_edge", rocker.TOP_EDGE_BAND[0]), ("profile_outer", rocker.TOP_EDGE_BAND[1])):
+        assert features[name]["dimension_type"] == "basic"
+        assert "unknown" in features[name]["requirements"]
+        assert features[name]["note"] == f"SURFACE PROFILE {rocker.TOP_EDGE_BAND[0]:g} U{outside:g} TO A|B|C"
+        assert set(exporter._cite(rocker, "TOP_EDGE_BAND")) <= set(features[name]["cite"]["note"])
     assert "depth_ref" not in features["profile_outer"]["requirements"]
     assert "centre_from_pivot_ref" not in features["top_edge"]["requirements"]
     shaft = exporter.requirement_manifest("ch_pivot_shaft")

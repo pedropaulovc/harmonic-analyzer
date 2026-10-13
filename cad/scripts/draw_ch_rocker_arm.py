@@ -34,7 +34,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
-import _config
 import _surface_finish
 import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
@@ -274,28 +273,28 @@ def _rocker_points() -> tuple[tuple[float, float], tuple[float, float], tuple[fl
 _TOP, _TIP, _BOTTOM = _rocker_points()
 _RIGHT = (_plane_between(_TOP, _TIP), _plane_between(_TIP, _BOTTOM))
 _TIPS = tuple(PlanarFace((-face.normal[0], face.normal[1], 0.0), face.offset_mm) for face in _RIGHT)
-_LAND_ANGLE = math.degrees(math.acos(
-    sum((_TIP[i] - _TOP[i]) * _RIGHT[0].normal[i] for i in (0, 1)) / rocker.TIP_FACE
-))
-_ANGULAR = float(_config.title_block("angular")["value_deg"])
+_LAND_ANGLE = math.degrees(rocker._ALPHA_TOP)
 
 for _name, _sign, _face in (("tip_land_pos_x", 1, _RIGHT[0]), ("tip_land_neg_x", -1, _TIPS[0])):
     requirement(
-        _name, kind="face", faces=(_face,), requirements=("tip_land", "land_angle_deg"), fields={
-            "tip_land": (_band(rocker.TIP_FACE, _P), ("TIP_FACE", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
-            "land_angle_deg": ([round(_LAND_ANGLE, 0) - _ANGULAR, round(_LAND_ANGLE, 0) + _ANGULAR], ("TIP_FACE", "TOP_END_X", "TOP_END_Y", "ROD_TIP_X", "R_TOP", "CENTER_Y", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
-            "land_angle_nominal_deg": (_LAND_ANGLE, ("TOP_END_X", "TOP_END_Y", "ROD_TIP_X", "TIP_FACE", "R_TOP", "CENTER_Y", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
+        _name, kind="face", faces=(_face,), requirements=("tip_land", "land_angle_deg") + (("station",) if _sign == 1 else ()), fields={
+            "tip_land": (_band(rocker.TIP_FACE, _P), ("TIP_FACE", ("draw_ch_rocker_arm", "_dress_detail_dimensions"))),
+            "land_angle_deg": (round(_LAND_ANGLE, _P), ("_ALPHA_TOP", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
+            "land_angle_nominal_deg": (_LAND_ANGLE, ("_ALPHA_TOP",)),
+            "dimension_type": ("basic", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
             "radial_tip_end": ([_sign * _TIP[0], _TIP[1]], ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
             "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
-            **({"datum": ("C", (("draw_ch_rocker_arm", "build"),))} if _sign == 1 else {}),
-        }, precision={"tip_land": _P, "land_angle_deg": 0},
+            **({
+                "datum": ("C", (("draw_ch_rocker_arm", "_add_land_datum"),)),
+                "station": (rocker.ROD_TIP_X, ("ROD_TIP_X", ("draw_ch_rocker_arm", "_add_rocker_outline_dimensions"))),
+                "station_nominal": (rocker.ROD_TIP_X, ("ROD_TIP_X",)),
+            } if _sign == 1 else {}),
+        }, precision={"tip_land": _P, "land_angle_deg": _P, **({"station": _P} if _sign == 1 else {})},
     )
 
 part_metadata(datums={
-    "C": ({"feature": "tip_land_pos_x", "surface": "rod-side (+X) radial tip land"}, (("draw_ch_rocker_arm", "build"),)),
+    "C": ({"feature": "tip_land_pos_x", "surface": "rod-side (+X) radial tip land"}, (("draw_ch_rocker_arm", "_add_land_datum"),)),
 })
-
-
 
 
 def _project(adapter: Any, view: Any, points: Any, *, label: str) -> list[tuple[float, float]]:
@@ -1545,9 +1544,9 @@ PIVOT_BORE = requirement(
         "at": _CENTRE, "axis": _AXIS,
         "dia": (_band(rocker.PIVOT_HOLE_DIA, _P, rocker.PIVOT_HOLE_BAND), ("PIVOT_HOLE_DIA", "PIVOT_HOLE_BAND")),
         "nominal_dia": (rocker.PIVOT_HOLE_DIA, ("PIVOT_HOLE_DIA",)),
-        "thru": (True, (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
+        "thru": (True, (("draw_ch_rocker_arm", "_dress_detail_dimensions"),)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
-        "process": ("ream", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)), "datum": ("A", (("draw_ch_rocker_arm", "build"),)),
+        "process": ("ream", (("draw_ch_rocker_arm", "_dress_detail_dimensions"),)), "datum": ("A", (("draw_ch_rocker_arm", "build"),)),
     }, precision={"dia": _P, "finish_ra": 1},
 )
 
@@ -1708,35 +1707,34 @@ FRONT_KEEP = {
 _TOP_P = rocker_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"]
 TOP_EDGE = requirement(
     "top_edge", kind="profile", faces=(CylinderFace(2 * rocker.R_TOP),),
-    requirements=("height_above_pivot", "radius", "profile_zone", "arc_len"), fields={
+    requirements=("height_above_pivot", "radius", "unknown"), fields={
         "height_above_pivot": (rocker.TOP_EDGE_ABOVE_PIVOT, ("TOP_EDGE_ABOVE_PIVOT", ("draw_ch_rocker_arm", "_basic_profile_dimensions"))),
         "height_from": ("pivot_bore", (("draw_ch_rocker_arm", "build"),)),
         "radius": (rocker.R_TOP, ("R_TOP", ("draw_ch_rocker_arm", "_basic_profile_dimensions"))), "radius_nominal": (rocker.R_TOP, ("R_TOP",)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
-        "profile_zone": (float(ARC_PROFILE_ZONE_MM), (("ch_rocker_arm_notes", "ARC_PROFILE_ZONE_MM"),)),
-        "outside_disposition": (float(ARC_PROFILE_OUTSIDE_MM["TopRadius"]), (("ch_rocker_arm_notes", "ARC_PROFILE_OUTSIDE_MM"),)),
-        "profile_datums": (["A", "B", "C"], (("draw_ch_rocker_arm", "_add_arc_profiles"),)),
-        "arc_len": (_band(rocker.TOP_ARC_LEN, _P), ("TOP_ARC_LEN", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
+        # The consumer schema has no surface-profile/disposition fields.
+        # Preserve the sourced control as a note plus an unknown requirement,
+        # never as an invented radius or height acceptance band.
+        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['TopRadius']} TO A|B|C", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
+        "arc_len": (rocker.TOP_ARC_LEN, ("TOP_ARC_LEN",)),
         "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)),
-        "centre_from_pivot_ref": (rocker.CENTER_Y - rocker.PIVOT_MID_Y, ("CENTER_Y", "PIVOT_MID_Y", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
+        "centre_from_pivot_ref": (rocker.CENTER_Y - rocker.PIVOT_MID_Y, ("CENTER_Y", "PIVOT_MID_Y")),
         "end": (list(_TOP), ("TOP_END_X", "TOP_END_Y")),
-    }, precision={"height_above_pivot": _TOP_P, "radius": _P, "arc_len": _P},
+    }, precision={"height_above_pivot": _TOP_P, "radius": _P},
 )
 PROFILE_OUTER = requirement(
     "profile_outer", kind="profile", faces=(CylinderFace(2 * rocker.R_BOTTOM), _RIGHT[1], _TIPS[1]),
-    requirements=("bottom_radius", "profile_zone", "bottom_arc_len", "mirror_symmetric"), fields={
+    requirements=("bottom_radius", "mirror_symmetric", "unknown"), fields={
         "bottom_radius": (rocker.R_BOTTOM, ("R_BOTTOM", ("draw_ch_rocker_arm", "_basic_profile_dimensions"))),
         "bottom_radius_nominal": (rocker.R_BOTTOM, ("R_BOTTOM",)),
         "dimension_type": ("basic", (("draw_ch_rocker_arm", "_basic_profile_dimensions"),)),
-        "profile_zone": (float(ARC_PROFILE_ZONE_MM), (("ch_rocker_arm_notes", "ARC_PROFILE_ZONE_MM"),)),
-        "outside_disposition": (float(ARC_PROFILE_OUTSIDE_MM["BottomRadius"]), (("ch_rocker_arm_notes", "ARC_PROFILE_OUTSIDE_MM"),)),
-        "profile_datums": (["A", "B", "C"], (("draw_ch_rocker_arm", "_add_arc_profiles"),)),
+        "note": (f"SURFACE PROFILE {ARC_PROFILE_ZONE_MM} U{ARC_PROFILE_OUTSIDE_MM['BottomRadius']} TO A|B|C", ("TOP_EDGE_BAND", ("draw_ch_rocker_arm", "_add_arc_profiles"))),
         "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)), "top_edge_feature": ("top_edge", (("ch_rocker_arm_notes", "DRAWING_NOTES"),)),
-        "bottom_arc_len": (_band(rocker.BOT_ARC_LEN, _P), ("BOT_ARC_LEN", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
-        "mirror_symmetric": (True, (("ch_rocker_arm_notes", "DRAWING_NOTES"),)), "depth_ref": (rocker.ARM_DEPTH, ("ARM_DEPTH", ("ch_rocker_arm_notes", "DRAWING_NOTES"))),
+        "bottom_arc_len": (rocker.BOT_ARC_LEN, ("BOT_ARC_LEN",)),
+        "mirror_symmetric": (True, (("ch_rocker_arm_notes", "DRAWING_NOTES"),)), "depth_ref": (rocker.ARM_DEPTH, ("ARM_DEPTH",)),
         "bottom_end": (list(_BOTTOM), ("BOT_END_X", "R_BOTTOM", "CENTER_Y")),
         "radial_tip_end": (list(_TIP), ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
-    }, precision={"bottom_radius": _P, "bottom_arc_len": _P},
+    }, precision={"bottom_radius": _P},
 )
 HUB_OD = requirement(
     "hub_od", kind="boss", faces=(CylinderFace(rocker.HUB_DIA),),
@@ -1798,7 +1796,6 @@ STRAP_DATUM_B = requirement(
 part_metadata(datums={
     "B": ({"feature": "strap_datum_b", "surface": "+Z broad strap face"}, (("draw_ch_rocker_arm", "build"),)),
 })
-TOP_KEEP: dict[str, tuple[float, float]] = {}
 BASIC_PROFILE_DIMENSIONS = {"TopRadius", "BottomRadius", "TopAbovePivot"}
 
 
@@ -3217,7 +3214,7 @@ async def build(adapter: Any) -> dict[str, str]:
     datum_a = add_datum_feature(
         adapter, hub, edge_xy=pivot_datum_pick,
         symbol_xy=_pivot_datum_request(pivot_centre, projected_radius),
-        datum="A", label="pivot bore cylindrical datum feature", shoulder=True,
+        datum=PIVOT_BORE.fields["datum"][0], label="pivot bore cylindrical datum feature", shoulder=True,
     )
     _require_datum_on_bore(adapter.swApp, datum_a, pivot_bore_edge)
     pivot_finish_rim, pivot_finish_symbol = _pivot_finish_placement(adapter, hub)

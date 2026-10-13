@@ -106,9 +106,14 @@ model nominal coordinates are separate; BASIC and REF dimensions do not acquire
 invented general-tolerance bands. Explicit native tolerance bands retain the
 exact authored nominal where native display rounding has not been proved.
 Precision alone does not justify a private rounding convention.
-The rocker's zero-place `land_angle_deg` band is centred on
-`round(land_angle_nominal_deg, 0)` plus/minus the printed title-block angular
-tolerance; the separate nominal remains the unrounded geometry value.
+The rocker's `land_angle_deg` is the two-place BASIC mirror-plane clock angle
+from `_ALPHA_TOP`, printed in Manufacturing Note 1, not the retired zero-place
+land-perpendicularity band. BASIC radii and height remain nominal scalars;
+arc lengths remain geometry-only metadata, not separate acceptance bands.
+The consumer schema does not expose unequally disposed surface-profile fields:
+the sourced profile control is retained in each arc feature's `note` and its
+acceptance identity remains explicitly `unknown`, never silently omitted or
+replaced with a size band.
 
 Turned-feature `z_mm` intervals describe nominal geometry along the feature's
 source-frame Z axis, not an acceptance band. Shaft grooves overlay the journal

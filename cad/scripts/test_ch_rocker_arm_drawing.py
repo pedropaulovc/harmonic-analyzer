@@ -1691,9 +1691,10 @@ def test_pivot_precision_binding_failures_fail_closed(
 
 def test_build_keeps_pivot_out_of_strict_part_precision() -> None:
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
     strict_call = next(
         node
-        for node in ast.walk(tree)
+        for node in ast.walk(build)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "assert_imported_precision"
@@ -2601,7 +2602,7 @@ def test_land_locator_expected_value_is_sourced_and_rejects_stale_native_geometr
 
 def test_land_locator_guard_runs_after_final_rebuild_and_preserves_marked_census():
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    build = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "build")
+    build = next(node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "build")
     calls = [
         node for node in ast.walk(build) if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
@@ -5571,7 +5572,7 @@ def test_source_height_normalization_then_quantized_native_caption_seating_keeps
 
 
 _POST_CAPTION_PHASES = (
-    "rebuild", "dimension census", "REAM clearance", "front-detail air",
+    "rebuild", "dimension census", "datum C land location", "REAM clearance", "front-detail air",
     "radius exterior", "arc profile clearance",
     "R24 detail layout", "R24 DOT state", "R24 DOT route",
     "shared layout", "finalize",
@@ -5607,6 +5608,7 @@ def post_caption_block():
             "adapter", "front", "hub", "end", "right", "iso", "notes_box", "arc_profiles",
             "FRONT_KEEP", "HUB_KEEP", "END_KEEP", "RIGHT_KEEP", "OUTPUTS", "SHEET_SCALE",
             "taper_dimension", "taper_entities", "rod_land", "rod_tip_attached",
+            "land_dimension", "land_entities",
             "rod_position_gtol", "rod_hole_edge", "rod_position_landing", "rod_position_signature",
         )
     }
@@ -5623,7 +5625,7 @@ def post_caption_block():
         return call
 
     for name, phase in zip((
-        "rebuild_drawing", "_require_dimension_census", "_require_ream_clearance",
+        "rebuild_drawing", "_require_dimension_census", "_require_land_location", "_require_ream_clearance",
         "_require_front_detail_air", "_require_radius_exterior",
         "_require_arc_profile_clearance", "_require_r24_detail_layout",
         "_require_rod_position_dot", "_require_rod_dot_route",
@@ -5714,6 +5716,10 @@ def test_post_caption_success_keeps_order_arguments_result_and_skips_capture(pos
             ("right", ns["right"], ns["RIGHT_KEEP"]),
             ("iso", ns["iso"], {}),
         )), {}),
+        ((adapter, (
+            ("front", ns["front"]), ("detail D", ns["hub"]), ("detail E", ns["end"]),
+            ("right", ns["right"]), ("iso", ns["iso"]),
+        ), ns["land_dimension"], ns["land_entities"]), {}),
         ((adapter, ns["hub"], ns["notes_box"]), {}),
         ((adapter, ns["front"], ns["hub"], ns["end"]), {}),
         ((adapter, ns["front"]), {}),
@@ -8223,7 +8229,7 @@ def test_r26_actual_inside_r800_tail_and_strap_extension_refuse_restored_legacy_
 @pytest.fixture
 def r24_taper(native_front, bound, monkeypatch):
     case = native_front
-    taper, entities = drawing._add_rocker_outline_dimensions(case.adapter, object())
+    taper, entities, _land_dimension, _land_entities = drawing._add_rocker_outline_dimensions(case.adapter, object())
     data = _ClearanceDisplayData(
         [_r24_text("132.76", (0.2118882, 0.132), width=0.0142236),
          _r24_text("R816/TAPER", (0.2059139, 0.1264437), width=0.0261722)],

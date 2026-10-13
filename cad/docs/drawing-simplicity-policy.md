@@ -261,6 +261,7 @@ recorded on the same issues.
 
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|
+| MHA-CH-006 rocker arm integral pivot hub (the sheet states MIN HUB WALL 1.53) | Bore-to-hub wall 1.53 MIN at the worst printed limits: (Ø10.20 −0.51 − Ø6.53 maximum bore) / 2 −0.05 radial eccentricity from Ø0.10 coaxiality; below the 2.0 target, above the unchanged 1.5 floor | The OD ceiling is set by the amplitude-bar foot cheeks at rest (`channel_kinematics.bar_bottom`, `test_rocker_bank_layout`), so the shared hub/washer nominal Ø10.20 remains unchanged. The spec's minimum OD includes twice the radial eccentricity. This is scoped to the approved R28 sheet; it does not restore any reset exception. | Pedro, explicit Ship with issues disposition for PR #1354; prior option-A record 2026-10-12 |
 
 
 ## The gate
