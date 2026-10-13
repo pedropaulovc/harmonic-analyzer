@@ -3015,6 +3015,9 @@ def task_check():
         # Builder gates handed to save's final deep rebuild (drive-train) must
         # read AFTER it, cost no second rebuild, and still block the save.
         SCRIPTS_DIR / "test_assembly_save_solved_gates.py",
+        # Persisted display data must fail closed before assembly publication.
+        SCRIPTS_DIR / "test_assembly_save.py",
+        REPO_ROOT / "tests" / "test_saved_display_data.py",
         # The copied-mate safeguard must keep failing CLOSED: an unreadable
         # GetErrorCode2 or a truncated MateGroup scan has to raise/re-walk, never
         # read as "this copy is clean".
@@ -3265,6 +3268,8 @@ def task_check():
     }
     recipe_test_deps = sorted(
         {
+            # Pytest discovers shared fixtures outside the import closure.
+            str((REPO_ROOT / "conftest.py").resolve()),
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
             *(str(path.resolve()) for path in machinist_review_contract_deps),

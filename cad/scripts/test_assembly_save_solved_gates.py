@@ -18,8 +18,8 @@ deep rebuild of its own before the explode. That is sound only if:
 * the DOF manifest is published only beside an assembly that was saved: a
   failed gate or save leaves none.
 
-The save pipeline after the gates is stubbed EXCEPT the conditional
-``rebuild_if_needed_before_save``, which runs for real on the fake model.
+The expensive save pipeline after the gates is stubbed, but the conditional
+``rebuild_if_needed_before_save`` and final saved-display-data gate run for real.
 
 Run: ``uv run python -m pytest cad/scripts/test_assembly_save_solved_gates.py -q``
 """
@@ -37,6 +37,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _assembly  # noqa: E402
+from _assembly import reconcile_saved_rebuild_state as _native_reconcile  # noqa: E402
 
 FULLY, UNDER = 3, 2
 ASM = "dt-drive-train"
@@ -141,8 +142,8 @@ class Model:
 
 
 @pytest.fixture
-def save_steps(tmp_path, monkeypatch):
-    """Stub the save pipeline after the gates; record what ran."""
+def save_steps(tmp_path, monkeypatch, saved_native_bytes):
+    """Stub expensive native operations while retaining the saved-byte gate."""
     steps: list[str] = []
     monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
     _assembly.reset_dof_manifest()
@@ -154,6 +155,7 @@ def save_steps(tmp_path, monkeypatch):
             _assembly.named_ref("Right Plane", "PLANE"),
         ],
     )
+    (tmp_path / f"{ASM}.SLDASM").write_bytes(saved_native_bytes())
     yield steps
     _assembly.reset_dof_manifest()
 
@@ -320,3 +322,59 @@ def test_failed_save_retires_the_old_manifest_and_publishes_none(save_steps, mon
     with pytest.raises(RuntimeError, match="no file"):
         _save(adapter, _free_dof_gate)
     assert not stale.exists()
+
+
+@pytest.mark.parametrize("flag", [0, 2])
+def test_incomplete_or_unsupported_saved_bytes_prevent_manifest_publication(
+    save_steps, monkeypatch, saved_native_bytes, flag
+):
+    adapter, _model = _drive_train_like()
+
+    def save_invalid(*_args):
+        (_assembly.OUT_SLDASM / f"{ASM}.SLDASM").write_bytes(saved_native_bytes(flag))
+
+    monkeypatch.setattr(_assembly, "_save_new_assembly_as_copy", save_invalid)
+    monkeypatch.setattr(_assembly, "reconcile_saved_rebuild_state", _native_reconcile)
+    with pytest.raises(RuntimeError, match="display"):
+        _save(adapter, _free_dof_gate)
+    assert not _assembly.dof_manifest_path(ASM).exists()
+
+
+@pytest.mark.parametrize("saved_flag", [None, 0, 2])
+def test_dirty_configuration_publication_uses_one_preventive_save(
+    save_steps, monkeypatch, saved_native_bytes, saved_flag
+):
+    from test_simplified_helpers import FakeAssemblyFile, FakeOpenAssembly
+
+    adapter, _model = _drive_train_like()
+    file = FakeAssemblyFile(
+        _assembly.OUT_SLDASM / f"{ASM}.SLDASM", saved_native_bytes,
+        {"Default": True, "Default Simplified": True}, saved_flag=saved_flag,
+    )
+    file.proof = _assembly.OUT_SLDASM / f".{ASM}.massprops.sha"
+    file.proof.write_text("stale-proof\n", encoding="utf-8")
+
+    async def open_saved(_path):
+        adapter.currentModel = FakeOpenAssembly(file)
+        file.opens.append(adapter.currentModel)
+        file.events.append(("open", adapter.currentModel.NeedsRebuild2))
+        return True
+
+    adapter.open_model = open_saved
+    adapter.swApp.CloseAllDocuments = lambda _include_unsaved: True
+    monkeypatch.setattr(_assembly, "reconcile_saved_rebuild_state", _native_reconcile)
+    if saved_flag is None:
+        _save(adapter, _free_dof_gate)
+        assert file.path.read_bytes() == saved_native_bytes()
+        assert _assembly.dof_manifest_path(ASM).exists()
+        assert "images" in save_steps
+        assert file.proof.read_text(encoding="utf-8") == "sha\n"
+    else:
+        with pytest.raises(RuntimeError, match="display"):
+            _save(adapter, _free_dof_gate)
+        assert not _assembly.dof_manifest_path(ASM).exists()
+        assert not file.proof.exists()
+    assert file.opens[-1].NeedsRebuild2 == 0
+    assert [event[0] for event in file.events] == ["open", "save", "open"]
+    assert all(mark is True for mark in file.display_marks.values())
+    assert file.opens[-1].operations == []

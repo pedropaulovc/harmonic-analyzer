@@ -24,7 +24,6 @@ EXEMPT: dict[str, str] = {}
 # then they are listed here so the guard fails only on NEW orphans.
 PENDING_TRIAGE: frozenset[str] = frozenset(
     {
-        "test_assembly_save.py",
         "test_base_serial.py",
         "test_channel_installation_cascade.py",
         "test_diag_dump_part.py",

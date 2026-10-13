@@ -42,6 +42,123 @@ bytes for private mutation fixtures. Keep each case's writable checkout, task
 state and invalidation checks isolated. Error-budget timings must retain the
 configured draws, seeds, reference cases and numerical acceptance checks.
 
+## Persisted assembly display data
+
+Assembly publication requires both a fresh native rebuild-state proof and a
+strict check of the saved `Contents/DisplayLists` part flags. A clean
+`NeedsRebuild2 == 0` does **not** prove that eDrawings has complete saved previews.
+Full builds and refreshes gate persisted bytes before publication; even an
+unchanged refresh rejects invalid saved bytes instead of certifying a no-save hit.
+`assert_saved_display_data(path)` is strictly read-only.
+
+### Preventive display-data mark
+
+The production fix is preventive, not a repair. Before an assembly is saved
+natively for the first time (`SaveAs3` copy) and before every changed in-place
+or reconcile `Save3`, `_mark_assembly_display_data` enumerates the **existing**
+configurations of the open model and sets the supported
+`IConfiguration.LargeDesignReviewMark = True` on **every** one of them. A
+configuration that already reads back `True` is skipped, so no extra native call
+dirties it; otherwise the assignment is read back with an identity-strict
+`is True` check on the `VT_BOOL` value (no generic truthiness) and fails closed
+if any configuration does not report the mark. It never calls
+`ShowConfiguration2`, never creates or rebuilds configurations, and never
+changes geometry; the active configuration is checked to be the same before and
+after. A null configuration, a missing active configuration or a
+configuration-API error aborts the save.
+
+The mark is only defined for multi-configuration assemblies. Exactly one
+configuration is a recorded not-applicable outcome and the save proceeds
+unmarked; zero configurations or a failed enumeration is **not** not-applicable
+and aborts. One telemetry span wraps the whole loop with the configuration count,
+names and outcome; there are no per-configuration spans.
+
+An unchanged, complete assembly is a full no-op: reconciliation and refresh
+never mark and never save it, so its bytes stay identical.
+
+### Reconcile cycle
+
+Reconciliation runs the strict read-only saved-data preflight, then opens the
+assembly. If `NeedsRebuild2 == 0` it returns without writing. Otherwise it keeps
+the original cycle: rebuild every configuration with the rest-of-run
+configuration last, `AddRebuildSaveMark` with readback, the display-data mark
+above, exactly one validated `Save3(1)`, a fresh reopen proving
+`NeedsRebuild2 == 0`, and the strict saved-data gate. There is no display-only
+repair `Save3`, no extra verification reopen and no separate zero-flag branch:
+a supported zero flag in the saved output simply fails. Native saves require the
+native `(bool, int, int)` result tuple: false or errors fail, warnings are
+logged, and there is no generic retry or repair of unsupported formats. In-place
+saves and refreshes apply the same strict preflight and output validation and
+do not catch `IncompleteSavedDisplayData`.
+
+### Saved-data parser
+
+The parser supports only the empirically observed v37/v40 layout, not a
+documented SOLIDWORKS format. It checks every exact display-list stream, compressed
+completion, sizes and CRC32, with a 64 MiB expanded limit per stream, and validates
+recognized `.SLDPRT` records and flags; nothing else is interpreted. Legitimate
+zero `.SLDASM` container flags are excluded. Missing, malformed, unknown,
+overlapping or extended-length records fail closed; zero flags are classified
+(`IncompleteSavedDisplayData`) only after **all** streams and records validate,
+so a structural fault is never masked by an earlier zero flag, and neither
+outcome authorizes any save. Observed decoys and verified directory-copy
+references delimit inspection; the remaining footer, absent configurations and
+actual rendered eDrawings visibility are not proven by this gate — it observes
+part records, nothing more. A tagged part-path string with the same prefix is
+not distinguishable from a component record.
+
+### Pinned native reproduction (historical evidence)
+
+The temporary probe, builder hook and pn-only output declarations were removed
+from tip; no private per-instance flag setter and no diagnostic hook ships, and
+the diagnostic source is not imported by production. The runs below are the
+evidence that selected the preventive mark; the C→E→F differential is **not**
+the production fix.
+
+Reproduce the original causal matrix only from an isolated checkout at
+`f4927b968cb93cb46da933b1d011ebded120cede`, which retains the probe and builder
+hook. Under [the persistent supervisor](#starting-one-under-the-supervisor), use
+the existing `farm-run.ps1` launch shape with `"-Worktree", "<checkpoint checkout>"`,
+`"-PoolHome", "C:/src/solidworks-pool"`, `"-Targets", "assembly:pn_pen"`,
+`"-LeafTimeout", "90"`, `"-DisplayName", "DisplayData - Reproduce pinned pn matrix"`
+and a unique `"-Tag", "display-data-repro"` / supervisor process name. Keep logs
+outside worktrees, retain the recorded run and use the protocol-compatible pool;
+do not invoke the probe locally or transplant its hook into production.
+The observed protocol-6 run was
+`20261012T071150070Z-5c47034df7644314b3136e88072c9fd6`.
+
+In its cached-hanger-twice plus threaded-screw fixture:
+
+- C (`refcfg-c-both-rebuild-copy11`): all three part flags were 1,
+  `NeedsRebuild2 == 1`, and eDrawings hid 0 components.
+- E (`refcfg-e-reconcile-save1`): the then-production derived/Default
+  `EditRebuild3` / `AddRebuildSaveMark` / `Save3(1)` sequence left the first unique
+  hanger and screw flags at 0, the duplicate hanger at 1,
+  `NeedsRebuild2 == 0`, and 1 hidden component.
+- F (`refcfg-f-fresh-resave-save1`): freshly opening E and only `Save3(1)`-saving
+  produced all flags 1, `NeedsRebuild2 == 0`, and 0 hidden components, without
+  configuration switching, rebuilding or mark writes.
+
+The original full pn assembly had 8 zero flags across 10 groups and 8 hidden
+components; `normal-resave-inherited` yielded 0 hidden components without adding
+LDR marks. All referenced input hashes stayed unchanged. These are differential
+native-save and eDrawings observations: the internal first-unique-record-specific
+mechanism remains **UNPROVEN**, not an inferred SOLIDWORKS implementation detail.
+
+The stronger, selecting evidence is the independent diagnostic matrix at
+`7caba42893615b78541204fc6d79ac710c206bf7`, run on the actual pn assembly with
+the unchanged production builder on SOLIDWORKS 2026
+([`pn-pen-display-matrix.json`](https://github.com/user-attachments/files/33348209/pn-pen-display-matrix.json)):
+
+- Marking **both** `Default` and `Default Simplified` before the first
+  `SaveAs3` copy (option 11), followed by the original first reconciliation
+  `Save3(1, 0, 0)`, produced 16 part records with 0 zero flags, all 8 parts
+  visible in eDrawings, `NeedsRebuild2 == 0` and `GetSaveFlag == False`.
+- Marking **only** `Default` produced 8 zero flags and 8 hidden components.
+
+This proves the preventive mark for that assembly and fixture; other assemblies
+await the full-farm build and native eDrawings visibility review.
+
 ## Supervised farm launches
 
 A farm build outlives every agent turn and every harness deadline: a cold
