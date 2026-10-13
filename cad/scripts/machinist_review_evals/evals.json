@@ -242,7 +242,7 @@
           "rule": 24,
           "polarity": "negative",
           "confidence": "medium",
-          "evidence": "dt-drive-train-assembly sheet 6 step 4 prints the worst-case design clearances alongside the 0.10 feeler check. Rule 24 (assembly information only) and rule 7 (no design story). Prior reviewers fable-new1/v2 flagged it."
+          "evidence": "dt-drive-train-assembly sheet 6 step 4 prints the worst-case design clearances alongside the 0.10 feeler check. Rule 24 (assembly information only): the fitter acts on the feeler check and the cut, not the design stack. Prior reviewers fable-new1/v2 flagged it."
         },
         {
           "text": "An over-specification finding reports that sheet 9 check 3 carries the design justification '(AT LEAST 81% OF THE RING WIDTH STAYS ON THE CAM)' rather than a measurable acceptance.",
@@ -3201,14 +3201,24 @@
           "evidence": "MHA-MG-007 sheet 1 side view: Ra 1.6 leader to the stud; MHA-MG-005 says 'Ø5 AXLE BORE THRU, REAMED; RUNNING FIT ON THE AXLE STUD'. A running journal takes Ra 1.6."
         },
         {
-          "text": "An over_specification finding flags the note 'TURN COMPLETE IN ONE SETUP; STUD OD IS THE WHEEL BEARING SURFACE -- NO TOOL MARKS OR STEPS.' as method and design-intent narration (rule 7)",
+          "text": "An over_specification finding flags 'TURN COMPLETE IN ONE SETUP' in the wheel-axle note as a prescribed method (rule 7)",
           "check": {
             "category": "over_specification"
           },
           "rule": 7,
           "polarity": "negative",
           "confidence": "high",
-          "evidence": "MHA-MG-007 sheet 1, single note line under the side view. 'TURN COMPLETE IN ONE SETUP' is a method; 'STUD OD IS THE WHEEL BEARING SURFACE' narrates intent. The Ra 1.6 symbol already carries the requirement."
+          "evidence": "MHA-MG-007 sheet 1, single note line under the side view: 'TURN COMPLETE IN ONE SETUP; STUD OD IS THE WHEEL BEARING SURFACE -- NO TOOL MARKS OR STEPS.' 'TURN COMPLETE IN ONE SETUP' prescribes the process; the dimensioned, toleranced stud is the requirement."
+        },
+        {
+          "text": "No finding objects to 'STUD OD IS THE WHEEL BEARING SURFACE' as design-intent narration; it states why the stud is held tight and finished (rule 7)",
+          "check": {
+            "absent_from": "over_specification"
+          },
+          "rule": 7,
+          "polarity": "positive",
+          "confidence": "medium",
+          "evidence": "MHA-MG-007 sheet 1 note. Rule 7: a short functional reason where a tight band or roughness symbol would otherwise look arbitrary is welcome and never a defect in itself. Objecting to the method words in the same line is fine."
         },
         {
           "text": "A clarity finding says the note 'TURN COMPLETE IN ONE SETUP; STUD OD IS THE WHEEL BEARING SURFACE -- NO TOOL MARKS OR STEPS.' runs into the title block, overprinting its tolerance rows",
@@ -4557,14 +4567,14 @@
           "evidence": "MHA-SM-002 sheet 1 front view: ⌖|Ø0.20|A leadered to the Ø12.00 THRU bore; datum A on the top seat. The views carry only 24.00, 29.37 (block height) and 14.00, none boxed; the note says 'CENTRE 20.37 BELOW THE TOP SEAT (DATUM A)' and 'CENTRED IN THE 24.00 WIDTH'. Rule 5: 'a located feature with no basic is a defect'; the part prompt puts a geometric control missing datums or basics in blockers."
         },
         {
-          "text": "An over_specification finding flags the knife-mount note block for narrating design intent ('THE BORE IS THE KNIFE-EDGE BEARING: THE LEVER TRUNNION RIDES ITS UPPER INNER WALL') and/or repeating the finish ('HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING; LEAVE UNPAINTED') outside the title block (rule 7)",
+          "text": "An over_specification finding flags the knife-mount note block for repeating the finish ('LEAVE UNPAINTED') outside the title block, carrying the bore location ('CENTRE 20.37 BELOW THE TOP SEAT (DATUM A)') as a note, or running well past four lines (rule 7)",
           "check": {
             "category": "over_specification"
           },
           "rule": 7,
           "polarity": "negative",
           "confidence": "high",
-          "evidence": "MHA-SM-002 sheet 1: a 10-line note block. The Finish field reads 'heat treated, unpainted' while the note repeats 'LEAVE UNPAINTED'. The note also carries the location 'CENTRE 20.37 BELOW THE TOP SEAT (DATUM A)' and narrates 'TWO BLOCKS USED, ONE PER TRUNNION' and 'AS INTENDED'."
+          "evidence": "MHA-SM-002 sheet 1: a 10-line note block. The Finish field reads 'heat treated, unpainted' while the note repeats 'LEAVE UNPAINTED', and the note carries the location 'CENTRE 20.37 BELOW THE TOP SEAT (DATUM A)'. 'THE BORE IS THE KNIFE-EDGE BEARING' is an allowed functional reason under rule 7 and is not the defect."
         },
         {
           "text": "Reports that the 1/2-13 tapped hole's depth and its tap-drill breakthrough into the Ø12.00 bore are shown only by hidden (dashed) lines in the front and side views, with no section cut, so the internal shape is read from hidden lines.",

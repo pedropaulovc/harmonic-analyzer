@@ -106,6 +106,8 @@ a chamfer gets the loosest title-block band that serves it.
   ("SLIDING FIT ON SHAFT, ITEM 4", or the mate's name and drawing or part
   number) and the fit it needs: running, sliding, press or locating. A gear
   centre distance names the mesh; a width that sets a stack names the stack.
+  Where the mate alone does not show why the band is tight, add a few words
+  of reason (`SETS MESH BACKLASH`, `KNIFE-EDGE SEAT`); see rule 7.
   The shop can then make the hole to the shaft instead of chasing a number.
   A tight band whose mate appears nowhere in the package is a blocker: either
   name the mate or loosen the band. A mate named somewhere in the package (a
@@ -201,9 +203,15 @@ DP, contact ratio), addendum modification and a backlash acceptance; those
 are gear data, not narration.
 
 - A note never restates the title block, never carries a dimension or a
-  tolerance that belongs on a feature, never explains what a datum letter is,
-  and never narrates design intent. Other part numbers appear only to identify
-  a mate, and identifying a mate is always allowed.
+  tolerance that belongs on a feature, and never explains what a datum letter
+  is. Other part numbers appear only to identify a mate, and identifying a
+  mate is always allowed.
+- **Say why when it is not obvious.** A short functional reason is welcome
+  where a tight band, a roughness symbol or a hardness would otherwise look
+  arbitrary: `WHEEL BEARING SURFACE`, `KNIFE-EDGE SEAT`, `SETS MESH BACKLASH`.
+  Put it on the callout it explains; naming the mate (rule 4) is the commonest
+  form. A reason says what the feature does, never how to make it, and it is
+  never a defect in itself. What a note must not do is prescribe the process.
 - The title block's Finish field (`AS DRAWN`, `DRAWN WIRE`, `BORE AS REAMED`)
   is a finish statement under rule 2, not a note line and not a method.
 - **Flag it where it applies.** A requirement that matters (a matched fit, a
