@@ -54,9 +54,8 @@ def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:
     assert pd_guide_lock_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
 
 
-# Title block: .X ±0.8, .XX ±0.51; drilled holes +0.10/-0.
+# Title block: .X ±0.8; drilled holes +0.10/-0.
 _ONE_PLACE = 0.8
-_TWO_PLACES = 0.51
 _DRILLED_PLUS = 0.10
 _CHAR_WIDTH = 0.00276  # sheet m per character of 3.5-mm note text
 
@@ -67,7 +66,7 @@ def _ligaments(hole_y: float) -> dict[str, float]:
     xs = [x for x, _ in pd_guide_lock_spec.HOLE_XY]
     return {
         "guide-side edge": hole_y - band - r_max,
-        "far edge": (9.5 - _TWO_PLACES) - hole_y - band - r_max,
+        "far edge": (9.6 - _ONE_PLACE) - hole_y - band - r_max,
         "left edge": min(xs) - band - r_max,
         "right edge": (22.0 - _ONE_PLACE) - max(xs) - band - r_max,
     }
@@ -83,7 +82,7 @@ def test_screw_holes_keep_the_ligament_floor_at_the_printed_worst_case() -> None
     worst = _ligaments(hole_y)
     assert min(worst.values()) >= 1.5
     assert pd_guide_lock_spec.HOLE_LIGAMENTS_WORST == pytest.approx(worst)
-    assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Height"] == 2
+    assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Height"] == 1
     assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Width"] == 1
 
 
@@ -131,23 +130,21 @@ def test_the_hole_1_x_text_stands_outboard_of_its_extension_lines() -> None:
     assert y > drawing.FRONT_KEEP["Hole2X"][1] + 0.004
 
 
-def test_the_height_text_block_sits_between_its_extension_lines() -> None:
+def test_the_height_text_sits_between_its_extension_lines() -> None:
     """Machinist review of 1c9f9b2a6: inboard of the hole Y dimension the
-    9.50 sat on the plate's top-edge extension line and its two-line callout
-    crowded the hole Y extension. SolidWorks centres the value and callout as
-    one block on the keep (farm run 20261013T031858107Z: lines 5.7 mm apart),
-    so the block now centres between the top and bottom extension lines,
-    left of the hole Y dimension line, where the hole Y extension stops."""
-    lines = ["9.50", *drawing.HEIGHT_BAND_CALLOUT.split("\n")]
-    assert len(lines) == 3
+    height's value sat on the plate's top-edge extension line. It now stands
+    mid-way between the top and bottom extension lines, left of the hole Y
+    dimension line, where the hole Y extension stops, and carries no callout
+    (Codex P1 on #1353: rule 6 bars a design-intent note)."""
+    assert "Height" not in drawing.DIMENSION_CALLOUTS
+    assert not hasattr(drawing, "HEIGHT_BAND_CALLOUT")
     x, y = drawing.FRONT_KEEP["Height"]
-    half_w = max(len(line) for line in lines) * _CHAR_WIDTH / 2.0
+    half_w = len("9.6") * _CHAR_WIDTH / 2.0
     assert x - half_w > 0.0127
     assert x + half_w < drawing.FRONT_KEEP["Hole1Y"][0] - 0.002
-    line_pitch, glyph = 0.0058, 0.0035
-    half_h = line_pitch * (len(lines) - 1) / 2.0 + glyph / 2.0
-    assert y + half_h < drawing._sheet_y(pd_guide_lock_spec.LOCK_HEIGHT) - 0.003
-    assert y - half_h > drawing.BOTTOM_EDGE_Y + 0.003
+    half_h = 0.0035 / 2.0
+    assert y + half_h < drawing._sheet_y(pd_guide_lock_spec.LOCK_HEIGHT) - 0.005
+    assert y - half_h > drawing.BOTTOM_EDGE_Y + 0.005
 
 
 def test_the_views_sit_centred_between_the_border_and_title_block() -> None:

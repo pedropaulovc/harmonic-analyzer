@@ -5,7 +5,7 @@ views, dimension layout and hole callout;
 sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
-The sheet runs at 4:1 (the plate is 22 x 9.5, cut from 1/16 sheet, its four
+The sheet runs at 4:1 (the plate is 22 x 9.6, cut from 1/16 sheet, its four
 corners rounded); the isometric carries an explicit 2:1 override so it stays
 clear of the title block.  A flat plate needs only the face view (front), one
 thickness view (right) and the iso.
@@ -72,8 +72,8 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (4.0, 1.0)
 
-# Sheet layout (meters).  The front view's model bbox is 22 x 9.5 (the plate
-# face); at 4:1 the view is 88 x 38 mm, x 0.106..0.194, y 0.156..0.194.
+# Sheet layout (meters).  The front view's model bbox is 22 x 9.6 (the plate
+# face); at 4:1 the view is 88 x 38.4 mm, x 0.106..0.194, y 0.156..0.194.
 # Third angle: the right view (the 1/16 sheet edge-on) sits to its right,
 # past the hole callout; the isometric rides top-right.  The whole group sits
 # centred between the border and the title block (it sat 25 mm low and 15 mm
@@ -107,12 +107,10 @@ HOLE_2_X_SHEET = _sheet_x(HOLE_XY[1][0])
 # coordinates, the 4.000's text outboard of the plate's left edge (between
 # its extension lines the hole's own extension cut through it); the shared
 # hole Y stands left of the plate, its text under the plate's bottom-left
-# corner, and Height outboard of it (smaller dimension nearer the part): its
-# value and two-line callout centre as one block on the keep, mid-way between
-# the top and bottom extension lines and left of the hole Y dimension line,
-# where the hole Y extension stops (inboard of it, the 9.50 sat on the top
-# extension line and the callout crowded the hole Y extension, machinist
-# review of 1c9f9b2a6); the 4X
+# corner, and Height outboard of it (smaller dimension nearer the part), its
+# value mid-way between the top and bottom extension lines and left of the
+# hole Y dimension line, where the hole Y extension stops (inboard of it, the
+# value sat on the top extension line, machinist review of 1c9f9b2a6); the 4X
 # corner radius stands off the top-right corner, its leader landing on that
 # arc clear of the Height's extension lines on the left and the hole callout
 # below; the sheet thickness rides above the right view, its one-line
@@ -132,14 +130,6 @@ RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.209)}
 # without, farm run 20261012T061737079Z).
 DIMENSION_PREFIXES = {"Hole1Y": "2X ", "CornerR": "4X R"}
 DIMENSION_CALLOUTS = {"Depth": LOCK_STOCK_CALLOUT}
-# The height's .XX band is tighter than the general .X because at -0.8 the
-# lifted top plates would lap the support bar 0.47, under the 0.5 retention
-# floor (pd_guide_lock_spec.DRAWING_PRECISION,
-# build_pd_paper_drive_assembly._assert_lock_retention); machinist review of
-# 40e51b9a7 flagged it unstated, so the print says why in two short lines
-# below the value (an above-callout cannot break lines).
-HEIGHT_BAND_CALLOUT = "BAND KEEPS\nBAR OVERLAP"
-DIMENSION_CALLOUTS_BELOW = {"Height": HEIGHT_BAND_CALLOUT}
 # The bent leader elbows at the text's LEFT end and enters hole 2 from its
 # upper-right quadrant, crossing only the plate's right edge; the text stands
 # between that edge and the right view.
@@ -225,7 +215,6 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="above")
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS_BELOW)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

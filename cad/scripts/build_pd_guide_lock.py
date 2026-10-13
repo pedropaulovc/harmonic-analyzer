@@ -69,7 +69,7 @@ MATERIAL = "Plain Carbon Steel"
 # edge ligament) + 5 rail + the overlap behind the bar. The 28-tall bar
 # (pd_support_bar_spec) closes the old 7 open channel to a 1.0 running
 # clearance over the bottom rail and carries the top rail on its top edge, so
-# the 9.5 plate overlaps the bar 2.5 at the bottom stations and 3.5 at the
+# the 9.6 plate overlaps the bar 2.6 at the bottom stations and 3.6 at the
 # top (2026-07-07 field report: a 12-tall plate across the 7 channel topped
 # out AT the bar's bottom edge and retained nothing at the bottom stations;
 # its 15.65 successor stood 9.65 over the bar at the top, toward the latch

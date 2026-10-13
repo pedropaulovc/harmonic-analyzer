@@ -28,14 +28,17 @@ LOCK_WIDTH = 22.0  # along +X
 # holes, on the rail's mid-line, stand 3.5 from the guide-side edge and keep
 # the 1.5 ligament at the printed worst case (2.5 left 0.81).
 RAIL_EDGE_LIP = 1.0
-# 9.5 along +Y; y = 0 is the guide-side edge. One plate serves both rails
+# 9.6 along +Y; y = 0 is the guide-side edge. One plate serves both rails
 # (user ruling 2026-10-11): 1 lip + 5 rail + ~3 bar overlap. The 28-tall bar
 # fills the channel to a 1.0 running clearance over the bottom rail
-# (pd_support_bar_spec.BAR_HEIGHT), so the plate overlaps the bar 3.5 at the
-# top rail (which hangs on it) and 2.5 at the bottom rail. The 15.65 plate
+# (pd_support_bar_spec.BAR_HEIGHT), so the plate overlaps the bar 3.6 at the
+# top rail (which hangs on it) and 2.6 at the bottom rail. 9.6, not 9.5, so
+# the height prints at the general .X (Codex P1 on #1353: a tighter .XX
+# needed a design-intent note, which rule 6 bars); at 9.5 - 0.8 the lifted
+# top plates would lap the bar under the 0.5 retention floor. The 15.65 plate
 # (R9-61) spanned the old 7 channel and stood 9.65 over the bar at the top
 # rail, toward the latch hook.
-LOCK_HEIGHT = 9.5
+LOCK_HEIGHT = 9.6
 # 2026-10-11 (user): 1/16 in steel sheet, thickness as supplied: A36
 # precision-ground sheet, McMaster-Carr 1388K196, 1/16 in -0.005 to +0.005 in
 # (read live 2026-10-11; the family's +/-0.003 and +/-0.001 grades sit inside
@@ -87,14 +90,14 @@ HOLE_LOCATION_DIMENSIONS = DRAWING_DIMENSIONS["ScrewHoles"]
 # paper-drive lock-station sweep judges the plate at (policy rule 12). The
 # plate's back face carries the slotted pan heads past the hanger arm and arm
 # plate, so the sheet's thickness prints .XXX under its ±0.127 mill band
-# (LOCK_THICK_BAND). The height prints .XX (±0.51): its least size still
+# (LOCK_THICK_BAND). The height prints .X (±0.8): its least size still
 # overlaps the bar (build_pd_paper_drive_assembly._assert_lock_retention) and
 # its largest clears the latch hook and pivot spacer. The width prints .X:
 # its +0.8 lengthens the overhang the skew swings
 # (vn_guide_lock_screw_spec.CORNER_OVERHANG_MAX). The corner radius prints .X
 # (±0.8), shared by all four (4X).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "LockProfile": {"Width": 1, "Height": 2},
+    "LockProfile": {"Width": 1, "Height": 1},
     "Lock": {"Depth": 3},
     "ScrewHoles": {name: HOLE_LOCATION_PLACES for name in HOLE_LOCATION_DIMENSIONS},
     "Corners": {"CornerR": 1},
