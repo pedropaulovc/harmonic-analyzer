@@ -157,7 +157,8 @@ the package kind (`cad/scripts/prompts/machinist_review_part.md` or
   user's standing last-resort rule applies: work authored by Sol or Opus is
   reviewed by Astra or Fable, and work authored by Astra or Fable by Astra or
   Fable at high reasoning. Defaults: `claude-fable-5-1` at medium effort,
-  `gpt-6-astra` at low.
+  `gpt-6-astra` at low. `--reviewer claude --model claude-opus-5-5` runs
+  Opus 5.5 instead of Fable, e.g. when Fable is over quota.
 - Every native PDF page is rendered at 300 dpi and all sheets go to one
   review. A downscaled contact sheet is not a substitute.
 - A package passes on `SHIP` with no blocker, over-specification or clarity

@@ -1798,7 +1798,10 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--reviewer", choices=REVIEWERS)
     parser.add_argument(
         "--model",
-        help=f"reviewer model (defaults: {DEFAULT_MODELS})",
+        help=(
+            f"reviewer model (defaults: {DEFAULT_MODELS}; "
+            "claude also takes claude-opus-5-5)"
+        ),
     )
     parser.add_argument(
         "--effort",
