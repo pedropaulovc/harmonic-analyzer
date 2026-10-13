@@ -351,9 +351,20 @@ it (cone_swing_platform detail B, leaf 20260928T075849Z-1-882b4704). A loop
 that "corrects" the projection moves a correct view off the sheet target and
 needs a second move to recover; on three #1105 leaves it never did.
 Do: place by the outline centre (`GetOutline` is the ink; `SetViewPosition`
-moves it by the delta from the `Position` it reads), then re-read the
-projection until it agrees with the outline before hanging anything on the
-view.
+moves it by the delta from the `Position` it reads), then read the projection
+behind `IView::UpdateViewDisplayGeometry` before hanging anything on the
+view (`_drawing_detail_projection.settle_detail_projection`). Don't settle
+it with a count of `EditRebuild3` calls. Rebuilds, re-reads and idle time
+each catch the transform up only some of the time. Detail B's first read was
+stale in 41 of 41 leaves, and it was still stale after three rebuilds on 4 of
+them (#1336). With the barrier in front of every read, the cone-gear-shaft tip
+detail read current first time in 15 of 15 leaves, against 3 of 35 without
+it. On seat-probe leaf 20261013T052718Z-1-4b76316f, 20 throwaway details all
+read stale first and all 4 behind the barrier then read current. The same
+leaf's real detail B, settled the old way, stayed stale through three rebuilds
+and failed. The settle span records `reads`, `rebuilds`, `waited_s` and the
+unrefreshed control offset. If the barrier ever fails to refresh the transform,
+the span shows it as more than one read, inside a time budget.
 The same holds for a section after `IDrSection::SetReversedCutDirection`:
 the reversal stood thumbnut A-A rim-up, yet `SetViewPosition` on its
 creation target left the seat projected one nut length (48.3 mm at 3:1)

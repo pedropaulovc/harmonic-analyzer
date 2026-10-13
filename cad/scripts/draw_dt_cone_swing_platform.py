@@ -49,6 +49,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -625,19 +626,17 @@ def _create_detail_view(
             f"requested {view_xy}"
         )
     # Every later placement on this view projects through its transform, so
-    # it must agree with the ink before anything is hung on it.
-    for attempt in range(3):
-        projected = model_point_in_view(
-            adapter, detail, center_m, label=f"{label} centre, read {attempt}"
-        )
-        if max(abs(projected[0] - landed[0]), abs(projected[1] - landed[1])) < 0.0005:
-            break
-        rebuild_drawing(adapter, label=f"settle detail view {detail_label}")
-    else:
-        raise RuntimeError(
-            f"detail {detail_label} projects its centre to {projected} while its "
-            f"outline is centred on {landed} (requested {view_xy})"
-        )
+    # it must agree with the ink before anything is hung on it.  Rebuilds
+    # alone left it stale through three reads on 4 of 41 leaves (#1336); the
+    # settle reads it behind the view barrier.
+    projected = settle_detail_projection(
+        adapter,
+        detail,
+        center_m,
+        ink_xy=landed,
+        tolerance_xy=(0.0005, 0.0005),
+        label=f"detail {detail_label}",
+    )
     print(
         f"detail {detail_label}: parent_sheet_centre={sheet[0]} "
         f"sketch_centre={points[0]} requested={view_xy} landed={landed} "

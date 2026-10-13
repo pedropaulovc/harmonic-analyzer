@@ -3069,6 +3069,9 @@ def task_check():
         # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
         SCRIPTS_DIR / "test_drawing_marks.py",
         SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
+        # A fresh detail view's projection is read behind the view barrier
+        # and settled within a time budget, not a read count (#1336).
+        SCRIPTS_DIR / "test_drawing_detail_projection.py",
         SCRIPTS_DIR / "test_fastener_catalog.py",
         # The keeper chain's rest-pose solve: whole pitches, clearances, and a
         # length that lets the taper pin come fully out.
