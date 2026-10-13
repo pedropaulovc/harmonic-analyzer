@@ -2,7 +2,7 @@
 
 Exercises the collision / sheet-overflow logic on plain boxes so a regression in
 the audit is caught without a COM seat. The live element collection lives in
-``_drawing_layout_collect`` and is exercised end-to-end by the drawing builds.
+``_drawing_layout_collect``; native-math fakes exercise its detail-crop path here.
 
 The ``*_real_boxes_*`` cases are positive controls: the element boxes measured
 off the shipped, visually-inspected lever-bushing and platen-guide drawings must
@@ -27,6 +27,7 @@ import _drawing_balloons
 import _drawing_common
 import _drawing_edges
 import _drawing_layout_audit
+import _drawing_detail_crop
 from _drawing_layout_check import (
     DEFAULT_BOUNDARY_ALLOWANCE_M,
     DEFAULT_OVERLAP_TOL_M,
@@ -285,6 +286,516 @@ def _el(label, x0, y0, x1, y1, kind="view", scope=CollisionScope.ALL, owner=""):
     return LayoutElement(label, kind, x0, y0, x1, y1, scope=scope, owner=owner)
 
 
+# R18 run 20261013T031823504Z-e68aa7002ea54a59b5611f26fbb9465e,
+# task.log at 42.7/51.5s (sketch geometry) and 48.5/59.9s (caption ink).
+# Only the FIRST sketch -> parent SHEET hop was logged as a matrix. The later
+# parent SHEET -> MODEL -> detail SHEET transforms below are SYNTHETIC, not
+# recovered R18 matrices or claims of new native-seat execution.
+_R18_SKETCH_MATRIX = (
+    1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+    -0.36, -0.35, 0.0, 2.0, 0.0, 0.0, 0.0,
+)
+_R18_DETAIL = {
+    "D": {
+        "raw_centre": (0.0, -0.006647320062878381, 0.0),
+        "raw_radius": 0.006724999999999981,
+        "parent_centre": (0.18, 0.1716763399685608),
+        "centre": (0.18, 0.095),
+        "ratio": (4.0, 1.0),
+        "outline": (0.1421321075479388, 0.05713200987360469,
+                    0.21786799117225408, 0.1328679063850961),
+        "crop": (0.15310000000000007, 0.06810000000000008,
+                 0.20689999999999992, 0.12189999999999993),
+        "caption": (0.1677665752508361, 0.05487079598662206,
+                    0.19254814046822738, 0.06392559866220734),
+    },
+    "E": {
+        "raw_centre": (0.13950591159423764, 0.005435871215965893, 0.0),
+        "raw_radius": 0.011919069550251904,
+        "parent_centre": (0.24975295579711881, 0.17771793560798294),
+        "centre": (0.33, 0.11000000000000001),
+        "ratio": (2.0, 1.0),
+        "outline": (0.2958062990191663, 0.07580625403539039,
+                    0.36419374578125124, 0.14419375332406856),
+        "crop": (0.3061618608994962, 0.0861618608994962,
+                 0.3538381391005038, 0.13383813910050382),
+        "caption": (0.31788567224080266, 0.07298040133779266,
+                    0.3421906688963211, 0.08203520401337794),
+    },
+}
+
+
+class _CropMathTransform:
+    """Deterministic native-math shape; translation follows SW ArrayData."""
+
+    def __init__(self, *, scale=1.0, translation=(0.0, 0.0, 0.0)):
+        self.scale = scale
+        self.translation = translation
+        self.ArrayData = (
+            1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+            *translation, scale, 0.0, 0.0, 0.0,
+        )
+        self.inverse_calls = 0
+
+    def Inverse(self):
+        self.inverse_calls += 1
+        return _CropMathTransform(
+            scale=1.0 / self.scale,
+            translation=tuple(-value / self.scale for value in self.translation),
+        )
+
+    def IInverse(self):
+        raise AssertionError("native IInverse is not an automation call")
+
+    def apply(self, xyz):
+        return tuple(value * self.scale + offset
+                     for value, offset in zip(xyz, self.translation))
+
+
+class _CropMathPoint:
+    def __init__(self, xyz):
+        self.ArrayData = tuple(getattr(xyz, "value", xyz))
+
+    def MultiplyTransform(self, transform):
+        return _CropMathPoint(transform.apply(self.ArrayData))
+
+
+class _CropSketch:
+    def __init__(self, transform):
+        self.transform = transform
+        self.views = []
+
+    @property
+    def ModelToSketchTransform(self):
+        assert len(self.views) == 2 and all(view.refreshed for view in self.views), (
+            "sketch transform read before both UpdateViewDisplayGeometry barriers"
+        )
+        return self.transform
+
+
+class _CropView:
+    # Official swDrawingViewTypes_e: detail=3, standard=6; not guessed 5.
+    Type = 3
+
+    def __init__(self, name, outline, parent, circle, transform, ratio):
+        self.name, self.outline = name, outline
+        self.parent, self.circle = parent, circle
+        self.transform, self.ScaleRatio = transform, ratio
+        self.annotations = []
+        self.tables = []
+        self.outline_reads = 0
+        self.outline_refresh_states = []
+        self.refreshed = False
+        self.next_view = None
+        self.defect = None
+        self.refresh_events = []
+
+    def GetName2(self):
+        return self.name
+
+    def GetOrientationName(self):
+        return "*Front"
+
+    def GetOutline(self):
+        self.outline_reads += 1
+        if self.defect == "outline-error":
+            raise OSError("outline binding failed")
+        if self.Type == 3:
+            fresh = self.parent.refreshed and self.refreshed
+            self.outline_refresh_states.append(fresh)
+            if not fresh:
+                # SYNTHETIC stale first-create extent, smaller than the crop.
+                # Reading before BOTH barriers must make containment refuse.
+                return (0.0, 0.0, 0.001, 0.001)
+        return self.outline
+
+    @property
+    def ModelToViewTransform(self):
+        assert self.refreshed, "transform read before UpdateViewDisplayGeometry"
+        return self.transform
+
+    def UpdateViewDisplayGeometry(self):
+        self.refreshed = True
+        self.refresh_events.append(self)
+        # Native VT_VOID: returning None must not be mistaken for failure.
+
+    def GetBaseView(self):
+        return self.parent
+
+    def GetDetail(self):
+        if self.defect == "crop-binding-error":
+            raise OSError("crop binding failed")
+        return self.circle
+
+    def GetAnnotations(self):
+        return self.annotations
+
+    def GetTableAnnotations(self):
+        return self.tables
+
+    def GetNextView(self):
+        return self.next_view
+
+
+def _crop_note(name, box, *, leader=()):
+    x0, y0, x1, y1 = box
+    return SimpleNamespace(
+        GetName=name, GetType=6, OwnerType=1,
+        GetSpecificAnnotation=SimpleNamespace(
+            GetExtent=(x0, y0, 0.0, x1, y1, 0.0),
+            GetText=lambda: "", IsBomBalloon=lambda: False,
+        ),
+        GetLeaderCount=lambda: int(bool(leader)),
+        GetLeaderPointsAtIndex=lambda _index: tuple(leader),
+    )
+
+
+def _crop_fixture(monkeypatch, label, *, centre=None):
+    data = _R18_DETAIL[label]
+    sketch_transform = _CropMathTransform(scale=2.0, translation=(-0.36, -0.35, 0.0))
+    assert sketch_transform.ArrayData == _R18_SKETCH_MATRIX
+    sketch = _CropSketch(sketch_transform)
+    profile = SimpleNamespace(
+        GetType=lambda: 1, IsCircle=lambda: 1,
+        GetCenterPoint2=lambda: SimpleNamespace(
+            X=data["raw_centre"][0], Y=data["raw_centre"][1], Z=data["raw_centre"][2],
+        ),
+        GetRadius=lambda: data["raw_radius"], GetSketch=lambda: sketch,
+    )
+    # No generic outline-flag probes are permitted: another production stem
+    # uses NoOutline=True. HasFullOutline/GetDisplay/JaggedOutline are absent.
+    circle = SimpleNamespace(
+        GetLabel=lambda: label, GetProfileItems=lambda: (profile,), NoOutline=True,
+    )
+    # SYNTHETIC affine view transforms: nonidentity parent inverse is essential.
+    parent_transform = _CropMathTransform(scale=0.5, translation=(0.18, 0.175, 0.0))
+    parent = _CropView("parent", (0.1, 0.15, 0.3, 0.25), None, None,
+                       parent_transform, (1.0, 2.0))
+    parent.Type = 6
+    model_centre = parent_transform.Inverse().apply((*data["parent_centre"], 0.0))
+    parent_transform.inverse_calls = 0
+    scale = data["ratio"][0] / data["ratio"][1]
+    target = centre or data["centre"]
+    detail_transform = _CropMathTransform(
+        scale=scale,
+        translation=tuple(target[index] - model_centre[index] * scale
+                          for index in range(2)) + (0.0,),
+    )
+    # Both objects are linked before the reader can fetch any transform.
+    view = _CropView(label, data["outline"], parent, circle, detail_transform, data["ratio"])
+    sketch.views = [parent, view]
+    sheet_view = SimpleNamespace(
+        GetNextView=lambda: view, GetAnnotations=lambda: [], GetTableAnnotations=[],
+    )
+    sheet = SimpleNamespace(
+        GetProperties=lambda: [0.0, 0.0, 1.0, 1.0, 0.0, SHEET_W, SHEET_H],
+        GetZoneMargin=lambda _code: 0.0127,
+    )
+    refreshed = []
+    parent.refresh_events = view.refresh_events = refreshed
+
+    model = SimpleNamespace(
+        GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view,
+    )
+    adapter = _FakeAdapter(model)
+    adapter.swApp = SimpleNamespace(
+        GetMathUtility=lambda: SimpleNamespace(CreatePoint=_CropMathPoint),
+    )
+    monkeypatch.setattr(_drawing_detail_crop, "_early_bound", lambda obj, _kind: obj)
+    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda obj, _kind: obj)
+    monkeypatch.setattr(
+        solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag",
+        lambda obj, *_args, **_kwargs: obj,
+    )
+    return adapter, view, profile, sketch_transform, refreshed
+
+
+def _collect_crop(adapter):
+    return _drawing_layout_collect.collect_layout_elements(
+        adapter, layout=DrawingLayout.LANDSCAPE
+    )
+
+
+@pytest.mark.parametrize("label", ("D", "E"))
+def test_generic_crop_r18_sketch_hop_and_synthetic_view_hops(monkeypatch, label):
+    adapter, view, _profile, sketch_transform, refreshed = _crop_fixture(monkeypatch, label)
+    data = _R18_DETAIL[label]
+    crop = _drawing_detail_crop.read_circular_detail_crop(
+        adapter, view, label=label
+    )
+    assert crop.label == label
+    assert crop.parent is view.parent
+    assert crop.parent_centre == pytest.approx(data["parent_centre"], abs=1e-14)
+    assert crop.parent_radius == pytest.approx(data["raw_radius"] / 2.0, abs=1e-14)
+    assert crop.parent_radius_y == pytest.approx(crop.parent_radius, abs=1e-14)
+    assert crop.parent_ratio == (1.0, 2.0)
+    assert crop.detail_ratio == data["ratio"]
+    assert crop.crop == pytest.approx(data["crop"], abs=1e-14)
+    assert crop.outline == data["outline"]
+    assert view.parent in refreshed and view in refreshed
+    assert view.circle.NoOutline is True
+    assert sketch_transform.inverse_calls == 1
+    assert view.parent.transform.inverse_calls == 1
+    assert view.outline_reads == 1  # helper owns the single fresh native read
+    assert view.outline_refresh_states == [True]
+    with pytest.raises(AttributeError):
+        crop.crop = data["outline"]
+
+
+@pytest.mark.parametrize("label", ("D", "E"))
+def test_collector_refreshes_before_reading_single_native_outline(monkeypatch, label):
+    adapter, view, *_rest = _crop_fixture(monkeypatch, label)
+    stale = view.GetOutline()
+    assert stale != view.outline
+    assert stale[2] < _R18_DETAIL[label]["crop"][0]
+    view.outline_reads = 0
+    view.outline_refresh_states.clear()
+    elements, _leaders, _region = _collect_crop(adapter)
+    assert next(element for element in elements if element.label == label).box == pytest.approx(
+        _R18_DETAIL[label]["crop"], abs=1e-14
+    )
+    assert view.outline_reads == 1
+    assert view.outline_refresh_states == [True]
+
+
+def test_collector_r18_three_phantom_overlaps_become_zero(monkeypatch):
+    adapter, d, *_rest = _crop_fixture(monkeypatch, "D")
+    _e_adapter, e, *_rest = _crop_fixture(monkeypatch, "E")
+    d.next_view = e
+    for view in (d, e):
+        view.annotations = [_crop_note(f"{view.name}-caption", _R18_DETAIL[view.name]["caption"])]
+    elements, leaders, region = _collect_crop(adapter)
+    old = [
+        _el(element.label, *_R18_DETAIL[element.label]["outline"],
+            kind=element.kind, scope=element.scope, owner=element.owner)
+        if element.kind == "view" else element
+        for element in elements
+    ]
+    overlaps, overflows, crossings = audit_layout(old, region, leaders=leaders)
+    assert {frozenset((item.a.label, item.b.label)) for item in overlaps} == {
+        frozenset(("D", "D-caption")), frozenset(("D", "title-block")),
+        frozenset(("E", "E-caption")),
+    }
+    assert len(overlaps) == 3
+    assert overflows == crossings == []
+    assert audit_layout(elements, region, leaders=leaders) == ([], [], [])
+    assert d.outline_reads == e.outline_reads == 1
+
+
+@pytest.mark.parametrize("label", ("D", "E"))
+@pytest.mark.parametrize("obstacle", ("caption", "title-block"))
+def test_collector_actual_crop_encroachment_still_fails(monkeypatch, label, obstacle):
+    data = _R18_DETAIL[label]
+    radius = (data["crop"][2] - data["crop"][0]) / 2.0
+    if obstacle == "caption":
+        # Move only this SYNTHETIC detail transform: caption ink stays measured.
+        centre = (data["centre"][0], data["caption"][3] + radius - 0.002)
+    else:
+        centre = (max(data["centre"][0], 0.216 + 0.002 - radius),
+                  0.066 + radius - 0.002)
+    adapter, view, *_rest = _crop_fixture(monkeypatch, label, centre=centre)
+    # A moved native view still provides a legitimate containing outline.
+    view.outline = (centre[0] - radius - 0.01, centre[1] - radius - 0.01,
+                    centre[0] + radius + 0.01, centre[1] + radius + 0.01)
+    view.annotations = [_crop_note(f"{label}-caption", data["caption"])]
+    elements, leaders, region = _collect_crop(adapter)
+    findings = audit_layout(elements, region, leaders=leaders)[0]
+    finding = next(item for item in findings
+                   if {item.a.label, item.b.label} == {label, f"{label}-caption" if obstacle == "caption" else obstacle})
+    assert finding.depth_x > DEFAULT_OVERLAP_TOL_M
+    assert finding.depth_y > DEFAULT_OVERLAP_TOL_M
+
+
+@pytest.mark.parametrize(
+    ("defect", "reason"),
+    (
+        ("missing-profile", "one persisted circle profile"),
+        ("duplicate-profile", "one persisted circle profile"),
+        ("noncircle", "not a complete circle"),
+        ("nonarc", "not a sketch arc"),
+        ("nonfinite", "invalid native circle"),
+        ("zero-radius", "invalid native circle"),
+        ("nonfinite-outline", "invalid native box"),
+        ("inverted-outline", "invalid native box"),
+        ("empty-outline", "invalid native box"),
+        ("empty-crop", "invalid native box"),
+        ("noncontained", "outside native outline"),
+        ("type-error", "cannot read native IView.Type"),
+        ("bool-type", "invalid native IView.Type"),
+        ("outline-error", "cannot read current native outline after display geometry update"),
+        ("crop-binding-error", "crop binding failed"),
+    ),
+)
+def test_collector_detail_crop_failures_are_named_fatal(monkeypatch, defect, reason):
+    adapter, view, profile, _transform, _refreshed = _crop_fixture(monkeypatch, "D")
+    if defect == "missing-profile":
+        view.circle.GetProfileItems = lambda: ()
+    elif defect == "duplicate-profile":
+        view.circle.GetProfileItems = lambda: (profile, profile)
+    elif defect == "noncircle":
+        profile.IsCircle = lambda: 0
+    elif defect == "nonarc":
+        profile.GetType = lambda: 0
+    elif defect == "nonfinite":
+        profile.GetRadius = lambda: float("nan")
+    elif defect == "zero-radius":
+        profile.GetRadius = lambda: 0.0
+    elif defect == "nonfinite-outline":
+        view.outline = (0.0, 0.0, float("nan"), 1.0)
+    elif defect == "empty-crop":
+        # Finite, positive scales can still collapse a crop below one ULP.
+        view.ScaleRatio = (1e-300, 1.0)
+    elif defect == "inverted-outline":
+        view.outline = (0.3, 0.1, 0.2, 0.2)
+    elif defect == "empty-outline":
+        view.outline = ()
+    elif defect == "noncontained":
+        view.outline = (0.16, 0.08, 0.20, 0.12)
+    elif defect == "type-error":
+        class BrokenType(_CropView):
+            @property
+            def Type(self):
+                raise OSError("Type binding failed")
+        view.__class__ = BrokenType
+    elif defect == "bool-type":
+        view.Type = True
+    else:
+        view.defect = defect
+    # A swallowed read would silently omit D (or use its padded outline).
+    with pytest.raises(RuntimeError, match="D") as caught:
+        _collect_crop(adapter)
+    assert reason in str(caught.value)
+
+
+@pytest.mark.parametrize("side", range(4))
+def test_collector_crop_exact_containment_edges_and_one_ulp(monkeypatch, side):
+    adapter, view, *_rest = _crop_fixture(monkeypatch, "D")
+    crop = _drawing_detail_crop.read_circular_detail_crop(
+        adapter, view, label="D"
+    ).crop
+    view.outline = crop
+    elements, _leaders, _region = _collect_crop(adapter)
+    assert next(element for element in elements if element.label == "D").box == crop
+    outside = list(crop)
+    outside[side] = _math.nextafter(crop[side], _math.inf if side < 2 else -_math.inf)
+    view.outline = tuple(outside)
+    with pytest.raises(RuntimeError, match="D"):
+        _collect_crop(adapter)
+
+
+def test_collector_crop_preserves_ordinary_elements_leaders_and_tag_boundary(monkeypatch):
+    adapter, detail, *_rest = _crop_fixture(monkeypatch, "D")
+    # Centre is outside the crop, ON the original native outline boundary.
+    x = detail.outline[0]
+    y = 0.095
+    detail.annotations = [
+        _crop_note("boundary-tag", (x - 0.002, y - 0.002, x + 0.002, y + 0.002)),
+        _crop_note("foreign-leader", (0.02, 0.12, 0.025, 0.124),
+                   leader=(0.02, 0.12, 0.0, 0.22, 0.12, 0.0)),
+    ]
+    ordinary = _CropView("ordinary", (0.02, 0.15, 0.06, 0.19),
+                         None, None, None, (1.0, 1.0))
+    ordinary.Type = 6
+    ordinary.annotations = [_crop_note("free-note", (0.08, 0.15, 0.10, 0.17))]
+    ordinary.annotations.append(SimpleNamespace(
+        GetName="surface-finish", GetType=7, GetPosition=(0.04, 0.20, 0.0),
+        GetLeaderCount=0,
+    ))
+    ordinary.tables = [SimpleNamespace(
+        GetAnnotation=lambda: SimpleNamespace(GetName="table", GetPosition=(0.08, 0.20, 0.0)),
+        RowCount=1, ColumnCount=1,
+        GetColumnWidth=lambda _index: 0.02, GetRowHeight=lambda _index: 0.01,
+    )]
+    detail.next_view = ordinary
+    elements, leaders, region = _collect_crop(adapter)
+    detail.Type = 6  # old collector occupancy, same annotation policy
+    old_elements, old_leaders, old_region = _collect_crop(adapter)
+    assert [element for element in elements if element.label != "D"] == [
+        element for element in old_elements if element.label != "D"
+    ]
+    assert leaders == old_leaders and region == old_region
+    assert {"view", "note", "gdt", "table", "titleblock"} == {
+        element.kind for element in elements
+    }
+    assert next(element for element in elements if element.label == "ordinary").box == ordinary.outline
+    assert next(element for element in elements if element.label == "boundary-tag").scope is CollisionScope.NON_VIEW
+    new_view = next(element for element in elements if element.label == "D")
+    old_view = next(element for element in old_elements if element.label == "D")
+    assert (new_view.label, new_view.kind, new_view.scope, new_view.owner) == (
+        old_view.label, old_view.kind, old_view.scope, old_view.owner,
+    )
+
+
+def test_collector_ordinary_outline_failure_keeps_old_behavior(monkeypatch):
+    adapter, view, *_rest = _crop_fixture(monkeypatch, "D")
+    view.Type = 6
+    view.defect = "outline-error"
+    view.annotations = [_crop_note("ordinary-note", (0.02, 0.15, 0.04, 0.16))]
+    elements, leaders, _region = _collect_crop(adapter)
+    assert [(element.label, element.kind) for element in elements] == [
+        ("ordinary-note", "note"), ("title-block", "titleblock"),
+    ]
+    assert leaders == []
+
+
+def _crop_finding_keys(elements, leaders, region):
+    overlaps, overflows, crossings = audit_layout(elements, region, leaders=leaders)
+    keys = {("overlap", *sorted((item.a.label, item.b.label))) for item in overlaps}
+    keys.update(("overflow", item.element.label, side)
+                for item in overflows for side, _depth in item.sides)
+    for item in crossings:
+        if isinstance(item, Crossing):
+            keys.add(("foreign-leader", item.segment.label, item.view.label))
+        else:
+            keys.add(("leader-leader", *sorted((item.a.label, item.b.label))))
+    return keys
+
+
+@pytest.mark.parametrize("scope", tuple(CollisionScope))
+@pytest.mark.parametrize("padding", (0.0, 0.002, 0.02))
+def test_collector_contained_crop_finding_keys_are_subset(monkeypatch, scope, padding):
+    adapter, detail, *_rest = _crop_fixture(monkeypatch, "D")
+    crop = _R18_DETAIL["D"]["crop"]
+    detail.outline = (crop[0] - padding - 1e-12, crop[1] - padding - 1e-12,
+                      crop[2] + padding + 1e-12, crop[3] + padding + 1e-12)
+    # Classification probes include crop-interior and outline-only tags.
+    detail.annotations = [
+        _crop_note("tag", (0.175, 0.09, 0.179, 0.094)),
+        _crop_note("large-note", (0.145, 0.07, 0.205, 0.10)),
+        _crop_note("leader-a", (0.03, 0.12, 0.035, 0.124),
+                   leader=(0.02, 0.10, 0.0, 0.25, 0.10, 0.0)),
+        _crop_note("leader-b", (0.08, 0.20, 0.085, 0.204),
+                   leader=(0.12, 0.02, 0.0, 0.12, 0.22, 0.0)),
+    ]
+    foreign = _CropView("foreign", (0.10, 0.085, 0.13, 0.115),
+                        None, None, None, (1.0, 1.0))
+    foreign.Type = 6
+    foreign.annotations = [_crop_note("foreign-note", (0.17, 0.09, 0.19, 0.11))]
+    detail.next_view = foreign
+    monkeypatch.setattr(
+        _drawing_layout_collect, "_view_scope",
+        lambda _adapter, view: scope if view is detail else CollisionScope.ALL,
+    )
+    elements, leaders, _region = _collect_crop(adapter)
+    detail.Type = 6
+    old_elements, old_leaders, _old_region = _collect_crop(adapter)
+    assert leaders == old_leaders
+    assert [element for element in elements if element.kind != "view"] == [
+        element for element in old_elements if element.kind != "view"
+    ]
+    # A tight SYNTHETIC region ensures this property exercises overflow as well
+    # as overlap and both leader policies; no random seed or hidden randomness.
+    region = DrawableRegion(0.16, 0.08, 0.20, 0.12)
+    before = _crop_finding_keys(old_elements, old_leaders, region)
+    after = _crop_finding_keys(elements, leaders, region)
+    assert after <= before
+    assert any(key[0] == "overflow" for key in before)
+    assert any(key[0] == "leader-leader" for key in before)
+    if scope is not CollisionScope.NONE:
+        assert any(key[0] == "overlap" for key in before)
+    assert any(key[0] == "foreign-leader" for key in before)
+
+
 def test_live_collector_never_flags_transient_dispatches(monkeypatch):
     """The audit must not pay whole-interface flagging for fresh COM wrappers."""
 
@@ -317,6 +828,7 @@ def test_live_collector_never_flags_transient_dispatches(monkeypatch):
 
     view = SimpleNamespace(
         GetName2="Front",
+        Type=6,  # swDrawingViewTypes_e.swDrawingStandardView
         GetOrientationName=lambda: "*Front",
         GetOutline=[0.05, 0.15, 0.15, 0.25],
         GetAnnotations=lambda: [note_annotation, dim_annotation],
@@ -1007,6 +1519,7 @@ def test_collector_boxes_no_dimension_but_keeps_hole_callout_leaders(monkeypatch
     callout.GetPosition = lambda: [0.104, 0.2192, 0.0]
     view = SimpleNamespace(
         GetName2="Front",
+        Type=6,  # swDrawingViewTypes_e.swDrawingStandardView
         GetOrientationName=lambda: "*Front",
         GetOutline=[0.05, 0.15, 0.15, 0.25],
         GetAnnotations=lambda: [callout],

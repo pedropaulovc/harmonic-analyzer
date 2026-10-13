@@ -6,6 +6,7 @@ import ast
 import json
 import math
 import re
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -16,6 +17,7 @@ import ch_rocker_arm_notes
 import ch_rocker_arm_spec
 import draw_ch_rocker_arm as drawing
 import build_ch_rocker_arm as arm
+import _drawing_detail_crop as detail_crop
 from _drawing_layout_check import DrawableRegion
 from _layout_geometry import AnnotationGeometry, Box, Segment, segment_box_distance, text_overlap
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -1366,6 +1368,7 @@ _APP = SimpleNamespace(IsSame=lambda a, b: 1 if a is b else 0)
 def bound(monkeypatch: pytest.MonkeyPatch) -> None:
     """Bypass native wrapping for offline logic only, not native-binding proof."""
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(detail_crop, "_early_bound", lambda obj, _interface: obj)
     import _drawing_layout_audit
 
     monkeypatch.setattr(_drawing_layout_audit, "_early_bound", lambda obj, _interface: obj)
@@ -2767,18 +2770,25 @@ class _DetailMathPoint:
 
 
 class _DetailParent:
-    __slots__ = ("transform", "ScaleRatio", "projection_scale")
+    __slots__ = ("transform", "ScaleRatio", "projection_scale", "display_updates")
 
     def __init__(self):
         self.transform = _DetailTransform()
         self.ScaleRatio = (1.0, 2.0)
         self.projection_scale = 0.5
+        self.display_updates = 0
 
     def GetSketch(self):
         return SimpleNamespace(ModelToSketchTransform=self.transform)
 
+    @property
+    def ModelToViewTransform(self):
+        # Synthetic NEW cross-view hop; the original sketch hop is independent.
+        assert self.display_updates > 0
+        return _DetailTransform(self.projection_scale, (0.180, 0.175, 0.0))
+
     def UpdateViewDisplayGeometry(self):
-        return None
+        self.display_updates += 1
 
     def project(self, xyz):
         return (0.180 + xyz[0] * self.projection_scale,
@@ -2837,7 +2847,7 @@ class _DetailView:
     """Native bbox padding/offset is independent of the persisted crop circle."""
     __slots__ = ("parent", "radius", "defect", "_position", "physical",
                  "_scale_ratio", "UseParentScale", "UseSheetScale", "events",
-                 "crop_circle", "padding", "bbox_offset", "model_centre", "notes", "annotations")
+                 "crop_circle", "padding", "bbox_offset", "model_centre", "notes", "annotations", "outline_reads")
 
     def __init__(self, parent, *, label="D", defect=None, padding=0.01096794, bbox_offset=(0.0, 0.005)):
         self.parent, self.defect = parent, defect
@@ -2853,6 +2863,7 @@ class _DetailView:
         self.crop_circle = None
         self.padding, self.bbox_offset = padding, bbox_offset
         self.notes, self.annotations = [], []
+        self.outline_reads = 0
 
     @property
     def Position(self):
@@ -2873,6 +2884,13 @@ class _DetailView:
         ratio = tuple(value.value)
         assert len(ratio) == 2
         self._scale_ratio = (1.0, 2.0) if self.defect == "scale" else ratio
+
+    @property
+    def ModelToViewTransform(self):
+        assert self.events[-1] == "barrier"
+        scale = self._scale_ratio[0] / self._scale_ratio[1]
+        translation = tuple(self.physical[i] - self.model_centre[i] * scale for i in range(2))
+        return _DetailTransform(scale, (*translation, 0.0))
 
     def GetBaseView(self):
         return object() if self.defect == "parent" else self.parent
@@ -2895,6 +2913,7 @@ class _DetailView:
         return tuple(self.physical[i] + (xyz[i] - self.model_centre[i]) * scale for i in range(2))
 
     def GetOutline(self):
+        self.outline_reads += 1
         if self.defect == "invalid-bbox":
             return (0.0, 0.0, float("nan"), 1.0)
         x, y = (self._position[i] + self.bbox_offset[i] for i in range(2))
@@ -3035,6 +3054,7 @@ def test_detail_transform_fake_refuses_native_inverse_but_supports_automation():
 def test_crop_reads_persisted_circle_not_padded_or_offset_native_view_bbox(bound, monkeypatch, label):
     adapter, view = _native_crop_fixture(monkeypatch, label)
     crop = drawing._detail_crop(adapter, view, label=label)
+    assert view.outline_reads == 1
     x, y = view.physical
     assert crop == pytest.approx((x - view.radius, y - view.radius, x + view.radius, y + view.radius))
     bbox = view.GetOutline()
@@ -3043,6 +3063,30 @@ def test_crop_reads_persisted_circle_not_padded_or_offset_native_view_bbox(bound
     assert view.crop_circle.profiles[0].GetRadius() != pytest.approx(view.radius)
     assert view.parent.ScaleRatio == (1.0, 2.0)  # Parent .5, native D 4 / E 2.
     assert view.parent.transform.inverse_calls == 1
+
+
+@pytest.mark.parametrize("label", ["D", "E"])
+def test_crop_reads_one_current_outline_after_both_geometry_barriers(bound, monkeypatch, label):
+    adapter, view = _native_crop_fixture(monkeypatch, label)
+    current_outline = _DetailView.GetOutline
+    reads = []
+    def initially_stale_outline(native):
+        if native is not view:
+            return current_outline(native)
+        reads.append((native.parent.display_updates, native.events.count("barrier")))
+        if native.parent.display_updates == 0 or not native.events:
+            # Historical swing B had an undersized first-create outline. This
+            # box cannot contain the circle; only a display barrier refreshes it.
+            x, y = native.physical
+            half = native.radius * 0.4
+            return (x - half, y - half, x + half, y + half)
+        return current_outline(native)
+    monkeypatch.setattr(_DetailView, "GetOutline", initially_stale_outline)
+    crop = drawing._detail_crop(adapter, view, label=label)
+    assert reads == [(1, 1)]
+    assert view.outline_reads == 1
+    x, y = view.physical
+    assert crop == pytest.approx((x - view.radius, y - view.radius, x + view.radius, y + view.radius))
 
 
 def test_crop_preserves_actual_native_geometry_within_readback_tolerance(bound, monkeypatch):
@@ -3057,6 +3101,37 @@ def test_crop_preserves_actual_native_geometry_within_readback_tolerance(bound, 
     assert crop == pytest.approx((x - radius, y - radius, x + radius, y + radius), abs=1e-12)
     assert (crop[0] + crop[2]) / 2.0 != pytest.approx(view.physical[0], abs=1e-6)
     assert (crop[2] - crop[0]) / 2.0 != pytest.approx(view.radius, abs=1e-6)
+
+
+@pytest.mark.parametrize("label", ["D", "E"])
+@pytest.mark.parametrize("edge", range(4))
+@pytest.mark.parametrize("delta", [-0.000051, 0.000051])
+def test_crop_refuses_shared_box_drift_both_directions(bound, monkeypatch, label, edge, delta):
+    adapter, view = _native_crop_fixture(monkeypatch, label)
+    actual_reader = drawing.read_circular_detail_crop
+    def wrong_box(*args, **kwargs):
+        readback = actual_reader(*args, **kwargs)
+        crop = list(readback.crop)
+        crop[edge] += delta
+        return replace(readback, crop=tuple(crop))
+    monkeypatch.setattr(drawing, "read_circular_detail_crop", wrong_box)
+    with pytest.raises(RuntimeError, match="shared/independent legacy crop mismatch"):
+        drawing._detail_crop(adapter, view, label=label)
+
+
+@pytest.mark.parametrize("delta", [-0.000049, 0.000049])
+def test_crop_accepts_shared_box_drift_only_within_unchanged_tolerance(bound, monkeypatch, delta):
+    adapter, view = _native_crop_fixture(monkeypatch, "D")
+    actual_reader = drawing.read_circular_detail_crop
+    def within_tolerance(*args, **kwargs):
+        readback = actual_reader(*args, **kwargs)
+        return replace(readback, crop=tuple(v + delta for v in readback.crop))
+    monkeypatch.setattr(drawing, "read_circular_detail_crop", within_tolerance)
+    x, y = view.physical
+    expected = (x - view.radius, y - view.radius, x + view.radius, y + view.radius)
+    assert drawing._detail_crop(adapter, view, label="D") == pytest.approx(
+        tuple(v + delta for v in expected), abs=1e-12,
+    )
 
 
 @pytest.mark.parametrize("defect", [
@@ -3961,17 +4036,48 @@ def test_details_keep_native_scale_source_census_and_unclipped_overall_contract(
         assert sum(isinstance(node.func, ast.Name) and node.func.id == "_detail_crop" for node in calls) == count
         assert not any(isinstance(node.func, ast.Attribute) and node.func.attr == "GetOutline" for node in calls)
     crop_attributes = {node.attr for node in ast.walk(definitions["_detail_crop"]) if isinstance(node, ast.Attribute)}
+    shared_tree = ast.parse(Path(detail_crop.__file__).read_text(encoding="utf-8"))
+    shared_definitions = {node.name: node for node in shared_tree.body if isinstance(node, ast.FunctionDef)}
+    shared_reader = shared_definitions["read_circular_detail_crop"]
+    shared_attributes = {node.attr for node in ast.walk(shared_reader) if isinstance(node, ast.Attribute)}
+    native_outline_calls = [node for node in ast.walk(shared_reader) if isinstance(node, ast.Call)
+                            and isinstance(node.func, ast.Attribute) and node.func.attr == "GetOutline"]
+    assert len(native_outline_calls) == 1
+    outline_statement = next(i for i, statement in enumerate(shared_reader.body)
+                             if native_outline_calls[0] in list(ast.walk(statement)))
+    barrier_statements = [i for i, statement in enumerate(shared_reader.body)
+                          if isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Call)
+                          and isinstance(statement.value.func, ast.Attribute)
+                          and statement.value.func.attr == "UpdateViewDisplayGeometry"]
+    assert len(barrier_statements) == 2 and max(barrier_statements) < outline_statement
+    wrapper_calls = [node.func.id for node in ast.walk(definitions["_detail_crop"])
+                     if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
+    assert wrapper_calls.count("read_circular_detail_crop") == 1 and "_outline" not in wrapper_calls
     build_attributes = {node.attr for node in ast.walk(definitions["build"]) if isinstance(node, ast.Attribute)}
     assert "GetText" not in build_attributes  # Hole callouts cannot use resolved text compartments.
     assert sum(node.func.id == "_require_rod_through_callout" for node in build_calls) == 1
     through_attributes = {node.attr for node in ast.walk(definitions["_require_rod_through_callout"]) if isinstance(node, ast.Attribute)}
     assert {"GetDisplayData", "GetTextCount", "GetTextAtIndex"} <= through_attributes
     assert "GetText" not in through_attributes
-    assert {"GetDetail", "GetProfileItems", "Inverse", "ArrayData"} <= crop_attributes
-    assert "IInverse" not in crop_attributes  # Generated presence does not prove IDispatch support.
-    assert "ModelToViewTransform" not in crop_attributes  # Inverse sketch mapping already returns sheet.
-    circle_attributes = {node.attr for node in ast.walk(definitions["_native_circle_geometry"]) if isinstance(node, ast.Attribute)}
+    assert {"GetDetail", "GetProfileItems", "Inverse", "ArrayData", "ModelToViewTransform"} <= shared_attributes
+    assert "IInverse" not in crop_attributes | shared_attributes  # Automation Inverse only.
+    assert "ModelToViewTransform" not in crop_attributes  # Recipe only adds independent source/F5 checks.
+    sketch_loop = next(node for node in ast.walk(shared_reader)
+                       if isinstance(node, ast.For) and isinstance(node.target, ast.Name) and node.target.id == "xyz")
+    loop_calls = [node for node in ast.walk(sketch_loop) if isinstance(node, ast.Call)]
+    mappings = [node for node in loop_calls if isinstance(node.func, ast.Name) and node.func.id == "_transform_point"]
+    assert len(mappings) == 1 and ast.unparse(mappings[0].args[2]) == "inverse"
+    # Sketch inverse ALREADY returns parent SHEET. Only the centre subsequently
+    # takes parent-sheet -> MODEL -> detail-sheet; never parent forward twice.
+    centre_mappings = [node for node in shared_reader.body
+                       if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)
+                       and isinstance(node.value.func, ast.Name) and node.value.func.id == "_transform_point"]
+    assert [ast.unparse(node.value.args[2]) for node in centre_mappings] == ["parent_inverse", "detail_transform"]
+    assert ast.unparse(centre_mappings[0].value.args[1]) == "(*parent_centre, 0.0)"
+    assert ast.unparse(centre_mappings[1].value.args[1]) == "model_centre"
+    circle_attributes = {node.attr for node in ast.walk(shared_definitions["native_circle_geometry"]) if isinstance(node, ast.Attribute)}
     assert {"GetType", "GetRadius", "GetCenterPoint2", "IsCircle"} <= circle_attributes
+    assert not hasattr(drawing, "_native_circle_geometry")
 
 
 def test_datum_landing_refuses_null_native_annotation(monkeypatch):

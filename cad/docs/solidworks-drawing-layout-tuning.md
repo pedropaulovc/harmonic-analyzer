@@ -65,7 +65,7 @@ display mode, and every annotation's text box, `GetPosition`, and line segments.
 
 | Question | API | Evidence |
 | --- | --- | --- |
-| A view's sheet box, metres | `IView::GetOutline` -> `[xmin, ymin, xmax, ymax]` | `types/IView/GetOutline.md` |
+| A view's native extent, metres (not a detail's bare circular crop) | `IView::GetOutline` -> `[xmin, ymin, xmax, ymax]` | `types/IView/GetOutline.md` |
 | An annotation's sheet origin, and WHICH corner that is | `IAnnotation::GetPosition` | `types/IAnnotation/GetPosition.md` (note = upper-left of text box; display dimension = leader attachment / centre of text box's bottom border; GD&T = upper-left; surface finish = lower-left; table = per `ITableAnnotation::AnchorType`) |
 | A note's EXACT box | `INote::GetExtent` -> 6 doubles, lower-left then upper-right, sheet space | `types/INote/GetExtent.md` |
 | Real rendered lines (dimension line, witness lines, leader) | `IAnnotation::GetDisplayData` -> `IDisplayData::GetLineCount` / `GetLineAtIndex3` -> `[color, lineType, lineStyle, lineWeight, startPt[3], endPt[3]]` | `types/IAnnotation/GetDisplayData.md`, `types/IDisplayData/GetLineAtIndex3.md` |
@@ -493,22 +493,48 @@ away and `Position` reads 99 mm from where `SetViewPosition` later has to put
 it (cone_swing_platform detail B, leaf 20260928T075849Z-1-882b4704). A loop
 that "corrects" the projection moves a correct view off the sheet target and
 needs a second move to recover; on three #1105 leaves it never did.
-Do: place by the outline centre (`GetOutline` is the ink; `SetViewPosition`
-moves it by the delta from the `Position` it reads), then read the projection
-behind `IView::UpdateViewDisplayGeometry` before hanging anything on the
-view (`_drawing_detail_projection.settle_detail_projection`). Don't settle
-it with a count of `EditRebuild3` calls. Rebuilds, re-reads and idle time
-each catch the transform up only some of the time. Detail B's first read was
-stale in 41 of 41 leaves, and it was still stale after three rebuilds on 4 of
-them (#1336). With the barrier in front of every read, the cone-gear-shaft tip
-detail read current first time in 15 of 15 leaves, against 3 of 35 without
-it. On seat-probe leaf 20261013T052718Z-1-4b76316f, 20 throwaway details all
-read stale first and all 4 behind the barrier then read current. The same
-leaf's real detail B, settled the old way, stayed stale through three rebuilds
-and failed. The settle span records `reads`, `rebuilds`, `waited_s` and the
-unrefreshed control offset. If the barrier ever fails to refresh the transform,
-the span shows it as more than one read, inside a time budget.
-The same holds for a section after `IDrSection::SetReversedCutDirection`:
+The cone-swing workaround placed by the outline centre, then re-read the
+projection before hanging anything on the view. Do not generalize that
+centre: the profile fixture's outline was 5 mm off its physical bore centre.
+Refresh parent and detail with `UpdateViewDisplayGeometry` before reading
+their transforms or the one outline used for containment/classification.
+Use `_drawing_detail_projection.settle_detail_projection` for projection
+settling; don't settle it with a count of `EditRebuild3` calls. Rebuilds,
+re-reads and idle time each catch the transform up only some of the time.
+Detail B's first read was stale in 41 of 41 leaves, and it was still stale
+after three rebuilds on 4 of them (#1336). With the barrier in front of every
+read, the cone-gear-shaft tip detail read current first time in 15 of 15 leaves,
+against 3 of 35 without it. On seat-probe leaf 20261013T052718Z-1-4b76316f,
+20 throwaway details all read stale first and all 4 behind the barrier then
+read current. The same leaf's real detail B, settled the old way, stayed
+stale through three rebuilds and failed. The settle span records `reads`,
+`rebuilds`, `waited_s` and the unrefreshed control offset. If the barrier ever
+fails to refresh the transform, the span shows it as more than one read,
+inside a time budget.
+The historical swing log also shows a transient 38 x 40 mm outline becoming
+68.776 mm square around its 48 mm circle; even containment is unreliable if
+the outline is read before the display-geometry barrier.
+
+For shared layout collection, `_drawing_detail_crop.read_circular_detail_crop`
+uses the persisted complete sketch circle, its sketch inverse, and the
+parent/detail native transforms and scale ratios. `IView.Type == 3`
+(`swDrawingDetailView`) selects this path, not the generated view name.
+Missing, duplicate, invalid or non-contained crop data raises with the view
+name; it never falls back to `GetOutline` or disappears through an attempted
+read. The geometric crop box must be contained in the same refreshed native
+outline with **exactly zero slack**: equality is allowed, one ULP outside
+refuses, and no clipping or guessed padding is applied. Log both boxes.
+Only the view's occupied box changes. Keep its original outline for small
+note classification, and retain all annotation/table/title-block/leader
+objects, scopes and collision policies. Incidental coverage from a padded
+view box is not the annotation's contract; the native/PDF audit still reads
+those objects. Every other view kind retains its existing outline.
+The rocker additionally compares all four shared crop edges, in both
+directions, with its independent source-fence formula within the existing
+50 micrometres. That check must stay: synthetic math fixtures do not prove
+the new cross-view inverse step on a real seat. No new optional ownership,
+broken-view, depth-parallelism or outline-style probes are implied here.
+A section's projection can also lag after `IDrSection::SetReversedCutDirection`:
 the reversal stood thumbnut A-A rim-up, yet `SetViewPosition` on its
 creation target left the seat projected one nut length (48.3 mm at 3:1)
 above where a centred rim-up section puts it (run 20261001T142942518Z).
