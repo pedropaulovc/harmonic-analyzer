@@ -109,6 +109,10 @@ def test_tapped_hole_is_a_wizard_feature_with_a_native_callout() -> None:
     assert drawing.HOLE_R_SHEET == pytest.approx(
         blind_cut_dia_mm(spec.SET_SCREW_TAP_SPEC) * drawing.VIEW_SCALE / 2000.0
     )
+    # SolidWorks pins its own "#4-40 Tapped Hole" note once the tap carries
+    # the callout; finalize deletes exactly that one, never the callout.
+    assert 'redundant_note_substrings=("Tapped Hole",)' in source
+    assert "expected_redundant_notes=1" in source
 
 
 def test_no_geometry_rides_in_notes_and_no_gdt() -> None:

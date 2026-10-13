@@ -175,9 +175,12 @@ async def build(adapter: Any) -> dict[str, str]:
     bottom = place_view(
         adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=END_SCALE
     )
-    # finalize_drawing shades the pictorial isometric with edges.
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (front, top, bottom):
+    # The iso too: a new view already reads Shaded With Edges, so
+    # finalize_drawing's SetDisplayMode4 is a no-op that leaves its cosmetic
+    # threads at draft quality (farm c0b95549c readback cosmetic_threads=False).
+    # From HLR the shading call really changes the mode and takes precision.
+    for view in (front, top, bottom, iso):
         set_hidden_lines_removed(adapter, view)
 
     annotations = [

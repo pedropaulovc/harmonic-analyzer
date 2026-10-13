@@ -254,9 +254,13 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
         label="pivot bore and set-screw tap section",
     )
-    # finalize_drawing shades the pictorial isometric with edges.
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (front, right, bottom, section):
+    # The iso too: a new view already reads Shaded With Edges, so
+    # finalize_drawing's SetDisplayMode4 is a no-op that leaves its cosmetic
+    # threads at draft quality (farm c0b95549c readback cosmetic_threads=False
+    # on the hanger and rod). From HLR the shading call really changes the mode
+    # and takes precision.
+    for view in (front, right, bottom, section, iso):
         set_hidden_lines_removed(adapter, view)
 
     annotations = [

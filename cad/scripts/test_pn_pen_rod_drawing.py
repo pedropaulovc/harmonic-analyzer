@@ -239,6 +239,12 @@ def test_view_scales_and_notes_are_explicit() -> None:
         assert f'"{note}": ' in _PART_SOURCE
 
 
+def test_isometric_starts_hidden_lines_removed() -> None:
+    # Left at its default Shaded With Edges, finalize_drawing's shading call is
+    # a no-op and the iso's cosmetic thread stays draft (farm c0b95549c).
+    assert "for view in (front, top, bottom, iso):" in _DRAWING_SOURCE
+
+
 @pytest.mark.parametrize(
     "name", ["Number", "Material Specification", "Finish", "Quantity"]
 )

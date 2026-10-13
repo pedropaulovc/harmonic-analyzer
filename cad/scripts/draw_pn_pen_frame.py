@@ -229,6 +229,12 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Pen Frame Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # SolidWorks pins its own "#4-40 Tapped Hole" note to the bottom view
+        # once the tap carries a hole callout; the callout already states the
+        # thread, and the note sat under it with the callout's leader through
+        # it (farm c0b95549c: merged-blocks + leader-through-text).
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 
