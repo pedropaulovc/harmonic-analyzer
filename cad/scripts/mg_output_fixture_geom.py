@@ -1,9 +1,11 @@
 r"""MHA-MG-006 output fixture: drawing-free geometry and installed pose.
 
 PURE DATA, no SolidWorks/COM imports and no drawing spec, title block or
-registry in its import closure, so the assembly, the lever wire and the
-interference contracts read the fixture's shape and pose, and the release
-exporters will read it (issue #1351), without re-keying on a sheet edit.
+registry in its import closure. The assembly and lever wire share the
+fixture's shape and pose without importing its drawing contracts.
+Shared interference oracles deliberately restate test-pinned limit literals;
+they do not import this pose module. Release exporters remain pinned to
+archived CAD; the geometry cutover accompanies the asset refresh in #1351.
 Bands, places, worst-case walls and sheet text live in
 ``mg_output_fixture_spec``.
 
