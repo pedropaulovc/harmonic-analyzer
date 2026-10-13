@@ -585,9 +585,14 @@ Across the flange, the lower edge is Y=-6.35, the arm spans -3.00..+4.50
 and the far edge is +6.35: 3.35 edge-to-arm plus 7.50 arm width leaves
 1.85, not a contradictory 12.70 chain. The lower edge-to-bore axis is
 6.35 REF, closing the existing 3.35 and 3.00 controls. Attach the native
-REF to the real lower flange edge and collar-circle centre, prove its
-model ownership and value, and check its witness ink with the complete
-mounting-coordinate stack; a floating "(6.35)" note cannot locate the axis.
+REF to the real west/lower flange vertex and existing bore-circle centre
+sketch point, both selected in BOTTOM. Map the native centre point into that
+view and prove its model origin and source identity; never combine a SIDE
+rim with a BOTTOM edge. Require both selected objects to belong to BOTTOM,
+native linear type 2/11/12, the measured 6.35 mm value and exact annotation
+owner/attachments. Angular type 3 is wrong geometry, not a guard exception.
+Check its rebuilt witness ink with the complete mounting-coordinate stack;
+a floating "(6.35)" note cannot locate the axis.
 
 Put the junction's 7.50 width and 3.35 edge location on the bottom view,
 where its footprint is visible, without a second controlling copy in the
@@ -616,8 +621,13 @@ The 1.97 MIN bore-to-flat wall is the ligament to the two parallel flats,
 not an entry-face wall. Name the through-corners orientation on the sheet,
 and hold on flats and centre-drill the 120-degree ridge before drill/ream.
 The end-view bore axis is a native centreline attached to the named
-`RodBore` cylindrical face, mapped into that view and proved back to its
-source. Retain one tap centre mark but disable its extended arms, so the
+`RodBore` cylindrical face. Map its feature with `IView.GetCorresponding`,
+then reacquire exactly one centred Ø5.20 Y-axis cylinder from that mapped
+feature's faces. Prove it back to the independently identified source face
+with `GetCorrespondingEntity2` and `IsSame == 1`. The rotated end view returned
+null for direct source-face mapping; that is not permission to accept an
+unmapped face or replace the native axis with cosmetic ink.
+Retain one tap centre mark but disable its extended arms, so the
 rod axis and small tap cross communicate different features, not duplicate
 lines. Place the vertical stock AF REF beside the rotated hex and prove
 its model identity, value, parentheses and flat-to-flat witness ink.

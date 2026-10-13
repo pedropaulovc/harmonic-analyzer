@@ -41,7 +41,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_name, place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_name, place_view, view_name
 
 from _check import check
 from _com import _early_bound
@@ -254,8 +254,8 @@ BOTTOM_HOLE_KEEP = {
 # The across-flange chain is not a closure: Y -6.35 -> -3 -> +4.5 -> +6.35
 # leaves 1.85 at the far edge.  The bore axis is Y 0, so the lower flange
 # edge -> axis is FootprintOffset + ArmBelowAxis = 3.35 + 3.00.  Pick the
-# actual collar OD arc (edge-on in this view), centre-anchor it as for the
-# arm-end REF, and the lower flange edge; never substitute a mounting hole.
+# actual bore-circle centre point in CollarProfile and the mounting face's
+# west lower vertex, BOTH mapped/selected in BOTTOM; never select a SIDE rim.
 # West of the holes' Y column (x 80 mm), the REF column at x 44 mm has only
 # its value and "BORE / AXIS" rows, all below the flange.  At the widest
 # measured pitch their right ends stay west of the X-coordinate text
@@ -372,9 +372,9 @@ SIDE_SECTION_KEEP = {
 ARM_END_REFERENCE = "arm end from bore axis"
 ARM_END_REFERENCE_XY = (SIDE_AXIS_X + 0.031, 0.177)
 ARM_END_REFERENCE_CALLOUT = "ARM END\nFROM BORE AXIS"
-# swDimensionType_e: swLinearDimension, swVertLinearDimension -- what a
-# vertical dimension between a circle and a line may read back as.
-_LINEAR_DIMENSION_TYPES = (2, 12)
+# swDimensionType_e: swLinearDimension, swHorLinearDimension,
+# swVertLinearDimension. Angular type 3 is never a linear distance.
+_LINEAR_DIMENSION_TYPES = (2, 11, 12)
 # swDimensionArrowsSide_e: every short span in both stacks stands its
 # arrows OUTSIDE -- no 3 or 3.35 mm span fits two 3.556 mm arrowheads
 # inside (retry11 rule: no inside-arrowhead overlap) -- forced rather than
@@ -906,43 +906,159 @@ def _arm_end_reference(adapter: Any, side: Any, edges: ViewEdges) -> Any:
     return annotation
 
 
-def _flange_axis_reference(adapter: Any, bottom: Any, rim: ViewEdge, edge: ViewEdge) -> Any:
-    """A pure, read-only REF between the lower flange edge and the real bore
-    axis.  The collar's OD arc projects edge-on in the mounting-face view;
-    native centre anchoring must still read its centre, not a silhouette
-    flank or a mounting-hole centre.  Prove both attachments and the distance
-    before adding parentheses, spec places and the axis-identifying callout."""
-    centre_mm = rim.circle[:3]
-    dimension = add_edge_dimension(
-        adapter,
-        bottom,
-        p0=model_point_in_view(
-            adapter, bottom, tuple(v / 1000.0 for v in centre_mm), label="collar bore axis in bottom view"
-        ),
-        p1=model_point_in_view(
-            adapter, bottom, tuple(v / 1000.0 for v in edge.midpoint_mm), label="lower flange edge in bottom view"
-        ),
-        text_xy=FLANGE_AXIS_REFERENCE_XY,
-        label=FLANGE_AXIS_REFERENCE,
-        orientation="vertical",
-        entities=(rim.edge, edge.edge),
-    )
+def _collar_bore_centre(adapter: Any, bottom: Any) -> Any:
+    """The existing bore circle's real centre point, in the BOTTOM context.
+
+    CollarProfile is on the Right plane, not the drawing sheet. Its point
+    coordinates go through the inverse sketch transform before the origin
+    check; neither a projected rim nor a same-height mounting hole is an axis.
+    """
+    view = _early_bound(bottom, "IView")
+    model = view.ReferencedDocument
+    if model is None:
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: bottom view has no source part")
+    feature = _early_bound(model, "IPartDoc").FeatureByName("CollarProfile")
+    if feature is None:
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: source has no CollarProfile")
+    raw_sketch = _early_bound(feature, "IFeature").GetSpecificFeature2()
+    if raw_sketch is None:
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: CollarProfile has no sketch")
+    sketch = _early_bound(raw_sketch, "ISketch")
+    centres = []
+    for raw in sketch.GetSketchSegments() or ():
+        kind = _early_bound(raw, "ISketchSegment").GetType()
+        if type(kind) is not int or kind != 1:  # swSketchSegments_e.swSketchARC
+            continue
+        arc = _early_bound(raw, "ISketchArc")
+        circle = arc.IsCircle()  # native LONG, not BOOL
+        radius = arc.GetRadius()  # metres, independent of document units
+        if (
+            type(circle) is int and circle == 1
+            and type(radius) in (int, float) and math.isfinite(radius)
+            and abs(radius - COLLAR_BORE_DIA / 2000.0) <= 1e-8
+        ):
+            point = arc.GetCenterPoint2()
+            if point is None:
+                raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: bore circle has no centre point")
+            centres.append(_early_bound(point, "ISketchPoint"))
+    if len(centres) != 1:
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: expected one native bore circle, found {len(centres)}")
+    point = centres[0]
+    coordinates = (point.X, point.Y, point.Z)
+    if not all(type(v) in (int, float) and math.isfinite(v) for v in coordinates):
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: bore centre has invalid sketch coordinates")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform").Inverse()
+    if transform is None:
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: bore sketch transform is not invertible")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    raw_math_point = utility.CreatePoint(double_array(coordinates))
+    if raw_math_point is None:
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: could not read the bore centre in model space")
+    projected = _early_bound(raw_math_point, "IMathPoint").MultiplyTransform(transform)
+    if projected is None:
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: bore centre has no model-space transform")
+    xyz = tuple(_early_bound(projected, "IMathPoint").ArrayData or ())
+    if (
+        len(xyz) != 3
+        or not all(type(v) in (int, float) and math.isfinite(v) for v in xyz)
+        or max(abs(v) for v in xyz) > 1e-8
+    ):
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: native bore centre is not the model origin: {xyz!r}")
+    in_view = view.GetCorresponding(point)
+    if in_view is None:
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: bore centre has no bottom-view correspondence")
+    source = _early_bound(
+        _early_bound(model, "IModelDoc2").Extension, "IModelDocExtension"
+    ).GetCorresponding2(in_view)
+    same = adapter.swApp.IsSame(source, point) if source is not None else None
+    if type(same) is not int or same != 1:  # swObjectEquality.swObjectSame
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: bore centre lost its source/view identity")
+    return _early_bound(in_view, "ISketchPoint")
+
+
+def _flange_axis_reference(adapter: Any, bottom: Any, edges: ViewEdges) -> Any:
+    """A native vertical distance between two genuine BOTTOM-view points.
+
+    The west lower mounting-face vertex and CollarProfile's bore centre point
+    cannot form an angle. Prove both actual selections belong to BOTTOM before
+    inserting, then prove native linear type, ownership, attachments and metres
+    before adding the reference style. No SIDE-view entity is an input.
+    """
+    view = _early_bound(bottom, "IView")
+    centre = _collar_bore_centre(adapter, view)
+    edge = _flange_lower_edge(edges)
+    if edge.vertices is None or any(vertex is None for vertex in edge.vertices):
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: lower flange edge has no native vertices")
+    west_index = 0 if edge.line[0][0] < edge.line[1][0] else 1
+    vertex = edge.vertices[west_index]
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if ddoc.ActivateView(view_name(adapter, view)) is not True:
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: could not activate bottom view")
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    # Match add_edge_dimension's explicit-entity selection; ISketchPoint is
+    # not IEntity, so its own Select4 is required here.
+    entities = (centre, vertex)
+    draw.ClearSelection2(True)
+    try:
+        for index, (entity, interface, kinds) in enumerate((
+            (centre, "ISketchPoint", (11, 25)),  # swSel[EXT]SKETCHPOINTS
+            (vertex, "IEntity", (3,)),  # swSelVERTICES
+        ), 1):
+            selection = _early_bound(manager.CreateSelectData(), "ISelectData")
+            selection.View = view
+            if _early_bound(entity, interface).Select4(index > 1, selection) is not True:
+                raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: failed to select native point {index}")
+            count = manager.GetSelectedObjectCount2(-1)
+            kind = manager.GetSelectedObjectType3(index, -1)
+            picked = manager.GetSelectedObject6(index, -1)
+            picked_view = manager.GetSelectedObjectsDrawingView2(index, -1)
+            same_entity = adapter.swApp.IsSame(picked, entity) if picked is not None else None
+            same_view = adapter.swApp.IsSame(picked_view, view) if picked_view is not None else None
+            if (
+                type(count) is not int or count != index
+                or type(kind) is not int or kind not in kinds
+                or type(same_entity) is not int or same_entity != 1
+                or type(same_view) is not int or same_view != 1
+            ):
+                raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: native point {index} is not its named BOTTOM-view selection")
+        dimension = draw.AddVerticalDimension2(*FLANGE_AXIS_REFERENCE_XY, 0.0)
+    finally:
+        draw.ClearSelection2(True)
+    if dimension is None:
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: failed to add native vertical distance")
     display = _early_bound(dimension, "IDisplayDimension")
     kind = display.Type2
     if type(kind) is not int or kind not in _LINEAR_DIMENSION_TYPES:
         raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: expected a linear dimension, got type {kind!r}")
-    set_arc_endpoints_to_center(adapter, dimension, label=FLANGE_AXIS_REFERENCE)
-    assert_dimension_measures(
-        adapter,
-        dimension,
-        expected_mm=-SIDE_PLATE_Y[0],
-        label=FLANGE_AXIS_REFERENCE,
-        entities=(rim.edge, edge.edge),
-    )
     raw_annotation = display.GetAnnotation()
     if raw_annotation is None:
         raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: sheet dimension has no annotation")
     annotation = _early_bound(raw_annotation, "IAnnotation")
+    owner_type = annotation.OwnerType
+    owner = annotation.Owner
+    same_owner = adapter.swApp.IsSame(owner, view) if owner is not None else None
+    count = annotation.GetAttachedEntityCount3()
+    kinds = tuple(annotation.GetAttachedEntityTypes() or ())
+    if (
+        type(owner_type) is not int or owner_type != 0  # swAnnotationOwner_DrawingView
+        or type(same_owner) is not int or same_owner != 1
+        or type(count) is not int or count != 2
+        or len(kinds) != 2 or any(type(k) is not int for k in kinds)
+        or sorted(kinds) not in ([3, 11], [3, 25])
+        or annotation.IsDangling() is not False
+    ):
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: not an attached BOTTOM-view point distance")
+    measured = assert_dimension_measures(
+        adapter,
+        dimension,
+        expected_mm=-SIDE_PLATE_Y[0],
+        label=FLANGE_AXIS_REFERENCE,
+        entities=entities,
+        entity_types=("SKETCHPOINT", "VERTEX"),
+    )
+    if not math.isfinite(measured):
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: native distance is not finite")
     set_reference_dimension(adapter, annotation, label=FLANGE_AXIS_REFERENCE)
     _set_reference_precision(adapter, display, label=FLANGE_AXIS_REFERENCE)
     _set_callout_below(display, FLANGE_AXIS_REFERENCE_CALLOUT, FLANGE_AXIS_REFERENCE)
@@ -1198,9 +1314,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError(
             f"bottom view's coordinates imported {sorted(west)}, expected {sorted(BOTTOM_HOLE_KEEP)}"
         )
-    west[FLANGE_AXIS_REFERENCE] = _flange_axis_reference(
-        adapter, bottom, _collar_od_rim(side_edges), _flange_lower_edge(bottom_edges)
-    )
+    west[FLANGE_AXIS_REFERENCE] = _flange_axis_reference(adapter, bottom, bottom_edges)
     rebuild_drawing(adapter, label="bottom view annotations")
     _assert_dimensions_clear(east, BOTTOM_AXES, label="bottom view east stack")
     _assert_dimensions_clear(west, BOTTOM_WEST_AXES, label="bottom view west reference")

@@ -1691,37 +1691,67 @@ class _CylinderFace:
 
 def _bore_face_fakes(
     monkeypatch: pytest.MonkeyPatch, faces: tuple, *, mapped: bool = True,
-    roundtrip: bool = True, equality: int = 1,
+    roundtrip: bool = True, equality: int = 1, wrong_source: bool = False,
+    view_faces: tuple | None = None,
 ) -> tuple[SimpleNamespace, SimpleNamespace, object]:
     source_face = faces[0] if faces else object()
-    view_face = object()
+    view_face = (
+        view_faces[0] if view_faces else _CylinderFace(_Y_BORE_CYLINDER)
+    )
     feature = SimpleNamespace(GetFaces=lambda: faces)
+    view_feature = SimpleNamespace(
+        GetFaces=lambda: (view_face,) if view_faces is None else view_faces
+    )
 
     def feature_by_name(name: str) -> SimpleNamespace:
         assert name == "RodBore"
         return feature
 
-    extension = SimpleNamespace(
-        GetCorrespondingEntity2=lambda entity: source_face if roundtrip else None
-    )
+    def corresponding_feature(input_object: object) -> SimpleNamespace | None:
+        assert input_object is feature
+        return view_feature if mapped else None
+
+    def corresponding_source(entity: object) -> object | None:
+        assert entity is view_face
+        if not roundtrip:
+            return None
+        return object() if wrong_source else source_face
+
+    extension = SimpleNamespace(GetCorrespondingEntity2=corresponding_source)
     model = SimpleNamespace(FeatureByName=feature_by_name, Extension=extension)
     view = SimpleNamespace(
         ReferencedDocument=model,
-        GetCorrespondingEntity=lambda entity: view_face if mapped else None,
+        GetCorresponding=corresponding_feature,
     )
     app = SimpleNamespace(IsSame=lambda first, second: equality if first is second else 0)
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
     return SimpleNamespace(swApp=app), view, view_face
 
 
-def test_bore_axis_selects_named_model_cylinder_and_maps_it_by_identity(
+def test_bore_axis_reacquires_the_views_cylinder_when_direct_face_mapping_is_null(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    adapter, view, face = _bore_face_fakes(monkeypatch, (_CylinderFace(_Y_BORE_CYLINDER),))
+    source_face = _CylinderFace(_Y_BORE_CYLINDER)
+    adapter, view, face = _bore_face_fakes(monkeypatch, (source_face,))
+    direct_calls: list[object] = []
+
+    def direct_face_mapping(entity: object) -> None:
+        direct_calls.append(entity)
+        return None
+
+    view.GetCorrespondingEntity = direct_face_mapping
     assert drawing._rod_bore_face(adapter, view) is face
+    assert face is not source_face
+    assert direct_calls == []
 
 
-@pytest.mark.parametrize("case", ["no-face", "two-faces", "tap", "no-view", "no-source", "unknown"])
+@pytest.mark.parametrize(
+    "case",
+    [
+        "no-face", "two-faces", "tap", "no-view", "no-source", "wrong-source",
+        "different", "unknown",
+    ],
+)
 def test_bore_axis_face_refuses_ambiguity_or_lost_source_correspondence(
     monkeypatch: pytest.MonkeyPatch, case: str,
 ) -> None:
@@ -1737,10 +1767,45 @@ def test_bore_axis_face_refuses_ambiguity_or_lost_source_correspondence(
         options["mapped"] = False
     elif case == "no-source":
         options["roundtrip"] = False
+    elif case == "wrong-source":
+        options["wrong_source"] = True
     else:
-        options["equality"] = -1
+        options["equality"] = 0 if case == "different" else -1
     adapter, view, _face = _bore_face_fakes(monkeypatch, faces, **options)
     with pytest.raises(RuntimeError):
+        drawing._rod_bore_face(adapter, view)
+
+
+@pytest.mark.parametrize(
+    "view_faces",
+    [
+        (),
+        (_CylinderFace(_Y_BORE_CYLINDER),) * 2,
+        (_CylinderFace(_Y_BORE_CYLINDER, cylinder=False),),
+        (_CylinderFace((0.0, 0.0, 0.0, 1.0, 0.0, 0.0, geom.TAP_DRILL_DIA / 2000.0)),),
+        (_CylinderFace((*_Y_BORE_CYLINDER[:6], geom.SPIGOT_DIA / 2000.0)),),
+        (_CylinderFace((0.0001, *_Y_BORE_CYLINDER[1:])),),
+    ],
+)
+def test_bore_axis_refuses_a_mapped_feature_without_one_true_y_bore(
+    monkeypatch: pytest.MonkeyPatch, view_faces: tuple,
+) -> None:
+    adapter, view, _face = _bore_face_fakes(
+        monkeypatch, (_CylinderFace(_Y_BORE_CYLINDER),), view_faces=view_faces
+    )
+    with pytest.raises(RuntimeError, match="one RodBore Y-axis cylindrical face in end view"):
+        drawing._rod_bore_face(adapter, view)
+
+
+def test_bore_axis_refuses_unmeasured_cylinder_status_in_the_mapped_feature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mapped_face = _CylinderFace(_Y_BORE_CYLINDER)
+    mapped_face.surface.IsCylinder = lambda: 1
+    adapter, view, _face = _bore_face_fakes(
+        monkeypatch, (_CylinderFace(_Y_BORE_CYLINDER),), view_faces=(mapped_face,)
+    )
+    with pytest.raises(RuntimeError, match="IsCylinder did not return a native BOOL"):
         drawing._rod_bore_face(adapter, view)
 
 

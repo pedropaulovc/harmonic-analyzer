@@ -762,20 +762,14 @@ def _is_rod_bore_cylinder(parameters: tuple[float, ...]) -> bool:
     )
 
 
-def _rod_bore_face(adapter: Any, view: Any) -> Any:
-    native = _early_bound(view, "IView")
-    model = native.ReferencedDocument
-    if model is None:
-        raise RuntimeError("rod bore axis view has no referenced part")
-    feature = _early_bound(model, "IPartDoc").FeatureByName("RodBore")
-    if feature is None:
-        raise RuntimeError("rod bore axis source has no RodBore feature")
+def _rod_bore_cylinder_face(feature: Any, *, context: str) -> Any:
+    """Census the true bore in either the source or the view's feature topology."""
     matches = []
     for raw in _early_bound(feature, "IFeature").GetFaces() or ():
         face = _early_bound(raw, "IFace2")
         surface = face.GetSurface()
         if surface is None:
-            raise RuntimeError("RodBore face has no native surface")
+            raise RuntimeError(f"RodBore {context} face has no native surface")
         surface = _early_bound(surface, "ISurface")
         cylinder = surface.IsCylinder()
         if type(cylinder) is not bool:
@@ -785,14 +779,34 @@ def _rod_bore_face(adapter: Any, view: Any) -> Any:
         ):
             matches.append(face)
     if len(matches) != 1:
-        raise RuntimeError(f"expected one RodBore Y-axis cylindrical face, found {len(matches)}")
-    in_view = native.GetCorrespondingEntity(matches[0])
-    if in_view is None:
-        raise RuntimeError("RodBore cylinder has no end-view correspondence")
+        raise RuntimeError(
+            f"expected one RodBore Y-axis cylindrical face in {context}, "
+            f"found {len(matches)}"
+        )
+    return matches[0]
+
+
+def _rod_bore_face(adapter: Any, view: Any) -> Any:
+    native = _early_bound(view, "IView")
+    model = native.ReferencedDocument
+    if model is None:
+        raise RuntimeError("rod bore axis view has no referenced part")
+    feature = _early_bound(model, "IPartDoc").FeatureByName("RodBore")
+    if feature is None:
+        raise RuntimeError("rod bore axis source has no RodBore feature")
+    source_face = _rod_bore_cylinder_face(feature, context="source part")
+    # Map the feature, then reacquire its face in this rotated view's topology.
+    # IView::GetCorresponding explicitly supports IFeature; IFeature::GetFaces
+    # returns its owned faces. Direct GetCorrespondingEntity(source_face) was
+    # null on retry13 despite the source cylinder passing the full census.
+    in_view_feature = native.GetCorresponding(feature)
+    if in_view_feature is None:
+        raise RuntimeError("RodBore feature has no end-view correspondence")
+    in_view = _rod_bore_cylinder_face(in_view_feature, context="end view")
     source = _early_bound(
         _early_bound(model, "IModelDoc2").Extension, "IModelDocExtension"
     ).GetCorrespondingEntity2(in_view)
-    if source is None or int(adapter.swApp.IsSame(source, matches[0])) != 1:
+    if source is None or int(adapter.swApp.IsSame(source, source_face)) != 1:
         raise RuntimeError("RodBore cylinder lost its source/view identity")
     return in_view
 

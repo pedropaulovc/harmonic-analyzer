@@ -860,7 +860,7 @@ def test_side_view_axis_chain_reads_once_with_its_sum_as_reference() -> None:
         "arm end from bore axis": 2, "flange edge to bore axis": 2,
     }
     assert drawing.DRAWING_REFERENCE_PRECISION is mg_magnifying_bracket_spec.DRAWING_REFERENCE_PRECISION
-    assert drawing._LINEAR_DIMENSION_TYPES == (2, 12)
+    assert drawing._LINEAR_DIMENSION_TYPES == (2, 11, 12)
     assert 'orientation="vertical"' in source
     assert "entities=(rim.edge, end.edge)" in source
     assert "set_arc_endpoints_to_center(adapter, dimension, label=ARM_END_REFERENCE)" in source
@@ -1705,42 +1705,134 @@ def test_lower_flange_edge_is_on_the_actual_mounting_face() -> None:
 
 @pytest.fixture
 def flange_axis_native_contract(monkeypatch):
-    """An offline native-shaped dimension, not a SolidWorks execution.
-    Leave the REAL attachment/value proof in use so equal-valued wrong
-    entities and tangent-to-rim distances cannot pass this contract."""
-    from types import SimpleNamespace
-    from _drawing_edges import ViewEdge
-    import _drawing_edge_dimensions as measured
+    """Native-shaped fakes; keep the real centre, selection and value proofs.
 
-    rim = ViewEdge(
-        object(), None,
-        (part.COLLAR_HALF_LEN, 0.0, 0.0, 1.0, 0.0, 0.0, part.COLLAR_OD / 2.0),
-        None,
-    )
+    The drawing points differ from their source objects. A foreign-view
+    selection, false correspondence or equal-valued wrong attachment must not
+    be hidden by a fake AddVerticalDimension2 that always returns 6.35.
+    """
+    from types import SimpleNamespace
+    from _drawing_edges import ViewEdge, ViewEdges
+    import _drawing_edge_dimensions as measured
+    import _drawing_dimensions as reference
+
+    calls = []
+
+    class Manager:
+        def __init__(self):
+            self.selected = []
+            self.foreign_index = None
+            self.wrong_entity_index = None
+            self.wrong_kind_index = None
+            self.count_override = None
+
+        def CreateSelectData(self):
+            return SimpleNamespace(View=None)
+
+        def GetSelectedObjectCount2(self, mark):
+            assert mark == -1
+            return len(self.selected) if self.count_override is None else self.count_override
+
+        def GetSelectedObjectType3(self, index, mark):
+            assert mark == -1
+            return True if index == self.wrong_kind_index else self.selected[index - 1][0].kind
+
+        def GetSelectedObject6(self, index, mark):
+            assert mark == -1
+            return object() if index == self.wrong_entity_index else self.selected[index - 1][0]
+
+        def GetSelectedObjectsDrawingView2(self, index, mark):
+            assert mark == -1
+            return object() if index == self.foreign_index else self.selected[index - 1][1]
+
+    manager = Manager()
+
+    class Point:
+        def __init__(self, kind, coordinates=(0.0, 0.0, 0.0)):
+            self.kind = kind
+            self.X, self.Y, self.Z = coordinates
+            self.select_result = True
+
+        def Select4(self, append, data):
+            calls.append(("select", self, append, data.View))
+            if self.select_result is True:
+                if not append:
+                    manager.selected.clear()
+                manager.selected.append((self, data.View))
+            return self.select_result
+
+    source_point = Point(11)
+    centre = Point(25)  # swSelEXTSKETCHPOINTS: point of the referenced part
+    vertex = Point(3)
+    other_vertex = Point(3)
     edge = ViewEdge(
         object(),
         (
             (part.FLANGE_X[0], part.FLANGE_Y[0], part.FLANGE_Z[1]),
             (part.FLANGE_X[1], part.FLANGE_Y[0], part.FLANGE_Z[1]),
         ),
-        None, None,
+        None, (vertex, other_vertex),
     )
-    calls = []
+    arc = SimpleNamespace(
+        GetType=lambda: 1,
+        IsCircle=lambda: 1,  # native LONG, NOT BOOL
+        GetRadius=lambda: part.COLLAR_BORE_DIA / 2000.0,
+        GetCenterPoint2=lambda: source_point,
+    )
+    inverse = object()
+    transform = SimpleNamespace(Inverse=lambda: inverse)
+    sketch = SimpleNamespace(
+        GetSketchSegments=lambda: (arc,),
+        ModelToSketchTransform=transform,
+    )
+    model_space = SimpleNamespace(ArrayData=(0.0, 0.0, 0.0))
+
+    def create_point(coordinates):
+        assert tuple(coordinates) == (source_point.X, source_point.Y, source_point.Z)
+
+        def multiply(native_transform):
+            assert native_transform is inverse
+            return model_space
+
+        return SimpleNamespace(MultiplyTransform=multiply)
+
+    feature = SimpleNamespace(GetSpecificFeature2=lambda: sketch)
+    extension = SimpleNamespace(GetCorresponding2=lambda p: source_point if p is centre else None)
+
+    def feature_by_name(name):
+        assert name == "CollarProfile"
+        return feature
+
+    model = SimpleNamespace(FeatureByName=feature_by_name, Extension=extension)
+    bottom = SimpleNamespace(
+        ReferencedDocument=model,
+        GetCorresponding=lambda p: centre if p is source_point else None,
+    )
     model_dimension = SimpleNamespace(SystemValue=-drawing.SIDE_PLATE_Y[0] / 1000.0)
 
     class Annotation:
-        attached = (rim.edge, edge.edge)
+        attached = (centre, vertex)
+        kinds = (25, 3)
         dangling = False
+        OwnerType = 0
+        Owner = bottom
+        count_override = None
+
+        def GetAttachedEntityCount3(self):
+            return len(self.attached) if self.count_override is None else self.count_override
 
         def GetAttachedEntities3(self):
             calls.append(("attachments",))
             return self.attached
 
         def GetAttachedEntityTypes(self):
-            return (1, 1)
+            return self.kinds
 
         def IsDangling(self):
             return self.dangling
+
+        def GetSpecificAnnotation(self):
+            return display
 
     annotation = Annotation()
 
@@ -1752,14 +1844,10 @@ def flange_axis_native_contract(monkeypatch):
             self.text = {}
             self.arrow_side = 0
             self.ignore_arrow = False
-            self.annotation_reads = 0
             self.lose_annotation = False
 
         def GetAnnotation(self):
-            self.annotation_reads += 1
-            if self.lose_annotation and self.annotation_reads > 1:
-                return None
-            return annotation
+            return None if self.lose_annotation else annotation
 
         def GetDimension2(self, index):
             assert index == 0
@@ -1776,7 +1864,7 @@ def flange_axis_native_contract(monkeypatch):
 
         def SetText(self, kind, text):
             calls.append(("text", kind, text))
-            self.text[kind] = text + "\r"
+            self.text[kind] = text
             return None  # native VT_VOID, not a success bool
 
         def GetText(self, kind):
@@ -1792,104 +1880,217 @@ def flange_axis_native_contract(monkeypatch):
                 self.arrow_side = value
 
     display = Display()
-    bottom = object()
-    adapter = SimpleNamespace(_attempt=lambda fn: fn())
+
+    def add(x, y, z):
+        calls.append(("add", x, y, z, tuple(manager.selected)))
+        return display
+
+    draw = SimpleNamespace(
+        SelectionManager=manager,
+        ActivateView=lambda name: name == "bottom",
+        ClearSelection2=lambda clear: manager.selected.clear(),
+        AddVerticalDimension2=add,
+    )
+    adapter = SimpleNamespace(
+        _attempt=lambda fn: fn(),
+        currentModel=draw,
+        swApp=SimpleNamespace(
+            IsSame=lambda a, b: 1 if a is b else 0,
+            GetMathUtility=lambda: SimpleNamespace(CreatePoint=create_point),
+        ),
+    )
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(drawing, "view_name", lambda a, view: "bottom" if view is bottom else "foreign")
+    monkeypatch.setattr(drawing, "double_array", tuple)
     monkeypatch.setattr(measured, "_early_bound", lambda obj, interface: obj)
     monkeypatch.setattr(measured._sw_type_info, "early_bound_or_flag", lambda obj, *args: obj)
     monkeypatch.setattr(measured, "_is_same_attachment", lambda a, actual, expected, kind: actual is expected)
-
-    def project(a, view, point, *, label):
-        assert a is adapter and view is bottom
-        return (0.134 + point[0], drawing.BOTTOM_CENTER[1] + point[1])
-
-    def add(a, view, **kwargs):
-        assert a is adapter and view is bottom
-        calls.append(("add", kwargs))
-        return display
-
-    monkeypatch.setattr(drawing, "model_point_in_view", project)
-    monkeypatch.setattr(drawing, "add_edge_dimension", add)
-    monkeypatch.setattr(
-        drawing, "set_arc_endpoints_to_center",
-        lambda a, d, *, label: calls.append(("arc", d, label)),
-    )
-    monkeypatch.setattr(
-        drawing, "set_reference_dimension",
-        lambda a, ann, *, label: calls.append(("reference", ann, label)),
-    )
+    monkeypatch.setattr(reference, "rebuild_drawing", lambda a, *, label: calls.append(("rebuild", label)))
     monkeypatch.setattr(measured._telemetry, "success", lambda *args, **kwargs: None)
     return SimpleNamespace(
-        adapter=adapter, bottom=bottom, rim=rim, edge=edge,
-        display=display, annotation=annotation, dimension=model_dimension, calls=calls,
+        adapter=adapter, bottom=bottom, centre=centre, vertex=vertex, edge=edge,
+        edges=ViewEdges("bottom", (edge,)), manager=manager, draw=draw,
+        arc=arc, source_point=source_point, sketch=sketch, model_space=model_space,
+        extension=extension, display=display, annotation=annotation,
+        dimension=model_dimension, calls=calls,
     )
 
 
-def test_flange_axis_reference_projects_the_actual_edge_on_collar(flange_axis_native_contract) -> None:
+@pytest.mark.parametrize("kind", [2, 11, 12])
+def test_flange_axis_reference_is_a_same_view_native_point_distance(flange_axis_native_contract, kind) -> None:
     c = flange_axis_native_contract
-    result = drawing._flange_axis_reference(c.adapter, c.bottom, c.rim, c.edge)
+    c.display.Type2 = kind
+    result = drawing._flange_axis_reference(c.adapter, c.bottom, c.edges)
     assert result is c.annotation
-    kwargs = c.calls[0][1]
-    # +Z view: the OD circle's X axis projects edge-on, but its centre
-    # remains the real bore axis, Y 0; the flange edge is Y -6.35.
-    assert c.rim.circle[3:6] == (1.0, 0.0, 0.0)
-    assert kwargs["p0"] == pytest.approx((0.139, 0.110))
-    assert kwargs["p1"] == pytest.approx((0.115, 0.10365))
-    assert kwargs["entities"] == (c.rim.edge, c.edge.edge)
-    assert kwargs["orientation"] == "vertical"
-    assert kwargs["text_xy"] == drawing.FLANGE_AXIS_REFERENCE_XY
-    assert kwargs["label"] == drawing.FLANGE_AXIS_REFERENCE
-    assert [call[0] for call in c.calls] == [
-        "add", "arc", "attachments", "value", "reference", "precision", "text",
+    selections = [call for call in c.calls if call[0] == "select"]
+    assert selections == [
+        ("select", c.centre, False, c.bottom),
+        ("select", c.vertex, True, c.bottom),
     ]
-    assert c.calls[1] == ("arc", c.display, drawing.FLANGE_AXIS_REFERENCE)
+    inserted = next(call for call in c.calls if call[0] == "add")
+    assert inserted[1:4] == (*drawing.FLANGE_AXIS_REFERENCE_XY, 0.0)
+    assert inserted[4] == ((c.centre, c.bottom), (c.vertex, c.bottom))
+    assert c.dimension.SystemValue == pytest.approx(0.00635)
+    assert [call[0] for call in c.calls] == [
+        "select", "select", "add", "attachments", "value", "text", "text",
+        "rebuild", "precision", "text",
+    ]
+    assert ("text", 1, "(") in c.calls and ("text", 2, ")") in c.calls
     assert c.calls[-2] == ("precision", 2, -1, -1, -1)
     assert c.calls[-1] == ("text", 4, "BORE\nAXIS")
     assert c.display.ArrowSide == drawing._ARROWS_OUTSIDE
+    assert c.manager.selected == []
 
 
-@pytest.mark.parametrize("failure", ["wrong entity", "extra entity", "dangling", "wrong value"])
-def test_flange_axis_reference_rejects_unassociated_or_wrong_distance(flange_axis_native_contract, failure) -> None:
+def test_flange_axis_reference_uses_inverse_sketch_coordinates_and_west_vertex(flange_axis_native_contract) -> None:
+    from _drawing_edges import ViewEdge, ViewEdges
+
+    c = flange_axis_native_contract
+    # Sketch coordinates need not be model coordinates; the native inverse
+    # maps this sketch centre to the source bore's model-space origin.
+    c.source_point.X, c.source_point.Y, c.source_point.Z = (0.012, 0.013, 0.014)
+    c.edges = ViewEdges("bottom", (ViewEdge(
+        c.edge.edge, tuple(reversed(c.edge.line)), None, tuple(reversed(c.edge.vertices)),
+    ),))
+    assert drawing._flange_axis_reference(c.adapter, c.bottom, c.edges) is c.annotation
+    assert [call[1] for call in c.calls if call[0] == "select"] == [c.centre, c.vertex]
+
+
+@pytest.mark.parametrize("result", [None, False, 1, object()])
+def test_flange_axis_reference_requires_native_point_selection_bool(flange_axis_native_contract, result) -> None:
+    c = flange_axis_native_contract
+    c.centre.select_result = result
+    with pytest.raises(RuntimeError, match="failed to select native point"):
+        drawing._flange_axis_reference(c.adapter, c.bottom, c.edges)
+    assert not any(call[0] == "add" for call in c.calls)
+    assert c.manager.selected == []
+
+
+@pytest.mark.parametrize("count", [True, 0, 2, None])
+def test_flange_axis_reference_requires_native_integer_selection_count(flange_axis_native_contract, count) -> None:
+    c = flange_axis_native_contract
+    # None is a missing native readback, not the fake's usual count sentinel.
+    c.manager.GetSelectedObjectCount2 = lambda mark: count
+    with pytest.raises(RuntimeError, match="not its named BOTTOM-view selection"):
+        drawing._flange_axis_reference(c.adapter, c.bottom, c.edges)
+    assert not any(call[0] == "add" for call in c.calls)
+    assert c.manager.selected == []
+
+
+@pytest.mark.parametrize("index", [1, 2])
+@pytest.mark.parametrize("failure", ["foreign view", "foreign entity", "wrong kind"])
+def test_flange_axis_reference_cannot_insert_cross_view_or_wrong_points(flange_axis_native_contract, index, failure) -> None:
+    c = flange_axis_native_contract
+    if failure == "foreign view":
+        c.manager.foreign_index = index
+    elif failure == "foreign entity":
+        c.manager.wrong_entity_index = index
+    else:
+        c.manager.wrong_kind_index = index
+    with pytest.raises(RuntimeError, match="not its named BOTTOM-view selection"):
+        drawing._flange_axis_reference(c.adapter, c.bottom, c.edges)
+    assert not any(call[0] == "add" for call in c.calls)
+    assert c.manager.selected == []
+
+
+@pytest.mark.parametrize("failure", ["no mapping", "wrong source", "wrong centre", "not a circle", "wrong radius", "no vertex"])
+def test_flange_axis_reference_requires_the_real_model_bore_centre_and_vertex(flange_axis_native_contract, failure) -> None:
+    from _drawing_edges import ViewEdge, ViewEdges
+
+    c = flange_axis_native_contract
+    if failure == "no mapping":
+        c.bottom.GetCorresponding = lambda p: None
+        match = "no bottom-view correspondence"
+    elif failure == "wrong source":
+        c.extension.GetCorresponding2 = lambda p: object()
+        match = "lost its source/view identity"
+    elif failure == "wrong centre":
+        # A coincident-looking drawing point is insufficient: inverse sketch
+        # transformation must locate the actual native point on the bore axis.
+        c.model_space.ArrayData = (0.0, 0.00635, 0.0)
+        match = "not the model origin"
+    elif failure == "not a circle":
+        c.arc.IsCircle = lambda: True  # LONG masquerading as BOOL must fail
+        match = "expected one native bore circle"
+    elif failure == "wrong radius":
+        c.arc.GetRadius = lambda: part.COLLAR_OD / 2000.0
+        match = "expected one native bore circle"
+    else:
+        c.edges = ViewEdges("bottom", (ViewEdge(c.edge.edge, c.edge.line, None, None),))
+        match = "no native vertices"
+    with pytest.raises(RuntimeError, match=match):
+        drawing._flange_axis_reference(c.adapter, c.bottom, c.edges)
+    assert not any(call[0] == "add" for call in c.calls)
+
+
+@pytest.mark.parametrize("failure", ["wrong entity", "extra entity", "dangling", "foreign owner", "sheet owner", "wrong attachment type", "wrong attachment count"])
+def test_flange_axis_reference_rejects_unassociated_or_foreign_distance(flange_axis_native_contract, failure) -> None:
     c = flange_axis_native_contract
     if failure == "wrong entity":
-        # A mounting-hole rim could give the SAME 6.35, but is not the bore.
-        c.annotation.attached = (object(), c.edge.edge)
+        # Another point at Y 0 would give the SAME 6.35, but is not the bore.
+        c.annotation.attached = (object(), c.vertex)
+        match = "not the dimension between its named entities"
     elif failure == "extra entity":
-        c.annotation.attached = (c.rim.edge, c.edge.edge, object())
+        c.annotation.attached = (c.centre, c.vertex, object())
+        match = "not an attached BOTTOM-view point distance"
     elif failure == "dangling":
         c.annotation.dangling = True
+        match = "not an attached BOTTOM-view point distance"
+    elif failure == "foreign owner":
+        c.annotation.Owner = object()
+        match = "not an attached BOTTOM-view point distance"
+    elif failure == "sheet owner":
+        c.annotation.OwnerType = True  # strict LONG: BOOL is not view ownership
+        match = "not an attached BOTTOM-view point distance"
+    elif failure == "wrong attachment type":
+        c.annotation.kinds = (1, 3)
+        match = "not an attached BOTTOM-view point distance"
     else:
-        # Forgetting centre anchoring can read a tangent, not the axis.
-        c.dimension.SystemValue = (6.35 - part.COLLAR_OD / 2.0) / 1000.0
-    match = "measures" if failure == "wrong value" else "not the dimension between its named entities"
+        c.annotation.count_override = True
+        match = "not an attached BOTTOM-view point distance"
     with pytest.raises(RuntimeError, match=match):
-        drawing._flange_axis_reference(c.adapter, c.bottom, c.rim, c.edge)
-    assert not any(call[0] == "reference" for call in c.calls)
+        drawing._flange_axis_reference(c.adapter, c.bottom, c.edges)
+    assert not any(call[0] in {"text", "precision"} for call in c.calls)
 
 
-@pytest.mark.parametrize("kind", [14, None, True, "12", object()])
+@pytest.mark.parametrize("value", [6.35, 6.35 * 0.0254, 0.00035, float("nan"), float("inf")])
+def test_flange_axis_reference_rejects_wrong_native_units_or_value(flange_axis_native_contract, value) -> None:
+    c = flange_axis_native_contract
+    c.dimension.SystemValue = value
+    with pytest.raises(RuntimeError, match="measures|not finite"):
+        drawing._flange_axis_reference(c.adapter, c.bottom, c.edges)
+    assert not any(call[0] in {"text", "precision"} for call in c.calls)
+
+
+@pytest.mark.parametrize("kind", [3, 14, None, True, "12", object()])
 def test_flange_axis_reference_rejects_non_linear_native_types(flange_axis_native_contract, kind) -> None:
     c = flange_axis_native_contract
     c.display.Type2 = kind
+    # Even 0.00635 in the native value cannot rescue ANGULAR type 3: the
+    # dimension's radians must never be converted to a plausible mm nominal.
     with pytest.raises(RuntimeError, match="expected a linear dimension"):
-        drawing._flange_axis_reference(c.adapter, c.bottom, c.rim, c.edge)
-    assert [call[0] for call in c.calls] == ["add"]
+        drawing._flange_axis_reference(c.adapter, c.bottom, c.edges)
+    assert [call[0] for call in c.calls] == ["select", "select", "add"]
 
 
-@pytest.mark.parametrize("failure", ["annotation", "callout", "arrows"])
+@pytest.mark.parametrize("failure", ["annotation", "parentheses", "callout", "arrows"])
 def test_flange_axis_reference_refuses_native_readback_failures(flange_axis_native_contract, failure) -> None:
     c = flange_axis_native_contract
     if failure == "annotation":
         c.display.lose_annotation = True
         match = "sheet dimension has no annotation"
+    elif failure == "parentheses":
+        c.display.GetText = lambda kind: ""
+        match = "failed to parenthesize"
     elif failure == "callout":
-        c.display.GetText = lambda kind: "BORE"
+        original = c.display.GetText
+        c.display.GetText = lambda kind: "BORE" if kind == 4 else original(kind)
         match = "callout-below text did not persist"
     else:
         c.display.ignore_arrow = True
         match = "reference did not keep outside arrows"
     with pytest.raises(RuntimeError, match=match):
-        drawing._flange_axis_reference(c.adapter, c.bottom, c.rim, c.edge)
+        drawing._flange_axis_reference(c.adapter, c.bottom, c.edges)
 
 
 @pytest.mark.parametrize("label", ["arm end from bore axis", "flange edge to bore axis"])
@@ -1975,10 +2176,12 @@ def test_flange_axis_reference_source_keeps_native_proofs_and_spec_places() -> N
 
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     reference = inspect.getsource(drawing._flange_axis_reference)
-    assert "entities=(rim.edge, edge.edge)" in reference
+    assert "entities=entities" in reference
+    assert 'entity_types=("SKETCHPOINT", "VERTEX")' in reference
     assert "expected_mm=-SIDE_PLATE_Y[0]" in reference
-    assert "set_arc_endpoints_to_center" in reference
-    assert reference.index("set_arc_endpoints_to_center") < reference.index("assert_dimension_measures")
+    assert "set_arc_endpoints_to_center" not in reference
+    assert "GetSelectedObjectsDrawingView2" in reference
+    assert "annotation.Owner" in reference
     assert reference.index("assert_dimension_measures") < reference.index("set_reference_dimension")
     assert "set_reference_dimension(adapter, annotation, label=FLANGE_AXIS_REFERENCE)" in reference
     assert "_set_reference_precision(adapter, display, label=FLANGE_AXIS_REFERENCE)" in reference
@@ -1987,7 +2190,8 @@ def test_flange_axis_reference_source_keeps_native_proofs_and_spec_places() -> N
     assert "hole_annotations = curate_hidden_dimensions(" in source
     assert "west = {dimension_name(adapter, a): a for a in hole_annotations}" in source
     assert "west[FLANGE_AXIS_REFERENCE] = _flange_axis_reference(" in source
-    assert "_collar_od_rim(side_edges), _flange_lower_edge(bottom_edges)" in source
+    assert "_flange_axis_reference(adapter, bottom, bottom_edges)" in source
+    assert "_collar_od_rim(side_edges), _flange_lower_edge(bottom_edges)" not in source
     proof = '_assert_dimensions_clear(west, BOTTOM_WEST_AXES, label="bottom view west reference")'
     assert source.index('rebuild_drawing(adapter, label="bottom view annotations")') < source.index(proof)
     assert source.index(proof) < source.index("_place_bottom_caption(adapter, bottom, front_annotations)")
