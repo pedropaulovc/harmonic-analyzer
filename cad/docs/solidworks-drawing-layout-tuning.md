@@ -132,10 +132,11 @@ keeping the attachment on its actual broad face; move E's letter clear of both
 drill rows; place the **whole** HubLength value/stack to the left, outside both
 witnesses and clear of the drill and arrow tail. A rightward move is not a
 clearance proof: an above-callout row can reflow the lower tolerance into E's
-full circle. Keep the land-angle dimension's numeric BASIC row at its existing
-position and witness reach; bind its actual angle explicitly to DETAIL E and
-MIRROR PLANE in Manufacturing Notes instead of a dimension row struck by its
-own witness/arc. Move R816 away from the taper arrow. Remove automatic
+full circle. Removing the land-angle dimension's inline MIRROR row left its
+numeric BASIC box on the witness and arc in R23. R24 uses the text-only
+angular offset convention below; the actual angle remains explicitly bound
+to DETAIL E and MIRROR PLANE in Manufacturing Notes. Move R816 away from the
+taper arrow. Remove automatic
 centre-mark reinsertion on front/D/E while strictly retaining the native
 2/1/1 **printed** centre-mark census, rather than counting every allocated
 annotation or merely deleting the observed front pair.
@@ -189,6 +190,36 @@ epsilon, rounding of native rows, crop expansion or a global audit allowance.
 Two-ULP and 1 um overruns still refuse; ghost, inside-empty and malformed-data
 rules are unchanged. The shared exact-zero **crop versus outline** containment
 and independent 50 um F5 equation remain unchanged (double versus double).
+
+R24's remaining repairs are local to the rocker recipe. The rod-hole position
+frame retains its circular-edge attachment, but uses a short right-sided bent
+leader with a filled-dot arrowhead on the south rim where the printed
+centre-mark arm passes through it. Read back the leader side/style, disabled
+smart-arrow state, dot style in both annotation and display data, complete
+leader points, attached-entity identity and unchanged frame XML after redraw.
+The actual route must miss the taper; a success status alone is not evidence.
+Do not use `SetLeaderAttachmentPointAtIndex` on the frame.
+
+Radius leaders must land on their **finite manufactured arc**, not just the
+corresponding complete circle. R800's text belongs on the concave, centre side
+above the finite top arc, clear of the actual manufactured outline. Requiring
+it outside the complete R800 circle was wrong: that forced a radial leader
+through the strap or onto an extrapolated arc. Only TopRadius replaces that
+old predicate. Its complete text and radial leader must miss the actual part,
+the overall/offset dimensions, top profile frame and leader, pin-axis basics
+and top-height basic; its arrow terminates inside the finite top-arc span.
+R816 retains its complete-circle exterior check and stays clear of the
+taper-dimension and D corridors.
+The 5.59 land dimension retains both real corner attachments and the unchanged
+E crop, with both witness starts visible. The parent taper witness must miss
+E's source circle without changing its value or endpoints. Note 2 states
+explicitly that the top basic is **ABOVE A** and the common arc centre is
+above A. The approved B2-1 reference clarification defines the mirror plane
+through datum axis A, perpendicular to datum B and at the source-derived
+10.46° BASIC angle to datum C; note 5 refers to that datum-defined plane.
+The familiar pin coordinates and arc basics remain unchanged and are thereby
+chained to A|B|C. None of these presentation/reference controls changes a
+datum feature, geometry, zone or manufacturing tolerance.
 
 
 ## What is readable from the API (stop guessing)
@@ -441,6 +472,30 @@ dimension: `ArcExtensionLineOrOppositeSide` (radial only,
 `types/IDisplayDimension/DisplayAsLinear.md`), and `SetBrokenLeader2(UseDoc,
 Broken)` (`types/IDisplayDimension/SetBrokenLeader2.md`). Re-read the geometry
 from `GetDisplayData` afterwards; the render is not the evidence.
+
+For an **angular** dimension, use the existing thumbnut convention instead:
+`OffsetText = True` before `IAnnotation::SetPosition2` moves only the native
+text and its connector, preserving the dimension arc and witness attachments.
+Do not copy the thumbnut's separate `OffsetText = False` arc-placement step
+when the current arc and capped 8 mm witnesses must stay fixed. A cap readback
+is not proof of the drawn witness lengths. R23 rocker's on-arc BASIC 10.46°
+box still intersected both its witness and arc after the inline MIRROR row was
+removed; moving a free-floating note or translating only an offline box would
+not fix that native dimension.
+
+R24's rocker-local contract uses an outward, approximately bisector-aligned
+text position, away from the capped witness pair, with at least 3 mm air to
+the isometric caption. From validated native display readback, account for the
+connector polyline, preserve both 8 mm witnesses and the model attachments,
+and refuse any connector crossing of a witness, dimension arc or the
+5.59/datum-C cluster. Certify arc membership analytically from radius and sweep,
+not distance to a sampled chord. Only a classified degree-one connector
+terminal may join its own arc within the existing 50 um attachment tolerance;
+all witness, cluster and other connector crossings remain strict. The other
+terminal joins the actual native text-frame border, not an estimated glyph box.
+Empty, truncated or unclassified primitive data cannot certify a clean route.
+Native anchor conventions and regenerated connector geometry must be checked,
+not inferred from `SetPosition2` returning success.
 
 **b. `IView::SetDisplayMode4` refusing HLR on a native detail view.**
 Don't: read `False` as "detail views can't do HLR". Two causes, both documented

@@ -82,21 +82,21 @@ BUILT_UP_PERMISSION_NOTE = None
 
 DRAWING_NOTES = "\n".join(
     (
-        # Nominal CAD mirror plane is x=0: through the physical pivot axis A,
-        # normal to the arm's length. It is not symmetry about the bore axis.
-        "1. NOMINAL MIRROR SYMMETRY ABOUT PLANE",
-        "   THROUGH DATUM AXIS A, NORMAL TO LENGTH;",
+        # B2-1: the same CAD mirror plane is now reconstructible from A|B|C.
+        # This changes its note reference only, not the plane, geometry or zones.
+        "1. MIRROR PLANE: THROUGH DATUM AXIS A,",
+        "   PERPENDICULAR TO DATUM B, AT",
+        f"   {math.degrees(_ALPHA_TOP):.2f}° BASIC TO DATUM C.",
         "   ROD-PIN HOLE (1X) AT THE END SHOWN.",
-        "2. NOMINAL ARCS CONCENTRIC ON THAT PLANE.",
-        f"   BASIC {TOP_EDGE_ABOVE_PIVOT:.{DEFAULT_DRAWING_PRECISION}f}: TOP ARC FROM A.",
+        "2. COMMON ARC CENTRE ABOVE A ON THE PLANE.",
+        f"   BASIC {TOP_EDGE_ABOVE_PIVOT:.{DEFAULT_DRAWING_PRECISION}f}: TOP ARC ABOVE A.",
         # #948 ruling R: the rod's float on the arm is taken from the hub's
         # mid-plane, so the strap's offset from it is held.
         "3. STRAP SYMMETRIC TO HUB WITHIN "
         f"{STRAP_HUB_SYMMETRY:.{DEFAULT_DRAWING_PRECISION}f};",
         "   INTEGRAL HUB LENGTH SETS THE PITCH",
         "   (NO SPACERS). HUB OD COAXIAL WITH PIVOT",
-        f"   BORE WITHIN Ø{HUB_COAXIALITY_DIA:.{DEFAULT_DRAWING_PRECISION}f}.",
-        f"   {HUB_WALL_NOTE}.",
+        f"   BORE WITHIN Ø{HUB_COAXIALITY_DIA:.{DEFAULT_DRAWING_PRECISION}f}. {HUB_WALL_NOTE}.",
         # Source context: channel_kinematics.arc_geometry/solve_state and
         # build_ch_rocker_arm's chapter-30 profile reconstruction. The lower
         # arc is not a second amplitude-bar contact or independent gain control.
@@ -105,7 +105,7 @@ DRAWING_NOTES = "\n".join(
         # note 1's identified hole plus its native basics/callout/position FCF.
         "4. UPPER BAR CONTACT; LOWER STRAP ENVELOPE",
         f"5. DETAIL E: {math.degrees(_ALPHA_TOP):.2f}° BASIC IS MEASURED",
-        "   FROM THE NOMINAL MIRROR PLANE.",
+        "   FROM THE DATUM-DEFINED MIRROR PLANE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
