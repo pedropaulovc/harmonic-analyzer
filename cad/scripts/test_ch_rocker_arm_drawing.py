@@ -25,6 +25,24 @@ from dt_cone_pivot_post_installation import MECHANISM_X_SHIFT
 from _hole_spec import blind_cut_dia_mm
 
 
+def _native(*interfaces, **members):
+    """Declare a producer's interfaces; never infer ownership from its members."""
+    if {"IAnnotation", "IDisplayDimension"} <= set(interfaces):
+        raise AssertionError("annotation and display dimension require distinct objects")
+    return SimpleNamespace(_native_interfaces=interfaces, **members)
+
+
+def _bind_owner(native, interface, *_members):
+    """NULL survives binding; unknown and wrong interfaces fail without COM."""
+    if native is None:
+        return None
+    owners = getattr(native, "_native_interfaces", ())
+    if interface not in owners:
+        raise RuntimeError(f"native owner mismatch: {owners!r} cannot bind {interface}")
+    query = getattr(native, "_native_query", None)
+    return query(interface) if query is not None else native
+
+
 def _front_xy(mx: float, my: float) -> tuple[float, float]:
     """Offline projection fixture, never production or native layout evidence."""
     scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
@@ -369,6 +387,8 @@ def test_datum_b_moves_above_pin_text_without_changing_its_broad_face_attachment
 class _ProfileDisplay:
     """Model COM property writes, including silently ignored setters."""
 
+    _native_interfaces = ("IDisplayDimension",)
+
     def __init__(self, ignored: str | None = None) -> None:
         self.ignored = ignored
         self.writes: list[tuple[str, object]] = []
@@ -388,7 +408,7 @@ class _ProfileDisplay:
 def _profile_annotations(monkeypatch: pytest.MonkeyPatch, displays: dict) -> list:
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, ann: ann.name)
     return [
-        SimpleNamespace(name=name, GetSpecificAnnotation=lambda display=display: display)
+        _native("IAnnotation", name=name, GetSpecificAnnotation=lambda display=display: display)
         for name, display in displays.items()
     ]
 
@@ -570,6 +590,8 @@ def _native_line(x0, y0, x1, y1):
 class _ClearanceDisplayData:
     """Method-shaped native reads; the real dump/parser are NOT replaced."""
 
+    _native_interfaces = ("IDisplayData",)
+
     def __init__(self, texts, lines, *, primitives=None):
         self.texts, self.lines = texts, lines
         self.primitives = {} if primitives is None else primitives
@@ -626,6 +648,7 @@ class _ClearanceDisplayData:
 
 
 class _ClearanceAnnotation:
+    _native_interfaces = ("IAnnotation",)
     OwnerType, Visible, Layer = 0, 1, ""
 
     def __init__(self, name, position, data, *, leaders=(), kind=5, hole_callout=True):
@@ -652,7 +675,7 @@ class _ClearanceAnnotation:
         return self.leaders[index]
 
     def GetSpecificAnnotation(self):  # noqa: N802
-        return SimpleNamespace(IsHoleCallout=lambda: self.hole_callout)
+        return _native("IDisplayDimension", IsHoleCallout=lambda: self.hole_callout)
 
 
 # IDisplayData's documented rows, not shortened fixtures accepted by tolerant
@@ -677,7 +700,7 @@ def native_callout_record(monkeypatch):
     """Exercise actual record production without importing/activating COM."""
     import _drawing_layout_audit
 
-    monkeypatch.setattr(_drawing_layout_audit, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_drawing_layout_audit, "_early_bound", _bind_owner)
     data = _ClearanceDisplayData(
         [{"t": "REAM +0.03", "pos": [0.08, 0.09, 0],
           "h": 0.0035, "ref": 1, "ang": 0.0}],
@@ -980,8 +1003,8 @@ def native_profile_clearance(monkeypatch):
     # Historical native records intentionally stay independent of R10 anchors.
     import _drawing_layout_audit
 
-    monkeypatch.setattr(_drawing_layout_audit, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_drawing_layout_audit, "_early_bound", _bind_owner)
+    monkeypatch.setattr(drawing, "_early_bound", _bind_owner)
     logs = []
     monkeypatch.setattr(drawing._telemetry, "info", logs.append)
 
@@ -1027,10 +1050,10 @@ def native_profile_clearance(monkeypatch):
         kind=4, hole_callout=False,
     )
     annotations = [top, bottom, ream, r816]
-    front = SimpleNamespace(GetAnnotationCount=lambda: len(annotations), GetAnnotations=lambda: annotations)
+    front = _native("IView", GetAnnotationCount=lambda: len(annotations), GetAnnotations=lambda: annotations)
     profiles = {
-        "TopRadius": SimpleNamespace(GetAnnotation=lambda: top),
-        "BottomRadius": SimpleNamespace(GetAnnotation=lambda: bottom),
+        "TopRadius": _native("IGtol", GetAnnotation=lambda: top),
+        "BottomRadius": _native("IGtol", GetAnnotation=lambda: bottom),
     }
     return SimpleNamespace(
         adapter=object(), front=front, profiles=profiles, top=top, bottom=bottom,
@@ -1468,28 +1491,26 @@ _DETAIL_BORE_R = ch_rocker_arm_spec.PIVOT_HOLE_DIA / 2000.0 * (
 
 
 class _Tag:
+    _native_interfaces = ("IDatumTag",)
     def __init__(self, attached: tuple, dangling: bool = False) -> None:
-        self.annotation = SimpleNamespace(
-            GetAttachedEntities3=lambda: attached,
-            IsDangling=lambda: dangling,
-        )
+        self.annotation = _native("IAnnotation", GetAttachedEntities3=lambda: attached, IsDangling=lambda: dangling,)
 
     def GetAnnotation(self) -> SimpleNamespace:
         return self.annotation
 
 
 _BORE, _HUB = object(), object()
-_APP = SimpleNamespace(IsSame=lambda a, b: 1 if a is b else 0)
+_APP = _native("ISldWorks", IsSame=lambda a, b: 1 if a is b else 0)
 
 
 @pytest.fixture
 def bound(monkeypatch: pytest.MonkeyPatch) -> None:
     """Bypass native wrapping for offline logic only, not native-binding proof."""
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
-    monkeypatch.setattr(detail_crop, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "_early_bound", _bind_owner)
+    monkeypatch.setattr(detail_crop, "_early_bound", _bind_owner)
     import _drawing_layout_audit
 
-    monkeypatch.setattr(_drawing_layout_audit, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(_drawing_layout_audit, "_early_bound", _bind_owner)
     # Caption refusals must never probe this host's real seat in an offline test.
     def capture(_adapter, _label, _message, *, exception, **_context):
         raise exception
@@ -1843,6 +1864,7 @@ DRAWABLE = DrawableRegion(0.0127, BORDER_BOTTOM, 0.4191, 0.2667)
 
 
 class _FakeAnnotation:
+    _native_interfaces = ("IAnnotation",)
     def __init__(self, position: tuple[float, float]) -> None:
         self.position = position
 
@@ -1857,6 +1879,8 @@ class _FakeAnnotation:
 class _FakeNote:
     """A top-left-anchored text block whose box sits off its insertion point
     and follows a move only ``tracking`` of the way, as SolidWorks' does."""
+
+    _native_interfaces = ("INote",)
 
     def __init__(
         self, anchor: tuple[float, float], height: float, tracking: float = 1.0
@@ -1880,9 +1904,9 @@ class _FakeNote:
 
 def _seat(monkeypatch: pytest.MonkeyPatch, note: _FakeNote) -> tuple[float, ...]:
     adapter = SimpleNamespace(
-        currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None)
+        currentModel=_native("IModelDoc2", GraphicsRedraw2=lambda: None)
     )
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "_early_bound", _bind_owner)
     monkeypatch.setattr(
         drawing, "sheet_drawable_region", lambda *_args, **_kwargs: DRAWABLE
     )
@@ -2006,20 +2030,18 @@ def test_native_reference_parentheses_never_replace_the_measured_nominal(
 
     text = {1: "", 2: ""}
     writes = []
-    model = SimpleNamespace(SystemValue=0.00227825)
+    model = _native("IDimension", SystemValue=0.00227825)
 
     def set_text(part, value):
         writes.append((part, value))
         if part != ignored_part:
             text[part] = value
 
-    display = SimpleNamespace(
-        SetText=set_text, GetText=lambda part: text[part],
-        GetDimension2=lambda _index: model,
-    )
-    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    display = _native("IDisplayDimension", SetText=set_text, GetText=lambda part: text[part],
+    GetDimension2=lambda _index: model,)
+    annotation = _native("IAnnotation", GetSpecificAnnotation=lambda: display)
     adapter = SimpleNamespace(_attempt=lambda fn: fn())
-    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda obj, *_: obj)
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", _bind_owner)
     monkeypatch.setattr(_drawing_dimensions, "rebuild_drawing", lambda *_a, **_k: None)
     if ignored_part is None:
         assert _drawing_dimensions.set_reference_dimension(
@@ -2071,23 +2093,16 @@ def test_native_linear_measurement_reads_the_model_and_named_attachments(
     from solidworks_mcp.adapters import sw_type_info
 
     first, second, neighbour = object(), object(), object()
-    model = None if defect == "missing" else SimpleNamespace(
-        SystemValue=(expected + (0.1 if defect == "wrong" else 0.0)) / 1000.0,
-    )
+    model = None if defect == "missing" else _native("IDimension", SystemValue=(expected + (0.1 if defect == "wrong" else 0.0)) / 1000.0, )
     if defect in {"nan", "inf", "no_value"}:
         model.SystemValue = None if defect == "no_value" else float(defect)
     attached = (first, neighbour if defect == "neighbour" else second)
-    annotation = SimpleNamespace(
-        GetAttachedEntities3=lambda: attached,
-        GetAttachedEntityTypes=lambda: (1, 1),
-        IsDangling=lambda: defect == "dangling",
-    )
-    display = SimpleNamespace(
-        GetDimension2=lambda _index: model, GetAnnotation=lambda: annotation,
-    )
+    annotation = _native("IAnnotation", GetAttachedEntities3=lambda: attached, GetAttachedEntityTypes=lambda: (1, 1),
+    IsDangling=lambda: defect == "dangling",)
+    display = _native("IDisplayDimension", GetDimension2=lambda _index: model, GetAnnotation=lambda: annotation,)
     adapter = SimpleNamespace(swApp=_APP)
-    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda obj, *_: obj)
-    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda obj, *_: obj)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", _bind_owner)
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", _bind_owner)
     monkeypatch.setattr(
         _drawing_edge_dimensions, "_is_same_attachment",
         lambda _adapter, actual, wanted, _kind: actual is wanted,
@@ -2116,14 +2131,12 @@ def test_native_reference_precision_reads_back_normal_two_places(
         calls.append((primary, dual, tolerance, dual_tolerance))
         if retained:
             state["precision"] = primary
-        return True
+        return 0  # SetPrecision3 returns native integer status, not VT_BOOL.
 
-    display = SimpleNamespace(
-        SetPrecision3=set_precision, GetPrimaryPrecision2=lambda: state["precision"],
-    )
-    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    display = _native("IDisplayDimension", SetPrecision3=set_precision, GetPrimaryPrecision2=lambda: state["precision"],)
+    annotation = _native("IAnnotation", GetSpecificAnnotation=lambda: display)
     adapter = SimpleNamespace(_attempt=lambda fn: fn())
-    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda obj, *_: obj)
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", _bind_owner)
     monkeypatch.setattr(_drawing_dimensions, "dimension_name", lambda *_: "offset")
     monkeypatch.setattr(_drawing_dimensions, "rebuild_drawing", lambda *_a, **_k: None)
     kwargs = {"offset": ch_rocker_arm_notes.DEFAULT_DRAWING_PRECISION}
@@ -2154,15 +2167,10 @@ def test_imported_hub_diameter_cannot_lose_the_model_two_place_size_band(
     import _drawing_dimensions
     from solidworks_mcp.adapters import sw_type_info
 
-    display = SimpleNamespace(
-        GetPrimaryPrecision2=lambda: 1 if defect == "one_place" else 2,
-        SetPrecision3=lambda *_: pytest.fail("imported hub precision is part-owned"),
-    )
-    annotation = SimpleNamespace(
-        GetSpecificAnnotation=lambda: None if defect == "no_display" else display,
-    )
+    display = _native("IDisplayDimension", GetPrimaryPrecision2=lambda: 1 if defect == "one_place" else 2, SetPrecision3=lambda *_: pytest.fail("imported hub precision is part-owned"),)
+    annotation = _native("IAnnotation", GetSpecificAnnotation=lambda: None if defect == "no_display" else display)
     adapter = SimpleNamespace(_attempt=lambda fn: fn())
-    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda obj, *_: obj)
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", _bind_owner)
     monkeypatch.setattr(_drawing_dimensions, "dimension_name", lambda *_: "HubDia")
     annotations = [] if defect == "missing" else [annotation]
     precision = ch_rocker_arm_notes.DRAWING_PRECISION["HubProfile"]
@@ -2178,11 +2186,13 @@ def test_native_angular_dimension_keeps_named_entities_and_explicit_pick_points(
     monkeypatch: pytest.MonkeyPatch, defect: str | None,
 ) -> None:
     import _drawing_edge_dimensions
+    from solidworks_mcp.adapters import sw_type_info
 
     selected = []
     events = []
     view = object()
     class ModelDimension:
+        _native_interfaces = ("IDimension",)
         __slots__ = ("state",)
 
         def __init__(self):
@@ -2204,7 +2214,7 @@ def test_native_angular_dimension_keeps_named_entities_and_explicit_pick_points(
     def get_dimension(index):
         assert type(index) is int and index == 0
         return None if defect == "missing-model" else model
-    display = SimpleNamespace(GetDimension2=get_dimension)
+    display = _native("IDisplayDimension", GetDimension2=get_dimension)
 
     def select(entity, append, data):
         assert data.View is view
@@ -2214,8 +2224,8 @@ def test_native_angular_dimension_keeps_named_entities_and_explicit_pick_points(
         events.append(("select", entity))
         return defect != "selection"
 
-    first = SimpleNamespace(Select4=lambda append, data: select("land", append, data))
-    second = SimpleNamespace(Select4=lambda append, data: select("mirror", append, data))
+    first = _native("IEntity", Select4=lambda append, data: select("land", append, data))
+    second = _native("IEntity", Select4=lambda append, data: select("mirror", append, data))
 
     def landing(index, mark, x, y, z):
         events.append(("landing", index, mark, x, y, z))
@@ -2226,20 +2236,24 @@ def test_native_angular_dimension_keeps_named_entities_and_explicit_pick_points(
         events.append(("create", x, y, z, kind, error))
         return (None if defect == "creation" else display), (1 if defect == "status" else 0)
 
-    draw = SimpleNamespace(
+    draw = _native(
+        "IModelDoc2", "IDrawingDoc",
         ActivateView=lambda _name: True,
         ClearSelection2=lambda _all: selected.clear(),
-        SelectionManager=SimpleNamespace(
-            CreateSelectData=SimpleNamespace,
+        SelectionManager=_native(
+            "ISelectionMgr",
+            CreateSelectData=lambda: _native("ISelectData"),
             GetSelectedObjectCount2=lambda _mark: len(selected),
             SetSelectionPoint2=landing,
         ),
-        Extension=SimpleNamespace(
+        Extension=_native(
+            "IModelDocExtension",
             AddSpecificDimension=create,
             SelectByID2=lambda *_: pytest.fail("native angle must not coordinate hit-test"),
         ),
     )
-    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda obj, *_: obj)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", _bind_owner)
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", _bind_owner)
     monkeypatch.setattr(_drawing_edge_dimensions, "view_name", lambda *_: "front")
     kwargs = dict(
         p0=(0.22, 0.2), p1=(0.13, 0.2), text_xy=(0.24, 0.21),
@@ -2284,15 +2298,9 @@ def test_native_land_angle_measures_source_angle_in_radians_and_fails_closed(
         "nan": float("nan"),
         "inf": float("inf"),
     }
-    model = SimpleNamespace(
-        SystemValue=values.get(defect, radians),
-        Type2=1 if defect == "wrong_type" else 3,
-    )
-    display = SimpleNamespace(
-        Type2=1 if defect == "wrong_type" else 3,
-        GetDimension2=lambda _index: None if defect == "missing" else model,
-    )
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, *_: obj)
+    model = _native("IDimension", SystemValue=values.get(defect, radians), Type2=1 if defect == "wrong_type" else 3,)
+    display = _native("IDisplayDimension", Type2=1 if defect == "wrong_type" else 3, GetDimension2=lambda _index: None if defect == "missing" else model)
+    monkeypatch.setattr(drawing, "_early_bound", _bind_owner)
     kwargs = dict(expected_degrees=expected, label="end-land angle")
     if defect is None:
         assert drawing._require_native_angle(display, **kwargs) == pytest.approx(expected)
@@ -2309,8 +2317,32 @@ def test_measured_dimension_expectations_import_the_geometry_source(name: str) -
     assert getattr(drawing, name) == getattr(ch_rocker_arm_spec, name)
 
 
+class _NativeQuantityAnnotation:
+    """IAnnotation owns specific-object lookup and dimension attachment reads."""
+
+    _native_interfaces = ("IAnnotation",)
+
+    def __init__(self, display):
+        self.display = display
+        self.name = display.name
+
+    def GetSpecificAnnotation(self):
+        return self.display
+
+    def GetAttachedEntities3(self):
+        return self.display.attached
+
+    def GetAttachedEntityTypes(self):
+        return tuple(1 for _ in self.display.attached)
+
+    def IsDangling(self):
+        return self.display.dangling
+
+
 class _NativeQuantity:
-    """A native display/model pair, retaining independent text and size bands."""
+    """IDisplayDimension retaining independent text and model-size bands."""
+
+    _native_interfaces = ("IDisplayDimension",)
 
     def __init__(self, name: str, mm: float, *, precision: int = 2) -> None:
         self.name = name
@@ -2332,28 +2364,20 @@ class _NativeQuantity:
         self.attached = ()
         self.dangling = False
         self.arc_conditions = {1: 2, 2: 0}
-        self.model = SimpleNamespace(
-            SystemValue=mm / 1000.0,
-            Type2=6 if name in {"PivotDia", "HubDia"} else 1,
-            SetToleranceType=self._set_tolerance_type,
-            GetToleranceType=lambda: self.tolerance_type,
-            Tolerance=SimpleNamespace(
-                GetMaxValue=lambda: self.band[0],
-                GetMinValue=lambda: self.band[1],
-            ),
-            GetArcEndCondition=lambda index: self.arc_conditions[index],
-            SetArcEndCondition=self._set_arc_condition,
-        )
+        self.annotation = _NativeQuantityAnnotation(self)
+        self.model = _native("IDimension", SystemValue=mm / 1000.0, Type2=6 if name in {"PivotDia", "HubDia"} else 1,
+        SetToleranceType=self._set_tolerance_type,
+        GetToleranceType=lambda: self.tolerance_type,
+        Tolerance=_native("IDimensionTolerance", GetMaxValue=lambda: self.band[0], GetMinValue=lambda: self.band[1]),
+        GetArcEndCondition=lambda index: self.arc_conditions[index],
+        SetArcEndCondition=self._set_arc_condition,)
 
     def _set_tolerance_type(self, kind):
         self.tolerance_type = kind
         return True
 
-    def GetSpecificAnnotation(self):
-        return self
-
     def GetAnnotation(self):
-        return self
+        return self.annotation
 
     def GetDimension2(self, _index):
         return self.model
@@ -2364,15 +2388,6 @@ class _NativeQuantity:
     def _set_arc_condition(self, index, condition):
         self.arc_conditions[index] = condition
         return 0
-
-    def GetAttachedEntities3(self):
-        return self.attached
-
-    def GetAttachedEntityTypes(self):
-        return tuple(1 for _ in self.attached)
-
-    def IsDangling(self):
-        return self.dangling
 
     def GetText(self, part):
         return self.text[{5: 1, 6: 2, 7: 3, 8: 4}.get(part, part)]
@@ -2412,14 +2427,16 @@ def _imported_native_quantities(monkeypatch: pytest.MonkeyPatch):
     }
     adapter = SimpleNamespace(
         _attempt=lambda fn, **_kwargs: fn(), swApp=_APP,
-        currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None),
+        currentModel=_native("IModelDoc2", GraphicsRedraw2=lambda: None),
     )
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, *_: obj)
-    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda obj, *_: obj)
-    monkeypatch.setattr(_drawing_dimensions, "_early_bound", lambda obj, *_: obj)
-    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda obj, *_: obj)
-    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, ann: ann.name)
-    monkeypatch.setattr(_drawing_dimensions, "dimension_name", lambda _adapter, ann: ann.name)
+    monkeypatch.setattr(drawing, "_early_bound", _bind_owner)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", _bind_owner)
+    monkeypatch.setattr(_drawing_dimensions, "_early_bound", _bind_owner)
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", _bind_owner)
+    def name(_adapter, annotation):
+        return _bind_owner(annotation, "IAnnotation").name
+    monkeypatch.setattr(drawing, "dimension_name", name)
+    monkeypatch.setattr(_drawing_dimensions, "dimension_name", name)
     monkeypatch.setattr(_drawing_dimensions, "rebuild_drawing", lambda *_a, **_k: None)
     return adapter, displays
 
@@ -2429,7 +2446,7 @@ def test_front_native_process_keeps_the_nominal_token_and_model_bore_band(
 ) -> None:
     adapter, displays = _imported_native_quantities(monkeypatch)
     before = {name: display.model.SystemValue for name, display in displays.items()}
-    drawing._dress_detail_dimensions(adapter, list(displays.values()), keep={**drawing.HUB_KEEP, **drawing.END_KEEP})
+    drawing._dress_detail_dimensions(adapter, [display.GetAnnotation() for display in displays.values()], keep={**drawing.HUB_KEEP, **drawing.END_KEEP})
     pivot = displays["PivotDia"]
     assert pivot.text[1].startswith("REAM ")
     assert "<MOD-DIAM>" in pivot.text[1]
@@ -2462,7 +2479,7 @@ def test_imported_front_sizes_require_each_sourced_native_readback(
             else float(defect)
         )
     with pytest.raises(RuntimeError):
-        drawing._dress_detail_dimensions(adapter, list(displays.values()), keep={**drawing.HUB_KEEP, **drawing.END_KEEP})
+        drawing._dress_detail_dimensions(adapter, [display.GetAnnotation() for display in displays.values()], keep={**drawing.HUB_KEEP, **drawing.END_KEEP})
 
 
 @pytest.mark.parametrize("ignored", ["prefix", "suffix", "hub_precision"])
@@ -2475,7 +2492,7 @@ def test_front_native_dressing_rejects_ignored_text_or_lost_hub_precision(
     else:
         displays["PivotDia"].ignored_text = 1 if ignored == "prefix" else 2
     with pytest.raises(RuntimeError):
-        drawing._dress_detail_dimensions(adapter, list(displays.values()), keep=drawing.HUB_KEEP)
+        drawing._dress_detail_dimensions(adapter, [display.GetAnnotation() for display in displays.values()], keep=drawing.HUB_KEEP)
 
 
 @pytest.fixture
@@ -2562,7 +2579,7 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
         state.displays[label] = display
         return display
 
-    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *_a, **_k: list(imported.values()))
+    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *_a, **_k: [display.GetAnnotation() for display in imported.values()])
     monkeypatch.setattr(
         drawing, "_basic_profile_dimensions",
         lambda _adapter, annotations: state.basic_calls.append(annotations),
@@ -2645,7 +2662,7 @@ def test_source_geometry_change_invalidates_stale_front_measurements(
         elif source == "_ALPHA_TOP":
             drawing._add_land_angle(native_front.adapter, object(), native_front.land)
         elif source == "HUB_DIA":
-            drawing._dress_detail_dimensions(native_front.adapter, list(native_front.imported.values()), keep=drawing.HUB_KEEP)
+            drawing._dress_detail_dimensions(native_front.adapter, [display.GetAnnotation() for display in native_front.imported.values()], keep=drawing.HUB_KEEP)
         else:
             drawing._add_rocker_outline_dimensions(native_front.adapter, object())
 
@@ -2804,7 +2821,7 @@ def test_offset_formula_change_invalidates_stale_native_measurement(
 
 def test_projection_barrier_is_void_and_precedes_native_math(bound, monkeypatch):
     events = []
-    view = SimpleNamespace(UpdateViewDisplayGeometry=lambda: events.append("barrier"))
+    view = _native("IView", UpdateViewDisplayGeometry=lambda: events.append("barrier"))
     def project(_adapter, actual, points, **_kwargs):
         assert actual is view and events == ["barrier"]
         return [(0.180, 0.095)]
@@ -2814,6 +2831,7 @@ def test_projection_barrier_is_void_and_precedes_native_math(bound, monkeypatch)
 
 class _DetailCircle:
     """Native method-shaped labels, void setter, two out-double getter."""
+    _native_interfaces = ("IDetailCircle",)
     def __init__(self, label, *, ignored=False):
         self.label, self.ignored = label, ignored
         self.xy = (0.0, 0.0)
@@ -2832,7 +2850,7 @@ class _DetailCircle:
 @pytest.mark.parametrize("labels", [("E", "D"), ("D",), ("D", "D"), ("D", "E", "F")])
 def test_detail_letters_bind_by_exact_native_label_not_enumeration(bound, monkeypatch, labels):
     circles = [_DetailCircle(label) for label in labels]
-    front = SimpleNamespace(GetDetailCircles=lambda: circles)
+    front = _native("IView", GetDetailCircles=lambda: circles)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
     if labels == ("E", "D"):
         drawing._place_detail_letters(object(), front)
@@ -2846,11 +2864,12 @@ def test_detail_letter_refuses_a_silently_ignored_void_setter(bound, monkeypatch
     circles = [_DetailCircle("D"), _DetailCircle("E", ignored=True)]
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
     with pytest.raises(RuntimeError, match="native letter stayed"):
-        drawing._place_detail_letters(object(), SimpleNamespace(GetDetailCircles=lambda: circles))
+        drawing._place_detail_letters(object(), _native("IView", GetDetailCircles=lambda: circles))
 
 
 class _DetailTransform:
     """Nonidentity native sketch transform; inverse maps back to sheet units."""
+    _native_interfaces = ("IMathTransform",)
     __slots__ = ("scale", "translation", "bad_inverse", "bad_matrix", "inverse_calls")
 
     def __init__(self, scale=2.0, translation=(0.013, -0.007, 0.0)):
@@ -2879,6 +2898,7 @@ class _DetailTransform:
 
 
 class _DetailMathPoint:
+    _native_interfaces = ("IMathPoint",)
     __slots__ = ("_coordinates",)
 
     def __init__(self, values):
@@ -2896,6 +2916,7 @@ class _DetailMathPoint:
 
 
 class _DetailParent:
+    _native_interfaces = ("IView",)
     __slots__ = ("transform", "ScaleRatio", "projection_scale", "display_updates")
 
     def __init__(self):
@@ -2905,7 +2926,7 @@ class _DetailParent:
         self.display_updates = 0
 
     def GetSketch(self):
-        return SimpleNamespace(ModelToSketchTransform=self.transform)
+        return _native("ISketch", ModelToSketchTransform=self.transform)
 
     @property
     def ModelToViewTransform(self):
@@ -2921,26 +2942,40 @@ class _DetailParent:
                 0.175 + xyz[1] * self.projection_scale)
 
 
+class _DetailArc:
+    """ISketchArc slice of the same native circle as its selectable segment."""
+
+    _native_interfaces = ("ISketchArc",)
+
+    def __init__(self, segment):
+        self.segment = segment
+
+    def IsCircle(self):
+        return self.segment.complete  # Native INT 1/0.
+
+    def GetCenterPoint2(self):
+        centre = self.segment.centre
+        if centre is None:
+            return None
+        return _native("ISketchPoint", X=centre[0], Y=centre[1], Z=centre[2])
+
+    def GetRadius(self):
+        return self.segment.radius
+
+
 class _DetailProfile:
+    _native_interfaces = ("ISketchSegment", "ISketchArc")
     __slots__ = ("centre", "radius", "sketch", "complete", "segment_type", "selectable")
 
     def __init__(self, centre, radius, sketch):
         self.centre, self.radius, self.sketch = centre, radius, sketch
         self.complete, self.segment_type, self.selectable = 1, 1, True
 
+    def _native_query(self, interface):
+        return self if interface == "ISketchSegment" else _DetailArc(self)
+
     def GetType(self):
         return self.segment_type
-
-    def IsCircle(self):
-        return self.complete  # Native INT 1/0.
-
-    def GetCenterPoint2(self):
-        if self.centre is None:
-            return None
-        return SimpleNamespace(X=self.centre[0], Y=self.centre[1], Z=self.centre[2])
-
-    def GetRadius(self):
-        return self.radius
 
     def GetSketch(self):
         return self.sketch
@@ -2950,6 +2985,7 @@ class _DetailProfile:
 
 
 class _DetailCropCircle:
+    _native_interfaces = ("IDetailCircle",)
     __slots__ = ("label", "profiles", "NoOutline", "_jagged", "full", "display")
 
     def __init__(self, label, profile):
@@ -2984,6 +3020,7 @@ class _DetailCropCircle:
 
 class _DetailView:
     """Native bbox padding/offset is independent of the persisted crop circle."""
+    _native_interfaces = ("IView",)
     __slots__ = ("parent", "radius", "defect", "_position", "physical",
                  "_scale_ratio", "UseParentScale", "UseSheetScale", "events",
                  "crop_circle", "padding", "bbox_offset", "model_centre", "notes", "annotations", "outline_reads")
@@ -3084,6 +3121,7 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
     detail = _DetailView(parent, label=label, defect=defect)
     created = []
     class Manager:
+        _native_interfaces = ("ISketchManager",)
         __slots__ = ("AddToDB",)
         def __init__(self):
             self.AddToDB = False
@@ -3098,6 +3136,7 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
             created.append(circle)
             return None if defect == "fence" else circle
     class SelectData:
+        _native_interfaces = ("ISelectData",)
         __slots__ = ("View",)
     manager = Manager()
     calls = []
@@ -3120,16 +3159,12 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
         elif defect == "outline-flags":
             detail.crop_circle.NoOutline = label != "D"
         return None if defect == "creation" else detail
-    doc = SimpleNamespace(
-        ActivateView=lambda _name: defect != "activation", ClearSelection2=lambda _all: None,
-        SketchManager=manager,
-        SelectionManager=SimpleNamespace(CreateSelectData=SelectData),
-        CreateDetailViewAt4=create,
-    )
+    doc = _native("IModelDoc2", "IDrawingDoc", ActivateView=lambda _name: defect != "activation", ClearSelection2=lambda _all: None,
+    SketchManager=manager,
+    SelectionManager=_native("ISelectionMgr", CreateSelectData=SelectData),
+    CreateDetailViewAt4=create,)
     adapter = SimpleNamespace(
-        currentModel=doc, swApp=SimpleNamespace(
-            IsSame=_APP.IsSame, GetMathUtility=lambda: SimpleNamespace(CreatePoint=_DetailMathPoint),
-        ),
+        currentModel=doc, swApp=_native("ISldWorks", IsSame=_APP.IsSame, GetMathUtility=lambda: _native("IMathUtility", CreatePoint=_DetailMathPoint)),
     )
     monkeypatch.setattr(drawing, "model_points_in_view",
                         lambda _adapter, view, points, **_kwargs: [view.project(point) for point in points])
@@ -3172,8 +3207,8 @@ def _native_crop_fixture(monkeypatch, label, *, centre=None, defect=None):
     )
     view.crop_circle = _DetailCropCircle(label, profile)
     adapter = SimpleNamespace(
-        swApp=SimpleNamespace(GetMathUtility=lambda: SimpleNamespace(CreatePoint=_DetailMathPoint)),
-        currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None),
+        swApp=_native("ISldWorks", GetMathUtility=lambda: _native("IMathUtility", CreatePoint=_DetailMathPoint)),
+        currentModel=_native("IModelDoc2", GraphicsRedraw2=lambda: None),
     )
     monkeypatch.setattr(drawing, "model_points_in_view",
                         lambda _adapter, native, points, **_kwargs: [native.project(p) for p in points])
@@ -3202,7 +3237,8 @@ def test_crop_reads_persisted_circle_not_padded_or_offset_native_view_bbox(bound
     bbox = view.GetOutline()
     assert bbox[2] - bbox[0] > crop[2] - crop[0] + 0.020
     assert (bbox[1] + bbox[3]) / 2.0 == pytest.approx(y + 0.005)
-    assert view.crop_circle.profiles[0].GetRadius() != pytest.approx(view.radius)
+    arc = _bind_owner(view.crop_circle.profiles[0], "ISketchArc")
+    assert arc.GetRadius() != pytest.approx(view.radius)
     assert view.parent.ScaleRatio == (1.0, 2.0)  # Parent .5, native D 4 / E 2.
     assert view.parent.transform.inverse_calls == 1
 
@@ -3381,21 +3417,14 @@ def test_native_crop_refuses_wrong_persisted_geometry_flags_or_coordinate_frame(
 def _native_sheet(*, top=0.066, scale_retained=True, rule=True, missing_endpoint=None):
     template = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout]
     def line(y):
-        return SimpleNamespace(
-            GetType=lambda: 0,
-            GetStartPoint2=lambda: None if missing_endpoint == "start" else SimpleNamespace(X=template.title_block_left_m, Y=y),
-            GetEndPoint2=lambda: None if missing_endpoint == "end" else SimpleNamespace(X=template.width_m - 0.0127, Y=y),
-        )
+        return _native("ISketchSegment", "ISketchLine", GetType=lambda: 0, GetStartPoint2=lambda: None if missing_endpoint == "start" else _native("ISketchPoint", X=template.title_block_left_m, Y=y), GetEndPoint2=lambda: None if missing_endpoint == "end" else _native("ISketchPoint", X=template.width_m - 0.0127, Y=y))
     state = {"scale": (1.0, 1.0)}
     def set_scale(numerator, denominator, _position, _text):
         if scale_retained:
             state["scale"] = (numerator, denominator)
         return True
-    return SimpleNamespace(
-        SetScale=set_scale,
-        GetProperties2=lambda: (0, 0, *state["scale"], 0, 0.4318, 0.2794, 0),
-        GetTemplateSketch=lambda: SimpleNamespace(GetSketchSegments=lambda: [line(top), line(top / 2)] if rule else []),
-    )
+    return _native("ISheet", SetScale=set_scale, GetProperties2=lambda: (0, 0, *state["scale"], 0, 0.4318, 0.2794, 0),
+    GetTemplateSketch=lambda: _native("ISketch", GetSketchSegments=lambda: [line(top), line(top / 2)] if rule else []),)
 
 
 @pytest.mark.parametrize("endpoint", ["start", "end"])
@@ -3406,6 +3435,8 @@ def test_title_block_rule_refuses_null_native_endpoint(bound, endpoint):
 
 class _CaptionTextFormat:
     """Read-only test surface for the native properties the probe reads."""
+
+    _native_interfaces = ("ITextFormat",)
 
     CharHeight = property(lambda self: 0.0035)
     CharHeightInPts = property(lambda self: 10)
@@ -3451,13 +3482,13 @@ class _CaptionNote(_FakeNote):
 
 def test_both_caption_diagnostics_log_native_text_formats_and_display_geometry(bound, monkeypatch):
     redraws = []
-    adapter = SimpleNamespace(currentModel=SimpleNamespace(GraphicsRedraw2=lambda: redraws.append("redraw")))
+    adapter = SimpleNamespace(currentModel=_native("IModelDoc2", GraphicsRedraw2=lambda: redraws.append("redraw")))
     sheet = _native_sheet()
     logs = []
     monkeypatch.setattr(drawing._telemetry, "info", logs.append)
     for label in ("D", "E"):
         note = _CaptionNote(label)
-        view = SimpleNamespace(GetNotes=lambda: (note,))
+        view = _native("IView", GetNotes=lambda: (note,))
         drawing._record_detail_caption(adapter, view, sheet, label=label, stage="before guards")
     assert len(logs) == 2
     assert redraws == []
@@ -3687,6 +3718,7 @@ def test_end_caption_fails_closed_without_real_ink_and_three_mm_air(bound, monke
 
 
 class _CensusAnnotation:
+    _native_interfaces = ("IAnnotation",)
     def __init__(self, name, *, kind=4, specific=None):
         self.name, self.kind, self.specific = name, kind, specific
 
@@ -3698,6 +3730,7 @@ class _CensusAnnotation:
 
 
 class _CensusDisplayDimension:
+    _native_interfaces = ("IDisplayDimension",)
     def __init__(self, dimension, *, hole_callout=False):
         self.dimension, self.hole_callout = dimension, hole_callout
 
@@ -3715,21 +3748,32 @@ def native_annotation_binding(monkeypatch):
     wrappers, calls = {}, []
 
     def raw(native, interface):
+        _bind_owner(native, interface)
         dispatch = object()
         wrappers[id(dispatch)] = (dispatch, interface, native)
         return dispatch
 
-    def bind(dispatch, interface):
+    def bind(dispatch, interface, *_members):
         entry = wrappers.get(id(dispatch))
         if entry is None:
-            assert interface not in ("IAnnotation", "IDisplayDimension")
-            return dispatch
+            return _bind_owner(dispatch, interface)
         assert entry[0] is dispatch and entry[1] == interface
         calls.append((interface, entry[2]))
-        return entry[2]
+        return _bind_owner(entry[2], interface)
 
-    monkeypatch.setattr(drawing, "_early_bound", bind)
-    return SimpleNamespace(raw=raw, calls=calls)
+    import _drawing_dimensions
+    import _drawing_edge_dimensions
+    import _drawing_layout_audit
+    import _drawing_notes
+    from solidworks_mcp.adapters import sw_type_info
+
+    for module in (
+        drawing, detail_crop, _drawing_dimensions, _drawing_edge_dimensions,
+        _drawing_layout_audit, _drawing_notes,
+    ):
+        monkeypatch.setattr(module, "_early_bound", bind)
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", bind)
+    return SimpleNamespace(raw=raw, bind=bind, calls=calls)
 
 
 @pytest.fixture
@@ -3740,7 +3784,7 @@ def raw_dimension_census(monkeypatch, native_annotation_binding):
     annotations = [[_CensusAnnotation(name) for name in keep] for keep in keeps]
     raws = [[native_annotation_binding.raw(ann, "IAnnotation") for ann in row]
             for row in annotations]
-    native_views = [SimpleNamespace(GetAnnotationCount=lambda row=row: len(row), GetAnnotations=lambda row=row: row)
+    native_views = [_native("IView", GetAnnotationCount=lambda row=row: len(row), GetAnnotations=lambda row=row: row)
                     for row in raws]
     views = [(label, native_annotation_binding.raw(view, "IView"), keep)
              for label, view, keep in zip(("front", "D", "E", "right"), native_views, keeps)]
@@ -3802,7 +3846,7 @@ def test_census_union_refuses_even_when_each_native_view_matches_its_keep(raw_di
 def test_census_refuses_every_unnamed_actual_model_dimension(raw_dimension_census, defect, hole_callout):
     case = raw_dimension_census
     name = "PivotDia" if defect == "hidden-wrong-owner" else "TopRadius"
-    display = _CensusDisplayDimension(SimpleNamespace(Name=name), hole_callout=hole_callout)
+    display = _CensusDisplayDimension(_native("IDimension", Name=name), hole_callout=hole_callout)
     annotation = _CensusAnnotation("", specific=case.binding.raw(display, "IDisplayDimension"))
     raw = case.binding.raw(annotation, "IAnnotation")
     if defect == "unreadable":
@@ -3905,7 +3949,7 @@ def test_bound_view_annotations_accepts_native_empty_array(native_annotation_bin
     def annotations():
         events.append("GetAnnotations")
         return raw
-    view = SimpleNamespace(GetAnnotationCount=count, GetAnnotations=annotations)
+    view = _native("IView", GetAnnotationCount=count, GetAnnotations=annotations)
     monkeypatch.setattr(drawing._telemetry, "info", logs.append)
     assert drawing._bound_view_annotations(view, label="test view") == ()
     assert events == ["GetAnnotationCount", "GetAnnotations"]
@@ -3930,7 +3974,7 @@ def test_bound_view_annotations_binds_each_native_array_item(native_annotation_b
     def read():
         events.append("GetAnnotations")
         return raw
-    view = SimpleNamespace(GetAnnotationCount=count, GetAnnotations=read)
+    view = _native("IView", GetAnnotationCount=count, GetAnnotations=read)
     monkeypatch.setattr(drawing, "_early_bound", bind)
     assert drawing._bound_view_annotations(binding.raw(view, "IView"), label="test view") == tuple(annotations)
     assert binding.calls == [("IView", view), *(("IAnnotation", ann) for ann in annotations)]
@@ -3939,7 +3983,7 @@ def test_bound_view_annotations_binds_each_native_array_item(native_annotation_b
 
 @pytest.mark.parametrize("raw", [False, 0, "", {}, object(), iter(())])
 def test_bound_view_annotations_refuses_nonarray_native_shape(native_annotation_binding, raw):
-    view = SimpleNamespace(GetAnnotationCount=lambda: 0, GetAnnotations=lambda: raw)
+    view = _native("IView", GetAnnotationCount=lambda: 0, GetAnnotations=lambda: raw)
     with pytest.raises(RuntimeError, match="test view: invalid native annotation array"):
         drawing._bound_view_annotations(view, label="test view")
     assert native_annotation_binding.calls == []
@@ -3950,14 +3994,14 @@ def test_bound_view_annotations_refuses_nonarray_native_shape(native_annotation_
 def test_bound_view_annotations_refuses_null_array_item(native_annotation_binding, array, index):
     binding = native_annotation_binding
     raw = [binding.raw(_CensusAnnotation("TopRadius"), "IAnnotation"), None] if index else [None]
-    view = SimpleNamespace(GetAnnotationCount=lambda: len(raw), GetAnnotations=lambda: array(raw))
+    view = _native("IView", GetAnnotationCount=lambda: len(raw), GetAnnotations=lambda: array(raw))
     with pytest.raises(RuntimeError, match=rf"test view: native annotation #{index} is null"):
         drawing._bound_view_annotations(view, label="test view")
 
 
 @pytest.mark.parametrize("count", [1, 2])
 def test_bound_view_annotations_refuses_positive_count_with_null_array(native_annotation_binding, monkeypatch, count):
-    view = SimpleNamespace(GetAnnotationCount=lambda: count, GetAnnotations=lambda: None)
+    view = _native("IView", GetAnnotationCount=lambda: count, GetAnnotations=lambda: None)
     logs = []
     monkeypatch.setattr(drawing._telemetry, "info", logs.append)
     with pytest.raises(RuntimeError, match=rf"native annotation count {count} returned no annotation array"):
@@ -3973,7 +4017,7 @@ def test_bound_view_annotations_refuses_count_array_length_mismatch(
 ):
     binding = native_annotation_binding
     raw = array(binding.raw(_CensusAnnotation("TopRadius"), "IAnnotation") for _ in range(size))
-    view = SimpleNamespace(GetAnnotationCount=lambda: count, GetAnnotations=lambda: raw)
+    view = _native("IView", GetAnnotationCount=lambda: count, GetAnnotations=lambda: raw)
     logs = []
     monkeypatch.setattr(drawing._telemetry, "info", logs.append)
     with pytest.raises(RuntimeError, match=rf"native annotation array length {size}, expected count {count}"):
@@ -3984,10 +4028,7 @@ def test_bound_view_annotations_refuses_count_array_length_mismatch(
 
 @pytest.mark.parametrize("count", [None, True, False, -1, 1.0, "1", lambda: 1, object()])
 def test_bound_view_annotations_refuses_malformed_count_before_array_read(native_annotation_binding, count):
-    view = SimpleNamespace(
-        GetAnnotationCount=lambda: count,
-        GetAnnotations=lambda: pytest.fail("GetAnnotations called after invalid native count"),
-    )
+    view = _native("IView", GetAnnotationCount=lambda: count, GetAnnotations=lambda: pytest.fail("GetAnnotations called after invalid native count"),)
     with pytest.raises(RuntimeError, match="test view: invalid native annotation count"):
         drawing._bound_view_annotations(view, label="test view")
     assert native_annotation_binding.calls == []
@@ -4005,7 +4046,7 @@ def test_bound_view_annotations_preserves_native_exception_identity_and_read_ord
     def annotations():
         events.append("GetAnnotations")
         raise failure
-    view = SimpleNamespace(GetAnnotationCount=count, GetAnnotations=annotations)
+    view = _native("IView", GetAnnotationCount=count, GetAnnotations=annotations)
     with pytest.raises(OSError) as caught:
         drawing._bound_view_annotations(view, label="test view")
     assert caught.value is failure
@@ -4126,12 +4167,9 @@ def test_each_face_retains_only_its_template_marks_without_batch_reinsertion(
     views = []
     for kinds in kinds_by_view:
         annotations = [
-            SimpleNamespace(GetType=lambda kind=kind: kind) for kind in kinds
+            _native("IAnnotation", GetType=lambda kind=kind: kind) for kind in kinds
         ]
-        views.append(SimpleNamespace(
-            GetAnnotationCount=lambda items=annotations: len(items),
-            GetAnnotations=lambda items=annotations: items,
-        ))
+        views.append(_native("IView", GetAnnotationCount=lambda items=annotations: len(items), GetAnnotations=lambda items=annotations: items,))
     reads = []
 
     def census(view, *, label):
@@ -4164,10 +4202,12 @@ def test_hub_identity_label_is_above_the_whole_stack_and_preserves_native_size(
     strap = _NativeQuantity("StrapThickness", ch_rocker_arm_spec.ARM_THICKNESS, precision=3)
     before = (hub.model.SystemValue, hub.band, hub.tolerance_type, hub.precision)
     if defect == "null-display":
-        hub.GetSpecificAnnotation = lambda: None
+        hub.annotation.GetSpecificAnnotation = lambda: None
     elif defect == "ignored":
         hub.ignored_text = 3
-    annotations = [strap] if defect == "missing" else [hub, strap]
+    annotations = [strap.GetAnnotation()] if defect == "missing" else [
+        hub.GetAnnotation(), strap.GetAnnotation(),
+    ]
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     build = next(
         node for node in tree.body
@@ -4211,15 +4251,16 @@ def test_hub_identity_label_is_above_the_whole_stack_and_preserves_native_size(
 
 def test_land_vertical_early_binds_view_and_refuses_null_native_sketch(monkeypatch):
     raw_view = object()
-    native_view = SimpleNamespace(GetSketch=lambda: None)
+    native_view = _native("IView", GetSketch=lambda: None)
     bindings = []
     def bind(obj, interface):
         bindings.append((obj, interface))
-        return native_view if obj is raw_view and interface == "IView" else obj
+        native = native_view if obj is raw_view and interface == "IView" else obj
+        return _bind_owner(native, interface)
     def name(_adapter, view):
         assert view is native_view
         return "E"
-    draw = SimpleNamespace(ActivateView=lambda _name: True, ClearSelection2=lambda _all: None)
+    draw = _native("IModelDoc2", "IDrawingDoc", ActivateView=lambda _name: True, ClearSelection2=lambda _all: None)
     monkeypatch.setattr(drawing, "_early_bound", bind)
     monkeypatch.setattr(drawing, "view_name", name)
     with pytest.raises(RuntimeError, match="land-angle detail has no native drawing sketch"):
@@ -4312,8 +4353,8 @@ def test_details_keep_native_scale_source_census_and_unclipped_overall_contract(
 def test_datum_landing_refuses_null_native_annotation(monkeypatch):
     import _drawing_gdt
 
-    monkeypatch.setattr(_drawing_gdt, "_early_bound", lambda obj, *_: obj)
-    tag = SimpleNamespace(GetAnnotation=lambda: None)
+    monkeypatch.setattr(_drawing_gdt, "_early_bound", _bind_owner)
+    tag = _native("IDatumTag", GetAnnotation=lambda: None)
     with pytest.raises(RuntimeError, match="datum landing has no annotation.*rod-side radial land"):
         _drawing_gdt.assert_datum_landing(
             object(), tag, expected_xy=(0.21, 0.167), label="rod-side radial land",
@@ -4345,12 +4386,13 @@ def test_land_angle_refuses_null_native_attachment_before_identity_dispatch(nati
             pytest.fail("IsSame cannot receive a NULL native attachment")
         return 1 if actual is expected else 0
     monkeypatch.setattr(drawing, "add_edge_dimension", create)
-    state.adapter.swApp = SimpleNamespace(IsSame=same)
+    state.adapter.swApp = _native("ISldWorks", IsSame=same)
     with pytest.raises(RuntimeError, match="exact land and local vertical"):
         drawing._add_land_angle(state.adapter, object(), state.land)
 
 
 class _RenderedRodText:
+    _native_interfaces = ("IDisplayData",)
     __slots__ = ("texts", "count", "reads")
 
     def __init__(self, texts):
@@ -4365,6 +4407,7 @@ class _RenderedRodText:
 
 
 class _RenderedRodCallout:
+    _native_interfaces = ("IDisplayDimension",)
     __slots__ = ("data",)
 
     def __init__(self, texts):
@@ -4506,7 +4549,7 @@ def test_front_detail_text_guard_cannot_pass_missing_native_geometry(native_prof
 @pytest.mark.parametrize("points", [[], [(0.18,)], [(0.18, float("nan"))], [(0.18, float("inf"))]])
 def test_native_projection_fails_closed_on_missing_or_invalid_coordinates(bound, monkeypatch, points):
     events = []
-    view = SimpleNamespace(UpdateViewDisplayGeometry=lambda: events.append("barrier"))
+    view = _native("IView", UpdateViewDisplayGeometry=lambda: events.append("barrier"))
     monkeypatch.setattr(drawing, "model_points_in_view", lambda *_a, **_k: points)
     with pytest.raises(RuntimeError, match="invalid native projected points"):
         drawing._project(object(), view, [(0.0, 0.008, 0.0)], label="detail D pivot")
@@ -4581,13 +4624,15 @@ def test_radius_dimension_name_receives_bound_native_annotations(
 
 @pytest.mark.parametrize("properties", [None, (), (0.0, 0.0, 1.0)])
 def test_sheet_scale_cannot_claim_success_without_native_properties(bound, properties):
-    sheet = SimpleNamespace(SetScale=lambda *_args: True, GetProperties2=lambda: properties)
+    sheet = _native("ISheet", SetScale=lambda *_args: True, GetProperties2=lambda: properties)
     with pytest.raises(RuntimeError, match="sheet scale did not persist"):
         drawing._pin_sheet_scale(object(), sheet)
 
 
 class _StyleTextFormat:
     """Native get/put properties; CharHeight switches authority to metres."""
+
+    _native_interfaces = ("ITextFormat",)
 
     def __init__(self, height=0.00635, *, points=False, font="Century Gothic"):
         self._height, self.points, self.font = height, points, font
@@ -4687,6 +4732,8 @@ class _StyleNote(_CaptionNote):
 class _StyleDocExtension:
     """Document-only native preference methods with detached fresh readbacks."""
 
+    _native_interfaces = ("IModelDocExtension",)
+
     def __init__(self, notes, circles):
         self.notes, self.circles = notes, circles
         self.preferences = {
@@ -4768,16 +4815,14 @@ class _StyleCircle(_DetailCircle):
 def native_caption_style(bound, monkeypatch):
     import _drawing_notes
 
-    monkeypatch.setattr(_drawing_notes, "_early_bound", lambda obj, _interface: obj)
-    front = SimpleNamespace()
+    monkeypatch.setattr(_drawing_notes, "_early_bound", _bind_owner)
+    front = _native("IView")
     notes = {label: _StyleNote(label) for label in ("D", "E")}
     views = {
-        label: SimpleNamespace(
-            GetNotes=lambda label=label: [notes[label]], GetBaseView=lambda: front,
-            Position=drawing.HUB_CENTER if label == "D" else drawing.END_CENTER,
-            ScaleRatio=drawing.HUB_SCALE if label == "D" else drawing.END_SCALE,
-            UseParentScale=False, UseSheetScale=0,
-        ) for label in ("D", "E")
+        label: _native("IView", GetNotes=lambda label=label: [notes[label]], GetBaseView=lambda: front,
+        Position=drawing.HUB_CENTER if label == "D" else drawing.END_CENTER,
+        ScaleRatio=drawing.HUB_SCALE if label == "D" else drawing.END_SCALE,
+        UseParentScale=False, UseSheetScale=0,) for label in ("D", "E")
     }
     circles = {label: _StyleCircle(label, front, views[label]) for label in ("D", "E")}
     front.GetDetailCircles = lambda: [circles["E"], circles["D"]]
@@ -4810,8 +4855,8 @@ def native_caption_style(bound, monkeypatch):
     def redraw():
         events.append("redraw")
     adapter = SimpleNamespace(
-        currentModel=SimpleNamespace(Extension=extension, GraphicsRedraw2=redraw),
-        swApp=SimpleNamespace(IsSame=_APP.IsSame),  # No application preferences exist.
+        currentModel=_native("IModelDoc2", Extension=extension, GraphicsRedraw2=redraw),
+        swApp=_native("ISldWorks", IsSame=_APP.IsSame),  # No application preferences exist.
     )
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: events.append("rebuild"))
     monkeypatch.setattr(
@@ -5764,7 +5809,7 @@ def test_downstream_clearance_guards_refuse_empty_or_malformed_annotation_arrays
 
 @pytest.mark.parametrize("skip", ["half-hidden", "hidden", "center-mark", "center-line"])
 def test_front_detail_text_air_cannot_pass_with_zero_checked_boxes(
-    native_profile_clearance, monkeypatch, skip,
+    native_profile_clearance, bound, monkeypatch, skip,
 ):
     case = native_profile_clearance
     case.front.GetAnnotations = lambda: [case.r816]
@@ -5777,3 +5822,696 @@ def test_front_detail_text_air_cannot_pass_with_zero_checked_boxes(
     _adapter, end = _native_crop_fixture(monkeypatch, "E")
     with pytest.raises(RuntimeError, match="no visible native callout text was checked"):
         drawing._require_front_detail_air(case.adapter, case.front, hub, end)
+
+
+def test_reference_dimension_rejects_display_dimension_as_annotation(monkeypatch):
+    import _drawing_dimensions
+
+    adapter, _imported = _imported_native_quantities(monkeypatch)
+    display = _NativeQuantity("rocker overall width", 2.0 * drawing.ROD_TIP_X)
+    nominal = display.model.SystemValue
+    with pytest.raises(RuntimeError, match="native owner mismatch.*IAnnotation"):
+        _drawing_dimensions.set_reference_dimension(
+            adapter, display, label="rocker overall width",
+        )
+    assert display.writes == []
+    assert display.model.SystemValue == nominal
+    assert not hasattr(display, "GetSpecificAnnotation")
+    assert not hasattr(display.GetAnnotation(), "GetAnnotation")
+    assert not hasattr(display.GetAnnotation(), "SetText")
+
+
+def test_overall_width_reference_follows_the_produced_bound_owner_chain(
+    native_front, native_annotation_binding, monkeypatch,
+):
+    state, binding = native_front, native_annotation_binding
+    original_create = drawing.add_edge_dimension
+    produced = {}
+
+    def create(*args, **kwargs):
+        display = original_create(*args, **kwargs)
+        if kwargs["label"] != "rocker overall width":
+            return display
+        annotation = display.GetAnnotation()
+        raw_display = binding.raw(display, "IDisplayDimension")
+        raw_annotation = binding.raw(annotation, "IAnnotation")
+        display.GetAnnotation = lambda: raw_annotation
+        annotation.GetSpecificAnnotation = lambda: raw_display
+        produced.update(display=display, annotation=annotation)
+        return raw_display
+
+    monkeypatch.setattr(drawing, "add_edge_dimension", create)
+    drawing._add_rocker_outline_dimensions(state.adapter, object())
+    display, annotation = produced["display"], produced["annotation"]
+    assert annotation is not display
+    assert binding.calls == [
+        ("IDisplayDimension", display),
+        ("IAnnotation", annotation),
+        ("IAnnotation", annotation),  # Unchanged named-attachment measurement.
+        ("IDisplayDimension", display),  # IAnnotation.GetSpecificAnnotation.
+    ]
+    assert display.writes == [(1, "("), (2, ")")]
+    assert display.model.SystemValue == pytest.approx(2.0 * drawing.ROD_TIP_X / 1000.0)
+    assert display.model.GetToleranceType() == 0
+    assert state.calls[0]["entities"] == display.attached
+
+
+def test_overall_width_refuses_null_annotation_before_reference_or_taper(
+    native_front, monkeypatch,
+):
+    native_front.defect_label = "rocker overall width"
+    native_front.defect = "null-annotation"
+    monkeypatch.setattr(
+        drawing, "set_reference_dimension",
+        lambda *_args, **_kwargs: pytest.fail("NULL annotation cannot reach the reference helper"),
+    )
+    with pytest.raises(RuntimeError, match="rocker overall width has no native annotation"):
+        drawing._add_rocker_outline_dimensions(native_front.adapter, object())
+    assert [call["label"] for call in native_front.calls] == ["rocker overall width"]
+    assert native_front.displays["rocker overall width"].writes == []
+
+
+@pytest.mark.parametrize("stage", ["annotation", "specific-display"])
+def test_overall_width_refuses_wrong_produced_interface_owner(
+    native_front, monkeypatch, stage,
+):
+    original_create = drawing.add_edge_dimension
+
+    def create(*args, **kwargs):
+        display = original_create(*args, **kwargs)
+        if kwargs["label"] == "rocker overall width":
+            if stage == "annotation":
+                display.GetAnnotation = lambda: display
+            else:
+                annotation = display.GetAnnotation()
+                annotation.GetSpecificAnnotation = lambda: annotation
+        return display
+
+    monkeypatch.setattr(drawing, "add_edge_dimension", create)
+    interface = "IAnnotation" if stage == "annotation" else "IDisplayDimension"
+    with pytest.raises(RuntimeError, match=f"native owner mismatch.*{interface}"):
+        drawing._add_rocker_outline_dimensions(native_front.adapter, object())
+    assert [call["label"] for call in native_front.calls] == ["rocker overall width"]
+    assert native_front.displays["rocker overall width"].writes == []
+
+
+@pytest.mark.parametrize("ignored_part", [1, 2])
+def test_overall_width_owner_fix_retains_reference_prefix_suffix_guard(
+    native_front, monkeypatch, ignored_part,
+):
+    original_create = drawing.add_edge_dimension
+
+    def create(*args, **kwargs):
+        display = original_create(*args, **kwargs)
+        if kwargs["label"] == "rocker overall width":
+            display.ignored_text = ignored_part
+        return display
+
+    monkeypatch.setattr(drawing, "add_edge_dimension", create)
+    with pytest.raises(RuntimeError, match="failed to parenthesize rocker overall width"):
+        drawing._add_rocker_outline_dimensions(native_front.adapter, object())
+    display = native_front.displays["rocker overall width"]
+    assert display.writes == [(1, "("), (2, ")")]
+    assert display.model.SystemValue == pytest.approx(2.0 * drawing.ROD_TIP_X / 1000.0)
+    assert [call["label"] for call in native_front.calls] == ["rocker overall width"]
+
+
+@pytest.mark.parametrize("factory", [
+    pytest.param(lambda: _ProfileDisplay(), id="profile-display"),
+    pytest.param(lambda: _ClearanceDisplayData([], []), id="clearance-display-data"),
+    pytest.param(lambda: _ClearanceAnnotation("frame", (0, 0, 0), None), id="clearance-annotation"),
+    pytest.param(lambda: _Tag(()), id="datum-tag"),
+    pytest.param(lambda: _FakeAnnotation((0, 0)), id="note-annotation"),
+    pytest.param(lambda: _FakeNote((0, 0), 0.01), id="ordinary-note"),
+    pytest.param(lambda: _NativeQuantity("span", 1), id="native-dimension-display"),
+    pytest.param(lambda: _NativeQuantity("span", 1).GetAnnotation(), id="native-dimension-annotation"),
+    pytest.param(lambda: _NativeQuantity("span", 1).GetDimension2(0), id="native-model-dimension"),
+    pytest.param(lambda: _NativeQuantity("span", 1).model.Tolerance, id="native-dimension-tolerance"),
+    pytest.param(lambda: _DetailCircle("D"), id="detail-circle"),
+    pytest.param(lambda: _DetailTransform(), id="detail-transform"),
+    pytest.param(lambda: _DetailParent(), id="detail-parent-view"),
+    pytest.param(lambda: _DetailView(_DetailParent()), id="detail-view"),
+    pytest.param(lambda: _DetailCropCircle("D", None), id="detail-crop-circle"),
+    pytest.param(lambda: _CensusAnnotation("size"), id="census-annotation"),
+    pytest.param(lambda: _CensusDisplayDimension(None), id="census-display"),
+    pytest.param(lambda: _RenderedRodCallout(("THRU",)), id="hole-callout-display"),
+    pytest.param(lambda: _RenderedRodText(("THRU",)), id="hole-callout-display-data"),
+    pytest.param(lambda: _CaptionTextFormat(), id="caption-text-format"),
+    pytest.param(lambda: _CaptionNote("D"), id="caption-note"),
+    pytest.param(lambda: _StyleNote("D"), id="rich-caption-note"),
+    pytest.param(lambda: _StyleNote("D").GetAnnotation(), id="rich-caption-annotation"),
+    pytest.param(lambda: _StyleNote("D").data, id="rich-caption-display-data"),
+    pytest.param(lambda: _StyleTextFormat(), id="rich-caption-text-format"),
+    pytest.param(lambda: _StyleDocExtension({}, {}), id="document-font-extension"),
+    pytest.param(lambda: _StyleCircle("D", _native("IView"), _native("IView")), id="styled-detail-circle"),
+    pytest.param(lambda: _native_sheet(), id="sheet"),
+    pytest.param(lambda: _DetailParent().GetSketch(), id="detail-sketch"),
+    pytest.param(lambda: _DetailProfile((0, 0, 0), 1, None), id="detail-segment-arc-qi"),
+    pytest.param(lambda: _native("ISketchPoint", X=0, Y=0, Z=0), id="sketch-point"),
+    pytest.param(lambda: _DetailMathPoint(drawing.double_array([0.0, 0.0, 0.0])), id="math-point"),
+    pytest.param(lambda: _native("IMathUtility", CreatePoint=_DetailMathPoint), id="math-utility"),
+    pytest.param(lambda: _native("ISketchManager", AddToDB=False), id="sketch-manager"),
+    pytest.param(lambda: _native("ISelectionMgr", CreateSelectData=lambda: _native("ISelectData")), id="selection-manager"),
+    pytest.param(lambda: _native("ISelectData"), id="select-data"),
+    pytest.param(lambda: _native("IEntity", Select4=lambda *_args: True), id="selected-entity"),
+    pytest.param(lambda: _native("IModelDoc2", "IDrawingDoc"), id="drawing-document-qi"),
+    pytest.param(lambda: _APP, id="application"),
+])
+def test_rocker_local_native_families_refuse_every_wrong_interface(factory):
+    native = factory()
+    interfaces = (
+        "IAnnotation", "IDisplayDimension", "IDimension", "IDimensionTolerance",
+        "INote", "IDisplayData", "ITextFormat", "IDetailCircle", "IDatumTag",
+        "IView", "ISheet", "ISketch", "ISketchSegment", "ISketchArc",
+        "ISketchPoint", "IMathTransform", "IMathPoint", "IMathUtility",
+        "ISketchManager", "ISelectionMgr", "ISelectData", "IEntity",
+        "IModelDoc2", "IDrawingDoc", "IModelDocExtension", "ISldWorks",
+    )
+    for interface in interfaces:
+        if interface in native._native_interfaces:
+            assert interface in _bind_owner(native, interface)._native_interfaces
+        else:
+            with pytest.raises(RuntimeError, match="native owner mismatch"):
+                _bind_owner(native, interface)
+
+
+def test_native_owner_registry_refuses_unknown_or_forged_owner(native_annotation_binding):
+    binding = native_annotation_binding
+    with pytest.raises(RuntimeError, match="native owner mismatch"):
+        binding.bind(object(), "IView")
+    display = _NativeQuantity("span", 1)
+    with pytest.raises(RuntimeError, match="native owner mismatch.*IAnnotation"):
+        binding.raw(display, "IAnnotation")
+    raw = binding.raw(display, "IDisplayDimension")
+    with pytest.raises(AssertionError):
+        binding.bind(raw, "IAnnotation")
+    assert binding.bind(None, "IAnnotation") is None
+    assert binding.calls == []
+
+
+def test_detail_circle_qi_exposes_separate_segment_and_arc_member_slices():
+    profile = _DetailProfile((0, 0, 0), 0.01, _DetailParent().GetSketch())
+    segment = _bind_owner(profile, "ISketchSegment")
+    arc = _bind_owner(profile, "ISketchArc")
+    assert segment is profile and arc.segment is profile
+    assert segment.GetType() == 1 and arc.IsCircle() == 1
+    assert arc.GetRadius() == 0.01
+    assert not hasattr(segment, "IsCircle")
+    assert not hasattr(segment, "GetCenterPoint2")
+    assert not hasattr(arc, "GetType")
+    assert not hasattr(arc, "Select4")
+
+
+@pytest.mark.parametrize("stage", ["source-note", "annotation", "display-data", "text-format", "document-extension"])
+def test_rocker_source_font_helpers_refuse_wrong_interface_owners(native_caption_style, stage):
+    case = native_caption_style
+    if stage == "source-note":
+        case.source = case.source.annotation
+    elif stage == "annotation":
+        case.source.GetAnnotation = lambda: case.source
+    elif stage == "display-data":
+        case.source.data = case.source.text_format
+    elif stage == "text-format":
+        case.source.text_format = case.source.data
+    else:
+        case.adapter.currentModel.Extension = case.source.annotation
+    with pytest.raises(RuntimeError, match="native owner mismatch") as caught:
+        drawing._pin_detail_caption_font_source(case.adapter, case.source)
+    assert case.captures == [caught.value]
+    assert case.extension.writes == []
+
+
+@pytest.mark.parametrize("stage", ["caption-view", "caption-note", "source-circle", "circle-text-format"])
+def test_rocker_style_normalization_refuses_wrong_interface_owners(native_caption_style, stage):
+    case = native_caption_style
+    font_source = drawing._pin_detail_caption_font_source(case.adapter, case.source)
+    case.extension.create_details()
+    if stage == "caption-view":
+        case.views["D"] = case.notes["D"]
+    elif stage == "caption-note":
+        case.views["D"].GetNotes = lambda: [case.notes["D"].annotation]
+    elif stage == "source-circle":
+        case.front.GetDetailCircles = lambda: [case.notes["D"], case.circles["E"]]
+    else:
+        case.circles["D"].GetTextFormat = lambda: case.notes["D"].data
+    with pytest.raises(RuntimeError, match="native owner mismatch") as caught:
+        drawing._normalize_detail_caption_styles(
+            case.adapter, case.front, case.views["D"], case.views["E"], font_source,
+        )
+    assert case.captures == [caught.value]
+
+
+@pytest.mark.parametrize("helper", ["projection", "outline", "scale", "detail-crop", "bound-annotations", "through-callout"])
+def test_rocker_local_readers_refuse_wrong_owner_before_member_access(bound, helper):
+    wrong = _FakeNote((0, 0), 0.01)
+    readers = {
+        "projection": lambda: drawing._project(object(), wrong, [], label="wrong-owner"),
+        "outline": lambda: drawing._outline(wrong, label="wrong-owner"),
+        "scale": lambda: drawing._view_scale_ratio(wrong, label="wrong-owner"),
+        "detail-crop": lambda: drawing._detail_crop(object(), wrong, label="D"),
+        "bound-annotations": lambda: drawing._bound_view_annotations(wrong, label="wrong-owner"),
+        "through-callout": lambda: drawing._require_rod_through_callout(wrong),
+    }
+    with pytest.raises(RuntimeError, match="native owner mismatch"):
+        readers[helper]()
+
+
+def test_native_fixture_cannot_declare_annotation_and_display_as_one_object():
+    with pytest.raises(AssertionError, match="require distinct objects"):
+        _native("IAnnotation", "IDisplayDimension")
+
+
+class _AuthoredGdtAnnotation(_FakeAnnotation):
+    """Native IAnnotation only; its producer owns tag/frame-specific methods."""
+
+    def __init__(self, entity, data, *, leaders):
+        super().__init__((0.0, 0.0))
+        self.entity, self.data = entity, data
+        self.leaders, self.dangling = leaders, False
+        self.landing = (0.0, 0.0)
+        self.leader_writes = []
+
+    def SetPosition2(self, x, y, z):
+        assert z == 0.0
+        return self.SetPosition(x, y, z)
+
+    def GetAttachedEntities3(self):
+        return (self.entity,)
+
+    def GetAttachedEntityCount3(self):
+        return 1
+
+    def GetAttachedEntityTypes(self):
+        return (1,)  # swSelEDGES.
+
+    def GetLeaderCount(self):
+        return self.leaders
+
+    def IsDangling(self):
+        return self.dangling
+
+    def GetDisplayData(self):
+        return self.data
+
+    def SetLeader3(self, *args):
+        self.leader_writes.append(args)
+        return 0  # Native integer status.
+
+    def GetLeaderPointsAtIndex(self, index):
+        assert index == 0
+        return (*self.position, 0.0, *self.landing, 0.0)
+
+
+class _AuthoredDatumTag:
+    _native_interfaces = ("IDatumTag",)
+
+    def __init__(self, annotation):
+        self.annotation, self.label = annotation, ""
+        self.Shoulder = self.ForcedShoulder = False
+
+    def SetLabel(self, label):
+        self.label = label
+        return True
+
+    def GetLabel(self):
+        return self.label
+
+    def GetAnnotation(self):
+        return self.annotation
+
+
+class _AuthoredGtolFrame:
+    """Only IGtolFrame may read/write the XML payload."""
+
+    _native_interfaces = ("IGtolFrame",)
+
+    def __init__(self, events):
+        self.xml = ""
+        self.events, self.writes = events, []
+        self.result = True
+        self.on_write = lambda xml: xml
+
+    def SetSymbolXml(self, xml):
+        self.events.append("SetSymbolXml")
+        self.writes.append(xml)
+        if self.result is True:
+            self.xml = self.on_write(xml)
+        return self.result
+
+    def GetSymbolXml(self):
+        self.events.append("GetSymbolXml")
+        return self.xml
+
+
+class _AuthoredGtol:
+    """Only IGtol may produce a frame; legacy migration retains native shapes."""
+
+    _native_interfaces = ("IGtol",)
+
+    def __init__(self, frame, annotation, events):
+        self.frame, self.annotation, self.events = frame, annotation, events
+        self.count, self.format = 0, 2
+        self.add_result = True
+        self.seed_symbols, self.seed_values = [], []
+
+    def GetFrameCount(self):
+        return self.count
+
+    def AddFrame(self):
+        self.events.append("AddFrame")
+        if self.add_result is True:
+            self.count += 1
+        return self.add_result
+
+    def GetFrame(self, index):
+        assert index == 1
+        self.events.append("GetFrame")
+        return self.frame if self.format == 2 and self.count == 1 else None
+
+    def GetFormat(self):
+        return self.format
+
+    def SetFrameSymbols2(self, *args):
+        self.seed_symbols.append(args)
+        return None  # Native VT_VOID.
+
+    def SetFrameValues2(self, *args):
+        self.seed_values.append(args)
+        return True
+
+    def CanConvertFormat(self):
+        return True
+
+    def ConvertFormat(self):
+        assert self.count == 1 and self.seed_symbols and self.seed_values
+        self.events.append("ConvertFormat")
+        self.format = 2
+        return 0  # Native conversion status.
+
+    def GetAnnotation(self):
+        return self.annotation
+
+
+@pytest.fixture
+def actual_rocker_gdt(native_annotation_binding, monkeypatch):
+    """Execute actual selection, insertion, attachment, landing and XML helpers."""
+    import _drawing_attachment
+    import _drawing_gdt
+    import _drawing_selection
+
+    binding = native_annotation_binding
+    for module in (_drawing_attachment, _drawing_gdt, _drawing_selection):
+        monkeypatch.setattr(module, "_early_bound", binding.bind)
+
+    events, selected = [], []
+    view = _native("IView", GetName2=lambda: "rocker front")
+    landing = (0.210, 0.167)
+    data = _ClearanceDisplayData([], [], primitives={
+        "arrows": [[*landing, 0.0, -1, 0, 0, 0.003, 0.003, 0, 0, 0, 1]],
+    })
+    state = SimpleNamespace(
+        events=events, selected=selected, landing=landing, selection_result=True,
+        on_rebuild=lambda: None,
+    )
+
+    def select(append, select_data):
+        assert append is False and select_data.View is view
+        selected[:] = [entity]
+        events.append("Select4")
+        return True
+
+    entity = _native("IEntity", Select4=select)
+    datum_annotation = _AuthoredGdtAnnotation(
+        entity, binding.raw(data, "IDisplayData"), leaders=0,
+    )
+    frame_annotation = _AuthoredGdtAnnotation(entity, None, leaders=1)
+    datum = _AuthoredDatumTag(binding.raw(datum_annotation, "IAnnotation"))
+    frame = _AuthoredGtolFrame(events)
+    gtol = _AuthoredGtol(
+        binding.raw(frame, "IGtolFrame"),
+        binding.raw(frame_annotation, "IAnnotation"), events,
+    )
+    state.datum_result = binding.raw(datum, "IDatumTag")
+    state.gtol_result = binding.raw(gtol, "IGtol")
+
+    def set_landing(index, mark, x, y, z):
+        assert (index, mark, z) == (1, -1, 0.0)
+        assert selected == [entity]
+        events.append(("SetSelectionPoint2", x, y))
+        if state.selection_result is True:
+            datum_annotation.landing = frame_annotation.landing = (x, y)
+            data.primitives["arrows"][0][:2] = [x, y]
+        return state.selection_result
+
+    manager = _native(
+        "ISelectionMgr",
+        CreateSelectData=lambda: _native("ISelectData"),
+        GetSelectedObjectCount2=lambda _mark: len(selected),
+        GetSelectedObject6=lambda index, mark: selected[index - 1],
+        SetSelectionPoint2=set_landing,
+    )
+
+    def coordinate_select(name, kind, x, y, z, append, mark, callout, option):
+        assert (name, kind, z, append, mark, option) == ("", "EDGE", 0.0, False, 0, 0)
+        selected[:] = [entity]
+        events.append("SelectByID2")
+        return True
+
+    extension = _native("IModelDocExtension", SelectByID2=coordinate_select)
+
+    def insert(kind):
+        events.append("InsertDatumTag2" if kind == "datum" else "InsertGtol")
+        assert selected == [entity]
+        return state.datum_result if kind == "datum" else state.gtol_result
+
+    doc = _native(
+        "IModelDoc2", "IDrawingDoc",
+        SelectionManager=manager, Extension=extension,
+        ActivateView=lambda name: name == "rocker front",
+        ClearSelection2=lambda _all: selected.clear(),
+        InsertDatumTag2=lambda: insert("datum"),
+        InsertGtol=lambda: insert("frame"),
+    )
+    view.UpdateViewDisplayGeometry = lambda: events.append("UpdateViewDisplayGeometry")
+    adapter = SimpleNamespace(
+        currentModel=doc, swApp=_APP,
+        _get_attr_or_call=lambda native, member: getattr(_bind_owner(native, "IView"), member)(),
+    )
+
+    def rebuild(_adapter, *, label):
+        assert _adapter is adapter
+        events.append(("rebuild", label))
+        state.on_rebuild()
+
+    monkeypatch.setattr(_drawing_gdt, "rebuild_drawing", rebuild)
+    state.adapter, state.view, state.entity = adapter, view, entity
+    state.datum, state.datum_annotation, state.data = datum, datum_annotation, data
+    state.gtol, state.frame, state.frame_annotation = gtol, frame, frame_annotation
+    state.manager, state.extension, state.doc, state.binding = manager, extension, doc, binding
+    return state
+
+
+def _author_actual_rocker_gdt(case, kind, *, coordinate=False, arc="BottomRadius"):
+    import _drawing_gdt
+
+    pick = (
+        {"edge_xy": case.landing, "expected_entity": case.entity}
+        if coordinate and kind == "datum"
+        else {"edge_xy": case.landing}
+        if coordinate
+        else {"edge_entity": case.entity}
+    )
+    if kind == "datum":
+        return _drawing_gdt.add_datum_feature(
+            case.adapter, case.view, **pick,
+            symbol_xy=(0.225, 0.180), datum="C", label="+Z rod-side radial land",
+            leader_attach_xy=case.landing,
+        )
+    return _drawing_gdt.add_feature_control_frame(
+        case.adapter, case.view, **pick,
+        frame_xy=drawing.ARC_PROFILE_FRAME_XY[arc], characteristic="profile_surface",
+        tolerance=drawing.ARC_PROFILE_ZONE_MM,
+        outside_disposition=drawing.ARC_PROFILE_OUTSIDE_MM[arc],
+        datums=("A", "B", "C"), leader_attach_xy=case.landing,
+        label=f"arc-system {arc} profile",
+    )
+
+
+@pytest.mark.parametrize("coordinate", [False, True])
+def test_actual_datum_helper_retains_selected_land_and_rendered_triangle(actual_rocker_gdt, coordinate):
+    import _drawing_gdt
+
+    case = actual_rocker_gdt
+    assert _author_actual_rocker_gdt(case, "datum", coordinate=coordinate) is case.datum
+    assert case.datum.GetLabel() == "C"
+    assert case.datum_annotation.GetPosition() == (0.225, 0.180, 0.0)
+    assert _drawing_gdt.assert_datum_landing(
+        case.adapter, case.datum, expected_xy=case.landing, label="strict datum C",
+    ) == case.landing
+    assert ("SetSelectionPoint2", *case.landing) in case.events
+    assert case.events.index(("SetSelectionPoint2", *case.landing)) < case.events.index("InsertDatumTag2")
+    assert ("IDatumTag", case.datum) in case.binding.calls
+    assert ("IAnnotation", case.datum_annotation) in case.binding.calls
+    assert ("IDisplayData", case.data) in case.binding.calls
+    assert case.datum_annotation.GetLeaderCount() == 0
+    assert case.datum_annotation.GetAttachedEntities3() == (case.entity,)
+
+
+@pytest.mark.parametrize("stage", [
+    "drawing-document", "selection-manager", "datum-tag", "annotation", "display-data", "selection-extension",
+])
+def test_actual_datum_helper_refuses_wrong_produced_interface(actual_rocker_gdt, stage):
+    case = actual_rocker_gdt
+    if stage == "drawing-document":
+        case.adapter.currentModel = case.datum_annotation
+    elif stage == "selection-manager":
+        case.doc.SelectionManager = case.datum_annotation
+    elif stage == "datum-tag":
+        case.datum_result = case.frame
+    elif stage == "annotation":
+        case.datum.annotation = case.datum
+    elif stage == "display-data":
+        case.datum_annotation.data = case.frame
+    else:
+        case.doc.Extension = case.datum_annotation
+    with pytest.raises((RuntimeError, AttributeError)):
+        _author_actual_rocker_gdt(case, "datum", coordinate=stage == "selection-extension")
+
+
+@pytest.mark.parametrize("defect", ["dangling", "missing-data", "moved-tip", "no-tip", "nonfinite-tip"])
+def test_actual_datum_landing_refuses_unreadable_or_moved_triangle(actual_rocker_gdt, defect):
+    import _drawing_gdt
+
+    case = actual_rocker_gdt
+    _author_actual_rocker_gdt(case, "datum")
+    if defect == "dangling":
+        case.datum_annotation.dangling = True
+    elif defect == "missing-data":
+        case.datum_annotation.data = None
+    elif defect == "moved-tip":
+        case.data.primitives["arrows"][0][0] += 0.000051
+    elif defect == "no-tip":
+        case.data.primitives.clear()
+    else:
+        case.data.primitives["arrows"][0][0] = float("nan")
+    with pytest.raises(RuntimeError, match="datum landing"):
+        _drawing_gdt.assert_datum_landing(
+            case.adapter, case.datum, expected_xy=case.landing, label="strict datum C",
+        )
+
+
+@pytest.mark.parametrize("arc", ["TopRadius", "BottomRadius"])
+@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize("coordinate", [False, True])
+def test_actual_profile_frame_helper_preserves_unequal_xml_on_frame_owner(
+    actual_rocker_gdt, arc, legacy, coordinate,
+):
+    from _gtol_frame import gtol_frame_signature
+
+    case = actual_rocker_gdt
+    case.gtol.format = 1 if legacy else 2
+    case.gtol.count = 1 if legacy else 0
+    assert _author_actual_rocker_gdt(case, "frame", arc=arc, coordinate=coordinate) is case.gtol
+    signature = gtol_frame_signature(case.frame.GetSymbolXml())
+    assert signature.tolerance == "0.5"
+    assert signature.outside_disposition == drawing.ARC_PROFILE_OUTSIDE_MM[arc]
+    assert signature.datums == ("A", "B", "C")
+    assert signature.tolerance_zone == "linear"
+    assert len(case.frame.writes) == 1
+    if legacy:
+        assert "AddFrame" not in case.events  # AddFrame is current-format only.
+        assert case.events.index("ConvertFormat") < case.events.index("SetSymbolXml")
+    else:
+        assert case.events.index("AddFrame") < case.events.index("SetSymbolXml")
+    assert case.events.index(("SetSelectionPoint2", *case.landing)) < case.events.index("InsertGtol")
+    assert case.gtol.GetFormat() == 2 and case.gtol.GetFrameCount() == 1
+    assert bool(case.gtol.seed_symbols) is legacy
+    assert bool(case.gtol.seed_values) is legacy
+    if legacy:
+        assert case.gtol.seed_values == [
+            (1, drawing.ARC_PROFILE_ZONE_MM, "", "A", "B", "C"),
+        ]
+    assert ("IGtol", case.gtol) in case.binding.calls
+    assert ("IGtolFrame", case.frame) in case.binding.calls
+    assert ("IAnnotation", case.frame_annotation) in case.binding.calls
+    assert case.frame_annotation.GetAttachedEntities3() == (case.entity,)
+    assert case.frame_annotation.leader_writes == [(2, 0, True, False, False, False)]
+
+
+@pytest.mark.parametrize("stage", [
+    "selection-manager", "selection-extension", "gtol", "frame", "annotation",
+])
+def test_actual_profile_frame_helper_refuses_wrong_produced_interface(actual_rocker_gdt, stage):
+    case = actual_rocker_gdt
+    if stage == "selection-manager":
+        case.doc.SelectionManager = case.frame_annotation
+    elif stage == "selection-extension":
+        case.doc.Extension = case.frame_annotation
+    elif stage == "gtol":
+        case.gtol_result = case.frame
+    elif stage == "frame":
+        case.gtol.frame = case.frame_annotation
+    else:
+        case.gtol.annotation = case.gtol
+    with pytest.raises((RuntimeError, AttributeError)):
+        _author_actual_rocker_gdt(case, "frame", coordinate=stage == "selection-extension")
+
+
+@pytest.mark.parametrize("target", ["AddFrame", "SetSymbolXml"])
+@pytest.mark.parametrize("result", [False, None, 1])
+def test_actual_profile_frame_helper_requires_native_bool_writer_success(actual_rocker_gdt, target, result):
+    case = actual_rocker_gdt
+    if target == "AddFrame":
+        case.gtol.add_result = result
+    else:
+        case.frame.result = result
+    with pytest.raises(RuntimeError, match="failed to create|rejected feature-control frame XML"):
+        _author_actual_rocker_gdt(case, "frame")
+    assert case.frame.xml == ""
+
+
+@pytest.mark.parametrize("kind", ["datum", "frame"])
+@pytest.mark.parametrize("result", [False, None, 1])
+def test_actual_gdt_helpers_require_true_selection_landing_before_insertion(actual_rocker_gdt, kind, result):
+    case = actual_rocker_gdt
+    case.selection_result = result
+    with pytest.raises(RuntimeError, match="failed to set.*landing"):
+        _author_actual_rocker_gdt(case, kind)
+    assert "InsertDatumTag2" not in case.events and "InsertGtol" not in case.events
+
+
+@pytest.mark.parametrize("defect", [
+    "outside-before-rebuild", "outside-after-rebuild", "attachment", "leader-landing",
+])
+def test_actual_profile_frame_helper_retains_xml_attachment_and_landing_guards(actual_rocker_gdt, defect):
+    from _gtol_frame import gtol_frame_xml
+
+    case = actual_rocker_gdt
+    symmetric = gtol_frame_xml("profile_surface", drawing.ARC_PROFILE_ZONE_MM, datums=("A", "B", "C"))
+    if defect == "outside-before-rebuild":
+        case.frame.on_write = lambda _xml: symmetric
+    elif defect == "outside-after-rebuild":
+        case.on_rebuild = lambda: setattr(case.frame, "xml", symmetric)
+    elif defect == "attachment":
+        case.on_rebuild = lambda: setattr(case.frame_annotation, "entity", object())
+    else:
+        case.on_rebuild = lambda: setattr(case.frame_annotation, "landing", (0.215, 0.167))
+    with pytest.raises(RuntimeError, match="did not persist|changed semantics|lost its edge attachment|leader attachment moved"):
+        _author_actual_rocker_gdt(case, "frame")
+
+
+def test_actual_gdt_producers_keep_specific_frame_and_annotation_members_disjoint(actual_rocker_gdt):
+    case = actual_rocker_gdt
+    assert not hasattr(case.gtol, "SetSymbolXml")
+    assert not hasattr(case.frame, "AddFrame")
+    assert not hasattr(case.frame, "GetAnnotation")
+    assert not hasattr(case.frame_annotation, "AddFrame")
+    assert not hasattr(case.frame_annotation, "SetSymbolXml")
+    assert not hasattr(case.datum_annotation, "SetLabel")
+    for native, wrong in (
+        (case.gtol, "IGtolFrame"), (case.frame, "IGtol"),
+        (case.datum, "IAnnotation"), (case.datum_annotation, "IDatumTag"),
+        (case.frame_annotation, "IGtolFrame"),
+    ):
+        with pytest.raises(RuntimeError, match="native owner mismatch"):
+            case.binding.bind(native, wrong)

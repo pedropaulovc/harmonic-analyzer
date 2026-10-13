@@ -197,6 +197,15 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   declares (the late-binding fallback was deliberately removed). `GetViews` is
   `IDrawingDoc`; `GetAnnotations`/`GetOutline` are `IView`; `GetExtent` is
   `INote`; `GetProperties2` is `ISheet`. Bind the owning interface at each hop.
+  The registered [`test_drawing_layout_check.py`](../scripts/test_drawing_layout_check.py)
+  contracts use explicit producer owners and closed interface member surfaces,
+  never identity-cast fallbacks. Notes, annotations and text formats stay separate;
+  a sketch profile may support both segment and arc QI, but each binding exposes
+  only its own methods. Wrong-owner returns injected into the actual note factory,
+  crop and collector routes must refuse before borrowing a member. Keep native
+  properties as values (`IView.Type` is get-only), and math points separate from
+  transforms despite their shared `ArrayData` name. These offline contracts do
+  not establish native transform frames, rendered geometry or print acceptance.
 - **An annotation array still contains opaque dispatches.** Bind the view to
   `IView`, call `GetAnnotationCount()` **before** `GetAnnotations()` as the
   official remarks require, and match the actual nonnegative integer count to

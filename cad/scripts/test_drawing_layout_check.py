@@ -46,6 +46,7 @@ from _drawing_layout_check import (
     format_findings,
 )
 import _drawing_layout_collect
+import _drawing_notes
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 import _drawing_scan
 import _drawing_view_display
@@ -324,9 +325,100 @@ _R18_DETAIL = {
     },
 }
 
+# Closed surfaces from the generated SW2026 owners, not caller-requested members.
+# One profile dispatch supports segment AND arc QI, but each binding exposes only
+# its own surface. Bookkeeping on the underlying fixtures is never a COM member.
+_OWNER_METHODS = {
+    "IDrawingDoc": {"GetCurrentSheet", "GetFirstView"},
+    "ISheet": {"GetProperties", "GetZoneMargin"},
+    "IView": {
+        "GetName2", "GetOrientationName", "GetOutline", "GetBaseView", "GetDetail",
+        "UpdateViewDisplayGeometry", "GetAnnotations", "GetTableAnnotations", "GetNextView",
+    },
+    "IDetailCircle": {"GetLabel", "GetProfileItems"},
+    "ISketchSegment": {"GetType", "GetSketch"},
+    "ISketchArc": {"IsCircle", "GetCenterPoint2", "GetRadius"},
+    "ISketchPoint": set(),
+    "ISketch": set(),
+    "IMathTransform": {"Inverse"},
+    "ISldWorks": {"GetMathUtility"},
+    "IMathUtility": {"CreatePoint"},
+    "IMathPoint": {"MultiplyTransform"},
+    "INote": {"GetAnnotation", "GetExtent", "GetText", "IsBomBalloon"},
+    "IAnnotation": {
+        "GetName", "GetType", "GetSpecificAnnotation", "GetPosition", "GetLeaderCount",
+        "GetLeaderPointsAtIndex", "GetTextFormat", "SetTextFormat",
+    },
+    "ITextFormat": set(),
+    "ITableAnnotation": {
+        "GetAnnotation", "GetSplitInformation", "GetColumnWidth", "GetRowHeight",
+    },
+}
+_OWNER_PROPERTIES = {
+    "IView": {"Type", "ScaleRatio", "ModelToViewTransform"},
+    "IDetailCircle": {"NoOutline"},
+    "ISketchPoint": {"X", "Y", "Z"},
+    "ISketch": {"ModelToSketchTransform"},
+    "IMathTransform": {"ArrayData"},
+    "IMathPoint": {"ArrayData"},
+    "IAnnotation": {"OwnerType"},
+    "ITextFormat": {"CharHeight"},
+    "ITableAnnotation": {"RowCount", "ColumnCount"},
+}
+
+
+class _OwnerView:
+    """A bound interface slice; it cannot borrow a sibling interface's member."""
+
+    def __init__(self, target, interface):
+        object.__setattr__(self, "_target", target)
+        object.__setattr__(self, "_interface", interface)
+
+    def __getattr__(self, name):
+        methods = _OWNER_METHODS[self._interface]
+        properties = _OWNER_PROPERTIES.get(self._interface, set())
+        if name not in methods | properties:
+            raise AttributeError(f"{self._interface} does not own {name}")
+        value = getattr(self._target, name)
+        if callable(value) != (name in methods):
+            raise AssertionError(f"{self._interface}.{name} has the wrong native shape")
+        self._target._native_reads.append((self._interface, name))
+        return value
+
+    def __setattr__(self, name, value):
+        # The shared note writer's only native property assignment.
+        if (self._interface, name) != ("ITextFormat", "CharHeight"):
+            raise AttributeError(f"{self._interface} cannot write {name}")
+        self._target._native_writes.append((self._interface, name, value))
+        setattr(self._target, name, value)
+
+
+def _owner_fake(interface, **members):
+    return SimpleNamespace(
+        _native_interfaces=(interface,), _native_reads=[], _native_writes=[], **members
+    )
+
+
+def _bind_owner(obj, interface, *_members, **_kwargs):
+    if obj is None:
+        return None
+    if isinstance(obj, _OwnerView):
+        if obj._interface == interface:
+            return obj
+        obj = obj._target
+    owners = getattr(obj, "_native_interfaces", ())
+    if interface not in owners:
+        raise AssertionError(f"cannot bind {owners!r} as {interface}")
+    if not hasattr(obj, "_native_reads"):
+        obj._native_reads = []
+        obj._native_writes = []
+    return _OwnerView(obj, interface)
+
+
 
 class _CropMathTransform:
     """Deterministic native-math shape; translation follows SW ArrayData."""
+    _native_interfaces = ("IMathTransform",)
 
     def __init__(self, *, scale=1.0, translation=(0.0, 0.0, 0.0)):
         self.scale = scale
@@ -353,14 +445,19 @@ class _CropMathTransform:
 
 
 class _CropMathPoint:
+    _native_interfaces = ("IMathPoint",)
+
     def __init__(self, xyz):
         self.ArrayData = tuple(getattr(xyz, "value", xyz))
 
     def MultiplyTransform(self, transform):
-        return _CropMathPoint(transform.apply(self.ArrayData))
+        transform = _bind_owner(transform, "IMathTransform")
+        return _CropMathPoint(transform._target.apply(self.ArrayData))
 
 
 class _CropSketch:
+    _native_interfaces = ("ISketch",)
+
     def __init__(self, transform):
         self.transform = transform
         self.views = []
@@ -374,6 +471,8 @@ class _CropSketch:
 
 
 class _CropView:
+    _native_interfaces = ("IView",)
+
     # Official swDrawingViewTypes_e: detail=3, standard=6; not guessed 5.
     Type = 3
 
@@ -439,10 +538,10 @@ class _CropView:
 
 def _crop_note(name, box, *, leader=()):
     x0, y0, x1, y1 = box
-    return SimpleNamespace(
-        GetName=name, GetType=6, OwnerType=1,
-        GetSpecificAnnotation=SimpleNamespace(
-            GetExtent=(x0, y0, 0.0, x1, y1, 0.0),
+    return _owner_fake(
+        "IAnnotation", GetName=lambda: name, GetType=lambda: 6, OwnerType=1,
+        GetSpecificAnnotation=lambda: _owner_fake(
+            "INote", GetExtent=lambda: (x0, y0, 0.0, x1, y1, 0.0),
             GetText=lambda: "", IsBomBalloon=lambda: False,
         ),
         GetLeaderCount=lambda: int(bool(leader)),
@@ -455,16 +554,19 @@ def _crop_fixture(monkeypatch, label, *, centre=None):
     sketch_transform = _CropMathTransform(scale=2.0, translation=(-0.36, -0.35, 0.0))
     assert sketch_transform.ArrayData == _R18_SKETCH_MATRIX
     sketch = _CropSketch(sketch_transform)
-    profile = SimpleNamespace(
-        GetType=lambda: 1, IsCircle=lambda: 1,
-        GetCenterPoint2=lambda: SimpleNamespace(
+    profile = _owner_fake(
+        "ISketchSegment", GetType=lambda: 1, IsCircle=lambda: 1,
+        GetCenterPoint2=lambda: _owner_fake(
+            "ISketchPoint",
             X=data["raw_centre"][0], Y=data["raw_centre"][1], Z=data["raw_centre"][2],
         ),
         GetRadius=lambda: data["raw_radius"], GetSketch=lambda: sketch,
     )
+    profile._native_interfaces = ("ISketchSegment", "ISketchArc")
     # No generic outline-flag probes are permitted: another production stem
     # uses NoOutline=True. HasFullOutline/GetDisplay/JaggedOutline are absent.
-    circle = SimpleNamespace(
+    circle = _owner_fake(
+        "IDetailCircle",
         GetLabel=lambda: label, GetProfileItems=lambda: (profile,), NoOutline=True,
     )
     # SYNTHETIC affine view transforms: nonidentity parent inverse is essential.
@@ -484,30 +586,278 @@ def _crop_fixture(monkeypatch, label, *, centre=None):
     # Both objects are linked before the reader can fetch any transform.
     view = _CropView(label, data["outline"], parent, circle, detail_transform, data["ratio"])
     sketch.views = [parent, view]
-    sheet_view = SimpleNamespace(
-        GetNextView=lambda: view, GetAnnotations=lambda: [], GetTableAnnotations=[],
+    sheet_view = _owner_fake(
+        "IView", GetNextView=lambda: view, GetAnnotations=lambda: [], GetTableAnnotations=lambda: [],
     )
-    sheet = SimpleNamespace(
+    sheet = _bind_owner(_owner_fake(
+        "ISheet",
         GetProperties=lambda: [0.0, 0.0, 1.0, 1.0, 0.0, SHEET_W, SHEET_H],
         GetZoneMargin=lambda _code: 0.0127,
-    )
+    ), "ISheet")
     refreshed = []
     parent.refresh_events = view.refresh_events = refreshed
 
-    model = SimpleNamespace(
-        GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view,
+    model = _owner_fake(
+        "IDrawingDoc", GetCurrentSheet=lambda: sheet, GetFirstView=lambda: sheet_view,
     )
     adapter = _FakeAdapter(model)
-    adapter.swApp = SimpleNamespace(
-        GetMathUtility=lambda: SimpleNamespace(CreatePoint=_CropMathPoint),
+    utility = _owner_fake("IMathUtility", CreatePoint=_CropMathPoint)
+    adapter.swApp = _bind_owner(
+        _owner_fake("ISldWorks", GetMathUtility=lambda: utility), "ISldWorks"
     )
-    monkeypatch.setattr(_drawing_detail_crop, "_early_bound", lambda obj, _kind: obj)
-    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", lambda obj, _kind: obj)
+    monkeypatch.setattr(_drawing_detail_crop, "_early_bound", _bind_owner)
+    monkeypatch.setattr(_drawing_layout_collect, "_early_bound", _bind_owner)
+    monkeypatch.setattr(solidworks_mcp.adapters.sw_type_info, "early_bound", _bind_owner)
     monkeypatch.setattr(
-        solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag",
-        lambda obj, *_args, **_kwargs: obj,
+        solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag", _bind_owner
     )
     return adapter, view, profile, sketch_transform, refreshed
+
+
+@pytest.mark.parametrize(
+    ("producer", "required"),
+    (
+        ("input-view", "IView"),
+        ("base-view", "IView"),
+        ("detail-circle", "IDetailCircle"),
+        ("profile-segment", "ISketchSegment"),
+        ("profile-arc", "ISketchArc"),
+        ("centre-point", "ISketchPoint"),
+        ("profile-sketch", "ISketch"),
+        ("sketch-transform", "IMathTransform"),
+        ("sketch-inverse", "IMathTransform"),
+        ("math-utility", "IMathUtility"),
+        ("created-point", "IMathPoint"),
+        ("transformed-point", "IMathPoint"),
+        ("parent-transform", "IMathTransform"),
+        ("detail-transform", "IMathTransform"),
+        ("parent-inverse", "IMathTransform"),
+    ),
+)
+def test_generic_crop_rejects_wrong_owner_at_each_native_producer(
+    monkeypatch, producer, required
+):
+    adapter, view, profile, transform, _refreshed = _crop_fixture(monkeypatch, "D")
+    wrong_calls = []
+
+    def wrong_member(*_args):
+        wrong_calls.append("borrowed member")
+        raise AssertionError("wrong-owner member must never be invoked")
+
+    # Decoy members exist on the wrong object: a pass-through cast would reach
+    # them. The strict cast must refuse BEFORE the helper invokes any of them.
+    wrong = _owner_fake(
+        "INote", GetBaseView=wrong_member, GetLabel=wrong_member,
+        GetType=wrong_member, IsCircle=wrong_member, GetCenterPoint2=wrong_member,
+        GetSketch=wrong_member, Inverse=wrong_member, CreatePoint=wrong_member,
+        MultiplyTransform=wrong_member, ArrayData=(0.0,) * 16,
+        ModelToSketchTransform=transform, ModelToViewTransform=transform,
+        X=0.0, Y=0.0, Z=0.0,
+    )
+    utility = adapter.swApp.GetMathUtility()
+    input_view = view
+    if producer == "input-view":
+        input_view = wrong
+    elif producer == "base-view":
+        view.parent = wrong
+    elif producer == "detail-circle":
+        view.circle = wrong
+    elif producer == "profile-segment":
+        view.circle.GetProfileItems = lambda: (wrong,)
+    elif producer == "profile-arc":
+        wrong._native_interfaces = ("ISketchSegment",)
+        wrong.GetType = lambda: 1  # The segment hop legitimately succeeds.
+        view.circle.GetProfileItems = lambda: (wrong,)
+    elif producer == "centre-point":
+        profile.GetCenterPoint2 = lambda: wrong
+    elif producer == "profile-sketch":
+        profile.GetSketch = lambda: wrong
+    elif producer == "sketch-transform":
+        profile.GetSketch().transform = wrong
+    elif producer == "sketch-inverse":
+        transform.Inverse = lambda: wrong
+    elif producer == "math-utility":
+        adapter.swApp._target.GetMathUtility = lambda: wrong
+    elif producer == "created-point":
+        utility.CreatePoint = lambda _xyz: wrong
+    elif producer == "transformed-point":
+        point = _owner_fake("IMathPoint", MultiplyTransform=lambda _transform: wrong)
+        utility.CreatePoint = lambda _xyz: point
+    elif producer == "parent-transform":
+        view.parent.transform = wrong
+    elif producer == "detail-transform":
+        view.transform = wrong
+    else:
+        assert producer == "parent-inverse"
+        view.parent.transform.Inverse = lambda: wrong
+
+    with pytest.raises(AssertionError, match=f"as {required}"):
+        _drawing_detail_crop.read_circular_detail_crop(adapter, input_view, label="D")
+    assert wrong_calls == []
+    assert wrong._native_reads == (
+        [("ISketchSegment", "GetType")] if producer == "profile-arc" else []
+    )
+    assert wrong._native_writes == []
+
+
+def test_generic_crop_qi_keeps_segment_arc_point_and_math_surfaces_separate(monkeypatch):
+    adapter, view, profile, transform, _refreshed = _crop_fixture(monkeypatch, "D")
+    crop = _drawing_detail_crop.read_circular_detail_crop(adapter, view, label="D")
+    assert crop.crop == pytest.approx(_R18_DETAIL["D"]["crop"], abs=1e-14)
+    assert {"ISketchSegment", "ISketchArc"} == {
+        interface for interface, _member in profile._native_reads
+    }
+    surfaces = (
+        (_bind_owner(profile, "ISketchSegment"), "IsCircle"),
+        (_bind_owner(profile, "ISketchSegment"), "GetRadius"),
+        (_bind_owner(profile, "ISketchArc"), "GetType"),
+        (_bind_owner(profile, "ISketchArc"), "GetSketch"),
+        (_bind_owner(profile.GetCenterPoint2(), "ISketchPoint"), "ArrayData"),
+        (_bind_owner(_CropMathPoint((0.0, 0.0, 0.0)), "IMathPoint"), "X"),
+        (_bind_owner(transform, "IMathTransform"), "MultiplyTransform"),
+        (_bind_owner(adapter.swApp.GetMathUtility(), "IMathUtility"), "ArrayData"),
+        (_bind_owner(view, "IView"), "GetProfileItems"),
+        (_bind_owner(view.circle, "IDetailCircle"), "GetOutline"),
+        (_bind_owner(profile.GetSketch(), "ISketch"), "Inverse"),
+    )
+    for owner, borrowed_member in surfaces:
+        with pytest.raises(AttributeError, match="does not own"):
+            getattr(owner, borrowed_member)
+    with pytest.raises(AttributeError, match="cannot write"):
+        _bind_owner(view, "IView").Type = 3  # Native Type is get-only.
+    with pytest.raises(AssertionError, match="cannot bind"):
+        _bind_owner(SimpleNamespace(GetOutline=lambda: view.outline), "IView")
+    assert _bind_owner(None, "IView") is None
+
+
+def test_collector_reads_type_only_from_bound_view_and_keeps_crop_record(monkeypatch):
+    adapter, view, *_rest = _crop_fixture(monkeypatch, "D")
+    elements, _leaders, _region = _collect_crop(adapter)
+    assert ("IView", "Type") in view._native_reads
+    assert next(element for element in elements if element.label == "D").box == pytest.approx(
+        _R18_DETAIL["D"]["crop"], abs=1e-14
+    )
+    assert ("IView", "GetOutline") in view._native_reads
+
+
+def test_collector_wrong_view_owner_refuses_before_type_read(monkeypatch):
+    adapter, view, *_rest = _crop_fixture(monkeypatch, "D")
+    wrong = _owner_fake("IDetailCircle", Type=3)
+    monkeypatch.setattr(_drawing_layout_collect, "iter_views", lambda _adapter: iter((wrong,)))
+    monkeypatch.setattr(_drawing_layout_collect, "view_name", lambda _adapter, _view: "D")
+    with pytest.raises(AssertionError, match="as IView"):
+        _collect_crop(adapter)
+    assert wrong._native_reads == []
+    assert view.outline_reads == 0
+
+
+@pytest.mark.parametrize("member", ("Type", "ScaleRatio", "ModelToViewTransform"))
+def test_collector_rejects_method_shaped_view_properties(monkeypatch, member):
+    adapter, view, *_rest = _crop_fixture(monkeypatch, "D")
+    if member == "ModelToViewTransform":
+        monkeypatch.setattr(_CropView, member, property(lambda self: lambda: self.transform))
+    else:
+        setattr(view, member, lambda: 3)
+    with pytest.raises(RuntimeError, match="D:") as caught:
+        _collect_crop(adapter)
+    if member == "Type":
+        assert str(caught.value) == "D: cannot read native IView.Type for layout"
+    else:
+        assert str(caught.value).startswith("D: circular detail crop readback refused:")
+    assert isinstance(caught.value.__cause__, AssertionError)
+    assert str(caught.value.__cause__) == f"IView.{member} has the wrong native shape"
+
+
+def _linked_note_owner_fixture(monkeypatch):
+    calls = []
+    format_target = _owner_fake("ITextFormat", CharHeight=0.00635)
+    text_format = _bind_owner(format_target, "ITextFormat")
+
+    def get_format(index):
+        calls.append(("get-format", index))
+        return text_format
+
+    def set_format(index, use_doc, value):
+        assert _bind_owner(value, "ITextFormat").CharHeight == 0.0035
+        calls.append(("set-format", index, use_doc, value))
+        return True
+
+    annotation = _owner_fake(
+        "IAnnotation", GetTextFormat=get_format, SetTextFormat=set_format,
+    )
+    note = _owner_fake("INote", GetAnnotation=lambda: annotation)
+
+    def insert_note(adapter, text, x, y):
+        calls.append(("add-note", adapter, text, x, y))
+        return note
+
+    monkeypatch.setattr(_drawing_notes, "add_note", insert_note)
+    monkeypatch.setattr(_drawing_notes, "_early_bound", _bind_owner)
+    return note, annotation, format_target, text_format, calls
+
+
+@pytest.mark.parametrize("height", (None, 0.0035))
+def test_shared_linked_note_uses_note_annotation_and_format_owners(monkeypatch, height):
+    note, annotation, format_target, text_format, calls = _linked_note_owner_fixture(monkeypatch)
+    adapter = _FakeAdapter(None)
+    result = _drawing_notes.add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.024, 0.182, char_height=height
+    )
+    assert calls[0] == ("add-note", adapter, '$PRPSHEET:"Manufacturing Notes"', 0.024, 0.182)
+    if height is None:
+        assert result is note
+        assert len(calls) == 1
+        assert note._native_reads == annotation._native_reads == format_target._native_writes == []
+    else:
+        assert result._target is note and result._interface == "INote"
+        assert calls[1:] == [("get-format", 0), ("set-format", 0, False, text_format)]
+        assert note._native_reads == [("INote", "GetAnnotation")]
+        assert annotation._native_reads == [
+            ("IAnnotation", "GetTextFormat"), ("IAnnotation", "SetTextFormat"),
+        ]
+        assert format_target._native_writes == [("ITextFormat", "CharHeight", 0.0035)]
+
+
+@pytest.mark.parametrize(
+    ("producer", "reason"),
+    (("note", "as INote"), ("annotation", "as IAnnotation"), ("format", "INote cannot write CharHeight")),
+)
+def test_shared_linked_note_rejects_wrong_owner_before_format_access(
+    monkeypatch, producer, reason
+):
+    note, annotation, _format_target, _text_format, calls = _linked_note_owner_fixture(monkeypatch)
+    wrong_calls = []
+    wrong = _owner_fake(
+        "IAnnotation" if producer == "note" else "INote",
+        GetAnnotation=lambda: wrong_calls.append("annotation"),
+        GetTextFormat=lambda _index: wrong_calls.append("format"),
+        CharHeight=0.00635,
+    )
+    if producer == "note":
+        monkeypatch.setattr(_drawing_notes, "add_note", lambda *_args: wrong)
+    elif producer == "annotation":
+        note.GetAnnotation = lambda: wrong
+    else:
+        annotation.GetTextFormat = lambda _index: _bind_owner(wrong, "INote")
+
+    with pytest.raises((AssertionError, AttributeError), match=reason):
+        _drawing_notes.add_property_linked_note(
+            _FakeAdapter(None), "Manufacturing Notes", 0.024, 0.182, char_height=0.0035
+        )
+    assert wrong_calls == []
+    assert wrong._native_reads == wrong._native_writes == []
+    assert wrong.CharHeight == 0.00635
+    assert not any(call[0] == "set-format" for call in calls)
+
+
+@pytest.mark.parametrize("result", (False, None, 1, "True"))
+def test_shared_linked_note_requires_native_bool_format_setter(monkeypatch, result):
+    _note, annotation, _format_target, _text_format, _calls = _linked_note_owner_fixture(monkeypatch)
+    annotation.SetTextFormat = lambda *_args: result
+    with pytest.raises(RuntimeError, match="failed to set linked drawing note"):
+        _drawing_notes.add_property_linked_note(
+            _FakeAdapter(None), "Manufacturing Notes", 0.024, 0.182, char_height=0.0035
+        )
 
 
 def _collect_crop(adapter):
@@ -524,7 +874,7 @@ def test_generic_crop_r18_sketch_hop_and_synthetic_view_hops(monkeypatch, label)
         adapter, view, label=label
     )
     assert crop.label == label
-    assert crop.parent is view.parent
+    assert crop.parent._target is view.parent
     assert crop.parent_centre == pytest.approx(data["parent_centre"], abs=1e-14)
     assert crop.parent_radius == pytest.approx(data["raw_radius"] / 2.0, abs=1e-14)
     assert crop.parent_radius_y == pytest.approx(crop.parent_radius, abs=1e-14)
@@ -697,13 +1047,16 @@ def test_collector_crop_preserves_ordinary_elements_leaders_and_tag_boundary(mon
                          None, None, None, (1.0, 1.0))
     ordinary.Type = 6
     ordinary.annotations = [_crop_note("free-note", (0.08, 0.15, 0.10, 0.17))]
-    ordinary.annotations.append(SimpleNamespace(
-        GetName="surface-finish", GetType=7, GetPosition=(0.04, 0.20, 0.0),
-        GetLeaderCount=0,
+    ordinary.annotations.append(_owner_fake(
+        "IAnnotation", GetName=lambda: "surface-finish", GetType=lambda: 7,
+        GetPosition=lambda: (0.04, 0.20, 0.0), GetLeaderCount=lambda: 0,
     ))
-    ordinary.tables = [SimpleNamespace(
-        GetAnnotation=lambda: SimpleNamespace(GetName="table", GetPosition=(0.08, 0.20, 0.0)),
-        RowCount=1, ColumnCount=1,
+    ordinary.tables = [_owner_fake(
+        "ITableAnnotation",
+        GetAnnotation=lambda: _owner_fake(
+            "IAnnotation", GetName=lambda: "table", GetPosition=lambda: (0.08, 0.20, 0.0),
+        ),
+        RowCount=1, ColumnCount=1, GetSplitInformation=lambda *_args: (),
         GetColumnWidth=lambda _index: 0.02, GetRowHeight=lambda _index: 0.01,
     )]
     detail.next_view = ordinary
@@ -774,7 +1127,7 @@ def test_collector_contained_crop_finding_keys_are_subset(monkeypatch, scope, pa
     detail.next_view = foreign
     monkeypatch.setattr(
         _drawing_layout_collect, "_view_scope",
-        lambda _adapter, view: scope if view is detail else CollisionScope.ALL,
+        lambda _adapter, view: scope if view._target is detail else CollisionScope.ALL,
     )
     elements, leaders, _region = _collect_crop(adapter)
     detail.Type = 6

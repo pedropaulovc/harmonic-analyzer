@@ -1686,12 +1686,16 @@ def _add_rocker_outline_dimensions(adapter: Any, front: Any) -> None:
         text_xy=OVERALL_WIDTH_TEXT_XY, label="rocker overall width",
         orientation="horizontal", entities=vertices, entity_types=("VERTEX", "VERTEX"),
     )
+    width = _early_bound(width, "IDisplayDimension")
+    width_annotation = _early_bound(width.GetAnnotation(), "IAnnotation")
+    if width_annotation is None:
+        raise RuntimeError("rocker overall width has no native annotation")
     assert_dimension_measures(
         adapter, width, expected_mm=2.0 * ROD_TIP_X, label="rocker overall width",
         entities=vertices, entity_types=("VERTEX", "VERTEX"),
     )
     # Overall span is derived from the controlled profile, not a second size band.
-    set_reference_dimension(adapter, width, label="rocker overall width")
+    set_reference_dimension(adapter, width_annotation, label="rocker overall width")
     pivot = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
     taper_point = (BOT_END_X, _BOT_END_Y, ARM_THICKNESS / 2.0)
     taper = edges.exact_vertex_at(taper_point, label="+Z taper/lower-arc intersection")
