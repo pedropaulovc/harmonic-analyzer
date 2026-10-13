@@ -281,17 +281,18 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
         )
         assert paper_drive[pair] == pytest.approx(42.217366426182714)
 
+    # The MHA-VN-006 guide screws alone: seed -1, then the grid -2..-10.
     guide_receivers_and_limits = {
+        1: (1, 13.951902256034774),
+        2: (2, 13.951902256034774),
+        3: (1, 13.951902256034774),
+        4: (2, 13.951902256034774),
         5: (1, 13.951902256034774),
         6: (2, 13.951902256034774),
         7: (1, 13.951902256034774),
         8: (2, 13.951902256034774),
         9: (1, 13.951902256034774),
         10: (2, 13.951902256034774),
-        11: (1, 13.951902256034774),
-        12: (2, 13.951902256034774),
-        13: (1, 13.951902256034774),
-        14: (2, 13.951902256034774),
     }
     for screw_number, (guide_number, limit) in guide_receivers_and_limits.items():
         pair = frozenset(
@@ -522,17 +523,18 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 3.454,
                 9.0124,
             ),
+            # MHA-VN-059 #2-56 clip screws, 5.55 in the platen's through tap.
             **_expected_numbered_pairs(
-                "vn-fillister-screw",
+                "vn-platen-clip-screw",
                 range(1, 5),
                 "pd-platen",
-                2.8448,
-                2.261,
-                4.5,
+                2.184,
+                1.778,
+                5.55,
             ),
             **_expected_numbered_pairs(
                 "vn-fillister-screw",
-                range(5, 15, 2),
+                range(1, 11, 2),
                 "pd-platen-guide",
                 2.8448,
                 2.261,
@@ -540,7 +542,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
             **_expected_numbered_pairs(
                 "vn-fillister-screw",
-                range(6, 15, 2),
+                range(2, 11, 2),
                 "pd-platen-guide",
                 2.8448,
                 2.261,

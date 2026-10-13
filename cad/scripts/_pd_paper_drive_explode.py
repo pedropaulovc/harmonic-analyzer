@@ -17,7 +17,7 @@ from __future__ import annotations
 import math
 import sys
 from pathlib import Path
-from typing import Any, Mapping, NamedTuple
+from typing import Any, NamedTuple
 
 import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
@@ -27,7 +27,6 @@ from pd_paper_drive_explode_spec import (
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,
     Instance,
-    Role,
     plan_explode,
 )
 
@@ -125,16 +124,12 @@ def _create_named_view(
 
 
 @_telemetry.traced("assembly.paper_drive_explode")
-def create_paper_drive_explode(
-    adapter: Any, roles: Mapping[str, Role], configuration_name: str
-) -> None:
+def create_paper_drive_explode(adapter: Any, configuration_name: str) -> None:
     """Author the released presentation in the active ``configuration_name``
     and restore the working model.
 
-    ``roles`` maps each fillister-screw instance to the joint the builder
-    placed it in (guide or clip screw). The builder runs this in Default and
-    in Default Simplified (``_assembly.author_in_drawing_configurations``):
-    each owns its explode."""
+    The builder runs this in Default and in Default Simplified
+    (``_assembly.author_in_drawing_configurations``): each owns its explode."""
     from solidworks_mcp.adapters.com_variant import null_callout
 
     view_name = exploded_view_name(configuration_name)
@@ -159,17 +154,10 @@ def create_paper_drive_explode(
     by_name = {str(component.Name2): component for component in components}
     if len(by_name) != len(components):
         raise RuntimeError(f"{view_name}: duplicate component identities")
-    unknown_roles = sorted(set(roles) - set(by_name))
-    if unknown_roles:
-        raise RuntimeError(
-            f"{view_name}: roles name absent components {unknown_roles!r}"
-        )
     baseline = {name: _presentation_transform(c) for name, c in by_name.items()}
     instances = [
         Instance(
-            name=name,
-            stem=Path(str(component.GetPathName() or "")).stem.casefold(),
-            role=roles.get(name),
+            name=name, stem=Path(str(component.GetPathName() or "")).stem.casefold()
         )
         for name, component in by_name.items()
     ]

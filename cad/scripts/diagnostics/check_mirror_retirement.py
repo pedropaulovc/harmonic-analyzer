@@ -906,25 +906,24 @@ expect(
     "pd-platen-paper",
     **_SOLV,
 )
-_fs = 0
-for x, y in p.CLIP_SCREW_XY:
-    _fs += 1
+# The MHA-VN-059 #2-56 clip screws are their own stem; the MHA-VN-006 guide
+# screws number from 1 on their own.
+for i, (x, y) in enumerate(p.CLIP_SCREW_XY):
     expect(
         PD,
-        f"vn-fillister-screw-{_fs}",
-        [x, y, p.PLATE_FRONT_Z - p.CLIP_THICKNESS - p.SCREW_SEAT_BOSS_H],
+        f"vn-platen-clip-screw-{i + 1}",
+        [x, y, p.PLATE_FRONT_Z - p.CLIP_THICKNESS],
         IDENTITY,
-        f"clip screw {_fs}",
+        f"clip screw {i + 1}",
         **_SOLV,
     )
-for x, y in p.GUIDE_SCREW_XY:
-    _fs += 1
+for i, (x, y) in enumerate(p.GUIDE_SCREW_XY):
     expect(
         PD,
-        f"vn-fillister-screw-{_fs}",
+        f"vn-fillister-screw-{i + 1}",
         [x, y, p.PLATE_FRONT_Z + p.PLATEN_CBORE_DEPTH],
         IDENTITY,
-        f"guide screw {_fs}",
+        f"guide screw {i + 1}",
         **_SOLV,
     )
 # R9-31: the guide-lock screws are their own button-head stem (MHA-VN-046).

@@ -21,7 +21,7 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | `pn` / `PN` | Pen | 6 |
 | `ms` / `MS` | Measuring stick | 3 |
 | `sm` / `SM` | Summing | 4 |
-| `vn` / `VN` | Vendor parts | 55 |
+| `vn` / `VN` | Vendor parts | 56 |
 | `sh` / `SH` | Shared fabricated parts | 2 |
 
 Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. The retained orphan chain sprocket belongs to PD by its translational-gearing and platen-chain evidence; the retained orphan hex bolt belongs to VN by catalog evidence. Wheel axle nut is VN by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
@@ -99,7 +99,7 @@ Dated reports, released packages, raw logs, source quotations and user-authored 
 
 ## Identity migration table
 
-The table covers 157 part families (the 153 current families plus the four retired identities below) and nine assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
+The table covers 161 part families (the 157 current families plus the four retired identities below) and nine assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
 
 Retired identities keep their rows here for historical lookup but have no registry, builder or drawing, and their Numbers are never reissued. MHA-PD-021 `pd-latch-hook-bracket` (MHA-170) and MHA-VN-045 `vn-latch-hook-rivet` (MHA-175) are retired: the one-piece formed spring-steel latch hook MHA-PD-014 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-VN-043 screws. MHA-VN-026 `vn-knife-hanger-washer` (MHA-131) is retired: the MHA-VN-024 socket head screw seats on the MHA-FR-002 counterbore floor. MHA-VN-037 `vn-transgear-collar-cross-pin` (MHA-154) is retired: the true D-bore of the MHA-PD-022 drive collar carries the torque on the knob shaft's D-flat, so no front cross-pin remains.
 
@@ -265,6 +265,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | `vn-transgear-arm-plate-locating-pin` | — | MHA-VN-056 |
 | part | — | `vn-wheel-axle-back-washer` | — | MHA-VN-057 |
 | part | — | `vn-wheel-axle-front-washer` | — | MHA-VN-058 |
+| part | — | `vn-platen-clip-screw` | — | MHA-VN-059 |
 | part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
 | part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
 | assembly | `frame` | `fr-frame` | MHA-A04 | MHA-FR-000 |
@@ -294,3 +295,4 @@ next free Number in its category and has no old stem or old Number.
 | added | `vn-wheel-axle-back-washer` | MHA-VN-057 | brass #10 washer between the MHA-MG-008 wheel bar and the MHA-MG-005 wheel hub |
 | added | `vn-wheel-axle-front-washer` | MHA-VN-058 | brass #4 washer between the MHA-MG-005 wheel spigot face and the first MHA-VN-025 nut; its Ø7.1 OD bears inside the Ø14.0 spigot end, clear of the MHA-MG-010 drum |
 | added | `sm-gooseneck-spring-screw` | MHA-SM-004 | shop-turned slotted fillister screw clamps the counter spring's upper eye to MHA-SM-001's brazed, #6-32 through-tapped end plug |
+| added | `vn-platen-clip-screw` | MHA-VN-059 | four brass #2-56 fillister screws hold the MHA-PD-003 platen clip to the MHA-PD-002 platen in place of MHA-VN-006 |

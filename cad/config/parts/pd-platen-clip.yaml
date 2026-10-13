@@ -2,4 +2,4 @@ pd-platen-clip:
   number: MHA-PD-003
   material: Brass
   tolerance_class: machined_block
-  process: "one-piece 0.8 mm sheet brass; opposed open-ended notches leave a formed center-bridged spring rail"
+  process: "one-piece 0.8 mm sheet brass; opposed open-ended slits with rounded ends leave a center-bridged spring rail, formed in smooth tangent bends"

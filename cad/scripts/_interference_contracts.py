@@ -445,21 +445,27 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         "sh-column-clamp-back",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 9.0124),
     ),
+    # MHA-VN-059 #2-56 clip screws: 6.35 shank - 0.8 clip sheet = 5.55 in the
+    # platen's through tap (3.85 plate + 1.70 rear boss).
     **_numbered_pairs(
-        "vn-fillister-screw",
+        "vn-platen-clip-screw",
         range(1, 5),
         "pd-platen",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 4.5),
+        _smooth_annulus_limit_mm3(
+            THREAD_MAJOR_MM["#2-56"], TAP_DRILL_MM["#2-56"], 5.55
+        ),
     ),
+    # MHA-VN-006 guide screws: seed -1, then the grid -2..-10, alternating
+    # between the two guide rails.
     **_numbered_pairs(
         "vn-fillister-screw",
-        range(5, 15, 2),
+        range(1, 11, 2),
         "pd-platen-guide",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 5.4178),
     ),
     **_numbered_pairs(
         "vn-fillister-screw",
-        range(6, 15, 2),
+        range(2, 11, 2),
         "pd-platen-guide",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 5.4178),
         second_number=2,
