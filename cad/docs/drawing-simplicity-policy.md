@@ -199,7 +199,12 @@ frames and no datums.
    to datum C. Pedro's superseding ruling removes the angular dimension from
    DETAIL E rather than adding another layout mechanism. The main front view
    carries BASIC R800/R816/8.00 and both BASIC pin-axis coordinates from physical
-   datum A. Parent-linked DETAIL D owns native `PivotDia@PivotHoleProfile` and
+   datum A, plus one native horizontal BASIC A-to-datum-C-land location from
+   the centred pivot bore to the physical +X tip corner. Its value is the
+   spec-derived `ROD_TIP_X`, not a typed nominal; the `DATUM C LAND` row uses
+   the existing capped-witness mechanism and feeds the retained A|B|C controls
+   without adding geometry or a tolerance requirement. Parent-linked DETAIL D
+   owns native `PivotDia@PivotHoleProfile` and
    `HubDia@HubProfile`, the pivot-bore datum A and bore finish; DETAIL E owns
    `RodTipLen@StrapProfile`, datum C, DRILL THRU callout
    and unchanged rod-pin position frame. Hub OD retains its two-place general

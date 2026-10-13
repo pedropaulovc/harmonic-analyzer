@@ -2288,6 +2288,13 @@ class _NativeQuantity:
         return self.second_arrow[1]
 
 
+class _IgnoredLocatorCap(_NativeQuantity):
+    """Native cap setter accepts the call without retaining the requested value."""
+
+    def __setattr__(self, name, value):
+        super().__setattr__(name, 0.100 if name == "MaxWitnessLineLength" else value)
+
+
 def _imported_native_quantities(monkeypatch: pytest.MonkeyPatch):
     from solidworks_mcp.adapters import sw_type_info
     import _drawing_dimensions
@@ -2410,7 +2417,7 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
         entities = kwargs["entities"]
         if label == "rocker overall width":
             value_mm = abs(vertex_points[entities[1]][0] - vertex_points[entities[0]][0])
-        elif label == "taper intersection X":
+        elif label in {"taper intersection X", "datum C land X location"}:
             value_mm = abs(vertex_points[entities[1]][0])
         else:
             pytest.fail(f"unowned native dimension {label}")
@@ -2429,6 +2436,14 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
                 display.attached = (entities[0], object())
             elif state.defect == "null-annotation":
                 display.GetAnnotation = lambda: None
+            elif state.defect == "uncentred":
+                display.model.SetArcEndCondition = lambda *_a: 0
+            elif state.defect == "basic":
+                display.model.SetToleranceType = lambda _kind: True
+            elif state.defect == "text":
+                display.ignored_text = 4
+            elif state.defect == "cap":
+                display.__class__ = _IgnoredLocatorCap
         state.displays[label] = display
         return display
 
@@ -2459,15 +2474,29 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
     expected = {
         "rocker overall width": 2.0 * ch_rocker_arm_spec.ROD_TIP_X / 1000.0,
         "taper intersection X": ch_rocker_arm_spec.BOT_END_X / 1000.0,
+        "datum C land X location": ch_rocker_arm_spec.ROD_TIP_X / 1000.0,
     }
     assert {
         label: display.model.SystemValue for label, display in state.displays.items()
     } == pytest.approx(expected)
-    width, taper = state.calls
+    width, taper, land = state.calls
     assert width["entity_types"] == ("VERTEX", "VERTEX")
     assert "entity_type" not in width
     assert taper["entity_types"] == ("EDGE", "VERTEX")
     assert state.displays["taper intersection X"].arc_conditions[1] == 1
+    assert land["orientation"] == "horizontal"
+    assert land["text_xy"] == drawing.LAND_LOCATION_TEXT_XY == (0.219, 0.235)
+    assert land["entity_types"] == ("EDGE", "VERTEX")
+    assert land["entities"] == (taper["entities"][0], width["entities"][1])
+    assert land["p0"] == taper["p0"] and land["p1"] == width["p1"]
+    locator = state.displays["datum C land X location"]
+    assert locator.arc_conditions[1] == 1
+    assert locator.model.GetToleranceType() == 1
+    assert locator.ShowDimensionValue is True
+    assert locator.text[1] == locator.text[2] == ""
+    assert locator.text[4] == "DATUM C LAND"
+    assert locator.writes[-2:] == [(4, ""), (4, "DATUM C LAND")]
+    assert locator.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH
     width_display = state.displays["rocker overall width"]
     assert (width_display.text[1], width_display.text[2]) == ("(", ")")
     assert width_display.model.GetToleranceType() == 0
@@ -2475,7 +2504,7 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
 
 
 @pytest.mark.parametrize("label", [
-    "rocker overall width", "taper intersection X",
+    "rocker overall width", "taper intersection X", "datum C land X location",
 ])
 @pytest.mark.parametrize("defect", ["creation", "wrong", "missing", "nan", "inf", "attachment"])
 def test_each_new_outline_measurement_fails_closed(native_front, label, defect) -> None:
@@ -2483,6 +2512,112 @@ def test_each_new_outline_measurement_fails_closed(native_front, label, defect) 
     native_front.defect = defect
     with pytest.raises(RuntimeError):
         drawing._add_rocker_outline_dimensions(native_front.adapter, object())
+
+
+@pytest.mark.parametrize("defect", ["uncentred", "basic", "text", "cap"])
+def test_land_locator_rejects_ignored_native_setters(native_front, defect):
+    native_front.defect_label = "datum C land X location"
+    native_front.defect = defect
+    with pytest.raises(RuntimeError):
+        drawing._add_rocker_outline_dimensions(native_front.adapter, object())
+
+
+@pytest.mark.parametrize("defect", [
+    None, "wrong", "missing-value", "nan", "inf", "attachment", "missing-attachment",
+    "uncentred", "basic", "text", "hidden-value", "reference", "cap", "nan-cap",
+    "missing", "duplicate", "wrong-view", "unnamed",
+])
+def test_land_locator_final_rebuild_readback_and_exact_front_census(
+    native_front, monkeypatch, defect,
+):
+    case = native_front
+    front, other = object(), object()
+    _taper, _taper_entities, display, entities = drawing._add_rocker_outline_dimensions(case.adapter, front)
+    annotations = {front: [display.annotation], other: []}
+    monkeypatch.setattr(drawing, "_bound_view_annotations", lambda view, **_k: annotations[view])
+    if defect in {"wrong", "missing-value", "nan", "inf"}:
+        display.model.SystemValue = (
+            display.model.SystemValue + 0.0001 if defect == "wrong"
+            else None if defect == "missing-value" else float(defect)
+        )
+    elif defect == "attachment":
+        display.attached = (entities[0], object())
+    elif defect == "missing-attachment":
+        display.attached = ()
+    elif defect == "uncentred":
+        display.arc_conditions[1] = 2
+    elif defect == "basic":
+        display.tolerance_type = 0
+    elif defect == "text":
+        display.text[4] = ""
+    elif defect == "hidden-value":
+        display.ShowDimensionValue = False
+    elif defect == "reference":
+        display.text[1], display.text[2] = "(", ")"
+    elif defect in {"cap", "nan-cap"}:
+        display.MaxWitnessLineLength = 0.100 if defect == "cap" else float("nan")
+    elif defect == "missing":
+        annotations[front] = []
+    elif defect == "duplicate":
+        annotations[front].append(display.annotation)
+    elif defect == "wrong-view":
+        annotations[other] = annotations.pop(front)
+        annotations[front] = []
+    elif defect == "unnamed":
+        display.annotation.name = ""
+    if defect is None:
+        drawing._require_land_location(case.adapter, (("front", front), ("detail E", other)), display, entities)
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._require_land_location(case.adapter, (("front", front), ("detail E", other)), display, entities)
+
+
+def test_land_locator_expected_value_is_sourced_and_rejects_stale_native_geometry(
+    native_front, monkeypatch,
+):
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    assert any(
+        isinstance(node, ast.ImportFrom) and node.module == "ch_rocker_arm_spec"
+        and any(alias.name == "ROD_TIP_X" for alias in node.names)
+        for node in tree.body
+    )
+    for name in ("_add_rocker_outline_dimensions", "_require_land_location"):
+        function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == name)
+        checks = [
+            node for node in ast.walk(function) if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name) and node.func.id == "assert_dimension_measures"
+            and any(k.arg == "label" and isinstance(k.value, ast.Constant)
+                    and k.value.value == "datum C land X location" for k in node.keywords)
+        ]
+        assert len(checks) == 1
+        assert next(ast.unparse(k.value) for k in checks[0].keywords if k.arg == "expected_mm") == "ROD_TIP_X"
+    front = object()
+    _taper, _taper_entities, display, entities = drawing._add_rocker_outline_dimensions(native_front.adapter, front)
+    monkeypatch.setattr(drawing, "_bound_view_annotations", lambda *_a, **_k: [display.annotation])
+    monkeypatch.setattr(drawing, "ROD_TIP_X", ch_rocker_arm_spec.ROD_TIP_X + 0.1)
+    with pytest.raises(RuntimeError):
+        drawing._require_land_location(native_front.adapter, (("front", front),), display, entities)
+
+
+def test_land_locator_guard_runs_after_final_rebuild_and_preserves_marked_census():
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "build")
+    calls = [
+        node for node in ast.walk(build) if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+    ]
+    guards = [node for node in calls if node.func.id == "_require_land_location"]
+    assert len(guards) == 1
+    guard = guards[0]
+    final_rebuild = next(
+        node for node in calls if node.func.id == "rebuild_drawing"
+        and any(k.arg == "label" and isinstance(k.value, ast.Constant)
+                and k.value.value == "rocker-arm layout audit" for k in node.keywords)
+    )
+    census = next(node for node in calls if node.func.id == "_require_dimension_census")
+    assert final_rebuild.lineno < census.lineno < guard.lineno
+    assert [ast.unparse(arg) for arg in guard.args[2:]] == ["land_dimension", "land_entities"]
+    assert set(drawing.FRONT_KEEP) == drawing.BASIC_PROFILE_DIMENSIONS
 
 
 @pytest.mark.parametrize("source", ["ROD_TIP_X", "TIP_FACE", "BOT_END_X", "HUB_DIA"])
@@ -4128,9 +4263,11 @@ def test_details_keep_native_scale_source_census_and_unclipped_overall_contract(
             if isinstance(node, ast.Assign)
             and any(isinstance(target, ast.Attribute) and target.attr == "MaxWitnessLineLength"
                     for target in node.targets)]
-    assert len(caps) == 1
-    assert ast.unparse(caps[0].targets[0]) == "taper_dimension.MaxWitnessLineLength"
-    assert ast.unparse(caps[0].value) == "TAPER_WITNESS_LENGTH"  # Overall remains full-length.
+    assert len(caps) == 2
+    assert [ast.unparse(cap.targets[0]) for cap in caps] == [
+        "taper_dimension.MaxWitnessLineLength", "land_dimension.MaxWitnessLineLength",
+    ]
+    assert all(ast.unparse(cap.value) == "TAPER_WITNESS_LENGTH" for cap in caps)  # Overall remains full-length.
     assert not hasattr(drawing, "OVERALL_WITNESS_LENGTH")
     assert not hasattr(drawing, "PIVOT_PICK_ZOOM_HALF")
     assert set(drawing.FRONT_KEEP) == drawing.BASIC_PROFILE_DIMENSIONS
@@ -7926,12 +8063,15 @@ def test_r24_dot_actual_printed_arm_and_taper_route_are_not_inferred_from_reques
         drawing._require_rod_dot_route(case.adapter, case.view, case.gtol, case.landing)
 
 
-def test_r24_taper_cap_applies_only_to_taper_and_retains_exact_measured_entities(native_front):
+def test_r24_caps_taper_and_land_locator_but_preserves_uncapped_overall(native_front):
     case = native_front
-    display, entities = drawing._add_rocker_outline_dimensions(case.adapter, object())
+    display, entities, land, land_entities = drawing._add_rocker_outline_dimensions(case.adapter, object())
     assert display is case.displays["taper intersection X"]
     assert display.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH == 0.008
     assert display.annotation.GetAttachedEntities3() == entities
+    assert land is case.displays["datum C land X location"]
+    assert land.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH
+    assert land.annotation.GetAttachedEntities3() == land_entities
     assert not hasattr(case.displays["rocker overall width"], "MaxWitnessLineLength")
 
 

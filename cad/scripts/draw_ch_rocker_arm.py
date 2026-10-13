@@ -246,6 +246,7 @@ _BOT_END_Y = CENTER_Y - math.sqrt(R_BOTTOM**2 - BOT_END_X**2)
 # Full witnesses connect the overall row to the actual physical tips.
 OVERALL_WIDTH_TEXT_XY = (FRONT_CENTER[0], 0.215)
 TAPER_INTERSECTION_TEXT_XY = (0.219, 0.132)
+LAND_LOCATION_TEXT_XY = (0.219, 0.235)
 PIN_X_TEXT_XY = (0.219, 0.197)
 PIN_Y_TEXT_XY = (0.267, 0.162)
 TAPER_WITNESS_LENGTH = 0.008
@@ -1896,7 +1897,9 @@ def _dress_detail_dimensions(
         )
 
 
-def _add_rocker_outline_dimensions(adapter: Any, front: Any) -> tuple[Any, tuple[Any, Any]]:
+def _add_rocker_outline_dimensions(
+    adapter: Any, front: Any,
+) -> tuple[Any, tuple[Any, Any], Any, tuple[Any, Any]]:
     """Import profile nominals and measure the remaining actual CAD outline."""
     annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front",
@@ -1958,7 +1961,30 @@ def _add_rocker_outline_dimensions(adapter: Any, front: Any) -> tuple[Any, tuple
     if (not _native_finite_scalar(taper_dimension.MaxWitnessLineLength)
             or abs(taper_dimension.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
         raise RuntimeError("132.76 retained full-height witnesses through parent E")
-    return taper_dimension, (pivot, taper)
+    land_entities = (pivot, vertices[1])
+    land_dimension = add_edge_dimension(
+        adapter, front, p0=pivot_xy, p1=width_xy[1],
+        text_xy=LAND_LOCATION_TEXT_XY, label="datum C land X location",
+        orientation="horizontal", entities=land_entities, entity_types=("EDGE", "VERTEX"),
+    )
+    set_arc_endpoints_to_center(adapter, land_dimension, label="datum C land X location")
+    land_dimension = _early_bound(land_dimension, "IDisplayDimension")
+    model = _early_bound(land_dimension.GetDimension2(0), "IDimension")
+    if model.GetArcEndCondition(1) != 1:
+        raise RuntimeError("datum C land X location: physical A endpoint must be centred")
+    assert_dimension_measures(
+        adapter, land_dimension, expected_mm=ROD_TIP_X, label="datum C land X location",
+        entities=land_entities, entity_types=("EDGE", "VERTEX"),
+    )
+    set_basic_dimension(adapter, land_dimension, label="datum C land X location")
+    land_dimension.SetText(4, "DATUM C LAND")
+    if str(land_dimension.GetText(4) or "") != "DATUM C LAND":
+        raise RuntimeError("datum C land X location: native label did not persist")
+    land_dimension.MaxWitnessLineLength = TAPER_WITNESS_LENGTH
+    if (not _native_finite_scalar(land_dimension.MaxWitnessLineLength)
+            or abs(land_dimension.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
+        raise RuntimeError("datum C land X location retained full-height witnesses")
+    return taper_dimension, (pivot, taper), land_dimension, land_entities
 
 
 def _add_pin_coordinates(adapter: Any, front: Any) -> None:
@@ -1993,6 +2019,37 @@ def _add_pin_coordinates(adapter: Any, front: Any) -> None:
         display.SetText(4, "PIN AXIS")
         if str(display.GetText(4) or "") != "PIN AXIS":
             raise RuntimeError(f"{label}: native PIN AXIS label did not persist")
+
+
+def _require_land_location(
+    adapter: Any, views: Any, dimension: Any, entities: tuple[Any, Any],
+) -> None:
+    """Recheck the sole front-view BASIC locator after the final rebuild."""
+    display = _early_bound(dimension, "IDisplayDimension")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    name = dimension_name(adapter, annotation)
+    if not name:
+        raise RuntimeError("datum C land X location has no native dimension name")
+    owners = [
+        label for label, view in views
+        for candidate in _bound_view_annotations(view, label=f"rocker {label}")
+        if dimension_name(adapter, candidate) == name
+    ]
+    if owners != ["front"]:
+        raise RuntimeError(f"datum C land X location census owners {owners!r}, expected ['front']")
+    assert_dimension_measures(
+        adapter, display, expected_mm=ROD_TIP_X, label="datum C land X location",
+        entities=entities, entity_types=("EDGE", "VERTEX"),
+    )
+    model = _early_bound(display.GetDimension2(0), "IDimension")
+    if (model.GetArcEndCondition(1) != 1
+            or model.GetToleranceType() != 1
+            or display.ShowDimensionValue is not True
+            or str(display.GetText(4) or "") != "DATUM C LAND"
+            or any(str(display.GetText(part) or "") for part in (1, 2))
+            or not _native_finite_scalar(display.MaxWitnessLineLength)
+            or abs(display.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
+        raise RuntimeError("datum C land X location lost its centred BASIC label/value or witness cap")
 
 
 def _require_rod_through_callout(callout: Any) -> None:
@@ -3043,7 +3100,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Import the source radii and top height too: these are the BASIC nominal
     # geometry of the profile zone, not independent radius/height bands.
-    taper_dimension, taper_entities = _add_rocker_outline_dimensions(adapter, front)
+    taper_dimension, taper_entities, land_dimension, land_entities = _add_rocker_outline_dimensions(adapter, front)
     try:
         notes = add_property_linked_note(
             adapter, "Manufacturing Notes", NOTES_LEFT, NOTES_CEILING
@@ -3238,6 +3295,12 @@ async def build(adapter: Any) -> dict[str, str]:
             ("front", front, FRONT_KEEP), ("detail D", hub, HUB_KEEP),
             ("detail E", end, END_KEEP), ("right", right, RIGHT_KEEP), ("iso", iso, {}),
         ))
+        phase = "datum C land location"
+        _require_land_location(
+            adapter, (("front", front), ("detail D", hub), ("detail E", end),
+                      ("right", right), ("iso", iso)),
+            land_dimension, land_entities,
+        )
         phase = "REAM clearance"
         _require_ream_clearance(adapter, hub, notes_box)
         phase = "front-detail air"
