@@ -14,7 +14,7 @@ import mg_lever_wire_geom
 import mg_magnifying_wheel_geom as geom
 import mg_magnifying_wheel_spec
 from _drawing_contract import model_toleranced_dimensions
-from _drawing_precision import printed_band_mm
+from _printed_tolerance import printed_band_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED_UM, SEAT_UM
 
