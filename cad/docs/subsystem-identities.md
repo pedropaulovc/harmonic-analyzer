@@ -16,7 +16,7 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | `ch` / `CH` | Channel | 11 |
 | `dt` / `DT` | Drive train | 36 |
 | `fr` / `FR` | Frame | 5 |
-| `mg` / `MG` | Magnifier | 10 |
+| `mg` / `MG` | Magnifier | 11 |
 | `pd` / `PD` | Paper drive | 24 |
 | `pn` / `PN` | Pen | 6 |
 | `ms` / `MS` | Measuring stick | 3 |

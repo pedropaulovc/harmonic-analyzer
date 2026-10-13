@@ -68,6 +68,9 @@ STEMS = (
     "vn-pen-marker",
     "pn-pen-frame",
     "vn-pen-set-screw",
+    "vn-pen-rod-set-screw",
+    "pn-pen-adjust-screw",
+    "vn-pen-adjust-nut",
     "pn-pen-wire",
 )
 PEN_STEMS = (
@@ -76,6 +79,9 @@ PEN_STEMS = (
     "vn-pen-marker",
     "pn-pen-frame",
     "vn-pen-set-screw",
+    "vn-pen-rod-set-screw",
+    "pn-pen-adjust-screw",
+    "vn-pen-adjust-nut",
     "pn-pen-wire",
 )
 REPORT = ROOT / "cad/out/reports/stock-spring-gravity.json"

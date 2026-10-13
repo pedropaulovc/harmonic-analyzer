@@ -23,7 +23,7 @@ A few millimetres of summing-lever travel become a few centimetres of pen travel
 | `mg-magnifying-vertical-rod` | TODO | TODO | TODO |
 | `mg-lever-wire` | TODO | TODO | TODO |
 | `mg-wheel-axle` | TODO | TODO | TODO |
-| `mg-wheel-axle-spacer` | 1 | brass | 7/16 in round bar |
+| `mg-wheel-axle-spacer` | 1 | brass | Ø11.11 mm (7/16") round bar |
 | `mg-wheel-bar` | TODO | TODO | TODO |
 | `pivot-ball-mount` | TODO | TODO | TODO |
 
