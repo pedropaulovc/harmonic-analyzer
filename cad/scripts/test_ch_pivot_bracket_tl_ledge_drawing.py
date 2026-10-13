@@ -11,7 +11,7 @@ import ch_pivot_bracket_tl_angle_plate_spec as plate
 import ch_pivot_bracket_tl_ledge_spec as spec
 import draw_ch_pivot_bracket_tl_ledge as drawing
 import export_features
-from _feature_requirements import limits
+from _printed_limits import limits
 from _hole_spec import THREAD_MAJOR_MM
 
 # The prechips S4 hold the ledge and plate are built for (review/compose-r5

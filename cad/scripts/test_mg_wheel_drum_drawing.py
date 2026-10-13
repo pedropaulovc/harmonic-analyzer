@@ -25,6 +25,12 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["mg_wheel_drum"].script == Path(drawing.__file__).resolve()
 
 
+def test_dimension_transfer_uses_shared_helper() -> None:
+    from _drawing_dimensions import move_model_dimension
+
+    assert drawing.move_model_dimension is move_model_dimension
+
+
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) == marked

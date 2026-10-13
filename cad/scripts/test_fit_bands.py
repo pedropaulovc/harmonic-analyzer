@@ -10,7 +10,7 @@ This file finds every band consumer by reading the scripts' source, resolves eac
 argument in the imported module (the value ``build()`` would see), and applies
 the same checks ``build()`` would:
 
-* ``deviations(band)`` and ``_feature_requirements.limits(model, places, band)``
+* ``deviations(band)`` and ``_printed_limits.limits(model, places, band)``
   take ``(upper, lower)``; the helper must accept it and return lower < upper.
 * ``set_dimension_bilateral_tolerance(..., *BAND)`` splats ``(lower, upper)``
   straight into the setter, which refuses lower >= upper.
@@ -54,6 +54,12 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     # def gear_tip_band_mm(grade): band = ...; deviations(band)
     ("_gear_fit_limits", "band"): (
         "(gear_tip_band_mm('standard'), gear_tip_band_mm('contact_critical'))",
+        "each",
+    ),
+    # drilled_limits derives its local native band from the title-block row.
+    ("_printed_limits", "(float(row['plus_mm']), -float(row['minus_mm']))"): (
+        "((float(_config.title_block('drilled_hole')['plus_mm']),"
+        " -float(_config.title_block('drilled_hole')['minus_mm'])),)",
         "each",
     ),
     # Fixture builders apply the same bands their specs publish on the sheet.
@@ -292,19 +298,19 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "indexed for the symmetric rod-pin coordinate tolerance and position budget"
     ),
     ("ch_rocker_arm_tl_profile_fixture_spec", "DRILLED_BAND"): (
-        "indexed by _feature_requirements.limits for drilled-hole inspection limits"
+        "indexed by _printed_limits.limits for drilled-hole inspection limits"
     ),
     ("ch_rocker_arm_tl_vise_stop_spec", "SCREW_LENGTH_BAND"): (
         "indexed for the ISO 4762 screw's minimum engagement and maximum protrusion"
     ),
     ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"): (
-        "indexed by _feature_requirements.limits for the stud-drill inspection limits"
+        "indexed by _printed_limits.limits for the stud-drill inspection limits"
     ),
     ("ch_rocker_arm_tl_c_stop_bar_spec", "DRILLED_BAND"): (
-        "indexed by _feature_requirements.limits for screw-hole inspection limits"
+        "indexed by _printed_limits.limits for screw-hole inspection limits"
     ),
     ("ch_rocker_arm_tl_inspection_box_spec", "DRILLED_BAND"): (
-        "indexed by _feature_requirements.limits for tap-drill inspection limits"
+        "indexed by _printed_limits.limits for tap-drill inspection limits"
     ),
     ("ch_rocker_arm_tl_filing_button_spec", "BORE_BAND"): (
         "matched-fit design intent, indexed by filing_stud_spec for bore clearance"
@@ -473,14 +479,14 @@ def test_band_uses_are_found() -> None:
     ):
         assert f"{module}:band" in ids, f"missing band consumer anchor: {module}:band"
     for module in (
-        "ch_rocker_arm_tl_c_stop_bar_spec",
-        "ch_rocker_arm_tl_inspection_box_spec",
-        "ch_rocker_arm_tl_profile_fixture_spec",
-        "ch_rocker_arm_tl_vise_stop_spec",
-        "dt_cone_pivot_post_tl_saw_cradle_spec",
+        "draw_ch_rocker_arm_tl_c_stop_bar",
+        "draw_ch_rocker_arm_tl_inspection_box",
+        "draw_ch_rocker_arm_tl_profile_fixture",
+        "draw_ch_rocker_arm_tl_vise_stop",
+        "draw_dt_cone_pivot_post_tl_saw_cradle",
     ):
-        assert f"{module}:DRILLED_BAND" in ids, (
-            f"missing band consumer anchor: {module}:DRILLED_BAND"
+        assert f"{module}:part_spec.DRILLED_BAND" in ids, (
+            f"missing band consumer anchor: {module}:part_spec.DRILLED_BAND"
         )
 
 
@@ -596,11 +602,11 @@ def band_use_source_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Pat
         "build_ch_rocker_arm_tl_c_stop_bar": "band",
         "build_ch_rocker_arm_tl_diamond_pin": "band",
         "build_ch_rocker_arm_tl_inspection_box": "band",
-        "ch_rocker_arm_tl_c_stop_bar_spec": "DRILLED_BAND",
-        "ch_rocker_arm_tl_inspection_box_spec": "DRILLED_BAND",
-        "ch_rocker_arm_tl_profile_fixture_spec": "DRILLED_BAND",
-        "ch_rocker_arm_tl_vise_stop_spec": "DRILLED_BAND",
-        "dt_cone_pivot_post_tl_saw_cradle_spec": "DRILLED_BAND",
+        "draw_ch_rocker_arm_tl_c_stop_bar": "part_spec.DRILLED_BAND",
+        "draw_ch_rocker_arm_tl_inspection_box": "part_spec.DRILLED_BAND",
+        "draw_ch_rocker_arm_tl_profile_fixture": "part_spec.DRILLED_BAND",
+        "draw_ch_rocker_arm_tl_vise_stop": "part_spec.DRILLED_BAND",
+        "draw_dt_cone_pivot_post_tl_saw_cradle": "part_spec.DRILLED_BAND",
     }
     for module, expression in anchors.items():
         (tmp_path / f"{module}.py").write_text(
@@ -634,11 +640,11 @@ def test_band_uses_anchor_rejects_no_match(
         ("build_ch_rocker_arm_tl_c_stop_bar", "band"),
         ("build_ch_rocker_arm_tl_diamond_pin", "band"),
         ("build_ch_rocker_arm_tl_inspection_box", "band"),
-        ("ch_rocker_arm_tl_c_stop_bar_spec", "DRILLED_BAND"),
-        ("ch_rocker_arm_tl_inspection_box_spec", "DRILLED_BAND"),
-        ("ch_rocker_arm_tl_profile_fixture_spec", "DRILLED_BAND"),
-        ("ch_rocker_arm_tl_vise_stop_spec", "DRILLED_BAND"),
-        ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"),
+        ("draw_ch_rocker_arm_tl_c_stop_bar", "part_spec.DRILLED_BAND"),
+        ("draw_ch_rocker_arm_tl_inspection_box", "part_spec.DRILLED_BAND"),
+        ("draw_ch_rocker_arm_tl_profile_fixture", "part_spec.DRILLED_BAND"),
+        ("draw_ch_rocker_arm_tl_vise_stop", "part_spec.DRILLED_BAND"),
+        ("draw_dt_cone_pivot_post_tl_saw_cradle", "part_spec.DRILLED_BAND"),
     ],
 )
 def test_band_uses_anchor_rejects_one_directory_deep_source(

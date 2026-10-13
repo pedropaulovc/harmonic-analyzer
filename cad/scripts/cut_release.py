@@ -32,19 +32,21 @@ What it does, in order:
      so the comparison gallery renders from the bundle with no SolidWorks.
      The independently produced feature bundles are checked for the same face
      labels and patch counts as the full STEPs, then copied intact under
-     ``features/<stem>/`` with their own digest-bound adjacent STEP.
+     ``features/<stem>/`` with their own digest-bound adjacent STEP, and verified
+     strict travelers for every enrolled plan under ``travelers/<stem>/``.
      Everything is staged and zipped into ONE bundle
      ``cad/out/release/harmonic-analyzer-<version>.zip`` (``solidworks/`` native +
      ``slddrw/`` + ``step/`` + ``stl/`` + ``gltf/`` + ``boxes/`` + ``png/`` +
-     ``pdf/`` + ``diff/`` + ``features/``). Records the SW revision. (Build logs ship as a
-     SEPARATE logs asset, not in this zip.)
+     ``pdf/`` + ``diff/`` + ``features/`` + ``travelers/``). Records the SW revision.
+     (Build logs ship as a SEPARATE logs asset, not in this zip.)
   4. diff: render the changed-parts highlight (this staged bundle vs the previous
      release, fetched from GitHub) into ``stage/diff`` so it ships in the zip.
   5. Before publication, regenerate every README-generated picture from the
      versioned staged bundle into an untracked temporary directory, and validate
-     and stage the ``release.yaml`` next-revision update. Missing images, PDF
-     sheets, or rendering tools fail before any tag/push. Requires the project's
-     meshprobe/PDFium dependencies and Blender >= 5.2; no local COM is used.
+     and stage the ``release.yaml`` and enrolled plans' next-revision updates.
+     Missing images, PDF sheets, or rendering tools fail before any tag/push.
+     Requires the project's meshprobe/PDFium dependencies and Blender >= 5.2;
+     no local COM is used.
   6. git: annotated tag at HEAD, pushed to origin.
   7. gh: create the GitHub release for the tag (auto-generated notes header + our
      provenance block + an inline changed-parts gallery) and upload the bundle,
@@ -54,9 +56,10 @@ What it does, in order:
      as-is). ``--no-publish`` prepares everything but does not tag/push, invoke
      gh, or change tracked images/revision.
   8. Only after successful publication, install the prepared README images and
-     next-revision update. The release agent must put both into one generated-only
-     follow-up PR before the next release; that narrowly scoped PR is exempt from
-     regular review and may merge immediately. Executable code, README prose, and
+     next-revision updates. The release agent must put those revisions and images
+     into one generated-only follow-up PR before the next release; that narrowly
+     scoped PR is exempt from regular review and may merge immediately.
+     Executable code, README prose, and
      release-process changes still require normal review. A failed post-publication
      install reports the published version and exact manual recovery command.
 
@@ -89,6 +92,7 @@ from typing import Any
 from _check import log
 from _paths import CAD_ROOT, OUT_SLDASM
 import _config
+import _process_plans
 from _drawing_registry import DRAWINGS
 from export_models import stage_release_neutral
 from features_bound import stage_bound_features
@@ -216,68 +220,106 @@ def require_configured_revision(version: str) -> None:
 
 
 class _PreparedRevisionAdvance:
-    """A validated next-revision write held until the release is published."""
+    """Validated revision writes held until the release is published."""
 
-    def __init__(self, source: Path, temporary: Path, next_version: str) -> None:
-        self.source = source
-        self.temporary: Path | None = temporary
+    def __init__(
+        self, updates: list[tuple[Path, Path]], next_version: str
+    ) -> None:
+        self.updates = updates
         self.next_version = next_version
 
     def commit(self) -> str:
-        """Atomically install the prepared revision file."""
-        assert self.temporary is not None
-        os.replace(self.temporary, self.source)
-        self.temporary = None
+        """Install in order; individual replacements are atomic, the set is not."""
+        installed: list[Path] = []
+        for source, temporary in self.updates:
+            try:
+                os.replace(temporary, source)
+            except OSError as exc:
+                raise RuntimeError(
+                    f"partial revision install: installed "
+                    f"{', '.join(map(str, installed)) or '(none)'}; "
+                    f"could not install {source} at {self.next_version}: {exc}"
+                ) from exc
+            installed.append(source)
         return self.next_version
 
     def discard(self) -> None:
-        """Remove an uncommitted prepared revision file."""
-        if self.temporary is None:
-            return
-        try:
-            self.temporary.unlink(missing_ok=True)
-        except OSError:
-            pass
-        finally:
-            self.temporary = None
+        """Remove all remaining temporary files, including after a partial install."""
+        for _source, temporary in self.updates:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def prepare_configured_revision_advance(version: str) -> _PreparedRevisionAdvance:
-    """Validate and stage the next revision before publishing the release."""
+    """Stage release.yaml and enrolled plan revisions without touching sources."""
     require_configured_revision(version)
     next_version = f"v{int(version[1:]) + 1}"
-    source = RELEASE_VERSION_FILE
-    text = source.read_text(encoding="utf-8")
-    updated, count = re.subn(
-        r"(?m)^(\s*next_revision:\s*)v[1-9]\d*(\s*)$",
-        rf"\g<1>{next_version}\g<2>",
-        text,
-        count=1,
-    )
-    if count != 1:
-        raise RuntimeError(f"could not advance next_revision in {source}")
-
-    temporary: Path | None = None
+    sources = [
+        RELEASE_VERSION_FILE,
+        *(_process_plans.plan_path(stem) for stem in _process_plans.TRAVELER_STEMS),
+    ]
+    updates: list[tuple[Path, Path]] = []
+    prepared = _PreparedRevisionAdvance(updates, next_version)
     try:
-        with tempfile.NamedTemporaryFile(
-            "w",
-            encoding="utf-8",
-            dir=source.parent,
-            prefix=f".{source.name}.",
-            suffix=".tmp",
-            delete=False,
-        ) as target:
-            temporary = Path(target.name)
-            target.write(updated)
-            target.flush()
-            os.fsync(target.fileno())
-    except OSError as exc:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
-        raise RuntimeError(
-            f"could not prepare next_revision update in {source}: {exc}"
-        ) from exc
-    return _PreparedRevisionAdvance(source, temporary, next_version)
+        for source in sources:
+            text = source.read_bytes().decode("utf-8")
+            if source == RELEASE_VERSION_FILE:
+                updated, count = re.subn(
+                    rf"(?m)^([ \t]*next_revision:[ \t]*){re.escape(version)}"
+                    r"([ \t]*(?:#[^\r\n]*)?\r?)$",
+                    rf"\g<1>{next_version}\g<2>",
+                    text,
+                )
+                field = "next_revision"
+            else:
+                sections = list(re.finditer(
+                    r"(?m)^[ \t]*\[drawing\][ \t]*(?:#[^\r\n]*)?\r?$", text
+                ))
+                if len(sections) != 1:
+                    raise RuntimeError(f"expected one [drawing] section in {source}")
+                start = sections[0].end()
+                following = re.search(r"(?m)^[ \t]*\[", text[start:])
+                end = start + following.start() if following else len(text)
+                if len(re.findall(
+                    r"(?m)^[ \t]*revision[ \t]*=", text[start:end]
+                )) != 1:
+                    raise RuntimeError(
+                        f"expected exactly one [drawing].revision line in {source}"
+                    )
+                drawing, count = re.subn(
+                    rf"""(?m)^([ \t]*revision[ \t]*=[ \t]*)(["'])"""
+                    rf"""{re.escape(version)}\2([ \t]*(?:#[^\r\n]*)?\r?)$""",
+                    rf"\g<1>\g<2>{next_version}\g<2>\g<3>",
+                    text[start:end],
+                )
+                updated = text[:start] + drawing + text[end:]
+                field = "[drawing].revision"
+            if count != 1:
+                raise RuntimeError(
+                    f"expected exactly one {field} = {version} line in {source}; "
+                    f"found {count}"
+                )
+            with tempfile.NamedTemporaryFile(
+                "wb",
+                dir=source.parent,
+                prefix=f".{source.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as target:
+                updates.append((source, Path(target.name)))
+                target.write(updated.encode("utf-8"))
+                target.flush()
+                os.fsync(target.fileno())
+    except Exception as exc:
+        prepared.discard()
+        if isinstance(exc, OSError):
+            raise RuntimeError(
+                f"could not prepare revision update in {source}: {exc}"
+            ) from exc
+        raise
+    return prepared
 
 
 def advance_configured_revision(version: str) -> str:
@@ -473,8 +515,13 @@ def stage_comparisons(stage: Path) -> dict[str, Any]:
 
 
 def preflight(version: str, allow_dirty: bool) -> None:
-    """Fail fast before staging or creating anything."""
+    """Fail fast on configured/plan/manifest revision drift before staging."""
     require_configured_revision(version)
+    for stem in _process_plans.TRAVELER_STEMS:
+        try:
+            _process_plans.check_plan_revision(stem, CAD_ROOT / "out", revision=version)
+        except _process_plans.PlanBindError as exc:
+            raise SystemExit(f"!!  traveler plan {stem}: {exc}") from exc
     if _git("tag", "--list", version):
         raise SystemExit(f"!!  tag {version} already exists -- pick another version")
 
@@ -922,6 +969,10 @@ def bundle(
         path.relative_to(stage).as_posix()
         for path in stage_bound_features(CAD_ROOT / "out", stage)
     ]
+    facts["travelers"] = [
+        path.relative_to(stage).as_posix()
+        for path in _process_plans.stage_travelers(CAD_ROOT / "out", stage)
+    ]
     facts["drawings"] = stage_drawings(stage)
     facts["drawings"].update(native_drawings)
     facts["solidworks_files"] = sum(1 for path in sw_dir.iterdir() if path.is_file())
@@ -1038,6 +1089,13 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"this bundle with `cad/comparisons/tools/render_offline.py` (no SolidWorks)\n"
         f"- `png/` -- isometric preview renders "
         f"({facts['pngs']} images)\n"
+        + (
+            "- `travelers/` -- verified strict prechips travelers: "
+            + ", ".join(f"`{path}`" for path in facts["travelers"])
+            + "\n"
+            if facts.get("travelers")
+            else ""
+        )
         + (
             f"- `comparisons/` -- this model overlaid on Michelson's ch30 photos "
             f"({facts['comparisons']['pairs']} pairs"
@@ -1304,8 +1362,8 @@ def main() -> int:
                 if opts.no_publish:
                     report_no_publish(version, zip_path, facts, log_path)
                     log(
-                        "--no-publish: prepared all README images; tracked images "
-                        "and next_revision are unchanged"
+                        "--no-publish: prepared all README images; tracked images, "
+                        "next_revision and enrolled plan revisions are unchanged"
                     )
                     url = None
                 else:
@@ -1320,12 +1378,17 @@ def main() -> int:
                         except Exception as exc:
                             message = (
                                 f"release {version} was published at {url}, but could not "
-                                "install all generated README images and the revision bump; "
-                                "recover with `uv run python cad/scripts/trim_renders.py "
+                                "install all generated README images and revision bumps; "
+                                f"{exc}. Recover with `uv run --frozen python "
+                                "cad/scripts/trim_renders.py "
                                 f"--release-root cad/out/release/{PROJECT_SLUG}-{version}`, "
                                 f"set {RELEASE_VERSION_FILE} to "
-                                f"next_revision: {prepared.next_version}, and commit both "
-                                "in one generated-only follow-up PR before the next release. "
+                                f"next_revision: {prepared.next_version}, set "
+                                "[drawing].revision to "
+                                f"{prepared.next_version} in enrolled plans "
+                                f"{', '.join(str(source) for source, _ in prepared.updates[1:]) or '(none)'}, "
+                                "and commit those revisions and generated images in one "
+                                "generated-only follow-up PR before the next release. "
                                 "That image+revision-only PR is exempt from regular review "
                                 "and may merge immediately; any code or process changes "
                                 "still require normal review"
@@ -1341,7 +1404,9 @@ def main() -> int:
                     _telemetry.warn(
                         "POST-RELEASE PR REQUIRED: refreshed generated README images in "
                         f"{trim_renders.DOCS_IMAGES} and advanced "
-                        f"{RELEASE_VERSION_FILE} to {next_revision}. Commit both in one "
+                        f"{RELEASE_VERSION_FILE} and enrolled plans "
+                        f"{', '.join(str(source) for source, _ in prepared.updates[1:]) or '(none)'} "
+                        f"to {next_revision}. Commit revisions and images in one "
                         "generated-only follow-up PR before cutting the next release. "
                         "That narrowly image+revision-only PR is exempt from regular review "
                         "and may merge immediately; code, README prose, and release-process "

@@ -43,6 +43,11 @@ from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+import ch_rocker_arm_tl_vise_stop_spec as part_spec
+from _feature_requirements import part_metadata, requirement
+from _printed_limits import limits
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_vise_stop_spec import (
     ARM_INNER_Y,
     ARM_TOP_Z,
@@ -128,6 +133,114 @@ ELEVATION_KEEP = {
     "ScrewGrip": (_elevation(SEAT_X - SCREW_GRIP / 2.0, 0.0)[0], _ELEVATION_BOTTOM - 0.010),
     "NotchHeight": (_ELEVATION_LEFT - 0.012, _elevation(0.0, (BOTTOM_Z + NOTCH_TOP_Z) / 2.0)[1]),
 }
+
+
+_PLUS_X = ([1.0, 0.0, 0.0], ("__frame__",))
+
+
+def _sized_face(
+    normal: tuple[float, float, float], axis: str, value: float, field: str, size: float,
+    size_name: str, reference: str, contains_x: float | None = None,
+) -> dict:
+    """A planar face whose printed one-place size from ``reference`` is ``size``."""
+    offset = value if sum(normal) > 0.0 else -value
+    return {
+        'kind': "face",
+        'faces': (PlanarFace(normal, offset, contains_x_mm=contains_x),),
+        'requirements': (field,),
+        'fields': {
+            "normal": (list(normal), ("__frame__",)),
+            "plane": ({"frame": "model", "axis": axis, "value": value}, (size_name,)),
+            field: (limits(size, 1), (size_name,)),
+            f"{field}_nominal": (size, (size_name,)),
+            **(
+                {"height_from": (reference, (("draw_ch_rocker_arm_tl_vise_stop", "build"),))}
+                if field == "height"
+                else {"note": (f"{field} from {reference}", (size_name, ("draw_ch_rocker_arm_tl_vise_stop", "build")))}
+            ),
+        },
+        'precision': {field: 1},
+    }
+
+
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
+
+requirement("seat_face",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), part_spec.SEAT_X),),
+    requirements=("length",),
+    fields={
+        "normal": _PLUS_X,
+        "plane": ({"frame": "model", "axis": "x", "value": part_spec.SEAT_X}, ("SEAT_X", "BASE_DEPTH")),
+        "length": (limits(part_spec.OVERALL_LENGTH, 1), ("OVERALL_LENGTH",)),
+        "length_nominal": (part_spec.OVERALL_LENGTH, ("OVERALL_LENGTH",)),
+        "note": (
+            "clamped to the tapped face of a Kanetec MB-PM magnetic base "
+            "(40 x 40 x 40, M6 x 6 tap) by one M6 x 16 SHCS",
+            ("SCREW_HOLE_CALLOUT", "BASE_SKU", "BASE_SIZE", "BASE_TAP_DEPTH", "SCREW_THREAD", "SCREW_LENGTH"),
+        ),
+    },
+    precision={"length": 1},
+)
+
+requirement("finger_front",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), part_spec.FINGER_FRONT_X),),
+    requirements=("length",),
+    fields={
+        "normal": _PLUS_X,
+        "plane": (
+            {"frame": "model", "axis": "x", "value": part_spec.FINGER_FRONT_X},
+            ("FINGER_FRONT_X", "NOSE_FACE_X", "NOSE_PIN_LENGTH", "FINGER_THICK"),
+        ),
+        "length": (limits(part_spec.FINGER_FRONT, 1), ("FINGER_FRONT",)),
+        "length_nominal": (part_spec.FINGER_FRONT, ("FINGER_FRONT",)),
+        "note": ("length from seat_face", (("draw_ch_rocker_arm_tl_vise_stop", "build"),)),
+    },
+    precision={"length": 1},
+)
+
+# The lug's head-bearing face: its printed three-place distance from the
+# seat face (the screw grip) sets the screw's engagement and tip clearance.
+requirement("screw_seat",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), -part_spec.GRIP_FACE_X),),
+    requirements=("length",),
+    fields={
+        "normal": ([-1.0, 0.0, 0.0], ("__frame__",)),
+        "plane": (
+            {"frame": "model", "axis": "x", "value": part_spec.GRIP_FACE_X},
+            ("GRIP_FACE_X", "SEAT_X", "SCREW_GRIP"),
+        ),
+        "length": (limits(part_spec.SCREW_GRIP, 3), ("SCREW_GRIP", "DRAWING_PRECISION")),
+        "length_nominal": (part_spec.SCREW_GRIP, ("SCREW_GRIP",)),
+        "note": (
+            "lug face under the M6 SHCS head; length is the grip from the seat face",
+            ("SCREW_GRIP", "SEAT_X", ("draw_ch_rocker_arm_tl_vise_stop", "build")),
+        ),
+    },
+    precision={"length": 3},
+)
+
+# The printed heights and widths' reference faces: the lug's bottom and
+# the shared rear face.
+requirement("bottom_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), -part_spec.BOTTOM_Z),),
+    requirements=(),
+    fields={
+        "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "z", "value": part_spec.BOTTOM_Z}, ("BOTTOM_Z", "NOSE_HEIGHT")),
+    },
+)
+
+# The step's ceiling under the arm (station inside the arm span, should
+# the finger's underside bind as a separate coplanar face).
+requirement("notch_ceiling", **_sized_face(
+    (0.0, 0.0, -1.0), "z", part_spec.NOTCH_TOP_Z, "height", part_spec.NOTCH_HEIGHT, "NOTCH_HEIGHT", "bottom_face",
+    contains_x=(part_spec.GRIP_FACE_X + part_spec.FINGER_FRONT_X) / 2.0,
+))
+
 SIDE_KEEP = {
     "FingerLength": (SIDE_CENTER[0], _SIDE_BOTTOM - 0.012),
     "NoseFromRear": (_side((NOSE_Y + REAR_Y) / 2.0, 0.0)[0], _SIDE_BOTTOM - 0.023),
@@ -140,12 +253,120 @@ SIDE_KEEP = {
     "NoseHoleDia": (_side(NOSE_Y, 0.0)[0] - 0.011, _SIDE_TOP + 0.034),
     "ScrewHoleDia": (_SIDE_RIGHT + 0.058, _SIDE_TOP + 0.036),
 }
+
+
+requirement("rear_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), part_spec.REAR_Y),),
+    requirements=(),
+    fields={
+        "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "y", "value": part_spec.REAR_Y}, ("REAR_Y", "SCREW_FROM_REAR")),
+    },
+)
+
+requirement("finger_top", **_sized_face(
+    (0.0, 0.0, 1.0), "z", part_spec.FINGER_TOP_Z, "height", part_spec.FINGER_HEIGHT, "FINGER_HEIGHT", "bottom_face"
+))
+
+requirement("finger_end", **_sized_face(
+    (0.0, -1.0, 0.0), "y", part_spec.FINGER_END_Y, "length", part_spec.FINGER_LENGTH, "FINGER_LENGTH", "rear_face"
+))
+
+requirement("arm_top", **_sized_face((0.0, 0.0, 1.0), "z", part_spec.ARM_TOP_Z, "height", part_spec.ARM_HEIGHT, "ARM_HEIGHT", "bottom_face"))
+
+requirement("arm_inner_face", **_sized_face(
+    (0.0, -1.0, 0.0), "y", part_spec.ARM_INNER_Y, "width", part_spec.ARM_WIDTH, "ARM_WIDTH", "rear_face"
+))
+
 # The drilling and the bought nose pin it takes read under the hole's size,
 # standing high enough above the section for the three callout lines.
 CALLOUTS_BELOW = {
     "NoseHoleDia": f"DRILL THRU\n{NOSE_PIN_CALLOUT}",
     "ScrewHoleDia": SCREW_HOLE_CALLOUT,
 }
+
+
+requirement("nose_hole",
+    kind="hole",
+    faces=(CylinderFace(part_spec.NOSE_HOLE_DIA),),
+    requirements=("dia", "at", "end", "station", "height"),
+    fields={
+        "at": ([part_spec.FINGER_FRONT_X, part_spec.NOSE_Y, part_spec.NOSE_Z], ("FINGER_FRONT_X", "NOSE_Y", "NOSE_Z")),
+        "axis": _PLUS_X,
+        "dia": (limits(part_spec.NOSE_HOLE_DIA, 2, part_spec.DRILLED_BAND), ("NOSE_HOLE_DIA", "DRILLED_BAND")),
+        "dia_nominal": (part_spec.NOSE_HOLE_DIA, ("NOSE_HOLE_DIA",)),
+        "thru": (True, (("draw_ch_rocker_arm_tl_vise_stop", "CALLOUTS_BELOW"),)),
+        # Printed NoseFromRear / NoseHeight, from the rear and bottom faces
+        # (the schema's only reference field is height_from; the note
+        # names the station's).
+        "station": (limits(part_spec.NOSE_FROM_REAR, 1), ("NOSE_FROM_REAR", "REAR_Y", "NOSE_Y")),
+        "station_nominal": (part_spec.NOSE_FROM_REAR, ("NOSE_FROM_REAR",)),
+        "height": (limits(part_spec.NOSE_HEIGHT, 1), ("NOSE_HEIGHT",)),
+        "height_nominal": (part_spec.NOSE_HEIGHT, ("NOSE_HEIGHT",)),
+        "height_from": ("bottom_face", (("draw_ch_rocker_arm_tl_vise_stop", "build"),)),
+        "process": ("drill", (("draw_ch_rocker_arm_tl_vise_stop", "CALLOUTS_BELOW"),)),
+        # The stop contact: the fixed pin's end, on the blank's raw left
+        # end (nominal; X zero is edge-found on the part afterwards).
+        "end": (
+            [part_spec.NOSE_FACE_X, part_spec.NOSE_Y, part_spec.NOSE_Z],
+            ("NOSE_FACE_X", "BLANK_END_X_SETUP", "JAW_HALF_WIDTH", ("ch_rocker_arm_spec", "ROD_TIP_X")),
+        ),
+        "supply_length": (part_spec.NOSE_PIN_LENGTH, ("NOSE_PIN_LENGTH",)),
+        "note": (
+            "bought hardened 6 x 8 dowel pin fixed immovable, flush with the back face; "
+            "its end is the blank-end stop; station from rear_face, height from bottom_face",
+            ("DRAWING_NOTES", "NOSE_PIN_CALLOUT", "NOSE_PIN_DIA", "NOSE_PIN_LENGTH", "BOND_GAP_MAX", ("draw_ch_rocker_arm_tl_vise_stop", "build")),
+        ),
+    },
+    precision={"dia": 2, "station": 1, "height": 1},
+)
+
+requirement("screw_hole",
+    kind="hole",
+    faces=(CylinderFace(part_spec.SCREW_HOLE_DIA),),
+    requirements=("dia", "at", "station", "height"),
+    fields={
+        "at": ([part_spec.SEAT_X, part_spec.SCREW_Y, part_spec.SCREW_Z], ("SEAT_X", "SCREW_Y", "SCREW_Z")),
+        "axis": ([-1.0, 0.0, 0.0], ("__frame__",)),
+        "dia": (limits(part_spec.SCREW_HOLE_DIA, 2, part_spec.DRILLED_BAND), ("SCREW_HOLE_DIA", "DRILLED_BAND")),
+        "dia_nominal": (part_spec.SCREW_HOLE_DIA, ("SCREW_HOLE_DIA",)),
+        "thru": (True, ("SCREW_HOLE_CALLOUT",)),
+        # Printed ScrewFromRear / ScrewHeight, from the rear and bottom faces.
+        "station": (limits(part_spec.SCREW_FROM_REAR, 1), ("SCREW_FROM_REAR",)),
+        "station_nominal": (part_spec.SCREW_FROM_REAR, ("SCREW_FROM_REAR",)),
+        "height": (limits(part_spec.SCREW_HEIGHT, 1), ("SCREW_HEIGHT",)),
+        "height_nominal": (part_spec.SCREW_HEIGHT, ("SCREW_HEIGHT",)),
+        "height_from": ("bottom_face", (("draw_ch_rocker_arm_tl_vise_stop", "build"),)),
+        "process": ("drill", ("SCREW_HOLE_CALLOUT",)),
+        "note": (
+            f"drilled clearance through the lug for one M6 x {part_spec.SCREW_LENGTH:g} SHCS (ISO 4762) "
+            f"into the M6 x {part_spec.BASE_TAP_DEPTH:g} deep tap of a Kanetec MB-PM base; head on "
+            f"the lug face (screw_seat, {part_spec.SCREW_GRIP:.3f} +-{part_spec.LINEAR_3PL:g} from the seat); "
+            f"full-thread engagement {part_spec.SCREW_ENGAGEMENT_PRINTED:.1f} min "
+            f"({part_spec.SCREW_ENGAGEMENT_PRINTED_D:.2f}D); tip {part_spec.SCREW_TIP_CLEARANCE_PRINTED:.1f} min "
+            "clear of the tap bottom; hand-seating load only; station from rear_face, "
+            "height from bottom_face",
+            (
+                "SCREW_HOLE_CALLOUT",
+                "SCREW_THREAD",
+                "SCREW_LENGTH",
+                "SCREW_LENGTH_BAND",
+                "BASE_SKU",
+                "BASE_TAP_DEPTH",
+                "SCREW_GRIP",
+                "LINEAR_3PL",
+                "SCREW_ENGAGEMENT_PRINTED",
+                "SCREW_ENGAGEMENT_PRINTED_D",
+                "SCREW_TIP_CLEARANCE_PRINTED",
+                "SCREW_ENGAGEMENT_MIN",
+                "SCREW_TIP_CLEARANCE_MIN",
+            ),
+        ),
+    },
+    precision={"dia": 2, "station": 1, "height": 1},
+)
+
 
 
 async def build(adapter: Any) -> dict[str, str]:

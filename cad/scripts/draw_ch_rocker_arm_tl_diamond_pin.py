@@ -29,6 +29,11 @@ from _paths import CAD_ROOT
 from _section_axis import create_section_axis_centerline, position_section_caption
 from _session import run_build
 import _telemetry
+import ch_rocker_arm_tl_diamond_pin_spec as part_spec
+from _feature_requirements import part_metadata, requirement
+from _printed_limits import limits
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_diamond_pin_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -74,6 +79,45 @@ AXIAL_XY = {
         -0.052,
     ),  # below the view: a size of the bought pin, not a body station
 }
+
+
+_AXIS = ([0.0, 0.0, 1.0], ("__frame__",))
+_ROD = ("ch_rocker_arm_spec", "ROD_HOLE_SPEC")
+
+
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", "DRAWING_REFERENCE_PRECISION"))
+
+requirement("neck_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("height",),
+    fields={
+        "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
+        "height": (
+            limits(part_spec.COLLAR_END, 1, part_spec.COLLAR_END_BAND),
+            ("COLLAR_END", "COLLAR_END_BAND", "FACE_B_ABOVE_PLATE"),
+        ),
+    },
+    precision={"height": 1},
+)
+
+# The printed 15.0 body length: the shank end face from the neck face.
+requirement("shank_end",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part_spec.OVERALL_LENGTH),),
+    requirements=("height",),
+    fields={
+        "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "plane": (
+            {"frame": "model", "axis": "z", "value": part_spec.OVERALL_LENGTH},
+            ("OVERALL_LENGTH",),
+        ),
+        "height": (limits(part_spec.OVERALL_LENGTH, 1), ("OVERALL_LENGTH",)),
+    },
+    precision={"height": 1},
+)
+
 # Reference overall, land tip to shank end, on the top tier.
 OVERALL_REF_XY = (6.7, 0.082)
 OVERALL_REF = OVERALL_LENGTH + LAND_HEIGHT
@@ -83,10 +127,134 @@ DIAMETER_XY = {
     "ReamDia": (8.6, -0.040),
     "ShankDia": (13.5, -0.026),
 }
+
+
+requirement("collar_seat",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part_spec.COLLAR_END),),
+    requirements=("dia",),
+    fields={
+        "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "plane": (
+            {"frame": "model", "axis": "z", "value": part_spec.COLLAR_END},
+            ("COLLAR_END",),
+        ),
+        "dia": (limits(part_spec.COLLAR_DIA, 1), ("COLLAR_DIA",)),
+    },
+    precision={"dia": 1},
+)
+
+requirement("shank",
+    kind="boss",
+    faces=(CylinderFace(part_spec.SHANK_DIA, tolerance_mm=0.003),),
+    requirements=("dia",),
+    fields={
+        "at": ([0.0, 0.0, part_spec.COLLAR_END], ("COLLAR_END",)),
+        "axis": _AXIS,
+        "dia": (limits(part_spec.SHANK_DIA, 2, part_spec.SHANK_BAND), ("SHANK_DIA", "SHANK_BAND")),
+        "dia_nominal": (part_spec.SHANK_DIA, ("SHANK_DIA",)),
+        # Reference only: the inspected lengths are OverallLength (shank_end)
+        # and CollarEnd (neck_face); SHANK_LENGTH_LIMITS keeps the derived max.
+        "length_nominal": (
+            round(part_spec.OVERALL_LENGTH - part_spec.COLLAR_END, 6),
+            ("OVERALL_LENGTH", "COLLAR_END"),
+        ),
+    },
+    precision={"dia": 2},
+)
+
+# The neck whose wall is the named exception, and the ream's open length
+# below the bonded pin (the pin fills the bore through the neck).
+requirement("neck",
+    kind="boss",
+    faces=(
+        CylinderFace(part_spec.NECK_DIA, contains_z_mm=part_spec.NECK_LENGTH / 2.0, tolerance_mm=0.003),
+    ),
+    requirements=("dia", "length"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "axis": _AXIS,
+        "dia": (
+            limits(part_spec.NECK_DIA, part_spec.NECK_PLACES, part_spec.NECK_BAND),
+            ("NECK_DIA", "NECK_BAND"),
+        ),
+        "length": (limits(part_spec.NECK_LENGTH, 1), ("NECK_LENGTH",)),
+    },
+    precision={"dia": part_spec.NECK_PLACES, "length": 1},
+)
+
+requirement("ream",
+    kind="hole",
+    faces=(
+        CylinderFace(
+            part_spec.REAM_DIA,
+            contains_z_mm=(part_spec.PIN_ENGAGEMENT + part_spec.REAM_DEPTH) / 2.0,
+            tolerance_mm=0.003,
+        ),
+    ),
+    requirements=("dia", "depth"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "axis": _AXIS,
+        "dia": (limits(part_spec.REAM_DIA, 3, part_spec.REAM_BAND), ("REAM_DIA", "REAM_BAND")),
+        "depth": (limits(part_spec.REAM_DEPTH, 1), ("REAM_DEPTH",)),
+    },
+    precision={"dia": 3, "depth": 1},
+)
+
 END_KEEP = {
     "LandDia": (0.375, 0.225),
     "FlatsAF": (0.335, 0.232),
 }
+
+
+requirement("lands",
+    kind="pin",
+    faces=(CylinderFace(part_spec.LAND_DIA, contains_z_mm=-1.0, tolerance_mm=0.003),),
+    requirements=("dia", "width", "height", "length"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "axis": _AXIS,
+        "dia": (
+            limits(part_spec.LAND_DIA, part_spec.LAND_PLACES, part_spec.LAND_BAND),
+            ("LAND_DIA", "LAND_BAND", _ROD),
+        ),
+        "dia_nominal": (part_spec.LAND_DIA, ("LAND_DIA",)),
+        # width = across the stoned flats (normals +-X, see "flat_pos"/"flat_neg")
+        "width": (limits(part_spec.FLATS_AF, part_spec.FLATS_PLACES), ("FLATS_AF",)),
+        "z_mm": ([-part_spec.LAND_HEIGHT, 0.0], ("LAND_HEIGHT",)),
+        "height": (
+            limits(part_spec.LAND_HEIGHT, part_spec.LAND_HEIGHT_PLACES, part_spec.LAND_HEIGHT_BAND),
+            (
+                "LAND_HEIGHT",
+                "LAND_HEIGHT_BAND",
+                "COLLAR_END_BAND",
+                "FACE_B_ABOVE_PLATE",
+                ("ch_rocker_arm_spec", "ARM_THICKNESS"),
+            ),
+        ),
+        # The bought pin's total length: keeps it off the bore bottom and
+        # its inserted end past the thin neck.
+        "length": (
+            limits(part_spec.PIN_LENGTH, 1),
+            ("PIN_LENGTH", "REAM_DEPTH", "NECK_LENGTH"),
+        ),
+    },
+    precision={"width": part_spec.FLATS_PLACES, "height": part_spec.LAND_HEIGHT_PLACES, "length": 1},
+)
+
+for name, sign in (("flat_pos", 1.0), ("flat_neg", -1.0)):
+    requirement(name,
+        kind="face",
+        faces=(PlanarFace((sign, 0.0, 0.0), part_spec.FLATS_AF / 2.0),),
+        requirements=("normal",),
+        fields={
+            "normal": ([sign, 0.0, 0.0], ("__frame__",)),
+            "width": (limits(part_spec.FLATS_AF, part_spec.FLATS_PLACES), ("FLATS_AF",)),
+        },
+        precision={"width": part_spec.FLATS_PLACES},
+    )
+
 
 
 def _section_mapper(adapter: Any, section: Any):

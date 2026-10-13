@@ -25,11 +25,8 @@ from __future__ import annotations
 
 import dt_cone_pivot_post_spec as post
 import dt_cone_pivot_post_tl_cap_jaw_button_spec as button
-from _feature_requirements import ExportFeature, limits
-from _gtol_cylinder import CylinderFace
-from _gtol_planar import PlanarFace
 from _hole_spec import HoleSpec
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 
 MM_PER_IN = 25.4
 
@@ -87,14 +84,16 @@ PARALLEL_HEIGHT = 0.5 * MM_PER_IN
 
 _XX = printed_band_mm(2)
 _HOLE_MAX = BOLT_HOLE_DIA + drilled_oversize_mm()
-_HEIGHT_RANGE = limits(PLATE_HEIGHT, HEIGHT_PLACES)
-_THICK_RANGE = limits(PLATE_THICK, THICK_PLACES)
+_HEIGHT_RANGE = [round(PLATE_HEIGHT + deviation, 12) for deviation in printed_deviations(PLATE_HEIGHT, HEIGHT_PLACES)]
+_THICK_RANGE = [round(PLATE_THICK + deviation, 12) for deviation in printed_deviations(PLATE_THICK, THICK_PLACES)]
 
 # Jaw top above foot B at the plate's printed height band.
 JAW_TOP_ABOVE_FOOT = tuple(height - PARALLEL_HEIGHT for height in _HEIGHT_RANGE)
 # The jaws reach over the full caps: the cap top at the post's highest cone
 # axis and largest boss.
-_BOSS_MAX = limits(post.CONE_BOSS_DIA, post.DRAWING_PRECISION_BY_NAME["ConeBossDia"])[1]
+_BOSS_MAX = round(
+    post.CONE_BOSS_DIA + printed_deviations(post.CONE_BOSS_DIA, post.DRAWING_PRECISION_BY_NAME["ConeBossDia"])[1], 12
+)
 CAP_TOP_ABOVE_FOOT = post.BORE_HEIGHT + post.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM + _BOSS_MAX / 2.0
 # ...and stay under the head shoulder and the crank boss underside.
 _HEAD_SHOULDER_MIN = post.HEAD_BASE_Y
@@ -109,7 +108,7 @@ if min(JAW_TOP_MARGINS.values()) <= 0.0:
 
 # The cap jaw button bears on solid gripping face: its largest face, at the
 # post's lowest cone axis, stays above the counterbore rims.
-_BUTTON_FACE_MAX = limits(button.FACE_DIA, button.FACE_PLACES)[1]
+_BUTTON_FACE_MAX = round(button.FACE_DIA + printed_deviations(button.FACE_DIA, button.FACE_PLACES)[1], 12)
 _BUTTON_BOTTOM_ABOVE_BED = (
     PARALLEL_HEIGHT + post.BORE_HEIGHT - post.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM
 ) - _BUTTON_FACE_MAX / 2.0
@@ -120,7 +119,7 @@ if BUTTON_OVER_CBORE <= 0.0:
 
 # The vise still closes on the buttons over the caps with the thicker plates.
 OPENING_WITH_PLATES = VISE_OPENING - 2.0 * (_THICK_RANGE[1] - HARD_JAW_DEPTH)
-GRIP_SPAN = post.CONE_BOSS_LENGTH + 2.0 * limits(button.FACE_THICK, 1)[1]
+GRIP_SPAN = post.CONE_BOSS_LENGTH + 2.0 * round(button.FACE_THICK + printed_deviations(button.FACE_THICK, 1)[1], 12)
 if OPENING_WITH_PLATES <= GRIP_SPAN:
     raise AssertionError("soft jaws cannot open over the buttoned cone caps")
 
@@ -165,113 +164,3 @@ DRAWING_NOTES = "\n".join(
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 
-_JAW_TOP_SOURCES = (
-    "PLATE_HEIGHT",
-    "PARALLEL_HEIGHT",
-    ("dt_cone_pivot_post_spec", "BORE_HEIGHT"),
-    ("dt_cone_pivot_post_spec", "JOURNAL_AXIS_HEIGHT_TOLERANCE_MM"),
-    ("dt_cone_pivot_post_spec", "CONE_BOSS_DIA"),
-    ("dt_cone_pivot_post_spec", "HEAD_BASE_Y"),
-    ("dt_cone_pivot_post_spec", "CRANK_BORE_HEIGHT"),
-    ("dt_cone_pivot_post_spec", "CRANK_BOSS_DIA"),
-)
-_CBORE_FLOOR_Z = PLATE_THICK - CBORE_DEPTH
-
-
-def _bolt_features(side: str, x: float, name: str) -> dict[str, ExportFeature]:
-    hole = f"bolt_{side}"
-    return {
-        hole: ExportFeature(
-            kind="hole",
-            faces=(CylinderFace(BOLT_HOLE_DIA, contains_x_mm=x),),
-            requirements=("dia", "thru", "station", "height"),
-            fields={
-                "at": ([x, BOLT_HEIGHT, PLATE_THICK], (name, "BOLT_HEIGHT", "PLATE_THICK")),
-                "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
-                "dia": (
-                    [BOLT_HOLE_DIA, round(_HOLE_MAX, 12)],
-                    ("BOLT_HOLE_DIA", "JAW_SCREW_MAJOR"),
-                ),
-                "nominal_dia": (BOLT_HOLE_DIA, ("BOLT_HOLE_DIA",)),
-                "thru": (True, ("BOLT_HOLE_SPEC",)),
-                "station": (limits(x, BOLT_PLACES), (name,)),
-                "station_nominal": (x, (name,)),
-                "height": (limits(BOLT_HEIGHT, BOLT_PLACES), ("BOLT_HEIGHT",)),
-                "height_nominal": (BOLT_HEIGHT, ("BOLT_HEIGHT",)),
-            },
-            precision={"dia": 2, "station": BOLT_PLACES, "height": BOLT_PLACES},
-        ),
-        f"{hole}_counterbore": ExportFeature(
-            kind="counterbore",
-            faces=(
-                CylinderFace(CBORE_DIA, contains_x_mm=x),
-                PlanarFace((0.0, 0.0, 1.0), _CBORE_FLOOR_Z, contains_x_mm=x),
-            ),
-            requirements=("dia", "depth"),
-            fields={
-                "parent": (hole, ("BOLT_HOLE_SPEC",)),
-                "dia": (limits(CBORE_DIA, 2), ("CBORE_DIA", "JAW_SCREW_HEAD_DIA")),
-                "nominal_dia": (CBORE_DIA, ("CBORE_DIA",)),
-                "depth": (limits(CBORE_DEPTH, 2), ("CBORE_DEPTH", "JAW_SCREW_HEAD_HEIGHT")),
-                "depth_ref": (CBORE_DEPTH, ("CBORE_DEPTH",)),
-            },
-            precision={"dia": 2, "depth": 2},
-        ),
-    }
-
-
-EXPORT_FEATURES: dict[str, ExportFeature] = {
-    # The gripping face carries a cap jaw button on each cone-boss cap.
-    "grip_face": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 0.0, 1.0), PLATE_THICK),),
-        requirements=("thickness",),
-        fields={
-            "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "z", "value": PLATE_THICK}, ("PLATE_THICK",)),
-            "thickness": (_THICK_RANGE, ("PLATE_THICK",)),
-            "thickness_nominal": (PLATE_THICK, ("PLATE_THICK",)),
-        },
-        precision={"thickness": THICK_PLACES},
-    ),
-    # The back face seats on the vise jaw in place of the hardened plate.
-    "jaw_seat": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
-        requirements=("thickness",),
-        fields={
-            "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
-            "thickness": (_THICK_RANGE, ("PLATE_THICK",)),
-        },
-        precision={"thickness": THICK_PLACES},
-    ),
-    # The bottom edge stands on the vise bed beside the parallels.
-    "bed_face": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
-        requirements=("height",),
-        fields={
-            "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
-            "height": (_HEIGHT_RANGE, ("PLATE_HEIGHT",)),
-        },
-        precision={"height": HEIGHT_PLACES},
-    ),
-    # The jaw top: over the cone caps, under the head shoulder and crank boss.
-    "jaw_top": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 1.0, 0.0), PLATE_HEIGHT),),
-        requirements=("height", "length"),
-        fields={
-            "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "y", "value": PLATE_HEIGHT}, ("PLATE_HEIGHT",)),
-            "height": (_HEIGHT_RANGE, _JAW_TOP_SOURCES),
-            "height_nominal": (PLATE_HEIGHT, ("PLATE_HEIGHT",)),
-            "length": (limits(PLATE_LENGTH, LENGTH_PLACES), ("PLATE_LENGTH",)),
-        },
-        precision={"height": HEIGHT_PLACES, "length": LENGTH_PLACES},
-    ),
-    **_bolt_features("left", BOLT_LEFT_X, "BOLT_LEFT_X"),
-    **_bolt_features("right", BOLT_RIGHT_X, "BOLT_RIGHT_X"),
-}

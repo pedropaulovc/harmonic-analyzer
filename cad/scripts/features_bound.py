@@ -1,14 +1,12 @@
 """Check and stage isolated feature bundles against the full neutral export.
 
-SolidWorks never writes the same STEP bytes twice: the header stamps the write
-time and every export renumbers its entities. The release-only gate therefore
-compares what the feature contract needs. For each supported part, the scoped
-STEP (``features/<stem>/<part>.STEP``) and the full export
-(``step/<part>.STEP``) must carry the same feature -> face-label -> patch-count
-map, read with ``step_face_sets``. ``features.toml`` must satisfy the pinned
-prechips schema, bind the exact raw bytes of its adjacent scoped STEP, and
-record that STEP's exact face sets per feature. Both raw digests are logged,
-and every failure reports them. The gate never opens CAD or repairs either producer.
+The isolated producer owns the raw labelled STEP and its adjacent manifest.
+Full export copies that STEP without rewriting it; the release-only gate
+requires byte-identical scoped and neutral copies. ``features.toml`` must
+satisfy the pinned prechips schema, bind its adjacent STEP's exact raw bytes,
+and record that STEP's exact face sets per feature. Consumers derive feature
+names from the produced manifest, never reload drawing declarations. Every
+failure is loud; neither export nor the gate regenerates a missing bundle.
 """
 
 from __future__ import annotations
@@ -16,7 +14,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import tomllib
-from collections import Counter
 from pathlib import Path
 from typing import NoReturn
 
@@ -33,8 +30,6 @@ _REBUILD = "regenerate package:features and export before releasing"
 # #1204 spike found the v38 rocker-arm pivot bore as two Ø6.5 halves, so a
 # half-labelled split (one patch) must fail here, not ship a partial datum A.
 _STEP_FACE_COUNTS = {"ch_rocker_arm": {"pivot_bore": 2}}
-
-FaceLabels = dict[str, Counter[str]]
 
 
 class FeaturesBoundError(RuntimeError):
@@ -59,29 +54,15 @@ def _face_sets(path: Path, content: bytes, features: list[str], digests: str) ->
         _fail(str(path), f"{exc} ({digests})")
 
 
-def _face_labels(faces: dict[str, list[str]]) -> FaceLabels:
-    # A face reference is ``#<entity>/ADVANCED_FACE[<ordinal>]/<label>``; only
-    # the label survives a re-export, so entity ids and file order are dropped.
-    return {
-        feature: Counter(ref.rsplit("/", 1)[1] for ref in refs)
-        for feature, refs in faces.items()
-    }
-
-
-def _validated_files(out: Path) -> tuple[tuple[Path, bytes], ...]:
+def _validated_bundles(out: Path) -> tuple[tuple[Path, bytes], ...]:
+    """Read and validate the complete producer inventory before any copy."""
     pending: list[tuple[Path, bytes]] = []
     for stem in export_features.SUPPORTED_PARTS:
-        dashed = stem.replace("_", "-")
-        directory = out / "features" / stem
-        step_path = directory / f"{dashed}.STEP"
-        manifest_path = directory / "features.toml"
-        full_path = out / "step" / step_path.name
+        manifest_path, step_path = export_features.bundle_paths(stem, out)
         step_bytes = _read(step_path)
         manifest_bytes = _read(manifest_path)
-        full_bytes = _read(full_path)
         scoped_digest = hashlib.sha256(step_bytes).hexdigest()
-        full_digest = hashlib.sha256(full_bytes).hexdigest()
-        digests = f"scoped sha256 {scoped_digest}, full sha256 {full_digest}"
+        digests = f"scoped sha256 {scoped_digest}"
         try:
             manifest = tomllib.loads(manifest_bytes.decode("utf-8"))
         except (UnicodeError, tomllib.TOMLDecodeError) as exc:
@@ -90,37 +71,65 @@ def _validated_files(out: Path) -> tuple[tuple[Path, bytes], ...]:
             validated = Features.model_validate(manifest)
         except ValidationError as exc:
             _fail(str(manifest_path), f"invalid feature manifest ({exc})")
+        if validated.part != stem.replace("_", "-"):
+            _fail(str(manifest_path), f"part must identify {stem.replace('_', '-')!r}, recorded {validated.part!r}")
         if manifest.get("step") != step_path.name:
             _fail(str(manifest_path), f"step must be adjacent basename {step_path.name!r}, recorded {manifest.get('step')!r}")
         if manifest.get("step_sha256") != scoped_digest:
             _fail(str(manifest_path), f"step_sha256 {manifest.get('step_sha256')!r} does not bind the adjacent STEP ({digests})")
-        features = list(export_features.feature_selectors(stem))
+        features = list(validated.features)
+        if not features:
+            _fail(str(manifest_path), "feature manifest has no features")
         scoped_faces = _face_sets(step_path, step_bytes, features, digests)
-        if set(validated.features) != set(features):
-            _fail(str(manifest_path), f"feature names differ from scoped STEP contract ({digests})")
         for feature, refs in scoped_faces.items():
             recorded = validated.features[feature].faces
-            if not isinstance(recorded, list) or set(recorded) != set(refs):
+            if not isinstance(recorded, list) or len(recorded) != len(refs) or set(recorded) != set(refs):
                 _fail(str(manifest_path), f"{feature} faces {recorded!r} differ from adjacent STEP {refs!r} ({digests})")
-        scoped = _face_labels(scoped_faces)
-        full = _face_labels(_face_sets(full_path, full_bytes, features, digests))
-        if scoped != full:
-            differing = {
-                feature: {"scoped": dict(scoped[feature]), "full": dict(full[feature])}
-                for feature in features
-                if scoped[feature] != full[feature]
-            }
-            _fail(stem, f"scoped and full STEP face labels differ {differing} ({digests})")
         for feature, expected in _STEP_FACE_COUNTS.get(stem, {}).items():
-            actual = sum(scoped[feature].values())
+            actual = len(scoped_faces.get(feature, ()))
             if actual != expected:
                 _fail(stem, f"{feature} must be exactly {expected} STEP faces, found {actual} ({digests})")
-        _telemetry.info(
-            f"features-bound: {stem} face labels agree ({digests})",
-            stem=stem, scoped_sha256=scoped_digest, full_sha256=full_digest,
-        )
         pending.extend(((step_path, step_bytes), (manifest_path, manifest_bytes)))
     return tuple(pending)
+
+
+def stage_feature_steps(out: Path, step_directory: Path) -> tuple[Path, ...]:
+    """Copy every validated producer STEP to the neutral cache, byte-for-byte.
+
+    All bundles must be complete and valid before the first destination is
+    created. Copy the snapshots just validated, not a later read of the cache.
+    """
+    with _telemetry.span("export.feature_steps", parts=len(export_features.SUPPORTED_PARTS)):
+        pending = _validated_bundles(Path(out))
+        staged = []
+        for source, content in pending:
+            if source.suffix != ".STEP":
+                continue
+            target = Path(step_directory) / source.name
+            if not target.is_file() or target.read_bytes() != content:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(content)
+            staged.append(target)
+        return tuple(staged)
+
+
+def _validated_files(out: Path) -> tuple[tuple[Path, bytes], ...]:
+    pending = _validated_bundles(out)
+    for step_path, step_bytes in pending:
+        if step_path.suffix != ".STEP":
+            continue
+        full_path = out / "step" / step_path.name
+        full_bytes = _read(full_path)
+        scoped_digest = hashlib.sha256(step_bytes).hexdigest()
+        full_digest = hashlib.sha256(full_bytes).hexdigest()
+        digests = f"scoped sha256 {scoped_digest}, full sha256 {full_digest}"
+        if step_bytes != full_bytes:
+            _fail(str(full_path), f"full STEP is not the exact scoped copy ({digests})")
+        _telemetry.info(
+            f"features-bound: {step_path.parent.name} exact STEP copy agrees ({digests})",
+            stem=step_path.parent.name, scoped_sha256=scoped_digest, full_sha256=full_digest,
+        )
+    return pending
 
 
 def check_bound_features(out: Path | None = None) -> tuple[Path, ...]:

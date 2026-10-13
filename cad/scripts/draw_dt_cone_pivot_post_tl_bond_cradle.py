@@ -38,6 +38,11 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+import dt_cone_pivot_post_tl_bond_cradle_spec as part_spec
+from _feature_requirements import part_metadata, requirement
+from _printed_limits import limits
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from dt_cone_pivot_post_tl_bond_cradle_spec import (
     BODY_SADDLE_THICK,
     BODY_SADDLE_Y,
@@ -117,6 +122,224 @@ PLAN_KEEP = {
     "CrankPinY": (-64.0, CRANK_PIN_Y / 2.0, 0.0),
     "CrankPinDia": (-52.0, 100.0, 0.0),
 }
+
+
+_POST = "dt_cone_pivot_post_spec"
+_UP = ([0.0, 0.0, 1.0], ("__frame__",))
+_POST_AXIS = ([0.0, 1.0, 0.0], ("__frame__",))
+_HEIGHT_FROM = "body_seat"
+_FROM_BASE_TOP = ("base_top", (("draw_dt_cone_pivot_post_tl_bond_cradle", "build"),))
+
+
+def _width(nominal: float, printed: str, sources: tuple[str, ...]) -> dict:
+    """A transverse location or size: its band and nominal at printed places.
+
+    Every exported ``*_nominal`` is the PRINTED value (FixtureCAD ruling:
+    prechips refuses a nominal outside its band), never the raw model one.
+    """
+    places = part_spec.DRAWING_PRECISION_BY_NAME[printed]
+    return {
+        "width": (limits(nominal, places), sources),
+        "width_nominal": (round(nominal, places), sources),
+    }
+
+
+def _block_face(
+    axis: str,
+    outward: float,
+    at: float,
+    key: str,
+    printed: str,
+    nominal: float,
+    sources: tuple[str, ...],
+    *,
+    picks: tuple[float | None, ...] = (None,),
+) -> dict:
+    """One printed block dimension, owned by the face(s) it ends on: the plane
+    at model ``axis`` = ``at`` facing ``outward``. Heights read from the base
+    top, stations from foot B, widths from the side named above."""
+    normal = [0.0, 0.0, 0.0]
+    normal["xyz".index(axis)] = outward
+    places = part_spec.DRAWING_PRECISION_BY_NAME[printed]
+    fields = {
+        "normal": (normal, ("__frame__",)),
+        "plane": ({"frame": "model", "axis": axis, "value": at}, sources),
+        key: (limits(nominal, places), sources),
+        f"{key}_nominal": (round(nominal, places), sources),
+    }
+    if key == "height":
+        fields["height_from"] = _FROM_BASE_TOP
+    return {
+        'kind': "face",
+        'faces': tuple(PlanarFace(tuple(normal), outward * at, contains_x_mm=x) for x in picks),
+        'requirements': (key,),
+        'fields': fields,
+        'precision': {key: places},
+    }
+
+
+def _seat_finish_fields(key: str) -> dict:
+    control = next(item for item in part_spec.SURFACE_FINISHES if item.key == key)
+    return {"finish_ra": (control.roughness_um, ("SURFACE_FINISHES",))}
+
+
+def _crank_pin(x: float) -> dict:
+    return {
+        'kind': "pin",
+        'faces': (
+            CylinderFace(part_spec.PIN_DIA, contains_x_mm=x, contains_y_mm=part_spec.CRANK_PIN_Y),
+            PlanarFace((0.0, 0.0, 1.0), part_spec.CRANK_PIN_TOP_Z, contains_x_mm=x),
+        ),
+        'requirements': ("height", "station", "width"),
+        'fields': {
+            "at": ([x, part_spec.CRANK_PIN_Y, part_spec.CRANK_PIN_TOP_Z], ("CRANK_PIN_X", "CRANK_PIN_Y", "CRANK_PIN_TOP_Z")),
+            "axis": _UP,
+            "height": (
+                limits(
+                    part_spec.CRANK_PIN_FROM_AXIS,
+                    part_spec.DRAWING_PRECISION_BY_NAME["CrankPinFromAxis"],
+                    (part_spec.CRANK_PIN_FROM_AXIS_TOL, -part_spec.CRANK_PIN_FROM_AXIS_TOL),
+                ),
+                (
+                    "CRANK_PIN_FROM_AXIS",
+                    (_POST, "CRANK_BOSS_NORTH_FACE"),
+                    "CRANK_PIN_FROM_AXIS_TOL",
+                    (_POST, "DRAWING_PRECISION"),
+                ),
+            ),
+            "height_nominal": (part_spec.CRANK_PIN_FROM_AXIS, ("CRANK_PIN_FROM_AXIS",)),
+            "height_from": (_HEIGHT_FROM, (("draw_dt_cone_pivot_post_tl_bond_cradle", "build"),)),
+            "station": (
+                limits(part_spec.CRANK_PIN_Y, part_spec.DRAWING_PRECISION_BY_NAME["CrankPinY"]),
+                ("CRANK_PIN_Y", (_POST, "CRANK_BORE_HEIGHT")),
+            ),
+            "station_nominal": (
+                round(
+                    part_spec.CRANK_PIN_Y,
+                    part_spec.DRAWING_PRECISION_BY_NAME["CrankPinY"],
+                ),
+                ("CRANK_PIN_Y",),
+            ),
+            "dia_nominal": (part_spec.PIN_DIA, ("PIN_DIA",)),
+            **_width(
+                x - part_spec.SIDE_W_X,
+                "CrankPinWestX" if x < 0.0 else "CrankPinEastX",
+                ("CRANK_PIN_WEST_FROM_SIDE" if x < 0.0 else "CRANK_PIN_EAST_FROM_SIDE",),
+            ),
+        },
+        'precision': {
+            "height": part_spec.DRAWING_PRECISION_BY_NAME["CrankPinFromAxis"],
+            "station": part_spec.DRAWING_PRECISION_BY_NAME["CrankPinY"],
+            "width": part_spec.DRAWING_PRECISION_BY_NAME["CrankPinWestX" if x < 0.0 else "CrankPinEastX"],
+        },
+    }
+
+
+def _cone_pin(name: str) -> dict:
+    pin = part_spec.CONE_PINS[name]
+    pin_name = f"CONE_PIN_{name.upper()}"
+    entry = f"ConePinEntry{name.title()}X"
+    return {
+        'kind': "pin",
+        'faces': (CylinderFace(part_spec.PIN_DIA, contains_x_mm=pin.top_x, contains_y_mm=part_spec.CONE_PIN_Y),),
+        'requirements': ("height", "station", "width", "land_angle_deg", "note"),
+        'fields': {
+            "at": (
+                [pin.top_x, part_spec.CONE_PIN_Y, pin.top_z],
+                (pin_name, "CONE_PIN_Y", "CONE_PIN_SPREAD", (_POST, "CONE_BOSS_LENGTH")),
+            ),
+            "axis": (list(part_spec.CONE_PIN_AXIS), ("CONE_PIN_AXIS", (_POST, "INCLINE_DEG"))),
+            # Along the pin's own axis, from the post axis to the tops' plane.
+            "height": (
+                limits(
+                    part_spec.CONE_PIN_FROM_AXIS,
+                    part_spec.DRAWING_PRECISION_BY_NAME["ConePinFromAxis"],
+                    (part_spec.CONE_PIN_FROM_AXIS_TOL, -part_spec.CONE_PIN_FROM_AXIS_TOL),
+                ),
+                (
+                    "CONE_PIN_FROM_AXIS",
+                    (_POST, "CONE_BOSS_LENGTH"),
+                    "CONE_PIN_FROM_AXIS_TOL",
+                    (_POST, "DRAWING_PRECISION"),
+                ),
+            ),
+            "height_nominal": (part_spec.CONE_PIN_FROM_AXIS, ("CONE_PIN_FROM_AXIS",)),
+            "height_from": (_HEIGHT_FROM, (("draw_dt_cone_pivot_post_tl_bond_cradle", "build"),)),
+            "station": (
+                limits(part_spec.CONE_PIN_Y, part_spec.DRAWING_PRECISION_BY_NAME["ConePinY"]),
+                ("CONE_PIN_Y", (_POST, "BORE_HEIGHT")),
+            ),
+            "station_nominal": (
+                round(part_spec.CONE_PIN_Y, part_spec.DRAWING_PRECISION_BY_NAME["ConePinY"]),
+                ("CONE_PIN_Y",),
+            ),
+            "angle_deg": (part_spec.post.INCLINE_DEG, ((_POST, "INCLINE_DEG"),)),
+            # The printed 12.5 deg tilt, +/- the general angular band.
+            "land_angle_deg": (
+                [part_spec.CONE_PIN_TILT - part_spec.CONE_PIN_TILT_TOL, part_spec.CONE_PIN_TILT + part_spec.CONE_PIN_TILT_TOL],
+                ("CONE_PIN_TILT", "CONE_PIN_TILT_TOL", (_POST, "INCLINE_DEG")),
+            ),
+            "land_angle_nominal_deg": (part_spec.CONE_PIN_TILT, ("CONE_PIN_TILT", (_POST, "INCLINE_DEG"))),
+            # The hole's entry into the base top, from the west side.
+            **_width(part_spec.CONE_PIN_ENTRY_FROM_SIDE[name], entry, ("CONE_PIN_ENTRY_FROM_SIDE",)),
+            "dia_nominal": (part_spec.PIN_DIA, ("PIN_DIA",)),
+            "note": (part_spec.CONE_PIN_TOPS_NOTE, ("CONE_PIN_TOPS_NOTE", "CONE_PIN_TOPS_MATCH")),
+        },
+        'precision': {
+            "height": part_spec.DRAWING_PRECISION_BY_NAME["ConePinFromAxis"],
+            "station": part_spec.DRAWING_PRECISION_BY_NAME["ConePinY"],
+            "width": part_spec.DRAWING_PRECISION_BY_NAME[entry],
+            "land_angle_deg": part_spec.DRAWING_PRECISION_BY_NAME["ConePinTilt"],
+        },
+    }
+
+
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_surface_finish", "ra")))
+
+# The face every transverse location prints from.
+requirement("base_west_side",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), -part_spec.SIDE_W_X),),
+    requirements=("plane",),
+    fields={
+        "normal": ([-1.0, 0.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "x", "value": part_spec.SIDE_W_X}, ("SIDE_W_X",)),
+    },
+)
+
+requirement("base_east_side", **_block_face(
+    "x", 1.0, -part_spec.SIDE_W_X, "width", "BaseWidth", part_spec.BASE_WIDTH, ("BASE_WIDTH", "SIDE_W_X")
+))
+
+requirement("stop_west_side", **_block_face(
+    "x",
+    -1.0,
+    -part_spec.STOP_WIDTH / 2.0,
+    "width",
+    "StopSideX",
+    part_spec.STOP_SIDE_OFFSET,
+    ("STOP_SIDE_OFFSET", "STOP_WIDTH", "SIDE_W_X"),
+))
+
+requirement("stop_east_side", **_block_face(
+    "x", 1.0, part_spec.STOP_WIDTH / 2.0, "width", "StopWidth", part_spec.STOP_WIDTH, ("STOP_WIDTH",)
+))
+
+# Both saddles' side faces share each plane.
+requirement("saddle_west_sides", **_block_face(
+    "x",
+    -1.0,
+    -part_spec.SADDLE_WIDTH / 2.0,
+    "width",
+    "SaddleSideX",
+    part_spec.SADDLE_SIDE_OFFSET,
+    ("SADDLE_SIDE_OFFSET", "SADDLE_WIDTH", "SIDE_W_X"),
+))
+
+requirement("saddle_east_sides", **_block_face(
+    "x", 1.0, part_spec.SADDLE_WIDTH / 2.0, "width", "SaddleWidth", part_spec.SADDLE_WIDTH, ("SADDLE_WIDTH",)
+))
+
 ELEVATION_KEEP = {
     "BaseLength": (0.0, 55.0, -50.0),
     "BaseThick": (0.0, -22.0, -35.0),
@@ -136,6 +359,105 @@ ELEVATION_KEEP = {
     "CrankPinFromAxis": (0.0, CRANK_PIN_Y - 10.7, -8.0),
     "TailSaddleHeight": (0.0, 130.0, -22.0),
 }
+
+
+requirement("foot_stop",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), 0.0),),
+    requirements=("plane", "thickness"),
+    fields={
+        "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
+        "thickness": (
+            limits(part_spec.STOP_THICK, part_spec.DRAWING_PRECISION_BY_NAME["StopThick"]),
+            ("STOP_THICK",),
+        ),
+        "thickness_nominal": (part_spec.STOP_THICK, ("STOP_THICK",)),
+    },
+    precision={"thickness": part_spec.DRAWING_PRECISION_BY_NAME["StopThick"]},
+)
+
+requirement("base_top",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part_spec.BASE_TOP_Z),),
+    requirements=("thickness",),
+    fields={
+        "normal": _UP,
+        "plane": ({"frame": "model", "axis": "z", "value": part_spec.BASE_TOP_Z}, ("BASE_TOP_Z",)),
+        "thickness": (
+            limits(part_spec.BASE_THICK, part_spec.DRAWING_PRECISION_BY_NAME["BaseThick"]),
+            ("BASE_THICK",),
+        ),
+        "thickness_nominal": (part_spec.BASE_THICK, ("BASE_THICK",)),
+    },
+    precision={"thickness": part_spec.DRAWING_PRECISION_BY_NAME["BaseThick"]},
+)
+
+requirement("base_far_end", **_block_face(
+    "y",
+    1.0,
+    part_spec.BASE_END_Y + part_spec.BASE_LENGTH,
+    "length",
+    "BaseLength",
+    part_spec.BASE_LENGTH,
+    ("BASE_LENGTH", "BASE_END_Y"),
+))
+
+requirement("stop_top", **_block_face(
+    "z",
+    1.0,
+    part_spec.BLOCK_TOP_Z,
+    "height",
+    "StopHeight",
+    part_spec.BLOCK_HEIGHT,
+    ("BLOCK_HEIGHT", "BLOCK_TOP_Z"),
+    picks=(0.0,),
+))
+
+# Both saddles' tops, either side of each seat: one plane, one height.
+requirement("saddle_tops", **_block_face(
+    "z",
+    1.0,
+    part_spec.BLOCK_TOP_Z,
+    "height",
+    "BodySaddleHeight",
+    part_spec.BLOCK_HEIGHT,
+    ("BLOCK_HEIGHT", "BLOCK_TOP_Z", "SADDLE_TOP_PICK_X"),
+    picks=(-part_spec.SADDLE_TOP_PICK_X, part_spec.SADDLE_TOP_PICK_X),
+))
+
+requirement("body_saddle_south", **_block_face(
+    "y", -1.0, part_spec.BODY_SADDLE_Y, "station", "BodySaddleY", part_spec.BODY_SADDLE_Y, ("BODY_SADDLE_Y",)
+))
+
+requirement("body_saddle_north", **_block_face(
+    "y",
+    1.0,
+    part_spec.BODY_SADDLE_Y + part_spec.BODY_SADDLE_THICK,
+    "thickness",
+    "BodySaddleThick",
+    part_spec.BODY_SADDLE_THICK,
+    ("BODY_SADDLE_THICK", "BODY_SADDLE_Y"),
+))
+
+requirement("tail_saddle_south", **_block_face(
+    "y", -1.0, part_spec.TAIL_SADDLE_Y, "station", "TailSaddleY", part_spec.TAIL_SADDLE_Y, ("TAIL_SADDLE_Y",)
+))
+
+requirement("tail_saddle_north", **_block_face(
+    "y",
+    1.0,
+    part_spec.TAIL_SADDLE_Y + part_spec.TAIL_SADDLE_THICK,
+    "thickness",
+    "TailSaddleThick",
+    part_spec.TAIL_SADDLE_THICK,
+    ("TAIL_SADDLE_THICK", "TAIL_SADDLE_Y"),
+))
+
+requirement("crank_pin_west", **_crank_pin(-part_spec.CRANK_PIN_X))
+
+requirement("crank_pin_east", **_crank_pin(part_spec.CRANK_PIN_X))
+
 # Each seat's profile sketch is parallel to its section, so the section
 # imports its diameter. Each seat is a matched fit: its diameter prints as a
 # reference size with its narrow callout (the spec's *_SEAT_CALLOUT) below
@@ -169,6 +491,36 @@ SECTION_A_KEEP = {
     # one wide line ran over both extension lines and the seat's leader).
     "ConePinFromAxis": (-20.0, CONE_PIN_Y, 26.0),
 }
+
+
+requirement("body_seat",
+    kind="seat",
+    faces=(CylinderFace(part_spec.BODY_SEAT_DIA),),
+    requirements=("note", "height", "width", "finish_ra"),
+    fields={
+        "at": ([0.0, part_spec.BODY_SADDLE_Y, 0.0], ("BODY_SADDLE_Y", "__frame__")),
+        "axis": _POST_AXIS,
+        "dia_nominal": (part_spec.BODY_SEAT_DIA, ("BODY_SEAT_DIA", (_POST, "BLOCK_DIA"))),
+        "note": (part_spec.BODY_SEAT_CALLOUT, ("BODY_SEAT_CALLOUT", "POST_NUMBER")),
+        "height": (
+            limits(part_spec.SEAT_AXIS_HEIGHT, part_spec.DRAWING_PRECISION_BY_NAME["BodySeatAxisHeight"]),
+            ("SEAT_AXIS_HEIGHT", "BASE_TOP_Z"),
+        ),
+        "height_nominal": (part_spec.SEAT_AXIS_HEIGHT, ("SEAT_AXIS_HEIGHT",)),
+        **_width(part_spec.SEAT_AXIS_FROM_SIDE, "BodySeatAxisX", ("SEAT_AXIS_FROM_SIDE",)),
+        **_seat_finish_fields("body_seat"),
+    },
+    precision={
+        "height": part_spec.DRAWING_PRECISION_BY_NAME["BodySeatAxisHeight"],
+        "width": part_spec.DRAWING_PRECISION_BY_NAME["BodySeatAxisX"],
+        "finish_ra": 1,
+    },
+)
+
+requirement("cone_pin_east", **_cone_pin("east"))
+
+requirement("cone_pin_west", **_cone_pin("west"))
+
 # B-B's callout reads below the value, above the finish symbol; its seat-axis
 # height stands outboard of its +X side, below the finish symbol.
 SECTION_B_KEEP = {
@@ -176,6 +528,32 @@ SECTION_B_KEEP = {
     "TailSeatAxisX": (-20.0, TAIL_SECTION_Y, 12.0),
     "TailSeatAxisHeight": (44.0, TAIL_SECTION_Y, -20.0),
 }
+
+
+requirement("tail_seat",
+    kind="seat",
+    faces=(CylinderFace(part_spec.TAIL_SEAT_DIA),),
+    requirements=("note", "height", "width", "finish_ra"),
+    fields={
+        "at": ([0.0, part_spec.TAIL_SADDLE_Y, 0.0], ("TAIL_SADDLE_Y", "__frame__")),
+        "axis": _POST_AXIS,
+        "dia_nominal": (part_spec.TAIL_SEAT_DIA, ("TAIL_SEAT_DIA",)),
+        "note": (part_spec.TAIL_SEAT_CALLOUT, ("TAIL_SEAT_CALLOUT", "POST_NUMBER")),
+        "height": (
+            limits(part_spec.SEAT_AXIS_HEIGHT, part_spec.DRAWING_PRECISION_BY_NAME["TailSeatAxisHeight"]),
+            ("SEAT_AXIS_HEIGHT", "BASE_TOP_Z"),
+        ),
+        "height_nominal": (part_spec.SEAT_AXIS_HEIGHT, ("SEAT_AXIS_HEIGHT",)),
+        **_width(part_spec.SEAT_AXIS_FROM_SIDE, "TailSeatAxisX", ("SEAT_AXIS_FROM_SIDE",)),
+        **_seat_finish_fields("tail_seat"),
+    },
+    precision={
+        "height": part_spec.DRAWING_PRECISION_BY_NAME["TailSeatAxisHeight"],
+        "width": part_spec.DRAWING_PRECISION_BY_NAME["TailSeatAxisX"],
+        "finish_ra": 1,
+    },
+)
+
 DIMENSION_CALLOUTS = {
     "CrankPinDia": "4X DOWEL",
     "SaddleWidth": "2X",

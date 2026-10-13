@@ -17,8 +17,11 @@ Task groups (the prefix says whether SolidWorks is required):
   part:<stem>        build one part            (COM -- needs SolidWorks)
   assembly:<stem>    build/refresh one assembly (COM)
   drawing:<stem>     build one manufacturing drawing (COM)
+  package:features:<stem> isolated STEP/requirements bundle (COM)
+  package:features   aggregate every feature bundle (NO SolidWorks)
   verify:<suite>     soundness/subsystems/kinematics gates (COM)
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
+  prechips:<stem>    strict manufacturing traveler (NO SolidWorks; FreeCAD)
   export             neutral STEP/STL/glTF/scene export (COM)
   release            cut a tagged GitHub release (COM + gh; opt-in)
   build              EVERY part + assembly + EVERY gate -- the one safe entry
@@ -621,8 +624,8 @@ def _stage_name(label: str) -> str:
         return "verify-" + label.split(":", 2)[1]
     if label.startswith("verify "):
         return "verify-" + label.split(None, 2)[1]
-    if label.startswith("check:traveler_"):
-        return "check-traveler"
+    if label.startswith("prechips:"):
+        return "prechips-traveler"
     if label.startswith("check "):
         return "check-" + label.split(None, 2)[1]
     if label.startswith("cut release") or label in ("release", "package:release"):
@@ -631,7 +634,7 @@ def _stage_name(label: str) -> str:
         return "preflight"
     if label == "gallery":
         return "gallery"
-    if label.startswith(("export", "package:features")):
+    if label.startswith(("export", "package:features:")):
         return "export"
     return "harmonic-analyzer"
 
@@ -1396,9 +1399,6 @@ _CHECK_NAMES = (
     # Threaded-joint retention (drawing-simplicity-policy rule 9). Audit-only
     # while joint_retention.ENFORCEMENT is AUDIT: it reports, never fails.
     "joint_retention",
-    "traveler_ch_rocker_arm",
-    "traveler_ch_pivot_shaft",
-    "traveler_dt_cone_pivot_post",
 )
 # Checks outside the every-build set. verify_telemetry is opt-in;
 # features_bound is required only by release. Union must match the specs.
@@ -1476,15 +1476,15 @@ def _digest_files(files: list[str]) -> str:
 # COM -- stay off it.
 #
 # THREE tiers (the over-rebuild fix): DRAWING tasks fold the WHOLE tree
-# (``_submodule_dep`` -> ``_submodule_digest``); ASSEMBLY recipes fold the tree MINUS
-# drawing.py (``_submodule_assembly_dep`` -> ``_submodule_assembly_digest``); PART
+# (``_submodule_dep`` -> ``_submodule_digest``); ASSEMBLY, export and features recipes
+# fold the tree MINUS drawing.py (``_submodule_assembly_dep``); PART
 # recipes fold the tree MINUS {assembly.py, motion.py, drawing.py}
 # (``_submodule_part_dep`` -> ``_submodule_part_digest``). So a bump touching only
 # assembly.py/motion.py rebuilds the 8 assemblies but leaves all ~100 parts cached, and
 # a bump touching only drawing.py rebuilds just the (few) drawing tasks. Every exclusion
-# is SAFE because the excluded module is never CALLED by that tier's build scripts --
-# enforced loud by ``check:partiso`` (test_part_isolation.py); see the exclusion sets
-# below.
+# is SAFE because the excluded module is never CALLED by that tier's runtime.
+# Native build exclusions are enforced by ``check:partiso``; see the exclusion
+# sets below and the feature-producer rationale in the drawing.py entry.
 _SUBMODULE_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule.digest"
 _SUBMODULE_ASSEMBLY_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule-assembly.digest"
 _SUBMODULE_PART_DIGEST_FILE = REPORTS / ".solidworks-mcp-submodule-part.digest"
@@ -1501,8 +1501,8 @@ _SUBMODULE_PART_DEP_PATH: str | None = None
 # fails loud if a build script ever imports a module its tier excludes:
 #
 #   * DRAWING tasks fold the WHOLE tree (``_submodule_digest``).
-#   * ASSEMBLY recipes fold the tree MINUS ``drawing.py`` (``_submodule_assembly_digest``)
-#     -- see ``_ASSEMBLY_DIGEST_EXCLUDE_FILES``.
+#   * ASSEMBLY/export/features recipes fold the tree MINUS ``drawing.py``
+#     (``_submodule_assembly_digest``) -- see ``_ASSEMBLY_DIGEST_EXCLUDE_FILES``.
 #   * PART recipes fold the tree MINUS {assembly.py, motion.py, drawing.py}
 #     (``_submodule_part_digest``) -- see ``_PART_DIGEST_EXCLUDE_FILES``.
 #
@@ -1521,6 +1521,10 @@ _SUBMODULE_PART_DEP_PATH: str | None = None
 #     claim ("excluded from every part *and* assembly cache key"). Drawing tasks keep
 #     folding it via the full ``_submodule_dep`` (task_drawing), so their recipe still
 #     tracks it.
+#     Features import draw modules for their declarations and so LOAD drawing.py,
+#     but do not use its constants or call its helpers. Its module-level setup
+#     defines drawing-only state; _drawing_common sets only CENTER_MARK_OBSERVER,
+#     consulted by auto_center_marks, never by IPartDoc face naming or SaveAs3.
 #
 # CONSERVATIVE elsewhere: everything NOT named here (base, com_variant, sketch, feature,
 # sw_type_info, pywin32_adapter, factory, AND the MCP-server surface tools/agents/ui/
@@ -1669,12 +1673,11 @@ def _submodule_dep() -> str:
 
 
 def _submodule_assembly_dep() -> str:
-    """Path to the synthetic file_dep tracking the ASSEMBLY-relevant submodule slice
-    (whole tree MINUS drawing.py) for ASSEMBLY recipes (``_recipe_files`` /
-    ``_assembly_file_deps``): a separate sidecar whose CONTENT is
+    """Synthetic file_dep for the assembly/neutral-export/features submodule slice
+    (whole tree MINUS drawing.py): a separate sidecar whose CONTENT is
     ``_submodule_assembly_digest()``. Distinct from ``_submodule_dep`` so a drawing.py
-    edit flips the drawing-task sidecar but leaves this one (and the ~8 assemblies)
-    untouched. Memoized to one write-check per process."""
+    edit flips the drawing-task sidecar but leaves these COM consumers untouched.
+    Memoized to one write-check per process."""
     global _SUBMODULE_ASSEMBLY_DEP_PATH
     if _SUBMODULE_ASSEMBLY_DEP_PATH is None:
         _SUBMODULE_ASSEMBLY_DEP_PATH = _write_digest_sidecar(
@@ -1863,6 +1866,8 @@ def _fit_groups_env(task: str) -> str | None:
         deps = _recipe_files(stem)
     elif family == "drawing" and stem in DRAWINGS_BY_NAME:
         deps = _drawing_file_deps(stem)
+    elif task.startswith("package:features:"):
+        deps = _feature_export_file_deps(task.removeprefix("package:features:"))
     elif family in ("part", "assembly", "drawing"):
         raise ValueError(f"{task!r} names no {family} task; its fit groups are unknown")
     else:
@@ -2037,40 +2042,66 @@ def _preflight_file_deps() -> list[str]:
 
 
 def _export_file_deps() -> list[str]:
-    """Exporter source/config closure plus every model's exact identity."""
-    return [*_export_requirement_deps(), *_cad_identity_deps()]
-
-
-def _export_requirement_deps() -> list[str]:
-    """Source/config closure for the exporter and its named-face requirements."""
-    from export_features import SUPPORTED_PARTS, source_paths
-
+    """Exporter runtime, complete produced feature bundles, and native identities."""
     return sorted({
-        str(EXPORT_PY),
-        *module_deps_of(EXPORT_PY),
-        *(path for stem in SUPPORTED_PARTS
-          for path in _config_deps(SCRIPTS_DIR / "export_features.py", stem, "part")),
-        *(str(path.resolve()) for path in source_paths()),
+        *_export_requirement_deps(),
+        *(str(path) for path in _feature_bundle_outputs()),
+        *_cad_identity_deps(),
     })
 
 
-def _feature_export_file_deps() -> list[str]:
+def _feature_requirement_deps(stem: str) -> list[str]:
+    """One part's declaration/citation closure and generic exporter inputs.
+
+    Discovery identifies supported stems but never contributes another part's
+    draw/spec files to this leaf. Config reads include dynamically loaded
+    citation sources, not just imports the generic driver can see.
+    """
+    from export_features import source_paths
+
+    sources = {
+        EXPORT_PY.resolve(),
+        *(Path(path).resolve() for path in module_deps_of(EXPORT_PY)),
+        *(path.resolve() for path in source_paths(stem)),
+    }
+    return sorted({
+        *(str(path) for path in sources),
+        *(dep for path in sources if path.suffix == ".py"
+          for dep in _config_deps(path, stem, "part")),
+    })
+
+
+def _export_requirement_deps() -> list[str]:
+    """Generic export runtime/config only; declarations belong to feature leaves."""
+    return sorted({
+        *_executed_closure([str(EXPORT_PY)]),
+        _submodule_assembly_dep(),
+    })
+
+
+def _feature_export_file_deps(stem: str) -> list[str]:
+    """One bundle's recipe plus release revision and exact native identity."""
+    return sorted({
+        *_feature_requirement_deps(stem),
+        str(RELEASE_VERSION_FILE),
+        _submodule_assembly_dep(),
+        _sldprt(stem),
+        _part_execution_token(stem),
+    })
+
+
+def _feature_export_outputs(stem: str) -> list[Path]:
+    from export_features import bundle_paths
+
+    return [path.resolve() for path in bundle_paths(stem, CAD_OUT)]
+
+
+def _feature_bundle_outputs() -> list[Path]:
+    """The complete bundle inventory for seat-free aggregate consumers."""
     from export_features import SUPPORTED_PARTS
 
     return [
-        *_export_requirement_deps(),
-        *(path for stem in SUPPORTED_PARTS
-          for path in (_sldprt(stem), _part_execution_token(stem))),
-    ]
-
-
-def _feature_export_outputs() -> list[Path]:
-    from export_features import SUPPORTED_PARTS
-
-    return [
-        (CAD_OUT / "features" / stem / name).resolve()
-        for stem in SUPPORTED_PARTS
-        for name in (f"{stem.replace('_', '-')}.STEP", "features.toml")
+        path for stem in SUPPORTED_PARTS for path in _feature_export_outputs(stem)
     ]
 
 
@@ -2985,6 +3016,19 @@ def task_verify():
     }
 
 
+def _executed_closure(cmd: list[str]) -> set[str]:
+    """Source and config inputs of every Python entry point a command executes."""
+    return {
+        path
+        for entry in (Path(arg) for arg in cmd if arg.endswith(".py"))
+        for path in (
+            str(entry.resolve()),
+            *module_deps_of(entry),
+            *_config_deps(entry),
+        )
+    }
+
+
 def task_check():
     """SolidWorks-FREE checks -- no COM, so they run in parallel under ``-n N``.
 
@@ -2993,6 +3037,8 @@ def task_check():
     ``check:nameplate`` / ``check:recipe`` wrap the pure-python unit tests via
     pytest. None takes the COM seat lock, so they fan out under ``-n``.
     """
+    import _process_plans
+
     config_py = str((SCRIPTS_DIR / "_config.py").resolve())
     # The tolerance audit (check:config) scans every build_*.py for PART_NAME, so a
     # part script added/renamed without touching the config YAML must still
@@ -3013,6 +3059,8 @@ def task_check():
         SCRIPTS_DIR / "test_features_bound.py",
         # Shared native gear-gap authoring/status contracts use bounded fakes.
         SCRIPTS_DIR / "test_gear.py",
+        SCRIPTS_DIR / "test_process_plans.py",
+        SCRIPTS_DIR / "test_prechips_traveler.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_release_diff.py",
@@ -3285,6 +3333,11 @@ def task_check():
             *(str(path.resolve()) for path in machinist_review_contract_deps),
             *adapter_contract_deps,
             *scanned_by_binding_gate,
+            # The enrolled revision contract reads plans rather than importing them.
+            *(
+                str(_process_plans.plan_path(stem).resolve())
+                for stem in _process_plans.TRAVELER_STEMS
+            ),
             # module_deps_of only walks cad/scripts; comparison tests import
             # sibling tools (and load render_diff via importlib) outside it.
             *(
@@ -3646,85 +3699,12 @@ def task_check():
                 str(REPORTS / "joint-retention.md"),
             ],
         },
-        "traveler_ch_rocker_arm": {
-            "file_dep": [
-                str((REPO_ROOT / "cad/process/ch_rocker_arm/plan.toml").resolve()),
-                *(str((REPO_ROOT / "cad/process/shop" / name).resolve())
-                  for name in ("inventory.toml", "shop-policy.toml", "cutting-data.toml")),
-                str((CAD_OUT / "features/ch_rocker_arm/features.toml").resolve()),
-                str((CAD_OUT / "features/ch_rocker_arm/ch-rocker-arm.STEP").resolve()),
-                str((REPO_ROOT / "pyproject.toml").resolve()),
-                str((REPO_ROOT / "uv.lock").resolve()),
-                str((REPO_ROOT / "dodo.py").resolve()),
-                str((SCRIPTS_DIR / "_telemetry.py").resolve()),
-            ],
-            "cmd": [
-                sys.executable, str(SCRIPTS_DIR / "check_traveler.py"),
-                str(REPO_ROOT / "cad/process/ch_rocker_arm/plan.toml"),
-                "--out", str(REPORTS / "traveler_ch_rocker_arm"),
-            ],
-            "label": "check:traveler_ch_rocker_arm",
-            "task_dep": ["package:features"],
-            "targets": [
-                str(REPORTS / "traveler_ch_rocker_arm/report.json"),
-                str(REPORTS / "traveler_ch_rocker_arm/traveler.html"),
-            ],
-        },
-        "traveler_ch_pivot_shaft": {
-            "file_dep": [
-                str((REPO_ROOT / "cad/process/ch_pivot_shaft/plan.toml").resolve()),
-                *(str((REPO_ROOT / "cad/process/shop" / name).resolve())
-                  for name in ("inventory.toml", "shop-policy.toml", "cutting-data.toml")),
-                str((CAD_OUT / "features/ch_pivot_shaft/features.toml").resolve()),
-                str((CAD_OUT / "features/ch_pivot_shaft/ch-pivot-shaft.STEP").resolve()),
-                str((REPO_ROOT / "pyproject.toml").resolve()),
-                str((REPO_ROOT / "uv.lock").resolve()),
-                str((REPO_ROOT / "dodo.py").resolve()),
-                str((SCRIPTS_DIR / "_telemetry.py").resolve()),
-            ],
-            "cmd": [
-                sys.executable, str(SCRIPTS_DIR / "check_traveler.py"),
-                str(REPO_ROOT / "cad/process/ch_pivot_shaft/plan.toml"),
-                "--out", str(REPORTS / "traveler_ch_pivot_shaft"),
-            ],
-            "label": "check:traveler_ch_pivot_shaft",
-            "task_dep": ["package:features"],
-            "targets": [
-                str(REPORTS / "traveler_ch_pivot_shaft/report.json"),
-                str(REPORTS / "traveler_ch_pivot_shaft/traveler.html"),
-            ],
-        },
-        "traveler_dt_cone_pivot_post": {
-            "file_dep": [
-                str((REPO_ROOT / "cad/process/dt_cone_pivot_post/plan.toml").resolve()),
-                *(str((REPO_ROOT / "cad/process/shop" / name).resolve())
-                  for name in ("inventory.toml", "shop-policy.toml", "cutting-data.toml")),
-                str((CAD_OUT / "features/dt_cone_pivot_post/features.toml").resolve()),
-                str((CAD_OUT / "features/dt_cone_pivot_post/dt-cone-pivot-post.STEP").resolve()),
-                str((REPO_ROOT / "pyproject.toml").resolve()),
-                str((REPO_ROOT / "uv.lock").resolve()),
-                str((REPO_ROOT / "dodo.py").resolve()),
-                str((SCRIPTS_DIR / "_telemetry.py").resolve()),
-            ],
-            "cmd": [
-                sys.executable, str(SCRIPTS_DIR / "check_traveler.py"),
-                str(REPO_ROOT / "cad/process/dt_cone_pivot_post/plan.toml"),
-                "--out", str(REPORTS / "traveler_dt_cone_pivot_post"),
-            ],
-            "label": "check:traveler_dt_cone_pivot_post",
-            "task_dep": ["package:features"],
-            "targets": [
-                str(REPORTS / "traveler_dt_cone_pivot_post/report.json"),
-                str(REPORTS / "traveler_dt_cone_pivot_post/traveler.html"),
-            ],
-        },
         "features_bound": {
             "file_dep": [
                 str((SCRIPTS_DIR / "features_bound.py").resolve()),
-                *(_export_requirement_deps()),
-                *(str(path) for path in _feature_export_outputs()),
+                *(str(path) for path in _feature_bundle_outputs()),
                 *(str((CAD_OUT / "step" / path.name).resolve())
-                  for path in _feature_export_outputs() if path.suffix == ".STEP"),
+                  for path in _feature_bundle_outputs() if path.suffix == ".STEP"),
             ],
             "task_dep": ["package:features", "export"],
             "cmd": [sys.executable, str(SCRIPTS_DIR / "features_bound.py"),
@@ -3749,15 +3729,7 @@ def task_check():
         # (2026-09-23). The hand-listed deps above stay for what an import graph
         # cannot see: runtime-read data, scanned sources, dodo.py, and the tooling
         # modules module_deps_of excludes. test_dodo_recipe pins the invariant.
-        executed = {
-            path
-            for entry in (Path(arg) for arg in spec["cmd"] if arg.endswith(".py"))
-            for path in (
-                str(entry.resolve()),
-                *module_deps_of(entry),
-                *_config_deps(entry),
-            )
-        }
+        executed = _executed_closure(spec["cmd"])
         yield {
             "name": name,
             "file_dep": sorted({*spec["file_dep"], *executed}),
@@ -3770,6 +3742,111 @@ def task_check():
                     stamp, f"check:{name}",
                 ])
             ],
+            "clean": True,
+            "verbosity": 2,
+        }
+
+
+class _PrechipsKernelTracker:
+    """Compare the lazy FreeCAD identity with the last successful traveler run."""
+
+    def __init__(self):
+        self.identity: dict[str, str] | None = None
+
+    def _calc(self) -> dict[str, str] | None:
+        from prechips.kernel import discover_kernel
+
+        try:
+            command = discover_kernel()
+            if command is None:
+                return None
+            path = str(Path(command).resolve())
+            with _telemetry.span("prechips.kernel_identity", path=path):
+                version = subprocess.check_output(
+                    [path, "--version"],
+                    text=True,
+                    stderr=subprocess.STDOUT,
+                    timeout=10,
+                    env=_telemetry.inject_env(),
+                ).strip()
+        except (OSError, UnicodeError, subprocess.SubprocessError):
+            return None
+        return {"path": path, "version": version} if version else None
+
+    def __call__(self, task, values) -> bool:
+        self.identity = self._calc()
+        task.value_savers.append(lambda: {"_prechips_kernel": self.identity})
+        return self.identity is not None and values.get("_prechips_kernel") == self.identity
+
+
+def _fail_prechips_inventory(label: str, inventory: str, diagnostic: str) -> None:
+    """Fail only the selected traveler, using the diagnostic captured at task load."""
+    with _telemetry.span("task", label=label, service=_stage_name(label)):
+        raise RuntimeError(f"{label}: {inventory}: {diagnostic}")
+
+
+def task_prechips():
+    """Strict, SolidWorks-free travelers for enrolled parts (requires FreeCAD)."""
+    import _process_plans
+    from export_features import SUPPORTED_PARTS, bundle_paths
+
+    for stem in _process_plans.TRAVELER_STEMS:
+        assert stem in SUPPORTED_PARTS, f"traveler stem is not exported: {stem}"
+        label = f"prechips:{stem}"
+        directory = _process_plans.traveler_dir(stem, CAD_OUT)
+        stamp = str(REPORTS / f"prechips-{stem}.ok")
+        cmd = [
+            sys.executable, str(SCRIPTS_DIR / "prechips_traveler.py"),
+            stem, "--out", str(CAD_OUT),
+        ]
+        diagnostic = None
+        try:
+            specs = [
+                SCRIPTS_DIR / f"{module}.py"
+                for module in _process_plans.shop_spec_modules()
+            ]
+            for spec in specs:
+                if not spec.is_file():
+                    raise _process_plans.PlanBindError(
+                        f"missing CAD fixture spec: {spec.resolve()}; "
+                        "add the spec file or correct the inventory cad stem"
+                    )
+        except _process_plans.PlanBindError as exc:
+            specs = []
+            diagnostic = str(exc)
+        actions = [(_run_stamped, [cmd, label, stamp, label])]
+        uptodate = [
+            (_process_plans.traveler_complete, [stem, CAD_OUT]),
+            _PrechipsKernelTracker(),
+        ]
+        if diagnostic is not None:
+            actions = [(
+                _fail_prechips_inventory,
+                [label, str(_process_plans.shop_paths()[0].resolve()), diagnostic],
+            )]
+            uptodate = [False]
+        # A captured shop error must fail without first exporting scoped geometry.
+        bundles = bundle_paths(stem, CAD_OUT) if diagnostic is None else ()
+        yield {
+            "name": stem,
+            "file_dep": sorted({
+                str(_process_plans.plan_path(stem).resolve()),
+                *(str(path.resolve()) for path in _process_plans.shop_paths()),
+                *(str(path.resolve()) for path in bundles),
+                *(path for spec in specs for path in _executed_closure([str(spec)])),
+                str((REPO_ROOT / "pyproject.toml").resolve()),
+                str((REPO_ROOT / "uv.lock").resolve()),
+                str((REPO_ROOT / "dodo.py").resolve()),
+                str((SCRIPTS_DIR / "_telemetry.py").resolve()),
+                *_executed_closure(cmd),
+            }),
+            "task_dep": [f"package:features:{stem}"] if diagnostic is None else [],
+            "targets": [
+                stamp, str(directory / "plan.toml"),
+                str(directory / "report.json"), str(directory / "traveler.html"),
+            ],
+            "uptodate": uptodate,
+            "actions": actions,
             "clean": True,
             "verbosity": 2,
         }
@@ -3801,9 +3878,9 @@ def task_export():
             str((CAD_OUT / "boxes" / "ha-harmonic-analyzer.json").resolve()),
             str((REPORTS / "release-neutral.json").resolve()),
         ],
-        # Neutral release formats require soundness and kinematics, independent
-        # of the separately produced requirements bundles.
-        "task_dep": ["verify:soundness", "verify:kinematics"],
+        # Named STEP copies require the complete produced feature inventory;
+        # native neutral formats also require soundness and kinematics.
+        "task_dep": ["verify:soundness", "verify:kinematics", "package:features"],
         "uptodate": [False],
         # --record-digests: this runs AFTER every part/assembly is (re)built (its
         # file_dep) and the verify gates, so the natives are current and their
@@ -3909,10 +3986,11 @@ def task_preflight():
 
 
 def task_package():
-    """COM packages with distinct, cache-keyed leaf payloads.
+    """Feature aggregation and cache-keyed native release packaging.
 
-    ``package:features`` exports isolated STEP/requirements bundles for three
-    native parts. It never writes the full export's paths or ledgers.
+    ``package:features`` is action-free and seat-free. Its explicit task edges
+    include every ``package:features:<stem>`` leaf in the packaged farm graph; file edges
+    require each leaf's complete adjacent STEP/manifest bundle.
 
     ``package:release`` is the COM half of a release: SolidWorks Pack-and-Go of
     the top assembly and of every native drawing, merged and de-duplicated into
@@ -3925,17 +4003,30 @@ def task_package():
     """
     from export_features import SUPPORTED_PARTS
 
-    feature_deps = _feature_export_file_deps()
+    for stem in SUPPORTED_PARTS:
+        deps = _feature_export_file_deps(stem)
+        outputs = _feature_export_outputs(stem)
+        yield {
+            "name": f"features:{stem}",
+            "file_dep": deps,
+            "targets": [str(path) for path in outputs],
+            # Always probe the cache so existing but tampered/partial bundles repair.
+            "uptodate": [False],
+            "actions": [(_cached_com_action, [
+                f"package:features:{stem}",
+                [sys.executable, str(EXPORT_PY), "--features", stem],
+                deps, outputs, f"features-{stem.replace('_', '-')}",
+            ])],
+            "clean": True,
+            "verbosity": 2,
+        }
+
+
     yield {
         "name": "features",
-        "file_dep": feature_deps,
-        "targets": [str(path) for path in _feature_export_outputs()],
-        "uptodate": [False],
-        "actions": [(_cached_com_action, [
-            "package:features",
-            [sys.executable, str(EXPORT_PY), "--features", *SUPPORTED_PARTS],
-            feature_deps, _feature_export_outputs(), "package-features",
-        ])],
+        "task_dep": [f"package:features:{stem}" for stem in SUPPORTED_PARTS],
+        "file_dep": [str(path) for path in _feature_bundle_outputs()],
+        "actions": [],
         "verbosity": 2,
     }
 
@@ -3994,9 +4085,11 @@ def task_release():
     parts/assemblies + the ``verify:*`` gates), ``gallery``, ``package:release``
     (the Pack-and-Go tree it stages), every registered ``drawing:*`` artifact,
     ``preflight`` (gear-ratios), the ``verify:*`` suites, and every offline
-    ``check:*`` -- so a release cannot publish past a stale/failing gate or package
-    a missing/stale drawing.
+    ``check:*`` and enrolled ``prechips:*`` travelers -- so a release cannot publish
+    past a stale/failing gate or package a missing/stale drawing or traveler.
     """
+    import _process_plans
+
     return {
         "task_dep": [
             "export",
@@ -4007,6 +4100,7 @@ def task_release():
             *(f"drawing:{s}" for s in _drawing_order()),
             *(f"verify:{s}" for s in _VERIFY_NAMES),
             *(f"check:{c}" for c in _CHECK_NAMES),
+            *(f"prechips:{stem}" for stem in _process_plans.TRAVELER_STEMS),
         ],
         "uptodate": [False],
         "pos_arg": "relargs",
@@ -4017,21 +4111,22 @@ def task_release():
 
 def task_build():
     """THE fully-safe entry point (also ``default_tasks``): every part + assembly
-    + every gate (SolidWorks ``verify:*`` and offline ``check:*``).
+    + every gate (SolidWorks ``verify:*``, offline ``check:*``, strict travelers).
 
-    No neutral export / Pack-and-Go -- doit only runs a selected task's upstream
-    prerequisites. Use ``doit -n N`` to fan out the ``check:*`` work alongside the
-    COM stream (serialized by the seat lock, not a spine).
+    Enrolled travelers pull isolated feature bundles, not the full neutral export
+    or Pack-and-Go. Use ``doit -n N`` to fan out SolidWorks-free work alongside
+    the COM stream (serialized by the seat lock, not a spine).
 
     Ordering here is a SCHEDULING HINT only (real deps drive correctness): the
     offline ``check:*`` gates are listed FIRST so workers burn through that ~1 min of
     SolidWorks-free work before piling onto the COM seat, and the parts are in
     per-seat order so two cold builders diverge and split the fleet cache.
 
-    Every gate is farm-dispatchable, so the ``verify:*`` suites are included under
-    every executor: under ``--executor farm`` each cache-missing gate runs as its
-    own leaf on a worker instead of needing a local COM seat.
+    Every COM gate is farm-dispatchable: under ``--executor farm`` each cache-missing
+    gate runs on a worker. Offline checks and travelers run on the submitter.
     """
+    import _process_plans
+
     return {
         "actions": None,
         "task_dep": (
@@ -4040,6 +4135,7 @@ def task_build():
             + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
             + [f"drawing:{s}" for s in _drawing_order()]
             + [f"verify:{s}" for s in _VERIFY_NAMES]
+            + [f"prechips:{stem}" for stem in _process_plans.TRAVELER_STEMS]
         ),
     }
 
@@ -4080,7 +4176,10 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
     rows.append(("verify:kinematics", _kinematics_file_deps()))
     rows.append(("preflight", _preflight_file_deps()))
     rows.append(("export", _export_file_deps()))
-    rows.append(("package:features", _feature_export_file_deps()))
+    from export_features import SUPPORTED_PARTS
+
+    for stem in SUPPORTED_PARTS:
+        rows.append((f"package:features:{stem}", _feature_export_file_deps(stem)))
     rows.append(("package:release", _package_file_deps()))
     return rows
 

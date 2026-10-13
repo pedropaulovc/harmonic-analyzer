@@ -205,6 +205,19 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     )
 
 
+def test_mounting_hole_callouts_cite_their_split_helper_owner() -> None:
+    from _drawing_hole_callout import add_native_hole_callout
+    from _feature_requirements import requirements_for
+
+    assert drawing.add_native_hole_callout is add_native_hole_callout
+    requirements = requirements_for(drawing)
+    for name in ("mount_west", "mount_east"):
+        assert requirements[name].fields["dia"][1] == (
+            "ATTACHMENT_THRU_DIA",
+            ("_drawing_hole_callout", "add_native_hole_callout"),
+        )
+
+
 @pytest.mark.parametrize(
     ("extent", "expected_error"),
     [

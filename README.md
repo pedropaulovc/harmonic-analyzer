@@ -174,11 +174,12 @@ Without a seat you can still run the offline gates
 glTF exports plus the drawing PDFs.
 
 Drawing-bound requirement manifests for the rocker arm, pivot shaft and cone
-pivot post are exported with named STEP face sets. Their
-`check:traveler_ch_rocker_arm`, `check:traveler_ch_pivot_shaft` and
-`check:traveler_dt_cone_pivot_post` gates print the committed process plans through
-[prechips](https://github.com/pedropaulovc/prechips); shop blockers are advisory
-to this CAD gate, not permission to machine. See the
+pivot post are exported with named STEP face sets. Enrolled `prechips:<stem>`
+tasks bind the committed process plans to those exact exports and generate strict
+[prechips](https://github.com/pedropaulovc/prechips) travelers; only exit 0 passes
+the build and release gates. Releases include the verified travelers alongside
+their feature bundles. No plans are enrolled yet: the legacy plans are retained
+but must be migrated and pass on real geometry before enrollment. See the
 [export/traveler contract](cad/docs/pipeline/features-travelers.md).
 
 ## References

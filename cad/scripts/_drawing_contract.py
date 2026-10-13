@@ -23,6 +23,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+from _feature_requirements import declaration_calls
+
 _TOLERANCE_SETTERS = frozenset(
     {
         "set_dimension_bilateral_tolerance",
@@ -730,6 +732,146 @@ def _leaves_primary_precision(node: ast.Call) -> bool:
     )
 
 
+def _sourced_declaration_strings(
+    tree: ast.Module, *, filename: str
+) -> frozenset[ast.expr]:
+    """Locate inline declaration strings whose interpolations have own-spec cites.
+
+    Only ``draw_<stem>.py`` establishes the sibling ``<stem>_spec`` authority.
+    Imported symbol/module aliases resolve to that exact module, not any
+    ``*_spec`` or arbitrary object's attributes. Each string's own data pair
+    must cite every interpolated symbol; assignment aliases and calls are not
+    declaration data. Native drawing calls remain checked separately.
+    """
+    stem = Path(filename).stem
+    if not stem.startswith("draw_"):
+        return frozenset()
+    spec_module = f"{stem.removeprefix('draw_')}_spec"
+    bindings: dict[str, str | None] = {}
+    symbols: dict[ast.expr, str] = {}
+
+    class OwnSpecBindings(ast.NodeVisitor):
+        def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+            for alias in node.names:
+                name = alias.asname or alias.name
+                bindings.pop(name, None)
+                if (
+                    node.module == spec_module
+                    and node.level == 0
+                    and alias.name != "*"
+                ):
+                    bindings[name] = alias.name
+
+        def visit_Import(self, node: ast.Import) -> None:
+            for alias in node.names:
+                name = alias.asname or alias.name.split(".")[0]
+                bindings.pop(name, None)
+                if alias.name == spec_module:
+                    bindings[name] = None
+
+        def visit_Name(self, node: ast.Name) -> None:
+            if isinstance(node.ctx, (ast.Store, ast.Del)):
+                bindings.pop(node.id, None)
+            elif node.id in bindings and bindings[node.id] is not None:
+                symbols[node] = bindings[node.id]
+
+        def visit_Attribute(self, node: ast.Attribute) -> None:
+            if (
+                isinstance(node.ctx, ast.Load)
+                and isinstance(node.value, ast.Name)
+                and node.value.id in bindings
+                and bindings[node.value.id] is None
+            ):
+                symbols[node] = node.attr
+            self.generic_visit(node)
+
+        def visit_Assign(self, node: ast.Assign) -> None:
+            self.visit(node.value)
+            for target in node.targets:
+                self.visit(target)
+
+        def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+            if node.value is not None:
+                self.visit(node.value)
+                self.visit(node.target)
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            bindings.pop(node.name, None)
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+            bindings.pop(node.name, None)
+
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
+            bindings.pop(node.name, None)
+
+        def visit_Lambda(self, node: ast.Lambda) -> None:
+            pass
+
+    OwnSpecBindings().visit(tree)
+
+    def is_source(node: ast.expr) -> bool:
+        if isinstance(node, ast.Constant):
+            return isinstance(node.value, str) and bool(node.value)
+        return (
+            isinstance(node, ast.Tuple)
+            and len(node.elts) == 2
+            and all(
+                isinstance(item, ast.Constant)
+                and isinstance(item.value, str)
+                and bool(item.value)
+                for item in node.elts
+            )
+        )
+
+    def data_strings(value: ast.expr) -> Iterable[ast.expr]:
+        if isinstance(value, ast.JoinedStr) or (
+            isinstance(value, ast.Constant) and isinstance(value.value, str)
+        ):
+            yield value
+        elif isinstance(value, (ast.Dict, ast.List, ast.Tuple)):
+            children = value.values if isinstance(value, ast.Dict) else value.elts
+            for child in children:
+                yield from data_strings(child)
+
+    strings: set[ast.expr] = set()
+    for api in ("requirement", "part_metadata"):
+        keywords = {"fields"} if api == "requirement" else {"fields", "frames", "datums"}
+        for call in declaration_calls(tree, api):
+            for keyword in call.keywords:
+                if keyword.arg not in keywords or not isinstance(keyword.value, ast.Dict):
+                    continue
+                for pair in keyword.value.values:
+                    if not isinstance(pair, ast.Tuple) or len(pair.elts) != 2:
+                        continue
+                    value, sources = pair.elts
+                    if not (
+                        isinstance(sources, ast.Tuple)
+                        and sources.elts
+                        and all(is_source(source) for source in sources.elts)
+                    ):
+                        continue
+                    cited = {
+                        source.value
+                        if isinstance(source, ast.Constant)
+                        else source.elts[1].value
+                        for source in sources.elts
+                        if isinstance(source, ast.Constant)
+                        or source.elts[0].value == spec_module
+                    }
+                    for string in data_strings(value):
+                        formatted = tuple(
+                            node.value
+                            for node in ast.walk(string)
+                            if isinstance(node, ast.FormattedValue)
+                        )
+                        if formatted and all(
+                            expression in symbols and symbols[expression] in cited
+                            for expression in formatted
+                        ):
+                            strings.add(string)
+    return frozenset(strings)
+
+
 def drawing_specification_violations(
     source: str, *, filename: str = "<string>"
 ) -> tuple[DrawingSpecificationViolation, ...]:
@@ -739,6 +881,12 @@ def drawing_specification_violations(
     scales, leader elbows, and table positions belong to the sheet.  The gate
     targets values that are rendered as tolerances/finish requirements or that
     mutate a drawing dimension's tolerance object.
+
+    Cited feature-declaration data is not a COM print operation. Within its
+    inline sourced-value pairs, f-string fragments from this drawing's own spec
+    are permitted only when the pair cites each interpolated symbol. Literal
+    manufacturing numbers and local interpolations are still rejected.
+    All drawing/native calls remain checked, including calls in declarations.
     """
     tree = ast.parse(source, filename=filename)
     parent = {
@@ -746,6 +894,7 @@ def drawing_specification_violations(
     }
     docstrings = _docstring_nodes(tree)
     assignments = _simple_assignments(tree)
+    declaration_strings = _sourced_declaration_strings(tree, filename=filename)
     catalog_direct, catalog_modules = _surface_finish_imports(tree)
     part_spec_direct, part_spec_modules = _part_spec_imports(tree)
     reference_precision_names = _reference_precision_names(tree)
@@ -803,12 +952,30 @@ def drawing_specification_violations(
             )
             if (ra and not catalog_ra) or limits or bilateral or unilateral:
                 match = ra or limits or bilateral or unilateral
-                assert match is not None
-                add(
-                    node,
-                    "drawing-spec-string",
-                    repr(match.group(0).replace("\x00", "{...}")),
-                )
+                if node in declaration_strings and formatted:
+                    # Only interpolated spec values cross the data boundary.
+                    # Check every fragment so a sourced MIN cannot mask a
+                    # frozen MAX later in the same declaration string.
+                    match = next(
+                        (
+                            fragment
+                            for pattern in (
+                                _RA_FRAGMENT,
+                                _LIMIT_FRAGMENT,
+                                _BILATERAL_FRAGMENT,
+                                _UNILATERAL_FRAGMENT,
+                            )
+                            for fragment in pattern.finditer(rendered)
+                            if any(character.isdigit() for character in fragment.group(0))
+                        ),
+                        None,
+                    )
+                if match is not None:
+                    add(
+                        node,
+                        "drawing-spec-string",
+                        repr(match.group(0).replace("\x00", "{...}")),
+                    )
 
         if isinstance(node, ast.Call):
             if _call_is(node, "add_surface_finish", surface_direct, surface_modules):

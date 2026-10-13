@@ -23,7 +23,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    move_model_dimension,
+    set_dimension_callouts,
+)
 from _drawing_finish import add_surface_finish
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
@@ -31,7 +35,6 @@ from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
-from draw_dt_cone_pivot_post_tl_cap_jaw_button import _move_dimension
 from mg_wheel_drum_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -166,7 +169,7 @@ async def build(adapter: Any) -> dict[str, str]:
     od_donors = [a for a in front_annotations if dimension_name(adapter, a) == "DrumOd"]
     if len(od_donors) != 1:
         raise RuntimeError("expected one drum O.D. donor dimension")
-    moved_od = _move_dimension(
+    moved_od = move_model_dimension(
         adapter, od_donors[0], right, OD_ON_SIDE, source_view=front
     )
     annotations = [

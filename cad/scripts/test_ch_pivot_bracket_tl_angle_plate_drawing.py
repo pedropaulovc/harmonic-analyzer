@@ -11,7 +11,7 @@ import ch_pivot_bracket_sides as sides
 import ch_pivot_bracket_tl_angle_plate_spec as spec
 import draw_ch_pivot_bracket_tl_angle_plate as drawing
 import export_features
-from _feature_requirements import limits
+from _printed_limits import limits
 
 
 def _features() -> dict:
