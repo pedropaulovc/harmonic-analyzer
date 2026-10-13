@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import math
 import re
 
@@ -9,6 +10,7 @@ import pytest
 
 import draw_pn_pen_hanger as draw
 import pn_pen_hanger_spec as spec
+from _printed_tolerance import printed_band_mm
 
 
 def test_hanger_tap_lands_on_the_bar_screw_axis() -> None:
@@ -69,10 +71,16 @@ def test_slots_centre_on_the_rod_line_with_a_running_fit() -> None:
     # Worst lean between the two slots' outer faces stays under 0.25 deg.
     span = spec.GUIDE_PITCH + spec.GUIDE_PLATE_T
     assert math.degrees(math.atan((wide - rod_min) / span)) < 0.25
-    # Slot bottom behind the largest rod's back face at its band's low limit.
+    # Slot bottom behind the largest rod's back face at its .X limit, and the
+    # corner fillets' wall tangency still behind it with the radius at its .X
+    # limit too (drawing-guidelines.md rule 16 corner radius, no tight band).
     back_face = spec.ROD_AXIS_Z + rod_max / 2.0
-    slot_bottom_near = -(spec.SLOT_BOTTOM + spec.SLOT_BOTTOM_BAND[0])
-    assert slot_bottom_near - back_face == pytest.approx(0.4)
+    slot_bottom_near = spec.SLOT_BOTTOM_Z - printed_band_mm(1)
+    assert slot_bottom_near - back_face == pytest.approx(3.2)
+    fillet_tangent = slot_bottom_near - (spec.SLOT_CORNER_R + printed_band_mm(1))
+    assert fillet_tangent - back_face == pytest.approx(0.4)
+    assert ("UpperGuideProfile", "SlotBottom") not in spec.DRAWING_BANDS
+    assert spec.DRAWING_PRECISION["UpperGuideProfile"]["SlotBottom"] == 1
     # The arms reach past the rod's front face.
     assert spec.ROD_AXIS_Z - rod_max / 2.0 - spec.PLATE_FRONT_Z == pytest.approx(1.5)
 
@@ -102,13 +110,66 @@ def test_both_guides_engage_the_rod_square_over_the_full_travel() -> None:
 
 def test_drawing_keeps_exactly_the_marked_dimensions() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(draw.FRONT_KEEP) | set(draw.TOP_KEEP)
-    assert not set(draw.FRONT_KEEP) & set(draw.TOP_KEEP)
+    kept = set(draw.FRONT_KEEP) | set(draw.SECTION_KEEP)
+    assert not set(draw.FRONT_KEEP) & set(draw.SECTION_KEEP)
     assert kept == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     for feature, name in spec.DRAWING_BANDS:
         assert name in spec.DRAWING_DIMENSIONS[feature]
         assert name in spec.DIMENSION_CALLOUTS
+    # The printed corner radius counts both corners and keeps its own "R".
+    assert spec.DIMENSION_PREFIXES == {("UpperSlotCorner", "SlotCornerR"): "2X R"}
+    for feature, name in spec.DIMENSION_PREFIXES:
+        assert name in spec.DRAWING_DIMENSIONS[feature]
+
+
+def test_front_view_looks_at_the_plates_and_keeps_the_taper_outside() -> None:
+    # *Back: model +x prints left, so the strap's wide (-x) top corner is right.
+    assert draw._fx(spec.STRAP_TOP_X[0]) > draw._fx(spec.STRAP_TOP_X[1])
+    assert draw._fx(draw._X[0]) - draw._fx(draw._X[1]) == pytest.approx(0.021)
+    # The taper's dimension sits under the view, beside the bottom width, so
+    # its long extension line drops from the top outer corner outside the
+    # strap instead of running down through it.
+    bottom = draw._fy(spec.STRAP_BOT_Y)
+    taper_x, taper_y = draw.FRONT_KEEP["StrapTaperDx"]
+    assert taper_y < draw.FRONT_KEEP["StrapBotWidth"][1] < bottom
+    assert draw._fx(spec.STRAP_BOT_X[0]) < taper_x < draw._fx(spec.STRAP_TOP_X[0])
+    # The tap callout and its leader stay right of the strap; every dimension
+    # stacked beside the strap is on its left.
+    right_edge = draw._fx(draw._X[0])
+    assert draw.CALLOUT_XY[0] > right_edge
+    for name in ("ScrewY", "UpperPlateDrop", "StrapRise", "PlateThick"):
+        assert draw.FRONT_KEEP[name][0] < draw._fx(draw._X[1]), name
+
+
+def test_section_cuts_the_upper_plate_and_spans_its_silhouette() -> None:
+    lower, upper = spec.GUIDE_PLATE_YS[1], spec.GUIDE_PLATE_YS[1] + spec.GUIDE_PLATE_T
+    start, end = draw.SECTION_LINE_MODEL_MM
+    assert start[1] == end[1] == draw.SECTION_Y
+    assert lower < draw.SECTION_Y < upper
+    strap = draw._strap_x_at(draw.SECTION_Y)
+    assert end[0] < min(strap[0], -spec.GUIDE_PLATE_WIDTH / 2.0)
+    assert start[0] > max(strap[1], spec.GUIDE_PLATE_WIDTH / 2.0)
+    # Looking down: model +x left, the strap back face above the plate front.
+    assert draw._ax(1.0) < draw._ax(0.0)
+    assert draw._az(spec.STRAP_Z[1]) > draw._az(spec.PLATE_FRONT_Z)
+    centre = (draw._ax(draw._SX), draw._az(draw._SZ))
+    assert centre == pytest.approx(draw.SECTION_CENTER)
+    # The width rows stack under the plate front, the slot width outermost.
+    front = draw._az(spec.PLATE_FRONT_Z)
+    rows = [
+        draw.SECTION_KEEP[name][1] for name in ("ArmWidth", "PlateWidth", "SlotWidth")
+    ]
+    assert front > rows[0] > rows[1] > rows[2]
+    assert draw.SECTION_CAPTION_XY[1] < rows[2]
+
+
+def test_tap_callout_omits_the_title_block_thread_class() -> None:
+    source = inspect.getsource(draw)
+    assert (
+        'omit_title_block_thread_class(tap_callout, label="hanger-screw through tap")'
+        in source
+    )
 
 
 def test_notes_carry_no_dimensions() -> None:

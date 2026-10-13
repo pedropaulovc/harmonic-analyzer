@@ -51,7 +51,11 @@ def test_drawing_keeps_exactly_the_marked_dimensions() -> None:
     assert set(kept) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert drawing.DIMENSION_CALLOUTS is spec.DIMENSION_CALLOUTS
+    assert drawing.DIMENSION_CALLOUTS_ABOVE is spec.DIMENSION_CALLOUTS_ABOVE
     assert set(spec.DIMENSION_CALLOUTS) <= marked
+    assert set(spec.DIMENSION_CALLOUTS_ABOVE) <= marked
+    for feature, name in spec.DIMENSION_PREFIXES:
+        assert name in spec.DRAWING_DIMENSIONS[feature]
     for feature, name in spec.DRAWING_BANDS:
         assert name in spec.DRAWING_DIMENSIONS[feature]
         assert name in spec.DIMENSION_CALLOUTS
@@ -73,12 +77,68 @@ def test_build_authors_every_marked_feature_and_dimension_name() -> None:
         "Relief",
         "PivotBoreProfile",
         "PivotBore",
+        "PivotBoreChamfer",
         "SetScrewHole",
         "LighteningBore",
     ]
     positions = [_PART_SOURCE.index(f'"{name}"') for name in tree_order]
+    # The reference sketches' helpers sit above build(); their calls come last.
+    positions += [
+        _PART_SOURCE.index(f"drive_jobs += await _{helper}_reference(adapter)")
+        for helper in ("relief", "pivot", "lightening")
+    ]
     # The tap is built after the bore, so its through_next stops at the bore.
     assert positions == sorted(positions)
+
+
+def test_every_feature_is_located_from_the_front_face() -> None:
+    # drawing-guidelines.md rule 10: no feature across the depth by symmetry.
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert {"VMouthZ", "ReliefZ0", "PivotZ", "LighteningZ"} <= marked
+    assert '"VApexZ"' not in _PART_SOURCE
+    for feature in ("ReliefReference", "PivotReference", "LighteningReference"):
+        assert f'"{feature}"' in _PART_SOURCE
+    # Hidden only once marked, before the save that the drawing opens.
+    marks = _PART_SOURCE.index("mark_dimensions_for_drawing(adapter, feature_name")
+    hide = _PART_SOURCE.index("_hide_references(adapter)\n")
+    assert marks < hide < _PART_SOURCE.index("save_part_and_images(adapter")
+    assert "segment.ConstructionGeometry = True" in _PART_SOURCE
+    # PivotZ's extension line lands on the section's bore-axis centreline.
+    assert "add_view_centerline(" in _DRAWING_SOURCE
+
+
+def test_relief_corners_carry_the_largest_radius_the_grip_allows() -> None:
+    assert spec.RELIEF_CORNER_R == 1.0
+    assert spec._GRIP_GAP_AT_BOTTOM - spec.RELIEF_CORNER_R >= 0.25
+    assert spec.DIMENSION_PREFIXES == {("ReliefProfile", "ReliefCornerR"): "2X R"}
+    assert (
+        "set_dimension_prefix(adapter, feature_name, dimension_name, prefix)"
+        in _PART_SOURCE
+    )
+    assert '"tangent"' in _PART_SOURCE and '"radial"' in _PART_SOURCE
+
+
+def test_pivot_chamfer_clears_the_rod_fillet_as_a_min_limit() -> None:
+    import _config
+    import pn_pen_rod_spec as rod
+
+    fillet_reach = rod.SHOULDER_FILLET_R * (2.0 - math.sqrt(2.0))
+    assert spec.PIVOT_BORE_TOP_CHAMFER - fillet_reach >= 0.1
+    mouth_r = (spec.PIVOT_BORE_DIA + spec.PIVOT_BORE_BAND[0]) / 2.0
+    largest = spec.PIVOT_BORE_TOP_CHAMFER + spec.PIVOT_CHAMFER_BAND[0]
+    assert mouth_r + largest < (rod.ROD_SECTION + rod.SECTION_BAND[1]) / 2.0
+    assert spec.PIVOT_CHAMFER_TOL_TYPE == 5  # swTolMIN
+    assert "tolerance.Type = PIVOT_CHAMFER_TOL_TYPE" in _PART_SOURCE
+    assert _PART_SOURCE.index("_pivot_chamfer_min_limit(adapter)\n") < (
+        _PART_SOURCE.index("clear_dimensions_for_drawing(adapter)")
+    )
+    rod_number = _config.parts("pn-pen-rod")["number"]
+    assert rod_number in spec.DIMENSION_CALLOUTS_ABOVE["PivotChamferSize"]
+    for text in (
+        spec.DIMENSION_CALLOUTS["PivotChamferSize"],
+        spec.DIMENSION_CALLOUTS_ABOVE["PivotChamferSize"],
+    ):
+        assert not re.search(r"\d\.\d", text)
 
 
 def test_holes_are_native_wizard_features_with_native_callouts() -> None:
@@ -96,6 +156,16 @@ def test_holes_are_native_wizard_features_with_native_callouts() -> None:
     assert _DRAWING_SOURCE.count("add_native_hole_callout(") == 2
     assert 'process="TAP"' in _DRAWING_SOURCE
     assert 'process="DRILL"' in _DRAWING_SOURCE
+    # The title block owns the thread class (rule 2); the drill's and the
+    # reamed bore's leaders stop on the near rim (rule 14).
+    assert (
+        'omit_title_block_thread_class(tap_callout, label="rod set-screw tap")'
+        in _DRAWING_SOURCE
+    )
+    assert "lightening_callout.GetAnnotation()" in _DRAWING_SOURCE
+    assert 'set_near_side_diameter(pivot_dia[0], "reamed pivot-bore diameter")' in (
+        _DRAWING_SOURCE
+    )
 
 
 def test_pivot_callout_names_its_mate_and_says_ream() -> None:
@@ -113,7 +183,15 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
 
     assert part.V_BLOCK == pytest.approx(11016.0)
     assert part.V_GROOVE == pytest.approx(360.0)
-    assert part.V_RELIEF == pytest.approx(2197.0)
+    # The carriage mass model cuts the relief square-cornered and leaves the
+    # bore's top chamfer: both under 0.05% of the block.
+    assert part.V_RELIEF + part.V_RELIEF_CORNERS == pytest.approx(2197.0)
+    corner_r, relief_h = spec.RELIEF_CORNER_R, spec.RELIEF_HEIGHT
+    assert part.V_RELIEF_CORNERS == pytest.approx(
+        2.0 * (1.0 - math.pi / 4.0) * corner_r**2 * relief_h
+    )
+    assert 0.0 < part.V_RELIEF_CORNERS < 0.0005 * part.V_TOTAL
+    assert 0.0 < part.V_PIVOT_CHAMFER < 0.0005 * part.V_TOTAL
     bore_length = spec.BLOCK_HEIGHT - spec.RELIEF_HEIGHT
     assert part.V_PIVOT_BORE == pytest.approx(math.pi * 4.0 * bore_length)
     tap_r = TAP_DRILL_MM[spec.SET_SCREW_TAP_SPEC.size] / 2.0
@@ -129,7 +207,10 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
         if name.startswith("v-block ")
     )
     sliver = part.V_SET_SCREW_TAP - math.pi * tap_r**2 * spec.SET_SCREW_TAP_LENGTH
-    assert block_mass / carriage.BRASS_G_PER_MM3 - sliver == pytest.approx(part.V_TOTAL)
+    carriage_volume = block_mass / carriage.BRASS_G_PER_MM3 - sliver
+    assert carriage_volume == pytest.approx(
+        part.V_TOTAL - part.V_RELIEF_CORNERS + part.V_PIVOT_CHAMFER
+    )
 
 
 def test_sheet_runs_at_4_to_1_with_1_to_1_isometric() -> None:

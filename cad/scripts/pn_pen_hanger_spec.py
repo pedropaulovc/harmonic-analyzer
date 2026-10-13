@@ -85,12 +85,18 @@ SLOT_WIDTH = 5.05
 # largest rod (pn_pen_rod_spec 0/-0.05); the high limit bounds the lean the two
 # slots allow (GUIDE_TILT_MAX).
 SLOT_WIDTH_BAND = (0.05, 0.0)
-SLOT_BOTTOM_GAP = 0.5  # nominal, largest rod's back face to slot bottom
+# Nominal, largest rod's back face to slot bottom.  Open enough that the
+# title-block .X band on the slot bottom AND on the corner radius below still
+# keeps the rod's back corners off the slot-corner fillets (guarded below),
+# so the slot bottom needs no tight band.
+SLOT_BOTTOM_GAP = 4.0
 SLOT_BOTTOM_Z = round(ROD_AXIS_Z + ROD_SECTION / 2.0 + SLOT_BOTTOM_GAP, 6)
 # Printed from the strap back face (the bar seat), the one face that fixes the
 # rod line relative to the slot.
 SLOT_BOTTOM = -SLOT_BOTTOM_Z
-SLOT_BOTTOM_BAND = (0.10, -0.10)
+# drawing-guidelines.md rule 16: the slot's two milled internal corners carry
+# the largest radius the rod's corner clearance allows.
+SLOT_CORNER_R = 2.0
 GUIDE_NOSE = 4.0  # plate front edge ahead of the rod axis
 PLATE_FRONT_Z = round(ROD_AXIS_Z - GUIDE_NOSE, 6)
 PLATE_REACH = round(STRAP_Z[0] - PLATE_FRONT_Z, 6)  # strap front to plate front
@@ -109,10 +115,21 @@ if SLOT_CLEARANCE[0] <= 0.0:
 GUIDE_TILT_MAX = math.atan(SLOT_CLEARANCE[1] / (GUIDE_PITCH + GUIDE_PLATE_T))
 if math.degrees(GUIDE_TILT_MAX) > 0.25:
     raise AssertionError("guide slots let the pen rod lean over 0.25 deg")
-# The slot bottom stays behind the rod's back face at the band's worst case.
-SLOT_BOTTOM_GAP_MIN = SLOT_BOTTOM_GAP + SLOT_BOTTOM_BAND[1]
+# The slot bottom stays behind the rod's back face at its .X limit.
+SLOT_BOTTOM_GAP_MIN = SLOT_BOTTOM_GAP - printed_band_mm(1)
 if SLOT_BOTTOM_GAP_MIN <= 0.0:
     raise AssertionError("guide slot bottom can bear on the pen rod")
+# The corner fillets are tangent to the walls SLOT_CORNER_R ahead of the slot
+# bottom: with the slot bottom AND the radius both at their .X limits, the
+# rod's back corners still pass the fillets' wall tangency.
+SLOT_CORNER_R_MAX = SLOT_CORNER_R + printed_band_mm(1)
+if SLOT_BOTTOM_GAP_MIN < SLOT_CORNER_R_MAX:
+    raise AssertionError(
+        "guide slot corner fillets can bear on the pen rod's back corners"
+    )
+# The two fillets leave a flat slot bottom between them, inside the slot depth.
+if 2.0 * SLOT_CORNER_R >= SLOT_WIDTH or SLOT_CORNER_R >= SLOT_DEPTH:
+    raise AssertionError("guide slot corner radius does not fit the slot")
 # The arms still cover the rod's front face with the reach at its .X limit.
 GUIDE_ARM_COVER_MIN = GUIDE_NOSE - _ROD_MAX / 2.0 - printed_band_mm(1)
 if GUIDE_ARM_COVER_MIN <= 0.0:
@@ -151,15 +168,17 @@ if HANGER_THREAD_STRAP_WALL <= 0.0:
     raise AssertionError("stock #8 hanger thread breaks through the tapered strap")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  Front view: the strap outline, the tap station, the upper
-# plate's thickness and drop.  Top view: the upper guide plate's U outline and
-# the strap stock thickness (the lower plate is identical and flush with the
-# strap bottom end -- notes). ---
+# print shows.  Front view (looking at the plates): the strap outline, the tap
+# station, the upper plate's drop and the (alike) lower plate's thickness.
+# Section A-A through the upper plate: its U outline, the slot-corner radius
+# and the strap stock thickness (the lower plate is identical and flush with
+# the strap bottom end -- notes). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StrapProfile": {"StrapTopRun", "StrapTaperDx", "StrapRise", "StrapBotWidth"},
     "Strap": {"StrapThick"},
     "ScrewHole": {"ScrewX", "ScrewY"},
-    "UpperGuide": {"PlateThick", "UpperPlateDrop"},
+    "UpperGuide": {"UpperPlateDrop"},
+    "LowerGuide": {"PlateThick"},
     "UpperGuideProfile": {
         "SlotWidth",
         "SlotBottom",
@@ -167,6 +186,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "PlateReach",
         "PlateWidth",
     },
+    "UpperSlotCorner": {"SlotCornerR"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
@@ -177,14 +197,16 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "Strap": {"StrapThick": 1},
     "ScrewHole": {"ScrewX": 1, "ScrewY": 1},
-    "UpperGuide": {"PlateThick": 1, "UpperPlateDrop": 1},
+    "UpperGuide": {"UpperPlateDrop": 1},
+    "LowerGuide": {"PlateThick": 1},
     "UpperGuideProfile": {
         "SlotWidth": 2,
-        "SlotBottom": 2,
+        "SlotBottom": 1,
         "ArmWidth": 1,
         "PlateReach": 1,
         "PlateWidth": 1,
     },
+    "UpperSlotCorner": {"SlotCornerR": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -199,12 +221,15 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
 # (feature, dimension) -> (upper, lower) native band.
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("UpperGuideProfile", "SlotWidth"): SLOT_WIDTH_BAND,
-    ("UpperGuideProfile", "SlotBottom"): SLOT_BOTTOM_BAND,
 }
 # Every tight band names its mate on the dimension it governs.
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "SlotWidth": f"2X SLIDING FIT ON PEN ROD {PEN_ROD_NUMBER}",
-    "SlotBottom": f"2X CLEARS PEN ROD {PEN_ROD_NUMBER}",
+    "SlotWidth": f"2X SLIDING FIT ON\nPEN ROD {PEN_ROD_NUMBER}",
+}
+# (feature, dimension) -> native prefix.  A custom radius prefix replaces
+# SolidWorks' own "R", so it carries it: the section's two slot corners.
+DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
+    ("UpperSlotCorner", "SlotCornerR"): "2X R",
 }
 
 DRAWING_NOTES = "\n".join(
@@ -216,5 +241,4 @@ DRAWING_NOTES = "\n".join(
     )
 )
 FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:1"
-TOP_VIEW_NOTE = "TOP VIEW SCALE 2:1"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

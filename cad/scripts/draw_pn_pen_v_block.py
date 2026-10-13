@@ -7,21 +7,24 @@ lives in ``_drawing_common``.  Dimension import and curation live in
 ``_drawing_dimension_import``; places and the pivot band are authored on the
 part (``pn_pen_v_block_spec``).
 
-The views follow the part frame (x 0 the paper end, z 0 the front face):
+The views follow the part frame (x 0 the paper end, z 0 the front face); every
+feature is located across the depth from the front face:
 
 * front: ``*Back`` looks at the z 0 face the set screw enters, so the paper
   end is on the RIGHT.  It carries the chamfered outline and the tap's two
   coordinates, the tap's native callout, and section A-A's cutting line on
   the pivot-bore axis.
 * right (third angle, right of the ``*Back`` face): ``*Left``, the paper end,
-  shows the V in solid lines -- apex height, angle, and the block depth.
+  shows the V in solid lines -- its front mouth edge from the front face,
+  mouth width, apex height, and the block depth.
 * bottom: ``*Bottom`` turned 180 degrees to keep the front view's X, looking
   up into the V and the relief; through the relief the roof shows both
-  vertical bores.  It carries the V's length, the relief width, the pivot
-  bore (station and reamed, banded diameter) and the lightening bore's
-  station with its native callout.
+  vertical bores.  It carries the relief's start station and corner radius,
+  the pivot bore (station and reamed, banded diameter) and the lightening
+  bore's two stations with its native callout.
 * section A-A through the pivot-bore axis: bore, tap and relief in one cut;
-  it carries the relief height.
+  it carries the relief's near wall, width and height, the pivot bore's
+  station from the front face, and the bore's top chamfer.
 
 No datums, frames, basic dimensions or roughness (drawing-simplicity-policy.md
 rules 5 and 6), no note block: material and finish ride the title block.  The
@@ -39,7 +42,11 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
 
 from _check import check
 from _com import _early_bound
@@ -51,15 +58,18 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_centerline import add_view_centerline
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import scan_view_edges
 from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import TAP_DRILL_MM
 from _paths import CAD_ROOT
 from _session import run_build
@@ -70,12 +80,17 @@ from pn_pen_v_block_spec import (
     BLOCK_LENGTH,
     CHAMFER,
     DIMENSION_CALLOUTS,
+    DIMENSION_CALLOUTS_ABOVE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     LIGHTENING_DIA,
     LIGHTENING_X,
+    PIVOT_BORE_DIA,
+    PIVOT_BORE_TOP_CHAMFER,
     PIVOT_BORE_X,
+    RELIEF_CORNER_R,
     RELIEF_HEIGHT,
+    RELIEF_WIDTH,
     RELIEF_X0,
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
@@ -113,6 +128,10 @@ SECTION_CENTER = (0.360, FRONT_CENTER[1])
 ISO_CENTER = (0.375, 0.105)
 ISO_NOTE_XY = (0.350, 0.074)
 TAP_CALLOUT_XY = (0.235, 0.252)
+# Above-left of the bottom view, the lightening bore's near (upper-left) rim
+# 13 mm down-right of the text: one arrow there, no line through the bore
+# (set_near_side_diameter), clear of LighteningZ's extension line at the
+# view's z 0 edge (y 0.126) left of x 0.040, which ends 11 mm below the text.
 LIGHTENING_CALLOUT_XY = (0.060, 0.140)
 # Section A-A's cutting line: the pivot-bore axis (x = PIVOT_BORE_X), 1.5 mm
 # past the bottom and top faces, so the cut closes across the whole block.
@@ -151,6 +170,16 @@ def _ry(model_y_mm: float) -> float:
     return RIGHT_CENTER[1] + (model_y_mm - _CY) * _S
 
 
+def _sz(model_z_mm: float) -> float:
+    """Sheet X of a model-Z point in section A-A: it looks toward the paper end,
+    so z 0 (the front face, where the tap enters) is on its RIGHT."""
+    return SECTION_CENTER[0] - (model_z_mm - _CZ) * _S
+
+
+def _sy(model_y_mm: float) -> float:
+    return SECTION_CENTER[1] + (model_y_mm - _CY) * _S
+
+
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.
 # Front: overall length on top over the free-end chamfer leg, whose wide
@@ -164,29 +193,67 @@ FRONT_KEEP = {
     "SetScrewY": (_fx(0.0) + 0.010, _fy(SET_SCREW_Y / 2.0)),
     "SetScrewX": (_fx(PIVOT_BORE_X / 4.0), _fy(0.0) - 0.012),
 }
-# Paper end: the depth under the view, the V's mouth width just under it, the
+# Paper end: the depth under the view; one row above it the V's front mouth
+# edge from the front face (z 0, the view's left edge) chained with the mouth
+# width.  The 3.00's 12 mm span would cramp its text between the arrows, so
+# it sits 8 mm left of the z 0 corner, in the gap to the front view (whose
+# right edge is at x 0.184; its SetScrewY text is at y 0.180, above).  The
 # apex height right of the view.
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], _ry(0.0) - 0.020),
     "VMouth": (RIGHT_CENTER[0], _ry(0.0) - 0.007),
+    "VMouthZ": (_rz(0.0) - 0.008, _ry(0.0) - 0.007),
     "VApexY": (_rz(BLOCK_DEPTH) + 0.012, _ry(V_APEX_Y / 2.0)),
 }
-# Bottom: the bore station above the view (the gap under the front view), the
-# V's length (the relief's start station) and the lightening station stacked
-# below, the relief width left, the reamed diameter's wide callout wholly right
-# of the paper end so the stations' extension lines there clear it.
+# Bottom: all three stations from the paper end below the view, a baseline
+# stack nested shortest-innermost (relief step x 0.144, pivot axis 0.134,
+# lightening axis 0.092; rows 10 mm apart down to y 0.024, 11 mm above the
+# border) so no extension line crosses a dimension line under it.  That frees
+# the gap above the view for the relief corner's radius: its text sits 45 deg
+# up-right of the front-face corner arc (centre x 0.140, y 0.112), so the
+# radial leader runs out from the arc's midpoint across only the bottom face's
+# land; the text (x 0.153..0.168) is clear of the front view's SetScrewX line
+# (y 0.142) above and the reamed diameter's callout (from x 0.188) right.  The
+# lightening bore's depth station left of the free end, from that end's
+# front-face corner (x 0.040, y 0.126) to its centre mark.  The reamed
+# diameter's wide callout wholly right of the paper end, its single arrow on
+# the near rim (set_near_side_diameter), so no leader crosses the bore.
 BOTTOM_KEEP = {
-    "PivotX": (_fx(PIVOT_BORE_X / 2.0), _bz(0.0) + 0.008),
-    "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BLOCK_DEPTH) - 0.012),
-    "LighteningX": (_fx(LIGHTENING_X / 2.0), _bz(BLOCK_DEPTH) - 0.024),
-    "ReliefWidth": (_fx(BLOCK_LENGTH) - 0.014, BOTTOM_CENTER[1]),
+    "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BLOCK_DEPTH) - 0.010),
+    "PivotX": (_fx(PIVOT_BORE_X / 2.0), _bz(BLOCK_DEPTH) - 0.020),
+    "LighteningX": (_fx(LIGHTENING_X / 2.0), _bz(BLOCK_DEPTH) - 0.030),
+    "LighteningZ": (_fx(BLOCK_LENGTH) - 0.012, _bz(_CZ / 2.0)),
+    "ReliefCornerR": (
+        _fx(RELIEF_X0 + RELIEF_CORNER_R) + 0.020,
+        _bz((BLOCK_DEPTH - RELIEF_WIDTH) / 2.0 + RELIEF_CORNER_R) + 0.020,
+    ),
     "PivotDia": (_fx(0.0) + 0.048, _bz(0.0) - 0.008),
 }
-# Section A-A: the relief height right of the cut.
+# Section A-A (z 0 at x 0.396 on the right, the bottom face at y 0.156, the
+# top at 0.228; the caption sits ~0.017 under the view):
+# * the relief's near wall from the front face and its width, one chain 7 mm
+#   under the bottom face, their extension lines on the wall feet; the 2.50's
+#   10 mm span is too short for its text, which sits just right of the z 0
+#   foot (x 0.405) under the relief height's lower end (y 0.156).
+# * the relief height right of the cut, from the near wall's foot to the
+#   roof, as before.
+# * the pivot station 8 mm over the top face (y 0.236), from the front face's
+#   top corner (x 0.396) to the bore axis (x 0.360, a centreline added
+#   below); its extension lines top out near y 0.2375.
+# * the chamfer size on the bore's far rim (x 0.351..0.352, the z 11 side),
+#   its "0.3 MIN" (~14 mm wide) centred 12 mm left of that rim and 12 mm up
+#   (y 0.240): its dimension line runs left, away from PivotZ's extension
+#   line at x 0.360; the angle callout below stays left of x 0.35; the
+#   functional note above (~70 mm wide, y ~0.245) clears every extension
+#   line's top and the tap callout's right end (x 0.266).
 SECTION_KEEP = {
-    "ReliefHeight": (
-        SECTION_CENTER[0] + _CZ * _S + 0.012,
-        SECTION_CENTER[1] + (RELIEF_HEIGHT / 2.0 - _CY) * _S,
+    "ReliefZ0": (_sz(0.0) + 0.009, _sy(0.0) - 0.007),
+    "ReliefWidth": (_sz(_CZ), _sy(0.0) - 0.007),
+    "ReliefHeight": (_sz(0.0) + 0.012, _sy(RELIEF_HEIGHT / 2.0)),
+    "PivotZ": (_sz(_CZ / 2.0), _sy(BLOCK_HEIGHT) + 0.008),
+    "PivotChamferSize": (
+        _sz(_CZ + PIVOT_BORE_DIA / 2.0 + PIVOT_BORE_TOP_CHAMFER) - 0.012,
+        _sy(BLOCK_HEIGHT) + 0.012,
     ),
 }
 
@@ -282,12 +349,30 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(
+        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
+    )
+    # Natively the reamed diameter's leader runs rim to rim through the bore
+    # and across its centre mark; one arrow on the near rim keeps it outside.
+    pivot_dia = [a for a in annotations if dimension_name(adapter, a) == "PivotDia"]
+    if len(pivot_dia) != 1:
+        raise RuntimeError(f"expected one PivotDia dimension, found {len(pivot_dia)}")
+    set_near_side_diameter(pivot_dia[0], "reamed pivot-bore diameter")
     # Places (and the pivot band) are authored on the part; the sheet only
     # proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for view, label in ((front, "front"), (bottom, "bottom")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to the {label} view")
+    # PivotZ's extension line rises from the bore axis at the top face: the
+    # axis's centreline, picked on the bore's far wall (z 10, y 15: above the
+    # tap, below the chamfer), is the geometry it lands on.
+    add_view_centerline(
+        adapter,
+        section,
+        face_xy=(_sz(_CZ + 1.0), _sy(15.0)),
+        label="section A-A pivot-bore axis",
+    )
 
     # Native Hole Wizard callouts on each hole's visible rim: the tap's mouth on
     # the front face, the lightening bore where it breaks through the relief roof.
@@ -297,7 +382,7 @@ async def build(adapter: Any) -> dict[str, str]:
         axis=(0.0, 0.0, 1.0),
         label="set-screw tap mouth",
     )
-    add_native_hole_callout(
+    tap_callout = add_native_hole_callout(
         adapter,
         front,
         edge=tap_rim.edge,
@@ -305,13 +390,15 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rod set-screw tap into the pivot bore",
         process="TAP",
     )
+    # The title block's THREADS row owns the general thread class (rule 2).
+    omit_title_block_thread_class(tap_callout, label="rod set-screw tap")
     lightening_rim = scan_view_edges(bottom, label="bottom").circle_at(
         (LIGHTENING_X, RELIEF_HEIGHT, _CZ),
         LIGHTENING_DIA / 2.0,
         axis=(0.0, 1.0, 0.0),
         label="lightening bore at the relief roof",
     )
-    add_native_hole_callout(
+    lightening_callout = add_native_hole_callout(
         adapter,
         bottom,
         edge=lightening_rim.edge,
@@ -319,6 +406,12 @@ async def build(adapter: Any) -> dict[str, str]:
         label="free-end lightening bore",
         process="DRILL",
     )
+    # Natively its leader ran through the bore and across its centre mark:
+    # one arrow on the near rim, the leader wholly outside.
+    set_near_side_diameter(
+        lightening_callout.GetAnnotation(), "lightening bore callout"
+    )
+    rebuild_drawing(adapter, label="near-side diameter leaders")
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 

@@ -5,11 +5,13 @@ One side view, the *Right view turned so the stud lies as it is turned
 cross hole seen end-on as a circle with its center mark and native #54 DRILL
 callout. Every marked dimension (pn_pen_adjust_screw_spec.DRAWING_DIMENSIONS)
 lives in a Right-plane sketch and imports here: the thread's major diameter
-and length, the head's diameter and height, and the eye's station from the
-threaded end (the hidden EyeStationReference sketch, shown in this view only).
-A shaded isometric at the sheet scale completes the package (rule 8). No
-datums, frames or roughness symbols: the stud is not on the GD&T allowlist
-(rule 5) and nothing on it runs or locates (rule 6).
+(printed as its #0-80 UNF designation), its usable full-thread length, the
+head's diameter and height, the overall length, and the eye's station from the
+head's faced end (the hidden EyeStationReference sketch, shown in this view
+only). A shaded isometric at the sheet scale completes the package (rule 8).
+No datums, frames or roughness symbols: the stud is not on the GD&T allowlist
+(rule 5) and nothing on it runs or locates (rule 6). No general note: the
+title block says all the stud needs.
 """
 
 from __future__ import annotations
@@ -32,11 +34,13 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import import_cosmetic_threads
-from _drawing_dimensions import assert_imported_precision
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_dimension_text,
+)
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
-from _drawing_leader_notes import add_attached_note
-from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -45,15 +49,18 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from pn_pen_adjust_screw_spec import (
+    DIMENSION_CALLOUTS,
+    DIMENSION_TEXT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     EYE_DIA,
     EYE_SPEC,
     EYE_Y,
+    FULL_THREAD_LENGTH,
     HEAD_DIA,
     OVERALL_LENGTH,
+    SHANK_LENGTH,
     THREAD_CALLOUT,
-    THREAD_LENGTH,
     THREAD_MAJOR,
 )
 
@@ -91,41 +98,60 @@ def sheet_x(model_y_mm: float) -> float:
 
 
 THREAD_END_X = sheet_x(0.0)
-SHOULDER_X = sheet_x(THREAD_LENGTH)
+FULL_THREAD_X = sheet_x(FULL_THREAD_LENGTH)
+SHOULDER_X = sheet_x(SHANK_LENGTH)
 EYE_X = sheet_x(EYE_Y)
 TOP_X = sheet_x(OVERALL_LENGTH)
 THREAD_HALF = THREAD_MAJOR / 2.0 * _S
 HEAD_HALF = HEAD_DIA / 2.0 * _S
 EYE_HALF = EYE_DIA / 2.0 * _S
 
-# Lengths (rules 10/11): below the profile, the thread from the faced
-# threaded end and the head from its shoulder on one row; above it, the eye's
-# station from the threaded end, its extension line rising through the eye's
-# center mark, so no extension line crosses another dimension line. The
-# thread's Ø stands below the thread, short of the length row; the head's Ø
-# right of the faced top, between its extension lines.
-_ROW_BELOW_Y = AXIS_Y - 0.032
+# Lengths (rules 10/11), all below the profile except the eye's station, so
+# the profile's half-section dimensions (drawn on the sheet's lower half) send
+# their extension lines down off the part:
+# - row 1: the full thread from the faced threaded end to the thread-limit
+#   edge, and the head from its shoulder to its faced end; 18 mm of clear
+#   paper between the two runs' inner extension lines;
+# - row 2, 18 mm lower so the FULL THREAD callout under row 1's line has
+#   room: the overall, end to end. Its extension lines run collinear with row
+#   1's outer ones, so no extension line crosses a dimension line.
+# Above the head, the eye's station from the head's faced end: one extension
+# line rises from the eye's centre (through its center mark), the other along
+# the faced end. The thread's Ø line (printed as the thread designation)
+# stands below the thread, short of row 1; the head's Ø right of the faced
+# end, between its extension lines.
+_ROW_1_Y = AXIS_Y - 0.032
+_ROW_2_Y = AXIS_Y - 0.050
 _ROW_ABOVE_Y = AXIS_Y + 0.035
 SIDE_KEEP = {
-    "ThreadLength": ((THREAD_END_X + SHOULDER_X) / 2.0, _ROW_BELOW_Y),
-    "HeadHeight": ((SHOULDER_X + TOP_X) / 2.0, _ROW_BELOW_Y),
-    "EyeY": ((THREAD_END_X + EYE_X) / 2.0, _ROW_ABOVE_Y),
+    "FullThreadLength": ((THREAD_END_X + FULL_THREAD_X) / 2.0, _ROW_1_Y),
+    "HeadHeight": ((SHOULDER_X + TOP_X) / 2.0, _ROW_1_Y),
+    "OverallLength": ((THREAD_END_X + TOP_X) / 2.0, _ROW_2_Y),
+    "EyeFromHeadEnd": ((EYE_X + TOP_X) / 2.0, _ROW_ABOVE_Y),
     "ThreadDia": (sheet_x(6.0), AXIS_Y - 0.016),
     "HeadDia": (TOP_X + 0.021, AXIS_Y),
 }
-# The thread callout stands between the thread and the EyeY row, its short
-# leader dropping onto the major-diameter silhouette toward the shoulder.
-THREAD_PICK = (sheet_x(14.0), AXIS_Y + THREAD_HALF)
-THREAD_NOTE_XY = (sheet_x(6.0), AXIS_Y + 0.018)
-# The eye callout's leader rises from the circle's top rim up and right, over
-# the faced top, inside the head's Ø extension line.
-EYE_RIM_PICK = (EYE_X, AXIS_Y + EYE_HALF)
-EYE_CALLOUT_XY = (TOP_X + 0.013, AXIS_Y + 0.045)
-# A point on the thread's face between the ThreadDia line and the callout's
-# leader.
+# The eye callout stands up and LEFT of the eye, above the bare thread (the
+# old up-and-right place dropped its leader through the station dimension's
+# line, rule 14). SolidWorks hangs the leader off the text end nearer the
+# hole -- the right end, ~59 mm of "#54 DRILL Ø1.40 THRU ALL" (measured on the
+# 20261013T222120 sheet) right of a centred text box -- so that end stands
+# 20 mm left of the eye's center. The leader then runs down-right into the
+# rim on the eye's centre line from the text end: it crosses only the head's
+# top silhouette, left of the station dimension's extension line through the
+# eye's centre, and stays under the station dimension's row.
+_EYE_CALLOUT_TEXT_WIDTH = 0.059
+EYE_CALLOUT_XY = (EYE_X - 0.020 - _EYE_CALLOUT_TEXT_WIDTH / 2.0, AXIS_Y + 0.038)
+_EYE_LEADER_DX = (EYE_CALLOUT_XY[0] + _EYE_CALLOUT_TEXT_WIDTH / 2.0) - EYE_X
+_EYE_LEADER_DY = EYE_CALLOUT_XY[1] - AXIS_Y
+_EYE_LEADER_LEN = math.hypot(_EYE_LEADER_DX, _EYE_LEADER_DY)
+EYE_RIM_PICK = (
+    EYE_X + EYE_HALF * _EYE_LEADER_DX / _EYE_LEADER_LEN,
+    AXIS_Y + EYE_HALF * _EYE_LEADER_DY / _EYE_LEADER_LEN,
+)
+# A point on the thread's face between the thread's Ø line and the
+# thread-limit edge.
 CENTERLINE_PICK = (sheet_x(10.0), AXIS_Y + THREAD_HALF / 2.0)
-# Bottom-left, above the title-block line.
-NOTES_XY = (0.020, 0.048)
 
 
 def _shift(
@@ -148,14 +174,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -201,6 +225,11 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # The thread's major-diameter dimension reads as its designation (the
+    # thread callout, associative to the profile), and the full-thread length
+    # says what it bounds.
+    set_dimension_text(adapter, annotations, DIMENSION_TEXT)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="below")
     if not auto_center_marks(adapter, side, holes=True, size=0.0025):
         raise RuntimeError("failed to add the ASME center mark to the eye")
     add_view_centerline(
@@ -208,15 +237,6 @@ async def build(adapter: Any) -> dict[str, str]:
         side,
         face_xy=spt(*CENTERLINE_PICK),
         label="adjuster stud turning axis",
-    )
-    add_attached_note(
-        adapter,
-        side,
-        text=THREAD_CALLOUT,
-        entity_xy=spt(*THREAD_PICK),
-        note_xy=spt(*THREAD_NOTE_XY),
-        label="adjuster stud thread callout",
-        entity_type="SILHOUETTE",
     )
     add_native_hole_callout(
         adapter,
@@ -227,7 +247,6 @@ async def build(adapter: Any) -> dict[str, str]:
         process=drill_process(EYE_SPEC),
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     # The shaded isometric shows the #0-80 the callout names; imported before
     # finalize's note cleanup, so its label is counted rather than first
     # appearing at the native save (draw_pn_pen_hanger).

@@ -3,7 +3,8 @@ r"""Reproduction script: pen square rod (book ch. 24, pp. 64-65).
 The square brass rod of the pen carriage: it slides in the pen hanger's two U
 guides, its turned pivot end drops into the v-block's pivot bore with the
 square shoulder resting on the block top, and the adjuster stud (with its
-#0-80 jam nut and wire eye) threads into the tapped top face.
+#0-80 jam nut and wire eye) threads into the tapped top face. The shoulder's
+internal root carries a modelled tool radius, banded as a single MAX limit.
 
 Frame (``pn_pen_rod_spec`` docstring; the assembly places the part by it):
 origin on the rod axis at the SHOULDER. The square runs +Y from the shoulder to
@@ -22,9 +23,11 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -39,7 +42,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
@@ -48,11 +51,13 @@ from pn_pen_rod_spec import (
     BOTTOM_VIEW_NOTE,
     DRAWING_BANDS,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     PIVOT_DIA,
     PIVOT_LENGTH,
     ROD_SECTION,
+    SHOULDER_FILLET_BAND,
+    SHOULDER_FILLET_R,
+    SHOULDER_FILLET_TOL_TYPE,
     SQUARE_LENGTH,
     STUD_TAP_DRILL_DIA,
     STUD_TAP_SPEC,
@@ -64,6 +69,35 @@ MATERIAL = "Brass"  # see _appearance.apply_material docstring
 # The assembly mates the rod line to ``Axis1@pn-pen-rod-1``: the slide axis
 # must be the first (and only) reference axis the part creates.
 SLIDE_AXIS = "Axis1"
+
+
+def _shoulder_fillet_max_limit(adapter) -> None:
+    """ShoulderRadius as a MAX single limit carrying the band's deviations
+    (build_pd_transgear_front_bushing._chamfer_max_limit's recipe)."""
+    lower, upper = deviations(SHOULDER_FILLET_BAND)
+    _, dimension = _named_dimension(adapter, "ShoulderFillet", "ShoulderRadius")
+    label = "ShoulderRadius@ShoulderFillet"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, SHOULDER_FILLET_R / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
+            f"{SHOULDER_FILLET_R}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = SHOULDER_FILLET_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != SHOULDER_FILLET_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {SHOULDER_FILLET_R:g} MAX")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -78,6 +112,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "SquareLength", f"{SQUARE_LENGTH}mm")
     await set_global(adapter, "PivotDia", f"{PIVOT_DIA}mm")
     await set_global(adapter, "PivotLength", f"{PIVOT_LENGTH}mm")
+    await set_global(adapter, "ShoulderRadius", f"{SHOULDER_FILLET_R}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -156,7 +191,29 @@ async def build(adapter) -> dict[str, str]:
         adapter, "rod pivot end", volume + v_pivot, 0.005 * v_pivot
     )
 
-    # 3. Adjuster stud tap: one blind #0-80 Hole Wizard tap in the top face on
+    # 3. Shoulder root: the internal corner where the pivot turns down from the
+    #    square's bottom (seat) face gets the tool-nose radius the print allows
+    #    (R MAX). Picked on the circular shoulder edge at +X: the only edge
+    #    through that point.
+    check(
+        "fillet shoulder root",
+        await adapter.add_fillet(SHOULDER_FILLET_R, [[PIVOT_DIA / 2.0, 0.0, 0.0]]),
+    )
+    name_last_feature(adapter, "ShoulderFillet")
+    fillet_dim = name_dimensions(adapter, "ShoulderFillet", ["ShoulderRadius"])
+    drive_jobs += [(fillet_dim[0], '"ShoulderRadius"')]
+    # Pappus: the corner spandrel r^2 (1 - pi/4), its centroid r (10 - 3 pi) /
+    # (3 (4 - pi)) out from the pivot surface, revolved about the rod axis.
+    spandrel = SHOULDER_FILLET_R**2 * (1.0 - math.pi / 4.0)
+    spandrel_r = PIVOT_DIA / 2.0 + SHOULDER_FILLET_R * (10.0 - 3.0 * math.pi) / (
+        3.0 * (4.0 - math.pi)
+    )
+    v_fillet = 2.0 * math.pi * spandrel_r * spandrel
+    volume = await volume_check(
+        adapter, "shoulder root fillet", volume + v_fillet, 0.005 * v_pivot
+    )
+
+    # 4. Adjuster stud tap: one blind #0-80 Hole Wizard tap in the top face on
     #    the axis (the placement point coincident with the projected origin).
     stud_tap = wizard_holes(
         adapter,
@@ -185,7 +242,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven pen rod (equations neutral)", volume, 0.005 * v_square
     )
 
-    # 4. Named slide axis (local Y through the origin = Front Plane ∩ Right
+    # 5. Named slide axis (local Y through the origin = Front Plane ∩ Right
     #    Plane, the rod axis): the rod line the assembly mates to as
     #    ``Axis1@<rod>``. No feature above creates a reference axis, so this is
     #    Axis1; fail loud if SolidWorks named it anything else.
@@ -210,6 +267,7 @@ async def build(adapter) -> dict[str, str]:
             adapter, feature_name, dimension_name, *deviations(band)
         )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _shoulder_fillet_max_limit(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -217,7 +275,6 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Manufacturing Notes": DRAWING_NOTES,
             "Top View Note": TOP_VIEW_NOTE,
             "Bottom View Note": BOTTOM_VIEW_NOTE,
         },
@@ -230,7 +287,6 @@ async def build(adapter) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Top View Note",
             "Bottom View Note",
         ),

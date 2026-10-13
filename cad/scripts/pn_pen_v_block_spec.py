@@ -27,6 +27,9 @@ Drawing contract: the pivot bore is a sketched, reamed cut (its toleranced
 diameter is a marked sketch dimension, banded to the rod pivot); the set-screw
 tap and the lightening bore are Hole Wizard features whose sizes print as native
 hole callouts and whose stations print as their marked placement dimensions.
+The bore's top-edge chamfer prints as a native single MIN limit: it must clear
+the rod's shoulder-root fillet; a light break past that floor still leaves the
+rod's seat flats (guard below).
 No GD&T (drawing-simplicity-policy.md rule 5) and no roughness symbols: the
 pivot is clamped by the set screw, nothing runs or slides on the block (rule 6).
 Material and finish (bright brass) ride the title block, so the sheet carries
@@ -39,6 +42,7 @@ import math
 
 import _config
 from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
+import pn_pen_rod_spec as rod
 import vn_pen_marker_spec as marker
 import vn_pen_rod_set_screw_spec as rod_set_screw
 
@@ -63,12 +67,29 @@ V_CONTACT_Y = V_APEX_Y - (marker.BARREL_DIA / 2.0) * math.sin(_HALF)
 RELIEF_X0 = 10.0
 RELIEF_WIDTH = 13.0
 RELIEF_HEIGHT = 6.5
+# The slot's two internal corners at the step (x = RELIEF_X0) keep the end
+# mill's radius: the largest the grip allows (guard below), a 2 mm cutter
+# 6.5 deep.  Modelled as plan arcs in the slot profile, not a fillet feature:
+# at the bottom face the step is only (V mouth - relief) / 2 = 0.5 wide beside
+# the V, so a rolling-ball fillet would run off it.
+RELIEF_CORNER_R = 1.0
 
 # --- Pivot bore (rod's turned end): a sketched cut from the top face down
 # into the relief slot, reamed to the band ---
 PIVOT_BORE_DIA = 4.0  # reamed
 PIVOT_BORE_BAND = (0.012, 0.0)  # H7
 PIVOT_BORE_X = 12.5  # chosen with LIGHTENING_X by the CG solve (pn_pen_carriage_geom)
+# 45 deg chamfer on the bore's TOP edge, where the rod's square shoulder seats:
+# it clears the rod's shoulder-root fillet (pn_pen_rod_spec.SHOULDER_FILLET_R
+# MAX).  Printed as a native single MIN limit: the title block's .X band would
+# let it shrink to nothing.
+PIVOT_BORE_TOP_CHAMFER = 0.3
+# (upper, lower): the nominal IS the MIN limit (lower 0); the upper, which a
+# MIN print does not show, is the native record of what still leaves the
+# rod's seat flats (guard below).
+PIVOT_CHAMFER_BAND = (0.1, 0.0)
+PIVOT_CHAMFER_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "0.3 MIN"
+PIVOT_CHAMFER_PLACES = 1
 
 # --- Rod set screw: #4-40 tapped from the front face into the pivot bore ---
 SET_SCREW_TAP_SPEC = HoleSpec("tapped", rod_set_screw.THREAD, end="through_next")
@@ -121,6 +142,39 @@ if (
     or LIGHTENING_DIA > RELIEF_WIDTH - 2.0 * _WALL
 ):
     raise AssertionError("lightening bore must open wholly into the relief slot")
+# The relief corners stand RELIEF_CORNER_R into the slot from each wall at the
+# step.  The grip seats in the V and may run on past the step (the carriage
+# places it 1.5 past); it is widest in the slot at the bottom face (its axis
+# is below the block), so the corner must stand clear of it there wherever it
+# ends.  The body (wider) must start past x = RELIEF_X0 + RELIEF_CORNER_R; the
+# carriage layout owns where it starts.
+_GRIP_R = marker.BARREL_DIA / 2.0
+_GRIP_GAP_AT_BOTTOM = (
+    BLOCK_DEPTH / 2.0
+    - math.sqrt(_GRIP_R**2 - MARKER_AXIS_Y**2)
+    - (BLOCK_DEPTH - RELIEF_WIDTH) / 2.0
+)
+if _GRIP_GAP_AT_BOTTOM - RELIEF_CORNER_R < 0.25:
+    raise AssertionError("relief corner radius reaches the marker grip")
+if (BLOCK_DEPTH - RELIEF_WIDTH) / 2.0 + RELIEF_CORNER_R >= (
+    BLOCK_DEPTH - PIVOT_BORE_DIA
+) / 2.0 - _WALL:
+    raise AssertionError("relief corner radius crowds the pivot bore")
+# The rod's shoulder fillet (R MAX) is a quarter round on the pivot; with the
+# pivot against the bore wall its arc stands at most R * (2 - sqrt 2) proud of
+# a 45 deg chamfer's leg at the bore edge, so the chamfer's MIN leg must reach
+# that with 0.1 to spare; the chamfered mouth must stay inside the square's
+# seat flats.
+if PIVOT_BORE_TOP_CHAMFER < rod.SHOULDER_FILLET_R * (2.0 - math.sqrt(2.0)) + 0.1:
+    raise AssertionError("pivot-bore chamfer does not clear the rod shoulder fillet")
+if (
+    PIVOT_BORE_DIA + PIVOT_BORE_BAND[0]
+) / 2.0 + PIVOT_BORE_TOP_CHAMFER + PIVOT_CHAMFER_BAND[0] >= (
+    rod.ROD_SECTION + rod.SECTION_BAND[1]
+) / 2.0:
+    raise AssertionError("pivot-bore chamfer eats the rod shoulder's seat flats")
+if round(PIVOT_BORE_TOP_CHAMFER, PIVOT_CHAMFER_PLACES) != PIVOT_BORE_TOP_CHAMFER:
+    raise AssertionError("the pivot-bore chamfer must print exactly at its places")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  ``build_pn_pen_v_block`` marks exactly these; ``draw_pn_pen_v_block``
@@ -131,30 +185,50 @@ if (
 # pivot station on the face the tap is drilled from).  The V's length prints as
 # the relief's start station (ReliefX0, the same "ReliefX0" global): the
 # V-groove cut's own depth dimension projects off the paper end in the bottom
-# view, away from the brass it measures. ---
+# view, away from the brass it measures.  Every feature is located across the
+# depth from the FRONT face (z 0), never by the depth's symmetry: the V by its
+# front mouth edge (VMouthZ).  Three features' own depth stations would print
+# off real geometry, so hidden reference sketches own those values instead.
+# Section A-A shows the relief and the pivot bore across the depth, but their
+# sketches lie in the Top plane and project edge-on there; ReliefReference
+# (Right plane) chains the near wall (ReliefZ0) and the width along the
+# bottom face and runs the height up the near wall to the roof (the Relief
+# cut's own depth vector starts on the bottom-face plane and stops in air);
+# PivotReference (Right plane) runs the front face's top edge to the bore
+# axis, and owns the bore's top chamfer leg on the far (z 11) side: the
+# chamfer feature's own dimension may attach on the near side, under PivotZ.
+# The lightening bore's placement dimension runs to the paper-end corner,
+# whose extension line would lie along the bottom view's whole front edge;
+# LighteningReference (Top plane) measures it from the free end's front
+# corner instead. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OutlineProfile": {"Length", "Height", "Chamfer2dx"},
     "Block": {"Depth"},
-    "VGrooveProfile": {"VApexY", "VMouth"},
-    "ReliefProfile": {"ReliefWidth", "ReliefX0"},
-    "Relief": {"ReliefHeight"},
+    "VGrooveProfile": {"VApexY", "VMouth", "VMouthZ"},
+    "ReliefProfile": {"ReliefX0", "ReliefCornerR"},
+    "ReliefReference": {"ReliefZ0", "ReliefWidth", "ReliefHeight"},
     "PivotBoreProfile": {"PivotX", "PivotDia"},
+    "PivotReference": {"PivotZ", "PivotChamferSize"},
     "SetScrewHole": {"SetScrewX", "SetScrewY"},
     "LighteningBore": {"LighteningX"},
+    "LighteningReference": {"LighteningZ"},
 }
 # Places carry the title block's tolerance (drawing-guidelines.md rule 3).
-# .XX where a fit depends on it: the V apex sets the marker axis, the relief
-# width keeps its 0.53-a-side body clearance at +/-0.51, and the tap must meet
+# .XX where a fit depends on it: the V's mouth and apex set the marker axis,
+# the relief's near wall and width keep its 0.53-a-side body clearance, the
+# pivot bore's depth station sits it on the V's axis, and the tap must meet
 # the bore it locks (both stations from the paper end).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutlineProfile": {"Length": 1, "Height": 1, "Chamfer2dx": 1},
     "Block": {"Depth": 1},
-    "VGrooveProfile": {"VApexY": 2, "VMouth": 2},
-    "ReliefProfile": {"ReliefWidth": 2, "ReliefX0": 1},
-    "Relief": {"ReliefHeight": 1},
+    "VGrooveProfile": {"VApexY": 2, "VMouth": 2, "VMouthZ": 2},
+    "ReliefProfile": {"ReliefX0": 1, "ReliefCornerR": 1},
+    "ReliefReference": {"ReliefZ0": 2, "ReliefWidth": 2, "ReliefHeight": 1},
     "PivotBoreProfile": {"PivotX": 2, "PivotDia": 3},
+    "PivotReference": {"PivotZ": 2, "PivotChamferSize": PIVOT_CHAMFER_PLACES},
     "SetScrewHole": {"SetScrewX": 2, "SetScrewY": 1},
     "LighteningBore": {"LighteningX": 1},
+    "LighteningReference": {"LighteningZ": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -170,11 +244,23 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("PivotBoreProfile", "PivotDia"): PIVOT_BORE_BAND,
 }
-# Every tight band names its mate on the dimension it governs.
+# Every tight band or limit names its mate on the dimension it governs.  The
+# chamfer reads "0.3 MIN" over its angle; why it has a floor rides above it,
+# clear of the extension lines below (draw_pn_pen_v_block's SECTION_KEEP).
 PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
 DIMENSION_CALLOUTS: dict[str, str] = {
     "PivotDia": f"REAM THRU\nSLIP FIT ON PEN ROD PIVOT {PEN_ROD_NUMBER}",
     "Chamfer2dx": "X 45 DEG, 2 PLACES",
+    "PivotChamferSize": "X 45 DEG",
+}
+DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
+    "PivotChamferSize": f"CLEARS ROD {PEN_ROD_NUMBER} FILLET",
+}
+# Both relief corners are one radius; the printed one stands for the pair.  A
+# custom prefix replaces SolidWorks' own radius "R", so it carries it
+# (pn_pen_hanger_spec's slot corners).
+DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
+    ("ReliefProfile", "ReliefCornerR"): "2X R",
 }
 
 # Material and finish ride the title block; nothing else needs saying.

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import math
 
+import _config
 import vn_wheel_axle_back_washer_spec as _back
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _surface_finish import SurfaceFinishControl
@@ -48,7 +49,9 @@ if not math.isclose(LENGTH * 10.0, round(LENGTH * 10.0), abs_tol=1e-6):
 # that keeps the locknut on full thread (mg_wheel_group) spends this band.
 LENGTH_BAND = 0.03
 LENGTH_PLACES = 2
-LENGTH_CALLOUT = "SETS WHEEL STACK ON\nMG-WHEEL-AXLE THREAD"
+# Two lines narrower than the 3:1 extension-line span (18.6 x 3 = 55.8 mm): the
+# one-line "MG-WHEEL-AXLE THREAD" ran into both extension lines.
+LENGTH_CALLOUT = f"SETS WHEEL STACK\nON AXLE {_config.parts('mg-wheel-axle')['number']}"
 
 # 7/16 bar as supplied (11.11) meets the .X O.D.: the washer's own O.D.
 OD = 11.0

@@ -5,7 +5,7 @@ vn-pen-marker:
   supplier: Newell Brands (Sharpie)
   supplier_skus: ["35111"]
   material: PP Copolymer
-  material_specification: "Plastic marker, polypropylene barrel; Sharpie Mini, fine point"
+  material_specification: "Polypropylene barrel, Sharpie Mini"
   finish: as supplied
   quantity: 1
   tolerance_class: visual_noncritical

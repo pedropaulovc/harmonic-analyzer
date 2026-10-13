@@ -57,13 +57,38 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_turned_brass_stud() -> None:
     assert spec.THREAD == pn_pen_rod_spec.STUD_THREAD == "#0-80"
     assert spec.THREAD_MAJOR == pytest.approx(1.524)
-    assert spec.THREAD_LENGTH == 18.0
+    assert spec.THREAD_PITCH == pytest.approx(25.4 / 80.0)
+    assert spec.OVERALL_LENGTH == 23.0
     assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == (5.0, 5.0)
+    assert spec.SHANK_LENGTH == pytest.approx(18.0)
+    assert spec.FULL_THREAD_LENGTH == 15.0
+    assert spec.PLAIN_SHANK == pytest.approx(3.0)
     assert spec.EYE_SPEC == HoleSpec("drilled_number", "#54")
     assert spec.EYE_DIA == pytest.approx(1.397)
+    assert spec.EYE_FROM_HEAD_END == pytest.approx(2.5)
     assert spec.EYE_Y == pytest.approx(20.5)
-    assert spec.OVERALL_LENGTH == pytest.approx(23.0)
     assert spec.THREAD_CALLOUT == "#0-80 UNF"
+
+
+def test_full_thread_covers_engagement_nut_and_adjustment() -> None:
+    """The shortest accepted full thread (title-block .X band) still carries
+    the rod engagement, the jam nut and the adjustment; the worst-case
+    printed stack still leaves the die a pitch of run-out under the head
+    (drawing-guidelines.md rule 16)."""
+    import vn_pen_adjust_nut_spec as jam_nut
+    from _printed_tolerance import printed_band_mm
+
+    band = printed_band_mm(1)
+    assert band == pytest.approx(0.8)
+    assert spec.FULL_THREAD_LENGTH - band >= (
+        pn_pen_rod_spec.STUD_ENGAGEMENT + jam_nut.THICKNESS + spec.ADJUSTMENT_RANGE
+    )
+    worst_plain = (
+        (spec.OVERALL_LENGTH - band)
+        - (spec.HEAD_HEIGHT + band)
+        - (spec.FULL_THREAD_LENGTH + band)
+    )
+    assert worst_plain >= spec.THREAD_PITCH
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -72,8 +97,14 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert drawing.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     assert drawing.DRAWING_PRECISION_BY_NAME is spec.DRAWING_PRECISION_BY_NAME
     assert spec.DRAWING_DIMENSIONS == {
-        "StudProfile": {"ThreadDia", "ThreadLength", "HeadDia", "HeadHeight"},
-        "EyeStationReference": {"EyeY"},
+        "StudProfile": {
+            "ThreadDia",
+            "FullThreadLength",
+            "HeadDia",
+            "HeadHeight",
+            "OverallLength",
+        },
+        "EyeStationReference": {"EyeFromHeadEnd"},
     }
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.SIDE_KEEP) == marked
@@ -82,10 +113,11 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     } == spec.DRAWING_DIMENSIONS
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "ThreadDia": 3,
-        "ThreadLength": 1,
+        "FullThreadLength": 1,
         "HeadDia": 1,
         "HeadHeight": 1,
-        "EyeY": 1,
+        "OverallLength": 1,
+        "EyeFromHeadEnd": 1,
     }
 
 
@@ -93,17 +125,54 @@ def test_every_marked_dimension_is_created_and_named_by_the_build() -> None:
     """Each printed name is recorded on the sketch whose feature the spec keys
     it under, so mark_dimensions_for_drawing finds exactly that set."""
     source = _source(part)
-    for name in ("ThreadDia", "ThreadLength", "HeadDia", "HeadHeight"):
-        assert f'profile.record("{name}", ' in source
-    assert 'station.record("EyeY", EYE_Y_EXPR)' in source
+    for name in (
+        "ThreadDia",
+        "FullThreadLength",
+        "HeadDia",
+        "HeadHeight",
+        "OverallLength",
+    ):
+        assert f'profile.record("{name}", \'"{name}"\')' in source
+    assert 'station.record("HeadEndStation", \'"OverallLength"\')' in source
+    assert 'station.record("EyeFromHeadEnd", EYE_FROM_HEAD_END_EXPR)' in source
     assert 'drive_jobs += profile.apply(adapter, "StudProfile")' in source
     assert 'drive_jobs += station.apply(adapter, "EyeStationReference")' in source
-    assert part.EYE_Y_EXPR == '"ThreadLength" + "HeadHeight" / 2'
+    assert part.EYE_Y_EXPR == '"OverallLength" - "HeadHeight" / 2'
+    assert part.EYE_FROM_HEAD_END_EXPR == '"HeadHeight" / 2'
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
     assert "clear_dimensions_for_drawing(adapter)" in source
     assert (
         "mark_dimensions_for_drawing(adapter, feature_name, dimension_names)" in source
     )
+
+
+def test_the_eye_station_is_located_from_the_head_end() -> None:
+    """drawing-guidelines.md rule 11: the head's features from its own faced
+    end. The reference line runs from the eye up to the head end; only its
+    length (the eye's station from that face) is marked."""
+    (line,) = _calls(part, "add_line")
+    assert [ast.unparse(arg) for arg in line.args] == [
+        "0.0",
+        "EYE_Y",
+        "0.0",
+        "OVERALL_LENGTH",
+    ]
+    assert "HeadEndStation" not in set().union(*spec.DRAWING_DIMENSIONS.values())
+
+
+def test_profile_splits_the_thread_limit_off_the_plain_shank() -> None:
+    """The full thread and the plain shank are separate profile segments, so
+    the revolve leaves the thread-limit edge the FullThreadLength dimension
+    lands on; the shoulder sits at the shank length."""
+    source = _source(part)
+    assert "(THREAD_R, FULL_THREAD_LENGTH)," in source
+    assert "(THREAD_R, SHANK_LENGTH)," in source
+    assert "(HEAD_R, SHANK_LENGTH)," in source
+    assert (
+        "end, thread, shank, shoulder, head, top, closure = await add_line_chain("
+        in source
+    )
+    assert '("plain shank", shank, "vertical"),' in source
 
 
 def test_feature_names_are_the_contract() -> None:
@@ -145,7 +214,7 @@ def test_stud_axis_is_axis1_through_the_origin() -> None:
 
 def test_volumes_are_analytic() -> None:
     r_thread, r_head = spec.THREAD_MAJOR / 2.0, spec.HEAD_DIA / 2.0
-    stud = math.pi * (r_thread**2 * spec.THREAD_LENGTH + r_head**2 * spec.HEAD_HEIGHT)
+    stud = math.pi * (r_thread**2 * spec.SHANK_LENGTH + r_head**2 * spec.HEAD_HEIGHT)
     assert part.V_STUD == pytest.approx(stud)
     assert part.V_EYE == pytest.approx(
         cross_hole_volume_mm3(spec.EYE_DIA, spec.HEAD_DIA)
@@ -159,11 +228,12 @@ def test_volumes_are_analytic() -> None:
     assert '"cosmetic thread cuts nothing", driven, 1e-6' in source
 
 
-def test_cosmetic_thread_runs_the_full_thread() -> None:
+def test_cosmetic_thread_runs_the_full_thread_only() -> None:
     (thread,) = _calls(part, "AddThreadParameters")
     assert ast.unparse(_keyword(thread, "edge_point")) == "[THREAD_R, 0.0, 0.0]"
     assert ast.unparse(_keyword(thread, "size")) == "THREAD"
-    assert ast.unparse(_keyword(thread, "depth")) == "THREAD_LENGTH"
+    assert ast.literal_eval(_keyword(thread, "end_type")) == "blind"
+    assert ast.unparse(_keyword(thread, "depth")) == "FULL_THREAD_LENGTH"
     assert "import_cosmetic_threads(adapter, iso)" in _source(drawing)
 
 
@@ -195,33 +265,43 @@ def test_eye_prints_the_native_wizard_callout() -> None:
     assert "auto_center_marks(adapter, side, holes=True" in _source(drawing)
 
 
-def test_thread_callout_and_notes() -> None:
-    (note,) = _calls(drawing, "add_attached_note")
-    assert ast.unparse(_keyword(note, "text")) == "THREAD_CALLOUT"
-    notes = spec.DRAWING_NOTES
-    assert len(notes.splitlines()) <= 4
-    assert not any(character.isdigit() for character in notes)
-    for title_block_word in (
-        "DEBUR",
-        "BREAK SHARP",
-        "FINISH:",
-        "MATERIAL:",
-        "TOLERANCE",
-    ):
-        assert title_block_word not in notes.upper()
-    assert '{"Manufacturing Notes": DRAWING_NOTES}' in _source(part)
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source(drawing)
+def test_thread_callout_rides_the_model_and_no_notes() -> None:
+    """The thread prints as its designation on the native major-diameter
+    dimension (no Ø1.524, no class: the title block's THREADS row owns it),
+    the full-thread length as a native dimension with a word callout; no
+    general note (the title block's edge-break covers the eye)."""
+    assert spec.DIMENSION_TEXT == {"ThreadDia": "#0-80 UNF"}
+    assert spec.DIMENSION_CALLOUTS == {"FullThreadLength": "FULL THREAD"}
+    for text in (*spec.DIMENSION_TEXT.values(), *spec.DIMENSION_CALLOUTS.values()):
+        assert "2A" not in text and "." not in text
+    assert not any(c.isdigit() for c in spec.DIMENSION_CALLOUTS["FullThreadLength"])
+    draw_source = _source(drawing)
+    assert "set_dimension_text(adapter, annotations, DIMENSION_TEXT)" in draw_source
+    assert (
+        "set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, "
+        'location="below")'
+    ) in draw_source
+    assert not _calls(drawing, "add_attached_note")
+    assert spec.DRAWING_NOTES == ""
+    for module in (part, drawing):
+        assert "Manufacturing Notes" not in _source(module)
+        assert "add_property_linked_note" not in _source(module)
 
 
 def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     source = _source(part)
-    assert "apply_drawing_properties(" in source
+    assert "apply_drawing_properties(adapter, PART_NAME)" in source
     assert (
         "require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)" in source
     )
-    assert "Manufacturing Notes" in part._SAVED_DRAWING_PROPERTIES
+    assert part._SAVED_DRAWING_PROPERTIES == (
+        "Number",
+        "Material Specification",
+        "Finish",
+        "Quantity",
+    )
     assert part.MATERIAL == "Brass"
     row = _config.parts(part.PART_NAME)
     assert row["number"] == "MHA-PN-007"
@@ -245,34 +325,48 @@ def test_the_part_owns_the_printed_precision() -> None:
 
 
 def test_side_view_layout_reads_like_the_lathe() -> None:
-    """Threaded end left, head right; lengths below, the eye's station above,
-    diameters clear of both rows; everything inside the B-size border."""
+    """Threaded end left, head right; lengths below in two rows (full thread
+    and head, then the overall), the eye's station above from the head end;
+    the eye callout up-left so its leader crosses no dimension or extension
+    line; everything inside the B-size border."""
     assert drawing.SHEET_SCALE == (6.0, 1.0)
     assert '"*Isometric", *ISO_CENTER, scale=VIEW_SCALE' in _source(drawing)
-    assert drawing.THREAD_END_X < drawing.SHOULDER_X < drawing.EYE_X < drawing.TOP_X
+    assert (
+        drawing.THREAD_END_X
+        < drawing.FULL_THREAD_X
+        < drawing.SHOULDER_X
+        < drawing.EYE_X
+        < drawing.TOP_X
+    )
     assert drawing.TOP_X - drawing.THREAD_END_X == pytest.approx(
         spec.OVERALL_LENGTH * drawing._S
     )
     keep = drawing.SIDE_KEEP
     head_bottom = drawing.AXIS_Y - drawing.HEAD_HALF
     head_top = drawing.AXIS_Y + drawing.HEAD_HALF
-    assert keep["ThreadLength"][1] == keep["HeadHeight"][1] < head_bottom
+    assert keep["FullThreadLength"][1] == keep["HeadHeight"][1] < head_bottom
+    # Row 2 a callout line plus a text height below row 1.
+    assert keep["FullThreadLength"][1] - keep["OverallLength"][1] >= 0.015
     assert (
-        keep["ThreadLength"][1]
+        keep["FullThreadLength"][1]
         < keep["ThreadDia"][1]
         < drawing.AXIS_Y - drawing.THREAD_HALF
     )
-    assert keep["EyeY"][1] > head_top
-    assert (
-        drawing.AXIS_Y + drawing.THREAD_HALF
-        < drawing.THREAD_NOTE_XY[1]
-        < keep["EyeY"][1]
-    )
+    assert drawing.THREAD_END_X < keep["ThreadDia"][0] < drawing.FULL_THREAD_X
+    assert keep["EyeFromHeadEnd"][1] > head_top
+    assert drawing.EYE_X < keep["EyeFromHeadEnd"][0] < drawing.TOP_X
     assert keep["HeadDia"][0] > drawing.TOP_X
-    assert drawing.EYE_CALLOUT_XY[0] > drawing.TOP_X
-    assert drawing.EYE_CALLOUT_XY[1] > head_top
-    assert (
-        drawing.THREAD_END_X > 0.020
-        and drawing.EYE_CALLOUT_XY[0] < drawing.ISO_CENTER[0]
+    # The eye callout: text right end left of the eye's centre (the station
+    # dimension's extension line), above the head, clear of the threaded end.
+    half_width = drawing._EYE_CALLOUT_TEXT_WIDTH / 2.0
+    assert drawing.EYE_CALLOUT_XY[0] + half_width < drawing.EYE_X
+    assert drawing.EYE_CALLOUT_XY[0] - half_width > drawing.THREAD_END_X
+    assert head_top < drawing.EYE_CALLOUT_XY[1]
+    rim_x, rim_y = drawing.EYE_RIM_PICK
+    assert math.hypot(rim_x - drawing.EYE_X, rim_y - drawing.AXIS_Y) == pytest.approx(
+        drawing.EYE_HALF
     )
-    assert drawing.EYE_RIM_PICK == (drawing.EYE_X, drawing.AXIS_Y + drawing.EYE_HALF)
+    # Up-left quadrant, so the leader never reaches the extension line rising
+    # through the eye's centre.
+    assert rim_x < drawing.EYE_X and rim_y > drawing.AXIS_Y
+    assert drawing.THREAD_END_X > 0.020

@@ -66,23 +66,51 @@ if STUD_TAP_SPEC.depth_mm + STUD_TAP_DRILL_DIA / 2.0 * DRILL_POINT_H >= SQUARE_L
 if PIVOT_DIA >= ROD_SECTION:
     raise AssertionError("pivot end must turn down inside the square (a shoulder)")
 
+# Shoulder root: the square's bottom face seats the carriage on the v-block's
+# top face, so the internal corner where the pivot turns down from it carries
+# a modelled radius, printed as a single MAX limit (sharp is good, anything up
+# to the limit is good). 0.2 leaves the seat face a land on every flat and
+# clears the v-block's broken bore mouth (cross-part assert in
+# pn_pen_carriage_geom).
+SHOULDER_FILLET_R = 0.2
+# (upper, lower) deviations: the nominal IS the limit, down to sharp.
+SHOULDER_FILLET_BAND = (0.0, -SHOULDER_FILLET_R)
+SHOULDER_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.2 MAX"
+SHOULDER_FILLET_PLACES = 1
+if SHOULDER_FILLET_BAND[0] != 0.0 or SHOULDER_FILLET_BAND[1] != -SHOULDER_FILLET_R:
+    raise AssertionError("the shoulder radius band must run from sharp to the nominal")
+if round(SHOULDER_FILLET_R, SHOULDER_FILLET_PLACES) != SHOULDER_FILLET_R:
+    raise AssertionError("the shoulder radius must print exactly at its places")
+if PIVOT_DIA / 2.0 + SHOULDER_FILLET_R >= (ROD_SECTION + SECTION_BAND[1]) / 2.0:
+    raise AssertionError("shoulder fillet must end inside the square's seat face")
+
+# The overall length, end face to end face, is a reference only (rule 10):
+# the square and pivot lengths own it. Printed at one place, in parentheses.
+DRAWING_REFERENCE_PRECISION = 1
+if round(TOTAL_LENGTH, DRAWING_REFERENCE_PRECISION) != TOTAL_LENGTH:
+    raise AssertionError("the overall reference must print exactly at its places")
+
 # Front view (1:1): the square's width and length, the pivot length. Top view
 # (4:1): the square's depth and the stud-tap wizard callout. Bottom view (4:1):
-# the pivot diameter, seen end-on inside the square.
+# the pivot diameter, seen end-on inside the square. Shoulder detail (10:1):
+# the shoulder root's MAX radius.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"Section", "Length"},
     "Rod": {"Depth"},
     "PivotProfile": {"PivotDia"},
     "Pivot": {"PivotLength"},
+    "ShoulderFillet": {"ShoulderRadius"},
 }
 # Places (drawing-guidelines.md rule 3): the banded square and pivot print at
 # their bands' places; the overall length and the pivot length (1.0 clear of
-# the v-block relief roof) are near-enough sizes.
+# the v-block relief roof) are near-enough sizes; the shoulder radius prints
+# its MAX limit at one place.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RodProfile": {"Section": 2, "Length": 1},
     "Rod": {"Depth": 2},
     "PivotProfile": {"PivotDia": 3},
     "Pivot": {"PivotLength": 1},
+    "ShoulderFillet": {"ShoulderRadius": SHOULDER_FILLET_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -100,15 +128,14 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("Rod", "Depth"): SECTION_BAND,
     ("PivotProfile", "PivotDia"): PIVOT_BAND,
 }
-# Every tight band names its mate on the dimension it governs (rule 4).
+# Every tight band names its mate on the dimension it governs (rule 4); the
+# shoulder radius names the part its seat face lands on.
 DIMENSION_CALLOUTS: dict[str, str] = {
     "Section": f"SLIDING FIT IN PEN HANGER\n{PEN_HANGER_NUMBER} GUIDES",
     "Depth": f"SLIDING FIT IN PEN HANGER\n{PEN_HANGER_NUMBER} GUIDES",
     "PivotDia": f"SLIP FIT IN PEN V-BLOCK\n{PEN_V_BLOCK_NUMBER} PIVOT BORE",
+    "ShoulderRadius": f"SEATS ON PEN V-BLOCK\n{PEN_V_BLOCK_NUMBER}",
 }
 
-DRAWING_NOTES = (
-    "SHOULDER: KEEP SHARP AND SQUARE - IT SEATS THE CARRIAGE ON THE V-BLOCK."
-)
 TOP_VIEW_NOTE = "TOP VIEW SCALE 4:1"
 BOTTOM_VIEW_NOTE = "BOTTOM VIEW SCALE 4:1"

@@ -5,14 +5,15 @@ the dimension layout and the tapped-hole callout; sheet/template and export
 behavior lives in ``_drawing_common``.  Dimension import and curation live in
 ``_drawing_dimension_import``.
 
-The pen frame is a flat rectangular brass ring with a centred window and a
-#4-40 thumb-screw hole tapped up through the bottom rail.  Every size is a
-native associative dimension marked on the part (``pn_pen_frame_spec``):
-the front view carries the outer envelope and the two rail widths; the bottom
-view, looking up at the tapped rail, carries the depth, the hole's two
-coordinates from the outer faces and the hole's native Hole Wizard callout.
-No datums, no frames (drawing-guidelines.md rule 5), no note block.  The sheet
-runs 2:1; the isometric stays 1:1.
+The pen frame is a flat rectangular brass ring with a centred, corner-filleted
+window and a #4-40 thumb-screw hole tapped up through the bottom rail.  Every
+size is a native associative dimension marked on the part
+(``pn_pen_frame_spec``): the front view carries the outer envelope, the
+window's size, its lower-left corner from the left and bottom faces and the
+4X window-corner radius; the bottom view, looking up at the tapped rail,
+carries the depth, the hole's two coordinates from the outer faces and the
+hole's native Hole Wizard callout.  No datums, no frames (drawing-guidelines.md
+rule 5), no note block.  The sheet runs 2:1; the isometric stays 1:1.
 
 Run with SolidWorks open::
 
@@ -25,9 +26,14 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -42,6 +48,7 @@ from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import blind_cut_dia_mm
 from _paths import CAD_ROOT
 from _session import run_build
@@ -52,7 +59,10 @@ from pn_pen_frame_spec import (
     FRAME_DEPTH,
     OUTER_HEIGHT,
     OUTER_WIDTH,
+    RAIL_END,
+    RAIL_SIDE,
     SET_SCREW_TAP_SPEC,
+    WINDOW_CORNER_R,
 )
 
 
@@ -105,30 +115,76 @@ BOTTOM_RIGHT_X, BOTTOM_HIGH_Y = _bottom_xy(OUTER_WIDTH, FRAME_DEPTH)
 HOLE_CENTER_MM = (OUTER_WIDTH / 2.0, 0.0, FRAME_DEPTH / 2.0)
 HOLE_SHEET_XY = _bottom_xy(HOLE_CENTER_MM[0], HOLE_CENTER_MM[2])
 HOLE_R_SHEET = blind_cut_dia_mm(SET_SCREW_TAP_SPEC) * VIEW_SCALE / 2000.0
+# The printed (top-right) window-corner fillet's arc centre.
+CORNER_ARC_CENTER_XY = _front_xy(
+    OUTER_WIDTH - RAIL_SIDE - WINDOW_CORNER_R, OUTER_HEIGHT - RAIL_END - WINDOW_CORNER_R
+)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
-# text position.  Front: the width above, the height right, the two rail
-# widths (window corner from the origin corner) left and below, each text
-# outboard of its own extension lines.  Bottom: the hole's X coordinate below,
-# its Z coordinate left, the depth right; the hole callout stands above-right,
-# between the bottom view and the front view's height dimension.
+# text position.  Front view (ring x 0.087..0.143, y 0.145..0.225; window
+# x 0.095..0.135, y 0.157..0.213):
+# - The 28.0 width rides above, alone: no other dimension leaves the top.
+# - The window corner's two location dims and its two sizes all leave from
+#   the window's left and bottom edges (build_pn_pen_frame's chain order), so
+#   they stack left and below, each smaller one nearer the ring: the 28.0
+#   window height 10 mm left (its text 4.5 mm off the left face), the 6.00
+#   bottom wall 24 mm left with its text between its own extension lines; the
+#   20.00 window width 8 mm below, the 4.00 left wall 17 mm below with its
+#   text outboard left as before.  Each pair shares the extension line from
+#   the window's bottom-left corner, so neither crosses the other's
+#   dimension line.
+# - The top-right corner is the one no extension line leaves from: the 4X R1.0
+#   text stands 14 mm right of the ring, 6 mm under its top (clear of the
+#   40.0's top extension line), so its leader runs from the arc out through
+#   the right rail, ~20-30 deg above horizontal from the arc centre (inside the
+#   arc's 0-90 deg span), crossing only the ring's right face.
+# - The 40.0 height moves 30 mm right (was 16) to leave that text 6 mm clear
+#   of its dimension line.
+# Bottom view: the hole's X coordinate below, its Z coordinate left, the depth
+# right; the hole callout stands above-right, between the bottom view and the
+# front view's height dimension.
 FRONT_KEEP = {
     "OuterSpanX": (FRONT_CENTER[0], FRONT_TOP_Y + 0.014),
-    "OuterHeightDim": (FRONT_RIGHT_X + 0.016, FRONT_CENTER[1]),
-    "InnerAnchorY": (FRONT_LEFT_X - 0.012, _front_xy(0.0, 3.0)[1]),
-    "InnerAnchorX": (FRONT_LEFT_X - 0.012, FRONT_BOTTOM_Y - 0.010),
+    "OuterHeightDim": (FRONT_RIGHT_X + 0.030, FRONT_CENTER[1]),
+    "WindowHeight": (FRONT_LEFT_X - 0.010, FRONT_CENTER[1]),
+    "BottomWall": (FRONT_LEFT_X - 0.024, _front_xy(0.0, RAIL_END / 2.0)[1]),
+    "WindowWidth": (FRONT_CENTER[0], FRONT_BOTTOM_Y - 0.008),
+    "LeftWall": (FRONT_LEFT_X - 0.012, FRONT_BOTTOM_Y - 0.017),
+    "WindowCornerR": (FRONT_RIGHT_X + 0.014, FRONT_TOP_Y - 0.006),
 }
 BOTTOM_KEEP = {
     "ScrewX": (_bottom_xy(OUTER_WIDTH / 4.0, 0.0)[0], BOTTOM_LOW_Y - 0.010),
     "ScrewZ": (BOTTOM_LEFT_X - 0.010, _bottom_xy(0.0, FRAME_DEPTH / 4.0)[1]),
     "Depth": (BOTTOM_RIGHT_X + 0.016, BOTTOM_CENTER[1]),
 }
+# The one printed fillet stands for all four equal window corners.  A custom
+# prefix replaces SolidWorks' own radius "R", so it carries it
+# (draw_pd_guide_lock: "4X 1.8" printed without).
+DIMENSION_PREFIXES = {"WindowCornerR": "4X R"}
 HOLE_CALLOUT_XY = (0.165, 0.128)
 HOLE_CALLOUT_PROCESS = "TAP"
 
 FRONT_VIEW_NOTE_XY = (0.175, 0.240)
 BOTTOM_VIEW_NOTE_XY = (0.070, 0.072)
 ISO_VIEW_NOTE_XY = (0.290, 0.140)
+
+
+def _set_dimension_prefixes(
+    adapter: Any, annotations: list[Any], prefixes: dict[str, str]
+) -> None:
+    """Write a native prefix on named imported dimensions and read it back."""
+    remaining = dict(prefixes)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        prefix = remaining.pop(dimension_name(adapter, annotation), None)
+        if prefix is None:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(1, prefix)  # swDimensionTextPrefix
+        if str(display.GetText(1) or "") != prefix:
+            raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
+    if remaining:
+        raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -201,6 +257,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     # Places are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
 
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the bottom view")
@@ -210,7 +267,7 @@ async def build(adapter: Any) -> dict[str, str]:
         axis=(0.0, 1.0, 0.0),
         label="thumb-screw tap mouth",
     )
-    add_native_hole_callout(
+    tap_callout = add_native_hole_callout(
         adapter,
         bottom,
         edge=hole_rim.edge,
@@ -218,6 +275,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="thumb-screw tapped hole",
         process=HOLE_CALLOUT_PROCESS,
     )
+    # The title block's THREADS row owns the 2B class (drawing-guidelines.md
+    # rule 2): the callout reads TAP 4-40 UNC THRU.
+    omit_title_block_thread_class(tap_callout, label="thumb-screw tapped hole")
 
     add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)
     add_property_linked_note(adapter, "Bottom View Note", *BOTTOM_VIEW_NOTE_XY)

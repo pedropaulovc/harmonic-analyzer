@@ -7,7 +7,8 @@ face and running 170 down from the bar top to just above the platen, with two
 thin open U guide plates brazed across its front face 40 apart.  Each plate's
 slot opens forward (-Z), so the square pen rod hangs on its wire inside both
 slots and lifts straight out of them; the slot sides are the rod's only
-lateral guide.  The lower plate is flush with the strap's bottom end.  A #8-32
+lateral guide, and the slot's two milled bottom corners carry a radius.  The
+lower plate is flush with the strap's bottom end.  A #8-32
 tap near the strap top takes the hanger screw coming through the bar FROM
 BEHIND (the magnifying wheel's rim passes in front of the strap, so no
 front-side head fits).
@@ -53,10 +54,12 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
+from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _holes import TAP_DRILL_MM, wizard_holes
 from pn_pen_hanger_spec import (
+    DIMENSION_PREFIXES,
     DRAWING_BANDS,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -65,12 +68,15 @@ from pn_pen_hanger_spec import (
     GUIDE_PLATE_DROPS,
     GUIDE_PLATE_T,
     GUIDE_PLATE_WIDTH,
+    GUIDE_PLATE_YS,
     ISOMETRIC_VIEW_NOTE,
     PLATE_FRONT_Z,
     PLATE_REACH,
     SCREW_HOLE_XY,
     SCREW_TAP_SPEC,
     SLOT_BOTTOM,
+    SLOT_BOTTOM_Z,
+    SLOT_CORNER_R,
     SLOT_DEPTH,
     SLOT_WIDTH,
     STRAP_BOT_X,
@@ -79,7 +85,6 @@ from pn_pen_hanger_spec import (
     STRAP_T,
     STRAP_TOP_X,
     STRAP_Z,
-    TOP_VIEW_NOTE,
 )
 
 import _telemetry
@@ -165,6 +170,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "SlotBottom", f"{SLOT_BOTTOM}mm")
     await set_global(adapter, "LowerPlateDrop", f"{GUIDE_PLATE_DROPS[0]}mm")
     await set_global(adapter, "UpperPlateDrop", f"{GUIDE_PLATE_DROPS[1]}mm")
+    await set_global(adapter, "SlotCornerR", f"{SLOT_CORNER_R}mm")
 
     # Drive equations collected as dims are recorded, applied in one deferred
     # batch after the whole model + a rebuild exists (every target must resolve).
@@ -215,6 +221,37 @@ async def build(adapter) -> dict[str, str]:
         drive_jobs += await _guide_plate(adapter, prefix, drop)
         vol = await volume_check(
             adapter, f"{prefix.lower()} guide plate", vol + v_plate, 0.01 * v_plate
+        )
+
+    # 2b. The slot's milled bottom corners (drawing-guidelines.md rule 16),
+    # each adding the square R x R less its quarter disc back to the plate.
+    # The vertical corner edges run through each plate's thickness at the slot
+    # bottom.  The printed 2X radius belongs to "UpperSlotCorner", a fillet on
+    # the upper plate's -x corner ALONE: an imported fillet dimension attaches
+    # to its feature's first edge (build_pd_guide_lock), and section A-A cuts
+    # the upper plate and carries the radius off that corner.  The other three
+    # corners are one unprinted fillet driven by the same SlotCornerR.
+    lower_mid = GUIDE_PLATE_YS[0] + GUIDE_PLATE_T / 2.0
+    upper_mid = GUIDE_PLATE_YS[1] + GUIDE_PLATE_T / 2.0
+    half_slot = SLOT_WIDTH / 2.0
+    corner_features = (
+        ("UpperSlotCorner", "SlotCornerR", ((-half_slot, upper_mid),)),
+        (
+            "OtherSlotCorners",
+            "OtherSlotCornerR",
+            ((half_slot, upper_mid), (-half_slot, lower_mid), (half_slot, lower_mid)),
+        ),
+    )
+    v_corner = (SLOT_CORNER_R**2 - math.pi * SLOT_CORNER_R**2 / 4.0) * GUIDE_PLATE_T
+    for feature, dimension, corners in corner_features:
+        edges = [[x, y, SLOT_BOTTOM_Z] for x, y in corners]
+        check(f"fillet {feature}", await adapter.add_fillet(SLOT_CORNER_R, edges))
+        name_last_feature(adapter, feature)
+        corner_dim = name_dimensions(adapter, feature, [dimension])
+        drive_jobs.append((corner_dim[0], '"SlotCornerR"'))
+        v_corners = len(corners) * v_corner
+        vol = await volume_check(
+            adapter, f"hanger with {feature}", vol + v_corners, 0.1 * v_corners
         )
 
     # 3. Native #8-32 through tap in the strap, drilled from its front face
@@ -271,6 +308,8 @@ async def build(adapter) -> dict[str, str]:
             adapter, feature_name, dimension_name, *deviations(band)
         )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    for (feature_name, dimension_name), prefix in DIMENSION_PREFIXES.items():
+        set_dimension_prefix(adapter, feature_name, dimension_name, prefix)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -280,7 +319,6 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Front View Note": FRONT_VIEW_NOTE,
-            "Top View Note": TOP_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

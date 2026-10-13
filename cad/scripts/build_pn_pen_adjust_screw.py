@@ -10,16 +10,20 @@ axis, +Y up the axis, the eye's cross hole along X at y = EYE_Y. Axis1 is the
 stud axis (Front Plane x Right Plane) for the coaxial mate with the rod's tap.
 
 Built as ONE Right-plane half-profile revolved 360 degrees (StudProfile ->
-Stud): the thread's major diameter and length and the head's diameter and
-height are its named dimensions. The profile sits on the Right plane (sketch
-u -> model -Z, v -> model Y) rather than the Front, so the *Right side view
--- the one that sees the X cross hole end-on as a circle -- imports every
-marked dimension (pn_pen_adjust_screw_spec.DRAWING_DIMENSIONS). The #54 eye
-is a native Hole Wizard drill (EyeHole) radially through the head, placed on
-EyeStationPlane; its printed station EyeY rides the hidden Right-plane
-reference sketch EyeStationReference, because the wizard's cylindrical
-placement sketch carries no dimension. The thread carries a cosmetic #0-80
-so the isometric matches the callout.
+Stud): the thread's major diameter, its usable full-thread length (the
+silhouette is split there, so the revolve leaves the thread-limit edge the
+length dimensions from), the head's diameter and height and the overall
+length are its named dimensions; the plain shank under the head is what is
+left. The profile sits on the Right plane (sketch u -> model -Z, v -> model
+Y) rather than the Front, so the *Right side view -- the one that sees the X
+cross hole end-on as a circle -- imports every marked dimension
+(pn_pen_adjust_screw_spec.DRAWING_DIMENSIONS). The #54 eye is a native Hole
+Wizard drill (EyeHole) radially through the head, placed on EyeStationPlane;
+its printed station EyeFromHeadEnd (from the head's faced end) rides the
+hidden Right-plane reference sketch EyeStationReference, because the wizard's
+cylindrical placement sketch carries no dimension. The thread carries a
+blind cosmetic #0-80 over the full-thread length so the isometric matches the
+callout.
 
 Run (SolidWorks already open)::
 
@@ -62,16 +66,17 @@ from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from pn_pen_adjust_screw_spec import (
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     EYE_DIA,
+    EYE_FROM_HEAD_END,
     EYE_SPEC,
     EYE_Y,
+    FULL_THREAD_LENGTH,
     HEAD_DIA,
     HEAD_HEIGHT,
     OVERALL_LENGTH,
+    SHANK_LENGTH,
     THREAD,
-    THREAD_LENGTH,
     THREAD_MAJOR,
 )
 
@@ -82,16 +87,18 @@ _SAVED_DRAWING_PROPERTIES = (
     "Material Specification",
     "Finish",
     "Quantity",
-    "Manufacturing Notes",
 )
-# The eye's station from the threaded end, as the drive equations state it.
-EYE_Y_EXPR = '"ThreadLength" + "HeadHeight" / 2'
+# The eye's station from the threaded end (the plane the wizard drills on)
+# and from the head's faced end (the printed one), as the drive equations
+# state them.
+EYE_Y_EXPR = '"OverallLength" - "HeadHeight" / 2'
+EYE_FROM_HEAD_END_EXPR = '"HeadHeight" / 2'
 
 THREAD_R = THREAD_MAJOR / 2.0
 HEAD_R = HEAD_DIA / 2.0
-V_THREAD = math.pi * THREAD_R**2 * THREAD_LENGTH
+V_SHANK = math.pi * THREAD_R**2 * SHANK_LENGTH
 V_HEAD = math.pi * HEAD_R**2 * HEAD_HEIGHT
-V_STUD = V_THREAD + V_HEAD
+V_STUD = V_SHANK + V_HEAD
 # The through drill crosses the full head diameter on its axis.
 V_EYE = cross_hole_volume_mm3(EYE_DIA, HEAD_DIA)
 V_TOTAL = V_STUD - V_EYE
@@ -112,17 +119,20 @@ async def build(adapter) -> dict[str, str]:
     # deferred drive batch.
     for name, value in (
         ("ThreadDia", THREAD_MAJOR),
-        ("ThreadLength", THREAD_LENGTH),
+        ("FullThreadLength", FULL_THREAD_LENGTH),
         ("HeadDia", HEAD_DIA),
         ("HeadHeight", HEAD_HEIGHT),
+        ("OverallLength", OVERALL_LENGTH),
     ):
         await set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
     # Half-section on the Right plane (sketch u = -z, v = y): the flat threaded
-    # end on the origin, the thread at its basic major up to the head's
-    # shoulder, the head, the faced top, and the closure back down the axis.
+    # end on the origin, the full thread at its basic major, the plain shank
+    # (same diameter, its own segment so the revolve leaves the thread-limit
+    # edge) up to the head's shoulder, the head, the faced top, and the
+    # closure back down the axis.
     profile = SketchDims()
     check("create_sketch stud profile", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
@@ -133,12 +143,15 @@ async def build(adapter) -> dict[str, str]:
     points = [
         (0.0, 0.0),
         (THREAD_R, 0.0),
-        (THREAD_R, THREAD_LENGTH),
-        (HEAD_R, THREAD_LENGTH),
+        (THREAD_R, FULL_THREAD_LENGTH),
+        (THREAD_R, SHANK_LENGTH),
+        (HEAD_R, SHANK_LENGTH),
         (HEAD_R, OVERALL_LENGTH),
         (0.0, OVERALL_LENGTH),
     ]
-    end, thread, shoulder, head, top, closure = await add_line_chain(adapter, points)
+    end, thread, shank, shoulder, head, top, closure = await add_line_chain(
+        adapter, points
+    )
     set_sketch_direct_db(adapter, False)
     for label, first, second in (
         ("axis start", f"{axis}.start", f"{end}.start"),
@@ -148,6 +161,7 @@ async def build(adapter) -> dict[str, str]:
     for label, entity, relation in (
         ("threaded end", end, "horizontal"),
         ("thread", thread, "vertical"),
+        ("plain shank", shank, "vertical"),
         ("shoulder", shoulder, "horizontal"),
         ("head", head, "vertical"),
         ("top", top, "horizontal"),
@@ -157,21 +171,22 @@ async def build(adapter) -> dict[str, str]:
         check(label, await adapter.add_sketch_constraint(entity, None, relation))
     await anchor_point_to_origin(adapter, f"{end}.start", 0.0, 0.0, "threaded end")
     await add_diametric_linear_dimension(
-        adapter, axis, thread, (THREAD_R + 4.0, THREAD_LENGTH / 2.0), "ThreadDia"
+        adapter, axis, thread, (THREAD_R + 4.0, FULL_THREAD_LENGTH / 2.0), "ThreadDia"
     )
     profile.record("ThreadDia", '"ThreadDia"')
-    # The thread runs from the faced threaded end to the shoulder; the head
-    # from the shoulder to the faced top (drawing-guidelines.md rule 11).
+    # Lengths (drawing-guidelines.md rules 10/11): the usable full thread from
+    # the faced threaded end; the head from its own faced end to the shoulder;
+    # the overall from end to end. The plain shank is what is left.
     check(
-        "thread length",
-        await adapter.add_sketch_dimension(thread, None, "linear", THREAD_LENGTH),
+        "full thread length",
+        await adapter.add_sketch_dimension(thread, None, "linear", FULL_THREAD_LENGTH),
     )
-    profile.record("ThreadLength", '"ThreadLength"')
+    profile.record("FullThreadLength", '"FullThreadLength"')
     await add_diametric_linear_dimension(
         adapter,
         axis,
         head,
-        (HEAD_R + 4.0, THREAD_LENGTH + HEAD_HEIGHT / 2.0),
+        (HEAD_R + 4.0, SHANK_LENGTH + HEAD_HEIGHT / 2.0),
         "HeadDia",
     )
     profile.record("HeadDia", '"HeadDia"')
@@ -180,6 +195,15 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(head, None, "linear", HEAD_HEIGHT),
     )
     profile.record("HeadHeight", '"HeadHeight"')
+    await dimension_between(
+        adapter,
+        f"{end}.start",
+        f"{top}.end",
+        "vertical_distance",
+        OVERALL_LENGTH,
+        "overall length, threaded end to head end",
+    )
+    profile.record("OverallLength", '"OverallLength"')
     await ensure_fully_defined(adapter, "stud profile")
     check("exit_sketch stud profile", await adapter.exit_sketch())
     name_last_feature(adapter, "StudProfile")
@@ -215,15 +239,18 @@ async def build(adapter) -> dict[str, str]:
     )
     volume = await volume_check(adapter, "eye cross hole", V_TOTAL, 0.02 * V_EYE)
 
-    # Drawing-only station reference: a construction line up the axis from
-    # the threaded end to the eye, whose one dimension is the printed EyeY.
-    # On the Right plane, the plane of the side view that prints it.
+    # Drawing-only station reference: a construction line down the axis from
+    # the head's faced end to the eye, whose printed dimension is the eye's
+    # station from that face (drawing-guidelines.md rule 11: head features
+    # from the head's own faced end). Its other dimension only seats the
+    # line's top on the head end; it is never marked. On the Right plane, the
+    # plane of the side view that prints it.
     station = SketchDims()
     check("create_sketch eye station", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     station_line = check(
         "eye station reference line",
-        await adapter.add_line(0.0, 0.0, 0.0, EYE_Y),
+        await adapter.add_line(0.0, EYE_Y, 0.0, OVERALL_LENGTH),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[station_line], "ISketchSegment")
@@ -235,17 +262,22 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_constraint(station_line, None, "vertical"),
     )
     await anchor_point_to_origin(
-        adapter, f"{station_line}.start", 0.0, 0.0, "eye station at the threaded end"
+        adapter,
+        f"{station_line}.end",
+        0.0,
+        OVERALL_LENGTH,
+        "eye station reference on the head end",
     )
+    station.record("HeadEndStation", '"OverallLength"')
     await dimension_between(
         adapter,
         f"{station_line}.start",
         f"{station_line}.end",
         "vertical_distance",
-        EYE_Y,
-        "eye station from the threaded end",
+        EYE_FROM_HEAD_END,
+        "eye station from the head end",
     )
-    station.record("EyeY", EYE_Y_EXPR)
+    station.record("EyeFromHeadEnd", EYE_FROM_HEAD_END_EXPR)
     await ensure_fully_defined(adapter, "eye station reference sketch")
     check("exit_sketch eye station", await adapter.exit_sketch())
     name_last_feature(adapter, "EyeStationReference")
@@ -271,8 +303,9 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven stud (equations neutral)", volume, 0.001 * volume
     )
 
-    # Cosmetic #0-80 from the threaded end's edge up to the shoulder, so the
-    # shaded isometric shows the thread the callout names. It cuts nothing.
+    # Cosmetic #0-80 from the threaded end's edge, blind over the usable full
+    # thread to the thread-limit edge, so the shaded isometric shows the
+    # thread the callout names and where it stops. It cuts nothing.
     adapter._zoom_to_fit(adapter.currentModel)
     check(
         f"cosmetic thread {THREAD}",
@@ -282,7 +315,7 @@ async def build(adapter) -> dict[str, str]:
                 standard="ansi_inch",
                 size=THREAD,
                 end_type="blind",
-                depth=THREAD_LENGTH,
+                depth=FULL_THREAD_LENGTH,
             )
         ),
     )
@@ -295,14 +328,10 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {"Manufacturing Notes": DRAWING_NOTES},
-    )
+    apply_drawing_properties(adapter, PART_NAME)
     # The reference sketch owns a printed dimension but no geometry: hide it
     # so no assembly instance renders it; the drawing shows it in the side
-    # view only (_drawing_hidden_sketches) to import EyeY.
+    # view only (_drawing_hidden_sketches) to import EyeFromHeadEnd.
     blank_sketch(adapter, "EyeStationReference")
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
