@@ -309,10 +309,12 @@ TAP_CALLOUT_PRECISION = {
 }
 STOCK_NOTE = "3/8 HEX BAR, FLATS AS SUPPLIED."
 # Named exception: MHA-MG-006 bore-to-flat wall (drawing-simplicity-policy.md, "Named exceptions").
-# The centring and the wall that accepts it share a line (rule 6's four).
+# The source bore runs through the corners, along Y; its parallel-flat wall
+# acceptance is unchanged.  Keep the approved wording on one short row.
 BORE_WALL_NOTE = (
-    f"ROD BORE CENTRED; BORE TO FLAT WALL {BORE_WALL_STATED_MIN:.2f} MIN."
+    f"ROD BORE THROUGH CORNERS, CENTRED; BORE TO FLAT WALL {BORE_WALL_STATED_MIN:.2f} MIN"
 )
+BORE_TOOL_NOTE = "HOLD ON FLATS; CENTRE-DRILL ON CORNER BEFORE DRILL/REAM."
 # The tap the reach above rests on, and the thread's extent: the rod bore ends
 # it; the callout prints the native thread depth, its nominal, as (REF).
 TAP_TOOL_NOTE = (
@@ -320,4 +322,8 @@ TAP_TOOL_NOTE = (
     f"{PLUG_TAP_CHAMFER_THREADS[0]}-{PLUG_TAP_CHAMFER_THREADS[1]} THREAD CHAMFER."
 )
 TAP_EXTENT_NOTE = "THREAD ENDS AT ROD BORE."
-DRAWING_NOTES = "\n".join((STOCK_NOTE, BORE_WALL_NOTE, TAP_TOOL_NOTE, TAP_EXTENT_NOTE))
+# The specifically approved corner-start method and the two existing tap
+# facts fit rule 6's four rows; the tap's two sentences share the last row.
+DRAWING_NOTES = "\n".join(
+    (STOCK_NOTE, BORE_WALL_NOTE, BORE_TOOL_NOTE, f"{TAP_TOOL_NOTE} {TAP_EXTENT_NOTE}")
+)

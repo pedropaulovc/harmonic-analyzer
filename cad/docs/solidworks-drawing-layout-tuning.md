@@ -580,6 +580,14 @@ The controlling chain is 55.19 seat-to-axis plus 3.11 arm-past-seat;
 on the collar rim's arc centre and the arm end. Identify the mounting plane
 from the installed joint, rather than guessing it from a step's outline.
 The arm's 3.11 extension lies beside the lever across a 5.55 mm X gap.
+Label that short extension `ARM PAST MOUNTING FACE`, not merely 3.11.
+Across the flange, the lower edge is Y=-6.35, the arm spans -3.00..+4.50
+and the far edge is +6.35: 3.35 edge-to-arm plus 7.50 arm width leaves
+1.85, not a contradictory 12.70 chain. The lower edge-to-bore axis is
+6.35 REF, closing the existing 3.35 and 3.00 controls. Attach the native
+REF to the real lower flange edge and collar-circle centre, prove its
+model ownership and value, and check its witness ink with the complete
+mounting-coordinate stack; a floating "(6.35)" note cannot locate the axis.
 
 Put the junction's 7.50 width and 3.35 edge location on the bottom view,
 where its footprint is visible, without a second controlling copy in the
@@ -594,6 +602,32 @@ station witness separately. The view-direction caption belongs above the
 bottom outline where neither mounting witnesses nor the hole leader crosses
 it; centre it on `IView::GetOutline` and prove clearance to the neighbouring
 view's printed dimension ink.
+
+The MG-006 hex fixture's principal `*Top` view looks down the rod bore,
+which runs through the hex corners along local Y, not normal to a flat.
+Its height is AF 9.525, with one projected corner ridge through the bore
+circle. An unturned `*Right` end view instead puts Y up and shows the
+across-corners height 10.9985; that is not a third-angle projection of the
+principal view. Turn the end view by its measured axis mapping so -Z is up
+in both views, then align their projected origins before importing any
+dimensions. The end-view bore axis now runs through the left/right corners;
+do not change the model to make a mistaken flat-entry reading true.
+The 1.97 MIN bore-to-flat wall is the ligament to the two parallel flats,
+not an entry-face wall. Name the through-corners orientation on the sheet,
+and hold on flats and centre-drill the 120-degree ridge before drill/ream.
+The end-view bore axis is a native centreline attached to the named
+`RodBore` cylindrical face, mapped into that view and proved back to its
+source. Retain one tap centre mark but disable its extended arms, so the
+rod axis and small tap cross communicate different features, not duplicate
+lines. Place the vertical stock AF REF beside the rotated hex and prove
+its model identity, value, parentheses and flat-to-flat witness ink.
+For the groove R1.20, keep the genuine model radius and turn off
+`ArcExtensionLineOrOppositeSide`: an arrow on the circle's extension in
+air is not a material-arc attachment. Give only the groove-station's
+centre-side witness a 3 mm local gap, not the root-diameter witnesses,
+and prove the rebuilt radius arrow lies on the groove arc with at least
+2 mm separation from that station witness. A flag readback alone does not
+prove where SOLIDWORKS drew the leader.
 
 ## The sheet-split rule
 

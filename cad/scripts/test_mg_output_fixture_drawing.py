@@ -168,9 +168,9 @@ def test_bore_is_centred_and_the_stated_wall_is_the_named_shortfall() -> None:
     stated = f"{spec.BORE_WALL_STATED_MIN:.2f}"
     assert spec.DRAWING_NOTES.splitlines() == [
         "3/8 HEX BAR, FLATS AS SUPPLIED.",
-        f"ROD BORE CENTRED; BORE TO FLAT WALL {stated} MIN.",
-        "4-40: PLUG TAP, 3-5 THREAD CHAMFER.",
-        "THREAD ENDS AT ROD BORE.",
+        f"ROD BORE THROUGH CORNERS, CENTRED; BORE TO FLAT WALL {stated} MIN",
+        "HOLD ON FLATS; CENTRE-DRILL ON CORNER BEFORE DRILL/REAM.",
+        "4-40: PLUG TAP, 3-5 THREAD CHAMFER. THREAD ENDS AT ROD BORE.",
     ]
     policy = POLICY.read_text(encoding="utf-8").split("\n## Named exceptions", 1)[1]
     rows = [line for line in policy.splitlines() if line.startswith("| MHA-MG-006")]
@@ -239,7 +239,7 @@ def test_a_plug_tap_reaches_full_thread_through_the_wall_and_stops_short() -> No
     # A 6-thread plug chamfer (the long end of ICS's 3-6) would leave the
     # deepest flank under-cut at the worst case: hence the sheet's 3-5.
     assert deepest_wall + 6.0 * pitch > reach
-    assert spec.TAP_TOOL_NOTE in spec.DRAWING_NOTES.splitlines()
+    assert f"{spec.TAP_TOOL_NOTE} {spec.TAP_EXTENT_NOTE}" in spec.DRAWING_NOTES.splitlines()
 
 
 def _code_strings(tree: ast.Module) -> list[str]:
@@ -268,7 +268,7 @@ def test_the_rod_bore_ends_the_thread_and_its_depth_is_ref() -> None:
     # a bare 10.1 in the callout read as controlling while the note said REF.
     assert spec.TAP_EXTENT_NOTE == "THREAD ENDS AT ROD BORE."
     assert "REF" not in spec.DRAWING_NOTES
-    assert spec.TAP_EXTENT_NOTE in spec.DRAWING_NOTES.splitlines()
+    assert f"{spec.TAP_TOOL_NOTE} {spec.TAP_EXTENT_NOTE}" in spec.DRAWING_NOTES.splitlines()
     assert geom.TAP_SPEC.overrides_mm["ThreadDepth"] == geom.TAP_LENGTH
     assert geom.TAP_LENGTH == pytest.approx(geom.SPIGOT_FACE_X - geom.ROD_BORE_DIA / 2.0)
     assert set(spec.TAP_CALLOUT_PRECISION) == {
@@ -726,12 +726,12 @@ def test_turned_diameters_stack_right_of_the_face_smaller_inside() -> None:
     assert spigot_box[0] > root_x + 0.003
     assert root_box[2] < spigot_x - 0.003
     assert spigot_box[1] - root_box[3] >= _TEXT_HEIGHT
-    # The spigot's text stays clear of the end view's centre-mark stub, 28 mm
-    # left of its axis (retry09 DetailItem347: 234.0 mm).
-    assert spigot_box[2] < drawing.END_CENTER[0] - 0.028 - 0.005
-    # The overall length stays under the view, the groove's radius over it.
+    # The spigot's text clears the rotated end view's left-standing AF line.
+    assert spigot_box[2] < drawing.END_KEEP["HexAf"][0] - 0.005
+    # Overall length stays under the view.  The radius text is lowered to
+    # the arc-centre height: its measured elbow is 2.8 mm below the request.
     assert drawing.SIDE_KEEP["OverallLength"][1] < drawing._SIDE_BOTTOM
-    assert drawing.SIDE_KEEP["GrooveRadius"][1] > drawing._SIDE_TOP
+    assert drawing.SIDE_KEEP["GrooveRadius"][1] == drawing._side_y(geom.GROOVE_CENTRE_R)
 
 
 def _function(tree: ast.Module, name: str) -> ast.AST:
@@ -959,20 +959,16 @@ def test_bore_callout_reads_over_the_hex_between_its_witnesses() -> None:
     assert drawing.SIDE_KEEP["GrooveStation"][1] - hex_y > 0.0099
 
 
-def test_end_view_flats_read_above_the_hex_clear_of_the_tap_leader() -> None:
-    scale = drawing._S / 1000.0
-    centre_x, centre_y = drawing.END_CENTER
-    flat_top = centre_y + geom.HEX_CORNER_RADIUS / 2.0 * scale
-    hex_top = centre_y + geom.HEX_CORNER_RADIUS * scale
+def test_end_view_flats_read_vertically_left_of_the_hex_clear_of_the_tap() -> None:
+    assert drawing._END_HALF_HEIGHT == pytest.approx(geom.HEX_AF * drawing._S / 2000.0)
+    assert drawing._END_HALF_WIDTH == pytest.approx(geom.HEX_CORNER_RADIUS * drawing._S / 1000.0)
     assert set(drawing.END_KEEP) == {"HexAf"}
     af_x, af_y = drawing.END_KEEP["HexAf"]
-    # It witnesses the near flat from its top corner: above the hex, mid-span.
-    assert hex_top < af_y - _TEXT_OVER_LINE
-    assert af_x == centre_x
-    # The tap's shoulder runs under the flat's top corner, where no witness
-    # hangs.
-    shoulder_y = drawing.TAP_CALLOUT_XY[1] - drawing._TAP_CALLOUT_SHOULDER_DROP
-    assert shoulder_y < flat_top - 0.004
+    assert af_x < drawing.END_CENTER[0] - drawing._END_HALF_WIDTH - 0.010
+    assert af_y == drawing.END_CENTER[1]
+    text_left = drawing.TAP_CALLOUT_XY[0] - drawing._TAP_CALLOUT_HALF_WIDTH
+    assert text_left > drawing.END_CENTER[0] + drawing._END_HALF_WIDTH + 0.005
+    assert drawing.TAP_CALLOUT_XY[1] - drawing._TAP_CALLOUT_SHOULDER_DROP > af_y
 
 
 # Calls that add a centre mark; a comment naming one adds nothing.
@@ -1032,7 +1028,9 @@ def test_end_view_tap_keeps_the_template_centre_mark_alone() -> None:
         for node in ast.walk(build)
         if isinstance(node, ast.Call) and _call_name(node) == "_prove_tap_centre_mark"
     ]
-    assert [_arg_names(call) for call in proofs] == [["adapter", "end", "tap_drill"]]
+    assert [_arg_names(call) for call in proofs] == [
+        ["adapter", "end", "tap_drill"], ["adapter", "end", "tap_drill"]
+    ]
     callouts = [
         node
         for node in ast.walk(build)
@@ -1253,6 +1251,9 @@ def test_tap_centre_mark_unmeasured_fails(
 def test_notes_are_short() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     assert 1 <= len(lines) <= 4
+    assert len(lines) == 4
+    assert max(map(len, lines)) <= 68
+    assert spec.BORE_TOOL_NOTE in lines
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
@@ -1269,3 +1270,808 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material"] == config["material_specification"]
     assert config["finish"]
     assert int(config["quantity"]) == 1
+
+
+def test_corner_bore_notes_are_model_owned_and_preserve_the_tap_facts() -> None:
+    assert part.DRAWING_NOTES is spec.DRAWING_NOTES
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '{"Manufacturing Notes": DRAWING_NOTES}' in source
+    assert spec.BORE_WALL_NOTE == (
+        f"ROD BORE THROUGH CORNERS, CENTRED; BORE TO FLAT WALL "
+        f"{spec.BORE_WALL_STATED_MIN:.2f} MIN"
+    )
+    assert spec.BORE_TOOL_NOTE == (
+        "HOLD ON FLATS; CENTRE-DRILL ON CORNER BEFORE DRILL/REAM."
+    )
+
+
+def test_projection_precedes_import_and_all_native_ink_proofs_follow_rebuild() -> None:
+    assert _build_calls_in_order({
+        "_project_end_view", "curate_view_dimensions", "_add_rod_bore_axis",
+        "_place_groove_radius", "_prove_end_stock_reference", "_prove_rod_bore_axis",
+        "_prove_groove_radius", "_prove_groove_root_diameter",
+    }) == [
+        "_project_end_view", "curate_view_dimensions", "curate_view_dimensions",
+        "_add_rod_bore_axis", "_place_groove_radius", "_prove_end_stock_reference",
+        "_prove_rod_bore_axis", "_prove_groove_radius", "_prove_groove_root_diameter",
+    ]
+
+
+class _ProjectedView:
+    """IView.Angle/Position properties and BOOL SetViewPosition, no COM."""
+
+    def __init__(
+        self, kind: str, angle: float = 0.0, *, turn: bool = True,
+        move: bool = True, move_result: object = True, handed: float = 1.0,
+    ) -> None:
+        self.kind = kind
+        self._angle = angle
+        self.turn = turn
+        self.move = move
+        self.move_result = move_result
+        self.handed = handed
+        self.Position = [0.260, 0.190]
+        self.offset = (0.003, -0.002)
+        self.writes: list[float] = []
+
+    @property
+    def Angle(self) -> float:
+        return self._angle
+
+    @Angle.setter
+    def Angle(self, value: float) -> None:
+        self.writes.append(value)
+        if self.turn:
+            self._angle = value
+
+    def SetViewPosition(self, position: list[float], move_children: bool) -> object:
+        assert move_children is False
+        assert len(position) == 2
+        if self.move:
+            self.Position = list(position)
+        return self.move_result
+
+    def project(self, xyz: tuple[float, float, float]) -> tuple[float, float]:
+        x, y, z = xyz
+        u, v = (x, -z) if self.kind == "top" else (-z, self.handed * y)
+        u, v = u * drawing._S + self.offset[0], v * drawing._S + self.offset[1]
+        c, s = math.cos(self.Angle), math.sin(self.Angle)
+        return self.Position[0] + u * c - v * s, self.Position[1] + u * s + v * c
+
+
+def _projection_fakes(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    rebuilds: list[str] = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(drawing, "double_array", lambda values: list(values))
+    monkeypatch.setattr(
+        drawing, "model_point_in_view",
+        lambda adapter, view, xyz, *, label: view.project(xyz),
+    )
+    monkeypatch.setattr(
+        drawing, "rebuild_drawing", lambda adapter, *, label: rebuilds.append(label)
+    )
+    return rebuilds
+
+
+@pytest.mark.parametrize("initial", [0.0, math.pi / 2.0, -math.pi / 2.0, 0.37])
+def test_end_turn_is_derived_from_axes_and_origin_is_pinned(
+    monkeypatch: pytest.MonkeyPatch, initial: float
+) -> None:
+    rebuilds = _projection_fakes(monkeypatch)
+    front, end = _ProjectedView("top"), _ProjectedView("right", initial)
+    front.Position = list(drawing.SIDE_CENTER)
+    drawing._project_end_view(object(), front, end)
+    origin = end.project((0.0, 0.0, 0.0))
+    assert origin == pytest.approx((drawing.END_CENTER[0], front.project((0.0, 0.0, 0.0))[1]))
+    z = end.project((0.0, 0.0, 0.001))
+    y = end.project((0.0, 0.001, 0.0))
+    assert (z[0] - origin[0], z[1] - origin[1]) == pytest.approx((0.0, -0.004))
+    assert (y[0] - origin[0], y[1] - origin[1]) == pytest.approx((-0.004, 0.0))
+    assert rebuilds == ["turn fixture end view", "pin fixture end view"]
+
+
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        ({"turn": False}, "end \\+Z"),
+        ({"handed": -1.0}, "end \\+Y"),
+        ({"move": False}, "does not share front origin height"),
+        ({"move_result": False}, "failed to pin"),
+        ({"move_result": None}, "failed to pin"),
+        ({"move_result": 1}, "failed to pin"),
+    ],
+)
+def test_end_projection_refuses_ignored_turn_mirror_move_and_nonbool_success(
+    monkeypatch: pytest.MonkeyPatch, options: dict, message: str
+) -> None:
+    _projection_fakes(monkeypatch)
+    with pytest.raises(RuntimeError, match=message):
+        drawing._project_end_view(object(), _ProjectedView("top"), _ProjectedView("right", **options))
+
+
+def _end_flat_points() -> tuple[tuple[float, float], tuple[float, float]]:
+    x, y = drawing.END_CENTER
+    return (
+        (x - drawing._END_HALF_WIDTH / 2.0, y + drawing._END_HALF_HEIGHT),
+        (x + drawing._END_HALF_WIDTH / 2.0, y - drawing._END_HALF_HEIGHT),
+    )
+
+
+def _vertical_af_ink() -> list:
+    x = drawing.END_KEEP["HexAf"][0]
+    top, bottom = _end_flat_points()
+    return [
+        ((x, bottom[1]), (x, top[1])),
+        ((top[0] - drawing.EXTENSION_START_GAP, top[1]), (x - 0.001, top[1])),
+        ((bottom[0] - drawing.EXTENSION_START_GAP, bottom[1]), (x - 0.001, bottom[1])),
+    ]
+
+
+def test_rotated_end_stock_af_ink_stands_across_flats_not_corners() -> None:
+    assert drawing._end_af_ink_problem(_vertical_af_ink(), _end_flat_points()) is None
+
+
+@pytest.mark.parametrize("case", ["empty", "missing-flat", "ac-height", "horizontal", "short-witness"])
+def test_rotated_end_stock_af_refuses_wrong_frame_or_unwitnessed_flats(case: str) -> None:
+    ink = _vertical_af_ink()
+    if case == "empty":
+        ink = []
+    elif case == "missing-flat":
+        ink = ink[:-1]
+    elif case == "ac-height":
+        x = drawing.END_KEEP["HexAf"][0]
+        y = drawing.END_CENTER[1]
+        ink[0] = ((x, y - drawing._END_HALF_WIDTH), (x, y + drawing._END_HALF_WIDTH))
+    elif case == "horizontal":
+        x, y = drawing.END_CENTER
+        ink[0] = ((x - drawing._END_HALF_HEIGHT, y), (x + drawing._END_HALF_HEIGHT, y))
+    else:
+        (x0, y0), p1 = ink[1]
+        ink[1] = ((x0 - 0.004, y0), p1)
+    assert drawing._end_af_ink_problem(ink, _end_flat_points()) is not None
+
+
+class _NativeDisplay:
+    """IDisplayDimension properties, methods and metre-valued IDimension."""
+
+    def __init__(
+        self, name: str, feature: str, value_mm: float, *, kind: int = 5,
+        diametric: bool = False, arc_persists: bool = True, gap_result: object = True,
+    ) -> None:
+        self.dimension = SimpleNamespace(
+            FullName=f"{name}@{feature}@mg-output-fixture.SLDPRT",
+            SystemValue=value_mm / 1000.0,
+        )
+        self.Type2 = kind
+        self.Diametric = diametric
+        self._arc = True
+        self.arc_persists = arc_persists
+        self.gap_result = gap_result
+        self.gaps: list[tuple[int, bool, float]] = []
+        self.data: object | None = None
+
+    @property
+    def ArcExtensionLineOrOppositeSide(self) -> bool:
+        return self._arc
+
+    @ArcExtensionLineOrOppositeSide.setter
+    def ArcExtensionLineOrOppositeSide(self, value: bool) -> None:
+        assert type(value) is bool
+        if self.arc_persists:
+            self._arc = value
+
+    def GetDimension2(self, index: int) -> SimpleNamespace:
+        assert index == 0
+        return self.dimension
+
+    def SetWitnessLineGap(self, index: int, use_doc: bool, gap: float) -> object:
+        assert type(index) is int and index == 1
+        assert use_doc is False
+        assert type(gap) is float
+        self.gaps.append((index, use_doc, gap))
+        return self.gap_result
+
+    def GetDisplayData(self) -> object | None:
+        return self.data
+
+
+def _radial_display(**options) -> _NativeDisplay:
+    return _NativeDisplay("GrooveRadius", "GrooveProfile", geom.GROOVE_RADIUS, **options)
+
+
+def _station_display(**options) -> _NativeDisplay:
+    return _NativeDisplay("GrooveStation", "GrooveProfile", spec.GROOVE_STATION, **options)
+
+
+def test_native_radius_style_and_only_station_witness_one_are_written(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rebuilds = _projection_fakes(monkeypatch)
+    radius, station = _radial_display(), _station_display()
+    drawing._place_groove_radius(object(), _RootAnnotation(radius), _RootAnnotation(station))
+    assert radius.ArcExtensionLineOrOppositeSide is False
+    assert radius.gaps == []
+    assert station.gaps == [(1, False, drawing.GROOVE_STATION_GAP)]
+    assert drawing.EXTENSION_START_GAP == 0.001
+    assert rebuilds == ["place fixture material-arc radius"]
+
+
+@pytest.mark.parametrize("result", [False, None, 1])
+def test_station_witness_gap_requires_native_bool_success(
+    monkeypatch: pytest.MonkeyPatch, result: object
+) -> None:
+    _projection_fakes(monkeypatch)
+    with pytest.raises(RuntimeError, match="refused its centre-side witness gap"):
+        drawing._place_groove_radius(
+            object(), _RootAnnotation(_radial_display()),
+            _RootAnnotation(_station_display(gap_result=result)),
+        )
+
+
+@pytest.mark.parametrize("options", [{"kind": 6}, {"diametric": True}, {"arc_persists": False}])
+def test_native_radius_style_refuses_nonradius_or_ignored_false_property(
+    monkeypatch: pytest.MonkeyPatch, options: dict,
+) -> None:
+    _projection_fakes(monkeypatch)
+    with pytest.raises(RuntimeError):
+        drawing._place_groove_radius(
+            object(), _RootAnnotation(_radial_display(**options)), _RootAnnotation(_station_display())
+        )
+
+
+@pytest.mark.parametrize(
+    ("name", "feature", "value"),
+    [
+        ("OtherRadius", "GrooveProfile", geom.GROOVE_RADIUS),
+        ("GrooveRadius", "OtherSketch", geom.GROOVE_RADIUS),
+        ("GrooveRadius", "GrooveProfile", geom.GROOVE_RADIUS + 2e-5),
+    ],
+)
+def test_native_radius_identity_refuses_equal_ink_from_another_model_dimension(
+    monkeypatch: pytest.MonkeyPatch, name: str, feature: str, value: float
+) -> None:
+    _projection_fakes(monkeypatch)
+    annotation = _RootAnnotation(_NativeDisplay(name, feature, value))
+    with pytest.raises(RuntimeError, match="wrong model dimension"):
+        drawing._model_display(annotation, "GrooveRadius", "GrooveProfile", geom.GROOVE_RADIUS)
+
+
+def _material_radius_ink() -> tuple[list, tuple[float, float], list, tuple[float, float]]:
+    centre = (drawing._side_x(geom.GROOVE_X), drawing._side_y(geom.GROOVE_CENTRE_R))
+    radius = geom.GROOVE_RADIUS * drawing._S / 1000.0
+    tip = (centre[0] + radius * math.cos(-0.28), centre[1] + radius * math.sin(-0.28))
+    elbow = (centre[0] + 0.01012, centre[1] - 0.0028)
+    ink = [(centre, tip), (tip, elbow), (elbow, (elbow[0] + 0.0016, elbow[1]))]
+    station = [
+        ((centre[0], centre[1] + drawing.GROOVE_STATION_GAP), (centre[0], 0.23227))
+    ]
+    return ink, tip, station, centre
+
+
+def test_material_radius_ink_and_separate_station_foot_pass() -> None:
+    assert drawing._groove_radius_ink_problem(*_material_radius_ink()) is None
+
+
+@pytest.mark.parametrize(
+    ("case", "message"),
+    [
+        ("retry12-arrow", "not on the face-side material arc"),
+        ("opposite-arc", "not on the face-side material arc"),
+        ("off-circle", "not on the face-side material arc"),
+        ("empty", "no attached leader ink"),
+        ("disconnected", "no attached leader ink"),
+        ("missing-witness", "no unique witness"),
+        ("stale-gap", "did not reach the rebuilt ink"),
+        ("near-foot", "not clear"),
+        ("crossing", "not clear"),
+    ],
+)
+def test_radius_ink_refuses_extension_air_detachment_and_station_ambiguity(
+    case: str, message: str
+) -> None:
+    ink, tip, station, centre = _material_radius_ink()
+    if case == "retry12-arrow":
+        tip = (0.15154, 0.20036)  # scout's native12: v5.09, arc stops at v4.50
+    elif case == "opposite-arc":
+        tip = (2.0 * centre[0] - tip[0], tip[1])
+    elif case == "off-circle":
+        tip = (tip[0] + 0.001, tip[1])
+    elif case == "empty":
+        ink = []
+    elif case == "disconnected":
+        ink = [((0.170, 0.195), (0.180, 0.195))]
+    elif case == "missing-witness":
+        station = []
+    elif case == "stale-gap":
+        station[0] = ((centre[0], centre[1] + 0.001), station[0][1])
+    elif case == "near-foot":
+        ink.append((centre, (centre[0], centre[1] + 0.0015)))
+    else:
+        ink.append((centre, (centre[0], centre[1] + 0.004)))
+    problem = drawing._groove_radius_ink_problem(ink, tip, station, centre)
+    assert problem is not None and message in problem
+
+
+class _ArrowData:
+    """IDisplayData arrow count and 12-double GetArrowHeadAtIndex2 method."""
+
+    def __init__(self, tip: tuple[float, float], *, count: int = 1, complete: bool = True) -> None:
+        self.count = count
+        self.arrow = (*tip, 0.0, 1.0, 0.0, 0.0, 0.003556, 0.001, 0.0, 0.0, 0.0, 1.0)
+        if not complete:
+            self.arrow = self.arrow[:2]
+
+    def GetArrowHeadCount(self) -> int:
+        return self.count
+
+    def GetArrowHeadAtIndex2(self, index: int) -> tuple:
+        assert index == 0
+        return self.arrow
+
+
+class _RadialAnnotation(_RootAnnotation):
+    def __init__(self, display: _NativeDisplay) -> None:
+        super().__init__(display)
+        self.OwnerType = 0
+        self.dangling = False
+
+    def IsDangling(self) -> bool:
+        return self.dangling
+
+
+def _radius_readback_fakes(
+    monkeypatch: pytest.MonkeyPatch, *, count: int = 1, complete: bool = True
+) -> tuple[_RootAnnotation, _RootAnnotation]:
+    ink, tip, station_ink, centre = _material_radius_ink()
+    display = _radial_display()
+    display.ArcExtensionLineOrOppositeSide = False
+    display.data = _ArrowData(tip, count=count, complete=complete)
+    radius, station = _RadialAnnotation(display), _RootAnnotation(_station_display())
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(
+        drawing, "model_point_in_view", lambda adapter, view, xyz, *, label: centre
+    )
+    monkeypatch.setattr(
+        drawing, "dimension_segments", lambda annotation: ink if annotation is radius else station_ink
+    )
+    return radius, station
+
+
+def test_rebuilt_radius_proof_reads_native_arrow_tip_and_model_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    radius, station = _radius_readback_fakes(monkeypatch)
+    drawing._prove_groove_radius(object(), object(), radius, station)
+
+
+@pytest.mark.parametrize(
+    ("count", "complete", "message"),
+    [(0, True, "exactly one"), (2, True, "exactly one"), (1, False, "incomplete arrow")],
+)
+def test_rebuilt_radius_proof_refuses_missing_extra_or_unreadable_arrow(
+    monkeypatch: pytest.MonkeyPatch, count: int, complete: bool, message: str
+) -> None:
+    radius, station = _radius_readback_fakes(monkeypatch, count=count, complete=complete)
+    with pytest.raises(RuntimeError, match=message):
+        drawing._prove_groove_radius(object(), object(), radius, station)
+
+
+_Y_BORE_CYLINDER = (0.0, 0.004, 0.0, 0.0, 1.0, 0.0, geom.ROD_BORE_DIA / 2000.0)
+
+
+@pytest.mark.parametrize("sign", [1.0, -1.0])
+def test_rod_bore_cylinder_accepts_only_the_model_y_axis(sign: float) -> None:
+    params = (*_Y_BORE_CYLINDER[:4], sign, *_Y_BORE_CYLINDER[5:])
+    assert drawing._is_rod_bore_cylinder(params)
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        (),
+        _Y_BORE_CYLINDER[:6],
+        (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, geom.TAP_DRILL_DIA / 2000.0),
+        (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, geom.ROD_BORE_DIA / 2000.0),
+        (0.0001, *_Y_BORE_CYLINDER[1:]),
+        (*_Y_BORE_CYLINDER[:6], geom.SPIGOT_DIA / 2000.0),
+        (*_Y_BORE_CYLINDER[:6], float("nan")),
+    ],
+)
+def test_rod_bore_cylinder_refuses_the_axial_tap_wrong_radius_and_offset(params: tuple) -> None:
+    assert not drawing._is_rod_bore_cylinder(params)
+
+
+class _CylinderFace:
+    def __init__(self, params: tuple, *, cylinder: bool = True) -> None:
+        self.surface = SimpleNamespace(CylinderParams=params, IsCylinder=lambda: cylinder)
+
+    def GetSurface(self) -> SimpleNamespace:
+        return self.surface
+
+
+def _bore_face_fakes(
+    monkeypatch: pytest.MonkeyPatch, faces: tuple, *, mapped: bool = True,
+    roundtrip: bool = True, equality: int = 1,
+) -> tuple[SimpleNamespace, SimpleNamespace, object]:
+    source_face = faces[0] if faces else object()
+    view_face = object()
+    feature = SimpleNamespace(GetFaces=lambda: faces)
+
+    def feature_by_name(name: str) -> SimpleNamespace:
+        assert name == "RodBore"
+        return feature
+
+    extension = SimpleNamespace(
+        GetCorrespondingEntity2=lambda entity: source_face if roundtrip else None
+    )
+    model = SimpleNamespace(FeatureByName=feature_by_name, Extension=extension)
+    view = SimpleNamespace(
+        ReferencedDocument=model,
+        GetCorrespondingEntity=lambda entity: view_face if mapped else None,
+    )
+    app = SimpleNamespace(IsSame=lambda first, second: equality if first is second else 0)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    return SimpleNamespace(swApp=app), view, view_face
+
+
+def test_bore_axis_selects_named_model_cylinder_and_maps_it_by_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter, view, face = _bore_face_fakes(monkeypatch, (_CylinderFace(_Y_BORE_CYLINDER),))
+    assert drawing._rod_bore_face(adapter, view) is face
+
+
+@pytest.mark.parametrize("case", ["no-face", "two-faces", "tap", "no-view", "no-source", "unknown"])
+def test_bore_axis_face_refuses_ambiguity_or_lost_source_correspondence(
+    monkeypatch: pytest.MonkeyPatch, case: str,
+) -> None:
+    faces = (_CylinderFace(_Y_BORE_CYLINDER),)
+    options: dict = {}
+    if case == "no-face":
+        faces = ()
+    elif case == "two-faces":
+        faces = faces * 2
+    elif case == "tap":
+        faces = (_CylinderFace(_DRILL_CIRCLE),)
+    elif case == "no-view":
+        options["mapped"] = False
+    elif case == "no-source":
+        options["roundtrip"] = False
+    else:
+        options["equality"] = -1
+    adapter, view, _face = _bore_face_fakes(monkeypatch, faces, **options)
+    with pytest.raises(RuntimeError):
+        drawing._rod_bore_face(adapter, view)
+
+
+def _bore_axis_corners() -> tuple[tuple[float, float], tuple[float, float]]:
+    x, y = drawing.END_CENTER
+    return ((x - drawing._END_HALF_WIDTH, y), (x + drawing._END_HALF_WIDTH, y))
+
+
+def test_bore_axis_ink_spans_both_corners_horizontally_in_the_rotated_frame() -> None:
+    corners = _bore_axis_corners()
+    assert drawing._bore_axis_ink_problem([corners], corners) is None
+
+
+@pytest.mark.parametrize("case", ["empty", "tap-cross", "vertical", "offset", "overshoot"])
+def test_bore_axis_ink_refuses_a_tap_mark_or_false_axis(case: str) -> None:
+    corners = _bore_axis_corners()
+    x, y = drawing.END_CENTER
+    ink = {
+        "empty": [],
+        "tap-cross": [((x - 0.003, y), (x + 0.003, y))],
+        "vertical": [((x, y - drawing._END_HALF_WIDTH), (x, y + drawing._END_HALF_WIDTH))],
+        "offset": [((corners[0][0], y + 0.001), (corners[1][0], y + 0.001))],
+        "overshoot": [((x - 0.04, y), (x + 0.04, y))],
+    }[case]
+    assert drawing._bore_axis_ink_problem(ink, corners) is not None
+
+
+class _AttachedAxis(_MarkAnnotation):
+    def __init__(self, face: object, *, owner: int = 0, dangling: bool = False, kind: int = 2) -> None:
+        corners = _bore_axis_corners()
+        super().__init__(_MarkData([(*corners[0], *corners[1])]))
+        self.face = face
+        self.OwnerType = owner
+        self.dangling = dangling
+        self.kind = kind
+
+    def GetAttachedEntities3(self) -> tuple:
+        return (self.face,)
+
+    def GetAttachedEntityCount3(self) -> int:
+        return 1
+
+    def GetAttachedEntityTypes(self) -> tuple:
+        return (self.kind,)
+
+    def GetLeaderCount(self) -> int:
+        return 0
+
+    def IsDangling(self) -> bool:
+        return self.dangling
+
+
+class _TapCross(_MarkAnnotation):
+    def __init__(self, *, extended: bool = False) -> None:
+        x, y = drawing.END_CENTER
+        reach = 0.028 if extended else 0.003
+        super().__init__(_MarkData([(x - reach, y, x + reach, y), (x, y - reach, x, y + reach)]))
+        self.mark = SimpleNamespace(UseDocDisplaySettings=False, ShowLines=False)
+
+    def GetSpecificAnnotation(self) -> SimpleNamespace:
+        return self.mark
+
+
+def _axis_readback_fakes(
+    monkeypatch: pytest.MonkeyPatch, *, wrong_face: bool = False, stale: bool = False,
+    count: int = 1, owner: int = 0, dangling: bool = False, kind: int = 2,
+    equality: int = 1, extended: bool = False,
+) -> tuple:
+    face = object()
+    annotation = _AttachedAxis(object() if wrong_face else face, owner=owner, dangling=dangling, kind=kind)
+    axis = SimpleNamespace(GetAnnotation=lambda: annotation)
+    ink = _AttachedAxis(face) if stale else annotation
+
+    def annotations_by_type(annotation_type: int) -> tuple:
+        assert annotation_type == 15
+        return (ink,) * count
+
+    view = SimpleNamespace(GetAnnotationsByType=annotations_by_type)
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(IsSame=lambda first, second: equality if first is second else 0)
+    )
+
+    def project(adapter, view, xyz, *, label):
+        return drawing.END_CENTER[0] - xyz[1] * drawing._S, drawing.END_CENTER[1]
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    return adapter, view, axis, face, _TapCross(extended=extended)
+
+
+def test_native_bore_axis_proof_requires_face_identity_owner_ink_and_small_tap_cross(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    drawing._prove_rod_bore_axis(*_axis_readback_fakes(monkeypatch))
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"wrong_face": True}, {"stale": True}, {"count": 0}, {"count": 2},
+        {"owner": 1}, {"dangling": True}, {"kind": 1}, {"equality": -1},
+        {"extended": True},
+    ],
+)
+def test_native_bore_axis_refuses_unassociated_sheet_ink_duplicates_and_long_tap_arms(
+    monkeypatch: pytest.MonkeyPatch, options: dict,
+) -> None:
+    with pytest.raises(RuntimeError):
+        drawing._prove_rod_bore_axis(*_axis_readback_fakes(monkeypatch, **options))
+
+
+def test_bore_axis_insertion_reuses_native_face_helper_and_shortens_existing_mark(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    face, axis = object(), object()
+    tap_mark = _TapCross()
+    tap_mark.mark.UseDocDisplaySettings = True
+    tap_mark.mark.ShowLines = True
+    view = SimpleNamespace(GetAnnotationsByType=lambda kind: ())
+    calls: list[tuple] = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(drawing, "_rod_bore_face", lambda adapter, native: face)
+
+    def insert(adapter, native, *, entity, label):
+        assert native is view
+        calls.append((entity, label))
+        return axis
+
+    monkeypatch.setattr(drawing, "add_view_centerline", insert)
+    assert drawing._add_rod_bore_axis(object(), view, tap_mark) == (axis, face)
+    assert tap_mark.mark.UseDocDisplaySettings is False
+    assert tap_mark.mark.ShowLines is False
+    assert calls == [(face, "rod bore Y axis through hex corners")]
+
+
+@pytest.mark.parametrize("case", ["dangling", "sheet-owned", "lost-style", "no-data"])
+def test_radius_readback_refuses_floating_ink_and_lost_native_style(
+    monkeypatch: pytest.MonkeyPatch, case: str,
+) -> None:
+    radius, station = _radius_readback_fakes(monkeypatch)
+    if case == "dangling":
+        radius.dangling = True
+    elif case == "sheet-owned":
+        radius.OwnerType = 1
+    elif case == "lost-style":
+        radius.display.ArcExtensionLineOrOppositeSide = True
+    else:
+        radius.display.data = None
+    with pytest.raises(RuntimeError):
+        drawing._prove_groove_radius(object(), object(), radius, station)
+
+
+@pytest.mark.parametrize("brackets", [("(", ")"), ("", ""), ("(<MOD-DIAM>", ")")])
+def test_end_af_native_proof_preserves_linear_ref_brackets(
+    monkeypatch: pytest.MonkeyPatch, brackets: tuple[str, str],
+) -> None:
+    display = _NativeDisplay("HexAf", "HexProfile", geom.HEX_AF, kind=2)
+    display.GetText = lambda part: {1: brackets[0], 2: brackets[1]}[part]
+    annotation = _RootAnnotation(display)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(drawing, "dimension_segments", lambda raw: _vertical_af_ink())
+
+    def project(adapter, view, xyz, *, label):
+        return (
+            drawing.END_CENTER[0] - xyz[1] * drawing._S,
+            drawing.END_CENTER[1] - xyz[2] * drawing._S,
+        )
+
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    if brackets == ("(", ")"):
+        drawing._prove_end_stock_reference(object(), object(), annotation)
+    else:
+        with pytest.raises(RuntimeError, match="linear stock-reference brackets"):
+            drawing._prove_end_stock_reference(object(), object(), annotation)
+
+
+def test_native_bore_axis_refuses_null_annotation(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    with pytest.raises(RuntimeError, match="no annotation"):
+        drawing._prove_rod_bore_axis(
+            object(), object(), SimpleNamespace(GetAnnotation=lambda: None), object(), object()
+        )
+
+
+def test_bore_axis_insertion_refuses_an_existing_coincident_axis(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    view = SimpleNamespace(GetAnnotationsByType=lambda kind: (object(),))
+    with pytest.raises(RuntimeError, match="already has a centreline"):
+        drawing._add_rod_bore_axis(object(), view, _TapCross())
+
+
+class _FalseLikeReadback:
+    """A non-BOOL object can be falsey without measuring native False."""
+
+    def __bool__(self) -> bool:
+        return False
+
+    def member(self) -> bool:
+        return False
+
+
+_NON_BOOL_READBACKS = (
+    None, 0, 1, _FalseLikeReadback(), _FalseLikeReadback().member, object(),
+)
+
+
+@pytest.mark.parametrize("readback", _NON_BOOL_READBACKS)
+def test_radius_arc_property_requires_measured_bool_false_after_write(
+    monkeypatch: pytest.MonkeyPatch, readback: object,
+) -> None:
+    _projection_fakes(monkeypatch)
+    display = _radial_display(arc_persists=False)
+    display._arc = readback
+    with pytest.raises(RuntimeError, match="still attaches"):
+        drawing._place_groove_radius(
+            object(), _RootAnnotation(display), _RootAnnotation(_station_display())
+        )
+
+
+@pytest.mark.parametrize("readback", _NON_BOOL_READBACKS)
+def test_radius_diametric_property_requires_measured_bool_false_before_write(
+    monkeypatch: pytest.MonkeyPatch, readback: object,
+) -> None:
+    _projection_fakes(monkeypatch)
+    display = _radial_display()
+    display.Diametric = readback
+    with pytest.raises(RuntimeError, match="genuine radial dimension"):
+        drawing._place_groove_radius(
+            object(), _RootAnnotation(display), _RootAnnotation(_station_display())
+        )
+
+
+@pytest.mark.parametrize("readback", _NON_BOOL_READBACKS)
+@pytest.mark.parametrize("member", ["Diametric", "ArcExtensionLineOrOppositeSide", "IsDangling"])
+def test_rebuilt_radius_bool_readbacks_refuse_none_integer_boundmethod_and_object(
+    monkeypatch: pytest.MonkeyPatch, readback: object, member: str,
+) -> None:
+    radius, station = _radius_readback_fakes(monkeypatch)
+    if member == "Diametric":
+        radius.display.Diametric = readback
+    elif member == "ArcExtensionLineOrOppositeSide":
+        radius.display._arc = readback
+    else:
+        radius.dangling = readback
+    with pytest.raises(RuntimeError):
+        drawing._prove_groove_radius(object(), object(), radius, station)
+
+
+@pytest.mark.parametrize("readback", _NON_BOOL_READBACKS)
+def test_bore_surface_is_cylinder_requires_an_actual_native_bool(
+    monkeypatch: pytest.MonkeyPatch, readback: object,
+) -> None:
+    face = _CylinderFace(_Y_BORE_CYLINDER)
+    face.surface.IsCylinder = lambda: readback
+    adapter, view, _face = _bore_face_fakes(monkeypatch, (face,))
+    with pytest.raises(RuntimeError, match="IsCylinder did not return a native BOOL"):
+        drawing._rod_bore_face(adapter, view)
+
+
+def test_bore_surface_false_is_skipped_without_rejecting_the_true_cylinder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    faces = (
+        _CylinderFace(_Y_BORE_CYLINDER),
+        _CylinderFace(_Y_BORE_CYLINDER, cylinder=False),
+    )
+    adapter, view, face = _bore_face_fakes(monkeypatch, faces)
+    assert drawing._rod_bore_face(adapter, view) is face
+
+
+class _MarkFlagReadback:
+    """ICenterMark BOOL properties with one deliberately ignored write."""
+
+    def __init__(self, member: str, readback: object) -> None:
+        self.member = member
+        self.readback = readback
+        self._doc = False
+        self._lines = False
+
+    @property
+    def UseDocDisplaySettings(self) -> object:
+        return self.readback if self.member == "UseDocDisplaySettings" else self._doc
+
+    @UseDocDisplaySettings.setter
+    def UseDocDisplaySettings(self, value: bool) -> None:
+        assert type(value) is bool
+        if self.member != "UseDocDisplaySettings":
+            self._doc = value
+
+    @property
+    def ShowLines(self) -> object:
+        return self.readback if self.member == "ShowLines" else self._lines
+
+    @ShowLines.setter
+    def ShowLines(self, value: bool) -> None:
+        assert type(value) is bool
+        if self.member != "ShowLines":
+            self._lines = value
+
+
+@pytest.mark.parametrize("readback", (*_NON_BOOL_READBACKS, True))
+@pytest.mark.parametrize("member", ["UseDocDisplaySettings", "ShowLines"])
+def test_tap_cross_false_properties_require_measured_false_after_native_write(
+    monkeypatch: pytest.MonkeyPatch, readback: object, member: str,
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    mark = _TapCross()
+    mark.mark = _MarkFlagReadback(member, readback)
+    view = SimpleNamespace(GetAnnotationsByType=lambda kind: ())
+    with pytest.raises(RuntimeError, match="retained coincident"):
+        drawing._add_rod_bore_axis(object(), view, mark)
+
+
+@pytest.mark.parametrize("readback", (*_NON_BOOL_READBACKS, True))
+@pytest.mark.parametrize("member", ["UseDocDisplaySettings", "ShowLines"])
+def test_rebuilt_tap_cross_refuses_unmeasured_false_and_ignored_property_writes(
+    monkeypatch: pytest.MonkeyPatch, readback: object, member: str,
+) -> None:
+    adapter, view, axis, face, tap_mark = _axis_readback_fakes(monkeypatch)
+    tap_mark.mark = _MarkFlagReadback(member, readback)
+    with pytest.raises(RuntimeError, match="regained its coincident"):
+        drawing._prove_rod_bore_axis(adapter, view, axis, face, tap_mark)
+
+
+@pytest.mark.parametrize("readback", _NON_BOOL_READBACKS)
+def test_bore_axis_dangling_method_requires_measured_false(
+    monkeypatch: pytest.MonkeyPatch, readback: object,
+) -> None:
+    adapter, view, axis, face, tap_mark = _axis_readback_fakes(monkeypatch)
+    axis.GetAnnotation().dangling = readback
+    with pytest.raises(RuntimeError, match="dangling state is not measured False"):
+        drawing._prove_rod_bore_axis(adapter, view, axis, face, tap_mark)

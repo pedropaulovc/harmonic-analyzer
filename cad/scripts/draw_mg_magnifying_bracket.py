@@ -16,7 +16,8 @@ front face.  One third-angle set (blind machinist review, mreview09):
   face opposite the mounting face) and, from the part's blanked
   ``ArmFootprint`` witness, the arm's thickness and its lower face from the
   flange's hole-datum edge (both controlling), beside the arm's end face
-  the view draws face-on inside the flange.
+  the view draws face-on inside the flange.  The flange edge to the bore
+  axis is a drawing-native reference: FootprintOffset + ArmBelowAxis.
 - RIGHT SIDE (``*Right`` TURNED so model +Z runs down the sheet and pinned by
   projection at the front view's origin height): the collar end-on with its
   OD and banded bore (near-side single-arrow leaders), and, from the part's
@@ -24,7 +25,7 @@ front face.  One third-angle set (blind machinist review, mreview09):
   (controlling) and the bore axis' ONE toleranced chain along Z -- the
   flange's mounting face from the axis, the arm's end past that face --
   with the arm's end from the axis printed as that chain's parenthesised
-  sum, the sheet's one drawing-native reference dimension.
+  sum, a drawing-native reference dimension.
 
 Run with SolidWorks open::
 
@@ -81,6 +82,8 @@ import _telemetry
 from magnifying_bracket_joint_layout import (
     BRACKET_HOLE_POINTS,
     CLEARANCE_DIA,
+    SIDE_PLATE_X,
+    SIDE_PLATE_Y,
     SIDE_PLATE_Z,
 )
 from build_mg_magnifying_bracket import ARM_HALF_X, ARM_Y, ARM_Z, COLLAR_OD
@@ -248,6 +251,20 @@ BOTTOM_HOLE_KEEP = {
     "MountingX1": (0.075, 0.0838),
     "MountingY0": (0.080, 0.1166),
 }
+# The across-flange chain is not a closure: Y -6.35 -> -3 -> +4.5 -> +6.35
+# leaves 1.85 at the far edge.  The bore axis is Y 0, so the lower flange
+# edge -> axis is FootprintOffset + ArmBelowAxis = 3.35 + 3.00.  Pick the
+# actual collar OD arc (edge-on in this view), centre-anchor it as for the
+# arm-end REF, and the lower flange edge; never substitute a mounting hole.
+# West of the holes' Y column (x 80 mm), the REF column at x 44 mm has only
+# its value and "BORE / AXIS" rows, all below the flange.  At the widest
+# measured pitch their right ends stay west of the X-coordinate text
+# (x >= 61.45 mm); its upper tail and both full-width witnesses stay clear
+# of the holes' row text (x >= 55.5 mm, y >= 114.7 mm).  All those witnesses,
+# including the existing hole-Y dimension's, join the rebuilt ink proof.
+FLANGE_AXIS_REFERENCE = "flange edge to bore axis"
+FLANGE_AXIS_REFERENCE_XY = (0.044, 0.0978)
+FLANGE_AXIS_REFERENCE_CALLOUT = "BORE\nAXIS"
 # The collar's end-on circles: the annulus sketch lies on the part's Right
 # plane, so its two diameters import to the side view, whose collar centre is
 # the pinned origin (SIDE_AXIS_X, FRONT_ORIGIN_Y) = (228, 206.15) mm.  A
@@ -301,24 +318,19 @@ SIDE_KEEP = {
 #     216.5 mm, y ~172..186.6 mm, 5.15 mm left of the flange; its witness
 #     from the origin starts at the collar's far edge (x 234 mm, retry10)
 #     and runs left through the centre to the column;
-#   - the arm's end past that face, "3.11" (ArmPastSeat), VERTICAL and hung
-#     BELOW its 3.11 mm span (a lone row hung off a short vertical span
-#     prints beside its column on a shoulder 2.78 mm under the requested y:
-#     the bottom view's 6.35, retry09): column x 212 mm, between the
-#     mounting face's column and the arm (x 223.5 mm); its witnesses run
-#     left from the arm's end corner (231, 147.85) mm and the flange's
-#     hole-datum corner (234.35, 150.96) mm, the second along the mounting
-#     face's witness (collinear extension lines are exempt); the row (9.1
-#     mm) sits on its shoulder at y 138.7..142.2 mm on whichever hand the
-#     column takes (x 202.9..221.1 mm covers both), 4.3 mm over the 3.00's
-#     line, whose tail ends at x 221.6 mm, 0.5 mm right of the row's widest
-#     reach, and whose left arrowhead tip (x 224.4 mm) stands 3.3 mm right
-#     of it; the column's outside-arrow tail ends 6.4 mm over the mounting
-#     face, at y 157.4 mm, in air (the mounting face's rows start at y ~172
-#     mm).
+#   - the arm's physical overhang, "3.11 / ARM PAST / MOUNTING / FACE"
+#     (ArmPastSeat), VERTICAL and hung BELOW its 3.11 mm span.  Its
+#     column stays at x 212 mm, short of the 3.00's left tail at x 221.65
+#     mm; its widest row (22.8 mm, either hand) stays over x 189.2..234.8
+#     mm, clear of the bottom view's east stack (x <= 181.1 mm).  Requested
+#     at y 119.5 mm, the four-row block stays under the 3.00's line at
+#     y 134.44 mm and over the counterbore callout's top at y 95.1 mm.
+#     Its witnesses still name the arm's end and the mounting face;
+#     the upper tail ends at y 157.31 mm, under the mounting-face rows.
+#     This remains an ordinary .XX control, not a tight overhang band.
 # The arm's end from the bore axis, "(58.30) / ARM END / FROM BORE AXIS", is
 # the chain's SUM (55.19 + 3.11 = 58.30 exactly) and prints as the sheet's
-# one drawing-native REFERENCE (_arm_end_reference: a vertical dimension
+# drawing-native REFERENCE (_arm_end_reference: a vertical dimension
 # between the collar's OD rim, re-anchored to its CENTRE, and the arm's end
 # edge, proven to measure ARM_Z[1] on those two entities, parenthesised, its
 # places from the spec's DRAWING_REFERENCE_PRECISION): in-span on the RIGHT
@@ -345,14 +357,14 @@ SIDE_KEEP = {
 # corner witness (x 234.35 mm, the 3.11's, which ends at y 149.96 mm, above
 # these rows); the rows end 5.2 mm and more left of the isometric's outline
 # (x 294.7 mm).  The line runs from the rows' near end left through both
-# witnesses to its tail at x 221.65 mm, over no foreign ink: the 3.11's
-# column stands at x 212 mm and the mounting face's at 198 mm, and nothing
-# else sits under the arm's end at x 180..285 mm (the counterbore callout's
-# block ends at y ~95 mm, the isometric starts at x 294.7 mm), which
-# _assert_dimensions_clear proves on the rendered ink.
+# witnesses to its tail at x 221.65 mm, clear of the overhang's column at
+# x 212 mm and the mounting face's at x 198 mm.  The overhang's labelled
+# block hangs well under this line; the counterbore callout ends at y ~95
+# mm and the isometric starts at x 294.7 mm.  _assert_dimensions_clear
+# still proves the complete rebuilt side-view ink, without exemptions.
 SIDE_SECTION_KEEP = {
     "SeatToAxis": (SIDE_AXIS_X - 0.030, 0.1785),
-    "ArmPastSeat": (SIDE_AXIS_X - 0.016, 0.1415),
+    "ArmPastSeat": (SIDE_AXIS_X - 0.016, 0.1195),
     "ArmBelowAxis": (SIDE_AXIS_X + 0.036, 0.1400),
 }
 # The sheet-derived reference: its spec key (DRAWING_REFERENCE_PRECISION),
@@ -388,6 +400,12 @@ SECTION_AXES = {
     ARM_END_REFERENCE: "y",
 }
 BOTTOM_AXES = {name: "y" for name in (*BOTTOM_KEEP, *BOTTOM_FOOTPRINT_KEEP)}
+BOTTOM_WEST_AXES = {
+    "MountingX0": "x",
+    "MountingX1": "x",
+    "MountingY0": "y",
+    FLANGE_AXIS_REFERENCE: "y",
+}
 # Blind-review round 1: the plan values read unattached at a glance -- label
 # each with the feature it controls.  The collar's length names its
 # direction (machinist review: 10.00 vs the Ø12 read as one feature).
@@ -402,21 +420,14 @@ SIDE_CALLOUTS = {
     "CollarOd": "COLLAR OD",
     "CollarBore": "REAM OR BORE: PRESS SEAT\nFOR MHA-MG-003 LEVER",
 }
-# The arm's section names its faces (mreview10 blocker 1: "3.00 FROM BORE
-# AXIS" did not say which edge its far end was): the arm's lower face from
-# the bore axis; the mounting face is named as the one the plate sees; the
-# arm end past it ("3.11") reads by its witnesses between the two named
-# faces and needs no row of its own (a hung row beside its column could
-# print on either hand, and a wide one on the right would sit under the
-# arm's witnesses).  The 3.00's callout is ONE row (a two-row block) so it
-# fits under the arm's end.  The bottom view's footprint pair (3.35 to the
-# flange's hole-datum edge, 7.50 thick) carries no callout: the arm's end
-# face is drawn face-on inside the flange there, each value's witnesses
-# name their edges, and a hung row of words could print on either hand of
-# its column into the neighbouring column's ink.
+# The section labels name the physical arm face, mounting face and overhang.
+# Split the overhang's words across three rows so the native block hangs clear
+# under the side view without reaching the bottom view's east-stack ink.
+# The footprint pair's face-on witnesses still name their actual edges.
 SECTION_CALLOUTS = {
     "ArmBelowAxis": "ARM FROM BORE AXIS",
     "SeatToAxis": "MOUNTING FACE\nTO BORE AXIS",
+    "ArmPastSeat": "ARM PAST\nMOUNTING\nFACE",
 }
 # The counterbore callout names the entry face in the sheet's own words: the
 # bottom view looks at the mounting face (the one the plate sees, named on
@@ -437,10 +448,9 @@ PROJECTION_ANGLE_TOL = 1e-6
 PROJECTION_TOL_M = 1e-4  # the latch hook's _PIN_TOL_M
 
 
-def _mounting_rims(bottom: Any) -> list[Any]:
-    """The through holes' rims on the mounting face: the bottom view looks
-    from +Z, and the counterbores open on the far (-Z) face."""
-    edges = scan_view_edges(bottom, label="bracket mounting face")
+def _mounting_rims(edges: ViewEdges) -> list[Any]:
+    """The through holes' rims on the mounting face, from its one edge sweep:
+    the bottom view looks from +Z; the counterbores open on the far face."""
     return [
         edges.circle_at(
             (point[0], point[1], SIDE_PLATE_Z[1]),
@@ -568,6 +578,25 @@ def _arm_end_edge(edges: ViewEdges) -> ViewEdge:
         or any(abs(p[0] - ARM_HALF_X) > 1e-6 or abs(p[2] - ARM_Z[1]) > 1e-6 for p in (start, end))
     ):
         raise RuntimeError(f"bracket arm end edge resolved to {edge.line}, not the end face's edge")
+    return edge
+
+
+def _flange_lower_edge(edges: ViewEdges) -> ViewEdge:
+    """The full lower flange edge on the actual +Z mounting face, not an
+    arm edge, a counterbore rim or the opposite flange face."""
+    midpoint = ((SIDE_PLATE_X[0] + SIDE_PLATE_X[1]) / 2.0, SIDE_PLATE_Y[0], SIDE_PLATE_Z[1])
+    edge = edges.exact_line_through(midpoint, label="bracket lower flange edge")
+    start, end = edge.line
+    xs = sorted((start[0], end[0]))
+    if (
+        abs(edge.length_mm - (SIDE_PLATE_X[1] - SIDE_PLATE_X[0])) > 1e-6
+        or any(abs(x - expected) > 1e-6 for x, expected in zip(xs, SIDE_PLATE_X))
+        or any(
+            abs(p[1] - SIDE_PLATE_Y[0]) > 1e-6 or abs(p[2] - SIDE_PLATE_Z[1]) > 1e-6
+            for p in (start, end)
+        )
+    ):
+        raise RuntimeError(f"bracket lower flange edge resolved to {edge.line}, not the mounting face's edge")
     return edge
 
 
@@ -800,26 +829,22 @@ def _prove_collar_diameters_clear(
         )
 
 
-def _set_reference_precision(adapter: Any, display: Any) -> None:
-    """Give the one SHEET-derived dimension its spec-authored decimal places
-    (the crank arm's _set_reference_precision): never a literal here.
-    SetPrecision3 reports rejection through its return status, so the
-    side effect is read back."""
-    places = DRAWING_REFERENCE_PRECISION[ARM_END_REFERENCE]
+def _set_reference_precision(adapter: Any, display: Any, *, label: str) -> None:
+    """Give a SHEET-derived reference its spec-authored places, checking the
+    integer SetPrecision3 status and the applied primary precision."""
+    places = DRAWING_REFERENCE_PRECISION[label]
     display = _early_bound(display, "IDisplayDimension")
-    # -1: swDimensionPrecisionSettings_e do-not-change for the dual and both
-    # tolerance places.  The subscript is written out again because
-    # _drawing_contract only accepts a spec lookup here.
-    adapter._attempt(
-        lambda: display.SetPrecision3(
-            DRAWING_REFERENCE_PRECISION["arm end from bore axis"], -1, -1, -1
-        )
+    # -1: swDimensionPrecisionSettings_e do-not-change for dual/tolerance.
+    # Keep the spec lookup at the call site for the specification-purity gate.
+    status = adapter._attempt(
+        lambda: display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
     )
+    if type(status) is not int or status != 0:
+        raise RuntimeError(f"{label}: SetPrecision3 did not succeed: {status!r}")
     applied = adapter._attempt(display.GetPrimaryPrecision2)
-    if applied != places:
+    if type(applied) is not int or applied != places:
         raise RuntimeError(
-            f"{ARM_END_REFERENCE}: sheet dimension prints {applied} decimal places, "
-            f"not {places}"
+            f"{label}: sheet dimension prints {applied} decimal places, not {places}"
         )
 
 
@@ -828,8 +853,8 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
     ``SetText`` reports nothing, so it is read back."""
     display = _early_bound(display, "IDisplayDimension")
     display.SetText(4, text)  # swDimensionTextCalloutBelow
-    applied = str(display.GetText(4) or "")
-    if applied.replace("\r", "") != text:
+    applied = display.GetText(4)
+    if type(applied) is not str or applied.replace("\r", "") != text:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
 
 
@@ -860,9 +885,9 @@ def _arm_end_reference(adapter: Any, side: Any, edges: ViewEdges) -> Any:
         entities=(rim.edge, end.edge),
     )
     display = _early_bound(dimension, "IDisplayDimension")
-    kind = int(display.Type2)
-    if kind not in _LINEAR_DIMENSION_TYPES:
-        raise RuntimeError(f"{ARM_END_REFERENCE}: expected a linear dimension, got type {kind}")
+    kind = display.Type2
+    if type(kind) is not int or kind not in _LINEAR_DIMENSION_TYPES:
+        raise RuntimeError(f"{ARM_END_REFERENCE}: expected a linear dimension, got type {kind!r}")
     set_arc_endpoints_to_center(adapter, dimension, label=ARM_END_REFERENCE)
     assert_dimension_measures(
         adapter,
@@ -871,10 +896,60 @@ def _arm_end_reference(adapter: Any, side: Any, edges: ViewEdges) -> Any:
         label=ARM_END_REFERENCE,
         entities=(rim.edge, end.edge),
     )
-    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    raw_annotation = display.GetAnnotation()
+    if raw_annotation is None:
+        raise RuntimeError(f"{ARM_END_REFERENCE}: sheet dimension has no annotation")
+    annotation = _early_bound(raw_annotation, "IAnnotation")
     set_reference_dimension(adapter, annotation, label=ARM_END_REFERENCE)
-    _set_reference_precision(adapter, display)
+    _set_reference_precision(adapter, display, label=ARM_END_REFERENCE)
     _set_callout_below(display, ARM_END_REFERENCE_CALLOUT, ARM_END_REFERENCE)
+    return annotation
+
+
+def _flange_axis_reference(adapter: Any, bottom: Any, rim: ViewEdge, edge: ViewEdge) -> Any:
+    """A pure, read-only REF between the lower flange edge and the real bore
+    axis.  The collar's OD arc projects edge-on in the mounting-face view;
+    native centre anchoring must still read its centre, not a silhouette
+    flank or a mounting-hole centre.  Prove both attachments and the distance
+    before adding parentheses, spec places and the axis-identifying callout."""
+    centre_mm = rim.circle[:3]
+    dimension = add_edge_dimension(
+        adapter,
+        bottom,
+        p0=model_point_in_view(
+            adapter, bottom, tuple(v / 1000.0 for v in centre_mm), label="collar bore axis in bottom view"
+        ),
+        p1=model_point_in_view(
+            adapter, bottom, tuple(v / 1000.0 for v in edge.midpoint_mm), label="lower flange edge in bottom view"
+        ),
+        text_xy=FLANGE_AXIS_REFERENCE_XY,
+        label=FLANGE_AXIS_REFERENCE,
+        orientation="vertical",
+        entities=(rim.edge, edge.edge),
+    )
+    display = _early_bound(dimension, "IDisplayDimension")
+    kind = display.Type2
+    if type(kind) is not int or kind not in _LINEAR_DIMENSION_TYPES:
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: expected a linear dimension, got type {kind!r}")
+    set_arc_endpoints_to_center(adapter, dimension, label=FLANGE_AXIS_REFERENCE)
+    assert_dimension_measures(
+        adapter,
+        dimension,
+        expected_mm=-SIDE_PLATE_Y[0],
+        label=FLANGE_AXIS_REFERENCE,
+        entities=(rim.edge, edge.edge),
+    )
+    raw_annotation = display.GetAnnotation()
+    if raw_annotation is None:
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: sheet dimension has no annotation")
+    annotation = _early_bound(raw_annotation, "IAnnotation")
+    set_reference_dimension(adapter, annotation, label=FLANGE_AXIS_REFERENCE)
+    _set_reference_precision(adapter, display, label=FLANGE_AXIS_REFERENCE)
+    _set_callout_below(display, FLANGE_AXIS_REFERENCE_CALLOUT, FLANGE_AXIS_REFERENCE)
+    display.ArrowSide = _ARROWS_OUTSIDE
+    applied_side = display.ArrowSide
+    if type(applied_side) is not int or applied_side != _ARROWS_OUTSIDE:
+        raise RuntimeError(f"{FLANGE_AXIS_REFERENCE}: reference did not keep outside arrows")
     return annotation
 
 
@@ -1028,6 +1103,10 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError(
             f"arm section imported {sorted(section)}, expected {sorted(SIDE_SECTION_KEEP)}"
         )
+    overhang_display = section["ArmPastSeat"].GetSpecificAnnotation()
+    if overhang_display is None:
+        raise RuntimeError("ArmPastSeat: controlling dimension has no display annotation")
+    _set_callout_below(overhang_display, SECTION_CALLOUTS["ArmPastSeat"], "ArmPastSeat")
     # One sweep of the side view's edges serves the sheet reference's two
     # picks and the bore axis both proofs below measure from.
     side_edges = scan_view_edges(side, label="bracket collar end")
@@ -1043,7 +1122,8 @@ async def build(adapter: Any) -> dict[str, str]:
         {name: section[name] for name in ("SeatToAxis", ARM_END_REFERENCE)},
         axis=bore_axis,
     )
-    rims = _mounting_rims(bottom)
+    bottom_edges = scan_view_edges(bottom, label="bracket mounting face")
+    rims = _mounting_rims(bottom_edges)
 
     add_native_hole_callout(
         adapter,
@@ -1084,7 +1164,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="two bracket counterbores",
         process=COUNTERBORE_PROCESS,
     )
-    curate_hidden_dimensions(
+    hole_annotations = curate_hidden_dimensions(
         adapter,
         bottom,
         keep=BOTTOM_HOLE_KEEP,
@@ -1113,8 +1193,17 @@ async def build(adapter: Any) -> dict[str, str]:
             f"bottom view's east stack imported {sorted(east)}, expected {sorted(BOTTOM_AXES)}"
         )
     _set_arrow_sides(adapter, east_annotations, BOTTOM_ARROW_SIDES, label="bottom view")
+    west = {dimension_name(adapter, a): a for a in hole_annotations}
+    if set(west) != set(BOTTOM_HOLE_KEEP) or len(west) != len(hole_annotations):
+        raise RuntimeError(
+            f"bottom view's coordinates imported {sorted(west)}, expected {sorted(BOTTOM_HOLE_KEEP)}"
+        )
+    west[FLANGE_AXIS_REFERENCE] = _flange_axis_reference(
+        adapter, bottom, _collar_od_rim(side_edges), _flange_lower_edge(bottom_edges)
+    )
     rebuild_drawing(adapter, label="bottom view annotations")
     _assert_dimensions_clear(east, BOTTOM_AXES, label="bottom view east stack")
+    _assert_dimensions_clear(west, BOTTOM_WEST_AXES, label="bottom view west reference")
     _place_bottom_caption(adapter, bottom, front_annotations)
 
     # The collar bore's ASME centre mark is the template's, placed with the
