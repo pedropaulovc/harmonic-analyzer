@@ -155,7 +155,7 @@ def test_paired_keeper_bores_keep_a_running_fit_on_the_rail_seats() -> None:
     # 1.02 out of line, far past the fit; reamed through in one pass at their
     # installed spacing they are one straight line, so a setup tilt of that
     # line costs nothing. GPT round 3 (PR #1311): the residual is the rail
-    # under the two feet, faced in one setup on MHA-FR-002 to one 0.04 zone: a
+    # under the two feet, MHA-FR-002's faced rail top, flat to one 0.04 zone: a
     # step, opposite rolls across the 14 width (each lug centre 25.2 high) and
     # a pitch over the 16.5 seat; the shaft runs through both lug centres
     # 148 apart and each 6.0 lug spends its thickness x (pitch + slope).

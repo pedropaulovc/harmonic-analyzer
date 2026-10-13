@@ -332,6 +332,39 @@ def test_the_channel_apex_set_screws_are_waived_only_by_their_ruling() -> None:
     assert joint_id in unlocked(without)
 
 
+def test_the_gooseneck_set_screw_is_waived_only_by_its_ruling() -> None:
+    """Q5 on PR #1348: the MHA-VN-023 cup point is the gooseneck post's only
+    retention, an oscillating joint with no jam nut. The user waived rule 9
+    for it (2026-10-12): adjustable by design and re-set periodically."""
+    joint_id = "ha-harmonic-analyzer/gooseneck-set-screw-in-top-frame"
+    (row,) = [j for j in jr.JOINTS if j.id == joint_id]
+    assert row.exposure is Exposure.OSCILLATING
+    assert row.lock is Lock.NONE
+    assert "91410A540" in row.evidence
+    assert jr._config.parts("vn-gooseneck-set-screw")["supplier_skus"] == ["91410A540"]
+    ruling = jr.RULINGS[row.exception]
+    assert ruling.joint == joint_id
+    assert "adjustable by design, periodic re-set; user 2026-10-12" in ruling.granted
+
+    def unlocked(rulings) -> set[str]:
+        findings = jr.audit(
+            jr.JOINTS,
+            jr.build_inventory(),
+            threaded=jr.THREADED_PARTS,
+            unthreaded=jr.UNTHREADED_PARTS,
+            purchased=jr.purchased_parts(),
+            unthreaded_stock=jr.UNTHREADED_STOCK,
+            required=jr.REQUIRED_JOINTS,
+            rulings=rulings,
+        )
+        return {f.subject for f in findings if f.kind is Kind.UNLOCKED}
+
+    assert joint_id not in unlocked(jr.RULINGS)
+    assert joint_id not in {f.subject for f in jr.audit_table()}
+    without = {k: v for k, v in jr.RULINGS.items() if k != row.exception}
+    assert joint_id in unlocked(without)
+
+
 def test_a_static_clamp_must_say_why_no_operating_torque_reaches_it() -> None:
     unreasoned = dataclasses.replace(SCREW, exposure_reason="  ")
     assert _kinds(_audit((STUD, CAP, unreasoned, NUT))) == {

@@ -254,6 +254,7 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     # actual (assembly-derived) geometry to <0.05 mm so they cannot drift.
     assert sm_knife_mount_spec.R_BORE == part.R_BORE
     assert sm_knife_mount_spec.SUPPORT_Z_THICK == part.SUPPORT_Z_THICK
+    assert sm_knife_mount_spec.BLK_HALF_X == part.BLK_HALF_X == 12.5
     assert abs(sm_knife_mount_spec.BLK_TOP - part.BLK_TOP) < 0.005
     assert abs(sm_knife_mount_spec.BLK_BOT - part.BLK_BOT) < 0.05
     assert abs(sm_knife_mount_spec.BORE_CY - part.BORE_CY) < 0.05
@@ -266,11 +267,11 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     assert not hasattr(part, "STUD_TAP_DEPTH")
     assert part.STUD_TAP_SPEC is sm_knife_mount_spec.STUD_TAP_SPEC
     assert part.STUD_TAP_DIA == sm_knife_mount_spec.STUD_TAP_DIA
-    # Dowel holes: one each side of the tap at +/-6.350 (the printed span
-    # 12.700 .XXX), printed places and the volume the build's gate expects.
-    assert sm_knife_mount_spec.PIN_HOLE_X == 6.350
-    assert sm_knife_mount_spec.PIN_HOLE_XS == (-6.350, 6.350)
-    assert sm_knife_mount_spec.PIN_HOLE_SPAN == 12.700
+    # Dowel holes: one each side of the tap at +/-7.100 (the printed BASIC
+    # span 14.200), printed places and the volume the build's gate expects.
+    assert sm_knife_mount_spec.PIN_HOLE_X == 7.100
+    assert sm_knife_mount_spec.PIN_HOLE_XS == (-7.100, 7.100)
+    assert sm_knife_mount_spec.PIN_HOLE_SPAN == 14.200
     assert sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME == {
         "BlockWidth": 1,
         "BlockHeight": 1,
@@ -519,7 +520,7 @@ def test_hidden_threads_and_restated_hidden_lines_are_gone() -> None:
 
 def test_the_pattern_is_located_from_the_side_and_front_faces() -> None:
     # Machinist review B1: the span located the dowels only to each other.
-    # The +X hole's axis stands 5.65 .XX from the +X face, a row above the
+    # The +X hole's axis stands 5.40 .XX from the +X face, a row above the
     # BASIC span over the top view (clear of the dowel frame's leader under
     # it, and of the span's arrows); the row 7.0 .X from the front face, left
     # of the view.
@@ -549,7 +550,7 @@ def test_the_tap_and_bore_axis_is_basic_from_the_dowel_pattern() -> None:
     # Machinist review (2026-10-10): the tap frame and the bore's frames
     # reference B, but their offset from B was only the implied centre.  The
     # tap axis, run on through the bore's centre in section A-A, stands BASIC
-    # 6.350 from the -X dowel axis; its boxed value parks left of that axis,
+    # 7.100 from the -X dowel axis; its boxed value parks left of that axis,
     # over the section's top seat.
     assert sm_knife_mount_spec.PIN_HOLE_X == pytest.approx(
         sm_knife_mount_spec.PIN_HOLE_SPAN / 2.0

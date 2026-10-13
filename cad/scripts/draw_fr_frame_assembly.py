@@ -159,7 +159,7 @@ BOM_DESCRIPTIONS = {
     "vn-frame-cross-screw": (
         "ZINC-PLATED STEEL #10-32 X 1-3/4 NARROW FILLISTER-HEAD SLOTTED SCREW"
     ),
-    "vn-gooseneck-set-screw": "STEEL 1/4-20 X 5/8 SQUARE-HEAD CUP-POINT SET SCREW",
+    "vn-gooseneck-set-screw": "STEEL 1/4-20 X 3/4 SQUARE-HEAD CUP-POINT SET SCREW",
 }
 BOM_PART_NUMBERS = {
     "fr-harmonic-base": "MHA-FR-001",

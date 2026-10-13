@@ -142,7 +142,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "vn-gooseneck-set-screw": _stock(
         "vn-gooseneck-set-screw",
         "Steel Square-Head Cup-Point Set Screw",
-        "91410A538",
+        "91410A540",
     ),
     "vn-hanger-screw": _stock(
         "vn-hanger-screw",

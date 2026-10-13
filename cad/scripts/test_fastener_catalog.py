@@ -23,7 +23,7 @@ _EXPECTED = {
     "vn-frame-side-screw": (("91794A080",), "MHA-VN-022", 2),
     "vn-fulcrum-set-screw": (("91375A942",), "MHA-VN-055", 2),
     "vn-frame-cross-screw": (("90280A837",), "MHA-VN-027", 8),
-    "vn-gooseneck-set-screw": (("91410A538",), "MHA-VN-023", 1),
+    "vn-gooseneck-set-screw": (("91410A540",), "MHA-VN-023", 1),
     "vn-hanger-screw": (("93075A194",), "MHA-VN-007", 1),
     "vn-hex-bolt": (("92865A585",), "MHA-VN-008", None),
     "vn-knife-hanger-stud": (("91251A157",), "MHA-VN-024", 2),

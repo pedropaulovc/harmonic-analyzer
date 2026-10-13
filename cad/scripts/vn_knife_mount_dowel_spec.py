@@ -66,7 +66,14 @@ _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
 PER_MOUNT = 2
 MOUNTS = 2
 QUANTITY = PER_MOUNT * MOUNTS
-HANGER_OFFSET = 0.25 * MM_PER_IN  # 6.350
+# 7.100, not the original 1/4 in: at 6.350 the crossbar's blind slot left
+# under 2.0 of wall to the #6 clearance hole at the print-worst plus drill
+# drift (codex machinist review of fr_top_frame 4d11a94e).  Q7 option C,
+# approved as built by the user 2026-10-13 (#1348): 14.200 BASIC span,
+# 24 crossbar, 25 block, Ø4.699 #6 hole drilled from the underside.
+# 7.1 rather than 7.0 so the wall holds 2.0 with both the clearance hole
+# and the slot charged their drift toward each other.
+HANGER_OFFSET = 7.1
 HANGER_OFFSET_PLACES = 3
 HANGER_OFFSET_TOL = _XXX  # 0.13
 # The pair's centre-to-centre span along the dowel line, BASIC.  Each hole's
@@ -75,7 +82,7 @@ HANGER_OFFSET_TOL = _XXX  # 0.13
 # (``sm_knife_mount_spec.GEOMETRIC_TOLERANCES_MM``, which asserts it equals
 # SPAN_TOL) keeps the 0.13 the .XXX span gave, and with it every stack the
 # pair feeds (the 2026-10-09 ruling).
-SPAN = 2.0 * HANGER_OFFSET  # 12.700
+SPAN = 2.0 * HANGER_OFFSET  # 14.200
 SPAN_PLACES = 3
 SPAN_TOL = 0.13
 # Pressed to the flat floor of the knife mount's blind hole, printed .X.

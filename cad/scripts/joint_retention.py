@@ -243,6 +243,15 @@ RULINGS: dict[str, Ruling] = {
             "pivot screw keeps its low-strength threadlocker"
         ),
     ),
+    "U-MHA-VN-023-no-lock": Ruling(
+        joint="ha-harmonic-analyzer/gooseneck-set-screw-in-top-frame",
+        granted=(
+            "user, 2026-10-12, joint-specific rule-9 ruling on PR #1348 (Q5, option (a), "
+            "no jam nut): adjustable by design, periodic re-set; user 2026-10-12. The "
+            "MHA-VN-023 cup point sets the gooseneck post's slid-to-level height and is "
+            "re-set when it drifts, so the screw stays bare in the hub boss's spot-faced tap"
+        ),
+    ),
 }
 
 
@@ -591,7 +600,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_fulcrum_set_screw",  # #1-72 UNF x 5/32 cup-point set screw (McMaster 91375A942, MHA-VN-055), member: x2, one into each fulcrum_keeper crown tap
         "sm_gooseneck",  # receiver: through-tapped brazed end plug; also the post gripped by the frame's set screw
         "sm_gooseneck_spring_screw",  # made MHA-SM-004 fillister: clamps the counter-spring upper eye to the plug
-        "vn_gooseneck_set_screw",  # 1/4-20 UNC square-head cup point (91410A538), member: into top_frame hub tap, grips summing gooseneck
+        "vn_gooseneck_set_screw",  # 1/4-20 UNC x 3/4 square-head cup point (91410A540), member: into top_frame hub boss tap, grips summing gooseneck
         "vn_guide_lock_screw",  # #4-40 slotted pan head (McMaster 91792A108, MHA-VN-046, R9-31), member: 8 into the platen_guide rear through taps
         "vn_hanger_screw",  # #8-32 UNC x 1/2 hex head (McMaster 93075A194), member into the pen-hanger strap tap
         "fr_harmonic_base",  # receiver: #10-32 cross taps, 1/4-20 hold-down seats, #4-40 nameplate seats, and the drive_train screws' seats (top-level rows)
@@ -820,9 +829,10 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="MHA-FR-000 STEP 10",
         exposure=Exposure.OSCILLATING,
         exposure_reason="cup point is the ONLY retention of the summing gooseneck post (MHA-SM-001) in the top_frame rail-hub bore, both its slid-to-level height and its rotation; the post's arm carries the counter-spring hung from the rocking summing lever, so the load it reacts cycles every stroke",
-        axial_capture="threads into the through-to-bore 1/4-20 GooseneckTap in the east-rail hub rib; square head outboard; cup point bears radially on the Ø16 post (as modelled it stands 0.15 clear)",
+        axial_capture="threads into the through-to-bore 1/4-20 GooseneckTap through the east-rail hub boss's Ø10 spot face; square head standing proud outboard; cup point bears radially on the Ø16 post (as modelled it stands 0.15 clear)",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (gooseneck-set-screw, SET_SCREW_TIP_X) + module comment; build_fr_top_frame.py:SET_TAP_SPEC, step 14 GooseneckTap; build_sm_summing_assembly.py docstring + gooseneck placement; spring_mount_geom.py docstring ('setup slides the gooseneck until level'); draw_fr_frame_assembly.py ASSEMBLY_STEPS 10 ('START MHA-VN-023 ... LEAVE ITS CUP POINT CLEAR'), ASSEMBLY_CHECKS 5",
+        evidence="build_fr_frame_assembly.py:build (gooseneck-set-screw, SET_SCREW_TIP_X, McMaster 91410A540 SHANK_LEN) + module comment; build_fr_top_frame.py:SET_TAP_SPEC, step 8 SetBoss/SetSpotFace, step 14 GooseneckTap; build_sm_summing_assembly.py docstring + gooseneck placement; spring_mount_geom.py docstring ('setup slides the gooseneck until level'); draw_fr_frame_assembly.py ASSEMBLY_STEPS 10 ('START MHA-VN-023 ... LEAVE ITS CUP POINT CLEAR'), ASSEMBLY_CHECKS 5",
+        exception="U-MHA-VN-023-no-lock",
     ),
     # --- drive_train (MHA-DT-000): cone set and crank, and their screws into the frame's base ---
     Joint(
@@ -1415,7 +1425,7 @@ JOINTS: tuple[Joint, ...] = (
         ),
         axial_capture=(
             "socket head (91251A157) seated on the crossbar's #6 counterbore floor, HANGER_GRIP 30.0 above "
-            "the underside (no washer); the screw passes the O4.318 clearance hole and reaches 8.10 nominal "
+            "the underside (no washer); the screw passes the O4.699 clearance hole and reaches 8.10 nominal "
             "(6.284..8.90 worst case, asserted) into the 9.7 full thread of the #6-32 bottoming tap, drawing "
             "the block up against the casting"
         ),

@@ -26,11 +26,11 @@ Layout (part-local): origin = the **knife-edge contact line** = the hex top
 vertex ridge (placed at machine (15, 984.83, +-87)); local Z = the bore/trunnion
 axis, +Y up, +X across. The bore centre sits ``R_BORE`` below the origin so the
 bore's upper inner wall lands on the ridge (with a TOP_CLEAR sliver margin). The
-block rises from below the bore up to the top-frame casting underside (999.7),
-its top seat clamped flush to it: the #6-32 screw threads into a 9.7 full-thread
-bottoming tap (drill 10.9) on the bore's vertical centreline, which leaves 2.0
-of metal over the bore crown at worst case; the two dowels' blind flat-bottom
-reamed holes sit 6.350 either side of the tap axis along X.
+block rises from below the bore up to the top-frame casting's faced underside
+(999.7), its top seat clamped flush to it: the #6-32 screw threads into a 9.7
+full-thread bottoming tap (drill 10.9) on the bore's vertical centreline, which
+leaves 2.0 of metal over the bore crown at worst case; the two dowels' blind
+flat-bottom reamed holes sit 7.100 either side of the tap axis along X.
 
 The named "knife axis" is the contact ridge line itself (part origin); the
 assembly mates the lever's knife ridge (``Axis3@sm-summing-lever``) coincident to
@@ -118,16 +118,18 @@ BORE_CY = TOP_CLEAR - R_BORE  # -5.75 (bore top inner wall at local y +TOP_CLEAR
 
 # --- block (bearing body, held to the crossbar) ----------------------------
 SUPPORT_Z_THICK = 14.0  # axial length straddling the trunnion mid (low)
-BLK_HALF_X = 12.0  # bore wall + flank (24 across, photo-scaled)
+BLK_HALF_X = 12.5  # bore wall + flank (25 across: the 14.200 dowel span's webs)
 WALL = 3.0  # material below the bore
 BLK_BOT = BORE_CY - R_BORE - WALL  # -14.75
 
 # Mount: the block top seat is clamped to the top-frame casting underside (the
-# integral crossbar's flush lower face) by the #6-32 knife-hanger screw threaded
-# into the block top (build_sm_summing_assembly).
+# integral crossbar's flush lower face, faced Ra 3.2 with the whole underside
+# plane between the bosses, user ruling 2026-10-12) by the #6-32 knife-hanger
+# screw threaded into the block top (build_sm_summing_assembly).  999.7 is the
+# finished plane: the facing cut comes out of casting allowance.
 KNIFE_Y = 979.7  # machine y of the pivot centreline (build_sm_summing_assembly KNIFE)
-CASTING_UNDERSIDE_Y = 999.7  # top-frame casting underside (integral crossbar)
-MOUNT_GAP = 0.0  # seat clamped to the casting underside by the #6-32 screw
+CASTING_UNDERSIDE_Y = 999.7  # top-frame faced underside (integral crossbar)
+MOUNT_GAP = 0.0  # seat clamped to the faced underside by the #6-32 screw
 CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (984.834)
 BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # local top (14.866)
 if abs(BLK_TOP - sm_knife_mount_spec.BLK_TOP) > 0.005:

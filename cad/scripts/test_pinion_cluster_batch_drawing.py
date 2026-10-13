@@ -429,8 +429,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 4.0386,
                 19.410836196070765,
             ),
+            # MHA-VN-023 / 91410A540: spot face 21.0 from the bore axis to the
+            # cup tip 8.15 from it (12.5 to the O17 bore wall + 0.35).
             frozenset(("vn-gooseneck-set-screw-1", "fr-top-frame-1")): _annulus_limit(
-                6.35, 5.105, 6.95
+                6.35, 5.105, 12.85
             ),
             **_expected_numbered_pairs(
                 "vn-fillister-screw",

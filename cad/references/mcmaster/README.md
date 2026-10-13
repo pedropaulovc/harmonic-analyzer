@@ -37,7 +37,8 @@ recipes:
 | 91255A148 | — (diagnostic recipe; a former `vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91375A106 | `vn-arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
 | 91375A942 | `vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
-| 91410A538 | `vn-gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
+| 91410A538 | — (diagnostic recipe; `vn-gooseneck-set-screw` until 2026-10-12) | Steel Square-Head Cup-Point Set Screw |
+| 91410A540 | `vn-gooseneck-set-screw` (catalogue-only; no vendor model) | Steel Square-Head Cup-Point Set Screw |
 | 91790A199 | `vn-transgear-arm-plate-screw` (catalogue-only; populated live SKU verified; 2-D PDF offered, CAD requires login) | 18-8 Stainless Steel Oval Head Slotted Screw |
 | 91792A108 | `vn-guide-lock-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Pan Head Slotted Screw |
 | 91794A112 | `vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
@@ -76,6 +77,29 @@ recipes:
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_vn_cone_lock_knob.py`
 and `cad/scripts/build_vn_swing_stop_screw.py`.
+
+Live catalogue verification on October 12, 2026:
+
+- [91410A540](https://www.mcmaster.com/91410A540/) replaces 91410A538 as the
+  MHA-VN-023 gooseneck set screw, per the user's Q5 ruling of October 12,
+  2026: the top frame's hub now carries a cast square-sided boss with a Ø10
+  spot face 21.0 from the bore axis, and the longer screw keeps at least 1.5D
+  of full thread in it. The square-head cup-point family row was read live in
+  a browser on October 12, 2026 (screenshot
+  `C:/src/dt-logs/keeper-face-q5/91410A540-family-row-2026-10-12.png`):
+  1/4-20 thread, length **3/4 in**, head width **1/4 in**, head height
+  **3/16 in**, Rockwell **B80**, package quantity **50**, package price
+  **$12.82**; UNC class 2A, ASME B18.6.2 / ASTM F912. The 5/8 in row is
+  91410A538 ($12.34), otherwise identical. No jam nut: the joint is
+  adjustable by design and re-set periodically (rule-9 exception, user
+  ruling October 12, 2026). The STEP download needs a McMaster login, so no
+  vendor model is harvested. [INFERENCE] The cup rim (R1.739789, 45/59 deg)
+  and the 75 deg head chamfers are 91410A538's vendor-solved values, which
+  the family row does not distinguish; `_mcmaster_91410a540.py` carries
+  them with the 19.05 mm length, and `diag_build_91410A540.py` builds it
+  with the law it shares with 91410A538
+  (`diag_mcmaster_square_set_screw.py`). It is catalogue-only: no replica
+  gate. `diagnostics.diag_build_91410A538` stays as a diagnostic recipe.
 
 Live catalog verification on October 11, 2026:
 

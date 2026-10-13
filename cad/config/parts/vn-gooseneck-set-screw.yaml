@@ -3,9 +3,9 @@ vn-gooseneck-set-screw:
   number: MHA-VN-023
   stock_name: Steel Square-Head Cup-Point Set Screw
   supplier: McMaster-Carr
-  supplier_skus: [91410A538]
+  supplier_skus: [91410A540]
   material: Plain Carbon Steel
-  material_specification: Steel, McMaster-Carr 91410A538
+  material_specification: Steel, McMaster-Carr 91410A540
   finish: as supplied
   quantity: 1
   tolerance_class: machined_block
