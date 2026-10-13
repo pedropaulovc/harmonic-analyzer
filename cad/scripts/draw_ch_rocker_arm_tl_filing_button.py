@@ -231,7 +231,7 @@ async def build(adapter: Any) -> dict[str, str]:
             label=f"filing button {name}",
             diameter=name.endswith("Dia"),
         )
-        # Policy rules 2 and 6: the matched fit rides the callout.
+        # drawing-guidelines.md rule 4 (tighten only for function, and name the mate) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit rides the callout.
         for part, text in zip((3, 4), REFERENCE_CALLOUTS.get(name, ())):
             if text:  # swDimensionTextCalloutAbove / CalloutBelow
                 display.SetText(part, text)

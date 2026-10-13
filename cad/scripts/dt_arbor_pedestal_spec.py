@@ -78,7 +78,7 @@ SET_SCREW_THREAD = "#4-40"
 SET_SCREW_HOLE_SPEC = HoleSpec("tapped", SET_SCREW_THREAD, end="through_next")
 SET_SCREW_Z = STRAP_INNER_Z - STRAP_T / 2.0  # local z +3: strap mid-depth
 SET_SCREW_PITCH = 25.4 / 40.0
-SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # rule 12: >= 1.5D of full thread
+SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # drawing-guidelines.md rule 18 (thread engagement): >= 1.5D of full thread
 
 # Full thread in the crown wall at the printed worst case. The crown radius
 # prints at one place (title block .X, +-0.8) and the bore at its own running
@@ -124,7 +124,7 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
     )
 # Web between the tap and each strap face (z). The strap depth prints at .X
 # and the screw location at .XX from the strap inner face (both below), so
-# the outer web loses both bands. Target 2.0 / floor 1.5 (policy rule 12).
+# the outer web loses both bands. Target 2.0 / floor 1.5 (drawing-guidelines.md rule 17 (walls and webs)).
 _STRAP_DEPTH_BAND_MM = 0.8
 _SET_SCREW_LOCATION_BAND_MM = 0.51
 SET_SCREW_WEB_MM = min(
@@ -147,7 +147,7 @@ SURFACE_FINISHES = (
     SurfaceFinishControl("foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
 )
 
-# Hidden reference sketches (#810 Codex l4afp, policy rule 2): the strap band,
+# Hidden reference sketches (#810 Codex l4afp, drawing-simplicity-policy.md `How the repository implements the guidelines`): the strap band,
 # the hold-down hole's station off the foot's far face and both lateral
 # locations off the west side face are manufacturing dimensions under the
 # .X band, yet no feature dimension measures them -- the strap band is an
@@ -180,8 +180,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SetScrewReference": {"SetScrewLocation"},
 }
 
-# Decimal places ARE the tolerance statement (drawing-simplicity policy rule
-# 2), so the MODEL owns them: build_dt_arbor_pedestal applies this map to the
+# Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`
+# ), so the MODEL owns them: build_dt_arbor_pedestal applies this map to the
 # .SLDPRT and draw_dt_arbor_pedestal only reads it back.  The foot envelope and
 # flange height are round nominals under the title block's general .X band.
 # The bore takes two places for two different reasons: its diameter carries
@@ -207,7 +207,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     # strap inner face: at one place the strap's outer web under the tap
     # would fall to 1.98, under the 2.0 target (SET_SCREW_WEB_MM).
     "SetScrewReference": {"SetScrewLocation": 2},
-    # Both lateral locations run off the foot's west side face (policy rule 7:
+    # Both lateral locations run off the foot's west side face (drawing-guidelines.md rule 10 (dimension from a real feature):
     # an origin is a feature, not the symmetry axis). One place: the drum x is
     # set with the arbor itself at assembly (DRO edge-find), so neither hole's
     # side offset feeds a fit, and the crown is concentric with the bore.

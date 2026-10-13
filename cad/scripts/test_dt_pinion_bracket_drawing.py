@@ -73,7 +73,7 @@ def test_drive_train_recipe_depends_on_geometry_not_drawing_notes() -> None:
 
 
 def test_every_band_traces_to_a_named_fit_class() -> None:
-    # Policy rule 1: a per-feature band exists only where a fit demands it, and
+    # drawing-guidelines.md rule 4 (tighten only for function, and name the mate): a per-feature band exists only where a fit demands it, and
     # its numbers come from the shared fit table rather than a local literal.
     # Three features qualify -- two running bores and the pressed follower seat.
     assert model_toleranced_dimensions(bracket) == {
@@ -97,7 +97,7 @@ def test_every_band_traces_to_a_named_fit_class() -> None:
 
 
 def test_print_contract_carries_no_gdt_datums_or_note_block() -> None:
-    # Policy rules 3 and 6: a bracket is not on the GD&T allowlist, and a note
+    # drawing-guidelines.md rule 5 (avoid excessive GD&T) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): a bracket is not on the GD&T allowlist, and a note
     # block that repeats the geometry is over-specification.
     assert dt_pinion_bracket_spec.GEOMETRIC_TOLERANCES_MM == {}
     assert dt_pinion_bracket_spec.DRAWING_NOTES == ""
@@ -162,7 +162,7 @@ def test_blind_seat_dimensions_are_assigned_to_readable_views() -> None:
 
 
 def test_follower_seat_station_is_printed_from_face_a_with_a_rule_12_web() -> None:
-    # Rule 12 (audit W23) under user ruling (a), Codex #858 P2: the station
+    # drawing-guidelines.md rule 17 (walls and webs) (audit W23) under user ruling (a), Codex #858 P2: the station
     # is the model's own PinSeatCz from broad face A, never "CENTRED" prose.
     # At the general .XX grade the far-face web was 1.18, so the user approved
     # +/-0.10 on the station alone: 1.54 worst case over the 1.5 floor.

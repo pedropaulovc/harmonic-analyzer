@@ -50,8 +50,8 @@ def test_only_the_bore_carries_a_model_band() -> None:
 
 
 def test_the_bore_runs_on_the_pin_and_names_it() -> None:
-    """Rule 2: the running-fit callout names the mate and its clearance;
-    rule 7: the fit bore's process is REAM."""
+    """drawing-guidelines.md rule 4 (tighten only for function, and name the mate): the running-fit callout names the mate and its clearance;
+    drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the fit bore's process is REAM."""
     low, high = fit.BORE_DIAMETRAL_CLEARANCE
     assert 0.0 < low < high
     assert spec.BORE_DIA == pin.DIA

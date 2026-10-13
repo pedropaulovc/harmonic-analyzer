@@ -110,7 +110,7 @@ SURFACE_FINISHES = (
     ),
 )
 
-# --- Decimal places ARE the tolerance (policy rule 2) --------------------------
+# --- Decimal places ARE the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)) --------------------------
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {
         "ShankDia",

@@ -64,8 +64,8 @@ def test_only_the_bore_carries_a_model_band() -> None:
 
 
 def test_the_bore_runs_on_the_pin_and_names_it() -> None:
-    """Rule 2: the running-fit callout names the mate and its clearance;
-    rule 7: the fit bore's process is REAM."""
+    """drawing-guidelines.md rule 4 (tighten only for function, and name the mate): the running-fit callout names the mate and its clearance;
+    drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the fit bore's process is REAM."""
     low, high = fit.BORE_DIAMETRAL_CLEARANCE
     assert 0.0 < low < high
     assert spec.BORE_DIA == pin.DIA
@@ -159,7 +159,7 @@ def test_the_length_callout_points_at_the_front_bushing_step() -> None:
 
 
 def test_the_bore_and_both_end_faces_run_machined() -> None:
-    """Rule 5: the bore runs on the pin, the faces bear (review of 6de7230aa:
+    """drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore runs on the pin, the faces bear (review of 6de7230aa:
     the running bore had no Ra)."""
     faces = {
         control.key: (control.roughness_um, control.face)

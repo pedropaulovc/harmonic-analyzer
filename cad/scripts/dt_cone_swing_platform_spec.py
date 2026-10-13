@@ -38,7 +38,7 @@ POST_CONE_BORE_HEIGHT = dt_cone_pivot_post_spec.BORE_HEIGHT
 PLATE_THICKNESS = post_mount.PLATFORM_THICKNESS_MM
 # User ruling U41 (2026-09-23): the thickness is the stock's, printed as a
 # reference "(6.35)" with "1/4 PLATE AS SUPPLIED" -- no machined thickness
-# band.  Rule-12 stacks through the plate use the stock's mill tolerance.
+# band.  drawing-guidelines.md rule 19 (absorb stacks at fit-up, not with tighter bands) stacks through the plate use the stock's mill tolerance.
 PLATE_STOCK_BAND = 0.13
 # Two lines: on one, the text hung 49.5 mm left of section A-A into the
 # notch plan's 7.0 and 205.81 (81788ce9 render).  Broken after "AS" so the
@@ -46,7 +46,7 @@ PLATE_STOCK_BAND = 0.13
 # back from it (aa9766da: "AS SUPPLIED" ran its D into the arrow).
 PLATE_STOCK_CALLOUT = "1/4 PLATE AS\nSUPPLIED"
 # The top relief is 10.50 wide, round-ended about the pivot and OPEN through
-# the north edge (rule-12 W18, Main 2026-09-23, option (d)): as a closed
+# the north edge (drawing-guidelines.md rule 17 (walls and webs) W18, Main 2026-09-23, option (d)): as a closed
 # Ø10.50 spotface 7.0 from that edge it left a 1.75 web.  The width keeps the
 # stock 3/8 head's radial clearance (BDT reads it as the relief diameter).
 PIVOT_BEARING_RELIEF_DIAMETER = 10.50
@@ -145,7 +145,7 @@ POST_MOUNT_TAP_BREAK_NOTE = (
     f"1/4-20 TAPPED HOLES: DEBURR ONLY, {POST_MOUNT_TAP_EDGE_BREAK:.1f} MAX BREAK EACH END."
 )
 # U37 (2026-09-23): the user accepted short engagement for MHA-VN-031 as a named
-# exception to rule 12's 1.5D; the plate slides on the deck, so no boss can
+# exception to drawing-guidelines.md rule 18 (thread engagement)'s 1.5D; the plate slides on the deck, so no boss can
 # add thread.  Worst case: the thinnest stock plate (U41) less the cut-to-fit
 # allowance and the break at both ends of the tap, counted as MHA-DT-032 counts
 # its exit break.  A MIN never rounds up, so the print floors to two places.
@@ -162,19 +162,19 @@ POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS = (
 POST_MOUNT_ENGAGEMENT_PRINTED = (
     math.floor(POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS * 100.0) / 100.0
 )
-# The rule-12 audit's E7 floor (0.87D, at the old .XX plate band): the stock
+# The drawing-guidelines.md rule 18 (thread engagement) audit's E7 floor (0.87D, at the old .XX plate band): the stock
 # band must not print below it without a new ruling.
 if POST_MOUNT_ENGAGEMENT_PRINTED < 0.87:
     raise AssertionError("MHA-VN-031 engagement fell below the audited 0.87D floor")
 # The sheet states the shortfall as a plain fact, worded like MHA-DT-032's,
 # over the break override it depends on: one line each.
-# Named exception: MHA-VN-031 engagement (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-VN-031 engagement (#1019).
 POST_MOUNT_ENGAGEMENT_NOTE = (
     f"1/4-20 THREAD ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN (MHA-VN-031).\n"
     f"{POST_MOUNT_TAP_BREAK_NOTE}"
 )
 
-# Named exception: MHA-VN-031 engagement (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-VN-031 engagement (#1019).
 POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT = (
     f"ENGAGEMENT {POST_MOUNT_ENGAGEMENT_WORST:.2f} MIN "
     f"({POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D)."
@@ -230,7 +230,7 @@ HOLDDOWN_HOLE_SPEC = HoleSpec(
         "CounterBoreDepth": HOLDDOWN_CBORE_DEPTH,
     },
 )
-# Print-worst checks (rule 12): .XX counterbore sizes, drilled-hole oversize,
+# Print-worst checks (drawing-guidelines.md rule 17 (walls and webs)): .XX counterbore sizes, drilled-hole oversize,
 # the stock plate's mill band.
 HOLDDOWN_HEAD_RECESS = HOLDDOWN_CBORE_DEPTH - _XX - HOLDDOWN_SCREW_HEAD_H
 HOLDDOWN_CBORE_HEAD_CLEARANCE = HOLDDOWN_CBORE_DIA - _XX - HOLDDOWN_SCREW_HEAD_DIA

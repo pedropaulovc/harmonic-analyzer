@@ -9,7 +9,7 @@ because the spots taken through the seated ledge govern them. The right view
 (1:1, projected straight across) carries the section's reference sizes. Each
 hole pair takes one native callout above the face; the iso rides top-right at
 1:3. No datums (policy
-rule 3).
+drawing-guidelines.md rule 5 (avoid excessive GD&T)).
 
 Run with SolidWorks open::
 

@@ -1005,7 +1005,7 @@ def test_hold_down_tap_keeps_every_limit_at_the_printed_extremes() -> None:
 
 
 def test_foot_tap_callout_reads_as_a_blind_tap_with_both_depths() -> None:
-    """Policy rule 7 on the resolved callout: the thread and its full-thread
+    """drawing-guidelines.md rule 12 (hole and slot callouts say what to do) on the resolved callout: the thread and its full-thread
     depth on one line, the tap drill's depth on another, no THRU."""
     spec = dt_cone_tip_block_spec
     places = spec.FOOT_DEPTH_PLACES

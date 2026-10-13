@@ -76,7 +76,7 @@ SHEET_SCALE = (1.0, 1.0)
 # The side view is "*Right": the axis horizontal, as the bar sits in the lathe.
 # Model -Z runs to the sheet's right: the north end (the part origin) is on
 # the LEFT, the plain cut-to-fit end on the right. It carries the diameter,
-# the length and the south flat's station (policy rule 7), all authored on
+# the length and the south flat's station (drawing-guidelines.md rule 11 (turned parts read like the lathe)), all authored on
 # Right-plane sketches, so the view imports them natively, both flats edge-on
 # on its top silhouette. An end view would carry nothing, so this sheet has
 # none; the north end's flat and dome go to DETAIL A.

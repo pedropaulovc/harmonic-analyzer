@@ -1325,7 +1325,7 @@ def test_deck_land_worst_case_is_proven_instead_of_noted() -> None:
 def test_underside_pocket_backs_every_deck_seat_at_the_worst_case() -> None:
     """User ruling 2026-10-09: the base is cored from below. Every blind deck
     seat ends in a boss hung from the pocket ceiling, on the shallow level
-    unless that level cannot back it, and every wall holds policy rule 12."""
+    unless that level cannot back it, and every wall holds drawing-guidelines.md rule 17 (walls and webs)."""
     spec = fr_harmonic_base_spec
     assert spec.POCKET_HALF_X == pytest.approx(spec.TOP_LENGTH / 2.0 - spec.POCKET_WALL)
     assert spec.POCKET_HALF_Z == pytest.approx(spec.TOP_WIDTH / 2.0 - spec.POCKET_WALL)
@@ -1647,7 +1647,7 @@ def test_underside_section_cuts_both_boss_heights_clear_of_every_bore() -> None:
 
 
 def test_underside_section_texts_sit_in_open_air() -> None:
-    # Rule 8: dimension text outside silhouettes. The ceiling height sits in
+    # drawing-guidelines.md rule 14 (keep text off the part): dimension text outside silhouettes. The ceiling height sits in
     # the pocket's open air at the cut; the others left of the underside,
     # each level caption (DEEP/SHALLOW LEVEL) clear of the bench face.
     import draw_fr_harmonic_base as sheet

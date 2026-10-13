@@ -1401,7 +1401,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_reference_dimension(
         adapter, crank_height[0], label="crank axis height reference"
     )
-    # #906: the plan angle feeds the crank bore's angularity frame (rule 4).
+    # #906: the plan angle feeds the crank bore's angularity frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)).
     set_basic_dimensions(adapter, annotations, BASIC_DIMENSIONS)
     # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
     # this sheet only proves they survived the import.  A silent fallback to
@@ -1601,7 +1601,7 @@ async def build(adapter: Any) -> dict[str, str]:
         0.202,
         0.104,
     )
-    # Rule 6 caps the block at four lines (about 18 mm); the anchor keeps the
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) caps the block at four lines (about 18 mm); the anchor keeps the
     # r7 clearance to the bottom inner border.
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_ANCHOR)
 

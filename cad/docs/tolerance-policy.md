@@ -123,7 +123,7 @@ own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
   interference. T012's worst-corner overlap (0.32 mm, REF) is a fit-up note on
   the assembly sheet: if T012 binds after the set, back the swing off or stone
   its tip.
-- **T006** (named exception): its DT6-FORM1 relief stands ≥ 0.010 mm clear of
+- **T006** (pending exception ruling #971): its DT6-FORM1 relief stands ≥ 0.010 mm clear of
   every printed drum-tip path over the RSS centre range and keeps ≥ 0.02 mm
   backlash; its contact ratio (≈ 0.77) is REF.
 - **Crank 16T:64T** (fixed bore, no adjustment): contact ratio ≥ 1.0 at the

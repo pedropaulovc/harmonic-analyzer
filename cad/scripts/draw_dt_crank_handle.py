@@ -12,7 +12,7 @@ After the MHA-DT-008 machinist review (user ruling 2026-09-29) the sheet is plai
 no datums, feature-control frames or basic dimensions -- the grip is turned to
 its arcs within a contour allowance stated in the note.  The longitudinal
 section A-A, taken on the end view's vertical centre line, is the handle's
-length view (policy rule 7): it shows the counterbore step on cut edges and
+length view (drawing-guidelines.md rule 11 (turned parts read like the lathe)): it shows the counterbore step on cut edges and
 carries every profile dimension, since the profile sketches on the Front plane
 the section lies in.  The end view stands on the section's axis and carries the
 reamed bore.

@@ -121,7 +121,7 @@ FRONT_KEEP = {
 }
 # Descriptive text beneath each native value/band: the strap bore; the fork's
 # crown, a full round on the pin tangent to its sides; the reamed press hole
-# (policy rule 7: the decimal Ø and the process).
+# (drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the decimal Ø and the process).
 FRONT_CALLOUTS = {
     "StrapBoreDia": "BORE",
     "ForkWidthDim": "FULL R",

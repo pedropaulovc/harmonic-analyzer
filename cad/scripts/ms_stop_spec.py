@@ -8,7 +8,7 @@ above Y=0 and their threads extending along -Y. No SolidWorks imports.
 User ruling 2026-10-09, option B in stop_roof_options_v1.png: height 14.1
 and a directly dimensioned 2.1 roof replace the original 14 / 2 sketch.
 Routine +/-0.51 on that direct roof dimension leaves 1.59 minimum; no
-rule-12 exception or artificially tightened roof tolerance is required.
+drawing-guidelines.md rule 17 (walls and webs) exception or artificially tightened roof tolerance is required.
 """
 
 from __future__ import annotations

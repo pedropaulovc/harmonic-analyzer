@@ -91,7 +91,7 @@ if not (
 ):
     raise AssertionError("integral journal and post bore exceed the running-fit clearance band")
 
-# Every axial station prints from the FAR END at one place (policy rule 7), and
+# Every axial station prints from the FAR END at one place (drawing-guidelines.md rule 11 (turned parts read like the lathe)), and
 # each one below is chosen to print EXACTLY, so its printed row IS its limit
 # and no rounding of a printed nominal can eat a margin.  Local stations (from
 # the dome root, where the features measure) follow from the far end.
@@ -265,7 +265,7 @@ _PIN_HOLE_OUTER_R = DRIVE_PIN_CIRCLE_RADIUS + DRIVE_PIN_HOLE_DIA / 2.0
 if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0 < COLLAR_DIA / 2.0:
     raise AssertionError("the spigot must enclose the pin holes, inside the body")
 
-# Functional bands (policy rule 12), each at the places that print it:
+# Functional bands (drawing-guidelines.md rule 3 (decimal places carry the tolerance)), each at the places that print it:
 # - The two collar faces print from the far end like every station, but at
 #   .X the seat face could come 0.8 + the Depth's 0.4 toward the crank and
 #   close the contracted 0.7 air between the hub's rear face and the wheel,
@@ -433,7 +433,7 @@ if any(start >= end for start, end in SHAFT_CORE_LANDS):
 # control on the native cylindrical face and their own drawing leader.  The
 # collar's rear face runs against the fitted MHA-DT-036 thrust washer, so it
 # carries the running grade too; the wheel's seat face is a static sprocket
-# seat and stays "cast/machined" (rule 5).
+# seat and stays "cast/machined" (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
 SURFACE_FINISHES = (
     *(
         SurfaceFinishControl(
@@ -453,7 +453,7 @@ SURFACE_FINISHES = (
 
 
 # Every printed axial station is a baseline from ONE origin: the FAR END, the
-# one faced end the shop zeroes on (policy rule 7).  The features themselves
+# one faced end the shop zeroes on (drawing-guidelines.md rule 11 (turned parts read like the lathe)).  The features themselves
 # measure from the dome root, so the far-end stations, the overall and the
 # dome's spherical radius live on a construction-only StationReference sketch
 # driven by the same globals (no geometry).  Depth (far end to dome root) and

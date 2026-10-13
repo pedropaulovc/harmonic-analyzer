@@ -133,7 +133,7 @@ _CRANK_PIN_SHAFT_MM3 = _pin_overlap(_CS_S0, _CS_S1, _CS_PILOT)
 # materially deeper insertion fails.  The cup-tip adjuster makes its intended
 # thrust contact with the shaft end at 0.13 mm3: the 45 deg cup's analytic
 # (2/3)*pi*r^3 for the 0.79 stub (0.131), re-read at 0.1309 by the
-# mha092-r3-8b1b drive-train leaf on rule-12 E11's 94025A164.  The 1/16 in
+# mha092-r3-8b1b drive-train leaf on drawing-guidelines.md rule 18 (thread engagement) E11's 94025A164.  The 1/16 in
 # tip land doubles the stub radius, so the contact scales by r^3: 0.13 * 8 =
 # 1.04 (analytic 1.047) until the next drive-train build re-observes it.
 #
@@ -175,7 +175,7 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(("dt-crank-handle-pivot-screw-1", "dt-crank-arm-1")): _smooth_annulus_limit_mm3(
         THREAD_MAJOR_MM["#4-40"], TAP_DRILL_MM["#4-40"], 7.0
     ),
-    # Rule-12 E11: #10-32 94025A164 in the tapped block, observed above.
+    # drawing-guidelines.md rule 18 (thread engagement) E11: #10-32 94025A164 in the tapped block, observed above.
     frozenset(
         ("vn-cone-tip-adjuster-1", "dt-cone-tip-block-1")
     ): _TIP_ADJUSTER_GATE_LIMIT_MM3,

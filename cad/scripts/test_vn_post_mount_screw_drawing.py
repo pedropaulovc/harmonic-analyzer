@@ -227,7 +227,7 @@ def test_cut_to_fit_allowance_is_exported_once() -> None:
 
 
 def test_cut_length_is_a_model_owned_drawing_dimension() -> None:
-    """Rule 2: the value and places are the part's; the sheet imports the
+    """drawing-simplicity-policy.md `How the repository implements the guidelines`: the value and places are the part's; the sheet imports the
     cut length from its hidden reference sketch and the break from the deburr
     cutter's profile, and re-reads both."""
     assert spec.DRAWING_DIMENSIONS == {
@@ -373,7 +373,7 @@ def test_cut_end_features_are_driven_by_the_model_dimensions() -> None:
 
 
 def test_finish_oils_the_bare_cut_end() -> None:
-    """Rule 1: bare-surface protection is the Finish field's, worded like the
+    """drawing-guidelines.md rule 2 (the title block is the general specification): bare-surface protection is the Finish field's, worded like the
     boss hook's (MHA-VN-001), never a note."""
     finish = _config.parts(part.PART_NAME)["finish"]
     boss = _config.parts("vn-boss-hook")["finish"]
@@ -382,7 +382,7 @@ def test_finish_oils_the_bare_cut_end() -> None:
 
 
 def test_sheet_notes_carry_no_dimension_rule_or_sequence() -> None:
-    """Main's eye pass of warm-c486 (rule 6): the old INSTALLATION block
+    """Main's eye pass of warm-c486 (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the old INSTALLATION block
     printed "(NOMINAL 86.0)", "0.90D MIN" and "NAMED EXCEPTION TO RULE 12".
     The cut length is now a reference dimension, the engagement minimum a
     line of its callout (never a note) and the sequence an MHA-DT-000 step, so
@@ -429,24 +429,8 @@ def test_the_modelled_length_is_a_cut_the_sheet_accepts() -> None:
     assert part.SHANK_LEN == spec.CUT_LENGTH_MM
 
 
-def test_policy_exception_row_names_the_length_constant_not_a_number() -> None:
-    """Codex P2 on #857 (PRRT_kwDOPHDy386mRsWJ): the policy's named-exception
-    row must follow the nominal cut through the spec constant, rather than
-    carrying a length that can drift from the model."""
-    policy = Path(part.__file__).resolve().parents[1] / "docs" / "drawing-simplicity-policy.md"
-    rows = [
-        line
-        for line in policy.read_text(encoding="utf-8").splitlines()
-        if line.startswith("| MHA-VN-031 ")
-    ]
-    assert len(rows) == 1, rows
-    assert "vn_post_mount_screw_spec.CUT_LENGTH_MM" in rows[0]
-    assert not re.search(r"nominal \d", rows[0]), rows[0]
-    assert f"{spec.CUT_LENGTH_MM:.1f}" not in rows[0]
-
-
 def test_engagement_exception_is_held_by_the_model() -> None:
-    """The named rule-12 exception (0.90D) is a model assert on the chain;
+    """The rule-18 shortfall pending #1019 (0.90D) is a model assert on the chain;
     the sheet prints it on the cut-length callout
     (test_engagement_minimum_prints_on_the_cut_length_callout)."""
     assert spec.MIN_ENGAGEMENT_DIAMETERS == 0.90

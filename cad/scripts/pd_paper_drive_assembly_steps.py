@@ -146,7 +146,7 @@ def matched_locator_notes(
     """The arm's and the plate's two sheet notes: each requirement with its value.
 
     The sheet states the setting and the acceptance the pair must meet; the
-    procedure stays at the cited steps (drawing-simplicity rule 6). The
+    procedure stays at the cited steps (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). The
     centre distance and its setting window are the reducer mesh's
     (pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW).
     """

@@ -227,7 +227,7 @@ def _up_to_tenth(length: float) -> float:
 
 
 # The shortest shaft in the longest stack must still bear
-# FRONT_BLOCK_MIN_BEARING of the front block's bore (rule 12's 1.5 D on the
+# FRONT_BLOCK_MIN_BEARING of the front block's bore (drawing-guidelines.md rule 18 (thread engagement)'s 1.5 D on the
 # 1/4 in shaft), and BLOCK_BEARING_MARGIN more (Main, #858: rounding the
 # length to its .X place had left 0.09).  Set back-flush, the shaft's front
 # end reaches past the back block and the inner span into the front block;
@@ -284,7 +284,7 @@ TORQUE_SHAFT_PIN_HOLE_Z = tuple(z - TORQUE_SHAFT_Z0 for z in STRAP_MID_Z)
 # cluster's end play.  Match-drilled flush with the back block's outer face at
 # the back stop, it retreats up to the widest feeler setting into the back
 # block when the cluster runs forward to the front block, so the shallowest
-# printed back block must still give it the front block's floor (rule 12's
+# printed back block must still give it the front block's floor (drawing-guidelines.md rule 17 (walls and webs)'s
 # 1.5 D on the 1/4 in shaft).  Geometry, not a tighter band, carries it:
 # BLOCK_DEPTH, with BLOCK_BEARING_MARGIN over that floor (Main, #858: the
 # 10.5 block left 0.04 once the flush setting was booked).

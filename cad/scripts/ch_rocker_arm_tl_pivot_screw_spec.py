@@ -32,7 +32,7 @@ from _surface_finish import GROUND_UM, MACHINED_UM, SurfaceFinishControl
 
 # --- stations (fixture frame, mm) -------------------------------------------
 # The MHA-CH-006-TL-07 washer under the head. 2.0, not the inventory's 1.5:
-# at .XXX its thinnest stays over the rule-12 floor.
+# at .XXX its thinnest stays over the drawing-guidelines.md rule 17 (walls and webs) floor.
 WASHER_THICK = 2.0
 WASHER_THICK_PLACES = 3
 HEAD_DIA = 8.0
@@ -60,7 +60,7 @@ AXIAL_PLACES = 3
 THREAD_LENGTH = round(UNDER_HEAD_LENGTH - SHOULDER_LENGTH, 6)
 SLOT_WIDTH = 1.0
 # 0.9 deep (route said 1.5): at the one-place general band
-# the worst head left behind the slot stays over the rule-12 floor.
+# the worst head left behind the slot stays over the drawing-guidelines.md rule 17 (walls and webs) floor.
 SLOT_DEPTH = 0.9
 
 UNDERHEAD_Z = WASHER_THICK
@@ -210,7 +210,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked pivot-screw dimension needs authored places")
 
-# Policy rule 2/6: a matched fit sits ON the feature callout, naming each
+# drawing-guidelines.md rule 4 (tighten only for function, and name the mate) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): a matched fit sits ON the feature callout, naming each
 # mate by name and Number and the acceptance; the general notes carry no
 # digits. The outline-template bush has no Number yet, so it is named only.
 ROCKER_NUMBER = "MHA-CH-006"
@@ -254,6 +254,6 @@ _HEAD_BEHIND_SLOT_MIN = round(
     HEAD_LENGTH - SLOT_DEPTH - 2.0 * printed_band_mm(1), 6
 )
 if _HEAD_BEHIND_SLOT_MIN < 1.5:
-    raise AssertionError("pivot-screw slot leaves under the rule-12 floor in the head")
+    raise AssertionError("pivot-screw slot leaves under the drawing-guidelines.md rule 17 (walls and webs) floor in the head")
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"
 

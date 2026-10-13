@@ -70,7 +70,7 @@ DRUM_RECESS = (
 )  # 0.0 .. 0.2: the drum face below the spigot face
 if DRUM_RECESS[0] < 0.0:
     raise AssertionError(f"the drum can stand proud of the spigot: {DRUM_RECESS}")
-# Matched fit (policy rule 2): the drum is made first to its H7 bore, and the
+# Matched fit (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the drum is made first to its H7 bore, and the
 # spigot is turned to this diametral interference in that finished bore, so
 # the spigot's Ø prints as a reference nominal.  The range is r6's against H7
 # (the user's round-6 ruling), stated rather than banded on the spigot.

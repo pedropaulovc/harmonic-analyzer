@@ -386,7 +386,7 @@ def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     assert spec.PIVOT_BORE_CALLOUT.splitlines()[0] == "REAM TO MEASURED VN041"
     assert "SHOULDER +0.132/+0.152 DIA" in spec.PIVOT_BORE_CALLOUT
     assert "MATCHED SET; NOT INTERCHANGEABLE" in spec.PIVOT_BORE_CALLOUT
-    # Rule 6: the matched fit rides the callout; no inspection-method note.
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit rides the callout; no inspection-method note.
     assert not hasattr(spec, "PIVOT_FIT_INSPECTION_NOTE")
     assert "Pivot Fit Inspection" not in part._SAVED_DRAWING_PROPERTIES
     assert "BORE AXIS 90° TO FRONT FACE" in spec.PIVOT_BORE_CALLOUT

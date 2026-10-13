@@ -93,7 +93,7 @@ PRESS_DEPTH_TOL = _X  # 0.8
 SLIP_DEPTH = 12.0
 SLIP_DEPTH_PLACES = 1
 SLIP_DEPTH_TOL = _X  # 0.8
-# A press-fit dowel grips at least 1.5 D (the rule-12 engagement floor,
+# A press-fit dowel grips at least 1.5 D (the drawing-guidelines.md rule 18 (thread engagement) engagement floor,
 # applied to the press as ``vn_transgear_latch_pin_spec`` does), counted over
 # the full diameter only: the chamfer inside the hole carries no interference.
 PRESS_ENGAGEMENT_MIN_D = 1.5

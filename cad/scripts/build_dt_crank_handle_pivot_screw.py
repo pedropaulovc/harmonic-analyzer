@@ -326,7 +326,7 @@ async def build(adapter) -> dict[str, str]:
     # Drawing-only station reference: the overall length, printed as a
     # reference restatement for stock cut-off.  One construction line on the
     # axis of the Right plane (the side view's plane) whose single driving
-    # dimension IS the printed value (policy rule 2), driven by the same
+    # dimension IS the printed value (drawing-simplicity-policy.md `How the repository implements the guidelines`), driven by the same
     # globals as the profile so no geometry moves.
     stations = SketchDims()
     check("create_sketch station reference", await adapter.create_sketch("Right"))
@@ -429,7 +429,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven slotted screw (equations neutral)", V_FINAL, 0.02 * V_SLOT
     )
 
-    # Model-owned bands (policy rule 2): the running-fit shoulder and its
+    # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the running-fit shoulder and its
     # length, and the thread length that must stay inside the 8.0 arm.
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND)

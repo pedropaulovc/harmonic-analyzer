@@ -68,7 +68,7 @@ BAR_STOCK_UNDERSIZE = 0.002 * MM_PER_IN  # 0.051
 # press; the minimum only has to stay positive (the pin carries no axial load:
 # the lever bears on it radially and the bar cheeks hold it square).
 PRESS_INTERFERENCE_MAX = 0.00085 * MM_PER_IN  # 0.0216
-RULE12_WALL_TARGET = 2.0  # drawing-simplicity policy rule 12
+RULE12_WALL_TARGET = 2.0  # drawing-guidelines.md rule 17 (walls and webs)
 RULE12_WALL_FLOOR = 1.5
 RUNNING_FLOOR = _bar.STRADDLE_RUNNING_FLOOR  # 0.10, oiled steel faces
 
@@ -80,7 +80,7 @@ def _band(nominal: float, band: tuple[float, float]) -> tuple[float, float]:
 def joint_budget() -> dict[str, float]:
     """Worst-case values of every fit the joint must hold (all mm).
 
-    Every term is at the worst case of its printed band (policy rule 12): the
+    Every term is at the worst case of its printed band (drawing-guidelines.md rule 17 (walls and webs)): the
     drill rod +/-0.005, the reamed cheek hole +0.010/0, the lever's #47 hole
     +0.10/0, the lever 3.00 +/-0.10, the top notch 3.20 +0.30/0, its ledge
     1.575 +/-0.05, the bar stock +0/-0.051, the hubs that set the pitch never
@@ -131,7 +131,7 @@ if BUDGET["running_clearance_min"] <= 0.0:
 if BUDGET["neighbour_clearance_min"] < RUNNING_FLOOR - 1e-9:
     raise AssertionError("a pin end can close the bar-to-bar running gap")
 if BUDGET["hole_face_wall_min"] < RULE12_WALL_TARGET - 1e-9:
-    raise AssertionError("reamed hole to bar face under the rule-12 target")
+    raise AssertionError("reamed hole to bar face under the drawing-guidelines.md rule 17 (walls and webs) target")
 if BUDGET["blank_excess_min"] <= 0.0:
     raise AssertionError("pin blank too short to dress flush at both faces")
 if PIN_INSTALLED_LENGTH != _bar.BAR_WIDTH:
@@ -141,9 +141,9 @@ if _bar.LEVER_THICKNESS != _lever.LEVER_THICKNESS:
 if not math.isclose(_lever.HUB_LENGTH, 7.0565):
     raise AssertionError("the station pitch moved; re-run the #1038 gap budget")
 
-# --- Drawing contract (policy rule 2: the PART owns places and bands). ---
+# --- Drawing contract (drawing-simplicity-policy.md `How the repository implements the guidelines`: the PART owns places and bands). ---
 # Both marked dimensions live on the revolve's half-profile (``PinProfile``),
-# so both import into the side view beside each other (rule 7, turned part).
+# so both import into the side view beside each other (drawing-guidelines.md rule 11 (turned parts read like the lathe), turned part).
 # The diameter carries the drill rod's own grind band natively at three
 # places; the installed length is the bar's width, printed as REFERENCE (the
 # bar's stock owns it). The blank cut length is a shop instruction in the notes.

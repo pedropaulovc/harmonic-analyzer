@@ -29,7 +29,7 @@ if _HOLE_LOWER != 0.0:
 # (amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND), each ledge with
 # NOTCH_OFFSET_TOLERANCE_MM -- print as model dimensions in its end's detail,
 # and the floor's Ra is a native symbol there (amplitude_bar_drawing_spec),
-# never here (policy rule 2, Codex #936 PRRT_kwDOPHDy386mWF0L).
+# never here (drawing-simplicity-policy.md `How the repository implements the guidelines`, Codex #936 PRRT_kwDOPHDy386mWF0L).
 # "ROOTS R0.40 MAX." is a Main-ruled exception (2026-09-27): it limits the
 # cutter's corner at an unmodelled root, so nothing in the model can carry it.
 DRAWING_NOTES = "\n".join(

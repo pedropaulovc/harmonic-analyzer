@@ -557,7 +557,7 @@ def _sheet_text() -> str:
 
 
 def test_every_mate_the_sheet_cites_is_named_with_its_own_number() -> None:
-    """Policy rule 2: every part number the sheet cites is a mate's, printed
+    """drawing-guidelines.md rule 3 (decimal places carry the tolerance): every part number the sheet cites is a mate's, printed
     after that mate's name, and is the number the mate's own sheet carries."""
     name_by_number: dict[str, str] = {}
     for stem, name in (
@@ -576,7 +576,7 @@ def test_every_mate_the_sheet_cites_is_named_with_its_own_number() -> None:
 
 
 def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
-    """Policy rule 12, recomputed from the title block's rows."""
+    """drawing-guidelines.md rule 17 (walls and webs), recomputed from the title block's rows."""
     hub_wall = (
         (spec.HUB_DIA - _row(_places("HubDia"))) - (spec.BORE_DIA + spec.BORE_BAND[0])
     ) / 2.0
@@ -792,7 +792,7 @@ def _printed_box(name: str, anchor: tuple[float, float]) -> Box:
 
 
 def test_turned_diameters_print_inline_beside_their_own_step_on_the_edge_view() -> None:
-    """Policy rule 7: the turned diameters sit on the edge view, not leader-
+    """drawing-guidelines.md rule 11 (turned parts read like the lathe): the turned diameters sit on the edge view, not leader-
     piled through the face view's centre, each inline between its own
     extension lines and off the part; the face view keeps the bore and the
     holes; no two texts on the sheet print over each other."""

@@ -237,7 +237,7 @@ CALLOUTS_BELOW = {
 }
 # The roll's centre sits 80 left of the vertical: off the sheet at 3:2.
 SHORTENED_RADII = ("RollR",)
-# The formed overall height (rule 7), a reference left of the side view: its
+# The formed overall height (drawing-guidelines.md rule 10 (dimension from a real feature)), a reference left of the side view: its
 # dimension line passes left of the width's text, its text below the front
 # view's 70.4 level and clear right of it; picked on the ear's top edge and
 # on the full round, re-anchored to the round's far extreme (its tip).

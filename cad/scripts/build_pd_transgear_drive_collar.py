@@ -314,7 +314,7 @@ async def build(adapter) -> dict[str, str]:
     # --- Body and pilot: one stepped profile revolved about the axis -----------
     # Right sketch (u, v) maps to model (-Z, Y), the plane the *Right side view
     # looks at, so the turned diameters and both lengths print there (policy
-    # rule 7).  The seat face is u = 0; the body runs to the rear face at
+    # drawing-guidelines.md rule 11 (turned parts read like the lathe)).  The seat face is u = 0; the body runs to the rear face at
     # u = -LENGTH, the pilot to its front face at u = +PILOT_LENGTH.  Both
     # lengths run from the seat face, the datum the T24 seats on.  A profile
     # turned the wrong way fails the volume gate and the planes' rebuild.

@@ -474,8 +474,8 @@ async def build(adapter) -> dict[str, str]:
             await adapter.add_sketch_constraint(line, None, direction),
         )
     # The spigot's front face sits HUB_FRONT_Z below the spokes' mid-plane
-    # (the origin): every axial size reads from that one faced end (policy
-    # rule 7), the spigot length the drum's recess needs among them.
+    # (the origin): every axial size reads from that one faced end
+    # (drawing-guidelines.md rule 11 (turned parts read like the lathe)), the spigot length the drum's recess needs among them.
     await anchor_point_to_origin(
         adapter, f"{front}.end", front_x, 0.0, "hub spigot front face"
     )
@@ -843,7 +843,7 @@ async def build(adapter) -> dict[str, str]:
     _assert_yoke_point(adapter)
     await report_mass_properties(adapter)
 
-    # Drawing-simplicity rule 2: the tight bands sit on the model dimensions,
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`: the tight bands sit on the model dimensions,
     # the places on every marked one.  The spigot and the bore are matched
     # fits (mg_magnifying_wheel_spec.REFERENCE_DIMENSIONS): no band.
     set_dimension_bilateral_tolerance(

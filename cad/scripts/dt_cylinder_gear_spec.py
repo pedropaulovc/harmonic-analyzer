@@ -145,8 +145,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "NotchProfile": {"NotchDepth", "NotchWidth", "NotchPhase", "PatternNotchPhase"},
 }
 
-# Decimal places ARE the tolerance statement (drawing-simplicity policy rule
-# 2), so the MODEL owns them: build_dt_cylinder_gear applies this map to the
+# Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`
+# ), so the MODEL owns them: build_dt_cylinder_gear applies this map to the
 # .SLDPRT and draw_dt_cylinder_gear only reads it back.  Three places where a
 # three-place band rides the dimension (the matched running bore's reference
 # nominal, the cam eccentricity, the +0.05/0 stacking thickness that sets

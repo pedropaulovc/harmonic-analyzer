@@ -1,7 +1,7 @@
 r"""Create the manufacturing drawing for the transgear disc hub (MHA-PD-017).
 
 The edge view is the ``*Top`` orientation turned a quarter turn so the hub's
-axis lies horizontal, as it sits in the lathe (policy rule 7): the hub front
+axis lies horizontal, as it sits in the lathe (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the hub front
 face on the left, the flange and the spigot on the right.  It carries the
 turned profile: the three diameters beside their steps, the spigot's and
 flange's lengths from the flange's rear face, the overall (spigot end to hub

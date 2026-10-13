@@ -73,7 +73,7 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "DiscThick": (0.235, 0.190),
 }
-# Rule 7: a hole callout states its process. The bore is a drilled running
+# drawing-guidelines.md rule 12 (hole and slot callouts say what to do): a hole callout states its process. The bore is a drilled running
 # clearance on the shaft, so the title block's DRILLED HOLES row is its band
 # (PR #1317 machinist review).
 BORE_CALLOUT = "DRILL THRU"

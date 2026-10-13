@@ -152,7 +152,7 @@ def test_collar_press_seat_is_native_and_reads_the_press_contract() -> None:
     assert drawing.SIDE_KEEP.keys() == {"CollarOd", "CollarBore"}
     assert "CollarLen" in drawing.FRONT_KEEP
     assert drawing.SIDE_CALLOUTS.keys() == {"CollarOd", "CollarBore"}
-    # Policy rule 6: the fit bore names its process; the mate is the lever
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the fit bore names its process; the mate is the lever
     # part, by number and name (machinist review: "rod" read as another part).
     bore_callout = drawing.SIDE_CALLOUTS["CollarBore"]
     assert "REAM OR BORE" in bore_callout

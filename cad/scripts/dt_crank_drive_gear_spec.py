@@ -4,11 +4,11 @@ The dark steel 64T gear at the cone set's large end; it carries the crossed-axis
 helical accommodation for its straight 16T crank pinion mate (4:1 crank-to-cone
 reduction).
 
-Recreated under ``cad/docs/drawing-simplicity-policy.md``. The five blank,
+Recreated under ``cad/docs/drawing-guidelines.md``. The five blank,
 bore and entry sizes -- outside diameter, face width, round bore, D-bore
 across-flat and south bore chamfer -- are NATIVE model dimensions carrying
 their own decimal places and bands; the tooth system a cut-gear print cannot
-express as dimensions stays in the gear-data block rule 6 allows, with every
+express as dimensions stays in the gear-data block drawing-guidelines.md rule 7 (notes: few, flagged, never a method) allows, with every
 generating number marked REF.
 
 PURE DATA, no SolidWorks/COM imports: ``build_dt_crank_drive_gear`` marks and
@@ -326,7 +326,7 @@ FLAT_ENGAGEMENT_MIN = FACE_WIDTH + FACE_WIDTH_BAND[1] - (
 # size-toleranced fit onto the cone shaft's land, and a fit lives on the peaks
 # as much as on the limits, so the bore carries the project's general machined
 # grade. Nothing runs on the teeth or the end faces -- they are as the title
-# block's process row states (drawing-simplicity-policy.md rule 5).
+# block's process row states (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
     SurfaceFinishControl("crank_drive_gear_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
 )
@@ -339,7 +339,7 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 # ``OutsideDiaReference`` is a construction-geometry sketch whose single driving
 # dimension IS the tip circle: the helix recipe grows the teeth off a ROOT
 # cylinder blank, so no solid feature owns the diameter the turner sets, and
-# rule 2 says model it rather than type it into the data block.
+# drawing-simplicity-policy.md `How the repository implements the guidelines` says model it rather than type it into the data block.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OutsideDiaReference": {"OutsideDia"},
     "GearBlank": {"FaceWidth"},
@@ -349,7 +349,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # --- Decimal places, authored ON THE PART ------------------------------------
 #
-# Policy rule 2: the places a dimension prints are part of the tolerance it
+# drawing-simplicity-policy.md `How the repository implements the guidelines`: the places a dimension prints are part of the tolerance it
 # claims, and the model owns both. ``build_dt_crank_drive_gear`` applies this table
 # natively (``_drawing_precision.apply_drawing_precision``) right after the drawing
 # marks, so ``draw_dt_crank_drive_gear`` imports each dimension verbatim and only

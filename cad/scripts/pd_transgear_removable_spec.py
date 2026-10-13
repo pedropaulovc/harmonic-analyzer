@@ -150,8 +150,8 @@ DRIVE_PIN_OFFSET_PLACES = 3
 DRIVE_PIN_OFFSET_TOL = 0.025
 
 # Bore <-> pin-hole web.  Photo-faithful to the p.56 catalog view, where the
-# holes nearly touch the bore; under the policy's 1.5 wall floor, accepted by
-# name (drawing-simplicity-policy.md, "Named exceptions").  Its printed worst
+# holes nearly touch the bore; under the 1.5 wall floor, pending a ruling
+# in #1377. Its printed worst
 # case is sheet text (pd_transgear_removable_notes.BORE_PIN_WEB_WORST): it reads
 # the title block's drilled-hole row, which this module's importers must not.
 BORE_PIN_WEB = PIN_CIRCLE_RADIUS - PIN_HOLE_DIA / 2.0 - BORE_DIA / 2.0  # 0.60
@@ -252,7 +252,7 @@ DRIVE_PIN_HOLE_DIA = 2.38  # reamed for the press (3/32 nominal)
 # collar, the whole Ø17.5 collar on the knob shaft.  Small enough that the
 # #25 plates wrapping the T12 clear it (Main's ruling, 2026-09-30).
 SEAT_SPIGOT_DIA = 17.5
-# Pin hole to the spigot's rim: under the 1.5 wall floor (Named exceptions).
+# Pin hole to the spigot's rim: under the 1.5 wall floor (pending ruling #991).
 SEAT_SPIGOT_RIM = (
     SEAT_SPIGOT_DIA / 2.0 - PIN_CIRCLE_RADIUS - DRIVE_PIN_HOLE_DIA / 2.0
 )  # 0.56

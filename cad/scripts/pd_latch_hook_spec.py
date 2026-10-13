@@ -48,7 +48,7 @@ How the sheet locates things:
 * the formed overall height, the ear's top edge to the full round's tip: a
   reference only, at DRAWING_REFERENCE_PRECISION.
 
-Walls (policy rule 12) are judged at the worst case of those bands, with the
+Walls (drawing-guidelines.md rule 17 (walls and webs)) are judged at the worst case of those bands, with the
 sheet rounding each printed value to its places.  The pin hole is drilled on
 the pin, so its walls take its model place; where the pin sits on the bar is
 the paper-drive assembly's to hold.
@@ -280,7 +280,7 @@ SCREW_HOLE_MATE = "LOCATE TO MHA-PD-007 TAPS"
 PIN_HOLE_CALLOUT = "MATCH-DRILL"
 ROUND_CALLOUT = "FULL ROUND"
 FLAT_ROUND_CALLOUT = "TO FULL-ROUND CENTRE"
-# Rule 7: the formed overall height, the ear's top edge to the full round's
+# drawing-guidelines.md rule 10 (dimension from a real feature): the formed overall height, the ear's top edge to the full round's
 # tip, a reference left of the side view (the front view's 70.4 to the pin
 # stays its own dimension).
 OVERALL_HEIGHT = BBOX_Y[1] - BBOX_Y[0]  # 96.5
@@ -292,7 +292,7 @@ FLAT_SKETCH = "FlatBlank"
 REFERENCE_SKETCHES = (FLAT_SKETCH,)
 
 # Marked model dimensions and the places the model authors on them
-# (drawing-simplicity policy rule 2).  The second screw hole shares its size
+# (drawing-simplicity-policy.md `How the repository implements the guidelines`).  The second screw hole shares its size
 # and Y with the first (same globals) and prints once under "2X".
 FORMED_DIMENSIONS: dict[str, set[str]] = {
     "ArmProfile": {"RollStart", "RollR", "StraightLen", "TabR", "TabEndX"},

@@ -21,7 +21,7 @@ from mg_wheel_drum_geom import (  # noqa: F401 (re-export)
 )
 
 # Marked model dimensions and the places the model authors on them
-# (drawing-simplicity rule 2): the press-fit bore at three places, the O.D.
+# (drawing-simplicity-policy.md `How the repository implements the guidelines`): the press-fit bore at three places, the O.D.
 # on the title block's .X row (the geom's WALL_WORST holds 2.0 under it).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {"DrumOd", "DrumBore"},
@@ -32,7 +32,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Drum": {"DrumLen": 2},
 }
 
-# Each band's need, printed on its own callout (policy rules 2 and 6): the
+# Each band's need, printed on its own callout (drawing-guidelines.md rule 4 (tighten only for function, and name the mate) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the
 # bore's diametral interference on the wheel spigot, which is turned to it
 # (the bore keeps its H7 band: the drum is made first), with the seating
 # stop, and how far the length leaves the drum's front face under the
@@ -46,7 +46,7 @@ PRESS_CALLOUT = (
 RECESS_CALLOUT = (
     f"FRONT FACE {DRUM_RECESS[0]:.2f}-{DRUM_RECESS[1]:.2f} BELOW\nWHEEL SPIGOT FACE"
 )
-# Rule 5: the bore is a static locating press seat on the wheel's spigot.
+# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore is a static locating press seat on the wheel's spigot.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
     SurfaceFinishControl("mg_drum_bore", SEAT_UM, CylinderFace(DRUM_BORE)),
 )

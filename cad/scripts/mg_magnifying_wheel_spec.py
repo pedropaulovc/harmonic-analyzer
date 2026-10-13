@@ -73,7 +73,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Tie1Profile": {"Tie1Y", "Tie1HoleDia"},
     "Tie2Profile": {"Tie2HoleDia", "Tie2Angle"},
 }
-# Decimal places per marked dimension (drawing-simplicity rule 2): the cast
+# Decimal places per marked dimension (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the cast
 # shapes at one place, the turned and drilled sizes at two.  The rim's OD
 # keeps two: at .X its Ø99.2 floor leaves the groove 0.75 deep under the 0.8
 # pen wire (GROOVE_DEPTH_MIN), so its callout says what the band holds.  The
@@ -98,12 +98,12 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Tie1Profile": {"Tie1Y": 2, "Tie1HoleDia": 2},
     "Tie2Profile": {"Tie2HoleDia": 2, "Tie2Angle": 0},
 }
-# Matched fits (policy rule 2): the spigot is turned to the stated
+# Matched fits (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the spigot is turned to the stated
 # interference in the finished drum's bore and the bore reamed to the stated
 # clearance on the finished axle, so each Ø is a reference nominal and its
 # callout names the mate and the acceptance.
 REFERENCE_DIMENSIONS = frozenset({"SpigotDia", "BoreDiaDim"})
-# Places of the sheet-added dimensions (policy rule 2: the spec owns them,
+# Places of the sheet-added dimensions (drawing-simplicity-policy.md `How the repository implements the guidelines`: the spec owns them,
 # the sheet only passes them through).  The rim-bore round is a single
 # limit, R0.8 MAX at one place: TIE2_FACE_WALL takes the R at that limit,
 # and a sharp edge falls under the title block's edge break.  The rim's
@@ -114,17 +114,17 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
 }
 ROUND_TEXT_SUFFIX = " MAX"
 
-# Rule 6: the notes say only what no callout can.  The spigot's press fit and
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the notes say only what no callout can.  The spigot's press fit and
 # the bore's running fit print on their own diameter callouts.  The spokes'
 # clocking is a 0 deg relation no dimension can show: the seed spoke lies on
 # local +X, so two spokes lie on the face view's horizontal centerline, the
 # one TIE 2's angle is measured from, and TIE 1 on the vertical one falls
 # midway between two (both asserted below).  TIE 1's 9.85 keeps a tight
 # band for the boss wall (TIE1_HUB_WALL); the need rides TIE 1's note
-# without a number (a note never carries a dimension, rule 5): no callout
+# without a number (a note never carries a dimension, drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): no callout
 # line fits between that dimension's extension lines 9.85 apart, and a
 # longer TIE 1 hole block steepens its leader onto the A-A line (run 18).
-MIN_WALL = 2.0  # drawing-simplicity rule 12 target
+MIN_WALL = 2.0  # drawing-guidelines.md rule 17 (walls and webs) target
 DRAWING_NOTES = "\n".join(
     (
         f"{SPOKE_COUNT} TAPERED SPOKES EQUALLY SPACED, TWO ON THE HORIZONTAL CENTERLINE.",
@@ -132,7 +132,7 @@ DRAWING_NOTES = "\n".join(
         "TIE 2: PEN-WIRE TIE HOLE, GROOVE BOTTOM TO RIM BORE.",
     )
 )
-# Rule 5: the bore is a running journal on the axle; the spigot is the static
+# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore is a running journal on the axle; the spigot is the static
 # seat the drum is pressed onto.  The boss step the drum butts against is a
 # register face and carries no symbol.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
@@ -141,7 +141,7 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
-# --- walls and the groove seat at the worst PRINTED band (rule 12) -----------------
+# --- walls and the groove seat at the worst PRINTED band (drawing-guidelines.md rule 17 (walls and webs)) -----------------
 _PLACES = {
     name: places
     for names in DRAWING_PRECISION.values()

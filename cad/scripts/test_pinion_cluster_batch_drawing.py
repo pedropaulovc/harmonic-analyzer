@@ -57,7 +57,7 @@ TITLE_BLOCK_OWNED_NOTE_TEXT = (
 
 def test_notes_do_not_repeat_title_block_metadata() -> None:
     for part_name, spec in SHEETS:
-        # A sheet with no notes (MHA-DT-030, rule 6) has nothing to repeat.
+        # A sheet with no notes (MHA-DT-030, drawing-guidelines.md rule 7 (notes: few, flagged, never a method)) has nothing to repeat.
         notes = getattr(spec, "DRAWING_NOTES", "").upper()
         for duplicate in TITLE_BLOCK_OWNED_NOTE_TEXT:
             assert duplicate not in notes, f"{part_name}: {duplicate}"

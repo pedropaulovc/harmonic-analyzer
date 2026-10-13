@@ -1,9 +1,9 @@
-"""Rule-12 worst case of the #6-32 knife hanger (MHA-VN-024 in MHA-SM-002,
+"""drawing-guidelines.md rule 17 (walls and webs) worst case of the #6-32 knife hanger (MHA-VN-024 in MHA-SM-002,
 keyed by MHA-VN-051), read from the real spec and assembly constants.
 
 The retired 1/2-13 hanger broke its tap-drill point into the knife bore crown
 and needed a drawing exception; every number here is judged at the printed
-bands (cad/docs/drawing-simplicity-policy.md rule 12), and the old geometry is
+bands (cad/docs/drawing-guidelines.md rule 17 (walls and webs)), and the old geometry is
 run through the same web formula to prove it discriminates.  SolidWorks-free.
 """
 
@@ -199,7 +199,7 @@ def test_the_crossbar_webs_hold_round_the_hole_and_the_slot() -> None:
     assert build_fr_top_frame.SLOT_X == pytest.approx(-22.1)
     assert build_fr_top_frame.PIN_HOLE_X == pytest.approx(-7.9)
     # Every wall at its print-worst less the drill drift each hole takes up
-    # its depth (both enter from the underside): rule 12's 2.0 holds.
+    # its depth (both enter from the underside): drawing-guidelines.md rule 17 (walls and webs)'s 2.0 holds.
     assert build_fr_top_frame.PIN_HOLE_BAR_WALL == pytest.approx(3.068, abs=5e-4)
     assert build_fr_top_frame.PIN_HOLE_SCREW_WALL == pytest.approx(2.801, abs=5e-4)
     # The longest .XXX slot (4.33) with its station at the round hole's
@@ -221,7 +221,7 @@ def test_the_slot_length_band_is_functional() -> None:
     # Codex review of 080fda97 asked for a one-place slot length.  The .XXX
     # band is what keeps both ends of the stack: at the title block's .XX or
     # .X band the shortest slot must still take the dowel's travel, so the
-    # longest one cuts the wall to the screw clearance hole under rule 12's
+    # longest one cuts the wall to the screw clearance hole under drawing-guidelines.md rule 17 (walls and webs)'s
     # 2.0 target.
     wall_at_longest = (
         build_fr_top_frame.SLOT_SCREW_WALL

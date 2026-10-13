@@ -249,7 +249,7 @@ PIN_HOLE_Z = THICKNESS / 2.0  # mid-thickness, on y = 0
 # The latch pin's axis in the machine frame; the hook's hole is drilled on it.
 PIN_MACHINE_Z = FRONT_FACE_MACHINE_Z + PIN_HOLE_Z  # -120.43125
 
-# --- Bands the sheet prints (hard-coded title-block rows, policy rule 12) ---
+# --- Bands the sheet prints (hard-coded title-block rows, drawing-guidelines.md rule 3 (decimal places carry the tolerance)) ---
 BAND_X = 0.8
 BAND_XX = 0.51
 BAND_XXX = 0.13

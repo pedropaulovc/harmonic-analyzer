@@ -247,7 +247,7 @@ async def build(adapter) -> dict[str, str]:
     # +X), extruded mid-plane so it spans x -HalfLen..+HalfLen. Two on-axis
     # circles, so each records ONLY its diameter dim -- and those are the
     # print's: the end view (RIGHT) imports the O12 and the press-seat bore
-    # with its band natively (policy rule 2), where the old revolved
+    # with its band natively (drawing-guidelines.md rule 3 (decimal places carry the tolerance)), where the old revolved
     # half-profile put the bore on a hidden wall line.
     collar = SketchDims()
     check("create_sketch collar", await adapter.create_sketch("Right"))
@@ -397,7 +397,7 @@ async def build(adapter) -> dict[str, str]:
 
     # 4. Arm section witness (ArmSection, blanked; Right plane, sketch (u, v)
     # -> model (-Z, Y)): the RIGHT view shows the arm in profile between the
-    # flange's seat face and the collar, and policy rule 2 wants the arm's
+    # flange's seat face and the collar, and drawing-simplicity-policy.md `How the repository implements the guidelines` wants the arm's
     # station along Z and its lower face from the bore axis as native
     # dimensions (machinist review: nothing located the bore axis). Three
     # construction lines, each on an edge the view already draws: the arm's

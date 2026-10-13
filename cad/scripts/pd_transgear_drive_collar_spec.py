@@ -472,7 +472,7 @@ for _ok, _what in (
     if not _ok:
         raise AssertionError(f"MHA-PD-022: {_what}")
 
-# Policy rule 6: the callout states the requirement, not a method; the
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the callout states the requirement, not a method; the
 # native +0.012/0.000 band already prints the curved portion's H7.
 BORE_CALLOUT = "TRUE D THRU"
 PIN_HOLE_CALLOUT = "2X REAM THROUGH"
@@ -627,10 +627,12 @@ FIT_UP_NOTE = "\n".join(
     )
 )
 
-# Existing named external drive-pin rim exception only. The pilot now meets
-# the target and the obsolete slotted-floor exception no longer exists. The
-# drawing numbers these 1 and 2 and appends the two fitted lengths as notes 3
-# and 4 with their assembly steps (draw_pd_transgear_drive_collar.FIT_NOTES).
+# The external drive-pin rim shortfall only (pending ruling #1381, never on
+# the sheet). The pilot now meets the target and the obsolete slotted-floor
+# exception no longer exists. The drawing numbers these 1 and 2 and appends the
+# two fitted lengths as notes 3 and 4 with their assembly steps
+# (draw_pd_transgear_drive_collar.FIT_NOTES).
+# Pending exception ruling: MHA-PD-022 collar rim (#1381).
 DRAWING_NOTES = "\n".join(
     (
         f"1. DRIVE-PIN HOLE TO COLLAR RIM {DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN.",

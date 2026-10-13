@@ -82,13 +82,13 @@ SCREW_RADIAL_CLEARANCE = (CLEARANCE_DIA - THREAD_MAJOR_MM[SCREW_THREAD]) / 2.0
 SCREW_POSITION_BAND = (0.10, -0.10)  # (upper, lower), each part, each axis
 if 2.0 * (2.0 * SCREW_POSITION_BAND[0] ** 2) ** 0.5 >= SCREW_RADIAL_CLEARANCE:
     raise AssertionError("C stop bar screw stations can bind the screws")
-# Rule 12 walls at worst case: shortest bar, hole high or low in its band,
+# drawing-guidelines.md rule 17 (walls and webs) walls at worst case: shortest bar, hole high or low in its band,
 # largest counterbore.
 _CBORE_R_MAX = (CBORE_DIA + _XX) / 2.0
 if (BAR_HEIGHT + BAR_HEIGHT_BAND[1]) - (SCREW_Y + SCREW_POSITION_BAND[0]) - _CBORE_R_MAX < 2.0:
-    raise AssertionError("counterbore wall to the bar top under rule 12")
+    raise AssertionError("counterbore wall to the bar top under drawing-guidelines.md rule 17 (walls and webs)")
 if (SCREW_Y + SCREW_POSITION_BAND[1]) - _CBORE_R_MAX < 2.0:
-    raise AssertionError("counterbore wall to the bar bottom under rule 12")
+    raise AssertionError("counterbore wall to the bar bottom under drawing-guidelines.md rule 17 (walls and webs)")
 SCREW_HOLE_SPEC = HoleSpec(
     "counterbore_socket",
     "#8",

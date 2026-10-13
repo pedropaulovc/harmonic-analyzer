@@ -178,7 +178,7 @@ PHOTO_ARM_TO_HUB_RATIO = PHOTO_ARM / PHOTO_HUB
 
 # MHA-DT-009's match-ream is fully behind the 8-mm arm, located from the arm
 # shoulder it must not break into; the barrel -- printed from the shoulder --
-# carries the 1:48 ream at that station: policy rule 12 ligaments below.
+# carries the 1:48 ream at that station: drawing-guidelines.md rule 17 (walls and webs) ligaments below.
 SERVICE_PIN_FROM_SHOULDER = 5.6
 SERVICE_PIN_STATION = HUB_SEAT_LENGTH + SERVICE_PIN_FROM_SHOULDER
 CRANK_FACE_SHIFT = ARM_THICKNESS
@@ -230,7 +230,7 @@ HUB_BORE_DIA_MAX = HUB_BORE_DIA + HUB_BORE_BAND[0]
 GENERAL_2PL_TOL_MM = round(
     float(_config.title_block("linear_2pl")["value_in"]) * MM_PER_IN, 2
 )
-# Policy rule 12 (U27): MHA-DT-009 ream ligaments at the worst case of the printed
+# drawing-guidelines.md rule 17 (walls and webs) (U27): MHA-DT-009 ream ligaments at the worst case of the printed
 # bands.  The ream never exceeds the pin's big end, which stands proud of the
 # hub.  Ahead of it the arm shoulder: the .XX station printed from it.  Behind
 # it the relief shoulder, which the print places from the front face through

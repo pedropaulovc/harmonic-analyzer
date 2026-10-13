@@ -22,7 +22,7 @@ four plan corners are rounded, echoing the hardware each sits beside
 (pivot screw head at the north end, the green column at the south-east,
 the lock-knob head at the south-west). A native close-clearance Ø6.756 pivot
 hole clears the stock Ø6.35 shoulder. A 10.50-wide x 0.25-deep top relief,
-round-ended about the pivot and open through the north edge (rule-12 W18),
+round-ended about the pivot and open through the north edge (drawing-guidelines.md rule 17 (walls and webs) W18),
 reduces only the local bearing thickness to 6.10, preserving 0.25 running
 axial clearance without lowering the plate or its mounted hardware.
 

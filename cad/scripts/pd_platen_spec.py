@@ -24,13 +24,13 @@ PLATE_THICKNESS = 3.85
 # (vn-platen-clip-screw) sits directly on the clip's flat 0.8 brass sheet
 # (ch22 img03: no raised seat, small heads), and its shank reaches through a
 # #2-56 tap through the plate and a Ø7 boss standing SOCKET_BOSS_H proud of the
-# back face at each station, so the thread engages >= 1.5D (rule 12) and the
+# back face at each station, so the thread engages >= 1.5D (drawing-guidelines.md rule 18 (thread engagement)) and the
 # screw tip finishes flush with the boss's rear face. These must be through
 # taps: no blind receiver here can accept the exact 6.35-mm under-head length
 # without bottoming. The bosses stand above the top guide rail's band, where
 # nothing but the clip-screw tips rides the back.
 SOCKET_SPEC = HoleSpec("tapped", "#2-56")
-SOCKET_BOSS_DIA = 7.0  # 2.41 wall around the #2-56 major (rule 12: 2.0)
+SOCKET_BOSS_DIA = 7.0  # 2.41 wall around the #2-56 major (drawing-guidelines.md rule 17 (walls and webs): 2.0)
 # 6.35 shank - 0.8 clip sheet - 3.85 plate: 5.55 engaged (2.54D), tip flush.
 # build_pd_platen_clip asserts the closure against the live screw and sheet.
 SOCKET_BOSS_H = 1.70

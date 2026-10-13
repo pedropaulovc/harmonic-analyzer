@@ -149,7 +149,7 @@ SCREW_HOLES = tuple(
     (station - BORE_STATION, -BORE_OFFSET) for station in ARM.PLATE_TAP_STATIONS
 )
 
-# --- Bands the sheet prints (hard-coded title-block rows, policy rule 12) ---
+# --- Bands the sheet prints (hard-coded title-block rows, drawing-guidelines.md rule 3 (decimal places carry the tolerance)) ---
 BAND_X = ARM.BAND_X
 BAND_XX = ARM.BAND_XX
 BAND_XXX = ARM.BAND_XXX

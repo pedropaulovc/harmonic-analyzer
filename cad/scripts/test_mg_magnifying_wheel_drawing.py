@@ -206,7 +206,7 @@ def test_no_gdt_frames_and_one_sheet_dimension() -> None:
     calls = _called_names(drawing.__file__)
     assert calls.count("add_datum_feature") == 0
     assert calls.count("add_feature_control_frame") == 0
-    # Policy rule 5: the running bore takes the machined grade, the pressed
+    # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the running bore takes the machined grade, the pressed
     # spigot the seat grade.
     finishes = {
         control.key: control.roughness_um
@@ -229,7 +229,7 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("mg-magnifying-wheel")
     assert config["material"] == config["material_specification"]
-    # Paint never reaches a fitted or wire-bearing surface (policy rule 1).
+    # Paint never reaches a fitted or wire-bearing surface (drawing-guidelines.md rule 2 (the title block is the general specification)).
     assert config["finish"] == (
         "BLACK ENAMEL; MASK BORE, SPIGOT, HUB ENDS, RIM AND GROOVE; OIL BARE SURFACES"
     )

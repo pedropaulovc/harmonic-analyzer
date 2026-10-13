@@ -81,7 +81,7 @@ SEAT_Z = POST_AXIS_Z
 # in the body's tangent plane. The post prints the body diameter at .X and the
 # boss length at .XX independently, so with the body seated a compliant cap
 # stands anywhere within CAP_OFFSET_MAX of the seat bottoms: no printed pad
-# height carries every post. The pad is a MATCHED FIT (policy rule 2): the
+# height carries every post. The pad is a MATCHED FIT (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the
 # model leaves it proud of every compliant cap over the seat-bottom band, its
 # height prints as a reference size, and the callout names the mate and the
 # acceptance.

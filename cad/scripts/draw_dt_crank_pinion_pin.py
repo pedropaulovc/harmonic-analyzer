@@ -1,9 +1,9 @@
 r"""Create the curated manufacturing drawing for the crank pinion retention pin.
 
-Recreated under ``cad/docs/drawing-simplicity-policy.md``: a plain straight
+Recreated under ``cad/docs/drawing-guidelines.md``: a plain straight
 pin is two native model dimensions -- its diameter and its length, both on
 the side view where a turned part's diameter sits beside its axial extent
-(rule 7) -- an axis centerline, a bare end view, the isometric, and one note
+(drawing-guidelines.md rule 11 (turned parts read like the lathe)) -- an axis centerline, a bare end view, the isometric, and one note
 saying where the stock may come from. No datums, no frames, no roughness
 symbol, no band: the match-drilled hole it is driven into (crank_pinion_spec)
 is the fit.
@@ -121,7 +121,7 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    # A solid pin has nothing inside: hidden lines off everywhere (rule 7).
+    # A solid pin has nothing inside: hidden lines off everywhere (drawing-guidelines.md rule 9 (show internal shape in solid lines)).
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
@@ -139,7 +139,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin end view")
     # The side view is a rectangle: its axis centerline says which pair of
-    # edges is the faced ends (rule 7, turned parts).
+    # edges is the faced ends (drawing-guidelines.md rule 11 (turned parts read like the lathe), turned parts).
     add_view_centerline(
         adapter,
         right,

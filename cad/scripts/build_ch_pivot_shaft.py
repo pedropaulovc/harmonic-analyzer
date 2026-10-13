@@ -14,7 +14,7 @@ ear's apex onto a flat milled under it; both flats face +Y, in line.
 Layout: axis along Z with the origin on the axis at the NORTH end of the
 cylinder; the body runs toward -Z. The body is ONE Right-plane half-profile
 (a plain rectangle) revolved (sketch +u -> model -Z, +v -> model Y), so the
-diameter and length import into the side view (policy rule 7, the
+diameter and length import into the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe), the
 crank-pinion boss idiom). Each dome is its own revolved cap (the
 pinion-pivot-shaft crown idiom), sketched on the same plane. Both flats are
 ONE Right-plane cut (``FlatProfile``, the cone-gear-shaft flat idiom turned

@@ -49,11 +49,11 @@ if _BORE_MAX >= screw.HEAD_DIA + screw.HEAD_BAND[1]:
 # a washer rim past the hub edge only overhangs air.
 if screw.HEAD_DIA + screw.HEAD_BAND[0] >= screw.rocker.HUB_DIA:
     raise AssertionError("pivot-screw head clamps outside the rocker hub face")
-# Rule 12: radial wall and axial thickness at their worst printed limits.
+# drawing-guidelines.md rule 17 (walls and webs): radial wall and axial thickness at their worst printed limits.
 WALL_MIN = round(((OUTER_DIA + OUTER_BAND[1]) - _BORE_MAX) / 2.0, 6)
 THICK_MIN = round(THICK - printed_band_mm(THICK_PLACES), 6)
 if min(WALL_MIN, THICK_MIN) < 1.5 - 1e-9:
-    raise AssertionError("pivot washer falls under the rule-12 floor")
+    raise AssertionError("pivot washer falls under the drawing-guidelines.md rule 17 (walls and webs) floor")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "WasherProfile": {"OuterDia", "BoreDia"},
@@ -69,7 +69,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked pivot-washer dimension needs authored places")
 
-# Named exception: MHA-CH-006-TL-07 wall 1.64 MIN (drawing-simplicity-policy.md)
+# Pending exception ruling: MHA-CH-006-TL-07 wall 1.64 MIN (#1370).
 WALL_STATED_MIN = 1.64
 if round(WALL_MIN, 2) != WALL_STATED_MIN:
     raise AssertionError("pivot-washer stated wall drifted from its geometry")

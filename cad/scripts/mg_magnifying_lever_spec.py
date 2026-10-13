@@ -44,7 +44,7 @@ from mg_magnifying_lever_geom import ROD_LENGTH  # noqa: F401 (re-export)
 # ``PressZone`` reference sketch: its start from the tip carrying
 # PRESS_ZONE_LENGTH_BAND, its cylinder length to the tangent (a REFERENCE:
 # start minus the dome radius), and its diameter carrying PRESS_ZONE_DIA_BAND,
-# both bands native (policy rule 2); the drawing shows both sketches in the
+# both bands native (drawing-guidelines.md rule 3 (decimal places carry the tolerance)); the drawing shows both sketches in the
 # front view (_drawing_hidden_sketches). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"OverallLength", "DomeRadius"},

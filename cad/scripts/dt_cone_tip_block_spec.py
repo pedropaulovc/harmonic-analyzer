@@ -76,7 +76,7 @@ SLIT_DEPTH_PLACES = 1
 SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - 0.65
 SLIT_W = 1.2
 SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
-# Rule-12 E11/W1 (Main, 2026-09-24): a #10-32 x 3/8 cup set screw (McMaster
+# drawing-guidelines.md rule 18 (thread engagement) E11/W1 (Main, 2026-09-24): a #10-32 x 3/8 cup set screw (McMaster
 # 94025A164) in a thread tapped THROUGH the block, a 90-degree countersink at
 # both mouths, and no block growth.  A through tap has no floor to break out
 # and no tap lead to deduct; the shaft tip enters through the same thread.
@@ -307,7 +307,7 @@ if (
     or PINCH_CLEARANCE_DIA <= THREAD_MAJOR_MM[PINCH_THREAD]
 ):
     raise AssertionError("the far jaw is not tapped full-thread through to the slit")
-# Rule-12 E1 (user ruling, Main option (a), 2026-09-25): a #4-40 x 5/8 18-8
+# drawing-guidelines.md rule 18 (thread engagement) E1 (user ruling, Main option (a), 2026-09-25): a #4-40 x 5/8 18-8
 # stainless fillister screw (McMaster 91794A112, 15.875 under the head) seats
 # on the +X face and threads only into the far jaw, whose thread starts at the
 # slit's far wall.  From the head face that wall stands at most the +X half
@@ -343,9 +343,8 @@ if WORST_PINCH_TIP_RECESS_MM < PINCH_SCREW_RECESS_MM - 1e-9:
 # ADJUSTER_EMBED; build_dt_drive_train_assembly asserts that band stays inside
 # this window.
 #
-# Named exception to the drawing policy's 1.5D thread-engagement rule (user
-# ruling 2026-09-29, option (a); the policy's Named exceptions row for
-# MHA-VN-017): the cup adjuster engages 1.0D at the worst case.  It carries only
+# Pending exception ruling: MHA-VN-017 engagement (#975).
+# The cup adjuster engages 1.0D at the worst case. It carries only
 # the shaft's end-play thrust -- the cone set's running push, no clamp load;
 # the pinch screw across the slit locks it -- and 1.5D would need a block deep
 # enough to push the MHA-VN-016 stack collar into the block's south face at
@@ -357,8 +356,8 @@ ADJUSTER_EMBED_WINDOW = (
 )
 if ADJUSTER_MIN_ENGAGEMENT_D != 1.0:
     raise AssertionError(
-        "the MHA-VN-017 1.0D engagement is a named exception (user ruling "
-        "2026-09-29); any other value is a new ruling"
+        "the MHA-VN-017 engagement baseline pending ruling #975 is 1.0D; "
+        "any other value needs the user's ruling"
     )
 if not (
     ADJUSTER_EMBED_WINDOW[0] < ADJUSTER_EMBED < ADJUSTER_EMBED_WINDOW[1]
@@ -373,7 +372,7 @@ ADJUSTER_ENGAGEMENT_MIN_MM = (
 )
 # The assembly sheet states the shortfall as a plain fact at the step that
 # sets the adjuster, worded like MHA-VN-031's.
-# Named exception: MHA-VN-017 engagement (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-VN-017 engagement (#975).
 ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT = (
     f"ENGAGEMENT {ADJUSTER_ENGAGEMENT_MIN_MM:.2f} MIN ({ADJUSTER_MIN_ENGAGEMENT_D:.1f}D)."
 )

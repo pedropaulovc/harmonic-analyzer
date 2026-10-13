@@ -60,7 +60,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 
 def test_the_part_owns_every_printed_decimal_place() -> None:
-    """Policy rule 2: places are the tolerance, so the .SLDPRT carries them."""
+    """drawing-simplicity-policy.md `How the repository implements the guidelines`: places are the tolerance, so the .SLDPRT carries them."""
     by_name = dt_arbor_pedestal_spec.DRAWING_PRECISION_BY_NAME
     assert by_name == {
         "Width": 1,
@@ -170,7 +170,7 @@ def test_no_sheet_re_solves_a_model_dimension_through_diametric() -> None:
 
 
 def test_manufacturing_locations_are_model_dimensions() -> None:
-    """#810 Codex l4afp, policy rule 2: the strap band, the hold-down station
+    """#810 Codex l4afp, drawing-simplicity-policy.md `How the repository implements the guidelines`: the strap band, the hold-down station
     and both lateral locations carry the .X band, so the part owns them --
     hidden reference sketches whose one driving dimension IS the value --
     and the sheet imports them verbatim instead of deriving them from view
@@ -230,7 +230,7 @@ def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
         assert end[1 - axis] == start[1 - axis]
         anchors = [abs(c) for c in start if abs(c) > 1e-9]
         assert [evaluate(d) for d in drives] == [value, *anchors], sketch
-        # Rule 7: every line starts on a feature -- the west side face for a
+        # drawing-guidelines.md rule 10 (dimension from a real feature): every line starts on a feature -- the west side face for a
         # lateral location, the far face or strap root for a plan depth.
         if name in ("HoleLateral", "BoreLateral", "HoldDownLocation"):
             assert start[0] == -spec.FOOT_WIDTH / 2.0
@@ -524,7 +524,7 @@ def test_part_stamps_make_flexible_material_and_protective_finish() -> None:
 
 
 def test_lateral_locations_start_on_a_feature_not_the_symmetry_axis() -> None:
-    """Policy rule 7: X is dimensioned from the foot's west side face in both
+    """drawing-guidelines.md rule 10 (dimension from a real feature): X is dimensioned from the foot's west side face in both
     views, and no callout falls back on the part centreline."""
     source = _drawing_source()
     assert "PART C/L" not in source
@@ -561,7 +561,7 @@ def test_apex_set_screw_tap_keeps_1_5d_only_at_r11() -> None:
     through the crown onto the arbor. At the printed worst case (crown radius
     .X low, bore at its maximum, both sags across the thread and a one-pitch
     entry lost) the photographed R10 crown leaves 1.21D of full thread and
-    fails rule 12; R11 leaves 1.57D."""
+    fails drawing-guidelines.md rule 17 (walls and webs); R11 leaves 1.57D."""
     spec = dt_arbor_pedestal_spec
     assert spec.TOP_RADIUS == 11.0
     assert spec.SET_SCREW_THREAD == "#4-40"

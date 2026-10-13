@@ -75,7 +75,7 @@ if FULL_THREAD_REACH_MIN <= gooseneck.PLUG_LENGTH + PLUG_LENGTH_BAND:
 if min(TIP_PROTRUSION_MIN, TIP_TO_BEND_MIN, TIP_BORE_RADIAL_CLEARANCE_MIN) <= 0.0:
     raise AssertionError("gooseneck screw tip is not clear in the open tube bore")
 if PLUG_WALL_NOMINAL < 2.0 or PLUG_WALL_MIN < 1.5:
-    raise AssertionError("gooseneck plug loses a rule-12 wall")
+    raise AssertionError("gooseneck plug loses a drawing-guidelines.md rule 17 (walls and webs) wall")
 if HEAD_RETENTION_MIN < 1.0:
     raise AssertionError("gooseneck screw head does not retain the spring eye")
 if EYE_FULL_THREAD_OVERLAP_MIN <= 0.0:

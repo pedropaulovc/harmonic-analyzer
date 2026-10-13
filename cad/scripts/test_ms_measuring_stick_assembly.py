@@ -349,7 +349,7 @@ def test_fitter_package_covers_rule_9() -> None:
     assert drawing.EXPLODED_CAPTION == spec.EXPLODED_CAPTION == (
         "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
     )
-    # Rule 1/6: the component Finish fields, not fitter notes or steps, own finish.
+    # drawing-guidelines.md rule 2 (the title block is the general specification) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the component Finish fields, not fitter notes or steps, own finish.
     assert not any("BLACKEN" in step or "FINISH" in step for step in spec.ASSEMBLY_STEPS)
     for obsolete in ("FINISH_NOTE", "FINISH_NOTE_TEXT", "FINISH_NOTE_XY", "_BLOCK_FINISH"):
         assert not hasattr(drawing, obsolete)

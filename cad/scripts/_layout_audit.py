@@ -106,7 +106,7 @@ class FindingSeverity(Enum):
 
 
 # Near-contact clearance between the text of two DISTINCT annotations, as a
-# fraction of the smaller text height. Rule 8 requires visible air: two runs
+# fraction of the smaller text height. drawing-guidelines.md rule 14 (keep text off the part) requires visible air: two runs
 # closer than a word space read as ONE string. Measured on MHA-DT-021's own PDF
 # (tight pdfium glyph boxes, 3.5 mm text): the word space in "SLOT DEPTH" is
 # 1.77 mm (0.51 h), while "20.8" and "8.42" -- which print as "20.88.42" --
@@ -2758,7 +2758,7 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
     """A leader or callout shoulder transversally crossing another annotation's
     dimension/witness line.
 
-    Rule 8: no leader crosses a dimension line. A callout's shoulder is its
+    drawing-guidelines.md rule 14 (keep text off the part): no leader crosses a dimension line. A callout's shoulder is its
     leader's last run under the text: MHA-DT-021's 5.56 heel-height line crossed
     the ADJUSTER callout's shoulder (swing's gap diff, class d). Touches (a
     leader landing ON a line) are not crossings -- see
@@ -3595,7 +3595,7 @@ def find_text_on_view(
     MHA-DT-021's adjuster callout, owned by the front view, printed across the
     right view's face (swing's gap diff). Text-on-line only sees text that
     touches an edge; text sitting INSIDE a foreign view, between its edges, is
-    just as wrong (policy rule 8). The outline is ``GetOutline``'s padded box,
+    just as wrong (drawing-guidelines.md rule 14 (keep text off the part)). The outline is ``GetOutline``'s padded box,
     inset like the leader-crossing check; pictorial views are skipped because
     their box is mostly empty diagonal space.
 

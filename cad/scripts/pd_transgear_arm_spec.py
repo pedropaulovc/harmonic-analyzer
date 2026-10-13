@@ -50,7 +50,7 @@ from pd_transgear_arm_geometry import (
 )
 
 # The general-tolerance band each printed place count claims (the title-block
-# rows the geometry module hard-codes, policy rule 12).
+# rows the geometry module hard-codes, drawing-guidelines.md rule 3 (decimal places carry the tolerance)).
 BAND_BY_PLACES: dict[int, float] = {1: BAND_X, 2: BAND_XX, 3: BAND_XXX}
 
 # Places each printed dimension carries (contract §3.1 / §12):
@@ -154,7 +154,7 @@ GEOMETRIC_CONTROLS += (
     ),
 )
 # The press and its proud set are assembly (MHA-PD-000 "arm-plate-located");
-# the callout keeps the hole's own requirements only (policy rule 6).
+# the callout keeps the hole's own requirements only (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 LOCATOR_CALLOUT = (
     "2X REAM, FLAT BOTTOM\n"
     f"BREAK EDGE {ARM.LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX"
@@ -216,7 +216,7 @@ PIN_BORE_CALLOUT = "\n".join(
 def engagement_line(worst_mm: float, worst_d: float) -> str:
     """The installed full-thread engagement a tap callout states: the
     worst-case length and its multiple of the major diameter, each floored
-    to two places (a MIN never rounds up), as the policy's rows state it."""
+    to two places (a MIN never rounds up), pending ruling #1385."""
     mm = int(worst_mm * 100.0 + 1e-9) / 100.0
     d = int(worst_d * 100.0 + 1e-9) / 100.0
     return f"ENGAGEMENT {mm:.2f} MIN ({d:.2f}D)"
@@ -265,7 +265,7 @@ ISO_VIEW_SCALE = (1, 2)
 ISOMETRIC_VIEW_NOTE = f"ISOMETRIC VIEW SCALE {ISO_VIEW_SCALE[0]}:{ISO_VIEW_SCALE[1]}"
 
 # Marked model dimensions and the places the model authors on them
-# (drawing-simplicity policy rule 2).  The hole stations live in the blanked
+# (drawing-simplicity-policy.md `How the repository implements the guidelines`).  The hole stations live in the blanked
 # ``StationReference`` sketch: the Hole Wizard placement sketches that drive
 # the taps are not importable, and the pin bore's station prints with them.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

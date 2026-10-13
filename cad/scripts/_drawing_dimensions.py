@@ -245,7 +245,7 @@ def assert_imported_precision(
 ) -> None:
     """Prove imported model dimensions kept their PART-authored decimal places.
 
-    Policy rule 2 makes the model own display precision, so a migrated sheet
+    drawing-simplicity-policy.md `How the repository implements the guidelines` makes the model own display precision, so a migrated sheet
     may not rewrite it -- but it must still fail loud when an import loses the
     override, because a dimension that silently falls back to the drawing
     document's two-place default prints a tighter band than anyone specified.

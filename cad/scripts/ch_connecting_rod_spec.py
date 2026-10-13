@@ -43,7 +43,7 @@ RING_WALL = 5.0  # radial strap wall
 # a flat rod held by its fork on the arm needs the cam-vs-arm offset inside
 # its float there: 2.200 at three places widens that float over the old
 # 3.00 / 2.50 at two places by geometry, and still leaves a 2.073 section at
-# its thinnest (drawing-simplicity rule 12).
+# its thinnest (drawing-guidelines.md rule 17 (walls and webs)).
 RING_THICKNESS = 2.2
 RING_THICKNESS_BAND = (0.127, -0.127)  # (upper, lower) deviations
 SHANK_WIDTH = 8.0
@@ -52,9 +52,9 @@ SHANK_THICKNESS_BAND = RING_THICKNESS_BAND
 # Ring and shank symmetric to the fork slot within this (total), so the
 # ring's float in the cam slot and the fork's on the arm share a mid-plane.
 RING_SLOT_SYMMETRY = 0.10
-RULE12_SECTION_MIN = 2.0  # drawing-simplicity policy rule 12
+RULE12_SECTION_MIN = 2.0  # drawing-guidelines.md rule 17 (walls and webs)
 if RING_THICKNESS + RING_THICKNESS_BAND[1] < RULE12_SECTION_MIN:
-    raise AssertionError("the rod's thinnest ring/shank section is under rule 12's 2.0")
+    raise AssertionError("the rod's thinnest ring/shank section is under drawing-guidelines.md rule 17 (walls and webs)'s 2.0")
 # --- Fork (the U-shaped clevis straddling the 2.500 +/-0.025 rocker strap). ---
 # The rod is flat: ring, shank and fork share one mid-plane (z = 0), the cam
 # plane, which is also the arm plane (rocker_bank_layout.ARM_MID_DZ). Two tines

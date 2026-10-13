@@ -89,7 +89,7 @@ FIDUCIAL_Y = _FIDUCIAL_AXIS
 
 # Keeper-ring anchor (ch11 p.14): a small slotted screw in the arm's outboard
 # face clamps the brass eyelet that once tethered removable pin MHA-DT-009.
-# Tapped THRU the 5/16 bar (policy rule 12, audit W7): a blind 6.5 drill left
+# Tapped THRU the 5/16 bar (drawing-guidelines.md rule 17 (walls and webs), audit W7): a blind 6.5 drill left
 # its point 0.76 from the inboard face nominal and through it at the printed
 # band; through, the screw has 7.94 of thread (2.79D) and nothing to bottom on.
 ANCHOR_SCREW_X = 20.0
@@ -164,10 +164,10 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # The one sheet-derived dimension: the parenthesised extreme-to-extreme
 # overall, a read-only sum of the two end radii and the pivot station with no model
 # dimension to import. Its places are still specification, so the sheet
-# reads them here instead of typing a literal (policy rule 2).
+# reads them here instead of typing a literal (drawing-simplicity-policy.md `How the repository implements the guidelines`).
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
 
-# Policy rule 6: at most four short lines, each under ~75 characters so the
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): at most four short lines, each under ~75 characters so the
 # block stays left of the title block.  The section line is a requirement,
 # not a convenience: the U29 cheek around the hub seat reaches 2 mm only at
 # the mill's width tolerance, not at the .X band.  The #4-40 handle pivot

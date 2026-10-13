@@ -762,7 +762,7 @@ GEOMETRIC_CONTROLS = (
 # ``StudProfile`` is the Right-plane revolve in front of F (the core, the
 # thread relief, the thread blank and the tip chamfer); it also carries
 # construction-only witnesses, the tooth-tip blank across the face (OutsideDia,
-# rule 2's reference-sketch allowance) and the cutter's full-depth station and
+# drawing-simplicity-policy.md `How the repository implements the guidelines`'s reference-sketch allowance) and the cutter's full-depth station and
 # run-out limit from F (R9-21), so every turned size imports natively beside
 # its axial extent.  ``JournalProfile`` is the revolve behind the teeth.
 # ``GearBlank`` owns the face width.

@@ -85,7 +85,7 @@ if _BODY_LEN_MIN <= _HUB_TOP_MAX:
 # Bought clamping nut: McMaster 90264A435, zinc-plated steel hex coupling
 # nut, 1/4"-20, 7/8 in long, 3/8 in across flats, fully threaded (verified
 # live 2026-10-08). Its chamfers are not stated; each end is taken as one
-# pitch of incomplete thread. Rule 12: at the worst case of the printed
+# pitch of incomplete thread. drawing-guidelines.md rule 18 (thread engagement): at the worst case of the printed
 # stack and stations the INSTALLED full-thread engagement in the nut is at
 # least one and a half diameters. Engagement starts above the stack top
 # past the nut's entry chamfer, or past the die's runout (one and a half
@@ -150,7 +150,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # The locating diameter prints as a reference; the fit callout on it
 # governs. BODY_BAND is that fit's design intent for the stack checks only;
 # features.toml carries the printed nominal and the callout text.
-# Policy rules 2 and 6: the matched fit sits on the locating diameter's
+# drawing-guidelines.md rule 4 (tighten only for function, and name the mate) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit sits on the locating diameter's
 # callout, naming each mate by Number with its acceptance (above, below).
 BODY_FIT_CALLOUT = (
     "SLIDES IN MHA-CH-006 ROCKER ARM PIVOT BORE AND",

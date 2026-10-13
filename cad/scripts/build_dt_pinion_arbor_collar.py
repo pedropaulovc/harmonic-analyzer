@@ -204,7 +204,7 @@ async def build(adapter) -> dict[str, str]:
     # Manufacturing drawing support: only the pin hole's tighter band rides
     # the model.  The Ø8 bore is a plain drilled hole, so the title block's
     # DRILLED HOLES row governs it and the dimension restates nothing (policy
-    # rule 1, Codex on #860).  The places are the part's (policy rule 2).
+    # drawing-guidelines.md rule 2 (the title block is the general specification), Codex on #860).  The places are the part's (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     set_dimension_bilateral_tolerance(
         adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)
     )

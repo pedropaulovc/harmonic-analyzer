@@ -11,7 +11,7 @@ assembly its +Z is laid along machine +X through the pinion's hole.
 
 Built as a REVOLVE of a half-profile on the Right plane rather than an
 extruded circle: a turned part prints its diameter on the side view next to
-its length (drawing-simplicity-policy.md rule 7), and only a dimension whose
+its length (drawing-guidelines.md rule 11 (turned parts read like the lathe)), and only a dimension whose
 sketch plane is parallel to that view imports there natively. A Right-plane
 sketch maps local +x -> model -Z, so the profile runs x 0..-PIN_LEN.
 
@@ -138,7 +138,7 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
 
     # Mark the print's two dimensions, author their decimal places natively
-    # (policy rule 2) and stamp the title-block properties the sheet reads.
+    # (drawing-guidelines.md rule 3 (decimal places carry the tolerance)) and stamp the title-block properties the sheet reads.
     # No band on either: the match-drilled hole sets the fit.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

@@ -16,7 +16,7 @@ into the strap's blind edge bore, 13 proud after the v2 linkage closure; domed o
 0.8, the rod-end crown idiom). Axisymmetric about its local x = 0.  Shank and
 crown are both Right-plane half-profiles (sketch u = -z), so the diameter,
 length and crown radius all import into the *Right side view, where the pin
-lies as it is turned (rule 7; machinist review of 7f7fc1717).
+lies as it is turned (drawing-guidelines.md rule 11 (turned parts read like the lathe); machinist review of 7f7fc1717).
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 

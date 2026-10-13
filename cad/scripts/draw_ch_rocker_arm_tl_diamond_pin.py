@@ -163,7 +163,7 @@ requirement("shank",
     precision={"dia": 2},
 )
 
-# The neck whose wall is the named exception, and the ream's open length
+# The neck whose wall is pending ruling #1368, and the ream's open length
 # below the bonded pin (the pin fills the bore through the neck).
 requirement("neck",
     kind="boss",

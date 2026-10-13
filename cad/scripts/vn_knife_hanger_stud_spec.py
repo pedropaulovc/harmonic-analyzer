@@ -34,5 +34,5 @@ THREAD_LENGTH = DIMS.thread_length  # 19.05
 LENGTH_BAND = (0.0, -0.04 * 25.4)
 LENGTH_MIN = LENGTH + LENGTH_BAND[1]  # 37.084
 LENGTH_MAX = LENGTH + LENGTH_BAND[0]  # 38.1
-# The rule-12 thread engagement floor.
+# The drawing-guidelines.md rule 18 (thread engagement) thread engagement floor.
 ENGAGEMENT_MIN_D = 1.5

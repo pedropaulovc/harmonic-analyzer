@@ -3,7 +3,7 @@
 The MHA-PD-008 knob shaft's #8-32 stud and D-core, the MHA-PD-022 drive
 collar's matching D-bore and rear-face clamp reaction on actual gear face F,
 and the MHA-PD-013 thumbnut, each pair judged at the printed worst case
-(policy rule 12). Every corner is recomputed from printed values and places,
+(drawing-guidelines.md rule 17 (walls and webs)). Every corner is recomputed from printed values and places,
 not read back from derived constants; reloads prove the refusal guards.
 """
 

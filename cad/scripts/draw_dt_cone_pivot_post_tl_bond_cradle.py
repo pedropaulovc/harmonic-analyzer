@@ -825,7 +825,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *section_b_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    # Matched-fit seats (policy rule 2): the diameter is a reference size; the
+    # Matched-fit seats (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the diameter is a reference size; the
     # callout names the mate and states the acceptance.
     set_reference_dimensions(adapter, annotations, ("BodySeatDia", "TailSeatDia"))
     set_dimension_callouts(adapter, section_a_annotations, {"BodySeatDia": BODY_SEAT_CALLOUT})

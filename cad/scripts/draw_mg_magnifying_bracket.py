@@ -397,7 +397,7 @@ DIMENSION_CALLOUTS = {
     "FlangeDepth": "FLANGE DEPTH",
     "CollarLen": "COLLAR LENGTH\nALONG BORE AXIS",
 }
-# The bore names its process (policy rule 6) and the part it seats: the lever.
+# The bore names its process (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)) and the part it seats: the lever.
 SIDE_CALLOUTS = {
     "CollarOd": "COLLAR OD",
     "CollarBore": "REAM OR BORE: PRESS SEAT\nFOR MHA-MG-003 LEVER",

@@ -113,7 +113,7 @@ def test_journal_finish_and_no_gdt() -> None:
             assert token not in source, (module.__name__, token)
     for name in ("GEOMETRIC_CONTROLS", "PART_DATUMS"):
         assert not hasattr(spec, name)
-    # The wheel runs on the shank: a journal, machined grade (rule 5).
+    # The wheel runs on the shank: a journal, machined grade (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
     assert [(c.key, c.roughness_um) for c in spec.SURFACE_FINISHES] == [
         ("mg_axle_journal", MACHINED_UM)
     ]

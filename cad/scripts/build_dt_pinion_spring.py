@@ -224,7 +224,7 @@ async def _formed_path(
     # origin, foot length, both radii, then the kink start (the two literal
     # lean-dependent dims) and the flat tip's x, which fixes the kink sweep.
     # The print baselines the formed profile from the foot's free end (policy
-    # rule 7), so those locations dimension from foot.end, not the origin.
+    # drawing-guidelines.md rule 10 (dimension from a real feature)), so those locations dimension from foot.end, not the origin.
     check(
         f"{prefix}foot horizontal",
         await adapter.add_sketch_constraint(foot, None, "horizontal"),

@@ -240,7 +240,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The front view keeps its hidden lines: they are the only place the tap
     # drill shows WHICH side of the eccentric it enters -- the heavy side,
-    # opposite the bore offset (rule 7's cross-hole-through-a-wall case;
+    # opposite the bore offset (drawing-guidelines.md rule 9 (show internal shape in solid lines)'s cross-hole-through-a-wall case;
     # Fable review r4 blocker).
     set_hidden_lines_visible(adapter, front)
     for view in (side, bottom, iso):

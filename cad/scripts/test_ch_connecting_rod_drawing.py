@@ -163,7 +163,7 @@ def test_the_pin_bears_on_the_whole_tine() -> None:
         - (spec.FORK_SLOT_WIDTH + spec.FORK_SLOT_BAND[0])
     ) / 2.0 - spec.FORK_TINE_MATCH / 2.0
     assert thinnest_tine == pytest.approx(1.5865)
-    assert thinnest_tine >= 1.5  # drawing-simplicity rule 12 floor
+    assert thinnest_tine >= 1.5  # drawing-guidelines.md rule 17 (walls and webs) floor
     # Positive control: the countersink this replaced fails the same check.
     old_csk_depth = (3.2 + 0.127 - 1.994) / 2.0  # 90-degree: depth = radial step
     assert thinnest_tine - old_csk_depth < 1.5
@@ -202,7 +202,7 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     )
     assert tine_note in notes.splitlines()
     # The press fit (user ruling 2026-10-09, PR #1292 review F1) names its
-    # pin; the hole's size and band are the model's PinHoleDia (rules 2 and 6,
+    # pin; the hole's size and band are the model's PinHoleDia (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method),
     # PR #1292 review N1), so no limit of it may ride the note text.
     assert "5. PRESS FIT PIN MHA-CH-010 INTO THE" in notes
     assert "   REAMED PIN HOLE, BOTH TINES." in notes
@@ -223,7 +223,7 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     assert "147.67" not in notes  # the BASIC sheet dimension owns it
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
-    # Material and finish are title-block rows (simplicity policy rule 1).
+    # Material and finish are title-block rows (drawing-guidelines.md rule 2 (the title block is the general specification)).
     for title_block_word in ("1018", "STEEL", "IRON", "BLACK", "ENAMEL"):
         assert title_block_word not in notes
     for fork_dimension in (
@@ -309,7 +309,7 @@ def test_fork_print_is_three_place_and_model_owned() -> None:
 
 
 def test_reamed_pin_hole_is_a_native_three_place_dimension() -> None:
-    """PR #1292 review N1 (policy rules 2 and 6): the press hole's Ø1.968
+    """PR #1292 review N1 (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the press hole's Ø1.968
     +0.010/0 is the PinHoleDia model dimension -- marked, authored at three
     places with its native band -- imported into the front view with the
     process beneath it, never general-note text."""

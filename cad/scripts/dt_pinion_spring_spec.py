@@ -55,7 +55,7 @@ FORMED_DIMENSIONS: dict[str, set[str]] = {
 }
 
 # Everything the print carries.  The profile is baselined from the foot's free
-# end (policy rule 7): the FREE kink start and tip are located from it, never
+# end (drawing-guidelines.md rule 10 (dimension from a real feature)): the FREE kink start and tip are located from it, never
 # from the model origin.  The pad, the strip width and the hole location are
 # cut with the flat blank, so they take the title-block .XX row.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -64,7 +64,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PadProfile": {"PadWidth", "PadLen"},
 }
 
-# Decimal places ARE the tolerance statement (policy rule 2); the model owns
+# Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the model owns
 # them and the drawing reads them back.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SpringProfile": {name: 1 for name in FORMED_DIMENSIONS["SpringProfile"]},

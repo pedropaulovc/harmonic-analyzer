@@ -47,7 +47,7 @@ def test_nothing_is_banded_on_the_model() -> None:
     no datum chain: it is the stock's, judged at the mill's band by the bar
     clearance (test_rocker_bank_layout). The bore prints DRILL THRU, so the
     title block's DRILLED HOLES row is its band (PR #1317 machinist review:
-    a model +0.1/0 restated it, against rule 1)."""
+    a model +0.1/0 restated it, against drawing-guidelines.md rule 2 (the title block is the general specification))."""
     from _printed_tolerance import drilled_oversize_mm
 
     assert model_toleranced_dimensions(part) == {}
@@ -85,7 +85,7 @@ def test_thickness_is_the_one_thirty_second_stock() -> None:
 
 def test_bore_callout_states_its_process() -> None:
     """PR #1317 machinist review: the banded bore printed no DRILL/REAM.
-    Rule 7: a hole callout states the process; the bore is a drilled-class
+    drawing-guidelines.md rule 12 (hole and slot callouts say what to do): a hole callout states the process; the bore is a drilled-class
     running clearance on the shaft."""
     assert drawing.BORE_CALLOUT == "DRILL THRU"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -120,7 +120,7 @@ def test_title_block_material_prints_the_ruled_sheet() -> None:
 
 def test_od_is_the_hub_od_over_its_own_wall_floor() -> None:
     """Main 2026-09-26: one O10.20 for hub and washer, each over its own
-    rule-12 floor (bore max + 2 x 1.5 + the .XX band), computed in its spec."""
+    drawing-guidelines.md rule 17 (walls and webs) floor (bore max + 2 x 1.5 + the .XX band), computed in its spec."""
     band = _config.title_block("linear_2pl")["value_in"] * 25.4
     assert ch_rocker_arm_spec.LINEAR_2PL == pytest.approx(band)
     assert spec.OD == ch_rocker_arm_spec.HUB_DIA

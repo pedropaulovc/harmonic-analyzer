@@ -1,10 +1,10 @@
 """Offline contracts for the rod pivot pin (MHA-CH-010) part and drawing.
 
-The installed pressed pin under ``cad/docs/drawing-simplicity-policy.md``
+The installed pressed pin under ``cad/docs/drawing-guidelines.md``
 (user ruling 2026-10-09, PR #1292 review F1): three native model dimensions
 whose places and bands the PART owns -- the diameter with its grind band, the
 installed length as REFERENCE, and the blank's cut length from a blanked
-reference sketch with its band (rule 2; PR #1292 review N1: never note
+reference sketch with its band (drawing-simplicity-policy.md `How the repository implements the guidelines`; PR #1292 review N1: never note
 text) -- no GD&T, no roughness symbol, and at most four note lines: cut the
 blank, the press, the flush ends, the running fit.
 """
@@ -100,7 +100,7 @@ def test_precision_and_band_are_authored_on_the_part() -> None:
 def test_blank_length_is_a_model_dimension_with_its_band() -> None:
     """PR #1292 review N1: the 6.40 +/-0.13 cut length prints from a blanked
     reference sketch on the pin axis with its native band at its native two
-    places, never from note text (policy rules 2 and 6)."""
+    places, never from note text (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method))."""
     assert spec.PIN_BLANK_LENGTH == 6.40
     assert spec.PIN_BLANK_LENGTH_BAND == (0.13, -0.13)
     assert notes.DRAWING_DIMENSIONS["BlankReference"] == {"BlankLen"}
@@ -141,7 +141,7 @@ def test_print_carries_no_gdt_roughness_or_callouts() -> None:
 
 def test_notes_state_blank_press_flush_ends_and_running_fit() -> None:
     lines = notes.DRAWING_NOTES.splitlines()
-    assert len(lines) <= 4  # policy rule 6
+    assert len(lines) <= 4  # drawing-guidelines.md rule 7 (notes: few, flagged, never a method)
     assert lines == [
         "1. CUT BLANK TO THE BLANK LENGTH SHOWN; INSTALLED STATE SHOWN.",
         "2. PRESS IN; REMOVABLE WITH PUNCH.",
@@ -150,7 +150,7 @@ def test_notes_state_blank_press_flush_ends_and_running_fit() -> None:
         "4. RUNS FREE IN THE MHA-CH-006 #47 ROD HOLE.",
     ]
     text = notes.DRAWING_NOTES
-    # Rules 2 and 6 (PR #1292 review N1): the blank's size and band are the
+    # drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (PR #1292 review N1): the blank's size and band are the
     # BlankLen model dimension's, so no limit may ride the note text.
     for limit in (
         f"{spec.PIN_BLANK_LENGTH:.2f}",

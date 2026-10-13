@@ -106,7 +106,7 @@ def _end_gap_min(
 # (each pad is centred in it), so it prints at one place (codex review of run
 # 20261008T010334394Z: 17.500 was over-specified); the end walls are sized so
 # neighbouring pockets keep a 2 mm web at the worst case of those .X lengths
-# and their .XXX locations (rule 12 target), and each pad is shortened by the
+# and their .XXX locations (drawing-guidelines.md rule 17 (walls and webs) target), and each pad is shortened by the
 # wider band so it still ends clear.
 # Each pad stands at least PAD_OUTLINE_MARGIN inside the arm's finished outline
 # (the inventory's "~6 mm inside, outside the end mills' swept bands") and is
@@ -152,7 +152,7 @@ PADS: tuple[tuple[str, float, float, float, float], ...] = tuple(
     for tag, cx, cy, length, width in PAD_POCKETS
 )
 if min(width for *_head, width in PADS) - _XXX < 2.0:
-    raise AssertionError("a pad is under 2 mm wide at the .XXX band (rule 12 target)")
+    raise AssertionError("a pad is under 2 mm wide at the .XXX band (drawing-guidelines.md rule 17 (walls and webs) target)")
 # Web between neighbouring pockets: half of each pocket's length band at the
 # shared end, and both location bands.
 if 2.0 * POCKET_END_WALL - _PAD_POCKET_LENGTH_BAND - 2.0 * _XXX < 2.0:
@@ -324,7 +324,7 @@ if _side_bond_line_min(STAND_POCKET_DIA, STAND_OD) < BOND_LINE_MIN:
     raise AssertionError("the hub stand can bind in its counterbore")
 STAND_WALL_MIN = ((STAND_OD - _XXX) - (STAND_BORE + _DRILLED_PLUS)) / 2.0
 if STAND_WALL_MIN < 2.0:
-    raise AssertionError("hub stand wall is below the rule-12 target")
+    raise AssertionError("hub stand wall is below the drawing-guidelines.md rule 17 (walls and webs) target")
 if STAND_BORE + _DRILLED_PLUS >= rocker.HUB_DIA:
     raise AssertionError("the hub can drop into the stand bore")
 # As the pads: clear of the counterbore floor at the worst printed PlateDrop,
@@ -383,7 +383,7 @@ if (
     )
     < 2.0
 ):
-    raise AssertionError("pivot tap drill point leaves under the rule-12 floor wall")
+    raise AssertionError("pivot tap drill point leaves under the drawing-guidelines.md rule 17 (walls and webs) floor wall")
 
 # --- Rod-pin hole (agreed with the MHA-CH-006-TL diamond pin) ------------------------
 ROD_PIN_HOLE_DIA = 3.0
@@ -507,10 +507,10 @@ CLAMP_STUD_PLACES = 1
 # left about 0.7 under its point on the thinnest plate); 16.5 of thread still
 # clears 1.5 D above, and the tap keeps 3.0 of lead.
 if _blind_drill_floor_wall(CLAMP_STUD_SPEC.depth_mm + _XX, CLAMP_STUD_DRILL_DIA) < 2.0:
-    raise AssertionError("clamp-stud drill point leaves under the rule-12 floor wall")
+    raise AssertionError("clamp-stud drill point leaves under the drawing-guidelines.md rule 17 (walls and webs) floor wall")
 
 
-# --- Rule 12: every machined wall keeps the floor --------------------------------
+# --- drawing-guidelines.md rule 17 (walls and webs): every machined wall keeps the floor --------------------------------
 def _rect_gap(
     a: tuple[float, float, float, float], b: tuple[float, float, float, float]
 ) -> float:
@@ -574,7 +574,7 @@ WALL_MIN = min(
     ),
 )
 if WALL_MIN < 2.0:
-    raise AssertionError(f"a plate wall is {WALL_MIN:.2f} mm, below the rule-12 target")
+    raise AssertionError(f"a plate wall is {WALL_MIN:.2f} mm, below the drawing-guidelines.md rule 17 (walls and webs) target")
 
 # --- Drawing ----------------------------------------------------------------------
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -588,7 +588,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LocatingBore": {"LocatingBoreDepth"},
     "RodPinHoleProfile": {"RodPinHoleDia"},
 }
-# Places that only the schedules state (policy rule 2: the model owns every
+# Places that only the schedules state (drawing-simplicity-policy.md `How the repository implements the guidelines`: the model owns every
 # scheduled driving dimension's places; cross-vendor review of PR 1252).
 # The pin seats on its collar, not the hole floor: the depth only clears the
 # shank, so it prints at one place. The hub stand bore is drilled: two places,
@@ -689,7 +689,7 @@ DIMENSION_CALLOUTS = {"LocatingBoreDia": "REAM", "RodPinHoleDia": "REAM"}
 
 # Schedules (sheets two and three): every pocket and hole is tagged on the
 # sheet-two plan and located here from the locating bore axis; every bonded part
-# is sized. Every number in a schedule is a model dimension (policy rule 2):
+# is sized. Every number in a schedule is a model dimension (drawing-simplicity-policy.md `How the repository implements the guidelines`):
 # SCHEDULE_CELL_DIMENSIONS maps each (schedule, row tag, column) to the
 # (feature, dimension) pairs that own it, and the cell prints their value at
 # their authored places (a row of two mirrored parts has one owner in each

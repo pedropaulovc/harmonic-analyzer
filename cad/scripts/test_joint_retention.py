@@ -293,7 +293,7 @@ def test_the_knife_hanger_is_a_threadlocked_clamp_keyed_by_its_dowel() -> None:
 
 def test_the_channel_apex_set_screws_are_waived_only_by_their_ruling() -> None:
     """PR #1317 Codex review: the MHA-VN-034 cups hold the rocked MHA-CH-005
-    shaft, an exposed joint. The user waived rule 9 for it (2026-10-10): snug
+    shaft, an exposed joint. The user waived drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) for it (2026-10-10): snug
     with Loctite 222, the step that drives them says so."""
     import draw_ch_channel_assembly as channel
 
@@ -334,7 +334,7 @@ def test_the_channel_apex_set_screws_are_waived_only_by_their_ruling() -> None:
 
 def test_the_gooseneck_set_screw_is_waived_only_by_its_ruling() -> None:
     """Q5 on PR #1348: the MHA-VN-023 cup point is the gooseneck post's only
-    retention, an oscillating joint with no jam nut. The user waived rule 9
+    retention, an oscillating joint with no jam nut. The user waived drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)
     for it (2026-10-12): adjustable by design and re-set periodically."""
     joint_id = "ha-harmonic-analyzer/gooseneck-set-screw-in-top-frame"
     (row,) = [j for j in jr.JOINTS if j.id == joint_id]

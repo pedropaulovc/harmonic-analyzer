@@ -206,7 +206,7 @@ HOLE_TOP_CENTER = (0.280, 0.195)
 HOLE_SIDE_CENTER = (0.280, 0.095)
 SECTION_CENTER = (0.375, 0.135)
 HOLE_TABLE_ANCHOR = (0.018, 0.260)
-# Rule 6: the A1-A4 matched fit sits on the sockets, not in a general note
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the A1-A4 matched fit sits on the sockets, not in a general note
 # (Main's hb-render-6 eye pass). It is a leader note on A2 -- the rear-left
 # socket, min(COLUMN_SOCKET_XZ) -- because A2 faces the open band between
 # the hole table and the plan, under the TOP VIEW caption; "4X" carries it
@@ -285,7 +285,7 @@ SOCKET_FINISH_SHOULDER = 0.004
 # Every manufacturing value on the sheets is imported here: the part marks
 # and precises them (harmonic_base_spec.DRAWING_DIMENSIONS / DRAWING_PRECISION)
 # and these tables only say WHICH view shows each one and WHERE its text sits
-# -- the placement-only division policy rule 2 draws. The six keeps partition
+# -- the placement-only division drawing-guidelines.md rule 3 (decimal places carry the tolerance) draws. The six keeps partition
 # DRAWING_PRECISION_BY_NAME exactly, which assert_imported_precision proves at
 # the end of the build.
 GEOMETRY_TOP_KEEP = {
@@ -975,7 +975,7 @@ UNDERSIDE_SECTION_CALLOUTS = {
 # cross-tap lugs, the ribs and the MHA-DT-024 foot boss stand under seats the
 # hole table does not locate, or under none, so their sizes and their places
 # are model dims, placed from the table's own X0 Y0 -- the flange's rear-west
-# theoretical corner, top left in a bottom view (rule 7: one feature origin
+# theoretical corner, top left in a bottom view (drawing-guidelines.md rule 10 (dimension from a real feature): one feature origin
 # per view; baselines, never chains). One *Bottom view at 1:2: the X
 # baselines stack in rows above it and the Y baselines in columns left of it,
 # shortest innermost, so no extension line crosses a dimension line.
@@ -1887,7 +1887,7 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
     side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    # Rule 7: hidden lines only where they inform. Nothing on this sheet is
+    # drawing-guidelines.md rule 9 (show internal shape in solid lines): hidden lines only where they inform. Nothing on this sheet is
     # communicated by a dashed edge -- the envelope, the corner radii, the
     # heights and the stamped ID all read off the outline, and every internal
     # feature is defined by sheet 2's hole table, its callouts and section A-A
@@ -2008,7 +2008,7 @@ async def build(adapter: Any) -> dict[str, str]:
             label="underside finish edge",
         ),
     )
-    # Rule 5: the flange perimeter is the hole table's datum -- every sheet-2
+    # drawing-guidelines.md rule 10 (dimension from a real feature): the flange perimeter is the hole table's datum -- every sheet-2
     # coordinate is measured from the virtual corner of its west and rear
     # faces -- so the plan carries the seat grade once, read off the west
     # flange edge, and its target names the surface AND its function. The
@@ -2052,7 +2052,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         label="base column-socket section",
     )
-    # Rule 7 again: the hole table plus the cross-tap and spotface callouts
+    # drawing-guidelines.md rule 12 (hole and slot callouts say what to do) again: the hole table plus the cross-tap and spotface callouts
     # define every hole on this sheet, and section A-A shows the socket, its
     # depth and the cross tap through it in SOLID lines, so no view here needs
     # dashed edges -- plan, front cross-tap elevation and section are all
@@ -2224,7 +2224,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, hole_side, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base cross-screw entries")
     # The four sockets locate the frame columns, so their bores carry the seat
-    # grade (rule 5) -- the deck symbol stops at the deck plane and the hole
+    # grade (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)) -- the deck symbol stops at the deck plane and the hole
     # table's bore diameters are reference-only match-fit sizes. Section A-A is
     # the one view that draws a controlled bore wall in SOLID lines, so the
     # single sheet symbol lives here and its target names all four tags; the
@@ -2295,7 +2295,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _telemetry.info(f"section A-A native cosmetic threads: seeds/instances={section_threads!r}")
 
     # Sheet 3, the underside: the pocket in plan from below, and section B-B
-    # through it for the heights. Rule 7: both views hidden-lines-removed --
+    # through it for the heights. drawing-guidelines.md rule 9 (show internal shape in solid lines): both views hidden-lines-removed --
     # the pocket opens downward, so every rib, boss and fillet the bottom view
     # dimensions is a visible edge, and the section draws its cut solid.
     if not ddoc.ActivateSheet(SHEET_NAMES[2]):
@@ -2378,7 +2378,7 @@ async def build(adapter: Any) -> dict[str, str]:
             view=pads,
         )
 
-    # Policy rule 2's proof obligation, now that no sheet code writes places:
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`'s proof obligation, now that no sheet code writes places:
     # every imported dimension must still print what its PART authored. A
     # silent fallback to the drawing document's two places would ask the shop
     # for a band nobody specified, and nothing else on the sheet would look

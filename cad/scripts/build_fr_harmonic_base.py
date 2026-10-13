@@ -384,7 +384,7 @@ PEDESTAL_SCREW_XZ = (
     (X_DRUM, BANK_FRONT_STRAP_INNER_Z - _PEDESTAL_LEDGE_OFFSET),
     (X_DRUM, BANK_BACK_STRAP_INNER_Z + _PEDESTAL_LEDGE_OFFSET),
 )
-# Rule 12 (audit E15), judged at the printed worst case: flange 5.0 +-0.8,
+# drawing-guidelines.md rule 18 (thread engagement) (audit E15), judged at the printed worst case: flange 5.0 +-0.8,
 # screw 19.05 +0/-0.76 (B18.6.3), these depths +-0.8 (.X). The longest screw
 # in the thinnest flange reaches 14.85; 16.0 - 0.8 keeps it 0.35 off the
 # incomplete threads (>= 0.25 tip reserve). The drill keeps two #8-32 pitches
@@ -480,7 +480,7 @@ PEDESTAL_SEAT_SPEC = HoleSpec(
     thread_class="2B",
     overrides_mm={"ThreadDepth": PEDESTAL_SCREW_HOLE_DEPTH},
 )
-# Rule 12 (E15) at the printed worst case, not just the nominal the stock-fit
+# drawing-guidelines.md rule 18 (thread engagement) (E15) at the printed worst case, not just the nominal the stock-fit
 # guard checks: the shallowest drill still keeps two pitches of bottoming-tap
 # lead past the deepest thread (the reach side is asserted by the drive train
 # against BASE_PEDESTAL_HOLE_DEPTH).
@@ -815,7 +815,7 @@ HANGING_SEATS = (
 
 
 def require_hanging_boss(seat: HangingSeat) -> None:
-    """Back one blind seat at the printed worst case (policy rule 12).
+    """Back one blind seat at the printed worst case (drawing-guidelines.md rule 17 (walls and webs)).
 
     Under the tip: 1.5 thread diameters at nominal, and the 2.0 wall target
     once the printed depth runs deep and the cast level runs high by their
@@ -1635,7 +1635,7 @@ async def build(adapter) -> dict[str, str]:
     # seats the hole table does not locate (transfer seats, cross taps) or
     # under none, so the drawing places them from the table's own X0 Y0: the
     # flange's rear-west theoretical sharp corner, one datum per view (drawing
-    # policy rule 7). Each sketch carries that corner as a point, and every
+    # drawing-guidelines.md rule 10 (dimension from a real feature)). Each sketch carries that corner as a point, and every
     # such feature is dimensioned FROM it, so the printed locations are these
     # sketches' own driving dims (Codex P2 on #1310: the pads printed no size
     # or place; machinist review: nor did the ribs or the MHA-DT-024 boss).
@@ -2498,7 +2498,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven base (equations neutral)", after, 0.005 * after)
 
     # REFERENCE sketches. The flange-to-deck height is a manufacturing value
-    # the sheet prints, so policy rule 2 says the model owns it -- but it is
+    # the sheet prints, so drawing-simplicity-policy.md `How the repository implements the guidelines` says the model owns it -- but it is
     # no feature's dimension: the 38.1 spans three features. It therefore
     # gets a hidden one-line sketch whose single driving dimension IS the
     # value, marked for drawing like any other. The line is construction and
@@ -2628,7 +2628,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     # Decimal places are the tolerance statement, so they are authored HERE
-    # and the drawing only reads them back (policy rule 2). Same for the one
+    # and the drawing only reads them back (drawing-simplicity-policy.md `How the repository implements the guidelines`). Same for the one
     # dimension whose band is not the title block's: a spotface may run deep,
     # never shallow, or the screw head rocks on an unfaced ring.
     apply_drawing_precision(adapter, DRAWING_PRECISION)

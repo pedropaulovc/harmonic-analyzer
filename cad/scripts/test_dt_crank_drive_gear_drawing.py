@@ -1,6 +1,6 @@
 """Offline contracts for the crank-drive-gear drawing.
 
-The print is recreated under ``cad/docs/drawing-simplicity-policy.md``: a 64T
+The print is recreated under ``cad/docs/drawing-guidelines.md``: a 64T
 helical gear slipped onto the cone shaft's land carries no datums and no frames,
 its blank, bore and south-entry sizes are native model dimensions whose places
 and bands the PART owns, and the tooth system it cannot dimension -- helix
@@ -61,7 +61,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 def test_the_outside_diameter_is_a_native_reference_sketch_dimension() -> None:
     # The helix recipe grows the teeth off a ROOT cylinder blank, so no solid
     # feature owns the tip circle -- and the OD is the first size the turner
-    # sets. Rule 2's remedy is to MODEL it (a construction sketch whose one
+    # sets. drawing-simplicity-policy.md `How the repository implements the guidelines`'s remedy is to MODEL it (a construction sketch whose one
     # driving dimension IS the value), not to type it into the data block.
     build = _build_source()
     assert 'name_last_feature(adapter, "OutsideDiaReference")' in build
@@ -95,7 +95,7 @@ def test_the_face_width_is_a_named_driven_blank_dimension() -> None:
 
 
 def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
-    # Rule 2: the places a dimension prints are part of the tolerance it
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`: the places a dimension prints are part of the tolerance it
     # claims, so the model owns them.
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "OutsideDia": 2,
@@ -249,9 +249,9 @@ def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
 
 
 def test_print_carries_no_gdt_or_basic_dimensions() -> None:
-    # Rules 3-4: a gear on a shaft land is not on the GD&T allowlist, so the
+    # drawing-guidelines.md rule 5 (avoid excessive GD&T): a gear on a shaft land is not on the GD&T allowlist, so the
     # end-face perpendicularity frame, the tooth-tip runout frame and the bore
-    # datum are gone. The ONE roughness it keeps is rule 5's exception -- the
+    # datum are gone. The ONE roughness it keeps is drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)'s exception -- the
     # bore is a size-toleranced fit, and a fit depends on the peaks as well as
     # on the size.
     source = _source()

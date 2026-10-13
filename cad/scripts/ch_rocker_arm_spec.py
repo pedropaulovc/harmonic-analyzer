@@ -86,7 +86,7 @@ PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 # Its fundamental moves at most 0.0036 mm (0.04 % of the d = 88 term) across
 # the stations: error_budget.hook_displacement with the edge 0.5 high and the
 # notch 0.5 shallow (test_rocker_bank_layout pins both numbers).
-# Policy rule 2 (Codex #936 PRRT_kwDOPHDy386mV3AO): the band is the part's,
+# drawing-simplicity-policy.md `How the repository implements the guidelines` (Codex #936 PRRT_kwDOPHDy386mV3AO): the band is the part's,
 # on a model dimension -- build_ch_rocker_arm's hidden TopEdgeReference sketch,
 # whose one printed dimension IS this height and drives the arcs' centre.
 TOP_EDGE_ABOVE_PIVOT = CENTER_Y - PIVOT_MID_Y - R_TOP  # 8.0
@@ -102,7 +102,7 @@ TOP_EDGE_BAND = (0.50, 0.0)  # (upper, lower)
 # pitch -- there are no loose spacer bushings (the 19 `pivot-bushing` parts
 # are retired).
 #
-# The OD's floor is the hub wall: drawing-simplicity policy rule 12's 1.5
+# The OD's floor is the hub wall: drawing-guidelines.md rule 17 (walls and webs)'s 1.5
 # over the reamed bore at its largest, with the OD at the bottom of the
 # title block's .XX band (machinist review, MHA-CH-006 round 1: O10.00 left
 # 1.48). The MHA-CH-009 thrust washer's own floor is higher, so the two share
@@ -110,14 +110,14 @@ TOP_EDGE_BAND = (0.50, 0.0)  # (upper, lower)
 # foot cheeks, which pass over the hub at d = 0 (channel_kinematics
 # ``bar_bottom``); test_rocker_bank_layout pins the slack.
 PIVOT_HOLE_BAND = (0.03, 0.0)  # (upper, lower): reamed; native on PivotDia
-RULE12_WALL_FLOOR = 1.5  # drawing-simplicity policy rule 12
+RULE12_WALL_FLOOR = 1.5  # drawing-guidelines.md rule 17 (walls and webs)
 LINEAR_2PL = 0.508  # title-block .XX band (pinned to _config by the tests)
 _HUB_FLOOR = PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0] + 2.0 * RULE12_WALL_FLOOR + LINEAR_2PL
 HUB_DIA_MIN = math.ceil(round(_HUB_FLOOR * 100.0, 9)) / 100.0  # 10.04
 HUB_DIA = 10.2
 if HUB_DIA < HUB_DIA_MIN:
     raise AssertionError(
-        f"hub O{HUB_DIA:.2f} is under its rule-12 wall floor O{HUB_DIA_MIN:.2f}"
+        f"hub O{HUB_DIA:.2f} is under its drawing-guidelines.md rule 17 (walls and webs) wall floor O{HUB_DIA_MIN:.2f}"
     )
 HUB_LENGTH = 7.0565  # == machine channels.station_pitch_mm (asserted by the build)
 # (upper, lower) on the printed hub length (#743 PR2): a hub may only come out

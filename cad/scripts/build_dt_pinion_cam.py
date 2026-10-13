@@ -246,7 +246,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Manufacturing drawing support: the bands and decimal places live on the
-    # model dimensions (policy rule 2 -- the places are the tolerance, so the
+    # model dimensions (drawing-simplicity-policy.md `How the repository implements the guidelines` -- the places are the tolerance, so the
     # sheet reads them back instead of rewriting them); mark exactly the
     # print's dimensions and stamp the make-critical title-block properties.
     set_dimension_bilateral_tolerance(

@@ -134,7 +134,7 @@ def test_counterbore_floor_keeps_rule_12_target_to_the_cap_recess() -> None:
     # Codex reviews of 67d8b2c6 and 080fda97 (sheet 4, A-A): with the floor
     # at 16.1 its outboard limit left 1.518 (.X) / 1.80 (.XX) to the cap
     # recess's deepest, widest corner, and .XXX read as over-precision
-    # (63d4b5d6).  Rule 12 fixes it with geometry: the floor stands at 16.35
+    # (63d4b5d6).  drawing-guidelines.md rule 17 (walls and webs) fixes it with geometry: the floor stands at 16.35
     # and prints .XX; every printed corner keeps 2.0.
     floor_places = spec.DRAWING_REFERENCE_PRECISION["counterbore floor from socket axis"]
     axis_places = spec.DRAWING_REFERENCE_PRECISION["cross screw axis from boss top"]
@@ -910,7 +910,7 @@ def test_printed_typ_top_flange_minimum_keeps_the_receiver_wall(stack) -> None:
 
 
 def test_every_imported_drawing_dimension_has_part_authored_places() -> None:
-    # Rule 2: the part owns the decimal places, so a kept model dimension
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`: the part owns the decimal places, so a kept model dimension
     # nobody authored places for prints SolidWorks' template default and the
     # sheet has nowhere left to say otherwise.
     kept = set().union(
@@ -1469,7 +1469,7 @@ def test_set_screw_pocket_is_retired_for_the_boss() -> None:
         "SetBossWidth": "BOSS WIDTH CENTRED ON TAP\nTOP AT FLANGE UNDERSIDE",
         "SetSpotDia": "SPOT FACE",
     }
-    # Rule 6: short callouts that state the feature, not the process.
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): short callouts that state the feature, not the process.
     for text in drawing.HUB_LEFT_CALLOUTS.values():
         assert len(text.splitlines()) <= 4
         assert not {"CAST", "MILL", "MACHINE"} & set(text.replace("\n", " ").split())
@@ -1811,7 +1811,7 @@ def test_knife_hanger_is_a_6_shcs_counterbore_on_the_knife_line() -> None:
     assert drawing.HANGER_X == part.HANGER_X
     # The counterbore stays inside the junction material at the rear station.
     assert part.STUD_Z_REAR + spec.HANGER_CBORE_DIA / 2.0 < part.INNER_Z + part.GUSSET
-    # Print-worst head checks (rule 12).
+    # Print-worst head checks (drawing-guidelines.md rule 17 (walls and webs)).
     assert spec.HANGER_CBORE_HEAD_CLEARANCE == pytest.approx(0.7496)
     assert spec.HANGER_HEAD_RECESS == pytest.approx(2.4848)
     assert spec.HANGER_HEAD_BEARING == pytest.approx(0.4707)
@@ -1840,7 +1840,7 @@ def test_dowel_slip_hole_contract() -> None:
     assert spec.HANGER_PIN_SLIP_CLEARANCE_MIN == pytest.approx(0.02738)
     assert spec.HANGER_PIN_SLIP_CLEARANCE_MAX == pytest.approx(0.09246)
     assert 0.02 <= spec.HANGER_PIN_SLIP_CLEARANCE_MIN < spec.HANGER_PIN_SLIP_CLEARANCE_MAX <= 0.10
-    # Rule 12 walls and floor, print-worst (the station at its .XXX limit)
+    # drawing-guidelines.md rule 17 (walls and webs) walls and floor, print-worst (the station at its .XXX limit)
     # and after drill drift (test_hanger_walls_meet_the_target_after_drift).
     assert part.PIN_HOLE_BAR_WALL == pytest.approx(3.068, abs=5e-4)
     assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.8015, abs=5e-4)
@@ -1871,7 +1871,7 @@ def test_dowel_slot_contract() -> None:
     # along the slot; from the screw axis it carries both .XXX bands.
     assert spec.HANGER_SLOT_FROM_ROUND == pytest.approx(14.2)
     assert spec.HANGER_SLOT_STATION_TOL == pytest.approx(0.26)
-    # Rule 12 walls and floor, print-worst and after drill drift: both meet
+    # drawing-guidelines.md rule 17 (walls and webs) walls and floor, print-worst and after drill drift: both meet
     # the 2.0 target.
     assert part.SLOT_BAR_WALL == pytest.approx(2.408, abs=5e-4)
     assert part.SLOT_SCREW_WALL == pytest.approx(2.1415, abs=5e-4)
@@ -2000,7 +2000,7 @@ def test_dowel_slot_stadium_closes_counter_clockwise(along_u: bool) -> None:
 
 
 def test_slots_are_positioned_to_the_round_holes_with_translation() -> None:
-    # Policy rule 3 (knife-edge system): datum B the front round hole, C the
+    # drawing-guidelines.md rule 5 (avoid excessive GD&T) (knife-edge system): datum B the front round hole, C the
     # rear; each slot 0.05 to its own station's hole, the other translated.
     assert spec.GEOMETRIC_TOLERANCES_MM == {"knife-hanger slot position": "0.05"}
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -2382,12 +2382,12 @@ def test_section_note_states_the_far_wall_print_worst_engagement() -> None:
     from _mcmaster_90280a837 import SHANK_DIA
 
     engagement = drawing.CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT
-    # Rule 12: the printed bands only shorten the far-wall engagement, and
+    # drawing-guidelines.md rule 17 (walls and webs): the printed bands only shorten the far-wall engagement, and
     # the shortest still holds 1.5D.
     assert 1.5 * SHANK_DIA <= engagement < assembly.TOP_FAR_CASTING_ENGAGEMENT
     note = drawing.CROSS_TAP_SECTION_NOTE
     assert f"{engagement:.1f} FULL THREAD" in note
-    # Rule 6: short notes, short of the title block and inside the frame.
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): short notes, short of the title block and inside the frame.
     lines = note.splitlines()
     x, y = drawing.CROSS_TAP_SECTION_NOTE_XY
     assert len(lines) <= 4
@@ -2409,7 +2409,7 @@ def test_plan_note_centres_the_rail_outlines_on_the_socket_pattern() -> None:
     assert "CENTRED" in note and "4X SOCKET" in note
     lines = note.splitlines()
     x, y = drawing.PLAN_CENTRING_NOTE_XY
-    # Rule 6: a short note.  Rule 8: clear of the sheet-2 ink round it
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): a short note.  drawing-guidelines.md rule 14 (keep text off the part): clear of the sheet-2 ink round it
     # (4d11a94e render, metres): the frame's left edge, the 269.0 extension
     # line at y 0.12365, the 152.9 extension line at x 0.08502 and the front
     # view, whose top is y 0.09747.  Characters print 2.87 mm wide ("CROSSBAR
@@ -2437,7 +2437,7 @@ def test_slip_hole_callout_states_process_and_purpose_briefly() -> None:
     text = spec.HANGER_PIN_HOLE_CALLOUT
     assert text.startswith("2X ") and "REAM" in text and "MHA-VN-051" in text
     assert "BLIND" in text and "FLAT-BOTTOM" in text
-    # Rule 6: short notes.
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): short notes.
     assert len(text.splitlines()) <= 2
     assert max(len(line) for line in text.splitlines()) <= 26
     assert drawing.HANGER_SECTION_CALLOUTS["HangerPinHoleDia"] == text
@@ -2524,7 +2524,7 @@ def test_slot_basic_note_completes_both_stations_frames() -> None:
     # 07527cf4, their transverse station: the screw axis's own Z.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'suffix="2X ROUND HOLE FROM\\nSCREW AXIS, SAME Z"' in source
-    # Rule 6, and rule 8 against the a3735691 sheet-6 ink (metres): F-F's
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method), and drawing-guidelines.md rule 14 (keep text off the part) against the a3735691 sheet-6 ink (metres): F-F's
     # 7.100 block top 0.1133, the 72.0 block's underline 0.13663, detail C's
     # fence (r 0.076 about its centre) at its nearest over the note's rows.
     # Rows print 4.6 mm apart and 3.6 tall, 2.45 mm a glyph (87d93d70).
@@ -2542,7 +2542,7 @@ def test_slot_basic_note_completes_both_stations_frames() -> None:
 
 
 def test_slip_hole_callout_is_parked_clear_of_the_section() -> None:
-    # Rule 8 (dda9a33a8 render): the four-line callout stood across the hole's
+    # drawing-guidelines.md rule 14 (keep text off the part) (dda9a33a8 render): the four-line callout stood across the hole's
     # own extension lines and the underside edge.  It now rides a leader to a
     # block wholly below the section, right of the size's extension lines and
     # left of the title block.
@@ -2575,7 +2575,7 @@ def test_hanger_drill_callout_states_both_entries() -> None:
     """Q7 option C (user, 2026-10-13): the #6 holes are drilled from the
     underside and the counterbores cut from the top.  Sheet 3's callout says
     both, so neither reads as the other's side, with the native size and
-    counterbore rows on their own rows: four rows at most (rule 6)."""
+    counterbore rows on their own rows: four rows at most (drawing-guidelines.md rule 7 (notes: few, flagged, never a method))."""
     import ast
 
     import _drawing_hole_callout
@@ -3010,7 +3010,7 @@ def test_keeper_facing_note_is_the_part_property_carrying_the_keeper_budget() ->
     # One requirement on one face: the whole keeper-rail top between its
     # bosses, named as the print names that rail, with the function that
     # needs it.  No region size, no edge margin, no setup method (machinist
-    # review r13); rule 6's four rows at most.
+    # review r13); drawing-guidelines.md rule 7 (notes: few, flagged, never a method)'s four rows at most.
     assert spec.DRAWING_NOTES_B.splitlines() == [
         "RIGHT RAIL TOP BETWEEN BOSSES",
         "(MHA-CH-007 KEEPER SEATS):",
@@ -3184,7 +3184,7 @@ def test_underside_facing_note_is_the_part_property_carrying_the_seat_finish() -
 
     # Every face on the underside plane between the bosses, named by the
     # mating seats that need it; the bosses and hub gussets below the plane
-    # are named out of it.  No flatness zone, no setup method; rule 6's four
+    # are named out of it.  No flatness zone, no setup method; drawing-guidelines.md rule 7 (notes: few, flagged, never a method)'s four
     # rows at most.
     assert spec.DRAWING_NOTES_C.splitlines() == [
         "UNDERSIDE PLANE BETWEEN BOSSES",

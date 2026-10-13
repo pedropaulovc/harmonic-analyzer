@@ -353,7 +353,7 @@ _DIMENSION = re.compile(r"\d")
 
 def test_sheet_states_the_cut_and_no_dimension_in_the_registry_names() -> None:
     """The purchased sheet prints the registry's stock name, supplier and SKU
-    besides its fixed footer, so none of those may carry a size (Rule 6); the
+    besides its fixed footer, so none of those may carry a size (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); the
     installation note states the cut to fit (R9-47, as the paper-drive
     assembly step prints it) and the cut end's break."""
     row = _config.parts(part.PART_NAME)

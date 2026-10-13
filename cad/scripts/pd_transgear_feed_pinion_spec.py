@@ -483,7 +483,7 @@ OIL_HOLE_TOOTH_OFFSET_DEG = (
 if abs(OIL_HOLE_TOOTH_OFFSET_DEG - GAP_CENTRE_PHASE_DEG) > 1e-9:
     raise AssertionError("the +Y oil hole is no longer on a tooth centre")
 
-# --- walls (rule 12: target 2.0, floor 1.5, at the printed bands) --------------
+# --- walls (drawing-guidelines.md rule 17 (walls and webs): target 2.0, floor 1.5, at the printed bands) --------------
 WALL_TARGET = 2.0
 WALL_FLOOR = 1.5
 _BORE_MAX = BORE_DIA + BORE_DIA_BAND[0]
@@ -517,7 +517,7 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 # ``SleeveProfile`` is the Right-plane revolve of the boss, with
 # construction-only witnesses for the tooth tip, the root and the bore, so
 # every turned diameter prints beside its axial extent on the longitudinal
-# section (rules 2 and 7), and for the cutter's full-depth station, its
+# section (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 11 (turned parts read like the lathe)), and for the cutter's full-depth station, its
 # run-out limit (R9-67).  Lengths are baselined from the rear face.
 # ``FlatProfile`` is the flat's cut sketch on the Right plane (the section
 # plane): the flat from the axis and its end wall from the rear face print on
@@ -602,7 +602,7 @@ GEAR_DATA = gear_data_note(
 # The title block's 0.25 edge break is 14% of this fine tooth's whole depth,
 # and the tooth ends seat the hub's spigot.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-# Named exception: MHA-PD-010 flat wall (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-PD-010 flat wall (#1378).
 # A shop note states the requirement, not the measuring method or the cutter
 # choice (Main ruling 2026-10-10): the run-out length is dimensioned.
 FLAT_WALL_NOTE = f"D-FLAT WALL TO BORE {FLAT_WALL_PRINTED:.2f} MIN."

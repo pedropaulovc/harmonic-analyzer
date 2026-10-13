@@ -218,7 +218,7 @@ if abs(SOCKET_THREAD_ENGAGEMENT - (PLATE_THICKNESS + SOCKET_BOSS_H)) > 1e-9:
     raise AssertionError("clip screw receiver no longer runs through plate and boss")
 if SOCKET_THREAD_ENGAGEMENT + 1e-9 < 1.5 * THREAD_MAJOR_MM[THREAD]:
     raise AssertionError(
-        f"clip {THREAD} engagement {SOCKET_THREAD_ENGAGEMENT:.4f} < 1.5D (rule 12)"
+        f"clip {THREAD} engagement {SOCKET_THREAD_ENGAGEMENT:.4f} < 1.5D (drawing-guidelines.md rule 18 (thread engagement))"
     )
 if HOLE_DIA < SHANK_DIA:
     raise AssertionError("stock fillister shank does not clear the clip")

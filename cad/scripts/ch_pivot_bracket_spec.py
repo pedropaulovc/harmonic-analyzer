@@ -40,7 +40,7 @@ BORE_H = 25.2  # shaft axis above the seat: the rocker pivot stays at machine
 BORE_DIA = 6.5  # O6.35 shaft, 0.15 diametral clearance
 EAR_ARCH_R = EAR_W / 2.0  # the ear's top is a half-round about the bore
 EAR_TOP_Y = BORE_H + EAR_ARCH_R  # 33.2
-BORE_LIGAMENT = EAR_ARCH_R - BORE_DIA / 2.0  # 4.75: rule 12 web over the bore
+BORE_LIGAMENT = EAR_ARCH_R - BORE_DIA / 2.0  # 4.75: drawing-guidelines.md rule 17 (walls and webs) web over the bore
 # The MHA-VN-032 hold-down passes here: #8 close clearance, the hole MHA-DT-002
 # gives the same screw. The old #19 (0.025 radial over the thread major)
 # caught the screw's under-head junction fillet on its mouth (r743-3C).
@@ -161,11 +161,11 @@ SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_WALL_TERMS.values())  # 3.10
 SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.09D
 SET_SCREW_ENGAGEMENT_PRINTED = int(SET_SCREW_ENGAGEMENT_D * 100.0) / 100.0
 # The ruled floor: the R8 arch over the bore is all the thread there is, short
-# of rule 12's 1.5D. It must not fall further without a new ruling.
+# of drawing-guidelines.md rule 18 (thread engagement)'s 1.5D. It must not fall further without a new ruling.
 if SET_SCREW_ENGAGEMENT_PRINTED < 1.08:
     raise AssertionError("MHA-CH-008 apex set-screw engagement fell below 1.08D")
 # The channel assembly's set-screw step states the shortfall as a plain fact.
-# Named exception: MHA-CH-008 set-screw engagement (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-CH-008 set-screw engagement (#1371).
 SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT = (
     f"#4-40 ENGAGEMENT {SET_SCREW_FULL_THREAD_MIN:.2f} MIN "
     f"({SET_SCREW_ENGAGEMENT_PRINTED:.2f}D)."

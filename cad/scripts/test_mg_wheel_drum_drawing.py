@@ -59,7 +59,7 @@ def test_every_size_carries_its_band_on_the_model() -> None:
         ("Drum", "DrumLen"): "*deviations(DRUM_LEN_BAND)",
     }
     assert spec.DRAWING_PRECISION["RingProfile"] == {"DrumOd": 1, "DrumBore": 3}
-    # Rule 12 at the worst printed corner: the .X O.D. on the H7 bore.
+    # drawing-guidelines.md rule 17 (walls and webs) at the worst printed corner: the .X O.D. on the H7 bore.
     assert mg_wheel_drum_geom.WALL_WORST == pytest.approx((18.1 - 14.018) / 2.0)
     assert mg_wheel_drum_geom.WALL_WORST >= mg_wheel_drum_geom.MIN_WALL
 
@@ -83,7 +83,7 @@ def test_drum_presses_on_the_wheel_spigot_never_proud() -> None:
 
 
 def test_each_band_states_its_need_on_its_callout() -> None:
-    # Rule 6: the seating stop rides the press-fit callout; no general note.
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the seating stop rides the press-fit callout; no general note.
     assert not hasattr(spec, "DRAWING_NOTES")
     bore = drawing.DIMENSION_CALLOUTS["DrumBore"].splitlines()
     assert bore == [

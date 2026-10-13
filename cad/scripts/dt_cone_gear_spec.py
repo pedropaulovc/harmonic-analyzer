@@ -81,8 +81,8 @@ PITCH_DIA = TEETH * MODULE_MM
 # dt_mesh_checks.cone_check gates it at the RSS corner of cone_set_stack).
 TOOTH_THICKNESS_BAND = (0.075, -0.075)
 
-# DT6-FORM1, T006 option (a) (user ruling 2026-10-10). T006 is a named
-# exception: against the shared 20 deg 120T drum no full-depth six-tooth form
+# DT6-FORM1, T006 option (a) (user ruling 2026-10-10). T006 is pending
+# exception ruling #971: against the shared 20 deg 120T drum no full-depth six-tooth form
 # can reach a contact ratio of 1, so its tooth is sized for no binding and
 # the drum-tip path instead.
 # * Thickness 0.872 at the tool pitch, the band's upper limit
@@ -516,7 +516,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # 0/-0.05). Every corner must still keep finite cutter support, tip land,
 # root air and web before construction.
 BLANK_DIA_BAND = (0.0, -0.05)
-# T006 keeps its own bands (the named exception, user ruling 2026-10-10):
+# T006 keeps its own bands (pending exception ruling #971, user ruling 2026-10-10):
 # DT6-FORM1's relief leaves no flank for a tooth thicker than the tool, and a
 # thinner or smaller T006 loses the tip land. build_dt_cone_gear writes every
 # configuration's band into that configuration (IDimensionTolerance.SetValues2).
@@ -641,7 +641,7 @@ def configuration_number(part_number: str, teeth: int) -> str:
 
 # --- Decimal places, authored ON THE PART ------------------------------------
 #
-# Policy rule 2: places and bands are model properties.  Three places belong
+# drawing-simplicity-policy.md `How the repository implements the guidelines`: places and bands are model properties.  Three places belong
 # on the fitted bore, across-flat, tooth thickness and gap-floor limits, so
 # both ends of each narrow floor window print without rounding inward.
 # Tip diameter prints two places with its own BLANK_DIA_BAND (below); face

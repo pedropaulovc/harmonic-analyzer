@@ -7,11 +7,11 @@ the tooth root, a little over half a face long, edge rounded, the crankshaft
 end recessed inside it, and the small head of a radial retention pin on its
 side. The pin is what keeps the "removable" pinion on the shaft.
 
-Recreated under ``cad/docs/drawing-simplicity-policy.md``. The sizes a
+Recreated under ``cad/docs/drawing-guidelines.md``. The sizes a
 machinist turns, bores and drills -- outside diameter, face width, bore, boss
 diameter, overall length, pin station -- are NATIVE model dimensions carrying
-their own decimal places and bands (rules 1, 2, 4); the tooth system that a
-cut-gear print cannot express as dimensions stays in the gear-data block rule 6
+their own decimal places and bands (drawing-guidelines.md rule 2 (the title block is the general specification), drawing-guidelines.md rule 3 (decimal places carry the tolerance) and drawing-guidelines.md rule 5 (avoid excessive GD&T)); the tooth system that a
+cut-gear print cannot express as dimensions stays in the gear-data block drawing-guidelines.md rule 7 (notes: few, flagged, never a method)
 allows, with cutter inputs and actual root/depth data marked REF. Exact stock
 base-tangent span carries the part's functional tooth-control limits; circular
 pitch thickness is REF. Nothing here restates the title block.
@@ -240,7 +240,7 @@ SHOULDER_LENGTH_FITUP_MIN = SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[0]
 # north face and leaves its end recessed inside the boss as photographed; its
 # length is derived below (W15). The boss is
 # extruded from the SAME faced end as the teeth, so the print carries one
-# overall length from that end (rule 7: lengths from one faced end, the overall
+# overall length from that end (drawing-guidelines.md rule 11 (turned parts read like the lathe): lengths from one faced end, the overall
 # length real and conspicuous), and the toothed length is FaceWidth.
 BOSS_DIA = ROOT_DIA_MIN
 # The boss's outer end edge takes the title block's edge break: the sized
@@ -286,7 +286,7 @@ def floor_to_places(value: float, places: int) -> float:
 # root, where a form cutter runs out onto it untouched and the photo reads it;
 # a boss proud of the root is scalloped by the cutter's arc up to the pin hole.
 # Its worst wall -- the printed diameter at its general row over the bore's
-# upper limit -- is therefore a ruled exception under the 2.0 wall target,
+# upper limit -- is therefore a shortfall under the 2.0 wall target (pending ruling #1374),
 # held above the 1.5 floor here, so an OD, tooth or bore change that eats
 # into the floor fails loud.
 BOSS_DIA_PLACES = 1
@@ -515,7 +515,7 @@ BORE_FIT_CALLOUT = "\n".join(
 # a sheet stands alone, so each carries all four facts --
 # match drill at assembly, ream to fit the named pin, the fit's acceptance,
 # flush -- with the other part and where on this one the hole runs.
-# Four lines, no dimensions (rule 6); MHA-DT-000 step 4 reads the shaft's.
+# Four lines, no dimensions (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); MHA-DT-000 step 4 reads the shaft's.
 PIN_FIT_LINES = (
     f"REAM TO FIT PIN {PIN_NUMBER}, LIGHT HAMMER FIT",
     "NOT REMOVABLE BY HAND, FLUSH BOTH SIDES",
@@ -537,7 +537,7 @@ CRANKSHAFT_PIN_HOLE_PROCESS = pin_hole_note(
 # a size-toleranced fit onto the crankshaft, and a fit lives on the peaks as
 # much as on the limits, so the bore carries the project's general machined
 # grade. Nothing runs on the teeth or the faces -- they are as the title
-# block's process row states (cad/docs/drawing-simplicity-policy.md rule 5).
+# block's process row states (cad/docs/drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
     SurfaceFinishControl("crank_pinion_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
 )
@@ -550,7 +550,7 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 # turned diameters/lengths on the side view without changing the solid:
 # ``BossDia`` and ``OverallLength`` drive the revolve, while ``OutsideDia`` and
 # ``BoreDia`` are equation-driven native reference dimensions attached to the
-# matching axial extents (rule 2's reference-sketch allowance and rule 7's
+# matching axial extents (drawing-simplicity-policy.md `How the repository implements the guidelines`'s reference-sketch allowance and drawing-guidelines.md rule 11 (turned parts read like the lathe)'s
 # turned-part layout). The ``TurnedBandProfile`` is the Right-plane revolve
 # cut that turns the teeth down north of the shoulder; its shoulder length
 # (from the same faced end) and turned diameter drive it. ---
@@ -562,7 +562,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # --- Decimal places, authored ON THE PART ------------------------------------
 #
-# Policy rule 2: the places a dimension prints are part of the tolerance it
+# drawing-simplicity-policy.md `How the repository implements the guidelines`: the places a dimension prints are part of the tolerance it
 # claims, and the model owns both. ``build_dt_crank_pinion`` applies this table
 # natively (``_drawing_precision.apply_drawing_precision``) right after the drawing
 # marks, so ``draw_dt_crank_pinion`` imports each dimension verbatim and only reads

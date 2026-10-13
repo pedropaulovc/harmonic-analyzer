@@ -8,7 +8,7 @@ interference are reported only. The crank pair's open-corner figure is a
 reference, as main printed it (dt_crank_drive_gear_notes, user ruling
 2026-09-30).
 
-Named exceptions:
+Pending exception rulings (#971):
 * T006 (user ruling 2026-10-10): no full-depth six-tooth form reaches a
   contact ratio of 1 against the shared 20 deg drum. It is gated for a ground
   relief at least 10 um clear of every drum-tip corner's path over its RSS

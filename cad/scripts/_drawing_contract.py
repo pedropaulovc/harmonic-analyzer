@@ -33,7 +33,7 @@ _TOLERANCE_SETTERS = frozenset(
     }
 )
 
-# Drawing scripts whose part builds own display precision (policy rule 2):
+# Drawing scripts whose part builds own display precision (drawing-guidelines.md rule 3 (decimal places carry the tolerance)):
 # ``<part>_spec.DRAWING_PRECISION`` is applied natively on the .SLDPRT and the
 # drawing only reads it back.  A render-time ``SetPrecision3`` /
 # ``set_dimension_precision`` in one of these is a part missing its tolerance.

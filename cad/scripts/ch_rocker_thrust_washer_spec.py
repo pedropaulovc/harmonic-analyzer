@@ -59,24 +59,24 @@ MATERIAL_TITLE = "1008 CR sheet, ASTM A1008 CS"
 BORE_DIA = _BRACKET_BORE_DIA  # slips on the O6.35 pivot shaft
 # Running clearance on the shaft: never under the bore. The sheet calls it
 # DRILL THRU, so the title block's DRILLED HOLES row is its band and the model
-# carries none (rule 1: a callout never restates the title block; PR #1317
+# carries none (drawing-guidelines.md rule 2 (the title block is the general specification): a callout never restates the title block; PR #1317
 # machinist review). The layout's wall and clearance stacks read this; the
 # value is that row's (pinned to _config by the tests, so the rocker bank
 # layout does not read the title block).
 BORE_BAND = (0.10, 0.0)  # (upper, lower) deviations
 
-# The wall floor: rule 12's 1.5 over the bore at its largest, with the OD at
+# The wall floor: drawing-guidelines.md rule 17 (walls and webs)'s 1.5 over the bore at its largest, with the OD at
 # the bottom of the .XX band (machinist review, MHA-CH-009 round 1).
 _OD_FLOOR = BORE_DIA + BORE_BAND[0] + 2.0 * RULE12_WALL_FLOOR + LINEAR_2PL
 OD_MIN = math.ceil(round(_OD_FLOOR * 100.0, 9)) / 100.0  # 10.11
 OD = HUB_DIA
 if OD < OD_MIN:
     raise AssertionError(
-        f"washer O{OD:.2f} is under its rule-12 wall floor O{OD_MIN:.2f}"
+        f"washer O{OD:.2f} is under its drawing-guidelines.md rule 17 (walls and webs) wall floor O{OD_MIN:.2f}"
     )
 
 # Marked model dimensions and the places the model authors on them
-# (drawing-simplicity policy rule 2): the bore banded, the thickness printed
+# (drawing-simplicity-policy.md `How the repository implements the guidelines`): the bore banded, the thickness printed
 # as the stock callout.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {"DiscDia", "BoreDia"},

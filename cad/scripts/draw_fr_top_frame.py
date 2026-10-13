@@ -415,7 +415,7 @@ BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0135, 0.176)
 
 # A-A's joint note. The near wall between the flush counterbore floor and
 # the socket bore only starts the thread; the far casting wall carries the
-# MHA-VN-027 joint. Rule 12, print-worst: the stock shank, less the most
+# MHA-VN-027 joint. drawing-guidelines.md rule 17 (walls and webs), print-worst: the stock shank, less the most
 # outboard printed floor (16.35 + band) and the largest printed socket radius.
 _SOCKET_DIA_PLACES = DRAWING_PRECISION["BoreProfile"]["B0Dia"]
 CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT = (
@@ -907,7 +907,7 @@ PLAN_CENTRING_NOTE_XY = (0.016, 0.118)
 # are not imported: the model's Hole Wizard placement dims measure from the
 # origin -- mid-air on the print, a centre the shop would first have to
 # derive from the socket pattern -- so sheet 3 dimensions every hole from
-# the socket bore axes instead (``HOLE_STATIONS``, policy rule 7).
+# the socket bore axes instead (``HOLE_STATIONS``, drawing-guidelines.md rule 10 (dimension from a real feature)).
 DETAIL_TOP_KEEP = {
     "C0Dia": (0.035, 0.232),
     "B0Dia": (0.050, 0.252),
@@ -1046,7 +1046,7 @@ def _exact_linear_entities(
 def _set_derived_precision(display: Any, *, label: str) -> int:
     """Give one SHEET-DERIVED dimension the places the part's spec owns.
 
-    Policy rule 2 puts the decimal places on the model dimension, and every
+    drawing-simplicity-policy.md `How the repository implements the guidelines` puts the decimal places on the model dimension, and every
     dimension the part carries is imported and read back
     (``assert_imported_precision``).  What is left on this print are distances
     between two model faces that no single model dimension expresses -- a web
@@ -1252,7 +1252,7 @@ def _assert_section_display(
 ) -> None:
     """Read one section view's display mode and cut state back off the sheet.
 
-    Policy rule 7: hidden lines belong only in a view whose features are
+    drawing-guidelines.md rule 9 (show internal shape in solid lines): hidden lines belong only in a view whose features are
     communicated by them.  A section already exposes its interior by cutting,
     so the removed half redrawn as dashed ghosts was the one thing on the view
     saying nothing -- every section on this print is hidden-lines-removed.
@@ -1481,7 +1481,7 @@ def _hub_boss_section(adapter: Any, parent_view: Any) -> Any:
 def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     """A removed section F-F through the rear knife-hanger station.
 
-    Policy rule 7: the counterbore floor and the blind slip hole are interior
+    drawing-guidelines.md rule 9 (show internal shape in solid lines): the counterbore floor and the blind slip hole are interior
     features, so they are dimensioned where a cut shows them as solid lines,
     never off hidden lines.  The counterbore itself is fully defined by its
     callout on sheet 3; this view adds what no callout states -- the floor's
@@ -1609,7 +1609,7 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     )
     set_dimension_callouts(adapter, dimensions, HANGER_SECTION_CALLOUTS)
     # Four lines cannot stand between extension lines 3.24 apart: park the
-    # text on a leader, clear of the section (rule 8: no text on a line).
+    # text on a leader, clear of the section (drawing-guidelines.md rule 14 (keep text off the part): no text on a line).
     offset_dimension_text(
         adapter, dimensions, {"HangerPinHoleDia": HANGER_PIN_DIA_OFFSET_XY}
     )
@@ -2127,7 +2127,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *GEOMETRY_FRONT_CENTER,
         scale=SHEET_SCALE,
     )
-    # Policy rule 7: the plan view's hidden rail undersides and land
+    # drawing-guidelines.md rule 9 (show internal shape in solid lines): the plan view's hidden rail undersides and land
     # pads repeat what sections B-B and E-E plus the sheet 6 underside
     # view already describe, so they come off the dimensioned plan.
     set_hidden_lines_removed(adapter, geometry_top)
@@ -2626,7 +2626,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=DETAIL_SECTION_SCALE,
         label="top-frame corner section",
     )
-    # Rule 7: hidden lines only where they inform.  The cross-taps this
+    # drawing-guidelines.md rule 9 (show internal shape in solid lines): hidden lines only where they inform.  The cross-taps this
     # elevation calls out are counterbored from the face it looks at, so the
     # Ø9.0 counterbore rim and the tap drill circle inside it are VISIBLE ink
     # and the 10-32 callout, its native drill/thread depths and the
@@ -2779,7 +2779,7 @@ async def build(adapter: Any) -> dict[str, str]:
         opposed_floors.append(max(candidates, key=lambda item: item[1][1]))
     # The counterbore floors are located from the socket bore AXIS the shop
     # indicates, not from the frame midplane (a centre it would first have
-    # to derive from the socket pattern -- codex round 5, policy rule 7):
+    # to derive from the socket pattern -- codex round 5, drawing-guidelines.md rule 10 (dimension from a real feature)):
     # the rear floor from the rear bore axis, the front pair being its
     # mirror at the 224.00 pitch sheet 3 states.  The floor-to-floor span
     # stays as a parenthesised reference.
@@ -3151,7 +3151,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The knife-hanger dowel pattern: datum B the front round hole, datum C
     # the rear one; each slot located to the near round hole, free along the
-    # line to the far one (tolerance-gdt-assessment / policy rule 3).  Each
+    # line to the far one (tolerance-gdt-assessment / drawing-guidelines.md rule 5 (avoid excessive GD&T)).  Each
     # tag is attached by a sheet-point pick on its hole's rim, toward the tag,
     # proved to be the scanned circle: selected as an edge object, the tag
     # ignored SetPosition2 and stayed at its default drop, 37.6 mm from its

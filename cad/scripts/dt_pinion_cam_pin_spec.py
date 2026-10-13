@@ -34,14 +34,14 @@ RETAINING_COMPOUND_MAX_GAP_MM = 0.25
 PIN_LENGTH_TOLERANCE_MM = 0.05
 CAP_RADIUS_TOLERANCE_MM = 0.05
 
-# Rule 7 (turned parts): the shank is a Right-plane half-profile, so its
+# drawing-guidelines.md rule 11 (turned parts read like the lathe) (turned parts): the shank is a Right-plane half-profile, so its
 # diameter prints on the side view beside the length, not on the end view
 # (machinist review of 7f7fc1717).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "Depth"},
     "CapProfile": {"CapR"},
 }
-# Decimal places ARE the tolerance statement (policy rule 2): the h9 stock
+# Decimal places ARE the tolerance statement (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the h9 stock
 # band and the two +/-0.05 bands are all hundredths.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {"PinDia": 2, "Depth": 2},
@@ -64,7 +64,7 @@ if "drill rod" not in STOCK.lower():
     raise AssertionError(f"the h9 bonded slip fit assumes drill rod, not {STOCK!r}")
 PIN_DIA_CALLOUT = f"SLIP FIT IN {SEAT_NUMBER} FOLLOWER SEAT"
 
-# Rule 5: the crown is the surface that runs (it rides the cam OD); the
+# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the crown is the surface that runs (it rides the cam OD); the
 # bonded shank is a static seat and carries no symbol.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -83,7 +83,7 @@ if BOND_CLEARANCE_MIN < 0.0 or BOND_CLEARANCE_MAX > RETAINING_COMPOUND_MAX_GAP_M
         f" 0-{RETAINING_COMPOUND_MAX_GAP_MM} {RETAINING_COMPOUND} window"
     )
 
-# Rule 6: assembly requirements belong on the feature callout or the
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): assembly requirements belong on the feature callout or the
 # assembly step, never in a part's general notes.  ASSEMBLY_STEP is the
 # pinion fit-up step text (pinion_rig_fitup) that owns this joint.
 DRAWING_NOTES = "\n".join(
@@ -100,5 +100,5 @@ ASSEMBLY_STEP = (
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"
 # The overall (seated end to crown apex) is a pure reference restatement;
-# its places are specification (policy rule 2).
+# its places are specification (drawing-guidelines.md rule 3 (decimal places carry the tolerance)).
 DRAWING_REFERENCE_PRECISION = 2

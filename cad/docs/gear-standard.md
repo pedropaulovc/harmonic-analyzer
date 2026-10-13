@@ -111,7 +111,7 @@ written for a set mesh (`cone_set_stack`, `dt_mesh_checks`,
 - Cones T012–T120 must reach a contact ratio of at least 1.0 at the nominal
   set centre, and show no binding and no interference at the RSS corner of the
   centre and tooth bands. Nominal ratios run from 1.05 (T012) up to about 1.19.
-- T006 is the named exception. No full-depth six-tooth form reaches a contact
+- T006 is pending exception ruling #971. No full-depth six-tooth form reaches a contact
   ratio of 1 against the 20° 120T drum, so T006 is gated instead on its
   DT6-FORM1 relief standing at least 0.010 mm clear of every printed drum-tip
   path over the RSS centre range, with at least 0.02 mm backlash. Its contact

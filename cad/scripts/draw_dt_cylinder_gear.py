@@ -590,7 +590,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*front_annotations, *right_annotations, *detail_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    # Every place the part authored (policy rule 2) must have survived the
+    # Every place the part authored (drawing-simplicity-policy.md `How the repository implements the guidelines`) must have survived the
     # import: a dimension that fell back to the sheet default would print a
     # band nobody specified.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

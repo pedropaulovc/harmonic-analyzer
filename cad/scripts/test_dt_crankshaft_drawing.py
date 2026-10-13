@@ -29,7 +29,7 @@ def test_required_drawing_paths() -> None:
 
 
 def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
-    # Rule 3: a shaft carries no frames, datums or basic dimensions.
+    # drawing-guidelines.md rule 5 (avoid excessive GD&T): a shaft carries no frames, datums or basic dimensions.
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     for helper in (
@@ -39,7 +39,7 @@ def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
         "set_dimension_precision",
     ):
         assert helper not in source
-    # Rule 2: the part authors every printed dimension's places.
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`: the part authors every printed dimension's places.
     assert "draw_dt_crankshaft.py" in PRECISION_MIGRATED_DRAWINGS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
@@ -55,7 +55,7 @@ def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
         "CollarSeatStation",
     } <= marked - spec.REFERENCE_DIMENSIONS
     # Running/seat fits print at three places; the seat collar's functional
-    # bands (rule 12) at the places that hold them; the rest at one.
+    # bands (drawing-guidelines.md rule 3 (decimal places carry the tolerance)) at the places that hold them; the rest at one.
     functional_places = {
         "ShaftDiaDim": 3,
         "JournalDiaDim": 3,
@@ -147,36 +147,15 @@ def test_seat_collar_lands_the_wheel_seat_and_leaves_the_washer_its_fit() -> Non
     )
 
 
-_POLICY = (
-    Path(spec.__file__).resolve().parents[1] / "docs" / "drawing-simplicity-policy.md"
-)
-
 
 def _floor_2(value: float) -> float:
     return math.floor(value * 100.0 + 1e-9) / 100.0
 
 
-def test_spigot_rim_is_the_named_exception_the_sheet_states() -> None:
-    # The drive-pin holes' rim to the Ø17.5 seat spigot is under the policy's
-    # wall floor (a named exception, MHA-DT-011): the worst case of the printed
-    # bands is what the sheet states under the holes' callout and what the
-    # policy row records, rounded down so neither claims more rim than exists.
-    policy = _POLICY.read_text(encoding="utf-8")
-    floor = re.search(r"hard floor of \*\*(\d+(?:\.\d+)?) mm\*\*", policy)
-    assert floor
-    section = policy.split("\n## Named exceptions", 1)[1].split("\n## ", 1)[0]
-    rows = [
-        [cell.strip() for cell in line.strip().strip("|").split("|")]
-        for line in section.splitlines()
-        if line.startswith("| MHA-DT-011 ")
-    ]
-    (shortfall,) = [cells[1] for cells in rows if "spigot" in cells[0]]
-    recorded = re.search(
-        r"spigot rim (\d+\.\d\d) nominal, (\d+\.\d\d) at the worst case",
-        shortfall,
-        re.IGNORECASE,
-    )
-    assert recorded, shortfall
+def test_spigot_rim_is_the_shortfall_the_sheet_states() -> None:
+    # The drive-pin holes' rim to the Ø17.5 seat spigot is under the 1.5 mm
+    # wall floor (pending ruling #991): the sheet states the worst case of
+    # the printed bands, rounded down so it never claims more rim than exists.
     hole_r = spec.DRIVE_PIN_HOLE_DIA / 2.0
     nominal = spec.SPIGOT_DIA / 2.0 - (spec.DRIVE_PIN_CIRCLE_RADIUS + hole_r)
     worst = (spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[1]) / 2.0 - (
@@ -187,12 +166,11 @@ def test_spigot_rim_is_the_named_exception_the_sheet_states() -> None:
     )
     rim = spec.DRIVE_PIN_SPIGOT_RIM_WORST
     assert rim == _floor_2(worst)
-    assert 0.0 < rim < float(floor.group(1))
+    assert 0.0 < rim < 1.5
     printed = re.search(r"SPIGOT RIM (\d+\.\d\d) MIN\.", notes.DRIVE_PIN_CALLOUT)
     assert printed
     assert float(printed.group(1)) == rim
-    assert float(recorded.group(2)) == rim
-    assert float(recorded.group(1)) == _floor_2(nominal) == spec.DRIVE_PIN_SPIGOT_RIM
+    assert _floor_2(nominal) == spec.DRIVE_PIN_SPIGOT_RIM
 
 
 def test_drive_pin_depth_prints_its_band_after_the_native_depth() -> None:

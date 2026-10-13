@@ -42,7 +42,7 @@ if not (_HUB_MIN <= _OD_MIN and _OD_MAX <= _HUB_MAX):
 BORE_DIA = 6.51
 BORE_BAND = (0.005, -0.005)
 BORE_PLACES = 3
-# Policy rules 2 and 6: the matched fit sits on the bore's callout, naming
+# drawing-guidelines.md rule 4 (tighten only for function, and name the mate) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit sits on the bore's callout, naming
 # the mate by Number with its acceptance (callout above, callout below).
 BORE_FIT_CALLOUT = ("", "SLIDES ON MHA-CH-006-TL-05 STUD BY HAND WITHOUT SHAKE")
 BORE_FIT_NOTE = " ".join(part for part in BORE_FIT_CALLOUT if part)
@@ -68,11 +68,11 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),)
 # The blind reviewer sees only the sheet: each note states a function.
 # Hardness lives in the Finish field.
-# Rule 12 wall: the rim between the printed O.D. lower limit and the bore.
+# drawing-guidelines.md rule 17 (walls and webs) wall: the rim between the printed O.D. lower limit and the bore.
 RIM_WALL_MIN = 1.78
 if round((_OD_MIN - BORE_DIA) / 2.0, 2) != RIM_WALL_MIN:
     raise AssertionError("filing-button stated rim wall drifted from its geometry")
-# Named exception: MHA-CH-006-TL-04 rim wall 1.78 MIN
+# Pending exception ruling: MHA-CH-006-TL-04 rim wall 1.78 MIN (#1369).
 RIM_WALL_NOTE = f"RIM WALL {RIM_WALL_MIN:.2f} MIN."
 DRAWING_NOTES = (
     "RIM SETS THE FILED DIAMETER OF THE ROCKER ARM HUB; O.D. ROUND AND TRUE TO BORE.\n"

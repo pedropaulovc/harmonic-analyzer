@@ -8,7 +8,7 @@ Every value comes from the part specs and config:
   user ruling 2026-10-10): nominal contact ratio >= 1.0 at the mean centre,
   and no binding and no interference at the RSS corner. The RSS contact
   ratio and the arithmetic worst-corner interference are reported only;
-* the T006 named exception: its DT6-FORM1 relief must stay clear of every
+* the T006 shortfall (pending exception ruling #971): its DT6-FORM1 relief must stay clear of every
   printed drum-tip corner's path over the RSS centre range
   (``t006_relief_clearance_mm``).
 

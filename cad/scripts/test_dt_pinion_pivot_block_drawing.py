@@ -75,7 +75,7 @@ def test_live_stock_block_screw_keeps_full_threads_at_the_longest_grip() -> None
 
 
 def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
-    # Both bores run a shaft (rule 5): MHA-DT-019 in the pivot bore, MHA-DT-017
+    # Both bores run a shaft (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MHA-DT-019 in the pivot bore, MHA-DT-017
     # in the lift bore.
     pivot, lift = dt_pinion_pivot_block_spec.SURFACE_FINISHES
     assert (pivot.key, lift.key) == ("pivot_bore", "lift_bore")
@@ -135,7 +135,7 @@ def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
 def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
     notes = dt_pinion_pivot_block_spec.DRAWING_NOTES
     # Fable review r4: the notes no longer restate the REAM and hold-down
-    # callouts; they name each running bore's mate (rule 2).
+    # callouts; they name each running bore's mate (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)).
     assert "Ø4.978" not in notes
     assert "REAM" not in notes
     # Each mate is named exactly as its own title block reads (pc-r7 eye
@@ -176,7 +176,7 @@ def test_hole_states_are_annotated() -> None:
 
 
 def test_block_carries_no_gdt_only_its_running_bore_finish() -> None:
-    # Drawing-simplicity policy rules 3/4: blocks are not on the GD&T
+    # drawing-guidelines.md rule 5 (avoid excessive GD&T): blocks are not on the GD&T
     # allowlist, so no datum tags, no feature-control frames, no basic boxes.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_datum_feature(" not in source
@@ -220,15 +220,15 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
 def test_notes_stay_within_policy_and_leave_assembly_to_the_assembly() -> None:
     notes = dt_pinion_pivot_block_spec.DRAWING_NOTES.splitlines()
-    assert len(notes) <= 4  # policy rule 6
-    # Never a method (rule 6): spotting the base seats through the block
+    assert len(notes) <= 4  # drawing-guidelines.md rule 7 (notes: few, flagged, never a method)
+    # Never a method (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): spotting the base seats through the block
     # is the rig-set step and the base sheet's transfer callout.
     assert not any("ASSEMBLY" in line or "SPOT" in line for line in notes)
     from pinion_rig_fitup import RIG_SET_STEP
 
     assert "SPOTTING THE TRANSFER SEATS" in RIG_SET_STEP
     # The feeler setting is an assembly step (drive-train assembly drawing),
-    # and a note carries no dimension (rule 6, Codex #854).
+    # and a note carries no dimension (drawing-guidelines.md rule 7 (notes: few, flagged, never a method), Codex #854).
     assert not any(re.search(r"\d", line) and "MHA-" not in line for line in notes)
     assert not any("FEELER" in line for line in notes)
     assert not any("FINISH" in line for line in notes)  # the title block owns it
@@ -247,7 +247,7 @@ def test_assembly_and_base_depend_on_geometry_not_drawing_notes() -> None:
 
 
 def test_views_carry_no_hidden_lines_and_the_drill_callout_names_its_process() -> None:
-    # Fable review r4 (rule 7): the holes are standard drills and reams fully
+    # Fable review r4 (drawing-guidelines.md rule 9 (show internal shape in solid lines)): the holes are standard drills and reams fully
     # defined by their callouts, so every view is hidden-lines-removed.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_hidden_lines_visible" not in source

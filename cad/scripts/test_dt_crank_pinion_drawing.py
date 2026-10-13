@@ -1,6 +1,6 @@
 """Offline contracts for the crank-pinion drawing.
 
-The print is recreated under ``cad/docs/drawing-simplicity-policy.md``: a
+The print is recreated under ``cad/docs/drawing-guidelines.md``: a
 custom 16T pinion with a hub boss and a match-drilled retention pin
 carries no datums or frames, its turned sizes and lengths are native model
 dimensions whose places and bands the PART owns, the pin hole is governed by
@@ -64,7 +64,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         }
     )
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    # Turned part (rules 7 and 12): every diameter sits beside its axial extent
+    # Turned part (drawing-guidelines.md rule 11 (turned parts read like the lathe)): every diameter sits beside its axial extent
     # on the longitudinal section. The tip circle and bore are native
     # construction-reference dimensions in the Right-plane boss profile, not
     # numbers authored by the drawing; the end view is left dimension-free.
@@ -87,7 +87,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 
 def test_the_blank_sizes_are_native_model_dimensions() -> None:
-    # Rule 1: the outside diameter and the face width are turned before a
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`: the outside diameter and the face width are turned before a
     # cutter touches the part, so they are model dimensions of the gear blank
     # the shared helper builds -- named, driven and toleranced HERE, never
     # retyped into the gear-data block as text.
@@ -115,7 +115,7 @@ def test_the_blank_sizes_are_native_model_dimensions() -> None:
 
 
 def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
-    # Rule 2: the places a dimension prints are part of the tolerance it
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`: the places a dimension prints are part of the tolerance it
     # claims, so the model owns them. The overall length is a look (the shaft
     # end recessed inside the boss), not a fit: one place like the face width.
     assert spec.DRAWING_PRECISION_BY_NAME == {
@@ -184,7 +184,7 @@ def test_the_boss_is_the_root_circle_and_the_pin_hole_stays_in_its_wall() -> Non
 
 
 def _assert_four_fact_note(note: str, mate_number: str) -> None:
-    """Rule 6 (Main, 2026-09-25): at most four lines, no dimensions, and --
+    """drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main, 2026-09-25): at most four lines, no dimensions, and --
     because each sheet stands alone -- all four facts of the matched fit:
     match drill at assembly with the named mate (and where it runs), ream to
     fit the named pin, the fit's acceptance, flush both sides."""
@@ -317,7 +317,7 @@ def test_bore_finish_lands_lower_right_clear_of_the_cutting_line() -> None:
 
 
 def test_the_bore_fit_is_the_only_three_place_dimension() -> None:
-    # Policy rule 2: the places a dimension prints select its band. Only the
+    # drawing-guidelines.md rule 3 (decimal places carry the tolerance): the places a dimension prints select its band. Only the
     # fit over the crankshaft needs three, and the native Right-plane
     # dimension carrying it is the one the sheet keeps.
     assert "BoreDia" in spec.DRAWING_DIMENSIONS["BossProfile"]
@@ -387,9 +387,9 @@ def test_callouts_add_only_what_the_number_cannot_carry() -> None:
 
 
 def test_print_carries_no_gdt_or_basic_dimensions() -> None:
-    # Rules 3-4: a removable stock pinion clamped to its crankshaft is not on
+    # drawing-guidelines.md rule 5 (avoid excessive GD&T): a removable stock pinion clamped to its crankshaft is not on
     # the GD&T allowlist, so no datum, frame or basic dimension survives. The
-    # ONE roughness it keeps is rule 5's exception -- the bore is a
+    # ONE roughness it keeps is drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)'s exception -- the bore is a
     # size-toleranced fit, and a fit depends on the peaks as well as the size.
     source = _source()
     for helper in (
@@ -594,7 +594,7 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material_specification"] == material
     # The FINISH field states the surface condition only: how the teeth are
     # made is the PROCESS row's job, and saying it twice is the
-    # over-specification rule 4 bans (codex machinist review, 2026-09-20).
+    # over-specification drawing-guidelines.md rule 5 (avoid excessive GD&T) bans (codex machinist review, 2026-09-20).
     assert config["finish"] == "oiled"
     assert not any(
         word in config["finish"].lower() for word in ("cut", "hob", "shaper", "machin")

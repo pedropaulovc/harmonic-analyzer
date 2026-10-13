@@ -33,7 +33,7 @@ LENGTH = 5.2
 # The forward stop of the knob's end float (contract §12): explicit ± band.
 LENGTH_TOL = 0.05
 
-# Places each printed dimension carries (policy rule 12): the O.D. is routine
+# Places each printed dimension carries (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the O.D. is routine
 # at .X (the wall below holds at that row, and nothing fits on the O.D.); the
 # bore prints at .XX under its own band; the length at .XXX under its
 # explicit band.
@@ -69,7 +69,7 @@ SURFACE_FINISHES = (
 )
 
 # Marked model dimensions and the places the model authors on them
-# (drawing-simplicity policy rule 2).
+# (drawing-simplicity-policy.md `How the repository implements the guidelines`).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {"RingOd", "BoreDia"},
     "Ring": {"RingLength"},

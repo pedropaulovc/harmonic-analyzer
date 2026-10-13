@@ -181,7 +181,7 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(3, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     # Every hole here is a standard drill or ream fully defined by its
-    # callout, so no view carries hidden lines (rule 7; Fable review r4).
+    # callout, so no view carries hidden lines (drawing-guidelines.md rule 9 (show internal shape in solid lines); Fable review r4).
     for view in (front, top, right, iso):
         set_hidden_lines_removed(adapter, view)
 
@@ -207,7 +207,7 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
     # Hold-down holes: ordinary coordinates baselined from the WEST end, the
-    # edge the pivot bore's 26.00 already runs from.  Policy rules 3/4: a block
+    # edge the pivot bore's 26.00 already runs from.  drawing-guidelines.md rule 5 (avoid excessive GD&T): a block
     # carries no frames, datums or basic boxes.  Both drills sit at exact
     # mid-depth, so one depth coordinate from the broad face locates the pair.
     west_end = (_front_x(-BLOCK_WEST), TOP_CENTER[1])
@@ -270,7 +270,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pivot bore finish",
         char_height=0.0025,
     )
-    # The lift bore runs MHA-DT-017 (rule 5).  Its REAM callout leaves the rim
+    # The lift bore runs MHA-DT-017 (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).  Its REAM callout leaves the rim
     # upper-left and crosses to the lower-right, its centre lines leave at
     # 180 and 270 deg, so 225 deg is the clear sector; the symbol sits in
     # the empty band left of the block, under the lift REAM callout and

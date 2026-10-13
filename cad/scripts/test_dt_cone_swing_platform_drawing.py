@@ -169,7 +169,7 @@ def test_stepped_collar_extension_keeps_post_and_tip_attachment_laws() -> None:
 
 
 def test_pivot_relief_runs_out_through_the_north_edge() -> None:
-    """Rule-12 W18 (d): no web is left between the relief and the north edge.
+    """drawing-guidelines.md rule 17 (walls and webs) W18 (d): no web is left between the relief and the north edge.
 
     As a closed Ø10.50 spotface 7.0 from the edge it left 1.75 nominal, under
     the 2.0 target.  Open to the edge, the web does not exist; the relief's
@@ -434,7 +434,7 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     U37 accepts short engagement for the 1/4-20 post screws. The printed worst
     case is the thinnest stock plate (U41 band), less the 0.3 cut-to-fit
     allowance and the local 0.1 break at each end of the tap, floored:
-    5.72 mm = 0.90D, never under the rule-12 audit's E7 floor of 0.87D.
+    5.72 mm = 0.90D, never under the drawing-guidelines.md rule 18 (thread engagement) audit's E7 floor of 0.87D.
     """
     worst = (
         spec.PLATE_THICKNESS

@@ -7,7 +7,7 @@ Section A-A uses the Front plane through the axis and two knurl crests, so the
 knurl diameter, the head, waist and flange, the overall length from the seat
 face and the dish's rim and floor diameters and its depth to the floor print
 on solid cut edges.  No roughness symbol: the seat face clamps the wheel
-(policy rule 5).
+(drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
 """
 
 from __future__ import annotations

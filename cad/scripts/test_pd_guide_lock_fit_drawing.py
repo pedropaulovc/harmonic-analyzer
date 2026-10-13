@@ -360,7 +360,7 @@ def test_one_lock_size_retains_the_platen_on_both_rails(monkeypatch) -> None:
 
 def test_the_height_holds_retention_at_the_general_band(monkeypatch) -> None:
     """Codex P1 on #1353: a .XX height needed a design-intent note to justify
-    it, which rule 6 bars, so the plate grows to 9.6 and prints the general
+    it, which drawing-guidelines.md rule 7 (notes: few, flagged, never a method) bars, so the plate grows to 9.6 and prints the general
     .X. At 9.6 ±0.8 the lifted top plates still lap the bar 0.5 or more; a
     9.5 plate at the same band would not."""
     import build_pd_paper_drive_assembly as assembly

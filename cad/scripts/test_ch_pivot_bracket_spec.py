@@ -49,8 +49,8 @@ def test_web_over_the_bore_keeps_the_floor() -> None:
 
 
 def test_set_screw_engagement_is_the_named_exception_value() -> None:
-    """Short of rule 12's 1.5D: the R8 arch over the bore is all the thread
-    there is (named exception, drawing-simplicity-policy.md)."""
+    """Short of drawing-guidelines.md rule 18 (thread engagement)'s 1.5D: the R8 arch over the bore is all the thread
+    there is (pending exception ruling #1371)."""
     assert bracket.SET_SCREW_FULL_THREAD_MIN == pytest.approx(3.098, abs=1e-3)
     assert bracket.SET_SCREW_ENGAGEMENT_D == pytest.approx(1.089, abs=1e-3)
     assert bracket.SET_SCREW_ENGAGEMENT_PRINTED == 1.08

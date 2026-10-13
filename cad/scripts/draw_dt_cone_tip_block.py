@@ -1426,7 +1426,7 @@ def _pinch_thread_callout_resolved(resolved_parts: dict[int, str]) -> bool:
     )
 
 
-# Policy rule 7: a blind tap states its full-thread depth, and here its
+# drawing-guidelines.md rule 12 (hole and slot callouts say what to do): a blind tap states its full-thread depth, and here its
 # tap-drill depth too, which sets the lead the tap needs past the thread.
 # Both print at FOOT_DEPTH_PLACES, the general band the spec's reach and lead
 # stacks read, not the native two places.

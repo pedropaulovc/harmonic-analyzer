@@ -180,7 +180,7 @@ tolerance.**
 
 4. **The Ø6-tooth gear is marginal by construction.** T006's gap floor, cut by its DT6-FORM1
    tool, is printed at Ø2.136 MIN, which leaves a **0.64 mm minimum web** over the largest allowed
-   1/32 in bore, against the 0.62 mm floor of its named exception. The first 48DP PA20 study left
+   1/32 in bore, against the 0.62 mm floor of its pending exception ruling (#971). The first 48DP PA20 study left
    only 0.354 mm on a 1/16 in bore, so the terminal journal was cut to
    1/32 in. That is a real machining hazard, not a CAD
    artifact — call it out as the hardest part to make, and note the period-correct mitigation: the

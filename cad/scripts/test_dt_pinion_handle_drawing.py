@@ -34,7 +34,7 @@ def test_registry_slug_now_describes_the_separate_grip_crossrod() -> None:
 def test_crossrod_preserves_released_geometry_and_local_origin() -> None:
     # R1: as-received Ø6 bar, bonded into MHA-DT-022 (no longer a 6.0175 press rod).
     assert spec.ROD_DIA == pytest.approx(6.0)
-    # Rule 6: the bond and its acceptance are the fit-up step, not notes.
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the bond and its acceptance are the fit-up step, not notes.
     assert spec.DRAWING_NOTES == "USE COLD-FINISHED BAR AS RECEIVED."
     assert spec.ASSEMBLY_STEP == (
         "BOND MHA-DT-015 INTO MHA-DT-022 HEAD WITH LOCTITE 638; "
@@ -127,7 +127,7 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
         park.Y_DRIVE,
         expected_arbor_z - (9.0 / 2.0 + 2.0),
     )
-    # Rule 12 (audit W6) grew the head 9.0 -> 10.5 and the machinist review of
+    # drawing-guidelines.md rule 17 (walls and webs) (audit W6) grew the head 9.0 -> 10.5 and the machinist review of
     # 7f7fc1717 (Main's option 2) to 11.5, each about the released centre, so
     # both faces and the crown move 1.25 out.  The neck shoulder (the released
     # head rear + 2 wall + 10) moves 0.25 forward, so every turned length on
@@ -232,7 +232,7 @@ def test_part_metadata_names_the_grip_crossrod_work() -> None:
 
 
 def test_no_note_line_carries_a_dimension() -> None:
-    """Rule 6 (Codex P1 on #814): the Ø6 bar size lives in the registry's
+    """drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Codex P1 on #814): the Ø6 bar size lives in the registry's
     material specification and the imported RodDia, never in a note."""
     for line in spec.DRAWING_NOTES.splitlines():
         text = re.sub(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", "", line).replace(arbor.RETAINING_COMPOUND, "")

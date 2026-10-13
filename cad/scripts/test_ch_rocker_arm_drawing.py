@@ -243,7 +243,7 @@ def test_hub_length_prints_its_one_sided_band() -> None:
 def test_strap_thickness_prints_its_band_natively() -> None:
     """Main ruling 2026-10, option b: each inter-arm gap holds one tine of
     each neighbouring rod fork, so the strap prints 2.500 +/-0.025 at three
-    places on the Strap extrude's own depth (policy rule 2), selected by
+    places on the Strap extrude's own depth (drawing-simplicity-policy.md `How the repository implements the guidelines`), selected by
     feature and dimension name in the end view, and no note repeats it."""
     from _drawing_contract import model_toleranced_dimensions
 
@@ -284,7 +284,7 @@ def test_strap_thickness_text_clears_datum_b_the_frame_and_the_iso_caption() -> 
 
 
 def test_top_edge_height_is_a_banded_model_dimension() -> None:
-    """Codex #936 PRRT_kwDOPHDy386mV3AO, policy rule 2: the clearance-critical
+    """Codex #936 PRRT_kwDOPHDy386mV3AO, drawing-simplicity-policy.md `How the repository implements the guidelines`: the clearance-critical
     "8.00 +0.50/0" lived only in a note. It is now the one printed dimension
     of a hidden reference sketch, carrying the band natively; the arcs'
     centre is derived from it, and no note repeats it."""
@@ -312,7 +312,7 @@ def test_top_edge_height_is_a_banded_model_dimension() -> None:
 
 
 def test_pivot_bore_ream_band_rides_its_diameter_not_a_note() -> None:
-    """Codex #936 sweep (policy rule 2): note 6 printed "REAM +0.03/0, Ra
+    """Codex #936 sweep (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): note 6 printed "REAM +0.03/0, Ra
     1.6" while the O6.50 printed bare. The band is now native on PivotDia and
     the Ra is the bore's own symbol; the note keeps only REAM."""
     from _drawing_contract import model_toleranced_dimensions
@@ -332,7 +332,7 @@ def test_pivot_bore_ream_band_rides_its_diameter_not_a_note() -> None:
 
 
 def test_no_rocker_note_carries_a_tolerance_band() -> None:
-    """Policy rule 2 / 6: every band on MHA-CH-006 is a model tolerance. The one
+    """drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): every band on MHA-CH-006 is a model tolerance. The one
     exception is the hub coaxiality, a plain note by Main's ruling
     (2026-09-26)."""
     for line in ch_rocker_arm_notes.DRAWING_NOTES.splitlines():

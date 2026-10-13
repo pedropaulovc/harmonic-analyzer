@@ -83,7 +83,7 @@ def test_plug_print_uses_physical_size_and_shared_loose_bands() -> None:
     )
     assert "#6-32 UNC-2B THRU PLUG" in notes
     assert "SILVER-BRAZE" in notes
-    # Policy rule 2: a matched fit names its mate and states the clearance.
+    # drawing-guidelines.md rule 4 (tighten only for function, and name the mate): a matched fit names its mate and states the clearance.
     fit = re.search(
         r"FIT TO THE TUBE BORE AT\s+([\d.]+)-([\d.]+)\s+DIAMETRAL CLEARANCE", notes
     )

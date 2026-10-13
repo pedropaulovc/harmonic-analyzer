@@ -6,7 +6,7 @@ the genuine native two-tooth span, bore fit note, finish and datum A; the
 rear-face view carries the toothspace inspection callout on a full-depth
 flank; the section carries diameters beside their
 axial extent, the D-flat from the axis, the lengths baselined from the rear
-face (rule 7) and the step face (the disc hub's seat) square to the bore, all
+face (drawing-guidelines.md rule 11 (turned parts read like the lathe)) and the step face (the disc hub's seat) square to the bore, all
 imported natively from the part with the places and bands the part authored
 (``transgear_feed_pinion_spec``).  The oil hole is drilled through the seated
 hub at assembly, so the section carries only its one-line drill note; its
@@ -480,7 +480,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_note_inside_border(oil_note, "oil hole note")
     _assert_note_inside_border(bore_fit, "bore fit note")
     # The bore is the part's one running surface: its finish is authored on
-    # the part and read back here (rule 5).
+    # the part and read back here (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
     add_surface_finish(
         adapter,
         front,

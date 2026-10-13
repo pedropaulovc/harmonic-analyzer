@@ -122,8 +122,9 @@ def test_note_names_the_mating_tenon() -> None:
     assert spec.HANDLE_NUMBER == row["number"]
     assert f"{spec.HANDLE_NUMBER} {spec.HANDLE_NAME}" in spec.DRAWING_NOTES
     assert len(spec.DRAWING_NOTES.splitlines()) == 4
-    # Machinist review of crank-v4-16: name the bore operation.  Rule 6
-    # (Codex P1 on #1139, c81d97280): no narration of why the band exists.
+    # Machinist review of crank-v4-16: name the bore operation. The band's
+    # reason stays off this full four-line block (Codex P1 on #1139,
+    # c81d97280); drawing-guidelines.md rule 7 would allow a short one.
     # The OD is stock, skimmed at assembly.
     flat = " ".join(spec.DRAWING_NOTES.split())
     # The operation, not the machine (machinist review of crank-v4-22).

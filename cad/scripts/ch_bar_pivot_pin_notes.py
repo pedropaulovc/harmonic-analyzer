@@ -6,7 +6,7 @@ channel assembly and ``test_ch_bar_pivot_fit`` import the spec, so prose there
 would re-key them on every wording edit. Imported ONLY by
 ``build_ch_bar_pivot_pin`` and the offline tests.
 
-Policy rule 6: four lines a machinist cannot read off the views. The model is
+drawing-guidelines.md rule 7 (notes: few, flagged, never a method): four lines a machinist cannot read off the views. The model is
 the INSTALLED pin, so the blank's cut length is the one size the views cannot
 show; the press and its removal are the retention requirement (user ruling
 2026-10); the flush dressing is the bar-to-bar gap's requirement (#1038); the

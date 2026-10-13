@@ -9,7 +9,7 @@ The sheet runs at 4:1 (the plate is 22 x 9.6, cut from 1/16 sheet, its four
 corners rounded); the isometric carries an explicit 2:1 override so it stays
 clear of the title block.  A flat plate needs only the face view (front), one
 thickness view (right) and the iso.
-No frames and no datums (policy rule 3): the screw holes locate by +/-
+No frames and no datums (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the screw holes locate by +/-
 coordinates from the plate's corner, authored on the part.
 
 Run with SolidWorks open::

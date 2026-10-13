@@ -77,7 +77,7 @@ DRAWING_PRECISION = {
 }
 # The pure SHEET-derived reference is SeatToAxis + ArmPastSeat (arm end).
 # It reads actual model entities and prints in parentheses; its places remain
-# spec-owned under policy rule 2.  FootprintOffset + ArmBelowAxis already
+# spec-owned under drawing-simplicity-policy.md `How the repository implements the guidelines`.  FootprintOffset + ArmBelowAxis already
 # locate the bore axis from the lower flange edge without a duplicate REF.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "arm end from bore axis": 2,
@@ -86,7 +86,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
 # from mg_lever_press_fit_geom (COLLAR_LENGTH_BAND) onto the extrude's CollarLen.
 DRAWING_POSITION_BAND = POSITION_BAND
 
-# True free-text instructions only (policy rule 6): the collar's sizes and the
+# True free-text instructions only (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the collar's sizes and the
 # bore's band, the arm's section and the mounting pattern are native dimensions
 # on the sheet (the bore's callout names the MHA-MG-003 lever), so the notes
 # carry the assembly-time press and its retention -- the press contract's own
@@ -95,8 +95,7 @@ DRAWING_POSITION_BAND = POSITION_BAND
 DRAWING_NOTES = "\n".join(
     (
         PRESS_INSTALLATION_NOTES,
-        # Named exception: MHA-MG-001 counterbore floor 1.525 MIN
-        # (drawing-simplicity-policy.md, "Named exceptions").
+        # Pending exception ruling: MHA-MG-001 counterbore floor 1.525 MIN (#1294).
         f"COUNTERBORE FLOOR {GRIP_MIN:.3f} MIN.",
     )
 )

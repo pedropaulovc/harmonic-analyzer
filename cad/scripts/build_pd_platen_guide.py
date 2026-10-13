@@ -267,7 +267,7 @@ async def build(adapter) -> dict[str, str]:
 
     # The depth's one-sided band is the paper-drive lock-station sweep's
     # (pd_platen_guide_spec), native on the model so the sheet prints it; every
-    # printed dimension's places are authored here too (policy rule 2).
+    # printed dimension's places are authored here too (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     set_dimension_bilateral_tolerance(
         adapter, "Guide", "Depth", *deviations(GUIDE_DEPTH_BAND)
     )

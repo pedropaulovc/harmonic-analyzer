@@ -1118,8 +1118,7 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-            # Named exception: MHA-SM-003 bracket tap-drill wall 1.501 MIN
-            # (drawing-simplicity-policy.md, "Named exceptions").
+            # Pending exception ruling: MHA-SM-003 bracket tap-drill wall 1.501 MIN (#1295).
             "Bracket Receiver Note": f"BRACKET TAP DRILL LATERAL WALL {DRILL_LATERAL_WALL_MIN:.3f} MIN.",
         },
     )

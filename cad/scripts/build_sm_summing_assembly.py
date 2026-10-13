@@ -121,7 +121,7 @@ HANGER_SEAT_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP  # 1029.7
 HANGER_STUD_Y = HANGER_SEAT_Y - hanger_screw.UNDERHEAD_LEN  # 991.6 (thread tip)
 # The screw's nominal reach into the knife-mount top tap: 8.10.
 HANGER_REACH = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y
-# Its print-worst reach (rule 12): the shortest screw in the longest grip,
+# Its print-worst reach (drawing-guidelines.md rule 17 (walls and webs)): the shortest screw in the longest grip,
 # 37.084 - 30.8 = 6.284, and the longest in the shortest, 38.1 - 29.2 = 8.90.
 # The grip prints from the faced underside, which is faced before the
 # counterbore is cut: a later cut would shorten it, eating the tip clearance.
@@ -146,7 +146,7 @@ HANGER_SCREW_CLEARANCE = top_frame.HANGER_CLEARANCE_DIA - hanger_screw.SHANK_DIA
 KNIFE_DOWEL_Y = KNIFE_MOUNT_TOP_Y - knife_dowel.PRESS_DEPTH
 # The pair's stations from the screw axis, -X (slot) first: 7.100 along X.
 KNIFE_DOWEL_X_OFFSETS = knife_mount.PIN_HOLE_XS
-# The screw must still pass the crossbar's #6 clearance hole (rule 12) when
+# The screw must still pass the crossbar's #6 clearance hole (drawing-guidelines.md rule 17 (walls and webs)) when
 # every station sits at its limit.  Along the dowel line (X): the crossbar's
 # round-hole station (.XXX, 0.13), the knife mount's half-span band (0.065),
 # its tap's position zone radius (0.05) and the round-hole pin across its
@@ -188,7 +188,7 @@ HANGER_SCREW_DRIFT = top_frame.DRILL_DRIFT_PER_MM * (
 HANGER_SCREW_FLOAT_SPARE = top_frame.HANGER_SCREW_FLOAT - (
     HANGER_SCREW_MISMATCH + HANGER_SCREW_DRIFT
 )
-# The free rock the knife-edge keeps at the rule-12 worst case (the
+# The free rock the knife-edge keeps at the drawing-guidelines.md rule 17 (walls and webs) worst case (the
 # 2026-10-09 ruling: >= 5.0 deg).  The pair yaws the block about the screw by
 # the slot pin's worst offset over the shortest span, atan(0.117 / 14.07) =
 # 0.478 deg; across the deepest .X block (14.8) that walks the bore's far end

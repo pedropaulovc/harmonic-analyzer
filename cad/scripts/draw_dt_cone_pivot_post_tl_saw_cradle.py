@@ -380,7 +380,7 @@ requirement("saddle_z0", **_z_face(part_spec.SADDLE_Z[0], -1.0, "SADDLE_Z"))
 requirement("saddle_z1", **_z_face(part_spec.SADDLE_Z[1], 1.0, "SADDLE_Z"))
 
 # The far tap shares the near tap's X station by a model relation, so the one
-# printed station locates both. The pad top is a matched fit (policy rule 2):
+# printed station locates both. The pad top is a matched fit (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)):
 # its height is a reference size, and the callout names the mate and states
 # the acceptance.
 _PREFIX, _SUFFIX = 1, 2  # swDimensionTextPrefix, swDimensionTextSuffix

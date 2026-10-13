@@ -61,7 +61,7 @@ PNG = OUTPUTS.png
 
 # A Ø18.9 x 9 ring at 3:1: the face view, the side view and the isometric
 # sit on one row midway between the top border and the title block (top at
-# about 65 mm), with no general note left to anchor (policy rule 6).
+# about 65 mm), with no general note left to anchor (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 FRONT_CENTER = (0.100, 0.155)
@@ -96,12 +96,12 @@ RIGHT_KEEP = {
     ),
 }
 OD_ON_SIDE = (RIGHT_CENTER[0] + DRUM_LEN / 2.0 * _S + 0.030, RIGHT_CENTER[1])
-# Each band's need prints on its own callout (policy rule 6).
+# Each band's need prints on its own callout (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 DIMENSION_CALLOUTS = {
     "DrumBore": f"REAM THRU\n{PRESS_CALLOUT}",
     "DrumLen": RECESS_CALLOUT,
 }
-# The bore's seat finish (policy rule 5) lands on the bore up-left, clear of
+# The bore's seat finish (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)) lands on the bore up-left, clear of
 # the Ø line that runs up-right to its callout and through the centre to the
 # lower-left rim; the symbol stands outside the O.D. on the same bearing
 # (sheet metres from the landing).  Model x and y are the face view's.

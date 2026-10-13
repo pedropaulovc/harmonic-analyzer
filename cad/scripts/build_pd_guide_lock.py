@@ -200,7 +200,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Manufacturing drawing support: the sheet thickness's and the hole
     # coordinates' explicit bands and every printed dimension's places live
-    # on the model (policy rule 2; the paper-drive lock-station sweep and the
+    # on the model (drawing-simplicity-policy.md `How the repository implements the guidelines`; the paper-drive lock-station sweep and the
     # screw set window read the same constants), then mark exactly the print's
     # dimensions (the drawing recipe imports the marked set and must find
     # every one of these), and stamp the make-critical title-block properties.

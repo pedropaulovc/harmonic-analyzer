@@ -517,8 +517,8 @@ async def build(adapter) -> dict[str, str]:
     # P2, user ruling (a): a REFERENCE sketch owns it as a model dimension --
     # one construction line on the Right Plane from the hole's centre to the
     # pivot-bore wall, whose single marked dimension CrossHoleFromBoreWall is
-    # "PivotBore" / 2 (the harmonic base's reference-sketch idiom; policy rule
-    # 2).  It is BLANKED once built so it never renders in an assembly, and
+    # "PivotBore" / 2 (the harmonic base's reference-sketch idiom; drawing-simplicity-policy.md `How the repository implements the guidelines`
+    # ).  It is BLANKED once built so it never renders in an assembly, and
     # the drawing shows it in the side view only
     # (_drawing_hidden_sketches.curate_view_dimensions).
     check(
@@ -619,7 +619,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     # Decimal places are the tolerance statement, so the part authors them and
-    # the drawing only reads them back (policy rule 2).
+    # the drawing only reads them back (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _tolerance_at_dimension_places(adapter, "PinSeatProfile", "PinSeatCz")
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)

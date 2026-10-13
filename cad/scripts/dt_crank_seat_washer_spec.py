@@ -155,7 +155,7 @@ SURFACE_FINISHES = (
 )
 
 # Marked model dimensions and the places the model authors on them
-# (drawing-simplicity policy rule 2): the O.D. routine, the bore banded, and
+# (drawing-simplicity-policy.md `How the repository implements the guidelines`): the O.D. routine, the bore banded, and
 # the thickness a one-place REFERENCE under its fit-at-assembly callout.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {"DiscDia", "BoreDia"},

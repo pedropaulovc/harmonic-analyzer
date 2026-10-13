@@ -27,7 +27,7 @@ exactly what Pedro flagged as "way too overengineered". The new prompt (distille
 from Harvey *Machine Shop Trade Secrets* ch. 9 and Lipton *Sink or Swim* ch. 2-3)
 reads the title block as the general spec, scores **over-specification as a
 defect**, and encodes hidden-lines-on / one origin / drill-vs-ream / few notes.
-Standard: `cad/docs/drawing-simplicity-policy.md`. Baseline check: the old
+Standard: `cad/docs/drawing-guidelines.md`. Baseline check: the old
 crank-arm sheet came back FIX with 11 over-spec findings naming every datum,
 frame and boxed basic — the calibration works.
 

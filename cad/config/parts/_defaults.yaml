@@ -14,7 +14,7 @@ defaults:
 # `material_family:` INSTEAD of its own `material` / `material_specification`
 # (`_config.parts` expands the family; naming both is an error). One row here
 # is the single source of a fleet-wide alternative, so the wording can never
-# drift across the parts that share it (drawing-simplicity-policy.md rule 1:
+# drift across the parts that share it (drawing-guidelines.md rule 2 (the title block is the general specification):
 # name acceptable families as explicit alternatives). Lives in this file, not
 # materials.yaml, because every `_config.parts(<stem>)` reader already depends
 # on it (_buildgraph.part_registry_files) — no new dependency edge.

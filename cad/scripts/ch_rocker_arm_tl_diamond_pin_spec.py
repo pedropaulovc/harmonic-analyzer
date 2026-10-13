@@ -82,8 +82,8 @@ OVERALL_LENGTH = COLLAR_END + 4.8  # shank clears the .X 7.0 hole bottom at ever
 REAM_DIA = 2.0
 REAM_BAND = (0.010, 0.0)  # the shop's rod reamer, 2.000-2.010
 REAM_DEPTH = 8.0
-# Named wall shortfall (drawing-simplicity-policy.md "Named exceptions",
-# MHA-CH-006-TL-03 row): the neck over the reamed bore is the thinnest wall,
+# Pending wall shortfall ruling (#1368):
+# MHA-CH-006-TL-03 neck over the reamed bore is the thinnest wall,
 # stated on the sheet as a MIN, rounded down.
 NECK_WALL_MIN = (
     math.floor(((NECK_DIA + NECK_BAND[1]) - (REAM_DIA + REAM_BAND[0])) / 2.0 * 100.0)
@@ -188,7 +188,7 @@ DRAWING_NOTES = "\n".join(
         + " PIN SET TO ITS PROJECTION, FILLING THE BORE THROUGH THE NECK.",
         "BODY LENGTHS FROM THE NECK FACE; COLLAR SEAT HOLDS THE TIP UNDER THE ARM TOP;"
         " FLATS FULL LAND LENGTH. NECK OD TURNED CONCENTRIC TO THE REAMED BORE.",
-        # Named exception: MHA-CH-006-TL-03 neck wall (drawing-simplicity-policy.md, "Named exceptions").
+        # Pending exception ruling: MHA-CH-006-TL-03 neck wall (#1368).
         "HAND-LOAD LOCATOR; NO CLAMP OR CUT LOAD."
         f" NECK WALL TO BORE {NECK_WALL_MIN:.2f} MIN, COLLAR {COLLAR_WALL_MIN:.2f} MIN."
         " FITS LOCATE, BOND FILLS.",

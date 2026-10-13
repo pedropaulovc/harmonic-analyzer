@@ -95,7 +95,7 @@ _HORIZONTAL_LINEAR_DIMENSION = 11  # swHorLinearDimension
 
 # Sheet geometry, metres: the template's inner border and the title block in
 # its lower-right corner. Every view outline and balloon ring stays inside the
-# border and out of the title block (drawing-simplicity rule 8).
+# border and out of the title block (drawing-guidelines.md rule 13 (stay inside the border)).
 _TEMPLATE = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
 SHEET_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 TITLE_BLOCK = (

@@ -66,7 +66,7 @@ FLAT_FROM_END = SHAFT_LENGTH / 2.0 - FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 4.9
 ACROSS_FLAT = SHAFT_DIA - FLAT_DEPTH  # 6.05: the printed size
 FLAT_HEIGHT = SHAFT_R - FLAT_DEPTH  # 2.875: the set screw's cup seat above the axis
 
-# --- Worst case of the printed bands (policy rule 12; DRAWING_PRECISION
+# --- Worst case of the printed bands (drawing-guidelines.md rule 17 (walls and webs); DRAWING_PRECISION
 # below). ---
 _BAND_BY_PLACES = {1: 0.8, 2: 0.51, 3: 0.13}
 _FLAT_LENGTH_MIN = FLAT_LENGTH - _BAND_BY_PLACES[1]
@@ -88,7 +88,7 @@ if FLAT_LENGTH + _BAND_BY_PLACES[1] > 2.0 * LUG_HALF_T:
 if KEEPER_Z_OFF + FLAT_LENGTH / 2.0 >= CYLINDER_HALF:
     raise AssertionError("set-screw flat runs onto the domed end")
 
-# Installed set screw (policy rule 12: >= 1.5D of FULL thread at the worst
+# Installed set screw (drawing-guidelines.md rule 18 (thread engagement): >= 1.5D of FULL thread at the worst
 # case). Heights are above the keeper bore axis: the set screw pulls the shaft
 # down onto the bore wall, so its flat sits AcrossFlat - bore radius up. The
 # tap's full thread runs from the bore top (plus the keeper spec's
@@ -140,7 +140,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDia", "OverallLength"},
     "FlatProfile": {"FlatLength", "FlatFromEnd", "FlatPitch", "AcrossFlat"},
 }
-# Decimal places are the tolerance statement (policy rule 2); the model owns
+# Decimal places are the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the model owns
 # them. ShaftDia carries its SHAFT_H band natively; AcrossFlat at .XXX holds
 # FLAT_CHORD_MIN above the set screw's major. OverallLength at .XX and
 # FlatFromEnd and FlatPitch at .XXX hold FLAT_STATION_WINDOW_MM (0.14) open;
@@ -165,7 +165,7 @@ DIMENSION_PREFIXES = {
 
 
 # --- Flat stations, at the worst case of every printed band and of the
-# MHA-CH-000 fit-up (policy rule 12). The keepers go on the frame with their
+# MHA-CH-000 fit-up (drawing-guidelines.md rule 19 (absorb stacks at fit-up, not with tighter bands)). The keepers go on the frame with their
 # lug inner faces DRO-set (KEEPER_FITUP_LOCATION_BAND_MM each); each tap
 # stands SetScrewLocation off its lug's outer face, the lug LugThickness
 # thick. The shaft is free to slide until both screws bite, so it needs ONE

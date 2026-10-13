@@ -2,7 +2,7 @@ r"""Create the curated machinist drawing for MHA-DT-034, the crank handle ferrul
 
 A plain brass ring (user ruling 2026-09-29, ch11 p.14/p.15): OD, bore and
 length.  The end view carries only its centre mark and the cutting plane; the
-longitudinal section A-A is the ring's length view (policy rule 7) and takes
+longitudinal section A-A is the ring's length view (drawing-guidelines.md rule 9 (show internal shape in solid lines)) and takes
 every dimension, so the bore reads on cut edges rather than hidden lines (the
 MHA-DT-034 machinist review).  Every size is routine (.X): the oak tenon is
 turned to suit this bore.

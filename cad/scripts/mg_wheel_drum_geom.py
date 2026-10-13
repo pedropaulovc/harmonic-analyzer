@@ -34,7 +34,7 @@ DRUM_LEN_BAND = (0.0, -0.10)
 LEVER_WIRE_DIA = 0.8  # the lever wire the drum carries (mg_lever_wire_geom)
 DRUM_WIRE_R = DRUM_OD / 2.0 + LEVER_WIRE_DIA / 2.0  # 9.85, wire-centre radius
 
-MIN_WALL = 2.0  # drawing-simplicity rule 12 target, at the worst printed band
+MIN_WALL = 2.0  # drawing-guidelines.md rule 17 (walls and webs) target, at the worst printed band
 WALL_WORST = (
     DRUM_OD - printed_band_mm(DRUM_OD_PLACES) - (DRUM_BORE + DRUM_BORE_BAND[0])
 ) / 2.0  # 2.041: (18.1 - 14.018) / 2

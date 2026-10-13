@@ -71,7 +71,7 @@ _NUTS = (2.0 * _nut.THICKNESS_MIN, 2.0 * _nut.THICKNESS_MAX)
 # (a) The pin's shank-to-thread step stays inside the hub's front face, so the
 # wheel runs on the full shank and the front washer sits on the thread.
 STEP_INSIDE_HUB = (_BACK[0] + _HUB[0]) - _GAUGE[1]  # 0.687
-# (b) The locknut sits on FULL thread (rule 12 counts full threads only): the
+# (b) The locknut sits on FULL thread (drawing-guidelines.md rule 18 (thread engagement) counts full threads only): the
 # thread less the incomplete pitch the dome cuts runs past its outer face,
 # and the first nut's inner face sits past the die's run-out at the step.
 LOCKNUT_THREAD_MARGIN = (_GAUGE[0] + _THREAD[0] - _pin.TIP_INCOMPLETE) - (
@@ -104,7 +104,7 @@ if THREAD_PAST_LOCKNUT_MAX > THREAD_PAST_LOCKNUT_LIMIT:
     )
 # The thread length's band holds both: its callout on the axle's drawing
 # names the gauged step it reads from and states the lower and the upper
-# need (policy rules 2 and 7).
+# need (drawing-guidelines.md rule 4 (tighten only for function, and name the mate) and drawing-guidelines.md rule 10 (dimension from a real feature)).
 THREAD_LENGTH_CALLOUT = (
     "FROM SHANK STEP;\nLOCKNUT ON FULL THREAD,\n"
     f"END {THREAD_PAST_LOCKNUT_LIMIT:.1f} MAX PAST LOCKNUT"
@@ -117,7 +117,7 @@ BAR_PRESS = (
     _PIN[0] - (_bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[0]),
     _PIN[1] - (_bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[1]),
 )  # 0.010 .. 0.030
-# Matched running fit (policy rule 2): the wheel's bore is reamed to this
+# Matched running fit (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the wheel's bore is reamed to this
 # diametral clearance on its finished axle, the range the round-15 band gave.
 HUB_RUNNING = (0.033, 0.053)
 # The largest finished bore: the loosest clearance on the largest pin.

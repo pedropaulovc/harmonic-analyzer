@@ -60,7 +60,7 @@ PROUD = 13.725
 # The pressed end on the hole floor: the length the press fit grips, and the
 # arm's nominal hole depth.
 PRESS_DEPTH = LENGTH - PROUD  # 8.50
-# A press-fit dowel grips at least 1.5 D (the rule-12 engagement floor,
+# A press-fit dowel grips at least 1.5 D (the drawing-guidelines.md rule 18 (thread engagement) engagement floor,
 # applied to the press as the contract does), counted over the full
 # diameter only: the chamfer inside the hole carries no interference.
 PRESS_ENGAGEMENT_MIN_D = 1.5

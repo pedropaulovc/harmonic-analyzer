@@ -632,7 +632,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="MHA-PD-008 stud thread callout",
     )
 
-    # The two running surfaces, authored on the part and read back (rule 5).
+    # The two running surfaces, authored on the part and read back (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
     add_surface_finish(
         adapter,
         end,

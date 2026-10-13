@@ -178,7 +178,7 @@ RUNNING_BORE_BAND = (0.005, -0.025)
 # upper +0.37 bound predates that no-bind-only requirement; keep it as ruled,
 # without treating its former backlash-window derivation as a current gate.
 # The current spacing follows the physical fixed-centre pair; its band stays
-# +0.37/0.  How the shop holds it is theirs (policy rule 6).
+# +0.37/0.  How the shop holds it is theirs (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
 CRANK_ABOVE_CONE_BAND = (0.37, 0.0)
 
@@ -191,7 +191,7 @@ CRANK_ABOVE_CONE_BAND = (0.37, 0.0)
 # build_dt_drive_train_assembly asserts the capture closes.
 JOURNAL_AXIS_HEIGHT_TOLERANCE_MM = 0.25
 
-# Webs around the Ø11.438 crank bore, at print-worst (policy rule 12: 2.0
+# Webs around the Ø11.438 crank bore, at print-worst (drawing-guidelines.md rule 17 (walls and webs): 2.0
 # target, 1.5 floor).  The bore is centred on the post's symmetry plane, which
 # is what keeps the two mounting holes beside it workable; its worst case is
 # the running band's maximum with the crank axis at its highest (the cone axis
@@ -283,7 +283,7 @@ SURFACE_FINISHES = (
     # is the process statement "CAST/MACHINED", not a grade).
     SurfaceFinishControl("foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
     # The crankshaft MHA-DT-011 runs in the crank bore, so it is a running
-    # journal (rule 5), like the cone bore.
+    # journal (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)), like the cone bore.
     SurfaceFinishControl(
         "crank_bore",
         MACHINED_UM,
@@ -332,7 +332,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places are product definition: they select the title-block general
 # band (.X +/-0.8, .XX +/-0.51, .XXX +/-0.13), so the PART owns them and the
-# sheet only proves they survived the import (drawing-simplicity-policy rule 2).
+# sheet only proves they survived the import (drawing-simplicity-policy.md `How the repository implements the guidelines`).
 # The head and the cast body/boss sizes take one place -- nothing mates on
 # them.  The cone-axis height and the crank-above-cone spacing (each carries
 # its own explicit band), the crank-axis height the print repeats only as a
@@ -381,7 +381,7 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 
 # Notes identify mating parts and geometry relationships that are not
 # recognizable from silhouette alone; every size, band and finish remains on a
-# dimension or native symbol (drawing-simplicity-policy rules 1 and 6).
+# dimension or native symbol (drawing-guidelines.md rule 2 (the title block is the general specification) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 DRAWING_NOTES = "\n".join(
     (
         "CRANK BORE CARRIES MHA-DT-011,",
@@ -391,7 +391,7 @@ DRAWING_NOTES = "\n".join(
     )
 )
 
-# One frame, on the rule-3 allowlist since #906 (USER RULING 2026-09-26,
+# One frame, on the drawing-simplicity-policy.md `GD&T allowlist (rule 5)` allowlist since #906 (USER RULING 2026-09-26,
 # option ii): the crank bore's orientation to the cone journal.  The 16T:64T
 # crossed mesh loses backlash to yaw and tilt of the crank axis -- the #906
 # pose study (dt-logs/crankhub/crank-mesh-angle-20260926.jsonl) measured

@@ -33,7 +33,7 @@ CHAMFER_CALLOUT = "X 45 DEG"
 # (RELIEF_LEAD_TOL) all the same.
 RELIEF_CALLOUT = f"{RELIEF_LEAD_MIN:.2f}-{RELIEF_LEAD_MAX:.2f} {CHAMFER_CALLOUT} LEAD"
 
-# Policy rule 12: the head left under the slot floor, at the shortest head,
+# drawing-guidelines.md rule 17 (walls and webs): the head left under the slot floor, at the shortest head,
 # the deepest slot and a full under-head edge break, stays above the 2.0
 # wall target (7.00 - 0.51 - 3.51 - 0.25 = 2.73).
 EDGE_BREAK_MAX = float(_config.title_block("edge_break")["chamfer_max_mm"])
@@ -42,7 +42,7 @@ SLOT_WEB_MIN = round(
     HEAD_H + HEAD_H_LOWER - (SLOT_DEPTH + SLOT_DEPTH_UPPER) - EDGE_BREAK_MAX, 6
 )
 if SLOT_WEB_MIN < SLOT_WEB_TARGET:
-    raise AssertionError("spring-screw slot leaves under the rule-12 head web")
+    raise AssertionError("spring-screw slot leaves under the drawing-guidelines.md rule 17 (walls and webs) head web")
 
 # The crown rise is the only printed size that fixes the dome (the head Ø and
 # height do not), so it controls at the .XX band.  Across that band the dome
@@ -79,7 +79,7 @@ REFERENCE_DIMENSIONS = frozenset({"OverallLength"})
 
 # Line 3 is the installation step the static-clamp retention relies on
 # (user ruling 2026-09-21: no torque value, no threadlocker). The three-view
-# summing sheet prints no notes until it is built out (policy rule 9), so the
+# summing sheet prints no notes until it is built out (drawing-guidelines.md rule 22 (an assembly package is complete)), so the
 # fitter reads it here, on the screw's own sheet.
 CLAMP_INSTRUCTION = (
     "3. AT ASSEMBLY TIGHTEN UNTIL THE MHA-VN-005 UPPER EYE IS CLAMPED\n"

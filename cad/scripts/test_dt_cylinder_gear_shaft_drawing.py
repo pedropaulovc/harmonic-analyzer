@@ -17,7 +17,7 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 
 
 def test_every_marked_dimension_lands_where_a_turner_reads_it() -> None:
-    """Policy rule 7: a turned part's diameters belong on the SIDE view.
+    """drawing-guidelines.md rule 11 (turned parts read like the lathe): a turned part's diameters belong on the SIDE view.
 
     A circle sketch's diameter only imports into a view that faces the circle,
     so the sheet imports it in a donor view and moves it -- which means every
@@ -68,7 +68,7 @@ def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None
 
 
 def test_a_plain_drive_train_shaft_carries_no_gdt_and_no_end_view() -> None:
-    """Rule 3 keeps GD&T for the castings and gear blanks.
+    """drawing-guidelines.md rule 5 (avoid excessive GD&T) keeps GD&T for the castings and gear blanks.
 
     Size limits plus the title-block general grade already state everything a
     lathe hand can hold on a plain rod, and the end view existed only to carry

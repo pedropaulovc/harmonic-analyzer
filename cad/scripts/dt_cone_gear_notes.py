@@ -72,6 +72,7 @@ def gear_data(teeth: int) -> str:
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T; INCLINED AXES"),
         ("BACKLASH WITH MATE (mm, REF)", f"{minimum:.2f} TO {maximum:.2f}"),
         ("ROOT RADIAL MIN/MAX (mm, REF)", f"{profile.root_radius_min_mm:.3f} / {profile.root_radius_max_mm:.3f}"),
+        # Pending exception ruling: MHA-DT-003 web (#971).
         ("WEB MIN (mm, REF)", f"{web:.2f}"),
         # cone_set_stack books each gear's tooth runout about its bore.
         ("TOOTH CUTTING SETUP, ACCEPT AT SETUP",

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dt_crankshaft_spec import DRIVE_PIN_DEPTH_TOL, DRIVE_PIN_SPIGOT_RIM_WORST
 
-# Matched-fit requirement on the feature callout (rule 6), naming both mates
+# Matched-fit requirement on the feature callout (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), naming both mates
 # and the acceptance of the custom 1:48 taper pin (crank_pin_spec).  It reads
 # under the native #9 drill size, in the order the work is done (drill, then
 # taper-ream with the hub); short lines keep it narrow beside the cross-hole.
@@ -24,7 +24,7 @@ CROSS_HOLE_CALLOUT = "\n".join(
 # The thinnest wall round the drive-pin holes, to the seat spigot's rim, at
 # the printed worst case (crankshaft_spec rounds it down): stated as the fact
 # the shop holds, under the holes' own callout.
-# Named exception: MHA-DT-011 rim (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-DT-011 rim (#991).
 DRIVE_PIN_RIM_NOTE = f"DRIVE-PIN HOLE TO SPIGOT RIM {DRIVE_PIN_SPIGOT_RIM_WORST:.2f} MIN."
 
 # Under the native REAM callout on the seat spigot's two blind holes: the

@@ -260,7 +260,7 @@ def test_required_drawing_paths() -> None:
 
 def test_sheet_carries_no_notes_block_restating_the_position_frame() -> None:
     # The 9X position frame already says it; "HOLE POSITION PER FCF." only
-    # repeated it (rule 6), and nothing else needs a note.
+    # repeated it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), and nothing else needs a note.
     assert not hasattr(guide, "DRAWING_NOTES")
     for module in (guide, drawing):
         assert "Manufacturing Notes" not in Path(module.__file__).read_text(

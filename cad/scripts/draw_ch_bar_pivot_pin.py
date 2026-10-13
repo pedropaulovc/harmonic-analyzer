@@ -1,9 +1,9 @@
 r"""Create the curated manufacturing drawing for the bar pivot pin (MHA-CH-011).
 
-Under ``cad/docs/drawing-simplicity-policy.md``: the INSTALLED pin -- a 5/64
+Under ``cad/docs/drawing-guidelines.md``: the INSTALLED pin -- a 5/64
 drill-rod cylinder pressed into the amplitude bar's reamed top pin hole and
 dressed flush with the bar's faces -- on two native model dimensions, both on
-the side view where a turned part's diameter sits beside its length (rule 7):
+the side view where a turned part's diameter sits beside its length (drawing-guidelines.md rule 11 (turned parts read like the lathe)):
 the Ø with the drill rod's own grind band, and the installed length as
 REFERENCE (the bar's width; the MHA-CH-001 stock owns it). An axis
 centerline, a bare end view with its center mark, the isometric, and the
@@ -134,7 +134,7 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    # A solid pin has nothing inside: hidden lines off everywhere (rule 7).
+    # A solid pin has nothing inside: hidden lines off everywhere (drawing-guidelines.md rule 9 (show internal shape in solid lines)).
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 

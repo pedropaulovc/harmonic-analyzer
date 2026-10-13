@@ -77,7 +77,7 @@ TOP_NOTCH_OFFSET = (BAR_WIDTH - TOP_NOTCH_WIDTH) / 2.0  # 1.575
 # either side pass over the rocker hub; a deep notch drops them onto it one
 # for one. So the depth is one-sided, shallow only (user ruling 2026-09-26):
 # a shallow notch just lifts the bar at rest (ch_rocker_arm_spec.TOP_EDGE_BAND
-# states the lift budget and its effect on the channel). Policy rule 2
+# states the lift budget and its effect on the channel). drawing-simplicity-policy.md `How the repository implements the guidelines`
 # (Codex #936 PRRT_kwDOPHDy386mWF0L): the band is the part's, native on
 # BottomNotchHeight, never note text.
 BOTTOM_NOTCH_DEPTH_BAND = (0.0, -0.50)  # (upper, lower) deviations
@@ -102,7 +102,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "TopRightLedge",
     },
 }
-# Places the part authors on each printed dimension (policy rule 2).
+# Places the part authors on each printed dimension (drawing-simplicity-policy.md `How the repository implements the guidelines`).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BarProfile": {
         "BarLength": 2,

@@ -1,16 +1,16 @@
 r"""Create the curated manufacturing drawing for the crank-drive gear (64T).
 
-Recreated under ``cad/docs/drawing-simplicity-policy.md``. The sheet is a
+Recreated under ``cad/docs/drawing-guidelines.md``. The sheet is a
 face view, a longitudinal centre section through the D-flat and an isometric
 of a helical toothed disc with a local +X D-bore, and five native model
 dimensions -- outside diameter, four-place face width, round bore diameter,
-across-flat and south-entry chamfer -- plus the gear-data block rule 6 keeps
+across-flat and south-entry chamfer -- plus the gear-data block drawing-guidelines.md rule 7 (notes: few, flagged, never a method) keeps
 for the crossed-axis tooth system.
 
 No datums, no feature control frames: a gear slipped onto a shaft land is not
-on the GD&T allowlist (rules 3-4), and the retired end-face perpendicularity
+on the GD&T allowlist (drawing-guidelines.md rule 5 (avoid excessive GD&T)), and the retired end-face perpendicularity
 and tooth-tip runout frames said nothing a hobby shop could hold that the bore
-and blank limits do not already imply. The one roughness symbol is rule 5's
+and blank limits do not already imply. The one roughness symbol is drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)'s
 running-surface case: the bore is a size-toleranced fit and a fit lives on the
 peaks too. The decimal places are the PART's
 (``crank_drive_gear_spec.DRAWING_PRECISION``, applied natively by
@@ -461,7 +461,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # peaks as well as the size, so the bore carries its own roughness; the
     # THRU callout names no process to imply one. The roughness is the
     # project's general machined grade, authored on the PART and read back
-    # here (policy rule 5's running-surface case).
+    # here (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)'s running-surface case).
     finish = add_surface_finish(
         adapter,
         front,

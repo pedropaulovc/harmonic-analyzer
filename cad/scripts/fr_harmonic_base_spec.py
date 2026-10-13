@@ -103,7 +103,7 @@ if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
 # The flange perimeter carries the same seat grade because it is the drawing's
 # hole-table origin: every mounting coordinate is measured from the virtual
 # sharp corner of two of these faces, so they LOCATE the part (simplicity
-# policy rule 5) and cannot be left as-cast under the title block's
+# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)) and cannot be left as-cast under the title block's
 # CAST/MACHINED surface row. All four sides are required equally -- the corner
 # arcs between them are skimmed with the sides -- and the flange keeps the
 # RAL6000 body colour (only the deck and underside are blacked by the Finish
@@ -138,7 +138,7 @@ SURFACE_FINISHES = (
 )
 
 # --- Column sockets: the frame interface this casting owns -----------------
-# Simplicity-policy rule 5: the four sockets LOCATE the frame on the base --
+# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the four sockets LOCATE the frame on the base --
 # each column tube is matched to its own bore for a close hand-slip fit, and
 # the deck's Ra 3.2 stops at the deck plane -- so every bore is a seat that
 # MUST be cut on a casting the title block otherwise leaves as CAST/MACHINED.
@@ -218,7 +218,7 @@ UNDERSIDE_PAD_PREFIXES: dict[tuple[str, str], str] = {
     for name in names
 }
 
-# Mark every dimension the drawing imports. Policy rule 2: a printed nominal
+# Mark every dimension the drawing imports. drawing-simplicity-policy.md `How the repository implements the guidelines`: a printed nominal
 # whose decimal places state a tolerance is a MODEL dimension, so the deck
 # extent and rise, the flange-to-deck height, the 45-degree edge breaks, the
 # cross-screw axis height, the spotface size and depth and the underside
@@ -269,7 +269,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PocketFillets": {"PocketFilletRadius"},
 }
 
-# Decimal places ARE the tolerance statement (policy rule 2), so the MODEL
+# Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL
 # owns them: build_fr_harmonic_base applies this map to the .SLDPRT and
 # draw_fr_harmonic_base only reads it back. Everything on this casting is held to
 # the title block's general .X band, so every imported dimension prints ONE

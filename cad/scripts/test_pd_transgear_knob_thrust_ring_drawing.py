@@ -77,7 +77,7 @@ def test_ring_bore_and_opposed_axial_faces_consume_the_new_interface() -> None:
 
 
 def test_wall_holds_at_the_worst_case_the_sheet_prints() -> None:
-    """Policy rule 12: the smallest O.D. its printed row accepts over the
+    """drawing-guidelines.md rule 17 (walls and webs): the smallest O.D. its printed row accepts over the
     largest bore its band accepts."""
     od_band = _printed_tolerance.printed_band_mm(spec.OD_PLACES)
     worst = ((spec.OD - od_band) - (spec.ID + max(spec.ID_BAND))) / 2.0
@@ -106,14 +106,14 @@ def test_the_wall_gate_refuses_a_coarser_printed_row(monkeypatch) -> None:
 
 
 def test_the_od_prints_at_the_coarsest_row_its_wall_allows() -> None:
-    """Policy rule 12: nothing fits on the O.D., so it prints at the title
+    """drawing-guidelines.md rule 17 (walls and webs): nothing fits on the O.D., so it prints at the title
     block's .X row once the wall holds there."""
     assert spec.worst_wall(1) >= spec.WALL_FLOOR
     assert spec.OD_PLACES == 1
 
 
 def test_the_od_is_dimensioned_on_the_side_view_beside_the_rear_face() -> None:
-    """Policy rule 7, turned parts: the O.D. sits on the side view, so the
+    """drawing-guidelines.md rule 11 (turned parts read like the lathe), turned parts: the O.D. sits on the side view, so the
     end view carries one diameter (the bore's callout) and no two diameter
     lines cross its centre."""
     assert set(drawing.END_KEEP) - drawing.MOVED_TO_SIDE == set(

@@ -386,7 +386,7 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "handle axis")
 
     # Manufacturing drawing support: the model owns the one printed band
-    # (policy rule 2), the reamed bore, and the places every mark prints with.
+    # (drawing-simplicity-policy.md `How the repository implements the guidelines`), the reamed bore, and the places every mark prints with.
     # The tenon and the counterbore are fitted to the parts they take.
     set_dimension_bilateral_tolerance(
         adapter,

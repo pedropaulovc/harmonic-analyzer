@@ -120,7 +120,7 @@ if blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) >= LUG_T:
 # The drawing-reference lines (ch_fulcrum_keeper_spec.REFERENCE_SKETCHES):
 # (sketch, plane, dimension, start, end, orientation, value, drives), the
 # dt_arbor_pedestal pattern. Each line starts on the feature it is measured
-# from (policy rule 7): the set-screw tap's runs along the crown-top outline
+# from (drawing-guidelines.md rule 10 (dimension from a real feature)): the set-screw tap's runs along the crown-top outline
 # from the outer lug face to the tap axis; the foot screw's run on the seat
 # (Top plane: sketch u = model X, v = -model Z) from the outer lug face to the
 # screw axis and from the screw axis to the -Z side face. ``drives`` binds

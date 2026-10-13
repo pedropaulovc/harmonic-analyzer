@@ -24,7 +24,7 @@ raw left end (setup X-170).
 
 One-piece rather than the inventory's built-up arm + finger: the arm's end
 could not carry the screw clearance, two finger screws and a dowel with
-rule-12 walls, and the shop has no 4 mm reamer for that dowel
+drawing-guidelines.md rule 17 (walls and webs) walls, and the shop has no 4 mm reamer for that dowel
 (review-loop r3 shop-additions, C bar). The inventory's 30 x 17 x 24 base
 has no vendor SKU; the MB-PM is the smallest documented switchable base
 with an M6 tap. Aluminium, not steel: Kanetec warns that a magnetic plate
@@ -71,7 +71,7 @@ NOSE_Z = NOSE_Z_SETUP - SETUP_Z_OF_JAW_TOP  # -0.31705
 # --- Bought items (not modelled) -------------------------------------------
 # Nose: hardened 6 x 8 dowel pin (ISO 8734, m6: 6.004..6.012), fixed in the
 # finger flush with its back face. The sheet states the installed result
-# (rule 6: no method in the notes). The block itself stays one piece: an
+# (drawing-guidelines.md rule 7 (notes: few, flagged, never a method): no method in the notes). The block itself stays one piece: an
 # ordinary note, not BUILT_UP_PERMISSION_NOTE, so construction exports
 # one_piece and no built-up arm or finger is accepted.
 NOSE_INSTALLED_NOTE = "NOSE IS A BOUGHT DOWEL PIN, FIXED IMMOVABLE IN ITS HOLE."
@@ -169,7 +169,7 @@ LINEAR_1PL = printed_band_mm(1)
 LINEAR_3PL = printed_band_mm(3)
 RULE12_WALL_TARGET = 2.0
 
-# --- Rule 12 at the printed worst case ---------------------------------------
+# --- drawing-guidelines.md rule 17 (walls and webs) at the printed worst case ---------------------------------------
 _NOSE_R = (NOSE_HOLE_DIA + DRILLED_BAND[0]) / 2.0
 # The screw hole is drilled through the lug only (about 2 D), so no
 # deep-drilling wander is added.
@@ -197,7 +197,7 @@ WALLS = {
 }
 _thin = {name: round(wall, 3) for name, wall in WALLS.items() if wall < RULE12_WALL_TARGET}
 if _thin:
-    raise AssertionError(f"vise stop walls under the rule-12 target: {_thin}")
+    raise AssertionError(f"vise stop walls under the drawing-guidelines.md rule 17 (walls and webs) target: {_thin}")
 # The screw head clears the flange over the step at the worst case.
 HEAD_CLEARANCE_MIN = (
     (NOTCH_HEIGHT - LINEAR_1PL) - (SCREW_HEIGHT + LINEAR_1PL) - _HEAD_R
@@ -231,8 +231,8 @@ if SCREW_ENGAGEMENT_MIN < SCREW_ENGAGEMENT_RULED - 1e-9:
     raise AssertionError("M6 screw engages under the ruled 2.7 MIN in the base")
 if SCREW_ENGAGEMENT_MIN <= 0.0:
     raise AssertionError("M6 screw engages no full thread in the base")
-# Under rule 12's 1.5 D: the base's 6 mm tap caps it. Named exception row
-# MHA-CH-006-TL-01 (user, 2026-10-07): hand-seating load only, no cutting load.
+# Under the 1.5 D guideline: the base's 6 mm tap caps it. Pending ruling
+# MHA-CH-006-TL-01 (#1367): hand-seating load only, no cutting load.
 SCREW_ENGAGEMENT_MIN_D = SCREW_ENGAGEMENT_MIN / SCREW_MAJOR
 SCREW_ENGAGEMENT_PRINTED = math.floor(SCREW_ENGAGEMENT_MIN * 10.0 + 1e-9) / 10.0
 SCREW_ENGAGEMENT_PRINTED_D = math.floor(SCREW_ENGAGEMENT_MIN_D * 100.0 + 1e-9) / 100.0
@@ -336,7 +336,7 @@ DRAWING_NOTES = "\n".join(
         "HAND-SEATING LOAD ONLY, NO CUTTING LOAD.",
     )
 )
-# The bought nose pin and its seating ride the hole's callout (rule 6: the
+# The bought nose pin and its seating ride the hole's callout (drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the
 # note carries no numbers); the projection is reference, set by the pin.
 NOSE_PROJECTION = NOSE_PIN_LENGTH - FINGER_THICK
 NOSE_PIN_CALLOUT = "\n".join(
@@ -345,7 +345,7 @@ NOSE_PIN_CALLOUT = "\n".join(
         f"FLUSH AT BACK FACE, ({NOSE_PROJECTION:.1f}) PROUD",
     )
 )
-# Named exception: MHA-CH-006-TL-01 engagement (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-CH-006-TL-01 engagement (#1367).
 SCREW_HOLE_CALLOUT = "\n".join(
     (
         f"DRILL THRU FOR {SCREW_THREAD} X {SCREW_LENGTH:g} SHCS",

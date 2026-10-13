@@ -254,7 +254,7 @@ def test_every_marked_dimension_has_exactly_one_view_owner() -> None:
 
 
 def test_the_part_owns_every_printed_decimal_place() -> None:
-    """Policy rule 2: places are the tolerance, so the .SLDPRT carries them.
+    """drawing-simplicity-policy.md `How the repository implements the guidelines`: places are the tolerance, so the .SLDPRT carries them.
 
     Three places only where a three-place band rides the dimension (the
     matched bore's reference nominal, the cam eccentricity); four on the

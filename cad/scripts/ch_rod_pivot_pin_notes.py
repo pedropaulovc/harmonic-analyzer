@@ -7,9 +7,9 @@ channel assembly and ``test_ch_rod_pivot_fit`` import the spec, so prose there
 would re-key them on every drawing edit. Imported ONLY by
 ``build_ch_rod_pivot_pin``, ``draw_ch_rod_pivot_pin`` and the offline tests.
 
-Policy rule 6: four lines a machinist cannot read off the views. The model is
+drawing-guidelines.md rule 7 (notes: few, flagged, never a method): four lines a machinist cannot read off the views. The model is
 the INSTALLED pin, so the blank's cut length prints from a blanked reference
-sketch (rule 2: its band rides that model dimension, never note text) and
+sketch (drawing-simplicity-policy.md `How the repository implements the guidelines`: its band rides that model dimension, never note text) and
 note 1 only says to cut it; the press and its removal are the retention
 requirement (user ruling 2026-10-09, PR #1292 review F1); the flush dressing
 keeps the inter-arm gap's neighbour clearance; the running fit names its
@@ -23,10 +23,10 @@ import ch_rod_pivot_pin_spec as pin
 if pin.PIN_END_PROUD_MAX != 0.0:
     raise AssertionError("note 3 states flush ends")
 
-# --- Drawing contract (policy rule 2: the PART owns places and bands). ---
+# --- Drawing contract (drawing-simplicity-policy.md `How the repository implements the guidelines`: the PART owns places and bands). ---
 # The journal and the installed length live on the revolve's half-profile
 # (``PinProfile``), so both import into the side view beside each other
-# (rule 7, turned part). The journal carries the drill rod's own grind band
+# (drawing-guidelines.md rule 11 (turned parts read like the lathe), turned part). The journal carries the drill rod's own grind band
 # natively at three places; the installed length is the fork's thickness,
 # printed as REFERENCE (the fork print owns it) at its three places. The
 # blank's cut length lives on the blanked ``BlankReference`` sketch on the

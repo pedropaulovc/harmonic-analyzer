@@ -186,7 +186,7 @@ CROSS_HOLE_CALLOUT = (
 # Notes never carry dimensions (Codex P1 on #814): the drum station is the
 # model's DrumStationFromHeadRear, printed on the profile as "DRUM STATION"
 # with its .X band, and the note only names it.
-# Rule 6: assembly requirements belong on the feature callout or the
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): assembly requirements belong on the feature callout or the
 # assembly step, never in a part's general notes.  ASSEMBLY_STEP is the
 # pinion fit-up step text (pinion_rig_fitup) that owns this joint.
 # The drum joint's one step covers MHA-DT-001 too (dt_alignment_pinion_spec).

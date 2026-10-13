@@ -51,7 +51,7 @@ def test_every_marked_dimension_is_placed_and_has_places() -> None:
 
 
 def test_sheet_authors_no_manufacturing_value() -> None:
-    # Rule 2: places and bands come from the part; the sheet reads them back.
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`: places and bands come from the part; the sheet reads them back.
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert not drawing_specification_violations(source, filename=drawing.__file__)
@@ -67,7 +67,7 @@ def test_bands_come_from_named_spec_constants() -> None:
         ("FlatProfile", "FlatToAxis"): "*FLAT_TO_AXIS_DEVIATIONS",
         ("SleeveProfile", "OutsideDia"): "*OUTSIDE_DIA_DEVIATIONS",
     }
-    # A band tighter than its printed row needs a functional reason (rule 12):
+    # A band tighter than its printed row needs a functional reason (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)):
     # stations' ±0.05, the tip class, boss h6 and flat
     # 0/-0.015 bands have functional reasons tighter than their printed rows.
     assert spec.STATION_TOL < printed_band_mm(spec.STATION_PLACES)
@@ -198,7 +198,7 @@ def test_cutter_run_out_ends_inside_its_limit_clear_of_the_disc() -> None:
 def test_cutter_stations_are_native_banded_model_dimensions() -> None:
     """Codex P2 on R9-67: the full-depth window and the run-out limit print as
     the model's own dimensions, band and places on the part, not as numbers
-    frozen into note text (policy rules 2 and 7)."""
+    frozen into note text (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 12 (hole and slot callouts say what to do))."""
     assert {"FullDepth", "CutterRunout"} <= spec.DRAWING_DIMENSIONS["SleeveProfile"]
     places = spec.DRAWING_PRECISION_BY_NAME
     assert places["FullDepth"] == spec.FULL_DEPTH_PLACES == 3

@@ -10,7 +10,7 @@ depth added across the right-view section.  The two MHA-VN-051 dowel holes
 print their 2X reamed Ø (with its band and press callout) and a position
 frame under it, Ø0.13 to A, carrying the datum feature symbol B for the pair,
 at their BASIC span in the top view, and their flat-floor depth in section
-A-A, cut from the top view through the tap and dowel axes (policy rule 7: the
+A-A, cut from the top view through the tap and dowel axes (drawing-guidelines.md rule 9 (show internal shape in solid lines): the
 floor is hidden in the front view, so it is dimensioned where the cut shows
 it).  The pattern is located on the block's +X side and front faces at
 general tolerance in the top view; the tap axis, run on through the bore's
@@ -202,7 +202,7 @@ TAP_STATION_OFFSET_XY = (_section_x(-PIN_HOLE_X) - 0.012, TAP_STATION_TEXT_XY[1]
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 TOP_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 # The dowel hole's Ø and its three callout lines park in the open band right
-# of the top view (policy rule 8: callout text outside the silhouette, no text
+# of the top view (drawing-guidelines.md rule 14 (keep text off the part): callout text outside the silhouette, no text
 # on a line).  SolidWorks hangs the block left of its text position by half
 # the widest line plus the shoulder's overhang and runs the shoulder under the
 # last line; both are measured on the dda9a33a8 farm render (3.5 mm text,
@@ -634,7 +634,7 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     # Section A-A cuts the top view on z = 0 through the tap and dowel axes:
-    # the blind dowel hole's floor is hidden in the front view (policy rule 7),
+    # the blind dowel hole's floor is hidden in the front view (drawing-guidelines.md rule 9 (show internal shape in solid lines)),
     # so its depth is dimensioned on the cut.
     section_ends = [
         model_point_in_view(
@@ -721,7 +721,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # SolidWorks pins its own raw "#6-32 Tapped Hole" note to a view that
     # imports from the tapped part (the dda9a33a8 render put it on the top
     # view, through the dowel callout).  The tap is stated once, on its hole
-    # callout below (rule 6), so every such note goes.  Which views receive
+    # callout below (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), so every such note goes.  Which views receive
     # one is SolidWorks' choice (draw_fr_top_frame._auto_tapped_hole_notes),
     # so the count is logged, not gated; finalize_drawing then proves none is
     # left.

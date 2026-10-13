@@ -379,7 +379,7 @@ async def build(adapter) -> dict[str, str]:
     # Drawing-only station reference: the apex-to-tip overall, printed as a
     # reference for stock cut-off.  One construction line on the axis of the
     # Right plane whose single length dimension IS the printed value (policy
-    # rule 2), driven by the same globals so no geometry moves.
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`), driven by the same globals so no geometry moves.
     stations = SketchDims()
     check("create_sketch station reference", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
@@ -431,7 +431,7 @@ async def build(adapter) -> dict[str, str]:
             f"spring screw: expected one solid body, found {len(bodies)}"
         )
 
-    # Model-owned bands (policy rule 2): the relief diameter keeps the die's
+    # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the relief diameter keeps the die's
     # run-out under the thread root, the relief lead prints as limits on the
     # relief callout, and the tip chamfer is too small to ride the .XX band.
     # Every other mark takes the title block's two-place band.

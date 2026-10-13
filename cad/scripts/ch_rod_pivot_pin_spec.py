@@ -13,7 +13,7 @@ through both tines, its ends dressed flush with the fork's faces, exactly as
 the MHA-CH-011 bar pin (``ch_bar_pivot_pin_spec``) is pressed into the
 amplitude bar. Press-fit retention is the user's ruling (2026-10-09, PR #1292
 review F1): a 90-degree Ø3.2 countersink sunk into each tine for a peened end
-left 0.92 of bearing land under the pin, below rule 12's 1.5 floor, so the
+left 0.92 of bearing land under the pin, below drawing-guidelines.md rule 17 (walls and webs)'s 1.5 floor, so the
 ruling reverses the #746 reconstruction choice of peening. A pressed pin
 drives out with a punch.
 
@@ -61,13 +61,13 @@ ROD_HOLE_BAND = _rod.PIN_HOLE_BAND
 # press; the minimum only has to stay positive (the pin carries no axial load:
 # the arm bears on it radially and the tines hold it square).
 PRESS_INTERFERENCE_MAX = 0.00085 * MM_PER_IN  # 0.0216
-RULE12_WALL_TARGET = 2.0  # drawing-simplicity policy rule 12
+RULE12_WALL_TARGET = 2.0  # drawing-guidelines.md rule 17 (walls and webs)
 RULE12_WALL_FLOOR = 1.5
 RUNNING_FLOOR = 0.10  # rocker_bank_layout.RUNNING_FLOOR: oiled steel faces
 MARGIN_SPARE = 0.25  # rocker_bank_layout.MARGIN_SPARE: novice spare
 NEIGHBOUR_CLEARANCE_MIN = RUNNING_FLOOR + MARGIN_SPARE  # 0.35
 CROTCH_CLEARANCE_MIN = 1.0  # slot floor below the arm's bottom edge, all poses
-BRIDGE_TARGET = 2.0  # fork bridge below the slot floor: the rule-12 target
+BRIDGE_TARGET = 2.0  # fork bridge below the slot floor: the drawing-guidelines.md rule 17 (walls and webs) target
 # Arm tilt less rod tilt, the swing the crotch must clear: the solved loop
 # (channel_kinematics, cam phase 0..360) spans -8.662..+1.061 deg with the
 # rod closing the raised drive axis to the level rocker, restated here
@@ -111,7 +111,7 @@ def _arm_bottom_low(
 def joint_budget() -> dict[str, float]:
     """Worst-case values of every fit the joint must hold (all mm).
 
-    Every term is at the worst case of its printed band (policy rule 12):
+    Every term is at the worst case of its printed band (drawing-guidelines.md rule 17 (walls and webs)):
     the drill rod +/-0.005, the reamed tine hole +0.010/0, the arm's #47 hole
     +0.10/0, the arm strap 2.500 +/-0.025 and symmetric to its hub within
     STRAP_HUB_SYMMETRY, the fork 6.075 +/-0.05, the slot 2.625 +0.127/0, the
@@ -215,13 +215,13 @@ if BUDGET["side_clearance_min"] < RUNNING_FLOOR - 1e-9:
 if BUDGET["neighbour_clearance_min"] < NEIGHBOUR_CLEARANCE_MIN - 1e-9:
     raise AssertionError("neighbouring forks can touch in the inter-arm gap")
 if BUDGET["tine_bearing_land_min"] < RULE12_WALL_FLOOR - 1e-9:
-    raise AssertionError("the pin's land in a tine is under the rule-12 floor")
+    raise AssertionError("the pin's land in a tine is under the drawing-guidelines.md rule 17 (walls and webs) floor")
 if BUDGET["crotch_clearance_min"] < CROTCH_CLEARANCE_MIN - 1e-9:
     raise AssertionError("fork crotch can strike the arm's bottom edge")
 if BUDGET["bridge_min"] < BRIDGE_TARGET - 1e-9:
     raise AssertionError("fork bridge below the slot under the 2.0 target")
 if BUDGET["crown_wall_min"] < RULE12_WALL_TARGET - 1e-9:
-    raise AssertionError("reamed hole to fork crown under the rule-12 target")
+    raise AssertionError("reamed hole to fork crown under the drawing-guidelines.md rule 17 (walls and webs) target")
 if BUDGET["blank_excess_min"] <= 0.0:
     raise AssertionError("pin blank too short to dress flush at both tines")
 if PIN_INSTALLED_LENGTH != _rod.FORK_THICKNESS:

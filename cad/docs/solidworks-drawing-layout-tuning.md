@@ -15,7 +15,7 @@ a placement operation (`OffsetText` on a diametric dimension, HLR on a detail
 view, moving a section view to another sheet).
 
 Do not use for what the drawing SAYS — dimension selection, tolerancing,
-callout wording, view choice. That is `cad/docs/drawing-simplicity-policy.md`.
+callout wording, view choice. That is `cad/docs/drawing-guidelines.md`.
 
 ## The loop
 
@@ -694,7 +694,7 @@ they do not justify suppressing actual text crossings.
 ## The sheet-split rule
 
 When two views' callouts are squeezed together, the fix is a NEW SHEET, not a
-smaller scale. Policy rule 8: extra sheets are cheap, cramming is not. The
+smaller scale. drawing-guidelines.md rule 14 (keep text off the part): extra sheets are cheap, cramming is not. The
 `view-crowding` finding is the trigger; move whole sections, detail views, or the
 hole table with its notes. Do not abbreviate text, shrink the scale, or thread
 callouts between lines to make one sheet fit.

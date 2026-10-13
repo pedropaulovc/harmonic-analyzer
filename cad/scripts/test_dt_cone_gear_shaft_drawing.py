@@ -150,7 +150,7 @@ def test_only_the_terminal_d_section_prints_the_torque_corner_limit(monkeypatch)
 
 
 def test_display_precision_is_owned_by_the_part() -> None:
-    """Policy rule 2: the .SLDPRT carries the places, the sheet reads them back."""
+    """drawing-simplicity-policy.md `How the repository implements the guidelines`: the .SLDPRT carries the places, the sheet reads them back."""
     assert "draw_dt_cone_gear_shaft.py" in PRECISION_MIGRATED_DRAWINGS
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_dimension_precision" not in source
@@ -190,7 +190,7 @@ def test_display_precision_is_owned_by_the_part() -> None:
         "CollarDia": 2,
         "CollarWidth": 3,
     }
-    # Rule 12: the web holds the 2.0 target at the low limit it prints.
+    # drawing-guidelines.md rule 17 (walls and webs): the web holds the 2.0 target at the low limit it prints.
     web = dt_cone_gear_shaft_spec.COLLAR_THICKNESS
     assert web - _config.title_block("linear_3pl")["value_in"] * 25.4 >= 2.0
 
@@ -1021,7 +1021,7 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     assert dt_cone_gear_shaft_spec.TIP_BLOCK_NORTH_FACE_STATION == pytest.approx(
         cone_line.PIVOT_STATION - cone_line.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
     )
-    # Rule-12 E11: #10-32 94025A164 at the block spec's fit-up embed.
+    # drawing-guidelines.md rule 18 (thread engagement) E11: #10-32 94025A164 at the block spec's fit-up embed.
     assert dt_cone_gear_shaft_spec.ADJUSTER_EMBED == dt_cone_tip_block_spec.ADJUSTER_EMBED
     assert dt_cone_gear_shaft_spec.ADJUSTER_CUP_RIM_STATION == pytest.approx(
         cone_line.TIP_BLOCK_NORTH_FACE - dt_cone_tip_block_spec.ADJUSTER_EMBED
@@ -1154,8 +1154,8 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # (the gear-seat steps; the collar's roots stay sharp, #914).
     assert drawing.DIMENSION_CALLOUTS["ShoulderR"] == "3X"
     # The old "SHOULDER ROOTS R0.10 MAX" note is gone.  What remains names
-    # the gear seats' and flats' mates (rule 2; codex 375a122c) without any
-    # joint method (rule 6; user ruling 2026-09-28: the gears are a solid
+    # the gear seats' and flats' mates (drawing-guidelines.md rule 4 (tighten only for function, and name the mate); codex 375a122c) without any
+    # joint method (drawing-guidelines.md rule 7 (notes: few, flagged, never a method); user ruling 2026-09-28: the gears are a solid
     # touching stack keyed by the flats, nothing holds them but the D)
     # or a check of its own (no MUST), and carries
     # no number but the mates' part numbers, no tolerance, datum or method
@@ -1208,7 +1208,7 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
 
 
 def test_the_sheet_carries_no_datums_or_feature_control_frames() -> None:
-    """Simplicity policy rule 3: no GD&T on a hand-built hobby shaft."""
+    """drawing-guidelines.md rule 5 (avoid excessive GD&T): no GD&T on a hand-built hobby shaft."""
     assert not hasattr(dt_cone_gear_shaft_spec, "PART_DATUMS")
     assert not hasattr(dt_cone_gear_shaft_spec, "GEOMETRIC_CONTROLS")
     source = Path(drawing.__file__).read_text(encoding="utf-8")

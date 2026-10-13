@@ -73,7 +73,7 @@ SLOT_DEPTH = 1.0
 SLOT_DEPTH_TOL = 0.20
 
 # The running surface under the oak bore.  (upper, lower) deviations from the
-# Ø4.00 nominal; the model carries the band natively (policy rule 2).  Ø4.00
+# Ø4.00 nominal; the model carries the band natively (drawing-simplicity-policy.md `How the repository implements the guidelines`).  Ø4.00
 # (user ruling 2026-09-30): the tenon keeps 1.5 of oak over its bore.
 SHOULDER_DIA = 4.00
 SHOULDER_DIA_BAND = (-0.03, -0.08)
@@ -180,7 +180,7 @@ RELIEF_WIDTH = 2.2
 # an equation, and printed as a callout on the lead's axial size, as limits
 # (MHA-DT-032 re-review: at .X the lead could print as nothing).
 RELIEF_LEAD = 0.3
-# The model owns the band (policy rule 2; Codex P2 on #1139): the ReliefLead
+# The model owns the band (drawing-simplicity-policy.md `How the repository implements the guidelines`; Codex P2 on #1139): the ReliefLead
 # dimension carries +/-0.10 and the callout prints the limits it gives, so a
 # nominal edit cannot leave the printed limits behind.
 RELIEF_LEAD_TOL = 0.10
@@ -476,7 +476,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "DriverSlot": {"SlotDepth"},
     "StationReference": {"OverallLength", "UnderHeadLocation"},
 }
-# Decimal places ARE the tolerance (policy rule 2): the shoulder diameter is
+# Decimal places ARE the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the shoulder diameter is
 # the running fit and prints its band at two places, the head diameter its
 # cup-floor bearing band, and the relief width prints at two places for the
 # 1.5D engagement rule; every other size is routine (.X), the fitted

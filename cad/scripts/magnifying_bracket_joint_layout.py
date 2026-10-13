@@ -148,4 +148,4 @@ if min(
     GRIP_MIN, DRILL_LATERAL_WALL_MIN,
     COUNTERBORE_END_WALL_MIN, COUNTERBORE_HEIGHT_WALL_MIN,
 ) < 1.5:
-    raise AssertionError("magnifying bracket joint loses a rule-12 wall")
+    raise AssertionError("magnifying bracket joint loses a drawing-guidelines.md rule 17 (walls and webs) wall")

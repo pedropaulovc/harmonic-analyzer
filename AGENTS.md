@@ -42,7 +42,9 @@ credibility rests on:
 1. **The CAD is the source of truth for geometry.** `cad/config/` and
    `cad/scripts/build_*.py` — never a remembered number, never a figure read off
    a render.
-2. **The drawing-simplicity policy is a required CAD design standard.** Read
+2. **The drawing guidelines are a required CAD design standard.** Read
+   [`cad/docs/drawing-guidelines.md`](cad/docs/drawing-guidelines.md) and its
+   repository governance in
    [`cad/docs/drawing-simplicity-policy.md`](cad/docs/drawing-simplicity-policy.md)
    before changing CAD geometry or manufacturing drawings. Drawing review is
    the last DFM backstop: a finding that exposes a plausible model omission,
@@ -159,9 +161,9 @@ not mergeable until ALL THREE hold — no partial credit:
    **Drawing sheets need a machinist review; an eye pass does not count.**
    Every drawing sheet whose rendered output the PR changes — because the PR
    edits its drawing script or spec, or because it changes CAD geometry,
-   config or a helper the sheet depends on — needs a cross-family
+   config or a helper the sheet depends on — needs a
    `cad/scripts/machinist_review.py` verdict on the exact version being
-   merged (reviewer family rules: `cad/docs/drawing-simplicity-policy.md`,
+   merged (reviewer rules: `cad/docs/drawing-simplicity-policy.md`,
    "The gate"). A sheet whose drawing script or spec the PR edits must reach
    `SHIP` (or `FIX` whose only gating findings are blockers matching a named
    exception, cited in the PR). A sheet changed only indirectly passes when

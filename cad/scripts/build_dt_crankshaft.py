@@ -210,7 +210,7 @@ async def _angled_plane_containing(
     raise RuntimeError(f"{name}: neither angled-plane solution contains {direction}")
 
 
-# Far-end stations the drawing prints (policy rule 7), each drawn on the
+# Far-end stations the drawing prints (drawing-guidelines.md rule 11 (turned parts read like the lathe)), each drawn on the
 # StationReference sketch from its dome-root station and driven by the same
 # globals as the feature it locates.
 _STATIONS = {
@@ -841,9 +841,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Drawing-only station reference.  The print baselines every axial
     # station from the FAR END, the one faced end a machinist zeroes on
-    # (policy rule 7), but the model's features measure from the dome root.
+    # (drawing-guidelines.md rule 11 (turned parts read like the lathe)), but the model's features measure from the dome root.
     # Each construction line's one driving dimension IS the printed value
-    # (policy rule 2), driven by the same globals as the features, so no
+    # (drawing-simplicity-policy.md `How the repository implements the guidelines`), driven by the same globals as the features, so no
     # geometry moves.  The sketch sits on the Right plane because the *Right
     # side view prints it (every reference sketch that imports natively sits
     # on the plane of its view -- build_dt_crank_hub's
@@ -985,7 +985,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "Shaft", "Depth", *deviations(SHAFT_LENGTH_BAND)
     )
-    # The seat collar's functional bands (dt_crankshaft_spec, rule 12): the two
+    # The seat collar's functional bands (dt_crankshaft_spec, drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the two
     # far-end stations, the body OD, the seat spigot's diameter and its length
     # from the seat face, and the drive-pin holes' location, press size and
     # depth.

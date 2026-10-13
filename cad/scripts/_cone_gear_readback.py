@@ -42,7 +42,7 @@ _TOL_BILAT = 2  # swTolType_e.swTolBILAT
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 
 
-# The two bilateral bands T006 overrides (the named exception); every other
+# The two bilateral bands T006 overrides (pending exception ruling #971); every other
 # configuration carries the shared band.
 _BANDED_DIMENSIONS = (
     ("BlankProfile", "BlankDia", blank_dia_band),

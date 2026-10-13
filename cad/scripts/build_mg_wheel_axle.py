@@ -169,7 +169,7 @@ async def build(adapter) -> dict[str, str]:
     )
     profile.record("ThreadDia", '"ThreadDia"')
     # The thread from the step: the gauged face the nut stack hangs off
-    # (policy rule 7's functional datum, mg_wheel_axle_spec.THREAD_LEN).
+    # (drawing-guidelines.md rule 10 (dimension from a real feature)'s functional datum, mg_wheel_axle_spec.THREAD_LEN).
     check(
         "thread length",
         await adapter.add_sketch_dimension(thread, None, "linear", THREAD_LEN),

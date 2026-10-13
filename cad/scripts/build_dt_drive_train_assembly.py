@@ -894,7 +894,7 @@ for _got, _want, _what in (
 if min(vn_keeper_chain_spec.clearance_report().values()) < 0.0:
     raise AssertionError("keeper chain touches a part it must clear")
 ANCHOR_THREAD_ENGAGEMENT = ANCHOR_HEAD_Z + ANCHOR_SCREW_SHANK_LEN - CRANK_ARM_Z0
-# The #4-40 is tapped THRU the arm (rule 12, W7): nothing to bottom on; the
+# The #4-40 is tapped THRU the arm (drawing-guidelines.md rule 17 (walls and webs), W7): nothing to bottom on; the
 # screw tip must stay short of the inboard face.
 ANCHOR_TIP_RESERVE = ARM_THICKNESS - ANCHOR_THREAD_ENGAGEMENT
 if ANCHOR_HOLE_SPEC.end != "through_all":
@@ -1409,7 +1409,7 @@ if any(
     )
 # U30 post mount (I22): each MHA-VN-031 seats on the MHA-DT-005 counterbore floor and
 # is cut to fit into the MHA-DT-020 tap: never proud of the plate underside, and
-# at least 0.90D of thread (U37c/U41's named exception to rule 12) both at the
+# at least 0.90D of thread (pending exception ruling #1019) both at the
 # modelled cut length and at the platform spec's printed worst case.
 _require_tapped_thread("cone-post mount", POST_SCREW_THREAD, POST_MOUNT_SPEC)
 POST_SCREW_SEAT = POST_BLOCK_HEIGHT - POST_CBORE_DEPTH  # above PlateTop
@@ -1577,7 +1577,7 @@ if abs(SHAFT_FRONT_STATION + SHAFT_COLLAR_END - _GEAR64_SOUTH_STATION) > 1e-9:
 # Along the axis, south to north: T006 gear | feeler gap | MHA-VN-016 stack
 # collar, locked on the Sec4 D-flat | air | block | shaft tip | the 94025A164
 # adjuster's conical cup, its #10-32 thread tapped through the block
-# (rule-12 E11/W1). The shaft's terminal D-flat end cannot reach the cup apex:
+# (drawing-guidelines.md rule 18 (thread engagement) E11/W1). The shaft's terminal D-flat end cannot reach the cup apex:
 # it seats on the remaining round edge where it meets the cone wall,
 # ADJ_SEAT_DEPTH short of the apex (end radius / tan of the vendor cup's
 # half-angle). The adjuster backs out from nominal ADJ_EMBED by that depth;
@@ -4199,7 +4199,7 @@ _require_tapped_thread(
     BASE_PEDESTAL_SEAT_SPEC,
     kind="tapped_bottoming",
 )
-# Rule 12 (audit E15): at the printed worst case (flange 5.0 +-0.8, screw
+# drawing-guidelines.md rule 18 (thread engagement) (audit E15): at the printed worst case (flange 5.0 +-0.8, screw
 # 19.05 +0/-0.76, seat depths +-0.8) the screw keeps >= 1.5D of thread and
 # never reaches the incomplete threads at the bottom of the seat.
 _HDSCREW_MIN_ENGAGEMENT = (HDSCREW_SHANK_LEN - 0.76) - (ARBOR_PED_FLANGE_T + 0.8)

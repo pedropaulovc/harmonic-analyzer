@@ -26,7 +26,7 @@ TOP_SCREW_Y = 1017.95
 # Top-frame bosses take a flush counterbore, not a spotface: the stock
 # fillister head (HEAD_H 4.572) sits below the Ø9 mouth's lowest barrel point
 # at every printed corner, and the floor stands far enough outboard to keep
-# rule 12's 2.0 to the cap recess at its .XX band (build_fr_top_frame proves
+# drawing-guidelines.md rule 17 (walls and webs)'s 2.0 to the cap recess at its .XX band (build_fr_top_frame proves
 # both; at 128.1 the ligament was 1.80, codex review of 080fda97).
 TOP_SCREW_SEAT_Z = 128.35
 TOP_SCREW_COUNTERBORE_DIAMETER = 9.0

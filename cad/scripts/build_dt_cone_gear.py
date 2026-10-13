@@ -560,7 +560,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Blank")
     # The face width is a size the turner sets, so it prints as a NATIVE model
-    # dimension (drawing-simplicity-policy.md rules 1-2): name the extrude
+    # dimension (drawing-simplicity-policy.md `How the repository implements the guidelines`): name the extrude
     # depth so it can be marked and given its decimal places like the two
     # circle dims. It stays a literal (no drive job): FACE_WIDTH is one value
     # across all 20 configurations.

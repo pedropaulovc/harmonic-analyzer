@@ -86,7 +86,7 @@ def test_linked_notes_carry_the_notches_and_hole() -> None:
 def test_bottom_notch_depth_band_is_native_on_its_dimension() -> None:
     """User ruling 2026-09-26: a deep notch drops the cheeks onto the rocker
     hub one for one, so the depth may only come out shallow. Codex #936
-    PRRT_kwDOPHDy386mWF0L, policy rule 2: that band is the part's, native on
+    PRRT_kwDOPHDy386mWF0L, drawing-simplicity-policy.md `How the repository implements the guidelines`: that band is the part's, native on
     BottomNotchHeight from the one constant the cheek-over-hub test reads,
     printed in DETAIL A -- and no note carries it or any notch size."""
     from _drawing_contract import model_toleranced_dimensions

@@ -14,14 +14,14 @@ Plane x Top Plane), the assembly's concentric-mate reference.
 
 Built as a REVOLVE of a half-profile on the Right plane (the
 ``build_dt_crank_pinion_pin`` idiom): a turned part prints its diameter on the
-side view beside its length (drawing-simplicity-policy.md rule 7), and only a
+side view beside its length (drawing-guidelines.md rule 11 (turned parts read like the lathe)), and only a
 dimension whose sketch is parallel to that view imports there natively. A
 Right-plane sketch maps local +x -> model -Z; the profile is symmetric, so the
 axis line's midpoint on the origin centres the pin on the Front Plane.
 
 ``BlankReference`` (blanked, on the Right plane, on the pin axis): the blank's
 cut length, a construction line centred on the Front Plane whose one
-dimension carries the 2-place band (policy rule 2: the model, not a note,
+dimension carries the 2-place band (drawing-simplicity-policy.md `How the repository implements the guidelines`: the model, not a note,
 owns it); the side view prints it below the installed length.
 
 Run (SolidWorks already open)::
@@ -203,7 +203,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
 
-    # The journal carries the drill rod's grind band natively (rule 2); the
+    # The journal carries the drill rod's grind band natively (drawing-guidelines.md rule 3 (decimal places carry the tolerance)); the
     # installed length is the fork's, parenthesized as REFERENCE on the sheet;
     # the blank's cut length carries its own band (the dressing stock,
     # ch_rod_pivot_pin_spec.joint_budget blank_excess_min/max).

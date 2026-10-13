@@ -5,14 +5,14 @@ length: a MODIFIED purchased part.  Its head seats on the MHA-DT-005
 counterbore floor and the shank threads through the MHA-DT-020 plate, which
 swings over the base, so the cut end must never stand proud of the plate's
 underside.  The cut length is therefore a real, model-owned dimension on the
-sheet (policy rule 2), not a number in an installation note (rule 6, Main's
+sheet (drawing-simplicity-policy.md `How the repository implements the guidelines`), not a number in an installation note (drawing-guidelines.md rule 7 (notes: few, flagged, never a method), Main's
 eye pass of warm-c486).  Across the printed post and plate bands no single
 length both stays flush and keeps the engagement minimum (U27 check below),
 so the length prints as a REFERENCE and each screw is cut to its own hole at
 assembly.
 
-The engagement this leaves is the named rule-12 exception in
-``cad/docs/drawing-simplicity-policy.md``.  The sheet states it as a plain
+The engagement this leaves falls short of drawing guideline rule 18 and is
+pending the user's ruling in #1019. The sheet states it as a plain
 fact, "ENGAGEMENT 0.90D MIN", the last line of the cut-length callout
 (CUT_TO_FIT_CALLOUT), formatted from the floored worst case
 POST_MOUNT_ENGAGEMENT_PRINTED; the asserts below still guard that value and
@@ -137,7 +137,7 @@ FLOOR_HIGH_MM = (_POST_HEIGHT_PRINTED + _GENERAL_1PL_MM) - (
 PLATE_THIN_MM = platform.PLATE_THICKNESS - PLATE_STOCK_BAND_MM
 PLATE_THICK_MM = platform.PLATE_THICKNESS + PLATE_STOCK_BAND_MM
 
-# The named rule-12 exception (User, U37c/U41): 0.90D minimum engagement.
+# Pending ruling #1019 against rule 18: 0.90D minimum engagement.
 MIN_ENGAGEMENT_DIAMETERS = 0.90
 MIN_ENGAGEMENT_MM = MIN_ENGAGEMENT_DIAMETERS * THREAD_DIA_MM
 # Corner 1, never proud: lowest floor on the thinnest plate.  A fixed length
@@ -196,7 +196,7 @@ if not 0.0 <= CUT_SHORT_NOMINAL_MM <= POST_SCREW_CUT_TO_FIT_SHORT:
         f"{POST_SCREW_CUT_TO_FIT_SHORT} short"
     )
 
-# The named exception's worst case, cut to fit: unlike the fixed-length
+# The shortfall pending ruling #1019, cut to fit: unlike the fixed-length
 # corner above, the floor drops out (each screw is cut to its own hole), so
 # the plate limits it -- the thinnest stock, the full fit-to-hole allowance,
 # and both breaks at their maximum. The platform's tap-exit deburr and this
@@ -229,7 +229,7 @@ if POST_MOUNT_ENGAGEMENT_PRINTED < MIN_ENGAGEMENT_DIAMETERS:
 # Provenance stays here: the User's U37c/U41 ruling admits 0.90D under the
 # 1.5D rule.  The wording follows S1's drive-train step ("ENGAGEMENT 0.90D
 # MIN.").
-# Named exception: MHA-VN-031 engagement (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-VN-031 engagement (#1019).
 CUT_TO_FIT_CALLOUT = (
     "CUT TO FIT AT ASSEMBLY\n"
     f"END FLUSH TO {POST_SCREW_CUT_TO_FIT_SHORT:.{_FIT_PLACES}f} SHORT\n"
@@ -338,7 +338,7 @@ if not 0.0 < _ROOT_REACHED_MM < FACTORY_TIP_CHAMFER_MM:
 if STOCK_LENGTH_MM - FACTORY_TIP_CHAMFER_MM <= CUT_LENGTH_MM:
     raise ValueError("the cut no longer clears the factory tip")
 
-# Rule 6: no dimension, no tolerance, no installation sequence.  The cut
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): no dimension, no tolerance, no installation sequence.  The cut
 # length is the reference dimension above; its fit-to-hole acceptance is the
 # CutLength callout (CUT_TO_FIT_CALLOUT), not a note.
 MANUFACTURING_NOTES = (

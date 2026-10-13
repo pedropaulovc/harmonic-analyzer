@@ -1,6 +1,6 @@
 r"""Create the curated manufacturing drawing for the crank pinion (16T).
 
-Recreated under ``cad/docs/drawing-simplicity-policy.md``. The sheet has an end
+Recreated under ``cad/docs/drawing-guidelines.md``. The sheet has an end
 view, longitudinal section and isometric of a toothed disc with a hub boss.
 Every turned diameter sits beside its axial extent on the longitudinal
 section: tooth-tip blank, turned north band, reamed bore and boss, with
@@ -10,7 +10,7 @@ carry the requirements geometry cannot convey.
 
 No datums, no feature control frames, one roughness symbol (the bore): a
 custom pinion pinned to its crankshaft is not on the GD&T allowlist
-(rules 3-5). The bore's native limits and feature callout jointly identify its
+(drawing-guidelines.md rule 5 (avoid excessive GD&T) and drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)). The bore's native limits and feature callout jointly identify its
 mating crankshaft and required diametral clearance. The decimal places are the
 PART's (``crank_pinion_spec.DRAWING_PRECISION``, applied natively by
 ``build_crank_pinion``); this script only reads them back off the sheet.
@@ -185,7 +185,7 @@ def _position_section_caption(
 
 # The end view is pictorial and carries only its center mark. Every turned
 # diameter belongs beside the matching axial extent on the longitudinal section
-# (rule 7); ``BossProfile`` supplies the tooth-tip and bore as construction-only
+# (drawing-guidelines.md rule 11 (turned parts read like the lathe)); ``BossProfile`` supplies the tooth-tip and bore as construction-only
 # native model dimensions so they import without sheet-authored numbers.
 FRONT_KEEP: dict[str, tuple[float, float]] = {}
 # Longitudinal section: the tooth-tip diameter sits above its axial span; the
@@ -193,7 +193,7 @@ FRONT_KEEP: dict[str, tuple[float, float]] = {}
 # and clear of the end view. The turned-band diameter sits above the band,
 # its text at the bore diameter's height so it stays clear of the tip
 # diameter's. The three lengths stay baseline-stacked below the view from the
-# toothed south face, shortest innermost (rule 7: one origin per view,
+# toothed south face, shortest innermost (drawing-guidelines.md rule 11 (turned parts read like the lathe): one origin per view,
 # baseline not chained). The boss diameter reads on a vertical dimension line
 # beyond the boss end, its text on the axis between the extension lines: at
 # +0.020 it sat on the upper extension line (machinist review of 4d4e038e3),
@@ -454,7 +454,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin cross-hole")
     # The longitudinal section is the turned part's length view: its explicit
-    # sketch centerline says which pair of edges is the faced ends (rule 7),
+    # sketch centerline says which pair of edges is the faced ends (drawing-guidelines.md rule 11 (turned parts read like the lathe)),
     # while the cut exposes the bore so its native diameter never lands on
     # hidden lines.
     _create_section_axis_centerline(
@@ -490,7 +490,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     # Put the fit note immediately left of the end view and send its short
     # leader radially through the upper-left tooth gap to the visible bore.
-    # The native section-view diameter remains beside its axial extent (rule 7).
+    # The native section-view diameter remains beside its axial extent (drawing-guidelines.md rule 11 (turned parts read like the lathe)).
     bore_fit = add_leader_note(
         adapter,
         BORE_FIT_CALLOUT,
@@ -505,7 +505,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The bore is the part's one fit surface, and a fit is a function of the
     # peaks as well as the size: REAM names the operation, not the finish it
     # leaves. The roughness is the project's general machined grade, authored
-    # on the PART and read back here (policy rule 5's "a surface that has to
+    # on the PART and read back here (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)'s "a surface that has to
     # work" case). A surface symbol's native anchor is its lower-left corner,
     # and its text grows rightward; place it right of the face view, clear of
     # the A-A cutting-plane line.

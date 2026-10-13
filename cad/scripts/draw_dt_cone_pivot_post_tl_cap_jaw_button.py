@@ -222,7 +222,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    # The spigot band's reason (policy rule 2): the mate and the acceptance.
+    # The spigot band's reason (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the mate and the acceptance.
     set_dimension_callouts(adapter, diameters, {"SpigotDia": SPIGOT_CALLOUT})
     add_view_centerline(
         adapter, profile, face_xy=PROFILE_CENTER, label="button turning axis"

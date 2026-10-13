@@ -87,7 +87,7 @@ def test_screw_holes_keep_the_ligament_floor_at_the_printed_worst_case() -> None
 
 
 def test_hole_coordinates_print_from_the_corner_without_a_frame() -> None:
-    """Rule 3: no frame on this plate; each hole coordinate prints from the
+    """drawing-guidelines.md rule 5 (avoid excessive GD&T): no frame on this plate; each hole coordinate prints from the
     plate's corner at .XXX under its own band, and the shared Y once, 2X."""
     holes = pd_guide_lock_spec.DRAWING_DIMENSIONS["ScrewHoles"]
     assert holes == {"Hole1X", "Hole2X", "Hole1Y"} <= set(drawing.FRONT_KEEP)
@@ -135,7 +135,7 @@ def test_the_height_text_sits_between_its_extension_lines() -> None:
     height's value sat on the plate's top-edge extension line. It now stands
     mid-way between the top and bottom extension lines, left of the hole Y
     dimension line, where the hole Y extension stops, and carries no callout
-    (Codex P1 on #1353: rule 6 bars a design-intent note)."""
+    (Codex P1 on #1353: drawing-guidelines.md rule 7 (notes: few, flagged, never a method) bars a design-intent note)."""
     assert "Height" not in drawing.DIMENSION_CALLOUTS
     assert not hasattr(drawing, "HEIGHT_BAND_CALLOUT")
     x, y = drawing.FRONT_KEEP["Height"]

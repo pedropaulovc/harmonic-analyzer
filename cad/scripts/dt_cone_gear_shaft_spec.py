@@ -75,7 +75,7 @@ FRONT_STUB = (
 #
 # The 64T's SOUTH face sits SOUTH_FACE_SHIFT_NORTH north of where the 8.0
 # layout face on the 19.9 station put it (#1126), so the collar is the 1.681
-# web under that layout face plus the shift: 3.181, above rule 12's 2.0 target
+# web under that layout face plus the shift: 3.181, above drawing-guidelines.md rule 17 (walls and webs)'s 2.0 target
 # at its low limit.  The solid stack (user ruling 2026-09-28) grows the 64T
 # NORTH from that face to bear on T120, so the collar does not move.  The 64T
 # centre is the drive-train's physical 64T station (the shaft tests pin the
@@ -117,7 +117,7 @@ STOCK_DIA = 0.625 * MM_PER_IN
 STOCK_DIA_BAND = (0.0, -0.002 * MM_PER_IN)
 COLLAR_DIA = STOCK_DIA
 # The thrust ring: the collar's south face on the post boss, between the bore
-# and the collar OD.  Held to rule 12's 1.5 floor (user ruling 2026-09-26)
+# and the collar OD.  Held to drawing-guidelines.md rule 17 (walls and webs)'s 1.5 floor (user ruling 2026-09-26)
 # with BOTH bounding edges broken at the worst case: the collar's OD edge and
 # the post's bore rim.  The title block's 0.25 break would take the 1.77 ring
 # to 1.27, so both edges print a smaller break, derived from
@@ -191,7 +191,7 @@ if not (
 # Sec4 D-flat.  The MHA-DT-021 tip block is a straight prism fixed by its
 # hold-down: its north face stands TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of
 # the pivot, itself PIVOT_FROM_T006_NORTH_FACE north of T006's face
-# (cone_line's constants).  Rule-12 E11's #10-32 McMaster 94025A164 cup
+# (cone_line's constants).  drawing-guidelines.md rule 18 (thread engagement) E11's #10-32 McMaster 94025A164 cup
 # adjuster sits ADJUSTER_EMBED (the block spec's) in from that face with its
 # apex on the tip.  The vendor Sketch2 profile (Line7, harvested 2026-09-24)
 # puts the 45 deg conical cup apex 1.2065 mm beyond the cup rim
@@ -297,7 +297,7 @@ for _land in FLAT_LANDS[:-1]:
         )
 
 # One length origin (#914 option A, Main ruling 2026-09-25): the collar's
-# thrust face, the face the post bears on.  Drawing policy rule 8 allows one
+# thrust face, the face the post bears on.  drawing-guidelines.md rule 14 (keep text off the part) allows one
 # origin per view, baseline from it.  The journal runs back from it to the
 # front stub, and the three land steps and the tip run forward from it.
 # Measuring the steps from the same face as the gear stack keeps the
@@ -356,21 +356,21 @@ SURFACE_FINISHES = (
     ),
 )
 
-# What the native dimensions cannot say (drawing-simplicity policy rule 2: a
+# What the native dimensions cannot say (drawing-guidelines.md rule 3 (decimal places carry the tolerance): a
 # fit requirement names its mate).  The gear seats and their flats name the
 # bores they fit (MHA-DT-003's and MHA-DT-007's); why the seat band sits below
 # nominal is cone_shaft_land_bands.GEAR_SEAT_BAND's comment, and the fit-up
-# lives only at the drive-train assembly step -- rule 6 keeps both off the
+# lives only at the drive-train assembly step -- drawing-guidelines.md rule 7 (notes: few, flagged, never a method) keeps both off the
 # sheet (Main, 2026-09-26).  No check the shop cannot make (codex, 375a122c),
 # no digits but the mates' numbers, no method words but one.  Lines stay
 # short: the note block starts 58 mm in and the title block begins at 216 mm.
 # The tailstock line is that one process word, by user ruling (U40,
 # 2026-09-23): the slender terminal land cannot be turned unsupported,
-# so the support IS the requirement (rule 6's exception), not a
+# so the support IS the requirement (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)'s exception), not a
 # method preference.  The parallel line is the flats' relative clock (codex,
 # fca59e2b): each land's flat turns every gear on it, so the four must share
 # one clock.  No dimension can say it -- the flats stand in four separate
-# sections -- and rule 3 keeps a parallelism frame off a shaft, so the
+# sections -- and drawing-guidelines.md rule 5 (avoid excessive GD&T) keeps a parallelism frame off a shaft, so the
 # requirement is the note and its tolerance is the title block's angle,
 # which error_budget.yaml books per land as cone_land_clock.
 DRAWING_NOTES = "\n".join(
@@ -401,7 +401,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Collar": {"CollarWidth"},
 }
 
-# Display precision is a MODEL property (drawing-simplicity policy rule 2):
+# Display precision is a MODEL property (drawing-simplicity-policy.md `How the repository implements the guidelines`):
 # the part build stamps it and the sheet only reads it back.
 #
 # Diameters and across-flats: three places.  Each carries its named band

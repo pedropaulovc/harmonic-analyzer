@@ -1011,7 +1011,7 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
     # the cluster at the back stop, it retreats up to P_MAX into that block
     # when the cluster runs forward to the front block -- and the shallowest
     # accepted block is its printed depth less the .XX row.  It must still bear
-    # the 1.5 D floor the front block keeps (rule 12).  The retired check read
+    # the 1.5 D floor the front block keeps (drawing-guidelines.md rule 18 (thread engagement)).  The retired check read
     # the nominal depth only (10.25 - 0.35 = 9.90); at the printed worst case
     # the U28 block bore 9.39.  Main (#858, ruling 2): the flush setting it is
     # drilled at carries its own error, printed on MHA-DT-000's SHAFT DRILL SET.
@@ -1692,7 +1692,7 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
     for callout in (base_sheet.TRANSFER_BLOCK_CALLOUT, base_sheet.TRANSFER_SPRING_CALLOUT):
         assert FITUP.TRANSFER_AFTER_RIG_SET in callout
     # The collars' set is an assembly step: nothing is cut, so MHA-DT-023's own
-    # print stays free of it (policy rule 6, as MHA-DT-018 keeps its feeler).
+    # print stays free of it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method), as MHA-DT-018 keeps its feeler).
     assert "LEAF" not in dt_pinion_cam_spec.DRAWING_NOTES
     assert FITUP.COLLAR_SET_STEP.startswith("SET MHA-DT-023 COLLARS ON STARRETT 66MA")
     assert "0.90 OFF BACK MHA-DT-018" in FITUP.COLLAR_SET_STEP
@@ -1702,7 +1702,7 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
 
 
 def test_the_rig_assembly_sequence_carries_each_part_step_verbatim() -> None:
-    # #814 moved the rule-6 assembly notes off MHA-DT-025, MHA-DT-015, MHA-DT-022,
+    # #814 moved the drawing-guidelines.md rule 7 (notes: few, flagged, never a method) assembly notes off MHA-DT-025, MHA-DT-015, MHA-DT-022,
     # MHA-DT-001 and MHA-DT-030 into ASSEMBLY_STEP constants. The sequence imports
     # them (identity, not a retyped copy), bonds before RIG SET, pin last.
     # MHA-DT-033 and the front strap go on first: neither passes the Ø15 head

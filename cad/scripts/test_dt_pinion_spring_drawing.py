@@ -73,7 +73,7 @@ def test_every_formed_feature_carries_the_one_formed_band() -> None:
 
 
 def test_profile_is_baselined_from_the_foots_free_end() -> None:
-    # Rule 7: the kink start and the tip locate from the free end, the one
+    # drawing-guidelines.md rule 10 (dimension from a real feature): the kink start and the tip locate from the free end, the one
     # feature the maker can put a rule on, never from the model origin.
     source = Path(spring.__file__).read_text(encoding="utf-8")
     assert "KinkStartX" not in source and "FlatTipX" not in source

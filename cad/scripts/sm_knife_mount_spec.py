@@ -16,7 +16,7 @@ hex), so only the trunnion's TOP VERTEX LINE nears the bore's upper inner wall
 -- the true knife-edge line contact.  The sharp ridge is on the LEVER trunnion
 (``build_sm_summing_lever``), NOT on this part; this part's critical surface is the
 bore's upper inner wall, the knife SEAT: it carries ``MACHINED_UM`` (1.6, policy
-rule 5 -- ``GROUND_UM`` 0.8 is reserved for knife edges and pivot-screw
+drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates) -- ``GROUND_UM`` 0.8 is reserved for knife edges and pivot-screw
 shoulders).
 """
 
@@ -42,14 +42,14 @@ BORE_CY = -5.75  # bore centre below the ridge origin (TopClear 0.25 - R_BORE)
 
 # The knife bore's reamed seat, Ra 1.6; the top seat (datum A), which the
 # screw clamps to the casting underside and the dowels key, Ra 3.2: a static
-# mating face, nothing runs on it (SEAT_UM, policy rule 5; 2026-10-10 ruling).
+# mating face, nothing runs on it (SEAT_UM, drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates); 2026-10-10 ruling).
 SURFACE_FINISHES = (
     SurfaceFinishControl("knife_bore", MACHINED_UM, CylinderFace(2.0 * R_BORE)),
     SurfaceFinishControl("top_seat", SEAT_UM, PlanarFace((0.0, 1.0, 0.0), BLK_TOP)),
 )
 
 # --- Knife-hanger screw tap and anti-rotation dowel holes (top seat) ---------
-# General tolerances the printed places claim (title block, policy rule 12).
+# General tolerances the printed places claim (title block, drawing-guidelines.md rule 3 (decimal places carry the tolerance)).
 _X = float(str(_config.title_block("linear_1pl")["display"]).lstrip("\u00b1"))
 _XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("\u00b1"))
 _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
@@ -61,7 +61,7 @@ BORE_DIA_BAND = (0.03, 0.0)
 BORE_DIA_PLACES = 2
 BORE_R_MIN = R_BORE + min(BORE_DIA_BAND) / 2.0  # 6.000
 BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.015
-# The block's overall sizes print one place (.X, rule 12: every web below
+# The block's overall sizes print one place (.X, drawing-guidelines.md rule 17 (walls and webs): every web below
 # holds at that band); the stacks judge the block at those limits.
 BLOCK_SIZE_PLACES = 1
 BLOCK_SIZE_TOL = _X  # 0.8
@@ -73,7 +73,7 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "knife-hanger tap position": "0.10",
     "dowel hole pattern position": "0.13",
 }
-# The bore (policy rule 3, knife-edge system): ⌖Ø0.20 locates it to the top
+# The bore (drawing-guidelines.md rule 5 (avoid excessive GD&T), knife-edge system): ⌖Ø0.20 locates it to the top
 # seat (datum A) and the dowel pattern (datum B); a stacked ⊥Ø0.05|B holds
 # its axis square to the plane of the dowel axes.  That one Ø zone bounds
 # both the yaw off the dowel line (the rock budget's far-end offset) and the
@@ -129,7 +129,7 @@ def free_rock_deg(
 # Why Ø0.05 (2026-10-09 ruling): a yawed bore steals rock.  Free rock of the
 # nominal 8.080 x 10.268 trunnion in the nominal Ø12 against the far-end
 # offset t across the 14 deep bore: t 0 -> 8.92 deg, 0.05 -> 8.44, 0.10 ->
-# 7.96, 0.18 -> 7.17.  The rule-12 budget -- the trunnion's .XXX section and
+# 7.96, 0.18 -> 7.17.  The drawing-guidelines.md rule 17 (walls and webs) budget -- the trunnion's .XXX section and
 # the bore's .XX size at their band limits, t the ⊥Ø0.05 zone plus the dowel
 # yaw across the deepest .X block -- is
 # ``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG`` (>= 5.0, 6.31 in
@@ -239,7 +239,7 @@ PIN_HOLE_COUNT = len(PIN_HOLE_XS)
 if PIN_HOLE_COUNT != DOWEL.PER_MOUNT:
     raise AssertionError("the knife mount reams one hole per MHA-VN-051 dowel")
 # The pair's 2X ream carries ⌖Ø0.13 to the top seat (datum A) and names the
-# pattern datum B (the datum feature symbol on that frame; policy rule 3); the sheet
+# pattern datum B (the datum feature symbol on that frame; drawing-guidelines.md rule 5 (avoid excessive GD&T)); the sheet
 # prints its span BASIC between the two hole axes, centred on the block, and
 # positions the tap and the bore to A|B.  Each hole's station from the
 # pattern centre varies by the zone's radius, and from the tap axis by that
@@ -384,7 +384,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinHole": {"PinHoleDepth"},
 }
 # Places the part authors on the marked dimensions (drawing-simplicity
-# policy rule 2): the block's sizes at .X, the reamed bore at its band's two.
+# drawing-simplicity-policy.md `How the repository implements the guidelines`): the block's sizes at .X, the reamed bore at its band's two.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"BlockWidth": BLOCK_SIZE_PLACES, "BlockHeight": BLOCK_SIZE_PLACES},
     "BoreProfile": {"BoreDia": BORE_DIA_PLACES},

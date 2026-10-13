@@ -173,7 +173,7 @@ def test_notes_are_short_and_carry_no_dimension_or_method() -> None:
 
 def test_sheet_prints_the_ruled_clamp_instruction() -> None:
     # The static-clamp retention depends on this step and the three-view
-    # summing sheet prints no notes (rule 9), so the screw sheet carries it.
+    # summing sheet prints no notes (drawing-guidelines.md rule 22 (an assembly package is complete)), so the screw sheet carries it.
     notes = " ".join(spec.DRAWING_NOTES.split())
     assert spec.CLAMP_INSTRUCTION in spec.DRAWING_NOTES
     assert (

@@ -3,7 +3,7 @@ r"""Create the drawing for the pivot bracket's angle-plate ledge (MHA-CH-008-TL-
 A 22.6 x 26.9 x 6 block: the face view (front) carries the width, the
 milled height and both screw-hole stations, each from the left end or the bottom
 face (no chains); the edge view (right) carries the thickness; the iso
-rides top-right at 2:1. No datums (policy rule 3).
+rides top-right at 2:1. No datums (drawing-guidelines.md rule 5 (avoid excessive GD&T)).
 
 Run with SolidWorks open::
 

@@ -4,7 +4,7 @@ The end view shows the actual D opening and the two axial drive holes.
 An axial section through the D-flat shows the controlled rear entry break,
 turned diameters and fitted body/pilot lengths. The saved body dimension
 is REF; its linked assembly step faces the actual rear reaction face on F.
-No roughness symbol is added to these clamp faces (policy rule 5).
+No roughness symbol is added to these clamp faces (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
 """
 
 from __future__ import annotations
@@ -218,7 +218,7 @@ def _orient_section(adapter: Any, view: Any) -> None:
 
 
 def _overall_reference(adapter: Any, side: Any) -> None:
-    """The unbanded overall, pilot front face to actual rear face (rule 7)."""
+    """The unbanded overall, pilot front face to actual rear face (drawing-guidelines.md rule 10 (dimension from a real feature))."""
     label = "drive-collar overall length reference"
     display = add_edge_dimension(
         adapter,

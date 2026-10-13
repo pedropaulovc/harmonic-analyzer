@@ -58,7 +58,7 @@ _X = printed_band_mm(1)
 # stop short of the box top; the back window stays inside the core.
 if not WINDOW_FRONT + _X < WALL < WINDOW_FRONT + WINDOW_W - _X:
     raise AssertionError("clamp window does not open past the front wall's inner face")
-if WINDOW_UP_BASE + WINDOW_H + _X > BOX - 2.0:  # rule 12 floor over the window
+if WINDOW_UP_BASE + WINDOW_H + _X > BOX - 2.0:  # drawing-guidelines.md rule 17 (walls and webs) floor over the window
     raise AssertionError("upper clamp window breaks the box top lip")
 if WINDOW_LOW_BASE + WINDOW_H + 2.0 * _X > WINDOW_UP_BASE:
     raise AssertionError("clamp windows merge")
@@ -77,7 +77,7 @@ if bar.SCREW_ENGAGEMENT > TAP_SPEC.overrides_mm["ThreadDepth"]:
 if TAP_SPEC.depth_mm + TAP_DRILL_DIA >= WALL:
     raise AssertionError("C stop bar tap breaks into the core")
 if TAP_Y - THREAD_MAJOR_MM[bar.SCREW_THREAD] / 2.0 < 2.0:
-    raise AssertionError("C stop bar tap is under rule 12 from the base")
+    raise AssertionError("C stop bar tap is under drawing-guidelines.md rule 17 (walls and webs) from the base")
 # The rocker's datum-B strap face seats on the front face above the bar.
 if rocker.ARM_THICKNESS >= bar.BAR_WIDTH:
     raise AssertionError("C stop bar projection does not carry the rocker strap")

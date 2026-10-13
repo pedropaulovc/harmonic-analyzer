@@ -168,7 +168,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven butt cup (equations neutral)", V_CUP, 0.005 * V_CUP
     )
 
-    # The model-owned bands (policy rule 2): the body diameter that holds the
+    # The model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the body diameter that holds the
     # pocket wall, and the pocket depth that keeps the MHA-DT-032 head below the
     # face.  Every other size is routine (.X); the pocket is bored to suit
     # the head's diameter.

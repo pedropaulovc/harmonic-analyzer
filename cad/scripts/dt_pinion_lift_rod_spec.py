@@ -26,7 +26,7 @@ ROD_DIA_BAND = SHAFT_H
 
 LEVER_NUMBER = "MHA-DT-016"
 
-# Rule 5: the rod turns in the pivot blocks' west bores -- the one running
+# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the rod turns in the pivot blocks' west bores -- the one running
 # surface on the part.
 SURFACE_FINISHES = (
     SurfaceFinishControl("bearing", MACHINED_UM, CylinderFace(ROD_DIA)),
@@ -38,11 +38,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BackCapProfile": {"CapR"},
     # U36: the MHA-DT-030 pin hole, located from the flat front end face -- the
     # part origin sits on that face, so the circle's own anchor IS the
-    # front-end baseline (policy rule 7).
+    # front-end baseline (drawing-guidelines.md rule 10 (dimension from a real feature)).
     "PinHoleProfile": {"PinHoleDia", "PinHoleZ"},
 }
 
-# Decimal places ARE the tolerance statement (policy rule 2); the part authors
+# Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the part authors
 # them and the drawing reads them back.  Two on the banded bearing diameter and
 # the drilled pin hole; one on the length, the crown and the pin station,
 # which the lever's mid-engagement sets at assembly.
@@ -63,7 +63,7 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-# Rule 6: the matched fit rides the pin hole's own callout, as the hole
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit rides the pin hole's own callout, as the hole
 # specification only; the drive and peen are
 # dt_pinion_lever_pin_spec.ASSEMBLY_STEP (LEVER PIN SET).
 PIN_HOLE_CALLOUT = "\n".join(

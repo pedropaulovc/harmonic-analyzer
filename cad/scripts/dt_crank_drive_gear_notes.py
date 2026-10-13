@@ -20,7 +20,7 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 
-# Rule 6's compact data identifies the standard normal full-depth CUTTER.
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)'s compact data identifies the standard normal full-depth CUTTER.
 # The supported blank's actual cut depth and root envelope are separately REF.
 # The primary exact normal span controls the part, not an ideal tooth caliper.
 GEAR_DATA = gear_data_note(
@@ -82,14 +82,14 @@ GEAR_DATA = gear_data_note(
 
 # The local +X flat and the paired shaft seat are defined by the native
 # BoreAF and BoreDia dimensions; the assembly's stack locates this gear.
-# The seat's owner, quoted only to identify the mate (rule 6). Hard-coded
+# The seat's owner, quoted only to identify the mate (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). Hard-coded
 # rather than read from ``_config.parts``: this module is in the part's
 # rebuild closure, and a cross-part config read would make cone-gear-shaft.yaml
 # a rebuild dependency of this gear. ``test_crank_drive_gear_drawing`` checks
 # it against the registry offline, where a cross-check costs nothing.
 SHAFT_MATE_NUMBER = "MHA-DT-004"
 
-# Rule 6's only note: the standard title-block edge break would erase too
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)'s only note: the standard title-block edge break would erase too
 # much of these fine teeth. The D-bore, its AF band and its shaft mate are
 # defined by the model dimensions and fit callout, not by another note.
 DRAWING_NOTES = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."

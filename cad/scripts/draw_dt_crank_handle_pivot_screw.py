@@ -1,7 +1,7 @@
 r"""Create the MHA-DT-032 crank handle pivot screw manufacturing drawing.
 
 The SLDPRT remains authoritative.  A screw carries no datum and no
-geometric-control frame (policy rule 3): the running-fit shoulder keeps its
+geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the running-fit shoulder keeps its
 native size band and one bearing-surface finish, the shoulder and thread
 lengths keep their native bands, and every other size is an ordinary model
 dimension at its part-authored places.
@@ -143,7 +143,7 @@ SIDE_KEEP = {
     # The under-head face located from the tip, like every axial location.
     "UnderHeadLocation": ((TIP_X + UNDERHEAD_X) / 2.0, _ROW_Y[1]),
     "OverallLength": ((TIP_X + HEAD_FACE_X) / 2.0, _ROW_Y[2]),
-    # Diameters on the side view (rule 7).  The shoulder's dimension line
+    # Diameters on the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe)).  The shoulder's dimension line
     # crosses the shoulder near its thread end; the head's stands clear of the
     # head face, left of the end view.
     "ShoulderDia": (SEAT_X + 0.056, SIDE_CENTER[1] + 0.030),

@@ -108,7 +108,7 @@ if POST_FOOT_CONTAINMENT < 0.25:
 if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
     raise AssertionError("v2 post mount taps fall outside the casting foot")
 
-# Rule-12 webs round the tip-block hold-down hole (user ruling 2026-09-29), at
+# drawing-guidelines.md rule 17 (walls and webs) webs round the tip-block hold-down hole (user ruling 2026-09-29), at
 # print worst: the outline at .X, relief and counterbore at .XX, drilled holes
 # +0.10, the hole's two stations (HoldDownX, HoldDownZ) at their +/-0.10
 # bands; the post taps at their +/-0.10 bands, judged at the thread major.

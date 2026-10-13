@@ -92,7 +92,7 @@ STEP_X = _sheet_x(STEP_Y)
 THREAD_END_X = _sheet_x(THREAD_END_Y)
 TIP_X = _sheet_x(TIP_Y)
 
-# Rows below the profile (policy rule 7): the shank and the thread both
+# Rows below the profile (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the shank and the thread both
 # baseline from the gauged step (the press gauge's face), each with the
 # dimension-origin circle on the step's extension line and named on its
 # callout, then the overall as a reference. Run 18 left the shank's 4-line
@@ -132,7 +132,7 @@ THREAD_PICK = (
     SIDE_CENTER[1] + THREAD_MAJOR / 2.0 * _S / 1000.0,
 )
 THREAD_NOTE_XY = (THREAD_END_X + 0.012, SIDE_CENTER[1] + 0.042)
-# Each band states its need on its own callout (policy rule 2): the pin's
+# Each band states its need on its own callout (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the pin's
 # press fit with the bar bore's limits read from the bar's geom, the thread
 # length's origin, the locknut's full thread and the most thread past it
 # (mg_wheel_group). The .X shank names only its origin.
@@ -150,7 +150,7 @@ DIMENSION_CALLOUTS = {
 ORIGIN_DIMENSIONS = ("ShankLength", "ThreadLength")
 _ORIGIN_ARROWHEAD = 4  # swArrowStyle_e.swORIGIN_ARROWHEAD
 _CLOSED_ARROWHEAD = 1  # swArrowStyle_e.swCLOSED_ARROWHEAD
-# The journal's finish (policy rule 5) lands on the shank's top silhouette
+# The journal's finish (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)) lands on the shank's top silhouette
 # between the Ø line and the step, where the wheel runs; the symbol stands
 # just above, left of the thread callout's leader.
 JOURNAL_FINISH_PICK = (STEP_X - 0.012, SIDE_CENTER[1] + PIN_DIA / 2.0 * _S / 1000.0)

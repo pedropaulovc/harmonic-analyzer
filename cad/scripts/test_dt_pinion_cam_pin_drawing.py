@@ -56,7 +56,7 @@ def test_sheet_runs_at_8_to_1_with_a_4_to_1_pictorial() -> None:
 def test_side_view_lies_as_turned_with_the_end_view_in_projection() -> None:
     """Machinist review of 7f7fc1717: the end view sat beside a vertical
     elevation, out of projection, carrying the only diameter.  The side view
-    now lies horizontal (rule 7, turned parts), the end view projects to its
+    now lies horizontal (drawing-guidelines.md rule 11 (turned parts read like the lathe), turned parts), the end view projects to its
     left on the same Y station (third angle), and the Ø prints on the side
     view beside the length."""
     assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
@@ -109,7 +109,7 @@ def test_bonded_slip_fit_replaces_the_press() -> None:
     assert round(seat_min - pin_max, 6) == 0.0
     assert round(seat_max - pin_min, 6) == 0.042
     assert seat_max - pin_min <= dt_pinion_cam_pin_spec.RETAINING_COMPOUND_MAX_GAP_MM
-    # Rule 6 (Main's MHA-DT-025 eye pass): the bond is the fit-up step, not a note.
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main's MHA-DT-025 eye pass): the bond is the fit-up step, not a note.
     notes = dt_pinion_cam_pin_spec.DRAWING_NOTES
     assert "LOCTITE" not in notes and "ON ASSEMBLY" not in notes
     assert len(notes.splitlines()) == 2
@@ -138,7 +138,7 @@ def test_the_bond_step_counts_one_pin_per_strap() -> None:
 
 
 def test_no_gdt_and_the_crown_carries_the_finish() -> None:
-    """Policy rule 3: a pin is not on the GD&T allowlist.  Rule 5: the crown
+    """drawing-simplicity-policy.md `GD&T allowlist (rule 5)`: a pin is not on the GD&T allowlist.  drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the crown
     rides the cam; the bonded shank is a static seat."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert not hasattr(dt_pinion_cam_pin_spec, "GEOMETRIC_TOLERANCES_MM")
@@ -162,7 +162,7 @@ def test_no_gdt_and_the_crown_carries_the_finish() -> None:
     assert "FINAL SIZE" not in drawing.DIMENSION_CALLOUTS["PinDia"]
     assert "SEATED FLAT END" in drawing.DIMENSION_CALLOUTS["Depth"]
     assert "CapR" in drawing.RIGHT_KEEP
-    # The reference overall replaces the crown-height prose (rule 7).
+    # The reference overall replaces the crown-height prose (drawing-guidelines.md rule 10 (dimension from a real feature)).
     assert "_overall_reference(adapter, right)" in source
     assert "set_reference_dimension(" in source
     assert "SetPrecision3(DRAWING_REFERENCE_PRECISION" in source

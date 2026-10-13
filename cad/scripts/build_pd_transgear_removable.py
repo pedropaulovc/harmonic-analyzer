@@ -31,7 +31,7 @@ Config-independent mounting interface, cut after the tooth pattern: bore
 ``BORE_DIA`` and two ``PIN_HOLE_DIA`` drive-pin holes on ``PIN_CIRCLE_RADIUS``
 at ``PIN_HOLE_ANGLES_DEG`` (local +/-Y). The bore/pin-hole web
 (``spec.BORE_PIN_WEB``, 0.60 nominal) sits below the 1.5 wall floor as a
-Named exception; the sheet states its printed worst case
+pending exception ruling (#1377); the sheet states its printed worst case
 (``pd_transgear_removable_notes.BORE_PIN_WEB_NOTE``).
 
 Drawing marks (``draw_pd_transgear_removable``): ``spec.DRAWING_DIMENSIONS`` at
@@ -1092,7 +1092,7 @@ async def build(adapter) -> dict[str, str]:
     # Manufacturing drawing support: supplied plate thickness stays within
     # its nominal band and each machined pin centre holds its location band.
     # Bore and pin-hole sizes are drilled (the title block's DRILLED HOLES
-    # row governs them). The places are the part's (policy rule 2).
+    # row governs them). The places are the part's (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     set_dimension_bilateral_tolerance(
         adapter, "BlankProfile", "BlankWidth", *deviations(spec.PLATE_BAND)
     )

@@ -34,7 +34,7 @@ RAIL_EDGE_LIP = 1.0
 # (pd_support_bar_spec.BAR_HEIGHT), so the plate overlaps the bar 3.6 at the
 # top rail (which hangs on it) and 2.6 at the bottom rail. 9.6, not 9.5, so
 # the height prints at the general .X (Codex P1 on #1353: a tighter .XX
-# needed a design-intent note, which rule 6 bars); at 9.5 - 0.8 the lifted
+# needed a design-intent note, which drawing-guidelines.md rule 7 (notes: few, flagged, never a method) bars); at 9.5 - 0.8 the lifted
 # top plates would lap the bar under the 0.5 retention floor. The 15.65 plate
 # (R9-61) spanned the old 7 channel and stood 9.65 over the bar at the top
 # rail, toward the latch hook.
@@ -68,7 +68,7 @@ CORNER_R = 1.8
 # (vn_guide_lock_screw_spec.LOCK_SET_OFFSET); the #4 close Ø3.048 left too little.
 HOLE_XY = ((4.0, RAIL_EDGE_LIP + 2.5), (18.0, RAIL_EDGE_LIP + 2.5))
 HOLE_SPEC = HoleSpec("drilled_fractional", "1/8")
-# ± on each printed hole coordinate (rule 3: no frame on this plate). Its
+# ± on each printed hole coordinate (drawing-guidelines.md rule 5 (avoid excessive GD&T): no frame on this plate). Its
 # radial reach, hypot(0.035, 0.035) = 0.0495, is what the set window spends.
 HOLE_LOCATION_BAND = 0.035
 HOLE_LOCATION_PLACES = 3
@@ -87,7 +87,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 HOLE_LOCATION_DIMENSIONS = DRAWING_DIMENSIONS["ScrewHoles"]
 
 # Places and explicit bands the print carries on those dimensions, the ones the
-# paper-drive lock-station sweep judges the plate at (policy rule 12). The
+# paper-drive lock-station sweep judges the plate at (drawing-guidelines.md rule 17 (walls and webs)). The
 # plate's back face carries the slotted pan heads past the hanger arm and arm
 # plate, so the sheet's thickness prints .XXX under its ±0.127 mill band
 # (LOCK_THICK_BAND). The height prints .X (±0.8): its least size still

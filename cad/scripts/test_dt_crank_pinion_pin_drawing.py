@@ -1,6 +1,6 @@
 """Offline contracts for the crank-pinion retention-pin drawing.
 
-A plain straight pin under ``cad/docs/drawing-simplicity-policy.md``: two
+A plain straight pin under ``cad/docs/drawing-guidelines.md``: two
 native model dimensions whose places the PART owns, no band, no GD&T, no
 roughness symbol, one stock note -- the match-drilled hole it is driven into
 (``crank_pinion_spec``) is the fit.
@@ -52,7 +52,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.RIGHT_KEEP) == marked == {"PinDia", "PinLen"}
-    # Turned part (rule 7): the diameter beside the length on the side view,
+    # Turned part (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the diameter beside the length on the side view,
     # which only a half-profile parallel to that view can supply natively --
     # so the pin is a Right-plane revolve, not an extruded circle, and its
     # end view carries no dimension at all.
@@ -60,7 +60,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert spec.DRAWING_DIMENSIONS == {"PinProfile": {"PinDia", "PinLen"}}
 
 def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
-    # Rule 2: the diameter is routine at the title block's .XX grade (the
+    # drawing-simplicity-policy.md `How the repository implements the guidelines`: the diameter is routine at the title block's .XX grade (the
     # match-drilled hole sets the fit) and the length, whose only function is
     # "not proud", claims no more than the .X grade -- no band, no three-place
     # number.
@@ -78,7 +78,7 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
 
 
 def test_print_carries_no_gdt_roughness_or_callouts() -> None:
-    # Rules 3-5: a pin is not on the GD&T allowlist and nothing runs on it.
+    # drawing-guidelines.md rule 5 (avoid excessive GD&T) and drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): a pin is not on the GD&T allowlist and nothing runs on it.
     source = _source()
     for helper in (
         "add_datum_feature(",
@@ -100,7 +100,7 @@ def test_print_carries_no_gdt_roughness_or_callouts() -> None:
 
 
 def test_sheet_carries_no_manufacturing_note() -> None:
-    # Rule 6 (Main, 2026-09-25): the stock is stated once, in the title-block
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main, 2026-09-25): the stock is stated once, in the title-block
     # MATERIAL; a note repeating "1/8 IN DRILL ROD" put a dimension in a note.
     assert not hasattr(spec, "DRAWING_NOTES")
     assert "Manufacturing Notes" not in _build_source()

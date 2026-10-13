@@ -14,7 +14,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 
 
 def test_knife_seat_bore_finish_is_part_owned_and_consumed_by_key() -> None:
-    # Policy rule 5: the knife SEAT carries MACHINED_UM (1.6); GROUND_UM (0.8)
+    # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the knife SEAT carries MACHINED_UM (1.6); GROUND_UM (0.8)
     # is for the knife edge itself, which is the lever trunnion's ridge.  The
     # top seat, datum A, a static mating face, carries SEAT_UM (3.2;
     # 2026-10-10 ruling).
@@ -109,7 +109,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 
 def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> None:
-    # Policy rule 7: the blind dowel hole's floor is a hidden edge in the
+    # drawing-guidelines.md rule 9 (show internal shape in solid lines): the blind dowel hole's floor is a hidden edge in the
     # front view, so its depth rides section A-A, cut on z = 0 through the
     # tap axis (the origin) and both dowel axes, and only there.
     assert set(drawing.SECTION_KEEP) == {"PinHoleDepth"}
@@ -138,7 +138,7 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
 
 
 def test_dowel_callout_is_parked_clear_of_the_top_view() -> None:
-    # Rule 8 (dda9a33a8 render): the three callout lines ran through both
+    # drawing-guidelines.md rule 14 (keep text off the part) (dda9a33a8 render): the three callout lines ran through both
     # holes and the leader shoulder crossed the view.  The block now hangs
     # wholly right of the block's +X face, and the shoulder's near end stands
     # below the hole centre so the leader climbs to the hole rim.
@@ -160,7 +160,7 @@ def test_dowel_callout_is_parked_clear_of_the_top_view() -> None:
 
 
 def test_the_tap_is_stated_once_on_its_hole_callout() -> None:
-    # Rule 6: the tap rides one native Hole Wizard callout (thread, full
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the tap rides one native Hole Wizard callout (thread, full
     # thread depth, drill and drill depth stay associative); SolidWorks' raw
     # "#6-32 Tapped Hole" note would restate it, so it is deleted and
     # finalize proves none is left at export.
@@ -178,7 +178,7 @@ def test_the_tap_is_stated_once_on_its_hole_callout() -> None:
 
 
 def test_tap_callout_parks_between_the_top_view_and_the_datum_tag() -> None:
-    # Rule 8: the three rows stand in the band under the top view and over
+    # drawing-guidelines.md rule 14 (keep text off the part): the three rows stand in the band under the top view and over
     # the front view's datum-A tag, left of the tag, so neither the text nor
     # its steep leader crosses a view, a dimension or the A-A cutting line.
     x, y = drawing.TAP_CALLOUT_XY
@@ -303,7 +303,7 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
 
 
 def test_the_sheet_carries_no_notes_block() -> None:
-    # Rule 6: every fact the notes held now rides a callout or a field --
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): every fact the notes held now rides a callout or a field --
     # the bore's location its BASICs and position frame, the tap its hole
     # callout, the heat treatment the Finish field -- and the design-intent
     # prose (knife-edge bearing, screw clamp, two blocks) is gone.
@@ -439,7 +439,7 @@ def test_part_stamps_make_critical_properties() -> None:
     assert part.MATERIAL == "Plain Carbon Steel"
     assert config["material"] == "Plain Carbon Steel"
     assert config["material_specification"] == "AISI O1 tool steel"
-    # Rule 1: the heat treatment and the bare surface are the Finish field's,
+    # drawing-guidelines.md rule 2 (the title block is the general specification): the heat treatment and the bare surface are the Finish field's,
     # stated once there (the sheet has no notes block).
     assert config["finish"] == "hardened and tempered 58-60 HRC, unpainted"
     assert "Brass" not in config["material_specification"]

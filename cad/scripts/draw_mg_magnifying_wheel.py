@@ -4,12 +4,12 @@ A Ø100 cast-iron spider: six tapered spokes, a grooved rim, a Ø25 boss with
 the Ø14.0 drum spigot, a reamed axle bore and two wire-tie holes.  The wheel
 axis is local +Z, so the FRONT view is the face (rim, spokes, fillets, bore,
 ties) and SECTION A-A, cut on the axis through the model's Right plane, is
-the hub profile, the groove and the axial widths in solid lines (policy rule
-7).  Every size rides the part's marked dimensions; only the rim's axial
+the hub profile, the groove and the axial widths in solid lines
+(drawing-guidelines.md rule 9 (show internal shape in solid lines)).  Every size rides the part's marked dimensions; only the rim's axial
 width and the rim-bore round's R (on its cut arc) are added on the sheet.
 The bore's and the spigot's mates print on
-their own diameter callouts (rule 6), and each carries the part-owned
-roughness its fit needs (rule 5).
+their own diameter callouts (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), and each carries the part-owned
+roughness its fit needs (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
 
 Run with SolidWorks open::
 
@@ -139,8 +139,8 @@ DRAWING_PRECISION_BY_NAME = {
 
 # Face view.  The sheet's front view is the model's XY plane at 1:1 (sheet x
 # = model x), so each text point below is derived from the feature it names.
-# Every text and finish symbol stands outside the Ø100 silhouette (policy
-# rule 8), and no leader or shoulder may cross another's line.  Farm run 7
+# Every text and finish symbol stands outside the Ø100 silhouette
+# (drawing-guidelines.md rule 14 (keep text off the part)), and no leader or shoulder may cross another's line.  Farm run 7
 # (396077c3e) failed on exactly that: the native Ø100 and Ø88 lines ran rim
 # to rim through the centre, so the shoulders under them crossed them.  The
 # three diameters take one arrow on their near rim (set_near_side_diameter),
@@ -376,7 +376,7 @@ _GROOVE_DIA_X = _HUB_DIA_X - _DIA_TEXT_HALF - _TEXT_OFF_LINE
 _SPOKE_ROW = SECTION_CENTER[1] + HUB_DIA / 2000.0 + 0.0055
 _RIM_WIDTH_ROW = _SPOKE_ROW + 0.010
 # The hub's three axial sizes below the rim, one row each, all from the
-# spigot's faced front end (policy rule 7) and all texts right of it except
+# spigot's faced front end (drawing-guidelines.md rule 11 (turned parts read like the lathe)) and all texts right of it except
 # the overall's; each text OUTSIDE its span so no extension line runs
 # through a text (run 7: four extension-through-own-text findings).
 # Nearest the part the spigot length ("9.00 +0.10/0"), whose band keeps the
@@ -479,8 +479,8 @@ ROUND_TEXT_XY = (SECTION_CENTER[0] + 0.0292, SECTION_CENTER[1] + 0.0542)
 ROUND_CALLOUT = "2X RIM BORE EDGES\nHOLDS TIE 2 WALL"
 
 
-# The two fits print on their own diameters (policy rule 6) as matched fits
-# (policy rule 2): each Ø is a reference nominal (REFERENCE_DIMENSIONS), and
+# The two fits print on their own diameters (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)) as matched fits
+# (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): each Ø is a reference nominal (REFERENCE_DIMENSIONS), and
 # its callout names the mate and states the diametral fit the finished pair
 # must make (mg_wheel_group.HUB_RUNNING, mg_magnifying_wheel_geom.DRUM_PRESS):
 # the bore is reamed to run on the finished axle, and the spigot turned to
@@ -758,7 +758,7 @@ def _assert_face_leaders_clear(
     axis: tuple[float, float],
 ) -> None:
     """Fail unless the face's leaders, the bore finish's and the A-A cutting
-    line cross none of each other (policy rule 8), each landing on its own
+    line cross none of each other (drawing-guidelines.md rule 14 (keep text off the part)), each landing on its own
     feature."""
     named = {
         dimension_name(adapter, annotation): annotation for annotation in annotations
@@ -937,7 +937,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _orient_section(adapter, section)
     position_section_caption(adapter, section, SECTION_CAPTION_XY, label="wheel")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    # Policy rule 7: a section shows no hidden lines, and the face view needs
+    # drawing-guidelines.md rule 9 (show internal shape in solid lines): a section shows no hidden lines, and the face view needs
     # none once the section carries the hub.
     for view in (front, section, iso):
         set_hidden_lines_removed(adapter, view)
@@ -981,7 +981,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _near_side_diameters(adapter, annotations, axis=axis)
     _trim_centre_marks(adapter, front, {"bore": axis, "tie 1": tie1})
 
-    # Policy rule 5: the bore is a running fit (the general machined grade),
+    # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore is a running fit (the general machined grade),
     # the spigot a static locating press seat; both controls are authored on
     # the part and read back here.  The boss step is the drum's register face
     # and takes no symbol.

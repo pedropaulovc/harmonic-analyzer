@@ -80,7 +80,7 @@ CROSS_HOLE_BAND = _strap_pin.HOLE_BAND
 # keeps the number in step with the parts registry.
 CROSS_HOLE_CALLOUT = "THRU\nFOR MHA-VN-033 SPRING PIN"
 
-# Rule 12 (#842, U27; audit W23) worst-case web from the blind seat to a broad
+# drawing-guidelines.md rule 17 (walls and webs) (#842, U27; audit W23) worst-case web from the blind seat to a broad
 # face.  Codex #858 P2, user ruling (a) (2026-09-25): the seat's station is
 # printed from broad face A as the model's own PinSeatCz, not as "CENTRED ON
 # THICKNESS" prose.  At the general .XX grade that web was 1.18, under the 1.5
@@ -120,7 +120,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "TopCapRadius",
     },
     "Strap": {"Depth"},
-    # Rule 12 (audit W23) and user ruling (a): the seat's station from broad
+    # drawing-guidelines.md rule 17 (walls and webs) (audit W23) and user ruling (a): the seat's station from broad
     # face A prints as the model's own PinSeatCz at +/-0.10 -- see
     # PIN_SEAT_WEB_WORST.
     "PinSeatProfile": {"PinSeatDia", "PinSeatCy", "PinSeatCz"},
@@ -132,8 +132,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CrossHoleAxisReference": {"CrossHoleFromBoreWall"},
 }
 
-# Decimal places ARE the tolerance statement (drawing-simplicity policy rule
-# 2), so the MODEL owns them: build_dt_pinion_bracket applies this map to the
+# Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`
+# ), so the MODEL owns them: build_dt_pinion_bracket applies this map to the
 # .SLDPRT and draw_dt_pinion_bracket only reads it back.
 #
 # Three places (title-block .XXX, +/-0.13) on PinSeatCy alone: the follower
@@ -184,7 +184,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # The (43.0) overall is a REFERENCE the sheet derives from the outline (C2C
 # plus both end radii), not a model dimension, so no part-side map can hand
 # its decimal places over: the spec owns the digit and the sheet passes it to
-# ``SetPrecision3`` instead of writing a literal (policy rule 2).  One place
+# ``SetPrecision3`` instead of writing a literal (drawing-simplicity-policy.md `How the repository implements the guidelines`).  One place
 # because the two end radii it sums are one-place dimensions.
 DRAWING_REFERENCE_PRECISION = 1
 
@@ -204,11 +204,11 @@ SURFACE_FINISHES = (
 
 # No manufacturing-note block.  Everything this strap needs is a dimension, a
 # hole callout, a roughness symbol or a title-block field (drawing-simplicity
-# policy rule 6); the retired block restated geometry the native dimensions
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); the retired block restated geometry the native dimensions
 # and outline already define and prescribed an unnecessary fixturing method.
 DRAWING_NOTES = ""
 
-# Brackets carry no datums and no feature-control frames (policy rule 3): the
+# Brackets carry no datums and no feature-control frames (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the
 # end-arc profile frames this sheet used to print were form control on a
 # clearance outline, which no +/- on a dimension was failing to express.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {}

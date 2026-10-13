@@ -164,7 +164,7 @@ TOP_KEEP = {
     ),
     "HoleLateral": HOLE_LATERAL_XY,
 }
-# X on this part starts on a FEATURE, never the symmetry axis (policy rule 7):
+# X on this part starts on a FEATURE, never the symmetry axis (drawing-guidelines.md rule 10 (dimension from a real feature)):
 # the bore in the elevation and the hold-down hole in the plan are both
 # dimensioned from the foot's west side face, so the two views share one
 # origin the shop can touch off.
@@ -174,7 +174,7 @@ DIMENSION_CALLOUTS = {
 CROWN_CALLOUT = "SIDES TANGENT FROM FOOT CORNERS"
 # The apex tap runs down to the arbor bore and stops there; the MHA-VN-034 cup
 # point's spot is drilled into the arbor at fit-up through this hole, so the
-# callout says where the thread ends and nothing more (digit-free, rule 6).
+# callout says where the thread ends and nothing more (digit-free, drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 # The plan already shows the hole at the apex, so the words do not repeat it:
 # v37's "..., AT CROWN APEX" ran the callout 22.6 mm past the zone frame.
 SET_SCREW_PROCESS = "TAP TO BORE"
@@ -251,7 +251,7 @@ def set_screw_callout_above() -> dict[str, tuple[float, ...]]:
 def _set_reference_precision(display: Any, label: str) -> None:
     """Give a SHEET-derived dimension its PART-authored decimal places.
 
-    Policy rule 2 puts display precision on the model, and every imported
+    drawing-simplicity-policy.md `How the repository implements the guidelines` puts display precision on the model, and every imported
     dimension here is read back by ``assert_imported_precision``. The strap
     band, the hold-down station and both lateral locations are owned by the
     part's hidden reference sketches, and the crown radius is the dome's own
@@ -328,7 +328,7 @@ def _show_crown_radius(adapter: Any, annotations: list[Any]) -> None:
 
     The dome is a full-circle boss in the model, but only its upper arc
     survives on the part, and a print gives an arc a radius -- so the PART
-    dimensions it as one (#810 Codex l4afp, policy rule 2). The sheet must not
+    dimensions it as one (#810 Codex l4afp, drawing-simplicity-policy.md `How the repository implements the guidelines`). The sheet must not
     flip a model diameter radial instead: that keeps the value and re-reads it
     as a radius, and v37 printed an R22 crown on this R11 part.
     """
@@ -620,7 +620,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     # The part authored every imported dimension's decimal places; prove the
     # import kept them instead of falling back to the sheet's two-place
-    # default (policy rule 2 -- the sheet may not rewrite them).
+    # default (drawing-simplicity-policy.md `How the repository implements the guidelines` -- the sheet may not rewrite them).
     assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
     return await finalize_drawing(
         adapter,

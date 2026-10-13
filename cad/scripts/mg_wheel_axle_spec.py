@@ -34,13 +34,13 @@ THREAD = "#4-40"
 THREAD_CALLOUT = "#4-40 UNC"
 THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]  # 2.845, modelled at the basic major
 THREAD_PITCH = MM_PER_IN / 40.0  # 0.635
-# Incomplete threads (drawing-simplicity rule 12 counts full thread only): the
+# Incomplete threads (drawing-guidelines.md rule 18 (thread engagement) counts full thread only): the
 # die cutting up to the step leaves 1.5 pitches of run-out there; the dome
 # cuts the last pitch short (the tip-chamfer allowance the filing stud takes).
 DIE_RUNOUT = 1.5 * THREAD_PITCH  # 0.9525
 TIP_INCOMPLETE = THREAD_PITCH  # 0.635
 # Step to thread end. The step is the gauged face the nut stack hangs off,
-# so the thread reads from it (policy rule 7's functional datum) and the
+# so the thread reads from it (drawing-guidelines.md rule 10 (dimension from a real feature)'s functional datum) and the
 # shank's band stays out of the thread's stack. ±0.25 is the user's option
 # (c) of 2026-10-12: 8.17 is the shortest .XX length whose FULL thread still
 # clears the locknut's outer face at the worst corner, and its long corner
@@ -97,13 +97,13 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 REFERENCE_DIMENSIONS = frozenset({"PinLength"})
 
 # The bar's reamed bore the pin presses into, its limits printed to three
-# places on the pin's own Ø callout (policy rule 6; mg_wheel_group.BAR_PRESS
+# places on the pin's own Ø callout (drawing-guidelines.md rule 7 (notes: few, flagged, never a method); mg_wheel_group.BAR_PRESS
 # proves the interference at both corners).
 BAR_BORE_LIMITS = (
     _bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[1],
     _bar.AXLE_BORE_DIA + _bar.AXLE_BORE_BAND[0],
 )
-# Rule 6: the note says only that the axle presses to the gauge and why. The
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the note says only that the axle presses to the gauge and why. The
 # gauge itself is a model dimension of the mg-magnifier assembly, printed on
 # MHA-MG-000's AXLE AS PRESSED detail (mg_magnifier_assembly_spec): its 0.10
 # is spent inside the thread-end window (mg_wheel_group: full thread under the
@@ -115,7 +115,7 @@ DRAWING_NOTES = "\n".join(
         "SO THE LOCKNUT SITS ON FULL THREAD; RED LOCTITE 271 OPTIONAL.",
     )
 )
-# Rule 5: the magnifying wheel runs on the shank, a shaft-in-bushing journal,
+# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the magnifying wheel runs on the shank, a shaft-in-bushing journal,
 # so the one Ø3/16 face carries the machined grade (its pressed length in the
 # bar is the same face).
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (

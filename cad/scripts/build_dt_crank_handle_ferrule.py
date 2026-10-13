@@ -161,7 +161,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven brass ferrule (equations neutral)", V_FERRULE, 0.005 * V_FERRULE
     )
 
-    # The one model-owned band (policy rule 2): the bore, which the oak tenon
+    # The one model-owned band (drawing-simplicity-policy.md `How the repository implements the guidelines`): the bore, which the oak tenon
     # is turned to suit, holds both the MHA-DT-008 seat and the oak round the
     # pivot bore.  The OD is the rod as supplied, skimmed at assembly; the
     # handle's end play is fitted on the MHA-DT-032 shoulder.

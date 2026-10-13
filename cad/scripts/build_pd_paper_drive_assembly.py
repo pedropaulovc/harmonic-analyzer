@@ -1373,7 +1373,7 @@ def _latch_hook_sections() -> list[tuple[str, tuple[float, float, float, float]]
 
 
 # The lock-station sweep judges every section at the printed worst case
-# (policy rule 12): each section is the envelope its printed bands allow,
+# (drawing-guidelines.md rule 17 (walls and webs)): each section is the envelope its printed bands allow,
 # grown toward its neighbours, and each pair must keep LOCK_SWEEP_FLOOR of
 # running clearance. The bar's back face is the datum the hanger stands on and
 # the platen rides its front face, so the thinnest bar carries the whole lock

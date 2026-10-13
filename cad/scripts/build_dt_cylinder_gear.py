@@ -501,7 +501,7 @@ async def build(adapter) -> dict[str, str]:
     # direction CamCy offsets the cam) and the notch radial (origin -> the kerf
     # centreline x = NOTCH_X at the mean notch radius) meet at NOTCH_PHASE_DEG,
     # half a circular pitch. A DRIVEN angular dimension between them carries
-    # the error budget's cam_phase tolerance (drawing-simplicity rule 2: the
+    # the error budget's cam_phase tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance): the
     # band goes on the dimension, not in a note); the kerf stays located by
     # NotchCenterX, so its geometry is unchanged and the sketch fully defined.
     set_sketch_direct_db(adapter, True)
@@ -720,7 +720,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Mark exactly the blank, fitted bore, functional cam, stacking thickness
     # and phase-kerf dimensions and author their decimal places on the part
-    # (policy rule 2: the places are the tolerance, so the sheet reads them
+    # (drawing-guidelines.md rule 3 (decimal places carry the tolerance): the places are the tolerance, so the sheet reads them
     # back instead of rewriting them).  The drawing adds only a checked
     # reference cam thickness.
     clear_dimensions_for_drawing(adapter)

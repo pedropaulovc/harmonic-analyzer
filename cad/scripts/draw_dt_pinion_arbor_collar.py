@@ -5,7 +5,7 @@ A plain turned steel collar: Ø15 x 20, a drilled Ø8 slide bore, and one
 profile lies as it sits in the lathe (axis horizontal) and looks along the
 pin hole, so the hole is a solid circle located from the right-hand end face;
 the end view to its left owns the bore callout, and its OD moves onto the
-profile (rule 7: diameters on the side view).
+profile (drawing-guidelines.md rule 11 (turned parts read like the lathe): diameters on the side view).
 
 Run with SolidWorks open::
 
@@ -86,7 +86,7 @@ _PROFILE_TOP = PROFILE_CENTER[1] + COLLAR_OD * _S / 2.0  # 0.1875
 _PROFILE_BOTTOM = PROFILE_CENTER[1] - COLLAR_OD * _S / 2.0  # 0.1425
 
 # The bore is a solid circle only end-on, so its callout stays there (a
-# standard drilled hole is defined by its callout, rule 7); its leader runs
+# standard drilled hole is defined by its callout, drawing-guidelines.md rule 12 (hole and slot callouts say what to do)); its leader runs
 # up-left, clear of the OD centre mark.
 END_KEEP = {
     "BoreDia": (0.040, 0.210),

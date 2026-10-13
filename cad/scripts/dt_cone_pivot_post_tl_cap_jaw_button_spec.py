@@ -34,7 +34,7 @@ SPIGOT_HAND_CLEARANCE_MIN = 0.05
 if SPIGOT_DIA + SPIGOT_BAND[0] > _BORE_MIN - SPIGOT_HAND_CLEARANCE_MIN:
     raise AssertionError("cap jaw-button spigot does not drop into the smallest journal bore")
 
-# The band's reason belongs on its callout (policy rule 2): it names the mate
+# The band's reason belongs on its callout (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): it names the mate
 # and states the acceptance, so the 0.05 band is not read as unjustified.
 POST_NUMBER = _config.parts("dt-cone-pivot-post")["number"]
 SPIGOT_CALLOUT = f"ENTERS {POST_NUMBER}\nCONE PIVOT POST\nJOURNAL BORE BY HAND"

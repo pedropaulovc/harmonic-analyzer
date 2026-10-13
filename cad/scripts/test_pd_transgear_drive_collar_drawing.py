@@ -51,7 +51,7 @@ def test_every_marked_dimension_prints_in_exactly_one_view() -> None:
 
 
 def test_turned_diameters_and_lengths_print_on_the_side_view() -> None:
-    # Rule 7: the turned outline and fitted lengths print on the axial cut.
+    # drawing-guidelines.md rule 11 (turned parts read like the lathe): the turned outline and fitted lengths print on the axial cut.
     body = spec.DRAWING_DIMENSIONS["BodyProfile"]
     assert body == {"CollarDia", "CollarLength", "PilotDia", "PilotLength"}
     assert body <= set(drawing.SIDE_KEEP)
@@ -442,7 +442,7 @@ def test_notes_and_recipe_have_no_obsolete_front_pin_or_slot() -> None:
     notes = f"{spec.DRAWING_NOTES}\n{drawing.FIT_NOTES}"
     assert f"{spec.DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN" in notes
     assert f"{spec.BODY_BLANK_LENGTH_MIN:.3f} MIN" in notes
-    # Rule 6: four numbered notes, no method words in the bore callout.
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): four numbered notes, no method words in the bore callout.
     assert [line[:3] for line in notes.splitlines() if not line.startswith(" ")] == [
         "1. ", "2. ", "3. ", "4. "
     ]

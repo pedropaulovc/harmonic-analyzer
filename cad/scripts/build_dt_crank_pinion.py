@@ -170,7 +170,7 @@ async def build(adapter) -> dict[str, str]:
     # Name the blank extrude and its absorbed
     # profile sketch here: the two sizes the turner sets before a cutter
     # touches the part -- face width and outside diameter -- print as NATIVE
-    # model dimensions (drawing-simplicity-policy.md rule 1), which means they
+    # model dimensions (drawing-simplicity-policy.md `How the repository implements the guidelines`), which means they
     # must be named, driven, toleranced and marked like any other. Driving both
     # is also the guard on these default names: a rename that resolved the
     # wrong feature would move the blank and the equation-neutral volume gate
@@ -192,7 +192,7 @@ async def build(adapter) -> dict[str, str]:
     # Hub boss (ch12 p.19): the root-circle cylinder BOSS_LENGTH past the
     # teeth. Its outboard end is dimensioned from the SAME faced end as the
     # teeth, so the overall length stays one conspicuous native dimension from
-    # one faced end (policy rule 7). The half-profile starts AT the tooth face,
+    # one faced end (drawing-guidelines.md rule 11 (turned parts read like the lathe)). The half-profile starts AT the tooth face,
     # not at the faced end: a profile run through the toothed length sits
     # exactly on every relieved gap floor's root arc, and SolidWorks drops
     # that revolve without a feature error on the next regeneration after the
@@ -201,7 +201,7 @@ async def build(adapter) -> dict[str, str]:
     # adds the same stub, which the volume gate proves. It is a REVOLVE of a
     # half-profile on the Right plane (local x -> model -Z, local y -> model Y)
     # rather than an extruded circle: a turned part prints its diameter beside
-    # its length on the side view (rule 7), and only a dimension whose sketch
+    # its length on the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe)), and only a dimension whose sketch
     # plane is parallel to that view imports there natively -- the boss
     # diameter as a doubled centerline-to-outline dim, the overall length
     # along the outline.
@@ -221,7 +221,7 @@ async def build(adapter) -> dict[str, str]:
     boss_lines = await add_line_chain(adapter, boss_pts)
     # Construction-only side-view witnesses for the other two turned
     # diameters.  The gear helper's blank circle and the bore circle must stay
-    # on Front to create their features, but rule 2 permits a construction
+    # on Front to create their features, but drawing-simplicity-policy.md `How the repository implements the guidelines` permits a construction
     # reference sketch whose own driving dimension carries the printed value.
     # Keeping the witnesses in this Right-plane profile lets every turned
     # diameter import natively beside its axial extent without changing the
@@ -335,7 +335,7 @@ async def build(adapter) -> dict[str, str]:
     # end passes under the inclined T120 rim. A revolve cut of a rectangle on
     # the Right plane (local x -> model -Z), like the boss: the shoulder
     # length prints from the same faced end as the face and overall length,
-    # the turned diameter beside it on the side view (rule 7). The rectangle
+    # the turned diameter beside it on the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe)). The rectangle
     # runs on to the part's far end and out past the tip -- above the boss,
     # so it cuts tooth material alone -- and both of those extents are driven
     # definition-only dimensions that follow the knobs.
@@ -530,7 +530,7 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
 
     # Mark this part's manufacturing dimensions, author the decimal
-    # places they print with (policy rule 2: the model owns both the band and
+    # places they print with (drawing-simplicity-policy.md `How the repository implements the guidelines`: the model owns both the band and
     # its spelling -- the drawing only reads them back), and stamp the
     # title-block + gear-data properties the curated drawing reads.
     clear_dimensions_for_drawing(adapter)

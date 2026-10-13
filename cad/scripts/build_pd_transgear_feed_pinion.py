@@ -443,7 +443,7 @@ async def build(adapter) -> dict[str, str]:
 
     # The boss: a revolve of a half-profile on the Right plane (local x ->
     # model -Z, local y -> model Y), so its diameter prints beside its length
-    # on the section (rule 7). The profile starts AT the tooth face, clear of
+    # on the section (drawing-guidelines.md rule 11 (turned parts read like the lathe)). The profile starts AT the tooth face, clear of
     # the relieved gap floors (crank pinion #906): the one step.
     # Construction witnesses carry the tip, root and bore diameters.
     profile = SketchDims()

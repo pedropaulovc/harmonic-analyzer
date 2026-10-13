@@ -26,7 +26,7 @@ the tip view.  The only
 note says to deburr the cut end and that the
 undimensioned purchased geometry is reference.  No installation sequence or rule number is
 printed: the sequence is an MHA-DT-000 assembly step (Main's eye pass of
-warm-c486, policy rule 6).  The engagement minimum prints as a plain fact,
+warm-c486, drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).  The engagement minimum prints as a plain fact,
 "ENGAGEMENT 0.90D MIN", on the cut-length callout's last line, never in a
 note; the spec's asserts still guard its value.
 

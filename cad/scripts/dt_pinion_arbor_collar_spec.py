@@ -52,7 +52,7 @@ ARBOR_NUMBER = "MHA-DT-022"
 STRAP_NUMBER = "MHA-DT-014"
 # Drilled Ø8 slide fit over the arbor (Ø8 -0.01/-0.10, lands -0.01/-0.03).
 # The title block's DRILLED HOLES row (+0.10/0) governs it and is NOT printed
-# on the dimension (policy rule 1); the band is restated here only for the
+# on the dimension (drawing-guidelines.md rule 2 (the title block is the general specification)); the band is restated here only for the
 # stacks below, and a test pins it to title_block.yaml's drilled_hole row.
 BORE_BAND = (0.10, 0.0)  # (upper, lower) deviations
 OD_BAND = LINEAR_X_BAND
@@ -130,7 +130,7 @@ if GAP_MIN < GAP_REQUIRED - 1e-9:
         f"collar gap to the front strap {GAP_MIN:.3f} under {GAP_REQUIRED}"
     )
 
-# Rule 12 webs at the printed worst case (U27 target 2.0, floor 1.5).
+# drawing-guidelines.md rule 17 (walls and webs) webs at the printed worst case (U27 target 2.0, floor 1.5).
 COLLAR_WALL_WORST = (COLLAR_OD - OD_BAND - (BORE + BORE_BAND[0])) / 2.0
 PIN_TO_END_WEB_WORST = PIN_TO_FACE_MIN - PIN_HOLE_MAX / 2.0
 for _name, _web in (
@@ -175,10 +175,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd"},
     "BoreProfile": {"BoreDia"},
     "Collar": {"Depth"},
-    # Rule 7: the pin station is printed from a finished end face.
+    # drawing-guidelines.md rule 11 (turned parts read like the lathe): the pin station is printed from a finished end face.
     "PinHoleProfile": {"PinHoleDia", "PinHoleCz"},
 }
-# The MODEL owns every printed place (policy rule 2).  Two on the two drilled
+# The MODEL owns every printed place (drawing-simplicity-policy.md `How the repository implements the guidelines`).  Two on the two drilled
 # fits (their bands ride the dimensions), one everywhere else.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CollarProfile": {"CollarOd": 1},

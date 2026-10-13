@@ -276,7 +276,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin hole")
 
-    # Rule 5: the flank turns in the pivot blocks' bores -- the one running
+    # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the flank turns in the pivot blocks' bores -- the one running
     # surface.  A cylinder carries no model edge along its side, so the pick
     # is a SILHOUETTE entity.
     add_surface_finish(

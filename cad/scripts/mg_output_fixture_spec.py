@@ -43,7 +43,7 @@ TAP_SPEC = _geom.TAP_SPEC
 # Axial stations from the free end (local x - FREE_END_X).
 GROOVE_STATION = GROOVE_X - FREE_END_X
 
-# --- Explicit bands the model carries (policy rule 2) --------------------------
+# --- Explicit bands the model carries (drawing-guidelines.md rule 3 (decimal places carry the tolerance)) --------------------------
 # (upper, lower): the reamed slip bore on the Ø5 rod.
 ROD_BORE_DIA_BAND = (0.03, 0.0)
 # +/- on the bore's station from the free end (its end wall and the tap's
@@ -124,7 +124,7 @@ GROOVE_HALF_OPENING_MAX = groove_half_opening(
     GROOVE_RADIUS + _RADIUS_HI, GROOVE_ROOT_DIA + _ROOT_LO, SPIGOT_DIA + _SPIGOT_HI
 )
 
-# --- Walls at the printed worst case (policy rule 12) ----------------------------
+# --- Walls at the printed worst case (drawing-guidelines.md rule 17 (walls and webs)) ----------------------------
 # (nominal, worst).  The bore-to-flat wall is the bore centred on the thinnest
 # stock at its largest Ø; how far off centre the bore may stand is what the
 # sheet's stated MIN accepts (below), not a printed band.
@@ -188,7 +188,7 @@ BORE_OFFSET_MAX = (
     (HEX_AF + HEX_STOCK_AF_BAND) / 2.0 - _ROD_BORE_R_MIN - BORE_WALL_STATED_MIN
 )
 
-# --- The tap's reach (policy rule 7) -----------------------------------------------
+# --- The tap's reach (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)) -----------------------------------------------
 # The sheet calls for a plug tap with a 3-5 thread chamfer: the #4-40 plug in
 # Morse Cutting Tools' catalogue
 # (https://morsecuttingtools.com/catalogue/product/552474, item 30000) is
@@ -308,7 +308,7 @@ TAP_CALLOUT_PRECISION = {
     TAP_THREAD_DEPTH_VARIABLE: TAP_DEPTH_PLACES,
 }
 STOCK_NOTE = "3/8 HEX BAR, FLATS AS SUPPLIED."
-# Named exception: MHA-MG-006 bore-to-flat wall (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-MG-006 bore-to-flat wall (#1433).
 # The source bore runs through the corners, along Y; its parallel-flat wall
 # acceptance is unchanged.  Keep the approved wording on one short row.
 BORE_WALL_NOTE = (
@@ -323,7 +323,7 @@ TAP_TOOL_NOTE = (
 )
 TAP_EXTENT_NOTE = "THREAD ENDS AT ROD BORE."
 # The specifically approved corner-start method and the two existing tap
-# facts fit rule 6's four rows; the tap's two sentences share the last row.
+# facts fit drawing-guidelines.md rule 7 (notes: few, flagged, never a method)'s four rows; the tap's two sentences share the last row.
 DRAWING_NOTES = "\n".join(
     (STOCK_NOTE, BORE_WALL_NOTE, BORE_TOOL_NOTE, f"{TAP_TOOL_NOTE} {TAP_EXTENT_NOTE}")
 )

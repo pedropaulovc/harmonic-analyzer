@@ -64,7 +64,7 @@ foreign line segment, text over text, an annotation outside the inner border or
 inside the title-block keep-out, a leader crossing a foreign view outline or
 another leader, and two views whose callouts are squeezed within one text
 height of each other (the "add a sheet" symptom named by
-``cad/docs/drawing-simplicity-policy.md`` rule 8).
+``cad/docs/drawing-guidelines.md`` rule 15 (balance the sheet; add a sheet before cramming)).
 
 HOW TO RUN IT
 -------------

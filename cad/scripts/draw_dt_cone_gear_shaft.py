@@ -1,4 +1,4 @@
-r"""Create the cone-gear-shaft manufacturing drawing under the simplicity policy.
+r"""Create the cone-gear-shaft manufacturing drawing under drawing-guidelines.md.
 
 The turned shaft is shown horizontally at 1:1 with baseline lengths from the
 collar's thrust face below it and every diameter above it on that same side

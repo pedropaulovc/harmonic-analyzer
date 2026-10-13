@@ -553,7 +553,7 @@ def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> 
 
 
 def test_notes_state_no_bore_joint_method_or_review_record() -> None:
-    # Rule 6: native D-bore dimensions carry its fit, and the Gear Data block
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): native D-bore dimensions carry its fit, and the Gear Data block
     # reports actual cutter/mesh facts separately. Every sheet keeps the same
     # two short manufacturing notes, without review history or waived floors.
     expected = [

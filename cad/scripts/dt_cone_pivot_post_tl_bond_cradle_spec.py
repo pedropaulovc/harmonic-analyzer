@@ -54,7 +54,7 @@ TAIL_SADDLE_THICK = 20.0
 # Seats: on the post axis, SEAT_AXIS_HEIGHT above the base top. The body seat
 # takes the post's turned body; the tail seat the raw bar the tail is left at
 # (cone-plan stock component "body", dia_mm 44.45). Both are MATCHED FITS
-# (policy rule 2): the body prints at .X (+/-0.8) on the post and the bar
+# (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the body prints at .X (+/-0.8) on the post and the bar
 # carries mill tolerance, so no printed seat band can take the actual post
 # without either rejecting it or letting it shake, and with it the axis the
 # pins work from. Each seat is bored to suit its identified mate; the
@@ -215,7 +215,7 @@ for _pin in CONE_PINS.values():
 # the 0.13 deg the S6 crank-mouth roll check allows (prechips cone data). Two
 # independent +/-0.06 bands alone could roll it 0.46 deg. The note names the
 # mate whose cone boss face bears on both tops, so the match reads as that
-# fit's acceptance (policy rule 2; run-17 review asked for its function).
+# fit's acceptance (drawing-guidelines.md rule 3 (decimal places carry the tolerance); run-17 review asked for its function).
 CONE_PIN_TOPS_MATCH = 0.03
 if math.degrees(math.atan(CONE_PIN_TOPS_MATCH / (2.0 * CONE_PIN_SPREAD))) >= 0.13:
     raise AssertionError("cone pin tops' match no longer holds the S6 roll check")

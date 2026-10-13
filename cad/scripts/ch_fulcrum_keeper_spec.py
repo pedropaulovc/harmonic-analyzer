@@ -5,7 +5,7 @@ top frame that carries its foot-screw taps.
 
 PURE DATA, no SolidWorks/COM imports: the nominal geometry (the "editable
 knobs"), the keeper's station on the fulcrum shaft, the hole layout the
-drawing needs for its view math, the rule-12 worst-case wall and thread
+drawing needs for its view math, the drawing-guidelines.md rule 17 (walls and webs) worst-case wall and thread
 terms, and the marked-dimension -> kept-dimension NAME map (see
 ``pd_guide_lock_spec.py`` for the pattern's build-graph rationale).
 
@@ -178,7 +178,7 @@ KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM = tuple(
 # foot, for the #2-56 x 7/16 fillister (MHA-VN-022, McMaster 91794A080:
 # 0.14 x 0.083 head, 18-8 stainless; no #2-56 in the 90280A steel family).
 # #2 rather than #4 so the frame's transferred tap, on the keeper's centre
-# line 2.9 off the frame web's centre, keeps the rule-12 ligament
+# line 2.9 off the frame web's centre, keeps the drawing-guidelines.md rule 17 (walls and webs) ligament
 # (build_fr_top_frame). The under-head plane sits at FOOT_H - CBORE_DEPTH. ---
 FOOT_SCREW_THREAD = "#2-56"
 FOOT_SCREW_LENGTH_MM = 11.1125  # 7/16 under the head (vn_frame_side_screw_spec)
@@ -222,9 +222,9 @@ KEEPER_TAP_SPEC = HoleSpec(
 SET_SCREW_THREAD = "#1-72"
 SET_SCREW_HOLE_SPEC = HoleSpec("tapped", SET_SCREW_THREAD, end="through_next")
 SET_SCREW_PITCH = 25.4 / 72.0
-SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # rule 12: >= 1.5D of full thread
+SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # drawing-guidelines.md rule 18 (thread engagement): >= 1.5D of full thread
 
-# --- Rule 12 at the printed worst case (title block .X +-0.8, .XX +-0.51,
+# --- drawing-guidelines.md rule 17 (walls and webs) at the printed worst case (title block .X +-0.8, .XX +-0.51,
 # .XXX +-0.13, DRILLED HOLES +0.10/0; DRAWING_PRECISION below). ---
 _BAND_BY_PLACES = {1: 0.8, 2: 0.51, 3: 0.13}
 _DRILLED_PLUS = 0.10
@@ -293,7 +293,7 @@ FOOT_SIDE_WALL_MM = min(
 )
 if FOOT_SIDE_WALL_MM < 1.5:
     raise AssertionError(f"keeper counterbore side wall {FOOT_SIDE_WALL_MM:.2f} < 1.5")
-# The foot screw's thread in the frame tap (rule 12: >= 1.5D). The screw
+# The foot screw's thread in the frame tap (drawing-guidelines.md rule 18 (thread engagement): >= 1.5D). The screw
 # enters below the under-head plane FOOT_H - CBORE_DEPTH: least with the
 # foot (FootRise, .X) tall and the counterbore (native callout, printed to
 # FOOT_COUNTERBORE_DEPTH_PLACES) shallow, most the other way. The thread's .X
@@ -318,7 +318,7 @@ if KEEPER_TAP_SPEC.depth_mm - _BAND_BY_PLACES[1] < (
 ):
     raise AssertionError("the frame tap drill leaves no plug-tap lead")
 
-# Hidden reference sketches (policy rule 2, the dt_arbor_pedestal pattern):
+# Hidden reference sketches (drawing-simplicity-policy.md `How the repository implements the guidelines`, the dt_arbor_pedestal pattern):
 # the set-screw tap's station off the outer lug face and the foot screw's
 # stations off the outer lug face and a side face are manufacturing
 # dimensions no feature measures (both holes are placed by point), so a
@@ -345,7 +345,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootScrewReference": {"ScrewFromLug"},
     "FootScrewSideReference": {"ScrewFromSide"},
 }
-# Decimal places ARE the tolerance statement (policy rule 2), so the MODEL
+# Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL
 # owns them. One place is the general grade: the crown thread is sized at
 # the .X worst case (SET_SCREW_ENGAGEMENT_D). The shaft-axis height takes
 # two (it sets the fulcrum height; the pair reaming lines the two bores

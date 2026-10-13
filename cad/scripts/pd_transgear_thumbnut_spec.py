@@ -141,7 +141,7 @@ FRONT_CSK_APEX_Y = DISH_FLOOR_Y - CSK_DIA / 2.0
 REAR_FULL_THREAD_Y = REAR_CSK_APEX_Y - TAP_DRILL_DIA / 2.0
 FRONT_FULL_THREAD_Y = FRONT_CSK_APEX_Y + TAP_DRILL_DIA / 2.0
 
-# --- Places each printed dimension carries (policy rule 12, contract §12) ----
+# --- Places each printed dimension carries (drawing-guidelines.md rule 3 (decimal places carry the tolerance), contract §12) ----
 # The diameters over the thread at .XX (walls); the overall length, the
 # knurl, the head length, the waist length and the dish at .X.  The stud is
 # cut to fit the nut's rim at assembly, so the engagement stack takes the
@@ -253,10 +253,10 @@ FRONT_THREAD_LOSS = DISH_DEPTH + _DISH_DEPTH_HI + REAR_THREAD_LOSS
 KNURL_CALLOUT = f"STRAIGHT KNURL {KNURL_DESIGNATION}; DIA OVER KNURL"
 
 # No roughness symbol: the seat face clamps the wheel (a clamp face, not a
-# running, sliding or locating surface; policy rule 5).
+# running, sliding or locating surface; drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
 
 # Marked model dimensions and the places the model authors on them
-# (drawing-simplicity policy rule 2).  The head profile carries the knurl
+# (drawing-simplicity-policy.md `How the repository implements the guidelines`).  The head profile carries the knurl
 # diameter, the head length and the overall length from the seat face; the
 # stem profile the flange and waist diameters and the waist length (the
 # flange length is the remainder); the dish its rim and floor diameters and

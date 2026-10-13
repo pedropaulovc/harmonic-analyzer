@@ -12,7 +12,7 @@ The model is the INSTALLED pin: a Ø PIN_DIA cylinder PIN_INSTALLED_LENGTH
 on the bar's top pin bore and its Right Plane on the bar's mid-width plane.
 The pin is a Front-plane half-profile revolved about that axis (the
 ``build_dt_pinion_lever_pin`` idiom), so its diameter and length both import
-into the *Front side view (rule 7, turned parts).
+into the *Front side view (drawing-guidelines.md rule 11 (turned parts read like the lathe), turned parts).
 
 Run (SolidWorks already open)::
 
@@ -162,7 +162,7 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven pin (equations neutral)", volume, 0.005 * V_PIN)
 
-    # The diameter carries the drill rod's grind band natively (rule 2); the
+    # The diameter carries the drill rod's grind band natively (drawing-guidelines.md rule 3 (decimal places carry the tolerance)); the
     # installed length is the bar's width, parenthesized as REFERENCE on the
     # sheet.
     set_dimension_symmetric_tolerance(

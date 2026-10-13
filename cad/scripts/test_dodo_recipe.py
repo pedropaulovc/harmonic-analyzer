@@ -2719,6 +2719,7 @@ def test_recipe_gate_tracks_machinist_prompt_and_schema_contract() -> None:
     recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
     prompt_dir = (dodo.SCRIPTS_DIR / "prompts").resolve()
     expected = {
+        str((dodo.SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md").resolve()),
         str(prompt_dir / "machinist_review_part.md"),
         str(prompt_dir / "machinist_review_assembly.md"),
         str(prompt_dir / "machinist_review_schema.json"),

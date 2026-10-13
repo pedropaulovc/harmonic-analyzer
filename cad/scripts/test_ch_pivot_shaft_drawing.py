@@ -28,7 +28,7 @@ def test_required_drawing_paths() -> None:
 
 
 def test_every_marked_dimension_lands_on_the_side_view_or_its_detail() -> None:
-    """Policy rule 7: a turned part's diameters and lengths sit on the side
+    """drawing-guidelines.md rule 11 (turned parts read like the lathe): a turned part's diameters and lengths sit on the side
     view (or DETAIL A, a 5:1 detail of it), and all of them are authored on
     Right-plane sketches: the half-profile, the flats' cut and the caps."""
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
@@ -87,7 +87,7 @@ def test_the_part_owns_display_precision_and_the_sheet_only_asserts_it() -> None
 
 
 def test_a_shaft_carries_no_gdt() -> None:
-    """Policy rule 3: shafts carry no frames and no datums (and the old end
+    """drawing-guidelines.md rule 5 (avoid excessive GD&T): shafts carry no frames and no datums (and the old end
     faces are domes now)."""
     for attribute in (
         "PART_DATUMS",

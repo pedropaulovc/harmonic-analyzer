@@ -609,7 +609,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # projects it into a view.  Two Top-plane construction centrelines carry
     # the two axis directions and a driving angular dimension reports the
     # angle, so the plan value the shop needs is model-owned, not sheet text
-    # (drawing-simplicity-policy.md rule 2); the crank boss's station has its
+    # (drawing-simplicity-policy.md `How the repository implements the guidelines`); the crank boss's station has its
     # own sketch (6b).  All geometry is construction, and the part saves the
     # sketch hidden (REFERENCE_SKETCHES): the drawing's plan shows it, and
     # imports its angle, through the hidden-owner import.

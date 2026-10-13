@@ -29,7 +29,7 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 OD = 8.6
 OD_BAND = 0.13  # ±0.13: 0.142 worst to the lock stations, floating (R9-61)
 # The bore is a light press on the Ø4.7625 -0.0254/0 shoulder, so it is a
-# reamed fit bore (policy rule 7: the callout states the process) under an
+# reamed fit bore (drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the callout states the process) under an
 # explicit band on the model dimension.  A standard hole, it is fully
 # defined by its callout on the end view, where it is a circle.
 BORE_DIA = 4.727
@@ -80,17 +80,17 @@ FRONT_FACE_PERPENDICULARITY = float(
 )
 FACE_PERPENDICULARITY_ZONE_DIA = OD - OD_BAND
 
-# Sheet text (policy rule 6).
-# Named exception: MHA-PD-020 wall (drawing-simplicity-policy.md, "Named exceptions").
+# Sheet text (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
+# Pending exception ruling: MHA-PD-020 wall (#1380).
 WALL_NOTE = f"WALL {WALL_WORST_PRINTED:.2f} MIN."
 
 # The sheet's general notes: the worst-case wall, a fact the views cannot
 # carry.  The length and bore bands are not here: they ride their dimensions
-# as model tolerances (policy rule 2).
+# as model tolerances (drawing-simplicity-policy.md `How the repository implements the guidelines`).
 DRAWING_NOTES = WALL_NOTE
 
 # Marked model dimensions and the places the part authors on them (policy
-# rule 2): every size prints at .XXX.  The title block's .XXX row governs the
+# drawing-simplicity-policy.md `How the repository implements the guidelines`): every size prints at .XXX.  The title block's .XXX row governs the
 # O.D. (OD_BAND restates it for the wall above only); the length carries
 # LENGTH_BAND and the bore BORE_DIA_BAND on their model dimensions.
 _XXX = 3
@@ -115,7 +115,7 @@ ISOMETRIC_VIEW_NOTE = (
     f"ISOMETRIC VIEW SCALE {ISOMETRIC_VIEW_SCALE[0]}:{ISOMETRIC_VIEW_SCALE[1]}"
 )
 
-# Both end faces are MACHINED (policy rule 5): the arm runs on the rear face
+# Both end faces are MACHINED (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): the arm runs on the rear face
 # and the front face bears on the bar.  Resolved on the exact native faces by
 # outward normal and offset in the part frame.  The bore carries no symbol.
 SURFACE_FINISHES = (

@@ -124,7 +124,7 @@ if OPENING_WITH_PLATES <= GRIP_SPAN:
     raise AssertionError("soft jaws cannot open over the buttoned cone caps")
 
 # The jaw screws: heads sink under the gripping face, pass the hole, and
-# clear the counterbore; the counterbore floor keeps a rule-12 wall.
+# clear the counterbore; the counterbore floor keeps a drawing-guidelines.md rule 17 (walls and webs) wall.
 WALL_FLOOR = 2.0
 SCREW_HEAD_RECESS = CBORE_DEPTH - _XX - JAW_SCREW_HEAD_HEIGHT
 SCREW_HEAD_CLEARANCE = CBORE_DIA - _XX - JAW_SCREW_HEAD_DIA
@@ -132,7 +132,7 @@ CBORE_FLOOR = _THICK_RANGE[0] - (CBORE_DEPTH + _XX)
 if min(SCREW_HEAD_RECESS, SCREW_HEAD_CLEARANCE, BOLT_HOLE_DIA - JAW_SCREW_MAJOR) <= 0.0:
     raise AssertionError("the vise's jaw screws do not seat below the gripping face")
 if CBORE_FLOOR < WALL_FLOOR:
-    raise AssertionError("soft-jaw counterbore floor under the rule-12 wall")
+    raise AssertionError("soft-jaw counterbore floor under the drawing-guidelines.md rule 17 (walls and webs) wall")
 if BOLT_HEIGHT - _XX - (CBORE_DIA + _XX) / 2.0 < WALL_FLOOR:
     raise AssertionError("soft-jaw counterbore breaks the bottom wall")
 

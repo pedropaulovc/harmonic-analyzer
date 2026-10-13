@@ -138,7 +138,7 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
     assert drive.CRANK_FACE_Z == -183.0
     assert drive.CRANKSHAFT_Z0 == drive.CRANK_HUB_Z0 == drive.CRANK_ARM_Z0 == -183.0
     assert drive.CRANK_ARM_ORIGIN_Z == -175.0
-    # MHA-DT-009 moved 1.6 inboard with the rule-12 hub station (13.6).
+    # MHA-DT-009 moved 1.6 inboard with the drawing-guidelines.md rule 17 (walls and webs) hub station (13.6).
     assert drive.CRANK_PIN_Z == pytest.approx(-169.4)
     # The hub rear reaches the removable: 0.7 air to its front face.
     assert drive.CRANK_HUB_REAR_Z == pytest.approx(-157.8)
@@ -162,7 +162,7 @@ def test_stock_anchor_still_clamps_eye_without_bottoming() -> None:
     assert drive.CRANK_ARM_Z0 - wire_back == pytest.approx(0.02)
     insertion = drive.ANCHOR_HEAD_Z + screw.SHANK_LEN - drive.CRANK_ARM_Z0
     assert insertion == pytest.approx(5.33)
-    # Tapped THRU the stock bar (rule 12, W7): no drill point, no bottom, and
+    # Tapped THRU the stock bar (drawing-guidelines.md rule 17 (walls and webs), W7): no drill point, no bottom, and
     # the tip stays inside the inboard face.
     assert spec.ANCHOR_HOLE_SPEC.end == "through_all"
     assert screw.SHANK_DIA < insertion < spec.ARM_THICKNESS
@@ -256,7 +256,7 @@ def test_hub_seat_keeps_its_printed_band_under_the_fit_note() -> None:
     # The 2026-09-23 review printed the bore as a reference so the note alone
     # governed.  Main 2026-09-25 (U29 follow-up): the bore is made first, so
     # its .X band is the cheek's real limit and stays printed; the note states
-    # the fit MHA-DT-031 is turned to (policy rule 2: retained limits still apply).
+    # the fit MHA-DT-031 is turned to (drawing-guidelines.md rule 4 (tighten only for function, and name the mate): retained limits still apply).
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "hub seat nominal" not in source
     assert spec.DRAWING_PRECISION["HubSeatProfile"]["HubSeatDia"] == 1

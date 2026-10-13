@@ -28,7 +28,7 @@ centerline on the axis from the zone start to the tip, located from the
 origin by the rod length, and a construction witness along the rod's bottom
 outline from the zone start to the tangent carry the zone's start from the
 tip, its cylinder length and its diameter with the press band natively
-(policy rule 2: the model, not a note, owns it; ch_rod_pivot_pin's
+(drawing-simplicity-policy.md `How the repository implements the guidelines`: the model, not a note, owns it; ch_rod_pivot_pin's
 ``BlankReference``).
 
 ``RodStock`` (blanked, on the Front plane): the rod's stock diameter with the
@@ -421,7 +421,7 @@ async def build(adapter) -> dict[str, str]:
     # Manufacturing drawing support: the stock diameter carries the cold-drawn
     # bar's band, the press zone's diameter the geom's tighter (upper, lower)
     # band and its start from the tip the collar length's axial band, all
-    # natively (policy rule 2), places come from the spec, then mark exactly
+    # natively (drawing-simplicity-policy.md `How the repository implements the guidelines`), places come from the spec, then mark exactly
     # the print's dimensions (the drawing recipe imports the marked set and
     # must find every one of these), author the OD finish on the part, and
     # stamp the make-critical title-block properties. The reference sketches

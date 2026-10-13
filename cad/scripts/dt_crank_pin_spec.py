@@ -57,7 +57,7 @@ CROSS_HOLE_WEB_MIN = (
     math.floor((PIN_DIA_AT_RING_HOLE_MIN - RING_HOLE_DIA - _DRILL_OVERSIZE) / 2.0 * 100.0)
     / 100.0
 )
-# Named exception: MHA-DT-009 web (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-DT-009 web (#989).
 CROSS_HOLE_WEB_NOTE = f"CROSS-HOLE WEB TO THE PIN SURFACE {CROSS_HOLE_WEB_MIN:.2f} MIN."
 
 DRAWING_NOTES = "\n".join(

@@ -4,7 +4,7 @@ The sheet carries the rocker bank's fit-up steps (#948 ruling R, PR #1292): the
 south bracket is set off a wave disc spring that preloads the bank north, and
 the plain pivot shaft is cut to fit and held by a set screw in each ear (user,
 2026-10-10), so the setting and its acceptance are shop instructions this sheet
-must print (drawing-simplicity rule 6), generated from ``rocker_bank_layout``
+must print (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), generated from ``rocker_bank_layout``
 and numbered by ``channel_assembly_steps``. The fulcrum shaft's keepers follow
 in a second block, numbered on from the first: their bench pair-ream, their
 DRO fit-up on the top frame and the set screws' staking
@@ -192,12 +192,12 @@ def _fitup_notes() -> tuple[str, str]:
             f"{DOME_HEIGHT:.1f}. REFIT AS STEP {north_step}, WASHERS AND SPRING "
             f"IN PLACE; SOUTH EAR AT ITS STEP {set_step} SETTING."
         ),
-        # Rule 9 waived for this joint only (joint_retention RULINGS
+        # drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) waived for this joint only (joint_retention RULINGS
         # "U-MHA-VN-034-channel-threadlocker", user 2026-10-10).
         "set-screws-driven": (
             f"NORTH END FLUSH, FLATS UP: RUN ONE {pivot_set_screw} DOWN EACH APEX "
             "TAP ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG. "
-            # Named exception: MHA-CH-008 set-screw engagement (drawing-simplicity-policy.md, "Named exceptions").
+            # Pending exception ruling: MHA-CH-008 set-screw engagement (#1371).
             f"{SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}"
         ),
         "preload-accepted": (

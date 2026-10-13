@@ -77,7 +77,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "BoreProfile": {"BoreDia": 3},
     # Two places: the .XX band is what keeps the MHA-DT-009 ream's ligament to
-    # the arm shoulder at 2.1 mm (dt_crank_hub_geometry, policy rule 12).
+    # the arm shoulder at 2.1 mm (dt_crank_hub_geometry, drawing-guidelines.md rule 17 (walls and webs)).
     "ServicePinStationReference": {"ServicePinFromShoulder": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -95,7 +95,7 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 # press-fit callout
 # (dt_crank_hub_notes owns the callout prose).
 REFERENCE_DIMENSIONS = frozenset({"SeatDia"})
-# No general notes (policy rule 6): the seat fit, the seam and the cross-hole
+# No general notes (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): the seat fit, the seam and the cross-hole
 # each carry their requirement on their own callout, and the U29 hub leaves a
 # 2-mm seam web at the printed bands, so no matched wall check.
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

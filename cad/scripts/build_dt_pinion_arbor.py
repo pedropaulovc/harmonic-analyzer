@@ -279,7 +279,7 @@ async def _add_journal_land(
     (projected both ways they cut the cylinder into its own face), a
     construction witness on the flank between them, and the three native
     dimensions the sheet prints -- station from the head shoulder, land
-    length, and the diameter that carries the journal band (policy rule 2).
+    length, and the diameter that carries the journal band (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     """
     feature_name = f"{prefix}Reference"
     start_v = -journal_z

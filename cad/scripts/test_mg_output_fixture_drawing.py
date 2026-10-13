@@ -20,7 +20,6 @@ from _layout_geometry import Box, Segment as AuditSegment, segment_box_distance
 from _printed_tolerance import printed_band_mm
 
 SCRIPTS = Path(geom.__file__).resolve().parent
-POLICY = SCRIPTS.parent / "docs" / "drawing-simplicity-policy.md"
 
 
 def test_required_drawing_paths() -> None:
@@ -175,9 +174,6 @@ def test_bore_is_centred_and_the_stated_wall_is_the_named_shortfall() -> None:
         "HOLD ON FLATS; CENTRE-DRILL ON CORNER BEFORE DRILL/REAM.",
         "4-40: PLUG TAP, 3-5 THREAD CHAMFER. THREAD ENDS AT ROD BORE.",
     ]
-    policy = POLICY.read_text(encoding="utf-8").split("\n## Named exceptions", 1)[1]
-    rows = [line for line in policy.splitlines() if line.startswith("| MHA-MG-006")]
-    assert len(rows) == 1 and stated in rows[0]
     # Nothing locates the bore from a flat any longer: the hex sketch centres
     # it by equal flats.
     assert not hasattr(geom, "BORE_FROM_FLAT")

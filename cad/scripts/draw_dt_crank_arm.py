@@ -252,7 +252,7 @@ def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
     The bore is made first and keeps the title block's .X band: its limits
     are the U29 cheek's real limits (crank_hub_geometry).  MHA-DT-031 is turned
     to suit it for a light press, and the note under the value states that
-    fit; the band bounds the bore, the note the fit (policy rule 2: "any
+    fit; the band bounds the bore, the note the fit (drawing-guidelines.md rule 4 (tighten only for function, and name the mate): "any
     retained dimensional limits still apply").
     """
     hub_seat = _named(adapter, annotations, "HubSeatDia")

@@ -6,7 +6,7 @@ sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 Every nominal, decimal place and tolerance band is imported from the model.
 
-The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+The print is deliberately plain (cad/docs/drawing-guidelines.md): a
 bracket carries no datums and no feature-control frames, and it carries no
 manufacturing-note block either -- the outline, three bore callouts, two
 roughness symbols and the title block say everything.  Three bands survive,
@@ -250,7 +250,7 @@ def _overall_reference(adapter: Any, left: Any) -> None:
         adapter, display.GetAnnotation(), label="overall length reference"
     )
     # A derived reference has no part-side precision to import; the spec owns
-    # the digit (policy rule 2).
+    # the digit (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
     if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
         raise RuntimeError("overall length reference precision did not persist")
@@ -260,7 +260,7 @@ def _seat_depth_dimension(adapter: Any, section: Any) -> Any:
 
     The section plane runs through the seat axis, so the blind cut's own depth
     dimension lies in the view plane and imports as a native model dimension
-    with the part-authored places (policy rule 2) -- the sheet never writes a
+    with the part-authored places (drawing-simplicity-policy.md `How the repository implements the guidelines`) -- the sheet never writes a
     precision for a controlling dimension.
     """
     (annotation,) = curate_view_dimensions(
@@ -335,7 +335,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=(3.0, 1.0),
         label="follower seat depth section",
     )
-    # Policy rule 7: every view is hidden-lines-removed.  The two reamed
+    # drawing-guidelines.md rule 9 (show internal shape in solid lines): every view is hidden-lines-removed.  The two reamed
     # through-bores are fully defined by their callouts and the blind seat by
     # its callout plus Section B-B, so no dashed line carries information here
     # (converged-r7 Fable delta, reviewfirst).

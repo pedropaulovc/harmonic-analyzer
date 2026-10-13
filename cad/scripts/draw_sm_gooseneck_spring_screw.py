@@ -1,7 +1,7 @@
 r"""Create the MHA-SM-004 gooseneck spring screw manufacturing drawing.
 
 The SLDPRT remains authoritative.  A screw carries no datum and no
-geometric-control frame (policy rule 3): the relief diameter, relief lead and
+geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the relief diameter, relief lead and
 tip chamfer keep their native bands, and every other size is an ordinary
 model dimension at its part-authored places under the title block's .XX band.
 
@@ -150,7 +150,7 @@ SIDE_KEEP = {
     "HeadHeight": ((APEX_X + UNDERHEAD_X) / 2.0, _ROW_Y[0]),
     "UnderHeadLength": ((UNDERHEAD_X + TIP_X) / 2.0, _ROW_Y[0]),
     "OverallLength": ((APEX_X + TIP_X) / 2.0, _ROW_Y[1]),
-    # Diameters on the side view (rule 7): the head's stands clear of the
+    # Diameters on the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the head's stands clear of the
     # crown, between the profile and the head-end view.
     "HeadDia": (APEX_X - 0.019, SIDE_CENTER[1]),
     # The crown rise and the slot depth both read from the apex, stacked

@@ -77,7 +77,7 @@ CLAMP_HOLE_SPEC = HoleSpec("clearance", "#8")
 CLAMP_HOLE_DIA = blind_cut_dia_mm(CLAMP_HOLE_SPEC)
 DRILLED_HOLE_PLUS = drilled_oversize_mm()
 
-BORE_MIN_WALL = 2.0  # drawing-simplicity rule 12 target, worst case
+BORE_MIN_WALL = 2.0  # drawing-guidelines.md rule 17 (walls and webs) target, worst case
 # Worst wall above or below each bore: the bar at its thinnest, the row at its
 # band, the bore at its largest.
 BORE_ROW_WALLS = {

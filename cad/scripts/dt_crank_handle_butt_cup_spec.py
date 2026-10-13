@@ -71,7 +71,7 @@ for _ok, _what in (
     (FLOOR_THICKNESS_MIN >= WALL_FLOOR_MM, "cup floor is under 1.5 at .X"),
     (
         POCKET_WALL_MIN >= POCKET_WALL_FLOOR_MM,
-        "pocket wall is under the 0.8 named exception at its limits",
+        "pocket wall is under the 0.8 baseline pending ruling #1375 at its limits",
     ),
     (FLOOR_HOLE_DIA < POCKET_DIA, "floor hole leaves no floor"),
     (BODY_DIA + BODY_DIA_TOL < STOCK_DIA - 0.2, "body is not turnable from 3/8-in rod"),
@@ -88,7 +88,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "FloorHoleDia",
     },
 }
-# Decimal places are the tolerance (policy rule 2): the body diameter and the
+# Decimal places are the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the body diameter and the
 # pocket depth print their bands at two places; every other size is routine
 # (.X).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -109,14 +109,14 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-DT-035 dimension needs authored places")
 REFERENCE_DIMENSIONS = frozenset({"PocketDia"})
 
-# The mating parts, quoted only to identify them (rule 6); the offline test
+# The mating parts, quoted only to identify them (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); the offline test
 # checks them against the registry.
 HANDLE_NUMBER = "MHA-DT-008"
 HANDLE_NAME = "CRANK HANDLE"
 SCREW_NUMBER = "MHA-DT-032"
 SCREW_NAME = "CRANK HANDLE PIVOT SCREW"
 FLOOR_HOLE_CALLOUT = "DRILL THRU"
-# Named exception: MHA-DT-035 pocket wall (drawing-simplicity-policy.md, "Named exceptions").
+# Pending exception ruling: MHA-DT-035 pocket wall (#1375).
 DRAWING_NOTES = "\n".join(
     (
         f"BORE THE POCKET TO SUIT THE {SCREW_NUMBER} {SCREW_NAME} HEAD FOR",

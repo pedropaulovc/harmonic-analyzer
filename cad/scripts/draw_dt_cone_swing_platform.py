@@ -321,8 +321,8 @@ RELIEF_NOTE_XY = (0.120, 0.0275)
 # The MHA-VN-031 named-exception note and its tap-break override (2.5 mm text,
 # two lines, ~141 x 8.8 mm), anchored upper-left in the empty band above the
 # title block (0.066): right of the plan caption row (x <= 0.2185) and under
-# the A-A label (y >= 0.0853).  A sheet must state a named exception (codex
-# review of 68565ace, blocker B1).
+# the A-A label (y >= 0.0853). A sheet must state the shortfall pending
+# ruling #1019 (codex review of 68565ace, blocker B1).
 ENGAGEMENT_NOTE_XY = (0.222, 0.0795)
 # SECTION C-C cuts across the plate through the hold-down hole's axis, so
 # the counterbore opening from the underside shows in solid lines and the
@@ -1143,7 +1143,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     # Name the relief so the reader ties the width to the fit note; it is
-    # open through the north edge (rule-12 W18), round-ended at the pivot.
+    # open through the north edge (drawing-guidelines.md rule 17 (walls and webs) W18), round-ended at the pivot.
     set_dimension_callouts(
         adapter,
         feature_annotations,

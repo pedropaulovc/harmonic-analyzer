@@ -391,13 +391,13 @@ async def build(adapter) -> dict[str, str]:
             f"Sec{land}AF",
             *deviations(FLAT_AF_BAND),
         )
-    # Display precision is model-owned too (drawing-simplicity policy rule 2).
+    # Display precision is model-owned too (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     # The two lands that RUN carry a roughness symbol.  No datums and no
-    # feature-control frames (drawing-simplicity policy rule 3).
+    # feature-control frames (drawing-guidelines.md rule 5 (avoid excessive GD&T)).
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_part_and_images(adapter, PART_NAME)
