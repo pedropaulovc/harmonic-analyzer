@@ -34,7 +34,26 @@ fixture's cost is charged to its first consumer. Collection and session overhead
 remain part of the suite wall time. Telemetry appends to that worktree's ignored
 `cad/out/reports/telemetry`, and the root conftest isolates the buildgraph facts
 cache in a temporary directory. Keep `NOSW_GUARD` enabled and leave
-`HARMONIC_BUILDGRAPH_CACHE` unset. The vendored `SolidworksMCP-python` tests are
+`HARMONIC_BUILDGRAPH_CACHE` unset. With the guard on (Windows only), a test
+fails if it starts SolidWorks or its 3DEXPERIENCE launchers, shell-opens
+anything (`os.startfile`, `ShellExecute(Ex)`, `explorer`/`rundll32`, a `cmd`
+or PowerShell command that starts, opens or evaluates something, or names a
+SolidWorks document), starts a service or another user's process, activates
+SolidWorks, a SolidWorks document or a program-launching COM class
+(`Shell.Application`, `WScript.Shell`, MMC, Task Scheduler, WMI), or reaches
+dodo's `_exec_com` with its real subprocess runner. Fake the runner instead;
+`tests/_child_guard/harmonic_solidworks_guard.py` lists every entry point.
+The guard covers every Python child too: the
+conftest puts `tests/_child_guard` first on `PYTHONPATH` and sets
+`HARMONIC_TEST_FORBID_SOLIDWORKS`, so `python -m doit`, `build.py`, a git diff
+helper or a build script started by a test loads the same refusals through
+`sitecustomize`, exits 97 on one, and fails the test that started it. The
+threat model is accidental launches only: the guard catches repo code and
+tests that start SolidWorks by mistake, through the APIs that code uses and
+their obvious neighbours. Deliberate evasion is out of scope: a native binary,
+raw ole32 activation through ctypes, a shell verb built at runtime, or a child
+run with `-I`, `-E` or `-S`, or with an environment that drops `PYTHONPATH`,
+which skips the child guard. The vendored `SolidworksMCP-python` tests are
 excluded because they can take the farm's SolidWorks licence.
 
 Reuse source facts only within an unchanged-source scan, or immutable baseline
