@@ -421,10 +421,16 @@ def build_codex_command(
         "tools.update_plan.enabled": False,
         "tools.experimental_request_user_input.enabled": False,
         "web_search": "disabled",
+        # Stable in 0.159.1: injects a clock namespace (curr_time, sleep).
+        "features.sleep_tool": False,
         "mcp_servers.sheets.command": sys.executable,
         "mcp_servers.sheets.args": [str(SHEETS_SERVER), *(str(p.resolve()) for p in sources)],
         "mcp_servers.sheets.default_tools_approval_mode": "approve",
         "mcp_servers.sheets.enabled_tools": ["view_sheet", "crop"],
+        # An optional server races the first turn: under parallel reviews the
+        # model was sampled before tools/list returned and judged with no tools.
+        # Required servers are awaited, and exec fails if one cannot start.
+        "mcp_servers.sheets.required": True,
     }
     for key, value in overrides.items():
         command.extend(("-c", f"{key}={json.dumps(value)}"))
