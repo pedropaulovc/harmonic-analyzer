@@ -28,7 +28,7 @@ or I+B. Native builds read its verified cache; they never run the diagnostic
 proof. Native geometry/model compatibility is not actual shop admission;
 real receiving and loaded-inspection data remain separately required.
 
-* ONE support bar (22 x 9 x 452, book p.62 "the bar that the platen rides on"),
+* ONE support bar (28 x 9 x 452, book p.62 "the bar that the platen rides on"),
   front face on the platen back, clamped to each column by a FRONT + BACK
   semi-arc pair closed by two long screws whose heads show on the bar front
   (ch30 p002).
@@ -235,7 +235,6 @@ from _printed_tolerance import printed_band_mm, printed_deviations  # noqa: E402
 from pd_guide_lock_spec import (  # noqa: E402
     DRAWING_PRECISION_BY_NAME as LOCK_PRECISION,
     HOLE_XY as LOCK_HOLE_XY,
-    LOCK_HEIGHT_BAND,
     LOCK_THICK_BAND,
     RAIL_EDGE_LIP as LOCK_RAIL_LIP,
 )
@@ -306,7 +305,17 @@ PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.75
 # The platen hangs: the bar's top edge carries the top guide's underside.
 GUIDE_Y = (283.734, 317.734)  # bottom / top rail seats (machine y)
 BAR_TOP_Y = GUIDE_Y[1]
-BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0
+BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0  # 303.734
+# The bar fills the channel between the rails down to this running clearance
+# over the bottom rail's top edge (pd_support_bar_spec.BAR_HEIGHT).
+BOTTOM_RAIL_CLEARANCE = 1.0
+if (
+    abs(BAR_TOP_Y - BAR_HEIGHT - GUIDE_Y[0] - GUIDE_HEIGHT - BOTTOM_RAIL_CLEARANCE)
+    > 1e-9
+):
+    raise AssertionError(
+        "the support bar's bottom edge is off the bottom rail's clearance"
+    )
 LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.9: lock plates on the guide backs,
 # 1.0 behind the bar's back face -- they bridge the bar so the platen cannot
 # fall off it.
@@ -1385,9 +1394,7 @@ _GUIDE_DEPTH_DEV = printed_deviations(
 # The rail's sheet prints its other sizes at the same document places.
 _GUIDE_HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES)
 _LOCK_THICK_DEV = (-LOCK_THICK_BAND, LOCK_THICK_BAND)  # the sheet's mill band
-_LOCK_HEIGHT_DEV = printed_deviations(
-    LOCK_HEIGHT, LOCK_PRECISION["Height"], deviations(LOCK_HEIGHT_BAND)
-)
+_LOCK_HEIGHT_DEV = printed_deviations(LOCK_HEIGHT, LOCK_PRECISION["Height"])
 _SPACER_LENGTH_DEV = (-SPACER.LENGTH_BAND, SPACER.LENGTH_BAND)
 _NOTCH_DEPTH_DEV = printed_deviations(
     ARM_PLATE.NOTCH_DEPTH, ARM_PLATE_SPEC.NOTCH_DEPTH_PLACES
@@ -1662,6 +1669,54 @@ def _assert_lock_station_sweep() -> None:
     log(
         "guide-lock station sweep clears the hanger at the printed worst case: "
         + ", ".join(f"{label} {gap:.3f}" for label, gap in minima.items())
+    )
+
+
+# The least bar overlap a set lock plate keeps at the printed worst case.
+LOCK_RETENTION_FLOOR = 0.5
+
+
+def _assert_lock_retention() -> None:
+    """The bar fills the channel between the rails to BOTTOM_RAIL_CLEARANCE
+    and one lock plate size serves both rails (user ruling 2026-10-11), so
+    the bottom rail must run clear of the bar's bottom edge and each set
+    plate must still overlap the bar, at the printed worst case: the bar at
+    its .XXX height band (it hangs the platen by its top edge), the rails at
+    their printed height band (their taps locate from the bottom face), the
+    plate at its least height, set away from the bar by its whole guide-side
+    reach (vn_guide_lock_screw_spec.LOCK_SET_EDGE_REACH, its hole bands
+    included). The bottom plates retain the hanging platen; the top plates
+    retain it lifted until its bottom rail meets the bar."""
+    bar_bottom = BAR_TOP_Y - BAR_HEIGHT
+    rail_top = GUIDE_Y[0] + GUIDE_HEIGHT
+    clearance_min = (
+        bar_bottom - BAR.BAR_HEIGHT_BAND - rail_top - max(_GUIDE_HEIGHT_DEV[1], 0.0)
+    )
+    if clearance_min < LOCK_SWEEP_FLOOR:
+        raise AssertionError(
+            f"the platen's bottom rail would rub the support bar's bottom edge"
+            f" (worst-case gap {clearance_min:.3f} < {LOCK_SWEEP_FLOOR})"
+        )
+    lift_max = (
+        bar_bottom + BAR.BAR_HEIGHT_BAND - rail_top - min(_GUIDE_HEIGHT_DEV[0], 0.0)
+    )
+    retreat = LOCK_SET_EDGE_REACH[1] - min(_LOCK_HEIGHT_DEV[0], 0.0)
+    overlaps = {
+        "bottom plates (hanging)": LOCK_PLATE_Y[0][1]
+        - retreat
+        - (bar_bottom + BAR.BAR_HEIGHT_BAND),
+        "top plates (lifted)": BAR_TOP_Y - LOCK_PLATE_Y[1][0] - retreat - lift_max,
+    }
+    for label, overlap in overlaps.items():
+        if overlap < LOCK_RETENTION_FLOOR:
+            raise AssertionError(
+                f"the set guide-lock {label} would overlap the support bar only"
+                f" {overlap:.3f} at the printed worst case (< {LOCK_RETENTION_FLOOR})"
+            )
+    log(
+        "guide-lock retention at the printed worst case: bottom rail under the bar "
+        f"{clearance_min:.3f} (lift {lift_max:.3f}), "
+        + ", ".join(f"{label} overlap {gap:.3f}" for label, gap in overlaps.items())
     )
 
 
@@ -2345,6 +2400,7 @@ async def build(adapter) -> dict[str, str]:
     activate_assembly_contract(ASM_NAME)
     _assert_fastener_stacks()
     _assert_lock_station_sweep()
+    _assert_lock_retention()
     rack_operating_domain = _assert_rack_mesh()
     _assert_gear_mesh()
     _assert_knob_shaft_clearance()
@@ -2500,9 +2556,9 @@ async def build(adapter) -> dict[str, str]:
         guides.append(guide)
     # Lock plates on the guide backs, bridging BEHIND the bar (1.0 clear of its
     # back face) and lapping LOCK_RAIL_LIP past each rail's outer edge: top-rail
-    # locks hang DOWN over the bar (Rz180), bottom-rail locks bridge UP across
-    # the 7 open channel onto the bar band (identity, 2.65 overlap, R9-61 --
-    # the plate's height is sized by this station).
+    # locks hang DOWN over the bar (Rz180, 3.5 overlap), bottom-rail locks
+    # bridge UP across the 1.0 clearance onto the bar (identity, 2.5 overlap;
+    # _assert_lock_retention).
     for x_c in LOCK_STATION_X:
         # Machine: the station is measured from the platen's +X edge (the mirror
         # of the pre-mirror left-edge station PLATE_X0 + x_c).

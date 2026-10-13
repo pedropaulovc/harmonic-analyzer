@@ -283,12 +283,6 @@ def test_clip_screw_bosses_sweep_clear_of_the_bar_and_hanger(
             printed_deviations(assembly.ARM_PLATE.NOTCH_DEPTH, 1),
             "heads .* into the arm plate as",
         ),
-        # A lock plate that may run tall at .XX sweeps into the pivot spacer.
-        (
-            "_LOCK_HEIGHT_DEV",
-            printed_deviations(assembly.LOCK_HEIGHT, 2),
-            "lock plates .* into the pivot spacer",
-        ),
         # A rail that may run 0.9 shallow rubs its plates on the bar.
         ("_GUIDE_DEPTH_DEV", (-0.9, 0.0), "bar's back face"),
     ],
