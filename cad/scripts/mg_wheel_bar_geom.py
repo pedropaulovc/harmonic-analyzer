@@ -17,6 +17,11 @@ from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 # --- bar section + length (DIMENSIONS.md ch21; M6.8 ch30 8-view pass) ----------
 BAR_SIDE = 10.0  # tall (Y)
 BAR_DEPTH = 9.0  # deep (Z) -- support-bar stock; back face seats on the clamp arc
+# The front face in the machine frame: the front clamp arc's front face
+# (-129.9) less BAR_DEPTH, the plane the platen's back face shares
+# (build_mg_magnifier_assembly asserts it against the clamp chain). The wheel
+# axle's press gauge and the axial stack on it read from here (mg_wheel_group).
+BAR_FRONT_Z = -138.9
 BAR_LENGTH = 234.0  # clamped end 29 past the west column + free end (photo, med)
 
 # --- hole stations (local X; the bores run along Z, the front-back axis) --------
@@ -28,13 +33,10 @@ HANGER_STATION = SCREW_HOLE_X - LEFT_END_X  # 5.0
 CLAMP_STATIONS = tuple(x - LEFT_END_X for x in CLAMP_HOLE_X)  # (187.5, 222.5)
 CLAMP_STATION_PLACES = 1
 
-# Fixed photographic registration, shared by the bar placement and hanger tap.
-# Moving the screw station must not move either the bar or the pen-guide body.
+# Fixed photographic registration, shared by the bar placement and hanger tap
+# (build_pn_pen_hanger places its strap tap on this machine x).
 WHEEL_BAR_X0 = 109.0
-HANGER_ORIGIN_X = 3.0
-HANGER_STRAP_TOP_LEFT_X = -16.0
 HANGER_SCREW_MACHINE_X = WHEEL_BAR_X0 + SCREW_HOLE_X
-HANGER_SCREW_LOCAL_X = HANGER_SCREW_MACHINE_X - HANGER_ORIGIN_X
 
 # Wheel-axle bore: reamed .1865 through at the wheel station; the 3/16
 # mg-wheel-axle presses in to a gauge from the front face (mg_wheel_axle_spec),
@@ -44,10 +46,9 @@ AXLE_BORE_X = WHEEL_X - WHEEL_BAR_X0  # -56
 AXLE_BORE_DIA = round(0.1865 * 25.4, 6)  # 4.7371
 AXLE_BORE_BAND = (0.010, 0.0)  # (upper, lower) deviations, reamed
 # The height is bright square stock as supplied (cold-drawn h11 is 0/-0.09):
-# minus-only. Its top limit sets the TIE 1 tail clearance (mg_wheel_group); its
-# bottom limit sets the walls over the bore row, which the print reads from the
-# bottom face, so the whole band lands on the top wall. At -0.5 the clamp holes'
-# top wall fell to 1.861; -0.3 holds 2.061.
+# minus-only. Its bottom limit sets the walls over the bore row, which the
+# print reads from the bottom face, so the whole band lands on the top wall. At
+# -0.5 the clamp holes' top wall fell to 1.861; -0.3 holds 2.061.
 BAR_SIDE_BAND = (0.0, -0.3)
 # Printed depth band: with the axle's press gauge and .X shank it places the
 # axle's back end on the back face (mg_wheel_axle_spec.BACK_END_PROUD_MAX).
@@ -59,12 +60,7 @@ BAR_DEPTH_BAND = (0.10, -0.10)
 BORE_ROW_HEIGHT = BAR_SIDE / 2.0  # 5.0
 BORE_ROW_HEIGHT_TOL = 0.10
 BORE_ROW_HEIGHT_PLACES = 2
-# The bar's faces from the row at their worst: the far face sets the TIE 1
-# tail clearance (mg_wheel_group), the near face the walls below.
-BORE_ROW_FAR_FACE = (
-    max(BORE_ROW_HEIGHT, BAR_SIDE + BAR_SIDE_BAND[0] - BORE_ROW_HEIGHT)
-    + BORE_ROW_HEIGHT_TOL
-)  # 5.10
+# The bar's near face from the row at its worst sets the walls below.
 BORE_ROW_NEAR_FACE = (
     min(BORE_ROW_HEIGHT, BAR_SIDE + BAR_SIDE_BAND[1] - BORE_ROW_HEIGHT)
     - BORE_ROW_HEIGHT_TOL

@@ -404,8 +404,17 @@ _SUMMING_ALLOWED_PAIRS = {
 }
 
 _PEN_ALLOWED_PAIRS = {
+    # #4-40 thumb screw through the stirrup's 6.0 bottom rail (pn_pen_frame_spec.RAIL_END).
     frozenset(("vn-pen-set-screw-1", "pn-pen-frame-1")): _smooth_annulus_limit_mm3(
-        2.8448, 2.261, 5.0
+        2.8448, 2.261, 6.0
+    ),
+    # #4-40 x 3/16 rod set screw wholly in the v-block's tap (vn_pen_rod_set_screw_spec.LENGTH).
+    frozenset(("vn-pen-rod-set-screw-1", "pn-pen-v-block-1")): _smooth_annulus_limit_mm3(
+        2.8448, 2.261, 4.7625
+    ),
+    # #0-80 adjuster stud threaded 4.0 into the rod top (pn_pen_rod_spec.STUD_ENGAGEMENT).
+    frozenset(("pn-pen-adjust-screw-1", "pn-pen-rod-1")): _smooth_annulus_limit_mm3(
+        1.524, 1.191, 4.0
     ),
     frozenset(("vn-hanger-screw-1", "pn-pen-hanger-1")): _smooth_annulus_limit_mm3(
         4.1656, 3.454, 3.0

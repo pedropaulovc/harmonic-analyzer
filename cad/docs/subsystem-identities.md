@@ -21,7 +21,7 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | `pn` / `PN` | Pen | 6 |
 | `ms` / `MS` | Measuring stick | 3 |
 | `sm` / `SM` | Summing | 4 |
-| `vn` / `VN` | Vendor parts | 57 |
+| `vn` / `VN` | Vendor parts | 60 |
 | `sh` / `SH` | Shared fabricated parts | 2 |
 
 Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. The retained orphan chain sprocket belongs to PD by its translational-gearing and platen-chain evidence; the retained orphan hex bolt belongs to VN by catalog evidence. Wheel axle nut is VN by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
@@ -101,7 +101,7 @@ Dated reports, released packages, raw logs, source quotations and user-authored 
 
 The migration table is a historical lookup inventory, not a live family-count assertion: its released inventory is frozen, while the section below records post-cutover additions and retirements. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
 
-Retired Numbers keep their rows here for historical lookup and are never reissued. MHA-PD-021 `pd-latch-hook-bracket` (MHA-170) and MHA-VN-045 `vn-latch-hook-rivet` (MHA-175) have no registry, builder or drawing: the one-piece formed spring-steel latch hook MHA-PD-014 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-VN-043 screws. MHA-VN-026 (MHA-131), the old 1/2-inch `vn-knife-hanger-washer`, remains retired. The new #10 18-8 washer uses the same functional canonical stem but the new Number MHA-VN-060; this does not revive VN-026. MHA-VN-024 retains `vn-knife-hanger-stud` and the drawing title **Bolt**, now made by cutting #10-24 hex-head stock 92314A253 and seated on the new washer on the MHA-FR-002 spotface. The former #6 socket-head/counterbore-floor route is obsolete. MHA-VN-037 `vn-transgear-collar-cross-pin` (MHA-154) is retired: the true D-bore of the MHA-PD-022 drive collar carries the torque on the knob shaft's D-flat, so no front cross-pin remains.
+Retired Numbers keep their rows here for historical lookup and are never reissued. MHA-PD-021 `pd-latch-hook-bracket` (MHA-170) and MHA-VN-045 `vn-latch-hook-rivet` (MHA-175) have no registry, builder or drawing: the one-piece formed spring-steel latch hook MHA-PD-014 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-VN-043 screws. MHA-VN-026 (MHA-131), the old 1/2-inch `vn-knife-hanger-washer`, remains retired. The new #10 18-8 washer uses the same functional canonical stem but the new Number MHA-VN-060; this does not revive VN-026. MHA-VN-024 retains `vn-knife-hanger-stud` and the drawing title **Bolt**, now made by cutting #10-24 hex-head stock 92314A253 and seated on the new washer on the MHA-FR-002 spotface. The former #6 socket-head/counterbore-floor route is obsolete. MHA-VN-037 `vn-transgear-collar-cross-pin` (MHA-154) is retired: the true D-bore of the MHA-PD-022 drive collar carries the torque on the knob shaft's D-flat, so no front cross-pin remains. MHA-PN-003 `pn-pen-marker` (MHA-050) is retired: the pen is a purchased Sharpie Mini, MHA-VN-060 `vn-pen-marker`, not a turned brass barrel.
 
 The measuring-stick cutover is recorded here and in the current registries, not in the sealed release identity map: `ha-measuring-stick` MHA-HA-001 became `ms-stick` MHA-MS-001 and `ha-measuring-stick-stop` MHA-HA-002 became `ms-stop-block` MHA-MS-002 on 2026-10-09, so the `measuring-stick` rows below carry their MS Numbers and the HA part Numbers are never reissued. `cad/config/identity-migration-map.json` retains its released v39 bytes for provenance and release pairing; the v39 web model keeps its release-pinned identities until the next model release.
 
@@ -173,6 +173,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `wheel-bar` | `mg-wheel-bar` | MHA-085 | MHA-MG-008 |
 | part | `lever-wire` | `mg-lever-wire` | MHA-115 | MHA-MG-009 |
 | part | — | `mg-wheel-drum` | — | MHA-MG-010 |
+| part | — | `mg-wheel-axle-spacer` | — | MHA-MG-011 |
 | part | `chain-inner-link` | `vn-chain-inner-link` | MHA-006 | MHA-VN-002 |
 | part | `chain-outer-link` | `vn-chain-outer-link` | MHA-007 | MHA-VN-003 |
 | part | `chain-sprocket` | `pd-chain-sprocket` | MHA-008 | MHA-PD-001 |
@@ -206,6 +207,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `pen-rod` | `pn-pen-rod` | MHA-051 | MHA-PN-004 |
 | part | `pen-v-block` | `pn-pen-v-block` | MHA-053 | MHA-PN-005 |
 | part | `pen-wire` | `pn-pen-wire` | MHA-100 | MHA-PN-006 |
+| part | — | `pn-pen-adjust-screw` | — | MHA-PN-007 |
 | part | `gooseneck` | `sm-gooseneck` | MHA-032 | MHA-SM-001 |
 | part | `knife-mount` | `sm-knife-mount` | MHA-037 | MHA-SM-002 |
 | part | `summing-lever` | `sm-summing-lever` | MHA-073 | MHA-SM-003 |
@@ -266,6 +268,9 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | `vn-wheel-axle-back-washer` | — | MHA-VN-057 |
 | part | — | `vn-wheel-axle-front-washer` | — | MHA-VN-058 |
 | part | — | `vn-platen-clip-screw` | — | MHA-VN-059 |
+| part | — | `vn-pen-marker` | — | MHA-VN-060 |
+| part | — | `vn-pen-rod-set-screw` | — | MHA-VN-061 |
+| part | — | `vn-pen-adjust-nut` | — | MHA-VN-062 |
 | part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
 | part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
 | assembly | `frame` | `fr-frame` | MHA-A04 | MHA-FR-000 |
@@ -292,8 +297,14 @@ next free Number in its category and has no old stem or old Number.
 | added | `vn-magnifying-bracket-screw` | MHA-VN-050 | screws the MHA-MG-001 magnifying bracket to the MHA-SM-003 summing lever |
 | added | `vn-knife-mount-dowel` | MHA-VN-051 | keys each MHA-SM-002 knife mount to the MHA-FR-002 crossbar |
 | added | `mg-wheel-drum` | MHA-MG-010 | brass drum pressed on the MHA-MG-005 wheel spigot; carries the lever wire |
-| added | `vn-wheel-axle-back-washer` | MHA-VN-057 | brass #10 washer between the MHA-MG-008 wheel bar and the MHA-MG-005 wheel hub |
+| added | `vn-wheel-axle-back-washer` | MHA-VN-057 | brass #10 washer between the MHA-MG-011 axle spacer and the MHA-MG-005 wheel hub |
 | added | `vn-wheel-axle-front-washer` | MHA-VN-058 | brass #4 washer between the MHA-MG-005 wheel spigot face and the first MHA-VN-025 nut; its Ø7.1 OD bears inside the Ø14.0 spigot end, clear of the MHA-MG-010 drum |
+| added | `mg-wheel-axle-spacer` | MHA-MG-011 | brass sleeve on the MHA-MG-007 axle between the MHA-MG-008 wheel bar and the MHA-VN-057 back washer; its length puts the MHA-MG-005 wheel's rim on the pen-rod line |
 | added | `sm-gooseneck-spring-screw` | MHA-SM-004 | shop-turned slotted fillister screw clamps the counter spring's upper eye to MHA-SM-001's brazed, #6-32 through-tapped end plug |
 | added | `vn-platen-clip-screw` | MHA-VN-059 | four brass #2-56 fillister screws hold the MHA-PD-003 platen clip to the MHA-PD-002 platen in place of MHA-VN-006 |
 | added | `vn-knife-hanger-washer` (new #10 family) | MHA-VN-060 | 18-8 SAE washer 96659A104 under the modified #10-24 hex-head MHA-VN-024 Bolt on the MHA-FR-002 spotface; functional stem reused, retired Number never reused |
+| retired | `pn-pen-marker` | MHA-PN-003 | replaced by the purchased MHA-VN-060 Sharpie Mini marker |
+| added | `vn-pen-marker` | MHA-VN-060 | purchased Sharpie Mini permanent marker, fine point, used uncapped; its cap-seat grip lies in the MHA-PN-005 v-block groove |
+| added | `vn-pen-rod-set-screw` | MHA-VN-061 | #4-40 x 3/16 cup-point set screw in the MHA-PN-005 v-block, locking the MHA-PN-004 pen rod's pivot end |
+| added | `vn-pen-adjust-nut` | MHA-VN-062 | brass #0-80 jam nut on the MHA-PN-007 adjuster stud in the MHA-PN-004 pen rod's top |
+| added | `pn-pen-adjust-screw` | MHA-PN-007 | turned brass #0-80 eye stud in the MHA-PN-004 pen rod's top, locked by the MHA-VN-062 jam nut; the MHA-PN-006 pen wire ties through its eye |

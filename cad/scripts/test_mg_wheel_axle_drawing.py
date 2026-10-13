@@ -11,9 +11,12 @@ import pytest
 import build_mg_wheel_axle as part
 import draw_mg_wheel_axle as drawing
 import mg_magnifying_wheel_geom
+import mg_wheel_axle_spacer_spec
 import mg_wheel_axle_spec as spec
 import mg_wheel_bar_geom
 import mg_wheel_group as group
+import paper_drive_geom
+import vn_wheel_axle_back_washer_spec
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED_UM
@@ -27,25 +30,27 @@ def test_required_drawing_paths() -> None:
 
 
 def test_spec_values_are_the_drill_rod_pin() -> None:
+    spacer = mg_wheel_axle_spacer_spec.LENGTH
     assert spec.PIN_DIA == pytest.approx(4.7625)
     assert spec.PIN_DIA_TOL == 0.005
-    assert spec.SHANK_LEN == 28.4
+    # The rev-10 pin grows by the spacer's length, shank and gauge alike.
+    assert spec.SHANK_LEN == pytest.approx(28.4 + spacer)
     assert spec.THREAD == "#4-40"
     assert spec.THREAD_MAJOR == pytest.approx(2.845, abs=1e-3)
-    assert spec.THREAD_LEN == 8.17
-    assert spec.PIN_LEN == pytest.approx(37.37)
+    assert spec.THREAD_LEN == 8.20
+    assert spec.PIN_LEN == pytest.approx(37.40 + spacer)
     # Full thread only: 1.5 pitches of die run-out at the step, one pitch
     # cut short by the dome.
     assert spec.THREAD_PITCH == pytest.approx(0.635)
-    assert spec.FULL_THREAD_START_Y == pytest.approx(19.5 + 1.5 * 0.635)
-    assert spec.FULL_THREAD_END_Y == pytest.approx(27.67 - 0.635)
+    assert spec.FULL_THREAD_START_Y == pytest.approx(spec.PRESS_GAUGE + 1.5 * 0.635)
+    assert spec.FULL_THREAD_END_Y == pytest.approx(spec.THREAD_END_Y - 0.635)
     assert spec.DOME_R == pytest.approx(1.665, abs=1e-3)
     # Pressed to the gauge from the bar's front face (the origin); the back
     # end then sits 0.10 inside the bar's back face.
-    assert spec.PRESS_GAUGE == spec.STEP_Y == 19.5
+    assert spec.PRESS_GAUGE == spec.STEP_Y == pytest.approx(19.5 + spacer)
     assert spec.BACK_Y == pytest.approx(-mg_wheel_bar_geom.BAR_DEPTH + 0.10)
-    assert (spec.STEP_Y, spec.THREAD_END_Y, spec.TIP_Y) == pytest.approx(
-        (19.5, 27.67, 28.47)
+    assert (spec.THREAD_END_Y, spec.TIP_Y) == pytest.approx(
+        (spec.STEP_Y + 8.20, spec.STEP_Y + 9.00)
     )
 
 
@@ -140,8 +145,8 @@ def test_thread_callout_and_notes() -> None:
 
 
 def test_view_scales_are_explicit() -> None:
-    assert drawing.SHEET_SCALE == (4.0, 1.0)
-    assert drawing.VIEW_SCALE == (4, 1)
+    assert drawing.SHEET_SCALE == (3.0, 1.0)
+    assert drawing.VIEW_SCALE == (3, 1)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=VIEW_SCALE") == 2
     assert drawing.SIDE_VIEW_ANGLE == -math.pi / 2.0
@@ -163,21 +168,29 @@ def test_part_stamps_make_critical_properties() -> None:
 
 def test_wheel_group_stack_fits_the_pin() -> None:
     assert group.STEP_INSIDE_HUB > 0.0
-    assert group.STEP_INSIDE_HUB == pytest.approx(0.6866, abs=1e-3)
+    assert group.STEP_INSIDE_HUB == pytest.approx(0.6566, abs=1e-3)
     # (b) on FULL thread: the dome's incomplete pitch is not counted, and the
     # first nut stays clear of the die run-out at the step.
     assert group.LOCKNUT_THREAD_MARGIN >= 0.0
     assert group.LOCKNUT_THREAD_MARGIN == pytest.approx(0.0016, abs=1e-3)
-    assert group.NUT_RUNOUT_MARGIN == pytest.approx(0.2413, abs=1e-3)
+    assert group.NUT_RUNOUT_MARGIN == pytest.approx(0.2113, abs=1e-3)
     assert group.THREAD_PAST_LOCKNUT_MAX <= group.THREAD_PAST_LOCKNUT_LIMIT == 2.9
-    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(2.8066, abs=1e-3)
-    assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(1.6575, abs=1e-3)
+    assert group.THREAD_PAST_LOCKNUT_MAX == pytest.approx(2.8666, abs=1e-3)
+    assert group.THREAD_PAST_LOCKNUT_NOMINAL == pytest.approx(1.6875, abs=1e-3)
     # Pressed to the gauge, the .X shank lands the back end near the back
     # face; nothing stands behind it there.
     assert spec.BACK_END_PROUD_MAX == pytest.approx(0.85)
     assert spec.BACK_END_SUNK_MAX == pytest.approx(1.05)
-    assert group.SPOKE_MID_D == pytest.approx(8.0)
-    assert group.WHEEL_MID_Z == -146.9
+    # The spacer lands the spokes' mid-plane on the pen-rod line.
+    assert group.SPOKE_MID_D == pytest.approx(
+        mg_wheel_axle_spacer_spec.LENGTH
+        + vn_wheel_axle_back_washer_spec.MODEL_THICKNESS
+        + mg_magnifying_wheel_geom.HUB_BACK_Z
+    )
+    assert group.WHEEL_MID_Z == paper_drive_geom.PEN_Z_MID
+    assert mg_wheel_bar_geom.BAR_FRONT_Z - group.SPOKE_MID_D == pytest.approx(
+        paper_drive_geom.PEN_Z_MID
+    )
 
 
 def test_pin_fits_are_press_in_the_bar_and_running_in_the_wheel() -> None:
@@ -192,9 +205,9 @@ def test_pin_fits_are_press_in_the_bar_and_running_in_the_wheel() -> None:
 def test_pen_travel_literals_match_their_source_modules() -> None:
     import _config
     import build_pd_paper_drive_assembly as paper
-    import build_pn_pen_assembly as pen
+    import pn_pen_carriage_geom as carriage
 
-    assert group.MARKER_TIP_REST_Y == pen.MARKER_POS[1]
+    assert group.MARKER_TIP_REST_Y == pytest.approx(carriage.MARKER_POS[1], abs=5e-4)
     # The 3.0 is the sheet's top margin under the plate's top edge.
     paper_height = paper.PAPER_GEOMETRY.RECORDING_PAPER_HEIGHT_MM
     assert group.PAPER_BOTTOM_Y == pytest.approx(

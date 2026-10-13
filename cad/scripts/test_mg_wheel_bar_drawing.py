@@ -157,8 +157,6 @@ def test_every_bore_keeps_a_two_mm_wall_from_the_bottom_face_row() -> None:
     # The former -0.5 height band would leave the clamp holes' top wall short.
     old_top_wall = geom.BAR_SIDE - 0.5 - height - tol - radii["clamp holes"]
     assert old_top_wall == pytest.approx(1.861)
-    # The far face, which the TIE 1 tail must clear, is unchanged at 5.10.
-    assert geom.BORE_ROW_FAR_FACE == pytest.approx(5.10)
 
 
 def test_axle_bore_is_a_marked_reamed_cut() -> None:

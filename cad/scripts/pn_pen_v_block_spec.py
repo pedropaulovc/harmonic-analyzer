@@ -1,104 +1,166 @@
 r"""Pen v-block dimensional contract -- the single source of truth shared by the
-part build (``build_pn_pen_v_block.py``) and its manufacturing drawing
-(``draw_pn_pen_v_block.py``).
+part build (``build_pn_pen_v_block.py``), its drawing (``draw_pn_pen_v_block.py``)
+and the carriage layout/balance (``pn_pen_carriage_geom``).
 
-PURE DATA, no SolidWorks/COM imports: the nominal geometry (the "editable
-knobs"), the derived spans the drawing needs for its view math, and the
-marked-dimension -> kept-dimension NAME map.  Keeping this in ONE module means a
-rename or a nominal change is a single edit that reaches both scripts, so the
-part-side ``mark_dimensions_for_drawing`` set and the drawing-side ``keep`` maps
-cannot silently drift apart.
+PURE DATA, no SolidWorks/COM imports.
 
-Build-graph consequence (intended): both ``build_pn_pen_v_block`` and
-``draw_pn_pen_v_block`` import from THIS file, so ``module_deps_of`` folds it into
-BOTH recipe digests -- an edit here rebuilds the part AND the drawing.  The
-drawing does not import ``build_pn_pen_v_block``, so a pure build-logic edit that
-leaves this spec (and the .SLDPRT geometry) untouched does not force a drawing
-rebuild; a geometry change still re-renders the drawing via its .SLDPRT
-``file_dep``.
+Part frame: length X 0..BLOCK_LENGTH (x 0 = the PAPER end face), height Y
+0..BLOCK_HEIGHT (y 0 = the bottom face), depth Z 0..BLOCK_DEPTH (z 0 = the
+FRONT face, away from the paper; the set screw enters there).
 
-The offline lockstep test (``test_pn_pen_v_block_drawing.py``) asserts the part
-marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS`` -- the drift alarm,
-run without SolidWorks in ~1 s.
+Re-derived from the engineerguy 4/4 video (9:15-10:34) and the 2026-10 design
+brief (``balance_options.png`` panel C):
+
+* The Sharpie Mini's grip (``vn_pen_marker_spec.BARREL_DIA``) seats in a 90
+  degree V-groove along the bottom of the paper-end section, pressed up by the
+  stirrup's thumb screw; the V centres the barrel whatever its diameter tolerance.
+* The marker's larger silver body runs out through a flat-roofed RELIEF slot
+  over the rest of the length, so only the grip touches the block.
+* The rod's turned pivot end drops into a reamed pivot bore near mid-block; the
+  rod's square shoulder rests on the block top, and a #4-40 set screw from the
+  front face locks the pen's angle to the paper (book: "a small set screw that
+  adjusts the angle of the pen").
+* A through lightening bore at the free end (the photo's open hole) trims the
+  carriage CG onto the rod axis (``pn_pen_carriage_geom`` solves and asserts).
+
+Drawing contract: the pivot bore is a sketched, reamed cut (its toleranced
+diameter is a marked sketch dimension, banded to the rod pivot); the set-screw
+tap and the lightening bore are Hole Wizard features whose sizes print as native
+hole callouts and whose stations print as their marked placement dimensions.
+No GD&T (drawing-simplicity-policy.md rule 5) and no roughness symbols: the
+pivot is clamped by the set screw, nothing runs or slides on the block (rule 6).
+Material and finish (bright brass) ride the title block, so the sheet carries
+no general note.
 """
 
 from __future__ import annotations
 
-from _gtol_cylinder import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+import math
 
-# --- Nominal geometry (DIMENSIONS.md "Chapter 24", all scaled from the p.65
-# close-up vs the ~5 mm square rod, low).  These drive the part's named
-# equation globals AND the drawing's coordinate math. ---
-# Photo read (ch24 p.60 macro + the 4/4 video, v4_t00579..t00645): a plain
-# brass block hanging on the square rod -- the rod drops into the bore nearest
-# the paper and a side set screw (front face, over that bore) pins it; the
-# second bore is a spare pen seat. The marker lies in a GROOVE milled along
-# the block's bottom face (the U-notch on the p.60 end face), and the stirrup
-# frame's thumb screw presses it up into that groove. The old read of the
-# p.60 notch as a stopped flexure slit is refuted by t00612 (the marker runs
-# through the groove, block level).
-BLOCK_LENGTH = 36.0  # X, along the marker (t00612: ~2.2x the 16 end face)
+import _config
+from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
+import vn_pen_marker_spec as marker
+import vn_pen_rod_set_screw_spec as rod_set_screw
+
+BLOCK_LENGTH = 36.0  # X, along the marker (t00612: ~2.2x the end face)
 BLOCK_HEIGHT = 18.0  # Y
-BLOCK_DEPTH = 16.0  # Z
-CHAMFER = 6.0  # 45 deg top corners
-BORE_DIA = 8.0  # two vertical pen bores
-BORE_X = (10.0, 26.0)  # rod bore (paper end) / spare pen seat (free end)
-GROOVE_WIDTH = 8.5  # bottom marker groove, across Z (O8 barrel + 0.25 each side)
-GROOVE_DEPTH = 4.5  # groove rise from the bottom face (the barrel stands 3.5 proud)
-GROOVE_Z0 = (BLOCK_DEPTH - GROOVE_WIDTH) / 2.0  # 3.75: centred across the depth
-SCREW_HOLE_DIA = 2.5  # front-face rod set-screw hole, over the rod bore
-SCREW_HOLE_XY = (BORE_X[0], 11.0)
+BLOCK_DEPTH = 18.0  # Z: the relief slot passes the Ø12.3 body with 2.5 legs
+CHAMFER = 6.0  # 45 deg top corners (the photo's bevelled top edges)
 
-_UPPER_BORE_Y = (GROOVE_DEPTH + BLOCK_HEIGHT) / 2.0
-SURFACE_FINISHES = tuple(
-    SurfaceFinishControl(
-        f"pen_bore_{index}",
-        MACHINED_UM,
-        CylinderFace(
-            BORE_DIA,
-            contains_x_mm=x,
-            contains_y_mm=_UPPER_BORE_Y,
-        ),
-    )
-    for index, x in enumerate(BORE_X)
-)
+# --- V-groove (grip seat), x 0..RELIEF_X0 ---
+V_ANGLE_DEG = 90.0
+V_APEX_Y = 6.0  # apex height above the bottom face, centred in Z
+V_MOUTH_WIDTH = 2.0 * V_APEX_Y * math.tan(math.radians(V_ANGLE_DEG / 2.0))  # 12.0
+# A barrel of radius r in the V: axis r/sin(half-angle) below the apex, the two
+# contact lines r*sin(half-angle) below it.
+_HALF = math.radians(V_ANGLE_DEG / 2.0)
+MARKER_AXIS_Y = V_APEX_Y - (marker.BARREL_DIA / 2.0) / math.sin(_HALF)
+V_CONTACT_Y = V_APEX_Y - (marker.BARREL_DIA / 2.0) * math.sin(_HALF)
 
-# Derived spans (equations of the primitives above).
+# --- Relief slot (body clearance), x RELIEF_X0..BLOCK_LENGTH ---
+RELIEF_X0 = 10.0
+RELIEF_WIDTH = 13.0
+RELIEF_HEIGHT = 6.5
+
+# --- Pivot bore (rod's turned end): a sketched cut from the top face down
+# into the relief slot, reamed to the band ---
+PIVOT_BORE_DIA = 4.0  # reamed
+PIVOT_BORE_BAND = (0.012, 0.0)  # H7
+PIVOT_BORE_X = 12.5  # chosen with LIGHTENING_X by the CG solve (pn_pen_carriage_geom)
+
+# --- Rod set screw: #4-40 tapped from the front face into the pivot bore ---
+SET_SCREW_TAP_SPEC = HoleSpec("tapped", rod_set_screw.THREAD, end="through_next")
+SET_SCREW_Y = 12.0
+SET_SCREW_TAP_LENGTH = BLOCK_DEPTH / 2.0 - PIVOT_BORE_DIA / 2.0  # front face to bore wall
+
+# --- Free-end lightening bore: 5/16 drill through into the relief slot ---
+LIGHTENING_SPEC = HoleSpec("drilled_fractional", "5/16", end="through_all")
+LIGHTENING_DIA = FRACTIONAL_DRILL_MM[LIGHTENING_SPEC.size]
+LIGHTENING_X = 23.0
+
+_WALL = 1.5  # drawing-guidelines.md rule 17 (walls and webs) floor
+if V_MOUTH_WIDTH + 2.0 * 2.0 > BLOCK_DEPTH:
+    raise AssertionError("V-groove leaves under 2.0 lands on the bottom face")
+if not 1.0 <= V_CONTACT_Y < V_APEX_Y:
+    raise AssertionError("grip contact lines must lie inside the V flanks")
+if (BLOCK_DEPTH - RELIEF_WIDTH) / 2.0 < 2.0:
+    raise AssertionError("relief slot legs under the rule 17 2.0 target")
+_BODY_R = marker.BODY_FRONT_DIA / 2.0
+_BODY_HALF_CHORD_AT_BOTTOM = math.sqrt(_BODY_R**2 - MARKER_AXIS_Y**2)
+if RELIEF_WIDTH / 2.0 - _BODY_HALF_CHORD_AT_BOTTOM < 0.25:
+    raise AssertionError("relief slot does not pass the marker body")
+if RELIEF_HEIGHT - (MARKER_AXIS_Y + _BODY_R) < 0.25 or RELIEF_HEIGHT <= V_APEX_Y:
+    raise AssertionError("relief roof must clear the body and swallow the V apex")
+if PIVOT_BORE_X - PIVOT_BORE_DIA / 2.0 <= RELIEF_X0:
+    raise AssertionError("pivot bore must drop wholly into the relief slot")
+if SET_SCREW_TAP_LENGTH < 1.5 * THREAD_MAJOR_MM[rod_set_screw.THREAD]:
+    raise AssertionError("rod set-screw tap is under drawing-guidelines.md rule 18 (1.5 D)")
+if rod_set_screw.LENGTH > SET_SCREW_TAP_LENGTH:
+    raise AssertionError("rod set screw stands proud of the front face")
+if BLOCK_HEIGHT - SET_SCREW_Y - TAP_DRILL_MM[rod_set_screw.THREAD] / 2.0 < _WALL:
+    raise AssertionError("rod set-screw tap breaks the block top")
+if LIGHTENING_X - LIGHTENING_DIA / 2.0 - (PIVOT_BORE_X + PIVOT_BORE_DIA / 2.0) < _WALL:
+    raise AssertionError("lightening bore runs into the pivot bore")
+# Free-end chamfer plane x + y = BLOCK_LENGTH + BLOCK_HEIGHT - CHAMFER.
+if (BLOCK_LENGTH + BLOCK_HEIGHT - CHAMFER - BLOCK_HEIGHT - (LIGHTENING_X + LIGHTENING_DIA / 2.0)) / math.sqrt(2.0) < _WALL:
+    raise AssertionError("lightening bore breaks the free-end chamfer")
+if LIGHTENING_X - LIGHTENING_DIA / 2.0 <= RELIEF_X0 or LIGHTENING_DIA > RELIEF_WIDTH - 2.0 * _WALL:
+    raise AssertionError("lightening bore must open wholly into the relief slot")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  ``build_pn_pen_v_block`` marks exactly these; ``draw_pn_pen_v_block``
 # keeps exactly their union across its per-view ``keep`` maps.  The offline test
-# enforces ``union(marks) == union(keeps)`` so a rename in one script that isn't
-# mirrored in the other fails before any SolidWorks build. ---
+# enforces ``union(marks) == union(keeps)``. The set-screw tap and lightening
+# bore are Hole Wizard features: their sizes print as native hole callouts,
+# their stations as the marked placement dimensions (SetScrewX repeats the
+# pivot station on the face the tap is drilled from). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "OutlineProfile": {"Length", "Chamfer2dx"},
+    "OutlineProfile": {"Length", "Height", "Chamfer2dx"},
     "Block": {"Depth"},
-    "BoreProfile": {"Bore0X", "Bore1X", "Bore0Dia"},
-    "GrooveProfile": {"GrooveWidth", "GrooveZ0"},
-    "Groove": {"GrooveDepth"},
-    "ScrewHoleProfile": {"ScrewHoleCx", "ScrewHoleCz", "ScrewHoleDiaDim"},
+    "VGrooveProfile": {"VApexY", "VAngle"},
+    "VGroove": {"VLength"},
+    "ReliefProfile": {"ReliefWidth"},
+    "Relief": {"ReliefHeight"},
+    "PivotBoreProfile": {"PivotX", "PivotDia"},
+    "SetScrewHole": {"SetScrewX", "SetScrewY"},
+    "LighteningBore": {"LighteningX"},
+}
+# Places carry the title block's tolerance (drawing-guidelines.md rule 3).
+# .XX where a fit depends on it: the V apex sets the marker axis, the relief
+# width keeps its 0.53-a-side body clearance at +/-0.51, and the tap must meet
+# the bore it locks (both stations from the paper end).
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "OutlineProfile": {"Length": 1, "Height": 1, "Chamfer2dx": 1},
+    "Block": {"Depth": 1},
+    "VGrooveProfile": {"VApexY": 2, "VAngle": 0},
+    "VGroove": {"VLength": 1},
+    "ReliefProfile": {"ReliefWidth": 2},
+    "Relief": {"ReliefHeight": 1},
+    "PivotBoreProfile": {"PivotX": 2, "PivotDia": 3},
+    "SetScrewHole": {"SetScrewX": 2, "SetScrewY": 1},
+    "LighteningBore": {"LighteningX": 1},
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
+    set(DRAWING_PRECISION[feature]) != names
+    for feature, names in DRAWING_DIMENSIONS.items()
+):
+    raise AssertionError("every marked pen v-block dimension needs authored places")
+# (feature, dimension) -> (upper, lower) native band.
+DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
+    ("PivotBoreProfile", "PivotDia"): PIVOT_BORE_BAND,
+}
+# Every tight band names its mate on the dimension it governs.
+PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
+DIMENSION_CALLOUTS: dict[str, str] = {
+    "PivotDia": f"REAM THRU\nSLIP FIT ON PEN ROD PIVOT {PEN_ROD_NUMBER}",
+    "Chamfer2dx": "X 45 DEG, 2 PLACES",
 }
 
-# True free-text instructions only.  Geometry, datum structure, form/orientation,
-# and roughness live in native dimensions / datum tags / FCFs / surface symbols.
-# The part build stamps these strings into the SLDPRT; the drawing displays only
-# $PRPSHEET links, so the print cannot silently diverge from its source model.
-DRAWING_NOTES = "\n".join(
-    (
-        "PEN BORES: 2X <MOD-DIAM>8 THRU (VERTICAL), CENTRED ACROSS 16 DEPTH.",
-        "MARKER GROOVE: MILL 8.5 WIDE X 4.5 DEEP ALONG THE FULL LENGTH OF",
-        "THE BOTTOM FACE, CENTRED ACROSS THE 16 DEPTH; FLOOR FLAT.",
-        "ROD SET-SCREW HOLE <MOD-DIAM>2.5 DRILL THRU (FRONT TO BACK) ON THE",
-        "LEFT BORE AXIS; THREAD/FIT TO SUIT SET SCREW AT ASSEMBLY.",
-        "FINISH: BRIGHT BRASS, DEBURR ALL EDGES; DO NOT PAINT.",
-    )
-)
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "pen bore position": "0.20",
-    "block top-face parallelism": "0.10",
-}
+# Material and finish ride the title block; nothing else needs saying.
+DRAWING_NOTES = ""
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

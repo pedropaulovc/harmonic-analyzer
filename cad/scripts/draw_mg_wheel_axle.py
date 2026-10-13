@@ -68,10 +68,12 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Every view prints at the sheet scale, so none needs a caption. 4:1 lays the
-# 37.4 pin 149 mm long and its 3/16 shank 19 mm across.
-SHEET_SCALE = (4.0, 1.0)
-VIEW_SCALE = (4, 1)
+# Every view prints at the sheet scale, so none needs a caption. 3:1 lays the
+# pin (about 56 with the MHA-MG-011 spacer's length in it) about 168 mm long,
+# its 3/16 shank 14 mm across, and keeps the isometric (model +Y up the sheet,
+# about 137 mm tall) inside the border; 4:1 ran both off the sheet.
+SHEET_SCALE = (3.0, 1.0)
+VIEW_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
 # One side view: the *Front view (parallel to the profile sketch, so its
 # dimensions import), turned so the pin lies horizontal, back end left.
@@ -100,7 +102,7 @@ TIP_X = _sheet_x(TIP_Y)
 # band (the audit asks 3.57); the .X shank prints one value line and one
 # callout line, and its row rises 3 mm, which alone clears it.
 _ROW_Y = (SIDE_CENTER[1] - 0.032, SIDE_CENTER[1] - 0.0588, SIDE_CENTER[1] - 0.0800)
-# The thread length spans 32.7 mm of sheet, its ~63 mm callout block wider:
+# The thread length spans about 25 mm of sheet, its ~63 mm callout block wider:
 # the block stands wholly left of the step's extension line (4 mm air, room
 # for the origin circle there), clear of the overall's extension line
 # dropping from the tip on the right.
@@ -169,7 +171,7 @@ def _view_center_delta(
 
     ``place_view`` anchors on the model origin's projection, not the geometry
     box center, so a part that is not origin-symmetric (this pin spans
-    y -8.9..28.47) lands its geometry offset from the requested center. Every
+    y BACK_Y..TIP_Y, about -8.9..47) lands its geometry offset from the requested center. Every
     layout constant in this recipe is authored about the intended geometry
     center; shifting by this delta makes the edge picks and text positions
     track wherever SolidWorks actually put the geometry.

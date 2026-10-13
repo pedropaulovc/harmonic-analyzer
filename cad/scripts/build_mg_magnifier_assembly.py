@@ -151,6 +151,7 @@ from _clamp_arc import EAR_HOLE_Z as CLAMP_EAR_DX  # noqa: E402
 from sh_column_clamp_front_geom import ARC_DEPTH as ARC_FRONT_DEPTH  # noqa: E402
 from mg_wheel_bar_geom import (  # noqa: E402
     BAR_DEPTH as WHEEL_BAR_DEPTH,
+    BAR_FRONT_Z as WHEEL_BAR_FRONT_Z,
     CLAMP_HOLE_X as BAR_CLAMP_HOLE_LOCAL_X,
     WHEEL_BAR_X0,
 )
@@ -158,6 +159,11 @@ from mg_wheel_bar_geom import (  # noqa: E402
 BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -129.9
 BAR_FRONT_Z = BAR_BACK_Z - WHEEL_BAR_DEPTH  # -138.9: bar front = platen-back plane
 BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.4 bar centre
+# The wheel stack (mg_wheel_group) and the axle's gauge read the bar's front
+# face from mg_wheel_bar_geom: it must be the clamp chain's.
+assert math.isclose(BAR_FRONT_Z, WHEEL_BAR_FRONT_Z, abs_tol=1e-9), (
+    "wheel-bar front face drifted from mg_wheel_bar_geom.BAR_FRONT_Z"
+)
 
 # --- magnifying group --------------------------------------------------------
 # Rod at the plate centreline (979.7 -- the whole summing chain dropped 10.3
@@ -290,21 +296,19 @@ CLAMP_SCREW_X = (COLUMN_X + CLAMP_EAR_DX, COLUMN_X - CLAMP_EAR_DX)
 assert sorted(round(WHEEL_BAR_X0 + lx, 6) for lx in BAR_CLAMP_HOLE_LOCAL_X) == sorted(
     round(x, 6) for x in CLAMP_SCREW_X
 ), "wheel-bar clamp holes drifted off the column clamp-screw lines"
-# The axial stack on the pin (bar front face -> back washer -> wheel hub ->
-# endshake -> front washer -> nut -> locknut) lives in mg_wheel_group, asserted
-# there at import; machine z = BAR_FRONT_Z - d.
-import mg_wheel_group as _group  # noqa: E402
+# The axial stack on the pin (bar front face -> spacer -> back washer -> wheel
+# hub -> endshake -> front washer -> nut -> locknut) lives in mg_wheel_group,
+# asserted there at import (the spacer's length lands the wheel's mid-plane on
+# the pen-rod line); machine z = BAR_FRONT_Z - d.
 from mg_wheel_group import (  # noqa: E402
     BACK_WASHER_D,
     FRONT_WASHER_D,
     LOCKNUT_D,
     NUT_D,
+    SPACER_D,
     WHEEL_MID_Z,
 )
 
-assert math.isclose(BAR_FRONT_Z, _group.BAR_FRONT_Z, abs_tol=1e-9), (
-    "wheel-bar front face drifted from mg_wheel_group.BAR_FRONT_Z"
-)
 assert (stack_spec.AXLE_X, stack_spec.AXLE_Y, stack_spec.BAR_FRONT_Z) == (
     WHEEL_X,
     WHEEL_BAR_Y,
@@ -314,8 +318,6 @@ assert (stack_spec.AXLE_X, stack_spec.AXLE_Y, stack_spec.BAR_FRONT_Z) == (
 # Endpoints + length live in build_mg_lever_wire.py (the part's length IS the run);
 # re-derive the anchors from THIS script's layout and fail loud on drift, so a
 # layout move can never leave a floating wire.
-import mg_lever_wire_geom as _lever_wire  # noqa: E402
-import pn_pen_wire_geom as _pen_wire  # noqa: E402
 from mg_lever_wire_geom import (  # noqa: E402
     CLEARANCE as WIRE_CLEARANCE,
     DRUM_DIA,
@@ -330,11 +332,9 @@ from mg_magnifying_wheel_geom import (  # noqa: E402
     HUB_STEP_Z,
 )
 
-for _geom in (_lever_wire, _pen_wire):
-    assert math.isclose(_geom.WHEEL_MID_Z, WHEEL_MID_Z, abs_tol=1e-9), (
-        f"{_geom.__name__}.WHEEL_MID_Z drifted from mg_wheel_group.WHEEL_MID_Z"
-    )
-DRUM_Z = WHEEL_MID_Z + DRUM_MID_Z  # -154.91: drum centre (drum frame mid-plane)
+# The lever wire, the pen wire and the wheel stack all take the wheel plane
+# from paper_drive_geom.PEN_Z_MID; mg_wheel_group asserts the stack closes on it.
+DRUM_Z = WHEEL_MID_Z + DRUM_MID_Z  # drum centre (drum frame mid-plane)
 
 # Transform the model-owned groove front tangent, rather than assuming an
 # x-symmetric collar: its nonzero local X must be rotated exactly once.
@@ -801,10 +801,10 @@ async def build(adapter) -> dict[str, str]:
     )
 
     async def _stack_part(stem: str, d: float, lock_label: str) -> str:
-        """A washer/nut on the pin at stack station d (mg_wheel_group): the
-        part's local +Z axis (z 0..thickness, Front Plane at z 0) turned onto
-        machine -Z by Ry(180), its back face at z BAR_FRONT_Z - d, locked to
-        the pin (the same lock the old single nut used)."""
+        """A spacer/washer/nut on the pin at stack station d (mg_wheel_group):
+        the part's local +Z axis (z 0..thickness, Front Plane at z 0) turned
+        onto machine -Z by Ry(180), its back face at z BAR_FRONT_Z - d, locked
+        to the pin (the same lock the old single nut used)."""
         target = [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z - d]
         comp = await place_component(
             adapter,
@@ -824,6 +824,11 @@ async def build(adapter) -> dict[str, str]:
         assert_component_placed(adapter, comp, target, ROT_Y_180)
         return comp
 
+    await _stack_part(
+        "mg-wheel-axle-spacer",
+        SPACER_D,
+        "wheel-axle spacer locked to the axle",
+    )
     await _stack_part(
         "vn-wheel-axle-back-washer",
         BACK_WASHER_D,

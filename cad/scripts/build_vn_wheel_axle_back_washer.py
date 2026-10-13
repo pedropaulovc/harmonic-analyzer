@@ -1,7 +1,7 @@
 r"""Purchased MHA-VN-057 wheel-axle back washer: McMaster 92916A480.
 
 A brass #10 washer (``vn_wheel_axle_back_washer_spec``) on the 3/16
-mg-wheel-axle between the mg-wheel-bar's front face and the magnifying
+mg-wheel-axle between the MHA-MG-011 axle spacer and the magnifying
 wheel's hub back face: the hub runs on it (``mg_wheel_group``).  The stock
 recipe ``diagnostics/diag_build_92916A480.py`` models the ID x OD annulus at
 the catalogue's nominal thickness; no vendor model was fetched, so its

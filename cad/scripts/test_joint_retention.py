@@ -557,20 +557,13 @@ def test_deleting_a_row_whose_parts_other_rows_name_is_omitted(
     assert gone in jr.report(findings)["failing_joints"]
 
 
-# Joints whose hardware the drawings call for but no builder places. A row
-# reusing the stem of a placed instance of the same part would hide them.
-UNPLACED = frozenset(
-    {
-        "pn-pen/v-block-set-screw-on-rod",  # no set-screw part exists
-    }
-)
-
-
-def test_hardware_no_builder_places_is_reported_as_unmodelled() -> None:
+def test_every_joint_the_table_names_places_its_hardware() -> None:
+    # The last unplaced row (the pen v-block's rod set screw) became the
+    # placed MHA-VN-061; a new UNMODELLED row must be a deliberate change here.
     unmodelled = {
         f.subject for f in jr.audit_table() if f.kind is Kind.HARDWARE_UNMODELLED
     }
-    assert UNPLACED <= unmodelled
+    assert unmodelled == set()
 
 
 def test_per_channel_joints_follow_the_built_channel_count(monkeypatch) -> None:

@@ -3,24 +3,25 @@ ch. 21/24, pp. 50-53 / 60-61).
 
 The steel wire that leaves the magnifying wheel's 100 mm rim groove and
 carries the pen rod (ch. 24: "square brass rod attached to the wire from the
-magnifying wheel"). The pen rod's wire hole sits exactly one wire-centre rim
-radius (RIM_WIRE_R 49.2: the wire seated in the rim groove) east of the wheel
-axis, so the hanging run is the vertical tangent off the groove's 3 o'clock
-point down to the hole. Modeled as the STRAIGHT REST-POSE RUN only
--- the rim wrap over the wheel top and the tie-off knot are NOT modeled (the
+magnifying wheel"). The pen rod line sits exactly one wire-centre rim radius
+(RIM_WIRE_R 49.2: the wire seated in the rim groove) east of the wheel axis,
+in the wheel's mid-plane, so the hanging run is the plumb tangent off the
+groove's 3 o'clock point down to the eye of the rod-top adjuster stud
+(pn-pen-adjust-screw). Modeled as the STRAIGHT REST-POSE RUN only -- the rim
+wrap over the wheel top and the tie-off through the eye are NOT modeled (the
 kinematic coupling stays a Motion-study scotch-yoke -- cad/docs/motion-policy.md);
 the run's top rides the groove bottom line-to-line (no overlap volume).
 
-Endpoint derivation lives HERE; ``build_pn_pen_assembly`` imports
-``WIRE_BOTTOM``/``WIRE_LEN`` and asserts them against its own layout anchors
-(pen-rod wire hole at machine y 513, wheel bar y 575.7), so a layout move
-fails loud instead of leaving a floating wire.
+Endpoint derivation lives in ``pn_pen_wire_geom`` (bottom = the stud's eye-head
+top at rest, ``pn_pen_carriage_geom.STUD_HEAD_TOP_REST_Y``; top = the wheel
+axis height), which ``build_pn_pen_assembly`` also places from, so a layout
+move re-derives the wire instead of leaving it floating.
 
 Dimensions: cad/config/dimensions.yaml ch. 21/24 -- wire dia photo-scaled
 (the book wire is hair-thin; 0.8 keeps it renderable, low confidence).
 
-Layout: wire axis along +Y from the origin (bottom end at the pen-rod wire
-hole level; the assembly places it upright), length ``WIRE_LEN``.
+Layout: wire axis along +Y from the origin (bottom end at the stud's eye
+head; the assembly places it upright), length ``WIRE_LEN``.
 
 Run (SolidWorks already open)::
 

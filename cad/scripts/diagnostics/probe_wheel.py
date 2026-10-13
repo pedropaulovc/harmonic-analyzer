@@ -29,10 +29,10 @@ from _assembly import (
 # (cad/config/assemblies/mg-magnifier.yaml), the assembly this probe mirrors.
 activate_assembly_contract("mg-magnifier")
 
-WHEEL_X = 53.0
-WHEEL_BAR_Y = 575.7
-BAR_FRONT_Z = -138.9
-WHEEL_MID_Z = -146.9
+from mg_lever_wire_geom import WHEEL_BAR_Y, WHEEL_X  # noqa: E402
+from mg_wheel_bar_geom import BAR_FRONT_Z  # noqa: E402
+from mg_wheel_group import WHEEL_MID_Z  # noqa: E402
+
 ROT_X_NEG90 = [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]]
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 

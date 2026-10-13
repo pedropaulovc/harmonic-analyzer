@@ -55,8 +55,25 @@ def test_platen_furniture_cascades_with_resized_envelope() -> None:
     clip_y0 = platen.PLATE_HEIGHT - clip.CLIP_LENGTH
     assert math.isclose(platen.SOCKET_XY[0][1], clip_y0 + clip.HOLE_INSET)
     assert math.isclose(platen.SOCKET_XY[1][1], platen.PLATE_HEIGHT - clip.HOLE_INSET)
-    side_margin = (platen.PLATE_WIDTH - paper_geometry.RECORDING_PAPER_WIDTH_MM) / 2.0
-    assert math.isclose(side_margin, 18.2007)
+    # The sheet sits 3.6 to -X of centre (the rack sweep; paper_drive_geom),
+    # still wholly between the two brass edge clips: each clip's screw rail
+    # hugs its plate edge and its spring rail points inward, short of the sheet.
+    left = paper_geometry.RECORDING_PAPER_LEFT_INSET_MM
+    right = paper_geometry.RECORDING_PAPER_RIGHT_INSET_MM
+    assert math.isclose(left, 14.6)
+    assert math.isclose(
+        left + paper_geometry.RECORDING_PAPER_WIDTH_MM + right, platen.PLATE_WIDTH
+    )
+    clip_inner_edges = (
+        platen.SOCKET_XY[0][0] - clip.HOLE_Y + clip.CLIP_WIDTH,
+        platen.PLATE_WIDTH - platen.SOCKET_XY[2][0] - clip.HOLE_Y + clip.CLIP_WIDTH,
+    )
+    assert (
+        min(platen.SOCKET_XY[0][0], platen.PLATE_WIDTH - platen.SOCKET_XY[2][0])
+        > clip.HOLE_Y
+    )
+    assert left - clip_inner_edges[0] > 2.0
+    assert right - clip_inner_edges[1] > 2.0
     assert math.isclose(
         platen.PLATE_HEIGHT - paper_geometry.RECORDING_PAPER_HEIGHT_MM - 3.0,
         51.32,

@@ -65,7 +65,7 @@ STEMS = (
     "mg-magnifying-wheel",
     "pn-pen-rod",
     "pn-pen-v-block",
-    "pn-pen-marker",
+    "vn-pen-marker",
     "pn-pen-frame",
     "vn-pen-set-screw",
     "pn-pen-wire",
@@ -73,7 +73,7 @@ STEMS = (
 PEN_STEMS = (
     "pn-pen-rod",
     "pn-pen-v-block",
-    "pn-pen-marker",
+    "vn-pen-marker",
     "pn-pen-frame",
     "vn-pen-set-screw",
     "pn-pen-wire",

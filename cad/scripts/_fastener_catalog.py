@@ -194,6 +194,21 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "99607A213",
         material="AISI 304",
     ),
+    # The C45 black-oxide cup point, #4-40 x 3/16, locking the pen rod's
+    # turned pivot end in the v-block.
+    "vn-pen-rod-set-screw": _stock(
+        "vn-pen-rod-set-screw",
+        "Alloy Steel Cup-Tip Set Screw",
+        "91375A105",
+        material="Alloy Steel",
+    ),
+    # Brass #0-80 jam nut on the pen rod's top adjuster stud.
+    "vn-pen-adjust-nut": _stock(
+        "vn-pen-adjust-nut",
+        "Brass Hex Nut",
+        "92671A115",
+        material="Brass",
+    ),
     # The four platen-clip screws: brass #2-56 x 1/4, whose 0.14 head stays
     # inside the clip's rail where the MHA-VN-006 #4-40 head would overhang.
     "vn-platen-clip-screw": _stock(

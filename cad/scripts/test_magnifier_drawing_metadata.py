@@ -17,6 +17,7 @@ MAGNIFIER_SPECS = {
     "mg-magnifying-wheel": "mg_magnifying_wheel_spec",
     "mg-wheel-bar": "mg_wheel_bar_spec",
     "mg-wheel-drum": "mg_wheel_drum_spec",
+    "mg-wheel-axle-spacer": "mg_wheel_axle_spacer_spec",
 }
 
 

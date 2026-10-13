@@ -1,56 +1,220 @@
-r"""Pure-data dimensional contract shared by the pen hanger and its drawing.
+r"""Pure-data contract for the pen hanger: geometry, fit and drawing.
 
-PURE DATA, no SolidWorks/COM imports.  ``build_pn_pen_hanger`` imports the marked-
-dimension NAME map + notes from here; ``draw_pn_pen_hanger`` imports the same plus
-the strap/block geometry from ``build_pn_pen_hanger`` for its view math, and keeps
-exactly ``DRAWING_DIMENSIONS`` across its per-view keep map.
+PURE DATA, no SolidWorks/COM imports.  ``build_pn_pen_hanger`` models this
+geometry and applies the bands and places below to its model dimensions;
+``draw_pn_pen_hanger`` keeps exactly ``DRAWING_DIMENSIONS`` across its two
+per-view keep maps; ``build_pn_pen_assembly`` places the part at
+``HANGER_POS`` and checks the rod's travel against ``GUIDE_SPAN_Y``.
+
+Frame: origin at the strap's top-right BACK corner -- on the wheel bar's front
+face, level with the bar top, on the rod line's x.  The part is authored
+MACHINE-handed and placed IDENTITY, so local axes are machine axes: the strap
+occupies y -170..0, z -3..0; the rod axis is local (0, ., ``ROD_AXIS_Z``).
+The rod line itself (``paper_drive_geom.PEN_ROD_X`` / ``PEN_Z_MID``) is never
+restated here.
 """
 
 from __future__ import annotations
 
-from mg_wheel_bar_geom import HANGER_SCREW_LOCAL_X, HANGER_STRAP_TOP_LEFT_X
+import math
 
+import _config
+from _hole_spec import HoleSpec
+from _printed_tolerance import printed_band_mm
+from mg_lever_wire_geom import WHEEL_BAR_Y
+from mg_wheel_bar_geom import BAR_FRONT_Z, BAR_SIDE, HANGER_SCREW_MACHINE_X
+from paper_drive_geom import PEN_ROD_X, PEN_Z_MID, PLATEN_BOTTOM_Y
+from pd_platen_spec import PLATE_HEIGHT as PLATEN_HEIGHT
+from pn_pen_rod_spec import ROD_SECTION, SECTION_BAND as ROD_SECTION_BAND
+from vn_hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA
+
+
+PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
+
+# --- Placement: the strap top is flush with the bar top, its back face seats
+# on the bar front face, its top-right corner sits on the rod line's x so the
+# slots centre on local x 0. ---
+HANGER_POS = (PEN_ROD_X, round(WHEEL_BAR_Y + BAR_SIDE / 2.0, 6), BAR_FRONT_Z)
+ROD_AXIS_Z = round(PEN_Z_MID - BAR_FRONT_Z, 6)  # local z of the rod line
+
+# --- Strap (photo: tapers 16 -> 10, black, flat on the bar). ---
+STRAP_T = 3.0
+STRAP_Z = (-STRAP_T, 0.0)
+STRAP_TOP_X = (-16.0, 0.0)  # 16 wide at the bar (low)
+STRAP_BOT_X = (-5.0, 5.0)  # 10 wide at the foot, centred on the rod (low)
+# 170 below the bar top: the strap stays flat on the bar plane, which the
+# platen and paper also cross (platen z -142.75..-138.9), so its foot stops
+# just above the platen top instead of running past the paper top (photo
+# ~184 below the screw; this is 165, inside the photo's +-15 % parallax).
+STRAP_RISE = 170.0
+STRAP_BOT_Y = -STRAP_RISE
+STRAP_OUTLINE = (
+    (STRAP_TOP_X[1], 0.0),
+    (STRAP_TOP_X[0], 0.0),
+    (STRAP_BOT_X[0], STRAP_BOT_Y),
+    (STRAP_BOT_X[1], STRAP_BOT_Y),
+)  # counter-clockwise from the origin corner
+PLATEN_TOP_CLEARANCE_MIN = 2.0
+PLATEN_TOP_CLEARANCE = HANGER_POS[1] + STRAP_BOT_Y - (PLATEN_BOTTOM_Y + PLATEN_HEIGHT)
+if PLATEN_TOP_CLEARANCE < PLATEN_TOP_CLEARANCE_MIN:
+    raise AssertionError(
+        f"hanger foot {PLATEN_TOP_CLEARANCE:.3f} above the platen top "
+        f"(< {PLATEN_TOP_CLEARANCE_MIN})"
+    )
+
+# --- Two open U guide plates (1.5 sheet), brazed across the strap front. ---
+GUIDE_PLATE_T = 1.5
+GUIDE_PITCH = 40.0  # lower-plate bottom to upper-plate bottom (photo ~42)
+GUIDE_PLATE_YS = (STRAP_BOT_Y, STRAP_BOT_Y + GUIDE_PITCH)  # bottom faces, local
+# Each plate's top face below the strap top edge: the extrude's start offset.
+GUIDE_PLATE_DROPS = tuple(-(y + GUIDE_PLATE_T) for y in GUIDE_PLATE_YS)
+GUIDE_PLATE_WIDTH = 10.0
+GUIDE_SPAN_Y = (
+    round(HANGER_POS[1] + GUIDE_PLATE_YS[0], 6),
+    round(HANGER_POS[1] + GUIDE_PLATE_YS[1] + GUIDE_PLATE_T, 6),
+)  # machine y: lower-plate bottom .. upper-plate top
+# The rod's square section must pass both plates by this much at both travel
+# extremes (pn_pen_carriage_geom; asserted by the hanger test and the pen
+# assembly).
+GUIDE_ENGAGE_MARGIN = 3.0
+
+# --- Slot: the rod's only lateral guide.  Width on the rod, bottom just behind
+# the rod's back face, the plate's front arms past the rod's front face. ---
+SLOT_WIDTH = 5.05
+# (upper, lower) deviations.  The low limit leaves running clearance on the
+# largest rod (pn_pen_rod_spec 0/-0.05); the high limit bounds the lean the two
+# slots allow (GUIDE_TILT_MAX).
+SLOT_WIDTH_BAND = (0.05, 0.0)
+SLOT_BOTTOM_GAP = 0.5  # nominal, largest rod's back face to slot bottom
+SLOT_BOTTOM_Z = round(ROD_AXIS_Z + ROD_SECTION / 2.0 + SLOT_BOTTOM_GAP, 6)
+# Printed from the strap back face (the bar seat), the one face that fixes the
+# rod line relative to the slot.
+SLOT_BOTTOM = -SLOT_BOTTOM_Z
+SLOT_BOTTOM_BAND = (0.10, -0.10)
+GUIDE_NOSE = 4.0  # plate front edge ahead of the rod axis
+PLATE_FRONT_Z = round(ROD_AXIS_Z - GUIDE_NOSE, 6)
+PLATE_REACH = round(STRAP_Z[0] - PLATE_FRONT_Z, 6)  # strap front to plate front
+SLOT_DEPTH = round(SLOT_BOTTOM_Z - PLATE_FRONT_Z, 6)
+ARM_WIDTH = (GUIDE_PLATE_WIDTH - SLOT_WIDTH) / 2.0
+
+_ROD_MAX = ROD_SECTION + ROD_SECTION_BAND[0]
+_ROD_MIN = ROD_SECTION + ROD_SECTION_BAND[1]
+SLOT_CLEARANCE = (
+    SLOT_WIDTH + SLOT_WIDTH_BAND[1] - _ROD_MAX,
+    SLOT_WIDTH + SLOT_WIDTH_BAND[0] - _ROD_MIN,
+)  # (tightest, loosest) side-to-side
+if SLOT_CLEARANCE[0] <= 0.0:
+    raise AssertionError("guide slot binds the largest pen rod")
+# Worst lean of the rod between the two slots' outer faces (radians).
+GUIDE_TILT_MAX = math.atan(SLOT_CLEARANCE[1] / (GUIDE_PITCH + GUIDE_PLATE_T))
+if math.degrees(GUIDE_TILT_MAX) > 0.25:
+    raise AssertionError("guide slots let the pen rod lean over 0.25 deg")
+# The slot bottom stays behind the rod's back face at the band's worst case.
+SLOT_BOTTOM_GAP_MIN = SLOT_BOTTOM_GAP + SLOT_BOTTOM_BAND[1]
+if SLOT_BOTTOM_GAP_MIN <= 0.0:
+    raise AssertionError("guide slot bottom can bear on the pen rod")
+# The arms still cover the rod's front face with the reach at its .X limit.
+GUIDE_ARM_COVER_MIN = GUIDE_NOSE - _ROD_MAX / 2.0 - printed_band_mm(1)
+if GUIDE_ARM_COVER_MIN <= 0.0:
+    raise AssertionError("guide plate arms can stop short of the rod's front face")
+
+# --- M6.10: the selected hanger screw threads into the strap near its top
+# through an exact #8-32 tapped Hole Wizard feature, on the bar's screw axis. ---
+SCREW_TAP_SPEC = HoleSpec("tapped", "#8-32")
+SCREW_HOLE_XY = (
+    round(HANGER_SCREW_MACHINE_X - HANGER_POS[0], 6),
+    round(WHEEL_BAR_Y - HANGER_POS[1], 6),
+)
+
+
+def _edge_distance(start: tuple[float, float], end: tuple[float, float]) -> float:
+    """Signed distance from the tap axis to one outline edge (+ inside)."""
+    (x1, y1), (x2, y2) = start, end
+    px, py = SCREW_HOLE_XY
+    return ((x2 - x1) * (py - y1) - (y2 - y1) * (px - x1)) / math.hypot(
+        x2 - x1, y2 - y1
+    )
+
+
+# Perpendicular distances to all four straight strap edges: a circular thread
+# envelope must remain inside the whole tapered outline.  The clearance bore's
+# bar-end ligament is checked in build_mg_wheel_bar; the receiver uses the
+# thread major diameter here.
+HANGER_THREAD_STRAP_WALL = (
+    min(
+        _edge_distance(a, b)
+        for a, b in zip(STRAP_OUTLINE, STRAP_OUTLINE[1:] + STRAP_OUTLINE[:1])
+    )
+    - HANGER_SCREW_DIA / 2.0
+)
+if HANGER_THREAD_STRAP_WALL <= 0.0:
+    raise AssertionError("stock #8 hanger thread breaks through the tapered strap")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  The guide-block width and the tapered strap (bottom width, top
-# run, rise) are marked -- all Front-plane sketch dims, so they import cleanly
-# into the single front profile view.  The 5.4 square pen-rod channel, the block
-# depth/reach and the #8-32 hanger hole are carried in the notes / native callout
-# (the channel dim lives on a Top-plane sketch and the hole is a native Hole
-# Wizard feature, neither a clean front-view import). ---
+# print shows.  Front view: the strap outline, the tap station, the upper
+# plate's thickness and drop.  Top view: the upper guide plate's U outline and
+# the strap stock thickness (the lower plate is identical and flush with the
+# strap bottom end -- notes). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "BlockProfile": {"BlockWidth"},
-    "StrapProfile": {"StrapBotWidth", "StrapTopRun", "StrapTaperDy"},
+    "StrapProfile": {"StrapTopRun", "StrapTaperDx", "StrapRise", "StrapBotWidth"},
+    "Strap": {"StrapThick"},
+    "ScrewHole": {"ScrewX", "ScrewY"},
+    "UpperGuide": {"PlateThick", "UpperPlateDrop"},
+    "UpperGuideProfile": {
+        "SlotWidth",
+        "SlotBottom",
+        "ArmWidth",
+        "PlateReach",
+        "PlateWidth",
+    },
+}
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "StrapProfile": {
+        "StrapTopRun": 1,
+        "StrapTaperDx": 1,
+        "StrapRise": 1,
+        "StrapBotWidth": 1,
+    },
+    "Strap": {"StrapThick": 1},
+    "ScrewHole": {"ScrewX": 1, "ScrewY": 1},
+    "UpperGuide": {"PlateThick": 1, "UpperPlateDrop": 1},
+    "UpperGuideProfile": {
+        "SlotWidth": 2,
+        "SlotBottom": 2,
+        "ArmWidth": 1,
+        "PlateReach": 1,
+        "PlateWidth": 1,
+    },
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
+    set(DRAWING_PRECISION[feature]) != names
+    for feature, names in DRAWING_DIMENSIONS.items()
+):
+    raise AssertionError("every marked pen-hanger dimension needs authored places")
+# (feature, dimension) -> (upper, lower) native band.
+DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
+    ("UpperGuideProfile", "SlotWidth"): SLOT_WIDTH_BAND,
+    ("UpperGuideProfile", "SlotBottom"): SLOT_BOTTOM_BAND,
+}
+# Every tight band names its mate on the dimension it governs.
+DIMENSION_CALLOUTS: dict[str, str] = {
+    "SlotWidth": f"2X SLIDING FIT ON PEN ROD {PEN_ROD_NUMBER}",
+    "SlotBottom": f"2X CLEARS PEN ROD {PEN_ROD_NUMBER}",
 }
 
-# Lines kept short (<~60 chars) so the note block stays clear of the title block
-# (x >= 0.264 m) and the tall front view; it grows DOWNWARD from its anchor.
 DRAWING_NOTES = "\n".join(
     (
-        "1. GUIDE BLOCK 12.00 W X 12.00 H X 22.10 DEEP. CUT 5.40",
-        "   +0.10/0.00 SQUARE HOLE THRU 12.00 H; INTERNAL R0.25 MAX.",
-        "   SIDE WALLS 3.30 NOM; WALL-THICKNESS DIFFERENCE 0.10 MAX.",
-        "   HOLE CENTER 4.00 +/-0.05 FROM FRONT DEPTH FACE; FRONT",
-        "   IS THE FACE OPPOSITE THE STRAP-FLUSH BACK FACE.",
-        "2. STRAP 3.00 THICK: 10.00 WIDE AT BLOCK, 16.00 AT TOP,",
-        "   OVER 69.70 VERTICAL RISE. TOP-EDGE CENTER IS 8.00 LEFT",
-        "   OF BLOCK CENTERLINE +/-0.10; DO NOT MIRROR. STRAP",
-        "   CENTERED ON BLOCK WIDTH +/-0.10; LOWER STRAP EDGES",
-        "   1.00 REF INBOARD OF BLOCK SIDES.",
-        "3. SILVER-BRAZE WITH AWS A5.8 BAg-7; STRAP BACK FACE",
-        "   FLUSH WITH BLOCK BACK DEPTH FACE WITHIN 0.10.",
-        "   BRAZE THE FULL 3.00 X 10.00 FAYING SURFACE (NO",
-        "   INTERNAL VOID OPEN TO EITHER SEAM >0.10). CONTINUOUS",
-        "   FRONT FILLET, 1.0 MIN LEG, ACROSS THE 10.00 WIDTH;",
-        "   CONTINUOUS FILLET VISIBLE ALONG THE FULL BACK SEAM.",
-        "   NO EXPOSED GAP >0.10; CUMULATIVE VOID LENGTH 0.50 MAX",
-        "   ON EITHER SEAM (VISUAL, BOTH SEAMS).",
-        "4. MACHINE HANGER-SCREW TAP FROM BACK; SEE NATIVE CALLOUT.",
-        "   AXIS 5.00 +/-0.05 VERTICALLY BELOW TOP EDGE + "
-        f"{HANGER_SCREW_LOCAL_X - HANGER_STRAP_TOP_LEFT_X:.2f}",
-        "   +/-0.05 HORIZONTALLY RIGHT OF FRONT-VIEW TOP-LEFT CORNER.",
+        "1. TWO GUIDE PLATES ALIKE, SILVER-BRAZED (BAg-7) TO STRAP",
+        "   FRONT FACE; LOWER PLATE FLUSH WITH STRAP BOTTOM END.",
+        f"2. SLOTS IN LINE: PEN ROD {PEN_ROD_NUMBER} SLIDES FREELY",
+        "   THROUGH BOTH UNDER ITS OWN WEIGHT.",
     )
 )
-FRONT_VIEW_NOTE = "FRONT VIEW SCALE 2:1"
+FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:1"
 TOP_VIEW_NOTE = "TOP VIEW SCALE 2:1"
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

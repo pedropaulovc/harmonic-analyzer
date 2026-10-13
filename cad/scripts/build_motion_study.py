@@ -1102,7 +1102,7 @@ async def _sample_pen(adapter, study_name=""):
 
     samples = []
     steps = 24
-    marker, _ = _find_one(adapter, "pn-pen-marker")  # enumerate ONCE, not per step
+    marker, _ = _find_one(adapter, "vn-pen-marker")  # enumerate ONCE, not per step
     if marker is None:
         log("    pen-marker not found")
         return samples

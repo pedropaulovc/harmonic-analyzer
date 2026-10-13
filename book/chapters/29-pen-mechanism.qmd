@@ -18,10 +18,13 @@ The one sub-assembly with no original to copy.
 | `pn-pen-frame` | TODO | TODO | TODO |
 | `pn-pen-v-block` | TODO | TODO | TODO |
 | `pn-pen-rod` | TODO | TODO | TODO |
-| `pn-pen-marker` | TODO | TODO | TODO |
+| `pn-pen-adjust-screw` | 1 | brass | turned #0-80 eye stud on the rod top; TODO |
+| `vn-pen-marker` | 1 | purchased | Sharpie Mini permanent marker, fine point (Sharpie 35111) |
 | `pn-pen-wire` | TODO | TODO | TODO |
 | `pn-pen-hanger` | TODO | TODO | TODO |
 | `vn-pen-set-screw` | TODO | TODO | TODO |
+| `vn-pen-rod-set-screw` | 1 | alloy steel, black oxide | #4-40 x 3/16 cup-point set screw (McMaster 91375A105) |
+| `vn-pen-adjust-nut` | 1 | brass | #0-80 hex nut (McMaster 92671A115) |
 | `mg-output-fixture` | 1 | C36000 brass | 9.525 mm (3/8 in) hex bar (`mg_output_fixture_geom.HEX_AF`); TODO(cut it first) |
 
 : {tbl-colwidths="[40,10,25,25]"}

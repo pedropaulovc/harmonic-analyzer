@@ -1,14 +1,16 @@
 r"""Reproduction script: pen square rod (book ch. 24, pp. 64-65).
 
-The square brass rod that carries the v-block; the wire from the
-magnifying wheel ties into the cross hole near its top, so the rod (and
-pen) mirror the summed motion vertically.
+The square brass rod of the pen carriage: it slides in the pen hanger's two U
+guides, its turned pivot end drops into the v-block's pivot bore with the
+square shoulder resting on the block top, and the adjuster stud (with its
+#0-80 jam nut and wire eye) threads into the tapped top face.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 24" — ~5 mm square photo-scaled
-(low); length ~120 from the p.64 inset (low).
-
-Layout: length along +Y from the origin (assembly orientation), section
-centred on the origin in X, extruded +Z; wire hole along Z near the top.
+Frame (``pn_pen_rod_spec`` docstring; the assembly places the part by it):
+origin on the rod axis at the SHOULDER. The square runs +Y from the shoulder to
+the top face and is centred on the Y axis in both X and Z (Front-plane sketch,
+mid-plane extrusion); the pivot runs -Y from the shoulder (Top-plane circle,
+reversed boss). Top Plane is the shoulder face; Front and Right Planes contain
+the rod axis; ``Axis1`` (the part's only reference axis) is the rod axis.
 
 Run (SolidWorks already open)::
 
@@ -31,33 +33,37 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, add_line_chain, ensure_fully_defined
 from _sketch_chains import define_rectilinear_chain
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _drawing_precision import apply_drawing_precision
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
-from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
-from _hole_spec import blind_cut_dia_mm
-from _holes import wizard_holes
+from _holes import blind_hole_volume_mm3, wizard_holes
 from pn_pen_rod_spec import (
+    BOTTOM_VIEW_NOTE,
+    DRAWING_BANDS,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
-    ROD_LENGTH,
+    DRAWING_PRECISION,
+    PIVOT_DIA,
+    PIVOT_LENGTH,
     ROD_SECTION,
-    SECTION_BAND,
-    SURFACE_FINISHES,
+    SQUARE_LENGTH,
+    STUD_TAP_DRILL_DIA,
+    STUD_TAP_SPEC,
     TOP_VIEW_NOTE,
-    WIRE_HOLE_SPEC,
-    WIRE_HOLE_Y,
 )
 
 PART_NAME = "pn-pen-rod"
 MATERIAL = "Brass"  # see _appearance.apply_material docstring
+# The assembly mates the rod line to ``Axis1@pn-pen-rod-1``: the slide axis
+# must be the first (and only) reference axis the part creates.
+SLIDE_AXIS = "Axis1"
 
 
 async def build(adapter) -> dict[str, str]:
@@ -65,30 +71,29 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): the square section, the rod length and
-    # the wire-hole geometry. The mm suffix is load-bearing -- this is an INCH
-    # document and the equation manager reads BARE numbers in document units (an
-    # unsuffixed 120 = 120 in, blowing the part up 25.4x).
+    # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
+    # is an INCH document and the equation manager reads BARE numbers in
+    # document units (an unsuffixed 112 = 112 in, blowing the part up 25.4x).
     await set_global(adapter, "RodSection", f"{ROD_SECTION}mm")
-    await set_global(adapter, "RodLength", f"{ROD_LENGTH}mm")
-    await set_global(adapter, "WireHoleY", f"{WIRE_HOLE_Y}mm")
-    # (The old WireHoleDia knob is gone: the wire hole is now a native Hole
-    # Wizard feature whose standard diameter is part-owned.)
+    await set_global(adapter, "SquareLength", f"{SQUARE_LENGTH}mm")
+    await set_global(adapter, "PivotDia", f"{PIVOT_DIA}mm")
+    await set_global(adapter, "PivotLength", f"{PIVOT_LENGTH}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Square section, anchored at the origin corner and spanning 0..ROD_LENGTH in
-    # Y (not origin-centred, so keep the rectilinear chain). Emission order: the
-    # kept per-segment distance dims (one horizontal width, one vertical length;
-    # the closing horizontal/vertical are redundant), THEN the anchor dims at the
-    # bottom-left corner (-RodSection/2, 0): only X is non-zero, so one anchor dim.
+    # 1. Square: Front-plane outline x -S/2..S/2, y 0..SQUARE_LENGTH (shoulder
+    #    to top face; not origin-centred in Y, so keep the rectilinear chain).
+    #    Emission order: the kept per-segment distance dims (one horizontal
+    #    width, one vertical length; the closing horizontal/vertical are
+    #    redundant), THEN the anchor dims at the bottom-left corner (-S/2, 0):
+    #    only X is non-zero, so one anchor dim.
     section = SketchDims()
     check("create_sketch section", await adapter.create_sketch("Front"))
     section_rect = [
         (-ROD_SECTION / 2.0, 0.0),
         (ROD_SECTION / 2.0, 0.0),
-        (ROD_SECTION / 2.0, ROD_LENGTH),
-        (-ROD_SECTION / 2.0, ROD_LENGTH),
+        (ROD_SECTION / 2.0, SQUARE_LENGTH),
+        (-ROD_SECTION / 2.0, SQUARE_LENGTH),
     ]
     lines = await add_line_chain(adapter, section_rect)
     await define_rectilinear_chain(
@@ -98,39 +103,76 @@ async def build(adapter) -> dict[str, str]:
         label="rod",
         dims=section,
         names=["Section", "Length", "CornerX"],
-        drives=['"RodSection"', '"RodLength"', '"RodSection" / 2'],
+        drives=['"RodSection"', '"SquareLength"', '"RodSection" / 2'],
     )
     await ensure_fully_defined(adapter, "rod outline")
     check("exit_sketch section", await adapter.exit_sketch())
     name_last_feature(adapter, "RodProfile")
     drive_jobs += section.apply(adapter, "RodProfile")
+    # Mid-plane: Depth is the TOTAL depth, S/2 each side of the Front Plane, so
+    # the square is centred on the rod axis in Z as well as X.
     check(
         "extrude rod",
-        await adapter.create_extrusion(ExtrusionParameters(depth=ROD_SECTION)),
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=ROD_SECTION, both_directions=True)
+        ),
     )
     name_last_feature(adapter, "Rod")
     depth_dim = name_dimensions(adapter, "Rod", ["Depth"])
     drive_jobs += [(depth_dim[0], '"RodSection"')]
-    v_rod = ROD_SECTION * ROD_SECTION * ROD_LENGTH
-    await volume_check(adapter, "rod", v_rod, 0.005 * v_rod)
+    v_square = ROD_SECTION * ROD_SECTION * SQUARE_LENGTH
+    volume = await volume_check(adapter, "rod square", v_square, 0.005 * v_square)
 
-    # Wire tie-off hole near the top, drilled +Z through the 5 mm square section
-    # (Z 0..ROD_SECTION) at (0, WIRE_HOLE_Y). Through-all is geometrically
-    # identical to the old mid-plane both-directions cut.
-    wire_cut = wizard_holes(
+    # 2. Pivot: Top-plane circle on the axis, boss extruded REVERSED (-Y) from
+    #    the shoulder. A Top-plane boss runs +Y by default (into the square);
+    #    reverse_direction=True drops it below, as fr_top_frame's HubBoss.
+    pivot = SketchDims()
+    check("create_sketch pivot", await adapter.create_sketch("Top"))
+    await define_circle(
         adapter,
-        WIRE_HOLE_SPEC,
-        [[0.0, WIRE_HOLE_Y, ROD_SECTION]],
-        (0.0, 0.0, 1.0),
-        "wire tie-off hole",
-        name="WireHole",
-        placement_dims=[((None, None), ("WireZ", '"WireHoleY"'))],
-        expect_dia_mm=blind_cut_dia_mm(WIRE_HOLE_SPEC),
+        0.0,
+        0.0,
+        PIVOT_DIA / 2.0,
+        "rod pivot end",
+        dims=pivot,
+        names=("PivotCx", "PivotCz", "PivotDia"),
+        drives=(None, None, '"PivotDia"'),
     )
-    drive_jobs += wire_cut.placement_drive_jobs
-    v_wire = math.pi * (wire_cut.hole_dia_mm / 2.0) ** 2 * ROD_SECTION
-    v_final = v_rod - v_wire
-    await volume_check(adapter, "wire hole", v_final, 0.005 * v_rod)
+    await ensure_fully_defined(adapter, "rod pivot sketch")
+    check("exit_sketch pivot", await adapter.exit_sketch())
+    name_last_feature(adapter, "PivotProfile")
+    drive_jobs += pivot.apply(adapter, "PivotProfile")
+    check(
+        "extrude pivot",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=PIVOT_LENGTH, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "Pivot")
+    pivot_length_dim = name_dimensions(adapter, "Pivot", ["PivotLength"])
+    drive_jobs += [(pivot_length_dim[0], '"PivotLength"')]
+    v_pivot = math.pi * (PIVOT_DIA / 2.0) ** 2 * PIVOT_LENGTH
+    volume = await volume_check(
+        adapter, "rod pivot end", volume + v_pivot, 0.005 * v_pivot
+    )
+
+    # 3. Adjuster stud tap: one blind #0-80 Hole Wizard tap in the top face on
+    #    the axis (the placement point coincident with the projected origin).
+    stud_tap = wizard_holes(
+        adapter,
+        STUD_TAP_SPEC,
+        [[0.0, SQUARE_LENGTH, 0.0]],
+        (0.0, 1.0, 0.0),
+        "adjuster stud tap (#0-80)",
+        name="StudTap",
+        expect_dia_mm=STUD_TAP_DRILL_DIA,
+        placement_dims=[((None, None), (None, None))],
+    )
+    drive_jobs += stud_tap.placement_drive_jobs
+    v_tap = blind_hole_volume_mm3(stud_tap.hole_dia_mm, STUD_TAP_SPEC.depth_mm)
+    volume = await volume_check(
+        adapter, "adjuster stud tap", volume - v_tap, 0.03 * v_tap
+    )
 
     # Apply the deferred drive equations after the whole model + a rebuild exists,
     # then re-check: every equation evaluates to the value just built, so the
@@ -140,12 +182,13 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(
-        adapter, "driven pen rod (equations neutral)", v_final, 0.005 * v_rod
+        adapter, "driven pen rod (equations neutral)", volume, 0.005 * v_square
     )
 
-    # Named slide axis (local Y through the origin = Front Plane ∩ Right Plane,
-    # the square rod's long axis) so the pen rod runs as a prismatic joint along
-    # the v-block guide in the M6 mated-DOF assembly (vertical pen travel).
+    # 4. Named slide axis (local Y through the origin = Front Plane ∩ Right
+    #    Plane, the rod axis): the rod line the assembly mates to as
+    #    ``Axis1@<rod>``. No feature above creates a reference axis, so this is
+    #    Axis1; fail loud if SolidWorks named it anything else.
     slide_axis = await name_bore_axis(
         adapter,
         "Front Plane",
@@ -154,32 +197,29 @@ async def build(adapter) -> dict[str, str]:
         0.0,
         "slide axis",
     )
+    if slide_axis != SLIDE_AXIS:
+        raise RuntimeError(
+            f"pen-rod slide axis is {slide_axis!r}; the assembly mates {SLIDE_AXIS!r}"
+        )
     _blank_ref_axis(adapter, slide_axis)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter, "RodProfile", "Section", *deviations(SECTION_BAND)
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "Rod", "Depth", *deviations(SECTION_BAND)
-    )
+    for (feature_name, dimension_name), band in DRAWING_BANDS.items():
+        set_dimension_bilateral_tolerance(
+            adapter, feature_name, dimension_name, *deviations(band)
+        )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # GD&T lives on the MODEL as plain annotations; the drawing imports it.
-    author_part_pmi(
-        adapter,
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        surface_finishes=SURFACE_FINISHES,
-    )
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Top View Note": TOP_VIEW_NOTE,
+            "Bottom View Note": BOTTOM_VIEW_NOTE,
         },
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
@@ -192,6 +232,7 @@ async def build(adapter) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Top View Note",
+            "Bottom View Note",
         ),
     )
     return artefacts

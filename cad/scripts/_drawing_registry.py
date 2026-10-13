@@ -215,13 +215,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="pn_pen_marker",
-        part="pn_pen_marker",
-        artifact_stem="pn-pen-marker",
-        script_name="draw_pn_pen_marker.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="pd_transgear_pin",
         part="pd_transgear_pin",
         artifact_stem="pd-transgear-pin",
@@ -278,6 +271,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="pn_pen_adjust_screw",
+        part="pn_pen_adjust_screw",
+        artifact_stem="pn-pen-adjust-screw",
+        script_name="draw_pn_pen_adjust_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="mg_magnifying_lever",
         part="mg_magnifying_lever",
         artifact_stem="mg-magnifying-lever",
@@ -324,6 +324,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="mg_wheel_drum",
         artifact_stem="mg-wheel-drum",
         script_name="draw_mg_wheel_drum.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="mg_wheel_axle_spacer",
+        part="mg_wheel_axle_spacer",
+        artifact_stem="mg-wheel-axle-spacer",
+        script_name="draw_mg_wheel_axle_spacer.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -1213,6 +1220,27 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="vn_pen_set_screw",
         artifact_stem="vn-pen-set-screw",
         script_name="draw_vn_pen_set_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_pen_marker",
+        part="vn_pen_marker",
+        artifact_stem="vn-pen-marker",
+        script_name="draw_vn_pen_marker.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_pen_rod_set_screw",
+        part="vn_pen_rod_set_screw",
+        artifact_stem="vn-pen-rod-set-screw",
+        script_name="draw_vn_pen_rod_set_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_pen_adjust_nut",
+        part="vn_pen_adjust_nut",
+        artifact_stem="vn-pen-adjust-nut",
+        script_name="draw_vn_pen_adjust_nut.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

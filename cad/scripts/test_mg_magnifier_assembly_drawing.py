@@ -12,6 +12,7 @@ import pytest
 import build_mg_magnifier_assembly as assembly
 import draw_mg_magnifier_assembly as drawing
 import mg_magnifier_assembly_spec as stack
+import mg_wheel_axle_spacer_spec
 import mg_wheel_axle_spec
 import mg_wheel_group
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
@@ -42,7 +43,12 @@ def test_magnifier_keeps_registry_outputs_and_precomputed_placement() -> None:
 
 
 def test_the_stack_settings_are_the_group_stations_with_their_bands() -> None:
-    assert stack.PRESS_GAUGE == mg_wheel_axle_spec.PRESS_GAUGE == 19.5
+    # The rev-10 19.5 plus the spacer that lands the wheel on the pen line.
+    assert (
+        stack.PRESS_GAUGE
+        == mg_wheel_axle_spec.PRESS_GAUGE
+        == pytest.approx(19.5 + mg_wheel_axle_spacer_spec.LENGTH)
+    )
     assert stack.PRESS_GAUGE_TOL == mg_wheel_axle_spec.PRESS_GAUGE_TOL == 0.05
     # The printed endshake band is exactly the group's set window.
     assert stack.ENDSHAKE - stack.ENDSHAKE_TOL == pytest.approx(

@@ -706,10 +706,15 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch tie 1", await adapter.exit_sketch())
     name_last_feature(adapter, "Tie1Profile")
     drive_jobs += tie1_sd.apply(adapter, "Tie1Profile")
+    # Mid-plane cut on the spokes' plane: it must reach past both boss faces
+    # (back HUB_BACK_Z, front HUB_STEP_Z), which sit off-centre on it.
     check(
         "cut tie 1",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * (HUB_BACK_Z + 1.0), both_directions=True)
+            ExtrusionParameters(
+                depth=2.0 * (max(HUB_BACK_Z, -HUB_STEP_Z) + 1.0),
+                both_directions=True,
+            )
         ),
     )
     name_last_feature(adapter, "Tie1")

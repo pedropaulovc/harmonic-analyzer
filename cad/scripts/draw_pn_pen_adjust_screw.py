@@ -1,0 +1,259 @@
+r"""Create the curated machinist drawing for the pen-height adjuster stud.
+
+One side view, the *Right view turned so the stud lies as it is turned
+(drawing-guidelines.md rule 11): threaded end left, eye head right, the X
+cross hole seen end-on as a circle with its center mark and native #54 DRILL
+callout. Every marked dimension (pn_pen_adjust_screw_spec.DRAWING_DIMENSIONS)
+lives in a Right-plane sketch and imports here: the thread's major diameter
+and length, the head's diameter and height, and the eye's station from the
+threaded end (the hidden EyeStationReference sketch, shown in this view only).
+A shaded isometric at the sheet scale completes the package (rule 8). No
+datums, frames or roughness symbols: the stud is not on the GD&T allowlist
+(rule 5) and nothing on it runs or locates (rule 6).
+"""
+
+from __future__ import annotations
+
+import argparse
+import math
+import sys
+from typing import Any
+
+from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+
+from _check import check
+from _com import _early_bound
+from _drawing_centerline import add_view_centerline
+from _drawing_common import (
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    stamp_drawing_summary,
+)
+from _drawing_dimension_import import import_cosmetic_threads
+from _drawing_dimensions import assert_imported_precision
+from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leader_notes import add_attached_note
+from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
+from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import set_hidden_lines_removed
+from _hole_spec import drill_process
+from _paths import CAD_ROOT
+from _session import run_build
+import _telemetry
+from pn_pen_adjust_screw_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    EYE_DIA,
+    EYE_SPEC,
+    EYE_Y,
+    HEAD_DIA,
+    OVERALL_LENGTH,
+    THREAD_CALLOUT,
+    THREAD_LENGTH,
+    THREAD_MAJOR,
+)
+
+
+SPEC = DRAWINGS_BY_NAME["pn_pen_adjust_screw"]
+PART_STEM = SPEC.artifact_stem
+SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
+OUTPUTS = DrawingOutputs(
+    slddrw=SPEC.outputs["slddrw"],
+    pdf=SPEC.outputs["pdf"],
+    png=SPEC.outputs["png"],
+)
+SLDDRW = OUTPUTS.slddrw
+PDF = OUTPUTS.pdf
+PNG = OUTPUTS.png
+
+# Every view prints at the sheet scale, so none needs a caption. 6:1 lays the
+# 23 mm stud 138 mm long, its Ø5 head 30 mm across and the #54 eye 8 mm.
+SHEET_SCALE = (6.0, 1.0)
+VIEW_SCALE = (6, 1)
+_S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0  # sheet metres per model mm
+# The *Right view faces the Right-plane sketches (so their dimensions import)
+# and sees the X cross hole end-on; a quarter turn clockwise sends model +Y
+# (threaded end -> head) to paper right.
+SIDE_CENTER = (0.150, 0.165)
+SIDE_VIEW_ANGLE = -math.pi / 2.0
+ISO_CENTER = (0.335, 0.190)
+AXIS_Y = SIDE_CENTER[1]
+
+
+def sheet_x(model_y_mm: float) -> float:
+    """Sheet X of a model-Y station on the side view, as laid out (the view
+    is centred on the stud's length)."""
+    return SIDE_CENTER[0] + (model_y_mm - OVERALL_LENGTH / 2.0) * _S
+
+
+THREAD_END_X = sheet_x(0.0)
+SHOULDER_X = sheet_x(THREAD_LENGTH)
+EYE_X = sheet_x(EYE_Y)
+TOP_X = sheet_x(OVERALL_LENGTH)
+THREAD_HALF = THREAD_MAJOR / 2.0 * _S
+HEAD_HALF = HEAD_DIA / 2.0 * _S
+EYE_HALF = EYE_DIA / 2.0 * _S
+
+# Lengths (rules 10/11): below the profile, the thread from the faced
+# threaded end and the head from its shoulder on one row; above it, the eye's
+# station from the threaded end, its extension line rising through the eye's
+# center mark, so no extension line crosses another dimension line. The
+# thread's Ø stands below the thread, short of the length row; the head's Ø
+# right of the faced top, between its extension lines.
+_ROW_BELOW_Y = AXIS_Y - 0.032
+_ROW_ABOVE_Y = AXIS_Y + 0.035
+SIDE_KEEP = {
+    "ThreadLength": ((THREAD_END_X + SHOULDER_X) / 2.0, _ROW_BELOW_Y),
+    "HeadHeight": ((SHOULDER_X + TOP_X) / 2.0, _ROW_BELOW_Y),
+    "EyeY": ((THREAD_END_X + EYE_X) / 2.0, _ROW_ABOVE_Y),
+    "ThreadDia": (sheet_x(6.0), AXIS_Y - 0.016),
+    "HeadDia": (TOP_X + 0.021, AXIS_Y),
+}
+# The thread callout stands between the thread and the EyeY row, its short
+# leader dropping onto the major-diameter silhouette toward the shoulder.
+THREAD_PICK = (sheet_x(14.0), AXIS_Y + THREAD_HALF)
+THREAD_NOTE_XY = (sheet_x(6.0), AXIS_Y + 0.018)
+# The eye callout's leader rises from the circle's top rim up and right, over
+# the faced top, inside the head's Ø extension line.
+EYE_RIM_PICK = (EYE_X, AXIS_Y + EYE_HALF)
+EYE_CALLOUT_XY = (TOP_X + 0.013, AXIS_Y + 0.045)
+# A point on the thread's face between the ThreadDia line and the callout's
+# leader.
+CENTERLINE_PICK = (sheet_x(10.0), AXIS_Y + THREAD_HALF / 2.0)
+# Bottom-left, above the title-block line.
+NOTES_XY = (0.020, 0.048)
+
+
+def _shift(
+    points: dict[str, tuple[float, float]], dx: float, dy: float
+) -> dict[str, tuple[float, float]]:
+    return {name: (x + dx, y + dy) for name, (x, y) in points.items()}
+
+
+async def build(adapter: Any) -> dict[str, str]:
+    if not SOURCE.is_file():
+        raise FileNotFoundError(f"source part is missing: {SOURCE}")
+
+    check("open adjuster-stud source", await adapter.open_model(str(SOURCE)))
+    read_required_properties(
+        adapter.currentModel,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
+    )
+    drawing_model, _sheet = new_project_drawing(
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+    )
+    stamp_drawing_summary(
+        adapter,
+        drawing_model,
+        {
+            0: "Pen Adjuster Stud Manufacturing Drawing",
+            1: "Harmonic Analyzer hobby-machinist book drawing",
+            2: "Harmonic Analyzer Project",
+            3: f"pen adjuster stud; {THREAD_CALLOUT}; cross-drilled eye; brass",
+            4: "Generated from the project-owned ASME B drawing standard",
+        },
+    )
+
+    side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=VIEW_SCALE)
+    native = _early_bound(side, "IView")
+    native.Angle = SIDE_VIEW_ANGLE
+    if abs(math.remainder(float(native.Angle) - SIDE_VIEW_ANGLE, 2.0 * math.pi)) > 1e-9:
+        raise RuntimeError("failed to rotate the adjuster-stud side view")
+    drawing_model.EditRebuild3()
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
+    for view in (side, iso):
+        set_hidden_lines_removed(adapter, view)
+
+    # Every layout constant is authored about the threaded end landing at
+    # (THREAD_END_X, AXIS_Y); track wherever SolidWorks actually put it.
+    origin = model_point_in_view(
+        adapter, side, (0.0, 0.0, 0.0), label="adjuster-stud threaded end"
+    )
+    dx, dy = origin[0] - THREAD_END_X, origin[1] - AXIS_Y
+
+    def spt(x: float, y: float) -> tuple[float, float]:
+        return (x + dx, y + dy)
+
+    annotations = curate_view_dimensions(
+        adapter,
+        side,
+        keep=_shift(SIDE_KEEP, dx, dy),
+        view_label="side",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    if not auto_center_marks(adapter, side, holes=True, size=0.0025):
+        raise RuntimeError("failed to add the ASME center mark to the eye")
+    add_view_centerline(
+        adapter,
+        side,
+        face_xy=spt(*CENTERLINE_PICK),
+        label="adjuster stud turning axis",
+    )
+    add_attached_note(
+        adapter,
+        side,
+        text=THREAD_CALLOUT,
+        entity_xy=spt(*THREAD_PICK),
+        note_xy=spt(*THREAD_NOTE_XY),
+        label="adjuster stud thread callout",
+        entity_type="SILHOUETTE",
+    )
+    add_native_hole_callout(
+        adapter,
+        side,
+        edge_xy=spt(*EYE_RIM_PICK),
+        callout_xy=spt(*EYE_CALLOUT_XY),
+        label="adjuster stud eye",
+        process=drill_process(EYE_SPEC),
+    )
+
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    # The shaded isometric shows the #0-80 the callout names; imported before
+    # finalize's note cleanup, so its label is counted rather than first
+    # appearing at the native save (draw_pn_pen_hanger).
+    thread_seeds, thread_instances = import_cosmetic_threads(adapter, iso)
+    if (thread_seeds, thread_instances) != (1, 1):
+        raise RuntimeError(
+            "adjuster-stud isometric cosmetic threads: "
+            f"seeds/instances={(thread_seeds, thread_instances)!r}, expected (1, 1)"
+        )
+
+    return await finalize_drawing(
+        adapter,
+        OUTPUTS,
+        pdf_title="Pen Adjuster Stud Manufacturing Drawing",
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("part", choices=[PART_STEM])
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    _parse_args()
+    _telemetry.set_service("drawing-export")
+    sys.exit(run_build(build))
