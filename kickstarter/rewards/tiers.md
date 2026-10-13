@@ -34,8 +34,8 @@
 
 ## Tier 6 is the one to argue about
 
-The cone gears are cut 20-at-a-time on a dividing head from a self-made form
-cutter (`cad/docs/machining-dfm.md`). Cutting a few spares during that same session
+The cone gears are cut 20-at-a-time on a dividing head with stock form cutters,
+plus a self-made cutter for the six-tooth gear (`cad/docs/machining-dfm.md`). Cutting a few spares during that same session
 is genuinely marginal work — *if* the setup succeeds and *if* the run happens
 before the fulfilment deadline. Both are real ifs.
 

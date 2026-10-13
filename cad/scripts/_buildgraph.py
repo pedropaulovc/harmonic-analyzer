@@ -2318,14 +2318,19 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "vn_boss_hook_spec",
         "build_dt_drive_train_assembly",
         "build_fr_harmonic_base",
-        "build_mg_wheel_bar",
         "dt_cone_pivot_post_spec",
         "dt_cone_swing_platform_geometry",
         "dt_cone_swing_platform_spec",
         "dt_cone_tip_block_spec",
+        # Drilled-hole and angular rows size the collar-to-bank air stack.
+        "dt_tip_collar_air",
+        # Angular row sets the through tap's angle in the screw landing gate.
+        "vn_cone_tip_collar_spec",
         "crank_boss_rim",
         "dt_crank_hub_geometry",
         "dt_crank_pinion_spec",
+        # Drilled-hole row sets the bore band and worst journal-pass clearance.
+        "dt_crank_seat_washer_spec",
         "dt_crankshaft_spec",
         "error_budget",
         "export_features",
@@ -2341,6 +2346,10 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "vn_knife_mount_dowel_spec",
         "pd_transgear_disc_hub_spec",
         "pd_transgear_removable_notes",
+        # Edge-break row sizes the knob tip and the rack window/lateral stacks.
+        "paper_drive_geom",
+        "paper_drive_rack_travel",
+        "pd_transgear_knob_shaft_spec",
     }
 )
 

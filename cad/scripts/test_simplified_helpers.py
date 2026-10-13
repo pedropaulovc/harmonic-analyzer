@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
 
 import _assembly
+import _saved_display_data
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -307,32 +309,73 @@ def test_a_childs_changed_simplified_geometry_forces_the_assembly_save() -> None
     assert (_sync(sub, paths), _sync(top, paths)) == (0, 0)
 
 
+@pytest.fixture(autouse=True)
+def _isolated_assembly_outputs(tmp_path, monkeypatch):
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+
+
 class FakeAssemblyFile:
-    """A saved ``.SLDASM``: whether each configuration's saved data is stale.
+    """Saved rebuild state and actual parser-readable display bytes."""
 
-    paper-drive (c85a21ec4) reconciled "was 1", read NeedsRebuild2=0 in memory
-    after its EditRebuild3 + Save3, and still opened with NeedsRebuild2=1 for
-    verify:soundness, while the same reconcile held on every build before
-    ``Default Simplified`` existed. The double models that: one stale saved
-    configuration makes the document open dirty, in memory NeedsRebuild2
-    reads only the active configuration, and a plain Save3 writes only the
-    active configuration's data plus the rebuild-save-marked ones'.
-    """
-
-    def __init__(self, stale: dict[str, bool], *, stuck: tuple[str, ...] = ()) -> None:
+    def __init__(
+        self,
+        path,
+        native,
+        stale: dict[str, bool],
+        *,
+        flag: int = 1,
+        saved_flag: int | None = None,
+        stuck: tuple[str, ...] = (),
+        save_result=(True, 0, 0),
+        display_mark_readback=True,
+        active: str = "Default",
+    ) -> None:
+        self.path = path
+        self.native = native
         self.stale = dict(stale)
-        self.stuck = set(stuck)  # saved stale whatever a rebuild does
+        self.stuck = set(stuck)
+        self.save_result = save_result
+        self.saved_flag = saved_flag
+        self.display_marks = {name: False for name in stale}
+        self.display_mark_readback = display_mark_readback
+        self.active = active
+        self.proof = path.parent / ".pd-paper-drive.massprops.sha"
+        self.proof.write_text("old-proof\n", encoding="utf-8")
+        self.events = []
+        self.opens = []
+        path.write_bytes(native(flag))
+
+
+class FakeSavedConfiguration(FakeConfiguration):
+    def __init__(self, name, model):
+        super().__init__(name)
+        self.model = model
+        self.display_mark = model.file.display_marks[name]
+
+    @property
+    def LargeDesignReviewMark(self):
+        return self.display_mark
+
+    @LargeDesignReviewMark.setter
+    def LargeDesignReviewMark(self, value):
+        self.model.operations.append(("display_mark", self.Name, value))
+        self.display_mark = self.model.file.display_mark_readback
 
 
 class FakeOpenAssembly:
     def __init__(self, file: FakeAssemblyFile) -> None:
         self.file = file
-        self.configurations = {name: FakeConfiguration(name) for name in file.stale}
+        self.configurations = {
+            name: FakeSavedConfiguration(name, self) for name in file.stale
+        }
         for name, configuration in self.configurations.items():
             configuration.NeedsRebuild = file.stale[name]
             configuration.AddRebuildSaveMark = False
-        self.configurations["Default"].NeedsRebuild = any(file.stale.values())
-        self.ConfigurationManager = SimpleNamespace(ActiveConfiguration=self.configurations["Default"])
+        self.configurations[file.active].NeedsRebuild = any(file.stale.values())
+        self.ConfigurationManager = SimpleNamespace(
+            ActiveConfiguration=self.configurations[file.active]
+        )
+        self.operations = []
         self.Extension = self
 
     @property
@@ -346,26 +389,48 @@ class FakeOpenAssembly:
         return self.configurations[name]
 
     def ShowConfiguration2(self, name: str) -> bool:
+        self.operations.append(("switch", name))
         if self.ConfigurationManager.ActiveConfiguration.Name == name:
             return False  # SolidWorks refuses the already-active configuration
         self.ConfigurationManager.ActiveConfiguration = self.configurations[name]
         return True
 
     def EditRebuild3(self) -> bool:
+        self.operations.append(("rebuild", self.ConfigurationManager.ActiveConfiguration.Name))
         self.ConfigurationManager.ActiveConfiguration.NeedsRebuild = False
         return True
 
-    def Save3(self, _options: int, _errors: int, _warnings: int) -> bool:
+    def Save3(self, options: int, errors: int, warnings: int):
+        assert (options, errors, warnings) == (1, 0, 0)
         active = self.ConfigurationManager.ActiveConfiguration
+        marked = tuple(
+            name for name, configuration in self.configurations.items()
+            if configuration.AddRebuildSaveMark
+        )
+        self.file.events.append(("save", active.Name, marked, tuple(self.operations)))
+        result = self.file.save_result
+        if result != (True, 0, 0):
+            return result
         for name, configuration in self.configurations.items():
             if configuration is active or configuration.AddRebuildSaveMark:
                 self.file.stale[name] = configuration.NeedsRebuild or name in self.file.stuck
-        return True
+        self.file.display_marks = {
+            name: configuration.LargeDesignReviewMark
+            for name, configuration in self.configurations.items()
+        }
+        complete = len(self.configurations) == 1 or all(
+            value is True for value in self.file.display_marks.values()
+        )
+        flag = self.file.saved_flag if self.file.saved_flag is not None else int(complete)
+        self.file.path.write_bytes(self.file.native(flag))
+        return result
 
 
 def _reconcile(file: FakeAssemblyFile) -> SimpleNamespace:
     async def open_model(_path: str) -> bool:
         adapter.currentModel = FakeOpenAssembly(file)
+        file.opens.append(adapter.currentModel)
+        file.events.append(("open", adapter.currentModel.NeedsRebuild2))
         return True
 
     adapter = SimpleNamespace(
@@ -374,25 +439,180 @@ def _reconcile(file: FakeAssemblyFile) -> SimpleNamespace:
         open_model=open_model,
         _attempt=lambda fn, default=None: fn(),
     )
-    asyncio.run(_assembly.reconcile_saved_rebuild_state(adapter, "pd-paper-drive", "x.SLDASM"))
+    asyncio.run(
+        _assembly.reconcile_saved_rebuild_state(adapter, "pd-paper-drive", file.path)
+    )
     return adapter
 
 
-def test_the_reconciled_assembly_reopens_clean_in_every_configuration() -> None:
-    file = FakeAssemblyFile({"Default": True, SIMPLIFIED_VIEW_CONFIGURATION: True})
+def test_the_reconciled_assembly_reopens_clean_in_every_configuration(
+    tmp_path, saved_native_bytes
+) -> None:
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes,
+        {"Default": True, SIMPLIFIED_VIEW_CONFIGURATION: True},
+    )
     adapter = _reconcile(file)
     assert file.stale == {"Default": False, SIMPLIFIED_VIEW_CONFIGURATION: False}
     assert FakeOpenAssembly(file).NeedsRebuild2 == 0  # verify:soundness's open
     assert adapter.currentModel.ConfigurationManager.ActiveConfiguration.Name == "Default"
+    _saved_display_data.assert_saved_display_data(file.path)
+    assert [event[0] for event in file.events] == ["open", "save", "open"]
 
 
-def test_a_reconciled_assembly_that_still_opens_dirty_is_refused() -> None:
+def test_a_reconciled_assembly_that_still_opens_dirty_is_refused(
+    tmp_path, saved_native_bytes
+) -> None:
     file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes,
         {"Default": True, SIMPLIFIED_VIEW_CONFIGURATION: True},
         stuck=(SIMPLIFIED_VIEW_CONFIGURATION,),
     )
     with pytest.raises(RuntimeError, match="Default Simplified"):
         _reconcile(file)
+
+
+@pytest.mark.parametrize("active", ["Default", SIMPLIFIED_VIEW_CONFIGURATION])
+def test_dirty_reconcile_marks_every_configuration_and_saves_once(
+    tmp_path, saved_native_bytes, active
+) -> None:
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes,
+        {"Default": True, SIMPLIFIED_VIEW_CONFIGURATION: True, "Exploded": True},
+        active=active,
+    )
+    _reconcile(file)
+    assert [event[0] for event in file.events] == ["open", "save", "open"]
+    save = file.events[1]
+    assert save[1] == active
+    assert set(save[2]) == set(file.stale)
+    order = [name for name in file.stale if name != active] + [active]
+    assert save[3] == tuple(
+        operation for name in order
+        for operation in [("switch", name), ("rebuild", name)]
+    ) + tuple(("display_mark", name, True) for name in file.stale)
+    assert all(value is True for value in file.display_marks.values())
+    assert file.opens[-1].operations == []
+    assert file.opens[-1].NeedsRebuild2 == 0
+    assert file.opens[-1].ConfigurationManager.ActiveConfiguration.Name == active
+    _saved_display_data.assert_saved_display_data(file.path)
+    assert not file.proof.exists()
+
+
+@pytest.mark.parametrize("dirty", [False, True])
+def test_incomplete_preflight_never_opens_marks_or_repairs(
+    tmp_path, saved_native_bytes, dirty
+) -> None:
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes,
+        {"Default": dirty, SIMPLIFIED_VIEW_CONFIGURATION: dirty}, flag=0,
+    )
+    original = file.path.read_bytes()
+    with pytest.raises(RuntimeError, match="display"):
+        _reconcile(file)
+    assert file.events == []
+    assert file.opens == []
+    assert not any(file.display_marks.values())
+    assert file.path.read_bytes() == original
+    assert file.proof.read_text(encoding="utf-8") == "old-proof\n"
+
+
+def test_clean_complete_saved_assembly_is_byte_preserving_no_save(
+    tmp_path, saved_native_bytes
+) -> None:
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes,
+        {"Default": False, SIMPLIFIED_VIEW_CONFIGURATION: False},
+    )
+    original = file.path.read_bytes()
+    _reconcile(file)
+    assert file.path.read_bytes() == original
+    assert file.events == [("open", 0)]
+    assert file.opens[0].operations == []
+    assert file.proof.read_text(encoding="utf-8") == "old-proof\n"
+
+
+@pytest.mark.parametrize("result", [(False, 0, 0), (True, 8, 0), True])
+def test_native_save_failure_stops_reconcile_before_fresh_success_proof(
+    tmp_path, saved_native_bytes, result
+) -> None:
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes,
+        {"Default": True, SIMPLIFIED_VIEW_CONFIGURATION: True},
+        save_result=result,
+    )
+    original = file.path.read_bytes()
+    with pytest.raises(RuntimeError, match="Save3"):
+        _reconcile(file)
+    assert file.path.read_bytes() == original
+    assert [event[0] for event in file.events] == ["open", "save"]
+    assert not file.proof.exists()
+
+
+@pytest.mark.parametrize("later_stream", [False, True])
+def test_unsupported_data_after_zero_never_opens_or_repairs(
+    tmp_path, saved_native_bytes, later_stream
+) -> None:
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes, {"Default": True},
+    )
+    data = (
+        saved_native_bytes(0) + saved_native_bytes(2) if later_stream
+        else saved_native_bytes(0, 2)
+    )
+    file.path.write_bytes(data)
+    with pytest.raises(RuntimeError) as failure:
+        _reconcile(file)
+    assert type(failure.value) is RuntimeError
+    assert file.events == []
+    assert file.path.read_bytes() == data
+
+
+@pytest.mark.parametrize("flag", [0, 2])
+def test_reconcile_failed_saved_output_has_no_second_save_or_third_open(
+    tmp_path, saved_native_bytes, flag
+) -> None:
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes,
+        {"Default": True, SIMPLIFIED_VIEW_CONFIGURATION: True}, saved_flag=flag,
+    )
+    with pytest.raises(RuntimeError, match="display"):
+        _reconcile(file)
+    assert [event[0] for event in file.events] == ["open", "save", "open"]
+    assert all(value is True for value in file.display_marks.values())
+    assert file.opens[-1].NeedsRebuild2 == 0
+    assert file.opens[-1].operations == []
+    assert not file.proof.exists()
+
+
+@pytest.mark.parametrize("data", [b"", b"not a native assembly"])
+def test_malformed_reconcile_preflight_refuses_before_open(tmp_path, saved_native_bytes, data):
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes, {"Default": True},
+    )
+    file.path.write_bytes(data)
+    with pytest.raises(RuntimeError):
+        _reconcile(file)
+    assert file.events == []
+    assert file.path.read_bytes() == data
+    assert file.proof.read_text(encoding="utf-8") == "old-proof\n"
+
+
+@pytest.mark.parametrize("readback", [False, 1, "True", lambda: True])
+def test_reconcile_display_mark_readback_failure_refuses_native_save(
+    tmp_path, saved_native_bytes, readback
+):
+    file = FakeAssemblyFile(
+        tmp_path / "x.SLDASM", saved_native_bytes,
+        {"Default": True, SIMPLIFIED_VIEW_CONFIGURATION: True},
+        display_mark_readback=readback,
+    )
+    original = file.path.read_bytes()
+    with pytest.raises(RuntimeError, match="mark"):
+        _reconcile(file)
+    assert [event[0] for event in file.events] == ["open"]
+    assert file.path.read_bytes() == original
+    assert not file.proof.exists()
 
 
 def _apply(view: FakeView, role: ViewRole = ViewRole.PLAIN) -> tuple[str, FakeDrawing]:
@@ -867,3 +1087,368 @@ def test_a_simplified_child_of_an_unnamed_configuration_is_an_orphan() -> None:
         _simplified_part.assert_simplified_configurations(
             adapter, "dt-cone-gear", TEETH, ["T006", "T120"]
         )
+
+
+LOCAL_TEETH = {
+    parent: (f"ToothGapCut{parent}", f"ToothGapPattern{parent}")
+    for parent in ("T006", "T120")
+}
+
+
+class FakeProperties:
+    def __init__(self, values=None):
+        self.values = dict(values or {})
+
+    def GetNames(self):
+        return list(self.values)
+
+    def Get6(self, name, _cached):
+        return (0, self.values[name][1], "", False, False)
+
+    def GetType2(self, name):
+        return self.values[name][0]
+
+    def Add3(self, name, kind, value, _options):
+        self.values[name] = (kind, value)
+        return 0
+
+
+class FakeLocalToothPart(FakePart):
+    """Two disjoint native triples plus the blank; no global active tooth set."""
+
+    def __init__(self):
+        super().__init__(("Default", *LOCAL_TEETH), active="T120")
+        self.features = {}
+        for parent, names in LOCAL_TEETH.items():
+            for name in (f"ToothGapProfile{parent}", *names):
+                self.features[name] = FakeFeature(
+                    name, self, set(self.configurations) - {parent}
+                )
+        self.properties = {}
+        for name, configuration in self.configurations.items():
+            configuration.NeedsRebuild = False
+            configuration.BOMPartNoSource = CONFIGURATION
+            configuration.Description = f"Detailed {name}"
+            configuration.UseDescriptionInBOM = True
+            self.properties[name] = FakeProperties({"Number": (30, f"part-{name}")})
+        self.Extension.CustomPropertyManager = self._properties
+        self.mutations = []
+        self.refuse = None
+
+    def _properties(self, name):
+        return self.properties.setdefault(name, FakeProperties())
+
+    def _add(self, *args):
+        self.mutations.append(("add", args[0]))
+        configuration = super()._add(*args)
+        configuration.NeedsRebuild = False
+        return configuration
+
+    def ShowConfiguration2(self, name):
+        self.mutations.append(("activate", name))
+        return False if self.refuse == "activate" else super().ShowConfiguration2(name)
+
+    def ForceRebuild3(self, _top_only):
+        self.mutations.append(("rebuild", self.ConfigurationManager.ActiveConfiguration.Name))
+        return self.refuse != "rebuild"
+
+    def GetTitle(self):
+        return "local-teeth.SLDPRT"
+
+    def detailed_state(self):
+        return (
+            self.states("Default", *LOCAL_TEETH),
+            {
+                name: (
+                    _simplified_part._bom_identity(self.configurations[name]),
+                    self.properties[name].values.copy(),
+                )
+                for name in ("Default", *LOCAL_TEETH)
+            },
+        )
+
+
+def test_configuration_local_targets_preserve_all_detailed_and_foreign_features():
+    part = FakeLocalToothPart()
+    before = part.detailed_state()
+    adapter = _part_adapter(part)
+    children = _simplified_part.add_simplified_configurations(
+        adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+    )
+    assert children == [simplified_name(parent) for parent in LOCAL_TEETH]
+    assert part.detailed_state() == before
+    assert part.ConfigurationManager.ActiveConfiguration.Name == "T120"
+    for parent, names in LOCAL_TEETH.items():
+        child = simplified_name(parent)
+        assert part.configurations[child].Comment == simplified_comment(", ".join(names))
+        assert part.properties[child].values == part.properties[parent].values
+        for name, feature in part.features.items():
+            assert (child in feature.suppressed) == (
+                True if name in names else parent in feature.suppressed
+            )
+    _simplified_part.assert_simplified_configurations(
+        adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+    )
+
+
+@pytest.mark.parametrize(
+    "mapping",
+    [
+        {"T006": LOCAL_TEETH["T006"]},
+        {**LOCAL_TEETH, "Default": TEETH},
+        {**LOCAL_TEETH, "T006": ()},
+        {**LOCAL_TEETH, "T006": ("",)},
+        {**LOCAL_TEETH, "T006": (" ",)},
+        {**LOCAL_TEETH, "T006": ("duplicate", "duplicate")},
+        {**LOCAL_TEETH, "T006": "ToothGapCutT006"},
+    ],
+)
+@pytest.mark.parametrize("operation", ["add", "assert", "saved"])
+def test_invalid_local_mapping_is_refused_before_any_native_mutation(mapping, operation):
+    part = FakeLocalToothPart()
+    before = part.detailed_state()
+    adapter = _part_adapter(part)
+    with pytest.raises(ValueError):
+        if operation == "saved":
+            asyncio.run(
+                _simplified_part.derive_simplified_on_saved_part(
+                    adapter, "local-teeth", mapping, "fixture.SLDPRT", list(LOCAL_TEETH)
+                )
+            )
+        else:
+            function = (
+                _simplified_part.add_simplified_configurations
+                if operation == "add"
+                else _simplified_part.assert_simplified_configurations
+            )
+            function(adapter, "local-teeth", mapping, list(LOCAL_TEETH))
+    assert not part.mutations
+    assert part.GetConfigurationNames() == ["Default", *LOCAL_TEETH]
+    assert part.detailed_state() == before
+    assert adapter.currentModel is part
+
+
+@pytest.mark.parametrize("defect", ["missing", "suppressed", "bad_suppression_answer"])
+def test_local_target_integrity_fails_before_deriving(defect):
+    part = FakeLocalToothPart()
+    name = LOCAL_TEETH["T006"][0]
+    if defect == "missing":
+        del part.features[name]
+    elif defect == "suppressed":
+        part.features[name].suppressed.add("T006")
+    else:
+        part.features[name].IsSuppressed2 = lambda *_args: ()
+    with pytest.raises(RuntimeError):
+        _simplified_part.add_simplified_configurations(
+            _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+        )
+    assert not part.mutations
+
+
+@pytest.mark.parametrize(
+    "defect", ["child_target", "parent_target", "foreign_child", "comment", "bom", "parent", "orphan"]
+)
+def test_local_full_readback_refuses_corrupted_configuration(defect):
+    part = FakeLocalToothPart()
+    adapter = _part_adapter(part)
+    _simplified_part.add_simplified_configurations(
+        adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+    )
+    child = part.configurations["T006 Simplified"]
+    if defect == "child_target":
+        part.features[LOCAL_TEETH["T006"][0]].suppressed.remove(child.Name)
+    elif defect == "parent_target":
+        part.features[LOCAL_TEETH["T006"][0]].suppressed.add("T006")
+    elif defect == "foreign_child":
+        part.features[LOCAL_TEETH["T120"][0]].suppressed.remove(child.Name)
+    elif defect == "comment":
+        child.Comment = simplified_comment(", ".join(LOCAL_TEETH["T120"]))
+    elif defect == "bom":
+        child.BOMPartNoSource = DOCUMENT
+    elif defect == "parent":
+        child.parent = part.configurations["T120"]
+    else:
+        part._add("Default Simplified", "", "", 0, "Default", "", False)
+    with pytest.raises(RuntimeError, match="readback failed"):
+        _simplified_part.assert_simplified_configurations(
+            adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+        )
+
+
+@pytest.mark.parametrize("refuse", ["activate", "rebuild"])
+def test_local_derivation_retains_activation_and_rebuild_gates(refuse):
+    part = FakeLocalToothPart()
+    part.refuse = refuse
+    with pytest.raises(RuntimeError, match="simplified configurations failed"):
+        _simplified_part.add_simplified_configurations(
+            _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+        )
+
+
+def test_local_derivation_retains_hard_fault_gate(monkeypatch):
+    part = FakeLocalToothPart()
+    monkeypatch.setattr(_simplified_part, "_hard_faults", lambda *_args: ["native fault"])
+    with pytest.raises(RuntimeError, match="rebuilt with faults"):
+        _simplified_part.add_simplified_configurations(
+            _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+        )
+
+
+def _saved_local_adapter(*, save_ok=True):
+    """Distinct authoring, reopened, persisted and readback document objects."""
+    authoring = FakeLocalToothPart()
+    disk = deepcopy(authoring)
+    events = []
+    adapter = _part_adapter(authoring)
+
+    def close(title):
+        events.append(("close", title))
+
+    def save(_options, _errors, _warnings):
+        nonlocal disk
+        events.append(("save",))
+        if save_ok:
+            disk = deepcopy(adapter.currentModel)
+        return (save_ok, 0 if save_ok else 1, 0)
+
+    async def open_model(path):
+        events.append(("open", path))
+        adapter.currentModel = deepcopy(disk)
+        adapter.currentModel.Save3 = save
+        return SimpleNamespace(is_success=True, data=None)
+
+    adapter.swApp = SimpleNamespace(CloseDoc=close)
+    adapter.open_model = open_model
+    return adapter, authoring, events
+
+
+def test_local_saved_reopen_derivation_persists_and_reads_every_parent_and_child():
+    adapter, authoring, events = _saved_local_adapter()
+    before = authoring.detailed_state()
+    asyncio.run(
+        _simplified_part.derive_simplified_on_saved_part(
+            adapter, "local-teeth", LOCAL_TEETH, "fixture.SLDPRT", list(LOCAL_TEETH)
+        )
+    )
+    assert adapter.currentModel is None
+    assert authoring.GetConfigurationNames() == ["Default", *LOCAL_TEETH]
+    assert not authoring.mutations
+    assert [event[0] for event in events] == ["close", "open", "save", "close"]
+    asyncio.run(adapter.open_model("fixture.SLDPRT"))
+    reopened = adapter.currentModel
+    assert reopened is not authoring
+    assert reopened.detailed_state() == before
+    assert reopened.ConfigurationManager.ActiveConfiguration.Name == "T120"
+    assert all(
+        configuration.AddRebuildSaveMark for configuration in reopened.configurations.values()
+    )
+    _simplified_part.assert_simplified_configurations(
+        adapter, "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+    )
+
+
+def test_local_saved_derivation_refuses_failed_save():
+    adapter, _authoring, events = _saved_local_adapter(save_ok=False)
+    with pytest.raises(RuntimeError, match="Save3 failed"):
+        asyncio.run(
+            _simplified_part.derive_simplified_on_saved_part(
+                adapter, "local-teeth", LOCAL_TEETH, "fixture.SLDPRT", list(LOCAL_TEETH)
+            )
+        )
+    assert [event[0] for event in events] == ["close", "open", "save"]
+
+
+def test_local_derivation_refuses_drift_in_an_unselected_detailed_parent(monkeypatch):
+    part = FakeLocalToothPart()
+    original_add = part._add
+
+    def add_with_drift(*args):
+        child = original_add(*args)
+        part.features[LOCAL_TEETH["T006"][0]].suppressed.discard("Default")
+        return child
+
+    monkeypatch.setattr(part.ConfigurationManager, "AddConfiguration2", add_with_drift)
+    with pytest.raises(RuntimeError, match="detailed configuration suppression changed"):
+        _simplified_part.add_simplified_configurations(
+            _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+        )
+
+
+@pytest.mark.parametrize("returns_success", [False, True])
+def test_local_child_suppression_must_succeed_and_read_back(monkeypatch, returns_success):
+    part = FakeLocalToothPart()
+    monkeypatch.setattr(
+        part.features[LOCAL_TEETH["T006"][0]],
+        "SetSuppression2",
+        lambda *_args: returns_success,
+    )
+    with pytest.raises(RuntimeError, match="SetSuppression2 refused|readback failed"):
+        _simplified_part.add_simplified_configurations(
+            _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+        )
+
+
+def test_local_telemetry_names_the_actual_targets_for_each_parent(monkeypatch):
+    part = FakeLocalToothPart()
+    annotations = []
+    monkeypatch.setattr(
+        _simplified_part._telemetry, "annotate", lambda **fields: annotations.append(fields)
+    )
+    _simplified_part.add_simplified_configurations(
+        _part_adapter(part), "local-teeth", LOCAL_TEETH, list(LOCAL_TEETH)
+    )
+    assert len(annotations) == 2
+    assert all(
+        fields["feature_names_by_parent"]
+        == {parent: list(names) for parent, names in LOCAL_TEETH.items()}
+        for fields in annotations
+    )
+    assert all(fields["features"] == 4 for fields in annotations)
+
+
+def test_local_saved_derivation_refuses_failed_reopen():
+    adapter, authoring, events = _saved_local_adapter()
+
+    async def failed_open(_path):
+        return SimpleNamespace(is_success=False, error="cannot reopen saved part")
+
+    adapter.open_model = failed_open
+    with pytest.raises(RuntimeError, match="cannot reopen saved part"):
+        asyncio.run(
+            _simplified_part.derive_simplified_on_saved_part(
+                adapter, "local-teeth", LOCAL_TEETH, "fixture.SLDPRT", list(LOCAL_TEETH)
+            )
+        )
+    assert not authoring.mutations
+    assert [event[0] for event in events] == ["close"]
+
+
+@pytest.mark.parametrize("defect", ["missing", "extra", "empty", "duplicate"])
+def test_direct_save_rejects_invalid_mapping_before_save_or_export(monkeypatch, defect):
+    part = FakeLocalToothPart()
+    adapter = _part_adapter(part)
+    # This API selects all detailed configurations, including the blank.
+    mapping = {**LOCAL_TEETH, "Default": TEETH}
+    if defect == "missing":
+        del mapping["T006"]
+    elif defect == "extra":
+        mapping["Unknown"] = TEETH
+    elif defect == "empty":
+        mapping["T120"] = ()
+    else:
+        mapping["T120"] = ("duplicate", "duplicate")
+    calls = []
+
+    async def save_or_export(*args, **kwargs):
+        calls.append((args, kwargs))
+        raise AssertionError("invalid mappings must never save or export")
+
+    monkeypatch.setattr(_simplified_part, "save_part_and_images", save_or_export)
+    before = part.detailed_state()
+    with pytest.raises(ValueError):
+        asyncio.run(_simplified_part.save_simplified_part(adapter, "local-teeth", mapping))
+    assert not calls
+    assert not part.mutations
+    assert adapter.currentModel is part
+    assert part.GetConfigurationNames() == ["Default", *LOCAL_TEETH]
+    assert part.detailed_state() == before

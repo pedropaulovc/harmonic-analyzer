@@ -1,4 +1,5 @@
 pd-transgear-feed-pinion:
+  title: Feed Pinion Sleeve
   number: MHA-PD-010
   material: SAE 1018 CF bar, ASTM A108-24
   material_specification: SAE 1018 CF bar, ASTM A108-24
@@ -6,4 +7,9 @@ pd-transgear-feed-pinion:
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
-  process: "turned; gear cutting (hob/shaper); flat milled"
+  # The independent 12T 32DP feed uses the finite lower-count #8/12T stock master,
+  # not the reducer's 48DP cutter and not a generated positive profile shift.
+  # Precise/Penn 10-289-328: 32DP PA20 #8, body OD 57.15 mm, arbor bore 25.4 mm.
+  # https://www.penntoolco.com/precise-20-involute-h-s-s-gear-cutter-8-diametral-pitch-32-cutter-diameter-2-1-4-hole-size-1/
+  # Ground depth/form accuracy are unpublished; 2.25-module depth is Main's premise.
+  process: "turned from bar; integral 12T 32DP PA20 teeth cut with stock #8 form cutter (12T master), with radial setting, tooth-span and all-space angular-index acceptance from the part specification; flat milled"

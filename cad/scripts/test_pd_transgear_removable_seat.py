@@ -14,7 +14,26 @@ import vn_crank_seat_drive_pin_spec as crank_pin
 import dt_crankshaft_spec as crank
 import pd_transgear_drive_collar_spec as collar
 import vn_transgear_knob_drive_pin_spec as knob_pin
+import vn_transgear_latch_pin_spec as dowel_spec
 import pd_transgear_removable_spec as spec
+
+
+@pytest.mark.parametrize(("configuration", "teeth"), spec.CONFIGS)
+def test_registered_configuration_resolves_its_teeth(
+    configuration: str, teeth: int
+) -> None:
+    assert spec.configuration_teeth(configuration) == teeth
+
+
+@pytest.mark.parametrize("configuration", ["", "t12", "unregistered"])
+def test_unregistered_mounted_selection_is_refused(configuration: str) -> None:
+    with pytest.raises(ValueError, match="unknown removable sprocket configuration"):
+        spec.configuration_teeth(configuration)
+
+
+def test_mounted_selections_resolve_through_the_part_configurations() -> None:
+    assert spec.CRANK_TEETH == spec.configuration_teeth(spec.CRANK_CONFIG)
+    assert spec.KNOB_TEETH == spec.configuration_teeth(spec.KNOB_CONFIG)
 
 
 def test_seat_spigot_rim_is_the_recorded_shortfall() -> None:
@@ -75,18 +94,18 @@ def _printed_band(places: int) -> float:
 
 
 def _wheel_float(hole_dia: float) -> float:
-    """The T12's worst offset from the shaft axis riding on its two pins:
+    """The wheel's worst offset from the shaft axis riding on its two pins:
     the holes drilled to their largest over the smallest stock dowel, plus
     a pin centre and its hole centre each at their location limit, opposite
     ways along the pins' line."""
     hole_max = hole_dia + float(_config.title_block("drilled_hole")["plus_mm"])
-    dowel_min = crank_pin.DIA + crank_pin.DIA_BAND_IN[0] * crank_pin.MM_PER_IN
+    dowel_min = crank_pin.DIA + dowel_spec.DIA_BAND_IN[0] * dowel_spec.MM_PER_IN
     return (hole_max - dowel_min) / 2.0 + 2.0 * spec.DRIVE_PIN_OFFSET_TOL
 
 
-def test_chain_on_the_floated_t12_keeps_its_radial_air() -> None:
-    """Codex P2 on a1ee741dc: the T12 rides its seat on two pins in drilled
-    slip holes, so a bought chain following it closes on the shaft-fixed
+def test_chain_on_the_floated_crank_wheel_keeps_its_radial_air() -> None:
+    """Codex P2 on a1ee741dc: the crank wheel rides two pins in drilled slip
+    holes, so a bought chain following it closes on the shaft-fixed
     spigot and on the hub relief.  Judge the corner the prints allow, every
     diameter at its largest printed size and the hub at the far side of its
     bore clearance; the gate must report that corner's air, and it must stay
@@ -108,19 +127,27 @@ def test_chain_on_the_floated_t12_keeps_its_radial_air() -> None:
         (4.8, bdt.CHAIN_SPIGOT_RADIAL_AIR_CAD, bdt.CHAIN_RELIEF_RADIAL_AIR_CAD),
     ):
         # The gate's air is the floated corner's, not the centred wheel's.
-        corner = _plate_edge_reach(12, height, wheel) - spigot_max / 2.0
+        corner = _plate_edge_reach(spec.CRANK_TEETH, height, wheel) - spigot_max / 2.0
         assert spigot_air == pytest.approx(corner, abs=1e-4)
         assert corner >= bdt.CHAIN_RADIAL_AIR_WORST_MIN > 0.0
-        corner = _plate_edge_reach(12, height, wheel + hub_float) - relief_max / 2.0
+        corner = (
+            _plate_edge_reach(spec.CRANK_TEETH, height, wheel + hub_float)
+            - relief_max / 2.0
+        )
         assert relief_air == pytest.approx(corner, abs=1e-4)
         assert corner >= bdt.CHAIN_RADIAL_AIR_WORST_MIN
-    assert bdt.CHAIN_SPIGOT_RADIAL_AIR_ANSI == pytest.approx(0.020, abs=1e-3)
-    # One drill size up (Ø2.6 holes) floats a real plate onto the spigot: the
-    # corner closes past contact and the gate refuses it.
-    loose = _wheel_float(2.6)
-    corner = _plate_edge_reach(12, spec.ANSI_PLATE_HEIGHT, loose) - spigot_max / 2.0
-    assert corner < 0.0
-    with pytest.raises(AssertionError, match="radial air -0.030"):
+    # Negative control: additional pin clearance floats the bought plate past
+    # the permitted radial-air floor, whatever crank configuration is selected.
+    loose = (
+        spec.chain_plate_inner_radius(spec.CRANK_TEETH, spec.ANSI_PLATE_HEIGHT)
+        - spigot_max / 2.0 - bdt.CHAIN_RADIAL_AIR_WORST_MIN + 0.02
+    )
+    corner = (
+        _plate_edge_reach(spec.CRANK_TEETH, spec.ANSI_PLATE_HEIGHT, loose)
+        - spigot_max / 2.0
+    )
+    assert corner < bdt.CHAIN_RADIAL_AIR_WORST_MIN
+    with pytest.raises(AssertionError, match="radial air"):
         bdt.chain_radial_air("spigot", spec.ANSI_PLATE_HEIGHT, spigot_max, loose)
 
 
@@ -179,14 +206,16 @@ def test_knob_pin_tip_stays_inside_the_thinnest_wheel_under_the_thumbnut() -> No
 
 
 def test_knob_pin_pressed_end_stays_inside_the_collar() -> None:
-    # Nominal: 4.0 - (4.7625 - 2.4).  Worst: the longest 3/16 dowel set
-    # lowest in the shortest .XXX collar: 3.87 - (4.7625 + 0.254 - 2.30).
-    assert collar.PIN_REAR_INSET == pytest.approx(1.6375)
+    # Nominal: 6.2 - (4.7625 - 2.4) on the 6.2 set body.  Worst: the longest
+    # 3/16 dowel set lowest in the shortest fitted body:
+    # 3.87 - (4.7625 + 0.254 - 2.30).
+    assert collar.LENGTH == pytest.approx(6.2)
+    assert collar.PIN_REAR_INSET == pytest.approx(3.8375)
     assert collar.PIN_REAR_INSET_WORST == pytest.approx(1.1535)
     # Negative control: the crank's 1/4 dowel set to the same stop in the
     # same shortest collar would stand out of its rear face toward the 12T.
     assert collar.pin_rear_inset(
-        collar.LENGTH_MIN,
+        collar.LENGTH_FITTED_MIN,
         crank_pin.LENGTH + crank.DRIVE_PIN_LENGTH_GRADE,
         min(knob_pin.PROUD_RANGE),
     ) == pytest.approx(-0.434)

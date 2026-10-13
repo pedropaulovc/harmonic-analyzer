@@ -84,6 +84,52 @@ chain; a limit that cannot cite each step is a habit, not a requirement.
 7. **Verify on the assembled machine** with the trials in the last section; the model is a
    prediction until a trial confirms it.
 
+### Drive-train gear tips and standard mesh checks
+
+Gear tips take `fits.gear_tip` in `tolerances/gear_tip.yaml` (read through
+`_gear_fit_limits.gear_tip_band_mm`), not the routine title-block band: an oversize
+tip eats root air and an undersize tip shortens the path of contact.
+`standard` (+0.00/−0.10 mm) is the default. `contact_critical` (+0.00/−0.02 mm)
+is kept only where a mesh gate needs it: the 12T knob-shaft pinion, whose
+12T:120T reducer contact ratio at the nominal centre is 1.207 at Ø7.38 (floor
+1.2) and would fall to 1.191 at −0.05. The 32T alignment and 120T cylinder
+tips were contact-critical until the stack6 machinist review. At −0.10 every
+drive-train check still passes: alignment backlash, root air and interference,
+and cone root air, backlash and interference. Only the reported contact
+ratios move.
+
+Every drive-train mesh is accepted by one closed-form AGMA-style check
+(`standard_mesh_checks`, applied in `dt_mesh_checks` and
+`crank_mesh_stack.standard_check`) plus the native SolidWorks assembly
+interference/soundness gate. The check takes each part's printed tip and
+tooth-thickness corners (`manufacturing_corner_profiles()`) and the booked
+centre range, and reports the contact ratio, the involute interference margin,
+exact backlash and root clearance. The crossed 16T:64T is checked in the 64T
+normal section (virtual radius R/cos²β, thickness × cos β). Geometry comes only
+from the specs and config; no build, drawing or import reads study output.
+
+Cone bands are ordinary (user ruling 2026-10-10): OD +0/−0.05, tooth thickness
+±0.075, H7/g6 running bores, 0.05 tooth-cutting runout; T006 alone keeps its
+own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
+
+- **Cones T012–T120** (`cone_set_stack`, `dt_mesh_checks.cone_check`): the cone
+  centre is set at assembly. Pedestals snug-loose, radial shims at T012 and
+  T120, tighten the pedestals, swing T120 in onto its radial feeler, lock the
+  cone-lock-knob (MHA-VN-013); the pedestals are not loosened after the set
+  (pedestal float booked 0 by that order). Each cone's centre is the set point
+  plus its own RSS half-range. Gated: nominal contact ratio ≥ 1.0 at the mean
+  centre, positive backlash and no interference at the RSS corner. Reported
+  only (REF): the RSS contact ratio and the arithmetic worst-corner
+  interference. T012's worst-corner overlap (0.32 mm, REF) is a fit-up note on
+  the assembly sheet: if T012 binds after the set, back the swing off or stone
+  its tip.
+- **T006** (named exception): its DT6-FORM1 relief stands ≥ 0.010 mm clear of
+  every printed drum-tip path over the RSS centre range and keeps ≥ 0.02 mm
+  backlash; its contact ratio (≈ 0.77) is REF.
+- **Crank 16T:64T** (fixed bore, no adjustment): contact ratio ≥ 1.0 at the
+  nominal centre, positive backlash and no interference at the worst corner;
+  the open-corner contact ratio is REF.
+
 ### The chain, and where each error enters
 
 ```mermaid
@@ -474,7 +520,9 @@ The build scripts already assert clearance margins analytically (and raise on vi
 are the concrete realizations of the classes above, being lifted into `tolerances/`:
 
 - spring-eye threading margins into the lever hole / under the tab;
-- oblique cone↔drum mesh penetration guard (edge slack);
+- oblique cone↔drum mesh set point (edge slack, `cone_set_stack`). The engaged cone centre is
+  set at assembly on T120's radial feeler and locked with the cone-lock-knob (MHA-VN-013); the
+  swing stop screw (MHA-VN-015) only limits the disengaged swing;
 - rack–pinion backlash;
 - bushing clearance under the amplitude-bar foot.
 

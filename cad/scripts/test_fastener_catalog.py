@@ -15,7 +15,6 @@ _EXPECTED = {
     "vn-cone-pivot-screw": (("91829A560",), "MHA-VN-014", 1),
     "vn-cone-tip-adjuster": (("94025A164",), "MHA-VN-017", 1),
     "vn-cone-tip-block-screw": (("91251A108",), "MHA-VN-030", 1),
-    "vn-cone-tip-collar": (("9414T1",), "MHA-VN-016", 1),
     "vn-cone-tip-pinch-screw": (("91794A112",), "MHA-VN-018", 1),
     "vn-crank-seat-drive-pin": (("98381A434",), "MHA-VN-044", 2),
     "vn-fillister-screw": (("90114A511",), "MHA-VN-006", 19),
@@ -36,12 +35,12 @@ _EXPECTED = {
     "vn-pedestal-hold-down-screw": (("90280A197",), "MHA-VN-032", 6),
     "vn-pen-set-screw": (("99607A213",), "MHA-VN-010", 1),
     "vn-pinion-strap-pin": (("98296A027",), "MHA-VN-033", 3),
-    "vn-post-mount-screw": (("40923898",), "MHA-VN-031", 2),
-    "vn-slotted-screw": (("90280A201",), "MHA-VN-019", 4),
+    "vn-post-mount-screw": (("40923906",), "MHA-VN-031", 2),
+    "vn-slotted-screw": (("90280A203",), "MHA-VN-019", 4),
     "vn-swing-stop-screw": (("90280A108",), "MHA-VN-015", 1),
     "vn-thumb-screw": (("91882A221",), "MHA-VN-011", 3),
-    "vn-transgear-arm-plate-screw": (("91790A196",), "MHA-VN-040", 2),
-    "vn-transgear-collar-cross-pin": (("98296A026",), "MHA-VN-037", 1),
+    "vn-transgear-arm-plate-screw": (("91790A199",), "MHA-VN-040", 2),
+    "vn-transgear-arm-plate-locating-pin": (("93600A189",), "MHA-VN-056", 2),
     "vn-transgear-knob-drive-pin": (("98381A433",), "MHA-VN-038", 2),
     "vn-transgear-knob-cup-pin": (("98296A031",), "MHA-VN-048", 1),
     "vn-transgear-disc-screw": (("91794A055",), "MHA-VN-039", 3),
@@ -51,10 +50,13 @@ _EXPECTED = {
     "vn-transgear-pivot-spring": (("9715K43",), "MHA-VN-049", 1),
     "vn-cylinder-bank-spring": (("9714K392",), "MHA-VN-052", 1),
     "vn-rocker-bank-spring": (("9714K24",), "MHA-VN-053", 1),
+    "vn-wheel-axle-nut": (("92671A005",), "MHA-VN-025", 2),
+    "vn-wheel-axle-back-washer": (("92916A480",), "MHA-VN-057", 1),
+    "vn-wheel-axle-front-washer": (("92916A250",), "MHA-VN-058", 1),
     "vn-spring-hook": (("9489T111",), "MHA-VN-012", 20),
     "vn-tube-frame-cap": (("9275K141",), "MHA-VN-028", 4),
 }
-# U37c: McMaster carries no 1/4-20 x 3-1/2 steel slotted fillister.
+# The post-mount screw's 1/4-20 x 4 in stock is sourced from MSC.
 _SUPPLIERS = {"vn-post-mount-screw": "MSC Industrial Supply"}
 
 
@@ -101,15 +103,14 @@ def test_fillister_stock_is_shared_across_the_fleet() -> None:
             if sku in spec.skus
         )
 
-    # Rule 12 (E10): the four pinion-block screws moved from the #8-32 x 1 to
-    # the clamp screws' #8-32 x 1-1/4; the swing stop then left the x 1 for
-    # the foot screw's #4-40 x 3/8 (2026-09-29), retiring 90280A199; the
-    # paper drive's latch hook takes two more (MHA-VN-043, ruling 2),
+    # Raised pinion blocks use #8-32 x 1-1/2; clamp screws retain x 1-1/4.
+    # The swing stop and paper-drive latch hook share the foot screw SKU,
     # while the magnifying bracket takes two #2-56 x 1/4 (MHA-VN-050).
     assert fleet_quantity("90280A199") == 0
     assert fleet_quantity("90280A108") == 4
     assert fleet_quantity("91794A077") == 2
-    assert fleet_quantity("90280A201") == 10
+    assert fleet_quantity("90280A201") == 6
+    assert fleet_quantity("90280A203") == 4
 
 
 def test_special_bom_titles_remain_machine_specific() -> None:

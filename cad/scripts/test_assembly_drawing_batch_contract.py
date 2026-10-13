@@ -7,6 +7,7 @@ import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 
+import _config
 import _assembly_drawing
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS, DrawingLayout
@@ -55,7 +56,9 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
     # The channel sheet left the shared builder when it gained the rocker
     # bank's fit-up steps (#743, Codex PRRT_kwDOPHDy386mRSOK); the paper-drive
     # sheet left it when it became three sheets with its own fit-up steps; the
-    # measuring-stick sheet is a full fitter package (BOM, explode, steps).
+    # measuring-stick sheet is a full fitter package (BOM, explode, steps); the
+    # magnifier sheet left it when it gained the axle-stack details that print
+    # the press gauge and the endshake (Codex PR #1330).
     if drawing
     not in (
         draw_fr_frame_assembly,
@@ -63,6 +66,7 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
         draw_ch_channel_assembly,
         draw_pd_paper_drive_assembly,
         draw_ms_measuring_stick_assembly,
+        draw_mg_magnifier_assembly,
     )
 )
 
@@ -103,7 +107,27 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_dt_drive_train_assembly:
             scripts_dir = Path(draw_dt_drive_train_assembly.__file__).resolve().parent
-            assert str(scripts_dir / "dt_drive_train_assembly_spec.py") in deps
+            assert {
+                str(scripts_dir / name)
+                for name in (
+                    "dt_drive_train_assembly_spec.py",
+                    "dt_drive_train_steps.py",
+                    "dt_crank_drive_gear_spec.py",
+                    "dt_crank_pinion_spec.py",
+                    "dt_cylinder_gear_spec.py",
+                    "vn_post_mount_screw_spec.py",
+                    "cylinder_bank_layout.py",
+                    "cone_line.py",
+                    "fr_harmonic_base_spec.py",
+                    "rocker_bank_layout.py",
+                )
+            } <= set(deps)
+            assert (
+                str(
+                    scripts_dir.parent / "config" / "parts" / "vn-post-mount-screw.yaml"
+                )
+                in deps
+            )
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_pd_paper_drive_assembly:
             scripts_dir = Path(draw_pd_paper_drive_assembly.__file__).resolve().parent
@@ -114,7 +138,6 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                 for name in (
                     "pd_paper_drive_assembly_steps.py",
                     "dt_drive_train_steps.py",
-                    "vn_transgear_collar_cross_pin_spec.py",
                     "pd_transgear_drive_collar_spec.py",
                     "vn_transgear_disc_screw_spec.py",
                     "vn_transgear_pivot_screw_spec.py",
@@ -139,8 +162,43 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                 )
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        elif drawing is draw_mg_magnifier_assembly:
+            scripts_dir = Path(draw_mg_magnifier_assembly.__file__).resolve().parent
+            # The stack spec whose settings the details print, and the axle
+            # spec that places the endshake detail.
+            assert {
+                str(scripts_dir / name)
+                for name in ("mg_magnifier_assembly_spec.py", "mg_wheel_axle_spec.py")
+            } <= set(deps)
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         else:
             assert str(Path(_assembly_drawing.__file__).resolve()) in deps
+
+
+def test_changed_base_keeps_its_identity_in_the_frame_bom() -> None:
+    stem = "fr-harmonic-base"
+    assert stem in draw_fr_frame_assembly.BOM_COMPONENTS
+    assert draw_fr_frame_assembly.BOM_QUANTITIES[stem] == 1
+    assert (
+        draw_fr_frame_assembly.BOM_PART_NUMBERS[stem] == _config.parts(stem)["number"]
+    )
+
+
+def test_changed_drivetrain_packages_keep_their_registered_assembly_sources() -> None:
+    """Frame/base and the integrated top model are not DT-only review scope."""
+    drawings = (
+        draw_dt_drive_train_assembly,
+        draw_fr_frame_assembly,
+        draw_pd_paper_drive_assembly,
+        draw_ha_harmonic_analyzer_assembly,
+    )
+    assert len({drawing.SPEC.name for drawing in drawings}) == len(drawings)
+    for drawing in drawings:
+        assert drawing.SOURCE == drawing.SPEC.source
+        assert drawing.SPEC.source_kind == "assembly"
+        assert drawing.SPEC.name in {
+            row.name for row in DRAWINGS if row.source_kind == "assembly"
+        }
 
 
 def test_each_simple_recipe_is_only_a_precomputed_shared_builder_call() -> None:

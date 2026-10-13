@@ -130,6 +130,14 @@ git submodule update --init --recursive
    SolidWorks, which takes the licence farm worker w15 shares. A bare `pytest` or
    `pytest .` at the root skips it (`testpaths`/`norecursedirs` in
    `pyproject.toml`); run it on a farm worker or in its own CI.
+4. Ground recipe calls in the vendored `PyWin32Adapter` implementation, including
+   its inherited mixins and delegated helpers; never infer an adapter method name
+   from a SolidWorks operation. Check that every changed call exists and binds
+   with a cheap source-only AST census against the SDK, without importing
+   recipes or constructing an adapter. The knob-shaft and
+   feed-pinion census is `cad/scripts/test_pd_transgear_adapter_contract.py`;
+   it checks every direct `adapter.<method>(...)` call, not an API allowlist.
+   Offline contracts do not replace final-source native geometry/readback proof.
 
 ## Minimum merge gate (every PR)
 
@@ -374,6 +382,48 @@ exports and travelers](cad/docs/pipeline/features-travelers.md).
   `.SLDPRT`, `.SLDASM`, and linked drawing title block. The publisher advances
   `next_revision` after a successful publish; the release agent MUST merge that
   generated-only follow-up before the next release.
+
+### Release notes
+
+Every release MUST describe what changed since the previous published release.
+Use [v37's release notes](https://github.com/pedropaulovc/harmonic-analyzer/releases/tag/v37)
+as the editorial pattern:
+
+- Open with a short account of the main changes and their effect on someone
+  making, assembling or using the machine.
+- Group descriptions by subsystem, with smaller headings where useful. Link
+  the relevant PRs or issues and explain the actual geometry, drawing, fit-up,
+  manufacturing or user-visible change. A commit-title dump is not sufficient.
+- Follow the section order where applicable: subsystems, cross-part drawings,
+  build and checks, known issues, decisions that shape this release, also in
+  this release, then the bundle appendix.
+- Recheck prior limitations and issues opened or closed since the previous
+  release against the source being released. Carry forward limitations that
+  still apply; remove those fixed in that commit. An issue closed after the
+  release commit does not prove that its fix shipped.
+
+Draft while the build runs, before publication, from
+`<previous published tag>..<release source commit>`, including merged PRs and
+direct commits. Check dimensions against that commit's CAD configuration.
+Run the humanizer skill on the authored prose, preserving numbers, part IDs,
+units, quoted drawing callouts and links.
+
+After successful publication (including a requested draft release), fetch the
+generated Markdown body with `gh release view vNN --json body --jq .body`.
+Append that Markdown verbatim after one `## Bundle` heading beneath the authored
+descriptions. Preserve its counts, size, changed-parts list, heading levels,
+diff images, asset URLs, provenance and logs. When correcting a release that
+already has authored notes, preserve everything below its existing `## Bundle`
+heading verbatim and replace only the authored prose. Write the complete notes
+to a host-visible file and install them immediately
+with `gh release edit vNN --notes-file <file>`. Read back the body, verify the
+authored descriptions and unchanged appendix, and confirm the tag pins the
+intended source commit before reporting completion.
+
+On `--no-publish` or a failed publish, retain the draft without editing GitHub.
+If the notes update fails after publication, retry only the notes edit. Do not
+rerun the publisher, retag, rebuild or re-upload unchanged artifacts to correct
+prose.
 
 ## `.farm-sources.json` — submodules the farm does not acquire
 
@@ -822,7 +872,8 @@ come from the model/spec, not separate text renderers.
 **Per-assembly contracts — `cad/config/assemblies/<dashed-stem>.yaml`.** Data
 that belongs to ONE assembly (its learned `flip_invert` seeds and its free-DOF
 contract: `free_dof`/`free_dof_per_active_channel`, `required_free_stems`,
-`allowed_free_stems`) lives in its own file, read through
+`allowed_free_stems`; and `carries_chain`, which hands the soundness
+interference gate the chain's wheel mounts) lives in its own file, read through
 `_assembly_contract.py` — never as a stem-keyed table in `_assembly.py` (on every
 assembly's recipe: one drive-train seed there used to re-key all eight
 assemblies and every gate behind them) or `verify.py` (on every soundness

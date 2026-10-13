@@ -22,6 +22,7 @@ import itertools
 import math
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
+from dt_pinion_pivot_block_geometry import BORE_UP
 from dt_pinion_spring_section import (
     PAD_WIDTH,
     PAD_WIDTH_PLACES as PAD_WIDTH_PLACES,
@@ -30,15 +31,15 @@ from dt_pinion_spring_section import (
     WIDTH,
     WIDTH_PLACES as WIDTH_PLACES,
 )
+from pinion_rig_park_geometry import STRAP_LEAN_DEG
 
 # The strap the blade bears on (the drive train asserts both in lockstep).
-STRAP_LEAN_DEG = 8.138574451932667  # parked lean, top east
 STRAP_HALF_WIDTH = 7.5
 
 # The part owns a convenient local frame; the assembly translates this local
 # pivot onto the live strap pivot.  These are not machine coordinates.
 PIVOT_LX = -7.88
-PIVOT_LY = 12.0
+PIVOT_LY = BORE_UP
 
 # Minimum inside bend radius (#859 ruling 4, Main 2026-09-25).  No 17-7 PH
 # bulletin publishes one for Condition C (ATI 17-7 TDS; Cleveland-Cliffs 17-7 PH
@@ -66,8 +67,8 @@ PARKED_AIR = 0.15
 # (test_dt_pinion_spring_drawing), which takes the 9.5 square.  O5 (Main,
 # 2026-09-24, option c): the screw stands 20.0 east of the pivot axis -- 12.5
 # east of the flank.  FOOT_FLAT is the straight between the pad and the bend:
-# ruling 4 sets it to zero (the bend starts at the pad's edge) so the R3.3
-# bend keeps the blade at 9.2 deg to the flank, inside O5's 9-13 deg band.
+# ruling 4 sets it to zero (the bend starts at the pad's edge). With the raised
+# pivot the blade remains inside O5's unchanged 9-13 degree flank-angle band.
 HOLE_SPEC = HoleSpec("clearance", "#4")
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
 PAD_LEN = 9.5
@@ -100,7 +101,12 @@ FORMED_BAND_MM = 0.5
 # scaling from tensile applies (ruling 1's rule was for tensile-only minima).
 # The optional CH 900 age (482 C, 1 h) raises it and is NOT counted.
 YIELD_MPA = 1205.0
-PRESET_DEG = 5.4
+# Raised-pivot design: the longer blade needs more free-form preset. An
+# isolated source-law sizing over all 32 formed corners leaves 7.90..9.03
+# degrees feasible against the current cutter-blank annulus mass and old native
+# gravity plus pose-change bounds. 8.2 preserves both 1.5x gates; this is not
+# a replacement for the integrated native gravity recalibration.
+PRESET_DEG = 8.2
 
 _LAM = math.radians(STRAP_LEAN_DEG)
 STRAP_U = (math.sin(_LAM), math.cos(_LAM))  # up the strap axis
@@ -177,10 +183,14 @@ FREE_KINK_START = _free(KINK_START)
 FREE_KINK_C = _free(KINK_C)
 FREE_KINK_EXIT = _free(KINK_EXIT)
 FREE_FLAT_TIP = _free(FLAT_TIP)
-# How far the free crest stands into the parked flank, along the flank normal.
+# How far the free crest's outer face stands into the parked flank, along the
+# flank normal: the free crest circle's centre shift less the parked air. The
+# parked contact point turned PRESET_DEG is no longer the face's nearest point
+# to the flank; it would understate this by (R_KINK + THICK)(1 - cos PRESET_DEG),
+# 0.038 mm at 8.2 degrees. formed_contact measures the same face.
 PRESET = (
-    (CREST[0] - _free(CREST)[0]) * STRAP_N[0]
-    + (CREST[1] - _free(CREST)[1]) * STRAP_N[1]
+    (KINK_C[0] - FREE_KINK_C[0]) * STRAP_N[0]
+    + (KINK_C[1] - FREE_KINK_C[1]) * STRAP_N[1]
     - PARKED_AIR
 )
 

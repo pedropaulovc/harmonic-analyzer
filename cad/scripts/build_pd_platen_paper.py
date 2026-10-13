@@ -36,14 +36,11 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, add_line_chain, ensure_fully_defined
 from _sketch_chains import define_rectilinear_chain
+from paper_drive_geom import RECORDING_PAPER_HEIGHT_MM, RECORDING_PAPER_WIDTH_MM
 
 PART_NAME = "pd-platen-paper"
 MATERIAL = "Oak"  # nearest wood-fibre entry in the SW database; colour overridden
 
-PAPER_WIDTH = 233.2386  # ch30-p002 Pose Studio: 259.5 * 0.8988
-PAPER_HEIGHT = 80.5  # ch30-p002 + ch22 p.55: the sheet ends level with the clip bottoms
-# (clip 83.5 minus the 3.0 top margin) -- the lower ~38% of the platen face
-# stays bare black with its two screw rows showing (ch30 p002/p003/p009)
 PAPER_THICKNESS = 0.25  # front face stays 0.5 proud (assembly plants it at
 # PLATE_FRONT_Z - 0.5); the thinner sheet leaves 0.25 air behind so the back
 # face never coincides with the platen front face (render z-fight)
@@ -59,8 +56,8 @@ async def build(adapter) -> dict[str, str]:
     # drives it). The mm suffix is load-bearing -- this is an INCH document and
     # the equation manager reads BARE numbers in document units (an unsuffixed
     # 233.2386 = 233.2386 in).
-    await set_global(adapter, "PaperWidth", f"{PAPER_WIDTH}mm")
-    await set_global(adapter, "PaperHeight", f"{PAPER_HEIGHT}mm")
+    await set_global(adapter, "PaperWidth", f"{RECORDING_PAPER_WIDTH_MM}mm")
+    await set_global(adapter, "PaperHeight", f"{RECORDING_PAPER_HEIGHT_MM}mm")
     await set_global(adapter, "PaperThickness", f"{PAPER_THICKNESS}mm")
 
     drive_jobs: list[tuple[str, str]] = []
@@ -74,9 +71,9 @@ async def build(adapter) -> dict[str, str]:
     check("create_sketch outline", await adapter.create_sketch("Front"))
     paper_rect = [
         (0.0, 0.0),
-        (PAPER_WIDTH, 0.0),
-        (PAPER_WIDTH, PAPER_HEIGHT),
-        (0.0, PAPER_HEIGHT),
+        (RECORDING_PAPER_WIDTH_MM, 0.0),
+        (RECORDING_PAPER_WIDTH_MM, RECORDING_PAPER_HEIGHT_MM),
+        (0.0, RECORDING_PAPER_HEIGHT_MM),
     ]
     lines = await add_line_chain(adapter, paper_rect)
     await define_rectilinear_chain(
@@ -94,7 +91,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Paper")
 
-    expected = PAPER_WIDTH * PAPER_HEIGHT * PAPER_THICKNESS
+    expected = RECORDING_PAPER_WIDTH_MM * RECORDING_PAPER_HEIGHT_MM * PAPER_THICKNESS
     await volume_check(adapter, "paper", expected, 0.005 * expected)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the

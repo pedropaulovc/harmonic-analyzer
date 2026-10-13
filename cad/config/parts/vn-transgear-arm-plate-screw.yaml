@@ -3,15 +3,16 @@ vn-transgear-arm-plate-screw:
   number: MHA-VN-040
   stock_name: 18-8 Stainless Steel Oval Head Slotted Screw
   supplier: McMaster-Carr
-  supplier_skus: [91790A196]
+  supplier_skus: [91790A199]
   material: 18-8 stainless steel
-  material_specification: "18-8 stainless steel, slotted oval head 82°, fully threaded; McMaster-Carr 91790A196"
-  finish: bright
+  material_specification: "18-8 stainless steel, slotted standard oval head, nominal 82°, #8-32 UNC Class 2A right-hand fully threaded, 1 in (25.40 mm) stock; McMaster-Carr 91790A199"
+  finish: "as supplied; finish not stated"
   quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased
   installation_notes: |-
-    INSTALLATION - THROUGH MHA-PD-019 INTO THE MHA-PD-018 ARM THROUGH TAP.
-    CUT EACH TIP FLUSH TO 0.20 PROUD OF THE MHA-PD-018 ARM FRONT FACE
-    AT ASSEMBLY; BREAK THE CUT END 0.1 MAX.
+    McMASTER 91790A199 / OVAL SLOTTED #8-32 UNC-2A
+    1 IN (25.40) STOCK, FROM BEVEL TOP; CUT TO FIT
+    CUT OFF MECHANISM BEFORE GUIDE-LOCK SWEEP
+    TRIM FLUSH OR PROUD 0.2 MAX; CUT-END BREAK 0.1 MAX

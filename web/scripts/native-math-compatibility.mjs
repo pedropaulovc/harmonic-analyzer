@@ -42,20 +42,34 @@ async function runtimeMagnifierRest(staged, webRoot) {
   const contactZ = geometry.hubTangentMm[2] / 1000
   // Independent coordinate control used by export-magnifier.py: solve the
   // tangent perpendicularity by bisection, not the runtime's analytic acos.
+  // The staged CAD's own visual wire end selects which hook tangent the release
+  // rides (+1: counter-clockwise about +Z of the hook bearing), so a runtime
+  // fixed to the other branch is refused instead of silently adopted.
+  const visual = geometry.hubTangentMm.map(value => value / 1000)
+  const branch = Math.sign(Math.sin(
+    Math.atan2(visual[1] - centre[1], visual[0] - centre[0])
+    - Math.atan2(restHook[1] - centre[1], restHook[0] - centre[0])))
   function tangent(hook) {
-    let lo = -Math.PI / 2, hi = Math.PI / 2
+    // |H - centre| - r > 0 at the hook bearing, -|H - centre| - r < 0 half a
+    // turn toward the branch side, monotone between.
+    let near = Math.atan2(hook[1] - centre[1], hook[0] - centre[0])
+    let far = near + branch * Math.PI
     for (let step = 0; step < 70; step++) {
-      const angle = (lo + hi) / 2
+      const angle = (near + far) / 2
       const dot = (hook[0] - centre[0]) * Math.cos(angle) + (hook[1] - centre[1]) * Math.sin(angle) - radius
-      if (dot > 0) hi = angle
-      else lo = angle
+      if (dot > 0) near = angle
+      else far = angle
     }
-    const angle = (lo + hi) / 2
+    const angle = (near + far) / 2
     const x = centre[0] + radius * Math.cos(angle)
     const y = centre[1] + radius * Math.sin(angle)
     return { angle, x, y, length: Math.hypot(hook[0] - x, hook[1] - y, hook[2] - contactZ) }
   }
   const rest = tangent(restHook)
+  // The taut no-slip wrap continues the hook-to-contact direction around the
+  // wheel (+1 counter-clockwise about +Z): L + wrap * r * (wheelAngle - a) is
+  // invariant.
+  const wrap = Math.sign((rest.y - restHook[1]) * Math.cos(rest.angle) - (rest.x - restHook[0]) * Math.sin(rest.angle))
   const input = {
     magnifierHookM: new Float64Array(3),
     magnifierClampM: geometry.clampRestMm.map(value => value / 1000),
@@ -69,7 +83,7 @@ async function runtimeMagnifierRest(staged, webRoot) {
     input.magnifierHookM[2] = restHook[2]
     runtime.solveMagnifier(input, pose)
     const control = tangent(input.magnifierHookM)
-    const wheelAngle = (control.length - rest.length) / radius + control.angle - rest.angle
+    const wheelAngle = control.angle - rest.angle - wrap * (control.length - rest.length) / radius
     const penTravel = -rimRadius * wheelAngle
     const label = `magnifier wire constraint (summing ${angle} rad)`
     equalNumber(`${label}.wheelAngleRad`, pose.wheelAngleRad, wheelAngle)

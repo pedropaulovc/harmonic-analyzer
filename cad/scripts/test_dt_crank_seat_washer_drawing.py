@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import math
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,7 @@ import dt_crankshaft_spec
 import draw_dt_crank_seat_washer as drawing
 import dt_drive_train_steps as steps
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
+from _printed_tolerance import printed_deviations
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -59,7 +61,7 @@ def test_the_bore_callout_names_its_drilled_process() -> None:
     """Rule 7: a hole callout states its process.  The +0.10/0 bore is the
     title block's DRILLED HOLES class, so it is drilled, not reamed."""
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "DRILL THRU"
-    assert spec.ID_BAND == (0.10, 0.0)
+    assert spec.ID_BAND == (float(_config.title_block("drilled_hole")["plus_mm"]), 0.0)
 
 
 def test_every_accepted_part_set_is_faced_from_the_blank_above_the_floor() -> None:
@@ -74,7 +76,14 @@ def test_every_accepted_part_set_is_faced_from_the_blank_above_the_floor() -> No
     callout = drawing.DIMENSION_CALLOUTS["DiscThick"]
     assert f"{spec.GAP_MIN:.2f}-{spec.GAP_MAX:.2f}" in callout
     assert steps.step_ref(drawing.FIT_STEP_KEY) in callout
+    assert "MHA-DT-011 COLLAR" in callout and "MHA-DT-005 BOSS" in callout
+    assert "NO AXIAL GAP" in callout and "MHA-DT-010 ON ITS SEAT FEELER" in callout
+    assert spec.REFERENCE_DIMENSIONS == {"DiscThick"}
+    assert drawing.DRAWING_PRECISION_BY_NAME is spec.DRAWING_PRECISION_BY_NAME
     assert drawing.FIT_STEP_KEY in steps.SEQUENCE
+    assert spec.BLANK_THICKNESS_MIN == pytest.approx(
+        math.ceil((spec.GAP_MAX + spec.FACING_ALLOWANCE - 1e-9) * 100) / 100
+    )
     assert f"{spec.BLANK_THICKNESS_MIN:.2f} MIN" in spec.DRAWING_NOTES
 
 
@@ -96,10 +105,16 @@ def test_the_floor_and_the_blank_refuse_a_fit_they_cannot_make(monkeypatch) -> N
         monkeypatch, dt_crankshaft_spec, "COLLAR_LENGTH", dt_crankshaft_spec.COLLAR_LENGTH
     )
     assert ruled.GAP_MIN == pytest.approx(spec.GAP_MIN)
-    # Negative control: the 10.3 collar the ruling shortened leaves the
-    # thinnest fit under the floor.
+    # Move the collar far enough to make the actual minimum fit fall below
+    # its unchanged floor, rather than reusing a former collar dimension.
+    too_long = (
+        dt_crankshaft_spec.COLLAR_LENGTH
+        + spec.GAP_MIN
+        - spec.THICKNESS_FLOOR
+        + spec.FACING_ALLOWANCE
+    )
     with pytest.raises(AssertionError, match="floor"):
-        _washer_spec_with(monkeypatch, dt_crankshaft_spec, "COLLAR_LENGTH", 10.3)
+        _washer_spec_with(monkeypatch, dt_crankshaft_spec, "COLLAR_LENGTH", too_long)
     monkeypatch.undo()
     # Negative control: a blank whose low limit is under the widest gap.
     spec.check_fit_up(spec.GAP_MIN, spec.GAP_MAX, spec.GAP_MAX + spec.FACING_ALLOWANCE)
@@ -140,7 +155,10 @@ def test_smallest_bore_passes_the_largest_journal_land() -> None:
     journal_max = dt_crankshaft_spec.JOURNAL_DIA + max(dt_crankshaft_spec.JOURNAL_DIA_BAND)
     assert bore_min - journal_max > 0.0
     # Rule 12 wall at the O.D.'s one-place title-block band.
-    od_min = spec.OD - _config.title_block("linear_1pl")["value_in"] * 25.4
+    od_min = (
+        spec.OD
+        + printed_deviations(spec.OD, spec.DRAWING_PRECISION_BY_NAME["DiscDia"])[0]
+    )
     assert (od_min - (spec.ID + max(spec.ID_BAND))) / 2.0 >= 2.0
 
 

@@ -19,8 +19,10 @@ import dt_pinion_handle_spec
 import dt_pinion_lever_pin_spec
 import dt_pinion_lever_spec
 import dt_pinion_pivot_shaft_spec
+import dt_pinion_pivot_block_geometry
 import dt_pinion_spring_spec
 import vn_post_mount_screw_spec
+import vn_slotted_screw_spec
 from _buildgraph import module_deps_of
 
 
@@ -451,6 +453,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("vn-thumb-screw-1", "mg-magnifying-clamp-1")): _annulus_limit(
                 2.8448, 2.261, 3.9
             ),
+            # MHA-MG-007 3/16 drill-rod pin pressed through the wheel bar's
+            # reamed .1865 bore, the bar's 9.0 depth.
+            frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): _annulus_limit(
+                4.7625, 4.7371, 9.0
+            ),
         },
         "sm-summing": {
             # Stock 91251A157: #6-32 major, #36 drill, 8.10 nominal reach.
@@ -583,6 +590,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): _annulus_limit(
                 3.9, 3.874, 7.9375
             ),
+            # MHA-VN-056 Ø2.0 dowels pressed into the arm's Ø1.995 blind reams,
+            # 6.0 long less 1.70 proud.
+            **_expected_numbered_pairs(
+                "vn-transgear-arm-plate-locating-pin",
+                range(1, 3),
+                "pd-transgear-arm",
+                2.0,
+                1.995,
+                6.0 - 1.70,
+            ),
             # R9-71: MHA-PD-020's Ø4.727 ream pressed on MHA-VN-041's Ø4.7625
             # shoulder over its 5.5 length.
             frozenset(("pd-transgear-pivot-spacer-1", "vn-transgear-pivot-screw-1")): (
@@ -609,11 +626,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("vn-transgear-arm-plate-screw-2", "pd-transgear-arm-plate-1")): (
                 1.10 * 0.00809042475
             ),
-            # R9-70: the nut on the collar's faced pilot, 2.9 in front of the
-            # seat face: 23.9 - 6.2 - 2.9 of the stud's thread blank.
+            # #8-32 nut on the collar's pilot, with its rear face on actual F:
+            # 23.9 - 6.2 - 2.9 of the Ø4.070 stud's thread blank.
             frozenset(
                 ("pd-transgear-thumbnut-1", "pd-transgear-knob-shaft-1")
-            ): _annulus_limit(6.22, 5.105, 14.8),
+            ): _annulus_limit(4.070, 3.454, 14.8),
             # MHA-VN-038 3/32 x 3/16 dowels pressed 2.3625 into MHA-PD-022's 2.38 reams.
             **_expected_numbered_pairs(
                 "vn-transgear-knob-drive-pin",
@@ -671,7 +688,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "fr-frame-1/fr-harmonic-base",
                 4.1656,
                 3.454,
-                11.25,  # rule 12 E10: #8-32 x 1-1/4 through the 20.5 block
+                vn_slotted_screw_spec.SHANK_LEN - dt_pinion_pivot_block_geometry.BLOCK_HEIGHT,
             ),
             **_expected_numbered_pairs(
                 "dt-drive-train-1/vn-foot-screw",
@@ -721,16 +738,15 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         frozenset(("dt-crank-pin-1", "dt-crank-hub-1")),
         frozenset(("dt-crank-pin-1", "dt-crankshaft-1")),
     }
-    # MHA-VN-037's tube pin across MHA-PD-008's unmodelled cross hole, and MHA-VN-048's
-    # across the hole match-drilled through MHA-PD-016 and the journal.
-    cross_pin_pairs = {
-        frozenset(("vn-transgear-collar-cross-pin-1", "pd-transgear-knob-shaft-1")),
+    # MHA-VN-048's retained tube pin across the hole match-drilled through
+    # MHA-PD-016 and the journal.
+    cup_pin_pairs = {
         frozenset(("vn-transgear-knob-cup-pin-1", "pd-transgear-knob-shaft-1")),
         frozenset(("vn-transgear-knob-cup-pin-1", "pd-transgear-knob-cup-1")),
     }
     special_pairs = {
         "dt-drive-train": crank_pairs,
-        "pd-paper-drive": cross_pin_pairs,
+        "pd-paper-drive": cup_pin_pairs,
     }
     for name, expected_threaded in threaded_by_assembly.items():
         allowed = _interference_contracts.allowed_interference_pairs(name)
@@ -754,12 +770,6 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # both receivers.
     assert 111.2 < crank_allowed[hub_pair] < 111.8
     assert 55.1 < crank_allowed[shaft_pair] < 55.6
-    # 1.10 x (12.470 - 4.755): the Ø1.5875 and Ø0.978 chords through Ø6.35.
-    paper_allowed = _interference_contracts.allowed_interference_pairs("pd-paper-drive")
-    cross_pin_pair = frozenset(
-        ("vn-transgear-collar-cross-pin-1", "pd-transgear-knob-shaft-1")
-    )
-    assert 8.4 < paper_allowed[cross_pin_pair] < 8.6
     # MHA-CH-011: each 5/64 bar pivot pin pressed into its bar's Ø1.968 ream
     # through both top-notch cheeks (6.35 bar less the 3.20 notch), and
     # MHA-CH-010: the same pin pressed into its rod's Ø1.968 fork ream through

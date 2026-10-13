@@ -25,12 +25,12 @@ TODO
 
 ## D-flat gear seats and axial stack
 
-The MHA-DT-004 gear-land AF sizes are 8.763/5.842/2.921/1.460 mm, each
+The MHA-DT-004 gear-land AF sizes are 8.763/5.842/2.921/0.420 mm, each
 +0/−0.010 mm; their mating D-bores are +0.010/+0.020 mm over the nominal
 AF. Check 0.01–0.03 mm flat clearance and 0.025–0.105 mm diametral
 round slip clearance (`cad/scripts/cone_shaft_land_bands.py`,
 `cad/scripts/gear_seat_fit.py`). Check the twenty touching
-6.8887 ±0.025 mm cone gears as a stack at 137.774 ±0.20 mm, then push the
+6.8756 ±0.025 mm cone gears as a stack at 137.512 ±0.20 mm, then push the
 MHA-VN-016 stack collar onto a 0.45 mm feeler on T006 and lock its set screw
 on the D-flat, for 0.35–0.55 mm stack end play (`COLLAR_FEELER`,
 `STACK_FLOAT`). Then hold the shaft's own end play at the cup screw to

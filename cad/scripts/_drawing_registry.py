@@ -320,6 +320,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="mg_wheel_drum",
+        part="mg_wheel_drum",
+        artifact_stem="mg-wheel-drum",
+        script_name="draw_mg_wheel_drum.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="mg_magnifying_bracket",
         part="mg_magnifying_bracket",
         artifact_stem="mg-magnifying-bracket",
@@ -611,6 +618,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="dt_alignment_pinion",
         artifact_stem="dt-alignment-pinion",
         script_name="draw_dt_alignment_pinion.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="pd_platen_rack",
+        part="pd_platen_rack",
+        artifact_stem="pd-platen-rack",
+        script_name="draw_pd_platen_rack.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -985,6 +999,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_transgear_arm_plate_locating_pin",
+        part="vn_transgear_arm_plate_locating_pin",
+        artifact_stem="vn-transgear-arm-plate-locating-pin",
+        script_name="draw_vn_transgear_arm_plate_locating_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="vn_transgear_pivot_screw",
         part="vn_transgear_pivot_screw",
         artifact_stem="vn-transgear-pivot-screw",
@@ -1017,13 +1038,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="pd_transgear_drive_collar",
         artifact_stem="pd-transgear-drive-collar",
         script_name="draw_pd_transgear_drive_collar.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="vn_transgear_collar_cross_pin",
-        part="vn_transgear_collar_cross_pin",
-        artifact_stem="vn-transgear-collar-cross-pin",
-        script_name="draw_vn_transgear_collar_cross_pin.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -1066,6 +1080,27 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="vn_rocker_bank_spring",
         artifact_stem="vn-rocker-bank-spring",
         script_name="draw_vn_rocker_bank_spring.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_wheel_axle_nut",
+        part="vn_wheel_axle_nut",
+        artifact_stem="vn-wheel-axle-nut",
+        script_name="draw_vn_wheel_axle_nut.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_wheel_axle_back_washer",
+        part="vn_wheel_axle_back_washer",
+        artifact_stem="vn-wheel-axle-back-washer",
+        script_name="draw_vn_wheel_axle_back_washer.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_wheel_axle_front_washer",
+        part="vn_wheel_axle_front_washer",
+        artifact_stem="vn-wheel-axle-front-washer",
+        script_name="draw_vn_wheel_axle_front_washer.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

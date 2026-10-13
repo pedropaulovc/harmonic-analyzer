@@ -4,14 +4,18 @@ The principal view is ``*Front``, looking at the REAR face: the outline (the
 pivot radius, the tip station and the end-face width), the pivot bore, the
 MHA-PD-023 pin's reamed press bore, the plate-tap callout with its qualifier
 lines, and the hole stations from the pivot (the blanked
-``StationReference`` sketch, shown in this view only).  Section
-A-A cuts it on the centreline -- through the pivot, every hole and the
+``StationReference`` sketch, shown in this view only). The plate-tap stations
+follow the reducer's knob bore through ``pd_transgear_arm_geometry``; neither
+their imported dimensions nor the annotation picks fix a previous centre.
+Section A-A cuts it on the centreline -- through the pivot, every hole and the
 latch-pin hole -- so the rear spot face's diameter, its floor from the FRONT
 face (the pivot head's end play) and the latch-pin hole's depth print on
 solid cut edges.  The end view (``*Right``, the square end) carries the
 thickness (the ground stock's, printed as a reference to it) and the
 latch-pin hole's reamed size, its height and the press of the pin to the
-hole floor.
+hole floor.  The matched locating sockets open in the rear face the front
+view looks at, so their stations, size and position frames print there;
+section B-B cuts them for their depth.
 """
 
 from __future__ import annotations
@@ -23,11 +27,13 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
 )
 
+import _config
 from _check import check
 from _com import _early_bound
 from _drawing_common import (
@@ -43,22 +49,28 @@ from _drawing_dimensions import (
     set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_reference_dimension,
+    set_reference_dimensions,
 )
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import visible_view_entities
+from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
+from _native_projected_zone import require_saved_projected_gtols
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from pd_paper_drive_assembly_steps import matched_locator_notes
 from pd_transgear_arm_geometry import (
+    LOCATOR_SITES_MM,
+    LOCATOR_HOLE_DIA_MM,
     PIN_HOLE_DEPTH,
-    PIN_HOLE_Z,
     PIN_STATION,
     PIVOT_END_R,
     PLATE_TAP_SPEC,
@@ -67,6 +79,8 @@ from pd_transgear_arm_geometry import (
     TIP_STATION,
 )
 from pd_transgear_arm_spec import (
+    GEOMETRIC_CONTROLS,
+    PART_DATUMS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
@@ -74,9 +88,11 @@ from pd_transgear_arm_spec import (
     ISO_VIEW_SCALE,
     OVERALL_LENGTH,
     PIN_BORE_CALLOUT,
+    LOCATOR_CALLOUT,
     PIN_HOLE_CALLOUT,
     PIVOT_BORE_CALLOUT,
-    PLATE_TAP_CSK_CALLOUT,
+    PLATE_TAP_EDGE_BREAK_CALLOUT,
+    PROJECTED_ZONE_NOTE,
     SPOT_FACE_CALLOUT,
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
@@ -112,8 +128,29 @@ FRONT_CENTER = (0.189, 0.205)
 # overall-length reference under the station stack.
 SECTION_CENTER = (FRONT_CENTER[0], 0.094)
 END_CENTER = (0.357, FRONT_CENTER[1])
-ISO_CENTER = (0.370, 0.115)
-ISO_NOTE_XY = (0.335, 0.080)
+# Bottom left between the notes and the title block, under section A-A's
+# label: the right column holds the end view, its pin callout and section
+# B-B (run 20261010T001620278Z: B-B's label printed on the isometric).
+ISO_CENTER = (0.184, 0.037)
+ISO_NOTE_XY = (0.080, 0.022)
+# Bottom left, clear of the section's floor-depth text above and of the
+# isometric caption below.
+NOTES_XY = (0.014, 0.060)
+# Characters per line that keep the block left of the isometric view.
+NOTES_WIDTH = 52
+NOTES_TEXT = "\n".join((
+    matched_locator_notes(
+        _config.parts("pd-transgear-arm")["number"],
+        _config.parts("pd-transgear-arm-plate")["number"],
+        on_arm=True,
+        width=NOTES_WIDTH,
+    ),
+    PROJECTED_ZONE_NOTE,
+))
+# Under the end view's pin callout and on its axis; its label clears the
+# title block and section A-A's 8.50.  The socket mouths face right, and the
+# column right of them holds the sockets' position frames inside the border.
+LOCATOR_SECTION_CENTER = (END_CENTER[0], 0.120)
 # The front view centres on the outline's bounding box (x -R .. tip).
 _BBOX_CENTER_X = (TIP_STATION - PIVOT_END_R) / 2.0
 
@@ -147,32 +184,45 @@ SECTION_LINE = (
 
 # Per-view survivors of the marked-dimension import.  The stations stack
 # under the front view, nearest first, the overall reference under them;
-# the callouts stand above it.
+# the callouts stand above it, the pin bore's below right.
 _UNDER_FRONT = _front_y(-PIVOT_END_R)
-STATION_PITCH = 0.010
+STATION_PITCH = 0.009
+
+
+def _station_row(index: int) -> float:
+    return _UNDER_FRONT - 0.010 - index * STATION_PITCH
+
+
+_LOCATOR_X = _front_x(LOCATOR_SITES_MM[0][0])
+# Midway between plate tap 1's and the sockets' station witness lines.
+_LOCATOR_OFFSET_X = (_front_x(PLATE_TAP_STATIONS[0]) + _LOCATOR_X) / 2.0
 FRONT_KEEP = {
-    "PivotEndR": (_front_x(-PIVOT_END_R) - 0.005, _front_y(PIVOT_END_R) + 0.012),
-    "PivotBoreDia": (_front_x(0.0) - 0.002, _front_y(PIVOT_END_R) + 0.026),
-    # The pin bore's Ø and its three callout lines stand above the arm, right
-    # of the plate-tap callout and left of the end view; lower than the pivot
-    # bore's, so its stacked +0.008 band keeps inside the upper border.
-    "PinBoreDia": (_front_x(PIN_STATION) + 0.036, _front_y(PIVOT_END_R) + 0.018),
+    # Lower left of the pivot round, clear of datum B's tag above it.
+    "PivotEndR": (0.025, FRONT_CENTER[1] + 0.010),
+    "PivotBoreDia": (0.060, _front_y(PIVOT_END_R) + 0.021),
+    # The pin bore's Ø and its callout lines stand below right of the arm,
+    # right of the station stack; the upper band holds the tap and locator
+    # callouts.
+    "PinBoreDia": (_front_x(PIN_STATION) + 0.056, _UNDER_FRONT - 0.024),
     "EndWidth": (_front_x(TIP_STATION) + 0.012, FRONT_CENTER[1]),
-    "PlateTapStation1": (
-        _front_x(PLATE_TAP_STATIONS[0] / 2.0),
-        _UNDER_FRONT - STATION_PITCH,
-    ),
-    "PlateTapStation2": (
-        _front_x(PLATE_TAP_STATIONS[1] / 2.0),
-        _UNDER_FRONT - 2 * STATION_PITCH,
-    ),
-    "PinStation": (_front_x(PIN_STATION / 2.0), _UNDER_FRONT - 3 * STATION_PITCH),
-    "TipStation": (_front_x(TIP_STATION / 2.0), _UNDER_FRONT - 4 * STATION_PITCH),
+    "PlateTapStation1": (_front_x(PLATE_TAP_STATIONS[0] / 2.0), _station_row(0)),
+    "LocatorX1": (_front_x(LOCATOR_SITES_MM[0][0] / 2.0), _station_row(1)),
+    "PlateTapStation2": (_front_x(PLATE_TAP_STATIONS[1] / 2.0), _station_row(2)),
+    "PinStation": (_front_x(PIN_STATION / 2.0), _station_row(3)),
+    "TipStation": (_front_x(TIP_STATION / 2.0), _station_row(4)),
+    # The socket offsets share one dimension line left of section line B,
+    # their texts outside the arm: above its top edge, under the tap
+    # callout's shelf, and below its bottom edge, between the plate tap's and
+    # the socket's station witness lines (machinist review: inside the
+    # silhouette they crowded the sockets and line B).
+    "LocatorY1": (_LOCATOR_OFFSET_X, _front_y(PIVOT_END_R) + 0.0045),
+    "LocatorY2": (_LOCATOR_OFFSET_X, _front_y(-PIVOT_END_R) - 0.0045),
+    "LocatorDia1": (0.245, _front_y(PIVOT_END_R) + 0.021),
 }
 # The true overall (review of 19e33c6c2: the 128.90 from the bore axis read
 # as one), a reference under the stations: picked on the pivot round's upper
 # flank and re-anchored to its far extreme, and on the square end.
-OVERALL_TEXT_XY = (FRONT_CENTER[0], _UNDER_FRONT - 5 * STATION_PITCH)
+OVERALL_TEXT_XY = (FRONT_CENTER[0], _station_row(5))
 _FLANK = PIVOT_END_R * math.sqrt(0.5)
 OVERALL_PICKS = (
     (_front_x(-_FLANK), _front_y(_FLANK)),
@@ -181,41 +231,52 @@ OVERALL_PICKS = (
 # The floor depth's text stands BELOW the section's pivot end, outside its
 # witness lines, where it hangs LEFT of the dimension line (away from the
 # part, right edge on the line): the line runs 2 mm off the pivot end.
+# The spot face's callout stands low enough to clear the overall reference,
+# which moved down a row when the locator station joined the stack.
 SECTION_KEEP = {
-    "SpotFaceDia": (_front_x(0.0), SECTION_CENTER[1] + 0.022),
+    "SpotFaceDia": (_front_x(0.0), SECTION_CENTER[1] + 0.020),
     "FloorDepth": (_front_x(-PIVOT_END_R) - 0.002, SECTION_CENTER[1] - 0.020),
     "PinHoleDepth": (
         _front_x(TIP_STATION - PIN_HOLE_DEPTH / 2.0),
         SECTION_CENTER[1] - 0.020,
     ),
 }
-END_KEEP = {
-    "Depth": (END_CENTER[0], _end_y(PIVOT_END_R) + 0.010),
-    "PinHoleZ": (_end_x(PIN_HOLE_Z / 2.0), _end_y(-PIVOT_END_R) - 0.010),
-    # Absolute x: the callout's right edge sits 2 mm inside the right border.
-    "PinHoleDia": (0.385, _end_y(0.0) + 0.018),
+# Each narrow depth's text stands right of its witness lines and outside
+# its view (run 20261010T001620278Z: inside them, the witness lines and the
+# view edges struck the text).
+LOCATOR_SECTION_KEEP = {
+    "LocatorDepth": (LOCATOR_SECTION_CENTER[0] + 0.027, 0.0935),
 }
+END_KEEP = {
+    "Depth": (END_CENTER[0], _end_y(PIVOT_END_R) + 0.017),
+    # Between the end view and the stock text, right of the front face.
+    "PinHoleZ": (_end_x(0.0) + 0.017, _end_y(PIVOT_END_R) + 0.006),
+    # Below the end view, above section B-B, right edge inside the border.
+    "PinHoleDia": (0.384, 0.162),
+}
+
+
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": PIVOT_BORE_CALLOUT,
     "PinBoreDia": PIN_BORE_CALLOUT,
     "SpotFaceDia": SPOT_FACE_CALLOUT,
     "FloorDepth": FLOOR_DEPTH_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
+    "LocatorDia1": LOCATOR_CALLOUT,
 }
 
-# Native tap callout: arrow on the plate-tap countersink mouth nearest the
-# rear face (the chamfer's own edge), text above the view, its top inside the
-# upper border (review of 19e33c6c2: at 30 mm over the pivot round it touched
-# the border).  It carries the countersink line and the mating screw's
-# installed full-thread engagement at the worst case (the screws are cut
-# flush and the taps go through), the hanger joints' figure, each mouth's
-# loss counted to the tap drill (R9-63).
+# Native tap callout: arrow on the rear entry break's own edge, text above
+# the view with its top inside the upper border. It carries the ordinary
+# entry/exit edge-break limit and the mating cut screw's worst-case full-
+# thread engagement. The joint source pays entry loss and the overlapping
+# exit/cut-end loss separately; screws do not locate or centre this joint.
 _PLATE_DRILL_R = blind_cut_dia_mm(PLATE_TAP_SPEC) / 2.0
-_CALLOUT_Y = _front_y(PIVOT_END_R) + 0.022
-PLATE_CALLOUT_XY = (_front_x(PLATE_TAP_STATIONS[0]) + 0.016, _CALLOUT_Y)
+_CALLOUT_Y = _front_y(PIVOT_END_R) + 0.0232
+# Between the pivot bore's callout and the locator's, above section label B.
+PLATE_CALLOUT_XY = (0.160, _CALLOUT_Y)
 PLATE_TAP_QUALIFIER = "\n".join(
     (
-        PLATE_TAP_CSK_CALLOUT,
+        PLATE_TAP_EDGE_BREAK_CALLOUT,
         engagement_line(
             joints.PLATE_SCREW_ENGAGEMENT_WORST, joints.PLATE_SCREW_ENGAGEMENT_WORST_D
         ),
@@ -259,7 +320,7 @@ def _overall_reference(adapter: Any, front: Any) -> None:
         raise RuntimeError("overall length reference precision did not persist")
 
 
-def _rear_rim(view: Any, *, radius_mm: float, station_mm: float, label: str) -> Any:
+def _rear_rim(view: Any, *, radius_mm: float, station_mm: float, label: str, offset_mm: float = 0.0) -> Any:
     """The tap-drill rim nearest the rear face, by radius and station.
 
     Looking down a through hole both drill rims project to one circle; the
@@ -275,8 +336,13 @@ def _rear_rim(view: Any, *, radius_mm: float, station_mm: float, label: str) -> 
         curve = _early_bound(curve, "ICurve")
         if not curve.IsCircle():
             continue
-        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
-        miss = abs(params[6] - radius_mm) + abs(params[0] - station_mm) + abs(params[1])
+        raw_params = curve.CircleParams
+        if raw_params is None:
+            raise RuntimeError(f"{label}: native circle parameters are NULL")
+        params = tuple(float(value) * 1000.0 for value in raw_params)
+        if len(params) != 7 or not all(map(math.isfinite, params)):
+            raise RuntimeError(f"{label}: native circle parameters are not seven finite values")
+        miss = abs(params[6] - radius_mm) + abs(params[0] - station_mm) + abs(params[1] - offset_mm)
         nearest_miss = min(nearest_miss, miss)
         if miss <= 0.02:
             rims.append((params[2], edge))
@@ -286,6 +352,52 @@ def _rear_rim(view: Any, *, radius_mm: float, station_mm: float, label: str) -> 
             f"nearest circle misses by {nearest_miss:.3f} mm"
         )
     return max(rims, key=lambda item: item[0])[1]
+
+
+def _rim_point(
+    adapter: Any, view: Any, *, station_mm: float, radius_mm: float,
+    bearing_deg: float, label: str, offset_mm: float = 0.0,
+) -> tuple[float, float]:
+    """Sheet point on a bore's rear rim at a model bearing."""
+    angle = math.radians(bearing_deg)
+    return model_point_in_view(
+        adapter, view,
+        (
+            (station_mm + radius_mm * math.cos(angle)) / 1000.0,
+            (offset_mm + radius_mm * math.sin(angle)) / 1000.0,
+            THICKNESS / 1000.0,
+        ),
+        label=label,
+    )
+
+
+def _wall_point(
+    adapter: Any, view: Any, *, x_mm: float, z_mm: float, label: str
+) -> tuple[float, float]:
+    """Sheet point on a centreline hole's wall in section A-A."""
+    return model_point_in_view(
+        adapter, view, (x_mm / 1000.0, 0.0, z_mm / 1000.0), label=label
+    )
+
+
+# Position frames on the locating sockets stand in section B-B, which cuts
+# both on their axes, right of the socket mouths and each on its socket's side
+# of the arm's centre (machinist review: in the front view they sat inside
+# the silhouette).  Each leader enters its socket's mouth and lands on the
+# wall nearer the centre 1 mm in, as section A-A's tap frames do.
+_LOCATOR_MOUTH_X = LOCATOR_SECTION_CENTER[0] + THICKNESS / 2.0 * _S / 1000.0
+_LOCATOR_FRAME_GAP = 0.006
+_LOCATOR_FRAME_RISE = 0.0025
+_FRAME_HALF_HEIGHT = 0.00345
+
+
+def _locator_frame_xy(offset_mm: float) -> tuple[float, float]:
+    """Top-left of a socket's position frame in section B-B."""
+    side = math.copysign(1.0, offset_mm)
+    centre_y = (
+        LOCATOR_SECTION_CENTER[1] + offset_mm * _S / 1000.0 + side * _LOCATOR_FRAME_RISE
+    )
+    return (_LOCATOR_MOUTH_X + _LOCATOR_FRAME_GAP, centre_y + _FRAME_HALF_HEIGHT)
 
 
 def tap_callout_definitions(
@@ -413,11 +525,19 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
         label="arm centreline section",
     )
+    locator_x = _front_x(LOCATOR_SITES_MM[0][0])
+    locator_section = create_section_view(
+        adapter, front,
+        line_start=(locator_x, _front_y(-PIVOT_END_R) - SECTION_LINE_OVERRUN),
+        line_end=(locator_x, _front_y(PIVOT_END_R) + SECTION_LINE_OVERRUN),
+        view_xy=LOCATOR_SECTION_CENTER, section_label="B", scale=VIEW_SCALE,
+        label="matched locating sockets transverse section",
+    )
     end = place_view(adapter, str(SOURCE), "*Right", *END_CENTER, scale=VIEW_SCALE)
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
     )
-    for view in (front, section, end, iso):
+    for view in (front, section, locator_section, end, iso):
         set_hidden_lines_removed(adapter, view)
 
     annotations = [
@@ -427,6 +547,10 @@ async def build(adapter: Any) -> dict[str, str]:
             keep=FRONT_KEEP,
             view_label="front",
             dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+        *hidden_sketches.curate_view_dimensions(
+            adapter, locator_section, keep=LOCATOR_SECTION_KEEP,
+            view_label="section B-B locating sockets", dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
         *hidden_sketches.curate_view_dimensions(
             adapter,
@@ -447,7 +571,100 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_reference_dimensions(adapter, annotations, ("PivotBoreDia",))
     _set_stock_text(adapter, annotations)
+    # Model-owned circular zones and actual feature datums. BASIC stations
+    # are imported from the part; no drawing-only coordinate tolerances.
+    bore_dia = {
+        datum.letter: datum.face.diameter_mm
+        for datum in PART_DATUMS if datum.letter != "A"
+    }
+    pin_r = bore_dia["C"] / 2.0
+    placements = {
+        "datum:A": PmiDrawingPlacement(
+            section, (_front_x(22.0), SECTION_CENTER[1] + 0.018),
+            attachment_xy=model_point_in_view(
+                adapter, section, (0.022, 0.0, 0.0), label="arm front datum",
+            ),
+        ),
+        # Datum tags on a bore are picked by a SHEET POINT on the rim
+        # (solidworks-drawing-layout-tuning.md section h): an edge-object
+        # pick leaves the tag at its default drop beside the bore, and run 5
+        # read datum B 35.5 mm from its request.  The point is projected
+        # from the rim's model position, on the bearing toward the tag.
+        "datum:B": PmiDrawingPlacement(
+            front, (_front_x(0.0) - 0.024, FRONT_CENTER[1] + 0.020),
+            attachment_xy=_rim_point(
+                adapter, front, station_mm=0.0, radius_mm=bore_dia["B"] / 2.0,
+                bearing_deg=135.0, label="datum B pivot bore rim",
+            ),
+        ),
+        "datum:C": PmiDrawingPlacement(
+            front, (_front_x(PIN_STATION) + 0.018, FRONT_CENTER[1] - 0.009),
+            attachment_xy=_rim_point(
+                adapter, front, station_mm=PIN_STATION, radius_mm=bore_dia["C"] / 2.0,
+                bearing_deg=-27.0, label="datum C pin bore rim",
+            ),
+        ),
+        # Above the arm, landing on the pin bore's upper right rim, clear of
+        # datum C's leader below it and of the locator frame left of it.
+        "feed_stud_position": PmiDrawingPlacement(
+            front, (_front_x(PIN_STATION) + 0.018, FRONT_CENTER[1] + 0.0285),
+            attachment_xy=_rim_point(
+                adapter, front, station_mm=PIN_STATION, radius_mm=pin_r,
+                bearing_deg=50.0, label="feed stud position pin bore rim",
+            ),
+        ),
+        # The projected-zone frames stand in section A-A on the side their
+        # zone projects to (the plate taps' rear, the stud's front), each
+        # leader entering the hole's mouth and landing on its wall 1 mm in.
+        "plate_tap_1_position": PmiDrawingPlacement(
+            section, (0.070, SECTION_CENTER[1] - 0.0094),
+            attachment_xy=_wall_point(
+                adapter, section, x_mm=PLATE_TAP_STATIONS[0] + _PLATE_DRILL_R,
+                z_mm=THICKNESS - 1.0, label="plate tap 1 wall",
+            ),
+        ),
+        "plate_tap_2_position": PmiDrawingPlacement(
+            section, (0.178, SECTION_CENTER[1] - 0.0094),
+            attachment_xy=_wall_point(
+                adapter, section, x_mm=PLATE_TAP_STATIONS[1] - _PLATE_DRILL_R,
+                z_mm=THICKNESS - 1.0, label="plate tap 2 wall",
+            ),
+        ),
+        "feed_stud_projected_axis": PmiDrawingPlacement(
+            section, (0.145, SECTION_CENTER[1] + 0.020),
+            attachment_xy=_wall_point(
+                adapter, section, x_mm=PIN_STATION + pin_r, z_mm=1.0,
+                label="feed stud projected axis pin bore wall",
+            ),
+        ),
+        "arm_rear_parallel": PmiDrawingPlacement(
+            section, (0.279, SECTION_CENTER[1] - 0.014),
+            attachment_xy=model_point_in_view(
+                adapter, section, (0.098, 0.0, THICKNESS / 1000.0),
+                label="actual rear mounting face parallelism",
+            ),
+        ),
+        **{
+            f"arm_locator_{index}_position": PmiDrawingPlacement(
+                locator_section, _locator_frame_xy(y),
+                attachment_xy=model_point_in_view(
+                    adapter, locator_section,
+                    (
+                        x / 1000.0,
+                        (y - math.copysign(LOCATOR_HOLE_DIA_MM / 2.0, y)) / 1000.0,
+                        (THICKNESS - 1.0) / 1000.0,
+                    ),
+                    label=f"arm locator {index} inner wall",
+                ),
+            ) for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1)
+        },
+    }
+    project_part_pmi(
+        adapter, placements=placements, datums=PART_DATUMS,
+        controls=GEOMETRIC_CONTROLS, label="transgear arm locating frame",
+    )
     _overall_reference(adapter, front)
     for view, label in ((front, "front"), (end, "end")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
@@ -465,8 +682,10 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         _set_tap_callout_text(callout, qualifier, label=label)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    if add_note(adapter, NOTES_TEXT, *NOTES_XY) is None:
+        raise RuntimeError("failed to add the arm's matched-pair notes")
 
-    return await finalize_drawing(
+    artefacts = await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Arm Manufacturing Drawing",
@@ -478,6 +697,11 @@ async def build(adapter: Any) -> dict[str, str]:
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=len(TAP_CALLOUTS),
     )
+    require_saved_projected_gtols(
+        adapter, artefacts["drawing"], GEOMETRIC_CONTROLS,
+        label="saved transgear arm drawing projected axes",
+    )
+    return artefacts
 
 
 def _parse_args() -> argparse.Namespace:

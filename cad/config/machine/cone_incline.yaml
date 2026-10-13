@@ -1,22 +1,25 @@
 
 cone_incline:
   # True-cone incline derived from exact tracking: sin(i) = radius_step / z_pitch.
-  # radius_step = 3*25.4/DP = 1.5295 (pitch-radius step per 6 teeth at DP 49.82);
-  # z_pitch = drum_seat*cos(asin(radius_step/drum_seat)) = 7.0565. -> incline = 12.5188 deg.
-  # NOTE drum_seat_nominal is RE-TUNED (7.5 -> 7.2204) so z_pitch stays 7.0565 =
-  # the channels.station_pitch grid: holding the channel spine fixed keeps the
-  # rocker/lever/spring/output machinery in place when the gear module shrinks.
-  radius_step_mm: 1.5295
-  drum_seat_nominal_mm: 7.2204
-  derived_incline_deg: 12.5188     # documentation only; code recomputes from the two inputs
-  source: "M6.7 true-cone derivation, re-tuned for DP 49.82 (ch13 OD 62.2)"
-  confidence: low
+  # Current 48DP design: radius_step = 3*25.4/48 = 1.5875 mm per 6 teeth.
+  # z_pitch = sqrt(drum_seat^2 - radius_step^2) = 7.0565 mm; i = 13.001107 deg.
+  # drum_seat_nominal is re-tuned to preserve the channels.station_pitch grid;
+  # the cone's along-shaft seat pitch is z_pitch*cos(i), not drum_seat_nominal.
+  # Earlier 49.82DP / OD62.2 photo-scale geometry is historical evidence only.
+  radius_step_mm: 1.5875
+  drum_seat_nominal_mm: 7.232865856629721
+  derived_incline_deg: 13.001107353689502
+  source: "2026-10-08 selected 48DP PA20 design; M6.7 exact-tracking derivation on the retained 7.0565 mm channel grid"
+  confidence: high                 # selected geometry; not a measured historical incline
   notes: >-
-    Incline is DERIVED, not measured: sin(i)=radius_step/z_pitch where
-    z_pitch=sqrt(drum_seat^2 - radius_step^2)=7.0565, giving i=12.5188°. The
-    smaller radius_step (1.5295 vs the old 2.54) follows from the finer module
-    DP 49.82 (ch13 OD 62.2); drum_seat_nominal is re-tuned to 7.2204 so z_pitch
-    stays locked to the channels.station_pitch 7.0565 grid (the cone seat pitch
-    along the shaft is now z_pitch*cos(i) = 6.8888, cone stack ~137.8 mm). The
-    naive arcsin(radius_step/drum_seat) is wrong (mistakes the drum chord for the
-    pitch advance) — see the solidworks-modeling-pitfalls memory.
+    Incline is derived from the selected 48DP train, not measured from a
+    photograph: sin(i)=radius_step/z_pitch, with radius_step=1.5875 mm and
+    z_pitch=sqrt(drum_seat^2-radius_step^2)=7.0565 mm, giving
+    i=13.0011073536895 degrees. The 7.232865856630 mm drum-seat input keeps
+    the channel grid fixed; the actual along-shaft cone seat pitch is
+    z_pitch*cos(i)=6.875611682 mm and the faced cone width is 6.8756 mm.
+    The former 49.82DP radius step 1.5295 mm, 7.2204 mm drum-seat input and
+    approximately 12.5188-degree incline belong to the superseded
+    photo-scale reconstruction, not the current manufacturing dimensions.
+    arcsin(radius_step/drum_seat) is not the exact-tracking incline: it
+    mistakes the drum chord for the pitch advance.

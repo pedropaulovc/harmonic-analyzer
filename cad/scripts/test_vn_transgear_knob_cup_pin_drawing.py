@@ -14,7 +14,6 @@ import vn_transgear_knob_cup_pin_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _test_stock_recipes import discovered_recipes
-from diagnostics import diag_build_98296A026 as cross_pin_recipe
 from diagnostics import diag_build_98296A031 as recipe
 
 STEM = "vn-transgear-knob-cup-pin"
@@ -62,13 +61,16 @@ def test_recipe_is_the_named_size_as_an_installed_tube() -> None:
     assert 0.0 < recipe.PIN_ID < recipe.PIN_OD
 
 
-def test_recipe_is_the_98296a026_section_in_a_longer_length() -> None:
-    """98296A031 is a length row of MHA-VN-037's pin: same section, longer."""
-    assert recipe.PIN_OD == pytest.approx(cross_pin_recipe.PIN_OD)
-    assert recipe.PIN_ID == pytest.approx(cross_pin_recipe.PIN_ID)
-    assert recipe.PIN_LEN > cross_pin_recipe.PIN_LEN
-    ratio = recipe.V_PIN / cross_pin_recipe.V_PIN
-    assert ratio == pytest.approx(recipe.PIN_LEN / cross_pin_recipe.PIN_LEN)
+def test_recipe_section_matches_the_retained_catalogue_authority() -> None:
+    """98296A031 retains its own catalogue section and 5/8-in length."""
+    from _mcmaster_98296a031 import SPRING_PIN_SIZE, WALL_T
+
+    dia, length = SPRING_PIN_SIZE
+    assert spec.PIN_DIA == pytest.approx(dia)
+    assert spec.PIN_LEN == pytest.approx(length)
+    assert spec.WALL_T == pytest.approx(WALL_T)
+    assert recipe.PIN_OD == pytest.approx(dia)
+    assert recipe.PIN_ID == pytest.approx(dia - 2.0 * WALL_T)
 
 
 def test_match_drilled_hole_band_grips_the_pin() -> None:

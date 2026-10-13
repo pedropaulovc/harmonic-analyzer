@@ -99,6 +99,7 @@ from _assembly_postbuild import (
     author_dof_drives,
     load_dof_manifest,
 )
+from _chain_mounts import mounted_wheels
 from _interference_contracts import allowed_interference_pairs
 from _native_spring_contact import assert_assembly_spring_contacts
 # component iteration helpers (read-only)
@@ -844,6 +845,16 @@ async def _reopen_assembly_rest_pose(adapter: Any, name: str, sldasm: Path) -> N
         check(f"activate {REST}", await adapter.set_active_configuration(REST))
 
 
+def _soundness_chain_mounts(name: str) -> Any:
+    """The authored wheel mounts for an assembly whose contract says it carries
+    the roller chain, else None: its build passes them to check_no_interference
+    (541011de0), so the soundness gate must too, or every chain-link-on-sprocket
+    mesh contact reads as interference."""
+    if not assembly_contract(name).carries_chain:
+        return None
+    return mounted_wheels()
+
+
 def _run_soundness_battery(
     adapter: Any, name: str, report: Report, rebuilt: Any
 ) -> None:
@@ -891,6 +902,7 @@ def _run_soundness_battery(
         lambda: check_no_interference(
             adapter,
             allowed_pairs=allowed_interference_pairs(name),
+            chain_mounts=_soundness_chain_mounts(name),
         ),
     )
     if name in ("ch-channel", "sm-summing"):
@@ -1028,6 +1040,7 @@ async def _verify_static_one(
         lambda: check_no_interference(
             adapter,
             allowed_pairs=allowed_interference_pairs(name),
+            chain_mounts=_soundness_chain_mounts(name),
         ),
     )
     if name in ("ch-channel", "sm-summing"):
@@ -1403,7 +1416,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     pose assert the wire still behaves like a wire:
 
     * wire-rides-hub: the wire's centreline stays at the stand-off tangency
-      radius of the wheel axis (hub r + wire r + clearance);
+      radius of the wheel axis (drum r + wire r + clearance);
     * hook-ball-holds: the wire's hook end stays on the fixture's anchor;
     * coupling-alive: the wheel angle actually spans with the lever (the yoke
       transmits);
@@ -1444,7 +1457,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     # Machine anchors for the invariants (the magnifier is authored
     # machine-handed, #151 -- constants feed straight through).
     axis_xy = (_mag.WHEEL_X, _mag.WHEEL_BAR_Y)  # wheel axis, along Z
-    r_expect = _wire.HUB_DIA / 2.0 + _wire.WIRE_DIA / 2.0 + _wire.CLEARANCE
+    r_expect = _wire.DRUM_DIA / 2.0 + _wire.WIRE_DIA / 2.0 + _wire.CLEARANCE
 
     def _xform(comp: str) -> tuple[list[list[float]], list[float]]:
         a = component_transform(adapter, comp)

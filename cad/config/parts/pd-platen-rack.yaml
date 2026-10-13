@@ -1,6 +1,19 @@
 pd-platen-rack:
+  title: Platen Rack and Backer
   number: MHA-PD-005
+  # Purchased toothed stock only; MHA-PD-005 is the fabricated rack/backer.
+  stock_name: Purchased Brass Rack Stock, 32DP PA20, 3/16 in Square, 48 in
+  supplier: SDP/SI
+  supplier_skus: [A 1B12-Y324]
+  # https://shop.sdp-si.com/a-1b12-y324.html
+  # https://sdp-si.com/D820/PDFS/Gears.pdf p. 1-193: Y = PA20; F = T = 3/16 in.
+  # Commercial rack; no published pitch-accuracy grade, inventory or certification claim.
   material: Brass
+  material_specification: "SDP/SI A 1B12-Y324 brass rack stock, 32DP PA20, 48 in, 3/16 in square; brass backer"
+  finish: "rack as purchased; backer and solder fillet cleaned"
+  quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
-  process: "gear cutting (hob/shaper)"
+  process: "fabricated from purchased SDP/SI A 1B12-Y324 rack stock, cut to 269.64 mm and soft-soldered to the existing 7.2375 x 6 mm brass backer; backer soft-soldered to the platen"
+  installation_notes: |-
+    CUT TO 269.6 MM; SOFT-SOLDER TO BACKER; SET MESH AT ASSEMBLY.

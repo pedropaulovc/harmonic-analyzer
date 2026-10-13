@@ -3006,6 +3006,8 @@ def task_check():
         SCRIPTS_DIR / "test_export_features.py",
         SCRIPTS_DIR / "test_export_feature_faces.py",
         SCRIPTS_DIR / "test_features_bound.py",
+        # Shared native gear-gap authoring/status contracts use bounded fakes.
+        SCRIPTS_DIR / "test_gear.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_release_diff.py",
@@ -3013,6 +3015,9 @@ def task_check():
         # Builder gates handed to save's final deep rebuild (drive-train) must
         # read AFTER it, cost no second rebuild, and still block the save.
         SCRIPTS_DIR / "test_assembly_save_solved_gates.py",
+        # Persisted display data must fail closed before assembly publication.
+        SCRIPTS_DIR / "test_assembly_save.py",
+        REPO_ROOT / "tests" / "test_saved_display_data.py",
         # The copied-mate safeguard must keep failing CLOSED: an unreadable
         # GetErrorCode2 or a truncated MateGroup scan has to raise/re-walk, never
         # read as "this copy is clean".
@@ -3069,15 +3074,30 @@ def task_check():
         # The supplied tooth-side cones must match their native sections and
         # the finished-part volume gate in every bought-blank configuration.
         SCRIPTS_DIR / "test_pd_transgear_removable_chamfer.py",
+        # Unchanged ANSI #25 chain: paid wrap/sag/strand-order premise;
+        # the inherited native continuous-arc guide is not a seating certificate.
+        SCRIPTS_DIR / "test_paper_drive_chain_fit.py",
         # The transgear hanger's screwed joints, pivot head play and the latch
         # pin's press, judged at the printed bands (transgear_hanger_joints).
         SCRIPTS_DIR / "test_transgear_hanger_joints.py",
+        # Matched stock-dowel registration and paid loaded plate motion.
+        SCRIPTS_DIR / "test_paper_drive_arm_registration.py",
         # The #6-32 knife hanger's tap web, screw reach and dowel stack at the
         # printed bands, and the retired 1/2-13 tap failing the same web formula.
         SCRIPTS_DIR / "test_knife_hanger_worst_case.py",
         # The paper-drive interference rows re-derived from their owner specs
         # (_interference_contracts writes them as literals).
         SCRIPTS_DIR / "test_pd_paper_drive_interference_contracts.py",
+        # Closed-form AGMA-style gates for the 12T:120T reducer and the feed
+        # pinion on the rack, plus one numeric flank-stepping cross-check.
+        SCRIPTS_DIR / "test_paper_drive_mesh_check.py",
+        # The integral pinion's finite cutter, running fits and retained bearings.
+        SCRIPTS_DIR / "test_pd48_knob_mechanics.py",
+        # Source-only adapter member/signature census; no SDK or native import.
+        SCRIPTS_DIR / "test_pd_transgear_adapter_contract.py",
+        # Finite purchased-rack ends and the complete recording-paper sweep.
+        SCRIPTS_DIR / "test_paper_drive_rack_travel.py",
+        SCRIPTS_DIR / "test_pd_platen_refit.py",
         # The kinematic probe's chain-ratio band separates the 12:24 tooth
         # ratio from the OD and pitch-circle couplings (verify:kinematics).
         SCRIPTS_DIR / "test_kinematic_probe_ratio.py",
@@ -3092,6 +3112,7 @@ def task_check():
         SCRIPTS_DIR / "test_drawing_specification_purity.py",
         SCRIPTS_DIR / "test_drawing_surface_finish_validation.py",
         SCRIPTS_DIR / "test_gtol_contracts.py",
+        SCRIPTS_DIR / "test_native_projected_zone.py",
         SCRIPTS_DIR / "test_part_owned_geometric_tolerances.py",
         SCRIPTS_DIR / "test_probe_surface_finish_pmi_telemetry.py",
         SCRIPTS_DIR / "test_surface_finish.py",
@@ -3108,6 +3129,9 @@ def task_check():
         # attributes the sheet no longer defines, and every check:* gate stayed
         # green (codex #416). Enrolled so the cross-sheet contracts are covered.
         SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
+        # Intended chain mesh follows the actual mounted instance pose, not
+        # configuration labels that may also name the loose spare.
+        SCRIPTS_DIR / "test_assembly_chain_mesh.py",
         # The ms-measuring-stick sub-assembly contract (2026-10-09): parked
         # pose, retention pairs, BOM numbers and the fully-fixed contract file.
         # Its YAML reads ride the gate's _CONFIG_YAMLS deps; its module imports
@@ -3116,6 +3140,8 @@ def task_check():
         # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
         # its three drive-train support pins red with every gate green.
         SCRIPTS_DIR / "test_dt_drive_train_support_layout.py",
+        # Native-STL gravity seam welding remains strict about holes and winding.
+        SCRIPTS_DIR / "test_dt_swing_gravity_collector.py",
         # The cone tip block's hold-down, embed-window and collar-air contracts
         # (I20/I22/I24/I31; prism ruling 2026-09-29) that
         # build_drive_train_assembly asserts at import.
@@ -3137,11 +3163,15 @@ def task_check():
         # (cascade -> integ merge, Main's restricted review).
         SCRIPTS_DIR / "test_module_constants_assigned_once.py",
         # Integ-branch tests that guard caught un-enrolled at #877 round 4.
-        SCRIPTS_DIR / "test_dt_cone_gear_mesh_design.py",
+        SCRIPTS_DIR / "test_standard_mesh_checks.py",
         SCRIPTS_DIR / "test_dt_cone_gear_seat_fit.py",
+        # Finite stock-cutter geometry is a production design contract.
+        SCRIPTS_DIR / "test_stock_form_cutter.py",
         SCRIPTS_DIR / "test_drawing_hidden_sketches.py",
         SCRIPTS_DIR / "test_dt_drive_train_steps.py",
         SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
+        # Supplier pose facts must stay independent of native replica recipes.
+        SCRIPTS_DIR / "test_vn_cone_pose_specs.py",
         SCRIPTS_DIR / "test_fit_bands.py",
         SCRIPTS_DIR / "test_printed_text_rulings.py",
         # ... and the #857 re-merge: its leader-geometry and replica-driver pins.
@@ -3149,9 +3179,6 @@ def task_check():
         SCRIPTS_DIR / "test_mcmaster_replica_driver.py",
         # ... and #906: the crank native-acceptance record pins.
         SCRIPTS_DIR / "test_crank_native_acceptance.py",
-        # ... and the fixed-centre 16T:64T crank mesh clearance.
-        SCRIPTS_DIR / "test_crank_mesh_stack.py",
-        SCRIPTS_DIR / "test_crank_mesh_studies_band.py",
         SCRIPTS_DIR / "test_crank_boss_rim.py",
         # ... and #937: the cylinder-bank layout bands and MHA-VN-034's set screw.
         SCRIPTS_DIR / "test_vn_arbor_set_screw.py",
@@ -3241,6 +3268,8 @@ def task_check():
     }
     recipe_test_deps = sorted(
         {
+            # Pytest discovers shared fixtures outside the import closure.
+            str((REPO_ROOT / "conftest.py").resolve()),
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
             *(str(path.resolve()) for path in machinist_review_contract_deps),

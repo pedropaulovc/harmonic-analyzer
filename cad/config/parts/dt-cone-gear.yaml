@@ -12,4 +12,11 @@ dt-cone-gear:
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
-  process: "gear cutting (hob/shaper)"
+  process: "gear cutting: 48DP PA20 cutter-native cone family; actual specified finite stock/custom tool authority governs blank and plunge"
+  # The current spec owns the actual cutter support, tip and floor geometry;
+  # no ideal upper-flank continuation is a manufacturing substitute.
+  # Earlier changed-profile studies refused 42/48/54T and other root/backlash cases.
+  # T006 is cut by the custom DT6-FORM1 N6PA20 tool, option (a) (user ruling
+  # 2026-10-10): root R1.10 with a drum-tip trochoid relief, on the 1/32 in
+  # journal; it is the named contact-ratio exception (dt_cone_gear_spec,
+  # test_standard_mesh_checks). The R1.491 tool with root MIN 2.346 is retired.
