@@ -218,6 +218,35 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   before closing the seat. The rocker keeps E at Y110, the fatal 3 mm air
   requirement, and its 4 mm caption target.
 
+- **Native detail-circle arrays describe allocation, not just used records.**
+  The rocker R16 farm run `20261012T230027778Z-c441f84fade64106b64bfe9537883c2b`
+  at `556f06825161ed9fde16f434d78da13638ea694f`
+  ([native evidence](https://github.com/pedropaulovc/harmonic-analyzer/pull/1354#issuecomment-6134936171))
+  verified both complete 3.5 mm Century Gothic captions with
+  `HasMultipleFonts == False` and both 3.5 mm source-circle formats. Its only
+  refusal was the assumption that the parsed circle records must consume
+  the entire `GetDetailCircleInfo2` array: the native array contained **69
+  finite doubles**, with count 2, two complete 16-double zero-arrow records,
+  both displayed heights 0.0035 m, and **36 unused zero doubles**.
+
+  Read the authoritative
+  [`IView.GetDetailCircleCount2`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IView~GetDetailCircleCount2.html)
+  return/out pair `(count, Size)` and require an actual two-integer tuple:
+  count must be exactly 2 and `Size` must equal the complete info-array
+  length. The official
+  [Get Detail Circle Information VBA example](https://help.solidworks.com/2026/english/api/sldworksapi/Get_Detail_Circle_Information_Example_VB.htm)
+  asserts count equals `info[0]` and `Size == UBound(info) + 1`, then walks
+  only the declared circles/arrows; it does **not** assert the final record
+  index equals the allocated length. Follow that count-driven traversal,
+  rejecting every nonnumeric/nonfinite value, incomplete 16-double circle
+  header, nonintegral/negative arrow count, and incomplete nine-double arrow
+  record, including the last circle's arrows, before using the shared decoder.
+  Accept unused declared allocation **only if every value is exactly zero**;
+  nonzero data, NaN, garbage, and undeclared appended zeros remain fatal.
+  Zero-filled unused allocation is observed R16 evidence, **not a documented
+  zero-padding guarantee** or an assumed fixed capacity. Keep the existing
+  1e-7 m displayed-height tolerance and original-exception forensic capture.
+
 ## Refusal catalogue — do / don't
 
 **a. `IDisplayDimension::OffsetText` on a radial or diametric dimension.**

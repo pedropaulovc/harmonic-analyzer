@@ -3748,6 +3748,7 @@ def native_caption_style(bound, monkeypatch):
     front.GetDetailCircles = lambda: [circles["E"], circles["D"]]
 
     display_order, display_reads = ["D", "E"], []
+    circle_padding = []
 
     def circle_info():
         display_reads.append({label: tuple(circle.writes) for label, circle in circles.items()})
@@ -3760,9 +3761,15 @@ def native_caption_style(bound, monkeypatch):
             ])
             for arrow in circle.arrows:
                 values.extend(arrow)
+        values.extend(circle_padding)
         return tuple(values)
 
     front.GetDetailCircleInfo2 = circle_info
+    # Native allocation metadata is independent of a replaced info method.
+    front.GetDetailCircleCount2 = lambda: (
+        len(circles),
+        1 + sum(16 + 9 * len(circle.arrows) for circle in circles.values()) + len(circle_padding),
+    )
     events, captures = [], []
     extension = _StyleDocExtension(notes, circles)
     def redraw():
@@ -3780,6 +3787,7 @@ def native_caption_style(bound, monkeypatch):
         adapter=adapter, front=front, notes=notes, views=views, circles=circles,
         source=_StyleNote("source", ordinary_height=0.0035), events=events, captures=captures,
         extension=extension, display_order=display_order, display_reads=display_reads,
+        circle_padding=circle_padding,
     )
 
 
@@ -4178,9 +4186,9 @@ def test_native_circle_display_height_mismatch_is_fatal_after_both_writes(native
 
 
 @pytest.mark.parametrize("defect", [
-    "missing-info", "empty-info", "wrong-count", "nonnumeric-info", "nonfinite-info",
-    "truncated-header", "truncated-arrow", "negative-arrows", "fractional-arrows",
-    "trailing-data",
+    "missing-info", "empty-info", "wrong-count", "fractional-count", "nonnumeric-info",
+    "boolean-info", "nonfinite-info", "truncated-header", "truncated-arrow",
+    "negative-arrows", "fractional-arrows", "trailing-data",
 ])
 def test_native_circle_display_batch_requires_complete_flat_shape_and_arrows(native_caption_style, defect):
     case = native_caption_style
@@ -4194,8 +4202,12 @@ def test_native_circle_display_batch_requires_complete_flat_shape_and_arrows(nat
             return ()
         if defect == "wrong-count":
             values[0] = 3.0
+        elif defect == "fractional-count":
+            values[0] = 2.5
         elif defect == "nonnumeric-info":
             values[1] = "layer"
+        elif defect == "boolean-info":
+            values[1] = False
         elif defect == "nonfinite-info":
             values[1] = float("nan")
         elif defect == "truncated-header":
@@ -4216,14 +4228,148 @@ def test_native_circle_display_batch_requires_complete_flat_shape_and_arrows(nat
         _normalize_style(case)
     assert case.captures == [caught.value]
     assert case.display_reads == [{label: ((False, 0.0035),) for label in ("D", "E")}]
+    if defect == "trailing-data":
+        assert case.front.GetDetailCircleCount2() == (2, 33)
+        assert "count/size mismatch" in str(caught.value)
 
 
-@pytest.mark.parametrize("arrow_counts", [(0, 1), (1, 2), (2, 0)])
-def test_native_circle_display_height_batch_accepts_complete_variable_arrow_records(native_caption_style, arrow_counts):
+@pytest.mark.parametrize("metadata", [
+    None, 2, (), (2,), (2, 33, 0), [2, 33],
+    (True, 33), (False, 33), (2.0, 33), ("2", 33), (None, 33),
+    (float("nan"), 33), (float("inf"), 33), ((2,), 33),
+    (0, 33), (-1, 33), (1, 33), (3, 33),
+    (2, True), (2, False), (2, 33.0), (2, "33"), (2, None),
+    (2, float("nan")), (2, float("inf")), (2, (33,)), (2, 0), (2, -1),
+])
+def test_native_circle_display_batch_requires_strict_count_allocation_pair(native_caption_style, metadata):
+    case = native_caption_style
+    case.front.GetDetailCircleCount2 = lambda: metadata
+    with pytest.raises(RuntimeError, match="invalid native circle display data metadata") as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+    assert case.display_reads == []
+    assert all(circle.writes == [(False, 0.0035)] for circle in case.circles.values())
+
+
+@pytest.mark.parametrize("size", [1, 32, 34, 69])
+def test_native_circle_display_batch_requires_independent_allocation_size(native_caption_style, size):
+    case = native_caption_style
+    case.front.GetDetailCircleCount2 = lambda: (2, size)
+    with pytest.raises(RuntimeError, match="native circle display data count/size mismatch") as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+    assert case.display_reads == [{label: ((False, 0.0035),) for label in ("D", "E")}]
+
+
+@pytest.mark.parametrize("defect", [
+    "missing-records", "first-header", "last-header", "first-arrow", "last-arrow",
+    "first-arrow-consumes-next-header", "last-arrow-overflow",
+])
+def test_native_circle_display_batch_bounds_every_record_before_decode(native_caption_style, monkeypatch, defect):
+    case = native_caption_style
+    original = case.front.GetDetailCircleInfo2
+    sizes = {
+        "missing-records": 1, "first-header": 16, "last-header": 32,
+        "first-arrow": 25, "last-arrow": 41,
+        "first-arrow-consumes-next-header": 33, "last-arrow-overflow": 33,
+    }
+    case.front.GetDetailCircleCount2 = lambda: (2, sizes[defect])
+
+    def truncated_info():
+        values = list(original())
+        if defect == "missing-records":
+            return tuple(values[:1])
+        if defect == "first-header":
+            return tuple(values[:16])
+        if defect == "last-header":
+            return tuple(values[:-1])
+        if defect == "first-arrow":
+            values[16] = 1.0
+            values = values[:17] + [0.0] * 8
+        elif defect == "last-arrow":
+            values[32] = 1.0
+            values.extend([0.0] * 8)
+        elif defect == "first-arrow-consumes-next-header":
+            values[16] = 1.0
+        elif defect == "last-arrow-overflow":
+            values[32] = 9999.0
+        return tuple(values)
+
+    case.front.GetDetailCircleInfo2 = truncated_info
+    monkeypatch.setattr(drawing, "_detail_circles", lambda _info: pytest.fail("incomplete native records reached decoder"))
+    with pytest.raises(RuntimeError, match="truncated native circle (display data|arrow record)") as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+    assert case.display_reads == [{label: ((False, 0.0035),) for label in ("D", "E")}]
+    if defect in ("first-arrow", "last-arrow", "last-arrow-overflow"):
+        assert "arrow record" in str(caught.value)
+
+
+def test_native_circle_display_batch_accepts_exact_r16_allocated_vector(native_caption_style, monkeypatch):
+    case = native_caption_style
+    # Exact native R16 records from artifact 3190, followed by its 36 zero doubles.
+    info = (
+        2.0,
+        -1.0, 0.18, 0.1716763399685608, 0.0,
+        0.18336249999999998, 0.1716763399685608, 0.0,
+        0.18336249999999998, 0.1716763399685608, 0.0, 3.0,
+        0.16538373244147153, 0.15733303678929766, -1.1181611215881618e-15, 0.0035, 0.0,
+        -1.0, 0.24975295579711881, 0.17771793560798294, 0.0,
+        0.25571249057224477, 0.17771793560798294, 0.0,
+        0.25571249057224477, 0.17771793560798294, 0.0, 3.0,
+        0.2626037190635451, 0.15018450836120403, -1.0682432143744043e-15, 0.0035, 0.0,
+    ) + (0.0,) * 36
+    original_info, original_decode = case.front.GetDetailCircleInfo2, drawing._detail_circles
+    decoded_inputs = []
+
+    def native_info():
+        original_info()
+        return info
+
+    def record_decode(values):
+        decoded_inputs.append(values)
+        return original_decode(values)
+
+    case.front.GetDetailCircleCount2 = lambda: (2, 69)
+    case.front.GetDetailCircleInfo2 = native_info
+    monkeypatch.setattr(drawing, "_detail_circles", record_decode)
+    assert len(info) == 69
+    assert info[15] == info[31] == 0.0035
+    _normalize_style(case)
+    assert decoded_inputs == [info]
+    assert case.display_reads == [{label: ((False, 0.0035),) for label in ("D", "E")}]
+    assert case.captures == []
+
+
+@pytest.mark.parametrize("padding_index", [0, 35])
+@pytest.mark.parametrize("unused_value", [
+    1.0, -1.0, 5e-324, float("nan"), float("inf"), -float("inf"),
+    None, "0", False, (0.0,),
+])
+def test_native_circle_display_batch_rejects_corrupted_declared_unused_allocation(native_caption_style, monkeypatch, padding_index, unused_value):
+    case = native_caption_style
+    case.circle_padding.extend([0.0] * 36)
+    case.circle_padding[padding_index] = unused_value
+    assert case.front.GetDetailCircleCount2() == (2, 69)
+    monkeypatch.setattr(drawing, "_detail_circles", lambda _info: pytest.fail("corrupted native allocation reached decoder"))
+    with pytest.raises(RuntimeError, match="native circle display data") as caught:
+        _normalize_style(case)
+    assert case.captures == [caught.value]
+    assert case.display_reads == [{label: ((False, 0.0035),) for label in ("D", "E")}]
+
+
+@pytest.mark.parametrize("arrow_counts", [(0, 0), (0, 1), (1, 2), (2, 0)])
+@pytest.mark.parametrize("padding_size", [0, 7, 36])
+@pytest.mark.parametrize("container", [tuple, list])
+def test_native_circle_display_height_batch_accepts_complete_variable_arrow_records(native_caption_style, arrow_counts, padding_size, container):
     case = native_caption_style
     arrow = (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0005, 0.001, 0.0)
     for label, count in zip(("D", "E"), arrow_counts, strict=True):
         case.circles[label].arrows = [arrow] * count
+    case.circle_padding.extend([0.0] * padding_size)
+    original = case.front.GetDetailCircleInfo2
+    case.front.GetDetailCircleInfo2 = lambda: container(original())
+    assert case.front.GetDetailCircleCount2() == (2, 33 + 9 * sum(arrow_counts) + padding_size)
     _normalize_style(case)
     assert case.display_reads == [{label: ((False, 0.0035),) for label in ("D", "E")}]
     assert case.captures == []
@@ -4260,7 +4406,7 @@ def test_native_font_quantization_is_small_not_a_pixel_or_point_fallback(native_
         assert case.captures == []
 
 
-@pytest.mark.parametrize("phase", ["source", "document-get", "document-set", "caption", "circle", "circle-display-batch"])
+@pytest.mark.parametrize("phase", ["source", "document-get", "document-set", "caption", "circle", "circle-count-batch", "circle-display-batch"])
 @pytest.mark.parametrize("capture_fails", [False, True])
 def test_style_refusals_preserve_original_exception_and_forensics_before_seat_close(native_caption_style, monkeypatch, phase, capture_fails):
     case = native_caption_style
@@ -4279,6 +4425,8 @@ def test_style_refusals_preserve_original_exception_and_forensics_before_seat_cl
         case.notes["D"].annotation.GetDisplayData = refuse
     elif phase == "circle":
         case.circles["D"].GetTextFormat = refuse
+    elif phase == "circle-count-batch":
+        case.front.GetDetailCircleCount2 = refuse
     else:
         case.front.GetDetailCircleInfo2 = refuse
     def capture(adapter, _label, message, **context):
@@ -4298,7 +4446,7 @@ def test_style_refusals_preserve_original_exception_and_forensics_before_seat_cl
     assert caught.value is original
     assert events == ["refusal", "capture", "seat-close"]
     assert bool(warnings) is capture_fails
-    if phase == "circle-display-batch":
+    if phase in ("circle-count-batch", "circle-display-batch"):
         assert all(circle.writes == [(False, 0.0035)] for circle in case.circles.values())
 
 

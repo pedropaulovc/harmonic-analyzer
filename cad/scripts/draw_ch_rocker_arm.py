@@ -964,20 +964,33 @@ def _require_detail_circle_display_heights(front: Any, height: float) -> None:
     # Every entry must have the same sourced height, so no anchor/order join
     # is needed. Keep the complete flat-record/arrow validation before decoding.
     front = _early_bound(front, "IView")
+    metadata = front.GetDetailCircleCount2()
+    if (type(metadata) is not tuple or len(metadata) != 2
+            or any(type(value) is not int for value in metadata)
+            or metadata[0] != 2 or metadata[1] <= 0):
+        raise RuntimeError(f"detail D/E: invalid native circle display data metadata={metadata!r}")
+    count, size = metadata
     info = front.GetDetailCircleInfo2()
-    if (type(info) not in (tuple, list) or not info or info[0] != 2
+    if (type(info) not in (tuple, list) or not info
             or any(type(value) not in (float, int) or not math.isfinite(value) for value in info)):
         raise RuntimeError(f"detail D/E: invalid native circle display data={info!r}")
+    if info[0] != count or len(info) != size:
+        raise RuntimeError(f"detail D/E: native circle display data count/size mismatch: metadata={metadata!r}, info={info!r}")
     index = 1
-    for _number in range(2):
-        if index + 16 > len(info):
+    for number in range(count):
+        if index + 16 > size:
             raise RuntimeError(f"detail D/E: truncated native circle display data={info!r}")
         arrows = info[index + 15]
         if arrows < 0 or arrows != int(arrows):
             raise RuntimeError(f"detail D/E: invalid native circle arrow count={arrows!r}")
-        index += 16 + int(arrows) * 9
-    if index != len(info):
-        raise RuntimeError(f"detail D/E: malformed native circle display data={info!r}")
+        next_index = index + 16 + int(arrows) * 9
+        if next_index > size:
+            raise RuntimeError(f"detail D/E: truncated native circle arrow record: circle_index={number}, info={info!r}")
+        index = next_index
+    # The official example checks count/allocated size and loops declared
+    # records only. R16 observed unused allocation; accept only exact zeroes.
+    if any(info[unused] != 0 for unused in range(index, size)):
+        raise RuntimeError(f"detail D/E: nonzero unused native circle display data={info!r}")
     decoded = _detail_circles(info)
     if len(decoded) != 2:
         raise RuntimeError(f"detail D/E: expected exactly two native circle display-height readbacks={decoded!r}")
