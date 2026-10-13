@@ -638,7 +638,11 @@ Catalog specifications checked on September 10, 2026:
   4-40 slotted family table was read live on October 11, 2026 (the product
   page needs a login): 18-8 stainless steel pan head slotted screw, #4-40 UNC
   class 2A, right hand, 3/8 in under the head, fully threaded, flat tip, head
-  Ø0.219 in x 0.068 in, 100 ksi, ASME B18.6.3. The 0.068 in head stands
+  Ø0.219 in x 0.068 in, 100 ksi, ASME B18.6.3. The family table has no finish
+  column and the product detail still needs a login on October 13, 2026, so
+  the finish comes from two resellers that mirror McMaster's 91792A108 spec
+  table (reli-tool.com and lily-bearing.com, read October 13, 2026): passivated,
+  as for the other 18-8 slotted screws here. The 0.068 in head stands
   0.009 in prouder than the button head, so the guide lock is 1/16 in sheet
   as supplied rather than a 2.0 strip, which keeps the lock-station
   sweep clear of the transgear arm plate. The page gives no head profile, slot or tip, so

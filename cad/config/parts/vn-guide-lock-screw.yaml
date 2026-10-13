@@ -6,7 +6,7 @@ vn-guide-lock-screw:
   supplier_skus: [91792A108]
   material: AISI 304
   material_specification: "18-8 stainless steel, slotted pan head, fully threaded, ASME B18.6.3; McMaster-Carr 91792A108"
-  finish: plain
+  finish: passivated
   quantity: 8
   tolerance_class: machined_block
   fit_class: fastener_clearance
