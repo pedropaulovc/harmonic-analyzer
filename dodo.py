@@ -3195,6 +3195,9 @@ def task_check():
         # Its YAML reads ride the gate's _CONFIG_YAMLS deps; its module imports
         # ride module_deps_of.
         SCRIPTS_DIR / "test_ms_measuring_stick_assembly.py",
+        # The pen carriage's CG-on-rod-axis balance, paper stand-off and rider
+        # layout (pn_pen_carriage_geom) that build_pn_pen_assembly places from.
+        SCRIPTS_DIR / "test_pn_pen_carriage_geom.py",
         # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
         # its three drive-train support pins red with every gate green.
         SCRIPTS_DIR / "test_dt_drive_train_support_layout.py",
