@@ -15,13 +15,10 @@ drops through each ear's arch apex onto the pivot shaft's flat (user,
 
 The channel assembly inserts the NORTH bracket as IDENTITY and the SOUTH one
 turned Ry(180) about its bore axis, so both feet run OUTBOARD, away from the
-rocker stack, and end flush with the support's end faces (user-approved
-sketch, 2026-10-09). The two feet therefore differ in length: one part number,
-two configurations, ``S`` and ``N``, each carrying its own ``FootZ1`` and
-``HoleZ`` globals (``ch_pivot_bracket_sides`` derives them). Default is a
-bystander that is never placed: the S configuration exists before the first
-global so every equation row is born through ``IEquationMgr.Add3`` and stays
-configuration-scopable (the MHA-DT-003 lesson).
+rocker stack (user-approved sketch, 2026-10-09). One part serves both sides
+(#1341, option A): its foot ends flush with the south support end face and
+short of the north one (``ch_pivot_bracket_sides`` derives the foot end
+``FootZ1`` and hole station ``HoleZ`` from both sides).
 
 Layout (part frame; the section lives in ``ch_pivot_bracket_spec``): seat face
 at y = 0; origin under the bore, on the seat plane. Foot FOOT_W along X by
@@ -50,19 +47,14 @@ from __future__ import annotations
 import math
 import sys
 
-import _config
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _check import check
-from _com import _early_bound, _read_member
+from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
-from _rebuild import (
-    active_configuration_name,
-    assert_saved_configurations_regenerate,
-    force_rebuild,
-)
+from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
     SketchDims,
@@ -74,19 +66,10 @@ from _sketch import (
 )
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
-from _configuration_material import require_material_in_every_configuration
 from _drawing_tolerances import set_dimension_symmetric_tolerance
-from _grouped_bom_properties import apply_grouped_bom_properties
 from _hole_spec import blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
-from ch_pivot_bracket_sides import (
-    CONFIGURATION_NUMBER,
-    CONFIGURATIONS,
-    FOOT_LEN,
-    FOOT_Z1,
-    HOLE_STATION,
-    HOLE_Z,
-)
+from ch_pivot_bracket_sides import FOOT_LEN, FOOT_Z1, HOLE_STATION, HOLE_Z
 from ch_pivot_bracket_spec import (
     BORE_DIA,
     BORE_H,
@@ -108,10 +91,7 @@ from ch_pivot_bracket_spec import (
 PART_NAME = "ch-pivot-bracket"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel (ch14 p.27)
 
-# The features are authored in AUTHORING_CONFIG; the other configuration is
-# copied from it once the part is finished.
-AUTHORING_CONFIG = CONFIGURATIONS[0]
-V_FOOT = {name: FOOT_W * FOOT_H * FOOT_LEN[name] for name in CONFIGURATIONS}
+V_FOOT = FOOT_W * FOOT_H * FOOT_LEN
 # The ear block sits on the foot top, as wide as the foot: its sides merge
 # into the foot's, so the part stays one body and the volumes simply add.
 V_BLOCK = EAR_W * (BORE_H - FOOT_H) * EAR_T
@@ -126,10 +106,7 @@ V_TAP = (
     cross_hole_volume_mm3(TAP_DRILL_DIA, 2.0 * EAR_ARCH_R)
     - cross_hole_volume_mm3(TAP_DRILL_DIA, BORE_DIA)
 ) / 2.0
-V_TOTAL = {
-    name: V_FOOT[name] + V_BLOCK + V_ARCH - V_BORE - V_TAP - V_HOLE
-    for name in CONFIGURATIONS
-}
+V_TOTAL = V_FOOT + V_BLOCK + V_ARCH - V_BORE - V_TAP - V_HOLE
 if EAR_ARCH_R != EAR_W / 2.0 or BORE_H - EAR_ARCH_R <= FOOT_H:
     raise AssertionError("the ear boss must be the block's width and clear the foot")
 if EAR_W > FOOT_W:
@@ -150,54 +127,16 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
-def _apply_configuration_number(adapter, configuration: str, number: str) -> None:
-    """Write and read back one configuration's ``Number`` property."""
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    extension = _read_member(model, "Extension")
-    manager = adapter._attempt(
-        lambda: extension.CustomPropertyManager(configuration), default=None
-    )
-    if manager is None:
-        raise RuntimeError(f"CustomPropertyManager unavailable for {configuration}")
-    manager = _early_bound(manager, "ICustomPropertyManager")
-    # swCustomInfoText (30), swCustomPropertyReplaceValue (2).
-    adapter._attempt(lambda: manager.Add3("Number", 30, number, 2), default=None)
-    observed = str(
-        adapter._attempt(
-            lambda: model.GetCustomInfoValue(configuration, "Number"), default=""
-        )
-    )
-    if observed != number:
-        raise RuntimeError(
-            f"{configuration} Number readback {observed!r} != {number!r}"
-        )
-
-
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import (
-        CreateConfigurationParameters,
-        ExtrusionParameters,
-        SetGlobalVariableParameters,
-    )
+    from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
-    # Seed the authoring configuration before the first global: on a
-    # one-configuration model the equation manager falls back to Add2, whose
-    # rows do not take per-configuration values (build_dt_cone_gear).
-    check(
-        f"create_configuration {AUTHORING_CONFIG}",
-        await adapter.create_configuration(
-            CreateConfigurationParameters(
-                name=AUTHORING_CONFIG, comment="south pivot bracket"
-            )
-        ),
-    )
 
     # Editable knobs (Tools > Equations). mm suffix load-bearing (INCH document).
     await set_global(adapter, "FootW", f"{FOOT_W}mm")
     await set_global(adapter, "FootH", f"{FOOT_H}mm")
-    await set_global(adapter, "FootZ1", f"{FOOT_Z1[AUTHORING_CONFIG]}mm")
-    await set_global(adapter, "HoleZ", f"{HOLE_Z[AUTHORING_CONFIG]}mm")
+    await set_global(adapter, "FootZ1", f"{FOOT_Z1}mm")
+    await set_global(adapter, "HoleZ", f"{HOLE_Z}mm")
     await set_global(adapter, "EarW", f"{EAR_W}mm")
     await set_global(adapter, "EarT", f"{EAR_T}mm")
     await set_global(adapter, "BoreH", f"{BORE_H}mm")
@@ -211,7 +150,7 @@ async def build(adapter) -> dict[str, str]:
     # the (-W/2, -FootZ1) corner anchor (x then z; the anchor z lands at the
     # magnitude FootZ1 -- the magnifying-bracket Top-sketch idiom).
     half_w = FOOT_W / 2.0
-    foot_z1 = FOOT_Z1[AUTHORING_CONFIG]
+    foot_z1 = FOOT_Z1
     foot = SketchDims()
     check("create_sketch foot", await adapter.create_sketch("Top"))
     rect = [
@@ -236,7 +175,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Foot")
     drive_jobs.append(("D1@Foot", '"FootH"'))
-    expected = V_FOOT[AUTHORING_CONFIG]
+    expected = V_FOOT
     await volume_check(adapter, "foot", expected, 0.005 * expected)
 
     # Ear block: Front-plane rectangle x +-EAR_W/2, y FOOT_H..BORE_H,
@@ -345,10 +284,9 @@ async def build(adapter) -> dict[str, str]:
     # (u, v) = model (X, -Z)), cut both ways past the foot height. A
     # construction line on x = 0 from the ear's inboard face (FOOT_Z0, the
     # face fit-up sets and the S4 hold's Z0) to the hole centre carries the
-    # station, HoleStation = HoleZ + EarT / 2 per configuration
-    # (build_pd_transgear_disc_hub's oil-hole station idiom); the circle's
-    # centre sits on its end.
-    hole_z = HOLE_Z[AUTHORING_CONFIG]
+    # station, HoleStation = HoleZ + EarT / 2 (build_pd_transgear_disc_hub's
+    # oil-hole station idiom); the circle's centre sits on its end.
+    hole_z = HOLE_Z
     hole = SketchDims()
     check("create_sketch hole", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
@@ -371,7 +309,7 @@ async def build(adapter) -> dict[str, str]:
         f"{station}.start",
         f"{station}.end",
         "vertical_distance",
-        HOLE_STATION[AUTHORING_CONFIG],
+        HOLE_STATION,
         "hold-down hole station from the ear's inboard face",
     )
     hole.record("HoleStation", '"HoleZ" + "EarT" / 2')
@@ -414,80 +352,25 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    authored = V_TOTAL[AUTHORING_CONFIG]
     await volume_check(
-        adapter, "driven bracket (equations neutral)", authored, 0.005 * authored
+        adapter, "driven bracket (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
     )
 
-    # Every model edit precedes the split, so the copied configuration starts
-    # from a finished part (the MHA-DT-030 lesson: apply_material sets only the
-    # ACTIVE configuration's material).
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
 
-    for name in CONFIGURATIONS[1:]:
-        check(
-            f"create_configuration {name}",
-            await adapter.create_configuration(
-                CreateConfigurationParameters(name=name, comment="north pivot bracket")
-            ),
-        )
-    # Each side's foot end and hole station, set in its own configuration so
-    # neither inherits the other's.
-    for name in CONFIGURATIONS:
-        for variable, value in (("FootZ1", FOOT_Z1[name]), ("HoleZ", HOLE_Z[name])):
-            check(
-                f"{variable} = {value} in {name}",
-                await adapter.set_global_variable(
-                    SetGlobalVariableParameters(
-                        name=variable, expression=f"{value}mm", configuration=name
-                    )
-                ),
-            )
-    for name in (*CONFIGURATIONS[1:], AUTHORING_CONFIG):
-        check(f"activate {name}", await adapter.set_active_configuration(name))
-        if active_configuration_name(adapter) != name:
-            raise RuntimeError(f"configuration {name} did not activate")
-        await force_rebuild(adapter)
-        await volume_check(
-            adapter, f"{name} bracket", V_TOTAL[name], 0.005 * V_TOTAL[name]
-        )
-
-    # The three lengths along the foot carry +/-0.10 natively, shared by both
-    # configurations (ch_pivot_bracket_spec: the south foot's short run cannot
-    # take title-block .XX): the foot length and the hold-down station, both
-    # from the ear's inboard face -- the face fit-up sets and the S4 hold
-    # touches Z0 on -- and the ear thickness. No in-repo sheet prints this
-    # part, so a fixture plan or later drawing inherits the bands from the
-    # saved model.
+    # The three lengths along the foot carry +/-0.10 natively
+    # (ch_pivot_bracket_spec: the foot's short run cannot take title-block
+    # .XX): the foot length and the hold-down station, both from the ear's
+    # inboard face -- the face fit-up sets and the S4 hold touches Z0 on --
+    # and the ear thickness. No in-repo sheet prints this part, so a fixture
+    # plan or later drawing inherits the bands from the saved model.
     set_dimension_symmetric_tolerance(adapter, "FootProfile", "FootLen", FOOT_LEN_BAND)
     set_dimension_symmetric_tolerance(adapter, "Ear", "EarThick", EAR_T_BAND)
     set_dimension_symmetric_tolerance(adapter, "HoleProfile", "HoleStation", STATION_BAND)
 
-    # One BOM identity for both sides; each configuration's own Number carries
-    # its side (the MHA-DT-003-T006 qualifier convention).
-    grouped_spec = _config.parts(PART_NAME)
-    apply_grouped_bom_properties(
-        adapter,
-        list(CONFIGURATIONS),
-        part_number=str(grouped_spec["number"]),
-        description=str(grouped_spec["description"]),
-    )
-    for name in CONFIGURATIONS:
-        _apply_configuration_number(adapter, name, CONFIGURATION_NUMBER[name])
     await report_mass_properties(adapter)
-    require_material_in_every_configuration(
-        adapter, PART_NAME, MATERIAL, CONFIGURATIONS
-    )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
-    # The channel assembly places both configurations while the part saves on
-    # one; reopen and prove each saved cache regenerates (cg-fx1).
-    part_title = str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle())
-    adapter.swApp.CloseDoc(part_title)
-    adapter.currentModel = None
-    check(f"reopen saved {PART_NAME}", await adapter.open_model(artefacts["part"]))
-    assert_saved_configurations_regenerate(adapter, PART_NAME)
-    return artefacts
+    return await save_part_and_images(adapter, PART_NAME)
 
 if __name__ == "__main__":
     sys.exit(run_build(build))
