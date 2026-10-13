@@ -238,6 +238,10 @@ def test_the_thumbnut_rocked_by_the_free_t24_is_waived_only_by_its_ruling() -> N
 
     joint_id = "pd-paper-drive/thumbnut-on-knob-shaft"
     (row,) = [j for j in jr.JOINTS if j.id == joint_id]
+    assert row.thread == "#8-32 UNC"
+    assert row.installed_at == "collar-shoulder-seated"
+    assert "D-flat -> shaft" in row.exposure_reason
+    assert "actual F" in row.axial_capture
     assert row.exposure is Exposure.OSCILLATING
     assert row.lock is Lock.NONE
     assert jr.RULINGS[row.exception].joint == joint_id
@@ -324,6 +328,39 @@ def test_the_channel_apex_set_screws_are_waived_only_by_their_ruling() -> None:
         return {f.subject for f in findings if f.kind is Kind.UNLOCKED}
 
     assert joint_id not in unlocked(jr.RULINGS)
+    without = {k: v for k, v in jr.RULINGS.items() if k != row.exception}
+    assert joint_id in unlocked(without)
+
+
+def test_the_gooseneck_set_screw_is_waived_only_by_its_ruling() -> None:
+    """Q5 on PR #1348: the MHA-VN-023 cup point is the gooseneck post's only
+    retention, an oscillating joint with no jam nut. The user waived drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)
+    for it (2026-10-12): adjustable by design and re-set periodically."""
+    joint_id = "ha-harmonic-analyzer/gooseneck-set-screw-in-top-frame"
+    (row,) = [j for j in jr.JOINTS if j.id == joint_id]
+    assert row.exposure is Exposure.OSCILLATING
+    assert row.lock is Lock.NONE
+    assert "91410A540" in row.evidence
+    assert jr._config.parts("vn-gooseneck-set-screw")["supplier_skus"] == ["91410A540"]
+    ruling = jr.RULINGS[row.exception]
+    assert ruling.joint == joint_id
+    assert "adjustable by design, periodic re-set; user 2026-10-12" in ruling.granted
+
+    def unlocked(rulings) -> set[str]:
+        findings = jr.audit(
+            jr.JOINTS,
+            jr.build_inventory(),
+            threaded=jr.THREADED_PARTS,
+            unthreaded=jr.UNTHREADED_PARTS,
+            purchased=jr.purchased_parts(),
+            unthreaded_stock=jr.UNTHREADED_STOCK,
+            required=jr.REQUIRED_JOINTS,
+            rulings=rulings,
+        )
+        return {f.subject for f in findings if f.kind is Kind.UNLOCKED}
+
+    assert joint_id not in unlocked(jr.RULINGS)
+    assert joint_id not in {f.subject for f in jr.audit_table()}
     without = {k: v for k, v in jr.RULINGS.items() if k != row.exception}
     assert joint_id in unlocked(without)
 
@@ -487,10 +524,10 @@ def test_every_registered_joint_cites_a_live_source_occurrence() -> None:
 def test_deleting_a_row_whose_parts_other_rows_name_is_omitted(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The guide screws' stems stay named without their row: fillister_screw
-    # as the clip screws' member, platen_guide as the lock screws' receiver.
-    # Only the registry notices the guide-screw joint is gone.
-    gone = "pd-paper-drive/guide-screw-in-guide"
+    # The cross screws' stems stay named without their base row:
+    # frame_cross_screw as the top-frame row's member, harmonic_base as the
+    # receiver of other frame rows. Only the registry notices the joint is gone.
+    gone = "fr-frame/cross-screw-in-base"
     table = tuple(j for j in jr.JOINTS if j.id != gone)
     findings = jr.audit(
         table,
@@ -510,7 +547,6 @@ def test_deleting_a_row_whose_parts_other_rows_name_is_omitted(
 # reusing the stem of a placed instance of the same part would hide them.
 UNPLACED = frozenset(
     {
-        "mg-magnifier/fixture-thumb-screw",  # build_mg_magnifier_assembly omits it
         "pn-pen/v-block-set-screw-on-rod",  # no set-screw part exists
     }
 )

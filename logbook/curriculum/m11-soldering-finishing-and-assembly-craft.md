@@ -45,7 +45,7 @@ The **cone gear stack on its D-flat shaft**: the 64T and twenty cone gears slid 
 
 ## Competency check
 
-A twenty-gear stack that measures 137.774 ±0.20 mm (`cad/scripts/dt_cone_gear_stack.py`) and turns free with no tight spot; a silver-soldered test joint pulled to destruction that fails in the parent metal, not the joint; and a polished brass surface with no visible scratch pattern.
+A twenty-gear stack that measures 137.512 ±0.20 mm (`cad/scripts/dt_cone_gear_stack.py`) and turns free with no tight spot; a silver-soldered test joint pulled to destruction that fails in the parent metal, not the joint; and a polished brass surface with no visible scratch pattern.
 
 ## Notes
 

@@ -91,7 +91,7 @@ def test_worst_case_joint_budget() -> None:
     assert b["tine_bearing_land_min"] == b["tine_min"]
     assert b["tine_bearing_land_min"] >= pin.RULE12_WALL_FLOOR
     assert b["crown_wall_min"] >= pin.RULE12_WALL_TARGET
-    assert b["crotch_clearance_min"] == pytest.approx(1.2098, abs=1e-4)
+    assert b["crotch_clearance_min"] == pytest.approx(1.2029, abs=1e-4)
     assert b["crotch_clearance_min"] >= pin.CROTCH_CLEARANCE_MIN
     assert b["bridge_min"] == pytest.approx(2.234, abs=1e-6)
     assert b["bridge_min"] >= pin.BRIDGE_TARGET

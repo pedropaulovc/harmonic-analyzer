@@ -33,11 +33,8 @@ import math
 
 import _config
 import dt_cone_pivot_post_spec as post
-from _feature_requirements import ExportFeature, limits
-from _gtol_cylinder import CylinderFace
-from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, TAP_DRILL_MM, HoleSpec
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 
 # --- Frame (B6 -> model) -------------------------------------------------------
 B6_X_AT_END = 2.0
@@ -69,9 +66,11 @@ POST_AXIS_Z = B6_Y_AT_SIDE
 # lets every body bottom on the seat's lowest line, which stays where a nominal
 # body's underside is. A smaller seat would carry a large body on its lips.
 SEAT_PLACES = 1
-BODY_DIA_MAX = limits(post.BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])[1]
+BODY_DIA_MAX = round(
+    post.BLOCK_DIA + printed_deviations(post.BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])[1], 12
+)
 SEAT_DIA = 43.6
-if limits(SEAT_DIA, SEAT_PLACES)[0] < BODY_DIA_MAX - 1e-9:
+if round(SEAT_DIA + printed_deviations(SEAT_DIA, SEAT_PLACES)[0], 12) < BODY_DIA_MAX - 1e-9:
     raise AssertionError("the smallest saw-cradle seat is smaller than the largest post body")
 SEAT_BOTTOM_Y = -B6_Z_AT_UNDERSIDE - post.BLOCK_DIA / 2.0
 SEAT_CENTRE_Y = SEAT_BOTTOM_Y + SEAT_DIA / 2.0
@@ -101,8 +100,14 @@ PAD_Z1 = PAD_Z + PAD_LENGTH / 2.0
 POST_NUMBER = _config.parts("dt-cone-pivot-post")["number"]
 # Narrow lines, so the block stands in the gap between the front and right views.
 PAD_FIT_CALLOUT = f"FIT TO SUIT\n{POST_NUMBER}\nCONE PIVOT\nPOST: CAP\nBEARS WITH\nBODY SEATED"
-_BODY_BAND = limits(post.BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])
-_BOSS_BAND = limits(post.CONE_BOSS_LENGTH, post.DRAWING_PRECISION_BY_NAME["ConeBossLen"])
+_BODY_BAND = [
+    round(post.BLOCK_DIA + deviation, 12)
+    for deviation in printed_deviations(post.BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])
+]
+_BOSS_BAND = [
+    round(post.CONE_BOSS_LENGTH + deviation, 12)
+    for deviation in printed_deviations(post.CONE_BOSS_LENGTH, post.DRAWING_PRECISION_BY_NAME["ConeBossLen"])
+]
 # The cap face stands body/2 - boss/2 above the seat line of a seated body.
 CAP_OFFSET_MAX = max(
     (_BODY_BAND[1] - _BOSS_BAND[0]) / 2.0, (_BOSS_BAND[1] - _BODY_BAND[0]) / 2.0
@@ -149,7 +154,9 @@ HEAD_GAP_MIN = (
     - printed_band_mm(post.DRAWING_PRECISION_BY_NAME["HeadHt"])
     - printed_band_mm(post.DRAWING_PRECISION_BY_NAME["MainBodyHt"])
     - post.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM
-    - limits(post.CONE_BOSS_DIA, post.DRAWING_PRECISION_BY_NAME["ConeBossDia"])[1] / 2.0
+    - round(
+        post.CONE_BOSS_DIA + printed_deviations(post.CONE_BOSS_DIA, post.DRAWING_PRECISION_BY_NAME["ConeBossDia"])[1], 12
+    ) / 2.0
 )
 if HEAD_SADDLE_WIDTH_MAX > HEAD_GAP_MIN:
     raise AssertionError("the head saddle can be wider than the post's shoulder-to-boss gap")
@@ -219,8 +226,13 @@ if STUD_RAISED_CLEARANCE_WORST < WALL_FLOOR_MM:
 # The pad still carries the whole cap with the post at its worst float: the
 # largest printed boss at the seat's widest float about the pad's narrowest
 # print.
-_CAP_RADIUS_MAX = limits(post.CONE_BOSS_DIA, post.DRAWING_PRECISION_BY_NAME["ConeBossDia"])[1] / 2.0
-_POST_FLOAT_MAX = (limits(SEAT_DIA, SEAT_PLACES)[1] - limits(post.BLOCK_DIA, 1)[0]) / 2.0
+_CAP_RADIUS_MAX = round(
+    post.CONE_BOSS_DIA + printed_deviations(post.CONE_BOSS_DIA, post.DRAWING_PRECISION_BY_NAME["ConeBossDia"])[1], 12
+) / 2.0
+_POST_FLOAT_MAX = (
+    round(SEAT_DIA + printed_deviations(SEAT_DIA, SEAT_PLACES)[1], 12)
+    - round(post.BLOCK_DIA + printed_deviations(post.BLOCK_DIA, 1)[0], 12)
+) / 2.0
 PAD_CAP_COVER_WORST = (
     (PAD_LENGTH / 2.0 - 2.0 * _ROW1) - (_CAP_RADIUS_MAX + _POST_FLOAT_MAX + _ROW1)
 )
@@ -269,179 +281,3 @@ SURFACE_FINISHES = ()
 DRAWING_NOTES = "BOTH SEATS ON ONE COMMON AXIS."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 
-_POST = "dt_cone_pivot_post_spec"
-_X_AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
-# Z heights (the stud stations across the base) run from the base side face.
-_FROM_SIDE = ("side_face", ("__frame__",))
-
-
-def _seat(x_span: tuple[float, float], name: str) -> ExportFeature:
-    return ExportFeature(
-        kind="hole",
-        faces=(CylinderFace(SEAT_DIA, contains_x_mm=sum(x_span) / 2.0),),
-        requirements=("dia", "height", "station", "process"),
-        fields={
-            "at": ([x_span[0], SEAT_CENTRE_Y, SEAT_Z], (name, "SEAT_CENTRE_Y", "SEAT_Z")),
-            "axis": _X_AXIS,
-            "dia": (
-                limits(SEAT_DIA, SEAT_PLACES),
-                ("SEAT_DIA", "BODY_DIA_MAX", (_POST, "BLOCK_DIA")),
-            ),
-            "nominal_dia": (SEAT_DIA, ("SEAT_DIA",)),
-            # Reference only: the print gives the saddle's two faces as
-            # stations (the *_saddle_x0/x1 features), not a length.
-            "length_nominal": (x_span[1] - x_span[0], (name,)),
-            "height": (
-                limits(SEAT_BOTTOM_Y, 1),
-                ("SEAT_BOTTOM_Y", (_POST, "BLOCK_DIA")),
-            ),
-            "height_nominal": (round(SEAT_BOTTOM_Y, 1), ("SEAT_BOTTOM_Y",)),
-            # The one printed SeatZ: the common seat axis across the base,
-            # from the base side face (model Z0).
-            "station": (limits(SEAT_Z, 1), ("SEAT_Z",)),
-            "station_nominal": (SEAT_Z, ("SEAT_Z",)),
-            "thru": (True, (name,)),
-            "process": ("bore", ("DRAWING_NOTES",)),
-        },
-        precision={"dia": SEAT_PLACES, "height": 1, "station": 1},
-    )
-
-
-def _stud(z: float) -> ExportFeature:
-    return ExportFeature(
-        kind="hole",
-        faces=(CylinderFace(STUD_TAP_DRILL, contains_z_mm=z),),
-        requirements=("thread", "dia", "station", "height"),
-        fields={
-            "at": ([STUD_X, BASE_HT, z], ("STUD_X", "BASE_HT", "STUD_Z")),
-            "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
-            "thread": (f"{STUD_THREAD} UNC-{STUD_TAP_SPEC.thread_class}", ("STUD_TAP_SPEC",)),
-            "tap_drill_mm": (STUD_TAP_DRILL, ("STUD_TAP_DRILL",)),
-            # THRU: no drill-point face of its own, so the tap carries the
-            # printed drill band.
-            "dia": (
-                limits(STUD_DRILL_PRINTED, STUD_DRILL_PLACES, DRILLED_BAND),
-                ("STUD_DRILL_PRINTED", "DRILLED_BAND", "STUD_TAP_SPEC"),
-            ),
-            "dia_nominal": (STUD_DRILL_PRINTED, ("STUD_DRILL_PRINTED",)),
-            "thru": (True, ("STUD_TAP_SPEC",)),
-            "station": (limits(STUD_X, 1), ("STUD_X",)),
-            "station_nominal": (round(STUD_X, 1), ("STUD_X",)),
-            "height": (limits(z, 1), ("STUD_Z",)),
-            "height_nominal": (round(z, 1), ("STUD_Z",)),
-            "height_from": _FROM_SIDE,
-        },
-        precision={"dia": STUD_DRILL_PLACES, "station": 1, "height": 1},
-    )
-
-
-def _x_face(x: float, outward: float, name: str, places: int) -> ExportFeature:
-    """A printed X station: one end face of a saddle or the pad, from the
-    base end face (model X0)."""
-    return ExportFeature(
-        kind="face",
-        faces=(PlanarFace((outward, 0.0, 0.0), outward * x),),
-        requirements=("station",),
-        fields={
-            "normal": ([outward, 0.0, 0.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "x", "value": x}, (name,)),
-            "station": (limits(x, places), (name,)),
-            "station_nominal": (round(x, places), (name,)),
-        },
-        precision={"station": places},
-    )
-
-
-def _z_face(z: float, outward: float, name: str) -> ExportFeature:
-    """A printed Z station: one side face of the pad, from the base side face."""
-    return ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 0.0, outward), outward * z),),
-        requirements=("height",),
-        fields={
-            "normal": ([0.0, 0.0, outward], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "z", "value": z}, (name,)),
-            "height": (limits(z, 1), (name,)),
-            "height_nominal": (round(z, 1), (name,)),
-            "height_from": _FROM_SIDE,
-        },
-        precision={"height": 1},
-    )
-
-
-EXPORT_FEATURES: dict[str, ExportFeature] = {
-    "head_seat": _seat(HEAD_SADDLE_X, "HEAD_SADDLE_X"),
-    "foot_seat": _seat(FOOT_SADDLE_X, "FOOT_SADDLE_X"),
-    "cap_pad": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 1.0, 0.0), PAD_HT),),
-        requirements=("note", "process"),
-        fields={
-            "at": ([PAD_X, PAD_HT, PAD_Z], ("PAD_X", "PAD_HT", "PAD_Z")),
-            "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "y", "value": PAD_HT}, ("PAD_HT",)),
-            # A matched fit: the reference height is the unfitted stock, and
-            # the callout's acceptance, not a band, defines the fitted top.
-            "height_nominal": (
-                PAD_HT,
-                ("PAD_HT", "PAD_FIT_STOCK_MIN", (_POST, "BLOCK_DIA"), (_POST, "CONE_BOSS_LENGTH")),
-            ),
-            # Reference sizes only: the print gives the pad's four faces as
-            # stations (the pad_x0/x1/z0/z1 features).
-            "width_nominal": (PAD_WIDTH, ("PAD_X0", "PAD_X1")),
-            "length_nominal": (PAD_LENGTH, ("PAD_Z0", "PAD_Z1")),
-            "process": (PAD_PROCESS, ("PAD_PROCESS", "PAD_FIT_CALLOUT")),
-            "note": (PAD_FIT_CALLOUT, ("PAD_FIT_CALLOUT", "POST_NUMBER")),
-        },
-    ),
-    "head_saddle_x0": _x_face(HEAD_SADDLE_X[0], -1.0, "HEAD_SADDLE_X", SADDLE_X_PLACES),
-    "head_saddle_x1": _x_face(HEAD_SADDLE_X[1], 1.0, "HEAD_SADDLE_X", SADDLE_X_PLACES),
-    "foot_saddle_x0": _x_face(FOOT_SADDLE_X[0], -1.0, "FOOT_SADDLE_X", SADDLE_X_PLACES),
-    "foot_saddle_x1": _x_face(FOOT_SADDLE_X[1], 1.0, "FOOT_SADDLE_X", SADDLE_X_PLACES),
-    "pad_x0": _x_face(PAD_X0, -1.0, "PAD_X0", 1),
-    "pad_x1": _x_face(PAD_X1, 1.0, "PAD_X1", 1),
-    "pad_z0": _z_face(PAD_Z0, -1.0, "PAD_Z0"),
-    "pad_z1": _z_face(PAD_Z1, 1.0, "PAD_Z1"),
-    # The saddles' relief sides (both saddles share each plane).
-    "saddle_z0": _z_face(SADDLE_Z[0], -1.0, "SADDLE_Z"),
-    "saddle_z1": _z_face(SADDLE_Z[1], 1.0, "SADDLE_Z"),
-    # The base's far end and far side carry the printed overall sizes.
-    "base_far_end": _x_face(BASE_LENGTH, 1.0, "BASE_LENGTH", 1),
-    "base_far_side": _z_face(BASE_WIDTH, 1.0, "BASE_WIDTH"),
-    "base_top": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 1.0, 0.0), BASE_HT),),
-        requirements=("height",),
-        fields={
-            "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "y", "value": BASE_HT}, ("BASE_HT",)),
-            "height": (limits(BASE_HT, 1), ("BASE_HT",)),
-            "height_nominal": (BASE_HT, ("BASE_HT",)),
-            "height_from": ("underside", ("__frame__",)),
-        },
-        precision={"height": 1},
-    ),
-    "underside": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
-        requirements=("height",),
-        fields={
-            "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
-            "height": (limits(OVERALL_HT, 1), ("OVERALL_HT",)),
-            "height_nominal": (OVERALL_HT, ("OVERALL_HT",)),
-        },
-        precision={"height": 1},
-    ),
-    "side_face": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
-        requirements=("plane",),
-        fields={
-            "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
-        },
-    ),
-    "stud_tap_near": _stud(STUD_Z[0]),
-    "stud_tap_far": _stud(STUD_Z[1]),
-}

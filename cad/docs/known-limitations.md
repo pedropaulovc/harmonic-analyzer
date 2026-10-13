@@ -26,14 +26,21 @@ These are tracked against the book photos and are fidelity-only, not mechanism-b
 - white render background vs the plates' black studio background (pipeline-inherent; the gallery
   blend layer compensates).
 
-The cone-pivot-post is no longer a cosmetic deferral: its 86 mm height was manually
-rederived from ch30 Eight Views station 2 (`ch30_images/page003_img01.png`), and its
-bossed-casting proportions from ch11 `page002_img05.jpeg` and `page002_img06.jpeg`.
+The cone-pivot-post is no longer a cosmetic deferral: its height was manually rederived at
+86 mm from ch30 Eight Views station 2 (`ch30_images/page003_img01.png`), and its
+bossed-casting proportions from ch11 `page002_img05.jpeg` and `page002_img06.jpeg`. The
+inch gear standard raised it to 94.732 mm to clear the larger 24DP crank pair
+([`gear-standard.md`](./gear-standard.md#what-changes-visibly)).
 
 ## Omitted hardware (documented)
 
 Drive-train tapered pin, output-fixture clamp screw, clevis hardware, nameplate screws, and
 fillister slots are below render resolution and currently omitted.
+
+- Measuring-stick stop (`ms-stop-block`, 2026-10-09): on the original stop's thumbscrew
+  face, beside the thread, sit a small round pin and a small square stub (ch16
+  `page001_img04.png`). Function unknown — possibly a pressure-pad guide or an
+  anti-rotation key. Not modelled; the block carries the bare #4-40 tapped hole.
 
 ## Manufacturing outputs
 

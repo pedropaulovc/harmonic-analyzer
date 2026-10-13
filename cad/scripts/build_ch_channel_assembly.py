@@ -23,8 +23,9 @@ the M6.8 mirror layer is gone).
   black foot-and-ear brackets on the rocker-arm-support's top, at the
   fit-up-located S/N stations (the old chrome pivot-ball-mount pair is retired
   -- photo-refuted, and its south pillar stood 19 mm past the support's end
-  in mid-air); since the 2026-10-09 sketch both feet run OUTBOARD, flush with
-  the support's end faces, as MHA-CH-008's S and N configurations) +
+  in mid-air); since the 2026-10-09 sketch both feet run OUTBOARD, and one
+  MHA-CH-008 serves both sides, flush with the south support end face and
+  short of the north one, #1341) +
   pedestal-hold-down-screw x2 (MHA-VN-032, one down through each foot into
   the support's transferred #8-32 seat -- rocker_bracket_seat_layout) +
   vn-arbor-set-screw x2 (MHA-VN-034, one down through each MHA-CH-008 ear's
@@ -318,10 +319,8 @@ GEAR_PHASE_DEG = CYLINDER_LOCK_PHASE_DEG
 RING_CENTER = (
     X_DRUM + CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG)),
     Y_DRIVE + CAM_ECC * math.cos(math.radians(GEAR_PHASE_DEG)),
-)  # The drum sits at machine X_DRUM (crank side -X); y is the v2 casting's
-# drive height 90.518 (gear_train.drive_axis_y_mm; build_dt_drive_train_assembly
-# derives and asserts it).
-# ROD_C2C (imported from ch_connecting_rod_spec.CENTER_DISTANCE, 163.1010):
+)  # Shared cone-line height; the rod length follows this phased cam centre.
+# ROD_C2C is imported from ch_connecting_rod_spec.CENTER_DISTANCE:
 # VERTICAL rod (ch30): every rod hangs PLUMB from the arm's rod-side tip onto
 # its cam -- the pin (ROD_HOLE_X out from the mid-seesaw pivot) sits
 # directly above the phased cam centre WITH THE ARM LEVEL (arm tilt 0: the ch14
@@ -511,13 +510,10 @@ if _BRACKET_HOLE_SPEC.kind != "clearance" or not (
         "bracket foot hole does not pass the #8 screw and its junction fillet"
         " under its head"
     )
-if any(
-    _bracket_sides.HOLE_Z[name] + _HDSCREW_HEAD_DIA / 2.0 > _bracket_sides.FOOT_Z1[name]
-    for name in _bracket_sides.CONFIGURATIONS
-):
-    raise AssertionError("a bracket hold-down head overhangs its foot end")
+if _bracket_sides.HOLE_Z + _HDSCREW_HEAD_DIA / 2.0 > _bracket_sides.FOOT_Z1:
+    raise AssertionError("the bracket hold-down head overhangs its foot end")
 if [z for _x, z in BRACKET_SCREW_XZ] != [
-    _bracket_sides.HOLE_MACHINE_Z[name] for name in _bracket_sides.CONFIGURATIONS
+    _bracket_sides.HOLE_MACHINE_Z[name] for name in _bracket_sides.SIDES
 ]:
     raise AssertionError("the hold-down screws are not over the brackets' holes")
 RAIL_TOP_Y = 1036.2  # new top-frame casting top face (was 1040.7; the rederive
@@ -1077,12 +1073,12 @@ async def build(adapter) -> dict[str, str]:
     # this subassembly, so each is datum-located (three orthogonal plane
     # distances), not fixed -- the #110 idiom. Both seat on the rocker-arm-
     # support's top (y 228.6). The part is an L (2026-09-02, ch14 p.27/28):
-    # its foot runs from the ear toward local +Z, OUTBOARD to the support's
+    # its foot runs from the ear toward local +Z, OUTBOARD toward the support's
     # end face (2026-10-09 sketch), so the north bracket (outboard = +Z) is
     # IDENTITY and the south one is turned Ry180 about its own origin -- the
     # bore stays on the pivot axis at (PIVOT[0], 253.8, mount_z) exactly, the
-    # foot flips to -Z. Each side places its own configuration (foot length).
-    for name in _bracket_sides.CONFIGURATIONS:
+    # foot flips to -Z. One part serves both sides.
+    for name in _bracket_sides.SIDES:
         mount_z = _bracket_sides.MOUNT_Z[name]
         foot_pos_z = _bracket_sides.OUTBOARD_SIGN[name] > 0.0
         mount = await place_component(
@@ -1092,14 +1088,13 @@ async def build(adapter) -> dict[str, str]:
             [0.0, 0.0, 0.0] if foot_pos_z else [0.0, 180.0, 0.0],
             IDENTITY if foot_pos_z else ROT_Y_180,
             ground=False,
-            configuration=name,
             label=f"pivot-bracket {name} z{mount_z:+.0f}",
         )
         await _locate_to_datum(adapter, mount)
     # Apex set screws (MHA-VN-034): one per ear, on its mid-plane, cup down on
     # the shaft's flat. Placed in the brackets' order (south first), so screw
     # n is in bracket n (_interference_contracts names the pairs).
-    for name in _bracket_sides.CONFIGURATIONS:
+    for name in _bracket_sides.SIDES:
         screw_z = _bracket_sides.MOUNT_Z[name]
         set_screw = await place_component(
             adapter,

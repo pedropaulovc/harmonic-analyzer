@@ -1,4 +1,8 @@
-r"""McMaster 94025A164 #10-32 cup-point adjuster (drawing-guidelines.md rule 18 (thread engagement) E11); its conical apex is the thrust contact."""
+r"""Native stock build of the McMaster 94025A164 #10-32 cup-point adjuster.
+
+Its conical apex is the thrust contact. Geometry-data consumers read
+``_mcmaster_94025a164`` directly, never this native build wrapper.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +19,6 @@ from diagnostics.diag_build_94025A164 import build_94025A164
 PART_NAME = "vn-cone-tip-adjuster"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
-
 
 
 async def build(adapter) -> dict[str, str]:

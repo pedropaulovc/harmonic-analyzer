@@ -84,6 +84,52 @@ chain; a limit that cannot cite each step is a habit, not a requirement.
 7. **Verify on the assembled machine** with the trials in the last section; the model is a
    prediction until a trial confirms it.
 
+### Drive-train gear tips and standard mesh checks
+
+Gear tips take `fits.gear_tip` in `tolerances/gear_tip.yaml` (read through
+`_gear_fit_limits.gear_tip_band_mm`), not the routine title-block band: an oversize
+tip eats root air and an undersize tip shortens the path of contact.
+`standard` (+0.00/−0.10 mm) is the default. `contact_critical` (+0.00/−0.02 mm)
+is kept only where a mesh gate needs it: the 12T knob-shaft pinion, whose
+12T:120T reducer contact ratio at the nominal centre is 1.207 at Ø7.38 (floor
+1.2) and would fall to 1.191 at −0.05. The 32T alignment and 120T cylinder
+tips were contact-critical until the stack6 machinist review. At −0.10 every
+drive-train check still passes: alignment backlash, root air and interference,
+and cone root air, backlash and interference. Only the reported contact
+ratios move.
+
+Every drive-train mesh is accepted by one closed-form AGMA-style check
+(`standard_mesh_checks`, applied in `dt_mesh_checks` and
+`crank_mesh_stack.standard_check`) plus the native SolidWorks assembly
+interference/soundness gate. The check takes each part's printed tip and
+tooth-thickness corners (`manufacturing_corner_profiles()`) and the booked
+centre range, and reports the contact ratio, the involute interference margin,
+exact backlash and root clearance. The crossed 16T:64T is checked in the 64T
+normal section (virtual radius R/cos²β, thickness × cos β). Geometry comes only
+from the specs and config; no build, drawing or import reads study output.
+
+Cone bands are ordinary (user ruling 2026-10-10): OD +0/−0.05, tooth thickness
+±0.075, H7/g6 running bores, 0.05 tooth-cutting runout; T006 alone keeps its
+own thin-only bands (thickness +0/−0.04, OD +0/−0.02) for its relief. Gates:
+
+- **Cones T012–T120** (`cone_set_stack`, `dt_mesh_checks.cone_check`): the cone
+  centre is set at assembly. Pedestals snug-loose, radial shims at T012 and
+  T120, tighten the pedestals, swing T120 in onto its radial feeler, lock the
+  cone-lock-knob (MHA-VN-013); the pedestals are not loosened after the set
+  (pedestal float booked 0 by that order). Each cone's centre is the set point
+  plus its own RSS half-range. Gated: nominal contact ratio ≥ 1.0 at the mean
+  centre, positive backlash and no interference at the RSS corner. Reported
+  only (REF): the RSS contact ratio and the arithmetic worst-corner
+  interference. T012's worst-corner overlap (0.32 mm, REF) is a fit-up note on
+  the assembly sheet: if T012 binds after the set, back the swing off or stone
+  its tip.
+- **T006** (pending exception ruling #971): its DT6-FORM1 relief stands ≥ 0.010 mm clear of
+  every printed drum-tip path over the RSS centre range and keeps ≥ 0.02 mm
+  backlash; its contact ratio (≈ 0.77) is REF.
+- **Crank 16T:64T** (fixed bore, no adjustment): contact ratio ≥ 1.0 at the
+  nominal centre, positive backlash and no interference at the worst corner;
+  the open-corner contact ratio is REF.
+
 ### The chain, and where each error enters
 
 ```mermaid
@@ -104,9 +150,9 @@ flowchart LR
     e4["station setting ±0.25 mm<br/><b>setup</b>; null lift 0.029"]:::setup -.-> bar
     e5["bar-pin / hook arms ±0.10<br/>0.8 / 0.6 %/mm"]:::part -.-> lever
     e6["spring rate ±1.25 %<br/><b>matched, 1 %/%</b>"]:::part -.-> spring
-    e7["hole position ±0.15 (2.58 %/mm)<br/>worst broad knife term 0.189 % FS"]:::part -.-> summing
-    e8["common-mode gain: calibrated out<br/>clamp 66–165 mm from knife:<br/><b>capacity 7.021 bars</b>"]:::free -.-> mag
-    e9["reading ±0.075 mm → 0.258 % FS<br/>crank index ±8° → 0.256 % FS"]:::setup -.-> op
+    e7["hole position ±0.15 (2.667 %/mm)<br/>worst broad knife term 0.166 % FS"]:::part -.-> summing
+    e8["common-mode gain: calibrated out<br/>clamp 66–165 mm from knife,<br/>wire arm 55.9–167.0 mm:<br/><b>operating P ≤ 8.07 bars</b>"]:::free -.-> mag
+    e9["reading ±0.075 mm → 0.255 % FS<br/>crank index ±8° → 0.255 % FS"]:::setup -.-> op
 
     classDef part fill:#fde2e2,stroke:#c0392b
     classDef setup fill:#fff3cd,stroke:#b7791f
@@ -265,16 +311,16 @@ with no clearance scatter, so no linear allowable half-width exists for it.
 | cam eccentricity | 0.025 mm | 0.025 | 0.14 | 0.27 | 0.047 | offset-turn in a 4-jaw, indicate the throw |
 | rocker rod-pin radius | 0.10 mm | 0.009 | 0.04 | 0.08 | 0.57 | DRO/CNC hole position — a Ø0.20 position zone; both radial and tangential axes are drawn |
 | lever bar-pin arm | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.71 | DRO/CNC hole position — a Ø0.20 position zone; both axes are drawn |
-| lever spring-hook arm | 0.10 mm | 0.005 | 0.03 | 0.05 | 0.96 | DRO/CNC hole position — a Ø0.20 position zone; the model draws both its axes (radial arm and tangential offset) |
-| summing hook position | 0.15 mm | 0.034 | 0.18 | 0.36 | 0.21 | ½ of the 0.30 pattern-position zone |
+| lever spring-hook arm | 0.10 mm | 0.005 | 0.03 | 0.05 | 0.95 | DRO/CNC hole position — a Ø0.20 position zone; the model draws both its axes (radial arm and tangential offset) |
+| summing hook position | 0.15 mm | 0.035 | 0.19 | 0.37 | 0.20 | ½ of the 0.30 pattern-position zone |
 | **spring rate** | **1.25 %** | **0.109** | **0.57** | **1.15** | 0.54 | **matched by measurement** — 60/80 mm inside-hook lengths; Ø2 mm pin centres at 58/78 mm; bin the 20 springs around their measured common mean |
-| spring initial tension | 0.27 N | 0.001 | 0.006 | 0.011 | 12.70 N | rounded bound on the catalog's ±0.06 lbf; record each force-curve intercept, not a machining tolerance |
+| spring initial tension | 0.27 N | ≈0 | ≈0 | ≈0 | ≈2.02×10⁸ N (linearized) | rounded bound on the catalog's ±0.06 lbf; record each force-curve intercept, not a machining tolerance |
 | cam phase | 0.25° | 0.038 | 0.21 | 0.23 | 0.33 | native `NotchPhase` dimension; the nominal 1.50° offset remains #749 |
 | mesh lag spread | 0.14° | 0.021 | 0.12 | 0.13 | 0.33 | derived from the 0.05–0.20 backlash band |
-| cone flat clock | 0.25° cone | 0.016 | 0.12 | 0.03 | 0.76° | native `BoreFlatClock` dimension; shaft flats share one clock, teeth indexed from each gear's flat in one setup; cam phase scales by T/120 |
-| cone flat play | 0.01–0.03 mm AF clearance | 0.070 | 0.36 | 0.49 | n/a | D-bore across-flat fit; phase = (clearance / lever) × T/120, the lever being the shortest flat half-chord MHA-DT-004 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on the torque corner; minus the Ø9.525-land lag removed by the crank index; per-land residual and per-channel variation remain |
-| station setting (setup) | 0.25 mm | 0.051 | 0.30 | 0.53 | 0.24 | interpolate the released stick; zero/travel-stop errors are one-sided and their mean bias is recorded. Scored at each input's pen-forced scale |
-| **all combined** | | **0.158** | **0.81** | **1.54** | | targets 0.30 / 1.5 / 2.0 |
+| cone flat clock | 0.25° cone | 0.016 | 0.12 | 0.03 | 0.77° | native `BoreFlatClock` dimension; shaft flats share one clock, teeth indexed from each gear's flat in one setup; cam phase scales by T/120 |
+| cone flat play | 0.01–0.03 mm AF clearance | 0.075 | 0.38 | 0.53 | n/a | D-bore across-flat fit; phase = (clearance / lever) × T/120, the lever being the shortest flat half-chord MHA-DT-004 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on the torque corner; minus the Ø9.525-land lag removed by the crank index; per-land residual and per-channel variation remain |
+| station setting (setup) | 0.25 mm | 0.045 | 0.27 | 0.53 | 0.24 | interpolate the released stick; zero/travel-stop errors are one-sided and their mean bias is recorded. Scored at each input's pen-forced scale |
+| **all combined** | | **0.158** | **0.80** | **1.57** | | targets 0.30 / 1.5 / 2.0 |
 
 The scatter calculation is below its broad-input and two-channel targets. This
 does not discharge the physical operating assumptions or the two waivers below.
@@ -319,15 +365,16 @@ does not discharge the physical operating assumptions or the two waivers below.
 | term | assumption (`error_budget.yaml reserved:`) | value | allowance |
 |---|---|---:|---:|
 | nominal residual after correction | table-lookup setting + read-vs-set vector + 2nd-harmonic correction (all in the shipped `READOUT.md`), **on the lobe-up machine** (`reserved.nominal_residual_mae.waive_cam_home_phase`, #749); the as-built CAD's 1.5° common cam phase leaves **0.30 % MAE** that no step removes | 0.007 % MAE (as-built 0.30) | 0.05 |
-| ordinate readout | ±0.075 mm reading uncertainty assumes a 0.15 mm technical-pen line; the CAD marker does not establish that performance. Loaded spring stiffness and the CAD wheel ratio give 2.089 mm per full-scale bar at the 66 mm clamp setting, or **7.180 bars** of ordinate capacity. Broad input scales are 0.338 (all ones), 0.673 (half rectangle/lifted square), and 0.809 (Gaussian). The sparse pair uses the built 165 mm radius but reaches only 13.401 mm of the 15 mm half-stroke. Each coefficient carries its own reading error and the k=0 normalizer's; `closed_form.readout` evaluates both through the actual stroke fill | 0.257 % MAE | 0.30 |
+| ordinate readout | ±0.075 mm reading uncertainty assumes a 0.15 mm technical-pen line; the CAD marker does not establish that performance. The pen gain runs on the **wire moment arm** — the knife axis's perpendicular distance to wire 1 — not the clamp's distance from the knife: the output fixture hooks the wire 9.7 mm on the knife side of the clamp and the wire leans toward the wheel, so the arm is 55.89 mm with the clamp against the collar (66 mm) and 166.97 mm at the as-built 165 mm (`error_budget.wire_moment_arm`, solved from `mg_lever_wire_geom`'s own run). Loaded spring stiffness and the CAD wheel ratio then give 1.858 mm per full-scale bar at the collar, or **≈8.07356 bars** of computed ordinate capacity; the conservative operating limit is **$P(f)\le8.07$**. The report's broad input scales are approximately 0.384 (all ones), 0.763 (half rectangle/lifted square) and 0.918 (Gaussian), all with the clamp at 66 mm; solve the table against the operating limit rather than using the rounded scales as settings. The sparse pair uses the built 165 mm station but reaches only 14.247 mm of the 15 mm half-stroke. Each coefficient carries its own reading error and the k=0 normalizer's; `closed_form.readout` evaluates both through the actual stroke fill | 0.255 % MAE | 0.30 |
 | timebase | stop the crank at 2k turns, repeatable to ±8° (uniform). Evaluate the shifted physical trace through the readout procedure, with the correction evaluated at the intended index; do not substitute the ideal Fourier-vector slope | 0.255 % FS | 0.30 |
-| knife-edge hysteresis | rolling-resistance length 0.005 mm at each case's **rest/preload force sum**. The worst broad cases, half rectangle and lifted square, each conservatively load the knife to 138.436 N and require 47.537 N counter force at 351.700 mm inside length. The configured neutral CAD case alone is 136.615 N / 46.912 N; it is not a universal preload. The conservative numerator sums force magnitudes and the report also gives the smaller resolved vertical load. The stall denominator remains the neutral small-signal loaded lift response, not a station-exact or cycle-peak transfer. Broad-input result is 0.187%, sparse pair 0.625%. Confirm gravity, operating loads, contact material/finish and reversal trace width before treating this allowance as demonstrated hardware performance | 0.187 % FS | 0.45 |
-| **total** | residual + RSS(scatter 0.158, readout, timebase, knife), under the stated assumptions | **0.444 % MAE** (as-built cam phase: **0.741 — over the benchmark**) | **0.7 benchmark** |
-| **two-channel worst coefficient** | all sources drawn jointly through the sparse-pair readout. The gate compares the expected largest coefficient error, not an ensemble quantile, with the historical benchmark | **1.561 %** (p50 1.534, p90 2.013, **p99 2.406**; 10.6% of draws exceed 2%; conservative per-source envelope 2.135) | **2.0 benchmark** |
+| knife-edge hysteresis | rolling-resistance length 0.005 mm at each case's **rest/preload force sum**. The heaviest broad cases, half rectangle and lifted square, each conservatively load the knife to 138.693 N and require 47.625 N counter force at 351.983 mm inside length; they also give the worst broad term. The configured neutral CAD case alone is 136.615 N / 46.912 N; it is not a universal preload. The conservative numerator sums force magnitudes and the report also gives the smaller resolved vertical load. The stall denominator remains the neutral small-signal loaded lift response, not a station-exact or cycle-peak transfer. Broad-input result is 0.166%, sparse pair 0.625%. Confirm gravity, operating loads, contact material/finish and reversal trace width before treating this allowance as demonstrated hardware performance | 0.166 % FS | 0.45 |
+| **total** | residual + RSS(scatter 0.158, readout, timebase, knife), under the stated assumptions | **0.434 % MAE** (as-built cam phase: **0.730 — over the benchmark**) | **0.7 benchmark** |
+| **two-channel worst coefficient** | all sources drawn jointly through the sparse-pair readout. The gate compares the expected largest coefficient error, not an ensemble quantile, with the historical benchmark | **1.542 %** (p50 1.514, p90 1.993, **p99 2.383**; 9.675% of draws exceed 2%; conservative per-source envelope 2.110) | **2.0 benchmark** |
 
 `check:budget` fails if a scored term or total overruns its allowance. Readout and
-timebase are now the largest broad-input terms. The 66 mm minimum clamp radius
-limits ordinate capacity, so broad inputs still need reduced station scales.
+timebase are now the largest broad-input terms. The wire moment arm at the 66 mm
+minimum clamp station (55.89 mm, the hook offset and wire lean) limits ordinate
+capacity, so all broad reference inputs, including the Gaussian, need reduced station scales.
 A longer pen stroke or a clamp that reaches nearer the knife would reduce these
 shares, but both are design proposals requiring native operating-pose validation,
 not tolerance changes. The current 66 mm pose remains waived under #748.
@@ -337,15 +384,15 @@ root-sum-square, the systematic residual adds):
 
 ```mermaid
 flowchart TB
-    subgraph rss["independent terms, RSS = 0.44"]
+    subgraph rss["independent terms, RSS = 0.427"]
         direction LR
         s["part scatter<br/>(Monte Carlo)<br/><b>0.158</b> / 0.30"]
-        r["ordinate readout<br/><b>0.257</b> / 0.30"]
-        t["timebase<br/>(crank index)<br/><b>0.26</b> / 0.30"]
-        k["knife hysteresis<br/>(worst broad rest load)<br/><b>0.187</b> / 0.45"]
+        r["ordinate readout<br/><b>0.255</b> / 0.30"]
+        t["timebase<br/>(crank index)<br/><b>0.255</b> / 0.30"]
+        k["knife hysteresis<br/>(worst broad rest load)<br/><b>0.166</b> / 0.45"]
     end
     n["nominal residual<br/>after corrections<br/><b>0.007</b> / 0.05<br/>(as-built cam phase: 0.30)"]
-    rss --> total["<b>total 0.444</b><br/>(as-built: 0.741)"]
+    rss --> total["<b>total 0.434</b><br/>(as-built: 0.730)"]
     n --> total
     total --> bench["benchmark 0.7<br/>Michelson & Stratton 1898"]
     style total fill:#e6f4ea,stroke:#2f855a
@@ -407,12 +454,21 @@ operator forms from step 1; the table is the only data the procedure needs beyon
    greatest term, with no internal unit needed (`READOUT.md` step 3; the model's
    `read_coefficients` is the same arithmetic). This removes all common-mode
    gain, including the magnifier setting, so the magnifier is reset per trial to bring the
-   k = 0 term to the full stroke. Its range is finite: with the clamp against the bracket collar
-   (66 mm from the knife) the trial's k = 0 peak $P = \sum x^{read}_i(1 + \kappa_i)$ may be at
-   most 7.021 full-scale bars. Set a broader function at the largest $f$ with
-   $P(f)\le7.021$, solved from the station table. Proportional scaling is wrong
-   because the idle bars retain a fixed read ordinate. A small input may not
-   fill the stroke even at the built 165 mm radius; use its actual reading.
+   k = 0 term to the full stroke. Its range is finite, and it runs on the wire's moment arm
+   about the knife (55.89 mm with the clamp against the bracket collar, 66 mm from the knife;
+   166.97 mm at the as-built 165 mm — the output fixture hooks the wire 9.7 mm toward the
+   knife and the wire leans toward the wheel), so at the collar the computed capacity is
+   ≈8.07356 full-scale bars. Use the conservative operating limit **$P(f)\le8.07$**, with
+   $P(f) = \sum_i t_i(1+\kappa_i)$ and $t_i$ the table ordinate at $f\,x_i\cdot88$ mm
+   **before division by $f$**; record $x^\text{read}_i=t_i/f$ for the sums above. Set a broader
+   function at the largest $f$ satisfying the limit, solved from the station table.
+   Proportional scaling is wrong because the idle bars retain a fixed table ordinate
+   (all ones: table solve $f\approx0.384$, proportional estimate 0.398, ~3% overdrive).
+   Then set the clamp from `READOUT.md`'s clamp-station table (pen travel per bar against the
+   station), not by proportion to the distance from the knife, and never beyond the built
+   165 mm station. At that station the gain is 5.55 mm per full-scale bar: a small input
+   with $P<2.70$ cannot fill the stroke; use its actual reading, or scale it up within
+   the capacity and bar travel before setting the bars.
 3. **Lift signed inputs**: every bar stays on the lifting side of the pivot (the CAD realises
    no negative station), so add a constant $c$ to a signed function before setting the bars and
    subtract its lift vector ($20c$ at k = 0, $-c$ at odd k) from the readings, exactly as for
@@ -442,7 +498,7 @@ operator forms from step 1; the table is the only data the procedure needs beyon
 | hysteresis | one bar at full scale, crank forward then back slowly | knife edge, wheel bearing, wire preload | proposed: trace width ≤ 1 % of that channel's stroke (an edge rolling-resistance length ≤ 0.005 mm at the derived load) |
 | station table check | one bar alone at each station, k = 0 amplitude vs a full-scale bar | slide-arc height, contact offset, gain curvature | matches the `READOUT.md` table; idle bar reads ≈ 0.029; subtract the read-vs-set vector (20ℓ at k = 0, −ℓ at odd k) from every trial |
 | broad-input benchmark | Michelson's Gaussian ($e^{-(0.1i)^2}$) and half-range rectangle, corrected readout | everything | MAE ≈ 0.7 %, max ≈ 2 % of the greatest term — historical parity |
-| sparse-input stress | channels 1 and 20 alone | consistency without averaging | expected worst coefficient ≤ 2 % (p99 2.406 reported) |
+| sparse-input stress | channels 1 and 20 alone | consistency without averaging | expected worst coefficient ≤ 2 % (p99 2.383 reported) |
 | pinion-spring bend coupon (before forming MHA-DT-024) | cut a coupon from the 2325K19 roll along its 50 in length (bend line across the rolling direction, as the part is cut); bend it 90° and 25° over a 7/32 in (Ø5.56) drill-rod mandrel, R2.78, at or under the R2.8 the ±0.5 formed band accepts on both R3.3 bends; then form one leaf and measure its free preset | whether 17-7 PH Condition C takes the tightest radius the drawing accepts at 0.015 in — the R3.3 nominal is proxied from NASA SP-5089 Table XXXI (hardened STA sheet, 0.012–0.016 in, R 0.13 in), and Condition C has less elongation, so the coupon qualifies the band's low limit, not the nominal | no crack or orange peel on the outside of either bend under a 10× loupe; the free crest preset measures 2.55 ± 0.5 into the flank (the formed band whose every corner the preload and stress gates in `build_dt_drive_train_assembly` walk); a crack moves both nominal radii up until the coupon passes at their low limit, and re-runs the corner gates |
 
 ## Fit classes (interfaces that must carry a rule)
@@ -474,7 +530,9 @@ The build scripts already assert clearance margins analytically (and raise on vi
 are the concrete realizations of the classes above, being lifted into `tolerances/`:
 
 - spring-eye threading margins into the lever hole / under the tab;
-- oblique cone↔drum mesh penetration guard (edge slack);
+- oblique cone↔drum mesh set point (edge slack, `cone_set_stack`). The engaged cone centre is
+  set at assembly on T120's radial feeler and locked with the cone-lock-knob (MHA-VN-013); the
+  swing stop screw (MHA-VN-015) only limits the disengaged swing;
 - rack–pinion backlash;
 - bushing clearance under the amplitude-bar foot.
 
@@ -538,29 +596,40 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   every lobe sits 1.5° off. Channel i turns i× faster than the crank, so no crank index zeroes
   all 20: it is a *common cam phase*, and its error h·Σ xᵢ sin(iθₖ) is the sine transform the
   machine does not read — no procedure step touches it. On the reference inputs: 0.15–0.30 % MAE,
-  1.7 % max — 6× the residual allowance, and an **as-built total of 0.735% vs 0.7%**.
+  1.9 % max — 6× the residual allowance, and an **as-built total of 0.730% vs 0.7%**.
   Cut the lobe half a pitch from the tooth crest without changing the gear mesh
   phase; reconcile the resulting rod/rocker rest closure before rebuilding.
   `verify:kinematics` uses a prescribed pen driver, not forces from the cams.
   `check:budget` scores the as-built residual beside the lobe-up one and fails
   unless `reserved.nominal_residual_mae.waive_cam_home_phase` is set; the waiver is set, and
   **the closure above is conditional on that cut**.
-- **Magnifier range / ordinate capacity** (#748): the loaded spring response,
-  lever radius 66–165 mm and CAD wheel ratio 4.76 give
-  2.136 mm pen travel per full-scale bar at the minimum setting, or 7.021 bars
-  within the 15 mm half-stroke. The sparse pair reaches only 13.705 mm at the
-  built radius. These are local linearized values, not a force-driven motion
-  simulation. **The minimum
-  pose is not CAD-gated**: `build_mg_magnifier_assembly` builds and `verify:soundness` exercises
+- **Magnifier range / ordinate capacity** (#748): the clamp's knife radii 66–165 mm (collar
+  face to as-built; 209 at the rod tip) are where the block sits — reach and setup. What the
+  pen sees is the **wire moment arm**, the knife axis's perpendicular distance to wire 1's rest
+  run (`error_budget.wire_moment_arm`, built from `mg_lever_wire_geom`'s own construction and
+  reproducing its as-built run): the output fixture hooks the wire its signed
+  `HOOK_OFFSET_X` (9.7 mm toward the knife) from the clamp station and the wire leans toward
+  the wheel, so the arm is 55.89 mm at the collar, 166.97 mm as built and 208.81 mm at the rod
+  tip — not proportional to the station (using the clamp radius instead would
+  overstate the collar gain). With the loaded spring response and the CAD
+  wheel pitch ratio 4.99492 that is 1.858 mm pen travel per full-scale bar at the collar, or
+  ≈8.07356 bars within the 15 mm half-stroke; use **$P(f)\le8.07$** as the operating limit.
+  The setup solves the arm that fills the stroke and the station that realises it.
+  The sparse pair reaches only 14.247 mm at the built station (gain 5.550 mm per bar).
+  These are local linearized values, not a force-driven motion simulation. **Only the as-built pose is
+  CAD-gated**: `build_mg_magnifier_assembly` builds and `verify:soundness` exercises
   only the as-built 165 mm placement; no clearance or articulation proof exists with the clamp
   face against the collar face (the vertical rod hangs 6 mm forward of the collar), yet every
-  broad input is scored there. `check:budget` names the inputs that rely on it and fails
-  unless `reserved.readout.waive_minimum_pose` is set; the waiver is set, and **the closure
-  above is conditional on that pose being buildable** (#748). The report prints an offline
-  straight-wire estimate beside the waiver (hook at x 51; the same 0.3 mm ring / 1.7 mm spoke
-  z clearance as the built pose, since the wire's z run does not depend on x) — it is not a
-  proof and says nothing about the clamp, rod or collar. `READOUT.md` caps the
-  operating radius at the built 165 mm. Validate the full required stroke in
+  broad input is scored at it (all ones, half rectangle/lifted square and Gaussian at
+  66 mm from the knife, with report scales ≈0.384, 0.763 and 0.918 respectively).
+  `check:budget` names those inputs with their stations and
+  fails unless `reserved.readout.waive_minimum_pose` is set; the waiver is set, and **the
+  closure above is conditional on the collar pose being buildable** (#748). The report prints
+  an offline straight-wire estimate beside the waiver (hook at x 41.267 mm; rim-face
+  gap 1.164 mm, spoke-face gap 3.469 mm and boss-face gap 3.689 mm) —
+  it is not a proof and says nothing about the clamp, rod or collar. `READOUT.md` tabulates
+  the pen travel per bar against the clamp station and caps the
+  operating station at the built 165 mm. Validate the full required stroke in
   both directions at minimum and built settings, including nonlinear spring
   equilibrium and wire tangency. The wire's physical pitch radius must be
   distinguished from the CAD display stand-off. The counter eye's mid-shank

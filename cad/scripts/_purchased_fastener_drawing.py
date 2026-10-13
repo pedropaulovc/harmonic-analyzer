@@ -480,7 +480,7 @@ async def _build_reference_sheet(
                 (
                     i
                     for i, line in enumerate(lines)
-                    if line.startswith(("SET QC:", "SETUP:"))
+                    if line.startswith("SET QC:")
                 ),
                 len(lines),
             )

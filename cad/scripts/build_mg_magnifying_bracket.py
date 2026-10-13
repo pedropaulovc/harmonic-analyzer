@@ -2,12 +2,30 @@ r"""Reproduction script: magnifying-lever bracket (book ch. 20, pp. 46-49).
 
 The black fitting that affixes the magnifying lever rod to the summing
 lever: a flange butted against the coefficients plate's front edge FACE
-and a forward arm ending in a collar (O12, bore 6.2) the O6 rod clamps
-into. The collar/rod sit at the plate centreline (machine y 979.7, after the
-2026-08-02 Cascade-A drop). The flange seats flush on the summing lever's
-installed front face and carries two native #2 counterbores entering -Z.
-The arm and collar remain unchanged. Joint geometry and hole specifications
-are owned by magnifying_bracket_joint_layout, independently of assemblies.
+and a forward arm ending in a collar (O12, bore mg_lever_press_fit_geom
+.COLLAR_BORE_DIA) the O6 rod is PRESSED into and retained with Loctite 638
+(p.46 "firmly affixed"; user ruling 2026-10-11). The collar/rod sit at the
+plate centreline (machine y 979.7, after the 2026-08-02 Cascade-A drop). The
+flange seats flush on the summing lever's installed front face and carries
+two native #2 counterbores entering -Z. Joint geometry and hole
+specifications are owned by magnifying_bracket_joint_layout, independently
+of assemblies; the press fit (bore nominal, band, engagement, budget,
+installation notes) by the config-free mg_lever_press_fit_geom, which the
+lever print and this one share.
+
+``ArmSection`` (blanked, on the Right plane): the arm's section in the
+profile the RIGHT view prints -- its lower face from the bore axis, the seat
+face from the bore axis and the arm's end past that face -- as native
+dimensions (machinist review: nothing located the bore axis). Its three
+construction lines lie on the arm's end face and the seat face's visible
+edge pieces, so the sketch, shown in that view to import its dimensions,
+prints nothing the model does not already draw but the bore axis: a
+centerline from the collar's centre to the arm's end station, the axis
+extended for dimensioning.  ``ArmFootprint`` (blanked, on the Front plane):
+the arm's end face as the BOTTOM view draws it, face-on inside the flange's
+outline -- its thickness and its lower face from the flange's hole-datum
+face as native dimensions, on the flange's east end the arm's +X face
+shares.
 
 Run (SolidWorks already open)::
 
@@ -22,8 +40,9 @@ import sys
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _dimensions import drive_dimension, set_global
+from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
+from _fit_deviations import deviations
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -33,10 +52,14 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    anchor_point_to_point,
+    blank_reference_sketches,
+    dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
 from _sketch_chains import define_rectilinear_chain
+from _sketch_circle import define_circle
 
 import _telemetry
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
@@ -48,6 +71,7 @@ from mg_magnifying_bracket_spec import (
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
 )
+from mg_lever_press_fit_geom import COLLAR_BORE_BAND, COLLAR_BORE_DIA, COLLAR_LENGTH_BAND
 from mg_magnifying_lever_geom import COLLAR_HALF_LEN as LEVER_COLLAR_HALF_LEN
 from magnifying_bracket_joint_layout import (
     BRACKET_HOLE_POINTS,
@@ -69,8 +93,10 @@ PART_NAME = "mg-magnifying-bracket"
 MATERIAL = "Plain Carbon Steel"  # black hardware
 
 COLLAR_OD = 12.0  # rod collar (low)
-COLLAR_BORE = 6.2  # the O6 magnifying rod clamps in (derived)
-# along X. CONFIG owns it (output.magnifier_collar_half_len_mm): the error
+# The bore is the press seat for the O6 lever rod: nominal and band come from
+# mg_lever_press_fit_geom (ONE config-free read point for the joint).
+# Half the collar length along X. CONFIG owns it
+# (output.magnifier_collar_half_len_mm): the error
 # budget derives the magnifier's minimum pose from the collar face, so the
 # config value must drive the CAD, not merely be asserted equal to it.
 COLLAR_HALF_LEN = LEVER_COLLAR_HALF_LEN
@@ -81,6 +107,15 @@ ARM_Z = (4.0, 58.3)
 async def _volume(adapter) -> float:
     res = await adapter.get_mass_properties()
     return res.data.volume if res.is_success else float("nan")
+
+
+def _make_construction(adapter, entity: str) -> None:
+    """Turn one sketch segment into construction geometry, and prove it."""
+    from _com import _early_bound
+    segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity}: failed to become construction geometry")
 
 
 def _resolve_native_mounting_dimensions(adapter) -> dict[str, str]:
@@ -137,7 +172,6 @@ def _apply_native_mounting_annotations(adapter, native_names: dict[str, str]) ->
 
 async def _mounting_coordinate_dimensions(adapter) -> None:
     """Own mounting coordinates from the real west edge and lower face."""
-    from _sketch import anchor_point_to_point
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
     check("mounting coordinate sketch", await adapter.create_sketch("Front"))
     dimensions = SketchDims()
@@ -176,7 +210,7 @@ async def _mounting_coordinate_dimensions(adapter) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import RevolveParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -185,11 +219,11 @@ async def build(adapter) -> dict[str, str]:
     # CollarOD or FlangeX0 -- never an auto "D3@Sketch2". The mm suffix is
     # load-bearing: this is an INCH document and the equation manager reads BARE
     # numbers in document units, so an unsuffixed "200" would be read as 200 in
-    # and blow the part up 25.4x. The arm/flange Y bounds drive only the extrude
-    # DEPTH/OFFSET (feature params, not sketch dims), so they are knobs with
-    # nothing in the deferred drive batch -- matches the exemplars.
+    # and blow the part up 25.4x. The arm/flange Y bounds drive the extrude
+    # DEPTH/OFFSET (feature params, not sketch dims) and the ArmSection witness
+    # dimensions the RIGHT view prints -- matches the exemplars.
     await set_global(adapter, "CollarOD", f"{COLLAR_OD}mm")
-    await set_global(adapter, "CollarBore", f"{COLLAR_BORE}mm")
+    await set_global(adapter, "CollarBore", f"{COLLAR_BORE_DIA}mm")
     await set_global(adapter, "CollarHalfLen", f"{COLLAR_HALF_LEN}mm")
     await set_global(adapter, "ArmHalfX", f"{ARM_HALF_X}mm")
     await set_global(adapter, "ArmZ0", f"{ARM_Z[0]}mm")
@@ -209,66 +243,43 @@ async def build(adapter) -> dict[str, str]:
     # target must resolve against the finished model).
     drive_jobs: list[tuple[str, str]] = []
 
-    # 1. Collar tube about the X axis (revolved rectangle).
+    # 1. Collar tube about the X axis: an annulus on the Right plane (normal
+    # +X), extruded mid-plane so it spans x -HalfLen..+HalfLen. Two on-axis
+    # circles, so each records ONLY its diameter dim -- and those are the
+    # print's: the end view (RIGHT) imports the O12 and the press-seat bore
+    # with its band natively (drawing-guidelines.md rule 3 (decimal places carry the tolerance)), where the old revolved
+    # half-profile put the bore on a hidden wall line.
     collar = SketchDims()
-    check("create_sketch collar", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    centerline = check(
-        "collar centerline",
-        await adapter.add_centerline(-COLLAR_HALF_LEN, 0.0, COLLAR_HALF_LEN, 0.0),
+    check("create_sketch collar", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter, 0.0, 0.0, COLLAR_OD / 2.0, "collar OD", dims=collar,
+        names=(None, None, "CollarOd"),
+        drives=(None, None, '"CollarOD"'),
     )
-    profile_rect = [
-        (-COLLAR_HALF_LEN, COLLAR_BORE / 2.0),
-        (COLLAR_HALF_LEN, COLLAR_BORE / 2.0),
-        (COLLAR_HALF_LEN, COLLAR_OD / 2.0),
-        (-COLLAR_HALF_LEN, COLLAR_OD / 2.0),
-    ]
-    profile = await add_line_chain(adapter, profile_rect)
-    set_sketch_direct_db(adapter, False)
-    # Emission (rectilinear chain): seg0 width (= 2*HalfLen), seg1 wall span
-    # (= OD/2 - Bore/2), THEN the (-HalfLen, Bore/2) corner anchor (x then z;
-    # both non-zero). Anchor dims are UNSIGNED distances from the origin: the
-    # corner sits at x = -HalfLen, so its dim shows +HalfLen and drives positive.
-    await define_rectilinear_chain(
-        adapter, profile, profile_rect, label="collar", dims=collar,
-        names=["WallLen", "WallSpan", "CornerX", "CornerZ"],
-        drives=[
-            '2 * "CollarHalfLen"',
-            '"CollarOD" / 2 - "CollarBore" / 2',
-            '"CollarHalfLen"',
-            '"CollarBore" / 2',
-        ],
+    await define_circle(
+        adapter, 0.0, 0.0, COLLAR_BORE_DIA / 2.0, "collar bore", dims=collar,
+        names=(None, None, "CollarBore"),
+        drives=(None, None, '"CollarBore"'),
     )
-    # The centerline shares no vertex with the off-axis profile rectangle,
-    # so it carries its own scheme: horizontal on the axis, length dim,
-    # start anchored to the origin. Both its dims are recorded after the chain
-    # dims, in creation order: length, then the on-axis start anchor distance.
-    check(
-        "centerline horizontal",
-        await adapter.add_sketch_constraint(centerline, None, "horizontal"),
-    )
-    check(
-        "centerline length",
-        await adapter.add_sketch_dimension(
-            centerline, None, "linear", 2.0 * COLLAR_HALF_LEN
-        ),
-    )
-    collar.record("CenterlineLen", '2 * "CollarHalfLen"')
-    await anchor_point_to_origin(
-        adapter, f"{centerline}.start", -COLLAR_HALF_LEN, 0.0, "centerline start"
-    )
-    collar.record("CenterlineX", '"CollarHalfLen"')  # unsigned: anchor at x = -HalfLen
     await ensure_fully_defined(adapter, "collar sketch")
     check("exit_sketch collar", await adapter.exit_sketch())
     name_last_feature(adapter, "CollarProfile")
     drive_jobs += collar.apply(adapter, "CollarProfile")
     check(
-        "revolve collar", await adapter.create_revolve(RevolveParameters(angle=360.0))
+        "extrude collar",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=2.0 * COLLAR_HALF_LEN, both_directions=True)
+        ),
     )
     name_last_feature(adapter, "Collar")
+    # The mid-plane extrude's one dimension is the collar's full length; the
+    # TOP view prints it.
+    drive_jobs += [
+        (name_dimensions(adapter, "Collar", ["CollarLen"])[0], '2 * "CollarHalfLen"')
+    ]
     expected = (
         math.pi
-        * ((COLLAR_OD / 2.0) ** 2 - (COLLAR_BORE / 2.0) ** 2)
+        * ((COLLAR_OD / 2.0) ** 2 - (COLLAR_BORE_DIA / 2.0) ** 2)
         * 2.0
         * COLLAR_HALF_LEN
     )
@@ -384,6 +395,194 @@ async def build(adapter) -> dict[str, str]:
         adapter, "bracket mounting counterbores", expected, 0.02 * cut_volume
     )
 
+    # 4. Arm section witness (ArmSection, blanked; Right plane, sketch (u, v)
+    # -> model (-Z, Y)): the RIGHT view shows the arm in profile between the
+    # flange's seat face and the collar, and drawing-simplicity-policy.md `How the repository implements the guidelines` wants the arm's
+    # station along Z and its lower face from the bore axis as native
+    # dimensions (machinist review: nothing located the bore axis). Three
+    # construction lines, each on an edge the view already draws: the arm's
+    # end face (its full thickness, past the seat face) and the seat face's
+    # two visible pieces -- below the arm, from the flange's lower (hole-datum)
+    # face up to the arm; above it, from the arm up to the flange's top -- so
+    # the sketch, shown in that view to import its dimensions, prints nothing
+    # new but the bore axis: a centerline from the arm's end station to the
+    # collar's centre, the axis extended for dimensioning (ASME Y14.5), so the
+    # arm's 3.00 from the axis reads off the centerline's end at the arm's end
+    # face, its two witnesses 3 mm long, not 60 mm back through the arm to the
+    # collar's centre. The dimensions the print keeps all take the arm's END
+    # corners, so their extension lines run away from the part instead of
+    # along the arm's faces. Six dimensions in creation order: the thickness
+    # (ArmThickness, unmarked: the print controls it in the bottom view, from
+    # ArmFootprint below), the arm's lower face from the bore axis
+    # (ArmBelowAxis), the arm's end past the seat face (ArmPastSeat: the
+    # arm's end corner to the seat piece's hole-datum corner, so the bore
+    # axis has ONE toleranced chain along Z -- SeatToAxis, then this -- and
+    # the sheet prints the arm's end from the axis as its parenthesised sum,
+    # mreview10 blocker 2), the arm's lower face from the hole-datum flange
+    # face (ArmOffset, unmarked: controlled in the bottom view too), the
+    # flange above the arm (unmarked) and the seat face from the bore axis
+    # (SeatToAxis, the flange's top corner to the origin).
+    section = SketchDims()
+    check("create_sketch arm section", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    seat_u = -FLANGE_Z[1]
+    end_u = -ARM_Z[1]
+    axis = check(
+        "arm section bore axis",
+        await adapter.add_centerline(end_u, 0.0, 0.0, 0.0),
+    )
+    end = check(
+        "arm section end face",
+        await adapter.add_line(end_u, ARM_Y[0], end_u, ARM_Y[1]),
+    )
+    below = check(
+        "arm section seat face below the arm",
+        await adapter.add_line(seat_u, FLANGE_Y[0], seat_u, ARM_Y[0]),
+    )
+    above = check(
+        "arm section seat face above the arm",
+        await adapter.add_line(seat_u, ARM_Y[1], seat_u, FLANGE_Y[1]),
+    )
+    set_sketch_direct_db(adapter, False)
+    for line in (end, below, above):
+        _make_construction(adapter, line)
+    check(
+        "arm section bore axis horizontal",
+        await adapter.add_sketch_constraint(axis, None, "horizontal"),
+    )
+    await anchor_point_to_origin(adapter, f"{axis}.end", 0.0, 0.0, "arm section bore axis end")
+    check(
+        "arm section bore axis from the arm's end station",
+        await adapter.add_sketch_constraint(
+            f"{axis}.start", f"{end}.start", "vertical_points"
+        ),
+    )
+    await anchor_point_to_point(
+        adapter, f"{end}.start", f"{end}.end",
+        0.0, ARM_Y[1] - ARM_Y[0], "arm section ArmThickness",
+    )
+    section.record("ArmThickness", '"ArmY1" - "ArmY0"')
+    await dimension_between(
+        adapter, f"{end}.start", f"{axis}.start", "vertical_distance",
+        -ARM_Y[0], "arm section ArmBelowAxis",
+    )
+    section.record("ArmBelowAxis", '-"ArmY0"')
+    await dimension_between(
+        adapter, f"{end}.start", f"{below}.start", "horizontal_distance",
+        ARM_Z[1] - FLANGE_Z[1], "arm section ArmPastSeat",
+    )
+    section.record("ArmPastSeat", '"ArmZ1" - "FlangeZ1"')
+    # Each seat piece's arm-side corner sits on the arm face it was drawn at:
+    # below.end on the arm's LOWER face (end.start), above.start on its upper
+    # face (end.end).  Pairing same-named corners (below.end with end.end)
+    # dragged the piece below the arm up to the arm's top, and ArmOffset's
+    # 3.35 then re-solved its seat-face witness to Y +0.35, above the bore
+    # axis (retry08 native layout audit: that extension line printed at sheet
+    # y 180.4 mm instead of on the hole-datum face at 173.65 mm).
+    for piece, corner, arm_corner in (
+        (below, "end", "start"),
+        (above, "start", "end"),
+    ):
+        check(
+            f"arm section {piece} vertical",
+            await adapter.add_sketch_constraint(piece, None, "vertical"),
+        )
+        check(
+            f"arm section {piece}.{corner} on the arm's face",
+            await adapter.add_sketch_constraint(
+                f"{piece}.{corner}", f"{end}.{arm_corner}", "horizontal_points"
+            ),
+        )
+    check(
+        "arm section seat pieces on one station",
+        await adapter.add_sketch_constraint(
+            f"{below}.end", f"{above}.start", "vertical_points"
+        ),
+    )
+    await dimension_between(
+        adapter, f"{below}.start", f"{end}.start", "vertical_distance",
+        ARM_Y[0] - FLANGE_Y[0], "arm section ArmOffset",
+    )
+    section.record("ArmOffset", '"ArmY0" - "FlangeY0"')
+    await dimension_between(
+        adapter, f"{above}.start", f"{above}.end", "vertical_distance",
+        FLANGE_Y[1] - ARM_Y[1], "arm section FlangeAboveArm",
+    )
+    section.record("FlangeAboveArm", '"FlangeY1" - "ArmY1"')
+    await dimension_between(
+        adapter, f"{above}.end", "origin", "horizontal_distance",
+        FLANGE_Z[1], "arm section SeatToAxis",
+    )
+    section.record("SeatToAxis", '"FlangeZ1"')
+    await ensure_fully_defined(adapter, "arm section sketch")
+    check("exit_sketch arm section", await adapter.exit_sketch())
+    name_last_feature(adapter, "ArmSection")
+    drive_jobs += section.apply(adapter, "ArmSection")
+
+    # 5. Arm footprint witness (ArmFootprint, blanked; Front plane, sketch
+    # (u, v) -> model (X, Y)): the BOTTOM view looks at the mounting face and
+    # draws the arm's end face face-on, a rectangle inside the flange's
+    # outline, so the arm's thickness across the flange and its lower face
+    # from the flange's lower (hole-datum) face are controlled THERE, where
+    # the footprint is seen (mreview10 blocker 1 wanted the arm tied to a
+    # flange edge by a toleranced dimension; the side view's edge-on stack
+    # of the same two values crowded the arm's end, Main's retry11 ruling).
+    # Two construction lines on the flange's east end, X = FLANGE_X[1], which
+    # the arm's +X face shares (ARM_HALF_X == FLANGE_X[1]), so both lie on
+    # the one edge the view draws there: the hole-datum face up to the arm's
+    # lower face, and the arm's full thickness.  Their dimensions take the
+    # flange's and the arm's east corners, so the extension lines run east,
+    # away from the part.  Four dimensions in creation order: the corner's
+    # anchor (FootprintCornerX, FootprintCornerY), the arm's lower face from
+    # the hole-datum face (FootprintOffset) and the thickness
+    # (FootprintThickness), every one driven by the globals so an edited
+    # flange or arm moves the witness with the body.
+    if ARM_HALF_X != FLANGE_X[1]:
+        raise RuntimeError(
+            "the arm footprint witness lies on the flange's east end, which the "
+            f"arm's +X face must share: ARM_HALF_X {ARM_HALF_X} != FLANGE_X[1] {FLANGE_X[1]}"
+        )
+    footprint = SketchDims()
+    check("create_sketch arm footprint", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    end_x = FLANGE_X[1]
+    gap = check(
+        "arm footprint hole-datum face to the arm",
+        await adapter.add_line(end_x, FLANGE_Y[0], end_x, ARM_Y[0]),
+    )
+    block = check(
+        "arm footprint arm thickness",
+        await adapter.add_line(end_x, ARM_Y[0], end_x, ARM_Y[1]),
+    )
+    set_sketch_direct_db(adapter, False)
+    for line in (gap, block):
+        _make_construction(adapter, line)
+    check(
+        "arm footprint pieces meet on the arm's lower face",
+        await adapter.add_sketch_constraint(f"{gap}.end", f"{block}.start", "coincident"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{gap}.start", end_x, FLANGE_Y[0], "arm footprint hole-datum corner"
+    )
+    footprint.record("FootprintCornerX", '"FlangeX1"')
+    footprint.record("FootprintCornerY", '-"FlangeY0"')
+    # Each piece's far end is pinned over its start (an alignment relation
+    # and one vertical dim, as the section's ArmThickness is).
+    await anchor_point_to_point(
+        adapter, f"{gap}.start", f"{gap}.end",
+        0.0, ARM_Y[0] - FLANGE_Y[0], "arm footprint FootprintOffset",
+    )
+    footprint.record("FootprintOffset", '"ArmY0" - "FlangeY0"')
+    await anchor_point_to_point(
+        adapter, f"{block}.start", f"{block}.end",
+        0.0, ARM_Y[1] - ARM_Y[0], "arm footprint FootprintThickness",
+    )
+    footprint.record("FootprintThickness", '"ArmY1" - "ArmY0"')
+    await ensure_fully_defined(adapter, "arm footprint sketch")
+    check("exit_sketch arm footprint", await adapter.exit_sketch())
+    name_last_feature(adapter, "ArmFootprint")
+    drive_jobs += footprint.apply(adapter, "ArmFootprint")
+
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so the geometry must not move -- the re-check below is the proof.
@@ -395,19 +594,30 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven magnifying-bracket (equations neutral)", expected, 0.005 * expected
     )
 
-    # Named collar axis (local X through the origin) so the magnifying lever
-    # rides this bore as a revolute in the M6 mated-DOF assembly.
+    # Named collar axis (local X through the origin): the lever rod's press
+    # seat. The assembly places the bracket at its joint origin and locks it to
+    # the lever (they rock together about the knife edge), so the axis is a
+    # reference, not a revolute.
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "collar axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Native model dimensions own the flange and head-seat bands; the print
-    # imports the plan dimensions and exposes the stepped holes by callout.
+    # Native model dimensions own the flange, head-seat and press-seat bands;
+    # the print imports the plan dimensions and exposes the stepped holes by
+    # callout. The bore and length bands are mg_lever_press_fit_geom's
+    # (upper, lower) contracts: the press contact is the collar's length less
+    # the lever's dome, so the length's band bounds the installation force.
     native_mounting_names = _resolve_native_mounting_dimensions(adapter)
     await _mounting_coordinate_dimensions(adapter)
     set_dimension_symmetric_tolerance(
         adapter, "FlangeProfile", "FlangeDepth", PLATE_THICKNESS_BAND
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "CollarProfile", "CollarBore", *deviations(COLLAR_BORE_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "Collar", "CollarLen", *deviations(COLLAR_LENGTH_BAND)
     )
     _apply_native_mounting_annotations(adapter, native_mounting_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
@@ -422,6 +632,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    blank_reference_sketches(adapter, ("ArmSection", "ArmFootprint"))
     # Annotation changes must preserve the cut holes through the final rebuild,
     # not merely at the earlier, pre-annotation equation check.
     await force_rebuild(adapter)

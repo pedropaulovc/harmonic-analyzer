@@ -59,7 +59,8 @@ cannot ask for what the authors were told to leave out.
 - **Layout (rules 13–15).** Each `DrawingSpec` records its sheet orientation.
   The layout audit (`_drawing_layout_check`) checks the template's border and
   title-block keep-out; the machinist review judges containment, balance and
-  fit of every visible element.
+  fit of every visible element. An eye pass never substitutes for it (merge
+  gate 3 in the root `AGENTS.md`).
 - **Thread engagement (rule 18)** is owned by the CAD: the build's seat-fit
   and stack asserts (for example `require_blind_seat_fit`) enforce it. Today
   they check only ≥ 1D; raising them to 1.5D at the worst case is #846.
@@ -82,15 +83,16 @@ A feature-control frame and its datums appear only on these features
 frames and no datums.
 
 - **Knife-edge system.** The knife-mount 2X dowel-hole pattern (one position
-  frame under its 2X Ø, Ø0.13 to the top seat, datum A, at the BASIC 12.700
+  frame under its 2X Ø, Ø0.13 to the top seat, datum A, at the BASIC 14.200
   span, datum feature B on that frame), its bore (⌖Ø0.20 to A|B with ⊥Ø0.05
   to B stacked under it) and its #6-32 hanger tap (Ø0.10 to A|B, so the
-  crossbar's Ø4.318 clearance hole still floats round the screw); the top
+  crossbar's Ø4.699 clearance hole still floats round the screw); the top
   frame's two knife-hanger dowel slots (⌖0.05 to the round dowel hole at
-  their own station, BASIC 12.700 from it, datum B front / C rear, B|C▷ and
+  their own station, BASIC 14.200 from it, datum B front / C rear, B|C▷ and
   C|B▷, so the two knife mounts' dowel lines stay square to the knife-edge
-  line); the summing-lever knife seat and its 20-hole spring pattern (one
-  pattern position frame).
+  line; the frame holds the slot's width, and a note holds its centre ±0.13
+  along the slot from the BASIC 14.200); the summing-lever knife seat and its
+  20-hole spring pattern (one pattern position frame).
 - **Cams.** The pinion-cam eccentric-axis position, and any future cam.
 - **Channel consistency.** At most one control per channel part (rocker arm,
   channel lever, amplitude bar, connecting rod) where a coordinate ± would let
@@ -108,6 +110,38 @@ frames and no datums.
 - **Hanger pivot.** The MHA-PD-020 pivot spacer's two faces square to its
   pressed bore (datum A): the preloaded MHA-VN-049 spring seats the hanger on
   them, so their squareness is the hanger's only tilt.
+- **Paper-drive stock-form gears.** MHA-PD-006, MHA-PD-008 and MHA-PD-010:
+  tooth-space radial runout to the actual running bore or journal axis,
+  measured with a calibrated pin in each space, not by blank-OD runout or
+  free-span variation. The disc's assembled running datum is the feed pinion
+  bore, not its floating hub pilot. The integral knob shaft's core and front
+  relief may carry runout to its running journal where the finite
+  stock-cutter clearance requires it. These are the user's gear-tooth and
+  bore-to-shaft critical classes, not a general permission to add frames to
+  shafts. The tooth-pattern indicator requirement is a feature-local,
+  model-property-linked callout, for example `TOOTH SPACE RUNOUT 0.05 TIR TO
+  A`, using the configured critical grade. Attach it to a real finite tooth
+  flank, name the actual running datum, and keep the pin size and all-spaces
+  line in the same callout. It is not a circular-runout frame on the blank OD
+  and not a multi-line inspection procedure in Manufacturing Notes. On the
+  disc sheet, distinguish the assembled feed-bore datum from the disc's own
+  pilot.
+- **Paper reducer location.** The transgear arm and arm plate's locating
+  pattern and running-axis locations may carry the critical position controls
+  required by the whole-stack stock-form gate, including the rigid two-hole
+  registration's yaw. Use stock dowels in reamed holes; the mounting screws
+  clamp but do not locate. A matched pair is reamed at the drawn, inspected
+  gear-axis setting, not accepted as-made. Running-bore squareness and the
+  arm's opposite seating faces may carry the configured controls needed at
+  the actual projected gear and chain planes. Name those planes and reachable
+  datum features; neither screw clearance nor assumed countersink centring is
+  a location control.
+- **Purchased paper rack acceptance.** The MHA-PD-005 rack sheet carries only
+  its two incoming stock sizes (stock height and face width MAX) and the
+  purchased-rack line. Its pitch accuracy is the catalogue part's; the
+  assembly checks the running mesh over the whole engaged window (no tight
+  spot, shake at every tooth). Keep numerical limits in the shared functional
+  source, not a generic multi-line Manufacturing Notes block.
 
 A new entry needs a user ruling.
 
@@ -136,7 +170,10 @@ restored, the affected packages fail the gate.
 Reset rows are recorded on issues #967, #968, #971, #974, #975, #976, #986,
 #989, #991, #992, #994, #1019, #1294, #1295, #1367, #1368, #1369, #1370,
 #1371, #1372, #1373, #1374, #1375, #1376, #1377, #1378, #1379, #1380,
-#1381, #1382, #1383, #1384, #1385, #1386 and #1387.
+#1381, #1382, #1383, #1384, #1385, #1386 and #1387. Rows that `main` changed,
+removed or added after the reset (MHA-VN-031, MHA-DT-003, MHA-DT-007,
+MHA-DT-010, MHA-PD-010, MHA-PD-022, and the new MHA-MG-006 row on #1433) are
+recorded on the same issues.
 
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|
@@ -149,14 +186,23 @@ package's verdict from a blind senior machinist. The prompt is
 kind (`cad/scripts/prompts/machinist_review_part.md` or
 `machinist_review_assembly.md`).
 
-- **Always review with Claude Opus 5.5**, the default (`--reviewer claude`,
+The gate covers every sheet whose rendered output a PR changes, including a
+sheet that changes only because CAD geometry, config or a helper it reads
+changed. A sheet the PR's own drawing script or spec edits must pass as below.
+A sheet changed only indirectly passes when its review adds no gating finding
+beyond a review of `main`'s version of the same sheet run with the same
+reviewer, model, effort and prompt (the report records each); the PR records
+both verdicts and the finding diff.
+
+- **Review with Claude Opus 5.5 by default** (`--reviewer claude`,
   `claude-opus-5-5` at medium effort). The machinist review does not follow
-  the cross-family rule for code review: Opus reviews every drawing, whichever
-  model authored it, and an Opus `SHIP` is the gate. On the 80-case benchmark
+  the cross-family rule for code review: Opus may review every drawing,
+  whichever model authored it. Another reviewer (`--reviewer codex`, or
+  `--model claude-fable-5-1`) is allowed, for example when Opus is over
+  quota; record the reviewer and model in the PR. On the 80-case benchmark
   (2026-10-13, vector zoom tool, same rubric) Opus met 340/410 expectations
   with 62 misses, Fable 5.1 332 with 73, Astra 322 with 84, and Opus cost
-  about a third of Fable. `--reviewer codex` and `--model` exist for
-  benchmarking only.
+  about a third of Fable.
 - Every native PDF page is rendered at 300 dpi and all sheets go to one
   review. A downscaled contact sheet is not a substitute.
 - A package passes on `SHIP` with no blocker, over-specification or clarity
@@ -197,6 +243,9 @@ or, when unset,
 `%LOCALAPPDATA%/harmonic-analyzer-agent-scratchpad/harmonic-analyzer/machinist-review-evals`.
 The benchmark measures release-package/LLM review regressions; the separate
 `machinist_review_eval.py` remains the frozen-PNG/human calibration tool.
+A case whose drawing was renamed after its release names the current registry
+package and the release's PDF basename in `release_pdf`; run and import read
+that PDF (eval 40, `ms_stick`, reads v40's `ha-measuring-stick.pdf`).
 
 Regression tests defend observable manufacturing contracts and plausible
 failures, not note wording, line counts or mocked API-call sequences. Native

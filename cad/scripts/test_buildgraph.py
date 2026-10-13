@@ -121,13 +121,14 @@ _INSERTED_SOURCES = {
     "sm_summing": "vn_boss_hook vn_counter_spring sm_gooseneck sm_gooseneck_spring_screw vn_knife_hanger_stud vn_knife_mount_dowel sm_knife_mount sm_summing_lever",
     "mg_magnifier": "vn_clamp_screw sh_column_clamp_back sh_column_clamp_front mg_lever_wire "
     "mg_magnifying_bracket vn_magnifying_bracket_screw mg_magnifying_clamp mg_magnifying_lever mg_magnifying_vertical_rod "
-    "mg_magnifying_wheel mg_output_fixture vn_thumb_screw mg_wheel_axle vn_wheel_axle_nut mg_wheel_bar",
+    "mg_magnifying_wheel mg_output_fixture vn_thumb_screw mg_wheel_axle vn_wheel_axle_back_washer "
+    "vn_wheel_axle_front_washer vn_wheel_axle_nut mg_wheel_bar mg_wheel_drum",
     "pn_pen": "vn_hanger_screw pn_pen_frame pn_pen_hanger pn_pen_marker pn_pen_rod vn_pen_set_screw pn_pen_v_block pn_pen_wire",
     "pd_paper_drive": "vn_chain_inner_link vn_chain_outer_link vn_clamp_screw "
     "sh_column_clamp_back sh_column_clamp_front vn_fillister_screw pd_guide_lock vn_guide_lock_screw pd_latch_hook "
-    "vn_latch_hook_bracket_screw "
+    "vn_latch_hook_bracket_screw vn_platen_clip_screw "
     "pd_platen pd_platen_clip pd_platen_guide pd_platen_paper pd_platen_rack pd_rack_pinion pd_support_bar "
-    "pd_transgear_arm pd_transgear_arm_plate vn_transgear_arm_plate_screw vn_transgear_collar_cross_pin "
+    "pd_transgear_arm pd_transgear_arm_plate vn_transgear_arm_plate_locating_pin vn_transgear_arm_plate_screw "
     "pd_transgear_disc_hub vn_transgear_disc_screw pd_transgear_drive_collar pd_transgear_feed_pinion "
     "pd_transgear_knob_cup vn_transgear_knob_cup_pin vn_transgear_knob_drive_pin "
     "pd_transgear_knob_shaft pd_transgear_knob_thrust_ring vn_transgear_latch_pin vn_transgear_pivot_screw "
@@ -135,14 +136,59 @@ _INSERTED_SOURCES = {
     "pd_transgear_front_bushing "
     "pd_transgear_removable vn_transgear_retaining_ring "
     "pd_transgear_thumbnut",
-    "ha_harmonic_analyzer": "ha_measuring_stick ha_measuring_stick_stop fr_frame dt_drive_train "
-    "ch_channel sm_summing mg_magnifier pn_pen pd_paper_drive",
+    "ms_measuring_stick": "ms_stick ms_stop_block ms_stop_plate vn_ms_stop_plate_screw vn_thumb_screw",
+    "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
+    "pd_paper_drive ms_measuring_stick",
 }
 
 
 @pytest.mark.parametrize("assembly", ASSEMBLY_ORDER)
 def test_all_assembly_references_match_inserted_source_manifests(assembly):
     assert set(references_of(assembly)) == set(_INSERTED_SOURCES[assembly].split())
+
+
+def test_arm_plate_locating_pin_has_real_assembly_dependents() -> None:
+    """The inserted locating dowels must be produced before the paper drive."""
+    stem = "vn_transgear_arm_plate_locating_pin"
+    assert stem in part_stems(), "dependency census requires a real producer"
+    assert stem in references_of("pd_paper_drive")
+    assert set(dependents_of(stem)) == {"pd_paper_drive", "ha_harmonic_analyzer"}
+
+
+def test_retired_front_pin_is_not_allocated_but_rear_cup_pin_is() -> None:
+    from _drawing_registry import DRAWINGS_BY_NAME
+    from _fastener_catalog import FASTENERS
+    from _test_stock_recipes import discovered_recipes
+
+    obsolete = "vn_transgear_collar_cross_pin"
+    retained = "vn_transgear_knob_cup_pin"
+    parts = set(part_stems())
+    assert retained in parts
+    assert retained in DRAWINGS_BY_NAME
+    assert FASTENERS[retained.replace("_", "-")].skus == ("98296A031",)
+    assert "98296A031" in discovered_recipes()
+    assert obsolete not in parts
+    assert obsolete not in DRAWINGS_BY_NAME
+    assert obsolete.replace("_", "-") not in FASTENERS
+    assert "98296A026" not in discovered_recipes()
+    assert not (
+        bg.CONFIG_DIR / "parts" / f"{obsolete.replace('_', '-')}.yaml"
+    ).exists()
+    for name in (
+        f"build_{obsolete}.py",
+        f"draw_{obsolete}.py",
+        f"{obsolete}_spec.py",
+        f"test_{obsolete}_drawing.py",
+    ):
+        assert not (SCRIPTS_DIR / name).exists()
+    for source in (
+        "build_pd_paper_drive_assembly.py",
+        "draw_pd_paper_drive_assembly.py",
+        f"build_{retained}.py",
+    ):
+        dependencies = _helper_names(source)
+        assert f"{retained}_spec" in dependencies
+        assert f"{obsolete}_spec" not in dependencies
 
 
 def _source_references(tmp_path, monkeypatch, source, parts=("ch_rocker_arm",)):
@@ -1332,7 +1378,7 @@ def test_references_is_inverse_of_dependents():
 
 def test_output_subs_reference_their_parts_only():
     """Each output sub inserts leaf parts, never another sub-assembly."""
-    for stem in ("sm_summing", "mg_magnifier", "pn_pen", "pd_paper_drive"):
+    for stem in ("sm_summing", "mg_magnifier", "pn_pen", "pd_paper_drive", "ms_measuring_stick"):
         refs = references_of(stem)
         assert refs, f"{stem} should reference its parts"
         parts = set(part_stems())
@@ -1342,25 +1388,18 @@ def test_output_subs_reference_their_parts_only():
         )
 
 
-def test_top_references_subassemblies_and_loose_parts():
-    """harmonic-analyzer mates the seven subs plus the two loose top-level parts:
-    the generic measuring-stick and its sliding stop stand directly on the base
-    (the stick propped on the stop block, 2026-09-02). The spare
+def test_top_references_only_subassemblies():
+    """harmonic-analyzer mates the eight subs and no loose part: the measuring
+    stick and its clamped stop moved into their own ms-measuring-stick sub
+    (2026-10-09), so nothing stands directly on the base any more. The spare
     transgear-removable rides inside paper-drive (a flat sibling of its mounted
     T24), not here -- at the top level its leaf name would collide with the
     T12/T24 instances nested in drive-train / paper-drive."""
     refs = set(references_of("ha_harmonic_analyzer"))
-    subs = {
-        "fr_frame",
-        "dt_drive_train",
-        "ch_channel",
-        "sm_summing",
-        "mg_magnifier",
-        "pn_pen",
-        "pd_paper_drive",
-    }
-    loose = {"ha_measuring_stick", "ha_measuring_stick_stop"}
-    assert refs == subs | loose, refs
+    subs = set(ASSEMBLY_ORDER) - {"ha_harmonic_analyzer"}
+    assert len(subs) == 8
+    assert refs == subs, refs
+    assert not (refs & set(part_stems())), refs & set(part_stems())
 
 
 def test_leaf_parts_do_not_depend_on_assembly_helpers():
@@ -1383,7 +1422,10 @@ def test_assemblies_depend_on_assembly_helpers():
 @pytest.mark.parametrize(
     ("helper", "consumers"),
     [
-        ("_assembly_patterns", {"dt_drive_train", "fr_frame", "mg_magnifier", "pd_paper_drive"}),
+        (
+            "_assembly_patterns",
+            {"dt_drive_train", "fr_frame", "mg_magnifier", "pd_paper_drive", "ms_measuring_stick"},
+        ),
         ("_assembly_couplings", {"dt_drive_train", "pd_paper_drive"}),
         # paper_drive reads its crank axis from cone_line, not the builder.
         ("_dt_drive_train_explode", {"dt_drive_train"}),
@@ -1455,12 +1497,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ("build_fr_frame_assembly.py", "build_fr_top_frame"): (
         "dtrefactor: reads SIDE_TAP_SPEC"
     ),
-    ("build_ha_harmonic_analyzer_assembly.py", "build_ha_measuring_stick"): (
-        "dtrefactor: reads BODY_THICKNESS, BODY_WIDTH, DIVISION_SPACING, SCALE_START_X"
-    ),
-    ("build_ha_harmonic_analyzer_assembly.py", "build_ha_measuring_stick_stop"): (
-        "dtrefactor: reads HEAD_H, SLOT_FLOOR, SLOT_H, SLOT_W"
-    ),
     ("build_kinematic_probe.py", "build_pd_paper_drive_assembly"): (
         "dtrefactor: reads CHAIN_CRANK_CENTRE, DISC_TEETH, FEED_PD, KNOB_SHAFT_XY, NET_RACK_TRAVEL_PER_CRANK_REV, SPARE_GEAR_POS, THIRD_TEETH"
     ),
@@ -1483,13 +1519,10 @@ _GRANDFATHERED_BUILDER_EDGES = {
         "dtrefactor: reads HOLE_DIA, LOCK_THICK, LOCK_WIDTH"
     ),
     ("build_pd_paper_drive_assembly.py", "build_pd_platen_clip"): (
-        "dtrefactor: reads CLIP_LENGTH, CLIP_THICKNESS, HOLE_DIA, HOLE_INSET, HOLE_Y, SCREW_SEAT_BOSS_H, SCREW_SEAT_DIA, SCREW_SEAT_STACK"
+        "dtrefactor: reads CLIP_LENGTH, CLIP_THICKNESS, HOLE_DIA, HOLE_INSET, HOLE_Y"
     ),
     ("build_pd_paper_drive_assembly.py", "build_pd_platen_guide"): (
         "dtrefactor: reads GUIDE_DEPTH, GUIDE_HEIGHT, GUIDE_LENGTH, GUIDE_SCREW_BOTTOM_CLEARANCE, GUIDE_SCREW_PASSAGE, GUIDE_SCREW_THREAD_ENGAGEMENT, HOLE_X, LOCK_SCREW_PASSAGE, LOCK_SCREW_THREAD_ENGAGEMENT, LOCK_SCREW_TIP_INSIDE_MIN, LOCK_STATION_X, SCREW_STATION_X"
-    ),
-    ("build_pd_paper_drive_assembly.py", "build_pd_platen_paper"): (
-        "dtrefactor: reads PAPER_HEIGHT, PAPER_WIDTH"
     ),
     ("build_pd_paper_drive_assembly.py", "build_pd_support_bar"): (
         "dtrefactor: reads BAR_DEPTH, BAR_HEIGHT, CLAMP_CBORE_DEPTH, CLAMP_CBORE_DIA, CLAMP_HEAD_RECESS, CLAMP_HOLE_DIA, CLAMP_HOLE_X"
@@ -1689,29 +1722,50 @@ def test_config_files_no_part_reads_dimensions():
 
 
 def test_config_files_track_real_reads():
-    """The read-set follows the actual _config calls, at SUB-FILE granularity:
-    a gear reads machine("gear_train", ...) -> machine/gear_train.yaml ONLY, so a
-    machine channels.active_count edit (machine/channels.yaml) skips it -- the
-    original problem. The channel/drive-train assemblies read channels.yaml
-    (amplitudes/cone_teeth); every part needs the registry via _part_properties."""
+    """Track actual reads at sub-file granularity, without inheriting world
+    placement for a part-local pitch. Cone face width needs gear_train and
+    cone_incline; its stamped mesh screen also needs tolerances. Neither needs
+    channels.active_count or station_z0. Assemblies that place channel stations
+    do read that grid; every part also needs its registry via _part_properties."""
     cone = config_files_of(SCRIPTS_DIR / "build_dt_cone_gear.py")
     assert "machine/gear_train.yaml" in cone
+    assert "machine/cone_incline.yaml" in cone, "face width follows the cone seat pitch"
+    assert "tolerances/cone_drum_oblique_mesh.yaml" in cone, (
+        "stamped mesh screen uses edge slack/journal float"
+    )
     assert "machine/channels.yaml" not in cone, (
         "gear must NOT depend on active_count's file"
     )
     assert "parts/*" in cone, "stamps its own properties -> parts registry token"
     assert "channels.yaml" in config_files_of(script_for("dt_drive_train"))
     assert "channels.yaml" in config_files_of(script_for("ch_channel"))
+    assert config_files_of(SCRIPTS_DIR / "cone_pitch.py") == frozenset(
+        {"machine/gear_train.yaml", "machine/cone_incline.yaml"}
+    )
+    cone_modules = {
+        Path(path).name
+        for path in module_deps_of(SCRIPTS_DIR / "build_dt_cone_gear.py")
+    }
+    assert "cone_pitch.py" in cone_modules
+    assert "cone_line.py" not in cone_modules, (
+        "part-local data must not import world datums"
+    )
 
 
 def test_config_files_subset_of_known_tokens():
     """Every real script resolves to known tokens (concrete files that exist, or
     the machine/* | tolerances/* | parts/* | title_block | ** dynamic tokens). The set can only
     NARROW the old whole-config dep, never invent a missing-file dependency."""
-    globs = {"machine/*", "tolerances/*", "parts/*", "title_block", "**"}
-    for stem in part_stems():
-        for tok in config_files_of(SCRIPTS_DIR / f"build_{stem}.py"):
-            assert tok in globs or (bg.CONFIG_DIR / tok).is_file(), f"{stem}: {tok}"
+    globs = {"machine/*", "tolerances/*", "parts/*", "title_block", "**", bg.ASSEMBLY_CONTRACTS_TOKEN}
+    scripts = [
+        *bg.part_scripts(),
+        *(script_for(stem) for stem in ASSEMBLY_ORDER),
+        *SCRIPTS_DIR.glob("draw_*.py"),
+        SCRIPTS_DIR / "export_features.py",
+    ]
+    for script in scripts:
+        for tok in config_files_of(script):
+            assert tok in globs or (bg.CONFIG_DIR / tok).is_file(), f"{script.name}: {tok}"
 
 
 def test_config_files_conservative_on_unknown_use():
@@ -2561,6 +2615,15 @@ def test_interference_contracts_do_not_depend_on_the_crankshaft_spec() -> None:
     assert "dt_crankshaft_spec" not in closure
 
 
+def test_interference_contracts_do_not_depend_on_magnifier_fit_or_pose() -> None:
+    # Shared interference oracles restate pinned literals; importing either
+    # magnifier owner would re-key unrelated assemblies on a fixture/fit edit.
+    closure = _helper_names("_interference_contracts.py")
+    assert "_hole_spec" in closure
+    assert "mg_output_fixture_geom" not in closure
+    assert "mg_lever_press_fit_geom" not in closure
+
+
 @pytest.mark.parametrize(
     ("script", "expected"),
     [
@@ -2578,3 +2641,62 @@ def test_interference_contracts_do_not_depend_on_the_crankshaft_spec() -> None:
 def test_reads_title_block_geometry_covers_root_and_closure(script, expected):
     assert bg.reads_title_block_geometry(SCRIPTS_DIR / script) is expected
 
+
+def test_feature_declarations_stay_out_of_all_native_build_closures():
+    """Manifest-only edits must never cascade through native part/assembly recipes."""
+    forbidden = {"_feature_requirements", "_printed_limits", "export_features"}
+    for script in [*bg.part_scripts(), *(script_for(stem) for stem in ASSEMBLY_ORDER)]:
+        closure = {Path(path).stem for path in module_deps_of(script)}
+        assert not closure & forbidden, (script.name, closure & forbidden)
+        assert not any(name.startswith("draw_") for name in closure), script.name
+
+
+def test_generic_feature_driver_closure_contains_no_discovered_part_draw_or_spec():
+    """Import-free discovery cannot become an all-part recipe dependency."""
+    import export_features
+
+    closure = {Path(path).name for path in module_deps_of(SCRIPTS_DIR / "export_features.py")}
+    assert "_feature_requirements.py" in closure
+    for stem in export_features.SUPPORTED_PARTS:
+        assert f"draw_{stem}.py" not in closure
+        assert f"{stem}_spec.py" not in closure
+
+
+def test_features_source_closures_preserve_draw_and_spec_config_reads():
+    import export_features
+
+    globs = {"machine/*", "tolerances/*", "parts/*", "title_block", "**", bg.ASSEMBLY_CONTRACTS_TOKEN}
+    for stem in export_features.SUPPORTED_PARTS:
+        sources = {path.resolve() for path in export_features.source_paths(stem)}
+        drawing = (SCRIPTS_DIR / f"draw_{stem}.py").resolve()
+        spec = (SCRIPTS_DIR / f"{stem}_spec.py").resolve()
+        assert {drawing, spec} <= sources, stem
+        assert {Path(path).resolve() for path in module_deps_of(drawing)} <= sources, stem
+        assert {
+            path.name for path in sources if path.name.startswith("draw_")
+        } == {drawing.name}, stem
+        for source in sources:
+            if source.suffix == ".py":
+                for token in config_files_of(source):
+                    assert token in globs or (bg.CONFIG_DIR / token).is_file(), (stem, source, token)
+
+
+def test_requirement_declarations_do_not_read_title_block_geometry():
+    script = SCRIPTS_DIR / "_feature_requirements.py"
+    assert script.stem not in bg.TITLE_BLOCK_GEOMETRY_MODULES
+    assert not bg.reads_title_block_geometry(script)
+    assert "title_block" not in config_files_of(script)
+
+
+@pytest.mark.parametrize("module", ["_printed_limits", "_printed_tolerance"])
+def test_numeric_tolerance_title_block_readers_are_classified(module):
+    script = SCRIPTS_DIR / f"{module}.py"
+    assert script.stem in bg.TITLE_BLOCK_GEOMETRY_MODULES
+    assert bg.reads_title_block_geometry(script)
+    assert "title_block" in config_files_of(script)
+
+
+def test_feature_exporter_revision_call_keeps_config_analysis_classifiable():
+    """A bare from-_config import must not widen every features leaf to '**'."""
+    exporter = SCRIPTS_DIR / "export_models.py"
+    assert "**" not in config_files_of(exporter)

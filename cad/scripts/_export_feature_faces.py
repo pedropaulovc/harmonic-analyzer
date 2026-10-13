@@ -12,8 +12,8 @@ names the native faces and the face sets are read back by those names:
    deterministic ASCII name (``IPartDoc::SetEntityName``, verified by
    ``IPartDoc::GetEntityName`` read-back).  A selector matching nothing, or a
    face claimed by two features, fails loud.
-2. ``export_models`` (the full export and the isolated ``--features`` bundles
-   share one ``_save_feature_step`` path) writes the STEP with
+2. ``export_models --features`` writes the authoritative scoped STEP through
+   ``_save_feature_step``; full export copies those exact bytes. The producer writes with
    ``swUserPreferenceToggle_e.swStepExportFaceEdgeProps`` on, which carries the
    face names into the ``ADVANCED_FACE`` labels, and split periodic faces on
    (the AP214 representation v38 shipped: the issue #1204 spike

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
+from dt_post_mount_stack import AXIS_RAISE_MM
 
 # --- Nominal geometry (cad/DIMENSIONS.md "Chapter 25").
 # These drive the part's named equation globals AND the drawing's coordinate
@@ -26,7 +27,9 @@ from _printed_tolerance import printed_band_mm
 BLOCK_EAST = 14.0  # pivot bore -> east end: 3.0 web past the east screw hole
 BLOCK_WEST = 26.0  # pivot bore -> west end: 4.3 web past the lift bore
 BLOCK_WIDTH = BLOCK_EAST + BLOCK_WEST  # 40.0 (photo ~38-41)
-BLOCK_HEIGHT = 20.5  # lift bore keeps 3.2 (2.1 worst) of web under the top
+# Keep the complete bore/top envelope while raising the pivot with the bank.
+BLOCK_HEIGHT = 20.5 + AXIS_RAISE_MM
+BLOCK_HEIGHT_BAND = printed_band_mm(2)  # BlockHeight prints .XX
 BLOCK_DEPTH = 11.0  # U28: 12 -> 10.25; ruling (c) then put the back strap hard
 # on this block and pinion_rig_layout sizes the shafts from the worst stack.
 # Option E-a (Main, Codex #858): the strap-pinned torque shaft retreats up to
@@ -44,7 +47,7 @@ BLOCK_DEPTH = 11.0  # U28: 12 -> 10.25; ruling (c) then put the back strap hard
 # follows (test_dt_pinion_pivot_block_drawing pins the two together).
 BLOCK_DEPTH_PLACES = 2
 BLOCK_DEPTH_BAND = printed_band_mm(BLOCK_DEPTH_PLACES)  # 0.51
-BORE_UP = 12.0  # pivot bore height above the base seat -- sets PIVOT_Y (derived)
+BORE_UP = 12.0 + AXIS_RAISE_MM
 BORE_DIA = 6.35  # 1/4 in: rides the Ø6.35 torque shaft / lift rod (derived)
 LIFT_BORE_SPACING = 18.5  # pivot -> lift bore, horizontal (photo ~16-17): the
 # eccentric collar (Ø14.6, ecc 2.0) orbits the lift axis and must clear the
@@ -60,7 +63,7 @@ SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)
 
 # Derived spans (equations of the primitives above).
 BLOCK_TOP_Y = BLOCK_HEIGHT - BORE_UP  # +8.5: block top above the pivot axis
-BLOCK_BOTTOM_Y = -BORE_UP  # -12.0: the base seat
-FRONT_BBOX_CX = (BLOCK_EAST - BLOCK_WEST) / 2.0  # -6.0: front-view centre
-FRONT_BBOX_CY = (BLOCK_TOP_Y + BLOCK_BOTTOM_Y) / 2.0  # -1.75: front-view centre
+BLOCK_BOTTOM_Y = -BORE_UP  # the base seat
+FRONT_BBOX_CX = (BLOCK_EAST - BLOCK_WEST) / 2.0
+FRONT_BBOX_CY = (BLOCK_TOP_Y + BLOCK_BOTTOM_Y) / 2.0
 SCREW_SPACING = 2.0 * SCREW_HALF_SPACING  # 17.0

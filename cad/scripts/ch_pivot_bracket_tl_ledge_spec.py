@@ -18,19 +18,15 @@ its back face (the face that seats on the upright). +X along the ledge, +Y up,
 It is the angle plate's model frame translated by
 (PLATE_LENGTH/2 - LEDGE_WIDTH/2, BLOCK_HEIGHT, 0), so the inventory's fixture
 frame (bracket plan setup frame TC) is
-TC = (x - LEDGE_WIDTH/2, -z, y + BLOCK_HEIGHT - (PLATE_HEIGHT + PART_PROUD[c]))
-for bracket configuration c (both stand on this one ledge).
+TC = (x - LEDGE_WIDTH/2, -z, y + BLOCK_HEIGHT - (PLATE_HEIGHT + PART_PROUD)).
 """
 
 from __future__ import annotations
 
 import ch_pivot_bracket_spec as bracket
 import ch_pivot_bracket_tl_angle_plate_spec as plate
-from _feature_requirements import ExportFeature, limits
-from _gtol_cylinder import CylinderFace
-from _gtol_planar import PlanarFace
 from _hole_spec import blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm
+from _printed_tolerance import drilled_oversize_mm, printed_deviations
 
 # As thick as the foot's depth off the upright and as tall as the gap from the
 # 1-2-3 block to the foot's free end. Wider than the 16 foot it carries so its
@@ -38,12 +34,12 @@ from _printed_tolerance import drilled_oversize_mm
 # general tolerance; its ends stay clear of the bridge's stud nuts.
 LEDGE_WIDTH = 22.6
 LEDGE_THICK = bracket.FOOT_H  # 6.0
-# 26.9, under the shorter S foot at the stack's worst case (angle-plate spec)
+# 26.9, under the bracket's foot at the stack's worst case (angle-plate spec)
 LEDGE_HEIGHT = round(plate.LEDGE_TOP_Y - plate.BLOCK_HEIGHT, 6)
 SIZE_PLACES = 1
 if LEDGE_WIDTH < bracket.FOOT_W:
     raise AssertionError("ledge narrower than the bracket foot it carries")
-if limits(LEDGE_WIDTH, SIZE_PLACES)[1] / 2.0 >= plate.STUD_HALF_PITCH - plate.STUD_NUT_DIA / 2.0:
+if round(LEDGE_WIDTH + printed_deviations(LEDGE_WIDTH, SIZE_PLACES)[1], 12) / 2.0 >= plate.STUD_HALF_PITCH - plate.STUD_NUT_DIA / 2.0:
     raise AssertionError("ledge end reaches a bridge stud nut")
 
 # Two #5 screw holes, 10.5 under the top, on the upright's tap pitch. The taps
@@ -59,15 +55,15 @@ HOLE_X_PLACES = 1
 HOLE_Y_PLACES = 1
 HOLE_DIA = blind_cut_dia_mm(CLEARANCE_SPEC)
 _HOLE_R_MAX = (HOLE_DIA + drilled_oversize_mm()) / 2.0
-_X1 = limits(HOLE_X[0], HOLE_X_PLACES)
-_X2 = limits(HOLE_X[1], HOLE_X_PLACES)
-_Y = limits(HOLE_Y, HOLE_Y_PLACES)
+_X1 = [round(HOLE_X[0] + deviation, 12) for deviation in printed_deviations(HOLE_X[0], HOLE_X_PLACES)]
+_X2 = [round(HOLE_X[1] + deviation, 12) for deviation in printed_deviations(HOLE_X[1], HOLE_X_PLACES)]
+_Y = [round(HOLE_Y + deviation, 12) for deviation in printed_deviations(HOLE_Y, HOLE_Y_PLACES)]
 HOLE_LIGAMENTS_MIN = {
     "left end": _X1[0] - _HOLE_R_MAX,
-    "right end": limits(LEDGE_WIDTH, SIZE_PLACES)[0] - _X2[1] - _HOLE_R_MAX,
+    "right end": round(LEDGE_WIDTH + printed_deviations(LEDGE_WIDTH, SIZE_PLACES)[0], 12) - _X2[1] - _HOLE_R_MAX,
     "web": _X2[0] - _X1[1] - 2.0 * _HOLE_R_MAX,
     "bottom": _Y[0] - _HOLE_R_MAX,
-    "top": limits(LEDGE_HEIGHT, SIZE_PLACES)[0] - _Y[1] - _HOLE_R_MAX,
+    "top": round(LEDGE_HEIGHT + printed_deviations(LEDGE_HEIGHT, SIZE_PLACES)[0], 12) - _Y[1] - _HOLE_R_MAX,
 }
 if min(HOLE_LIGAMENTS_MIN.values()) < 2.0:
     raise AssertionError(f"ledge screw-hole ligaments {HOLE_LIGAMENTS_MIN} under 2.0")
@@ -100,74 +96,3 @@ SURFACE_FINISHES = ()
 DRAWING_NOTES = "SPOT THE ANGLE PLATE TAPS THROUGH THESE HOLES."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
-EXPORT_FEATURES: dict[str, ExportFeature] = {
-    "foot_rest": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 1.0, 0.0), LEDGE_HEIGHT),),
-        requirements=("height", "width"),
-        fields={
-            "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "y", "value": LEDGE_HEIGHT}, ("LEDGE_HEIGHT",)),
-            "height": (
-                limits(LEDGE_HEIGHT, SIZE_PLACES),
-                ("LEDGE_HEIGHT", "SIZE_PLACES", ("ch_pivot_bracket_sides", "FOOT_LEN")),
-            ),
-            "height_nominal": (
-                LEDGE_HEIGHT,
-                ("LEDGE_HEIGHT", ("ch_pivot_bracket_sides", "FOOT_LEN")),
-            ),
-            "height_from": ("block_face", ("__frame__",)),
-            "width": (limits(LEDGE_WIDTH, SIZE_PLACES), ("LEDGE_WIDTH", ("ch_pivot_bracket_spec", "FOOT_W"))),
-        },
-        precision={"height": SIZE_PLACES, "width": SIZE_PLACES},
-    ),
-    "block_face": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
-        requirements=(),
-        fields={
-            "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
-        },
-    ),
-    "upright_seat": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
-        requirements=("thickness",),
-        fields={
-            "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
-            "thickness": (limits(LEDGE_THICK, SIZE_PLACES), ("LEDGE_THICK",)),
-        },
-        precision={"thickness": SIZE_PLACES},
-    ),
-}
-for _side, _x in (("left", HOLE_X[0]), ("right", HOLE_X[1])):
-    EXPORT_FEATURES[f"screw_hole_{_side}"] = ExportFeature(
-        kind="hole",
-        faces=(CylinderFace(HOLE_DIA, contains_x_mm=_x),),
-        requirements=("dia", "station", "height"),
-        fields={
-            "at": ([_x, HOLE_Y, LEDGE_THICK], ("HOLE_X", "HOLE_Y", "LEDGE_THICK")),
-            "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
-            "drill": (CLEARANCE_SPEC.size, ("CLEARANCE_SPEC",)),
-            # The callout prints the #5 size to two places (5.22); the band
-            # and nominal are that printed value.
-            "dia": (
-                limits(round(HOLE_DIA, 2), 2, (drilled_oversize_mm(), 0.0)),
-                ("HOLE_DIA", ("ch_pivot_bracket_tl_angle_plate_spec", "SCREW_CLEARANCE")),
-            ),
-            "nominal_dia": (round(HOLE_DIA, 2), ("HOLE_DIA",)),
-            "thru": (True, ("CLEARANCE_SPEC",)),
-            # model X from the left end; model Y from the block face
-            "station": (limits(_x, HOLE_X_PLACES), ("HOLE_X", "HOLE_X_PLACES")),
-            "station_nominal": (_x, ("HOLE_X",)),
-            "height": (
-                limits(HOLE_Y, HOLE_Y_PLACES),
-                ("HOLE_Y", "HOLE_Y_PLACES", ("ch_pivot_bracket_tl_angle_plate_spec", "SCREW_Y")),
-            ),
-            "height_nominal": (HOLE_Y, ("HOLE_Y",)),
-            "height_from": ("block_face", ("__frame__",)),
-        },
-        precision={"dia": 2, "station": HOLE_X_PLACES, "height": HOLE_Y_PLACES},
-    )

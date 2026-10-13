@@ -11,10 +11,11 @@ metadata:
 > Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
 
 
-**Current reviewer (2026-10-13): always Claude Opus 5.5**, the script's default
-(`--reviewer claude`, `claude-opus-5-5`, medium). The machinist review is exempt
-from the cross-family rule for code review: Opus reviews every drawing whatever
-model authored it. Chosen on the 80-case benchmark with the vector zoom tool:
+**Current reviewer (2026-10-13): Claude Opus 5.5 by default**, the script's
+default (`--reviewer claude`, `claude-opus-5-5`, medium). The machinist review is
+exempt from the cross-family rule for code review: Opus may review every drawing
+whatever model authored it; another family (`--reviewer codex`, `--model`)
+stays allowed. Chosen on the 80-case benchmark with the vector zoom tool:
 Opus 340/410, Fable 332, Astra 322, at about a third of Fable's cost. The Codex
 mechanics below are history from when Codex was the reviewer.
 

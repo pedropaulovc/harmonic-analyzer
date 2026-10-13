@@ -103,37 +103,251 @@ def test_release_requires_configured_cad_revision(
         cut_release.require_configured_revision("v23")
 
 
-def test_published_release_advances_tracked_revision(
+@pytest.mark.parametrize("no_publish", [False, True])
+@pytest.mark.parametrize(
+    "detail",
+    [
+        "plan drawing.revision 'v21' does not match feature manifest drawing.revision 'v22'",
+        "plan drawing.revision 'v21' does not match configured revision 'v22'",
+    ],
+)
+def test_release_revision_mismatch_fails_before_staging_or_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    no_publish: bool, detail: str,
+) -> None:
+    """Preflight preserves the binder's diagnostic, including during dry runs."""
+    stems = ("ch_rocker_arm", "ch_pivot_shaft")
+    calls: list[tuple[str, Path, str]] = []
+    cad = tmp_path / "cad"
+    monkeypatch.setattr(cut_release, "CAD_ROOT", cad)
+    monkeypatch.setattr(cut_release, "RELEASE_DIR", tmp_path / "release")
+    monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    monkeypatch.setattr(cut_release._process_plans, "TRAVELER_STEMS", stems)
+
+    def check_plan_revision(stem: str, out: Path, *, revision: str) -> None:
+        # The core helper's own tests exercise real synthetic plan/manifest bytes.
+        # Here its error proves release ordering and forwarding of both inputs.
+        calls.append((stem, out, revision))
+        if stem == stems[-1]:
+            raise cut_release._process_plans.PlanBindError(detail, line=9)
+
+    def forbidden(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("revision mismatch reached release side effects")
+
+    monkeypatch.setattr(
+        cut_release._process_plans, "check_plan_revision", check_plan_revision,
+    )
+    monkeypatch.setattr(
+        cut_release, "_start_release_log",
+        lambda _version: (tmp_path / "release.log", lambda: None),
+    )
+    for name in (
+        "_git", "_gh", "previous_tag", "bundle", "publish",
+        "prepare_configured_revision_advance", "report_no_publish",
+    ):
+        monkeypatch.setattr(cut_release, name, forbidden)
+    monkeypatch.setattr(trim_renders, "regenerate_readme_images", forbidden)
+    argv = ["cut_release.py", "v22"]
+    if no_publish:
+        argv.append("--no-publish")
+    monkeypatch.setattr(sys, "argv", argv)
+
+    with pytest.raises(SystemExit) as failure:
+        cut_release.main()
+
+    assert str(failure.value) == f"!!  traveler plan {stems[-1]}: line 9: {detail}"
+    assert calls == [(stem, cad / "out", "v22") for stem in stems]
+
+
+@pytest.fixture
+def enrolled_revision_plans(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, ...]:
+    """Synthetic enrolled plans; never read or rewrite the stale tracked plans."""
+    stems = ("ch_rocker_arm", "ch_pivot_shaft")
+    plans = {}
+    for stem, quote in zip(stems, ('"', "'"), strict=True):
+        plan = tmp_path / "process" / stem / "plan.toml"
+        plan.parent.mkdir(parents=True)
+        plan.write_bytes(
+            (
+                '# preserve v22 in prose\r\n[other]\r\nrevision = "v7"\r\n'
+                f"[drawing] # title block\r\n  revision = {quote}v22{quote} # reserved\r\n"
+                '[stock]\r\nrevision = "v9"\r\n'
+            ).encode("utf-8")
+        )
+        plans[stem] = plan
+    monkeypatch.setattr(cut_release._process_plans, "TRAVELER_STEMS", stems)
+    monkeypatch.setattr(cut_release._process_plans, "plan_path", plans.__getitem__)
+    return tuple(plans.values())
+
+
+def test_published_release_advances_tracked_revision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    enrolled_revision_plans: tuple[Path, ...],
 ) -> None:
     source = tmp_path / "release.yaml"
     source.write_text("next_revision: v22\n", encoding="utf-8")
     monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
     monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    originals = {plan: plan.read_bytes() for plan in enrolled_revision_plans}
 
     assert cut_release.advance_configured_revision("v22") == "v23"
     assert source.read_text(encoding="utf-8") == "next_revision: v23\n"
+    for plan, original in originals.items():
+        assert plan.read_bytes() == original.replace(
+            b'revision = "v22"', b'revision = "v23"'
+        ).replace(b"revision = 'v22'", b"revision = 'v23'")
 
 
 def test_revision_advance_is_staged_before_publish(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    enrolled_revision_plans: tuple[Path, ...],
 ) -> None:
     source = tmp_path / "release.yaml"
-    source.write_text("next_revision: v22\n", encoding="utf-8")
+    source.write_bytes(b"next_revision: v22\n")
     monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
     monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    originals = {plan: plan.read_bytes() for plan in enrolled_revision_plans}
 
     prepared = cut_release.prepare_configured_revision_advance("v22")
     try:
         assert prepared.next_version == "v23"
-        assert prepared.temporary is not None
-        assert prepared.temporary.exists()
-        assert source.read_text(encoding="utf-8") == "next_revision: v22\n"
+        assert [path for path, _ in prepared.updates] == [
+            source, *enrolled_revision_plans
+        ]
+        assert all(temporary.exists() for _, temporary in prepared.updates)
+        assert source.read_bytes() == b"next_revision: v22\n"
+        assert all(plan.read_bytes() == original for plan, original in originals.items())
         assert prepared.commit() == "v23"
     finally:
         prepared.discard()
 
     assert source.read_text(encoding="utf-8") == "next_revision: v23\n"
+    for plan, original in originals.items():
+        assert plan.read_bytes() == original.replace(
+            b'revision = "v22"', b'revision = "v23"'
+        ).replace(b"revision = 'v22'", b"revision = 'v23'")
+    assert all(not temporary.exists() for _, temporary in prepared.updates)
+
+
+@pytest.mark.parametrize(
+    "drawing",
+    [
+        '[drawing]\nname = "missing revision"\n',
+        '[drawing]\nrevision = "v22"\nrevision = "v22"\n',
+        '[drawing]\nrevision = "v22"\nrevision = "v21"\n',
+        '[drawing]\nrevision = "v21"\n',
+        '[other]\nrevision = "v22"\n',
+        '[drawing]\nrevision = "v22"\n[drawing]\nrevision = "v22"\n',
+    ],
+)
+def test_invalid_enrolled_revision_discards_every_prepared_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    enrolled_revision_plans: tuple[Path, ...], drawing: str,
+) -> None:
+    source = tmp_path / "release.yaml"
+    source.write_bytes(b"next_revision: v22\n")
+    enrolled_revision_plans[-1].write_text(drawing, encoding="utf-8")
+    originals = {
+        path: path.read_bytes() for path in (source, *enrolled_revision_plans)
+    }
+    monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
+    monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+
+    with pytest.raises(RuntimeError, match=r"\[drawing\]"):
+        cut_release.prepare_configured_revision_advance("v22")
+
+    for path, original in originals.items():
+        assert path.read_bytes() == original
+        assert not tuple(path.parent.glob(f".{path.name}.*.tmp"))
+
+
+def test_revision_prepare_io_failure_discards_all_temps(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    enrolled_revision_plans: tuple[Path, ...],
+) -> None:
+    source = tmp_path / "release.yaml"
+    source.write_bytes(b"next_revision: v22\n")
+    originals = {
+        path: path.read_bytes() for path in (source, *enrolled_revision_plans)
+    }
+    monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
+    monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    flushes = 0
+    fsync = os.fsync
+
+    def refuse_last_fsync(descriptor: int) -> None:
+        nonlocal flushes
+        flushes += 1
+        if flushes == len(originals):
+            raise OSError("cannot flush last plan")
+        fsync(descriptor)
+
+    monkeypatch.setattr(os, "fsync", refuse_last_fsync)
+    with pytest.raises(RuntimeError, match="could not prepare revision update"):
+        cut_release.prepare_configured_revision_advance("v22")
+
+    for path, original in originals.items():
+        assert path.read_bytes() == original
+        assert not tuple(path.parent.glob(f".{path.name}.*.tmp"))
+
+
+def test_revision_install_reports_ordered_partial_install_and_discards_temps(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    enrolled_revision_plans: tuple[Path, ...],
+) -> None:
+    source = tmp_path / "release.yaml"
+    source.write_bytes(b"next_revision: v22\n")
+    monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
+    monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    prepared = cut_release.prepare_configured_revision_advance("v22")
+    replace = os.replace
+    installed = []
+
+    def refuse_second_plan(temporary: Path, destination: Path) -> None:
+        if destination == enrolled_revision_plans[-1]:
+            raise PermissionError("plan is read-only")
+        replace(temporary, destination)
+        installed.append(destination)
+
+    monkeypatch.setattr(os, "replace", refuse_second_plan)
+    try:
+        with pytest.raises(RuntimeError, match="partial revision install") as failure:
+            prepared.commit()
+        assert installed == [source, enrolled_revision_plans[0]]
+        assert str(source) in str(failure.value)
+        assert str(enrolled_revision_plans[0]) in str(failure.value)
+        assert str(enrolled_revision_plans[1]) in str(failure.value)
+        assert source.read_bytes() == b"next_revision: v23\n"
+        assert (
+            tomllib.loads(enrolled_revision_plans[0].read_text())["drawing"]["revision"]
+            == "v23"
+        )
+        assert (
+            tomllib.loads(enrolled_revision_plans[1].read_text())["drawing"]["revision"]
+            == "v22"
+        )
+    finally:
+        prepared.discard()
+    assert all(not temporary.exists() for _, temporary in prepared.updates)
+
+
+def test_empty_enrollment_advances_only_release_yaml(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "release.yaml"
+    source.write_bytes(b"next_revision: v22\r\n# unchanged\r\n")
+    monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
+    monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    monkeypatch.setattr(cut_release._process_plans, "TRAVELER_STEMS", ())
+    monkeypatch.setattr(
+        cut_release._process_plans, "plan_path",
+        lambda _stem: pytest.fail("empty enrollment opened a plan"),
+    )
+
+    assert cut_release.advance_configured_revision("v22") == "v23"
+    assert source.read_bytes() == b"next_revision: v23\r\n# unchanged\r\n"
 
 
 def test_explicit_compact_version_is_accepted() -> None:
@@ -183,7 +397,9 @@ def readout_report(
                 "wheel_ratio": nom.wheel_ratio,
                 "pen_mm_per_full_scale_bar_at_min": pen_per_bar_at_min,
                 "pen_mm_per_full_scale_bar_at_built": (
-                    pen_per_bar_at_min * nom.lever_r_built / nom.lever_r_min
+                    pen_per_bar_at_min
+                    * error_budget.wire_moment_arm(nom, nom.lever_r_built)
+                    / error_budget.wire_moment_arm(nom, nom.lever_r_min)
                 ),
             },
             "readout": {
@@ -275,7 +491,13 @@ def test_staged_docs_reject_a_link_the_bundle_cannot_serve():
     cut_release.require_tracked("cad/docs/device-operation.md", "closure")
 
 
-def test_release_notes_report_the_native_pack_and_go_count() -> None:
+@pytest.mark.parametrize(
+    "travelers",
+    [[], ["travelers/ch_rocker_arm", "travelers/ch_pivot_shaft"]],
+)
+def test_release_notes_report_native_count_and_enrolled_travelers(
+    travelers: list[str],
+) -> None:
     """The native Pack-and-Go count and the neutral export inventory are two
     different numbers. They shared the ``documents`` key, so
     ``stage_release_neutral``'s inventory silently overwrote the COM-derived
@@ -290,12 +512,16 @@ def test_release_notes_report_the_native_pack_and_go_count() -> None:
         "pngs": 107,
         "comparisons": {"pairs": 3, "mean_score": None},
         "size_mb": 42.0,
+        "travelers": travelers,
     }
 
     notes = cut_release.release_notes("v42", facts)
 
     assert "native Pack-and-Go (137 referenced documents" in notes
     assert "99 referenced documents" not in notes
+    assert ("- `travelers/`" in notes) == bool(travelers)
+    for path in travelers:
+        assert f"`{path}`" in notes
 
 
 def _byte_record(path: Path) -> dict:
@@ -411,11 +637,14 @@ def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path)
                 }
                 adjacent = archive.read(f"{directory}/{manifest['step']}")
                 full = archive.read(f"step/{manifest['step']}")
-                # Independent exports: different raw bytes, the same face labels.
-                assert full == (out / "step" / manifest["step"]).read_bytes() != adjacent
-                assert hashlib.sha256(adjacent).hexdigest() == manifest["step_sha256"]
+                # Full export consumes the validated producer's exact raw STEP.
+                assert full == adjacent == (out / "step" / manifest["step"]).read_bytes()
+                digest = hashlib.sha256(adjacent).hexdigest()
+                assert digest == manifest["step_sha256"] == sums[f"step/{manifest['step']}"]
+                assert digest == sums[f"{directory}/{manifest['step']}"]
                 assert manifest["drawing"]["revision"] == "v38"
     assert set(facts["features"]) == set(expected)
+    assert facts["travelers"] == []
     assert (out / "reports" / "release-neutral.json").read_bytes() == before_certificate
 
 
@@ -441,9 +670,43 @@ def test_release_stages_baseline_but_never_seals_divergent_feature_producers(
     assert not stage.with_suffix(".zip").exists()
 
 
+def test_release_stages_enrolled_travelers_after_feature_binding(
+    feature_release: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def stage_travelers(out: Path, stage: Path) -> list[Path]:
+        assert out == feature_release
+        assert (stage / "features" / "ch_rocker_arm" / "features.toml").is_file()
+        traveler = stage / "travelers" / "ch_rocker_arm"
+        traveler.mkdir(parents=True)
+        (traveler / "traveler.html").write_bytes(b"verified strict traveler")
+        return [traveler]
+
+    monkeypatch.setattr(cut_release._process_plans, "stage_travelers", stage_travelers)
+    zip_path, facts = cut_release.bundle("v38")
+
+    assert facts["travelers"] == ["travelers/ch_rocker_arm"]
+    with zipfile.ZipFile(zip_path) as archive:
+        assert archive.read("travelers/ch_rocker_arm/traveler.html") == (
+            b"verified strict traveler"
+        )
+
+
+def test_release_never_seals_a_failed_traveler_verification(
+    feature_release: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def refuse_travelers(_out: Path, _stage: Path) -> list[Path]:
+        raise RuntimeError("traveler STEP digest mismatch")
+
+    monkeypatch.setattr(cut_release._process_plans, "stage_travelers", refuse_travelers)
+    with pytest.raises(RuntimeError, match="traveler STEP digest mismatch"):
+        cut_release.bundle("v38")
+    assert not (feature_release / "release" / "harmonic-analyzer-v38.zip").exists()
+
+
 @pytest.fixture
 def prepared_readme_release(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    enrolled_revision_plans: tuple[Path, ...],
 ) -> tuple[Path, Path, Path]:
     """Real local picture staging; only CAD building and external publication are isolated."""
     release_dir = tmp_path / "release"
@@ -483,7 +746,7 @@ def prepared_readme_release(
     for name in trim_renders.README_IMAGE_NAMES:
         (images / name).write_bytes(b"previous release image")
     revision = tmp_path / "release.yaml"
-    revision.write_text("next_revision: v22\n", encoding="utf-8")
+    revision.write_bytes(b"next_revision: v22\n")
     native = tmp_path / "native"
     native.mkdir()
     (native / "ha-harmonic-analyzer.SLDASM").write_bytes(b"preflight input")
@@ -507,6 +770,12 @@ def prepared_readme_release(
     monkeypatch.setattr(cut_release, "SCENE_JSON", scene)
     monkeypatch.setattr(cut_release, "LOGS_DIR", tmp_path / "logs")
     monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    # These image/publication tests have no feature manifests; revision validation
+    # is exercised separately by the preflight regression above.
+    monkeypatch.setattr(
+        cut_release._process_plans, "check_plan_revision",
+        lambda _stem, _out, *, revision: None,
+    )
     monkeypatch.setattr(trim_renders, "DOCS_IMAGES", images)
     monkeypatch.setattr(cut_release, "bundle", lambda *_args: (zip_path, facts))
     monkeypatch.setattr(cut_release, "_git", lambda *_args, **_kwargs: "")
@@ -521,10 +790,21 @@ def test_release_installs_images_and_revision_only_after_successful_publication(
 ) -> None:
     """Dry runs and gh failures cannot dirty the image/revision follow-up tree."""
     release_root, images, revision = prepared_readme_release
+    plans = tuple(
+        cut_release._process_plans.plan_path(stem)
+        for stem in cut_release._process_plans.TRAVELER_STEMS
+    )
+    original_revisions = {path: path.read_bytes() for path in (revision, *plans)}
+    warnings: list[str] = []
+    monkeypatch.setattr(cut_release._telemetry, "warn", warnings.append)
 
     def gh(*_args: str) -> str:
         assert publication != "dry-run", "dry run reached external publication"
         assert revision.read_text(encoding="utf-8") == "next_revision: v22\n"
+        assert all(
+            path.read_bytes() == original
+            for path, original in original_revisions.items()
+        )
         for name in trim_renders.README_IMAGE_NAMES:
             assert (images / name).read_bytes() == b"previous release image"
         if publication == "failed":
@@ -543,7 +823,16 @@ def test_release_installs_images_and_revision_only_after_successful_publication(
         assert cut_release.main() == 0
 
     if publication == "successful":
+        follow_up = next(
+            message for message in warnings if "POST-RELEASE PR REQUIRED" in message
+        )
+        assert str(revision) in follow_up
+        assert all(str(plan) in follow_up for plan in plans)
         assert revision.read_text(encoding="utf-8") == "next_revision: v23\n"
+        for plan in plans:
+            assert plan.read_bytes() == original_revisions[plan].replace(
+                b'revision = "v22"', b'revision = "v23"'
+            ).replace(b"revision = 'v22'", b"revision = 'v23'")
         assert (images / "dt-pinion-arbor-drawing.png").read_bytes() == (
             release_root / "png" / "dt-pinion-arbor_drawing.png"
         ).read_bytes()
@@ -555,10 +844,16 @@ def test_release_installs_images_and_revision_only_after_successful_publication(
             assert image.convert("RGB").getpixel((150, 75)) == (0, 0, 255)
     else:
         assert revision.read_text(encoding="utf-8") == "next_revision: v22\n"
+        assert all(
+            path.read_bytes() == original
+            for path, original in original_revisions.items()
+        )
         for name in trim_renders.README_IMAGE_NAMES:
             assert (images / name).read_bytes() == b"previous release image"
     assert not tuple(release_root.parent.glob(".v22-readme-images-*"))
     assert not tuple(revision.parent.glob(".release.yaml.*.tmp"))
+    for plan in plans:
+        assert not tuple(plan.parent.glob(".plan.toml.*.tmp"))
 
 
 def test_missing_readme_artifact_fails_before_tag_or_publish(
@@ -583,6 +878,9 @@ def test_missing_readme_artifact_fails_before_tag_or_publish(
         cut_release.main()
 
     assert revision.read_text(encoding="utf-8") == "next_revision: v22\n"
+    for stem in cut_release._process_plans.TRAVELER_STEMS:
+        plan = cut_release._process_plans.plan_path(stem)
+        assert tomllib.loads(plan.read_text())["drawing"]["revision"] == "v22"
     for name in trim_renders.README_IMAGE_NAMES:
         assert (images / name).read_bytes() == b"previous release image"
 
@@ -610,7 +908,7 @@ def test_postpublish_image_install_failure_preserves_revision_and_identifies_rec
     message = str(failure.value)
     assert url in message
     assert (
-        "uv run python cad/scripts/trim_renders.py "
+        "uv run --frozen python cad/scripts/trim_renders.py "
         "--release-root cad/out/release/harmonic-analyzer-v22"
     ) in message
     assert "next_revision: v23" in message
@@ -618,3 +916,44 @@ def test_postpublish_image_install_failure_preserves_revision_and_identifies_rec
     for name in trim_renders.README_IMAGE_NAMES:
         assert (images / name).read_bytes() == b"previous release image"
     assert not tuple(revision.parent.glob(".release.yaml.*.tmp"))
+    for stem in cut_release._process_plans.TRAVELER_STEMS:
+        plan = cut_release._process_plans.plan_path(stem)
+        assert str(plan) in message
+        assert tomllib.loads(plan.read_text())["drawing"]["revision"] == "v22"
+        assert not tuple(plan.parent.glob(".plan.toml.*.tmp"))
+
+
+def test_postpublish_partial_revision_install_names_all_recovery_paths(
+    prepared_readme_release: tuple[Path, Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, _images, revision = prepared_readme_release
+    plans = tuple(
+        cut_release._process_plans.plan_path(stem)
+        for stem in cut_release._process_plans.TRAVELER_STEMS
+    )
+    url = "https://github.com/example/repo/releases/tag/v22"
+    monkeypatch.setattr(cut_release, "_gh", lambda *_args: url)
+    replace = os.replace
+
+    def refuse_last_plan(source: Path, destination: Path) -> None:
+        if destination == plans[-1]:
+            raise PermissionError("last plan is read-only")
+        replace(source, destination)
+
+    monkeypatch.setattr(os, "replace", refuse_last_plan)
+    monkeypatch.setattr(sys, "argv", ["cut_release.py", "v22"])
+    with pytest.raises(RuntimeError) as failure:
+        cut_release.main()
+
+    message = str(failure.value)
+    assert url in message
+    assert "partial revision install" in message
+    assert "[drawing].revision" in message
+    assert "v23" in message
+    for path in (revision, *plans):
+        assert str(path) in message
+        assert not tuple(path.parent.glob(f".{path.name}.*.tmp"))
+    assert revision.read_bytes() == b"next_revision: v23\n"
+    assert tomllib.loads(plans[0].read_text())["drawing"]["revision"] == "v23"
+    assert tomllib.loads(plans[1].read_text())["drawing"]["revision"] == "v22"

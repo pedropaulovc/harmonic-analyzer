@@ -9,7 +9,7 @@ import draw_dt_cone_pivot_post_tl_saw_cradle as drawing
 import dt_cone_pivot_post_spec as post
 import dt_cone_pivot_post_tl_saw_cradle_spec as spec
 import export_features
-from _feature_requirements import limits
+from _printed_limits import limits
 from prechips.model import TOLERANCE_REQUIREMENTS
 
 STEM = "dt_cone_pivot_post_tl_saw_cradle"

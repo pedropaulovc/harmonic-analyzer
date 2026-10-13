@@ -97,7 +97,7 @@ def test_every_band_traces_to_a_named_fit_class() -> None:
 
 
 def test_print_contract_carries_no_gdt_datums_or_note_block() -> None:
-    # Policy rules 3 and 6: a bracket is not on the GD&T allowlist, and a note
+    # drawing-guidelines.md rule 5 (avoid excessive GD&T) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): a bracket is not on the GD&T allowlist, and a note
     # block that repeats the geometry is over-specification.
     assert dt_pinion_bracket_spec.GEOMETRIC_TOLERANCES_MM == {}
     assert dt_pinion_bracket_spec.DRAWING_NOTES == ""

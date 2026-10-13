@@ -56,9 +56,10 @@ import gear_seat_fit
 import mg_lever_wire_geom
 import mg_magnifying_clamp_geom
 import mg_magnifying_lever_geom
-import ha_measuring_stick_geom
+import mg_output_fixture_geom
+import ms_stick_geom
 import paper_drive_geom
-import pn_pen_wire_geom
+import mg_magnifying_wheel_geom
 import ch_rocker_arm_spec
 import sm_summing_lever_spec
 import spring_mount_geom
@@ -80,7 +81,11 @@ K_MAX = 20  # coefficients k = 0..20 read at theta_k = k*pi/20
 
 @dataclass(frozen=True)
 class Nominal:
-    """Every geometric input of the channel transfer, mm unless noted."""
+    """Channel geometry in mm unless noted.
+
+    Lever radii are clamp stations, not wire arms: magnifier gain uses the
+    signed groove-hook offset and the installed wire's three-dimensional lean.
+    """
 
     ecc: float  # cam throw
     rod: float  # connecting-rod centre distance
@@ -109,10 +114,17 @@ class Nominal:
     sum_hole_x: float  # manufactured hook-row position relative to the knife, mm
     d_max: float  # amplitude-bar full-scale station
     # -- output chain: summing lever -> magnifying lever -> wheel -> pen --
+    # The clamp's knife radii are where the BLOCK sits on the rod (reach and
+    # setup: collar face, as-built station, rod tip); what the pen sees is
+    # ``wire_moment_arm`` -- the knife axis's perpendicular distance to wire 1's
+    # rest run -- which the fixture's hook offset and the wire's lean toward
+    # the wheel move off the clamp radius.
     lever_r_min: float  # knife -> clamp centre, clamp against the bracket collar
     lever_r_built: float  # the as-built (CLAMP_LOCAL_X) radius
     lever_r_max: float  # clamp flush with the rod tip (mechanical bound)
-    wheel_ratio: float  # rim wire radius / hub wire radius
+    hook_offset_x: float  # wire hook (fixture groove tangent) from the clamp
+    # station along the rod, SIGNED machine x: negative = toward the knife
+    wheel_ratio: float  # rim wire pitch radius / drum wire pitch radius
     pen_half: float  # the pen's physical half-stroke
     # -- deviation-only axes (0 as designed) --
     hook_skew: float = 0.0  # rad: hook direction vs fulcrum->bar-pin direction on the
@@ -152,26 +164,75 @@ def nominal() -> Nominal:
         lever_r_min=lever_band[0],
         lever_r_built=lever_band[1],
         lever_r_max=lever_band[2],
-        wheel_ratio=(
-            pn_pen_wire_geom.RIM_DIA / 2.0
-            + pn_pen_wire_geom.WIRE_DIA / 2.0
-            + pn_pen_wire_geom.CLEARANCE
-        )
-        / (
-            mg_lever_wire_geom.HUB_DIA / 2.0
-            + mg_lever_wire_geom.WIRE_DIA / 2.0
-            + mg_lever_wire_geom.CLEARANCE
-        ),
+        hook_offset_x=mg_output_fixture_geom.HOOK_OFFSET_X,
+        wheel_ratio=mg_magnifying_wheel_geom.WIRE_RATIO,
         pen_half=float(_config.machine("output", "pen_trace_half_mm")),
     )
 
 
-def pen_gain(nom: Nominal, lever_r: float) -> float:
-    """Pen travel per summed vertical hook lift at the loaded CAD setting.
+# The knife axis in the machine frame mg_lever_wire_geom solves wire 1 in: the
+# magnifying lever's KnifeAxis lands on the summing chain's knife line
+# (build_mg_magnifier_assembly asserts it), the axis spring_force_model takes
+# its torques about, so a clamp at knife radius R sits at machine x KNIFE + R.
+KNIFE_AXIS_XY = (spring_mount_geom.KNIFE[0], spring_mount_geom.KNIFE_CONTACT_Y)
+
+
+def wire_rest_run(nom: Nominal, lever_r: float) -> tuple[np.ndarray, np.ndarray]:
+    """Wire 1's straight rest run, (hook, drum end) in machine mm, with the clamp
+    at knife radius ``lever_r``: the hook rides ``hook_offset_x`` from the clamp
+    station at the as-built y/z. Resolve the drum end through the same
+    drawing-free tangent function as the built wire; test_error_budget proves
+    this reproduces WIRE_START/WIRE_END at ``lever_r_built``."""
+    hook = np.array(
+        [
+            KNIFE_AXIS_XY[0] + lever_r + nom.hook_offset_x,
+            mg_lever_wire_geom.HOOK_Y,
+            mg_lever_wire_geom.HOOK_Z,
+        ]
+    )
+    end = np.array(mg_lever_wire_geom.tangent_end(float(hook[0]), float(hook[1])))
+    return hook, end
+
+
+def wire_moment_arm(nom: Nominal, lever_r: float) -> float:
+    """Effective wire moment arm (mm) about the knife axis at clamp station
+    ``lever_r``: the magnitude of the straight wire's length change per radian.
+    A small lever rotation moves the hook perpendicular to its knife radius;
+    only the component along the three-dimensional wire turns the drum.
+    This is the knife-axis component of ``r cross u``, not the clamp station
+    or the shortest distance between the skew knife and wire axes. The hook
+    sits ``hook_offset_x`` toward the knife and below it, and the wire leans
+    toward the wheel. It grows monotonically over the reachable clamp band
+    (test_error_budget asserts so)."""
+    hook, end = wire_rest_run(nom, lever_r)
+    run = end - hook
+    u = run / np.linalg.norm(run)
+    rx, ry = hook[0] - KNIFE_AXIS_XY[0], hook[1] - KNIFE_AXIS_XY[1]
+    return abs(float(rx * u[1] - ry * u[0]))
+
+
+def clamp_radius_for_arm(nom: Nominal, arm: float) -> float:
+    """The clamp's knife radius (mm) whose wire moment arm is ``arm``: the
+    inverse of ``wire_moment_arm`` on the reachable band, by bisection."""
+    lo, hi = nom.lever_r_min, nom.lever_r_max
+    if not wire_moment_arm(nom, lo) <= arm <= wire_moment_arm(nom, hi):
+        raise ValueError(f"wire moment arm {arm} mm is outside the clamp's band")
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        if wire_moment_arm(nom, mid) < arm:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
+def pen_gain_per_arm_mm(nom: Nominal) -> float:
+    """Pen travel per summed vertical hook lift per mm of wire moment arm at
+    the loaded CAD setting.
 
     Pretension contributes geometric stiffness. Mean-line zero removes its
     constant torque, not the derivative of torque as the lever rotates.
-    The output wheel then multiplies the clamp's small-angle displacement.
+    The output wheel then multiplies the wire's small-angle displacement.
     """
     channel = spring_force_model.channel_response(
         nom.sum_hole_x, nom.spring_rate, nom.spring_initial_tension
@@ -184,7 +245,13 @@ def pen_gain(nom: Nominal, lever_r: float) -> float:
     )
     if stiffness <= 0:
         raise ValueError("spring system has no stable rotational equilibrium")
-    return channel.lift_torque_n * lever_r * nom.wheel_ratio / stiffness
+    return channel.lift_torque_n * nom.wheel_ratio / stiffness
+
+
+def pen_gain(nom: Nominal, lever_r: float) -> float:
+    """Pen travel per summed vertical hook lift with the clamp at knife radius
+    ``lever_r`` -- through the wire moment arm that station realises."""
+    return pen_gain_per_arm_mm(nom) * wire_moment_arm(nom, lever_r)
 
 
 # --------------------------------------------------------------------------
@@ -629,13 +696,16 @@ class MagnifierSetup:
     """How one trial is fitted to the pen stroke: the ordinate scale the bars
     are set at (1 = the ordinate 1 is full-scale travel; < 1 = the operator
     scaled every ordinate down so the k=0 peak fits the stroke at the minimum
-    magnification), the magnifying-lever radius, and how much of the stroke the
-    k=0 reading spans (< 1 only when the maximum magnification is not enough)."""
+    magnification), the clamp's knife radius (its station on the rod), how
+    much of the stroke the k=0 reading spans (< 1 only when the as-built
+    station is not enough), the k=0 reading, and the wire moment arm the
+    station realises (what the pen gain is proportional to)."""
 
     ordinate_scale: float
     lever_r: float
     stroke_fill: float
     k0_reading_mm: float
+    wire_arm: float
 
 
 class NominalTrial:
@@ -754,29 +824,45 @@ class NominalTrial:
     def magnifier_setup(self, x: np.ndarray) -> MagnifierSetup:
         """Fit the trial to the pen: the k=0 reading must span the half-stroke
         (Michelson's normalisation to the greatest term, book p. 99: "scaled by
-        adjusting the magnifying lever"). Solve the lever radius that does it;
-        below the reachable minimum the operator instead scales every ordinate
-        down (``ordinate_scale_for`` against the machine's ordinate CAPACITY,
-        the peak the pen holds at minimum magnification) with the clamp at the
-        collar; above the maximum the reading falls short of the stroke by
-        ``stroke_fill``."""
+        adjusting the magnifying lever"). Solve the wire moment arm that does
+        it and the clamp station that realises it (``clamp_radius_for_arm``);
+        below the arm at the reachable minimum the operator instead scales
+        every ordinate down (``ordinate_scale_for`` against the machine's
+        ordinate CAPACITY, the peak the pen holds at minimum magnification)
+        with the clamp at the collar; above the arm at the as-built station
+        the reading falls short of the stroke by ``stroke_fill``."""
         nom = self.nom
-        pen_per_bar = pen_gain(nom, 1.0) * abs(self.f_full)  # per lever mm
+        pen_per_bar = pen_gain_per_arm_mm(nom) * abs(self.f_full)  # per arm mm
         peak = self.peak_bars(x * nom.d_max)
         if peak <= 0.0:
             raise ValueError("k=0 reading is not positive; the input is not lifted")
-        r_req = nom.pen_half / (pen_per_bar * peak)
-        if r_req >= nom.lever_r_min:
-            lever_r = min(r_req, nom.lever_r_built)
-            fill = min(1.0, nom.lever_r_built / r_req)
-            return MagnifierSetup(1.0, lever_r, fill, pen_per_bar * lever_r * peak)
-        capacity = nom.pen_half / (pen_per_bar * nom.lever_r_min)
+        arm_req = nom.pen_half / (pen_per_bar * peak)
+        arm_min = wire_moment_arm(nom, nom.lever_r_min)
+        arm_built = wire_moment_arm(nom, nom.lever_r_built)
+        if arm_req >= arm_built:
+            return MagnifierSetup(
+                1.0,
+                nom.lever_r_built,
+                arm_built / arm_req,
+                pen_per_bar * arm_built * peak,
+                arm_built,
+            )
+        if arm_req >= arm_min:
+            return MagnifierSetup(
+                1.0,
+                clamp_radius_for_arm(nom, arm_req),
+                1.0,
+                pen_per_bar * arm_req * peak,
+                arm_req,
+            )
+        capacity = nom.pen_half / (pen_per_bar * arm_min)
         f = self.ordinate_scale_for(x, capacity)
         return MagnifierSetup(
             f,
             nom.lever_r_min,
             1.0,
-            pen_per_bar * nom.lever_r_min * self.peak_bars(f * x * nom.d_max),
+            pen_per_bar * arm_min * self.peak_bars(f * x * nom.d_max),
+            arm_min,
         )
 
 
@@ -1250,55 +1336,28 @@ def monte_carlo(
 
 def _minimum_pose_wire_estimate(nom: Nominal) -> dict[str, float]:
     """An OFFLINE estimate -- not a CAD gate -- of wire 1's straight rest run
-    with the clamp against the bracket collar: the hook (which rides the clamp
-    at machine x = LEVER_X0 - clamp local x, the same y/z as built) to the hub
-    tangent, versus the magnifying wheel's rim. Reported so the waiver in
-    error_budget.yaml is an informed one; the proof is a seat build of the
+    with the clamp against the bracket collar (``wire_rest_run`` at
+    ``lever_r_min``) versus the wheel's pen-side faces. Reported so the waiver
+    in error_budget.yaml is an informed one; the proof is a seat build of the
     magnifier at that pose (#748)."""
-    import mg_magnifying_wheel_geom
-
-    lever_x0 = mg_lever_wire_geom.CLAMP_X + mg_magnifying_lever_geom.CLAMP_LOCAL_X  # 200
-    hook_x = lever_x0 - (mg_magnifying_lever_geom.KNIFE_LOCAL_X - nom.lever_r_min)
-    hook = np.array([hook_x, mg_lever_wire_geom.HOOK_Y, mg_lever_wire_geom.HOOK_Z])
+    hook, end = wire_rest_run(nom, nom.lever_r_min)
+    gaps = mg_lever_wire_geom.run_gaps(hook, end)
     cx, cy = mg_lever_wire_geom.WHEEL_X, mg_lever_wire_geom.WHEEL_BAR_Y
-    vx, vy = hook[0] - cx, hook[1] - cy
-    r_eff = mg_lever_wire_geom._R_EFF
-    theta = math.atan2(vy, vx) - math.acos(r_eff / math.hypot(vx, vy))
-    end = np.array(
-        [
-            cx + r_eff * math.cos(theta),
-            cy + r_eff * math.sin(theta),
-            mg_lever_wire_geom.HUB_END_Z,
-        ]
-    )
-    # closest approach of the run to the wheel: the wire runs in FRONT of the
-    # wheel (less negative z), so the clearance is wire z minus the face z of
-    # whatever it passes over -- the rim ring (radial 44..50) or the spokes
     ts = np.linspace(0.0, 1.0, 2001)
     pts = hook[None, :] + ts[:, None] * (end - hook)[None, :]
     radial = np.hypot(pts[:, 0] - cx, pts[:, 1] - cy)
-    rim_r = mg_magnifying_wheel_geom.RIM_OUTER_DIA / 2.0
-    rim_in = mg_magnifying_wheel_geom.RIM_INNER_DIA / 2.0
-    margin = mg_lever_wire_geom.WIRE_DIA / 2.0 + mg_lever_wire_geom.CLEARANCE
-    over_ring = (radial >= rim_in - margin) & (radial <= rim_r + margin)
-    over_spokes = (radial > mg_lever_wire_geom.HUB_DIA / 2.0 + margin) & (
-        radial < rim_in - margin
-    )
-    ring_face = mg_lever_wire_geom.WHEEL_MID_Z + mg_magnifying_wheel_geom.RIM_AXIAL / 2.0
-    spoke_face = mg_lever_wire_geom.WHEEL_MID_Z + mg_magnifying_wheel_geom.SPOKE_AXIAL / 2.0
-
-    def gap(mask: np.ndarray, face: float) -> float:
-        if not np.any(mask):
-            return float("inf")
-        return float(np.min(pts[mask, 2] - face)) - mg_lever_wire_geom.WIRE_DIA / 2.0
-
     return {
         "hook_x_mm": float(hook[0]),
-        "wire_length_mm": float(np.linalg.norm(end - hook)),
+        "wire_length_mm": float(math.dist(hook, end)),
+        "wire_arm_mm": wire_moment_arm(nom, nom.lever_r_min),
         "min_radial_to_wheel_axis_mm": float(np.min(radial)),
-        "rim_outer_radius_mm": rim_r,
-        "z_clearance_to_rim_face_where_over_ring_mm": gap(over_ring, ring_face),
-        "z_clearance_to_spoke_face_where_over_spokes_mm": gap(over_spokes, spoke_face),
+        "rim_outer_radius_mm": mg_magnifying_wheel_geom.RIM_OUTER_DIA / 2.0,
+        # surface gaps to the pen-side faces the run passes (+ = clear)
+        "rim_face_gap_mm": gaps["rim"],
+        "spoke_face_gap_mm": gaps["spokes"],
+        "boss_face_gap_mm": gaps["boss"],
+        "drum_back_lane_gap_mm": gaps["drum_back"],
+        "drum_front_lane_gap_mm": gaps["drum_front"],
         "note": "straight rest run only; no clamp/rod/collar/frame check, no articulation -- NOT a CAD gate",
     }
 
@@ -1601,12 +1660,18 @@ def closed_form_terms(
     # just fills the half-stroke at the minimum magnification -- every broad
     # input whose read ordinates sum to more than this is scaled down by the
     # operator (MagnifierSetup.ordinate_scale < 1), so setting and knife
-    # errors grow by that factor. A design lever, not a part tolerance.
+    # errors grow by that factor. A design lever, not a part tolerance. The
+    # lever radii are the clamp's STATIONS (reach: collar face, as-built, rod
+    # tip); the gain runs on the wire moment arm each station realises.
     gain_min = pen_gain(nom, nom.lever_r_min)
     magnifier = {
         "lever_radius_min_mm": nom.lever_r_min,
         "lever_radius_built_mm": nom.lever_r_built,
         "lever_radius_max_mm": nom.lever_r_max,
+        "hook_offset_x_mm": nom.hook_offset_x,
+        "wire_arm_min_mm": wire_moment_arm(nom, nom.lever_r_min),
+        "wire_arm_built_mm": wire_moment_arm(nom, nom.lever_r_built),
+        "wire_arm_max_mm": wire_moment_arm(nom, nom.lever_r_max),
         "wheel_ratio": nom.wheel_ratio,
         "pen_mm_per_full_scale_bar_at_min": gain_min * abs(trial.f_full),
         "pen_mm_per_full_scale_bar_at_built": pen_gain(nom, nom.lever_r_built)
@@ -1617,13 +1682,15 @@ def closed_form_terms(
         / (gain_min * abs(trial.f_full))
         * nom.d_max,
         "per_input": {n: asdict(setups[n]) for n in scored},
-        "inputs_at_minimum_pose": [
-            n for n in scored if setups[n].lever_r == nom.lever_r_min
+        # Only the as-built station is CAD-gated; every input fitted short of
+        # it runs at a pose the minimum one (clamp against the collar) bounds
+        "inputs_at_ungated_pose": [
+            n for n in scored if setups[n].lever_r < nom.lever_r_built
         ],
         "minimum_pose_cad_gated": False,  # build_mg_magnifier_assembly builds the
         # as-built pose only; the clamp/rod/wire at the collar is #748's proof
         "minimum_pose_wire_estimate": _minimum_pose_wire_estimate(nom),
-        "note": "capacity = full-scale bars whose k=0 peak fills the half-stroke at the minimum magnification; inputs beyond it are set at ordinate_scale < 1; the minimum pose is NOT CAD-gated (reserved.readout.waive_minimum_pose)",
+        "note": "capacity = full-scale bars whose k=0 peak fills the half-stroke at the minimum magnification; inputs beyond it are set at ordinate_scale < 1; lever radii are clamp stations, the gain runs on the wire moment arm (hook_offset_x, wire lean); only the as-built station is CAD-gated, the minimum pose bounds the rest (reserved.readout.waive_minimum_pose)",
     }
     return {
         "knife": knife,
@@ -2078,14 +2145,17 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
     # TODO(#748): CAD-gate the magnifier's minimum pose.
     mag = r["closed_form"]["mg-magnifier"]
     if (
-        mag["inputs_at_minimum_pose"]
+        mag["inputs_at_ungated_pose"]
         and not mag["minimum_pose_cad_gated"]
         and not r["minimum_pose_waived"]
     ):
         bad.append(
-            "magnifier minimum pose is not CAD-gated but scores "
-            f"{', '.join(mag['inputs_at_minimum_pose'])} "
-            f"(clamp at {mag['lever_radius_min_mm']:.0f} mm from the knife)"
+            "magnifier minimum pose is not CAD-gated but bounds the poses scoring "
+            + ", ".join(
+                f"{n} (clamp {mag['per_input'][n]['lever_r']:.0f} mm from the knife)"
+                for n in mag["inputs_at_ungated_pose"]
+            )
+            + f"; only the as-built {mag['lever_radius_built_mm']:.0f} mm station is gated"
         )
     if cl["total_mae"] > r["benchmark"]["mae_fs_pct"]:
         bad.append(
@@ -2094,7 +2164,7 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
     return bad
 
 
-STICK_DIVISION_MM = ha_measuring_stick_geom.DIVISION_SPACING  # the engraved scale
+STICK_DIVISION_MM = ms_stick_geom.DIVISION_SPACING  # the engraved scale
 
 
 def calibration_table(
@@ -2144,10 +2214,29 @@ def readout_procedure(r: dict[str, Any]) -> str:
         trial.peak_bars(naive_all * ones * nom.d_max),
     )
     p_min_full = (
-        mag["ordinate_capacity_full_scale_bars"]
-        * mag["lever_radius_min_mm"]
-        / mag["lever_radius_built_mm"]
+        cf["readout"]["pen_half_stroke_mm"] / mag["pen_mm_per_full_scale_bar_at_built"]
     )  # the smallest peak the as-built cap can still bring to full stroke
+    # The clamp-station table: the pen travel per bar follows the wire moment
+    # arm, not the clamp's distance from the knife, so the operator reads the
+    # station off this table rather than scaling the minimum radius by P.
+    arm_min = wire_moment_arm(nom, nom.lever_r_min)
+    stations = sorted(
+        {nom.lever_r_min, nom.lever_r_built}
+        | set(
+            float(s)
+            for s in np.arange(
+                math.ceil(nom.lever_r_min / 10.0) * 10.0,
+                nom.lever_r_built,
+                10.0,
+            )
+        )
+    )
+    clamp_table = "\n".join(
+        f"| {s:6.1f} | {wire_moment_arm(nom, s):6.1f} | "
+        f"{mag['pen_mm_per_full_scale_bar_at_min'] * wire_moment_arm(nom, s) / arm_min:5.2f} | "
+        f"{mag['ordinate_capacity_full_scale_bars'] * arm_min / wire_moment_arm(nom, s):5.2f} |"
+        for s in stations
+    )
     scale_table = "\n".join(
         f"| {f:.3f} | {f * nom.d_max:6.2f} | {trial.peak_bars(f * ones * nom.d_max):6.2f} |"
         for f in sorted(
@@ -2278,23 +2367,36 @@ gives $f = {scale_all:.3f}$, where proportion would say
 {mag["ordinate_capacity_full_scale_bars"] / p_all[0]:.3f} and overdrive the
 stroke by {100.0 * (p_all[1] / mag["ordinate_capacity_full_scale_bars"] - 1.0):.0f} %).
 $f$ is removed by the division in the read ordinates above, so step 3 sees
-the function's own units. Broad inputs run at 0.2-0.5 of full scale on this
-machine; the stick's +/-{tol:.2f} mm then costs that much more of each
-ordinate, which is what the budget's `station_setting` and `knife` terms
-carry. Then set the
-clamp radius so the peak just fills the stroke:
-$R = {mag["lever_radius_min_mm"]:.0f}$ mm $\\times$ {mag["ordinate_capacity_full_scale_bars"]:.2f} $/ P$,
-**capped at the as-built {mag["lever_radius_built_mm"]:.0f} mm** (the clamp's
-far end; the wheel's rim/hub wire ratio is {mag["wheel_ratio"]:.2f}). A sparse
+the function's own units. A broad input runs below full scale on this
+machine (20 bars at 1: $f = {scale_all:.3f}$); the stick's +/-{tol:.2f} mm
+then costs that much more of each ordinate, which is what the budget's
+`station_setting` and `knife` terms carry. Then set the
+clamp so the peak just fills the stroke. The pen travel per bar is NOT
+proportional to the clamp's distance from the knife: the wire hooks the
+output fixture {abs(nom.hook_offset_x):.1f} mm on the knife side of the clamp
+and leans toward the wheel, so what the pen sees is the effective wire
+moment arm -- {arm_min:.1f} mm with the clamp against the collar
+({mag["lever_radius_min_mm"]:.0f} mm from the knife),
+{wire_moment_arm(nom, nom.lever_r_built):.1f} mm at the as-built
+{mag["lever_radius_built_mm"]:.0f} mm. Set the clamp at the station whose
+last column matches the trial's $P$ (interpolate between rows), **never past
+the as-built {mag["lever_radius_built_mm"]:.0f} mm** (the clamp's far end; the
+wheel's rim/drum wire pitch ratio is {mag["wheel_ratio"]:.2f}):
+
+| clamp from knife (mm) | wire arm (mm) | pen mm per full-scale bar | $P$ that fills the stroke |
+|---:|---:|---:|---:|
+{clamp_table}
+
+A sparse
 or small input with $P < {p_min_full:.2f}$ therefore cannot fill the stroke:
 its $k=0$ reading is $r_0 = {mag["pen_mm_per_full_scale_bar_at_built"]:.2f}\\,P$ mm
 and every reading error in step 3 is $15/r_0$ times larger; scale such an
 input UP (multiply every ordinate by a constant, up to the capacity) before
 setting the bars -- step 3 removes it like any $f$.
 
-The minimum pose (clamp against the collar) is what every broad input uses
-and it is not CAD-gated (error_budget.yaml `waive_minimum_pose`, #748); the
-as-built pose is.
+Only the as-built pose is CAD-gated. The broad inputs run at or just above
+the minimum pose (clamp against the collar), which is not
+(error_budget.yaml `waive_minimum_pose`, #748).
 
 $P(f)$ for 20 bars set at $f$ (from the table; check your arithmetic against it):
 
@@ -2398,17 +2500,23 @@ def _main() -> int:
         mag = r["closed_form"]["mg-magnifier"]
         # TODO(#748): CAD-gate the magnifier's minimum pose, then drop this
         # waiver.
-        if mag["inputs_at_minimum_pose"] and r["minimum_pose_waived"]:
+        if mag["inputs_at_ungated_pose"] and r["minimum_pose_waived"]:
             est = mag["minimum_pose_wire_estimate"]
             print(
                 "WAIVED: the magnifier's minimum pose (clamp at "
-                f"{mag['lever_radius_min_mm']:.0f} mm from the knife) is not "
-                f"CAD-gated; it scores {', '.join(mag['inputs_at_minimum_pose'])} "
-                f"(offline straight-wire estimate: hook x {est['hook_x_mm']:.0f}, "
-                f"{est['z_clearance_to_rim_face_where_over_ring_mm']:.1f} mm in "
-                f"front of the rim ring, "
-                f"{est['z_clearance_to_spoke_face_where_over_spokes_mm']:.1f} mm in "
-                "front of the spokes) -- closure is conditional on #748"
+                f"{mag['lever_radius_min_mm']:.0f} mm from the knife, wire arm "
+                f"{mag['wire_arm_min_mm']:.1f}) is not CAD-gated; it bounds the "
+                "poses scoring "
+                + ", ".join(
+                    f"{n} ({mag['per_input'][n]['lever_r']:.0f} mm)"
+                    for n in mag["inputs_at_ungated_pose"]
+                )
+                + " "
+                f"(offline straight-wire estimate: hook x {est['hook_x_mm']:.0f}; "
+                "wire surface gaps to the wheel's pen-side faces: rim "
+                f"{est['rim_face_gap_mm']:.2f}, spokes "
+                f"{est['spoke_face_gap_mm']:.2f}, boss "
+                f"{est['boss_face_gap_mm']:.2f} mm) -- closure is conditional on #748"
             )
         print("\nBUDGET:", "closes" if not bad else "; ".join(bad))
     return 0 if not budget_closes(r) else 1

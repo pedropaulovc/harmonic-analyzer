@@ -79,10 +79,10 @@ HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCRE
 
 # The front row receives the ten guide screws (MHA-VN-006 fillisters) after each
 # shank passes through the platen material left below its stock-head
-# counterbore; the rear row receives the eight lock screws (MHA-VN-046 button
-# heads, rulings R9-31, R9-48) after each shank passes through a 2-mm lock
-# plate. Both are #4-40 tapped through (R9-64, R9-48), the tips stopping
-# inside the rail.
+# counterbore; the rear row receives the eight lock screws (MHA-VN-046 slotted
+# pan heads, rulings R9-31, R9-48) after each shank passes through a 1/16
+# sheet lock plate. Both are #4-40 tapped through (R9-64, R9-48), the tips
+# stopping inside the rail.
 SCREW_STATION_X = (26.964, 80.892, 134.82, 188.748, 242.676)
 GUIDE_SCREW_PASSAGE = PLATE_THICKNESS - PLATEN_CBORE_DEPTH
 # The stock 1/4 in shank (length band +0) is the screw's reach into the rail:
@@ -213,7 +213,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Lock-screw receivers: ONE native Hole Wizard #4-40 tapped THROUGH
     # feature (4 points) from the guide's REAR face (local z=-10, outward
-    # normal -Z). The stock 9.525-mm shanks pass through the 2-mm lock plates
+    # normal -Z). The stock 9.525-mm shanks pass through the 1/16 lock plates
     # and stop inside the rail (R9-48).
     lock_spec = LOCK_TAP_SPEC
     wizard_holes(

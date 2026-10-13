@@ -14,6 +14,10 @@ long, so the whole package runs 1:4 -- the front elevation too -- except the
 pictorial isometric (1:6) and the underside section and pads (1:2). Four
 sheets: exterior geometry, holes and sockets, the underside, and the
 underside's pads and lugs placed from the hole table's X0 Y0.
+The transferred block, spring-foot and pedestal seats consume the builder's
+live model stations to select their actual Hole Wizard rims. They remain
+outside the coordinate table: their associative size/depth callouts name the
+identified mating parts and the rig-set or assembly transfer requirement.
 
 Run with SolidWorks open::
 
@@ -123,6 +127,7 @@ from fr_harmonic_base_spec import (
     DRAWING_REFERENCE_PRECISION,
     GREEN_TOP,
     PART_SURFACE_FINISHES,
+    PIVOT_SEAT_POSITION_BAND_MM,
     POCKET_CEILING_Y,
     STACK_HEIGHT,
     socket_bore_finish_key,
@@ -738,8 +743,8 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
 
 
 # U28 assembly corollary (Main ruling 2026-09-23, from the user's U27/U28):
-# the pinion rig is set on the base by a 2.5 feeler at the parked tip gap,
-# then the pivot-block and spring-foot seats are spotted THROUGH those parts.
+# the pinion rig is located by the current RIG_SET_STEP, then the pivot-block
+# and spring-foot seats are spotted THROUGH their finished mating parts.
 # U34c does the same for the arbor pedestals: each is stood on the base with
 # the arbor running in both straps, and its seat is spotted through the ledge
 # hole. The sheet therefore prints no position for any of them: they leave
@@ -777,6 +782,26 @@ def is_rig_set_note(text: str) -> bool:
     """Whether a note read back off the sheet is the RIG SET note (INote text
     reads back with CRLF line breaks)."""
     return text.replace("\r\n", "\n").strip() == RIG_SET_STEP.strip()
+
+
+# The cone swing set (cone_set_stack) is made at T120 against the arbor, which
+# the MHA-DT-002 pedestals carry; a pivot-seat error reaches the near cones
+# x (1 - r) after it. The pivot seat is therefore located from the pedestal
+# seats, +-0.05, in one setup with them (Main ruling 2026-10-10, critical
+# interface), not from the table's corner datum: its table row stays the
+# nominal, the offsets below govern. Hung under the RIG SET note's five rows.
+_PIVOT_NEAR_PEDESTAL_XZ = min(
+    PEDESTAL_SCREW_XZ, key=lambda xz: math.dist(xz, PIVOT_SCREW_XZ)
+)
+PIVOT_SEAT_STEP = (
+    "PIVOT SEAT: DRILL AND TAP AT ASSEMBLY, AFTER\n"
+    "THE MHA-DT-002 SEATS, IN ONE SETUP WITH THEM;\n"
+    f"X {PIVOT_SCREW_XZ[0] - _PIVOT_NEAR_PEDESTAL_XZ[0]:.2f}, "
+    f"Y {_PIVOT_NEAR_PEDESTAL_XZ[1] - PIVOT_SCREW_XZ[1]:.2f} "
+    f"<MOD-PM>{PIVOT_SEAT_POSITION_BAND_MM:.2f} "
+    "FROM THE NEAR ONE."
+)
+PIVOT_SEAT_NOTE_XY = (0.020, 0.078)
 # The cross-tap callout carries hole facts only, in three rows: count, drill
 # and depth; this instruction; the thread and its depth, on its own row. The
 # old "DEPTHS FROM SPOTFACE FLOOR" row restated the model: the Hole Wizard
@@ -2068,6 +2093,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Sheet-2 left notes column, below the hole table: the RIG SET note both
     # rig transfer callouts name (the A1-A4 matched fit is on the sockets).
     add_note(adapter, RIG_SET_STEP, *RIG_SET_NOTE_XY)
+    add_note(adapter, PIVOT_SEAT_STEP, *PIVOT_SEAT_NOTE_XY)
     if not auto_center_marks(adapter, hole_top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 

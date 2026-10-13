@@ -50,8 +50,9 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
 * tube-frame-cap x4: intact stock McMaster 9275K141 push-on caps seated on the
   square tube ends, with their skirts sheltered by the top-frame recesses.
 * frame-cross-screw x8 + gooseneck-set-screw x1: four lower and four upper
-  casting-to-column retainers plus the top-frame hub fastener, each placed at
-  its shared physical station and locked to the fixed base.
+  casting-to-column retainers plus the top-frame hub fastener (3/4 in, through
+  the hub boss's spot face, head standing proud), each placed at its shared
+  physical station and locked to the fixed base.
 * nameplate x1: the maker's plate (book ch. 26; user ruling 2026-10-09), laid
   FLAT on the WEST (+X) end of the black deck, decorated side up and read by
   an operator west of the machine. Cosmetic; constrained at its shared
@@ -158,7 +159,7 @@ from fr_rocker_arm_support_spec import (
     SUPPORT_WORLD_X,
     SUPPORT_WORLD_Z,
 )
-from _mcmaster_91410a538 import SHANK_LEN as GOOSENECK_SHANK_LEN
+from _mcmaster_91410a540 import SHANK_LEN as GOOSENECK_SHANK_LEN
 from vn_frame_cross_screw_spec import (
     HEAD_DIA as CROSS_SCREW_HEAD_DIA,
     SHANK_DIA as CROSS_SCREW_SHANK_DIA,
@@ -175,7 +176,10 @@ from vn_lag_screw_spec import (
     THREAD_LEN as LAG_THREAD_LEN,
     THREAD_SIZE as LAG_THREAD_SIZE,
 )
-from build_fr_top_frame import SIDE_TAP_SPEC as TOP_CROSS_TAP_SPEC
+from build_fr_top_frame import (
+    SET_SPOT_FACE_X as TOP_SET_SPOT_FACE_X,
+    SIDE_TAP_SPEC as TOP_CROSS_TAP_SPEC,
+)
 from fr_frame_attachment_spec import (
     BASE_SCREW_SEAT_Z,
     BASE_SCREW_Y,
@@ -291,15 +295,22 @@ if not math.isclose(CAP_MOUTH_Y + CAP_INSIDE_HEIGHT, COLUMN_TOP_Y, abs_tol=1e-9)
 if not math.isclose(CAP_MOUTH_Y + CAP_TOTAL_HEIGHT, CAP_TOP_Y, abs_tol=1e-9):
     raise AssertionError("cap placement does not preserve the finished frame top")
 #
-# gooseneck-set-screw: 1x 1/4-20 UNC square-head set screw gripping the
-# gooseneck post through the casting's east-hub tapped rib hole, axis along X
-# at (y TOP_FRAME_MID_Y, z 3.088 -- the hub/post centreline). Entered from the
-# east outer face x -214.1: local +Y -> -X (rot_z_rows(90), euler [0,0,90])
-# points the exact stock shank inboard while retaining its cup tip at x -205.15,
-# 0.15 clear (outboard) of the Ø16 post surface at x -205.
+# gooseneck-set-screw: 1x McMaster 91410A540 1/4-20 x 3/4 square-head cup-point
+# set screw gripping the gooseneck post through the casting's east-hub boss,
+# axis along X at (y TOP_FRAME_MID_Y, z 3.088 -- the hub/post centreline).
+# Entered through the boss's spot face x -218.0 (21.0 from the bore axis):
+# local +Y -> -X (rot_z_rows(90), euler [0,0,90]) points the exact stock shank
+# inboard while retaining its cup tip at x -205.15, 0.15 clear (outboard) of
+# the Ø16 post surface at x -205. The under-head face is the tip less the
+# shank, x -224.20: the head stands 6.2 proud of the spot face, so the cup
+# point reaches the post before the head could bottom.
 GOOSENECK_HUB_Z = 3.088  # gooseneck bore centreline (unchanged position)
 SET_SCREW_TIP_X = -205.15  # 0.15 clear (outboard) of the Ø16 post surface -205
 SET_SCREW_UNDER_HEAD_X = SET_SCREW_TIP_X - GOOSENECK_SHANK_LEN
+if not SET_SCREW_UNDER_HEAD_X < TOP_SET_SPOT_FACE_X < SET_SCREW_TIP_X:
+    raise AssertionError(
+        "gooseneck set screw must cross the spot face with its head proud of it"
+    )
 
 # Maker's nameplate (ch.26 p.71; user ruling 2026-10-09): its traced outer edge
 # defines the brass plate, flat on the black deck's WEST (+X) end, decorated up.
@@ -329,10 +340,9 @@ if any(
 # ROT_X_POS90 (euler [90,0,0]) turns local +Z -> -Y. The stock shank passes
 # through NAMEPLATE_THICKNESS into the existing base threads; the head sits
 # above the decorated face.
-# The under-head plane seats FLUSH on the plate face, exactly as the
-# paper-drive seats the same screw on its clips. The stock external thread
-# engages the matching #4-40 base seat rather than using a tap-drill-sized
-# simplified shank.
+# The under-head plane seats FLUSH on the plate face. The stock external
+# thread engages the matching #4-40 base seat rather than using a
+# tap-drill-sized simplified shank.
 NAMEPLATE_SCREW_EULER = [90.0, 0.0, 0.0]
 NAMEPLATE_SCREW_ROWS = ROT_X_POS90
 if NAMEPLATE_SCREW_STATIONS != NAMEPLATE_SCREW_XZ:
@@ -874,7 +884,7 @@ async def build(adapter) -> dict[str, str]:
             )
             assert_component_placed(adapter, cross_screw, cross_target, s_rows)
 
-    # Gooseneck set screw: 1/4-20 square head through the west-hub tapped rib
+    # Gooseneck set screw: 1/4-20 x 3/4 square head through the hub boss's tap
     # hole along +X at the hub centreline; tip 0.15 clear of the Ø16 post
     # (see SET_SCREW_* constants). Same fix-all treatment.
     set_target = [SET_SCREW_UNDER_HEAD_X, TOP_FRAME_MID_Y, GOOSENECK_HUB_Z]

@@ -28,7 +28,7 @@ CONTRACT_DIR = Path(__file__).resolve().parent.parent / "config" / "assemblies"
 _REQUIRED_KEYS = frozenset(
     {"number", "flip_invert", "allowed_free_stems", "required_free_stems", "free_dof"}
 )
-_KNOWN_KEYS = _REQUIRED_KEYS | {"free_dof_per_active_channel"}
+_KNOWN_KEYS = _REQUIRED_KEYS | {"free_dof_per_active_channel", "carries_chain"}
 
 
 @dataclass(frozen=True)
@@ -46,6 +46,9 @@ class AssemblyContract:
     under-constrained (the necessity direction of the soundness gate).
     ``free_dof`` (+ ``free_dof_per_active_channel`` x the active channel count):
     the operational DOF the saved model ships free.
+    ``carries_chain``: the assembly wraps the roller chain, so its soundness
+    interference gate gets the authored wheel mounts as its build does
+    (541011de0); otherwise every link-on-sprocket mesh reads as interference.
     """
 
     stem: str
@@ -56,6 +59,7 @@ class AssemblyContract:
     required_free_stems: tuple[str, ...]
     free_dof: int
     free_dof_per_active_channel: int
+    carries_chain: bool
 
 
 def contract_path(stem: str) -> Path:
@@ -81,6 +85,12 @@ def _text(path: Path, key: str, value: object) -> str:
 def _count(path: Path, key: str, value: object) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise ValueError(f"{path}: {key} must be a non-negative integer")
+    return value
+
+
+def _flag(path: Path, key: str, value: object) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{path}: {key} must be true or false")
     return value
 
 
@@ -119,6 +129,7 @@ def assembly_contract(stem: str) -> AssemblyContract:
             "free_dof_per_active_channel",
             doc.get("free_dof_per_active_channel", 0),
         ),
+        carries_chain=_flag(path, "carries_chain", doc.get("carries_chain", False)),
     )
 
 

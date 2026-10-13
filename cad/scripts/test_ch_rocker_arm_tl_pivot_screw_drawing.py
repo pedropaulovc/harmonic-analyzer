@@ -11,7 +11,7 @@ import ch_rocker_arm_tl_pivot_washer_spec as washer
 import draw_ch_rocker_arm_tl_pivot_screw as screw_drawing
 import draw_ch_rocker_arm_tl_pivot_washer as washer_drawing
 import export_features
-from _feature_requirements import limits
+from _printed_limits import limits
 from _printed_tolerance import printed_band_mm
 from prechips.model import TOLERANCE_REQUIREMENTS
 

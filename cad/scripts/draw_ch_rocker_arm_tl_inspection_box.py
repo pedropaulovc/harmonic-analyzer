@@ -37,6 +37,12 @@ from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+import ch_rocker_arm_tl_inspection_box_spec as part_spec
+from _feature_requirements import part_metadata, requirement
+from _printed_limits import limits
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_inspection_box_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -67,6 +73,83 @@ LEFT_KEEP = {
     "WinLowBase": (0.032, 0.150),
     "WinUpBase": (0.020, 0.160),
 }
+
+
+def _window(
+    floor_y: float, height: float, faces: tuple, sources: tuple[str, ...],
+    width: float, station: float, normal: list[float], note: str,
+) -> dict:
+    """A printed .X through window: size, station along its wall, floor above
+    the base (lower_z is model Y here: the box frame is Y up)."""
+    return {
+        'kind': "window",
+        'faces': faces,
+        'requirements': ("width", "height", "station", "lower_z"),
+        'fields': {
+            "normal": (normal, ("__frame__",)),
+            "width": (limits(width, 1), (sources[0],)),
+            "width_nominal": (width, (sources[0],)),
+            "height": (limits(height, 1), (sources[1],)),
+            "height_nominal": (height, (sources[1],)),
+            "station": (limits(station, 1), (sources[2],)),
+            "station_nominal": (station, (sources[2],)),
+            "lower_z": (limits(floor_y, 1), (sources[3],)),
+            "height_from": ("base", (("draw_ch_rocker_arm_tl_inspection_box", "build"),)),
+            "note": (note, (("draw_ch_rocker_arm_tl_inspection_box", "DIMENSION_CALLOUTS"), ("draw_ch_rocker_arm_tl_inspection_box", "build"))),
+            "thru": (True, (("draw_ch_rocker_arm_tl_inspection_box", "DIMENSION_CALLOUTS"),)),
+        },
+        'precision': {"width": 1, "height": 1, "station": 1, "lower_z": 1},
+    }
+
+
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_drawing_hole_callout", "add_native_hole_callout")))
+
+# Bought reference faces: located, not reworked, so no printed band.
+requirement("datum_b_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), 0.0),),
+    requirements=(),
+    fields={
+        "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
+    },
+)
+
+requirement("base",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=(),
+    fields={
+        "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
+    },
+)
+
+requirement("right_side",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), part_spec.BOX),),
+    requirements=(),
+    fields={
+        "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "x", "value": part_spec.BOX}, ("BOX",)),
+    },
+)
+
+for level, floor_y, source in (
+    ("lower", part_spec.WINDOW_LOW_BASE, "WINDOW_LOW_BASE"),
+    ("upper", part_spec.WINDOW_UP_BASE, "WINDOW_UP_BASE"),
+):
+    requirement(f"clamp_window_{level}", **_window(
+        floor_y, part_spec.WINDOW_H,
+        (
+            PlanarFace((0.0, 1.0, 0.0), floor_y),
+            PlanarFace((0.0, -1.0, 0.0), -(floor_y + part_spec.WINDOW_H)),
+        ),
+        ("WINDOW_W", "WINDOW_H", "WINDOW_FRONT", source),
+        part_spec.WINDOW_W, part_spec.WINDOW_FRONT, [-1.0, 0.0, 0.0],
+        "through the left wall; station from the front face",
+    ))
+
 FRONT_KEEP = {
     "TapY": (0.207, 0.132),
     # 10.00 text outside the box's left edge; 30.00 text (and its wall
@@ -80,6 +163,19 @@ BACK_KEEP = {
     "BackY0": (0.320, 0.150),
     "BackX0": (0.275, 0.118),
 }
+
+
+requirement("back_window", **_window(
+    part_spec.BACK_WINDOW_Y0, part_spec.BACK_WINDOW,
+    (
+        PlanarFace((0.0, 1.0, 0.0), part_spec.BACK_WINDOW_Y0),
+        PlanarFace((1.0, 0.0, 0.0), part_spec.BACK_WINDOW_X0),
+    ),
+    ("BACK_WINDOW", "BACK_WINDOW", "BACK_WINDOW_X0", "BACK_WINDOW_Y0"),
+    part_spec.BACK_WINDOW, part_spec.BACK_WINDOW_X0, [0.0, 0.0, -1.0],
+    "through the back wall; station from the left face",
+))
+
 DIMENSION_CALLOUTS = {
     "WinLowW": "2X",
     "WinLowH": "2X",
@@ -89,6 +185,55 @@ DIMENSION_CALLOUTS = {
     "TapRightX": "TAPS IN 11/16 IN FRONT WALL",
 }
 TAP_CALLOUT_XY = (0.148, 0.215)
+
+
+for side, x in zip(("left", "right"), part_spec.TAP_X, strict=True):
+    requirement(f"bar_tap_{side}",
+        kind="hole",
+        faces=(CylinderFace(part_spec.TAP_DRILL_DIA, contains_x_mm=x),),
+        requirements=("station", "height", "thread", "depth"),
+        fields={
+            "at": ([x, part_spec.TAP_Y, 0.0], ("TAP_X", "TAP_Y", ("ch_rocker_arm_tl_c_stop_bar_spec", "SCREW_X"))),
+            "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
+            "station": (
+                limits(x, 2, part_spec.bar.SCREW_POSITION_BAND),
+                ("TAP_X", ("ch_rocker_arm_tl_c_stop_bar_spec", "SCREW_POSITION_BAND")),
+            ),
+            "station_nominal": (x, ("TAP_X",)),
+            "height": (
+                limits(part_spec.TAP_Y, 2, part_spec.bar.SCREW_POSITION_BAND),
+                ("TAP_Y", ("ch_rocker_arm_tl_c_stop_bar_spec", "SCREW_POSITION_BAND")),
+            ),
+            "height_nominal": (part_spec.TAP_Y, ("TAP_Y",)),
+            "thread": (f"{part_spec.bar.SCREW_THREAD} UNC-2B", ("TAP_SPEC",)),
+            "depth": (limits(part_spec.TAP_SPEC.overrides_mm["ThreadDepth"], 2), ("TAP_SPEC",)),
+            "depth_ref": (part_spec.TAP_SPEC.overrides_mm["ThreadDepth"], ("TAP_SPEC",)),
+            "tap_drill_mm": (part_spec.TAP_DRILL_DIA, ("TAP_DRILL_DIA", "TAP_SPEC")),
+            "thru": (False, ("TAP_SPEC",)),
+        },
+        precision={"station": 2, "height": 2, "depth": 2},
+    )
+
+for side, x in zip(("left", "right"), part_spec.TAP_X, strict=True):
+    requirement(f"bar_tap_{side}_drill",
+        kind="hole",
+        faces=(ConeFace(part_spec.DRILL_POINT_HALF_ANGLE, contains_x_mm=x),),
+        requirements=("dia", "depth"),
+        fields={
+            "parent": (f"bar_tap_{side}", ("TAP_SPEC", ("draw_ch_rocker_arm_tl_inspection_box", "build"))),
+            # The title-block drilled band qualifies the printed Ø3.45.
+            "dia": (
+                limits(round(part_spec.TAP_DRILL_DIA, 2), 2, part_spec.DRILLED_BAND),
+                ("TAP_DRILL_DIA", "DRILLED_BAND", "TAP_SPEC"),
+            ),
+            "dia_nominal": (round(part_spec.TAP_DRILL_DIA, 2), ("TAP_DRILL_DIA",)),
+            "depth": (limits(part_spec.TAP_SPEC.depth_mm, 2), ("TAP_SPEC",)),
+            "depth_ref": (part_spec.TAP_SPEC.depth_mm, ("TAP_SPEC",)),
+            "thru": (False, ("TAP_SPEC",)),
+        },
+        precision={"dia": 2, "depth": 2},
+    )
+
 _THREAD_LABEL_LAYER = "INSPECTION-BOX-THREAD-LABEL-HIDDEN"
 
 

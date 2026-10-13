@@ -26,6 +26,7 @@ GOLD = REPO / "cad" / "out" / "reports" / "pose-golden"
 
 import _telemetry  # status goes through telemetry, not bare print (AGENTS.md)
 import spring_mount_geom
+import paper_drive_geom
 
 fails = []
 
@@ -216,8 +217,8 @@ expect(
 expect(
     "mg-magnifier",
     "mg-output-fixture-1",
-    [m.CLAMP_X, m.FIXTURE_Y0, m.VROD_Z],
-    IDENTITY,
+    list(m.FIXTURE_POSITION),
+    m.FIXTURE_ROWS,
     "mg-output-fixture",
 )
 expect(
@@ -895,8 +896,8 @@ for i, (_sx, clip_x, clip_y, rz) in enumerate(p.CLIP_PLACEMENTS):
         f"platen-clip x{clip_x:+.0f} Rz{rz:+.0f}",
         **_SOLV,
     )
-_paper_side = (p.PLATE_WIDTH - p.PAPER_WIDTH) / 2.0
-_paper_y = p.PLATE_Y0 + p.PLATE_HEIGHT - p.PAPER_HEIGHT - 3.0
+_paper_side = (p.PLATE_WIDTH - paper_drive_geom.RECORDING_PAPER_WIDTH_MM) / 2.0
+_paper_y = p.PLATE_Y0 + p.PLATE_HEIGHT - paper_drive_geom.RECORDING_PAPER_HEIGHT_MM - 3.0
 expect(
     PD,
     "pd-platen-paper-1",
@@ -905,28 +906,27 @@ expect(
     "pd-platen-paper",
     **_SOLV,
 )
-_fs = 0
-for x, y in p.CLIP_SCREW_XY:
-    _fs += 1
+# The MHA-VN-059 #2-56 clip screws are their own stem; the MHA-VN-006 guide
+# screws number from 1 on their own.
+for i, (x, y) in enumerate(p.CLIP_SCREW_XY):
     expect(
         PD,
-        f"vn-fillister-screw-{_fs}",
-        [x, y, p.PLATE_FRONT_Z - p.CLIP_THICKNESS - p.SCREW_SEAT_BOSS_H],
+        f"vn-platen-clip-screw-{i + 1}",
+        [x, y, p.PLATE_FRONT_Z - p.CLIP_THICKNESS],
         IDENTITY,
-        f"clip screw {_fs}",
+        f"clip screw {i + 1}",
         **_SOLV,
     )
-for x, y in p.GUIDE_SCREW_XY:
-    _fs += 1
+for i, (x, y) in enumerate(p.GUIDE_SCREW_XY):
     expect(
         PD,
-        f"vn-fillister-screw-{_fs}",
+        f"vn-fillister-screw-{i + 1}",
         [x, y, p.PLATE_FRONT_Z + p.PLATEN_CBORE_DEPTH],
         IDENTITY,
-        f"guide screw {_fs}",
+        f"guide screw {i + 1}",
         **_SOLV,
     )
-# R9-31: the guide-lock screws are their own button-head stem (MHA-VN-046).
+# R9-31: the guide-lock screws are their own slotted pan-head stem (MHA-VN-046).
 for i, (x, y) in enumerate(p.LOCK_SCREW_XY):
     expect(
         PD,
@@ -1049,14 +1049,6 @@ for i, (x, y) in enumerate(p.KNOB_DRIVE_PIN_XY):
         f"knob drive pin {i + 1}",
         **_SOLV,
     )
-expect(
-    PD,
-    "vn-transgear-collar-cross-pin-1",
-    [*_K, p.CROSS_PIN_Z0],
-    IDENTITY,
-    "collar cross pin",
-    **_SOLV,
-)
 expect(
     PD,
     "pd-transgear-knob-shaft-1",

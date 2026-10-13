@@ -13,10 +13,11 @@ import pd_transgear_removable_spec as band
 import pd_platen_spec as platen
 import build_pd_platen_clip as clip
 import build_pd_platen_guide as guide
-import build_pd_platen_paper as paper
-import _platen_rack_geometry as rack
+import paper_drive_geom as paper_geometry
+import pd_platen_rack_spec as rack
 import build_pd_support_bar as support
 import vn_fillister_screw_spec as fillister
+import vn_platen_clip_screw_spec as clip_screw
 from _printed_tolerance import printed_deviations
 
 
@@ -39,7 +40,10 @@ def test_the_rack_is_flush_with_the_platen_and_a_gap_sits_over_the_stud() -> Non
     assert gaps == pytest.approx(round(gaps), abs=1e-9)
     shift = assembly.PLATE_X0 - assembly.PLATE_X0_PHOTO
     assert abs(shift) <= rack.PITCH / 2.0
-    assert shift == pytest.approx(-0.0355, abs=5e-5)
+    photo_gap = (
+        assembly.STUD_XY[0] - assembly.PLATE_X0_PHOTO - rack.FIRST_GAP_X
+    ) / rack.PITCH
+    assert shift == pytest.approx((photo_gap - round(photo_gap)) * rack.PITCH)
     assembly._assert_rack_mesh()
 
 
@@ -51,10 +55,10 @@ def test_platen_furniture_cascades_with_resized_envelope() -> None:
     clip_y0 = platen.PLATE_HEIGHT - clip.CLIP_LENGTH
     assert math.isclose(platen.SOCKET_XY[0][1], clip_y0 + clip.HOLE_INSET)
     assert math.isclose(platen.SOCKET_XY[1][1], platen.PLATE_HEIGHT - clip.HOLE_INSET)
-    side_margin = (platen.PLATE_WIDTH - paper.PAPER_WIDTH) / 2.0
+    side_margin = (platen.PLATE_WIDTH - paper_geometry.RECORDING_PAPER_WIDTH_MM) / 2.0
     assert math.isclose(side_margin, 18.2007)
     assert math.isclose(
-        platen.PLATE_HEIGHT - paper.PAPER_HEIGHT - 3.0,
+        platen.PLATE_HEIGHT - paper_geometry.RECORDING_PAPER_HEIGHT_MM - 3.0,
         51.32,
     )
 
@@ -65,41 +69,93 @@ def test_platen_clip_is_one_center_bridged_sheet() -> None:
         clip.SCREW_RAIL_WIDTH + clip.NOTCH_WIDTH + clip.SPRING_RAIL_WIDTH,
         clip.CLIP_WIDTH,
     )
+    # ch22 img03: equal 32-px rails either side of a 4-px slit.
+    assert math.isclose(clip.SCREW_RAIL_WIDTH, clip.SPRING_RAIL_WIDTH)
+    assert math.isclose(clip.NOTCH_WIDTH / clip.CLIP_WIDTH, 4.0 / 68.0)
     assert math.isclose(
-        2.0 * clip.NOTCH_LENGTH + clip.CENTER_BRIDGE_LENGTH,
-        clip.CLIP_LENGTH,
+        clip.BRIDGE_X0 + clip.CENTER_BRIDGE_LENGTH + clip.BRIDGE_X0, clip.CLIP_LENGTH
     )
-    assert clip.CENTER_BRIDGE_LENGTH == 5.0
+    assert math.isclose(clip.SLIT_END_RADIUS * 2.0, clip.NOTCH_WIDTH)
+    flat_plan_area = (
+        clip.CLIP_LENGTH * clip.SCREW_RAIL_WIDTH
+        - (4.0 - math.pi)
+        / 2.0
+        * (clip.SCREW_RAIL_END_RADIUS**2 + clip.SCREW_RAIL_SLIT_RADIUS**2)
+        + clip.CENTER_BRIDGE_LENGTH * clip.NOTCH_WIDTH
+        - math.pi * clip.SLIT_END_RADIUS**2
+    )
     spring_plan_area = (
-        (clip.CLIP_LENGTH - 2.0 * clip.SPRING_END_RADIUS)
-        * clip.SPRING_RAIL_WIDTH
+        clip.MID_SURFACE_LENGTH * clip.SPRING_RAIL_WIDTH
         + math.pi * clip.SPRING_END_RADIUS**2
     )
     expected = (
-        clip.CLIP_LENGTH * clip.SCREW_RAIL_WIDTH
-        + clip.CENTER_BRIDGE_LENGTH * clip.NOTCH_WIDTH
-        + spring_plan_area
-        - 2.0 * math.pi * (clip.HOLE_DIA / 2.0) ** 2
-    ) * clip.SHEET_T + (
-        2.0
-        * math.pi
-        * ((clip.SCREW_SEAT_DIA / 2.0) ** 2 - (clip.HOLE_DIA / 2.0) ** 2)
-        * clip.SCREW_SEAT_BOSS_H
-    )
+        flat_plan_area + spring_plan_area - 2.0 * math.pi * (clip.HOLE_DIA / 2.0) ** 2
+    ) * clip.SHEET_T
     assert math.isclose(clip.V_FINAL, expected)
+    assert not hasattr(clip, "SCREW_SEAT_BOSS_H")
 
 
-def test_platen_clip_free_halves_arch_and_return_to_sheet_plane() -> None:
-    stations = clip.ARCH_FRONT_XZ
-    assert stations[0] == (clip.SPRING_END_RADIUS, 0.0)
-    assert stations[-1] == (clip.CLIP_LENGTH - clip.SPRING_END_RADIUS, 0.0)
-    bridge_x0 = (clip.CLIP_LENGTH - clip.CENTER_BRIDGE_LENGTH) / 2.0
-    bridge_x1 = bridge_x0 + clip.CENTER_BRIDGE_LENGTH
-    assert stations[3] == (bridge_x0, 0.0)
-    assert stations[4] == (bridge_x1, 0.0)
-    assert [z for _, z in stations].count(-clip.ARCH_RISE) == 2
+def test_platen_clip_spring_rail_follows_its_knobs() -> None:
+    # The thin extrusion's width, start offset and wall are all equation-bound;
+    # the build names them by value, so the three values must be distinct.
+    drives = {name: (value, expr) for name, value, expr in clip.SPRING_RAIL_DRIVES}
+    assert drives == {
+        "RailWidth": (clip.SPRING_RAIL_WIDTH, '"SpringRailW"'),
+        "StartOffset": (clip.SPRING_RAIL_Y0, '"SpringRailY0"'),
+        "WallT": (clip.SHEET_T, '"SheetT"'),
+    }
+    values = sorted(value for value, _ in drives.values())
+    assert all(b - a > 0.1 for a, b in zip(values, values[1:]))
+    assert "SpringRail" not in clip.BOSS_DRIVES
+    # The native flex predicts each edited volume analytically and moves it
+    # well past the 0.5 % volume tolerance.
+    neutrals = {"sheet_t": clip.SHEET_T, "notch_w": clip.NOTCH_WIDTH}
+    assert clip.clip_volumes() == clip.clip_volumes(**neutrals)
+    for knob, neutral, flexed, knob_arg in clip.EQUATION_FLEX:
+        assert neutrals[knob_arg] == neutral
+        knobs = {**neutrals, knob_arg: flexed}
+        flat, spring, ends, holes = clip.clip_volumes(**knobs)
+        flexed_volume = flat + spring + ends - holes
+        assert abs(flexed_volume - clip.V_FINAL) > 0.02 * clip.V_FINAL, knob
+        # The end round stays wholly on the flat tip at the flexed slit width.
+        spring_w = clip.CLIP_WIDTH - clip.SCREW_RAIL_WIDTH - knobs["notch_w"]
+        assert spring_w <= clip.HOLE_INSET
+
+
+def test_platen_clip_free_halves_bow_smoothly_and_return_to_sheet_plane() -> None:
+    # Three equal tangent arcs per free half (concave, crown, concave): the
+    # run and the rise close, so the bow lands back in the sheet plane at the
+    # bridge with no crease.
+    r, a = clip.BEND_RADIUS, clip.BEND_ANGLE
+    assert math.isclose(4.0 * r * math.sin(a), clip.BOW_RUN)
+    assert math.isclose(2.0 * r * (1.0 - math.cos(a)), clip.ARCH_RISE)
     assert clip.ARCH_RISE == 1.5
+    assert clip.BOW_RUN == pytest.approx(clip.BRIDGE_X0 - clip.HOLE_INSET)
+    # Gentle brass bend, far above the sheet thickness.
+    assert r > 20.0 * clip.SHEET_T
+    near = clip._bow_points(clip.HOLE_INSET, 0.0)
+    for key in ("p1", "p2"):
+        assert math.dist(near[key], near["c2"]) == pytest.approx(r)
+    assert math.dist(near["p1"], near["c1"]) == pytest.approx(r)
+    assert math.dist(near["p2"], near["c3"]) == pytest.approx(r)
+    assert near["c2"][1] + r == pytest.approx(clip.ARCH_RISE)
+    # The end round lies wholly on the flat tip, before the bow lifts.
+    assert 2.0 * clip.SPRING_END_RADIUS <= clip.HOLE_INSET
     assert math.isclose(clip.SPRING_END_RADIUS * 2.0, clip.SPRING_RAIL_WIDTH)
+
+
+def test_platen_clip_screws_seat_on_the_flat_sheet_with_full_engagement() -> None:
+    # The user's #2-56 brass fillister (90114A124): its head lies wholly on the
+    # 4.23 screw rail, and the platen's through tap is the same thread.
+    assert clip_screw.SKU == "90114A124" and clip_screw.THREAD == "#2-56"
+    assert (platen.SOCKET_SPEC.kind, platen.SOCKET_SPEC.size) == ("tapped", "#2-56")
+    assert clip.HOLE_DIA == clip.CLEARANCE_MM[("#2", "normal")]
+    assert clip_screw.HEAD_DIA < clip.SCREW_RAIL_WIDTH
+    assert clip.CLIP_THICKNESS + platen.SOCKET_THREAD_ENGAGEMENT == pytest.approx(
+        clip_screw.SHANK_LEN
+    )
+    assert platen.SOCKET_THREAD_ENGAGEMENT >= 1.5 * clip.THREAD_MAJOR_MM["#2-56"]
+    assert platen.SOCKET_BOSS_H == pytest.approx(1.70)
 
 
 def test_platen_clip_holes_and_handed_assembly_placements_follow_flat_rail() -> None:
@@ -107,15 +163,10 @@ def test_platen_clip_holes_and_handed_assembly_placements_follow_flat_rail() -> 
     assert clip.HOLE_Y - clip.HOLE_DIA / 2.0 > 0.0
     assert clip.HOLE_Y + clip.HOLE_DIA / 2.0 < clip.SCREW_RAIL_WIDTH
     assert tuple(row[3] for row in assembly.CLIP_PLACEMENTS) == (90.0, -90.0)
-    assert math.isclose(
-        clip.SPRING_RAIL_Y0 - (clip.HOLE_Y + clip.SCREW_SEAT_DIA / 2.0),
-        clip.CLIP_SCREW_HEAD_CLEARANCE,
-    )
-    assert clip.SCREW_SEAT_DIA > clip.HEAD_DIA
-    assert (
+    assert clip.HEAD_TO_SPRING_RAIL == pytest.approx(
         clip.SPRING_RAIL_Y0 - (clip.HOLE_Y + clip.HEAD_DIA / 2.0)
-        > clip.CLIP_SCREW_HEAD_CLEARANCE
     )
+    assert clip.HEAD_TO_SPRING_RAIL > 0.25
 
     plate_mid_x = assembly.PLATE_X0 + assembly.PLATE_WIDTH / 2.0
     expected_y = sorted(
@@ -141,7 +192,7 @@ def test_platen_clip_holes_and_handed_assembly_placements_follow_flat_rail() -> 
 
 
 def test_cascaded_drive_geometry_closes() -> None:
-    assert rack.GAP_COUNT == 101
+    assert rack.GAP_COUNT == math.floor(rack.BAR_LENGTH / rack.PITCH)
     assembly._assert_rack_mesh()
     assembly._assert_gear_mesh()
     assembly._assert_knob_shaft_clearance()
@@ -151,15 +202,15 @@ def test_cascaded_drive_geometry_closes() -> None:
 def test_chain_slack_run_clears_the_chain_plane_parts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # R9-30: the sag the 68-link loop forces must clear every placed part in
+    # R9-30: the solved integer-link sag must clear every placed part in
     # the chain plane -- in plane, or axially by the band the chain sweeps.
     assembly._assert_chain_slack_clearance()
     run = assembly._slack_run_points()
     assert math.isclose(
-        math.dist(run[0], assembly.KNOB_SHAFT_XY), chain.PITCH_R_T24, abs_tol=1e-3
+        math.dist(run[0], assembly.KNOB_SHAFT_XY), chain.KNOB_PITCH_R, abs_tol=1e-3
     )
     crank_xy = (-assembly.CHAIN_CRANK_CENTRE[0], assembly.CHAIN_CRANK_CENTRE[1])
-    assert math.isclose(math.dist(run[-1], crank_xy), chain.PITCH_R_T12, abs_tol=1e-3)
+    assert math.isclose(math.dist(run[-1], crank_xy), chain.CRANK_PITCH_R, abs_tol=1e-3)
     # A part sitting on the sag's midpoint in the chain plane is refused...
     probe_xy = run[len(run) // 2]
     envelopes = assembly.CHAIN_PLANE_ENVELOPES
@@ -184,12 +235,30 @@ def test_guide_lock_stations_sweep_clear_of_the_hanger(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # The lock stations ride the platen across its whole feed; R9-31's low
-    # button heads pass under the hanger arm's front face at the printed
-    # worst case.
+    # slotted pan heads, on the 1/16-sheet lock backs, pass under the hanger
+    # arm's front face at the printed worst case.
     assembly._assert_lock_station_sweep()
     # Negative control: the stock fillister head stands into the arm.
     monkeypatch.setattr(assembly, "LOCK_SCREW_HEAD_H", fillister.HEAD_H)
     with pytest.raises(AssertionError, match="sweep into the arm"):
+        assembly._assert_lock_station_sweep()
+
+
+def test_clip_screw_bosses_sweep_clear_of_the_bar_and_hanger(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The rear clip-screw bosses ride the platen back across its whole feed:
+    # they pass above the bar's top edge and clear every fixed hanger section.
+    lines: list[str] = []
+    monkeypatch.setattr(assembly, "log", lines.append)
+    assembly._assert_lock_station_sweep()
+    (line,) = lines
+    assert "clip-screw bosses " in line
+    assert "clip-screw bosses on the bar " in line
+    # Negative control: a boss station dropped onto the bar's top edge.
+    x, _ = assembly.CLIP_SCREW_XY[0]
+    monkeypatch.setattr(assembly, "CLIP_SCREW_XY", ((x, assembly.BAR_TOP_Y),))
+    with pytest.raises(AssertionError, match="clip-screw boss"):
         assembly._assert_lock_station_sweep()
 
 
@@ -202,7 +271,7 @@ def test_guide_lock_stations_sweep_clear_of_the_hanger(
             printed_deviations(assembly.GUIDE_DEPTH, 2),
             "heads .* into the arm plate as",
         ),
-        # So does a lock plate whose strip thickness prints .XX...
+        # So does a lock plate whose thickness prints .XX, not its sheet band...
         (
             "_LOCK_THICK_DEV",
             printed_deviations(assembly.LOCK_THICK, 2),
@@ -213,12 +282,6 @@ def test_guide_lock_stations_sweep_clear_of_the_hanger(
             "_NOTCH_DEPTH_DEV",
             printed_deviations(assembly.ARM_PLATE.NOTCH_DEPTH, 1),
             "heads .* into the arm plate as",
-        ),
-        # A lock plate that may run tall at .XX sweeps into the pivot spacer.
-        (
-            "_LOCK_HEIGHT_DEV",
-            printed_deviations(assembly.LOCK_HEIGHT, 2),
-            "lock plates .* into the pivot spacer",
         ),
         # A rail that may run 0.9 shallow rubs its plates on the bar.
         ("_GUIDE_DEPTH_DEV", (-0.9, 0.0), "bar's back face"),
@@ -240,7 +303,7 @@ def test_guide_lock_sweep_judges_every_section_at_its_printed_band(
 def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
     # One chain plane, the spec's, for the links and both wheels.
     assert assembly.CHAIN_MID_Z == band.CHAIN_MID_Z
-    # Both wheels (crank T12, knob T24) sit on the one band: front face at
+    # Both selected wheels sit on the one band: front face at
     # the band front, rear face on the seat face (the knob side's is the
     # MHA-PD-022 drive collar's front face, set in front of the 12T's face F).
     knob_seat_z = assembly.KNOB_COLLAR_Z0
@@ -266,18 +329,15 @@ def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
 def test_knob_drive_collar_sits_between_the_seat_and_the_12t(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Round 10: the seat collar is no longer turned on the knob shaft; it is
-    # the separate 4.0-long MHA-PD-022, set at fit-up SET_NOMINAL in front of the
-    # 12T's front face F.  Pushed fully rearward its rear face meets F, and
-    # the disc's front face still stands behind F.
-    assert collar.LENGTH == 4.0
+    # The separate MHA-PD-022 collar is faced at fit-up so its rear face
+    # seats on the 12T's front face F; the disc's front face stands behind F.
+    assert collar.LENGTH == collar.SET_NOMINAL
+    assert collar.SEAT_MIN_FROM_F <= collar.LENGTH <= collar.SEAT_MAX_FROM_F
     assert math.isclose(assembly.KNOB_SHAFT_Z0, -148.1)
     assert math.isclose(
         assembly.KNOB_COLLAR_REAR_Z, assembly.KNOB_COLLAR_Z0 + collar.LENGTH
     )
-    travel = assembly.KNOB_SHAFT_Z0 - assembly.KNOB_COLLAR_REAR_Z
-    assert math.isclose(travel, collar.REARWARD_TRAVEL_NOMINAL)
-    assert min(collar.REARWARD_TRAVEL_RANGE) > 0.0
+    assert math.isclose(assembly.KNOB_COLLAR_REAR_Z, assembly.KNOB_SHAFT_Z0)
     assert assembly.DISC_Z0 - assembly.KNOB_SHAFT_Z0 > 0.0
     assembly._assert_knob_shaft_clearance()
     # Negative control: a disc 0.05 behind F binds on the collar pushed

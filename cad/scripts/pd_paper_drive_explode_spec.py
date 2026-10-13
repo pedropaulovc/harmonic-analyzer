@@ -20,83 +20,63 @@ from typing import Literal, Sequence
 EXPLODED_VIEW_NAME = "PAPER_DRIVE_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
 
-# The fillister-screw family holds both the guide screws (heads in the
-# platen's front counterbores) and the paper-clip screws. The builder tags
-# every instance with the joint it makes, never by where it stands.
-Role = Literal["guide-screw", "clip-screw"]
-GUIDE_SCREW_ROLE: Role = "guide-screw"
-CLIP_SCREW_ROLE: Role = "clip-screw"
-ROLE_STEMS = frozenset({"vn-fillister-screw"})
-
 
 @dataclass(frozen=True)
 class ExplodeStep:
-    """One native explode step: every instance of each ``(stem, role)`` member
-    moves ``distance_mm`` along the world ``axis`` (sign = direction); a
-    ``None`` role takes every instance of the family."""
+    """One native explode step: every instance of each member family moves
+    ``distance_mm`` along the world ``axis`` (sign = direction)."""
 
     label: str
-    members: tuple[tuple[str, Role | None], ...]
+    stems: tuple[str, ...]
     axis: Literal["x", "y", "z"]
     distance_mm: float
 
 
 EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
-    ExplodeStep("rack below the platen", (("pd-platen-rack", None),), "y", -35.0),
-    ExplodeStep(
-        "guide screws forward", (("vn-fillister-screw", GUIDE_SCREW_ROLE),), "z", -45.0
-    ),
+    ExplodeStep("rack below the platen", ("pd-platen-rack",), "y", -35.0),
+    ExplodeStep("guide screws forward", ("vn-fillister-screw",), "z", -45.0),
     ExplodeStep(
         "clips and paper forward",
-        (
-            ("pd-platen-clip", None),
-            ("pd-platen-paper", None),
-            ("vn-fillister-screw", CLIP_SCREW_ROLE),
-        ),
+        ("pd-platen-clip", "pd-platen-paper", "vn-platen-clip-screw"),
         "z",
         -40.0,
     ),
-    ExplodeStep(
-        "clip screws forward", (("vn-fillister-screw", CLIP_SCREW_ROLE),), "z", -30.0
-    ),
+    ExplodeStep("clip screws forward", ("vn-platen-clip-screw",), "z", -30.0),
     ExplodeStep(
         "guides above the platen",
-        (("pd-platen-guide", None), ("pd-guide-lock", None), ("vn-guide-lock-screw", None)),
+        ("pd-platen-guide", "pd-guide-lock", "vn-guide-lock-screw"),
         "y",
         110.0,
     ),
     ExplodeStep(
-        "locks above the guides",
-        (("pd-guide-lock", None), ("vn-guide-lock-screw", None)),
-        "y",
-        45.0,
+        "locks above the guides", ("pd-guide-lock", "vn-guide-lock-screw"), "y", 45.0
     ),
-    ExplodeStep("lock screws rearward", (("vn-guide-lock-screw", None),), "z", 35.0),
+    ExplodeStep("lock screws rearward", ("vn-guide-lock-screw",), "z", 35.0),
     ExplodeStep(
         "bar above the locks",
         (
-            ("pd-support-bar", None),
-            ("sh-column-clamp-front", None),
-            ("sh-column-clamp-back", None),
-            ("vn-clamp-screw", None),
+            "pd-support-bar",
+            "sh-column-clamp-front",
+            "sh-column-clamp-back",
+            "vn-clamp-screw",
         ),
         "y",
         200.0,
     ),
     ExplodeStep(
         "clamp arcs rearward",
-        (("sh-column-clamp-front", None), ("sh-column-clamp-back", None)),
+        ("sh-column-clamp-front", "sh-column-clamp-back"),
         "z",
         30.0,
     ),
-    ExplodeStep("back arcs rearward", (("sh-column-clamp-back", None),), "z", 30.0),
-    ExplodeStep("clamp screws forward", (("vn-clamp-screw", None),), "z", -45.0),
+    ExplodeStep("back arcs rearward", ("sh-column-clamp-back",), "z", 30.0),
+    ExplodeStep("clamp screws forward", ("vn-clamp-screw",), "z", -45.0),
 )
 # The platen carries the balloons in place.
 STATIONARY_STEMS = frozenset({"pd-platen"})
 # Every family the exploded sheet shows and balloons.
 SHOWN_STEMS = STATIONARY_STEMS | frozenset(
-    stem for step in EXPLODE_STEPS for stem, _role in step.members
+    stem for step in EXPLODE_STEPS for stem in step.stems
 )
 
 
@@ -104,7 +84,6 @@ SHOWN_STEMS = STATIONARY_STEMS | frozenset(
 class Instance:
     name: str
     stem: str
-    role: Role | None = None
 
 
 def plan_explode(
@@ -112,34 +91,23 @@ def plan_explode(
 ) -> list[tuple[ExplodeStep, tuple[str, ...]]]:
     """Resolve every step to the component names it moves.
 
-    Refuses a shown family the model lacks, an instance of a role family
-    without a role (or a role on any other family), and a step member that
-    selects nothing. Families outside ``SHOWN_STEMS`` are never moved.
+    Refuses a shown family the model lacks. Families outside ``SHOWN_STEMS``
+    are never moved.
     """
     stems = {instance.stem for instance in instances}
     missing = sorted(SHOWN_STEMS - stems)
     if missing:
         raise ValueError(f"explode families absent from the model: {missing!r}")
-    untagged = sorted(
-        instance.name
-        for instance in instances
-        if (instance.stem in ROLE_STEMS) != (instance.role is not None)
-    )
-    if untagged:
-        raise ValueError(f"role tags do not match the role families: {untagged!r}")
-    resolved = []
-    for step in EXPLODE_STEPS:
-        names: list[str] = []
-        for stem, role in step.members:
-            picked = sorted(
-                instance.name
-                for instance in instances
-                if instance.stem == stem and (role is None or instance.role == role)
-            )
-            if not picked:
-                raise ValueError(
-                    f"explode step {step.label!r} selects no {stem!r} ({role})"
+    return [
+        (
+            step,
+            tuple(
+                sorted(
+                    instance.name
+                    for instance in instances
+                    if instance.stem in step.stems
                 )
-            names += picked
-        resolved.append((step, tuple(sorted(names))))
-    return resolved
+            ),
+        )
+        for step in EXPLODE_STEPS
+    ]

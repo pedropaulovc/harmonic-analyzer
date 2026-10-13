@@ -54,6 +54,12 @@ from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+import ch_rocker_arm_tl_profile_fixture_spec as part_spec
+from _feature_requirements import part_metadata, requirement
+from _printed_limits import limits
+from _gtol_cone import ConeFace
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_profile_fixture_spec import (
     CLAMP_STUD_DRILL_DIA,
     CLAMP_STUD_POINTS,
@@ -145,6 +151,289 @@ PLAN_KEEP_AT = {
     "PlateSouthY": ((PLATE_EAST_X, PLATE_SOUTH_Y / 2.0), (0.008, 0.0)),
     "RodPinHoleDia": (ROD_PIN_HOLE_XY, (0.045, 0.012)),
 }
+
+
+_DOWN = ([0.0, 0.0, -1.0], ("__frame__",))
+_UP = ([0.0, 0.0, 1.0], ("__frame__",))
+_PAD_PLANE_SOURCES = (
+    "PAD_TOP_Z",
+    ("ch_rocker_arm_spec", "HUB_LENGTH"),
+    ("ch_rocker_arm_spec", "ARM_THICKNESS"),
+)
+_FROM_BORE = ("locating_bore", (("draw_ch_rocker_arm_tl_profile_fixture", "build"),))
+
+
+def _plan_location(
+    x: float, y: float, x_places: int, y_places: int, sources: tuple[str, ...]
+) -> dict:
+    """A scheduled centre: X as ``station`` and Y as ``height``, both from the
+    locating-bore axis, at their printed places."""
+    return {
+        "station": (limits(x, x_places), sources),
+        "station_nominal": (x, sources),
+        "height": (limits(y, y_places), sources),
+        "height_nominal": (y, sources),
+        "height_from": _FROM_BORE,
+    }
+
+
+def _pocket(
+    row: tuple[str, float, float, float, float], rows: str, faces: tuple, depth: float,
+    depth_source: str, length_places: int,
+) -> dict:
+    """One feature-schedule pocket row: its centre, size and depth."""
+    _tag, cx, cy, length, width = row
+    floor_z = part_spec.PLATE_TOP_Z - depth
+    return {
+        'kind': "pocket",
+        'faces': faces,
+        'requirements': ("station", "height", "length", "width", "depth"),
+        'fields': {
+            "at": ([cx, cy, part_spec.PLATE_TOP_Z], (rows, "PLATE_TOP_Z")),
+            "axis": _DOWN,
+            **_plan_location(cx, cy, part_spec.SCHEDULE_PLACES, part_spec.SCHEDULE_PLACES, (rows,)),
+            "length": (limits(length, length_places), (rows,)),
+            "length_nominal": (length, (rows,)),
+            "width": (limits(width, part_spec.SCHEDULE_PLACES), (rows,)),
+            "width_nominal": (width, (rows,)),
+            "depth": (limits(depth, part_spec.SCHEDULE_PLACES), (depth_source,)),
+            "depth_ref": (depth, (depth_source,)),
+            "plane": ({"frame": "model", "axis": "z", "value": floor_z}, ("PLATE_TOP_Z", depth_source)),
+        },
+        'precision': {
+            "station": part_spec.SCHEDULE_PLACES,
+            "height": part_spec.SCHEDULE_PLACES,
+            "length": length_places,
+            "width": part_spec.SCHEDULE_PLACES,
+            "depth": part_spec.SCHEDULE_PLACES,
+        },
+    }
+
+
+def _bonded_part(
+    row: tuple[str, float, float, float, float], rows: str, top_z: float, height: float,
+    height_source: str,
+) -> dict:
+    """One bonded part's sizes before bonding (part schedule), claiming its
+    outward end face, which no other part or pocket shares."""
+    _tag, cx, cy, length, width = row
+    side = 1.0 if cx > 0.0 else -1.0
+    return {
+        'kind': "boss",
+        'faces': (PlanarFace((side, 0.0, 0.0), abs(cx) + length / 2.0, contains_z_mm=top_z - 1.0),),
+        'requirements': ("length", "width", "height"),
+        'fields': {
+            "at": ([cx, cy, top_z], (rows, height_source)),
+            "axis": _UP,
+            "length": (limits(length, part_spec.PART_LENGTH_PLACES), (rows, "PART_LENGTH_PLACES")),
+            "length_nominal": (length, (rows,)),
+            "width": (limits(width, part_spec.SCHEDULE_PLACES), (rows,)),
+            "width_nominal": (width, (rows,)),
+            "height": (limits(height, part_spec.SCHEDULE_PLACES), (height_source,)),
+            "height_nominal": (height, (height_source,)),
+        },
+        'precision': {"length": part_spec.PART_LENGTH_PLACES, "width": part_spec.SCHEDULE_PLACES, "height": part_spec.SCHEDULE_PLACES},
+    }
+
+
+def _plate_face(normal: tuple[float, float, float], offset: float, key: str, value: float,
+                source: str) -> dict:
+    """A plate end or side printed from the locating-bore axis."""
+    return {
+        'kind': "face",
+        'faces': (PlanarFace(normal, offset),),
+        'requirements': (key,),
+        'fields': {
+            "normal": (list(normal), ("__frame__",)),
+            "plane": (
+                {"frame": "model", "axis": "x" if normal[0] else "y", "value": value}, (source,)
+            ),
+            key: (limits(value, 1), (source,)),
+            f"{key}_nominal": (value, (source,)),
+            **({"height_from": _FROM_BORE} if key == "height" else {}),
+        },
+        'precision': {key: 1},
+    }
+
+
+def _hold_down(index: int, x: float, y: float) -> dict[str, dict]:
+    """Hold-down row H<index>: the clearance hole at its scheduled centre and
+    the counterbore the 4X callout prints over it."""
+    name = f"hold_down_h{index}"
+    spec = ("HOLD_DOWN_HOLE_SPEC",)
+    return {
+        name: {
+            'kind': "hole",
+            'faces': (CylinderFace(part_spec.HOLD_DOWN_CLEARANCE_DIA, contains_x_mm=x, contains_y_mm=y),),
+            'requirements': ("station", "height", "dia", "thru"),
+            'fields': {
+                "at": ([x, y, part_spec.PLATE_TOP_Z], ("HOLD_DOWN_POINTS", "PLATE_TOP_Z")),
+                "axis": _DOWN,
+                **_plan_location(
+                    x, y, part_spec.HOLD_DOWN_X_PLACES, part_spec.HOLD_DOWN_Y_PLACES,
+                    ("HOLD_DOWN_POINTS", "HOLD_DOWN_X_PLACES", "HOLD_DOWN_Y_PLACES"),
+                ),
+                "dia": (
+                    limits(part_spec.HOLD_DOWN_CLEARANCE_DIA, 2, part_spec.DRILLED_BAND),
+                    ("HOLD_DOWN_CLEARANCE_DIA", "DRILLED_BAND", *spec),
+                ),
+                "dia_nominal": (part_spec.HOLD_DOWN_CLEARANCE_DIA, ("HOLD_DOWN_CLEARANCE_DIA",)),
+                "thru": (True, spec),
+                "hole_spec": ("1/2 SHCS COUNTERBORE", ("HOLD_DOWN_HOLE_SPEC", ("draw_ch_rocker_arm_tl_profile_fixture", "build"))),
+            },
+            'precision': {"station": part_spec.HOLD_DOWN_X_PLACES, "height": part_spec.HOLD_DOWN_Y_PLACES, "dia": 2},
+        },
+        f"{name}_counterbore": {
+            'kind': "counterbore",
+            'faces': (CylinderFace(part_spec.HOLD_DOWN_CBORE_DIA, contains_x_mm=x, contains_y_mm=y),),
+            'requirements': ("dia", "depth"),
+            'fields': {
+                "parent": (name, ("HOLD_DOWN_HOLE_SPEC", ("draw_ch_rocker_arm_tl_profile_fixture", "build"))),
+                "dia": (limits(part_spec.HOLD_DOWN_CBORE_DIA, 2), ("HOLD_DOWN_CBORE_DIA", *spec)),
+                "dia_nominal": (part_spec.HOLD_DOWN_CBORE_DIA, ("HOLD_DOWN_CBORE_DIA",)),
+                "depth": (limits(part_spec.HOLD_DOWN_CBORE_DEPTH, 2), ("HOLD_DOWN_CBORE_DEPTH", *spec)),
+                "depth_ref": (part_spec.HOLD_DOWN_CBORE_DEPTH, ("HOLD_DOWN_CBORE_DEPTH",)),
+            },
+            'precision': {"dia": 2, "depth": 2},
+        },
+    }
+
+
+def _drill_dia(drill_dia: float, spec_name: str) -> dict:
+    """The tap drill Ø its callout prints (two places), banded by the title
+    block's DRILLED HOLES row about that printed value."""
+    printed = round(drill_dia, 2)
+    return {
+        "dia": (limits(printed, 2, part_spec.DRILLED_BAND), (spec_name, "DRILLED_BAND")),
+        "dia_nominal": (printed, (spec_name,)),
+    }
+
+
+def _tap(spec: part_spec.HoleSpec, spec_name: str, drill_dia: float, at: list[float], places: tuple[int, int] | None,
+         sources: tuple[str, ...]) -> dict:
+    """A blind tapped hole on its drilled cylinder (matched at the true drill
+    size, kept as ``tap_drill_mm``): the printed drill Ø (the bore that
+    cylinder is), its thread and full-thread depth, all at two places as the
+    callout prints."""
+    thread_depth = spec.overrides_mm["ThreadDepth"]
+    location = {} if places is None else _plan_location(at[0], at[1], *places, sources)
+    return {
+        'kind': "hole",
+        'faces': (CylinderFace(drill_dia, contains_x_mm=at[0], contains_y_mm=at[1]),),
+        'requirements': (*(("station", "height") if location else ()), "dia", "thread", "depth"),
+        'fields': {
+            "at": (at, (*sources, "PLATE_TOP_Z")),
+            "axis": _DOWN,
+            **location,
+            **_drill_dia(drill_dia, spec_name),
+            "thread": (f"{spec.size} UNC-{spec.thread_class}", (spec_name,)),
+            "depth": (limits(thread_depth, 2), (spec_name,)),
+            "depth_ref": (thread_depth, (spec_name,)),
+            "tap_drill_mm": (drill_dia, (spec_name,)),
+            "thru": (False, (spec_name,)),
+        },
+        'precision': {
+            **({"station": places[0], "height": places[1]} if location else {}),
+            "dia": 2,
+            "depth": 2,
+        },
+    }
+
+
+def _tap_drill(
+    spec: part_spec.HoleSpec, spec_name: str, stations: tuple[float, ...], *, parent: str | None
+) -> dict:
+    """The drill depth a tap callout prints (two places), on its drill-point
+    cones; the drill Ø belongs to the tap's own cylinder."""
+    return {
+        'kind': "hole",
+        'faces': tuple(ConeFace(part_spec._DRILL_POINT_HALF_ANGLE_DEG, contains_x_mm=x) for x in stations),
+        'requirements': ("depth",),
+        'fields': {
+            **({} if parent is None else {"parent": (parent, (spec_name, ("draw_ch_rocker_arm_tl_profile_fixture", "build")))}),
+            "depth": (limits(spec.depth_mm, 2), (spec_name,)),
+            "depth_ref": (spec.depth_mm, (spec_name,)),
+            "thru": (False, (spec_name,)),
+        },
+        'precision': {"depth": 2},
+    }
+
+
+part_metadata(precision_sources=(
+    "DRAWING_PRECISION_BY_NAME", "SCHEDULE_PLACES", "PART_LENGTH_PLACES",
+    "PAD_POCKET_LENGTH_PLACES", "HOLD_DOWN_X_PLACES", "HOLD_DOWN_Y_PLACES",
+    "CLAMP_STUD_PLACES", "STAND_BORE_PLACES",
+    ("_drawing_hole_callout", "add_native_hole_callout"),
+))
+
+requirement("rod_pin_hole",
+    kind="hole",
+    faces=(
+        CylinderFace(
+            part_spec.ROD_PIN_HOLE_DIA,
+            contains_x_mm=part_spec.ROD_PIN_HOLE_XY[0],
+            contains_y_mm=part_spec.ROD_PIN_HOLE_XY[1],
+        ),
+    ),
+    requirements=("dia", "station", "height", "depth"),
+    fields={
+        "at": (
+            [part_spec.ROD_PIN_HOLE_XY[0], part_spec.ROD_PIN_HOLE_XY[1], part_spec.PLATE_TOP_Z],
+            (
+                "ROD_PIN_HOLE_XY",
+                "PLATE_TOP_Z",
+                ("ch_rocker_arm_spec", "ROD_HOLE_X"),
+                ("ch_rocker_arm_spec", "ROD_HOLE_Y"),
+                ("ch_rocker_arm_spec", "PIVOT_MID_Y"),
+            ),
+        ),
+        # X and Y of the ream from the locating-bore centre, as printed.
+        "station": (
+            limits(part_spec.ROD_PIN_HOLE_XY[0], 3, part_spec.ROD_PIN_XY_BAND),
+            ("ROD_PIN_HOLE_XY", "ROD_PIN_XY_BAND", "PARENT_BAND_SHARE"),
+        ),
+        "station_nominal": (part_spec.ROD_PIN_HOLE_XY[0], ("ROD_PIN_HOLE_XY",)),
+        "height": (
+            limits(part_spec.ROD_PIN_HOLE_XY[1], 3, part_spec.ROD_PIN_XY_BAND),
+            ("ROD_PIN_HOLE_XY", "ROD_PIN_XY_BAND", "PARENT_BAND_SHARE"),
+        ),
+        "height_nominal": (part_spec.ROD_PIN_HOLE_XY[1], ("ROD_PIN_HOLE_XY",)),
+        "height_from": ("locating_bore", (("draw_ch_rocker_arm_tl_profile_fixture", "build"),)),
+        "axis": _DOWN,
+        "dia": (
+            limits(part_spec.ROD_PIN_HOLE_DIA, 3, part_spec.ROD_PIN_HOLE_BAND),
+            ("ROD_PIN_HOLE_DIA", "ROD_PIN_HOLE_BAND"),
+        ),
+        "dia_nominal": (part_spec.ROD_PIN_HOLE_DIA, ("ROD_PIN_HOLE_DIA",)),
+        "depth": (
+            limits(part_spec.ROD_PIN_HOLE_DEPTH, part_spec.ROD_PIN_HOLE_DEPTH_PLACES),
+            ("ROD_PIN_HOLE_DEPTH", "ROD_PIN_HOLE_DEPTH_PLACES"),
+        ),
+        "depth_ref": (part_spec.ROD_PIN_HOLE_DEPTH, ("ROD_PIN_HOLE_DEPTH",)),
+        "process": ("REAM", ("DIMENSION_CALLOUTS",)),
+    },
+    precision={"dia": 3, "depth": part_spec.ROD_PIN_HOLE_DEPTH_PLACES, "station": 3, "height": 3},
+)
+
+requirement("plate_outline",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), part_spec.PLATE_EAST_X), PlanarFace((0.0, 1.0, 0.0), part_spec.PLATE_NORTH_Y)),
+    requirements=("length", "width"),
+    fields={
+        "length": (limits(part_spec.PLATE_LENGTH, 1), ("PLATE_LENGTH",)),
+        "length_nominal": (part_spec.PLATE_LENGTH, ("PLATE_LENGTH",)),
+        "width": (limits(part_spec.PLATE_WIDTH, 1), ("PLATE_WIDTH",)),
+        "width_nominal": (part_spec.PLATE_WIDTH, ("PLATE_WIDTH",)),
+    },
+    precision={"length": 1, "width": 1},
+)
+
+requirement("plate_west_end", **_plate_face((-1.0, 0.0, 0.0), -part_spec.PLATE_WEST_X, "station", part_spec.PLATE_WEST_X, "PLATE_WEST_X"))
+
+requirement("plate_south_side", **_plate_face(
+    (0.0, -1.0, 0.0), -part_spec.PLATE_SOUTH_Y, "height", part_spec.PLATE_SOUTH_Y, "PLATE_SOUTH_Y"
+))
+
 # Section D-D, model (x, z) mm: the plate-top baseline ladder (counterbore and
 # bore depths) right of the cut, the stand drop above the stand. A cut-only
 # section has no plate face edges, so the plate's own heights go on the end
@@ -157,6 +446,50 @@ SECTION_KEEP_AT = {
         (0.0, 0.0),
     ),
 }
+
+
+requirement("stand_top",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part_spec.STAND_TOP_Z),),
+    requirements=("height", "dia"),
+    fields={
+        "normal": _UP,
+        "plane": (
+            {"frame": "model", "axis": "z", "value": part_spec.STAND_TOP_Z},
+            ("STAND_TOP_Z",),
+        ),
+        "height": (
+            limits(part_spec.STAND_DROP, 3),
+            (
+                "STAND_DROP",
+                ("ch_rocker_arm_spec", "HUB_LENGTH_BAND"),
+                ("ch_rocker_arm_spec", "ARM_THICKNESS"),
+                ("ch_rocker_arm_notes", "DEFAULT_DRAWING_PRECISION"),
+            ),
+        ),
+        "height_from": ("pad_tops", (("draw_ch_rocker_arm_tl_profile_fixture", "build"),)),
+        "height_nominal": (part_spec.STAND_DROP, ("STAND_DROP",)),
+        "dia": (limits(part_spec.STAND_OD, part_spec.SCHEDULE_PLACES), ("STAND_OD",)),
+        "dia_nominal": (part_spec.STAND_OD, ("STAND_OD",)),
+    },
+    precision={"height": 3, "dia": 3},
+)
+
+requirement("stand_pocket",
+    kind="counterbore",
+    faces=(CylinderFace(part_spec.STAND_POCKET_DIA, contains_x_mm=0.0, contains_y_mm=0.0),),
+    requirements=("dia", "depth"),
+    fields={
+        "at": ([0.0, 0.0, part_spec.PLATE_TOP_Z], ("PLATE_TOP_Z",)),
+        "axis": _DOWN,
+        "dia": (limits(part_spec.STAND_POCKET_DIA, 3), ("STAND_POCKET_DIA",)),
+        "dia_nominal": (part_spec.STAND_POCKET_DIA, ("STAND_POCKET_DIA",)),
+        "depth": (limits(part_spec.STAND_POCKET_DEPTH, 3), ("STAND_POCKET_DEPTH",)),
+        "depth_ref": (part_spec.STAND_POCKET_DEPTH, ("STAND_POCKET_DEPTH",)),
+    },
+    precision={"dia": 3, "depth": 3},
+)
+
 # Front elevation (*Bottom: model X right, Z up) projected under the plan at
 # its scale: plate thickness left of it, the pad-top drop right of it (sheet
 # offsets from the plate ends). A turned end view printed an empty rotation
@@ -175,6 +508,64 @@ ELEVATION_KEEP_Z = {
     "RestTopHeight": (REST_TOP_Z + 10.0, -0.003),
     "PlateDrop": ((PAD_TOP_Z + PLATE_TOP_Z) / 2.0, 0.012),
 }
+
+
+requirement("pad_tops",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part_spec.PAD_TOP_Z),),
+    requirements=("height",),
+    fields={
+        "normal": _UP,
+        "plane": (
+            {"frame": "model", "axis": "z", "value": part_spec.PAD_TOP_Z},
+            _PAD_PLANE_SOURCES,
+        ),
+        "height": (
+            limits(part_spec.PLATE_DROP, 3),
+            ("PLATE_DROP", "PAD_TOP_Z", "PLATE_TOP_Z"),
+        ),
+        "height_from": ("plate_top", (("draw_ch_rocker_arm_tl_profile_fixture", "build"),)),
+        "height_nominal": (part_spec.PLATE_DROP, ("PLATE_DROP",)),
+    },
+    precision={"height": 3},
+)
+
+requirement("rail_rest_tops",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part_spec.REST_TOP_Z),),
+    requirements=("height",),
+    fields={
+        "normal": _UP,
+        "plane": (
+            {"frame": "model", "axis": "z", "value": part_spec.REST_TOP_Z},
+            ("REST_TOP_Z",),
+        ),
+        "height": (
+            limits(part_spec.REST_TOP_HEIGHT, 2),
+            ("REST_TOP_HEIGHT", "REST_HEIGHT", "REST_POCKET_DEPTH"),
+        ),
+        "height_from": ("plate_top", (("draw_ch_rocker_arm_tl_profile_fixture", "build"),)),
+        "height_nominal": (part_spec.REST_TOP_HEIGHT, ("REST_TOP_HEIGHT",)),
+    },
+    precision={"height": 2},
+)
+
+requirement("plate_top",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part_spec.PLATE_TOP_Z),),
+    requirements=("thickness",),
+    fields={
+        "normal": _UP,
+        "plane": (
+            {"frame": "model", "axis": "z", "value": part_spec.PLATE_TOP_Z},
+            ("PLATE_TOP_Z",),
+        ),
+        "thickness": (limits(part_spec.PLATE_THICK, 1), ("PLATE_THICK",)),
+        "thickness_nominal": (part_spec.PLATE_THICK, ("PLATE_THICK",)),
+    },
+    precision={"thickness": 1},
+)
+
 # Detail E, model (x, y) mm about the bore axis. Each text block centres on
 # its anchor; at x 10 both blocks ran inside the R9 (R27 at 3:1) circle
 # (codex review of run 20261008T020623281Z), so they sit at x 16, above and
@@ -185,6 +576,42 @@ DETAIL_KEEP_AT = {
 }
 PIVOT_CALLOUT_AT = (16.0, -11.0)
 
+
+requirement("locating_bore",
+    kind="hole",
+    faces=(CylinderFace(part_spec.LOCATING_BORE_DIA, contains_x_mm=0.0, contains_y_mm=0.0),),
+    requirements=("dia", "depth"),
+    fields={
+        "at": ([0.0, 0.0, part_spec.PLATE_TOP_Z], ("PLATE_TOP_Z",)),
+        "axis": _DOWN,
+        "dia": (
+            limits(part_spec.LOCATING_BORE_DIA, 3, part_spec.LOCATING_BORE_BAND),
+            (
+                "LOCATING_BORE_DIA",
+                "LOCATING_BORE_BAND",
+                ("ch_rocker_arm_spec", "PIVOT_HOLE_DIA"),
+            ),
+        ),
+        "dia_nominal": (part_spec.LOCATING_BORE_DIA, ("LOCATING_BORE_DIA",)),
+        "depth": (
+            limits(part_spec.LOCATING_BORE_DEPTH, part_spec.LOCATING_BORE_DEPTH_PLACES),
+            ("LOCATING_BORE_DEPTH", "LOCATING_BORE_DEPTH_PLACES"),
+        ),
+        "depth_ref": (part_spec.LOCATING_BORE_DEPTH, ("LOCATING_BORE_DEPTH",)),
+        "process": ("REAM", ("DIMENSION_CALLOUTS",)),
+    },
+    precision={"dia": 3, "depth": part_spec.LOCATING_BORE_DEPTH_PLACES},
+)
+
+# The pivot tap's depths run from the locating-bore floor, as printed.
+requirement("pivot_tap", **_tap(
+    part_spec.PIVOT_TAP_SPEC, "PIVOT_TAP_SPEC", part_spec.PIVOT_TAP_DRILL_DIA, [0.0, 0.0, part_spec.LOCATING_BORE_FLOOR_Z],
+    None, ("LOCATING_BORE_FLOOR_Z",),
+))
+
+requirement("pivot_tap_drill", **_tap_drill(part_spec.PIVOT_TAP_SPEC, "PIVOT_TAP_SPEC", (0.0,), parent="pivot_tap"))
+
+
 # --- Sheet TAGS ---------------------------------------------------------------------
 TAG_CENTER = (0.200, 0.183)
 TAG_SCALE = (1, 1)
@@ -192,10 +619,89 @@ ROW_PITCH = 0.0048
 PART_SCHEDULE_TOP = 0.104
 PART_COLUMNS = (0.016, 0.036, 0.064, 0.117, 0.145, 0.176)
 
+
+# The hub stand's drilled bore and its overall height (part schedule),
+# the height measured down from its top.
+requirement("stand_bore",
+    kind="hole",
+    faces=(CylinderFace(part_spec.STAND_BORE, contains_x_mm=0.0, contains_y_mm=0.0),),
+    requirements=("dia", "thru"),
+    fields={
+        "at": ([0.0, 0.0, part_spec.STAND_TOP_Z], ("STAND_TOP_Z",)),
+        "axis": _DOWN,
+        "dia": (limits(part_spec.STAND_BORE, part_spec.STAND_BORE_PLACES, part_spec.DRILLED_BAND), ("STAND_BORE", "DRILLED_BAND")),
+        "dia_nominal": (part_spec.STAND_BORE, ("STAND_BORE",)),
+        "thru": (True, ("STAND_BORE",)),
+    },
+    precision={"dia": part_spec.STAND_BORE_PLACES},
+)
+
+requirement("stand_foot",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), part_spec.STAND_HEIGHT - part_spec.STAND_TOP_Z, contains_x_mm=0.0),),
+    requirements=("height",),
+    fields={
+        "normal": _DOWN,
+        "plane": (
+            {"frame": "model", "axis": "z", "value": part_spec.STAND_TOP_Z - part_spec.STAND_HEIGHT},
+            ("STAND_TOP_Z", "STAND_HEIGHT"),
+        ),
+        "height": (limits(part_spec.STAND_HEIGHT, part_spec.SCHEDULE_PLACES), ("STAND_HEIGHT",)),
+        "height_nominal": (part_spec.STAND_HEIGHT, ("STAND_HEIGHT",)),
+        "height_from": ("stand_top", ("STAND_HEIGHT",)),
+    },
+    precision={"height": part_spec.SCHEDULE_PLACES},
+)
+
+for row in part_spec.PADS:
+    requirement(f"pad_{row[0].lower()}", **_bonded_part(row, "PADS", part_spec.PAD_TOP_Z, part_spec.PAD_HEIGHT, "PAD_HEIGHT"))
+
+for row in part_spec.RESTS:
+    requirement(f"rest_{row[0].lower()}", **_bonded_part(row, "RESTS", part_spec.REST_TOP_Z, part_spec.REST_HEIGHT, "REST_HEIGHT"))
+
+
 # --- Sheet SCHEDULE -----------------------------------------------------------------
 FEATURE_SCHEDULE_TOP = 0.258
 # X and Y wide enough for the rod-pin row's banded coordinates.
 FEATURE_COLUMNS = (0.016, 0.030, 0.072, 0.108, 0.144, 0.172, 0.200)
+
+
+for row in part_spec.PAD_POCKETS:
+    requirement(f"pad_pocket_{row[0].lower()}", **_pocket(
+        row, "PAD_POCKETS",
+        (PlanarFace((0.0, 0.0, 1.0), part_spec.PLATE_TOP_Z - part_spec.PAD_POCKET_DEPTH, contains_x_mm=row[1]),),
+        part_spec.PAD_POCKET_DEPTH, "PAD_POCKET_DEPTH", part_spec.PAD_POCKET_LENGTH_PLACES,
+    ))
+
+# Each rest pocket claims its two long walls, which carry its centre Y and
+# width Y (C1/C2 span the X of pad pockets A1/A2 and B1/B2).
+for row in part_spec.REST_POCKETS:
+    requirement(f"rest_pocket_{row[0].lower()}", **_pocket(
+        row, "REST_POCKETS",
+        (
+            PlanarFace((0.0, -1.0, 0.0), -(row[2] + row[4] / 2.0), contains_x_mm=row[1]),
+            PlanarFace((0.0, 1.0, 0.0), row[2] - row[4] / 2.0, contains_x_mm=row[1]),
+        ),
+        part_spec.REST_POCKET_DEPTH, "REST_POCKET_DEPTH", part_spec.REST_POCKET_LENGTH_PLACES,
+    ))
+
+for index, (x, y) in enumerate(part_spec.HOLD_DOWN_POINTS, start=1):
+    for name, fields in _hold_down(index, x, y).items():
+        requirement(name, **fields)
+
+for index, (x, y) in enumerate(part_spec.CLAMP_STUD_POINTS, start=1):
+    requirement(f"stud_tap_s{index}", **_tap(
+        part_spec.CLAMP_STUD_SPEC, "CLAMP_STUD_SPEC", part_spec.CLAMP_STUD_DRILL_DIA, [x, y, part_spec.PLATE_TOP_Z],
+        (part_spec.CLAMP_STUD_PLACES, part_spec.CLAMP_STUD_PLACES), ("CLAMP_STUD_POINTS", "CLAMP_STUD_PLACES"),
+    ))
+
+# A cone selector takes no Y, so one feature carries the drill-point cones
+# (one per stud station X) and the printed drill depth.
+requirement("stud_tap_drills", **_tap_drill(
+    part_spec.CLAMP_STUD_SPEC, "CLAMP_STUD_SPEC", tuple(sorted({x for x, _y in part_spec.CLAMP_STUD_POINTS})),
+    parent=None,
+))
+
 ISO_CENTER = (0.320, 0.185)
 ISO_SCALE = (1, 4)
 ISO_NOTE_XY = (0.272, 0.240)

@@ -19,9 +19,8 @@ from __future__ import annotations
 
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_filing_button_spec as button
-from _feature_requirements import ExportFeature, limits
+from _printed_tolerance import printed_deviations
 from _gtol_cylinder import CylinderFace
-from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # Lapped body: slips into the smallest pivot bore the arm's reamed band
@@ -43,7 +42,7 @@ HEAD_LENGTH = 3.5  # collar: two millimetres left at the worst-case stations
 if not (
     button.BORE_DIA + button.BORE_BAND[0]
     < HEAD_DIA
-    < limits(button.OD, button.OD_PLACES)[0]
+    < round(button.OD + printed_deviations(button.OD, button.OD_PLACES)[0], 12)
 ):
     raise AssertionError("filing-stud head does not land on the button face")
 
@@ -69,12 +68,15 @@ TAIL_DIA = 8.0  # stout in the vise; clear of the thread and body sizes
 THREAD = "1/4-20 UNC-2A"
 THREAD_MODEL_DIA = 6.35
 
-_BUTTON_MIN, _BUTTON_MAX = limits(button.THICKNESS, button.THICKNESS_PLACES)
+_BUTTON_MIN, _BUTTON_MAX = [
+    round(button.THICKNESS + deviation, 12)
+    for deviation in printed_deviations(button.THICKNESS, button.THICKNESS_PLACES)
+]
 _STACK_MIN = 2.0 * _BUTTON_MIN + rocker.HUB_LENGTH
 _STACK_MAX = 2.0 * _BUTTON_MAX + rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
 _HUB_TOP_MAX = _BUTTON_MAX + rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
-_SEAT_MIN, _SEAT_MAX = limits(THREAD_END, STATION_PLACES)
-_START_MIN, _START_MAX = limits(THREAD_START, STATION_PLACES)
+_SEAT_MIN, _SEAT_MAX = [round(THREAD_END + deviation, 12) for deviation in printed_deviations(THREAD_END, STATION_PLACES)]
+_START_MIN, _START_MAX = [round(THREAD_START + deviation, 12) for deviation in printed_deviations(THREAD_START, STATION_PLACES)]
 _BODY_LEN_MIN, _BODY_LEN_MAX = _SEAT_MIN - _START_MAX, _SEAT_MAX - _START_MIN
 if _BODY_LEN_MAX >= _STACK_MIN:
     raise AssertionError("filing-stud body can stand proud of the button stack")
@@ -113,7 +115,7 @@ ENGAGEMENT_MIN = min(
 if ENGAGEMENT_MIN < 1.5 * THREAD_MODEL_DIA:
     raise AssertionError("filing-stud nut engagement is under one and a half diameters")
 # A worst-case collar of two millimetres between the seat and back face.
-if limits(HEAD_BACK, STOCK_PLACES)[0] - _SEAT_MAX < 2.0:
+if round(HEAD_BACK + printed_deviations(HEAD_BACK, STOCK_PLACES)[0], 12) - _SEAT_MAX < 2.0:
     raise AssertionError(
         "filing-stud collar is thinner than two millimetres at worst case"
     )
@@ -148,7 +150,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # The locating diameter prints as a reference; the fit callout on it
 # governs. BODY_BAND is that fit's design intent for the stack checks only;
 # features.toml carries the printed nominal and the callout text.
-# Policy rules 2 and 6: the matched fit sits on the locating diameter's
+# drawing-guidelines.md rule 4 (tighten only for function, and name the mate) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit sits on the locating diameter's
 # callout, naming each mate by Number with its acceptance (above, below).
 BODY_FIT_CALLOUT = (
     "SLIDES IN MHA-CH-006 ROCKER ARM PIVOT BORE AND",
@@ -173,103 +175,3 @@ DRAWING_NOTES = (
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
-_AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
-# Stations are the printed tip-baseline bands, read from the faced tip.
-_FROM_TIP = ("tip_face", ("THREAD_END",))
-EXPORT_FEATURES: dict[str, ExportFeature] = {
-    "tip_face": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((1.0, 0.0, 0.0), THREAD_END),),
-        requirements=(),
-        fields={
-            "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
-            "plane": (
-                {"frame": "model", "axis": "x", "value": THREAD_END},
-                ("THREAD_END",),
-            ),
-        },
-    ),
-    "locating_body": ExportFeature(
-        kind="boss",
-        faces=(CylinderFace(BODY_DIA),),
-        requirements=("note", "finish_ra"),
-        fields={
-            "at": ([0.0, 0.0, 0.0], ("__frame__",)),
-            "axis": _AXIS,
-            "dia_nominal": (BODY_DIA, ("BODY_DIA",)),
-            "note": (
-                BODY_FIT_NOTE,
-                (
-                    "BODY_FIT_NOTE",
-                    ("ch_rocker_arm_spec", "PIVOT_HOLE_DIA"),
-                    ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"),
-                ),
-            ),
-            "finish_ra": (MACHINED_UM, ("SURFACE_FINISHES",)),
-        },
-        precision={"finish_ra": 1},
-    ),
-    "button_seat": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((1.0, 0.0, 0.0), 0.0),),
-        requirements=("dia", "station"),
-        fields={
-            "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "x", "value": 0.0}, ("__frame__",)),
-            "dia": (limits(HEAD_DIA, 1), ("HEAD_DIA",)),
-            "dia_nominal": (HEAD_DIA, ("HEAD_DIA",)),
-            "station": (limits(THREAD_END, STATION_PLACES), ("THREAD_END",)),
-            "station_nominal": (THREAD_END, ("THREAD_END",)),
-            "height_from": _FROM_TIP,
-        },
-        precision={"dia": 1, "station": STATION_PLACES},
-    ),
-    "head_back_face": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((-1.0, 0.0, 0.0), HEAD_LENGTH),),
-        requirements=("station",),
-        fields={
-            "normal": ([-1.0, 0.0, 0.0], ("__frame__",)),
-            "plane": (
-                {"frame": "model", "axis": "x", "value": -HEAD_LENGTH},
-                ("HEAD_LENGTH",),
-            ),
-            "station": (limits(HEAD_BACK, STOCK_PLACES), ("HEAD_BACK",)),
-            "station_nominal": (HEAD_BACK, ("HEAD_BACK",)),
-            "height_from": _FROM_TIP,
-        },
-        precision={"station": STOCK_PLACES},
-    ),
-    # The thread runs from the faced tip to the printed thread start, where
-    # the locating journal begins.
-    "thread": ExportFeature(
-        kind="boss",
-        faces=(CylinderFace(THREAD_MODEL_DIA),),
-        requirements=("thread", "length"),
-        fields={
-            "axis": _AXIS,
-            "thread": (THREAD, ("THREAD",)),
-            "length": (
-                limits(THREAD_START, STATION_PLACES),
-                ("THREAD_START", ("ch_rocker_arm_spec", "HUB_LENGTH")),
-            ),
-            "length_nominal": (THREAD_START, ("THREAD_START",)),
-            "height_from": _FROM_TIP,
-        },
-        precision={"length": STATION_PLACES},
-    ),
-    "vise_tail": ExportFeature(
-        kind="boss",
-        faces=(CylinderFace(TAIL_DIA),),
-        requirements=("dia", "station"),
-        fields={
-            "axis": _AXIS,
-            "dia": (limits(TAIL_DIA, 1), ("TAIL_DIA",)),
-            "dia_nominal": (TAIL_DIA, ("TAIL_DIA",)),
-            "station": (limits(OVERALL_LENGTH, STOCK_PLACES), ("OVERALL_LENGTH",)),
-            "station_nominal": (OVERALL_LENGTH, ("OVERALL_LENGTH",)),
-            "height_from": _FROM_TIP,
-        },
-        precision={"dia": 1, "station": STOCK_PLACES},
-    ),
-}

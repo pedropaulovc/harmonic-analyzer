@@ -237,16 +237,23 @@ def test_refresh_dof_gate_rejects_stray_free_component(tmp_path, monkeypatch) ->
         assert_manifest_dof_state(adapter, "ch-channel")
 
 
-def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof(
-    tmp_path, monkeypatch
+@pytest.mark.parametrize(
+    ("flag", "failure"),
+    [(1, "nanometre contact failed"), (0, "flag=0"), (2, "unsupported display flag")],
+)
+def test_unchanged_channel_refresh_refuses_invalid_display_or_contact_and_never_publishes(
+    tmp_path, monkeypatch, saved_native_bytes, flag, failure
 ) -> None:
     import _assembly
 
     assembly_path = tmp_path / "ch-channel.SLDASM"
-    assembly_path.write_bytes(b"byte-stable assembly")
+    original = saved_native_bytes(flag)
+    assembly_path.write_bytes(original)
     proof = tmp_path / ".ch-channel.massprops.sha"
     proof.write_text("same-digest\n", encoding="utf-8")
     saves = []
+    contacts = []
+    renders = []
 
     class Adapter(_Adapter):
         async def open_model(self, _path):
@@ -271,6 +278,7 @@ def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof
         return "same-digest"
 
     async def images(_adapter, _name, _views):
+        renders.append(True)
         return {}
 
     monkeypatch.setattr(_assembly, "assembly_geometry_digest", digest)
@@ -305,9 +313,10 @@ def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof
     )
 
     def fail_native_contact(_adapter, _name):
+        contacts.append(True)
         raise RuntimeError("nanometre contact failed")
 
-    with pytest.raises(RuntimeError, match="nanometre contact failed"):
+    with pytest.raises(RuntimeError, match=failure):
         asyncio.run(
             _assembly.refresh_assembly(
                 adapter,
@@ -317,9 +326,14 @@ def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof
             )
         )
 
-    assert saves == [False]
-    assert assembly_path.read_bytes() == b"byte-stable assembly"
-    assert not proof.exists()
+    assert saves == ([False] if flag == 1 else [])
+    assert contacts == ([True] if flag == 1 else [])
+    assert renders == []
+    assert assembly_path.read_bytes() == original
+    if flag == 1:
+        assert not proof.exists()
+    else:  # Invalid preflight refuses before touching the old proof.
+        assert proof.read_text(encoding="utf-8") == "same-digest\n"
 
 
 @pytest.mark.parametrize(
@@ -338,59 +352,134 @@ def test_spring_assembly_rejects_missing_native_checker(operation, assembly_name
 
 @pytest.mark.parametrize("persisted_failure", ["ch-channel", "sm-summing", None])
 def test_auto_repair_saves_every_document_before_persisted_contact_gate(
-    persisted_failure, monkeypatch, tmp_path
+    persisted_failure, monkeypatch, tmp_path, saved_native_bytes
 ) -> None:
-    parent = SimpleNamespace(
-        name="ha-harmonic-analyzer",
-        persisted=False,
-        ForceRebuild3=lambda _top_only: True,
-    )
+    import os
 
-    def repaired_model(name):
-        return SimpleNamespace(
-            name=name,
-            persisted=False,
-            ForceRebuild3=lambda _top_only: True,
-        )
+    import _assembly
 
-    channel = repaired_model("ch-channel")
-    summing = repaired_model("sm-summing")
+    from test_simplified_helpers import FakeOpenAssembly
+
     events = []
     rendered = {}
-    proof_states_at_reconcile = []
+    proof_states_on_saved_open = []
+    ordinary_saved_states = {}
+    repaired_names = ("ch-channel", "sm-summing")
+    proofs = {name: tmp_path / f".{name}.massprops.sha" for name in repaired_names}
+    files = {}
+    for name in (*repaired_names, "ha-harmonic-analyzer"):
+        path = tmp_path / f"{name}.SLDASM"
+        path.write_bytes(saved_native_bytes())
+        files[name] = SimpleNamespace(
+            path=path,
+            native=saved_native_bytes,
+            stale={"Default": False, "Default Simplified": False},
+            display_marks={"Default": False, "Default Simplified": False},
+            display_mark_readback=True,
+            active="Default",
+            events=[],
+            save_result=(True, 0, 0),
+            stuck=set(),
+            saved_flag=None,
+            repaired=name not in repaired_names,
+        )
+    for proof in proofs.values():
+        proof.write_text("stale-proof\n", encoding="utf-8")
+
+    class Model(FakeOpenAssembly):
+        def __init__(self, file):
+            super().__init__(file)
+            self.name = file.path.stem
+            self.persisted = True
+            self.repaired = file.repaired
+            self.closed = False
+
+        def GetCustomInfoValue(self, _configuration, property_name):
+            return {
+                "Revision": _assembly._config.release_revision(),
+                "Number": _assembly.assembly_contract(self.name).number,
+            }[property_name]
+
+        def SummaryInfo(self, _field):
+            return self.name
+
+        def GetSaveFlag(self):
+            return not self.persisted
+
+        def SetSaveFlag(self):
+            self.persisted = False
+
+        def ForceRebuild3(self, _top_only):
+            if self.closed:
+                raise RuntimeError(f"{self.name}: document was discarded")
+            for configuration in self.configurations.values():
+                configuration.NeedsRebuild = False
+            return True
+
+        def Save3(self, options, errors, warnings):
+            if self.closed:
+                raise RuntimeError(f"{self.name}: unsaved repair document was discarded")
+            if options == 9:
+                # A deep-rebuilt live repair has clean geometry, but its saved
+                # child rebuild stamps stay stale until a fresh native solve.
+                before = self.file.path.stat().st_mtime_ns
+                self.file.repaired = self.repaired
+                self.file.stale = dict.fromkeys(self.file.stale, True)
+                self.file.display_marks = {
+                    name: configuration.LargeDesignReviewMark
+                    for name, configuration in self.configurations.items()
+                }
+                self.file.path.write_bytes(
+                    self.file.native(int(all(self.file.display_marks.values())))
+                )
+                os.utime(self.file.path, ns=(before + 2_000_000_000,) * 2)
+                ordinary_saved_states[self.name] = dict(self.file.stale)
+                self.persisted = True
+                events.append(("save", self.name))
+                return True, 0, 0
+            # The existing stateful double persists each configuration's solve
+            # only when active or rebuild-save marked, and serializes the real
+            # display-data requests made by the production save helper.
+            return super().Save3(options, errors, warnings)
 
     class Adapter(_Adapter):
         def __init__(self):
             super().__init__()
-            self.currentModel = parent
-            self.swApp = SimpleNamespace(
-                CloseAllDocuments=lambda _save: events.append(("close", None))
-            )
+            self.open_documents = []
+            self.swApp = SimpleNamespace(CloseAllDocuments=self.close_all_documents)
+
+        def close_all_documents(self, _save):
+            events.append(("close", None))
+            for model in self.open_documents:
+                model.closed = True
+                model.repaired = model.file.repaired
+            self.open_documents.clear()
+            return True
 
         async def open_model(self, path):
+            name = Path(path).stem
             events.append(("open", path))
-            self.currentModel = SimpleNamespace(
-                name=Path(path).stem,
-                persisted=True,
-                ForceRebuild3=lambda _top_only: True,
-            )
+            if name in proofs:
+                proof_states_on_saved_open.append(
+                    tuple(proof.exists() for proof in proofs.values())
+                )
+            # Opening copies persisted state; it cannot solve or save anything.
+            self.currentModel = Model(files[name])
+            self.open_documents.append(self.currentModel)
             return SimpleNamespace(is_success=True, data=None)
 
         async def list_configurations(self):
-            return SimpleNamespace(is_success=True, data=["Default"])
+            return SimpleNamespace(is_success=True, data=["Default", "Default Simplified"])
 
     adapter = Adapter()
     monkeypatch.setattr(verify, "OUT_SLDASM", tmp_path)
-    (tmp_path / "ha-harmonic-analyzer.SLDASM").write_bytes(b"parent")
-    proofs = {
-        name: tmp_path / f".{name}.massprops.sha" for name in ("ch-channel", "sm-summing")
-    }
-    for proof in proofs.values():
-        proof.write_text("stale-proof\n", encoding="utf-8")
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
 
     monkeypatch.setattr(verify, "_assert_fresh", lambda *_args: True)
-    monkeypatch.setattr(verify, "assert_saved_rebuild_clean", lambda *_args: None)
-    monkeypatch.setattr(verify, "active_configuration_name", lambda _adapter: "Default")
+    monkeypatch.setattr(verify, "save_assembly_in_place", _assembly.save_assembly_in_place)
+    monkeypatch.setattr(
+        verify, "reconcile_saved_rebuild_state", _assembly.reconcile_saved_rebuild_state
+    )
     monkeypatch.setattr(verify, "_expected_free_dof", lambda _name: 0)
     monkeypatch.setattr(
         verify, "assert_components_fully_defined", lambda *_args, **_kwargs: None
@@ -402,49 +491,54 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
     monkeypatch.setattr(verify, "check_no_interference", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(verify, "assert_channel_independence", lambda *_args: None)
     monkeypatch.setattr(verify, "_dangling_faults", lambda _adapter: ["top:dangle"])
-    monkeypatch.setattr(
-        verify,
-        "_repair_cache_dangles",
-        lambda *_args: {
-            "rebuilt": True,
-            "documents": (("ch-channel", channel), ("sm-summing", summing)),
-        },
-    )
+
+    def repair(_adapter, _name):
+        documents = []
+        for name in repaired_names:
+            model = Model(files[name])
+            model.repaired = True
+            model.persisted = False
+            _adapter.open_documents.append(model)
+            documents.append((name, model))
+        return {"rebuilt": True, "documents": tuple(documents)}
+
+    monkeypatch.setattr(verify, "_repair_cache_dangles", repair)
     monkeypatch.setattr(verify, "_massprops_sidecar", lambda name: proofs[name])
-
-    def save(_adapter, name, geometry_changed, *, model):
-        events.append(("save", name))
-        return True
-
-    monkeypatch.setattr(verify, "save_assembly_in_place", save)
-
-    async def reconcile(_adapter, name, path):
-        proof_states_at_reconcile.append(
-            tuple(proof.exists() for proof in proofs.values())
-        )
-        events.append(("reconcile", name))
-        _adapter.currentModel = SimpleNamespace(name=name, persisted=True)
-
-    monkeypatch.setattr(verify, "reconcile_saved_rebuild_state", reconcile)
 
     def contact(_adapter, name):
         phase = "persisted" if _adapter.currentModel.persisted else "pre-save"
         events.append((f"contact-{phase}", name))
+        model = _adapter.currentModel
+        if model.closed or model.name != name or not model.repaired:
+            raise RuntimeError(f"{name}: repaired geometry unavailable")
+        if phase == "persisted" and (
+            any(files[name].stale.values()) or model.NeedsRebuild2 != 0
+        ):
+            raise RuntimeError(f"{name}: persisted rebuild state is dirty")
         if phase == "persisted" and name == persisted_failure:
             raise RuntimeError(f"{name} persisted contact failed")
 
     monkeypatch.setattr(verify, "assert_assembly_spring_contacts", contact)
 
     async def render(_adapter, name, _views):
+        if any(
+            not files[sibling].repaired or any(files[sibling].stale.values())
+            for sibling in repaired_names
+        ):
+            raise RuntimeError("render refuses unsolved persisted repairs")
+        if (
+            _adapter.currentModel.closed
+            or not _adapter.currentModel.persisted
+            or _adapter.currentModel.NeedsRebuild2 != 0
+        ):
+            raise RuntimeError(f"{name}: render requires a clean saved document")
         events.append(("render", name))
         rendered[name] = _adapter.currentModel.name
         return {}
 
     monkeypatch.setattr(verify, "_export_assembly_images", render)
     monkeypatch.setattr(
-        verify,
-        "discard_open_documents",
-        lambda _adapter: events.append(("discard", None)),
+        verify, "discard_open_documents", lambda _adapter: _adapter.close_all_documents(True)
     )
 
     report = verify.Report()
@@ -457,17 +551,17 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
     pre_save_indices = [
         events.index(("contact-pre-save", name)) for name in ("ch-channel", "sm-summing")
     ]
-    save_indices = [events.index(("save", name)) for name in ("ch-channel", "sm-summing")]
-    first_reconcile = next(
-        index for index, event in enumerate(events) if event[0] == "reconcile"
-    )
+    save_indices = [events.index(("save", name)) for name in repaired_names]
     assert max(pre_save_indices) < min(save_indices)
-    assert max(save_indices) < first_reconcile
-    assert all(not any(states) for states in proof_states_at_reconcile)
-    assert [event for event in events if event[0] == "reconcile"] == [
-        ("reconcile", "ch-channel"),
-        ("reconcile", "sm-summing"),
-    ]
+    assert ordinary_saved_states == {
+        name: {"Default": True, "Default Simplified": True} for name in repaired_names
+    }
+    for name in repaired_names:
+        assert files[name].repaired
+        assert not any(files[name].stale.values())
+        assert all(files[name].display_marks.values())
+    assert proof_states_on_saved_open
+    assert all(not any(states) for states in proof_states_on_saved_open)
     assert ("contact-persisted", "ch-channel") in events
     assert ("contact-persisted", "sm-summing") in events
     assert all(not proof.exists() for proof in proofs.values())

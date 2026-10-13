@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the knife-mount bearing block.
 
-A machined, heat-treated steel block (24 wide x ~29.6 tall x 14 deep) with a
+A machined, heat-treated steel block (25 wide x ~29.6 tall x 14 deep) with a
 single Ø12 bore.  The bore is the knife-edge bearing: the summing-lever
 trunnion's top vertex rides its upper inner wall in line contact (ch18 p.42:
 unpainted hardened steel, close bore -- 2026-09-02 user re-read).  Every face
@@ -14,7 +14,7 @@ A-A, cut from the top view through the tap and dowel axes (drawing-guidelines.md
 floor is hidden in the front view, so it is dimensioned where the cut shows
 it).  The pattern is located on the block's +X side and front faces at
 general tolerance in the top view; the tap axis, run on through the bore's
-centre, stands BASIC 6.350 from the -X dowel axis in section A-A.  The reamed
+centre, stands BASIC 7.100 from the -X dowel axis in section A-A.  The reamed
 bore carries a position frame to the top seat (datum A) and the dowel pattern
 (B) with a perpendicularity frame to B stacked under it, its centre a BASIC
 height under A; the #6-32 tap a position frame to the same A|B, its full
@@ -182,7 +182,7 @@ SECTION_KEEP = {
     ),
 }
 # The tap and bore frames both reference B, the dowel pair, so the tap axis
-# stands BASIC 6.350 from the -X dowel axis (blind machinist review,
+# stands BASIC 7.100 from the -X dowel axis (blind machinist review,
 # 2026-10-10: the implied centre left the tap and bore with no explicit
 # horizontal location).  It is dimensioned in section A-A, the one view that
 # cuts the tap, the bore and the dowel hole together, between two owned
@@ -193,8 +193,8 @@ SECTION_KEEP = {
 SECTION_AXIS_OVERRUN_MM = 2.0
 SECTION_AXIS_TAIL_MM = 1.0
 # The dimension line stands 8 mm over the cut top seat, in the open band
-# under the isometric's caption.  Its boxed value (~14 mm) is wider than the
-# 12.7 mm between the axes, so it parks on a leader left of the -X axis
+# under the isometric's caption.  Its boxed value (~14 mm) all but fills the
+# 14.2 mm between the axes, so it parks on a leader left of the -X axis
 # (draw_fr_top_frame's F-F station precedent: text past the arrows
 # otherwise rides the dimension line).
 TAP_STATION_TEXT_XY = (_section_x(-PIN_HOLE_X / 2.0), _section_y(BLK_TOP) + 0.008)
@@ -214,16 +214,17 @@ PIN_CALLOUT_HALF_WIDTH = 0.04225
 PIN_CALLOUT_SHOULDER_OVERHANG = 0.0016
 PIN_CALLOUT_SHOULDER_DROP = 0.01286
 PIN_CALLOUT_SHOULDER_START = (_sheet_x(BLK_HALF_X) + 0.006, TOP_CENTER[1] - 0.010)
-# The pair's BASIC 12.700 span runs above the top view, between the hole axes,
-# its box 3 mm left of centre so the side-face 5.65's left arrow (a row up)
+# The pair's BASIC 14.200 span runs above the top view, between the hole axes,
+# its box 3 mm left of centre so the side-face 5.40's left arrow (a row up)
 # stands clear of it.
 PIN_SPAN_TEXT_XY = (TOP_CENTER[0] - 0.003, TOP_CENTER[1] + TOP_HALF_Z + 0.0075)
 # The pattern's face locations (blind machinist review, 2026-10-09), both in
 # the top view: the +X hole's axis from the +X side face, a row above the
 # BASIC span (under the view, the 20261010T001553082Z render ran the dowel
 # frame's leader across its side-face extension line; on the span's own row,
-# 20261010T002544960Z, the two dimensions' outside arrows met under the 5.65
-# and its right arrow ran into the cutting line's "A", top 256.9 mm).  Its
+# 20261010T002544960Z, the two dimensions' outside arrows met under the side
+# face's 5.65 (the 24-wide block's) and its right arrow ran into the cutting
+# line's "A", top 256.9 mm).  Its
 # arrows clear that letter by ~2.8 mm and its text the border by ~2.8 mm;
 # the span's arrows stand under the letters' tops, between them.
 # The -X hole's axis from the front face (the view's lower edge), its line
@@ -997,7 +998,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The bore: Ø0.20 located to A|B; under it, ⊥Ø0.05 to B holds its axis
     # square to the dowel pattern, so the trunnion axis stands square to the
     # knife edge (sm_knife_mount_spec: one Ø zone bounds yaw and tilt).  Its
-    # centre is BASIC under A; across, BASIC 6.350 from a dowel axis.
+    # centre is BASIC under A; across, BASIC 7.100 from a dowel axis.
     add_feature_control_frame(
         adapter,
         front,

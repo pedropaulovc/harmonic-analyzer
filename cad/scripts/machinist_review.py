@@ -10,7 +10,7 @@ The reviewer is Claude Opus 5.5 by default (``--reviewer claude``), whoever
 authored the drawing: the machinist review is exempt from the cross-family rule
 that governs code review. An 80-case benchmark scored Opus with the zoom tool
 above Fable and Astra at about a third of Fable's cost. ``--reviewer codex``
-and ``--model`` remain for benchmarking.
+and ``--model`` select another reviewer when wanted (e.g. Opus over quota).
 PDF pages and PNG inputs are supplied in sheet order through ``view_sheet``;
 ``crop`` confirms fine details, with 8× magnification and 40 calls per attempt.
 The schema-validated verdict and provenance are written under
@@ -53,7 +53,7 @@ Usage (SolidWorks-free; PDFs in ``cad/out/pdf`` or ``--pdf-dir``)::
     uv run cad/scripts/machinist_review.py crank_arm pivot_shaft
     uv run cad/scripts/machinist_review.py --all --jobs 4
     uv run cad/scripts/machinist_review.py --png sheet-1.png --png sheet-2.png --kind assembly
-    uv run cad/scripts/machinist_review.py ch_pivot_shaft --pdf-dir release/pdf --reviewer codex
+    uv run cad/scripts/machinist_review.py ch_pivot_shaft --pdf-dir release/pdf
     uv run cad/scripts/machinist_review.py --index      # rebuild index.md only
 
 Exit status is 0 only when every reviewed package passes (``SHIP`` with no

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import subprocess
 import sys
 import tomllib
@@ -53,20 +54,20 @@ def _add_full_face(out: Path, stem: str, label: str) -> Path:
 
 
 def bound_output(tmp_path: Path, *, pivot_bore_faces: int = 2) -> Path:
-    """Scoped and full exports with distinct raw bytes and the same face labels.
+    """Authoritative scoped bundles and their byte-identical neutral copies.
 
     Manifests come from the real generator reading the scoped STEP it binds.
     """
     out = tmp_path / "cad" / "out"
     for stem in export_features.SUPPORTED_PARTS:
         labels = _labels(stem, pivot_bore_faces=pivot_bore_faces)
-        name = f"{stem.replace('_', '-')}.STEP"
-        step = out / "features" / stem / name
+        _manifest, step = export_features.bundle_paths(stem, out)
+        name = step.name
         step.parent.mkdir(parents=True)
         step.write_bytes(_step(name, labels, stamp="2026-10-01T22:03:24", first=10, stride=1))
         full = out / "step" / name
         full.parent.mkdir(parents=True, exist_ok=True)
-        full.write_bytes(_step(name, labels[::-1], stamp="2026-10-03T05:26:08", first=400, stride=7))
+        full.write_bytes(step.read_bytes())
         export_features.write_manifest(stem, step, revision="v38")
     return out
 
@@ -86,11 +87,17 @@ def _tree(root: Path) -> dict[str, bytes]:
     }
 
 
-def test_independent_exports_bind_and_stage_exact_scoped_bytes(tmp_path: Path) -> None:
+def test_copied_exports_bind_and_stage_exact_scoped_bytes(tmp_path: Path, monkeypatch) -> None:
     out = bound_output(tmp_path)
+
+    def refuse_declarations(*_args):
+        pytest.fail("bundle consumers must not reload drawing declarations")
+
+    monkeypatch.setattr(export_features, "feature_selectors", refuse_declarations)
+    monkeypatch.setattr(export_features, "requirement_manifest", refuse_declarations)
     for stem in export_features.SUPPORTED_PARTS:
         scoped, full = _digests(out, stem)
-        assert scoped != full
+        assert scoped == full
     stage = tmp_path / "stage"
 
     checked = features_bound.check_bound_features(out)
@@ -109,9 +116,23 @@ def test_independent_exports_bind_and_stage_exact_scoped_bytes(tmp_path: Path) -
         }
 
 
+@pytest.mark.parametrize("member", [0, 1], ids=["manifest", "step"])
+def test_unproduced_feature_leaf_never_stages_a_partial_package(tmp_path: Path, member: int) -> None:
+    out = bound_output(tmp_path)
+    stem = export_features.SUPPORTED_PARTS[-1]
+    missing = export_features.bundle_paths(stem, out)[member]
+    missing.unlink()
+    before = _tree(out)
+    stage = tmp_path / "stage"
+    with pytest.raises(features_bound.FeaturesBoundError, match=re.escape(str(missing))):
+        features_bound.stage_bound_features(out, stage)
+    assert not stage.exists()
+    assert _tree(out) == before
+
+
 @pytest.mark.parametrize(("mismatch", "diagnostic"), [
-    ("label-set", "face labels differ"),
-    ("patch-count", "face labels differ"),
+    ("label-set", "not the exact scoped copy"),
+    ("patch-count", "not the exact scoped copy"),
     ("adjacent-digest", "does not bind the adjacent STEP"),
 ])
 def test_unbound_bundle_never_stages_or_repairs(
@@ -138,7 +159,9 @@ def test_unbound_bundle_never_stages_or_repairs(
     ):
         with pytest.raises(features_bound.FeaturesBoundError, match=diagnostic) as caught:
             gate()
-        assert f"scoped sha256 {scoped}, full sha256 {full}" in str(caught.value)
+        assert f"scoped sha256 {scoped}" in str(caught.value)
+        if mismatch != "adjacent-digest":
+            assert f"full sha256 {full}" in str(caught.value)
     assert not stage.exists()
     assert _tree(out) == before
 
@@ -183,6 +206,29 @@ def test_half_labelled_rocker_pivot_bore_fails_even_when_both_exports_agree(
     out = bound_output(tmp_path, pivot_bore_faces=1)
     with pytest.raises(features_bound.FeaturesBoundError, match="pivot_bore must be exactly 2 STEP faces, found 1"):
         features_bound.check_bound_features(out)
+
+
+@pytest.mark.parametrize("mismatch", ["part", "step", "duplicate-face"])
+def test_bundle_identity_and_face_inventory_must_be_exact(tmp_path: Path, mismatch: str) -> None:
+    out = bound_output(tmp_path)
+    stem = export_features.SUPPORTED_PARTS[-1]
+    path, _step_path = export_features.bundle_paths(stem, out)
+    manifest = tomllib.loads(path.read_text(encoding="utf-8"))
+    if mismatch == "part":
+        manifest["part"] = "another-part"
+        diagnostic = "part must identify"
+    elif mismatch == "step":
+        manifest["step"] = "../another-part.STEP"
+        diagnostic = "adjacent basename"
+    else:
+        feature = next(iter(manifest["features"].values()))
+        feature["faces"].append(feature["faces"][0])
+        diagnostic = "differ from adjacent STEP"
+    path.write_text(export_features._toml(manifest), encoding="utf-8")
+    stage = tmp_path / "stage"
+    with pytest.raises(features_bound.FeaturesBoundError, match=diagnostic):
+        features_bound.stage_bound_features(out, stage)
+    assert not stage.exists()
 
 
 def test_cli_exit_status_is_actionable(tmp_path: Path) -> None:

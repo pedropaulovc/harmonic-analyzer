@@ -6,8 +6,9 @@ or as a prerequisite of ``doit release``; runnable standalone too.
 
 For every built part: AP214 STEP, per-part STL, and the build-owned isometric
 PNG certified in ``reports/release-neutral.json``. The STEP of every part in
-``export_features.SUPPORTED_PARTS`` carries transient requirement-feature face
-names (``_export_feature_faces``). For every built assembly:
+``export_features.SUPPORTED_PARTS`` is copied byte-for-byte from its previously
+produced feature bundle; full export never reloads its drawing declarations.
+For every built assembly:
 a boxes/scene JSON and a composed glTF binary. The release task validates and
 stages that complete set without reopening native documents. This is also the
 offline-render feed consumed by render_offline.py —
@@ -44,13 +45,17 @@ export above can run on a SolidWorks farm worker that has no renderer:
     uv run python cad\\scripts\\export_models.py --comparisons
 
 ``--features <stem> ...`` is the separate feature-bundle producer
-(the doit ``package:features`` leaf). For each supported part it writes ONLY
-``cad/out/features/<stem>/<dashed>.STEP`` (the same named, default-configuration
-``SaveAs3`` export the full run writes to ``cad/out/step``) and an adjacent
-``features.toml`` bound to those raw STEP bytes by ``export_features.write_manifest``.
+(the doit ``package:features:<stem>`` leaves, aggregated by ``package:features``).
+For each supported part it writes ONLY ``cad/out/features/<stem>/<dashed>.STEP``
+(the named, default-configuration ``SaveAs3`` export full export consumes) and an
+adjacent ``features.toml`` bound to those raw STEP bytes by ``export_features.write_manifest``.
 It never touches the global STEP/STL/PNG, colour, source-digest or release-neutral files:
 
     uv run python cad\\scripts\\export_models.py --features ch_rocker_arm ch_pivot_shaft
+
+Full export requires every enrolled bundle to exist and validate before copying
+any STEP. Missing or unbound bundles fail loudly; run the corresponding
+``package:features:<stem>`` tasks first. Full export never regenerates their manifests.
 """
 
 from __future__ import annotations
@@ -86,7 +91,7 @@ from _preferences import (
 )  # noqa: E402
 from _session import run_build  # noqa: E402
 from _buildgraph import ASSEMBLY_ORDER, part_stems  # noqa: E402
-from _config import release_revision  # noqa: E402
+import _config  # noqa: E402
 from _export_feature_faces import FeatureFaceError, name_feature_faces, step_face_sets  # noqa: E402
 
 import _telemetry  # noqa: E402
@@ -100,7 +105,6 @@ OUT_SLDASM = CAD_ROOT / "out" / "sldasm"
 OUT_PNG = CAD_ROOT / "out" / "png"
 # ``--features`` owns features/<underscore-stem>/{<dashed>.STEP, features.toml}.
 OUT_FEATURES = CAD_ROOT / "out" / "features"
-FEATURES_MANIFEST = "features.toml"
 COLORS = OUT_STL / "colors.json"
 # Per-output source-recipe digests: ``mesh|dashed-assembly -> digest`` recorded at
 # export time so a re-export fires iff the SOURCE's recipe changed. Keyed on doit's
@@ -159,9 +163,9 @@ DEFAULT_RGB = (0.55, 0.55, 0.55)
 # Declared baseline for every neutral export this module writes: a fine BINARY
 # STL in millimetres at the model origin (byte-identical to the part build's own
 # STL, which _part_save.export_part_stl enforces from the same ids) and STEP AP214
-# so the .step carries colours, face names and split periodic faces. Both the
-# full export and the ``--features`` bundles enforce this one spec, so their
-# named STEPs come from identical writer settings. SHOW_INFO -> False because
+# so the .step carries colours, face names and split periodic faces. Full export
+# and ``--features`` enforce this one spec; enrolled STEPs are copied from the
+# scoped producer, not written again. SHOW_INFO -> False because
 # every export would otherwise block an unattended run on the per-file
 # "Save <name>.STL?" modal.
 #
@@ -427,12 +431,12 @@ def save_colors(colors: dict) -> None:
 
 
 def _exporter_digest() -> str:
-    """Digest the exporter's source/config closure, including face-naming inputs.
+    """Digest the generic export runtime/config closure, not draw declarations.
 
-    The same requirements feed the outer export cache key and this freshness
-    sentinel: a cache miss after a naming change must also regenerate the STEP,
-    not reuse an older per-model ledger. Text uses Git-canonical bytes across
-    LF/CRLF checkouts; YAML uses the shared parsed-content digest.
+    Produced feature bundle bytes enter the outer cache key and are validated
+    and copied on every full run. They do not invalidate the native STL/scene
+    freshness ledger. Text uses Git-canonical bytes across LF/CRLF checkouts;
+    YAML uses the shared parsed-content digest.
 
     Best-effort: if dependency discovery fails, fall back to this module alone;
     if even that cannot be read, return a stable empty digest.
@@ -860,17 +864,18 @@ def _save_as(doc: Any, out: Path) -> int:
 
 def _feature_stems() -> tuple[str, ...]:
     """Underscore stems whose STEP carries named requirement-feature faces."""
-    from export_features import SUPPORTED_PARTS  # noqa: PLC0415 - specs load lazily
+    from export_features import SUPPORTED_PARTS  # noqa: PLC0415 - static discovery
 
     return tuple(SUPPORTED_PARTS)
 
 
 def _save_feature_step(doc: Any, stem: str, out: Path) -> None:
-    """The ONE named STEP export, shared by the full export and ``--features``:
-    name ``stem``'s feature faces on the open part in the configuration it
-    opened in, ``SaveAs3`` under :data:`EXPORT_PREFERENCES`, and read the labels
-    back (a zero, ambiguous or lost name raises).  The names are transient: the
-    caller closes the part unsaved and checks the native's SHA-256."""
+    """The named STEP producer used only by ``--features``.
+
+    Name ``stem``'s feature faces on the open part, ``SaveAs3`` under
+    :data:`EXPORT_PREFERENCES`, and read the labels back. Names are transient:
+    the caller closes the part unsaved and checks the native's SHA-256.
+    """
     names = name_feature_faces(doc, stem)
     _save_as(doc, out)
     faces = step_face_sets(out.read_text(encoding="latin-1"), names)
@@ -1126,11 +1131,12 @@ def part_stl_stale(stem: str, mesh: str, colors: dict, digests: dict[str, str]) 
 
 
 def manifest_part_stale(stem: str, colors: dict, digests: dict[str, str]) -> bool:
-    """Manifest-part freshness: additionally requires the archival ``<stem>.STEP`` (the
-    STL and STEP are written together in the top-level parts loop). The recipe-digest
-    check already re-exports a rebuilt part -- refreshing STL AND STEP AND colour -- so
-    the old STL-vs-STEP mtime race (codex review #11) no longer needs a mtime clause --
-    EXCEPT on the digest-unavailable fallback (``src_digest`` is None, e.g. a standalone
+    """Manifest-part freshness also requires the archival ``<stem>.STEP``.
+
+    Enrolled STEP bytes have already been validated/copied from feature bundles;
+    other STEPs are regenerated alongside STL and colour when the recipe changes.
+    The old STL-vs-STEP mtime race needs no mtime clause for recipe-keyed models,
+    except on the digest-unavailable fallback (``src_digest`` is None, e.g. a standalone
     run that cannot import dodo), where ``_source_changed`` compares only the STL mtime;
     there the STEP-vs-source mtime guard is re-added so a rebuilt part with a fresh STL
     but a stale STEP is not treated as fresh (codex review)."""
@@ -1470,11 +1476,11 @@ def refresh_comparison_gallery() -> None:
 def export_feature_bundles(stems: list[str]) -> int:
     """Write one isolated named STEP and adjacent manifest per supported part.
 
-    Each part opens once, exports through the full export's named STEP path,
-    closes unsaved, and must leave its native byte-identical before the manifest
-    reads and binds the just-written STEP. No global export output is touched.
+    Each part opens once, exports its authoritative named STEP, closes unsaved,
+    and must leave its native byte-identical before the manifest reads and
+    binds the just-written STEP. No global export output is touched.
     """
-    from export_features import write_manifest  # noqa: PLC0415
+    from export_features import bundle_paths, write_manifest  # noqa: PLC0415
 
     natives = {stem: OUT_SLDPRT / f"{stem.replace('_', '-')}.SLDPRT" for stem in stems}
     missing = sorted(path.name for path in natives.values() if not path.is_file())
@@ -1486,18 +1492,17 @@ def export_feature_bundles(stems: list[str]) -> int:
         done: dict[str, str] = {}
         for stem in stems:
             native = natives[stem]
-            bundle = OUT_FEATURES / stem
-            step = bundle / f"{stem.replace('_', '-')}.STEP"
+            manifest, step = bundle_paths(stem, OUT_FEATURES.parent)
             with _telemetry.span("export.feature_bundle", part=stem):
-                bundle.mkdir(parents=True, exist_ok=True)
-                (bundle / FEATURES_MANIFEST).unlink(missing_ok=True)
+                step.parent.mkdir(parents=True, exist_ok=True)
+                manifest.unlink(missing_ok=True)
                 native_sha = _file_sha256(native)
                 check(f"open {native.name}", await adapter.open_model(str(native)))
                 _save_feature_step(adapter.currentModel, stem, step)
                 log(f"saved {step.name} ({step.stat().st_size / 1e6:.1f} MB)")
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
                 _require_native_unchanged(native, native_sha)
-                write_manifest(stem, step, revision=release_revision())
+                write_manifest(stem, step, revision=_config.release_revision())
             done[stem] = "exported"
         return done
 
@@ -1569,6 +1574,14 @@ def main() -> int:
     if args.features:
         return export_feature_bundles(args.features)
 
+    from features_bound import stage_feature_steps  # noqa: PLC0415
+
+    # Read and validate all producer bundles before writing any neutral output.
+    # These exact snapshots own the enrolled STEP bytes, even under --force.
+    feature_steps = {
+        path.resolve() for path in stage_feature_steps(OUT_FEATURES.parent, OUT_STEP)
+    }
+
     # An untrusted cache (sentinel absent or mismatched) forces a FULL export so even
     # mtime-gated undeclared targets regenerate through the current logic, not just the
     # digest-gated declared ones (codex review).
@@ -1587,6 +1600,8 @@ def main() -> int:
     certified_drift: dict[Path, bool] = {}
 
     def neutral_changed(path: Path) -> bool:
+        if path.resolve() in feature_steps:
+            return False  # Already validated against its authoritative bundle.
         return _certified_output_changed(path, certified, certified_drift)
 
     parts = part_stems()
@@ -1757,24 +1772,17 @@ def main() -> int:
                 )
             }
 
-            # Open each part at most once. Default STEP/STL and the whole referenced
-            # configuration family are emitted in that one session; exporting all
-            # siblings preserves the distinct-CRC stale-tessellation guard.
-            feature_parts = {stem.replace("_", "-") for stem in _feature_stems()}
+            # Open each part at most once for STL/render/configuration exports.
+            # Enrolled STEP files were copied from the feature leaves above;
+            # only unenrolled parts need a fresh SaveAs3 STEP.
             for stem in sorted(default_stale | scene_stale | missing_part_png):
                 src = OUT_SLDPRT / f"{stem}.SLDPRT"
-                # Feature-face names are transient export-session state: the
-                # native part must leave this session byte-identical.
-                named = stem in default_stale and stem in feature_parts
-                native_sha = _file_sha256(src) if named else None
                 check(f"open {src.name}", await adapter.open_model(str(src)))
                 doc = adapter.currentModel
                 render_cfg = active_cfg(doc)
                 if stem in default_stale:
                     for out in (OUT_STL / f"{stem}.STL", OUT_STEP / f"{stem}.STEP"):
-                        if named and out.suffix == ".STEP":
-                            _save_feature_step(doc, stem.replace("-", "_"), out)
-                        else:
+                        if out.resolve() not in feature_steps:
                             _save_as(doc, out)
                         log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
                     colors[stem] = doc_rgb(doc)
@@ -1802,8 +1810,6 @@ def main() -> int:
                     for _cfg, mesh in entries:
                         digests[mesh] = d
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-                if native_sha is not None:
-                    _require_native_unchanged(src, native_sha)
                 done[stem] = "exported"
 
             # Fill component colours only after part exports, then publish each scene

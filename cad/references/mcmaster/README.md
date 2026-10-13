@@ -20,24 +20,27 @@ recipes:
 | 6793K4 | `pd-transgear-removable` T12 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 12 Teeth |
 | 6793K11 | `pd-transgear-removable` T18 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 18 Teeth |
 | 6793K17 | `pd-transgear-removable` T24 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 24 Teeth |
+| 90114A124 | `vn-ms-stop-plate-screw`, `vn-platen-clip-screw` (catalogue-only; no vendor model) | Brass Fillister Head Slotted Screw |
 | 90114A511 | `vn-fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `vn-foot-screw`, `vn-swing-stop-screw`, `vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | — (diagnostic recipe; a former `vn-frame-side-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A197 | `vn-pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A199 | — (diagnostic recipe; a former `vn-swing-stop-screw`) | Steel Narrow Fillister Head Slotted Screw |
-| 90280A201 | `vn-clamp-screw`, `vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A201 | `vn-clamp-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A203 | `vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `vn-frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 91247A720 | — (diagnostic recipe; a former `vn-knife-hanger-stud`) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A157 | `vn-knife-hanger-stud` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91255A106 | — (diagnostic recipe; a former `vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
-| 91255A108 | `vn-guide-lock-screw` (catalogue-only; no vendor model; SKU not yet read live) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91375A106 | `vn-arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
 | 91375A942 | `vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
-| 91410A538 | `vn-gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
-| 91790A196 | `vn-transgear-arm-plate-screw` (catalogue-only; no vendor model; SKU not yet read live) | 18-8 Stainless Steel Oval Head Slotted Screw |
+| 91410A538 | — (diagnostic recipe; `vn-gooseneck-set-screw` until 2026-10-12) | Steel Square-Head Cup-Point Set Screw |
+| 91410A540 | `vn-gooseneck-set-screw` (catalogue-only; no vendor model) | Steel Square-Head Cup-Point Set Screw |
+| 91790A199 | `vn-transgear-arm-plate-screw` (catalogue-only; populated live SKU verified; 2-D PDF offered, CAD requires login) | 18-8 Stainless Steel Oval Head Slotted Screw |
+| 91792A108 | `vn-guide-lock-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Pan Head Slotted Screw |
 | 91794A112 | `vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A055 | `vn-transgear-disc-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A077 | `vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
@@ -48,12 +51,17 @@ recipes:
 | 91882A221 | `vn-thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | — (diagnostic recipe; `vn-cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `vn-tube-frame-cap` | Metal Round Cap |
-| 9414T1 | `vn-cone-tip-collar` (catalogue-only; no vendor model) | Set Screw Shaft Collar for 1/16" Diameter |
+| 92671A005 | `vn-wheel-axle-nut` (catalogue-only; no vendor model) | Brass Hex Nut |
+| 9414T1 | — (historical MHA-VN-016 until the 2026-10-08 terminal redesign) | Set Screw Shaft Collar for 1/16" Diameter |
+| 94355A213 | `vn-cone-tip-collar` set screw, fitted as supplied | 18-8 Stainless Steel Flat-Tip Set Screw, #2-56 x 5/16" |
 | 92865A585 | `vn-hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
+| 92916A250 | `vn-wheel-axle-front-washer` (catalogue-only; no vendor model) | Brass Washer for Number 4 Screw Size |
+| 92916A480 | `vn-wheel-axle-back-washer` (catalogue-only; no vendor model) | Brass Washer for Number 10 Screw Size |
 | 93075A194 | `vn-hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93585A190 | `vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
+| 93600A189 | `vn-transgear-arm-plate-locating-pin` (catalogue-only; no vendor model) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
 | 9714K24 | `vn-rocker-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9714K392 | `vn-cylinder-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9715K43 | `vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
@@ -69,6 +77,53 @@ recipes:
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_vn_cone_lock_knob.py`
 and `cad/scripts/build_vn_swing_stop_screw.py`.
+
+Live catalogue verification on October 12, 2026:
+
+- [91410A540](https://www.mcmaster.com/91410A540/) replaces 91410A538 as the
+  MHA-VN-023 gooseneck set screw, per the user's Q5 ruling of October 12,
+  2026: the top frame's hub now carries a cast square-sided boss with a Ø10
+  spot face 21.0 from the bore axis, and the longer screw keeps at least 1.5D
+  of full thread in it. The square-head cup-point family row was read live in
+  a browser on October 12, 2026 (screenshot
+  `C:/src/dt-logs/keeper-face-q5/91410A540-family-row-2026-10-12.png`):
+  1/4-20 thread, length **3/4 in**, head width **1/4 in**, head height
+  **3/16 in**, Rockwell **B80**, package quantity **50**, package price
+  **$12.82**; UNC class 2A, ASME B18.6.2 / ASTM F912. The 5/8 in row is
+  91410A538 ($12.34), otherwise identical. No jam nut: the joint is
+  adjustable by design and re-set periodically (drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) exception, user
+  ruling October 12, 2026). The STEP download needs a McMaster login, so no
+  vendor model is harvested. [INFERENCE] The cup rim (R1.739789, 45/59 deg)
+  and the 75 deg head chamfers are 91410A538's vendor-solved values, which
+  the family row does not distinguish; `_mcmaster_91410a540.py` carries
+  them with the 19.05 mm length, and `diag_build_91410A540.py` builds it
+  with the law it shares with 91410A538
+  (`diag_mcmaster_square_set_screw.py`). It is catalogue-only: no replica
+  gate. `diagnostics.diag_build_91410A538` stays as a diagnostic recipe.
+
+Live catalog verification on October 11, 2026:
+
+- [90114A124](https://www.mcmaster.com/90114A124/), selected for the four
+  MHA-VN-059 platen-clip screws, is titled “Brass Fillister Head Slotted
+  Screws, 2-56 Thread Size, 1/4" Long”. The live page and
+  [technical drawing](https://www.mcmaster.com/mvD/Library/CAD2/20260619/961C5808/90114A124_Brass%20Fillister%20Head%20Slotted%20ScrewsS.GIF)
+  were viewed on October 11, 2026: brass, Rockwell B40, 50,000 psi tensile
+  strength, #2-56 UNC class 2A, fully threaded, flat tip, ASME B18.6.3,
+  high narrow slotted fillister head. Under-head length is 0.25 in
+  (6.35 mm), screw size decimal 0.086 in (2.1844 mm), head diameter
+  0.14 in (3.556 mm), and head height 0.083 in (2.1082 mm). The drawing
+  states no dimensional tolerances. Brass matches the book photograph's
+  brass clip screws, so the same-size 18-8 stainless 91794A077 (MHA-VN-050's
+  stock) is rejected for appearance; no brass #2-56 shorter than 1/4 in was
+  found live. The shared #4-40 MHA-VN-006 brass fillister 90114A511 is
+  rejected for the clip: its 4.65 mm head overhangs the clip's 4.23 mm rail,
+  and it stays selected for the other fleet deployments. Through the 0.8 mm
+  clip sheet the 6.35 mm shank leaves 5.55 mm of engagement in the platen's
+  3.85 mm plate and 1.70 mm boss, 2.54D (at least 1.5D), with the tip flush.
+  `diagnostics.diag_build_90114A124` reuses the native fillister family
+  recipe; its derived slot, dome, thread/runout and vendor-frame mapping are
+  family assumptions, not verified vendor geometry. No vendor model is
+  harvested.
 
 Live catalogue verification on October 9, 2026:
 
@@ -247,18 +302,40 @@ Catalog specifications checked on September 10, 2026:
   `5bcc08b043bb1e7a8060c75d32db9f30f1528139478ee2a3f35676ab754c05c8`;
   native SLDPRT
   `0e52851776ee9ac5cd03c4d6ad2b1c07715417e4b97b85f032206cd8c2e3fad2`.
-- [9414T1](https://www.mcmaster.com/9414T1/) (`vn-cone-tip-collar`, MHA-VN-016,
-  replacing the turned brass tip bushing by user ruling 2026-09-29): the
-  product page, read in a headless browser on September 29, 2026, gives a
-  one-piece set screw shaft collar for 1/16 in shaft, 1/4 in OD, 3/16 in
-  wide, black-oxide 1215 carbon steel, with one black-oxide steel hex-socket
-  set screw. The vendor STEP was read locally (not committed) for what the
-  page omits: 45 deg breaks 0.009375 in on all four edges and the #2-56
-  radial cup-point set screw at mid-width, 0.050 in hex socket, its outer
-  end 5/32 in from the axis. The numbers live in `vn_cone_tip_collar_spec.py`;
-  `diag_build_9414T1.py` builds them (flat-ended set screw at the cup rim,
-  threads not modelled). No vendor model is kept here, so it has no replica
-  gate; its standalone diagnostic is a catalog-only run.
+- [9414T1](https://www.mcmaster.com/9414T1/) is historical provenance only:
+  MHA-VN-016 used this actual 1/16-inch collar from 2026-09-29 until the
+  2026-10-08 1/32-inch terminal redesign. The September 29 page gave 1/4-inch
+  OD, 3/16-inch width and black-oxide 1215 steel; the uncommitted vendor STEP
+  supplied the 0.009375-inch edge breaks and #2-56 cup screw. It is not
+  relabelled as a 1/32-inch product; its obsolete recipe is removed.
+- [1/32-inch shaft collars](https://www.mcmaster.com/shaft-collars/shaft-diameter~1-32/)
+  were read live on October 8, 2026. 6435K234 (one-piece stainless),
+  6436K236 (two-piece stainless) and 6157K64 (aluminum) are 3/8-inch OD,
+  7/32-inch wide clamp-on collars. They are legitimate smaller-envelope
+  alternatives; preserving the existing set-screw mechanism motivated the
+  custom design, not an explicit user requirement that COTS collars cannot
+  meet. Final selection also depends on actual native assembly air.
+- [94355A213](https://www.mcmaster.com/94355A213/) was verified live on
+  October 8, 2026: 18-8 stainless flat-tip headless set screw, #2-56 UNC-3A,
+  5/16-inch long, 0.035-inch hex, basic major 0.086 inch, Rockwell B80,
+  ASME B18.3. The custom MHA-VN-016 collar is turned steel, not purchased;
+  this genuine screw is fitted unaltered. The page gives no socket depth or
+  end break.
+  [ASME B18.3-2012 Table 14](https://www.finesz.com/pic/ASME%20B18.3.pdf)
+  supplies the #2 minimum key engagement (0.060 inch), flat-point minimum
+  diameter (0.039 inch), 45-degree minimum point angle, 30–45-degree socket
+  face chamfer and ±0.01-inch length tolerance for this length. The retained
+  factory depiction is not vendor-exact geometry.
+  [BBI's ASME thread limits](https://www.brightonbest.com/download/pds/PDS_Thread_Details_Inch_Series.pdf)
+  give the #2-56 3A pitch-diameter minimum, 0.0728 inch; the
+  [2B UNC chart](https://amesweb.info/Screws/unc-thread-chart.aspx) gives the
+  receiver maximum, 0.0772 inch. The collar's landing gate books their radial
+  play and tilt with the tap's printed centring and angle. Because 2B gives
+  no internal major/root maximum, the custom print separately controls the
+  native MAX root gauge diameter; its wall proof does not invent a standard
+  maximum. The tap station prints at .XXX.
+  94355A212 (#2-56 x 1/4 inch, also verified) loses because the shorter
+  screw buries its drive at the collar's worst-case radial flat.
 - [90280A197](https://www.mcmaster.com/90280A197/) was read live on
   September 23, 2026: #8-32 UNC class 2A, 3/4 in (19.05 mm) long under the
   head, fully threaded zinc-plated steel, flat tip, ASME B18.6.3; head
@@ -266,6 +343,18 @@ Catalog specifications checked on September 10, 2026:
   harvested 90280A194 and 90280A199, so the shared fillister family recipe
   builds it from the length alone. No vendor SLDPRT has been harvested for
   this length yet.
+- [90280A203](https://www.mcmaster.com/90280A203/) was read live on
+  October 8, 2026: #8-32 UNC class 2A, 1-1/2 in (38.1 mm) long under the
+  head, fully threaded zinc-plated steel, flat tip, ASME B18.6.3; head
+  diameter 0.27 in and height 0.156 in. It replaces 90280A201 only for
+  MHA-VN-019: the raised pinion block needs the longer grip. The old
+  31.75-mm screw loses the 1.5D engagement floor at the block's printed
+  high limit even before entrance/tip deductions. Candidate 90280A202
+  returned “No results”; it is not a purchasable length. No length band or
+  slot dimensions are stated on the live page; the native family recipe's
+  existing slot depiction is not new vendor-qualified metrology. No vendor
+  SLDPRT was harvested. Base tap/drill depths follow the new stock length
+  and shortest printed block, preserving the ordinary blind-seat reserves.
 - [91255A148](https://www.mcmaster.com/91255A148/) is the #6-32 x 1/2 in
   black-oxide alloy steel button head hex drive screw that held the cone tip
   block under U30 (drawing-guidelines.md rule 17 (walls and webs) W22). `vn-cone-tip-block-screw` is now
@@ -401,20 +490,17 @@ Catalog specifications checked on September 10, 2026:
   `_button_head_dimensions.py` carry the 91255A148 vendor-measured laws over
   in proportion: flat top 7/5 of the hex, band 0.15 of the head height at
   10 deg, fillets 0.05, socket floor 0.55, the 60 deg countersink.
-  `_mcmaster_91255a106.py` and `_mcmaster_91255a108.py` hold their separate
-  SKU dimensions. It is catalogue-only: no vendor model is downloaded or
-  kept here, so it has no replica gate, and its standalone diagnostic is a
-  catalog-only run. Lost: 91255A105 (3/16 in; shortens the lock stack) and
+  `_mcmaster_91255a106.py` holds its SKU dimensions. It is catalogue-only: no
+  vendor model is downloaded or kept here, so it has no replica gate, and its
+  standalone diagnostic is a catalog-only run. Lost: 91255A105 (3/16 in;
+  shortens the lock stack) and
   18-8 stainless 92949A106 (same head and length, 70 ksi, Rockwell B55;
   the alloy screw matches the 91255A148 family whose laws the recipe uses).
-- [91255A108](https://www.mcmaster.com/91255A108/) (`vn-guide-lock-screw`)
-  replaces 91255A106 per ruling R9-48: the 1/4 in screw engaged only 1.26D
-  of the guide's blind tap at the worst case, so the guide's lock receivers
-  became through taps and the screw 3/8 in under the head (2.02D at the
-  worst case). [INFERENCE] 91255A108 is the 3/8 in length of the same
-  91255A series; its page has not been read live. `_mcmaster_91255a108.py`
-  carries that size, and `diag_mcmaster_button_head.py` builds it with the
-  shared laws at that length; it is catalogue-only.
+- 91255A108 (`vn-guide-lock-screw` from ruling R9-48 until October 11, 2026)
+  replaced 91255A106: the 1/4 in screw engaged only 1.26D of the guide's
+  blind tap at the worst case, so the guide's lock receivers became through
+  taps and the screw 3/8 in under the head. 91792A108 replaced it; its
+  recipe module was retired with it.
 - [98296A027](https://www.mcmaster.com/98296A027/) was read live on
   September 25, 2026: 1050-1095 spring steel slotted spring pin, 1/16 in
   diameter, 1/2 in long, 0.012 in wall, for a 0.062-0.065 in hole,
@@ -451,6 +537,19 @@ Catalog specifications checked on September 10, 2026:
   long, end shape "Round x Chamfer". As for 98381A434, `diag_build_98381A433.py`
   models the plain nominal cylinder; catalogue-only, no vendor model, no
   replica gate.
+- [93600A189](https://www.mcmaster.com/93600A189/), MHA-VN-056, quantity two,
+  was read live on October 9, 2026 in isolated Chromium (HTTP 200): passivated
+  316 stainless, ISO 2338-m6, diameter 2.002–2.008 mm, nominal length 6 mm,
+  both ends chamfered. The supplier does not publish a length or chamfer
+  band. [ISO 2338:1997 Table 1](https://cdn.standards.iteh.ai/samples/20001/5b26cece48c448b782c0de1eccb5b16c/ISO-2338-1997.pdf)
+  bounds nominal 6-mm stock to 5.75–6.25 mm;
+  [c≈0.35 mm](https://fullerfasteners.com/tech/iso-2338-specifications-parallel-pins/)
+  is approximate, not a hard end limit or full-cylinder certificate.
+  `vn_transgear_arm_plate_locating_pin_spec.py` owns the ordinary installation
+  fits and proud set. The whole standard length family has at least 0.17 mm
+  bottom air in the custom arm blind hole. `diag_build_93600A189.py` uses the
+  existing nominal-cylinder recipe: catalogue-only, no vendor model, no
+  replica gate and no new commodity receiving procedure.
 - [98381A473](https://www.mcmaster.com/98381A473/) (`vn-knife-mount-dowel`,
   MHA-VN-051, two; formerly `vn-transgear-latch-pin`) was read live on
   September 30, 2026:
@@ -518,29 +617,67 @@ Catalog specifications checked on September 10, 2026:
   91794A055` runs the replica gate against the vendor's volume 13.8241 mm³,
   surface 64.5474 mm² and 26-face area multiset. Evidence SHA-256: native
   SLDPRT `3b7b3ee38a51864b0c9d495e44ade30c80816d4b5498b8801211b8edb82676dc`.
-- [91790A196](https://www.mcmaster.com/91790A196/) (`vn-transgear-arm-plate-screw`,
-  MHA-VN-040, two) holds the transgear arm plate on the arm: each head sits flush
-  in a plate countersink and the thread enters the arm's through tap; at
-  assembly each tip is cut flush with the arm's front face and the cut end
-  broken 0.1 max (R9-44: with the ASME B18.6.3 length band, +0/-0.03 in, no
-  fixed length gives 1.5D in the tap and keeps the tip out of the guide-lock
-  sweep). The SKU is [INFERENCE]: the 5/8 in length of the series by the
-  90280A numbering this file records (194 = 1/2 in, 197 = 3/4 in), not yet
-  read live; the vendor check is pending. The 91790A series was read live on
-  September 30, 2026 at 3/8 in (91790A192) and 1/2 in: 18-8 stainless steel,
-  bright, slotted 82° oval head, 8-32 UNC class 2A, fully threaded, ASME
-  B18.6.3; head Ø0.312 in, 0.152 in total height of which the oval top is
-  0.052 in; the length is measured from the top of the bevel. The page gives
-  no slot, tip or crown radius, so `diag_mcmaster_oval.py` models the crown
-  as a spherical cap through the head rim, runs the 82° bevel down to the
-  thread major (the catalog's 0.100 in bevel reaches the cone's theoretical
-  sharp, inside the shank), and takes the slot, tip and thread-runout laws
-  of the 90280A fillister family (slot 0.135 of the head Ø wide and 1.5
-  widths deep). Its catalog build is the supplied 5/8 in screw; the
-  production part draws it cut to the installed length with the break in
-  place of the factory tip. It is catalogue-only: no vendor model is
-  downloaded or kept here, so it has no replica gate, and its standalone
-  diagnostic is a catalog-only run.
+- [91790A199](https://www.mcmaster.com/91790A199/) (`vn-transgear-arm-plate-screw`,
+  MHA-VN-040, two) was positively read live at 2026-10-09T07:17:13.553Z:
+  18-8 stainless steel, slotted standard oval head, #8-32 UNC right-hand
+  class 2A, fully threaded, ASME B18.6.3, flat tip. Supplied length is
+  1 in (25.40 mm) from the **top of the bevel**, not the crown. The longer
+  raw stock is cut to the unchanged installed fit, preserving the oval/
+  slotted look and quantity. Bench-fit the matched joint, remove/pre-cut
+  **off mechanism before the guide-lock sweep**, trim flush to 0.20 mm
+  proud of the arm front face and break the cut end 0.10 mm MAX, then
+  refit the same matched hardware.
+  The page's nominal head Ø0.312 in, total height 0.152 in, oval-top
+  height 0.052 in and nominal 82° angle are not supplier tolerance bands.
+  The native head is an ASME/reference construction, not a vendor solid
+  or a measured hardware profile. Conservative published
+  [ASME B18.6.3-2013 Table 7](https://www.finesz.com/pic/ASMEB18.6.3-2013.pdf)
+  gives maximum head Ø0.312 in, maximum protrusion F0.091 in above
+  standard gaging diameter G0.267 in, and included bearing angle 80–82°.
+  Side height H0.100, crown C0.052 and total O0.152 are **REF**, not MAX.
+  The whole-metal crown/cone/fillet cap derives from F/G, the minimum
+  permitted non-thread body diameter and fillet radius 15% basic diameter.
+  The distinct first-full-thread cap uses the GO-ring bearing datum at
+  maximum Class 2A major diameter, then two pitches; it does not charge
+  the fillet twice. These are published standard geometry bounds, not
+  new incoming gage procedures. The head-axis true-position diameter is
+  6% maximum head diameter; stock straightness is 0.006 in/in.
+  The oval **overall** length Lo=L+C receives the standard -0.03-in
+  tolerance. With no positive crown REF credit, Lo MIN is 24.638 mm.
+  The longer A199 raw stock leaves the factory-tip two-pitch region
+  outside the retained cut screw. Custom plate clearance accommodates
+  the maximum fillet; both arm tap entry and exit breaks are 0.10 mm MAX.
+  Critical matched S-K, running-fit and signed seat/load inspections
+  remain separate. No commodity stock-pair receipt, crown cap, q0 gauge,
+  GO-profile procedure or pin-full-span body certificate is required.
+  The purchased sheet retains its ordinary four-line stock/cut note.
+  The populated page offered a 2-D PDF and required login for CAD;
+  no availability or vendor 3-D claim is made. No vendor model is kept
+  here, so this is catalogue-only with no replica gate.
+  `diag_build_91790A199.py` is its supplied-stock diagnostic; production
+  geometry is cut to the same installed shape.
+- [91792A108](https://www.mcmaster.com/91792A108/) (`vn-guide-lock-screw`,
+  MHA-VN-046, eight) replaces 91255A108 on October 11, 2026: the book's
+  guide-lock plates (ch22 img05) show slotted heads, not hex sockets. The
+  4-40 slotted family table was read live on October 11, 2026 (the product
+  page needs a login): 18-8 stainless steel pan head slotted screw, #4-40 UNC
+  class 2A, right hand, 3/8 in under the head, fully threaded, flat tip, head
+  Ø0.219 in x 0.068 in, 100 ksi, ASME B18.6.3. The family table has no finish
+  column and the product detail still needs a login on October 13, 2026, so
+  the finish comes from two resellers that mirror McMaster's 91792A108 spec
+  table (reli-tool.com and lily-bearing.com, read October 13, 2026): passivated,
+  as for the other 18-8 slotted screws here. The 0.068 in head stands
+  0.009 in prouder than the button head, so the guide lock is 1/16 in sheet
+  as supplied rather than a 2.0 strip, which keeps the lock-station
+  sweep clear of the transgear arm plate. The page gives no head profile, slot or tip, so
+  `diag_build_91792A108.py` builds it on the shared slotted-head laws of
+  `diag_mcmaster_fillister.py` (cylinder band 0.8 of the head height under a
+  spherical-cap dome, slot 0.135 of the head Ø wide and 1.5 widths deep)
+  [INFERENCE]; `_mcmaster_91792a108.py` holds its size. It is
+  catalogue-only: no vendor model is downloaded or kept here, so it has no
+  replica gate, and its standalone diagnostic is a catalog-only run. Lost:
+  316 stainless 93923A353 (same head and length, 80 ksi, three times the
+  price).
 - [97431A260](https://www.mcmaster.com/97431A260/) (`vn-transgear-retaining-ring`,
   MHA-VN-047, R9-68) is pushed sideways into the MHA-PD-023 pin's groove in front
   of the MHA-PD-025 front bushing and closes the disc cluster's float. Its page
@@ -609,6 +746,42 @@ Catalog specifications checked on September 10, 2026:
   SolidWorks model is offered on each page, but none was fetched or kept
   here, so both are catalogue-only: no replica gate, and their standalone
   diagnostics are catalog-only runs.
+
+- [92671A005](https://www.mcmaster.com/92671A005/) (`vn-wheel-axle-nut`,
+  MHA-VN-025, two), [92916A480](https://www.mcmaster.com/92916A480/)
+  (`vn-wheel-axle-back-washer`, MHA-VN-057, one) and
+  [92916A250](https://www.mcmaster.com/92916A250/)
+  (`vn-wheel-axle-front-washer`, MHA-VN-058, one) carry the magnifying wheel
+  on the 3/16 mg-wheel-axle (mg wheel rev 10). The back washer sits between
+  the mg-wheel-bar's front face and the hub; the front washer sits on the
+  #4-40 end against the spigot face, the first nut is run down until the
+  wheel turns free without rattle (0.05-0.15 endshake) and the second jams
+  it. All three pages were checked live on October 10, 2026: 92671A005 is a
+  brass hex nut, ASME B18.2.2, #4-40, 1/4 in across flats, 3/32 in thick;
+  92916A480 is a brass washer for #10, ID 0.200 in, OD 0.438 in, thickness
+  0.029-0.043 in; 92916A250 is a brass washer for #4, ID 0.120 in, OD
+  0.281 in, thickness 0.018-0.032 in. `diag_build_92671A005.py` extrudes the
+  hexagon with a plain bore at the #4-40 basic major (the thread is not
+  modelled); `diag_build_92916A480.py` and `diag_build_92916A250.py` extrude
+  the ID x OD annulus at the range's nominal thickness. No vendor model was
+  fetched, so all three are catalogue-only: no replica gate, and their
+  standalone diagnostics are catalog-only runs.
+- [90114A124](https://www.mcmaster.com/90114A124/)
+  (`vn-ms-stop-plate-screw`, MHA-VN-054, two) retains the MHA-MS-003 plate
+  on MHA-MS-002. The product table and 2-D PDF were read live on October 9,
+  2026: brass, slotted fillister, #2-56 UNC-2A, fully threaded, flat tip;
+  length 1/4 in, head diameter 0.140 in, head height 0.083 in, major diameter
+  0.086 in, ASME B18.6.3, 50,000 psi, Rockwell B40, pack of 100 at $7.61.
+  The brass fillister series starts at #2-56 (near M2); the existing brass
+  90114A511 has a larger #4-40 / Ø0.183 in head, while the existing #0-80
+  91794A055 is stainless, so neither meets this small brass joint.
+  `_mcmaster_90114a124.py` owns the stated dimensions and the per-SKU size
+  passed to the native fillister author, whose local `@stock_recipe` declaration
+  identifies the threaded SKU without a shared recipe registry.
+  `diag_build_90114A124.py` follows the existing catalogue-only
+  `91794A077` fillister-family recipe: its dome, slot and thread/runout
+  details are family assumptions, not measurements of a vendor solid.
+  No vendor solid was downloaded and no replica equivalence is claimed.
 
 - [3606T118](https://www.mcmaster.com/3606T118/) (`vn-keeper-chain`, MHA-VN-035)
   and [3606T811](https://www.mcmaster.com/3606T811/) (`vn-keeper-chain-link`,

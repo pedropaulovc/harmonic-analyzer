@@ -101,14 +101,15 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Steel Narrow Fillister Head Slotted Screw",
         "90280A108",
     ),
-    # R9-31: the eight platen-riding guide-lock screws; a button head clears
-    # the hanger arm where the MHA-VN-006 fillister head would not. R9-48: 3/8
-    # long, so the guide's through tap holds 1.5D at the worst case.
+    # R9-31: the eight platen-riding guide-lock screws; a low slotted pan head
+    # (2026-10-11, as the book's lock plates show) clears the hanger arm where
+    # the MHA-VN-006 fillister head would not. R9-48: 3/8 long, so the guide's
+    # through tap holds 1.5D at the worst case.
     "vn-guide-lock-screw": _stock(
         "vn-guide-lock-screw",
-        "Black-Oxide Alloy Steel Button Head Hex Drive Screw",
-        "91255A108",
-        material="Alloy Steel",
+        "18-8 Stainless Steel Pan Head Slotted Screw",
+        "91792A108",
+        material="AISI 304",
     ),
     "vn-latch-hook-bracket-screw": _stock(
         "vn-latch-hook-bracket-screw",
@@ -120,6 +121,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "18-8 Stainless Steel Fillister Head Slotted Screw",
         "91794A077",
         material="AISI 304",
+    ),
+    "vn-ms-stop-plate-screw": _stock(
+        "vn-ms-stop-plate-screw",
+        "Brass Fillister Head Slotted Screw",
+        "90114A124",
+        material="Brass",
     ),
     "vn-frame-side-screw": _stock(
         "vn-frame-side-screw",
@@ -135,7 +142,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "vn-gooseneck-set-screw": _stock(
         "vn-gooseneck-set-screw",
         "Steel Square-Head Cup-Point Set Screw",
-        "91410A538",
+        "91410A540",
     ),
     "vn-hanger-screw": _stock(
         "vn-hanger-screw",
@@ -181,16 +188,29 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "99607A213",
         material="AISI 304",
     ),
+    # The four platen-clip screws: brass #2-56 x 1/4, whose 0.14 head stays
+    # inside the clip's rail where the MHA-VN-006 #4-40 head would overhang.
+    "vn-platen-clip-screw": _stock(
+        "vn-platen-clip-screw",
+        "Brass Fillister Head Slotted Screw",
+        "90114A124",
+        material="Brass",
+    ),
+    # MSC 40923906: 1/4-20 x 4 in (101.6 mm) supplied stock. Only the
+    # MHA-VN-031 modification applies vn_post_mount_screw_spec.CUT_LENGTH_MM
+    # as a reference trim, then matched-hole cut-to-fit/deburr acceptance.
     "vn-post-mount-screw": _stock(
         "vn-post-mount-screw",
         "Zinc-Plated Steel Slotted Fillister Head Machine Screw",
-        "40923898",
+        "40923906",
         supplier="MSC Industrial Supply",
     ),
+    # McMaster 90280A203: #8-32 x 1-1/2 in (38.1 mm) supplied stock.
+    # The former 31.75-mm geometry was not this SKU's verified stock length.
     "vn-slotted-screw": _stock(
         "vn-slotted-screw",
         "Steel Narrow Fillister Head Slotted Screw",
-        "90280A201",
+        "90280A203",
     ),
     "vn-swing-stop-screw": _stock(
         "vn-swing-stop-screw",
@@ -212,11 +232,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Zinc-Plated Steel #10-24 Open Routing Eyebolt (Trimmed Shank)",
         "9490T1",
     ),
-    "vn-cone-tip-collar": _stock(
-        "vn-cone-tip-collar",
-        "Black-Oxide Carbon Steel Set Screw Shaft Collar",
-        "9414T1",
-    ),
     "vn-transgear-knob-drive-pin": _stock(
         "vn-transgear-knob-drive-pin",
         "Alloy Steel Dowel Pin",
@@ -232,19 +247,20 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "vn-transgear-arm-plate-screw": _stock(
         "vn-transgear-arm-plate-screw",
         "18-8 Stainless Steel Oval Head Slotted Screw",
-        "91790A196",
+        "91790A199",
         material="AISI 304",
+    ),
+    "vn-transgear-arm-plate-locating-pin": _stock(
+        "vn-transgear-arm-plate-locating-pin",
+        "Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin",
+        "93600A189",
+        material="AISI 304",  # native library stand-in; purchased grade remains 316
     ),
     "vn-transgear-pivot-screw": _stock(
         "vn-transgear-pivot-screw",
         "Slotted 18-8 Stainless Steel Precision Shoulder Screw",
         "91829A205",
         material="AISI 304",
-    ),
-    "vn-transgear-collar-cross-pin": _stock(
-        "vn-transgear-collar-cross-pin",
-        "1050-1095 Spring Steel Slotted Spring Pin",
-        "98296A026",
     ),
     "vn-transgear-knob-cup-pin": _stock(
         "vn-transgear-knob-cup-pin",
@@ -282,6 +298,27 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "vn-rocker-bank-spring",
         "Wave Disc Spring",
         "9714K24",
+    ),
+    # MHA-VN-025 / -054 / -055 (mg wheel rev 10): the magnifying wheel's
+    # brass #4-40 nut and locknut and the two brass washers either side of
+    # its hub.
+    "vn-wheel-axle-nut": _stock(
+        "vn-wheel-axle-nut",
+        "Brass Hex Nut",
+        "92671A005",
+        material="Brass",
+    ),
+    "vn-wheel-axle-back-washer": _stock(
+        "vn-wheel-axle-back-washer",
+        "Brass Washer for Number 10 Screw Size",
+        "92916A480",
+        material="Brass",
+    ),
+    "vn-wheel-axle-front-washer": _stock(
+        "vn-wheel-axle-front-washer",
+        "Brass Washer for Number 4 Screw Size",
+        "92916A250",
+        material="Brass",
     ),
     "vn-tube-frame-cap": _stock(
         "vn-tube-frame-cap",

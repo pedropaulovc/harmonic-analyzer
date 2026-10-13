@@ -30,6 +30,11 @@ from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+import ch_rocker_arm_tl_c_stop_bar_spec as part_spec
+from _feature_requirements import part_metadata, requirement
+from _printed_limits import limits
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_c_stop_bar_spec import (
     CBORE_DIA,
     DRAWING_DIMENSIONS,
@@ -66,6 +71,66 @@ FRONT_KEEP = {
     "HoleRightX": (0.120, 0.120),
 }
 RIGHT_KEEP = {"BarWidth": (0.230, 0.135)}
+
+
+_Z = [0.0, 0.0, 1.0]
+
+
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_drawing_hole_callout", "add_native_hole_callout")))
+
+requirement("c_stop_top",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), part_spec.BAR_HEIGHT),),
+    requirements=("height", "length", "width"),
+    fields={
+        "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "y", "value": part_spec.BAR_HEIGHT}, ("BAR_HEIGHT",)),
+        "height": (
+            limits(part_spec.BAR_HEIGHT, 3, part_spec.BAR_HEIGHT_BAND),
+            ("BAR_HEIGHT", "BAR_HEIGHT_BAND"),
+        ),
+        "height_nominal": (part_spec.BAR_HEIGHT, ("BAR_HEIGHT",)),
+        "length_nominal": (part_spec.BAR_LENGTH, ("BAR_LENGTH",)),
+        "width_nominal": (part_spec.BAR_WIDTH, ("BAR_WIDTH",)),
+        "length": (
+            limits(part_spec.BAR_LENGTH, 1),
+            ("BAR_LENGTH", "C_LAND_X0", ("ch_rocker_arm_spec", "TIP_FACE")),
+        ),
+        "width": (
+            limits(part_spec.BAR_WIDTH, 1),
+            ("BAR_WIDTH", ("ch_rocker_arm_spec", "ARM_THICKNESS")),
+        ),
+    },
+    precision={"height": 3, "length": 1, "width": 1},
+)
+
+requirement("base_seat",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("height",),
+    fields={
+        "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
+        "height": (
+            limits(part_spec.BAR_HEIGHT, 3, part_spec.BAR_HEIGHT_BAND),
+            ("BAR_HEIGHT", "BAR_HEIGHT_BAND"),
+        ),
+    },
+    precision={"height": 3},
+)
+
+requirement("box_face_seat",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("width",),
+    fields={
+        "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
+        "width": (limits(part_spec.BAR_WIDTH, 1), ("BAR_WIDTH",)),
+    },
+    precision={"width": 1},
+)
+
 # Below the hole-height arrows and left of the side view's 12.7 extensions.
 CALLOUT_XY = (0.183, 0.138)
 # Functional acceptance sits on the dimension it governs, not in the notes.
@@ -76,6 +141,48 @@ CALLOUTS_BELOW = {
     # Inside the 30.00 extension lines: the stations' matching requirement.
     "HoleRightX": "SCREWS ENTER TL-08 TAPS",
 }
+
+
+for side, x in zip(("left", "right"), part_spec.SCREW_X, strict=True):
+    requirement(f"screw_hole_{side}",
+        kind="hole",
+        faces=(CylinderFace(part_spec.CLEARANCE_DIA, contains_x_mm=x),),
+        requirements=("station", "height", "dia", "thru"),
+        fields={
+            "at": ([x, part_spec.SCREW_Y, part_spec.BAR_WIDTH], ("SCREW_X", "SCREW_Y", "BAR_WIDTH")),
+            "axis": (_Z, ("__frame__",)),
+            "station": (limits(x, 2, part_spec.SCREW_POSITION_BAND), ("SCREW_X", "SCREW_POSITION_BAND")),
+            "station_nominal": (x, ("SCREW_X",)),
+            "height": (limits(part_spec.SCREW_Y, 2, part_spec.SCREW_POSITION_BAND), ("SCREW_Y", "SCREW_POSITION_BAND")),
+            "height_nominal": (part_spec.SCREW_Y, ("SCREW_Y",)),
+            "dia_nominal": (part_spec.CLEARANCE_DIA, ("CLEARANCE_DIA",)),
+            "dia": (
+                limits(part_spec.CLEARANCE_DIA, 2, part_spec.DRILLED_BAND),
+                ("CLEARANCE_DIA", "DRILLED_BAND", "SCREW_HOLE_SPEC"),
+            ),
+            "thru": (True, ("SCREW_HOLE_SPEC",)),
+        },
+        precision={"station": 2, "height": 2, "dia": 2},
+    )
+
+for side, x in zip(("left", "right"), part_spec.SCREW_X, strict=True):
+    requirement(f"screw_hole_{side}_counterbore",
+        kind="counterbore",
+        faces=(
+            CylinderFace(part_spec.CBORE_DIA, contains_x_mm=x),
+            PlanarFace((0.0, 0.0, 1.0), part_spec.BAR_WIDTH - part_spec.CBORE_DEPTH, contains_x_mm=x),
+        ),
+        requirements=("dia", "depth"),
+        fields={
+            "parent": (f"screw_hole_{side}", ("SCREW_HOLE_SPEC", ("draw_ch_rocker_arm_tl_c_stop_bar", "build"))),
+            "dia": (limits(part_spec.CBORE_DIA, 2), ("CBORE_DIA", "SCREW_HOLE_SPEC")),
+            "dia_nominal": (part_spec.CBORE_DIA, ("CBORE_DIA",)),
+            "depth": (limits(part_spec.CBORE_DEPTH, 2), ("CBORE_DEPTH", "SCREW_HOLE_SPEC")),
+            "depth_ref": (part_spec.CBORE_DEPTH, ("CBORE_DEPTH",)),
+        },
+        precision={"dia": 2, "depth": 2},
+    )
+
 
 
 def _counterbore_edge(adapter: Any, view: Any) -> Any:

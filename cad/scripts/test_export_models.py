@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import hashlib
 import json
 import re
 import struct
 import os
 import sys
+import tomllib
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -367,6 +369,9 @@ def test_saved_active_and_configuration_exports_preserve_geometry_and_native_sta
     monkeypatch.setattr(export_models, "COLORS", stl / "colors.json")
     monkeypatch.setattr(export_models, "SRC_DIGESTS", stl / "export-src.json")
     monkeypatch.setattr(export_models, "part_stems", lambda: ["sample_part"])
+    import export_features
+
+    monkeypatch.setattr(export_features, "SUPPORTED_PARTS", ())
     monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ("ha_harmonic_analyzer",))
     monkeypatch.setattr(export_models, "exporter_untrusted", lambda: False)
     monkeypatch.setattr(export_models, "_certified_outputs", lambda: {})
@@ -1029,3 +1034,225 @@ def test_gallery_gate_rejects_a_mesh_whose_source_is_gone(
 
     with pytest.raises(FileNotFoundError, match="is missing but dt-cone-gear--t102"):
         export_models.assert_gallery_inputs_current(manifest)
+
+
+@pytest.mark.parametrize("stem", ["ch_pivot_shaft", "ch_rocker_arm_tl_vise_stop"])
+def test_features_cli_writes_only_one_requested_part_using_public_bundle_paths(
+    tmp_path: Path, monkeypatch, stem: str,
+) -> None:
+    import export_features
+    from _export_feature_faces import face_name
+
+    native = tmp_path / "sldprt" / f"{stem.replace('_', '-')}.SLDPRT"
+    native.parent.mkdir()
+    native.write_bytes(b"unchanged native part")
+    unrelated = tmp_path / "features" / "ch_rocker_arm" / "features.toml"
+    unrelated.parent.mkdir(parents=True)
+    unrelated.write_bytes(b"another leaf's independent manifest")
+    ledger = tmp_path / "stl" / "export-src.json"
+    ledger.parent.mkdir()
+    ledger.write_bytes(b"full export ledger stays untouched")
+    before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+    opened = []
+    closed = []
+
+    class Adapter:
+        currentModel = None
+        swApp = SimpleNamespace(CloseAllDocuments=lambda unsaved: closed.append(unsaved))
+
+        async def open_model(self, path):
+            opened.append(Path(path))
+            self.currentModel = Path(path)
+            return SimpleNamespace(is_success=True, data=None)
+
+        def _attempt(self, call, default=None):
+            return call()
+
+    def save_step(_doc, selected, step):
+        assert selected == stem
+        rows = [
+            f"#{index} = ADVANCED_FACE ( '{face_name(feature, 1)}', ( #100 ), #101, .T. ) ;"
+            for index, feature in enumerate(export_features.feature_selectors(selected), 1)
+        ]
+        step.write_text(
+            "ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n"
+            + "\n".join(rows) + "\nENDSEC;\nEND-ISO-10303-21;\n",
+            encoding="ascii",
+        )
+
+    monkeypatch.setattr(export_models, "OUT_SLDPRT", native.parent)
+    monkeypatch.setattr(export_models, "OUT_FEATURES", tmp_path / "features")
+    monkeypatch.setattr(export_models, "enforce_preferences", lambda *_args: None)
+    monkeypatch.setattr(export_models, "_save_feature_step", save_step)
+    monkeypatch.setattr(export_models._config, "release_revision", lambda: "v38")
+    monkeypatch.setattr(
+        export_models, "run_build", lambda build: (asyncio.run(build(Adapter())), 0)[1],
+    )
+    monkeypatch.setattr(sys, "argv", ["export_models.py", "--features", stem.replace("_", "-")])
+
+    assert export_models.main() == 0
+    manifest, step = export_features.bundle_paths(stem, tmp_path)
+    content = tomllib.loads(manifest.read_text(encoding="utf-8"))
+    assert content["step"] == step.name
+    assert content["step_sha256"] == hashlib.sha256(step.read_bytes()).hexdigest()
+    assert content["drawing"]["revision"] == "v38"
+    assert set(content["features"]) == set(export_features.feature_selectors(stem))
+    assert opened == [native]
+    assert closed == [True]
+    after = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+    assert {path: after[path] for path in before} == before
+    assert set(after) - set(before) == {manifest, step}
+
+
+@pytest.fixture
+def produced_feature_bundles(tmp_path: Path, monkeypatch):
+    """Real manifest/STEP bundles with already-current native STL/render outputs."""
+    import export_features
+    from _export_feature_faces import face_name
+
+    stems = ("ch_pivot_shaft", "ch_rocker_arm_tl_vise_stop")
+    monkeypatch.setattr(export_features, "SUPPORTED_PARTS", stems)
+    colors = {}
+    digests = {}
+    for stem in stems:
+        manifest, step = export_features.bundle_paths(stem, tmp_path)
+        step.parent.mkdir(parents=True)
+        rows = [
+            f"#{index} = ADVANCED_FACE ( '{face_name(feature, 1)}', ( #100 ), #101, .T. ) ;"
+            for index, feature in enumerate(export_features.feature_selectors(stem), 1)
+        ]
+        step.write_bytes(
+            ("ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n"
+             + "\n".join(rows) + "\nENDSEC;\nEND-ISO-10303-21;\n").encode("ascii")
+        )
+        export_features.write_manifest(stem, step, revision="v38")
+        dashed = stem.replace("_", "-")
+        for relative in (
+            f"sldprt/{dashed}.SLDPRT", f"stl/{dashed}.STL",
+            f"png/{dashed}/{dashed}_isometric.png",
+        ):
+            path = tmp_path / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"current native-owned output")
+        colors[dashed] = (1, 1, 1)
+        digests[dashed] = "current-native-recipe"
+    for name, relative in (
+        ("OUT_FEATURES", "features"), ("OUT_STEP", "step"),
+        ("OUT_STL", "stl"), ("OUT_PNG", "png"), ("OUT_SLDPRT", "sldprt"),
+        ("OUT_SLDASM", "sldasm"), ("OUT_BOXES", "boxes"), ("OUT_GLTF", "gltf"),
+    ):
+        monkeypatch.setattr(export_models, name, tmp_path / relative)
+    monkeypatch.setattr(export_models, "COLORS", tmp_path / "stl/colors.json")
+    monkeypatch.setattr(export_models, "SRC_DIGESTS", tmp_path / "stl/export-src.json")
+    monkeypatch.setattr(export_models, "part_stems", lambda: list(stems))
+    monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ())
+    monkeypatch.setattr(export_models, "exporter_untrusted", lambda: False)
+    monkeypatch.setattr(export_models, "load_colors", lambda: dict(colors))
+    monkeypatch.setattr(export_models, "load_src_digests", lambda: dict(digests))
+    monkeypatch.setattr(export_models, "src_digest", lambda _path: "current-native-recipe")
+    monkeypatch.setattr(export_models, "_certified_outputs", lambda: {})
+    monkeypatch.setattr(export_models, "_certified_output_changed", lambda *_args: False)
+    monkeypatch.setattr(export_models, "stamp_render_cache_current", lambda _paths: None)
+
+    def refuse_generation(*_args, **_kwargs):
+        pytest.fail("full export must consume produced bundles, not regenerate them")
+
+    for name in ("feature_selectors", "requirement_manifest", "write_manifest"):
+        monkeypatch.setattr(export_features, name, refuse_generation)
+    monkeypatch.setattr(export_models, "_save_feature_step", refuse_generation)
+    monkeypatch.setattr(export_models, "export_feature_bundles", refuse_generation)
+    monkeypatch.setattr(export_models, "run_build", refuse_generation)
+    monkeypatch.setattr(sys, "argv", ["export_models.py"])
+    return tmp_path, stems
+
+
+def test_full_export_copies_raw_feature_steps_without_rederiving_or_opening_cad(
+    produced_feature_bundles,
+) -> None:
+    root, stems = produced_feature_bundles
+    originals = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+    # An old neutral STEP must be repaired even though the native STL ledger is fresh.
+    output = root / "step" / f"{stems[0].replace('_', '-')}.STEP"
+    output.parent.mkdir()
+    output.write_bytes(b"stale independent STEP")
+    assert export_models.main() == 0
+    for stem in stems:
+        name = f"{stem.replace('_', '-')}.STEP"
+        assert (root / "step" / name).read_bytes() == (
+            root / "features" / stem / name
+        ).read_bytes()
+    assert {path: path.read_bytes() for path in originals} == originals
+
+
+@pytest.mark.parametrize("fault", ["missing-manifest", "missing-step", "unbound-step"])
+def test_full_export_refuses_incomplete_bundles_before_copying_any_output(
+    produced_feature_bundles, fault: str,
+) -> None:
+    import export_features
+    from features_bound import FeaturesBoundError
+
+    root, stems = produced_feature_bundles
+    manifest, step = export_features.bundle_paths(stems[-1], root)
+    if fault == "missing-manifest":
+        manifest.unlink()
+        diagnostic = "cannot read required file"
+    elif fault == "missing-step":
+        step.unlink()
+        diagnostic = "cannot read required file"
+    else:
+        step.write_bytes(step.read_bytes() + b"unbound producer bytes")
+        diagnostic = "does not bind the adjacent STEP"
+    before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+    with pytest.raises(FeaturesBoundError, match=diagnostic):
+        export_models.main()
+    assert not (root / "step").exists()
+    assert {path: path.read_bytes() for path in root.rglob("*") if path.is_file()} == before
+
+
+def test_forced_full_export_regenerates_native_outputs_but_keeps_bundle_step_bytes(
+    produced_feature_bundles, monkeypatch,
+) -> None:
+    root, stems = produced_feature_bundles
+    native_bytes = {
+        path: path.read_bytes() for path in (root / "sldprt").iterdir()
+    }
+    saved = []
+
+    class Adapter:
+        swApp = SimpleNamespace(CloseAllDocuments=lambda _unsaved: None)
+        currentModel = None
+
+        async def open_model(self, path):
+            self.currentModel = Path(path)
+            return SimpleNamespace(is_success=True, data=None)
+
+        def _attempt(self, call, default=None):
+            return call()
+
+    def save_as(_doc, path):
+        assert path.suffix == ".STL", "enrolled STEP must never be re-exported"
+        path.write_bytes(b"forced native STL")
+        saved.append(path.name)
+        return 1
+
+    async def render(_adapter, stem):
+        path = root / "png" / stem / f"{stem}_isometric.png"
+        path.write_bytes(b"forced native render")
+
+    monkeypatch.setattr(export_models, "_save_as", save_as)
+    monkeypatch.setattr(export_models, "export_build_png", render)
+    monkeypatch.setattr(export_models, "enforce_preferences", lambda *_args: None)
+    monkeypatch.setattr(export_models, "doc_rgb", lambda _doc: (1, 1, 1))
+    monkeypatch.setattr(
+        export_models, "run_build",
+        lambda build: (asyncio.run(build(Adapter())), 0)[1],
+    )
+    monkeypatch.setattr(sys, "argv", ["export_models.py", "--force"])
+    assert export_models.main() == 0
+    assert set(saved) == {f"{stem.replace('_', '-')}.STL" for stem in stems}
+    for stem in stems:
+        name = f"{stem.replace('_', '-')}.STEP"
+        assert (root / "step" / name).read_bytes() == (
+            root / "features" / stem / name
+        ).read_bytes()
+    assert {path: path.read_bytes() for path in native_bytes} == native_bytes

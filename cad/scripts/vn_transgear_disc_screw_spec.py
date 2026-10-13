@@ -121,8 +121,8 @@ if not math.isclose(HELIX_REVS, round(HELIX_REVS), abs_tol=1e-9):
     raise ValueError(f"{SKU}: the helix must close on whole turns (vendor: 21)")
 
 # --- as supplied: the length band ----------------------------------------------
-# (+, -): ASME B18.6.3 machine-screw length tolerance, as the MHA-VN-040 screws'
-# (vn_transgear_arm_plate_screw_spec.STOCK_LENGTH_BAND).
+# (+, -): this fillister screw's ASME B18.6.3 machine-screw length allowance;
+# independent of the oval clamp's separately inspected design length minimum.
 STOCK_LENGTH_BAND = (0.0, 0.03 * IN)
 # An uncut screw's incomplete end thread does not count toward engagement:
 # one pitch, as the contract's §7 counts it.

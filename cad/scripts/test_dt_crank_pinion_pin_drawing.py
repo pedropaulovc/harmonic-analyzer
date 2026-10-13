@@ -78,7 +78,7 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
 
 
 def test_print_carries_no_gdt_roughness_or_callouts() -> None:
-    # Rules 3-5: a pin is not on the GD&T allowlist and nothing runs on it.
+    # drawing-guidelines.md rule 5 (avoid excessive GD&T) and drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): a pin is not on the GD&T allowlist and nothing runs on it.
     source = _source()
     for helper in (
         "add_datum_feature(",

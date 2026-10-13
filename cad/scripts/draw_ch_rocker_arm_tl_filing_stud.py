@@ -25,6 +25,7 @@ from _drawing_common import (
 )
 from _drawing_dimensions import (
     assert_imported_precision,
+    move_model_dimension,
     set_dimension_text,
     set_reference_dimension,
 )
@@ -37,6 +38,11 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+import ch_rocker_arm_tl_filing_stud_spec as part_spec
+from _feature_requirements import part_metadata, requirement
+from _printed_limits import limits
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_filing_stud_spec import (
     BODY_DIA,
     BODY_LENGTH,
@@ -50,7 +56,6 @@ from ch_rocker_arm_tl_filing_stud_spec import (
     TAIL_END,
     THREAD_END,
 )
-from draw_dt_cone_pivot_post_tl_cap_jaw_button import _move_dimension
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_filing_stud"]
 PART_STEM = SPEC.artifact_stem
@@ -93,6 +98,79 @@ PROFILE_KEEP = {
     "HeadBackStation": _row(-HEAD_LENGTH, 2),
     "TailEndStation": _row(-TAIL_END, 3),
 }
+
+
+_AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
+_FROM_TIP = ("tip_face", (("draw_ch_rocker_arm_tl_filing_stud", "build"),))
+
+
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_surface_finish", "ra")))
+
+requirement("tip_face",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), part_spec.THREAD_END),),
+    requirements=(),
+    fields={
+        "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
+        "plane": (
+            {"frame": "model", "axis": "x", "value": part_spec.THREAD_END},
+            ("THREAD_END",),
+        ),
+    },
+)
+
+requirement("button_seat",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), 0.0),),
+    requirements=("dia", "station"),
+    fields={
+        "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "x", "value": 0.0}, ("__frame__",)),
+        "dia": (limits(part_spec.HEAD_DIA, 1), ("HEAD_DIA",)),
+        "dia_nominal": (part_spec.HEAD_DIA, ("HEAD_DIA",)),
+        "station": (limits(part_spec.THREAD_END, part_spec.STATION_PLACES), ("THREAD_END",)),
+        "station_nominal": (part_spec.THREAD_END, ("THREAD_END",)),
+        "height_from": _FROM_TIP,
+    },
+    precision={"dia": 1, "station": part_spec.STATION_PLACES},
+)
+
+requirement("head_back_face",
+    kind="face",
+    faces=(PlanarFace((-1.0, 0.0, 0.0), part_spec.HEAD_LENGTH),),
+    requirements=("station",),
+    fields={
+        "normal": ([-1.0, 0.0, 0.0], ("__frame__",)),
+        "plane": (
+            {"frame": "model", "axis": "x", "value": -part_spec.HEAD_LENGTH},
+            ("HEAD_LENGTH",),
+        ),
+        "station": (limits(part_spec.HEAD_BACK, part_spec.STOCK_PLACES), ("HEAD_BACK",)),
+        "station_nominal": (part_spec.HEAD_BACK, ("HEAD_BACK",)),
+        "height_from": _FROM_TIP,
+    },
+    precision={"station": part_spec.STOCK_PLACES},
+)
+
+# The thread runs from the faced tip to the printed thread start, where
+# the locating journal begins.
+requirement("thread",
+    kind="boss",
+    faces=(CylinderFace(part_spec.THREAD_MODEL_DIA),),
+    requirements=("thread", "length"),
+    fields={
+        "axis": _AXIS,
+        "thread": (part_spec.THREAD, ("THREAD",)),
+        "length": (
+            limits(part_spec.THREAD_START, part_spec.STATION_PLACES),
+            ("THREAD_START", ("ch_rocker_arm_spec", "HUB_LENGTH")),
+        ),
+        "length_nominal": (part_spec.THREAD_START, ("THREAD_START",)),
+        "height_from": _FROM_TIP,
+    },
+    precision={"length": part_spec.STATION_PLACES},
+)
+
 DONOR_KEEP = {
     "TailDia": (0.300, 0.060),
     "HeadDia": (0.360, 0.060),
@@ -111,6 +189,44 @@ PROFILE_DIAMETER_XY = {
         PROFILE_CENTER[1] - 0.030,
     ),
 }
+
+
+requirement("locating_body",
+    kind="boss",
+    faces=(CylinderFace(part_spec.BODY_DIA),),
+    requirements=("note", "finish_ra"),
+    fields={
+        "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+        "axis": _AXIS,
+        "dia_nominal": (part_spec.BODY_DIA, ("BODY_DIA",)),
+        "note": (
+            part_spec.BODY_FIT_NOTE,
+            (
+                "BODY_FIT_NOTE",
+                ("ch_rocker_arm_spec", "PIVOT_HOLE_DIA"),
+                ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"),
+            ),
+        ),
+        "finish_ra": (part_spec.MACHINED_UM, ("SURFACE_FINISHES",)),
+    },
+    precision={"finish_ra": 1},
+)
+
+requirement("vise_tail",
+    kind="boss",
+    faces=(CylinderFace(part_spec.TAIL_DIA),),
+    requirements=("dia", "station"),
+    fields={
+        "axis": _AXIS,
+        "dia": (limits(part_spec.TAIL_DIA, 1), ("TAIL_DIA",)),
+        "dia_nominal": (part_spec.TAIL_DIA, ("TAIL_DIA",)),
+        "station": (limits(part_spec.OVERALL_LENGTH, part_spec.STOCK_PLACES), ("OVERALL_LENGTH",)),
+        "station_nominal": (part_spec.OVERALL_LENGTH, ("OVERALL_LENGTH",)),
+        "height_from": _FROM_TIP,
+    },
+    precision={"dia": 1, "station": part_spec.STOCK_PLACES},
+)
+
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -168,7 +284,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     diameters = [
-        _move_dimension(
+        move_model_dimension(
             adapter,
             annotation,
             profile,
@@ -197,7 +313,7 @@ async def build(adapter: Any) -> dict[str, str]:
             label=f"filing stud {name}",
             diameter=name.endswith("Dia"),
         )
-        # Policy rules 2 and 6: the matched fit rides the callout.
+        # drawing-guidelines.md rule 4 (tighten only for function, and name the mate) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit rides the callout.
         for part, text in zip((3, 4), REFERENCE_CALLOUTS.get(name, ())):
             if text:  # swDimensionTextCalloutAbove / CalloutBelow
                 display.SetText(part, text)

@@ -22,7 +22,7 @@ The one sub-assembly with no original to copy.
 | `pn-pen-wire` | TODO | TODO | TODO |
 | `pn-pen-hanger` | TODO | TODO | TODO |
 | `vn-pen-set-screw` | TODO | TODO | TODO |
-| `mg-output-fixture` | TODO | TODO | TODO |
+| `mg-output-fixture` | 1 | C36000 brass | 9.525 mm (3/8 in) hex bar (`mg_output_fixture_geom.HEX_AF`); TODO(cut it first) |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

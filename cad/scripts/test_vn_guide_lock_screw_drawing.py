@@ -1,28 +1,14 @@
-"""Offline contracts for the MHA-VN-046 guide-lock screw (McMaster 91255A108)."""
+"""Offline contracts for the MHA-VN-046 guide-lock screw (McMaster 91792A108)."""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
-import math
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-import _appearance
-import _com
-import _custom_properties
-import _dimensions
-import _extrude
-import _feature_tree
-import _part_checks
-import _part_properties
-import _part_save
-import _rebuild
-import _session
 import _sketch
-import _sketch_rectangle
 import _config
 import _telemetry
 import build_vn_guide_lock_screw as part
@@ -34,67 +20,46 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _hole_spec import blind_cut_dia_mm
 from _test_stock_recipes import discovered_recipes
-import _mcmaster_91255a106 as series
-from diagnostics import diag_mcmaster_button_head as recipe
-from diagnostics import diag_build_91255A108 as sku_recipe
+import _mcmaster_91792a108 as pan
+from diagnostics import diag_mcmaster_fillister as recipe
+from diagnostics import diag_mcmaster_oval as catalog
+from diagnostics import diag_build_91792A108 as sku_recipe
 from diagnostics import diag_mcmaster_lib
 
 STEM = "vn-guide-lock-screw"
 IN = 25.4
-# R9-31: the paper-drive contract's lock-screw head envelope (Ø × height).
-HEAD_ENVELOPE = (5.5, 2.0)
 
 
 def test_recipe_is_the_catalogue_screw() -> None:
-    """The 91255A106 page per mcmaster.com (2026-09-30): #4-40, button head
-    0.213 x 0.059, 1/16 hex drive, fully threaded; R9-48 takes the series'
-    3/8 in length, 91255A108 ([INFERENCE], not yet read live)."""
-    dims = sku_recipe.DIMS
-    assert dims.part_no == screw.SKU == "91255A108"
-    assert dims.major_dia == pytest.approx(0.112 * IN)
-    assert dims.pitch == pytest.approx(IN / 40.0)
-    assert dims.length == pytest.approx(0.375 * IN)
-    assert replace(dims, part_no=series.PART_NO, length=0.25 * IN) == series.DIMS
-    assert dims.head_dia == pytest.approx(0.213 * IN)
-    assert dims.head_h == pytest.approx(0.059 * IN)
-    assert dims.hex_af == pytest.approx(IN / 16.0)
-
-
-def test_head_fits_the_contract_envelope() -> None:
-    dia, height = HEAD_ENVELOPE
-    assert screw.HEAD_DIA <= dia
-    assert screw.HEAD_H <= height
+    """The McMaster 18-8 pan head slotted family table (read live
+    2026-10-11): #4-40 x 3/8 under the head, head Ø0.219 x 0.068 in."""
+    assert pan.PART_NO == screw.SKU == "91792A108"
+    assert pan.PAN_HEAD_SIZE == pytest.approx(
+        (0.112 * IN, 0.375 * IN, 0.068 * IN, 0.219 * IN, IN / 40.0)
+    )
+    assert (
+        screw.SHANK_DIA,
+        screw.SHANK_LEN,
+        screw.HEAD_H,
+        screw.HEAD_DIA,
+        screw.PITCH,
+    ) == pan.PAN_HEAD_SIZE
 
 
 def test_shank_is_the_lock_stack() -> None:
-    """The shank passes the lock plate into the guide's through tap (R9-48)
-    and stops inside the rail."""
+    """The shank passes the 1/16 lock sheet into the guide's through tap
+    (R9-48) and stops inside the rail."""
     assert screw.THREAD == "#4-40"
     assert guide.LOCK_SCREW_PASSAGE == lock.LOCK_THICK
     assert screw.SHANK_LEN == pytest.approx(
         guide.LOCK_SCREW_PASSAGE + guide.LOCK_SCREW_THREAD_ENGAGEMENT
     )
     assert guide.LOCK_SCREW_THREAD_ENGAGEMENT >= screw.SHANK_DIA
+    assert screw.ENGAGEMENT_WORST >= screw.ENGAGEMENT_FLOOR_D * screw.SHANK_DIA
     assert guide.LOCK_TAP_SPEC.end == "through_all"
     assert guide.LOCK_SCREW_TIP_INSIDE_MIN > 0.0
     # The 1/8 drill in the lock plate passes the shank.
     assert blind_cut_dia_mm(lock.HOLE_SPEC) > screw.SHANK_DIA
-
-
-def test_button_head_follows_the_91255A148_laws() -> None:
-    d = series.DIMS
-    assert d.flat_top_dia == pytest.approx(1.4 * d.hex_af)
-    assert d.band_h == pytest.approx(0.15 * d.head_h)
-    assert d.edge_fillet_r == pytest.approx(0.05 * d.head_h)
-    assert d.socket_depth == pytest.approx(0.55 * d.head_h)
-    # The flat top covers the hex corners; the socket floor stays above the band.
-    assert d.flat_top_dia > 2.0 * d.hex_corner_r
-    assert d.head_h - d.socket_depth > d.band_h
-    # The dome passes through the flat top's edge and the OD at the band top.
-    yc, big_r = d.dome_center_y, d.dome_radius
-    assert math.hypot(d.flat_top_dia / 2.0, d.head_h - yc) == pytest.approx(big_r)
-    assert math.hypot(d.head_dia / 2.0, d.band_h - yc) == pytest.approx(big_r)
-    assert 0.0 < recipe.bearing_face_dia(d) < 2.0 * d.bearing_edge_r < d.head_dia
 
 
 class _Recorder:
@@ -118,10 +83,7 @@ class _Recorder:
 
                 return call
 
-        self.obj = _Obj
         self.currentSketchManager = _Obj("sketch")
-        self.currentModel = _Obj("model")
-        self.currentModel.__dict__["FeatureManager"] = _Obj("fm")
 
     def log(self, name: str, args=(), kwargs=None) -> None:
         self.events.append((name, tuple(args), dict(kwargs or {})))
@@ -138,6 +100,12 @@ class _Recorder:
 
     async def create_revolve(self, *args):
         return await self._async("create_revolve", *args)
+
+    async def create_cut_extrude(self, *args):
+        return await self._async("create_cut_extrude", *args)
+
+    async def create_extrusion(self, *args):
+        return await self._async("create_extrusion", *args)
 
     async def add_fillet(self, *args):
         return await self._async("add_fillet", *args)
@@ -168,45 +136,8 @@ def _record(monkeypatch) -> list[tuple]:
     monkeypatch.setattr(recipe, "name_last_feature", logger("name_last_feature"))
     monkeypatch.setattr(recipe, "volume_check", volume_check)
     monkeypatch.setattr(recipe, "insert_helix", logger("insert_helix"))
-    monkeypatch.setattr(recipe, "offset_plane", logger("offset_plane"))
     monkeypatch.setattr(recipe, "thread_sweep_cut", logger("thread_sweep_cut"))
     monkeypatch.setattr(_sketch, "add_line_chain", add_line_chain)
-    monkeypatch.setattr(_sketch_rectangle, "add_line_chain", add_line_chain)
-    monkeypatch.setattr(_appearance, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(_com, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(_custom_properties, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(_feature_tree, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(_part_checks, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(_part_properties, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(_part_save, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(_rebuild, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(_session, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(_sketch, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(
-        _dimensions,
-        "_feature_by_name",
-        lambda _adapter, name: adapter.obj(f"feature {name}"),
-    )
-    monkeypatch.setattr(
-        _feature_tree,
-        "_feature_by_name",
-        lambda _adapter, name: adapter.obj(f"feature {name}"),
-    )
-    monkeypatch.setattr(
-        _sketch,
-        "_feature_by_name",
-        lambda _adapter, name: adapter.obj(f"feature {name}"),
-    )
-    monkeypatch.setattr(_com, "_read_member", lambda obj, name: getattr(obj, name))
-    monkeypatch.setattr(_custom_properties, "_read_member", lambda obj, name: getattr(obj, name))
-    monkeypatch.setattr(_extrude, "_read_member", lambda obj, name: getattr(obj, name))
-    monkeypatch.setattr(_feature_tree, "_read_member", lambda obj, name: getattr(obj, name))
-    monkeypatch.setattr(_part_properties, "_read_member", lambda obj, name: getattr(obj, name))
-    monkeypatch.setattr(_rebuild, "_read_member", lambda obj, name: getattr(obj, name))
-    monkeypatch.setattr(_session, "_read_member", lambda obj, name: getattr(obj, name))
-    monkeypatch.setattr(_sketch, "_read_member", lambda obj, name: getattr(obj, name))
-    monkeypatch.setattr(_sketch_rectangle, "_read_member", lambda obj, name: getattr(obj, name))
     monkeypatch.setattr(diag_mcmaster_lib, "no_sketch_inference", no_inference)
     monkeypatch.setattr(
         diag_mcmaster_lib,
@@ -217,34 +148,39 @@ def _record(monkeypatch) -> list[tuple]:
         )[1],
     )
     monkeypatch.setattr(_telemetry, "info", lambda *a, **k: None)
-    asyncio.run(sku_recipe.build_91255A108(adapter))
+    asyncio.run(sku_recipe.build_91792A108(adapter))
     return adapter.events
 
 
-def test_recipe_profile_is_the_catalogue_head_and_shank(monkeypatch) -> None:
-    d = sku_recipe.DIMS
+def test_recipe_profile_is_the_catalogue_pan_head_and_shank(monkeypatch) -> None:
+    major, length, head_h, head_dia, _pitch = pan.PAN_HEAD_SIZE
+    band = 0.8 * head_h
     calls = _record(monkeypatch)
     (arc,) = [c for c in calls if c[0] == "sketch.Create3PointArc"]
     start, end = arc[1][0:2], arc[1][3:5]
-    assert start == pytest.approx((d.flat_top_dia / 2000.0, d.head_h / 1000.0))
-    assert end == pytest.approx((d.head_dia / 2000.0, d.band_h / 1000.0))
+    assert start == pytest.approx((0.0, head_h / 1000.0))
+    assert end == pytest.approx((head_dia / 2000.0, band / 1000.0))
     profile = [c[1][0] for c in calls if c[0] == "add_line_chain"][0]
-    assert max(y for _x, y in profile) == pytest.approx(d.head_h)
-    assert max(x for x, _y in profile) == pytest.approx(d.head_dia / 2.0)
-    assert min(y for _x, y in profile) == pytest.approx(-d.length)
-    (revolved,) = [c for c in calls if c[0] == "volume_check" and c[1][0] == "revolved body"]
-    assert revolved[1][1] == pytest.approx(recipe.revolved_volume(d))
+    assert max(y for _x, y in profile) == pytest.approx(head_h)
+    assert max(x for x, _y in profile) == pytest.approx(head_dia / 2.0)
+    assert min(y for _x, y in profile) == pytest.approx(-length)
+    assert (major / 2.0, 0.0) in profile
 
 
-def test_recipe_cuts_the_socket_fillets_and_thread(monkeypatch) -> None:
-    d = sku_recipe.DIMS
+def test_recipe_cuts_the_driver_slot_and_thread(monkeypatch) -> None:
+    _major, length, head_h, head_dia, pitch = pan.PAN_HEAD_SIZE
+    slot_w = 0.135 * head_dia
     calls = _record(monkeypatch)
-    (cut,) = [c for c in calls if c[0] == "fm.FeatureCut4"]
-    assert cut[1][5] == pytest.approx(d.socket_depth / 1000.0)
-    (fillet,) = [c for c in calls if c[0] == "add_fillet"]
-    assert fillet[1][0] == pytest.approx(d.edge_fillet_r)
+    slot = [c[1][0] for c in calls if c[0] == "add_line_chain"][1]
+    assert sorted({x for x, _y in slot}) == pytest.approx([-slot_w / 2.0, slot_w / 2.0])
+    slot_floor = min(y for _x, y in slot)
+    assert slot_floor == pytest.approx(head_h - 1.5 * slot_w)
+    # The slot floor stays inside the head, above its bearing face.
+    assert 0.0 < slot_floor < head_h
+    assert ("create_sketch", ("Front",), {}) in calls
+    assert any(c[0] == "create_cut_extrude" for c in calls)
     (helix,) = [c for c in calls if c[0] == "insert_helix"]
-    assert helix[1][1:3] == pytest.approx((IN / 40.0, 0.375 * IN / (IN / 40.0) + 1.0))
+    assert helix[1][1:3] == pytest.approx((pitch, length / pitch + 1.0))
     sweeps = [c for c in calls if c[0] == "thread_sweep_cut"]
     assert [c[1][-1] for c in sweeps] == ["ThreadGroove"]
     assert ("split_at_plane", ("Top Plane", "HeadSplit"), {}) in calls
@@ -257,11 +193,12 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
     assert stock.skus == tuple(row["supplier_skus"]) == (screw.SKU,)
     assert stock.supplier == row["supplier"] == "McMaster-Carr"
     assert stock.stock_name == row["stock_name"]
-    assert stock.material == row["material"] == part.MATERIAL == "Alloy Steel"
+    assert "Slotted" in stock.stock_name
+    assert stock.material == row["material"] == part.MATERIAL == "AISI 304"
     assert row["number"] == "MHA-VN-046"
     metadata = discovered_recipes()[screw.SKU]
     assert metadata.module == sku_recipe.__name__
-    assert getattr(sku_recipe, metadata.callable_name) is sku_recipe.build_91255A108
+    assert getattr(sku_recipe, metadata.callable_name) is sku_recipe.build_91792A108
     assert metadata.threaded
 
 
@@ -294,15 +231,15 @@ def test_stock_build_takes_the_fillister_frame(monkeypatch) -> None:
     (component,) = seen["components"]
     (reference,) = fillister_seen["components"]
     assert component.sku == screw.SKU
-    assert component.author is sku_recipe.build_91255A108
+    assert component.author is sku_recipe.build_91792A108
     assert component.transform == reference.transform
     assert "screw_axis_planes" not in seen
 
 
 def test_standalone_recipe_run_is_catalog_only(monkeypatch, tmp_path) -> None:
     """No vendor model: the standalone run builds the recipe and saves it
-    under the reference directory, never entering the replica path."""
-    assert not hasattr(recipe, "replica_main")
+    under the reference directory, never entering a replica path."""
+    assert not hasattr(sku_recipe, "replica_main")
     saved: list[str] = []
     built: list = []
 
@@ -323,11 +260,15 @@ def test_standalone_recipe_run_is_catalog_only(monkeypatch, tmp_path) -> None:
     async def no_close(_adapter):
         return None
 
-    monkeypatch.setattr(recipe, "check", lambda *a, **k: True)
-    monkeypatch.setattr(sku_recipe, "build_91255A108", fake_recipe)
+    monkeypatch.setattr(catalog, "check", lambda *a, **k: True)
+    monkeypatch.setattr(sku_recipe, "build_91792A108", fake_recipe)
     monkeypatch.setattr(diag_mcmaster_lib, "OUT_DIR", tmp_path)
-    monkeypatch.setattr(diag_mcmaster_lib, "assert_seat_sketch_baseline", lambda *a: None)
-    monkeypatch.setattr(diag_mcmaster_lib, "mass_properties", lambda _a: {"volume_mm3": 40.0})
+    monkeypatch.setattr(
+        diag_mcmaster_lib, "assert_seat_sketch_baseline", lambda *a: None
+    )
+    monkeypatch.setattr(
+        diag_mcmaster_lib, "mass_properties", lambda _a: {"volume_mm3": 40.0}
+    )
     monkeypatch.setattr(diag_mcmaster_lib, "export_views", no_views)
     monkeypatch.setattr(diag_mcmaster_lib, "close_all", no_close)
     adapter = _Adapter()

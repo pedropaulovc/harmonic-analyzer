@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from fractions import Fraction
 
 from _assembly_contract import assembly_contract
 import _config
@@ -111,6 +112,89 @@ def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
     printed = tuple(float(value) for value in match.groups())
     assert printed == cone_stack_end_play.SHAFT_END_PLAY
     assert 0.0 < printed[0] < printed[1]
+
+
+def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
+    import vn_post_mount_screw_spec as screw
+
+    row = _config.parts("vn-post-mount-screw")
+    fitup = _step_body("post-and-tip-block")
+    assert row["number"] == drawing.BOM_PART_NUMBERS["vn-post-mount-screw"]
+    assert row["supplier_skus"][0] == screw.SKU
+    assert f"MSC {screw.SKU}" in drawing.BOM_DESCRIPTIONS["vn-post-mount-screw"]
+    assert (
+        f"MSC {screw.SKU}, {screw.THREAD} X {screw.STOCK_LENGTH_MM / 25.4:g} IN STOCK"
+        in fitup
+    )
+    places = screw.DRAWING_PRECISION_BY_NAME[screw.CUT_LENGTH_DIMENSION]
+    assert f"({screw.CUT_LENGTH_MM:.{places}f}) REF CUT LENGTH" in fitup
+    assert f"FLUSH TO {screw.POST_SCREW_CUT_TO_FIT_SHORT:g} SHORT" in fitup
+    assert "CUT TO FIT" in fitup and "UNDERSIDE, NEVER PROUD" in fitup
+    assert "DEBURR ENDS" in fitup
+    assert screw.FIXED_CUT_LENGTH_EXISTS is False
+    assert screw.STOCK_LENGTH_MM >= screw.FIXED_LENGTH_ENGAGEMENT_MIN_MM
+    assert (
+        0.0
+        <= screw.FLUSH_LENGTH_MM - screw.CUT_LENGTH_MM
+        <= screw.POST_SCREW_CUT_TO_FIT_SHORT
+    )
+    assert drawing.POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT in fitup
+
+
+def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> None:
+    import dt_crank_pinion_spec as pinion
+
+    fitup = _step_body("crank-mesh-checked")
+    shared_check = " ".join(pinion.T120_FITUP_ASSEMBLY_CHECK.split())
+    assert shared_check in fitup
+    order = (
+        "SLIDE MHA-DT-010 ON UNPINNED",
+        f"SET MHA-DT-010 {pinion.SEAT_FEELER_MM:.2f} OFF",
+        shared_check,
+        "TURN MHA-DT-007 ONE FULL REVOLUTION; IT MUST NEVER BIND",
+        "THEN MATCH-DRILL/REAM MHA-DT-029",
+        "RE-CHECK NO BINDING",
+    )
+    positions = [fitup.index(phrase) for phrase in order]
+    assert positions == sorted(positions)
+    assert "FLUSH BOTH SIDES" in fitup
+    assert "BACKLASH" not in fitup
+
+
+def test_full_turn_checks_use_the_spec_ratio_and_clear_the_unrelieved_platform() -> None:
+    import dt_crank_drive_gear_spec as gear64
+    import dt_crank_pinion_spec as pinion
+
+    checks = " ".join(drawing.CHECKS.split())
+    ratio = Fraction(pinion.TEETH, gear64.TEETH)
+    assert f"CONE SET {ratio} TURN ({pinion.TEETH}T:{gear64.TEETH}T)" in checks
+    assert "WITHOUT BINDING THROUGH ONE FULL MHA-DT-007 TURN" in checks
+    assert "MHA-DT-007 CLEAR OF THE UNRELIEVED MHA-DT-020 TOP THROUGHOUT" in checks
+    assert "RELIEF THROUGHOUT" not in checks
+    assert "FINISHING IN THE CYLINDERS' RUNNING DIRECTION TO TAKE UP PLAY" in checks
+    assert "BINDING THROUGH ONE FULL MHA-DT-007 TURN" in " ".join(
+        drawing.FIT_PLACEHOLDER.split()
+    )
+
+
+def test_crank_washer_fit_retains_the_live_recess_and_feeler_window() -> None:
+    import dt_crank_pinion_spec as pinion
+    import dt_crank_seat_washer_spec as washer
+
+    fitup = " ".join(drawing.CRANK_WASHER_FIT_NOTES.split())
+    middle = (pinion.SHAFT_END_RECESS_MIN + pinion.SHAFT_END_RECESS_MAX) / 2.0
+    assert f"{middle:.2f} BELOW MHA-DT-010 NORTH FACE" in fitup
+    assert f"({washer.GAP_MIN:.2f}-{washer.GAP_MAX:.2f})" in fitup
+    assert (
+        f"{pinion.SHAFT_END_RECESS_MIN:.2f}-{pinion.SHAFT_END_RECESS_MAX:.2f} BELOW"
+        in fitup
+    )
+    assert f"END PLAY {pinion.SEAT_FEELER_MM:.2f}" in fitup
+    assert (
+        fitup.index("WITHDRAW BOTH")
+        < fitup.index("FROM THE REAR")
+        < fitup.index("REFIT")
+    )
 
 
 def test_a_cite_to_the_wrong_step_is_caught() -> None:

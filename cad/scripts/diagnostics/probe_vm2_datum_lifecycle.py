@@ -95,10 +95,6 @@ def assert_annotation_state(state, baseline=None):
 
 def edge_ownership(app, edge, source_part, source_extension, view):
     """Map view topology to the source, require exact roundtrip and body identity."""
-    if __package__:
-        from . import _script_paths  # noqa: F401
-    else:
-        import _script_paths  # noqa: F401
     from _com import _early_bound
 
     bodies = tuple(source_part.GetBodies2(0, False) or ())  # swSolidBody, including hidden bodies

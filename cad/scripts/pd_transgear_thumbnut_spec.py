@@ -1,13 +1,13 @@
 r"""MHA-PD-013 transgear-thumbnut: the knurled brass nut on the knob shaft's stud.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  The nut runs on the 1/4-20 stud of the knob shaft (MHA-PD-008) and
+closure.  The nut runs on the #8-32 stud of the knob shaft (MHA-PD-008) and
 seats on the drive collar's (MHA-PD-022) pilot, faced at assembly to stand
 0.05-0.15 proud of the removable chain wheel's (MHA-PD-009, T24) front face, so
 the wheel floats free under it (R9-70, N-A).  Contract §1.6 (round 10):
 knurled head Ø20.5 × 8.7 with a dished front face (a cone from Ø15 at the
 rim to a flat Ø9 floor 1.0 deep), a Ø11 waist × 2.4 (ruling 5), a Ø12.4
-flange to the seat face, 16.1 long, 1/4-20 UNC-2B through with an entry
+flange to the seat face, 16.1 long, #8-32 UNC-2B through with an entry
 countersink at each end.  The stud's
 side of the engagement (tip station, tip chamfer, cut-to-fit) is MHA-PD-008's;
 this module owns only the nut's side of it.
@@ -28,7 +28,7 @@ from __future__ import annotations
 import math
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import angular_band_deg, printed_deviations
 
 # --- Turned outline (contract §1.6) -------------------------------------------
 HEAD_DIA = 20.5  # knurl crests: the diameter over the knurl
@@ -103,22 +103,33 @@ DISH_FLOOR_CORNER = (DISH_FLOOR_DIA / 2.0, DISH_FLOOR_Y)
 
 
 # --- Thread (contract §1.6, §7) -----------------------------------------------
-THREAD = "1/4-20"
+THREAD = "#8-32"
 TAP_SPEC = HoleSpec("tapped", THREAD)  # UNC-2B, through all
 TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]
-# The smallest 1/4-20 UNC-2B minor diameter, 0.1960 in, ASME B1.1 as tabled
-# by Engineers Edge (read 2026-10-01,
-# https://www.engineersedge.com/thread_strength/internal_screw_threads_chart.htm):
-# where the nut stands over MHA-PD-008's thread relief its crests clear it.
-TAP_MINOR_2B_MIN = 0.1960 * 25.4  # 4.978
+# Conservative #8-32 UNC-2B minor diameter: the published rounded 0.130 in
+# lower limit, ASME B1.1 Class 2B table (read 2026-10-08):
+# https://itpbolt.com/wp-content/uploads/2015/08/Class-2B-Internal-Threads.pdf
+# Where the nut stands over the shaft's relief, its crests must clear it.
+TAP_MINOR_2B_MIN = 0.130 * 25.4
 # 90° entry countersink at each end, opened 0.2 past the thread major so the
 # first thread starts full rather than on a feather edge.  The sheet prints
 # it as a MAX, so the thread it removes never exceeds the losses below.
 CSK_DIA = THREAD_MAJOR + 2.0 * 0.2
+CSK_DIA_PLACES = 3
+CSK_DIA_TOL_TYPE = 6  # swTolType_e.swTolMAX, same physical envelope as before
+CSK_DIA_DEVIATIONS = (THREAD_MAJOR - CSK_DIA, 0.0)
+CSK_INCLUDED_ANGLE_DEG = 90.0
+CSK_INCLUDED_ANGLE_TOL = angular_band_deg()
+CSK_HALF_ANGLE_DEG = CSK_INCLUDED_ANGLE_DEG / 2.0
+CSK_HALF_ANGLE_BAND = (
+    CSK_INCLUDED_ANGLE_TOL / 2.0, -CSK_INCLUDED_ANGLE_TOL / 2.0
+)
+CSK_HALF_ANGLE_PLACES = 1
+CSK_HALF_ANGLE_MIN = CSK_HALF_ANGLE_DEG + min(CSK_HALF_ANGLE_BAND)
 if CSK_DIA <= THREAD_MAJOR:
     raise AssertionError("MHA-PD-013 countersink ends inside the thread major")
-CSK_QUALIFIER = f"90\u00b0 CSK \u00d8{CSK_DIA:.2f} MAX BOTH ENDS"
+CSK_QUALIFIER = "2X CSK, BOTH ENDS"
 # Rear countersink: a 45° break on the tap-drill edge of the seat face, its
 # cone y = CSK_DIA / 2 - r.  Front: the same break on the dish floor, its
 # cone y = FRONT_CSK_APEX_Y + r.
@@ -228,8 +239,10 @@ for _name, _margin in DISH_FLOOR_MARGINS.items():
 # from the seat face and from the rim, the front one on the dish floor at its
 # deepest printed depth) and, after cut-to-fit, the nut's shortest printed
 # length.  The stud's tip station and chamfer are MHA-PD-008's.
-REAR_THREAD_LOSS = REAR_FULL_THREAD_Y - SEAT_FACE_Y  # 0.823
-FRONT_THREAD_LOSS = RIM_Y - FRONT_FULL_THREAD_Y + _DISH_DEPTH_HI  # 2.623
+# Smallest accepted included angle makes the largest axial thread loss.
+# Charge the printed angular row, not the nominal exactly-45-degree cone.
+REAR_THREAD_LOSS = REAR_CSK_BREAK / math.tan(math.radians(CSK_HALF_ANGLE_MIN))
+FRONT_THREAD_LOSS = DISH_DEPTH + _DISH_DEPTH_HI + REAR_THREAD_LOSS
 
 # The Ø20.5 dimension is the diameter over the knurl; the designation gives
 # the pitch and the 90° tooth, so no tooth count prints (R9-57).  One line:
@@ -252,6 +265,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HeadProfile": {"HeadDia", "HeadLength", "OverallLength"},
     "StemProfile": {"FlangeDia", "WaistDia", "WaistLength"},
     "DishProfile": {"DishDia", "DishFloorDia", "DishDepth"},
+    "CountersinkProfile": {"CountersinkDia", "CountersinkHalfAngle"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HeadProfile": {
@@ -268,6 +282,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "DishDia": DISH_DIA_PLACES,
         "DishFloorDia": DISH_FLOOR_DIA_PLACES,
         "DishDepth": DISH_DEPTH_PLACES,
+    },
+    "CountersinkProfile": {
+        "CountersinkDia": CSK_DIA_PLACES,
+        "CountersinkHalfAngle": CSK_HALF_ANGLE_PLACES,
     },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {

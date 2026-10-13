@@ -56,7 +56,6 @@ import math
 import pd_rack_pinion_spec as DISC
 import pd_transgear_arm_geometry as ARM
 import pd_transgear_arm_plate_geometry as ARM_PLATE
-import pd_transgear_arm_plate_spec as ARM_PLATE_SPEC
 import pd_transgear_disc_hub_geometry as HUB_JOINT
 import pd_transgear_feed_pinion_spec as SLEEVE
 import pd_transgear_knob_shaft_spec as KNOB_SHAFT
@@ -96,7 +95,7 @@ F_TERMS: tuple[tuple[str, float, float], ...] = (
     (
         "MHA-PD-019 hub face station",
         ARM_PLATE.HUB_FACE_TO_MOUNTING,
-        printed_band_mm(ARM_PLATE_SPEC.HUB_STATION_PLACES),
+        ARM_PLATE.HUB_FACE_TO_MOUNTING_BAND,
     ),
     ("MHA-VN-046 thrust ring length", KNOB_RING.LENGTH, KNOB_RING.LENGTH_TOL),
     (
@@ -201,7 +200,7 @@ DISC_REAR_Z = round(DISC_FRONT_Z + DISC.FACE_WIDTH, 6)  # -144.65
 NOSE_Z = round(SLEEVE_REAR_Z - SLEEVE.OVERALL_LENGTH, 6)  # -157.75
 HUB_FRONT_Z = round(STEP_Z - HUB_LENGTH_MODEL, 6)  # -157.70
 FRONT_BUSHING_REAR_Z = NOSE_Z
-FRONT_BUSHING_FRONT_Z = round(NOSE_Z - FRONT_BUSHING_MODEL, 6)  # -162.7775
+FRONT_BUSHING_FRONT_Z = round(NOSE_Z - FRONT_BUSHING_MODEL, 6)  # -162.8275
 RING_REAR_Z = round(FRONT_BUSHING_FRONT_Z - SLEEVE_FLOAT_WINDOW_CENTRE, 6)  # -163.0775
 RING_FRONT_Z = round(RING_REAR_Z - RING.THICKNESS, 6)  # -163.7125
 F_Z = round(ARM_REAR_Z - F_FROM_ARM_REAR, 6)  # -148.1
@@ -225,7 +224,7 @@ BORE_DIA_BAND = SLEEVE.BORE_DIA_BAND
 BORE_DIAMETRAL_CLEARANCE = (
     round(BORE_DIA_BAND[1] - PIN.DIA_BAND[0], 3),
     round(BORE_DIA_BAND[0] - PIN.DIA_BAND[1], 3),
-)  # 0.012 .. 0.038
+)
 
 for _ok, _what in (
     (

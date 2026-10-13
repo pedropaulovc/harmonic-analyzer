@@ -8,8 +8,8 @@ sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
 The casting has two axes and they are not parallel: the crank journal runs
-along part +Z and the cone journal is yawed 12.5182 degrees about the vertical
-body axis.  The part therefore persists a named view looking exactly down the
+along part +Z and the cone journal follows the configured cone-line incline
+about the vertical body axis. The part persists a view looking exactly down the
 cone axis.  That view retains the boss end face and shows its Ø17.2 OD and
 Ø12.281 bore as separate true-shape circles.  A native section in the
 horizontal cone-bore plane removes the head from the projection and exposes
@@ -39,6 +39,14 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
 )
 
+import _surface_finish
+import dt_cone_gear_shaft_spec as cone_shaft
+import dt_cone_pivot_post_spec as cone
+from _feature_requirements import part_metadata, requirement
+from _printed_limits import drilled_limits as _drilled_band
+from _printed_limits import limits as _band
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _check import check
 from _com import _early_bound
 from _drawing_centerline import add_view_centerline
@@ -163,6 +171,19 @@ DATUM_B_TAG_XY = (
 if not DATUM_B_TAG_XY[1] < _front_y(0.0):
     raise AssertionError("datum B's tag no longer sits below the foot seat it tags")
 
+FOOT_SEAT = requirement(
+    "foot_seat", kind="face", faces=(cone.SURFACE_FINISHES[0].face,),
+    requirements=("finish_ra",), fields={
+        "normal": ([0.0, -1.0, 0.0], ("SURFACE_FINISHES",)),
+        "finish_ra": (_surface_finish.SEAT_UM, ("SURFACE_FINISHES",)),
+        "datum": ("B", ("PART_DATUMS",)),
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
+    }, precision={"finish_ra": 1},
+)
+part_metadata(datums={
+    "B": ({"feature": "foot_seat", "surface": "foot seat plane"}, ("PART_DATUMS",)),
+})
+
 
 def _top_x(model_x: float) -> float:
     return TOP_CENTER[0] + model_x * _S
@@ -189,6 +210,53 @@ CONE_SECTION_LINE = (
 )
 
 
+def _cone_source_frames() -> dict[str, tuple[dict[str, Any], tuple[str, ...]]]:
+    """Rigid copies of model on authored axes, never setups or fixture choices."""
+    normal = cone.SURFACE_FINISHES[3].face.normal
+    axis = (-normal[0], -normal[2])
+    note = "geometry-only source frame on an authored spec axis; not a setup"
+    return {
+        "body_axis": (
+            {"origin": [0.0, 0.0, 0.0], "x": [1.0, 0.0, 0.0], "y": [0.0, 0.0, -1.0], "z": [0.0, 1.0, 0.0], "note": note},
+            ("__frame__", "BLOCK_HEIGHT", "HEAD_BASE_Y", "HEAD_HEIGHT"),
+        ),
+        "crank_axis": (
+            {"origin": [0.0, cone.CRANK_BORE_HEIGHT, 0.0], "x": [1.0, 0.0, 0.0], "y": [0.0, 1.0, 0.0], "z": [0.0, 0.0, 1.0], "note": note},
+            ("CRANK_BORE_HEIGHT", "CRANK_BOSS_START_Z", "CRANK_BOSS_LENGTH"),
+        ),
+        "cone_axis": (
+            {"origin": [0.0, cone.BORE_HEIGHT, 0.0], "x": [axis[1], 0.0, -axis[0]], "y": [0.0, 1.0, 0.0], "z": [axis[0], 0.0, axis[1]], "note": note},
+            ("BORE_HEIGHT", "INCLINE_DEG", "SURFACE_FINISHES"),
+        ),
+    }
+
+
+_P = cone.DRAWING_PRECISION_BY_NAME
+_NORMAL = cone.SURFACE_FINISHES[3].face.normal
+_HEAD_SOURCES = ("HEAD_BASE_Y", "BLOCK_HEIGHT", "HEAD_HEIGHT")
+_CRANK_END_SOURCES = ("CRANK_BOSS_START_Z", "CRANK_BOSS_NORTH_FACE", "HEAD_DIA", "CRANK_BOSS_END_Z", "CRANK_BOSS_LENGTH", "CRANK_BOSS_LENGTH_IN")
+part_metadata(
+    fields={"volume_mm3": (cone.HARVESTED_VOLUME_MM3, ("HARVESTED_VOLUME_MM3",))},
+    frames=_cone_source_frames(), model_sources=("BLOCK_HEIGHT",),
+    precision_sources=("DRAWING_PRECISION_BY_NAME", "GEOMETRIC_CONTROLS", ("_surface_finish", "ra")),
+)
+
+
+def _size_requirement(
+    kind: str, dimensions: dict[str, tuple[str, str]],
+    extras: dict[str, tuple[Any, tuple[str, ...]]] | None = None,
+) -> dict[str, Any]:
+    values = {}
+    precision = {}
+    for key, (constant, dimension) in dimensions.items():
+        model = getattr(cone, constant)
+        values[key] = (_band(model, _P[dimension]), (constant,))
+        values[f"{key}_nominal"] = (model, (constant,))
+        precision[key] = _P[dimension]
+    values.update(extras or {})
+    return {"kind": kind, "requirements": tuple(dimensions), "fields": values, "precision": precision}
+
+
 FRONT_KEEP = {
     "MainBodyHt": (0.040, FRONT_CENTER[1]),
     "MainBodyDia": (0.150, 0.080),
@@ -203,6 +271,50 @@ FRONT_KEEP = {
     # x=0.155 the two sat 4.15 mm apart, under one text height (r7 audit).
     "CrankBoreDia": (0.149, 0.172),
 }
+
+BODY = requirement(
+    "body", faces=(CylinderFace(cone.BLOCK_DIA),),
+    **_size_requirement("boss", {"dia": ("BLOCK_DIA", "MainBodyDia"), "height": ("BLOCK_HEIGHT", "MainBodyHt")}, {
+        "frame": ("body_axis", (*_HEAD_SOURCES, ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
+        "z_mm": ([0.0, round(cone.HEAD_BASE_Y, 12)], _HEAD_SOURCES),
+    }),
+)
+HEAD = requirement(
+    "head", faces=(CylinderFace(cone.HEAD_DIA), PlanarFace((0, 1, 0), cone.BLOCK_HEIGHT)),
+    **_size_requirement("boss", {"dia": ("HEAD_DIA", "HeadDia"), "height": ("HEAD_HEIGHT", "HeadHt")}, {
+        "frame": ("body_axis", (*_HEAD_SOURCES, ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
+        "z_mm": ([round(cone.HEAD_BASE_Y, 12), round(cone.BLOCK_HEIGHT, 12)], _HEAD_SOURCES),
+    }),
+)
+CRANK_BOSS = requirement(
+    "crank_boss", faces=(CylinderFace(cone.CRANK_BOSS_DIA),),
+    **_size_requirement("boss", {"dia": ("CRANK_BOSS_DIA", "CrankBossDia")}, {
+        "frame": ("crank_axis", ("CRANK_BORE_HEIGHT", ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
+        "z_mm": ([round(cone.CRANK_BOSS_START_Z, 12), round(cone.CRANK_BOSS_END_Z, 12)], _CRANK_END_SOURCES),
+    }),
+)
+CRANK_BORE = requirement(
+    "crank_bore", kind="hole", faces=(cone.SURFACE_FINISHES[1].face,),
+    requirements=("dia", "thru", "finish_ra", "separation", "angularity_dia", "angularity_datums"), fields={
+        "at": ([0.0, cone.CRANK_BORE_HEIGHT, 0.0], ("CRANK_BORE_HEIGHT",)),
+        "axis": ([0.0, 0.0, 1.0], ("INCLINE_DEG",)),
+        "dia": (_band(cone.CRANK_BORE_DIA, _P["CrankBoreDia"], cone.RUNNING_BORE_BAND), ("CRANK_BORE_DIA", "RUNNING_BORE_BAND")),
+        "nominal_dia": (cone.CRANK_BORE_DIA, ("CRANK_BORE_DIA",)), "thru": (True, (("draw_dt_cone_pivot_post", "DIMENSION_CALLOUTS"),)),
+        "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
+        "separation": (_band(cone.CRANK_ABOVE_CONE, _P["CrankAboveCone"], cone.CRANK_ABOVE_CONE_BAND), ("CRANK_ABOVE_CONE", "CRANK_ABOVE_CONE_BAND")),
+        "height_from": ("journal_bore", (("draw_dt_cone_pivot_post", "build"),)),
+        "height_nominal": (cone.CRANK_BORE_HEIGHT, ("CRANK_BORE_HEIGHT",)),
+        "angularity_dia": (float(cone.GEOMETRIC_CONTROLS[0].tolerance), ("CRANK_BORE_ANGULARITY_MM", "GEOMETRIC_CONTROLS")),
+        "angularity_datums": (list(cone.GEOMETRIC_CONTROLS[0].datums), ("GEOMETRIC_CONTROLS",)),
+        "dimension_type": ("basic", ("BASIC_DIMENSIONS",)),
+        "land_angle_nominal_deg": (cone.INCLINE_DEG, ("INCLINE_DEG", "BASIC_DIMENSIONS")),
+        "angle_tol_deg": (cone.CRANK_BORE_ANGLE_LIMIT_DEG, ("CRANK_BORE_ANGLE_LIMIT_DEG",)),
+    }, precision={
+        "dia": _P["CrankBoreDia"], "finish_ra": 1, "separation": _P["CrankAboveCone"],
+        "angularity_dia": len(cone.GEOMETRIC_CONTROLS[0].tolerance.partition(".")[2]),
+        "land_angle_nominal_deg": _P["InclineAngle"],
+    },
+)
 # The plan's hidden-owner import shows JournalPlanReference's rays for the
 # plan angle and CrankBossStationReference's ray for the crank boss's
 # north-face station, the face the crank boss length is taken from.
@@ -222,6 +334,36 @@ TOP_KEEP = {
     "MountWestX": (0.110, 0.2525),
     "InclineAngle": (0.142, _top_y(28.0)),
 }
+
+CRANK_BOSS_FACES = requirement(
+    "crank_boss_faces", faces=(
+        PlanarFace((0, 0, -1), cone.CRANK_BOSS_NORTH_FACE),
+        PlanarFace((0, 0, 1), cone.CRANK_BOSS_END_Z),
+    ),
+    **_size_requirement("face", {"length": ("CRANK_BOSS_LENGTH", "CrankBossLen"), "station": ("CRANK_BOSS_NORTH_FACE", "CrankBossStartZ")}),
+)
+for _side, _x, _dim in (("west", -cone.ATTACHMENT_X, "MountWestX"), ("east", cone.ATTACHMENT_X, "MountEastX")):
+    _name = f"mount_{_side}"
+    requirement(
+        _name, kind="hole", faces=(CylinderFace(cone.ATTACHMENT_THRU_DIA, contains_x_mm=_x),),
+        requirements=("dia", "thru", "station"), fields={
+            "at": ([_x, cone.BLOCK_HEIGHT, 0.0], ("ATTACHMENT_X", "BLOCK_HEIGHT")), "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
+            "dia": (_drilled_band(cone.ATTACHMENT_THRU_DIA, _P[_dim]), ("ATTACHMENT_THRU_DIA", ("_drawing_hole_callout", "add_native_hole_callout"))),
+            "nominal_dia": (cone.ATTACHMENT_THRU_DIA, ("ATTACHMENT_THRU_DIA",)), "thru": (True, (("draw_dt_cone_pivot_post", "build"),)),
+            "station": (_band(_x, _P[_dim]), ("ATTACHMENT_X",)), "station_nominal": (_x, ("ATTACHMENT_X",)),
+        }, precision={"dia": _P[_dim], "station": _P[_dim]},
+    )
+    requirement(
+        f"{_name}_counterbore", kind="counterbore", faces=(
+            CylinderFace(cone.ATTACHMENT_CBORE_DIA, contains_x_mm=_x),
+            PlanarFace((0, 1, 0), cone.BLOCK_HEIGHT - cone.ATTACHMENT_CBORE_DEPTH, contains_x_mm=_x),
+        ),
+        requirements=("dia", "depth"), fields={
+            "parent": (_name, (("draw_dt_cone_pivot_post", "build"),)),
+            "dia": (_band(cone.ATTACHMENT_CBORE_DIA, _P[_dim]), ("ATTACHMENT_CBORE_DIA",)), "nominal_dia": (cone.ATTACHMENT_CBORE_DIA, ("ATTACHMENT_CBORE_DIA",)),
+            "depth": (_band(cone.ATTACHMENT_CBORE_DEPTH, _P[_dim]), ("ATTACHMENT_CBORE_DEPTH",)), "depth_ref": (cone.ATTACHMENT_CBORE_DEPTH, ("ATTACHMENT_CBORE_DEPTH",)),
+        }, precision={"dia": _P[_dim], "depth": _P[_dim]},
+    )
 SECTION_KEEP = {
     "ConeBossLen": (0.355, 0.235),
 }
@@ -235,6 +377,31 @@ JOURNAL_KEEP = {
     "ConeBossDia": (0.292, 0.172),
     "JournalBoreDia": (0.292, 0.153),
 }
+
+CONE_BOSS = requirement(
+    "cone_boss", faces=(CylinderFace(cone.CONE_BOSS_DIA),),
+    **_size_requirement("boss", {"dia": ("CONE_BOSS_DIA", "ConeBossDia")}, {
+        "frame": ("cone_axis", ("BORE_HEIGHT", "INCLINE_DEG", "SURFACE_FINISHES", ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
+        "z_mm": ([round(-cone.CONE_BOSS_LENGTH / 2, 12), round(cone.CONE_BOSS_LENGTH / 2, 12)], ("CONE_BOSS_LENGTH", "BLOCK_DIA")),
+    }),
+)
+JOURNAL_BORE = requirement(
+    "journal_bore", kind="hole", faces=(cone.SURFACE_FINISHES[2].face,),
+    requirements=("dia", "thru", "finish_ra", "height", "unknown"), fields={
+        "at": ([0.0, cone.BORE_HEIGHT, 0.0], ("BORE_HEIGHT",)),
+        "axis": ([-_NORMAL[0], 0.0, -_NORMAL[2]], ("INCLINE_DEG",)),
+        "dia": (_band(cone.BORE_DIA, _P["JournalBoreDia"], cone.RUNNING_BORE_BAND), ("BORE_DIA", "RUNNING_BORE_BAND")),
+        "nominal_dia": (cone.BORE_DIA, ("BORE_DIA",)), "thru": (True, (("draw_dt_cone_pivot_post", "DIMENSION_CALLOUTS"),)),
+        "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
+        "height": (_band(cone.BORE_HEIGHT, _P["JournalAxisY"], (cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM, -cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM)), ("BORE_HEIGHT", "JOURNAL_AXIS_HEIGHT_TOLERANCE_MM")),
+        "height_from": ("foot_seat", ("BORE_HEIGHT",)), "datum": ("A", ("PART_DATUMS",)),
+        # No rim-break field exists: keep the sourced note and unknown inspection.
+        "note": (cone_shaft.POST_JOURNAL_RIM_BREAK, (("dt_cone_gear_shaft_spec", "POST_JOURNAL_RIM_BREAK"), ("dt_cone_gear_shaft_spec", "THRUST_EDGE_BREAK_MAX"))),
+    }, precision={"dia": _P["JournalBoreDia"], "finish_ra": 1, "height": _P["JournalAxisY"]},
+)
+part_metadata(datums={
+    "A": ({"feature": "journal_bore", "surface": "cone journal bore cylinder"}, ("PART_DATUMS",)),
+})
 # Both chained heights share the dimension line at JOURNAL_KEEP's x, and the
 # crank spacing's extension line runs up it past the 33.37's text, so that text
 # must end left of the line.  Its x here is only a start:
@@ -342,6 +509,22 @@ def _bore_rim_edge(view: Any, *, diameter_mm: float) -> Any:
 # The collar's Ra symbol sits up and left of its leader's landing point, clear
 # of the face-to-face dimension on the section's right (sheet metres).
 _NORTH_BOSS_FINISH_OFFSET = (-0.018, 0.006)
+
+
+CONE_BOSS_NORTH_FACE = requirement(
+    "cone_boss_north_face", kind="face", faces=(cone.SURFACE_FINISHES[3].face,),
+    requirements=("length", "finish_ra"), fields={
+        "length": (_band(cone.CONE_BOSS_LENGTH, _P["ConeBossLen"]), ("CONE_BOSS_LENGTH",)),
+        "length_nominal": (cone.CONE_BOSS_LENGTH, ("CONE_BOSS_LENGTH",)),
+        "normal": (list(_NORMAL), ("SURFACE_FINISHES",)),
+        "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
+    }, precision={"length": _P["ConeBossLen"]},
+)
+CONE_BOSS_SOUTH_FACE = requirement(
+    "cone_boss_south_face", kind="face",
+    faces=(PlanarFace(tuple(-v for v in _NORMAL), cone.CONE_BOSS_LENGTH / 2),),
+    requirements=(), fields={"normal": (tuple(-v for v in _NORMAL), ("SURFACE_FINISHES",))},
+)
 
 
 def _north_boss_end_edge(section: Any) -> Any:
@@ -1302,9 +1485,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="foot seat finish",
         char_height=0.0025,
     )
-    # The crank-bore Ra stands left of the head, between the (72.70)'s witness
-    # and the 86.0's top witness: above the view its leader crossed the 86.0's
-    # top witness (leader-crosses-line, ha-perf-parts audit).
+    # The crank-bore Ra stands left of the head, between the crank-height
+    # reference and the body's top witness: a symbol above the view crossed
+    # that top witness (leader-crosses-line, ha-perf-parts audit).
     add_surface_finish(
         adapter,
         front,
@@ -1387,15 +1570,18 @@ async def build(adapter: Any) -> dict[str, str]:
                 ),
             ),
             # The frame sits right of the head between HeadHt's extension
-            # lines, its leader landing on the bore rim at -28 degrees,
-            # between the CRANK BOSS diameter line and the centre-mark arm:
+            # lines, 3.7 mm below the crank axis, so it rides with the head
+            # when the post's height moves (a fixed y=0.138 met HeadHt's lower
+            # witness once the inch-train body grew to 94.7). Its leader lands
+            # on the bore rim at -28 degrees, between the CRANK BOSS diameter
+            # line and the centre-mark arm:
             # from (0.160, 0.128) to the natural lower-left landing it
             # crossed HeadHt's and CrankBossDia's lines (leader-crosses-line,
             # af13).  A sheet-point pick sets the landing; explicit leader
             # placement detached a GTol from its edge (fulcrum 1149f227f).
             "crank_bore_angularity": PmiDrawingPlacement(
                 view=front,
-                position=(0.124, 0.138),
+                position=(0.124, _front_y(CRANK_BORE_HEIGHT) - 0.0037),
                 attachment_xy=(
                     _front_x(CRANK_BORE_DIA / 2.0 * math.cos(math.radians(-28.0))),
                     _front_y(

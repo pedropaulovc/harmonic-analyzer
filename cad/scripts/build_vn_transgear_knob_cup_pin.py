@@ -7,7 +7,7 @@ assembly, so the cup is pinned to the shaft as the rear stop of its end
 float.  The stock recipe ``diagnostics/diag_build_98296A031.py`` models it as
 installed, a 1/16 tube with the catalog's 0.012 wall.
 
-Frame: axis along local X, centred on the origin (MHA-VN-037's layout).  The
+Frame: axis along local X, centred on the origin.  The
 axis is published as ``ScrewAxis`` (Front Plane x Top Plane); the Right Plane
 is the pin's mid-length plane.
 

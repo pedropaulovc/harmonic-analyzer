@@ -12,7 +12,7 @@ import draw_ch_rocker_arm_tl_filing_button as button_drawing
 import draw_ch_rocker_arm_tl_filing_stud as stud_drawing
 import export_features
 import pytest
-from _feature_requirements import limits
+from _printed_limits import limits
 from prechips.model import TOLERANCE_REQUIREMENTS
 
 BUTTON = "ch_rocker_arm_tl_filing_button"

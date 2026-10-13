@@ -34,7 +34,7 @@ from sm_summing_lever_spec import HEX_H, HEX_W
 
 # --- fixed geometry for the drawing's view math (mirrors build_sm_knife_mount) ----
 R_BORE = 6.0  # Ø12 knife-bearing bore (2026-09-02 ch18 p.42 re-read: close bore)
-BLK_HALF_X = 12.0  # block half-width (24 across)
+BLK_HALF_X = 12.5  # block half-width (25 across)
 SUPPORT_Z_THICK = 14.0  # axial depth straddling the trunnion mid
 BLK_TOP = 14.87  # local block top (clamped to the top-frame casting underside)
 BLK_BOT = -14.75  # local block bottom (BORE_CY - R_BORE - 3.0 wall)
@@ -132,9 +132,11 @@ def free_rock_deg(
 # 7.96, 0.18 -> 7.17.  The drawing-guidelines.md rule 17 (walls and webs) budget -- the trunnion's .XXX section and
 # the bore's .XX size at their band limits, t the ⊥Ø0.05 zone plus the dowel
 # yaw across the deepest .X block -- is
-# ``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG`` (>= 5.0, 6.16 in
-# the reamed bore), which owns the crossbar's slip terms.  Ø0.05 is also the bedding
-# gap a 0.05 feeler finds under a top seat that rocks on the casting.
+# ``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG`` (>= 5.0, 6.31 in
+# the reamed bore), which owns the crossbar's slip terms.  The top seat
+# clamps to the frame's faced Ra 3.2 underside plane (MHA-FR-002, user ruling
+# 2026-10-12), so no bedding term enters: seat form tilts the block, it
+# cannot yaw the bore off the dowel line.
 KNIFE_FREE_ROCK_DEG = free_rock_deg(0.0)
 # The bore crown (its upper inner wall) below the top seat: 14.62.
 BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
@@ -231,7 +233,7 @@ STUD_TAP_THREAD_DEPTH_MIN = STUD_TAP_THREAD_DEPTH - STUD_TAP_THREAD_DEPTH_BAND  
 # other in a slot along the dowel line, so the pattern never overconstrains.
 # The reamed holes hold the press of the stock dowel, as the MHA-PD-018
 # latch-pin hole holds the same 1/8 series' (``pd_transgear_arm_geometry``).
-PIN_HOLE_X = DOWEL.HANGER_OFFSET  # 6.350
+PIN_HOLE_X = DOWEL.HANGER_OFFSET  # 7.100
 PIN_HOLE_XS = (-PIN_HOLE_X, PIN_HOLE_X)
 PIN_HOLE_COUNT = len(PIN_HOLE_XS)
 if PIN_HOLE_COUNT != DOWEL.PER_MOUNT:
@@ -243,7 +245,7 @@ if PIN_HOLE_COUNT != DOWEL.PER_MOUNT:
 # pattern centre varies by the zone's radius, and from the tap axis by that
 # plus the tap's zone radius.
 PIN_HOLE_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"])
-PIN_HOLE_SPAN = DOWEL.SPAN  # 12.700 BASIC
+PIN_HOLE_SPAN = DOWEL.SPAN  # 14.200 BASIC
 PIN_HOLE_SPAN_PLACES = DOWEL.SPAN_PLACES
 PIN_HOLE_SPAN_TOL = PIN_HOLE_POSITION_TOL  # 0.13: the span's worst variation
 PIN_HOLE_HALF_SPAN_TOL = PIN_HOLE_SPAN_TOL / 2.0  # 0.065
@@ -283,17 +285,17 @@ _PIN_R_MAX = (PIN_HOLE_DIA + max(PIN_HOLE_DIA_BAND)) / 2.0
 # side face (.XX, the BASIC span chains on to the -X hole) and the -X hole's
 # axis from the front face (.X).  The row's square to the front face is the
 # title block's angular tolerance.
-PIN_HOLE_SIDE_DISTANCE = BLK_HALF_X - PIN_HOLE_X  # 5.65
+PIN_HOLE_SIDE_DISTANCE = BLK_HALF_X - PIN_HOLE_X  # 5.40
 PIN_HOLE_SIDE_PLACES = 2
 PIN_HOLE_SIDE_TOL = _XX  # 0.51
 HOLE_ROW_FACE_DISTANCE = SUPPORT_Z_THICK / 2.0  # 7.0
 HOLE_ROW_FACE_PLACES = 1
 HOLE_ROW_FACE_TOL = _X  # 0.8
 _ANGULAR_TOL_DEG = float(_config.title_block("angular")["value_deg"])  # 1.0
-# To the +X side face: 5.65 - 0.51 - 1.5875 = 3.55.
+# To the +X side face: 5.40 - 0.51 - 1.5875 = 3.30.
 PIN_HOLE_SIDE_WEB = PIN_HOLE_SIDE_DISTANCE - PIN_HOLE_SIDE_TOL - _PIN_R_MAX
 # The -X hole to the -X face, the narrowest .X block and the hole a full span
-# variation out: 23.2 - (6.16 + 12.83) - 1.5875 = 2.62.
+# variation out: 24.2 - (5.91 + 14.33) - 1.5875 = 2.37.
 PIN_HOLE_FAR_SIDE_WEB = (
     (2.0 * BLK_HALF_X - BLOCK_SIZE_TOL)
     - (PIN_HOLE_SIDE_DISTANCE + PIN_HOLE_SIDE_TOL + PIN_HOLE_SPAN + PIN_HOLE_SPAN_TOL)
@@ -302,10 +304,10 @@ PIN_HOLE_FAR_SIDE_WEB = (
 # Front and back faces: the -X hole off its .X band, the block at its
 # thinnest .X depth, the row skewed by the angular tolerance.  The +X hole
 # stands a full pattern variation and the longest span's skew off it, 0.13 +
-# 12.83 tan 1 deg = 0.354; the tap the half-span band, its zone radius and
-# half that skew, 0.227.  Back (the binding side) 13.2 - 7.8 = 5.4 from the
-# -X axis: dowel 5.4 - 0.354 - 1.5875 = 3.46, tap thread 5.4 - 0.227 -
-# 1.7525 = 3.42.
+# 14.33 tan 1 deg = 0.380; the tap the half-span band, its zone radius and
+# half that skew, 0.240.  Back (the binding side) 13.2 - 7.8 = 5.4 from the
+# -X axis: dowel 5.4 - 0.380 - 1.5875 = 3.43, tap thread 5.4 - 0.240 -
+# 1.7525 = 3.41.
 _ROW_Z_MIN = min(
     HOLE_ROW_FACE_DISTANCE - HOLE_ROW_FACE_TOL,
     (2.0 * HOLE_ROW_FACE_DISTANCE - BLOCK_SIZE_TOL)
@@ -320,8 +322,8 @@ STUD_TAP_Z_WALL = (
 )
 # The bore's flanks, its axis off the pattern centre by its zone radius and
 # the pattern centre off the side face by the +X hole's band and the span's
-# half variation: near 12 - 0.575 - 0.10 - 6.015 = 5.31, far 23.2 - 12.575 -
-# 0.10 - 6.015 = 4.51.
+# half variation: near 12.5 - 0.575 - 0.10 - 6.015 = 5.81, far 24.2 - 13.075
+# - 0.10 - 6.015 = 5.01.
 _PATTERN_X_MAX = BLK_HALF_X + PIN_HOLE_SIDE_TOL + PIN_HOLE_HALF_SPAN_TOL
 BORE_SIDE_WEB = (
     (2.0 * BLK_HALF_X - BLOCK_SIZE_TOL)
@@ -338,11 +340,11 @@ BORE_BOTTOM_WALL = (
     - KNIFE_BORE_POSITION_TOL / 2.0
     - BORE_R_MAX
 )
-# To the tap's thread major: 6.235 - 1.5875 - 1.7525 = 2.90.
+# To the tap's thread major: 6.985 - 1.5875 - 1.7525 = 3.645.
 PIN_HOLE_TAP_WEB = (PIN_HOLE_X - PIN_HOLE_X_TOL) - _PIN_R_MAX - STUD_THREAD_MAJOR / 2.0
 # The hole floor's inner corner to the bore, the floor at its deepest and the
 # bore at its largest, highest position, its axis also off the pattern
-# centre toward the hole by its zone radius: 4.95.
+# centre toward the hole by its zone radius: 5.52.
 _PIN_FLOOR_Y_MIN = BLK_TOP - (PIN_HOLE_DEPTH + DOWEL.PRESS_DEPTH_TOL)
 PIN_HOLE_BORE_WEB = (
     (PIN_HOLE_X - PIN_HOLE_HALF_SPAN_TOL - KNIFE_BORE_POSITION_TOL / 2.0 - _PIN_R_MAX)

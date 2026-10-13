@@ -22,3 +22,6 @@ flip_invert: []
 allowed_free_stems: []
 required_free_stems: []
 free_dof: 0
+# carries_chain: wraps the roller chain, so verify:soundness's interference
+#   gate gets the authored wheel mounts, as the assembly build does (541011de0).
+carries_chain: true

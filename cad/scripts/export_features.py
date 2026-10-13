@@ -16,194 +16,25 @@ import ast
 import hashlib
 import importlib
 import importlib.util
+from functools import lru_cache
 import json
 import math
-from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 from typing import Any
 
 import _config
-import _hole_spec
+import _part_properties
 import _surface_finish
-import dt_cone_gear_shaft_spec as cone_shaft
-import dt_cone_pivot_post_spec as cone
-import ch_pivot_shaft_spec as shaft
-import ch_rocker_arm_notes as rocker_notes
-import ch_rocker_arm_spec as rocker
-import rocker_bank_layout as bank
-from _feature_requirements import ExportFeature, limits
-from _gtol_cylinder import CylinderFace
+from _feature_requirements import declaration_calls, discover_parts, metadata_for, requirements_for, source_tree
 from _gtol_face import FaceSpec
-from _gtol_planar import PlanarFace
-from _gtol_sphere import SphereFace
 from _printed_tolerance import printed_band_mm
 
-# Parts whose ``<stem>_spec.EXPORT_FEATURES`` declares every requirement feature.
-SPEC_DRIVEN_PARTS: tuple[str, ...] = (
-    "dt_cone_pivot_post_tl_cap_jaw_button",
-    "ch_rocker_arm_tl_pivot_screw",
-    "ch_rocker_arm_tl_pivot_washer",
-    "ch_rocker_arm_tl_profile_fixture",
-    "dt_cone_pivot_post_tl_bond_cradle",
-    "ch_pivot_bracket_tl_ledge",
-    "ch_pivot_bracket_tl_angle_plate",
-    "dt_cone_pivot_post_tl_saw_cradle",
-    "ch_rocker_arm_tl_vise_stop",
-    "ch_rocker_arm_tl_filing_button",
-    "ch_rocker_arm_tl_filing_stud",
-    "ch_rocker_arm_tl_inspection_box",
-    "ch_rocker_arm_tl_c_stop_bar",
-    "dt_cone_pivot_post_tl_soft_jaw",
-    "ch_rocker_arm_tl_diamond_pin",
-)
-SUPPORTED_PARTS = ("ch_rocker_arm", "ch_pivot_shaft", "dt_cone_pivot_post", *SPEC_DRIVEN_PARTS)
+SUPPORTED_PARTS = discover_parts(Path(__file__).resolve().parent)
 REPO = Path(__file__).resolve().parents[2]
 CONFIG_DIR = REPO / "cad" / "config"
 OUT = REPO / "cad" / "out"
 UNKNOWN = "unknown"
-
-
-# Hand-authored source citations live only here. Python citations name line
-# ranges; YAML citations name scalar values by dotted key path.
-# The offline tripwire resolves every emitted YAML path, including registry ones.
-SOURCE_MAP = {
-    "rocker_hole": (
-        "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:517-523",
-        (("ROD_HOLE_SPEC", "expect_dia_mm"),),
-    ),
-    "rocker_hole_callout": (
-        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:442-452",
-        (("add_native_hole_callout", 'label="rod-pin hole"'),),
-    ),
-    "hole_callout": (
-        "harmonic-analyzer/cad/scripts/_drawing_hole_callout.py:50-56,83,136-153",
-        (("dia_tolerance_mm",), ("AddHoleCallout2",), ("compose_hole_callout_prefix",)),
-    ),
-    "rocker_position": (
-        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:546-556",
-        (("add_feature_control_frame", 'datums=("A", "B", "C")'),),
-    ),
-    "cone_mount": (
-        "harmonic-analyzer/cad/scripts/build_dt_cone_pivot_post.py:116-123",
-        (("ATTACHMENT_HOLE_SPEC", "CounterBoreDepth"),),
-    ),
-    "cone_mount_callout": (
-        "harmonic-analyzer/cad/scripts/draw_dt_cone_pivot_post.py:1269-1280",
-        (("add_native_hole_callout", 'label="mounting counterbores"'),),
-    ),
-    "rocker_strap_frame": (
-        "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:398-410",
-        (("depth=ARM_THICKNESS", "both_directions=True"),),
-    ),
-    "rocker_hub_frame": (
-        "harmonic-analyzer/cad/scripts/build_ch_rocker_arm.py:431-441",
-        (("depth=HUB_LENGTH", "both_directions=True"),),
-    ),
-    "cone_frame": (
-        "harmonic-analyzer/cad/scripts/build_dt_cone_pivot_post.py:10-16,372-395",
-        (("body stands on Top at y=0",), ('create_sketch("Top")', "depth=BLOCK_HEIGHT")),
-    ),
-    "cone_head_frame": (
-        "harmonic-analyzer/cad/scripts/build_dt_cone_pivot_post.py:399-429",
-        (("HEAD_BASE_Y..BLOCK_HEIGHT", 'base_plane="Top Plane", offset=HEAD_BASE_Y', "depth=HEAD_HEIGHT"),),
-    ),
-    "cone_crank_axis": (
-        "harmonic-analyzer/cad/scripts/build_dt_cone_pivot_post.py:439-478",
-        (("Straight crank boss along +Z", "offset=CRANK_BOSS_START_Z", "CRANK_BORE_HEIGHT,", "depth=CRANK_BOSS_LENGTH"),),
-    ),
-    "cone_journal_axis": (
-        "harmonic-analyzer/cad/scripts/build_dt_cone_pivot_post.py:126-136",
-        (("journal axis runs through (0, BORE_HEIGHT, 0)", "(sin I, 0, cos I)", "CONE_BOSS_LENGTH/2 either side"),),
-    ),
-    "rocker_datum_a": (
-        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:483-502",
-        (('datum="A"', "_require_datum_on_bore"),),
-    ),
-    "rocker_datum_b": (
-        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:517-536",
-        (("RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0", 'datum="B"'),),
-    ),
-    "right_view_frame": (
-        "harmonic-analyzer/cad/scripts/draw_ch_pivot_shaft.py:63-64",
-        (('"*Right"', "Model -Z runs to the sheet's right"),),
-    ),
-    "rocker_datum_c": (
-        "harmonic-analyzer/cad/scripts/draw_ch_rocker_arm.py:537-545",
-        (("_sheet_xy(_TIP_FACE_MID_X, _TIP_FACE_MID_Y)", 'datum="C"'),),
-    ),
-    "drawing_revision": (
-        "harmonic-analyzer/cad/config/release.yaml:next_revision",
-        (),
-    ),
-    "drawing_properties": (
-        "harmonic-analyzer/cad/scripts/_part_properties.py:16-30",
-        (("def part_properties", '"Revision": _config.release_revision()'),),
-    ),
-    "linear_1pl": (
-        "harmonic-analyzer/cad/config/title_block.yaml:linear_1pl.display",
-        (),
-    ),
-    "linear_2pl": (
-        "harmonic-analyzer/cad/config/title_block.yaml:linear_2pl.display",
-        (),
-    ),
-    "linear_3pl": (
-        "harmonic-analyzer/cad/config/title_block.yaml:linear_3pl.display",
-        (),
-    ),
-    "angular": (
-        "harmonic-analyzer/cad/config/title_block.yaml:angular.value_deg",
-        (),
-    ),
-    "drilled_hole_plus": (
-        "harmonic-analyzer/cad/config/title_block.yaml:drilled_hole.plus_mm",
-        (),
-    ),
-    "drilled_hole_minus": (
-        "harmonic-analyzer/cad/config/title_block.yaml:drilled_hole.minus_mm",
-        (),
-    ),
-    "edge_break_r": (
-        "harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_mm",
-        (),
-    ),
-    "chamfer_max": (
-        "harmonic-analyzer/cad/config/title_block.yaml:edge_break.chamfer_max_mm",
-        (),
-    ),
-    "edge_break_display_r": (
-        "harmonic-analyzer/cad/config/title_block.yaml:edge_break.display_r",
-        (),
-    ),
-    "edge_break_display_chamfer": (
-        "harmonic-analyzer/cad/config/title_block.yaml:edge_break.display_chamfer",
-        (),
-    ),
-}
-
-
-def _source_cite(*keys: str) -> list[str]:
-    return [SOURCE_MAP[key][0] for key in keys]
-
-
-def source_paths() -> tuple[Path, ...]:
-    """Import and citation inputs; config accessor reads use doit's _config_deps."""
-    from _buildgraph import module_deps_of
-
-    script = Path(__file__).resolve()
-    paths = {script, *(Path(path).resolve() for path in module_deps_of(script))}
-    paths.update(
-        REPO / reference.removeprefix("harmonic-analyzer/").partition(":")[0]
-        for reference, _anchors in SOURCE_MAP.values()
-    )
-    for stem in SUPPORTED_PARTS:
-        notes = _notes_module(stem)
-        note_path = Path(notes.__file__).resolve()
-        paths.add(note_path)
-        paths.update(Path(path).resolve() for path in module_deps_of(note_path))
-        paths.add(CONFIG_DIR / "parts" / f"{stem.replace('_', '-')}.yaml")
-    return tuple(sorted(paths))
 
 
 def _stem(stem: str) -> str:
@@ -213,19 +44,47 @@ def _stem(stem: str) -> str:
     return normalized
 
 
-@lru_cache(maxsize=None)
+def _drawing_module(stem: str) -> ModuleType:
+    return importlib.import_module(f"draw_{stem}")
+
+
+def _spec_module(stem: str) -> ModuleType:
+    return importlib.import_module(f"{stem}_spec")
+
+
+def _notes_module(stem: str) -> ModuleType:
+    name = f"{stem}_notes"
+    if importlib.util.find_spec(name) is not None:
+        return importlib.import_module(name)
+    return _spec_module(stem)
+
+
 def _declarations(module: ModuleType) -> dict[str, str]:
+    """Resolve cached, current AST declarations rather than hand-entered spans."""
     path = Path(module.__file__).resolve()
+    return _source_declarations(path, source_tree(path))
+
+
+def _target_names(target: ast.AST) -> tuple[str, ...]:
+    if isinstance(target, ast.Name):
+        return (target.id,)
+    if isinstance(target, (ast.Tuple, ast.List)):
+        return tuple(name for item in target.elts for name in _target_names(item))
+    return ()
+
+
+@lru_cache(maxsize=256)
+def _source_declarations(path: Path, tree: ast.Module) -> dict[str, str]:
     relative = path.relative_to(REPO).as_posix()
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    doc = tree.body[0]
-    result = {"__frame__": f"harmonic-analyzer/{relative}:1-{doc.end_lineno}"}
+    result = {}
+    if tree.body and isinstance(tree.body[0], ast.Expr) and isinstance(tree.body[0].value, ast.Constant) and isinstance(tree.body[0].value.value, str):
+        result["__frame__"] = f"harmonic-analyzer/{relative}:{tree.body[0].lineno}-{tree.body[0].end_lineno}"
     for node in tree.body:
         if isinstance(node, ast.Assign):
-            names = [target.id for target in node.targets if isinstance(target, ast.Name)]
+            names = [name for target in node.targets for name in _target_names(target)]
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
             names = [node.target.id]
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             names = [node.name]
         else:
             continue
@@ -235,462 +94,151 @@ def _declarations(module: ModuleType) -> dict[str, str]:
 
 
 def _cite(module: ModuleType, *names: str) -> list[str]:
-    return [_declarations(module)[name] for name in names]
+    declarations = _declarations(module)
+    missing = [name for name in names if name not in declarations]
+    if missing:
+        raise ValueError(f"{module.__name__}: missing citation symbol(s): {', '.join(missing)}")
+    return [declarations[name] for name in names]
+
+
+def _spec_cite(module: ModuleType, sources: tuple[str | tuple[str, str], ...]) -> list[str]:
+    citations = []
+    for source in sources:
+        owner, name = (importlib.import_module(source[0]), source[1]) if isinstance(source, tuple) else (module, source)
+        citations.extend(_cite(owner, name))
+    return list(dict.fromkeys(citations))
+
+
+@lru_cache(maxsize=256)
+def _call_spans(tree: ast.Module) -> frozenset[tuple[int, int]]:
+    return frozenset(
+        (call.lineno, call.end_lineno)
+        for api in ("requirement", "part_metadata")
+        for call in declaration_calls(tree, api)
+    )
+
+
+def _call_cite(path: Path, span: tuple[int, int]) -> list[str]:
+    tree = source_tree(path)
+    if span not in _call_spans(tree):
+        raise ValueError(f"missing declaration call at {path}:{span[0]}-{span[1]}")
+    return [f"harmonic-analyzer/{path.relative_to(REPO).as_posix()}:{span[0]}-{span[1]}"]
+
+
+def _title_cite(*keys: str) -> list[str]:
+    """Stable YAML paths to the title-block facts, validated as they are read."""
+    citations = []
+    for key in keys:
+        row, _, field = key.partition(".")
+        value = _config.title_block(row)
+        for component in field.split("."):
+            value = value[component]
+        citations.append(f"harmonic-analyzer/cad/config/title_block.yaml:{key}")
+    return citations
+
+
+def _source_module_path(name: str, scripts: Path) -> Path:
+    if not name or any(not component.isidentifier() for component in name.split(".")):
+        raise ValueError(f"invalid citation source module: {name!r}")
+    base = scripts.joinpath(*name.split("."))
+    for path in (base.with_suffix(".py"), base / "__init__.py"):
+        if path.is_file():
+            return path.resolve()
+    raise ValueError(f"missing citation source module: {name}")
+
+
+def _source_modules(tree: ast.Module) -> set[str]:
+    """Collect explicit (module, NAME) roots, including helper/runtime sources."""
+    assignments = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                for name in _target_names(target):
+                    assignments[name] = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None:
+            assignments[node.target.id] = node.value
+
+    def resolve(node: ast.AST, seen: frozenset[str] = frozenset()) -> ast.AST:
+        if isinstance(node, ast.Name) and node.id in assignments and node.id not in seen:
+            return resolve(assignments[node.id], seen | {node.id})
+        return node
+
+    modules = set()
+
+    def add_sources(node: ast.AST) -> None:
+        node = resolve(node)
+        if not isinstance(node, (ast.Tuple, ast.List)):
+            return
+        for source in node.elts:
+            if isinstance(source, ast.Starred):
+                add_sources(source.value)
+                continue
+            source = resolve(source)
+            if isinstance(source, ast.Tuple) and len(source.elts) == 2:
+                owner, symbol = (resolve(item) for item in source.elts)
+                if all(isinstance(item, ast.Constant) and isinstance(item.value, str) for item in (owner, symbol)):
+                    modules.add(owner.value)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Tuple) and len(node.elts) == 2:
+            # Also covers sourced values returned by declaration helpers.
+            add_sources(node.elts[1])
+        elif isinstance(node, ast.keyword) and node.arg in {"model_sources", "precision_sources"}:
+            add_sources(node.value)
+    return modules
+
+
+def source_paths(stem: str) -> tuple[Path, ...]:
+    """Statically cover this draw and its source closures; never import them."""
+    from _buildgraph import module_deps_of
+
+    stem = _stem(stem)
+    scripts = Path(__file__).resolve().parent
+    drawing = _source_module_path(f"draw_{stem}", scripts)
+    spec = _source_module_path(f"{stem}_spec", scripts)
+    notes = scripts / f"{stem}_notes.py"
+    roots = {Path(__file__).resolve(), drawing, spec}
+    if notes.is_file():
+        roots.add(notes.resolve())
+    roots.update(_source_module_path(name, scripts) for name in _source_modules(source_tree(drawing)))
+    paths = set(roots)
+    for path in roots:
+        paths.update(Path(dependency).resolve() for dependency in module_deps_of(path))
+    paths.add(CONFIG_DIR / "parts" / f"{stem.replace('_', '-')}.yaml")
+    return tuple(sorted(paths))
+
+
+def feature_selectors(stem: str) -> dict[str, tuple[FaceSpec, ...]]:
+    """Resolve all STEP patches using each drawing's geometric feature domains."""
+    drawing = _drawing_module(_stem(stem))
+    return {name: declared.faces for name, declared in requirements_for(drawing).items()}
 
 
 def _finish_precision() -> int:
     return len(_surface_finish.ra(_surface_finish.MACHINED_UM).partition(".")[2])
 
 
-def _feature(
-    module: ModuleType, kind: str, requirements: list[str] | str,
-    fields: dict[str, tuple[Any, tuple[str, ...]]],
-    *, precision: dict[str, int | str] | None = None,
-) -> dict[str, Any]:
-    result: dict[str, Any] = {"kind": kind, "frame": "model", "requirements": requirements}
-    citations = {}
-    for key, (value, names) in fields.items():
-        result[key] = list(value) if isinstance(value, tuple) else value
-        citations[key] = _cite(module, *names)
-    result["cite"] = citations
-    if precision is not None:
-        result["precision"] = precision
-        citations["precision"] = _cite(
-            module, "DRAWING_PRECISION" if hasattr(module, "DRAWING_PRECISION") else "__frame__",
-        )
-    return result
-
-
-def _spec_module(stem: str) -> ModuleType:
-    return importlib.import_module(f"{stem}_spec")
-
-
-def _spec_cite(module: ModuleType, sources: tuple[str | tuple[str, str], ...]) -> list[str]:
-    citations: list[str] = []
-    for source in sources:
-        owner, name = (importlib.import_module(source[0]), source[1]) if isinstance(source, tuple) else (module, source)
-        citations += _cite(owner, name)
-    return list(dict.fromkeys(citations))
-
-
-def _spec_declarations(stem: str) -> dict[str, ExportFeature]:
-    declared = _spec_module(stem).EXPORT_FEATURES
-    if not declared or not all(isinstance(item, ExportFeature) for item in declared.values()):
-        raise TypeError(f"{stem}_spec.EXPORT_FEATURES must map names to ExportFeature")
-    return declared
-
-
-def _spec_features(stem: str) -> dict[str, dict[str, Any]]:
+def _drawing_features(
+    stem: str, declarations: dict[str, Any], calls: dict[str, list[str]],
+    precision_cite: list[str],
+) -> dict[str, dict[str, Any]]:
     module = _spec_module(stem)
     result = {}
-    for name, declared in _spec_declarations(stem).items():
-        feature = _feature(
-            module, declared.kind, list(declared.requirements),
-            {key: (value, ()) for key, (value, _sources) in declared.fields.items()},
-            precision=dict(declared.precision) or None,
-        )
-        for key, (_value, sources) in declared.fields.items():
-            feature["cite"][key] = _spec_cite(module, sources)
+    for name, declared in declarations.items():
+        call = calls[name]
+        feature = {"kind": declared.kind, "frame": "model", "requirements": list(declared.requirements)}
+        citations = {}
+        for key, (value, sources) in declared.fields.items():
+            feature[key] = list(value) if isinstance(value, tuple) else value
+            citations[key] = list(dict.fromkeys([*call, *_spec_cite(module, sources)]))
+        if declared.precision:
+            feature["precision"] = dict(declared.precision)
+            if not precision_cite:
+                raise ValueError(f"draw_{stem}: feature precision needs nonempty metadata precision_sources")
+            citations["precision"] = list(dict.fromkeys([*call, *precision_cite]))
+        feature["cite"] = citations
         result[name] = feature
     return result
-
-
-_band = limits
-
-
-def _drilled_band(model: float, places: int) -> list[float]:
-    row = _config.title_block("drilled_hole")
-    # An associative Hole Wizard callout retains its authored native nominal.
-    # Precision is metadata, not evidence that a Python-rounded helper string
-    # replaced the callout's diameter or re-centred its drilled-hole band.
-    return _band(model, places, (float(row["plus_mm"]), -float(row["minus_mm"])))
-
-
-def _z_mm(
-    feature: dict[str, Any], low: float, high: float, cite: list[str],
-    frame: tuple[str, dict[str, Any]] | None = None,
-) -> None:
-    # prechips (rules/turned_profile.py, coordinates.py) reads z_mm as points
-    # on the feature frame's +Z axis, resolving that frame only from this
-    # manifest. It is the nominal extent of the feature's own surface along
-    # its turned axis -- never a cut-to-fit, setup or acceptance requirement.
-    feature["z_mm"] = [round(low, 12), round(high, 12)]
-    feature["cite"]["z_mm"] = list(cite)
-    if frame is not None:
-        name, source = frame
-        feature["frame"] = name
-        feature["cite"]["frame"] = list(source["cite"])
-        feature["cite"]["z_mm"] += source["cite"]
-
-
-def _cone_source_frames() -> dict[str, dict[str, Any]]:
-    """Rigid copies of model on the post's authored cylinder axes.
-
-    Geometry only: they carry no binding and propose no setup or fixture;
-    ``frames.setup`` stays unknown. Each +Z is a spec axis, so turned
-    features off model Z can state their axial z_mm extents.
-    """
-    # The journal axis, (sin I, 0, cos I): the journal bore's exported axis.
-    normal = cone.SURFACE_FINISHES[3].face.normal
-    axis = (-normal[0], -normal[2])
-    note = "geometry-only source frame on an authored spec axis; not a setup"
-    return {
-        # Body and head share the vertical post axis; the foot is at y=0.
-        "body_axis": {
-            "origin": [0.0, 0.0, 0.0], "x": [1.0, 0.0, 0.0], "y": [0.0, 0.0, -1.0], "z": [0.0, 1.0, 0.0],
-            "note": note, "cite": [*_cite(cone, "__frame__"), *_source_cite("cone_frame", "cone_head_frame")],
-        },
-        "crank_axis": {
-            "origin": [0.0, cone.CRANK_BORE_HEIGHT, 0.0], "x": [1.0, 0.0, 0.0], "y": [0.0, 1.0, 0.0], "z": [0.0, 0.0, 1.0],
-            "note": note, "cite": [*_cite(cone, "CRANK_BORE_HEIGHT"), *_source_cite("cone_frame", "cone_crank_axis")],
-        },
-        "cone_axis": {
-            "origin": [0.0, cone.BORE_HEIGHT, 0.0], "x": [axis[1], 0.0, -axis[0]], "y": [0.0, 1.0, 0.0], "z": [axis[0], 0.0, axis[1]],
-            "note": note, "cite": [*_cite(cone, "BORE_HEIGHT", "INCLINE_DEG", "SURFACE_FINISHES"), *_source_cite("cone_frame", "cone_journal_axis")],
-        },
-    }
-
-
-def _plane_between(
-    start: tuple[float, float], end: tuple[float, float],
-) -> PlanarFace:
-    dx, dy = end[0] - start[0], end[1] - start[1]
-    length = math.hypot(dx, dy)
-    normal = (-dy / length, dx / length, 0.0)
-    return PlanarFace(normal, normal[0] * start[0] + normal[1] * start[1])
-
-
-def _rocker_points() -> tuple[tuple[float, float], tuple[float, float], tuple[float, float]]:
-    top = (rocker.TOP_END_X, rocker.TOP_END_Y)
-    bottom = (rocker.BOT_END_X, rocker.CENTER_Y - math.sqrt(rocker.R_BOTTOM**2 - rocker.BOT_END_X**2))
-    tip = (rocker.ROD_TIP_X, rocker.TOP_END_Y + rocker.TIP_FACE * (rocker.TOP_END_Y - rocker.CENTER_Y) / rocker.R_TOP)
-    return top, tip, bottom
-
-
-def feature_selectors(stem: str) -> dict[str, tuple[FaceSpec, ...]]:
-    """Resolve every matching patch, using disjoint geometric feature domains.
-
-    Cylinders can split at a STEP seam. A selector identifies the geometric
-    surface, not an ordinal face; the COM helper names *all* matching patches.
-    Shaft crowns require the existing pure SphereFace vocabulary.
-    """
-    stem = _stem(stem)
-    if stem in SPEC_DRIVEN_PARTS:
-        return {name: declared.faces for name, declared in _spec_declarations(stem).items()}
-    if stem == "ch_rocker_arm":
-        top, tip, bottom = _rocker_points()
-        right = (_plane_between(top, tip), _plane_between(tip, bottom))
-        tips = tuple(
-            PlanarFace((-face.normal[0], face.normal[1], 0.0), face.offset_mm)
-            for face in right
-        )
-        return {
-            "pivot_bore": (CylinderFace(rocker.PIVOT_HOLE_DIA),),
-            "rod_hole": (CylinderFace(_hole_spec.blind_cut_dia_mm(rocker.ROD_HOLE_SPEC)),),
-            "hub_od": (CylinderFace(rocker.HUB_DIA),),
-            "hub_faces": tuple(PlanarFace((0, 0, sign), rocker.HUB_LENGTH / 2) for sign in (-1, 1)),
-            # Standard Right-view sheet +X is model -Z (right_view_frame).
-            # The drawing tags sheet LEFT of centre, hence the +Z broad face.
-            "strap_datum_b": (PlanarFace((0, 0, 1), rocker.ARM_THICKNESS / 2),),
-            "strap_faces": (PlanarFace((0, 0, -1), rocker.ARM_THICKNESS / 2),),
-            "top_edge": (CylinderFace(2 * rocker.R_TOP),),
-            "tip_land_pos_x": (right[0],),
-            "tip_land_neg_x": (tips[0],),
-            "profile_outer": (CylinderFace(2 * rocker.R_BOTTOM), right[1], tips[1]),
-        }
-    if stem == "ch_pivot_shaft":
-        return {
-            "pivot_bearing": (shaft.SURFACE_FINISHES[0].face,),
-            # Both flats face +Y on one plane; each is named by its station.
-            **{
-                f"{side}_flat": (PlanarFace((0, 1, 0), shaft.FLAT_AF - shaft.SHAFT_DIA / 2, contains_z_mm=-station),)
-                for side, station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS, strict=True)
-            },
-            "north_dome": (SphereFace(2 * shaft.DOME_SPHERE_RADIUS, (0, 0, shaft.DOME_HEIGHT - shaft.DOME_SPHERE_RADIUS)),),
-            "south_dome": (SphereFace(2 * shaft.DOME_SPHERE_RADIUS, (0, 0, -bank.PIVOT_SHAFT_LENGTH + shaft.DOME_SPHERE_RADIUS - shaft.DOME_HEIGHT)),),
-        }
-    normal = cone.SURFACE_FINISHES[3].face.normal
-    return {
-        "body": (CylinderFace(cone.BLOCK_DIA),),
-        "head": (CylinderFace(cone.HEAD_DIA), PlanarFace((0, 1, 0), cone.BLOCK_HEIGHT)),
-        "foot_seat": (cone.SURFACE_FINISHES[0].face,),
-        "crank_bore": (cone.SURFACE_FINISHES[1].face,),
-        "journal_bore": (cone.SURFACE_FINISHES[2].face,),
-        "crank_boss": (CylinderFace(cone.CRANK_BOSS_DIA),),
-        "crank_boss_faces": (
-            PlanarFace((0, 0, -1), cone.CRANK_BOSS_NORTH_FACE),
-            PlanarFace((0, 0, 1), cone.CRANK_BOSS_END_Z),
-        ),
-        "cone_boss": (CylinderFace(cone.CONE_BOSS_DIA),),
-        "cone_boss_north_face": (cone.SURFACE_FINISHES[3].face,),
-        "cone_boss_south_face": (PlanarFace(tuple(-v for v in normal), cone.CONE_BOSS_LENGTH / 2),),
-        **{
-            f"mount_{side}": (CylinderFace(cone.ATTACHMENT_THRU_DIA, contains_x_mm=x),)
-            for side, x in (("west", -cone.ATTACHMENT_X), ("east", cone.ATTACHMENT_X))
-        },
-        **{
-            f"mount_{side}_counterbore": (
-                CylinderFace(cone.ATTACHMENT_CBORE_DIA, contains_x_mm=x),
-                PlanarFace((0, 1, 0), cone.BLOCK_HEIGHT - cone.ATTACHMENT_CBORE_DEPTH, contains_x_mm=x),
-            )
-            for side, x in (("west", -cone.ATTACHMENT_X), ("east", cone.ATTACHMENT_X))
-        },
-    }
-
-
-def _rocker_features() -> dict[str, dict[str, Any]]:
-    p = rocker_notes.DEFAULT_DRAWING_PRECISION
-    hub_p = rocker_notes.DRAWING_PRECISION["Hub"]["HubLength"]
-    top_p = rocker_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"]
-    strap_p = rocker_notes.DRAWING_PRECISION["Strap"]["StrapThickness"]
-    strap_band = (_band(rocker.ARM_THICKNESS, strap_p, rocker.ARM_THICKNESS_BAND), ("ARM_THICKNESS", "ARM_THICKNESS_BAND"))
-    axis = ((0.0, 0.0, 1.0), ("__frame__",))
-    centre = ([0.0, rocker.PIVOT_MID_Y, 0.0], ("PIVOT_MID_Y",))
-    top, tip, bottom = _rocker_points()
-    tangent = _plane_between(top, tip).normal
-    land_angle = math.degrees(math.acos(
-        sum((tip[i] - top[i]) * tangent[i] for i in (0, 1)) / rocker.TIP_FACE
-    ))
-    result = {
-        "pivot_bore": _feature(rocker, "hole", ["dia", "thru", "finish_ra", "process"], {
-            "at": centre, "axis": axis,
-            "dia": (_band(rocker.PIVOT_HOLE_DIA, p, rocker.PIVOT_HOLE_BAND), ("PIVOT_HOLE_DIA", "PIVOT_HOLE_BAND")),
-            "nominal_dia": (rocker.PIVOT_HOLE_DIA, ("PIVOT_HOLE_DIA",)),
-            "thru": (True, ("PIVOT_HOLE_DIA",)),
-            "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
-            "process": ("ream", ("PIVOT_HOLE_BAND",)), "datum": ("A", ("PIVOT_HOLE_DIA",)),
-        }, precision={"dia": p, "finish_ra": 1}),
-        "rod_hole": _feature(rocker, "hole", ["at", "dia", "thru", "position_dia"], {
-            "at": ([rocker.ROD_HOLE_X, rocker.ROD_HOLE_Y, 0.0], ("ROD_HOLE_X", "ROD_HOLE_Y")),
-            "axis": axis, "drill": (rocker.ROD_HOLE_SPEC.size, ("ROD_HOLE_SPEC",)),
-            "dia": (_drilled_band(_hole_spec.blind_cut_dia_mm(rocker.ROD_HOLE_SPEC), p), ("ROD_HOLE_SPEC",)),
-            "nominal_dia": (_hole_spec.blind_cut_dia_mm(rocker.ROD_HOLE_SPEC), ("ROD_HOLE_SPEC",)),
-            "thru": (rocker.ROD_HOLE_SPEC.end == "through_all", ("ROD_HOLE_SPEC",)),
-            "position_dia": (float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]), ("GEOMETRIC_TOLERANCES_MM",)),
-            "position_datums": (["A", "B", "C"], ("GEOMETRIC_TOLERANCES_MM",)),
-            "dimension_type": ("basic", ("ROD_HOLE_X", "ROD_HOLE_Y")),
-        }, precision={"at": UNKNOWN, "dia": p, "position_dia": p}),
-        "hub_od": _feature(rocker, "boss", ["dia", "coaxiality_dia"], {
-            "at": centre, "axis": axis,
-            "dia": (_band(rocker.HUB_DIA, p), ("HUB_DIA",)),
-            "dia_nominal": (rocker.HUB_DIA, ("HUB_DIA",)),
-            "coaxiality_dia": (rocker_notes.HUB_COAXIALITY_DIA, ("HUB_DIA",)),
-            "coaxial_to": ("pivot_bore", ("HUB_DIA",)),
-        }, precision={"dia": p, "coaxiality_dia": p}),
-        "hub_faces": _feature(rocker, "face", ["length"], {
-            "length": (_band(rocker.HUB_LENGTH, hub_p, rocker.HUB_LENGTH_BAND), ("HUB_LENGTH", "HUB_LENGTH_BAND")),
-            "length_nominal": (rocker.HUB_LENGTH, ("HUB_LENGTH",)),
-            "upper_z": (rocker.HUB_LENGTH / 2, ("HUB_LENGTH",)),
-            "lower_z": (-rocker.HUB_LENGTH / 2, ("HUB_LENGTH",)),
-        }, precision={"length": hub_p}),
-        "strap_faces": _feature(rocker, "face", ["thickness"], {
-            "thickness": strap_band,
-            "thickness_nominal": (rocker.ARM_THICKNESS, ("ARM_THICKNESS",)),
-            "upper_z": (rocker.ARM_THICKNESS / 2, ("ARM_THICKNESS",)),
-            "lower_z": (-rocker.ARM_THICKNESS / 2, ("ARM_THICKNESS",)),
-        }, precision={"thickness": strap_p}),
-        "top_edge": _feature(rocker, "profile", ["height_above_pivot", "radius", "arc_len"], {
-            "height_above_pivot": (_band(rocker.TOP_EDGE_ABOVE_PIVOT, top_p, rocker.TOP_EDGE_BAND), ("TOP_EDGE_ABOVE_PIVOT", "TOP_EDGE_BAND")),
-            "height_from": ("pivot_bore", ("PIVOT_MID_Y",)),
-            "radius": (_band(rocker.R_TOP, p), ("R_TOP",)), "radius_nominal": (rocker.R_TOP, ("R_TOP",)),
-            "arc_len": (_band(rocker.TOP_ARC_LEN, p), ("TOP_ARC_LEN",)),
-            "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)),
-            "centre_from_pivot_ref": (rocker.CENTER_Y - rocker.PIVOT_MID_Y, ("CENTER_Y", "PIVOT_MID_Y")),
-            "end": (list(_rocker_points()[0]), ("TOP_END_X", "TOP_END_Y")),
-        }, precision={"height_above_pivot": top_p, "radius": p, "arc_len": p}),
-        "profile_outer": _feature(rocker, "profile", ["bottom_radius", "bottom_arc_len", "mirror_symmetric"], {
-            "bottom_radius": (_band(rocker.R_BOTTOM, p), ("R_BOTTOM",)),
-            "bottom_radius_nominal": (rocker.R_BOTTOM, ("R_BOTTOM",)),
-            "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)), "top_edge_feature": ("top_edge", ("R_TOP",)),
-            "bottom_arc_len": (_band(rocker.BOT_ARC_LEN, p), ("BOT_ARC_LEN",)),
-            "mirror_symmetric": (True, ("R_BOTTOM",)), "depth_ref": (rocker.ARM_DEPTH, ("ARM_DEPTH",)),
-            "bottom_end": (list(bottom), ("BOT_END_X", "R_BOTTOM", "CENTER_Y")),
-            "radial_tip_end": (list(tip), ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
-        }, precision={"bottom_radius": p, "bottom_arc_len": p}),
-    }
-    result["strap_datum_b"] = _feature(rocker, "face", ["thickness"], {
-        "thickness": strap_band,
-        "thickness_nominal": (rocker.ARM_THICKNESS, ("ARM_THICKNESS",)),
-        "plane": ({"frame": "model", "axis": "z", "value": rocker.ARM_THICKNESS / 2}, ("ARM_THICKNESS",)),
-        "datum": ("B", ("ARM_THICKNESS",)),
-    }, precision={"thickness": strap_p})
-    result["strap_datum_b"]["cite"]["datum"] = _source_cite("rocker_datum_b", "right_view_frame")
-    result["pivot_bore"]["cite"]["datum"] = _source_cite("rocker_datum_a")
-    for name, sign in (("tip_land_pos_x", 1), ("tip_land_neg_x", -1)):
-        result[name] = _feature(rocker, "face", ["tip_land", "land_angle_deg"], {
-            "tip_land": (_band(rocker.TIP_FACE, p), ("TIP_FACE",)),
-            "land_angle_deg": (UNKNOWN, ("TIP_FACE",)),
-            "land_angle_nominal_deg": (land_angle, ("TOP_END_X", "TOP_END_Y", "ROD_TIP_X", "TIP_FACE", "R_TOP", "CENTER_Y")),
-            "radial_tip_end": ([sign * tip[0], tip[1]], ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
-            "top_edge_feature": ("top_edge", ("R_TOP",)),
-        }, precision={"tip_land": p, "land_angle_deg": UNKNOWN})
-    result["tip_land_pos_x"]["datum"] = "C"
-    result["tip_land_pos_x"]["cite"]["datum"] = _source_cite("rocker_datum_c")
-    notes_cite = _cite(rocker_notes, "DRAWING_NOTES")
-    for name in ("pivot_bore", "top_edge", "profile_outer", "tip_land_pos_x", "tip_land_neg_x", "hub_od"):
-        for key in result[name]["cite"]:
-            result[name]["cite"][key] += notes_cite
-    result["hub_od"]["cite"]["coaxiality_dia"] = _cite(rocker_notes, "HUB_COAXIALITY_DIA", "DRAWING_NOTES")
-    result["rod_hole"]["cite"]["nominal_dia"] += _cite(_hole_spec, "NUMBER_DRILL_MM")
-    result["rod_hole"]["cite"]["dia"] += _cite(_hole_spec, "NUMBER_DRILL_MM")
-    result["rod_hole"]["cite"]["dia"] += _source_cite("rocker_hole", "rocker_hole_callout", "hole_callout")
-    result["rod_hole"]["cite"]["position_datums"] = _source_cite("rocker_position")
-    return result
-
-
-def _shaft_features() -> dict[str, dict[str, Any]]:
-    p = shaft.DRAWING_PRECISION_BY_NAME
-    result = {}
-    result["pivot_bearing"] = _feature(shaft, "shaft", ["dia", "finish_ra"], {
-        "at": ([0.0, 0.0, shaft.BODY_PROBE_Z_MM], ("BODY_PROBE_Z_MM",)),
-        "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
-        "dia": (_band(shaft.SHAFT_DIA, p["ShaftDia"], shaft.SHAFT_DIA_BAND), ("SHAFT_DIA", "SHAFT_DIA_BAND")),
-        "dia_nominal": (shaft.SHAFT_DIA, ("SHAFT_DIA",)),
-        "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
-        "length_ref": (bank.PIVOT_SHAFT_LENGTH, ("LENGTH_CALLOUT",)),
-        "note": (shaft.LENGTH_CALLOUT, ("LENGTH_CALLOUT",)),
-    }, precision={"dia": p["ShaftDia"], "finish_ra": 1})
-    result["pivot_bearing"]["cite"]["length_ref"] += _cite(bank, "PIVOT_SHAFT_LENGTH")
-    # The set-screw flats: milled faces on +Y, stations from the north end.
-    for side, station in zip(("south", "north"), bank.PIVOT_SHAFT_FLAT_STATIONS, strict=True):
-        dimension = f"{side.capitalize()}FlatStation"
-        result[f"{side}_flat"] = _feature(shaft, "face", ["height", "length", "station"], {
-            # The across-flats: the flat's height over the round opposite it.
-            "height": (_band(shaft.FLAT_AF, p["FlatAF"]), ("FLAT_AF",)),
-            "height_nominal": (shaft.FLAT_AF, ("FLAT_AF",)),
-            "height_from": ("pivot_bearing", ("FLAT_AF",)),
-            "length": (_band(shaft.FLAT_LENGTH, p["FlatLength"]), ("FLAT_LENGTH",)),
-            "length_nominal": (shaft.FLAT_LENGTH, ("FLAT_LENGTH",)),
-            "station": (_band(station, p[dimension]), ("NORTH_FLAT_STATION",)),
-            "station_nominal": (station, ("NORTH_FLAT_STATION",)),
-            "plane": ({"frame": "model", "axis": "y", "value": shaft.FLAT_AF - shaft.SHAFT_DIA / 2}, ("FLAT_AF", "SHAFT_DIA")),
-        }, precision={"height": p["FlatAF"], "length": p["FlatLength"], "station": p[dimension]})
-        result[f"{side}_flat"]["cite"]["station"] += _cite(bank, "PIVOT_SHAFT_FLAT_STATIONS")
-        result[f"{side}_flat"]["cite"]["station_nominal"] += _cite(bank, "PIVOT_SHAFT_FLAT_STATIONS")
-    for name, z in (("north_dome", 0.0), ("south_dome", -bank.PIVOT_SHAFT_LENGTH)):
-        result[name] = _feature(shaft, "dome", ["height"], {
-            "height": (_band(shaft.DOME_HEIGHT, p["DomeHeight"]), ("DOME_HEIGHT",)),
-            "height_nominal": (shaft.DOME_HEIGHT, ("DOME_HEIGHT",)),
-            "sphere_radius": (shaft.DOME_SPHERE_RADIUS, ("DOME_SPHERE_RADIUS",)),
-            "base_radius": (shaft.SHAFT_DIA / 2, ("SHAFT_DIA",)),
-            "base_z": (z, ("__frame__",)), "note": (shaft.DOME_CALLOUT, ("DOME_CALLOUT",)),
-        }, precision={"height": p["DomeHeight"]})
-    result["south_dome"]["cite"]["base_z"] = _cite(bank, "PIVOT_SHAFT_LENGTH")
-    # Model Z is the turned axis, origin at the north end of the cylinder.
-    # The O.D. spans the whole cylinder (the set-screw flats are milled, not
-    # turned); each dome rises from a cylinder end to its apex.
-    length = bank.PIVOT_SHAFT_LENGTH
-    for name, low, high, names, bank_names in (
-        ("north_dome", 0.0, shaft.DOME_HEIGHT, ("DOME_HEIGHT",), ()),
-        ("pivot_bearing", -length, 0.0, (), ("PIVOT_SHAFT_LENGTH",)),
-        ("south_dome", -length - shaft.DOME_HEIGHT, -length, ("DOME_HEIGHT",), ("PIVOT_SHAFT_LENGTH",)),
-    ):
-        _z_mm(result[name], low, high, [*_cite(shaft, *names), *_cite(bank, *bank_names)])
-    return result
-
-
-def _cone_features() -> dict[str, dict[str, Any]]:
-    p = cone.DRAWING_PRECISION_BY_NAME
-    def size(kind: str, fields: dict[str, tuple[str, str]]) -> dict[str, Any]:
-        values = {}
-        precision = {}
-        for key, (constant, dimension) in fields.items():
-            model = getattr(cone, constant)
-            values[key] = (_band(model, p[dimension]), (constant,))
-            values[f"{key}_nominal"] = (model, (constant,))
-            precision[key] = p[dimension]
-        return _feature(cone, kind, list(fields), values, precision=precision)
-    normal = cone.SURFACE_FINISHES[3].face.normal
-    result = {
-        "body": size("boss", {"dia": ("BLOCK_DIA", "MainBodyDia"), "height": ("BLOCK_HEIGHT", "MainBodyHt")}),
-        "head": size("boss", {"dia": ("HEAD_DIA", "HeadDia"), "height": ("HEAD_HEIGHT", "HeadHt")}),
-        "crank_boss": size("boss", {"dia": ("CRANK_BOSS_DIA", "CrankBossDia")}),
-        "crank_boss_faces": size("face", {"length": ("CRANK_BOSS_LENGTH", "CrankBossLen"), "station": ("CRANK_BOSS_NORTH_FACE", "CrankBossStartZ")}),
-        "cone_boss": size("boss", {"dia": ("CONE_BOSS_DIA", "ConeBossDia")}),
-        "cone_boss_north_face": size("face", {"length": ("CONE_BOSS_LENGTH", "ConeBossLen")}),
-        "cone_boss_south_face": _feature(cone, "face", [], {"normal": (tuple(-v for v in normal), ("SURFACE_FINISHES",))}),
-        "foot_seat": _feature(cone, "face", ["finish_ra"], {
-            "normal": ([0.0, -1.0, 0.0], ("SURFACE_FINISHES",)), "finish_ra": (_surface_finish.SEAT_UM, ("SURFACE_FINISHES",)),
-            "datum": ("B", ("PART_DATUMS",)), "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
-        }, precision={"finish_ra": 1}),
-    }
-    result["cone_boss_north_face"]["normal"] = list(normal)
-    result["cone_boss_north_face"]["finish_ra"] = _surface_finish.MACHINED_UM
-    result["cone_boss_north_face"]["requirements"].append("finish_ra")
-    result["cone_boss_north_face"]["cite"].update({"finish_ra": _cite(cone, "SURFACE_FINISHES"), "normal": _cite(cone, "SURFACE_FINISHES")})
-    for name, diameter, height, dimension in (
-        ("journal_bore", cone.BORE_DIA, cone.BORE_HEIGHT, "JournalBoreDia"),
-        ("crank_bore", cone.CRANK_BORE_DIA, cone.CRANK_BORE_HEIGHT, "CrankBoreDia"),
-    ):
-        constants = ("BORE_DIA", "BORE_HEIGHT") if name == "journal_bore" else ("CRANK_BORE_DIA", "CRANK_BORE_HEIGHT")
-        result[name] = _feature(cone, "hole", ["dia", "thru", "finish_ra"], {
-            "at": ([0.0, height, 0.0], (constants[1],)),
-            "axis": ([-normal[0], 0.0, -normal[2]] if name == "journal_bore" else [0.0, 0.0, 1.0], ("INCLINE_DEG",)),
-            "dia": (_band(diameter, p[dimension], cone.RUNNING_BORE_BAND), (constants[0], "RUNNING_BORE_BAND")),
-            "nominal_dia": (diameter, (constants[0],)), "thru": (True, (constants[0],)),
-            "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
-        }, precision={"dia": p[dimension], "finish_ra": 1})
-    journal = result["journal_bore"]
-    journal.update({"height": _band(cone.BORE_HEIGHT, p["JournalAxisY"], (cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM, -cone.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM)), "height_from": "foot_seat", "datum": "A", "note": cone_shaft.POST_JOURNAL_RIM_BREAK})
-    # The schema has no per-feature rim-break field. Preserve the sourced
-    # note and unresolved inspection identity instead of declaring it absent.
-    journal["requirements"] += ["height", UNKNOWN]
-    journal["precision"]["height"] = p["JournalAxisY"]
-    journal["cite"].update({"height": _cite(cone, "BORE_HEIGHT", "JOURNAL_AXIS_HEIGHT_TOLERANCE_MM"), "height_from": _cite(cone, "BORE_HEIGHT"), "datum": _cite(cone, "PART_DATUMS"), "note": _cite(cone_shaft, "POST_JOURNAL_RIM_BREAK", "THRUST_EDGE_BREAK_MAX")})
-    crank = result["crank_bore"]
-    control = cone.GEOMETRIC_CONTROLS[0]
-    crank.update({"separation": _band(cone.CRANK_ABOVE_CONE, p["CrankAboveCone"], cone.CRANK_ABOVE_CONE_BAND), "height_from": "journal_bore", "height_nominal": cone.CRANK_BORE_HEIGHT, "angularity_dia": float(control.tolerance), "angularity_datums": list(control.datums), "dimension_type": "basic", "land_angle_nominal_deg": cone.INCLINE_DEG})
-    crank["requirements"] += ["separation", "angularity_dia", "angularity_datums"]
-    crank["precision"].update({
-        "separation": p["CrankAboveCone"],
-        "angularity_dia": len(control.tolerance.partition(".")[2]),
-        "land_angle_nominal_deg": p["InclineAngle"],
-    })
-    crank["cite"].update({"separation": _cite(cone, "CRANK_ABOVE_CONE", "CRANK_ABOVE_CONE_BAND"), "height_from": _cite(cone, "CRANK_ABOVE_CONE"), "height_nominal": _cite(cone, "CRANK_BORE_HEIGHT"), "angularity_dia": _cite(cone, "CRANK_BORE_ANGULARITY_MM", "GEOMETRIC_CONTROLS"), "angularity_datums": _cite(cone, "GEOMETRIC_CONTROLS"), "dimension_type": _cite(cone, "BASIC_DIMENSIONS"), "land_angle_nominal_deg": _cite(cone, "INCLINE_DEG", "BASIC_DIMENSIONS")})
-    # The angularity zone over the boss length bounds the bore axis direction
-    # to this angle: a derived landing allowance, not a printed angle band,
-    # so it never joins the requirements beside the BASIC angle and its frame.
-    crank["angle_tol_deg"] = cone.CRANK_BORE_ANGLE_LIMIT_DEG
-    crank["cite"]["angle_tol_deg"] = _cite(cone, "CRANK_BORE_ANGLE_LIMIT_DEG")
-    for side, x, dim in (("west", -cone.ATTACHMENT_X, "MountWestX"), ("east", cone.ATTACHMENT_X, "MountEastX")):
-        name = f"mount_{side}"
-        result[name] = _feature(cone, "hole", ["dia", "thru", "station"], {
-            "at": ([x, cone.BLOCK_HEIGHT, 0.0], ("ATTACHMENT_X", "BLOCK_HEIGHT")), "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
-            "dia": (_drilled_band(cone.ATTACHMENT_THRU_DIA, p[dim]), ("ATTACHMENT_THRU_DIA",)),
-            "nominal_dia": (cone.ATTACHMENT_THRU_DIA, ("ATTACHMENT_THRU_DIA",)), "thru": (True, ("ATTACHMENT_THRU_DIA",)),
-            "station": (_band(x, p[dim]), ("ATTACHMENT_X",)), "station_nominal": (x, ("ATTACHMENT_X",)),
-        }, precision={"dia": p[dim], "station": p[dim]})
-        result[f"{name}_counterbore"] = _feature(cone, "counterbore", ["dia", "depth"], {
-            "parent": (name, ("ATTACHMENT_THRU_DIA",)),
-            "dia": (_band(cone.ATTACHMENT_CBORE_DIA, p[dim]), ("ATTACHMENT_CBORE_DIA",)), "nominal_dia": (cone.ATTACHMENT_CBORE_DIA, ("ATTACHMENT_CBORE_DIA",)),
-            "depth": (_band(cone.ATTACHMENT_CBORE_DEPTH, p[dim]), ("ATTACHMENT_CBORE_DEPTH",)), "depth_ref": (cone.ATTACHMENT_CBORE_DEPTH, ("ATTACHMENT_CBORE_DEPTH",)),
-        }, precision={"dia": p[dim], "depth": p[dim]})
-        result[name]["cite"]["dia"] += _source_cite("cone_mount", "cone_mount_callout", "hole_callout")
-    # Axial extents along each cylinder's own spec axis. The body's O.D. ends
-    # where the coaxial, larger head begins; both bosses span their authored
-    # end faces (crank: CrankBossStartZ + CrankBossLen; cone: mid-plane pads).
-    frames = _cone_source_frames()
-    head = ("HEAD_BASE_Y", "BLOCK_HEIGHT", "HEAD_HEIGHT")
-    crank_ends = ("CRANK_BOSS_START_Z", "CRANK_BOSS_NORTH_FACE", "HEAD_DIA", "CRANK_BOSS_END_Z", "CRANK_BOSS_LENGTH", "CRANK_BOSS_LENGTH_IN")
-    for name, frame, low, high, names in (
-        ("body", "body_axis", 0.0, cone.HEAD_BASE_Y, head),
-        ("head", "body_axis", cone.HEAD_BASE_Y, cone.BLOCK_HEIGHT, head),
-        ("crank_boss", "crank_axis", cone.CRANK_BOSS_START_Z, cone.CRANK_BOSS_END_Z, crank_ends),
-        ("cone_boss", "cone_axis", -cone.CONE_BOSS_LENGTH / 2, cone.CONE_BOSS_LENGTH / 2, ("CONE_BOSS_LENGTH", "BLOCK_DIA")),
-    ):
-        _z_mm(result[name], low, high, _cite(cone, *names), (frame, frames[frame]))
-    return result
-
-
-def _notes_module(stem: str) -> ModuleType:
-    name = f"{stem}_notes"
-    if importlib.util.find_spec(name) is not None:
-        return importlib.import_module(name)
-    # These specs supply the native Manufacturing Notes property consumed by
-    # the corresponding drawings' property-linked note.
-    if stem in SPEC_DRIVEN_PARTS:
-        return _spec_module(stem)
-    return {"ch_pivot_shaft": shaft, "dt_cone_pivot_post": cone}[stem]
 
 
 def _construction(module: ModuleType) -> tuple[str, list[str]]:
@@ -706,11 +254,34 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
     """Pure drawing requirement data, before binding it to STEP face names."""
     stem = _stem(stem)
     dashed = stem.replace("_", "-")
-    if stem in SPEC_DRIVEN_PARTS:
-        module, features = _spec_module(stem), _spec_features(stem)
-    else:
-        module = {"ch_rocker_arm": rocker, "ch_pivot_shaft": shaft, "dt_cone_pivot_post": cone}[stem]
-        features = {"ch_rocker_arm": _rocker_features, "ch_pivot_shaft": _shaft_features, "dt_cone_pivot_post": _cone_features}[stem]()
+    module = _spec_module(stem)
+    drawing = _drawing_module(stem)
+    declarations = requirements_for(drawing)
+    call_cites = {}
+
+    def call_cite(declared: Any) -> list[str]:
+        site = declared.path, declared.call_span
+        if site not in call_cites:
+            call_cites[site] = _call_cite(*site)
+        return call_cites[site]
+
+    calls = {name: call_cite(declared) for name, declared in declarations.items()}
+    metadata = [(declared, call_cite(declared)) for declared in metadata_for(drawing)]
+    facts = {}
+    fact_citations = {}
+    precision_cite = []
+    frame_cite = [*_cite(module, "__frame__"), *_cite(drawing, "build")]
+    for declared, call in metadata:
+        for key, (value, sources) in declared.fields.items():
+            facts[key] = value
+            fact_citations[key] = [*call, *_spec_cite(module, sources)]
+        if declared.model_sources:
+            frame_cite += [*call, *_spec_cite(module, declared.model_sources)]
+        if declared.precision_sources:
+            if any((source[1] if isinstance(source, tuple) else source) == "__frame__" for source in declared.precision_sources):
+                raise ValueError(f"draw_{stem}: precision_sources must cite printed precision, not a module docstring")
+            precision_cite += [*call, *_spec_cite(module, declared.precision_sources)]
+    features = _drawing_features(stem, declarations, calls, precision_cite)
     notes_module = _notes_module(stem)
     construction, construction_cite = _construction(notes_module)
     row = _config.parts(dashed)
@@ -739,37 +310,28 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
     }
     general.update({"angular_deg": float(_config.title_block("angular")["value_deg"]), "drilled_hole_plus": float(_config.title_block("drilled_hole")["plus_mm"]), "drilled_hole_minus": float(_config.title_block("drilled_hole")["minus_mm"]), "edge_break_r": float(_config.title_block("edge_break")["radius_mm"]), "chamfer_max": float(_config.title_block("edge_break")["chamfer_max_mm"])})
     general["cite"] = {
-        key: _source_cite(source)
+        key: _title_cite(source)
         for key, source in (
-            ("linear_1pl", "linear_1pl"), ("linear_2pl", "linear_2pl"),
-            ("linear_3pl", "linear_3pl"), ("angular_deg", "angular"),
-            ("drilled_hole_plus", "drilled_hole_plus"), ("drilled_hole_minus", "drilled_hole_minus"),
-            ("edge_break_r", "edge_break_r"), ("chamfer_max", "chamfer_max"),
+            ("linear_1pl", "linear_1pl.display"), ("linear_2pl", "linear_2pl.display"),
+            ("linear_3pl", "linear_3pl.display"), ("angular_deg", "angular.value_deg"),
+            ("drilled_hole_plus", "drilled_hole.plus_mm"), ("drilled_hole_minus", "drilled_hole.minus_mm"),
+            ("edge_break_r", "edge_break.radius_mm"), ("chamfer_max", "edge_break.chamfer_max_mm"),
         )
     }
-    for feature in features.values():
+    for name, feature in features.items():
+        call = calls[name]
         for key in feature.get("precision", {}) if isinstance(feature.get("precision"), dict) else ():
-            if stem == "ch_rocker_arm":
-                feature["cite"][f"precision.{key}"] = _cite(
-                    rocker_notes, "DRAWING_PRECISION", "DEFAULT_DRAWING_PRECISION",
-                )
+            if precision_cite:
+                feature["cite"][f"precision.{key}"] = list(dict.fromkeys([*call, *precision_cite]))
             if key in feature["cite"] and isinstance(feature.get(key), list) and len(feature[key]) == 2:
-                feature["cite"][key] += _source_cite(f"linear_{feature['precision'][key]}pl", "angular", "drilled_hole_plus", "drilled_hole_minus")
+                tolerance = "angular.value_deg" if key.endswith("_deg") else f"linear_{feature['precision'][key]}pl.display"
+                feature["cite"][key] += _title_cite(tolerance, "drilled_hole.plus_mm", "drilled_hole.minus_mm")
         if "finish_ra" in feature:
-            feature["cite"]["finish_ra"] += _cite(
-                _surface_finish,
-                "MACHINED_UM" if feature["finish_ra"] == _surface_finish.MACHINED_UM else "SEAT_UM",
-            )
             if isinstance(feature.get("precision"), dict):
                 feature["precision"]["finish_ra"] = _finish_precision()
-                feature["cite"]["precision.finish_ra"] = _cite(_surface_finish, "ra")
+                feature["cite"]["precision.finish_ra"] = [*call, *_cite(_surface_finish, "ra")]
         feature["faces"] = UNKNOWN
     notes = notes_module.DRAWING_NOTES
-    frame_cite = _cite(module, "__frame__")
-    if stem == "ch_rocker_arm":
-        frame_cite += _source_cite("rocker_strap_frame", "rocker_hub_frame")
-    elif stem == "dt_cone_pivot_post":
-        frame_cite += _source_cite("cone_frame")
     for feature in features.values():
         for key in ("axis", "at", "normal", "plane"):
             if key in feature:
@@ -779,25 +341,18 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
             feature["cite"]["z_mm"] = list(dict.fromkeys([*feature["cite"]["z_mm"], *frame_cite]))
     frames: dict[str, Any] = {"model": {"origin": [0.0, 0.0, 0.0], "x": [1.0, 0.0, 0.0], "y": [0.0, 1.0, 0.0], "z": [0.0, 0.0, 1.0], "cite": frame_cite}, "setup": UNKNOWN}
     datums: dict[str, Any] = {}
-    if stem == "ch_rocker_arm":
-        for name, sign in (("A", 1), ("B", -1)):
-            frames[name] = {"origin": [0.0, rocker.PIVOT_MID_Y, sign * rocker.HUB_LENGTH / 2], "x": [1.0, 0.0, 0.0], "y": [0.0, float(sign), 0.0], "z": [0.0, 0.0, float(sign)], "binding": UNKNOWN, "cite": _cite(rocker, "PIVOT_MID_Y", "HUB_LENGTH")}
-        datums = {
-            "A": {"feature": "pivot_bore", "surface": "pivot bore cylinder", "cite": _source_cite("rocker_datum_a")},
-            "B": {"feature": "strap_datum_b", "surface": "+Z broad strap face", "cite": _source_cite("rocker_datum_b", "right_view_frame")},
-            "C": {"feature": "tip_land_pos_x", "surface": "rod-side (+X) radial tip land", "cite": _source_cite("rocker_datum_c")},
-        }
-    elif stem == "dt_cone_pivot_post":
-        datums = {"A": {"feature": "journal_bore", "surface": "cone journal bore cylinder", "cite": _cite(cone, "PART_DATUMS")}, "B": {"feature": "foot_seat", "surface": "foot seat plane", "cite": _cite(cone, "PART_DATUMS")}}
-        frames.update(_cone_source_frames())
-    volume = {"volume_mm3": cone.HARVESTED_VOLUME_MM3, "volume_cite": _cite(cone, "HARVESTED_VOLUME_MM3")} if stem == "dt_cone_pivot_post" else {}
+    for declared, call in metadata:
+        for values, target in ((declared.frames, frames), (declared.datums, datums)):
+            for name, (value, sources) in values.items():
+                target[name] = {**value, "cite": [*call, *_spec_cite(module, sources)]}
+    volume = {"volume_mm3": facts["volume_mm3"], "volume_cite": fact_citations["volume_mm3"]} if "volume_mm3" in facts else {}
     return {
-        "part": dashed, "units": "mm", "precision": rocker_notes.DEFAULT_DRAWING_PRECISION if stem == "ch_rocker_arm" else UNKNOWN,
-        "step": f"{dashed}.STEP", "step_sha256": UNKNOWN, "construction": construction, **volume, "cite_root": "harmonic-analyzer",
-        "cite": {"construction": construction_cite, "units": frame_cite, "precision": _cite(rocker_notes, "DEFAULT_DRAWING_PRECISION") if stem == "ch_rocker_arm" else frame_cite, "frames": frame_cite},
-        "drawing": {"number": row["number"], "revision": UNKNOWN, "cite": [*registry_cite("number"), *_source_cite("drawing_revision", "drawing_properties")]},
-        "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": row.get("finish", UNKNOWN), "thickness": UNKNOWN, "cite": registry_cite("material_specification", "material", "finish")},
-        "notes": {"manufacturing": notes.splitlines(), "process": row.get("process", UNKNOWN), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {_config.title_block('edge_break')['display_r']} OR CHAMFER {_config.title_block('edge_break')['display_chamfer']} MAX", "cite": [*registry_cite("process"), *_source_cite("edge_break_display_r", "edge_break_display_chamfer"), *_cite(notes_module, "DRAWING_NOTES")]},
+        "part": dashed, "units": "mm", "precision": facts.get("precision", UNKNOWN),
+        "step": bundle_paths(stem)[1].name, "step_sha256": UNKNOWN, "construction": construction, **volume, "cite_root": "harmonic-analyzer",
+        "cite": {"construction": construction_cite, "units": frame_cite, "precision": fact_citations.get("precision", frame_cite), "frames": frame_cite},
+        "drawing": {"number": row["number"], "revision": UNKNOWN, "cite": [*registry_cite("number"), "harmonic-analyzer/cad/config/release.yaml:next_revision", *_cite(_part_properties, "part_properties")]},
+        "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": row.get("finish", UNKNOWN), "thickness": facts.get("material.thickness", UNKNOWN), "cite": [*registry_cite("material_specification", "material", "finish"), *fact_citations.get("material.thickness", [])]},
+        "notes": {"manufacturing": notes.splitlines(), "process": row.get("process", UNKNOWN), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {_config.title_block('edge_break')['display_r']} OR CHAMFER {_config.title_block('edge_break')['display_chamfer']} MAX", "cite": [*registry_cite("process"), *_title_cite("edge_break.display_r", "edge_break.display_chamfer"), *_cite(notes_module, "DRAWING_NOTES")]},
         "general_tolerances": general, "frames": frames, "datums": datums, "features": features,
     }
 
@@ -833,6 +388,13 @@ def _toml(data: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def bundle_paths(stem: str, out: Path = OUT) -> tuple[Path, Path]:
+    """Return the requirements manifest and scoped STEP in their shared bundle."""
+    stem = _stem(stem)
+    directory = Path(out) / "features" / stem
+    return directory / "features.toml", directory / f"{stem.replace('_', '-')}.STEP"
+
+
 def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
     """Bind all labelled STEP faces and write the adjacent requirements TOML."""
     from prechips.model import Features
@@ -843,10 +405,7 @@ def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
     step = Path(step)
     content = step.read_bytes()
     manifest = requirement_manifest(stem)
-    selectors = feature_selectors(stem)
-    if selectors.keys() != manifest["features"].keys():
-        raise ValueError(f"feature selector/requirement domains differ: {stem}")
-    faces = step_face_sets(content.decode("latin-1"), selectors.keys())
+    faces = step_face_sets(content.decode("latin-1"), manifest["features"].keys())
     step_cite = f"harmonic-analyzer/cad/out/features/{stem}/{step.name}"
     for name, feature in manifest["features"].items():
         feature["faces"] = faces[name]
@@ -856,7 +415,7 @@ def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
     manifest["cite"]["step_sha256"] = [step_cite]
     manifest["drawing"]["revision"] = revision
     Features.model_validate(manifest)
-    path = step.with_name("features.toml")
+    path = step.with_name(bundle_paths(stem)[0].name)
     partial = path.with_suffix(".toml.partial")
     partial.write_text(_toml(manifest), encoding="utf-8", newline="\n")
     partial.replace(path)

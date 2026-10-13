@@ -7,7 +7,7 @@ vn-thumb-screw:
   material: Plain Carbon Steel
   material_specification: Steel, McMaster-Carr 91882A221
   finish: as supplied
-  quantity: 2
+  quantity: 3
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased

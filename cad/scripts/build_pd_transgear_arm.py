@@ -15,8 +15,8 @@ face, +X to the square end, +Z to the rear face):
 * ``PivotBore``: the Ø4.9 running bore through at P.
 * ``PinBore``: the Ø3.874 reamed press bore through at S for the MHA-PD-023
   pin, cut normal to the faces (the pin's head seats on the rear face).
-* ``PlateTaps``: native Hole Wizard taps through from the rear face, their
-  mouths countersunk (``PlateTapCountersinks``).
+* ``PlateTaps``: native Hole Wizard taps through from the rear face, with
+  ``PlateTapRearEntryBreaks`` and ``PlateTapFrontExitBreaks`` at 0.10 MAX.
 * ``SpotFace``: the rear spot face, a revolved cut whose profile (Top plane,
   the arm's centreline section) dimensions its floor from the FRONT face.
 * ``PinHole``: the blind, flat-floored latch-pin hole (reamed for the dowel's
@@ -63,22 +63,30 @@ from _sketch import (
 )
 from _sketch_circle import define_circle
 from _drawing_dimension_insert import add_diametric_linear_dimension
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
 from _drawing_tolerances import (
+    set_dimension_basic_tolerance,
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
 from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import find_planar_face, wizard_holes
+from _part_pmi import author_part_pmi
+from _native_projected_zone import require_saved_projected_gtols
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from pd_transgear_arm_geometry import (
+    LOCATOR_SITES_MM,
+    LOCATOR_HOLE_DIA_MM,
+    LOCATOR_HOLE_BAND_MM,
+    LOCATOR_BLIND_DEPTH_MM,
+    LOCATOR_BLIND_DEPTH_BAND_MM,
     EDGE_LEAN,
     END_HALF_WIDTH,
     PIN_BORE_DIA,
@@ -94,7 +102,8 @@ from pd_transgear_arm_geometry import (
     PIVOT_TANGENT_Y,
     PLATE_TAP_SPEC,
     PLATE_TAP_STATIONS,
-    PLATE_TAP_CSK_DIA,
+    PLATE_TAP_ENTRY_BREAK_MAX_MM,
+    PLATE_TAP_EXIT_BREAK_MAX_MM,
     SPOT_FACE_DEPTH,
     SPOT_FACE_DIA,
     SPOT_FACE_FLOOR_FROM_FRONT,
@@ -102,10 +111,14 @@ from pd_transgear_arm_geometry import (
     TIP_STATION,
 )
 from pd_transgear_arm_spec import (
+    BASIC_REDUCER_DIMENSIONS,
+    GEOMETRIC_CONTROLS,
+    PART_DATUMS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    HOLE_POSITION_TOLERANCE,
+    LATCH_PIN_HEIGHT_TOLERANCE,
     ISOMETRIC_VIEW_NOTE,
+    PIVOT_BORE_CALLOUT,
     SPOT_FACE_DIA_BAND,
     SPOT_FACE_FLOOR_TOLERANCE,
 )
@@ -130,9 +143,19 @@ _R_SPOT = SPOT_FACE_DIA / 2.0
 _R_PIN = PIN_HOLE_DIA / 2.0
 _R_PIN_BORE = PIN_BORE_DIA / 2.0
 _R_PLATE = blind_cut_dia_mm(PLATE_TAP_SPEC) / 2.0
-# 90-degree countersinks: one 45-degree chamfer leg on each plate-tap drill
-# mouth.
-PLATE_CSK = PLATE_TAP_CSK_DIA / 2.0 - _R_PLATE
+# Small ordinary entry/exit breaks retain full thread; neither mouth needs
+# the old wide countersink. The rear screw is inserted by its actual thread.
+
+
+def _author_pivot_fit_annotation(adapter: Any) -> None:
+    """Native reference diameter plus the measured matched-set acceptance."""
+    display, _dimension = _named_dimension(adapter, "PivotBoreProfile", "PivotBoreDia")
+    display = _early_bound(display, "IDisplayDimension")
+    # SetText is void (VT_VOID); only GetText's BSTR readback proves it took.
+    for channel, text in ((1, "(<MOD-DIAM>"), (2, ")"), (4, PIVOT_BORE_CALLOUT)):
+        display.SetText(channel, text)
+        if str(display.GetText(channel) or "") != text:
+            raise RuntimeError("native matched pivot reference/callout did not persist")
 
 
 def _outline_area() -> float:
@@ -162,7 +185,10 @@ V_ARM = _outline_area() * THICKNESS
 V_BORE = math.pi * _R_BORE**2 * THICKNESS
 V_PIN_BORE = math.pi * _R_PIN_BORE**2 * THICKNESS
 V_PLATE = len(PLATE_TAP_STATIONS) * math.pi * _R_PLATE**2 * THICKNESS
-V_PLATE_CSK = 2.0 * len(PLATE_TAP_STATIONS) * _csk_volume(PLATE_CSK, _R_PLATE)
+V_PLATE_EDGE_BREAKS = len(PLATE_TAP_STATIONS) * (
+    _csk_volume(PLATE_TAP_ENTRY_BREAK_MAX_MM, _R_PLATE)
+    + _csk_volume(PLATE_TAP_EXIT_BREAK_MAX_MM, _R_PLATE)
+)
 V_SPOT = math.pi * (_R_SPOT**2 - _R_BORE**2) * SPOT_FACE_DEPTH
 V_PIN = math.pi * _R_PIN**2 * PIN_HOLE_DEPTH
 
@@ -262,6 +288,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ("PinHoleDia", PIN_HOLE_DIA),
         ("PinHoleDepth", PIN_HOLE_DEPTH),
         ("PinHoleZ", PIN_HOLE_Z),
+        ("LocatorX", LOCATOR_SITES_MM[0][0]),
+        ("LocatorY1", abs(LOCATOR_SITES_MM[0][1])),
+        ("LocatorY2", abs(LOCATOR_SITES_MM[1][1])),
+        ("LocatorDia", LOCATOR_HOLE_DIA_MM),
+        ("LocatorDepth", LOCATOR_BLIND_DEPTH_MM),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -396,7 +427,7 @@ async def build(adapter: Any) -> dict[str, str]:
     expected -= V_PIN_BORE
     await volume_check(adapter, "arm with pin bore", expected, 0.01 * V_PIN_BORE)
 
-    # --- Plate taps through from the rear face, their mouths countersunk ----
+    # --- Plate taps through, with ordinary rear entry/front exit breaks ----
     plate = wizard_holes(
         adapter,
         PLATE_TAP_SPEC,
@@ -413,21 +444,20 @@ async def build(adapter: Any) -> dict[str, str]:
     drive_jobs += plate.placement_drive_jobs
     expected -= V_PLATE
     await volume_check(adapter, "arm with plate taps", expected, 0.03 * V_PLATE)
-    check(
-        "countersink plate-tap mouths",
-        await adapter.add_chamfer(
-            PLATE_CSK,
-            [
-                [x + _R_PLATE, 0.0, z_face]
-                for x in PLATE_TAP_STATIONS
-                for z_face in (0.0, THICKNESS)
-            ],
-        ),
-    )
-    name_last_feature(adapter, "PlateTapCountersinks")
-    expected -= V_PLATE_CSK
+    for label, leg, z_face, feature in (
+        ("rear plate-tap entry breaks", PLATE_TAP_ENTRY_BREAK_MAX_MM, THICKNESS, "PlateTapRearEntryBreaks"),
+        ("front plate-tap exit breaks", PLATE_TAP_EXIT_BREAK_MAX_MM, 0.0, "PlateTapFrontExitBreaks"),
+    ):
+        check(
+            label,
+            await adapter.add_chamfer(
+                leg, [[x + _R_PLATE, 0.0, z_face] for x in PLATE_TAP_STATIONS],
+            ),
+        )
+        name_last_feature(adapter, feature)
+    expected -= V_PLATE_EDGE_BREAKS
     await volume_check(
-        adapter, "plate-tap countersinks", expected, 0.03 * V_PLATE_CSK + 0.05
+        adapter, "plate-tap edge breaks", expected, 0.03 * V_PLATE_EDGE_BREAKS + 0.05
     )
 
     # --- Rear spot face: revolved in the centreline section so its floor is
@@ -636,6 +666,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ("RearFace", "Front Plane", THICKNESS, '"ArmThickness"'),
         ("PivotHeadSeat", "Front Plane", SPOT_FACE_FLOOR_FROM_FRONT, '"SpotFaceFloor"'),
         ("EndFace", "Right Plane", TIP_STATION, '"TipStation"'),
+        ("LocatorClock", "Right Plane", LOCATOR_SITES_MM[0][0], '"LocatorX"'),
     ):
         check(
             f"create_plane {plane}",
@@ -649,8 +680,43 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     blank_reference_geometry(
         adapter,
-        (("RearFace", "PLANE"), ("PivotHeadSeat", "PLANE"), ("EndFace", "PLANE")),
+        (
+            ("RearFace", "PLANE"), ("PivotHeadSeat", "PLANE"),
+            ("EndFace", "PLANE"), ("LocatorClock", "PLANE"),
+        ),
     )
+
+    # Matched blind press sockets from the actual rear mounting face.
+    locators = SketchDims()
+    check("create_sketch locating sockets", await adapter.create_sketch("RearFace"))
+    for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1):
+        await define_circle(
+            adapter, x, y, LOCATOR_HOLE_DIA_MM / 2.0, f"locator {index}",
+            dims=locators,
+            names=(f"LocatorX{index}", f"LocatorY{index}", f"LocatorDia{index}"),
+            drives=('"LocatorX"', f'"LocatorY{index}"', '"LocatorDia"'),
+        )
+    await ensure_fully_defined(adapter, "matched locating socket sketch")
+    check("exit_sketch locating sockets", await adapter.exit_sketch())
+    name_last_feature(adapter, "LocatorProfile")
+    drive_jobs += locators.apply(adapter, "LocatorProfile")
+    check(
+        "cut blind locating sockets",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=LOCATOR_BLIND_DEPTH_MM)),
+    )
+    name_last_feature(adapter, "LocatorHoles")
+    drive_jobs.append(
+        (name_dimensions(adapter, "LocatorHoles", ["LocatorDepth"])[0], '"LocatorDepth"')
+    )
+    expected -= len(LOCATOR_SITES_MM) * math.pi * (LOCATOR_HOLE_DIA_MM / 2.0)**2 * LOCATOR_BLIND_DEPTH_MM
+    await volume_check(adapter, "matched blind locating sockets", expected, 0.001 * expected)
+    for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1):
+        axis = await name_bore_axis(
+            adapter, "Top Plane", y, "Right Plane", x, f"locator {index}",
+            drive_a=f'"LocatorY{index}"', drive_b='"LocatorX"', drive_jobs=drive_jobs,
+        )
+        if axis != f"Axis{index + 5}":
+            raise RuntimeError(f"locator {index} native axis is {axis!r}")
 
     # Deferred drive equations; each evaluates to the value just built.
     await force_rebuild(adapter)
@@ -673,16 +739,16 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "SpotFaceProfile", "FloorDepth", SPOT_FACE_FLOOR_TOLERANCE
     )
     set_dimension_symmetric_tolerance(
-        adapter, "StationReference", "PinStation", HOLE_POSITION_TOLERANCE
+        adapter, "LocatorHoles", "LocatorDepth", LOCATOR_BLIND_DEPTH_BAND_MM
     )
+    for index in (1, 2):
+        set_dimension_bilateral_tolerance(
+            adapter, "LocatorProfile", f"LocatorDia{index}", *deviations(LOCATOR_HOLE_BAND_MM)
+        )
+    for feature_name, dimension_name in BASIC_REDUCER_DIMENSIONS:
+        set_dimension_basic_tolerance(adapter, feature_name, dimension_name)
     set_dimension_symmetric_tolerance(
-        adapter, "StationReference", "PlateTapStation1", HOLE_POSITION_TOLERANCE
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "StationReference", "PlateTapStation2", HOLE_POSITION_TOLERANCE
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "PinHoleProfile", "PinHoleZ", HOLE_POSITION_TOLERANCE
+        adapter, "PinHoleProfile", "PinHoleZ", LATCH_PIN_HEIGHT_TOLERANCE
     )
     set_dimension_bilateral_tolerance(
         adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND)
@@ -691,17 +757,24 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "PinBoreProfile", "PinBoreDia", *deviations(PIN_BORE_DIA_BAND)
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _author_pivot_fit_annotation(adapter)
+    author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(
-        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
+        adapter, PART_NAME, {
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        }
     )
     # The reference sketch owns printed dimensions but no geometry: hidden in
     # the part; the drawing shows it per view (_drawing_hidden_sketches).
     blank_sketch(adapter, "StationReference")
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    require_saved_projected_gtols(
+        adapter, artefacts["part"], GEOMETRIC_CONTROLS, label="saved transgear arm projected axes",
+    )
     return artefacts
 
 

@@ -33,6 +33,11 @@ from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+import dt_cone_pivot_post_tl_soft_jaw_spec as part_spec
+from _feature_requirements import part_metadata, requirement
+from _printed_limits import limits
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from dt_cone_pivot_post_tl_soft_jaw_spec import (
     BOLT_HEIGHT,
     BOLT_LEFT_X,
@@ -84,7 +89,123 @@ FRONT_KEEP = {
     "BoltY": (0.054, _sheet_y(BOLT_HEIGHT / 2.0)),
     "PlateHeight": (0.033, FRONT_CENTER[1]),
 }
+
+
+_JAW_TOP_SOURCES = (
+    "PLATE_HEIGHT",
+    "PARALLEL_HEIGHT",
+    ("dt_cone_pivot_post_spec", "BORE_HEIGHT"),
+    ("dt_cone_pivot_post_spec", "JOURNAL_AXIS_HEIGHT_TOLERANCE_MM"),
+    ("dt_cone_pivot_post_spec", "CONE_BOSS_DIA"),
+    ("dt_cone_pivot_post_spec", "HEAD_BASE_Y"),
+    ("dt_cone_pivot_post_spec", "CRANK_BORE_HEIGHT"),
+    ("dt_cone_pivot_post_spec", "CRANK_BOSS_DIA"),
+)
+_CBORE_FLOOR_Z = part_spec.PLATE_THICK - part_spec.CBORE_DEPTH
+
+
+def _bolt_features(side: str, x: float, name: str) -> dict[str, dict]:
+    hole = f"bolt_{side}"
+    return {
+        hole: {
+            'kind': "hole",
+            'faces': (CylinderFace(part_spec.BOLT_HOLE_DIA, contains_x_mm=x),),
+            'requirements': ("dia", "thru", "station", "height"),
+            'fields': {
+                "at": ([x, part_spec.BOLT_HEIGHT, part_spec.PLATE_THICK], (name, "BOLT_HEIGHT", "PLATE_THICK")),
+                "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
+                "dia": (
+                    [part_spec.BOLT_HOLE_DIA, round(part_spec._HOLE_MAX, 12)],
+                    ("BOLT_HOLE_DIA", "JAW_SCREW_MAJOR"),
+                ),
+                "nominal_dia": (part_spec.BOLT_HOLE_DIA, ("BOLT_HOLE_DIA",)),
+                "thru": (True, ("BOLT_HOLE_SPEC",)),
+                "station": (limits(x, part_spec.BOLT_PLACES), (name,)),
+                "station_nominal": (x, (name,)),
+                "height": (limits(part_spec.BOLT_HEIGHT, part_spec.BOLT_PLACES), ("BOLT_HEIGHT",)),
+                "height_nominal": (part_spec.BOLT_HEIGHT, ("BOLT_HEIGHT",)),
+            },
+            'precision': {"dia": 2, "station": part_spec.BOLT_PLACES, "height": part_spec.BOLT_PLACES},
+        },
+        f"{hole}_counterbore": {
+            'kind': "counterbore",
+            'faces': (
+                CylinderFace(part_spec.CBORE_DIA, contains_x_mm=x),
+                PlanarFace((0.0, 0.0, 1.0), _CBORE_FLOOR_Z, contains_x_mm=x),
+            ),
+            'requirements': ("dia", "depth"),
+            'fields': {
+                "parent": (hole, ("BOLT_HOLE_SPEC", ("draw_dt_cone_pivot_post_tl_soft_jaw", "build"))),
+                "dia": (limits(part_spec.CBORE_DIA, 2), ("CBORE_DIA", "JAW_SCREW_HEAD_DIA")),
+                "nominal_dia": (part_spec.CBORE_DIA, ("CBORE_DIA",)),
+                "depth": (limits(part_spec.CBORE_DEPTH, 2), ("CBORE_DEPTH", "JAW_SCREW_HEAD_HEIGHT")),
+                "depth_ref": (part_spec.CBORE_DEPTH, ("CBORE_DEPTH",)),
+            },
+            'precision': {"dia": 2, "depth": 2},
+        },
+    }
+
+
+# The bottom edge stands on the vise bed beside the parallels.
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", ("_drawing_hole_callout", "add_native_hole_callout")))
+
+requirement("bed_face",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=("height",),
+    fields={
+        "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
+        "height": (part_spec._HEIGHT_RANGE, ("PLATE_HEIGHT",)),
+    },
+    precision={"height": part_spec.HEIGHT_PLACES},
+)
+
+# The jaw top: over the cone caps, under the head shoulder and crank boss.
+requirement("jaw_top",
+    kind="face",
+    faces=(PlanarFace((0.0, 1.0, 0.0), part_spec.PLATE_HEIGHT),),
+    requirements=("height", "length"),
+    fields={
+        "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "y", "value": part_spec.PLATE_HEIGHT}, ("PLATE_HEIGHT",)),
+        "height": (part_spec._HEIGHT_RANGE, _JAW_TOP_SOURCES),
+        "height_nominal": (part_spec.PLATE_HEIGHT, ("PLATE_HEIGHT",)),
+        "length": (limits(part_spec.PLATE_LENGTH, part_spec.LENGTH_PLACES), ("PLATE_LENGTH",)),
+    },
+    precision={"height": part_spec.HEIGHT_PLACES, "length": part_spec.LENGTH_PLACES},
+)
+
 TOP_KEEP = {"PlateThick": (0.250, TOP_CENTER[1])}
+
+
+# The gripping face carries a cap jaw button on each cone-boss cap.
+requirement("grip_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), part_spec.PLATE_THICK),),
+    requirements=("thickness",),
+    fields={
+        "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "z", "value": part_spec.PLATE_THICK}, ("PLATE_THICK",)),
+        "thickness": (part_spec._THICK_RANGE, ("PLATE_THICK",)),
+        "thickness_nominal": (part_spec.PLATE_THICK, ("PLATE_THICK",)),
+    },
+    precision={"thickness": part_spec.THICK_PLACES},
+)
+
+# The back face seats on the vise jaw in place of the hardened plate.
+requirement("jaw_seat",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+    requirements=("thickness",),
+    fields={
+        "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
+        "thickness": (part_spec._THICK_RANGE, ("PLATE_THICK",)),
+    },
+    precision={"thickness": part_spec.THICK_PLACES},
+)
+
 # The leader leaves the right counterbore from its upper-right quadrant and the
 # text stands right of the plate's upper half, above the length's extension
 # line and below the plan's thickness, short of the isometric.
@@ -94,6 +215,14 @@ HOLE_CALLOUT_EDGE_XY = (
     _sheet_y(BOLT_HEIGHT + 0.8 * _CBORE_R),
 )
 HOLE_CALLOUT_XY = (0.272, 0.168)
+
+
+for name, fields in _bolt_features("left", part_spec.BOLT_LEFT_X, "BOLT_LEFT_X").items():
+    requirement(name, **fields)
+
+for name, fields in _bolt_features("right", part_spec.BOLT_RIGHT_X, "BOLT_RIGHT_X").items():
+    requirement(name, **fields)
+
 HOLE_CALLOUT_PROCESS = "7/16 DRILL"
 
 

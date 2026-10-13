@@ -7,12 +7,12 @@ Dimension import and curation live in ``_drawing_dimension_import``.
 GEOMETRY defines the frame windows and T-rail section;
 HOLES-SOCKETS carries the hole/station plan; CROSS-TAPS carries the front
 cross-tap elevation with section A-A through a corner boss; HUB-SET-SCREW
-holds the hub location, true-axis side view and the removed set-pocket
+holds the hub location, true-axis side view and the removed set-screw boss
 section; UNDERSIDE holds the underside locator, its enlarged native
-detail and the removed knife-hanger section F-F; KEEPER-SEATS holds the two
-machined keeper foot seats, the nominal split-line footprint and section G-G
-through the flange under a faced seat.  A group gets its own sheet rather
-than a crowded corner of one:
+detail and the removed knife-hanger section F-F.  The faced keeper-rail top
+is one linked note under the keeper callout on HOLES-SOCKETS, the faced
+underside plane one beside the UNDERSIDE detail.  A group gets
+its own sheet rather than a crowded corner of one:
 qualifiers then park clear of cutting lines, centrelines and each other.
 Projected top/front pairs stay aligned; removed and section views carry scales.
 Keeper taps transfer from MHA-CH-007 at assembly; their retained station
@@ -64,6 +64,7 @@ from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -98,7 +99,6 @@ from build_fr_top_frame import (
     BOSS_BELOW,
     BOSS_DIA,
     CAP_RECESS_DIAMETER,
-    CAP_RECESS_FLOOR_Y,
     COLUMN_X,
     COUNTERBORE_DIA,
     COUNTERBORE_MAX_FLOOR_OFFSET,
@@ -133,7 +133,8 @@ from build_fr_top_frame import (
     REAR_COLUMN_Z,
     RING_HEIGHT,
     ROOT_FILLET_R,
-    SET_POCKET_DEPTH,
+    SET_BOSS_FACE_X,
+    SET_SPOT_FACE_X,
     SET_TAP_SPEC,
     SIDE_TAP_DRILL_DIA,
     SLOT_FLAT,
@@ -153,7 +154,6 @@ from fr_top_frame_spec import (
     DRAWING_PRECISION,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
-    FLANGE_THICKNESS_MM,
     GEOMETRIC_TOLERANCES_MM,
     HANGER_CBORE_DIA,
     HANGER_CLEARANCE_DIA,
@@ -163,15 +163,15 @@ from fr_top_frame_spec import (
     HANGER_PIN_HOLE_DEPTH,
     HANGER_PIN_HOLE_DIA,
     HANGER_PIN_X,
+    HANGER_SLOT_ALONG_CALLOUT,
     HANGER_SLOT_FROM_ROUND,
+    HANGER_SLOT_FROM_ROUND_PLACES,
     HANGER_SLOT_LENGTH,
     HANGER_SLOT_LENGTH_CALLOUT,
     HANGER_SLOT_WIDTH,
     HANGER_SLOT_WIDTH_CALLOUT,
-    KEEPER_SEAT_BOUNDS_XZ,
-    KEEPER_SEAT_CENTRES_XZ,
-    KEEPER_SEAT_LENGTH_MM,
-    KEEPER_SEAT_WIDTH_MM,
+    HUB_SET_BOSS_FROM_AXIS,
+    HUB_SET_SPOT_FROM_AXIS,
     KEEPER_TAP_CALLOUT_PRECISION,
     PRINTED_LINEAR_BAND_MM,
     SURFACE_FINISHES,
@@ -196,7 +196,6 @@ SHEET_NAMES = (
     "CROSS-TAPS",
     "HUB-SET-SCREW",
     "UNDERSIDE",
-    "KEEPER-SEATS",
 )
 SHEET_SCALE = (1.0, 3.0)
 # Sheet scale is a per-sheet property, and the title block's SCALE field
@@ -211,7 +210,6 @@ SHEET_SCALES = {
     "CROSS-TAPS": (1.0, 2.0),
     "HUB-SET-SCREW": SHEET_SCALE,
     "UNDERSIDE": SHEET_SCALE,
-    "KEEPER-SEATS": (1.0, 2.0),
 }
 # The station plan is drawn half size, so its centre-mark axes and label
 # lanes derive from its own scale and never from the title block's.
@@ -278,26 +276,22 @@ SOCKET_FINISH_SYMBOL_XY = (0.050, 0.090)
 FINISH_LEADER_TAIL = 0.035
 
 # Sheet 4: the cross-tap elevation across the sheet's upper band with
-# section A-A below it, both half size.  A-A carries the cap recess, the
-# cap seat and the 47.3 boss stack, so it gets the sheet's whole lower
-# half instead of a quarter of its right edge.
+# section A-A below it, both half size.  A-A carries the cap recess and the
+# 47.3 boss stack, so it gets the sheet's whole lower half instead of a
+# quarter of its right edge.
 DETAIL_FRONT_SCALE = SHEET_SCALES["CROSS-TAPS"]
 DETAIL_FRONT_CENTER = (0.145, 0.228)
 DETAIL_SECTION_SCALE = (1, 2)
 DETAIL_SECTION_CENTER = (0.290, 0.135)
 DETAIL_SECTION_CAPTION_XY = (0.240, 0.088)
 
-# #946 leader-over-part (layoutcheck's b2 leaf on b49e13940): two leaders ran
-# far over the part to reach their feature, reading as edges of it.
-# - RD4, the 2X keeper tap callout, stood above the upper-right boss and its
-#   leader crossed the boss and bore rings to the front keeper tap: 29.6 mm
-#   over the part, 18.3 mm more than the tap's shortest approach.
-# - The cap seat Ra 3.2 stood below-left of A-A and its leader climbed 24.7
-#   mm through the hatching to the far ledge: 16.6 mm more than the approach.
-# Each now enters by its feature's short side (Main: detour <= ~4 mm; swing's
-# RD2 fix, 4dda16fd5, left 3.8).  Placement is computed from the feature's
-# projected model points at build time; the pure placement functions below
-# are what the offline tests pin.
+# #946 leader-over-part (layoutcheck's b2 leaf on b49e13940): RD4, the 2X
+# keeper tap callout, stood above the upper-right boss and its leader crossed
+# the boss and bore rings to the front keeper tap: 29.6 mm over the part,
+# 18.3 mm more than the tap's shortest approach.  It now enters by the tap's
+# short side (Main: detour <= ~4 mm; swing's RD2 fix, 4dda16fd5, left 3.8).
+# Placement is computed from the tap's projected model points at build time;
+# the pure placement function below is what the offline tests pin.
 #
 # The sheet's frame: ISheet::GetZoneMargin's 12.7 mm inside the ASME B sheet.
 SHEET_FRAME = (0.0127, 0.0127, 0.4191, 0.2667)
@@ -307,6 +301,13 @@ INK_CLEARANCE = 0.002
 ROUND_OUT = 0.0001
 # The native arrowhead is 0.762 mm across (b49e1 dump, IDisplayData arrows).
 ARROW_HALF_WIDTH = 0.000381
+# The #6 hanger holes are drilled through from the faced underside and each
+# counterbore is then cut from the top (Q7 option C, approved by the user
+# 2026-10-13).  The callout says both entries: "DRILL FROM UNDERSIDE" alone
+# read as the counterbore's side too (codex review of 59f405ab).  The
+# trailing newline puts the native size and counterbore rows under it: four
+# rows in all.
+HANGER_DRILL_CALLOUT = "DRILL FROM UNDERSIDE;\nC'BORE FROM TOP:\n"
 # Transfer fit-up owns these locations; the nominal model holes and their
 # sheet coordinates are references, not independent inspection requirements.
 # The trailing newline keeps the native thread/drill/depth on separate rows
@@ -335,6 +336,16 @@ KEEPER_CALLOUT_EXTENT = (
     _KEEPER_NATIVE_CALLOUT_EXTENT[2] + KEEPER_TRANSFER_EXTRA_WIDTH,
     _KEEPER_NATIVE_CALLOUT_EXTENT[3] + KEEPER_TRANSFER_EXTRA_HEIGHT,
 )
+# Both facing notes set at the C2 note block's 3.5 mm height, which renders
+# about 2.6 mm per character on a 5.1 mm row (farm 30394c1da: its
+# 70-character line spans 30 -> 208 mm).
+FACING_NOTE_HEIGHT = 0.0035
+# Native SolidWorks centres the four-row RD4 block on its callout point and
+# lands the leader on an underline below the bottom row, 11.15 mm under that
+# point (HOLES-SOCKETS, farm 9e13b1b78 and b51258927: rows 91.7 -> 112.0 mm
+# about a 101.85 mm point, leader shoulder at 90.7 mm), not on the estimated
+# extent's bottom.  Rounded outward; the facing note hangs under it.
+KEEPER_CALLOUT_SHOULDER_DROP = 0.0112
 
 
 def _keeper_leader_angle(
@@ -372,11 +383,27 @@ KEEPER_TRANSFER_PLAN_SHIFT = (
     + KEEPER_TRANSFER_EXTRA_WIDTH
 )
 DETAIL_TOP_CENTER = (0.215 - KEEPER_TRANSFER_PLAN_SHIFT, 0.160)
+# HOLES-SOCKETS' left lanes, outside in: 202.1 REAR HANGER Z at x 27 mm, the
+# 224.00 socket pitch at x 40.5, 28.0 FRONT HANGER Z at x 62.  28.0's text
+# (42.9..81.3 mm on the 40d9d030e render) leaves the pitch line 2.4 mm of
+# air, and 202.1's three rows (22.4 mm wide) end 2.3 short of it.  The
+# pitch's value and qualifier park on a leader right of its line, in the
+# band between the plan, 28.0's extension line and the rear hanger's:
+# centred on the line they crossed the left rail and the x 92.6 baseline
+# extension line (machinist review).  The rear hanger's extension line
+# crosses the pitch line; outermost, the pitch's own three rows (25.6 mm
+# wide) would need 0.7 mm more than the sheet margin and 28.0's text leave.
+SOCKET_VERTICAL_PITCH_LINE_XY = (0.0405, DETAIL_TOP_CENTER[1])
+SOCKET_VERTICAL_PITCH_TEXT_XY = (0.0615, 0.140)
+REAR_HANGER_Z_TEXT_XY = (0.027, 0.165)
+# (29.2) FRONT KEEPER Z centres between its extension lines, 2.7 mm inside
+# each: at y 205 mm its qualifier row sat on the keeper's line.
+FRONT_KEEPER_Z_TEXT_XY = (
+    0.350,
+    DETAIL_TOP_CENTER[1]
+    - (FRONT_COLUMN_Z + KEEPER_TAP_Z_FRONT) / 2.0 * DETAIL_VIEW_SCALE / 1000.0,
+)
 
-# The cap seat symbol's ink right of its leader's bend: "CAP SEAT FLOORS, 4X"
-# and the rule over it end 4.64 mm past the bend (b49e1: bend at x 210.00,
-# text to 214.57, rule to 214.64), rounded outward.
-CAP_SEAT_FINISH_INK_PAST_BEND = 0.0047
 # Keep the boss-height lane 7.45 mm off A-A's rederived Ø45 boss silhouette.
 BOSS_ABOVE_RAIL_LINE_XY = (
     DETAIL_SECTION_CENTER[0] + DETAIL_PLAN_HALF_D + 0.00745,
@@ -389,7 +416,7 @@ BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0135, 0.176)
 # A-A's joint note. The near wall between the flush counterbore floor and
 # the socket bore only starts the thread; the far casting wall carries the
 # MHA-VN-027 joint. drawing-guidelines.md rule 17 (walls and webs), print-worst: the stock shank, less the most
-# outboard printed floor (16.1 + band) and the largest printed socket radius.
+# outboard printed floor (16.35 + band) and the largest printed socket radius.
 _SOCKET_DIA_PLACES = DRAWING_PRECISION["BoreProfile"]["B0Dia"]
 CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT = (
     CROSS_SCREW_SHANK_LEN
@@ -412,15 +439,36 @@ CROSS_TAP_SECTION_NOTE = (
 )
 CROSS_TAP_SECTION_NOTE_XY = (0.040, 0.032)
 
-# Sheet 5: hub location, true-axis side view, removed set-pocket section.
+# Sheet 5: hub location, true-axis side view, removed set-screw boss section.
 HUB_TOP_CENTER = (0.145, 0.200)
 HUB_LEFT_CENTER = (0.145, 0.095)
 HUB_LEFT_SCALE = (1, 2)
 HUB_SECTION_CENTER = (0.330, 0.210)
 HUB_SECTION_SCALE = (1, 1)
 HUB_SECTION_CAPTION_XY = (0.330, 0.178)
-POCKET_DEPTH_TEXT_XY = (0.330, 0.238)
-POCKET_DEPTH_OFFSET_XY = (0.378, 0.242)
+# D-D prints 1:1, the bore axis pinned at x 332.0 mm (HUB_SECTION_PROFILE_X),
+# so the boss face stands at 310.0, the spot face at 311.0 and the bore wall
+# at 323.5; the rail top prints at y 230.1 and the tap axis at 211.8 (the
+# 40d9d030e render).  The thread length nests inside the 21.0 and shares its
+# spot-face extension line: it stands nearer the rail top with its text out
+# LEFT, the 21.0 over it with its text out RIGHT, so neither leader leaves
+# its line across the other's extension lines.  The boss face's 22.0 hangs
+# under the view, its line 3.5 over the caption (178.0), its text out left
+# (test_hub_boss_section_texts_and_leaders_stand_clear_of_their_ink).
+HUB_SET_THREAD_LINE_XY = (0.3172, 0.2365)
+HUB_SET_THREAD_OFFSET_XY = (0.2840, 0.2380)
+HUB_SET_SPOT_LINE_XY = (0.3215, 0.2435)
+HUB_SET_SPOT_OFFSET_XY = (0.3640, 0.2460)
+HUB_SET_BOSS_LINE_XY = (0.3210, 0.1815)
+HUB_SET_BOSS_OFFSET_XY = (0.2810, 0.1880)
+# D-D's spot-face finish symbol stands on the spot face's own row, left of
+# the boss, its leader straight in through the spot's open mouth.  Its
+# "Ra 3.2" ends 14.8 mm right of the symbol point (the hub bore symbol's ink
+# on the 40d9d030e render, same height), so the tail runs 16.0 before the
+# bend and the point sits 19.0 left of the leader's tip on the spot face:
+# the ink stops 4.2 short of the spot face, 3.2 short of the boss face.
+HUB_SPOT_FINISH_TAIL = 0.016
+HUB_SPOT_FINISH_REACH = 0.019
 # In the left window, right of the bore (clears leader-crosses-line Ra 3.2 x
 # RibWidth at x 60): was (0.030, 0.160), its 35 mm tail cut the RibWidth
 # line.  The leader now lands on the bore's lower-right rim (-45 deg on the
@@ -447,7 +495,11 @@ HUB_LEFT_NOTE_XY = (0.093, 0.0455)
 # smallest features on the casting.
 HUB_BOTTOM_CENTER = (0.110, 0.200)
 HUB_BOTTOM_SCALE = (1, 3)
-HUB_BOTTOM_NOTE_XY = (0.060, 0.120)
+# Three rows, at the band's left edge: the 07527cf4 codex review read the
+# one 85.7 mm row, wedged between the slot width's block and F-F's 14.200,
+# as crowding the section dimensions.
+HUB_BOTTOM_NOTE_XY = (0.040, 0.118)
+HUB_BOTTOM_NOTE = "UNDERSIDE LOCATOR\nBAR/GUSSET BOTTOMS\nAT SEATS SHARP"
 HUB_DETAIL_CENTER = (0.300, 0.174)
 HUB_DETAIL_SCALE = (2, 1)
 HUB_DETAIL_CAPTION_XY = (0.300, 0.090)
@@ -455,6 +507,38 @@ HUB_BOSS_DIA_TEXT_XY = (0.210, 0.100)
 HUB_GUSSET_T_TEXT_XY = (0.300, 0.212)
 HUB_GUSSET_T_OFFSET_XY = (0.390, 0.243)
 LAND_TEXT_OFFSET_XY = (0.155, 0.145)
+# The faced underside plane's linked note C (top-left point).  The bands
+# round the locator are full: between F-F's 7.100 block (top 113.3 mm on
+# farm run 40d9d030e) and the 72.0 block (bottom 137.6) stand 24.3 mm, under
+# the four rows' 20.4 plus two clearances, and right of the plan the Ø30.0
+# leader and detail C's fence leave 41 mm.  So the note takes the open band
+# right of detail C's caption, over the title block: 80.6 x 20.4 mm at the
+# estimated glyph pitch, 11.6 over the title block, 8.5 inside the frame's
+# right edge, 5.7 off the fence (r 76 about the detail centre) and 13.9
+# right of the caption's DETAIL C (316.1 mm), beside the hub boss and
+# gussets it excludes.
+UNDERSIDE_FACING_NOTE_XY = (0.330, 0.098)
+# The slot position frames' basics, stated for both stations: F-F cuts only
+# the rear one, and its bare 14.200 box carries no text (a BASIC keeps none),
+# so the front slot's basic and the frames' 90 degrees to the B-C line went
+# unstated (codex review of a3735691, sheet 6).  A plain position frame on a
+# slot holds only its width's median plane, which left the basic 14.200
+# along the slot untoleranced and the slot-to-screw-hole wall unbounded
+# (codex review of 87d93d70); a note claiming the frames' zone held both
+# ways still left it without a control that does (codex review of
+# 0bb6ba81).  The frames keep the width; the note tolerances the slot
+# centre along the slot from its basic 14.200 directly, by the .XXX band
+# the spec's wall stack charges there (HANGER_SLOT_STATION_TOL).  It takes
+# the band between F-F's 7.100 block (top 113.3 mm)
+# and the 72.0 block's underline (136.6), left of detail C's fence (r 76
+# about the detail centre); top-left point, rows 4.6 mm apart and 3.6 tall,
+# 2.45 mm a glyph (87d93d70 render).
+SLOT_BASIC_NOTE = (
+    f"SLOTS: BASIC {HANGER_SLOT_FROM_ROUND:.{HANGER_SLOT_FROM_ROUND_PLACES}f} FROM\n"
+    "B (FRONT), C (REAR), AT\nBASIC 90 DEG TO B-C LINE;\n"
+    + HANGER_SLOT_ALONG_CALLOUT
+)
+SLOT_BASIC_NOTE_XY = (0.150, 0.1345)
 # Sheet 6, removed section F-F through the REAR knife-hanger station: the
 # #6 SHCS counterbore, its floor above the crossbar underside (the screw's
 # grip, closing RingHeight with the callout's counterbore depth), the round
@@ -487,25 +571,29 @@ def _hanger_section_xy(x: float, y: float) -> tuple[float, float]:
 # hole walls, its four-line callout parked on a leader in the open band
 # below-right of the section (the dda9a33a8 render printed it across its own
 # extension lines and the underside edge).  Right: the depth the hole and
-# slot share.  Above, between the owned axes: the hole's 6.350 station from
+# slot share.  Above, between the owned axes: the hole's 7.100 station from
 # the screw axis, its text on a jog to the right, clear of the locator's land
-# text; a row higher, so the two dimension lines never share the hole's
-# extension line at one height, the slot's BASIC 12.700 from the round hole
-# (the slot position frames' true location), its text on a jog to the left,
-# between the counterbore floor's text and the locator's label.  Under the
-# slot, a row below the hole's size so their arrows cannot meet: its length,
-# the text on a jog between the caption and the hole's callout.  The caption
-# takes the empty lower-left corner of the band.
+# text and the boss's Ø30.0; its rows state the hole stands at the screw's
+# own Z (codex review of 07527cf4: the round holes, datums B and C, had no
+# transverse location).  A row higher, so the two dimension lines never
+# share the hole's extension line at one height, the slot's BASIC 14.200
+# from the round hole (the slot position frames' true location), its box on
+# a short jog up-left, right of the locator's label.  Under the slot, a row
+# below the hole's size so their arrows cannot meet: its length, the text on
+# a jog left of its line, so the leader leaves the underline's right end
+# clear of its own rows (the 07527cf4 render ran it up through "2X"), between
+# the caption and the slot's extension lines.  The caption takes the empty
+# lower-left corner of the band.
 HANGER_FLOOR_TEXT_XY = _hanger_section_xy(
     BAR_X0 - HANGER_SECTION_GUSSET_REACH - 8.0, -HALF_H + HANGER_GRIP / 2.0
 )
 HANGER_FLOOR_OFFSET_XY = (0.058, 0.076)
 PIN_STATION_TEXT_XY = _hanger_section_xy((HANGER_X + PIN_HOLE_X) / 2.0, HALF_H + 8.0)
-PIN_STATION_OFFSET_XY = (0.160, 0.106)
+PIN_STATION_OFFSET_XY = (0.157, 0.106)
 SLOT_STATION_TEXT_XY = _hanger_section_xy((SLOT_X + PIN_HOLE_X) / 2.0, HALF_H + 14.0)
-SLOT_STATION_OFFSET_XY = (0.066, 0.104)
+SLOT_STATION_OFFSET_XY = (0.104, 0.1115)
 SLOT_LENGTH_TEXT_XY = _hanger_section_xy(SLOT_X, -HALF_H - 12.0)
-SLOT_LENGTH_OFFSET_XY = (0.118, 0.026)
+SLOT_LENGTH_OFFSET_XY = (0.0895, 0.024)
 # The callout block is 65 x 19 mm on that render (3.5 mm text).  Centred
 # here it spans sheet x 0.140..0.205 and y 0.025..0.044: its left edge is
 # 5.7 mm right of the size's outer arrow tail (0.1343), its top 6 mm under
@@ -523,30 +611,26 @@ HANGER_SECTION_CALLOUTS = {
     "HangerPinHoleDia": HANGER_PIN_HOLE_CALLOUT,
     "HangerPinHoleDepth": HANGER_PIN_DEPTH_CALLOUT,
 }
-HANGER_SECTION_CAPTION_XY = (0.070, 0.040)
+HANGER_SECTION_CAPTION_XY = (0.055, 0.040)
 # Sheet 6, UNDERSIDE locator (1:3, model x right and z up from the view
 # centre): datum B is the front round dowel hole, its tag low in the window
-# right of the crossbar, past the front slot frame's right end and under its
-# bottom, so its leader runs clear of that frame's text (at (122, 185) mm it
-# ran 7.9 mm through it, farm run 20261009T171439353Z); datum C the rear
-# one, its tag above the rear rail so its leader climbs away from F-F's
-# right arrow.  Each slot's position
+# right of the crossbar; datum C the rear one, its tag above the rear rail so
+# its leader climbs away from F-F's right arrow.  Each slot's position
 # frame, B|C> in front and C|B> at the rear (the translation modifier frees
-# the slot along the line to the other station's round hole).  The front
-# frame stands in the window left of the crossbar, between its junction
-# gussets and right of detail C's fence.  The rear one stands in the window
-# right of the crossbar, under F-F's right label: left of the crossbar its
-# text sat under both F labels and F-F's left arrow (farm run
-# 20261009T174542021Z: text-clearance 3.87 mm, text-on-line 3.05 mm), and
-# above the labels its leader would cross F-F's cutting line to the slot.
-# Its leader drops from the frame's left end, between the crossbar's right
-# edge and the right arrow, to the slot rim under the cutting line.  The
-# FRONT slot's width (the rear slot lies on F-F's cutting line) runs left of the front gusset, its text on a leader into
-# the band under the front rail, between the locator's label and the
-# land's dimension line.
+# the slot along the line to the other station's round hole), stands above
+# the plan, outside its silhouette, as the machinist review asked: the rear
+# one left of datum C's tag, its leader dropping from its right end to the
+# rear slot's outer end arc, above F-F's cutting line and left of datum C's
+# rim pick; the front one right of that tag, its leader dropping from its
+# left end, right of datum C's leader and F-F's right letter, to the front
+# slot's inner end arc, left of datum B's rim pick and right of the pocket
+# length's extension lines.  The FRONT slot's width (the rear slot lies on
+# F-F's cutting line) runs left of the front gusset, its text on a leader
+# into the band under the front rail that passes left of the land's
+# dimension line.
 _HUB_BOTTOM_M_PER_MM = HUB_BOTTOM_SCALE[0] / HUB_BOTTOM_SCALE[1] / 1000.0
 HANGER_DATUM_SYMBOL_XY = {"B": (0.136, 0.176), "C": (0.130, 0.257)}
-# Each round hole is 1.06 mm across at 1:3, its rim 1.0 mm (sheet) inside
+# Each round hole is 1.08 mm across at 1:3, its rim 1.1 mm (sheet) inside
 # the crossbar's +X edge, so the rim is hit-tested zoomed onto a 5 mm square
 # (draw_ch_rocker_arm's pivot-bore datum precedent), where the pick aperture
 # is hundredths of a millimetre.
@@ -565,37 +649,87 @@ def hanger_datum_pick(
     reach = math.hypot(dx, dy)
     radius = HANGER_PIN_HOLE_DIA / 2.0 * _HUB_BOTTOM_M_PER_MM
     return (centre[0] + radius * dx / reach, centre[1] + radius * dy / reach)
-HANGER_SLOT_FRAME_XY = {"front": (0.078, 0.185), "rear": (0.116, 0.2075)}
 # Each slot frame's printed text box and outline from its frame_xy (sheet m),
 # as farm run 20261009T204136744Z measured them with the translation modifier
 # inline (no vector): rear DetailItem507 at (116, 207.5) mm printed its text
 # [116.9, 202.2]..[148.5, 206.7] mm and a 39.1 x 7.0 mm outline.  The front
 # DetailItem506 prints the same outline and the same first and last text
 # items (only its middle divider sits 1.1 mm left, B being narrower than C),
-# so the same boxes.  Its leader
-# leaves the outline's left end at mid height on a 6.35 mm shoulder.
+# so the same boxes.  Its leader leaves the outline's end facing its slot at
+# mid height on a 6.35 mm shoulder.
 HANGER_SLOT_FRAME_TEXT_BOX = (0.0009, -0.0053, 0.0325, -0.0008)
 HANGER_SLOT_FRAME_OUTLINE = (0.0, -0.0070, 0.0391, 0.0)
 HANGER_SLOT_FRAME_SHOULDER = 0.00635
+# Each frame names its feature below it: at 1:3 the slot and the round hole
+# (datum B or C) beside it stand 4.7 mm apart, and a reader took the frames
+# for the round holes' own (codex review of 0d75ada1, sheet 6).  The
+# below-frame text prints left-aligned 1.1 mm under the outline, 3.4 tall,
+# 2.6 mm a glyph ("2X" under pn-pen-v-block's frame at (198, 196) mm printed
+# [198.1, 184.5]..[203.3, 187.9]).  Both frames' tops 5.7 mm under the
+# sheet frame, their names' 4.6 over the plan's top (y 244.8 mm): the rear
+# 3.3 right of the pocket length's block, the front 16.7 right of datum C's
+# tag.
+HANGER_SLOT_FRAME_QUANTITY = "DOWEL SLOT"
+HANGER_SLOT_FRAME_QUANTITY_BOX = (
+    0.0, -0.0116, 0.0026 * len(HANGER_SLOT_FRAME_QUANTITY), -0.0080
+)
+HANGER_SLOT_FRAME_XY = {"front": (0.160, 0.261), "rear": (0.052, 0.261)}
+
+
+def hanger_slot_frame_knee(
+    frame_xy: tuple[float, float], target: tuple[float, float]
+) -> tuple[float, float]:
+    """Where a slot frame's leader leaves its shoulder, toward ``target``.
+
+    The leader runs from the outline's end facing the target, at mid height.
+    """
+    left, bottom, right, top = HANGER_SLOT_FRAME_OUTLINE
+    y = frame_xy[1] + (bottom + top) / 2.0
+    if frame_xy[0] + left > target[0]:
+        return (frame_xy[0] + left - HANGER_SLOT_FRAME_SHOULDER, y)
+    return (frame_xy[0] + right + HANGER_SLOT_FRAME_SHOULDER, y)
+
+
+def hanger_slot_landing(
+    end_centre: tuple[float, float], knee: tuple[float, float]
+) -> tuple[float, float]:
+    """The sheet point on a dowel slot's end arc facing its frame's knee.
+
+    The view looks along the slot's depth, so each end prints as a half
+    circle of the slot's half width at the view's scale about its centre.
+    """
+    dx, dy = knee[0] - end_centre[0], knee[1] - end_centre[1]
+    reach = math.hypot(dx, dy)
+    radius = HANGER_SLOT_WIDTH / 2.0 * _HUB_BOTTOM_M_PER_MM
+    return (end_centre[0] + radius * dx / reach, end_centre[1] + radius * dy / reach)
+
+
 HANGER_SLOT_WIDTH_TEXT_XY = (
-    HUB_BOTTOM_CENTER[0] + (BAR_X0 - 24.0) * _HUB_BOTTOM_M_PER_MM,
+    HUB_BOTTOM_CENTER[0] + (BAR_X0 - 40.0) * _HUB_BOTTOM_M_PER_MM,
     HUB_BOTTOM_CENTER[1] + STUD_Z_FRONT * _HUB_BOTTOM_M_PER_MM,
 )
-HANGER_SLOT_WIDTH_OFFSET_XY = (0.060, 0.137)
+# The block left of the land's dimension line.  On the fe1a7611 render the
+# leader ran from the width's lower arrow tail (x 87.67, y 165.10 mm) to the
+# underline's right end (offset x + 26.0, y 124.11) and passed 0.8 mm from
+# the land line's left arrow tail (x 86.64, y 144.99) at its height (codex
+# review of fe1a7611): 8 mm further left it passes 4.7 mm clear.
+HANGER_SLOT_WIDTH_OFFSET_XY = (0.050, 0.137)
 # The crossbar pockets' length stands outside the plan, so nothing inside
 # the frame reads as part of it: its dimension line at model x -256, 12.2
 # left of the Ø45 barrels, 7.0 left of detail C's fence (r 38 about the
 # gooseneck) and 12.0 inside the sheet frame; its extension lines run at
 # y 177 / 223, under and over that fence and between the corner bosses.
-# The block (three rows, 24.6 x 17.5 mm as farm c75ac06 printed it) parks
-# on an offset leader above the plan's top-left corner: 3.0 inside the
-# sheet frame's left edge, 2.45 under its top, 1.9 over the plan's top and
-# 2.7 off the top-left boss.
+# The block (three rows: the value, "2X POCKET, E-E" naming the section that
+# cuts the T, "CENTRED ON T"; 17.5 mm tall as farm c75ac06 printed it, its
+# widest row 33.9 mm by the 40d9d030e render's glyphs) parks on an offset
+# leader above the plan's top-left corner: 2.4 inside the sheet frame's left
+# edge, 2.45 under its top, 1.9 over the plan's top and its top-left boss,
+# and 3.0 left of the rear slot frame.
 POCKET_LENGTH_TEXT_XY = (
     HUB_BOTTOM_CENTER[0] - 256.0 * _HUB_BOTTOM_M_PER_MM,
     HUB_BOTTOM_CENTER[1],
 )
-POCKET_LENGTH_OFFSET_XY = (0.028, 0.2555)
+POCKET_LENGTH_OFFSET_XY = (0.0320, 0.2555)
 
 # Sheet 1, Section E-E: the side rails and the crossbar T, cut inside the
 # crossbar pockets (|z| <= 69, where the crossbar is a T) and clear of every hole
@@ -615,12 +749,13 @@ RAIL_SECTION_NOTE_XY = (0.270, 0.1525)
 SIDE_SECTION_CENTER = (0.3183, 0.106)
 SIDE_SECTION_SCALE = (1, 4)
 SIDE_SECTION_CAPTION_XY = (0.3183, 0.0915)
-# The E-E note sits 2.0 above where it was so the side web's 13.0 (its top
-# at 124.5 mm) keeps 2.1 of air under the note's last line, and the web
-# text sits 8 mm left so its 37.5 mm qualifier row ends at 345.8 mm, 4.1
-# short of the crossbar flange's 8.0 dimension line at 349.9 (farm
-# 30394c1da: the row ran 3.8 mm past that line, text-on-line).
-SIDE_SECTION_NOTE_XY = (0.290, 0.135)
+# The E-E note's last line keeps 2.1 mm of air over the side web's 13.0 (its
+# top at 124.5 mm); its third line, the crossbar web's centring, lifts the
+# first to 139.8, 4.6 under B-B's note.  The web text sits 8 mm left so its
+# 37.5 mm qualifier row ends at 345.8 mm, 4.1 short of the crossbar flange's
+# 8.0 dimension line at 349.9 (farm 30394c1da: the row ran 3.8 mm past that
+# line, text-on-line).
+SIDE_SECTION_NOTE_XY = (0.290, 0.1398)
 SIDE_WEB_TEXT_XY = (0.327, 0.120)
 # Where each removed section prints the rail centreline it cuts, sheet x:
 # B-B at z 112 and E-E / D-D at x -197, as on b49e1, the #946 layout-audit
@@ -630,10 +765,16 @@ SIDE_WEB_TEXT_XY = (0.327, 0.120)
 RAIL_SECTION_PROFILE_X = 0.35643
 SIDE_SECTION_PROFILE_X = 0.29666
 HUB_SECTION_PROFILE_X = 0.33198
-# E-E's crossbar T dimensions: each dimension line stands one 5 mm gap off
-# the T (the web's below its underside, the flange's right of its +X face)
-# and its text parks on a leader at the right of the section, under the side
-# rail web's text and right of the caption.
+# E-E's crossbar T dimensions: the web's and the flange's dimension lines
+# stand one 5 mm gap off the T (the web's below its underside, the flange's
+# right of its +X face) and their text parks on a leader at the right of the
+# section, under the side rail web's text and right of the caption.  The
+# pockets' depth (flange underside to the T's underside) stands 2 mm left of
+# the flange's -X face, its arrows inside: outside, their tails would cross
+# the side web's dimension line above and the web's arrow tail below.  Its
+# two rows (24.4 x 9.2 mm) park low between the side rail and the T, 2.3 mm
+# right of the rail and 3.0 under the side web's line, so the leader runs
+# shallow, 2.9 mm off its lower extension line's end.
 _SIDE_SECTION_M_PER_MM = SIDE_SECTION_SCALE[0] / SIDE_SECTION_SCALE[1] / 1000.0
 
 
@@ -649,6 +790,10 @@ CROSSBAR_WEB_LINE_XY = _side_section_xy(HANGER_X, -HALF_H - 20.0)
 CROSSBAR_WEB_TEXT_XY = (0.382, 0.094)
 CROSSBAR_FLANGE_LINE_XY = _side_section_xy(BAR_X1 + 20.0, (HALF_H + FLANGE_BOT_Y) / 2.0)
 CROSSBAR_FLANGE_TEXT_XY = (0.382, 0.108)
+CROSSBAR_POCKET_DEPTH_LINE_XY = _side_section_xy(BAR_X0 - 8.0, (FLANGE_BOT_Y - HALF_H) / 2.0)
+CROSSBAR_POCKET_DEPTH_TEXT_XY = (0.3155, 0.1068)
+# swDimensionArrowsSide_e: swDimArrowsInside (draw_dt_cone_tip_block's precedent).
+_DIM_ARROWS_INSIDE = 0
 
 # #955 (layoutcheck on b49e1): three cutting-plane letters printed on ink.
 # B's outer letter sat on the +Z rail's outer edge and the 183.9, E's outer
@@ -669,7 +814,8 @@ SECTION_LETTER_EXTENTS = {
     "D": (-0.0024, 0.0158, 0.0028, 0.0221),
 }
 # The two window clear widths print their values on one line across the
-# plan's lower rail.  "183.9" measured on b49e1 about its text point
+# plan's lower rail.  The right one's text ("183.9" on b49e1, now 182.9 in
+# as many glyphs) measured on b49e1 about its text point
 # (left, down, right, up), rounded outward.  Its dimension line runs 2.78 mm
 # under the text point, rounded toward the text so the band under the rail
 # is never overstated.
@@ -688,115 +834,28 @@ SECTION_LETTER_TEXT_GAP = (
     SECTION_LETTER_EXTENTS["B"][2] - SECTION_LETTER_EXTENTS["B"][0] + INK_CLEARANCE + ROUND_OUT
 )
 
-# Sheet 7: the two keeper foot seats, split-line regions of the west rail's
-# existing top flange (faced, not raised or sunk).  The half-size plan shows
-# both; the REAR seat carries the nominal footprint and its location from the
-# rear socket axis off its own split lines, the dimension lines just outside
-# it or the plan and every value parked right of the plan.
-# Removed section G-G runs along the rail through the FRONT seat, outboard of
-# its keeper tap, from beyond the front boss to past the seat, so the faced
-# seat and the flat flange underside below it print in one cut plane.
-KEEPER_PLAN_SCALE = SHEET_SCALES["KEEPER-SEATS"]
-KEEPER_PLAN_VIEW_SCALE = KEEPER_PLAN_SCALE[0] / KEEPER_PLAN_SCALE[1]
-KEEPER_PLAN_CENTER = (0.130, 0.170)
-_KEEPER_PLAN_S = KEEPER_PLAN_VIEW_SCALE / 1000.0  # sheet m per model mm
-# Each footprint dimension line stands this far off the ink it clears: the
-# width line over the seat's split line, the length line past the plan, the
-# inner-edge location line below it.
-KEEPER_DIM_LINE_GAP = 0.004
-KEEPER_LENGTH_LINE_XY = (
-    KEEPER_PLAN_CENTER[0] + PLAN_HALF_X * _KEEPER_PLAN_S + KEEPER_DIM_LINE_GAP,
-    KEEPER_PLAN_CENTER[1] - KEEPER_SEAT_CENTRES_XZ[1][1] * _KEEPER_PLAN_S,
-)
-KEEPER_LENGTH_TEXT_XY = (0.262, 0.128)
-KEEPER_WIDTH_LINE_XY = (
-    KEEPER_PLAN_CENTER[0] + KEEPER_SEAT_CENTRES_XZ[1][0] * _KEEPER_PLAN_S,
-    KEEPER_PLAN_CENTER[1]
-    - KEEPER_SEAT_BOUNDS_XZ[1][2] * _KEEPER_PLAN_S
-    + KEEPER_DIM_LINE_GAP,
-)
-KEEPER_WIDTH_TEXT_XY = (0.262, 0.148)
-# Seat location: the socket-side end split line chains in line with the
-# length (the two share that witness), the inner split line's 2.1 mm of
-# paper runs below the plan, and both values stack under the length's.
-KEEPER_END_LINE_XY = (
-    KEEPER_LENGTH_LINE_XY[0],
-    KEEPER_PLAN_CENTER[1]
-    - (REAR_COLUMN_Z + KEEPER_SEAT_BOUNDS_XZ[1][3]) / 2.0 * _KEEPER_PLAN_S,
-)
-KEEPER_END_TEXT_XY = (0.264, 0.104)
-KEEPER_INNER_LINE_XY = (
-    KEEPER_PLAN_CENTER[0]
-    + (COLUMN_X + KEEPER_SEAT_BOUNDS_XZ[1][0]) / 2.0 * _KEEPER_PLAN_S,
-    KEEPER_PLAN_CENTER[1] - PLAN_HALF_Z * _KEEPER_PLAN_S - KEEPER_DIM_LINE_GAP,
-)
-KEEPER_INNER_TEXT_XY = (0.264, 0.084)
-KEEPER_SOCKET_QUALIFIER = "FROM SOCKET AXIS"
-KEEPER_SEAT_QUALIFIER = "2X KEEPER SEAT"
-# The part's own seat-facing note (Manufacturing Notes B, three rows), under
-# the plan: its top a clearance under the inner-edge location row, which runs
-# one line gap below the plan.
-KEEPER_SEAT_NOTE_XY = (
-    0.020,
-    KEEPER_PLAN_CENTER[1]
-    - PLAN_HALF_Z * _KEEPER_PLAN_S
-    - KEEPER_DIM_LINE_GAP
-    - INK_CLEARANCE,
-)
-KEEPER_SEAT_NOTE_HEIGHT = 0.0035
-KEEPER_SECTION_SCALE = (1, 1)
-KEEPER_SECTION_VIEW_SCALE = KEEPER_SECTION_SCALE[0] / KEEPER_SECTION_SCALE[1]
-_KEEPER_SECTION_S = KEEPER_SECTION_VIEW_SCALE / 1000.0
-# G-G's station: midway between the west web's root-fillet toe, where the
-# flange underside turns flat, and the seats' outer split line.  Inside the
-# faced footprint and outside the nominal root, the plane cuts each faced seat
-# over its flat underside, so the controlling flange thickness hangs on both
-# actual faces, never on the root arc or a construction proxy.  The keeper
-# tap stays inboard of the plane: G-G cuts no thread.
-_KEEPER_ROOT_TOE_X = WEB_OUT_X + ROOT_FILLET_R
-KEEPER_SECTION_X = (_KEEPER_ROOT_TOE_X + KEEPER_SEAT_BOUNDS_XZ[0][1]) / 2.0
-if not all(
-    _KEEPER_ROOT_TOE_X < KEEPER_SECTION_X < xmax
-    for _xmin, xmax, _zmin, _zmax in KEEPER_SEAT_BOUNDS_XZ
-):
-    raise AssertionError("G-G leaves the flat flange underside below the seats")
-if KEEPER_TAP_X + TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0 >= KEEPER_SECTION_X:
-    raise AssertionError("G-G reaches the keeper tap")
-# Plain stock each end of G's line runs past what the section shows.
-KEEPER_SECTION_RUNOUT = 6.0
-KEEPER_SECTION_END_Z = KEEPER_SEAT_BOUNDS_XZ[0][3] + KEEPER_SECTION_RUNOUT
-# Where G-G prints the front seat's centre on its faced top; every row of the
-# section derives from this point.
-KEEPER_SECTION_SEAT_Z = KEEPER_SEAT_CENTRES_XZ[0][1]
-KEEPER_SECTION_SEAT_XY = (0.355, 0.198)
-# The cut plane stands off the socket axis, so the boss crosses it as a
-# chord: half-chord in model mm.
-KEEPER_BOSS_HALF_CHORD = math.sqrt(
-    (BOSS_DIA / 2.0) ** 2 - (KEEPER_SECTION_X - COLUMN_X) ** 2
-)
-# The flange thickness's dimension line stands one line gap past the cut's
-# far end, in the air level with the flange, so neither it nor its value
-# lies on hatching; both witnesses run out along their own cut faces.
-KEEPER_FLANGE_LINE_XY = (
-    KEEPER_SECTION_SEAT_XY[0]
-    + (KEEPER_SECTION_END_Z - KEEPER_SECTION_SEAT_Z) * _KEEPER_SECTION_S
-    + KEEPER_DIM_LINE_GAP,
-    KEEPER_SECTION_SEAT_XY[1] - FLANGE_THICKNESS_MM / 2.0 * _KEEPER_SECTION_S,
-)
-KEEPER_FLANGE_TEXT_XY = (0.395, 0.192)
-KEEPER_FLANGE_QUALIFIER = "2X FLANGE UNDER\nKEEPER SEAT"
-KEEPER_SECTION_CAPTION_XY = (0.326, 0.151)
-# G's arrows point +X like B's (both cut at constant X, Z turned right), so
-# B's measured arrow-to-letter box is the provisional allowance for G.
-# An offline allowance: farm validation measures the rendered letter.
-KEEPER_SECTION_LETTER_EXTENT = SECTION_LETTER_EXTENTS["B"]
-
 # Only views drawn at a scale the title block does not state carry a label,
 # and every label sits under its own view - centred where the dimension
 # lanes below the view leave room, offset within that band where they do not.
 
-POCKET_RISE_LINE_XY = (0.070, 0.0785)
-POCKET_RISE_TEXT_XY = (0.0422, 0.0785)
+# The hub side view (1:2) sees the set-screw boss face on: the tap centre
+# prints at (146.5, 95.9) mm and the boss's sides at x 142.0 / 151.0.  The
+# 18.0 width stands over the rail, its extension lines up from the boss's
+# top corners (y 101.0) through the flange, its three rows straight over
+# it, 6.2 under the HUB LOCATION note (139.9).  The last row puts the boss's
+# top on the flange underside (codex review of 4faacfab: its shoulder had no
+# height).  Every leader that leaves the boss passes UNDER those extension
+# lines' feet, so each side holds one: the tap callout's leader keeps the
+# right (2.3 off that foot), and the Ø10.0 spot face takes the left, at 153
+# deg, 2.5 off the left foot.  Steeper, either would cross an extension
+# line; shallower, either would run along the rail (leader-over-part detour,
+# 10 mm gate: the spot's is 7.2, its 17.5 over the part against 10.2 from
+# the spot's rim to the view's top).  Its two rows land right, 4.8 over the
+# left barrel's top (107.2) and, estimated, 2.6 left of the width's wider
+# rows (test_hub_side_boss_width_and_spot_face_stand_clear_of_their_ink).
+SET_BOSS_WIDTH_LINE_XY = (0.1465, 0.1150)
+SET_BOSS_WIDTH_TEXT_XY = (0.1465, 0.1264)
+SET_SPOT_DIA_TEXT_XY = (0.0958, 0.1177)
 
 # The first sheet contains only the frame/window and T-rail definition.
 GEOMETRY_TOP_KEEP = {
@@ -823,6 +882,25 @@ GEOMETRY_CALLOUTS = {
     "GussetRunE": "4X 45 DEG GUSSET",
     "RingHeight": "RAIL HEIGHT",
 }
+# Two plan widths are shorter on paper than their own text (at 1:3 the 24.0
+# crossbar flange is 8.0 mm, the 18.0 gusset run 6.0), so text centred on
+# them stood across their extension lines (codex review of ca7edf4d, sheet
+# 2).  Each parks its text left of its line on a leader: the 24.0's between
+# the 152.9 window line (y 115.2) and the front view (96.7); the 18.0's
+# between the plan's top edge (212.2) and the 359.8 line (227.7), right of
+# that line's left extension (x 85.0).  Ink measured on the ca7edf4d render.
+CROSSBAR_FLANGE_TEXT_OFFSET_XY = (0.1085, 0.1080)
+GUSSET_RUN_TEXT_OFFSET_XY = (0.1145, 0.2205)
+
+# The plan's rail outlines -- the 428.2 x 262.0 flange extents and the
+# 359.8 x 186.0 windows inside them -- are symmetric about the four
+# sockets' pattern centre (the model's +/-OuterX, +/-InnerX, ...), but no
+# dimension tied them to the socket axes (codex review of 4d11a94e, sheets
+# 2-3), so a note states it.  It parks in the free corner under the 269.0
+# extension line (y 123.7), left of the 152.9 line (x 85.0) and over the
+# front view (top 97.5); ink measured on the 4d11a94e render.
+PLAN_CENTRING_NOTE = "RAIL FLANGE EXTENTS\nAND WINDOWS CENTRED\nON 4X SOCKET PATTERN"
+PLAN_CENTRING_NOTE_XY = (0.016, 0.118)
 
 # The boss/socket diameters leave the socket they qualify in opposite
 # directions so neither leader crosses the other's text.  The hole STATIONS
@@ -861,7 +939,12 @@ HUB_TOP_KEEP = {
     "RibWidth": (0.060, 0.1465),
 }
 HUB_LEFT_KEEP = {
-    "PocketRise": POCKET_RISE_LINE_XY,
+    "SetBossWidth": SET_BOSS_WIDTH_LINE_XY,
+    "SetSpotDia": SET_SPOT_DIA_TEXT_XY,
+}
+HUB_LEFT_CALLOUTS = {
+    "SetBossWidth": "BOSS WIDTH CENTRED ON TAP\nTOP AT FLANGE UNDERSIDE",
+    "SetSpotDia": "SPOT FACE",
 }
 HUB_TOP_CALLOUTS = {
     "GnDia": "DRILL THRU\nSAME X AS\nLEFT SOCKETS",
@@ -870,7 +953,7 @@ HUB_TOP_CALLOUTS = {
 DETAIL_FRONT_KEEP = {"CB1Dia": (0.045, 0.256)}
 DETAIL_SECTION_KEEP = {
     "CapRecessDia": (0.140, 0.170),
-    # The cap-seat depth reads beside its own band, not under it: the column
+    # The recess depth reads beside its own band, not under it: the column
     # below belongs to the 47.3 boss height, whose three-line text is 37 mm
     # wide and has nowhere else to sit on this sheet.
     "CapRecessDepth": (0.386, 0.155),
@@ -882,7 +965,7 @@ DETAIL_CALLOUTS = {
 FRONT_CALLOUTS = {"CB1Dia": "4X COUNTERBORE"}
 SECTION_CALLOUTS = {
     "CapRecessDia": "4X CAP RECESS",
-    "CapRecessDepth": "4X\nCAP SEAT",
+    "CapRecessDepth": "4X\nRECESS",
 }
 
 
@@ -997,7 +1080,7 @@ def _cut_face_edge(
 
     ``SetDisplayOnlySurfaceCut`` leaves a section showing its cut faces only,
     so every visible line carries the cut plane's own coordinate.  Pinning
-    that axis plus one face level -- a rail top, a boss top, a pocket floor --
+    that axis plus one face level -- a rail top, a boss top, a spot face --
     names the face itself instead of a hand-written station a geometry change
     would silently invalidate.  ``near`` is ``(axis, value, window)`` and
     picks between parallel faces (the front boss rather than the rear); the
@@ -1265,28 +1348,28 @@ def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
     return hidden
 
 
-def _hub_pocket_section(adapter: Any, parent_view: Any) -> Any:
+def _hub_boss_section(adapter: Any, parent_view: Any) -> Any:
     """A removed section through the hub rail at the bore/set-tap axis.
 
-    The cutting line runs from outside the hub (-X) rail to just past its
-    inner face, so ``partial=True`` sections that rail alone: the D arrows sit
-    on the hub end of the plan and the view carries the one profile the
-    pocket depth hangs on -- the same treatment as B-B/E-E.  (History: a
-    full-width cut then ``Crop2`` to the hub, whose leftover construction
-    midlines had to be hunted down and whose position had to be re-derived
-    from the cropped outline.)
+    The cutting line runs from outside the set-screw boss to just past the
+    rail's inner face, so ``partial=True`` sections that rail alone: the D
+    arrows sit on the hub end of the plan and the view carries the one
+    profile the spot face and the thread run hang on -- the same treatment as
+    B-B/E-E.  (History: a full-width cut then ``Crop2`` to the hub, whose
+    leftover construction midlines had to be hunted down and whose position
+    had to be re-derived from the cropped outline.)
     """
     line = [
         model_point_in_view(
             adapter, parent_view, (x/1000.0, 0.0, z/1000.0),
-            label="set-pocket section cutting line",
+            label="set-screw boss section cutting line",
         )
         for x, z in section_cut_ends()["D"]
     ]
     view = create_section_view(
         adapter, parent_view, line_start=line[0], line_end=line[1],
         view_xy=HUB_SECTION_CENTER, section_label="D", scale=HUB_SECTION_SCALE,
-        partial=True, label="set-pocket manufacturing section",
+        partial=True, label="set-screw boss manufacturing section",
     )
     _orient_cut_section(adapter, view, (1.0, 0.0, 0.0))
     set_hidden_lines_removed(adapter, view)
@@ -1296,56 +1379,100 @@ def _hub_pocket_section(adapter: Any, parent_view: Any) -> Any:
     outline = tuple(float(value) for value in view.GetOutline())
     position = tuple(float(value) for value in view.Position)
     if len(outline) != 4 or len(position) != 2:
-        raise RuntimeError("set-pocket section has invalid bounds")
+        raise RuntimeError("set-screw boss section has invalid bounds")
     target = [
         position[axis]+HUB_SECTION_CENTER[axis]-(outline[axis]+outline[axis+2])/2
         for axis in range(2)
     ]
     if not view.SetViewPosition(double_array(target), False):
-        raise RuntimeError("failed to position set-pocket section")
-    rebuild_drawing(adapter, label="_hub_pocket_section")
+        raise RuntimeError("failed to position set-screw boss section")
+    rebuild_drawing(adapter, label="_hub_boss_section")
     outline = tuple(float(value) for value in view.GetOutline())
     center = tuple((outline[axis]+outline[axis+2])/2 for axis in range(2))
     ratio = tuple(float(value) for value in view.ScaleRatio)
     if math.dist(center, HUB_SECTION_CENTER) > 0.0001:
-        raise RuntimeError("set-pocket section centre did not persist")
+        raise RuntimeError("set-screw boss section centre did not persist")
     if not math.isclose(ratio[0]/ratio[1], HUB_SECTION_SCALE[0]/HUB_SECTION_SCALE[1]):
-        raise RuntimeError("set-pocket section scale did not persist")
+        raise RuntimeError("set-screw boss section scale did not persist")
     _pin_section_profile(
         adapter, view, (-COLUMN_X, 0.0, GOOSENECK_Z), HUB_SECTION_PROFILE_X, label="D-D",
     )
-    _add_view_centerlines(
+    axes = _add_view_centerlines(
         adapter, view,
         (
             ((GOOSENECK_X, -HALF_H-HUB_BOSS_DROP-2.0, GOOSENECK_Z),
              (GOOSENECK_X, HALF_H+2.0, GOOSENECK_Z)),
-            ((-OUTER_X-2.0, 0.0, GOOSENECK_Z), (-INNER_X+2.0, 0.0, GOOSENECK_Z)),
+            ((SET_BOSS_FACE_X-2.0, 0.0, GOOSENECK_Z), (-INNER_X+2.0, 0.0, GOOSENECK_Z)),
         ),
     )
-    # The cut plane runs through the pocket centre, so the outer rail face and
-    # the pocket floor both appear in it as lines the pocket walls interrupt --
-    # picked as faces, since their Y extents depend on the cast rim breaks.
-    section_edges = scan_view_edges(view, label="D-D set-pocket section")
-    pocket_face_edge, pocket_face_point = _cut_face_edge(
-        section_edges, fixed={0: -OUTER_X, 2: GOOSENECK_Z},
-        label="set-pocket outer rail face",
+    # The cut plane runs through the tap axis, so the boss face, the spot face
+    # and the bore wall each appear in it as two lines the tap interrupts --
+    # picked as faces, the upper or the lower by ``near``, since their Y
+    # extents depend on the spot and the cast C2 breaks.  The thread length
+    # and the 21.0 stand over the rail top, so they take the upper lines; the
+    # boss face's 22.0 stands under the view and takes the boss face's lower
+    # line, whose extension line then runs clear of the spot's mouth.
+    section_edges = scan_view_edges(view, label="D-D set-screw boss section")
+    upper, lower = (1, HALF_H/2.0, HALF_H/2.0), (1, -HALF_H/2.0, HALF_H/2.0)
+    spot_edge, spot_point = _cut_face_edge(
+        section_edges, fixed={0: SET_SPOT_FACE_X, 2: GOOSENECK_Z}, near=upper,
+        label="set-screw spot face",
     )
-    pocket_floor_edge, pocket_floor_point = _cut_face_edge(
-        section_edges, fixed={0: -OUTER_X+SET_POCKET_DEPTH, 2: GOOSENECK_Z},
-        label="set-pocket floor",
+    bore_edge, bore_point = _cut_face_edge(
+        section_edges, fixed={0: GOOSENECK_X-GOOSENECK_BORE_DIA/2.0, 2: GOOSENECK_Z},
+        near=upper, label="gooseneck bore wall at the set tap",
+    )
+    boss_edge, boss_point = _cut_face_edge(
+        section_edges, fixed={0: SET_BOSS_FACE_X, 2: GOOSENECK_Z}, near=lower,
+        label="set-screw boss face",
+    )
+    # The thread runs from the spot face to the bore wall: a reference, the
+    # 21.0 less the bore's radius.
+    _checked_dimension(
+        adapter, view,
+        p0=spot_point, p1=bore_point,
+        text_xy=HUB_SET_THREAD_LINE_XY, label="set-screw thread length",
+        expected_mm=HUB_SET_SPOT_FROM_AXIS-GOOSENECK_BORE_DIA/2.0,
+        orientation="horizontal", reference=True,
+        entities=(spot_edge, bore_edge),
+        suffix="THREAD LENGTH", offset_text=HUB_SET_THREAD_OFFSET_XY,
     )
     _checked_dimension(
         adapter, view,
-        p0=pocket_face_point, p1=pocket_floor_point,
-        text_xy=POCKET_DEPTH_TEXT_XY, label="set-pocket depth from outer rail face",
-        expected_mm=SET_POCKET_DEPTH, orientation="horizontal",
-        entities=(pocket_face_edge, pocket_floor_edge),
-        suffix="POCKET DEPTH\nFROM OUTER FACE",
-        offset_text=POCKET_DEPTH_OFFSET_XY,
+        p0=(GOOSENECK_X, HALF_H+2.0, GOOSENECK_Z), p1=spot_point,
+        text_xy=HUB_SET_SPOT_LINE_XY, label="set-screw spot face from bore axis",
+        expected_mm=HUB_SET_SPOT_FROM_AXIS, orientation="horizontal",
+        entity_types=("SKETCHSEGMENT", "EDGE"), entities=(axes[0], spot_edge),
+        suffix="SPOT FACE\nFROM BORE AXIS", offset_text=HUB_SET_SPOT_OFFSET_XY,
     )
-    _hide_cosmetic_threads(adapter, view, label="D-D set-pocket section")
+    # The cast boss face is the spot face's stock, 1.0 proud of it: a
+    # reference, so the 21.0 alone locates the face the screw starts from.
+    _checked_dimension(
+        adapter, view,
+        p0=(GOOSENECK_X, -HALF_H-HUB_BOSS_DROP-2.0, GOOSENECK_Z), p1=boss_point,
+        text_xy=HUB_SET_BOSS_LINE_XY, label="set-screw boss face from bore axis",
+        expected_mm=HUB_SET_BOSS_FROM_AXIS, orientation="horizontal", reference=True,
+        entity_types=("SKETCHSEGMENT", "EDGE"), entities=(axes[0], boss_edge),
+        suffix="BOSS FACE\nFROM BORE AXIS", offset_text=HUB_SET_BOSS_OFFSET_XY,
+    )
+    spot_tip = model_point_in_view(
+        adapter, view, tuple(value/1000.0 for value in spot_point),
+        label="set-screw spot face finish leader",
+    )
+    spot_finish = add_surface_finish(
+        adapter,
+        view,
+        symbol_xy=(spot_tip[0]-HUB_SPOT_FINISH_REACH, spot_tip[1]),
+        control=surface_finish_by_key(SURFACE_FINISHES, "hub_set_spot_face"),
+        label="set-screw spot face finish",
+        entity=spot_edge,
+        leader_attach_xy=spot_tip,
+        char_height=0.0025,
+    )
+    _finish_leader_tail(spot_finish, label="set-screw spot face", length=HUB_SPOT_FINISH_TAIL)
+    _hide_cosmetic_threads(adapter, view, label="D-D set-screw boss section")
     _assert_section_display(
-        adapter, view, label="D-D set-pocket section", cut_surface_only=True,
+        adapter, view, label="D-D set-screw boss section", cut_surface_only=True,
         removed=True,
     )
     return view
@@ -1437,7 +1564,7 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         expected_mm=HANGER_PIN_X, orientation="horizontal",
         entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
         entities=(axes[0], axes[1]),
-        suffix="2X DOWEL HOLE\nFROM SCREW AXIS",
+        suffix="2X ROUND HOLE FROM\nSCREW AXIS, SAME Z",
         offset_text=PIN_STATION_OFFSET_XY,
     )
     # The slot's true location for its position frame: BASIC from the round
@@ -1593,13 +1720,18 @@ def keeper_callout_placement(
     return (shoulder_x + left, shoulder_y + down), tip
 
 
-def cap_seat_finish_placement(tip: Point, entry: Point) -> Point:
-    """The cap seat symbol's point, its leader running from ``tip`` (the near
-    ledge of the cap seat) back out through ``entry`` (where it crosses the
-    boss's outer face), bent to its tail an ink clearance off that face."""
-    bend_x = entry[0] - CAP_SEAT_FINISH_INK_PAST_BEND - INK_CLEARANCE - ROUND_OUT
-    slope = (entry[1] - tip[1]) / (entry[0] - tip[0])
-    return (bend_x - FINISH_LEADER_TAIL, tip[1] + (bend_x - tip[0]) * slope)
+def keeper_facing_note_xy(callout: Point) -> Point:
+    """Top-left of the keeper-rail facing note, in sheet m: under RD4 at
+    ``callout``, flush with its estimated left edge, an ink clearance below
+    the native leader shoulder that underlines its bottom row, so the faced
+    rail top and the taps it seats read together.  The leader leaves that
+    shoulder up-left, away from it.
+    """
+    left = KEEPER_CALLOUT_EXTENT[0]
+    return (
+        callout[0] - left,
+        callout[1] - KEEPER_CALLOUT_SHOULDER_DROP - INK_CLEARANCE - ROUND_OUT,
+    )
 
 
 def section_cut_ends() -> dict[str, tuple[Point, Point]]:
@@ -1653,32 +1785,16 @@ def section_cut_ends() -> dict[str, tuple[Point, Point]]:
     }
 
 
-def keeper_section_cut_ends() -> tuple[Point, Point]:
-    """G-G's cutting line (start, end) as plan-model (X, Z) mm.
-
-    Along the west rail at ``KEEPER_SECTION_X``, over the front seat's flat
-    flange underside: from beyond the front boss to past the seat's far split
-    line.  Both arrows point +X, off the plan's right edge where nothing else
-    prints.
-    """
-    return (
-        (KEEPER_SECTION_X, -PLAN_HALF_Z - KEEPER_SECTION_RUNOUT),
-        (KEEPER_SECTION_X, KEEPER_SECTION_END_Z),
-    )
-
-
 def _pin_section_profile(
     adapter: Any,
     view: Any,
     model_point: tuple[float, float, float],
     target_x: float,
     *,
-    target_y: float | None = None,
     label: str,
 ) -> None:
     """Slide a removed section along the sheet until ``model_point`` (the
-    rail centreline it cuts) prints at ``target_x`` -- and at ``target_y``
-    too when given, for a section whose rows are laid out from that point.
+    rail centreline it cuts) prints at ``target_x``.
 
     A removed section's outline, and so where SolidWorks centres it, grows
     with its cutting line, air included: on leaders955-f542 #955's longer
@@ -1691,10 +1807,7 @@ def _pin_section_profile(
     position = tuple(float(value) for value in view.Position)
     if len(position) != 2:
         raise RuntimeError(f"{label} section has no position")
-    moved = (
-        position[0] + target_x - x,
-        position[1] + (0.0 if target_y is None else target_y - y),
-    )
+    moved = (position[0] + target_x - x, position[1])
     if not view.SetViewPosition(double_array(list(moved)), False):
         raise RuntimeError(f"failed to pin the {label} section's profile")
     rebuild_drawing(adapter, label=f"pin {label} profile")
@@ -1703,11 +1816,10 @@ def _pin_section_profile(
         f"{label} rail centreline pinned {x*1000.0:.2f} -> {pinned_x*1000.0:.2f} mm",
         section_profile=label, from_x_mm=round(x*1000.0, 3), sheet_x_mm=round(pinned_x*1000.0, 3),
     )
-    row_y = y if target_y is None else target_y
-    if abs(pinned_x - target_x) > 0.00005 or abs(pinned_y - row_y) > 0.00005:
+    if abs(pinned_x - target_x) > 0.00005 or abs(pinned_y - y) > 0.00005:
         raise RuntimeError(
             f"{label} section profile prints at ({pinned_x*1000.0:.3f}, {pinned_y*1000.0:.3f}) mm, "
-            f"not at ({target_x*1000.0:.3f}, {row_y*1000.0:.3f}) mm"
+            f"not at x {target_x*1000.0:.3f} mm on its row"
         )
 
 
@@ -1734,7 +1846,7 @@ def _model_offset_in_view(
 def _machined_faces(view: Any) -> dict[str, Any]:
     """Resolve every part-owned surface-finish face through ``view``'s model.
 
-    A plan view shows four identical sockets and four identical cap seats,
+    A plan view shows four identical sockets,
     so a coordinate pick cannot say which face a symbol qualifies.  The
     part-owned face specs can: each resolves to exactly one model face, and
     ``add_surface_finish`` then re-checks the selected face against the same
@@ -1930,291 +2042,6 @@ def _socket_bore_circle(edges: ViewEdges, x: float, z: float, *, label: str) -> 
     return socket.edge
 
 
-def _keeper_seat_split_edge(
-    edges: ViewEdges,
-    start: tuple[float, float, float],
-    end: tuple[float, float, float],
-    *,
-    label: str,
-) -> Any:
-    """The plan's split-line edge running exactly ``start``-``end``.
-
-    A seat is a split-line region of the flange top, not a pad, so its
-    outline is the only ink saying where it stops.  Each footprint dimension
-    hangs on one whole boundary edge, proved corner to corner: a split that
-    merged into the residual top, or failed to project, cannot pass.
-    """
-    midpoint = tuple((a + b) / 2.0 for a, b in zip(start, end))
-    item = edges.exact_line_through(midpoint, label=label)
-    first, second = item.line
-    if not any(
-        math.dist(first, a) <= 1e-4 and math.dist(second, b) <= 1e-4
-        for a, b in ((start, end), (end, start))
-    ):
-        raise RuntimeError(
-            f"{label}: the edge through {midpoint} runs {first}->{second}, "
-            f"not the split line {start}->{end}"
-        )
-    return item.edge
-
-
-def _keeper_section_lines(edges: ViewEdges, y: float) -> list[tuple[Any, float, float]]:
-    """G-G's visible lines lying wholly at model level ``y``, as (item, z0, z1)."""
-    found = []
-    for item in edges.lines:
-        start, end = item.line
-        if any(
-            abs(point[0] - KEEPER_SECTION_X) > 1e-6 or abs(point[1] - y) > 1e-6
-            for point in (start, end)
-        ):
-            continue
-        found.append((item, *sorted((start[2], end[2]))))
-    return found
-
-
-def _keeper_section_lines_seen(found: list[tuple[Any, float, float]]) -> str:
-    return "; ".join(f"z {low:.3f}->{high:.3f}" for _item, low, high in found)
-
-
-def _keeper_seat_cut_edge(
-    edges: ViewEdges, *, label: str
-) -> tuple[Any, tuple[float, float, float]]:
-    """G-G's cut line of the front seat, split line to split line.
-
-    The plane runs outboard of the keeper tap, so the faced seat crosses it
-    as one unbroken rail-top line.  Exactly one rail-top line may overlap the
-    seat, and it must start and end on the seat's two split lines: a line
-    that ran on into the residual flange would mean the split did not hold.
-    Returns the edge and its point over the seat centre, in model mm.
-    """
-    _xmin, _xmax, near_end, far_end = KEEPER_SEAT_BOUNDS_XZ[0]
-    rail_top = _keeper_section_lines(edges, HALF_H)
-    overlapping = [
-        line
-        for line in rail_top
-        if line[2] > near_end + 1e-4 and line[1] < far_end - 1e-4
-    ]
-    if len(overlapping) != 1 or not (
-        abs(overlapping[0][1] - near_end) <= 1e-4
-        and abs(overlapping[0][2] - far_end) <= 1e-4
-    ):
-        raise RuntimeError(
-            f"{label}: expected one seat line from the split at z {near_end:.3f} "
-            f"to the split at z {far_end:.3f}, found {len(overlapping)}; "
-            f"rail-top lines: {_keeper_section_lines_seen(rail_top)}"
-        )
-    return overlapping[0][0].edge, (KEEPER_SECTION_X, HALF_H, KEEPER_SECTION_SEAT_Z)
-
-
-def _keeper_flange_underside_edge(
-    edges: ViewEdges, *, label: str
-) -> tuple[Any, tuple[float, float, float]]:
-    """G-G's cut line of the flat flange underside below the whole front seat.
-
-    Outside the root fillet the underside is flat, so one cut line at the
-    flange underside must span the seat from split to split; the flange
-    thickness hangs on it.  Returns the edge and its point under the seat
-    centre, in model mm.
-    """
-    _xmin, _xmax, near_end, far_end = KEEPER_SEAT_BOUNDS_XZ[0]
-    underside = _keeper_section_lines(edges, FLANGE_BOT_Y)
-    spanning = [
-        line
-        for line in underside
-        if line[1] <= near_end + 1e-4 and line[2] >= far_end - 1e-4
-    ]
-    if len(spanning) != 1:
-        raise RuntimeError(
-            f"{label}: expected one flange underside line spanning the seat "
-            f"z {near_end:.3f}->{far_end:.3f}, found {len(spanning)}; "
-            f"underside lines: {_keeper_section_lines_seen(underside)}"
-        )
-    return spanning[0][0].edge, (KEEPER_SECTION_X, FLANGE_BOT_Y, KEEPER_SECTION_SEAT_Z)
-
-
-def _keeper_seat_sheet(adapter: Any, ddoc: Any) -> None:
-    """The two machined keeper foot seats on their own sheet.
-
-    Nominal footprint and location from the rear seat's split lines and the
-    rear socket axis (reference: the part note sizes and places each seat to
-    its actual fitted keeper), the controlling final flange thickness under
-    the faced front seat in section G-G, and the part's own facing note,
-    which carries the seats' SEAT_UM finish.  No native Ra symbol: a face
-    pick by plane and box would take the residual flange top too.
-    """
-    if ddoc.ActivateSheet("KEEPER-SEATS") is not True:
-        raise RuntimeError("failed to activate top-frame keeper seat sheet")
-    keeper_plan = place_view(
-        adapter,
-        str(SOURCE),
-        "*Top",
-        *KEEPER_PLAN_CENTER,
-        scale=KEEPER_PLAN_SCALE,
-    )
-    set_hidden_lines_removed(adapter, keeper_plan)
-    keeper_plan_edges = scan_view_edges(keeper_plan, label="keeper seat plan")
-    xmin, xmax, zmin, zmax = KEEPER_SEAT_BOUNDS_XZ[1]
-    xc, zc = KEEPER_SEAT_CENTRES_XZ[1]
-    length_edges = (
-        _keeper_seat_split_edge(
-            keeper_plan_edges,
-            (xmin, HALF_H, zmin),
-            (xmax, HALF_H, zmin),
-            label="rear keeper seat inboard split line",
-        ),
-        _keeper_seat_split_edge(
-            keeper_plan_edges,
-            (xmin, HALF_H, zmax),
-            (xmax, HALF_H, zmax),
-            label="rear keeper seat socket-side split line",
-        ),
-    )
-    _checked_dimension(
-        adapter,
-        keeper_plan,
-        p0=(xc, HALF_H, zmin),
-        p1=(xc, HALF_H, zmax),
-        text_xy=KEEPER_LENGTH_LINE_XY,
-        label="keeper seat length",
-        expected_mm=KEEPER_SEAT_LENGTH_MM,
-        orientation="vertical",
-        reference=True,
-        entities=length_edges,
-        suffix=KEEPER_SEAT_QUALIFIER,
-        offset_text=KEEPER_LENGTH_TEXT_XY,
-    )
-    width_edges = (
-        _keeper_seat_split_edge(
-            keeper_plan_edges,
-            (xmin, HALF_H, zmin),
-            (xmin, HALF_H, zmax),
-            label="rear keeper seat inner split line",
-        ),
-        _keeper_seat_split_edge(
-            keeper_plan_edges,
-            (xmax, HALF_H, zmin),
-            (xmax, HALF_H, zmax),
-            label="rear keeper seat outer split line",
-        ),
-    )
-    _checked_dimension(
-        adapter,
-        keeper_plan,
-        p0=(xmin, HALF_H, zc),
-        p1=(xmax, HALF_H, zc),
-        text_xy=KEEPER_WIDTH_LINE_XY,
-        label="keeper seat width",
-        expected_mm=KEEPER_SEAT_WIDTH_MM,
-        orientation="horizontal",
-        reference=True,
-        entities=width_edges,
-        suffix=KEEPER_SEAT_QUALIFIER,
-        offset_text=KEEPER_WIDTH_TEXT_XY,
-    )
-    # Location, from the socket axis the keeper stack is fitted around: the
-    # same split-line edges, the bore circle re-anchored to its centre.
-    rear_socket_edge = _socket_bore_circle(
-        keeper_plan_edges, COLUMN_X, REAR_COLUMN_Z, label="keeper seat plan rear socket"
-    )
-    _checked_dimension(
-        adapter,
-        keeper_plan,
-        p0=(COLUMN_X, HALF_H, REAR_COLUMN_Z),
-        p1=(xmin, HALF_H, zc),
-        text_xy=KEEPER_INNER_LINE_XY,
-        label="keeper seat inner edge from socket",
-        expected_mm=COLUMN_X - xmin,
-        orientation="horizontal",
-        center=True,
-        reference=True,
-        entities=(rear_socket_edge, width_edges[0]),
-        suffix=KEEPER_SOCKET_QUALIFIER,
-        offset_text=KEEPER_INNER_TEXT_XY,
-    )
-    _checked_dimension(
-        adapter,
-        keeper_plan,
-        p0=(COLUMN_X, HALF_H, REAR_COLUMN_Z),
-        p1=(xc, HALF_H, zmax),
-        text_xy=KEEPER_END_LINE_XY,
-        label="keeper seat end from socket",
-        expected_mm=REAR_COLUMN_Z - zmax,
-        orientation="vertical",
-        center=True,
-        reference=True,
-        entities=(rear_socket_edge, length_edges[1]),
-        suffix=KEEPER_SOCKET_QUALIFIER,
-        offset_text=KEEPER_END_TEXT_XY,
-    )
-    seat_cut = [
-        model_point_in_view(
-            adapter,
-            keeper_plan,
-            (x / 1000.0, 0.0, z / 1000.0),
-            label="keeper seat section station",
-        )
-        for x, z in keeper_section_cut_ends()
-    ]
-    seat_section = create_section_view(
-        adapter,
-        keeper_plan,
-        line_start=seat_cut[0],
-        line_end=seat_cut[1],
-        view_xy=KEEPER_SECTION_SEAT_XY,
-        section_label="G",
-        scale=KEEPER_SECTION_SCALE,
-        partial=True,
-        label="keeper seat section",
-    )
-    _orient_cut_section(adapter, seat_section, (0.0, 0.0, 1.0))
-    # Pinned by the faced seat's centre, the point every G-G row derives from.
-    _pin_section_profile(
-        adapter,
-        seat_section,
-        (KEEPER_SECTION_X, HALF_H, KEEPER_SECTION_SEAT_Z),
-        KEEPER_SECTION_SEAT_XY[0],
-        target_y=KEEPER_SECTION_SEAT_XY[1],
-        label="G-G",
-    )
-    set_hidden_lines_removed(adapter, seat_section)
-    seat_section_edges = scan_view_edges(seat_section, label="G-G keeper seat section")
-    seat_edge, seat_point = _keeper_seat_cut_edge(
-        seat_section_edges,
-        label="front keeper seat",
-    )
-    underside_edge, underside_point = _keeper_flange_underside_edge(
-        seat_section_edges,
-        label="front keeper seat flange underside",
-    )
-    _checked_dimension(
-        adapter,
-        seat_section,
-        p0=underside_point,
-        p1=seat_point,
-        text_xy=KEEPER_FLANGE_LINE_XY,
-        label="keeper seat flange thickness",
-        expected_mm=FLANGE_THICKNESS_MM,
-        orientation="vertical",
-        entities=(underside_edge, seat_edge),
-        suffix=KEEPER_FLANGE_QUALIFIER,
-        offset_text=KEEPER_FLANGE_TEXT_XY,
-    )
-    _assert_section_display(
-        adapter,
-        seat_section,
-        label="G-G keeper seat section",
-        cut_surface_only=True,
-        removed=True,
-    )
-    _position_view_caption(adapter, seat_section, KEEPER_SECTION_CAPTION_XY)
-    add_property_linked_note(
-        adapter,
-        "Manufacturing Notes B",
-        *KEEPER_SEAT_NOTE_XY,
-        char_height=KEEPER_SEAT_NOTE_HEIGHT,
-    )
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -2230,6 +2057,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Manufacturing Notes B",
+            "Manufacturing Notes C",
         ),
         required=(
             "Number",
@@ -2238,6 +2066,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Manufacturing Notes B",
+            "Manufacturing Notes C",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -2324,6 +2153,11 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     geometry_callouts.update(GEOMETRY_CALLOUTS)
     set_dimension_callouts(adapter, geometry_annotations, geometry_callouts)
+    offset_dimension_text(
+        adapter, geometry_top_dimensions, {"GussetRunE": GUSSET_RUN_TEXT_OFFSET_XY}
+    )
+    if add_note(adapter, PLAN_CENTRING_NOTE, *PLAN_CENTRING_NOTE_XY) is None:
+        raise RuntimeError("failed to centre the plan's rail outlines on the sockets")
     # Every imported dimension's places are the part's; the whole print's
     # imports are collected here and read back once, before export.
     imported_annotations = [*geometry_annotations]
@@ -2390,7 +2224,8 @@ async def build(adapter: Any) -> dict[str, str]:
         p1=(BAR_X1, HALF_H-EDGE_CHAMFER, 0.0),
         text_xy=(GEOMETRY_TOP_CENTER[0], 0.1095), label="crossbar flange width",
         expected_mm=BAR_X1-BAR_X0, orientation="horizontal", exact_linear=True,
-        suffix="CROSSBAR FLANGE", edges=geometry_top_edges,
+        suffix="CROSSBAR FLANGE", offset_text=CROSSBAR_FLANGE_TEXT_OFFSET_XY,
+        edges=geometry_top_edges,
     )
     # B-B is a REMOVED section: the cutting line crosses the +Z rail alone
     # (the -Z rail is its mirror), so the section shows the one T profile the
@@ -2435,7 +2270,7 @@ async def build(adapter: Any) -> dict[str, str]:
          "FLANGE WIDTH", None),
         ((rail_cut_x, HALF_H, (INNER_Z+WEB_IN_Z)/2),
          (rail_cut_x, FLANGE_BOT_Y, (INNER_Z+WEB_IN_Z)/2),
-         FLANGE, (0.372, 0.2117), "vertical", "top flange thickness", "TOP FLANGE",
+         FLANGE, (0.372, 0.2117), "vertical", "top flange thickness", "TYP TOP FLANGE",
          (0.389, 0.2245)),
     ):
         _checked_dimension(
@@ -2535,9 +2370,24 @@ async def build(adapter: Any) -> dict[str, str]:
             expected_mm=expected, orientation=orientation, exact_linear=True,
             suffix=qualifier, offset_text=offset, edges=side_section_edges,
         )
+    # The pockets either side of the web, as the underside's 138.0 names
+    # them: their depth from the flange underside's flat to the T's underside.
+    pocket_depth = _checked_dimension(
+        adapter, side_section,
+        p0=(flange_flat_x, FLANGE_BOT_Y, SIDE_SECTION_Z), p1=(HANGER_X, -HALF_H, SIDE_SECTION_Z),
+        text_xy=CROSSBAR_POCKET_DEPTH_LINE_XY, label="crossbar pocket depth",
+        expected_mm=FLANGE_BOT_Y + HALF_H, orientation="vertical", exact_linear=True,
+        suffix="2X POCKET", offset_text=CROSSBAR_POCKET_DEPTH_TEXT_XY,
+        edges=side_section_edges,
+    )
+    pocket_depth.ArrowSide = _DIM_ARROWS_INSIDE
+    if int(pocket_depth.ArrowSide) != _DIM_ARROWS_INSIDE:
+        raise RuntimeError("crossbar pocket depth did not keep its arrows inside")
     _position_view_caption(adapter, side_section, SIDE_SECTION_CAPTION_XY)
     if add_note(
-        adapter, "E-E: LEFT SIDE RAIL AND CROSSBAR T\nRIGHT RAIL IDENTICAL; T FLANGE UNDERSIDE SHARP",
+        adapter,
+        "E-E: LEFT SIDE RAIL AND CROSSBAR T\nRIGHT RAIL IDENTICAL; T FLANGE UNDERSIDE SHARP\n"
+        "T WEB CENTRED UNDER FLANGE",
         *SIDE_SECTION_NOTE_XY,
     ) is None:
         raise RuntimeError("failed to identify the cut side rail and crossbar T")
@@ -2587,8 +2437,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # dimensioned from the frame centre any more, and drawn axes would
     # invite reading it as the datum.
     # The title block names no finish grade ("CAST/MACHINED"), so every
-    # surface that must be cut says so on the face: the tube sockets and
-    # their cap seats locate the columns, the hub bore locates the
+    # surface that must be cut says so on the face: the tube sockets
+    # locate the columns, the hub bore locates the
     # gooseneck.  Each symbol carries the part's own control and attaches
     # to the one model face that control names.
     machined_faces = _machined_faces(detail_top)
@@ -2619,14 +2469,14 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _checked_dimension(
         adapter, detail_top,
-        # Left sockets, not right (clears leader-crosses-line HANGER DRILL x
-        # 224.00): extension lines x 312.5->82 at y 216/104 become 115.5->82.
+        # Left sockets, not right (clears leader-crosses-line hanger callout
+        # x 224.00): extension lines run from the left bores to the x 40.5 lane.
         p0=(-COLUMN_X - BORE_DIA/2, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z),
         p1=(-COLUMN_X - BORE_DIA/2, HALF_H + BOSS_ABOVE, REAR_COLUMN_Z),
-        text_xy=(0.083, 0.168), label="socket vertical pitch",
+        text_xy=SOCKET_VERTICAL_PITCH_LINE_XY, label="socket vertical pitch",
         expected_mm=REAR_COLUMN_Z-FRONT_COLUMN_Z, orientation="vertical",
-        center=True,
-        suffix="MATCHES MHA-FR-001",
+        center=True, suffix="MATCHES\nMHA-FR-001",
+        offset_text=SOCKET_VERTICAL_PITCH_TEXT_XY,
     )
     # The counterbore rim (the top-face edge of the wizard feature), not the
     # clearance hole visible at its floor: the native callout then reads the
@@ -2646,10 +2496,12 @@ async def build(adapter: Any) -> dict[str, str]:
         detail_top,
         edge_xy=stud_edge,
         # Right of the 182.0 hanger-X row's end, so the leader reaches the
-        # hole past that row instead of across it (codex round 5).
-        callout_xy=(0.262, 0.258),
+        # hole past that row instead of across it (codex round 5).  Two rows
+        # centred here printed 262.6..253.4 mm (762a8de5); four need it 3.5
+        # mm lower to keep under the frame's 266.7 top (70ac591e: 264.6).
+        callout_xy=(0.262, 0.2545),
         label="2X #6 SHCS hanger counterbores",
-        process="HANGER DRILL",
+        process=HANGER_DRILL_CALLOUT,
     )
     # #946: RD4 reads off the rear keeper tap, from the rail's outer side.
     rear_keeper = (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR)
@@ -2705,6 +2557,14 @@ async def build(adapter: Any) -> dict[str, str]:
         KEEPER_TAP_CALLOUT_PRECISION,
         label="keeper tap sizes and depths",
     )
+    # The faced keeper-rail top (user ruling 2026-10-11): the part's own
+    # linked note B, hung under the transfer callout it belongs with.
+    add_property_linked_note(
+        adapter,
+        "Manufacturing Notes B",
+        *keeper_facing_note_xy(keeper_callout_xy),
+        char_height=FACING_NOTE_HEIGHT,
+    )
     upper_left_rim = (-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
     upper_right_rim = (COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
     hanger_x = HANGER_X
@@ -2717,13 +2577,13 @@ async def build(adapter: Any) -> dict[str, str]:
          STUD_Z_FRONT - FRONT_COLUMN_Z, (0.062, 0.209), "vertical",
          "front hanger z from upper sockets", "FRONT HANGER Z", False),
         (upper_left_rim, (hanger_x, HALF_H, STUD_Z_REAR + HANGER_CBORE_DIA/2),
-         STUD_Z_REAR - FRONT_COLUMN_Z, (0.040, 0.165), "vertical",
-         "rear hanger z from upper sockets", "REAR HANGER Z", False),
+         STUD_Z_REAR - FRONT_COLUMN_Z, REAR_HANGER_Z_TEXT_XY, "vertical",
+         "rear hanger z from upper sockets", "REAR\nHANGER Z", False),
         (upper_left_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_FRONT + keeper_drill_r),
          KEEPER_TAP_X + COLUMN_X, (0.150, 0.0745), "horizontal",
          "keeper x from left sockets", "KEEPER X", True),
         (upper_right_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_FRONT + keeper_drill_r),
-         KEEPER_TAP_Z_FRONT - FRONT_COLUMN_Z, (0.350, 0.205), "vertical",
+         KEEPER_TAP_Z_FRONT - FRONT_COLUMN_Z, FRONT_KEEPER_Z_TEXT_XY, "vertical",
          "front keeper z from upper sockets", "FRONT KEEPER Z", True),
         (upper_right_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR + keeper_drill_r),
          KEEPER_TAP_Z_REAR - FRONT_COLUMN_Z, (0.372, 0.160), "vertical",
@@ -2840,17 +2700,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # bracket, so the leader is the width of the gap and crosses nothing; the
     # 4.5 above its upper arrow, where its leader leaves the line's top stub.
     # Neither may drift left of x=378 or the extension lines run under the
-    # text, nor below y=137 or the cap-seat callout's do.
+    # text, nor below y=137 or the recess-depth callout's do.
     #
     # One crossing survives and is accepted: the 47.3, the 4.5 and the 16.30
-    # cap-seat depth all measure FROM the boss top face, so their upper
+    # recess depth all measure FROM the boss top face, so their upper
     # extension lines are collinear at y=146.8 and each runs right to its own
     # dimension line (x=366.5, 377, 387).  The 4.5's leader leaves its line
     # mid-band at y=145.7 -- below that shared face -- so any text it can
     # reach costs one crossing of a line collinear with its own, 0.3 mm from
     # where its own extension line ends.  The layout audit reports it as
     # leader-crosses-leader at (366.2,146.8); the alternatives measured worse
-    # (text over the cut faces, or the cap-seat callout's stub through this
+    # (text over the cut faces, or the recess-depth callout's stub through this
     # text), and no arrangement of three dimensions off one face avoids it.
     _checked_dimension(
         adapter, detail_section,
@@ -2994,48 +2854,14 @@ async def build(adapter: Any) -> dict[str, str]:
         suffix="TAP AXIS BELOW BOSS TOP",
         entities=(upper_boss_edge, front_tap_edge), offset_text=(0.300, 0.229),
     )
-    # #946: the leader lands on the cap seat's near (outboard) ledge and
-    # leaves through the boss's outer face midway between the cross tap's
-    # counterbore and the boss top, as far from both as that face allows.
-    cap_seat_tip = model_point_in_view(
-        adapter,
-        detail_section,
-        (
-            COLUMN_X/1000.0,
-            CAP_RECESS_FLOOR_Y/1000.0,
-            (FRONT_COLUMN_Z-(BORE_DIA+CAP_RECESS_DIAMETER)/4)/1000.0,
-        ),
-        label="cap seat finish leader",
-    )
-    cap_seat_entry = model_point_in_view(
-        adapter,
-        detail_section,
-        (
-            COLUMN_X/1000.0,
-            (COUNTERBORE_DIA/2 + HALF_H + BOSS_ABOVE)/2/1000.0,
-            (FRONT_COLUMN_Z-BOSS_DIA/2)/1000.0,
-        ),
-        label="cap seat finish leader entry",
-    )
-    cap_seat_finish = add_surface_finish(
-        adapter,
-        detail_section,
-        symbol_xy=cap_seat_finish_placement(cap_seat_tip, cap_seat_entry),
-        control=surface_finish_by_key(SURFACE_FINISHES, "cap_seat_west_front"),
-        label="cap seat floor finish",
-        entity_type="FACE",
-        entity=machined_faces["cap_seat_west_front"],
-        leader_attach_xy=cap_seat_tip,
-        char_height=0.0025,
-    )
-    _finish_leader_tail(cap_seat_finish, label="cap seat floor")
     _assert_section_display(
         adapter, detail_section, label="A-A corner section",
         cut_surface_only=False,
     )
     cap_fit_note = add_note(
         adapter,
-        "CAP RECESSES FOR MHA-VN-028 / 9275K141",
+        "CAP RECESSES CLEAR MHA-VN-028 / 9275K141 SKIRTS;\n"
+        "CAPS SEAT ON TUBE ENDS, NOT RECESS FLOORS",
         0.040,
         0.055,
     )
@@ -3057,11 +2883,12 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Left", *HUB_LEFT_CENTER, scale=HUB_LEFT_SCALE,
     )
     set_hidden_lines_removed(adapter, hub_top)
-    # The set pocket is a recess in the face this view looks at and the set tap
-    # breaks its floor, so both read as visible ink; the dashed sockets at the
-    # rail ends were the only thing hidden lines added here, and sheets 3 and 4
-    # own those.  The re-assertions below are not redundant: creating the D-D
-    # section and picking its faces both put the parent back in its default.
+    # The set-screw boss stands out of the face this view looks at and the set
+    # tap breaks its spot face, so both read as visible ink; the dashed sockets
+    # at the rail ends were the only thing hidden lines added here, and sheets
+    # 3 and 4 own those.  The re-assertions below are not redundant: creating
+    # the D-D section and picking its faces both put the parent back in its
+    # default.
     set_hidden_lines_removed(adapter, detail_left)
     hub_top_dimensions = curate_view_dimensions(
         adapter, hub_top, keep=HUB_TOP_KEEP,
@@ -3075,15 +2902,22 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*hub_top_dimensions, *hub_left_dimensions],
         {name: "" for name in (*HUB_TOP_KEEP, *HUB_LEFT_KEEP)},
     )
-    set_dimension_callouts(
-        adapter, hub_left_dimensions,
-        {"PocketRise": "SQ POCKET\nOUTER LEFT FACE\nCENTRED ON SET TAP"},
-    )
+    set_dimension_callouts(adapter, hub_left_dimensions, HUB_LEFT_CALLOUTS)
     set_dimension_callouts(adapter, hub_top_dimensions, HUB_TOP_CALLOUTS)
     imported_annotations += [*hub_top_dimensions, *hub_left_dimensions]
     offset_dimension_text(
-        adapter, hub_left_dimensions, {"PocketRise": POCKET_RISE_TEXT_XY},
+        adapter, hub_left_dimensions, {"SetBossWidth": SET_BOSS_WIDTH_TEXT_XY},
     )
+    # One arrow on the spot's rim, no line on through the tap centre: the
+    # 07527cf4 codex review read the diametric pair, meeting the tap
+    # callout's leader at the centre, as leaders converging on the boss.
+    spot_dia = [
+        annotation for annotation in hub_left_dimensions
+        if dimension_name(adapter, annotation) == "SetSpotDia"
+    ]
+    if len(spot_dia) != 1:
+        raise RuntimeError(f"expected one SetSpotDia dimension, found {len(spot_dia)}")
+    set_near_side_diameter(spot_dia[0], "set-screw spot face diameter")
     _add_view_centerlines(
         adapter, hub_top,
         (
@@ -3150,7 +2984,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_hidden_lines_removed(adapter, detail_left)
     detail_left_edges = scan_view_edges(detail_left, label="hub side")
-    tap_x = -(OUTER_X - SET_POCKET_DEPTH)
+    tap_x = SET_SPOT_FACE_X
     tap_radius = TAP_DRILL_MM[SET_TAP_SPEC.size] / 2.0
     rail_top_edge = None
     for item in detail_left_edges.lines:
@@ -3175,12 +3009,13 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail_left,
         edge=set_tap_edge,
-        # Up-right of the tap, not up-left (clears leader-crosses-line 5.11
-        # THRU x PocketRise 16.0): was (0.070, 0.125), whose leader cut the
-        # pocket's y 99.9 extension line.  (0.2294, 0.1306) elbows at (199.4,
+        # Up-right of the tap: the boss width's extension lines leave one
+        # leader per side under their feet, and the spot face's Ø10.0 takes
+        # the left (SET_SPOT_DIA_TEXT_XY).  (0.2294, 0.1306) elbows at (199.4,
         # 125.0) mm and drops at 0.55 through the tap centre (146.5, 95.9),
-        # passing 2.0 mm right of that line's end (149.5, 99.9) and 5.2 mm
-        # over the 18.2 text; the text sits 12.8 mm above the view.
+        # passing 2.3 mm right of the right extension line's foot (151.0,
+        # 101.0) and 5.2 mm over the 18.2 text; the text sits 12.8 mm above
+        # the view.
         callout_xy=(
             HUB_LEFT_CENTER[0] + 0.0844,
             HUB_LEFT_CENTER[1] + 0.0356,
@@ -3241,7 +3076,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _gusset_ramp_angle(adapter, detail_left, detail_left_edges)
     set_hidden_lines_removed(adapter, detail_left)
     left_note = add_note(
-        adapter, "HUB SIDE / REMOVED VIEW SCALE 1:2\nRIB BOTTOMS, GUSSETS, POCKET RIM SHARP",
+        adapter, "HUB SIDE / REMOVED VIEW SCALE 1:2\nRIB BOTTOMS, GUSSETS SHARP",
         *HUB_LEFT_NOTE_XY,
     )
     if (
@@ -3250,13 +3085,8 @@ async def build(adapter: Any) -> dict[str, str]:
         or left_note is None
     ):
         raise RuntimeError("failed to label top-frame holes/sockets sheet")
-    hub_section = _hub_pocket_section(adapter, hub_top)
+    hub_section = _hub_boss_section(adapter, hub_top)
     _position_view_caption(adapter, hub_section, HUB_SECTION_CAPTION_XY)
-    # The one thing left in D-D that is neither a cut face nor a dimension is
-    # the set tap's cosmetic thread, drawn dashed because the tap runs into the
-    # page. It is annotation, not geometry, so no display mode removes it and
-    # nothing in the view measures it -- it says WHERE the tap breaks into the
-    # pocket, and the callout that specifies it is one view up on this sheet.
     if not ddoc.ActivateSheet("UNDERSIDE"):
         raise RuntimeError("failed to activate top-frame underside sheet")
     hub_bottom_parent = place_view(
@@ -3281,11 +3111,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # itself and says nothing a reader can already read off the title block
     # beyond the knife seats' exception to the C2 note: the bar-side and
     # gusset-hypotenuse bottoms under both seats keep the title-block break.
-    if add_note(
-        adapter, "UNDERSIDE LOCATOR\nBAR/GUSSET BOTTOMS AT SEATS SHARP",
-        *HUB_BOTTOM_NOTE_XY,
-    ) is None:
+    if add_note(adapter, HUB_BOTTOM_NOTE, *HUB_BOTTOM_NOTE_XY) is None:
         raise RuntimeError("failed to label underside locator")
+    if add_note(adapter, SLOT_BASIC_NOTE, *SLOT_BASIC_NOTE_XY) is None:
+        raise RuntimeError("failed to state the dowel slots' basic location")
+    # The faced underside plane (user ruling 2026-10-12): the part's own
+    # linked note C, beside the enlarged hub boss and gussets it excludes.
+    add_property_linked_note(
+        adapter,
+        "Manufacturing Notes C",
+        *UNDERSIDE_FACING_NOTE_XY,
+        char_height=FACING_NOTE_HEIGHT,
+    )
     _checked_dimension(
         adapter, hub_bottom_parent,
         # The land ends' outline is the C2 breaks' upper edge.
@@ -3310,7 +3147,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=POCKET_LENGTH_TEXT_XY, label="crossbar pocket length",
         expected_mm=2*BAR_POCKET_Z, orientation="vertical",
         exact_linear=True, edges=hub_bottom_edges,
-        suffix="2X POCKET\nCENTRED", offset_text=POCKET_LENGTH_OFFSET_XY,
+        suffix="2X POCKET, E-E\nCENTRED ON T", offset_text=POCKET_LENGTH_OFFSET_XY,
     )
     # The knife-hanger dowel pattern: datum B the front round hole, datum C
     # the rear one; each slot located to the near round hole, free along the
@@ -3338,22 +3175,39 @@ async def build(adapter: Any) -> dict[str, str]:
                 symbol_xy=HANGER_DATUM_SYMBOL_XY[datum], datum=datum,
                 label=f"knife-hanger round dowel hole datum {datum}",
             )
+    # Each frame's leader lands on the slot's end arc facing the frame's
+    # knee, so it runs straight down from above the plan.
     for station, station_z, datums in (
         ("front", STUD_Z_FRONT, ("B", "C")),
         ("rear", STUD_Z_REAR, ("C", "B")),
     ):
+        slot_centre = model_point_in_view(
+            adapter, hub_bottom_parent,
+            (SLOT_X/1000.0, -HALF_H/1000.0, station_z/1000.0),
+            label=f"underside locator {station} dowel slot centre",
+        )
+        knee = hanger_slot_frame_knee(HANGER_SLOT_FRAME_XY[station], slot_centre)
+        end, end_name = (1.0, "inner") if knee[0] > slot_centre[0] else (-1.0, "outer")
+        end_x = SLOT_X + end * SLOT_FLAT / 2.0
+        end_centre = model_point_in_view(
+            adapter, hub_bottom_parent,
+            (end_x/1000.0, -HALF_H/1000.0, station_z/1000.0),
+            label=f"underside locator {station} dowel slot {end_name} end centre",
+        )
         add_feature_control_frame(
             adapter, hub_bottom_parent,
             edge_entity=hub_bottom_edges.circle_at(
-                (SLOT_X-SLOT_FLAT/2, -HALF_H, station_z), HANGER_SLOT_WIDTH/2,
+                (end_x, -HALF_H, station_z), HANGER_SLOT_WIDTH/2,
                 axis=(0.0, 1.0, 0.0),
-                label=f"underside locator {station} dowel slot outer end",
+                label=f"underside locator {station} dowel slot {end_name} end",
             ).edge,
+            leader_attach_xy=hanger_slot_landing(end_centre, knee),
             frame_xy=HANGER_SLOT_FRAME_XY[station],
             characteristic="position",
             tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"],
             datums=datums,
             translated=datums[1:],
+            quantity=HANGER_SLOT_FRAME_QUANTITY,
             label=f"knife-hanger {station} dowel slot position",
         )
     slot_dimensions = curate_view_dimensions(
@@ -3388,7 +3242,6 @@ async def build(adapter: Any) -> dict[str, str]:
     _position_view_caption(adapter, hanger_section, HANGER_SECTION_CAPTION_XY)
     imported_annotations += hanger_dimensions
 
-    _keeper_seat_sheet(adapter, ddoc)
     auto_tapped_notes = _auto_tapped_hole_notes(adapter)
     _telemetry.info(f"automatic tapped-hole notes per view: {auto_tapped_notes}")
     assert_imported_precision(
