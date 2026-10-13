@@ -96,7 +96,8 @@ _CZ = (_Z[0] + _Z[1]) / 2.0
 # sits low enough for the U's three width rows above its plate front.
 FRONT_CENTER = (0.075, 0.140)
 TOP_CENTER = (0.205, 0.200)
-ISO_CENTER = (0.330, 0.175)
+ISO_CENTER = (0.370, 0.175)  # right of the slot depth's callout under the U
+ISO_NOTE_XY = (0.340, 0.104)
 NOTES_XY = (0.130, 0.140)
 CALLOUT_XY = (0.140, 0.200)
 TOP_NOTE_XY = (0.168, 0.166)
@@ -147,8 +148,8 @@ FRONT_KEEP = {
 # callout under the view; the strap stock thickness left.
 TOP_KEEP = {
     "ArmWidth": (_tx(_X[1]) + 0.006, _tz(PLATE_FRONT_Z) + 0.006),
-    "PlateWidth": (_tx(_X[1]) + 0.006, _tz(PLATE_FRONT_Z) + 0.014),
-    "SlotWidth": (_tx(0.0), _tz(PLATE_FRONT_Z) + 0.022),
+    "PlateWidth": (_tx(_X[1]) + 0.010, _tz(PLATE_FRONT_Z) + 0.014),
+    "SlotWidth": (_tx(0.0), _tz(PLATE_FRONT_Z) + 0.024),
     "PlateReach": (_tx(_X[1]) + 0.010, _tz((STRAP_Z[0] + PLATE_FRONT_Z) / 2.0)),
     "SlotBottom": (_tx(_X[1]) + 0.036, _tz(STRAP_Z[1]) - 0.014),
     "StrapThick": (_tx(_X[0]) - 0.010, _tz((STRAP_Z[0] + STRAP_Z[1]) / 2.0)),
@@ -260,7 +261,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Front View Note", 0.030, 0.036)
     add_property_linked_note(adapter, "Top View Note", *TOP_NOTE_XY)
-    add_property_linked_note(adapter, "Isometric View Note", 0.290, 0.104)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     # Materialize the iso's cosmetic thread before the strict final note cleanup;
     # otherwise its descriptive label first appears during the native drawing save.
