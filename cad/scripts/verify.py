@@ -99,6 +99,7 @@ from _assembly_postbuild import (
     author_dof_drives,
     load_dof_manifest,
 )
+from _chain_mounts import mounted_wheels
 from _interference_contracts import allowed_interference_pairs
 from _native_spring_contact import assert_assembly_spring_contacts
 # component iteration helpers (read-only)
@@ -165,9 +166,10 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # band or a gate bug, never a real regression). Kept because the counts document
 # each assembly's structure and size the mock in test_verify_telemetry.
 # component_names counts top-level components only (GetComponents(TopLevelOnly)),
-# so harmonic-analyzer's count is its 7 child subassemblies + 1 loose part (the
-# measuring-stick; the spare gear rides inside paper-drive) -- NOT the ~340
-# flattened parts. Bands measured live on a green build, with margin.
+# so harmonic-analyzer's count is its 8 child subassemblies (the measuring stick
+# with its clamped stop is ms-measuring-stick; the spare gear rides inside
+# paper-drive) -- NOT the ~340 flattened parts. Bands measured live on a green
+# build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
 # active_count build-speed knob): channel = 8N + 17 (N×{rocker,rod,rod-pivot-pin,
 # bar,bar-pivot-pin,lever,spring,spring-hook} + pivot shaft + 2 thrust washers
@@ -217,10 +219,13 @@ _COMPONENT_BAND = {
     # chain; the paper-drive rework replaced the two rails + pinion-bar topology
     # with one bar + two-piece clamps + the hanging-platen furniture and its
     # 22 lock-mated fillister screws; the 2026-07-23 refit resolves 62 links)
+    # ch16 (2026-10-09 re-derivation): stick, block, cover, 2 plate screws and
+    # the thumbscrew.
+    "ms-measuring-stick": (5, 7),  # expected 6
     "ha-harmonic-analyzer": (
         7,
         9,
-    ),  # measured 8: 7 subassemblies + 1 loose part (measuring-stick)
+    ),  # expected 8: 7 machine subassemblies + ms-measuring-stick
 }
 
 # Tolerance audit (Part D / handoff §14.2 Gate E): every built part must carry
@@ -840,6 +845,16 @@ async def _reopen_assembly_rest_pose(adapter: Any, name: str, sldasm: Path) -> N
         check(f"activate {REST}", await adapter.set_active_configuration(REST))
 
 
+def _soundness_chain_mounts(name: str) -> Any:
+    """The authored wheel mounts for an assembly whose contract says it carries
+    the roller chain, else None: its build passes them to check_no_interference
+    (541011de0), so the soundness gate must too, or every chain-link-on-sprocket
+    mesh contact reads as interference."""
+    if not assembly_contract(name).carries_chain:
+        return None
+    return mounted_wheels()
+
+
 def _run_soundness_battery(
     adapter: Any, name: str, report: Report, rebuilt: Any
 ) -> None:
@@ -887,6 +902,7 @@ def _run_soundness_battery(
         lambda: check_no_interference(
             adapter,
             allowed_pairs=allowed_interference_pairs(name),
+            chain_mounts=_soundness_chain_mounts(name),
         ),
     )
     if name in ("ch-channel", "sm-summing"):
@@ -1024,6 +1040,7 @@ async def _verify_static_one(
         lambda: check_no_interference(
             adapter,
             allowed_pairs=allowed_interference_pairs(name),
+            chain_mounts=_soundness_chain_mounts(name),
         ),
     )
     if name in ("ch-channel", "sm-summing"):
@@ -1399,7 +1416,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     pose assert the wire still behaves like a wire:
 
     * wire-rides-hub: the wire's centreline stays at the stand-off tangency
-      radius of the wheel axis (hub r + wire r + clearance);
+      radius of the wheel axis (drum r + wire r + clearance);
     * hook-ball-holds: the wire's hook end stays on the fixture's anchor;
     * coupling-alive: the wheel angle actually spans with the lever (the yoke
       transmits);
@@ -1410,7 +1427,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     shipped free model is untouched.
     """
     import build_mg_magnifier_assembly as _mag
-    from build_mg_output_fixture import HOOK_ANCHOR_LOCAL
+    from mg_output_fixture_geom import HOOK_LOCAL
     import mg_lever_wire_geom as _wire
 
     name = "mg-magnifier"
@@ -1440,7 +1457,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     # Machine anchors for the invariants (the magnifier is authored
     # machine-handed, #151 -- constants feed straight through).
     axis_xy = (_mag.WHEEL_X, _mag.WHEEL_BAR_Y)  # wheel axis, along Z
-    r_expect = _wire.HUB_DIA / 2.0 + _wire.WIRE_DIA / 2.0 + _wire.CLEARANCE
+    r_expect = _wire.DRUM_DIA / 2.0 + _wire.WIRE_DIA / 2.0 + _wire.CLEARANCE
 
     def _xform(comp: str) -> tuple[list[list[float]], list[float]]:
         a = component_transform(adapter, comp)
@@ -1465,9 +1482,9 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
         frows, fpos = _xform("mg-output-fixture-1")
         anchor = [
             fpos[k]
-            + HOOK_ANCHOR_LOCAL[0] * frows[0][k]
-            + HOOK_ANCHOR_LOCAL[1] * frows[1][k]
-            + HOOK_ANCHOR_LOCAL[2] * frows[2][k]
+            + HOOK_LOCAL[0] * frows[0][k]
+            + HOOK_LOCAL[1] * frows[1][k]
+            + HOOK_LOCAL[2] * frows[2][k]
             for k in range(3)
         ]
         d_hook = math.dist(hook, anchor)

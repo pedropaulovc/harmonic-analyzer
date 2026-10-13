@@ -1,5 +1,6 @@
 r"""Magnifying-lever nominal geometry -- the drawing-FREE constant block shared
-by the part build, its ``_spec`` (drawing contract) and ``build_magnifier_assembly``
+by the part build, its ``_spec`` (drawing contract), ``build_mg_magnifying_bracket``
+(which imports the collar length it carries) and ``build_mg_magnifier_assembly``
 (which imports the knife-axis station).
 
 PURE DATA, no SolidWorks/COM and no drawing imports.  Kept SEPARATE from
@@ -9,15 +10,21 @@ it imports a constant from, so the drawing contract (notes / marked-dimension
 map) must NOT live here, else a print-note edit would move the assembly's recipe
 digest and force a needless rebuild.  ``_spec`` re-exports these for its
 drawing-side consumers and adds only the drawing data.
+
+The collar PRESS FIT (rod diameter, zone length, bore, bands, budget) is
+``mg_lever_press_fit_geom`` -- CONFIG-free, because this module reads the
+collar and clamp stations from output.yaml and the shared interference contract
+must not drag that config into unrelated closures.  Here the configured collar
+window is asserted to BE that zone, the rod's tip flush with its outer face.
 """
 
 from __future__ import annotations
 
 import _config
+from mg_lever_press_fit_geom import PRESS_ZONE_LENGTH
 
-# --- rod nominals (DIMENSIONS.md ch20; Ø6 photo-scaled, low) ------------------
+# --- rod nominals (DIMENSIONS.md ch20) ----------------------------------------
 ROD_LENGTH = 165.0  # calibrated p1, x -200..-35 (med; supersedes the 310 "4x" guess)
-ROD_DIA = 6.0  # round brass rod (low)
 
 # --- knife-edge pivot axis (KnifeAxis = Axis2) --------------------------------
 # The lever does NOT spin in the bracket collar: it EXTENDS FROM the pivoted
@@ -54,6 +61,17 @@ COLLAR_HALF_LEN: float = float(
 CLAMP_LOCAL_X: float = float(
     _config.machine("output", "magnifier_clamp_station_mm")
 )  # as-built clamp centre (machine x +150, p.46/48 insets)
+
+# --- the press zone's station on this rod -------------------------------------
+# The bracket collar's window in lever-local x. Its length and the rod's tip
+# flush with the collar's outer face are the press contract's assumptions
+# (mg_lever_press_fit_geom.COLLAR_ENGAGEMENT), so a station or collar-length
+# edit in output.yaml that breaks either fails loud here.
+PRESS_ZONE_X = (COLLAR_LOCAL_X - COLLAR_HALF_LEN, COLLAR_LOCAL_X + COLLAR_HALF_LEN)
+if abs((PRESS_ZONE_X[1] - PRESS_ZONE_X[0]) - PRESS_ZONE_LENGTH) > 1e-9:
+    raise AssertionError("the configured collar window is not the press zone's length")
+if abs(ROD_LENGTH - PRESS_ZONE_X[1]) > 1e-9:
+    raise AssertionError("the rod's east tip must end flush with the collar's outer face")
 
 
 def clamp_radius_band(block_depth: float) -> tuple[float, float, float]:

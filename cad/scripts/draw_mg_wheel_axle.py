@@ -8,42 +8,52 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
+    dimension_name,
     place_view,
     view_outline,
 )
 
 from _check import check
+from _com import _early_bound
+from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import set_dimension_callouts
-from _drawing_edge_dimensions import find_edge_near
+from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_finish import add_surface_finish
-from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
+from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from mg_wheel_axle_spec import (
-    COLLAR_DIA as COLLAR_DIA,
-    COLLAR_LEN,
-    FLANGE_DIA,
-    FLANGE_LEN,
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
-    STUD_DIA,
-    STUD_LEN,
+    BACK_Y,
+    BAR_BORE_LIMITS,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    PIN_DIA,
+    REFERENCE_DIMENSIONS,
+    STEP_Y,
     SURFACE_FINISHES,
+    THREAD_CALLOUT,
+    THREAD_END_Y,
+    THREAD_MAJOR,
+    TIP_Y,
 )
+from mg_wheel_group import THREAD_LENGTH_CALLOUT
 
 
 SPEC = DRAWINGS_BY_NAME["mg_wheel_axle"]
@@ -58,62 +68,98 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (3.0, 1.0)
-_K = SHEET_SCALE[0] / 1000.0  # model mm -> sheet meters
-_TOTAL_LEN = FLANGE_LEN + STUD_LEN
-
-# Front view: the profile (axle axis vertical, flange at the bottom).
-# End view: the tip-side circles, third-angle above the front view.
-FRONT_CENTER = (0.105, 0.100)
-# The O35 flange at 3:1 makes this view a 105 mm circle, so y=0.215 ran its
-# outline 3.4 mm into the top zone band. 0.208 clears it by ~3.6 mm and keeps
-# the third-angle stack (end view above front, both on x=0.105) intact; the gap
-# to the front view's upper dimensions is ~27 mm, so nothing crowds below.
-END_CENTER = (0.105, 0.208)
-ISO_CENTER = (0.310, 0.185)
+# Every view prints at the sheet scale, so none needs a caption. 4:1 lays the
+# 37.4 pin 149 mm long and its 3/16 shank 19 mm across.
+SHEET_SCALE = (4.0, 1.0)
+VIEW_SCALE = (4, 1)
+_S = SHEET_SCALE[0] / SHEET_SCALE[1]
+# One side view: the *Front view (parallel to the profile sketch, so its
+# dimensions import), turned so the pin lies horizontal, back end left.
+SIDE_CENTER = (0.160, 0.170)
+SIDE_VIEW_ANGLE = -math.pi / 2.0  # model +Y (back end -> tip) to paper right
+ISO_CENTER = (0.335, 0.185)
+_MID_Y = (BACK_Y + TIP_Y) / 2.0
 
 
-def _front_y(model_y: float) -> float:
-    return FRONT_CENTER[1] + (model_y - _TOTAL_LEN / 2.0) * _K
+def _sheet_x(model_y_mm: float) -> float:
+    """Sheet X of a model-Y station on the side view (the view is centred on
+    the model bbox, back end to tip)."""
+    return SIDE_CENTER[0] + (model_y_mm - _MID_Y) * _S / 1000.0
 
 
-FRONT_KEEP = {
-    "FlangeLength": (
-        FRONT_CENTER[0] - FLANGE_DIA / 2.0 * _K - 0.018,
-        _front_y(FLANGE_LEN / 2.0),
-    ),
-    "StudLength": (
-        FRONT_CENTER[0] + FLANGE_DIA / 2.0 * _K + 0.030,
-        _front_y(FLANGE_LEN + STUD_LEN / 2.0),
-    ),
-    "CollarLength": (
-        FRONT_CENTER[0] + FLANGE_DIA / 2.0 * _K + 0.012,
-        _front_y(_TOTAL_LEN - COLLAR_LEN / 2.0),
-    ),
+BACK_X = _sheet_x(BACK_Y)
+STEP_X = _sheet_x(STEP_Y)
+THREAD_END_X = _sheet_x(THREAD_END_Y)
+TIP_X = _sheet_x(TIP_Y)
+
+# Rows below the profile (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the shank and the thread both
+# baseline from the gauged step (the press gauge's face), each with the
+# dimension-origin circle on the step's extension line and named on its
+# callout, then the overall as a reference. Run 18 left the shank's 4-line
+# block (stacked band + two callout lines) 1.82 mm over the thread's stacked
+# band (the audit asks 3.57); the .X shank prints one value line and one
+# callout line, and its row rises 3 mm, which alone clears it.
+_ROW_Y = (SIDE_CENTER[1] - 0.032, SIDE_CENTER[1] - 0.0588, SIDE_CENTER[1] - 0.0800)
+# The thread length spans 32.7 mm of sheet, its ~63 mm callout block wider:
+# the block stands wholly left of the step's extension line (4 mm air, room
+# for the origin circle there), clear of the overall's extension line
+# dropping from the tip on the right.
+_THREAD_BLOCK_HALF = 0.0317
+# Diameters on the profile.
+SIDE_KEEP = {
+    "ShankLength": ((BACK_X + STEP_X) / 2.0, _ROW_Y[0]),
+    "ThreadLength": (STEP_X - 0.004 - _THREAD_BLOCK_HALF, _ROW_Y[1]),
+    "PinLength": ((BACK_X + TIP_X) / 2.0, _ROW_Y[2]),
+    # The shank's dimension line crosses the shank near the step; its text
+    # runs left from the line, the fit callout's two lines under it, so the
+    # block stands high enough to keep them off the shank.
+    "PinDia": (STEP_X - 0.030, SIDE_CENTER[1] + 0.045),
+    # Above-right of the tip: the leader lands on the dome's upper half, clear
+    # of the overall's extension line dropping from the tip, and under the
+    # thread callout.
+    "DomeR": (TIP_X + 0.015, SIDE_CENTER[1] + 0.015),
 }
-END_KEEP = {
-    "FlangeDia": (
-        END_CENTER[0] - FLANGE_DIA / 2.0 * _K - 0.012,
-        END_CENTER[1] + 0.045,
-    ),
-    "CollarDia": (
-        END_CENTER[0] + FLANGE_DIA / 2.0 * _K + 0.015,
-        END_CENTER[1] + 0.028,
-    ),
-    "StudDia": (
-        END_CENTER[0] + FLANGE_DIA / 2.0 * _K + 0.015,
-        END_CENTER[1] - 0.028,
-    ),
+DRAWING_PRECISION_BY_NAME = {
+    name: places
+    for names in DRAWING_PRECISION.values()
+    for name, places in names.items()
 }
-# The stud's unilateral-minus running-fit band lives on its source-model dimension.
-DIMENSION_CALLOUTS: dict[str, str] = {}
-
-# Datum B's projected-symbol offset from the end-view centre. Placed off-axis at
-# ~-54 deg so the tag's leader runs radially out of the stud circle clear of the
-# O35 dimension ray and the O5.00 text (measured live while this tag was still
-# sheet-authored; the same placement is now driven from the model PMI spec).
-_DATUM_B_OFFSET = (0.038, -0.052)
-_DATUM_B_ANGLE = math.atan2(_DATUM_B_OFFSET[1], _DATUM_B_OFFSET[0])
+# The thread callout's leader lands on the thread's major-diameter silhouette
+# midway along the threaded length; the note stands up and right so the
+# leader leans back onto it, clear of the dome.
+THREAD_PICK = (
+    (STEP_X + THREAD_END_X) / 2.0,
+    SIDE_CENTER[1] + THREAD_MAJOR / 2.0 * _S / 1000.0,
+)
+THREAD_NOTE_XY = (THREAD_END_X + 0.012, SIDE_CENTER[1] + 0.042)
+# Each band states its need on its own callout (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the pin's
+# press fit with the bar bore's limits read from the bar's geom, the thread
+# length's origin, the locknut's full thread and the most thread past it
+# (mg_wheel_group). The .X shank names only its origin.
+DIMENSION_CALLOUTS = {
+    "PinDia": (
+        "PRESS FIT IN MG-WHEEL-BAR\n"
+        f"<MOD-DIAM>{BAR_BORE_LIMITS[0]:.3f}-{BAR_BORE_LIMITS[1]:.3f} REAMED BORE"
+    ),
+    "ShankLength": "FROM SHANK STEP",
+    "ThreadLength": THREAD_LENGTH_CALLOUT,
+}
+# ASME Y14.5 dimension origin (swArrowStyle_e): the open circle marks the end
+# a dimension reads from, so both lengths show the step as their origin
+# rather than a chain through it; the other end keeps the closed arrowhead.
+ORIGIN_DIMENSIONS = ("ShankLength", "ThreadLength")
+_ORIGIN_ARROWHEAD = 4  # swArrowStyle_e.swORIGIN_ARROWHEAD
+_CLOSED_ARROWHEAD = 1  # swArrowStyle_e.swCLOSED_ARROWHEAD
+# The journal's finish (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)) lands on the shank's top silhouette
+# between the Ø line and the step, where the wheel runs; the symbol stands
+# just above, left of the thread callout's leader.
+JOURNAL_FINISH_PICK = (STEP_X - 0.012, SIDE_CENTER[1] + PIN_DIA / 2.0 * _S / 1000.0)
+JOURNAL_FINISH_SYMBOL = (STEP_X - 0.010, SIDE_CENTER[1] + 0.020)
+FINISH_CHAR_HEIGHT = 0.0025
+# A point on the shank face, clear of the Ø dimension line.
+CENTERLINE_PICK = (BACK_X + 0.020, SIDE_CENTER[1] + 0.003)
+# Bottom-left, above the title-block line.
+NOTES_XY = (0.020, 0.048)
 
 
 def _view_center_delta(
@@ -122,8 +168,8 @@ def _view_center_delta(
     """Measured-vs-intended geometry-center delta for coordinate picks.
 
     ``place_view`` anchors on the model origin's projection, not the geometry
-    box center, so a part that is not origin-symmetric (this axle spans
-    y 0..17) lands its geometry offset from the requested center. Every
+    box center, so a part that is not origin-symmetric (this pin spans
+    y -8.9..28.47) lands its geometry offset from the requested center. Every
     layout constant in this recipe is authored about the intended geometry
     center; shifting by this delta makes the edge picks and text positions
     track wherever SolidWorks actually put the geometry.
@@ -144,6 +190,55 @@ def _shift(
     points: dict[str, tuple[float, float]], dx: float, dy: float
 ) -> dict[str, tuple[float, float]]:
     return {name: (x + dx, y + dy) for name, (x, y) in points.items()}
+
+
+def _arrowheads(annotation: Any, label: str) -> list[tuple[float, int]]:
+    """Each arrowhead's tip x on the sheet and its style.
+
+    ``IDisplayData::GetArrowHeadAtIndex2`` returns tip[3], dir[3], width,
+    height, style, normal[3]; a length dimension carries exactly two.
+    """
+    data = annotation.GetDisplayData()
+    if data is None:
+        raise RuntimeError(f"{label} has no display data")
+    data = _early_bound(data, "IDisplayData")
+    heads = []
+    for index in range(int(data.GetArrowHeadCount() or 0)):
+        values = [float(value) for value in (data.GetArrowHeadAtIndex2(index) or ())]
+        if len(values) < 9:
+            raise RuntimeError(f"{label} arrowhead {index} is incomplete: {values!r}")
+        heads.append((values[0], round(values[8])))
+    if len(heads) != 2:
+        raise RuntimeError(f"{label} has {len(heads)} arrowheads, expected 2")
+    return heads
+
+
+def _set_dimension_origin(
+    adapter: Any, annotation: Any, *, origin_x: float, label: str
+) -> None:
+    """Put the dimension-origin circle on the arrowhead at ``origin_x``.
+
+    Which arrowhead ``SetArrowHeadStyle2``'s first style lands on is the
+    dimension's own order, so the styles are read back from the ink: if the
+    circle came out at the far end, the pair is applied swapped and read
+    again. Either way the sheet is proved, never assumed.
+    """
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    heads = _arrowheads(annotation, label)
+    near = min(range(2), key=lambda index: abs(heads[index][0] - origin_x))
+    styles = [_CLOSED_ARROWHEAD, _CLOSED_ARROWHEAD]
+    styles[near] = _ORIGIN_ARROWHEAD
+    for attempt in (styles, styles[::-1]):
+        if not display.SetArrowHeadStyle2(False, *attempt):
+            raise RuntimeError(f"failed to set the {label} arrowhead styles")
+        rebuild_drawing(adapter, label=f"{label} dimension origin")
+        heads = _arrowheads(annotation, label)
+        at_origin = min(heads, key=lambda head: abs(head[0] - origin_x))
+        far = max(heads, key=lambda head: abs(head[0] - origin_x))
+        if (at_origin[1], far[1]) == (_ORIGIN_ARROWHEAD, _CLOSED_ARROWHEAD):
+            return
+    raise RuntimeError(f"{label} origin circle is not at the step: {heads!r}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -180,144 +275,91 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Wheel Axle Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "wheel axle; flanged stud; turned steel",
+            3: f"wheel axle; 3/16 drill-rod pin; {THREAD_CALLOUT}; steel",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
-    end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=(3, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(3, 1))
-    for view in (front, iso):
+    side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=VIEW_SCALE)
+    native = _early_bound(side, "IView")
+    native.Angle = SIDE_VIEW_ANGLE
+    if abs(math.remainder(float(native.Angle) - SIDE_VIEW_ANGLE, 2.0 * math.pi)) > 1e-9:
+        raise RuntimeError("failed to rotate the wheel-axle side view")
+    drawing_model.EditRebuild3()
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
+    for view in (side, iso):
         set_hidden_lines_removed(adapter, view)
-    # The O5 stud hides under the O9 collar from the tip side; show it greyed
-    # so its diameter and GD&T attach to a real circle.
-    set_hidden_lines_visible(adapter, end)
 
-    fdx, fdy = _view_center_delta(adapter, front, FRONT_CENTER, "front")
-    edx, edy = _view_center_delta(adapter, end, END_CENTER, "end")
+    dx, dy = _view_center_delta(adapter, side, SIDE_CENTER, "side")
 
-    def fpt(x: float, y: float) -> tuple[float, float]:
-        return (x + fdx, y + fdy)
+    def spt(x: float, y: float) -> tuple[float, float]:
+        return (x + dx, y + dy)
 
-    def ept(x: float, y: float) -> tuple[float, float]:
-        return (x + edx, y + edy)
-
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=_shift(FRONT_KEEP, fdx, fdy), view_label="front"
-    )
-    end_annotations = curate_view_dimensions(
-        adapter, end, keep=_shift(END_KEEP, edx, edy), view_label="end"
-    )
-    set_dimension_callouts(
-        adapter, [*front_annotations, *end_annotations], DIMENSION_CALLOUTS
-    )
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to axle end view")
-
-    flange_face_edge = find_edge_near(
+    side_annotations = curate_view_dimensions(
         adapter,
-        front,
-        fpt(FRONT_CENTER[0] + FLANGE_DIA / 4.0 * _K, _front_y(0.0)),
-        axis="y",
-        label="flange seating face pick",
+        side,
+        keep=_shift(SIDE_KEEP, dx, dy),
+        view_label="side",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    stud_circle_top = find_edge_near(
+    assert_imported_precision(adapter, side_annotations, DRAWING_PRECISION_BY_NAME)
+    set_dimension_callouts(adapter, side_annotations, DIMENSION_CALLOUTS)
+    # Both lengths read from the step: the origin circle on its extension line.
+    for name in ORIGIN_DIMENSIONS:
+        matches = [a for a in side_annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one wheel-axle {name} dimension")
+        _set_dimension_origin(
+            adapter,
+            matches[0],
+            origin_x=spt(STEP_X, 0.0)[0],
+            label=f"wheel axle {name}",
+        )
+    # The overall sums the two stations and the dome: a reference.
+    for name in sorted(REFERENCE_DIMENSIONS):
+        matches = [a for a in side_annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one wheel-axle {name} reference dimension")
+        set_reference_dimension(adapter, matches[0], label=f"wheel axle {name}")
+    add_view_centerline(
         adapter,
-        end,
-        ept(END_CENTER[0], END_CENTER[1] + STUD_DIA / 2.0 * _K),
-        axis="y",
-        label="stud circle top pick",
+        side,
+        face_xy=spt(*CENTERLINE_PICK),
+        label="wheel axle turning axis",
     )
-    collar_circle_left = find_edge_near(
+    add_attached_note(
         adapter,
-        end,
-        ept(END_CENTER[0] - COLLAR_DIA / 2.0 * _K, END_CENTER[1]),
-        axis="x",
-        label="collar circle left pick",
-    )
-    stud_circle_at_datum_b = find_edge_near(
-        adapter,
-        end,
-        ept(
-            END_CENTER[0] + STUD_DIA / 2.0 * _K * math.cos(_DATUM_B_ANGLE),
-            END_CENTER[1] + STUD_DIA / 2.0 * _K * math.sin(_DATUM_B_ANGLE),
-        ),
-        axis="y",
-        label="stud circle datum-B pick",
-    )
-
-    # GD&T is model PMI (wheel_axle_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_wheel_axle) — project it and place it where the
-    # hand-authored symbols used to sit. Which VIEW receives each annotation
-    # depends on its attachment (a datum tag only lands in a view aligned
-    # with its face), and the projection fails loud on any mismatch. Placements track the measured view-centre deltas
-    # (fpt/ept), the same corrections the retired edge picks used.
-    project_part_pmi(
-        adapter,
-        placements={
-            "datum:A": PmiDrawingPlacement(
-                view=front,
-                position=fpt(
-                    FRONT_CENTER[0] + FLANGE_DIA / 4.0 * _K + 0.006,
-                    _front_y(0.0) - 0.016,
-                ),
-                attachment_xy=flange_face_edge,
-            ),
-            "datum:B": PmiDrawingPlacement(
-                view=end,
-                position=ept(
-                    END_CENTER[0] + _DATUM_B_OFFSET[0],
-                    END_CENTER[1] + _DATUM_B_OFFSET[1],
-                ),
-                attachment_xy=stud_circle_at_datum_b,
-            ),
-            # +0.052 in y put the frame's 8 mm half-box 8.3 mm over the top
-            # margin. Held to +0.045 and pushed out to +0.058 in x, which keeps
-            # it clear of the flange circle (52.5 mm radius) without reaching
-            # the 0.4191 right margin (a frame grows RIGHT by its full width).
-            "stud_perpendicularity": PmiDrawingPlacement(
-                view=end,
-                position=ept(END_CENTER[0] + 0.058, END_CENTER[1] + 0.045),
-                attachment_xy=stud_circle_top,
-            ),
-            "collar_runout": PmiDrawingPlacement(
-                view=end,
-                position=ept(END_CENTER[0] - 0.075, END_CENTER[1] - 0.045),
-                attachment_xy=collar_circle_left,
-            ),
-        },
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        label="wheel axle PMI",
-    )
-    # The stud OD is dimensioned in the end view, but its Ra belongs on the
-    # FRONT view. The symbol's TEXT renders ABOVE its arm (ASME Y14.36) and runs
-    # ~13..39 mm to the RIGHT of the anchor, so in the end view it cannot clear
-    # the O35 flange circle at ANY height the 12.7 mm left margin allows -- the
-    # arc reaches x=0.0534 at bore height while the text would need to stop by
-    # x=0.0144 -- and it printed over the arc. (The audit cannot catch that: it
-    # boxes the symbol as a nominal square about its anchor.) On the profile the
-    # stud's left flank has ~45 mm of empty sheet beside it, which takes the
-    # short, roughly horizontal leader this symbol wants.
-    stud_flank_y = _front_y(FLANGE_LEN + STUD_LEN / 2.0)
-    add_surface_finish(
-        adapter,
-        front,
-        # A cylinder's side outline is a SILHOUETTE, not a model edge.
-        edge_xy=fpt(FRONT_CENTER[0] - STUD_DIA / 2.0 * _K, stud_flank_y),
-        # Text lands at x~0.058..0.084: clear of the stud flank (x=0.0975) and
-        # of the O9 collar (x>=0.0915), which starts a further 9 mm up.
-        symbol_xy=fpt(0.045, stud_flank_y),
-        control=surface_finish_by_key(SURFACE_FINISHES, "stud_bearing"),
-        label="stud bearing finish",
+        side,
+        text=THREAD_CALLOUT,
+        entity_xy=spt(*THREAD_PICK),
+        note_xy=spt(*THREAD_NOTE_XY),
+        label="wheel axle thread callout",
         entity_type="SILHOUETTE",
     )
+    add_surface_finish(
+        adapter,
+        side,
+        edge_xy=spt(*JOURNAL_FINISH_PICK),
+        entity_type="SILHOUETTE",
+        symbol_xy=spt(*JOURNAL_FINISH_SYMBOL),
+        leader_attach_xy=spt(*JOURNAL_FINISH_PICK),
+        control=surface_finish_by_key(SURFACE_FINISHES, "mg_axle_journal"),
+        label="wheel axle journal finish",
+        char_height=FINISH_CHAR_HEIGHT,
+    )
 
-    # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
-    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
-    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.048)
+    # x=0.020: a note is left-aligned on its anchor, so the ink starts here,
+    # clear of the 12.7 mm zone margin.
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    # The shaded isometric shows the #4-40 the callout names; imported before
+    # finalize's note cleanup, so its label is counted rather than first
+    # appearing at the native save (draw_pn_pen_hanger).
+    thread_seeds, thread_instances = import_cosmetic_threads(adapter, iso)
+    if (thread_seeds, thread_instances) != (1, 1):
+        raise RuntimeError(
+            "wheel-axle isometric cosmetic threads: "
+            f"seeds/instances={(thread_seeds, thread_instances)!r}, expected (1, 1)"
+        )
 
     return await finalize_drawing(
         adapter,

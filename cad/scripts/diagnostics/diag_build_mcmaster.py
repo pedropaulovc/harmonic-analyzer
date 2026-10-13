@@ -50,12 +50,14 @@ from diagnostics.diag_build_90280A194 import build_90280A194  # noqa: E402
 from diagnostics.diag_build_90280A197 import build_90280A197  # noqa: E402
 from diagnostics.diag_build_90280A199 import build_90280A199  # noqa: E402
 from diagnostics.diag_build_90280A201 import build_90280A201  # noqa: E402
+from diagnostics.diag_build_90280A203 import build_90280A203  # noqa: E402
 from diagnostics.diag_build_90280A837 import build_90280A837  # noqa: E402
 from diagnostics.diag_build_91247A720 import build_91247A720  # noqa: E402
 from diagnostics.diag_build_91375A106 import build_91375A106  # noqa: E402
 from diagnostics.diag_build_91375A942 import build_91375A942  # noqa: E402
 from diagnostics.diag_build_91255A148 import build_91255A148  # noqa: E402
 from diagnostics.diag_build_91410A538 import build_91410A538  # noqa: E402
+from diagnostics.diag_build_91410A540 import build_91410A540  # noqa: E402
 from diagnostics.diag_build_91794A080 import build_91794A080  # noqa: E402
 from diagnostics.diag_build_91794A112 import build_91794A112  # noqa: E402
 from diagnostics.diag_build_91794A055 import build_91794A055  # noqa: E402
@@ -70,9 +72,9 @@ from diagnostics.diag_build_93075A194 import build_93075A194  # noqa: E402
 from diagnostics.diag_build_93585A190 import build_93585A190  # noqa: E402
 from diagnostics.diag_build_94025A150 import build_94025A150  # noqa: E402
 from diagnostics.diag_build_94025A164 import build_94025A164  # noqa: E402
-from diagnostics.diag_build_98296A026 import build_98296A026  # noqa: E402
 from diagnostics.diag_build_98296A027 import build_98296A027  # noqa: E402
 from diagnostics.diag_build_98296A031 import build_98296A031  # noqa: E402
+from diagnostics.diag_build_93600A189 import build_93600A189  # noqa: E402
 from diagnostics.diag_build_98381A473 import build_98381A473  # noqa: E402
 from diagnostics.diag_build_99607A213 import build_99607A213  # noqa: E402
 from diagnostics.diag_build_97431A260 import build_97431A260  # noqa: E402
@@ -85,6 +87,7 @@ REGISTRY = {
     "92240A539": build_92240A539,
     "92240A540": build_92240A540,
     "91410A538": build_91410A538,
+    "91410A540": build_91410A540,
     "93075A194": build_93075A194,
     "92865A585": build_92865A585,
     "91247A720": build_91247A720,
@@ -100,13 +103,14 @@ REGISTRY = {
     "90280A197": build_90280A197,
     "90280A199": build_90280A199,
     "90280A201": build_90280A201,
+    "90280A203": build_90280A203,
     "90280A837": build_90280A837,
     "91794A080": build_91794A080,
     "91794A112": build_91794A112,
     "9275K141": build_9275K141,
-    "98296A026": build_98296A026,
     "98296A027": build_98296A027,
     "98296A031": build_98296A031,
+    "93600A189": build_93600A189,
     "98381A473": build_98381A473,
     "91829A205": build_91829A205,
     "91794A055": build_91794A055,

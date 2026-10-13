@@ -12,6 +12,7 @@ import re
 import sys
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import contextmanager
+from enum import StrEnum
 from typing import Any
 
 import _config
@@ -26,6 +27,7 @@ from _part_save import set_isometric_view
 from _source_identity import _git_commit_year, _git_sha
 from _paths import DEFAULT_VIEWS, OUT_PNG, OUT_SLDASM, OUT_SLDPRT, _CHAIN_LINK_PREFIXES
 from _rebuild import _FEATURE_ERROR, active_configuration_name, whats_wrong
+from _saved_display_data import assert_saved_display_data
 from _simplified_identity import components_identity
 from _simplified_names import (
     SIMPLIFIED_COMMENT,
@@ -116,19 +118,96 @@ def _ensure_assembly_title(adapter: Any, asm_name: str, model: Any = None) -> bo
     return True
 
 
-# The sprockets the chain seats on (the mounted T24 + crank T12 removables).
-# A chain link touching one of these is intended MESH, not a fault: the chain
-# rides the pitch circle so the links overlap the teeth in the shared z-plane
-# (a coplanar single-plane stand-in). Whitelisted like link<->link contact in
-# check_no_interference. Defined here (not in _session) so it stays off every
-# part's recipe digest -- only the assemblies that read it rebuild on a change.
+# Chain mesh is an assembly-only policy: a configuration identifies a tooth
+# count, not a mounted wheel. A loose spare can have the SAME configuration as
+# either active wheel, so only the authored mount's root-world pose and selected
+# configuration qualify. The chain-carrying assemblies pass that authority in
+# (``_chain_mounts.mounted_wheels()``); importing it here would put the cone
+# line and channel table on every assembly's recipe.
 _CHAIN_SPROCKET_PREFIXES = ("pd-transgear-removable",)
-# Only the sprockets the roller chain actually WRAPS mesh it: the T12 crank wheel
-# and the T24 knob wheel. The loose T18 spare (same "transgear-removable" stem, a
-# different config) rests off the loop, so a chain-link overlap with IT is a real
-# collision, NOT intended mesh -- discriminate by referenced configuration so the
-# mesh whitelist below never masks a spare-part clash (codex #189 round-5).
-_CHAIN_SPROCKET_CONFIGS = ("T12", "T24")
+# COM readback tolerances, NOT manufacturing allowances: 0.00001 mm for the
+# authored centre/band, 0.00000001 for a rigid unit-scale rotation.
+_CHAIN_MOUNT_READBACK_MM = 1e-5
+_CHAIN_MOUNT_READBACK_UNIT = 1e-8
+
+
+def _chain_component_family(name: str, families: tuple[str, ...]) -> bool:
+    """Match the actual leaf family, including qualified nested ``Name2``."""
+    stem, separator, instance = name.rsplit("/", 1)[-1].rpartition("-")
+    return (
+        bool(separator)
+        and stem in families
+        and re.fullmatch(r"[1-9][0-9]*", instance) is not None
+    )
+
+
+def _mounted_chain_sprocket(component: Any, configuration: str, mounts: Any) -> bool:
+    """Prove one selected crank/knob mount, never infer a role from its suffix.
+
+    ``component`` comes directly from the active root assembly's interference
+    manager, not from a separately opened subassembly document. Its collapsed
+    total transform therefore includes any nesting in HA; do not compose a
+    parent again or fall back to a relative/identity transform on missing data.
+    ``mounts`` is the caller's ``_chain_mounts.WheelMounts``; without one no
+    contact is mesh.
+    """
+    if mounts is None:
+        return False
+    try:
+        mounts.configuration_teeth(configuration)
+        transform = _early_bound(component, "IComponent2").GetTotalTransform(False)
+        if transform is None:
+            return False
+        values = tuple(
+            float(value)
+            for value in _early_bound(transform, "IMathTransform").ArrayData
+        )
+    except Exception:
+        # An unmeasured pose is an unexpected contact, never intended mesh.
+        return False
+    if len(values) != 16 or not all(math.isfinite(value) for value in values):
+        return False
+
+    unit_tol = _CHAIN_MOUNT_READBACK_UNIT
+    if abs(values[12] - 1.0) > unit_tol:
+        return False
+    rows = (values[0:3], values[3:6], values[6:9])
+    for i in range(3):
+        for j in range(i, 3):
+            dot = sum(a * b for a, b in zip(rows[i], rows[j]))
+            if abs(dot - (1.0 if i == j else 0.0)) > unit_tol:
+                return False
+    determinant = (
+        values[0] * (values[4] * values[8] - values[5] * values[7])
+        - values[1] * (values[3] * values[8] - values[5] * values[6])
+        + values[2] * (values[3] * values[7] - values[4] * values[6])
+    )
+    if abs(determinant - 1.0) > unit_tol:
+        return False
+    if abs(values[6]) > unit_tol or abs(values[7]) > unit_tol:
+        return False
+
+    x, y, z = (value * 1000.0 for value in values[9:12])
+    # The part's plate is local z=0..PLATE. Authored mounts place that origin
+    # on the front face, with the rear face on the seat; Z spin is free, tilt
+    # or reversal is not the same axial band (the stored spare is Rx(-90)).
+    mm_tol = _CHAIN_MOUNT_READBACK_MM
+    if (
+        abs(z - mounts.band_front_z) > mm_tol
+        or abs(z + values[8] * mounts.plate - mounts.seat_face_z) > mm_tol
+    ):
+        return False
+    roles = mounts.roles
+    mounted = [
+        selected
+        for centre, selected in roles
+        if all(math.isfinite(value) for value in centre)
+        and abs(x + centre[0]) <= mm_tol
+        and abs(y - centre[1]) <= mm_tol
+    ]
+    # Check physical ambiguity BEFORE selection: even unequal selections must
+    # not choose a role when the two centre readback windows coincide.
+    return len(mounted) == 1 and configuration == mounted[0]
 
 
 def insert_sketch_text(
@@ -1908,6 +1987,7 @@ def check_no_interference(
     adapter: Any,
     *,
     allowed_pairs: Mapping[frozenset[str], float] | None = None,
+    chain_mounts: Any = None,
 ) -> None:
     """Run interference detection on the active assembly; raise on any hit.
 
@@ -1929,8 +2009,11 @@ def check_no_interference(
     is allowed and reported separately, not raised: a chain is an articulating
     connected mechanism whose links are in contact at every joint, so on the
     tight wraps the rigid links unavoidably touch their neighbours (the same
-    way the gate already tolerates face-flush and tangent contacts). Any link
-    touching a NON-link part is still a hard fault.
+    way the gate already tolerates face-flush and tangent contacts). Link contact
+    with a selected, physically mounted removable is intended chain mesh; any
+    other link/non-link overlap, including a same-configuration spare, is a fault.
+    Only an assembly that passes ``chain_mounts`` (``_chain_mounts.mounted_wheels()``)
+    can have chain mesh at all.
     """
     asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
     with _telemetry.span("gate.interference") as isp:
@@ -1952,7 +2035,8 @@ def check_no_interference(
             interference = _early_bound(interference, "IInterference")
             names = []
             configs = []
-            for comp in list(_read_member(interference, "Components") or []):
+            components = list(_read_member(interference, "Components") or [])
+            for comp in components:
                 # No flag: Name2 / ReferencedConfiguration are property reads (issue #87).
                 names.append(str(_read_member(comp, "Name2")))
                 configs.append(str(_read_member(comp, "ReferencedConfiguration") or ""))
@@ -1967,20 +2051,27 @@ def check_no_interference(
             ):
                 chain_contacts.append(volume_mm3)
                 continue
-            # Chain link <-> sprocket: intended mesh. The chain seats on the
-            # pitch circle so its links overlap the removables' teeth in the
-            # shared z-plane (a coplanar single-plane stand-in). Whitelisted
-            # like the link<->link contact above -- but ONLY for a sprocket the
-            # chain actually wraps (config T12/T24); a link overlapping the loose
-            # T18 spare is a real clash and must NOT be whitelisted (codex #189).
-            links = [n for n in names if n.startswith(_CHAIN_LINK_PREFIXES)]
-            sprockets = [
-                n
-                for n, cfg in zip(names, configs)
-                if n.startswith(_CHAIN_SPROCKET_PREFIXES)
-                and cfg in _CHAIN_SPROCKET_CONFIGS
+            # Tooth selection alone cannot distinguish an active wheel from a
+            # loose spare. Match the real leaf families, then prove exactly one
+            # authored mounted role from the raw component's root-world pose.
+            links = [
+                i
+                for i, name in enumerate(names)
+                if _chain_component_family(name, _CHAIN_LINK_PREFIXES)
             ]
-            if len(names) == 2 and len(links) == 1 and len(sprockets) == 1:
+            sprockets = [
+                i
+                for i, name in enumerate(names)
+                if _chain_component_family(name, _CHAIN_SPROCKET_PREFIXES)
+            ]
+            if (
+                len(names) == 2
+                and len(links) == 1
+                and len(sprockets) == 1
+                and _mounted_chain_sprocket(
+                    components[sprockets[0]], configs[sprockets[0]], chain_mounts
+                )
+            ):
                 chain_mesh_contacts.append(volume_mm3)
                 continue
             _telemetry.event(
@@ -2585,6 +2676,54 @@ def _run_solved_gates(
             )
 
 
+class _DisplayDataMarkOutcome(StrEnum):
+    MARKED = "marked"
+    NOT_APPLICABLE = "single_configuration"
+    FAILED = "failed"
+
+
+def _mark_assembly_display_data(adapter: Any, model: Any, asm_name: str) -> None:
+    """Request saved display data in every existing multi-config assembly pose.
+
+    IConfiguration.LargeDesignReviewMark is valid only with multiple
+    configurations. It stores a save request, not a geometry change; do not
+    activate configurations or rebuild while marking them.
+    """
+    with _telemetry.span(
+        "assembly.mark_all_configuration_display_data", asm=asm_name
+    ) as sp:
+        sp.set_attribute("outcome", _DisplayDataMarkOutcome.FAILED.value)
+        model = _early_bound(model, "IModelDoc2")
+        names = [str(name) for name in (model.GetConfigurationNames() or ())]
+        sp.set_attribute("configuration_count", len(names))
+        sp.set_attribute("configuration_names", names)
+        rest = active_configuration_name(adapter, model)
+        if not names or rest not in names:
+            raise RuntimeError(f"{asm_name}: active configuration {rest!r} not in {names}")
+        if len(names) == 1:
+            sp.set_attribute("outcome", _DisplayDataMarkOutcome.NOT_APPLICABLE.value)
+            return
+        for name in names:
+            configuration = _early_bound(
+                model.GetConfigurationByName(name), "IConfiguration"
+            )
+            if configuration is None:
+                raise RuntimeError(
+                    f"{asm_name}: display-data configuration {name!r} is unavailable"
+                )
+            if configuration.LargeDesignReviewMark is not True:
+                configuration.LargeDesignReviewMark = True
+                if configuration.LargeDesignReviewMark is not True:
+                    raise RuntimeError(
+                        f"{asm_name}: {name!r} display-data mark did not set"
+                    )
+        if active_configuration_name(adapter, model) != rest:
+            raise RuntimeError(
+                f"{asm_name}: display-data marking changed active configuration {rest!r}"
+            )
+        sp.set_attribute("outcome", _DisplayDataMarkOutcome.MARKED.value)
+
+
 @_telemetry.traced("assembly.save_copy")
 def _save_new_assembly_as_copy(adapter: Any, asm_path: Any) -> None:
     """Save a freshly built assembly without rewriting referenced artifacts.
@@ -2606,6 +2745,7 @@ def _save_new_assembly_as_copy(adapter: Any, asm_path: Any) -> None:
     _ensure_assembly_title(adapter, asm_path.stem)
     options = 1 | 2 | 8
     model = adapter.currentModel
+    _mark_assembly_display_data(adapter, model, asm_path.stem)
     if asm_path.exists():
         adapter._attempt(lambda: adapter.swApp.CloseDoc(str(asm_path)), default=None)
         asm_path.unlink()
@@ -2704,12 +2844,38 @@ def final_rebuild_before_save(adapter: Any, label: str, model: Any = None) -> No
         _telemetry.success(f"final rebuild clean before save ({label})")
 
 
+def _save_native_assembly(
+    adapter: Any, model: Any, asm_name: str, options: int
+) -> tuple[bool, int, int]:
+    """Consume makepy's Save3 retval/errors/warnings, never a truthy failure tuple."""
+    _mark_assembly_display_data(adapter, model, asm_name)
+    result = adapter._attempt(lambda: model.Save3(options, 0, 0), default=None)
+    if (
+        not isinstance(result, tuple)
+        or len(result) != 3
+        or not isinstance(result[0], bool)
+        or not isinstance(result[1], int)
+        or not isinstance(result[2], int)
+    ):
+        raise RuntimeError(f"{asm_name}: Save3 returned invalid native result {result!r}")
+    ok, errors, warnings = result
+    _telemetry.info(
+        f"{asm_name}: Save3({options}) ok={ok}, errors={errors}, warnings={warnings}"
+    )
+    if not ok or errors:
+        raise RuntimeError(
+            f"{asm_name}: Save3 failed: ok={ok}, errors={errors}, warnings={warnings}"
+        )
+    return ok, errors, warnings
+
+
 async def reconcile_saved_rebuild_state(
     adapter: Any, asm_name: str, asm_path: Any
 ) -> None:
-    """Reopen a just-saved assembly and, if it loads needing a rebuild, rebuild
-    each configuration + in-place Save3 so the persisted artifact reopens clean
-    (issue #267), then reopen it again and prove it.
+    """Prove saved rebuild state and part display flags without writing children.
+
+    Clean, complete artifacts remain byte-identical. Display data is requested
+    before native serialization; supported zero flags fail the saved-data gate.
 
     Root cause (proven by ``diagnostics/probe_rebuild_matrix.py`` /
     ``probe_child_dirty.py``): ``final_rebuild_before_save`` and the deep health
@@ -2738,6 +2904,7 @@ async def reconcile_saved_rebuild_state(
     must read clean, so an artifact that would fail it is never cached; a dirty
     reopen raises naming each configuration's saved state.
     """
+    assert_saved_display_data(asm_path)
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     with _telemetry.span("assembly.reconcile_rebuild", asm=asm_name) as sp:
         await adapter.open_model(str(asm_path))
@@ -2746,10 +2913,11 @@ async def reconcile_saved_rebuild_state(
         sp.set_attribute("needs_rebuild_on_open", status)
         if status == 0:
             _telemetry.success(
-                f"saved artifact already clean, no reconcile ({asm_name})"
+                f"saved artifact already clean and display-complete, no reconcile ({asm_name})"
             )
             return
         rest = active_configuration_name(adapter, model)
+        _invalidate_massprops_proof(_massprops_sidecar(asm_name))
         names = [str(name) for name in (model.GetConfigurationNames() or ())]
         if rest not in names:
             raise RuntimeError(f"{asm_name}: active configuration {rest!r} not in {names}")
@@ -2767,9 +2935,7 @@ async def reconcile_saved_rebuild_state(
             configuration.AddRebuildSaveMark = True
             if not bool(configuration.AddRebuildSaveMark):
                 raise RuntimeError(f"{asm_name}: {name!r} rebuild-save mark did not set")
-        result = adapter._attempt(
-            lambda: model.Save3(1, 0, 0), default=None
-        )  # Silent, in place
+        result = _save_native_assembly(adapter, model, asm_name, 1)
         in_mem = saved_rebuild_status(adapter, model)
         if in_mem != 0:
             raise RuntimeError(
@@ -2778,8 +2944,10 @@ async def reconcile_saved_rebuild_state(
             )
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
         await adapter.open_model(str(asm_path))
-        reopened = _early_bound(adapter.currentModel, "IModelDoc2")
-        status_on_reopen = saved_rebuild_status(adapter, reopened)
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        if active_configuration_name(adapter, model) != rest:
+            raise RuntimeError(f"{asm_name}: reconciled saved active configuration changed from {rest!r}")
+        status_on_reopen = saved_rebuild_status(adapter, model)
         sp.set_attribute("needs_rebuild_on_reopen", status_on_reopen)
         if status_on_reopen != 0:
             states = "; ".join(
@@ -2787,16 +2955,16 @@ async def reconcile_saved_rebuild_state(
                 f"AddRebuildSaveMark={bool(configuration.AddRebuildSaveMark)}"
                 for name in names
                 for configuration in [
-                    _early_bound(reopened.GetConfigurationByName(name), "IConfiguration")
+                    _early_bound(model.GetConfigurationByName(name), "IConfiguration")
                 ]
             )
             raise RuntimeError(
                 f"{asm_name}: reconciled .SLDASM still opens with "
                 f"NeedsRebuild2={status_on_reopen} ({states})"
             )
+        assert_saved_display_data(asm_path)
         _telemetry.success(
-            f"reconciled saved rebuild state ({asm_name}, was {status}, "
-            f"{len(names)} configuration(s), reopens clean)"
+            f"saved rebuild state and display data complete ({asm_name}, was {status})"
         )
 
 
@@ -3163,8 +3331,9 @@ def save_assembly_in_place(
         blocking parameterless ``Save()`` "Component documents must be saved"
         modal.
 
-    Passing the two [out] params as real pywin32 BYREF VARIANTs makes ``Save3``
-    write silently and return the error/warning codes. The option mask is
+    The early-bound makepy call returns ``(retval, errors, warnings)``; passing
+    literal zero for the two [out] slots avoids unwritten BYREF VARIANTs.
+    The option mask is
     ``swSaveAsOptions_Silent (1) | swSaveAsOptions_AvoidRebuildOnSave (8)`` -- the
     canonical bitmask, NOT ``SaveReferenced`` (which is **4**, long mislabeled as 8
     here and in the MCP adapter's ``io.py``): ``Silent`` suppresses the save
@@ -3194,6 +3363,7 @@ def save_assembly_in_place(
     must_save = geometry_changed or identity_changed or title_changed
     sldasm = OUT_SLDASM / f"{asm_name}.SLDASM"
     if not must_save:
+        assert_saved_display_data(sldasm)
         # No-op refresh: resolved geometry, Number, Revision and Title are identical to
         # the last save. Do NOT rewrite -- a fresh md5 would invalidate the parent.
         log(
@@ -3202,6 +3372,7 @@ def save_assembly_in_place(
         )
         return False
 
+    assert_saved_display_data(sldasm)
     # This is the shared last-mile chokepoint for refreshes, config hooks, and
     # verify --auto-repair. The caller may already have deep-rebuilt and then run
     # read-only gates; trust that resolved state while NeedsRebuild2 stays clean,
@@ -3212,14 +3383,10 @@ def save_assembly_in_place(
         log(f"{sldasm.name} reported clean -- forcing rewrite for md5 propagation")
         adapter._attempt(lambda: asm.SetSaveFlag(), default=None)
 
+    _invalidate_massprops_proof(_massprops_sidecar(asm_name))
     before = sldasm.stat().st_mtime
     options = 1 | 8  # swSaveAsOptions_Silent | swSaveAsOptions_AvoidRebuildOnSave
-    # Early-bound IModelDoc2::Save3 returns its two [out] codes in the tuple
-    # (retval, errors, warnings) -- pass literal 0 for the [out] slots and consume
-    # the tuple (mirrors io.py's in-place Save3). The byref-VARIANT idiom leaves
-    # err/warn unwritten and makes `ret` a truthy tuple under InvokeTypes.
-    result = adapter._attempt(lambda: asm.Save3(options, 0, 0), default=None)
-    ret, err, warn = result if result else (False, None, None)
+    ret, err, warn = _save_native_assembly(adapter, asm, asm_name, options)
 
     after = sldasm.stat().st_mtime
     if after <= before:
@@ -3227,6 +3394,7 @@ def save_assembly_in_place(
             f"{sldasm.name} mtime unchanged after Save3(Silent) "
             f"(ret={ret}, err={err}, warn={warn})"
         )
+    assert_saved_display_data(sldasm)
     log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err}, warn={warn})")
     return True
 
@@ -3271,6 +3439,8 @@ async def refresh_assembly(
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
     if not asm_path.exists():
         raise RuntimeError(f"missing assembly {asm_path}; build it from scratch first")
+    # Refuse incomplete, unknown or damaged persisted data before any native write.
+    assert_saved_display_data(asm_path)
     with _telemetry.span("open", asm=asm_name):
         check(f"open {asm_name}", await adapter.open_model(str(asm_path)))
         opened_rebuild_status = saved_rebuild_status(adapter)

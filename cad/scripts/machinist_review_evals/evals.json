@@ -2817,9 +2817,10 @@
     {
       "id": 40,
       "name": "ha-measuring-stick-rules",
-      "package": "ha_measuring_stick",
+      "package": "ms_stick",
       "kind": "part",
       "release": "v40",
+      "release_pdf": "ha-measuring-stick.pdf",
       "prompt": "Blind machinist review of the ha-measuring-stick part package.",
       "expected_output": "Rule-coverage case (rules 13, 15): reports each negative finding in the stated category and raises no positive-case item.",
       "expectations": [

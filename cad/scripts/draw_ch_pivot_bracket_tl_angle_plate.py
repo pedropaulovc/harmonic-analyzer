@@ -48,6 +48,11 @@ from _hole_spec import blind_cut_dia_mm, drill_process
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+import ch_pivot_bracket_tl_angle_plate_spec as part_spec
+from _feature_requirements import part_metadata, requirement
+from _printed_limits import limits
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from ch_pivot_bracket_tl_angle_plate_spec import (
     BASE_THICK,
     DRAWING_DIMENSIONS,
@@ -135,6 +140,48 @@ SIDE_KEEP = {
     "BaseThick": (_side_x(PLATE_WIDTH) + 0.010, _side_y(BASE_THICK / 2.0)),
     "UprightThick": (_side_x(UPRIGHT_THICK / 2.0), _side_y(PLATE_HEIGHT) + 0.010),
 }
+
+
+_INTO_PLATE = ([0.0, 0.0, -1.0], ("__frame__",))
+
+
+part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME", "TAP_DRILL_PLACES", "STUD_DIA_PLACES"))
+
+requirement("seat_face",
+    kind="face",
+    faces=(PlanarFace((0.0, 0.0, 1.0), 0.0),),
+    requirements=(),
+    fields={
+        "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
+        # Where the bracket's seat face lies on it: the foot's width about
+        # the centre, from the ledge top to the plate's top edge.
+        "bounds": (
+            {
+                "x": [part_spec.CENTRE_X - part_spec.bracket.FOOT_W / 2.0, part_spec.CENTRE_X + part_spec.bracket.FOOT_W / 2.0],
+                "y": [part_spec.LEDGE_TOP_Y, part_spec.PLATE_HEIGHT],
+            },
+            (
+                "CENTRE_X",
+                "LEDGE_TOP_Y",
+                "PLATE_HEIGHT",
+                ("ch_pivot_bracket_spec", "FOOT_W"),
+                ("ch_pivot_bracket_sides", "FOOT_LEN"),
+            ),
+        ),
+    },
+)
+
+requirement("table_face",
+    kind="face",
+    faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
+    requirements=(),
+    fields={
+        "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
+    },
+)
+
 # Each pair stands on the one row height the part prints; reference sizes
 # take ASME parentheses (inside the pair count on the tap row).
 DIMENSION_TEXT = {
@@ -146,6 +193,56 @@ DIMENSION_TEXT = {
 TAP_CALLOUT_XY = (0.100, 0.230)
 STUD_CALLOUT_XY = (0.170, 0.250)
 STUD_CALLOUT_PROCESS = f"LETTER {drill_process(STUD_SPEC)}"
+
+
+for _side, _x in (("left", part_spec.TAP_X[0]), ("right", part_spec.TAP_X[1])):
+    requirement(f"ledge_tap_{_side}",
+        kind="hole",
+        faces=(CylinderFace(part_spec._TAP_DRILL, contains_x_mm=_x),),
+        requirements=("thread", "note", "dia"),
+        fields={
+            "at": ([_x, part_spec.SCREW_Y, 0.0], ("TAP_X", "SCREW_Y")),
+            "axis": _INTO_PLATE,
+            "thread": (f"{part_spec.SCREW_THREAD} UNC-{part_spec.TAP_SPEC.thread_class}", ("TAP_SPEC", "SCREW_THREAD")),
+            "tap_drill_mm": (part_spec._TAP_DRILL, ("TAP_SPEC",)),
+            "dia": (
+                limits(part_spec.TAP_DRILL_PRINTED, part_spec.TAP_DRILL_PLACES, part_spec._DRILLED),
+                ("TAP_SPEC", "TAP_DRILL_PRINTED", "TAP_DRILL_PLACES"),
+            ),
+            "nominal_dia": (part_spec.TAP_DRILL_PRINTED, ("TAP_DRILL_PRINTED",)),
+            "thru": (True, ("TAP_SPEC",)),
+            "station_nominal": (_x, ("TAP_X",)),
+            "height_nominal": (part_spec.SCREW_Y, ("SCREW_Y",)),
+            "height_from": ("table_face", (("draw_ch_pivot_bracket_tl_angle_plate", "build"),)),
+            "note": (part_spec.TAP_SPOT_NOTE, ("DRAWING_NOTES", "TAP_SPOT_NOTE", "LEDGE_CLEARANCE_SPEC")),
+        },
+        precision={"dia": part_spec.TAP_DRILL_PLACES},
+    )
+
+for _side, _x in (("left", part_spec.STUD_X[0]), ("right", part_spec.STUD_X[1])):
+    requirement(f"stud_hole_{_side}",
+        kind="hole",
+        faces=(CylinderFace(part_spec._STUD_DRILL, contains_x_mm=_x),),
+        requirements=("dia", "station", "height"),
+        fields={
+            "at": ([_x, part_spec.STUD_Y, 0.0], ("STUD_X", "STUD_Y")),
+            "axis": _INTO_PLATE,
+            "drill": (part_spec.STUD_SPEC.size, ("STUD_SPEC",)),
+            "dia": (
+                limits(part_spec.STUD_DIA_PRINTED, part_spec.STUD_DIA_PLACES, part_spec._DRILLED),
+                ("STUD_SPEC", "STUD_DIA_PRINTED", "STUD_DIA_PLACES"),
+            ),
+            "nominal_dia": (part_spec.STUD_DIA_PRINTED, ("STUD_DIA_PRINTED",)),
+            "thru": (True, ("STUD_SPEC",)),
+            "station": (part_spec._station(_x), ("STUD_X", "STATION_PLACES")),
+            "station_nominal": (_x, ("STUD_X",)),
+            "height": (part_spec._station(part_spec.STUD_Y), ("STUD_Y", "STATION_PLACES")),
+            "height_nominal": (part_spec.STUD_Y, ("STUD_Y",)),
+            "height_from": ("table_face", (("draw_ch_pivot_bracket_tl_angle_plate", "build"),)),
+        },
+        precision={"dia": part_spec.STUD_DIA_PLACES, "station": part_spec.STATION_PLACES, "height": part_spec.STATION_PLACES},
+    )
+
 
 
 def _set_dimension_text(

@@ -91,7 +91,7 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_arc(R, 0.0, R, R, 0.0, 0.0),
     )
     set_sketch_direct_db(adapter, False)
-    # Same scheme as build_mg_magnifying_lever: origin corner + dome centres
+    # Capsule profile: origin corner + dome centres
     # anchored, one radial dim (the left dome's radius is forced by its
     # anchored centre + the anchored origin end), top edge horizontal and
     # aligned over the left centre; merged centerline unconstrained.

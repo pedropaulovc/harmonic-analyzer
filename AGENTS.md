@@ -132,6 +132,14 @@ git submodule update --init --recursive
    SolidWorks, which takes the licence farm worker w15 shares. A bare `pytest` or
    `pytest .` at the root skips it (`testpaths`/`norecursedirs` in
    `pyproject.toml`); run it on a farm worker or in its own CI.
+4. Ground recipe calls in the vendored `PyWin32Adapter` implementation, including
+   its inherited mixins and delegated helpers; never infer an adapter method name
+   from a SolidWorks operation. Check that every changed call exists and binds
+   with a cheap source-only AST census against the SDK, without importing
+   recipes or constructing an adapter. The knob-shaft and
+   feed-pinion census is `cad/scripts/test_pd_transgear_adapter_contract.py`;
+   it checks every direct `adapter.<method>(...)` call, not an API allowlist.
+   Offline contracts do not replace final-source native geometry/readback proof.
 
 ## Minimum merge gate (every PR)
 
@@ -150,11 +158,18 @@ not mergeable until ALL THREE hold — no partial credit:
    read; move the camera off the standard axes when needed). The CAD gates
    prove volumes and mates, not that the geometry LOOKS like the machine —
    a shape can pass every check and still be visibly wrong.
-   **Drawing sheets:** where a cross-family machinist review
-   (`cad/scripts/machinist_review.py`) runs on a sheet's exact version, that
-   review is its visual check, and a separate eye pass over the sheet is not
-   required. Eye-pass a drawing only when no machinist review covers the
-   version being merged.
+   **Drawing sheets need a machinist review; an eye pass does not count.**
+   Every drawing sheet whose rendered output the PR changes — because the PR
+   edits its drawing script or spec, or because it changes CAD geometry,
+   config or a helper the sheet depends on — needs a
+   `cad/scripts/machinist_review.py` verdict on the exact version being
+   merged (reviewer rules: `cad/docs/drawing-simplicity-policy.md`,
+   "The gate"). A sheet whose drawing script or spec the PR edits must reach
+   `SHIP` (or `FIX` whose only gating findings are blockers matching a named
+   exception, cited in the PR). A sheet changed only indirectly passes when
+   its review adds no gating finding beyond a baseline review of `main`'s
+   version of that sheet run with the same reviewer, model, effort and prompt;
+   post both verdicts and the finding diff on the PR.
 
 **Stacked PRs share gates 1 and 3.** A successful build at the TOP of a stack
 covers every PR in that stack, and so does the visual inspection of the renders
@@ -256,13 +271,31 @@ such build:
   attaching with `USE_EXISTING` retains that creator's label and `farm_run`,
   rather than transferring ownership to the attaching session. The label does
   not change the leaf request, workflow ID or cache key.
-- Task names use prefixed underscores (`part:pn_pen_rod`). An unknown or dashed target is
-  refused with doit's invalid-command exit 3, naming the target, before any
-  fleet query or workflow submission; a failed farm preflight exits 2. Neither
-  runs an action.
+- Task names use prefixed underscores (`part:pn_pen_rod`). An unknown or dashed
+  target is refused with doit's invalid-command exit 3, naming the target,
+  before any fleet query or workflow submission; a failed farm preflight
+  exits 2. Neither runs an action.
   Farm preflight also runs the same `check:undefined_names` Ruff scan before
   querying the fleet, so an undefined CAD/build-script name cannot dispatch a
   COM leaf even when the stamped checks would run later in the doit graph.
+  It also checks every would-be leaf in the entire requested closure with
+  `-PoolHome`'s authoritative `agent.protocol.leaf_admitted`, naming refused
+  tasks/prefixes before FIFO registration (exit 2). The selected pool admission
+  rule must match the deployed fleet identity: PoolHome's full `agent_identity`
+  is normalized by the pool's own `agent_identity_tag` and compared with
+  reported worker `agent_version` tags. Mixed, missing or mismatching tags exit
+  2; check out the deployed pool release at PoolHome, or finish the rollout.
+  This deliberately over-refuses for doit `-s`/`--single` and cache hits: the
+  entire requested closure is prechecked, even if some leaves would not run.
+  After successful preflight, the parent exports the admitted label set as
+  `HARMONIC_FARM_ADMITTED_LEAVES` only while executing the doit command in its
+  producer context, then restores the previous value; workers inherit it.
+  Actual `run_leaf(task, cache_key)` dispatch checks that set before any
+  request, span/config/identity lookup or reservation. A missing or invalid set,
+  or a task absent from it, raises a local `RuntimeError` naming the task and
+  its lack of preflight admission; never copy a prefix list into this guard.
+  Independently, the worker's exported graph is limited to the build/release
+  closure. Preflight admission does not enforce that worker restriction.
 - The build runs from a private snapshot of the pushed HEAD under
   `-LogDirectory` (which must sit outside every Git worktree). The default root
   is `$env:HARMONIC_AGENT_SCRATCHPAD` when set; otherwise, an OMP persistent
@@ -306,31 +339,53 @@ such build:
 | `part:<stem>`, `assembly:<stem>`, `drawing:<stem>` | yes | yes | yes |
 | `verify_soundness:<stem>`, `verify:kinematics` | yes | yes | yes |
 | `preflight`, `export`, `package:release` | yes | yes | yes |
-| `package:features` (isolated STEP/requirements bundles) | yes | yes | yes |
+| `package:features:<stem>` (one isolated STEP/requirements bundle) | yes | yes | yes |
+| `package:features` | no (aggregator) | no | — (its leaves are) |
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
 | `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
-| `check:traveler_ch_rocker_arm`, `check:traveler_ch_pivot_shaft`, `check:traveler_dt_cone_pivot_post` | **no** | no (parallel; needs exported manifest + STEP) | no |
-| `check:features_bound` | **no** | no (release only; compares scoped/full STEP face labels and patch counts) | no |
+| `prechips:<stem>` (enrolled process travelers) | **no** (FreeCAD 1.1) | no (parallel; needs scoped manifest + STEP) | no (submitter-only) |
+| `check:features_bound` | **no** | no (release only; validates scoped face refs and identical full STEP copy) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (submitter-only; no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
 | `build` (default), `build_bare`, `release` | meta | — | no (`release` publishes) |
 
-`package:features` builds only `ch_rocker_arm`, `ch_pivot_shaft`,
-`dt_cone_pivot_post` and the shop fixtures in `export_features.SPEC_DRIVEN_PARTS`
-(`SUPPORTED_PARTS` is the whole list) and writes
-`cad/out/features/<stem>/{<dashed-stem>.STEP,features.toml}`. The manifest's
+`package:features:<stem>` exports each part whose `draw_<stem>.py` has module-level
+`_feature_requirements.requirement(...)` declarations beside its printed drawing
+requirements. `export_features.SUPPORTED_PARTS` is derived by import-free AST
+discovery, not a maintained part list. Source-path construction is also static:
+neither operation imports draw modules during graph loading. Each leaf includes its own **entire draw-module
+closure**, cited-module/config inputs and native part identity. A draw-only edit
+does not re-key other feature leaves or native part/assembly builds; shared
+`_drawing_common`, layout-audit, `_pdf_ink` or drawing-helper edits re-key all 18
+feature leaves. `Requirement` returns are registry descriptors for inspection
+or explicit consumption, not automatic print-path wiring: the rocker consumes
+datum/rod-FCF fields and checks four imported native precisions against them.
+Feature precision requires explicit `part_metadata.precision_sources`; printed
+literals cite their actual notes or drawing function authority, not unrelated
+numeric symbols. Retained non-printed process values cite their route or native
+authority without claiming new sheet text.
+`package:features` is a seat-free aggregator over all those COM leaves. Each
+leaf writes `cad/out/features/<stem>/{<dashed-stem>.STEP,features.toml}` and uses
+`uptodate: [False]` to reach the cache probe even with existing local targets.
+Python citations resolve current declaration/call-site AST spans; YAML citations
+resolve scalar key paths. Missing cited symbols fail loudly. The manifest's
 `step_sha256` binds the raw adjacent STEP; this self-contained bundle is the
-consumer artefact. Full `export` is independent; neither producer overwrites
-the other's paths. The release-only `check:features_bound` compares the two
-sessions' face-label sets and patch counts per label, requires two rocker
-pivot-bore patches and reports both digests. It does not require byte equality:
-SolidWorks timestamps headers and renumbers entities. Release staging copies the
-verified scoped bundles under `features/`. The three build/release
-traveler checks use pinned prechips and `cad/process/`: exit 3 (bad input) fails;
-exit 2 (machining blockers) logs every `✗` as **warn** and passes; exit 4
-(required unknown) and 0 pass. This is not machining approval. See [feature
-exports and travelers](cad/docs/pipeline/features-travelers.md).
+consumer artefact. Full `export` waits for the bundles and copies their exact
+STEP bytes into its separate neutral inventory; it consumes bundle outputs,
+not draw closures directly. The release-only `check:features_bound` validates
+scoped recorded face refs, requires two rocker pivot-bore patches and identical
+scoped/full STEP bytes, and reports both digests. Release staging copies the
+verified scoped bundles under `features/`. Each enrolled `prechips:<stem>` task
+depends only on its own `package:features:<stem>` leaf, not `package:features`, and uses
+pinned prechips 0.1 and `cad/process/` with a strict **exit 0 only** policy:
+bad input, machining blockers and required unknowns all fail without a stamp.
+Build and release include every stem in `_process_plans.TRAVELER_STEMS`.
+Enrollment is currently empty: the tracked legacy plans remain as provenance,
+not runnable 0.1 plans or machining approval. A part enrolls only after a migrated
+plan reaches exit 0 on real exported geometry. Releases ship verified travelers
+under `travelers/<stem>/` and list them in the notes. See [feature exports and
+travelers](cad/docs/pipeline/features-travelers.md).
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
   (`verify.py` has no `--suite all` anymore — `build` replaced it.) It offers the
@@ -350,12 +405,14 @@ exports and travelers](cad/docs/pipeline/features-travelers.md).
   explicit tag/options after `--` (for example, `doit release -- v22 --draft`).
   Its COM half is the separate `package:release` leaf. The release action and
   publisher run on the submitter, precompute README images before the tag, and
-  install them with the `next_revision` bump only after publication succeeds.
+  install them with the `next_revision` and enrolled plan revision bumps only
+  after publication succeeds.
 - The release follow-up PR is exempt from the three merge gates ONLY if its
-  entire diff is the `cad/config/release.yaml` `next_revision` bump plus the
-  generated README image files. It may merge immediately. Code, prose, docs,
-  README markup/layout or any other change stays in an ordinary PR and MUST pass
-  every gate.
+  entire diff is the `cad/config/release.yaml` `next_revision` bump, the matching
+  `[drawing].revision` literal lines in enrolled `cad/process/<stem>/plan.toml`
+  files, and generated README image files. It may merge immediately. Other plan
+  or shop changes, code, prose, docs, README markup/layout or any other change
+  stays in an ordinary PR and MUST pass every gate.
 - For a supervised farm release, launch only
   `-Targets "build,export,package:release,preflight"` through
   `scripts/farm-run.ps1` (`build` supplies drawing and check gates). On recorded
@@ -366,9 +423,53 @@ exports and travelers](cad/docs/pipeline/features-travelers.md).
   redispatch. See
   [`DEVELOPING.md`](DEVELOPING.md#supervised-farm-releases).
 - The tracked `cad/config/release.yaml` value is the Revision on every
-  `.SLDPRT`, `.SLDASM`, and linked drawing title block. The publisher advances
-  `next_revision` after a successful publish; the release agent MUST merge that
-  generated-only follow-up before the next release.
+  `.SLDPRT`, `.SLDASM`, and linked drawing title block. Every enrolled process
+  plan's tracked `[drawing].revision` literal must match it. The publisher stages
+  all revision updates before publishing and advances them together afterward;
+  the release agent MUST merge that generated-only follow-up before the next
+  release. `--no-publish` leaves all tracked revisions and images byte-identical.
+
+### Release notes
+
+Every release MUST describe what changed since the previous published release.
+Use [v37's release notes](https://github.com/pedropaulovc/harmonic-analyzer/releases/tag/v37)
+as the editorial pattern:
+
+- Open with a short account of the main changes and their effect on someone
+  making, assembling or using the machine.
+- Group descriptions by subsystem, with smaller headings where useful. Link
+  the relevant PRs or issues and explain the actual geometry, drawing, fit-up,
+  manufacturing or user-visible change. A commit-title dump is not sufficient.
+- Follow the section order where applicable: subsystems, cross-part drawings,
+  build and checks, known issues, decisions that shape this release, also in
+  this release, then the bundle appendix.
+- Recheck prior limitations and issues opened or closed since the previous
+  release against the source being released. Carry forward limitations that
+  still apply; remove those fixed in that commit. An issue closed after the
+  release commit does not prove that its fix shipped.
+
+Draft while the build runs, before publication, from
+`<previous published tag>..<release source commit>`, including merged PRs and
+direct commits. Check dimensions against that commit's CAD configuration.
+Run the humanizer skill on the authored prose, preserving numbers, part IDs,
+units, quoted drawing callouts and links.
+
+After successful publication (including a requested draft release), fetch the
+generated Markdown body with `gh release view vNN --json body --jq .body`.
+Append that Markdown verbatim after one `## Bundle` heading beneath the authored
+descriptions. Preserve its counts, size, changed-parts list, heading levels,
+diff images, asset URLs, provenance and logs. When correcting a release that
+already has authored notes, preserve everything below its existing `## Bundle`
+heading verbatim and replace only the authored prose. Write the complete notes
+to a host-visible file and install them immediately
+with `gh release edit vNN --notes-file <file>`. Read back the body, verify the
+authored descriptions and unchanged appendix, and confirm the tag pins the
+intended source commit before reporting completion.
+
+On `--no-publish` or a failed publish, retain the draft without editing GitHub.
+If the notes update fails after publication, retry only the notes edit. Do not
+rerun the publisher, retag, rebuild or re-upload unchanged artifacts to correct
+prose.
 
 ## `.farm-sources.json` — submodules the farm does not acquire
 
@@ -817,7 +918,8 @@ come from the model/spec, not separate text renderers.
 **Per-assembly contracts — `cad/config/assemblies/<dashed-stem>.yaml`.** Data
 that belongs to ONE assembly (its learned `flip_invert` seeds and its free-DOF
 contract: `free_dof`/`free_dof_per_active_channel`, `required_free_stems`,
-`allowed_free_stems`) lives in its own file, read through
+`allowed_free_stems`; and `carries_chain`, which hands the soundness
+interference gate the chain's wheel mounts) lives in its own file, read through
 `_assembly_contract.py` — never as a stem-keyed table in `_assembly.py` (on every
 assembly's recipe: one drive-train seed there used to re-key all eight
 assemblies and every gate behind them) or `verify.py` (on every soundness
@@ -842,14 +944,17 @@ the modules that tier's build scripts never call:
 
 - **drawing tasks fold the WHOLE tree** (`_submodule_digest` — the only tier with
   `drawing.py`);
-- **assemblies fold the tree MINUS `drawing.py`** (`_submodule_assembly_digest` — see
-  `_ASSEMBLY_DIGEST_EXCLUDE_FILES`);
+- **assemblies, `package:features:<stem>` and full `export` fold the tree MINUS `drawing.py`**
+  (`_submodule_assembly_digest` — see `_ASSEMBLY_DIGEST_EXCLUDE_FILES`);
 - **parts fold the tree MINUS `{assembly.py, motion.py, drawing.py}`**
   (`_submodule_part_digest` — see `_PART_DIGEST_EXCLUDE_FILES`).
 
-Net: a bump touching only `assembly.py`/`motion.py` rebuilds the ~8 assemblies but
-leaves all ~100 parts cached; a bump touching only `drawing.py` rebuilds just the (few)
-drawing tasks, not the parts or assemblies. The three sidecars are distinct files
+Net: a bump touching only `assembly.py`/`motion.py` changes assembly/export-tier
+keys but leaves all ~100 part keys cached; a bump touching only submodule
+`drawing.py` changes drawing-task keys, not part, assembly or export keys.
+This does not narrow the feature leaves' main-repo draw-module closures:
+shared local drawing-helper edits still re-key all feature leaves.
+The three sidecars are distinct files
 (`.solidworks-mcp-submodule.digest` / `-assembly.digest` / `-part.digest`).
 
 Each exclusion is SAFE because the dropped module is never **CALLED** by that tier's
@@ -862,6 +967,9 @@ build scripts:
   module-level `IDrawingDoc` helpers), so nothing in a part OR assembly build graph
   imports it; only a `draw_*` drawing script does. Hence it drops from both the part and
   assembly digests (matching `drawing.py`'s own docstring).
+  Feature naming and `SaveAs3` export do not call `IDrawingDoc` helpers, so scoped
+  feature and full neutral exports use the assembly tier too, even though static
+  feature source keys conservatively include main-repo draw-module closures.
 
 `check:partiso` (`test_part_isolation.py`) ENFORCES both directions loud: it derives its
 forbidden sets straight from `dodo._PART_DIGEST_EXCLUDE_FILES` /

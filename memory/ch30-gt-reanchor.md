@@ -33,7 +33,7 @@ bit-exact — the −6.92° is the pin AZIMUTH, arm tilt is −7.82°; downstrea
   Corridor math then forced the real anatomy: stub boss (−123) → 64T south face is
   ~49 deep and a Ø46.2 column fills it with ~2 air each side, with the swing journal
   **nested inside** (Ø26 bottom-entry cavity + Ø24 cylindrical block + straight wall
-  windows for the 12.52° shaft — a slab + side-by-side block never fit, which is
+  windows for the inclined shaft — a slab + side-by-side block never fit, which is
   what pushed the slab off the base). Lessons: (1) a shape read from an occluded
   view must be cross-checked against the views that actually see the part; (2) when
   a placement only "fits" by leaving the base, treat that as a wrong-anatomy signal,
@@ -75,10 +75,10 @@ bit-exact — the −6.92° is the pin AZIMUTH, arm tilt is −7.82°; downstrea
   because the doit stamp was already green. Fixed on this branch (`sketch''s`).
 - **A part restored from git history re-inherits its era's defaults**: ch25's
   `build_alignment_pinion.py` called `build_fixed_gear` without `dp=`, silently
-  taking the DP 30 default from BEFORE the OD-62.2 rescale (train is DP 49.82
-  now) — teeth ~66% oversized, drum buried 5.4 mm into all 20 cylinder gears,
-  caught only by the assembly interference gate (config + assembly math already
-  said 49.82). When resurrecting a script, diff its numeric anchors against the
+  taking the DP 30 default from BEFORE the OD-62.2 rescale (the train was DP 49.82
+  then; it is 48DP PA20 now) — teeth ~66% oversized, drum buried 5.4 mm into all
+  20 cylinder gears, caught only by the assembly interference gate (config +
+  assembly math already said 49.82). When resurrecting a script, diff its numeric anchors against the
   CURRENT config-derived values, not just its own asserts.
 - The teammate-authored `build_pinion_bracket.py` hit the arc-centre
   equation-rejection pitfall (bisect + fix: see

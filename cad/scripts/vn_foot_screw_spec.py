@@ -1,11 +1,9 @@
-r"""Stock foot screw (McMaster 90280A108) nominals.
+r"""Pure stock foot-screw dimensions (McMaster 90280A108).
 
-PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure: the numbers other parts and assemblies read. The dims are the
-90280A108 dimensions from the per-SKU vendor source
-(``_mcmaster_90280a108.py``, SolidWorks-free at import).
-Consumers read them here, not from ``build_vn_foot_screw``, whose stock build
-recipe would otherwise ride their cache keys (#880).
+The dims are the 90280A108 row of the per-SKU vendor source
+(``_mcmaster_90280a108.py``, SolidWorks-free at import), the same row the
+swing-stop spec and the native fillister recipe read. These are
+supplier-model nominals, not inferred supplied tolerance limits.
 """
 
 from __future__ import annotations

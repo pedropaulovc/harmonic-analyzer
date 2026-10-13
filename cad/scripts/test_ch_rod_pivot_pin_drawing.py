@@ -150,7 +150,7 @@ def test_notes_state_blank_press_flush_ends_and_running_fit() -> None:
         "4. RUNS FREE IN THE MHA-CH-006 #47 ROD HOLE.",
     ]
     text = notes.DRAWING_NOTES
-    # Rules 2 and 6 (PR #1292 review N1): the blank's size and band are the
+    # drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (PR #1292 review N1): the blank's size and band are the
     # BlankLen model dimension's, so no limit may ride the note text.
     for limit in (
         f"{spec.PIN_BLANK_LENGTH:.2f}",

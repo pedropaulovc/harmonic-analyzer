@@ -41,7 +41,12 @@ import _session
 import _sketch
 import _sketch_rectangle
 
-CONE_FAULTS = (("ToothGapCut", 1, False), ("ToothGapPattern", 1, False))
+def cone_faults(configuration: str) -> tuple[tuple[str, int, bool], ...]:
+    """Current native row names, unlike the historical incident names above."""
+    return (
+        (f"ToothGapCut{configuration}", 1, False),
+        (f"ToothGapPattern{configuration}", 1, False),
+    )
 
 
 class _Config:
@@ -74,7 +79,7 @@ class _Extension:
     def GetWhatsWrong(self):  # noqa: N802
         faults = self.part.faults
         if self.part.active in self.part.bad:
-            faults = (*faults, *CONE_FAULTS)
+            faults = (*faults, *cone_faults(self.part.active))
         names, codes, warnings = zip(*faults) if faults else ((), (), ())
         return True, [_Feature(name) for name in names], list(codes), list(warnings)
 
@@ -292,8 +297,8 @@ def test_an_inactive_configuration_still_faulted_while_active_stops_the_save(
     with pytest.raises(
         RuntimeError,
         match=r"cone-gear: stale inactive configurations did not rebuild clean while "
-        r"active: T060: \['ToothGapCut \(unknown-error\)', "
-        r"'ToothGapPattern \(unknown-error\)'\]$",
+        r"active: T060: \['ToothGapCutT060 \(unknown-error\)', "
+        r"'ToothGapPatternT060 \(unknown-error\)'\]$",
     ):
         _rebuild.rebuild_stale_configurations(adapter, "dt-cone-gear")
     assert part.active == "T120"
@@ -339,7 +344,11 @@ def test_edit_rebuild_all_alone_leaves_the_cg_fx1_caches_that_fail_the_reopen(
     # Every faulted configuration remains diagnosable; prose and formatting
     # are not part of the regeneration contract.
     assert all(name in message for name in SWAPPED)
-    assert all(feature in message for feature in ("ToothGapCut", "ToothGapPattern"))
+    assert all(
+        feature in message
+        for configuration in SWAPPED
+        for feature, _code, _warning in cone_faults(configuration)
+    )
     assert "T120:" not in message and "Default:" not in message
     assert not any(entry.startswith("force") for entry in part.log)
     assert part.bad == set(SWAPPED)
@@ -395,18 +404,18 @@ def _configuration_builders() -> set[str]:
     }
 
 
-def test_the_builders_that_create_configurations_are_the_known_six() -> None:
+def test_the_builders_that_create_configurations_are_the_known_five() -> None:
     """A new multi-configuration builder must fail here until it reopens its
     saved part and runs the tripwire (and joins this set).  Every other builder
     that derives drawing configurations goes through save_simplified_part,
     which reopens and runs the tripwire itself."""
     assert _configuration_builders() == {
-        "build_ch_pivot_bracket",
         "build_dt_crank_handle_ferrule",
         "build_dt_cone_gear",
         "build_dt_crank_handle_pivot_screw",
         "build_dt_pinion_lever_pin",
         "build_pd_transgear_removable",
+        "build_vn_cone_tip_collar",
     }
 
 

@@ -36,7 +36,7 @@ Cross-subassembly fits (checked at the top level): the channel springs
 (ch-channel.SLDASM) thread the summing-lever plate's O4.5 holes -- gated
 analytically by build_ch_channel_assembly._assert_plate_threading; the knife-
 hanger screws drop through the top-frame casting's integral crossbar (#6
-counterbores with O4.318 clearance holes) and the knife-mount dowels slip
+counterbores with O4.699 clearance holes) and the knife-mount dowels slip
 into its blind round holes and slots (fr-frame.SLDASM); the gooseneck post drops
 through the casting's rail-hub bore, gripped by its 1/4-20 set screw.
 
@@ -111,8 +111,10 @@ HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 # Y=0, axis +Y), so seating its under-head face on the crossbar's counterbore
 # floor, HANGER_GRIP above the crossbar underside, fixes the screw origin; no
 # washer (its thickness band would break the reach stack).  The screw clamps
-# the knife mount's top seat to the underside.  Each dowel's pressed end (local
-# Y=0, axis +Y) sits on the floor of the knife mount's top-seat hole.
+# the knife mount's top seat to the underside, a faced Ra 3.2 plane (user
+# ruling 2026-10-12) whose 999.7 is the finished face, so the gap is 0 with no
+# bedding allowance.  Each dowel's pressed end (local Y=0, axis +Y) sits on
+# the floor of the knife mount's top-seat hole.
 KNIFE_MOUNT_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP  # 999.7: clamped, gap 0
 CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + top_frame.RING_HEIGHT
 HANGER_SEAT_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP  # 1029.7
@@ -121,6 +123,8 @@ HANGER_STUD_Y = HANGER_SEAT_Y - hanger_screw.UNDERHEAD_LEN  # 991.6 (thread tip)
 HANGER_REACH = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y
 # Its print-worst reach (drawing-guidelines.md rule 17 (walls and webs)): the shortest screw in the longest grip,
 # 37.084 - 30.8 = 6.284, and the longest in the shortest, 38.1 - 29.2 = 8.90.
+# The grip prints from the faced underside, which is faced before the
+# counterbore is cut: a later cut would shorten it, eating the tip clearance.
 HANGER_REACH_MIN = hanger_screw.LENGTH_MIN - (
     top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL
 )
@@ -135,12 +139,12 @@ HANGER_ENGAGEMENT_FLOOR = hanger_screw.ENGAGEMENT_MIN_D * hanger_screw.SHANK_DIA
 HANGER_TIP_CLEARANCE = knife_mount.STUD_TAP_THREAD_DEPTH_MIN - HANGER_REACH_MAX
 # The plain shank stays in the crossbar: 19.05 of thread covers the 8.90 reach.
 HANGER_THREAD_SPARE = hanger_screw.THREAD_LENGTH - HANGER_REACH_MAX
-# Diametral clearance of the screw in the crossbar's #6 hole: 0.813.
+# Diametral clearance of the screw in the crossbar's #6 loose hole: 1.194.
 HANGER_SCREW_CLEARANCE = top_frame.HANGER_CLEARANCE_DIA - hanger_screw.SHANK_DIA
 # Each dowel's pressed end on its hole floor: 990.2, standing PROUD 9.55 into
 # the crossbar's slip hole or slot.
 KNIFE_DOWEL_Y = KNIFE_MOUNT_TOP_Y - knife_dowel.PRESS_DEPTH
-# The pair's stations from the screw axis, -X (slot) first: 6.350 along X.
+# The pair's stations from the screw axis, -X (slot) first: 7.100 along X.
 KNIFE_DOWEL_X_OFFSETS = knife_mount.PIN_HOLE_XS
 # The screw must still pass the crossbar's #6 clearance hole (drawing-guidelines.md rule 17 (walls and webs)) when
 # every station sits at its limit.  Along the dowel line (X): the crossbar's
@@ -151,7 +155,7 @@ KNIFE_DOWEL_X_OFFSETS = knife_mount.PIN_HOLE_XS
 # (0.05), and the pair's mid-point between the round-hole pin and the slot
 # pin, each across its loosest slip and the slot's centre plane off by its
 # zone radius, (0.046 + 0.046 + 0.025) / 2 = 0.059.  hypot(0.291, 0.239) =
-# 0.376 inside the 0.4065 float.
+# 0.376.
 _KNIFE_DOWEL_SLIP_MAX = top_frame.HANGER_PIN_SLIP_CLEARANCE_MAX
 _KNIFE_DOWEL_PAIR_SHIFT = (
     _KNIFE_DOWEL_SLIP_MAX / 2.0
@@ -171,13 +175,27 @@ HANGER_SCREW_MISMATCH_Z = (
     + _KNIFE_DOWEL_PAIR_SHIFT / 2.0
 )  # 0.239
 HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATCH_Z)
+# The crossbar's #6 hole is drilled from the faced underside, where the dowel
+# holes are located from it, and the counterbore is piloted on it from the
+# top: its axis is true at the underside and wanders by the deep-drill
+# allowance up the longest .X grip, tan 0.3 deg x 30.8 = 0.161 at the head
+# end.  The screw axis is the knife mount's tap, so the mismatch and that
+# drift together must stay inside the 0.597 float: 0.376 + 0.161 = 0.537,
+# 0.059 spare.
+HANGER_SCREW_DRIFT = top_frame.DRILL_DRIFT_PER_MM * (
+    top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL
+)
+HANGER_SCREW_FLOAT_SPARE = top_frame.HANGER_SCREW_FLOAT - (
+    HANGER_SCREW_MISMATCH + HANGER_SCREW_DRIFT
+)
 # The free rock the knife-edge keeps at the drawing-guidelines.md rule 17 (walls and webs) worst case (the
 # 2026-10-09 ruling: >= 5.0 deg).  The pair yaws the block about the screw by
-# the slot pin's worst offset over the shortest span, atan(0.117 / 12.57) =
-# 0.535 deg; across the deepest .X block (14.8) that walks the bore's far end
-# 0.138 off the ridge line, and the bore's ⊥Ø0.05|B zone adds 0.05:
-# t = 0.188.  The trunnion is judged at its widest, lowest .XXX section
-# (8.21 x 10.138) in the smallest reamed bore (Ø12.00): 6.16 deg.
+# the slot pin's worst offset over the shortest span, atan(0.117 / 14.07) =
+# 0.478 deg; across the deepest .X block (14.8) that walks the bore's far end
+# 0.124 off the ridge line, and the bore's ⊥Ø0.05|B zone adds 0.05:
+# t = 0.174.  The trunnion is judged at its widest, lowest .XXX section
+# (8.21 x 10.138) in the smallest reamed bore (Ø12.00): 6.31 deg.  The faced
+# seat adds no term: its form tilts the block, it does not yaw the bore.
 KNIFE_DOWEL_SPAN_MIN = knife_mount.PIN_HOLE_SPAN - knife_mount.PIN_HOLE_SPAN_TOL
 KNIFE_MOUNT_YAW_DEG = math.degrees(
     math.atan(_KNIFE_DOWEL_PAIR_SHIFT / KNIFE_DOWEL_SPAN_MIN)
@@ -248,10 +266,11 @@ def _assert_knife_hanger_stack() -> None:
             "knife-hanger screw does not clear the crossbar hole: "
             f"{HANGER_SCREW_CLEARANCE:.4f} mm diametral clearance"
         )
-    if HANGER_SCREW_MISMATCH > top_frame.HANGER_SCREW_FLOAT:
+    if HANGER_SCREW_FLOAT_SPARE <= 0.0:
         raise RuntimeError(
             f"knife-hanger screw float {top_frame.HANGER_SCREW_FLOAT:.4f} does not "
-            f"cover the dowel and tap mismatch {HANGER_SCREW_MISMATCH:.4f}"
+            f"cover the dowel and tap mismatch {HANGER_SCREW_MISMATCH:.4f} plus the "
+            f"clearance hole's drill drift {HANGER_SCREW_DRIFT:.4f}"
         )
     if KNIFE_FREE_ROCK_WORST_DEG < KNIFE_FREE_ROCK_FLOOR_DEG:
         raise RuntimeError(
@@ -260,8 +279,8 @@ def _assert_knife_hanger_stack() -> None:
             f"{KNIFE_FREE_ROCK_FLOOR_DEG}"
         )
     # Both parts' dowel stations are the dowel spec's pair, and the crossbar
-    # hole and slot are deep enough for the proud pin (the spec asserts the
-    # print-worst case).
+    # hole and slot, 12.0 deep from the faced underside, are deep enough for
+    # the proud pin (the spec asserts the print-worst case).
     expected_stations = (-knife_dowel.HANGER_OFFSET, knife_dowel.HANGER_OFFSET)
     for owner, stations in (
         ("knife mount", knife_mount.PIN_HOLE_XS),
@@ -289,8 +308,9 @@ def _assert_knife_hanger_stack() -> None:
         f"{HANGER_REACH:.3f} ({HANGER_REACH_MIN:.3f}..{HANGER_REACH_MAX:.3f}); "
         f"full thread {HANGER_ENGAGEMENT_MIN:.3f} >= {HANGER_ENGAGEMENT_FLOOR:.3f}; "
         f"tip {HANGER_TIP_CLEARANCE:.3f} under the thread; crossbar clearance "
-        f"{HANGER_SCREW_CLEARANCE:.4f}, mismatch {HANGER_SCREW_MISMATCH:.4f} <= "
-        f"{top_frame.HANGER_SCREW_FLOAT:.4f}; dowel {KNIFE_DOWEL_Y:.4f}.."
+        f"{HANGER_SCREW_CLEARANCE:.4f}, mismatch {HANGER_SCREW_MISMATCH:.4f} + "
+        f"drift {HANGER_SCREW_DRIFT:.4f} <= {top_frame.HANGER_SCREW_FLOAT:.4f} "
+        f"(spare {HANGER_SCREW_FLOAT_SPARE:.4f}); dowel {KNIFE_DOWEL_Y:.4f}.."
         f"{dowel_top_y:.4f} under the slip floor {slip_floor_y:.4f} mm; rock "
         f"{KNIFE_FREE_ROCK_WORST_DEG:.3f} deg (yaw {KNIFE_MOUNT_YAW_DEG:.3f}, "
         f"t {KNIFE_BORE_FAR_END_OFFSET:.4f})"

@@ -5,7 +5,7 @@ from __future__ import annotations
 import _config
 import vn_boss_hook_spec
 import sm_gooseneck_spec
-import ha_measuring_stick_spec
+import ms_stick_spec
 import mg_output_fixture_spec
 import pn_pen_frame_spec
 import pn_pen_hanger_spec
@@ -15,7 +15,7 @@ import pn_pen_wire_spec
 SHEETS = (
     ("vn-boss-hook", vn_boss_hook_spec),
     ("sm-gooseneck", sm_gooseneck_spec),
-    ("ha-measuring-stick", ha_measuring_stick_spec),
+    ("ms-stick", ms_stick_spec),
     ("mg-output-fixture", mg_output_fixture_spec),
     ("pn-pen-frame", pn_pen_frame_spec),
     ("pn-pen-hanger", pn_pen_hanger_spec),

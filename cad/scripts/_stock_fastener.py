@@ -1,4 +1,4 @@
-"""Build production stock fasteners from verified McMaster geometry recipes."""
+"""Build production stock fasteners from vendor replays and catalog-only recipes."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from _visibility import FeatureWalk
 type ThreadedPartSaver = Callable[[Any, str, Sequence[str]], Awaitable[dict[str, str]]]
 type Vector3 = tuple[float, float, float]
 
-# The helical groove every threaded McMaster replay cuts
+# The helical groove every threaded stock recipe cuts
 # (diag_mcmaster_lib.thread_sweep_cut*): the only feature the drawing-view
 # configuration suppresses on a fastener.
 THREAD_FEATURE = "ThreadGroove"
@@ -446,14 +446,12 @@ async def build_stock_fastener(
     if color is not None:
         await apply_color(adapter, color)
     stock = fastener(part_name)
-    apply_custom_properties(
-        adapter,
-        {
-            "Stock Name": stock.stock_name,
-            "Supplier": stock.supplier,
-            "Supplier SKUs": ", ".join(stock.skus),
-        },
-    )
+    properties = {
+        "Stock Name": stock.stock_name,
+        "Supplier": stock.supplier,
+        "Supplier SKUs": ", ".join(stock.skus),
+    }
+    apply_custom_properties(adapter, properties)
     await report_mass_properties(adapter)
     return await _save_stock_part(
         adapter, part_name, threaded=threaded, save_threaded_part=save_threaded_part

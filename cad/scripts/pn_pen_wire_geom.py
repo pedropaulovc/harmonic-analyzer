@@ -11,19 +11,20 @@ same constants so the two can never drift.
 
 from __future__ import annotations
 
-WIRE_DIA = 0.8  # hair-thin in the photos; renderable stand-in (low)
-CLEARANCE = 0.25  # surface stand-off (interference-gate margin convention)
+from mg_magnifying_wheel_geom import PEN_WIRE_DIA, RIM_WIRE_R
+
+WIRE_DIA = PEN_WIRE_DIA  # hair-thin in the photos; renderable stand-in (low)
 
 # --- endpoint anchors (machine frame; asserted by build_pn_pen_assembly) --------
 WHEEL_X = 53.0  # magnifying-wheel centre (build_mg_magnifier_assembly.WHEEL_X)
 WHEEL_BAR_Y = 575.7  # wheel axis height = the vertical-tangent point's y
-RIM_DIA = 100.0  # ch. 21 annotated (build_mg_magnifying_wheel.RIM_OUTER_DIA)
 WHEEL_MID_Z = -146.9  # rim groove mid-plane (wheel mid-plane)
 WIRE_HOLE_Y = 513.0  # pen-rod wire hole: PEN_ROD_POS y 398 + local 115
 
-# Hanging run: 0.25 off the rim surface at the pen-rod-side tangent, straight
+# Hanging run: the wire centre rides the rim groove at RIM_WIRE_R; it leaves
+# the groove at the pen-rod-side (3 o'clock from the front) tangent, straight
 # down to the wire-hole level (the wire passes 1.7 clear in front of the
 # rod's z -149 front face -- the tie-off through the hole is implied).
-WIRE_X = WHEEL_X - RIM_DIA / 2.0 - WIRE_DIA / 2.0 - CLEARANCE  # 2.35
+WIRE_X = round(WHEEL_X - RIM_WIRE_R, 6)  # 3.8
 WIRE_BOTTOM = (WIRE_X, WIRE_HOLE_Y, WHEEL_MID_Z)
 WIRE_LEN = WHEEL_BAR_Y - WIRE_HOLE_Y  # 62.7

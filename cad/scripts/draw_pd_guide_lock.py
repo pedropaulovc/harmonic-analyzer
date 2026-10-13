@@ -5,9 +5,10 @@ views, dimension layout and hole callout;
 sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
-The sheet runs at 4:1 (the plate is 22 x 15.65 x 2); the isometric carries an
-explicit 2:1 override so it stays clear of the title block.  A flat plate
-needs only the face view (front), one thickness view (right) and the iso.
+The sheet runs at 4:1 (the plate is 22 x 9.6, cut from 1/16 sheet, its four
+corners rounded); the isometric carries an explicit 2:1 override so it stays
+clear of the title block.  A flat plate needs only the face view (front), one
+thickness view (right) and the iso.
 No frames and no datums (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the screw holes locate by +/-
 coordinates from the plate's corner, authored on the part.
 
@@ -38,7 +39,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -52,6 +53,7 @@ from pd_guide_lock_spec import (
     HOLE_SPEC,
     HOLE_XY,
     LOCK_HEIGHT,
+    LOCK_STOCK_CALLOUT,
     LOCK_WIDTH,
 )
 
@@ -70,13 +72,16 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (4.0, 1.0)
 
-# Sheet layout (meters).  The front view's model bbox is 22 x 15.65 (the plate
-# face); at 4:1 the view is 88 x 62.6 mm, x 0.091..0.179.  Third angle: the
-# right view (the 2-thick strip edge-on) sits to its right, past the hole
-# callout; the isometric rides top-right.
-FRONT_CENTER = (0.135, 0.150)
-RIGHT_CENTER = (0.265, 0.150)
-ISO_CENTER = (0.340, 0.200)
+# Sheet layout (meters).  The front view's model bbox is 22 x 9.6 (the plate
+# face); at 4:1 the view is 88 x 38.4 mm, x 0.106..0.194, y 0.156..0.194.
+# Third angle: the right view (the 1/16 sheet edge-on) sits to its right,
+# past the hole callout; the isometric rides top-right.  The whole group sits
+# centred between the border and the title block (it sat 25 mm low and 15 mm
+# left under an empty upper field, machinist review of 40e51b9a7).
+FRONT_CENTER = (0.150, 0.175)
+RIGHT_CENTER = (0.280, 0.175)
+ISO_CENTER = (0.355, 0.225)
+ISO_NOTE_XY = (0.330, 0.185)
 
 
 def _sheet_x(model_x_mm: float) -> float:
@@ -99,23 +104,36 @@ HOLE_2_X_SHEET = _sheet_x(HOLE_XY[1][0])
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Width stacks below the front view under the two hole X
-# coordinates; Height sits left of the plate and the shared hole Y outboard
-# of it, its text under the plate's bottom-left corner; the strip thickness
-# rides above the right view.
+# coordinates, the 4.000's text outboard of the plate's left edge (between
+# its extension lines the hole's own extension cut through it); the shared
+# hole Y stands left of the plate, its text under the plate's bottom-left
+# corner, and Height outboard of it (smaller dimension nearer the part), its
+# value mid-way between the top and bottom extension lines and left of the
+# hole Y dimension line, where the hole Y extension stops (inboard of it, the
+# value sat on the top extension line, machinist review of 1c9f9b2a6); the 4X
+# corner radius stands off the top-right corner, its leader landing on that
+# arc clear of the Height's extension lines on the left and the hole callout
+# below; the sheet thickness rides above the right view, its one-line
+# as-supplied stock callout in the clear field above the value.
 FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], 0.088),
-    "Height": (0.071, FRONT_CENTER[1]),
-    "Hole1X": (0.103, 0.104),
-    "Hole2X": (0.127, 0.096),
-    "Hole1Y": (0.061, 0.110),
+    "Width": (FRONT_CENTER[0], 0.125),
+    "Height": (0.057, FRONT_CENTER[1]),
+    "Hole1X": (0.087, 0.138),
+    "Hole2X": (0.142, 0.133),
+    "Hole1Y": (0.076, 0.147),
+    "CornerR": (0.215, 0.211),
 }
-RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.196)}
-# Both holes stand on the one Y coordinate the part prints (Hole1Y).
-DIMENSION_PREFIXES = {"Hole1Y": "2X "}
+RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.209)}
+# Both holes stand on the one Y coordinate the part prints (Hole1Y); the one
+# printed fillet stands for all four equal corners (CornerR). A custom prefix
+# replaces SolidWorks' own radius "R", so it carries it ("4X 1.8" printed
+# without, farm run 20261012T061737079Z).
+DIMENSION_PREFIXES = {"Hole1Y": "2X ", "CornerR": "4X R"}
+DIMENSION_CALLOUTS = {"Depth": LOCK_STOCK_CALLOUT}
 # The bent leader elbows at the text's LEFT end and enters hole 2 from its
 # upper-right quadrant, crossing only the plate's right edge; the text stands
 # between that edge and the right view.
-HOLE_CALLOUT_XY = (0.215, 0.160)
+HOLE_CALLOUT_XY = (0.230, 0.185)
 HOLE_CALLOUT_PROCESS = "DRILL"
 
 
@@ -185,16 +203,18 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # The places and the explicit bands (height, hole coordinates) are
-    # authored on the part (the paper-drive lock-station sweep and the screw
-    # set window read the same spec); the sheet only proves the import kept
-    # the places. The hole size ships as a native wizard callout below.
+    # The places and the explicit bands (sheet thickness, hole coordinates)
+    # are authored on the part (the paper-drive lock-station
+    # sweep and the screw set window read the same spec); the sheet only
+    # proves the import kept the places. The hole size ships as a native
+    # wizard callout below.
     annotations = [
         *curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front"),
         *curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right"),
     ]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="above")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -210,7 +230,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="guide-lock screw holes",
         process=HOLE_CALLOUT_PROCESS,
     )
-    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.160)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

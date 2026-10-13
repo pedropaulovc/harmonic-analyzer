@@ -6,10 +6,10 @@ strips, and the two back-side guide rails the platen hangs on are
 separate parts (build_pd_platen_rack.py / build_pd_platen_clip.py /
 build_pd_platen_guide.py). Fastener holes:
 
-* four clip-screw #4-40 through receivers at the resized plate's extreme
+* four clip-screw #2-56 through receivers at the resized plate's extreme
   left/right edges (x 5.3928/264.2472), matching the resized clips'
   7.1904-inset end holes at local y 29.6604/127.6296, each tapped on
-  through a Ø7 x 0.65 boss on the back face for >= 1.5D engagement;
+  through a Ø7 x 1.70 boss on the back face for >= 1.5D engagement;
 * ten O3 guide-screw through-holes in two rows of 5 (ch22 front photo)
   at the guide rail centrelines: bottom row y 13, top row y 47 (machine
   318 / 352 with the plate at y 305).
@@ -81,7 +81,7 @@ async def build(adapter) -> dict[str, str]:
     # BARE numbers in document units (an unsuffixed 269.64 = 269.64 in, blowing the
     # part up 25.4x). (The old Socket/GuideHole/Cbore dia+depth knobs are gone:
     # the fastener holes are now native Hole Wizard features whose dimensions
-    # come from the #4-40 / #4 standards + explicit artefact overrides, not
+    # come from the #2-56 / #4 standards + explicit artefact overrides, not
     # equation-driven sketch dims -- same as harmonic_base's FastenerHoles.)
     await set_global(adapter, "PlateWidth", f"{PLATE_WIDTH}mm")
     await set_global(adapter, "PlateHeight", f"{PLATE_HEIGHT}mm")
@@ -157,17 +157,17 @@ async def build(adapter) -> dict[str, str]:
         adapter, "plate with socket bosses", v_plate + v_bosses, 0.05 * v_bosses
     )
 
-    # Clip-screw receivers: ONE native Hole Wizard #4-40 through-tapped
-    # feature (4 points) from the front face. The clip's integral outer bosses
-    # consume the shank length not used here, so the 3.85 plate plus the 0.65
-    # rear boss give thread engagement and the stock screw tip finishes flush
-    # at the boss's rear face rather than bottoming in a blind socket.
+    # Clip-screw receivers: ONE native Hole Wizard #2-56 through-tapped
+    # feature (4 points) from the front face. The heads sit on the clip's flat
+    # 0.8 sheet, so the 3.85 plate plus the 1.70 rear boss take the rest of the
+    # stock shank as thread and its tip finishes flush at the boss's rear face
+    # rather than bottoming in a blind socket.
     pre = await adapter.get_mass_properties()
     wizard_holes(
         adapter, SOCKET_SPEC,
         [[x, y, 0.0] for x, y in SOCKET_XY],
         (0.0, 0.0, -1.0),
-        "clip-screw through-tapped receivers (#4-40)", name="Sockets",
+        "clip-screw through-tapped receivers (#2-56)", name="Sockets",
     )
     post = await adapter.get_mass_properties()
     v_sockets = (

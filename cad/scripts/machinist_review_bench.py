@@ -169,6 +169,12 @@ def load_evals(
             raise ValueError(
                 f"{name}: package/kind does not match the drawing registry"
             )
+        release_pdf = case.get("release_pdf")
+        if release_pdf is not None and (
+            not isinstance(release_pdf, str)
+            or not re.fullmatch(r"[a-z0-9][a-z0-9-]*\.pdf", release_pdf)
+        ):
+            raise ValueError(f"{name}: release_pdf must be a PDF basename")
         for key in ("release", "prompt", "expected_output"):
             if not isinstance(case.get(key), str) or not case[key].strip():
                 raise ValueError(f"{name}: {key} is required")
@@ -187,6 +193,12 @@ def load_evals(
             if str(case["id"]) in selected or case["name"] in selected
         ]
     return data.get("skill_name", "machinist-review"), cases
+
+
+def release_pdf_name(case: Mapping[str, Any]) -> str:
+    """The case's PDF basename in its release: the registry's, unless the
+    drawing was renamed after the release (``release_pdf``)."""
+    return case.get("release_pdf") or mr.DRAWINGS_BY_NAME[case["package"]].outputs["pdf"].name
 
 
 def compose_prompt(kind: str, ref: str | None = None, repo: Path = REPO_ROOT) -> str:
@@ -392,7 +404,7 @@ def import_iteration(
         for release in sorted({case["release"] for case in evals})
     }
     for case in evals:
-        filename = mr.DRAWINGS_BY_NAME[case["package"]].outputs["pdf"].name
+        filename = release_pdf_name(case)
         expected_hashes = [mr._sha256(pdfs[case["release"]] / filename)]
         for config in present:
             for path, report in matches[case["name"], config]:
@@ -1028,6 +1040,22 @@ def run_iteration(
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8")
 
+    def review_pdf_dir(case: dict[str, Any]) -> Path:
+        """The reviewer reads registry-named PDFs: stage a renamed release PDF
+        under the current registry name (same bytes, same source hash)."""
+        source = pdfs[case["release"]]
+        if "release_pdf" not in case:
+            return source
+        staged = source.parent / "renamed" / case["name"]
+        staged.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(
+            source / case["release_pdf"],
+            staged / mr.DRAWINGS_BY_NAME[case["package"]].outputs["pdf"].name,
+        )
+        return staged
+
+    review_pdf_dirs = {case["name"]: review_pdf_dir(case) for case in cases}
+
     def review(case: dict[str, Any], config: str, number: int) -> None:
         directory = run_directory(iteration, case, config, number)
         reports = directory / "reviewer"
@@ -1036,7 +1064,7 @@ def run_iteration(
             str(mr.SCRIPTS_DIR / "machinist_review.py"),
             case["package"],
             "--pdf-dir",
-            str(pdfs[case["release"]]),
+            str(review_pdf_dirs[case["name"]]),
             "--reviewer",
             args.reviewer,
             "--jobs",
@@ -1390,7 +1418,7 @@ def view_iteration(iteration: Path, static: Path, skill_creator: Path) -> Path:
         release = case["release"]
         if release not in pdf_cache:
             pdf_cache[release] = release_pdfs(release, iteration.parent)
-        filename = mr.DRAWINGS_BY_NAME[case["package"]].outputs["pdf"].name
+        filename = release_pdf_name(case)
         pdf = pdf_cache[release] / filename
         if report.get("source_sha256") != [mr._sha256(pdf)]:
             raise ValueError(f"{path}: review does not match the cached release PDF")

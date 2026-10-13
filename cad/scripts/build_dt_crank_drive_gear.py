@@ -3,29 +3,16 @@ r"""Reproduction script: crank-drive gear (book ch. 12, p. 20).
 The dark steel gear at the cone set's large end, annotated "This gear
 engages the crank" (p. 20): together with a pinion on the crankshaft
 (`build_dt_crank_pinion.py`) it implements the book-stated 4:1 crank-to-cone
-reduction (p. 16). The 64T:16T count split preserves that stated ratio;
-DP 25.731104 is fixed by the recentered 64T station against the unchanged
-cone-pivot-post-v2 crank axis at the checked 0.25-mm mesh slack. This
-supersedes the intermediate DP24.74 rear-shifted layout.
+reduction (p. 16). The 64T:16T pair uses standard normal 24DP PA20 teeth.
+The crank bore's configured height closes the mesh at the physical 64T
+centre without moving the 48DP cone stack or its face/seat datums.
 
-CROSSED-MESH CUT (2026-07-14 rederive, "crank-pinion and crank-drive gear
-are not meshing"): the 64T rides the cone shaft, inclined 12.52 deg IN
-PLAN, while its 16T pinion spins about machine z (ch30 GT pins the crank
-axle at the pedestal's x at BOTH ends -- a cone-parallel crankshaft would
-land 22 mm east at the arm, 20+ sigma off; the planar crank->paper chain
-corroborates). The pair is therefore a CROSSED-axis mesh, and straight
-uniform teeth geometrically cannot engage at depth across it (flank
-misregistration +-1.08 mm across the face vs <=0.70 available clearance
--- the old build backed the crank off until the tips cleared entirely,
-the user-flagged air gap). The book photos (ch12 p.18/p.19) show the
-real pair deeply engaged, so the real 64T must carry the accommodation
-the crossing demands; this script cuts it as a true swept helix -- the
-tooth gaps advance (z - face/2)*tan(incline)/R_pitch across the face
-(equivalently: gear helix angle = shaft angle, pinion straight = a
-textbook crossed-helical pair) -- plus transverse tooth thinning (config)
-that also absorbs the cos(incline) normal-pitch shrink, and a deepened root floor (the mating
-16T's tips need real dedendum). Study: crossed_mesh_study (analytic,
-2026-07-14); arbitrated against the live interference gate.
+CROSSED-MESH CUT: the 64T rides the cone shaft while the straight 16T
+spins about machine z. The finite normal-24DP PA20 stock #2/55T master
+owns the actual tooth form. The complete physical-pitch material sector
+is a nominal normal-section screw sweep with a right-hand constant lead,
+not an ideal transverse N64 involute or a physical disc-cutter envelope.
+Actual crossed-mesh engineering acceptance remains separate from this CAD gate.
 
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9.
@@ -53,7 +40,6 @@ from __future__ import annotations
 import math
 import sys
 
-import _config
 import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
@@ -72,7 +58,7 @@ from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawin
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
 from _fit_deviations import deviations
 from _simplified_part import save_simplified_part
-from _gear import build_fixed_gear, volume_check
+from _gear import build_stock_form_gear, volume_check
 from _part_pmi import author_part_pmi
 from dt_crank_drive_gear_notes import DRAWING_NOTES, GEAR_DATA
 from dt_crank_drive_gear_spec import (
@@ -81,15 +67,14 @@ from dt_crank_drive_gear_spec import (
     BORE_DIA_BAND,
     BORE_SOUTH_CHAMFER,
     BORE_SOUTH_CHAMFER_BAND,
-    CUTTER_DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_WIDTH,
     FACE_WIDTH_BAND,
-    LONG_ADDENDUM_MM,
+    NATIVE_SWEEP_BOUND_MM,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
-    PRESSURE_ANGLE_DEG,
+    STOCK_PROFILE,
     SURFACE_FINISHES,
 )
 
@@ -153,20 +138,9 @@ def _verify_named_dimension(adapter, full_name: str, expected_mm: float) -> None
 PART_NAME = "dt-crank-drive-gear"
 MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass train
 
-TEETH = 64  # Appendix C #9 estimate, photo-ratified 2026-07-14 (see docstring)
-DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine/gear_train.yaml
-PA_DEG = PRESSURE_ANGLE_DEG  # transverse, from the normal-plane cutter (spec)
 # The 64T seats on MHA-DT-004's flatted Sec1 gear land.
 BORE_DIAMETER = 0.375 * IN
 
-# Crossed-mesh accommodation (module docstring): the tooth inclination is the
-# exact-solid result for the recentered 64T station and is shared through the
-# gear-train config. Positive
-# sign: the gap azimuth advances CCW (about local +z) toward the gear's
-# +z face, which the assembly places toward machine +z (the analytic
-# study's zero-collision hand; the mirrored hand collides 28 mm^3).
-HELIX_DEG = _config.machine("gear_train", "crank_drive_helix_deg")
-BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
 
 
 
@@ -185,19 +159,15 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Normal-defined (#906): the transverse DP/PA place the involute, the
-    # cutter's DP sets the depth; the blank is turned long (R9-56).
-    disc = await build_fixed_gear(
-        adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG,
-        helix_deg=HELIX_DEG,
-        backlash_mm=BACKLASH_MM, root_relief=True,
-        depth_dp=CUTTER_DIAMETRAL_PITCH,
-        long_addendum_mm=LONG_ADDENDUM_MM,
+    # The shared helper sweeps the complete finite stock-form sector, including
+    # offcentre root-floor lobes; its phase and Green-volume gates precede pattern.
+    disc = await build_stock_form_gear(
+        adapter, STOCK_PROFILE, FACE_WIDTH, screw_sweep_bound_mm=NATIVE_SWEEP_BOUND_MM
     )
     volume = disc.volume
 
-    # build_fixed_gear is shared by five recipes, so it leaves the blank under
-    # the adapter's default names. Name the boss here: the face width is a size
+    # The shared stock-form helper leaves the base under adapter default names.
+    # Name it here: the face width is a size
     # the turner sets, so it prints as a NATIVE model dimension
     # (drawing-simplicity-policy.md `How the repository implements the guidelines`), which means it must be named,
     # driven, marked and given its decimal places like any other. Driving it is
@@ -326,8 +296,8 @@ async def build(adapter) -> dict[str, str]:
         expected, 0.03 * v_chamfer + 0.15,
     )
 
-    # The tip circle, as a REFERENCE sketch. The helix recipe grows the teeth
-    # off a ROOT cylinder blank (_gear.build_fixed_gear), so no solid feature
+    # The actual blank circle, as a REFERENCE sketch. The helix grows a complete
+    # stock material sector off an embedded base cylinder, so no solid feature
     # owns the outside diameter -- yet the OD is the first size the turner sets
     # and the print must carry it as a model dimension, not as text in the data
     # block (drawing-simplicity-policy.md `How the repository implements the guidelines`'s "model it, even if that takes a hidden reference

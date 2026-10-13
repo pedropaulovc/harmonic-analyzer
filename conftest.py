@@ -1,10 +1,15 @@
 """Suite-wide test isolation for the whole repository (``cad/scripts`` and ``tests``)."""
 
+import functools
+import importlib
+import importlib.util
 import os
 import subprocess
+import sys
 import tempfile
 import traceback
-from pathlib import PureWindowsPath
+from importlib.machinery import SourceFileLoader
+from pathlib import Path
 
 import pytest
 
@@ -12,16 +17,33 @@ import pytest
 # licence farm worker w15 shares; on a worker it takes the seat from the build.
 # NOSW_GUARD=0 turns this off for deliberate operator work, matching the shared
 # sitecustomize guard agents load with PYTHONPATH.
-_LAUNCH_MARKERS = (
-    "startfile",
-    ".lnk",
-    "sldworks",
-    "swxdesktop",
-    "3dexperiencelauncher",
-    "catstart",
-)
-_READ_ONLY_PROGRAMS = frozenset({"tasklist", "tasklist.exe"})
+#
+# What counts as a start lives in one module, shared with the guard every
+# Python child of this session loads through ``sitecustomize``: a child
+# (``python -m doit``, ``build.py``, a git diff helper) is past every patch in
+# this process. On 2026-10-11 orphaned ``doit -n`` workers ran a COM build
+# script that started sldworks.exe on the licence w15 shares.
+_CHILD_GUARD_DIR = Path(__file__).resolve().parent / "tests" / "_child_guard"
+
+
+def _load_shared_guard():
+    spec = importlib.util.spec_from_file_location(
+        "harmonic_solidworks_guard", _CHILD_GUARD_DIR / "harmonic_solidworks_guard.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+_guard = _load_shared_guard()
+_REAL_POPEN = subprocess.Popen
+_REAL_RUN = subprocess.run
 _refused: list[str] = []
+# The log this session's guarded children record their refusals in, and how
+# much of it has been reported.
+_child_log: str | None = None
+_child_log_read = 0
 
 
 class SolidWorksLaunchBlocked(RuntimeError):
@@ -42,32 +64,20 @@ def _refuse(route, detail):
     test = os.environ.get("PYTEST_CURRENT_TEST", "<no test>")
     message = (
         f"SolidWorks launch blocked in {test} via {route}: {str(detail)[:300]}\n"
+        "A test must never start SolidWorks or a COM build on the machine "
+        "running it: inject a fake runner, adapter or subprocess instead "
+        "(NOSW_GUARD=0 only for deliberate operator work).\n"
         f"Caller stack:\n{stack}"
     )
     _refused.append(message)
     raise SolidWorksLaunchBlocked(message)
 
 
-def _program(args):
-    if isinstance(args, (list, tuple)):
-        return PureWindowsPath(str(args[0])).name.lower() if args else ""
-    words = str(args).split()
-    return PureWindowsPath(words[0].strip('"')).name.lower() if words else ""
-
-
-def _launches_solidworks(args, executable=None):
-    if _program(args) in _READ_ONLY_PROGRAMS:
-        return False
-    parts = args if isinstance(args, (list, tuple)) else [args]
-    text = " ".join(str(part) for part in [*parts, executable] if part is not None)
-    return any(marker in text.lower() for marker in _LAUNCH_MARKERS)
-
-
 def _install_launch_guard():
     original_init = subprocess.Popen.__init__
 
     def guarded_init(self, args, *rest, **kwargs):
-        if _launches_solidworks(args, kwargs.get("executable")):
+        if _guard.launches_solidworks(args, kwargs.get("executable")):
             _refuse("subprocess.Popen", args)
         original_init(self, args, *rest, **kwargs)
 
@@ -83,101 +93,114 @@ def _install_launch_guard():
     original_system = os.system
 
     def guarded_system(command):
-        if _launches_solidworks(command):
+        if _guard.launches_solidworks(command):
             _refuse("os.system", command)
         return original_system(command)
 
     os.system = guarded_system
-
-
-# COM activation and the SolidworksMCP launch entry points. The process guard
-# above cannot see these: ``SldWorks.Application``'s LocalServer32 is
-# SLDWORKS.exe itself, so a Dispatch starts SolidWorks without any Popen, and
-# ``sw_recovery``'s connector launch only reaches Popen after a registry walk
-# a test can fake. Each is replaced for the whole session, collection included.
-_COM_ACTIVATORS = {
-    "win32com.client": ("Dispatch", "DispatchEx", "GetObject"),
-    "win32com.client.dynamic": ("Dispatch", "DumbDispatch"),
-    "win32com.client.gencache": ("EnsureDispatch",),
-    "pythoncom": ("CoCreateInstance", "CoCreateInstanceEx"),
-    "comtypes": ("CoCreateInstance",),
-    "comtypes.client": ("CreateObject", "CoGetObject"),
-}
-_LAUNCH_ENTRY_POINTS = {
-    "solidworks_mcp.adapters.sw_recovery": (
-        "start_solidworks",
-        "stop_solidworks",
-        "kill_connector_processes",
-        "recover_solidworks",
-    ),
-    "solidworks_mcp.adapters.sw_install": ("launch_via_platform_shortcut",),
-}
-
-
-def _solidworks_class_ids():
-    """The CLSID ``SldWorks.Application`` resolves to on this machine, if any.
-
-    A caller may activate the class by CLSID instead of ProgID.
-    """
-    try:
-        import winreg
-    except ImportError:
-        return set()
-    try:
-        with winreg.OpenKey(
-            winreg.HKEY_CLASSES_ROOT, r"SldWorks.Application\CLSID"
-        ) as key:
-            return {str(winreg.QueryValue(key, None)).lower()}
-    except OSError:
-        return set()
-
-
-def _names_solidworks(args, kwargs, class_ids):
-    text = " ".join(str(part) for part in (*args, *kwargs.values())).lower()
-    return "sldworks" in text or any(clsid in text for clsid in class_ids)
-
-
-def _refuse_com_activation(module_name, attribute, original, class_ids):
-    def refuse_solidworks_activation(*args, **kwargs):
-        if _names_solidworks(args, kwargs, class_ids):
-            _refuse(f"{module_name}.{attribute}", args)
-        return original(*args, **kwargs)
-
-    return refuse_solidworks_activation
-
-
-def _refuse_launch(module_name, attribute):
-    def refuse_solidworks_launch(*args, **kwargs):
-        _refuse(f"{module_name}.{attribute}", args)
-
-    return refuse_solidworks_launch
+    # Below these: ``nt.spawn*``/``exec*``/``system``/``startfile``, the shell
+    # ``cmd /c`` line Popen and os.system compose, and a ctypes binding of a
+    # native process or shell launcher.
+    sys.addaudithook(_guard.make_audit_hook(_refuse))
 
 
 def _install_activation_guard():
-    import importlib
+    """Every entry point in the shared tables, for the session.
 
-    class_ids = _solidworks_class_ids()
-    for module_name, attributes in _COM_ACTIVATORS.items():
+    COM activation, the native process creators (``_winapi``/``win32process``
+    ``CreateProcess``, below ``Popen``), shell command runners and the launch
+    entry points refused outright. The process guard above cannot see most of
+    these: ``SldWorks.Application``'s LocalServer32 is SLDWORKS.exe itself, so
+    a Dispatch starts SolidWorks without any Popen. Collection is covered too.
+    """
+    class_ids = _guard.launcher_class_ids()
+    for module_name in _guard.GUARDED_MODULES:
         try:
             module = importlib.import_module(module_name)
         except ImportError:
             continue
-        for attribute in attributes:
-            original = getattr(module, attribute, None)
-            if original is None:
-                continue
-            setattr(
-                module,
-                attribute,
-                _refuse_com_activation(module_name, attribute, original, class_ids),
-            )
-    for module_name, attributes in _LAUNCH_ENTRY_POINTS.items():
-        try:
-            module = importlib.import_module(module_name)
-        except ImportError:
-            continue
-        for attribute in attributes:
-            setattr(module, attribute, _refuse_launch(module_name, attribute))
+        _guard.guard_module(module_name, module, _refuse, class_ids)
+
+
+def _guard_child_processes():
+    """Make every Python child of this session load the shared guard.
+
+    A nested session keeps the outer one's refusal log.
+    """
+    global _child_log, _child_log_read
+    if not os.environ.get(_guard.MARKER):
+        handle, path = tempfile.mkstemp(prefix="solidworks-refusals-", suffix=".log")
+        os.close(handle)
+        os.environ[_guard.MARKER] = path
+    _child_log = os.environ[_guard.MARKER]
+    _child_log_read = os.path.getsize(_child_log)
+    entries = os.environ.get("PYTHONPATH", "").split(os.pathsep)
+    if str(_CHILD_GUARD_DIR) not in entries:
+        os.environ["PYTHONPATH"] = os.pathsep.join(
+            [str(_CHILD_GUARD_DIR), *filter(None, entries)]
+        )
+
+
+def _child_refusals():
+    """Refusals guarded children recorded since the last call."""
+    global _child_log_read
+    if _child_log is None:
+        return []
+    try:
+        with open(_child_log, encoding="utf-8") as log:
+            log.seek(_child_log_read)
+            text = log.read()
+            _child_log_read = log.tell()
+    except OSError:
+        return []
+    return [text] if text else []
+
+
+# dodo's COM chokepoint. Tests load dodo both by ``import dodo`` and as fresh
+# ``spec_from_file_location`` copies, so every load of a ``dodo.py`` is guarded
+# as it finishes executing. Collaborator identity, not the call, decides: a
+# test that fakes ``_run_subprocess`` or dodo's ``subprocess.run``/``Popen`` is
+# already hermetic and keeps exercising the real ``_exec_com``.
+def _runs_real_subprocess(module, log_stem):
+    """Whether dodo's ``_run_subprocess`` would start a real child.
+
+    It logs through ``Popen`` when given a log stem and calls ``run`` (which
+    itself uses ``Popen``) otherwise.
+    """
+    runner = getattr(module, "subprocess", None)
+    return getattr(runner, "Popen", None) is _REAL_POPEN and (
+        log_stem is not None or getattr(runner, "run", None) is _REAL_RUN
+    )
+
+
+def _guard_dodo(module):
+    run_subprocess = getattr(module, "_run_subprocess", None)
+    exec_com = getattr(module, "_exec_com", None)
+    if run_subprocess is None or exec_com is None:
+        return
+
+    @functools.wraps(exec_com)
+    def refuse_com_task(cmd, label, log_stem=None, *, task=None):
+        if module._run_subprocess is run_subprocess and _runs_real_subprocess(
+            module, log_stem
+        ):
+            _refuse("dodo._exec_com", f"{label}: {cmd}")
+        return exec_com(cmd, label, log_stem, task=task)
+
+    module._exec_com = refuse_com_task
+
+
+def _install_dodo_guard():
+    original_exec_module = SourceFileLoader.exec_module
+
+    def exec_module(self, module):
+        original_exec_module(self, module)
+        if os.path.basename(self.path).lower() == "dodo.py":
+            _guard_dodo(module)
+
+    SourceFileLoader.exec_module = exec_module
+    if "dodo" in sys.modules:
+        _guard_dodo(sys.modules["dodo"])
 
 
 def pytest_configure(config):
@@ -191,20 +214,31 @@ def pytest_configure(config):
     Tests therefore never read or write the real store. An explicit setting
     (``off`` or a path) is respected.
 
-    Refuse every SolidWorks start from this process: ``subprocess`` argv naming
-    ``os.startfile``, a ``.lnk`` or a SolidWorks/3DEXPERIENCE launcher image
-    (``tasklist`` still reads the process table), in-process ``os.startfile``,
-    and ``os.system``; COM activation of ``SldWorks.Application``; and the
-    SolidworksMCP start/stop/launch entry points. A refusal raises with the
-    caller's stack and fails the test even if the code under test swallowed it.
+    Refuse every SolidWorks start from this process, as
+    ``tests/_child_guard/harmonic_solidworks_guard.py`` defines it: a process
+    (``subprocess`` down to ``_winapi``/``win32process`` ``CreateProcess``,
+    ``os.system``, ``os.spawn*``/``exec*``, ``win32pipe.popen``) whose command
+    line names SolidWorks or its launchers, is a shell-open helper or is a
+    shell told to open something (``tasklist`` still reads the process
+    table); ``os.startfile``, ``ShellExecute(Ex)``, ``WinExec``, services,
+    other-user processes and ctypes process launchers; COM activation of, or
+    binding to, SolidWorks, a SolidWorks document or a launcher class; the
+    SolidworksMCP start/stop/launch entry points; and dodo's ``_exec_com``
+    with a real runner. A refusal raises with the caller's stack and fails the
+    test even if the code under test swallowed it. Every Python child loads
+    the same refusals through ``tests/_child_guard/sitecustomize.py`` and
+    exits on one, which fails the test that started it.
     """
     if "HARMONIC_BUILDGRAPH_CACHE" not in os.environ:
         os.environ["HARMONIC_BUILDGRAPH_CACHE"] = tempfile.mkdtemp(
             prefix="buildgraph-facts-"
         )
-    if not _guard_disabled():
+    # SolidWorks runs only on Windows; elsewhere there is nothing to start.
+    if sys.platform == "win32" and not _guard_disabled():
+        _guard_child_processes()
         _install_launch_guard()
         _install_activation_guard()
+        _install_dodo_guard()
 
 
 @pytest.fixture
@@ -215,14 +249,39 @@ def solidworks_launch_refusals():
     return _refused
 
 
+@pytest.fixture
+def solidworks_child_refusals():
+    """Take the refusals guarded children recorded; a guard test consumes them."""
+    if _guard_disabled():
+        pytest.skip("NOSW_GUARD=0: the SolidWorks launch guard is off")
+    return _child_refusals
+
+
+def _take_refusals():
+    taken = [*_refused, *_child_refusals()]
+    _refused.clear()
+    return taken
+
+
 @pytest.fixture(autouse=True)
 def _no_swallowed_solidworks_launch():
-    """Fail a test whose code caught a refused launch instead of surfacing it."""
-    _refused.clear()
+    """Fail a test whose code caught a refused launch instead of surfacing it.
+
+    A child's refusal counts too, whatever its exit code did to the test. A
+    refusal recorded outside any test body (collection, a wider-scoped
+    fixture, an earlier teardown) fails the next test rather than vanishing.
+    """
+    earlier = _take_refusals()
+    if earlier:
+        attempts = "\n".join(earlier)
+        pytest.fail(
+            f"SolidWorks launch attempt(s) refused before this test:\n{attempts}",
+            pytrace=False,
+        )
     yield
-    if _refused:
-        attempts = "\n".join(_refused)
-        _refused.clear()
+    refused = _take_refusals()
+    if refused:
+        attempts = "\n".join(refused)
         pytest.fail(f"SolidWorks launch attempt(s) refused:\n{attempts}", pytrace=False)
 
 
@@ -236,3 +295,36 @@ def _solidworks_autostart_off(monkeypatch):
     logic sets the variable itself and patches the lifecycle calls it reaches.
     """
     monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
+
+
+@pytest.fixture
+def saved_native_bytes():
+    """Build the observed native DisplayLists envelope for parser-backed tests."""
+    import struct
+    import zlib
+
+    def native(*flags):
+        records = []
+        for index, flag in enumerate(flags or (1,)):
+            path = rf"C:\parts\part-{index}.SLDPRT".encode("utf-16le")
+            records.append(
+                b"\xff\xfe\xff"
+                + bytes([len(path) // 2])
+                + path
+                + b"\x00" * 8
+                + struct.pack("<IdI", 6, 1000.0, flag)
+            )
+        data = b"".join(records)
+        compressor = zlib.compressobj(wbits=-15)
+        payload = compressor.compress(data) + compressor.flush()
+        name = b"Contents/DisplayLists"
+        swapped = bytes(((byte << 4) & 0xF0) | (byte >> 4) for byte in name)
+        return (
+            bytes.fromhex("140006000800")
+            + b"\x00" * 4
+            + struct.pack("<4I", zlib.crc32(data), len(payload), len(data), len(name))
+            + swapped
+            + payload
+        )
+
+    return native

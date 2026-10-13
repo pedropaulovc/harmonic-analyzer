@@ -15,26 +15,19 @@ west-rail fulcrum-keeper taps.
 
 from __future__ import annotations
 
+from math import radians, sqrt, tan
+
 import _config
 import vn_knife_hanger_stud_spec as HANGER_SCREW
 import vn_knife_mount_dowel_spec as KNIFE_DOWEL
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
-from _hole_spec import CLEARANCE_MM, HoleSpec
+from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z
 from fr_frame_attachment_spec import CAP_RECESS_DEPTH, COLUMN_SOCKET_DIAMETER
-from ch_fulcrum_keeper_spec import (
-    FOOT_TIP_X,
-    FULCRUM_KEEPER_CENTRE_Z,
-    KEEPER_FITUP_X_FROM_WEB_MM,
-    KEEPER_SEAT_FLATNESS_BUDGET_MM,
-    KEEPER_SEAT_LENGTH_MM as KEEPER_CONTACT_LENGTH_MM,
-    KEEPER_WIDTH,
-    KEEPER_Z_OFF,
-    LUG_HALF_T,
-)
+from ch_fulcrum_keeper_spec import KEEPER_SEAT_FLATNESS_BUDGET_MM
 
 # --- Machined-surface geometry ------------------------------------------------
 #
@@ -48,7 +41,7 @@ FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z  # -112
 REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z  # +112
 RING_HEIGHT = 36.5  # rail band (ch30 p002 36.7 / p006 37.0 / ch19 img03 35.6)
 HALF_H = RING_HEIGHT / 2.0  # 18.25; band local y -18.25..+18.25
-FLANGE_THICKNESS_MM = 8.0  # final top flange, including under the faced seats
+FLANGE_THICKNESS_MM = 8.0  # final top flange, including the faced right rail top
 FLANGE_THICKNESS_PLACES = 1
 BOSS_ABOVE = 4.5  # boss proud of the rail top (corner-crop step)
 BOSS_DIA = (
@@ -59,30 +52,29 @@ CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.45
 GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)
 GOOSENECK_BORE_DIA = 17.0  # O16 post slides through
 
-# Two faced regions on the existing top flange, not raised pads or pockets.
-# Native split lines bound the NOMINAL contact plus its edge allowance;
-# machining matches the actual keeper contacts in the single setup below.
-# The 16.5 contact length includes the lug underside as well as the foot.
-KEEPER_SEAT_EDGE_MARGIN_MM = 0.10
-KEEPER_SEAT_WIDTH_MM = KEEPER_WIDTH + 2.0 * KEEPER_SEAT_EDGE_MARGIN_MM
-KEEPER_SEAT_LENGTH_MM = KEEPER_CONTACT_LENGTH_MM + 2.0 * KEEPER_SEAT_EDGE_MARGIN_MM
-KEEPER_SEAT_CENTRES_XZ = tuple(
-    (
-        COLUMN_X + KEEPER_FITUP_X_FROM_WEB_MM,
-        FULCRUM_KEEPER_CENTRE_Z
-        + side * (KEEPER_Z_OFF + (FOOT_TIP_X - LUG_HALF_T) / 2.0),
-    )
-    for side in (-1.0, 1.0)
-)
-KEEPER_SEAT_BOUNDS_XZ = tuple(
-    (
-        x - KEEPER_SEAT_WIDTH_MM / 2.0,
-        x + KEEPER_SEAT_WIDTH_MM / 2.0,
-        z - KEEPER_SEAT_LENGTH_MM / 2.0,
-        z + KEEPER_SEAT_LENGTH_MM / 2.0,
-    )
-    for x, z in KEEPER_SEAT_CENTRES_XZ
-)
+# --- Gooseneck set-screw boss (east-rail hub) ---------------------------------
+#
+# User ruling 2026-10-12 (option (a), no jam nut): the MHA-VN-023 square-head
+# cup-point set screw that pinches the O16 post enters the hub through a cast
+# boss on the hub pad's outer face -- square-sided and blended into the rail
+# under the top flange, as the ch19 img04 hub shows it -- spot-faced square
+# to the tap. The spot face starts the thread square on a machined face (the
+# head stands proud of it: the cup point bites the post first); it prints .X
+# from the bore axis the screw pinches across.
+HUB_SET_SPOT_FROM_AXIS = 21.0  # .X
+HUB_SET_SPOT_PLACES = 1
+HUB_SET_BOSS_FROM_AXIS = 22.0  # cast face: 1.0 stock over the spot face
+HUB_SET_SPOT_DIA = 10.0  # clears the 1/4 square head's 8.98 diagonal at its .X minimum
+HUB_SET_BOSS_W = 18.0  # along the rail, centred on the tap (spot land: build)
+SET_SCREW_THREAD = "1/4-20"
+SET_SCREW_MAJOR_DIA = THREAD_MAJOR_MM[SET_SCREW_THREAD]  # 6.350
+SET_SCREW_PITCH = 25.4 / 20.0
+SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # drawing-guidelines.md rule 18 (thread engagement): >= 1.5D of full thread
+
+
+def _sag(radius: float) -> float:
+    """A circle's sag across the set screw's major diameter."""
+    return radius - sqrt(radius**2 - (SET_SCREW_MAJOR_DIA / 2.0) ** 2)
 
 
 # --- Knife-hanger screw counterbores and dowel slip holes (crossbar) ---------
@@ -100,7 +92,9 @@ _XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("\u00b1"))
 _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
 # The title block's DRILLED HOLES row: a drilled hole cuts up to this oversize.
 DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
-HANGER_CLEARANCE_DIA = CLEARANCE_MM[("#6", "normal")]  # 4.318
+# The loose #6 fit: its float about the shank carries the dowel pair's
+# spacing mismatch plus the hole's drill drift over the grip (below).
+HANGER_CLEARANCE_DIA = CLEARANCE_MM[("#6", "loose")]  # 4.699
 HANGER_CBORE_DIA = 7.0  # .XX
 HANGER_CBORE_DEPTH = 6.5  # .XX, from the crossbar top
 HANGER_HOLE_SPEC = HoleSpec(
@@ -126,7 +120,7 @@ HANGER_CBORE_HEAD_CLEARANCE = HANGER_CBORE_DIA - _XX - HANGER_SCREW.HEAD_DIA  # 
 HANGER_HEAD_RECESS = HANGER_CBORE_DEPTH - _XX - HANGER_SCREW.HEAD_H  # 2.48
 HANGER_HEAD_BEARING = (
     HANGER_SCREW.HEAD_DIA - (HANGER_CLEARANCE_DIA + DRILL_OVERSIZE)
-) / 2.0  # 0.66
+) / 2.0  # 0.47
 for _label, _value in (
     ("head in counterbore", HANGER_CBORE_HEAD_CLEARANCE),
     ("head recess", HANGER_HEAD_RECESS),
@@ -137,7 +131,7 @@ for _label, _value in (
 # The dowel slip hole: a slip on the pin's catalogue diameter at 0.02..0.10
 # diametral clearance (the dt_pinion_cam_spec slip band), reamed to an
 # explicit +/-0.03 band and printed .XXX: 0.0274..0.0925.
-HANGER_PIN_X = KNIFE_DOWEL.HANGER_OFFSET  # 6.350 either side of the screw axis
+HANGER_PIN_X = KNIFE_DOWEL.HANGER_OFFSET  # 7.100 either side of the screw axis
 # The pair's stations from the screw axis in the dowel spec's order: the -X
 # slot, then the +X round hole.
 HANGER_PIN_XS = (-HANGER_PIN_X, HANGER_PIN_X)
@@ -162,109 +156,140 @@ if HANGER_PIN_SLIP_CLEARANCE_MIN < 0.02 or HANGER_PIN_SLIP_CLEARANCE_MAX > 0.10:
     )
 # Manufacturing GD&T limits consumed by the part's drawing projection: each
 # slot to the round hole beside it (datum B front, C rear) at the BASIC
-# 12.700 between them, oriented by the other round hole with its location
+# 14.200 between them, oriented by the other round hole with its location
 # released (translation modifier), so the two mounts' dowel lines stay square
 # to the B-C line.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {"knife-hanger slot position": "0.05"}
 HANGER_SLOT_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"])
-# The slot's station from its round hole, BASIC (the frame's zone holds it),
-# so the crossbar's .XXX round-hole station never opens the slot-to-hole
-# spacing; from the screw axis it sits at the round hole's .XXX band plus
-# the zone radius: 0.155.
-HANGER_SLOT_FROM_ROUND = HANGER_ROUND_X - HANGER_SLOT_X  # 12.700, BASIC
+# The slot's station from its round hole, BASIC (codex review of 080fda97:
+# the frames need a basic location): the frame's zone holds the slot's width
+# (across the dowel line), and the note holds its centre along the slot from
+# the BASIC at the title block's .XXX band (a slot's plain position frame does
+# not reach that direction, codex review of 0bb6ba81; +-0.025 there read as
+# over-specification, 50fe7633).  From the screw axis it sits at the round
+# hole's .XXX band plus its own: 0.26.
+HANGER_SLOT_FROM_ROUND = HANGER_ROUND_X - HANGER_SLOT_X  # 14.200, BASIC
 HANGER_SLOT_FROM_ROUND_PLACES = 3
-HANGER_SLOT_STATION_TOL = HANGER_PIN_X_TOL + HANGER_SLOT_POSITION_TOL / 2.0
+HANGER_SLOT_ALONG_TOL = _XXX  # 0.13
+HANGER_SLOT_ALONG_CALLOUT = f"CENTRE \u00b1{HANGER_SLOT_ALONG_TOL:g} ALONG SLOT"
+HANGER_SLOT_STATION_TOL = HANGER_PIN_X_TOL + HANGER_SLOT_ALONG_TOL
 # The -X dowel's blind slot: the round hole's reamed slip width (so the pin
 # keeps the same 0.0274..0.0925 slip across it), held to the round hole
-# beside it by the position frame above, and its length (along X, the dowel
-# line) printed .XX.  The slot takes up the spacing mismatch: its zone
-# radius (0.025), the knife mount's .XXX span (0.13) and the round-hole pin
-# across its loosest slip (0.046), either way: 3.183 + 2 x 0.201 = 3.585
-# under the 3.790 shortest.
+# beside it by the position frame and note above, and its length (along X,
+# the dowel line) printed .XXX.  The slot takes up the spacing mismatch: its
+# centre's 0.13 along it, the knife mount's .XXX span (0.13) and the
+# round-hole pin across its loosest slip (0.046), either way: 3.183 + 2 x
+# 0.306 = 3.795 under the 4.070 shortest (0.275 spare).  The length's .XXX
+# band is functional, not a default: the longest slot sets the slot's wall to
+# the screw clearance hole (``build_fr_top_frame.SLOT_SCREW_WALL``, 2.141), and
+# at .XX the shortest slot must grow to 4.31 for the same travel, its longest
+# leaving 1.90 there, under drawing-guidelines.md rule 17 (walls and webs)'s 2.0 (codex review of 080fda97 asked for
+# a one-place length: 4.6 +-0.8 leaves 1.61).
 HANGER_SLOT_WIDTH = HANGER_PIN_HOLE_DIA
 HANGER_SLOT_WIDTH_BAND = HANGER_PIN_HOLE_DIA_BAND
 HANGER_SLOT_WIDTH_PLACES = HANGER_PIN_HOLE_DIA_PLACES
-HANGER_SLOT_LENGTH = 4.30
-HANGER_SLOT_LENGTH_PLACES = 2
-HANGER_SLOT_LENGTH_TOL = _XX  # 0.51
+HANGER_SLOT_LENGTH = 4.20
+HANGER_SLOT_LENGTH_PLACES = 3
+HANGER_SLOT_LENGTH_TOL = _XXX  # 0.13, functional (above)
 HANGER_SLOT_DEPTH = HANGER_PIN_HOLE_DEPTH
 HANGER_SLOT_TRAVEL = (
-    HANGER_SLOT_POSITION_TOL / 2.0
-    + KNIFE_DOWEL.SPAN_TOL
-    + HANGER_PIN_SLIP_CLEARANCE_MAX / 2.0
-)  # 0.201
-HANGER_SLOT_LENGTH_REQUIRED = KNIFE_DOWEL.DIA_MAX + 2.0 * HANGER_SLOT_TRAVEL  # 3.585
+    HANGER_SLOT_ALONG_TOL + KNIFE_DOWEL.SPAN_TOL + HANGER_PIN_SLIP_CLEARANCE_MAX / 2.0
+)  # 0.306
+HANGER_SLOT_LENGTH_REQUIRED = KNIFE_DOWEL.DIA_MAX + 2.0 * HANGER_SLOT_TRAVEL  # 3.795
 if HANGER_SLOT_LENGTH - HANGER_SLOT_LENGTH_TOL < HANGER_SLOT_LENGTH_REQUIRED:
     raise AssertionError(
         f"knife-hanger slot {HANGER_SLOT_LENGTH - HANGER_SLOT_LENGTH_TOL:.3f} long"
         f" at its shortest does not take the dowel's"
         f" {HANGER_SLOT_LENGTH_REQUIRED:.3f} travel"
     )
-# The drilled #6 hole's float about the screw shank: (4.318 - 3.505) / 2.  The
+# The drilled #6 hole's float about the screw shank: (4.699 - 3.505) / 2.  The
 # knife-hanger stack in ``build_sm_summing_assembly`` (which owns the knife
-# mount's tap position term) proves the dowel stations' mismatch stays inside.
-HANGER_SCREW_FLOAT = (HANGER_CLEARANCE_DIA - HANGER_SCREW.SHANK_DIA) / 2.0  # 0.41
+# mount's tap position term) proves the dowel stations' mismatch, plus the
+# hole's drift over the grip, stays inside.
+HANGER_SCREW_FLOAT = (HANGER_CLEARANCE_DIA - HANGER_SCREW.SHANK_DIA) / 2.0  # 0.597
 # Suffixes on the model's own slip-hole and slot sizes and the depth they
-# share (rules 6 and 7: count, process and purpose; the size and its band
+# share (drawing-guidelines.md rule 7 (notes: few, flagged, never a method) and drawing-guidelines.md rule 12 (hole and slot callouts say what to do): count, process and purpose; the size and its band
 # print natively): section F-F carries the round holes' size, the depth of
 # all four (both holes and both slots floor at one height) and the slots'
-# length; the underside locator the slots' width.
-HANGER_PIN_HOLE_CALLOUT = "2X BLIND FLAT-BOTTOM REAM\nSLIP FIT MHA-VN-051"
+# length; the underside locator the slots' width.  Each names its mate by
+# number and name (codex review of 59f405ab).
+HANGER_PIN_HOLE_CALLOUT = "2X BLIND FLAT-BOTTOM REAM\nSLIP FIT MHA-VN-051 DOWEL"
 HANGER_PIN_DEPTH_CALLOUT = "4X"
-HANGER_SLOT_WIDTH_CALLOUT = "2X BLIND SLOT\nREAMED WIDTH\nSLIP FIT MHA-VN-051"
+HANGER_SLOT_WIDTH_CALLOUT = "2X BLIND SLOT\nREAMED WIDTH, SLIP FIT\nMHA-VN-051 DOWEL"
 HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH"
+
+# Full thread in the hub at the printed worst case (dt_arbor_pedestal_spec's
+# terms): the thread is full only where its major circle lies wholly in metal,
+# so the bore's sag across the hole is lost, and so is the one-pitch entry
+# chamfer; the flat spot face loses none. The spot face sits at the near end
+# of its .X band, the bore at the larger of its printed .XX band and the title
+# block's drilled row.
+_GOOSENECK_BORE_RADIUS_MAX = (GOOSENECK_BORE_DIA + max(_XX, DRILL_OVERSIZE)) / 2.0
+SET_SCREW_THREAD_TERMS = {
+    "spot face from bore axis at its minimum": HUB_SET_SPOT_FROM_AXIS - _X,
+    "bore radius at its maximum": -_GOOSENECK_BORE_RADIUS_MAX,
+    "bore sag across the thread": -_sag(_GOOSENECK_BORE_RADIUS_MAX),
+    "one-pitch entry chamfer": -SET_SCREW_PITCH,
+}
+SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_THREAD_TERMS.values())  # 9.58
+SET_SCREW_FULL_THREAD_NOMINAL = (
+    HUB_SET_SPOT_FROM_AXIS
+    - GOOSENECK_BORE_DIA / 2.0
+    - _sag(GOOSENECK_BORE_DIA / 2.0)
+    - SET_SCREW_PITCH
+)  # 10.61
+SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.51D
+if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
+    raise AssertionError(
+        f"hub set screw keeps {SET_SCREW_ENGAGEMENT_D:.2f}D of full thread "
+        f"at the printed worst case (< {SET_SCREW_MIN_ENGAGEMENT_D}D)"
+    )
 
 
 # --- Machining-required surfaces ---------------------------------------------
 #
-# These nine faces own native finish controls. The two keeper-seat regions
-# carry SEAT_UM in the bounded facing/common-zone instruction below: existing
-# PlanarFace bounding-box selectors cannot distinguish those coplanar patches
-# from the residual rail top. The locating-seat finish is not a general grade.
+# These six faces own native finish controls. The right (west) rail top
+# between its bosses, which seats both MHA-CH-007 keepers, and the underside
+# plane between the bosses, which seats both MHA-SM-002 knife mounts, carry
+# SEAT_UM in the linked facing notes below: each is one plane, so its note
+# names the extent instead of a split-line region. The locating-seat finish
+# is not a general grade.
 #
 # * The four tube-socket bores take the MHA-FR-003 columns on a match-fitted close
 #   hand-slip; a cast bore wall cannot hold that fit and would score the tube.
-# * The four cap-recess floors are the axial seats the MHA-VN-028 caps land on --
-#   they set the columns' shoulder height, so their roughness is a fit surface,
-#   not cosmetic.
+# * The four cap-recess floors carry no finish: each MHA-VN-028 cap seats on
+#   its tube end (build_fr_frame_assembly asserts it), 1.5 mm above the floor,
+#   so the recess only clears the cap skirt.
 # * The gooseneck bore guides the O16 counter-spring post through the hub and
 #   is pinched by the set screw against it.
+# * The set-screw boss's spot face is the machined face the set tap starts
+#   square from, so the cup point bears on the post along the tap axis.
 #
 # SEAT grade throughout: nothing runs on these surfaces continuously, so the
 # commercial machine finish is what the fit needs. The part authors one native
-# symbol per one of these nine controlled faces; each sheet states it ONCE, and the
+# symbol per one of these six controlled faces; each sheet states it ONCE, and the
 # target text names the family so a single symbol cannot be misread as one
 # instance (harmonic-base FLANGE_PERIMETER_TARGET precedent).
 SOCKET_BORE_TARGET = "TUBE SOCKET BORES, 4X"
-CAP_SEAT_TARGET = "CAP SEAT FLOORS, 4X"
 SURFACE_FINISHES = tuple(
-    control
+    SurfaceFinishControl(
+        f"socket_{rail}_{end}",
+        SEAT_UM,
+        CylinderFace(BORE_DIA, contains_x_mm=x, contains_z_mm=z),
+        production_method=SOCKET_BORE_TARGET,
+    )
     for rail, x in (("east", GOOSENECK_X), ("west", COLUMN_X))
     for end, z in (("front", FRONT_COLUMN_Z), ("rear", REAR_COLUMN_Z))
-    for control in (
-        SurfaceFinishControl(
-            f"socket_{rail}_{end}",
-            SEAT_UM,
-            CylinderFace(BORE_DIA, contains_x_mm=x, contains_z_mm=z),
-            production_method=SOCKET_BORE_TARGET,
-        ),
-        SurfaceFinishControl(
-            f"cap_seat_{rail}_{end}",
-            SEAT_UM,
-            PlanarFace(
-                (0.0, 1.0, 0.0),
-                CAP_RECESS_FLOOR_Y,
-                contains_x_mm=x,
-                contains_z_mm=z,
-            ),
-            production_method=CAP_SEAT_TARGET,
-        ),
-    )
 ) + (
     SurfaceFinishControl(
         "hub_bore",
         SEAT_UM,
         CylinderFace(GOOSENECK_BORE_DIA, contains_x_mm=GOOSENECK_X),
+    ),
+    SurfaceFinishControl(
+        "hub_set_spot_face",
+        SEAT_UM,
+        PlanarFace((-1.0, 0.0, 0.0), HUB_SET_SPOT_FROM_AXIS - GOOSENECK_X),
     ),
 )
 
@@ -297,7 +322,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HubBossProfile": {"HubDia"},
     "HubBoss": {"HubBossExtent"},
     "RibProfile": {"RibWidth"},
-    "SetPocketProfile": {"PocketRun", "PocketRise"},
+    "SetBossProfile": {"SetBossWidth"},
+    "SetSpotProfile": {"SetSpotDia"},
     "GooseneckTap": {"SetTapZ"},
     "GooseneckProfile": {"GnDia", "GnX", "GnZ"},
     # The hanger-counterbore and keeper-tap placement dims (StudFrontX ...,
@@ -342,7 +368,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BarProfile": {"GussetRunE": 1},
     "HubBossProfile": {"HubDia": 1},
     "RibProfile": {"RibWidth": 1},
-    "SetPocketProfile": {"PocketRise": 1},
+    "SetBossProfile": {"SetBossWidth": 1},
+    "SetSpotProfile": {"SetSpotDia": 1},
     "GooseneckProfile": {"GnDia": 2},
     "CapRecessProfile": {"CapRecessDia": 2},
     "CapRecesses": {"CapRecessDepth": 2},
@@ -384,8 +411,8 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 # recipe's own dimension label.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # Sheet 1, GEOMETRY: envelope, windows, T-rail section B-B and side
-    # section E-E with the crossbar T -- cast stock under the title block's
-    # general band.
+    # section E-E with the crossbar T and its pockets -- cast stock under the
+    # title block's general band.
     "overall casting width": 1,
     "overall casting depth": 1,
     "side flange width": 1,
@@ -400,6 +427,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "side rail web thickness": 1,
     "crossbar web thickness": 1,
     "crossbar flange thickness": FLANGE_THICKNESS_PLACES,
+    "crossbar pocket depth": 1,
     # Sheet 2, HOLES-SOCKETS: the socket pitches are the setup datums the
     # column plan is drilled from, and MHA-FR-001 states them to 0.01, so they
     # are the one pair of sheet-derived numbers that earns a second place.
@@ -421,15 +449,20 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "top bore mouth chamfer": 1,
     "opposed counterbore floor separation": 1,
     "cross screw axis from boss top": 1,
-    "counterbore floor from socket axis": 1,
-    # Sheet 4, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the
-    # cropped set-pocket section D-D.
+    # .XX, the floor at 16.35 (fr_frame_attachment_spec.TOP_SCREW_SEAT_Z):
+    # 2.04 to the cap recess at every printed corner
+    # (build_fr_top_frame.COUNTERBORE_PRINTED_CAP_LIGAMENT).
+    "counterbore floor from socket axis": 2,
+    # Sheet 5, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the
+    # cropped set-screw boss section D-D (spot face, boss face, thread run).
     "hub from left front socket": 1,
     "set screw axis from rail top": 1,
     "hub boss underside drop": 1,
     "hub gusset feather span": 1,
     "hub gusset ramp angle": 1,
-    "set-pocket depth from outer rail face": 1,
+    "set-screw spot face from bore axis": HUB_SET_SPOT_PLACES,
+    "set-screw thread length": 1,
+    "set-screw boss face from bore axis": 1,
     # Sheet 6, UNDERSIDE: the junction lands and the knife-hanger section F-F
     # -- the counterbore floor (the screw's grip) above the crossbar underside,
     # the dowel slip hole's station from the screw axis, the slot's BASIC
@@ -441,13 +474,6 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "dowel hole from hanger axis": HANGER_PIN_X_PLACES,
     "dowel slot from dowel hole": HANGER_SLOT_FROM_ROUND_PLACES,
     "dowel slot length": HANGER_SLOT_LENGTH_PLACES,
-    # Keeper facing: actual contacts set size/location; split-line dimensions
-    # are references. Final local flange thickness binds the receiver-wall proof.
-    "keeper seat width": 1,
-    "keeper seat length": 1,
-    "keeper seat inner edge from socket": 1,
-    "keeper seat end from socket": 1,
-    "keeper seat flange thickness": FLANGE_THICKNESS_PLACES,
 }
 
 # Use the canonical printed-band reader, not the unrounded inch grades.
@@ -462,6 +488,10 @@ KEEPER_TAP_CALLOUT_PRECISION = {
 # drawing-guidelines.md rule 17 (walls and webs) receiver-wall stack: realistic angular drift through the FULL
 # printed cylindrical pilot depth, without relying on a precision drill jig.
 KEEPER_TAP_DRILL_WANDER_DEG = 0.3
+# The same allowance as a lateral drift per mm from a hole's entry face: the
+# knife-hanger holes, drilled from the faced underside, charge it
+# at the depth each wall is judged (``build_fr_top_frame``).
+DRILL_DRIFT_PER_MM = tan(radians(KEEPER_TAP_DRILL_WANDER_DEG))  # 0.00524
 
 # The nominal socket geometry stays fixed; the assigned actual tube governs fit.
 # The C2 general break overrides the title block's 0.25 max break on the
@@ -470,18 +500,40 @@ KEEPER_TAP_DRILL_WANDER_DEG = 0.3
 # proved without a chamfer).  The edges too short, too close to a feature or
 # under a knife seat for C2 (build_fr_top_frame._external_edge_breaks) are
 # the "UNLESS NOTED": section E-E's note names the crossbar flange underside,
-# the hub side view's note the hub rib bottoms, V-gussets and set-screw
-# pocket rim, the underside locator's the bar and gusset bottoms at the knife
-# seats; they keep the title block break.  drawing-guidelines.md rule 7 (notes: few, flagged, never a method) caps this block at four
-# lines of at most 70 characters.
+# the hub side view's note the hub rib bottoms and V-gussets, the underside
+# locator's the bar and gusset bottoms at the knife seats; they keep the
+# title block break.  drawing-guidelines.md rule 7 (notes: few, flagged, never a method) caps this block at four lines of at most 70
+# characters.
 DRAWING_NOTES = (
     "MATCH EACH SOCKET TO ITS ASSIGNED ACTUAL MHA-FR-003 TUBE.\n"
     "CLOSE HAND-SLIP; NO PERCEPTIBLE ROCK.\n"
     "RETAIN CORNER AND ORIENTATION MATCH MARKS.\n"
     "CONVEX CASTING EDGES C2 X 45 UNLESS NOTED; HOLE EDGES PER TITLE BLOCK."
 )
+# User ruling 2026-10-11: the whole right (west) rail top between the two
+# corner bosses is faced, so both keeper feet land on one flat face wherever
+# fit-up puts them; no split-line regions.  Its own property, placed beside
+# the keeper callout on HOLES-SOCKETS.  The last row states why the flatness
+# is held: the two keepers' lug bores carry one fulcrum shaft in a running fit
+# (blind machinist review, farm 0fbfc4d75).
 DRAWING_NOTES_B = (
-    f"BOTH SEATS WITHIN ONE COMMON {KEEPER_SEAT_FLATNESS_BUDGET_MM:.2f} FLATNESS ZONE.\n"
-    f"SIZE TO ACTUAL KEEPER CONTACTS PLUS {KEEPER_SEAT_EDGE_MARGIN_MM:.2f} EACH EDGE.\n"
-    f"KEEPER LOCATING SEATS: Ra {SEAT_UM:.1f} UM."
+    "RIGHT RAIL TOP BETWEEN BOSSES\n"
+    "(MHA-CH-007 KEEPER SEATS):\n"
+    f"FLAT WITHIN {KEEPER_SEAT_FLATNESS_BUDGET_MM:.2f}, Ra {SEAT_UM:.1f} UM,\n"
+    "SO BOTH KEEPER BORES ALIGN."
+)
+# User ruling 2026-10-12 (reading (i)): every face on the 999.7 underside
+# plane between the bosses is faced at the seat finish -- the rail web
+# bottoms, the junction lands and plan gussets, and the crossbar's full-depth
+# ends that seat both MHA-SM-002 knife mounts.  The 4X corner-boss bottoms
+# (6.3 below the plane) and the hub boss and its V-gussets (8.0 below) stay
+# off it.  No flatness zone (both knife seats lie on the one faced plane; no
+# stack spends a form budget on it) and no geometry change: the model's
+# underside is the finished plane.  Its own property, on the UNDERSIDE sheet
+# beside the enlarged detail of the hub boss and gussets it excludes.
+DRAWING_NOTES_C = (
+    "UNDERSIDE PLANE BETWEEN BOSSES\n"
+    "(MHA-SM-002 KNIFE-MOUNT SEATS):\n"
+    f"Ra {SEAT_UM:.1f} UM; BOSS BOTTOMS AND\n"
+    "HUB GUSSETS EXCLUDED."
 )

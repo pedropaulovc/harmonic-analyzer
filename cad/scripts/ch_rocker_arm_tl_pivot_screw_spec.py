@@ -25,9 +25,7 @@ from __future__ import annotations
 import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_profile_fixture_spec as profile
-from _feature_requirements import ExportFeature, limits
 from _gtol_cylinder import CylinderFace
-from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
 from _surface_finish import GROUND_UM, MACHINED_UM, SurfaceFinishControl
@@ -259,98 +257,3 @@ if _HEAD_BEHIND_SLOT_MIN < 1.5:
     raise AssertionError("pivot-screw slot leaves under the drawing-guidelines.md rule 17 (walls and webs) floor in the head")
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"
 
-_AXIS = ([0.0, 0.0, 1.0], ("__frame__",))
-_ROCKER = "ch_rocker_arm_spec"
-# One fact, one source: features.toml carries what the print says -- the
-# bracketed reference diameters and each feature's printed fit callout.
-# SHOULDER_BAND / HEAD_BAND stay design intent for the stack checks only.
-
-EXPORT_FEATURES: dict[str, ExportFeature] = {
-    "shoulder": ExportFeature(
-        kind="boss",
-        faces=(SURFACE_FINISHES[0].face,),
-        requirements=("note", "length", "finish_ra"),
-        fields={
-            "at": ([0.0, 0.0, SHOULDER_END_Z], ("SHOULDER_END_Z",)),
-            "axis": _AXIS,
-            "dia_nominal": (SHOULDER_DIA, ("SHOULDER_DIA",)),
-            "length": (limits(SHOULDER_LENGTH, AXIAL_PLACES), ("SHOULDER_LENGTH", "AXIAL_PLACES")),
-            "finish_ra": (GROUND_UM, ("SURFACE_FINISHES",)),
-            "process": ("lap", ("SURFACE_FINISHES",)),
-            "note": (" ".join(SHOULDER_FIT_CALLOUT.splitlines()), ("SHOULDER_FIT_CALLOUT",)),
-        },
-        precision={"length": AXIAL_PLACES, "finish_ra": 1},
-    ),
-    "head": ExportFeature(
-        kind="boss",
-        faces=(CylinderFace(HEAD_DIA),),
-        requirements=("note", "length", "finish_ra"),
-        fields={
-            "at": ([0.0, 0.0, UNDERHEAD_Z], ("UNDERHEAD_Z",)),
-            "axis": _AXIS,
-            "dia_nominal": (HEAD_DIA, ("HEAD_DIA",)),
-            "length": (limits(HEAD_LENGTH, 1), ("HEAD_LENGTH",)),
-            "finish_ra": (MACHINED_UM, ("SURFACE_FINISHES",)),
-            "process": ("lap", ("SURFACE_FINISHES",)),
-            "coaxial_to": ("shoulder", ("DRAWING_NOTES",)),
-            "note": (" ".join(HEAD_FIT_CALLOUT.splitlines()), ("HEAD_FIT_CALLOUT",)),
-        },
-        precision={"length": 1, "finish_ra": 1},
-    ),
-    "underhead": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 0.0, -1.0), -UNDERHEAD_Z),),
-        requirements=("plane",),
-        fields={
-            "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "z", "value": UNDERHEAD_Z}, ("UNDERHEAD_Z", "WASHER_THICK")),
-        },
-    ),
-    # The tip face owns the printed UnderHeadLength, located from the
-    # underhead.
-    "tip": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 0.0, -1.0), -TIP_Z),),
-        requirements=("station", "note"),
-        fields={
-            "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "z", "value": TIP_Z}, ("TIP_Z",)),
-            # The printed chamfer callout is the acceptance: 45 degrees, down
-            # to the thread root; its (0.65) size is reference.
-            "note": (TIP_CHAMFER_NOTE, ("CHAMFER_CALLOUT", "TIP_CHAMFER")),
-            "height_from": ("underhead", ("UNDER_HEAD_LENGTH",)),
-            "station_nominal": (UNDER_HEAD_LENGTH, ("UNDER_HEAD_LENGTH",)),
-            "station": (
-                limits(UNDER_HEAD_LENGTH, AXIAL_PLACES),
-                ("UNDER_HEAD_LENGTH", "AXIAL_PLACES"),
-            ),
-        },
-        precision={"station": AXIAL_PLACES},
-    ),
-    # The thread runs the whole projection, shoulder end to tip: its ends are
-    # the shoulder's printed length and the tip's printed station, so its own
-    # length is a reference, not a second band.
-    "thread": ExportFeature(
-        kind="thread",
-        faces=(CylinderFace(THREAD_MODEL_DIA),),
-        requirements=("thread",),
-        fields={
-            "at": ([0.0, 0.0, TIP_Z], ("TIP_Z",)),
-            "axis": _AXIS,
-            "thread": (THREAD_CALLOUT, ("THREAD_CALLOUT",)),
-            "length_reference": (THREAD_LENGTH, ("UNDER_HEAD_LENGTH", "SHOULDER_LENGTH")),
-        },
-    ),
-    "driver_slot": ExportFeature(
-        kind="slot",
-        faces=(PlanarFace((0.0, 0.0, 1.0), round(HEAD_TOP_Z - SLOT_DEPTH, 6)),),
-        requirements=("width", "depth"),
-        fields={
-            "at": ([0.0, 0.0, HEAD_TOP_Z], ("HEAD_TOP_Z",)),
-            "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
-            "width": (limits(SLOT_WIDTH, 1), ("SLOT_WIDTH",)),
-            "depth": (limits(SLOT_DEPTH, 1), ("SLOT_DEPTH",)),
-        },
-        precision={"width": 1, "depth": 1},
-    ),
-}

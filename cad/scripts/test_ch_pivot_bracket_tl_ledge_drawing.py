@@ -11,15 +11,14 @@ import ch_pivot_bracket_tl_angle_plate_spec as plate
 import ch_pivot_bracket_tl_ledge_spec as spec
 import draw_ch_pivot_bracket_tl_ledge as drawing
 import export_features
-from _feature_requirements import limits
+from _printed_limits import limits
 from _hole_spec import THREAD_MAJOR_MM
 
 # The prechips S4 hold the ledge and plate are built for (review/compose-r5
 # follow-on 67237b9, examples/inventory/pedro-shop.toml [fixtures.angle-plate]
-# and examples/pivot-bracket/plan.toml [setups.hold]), in Setup frame TC for
-# the S configuration (the shorter foot the ledge is sized for): Z0 is the
-# bracket's faced outer face (in the plane of the ear's inboard face, the
-# hold-down station's datum), 5.24 proud of the plate top. The 2026-10-10
+# and examples/pivot-bracket/plan.toml [setups.hold]), in Setup frame TC: Z0
+# is the bracket's faced outer face (in the plane of the ear's inboard face,
+# the hold-down station's datum), 5.24 proud of the plate top. The 2026-10-10
 # 8-thick ears and two thrust washers moved the ledge rows, and the
 # worst-case 4 mm floor (CodeRabbit on 3d649fd90) raised the ledge and
 # lowered the studs; the prechips plan follows these.
@@ -39,7 +38,7 @@ def test_ledge_and_plate_stations_are_the_prechips_s4_stack() -> None:
     case, so the ledge is 26.9 high with its holes 16.4 off its bottom, and the plate's taps and studs sit at
     the prechips hold's Z rows. Each printed value is held here, independently
     of the specs, and checked with its one-place band."""
-    assert round(plate.PART_PROUD[plate.LEDGE_CONFIG], 2) == PRECHIPS_PART_PROUD
+    assert round(plate.PART_PROUD, 2) == PRECHIPS_PART_PROUD
     ledge = _features()
     taps_and_studs = export_features.requirement_manifest("ch_pivot_bracket_tl_angle_plate")["features"]
     ledge_bottom = PRECHIPS_LEDGE_Z[0] - PRECHIPS_TABLE_Z  # on its 2 in block
@@ -91,10 +90,9 @@ def test_ledge_top_meets_the_bracket_foot_free_end() -> None:
     """On its 1-2-3 block the ledge top stands where the foot's free end
     lands with the bracket's outer face proud of the plate top."""
     top = _features()["foot_rest"]["height_nominal"]
-    for name, foot_len in sides.FOOT_LEN.items():
-        foot_end = plate.PLATE_HEIGHT + plate.PART_PROUD[name] - foot_len
-        assert abs(plate.BLOCK_HEIGHT + top - foot_end) < 1e-9
-        assert plate.PART_PROUD[name] >= plate.PART_PROUD_MIN
+    foot_end = plate.PLATE_HEIGHT + plate.PART_PROUD - sides.FOOT_LEN
+    assert abs(plate.BLOCK_HEIGHT + top - foot_end) < 1e-9
+    assert plate.PART_PROUD >= plate.PART_PROUD_MIN
 
 
 def test_ledge_carries_the_whole_foot_and_clears_the_stud_nuts() -> None:

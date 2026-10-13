@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -57,11 +58,49 @@ def test_the_section_cuts_the_cup_axis_across_the_face_view() -> None:
     assert x1 > drawing.FACE_CENTER[0] + drawing.HALF_OD
 
 
+def test_bore_assembly_pin_callout_stays_inside_the_left_border() -> None:
+    """4e9a4df PNG: the intact 70 mm pin line started at sheet x 5 mm."""
+    from _layout_geometry import estimate_text_box
+
+    def left_edge(anchor):
+        box = estimate_text_box(
+            spec.BORE_CALLOUT.splitlines()[-1], anchor=anchor,
+            height=0.0035, reference=5,
+        )
+        assert box is not None
+        # Use the larger of the calibrated source ink and the generic estimate.
+        return min(box.xmin, anchor[0] - 0.070 / 2.0)
+
+    assert left_edge(drawing.FACE_KEEP["BoreDia"]) > 0.0127 + 0.003
+    assert left_edge((0.040, drawing.FACE_KEEP["BoreDia"][1])) < 0.0127
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == spec.BORE_CALLOUT
+
+
+def test_cup_od_text_and_line_clear_the_native_section_scale_caption() -> None:
+    """4e9a4df PNG: SCALE 4:1 occupied y 126 .. 131 mm, across the OD line."""
+    from _layout_geometry import estimate_text_box
+
+    caption_bottom, caption_top = 0.126, 0.142
+
+    def clear(anchor):
+        box = estimate_text_box("Ø19.0", anchor=anchor, height=0.0035, reference=2)
+        assert box is not None
+        return box.ymax + 0.003 < caption_bottom and anchor[1] < caption_bottom - 0.003
+
+    assert clear(drawing.SECTION_KEEP["CupDia"])
+    assert not clear((0.200, 0.130))
+    assert caption_top < drawing.SECTION_CENTER[1] - spec.LENGTH * drawing._S / 2000.0
+    assert drawing.SECTION_KEEP["CupDia"][0] == drawing.SECTION_CENTER[0]
+    assert drawing.SECTION_KEEP["CupDia"][1] > 0.0127 + 0.003
+
+
 def test_only_the_bore_carries_a_model_band() -> None:
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_BAND)",
     }
-    assert min(spec.BORE_BAND) > 0.0
+    assert spec.BORE_DIA == pytest.approx(6.000)
+    assert spec.BORE_BAND == pytest.approx((0.012, 0.0))
+    assert min(spec.BORE_BAND) == 0.0
 
 
 def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
@@ -79,9 +118,9 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         "ring": (od_min - bore_max) / 2.0,
         "rear": length_min - station - hole_r,
     }
-    assert walls["journal"] == pytest.approx((8.465 - 1.65) / 2.0, abs=0.01)
+    assert walls["journal"] == pytest.approx((5.988 - 1.65) / 2.0, abs=1e-9)
     assert walls["front"] == pytest.approx(3.0 - 0.10 - 0.825, abs=1e-9)
-    assert walls["ring"] == pytest.approx((18.2 - 8.54) / 2.0, abs=1e-9)
+    assert walls["ring"] == pytest.approx((18.2 - 6.012) / 2.0, abs=1e-9)
     assert {k: w for k, w in walls.items() if w < spec.WALL_FLOOR} == {}
     assert spec.JOURNAL_PIN_WALL_WORST == pytest.approx(walls["journal"])
     assert spec.FRONT_PIN_WALL_WORST == pytest.approx(walls["front"])
@@ -106,6 +145,15 @@ def test_the_reamed_bore_slides_on_the_journal_over_the_full_bands() -> None:
     loosest = (spec.BORE_DIA + max(spec.BORE_BAND)) - knob_shaft.JOURNAL_DIA_MIN
     assert 0.0 < tightest <= loosest
     assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((tightest, loosest))
+
+
+def test_cup_bore_refuses_binding_on_the_actual_journal(monkeypatch) -> None:
+    assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((0.004, 0.024))
+    monkeypatch.setattr(knob_shaft, "JOURNAL_DIA_BAND", (0.020, 0.0))
+    fresh_spec = importlib.util.spec_from_file_location("_cup_perturbed", spec.__file__)
+    fresh = importlib.util.module_from_spec(fresh_spec)
+    with pytest.raises(AssertionError, match="bore binds"):
+        fresh_spec.loader.exec_module(fresh)
 
 
 def test_the_journal_end_stays_inside_the_shortest_cup() -> None:

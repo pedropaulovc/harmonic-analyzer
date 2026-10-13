@@ -1,19 +1,19 @@
 """Offline guards for the measuring stick's engraved-numerals DXF.
 
-The tracked ``cad/references/ha-measuring-stick-numerals.dxf`` is a GENERATED
-asset (``gen_stick_numerals_dxf``); the build imports it blind and only
+The tracked ``cad/references/ms-stick-numerals.dxf`` is a GENERATED
+asset (``gen_ms_stick_numerals_dxf``); the build imports it blind and only
 bound-checks the removed volume on the live seat. These tests keep the file,
-the generator and the build script's pinned constants in step without
+the generator and the pure model dimensional contract in step without
 SolidWorks: the file regenerates byte-identical, parses back as closed
 LWPOLYLINEs with the expected loop census, lands inside the ruled band clear
-of every tick, and matches the area/bbox the build asserts against.
+of every tick, and matches the model-owned pinned area/bbox.
 """
 
 from __future__ import annotations
 
 import _dxf_text as dxf
-import build_ha_measuring_stick as part
-import gen_stick_numerals_dxf as gen
+import ms_stick_spec as part
+import gen_ms_stick_numerals_dxf as gen
 
 EXPECTED_OUTER_LOOPS = 12  # glyph bodies: 0 1 2 3 4 5 6 7 8 9 + the "1" and "0" of 10
 EXPECTED_INNER_LOOPS = 7  # counters: 0, 4, 6, 8 (x2), 9, and the 0 of 10
@@ -24,7 +24,7 @@ def _read() -> str:
 
 
 def _tick_rects() -> list[tuple[float, float, float, float]]:
-    """Every engraved tick as (x0, y0, x1, y1), from the build's own layout."""
+    """Every engraved tick as (x0, y0, x1, y1), from the pure model layout."""
     half = part.TICK_WIDTH / 2.0
     rects = []
     for k in range(part.DIVISION_COUNT):
@@ -45,8 +45,8 @@ def test_dxf_is_tracked_and_regenerates_byte_identical():
     assert part.NUMERALS_DXF.is_file(), part.NUMERALS_DXF
     on_disk = dxf.normalize_newlines(part.NUMERALS_DXF.read_bytes())
     assert on_disk == gen.render(), (
-        "ha-measuring-stick-numerals.dxf drifted from gen_stick_numerals_dxf -- "
-        "re-run `uv run python cad/scripts/gen_stick_numerals_dxf.py` and commit"
+        "ms-stick-numerals.dxf drifted from gen_ms_stick_numerals_dxf -- "
+        "re-run `uv run python cad/scripts/gen_ms_stick_numerals_dxf.py` and commit"
     )
 
 
@@ -86,13 +86,13 @@ def test_numerals_sit_in_the_ruled_band_clear_of_every_tick():
     for k, numeral in enumerate(numerals):
         x0, y0, x1, y1 = dxf.bbox(numeral)
         assert 0.0 < x0 and x1 < part.BODY_LENGTH, (k, x0, x1)
-        assert 0.0 < y0 and y1 <= band_top + 1e-9, (k, y0, y1)
+        assert 0.0 < y0 and abs(y1 - band_top) < 1e-9, (k, y0, y1)
         tick = gen.tick_x(k)
         if k < part.DIVISION_COUNT - 1:
-            assert x0 >= tick + part.TICK_WIDTH / 2.0 + part.NUMERAL_GAP_MM - 1e-9, (k, x0)
+            assert abs(x0 - (tick + part.TICK_WIDTH / 2.0 + part.NUMERAL_GAP_MM)) < 1e-9, (k, x0)
             assert x0 < tick + part.DIVISION_SPACING / 2.0, (k, x0)  # next to ITS tick
         else:
-            assert x1 <= tick - part.TICK_WIDTH / 2.0 - part.NUMERAL_GAP_MM + 1e-9, (k, x1)
+            assert abs(x1 - (tick - part.TICK_WIDTH / 2.0 - part.NUMERAL_GAP_MM)) < 1e-9, (k, x1)
         for tx0, ty0, tx1, ty1 in ticks:
             overlaps = x0 < tx1 and tx0 < x1 and y0 < ty1 and ty0 < y1
             assert not overlaps, f"numeral {k} bbox overlaps a tick at x={tx0:.2f}"

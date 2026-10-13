@@ -3874,7 +3874,7 @@ ENFORCED_KINDS: frozenset[str] = frozenset(
 # (swmaker000007), 20260928T141421973Z (swmaker000008) and
 # 20260928T152556482Z (swmaker000004).
 # sm-knife-mount's sheet is crowded (three frames, a stacked frame pair and a
-# frame-attached datum over a 24 mm block), and its placements were tuned
+# frame-attached datum over a 25 mm block), and its placements were tuned
 # against this audit, so it enforces every gating kind but
 # "view-edges-missing": its front and right views print their edges but
 # none the audit reads as a 0.25 mm model edge, the line-weight false

@@ -219,6 +219,20 @@ Do: `ICalloutLengthVariable::Precision` and `::TolerancePrecision` per variable
 (`types/ICalloutLengthVariable/Precision.md`), reached through
 `IDisplayDimension::GetHoleCalloutVariables`. Dual/dual-tolerance values are
 global and still go through `SetPrecision3`, as both pages state.
+A REF depth in a hole callout goes the same way: into the DEFINITION, not the
+resolved text. A callout's four definitions read back through
+`IDisplayDimension::GetText` parts 5..8 (`swDimensionTextParts_e`: prefix,
+suffix, callout above, callout below) and are written through parts 1..4
+(`SetText(part - 4, ...)`; `draw_fr_harmonic_base._set_cross_tap_callout_text`
+writes 3 and reads back 7). The output fixture marks its thumb-screw tap's
+thread depth REF by bracketing the VARIABLE, `(<hw-threaddepth>)`, in the one
+definition that holds it, then reads all four back and requires exactly that:
+one bracketed thread depth, the drill depth's `<hw-tapdrldepth>` once and
+bare (it governs), the process prefix intact
+(`draw_mg_output_fixture._reference_thread_depth`). The printed `(10.1)` stays
+the model's value and follows it; typing the number would not. The thread's
+extent is the note's business (`THREAD ENDS AT ROD BORE.`), not a band on the
+REF value.
 
 **e. The hidden-line regen trap after annotating.**
 Don't: trust `GetDisplayMode2` / `GetFacettedHlrDisplay` to mean the EXPORT will
@@ -342,6 +356,14 @@ its edge. A pointer note (`add_leader_note`) has no attachment to lose (0 -> 0
 on the same run) and keeps the call. Where the pick and the landing differ,
 the leader may end on the PICK (pinion_bracket pivot finish, 4.6 mm off), so
 pick the edge at the landing point.
+The owning-face proof can also refuse a seemingly attached silhouette:
+the magnifying lever's capsule OD on retry10 (source `644308e47`, launcher
+`20261012T164103041Z`) read one type-46 entity, one leader and not dangling,
+but its attached silhouette's face failed `IsSame` against the picked one.
+Keep that refusal. Resolve the part-owned finish-control face on the view's
+`ReferencedDocument` and attach as a FACE with the pre-insertion selection
+point (`draw_dt_pinion_arbor`, `draw_mg_magnifying_lever`): `IsSame` proves
+the actual cylinder and the 1 mm landing readback still pins its flank.
 
 **j. A fresh detail view whose readbacks lag its ink.**
 Right after `CreateDetailViewAt4` + rebuild, `IView::GetOutline` is centred
@@ -351,9 +373,20 @@ it (cone_swing_platform detail B, leaf 20260928T075849Z-1-882b4704). A loop
 that "corrects" the projection moves a correct view off the sheet target and
 needs a second move to recover; on three #1105 leaves it never did.
 Do: place by the outline centre (`GetOutline` is the ink; `SetViewPosition`
-moves it by the delta from the `Position` it reads), then re-read the
-projection until it agrees with the outline before hanging anything on the
-view.
+moves it by the delta from the `Position` it reads), then read the projection
+behind `IView::UpdateViewDisplayGeometry` before hanging anything on the
+view (`_drawing_detail_projection.settle_detail_projection`). Don't settle
+it with a count of `EditRebuild3` calls. Rebuilds, re-reads and idle time
+each catch the transform up only some of the time. Detail B's first read was
+stale in 41 of 41 leaves, and it was still stale after three rebuilds on 4 of
+them (#1336). With the barrier in front of every read, the cone-gear-shaft tip
+detail read current first time in 15 of 15 leaves, against 3 of 35 without
+it. On seat-probe leaf 20261013T052718Z-1-4b76316f, 20 throwaway details all
+read stale first and all 4 behind the barrier then read current. The same
+leaf's real detail B, settled the old way, stayed stale through three rebuilds
+and failed. The settle span records `reads`, `rebuilds`, `waited_s` and the
+unrefreshed control offset. If the barrier ever fails to refresh the transform,
+the span shows it as more than one read, inside a time budget.
 The same holds for a section after `IDrSection::SetReversedCutDirection`:
 the reversal stood thumbnut A-A rim-up, yet `SetViewPosition` on its
 creation target left the seat projected one nut length (48.3 mm at 3:1)
@@ -439,6 +472,224 @@ bracket or a missing or misplaced glyph
 `<DatumLetter>C<MOD-TRANS2></DatumLetter>`, which is not well-formed XML
 (run 20261009T200747541Z); the frame-XML parser escapes `<MOD-…>`/`<GTOL-…>`
 codes before parsing.
+
+**n. Linear-dimension text requested outside its witness span.**
+Don't: treat the requested x coordinate as the centre of a vertical dimension's
+text. Outside the witness span, SOLIDWORKS hangs the rows away from the witnesses
+under a shoulder. In `mg-magnifying-bracket` retry08 (source `ae7c8f4d6`,
+launcher `20261012T111849499Z`), text requested at x 167 mm printed a shoulder
+from x 146.6 to 167.0 mm, across the adjacent arm-depth column at x 147 mm.
+Do: use the measured printed text boxes and shoulder endpoints, then derive the
+column and row positions with clearance for the full hung text and outside-arrow
+tails. A value-plus-callout row is wider than its number; do not centre either
+by assumption. Recheck the native audit after the repair.
+A HORIZONTAL dimension hangs differently: its rows print centred on the
+requested x and its dimension line runs on under the lowest row to that row's
+far end. The bracket's `10.00 / ARM WIDTH`, requested at x 88 mm beside its
+x 129..139 mm span (retry09, source `8d6d2088a`, launcher
+`20261012T124257186Z`), printed its rows over x 75..101 mm with the flange
+width's witness at x 91 mm through both; the block's far end is the request
+minus half the widest row, and every line that side of it must clear by a text
+height. A span shorter than its row (the 6.35 mm hole-row offset, witnesses at
+y 88.65 and 95 mm) requested AT a witness's coordinate prints centred on its own
+column, the witness and dimension line through the text: request it beyond the
+span so it hangs like the others.
+A genuine diameter hangs the same way and stops READING as one. The output
+fixture's groove root Ø7 is a doubled distance (`AddSpecificDimension`
+`swDiametricLinearDimension`, `Diametric` proven on the part); requested under
+the view on retry09, SOLIDWORKS ran its dimension line 20 mm down out of the
+groove into a 30 mm horizontal shoulder beside the bore's station, and the
+machinist read the Ø as an axial length. Nest it instead: the root Ø's line
+standing across the groove root to root, the spigot's Ø9 a pitch outboard
+(20 mm), their texts staggered 5 mm either side of the axis so each breaks only
+its own line, and prove the INK, not the glyph: `IDisplayDimension::Type2` is
+6 or 15 (`swDiameterDimension`, as retry10's drawing import reports, or
+the authoring `swDiametricLinearDimension`), `Diametric` is True, and
+`IDimension::SystemValue` equals the root diameter, not its radius or some
+other circle's diameter. Type14 is the single-distance radial linear form
+and is refused. The measured strokes must put an extension line from each
+root (starting 1 mm off it) out to the dimension line at the requested x
+(`draw_mg_output_fixture._prove_groove_root_diameter`).
+
+**o. A linear reference dimension formatted as a diameter.**
+Don't: pass a linear offset to `set_reference_dimensions`: that helper supplies
+the diameter prefix `(<MOD-DIAM>`. It printed the bracket's datum-face offset
+as `(Ø3.35)` although the model dimension was a linear point-to-point distance.
+Do: use the singular `set_reference_dimension` for a linear REF value; reserve
+the diameter-specific helper for actual diameters.
+
+**p. A generic Hole Wizard note census copied from a previous topology.**
+Don't: retain a through-tap note count after changing the native feature, or
+replace it with a universal “blind taps emit no note” rule. The fixture's old
+through-to-bore feature emitted one `Tapped Hole` note; retry08's blind feature
+emitted zero on the same worker, while other blind-tap drawings still emit one.
+Do: keep the final note sweep and a strict part-specific measured census. Keep
+the explicit resolved thread/drill callout and centre-mark proofs separate:
+an autogenerated label is not the machining instruction. The template also
+centre-marks an extruded annulus bore as the view is placed, not only Hole
+Wizard holes: the bracket's collar end view arrived with one mark on the bore
+(its extended lines end at the bore radius plus 2.5 mm) and the explicit
+`auto_center_marks(holes=True)` printed a second, identical one over it
+(DetailItem351/352 at (266.15, 180) mm, retry09; the washer's annulus end view
+read 1 → 2 the same way in #913). Add none; prove the one on the axis
+(`draw_mg_magnifying_bracket._prove_collar_centre_mark`).
+
+**q. A standard view placed as-is is not necessarily in projection.**
+Don't: assume `*Right` beside `*Top` makes a third-angle set, or add a mirrored
+`*Back` view to carry a face's hole dimensions. `mg-magnifying-bracket` retry09
+(source `8d6d2088a`, launcher `20261012T124257186Z`): `*Top` was the principal
+view with model +Z running DOWN it, but `*Right` arrived with +Y up and +Z to
+the sheet's LEFT, so the collar's circle stood beside an arm running left and
+the blind machinist read a different part (mreview09 blocker 1); the `*Back`
+view under it, mirrored about the flange, carried the counterbore callout and
+the hole coordinates and read as a duplicate "not a projection of anything
+above it". The same sheet located the bore axis twice from two origins — the
+arm's 54.30 from its buried start in the top view and the actual seat's
+55.19 from the axis in the side view (blocker 3).
+Do: turn the view by a MEASURED angle, not an assumed one: project a model
+axis before and after `IView::Angle` (`model_point_in_view` on the origin and
+a point along +Z, the cradle's `_turn`), require +Z down and +Y left within
+1e-6 rad, then pin the view's ORIGIN (not its centre) to the principal view's
+measured origin height through `IView::Position` / `SetViewPosition`, read
+back within 1e-4 m (the latch hook's `_pin_origin`), all BEFORE any import so
+every placed text is in the final frame
+(`draw_mg_magnifying_bracket._project_side_view`). Dimension the mounting
+face on the ALIGNED view that shows it (`*Front` under `*Top`): the
+counterbores open on the face that view cannot see, so the hole callout
+attaches to the THROUGH rims on the visible face (`ViewEdge.circle_at` at
+`SIDE_PLATE_Z[1]`, radius `CLEARANCE_DIA / 2`) and names the entry side in its
+process prefix (`DRILL / COUNTERBORE FROM` / `FACE OPPOSITE MOUNTING FACE`);
+whether `AddHoleCallout2` on
+the through rim resolves the Hole Wizard feature is native evidence, not an
+assumption. Give one axis ONE controlling chain from the actual flange seat,
+not an inner step merely labelled "mounting face". Other face-to-axis values
+are REF, with sufficient precision that their printed step sums consistently,
+and the dimension from the buried start is unmarked. The collar's OD, with no
+band of its own, inherits the title block's `.XX` ±0.51. The named OD print
+corners in `mg_lever_press_fit_geom` are conservative independently: strength
+uses Ø11.49 (330.8 MPa von Mises, below the 333 MPa limit), while maximum
+pressure and press force use Ø12.51. The press force is the friction term over the
+whole conservative contact envelope, not the nominal 7 mm straight cylinder, plus
+the normal reaction on the partial dome. The longest straight cylinder is
+10.00 − 2.997 = 7.003 mm; the part of the R3 hemisphere still outside the smallest
+(5.986) bore adds sqrt(3.000² − 2.993²) = 0.204819 mm, so the explicit maximum is
+7.207819 mm. Friction (μ 0.10–0.15, p 143.66 MPa, d 6.000, L 7.207819 mm) gives
+1951.871–2927.806 N, and the projected dome axial-normal reaction bound adds
+18.933819 N, so the total press force is 1970.804504–2946.739847 N
+(1.970805–2.946740 kN). The two corners are chosen independently on purpose
+(the smallest dome sets the longest cylinder, the largest dome the deepest
+penetration), so this is an envelope, not one physical part; its coupled tight
+corner is 7.204819 mm. The shared note rounds the high total upward to
+**3.0 kN MAX**. The 2.9 kN prints from native 16 are source-specific evidence for
+the old 7.003 mm, friction-only note; they do not prove this 3.0 kN note.
+`test_mg_fixture_installation` checks both corners and the
+ceiling independently. A safe low-OD stress corner does not justify using
+the nominal OD to cap force, nor an unnecessary second OD band.
+For the bracket the actual seat is local Z55.1875877804, not the arm's
+Z58.3 end: the flange's 3.175 stock thickness is a different distance.
+The controlling chain is 55.19 seat-to-axis plus 3.11 arm-past-seat;
+58.30 is the sum, printed as a genuine drawing-native linear REF picked
+on the collar rim's arc centre and the arm end. Identify the mounting plane
+from the installed joint, rather than guessing it from a step's outline.
+The arm's 3.11 extension lies beside the lever across a 5.55 mm X gap.
+Label that short extension `ARM PAST MOUNTING FACE`, not merely 3.11.
+Across the flange, the lower edge is Y=-6.35, the arm spans -3.00..+4.50
+and the far edge is +6.35: 3.35 edge-to-arm plus 7.50 arm width leaves
+1.85, not a contradictory 12.70 chain. The existing 3.35 edge-to-arm and
+3.00 arm-to-bore controls locate the bore axis 6.35 from the flange edge;
+do not duplicate that sum with an optional reference dimension. The required
+short overhang remains labelled `ARM PAST MOUNTING FACE`. A SIDE-view rim
+combined with a BOTTOM edge made an angle, and a subsequent mapped sketch
+centre could not prove its source identity: neither justifies relaxed
+dimension-type or identity guards. The optional REF and its exclusive
+selection code are removed; the complete mounting-coordinate ink guard stays.
+
+The arm's controlling 3.00 locates its Y=-3 face, not the opposite Y=+4.5
+face: label it `NEAR ARM FACE TO BORE AXIS`. Put `VIEW ON MOUNTING FACE`
+below the lower view it describes, rather than in the gap above it where
+it reads as the upper view's title. Read the rebuilt caption, controls and
+manufacturing-note extents to prove the lower placement remains clear.
+The added drill/counterbore process had two standalone rows; it was not
+an inherited five-row Hole Wizard limitation. Combine those into one
+truthful `C'BORE OPP. MOUNTING FACE` row, retaining the native
+hole association, size and tolerance stack.
+
+Put the junction's 7.50 width and 3.35 edge location on the bottom view,
+where its footprint is visible, without a second controlling copy in the
+side view. Short inside-arrow spans can overlap their arrowheads even after
+the witness crossings disappear. Instead distribute the controls between
+views and stack outside-arrow dimensions by their rebuilt ink: here the
+3.35 hangs below at x150, the 12.70 above at x166, and the 7.50 is outermost
+at x175. A full diametric chord always passes the bore-axis witness at the
+centre; use the genuine near-side single-arrow style
+(`set_near_side_diameter`) and prove the rebuilt leaders clear of each
+station witness separately. The view-direction caption belongs above the
+bottom outline where neither mounting witnesses nor the hole leader crosses
+it; centre it on `IView::GetOutline` and prove clearance to the neighbouring
+view's printed dimension ink.
+
+The MG-006 hex fixture's principal `*Top` view looks down the rod bore,
+which runs through the hex corners along local Y, not normal to a flat.
+Its height is AF 9.525, with one projected corner ridge through the bore
+circle. An unturned `*Right` end view instead puts Y up and shows the
+across-corners height 10.9985; that is not a third-angle projection of the
+principal view. Turn the end view by its measured axis mapping so -Z is up
+in both views, then align their projected origins before importing any
+dimensions. The end-view bore axis now runs through the left/right corners;
+do not change the model to make a mistaken flat-entry reading true.
+The 1.97 MIN bore-to-flat wall is the ligament to the two parallel flats,
+not an entry-face wall. Name the through-corners orientation on the sheet,
+and hold on flats and centre-drill the 120-degree ridge before drill/ream.
+The end-view bore axis is a native centreline attached to the named
+`RodBore` cylindrical face. Map its feature with `IView.GetCorresponding`,
+then reacquire exactly one centred Ø5.20 Y-axis cylinder from that mapped
+feature's faces. Prove it back to the independently identified source face
+with `GetCorrespondingEntity2` and `IsSame == 1`. The rotated end view returned
+null for direct source-face mapping; that is not permission to accept an
+unmapped face or replace the native axis with cosmetic ink.
+Retain one tap centre mark but disable its extended arms, so the
+rod axis and small tap cross communicate different features, not duplicate
+lines. Place the vertical stock AF REF beside the rotated hex and prove
+its model identity, value, parentheses and flat-to-flat witness ink.
+For the groove R1.20, keep the genuine model radius and turn off
+`ArcExtensionLineOrOppositeSide`: an arrow on the circle's extension in
+air is not a material-arc attachment. Give only the groove-station's
+centre-side witness a 3 mm local gap, not the root-diameter witnesses,
+and prove the rebuilt radius arrow lies on the groove arc with at least
+2 mm separation from that station witness. A flag readback alone does not
+prove where SOLIDWORKS drew the leader.
+Check the entire radius shoulder, not only its elbow: the native 29 mm
+shoulder at y196 crossed the OverallLength face-side witness at x160.4.
+Keep that proven material-arc leader and give only OverallLength's face-side
+extension a local gap derived from the y198 face corner, y196 shoulder,
+2 mm clearance and 0.4 mm ink readback allowance (4.4 mm here). Its expected
+start moves to y193.6, retaining 68.4 mm of witness. After rebuild require
+one complete witness at each length endpoint and at least 2 mm measured
+separation from every radius stroke to both witnesses; the readback allowance
+does not discount that minimum. Do not suppress the final layout audit.
+
+The next accepted native render still printed `R1.20 +/-0.05` through the
+spigot-diameter's top extension. Inspect the actual enlarged PNG as well
+as the audit boxes: this one crossed the glyphs, not merely their bounds.
+Join the model's material circle directly to the full shoulder, without a
+sub-millimetre jog or a new shoulder-span heuristic. At y197.6 the radius
+circle is x147 + sqrt(4.8^2 - 1.2^2) =151.647580 mm. Using the actual
+native keep-to-elbow offsets 15.2764/2.7781 mm derives the
+(166.923980,200.3781) mm text keep. The same OverallLength gap solve
+gives 2.8 mm and a witness start at y195.2, preserving 2.4 mm leader
+clearance. The expected text-to-diameter witness gap is 0.534 mm:
+collision-free text, not a 2 mm text-clearance claim. The native run
+must prove that the genuine material arrow and direct junction persisted;
+do not weaken the existing single-shoulder identity. No extra diameter-
+witness gap mechanism is warranted.
+The fixture recipe must refuse every remaining `text-on-line` finding
+in its existing completed audit report, not only findings naming the
+radius. Reuse those collected findings after finalization; do not add a
+second geometric parser or change the fleet-wide enforced-kind registry,
+which would re-key every other drawing for a one-sheet guard. Missing,
+malformed or wrong-stem audit output cannot count as a clean sheet.
+The known 0.18 mm model-edge collector false positives remain reports;
+they do not justify suppressing actual text crossings.
 
 ## The sheet-split rule
 

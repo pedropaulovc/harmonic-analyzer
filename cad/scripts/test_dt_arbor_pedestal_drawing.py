@@ -24,6 +24,15 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["dt_arbor_pedestal"].script == Path(drawing.__file__).resolve()
 
 
+def test_pedestal_uses_the_common_cone_axis_height() -> None:
+    from cone_line import Y_BASE_TOP, Y_DRIVE
+    from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
+
+    height = CONE_AXIS_HEIGHT_MM + PLATFORM_THICKNESS_MM
+    assert part.BORE_HEIGHT == drawing.BORE_HEIGHT == dt_arbor_pedestal_spec.BORE_HEIGHT == height
+    assert abs(Y_DRIVE - Y_BASE_TOP - height) < 1e-9
+
+
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is dt_arbor_pedestal_spec.DRAWING_DIMENSIONS
     marked = set().union(*dt_arbor_pedestal_spec.DRAWING_DIMENSIONS.values())

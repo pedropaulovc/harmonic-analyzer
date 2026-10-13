@@ -11,12 +11,15 @@ import asyncio
 import hashlib
 import re
 import sys
+import tomllib
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+import export_features
 import export_models
+import features_bound
 from _export_feature_faces import (
     FeatureFaceError,
     assign_feature_patches,
@@ -347,12 +350,14 @@ class _ExportDoc(_PartDoc):
         self.drop_names = drop_names
         self.drop_half = drop_half
         self.native = native
+        self.saved_paths: list[Path] = []
         self.ConfigurationManager = SimpleNamespace(
             ActiveConfiguration=SimpleNamespace(Name="Default")
         )
 
     def SaveAs3(self, path: str, _version: int, _options: int) -> int:
         out = Path(path)
+        self.saved_paths.append(out)
         if out.suffix == ".STEP":
             text = self.step_text()
             if self.drop_half:
@@ -371,28 +376,48 @@ _ROCKER_BUNDLE = ("ch-rocker-arm.STEP", "features.toml")
 
 def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
     """Point export_models at isolated outputs and a synthetic seat.
-    The manifest writer is a boundary double; generator tests own its schema."""
+    Only requirement declarations and COM are doubles: the manifest writer,
+    schema validation and full consumer read-back use their real APIs."""
     sldprt = tmp_path / "sldprt"
     sldprt.mkdir()
     for stem in _STEMS:
         (sldprt / f"{stem.replace('_', '-')}.SLDPRT").write_bytes(b"native part")
-    seen: dict = {"opened": [], "preferences": [], "drop_half": False}
+    seen: dict = {"opened": [], "documents": [], "preferences": [], "drop_half": False}
 
-    def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
-        path = step.with_name("features.toml")
-        path.write_text(
-            f'step = "{step.name}"\n'
-            f'step_sha256 = "{hashlib.sha256(step.read_bytes()).hexdigest()}"\n'
-            f'[drawing]\nrevision = "{revision}"\n',
-            encoding="utf-8",
-        )
-        return path
+    def requirement_manifest(stem: str) -> dict:
+        # These are the two synthetic face domains above, not the real rocker's
+        # drawing requirements. Keep the real writer/schema/binding gate intact.
+        return {
+            "part": stem.replace("_", "-"),
+            "units": "mm",
+            "cite": {},
+            "drawing": {"revision": "unknown"},
+            "frames": {
+                "model": {
+                    "origin": [0.0, 0.0, 0.0],
+                    "x": [1.0, 0.0, 0.0],
+                    "y": [0.0, 1.0, 0.0],
+                    "z": [0.0, 0.0, 1.0],
+                },
+            },
+            "features": {
+                "pivot_bore": {
+                    "kind": "hole", "frame": "model", "requirements": [],
+                    "nominal_dia": 6.5, "faces": "unknown", "cite": {},
+                },
+                "hub_top": {
+                    "kind": "plane", "frame": "model", "requirements": [],
+                    "plane": {"frame": "model", "axis": "z", "value": 3.5},
+                    "faces": "unknown", "cite": {},
+                },
+            },
+        }
 
-    monkeypatch.setitem(sys.modules, "export_features", SimpleNamespace(
-        SUPPORTED_PARTS=("ch_rocker_arm",),
-        feature_selectors=lambda _stem: _SELECTORS,
-        write_manifest=write_manifest,
-    ))
+    # Patch the shared module, not sys.modules: features_bound must see exactly
+    # the inventory the producer supplies, rather than the complete recipe.
+    monkeypatch.setattr(export_features, "SUPPORTED_PARTS", ("ch_rocker_arm",))
+    monkeypatch.setattr(export_features, "feature_selectors", lambda _stem: _SELECTORS)
+    monkeypatch.setattr(export_features, "requirement_manifest", requirement_manifest)
 
     class _Adapter:
         swApp = SimpleNamespace(CloseAllDocuments=lambda _include_unsaved: True)
@@ -402,6 +427,7 @@ def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
             seen["opened"].append(Path(path).name)
             self.currentModel = doc(Path(path))
             self.currentModel.drop_half |= seen["drop_half"]
+            seen["documents"].append(self.currentModel)
             return SimpleNamespace(is_success=True, data=None)
 
         def _attempt(self, call, default=None):
@@ -424,7 +450,7 @@ def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
     monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ())
     monkeypatch.setattr(export_models, "all_scene_part_meshes", lambda _asms: {})
     monkeypatch.setattr(export_models, "_exporter_digest", lambda: "exporter-v1")
-    monkeypatch.setattr(export_models, "release_revision", lambda: "v41")
+    monkeypatch.setattr(export_models._config, "release_revision", lambda: "v41")
     monkeypatch.setattr(
         export_models, "enforce_preferences",
         lambda _adapter, spec: seen["preferences"].append(spec),
@@ -444,6 +470,7 @@ def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
     def run(*argv: str) -> dict:
         monkeypatch.setattr(sys, "argv", ["export_models.py", *argv])
         seen["opened"].clear()
+        seen["documents"].clear()
         seen["rc"] = export_models.main()
         return seen
 
@@ -455,6 +482,16 @@ def _tree(root: Path) -> dict[str, bytes]:
         path.relative_to(root).as_posix(): path.read_bytes()
         for path in root.rglob("*") if path.is_file()
     }
+
+
+def _refuse_feature_production(monkeypatch) -> None:
+    def refuse(*_args, **_kwargs):
+        pytest.fail("full exports must consume existing feature bundles, not regenerate them")
+
+    for name in ("feature_selectors", "requirement_manifest", "write_manifest"):
+        monkeypatch.setattr(export_features, name, refuse)
+    monkeypatch.setattr(export_models, "_save_feature_step", refuse)
+    monkeypatch.setattr(export_models, "name_feature_faces", refuse)
 
 
 def test_feature_bundle_writes_only_step_and_manifest_without_saving_native(
@@ -479,72 +516,177 @@ def test_feature_bundle_writes_only_step_and_manifest_without_saving_native(
     assert seen["preferences"] == [export_models.EXPORT_PREFERENCES]
 
 
+@pytest.mark.parametrize("argv", [(), ("--force",)], ids=["full", "forced-full"])
 def test_full_and_scoped_exports_keep_their_paths_disjoint_and_native_unsaved(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path, monkeypatch, argv: tuple[str, ...],
 ) -> None:
     run, seen = _exporter(tmp_path, monkeypatch)
     native_before = _tree(tmp_path / "sldprt")
 
-    run()
+    # Full export is a consumer: its authoritative bundle must already exist.
+    run("--features", "ch_rocker_arm")
+    assert seen["rc"] == 0
+    scoped_step = tmp_path / "features" / "ch_rocker_arm" / "ch-rocker-arm.STEP"
+    # ANSI metadata and CRLFs make this an exact raw-byte copy proof, not just
+    # equivalent face labels from an independent SaveAs.
+    content = scoped_step.read_bytes().replace(
+        b"HEADER;\n", b"HEADER;\nFILE_DESCRIPTION(('M\xe9tal \x80 metadata'),'2;1');\n",
+    ).replace(b"\n", b"\r\n")
+    scoped_step.write_bytes(content)
+    export_features.write_manifest("ch_rocker_arm", scoped_step, revision="v41")
+    bundle_before = _tree(tmp_path / "features")
+
+    with monkeypatch.context() as consumer:
+        _refuse_feature_production(consumer)
+        run(*argv)
 
     assert seen["rc"] == 0
-    full = (tmp_path / "step" / "ch-rocker-arm.STEP").read_bytes()
-    assert step_face_sets(full.decode(), ["pivot_bore", "hub_top"]) == _EXPORTED_SETS
+    assert set(seen["opened"]) == {"fr-frame-rail.SLDPRT", "ch-rocker-arm.SLDPRT"}
+    full = tmp_path / "step" / "ch-rocker-arm.STEP"
+    assert full.read_bytes() == content
+    assert step_face_sets(content.decode("latin-1"), ["pivot_bore", "hub_top"]) == _EXPORTED_SETS
     assert {path.name for path in (tmp_path / "step").iterdir()} == {
         "fr-frame-rail.STEP", "ch-rocker-arm.STEP",
     }
     assert "HAF_" not in (tmp_path / "step" / "fr-frame-rail.STEP").read_text()
-    assert not (tmp_path / "features").exists()  # the full export writes no bundle
+    assert _tree(tmp_path / "features") == bundle_before
     assert _tree(tmp_path / "sldprt") == native_before
-    full_outputs = _tree(tmp_path)
+    assert {
+        path.relative_to(tmp_path).as_posix()
+        for doc in seen["documents"] for path in doc.saved_paths
+    } == {"stl/fr-frame-rail.STL", "step/fr-frame-rail.STEP", "stl/ch-rocker-arm.STL"}
+    assert all(not face.name for doc in seen["documents"] for face in doc.faces)
+    full_outputs = {
+        name: raw for name, raw in _tree(tmp_path).items()
+        if not name.startswith("features/")
+    }
 
     run("--features", "ch_rocker_arm")
 
-    scoped = (tmp_path / "features" / "ch_rocker_arm" / "ch-rocker-arm.STEP").read_text()
-    assert step_face_sets(scoped, ["pivot_bore", "hub_top"]) == _EXPORTED_SETS
-    after = _tree(tmp_path)
-    assert {key: after[key] for key in full_outputs} == full_outputs
-    assert set(after) - set(full_outputs) == {
-        f"features/ch_rocker_arm/{name}" for name in _ROCKER_BUNDLE
-    }
+    assert seen["rc"] == 0
+    assert seen["opened"] == ["ch-rocker-arm.SLDPRT"]
+    assert step_face_sets(scoped_step.read_text(), ["pivot_bore", "hub_top"]) == _EXPORTED_SETS
+    assert _tree(tmp_path / "features").keys() == bundle_before.keys()
+    assert {
+        name: raw for name, raw in _tree(tmp_path).items()
+        if not name.startswith("features/")
+    } == full_outputs
     assert _tree(tmp_path / "sldprt") == native_before
 
 
-@pytest.mark.parametrize("argv", [(), ("--features", "ch_rocker_arm")], ids=["full", "bundle"])
 def test_export_fails_when_the_step_drops_the_face_names(
-    tmp_path: Path, monkeypatch, argv: tuple[str, ...],
+    tmp_path: Path, monkeypatch,
 ) -> None:
     run, _seen = _exporter(
         tmp_path, monkeypatch, doc=lambda _native: _ExportDoc(drop_names=True),
     )
 
     with pytest.raises(FeatureFaceError, match="pivot_bore: no named STEP face"):
-        run(*argv)
+        run("--features", "ch_rocker_arm")
     assert not (tmp_path / "features" / "ch_rocker_arm" / "features.toml").exists()
 
 
-@pytest.mark.parametrize("argv", [(), ("--features", "ch_rocker_arm")], ids=["full", "bundle"])
 def test_export_fails_when_the_native_part_is_saved(
-    tmp_path: Path, monkeypatch, argv: tuple[str, ...],
+    tmp_path: Path, monkeypatch,
 ) -> None:
     run, _seen = _exporter(tmp_path, monkeypatch, doc=lambda native: _ExportDoc(native=native))
 
     with pytest.raises(RuntimeError, match="rocker-arm.SLDPRT changed on disk"):
-        run(*argv)
+        run("--features", "ch_rocker_arm")
     assert not (tmp_path / "features" / "ch_rocker_arm" / "features.toml").exists()
 
 
-@pytest.mark.parametrize("argv", [(), ("--features", "ch_rocker_arm")], ids=["full", "bundle"])
 def test_export_refuses_a_periodic_bore_with_only_one_named_half(
-    tmp_path: Path, monkeypatch, argv: tuple[str, ...],
+    tmp_path: Path, monkeypatch,
 ) -> None:
     run, _seen = _exporter(
         tmp_path, monkeypatch, doc=lambda _native: _ExportDoc(drop_half=True),
     )
 
     with pytest.raises(FeatureFaceError, match="pivot_bore: expected exactly 2 STEP patches, found 1"):
-        run(*argv)
+        run("--features", "ch_rocker_arm")
     assert not (tmp_path / "features" / "ch_rocker_arm" / "features.toml").exists()
+
+
+@pytest.mark.parametrize("member", [0, 1], ids=["manifest", "step"])
+def test_full_export_rejects_a_missing_bundle_before_any_native_or_neutral_write(
+    tmp_path: Path, monkeypatch, member: int,
+) -> None:
+    run, seen = _exporter(tmp_path, monkeypatch)
+    # A valid earlier bundle must not leak into staging when the last is missing.
+    monkeypatch.setattr(export_features, "SUPPORTED_PARTS", _STEMS)
+    run("--features", *_STEMS)
+    assert seen["rc"] == 0
+    missing = export_features.bundle_paths("ch_rocker_arm", tmp_path)[member]
+    missing.unlink()
+    before = _tree(tmp_path)
+    _refuse_feature_production(monkeypatch)
+    monkeypatch.setattr(
+        export_models, "run_build",
+        lambda _build: pytest.fail("invalid feature inventory must fail before the native seat opens"),
+    )
+
+    with pytest.raises(features_bound.FeaturesBoundError, match=re.escape(str(missing))):
+        run()
+
+    assert seen["opened"] == []
+    assert not (tmp_path / "step").exists()
+    assert _tree(tmp_path) == before
+
+
+@pytest.mark.parametrize(("defect", "diagnostic"), [
+    ("dropped-names", "pivot_bore: no named STEP face"),
+    ("half-labelled-bore", "pivot_bore must be exactly 2 STEP faces, found 1"),
+    ("invalid-schema", "invalid feature manifest"),
+    ("invalid-toml", "invalid TOML"),
+    ("unbound-digest", "does not bind the adjacent STEP"),
+    ("wrong-face-refs", "faces .* differ from adjacent STEP"),
+])
+def test_full_export_rejects_malformed_bundles_without_regeneration_or_partial_staging(
+    tmp_path: Path, monkeypatch, defect: str, diagnostic: str,
+) -> None:
+    run, seen = _exporter(tmp_path, monkeypatch)
+    monkeypatch.setattr(export_features, "SUPPORTED_PARTS", _STEMS)
+    run("--features", *_STEMS)
+    assert seen["rc"] == 0
+    manifest_path, step = export_features.bundle_paths("ch_rocker_arm", tmp_path)
+    manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+    if defect == "dropped-names":
+        step.write_bytes(step.read_bytes().replace(b"HAF_", b"NONE_"))
+        manifest["step_sha256"] = hashlib.sha256(step.read_bytes()).hexdigest()
+    elif defect == "half-labelled-bore":
+        step.write_bytes(step.read_bytes().replace(_BORE_1.encode(), b"NONE", 1))
+        # Bind the malformed source honestly, including its exact remaining refs:
+        # only the consumer's split-periodic cardinality check can reject it.
+        export_features.write_manifest("ch_rocker_arm", step, revision="v41")
+        manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+    elif defect == "invalid-schema":
+        manifest["units"] = "inches"
+    elif defect == "unbound-digest":
+        step.write_bytes(step.read_bytes() + b"\r\n/* raw header drift */\r\n")
+    elif defect == "wrong-face-refs":
+        manifest["features"]["pivot_bore"]["faces"] = manifest["features"]["hub_top"]["faces"]
+    if defect == "invalid-toml":
+        manifest_path.write_text("[features", encoding="utf-8")
+    else:
+        manifest_path.write_text(export_features._toml(manifest), encoding="utf-8")
+    # A prior full output is neither replaced by the valid first bundle nor
+    # supplemented with a partial last bundle on a failed preflight.
+    previous = tmp_path / "step" / "fr-frame-rail.STEP"
+    previous.parent.mkdir()
+    previous.write_bytes(b"previous full export")
+    before = _tree(tmp_path)
+    _refuse_feature_production(monkeypatch)
+    monkeypatch.setattr(
+        export_models, "run_build",
+        lambda _build: pytest.fail("malformed feature bundles must fail before the native seat opens"),
+    )
+
+    with pytest.raises(features_bound.FeaturesBoundError, match=diagnostic):
+        run("--force")
+
+    assert seen["opened"] == []
+    assert _tree(tmp_path) == before
 
 
 def test_export_refuses_more_than_two_named_rocker_bore_patches(tmp_path: Path, selectors) -> None:

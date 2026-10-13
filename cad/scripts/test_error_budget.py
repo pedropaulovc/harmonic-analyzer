@@ -220,7 +220,7 @@ def test_loaded_anchor_geometry_sets_pen_gain_and_hole_sensitivity(nom):
 
     expected_gain_per_lever_mm = lift_torque_gain() / total_stiffness
     actual_gain_per_lever_mm = eb.pen_gain(nom, nom.lever_r_built) / (
-        nom.lever_r_built * nom.wheel_ratio
+        eb.wire_moment_arm(nom, nom.lever_r_built) * nom.wheel_ratio
     )
     assert actual_gain_per_lever_mm == pytest.approx(
         expected_gain_per_lever_mm, rel=2e-6
@@ -361,35 +361,93 @@ def test_sparse_pair_is_gated_on_the_jointly_drawn_worst_coefficient(budget, rep
 
 
 def test_magnifier_setup_fits_reference_inputs_to_reachable_stroke(report, nom):
-    """Each reference input uses a reachable lever radius without exceeding the
-    physical pen stroke. Broad inputs scale down at the minimum radius; the
-    sparse pair stays full scale at the built-radius limit."""
+    """Classify each reference input from its peak and the reachable wire-arm
+    capacities, not from which regimes a particular drum happened to realise.
+    Scaling fills the stroke at the collar; a fitted input fills it inside the
+    band; a short input stays full scale at the built-station limit."""
     assert nom.lever_r_min < nom.lever_r_built <= nom.lever_r_max
+    trial = eb.NominalTrial(nom)
+    inputs = eb.reference_inputs()
+    arm_min = eb.wire_moment_arm(nom, nom.lever_r_min)
+    arm_built = eb.wire_moment_arm(nom, nom.lever_r_built)
+    pen_per_bar = eb.pen_gain_per_arm_mm(nom) * abs(trial.f_full)
+    capacity_min = nom.pen_half / (pen_per_bar * arm_min)
+    capacity_built = nom.pen_half / (pen_per_bar * arm_built)
+    assert 0.0 < capacity_built < capacity_min
     mag = report["closed_form"]["mg-magnifier"]
-    assert mag["ordinate_capacity_full_scale_bars"] > 0.0
+    assert mag["ordinate_capacity_full_scale_bars"] == pytest.approx(capacity_min)
+    regimes = {}
     for name, setup in mag["per_input"].items():
+        x = inputs[name]
+        peak = trial.peak_bars(x * nom.d_max)
+        arm_required = nom.pen_half / (pen_per_bar * peak)
         assert setup["k0_reading_mm"] == pytest.approx(
             nom.pen_half * setup["stroke_fill"], rel=1e-6
         )
         assert 0.0 < setup["stroke_fill"] <= 1.0
         assert nom.lever_r_min <= setup["lever_r"] <= nom.lever_r_built
-        if name == "pair_1_20":
-            assert setup["ordinate_scale"] == 1.0
-            assert setup["lever_r"] == nom.lever_r_built
-            assert setup["k0_reading_mm"] < nom.pen_half
-        else:
-            assert 0.0 < setup["ordinate_scale"] < 1.0
+        assert setup["wire_arm"] == pytest.approx(
+            eb.wire_moment_arm(nom, setup["lever_r"]), abs=1e-9
+        )
+        if peak > capacity_min:
+            regimes[name] = "scaled"
             assert setup["lever_r"] == nom.lever_r_min
-
-    trial = eb.NominalTrial(nom)
-    for name, setup in mag["per_input"].items():
-        x = eb.reference_inputs()[name]
+            assert 0.0 < setup["ordinate_scale"] < 1.0
+            assert setup["stroke_fill"] == 1.0
+        elif peak <= capacity_built:
+            regimes[name] = "short"
+            assert setup["lever_r"] == nom.lever_r_built
+            assert setup["ordinate_scale"] == 1.0
+            assert setup["stroke_fill"] == pytest.approx(arm_built / arm_required)
+            assert setup["k0_reading_mm"] <= nom.pen_half
+        else:
+            regimes[name] = "fitted"
+            assert nom.lever_r_min <= setup["lever_r"] < nom.lever_r_built
+            assert setup["lever_r"] == pytest.approx(
+                eb.clamp_radius_for_arm(nom, arm_required), abs=1e-9
+            )
+            assert setup["wire_arm"] == pytest.approx(arm_required)
+            assert setup["ordinate_scale"] == 1.0
+            assert setup["stroke_fill"] == 1.0
         stations = setup["ordinate_scale"] * x * nom.d_max
         physical_peak = eb.pen_gain(nom, setup["lever_r"]) * trial.k0_hook_mm(stations)
         assert physical_peak == pytest.approx(setup["k0_reading_mm"], rel=1e-3)
         assert trial.peak_bars(stations) == pytest.approx(
             trial.k0_hook_mm(stations) / abs(trial.f_full), rel=1e-3
         )
+    assert regimes["pair_1_20"] == "short"
+    assert mag["per_input"]["pair_1_20"]["k0_reading_mm"] < nom.pen_half
+    assert mag["per_input"]["pair_1_20"]["stroke_fill"] < 1.0
+    assert regimes["all_ones"] == "scaled"
+
+
+def test_magnifier_setup_fits_a_derived_interior_input(nom):
+    """Construct a full-stroke input for an interior clamp, so the fitted
+    branch remains exercised even when no reference input lands there."""
+    trial = eb.NominalTrial(nom)
+    target_radius = 0.5 * (nom.lever_r_min + nom.lever_r_built)
+    target_arm = eb.wire_moment_arm(nom, target_radius)
+    pen_per_bar = eb.pen_gain_per_arm_mm(nom) * abs(trial.f_full)
+    target_capacity = nom.pen_half / (pen_per_bar * target_arm)
+    ones = eb.reference_inputs()["all_ones"]
+    scale = trial.ordinate_scale_for(ones, target_capacity)
+    assert 0.0 < scale < 1.0
+    x = scale * ones
+    stations = x * nom.d_max
+    table_peak = float(np.sum(trial.x_read(stations) * (1.0 + trial.kappa(stations))))
+    assert table_peak == pytest.approx(target_capacity, rel=1e-9)
+    setup = trial.magnifier_setup(x)
+    assert nom.lever_r_min < setup.lever_r < nom.lever_r_built
+    assert setup.lever_r == pytest.approx(target_radius, abs=1e-9)
+    assert setup.wire_arm == pytest.approx(target_arm, abs=1e-9)
+    assert setup.ordinate_scale == 1.0
+    assert setup.stroke_fill == 1.0
+    expected_peak = pen_per_bar * target_arm * table_peak
+    assert expected_peak == pytest.approx(nom.pen_half, rel=1e-9)
+    assert setup.k0_reading_mm == pytest.approx(expected_peak, rel=1e-9)
+    gain = eb.pen_gain(nom, target_radius)
+    assert gain == pytest.approx(eb.pen_gain_per_arm_mm(nom) * target_arm)
+    assert gain * trial.k0_hook_mm(stations) == pytest.approx(expected_peak, rel=1e-3)
 
 
 def test_scale_rule_solves_the_table_instead_of_scaling_by_proportion(report, nom):
@@ -679,27 +737,138 @@ def test_cam_shaft_axis_is_fixed_by_the_frame_not_the_part(nom):
 
 
 def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
-    """Every broad input is scored at the magnifier's minimum pose (clamp
-    against the collar), which build_mg_magnifier_assembly never builds: the
-    report names those inputs, the gate fails on it unless the yaml records
+    """Every broad input is scored at or just above the magnifier's minimum
+    pose (clamp against the collar), which build_mg_magnifier_assembly never
+    builds -- only the as-built station is gated: the report names those
+    inputs with their stations, the gate fails on them unless the yaml records
     the waiver (#748), and the offline wire estimate that rides the waiver
     reproduces mg_lever_wire_geom's own numbers at the as-built pose."""
     import mg_lever_wire_geom
 
     mag = report["closed_form"]["mg-magnifier"]
     assert mag["minimum_pose_cad_gated"] is False
-    assert set(mag["inputs_at_minimum_pose"]) >= {"all_ones", "gaussian_a0p1"}
+    broad = [n for n in budget["reference_inputs"] if n != "pair_1_20"]
+    assert mag["inputs_at_ungated_pose"] == broad
+    for name in broad:
+        assert mag["per_input"][name]["lever_r"] < nom.lever_r_built
+    assert mag["per_input"]["pair_1_20"]["lever_r"] == nom.lever_r_built
     strict = negative(budget, readout={"waive_minimum_pose": False})
     bad = eb.budget_closes(eb.build_report(strict))
-    assert any(b.startswith("magnifier minimum pose is not CAD-gated") for b in bad), (
-        bad
-    )
+    gate = [b for b in bad if b.startswith("magnifier minimum pose is not CAD-gated")]
+    assert len(gate) == 1, bad
+    for name in broad:
+        assert (
+            f"{name} (clamp {mag['per_input'][name]['lever_r']:.0f} mm from the knife)"
+            in gate[0]
+        )
     built = eb._minimum_pose_wire_estimate(
         dataclasses.replace(nom, lever_r_min=nom.lever_r_built)
     )
-    assert built["hook_x_mm"] == pytest.approx(mg_lever_wire_geom.CLAMP_X)
+    assert built["hook_x_mm"] == pytest.approx(mg_lever_wire_geom.HOOK_X)
     assert built["wire_length_mm"] == pytest.approx(mg_lever_wire_geom.WIRE_LEN, abs=1e-3)
-    assert mag["minimum_pose_wire_estimate"]["hook_x_mm"] < mg_lever_wire_geom.CLAMP_X
+    assert built["wire_arm_mm"] == pytest.approx(mag["wire_arm_built_mm"])
+    assert mag["minimum_pose_wire_estimate"]["hook_x_mm"] < mg_lever_wire_geom.HOOK_X
+    assert mag["minimum_pose_wire_estimate"]["wire_arm_mm"] == mag["wire_arm_min_mm"]
+
+
+def test_pen_gain_runs_on_the_wire_moment_arm_not_the_clamp_station(nom):
+    """The pen sees the wire's length change per knife-axis rotation, not the
+    clamp's distance from the knife. The signed fixture offset and the real
+    drum tangent determine that arm. Independent endpoint and finite-rotation
+    calculations agree at minimum, built and maximum stations, while full-band
+    monotonicity makes the setup's inverse solve well posed."""
+    import mg_lever_wire_geom
+    import mg_output_fixture_geom
+    import spring_mount_geom
+
+    # the signed offset is the fixture's, and it points at the knife
+    assert nom.hook_offset_x == mg_output_fixture_geom.HOOK_OFFSET_X
+    assert nom.hook_offset_x < 0.0
+    assert eb.KNIFE_AXIS_XY == (spring_mount_geom.KNIFE[0], spring_mount_geom.KNIFE_CONTACT_Y)
+    assert eb.KNIFE_AXIS_XY[0] + nom.lever_r_built + nom.hook_offset_x == pytest.approx(
+        mg_lever_wire_geom.HOOK_X
+    )
+    hook, end = eb.wire_rest_run(nom, nom.lever_r_built)
+    assert tuple(hook) == pytest.approx(mg_lever_wire_geom.WIRE_START)
+    assert tuple(end) == pytest.approx(mg_lever_wire_geom.WIRE_END)
+
+    # the arm at the built station, from the module's own endpoints
+    start, stop = np.array(mg_lever_wire_geom.WIRE_START), np.array(mg_lever_wire_geom.WIRE_END)
+    u = (stop - start) / np.linalg.norm(stop - start)
+    rx = start[0] - eb.KNIFE_AXIS_XY[0]
+    ry = start[1] - eb.KNIFE_AXIS_XY[1]
+    arm_built = abs(rx * u[1] - ry * u[0])
+    assert eb.wire_moment_arm(nom, nom.lever_r_built) == pytest.approx(arm_built)
+    assert eb.pen_gain(nom, nom.lever_r_built) == pytest.approx(
+        eb.pen_gain_per_arm_mm(nom) * arm_built
+    )
+
+    # Independently construct each instantaneous tangent run from CAD inputs.
+    # Keep that drum endpoint FIXED while rotating the hook: re-solving the
+    # tangent after rotation would measure a different path's derivative.
+    for radius in (nom.lever_r_min, nom.lever_r_built, nom.lever_r_max):
+        start = np.array(
+            [
+                eb.KNIFE_AXIS_XY[0] + radius + mg_output_fixture_geom.HOOK_OFFSET_X,
+                mg_lever_wire_geom.HOOK_Y,
+                mg_lever_wire_geom.HOOK_Z,
+            ]
+        )
+        stop = np.array(mg_lever_wire_geom.tangent_end(float(start[0]), float(start[1])))
+        pivot = np.array([*eb.KNIFE_AXIS_XY, start[2]])
+        radial = start - pivot
+        direction = (stop - start) / np.linalg.norm(stop - start)
+        endpoint_arm = abs(float(np.cross(radial, direction)[2]))
+        arm = eb.wire_moment_arm(nom, radius)
+        assert arm == pytest.approx(endpoint_arm, abs=1e-9)
+        assert arm != pytest.approx(radius, rel=1e-6)
+        assert eb.pen_gain(nom, radius) == pytest.approx(
+            eb.pen_gain_per_arm_mm(nom) * endpoint_arm
+        )
+        for angle in (1e-5, 5e-6):
+            cos_angle, sin_angle = math.cos(angle), math.sin(angle)
+            hook_plus = pivot + np.array(
+                [
+                    cos_angle * radial[0] - sin_angle * radial[1],
+                    sin_angle * radial[0] + cos_angle * radial[1],
+                    radial[2],
+                ]
+            )
+            hook_minus = pivot + np.array(
+                [
+                    cos_angle * radial[0] + sin_angle * radial[1],
+                    -sin_angle * radial[0] + cos_angle * radial[1],
+                    radial[2],
+                ]
+            )
+            length_derivative = (
+                np.linalg.norm(stop - hook_plus) - np.linalg.norm(stop - hook_minus)
+            ) / (2.0 * angle)
+            assert abs(length_derivative) == pytest.approx(endpoint_arm, rel=1e-6)
+    arm_min = eb.wire_moment_arm(nom, nom.lever_r_min)
+    arm_max = eb.wire_moment_arm(nom, nom.lever_r_max)
+    # the offset's sign is load-bearing: at the clamp station (offset 0) the
+    # built arm grows by more than the offset's size
+    at_clamp = eb.wire_moment_arm(
+        dataclasses.replace(nom, hook_offset_x=0.0), nom.lever_r_built
+    )
+    assert at_clamp - arm_built > -nom.hook_offset_x
+    flipped = eb.wire_moment_arm(
+        dataclasses.replace(nom, hook_offset_x=-nom.hook_offset_x), nom.lever_r_min
+    )
+    assert flipped > arm_min
+
+    # monotone over the reachable band, and the inverse solve is exact
+    stations = np.linspace(nom.lever_r_min, nom.lever_r_max, 300)
+    arms = np.array([eb.wire_moment_arm(nom, s) for s in stations])
+    assert np.all(np.diff(arms) > 0.0)
+    assert arms[0] == arm_min and arms[-1] == arm_max
+    for s in (nom.lever_r_min, 0.5 * (nom.lever_r_min + nom.lever_r_built), nom.lever_r_max):
+        assert eb.clamp_radius_for_arm(nom, eb.wire_moment_arm(nom, s)) == pytest.approx(
+            s, abs=1e-9
+        )
+    with pytest.raises(ValueError, match="outside the clamp's band"):
+        eb.clamp_radius_for_arm(nom, 0.5 * arm_min)
 
 
 def test_rod_drive_is_on_the_crank_side(nom):
@@ -741,22 +910,22 @@ def test_normalisation_uses_only_observable_units():
     assert np.allclose(measured, eb.ideal_coefficients(x), atol=1e-12)
 
 
+@pytest.mark.parametrize("name", ("all_ones", "rect_half", "alternating"))
 def test_scaled_trial_needs_the_division_to_keep_step_4_a_small_known_vector(
-    report, nom
+    report, nom, name
 ):
     """On a trial the pen forced to scale f < 1, the operator sets bars at
     f x_i d_max, reads the pen, and looks up TABLE ordinates at those stations.
     READOUT.md says: divide each by f and use the quotient everywhere. Executed
-    literally on the nominal Gaussian trial that matches the model and recovers
-    the unscaled coefficients. The raw table ordinates ALSO recover them on a
+    literally on each scaled broad trial that matches the model and recovers
+    the unscaled coefficients (the Gaussian now fits without scaling). The raw
+    table ordinates ALSO recover them on a
     perfect machine -- the read-vs-set vector absorbs (f - 1) x -- but that
     vector is then (1 - f) of the answer, computed from the answer (circular),
     and a real channel-gain error comes out understated by f. With the
     division the vector is the lift-sized known deviation the budget scores."""
-    x = eb.reference_inputs()["gaussian_a0p1"]
-    f = report["closed_form"]["mg-magnifier"]["per_input"]["gaussian_a0p1"][
-        "ordinate_scale"
-    ]
+    x = eb.reference_inputs()[name]
+    f = report["closed_form"]["mg-magnifier"]["per_input"][name]["ordinate_scale"]
     assert 0.0 < f < 1.0
     trial = eb.NominalTrial(nom)
     stations = f * x * nom.d_max
@@ -1201,22 +1370,22 @@ def test_readout_term_counts_the_normalising_read(report):
 
 def test_stick_division_is_the_configured_scale_the_builder_engraves():
     """Configured divisions and tick count preserve the engraved end margin."""
-    import ha_measuring_stick_geom
+    import ms_stick_geom
 
     configured = float(eb._config.machine("amplitude", "stick_division_spacing_mm"))
-    assert ha_measuring_stick_geom.DIVISION_SPACING == configured
-    assert ha_measuring_stick_geom.DIVISION_COUNT == int(
+    assert ms_stick_geom.DIVISION_SPACING == configured
+    assert ms_stick_geom.DIVISION_COUNT == int(
         eb._config.machine("amplitude", "stick_division_count")
     )
-    assert ha_measuring_stick_geom.MINOR_SPACING == configured / int(
+    assert ms_stick_geom.MINOR_SPACING == configured / int(
         eb._config.machine("amplitude", "stick_minor_per_division")
     )
     assert eb.STICK_DIVISION_MM == configured
     # the engraved span follows the configured COUNT, so the last tick keeps
     # its end margin instead of running off a longer/shorter scale
-    import build_ha_measuring_stick as stick
+    import ms_stick_spec as stick
 
-    assert stick.SCALE_SPAN == (ha_measuring_stick_geom.DIVISION_COUNT - 1) * configured
+    assert stick.SCALE_SPAN == (ms_stick_geom.DIVISION_COUNT - 1) * configured
     assert stick.SCALE_START_X == (
         stick.BODY_LENGTH - stick.SCALE_SPAN - stick.SCALE_END_MARGIN
     )

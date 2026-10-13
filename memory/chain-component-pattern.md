@@ -7,6 +7,40 @@ metadata:
 
 > Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
 
+## Physical fit and the inherited native visual
+
+The installed chain is fixed by
+`pd_transgear_removable_spec.CHAIN_LINK_COUNT`; mounting another registered
+sprocket does not silently resize it. `_chain.py` solves the inherited
+continuous-arc visual's sag with that count and explicitly refuses an
+unreachable visual guide.
+
+A circular arc of length one pitch is **not** a rigid link of that pitch.
+The native visual's component count, on-path origins and historical
+interference observations below therefore do not certify the current
+purchased chain's seating or seam. `paper_drive_chain_fit.py` separately
+constructs a standard-pitch pinned cycle: integer pitch-polygon wraps, solved
+free wheel phases, a finite gravity-loaded hinged slack strand, every
+roller's air against the nominal ANSI root-to-tip boundary (including the
+native pocket at the printed OD maximum), and all nonadjacent link-plate
+air with separate backbend/strand margins. The air calculation uses the
+catalogue 0.130 in roller (3.302 mm), not the native visual's rounded 3.30 mm.
+This is an exact **6.35 mm pitch** fit calculation, not a vendor batch-length
+or uncontrolled tooth-profile certificate. A found cycle is exact; exhausting
+the stated sampled free-phase window does not prove physical impossibility.
+Its tests include the opposite taut strand, an open seam, wrong count,
+stretched pitch, wrong tooth phase, reverse-entry turn, unreachable centres
+and improper transforms.
+
+The pure fit's free phases are not changes to native DT park poses, drive
+pins or belt mates. The continuous native chain remains an intentional
+visual representation. A native interference failure is reported before
+changing that representation or its contact policy. Production acceptance
+also needs the authoritative reducer-centre family and actual DT crank
+frame; a candidate centre or a previously observed native build is not a
+certificate for those new inputs.
+
+
 
 ## SHIPPED 2026-07-05 — `_insert_roller_chain` now uses the native chain pattern
 

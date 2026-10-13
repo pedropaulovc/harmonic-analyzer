@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -35,8 +35,9 @@ async def build_simple_three_view_drawing(
     right_center: tuple[float, float],
     iso_center: tuple[float, float],
     pdf_title: str,
+    annotate: Callable[[Any], None] | None = None,
 ) -> dict[str, str]:
-    """Build a default-visual Front/Right/Isometric assembly drawing."""
+    """Build the standard three views, then any caller-owned model annotation."""
     if not source.is_file():
         raise FileNotFoundError(f"source assembly is missing: {source}")
 
@@ -81,6 +82,8 @@ async def build_simple_three_view_drawing(
         role = ViewRole.FULL_DETAIL if view_name == "*Isometric" else ViewRole.PLAIN
         apply_view_configuration(adapter, view, role=role, label=f"{pdf_title} {view_name}")
     assert_full_detail_view(adapter, label=pdf_title)
+    if annotate is not None:
+        annotate(adapter)
 
     return await finalize_drawing(
         adapter,

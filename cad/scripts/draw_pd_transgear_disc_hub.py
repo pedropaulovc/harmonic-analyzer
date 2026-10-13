@@ -14,6 +14,9 @@ the hub front) turned to match -- exactly the third-angle LEFT view of that
 profile -- so it sits on the profile's axis to its left and carries the
 bore (datum A) with its flat and the screw holes on their printed bolt
 circle.
+
+The bore and its flat import the model's sleeve-matched dimensions and native
+bands; fit callouts derive their clearances from those same printed limits.
 """
 
 from __future__ import annotations

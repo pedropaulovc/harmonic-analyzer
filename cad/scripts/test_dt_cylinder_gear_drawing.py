@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import runpy
 from collections import Counter
 from pathlib import Path
@@ -11,9 +12,10 @@ import pytest
 
 import _config
 from _buildgraph import module_deps_of
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
+from _gear_fit_limits import gear_tip_band_mm
 import build_dt_cylinder_gear as part
-from involute_gear import gear_facts
+import dt_cylinder_gear_notes as notes
 import dt_cylinder_gear_shaft_spec as arbor
 import dt_cylinder_gear_spec as spec
 import draw_dt_cylinder_gear as drawing
@@ -46,8 +48,194 @@ def test_blank_and_tooth_profile_follow_the_same_configured_pitch(
 
     monkeypatch.setattr(_config, "machine", machine_value)
     dimensions = runpy.run_path(spec.__file__)
-    profile = gear_facts(dimensions["TEETH"], configured_pitch)
-    assert dimensions["OUTSIDE_DIA"] / 2.0 == pytest.approx(profile["Ra"] * 25.4)
+    profile = dimensions["STOCK_FORM"]
+    assert profile.template.diametral_pitch == configured_pitch
+    assert profile.teeth == dimensions["TEETH"]
+    assert dimensions["OUTSIDE_DIA"] / 2.0 == pytest.approx(profile.blank_radius_mm)
+    assert dimensions["SUPPORT_OUTSIDE_DIA_MM"] == pytest.approx(
+        2.0 * profile.support_radius_max_mm
+    )
+
+
+def test_tooth_system_and_reference_cutter_are_spec_owned() -> None:
+    assert spec.TEETH == int(_config.machine("gear_train", "cylinder_teeth"))
+    assert spec.DIAMETRAL_PITCH == _config.machine("gear_train", "diametral_pitch")
+    assert spec.PRESSURE_ANGLE_DEG == _config.machine(
+        "gear_train", "pressure_angle_deg"
+    )
+    assert spec.PITCH_DIA == pytest.approx(spec.TEETH * spec.MODULE_MM)
+    assert spec.CUTTER_REFERENCE_TEETH == spec.CUTTER_TEETH_RANGE[0]
+    assert spec.STOCK_FORM.template == spec.CUTTER_TEMPLATE
+    assert spec.STOCK_FORM.teeth == spec.TEETH
+    assert spec.CUTTER_RADIAL_TRANSLATION_MM == pytest.approx(
+        spec.PITCH_DIA / 2.0 - spec.CUTTER_TEMPLATE.pitch_radius_mm
+    )
+    assert spec.ROOT_ENVELOPE_DIA_MM == pytest.approx(
+        (2.0 * spec.STOCK_FORM.root_radius_min_mm, 2.0 * spec.STOCK_FORM.root_radius_max_mm)
+    )
+    assert spec.ROOT_ENVELOPE_DIA_MM[0] < spec.ROOT_ENVELOPE_DIA_MM[1]
+    assert spec.WHOLE_DEPTH == pytest.approx(spec.STOCK_FORM.plunge_mm)
+    assert spec.MAX_CUT_DEPTH_MM > spec.WHOLE_DEPTH
+    assert spec.OUTSIDE_DIA <= spec.MAX_DEPTH_SUPPORT_OUTSIDE_DIA_MM
+    assert spec.OUTSIDE_DIA + 0.01 > spec.MAX_DEPTH_SUPPORT_OUTSIDE_DIA_MM
+    assert spec.OUTSIDE_DIA_BAND == gear_tip_band_mm("standard")
+    assert spec.WHOLE_DEPTH_BAND == (0.05, 0.0)
+    assert spec.CUTTER_NUMBER == 2
+    assert spec.CUTTER_TEETH_RANGE == (55, 134)
+    assert spec.CUTTER_TEETH_RANGE[0] <= spec.TEETH <= spec.CUTTER_TEETH_RANGE[1]
+    for row in (
+        f"NUMBER OF TEETH:  {spec.TEETH}",
+        f"DIAMETRAL PITCH:  {spec.DIAMETRAL_PITCH:.2f}",
+        f"PRESSURE ANGLE:  {spec.PRESSURE_ANGLE_DEG:.1f} DEG",
+        f"PITCH DIAMETER (mm, REF):  {spec.PITCH_DIA:.2f}",
+        f"ROOT ENVELOPE DIAMETER (mm, REF):  "
+        f"{spec.ROOT_ENVELOPE_DIA_MM[0]:.3f}-{spec.ROOT_ENVELOPE_DIA_MM[1]:.3f}",
+        f"CUTTER PLUNGE (mm):  {spec.WHOLE_DEPTH:.3f} "
+        f"+{spec.WHOLE_DEPTH_BAND[0]:.2f}/{spec.WHOLE_DEPTH_BAND[1]:.2f}",
+        f"FORM CUTTER:  #{spec.CUTTER_NUMBER}, "
+        f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
+        f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
+        "TOOTH FORM:  SPUR INVOLUTE, FULL DEPTH, AS CUT BY THE FORM CUTTER",
+    ):
+        assert row in notes.GEAR_DATA
+    assert "NONSTANDARD" not in notes.GEAR_DATA
+    assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
+
+
+def test_drum_prints_the_tooth_runout_the_cone_mesh_stack_books() -> None:
+    import cone_set_stack
+
+    assert notes.TOOTH_RUNOUT_TIR_MM == cone_set_stack.TOOTH_RUNOUT_TIR_MM
+    assert (
+        f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {cone_set_stack.TOOTH_RUNOUT_TIR_MM:.2f} "
+        "TIR MAX TO FINISHED BORE"
+    ) in notes.GEAR_DATA
+
+
+def test_cam_and_notch_oracles_use_actual_off_centre_root_material() -> None:
+    import math
+
+    profile = spec.STOCK_FORM
+    assert spec.CAM_ROOT_WEB_MIN_MM == pytest.approx(
+        profile.root_radius_min_mm - (spec.CAM_DIA / 2.0 + spec.ECCENTRICITY)
+    )
+    assert spec.CAM_ROOT_WEB_MIN_MM > 0.0
+    assert part.is_solid(0.0, 0.0)
+    assert not part.is_solid(spec.OUTSIDE_DIA / 2.0 + 0.01, 0.0)
+    radius = (profile.root_radius_min_mm + profile.root_radius_max_mm) / 2.0
+    root_parameter = profile.template.flank_parameter_min
+    root_angle = (
+        profile.template.half_space_base_angle_rad
+        + root_parameter
+        - math.atan(root_parameter)
+    )
+    reference_root = profile.template.root_radius_mm
+    endpoint_angle = math.atan2(
+        reference_root * math.sin(root_angle),
+        profile.radial_translation_mm + reference_root * math.cos(root_angle),
+    )
+    # A circular actual-axis root would classify both points identically.
+    assert profile.contains_material(radius, 0.0)
+    assert not profile.contains_material(
+        radius * math.cos(endpoint_angle), radius * math.sin(endpoint_angle)
+    )
+    for angle in (0.0, endpoint_angle, math.pi / spec.TEETH, math.pi / 2.0):
+        x, y = radius * math.cos(angle), radius * math.sin(angle)
+        assert part.is_solid(x, y) == profile.contains_material(
+            x, y, rotate_rad=math.pi / spec.TEETH
+        )
+
+
+def test_critical_tip_is_a_marked_native_dimension() -> None:
+    assert spec.DRAWING_DIMENSIONS["GearBlankProfile"] == {"OutsideDia"}
+    assert "OutsideDia" in drawing.RIGHT_KEEP
+    assert model_toleranced_dimensions(part)[("GearBlankProfile", "OutsideDia")] == (
+        "*deviations(OUTSIDE_DIA_BAND)"
+    )
+    assert part.OUTSIDE_DIA_BAND == spec.OUTSIDE_DIA_BAND
+
+
+def test_reference_axis_iterator_uses_nullable_dispatch_not_truthiness(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    class Feature:
+        def __init__(self, name, specific=None, next_feature=None):
+            self.Name = name  # IFeature.Name is a BSTR property.
+            self.specific = specific
+            self.next_feature = next_feature
+
+        def __bool__(self):
+            raise AssertionError("VT_DISPATCH features must not be truth-tested")
+
+        def GetNextFeature(self):  # VT_DISPATCH method, nullable return.
+            return self.next_feature
+
+        def GetSpecificFeature2(self):
+            return self.specific
+
+    axis = SimpleNamespace(GetRefAxisParams=lambda: (0.01, 0.02, 0.03, 0.04, 0.05, 0.06))
+    target = Feature("Axis3", axis)
+    first = Feature("GearBlank", next_feature=target)
+    model = SimpleNamespace(FirstFeature=lambda: first)  # nullable VT_DISPATCH method
+    adapter = SimpleNamespace(currentModel=model, _attempt=lambda fn, default=None: fn())
+    monkeypatch.setattr(part, "_flag", lambda _obj, _interface: None)
+    assert part._ref_axis_start_mm(adapter, "Axis3") == pytest.approx((10.0, 20.0, 30.0))
+    assert part._ref_axis_start_mm(adapter, "missing") is None
+    model.FirstFeature = lambda: None
+    assert part._ref_axis_start_mm(adapter, "Axis3") is None
+
+
+def test_printed_plunge_corners_keep_finite_actual_cutter_support() -> None:
+    depth_limits = spec.whole_depth_limits_mm()
+    nominal = round(spec.WHOLE_DEPTH, spec.WHOLE_DEPTH_PLACES)
+    upper, lower = spec.WHOLE_DEPTH_BAND
+    assert depth_limits == pytest.approx((nominal + lower, nominal + upper))
+    profiles = spec.manufacturing_corner_profiles()
+    assert len(profiles) == 4
+    for profile, (tip, depth) in zip(
+        profiles,
+        (
+            (tip, depth)
+            for tip in spec.outside_dia_limits_mm()
+            for depth in depth_limits
+        ),
+        strict=True,
+    ):
+        assert profile.template == spec.CUTTER_TEMPLATE
+        assert profile.teeth == spec.TEETH
+        assert profile.blank_radius_mm == pytest.approx(tip / 2.0)
+        assert profile.radial_translation_mm == pytest.approx(
+            tip / 2.0 - spec.CUTTER_TEMPLATE.root_radius_mm - depth
+        )
+        assert profile.plunge_mm == pytest.approx(depth)
+        assert profile.blank_radius_mm <= profile.support_radius_max_mm
+        assert profile.root_radius_min_mm > spec.CAM_DIA / 2.0 + spec.ECCENTRICITY
+
+
+def test_tip_limits_follow_printed_nominal_and_shared_grade(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    nominal = round(spec.OUTSIDE_DIA, spec.DRAWING_PRECISION_BY_NAME["OutsideDia"])
+    upper, lower = gear_tip_band_mm("standard")
+    assert spec.outside_dia_limits_mm() == pytest.approx(
+        (nominal + lower, nominal + upper), abs=1e-12
+    )
+    assert spec.outside_dia_limits_mm()[1] <= spec.SUPPORT_OUTSIDE_DIA_MM
+    assert spec.OUTSIDE_DIA < (spec.TEETH + 2) * spec.MODULE_MM
+    original_fit = _config.fit
+    changed_band = [0.0, -0.01]
+
+    def fit_value(*keys: str):
+        if keys == ("gear_tip", "standard_band_mm"):
+            return changed_band
+        return original_fit(*keys)
+
+    monkeypatch.setattr(_config, "fit", fit_value)
+    dimensions = runpy.run_path(spec.__file__)
+    assert dimensions["OUTSIDE_DIA_BAND"] == tuple(changed_band)
+    assert dimensions["outside_dia_limits_mm"]() == pytest.approx(
+        (nominal - 0.01, nominal), abs=1e-12
+    )
 
 
 def test_every_marked_dimension_has_exactly_one_view_owner() -> None:
@@ -265,3 +453,185 @@ def test_cam_thickness_refuses_a_missing_or_ambiguous_cam_face(count: int) -> No
     ]
     with pytest.raises(RuntimeError, match=f"expected one cam face, got {count}"):
         drawing._cam_thickness_rims(_CamView(faces))
+
+
+def test_pattern_notch_reference_uses_the_actual_seed_gap() -> None:
+    kerf_axis = math.pi / 2.0 + math.radians(spec.NOTCH_PHASE_DEG)
+    assert spec.TOOTH_PATTERN_GAP_RAD == pytest.approx(math.pi / spec.TEETH)
+    assert math.degrees(kerf_axis - spec.TOOTH_PATTERN_GAP_RAD) == pytest.approx(
+        spec.PATTERN_NOTCH_REF_ANGLE_DEG
+    )
+    assert spec.PATTERN_NOTCH_REF_ANGLE_DEG == 90.0
+    assert spec.CAM_PHASE_TOLERANCE_DEG == 0.25
+    assert spec.DRAWING_PRECISION["NotchProfile"]["NotchPhase"] == 1
+    assert spec.DRAWING_PRECISION["NotchProfile"]["PatternNotchPhase"] == 0
+    assert "PatternNotchPhase" in drawing.FRONT_KEEP
+
+
+def test_the_build_places_both_notch_angles_and_fixes_the_pattern_ray(monkeypatch) -> None:
+    """Run the real build, natively stubbed, to its two angular dimensions:
+    cam lobe to notch at NOTCH_PHASE_DEG, and the fixed stock-pattern seed ray
+    to notch at PATTERN_NOTCH_REF_ANGLE_DEG."""
+    import asyncio
+    import inspect
+    from unittest.mock import AsyncMock, MagicMock
+
+    class Reached(Exception):
+        pass
+
+    for attr, value in list(vars(part).items()):
+        if attr.startswith("__") or attr == "build" or not callable(value):
+            continue
+        if getattr(value, "__module__", "") == part.__name__:
+            continue
+        if inspect.isfunction(value) or inspect.isclass(value):
+            stub = AsyncMock() if inspect.iscoroutinefunction(value) else MagicMock()
+            monkeypatch.setattr(part, attr, stub)
+    monkeypatch.setattr(part, "check", lambda label, _result: label)
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(part, "_body_state", lambda *_a: "one body")
+    monkeypatch.setattr(
+        part, "build_stock_form_gear", AsyncMock(return_value=SimpleNamespace(volume=0.0))
+    )
+    monkeypatch.setattr(
+        part, "volume_check", AsyncMock(side_effect=lambda _a, _l, expected, _t: expected)
+    )
+    monkeypatch.setattr(part, "add_line_chain", AsyncMock(return_value=["B", "R", "T", "L"]))
+    angles = []
+
+    async def angular(_adapter, first, second, _xy, _label, *, expected_degrees):
+        angles.append((first, second, expected_degrees))
+        if len(angles) == 2:
+            raise Reached
+
+    monkeypatch.setattr(part, "add_angular_reference_dimension", angular)
+    adapter = AsyncMock()
+    adapter.get_mass_properties.return_value = SimpleNamespace(
+        is_success=True,
+        data=SimpleNamespace(center_of_mass=(
+            0.0, spec.ECCENTRICITY, spec.FACE_WIDTH + spec.CAM_THICKNESS / 2.0,
+        )),
+    )
+    with pytest.raises(Reached):
+        asyncio.run(part.build(adapter))
+    ray, radial = "actual seed-tooth-gap reference ray", "notch radial construction line"
+    assert angles == [
+        ("notch lobe-axis construction line", radial, spec.NOTCH_PHASE_DEG),
+        (ray, radial, spec.PATTERN_NOTCH_REF_ANGLE_DEG),
+    ]
+    assert adapter.add_sketch_constraint.await_args_list[-1].args == (ray, None, "fix")
+
+
+def test_pattern_notch_drawing_consumes_pure_specification() -> None:
+    from _drawing_contract import drawing_specification_violations
+
+    assert drawing.PATTERN_NOTCH_REF_ANGLE_DEG is spec.PATTERN_NOTCH_REF_ANGLE_DEG
+    assert drawing_specification_violations(
+        Path(drawing.__file__).read_text(encoding="utf-8")
+    ) == ()
+
+
+class _PatternDimension:
+    """Faithful method/property and nullable-dispatch shape, not native evidence."""
+
+    def __init__(self, fault=None):
+        self.fault = fault
+
+    def __bool__(self):
+        raise AssertionError("nullable IDimension must be checked with is None")
+
+    @property
+    def FullName(self):
+        return (
+            "NotchPhase@NotchProfile@test.SLDPRT"
+            if self.fault == "wrong_name"
+            else "PatternNotchPhase@NotchProfile@test.SLDPRT"
+        )
+
+    @property
+    def DrivenState(self):
+        return 0 if self.fault == "driving" else 1
+
+    @property
+    def SystemValue(self):
+        return math.radians(1.5 if self.fault == "cam_angle" else 90.0)
+
+    def GetToleranceType(self):
+        return 1 if self.fault == "basic" else 0
+
+
+class _PatternDisplay:
+    def __init__(self, fault=None):
+        self.fault = fault
+        self.dimension = None if fault == "null_dimension" else _PatternDimension(fault)
+        self.text = {}
+
+    @property
+    def Type2(self):
+        return 2 if self.fault == "linear" else 3
+
+    def SetText(self, part, text):
+        if self.fault != "parentheses_unmoved":
+            self.text[part] = text
+
+    def GetText(self, part):
+        return self.text.get(part, "")
+
+    def GetDimension2(self, index):
+        assert index == 0
+        return self.dimension
+
+
+class _PatternAnnotation:
+    def __init__(self, fault=None):
+        self.display = None if fault == "null_display" else _PatternDisplay(fault)
+
+    def GetSpecificAnnotation(self):
+        return self.display
+
+
+def _pattern_bindings(monkeypatch):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(
+        drawing, "dimension_name", lambda adapter, annotation: "PatternNotchPhase"
+    )
+    import _drawing_dimensions
+
+    monkeypatch.setattr(
+        _drawing_dimensions._sw_type_info, "early_bound_or_flag", lambda value, *_names: value
+    )
+    monkeypatch.setattr(_drawing_dimensions, "rebuild_drawing", lambda adapter, label: None)
+    return SimpleNamespace(_attempt=lambda fn, default=None: fn())
+
+
+def test_pattern_notch_prints_as_a_parenthesized_reference(monkeypatch) -> None:
+    adapter = _pattern_bindings(monkeypatch)
+    annotation = _PatternAnnotation()
+    display = drawing._pattern_notch_reference(adapter, [annotation])
+    assert display is annotation.display
+    # Main's reference form, as (Ø9.575): f68549253's ShowParenthesis printed 90°.
+    assert (display.GetText(1), display.GetText(2)) == ("(", ")")
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "null_display", "null_dimension", "wrong_name", "driving", "cam_angle", "linear",
+        "basic", "parentheses_unmoved",
+    ),
+)
+def test_pattern_notch_reference_refuses_non_authoritative_native_state(
+    monkeypatch, fault
+) -> None:
+    adapter = _pattern_bindings(monkeypatch)
+    with pytest.raises(RuntimeError):
+        drawing._pattern_notch_reference(adapter, [_PatternAnnotation(fault)])
+
+
+@pytest.mark.parametrize("count", (0, 2))
+def test_pattern_notch_reference_requires_one_named_locator(monkeypatch, count) -> None:
+    adapter = _pattern_bindings(monkeypatch)
+    with pytest.raises(RuntimeError, match="expected one actual PatternNotchPhase"):
+        drawing._pattern_notch_reference(
+            adapter, [_PatternAnnotation() for _ in range(count)]
+        )

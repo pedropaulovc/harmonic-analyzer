@@ -1,20 +1,24 @@
-r"""Purchased guide-lock screw: McMaster 91255A108, black oxide.
+r"""Purchased guide-lock screw: McMaster 91792A108, 18-8 stainless slotted pan head.
 
 Ruling R9-31 (2026-09-30): the eight screws that hold the four guide locks
 (MHA-PD-012 lock plates) to the platen guides ride the platen, and a brass
-fillister head there sweeps into the transgear hanger arm.  They take a
-#4-40 button head socket cap screw instead; every other MHA-VN-006 station keeps
-the fillister.  Ruling R9-48: 3/8 in under the head, into the guide's
-through taps, so the worst case still engages 1.5D
-(``vn_guide_lock_screw_spec.ENGAGEMENT_WORST``).
+fillister head there sweeps into the transgear hanger arm.  They take a low
+#4-40 head instead; every other MHA-VN-006 station keeps the fillister.
+2026-10-11: the low head is slotted, as the book's guide-lock plates show
+(ch22 img05: slotted domed heads, dark ferrous, unlike the brass platen-front
+screws), not a hex socket.  The 18-8 slotted pan head is the lowest stocked
+slotted #4 rounded head (0.068 in; binding 0.068, round 0.086, fillister
+0.107); no black-oxide slotted #4 head is stocked, and the 18-8 family is the
+repository's stainless slotted-screw stock (91794A, 91790A).  Ruling R9-48:
+3/8 in under the head, into the guide's through taps, so the worst case still
+engages 1.5D (``vn_guide_lock_screw_spec.ENGAGEMENT_WORST``).
 
-Geometry source: the catalogue, not a vendor model.  The series dimensions
-are the McMaster product page for 91255A106 (read in a headless browser on
-2026-09-30): #4-40 UNC-3A, fully threaded, button head Ø0.213 in x 0.059 in
-high, 1/16 in hex drive, black-oxide alloy steel, ASTM F835.  [INFERENCE]
-91255A108 is the same series at 3/8 in; its page is not yet read live.
-``diagnostics/diag_build_91255A108.py`` builds it with the 91255A106 recipe;
-it has no replica gate, and no McMaster .SLDPRT is committed or used.
+Geometry source: the catalogue, not a vendor model.  The McMaster family
+table read live on 2026-10-11 gives #4-40 UNC-2A, fully threaded, flat tip,
+pan head Ø0.219 in x 0.068 in high, 18-8 stainless, ASME B18.6.3.
+``diagnostics/diag_build_91792A108.py`` builds it with the shared slotted-head
+recipe (``diag_mcmaster_fillister``); it has no replica gate, and no McMaster
+.SLDPRT is committed or used.
 
 Frame: the MHA-VN-006 fillister's, so the paper drive places either the same
 way: the recipe's head-up body (axis +Y, bearing face at y = 0) turned -90 deg
@@ -31,7 +35,7 @@ from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from _simplified_part import save_simplified_part
-from diagnostics.diag_build_91255A108 import build_91255A108
+from diagnostics.diag_build_91792A108 import build_91792A108
 from vn_guide_lock_screw_spec import SKU
 
 PART_NAME = "vn-guide-lock-screw"
@@ -46,7 +50,7 @@ async def build(adapter) -> dict[str, str]:
         components=(
             StockComponent(
                 sku=SKU,
-                author=build_91255A108,
+                author=build_91792A108,
                 transform=RigidTransform(rotation_radians=(-pi / 2.0, 0.0, 0.0)),
             ),
         ),

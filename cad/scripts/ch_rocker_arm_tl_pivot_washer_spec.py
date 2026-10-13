@@ -15,9 +15,6 @@ pivot axis at the upper hub face, +Z up; the washer sits Z0..1.5.
 from __future__ import annotations
 
 import ch_rocker_arm_tl_pivot_screw_spec as screw
-from _feature_requirements import ExportFeature, limits
-from _gtol_cylinder import CylinderFace
-from _gtol_planar import PlanarFace
 from _printed_tolerance import printed_band_mm
 
 # AUTHOR'S CHOICE: Ø10 stock O1 drill rod with its OD left as supplied (the
@@ -86,48 +83,3 @@ DRAWING_NOTES = "\n".join(
 BORE_CALLOUT = "DRILL"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 5:1"
 
-EXPORT_FEATURES: dict[str, ExportFeature] = {
-    "bore": ExportFeature(
-        kind="hole",
-        faces=(CylinderFace(BORE_DIA),),
-        requirements=("dia",),
-        fields={
-            "at": ([0.0, 0.0, 0.0], ("__frame__",)),
-            "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
-            "dia": (
-                limits(BORE_DIA, PLACES, BORE_BAND),
-                ("BORE_DIA", "BORE_BAND", ("ch_rocker_arm_tl_pivot_screw_spec", "SHOULDER_DIA")),
-            ),
-            "thru": (True, ("BORE_DIA",)),
-        },
-        precision={"dia": PLACES},
-    ),
-    "hub_face": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
-        requirements=("thickness", "dia"),
-        fields={
-            "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
-            "thickness": (limits(THICK, THICK_PLACES), ("THICK", "THICK_PLACES")),
-            "dia": (
-                limits(OUTER_DIA, OUTER_PLACES, OUTER_BAND),
-                ("OUTER_DIA", "OUTER_BAND", ("ch_rocker_arm_spec", "HUB_DIA")),
-            ),
-            "process": ("face", ("DRAWING_NOTES",)),
-        },
-        precision={"thickness": THICK_PLACES, "dia": OUTER_PLACES},
-    ),
-    "head_face": ExportFeature(
-        kind="face",
-        faces=(PlanarFace((0.0, 0.0, 1.0), THICK),),
-        requirements=("thickness",),
-        fields={
-            "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "z", "value": THICK}, ("THICK",)),
-            "thickness": (limits(THICK, THICK_PLACES), ("THICK", "THICK_PLACES")),
-            "process": ("face", ("DRAWING_NOTES",)),
-        },
-        precision={"thickness": THICK_PLACES},
-    ),
-}

@@ -6,7 +6,7 @@ it without importing a COM build script.
 
 Part frame: seat face at y = 0, origin under the bore on the seat plane. The
 foot runs FOOT_Z0 along +Z (the ear end at -EAR_T/2, the free end outboard
-once placed, flush with the support's end face); the ear is EAR_W wide (X) by
+once placed, toward the support's end face); the ear is EAR_W wide (X) by
 EAR_T thick (Z), centred on the origin, rising from the foot top and ARCHED
 with radius EAR_W/2 about the O BORE_DIA cross-bore. The ear is as wide as
 the foot, so their sides are one flat each side. Each ear's inner face bears
@@ -18,11 +18,10 @@ ear's mid-plane, into the bore and onto the pivot shaft's flat (user,
 2026-10-10). EAR_T is 8.0 (was 6.0) so the tap keeps its walls to both ear
 faces.
 
-The foot's end and its one hold-down hole depend on which end of the support
-the bracket sits at, so they are per configuration: ``ch_pivot_bracket_sides``
-derives them from the bank layout (which imports this module for the ear, so
-the derivation cannot live here) and checks them with the ligament functions
-below.
+The foot's end and its one hold-down hole must suit both ends of the support,
+so ``ch_pivot_bracket_sides`` derives them from the bank layout (which
+imports this module for the ear, so the derivation cannot live here) and
+checks them with the ligament functions below.
 """
 
 from __future__ import annotations
@@ -53,8 +52,8 @@ HOLE_DIA = blind_cut_dia_mm(HOLD_DOWN_HOLE_SPEC)
 # INBOARD face -- the face fit-up sets (the north datum, the south blade-set
 # face), so the hole lands on the support's transferred seat without the foot
 # length's band (user, 2026-10-10, option ii). Worst case is each term at its
-# OWN band (Codex #936 PRRT_kwDOPHDy386mV3AN). Along the foot the south
-# bracket's short run leaves no room for title-block .XX, so three lengths
+# OWN band (Codex #936 PRRT_kwDOPHDy386mV3AN). Along the foot its short free
+# run leaves no room for title-block .XX, so three lengths
 # carry +/-0.10 (Codex P2 on 2026-10-09's flip, user option A): the foot
 # length and the hole station, both from the inboard ear face, and the ear
 # thickness. Across the foot its sides stay at .XX (the band

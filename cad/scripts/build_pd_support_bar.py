@@ -5,8 +5,9 @@ steel bar clamped across the two front columns by the two-piece column
 clamps (build_sh_column_clamp_front.py and build_sh_column_clamp_back.py), carrying the hanging platen
 (guides + locks on the platen back) and, on its own back face, the ch. 23
 transgear hanger (pivot screw MHA-VN-041) and the latch hook (MHA-PD-014).
-Cross-section 22 tall x 9 deep (ch22 back-side wear band + ch30 front
-view); 452 long so the ends run ~29 past each column (ch30 p002).
+Cross-section 28 tall x 9 deep (it fills the platen's guide channel to a
+1.0 bottom-rail clearance; ``pd_support_bar_spec.BAR_HEIGHT`` carries the
+photo chain); 452 long so the ends run ~29 past each column (ch30 p002).
 
 Holes (all along local Z, the machine front-back axis):
 * 4x clamp-screw counterbores flanking each column (x +-197 -+ 17.5):
@@ -34,7 +35,9 @@ import sys
 
 from _appearance import apply_material
 from _check import check
-from _dimensions import drive_dimension, set_global
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -51,6 +54,9 @@ from pd_support_bar_spec import (
     BACK_FACE_Z,
     BAR_DEPTH,
     BAR_HEIGHT,
+    BAR_BAND_PLACES,
+    BAR_DEPTH_BAND,
+    BAR_HEIGHT_BAND,
     BRACKET_TAP_CSK_DIA,
     BRACKET_TAP_SPEC,
     BRACKET_TAP_X,
@@ -128,6 +134,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Bar")
+    name_dimensions(adapter, "Bar", ["Depth"])
 
     expected = BAR_HEIGHT * BAR_DEPTH * BAR_LENGTH
     await volume_check(adapter, "bar", expected, 0.005 * expected)
@@ -250,6 +257,17 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven bar (equations neutral)", expected, 0.005 * expected)
+
+    # The bottom rail's running clearance under the bar spends the height's
+    # .XXX band, and the pivot floor and bracket-screw tips the thickness's
+    # (pd_support_bar_spec.BAR_HEIGHT_BAND, BAR_DEPTH_BAND), so both live on
+    # the model dimensions, read back by the helper, not only in the spec.
+    apply_drawing_precision(
+        adapter,
+        {"BarProfile": {"Height": BAR_BAND_PLACES}, "Bar": {"Depth": BAR_BAND_PLACES}},
+    )
+    set_dimension_symmetric_tolerance(adapter, "BarProfile", "Height", BAR_HEIGHT_BAND)
+    set_dimension_symmetric_tolerance(adapter, "Bar", "Depth", BAR_DEPTH_BAND)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

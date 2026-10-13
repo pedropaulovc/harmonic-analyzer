@@ -32,6 +32,22 @@ def test_91255A148_is_a_diagnostic_recipe_only() -> None:
     assert "91255A148" in discovered_recipes()
 
 
+def test_retired_front_pin_is_not_selected_but_rear_cup_pin_is(monkeypatch) -> None:
+    from diagnostics import diag_build_mcmaster as driver
+
+    assert "98296A026" not in driver.REGISTRY
+    assert "98296A026" not in discovered_recipes()
+    assert "98296A031" in driver.REGISTRY
+    assert "98296A031" in discovered_recipes()
+    monkeypatch.setattr(driver.sys, "argv", ["diag_build_mcmaster.py", "--all"])
+    selected = driver._selected_parts()
+    assert "98296A031" in selected
+    assert "98296A026" not in selected
+    monkeypatch.setattr(driver.sys, "argv", ["diag_build_mcmaster.py", "98296A026"])
+    with pytest.raises(SystemExit, match="no builder for: 98296A026"):
+        driver._selected_parts()
+
+
 def test_replica_driver_names_a_missing_local_vendor_file(
     tmp_path: Path, monkeypatch
 ) -> None:

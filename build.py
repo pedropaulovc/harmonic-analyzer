@@ -2,7 +2,7 @@
 
 Examples:
     uv run python build.py --help
-    uv run python build.py --verbosity warning -n 4
+    uv run python build.py --verbosity warning
     uv run python build.py --verbosity debug check:math
     uv run python build.py --executor farm --display-name "InchPD - Check assembly" --leaf-timeout 90 assembly:ha_harmonic_analyzer
 
@@ -47,7 +47,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
-from doit.cmd_base import get_loader
+from doit.cmd_base import get_loader, tasks_and_deps_iter
 from doit.cmdparse import CmdParseError
 from doit.control import TaskControl
 from doit.doit_cmd import DoitMain
@@ -73,7 +73,7 @@ _USAGE = (
 _DESCRIPTION = """\
 Run the doit graph (dodo.py). Only the options below belong to the wrapper; every
 other argument goes to doit unchanged, so `build.py part:dt_cone_gear`, `build.py
--n 4`, `build.py list` and `build.py help run` mean what they mean under `doit`."""
+--continue`, `build.py list` and `build.py help run` mean what they mean under `doit`."""
 _EPILOG = f"""\
 farm defaults (--executor farm; `build` / `build.cmd` pass it for you):
   display name  --display-name (alias -DisplayName) or HARMONIC_FARM_DISPLAY_NAME:
@@ -226,12 +226,13 @@ def _isolated_tasks(task_list):
 
 def _validate_farm_selection(
     task_list, selection, *, auto_delayed_regex: bool = False
-) -> None:
+) -> TaskControl:
     """Parse farm selections exactly as doit will, without consuming real tasks."""
     control = TaskControl(
         _isolated_tasks(task_list), auto_delayed_regex=auto_delayed_regex
     )
     control.process(selection)
+    return control
 
 
 def _farm_command(command_class, display_name: str | None = None):
@@ -243,7 +244,7 @@ def _farm_command(command_class, display_name: str | None = None):
         @functools.wraps(command_class._execute)
         def _execute(self, *args, **kwargs):
             try:
-                _validate_farm_selection(
+                control = _validate_farm_selection(
                     self.task_list,
                     self.sel_tasks,
                     auto_delayed_regex=kwargs.get("auto_delayed_regex", False),
@@ -257,14 +258,21 @@ def _farm_command(command_class, display_name: str | None = None):
                     raise FarmPreflightError(str(exc)) from None
                 if display_name is not None:
                     os.environ["HARMONIC_FARM_DISPLAY_NAME"] = label
-                _farm_preflight()
-                # No producer registration or build ID exists until preflight passes.
+                admitted, pool_identity = _require_leaf_admission(control)
+                if pool_identity is None:
+                    _farm_preflight()
+                else:
+                    _farm_preflight(pool_identity=pool_identity)
+                # No producer registration or build ID exists until every
+                # preflight passes.
             except BaseException as problem:
                 self.dep_manager.close()
                 if isinstance(problem, FarmPreflightError):
                     print(f"farm: {problem}", file=sys.stderr)
                     return 2
                 raise
+            previous_admission = os.environ.get("HARMONIC_FARM_ADMITTED_LEAVES")
+            os.environ["HARMONIC_FARM_ADMITTED_LEAVES"] = json.dumps(admitted)
             try:
                 with _farm.producer_build(label) as producer:
                     print(
@@ -279,6 +287,11 @@ def _farm_command(command_class, display_name: str | None = None):
                 self.dep_manager.close()
                 print(f"farm: {problem}", file=sys.stderr)
                 return 2
+            finally:
+                if previous_admission is None:
+                    os.environ.pop("HARMONIC_FARM_ADMITTED_LEAVES", None)
+                else:
+                    os.environ["HARMONIC_FARM_ADMITTED_LEAVES"] = previous_admission
 
     return FarmCommand
 
@@ -378,8 +391,8 @@ def _dirty_submodules() -> list[str]:
     return dirty
 
 
-def _farm_preflight() -> None:
-    """Validate local graph inputs, fleet protocol, and stamp committed HEAD."""
+def _farm_preflight(*, pool_identity: tuple[str, str] | None = None) -> None:
+    """Validate local inputs, fleet protocol/identity, and stamp committed HEAD."""
     status = _git("status", "--porcelain=v1", "--untracked-files=all")
     dirty = [line[3:] for line in status.splitlines()] + _dirty_submodules()
     if dirty:
@@ -402,7 +415,9 @@ def _farm_preflight() -> None:
     if not _artifact_cache.enabled():
         raise FarmPreflightError("HARMONIC_REMOTE_CACHE_MODE must be ro or rw")
 
-    _require_fleet_protocol(_pool_home(), _farm.FARM_PROTOCOL_VERSION)
+    _require_fleet_protocol(
+        _pool_home(), _farm.FARM_PROTOCOL_VERSION, pool_identity=pool_identity
+    )
     os.environ["HARMONIC_FARM_COMMIT"] = sha
     os.environ["HARMONIC_SW_AUTOSTART"] = "0"
 
@@ -411,6 +426,115 @@ def _pool_home() -> Path:
     return Path(
         os.environ.get("SOLIDWORKS_POOL_HOME", REPO_ROOT.parent / "solidworks-pool")
     )
+
+
+def _require_leaf_admission(
+    control: TaskControl,
+) -> tuple[list[str], tuple[str, str] | None]:
+    """Check would-be leaves, not local/aggregate tasks, against the selected pool."""
+    tasks = sorted(
+        task.name
+        for task in tasks_and_deps_iter(control.tasks, control.selected_tasks)
+        if any(
+            getattr(getattr(action, "py_callable", None), "_farm_leaf_action", False)
+            for action in task.actions
+        )
+    )
+    if not tasks:
+        return [], None
+    pool = _pool_home().resolve()
+    missing = [
+        str(path.relative_to(pool))
+        for path in (pool / "agent" / "protocol.py", pool / "pyproject.toml")
+        if not path.is_file()
+    ]
+    if missing:
+        raise FarmPreflightError(
+            f"PoolHome {pool} is missing required admission files: "
+            + ", ".join(missing)
+        )
+    # Load the selected checkout's exact file in the pool's environment: its
+    # namespace package must not lose to an unrelated installed ``agent`` package.
+    program = (
+        "import importlib.util, json, sys\n"
+        "from pathlib import Path\n"
+        "pool = Path(sys.argv[1])\n"
+        "def load(name, path):\n"
+        "    spec = importlib.util.spec_from_file_location(name, path)\n"
+        "    module = importlib.util.module_from_spec(spec)\n"
+        "    sys.modules[spec.name] = module\n"
+        "    spec.loader.exec_module(module)\n"
+        "    return module\n"
+        "protocol = load('pool_protocol', pool / 'agent' / 'protocol.py')\n"
+        "contract = load('pool_contract', pool / 'agent' / 'contract.py')\n"
+        "identity = protocol.agent_identity(pool / 'agent')\n"
+        "tasks = json.load(sys.stdin)\n"
+        "print(json.dumps({\n"
+        "    'refused': [task for task in tasks if not protocol.leaf_admitted(task)],\n"
+        "    'agent_identity': identity,\n"
+        "    'agent_version': contract.agent_identity_tag(identity),\n"
+        "}))\n"
+    )
+    argv = [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        str(pool),
+        "python",
+        "-c",
+        program,
+        str(pool),
+    ]
+    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+    try:
+        result = subprocess.run(
+            argv,
+            cwd=pool,
+            env=env,
+            input=json.dumps(tasks),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except OSError as exc:
+        raise FarmPreflightError(
+            f"pool leaf admission could not start: {exc}"
+        ) from None
+    if result.returncode != 0:
+        raise FarmPreflightError(
+            f"pool leaf admission could not be read (exit {result.returncode})"
+            + _tail(result.stderr)
+        )
+    try:
+        response = json.loads(result.stdout)
+    except (TypeError, ValueError):
+        raise FarmPreflightError(
+            "pool leaf admission returned an invalid response"
+        ) from None
+    if not isinstance(response, dict):
+        raise FarmPreflightError("pool leaf admission returned an invalid response")
+    refused = response.get("refused")
+    identity = response.get("agent_identity")
+    version = response.get("agent_version")
+    if (
+        not isinstance(refused, list)
+        or any(not isinstance(task, str) or task not in tasks for task in refused)
+        or not isinstance(identity, str)
+        or not identity
+        or not isinstance(version, str)
+        or not version
+    ):
+        raise FarmPreflightError("pool leaf admission returned an invalid response")
+    if refused:
+        raise FarmPreflightError(
+            f"unsupported farm leaf targets in requested closure (pool {pool}):\n"
+            + "\n".join(
+                f"  {task} (prefix: {task.partition(':')[0]})"
+                for task in sorted(set(refused))
+            )
+        )
+    return tasks, (identity, version)
 
 
 def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -472,8 +596,34 @@ def _dissenting_workers(reports: object, protocol: int) -> list[str]:
     return sorted(named)
 
 
-def _require_fleet_protocol(pool: Path, protocol: int) -> None:
-    """Stop unless the pool CLI and every known worker support ``protocol``."""
+def _require_fleet_identity(summary: dict, pool_identity: tuple[str, str]) -> None:
+    """Match the pool's canonical tag to identities already reported by workers."""
+    identity, version = pool_identity
+    # agents --json exposes deployed identity tags as agent_version, not the
+    # release's full agent_identity_sha256. Use the pool's own tag normalizer.
+    reports = summary["workers"] or summary["ignored"]
+    counts: dict[str, int] = {}
+    for worker in reports:
+        reported = worker.get("agent_version") if isinstance(worker, dict) else None
+        tag = reported if isinstance(reported, str) and reported else "<unreported>"
+        counts[tag] = counts.get(tag, 0) + 1
+    if not reports or any(tag != version for tag in counts):
+        raise FarmPreflightError(
+            f"PoolHome agent identity {identity} (agent_version {version}) "
+            "does not match reported fleet identities:\n"
+            + "\n".join(
+                f"  {tag}: {count} worker(s)"
+                for tag, count in sorted((counts or {"<unreported>": 0}).items())
+            )
+            + "\nCheck out the deployed pool release at PoolHome, "
+            "or finish the rollout."
+        )
+
+
+def _require_fleet_protocol(
+    pool: Path, protocol: int, *, pool_identity: tuple[str, str] | None = None
+) -> None:
+    """Stop unless the fleet supports the protocol and selected admission rule."""
     result = _pool_farm(pool, "agents", "--json")
     lines = [line for line in result.stdout.splitlines() if line.strip()]
     if result.returncode != 0 or not lines:
@@ -489,6 +639,8 @@ def _require_fleet_protocol(pool: Path, protocol: int) -> None:
                 f"{lines[-1][:200]}"
             )
         raise FarmPreflightError(report)
+    if pool_identity is not None:
+        _require_fleet_identity(summary, pool_identity)
     workers = summary["workers"]
     fresh = sum(
         1 for worker in workers if isinstance(worker, dict) and worker.get("fresh")

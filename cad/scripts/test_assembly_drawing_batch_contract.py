@@ -7,6 +7,8 @@ import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 
+import _config
+import pytest
 import _assembly_drawing
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS, DrawingLayout
@@ -19,6 +21,7 @@ import draw_dt_drive_train_assembly
 import draw_fr_frame_assembly
 import draw_ha_harmonic_analyzer_assembly
 import draw_mg_magnifier_assembly
+import draw_ms_measuring_stick_assembly
 import draw_pd_paper_drive_assembly
 import draw_pn_pen_assembly
 import draw_sm_summing_assembly
@@ -44,6 +47,7 @@ ASSEMBLY_DRAWINGS = (
     draw_mg_magnifier_assembly,
     draw_pd_paper_drive_assembly,
     draw_sm_summing_assembly,
+    draw_ms_measuring_stick_assembly,
     draw_ha_harmonic_analyzer_assembly,
 )
 
@@ -52,18 +56,23 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
     for drawing in ASSEMBLY_DRAWINGS
     # The channel sheet left the shared builder when it gained the rocker
     # bank's fit-up steps (#743, Codex PRRT_kwDOPHDy386mRSOK); the paper-drive
-    # sheet left it when it became three sheets with its own fit-up steps.
+    # sheet left it when it became three sheets with its own fit-up steps; the
+    # measuring-stick sheet is a full fitter package (BOM, explode, steps); the
+    # magnifier sheet left it when it gained the axle-stack details that print
+    # the press gauge and the endshake (Codex PR #1330).
     if drawing
     not in (
         draw_fr_frame_assembly,
         draw_dt_drive_train_assembly,
         draw_ch_channel_assembly,
         draw_pd_paper_drive_assembly,
+        draw_ms_measuring_stick_assembly,
+        draw_mg_magnifier_assembly,
     )
 )
 
 
-def test_registry_contains_exactly_the_eight_assembly_drawings() -> None:
+def test_registry_contains_exactly_the_nine_assembly_drawings() -> None:
     registered = tuple(spec for spec in DRAWINGS if spec.source_kind == "assembly")
     assert {spec.script for spec in registered} == {
         Path(drawing.__file__).resolve() for drawing in ASSEMBLY_DRAWINGS
@@ -99,7 +108,27 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_dt_drive_train_assembly:
             scripts_dir = Path(draw_dt_drive_train_assembly.__file__).resolve().parent
-            assert str(scripts_dir / "dt_drive_train_assembly_spec.py") in deps
+            assert {
+                str(scripts_dir / name)
+                for name in (
+                    "dt_drive_train_assembly_spec.py",
+                    "dt_drive_train_steps.py",
+                    "dt_crank_drive_gear_spec.py",
+                    "dt_crank_pinion_spec.py",
+                    "dt_cylinder_gear_spec.py",
+                    "vn_post_mount_screw_spec.py",
+                    "cylinder_bank_layout.py",
+                    "cone_line.py",
+                    "fr_harmonic_base_spec.py",
+                    "rocker_bank_layout.py",
+                )
+            } <= set(deps)
+            assert (
+                str(
+                    scripts_dir.parent / "config" / "parts" / "vn-post-mount-screw.yaml"
+                )
+                in deps
+            )
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_pd_paper_drive_assembly:
             scripts_dir = Path(draw_pd_paper_drive_assembly.__file__).resolve().parent
@@ -110,7 +139,6 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                 for name in (
                     "pd_paper_drive_assembly_steps.py",
                     "dt_drive_train_steps.py",
-                    "vn_transgear_collar_cross_pin_spec.py",
                     "pd_transgear_drive_collar_spec.py",
                     "vn_transgear_disc_screw_spec.py",
                     "vn_transgear_pivot_screw_spec.py",
@@ -120,8 +148,58 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                 )
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        elif drawing is draw_ms_measuring_stick_assembly:
+            scripts_dir = Path(draw_ms_measuring_stick_assembly.__file__).resolve().parent
+            # The spec module (poses, explode plan, steps text) and the pure
+            # part/vendor specs whose constants the sheets print.
+            assert {
+                str(scripts_dir / name)
+                for name in (
+                    "ms_measuring_stick_assembly_spec.py",
+                    "ms_stop_spec.py",
+                    "ms_stick_spec.py",
+                    "_mcmaster_91882a221.py",
+                    "_mcmaster_90114a124.py",
+                )
+            } <= set(deps)
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        elif drawing is draw_mg_magnifier_assembly:
+            scripts_dir = Path(draw_mg_magnifier_assembly.__file__).resolve().parent
+            # The stack spec whose settings the details print, and the axle
+            # spec that places the endshake detail.
+            assert {
+                str(scripts_dir / name)
+                for name in ("mg_magnifier_assembly_spec.py", "mg_wheel_axle_spec.py")
+            } <= set(deps)
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         else:
             assert str(Path(_assembly_drawing.__file__).resolve()) in deps
+
+
+def test_changed_base_keeps_its_identity_in_the_frame_bom() -> None:
+    stem = "fr-harmonic-base"
+    assert stem in draw_fr_frame_assembly.BOM_COMPONENTS
+    assert draw_fr_frame_assembly.BOM_QUANTITIES[stem] == 1
+    assert (
+        draw_fr_frame_assembly.BOM_PART_NUMBERS[stem] == _config.parts(stem)["number"]
+    )
+
+
+def test_changed_drivetrain_packages_keep_their_registered_assembly_sources() -> None:
+    """Frame/base and the integrated top model are not DT-only review scope."""
+    drawings = (
+        draw_dt_drive_train_assembly,
+        draw_fr_frame_assembly,
+        draw_pd_paper_drive_assembly,
+        draw_ha_harmonic_analyzer_assembly,
+    )
+    assert len({drawing.SPEC.name for drawing in drawings}) == len(drawings)
+    for drawing in drawings:
+        assert drawing.SOURCE == drawing.SPEC.source
+        assert drawing.SPEC.source_kind == "assembly"
+        assert drawing.SPEC.name in {
+            row.name for row in DRAWINGS if row.source_kind == "assembly"
+        }
 
 
 def test_each_simple_recipe_is_only_a_precomputed_shared_builder_call() -> None:
@@ -194,8 +272,9 @@ def test_shared_builder_places_named_views_without_per_script_visual_overrides()
         assert token not in source
 
 
+@pytest.mark.parametrize("with_annotations", (False, True))
 def test_shared_builder_places_exactly_front_right_and_isometric(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, with_annotations: bool
 ) -> None:
     source = tmp_path / "assembly.SLDASM"
     source.touch()
@@ -244,6 +323,10 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
 
     monkeypatch.setattr(_assembly_drawing, "finalize_drawing", finalize)
 
+    def annotate(actual_adapter):
+        assert actual_adapter is adapter
+        calls.append(("annotations", len(views)))
+
     result = asyncio.run(
         _assembly_drawing.build_simple_three_view_drawing(
             adapter,
@@ -255,6 +338,7 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
             right_center=(0.2, 0.2),
             iso_center=(0.3, 0.2),
             pdf_title="Assembly Drawing",
+            annotate=annotate if with_annotations else None,
         )
     )
 
@@ -267,6 +351,12 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
     ]
     assert all(call[5] == (1.0, 4.0) for call in view_calls)
     assert result == {"pdf": str(outputs.pdf)}
+    annotation_calls = [call for call in calls if call[0] == "annotations"]
+    assert annotation_calls == ([("annotations", 3)] if with_annotations else [])
+    if with_annotations:
+        assert calls.index(("annotations", 3)) < next(
+            index for index, call in enumerate(calls) if call[0] == "finalize"
+        )
     assert ("new", DrawingLayout.PORTRAIT, (1.0, 4.0)) in calls
     assert (
         "finalize",

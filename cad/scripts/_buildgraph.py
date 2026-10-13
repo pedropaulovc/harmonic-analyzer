@@ -49,9 +49,10 @@ _DATA_EXTENSIONS = (".dxf", ".dwg")
 _DATA_LITERAL_RE = re.compile(r"""["']([^"']+\.(?:dxf|dwg))["']""", re.IGNORECASE)
 
 # Sub-assemblies in build order; the top-level harmonic-analyzer references the
-# six subs, so it is last. doit derives ordering from file_dep, but this tuple
+# eight subs, so it is last. doit derives ordering from file_dep, but this tuple
 # still enumerates the assembly tasks. The former monolithic ``output`` is split
-# by function into summing -> magnifier -> pen (the value chain) + paper-drive.
+# by function into summing -> magnifier -> pen (the value chain) + paper-drive;
+# the measuring stick + its clamped stop form their own sub (MS, 2026-10-09).
 ASSEMBLY_ORDER = (
     "fr_frame",
     "dt_drive_train",
@@ -60,6 +61,7 @@ ASSEMBLY_ORDER = (
     "mg_magnifier",
     "pn_pen",
     "pd_paper_drive",
+    "ms_measuring_stick",
     "ha_harmonic_analyzer",
 )
 
@@ -811,9 +813,10 @@ def references_of(asm_stem: str) -> list[str]:
     """Part + sub-assembly stems this assembly's build script references.
 
     These are the prerequisite artefacts (the DAG edges): each output sub
-    (summing/magnifier/pen/paper_drive) references its leaf parts;
-    ``harmonic_analyzer`` references the six sub-assemblies
-    (build_harmonic_analyzer_assembly.SUBASSEMBLIES). doit turns each into a
+    (summing/magnifier/pen/paper_drive/measuring_stick) references its leaf
+    parts; ``harmonic_analyzer`` references eight sub-assemblies: the seven in
+    build_ha_harmonic_analyzer_assembly.SUBASSEMBLIES plus ``ms_measuring_stick``,
+    inserted separately at its derived parked pose. doit turns each into a
     ``file_dep`` on the referenced ``.SLDPRT``/sub-``.SLDASM`` target, so order
     and the refresh/full decision fall out of the graph.
     """
@@ -2074,6 +2077,12 @@ def config_files_of(script: Path) -> frozenset[str]:
     they read. Returns ``frozenset({"**"})`` if any source uses ``_config``
     unclassifiably or fails to parse -- so doit over-rebuilds rather than ever
     skipping a real change.
+
+    Runtime-loaded requirement declarations are deliberately not discovered here:
+    package:features:<stem> callers enumerate only source_paths(stem) and analyze each
+    Python source's closure. Full export reads produced bundles instead of these
+    declarations. Following every discovered drawing from the generic exporter
+    would make one declaration edit invalidate every feature leaf.
     """
     sources = [_resolved(script), *(Path(p) for p in module_deps_of(script))]
     tokens: set[str] = set()
@@ -2311,18 +2320,24 @@ def stamps_title_block_properties(script: Path) -> bool:
 # a stamper or a drawing script is listed here (test_dodo_recipe pins it).
 TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
     {
+        "_printed_limits",
         "_printed_tolerance",
         "vn_boss_hook_spec",
         "build_dt_drive_train_assembly",
         "build_fr_harmonic_base",
-        "build_mg_wheel_bar",
         "dt_cone_pivot_post_spec",
         "dt_cone_swing_platform_geometry",
         "dt_cone_swing_platform_spec",
         "dt_cone_tip_block_spec",
+        # Drilled-hole and angular rows size the collar-to-bank air stack.
+        "dt_tip_collar_air",
+        # Angular row sets the through tap's angle in the screw landing gate.
+        "vn_cone_tip_collar_spec",
         "crank_boss_rim",
         "dt_crank_hub_geometry",
         "dt_crank_pinion_spec",
+        # Drilled-hole row sets the bore band and worst journal-pass clearance.
+        "dt_crank_seat_washer_spec",
         "dt_crankshaft_spec",
         "error_budget",
         "export_features",
@@ -2338,6 +2353,10 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "vn_knife_mount_dowel_spec",
         "pd_transgear_disc_hub_spec",
         "pd_transgear_removable_notes",
+        # Edge-break row sizes the knob tip and the rack window/lateral stacks.
+        "paper_drive_geom",
+        "paper_drive_rack_travel",
+        "pd_transgear_knob_shaft_spec",
     }
 )
 

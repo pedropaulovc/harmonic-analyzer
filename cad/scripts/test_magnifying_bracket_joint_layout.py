@@ -105,10 +105,10 @@ def test_side_by_side_stations_have_counterbore_and_head_bearing() -> None:
         min(joint.SCREW_MACHINE_X) - joint.SCREW_HEAD_DIA / 2.0
         - (KNIFE[0] + knife_mount.BLK_HALF_X)
     )
-    assert head_air == pytest.approx(2.222)
+    assert head_air == pytest.approx(1.722)
     # Receiver stations follow the lever's real free edge: its width band
     # adds a whole-part translation relative to the pivot/knife line.
-    assert head_air - joint.POSITION_BAND - 2.0 * joint.LINEAR_BAND == pytest.approx(1.152)
+    assert head_air - joint.POSITION_BAND - 2.0 * joint.LINEAR_BAND == pytest.approx(0.652)
 
 
 def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
@@ -271,3 +271,16 @@ def test_assembly_places_the_two_screws_head_out_shank_into_the_lever() -> None:
     # Stock frame shank points -Y; rotated axis must point machine +Z.
     shank_axis = tuple(-rows[1][index] for index in range(3))
     assert shank_axis == (0.0, 0.0, 1.0)
+
+
+def test_wheel_pin_press_pair_pins_the_pin_and_bar_bore() -> None:
+    import mg_wheel_axle_spec as pin
+    import mg_wheel_bar_geom as bar
+
+    pairs = interference.allowed_interference_pairs("mg-magnifier")
+    limit = pairs[frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1"))]
+    assert limit == pytest.approx(
+        interference._smooth_annulus_limit_mm3(
+            pin.PIN_DIA, bar.AXLE_BORE_DIA, bar.BAR_DEPTH
+        )
+    )

@@ -42,7 +42,8 @@ import _telemetry
 import build_mg_magnifier_assembly as m
 import vn_counter_spring_spec
 import error_budget as eb
-import pn_pen_wire_geom
+import mg_magnifying_wheel_geom
+import mg_wheel_drum_geom
 import spring_mount_geom as s
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -179,13 +180,16 @@ async def build(adapter):
             rotation,
         )
         weight("mg-magnifying-vertical-rod", (m.CLAMP_X, m.VROD_TOP_Y, m.VROD_Z), rotation)
-        weight("mg-output-fixture", (m.CLAMP_X, m.FIXTURE_Y0, m.VROD_Z), m.IDENTITY)
+        weight("mg-output-fixture", m.FIXTURE_POSITION, m.FIXTURE_ROWS)
+        weight(
+            "vn-thumb-screw", m.FIXTURE_SCREW_POSITION, m.FIXTURE_SCREW_ROWS
+        )
         positive = sum(max(0, row["gravity_torque_n_mm"]) for row in rows)
         negative = sum(min(0, row["gravity_torque_n_mm"]) for row in rows)
         hook = m.HUB_WIRE_START
         hook_radius = math.hypot(hook[0] - s.KNIFE[0], hook[1] - s.KNIFE_CONTACT_Y)
-        physical_ratio = (pn_pen_wire_geom.RIM_DIA + pn_pen_wire_geom.WIRE_DIA) / (
-            m.HUB_DIA + m.HUB_WIRE_DIA
+        physical_ratio = (
+            mg_magnifying_wheel_geom.RIM_WIRE_R / mg_wheel_drum_geom.DRUM_WIRE_R
         )
         cad_ratio = eb.nominal().wheel_ratio
         ratio = max(physical_ratio, cad_ratio)
@@ -198,7 +202,7 @@ async def build(adapter):
             * 9.80665
             * wheel_ecc
             * hook_radius
-            / ((m.HUB_DIA + m.HUB_WIRE_DIA) / 2)
+            / mg_wheel_drum_geom.DRUM_WIRE_R
         )
         channel_radius = math.hypot(
             s.CHANNEL_ANCHOR_XY[0] - s.KNIFE[0],

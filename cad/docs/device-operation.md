@@ -102,8 +102,8 @@ Full procedure with the numbers: `READOUT.md` in the release bundle (or
 
 | step | what | why | provenance |
 |---|---|---|---|
-| 0 | **choose the ordinate scale**: with the clamp against the bracket collar (66 mm from the knife) one full-scale bar moves the pen 3.2 mm, so the bars' read ordinates may sum to at most **4.7** before the $k = 0$ peak overruns the 15 mm half-stroke; scale a broader function down first — to the largest $f$ with $P(f) \le 4.7$ read off the station table, not by proportion (the idle bars keep a fixed read ordinate, so proportion overdrives the stroke ~9 %) — then set the clamp so the peak just fills the stroke, **no farther than the as-built 165 mm**: a sparse or small input ($P < 1.9$) cannot fill the stroke at any setting, so scale it *up* first (every reading error is $15/r_0$ times larger otherwise) | the magnifier's range is finite (collar face to rod tip) and the collar-face pose is not CAD-gated (see #748); step 3 removes the scale, but every fixed error — the stick's 0.25 mm, the knife stall, the idle lift — is a larger share of a scaled-down trial | book p. 99 ("scaled by adjusting the magnifying lever"); the capacity is this CAD's, see [#748](https://github.com/pedropaulovc/harmonic-analyzer/issues/748) |
-| 1 | set bar $i$ to the linear station $x_i \cdot 88$ mm; **record the ordinate it reads** from the station table | a bar at the stick zero still moves (≈ 0.028 of full scale: the null lies behind the pivot); the gain is 1–2.5 % non-linear across the range | Michelson's unevenly-stamped stick (book p. 34); here a linear stick + table |
+| 0 | **choose the ordinate scale**: with the clamp against the bracket collar (66 mm from the knife; the wire's moment arm about the knife is 55.9 mm there, since the output fixture hooks it 9.7 mm toward the knife and the wire leans toward the wheel) one full-scale bar moves the pen 1.86 mm, giving a computed capacity of ≈ 8.07356 full-scale bars within the 15 mm half-stroke; use the conservative operating limit **$P(f) \le 8.07$**, where $P(f) = \sum_i t_i(1+\kappa_i)$ and $t_i$ is the table ordinate at the scaled station, before division by $f$. Scale a broader function down first — to the largest $f$ satisfying that limit, read off the station table, not by proportion (the idle bars keep a fixed read ordinate, so proportion overdrives the stroke ~3 % for all ones; the table solve gives $f \approx 0.384$) — then set the clamp at the station whose pen travel per bar fills the stroke, read off `READOUT.md`'s clamp-station table (the gain follows the wire arm, not the distance from the knife), **no farther than the as-built 165 mm**: a sparse or small input ($P < 2.70$) cannot fill the stroke at any permitted setting, so scale it *up* first within the capacity and bar travel (every reading error is $15/r_0$ times larger otherwise) | the magnifier's range is finite (collar face to rod tip) and only the as-built pose is CAD-gated (see #748); step 3 removes the scale, but every fixed error — the stick's 0.25 mm, the knife stall, the idle lift — is a larger share of a scaled-down trial | book p. 99 ("scaled by adjusting the magnifying lever"); the capacity is this CAD's, see [#748](https://github.com/pedropaulovc/harmonic-analyzer/issues/748) |
+| 1 | set bar $i$ to the linear station $f\,x_i \cdot 88$ mm; **record the ordinate it reads** from the station table, divided by $f$ so steps 3–4 use the function's own units | a bar at the stick zero still moves (≈ 0.028 of full scale: the null lies behind the pivot); the ordinate-per-mm slope changes by +4.1 % across the range | Michelson's unevenly-stamped stick (book p. 34); here a linear stick + table |
 | 2 | crank in one direction; read the pen height $r_k$ (mm) off the trace's own mean line at $\theta_k$, i.e. with the crank on its index after $2k$ turns | the coefficients are the ordinates at those divisions | 1898 p. 10; book p. 8 |
 | 3 | **normalise**: $s = r_0 / (S + C_2)$ with $S = \sum x^{read}_i$, $C_2 = \sum x^{read}_i \kappa_i$; then $O'_k = r_k / s$ | the pen scale is unknown; the $k = 0$ reading is the greatest term and fixes it | 1898 pp. 10–11 (`obs.` $n = 0$ ≡ 100); book p. 99 |
 | 4a | subtract $\sum_i x^{read}_i \kappa_i \cos(2i\theta_k)$, $\kappa_i$ from the table | a slider-crank is not a cosine: the rod adds a 2nd harmonic of $e/4L$ ≈ 1.4 % per channel, which aliases onto every readout point | design property of the eccentric-and-rod drive; not in the paper, *inside* its 0.7 % |
@@ -115,17 +115,17 @@ greatest term, mean absolute error; Gaussian input | two-channel input):
 
 | after | Gaussian | two-channel |
 |---|---:|---:|
-| reading and normalising only (Michelson's procedure) | 0.48 | 10.6 |
-| + the read-vs-set lift vector (4b, common lift only) | 0.14 | 1.30 |
+| reading and normalising only (Michelson's procedure) | 0.49 | 10.66 |
+| + the read-vs-set lift vector (4b, common lift only) | 0.14 | 1.33 |
 | + the second-harmonic correction (4a) | 0.06 | 0.14 |
-| + the full station table (1 and 4b) | **0.006** | **0.018** |
+| + the full station table (1 and 4b) | **0.007** | **0.019** |
 
 (on a machine whose cam lobes stand vertical at crank home; the as-built CAD's sit 1.5° off —
 the tooth-in-gap lock, [#749](https://github.com/pedropaulovc/harmonic-analyzer/issues/749) —
 and that common phase adds 0.30 | 0.80 that no step here can remove: it is the sine transform)
 
-against 0.13 from *all nine* part tolerances combined. The corrections are where the
-accuracy lives; the drawings are where the last 0.13 lives. That is the whole point of
+against 0.158 from the combined part and station-setting scatter. The corrections are where the
+accuracy lives; the drawings and setup are where that scatter lives. That is the whole point of
 the error budget, and why `READOUT.md` ships beside the drawings as a manufacturing
 output, not as a footnote.
 
@@ -153,9 +153,10 @@ The normalisation (step 3) can never be removed: it is the price of an adjustabl
 magnifier, and the reason the trace can span the paper for any input. What *can*
 change is how much the operator has to give up to fit the pen: on this CAD the
 clamp cannot get nearer the knife than the bracket collar, so a broad function is
-set at a fifth to a half of full scale and every fixed error grows by the same
-factor — the budget's largest single term after that is the knife stall, and it is
-the magnifier's range, not the edge, that sets it (#748).
+set at about 0.384 (all ones), 0.763 (half rectangle/lifted square) or 0.918
+(Gaussian) of full scale and every fixed error grows by the inverse scale.
+Readout and timebase are the largest broad-input terms; the magnifier's range
+forces those reduced scales, and the collar pose remains unproven (#748).
 
 ## For the impatient builder
 

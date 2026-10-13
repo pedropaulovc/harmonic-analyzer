@@ -510,8 +510,14 @@ def offline_release_pdfs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     def release_pdfs(release: str, workspace: Path) -> Path:
         directory = tmp_path / "fixture-pdfs" / release
         directory.mkdir(parents=True, exist_ok=True)
-        for drawing in evaluation.mr.DRAWINGS_BY_NAME.values():
-            (directory / drawing.outputs["pdf"].name).write_bytes(b"offline frozen PDF")
+        names = {d.outputs["pdf"].name for d in evaluation.mr.DRAWINGS_BY_NAME.values()}
+        names |= {
+            case["release_pdf"]
+            for case in evaluation.load_evals()[1]
+            if "release_pdf" in case
+        }
+        for name in names:
+            (directory / name).write_bytes(b"offline frozen PDF")
         return directory
 
     monkeypatch.setattr(evaluation, "release_pdfs", release_pdfs)
@@ -947,6 +953,57 @@ def test_run_without_baseline_never_loads_or_reviews_old_skill(
     assert list(manifest["configurations"]) == ["with_skill"]
     assert not (iteration / "inputs" / "old_skill").exists()
     assert not (iteration / case["name"] / "old_skill").exists()
+
+
+def test_release_pdf_override_reads_the_renamed_release_pdf(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A drawing renamed after its release keeps reading the release's PDF:
+    import hashes it, and run stages it under the registry name."""
+    from types import SimpleNamespace
+
+    _, cases = evaluation.load_evals(selectors=("ha-measuring-stick-rules",))
+    case = cases[0]
+    assert case["package"] == "ms_stick"
+    assert case["release_pdf"] == "ha-measuring-stick.pdf"
+    registry_pdf = evaluation.mr.DRAWINGS_BY_NAME["ms_stick"].outputs["pdf"].name
+    assert evaluation.release_pdf_name(case) == "ha-measuring-stick.pdf" != registry_pdf
+    release = tmp_path / "renamed-release" / "pdf"
+
+    def release_pdfs(name: str, workspace: Path) -> Path:
+        # The release holds only the old basename, never the registry's.
+        release.mkdir(parents=True, exist_ok=True)
+        (release / case["release_pdf"]).write_bytes(b"renamed release PDF")
+        return release
+
+    monkeypatch.setattr(evaluation, "release_pdfs", release_pdfs)
+    renamed_hash = hashlib.sha256(b"renamed release PDF").hexdigest()
+
+    source = tmp_path / "source"
+    report = _report(source, case)
+    with pytest.raises(ValueError, match="source hashes do not match"):
+        evaluation.import_iteration(tmp_path / "imported", [case], [f"with_skill={source}"])
+    report["source_sha256"] = [renamed_hash]
+    (source / f"{case['package']}.json").write_text(json.dumps(report), encoding="utf-8")
+    assert evaluation.import_iteration(tmp_path / "imported", [case], [f"with_skill={source}"])
+
+    staged = []
+
+    def review(command, **kwargs):
+        pdf_dir = Path(command[command.index("--pdf-dir") + 1])
+        staged.append((pdf_dir / registry_pdf).read_bytes())
+        _report(Path(command[command.index("--report-dir") + 1]), case)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(evaluation, "compose_prompt", lambda kind, ref=None: "prompt")
+    monkeypatch.setattr(evaluation.subprocess, "run", review)
+    monkeypatch.setattr(evaluation, "grade_iteration", lambda iteration, **kwargs: {})
+    args = evaluation._parse_args(
+        ["run", "--workspace", str(tmp_path / "run"), "--baseline-ref", "none",
+         "--runs", "1", "--jobs", "1"]
+    )
+    evaluation.run_iteration(args, [case])
+    assert staged == [b"renamed release PDF"]
 
 
 def test_failure_records_preserve_metadata_and_exclude_passing_entries() -> None:

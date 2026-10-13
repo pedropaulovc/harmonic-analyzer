@@ -11,7 +11,7 @@ import draw_dt_cone_pivot_post_tl_soft_jaw as drawing
 import dt_cone_pivot_post_spec as post
 import dt_cone_pivot_post_tl_soft_jaw_spec as spec
 import export_features
-from _feature_requirements import limits
+from _printed_limits import limits
 from _printed_tolerance import drilled_oversize_mm
 from prechips.model import TOLERANCE_REQUIREMENTS
 

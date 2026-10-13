@@ -7,9 +7,10 @@ platen cannot fall off it: the plate overlaps the guide on one long edge
 
 Layout: width along +X, height along +Y from the origin corner, thickness
 extruded +Z; the y = 0 edge is the guide-side edge (screw holes 2.5 above
-it). Bottom-rail copies mount as authored and bridge UP across the open
-channel onto the bar band; top-rail copies are flipped Rz180 by the assembly
-and hang DOWN over the bar.
+it), and its four plan corners are rounded. Bottom-rail copies mount as
+authored and bridge UP across the 1.0 running clearance onto the bar;
+top-rail copies are flipped Rz180 by the assembly and hang DOWN over the bar
+the top rail rides on.
 
 Run (SolidWorks already open)::
 
@@ -38,13 +39,12 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from pd_guide_lock_spec import (
+    CORNER_R,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     HOLE_LOCATION_BAND,
@@ -53,8 +53,8 @@ from pd_guide_lock_spec import (
     HOLE_XY,
     ISOMETRIC_VIEW_NOTE,
     LOCK_HEIGHT,
-    LOCK_HEIGHT_BAND,
     LOCK_THICK,
+    LOCK_THICK_BAND,
     LOCK_WIDTH,
 )
 from vn_guide_lock_screw_spec import SHANK_DIA as LOCK_SCREW_SHANK_DIA
@@ -64,22 +64,21 @@ MATERIAL = "Plain Carbon Steel"
 
 # LOCK_WIDTH/LOCK_HEIGHT/LOCK_THICK/HOLE_XY live in pd_guide_lock_spec.py (the
 # dimensional contract shared with draw_pd_guide_lock.py; re-exported here for
-# build_pd_paper_drive_assembly). LOCK_HEIGHT is sized by the BOTTOM station: its
-# rail sits 7 below the bar (open channel), so reaching the bar band takes
-# 5 (rail) + 7 (channel) + the overlap behind the bar. The 2026-09-02 user
-# re-read of ch22 p.54 shows a LOW lock: 5 rail + 7 channel + 3 bar overlap
-# (the 2026-07 plate reached a 7 overlap = 19), plus R9-59's 1.0 lip past the
-# rail's outer edge that gives the screw holes their edge ligament. R9-61
-# brought the spacer-side edge in by 0.35 so the set, skewed plate clears the
-# floating pivot spacer: the bottom station overlaps the bar 2.65 (2.15 at
-# the -0.50 height band). The top rail sits ON the bar, so the same plate
-# overlaps the bar by 9.65 there. (2026-07-07 field report: a 12-tall plate
-# topped out AT the bar's bottom edge and retained nothing at the bottom
-# stations.)
-# Stock 91255A108 button head shanks (MHA-VN-046, rulings R9-31, R9-48) pass
-# through the lock plates before threading into the guide's rear-face #4-40
-# through taps. The part-owned 1/8 drill (R9-49) carries both printed hole
-# positions over the screw majors (vn_guide_lock_screw_spec.LOCK_SET_OFFSET).
+# build_pd_paper_drive_assembly). One plate serves both rails (user ruling
+# 2026-10-11): R9-59's 1.0 lip past the rail's outer edge (the screw holes'
+# edge ligament) + 5 rail + the overlap behind the bar. The 28-tall bar
+# (pd_support_bar_spec) closes the old 7 open channel to a 1.0 running
+# clearance over the bottom rail and carries the top rail on its top edge, so
+# the 9.6 plate overlaps the bar 2.6 at the bottom stations and 3.6 at the
+# top (2026-07-07 field report: a 12-tall plate across the 7 channel topped
+# out AT the bar's bottom edge and retained nothing at the bottom stations;
+# its 15.65 successor stood 9.65 over the bar at the top, toward the latch
+# hook).
+# Stock 91792A108 slotted pan head shanks (MHA-VN-046, rulings R9-31, R9-48)
+# pass through the 1/16 sheet plates before threading into the guide's
+# rear-face #4-40 through taps. The part-owned 1/8 drill (R9-49) carries both
+# printed hole positions over the screw majors
+# (vn_guide_lock_screw_spec.LOCK_SET_OFFSET).
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
 if HOLE_DIA < LOCK_SCREW_SHANK_DIA:
     raise AssertionError("stock guide-lock screw shank does not clear the guide lock")
@@ -100,6 +99,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "LockHoleX1", f"{HOLE_XY[0][0]}mm")
     await set_global(adapter, "LockHoleX2", f"{HOLE_XY[1][0]}mm")
     await set_global(adapter, "LockHoleY", f"{HOLE_XY[0][1]}mm")
+    await set_global(adapter, "LockCornerR", f"{CORNER_R}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -160,6 +160,34 @@ async def build(adapter) -> dict[str, str]:
     v_final = v_plate - v_holes
     await volume_check(adapter, "lock with holes", v_final, 0.005 * v_plate)
 
+    # Rounded plan corners LAST (the photo's plates, pd_guide_lock_spec
+    # .CORNER_R), each giving up the square R x R less its quarter disc. The
+    # printed 4X radius belongs to "Corners", a fillet on the TOP-RIGHT edge
+    # alone: an imported fillet dimension attaches to its feature's first edge
+    # (farm run 20261012T061737079Z: one four-edge fillet put the radius on
+    # the bottom-left arc, its leader across hole 1 to text off the top-right),
+    # so the drawing's leader lands on the arc beside its text. The other three
+    # corners are one unprinted fillet driven by the same LockCornerR.
+    corner_features = (
+        ("Corners", "CornerR", ((LOCK_WIDTH, LOCK_HEIGHT),)),
+        (
+            "OtherCorners",
+            "OtherCornerR",
+            ((0.0, 0.0), (LOCK_WIDTH, 0.0), (0.0, LOCK_HEIGHT)),
+        ),
+    )
+    for feature, dimension, corners in corner_features:
+        edges = [[x, y, LOCK_THICK / 2.0] for x, y in corners]
+        check(f"fillet {feature}", await adapter.add_fillet(CORNER_R, edges))
+        name_last_feature(adapter, feature)
+        corner_dim = name_dimensions(adapter, feature, [dimension])
+        drive_jobs.append((corner_dim[0], '"LockCornerR"'))
+        v_corners = (
+            len(corners) * (CORNER_R**2 - math.pi * CORNER_R**2 / 4.0) * LOCK_THICK
+        )
+        v_final -= v_corners
+        await volume_check(adapter, f"lock with {feature}", v_final, 0.1 * v_corners)
+
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
     await force_rebuild(adapter)
@@ -170,15 +198,13 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven lock (equations neutral)", v_final, 0.005 * v_plate
     )
 
-    # Manufacturing drawing support: the height's and the hole coordinates'
-    # explicit bands and every printed dimension's places live on the model
-    # (drawing-simplicity-policy.md `How the repository implements the guidelines`; the paper-drive lock-station sweep and the screw set
-    # window read the same constants), then mark exactly the print's
+    # Manufacturing drawing support: the sheet thickness's and the hole
+    # coordinates' explicit bands and every printed dimension's places live
+    # on the model (drawing-simplicity-policy.md `How the repository implements the guidelines`; the paper-drive lock-station sweep and the
+    # screw set window read the same constants), then mark exactly the print's
     # dimensions (the drawing recipe imports the marked set and must find
     # every one of these), and stamp the make-critical title-block properties.
-    set_dimension_bilateral_tolerance(
-        adapter, "LockProfile", "Height", *deviations(LOCK_HEIGHT_BAND)
-    )
+    set_dimension_symmetric_tolerance(adapter, "Lock", "Depth", LOCK_THICK_BAND)
     for dimension_name in sorted(HOLE_LOCATION_DIMENSIONS):
         set_dimension_symmetric_tolerance(
             adapter, "ScrewHoles", dimension_name, HOLE_LOCATION_BAND

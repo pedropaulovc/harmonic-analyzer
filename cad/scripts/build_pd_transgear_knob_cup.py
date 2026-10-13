@@ -7,7 +7,7 @@ boss, the rear stop of the knob's end float (``pd_transgear_knob_cup_spec``).
 
 Layout: one turned half-profile on the Front plane, revolved about local +Y:
 the O.D. and the length are its driving dimensions.  The front face is the
-Top Plane (y = 0), the rear face y = LENGTH.  The reamed Ø8.5 bore is cut
+Top Plane (y = 0), the rear face y = LENGTH. The reamed Ø6 H7 bore is cut
 through the full length from a Top-plane circle.  ``Axis1`` is the cup axis
 (Front Plane ∩ Right Plane).  The paper-drive assembly mates ``Axis1`` to the
 knob shaft's axis and the Top Plane to the shaft's cup-face station.

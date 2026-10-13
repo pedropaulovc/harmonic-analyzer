@@ -1,16 +1,33 @@
-r"""Reproduction script: output fixture collar (book ch. 20, p. 48).
+r"""Reproduction script: output fixture (MHA-MG-006; book ch. 20 p. 48).
 
-The small fixture that slides up and down the vertical rod to set the
-trace's vertical placement on the paper; the wire to the magnifying wheel
-hooks onto it and a small reeded screw (separate thumb-screw part) locks
-it. Modelled as a collar with the rod bore and one cross hole that serves
-the clamp screw / wire hook.
+The small brass hex block that slides on the vertical rod to set the trace's
+height on the paper (the photographed fixture): the lever wire hooks into the
+full-radius groove on its turned spigot, and a #4-40 thumb screw in the axial
+tap through the spigot face locks it to the rod.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 20" — photo-scaled, p.48 bottom
-close-up (low).
+Layout (part frame, ``mg_output_fixture_geom``): the origin is the rod-bore
+centre, the hex axis local +X from the free end (x = FREE_END_X) to the
+spigot face (x = SPIGOT_FACE_X), flats facing +/-Z, corners on +/-Y.
 
-Layout: collar axis along Y (extruded from a Top-plane sketch, which maps
-(x, y) -> global (X, -Z)); cross hole along Z from a Front-plane sketch.
+* ``HexProfile``: the 3/8 hex on the ``FreeEnd`` plane, extruded to the
+  shoulder.  It carries the flats (``HexAf``); its corners sit on the
+  vertical through the sketch origin (the bore axis) and its two flats are
+  equal, so the rod bore is centred between the flats with no dimension to
+  either one.
+* ``TurnedProfile``: the spigot as a Top-plane rectangle from the free end to
+  the spigot face, revolved about local X (inside the hex it adds nothing:
+  its Ø is under the flats).  It carries every axial station from the free
+  end (``RodStation``, ``HexLength``, ``OverallLength``) and ``SpigotDia``.
+* ``GrooveProfile``: the full-radius groove, a Top-plane circle drawn as two
+  semicircles meeting at the root, revolved as a cut.  Its centreline starts
+  on the free end, so ``GrooveStation`` runs from there; ``GrooveRadius``
+  sizes it and ``GrooveRootDia`` is the diametric dimension from the axis to
+  the root point.
+* ``RodBoreProfile``: the reamed Ø5.20 cross bore along local Y.
+* ``AxialTap``: one blind Hole Wizard #4-40 tap from the spigot face (the
+  thumb screw's receiver): full thread to where its axis breaks into the
+  rod bore, the tap drill on to the bore axis, its point in the bore.
+* ``HookAnchorPoint``: the lever wire's hook at the groove root's +Z side.
 
 Run (SolidWorks already open)::
 
@@ -21,112 +38,218 @@ from __future__ import annotations
 
 import math
 import sys
+from typing import Any
 
 import _telemetry
 from _appearance import apply_material
 from _check import check
 from _com import _read_member
-from _dimensions import drive_dimension, set_global
-from _feature_tree import name_last_feature
-from _part_checks import report_mass_properties, volume_check
-from _part_save import save_part_and_images
-from _rebuild import force_rebuild
-from _session import run_build
-from _sketch import SketchDims, blank_sketch, ensure_fully_defined, set_sketch_direct_db
-from _sketch_circle import define_circle
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
+from _feature_tree import name_last_feature
+from _fit_deviations import deviations
+from _holes import cross_hole_volume_mm3, wizard_holes
+from _part_checks import bbox_extent_check, report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _saved_part_guard import require_saved_drawing_properties
+from _session import run_build
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
+from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
+from mg_output_fixture_geom import (
+    FREE_END_X,
+    GROOVE_CENTRE_R,
+    GROOVE_RADIUS,
+    GROOVE_ROOT_DIA,
+    GROOVE_X,
+    HEX_AF,
+    HEX_CORNER_RADIUS,
+    HEX_LENGTH,
+    HOOK_LOCAL,
+    OVERALL_LENGTH,
+    ROD_BORE_DIA,
+    ROD_STATION,
+    SHOULDER_X,
+    SPIGOT_DIA,
+    SPIGOT_FACE_X,
+    SPIGOT_LENGTH,
+    TAP_DRILL_DIA,
+    TAP_SPEC,
+)
 from mg_output_fixture_spec import (
-    COLLAR_DIA,
-    COLLAR_HEIGHT,
-    CROSS_HOLE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    END_VIEW_NOTE,
-    ISOMETRIC_VIEW_NOTE,
-    ROD_BORE_DIA,
+    DRAWING_PRECISION,
+    GROOVE_STATION,
+    ROD_BORE_DIA_BAND,
+    ROD_BORE_DIA_PLACES,
+    SYMMETRIC_BANDS,
 )
 
 PART_NAME = "mg-output-fixture"
-MATERIAL = "Brass"  # see _appearance.apply_material docstring
+MATERIAL = "Brass"  # C36000 free-cutting brass (the registry row names it)
 
-# Collar nominals live in mg_output_fixture_spec (the drawing consumes the same
-# values), so the print and the part cannot silently drift (codex review #361).
-# Design notes that stay with the producer:
-# - The Ø5 vertical rod slides through the coaxial ROD_BORE_DIA bore -- an
-#   engineered 0.2 mm running/slip fit, NOT a drilled hole, so it stays a plain
-#   dimensioned cut (a nearest-drill Hole Wizard fit would slop the slide).
-# The cross hole is a radial plain cut because the curved collar has no planar
-# Hole Wizard seat. Its diameter still derives from the part-owned tap spec.
-THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent crossed
+SPIGOT_R = SPIGOT_DIA / 2.0
+BORE_R = ROD_BORE_DIA / 2.0
+DRILL_R = TAP_DRILL_DIA / 2.0
+# The rod bore's mid-plane cut: past both corners.
+BORE_CUT_DEPTH = 2.0 * HEX_CORNER_RADIUS + 2.0
+# The cross-section's corner offset from the axis, for the hex sketch's
+# equation (the corner radius is the flats over sqrt(3)).
+_CORNER_PER_AF = 1.0 / math.sqrt(3.0)
+_SAVED_DRAWING_PROPERTIES = ("Manufacturing Notes",)
 
-# HookAnchorPoint: where the lever-wire's hook BALL JOINT grabs the fixture.
-# The wire ties through the cross hole and hangs just UNDER the collar's
-# bottom face (wire r 0.4 + 0.25 clearance = 0.65 below it) on the front face
-# of the vertical rod (rod r 2.5 + wire r 0.4 + 0.25 = 3.15 off the rod axis
-# in local -z).
-# build_mg_lever_wire.HOOK_Y/HOOK_Z anchor the same spot in machine coords;
-# build_mg_magnifier_assembly asserts the two agree. Local x = 0, so the point
-# is invariant under the machine-chirality mirror (no double-flip trap).
-HOOK_ANCHOR_LOCAL = (0.0, -0.65, -3.15)
+# --- Analytic volumes (mm^3) -----------------------------------------------------
+V_HEX = math.sqrt(3.0) / 2.0 * HEX_AF**2 * HEX_LENGTH
+V_SPIGOT = math.pi * SPIGOT_R**2 * SPIGOT_LENGTH
+
+
+def _groove_volume() -> float:
+    """Spigot material the full-radius groove removes: the circular segment
+    of the groove circle under the spigot OD, swept round the axis (Pappus)."""
+    above = GROOVE_CENTRE_R - SPIGOT_R  # centre height over the OD
+    half_chord_sq = GROOVE_RADIUS**2 - above**2
+    area = GROOVE_RADIUS**2 * math.acos(above / GROOVE_RADIUS) - above * math.sqrt(
+        half_chord_sq
+    )
+    centroid_r = GROOVE_CENTRE_R - (2.0 / 3.0) * half_chord_sq**1.5 / area
+    return 2.0 * math.pi * centroid_r * area
+
+
+def _bore_volume() -> float:
+    """Hex material the Ø bore across the corners removes: over the bore's
+    cross-section the hex's chord along Y is 2(R - |z|/sqrt(3)), so the
+    volume is 2R·πr² less (2/sqrt(3))·∬|z| dA = (2/sqrt(3))·(4/3)r³."""
+    return 2.0 * math.pi * HEX_CORNER_RADIUS * BORE_R**2 - 8.0 * BORE_R**3 / (
+        3.0 * math.sqrt(3.0)
+    )
+
+
+def _tap_volume() -> float:
+    """The tap drill from the spigot face into the rod bore: the full drill
+    cylinder to the bore axis less the drill's share of the bore's half on
+    the face side (half the perpendicular cross-hole volume).  The drill
+    stops at the bore axis, its point in the bore's air short of the far wall
+    (``mg_output_fixture_spec`` proves it), so the point removes nothing."""
+    return (
+        math.pi * DRILL_R**2 * SPIGOT_FACE_X
+        - cross_hole_volume_mm3(TAP_DRILL_DIA, ROD_BORE_DIA) / 2.0
+    )
+
+
+V_GROOVE = _groove_volume()
+V_BORE = _bore_volume()
+V_TAP = _tap_volume()
+V_TOTAL = V_HEX + V_SPIGOT - V_GROOVE - V_BORE - V_TAP
 
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
         ExtrusionParameters,
+        RevolveParameters,
     )
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): collar OD/height, rod bore and cross
-    # hole diameters. The mm suffix is load-bearing -- this is an INCH document
-    # and the equation manager reads BARE numbers in document units (an
-    # unsuffixed 10 = 10 in, blowing the part up 25.4x).
-    await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
-    await set_global(adapter, "CollarHeight", f"{COLLAR_HEIGHT}mm")
-    await set_global(adapter, "RodBoreDia", f"{ROD_BORE_DIA}mm")
-    await set_global(adapter, "CrossHoleDia", f"{CROSS_HOLE_DIA}mm")
+    # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
+    # is an INCH document and the equation manager reads BARE numbers in
+    # document units.
+    for name, value in (
+        ("HexAf", HEX_AF),
+        ("RodStation", ROD_STATION),
+        ("HexLength", HEX_LENGTH),
+        ("OverallLength", OVERALL_LENGTH),
+        ("SpigotDia", SPIGOT_DIA),
+        ("GrooveStation", GROOVE_STATION),
+        ("GrooveRadius", GROOVE_RADIUS),
+        ("GrooveRootDia", GROOVE_ROOT_DIA),
+        ("RodBoreDia", ROD_BORE_DIA),
+    ):
+        await set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Collar: on-axis circle (centre at the origin), so define_circle emits only
-    # the diameter dim -- the two centre slots are ignored.
-    collar = SketchDims()
-    check("create_sketch collar", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, 0.0, 0.0, COLLAR_DIA / 2.0, "collar", dims=collar,
-        names=("CollarCx", "CollarCz", "CollarDiaDim"),
-        drives=(None, None, '"CollarDia"'),
-    )
-    await ensure_fully_defined(adapter, "collar sketch")
-    check("exit_sketch collar", await adapter.exit_sketch())
-    name_last_feature(adapter, "CollarProfile")
-    drive_jobs += collar.apply(adapter, "CollarProfile")
+    # --- Hex: the free end's plane, the bar's section, extruded to the shoulder
     check(
-        "extrude collar",
-        await adapter.create_extrusion(ExtrusionParameters(depth=COLLAR_HEIGHT)),
+        "create_plane FreeEnd",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Right Plane", offset=FREE_END_X
+            )
+        ),
     )
-    name_last_feature(adapter, "Collar")
-    # Drive the collar's extrude depth from CollarHeight too (D1 is the blind-
-    # extrude depth dim). The cross hole is driven to CollarHeight/2, so the body
-    # height must move with it or a GUI edit of CollarHeight leaves the hole
-    # off-centre (or outside the collar). Evaluates to as-built -> neutral.
-    drive_jobs.append(("D1@Collar", '"CollarHeight"'))
-    v_collar = math.pi * (COLLAR_DIA / 2.0) ** 2 * COLLAR_HEIGHT
-    await volume_check(adapter, "collar", v_collar, 0.005 * v_collar)
+    name_last_feature(adapter, "FreeEnd")
+    blank_reference_geometry(adapter, (("FreeEnd", "PLANE"),))
+    free_end_offset = name_dimensions(adapter, "FreeEnd", ["FreeEndOffset"])[0]
+    drive_jobs.append((free_end_offset, '"RodStation"'))
+    drive_jobs += await _hex_profile(adapter)
+    # The negative-offset Right plane keeps the +X normal (build_fr_top_frame's
+    # set pocket), so the boss runs from the free end to the shoulder.
+    check(
+        "extrude hex",
+        await adapter.create_extrusion(ExtrusionParameters(depth=HEX_LENGTH)),
+    )
+    name_last_feature(adapter, "Hex")
+    drive_jobs.append(("D1@Hex", '"HexLength"'))
+    volume = await volume_check(adapter, "hex", V_HEX, 0.005 * V_HEX)
+    await _centroid_x_check(adapter, "hex", (FREE_END_X + SHOULDER_X) / 2.0)
+    await bbox_extent_check(adapter, "hex length", "x", HEX_LENGTH)
+    await bbox_extent_check(adapter, "hex across the flats", "z", HEX_AF)
+    await bbox_extent_check(
+        adapter, "hex across the corners", "y", 2.0 * HEX_CORNER_RADIUS
+    )
 
-    # Rod bore: on-axis circle, diameter dim only. A plain dimensioned slip cut
-    # (engineered 0.2 mm running fit, not a drilled hole).
+    # --- Spigot: turned from the free end, revolved about local X ---------------
+    drive_jobs += await _turned_profile(adapter)
+    check("revolve spigot", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Spigot")
+    volume = await volume_check(
+        adapter, "hex and spigot", volume + V_SPIGOT, 0.005 * (volume + V_SPIGOT)
+    )
+    await bbox_extent_check(adapter, "overall length", "x", OVERALL_LENGTH)
+
+    # --- Full-radius wire groove -------------------------------------------------
+    drive_jobs += await _groove_profile(adapter)
+    check(
+        "revolve groove",
+        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "Groove")
+    volume = await volume_check(
+        adapter, "wire groove", volume - V_GROOVE, 0.02 * V_GROOVE
+    )
+
+    # --- Rod bore across the corners (along local Y) ----------------------------
     rod = SketchDims()
     check("create_sketch rod bore", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, ROD_BORE_DIA / 2.0, "rod bore", dims=rod,
-        names=("RodCx", "RodCz", "RodBoreDiaDim"),
+        adapter,
+        0.0,
+        0.0,
+        BORE_R,
+        "rod bore",
+        dims=rod,
+        names=(None, None, "RodBoreDia"),
         drives=(None, None, '"RodBoreDia"'),
     )
     await ensure_fully_defined(adapter, "rod bore sketch")
@@ -136,112 +259,308 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut rod bore",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+            ExtrusionParameters(depth=BORE_CUT_DEPTH, both_directions=True)
         ),
     )
     name_last_feature(adapter, "RodBore")
-    v_bored = v_collar - math.pi * (ROD_BORE_DIA / 2.0) ** 2 * COLLAR_HEIGHT
-    await volume_check(adapter, "rod bore", v_bored, 0.005 * v_collar)
+    volume = await volume_check(adapter, "rod bore", volume - V_BORE, 0.01 * V_BORE)
 
-    # Cross hole along Z at mid-height (collar grows +Y from the Top plane). Left
-    # a PLAIN CUT at the #4-40 tap-drill Ø -- a radial hole in the curved collar
-    # wall has no planar seat for the Hole Wizard (see the CROSS_HOLE_DIA note).
-    # On the Front plane the centre is off-axis in y (height) only, so
-    # define_circle emits a z (height) dim then the diameter -- x slot ignored.
-    cross = SketchDims()
-    check("create_sketch cross hole", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter, 0.0, COLLAR_HEIGHT / 2.0, CROSS_HOLE_DIA / 2.0, "cross hole",
-        dims=cross,
-        names=("CrossCx", "CrossHeight", "CrossHoleDiaDim"),
-        drives=(None, '"CollarHeight" / 2', '"CrossHoleDia"'),
+    # --- Thumb-screw tap: from the spigot face into the rod bore ----------------
+    tap = wizard_holes(
+        adapter,
+        TAP_SPEC,
+        [[SPIGOT_FACE_X, 0.0, 0.0]],
+        (1.0, 0.0, 0.0),
+        f"thumb-screw tap ({TAP_SPEC.size} into the rod bore)",
+        name="AxialTap",
+        expect_dia_mm=TAP_DRILL_DIA,
+        placement_dims=[((None, None), (None, None))],
     )
-    await ensure_fully_defined(adapter, "cross hole sketch")
-    check("exit_sketch cross hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "CrossHoleProfile")
-    drive_jobs += cross.apply(adapter, "CrossHoleProfile")
-    check(
-        "cut cross hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "CrossHole")
-    # The Ø3 cross hole removes only the two annular walls it pierces (the bore
-    # already cleared the centre); no clean closed form, so a loose tol.
-    wall_span = COLLAR_DIA - ROD_BORE_DIA  # 2 x wall thickness pierced
-    v_final = v_bored - math.pi * (CROSS_HOLE_DIA / 2.0) ** 2 * wall_span
-    await volume_check(adapter, "cross hole", v_final, 30.0)
+    drive_jobs += tap.placement_drive_jobs
+    volume = await volume_check(adapter, "axial tap", volume - V_TAP, 0.03 * V_TAP)
 
-    # Apply the deferred drive equations after the whole model + a rebuild
-    # exists, then re-check neutrality (each equation evaluates to the as-built
-    # value, so the geometry must not move).
+    # --- The lever wire's hook ---------------------------------------------------
+    await _make_hook_point(adapter)
+
+    # Deferred drive equations, then re-check neutrality.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven output fixture (equations neutral)", v_final, 30.0)
+    await volume_check(
+        adapter, "driven output fixture (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
+    )
+    _assert_hook_point(adapter)
 
-    # HookAnchorPoint: the lever-wire ball joint's fixture-side anchor (see
-    # HOOK_ANCHOR_LOCAL). No adapter writer exists for a free-XYZ reference
-    # point, so: blanked offset plane -> hidden sketch point (inference off,
-    # exact coords) -> InsertReferencePoint(swRefPointSketchPoint = 7) ->
-    # rename -- the build_mg_magnifying_wheel WireYokePoint recipe (late-binding
-    # traps documented there and in memory/solidworks-modeling-pitfalls.md).
-    check(
-        "create_plane HookAnchorPlane",
-        await adapter.create_plane(CreatePlaneParameters(
-            mode="offset", base_plane="Top Plane", offset=HOOK_ANCHOR_LOCAL[1])),
+    await apply_material(adapter, MATERIAL)
+    await report_mass_properties(adapter)
+    # Places are the tolerance statement (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the part carries
+    # them and the explicit bands, the drawing reads them back.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "RodBoreProfile",
+        "RodBoreDia",
+        *deviations(ROD_BORE_DIA_BAND),
+        places=ROD_BORE_DIA_PLACES,
     )
-    name_last_feature(adapter, "HookAnchorPlane")
-    _blank_ref_plane(adapter, "HookAnchorPlane")
-    check("create_sketch hook anchor", await adapter.create_sketch("HookAnchorPlane"))
+    for dimension_name, (feature_name, tolerance) in SYMMETRIC_BANDS.items():
+        set_dimension_symmetric_tolerance(
+            adapter, feature_name, dimension_name, tolerance
+        )
+    # The last dimension edit is behind us: the saved geometry must still be
+    # the analytic part.
+    await force_rebuild(adapter)
+    await volume_check(adapter, "output fixture as saved", V_TOTAL, 0.005 * V_TOTAL)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
+
+
+async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
+    """The 3/8 hex on ``FreeEnd``, corners on the sketch's vertical axis.
+
+    On the negative-offset Right plane sketch x is model -Z (build_fr_top_frame
+    module docstring).  Both corners sit on the vertical through the origin
+    (the bore axis), each a corner radius off it; each flat is vertical, with
+    equal sides either side of it.  The two flats equal make the two halves
+    the same width, so the origin is centred between the flats and the rod
+    bore needs no location from either; the corner radius tied to the flats
+    makes the section regular.  The flats are dimensioned point to point
+    across the hex.
+    """
+    half_af, corner = HEX_AF / 2.0, HEX_CORNER_RADIUS
+    points = [
+        (0.0, corner),
+        (half_af, corner / 2.0),
+        (half_af, -corner / 2.0),
+        (0.0, -corner),
+        (-half_af, -corner / 2.0),
+        (-half_af, corner / 2.0),
+    ]
+    hexd = SketchDims()
+    check("create_sketch hex", await adapter.create_sketch("FreeEnd"))
     set_sketch_direct_db(adapter, True)
-    model = adapter.currentModel
-    # Top-plane sketch mapping (x, y) -> (X, -Z); the offset plane inherits it.
-    sk_point = model.SketchManager.CreatePoint(
-        HOOK_ANCHOR_LOCAL[0] / 1000.0, -HOOK_ANCHOR_LOCAL[2] / 1000.0, 0.0
+    lines = await add_line_chain(adapter, points)
+    set_sketch_direct_db(adapter, False)
+    for flat in (lines[1], lines[4]):
+        check(
+            f"hex flat {flat} vertical",
+            await adapter.add_sketch_constraint(flat, None, "vertical"),
+        )
+    for first, second in ((0, 1), (1, 2), (3, 4), (4, 5)):
+        check(
+            f"hex sides {first}={second}",
+            await adapter.add_sketch_constraint(lines[first], lines[second], "equal"),
+        )
+    # Equal flats, equal halves: the bore axis centred between the flats.
+    check(
+        "hex flats equal (bore centred)",
+        await adapter.add_sketch_constraint(lines[1], lines[4], "equal"),
     )
+    corner_drive = f'"HexAf" * {_CORNER_PER_AF!r}'
+    await anchor_point_to_origin(adapter, f"{lines[0]}.start", 0.0, corner, "hex top corner")
+    hexd.record("HexCornerTop", corner_drive)
+    await anchor_point_to_origin(adapter, f"{lines[3]}.start", 0.0, -corner, "hex bottom corner")
+    hexd.record("HexCornerBottom", corner_drive)
+    await dimension_between(
+        adapter,
+        f"{lines[1]}.start",
+        f"{lines[4]}.start",
+        "horizontal_distance",
+        HEX_AF,
+        "hex across the flats",
+    )
+    hexd.record("HexAf", '"HexAf"')
+    await ensure_fully_defined(adapter, "hex profile")
+    check("exit_sketch hex", await adapter.exit_sketch())
+    name_last_feature(adapter, "HexProfile")
+    return hexd.apply(adapter, "HexProfile")
+
+
+async def _turned_profile(adapter: Any) -> list[tuple[str, str]]:
+    """The spigot's Ø from the free end to the spigot face (Top plane: sketch
+    (x, y) is model (X, -Z)), split at the shoulder so every axial station
+    is a dimension from the free end's axis corner.
+
+    The centreline merges into both axis corners at creation, so the chain's
+    own relations define it (build_pd_transgear_thumbnut's head profile)."""
+    points = [
+        (FREE_END_X, 0.0),
+        (FREE_END_X, SPIGOT_R),
+        (SHOULDER_X, SPIGOT_R),
+        (SPIGOT_FACE_X, SPIGOT_R),
+        (SPIGOT_FACE_X, 0.0),
+    ]
+    turned = SketchDims()
+    check("create_sketch turned profile", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "turned axis", await adapter.add_centerline(FREE_END_X, 0.0, SPIGOT_FACE_X, 0.0)
+    )
+    lines = await add_line_chain(adapter, points)
+    set_sketch_direct_db(adapter, False)
+    for line, relation in zip(
+        lines, ("vertical", "horizontal", "horizontal", "vertical", "horizontal")
+    ):
+        check(
+            f"turned profile {relation} {line}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
+    free_end = f"{lines[0]}.start"
+    await anchor_point_to_origin(adapter, free_end, FREE_END_X, 0.0, "free end on the axis")
+    turned.record("RodStation", '"RodStation"')
+    await add_diametric_linear_dimension(
+        adapter, axis, lines[2], (GROOVE_X, SPIGOT_R + 4.0), "SpigotDia"
+    )
+    turned.record("SpigotDia", '"SpigotDia"')
+    await dimension_between(
+        adapter, free_end, f"{lines[1]}.end", "horizontal_distance", HEX_LENGTH, "shoulder"
+    )
+    turned.record("HexLength", '"HexLength"')
+    await dimension_between(
+        adapter,
+        free_end,
+        f"{lines[2]}.end",
+        "horizontal_distance",
+        OVERALL_LENGTH,
+        "spigot face",
+    )
+    turned.record("OverallLength", '"OverallLength"')
+    await ensure_fully_defined(adapter, "turned profile")
+    check("exit_sketch turned profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "TurnedProfile")
+    return turned.apply(adapter, "TurnedProfile")
+
+
+async def _groove_profile(adapter: Any) -> list[tuple[str, str]]:
+    """The groove circle on the Top plane, stationed from the free end.
+
+    The revolve axis runs from the free end to the bore axis, so its start is
+    the free end on the axis.  The circle is two semicircles meeting at the
+    root and at the crown, both plumb over the centre (the build_dt_crank_arm
+    end-cap recipe), so the root is a sketch point: ``GrooveRootDia`` is a
+    diametric dimension from the axis to it.  A diametric dimension to a
+    circle measures its single distance, not the doubled Ø, so it cannot
+    carry the root.  The axis stays the sketch's only centreline (the
+    revolve's implicit axis)."""
+    groove = SketchDims()
+    root_v = GROOVE_CENTRE_R - GROOVE_RADIUS  # sketch v of the root
+    crown_v = GROOVE_CENTRE_R + GROOVE_RADIUS
+    check("create_sketch groove", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "groove axis", await adapter.add_centerline(FREE_END_X, 0.0, 0.0, 0.0)
+    )
+    # add_arc sweeps CCW p1 -> p2: crown -> root bulges to the free end,
+    # root -> crown to the spigot face; the shared ends merge at creation.
+    toward_free_end = check(
+        "groove arc toward the free end",
+        await adapter.add_arc(
+            GROOVE_X, GROOVE_CENTRE_R, GROOVE_X, crown_v, GROOVE_X, root_v
+        ),
+    )
+    toward_face = check(
+        "groove arc toward the spigot face",
+        await adapter.add_arc(
+            GROOVE_X, GROOVE_CENTRE_R, GROOVE_X, root_v, GROOVE_X, crown_v
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    await anchor_point_to_origin(adapter, f"{axis}.end", 0.0, 0.0, "groove axis at the bore")
+    await anchor_point_to_origin(
+        adapter, f"{axis}.start", FREE_END_X, 0.0, "groove axis from the free end"
+    )
+    groove.record("GrooveDatum", '"RodStation"')
+    # Crown and root plumb over the first arc's centre make it a semicircle;
+    # the root plumb over the second's makes that one concentric.
+    for point, centre in (
+        (f"{toward_free_end}.start", f"{toward_free_end}.center"),
+        (f"{toward_free_end}.end", f"{toward_free_end}.center"),
+        (f"{toward_face}.start", f"{toward_face}.center"),
+    ):
+        check(
+            f"groove {point} plumb over its centre",
+            await adapter.add_sketch_constraint(point, centre, "vertical_points"),
+        )
+    await dimension_between(
+        adapter,
+        f"{axis}.start",
+        f"{toward_free_end}.center",
+        "horizontal_distance",
+        GROOVE_STATION,
+        "groove from the free end",
+    )
+    groove.record("GrooveStation", '"GrooveStation"')
+    check(
+        "groove radius",
+        await adapter.add_sketch_dimension(toward_face, None, "radial", GROOVE_RADIUS),
+    )
+    groove.record("GrooveRadius", '"GrooveRadius"')
+    await add_diametric_linear_dimension(
+        adapter,
+        axis,
+        f"{toward_face}.start",
+        (GROOVE_X, -GROOVE_CENTRE_R),
+        "GrooveRootDia",
+    )
+    groove.record("GrooveRootDia", '"GrooveRootDia"')
+    await ensure_fully_defined(adapter, "groove profile")
+    check("exit_sketch groove", await adapter.exit_sketch())
+    name_last_feature(adapter, "GrooveProfile")
+    return groove.apply(adapter, "GrooveProfile")
+
+
+async def _centroid_x_check(adapter: Any, label: str, expected_x: float) -> None:
+    """Fail if the body grew to the wrong side of its sketch plane."""
+    mass = await adapter.get_mass_properties()
+    if not mass.is_success:
+        raise RuntimeError(f"{label}: get_mass_properties failed: {mass.error}")
+    com_x = float(mass.data.center_of_mass[0])
+    if abs(com_x - expected_x) > 0.01:
+        raise RuntimeError(
+            f"{label}: centre of mass x {com_x:.4f} mm, expected {expected_x:.4f} "
+            "(the extrusion ran the wrong way off FreeEnd)"
+        )
+    _telemetry.success(f"{label}: centre of mass x {com_x:.4f} mm")
+
+
+async def _make_hook_point(adapter: Any) -> None:
+    """``HookAnchorPoint``, the lever-wire ball joint's fixture-side anchor.
+
+    No adapter writer exists for a free-XYZ reference point, so: a hidden
+    Top-plane sketch point (sketch (x, y) is model (X, -Z)) promoted by
+    ``InsertReferencePoint(swRefPointSketchPoint = 7)`` and renamed -- the
+    build_mg_magnifying_wheel WireYokePoint recipe."""
+    x, y = _hook_sketch_xy()
+    check("create_sketch hook anchor", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    sketches = adapter.currentModel.SketchManager
+    sk_point = sketches.CreatePoint(x / 1000.0, y / 1000.0, 0.0)
+    set_sketch_direct_db(adapter, False)
     if sk_point is None:
         raise RuntimeError("hook anchor sketch point creation failed")
-    set_sketch_direct_db(adapter, False)
     check("exit_sketch hook anchor", await adapter.exit_sketch())
     name_last_feature(adapter, "HookAnchorSketch")
     blank_sketch(adapter, "HookAnchorSketch")
     _make_hook_ref_point(adapter)
     _assert_hook_point(adapter)
 
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
-    clear_dimensions_for_drawing(adapter)
-    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
-        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "End View Note": END_VIEW_NOTE,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
-    )
-    return await save_part_and_images(adapter, PART_NAME)
+
+def _hook_sketch_xy() -> tuple[float, float]:
+    """The hook's Top-plane sketch coordinates (local Y is the sketch plane)."""
+    if HOOK_LOCAL[1] != 0.0:
+        raise AssertionError("the hook must lie on the Top plane")
+    return HOOK_LOCAL[0], -HOOK_LOCAL[2]
 
 
-def _blank_ref_plane(adapter, name: str) -> None:
-    """Hide a reference plane (shown ref geometry renders in every assembly
-    instance -- the fix_shown_sketches BlankRefGeom idiom, applied at build)."""
-    from solidworks_mcp.adapters.pywin32_adapter import null_callout
-
-    model = adapter.currentModel
-    model.ClearSelection2(True)
-    if not model.Extension.SelectByID2(name, "PLANE", 0, 0, 0, False, 0, null_callout(), 0):
-        raise RuntimeError(f"blank ref plane: cannot select {name!r}")
-    model.BlankRefGeom()
-    model.ClearSelection2(True)
-
-
-def _hook_sketch_points(adapter):
+def _hook_sketch_points(adapter: Any) -> list[Any]:
     """The ISketchPoint list of HookAnchorSketch (exactly one expected);
     members via ``_read_member`` (the pywin32 late-binding walk idiom)."""
     model = adapter.currentModel
@@ -256,9 +575,9 @@ def _hook_sketch_points(adapter):
     raise RuntimeError("HookAnchorSketch not found")
 
 
-def _make_hook_ref_point(adapter) -> None:
+def _make_hook_ref_point(adapter: Any) -> None:
     """Promote the anchor sketch point to the named ``HookAnchorPoint``
-    reference-point feature (raw COM -- see the build() comment)."""
+    reference-point feature (raw COM -- see ``_make_hook_point``)."""
     model = adapter.currentModel
     pts = _hook_sketch_points(adapter)
     if len(pts) != 1:
@@ -280,13 +599,13 @@ def _make_hook_ref_point(adapter) -> None:
     _telemetry.success("HookAnchorPoint reference point created")
 
 
-def _assert_hook_point(adapter) -> None:
+def _assert_hook_point(adapter: Any) -> None:
     """Fail loud if the (undimensioned, hidden) anchor point drifted from its
     authored sketch coords -- the ball joint's geometry must stay exact."""
     pts = _hook_sketch_points(adapter)
     x_mm = float(_read_member(pts[0], "X")) * 1000.0
     y_mm = float(_read_member(pts[0], "Y")) * 1000.0
-    exp_x, exp_y = HOOK_ANCHOR_LOCAL[0], -HOOK_ANCHOR_LOCAL[2]
+    exp_x, exp_y = _hook_sketch_xy()
     if abs(x_mm - exp_x) > 1e-3 or abs(y_mm - exp_y) > 1e-3:
         raise RuntimeError(
             f"hook anchor drifted: ({x_mm:.4f}, {y_mm:.4f}) != ({exp_x:.4f}, {exp_y:.4f})"

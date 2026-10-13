@@ -10,8 +10,8 @@ This file finds every band consumer by reading the scripts' source, resolves eac
 argument in the imported module (the value ``build()`` would see), and applies
 the same checks ``build()`` would:
 
-* ``deviations(band)`` takes ``(upper, lower)``; the helper must accept it and
-  return lower < upper.
+* ``deviations(band)`` and ``_printed_limits.limits(model, places, band)``
+  take ``(upper, lower)``; the helper must accept it and return lower < upper.
 * ``set_dimension_bilateral_tolerance(..., *BAND)`` splats ``(lower, upper)``
   straight into the setter, which refuses lower >= upper.
 
@@ -20,6 +20,9 @@ A second test inventories every module-level ``*_BAND`` / ``*_BANDS`` /
 modules. Each must be fed to a checked consumer, be listed in
 ``INDEXED_FIT_BANDS`` (a fit band read by index, checked the same way), or be
 listed in ``NOT_FIT_BANDS`` with the reason it is not a fit.
+
+Isolated AST-source controls also exercise both scanners and their source
+anchors against empty discovery and one-directory-deep source moves.
 """
 
 from __future__ import annotations
@@ -32,12 +35,14 @@ from typing import Any
 
 import pytest
 
+import _fit_close_running
 import _fit_deviations
+import _gear_fit_limits
 
 SCRIPTS = Path(__file__).resolve().parent
 
 # Helpers that take an (upper, lower) band, and the positional index of the band.
-_BAND_HELPERS = {"deviations": 0}
+_BAND_HELPERS = {"deviations": 0, "limits": 2}
 _SETTER = "set_dimension_bilateral_tolerance"
 
 # A consumer whose argument is a name local to build() (so it cannot be read off
@@ -46,17 +51,48 @@ _SETTER = "set_dimension_bilateral_tolerance"
 LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     # for section, band in enumerate(SECTION_DIA_BANDS): ... deviations(band)
     ("build_dt_cone_gear_shaft", "band"): ("SECTION_DIA_BANDS", "each"),
-    # Fixture builders apply the same bands their specs publish on the sheet.
-    ("build_ch_rocker_arm_tl_c_stop_bar", "band"): ("DRAWING_BANDS", "values"),
-    ("build_ch_rocker_arm_tl_inspection_box", "band"): ("DRAWING_BANDS", "values"),
-    ("build_ch_rocker_arm_tl_diamond_pin", "band"): (
-        "(LAND_BAND, LAND_HEIGHT_BAND, SHANK_BAND, NECK_BAND, REAM_BAND, COLLAR_END_BAND)",
+    # def gear_tip_band_mm(grade): band = ...; deviations(band)
+    ("_gear_fit_limits", "band"): (
+        "(gear_tip_band_mm('standard'), gear_tip_band_mm('contact_critical'))",
         "each",
     ),
+    # drilled_limits derives its local native band from the title-block row.
+    ("_printed_limits", "(float(row['plus_mm']), -float(row['minus_mm']))"): (
+        "((float(_config.title_block('drilled_hole')['plus_mm']),"
+        " -float(_config.title_block('drilled_hole')['minus_mm'])),)",
+        "each",
+    ),
+    # Fixture builders apply the same bands their specs publish on the sheet.
+    ("build_ch_rocker_arm_tl_c_stop_bar", "band"): ("DRAWING_BANDS", "values"),
+    ("build_ch_rocker_arm_tl_diamond_pin", "band"): ("DRAWING_BANDS", "values"),
+    ("build_ch_rocker_arm_tl_inspection_box", "band"): ("DRAWING_BANDS", "values"),
     # def _printed_limits(nominal, places): ... GENERAL_BAND_BY_PLACES[places]
     ("dt_cone_tip_block_spec", "GENERAL_BAND_BY_PLACES[places]"): (
         "GENERAL_BAND_BY_PLACES",
         "values",
+    ),
+    # for configuration, teeth in CONFIGS: band = band_for(teeth); deviations(band)
+    ("build_dt_cone_gear", "band"): (
+        "(blank_dia_band(6), tooth_thickness_band(6),"
+        " blank_dia_band(12), tooth_thickness_band(12))",
+        "each",
+    ),
+    # for name, band in (("BlankDia", blank_dia_band(teeth)), ...): deviations(band)
+    ("draw_dt_cone_gear", "band"): (
+        "(blank_dia_band(6), tooth_thickness_band(6),"
+        " blank_dia_band(12), tooth_thickness_band(12))",
+        "each",
+    ),
+    # _apply_neck_and_flat_limits passes each native LIMIT band in turn.
+    ("build_pd_transgear_knob_shaft", "band"): (
+        "(FRONT_CORNER_RADIUS_BAND, CORE_FLAT_CUT_END_BAND, CORE_FLAT_TOOL_END_RADIUS_BAND)",
+        "each",
+    ),
+    # for feature, name, band_for in _BANDED_DIMENSIONS: band = band_for(teeth)
+    ("_cone_gear_readback", "band"): (
+        "(blank_dia_band(6), tooth_thickness_band(6),"
+        " blank_dia_band(12), tooth_thickness_band(12))",
+        "each",
     ),
 }
 
@@ -119,16 +155,35 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_pinion_spring_geometry", "FORMED_CONTACT_BANDS"): (
         "names of the formed dimensions the contact corners perturb, not a band"
     ),
-    ("vn_transgear_arm_plate_screw_spec", "STOCK_LENGTH_BAND"): (
-        "the oval-head screw's B18.6.3 length tolerance (plus, minus): indexed "
-        "for the shortest stock left proud of the arm before its cut"
-    ),
     ("vn_transgear_disc_screw_spec", "STOCK_LENGTH_BAND"): (
         "the fillister screw's B18.6.3 length tolerance (plus, minus): indexed "
         "for the stock's reach past the disc's rear face before its cut"
     ),
+    ("pd_rack_pinion_spec", "_SPAN_DESIGN_SETTING_BAND"): (
+        "the cutter radial-setting design band the printed span limits are solved from"
+    ),
+    ("pd_rack_pinion_spec", "RADIAL_SETTING_BAND"): (
+        "the cutter radial setting implied by the printed span limits (a machine setting)"
+    ),
+    ("pd_transgear_feed_pinion_spec", "_SPAN_DESIGN_SETTING_BAND"): (
+        "the cutter radial-setting design band the printed span limits are solved from"
+    ),
+    ("pd_transgear_knob_shaft_spec", "_SPAN_DESIGN_SETTING_BAND"): (
+        "the cutter radial-setting design band the printed span limits are solved from"
+    ),
+    ("pd_transgear_knob_shaft_spec", "RADIAL_SETTING_BAND"): (
+        "the cutter radial setting implied by the printed span limits (a machine setting)"
+    ),
+    ("pd_transgear_drive_collar_spec", "FLAT_BAND"): (
+        "the D-flat's FLAT_LIMITS as deviations for the flat-to-core clearance "
+        "corners; the sheet prints the native LIMIT"
+    ),
+    ("pd_transgear_thumbnut_spec", "CSK_HALF_ANGLE_BAND"): (
+        "half the title block's angular band on the 90 deg countersink, for the "
+        "seat-cone corners; not a size fit"
+    ),
     ("vn_guide_lock_screw_spec", "SHANK_LEN_BAND"): (
-        "the button-head screw's B18.6.3 length tolerance (plus, minus): "
+        "the pan-head screw's B18.6.3 length tolerance (plus, minus): "
         "indexed for the shortest reach into the platen guide's through tap"
     ),
     ("vn_cylinder_bank_spring_spec", "ID_BAND"): (
@@ -160,6 +215,14 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the 5/8 bar's supplied size band, indexed for the thrust ring's "
         "worst-case width (THRUST_RING_MIN)"
     ),
+    ("vn_cone_pivot_screw_spec", "SHOULDER_DIA_BAND"): (
+        "McMaster 91829A560 supplied shoulder diameter +0/-0.0254 mm; "
+        "upper/lower deviations used by the platform's stock pivot fit"
+    ),
+    ("vn_cone_pivot_screw_spec", "SHOULDER_LEN_BAND"): (
+        "McMaster 91829A560 supplied shoulder length +0.0508/0 mm; "
+        "upper/lower deviations used by the platform's stock axial stack"
+    ),
     ("dt_crankshaft_spec", "SEAT_COLLAR_BAND"): (
         "the seat face's station deviations, indexed for the hub-to-sprocket air"
     ),
@@ -175,6 +238,9 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the drill-rod blank's cut-length deviations: indexed into the blank "
         "note and the dressing-stock stack (blank_excess_min/max)"
     ),
+    ("dt_cylinder_gear_spec", "WHOLE_DEPTH_BAND"): (
+        "indexed into the cylinder gear-data whole-depth limits"
+    ),
     ("ch_connecting_rod_spec", "SHANK_THICKNESS_BAND"): (
         "same 2.200 plate as the ring (note 2), indexed by cylinder_bank_layout "
         "for the thickest shank its cam slot holds"
@@ -187,9 +253,22 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the title block's drilled-hole row, indexed for the slide-clearance, "
         "wall and pin-end-depth stacks (not printed on the bore)"
     ),
+    ("mg_lever_press_fit_geom", "COLLAR_OD_BAND"): (
+        "inherited title-block .XX band, indexed into the collar's independent "
+        "Lamé strength and press-force corners; not a new native fit band"
+    ),
     ("dt_pinion_arbor_geometry", "DRUM_LEN_BAND"): "indexed into the drum-length limits",
     ("dt_pinion_handle_geometry", "ROD_DIA_BAND"): (
         "indexed by pinion_arbor_spec for the cross-rod fit limits"
+    ),
+    ("dt_cone_swing_platform_pivot_spec", "PIVOT_HOLE_BAND"): (
+        "the pivot bore reamed 6.350 H7 on the 91829A560 shoulder: indexed into "
+        "the Hole Wizard diameter tolerance, the cone set stack's and support "
+        "pose's pivot float and the assembly's pivot air"
+    ),
+    ("vn_cone_tip_collar_spec", "BORE_DIA_BAND"): (
+        "the finished bore's seat band, indexed to re-centre the modelled bore "
+        "(BORE_MODEL_DIA_BAND, the band the build sets natively)"
     ),
     ("ch_rocker_thrust_washer_spec", "BORE_BAND"): (
         "the title block's drilled-hole row, indexed for the washer's wall "
@@ -199,13 +278,9 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "
         "sets it natively on PivotDia"
     ),
-    ("vn_transgear_collar_cross_pin_spec", "HOLE_BAND"): (
-        "the spring pin's drilled cross hole (functional, R9-11): indexed for "
-        "HOLE_MAX against the B18.8.2 window and the fit-up step's limits"
-    ),
     ("vn_transgear_knob_cup_pin_spec", "HOLE_BAND"): (
-        "MHA-VN-037's cross-hole band reused for the hole match-drilled through "
-        "cup and journal: indexed for HOLE_MAX against the B18.8.2 window"
+        "the retained cup pin's hole match-drilled through cup and journal: "
+        "indexed for HOLE_MAX against the B18.8.2 catalogue window"
     ),
     ("vn_transgear_latch_pin_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "
@@ -223,19 +298,19 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "indexed for the symmetric rod-pin coordinate tolerance and position budget"
     ),
     ("ch_rocker_arm_tl_profile_fixture_spec", "DRILLED_BAND"): (
-        "indexed by _feature_requirements.limits for drilled-hole inspection limits"
+        "indexed by _printed_limits.limits for drilled-hole inspection limits"
     ),
     ("ch_rocker_arm_tl_vise_stop_spec", "SCREW_LENGTH_BAND"): (
         "indexed for the ISO 4762 screw's minimum engagement and maximum protrusion"
     ),
     ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"): (
-        "indexed by _feature_requirements.limits for the stud-drill inspection limits"
+        "indexed by _printed_limits.limits for the stud-drill inspection limits"
     ),
     ("ch_rocker_arm_tl_c_stop_bar_spec", "DRILLED_BAND"): (
-        "indexed by _feature_requirements.limits for screw-hole inspection limits"
+        "indexed by _printed_limits.limits for screw-hole inspection limits"
     ),
     ("ch_rocker_arm_tl_inspection_box_spec", "DRILLED_BAND"): (
-        "indexed by _feature_requirements.limits for tap-drill inspection limits"
+        "indexed by _printed_limits.limits for tap-drill inspection limits"
     ),
     ("ch_rocker_arm_tl_filing_button_spec", "BORE_BAND"): (
         "matched-fit design intent, indexed by filing_stud_spec for bore clearance"
@@ -387,10 +462,32 @@ def _case_ids() -> list[Any]:
 def test_band_uses_are_found() -> None:
     # A scanner that silently finds nothing would pass every case below.
     helpers = [u for u in BAND_USES if u.order == "upper_lower"]
-    assert len(helpers) >= 50, len(helpers)
+    assert len(helpers) >= 50, f"band consumer scan found only {len(helpers)} helper uses"
     ids = {f"{u.module}:{u.expression}" for u in BAND_USES}
-    assert "build_dt_crank_drive_gear:BORE_DIA_BAND" in ids
-    assert "build_dt_cone_gear_shaft:band" in ids
+    assert "build_dt_crank_drive_gear:BORE_DIA_BAND" in ids, (
+        "missing band consumer anchor: build_dt_crank_drive_gear:BORE_DIA_BAND"
+    )
+    assert "build_dt_cone_gear_shaft:band" in ids, (
+        "missing band consumer anchor: build_dt_cone_gear_shaft:band"
+    )
+    # Per-source anchors: neither the new fixture builders nor their exported
+    # limit consumers may disappear behind a rich unrelated source's count.
+    for module in (
+        "build_ch_rocker_arm_tl_c_stop_bar",
+        "build_ch_rocker_arm_tl_diamond_pin",
+        "build_ch_rocker_arm_tl_inspection_box",
+    ):
+        assert f"{module}:band" in ids, f"missing band consumer anchor: {module}:band"
+    for module in (
+        "draw_ch_rocker_arm_tl_c_stop_bar",
+        "draw_ch_rocker_arm_tl_inspection_box",
+        "draw_ch_rocker_arm_tl_profile_fixture",
+        "draw_ch_rocker_arm_tl_vise_stop",
+        "draw_dt_cone_pivot_post_tl_saw_cradle",
+    ):
+        assert f"{module}:part_spec.DRILLED_BAND" in ids, (
+            f"missing band consumer anchor: {module}:part_spec.DRILLED_BAND"
+        )
 
 
 def test_known_bad_ids_are_live() -> None:
@@ -477,10 +574,161 @@ def test_indexed_fit_bands_are_valid(module_name: str, name: str) -> None:
 
 def test_classification_lists_are_current() -> None:
     inventory = set(_inventory())
+    assert ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND") in inventory, (
+        "missing band inventory anchor: dt_cylinder_gear_spec:OVERALL_THICKNESS_BAND"
+    )
+    for module, name in (
+        ("ch_rocker_arm_tl_c_stop_bar_spec", "BAR_HEIGHT_BAND"),
+        ("ch_rocker_arm_tl_diamond_pin_spec", "LAND_BAND"),
+        ("ch_rocker_arm_tl_inspection_box_spec", "DRILLED_BAND"),
+        ("ch_rocker_arm_tl_profile_fixture_spec", "ROD_PIN_XY_BAND"),
+        ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"),
+    ):
+        assert (module, name) in inventory, (
+            f"missing band inventory anchor: {module}:{name}"
+        )
     for listing in (NOT_FIT_BANDS, INDEXED_FIT_BANDS):
         stale = set(listing) - inventory
         assert not stale, f"listed constants that are gone: {sorted(stale)}"
     assert not set(NOT_FIT_BANDS) & set(INDEXED_FIT_BANDS)
+
+
+@pytest.fixture
+def band_use_source_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """AST-only sources: every consumer anchor plus a rich unrelated module."""
+    anchors = {
+        "build_dt_crank_drive_gear": "BORE_DIA_BAND",
+        "build_dt_cone_gear_shaft": "band",
+        "build_ch_rocker_arm_tl_c_stop_bar": "band",
+        "build_ch_rocker_arm_tl_diamond_pin": "band",
+        "build_ch_rocker_arm_tl_inspection_box": "band",
+        "draw_ch_rocker_arm_tl_c_stop_bar": "part_spec.DRILLED_BAND",
+        "draw_ch_rocker_arm_tl_inspection_box": "part_spec.DRILLED_BAND",
+        "draw_ch_rocker_arm_tl_profile_fixture": "part_spec.DRILLED_BAND",
+        "draw_ch_rocker_arm_tl_vise_stop": "part_spec.DRILLED_BAND",
+        "draw_dt_cone_pivot_post_tl_saw_cradle": "part_spec.DRILLED_BAND",
+    }
+    for module, expression in anchors.items():
+        (tmp_path / f"{module}.py").write_text(
+            f"deviations({expression})\n", encoding="utf-8"
+        )
+    (tmp_path / "build_unrelated.py").write_text(
+        "".join(f"deviations(UNRELATED_{i}_BAND)\n" for i in range(60)),
+        encoding="utf-8",
+    )
+    monkeypatch.setitem(globals(), "SCRIPTS", tmp_path)
+    return tmp_path
+
+
+def test_band_uses_anchor_rejects_no_match(
+    band_use_source_tree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The positive control makes an actual scanner-glob mutation fail too.
+    monkeypatch.setitem(globals(), "BAND_USES", _band_uses())
+    test_band_uses_are_found()
+    monkeypatch.setitem(globals(), "SCRIPTS", band_use_source_tree / "nowhere")
+    monkeypatch.setitem(globals(), "BAND_USES", _band_uses())
+    with pytest.raises(AssertionError, match="band consumer scan found only 0"):
+        test_band_uses_are_found()
+
+
+@pytest.mark.parametrize(
+    ("module", "expression"),
+    [
+        ("build_dt_crank_drive_gear", "BORE_DIA_BAND"),
+        ("build_dt_cone_gear_shaft", "band"),
+        ("build_ch_rocker_arm_tl_c_stop_bar", "band"),
+        ("build_ch_rocker_arm_tl_diamond_pin", "band"),
+        ("build_ch_rocker_arm_tl_inspection_box", "band"),
+        ("draw_ch_rocker_arm_tl_c_stop_bar", "part_spec.DRILLED_BAND"),
+        ("draw_ch_rocker_arm_tl_inspection_box", "part_spec.DRILLED_BAND"),
+        ("draw_ch_rocker_arm_tl_profile_fixture", "part_spec.DRILLED_BAND"),
+        ("draw_ch_rocker_arm_tl_vise_stop", "part_spec.DRILLED_BAND"),
+        ("draw_dt_cone_pivot_post_tl_saw_cradle", "part_spec.DRILLED_BAND"),
+    ],
+)
+def test_band_uses_anchor_rejects_one_directory_deep_source(
+    band_use_source_tree: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    module: str,
+    expression: str,
+) -> None:
+    monkeypatch.setitem(globals(), "BAND_USES", _band_uses())
+    test_band_uses_are_found()
+    moved = band_use_source_tree / "moved"
+    moved.mkdir()
+    (band_use_source_tree / f"{module}.py").rename(moved / f"{module}.py")
+    monkeypatch.setitem(globals(), "BAND_USES", _band_uses())
+    # Sixty unrelated helpers still meet the count; only this source is lost.
+    with pytest.raises(
+        AssertionError, match=f"missing band consumer anchor: {module}:{expression}"
+    ):
+        test_band_uses_are_found()
+
+
+@pytest.fixture
+def band_inventory_source_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    """AST-only assignments satisfy real lists without importing their owners."""
+    names = set(NOT_FIT_BANDS) | set(INDEXED_FIT_BANDS) | {
+        ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND"),
+        ("ch_rocker_arm_tl_c_stop_bar_spec", "BAR_HEIGHT_BAND"),
+        ("ch_rocker_arm_tl_diamond_pin_spec", "LAND_BAND"),
+        ("ch_rocker_arm_tl_inspection_box_spec", "DRILLED_BAND"),
+        ("ch_rocker_arm_tl_profile_fixture_spec", "ROD_PIN_XY_BAND"),
+        ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"),
+    }
+    by_module: dict[str, list[str]] = {}
+    for module, name in sorted(names):
+        by_module.setdefault(module, []).append(f"{name} = (0.02, -0.02)\n")
+    for module, assignments in by_module.items():
+        (tmp_path / f"{module}.py").write_text(
+            "".join(assignments), encoding="utf-8"
+        )
+    (tmp_path / "build_unrelated.py").write_text(
+        "".join(f"UNRELATED_{i}_BAND = (0.02, -0.02)\n" for i in range(60)),
+        encoding="utf-8",
+    )
+    monkeypatch.setitem(globals(), "SCRIPTS", tmp_path)
+    return tmp_path
+
+
+def test_inventory_anchor_rejects_no_match(
+    band_inventory_source_tree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    test_classification_lists_are_current()
+    monkeypatch.setitem(globals(), "SCRIPTS", band_inventory_source_tree / "nowhere")
+    with pytest.raises(
+        AssertionError,
+        match="missing band inventory anchor: dt_cylinder_gear_spec:OVERALL_THICKNESS_BAND",
+    ):
+        test_classification_lists_are_current()
+
+
+@pytest.mark.parametrize(
+    ("module", "name"),
+    [
+        ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND"),
+        ("ch_rocker_arm_tl_c_stop_bar_spec", "BAR_HEIGHT_BAND"),
+        ("ch_rocker_arm_tl_diamond_pin_spec", "LAND_BAND"),
+        ("ch_rocker_arm_tl_inspection_box_spec", "DRILLED_BAND"),
+        ("ch_rocker_arm_tl_profile_fixture_spec", "ROD_PIN_XY_BAND"),
+        ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"),
+    ],
+)
+def test_inventory_anchor_rejects_one_directory_deep_source(
+    band_inventory_source_tree: Path, module: str, name: str
+) -> None:
+    test_classification_lists_are_current()
+    moved = band_inventory_source_tree / "moved"
+    moved.mkdir()
+    (band_inventory_source_tree / f"{module}.py").rename(moved / f"{module}.py")
+    # Unrelated assignments and every other source cannot replace this anchor.
+    with pytest.raises(
+        AssertionError, match=f"missing band inventory anchor: {module}:{name}"
+    ):
+        test_classification_lists_are_current()
 
 
 @pytest.mark.parametrize(
@@ -499,6 +747,69 @@ def test_check_band_rejects_inverted_and_zero_width_bands(
     # orders, or every parametrized case above passes vacuously.
     with pytest.raises((AssertionError, ValueError)):
         _check_band("synthetic", band, order)
+
+
+@pytest.mark.parametrize(
+    ("source", "replacement"),
+    [
+        ("REAM_H7", (0.017, 0.002)),
+        ("SHAFT_G6_3_TO_6_MM", (-0.006, -0.015)),
+    ],
+)
+def test_measured_close_running_clearance_tracks_shared_bands(
+    monkeypatch: pytest.MonkeyPatch,
+    source: str,
+    replacement: tuple[float, float],
+) -> None:
+    hole_lower, hole_upper = _fit_deviations.deviations(_fit_close_running.REAM_H7)
+    shaft_lower, shaft_upper = _fit_deviations.deviations(_fit_close_running.SHAFT_G6_3_TO_6_MM)
+    expected = hole_lower - shaft_upper, hole_upper - shaft_lower
+    assert _fit_close_running.measured_close_running_clearance_mm() == pytest.approx(expected)
+    assert 0.0 < expected[0] < expected[1]
+
+    # Change each input independently: a copied clearance literal cannot pass.
+    monkeypatch.setattr(_fit_close_running, source, replacement)
+    hole_lower, hole_upper = _fit_deviations.deviations(_fit_close_running.REAM_H7)
+    shaft_lower, shaft_upper = _fit_deviations.deviations(_fit_close_running.SHAFT_G6_3_TO_6_MM)
+    changed = hole_lower - shaft_upper, hole_upper - shaft_lower
+    assert changed != expected
+    assert _fit_close_running.measured_close_running_clearance_mm() == pytest.approx(changed)
+
+
+@pytest.mark.parametrize("grade", ("standard", "contact_critical"))
+def test_gear_tip_grade_reads_its_shared_configuration(grade: str) -> None:
+    import _config
+
+    configured = tuple(float(value) for value in _config.fit("gear_tip", f"{grade}_band_mm"))
+    assert _gear_fit_limits.gear_tip_band_mm(grade) == configured
+    assert configured[0] == 0.0
+    assert configured[1] < 0.0
+
+
+def test_gear_tip_grade_reader_tracks_config_edits(monkeypatch: pytest.MonkeyPatch) -> None:
+    import _config
+
+    seen = []
+
+    def fit_value(*keys: str):
+        seen.append(keys)
+        return [0.0, -0.03]
+
+    monkeypatch.setattr(_config, "fit", fit_value)
+    assert _gear_fit_limits.gear_tip_band_mm("standard") == (0.0, -0.03)
+    assert seen == [("gear_tip", "standard_band_mm")]
+
+
+def test_gear_tip_grade_reader_refuses_unknown_or_inverted_grades(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import _config
+
+    with pytest.raises(ValueError, match="unsupported gear-tip grade"):
+        _gear_fit_limits.gear_tip_band_mm("routine")
+    monkeypatch.setattr(_config, "fit", lambda *keys: (-0.02, 0.0))
+    with pytest.raises(ValueError, match="inverted"):
+        _gear_fit_limits.gear_tip_band_mm("contact_critical")
 
 
 @pytest.mark.parametrize("band", [(0.025, 0.025), (0.010, 0.050)])

@@ -14,7 +14,7 @@ import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_tl_profile_fixture_spec as spec
 import draw_ch_rocker_arm_tl_profile_fixture as drawing
 import export_features
-from _feature_requirements import limits
+from _printed_limits import limits
 from _printed_tolerance import printed_band_mm
 from prechips.model import TOLERANCE_REQUIREMENTS
 

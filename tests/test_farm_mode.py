@@ -1625,6 +1625,96 @@ def test_missing_config_points_at_credentials_issue(tmp_path):
     )
 
 
+@pytest.mark.parametrize(
+    "admission",
+    [
+        None,
+        "",
+        "{not json",
+        "null",
+        "true",
+        "42",
+        '"part:pen_rod"',
+        '{"part:pen_rod": true}',
+        "[]",
+        '["part:other"]',
+        '["part:pen_rod:child"]',
+        '["part:*"]',
+        '["part:pen_rod", null]',
+        '["part:pen_rod", 1]',
+        '["part:pen_rod", true]',
+        '["part:pen_rod", []]',
+        '["part:pen_rod", {}]',
+        '["part:pen_rod", ""]',
+        '["part:pen_rod", " \\t"]',
+        '[" part:pen_rod "]',
+    ],
+)
+def test_run_leaf_without_exact_preflight_admission_is_locally_refused(
+    monkeypatch, admission
+):
+    from temporalio.client import Client
+
+    if admission is None:
+        monkeypatch.delenv("HARMONIC_FARM_ADMITTED_LEAVES", raising=False)
+    else:
+        monkeypatch.setenv("HARMONIC_FARM_ADMITTED_LEAVES", admission)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("unadmitted leaf touched the farm boundary")
+
+    for name in (
+        "_dispatch",
+        "_record_request",
+        "_record_json",
+        "_rpc_update",
+        "_connect_client",
+        "load_config",
+        "submitter",
+        "_required_build_id",
+        "leaf_timeout_s",
+        "workflow_id",
+        "LeafRequest",
+    ):
+        monkeypatch.setattr(_farm, name, forbidden)
+    monkeypatch.setattr(_farm._telemetry, "span", forbidden)
+    monkeypatch.setattr(Client, "connect", forbidden)
+
+    with pytest.raises(RuntimeError) as failure:
+        _farm.run_leaf("part:pen_rod", "k" * 64)
+    assert "part:pen_rod" in str(failure.value)
+    assert "lacks preflight admission" in str(failure.value)
+    assert "HARMONIC_FARM_ADMITTED_LEAVES" in str(failure.value)
+
+
+def test_run_leaf_reads_current_admission_in_nested_environment(monkeypatch):
+    monkeypatch.setenv("HARMONIC_FARM_COMMIT", SHA)
+    monkeypatch.setenv("HARMONIC_FARM_BUILD_ID", BUILD_ID)
+    monkeypatch.setenv("HARMONIC_FARM_LEAF_TIMEOUT_S", "900")
+    monkeypatch.setenv("HARMONIC_FARM_ADMITTED_LEAVES", '["part:pen_rod"]')
+    monkeypatch.setattr(_farm, "submitter", lambda: "offline@test")
+    dispatched = []
+    result = _leaf_result()
+
+    async def dispatch(request, workflow):
+        dispatched.append((request.task, workflow))
+        return result
+
+    monkeypatch.setattr(_farm, "_dispatch", dispatch)
+    assert _farm.run_leaf("part:pen_rod", "k" * 64) is result
+    with monkeypatch.context() as child:
+        child.setenv("HARMONIC_FARM_ADMITTED_LEAVES", '["check:math"]')
+        with pytest.raises(RuntimeError, match="lacks preflight admission"):
+            _farm.run_leaf("part:pen_rod", "k" * 64)
+        assert _farm.run_leaf("check:math", None) is result
+    assert _farm.run_leaf("part:pen_rod", "k" * 64) is result
+    assert [task for task, _ in dispatched] == [
+        "part:pen_rod",
+        "check:math",
+        "part:pen_rod",
+    ]
+
+
 @pytest.fixture
 def temporal_boundary(tmp_path, monkeypatch):
     """Hermetic TLS connection, coordinator updates, and exact-run result."""
@@ -1632,6 +1722,10 @@ def temporal_boundary(tmp_path, monkeypatch):
 
     monkeypatch.setenv("SOLIDWORKS_POOL_CONFIG", str(_write_config(tmp_path)))
     monkeypatch.setenv("HARMONIC_FARM_COMMIT", SHA)
+    monkeypatch.setenv(
+        "HARMONIC_FARM_ADMITTED_LEAVES",
+        json.dumps(["part:pen_rod", "check:math"]),
+    )
     monkeypatch.delenv("HARMONIC_FARM_RUN", raising=False)
     monkeypatch.delenv("HARMONIC_FARM_REQUESTS", raising=False)
     calls = {"connect": [], "start": [], "submit": [], "handles": [], "queries": []}

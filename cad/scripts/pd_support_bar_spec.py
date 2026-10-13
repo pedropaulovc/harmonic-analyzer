@@ -7,7 +7,7 @@ its engagement without importing a COM build script.
 Bar frame (the build's): bar axis along X with the origin at the bar centre;
 height along Y (y = 0 at mid-height); depth along Z with the FRONT face at
 z = -BAR_DEPTH/2 and the BACK face at z = +BAR_DEPTH/2.  The paper-drive
-assembly places it without rotation at machine (0, 306.734, -134.4), so the
+assembly places it without rotation at machine (0, 303.734, -134.4), so the
 back face is machine z -129.9.
 
 Ch. 23 hanger holes (contract §5), all entering the BACK face:
@@ -26,14 +26,31 @@ from __future__ import annotations
 
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 
-BAR_HEIGHT = 22.0  # tall (Y) -- ch22 back-side wear band (low)
+# 28 tall (Y), the top edge carrying the hanging platen's top rail at machine
+# y 317.734 and the bottom edge 1.0 above the bottom rail (the paper-drive
+# assembly's GUIDE_Y and BOTTOM_RAIL_CLEARANCE). The rails' screw rows stand
+# ~34 apart in the front photos (ch30 p002: 33-34 by the platen width) and so
+# do the rail centres in the ch22 back photo, so the
+# rails stay put; with 5-tall rails that leaves a 29 channel, which the 22 bar
+# (an earlier low wear-band read) only part filled. The ch30 p002 front view
+# measures the exposed bar right of the platen at ~25.5 tall, and the ch22 back
+# photo's bright band between the rails at ~25 -- both well over 22. One lock
+# plate size then serves both rails (the user's 2026-10-11 ruling: 1 lip +
+# 5 rail + ~3 bar overlap, top and bottom).
+BAR_HEIGHT = 28.0
+# The bar's .XXX height band: the bottom rail's running clearance under the
+# bar spends it (build_pd_paper_drive_assembly._assert_lock_retention).
+# build_pd_support_bar authors it natively on Height@BarProfile.
+BAR_HEIGHT_BAND = 0.13
 BAR_DEPTH = 9.0  # deep (Z) -- front face rubs the platen back (low)
 # The pivot floor and the latch-hook-bracket-screw (MHA-VN-043) tips need the bar's
 # thickness at 9.000 ±0.13 (.XXX); at .XX the floor would be 1.69 worst.
+# build_pd_support_bar authors it natively on Depth@Bar.
 BAR_DEPTH_BAND = 0.13
+BAR_BAND_PLACES = 3  # both bands print .XXX
 BACK_FACE_Z = BAR_DEPTH / 2.0
 
-HANGER_TAP_Y = -3.5  # machine y 303.234 on the 306.734 bar centre
+HANGER_TAP_Y = -0.5  # machine y 303.234 on the 303.734 bar centre
 
 # --- MHA-VN-041 pivot tap -------------------------------------------------------
 PIVOT_TAP_X = -58.0

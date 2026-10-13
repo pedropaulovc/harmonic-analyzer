@@ -80,10 +80,7 @@ def main():
         raise RuntimeError("explicit inventoried SolidWorks PID required")
     if os.environ.get("HARMONIC_REMOTE_CACHE_MODE") != "off":
         raise RuntimeError("disable remote cache transfers")
-    if __package__:
-        from . import _script_paths  # noqa: F401
-    else:
-        import _script_paths  # noqa: F401
+
     from solidworks_mcp.adapters.com_variant import null_callout
     from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 
