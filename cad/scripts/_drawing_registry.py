@@ -1174,6 +1174,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_knife_hanger_washer",
+        part="vn_knife_hanger_washer",
+        artifact_stem="vn-knife-hanger-washer",
+        script_name="draw_vn_knife_hanger_washer.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="vn_knife_mount_dowel",
         part="vn_knife_mount_dowel",
         artifact_stem="vn-knife-mount-dowel",

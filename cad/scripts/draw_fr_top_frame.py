@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 from typing import Any
 
@@ -50,6 +51,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
+from _drawing_hidden_sketches import (
+    curate_view_dimensions as curate_hidden_sketch_dimensions,
+    part_sketches_shown,
+)
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
@@ -155,9 +160,16 @@ from fr_top_frame_spec import (
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     GEOMETRIC_TOLERANCES_MM,
-    HANGER_CBORE_DIA,
+    HANGER_SPOTFACE_DIA,
+    HANGER_SPOTFACE_FLOOR_Y,
+    HANGER_SPOTFACE_CALLOUT_PRECISION,
+    HANGER_GRIP_CALLOUT,
     HANGER_CLEARANCE_DIA,
+    HANGER_CLEARANCE_DIA_BAND,
+    HANGER_CLEARANCE_DIA_PLACES,
     HANGER_GRIP,
+    HANGER_GRIP_SKETCH,
+    HANGER_GRIP_TOL,
     HANGER_PIN_DEPTH_CALLOUT,
     HANGER_PIN_HOLE_CALLOUT,
     HANGER_PIN_HOLE_DEPTH,
@@ -174,6 +186,7 @@ from fr_top_frame_spec import (
     HUB_SET_SPOT_FROM_AXIS,
     KEEPER_TAP_CALLOUT_PRECISION,
     PRINTED_LINEAR_BAND_MM,
+    REFERENCE_SKETCHES,
     SURFACE_FINISHES,
 )
 
@@ -301,13 +314,12 @@ INK_CLEARANCE = 0.002
 ROUND_OUT = 0.0001
 # The native arrowhead is 0.762 mm across (b49e1 dump, IDisplayData arrows).
 ARROW_HALF_WIDTH = 0.000381
-# The #6 hanger holes are drilled through from the faced underside and each
-# counterbore is then cut from the top (Q7 option C, approved by the user
-# 2026-10-13).  The callout says both entries: "DRILL FROM UNDERSIDE" alone
-# read as the counterbore's side too (codex review of 59f405ab).  The
-# trailing newline puts the native size and counterbore rows under it: four
-# rows in all.
-HANGER_DRILL_CALLOUT = "DRILL FROM UNDERSIDE;\nC'BORE FROM TOP:\n"
+# Q7 preserves underside-entry through drilling and top-entry spotfacing.
+# Diameter values stay Hole Wizard variables; the native model grip in F-F
+# replaces a depth from the as-cast top.
+HANGER_DRILL_CALLOUT = "DRILL FROM UNDERSIDE;\nSPOTFACE FROM TOP:\n"
+HANGER_CENTER_FRAME_XY = (0.267, 0.231)
+CROSSBAR_MEDIAN_DATUM_XY = (0.142, 0.095)
 # Transfer fit-up owns these locations; the nominal model holes and their
 # sheet coordinates are references, not independent inspection requirements.
 # The trailing newline keeps the native thread/drill/depth on separate rows
@@ -540,8 +552,8 @@ SLOT_BASIC_NOTE = (
 )
 SLOT_BASIC_NOTE_XY = (0.150, 0.1345)
 # Sheet 6, removed section F-F through the REAR knife-hanger station: the
-# #6 SHCS counterbore, its floor above the crossbar underside (the screw's
-# grip, closing RingHeight with the callout's counterbore depth), the round
+# #10 clearance and washer spotface, with its native floor-to-finished-
+# underside grip, the round
 # dowel slip hole +X of it and the dowel slot -X of it, cut along its
 # length.  The cut crosses only the crossbar and its
 # junction gussets, its ends in the window past the gussets' rail-face reach.
@@ -606,10 +618,12 @@ HANGER_SECTION_KEEP = {
     "HangerPinHoleDepth": _hanger_section_xy(
         BAR_X1 + HANGER_SECTION_GUSSET_REACH + 8.0, -HALF_H + HANGER_PIN_HOLE_DEPTH / 2.0
     ),
+    "HangerGrip": HANGER_FLOOR_TEXT_XY,
 }
 HANGER_SECTION_CALLOUTS = {
     "HangerPinHoleDia": HANGER_PIN_HOLE_CALLOUT,
     "HangerPinHoleDepth": HANGER_PIN_DEPTH_CALLOUT,
+    "HangerGrip": HANGER_GRIP_CALLOUT,
 }
 HANGER_SECTION_CAPTION_XY = (0.055, 0.040)
 # Sheet 6, UNDERSIDE locator (1:3, model x right and z up from the view
@@ -882,11 +896,11 @@ GEOMETRY_CALLOUTS = {
     "GussetRunE": "4X 45 DEG GUSSET",
     "RingHeight": "RAIL HEIGHT",
 }
-# Two plan widths are shorter on paper than their own text (at 1:3 the 24.0
-# crossbar flange is 8.0 mm, the 18.0 gusset run 6.0), so text centred on
+# Two plan widths are shorter on paper than their text (at 1:3 the 25.0
+# crossbar flange is 8.33 mm, the 18.0 gusset run 6.0), so text centred on
 # them stood across their extension lines (codex review of ca7edf4d, sheet
-# 2).  Each parks its text left of its line on a leader: the 24.0's between
-# the 152.9 window line (y 115.2) and the front view (96.7); the 18.0's
+# 2). Each parks its text left of its line on a leader: the crossbar's between
+# the left-window line (y 115.2) and the front view (96.7); the 18.0's
 # between the plan's top edge (212.2) and the 359.8 line (227.7), right of
 # that line's left extension (x 85.0).  Ink measured on the ca7edf4d render.
 CROSSBAR_FLANGE_TEXT_OFFSET_XY = (0.1085, 0.1080)
@@ -1041,6 +1055,162 @@ def _exact_linear_entities(
 ) -> list[Any]:
     """The visible straight edges passing exactly through each of ``points``."""
     return [edges.exact_line_through(point, label=label).edge for point in points]
+
+
+_HANGER_SPOT_DEPTH = re.compile(r"\s*<HOLE-DEPTH>\s*<hw-cbdepth>")
+
+
+def _hanger_spotface_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Keep native diameters/extent; replace the cast-top depth with SPOTFACE.
+
+    Tokens are from the installed R2026x ANSI-inch calloutformat.txt. The
+    floor's axial location is the model's toleranced HangerGrip, imported in F-F.
+    """
+    native = "\n".join(definitions.values())
+    if (
+        set(definitions) != {5, 6, 7, 8}
+        or any(native.count(token) != 1 for token in (
+            "<hw-thruholedia>", "<hw-thru>", "<hw-cbdia>", "<hw-cbdepth>", "<HOLE-SPOT>",
+        ))
+        or len(_HANGER_SPOT_DEPTH.findall(native)) != 1
+    ):
+        raise RuntimeError(f"unexpected native hanger spotface callout: {definitions!r}")
+    return {
+        part: _HANGER_SPOT_DEPTH.sub("", text).replace("<HOLE-SPOT>", "SPOTFACE ")
+        for part, text in definitions.items()
+    }
+
+
+def _set_hanger_spotface_callout(display: Any) -> None:
+    """Edit only native definition fields and require their exact readback."""
+    display = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = _hanger_spotface_callout_definitions(definitions)
+    for definition, writable in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition] != definitions[definition]:
+            display.SetText(writable, updated[definition])
+    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    if persisted != updated:
+        raise RuntimeError(f"native hanger spotface definition did not persist: {persisted!r}")
+    set_hole_callout_precision(
+        display, HANGER_SPOTFACE_CALLOUT_PRECISION, label="hanger spotface diameters",
+    )
+    _tolerance_hanger_callout_clearance(display)
+
+
+def _tolerance_hanger_callout_clearance(display: Any) -> None:
+    """Publish/read back the model's unilateral band on its native variable.
+
+    SDK ICalloutVariable.ToleranceType, not IDimensionTolerance.Type, owns
+    multivalue-callout rendering (2016+). Length/tolerance values use native
+    SI units; the variable remains attached to the Hole Wizard diameter.
+    """
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch
+
+    # Concrete callout interfaces alias the generic metadata DISPIDs.
+    variables = [
+        (raw, dynamic_dispatch(raw._oleobj_))
+        for raw in display.GetHoleCalloutVariables() or ()
+    ]
+    matches = [
+        (raw, variable) for raw, variable in variables
+        if str(variable.VariableName) == "hw-thruholedia"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError("hanger callout lacks one native through-diameter variable")
+    raw, variable = matches[0]
+    lower_m, upper_m = (value/1000.0 for value in (
+        min(HANGER_CLEARANCE_DIA_BAND), max(HANGER_CLEARANCE_DIA_BAND),
+    ))
+    variable.ToleranceType = 2  # swTolType_e.swTolBILAT, +0.13/0
+    variable.ToleranceMin = lower_m
+    variable.ToleranceMax = upper_m
+    length = _early_bound(raw, "ICalloutLengthVariable")
+    length.TolerancePrecision = HANGER_CLEARANCE_DIA_PLACES
+    if (
+        int(variable.ToleranceType) != 2
+        or abs(float(variable.ToleranceMin)-lower_m) > 1e-9
+        or abs(float(variable.ToleranceMax)-upper_m) > 1e-9
+        or int(length.TolerancePrecision) != HANGER_CLEARANCE_DIA_PLACES
+    ):
+        raise RuntimeError("native hanger through-diameter callout band did not persist")
+
+
+def _require_model_hanger_grip(adapter: Any, dimensions: list[Any]) -> Any:
+    """F-F's imported HangerGrip: the model's driving grip, band as authored.
+
+    Read-only. The model owns the dimension, its nominal and its +/-0.05 band
+    (build_fr_top_frame drives the spotface depth from it); the sheet never
+    re-tolerances it, so a lost association or band raises here.
+    """
+    grips = [
+        annotation for annotation in dimensions
+        if dimension_name(adapter, annotation) == "HangerGrip"
+    ]
+    if len(grips) != 1:
+        raise RuntimeError(f"F-F imported {len(grips)} HangerGrip dimensions, not 1")
+    display = _early_bound(grips[0].GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    owner = str(dimension.FullName).split("@")[:2]
+    if owner != ["HangerGrip", HANGER_GRIP_SKETCH]:
+        raise RuntimeError(f"F-F grip is {dimension.FullName!r}, not the model's HangerGrip")
+    value_mm = float(dimension.SystemValue) * 1000.0
+    if abs(value_mm - HANGER_GRIP) > 1e-5:
+        raise RuntimeError(f"F-F grip reads {value_mm:.6f} mm, not {HANGER_GRIP}")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    band_m = HANGER_GRIP_TOL / 1000.0
+    if (
+        int(tolerance.Type) != 4  # swTolType_e.swTolSYMMETRIC
+        or abs(float(tolerance.GetMinValue()) + band_m) > 1e-9
+        or abs(float(tolerance.GetMaxValue()) - band_m) > 1e-9
+    ):
+        raise RuntimeError("F-F grip lost the model's symmetric band")
+    return grips[0]
+
+
+def _crossbar_median_datum(adapter: Any, view: Any, width: Any) -> None:
+    """Attach D to the native width size, establishing BOTH-face median plane.
+
+    IAnnotation.Select3 selects the dimension annotation; InsertDatumTag2
+    attaches the native tag to it. Unlike the edge-only generic helper,
+    this part-specific path requires swSelDIMENSIONS (14) and the SAME
+    IDisplayDimension/IDimension, not an edge or an unattached tag.
+    """
+    display = _early_bound(width, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    width_annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    if not _early_bound(model, "IDrawingDoc").ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate crossbar width datum view")
+    model.ClearSelection2(True)
+    data = _early_bound(model.SelectionManager, "ISelectionMgr").CreateSelectData()
+    data.View = view
+    if not width_annotation.Select3(False, data):
+        raise RuntimeError("failed to select crossbar width for median-plane datum")
+    raw_tag = model.InsertDatumTag2()
+    if raw_tag is None:
+        raise RuntimeError("failed to insert crossbar median-plane datum D")
+    tag = _early_bound(raw_tag, "IDatumTag")
+    if not tag.SetLabel("D"):
+        raise RuntimeError("failed to label crossbar median-plane datum D")
+    annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition2(*CROSSBAR_MEDIAN_DATUM_XY, 0.0):
+        raise RuntimeError("failed to position crossbar median-plane datum D")
+    model.ClearSelection2(True)
+    rebuild_drawing(adapter, label="crossbar median-plane datum D")
+    kinds = tuple(int(value) for value in annotation.GetAttachedEntityTypes() or ())
+    entities = tuple(annotation.GetAttachedEntities3() or ())
+    if kinds != (14,) or len(entities) != 1 or entities[0] is None:
+        raise RuntimeError(f"median-plane datum D is not attached to the width: {kinds}")
+    attached = _early_bound(entities[0], "IDisplayDimension")
+    attached_dimension = _early_bound(attached.GetDimension2(0), "IDimension")
+    if (
+        str(tag.GetLabel()) != "D"
+        or annotation.IsDangling()
+        or str(attached_dimension.FullName) != str(dimension.FullName)
+        or int(adapter.swApp.IsSame(attached, display)) != 1
+    ):
+        raise RuntimeError("median-plane datum D lost the exact crossbar width attachment")
 
 
 def _set_derived_precision(display: Any, *, label: str) -> int:
@@ -1481,11 +1651,12 @@ def _hub_boss_section(adapter: Any, parent_view: Any) -> Any:
 def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     """A removed section F-F through the rear knife-hanger station.
 
-    drawing-guidelines.md rule 9 (show internal shape in solid lines): the counterbore floor and the blind slip hole are interior
-    features, so they are dimensioned where a cut shows them as solid lines,
-    never off hidden lines.  The counterbore itself is fully defined by its
-    callout on sheet 3; this view adds what no callout states -- the floor's
-    height above the crossbar underside (the screw's grip), the slip hole's
+    drawing-guidelines.md rule 9 (show internal shape in solid lines): the
+    spotface floor and blind slip hole are exposed as solid cut lines.
+    F-F imports the model's driving HangerGrip (finished underside to
+    spotface floor, the band authored on it) from the hidden
+    HangerGripReference sketch and only reads it back; no sheet-side grip
+    or competing cast-top depth exists. This section also adds the slip hole's
     station from the screw axis, the slot's BASIC station from the slip hole
     and the slot's length -- and
     carries the model's own slip hole size, band and the depth hole and slot
@@ -1537,25 +1708,25 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         ),
     )
     edges = scan_view_edges(view, label="F-F knife-hanger section")
-    # The underside is interrupted by the clearance and slip holes; the
-    # longest run (left of the screw) wins.  The counterbore floor shows as
-    # two short lands either side of the clearance hole: take the left one.
-    underside_edge, underside_point = _cut_face_edge(
-        edges, fixed={1: -HALF_H, 2: z}, label="knife-hanger crossbar underside",
+    # The spotface floor has two lands either side of the clearance hole;
+    # the +X one takes the finish leader.
+    seat_edge, seat_point = _cut_face_edge(
+        edges, fixed={1: HANGER_SPOTFACE_FLOOR_Y, 2: z},
+        near=(0, HANGER_X+(HANGER_SPOTFACE_DIA+HANGER_CLEARANCE_DIA)/4.0, 0.5),
+        label="knife-hanger washer spotface finish land",
     )
-    floor_edge, floor_point = _cut_face_edge(
-        edges, fixed={1: -HALF_H+HANGER_GRIP, 2: z},
-        near=(0, HANGER_X-(HANGER_CBORE_DIA+HANGER_CLEARANCE_DIA)/4.0, 0.5),
-        label="knife-hanger counterbore floor",
+    spot_tip = model_point_in_view(
+        adapter, view, tuple(value/1000.0 for value in seat_point),
+        label="washer spotface finish landing",
     )
-    _checked_dimension(
+    add_surface_finish(
         adapter, view,
-        p0=floor_point, p1=underside_point,
-        text_xy=HANGER_FLOOR_TEXT_XY, label="hanger counterbore floor from underside",
-        expected_mm=HANGER_GRIP, orientation="vertical",
-        entities=(floor_edge, underside_edge),
-        suffix="2X CBORE FLOOR\nFROM UNDERSIDE",
-        offset_text=HANGER_FLOOR_OFFSET_XY,
+        symbol_xy=(0.155, 0.097),
+        control=surface_finish_by_key(SURFACE_FINISHES, "hanger_spotface_rear"),
+        label="washer spotface seat finish",
+        entity=seat_edge,
+        leader_attach_xy=spot_tip,
+        char_height=0.0025,
     )
     _checked_dimension(
         adapter, view,
@@ -1601,17 +1772,19 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         suffix=HANGER_SLOT_LENGTH_CALLOUT,
         offset_text=SLOT_LENGTH_OFFSET_XY,
     )
-    dimensions = curate_view_dimensions(
+    dimensions = curate_hidden_sketch_dimensions(
         adapter, view,
         keep=HANGER_SECTION_KEEP,
         view_label="knife-hanger section F-F",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _require_model_hanger_grip(adapter, dimensions)
     set_dimension_callouts(adapter, dimensions, HANGER_SECTION_CALLOUTS)
     # Four lines cannot stand between extension lines 3.24 apart: park the
     # text on a leader, clear of the section (drawing-guidelines.md rule 14 (keep text off the part): no text on a line).
     offset_dimension_text(
-        adapter, dimensions, {"HangerPinHoleDia": HANGER_PIN_DIA_OFFSET_XY}
+        adapter, dimensions,
+        {"HangerPinHoleDia": HANGER_PIN_DIA_OFFSET_XY, "HangerGrip": HANGER_FLOOR_OFFSET_XY},
     )
     _assert_section_display(
         adapter, view, label="F-F knife-hanger section", cut_surface_only=True,
@@ -2046,6 +2219,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
     check("open top-frame source", await adapter.open_model(str(SOURCE)))
+    source_model = adapter.currentModel
     read_required_properties(
         adapter.currentModel,
         (
@@ -2218,7 +2392,7 @@ async def build(adapter: Any) -> dict[str, str]:
             expected_mm=right_x-left_x, orientation="horizontal", exact_linear=True,
             edges=geometry_top_edges,
         )
-    _checked_dimension(
+    crossbar_width = _checked_dimension(
         adapter, geometry_top,
         p0=(BAR_X0, HALF_H-EDGE_CHAMFER, 0.0),
         p1=(BAR_X1, HALF_H-EDGE_CHAMFER, 0.0),
@@ -2227,6 +2401,7 @@ async def build(adapter: Any) -> dict[str, str]:
         suffix="CROSSBAR FLANGE", offset_text=CROSSBAR_FLANGE_TEXT_OFFSET_XY,
         edges=geometry_top_edges,
     )
+    _crossbar_median_datum(adapter, geometry_top, crossbar_width)
     # B-B is a REMOVED section: the cutting line crosses the +Z rail alone
     # (the -Z rail is its mirror), so the section shows the one T profile the
     # web, flange, chamfer and root dimensions hang on instead of that
@@ -2478,20 +2653,20 @@ async def build(adapter: Any) -> dict[str, str]:
         center=True, suffix="MATCHES\nMHA-FR-001",
         offset_text=SOCKET_VERTICAL_PITCH_TEXT_XY,
     )
-    # The counterbore rim (the top-face edge of the wizard feature), not the
-    # clearance hole visible at its floor: the native callout then reads the
-    # whole counterbore -- drill, counterbore diameter and depth.
+    # The native wizard spotface rim identifies the whole through-hole/seat
+    # feature. Keep both diameter variables, removing only the cast-top
+    # depth now controlled by the model's native underside-to-floor grip.
     stud_edge = model_point_in_view(
         adapter,
         detail_top,
         (
             HANGER_X / 1000.0,
             HALF_H / 1000.0,
-            (STUD_Z_FRONT + HANGER_CBORE_DIA / 2.0) / 1000.0,
+            (STUD_Z_FRONT + HANGER_SPOTFACE_DIA / 2.0) / 1000.0,
         ),
-        label="top-frame hanger counterbore rim",
+        label="top-frame hanger spotface rim",
     )
-    add_native_hole_callout(
+    hanger_callout = add_native_hole_callout(
         adapter,
         detail_top,
         edge_xy=stud_edge,
@@ -2500,8 +2675,24 @@ async def build(adapter: Any) -> dict[str, str]:
         # centred here printed 262.6..253.4 mm (762a8de5); four need it 3.5
         # mm lower to keep under the frame's 266.7 top (70ac591e: 264.6).
         callout_xy=(0.262, 0.2545),
-        label="2X #6 SHCS hanger counterbores",
+        label="2X #10 loose hanger washer spotfaces",
         process=HANGER_DRILL_CALLOUT,
+    )
+    _set_hanger_spotface_callout(hanger_callout)
+    # Linear position to D centres each bolt axis within +/-0.05 of the
+    # TWO-side-face median plane (implicit BASIC zero). No diameter prefix:
+    # this controls X only; the existing Z socket stations remain unchanged.
+    hanger_hole_edge = scan_view_edges(detail_top, label="hanger axis centring").circle_at(
+        (HANGER_X, HANGER_SPOTFACE_FLOOR_Y, STUD_Z_FRONT), HANGER_CLEARANCE_DIA / 2.0,
+        axis=(0.0, 1.0, 0.0), label="front hanger clearance at spotfloor",
+    ).edge
+    add_feature_control_frame(
+        adapter, detail_top, edge_entity=hanger_hole_edge,
+        frame_xy=HANGER_CENTER_FRAME_XY,
+        characteristic="position",
+        tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"],
+        datums=("D",), quantity="2X HANGER AXES ON D",
+        label="hanger axes on crossbar median plane",
     )
     # #946: RD4 reads off the rear keeper tap, from the rail's outer side.
     rear_keeper = (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR)
@@ -2570,13 +2761,13 @@ async def build(adapter: Any) -> dict[str, str]:
     hanger_x = HANGER_X
     keeper_drill_r = TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0
     for p0, p1, expected, xy, orientation, label, suffix, reference in (
-        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + HANGER_CBORE_DIA/2),
+        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + HANGER_SPOTFACE_DIA/2),
          COLUMN_X + hanger_x, (0.162, 0.240), "horizontal",
          "hanger x from left sockets", "2X HANGER X", False),
-        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + HANGER_CBORE_DIA/2),
+        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + HANGER_SPOTFACE_DIA/2),
          STUD_Z_FRONT - FRONT_COLUMN_Z, (0.062, 0.209), "vertical",
          "front hanger z from upper sockets", "FRONT HANGER Z", False),
-        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_REAR + HANGER_CBORE_DIA/2),
+        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_REAR + HANGER_SPOTFACE_DIA/2),
          STUD_Z_REAR - FRONT_COLUMN_Z, REAR_HANGER_Z_TEXT_XY, "vertical",
          "rear hanger z from upper sockets", "REAR\nHANGER Z", False),
         (upper_left_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_FRONT + keeper_drill_r),
@@ -2632,7 +2823,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # and the 10-32 callout, its native drill/thread depths and the
     # 22.7 tap-axis-below-boss-top dimension keep their attachments without
     # them.  What the dashed lines added was the far end's sockets, cap
-    # recesses and hanger counterbores -- none of them dimensioned here, all of
+    # recesses and hanger spotfaces -- none of them dimensioned here, all of
     # them cut open by A-A or specified by their own callouts -- crossing the
     # leaders that reach the taps.
     set_hidden_lines_removed(adapter, detail_front)
@@ -3238,7 +3429,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # also carries the drop and the ramp angle; repeating it here would be
     # the same length stated twice on two sheets.
     _position_view_caption(adapter, geometry_bottom, HUB_DETAIL_CAPTION_XY)
-    hanger_section, hanger_dimensions = _hanger_section(adapter, hub_bottom_parent)
+    # F-F imports HangerGrip from the part's hidden grip reference sketch:
+    # shown per view in the *Bottom parent it is cut from, and in the part
+    # for the life of the block.
+    with part_sketches_shown(
+        adapter, source_model, REFERENCE_SKETCHES,
+        label="knife-hanger grip", base_view=hub_bottom_parent,
+    ):
+        hanger_section, hanger_dimensions = _hanger_section(adapter, hub_bottom_parent)
     _position_view_caption(adapter, hanger_section, HANGER_SECTION_CAPTION_XY)
     imported_annotations += hanger_dimensions
 

@@ -2,8 +2,9 @@ r"""Reproduction script: knife bearing support (book ch. 18, pp. 42-43).
 
 The hardened-steel bearing block that suspends the summing lever's knife edge from the
 top-frame casting's integral crossbar (clamped to its underside by the MHA-VN-024
-#6-32 socket head cap screw threaded into a bottoming tap in the block top, and
-keyed against turning by the two MHA-VN-051 dowels pressed into the top seat).
+#10-24 plain hex bolt, through a washer on the crossbar's spotface, threaded into
+a bottoming tap in the block top, and keyed against turning by the two
+MHA-VN-051 dowels pressed into the top seat).
 The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
 of its hexagonal pivot trunnions** (build_sm_summing_lever ``_hex_collar``); each
 trunnion overhangs the lever body into one of these supports.
@@ -27,10 +28,12 @@ vertex ridge (placed at machine (15, 984.83, +-87)); local Z = the bore/trunnion
 axis, +Y up, +X across. The bore centre sits ``R_BORE`` below the origin so the
 bore's upper inner wall lands on the ridge (with a TOP_CLEAR sliver margin). The
 block rises from below the bore up to the top-frame casting's faced underside
-(999.7), its top seat clamped flush to it: the #6-32 screw threads into a 9.7
-full-thread bottoming tap (drill 10.9) on the bore's vertical centreline, which
-leaves 2.0 of metal over the bore crown at worst case; the two dowels' blind
-flat-bottom reamed holes sit 7.100 either side of the tap axis along X.
+(999.7), its top seat clamped flush to it: the #10-24 bolt threads into a
+9.650 full-thread bottoming tap (drill 11.24) on the bore's vertical
+centreline, whose charged pilot (Ø3.927, past the accepted Ø3.797-3.897) at
+its sharpest accepted point leaves 2.0 of metal over the bore crown at worst
+case; the two dowels' blind flat-bottom reamed holes sit 7.632 either side of
+the tap axis along X, in a block 25.4 across.
 
 The named "knife axis" is the contact ridge line itself (part origin); the
 assembly mates the lever's knife ridge (``Axis3@sm-summing-lever``) coincident to
@@ -78,6 +81,7 @@ from _drawing_marks import (
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _part_pmi import author_part_pmi
 from sm_knife_mount_spec import (
+    BLK_HALF_X,
     BORE_DIA_BAND,
     BORE_DIA_PLACES,
     DRAWING_DIMENSIONS,
@@ -92,6 +96,7 @@ from sm_knife_mount_spec import (
     STUD_TAP_DIA,
     STUD_TAP_DRILL_DEPTH,
     STUD_TAP_SPEC,
+    STUD_THREAD,
     SURFACE_FINISHES,
 )
 import sm_knife_mount_spec
@@ -118,18 +123,18 @@ BORE_CY = TOP_CLEAR - R_BORE  # -5.75 (bore top inner wall at local y +TOP_CLEAR
 
 # --- block (bearing body, held to the crossbar) ----------------------------
 SUPPORT_Z_THICK = 14.0  # axial length straddling the trunnion mid (low)
-BLK_HALF_X = 12.5  # bore wall + flank (25 across: the 14.200 dowel span's webs)
+# BLK_HALF_X (25.4 across) is the spec's: the dowel pattern's webs size it.
 WALL = 3.0  # material below the bore
 BLK_BOT = BORE_CY - R_BORE - WALL  # -14.75
 
 # Mount: the block top seat is clamped to the top-frame casting underside (the
 # integral crossbar's flush lower face, faced Ra 3.2 with the whole underside
-# plane between the bosses, user ruling 2026-10-12) by the #6-32 knife-hanger
-# screw threaded into the block top (build_sm_summing_assembly).  999.7 is the
+# plane between the bosses, user ruling 2026-10-12) by the #10-24 knife-hanger
+# bolt threaded into the block top (build_sm_summing_assembly).  999.7 is the
 # finished plane: the facing cut comes out of casting allowance.
 KNIFE_Y = 979.7  # machine y of the pivot centreline (build_sm_summing_assembly KNIFE)
 CASTING_UNDERSIDE_Y = 999.7  # top-frame faced underside (integral crossbar)
-MOUNT_GAP = 0.0  # seat clamped to the faced underside by the #6-32 screw
+MOUNT_GAP = 0.0  # seat clamped to the faced underside by the #10-24 bolt
 CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (984.834)
 BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # local top (14.866)
 if abs(BLK_TOP - sm_knife_mount_spec.BLK_TOP) > 0.005:
@@ -142,7 +147,8 @@ if abs(BLK_TOP - sm_knife_mount_spec.BLK_TOP) > 0.005:
 # BASIC 0.004 off the part (farm run 20261009T155421516Z measured 20.616).
 BORE_CENTRE_DEPTH = BLK_TOP - BORE_CY
 # The spec judges the tap's web at its rounded mirror; the derived top is
-# 0.004 lower, so re-judge it here (2.018).
+# 0.004 lower, so re-judge it here (2.0078: the charged pilot envelope,
+# Ø3.927, not the accepted Ø3.897, at the sharpest accepted point, 117 deg).
 _TAP_WEB_WORST = sm_knife_mount_spec.tap_web_worst(
     BLK_TOP,
     sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH,
@@ -357,19 +363,20 @@ async def build(adapter) -> dict[str, str]:
                 f"hex shoulder {d:.3f} mm too close to Ø{2 * R_BORE} bore"
             )
 
-    # Hanger-screw tap: ONE native Hole Wizard #6-32 bottoming tapped hole in
+    # Hanger-bolt tap: ONE native Hole Wizard #10-24 bottoming tapped hole in
     # the block top (drill STUD_TAP_DRILL_DEPTH, full thread to the spec's
     # ThreadDepth override), on the trunnion-axis centreline (both placement
     # coords are zero -> origin-axis relations, no placement dims). The
-    # analytic expectation subtracts the drill cylinder to its depth plus the
-    # drill point; the point stops STUD_TAP_WEB_WORST (2.02) above the bore
-    # crown, so none of it overlaps the bore void.
+    # analytic expectation subtracts the nominal drill cylinder to its depth
+    # plus its 118 deg point; even the charged pilot envelope at its sharpest
+    # accepted point stops _TAP_WEB_WORST (2.0078) above the bore crown, so
+    # none of it overlaps the bore void.
     wizard_holes(
         adapter,
         STUD_TAP_SPEC,
         [[0.0, BLK_TOP, 0.0]],
         (0.0, 1.0, 0.0),
-        "knife-hanger screw tapped hole (#6-32)",
+        f"knife-hanger bolt tapped hole ({STUD_THREAD})",
         name="StudTap",
         # no expect_dia_mm: a BLIND hole's definition reads 0.0 for both
         # diameter knobs on this seat (the tripwire is through-hole only);

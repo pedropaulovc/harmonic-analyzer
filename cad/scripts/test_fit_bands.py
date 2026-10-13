@@ -290,9 +290,17 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the knife mount's reamed blind hole"
     ),
+    ("fr_top_frame_spec", "HANGER_CLEARANCE_DIA_BAND"): (
+        "the native +0.13/0 float-hole diameter: indexed into its printed "
+        "minimum/maximum and written to both model and callout tolerances"
+    ),
+    ("sm_knife_mount_spec", "STUD_TAP_DIA_BAND"): (
+        "the native +0.10/0 tap-pilot diameter: indexed into accepted limits "
+        "and written through ICalloutVariable with native readback"
+    ),
     ("vn_knife_hanger_stud_spec", "LENGTH_BAND"): (
-        "the socket head screw's catalogue length tolerance: indexed into "
-        "LENGTH_MIN/LENGTH_MAX for the tap reach and bottoming stack"
+        "the finished cut-to-length hex bolt's inspection band: indexed into "
+        "LENGTH_MIN/LENGTH_MAX and its native CutLength control"
     ),
     ("ch_rocker_arm_tl_profile_fixture_spec", "ROD_PIN_XY_BAND"): (
         "indexed for the symmetric rod-pin coordinate tolerance and position budget"

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import _config
 import build_sm_knife_mount as part
 import draw_sm_knife_mount as drawing
 import sm_knife_mount_spec
@@ -162,7 +163,7 @@ def test_dowel_callout_is_parked_clear_of_the_top_view() -> None:
 def test_the_tap_is_stated_once_on_its_hole_callout() -> None:
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the tap rides one native Hole Wizard callout (thread, full
     # thread depth, drill and drill depth stay associative); SolidWorks' raw
-    # "#6-32 Tapped Hole" note would restate it, so it is deleted and
+    # "#10-24 Tapped Hole" note would restate it, so it is deleted and
     # finalize proves none is left at export.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_native_hole_callout(") == 1
@@ -177,8 +178,12 @@ def test_the_tap_is_stated_once_on_its_hole_callout() -> None:
     )
 
 
+# The ASME B landscape sheet's inner border, left edge.
+SHEET_INNER_BORDER_LEFT = 0.0127
+
+
 def test_tap_callout_parks_between_the_top_view_and_the_datum_tag() -> None:
-    # drawing-guidelines.md rule 14 (keep text off the part): the three rows stand in the band under the top view and over
+    # drawing-guidelines.md rule 14 (keep text off the part): the four rows stand in the band under the top view and over
     # the front view's datum-A tag, left of the tag, so neither the text nor
     # its steep leader crosses a view, a dimension or the A-A cutting line.
     x, y = drawing.TAP_CALLOUT_XY
@@ -192,7 +197,11 @@ def test_tap_callout_parks_between_the_top_view_and_the_datum_tag() -> None:
     assert y - drawing.TAP_CALLOUT_HALF_HEIGHT > drawing._front_y(
         sm_knife_mount_spec.BLK_TOP
     )
-    assert x - drawing.TAP_CALLOUT_HALF_WIDTH > 0.0
+    # Rule 13: the banded drill row widened the block; it stays inside.
+    assert x - drawing.TAP_CALLOUT_HALF_WIDTH > SHEET_INNER_BORDER_LEFT + 0.001
+    # Four rows of 4.3 mm, the widest the drill row with its stacked band.
+    assert drawing.TAP_CALLOUT_HALF_HEIGHT >= 4 * 0.0043 / 2.0
+    assert drawing.TAP_CALLOUT_HALF_WIDTH >= (0.0761 + 0.0108) / 2.0
 
 
 def test_tap_frame_leader_lands_clear_of_the_tap_callout_leader() -> None:
@@ -200,24 +209,47 @@ def test_tap_frame_leader_lands_clear_of_the_tap_callout_leader() -> None:
     # lower-left rim and the frame's, climbing from the frame's right end,
     # crossed the callout's 2 mm short of the tip (leader-crosses-leader,
     # enforced in report mode).  The leader ends below are that run's
-    # printed ones; the frame now lands on the lower-right rim instead.
+    # printed ones (the 25-wide block, the #6-32 tap's Ø2.705 drill); the
+    # frame now lands on the lower-right rim instead.
     from _layout_audit import _segment_crossing
     from _layout_geometry import Segment
 
-    callout_shoulder_end, callout_tip = (0.0947, 0.1986), (0.1137, 0.2326)
+    callout_shoulder_end, run_callout_tip = (0.0947, 0.1986), (0.1137, 0.2326)
     frame_end, old_frame_tip = (0.1103, 0.1900), (0.1130, 0.2332)
-    callout = Segment(*callout_shoulder_end, *callout_tip)
+    callout = Segment(*callout_shoulder_end, *run_callout_tip)
     assert _segment_crossing(callout, Segment(*frame_end, *old_frame_tip)) is not None
 
-    rim = drawing.STUD_TAP_DIA / 2.0 / 2.0**0.5 * drawing.SHEET_SCALE[0] / 1000.0
-
-    def lower_rim(x_side: float) -> tuple[float, float]:
+    def lower_rim(x_side: float, tap_drill_dia: float) -> tuple[float, float]:
+        rim = tap_drill_dia / 2.0 / 2.0**0.5 * drawing.SHEET_SCALE[0] / 1000.0
         return (drawing._sheet_x(0.0) + x_side * rim, drawing.TOP_CENTER[1] - rim)
 
-    assert math.dist(lower_rim(drawing.TAP_CALLOUT_RIM_SIDE), callout_tip) < 0.001
+    run_tap_drill_dia, run_blk_half_x = 2.705, 12.5
+    run_rim = lower_rim(drawing.TAP_CALLOUT_RIM_SIDE, run_tap_drill_dia)
+    assert math.dist(run_rim, run_callout_tip) < 0.001
     assert drawing.TAP_FRAME_RIM_SIDE == -drawing.TAP_CALLOUT_RIM_SIDE
-    frame_tip = lower_rim(drawing.TAP_FRAME_RIM_SIDE)
-    assert _segment_crossing(callout, Segment(*frame_end, *frame_tip)) is None
+    # Both leaders' roots stand off the block's -X face (TAP_CALLOUT_XY,
+    # TAP_FRAME_XY), so they follow it out to the 25.4 block; their tips land
+    # on the #10-24 drill's lower rims.
+    shift = drawing._sheet_x(-sm_knife_mount_spec.BLK_HALF_X) - drawing._sheet_x(
+        -run_blk_half_x
+    )
+    # The callout's leader leaves its block's right end (the run's block
+    # ended at face + 0.004, x 0.094, its root at 0.0947); the banded drill
+    # row widened the block and moved that end right.
+    run_callout_right = drawing._sheet_x(-run_blk_half_x) + 0.004
+    callout_shift = (
+        drawing.TAP_CALLOUT_XY[0] + drawing.TAP_CALLOUT_HALF_WIDTH - run_callout_right
+    )
+    callout = Segment(
+        callout_shoulder_end[0] + callout_shift,
+        callout_shoulder_end[1],
+        *lower_rim(drawing.TAP_CALLOUT_RIM_SIDE, drawing.STUD_TAP_DIA),
+    )
+    frame_tip = lower_rim(drawing.TAP_FRAME_RIM_SIDE, drawing.STUD_TAP_DIA)
+    frame = Segment(frame_end[0] + shift, frame_end[1], *frame_tip)
+    assert _segment_crossing(callout, frame) is None
+    # The callout's root stays left of the frame's.
+    assert callout.x0 < frame.x0
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "tap_rim = _tap_lower_rim(adapter, top, TAP_CALLOUT_RIM_SIDE)" in source
     assert "edge_xy=_tap_lower_rim(adapter, top, TAP_FRAME_RIM_SIDE)" in source
@@ -254,11 +286,12 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     # actual (assembly-derived) geometry to <0.05 mm so they cannot drift.
     assert sm_knife_mount_spec.R_BORE == part.R_BORE
     assert sm_knife_mount_spec.SUPPORT_Z_THICK == part.SUPPORT_Z_THICK
-    assert sm_knife_mount_spec.BLK_HALF_X == part.BLK_HALF_X == 12.5
+    # The block's width is the spec's alone: the build imports it.
+    assert sm_knife_mount_spec.BLK_HALF_X == part.BLK_HALF_X == 12.7
     assert abs(sm_knife_mount_spec.BLK_TOP - part.BLK_TOP) < 0.005
     assert abs(sm_knife_mount_spec.BLK_BOT - part.BLK_BOT) < 0.05
     assert abs(sm_knife_mount_spec.BORE_CY - part.BORE_CY) < 0.05
-    # The seat is clamped to the casting underside by the #6-32 screw.
+    # The seat is clamped to the casting underside by the #10-24 bolt.
     assert part.MOUNT_GAP == 0.0
     assert abs(part.BLK_TOP - 14.866) < 1e-3
     assert sm_knife_mount_spec.BLK_TOP == 14.87
@@ -267,11 +300,11 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     assert not hasattr(part, "STUD_TAP_DEPTH")
     assert part.STUD_TAP_SPEC is sm_knife_mount_spec.STUD_TAP_SPEC
     assert part.STUD_TAP_DIA == sm_knife_mount_spec.STUD_TAP_DIA
-    # Dowel holes: one each side of the tap at +/-7.100 (the printed BASIC
-    # span 14.200), printed places and the volume the build's gate expects.
-    assert sm_knife_mount_spec.PIN_HOLE_X == 7.100
-    assert sm_knife_mount_spec.PIN_HOLE_XS == (-7.100, 7.100)
-    assert sm_knife_mount_spec.PIN_HOLE_SPAN == 14.200
+    # Dowel holes: one each side of the tap at +/-7.632 (the printed BASIC
+    # span 15.264), printed places and the volume the build's gate expects.
+    assert sm_knife_mount_spec.PIN_HOLE_X == 7.632
+    assert sm_knife_mount_spec.PIN_HOLE_XS == (-7.632, 7.632)
+    assert sm_knife_mount_spec.PIN_HOLE_SPAN == 15.264
     assert sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME == {
         "BlockWidth": 1,
         "BlockHeight": 1,
@@ -285,6 +318,8 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     assert part.V_PINS == 2 * part.V_PIN
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "blind_hole_volume_mm3(STUD_TAP_DIA, STUD_TAP_DRILL_DEPTH)" in source
+    assert "\nBLK_HALF_X = " not in source
+    assert "    BLK_HALF_X,\n" in source
     assert 'for pin_dia_name in ("PinHoleDia", "PinHole2Dia"):' in source
     # The band prints at the nominal's places, +0.000/-0.010 under Ø3.175,
     # not "0.00 / -0.01" (farm run 20261009T171439353Z).
@@ -468,27 +503,152 @@ def test_close_bore_clears_the_hex_trunnion_only_at_the_ridge() -> None:
         assert d < part.R_BORE - 0.5
 
 
-def test_tap_callout_bands_its_depths_with_a_pitch_of_runout() -> None:
+def test_tap_callout_bands_its_pilot_and_drill_depth_with_a_pitch_of_runout() -> None:
     # Machinist review B2: the bottoming tap needs drill past the full
-    # thread.  The full thread prints 9.42 under the title block's .XX
-    # (2026-10-10 ruling); the drill carries the loosest band the 2.0 crown
-    # web and one 0.794 pitch of runout leave, 11.20 +/-0.47, on the native
-    # callout (the summing-lever bracket-tap precedent).
-    assert drawing.TAP_CALLOUT_DEPTH_BANDS == {
-        "hw-threaddepth": (9.42, None),
-        "hw-tapdrldepth": (11.2, 0.47),
+    # thread.  The #10-24 full thread prints 9.650 under the title block's
+    # .XXX (its shallowest 9.52 still holds 1.5 D); the drill runs 1.5 pitch
+    # past it nominally and carries the explicit +/-0.05 the 2.0 crown web
+    # leaves, 11.24, on the native callout (the summing-lever bracket-tap
+    # precedent), still one 1.058 pitch past the deepest thread at worst.
+    # Rule 3: the #25 pilot prints at three places, so it carries its own
+    # native +0.10/0, the DRILLED HOLES grade, not the general .XXX.
+    assert drawing.TAP_CALLOUT_BANDS == {
+        "hw-tapdrldia": (3.797, (0.10, 0.0)),
+        "hw-threaddepth": (9.65, None),
+        "hw-tapdrldepth": (11.24, (0.05, -0.05)),
     }
-    assert drawing.TAP_THREAD_DEPTH_PLACES == 2
-    assert sm_knife_mount_spec.STUD_TAP_RUNOUT_MIN >= sm_knife_mount_spec.STUD_PITCH
+    assert drawing.TAP_CALLOUT_BAND_PLACES == 2
+    # swTolType_e: the pilot's band bilateral (2), the drill depth's
+    # symmetric (4), each (lower, upper) as SolidWorks takes it.
+    assert drawing.tap_callout_tolerance((0.10, 0.0)) == (2, 0.0, 0.10)
+    assert drawing.tap_callout_tolerance((0.05, -0.05)) == (4, -0.05, 0.05)
+    assert drawing.TAP_CALLOUT_PLACES == {
+        "hw-tapdrldia": 3,
+        "hw-threaddepth": 3,
+        "hw-tapdrldepth": 2,
+    }
+    assert sm_knife_mount_spec.STUD_THREAD == "#10-24"
+    assert sm_knife_mount_spec.STUD_TAP_DIA == pytest.approx(3.797)
+    assert sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_BAND == sm_knife_mount_spec._XXX
+    pitch = sm_knife_mount_spec.STUD_PITCH
+    assert pitch == pytest.approx(25.4 / 24.0)
+    assert sm_knife_mount_spec.STUD_TAP_RUNOUT == pytest.approx(1.59)
+    assert sm_knife_mount_spec.STUD_TAP_RUNOUT >= 1.5 * pitch
+    assert sm_knife_mount_spec.STUD_TAP_RUNOUT_MIN == pytest.approx(1.41)
+    assert sm_knife_mount_spec.STUD_TAP_RUNOUT_MIN >= pitch
+    assert sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_MIN == pytest.approx(9.52)
+    assert sm_knife_mount_spec.STUD_TAP_THREAD_DEPTH_MIN >= (
+        1.5 * sm_knife_mount_spec.STUD_THREAD_MAJOR
+    )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "tap_callout = add_native_hole_callout(" in source
-    assert "_band_tap_callout_depths(tap_callout)" in source
-    assert '{"hw-threaddepth": TAP_THREAD_DEPTH_PLACES}' in source
-    body = source[source.index("def _band_tap_callout_depths(") :]
+    assert (
+        "    _write_tap_callout_definitions(adapter, tap_callout)\n"
+        "    _band_tap_callout(tap_callout)\n"
+    ) in source
+    assert "        TAP_CALLOUT_PLACES,\n" in source
+    body = source[source.index("def _band_tap_callout(") :]
     body = body[: body.index("\ndef ")]
-    assert "variable.ToleranceType = 4" in body
-    assert "variable.ToleranceType = 0" in body
+    assert "kind, lower, upper = tap_callout_tolerance(band)" in body
+    assert "variable.ToleranceType = kind" in body
+    assert "variable.ToleranceMin = lower / 1000.0" in body
+    assert "variable.ToleranceMax = upper / 1000.0" in body
+    assert "length.TolerancePrecision = TAP_CALLOUT_BAND_PLACES" in body
+    assert "variable.ToleranceType = _TOL_NONE" in body
     assert "if required:" in body
+    assert "_prove_tap_point(points[0])" in body
+
+
+def test_tap_crown_web_charges_a_pilot_wider_than_accepted_at_its_sharpest_point() -> None:
+    # The pilot's native +0.10/0 accepts Ø3.797-3.897.  The crown web
+    # charges more, Ø3.927 (the printed Ø3.797 plus the larger of that band
+    # and the general .XXX): a conservative envelope, charged, not accepted.
+    # The point, dimensioned 118° on the callout, takes the title block's
+    # angular +/-1: its sharpest, 117°, stands tallest.
+    from _printed_tolerance import angular_band_deg, drilled_oversize_mm
+
+    spec = sm_knife_mount_spec
+    assert spec.STUD_TAP_DIA_PLACES == 3
+    assert drilled_oversize_mm() == pytest.approx(0.10)
+    assert spec.STUD_TAP_DIA_BAND == (drilled_oversize_mm(), 0.0)
+    assert spec.STUD_TAP_DIA_ACCEPTED == pytest.approx((3.797, 3.897))
+    assert spec.STUD_TAP_DIA_MAX == pytest.approx(3.927)
+    assert spec.STUD_TAP_DIA_MAX - max(spec.STUD_TAP_DIA_ACCEPTED) == pytest.approx(0.03)
+    assert spec.STUD_TAP_DIA_OVERSIZE == pytest.approx(0.13)
+    assert angular_band_deg() == pytest.approx(1.0)
+    assert spec.STUD_TAP_POINT_ANGLE_DEG == 118.0
+    assert spec.STUD_TAP_POINT_ANGLE_PLACES == 0
+    assert spec.STUD_TAP_POINT_ANGLE_TOL_DEG == angular_band_deg()
+    assert spec.STUD_TAP_POINT_ANGLE_MIN_DEG == pytest.approx(117.0)
+    assert spec.STUD_TAP_POINT_H == pytest.approx(
+        3.927 / 2.0 / math.tan(math.radians(117.0 / 2.0))
+    )
+    assert spec.STUD_TAP_POINT_H == pytest.approx(1.2032343475, abs=1e-9)
+    assert spec.STUD_TAP_DRILL_DEPTH_MAX == pytest.approx(11.29)
+    assert spec.STUD_TAP_WEB_WORST == pytest.approx(2.0117656525, abs=1e-9)
+    assert part._TAP_WEB_WORST == pytest.approx(2.0077656525, abs=1e-9)
+    assert part._TAP_WEB_WORST >= spec.STUD_TAP_WEB_MIN == 2.0
+    # The nominal pilot at an exact 118 deg overstated the web.
+    assert spec.tap_web_worst(
+        part.BLK_TOP,
+        spec.STUD_TAP_DRILL_DEPTH,
+        spec.STUD_TAP_DIA,
+        drill_dia_oversize=0.0,
+        point_angle_deg=118.0,
+    ) > part._TAP_WEB_WORST
+
+
+def test_tap_point_and_mate_ride_the_native_definitions() -> None:
+    # The installed calloutformat.txt's blind tap, behind the process prefix.
+    drill_row = "<MOD-DIAM> <hw-tapdrldia> <HOLE-DEPTH> <hw-tapdrldepth>"
+    thread_row = "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH> <hw-threaddepth>"
+    before = {
+        5: f"{drawing.TAP_CALLOUT_PROCESS}{drill_row}\n{thread_row}",
+        6: "",
+        7: "",
+        8: "",
+    }
+    wanted = drawing.tap_callout_definitions(before)
+    assert wanted == {
+        **before,
+        5: (
+            f"{drawing.TAP_CALLOUT_PROCESS}{drill_row} X <hw-drlang>\n{thread_row}"
+        ),
+        8: "FOR MHA-VN-024 HEX BOLT",
+    }
+    # Rule 4: the full thread names its mate, the registry's bolt, on a row
+    # of its own under any below text already there.
+    assert sm_knife_mount_spec.BOLT_NUMBER == _config.parts("vn-knife-hanger-stud")[
+        "number"
+    ]
+    assert drawing.TAP_MATE_CALLOUT == f"FOR {sm_knife_mount_spec.BOLT_NUMBER} HEX BOLT"
+    assert drawing.tap_callout_definitions({**before, 8: "ROW\n"})[8] == (
+        "ROW\nFOR MHA-VN-024 HEX BOLT"
+    )
+    assert drawing._CALLOUT_BELOW_DEFINITION == 8
+    assert drawing._CALLOUT_DEFINITION_PARTS[8] == 4
+    assert drawing.TAP_POINT_ANGLE_VARIABLE == "hw-drlang"
+    assert drawing._CALLOUT_ANGLE_VARIABLE == 2
+    assert drawing._DRILL_ANGLE_VARIABLE == 16
+    for bad in (
+        {**before, 5: thread_row},
+        {**before, 6: drill_row},
+        {**before, 8: drawing.TAP_MATE_CALLOUT},
+        wanted,
+    ):
+        with pytest.raises(RuntimeError, match="knife-hanger tap callout"):
+            drawing.tap_callout_definitions(bad)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("def _write_tap_callout_definitions(") :]
+    body = body[: body.index("\ndef ")]
+    assert "callout.SetText(_CALLOUT_DEFINITION_PARTS[part], text)" in body
+    assert "if after != wanted:" in body
+    body = source[source.index("def _prove_tap_point(") :]
+    body = body[: body.index("\n# ")]
+    assert 'angle = _early_bound(raw, "ICalloutAngleVariable")' in body
+    assert "STUD_TAP_POINT_ANGLE_DEG" in body
+    assert "variable.ToleranceType = _TOL_NONE" in body
+    assert "angle.Precision = STUD_TAP_POINT_ANGLE_PLACES" in body
 
 
 def test_hidden_threads_and_restated_hidden_lines_are_gone() -> None:
@@ -520,7 +680,7 @@ def test_hidden_threads_and_restated_hidden_lines_are_gone() -> None:
 
 def test_the_pattern_is_located_from_the_side_and_front_faces() -> None:
     # Machinist review B1: the span located the dowels only to each other.
-    # The +X hole's axis stands 5.40 .XX from the +X face, a row above the
+    # The +X hole's axis stands 5.07 .XX from the +X face, a row above the
     # BASIC span over the top view (clear of the dowel frame's leader under
     # it, and of the span's arrows); the row 7.0 .X from the front face, left
     # of the view.
@@ -550,7 +710,7 @@ def test_the_tap_and_bore_axis_is_basic_from_the_dowel_pattern() -> None:
     # Machinist review (2026-10-10): the tap frame and the bore's frames
     # reference B, but their offset from B was only the implied centre.  The
     # tap axis, run on through the bore's centre in section A-A, stands BASIC
-    # 7.100 from the -X dowel axis; its boxed value parks left of that axis,
+    # 7.632 from the -X dowel axis; its boxed value parks left of that axis,
     # over the section's top seat.
     assert sm_knife_mount_spec.PIN_HOLE_X == pytest.approx(
         sm_knife_mount_spec.PIN_HOLE_SPAN / 2.0

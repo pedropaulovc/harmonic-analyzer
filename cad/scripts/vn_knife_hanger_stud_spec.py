@@ -1,38 +1,92 @@
-r"""Stock knife-hanger screw (McMaster 91251A157) nominals.
+"""MHA-VN-024 knife-hanger bolt: 92314A253 stock, cut to length.
 
-PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure: the thread, length and head dims the summing assembly's reach stack
-and the crossbar counterbore read to prove MHA-VN-024 is the screw the knife
-mount and the crossbar were sized for.  The vendor dims are ``DIMS`` in
-``_mcmaster_91251a157.py`` (SolidWorks-free at import), as
-``vn_cone_tip_block_screw_spec`` reads 91251A108's.
+Catalogue checked 2026-10-13: https://www.mcmaster.com/92314A253/.
+18-8 stainless plain external hex, #10-24 UNC-2A, fully threaded, flat tip,
+2 in under head, 5/16 in AF, 1/8 in head height, 80 ksi. The SKU omits a
+specification standard and head/length tolerances. Published UNC-2A thread
+major limits are separate from those unspecified supplier tolerances.
 
-Catalogue (https://www.mcmaster.com/91251A157/): black-oxide alloy steel
-socket head screw, 6-32 UNC class 3A, 1-1/2 in under the head, partially
-threaded (3/4 in minimum thread length), flat tip; head Ø0.226 x 0.138 in,
-7/64 hex; 170 ksi, Rockwell C37, ASTM A574.
+The finished cut band and thread-tail MIN below are MODIFIED-PART acceptance,
+not supplier tolerances. Retain a continuous usable tail through at least
+10.62 mm from the finished tip, with at most one pitch of incomplete thread
+at that tip. Gauge the rest of that tail as UNC-2A.
+The native model depicts catalogue fully-threaded geometry; inspection,
+not that depiction, certifies the tail used by the worst-case reach stack.
+
+Part frame: finished tip Y=0, axis +Y, bearing face Y=45.70.
 """
 
-from __future__ import annotations
-
-from _mcmaster_91251a157 import DIMS
+from _mcmaster_92314a253 import (
+    CATALOG_CHECKED_DATE as CATALOG_CHECKED_DATE,
+    CATALOG_DIMENSIONAL_TOLERANCES as CATALOG_DIMENSIONAL_TOLERANCES,
+    CATALOG_STANDARD as CATALOG_STANDARD,
+    CATALOG_URL as CATALOG_URL,
+    DIMS,
+    THREAD_MAJOR_MAX,
+    THREAD_MAJOR_MIN,
+)
 
 SKU = DIMS.part_no
-THREAD = "#6-32"
-SHANK_DIA = DIMS.major_dia  # 3.505
-PITCH = DIMS.pitch  # 0.794
-LENGTH = DIMS.length  # 38.1 under the head
-# The part frame's thread tip is at local y = 0, so the under-head face is
-# LENGTH up the +Y axis.
+THREAD = "#10-24"
+THREAD_FIT = "UNC-2A"
+SHANK_DIA = DIMS.major_dia
+SHANK_DIA_MIN = THREAD_MAJOR_MIN
+SHANK_DIA_MAX = THREAD_MAJOR_MAX
+PITCH = DIMS.pitch
+CATALOG_LENGTH = DIMS.length
+LENGTH = 45.70
 UNDERHEAD_LEN = LENGTH
-HEAD_DIA = DIMS.head_dia  # 5.7404
-HEAD_H = DIMS.head_h  # 3.5052
-# Catalogue minimum thread length from the tip; the shank above it is plain.
-THREAD_LENGTH = DIMS.thread_length  # 19.05
-# ASME B18.3 socket head cap screw length tolerance over 1 in through
-# 2-1/2 in: -0.04 in, as (upper, lower) deviations.
-LENGTH_BAND = (0.0, -0.04 * 25.4)
-LENGTH_MIN = LENGTH + LENGTH_BAND[1]  # 37.084
-LENGTH_MAX = LENGTH + LENGTH_BAND[0]  # 38.1
+LENGTH_BAND = (0.15, -0.15)  # Finished part, (upper, lower), mm.
+LENGTH_MIN = LENGTH + LENGTH_BAND[1]
+LENGTH_MAX = LENGTH + LENGTH_BAND[0]
+HEAD_AF = DIMS.head_af
+HEAD_H = DIMS.head_h
+THREAD_LENGTH = LENGTH  # Nominal catalogue fully-threaded depiction.
+THREAD_LENGTH_MIN = 10.62  # Tail measured from the finished tip.
+INCOMPLETE_TIP_LEN_MAX = PITCH
+FULL_FORM_TAIL_MIN = THREAD_LENGTH_MIN - INCOMPLETE_TIP_LEN_MAX
 # The drawing-guidelines.md rule 18 (thread engagement) thread engagement floor.
 ENGAGEMENT_MIN_D = 1.5
+TIP_Y = 0.0
+HEAD_UNDERFACE_Y = UNDERHEAD_LEN
+HEAD_TOP_Y = HEAD_UNDERFACE_Y + HEAD_H
+CHAMFER_WIDTH = 0.60
+CHAMFER_WIDTH_TOLERANCE = 0.05
+CHAMFER_ANGLE = 45.0
+CHAMFER_ANGLE_TOLERANCE = 1.0
+
+DRAWING_DIMENSIONS = {
+    "StockTrimProfile": {"CutLength"},
+    "StockDeburrProfile": {"ChamferWidth", "ChamferAngle"},
+    "ThreadTailAcceptance": {"ThreadLengthMin"},
+}
+DRAWING_PRECISION = {
+    "StockTrimProfile": {"CutLength": 2},
+    "StockDeburrProfile": {"ChamferWidth": 2, "ChamferAngle": 0},
+    "ThreadTailAcceptance": {"ThreadLengthMin": 2},
+}
+DIMENSION_PRECISION = {
+    name: digits
+    for dimensions in DRAWING_PRECISION.values()
+    for name, digits in dimensions.items()
+}
+DIMENSION_TOLERANCE_TYPES = {
+    "CutLength": 4,
+    "ChamferWidth": 4,
+    "ChamferAngle": 4,
+    "ThreadLengthMin": 5,
+}
+DIMENSION_CALLOUTS = {
+    "CutLength": (
+        "UNDER HEAD TO FINISHED TIP\n"
+        "MATE: MHA-SM-002 KNIFE MOUNT\n"
+        "SETS THREAD ENGAGEMENT AND TIP CLEARANCE"
+    ),
+    "ChamferWidth": "CUT-END CHAMFER",
+    "ThreadLengthMin": (
+        "#10-24 UNC-2A CONTINUOUS TAIL FROM TIP\n"
+        "INCOMPLETE CUT-END THREAD 1 PITCH MAX\n"
+        "ALL REMAINING TAIL FULL FORM"
+    ),
+}
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

@@ -1,16 +1,23 @@
 vn-knife-hanger-stud:
-  title: Knife-Hanger Screw
+  title: Knife-Hanger Bolt
   number: MHA-VN-024
-  stock_name: Black-Oxide Alloy Steel Socket Head Screw
+  stock_name: Knife-Hanger Bolt (18-8 Stainless Hex Screw, Cut to Length)
   supplier: McMaster-Carr
-  supplier_skus: [91251A157]
-  material: Alloy Steel
-  material_specification: "Alloy steel, black oxide, ASTM A574, Rockwell C37; McMaster-Carr 91251A157"
-  finish: black oxide
+  supplier_skus: [92314A253]
+  material: AISI 304
+  material_specification: "18-8 stainless steel, McMaster-Carr 92314A253"
+  finish: AS SUPPLIED; DEBURR CUT END
+  machining_notes: |-
+    PURCHASED HEX HEAD UNMODIFIED.
+    CUT END AND UNDER-HEAD LENGTH AS DRAWN.
+  inspection_notes: |-
+    NATIVE MIN THREAD TAIL IS FINISHED-PART ACCEPTANCE, NOT A SUPPLIER GRADE.
+    ALL TAIL AFTER INCOMPLETE END THREAD MUST BE FULL FORM.
   installation_notes: |-
-    INSTALLATION - MHA-FR-002 CROSSBAR COUNTERBORE
-    DROP THROUGH THE CROSSBAR INTO THE MHA-SM-002 TOP-SEAT TAP;
-    HEAD SEATS ON THE COUNTERBORE FLOOR, SEAT DRAWN UP TO THE CROSSBAR.
+    INSTALLATION - MHA-FR-002 CROSSBAR SPOTFACE
+    ONE MHA-VN-060 FLAT WASHER BETWEEN HEX HEAD AND SPOTFACE FLOOR.
+    THREAD INTO THE MHA-SM-002 #10-24 TOP-SEAT TAP;
+    DRAW THE MOUNT SEAT UP TO THE CROSSBAR UNDERSIDE.
     USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.
   quantity: 2
   tolerance_class: machined_block

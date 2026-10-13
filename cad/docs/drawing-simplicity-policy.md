@@ -83,16 +83,23 @@ A feature-control frame and its datums appear only on these features
 frames and no datums.
 
 - **Knife-edge system.** The knife-mount 2X dowel-hole pattern (one position
-  frame under its 2X Ø, Ø0.13 to the top seat, datum A, at the BASIC 14.200
+  frame under its 2X Ø, Ø0.13 to the top seat, datum A, at the BASIC 15.264
   span, datum feature B on that frame), its bore (⌖Ø0.20 to A|B with ⊥Ø0.05
-  to B stacked under it) and its #6-32 hanger tap (Ø0.10 to A|B, so the
-  crossbar's Ø4.699 clearance hole still floats round the screw); the top
+  to B stacked under it) and its #10-24 hanger tap (Ø0.10 to A|B, so the
+  crossbar's Ø6.045 clearance hole still floats round the bolt); the top
   frame's two knife-hanger dowel slots (⌖0.05 to the round dowel hole at
-  their own station, BASIC 14.200 from it, datum B front / C rear, B|C▷ and
+  their own station, BASIC 15.264 from it, datum B front / C rear, B|C▷ and
   C|B▷, so the two knife mounts' dowel lines stay square to the knife-edge
   line; the frame holds the slot's width, and a note holds its centre ±0.13
-  along the slot from the BASIC 14.200); the summing-lever knife seat and its
-  20-hole spring pattern (one pattern position frame).
+  along the slot from the BASIC 15.264); the top frame's crossbar socket
+  pattern has **one explicit native linear position control total, ⌖0.10
+  to D** (no Ø), where D is the median plane of the two crossbar width
+  faces, not a single side face. It bounds X shift to ±0.05 while retaining
+  the Z socket station, preserving the ≥2.0 mm screw/slot and side webs of
+  the 25.0 ±0.8 crossbar with its Ø17.0 ±0.51 washer spotface. This narrow
+  knife-edge-system permission does not extend to unrelated frames.
+  The summing-lever knife seat and its 20-hole spring pattern carry one
+  pattern position frame.
 - **Cams.** The pinion-cam eccentric-axis position, and any future cam.
 - **Channel consistency.** At most one control per channel part (rocker arm,
   channel lever, amplitude bar, connecting rod) where a coordinate ± would let

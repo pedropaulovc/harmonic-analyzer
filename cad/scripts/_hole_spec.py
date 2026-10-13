@@ -63,6 +63,10 @@ CLEARANCE_MM = {  # (size, fit) -> hole diameter (CLOSE/NORMAL/LOOSE_FIT)
     ("#8", "close"): 4.572,
     ("#8", "normal"): 4.978,
     ("#8", "loose"): 5.410,
+    # ASME B18.2.8 Table 2 inch series, matching the #6/#8 rows above.
+    ("#10", "close"): 5.232,  # 0.206 in, #5 drill
+    ("#10", "normal"): 5.613,  # 0.221 in, #2 drill
+    ("#10", "loose"): 6.045,  # 0.238 in, B drill
     ("1/4", "close"): 6.756,
     ("1/4", "normal"): 7.137,
     ("1/4", "loose"): 7.544,

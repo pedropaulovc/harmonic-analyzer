@@ -11,10 +11,11 @@ boss-hook / counter-spring / gooseneck chain.
 * knife-mount x2 -- the bearing supports, one per hex trunnion, centred on
   ``SUMMING_Z`` and separated by ``+/-HEX_Z_MID``; each top seat is clamped
   to the crossbar underside (``MOUNT_GAP`` 0).
-* knife-hanger-stud x2 -- McMaster 91251A157 #6-32 x 1-1/2 socket head cap
-  screws under the stable legacy stem: each drops through the crossbar's #6
-  counterbore, its head seated on the counterbore floor (no washer), and
-  threads into the knife-mount's #6-32 bottoming top tap.
+* knife-hanger-stud x2 -- McMaster 92314A253 #10-24 plain hex bolts,
+  cut from 2 in stock to 45.70 +/-0.15 mm under the head; each passes the
+  crossbar's #10 loose clearance hole and threads into the knife-mount tap.
+* knife-hanger-washer x2 -- new McMaster 96659A104 18-8 SAE washers,
+  one beneath each hex head, seated on the shallow crossbar spotface.
 * knife-mount-dowel x4 -- McMaster 98381A473 1/8 x 3/4 dowels, two per
   knife mount either side of its screw, each pressed to the floor of its
   top-seat hole; one slips into the crossbar underside's blind round hole,
@@ -35,9 +36,9 @@ boss-hook / counter-spring / gooseneck chain.
 Cross-subassembly fits (checked at the top level): the channel springs
 (ch-channel.SLDASM) thread the summing-lever plate's O4.5 holes -- gated
 analytically by build_ch_channel_assembly._assert_plate_threading; the knife-
-hanger screws drop through the top-frame casting's integral crossbar (#6
-counterbores with O4.699 clearance holes) and the knife-mount dowels slip
-into its blind round holes and slots (fr-frame.SLDASM); the gooseneck post drops
+hanger bolts pass the top-frame crossbar's O6.045 clearance holes and clamp
+through their washers on its spotfaces; the knife-mount dowels slip into its
+blind round holes and slots (fr-frame.SLDASM); the gooseneck post drops
 through the casting's rail-hub bore, gripped by its 1/4-20 set screw.
 
 Fix-all strategy (M6.2): every structural component inserted at its exact
@@ -87,6 +88,7 @@ from dt_cone_pivot_post_installation import SUMMING_Z
 import fr_top_frame_spec as top_frame
 import sm_knife_mount_spec as knife_mount
 import vn_knife_hanger_stud_spec as hanger_screw
+import vn_knife_hanger_washer_spec as hanger_washer
 import vn_knife_mount_dowel_spec as knife_dowel
 from build_sm_knife_mount import CASTING_UNDERSIDE_Y, MOUNT_GAP
 
@@ -105,48 +107,53 @@ from sm_summing_lever_spec import (  # noqa: E402
 
 HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 
-# --- knife-hanger hardware (two #6-32 screws + two dowels) -------------------
-# The top-frame, knife-mount, screw and dowel specs own every term of the
-# stack.  The 91251A157 build keeps the legacy screw frame (thread tip at local
-# Y=0, axis +Y), so seating its under-head face on the crossbar's counterbore
-# floor, HANGER_GRIP above the crossbar underside, fixes the screw origin; no
-# washer (its thickness band would break the reach stack).  The screw clamps
-# the knife mount's top seat to the underside, a faced Ra 3.2 plane (user
-# ruling 2026-10-12) whose 999.7 is the finished face, so the gap is 0 with no
-# bedding allowance.  Each dowel's pressed end (local Y=0, axis +Y) sits on
-# the floor of the knife mount's top-seat hole.
+# --- knife-hanger hardware (two #10-24 hex bolts, washers and dowel pairs) ----
+# The top-frame, knife-mount and purchased hardware specs own every term.
+# The bolt frame has its cut tip at local Y=0, axis +Y. Its under-head face
+# bears on the washer's upper face; the washer's local Y=0 lower bearing face
+# seats on the spotface floor, HANGER_GRIP above the finished underside.
+# The knife mount remains clamped face-to-face to that underside, gap 0,
+# with no bedding allowance. Each dowel's pressed end (local Y=0, axis +Y)
+# sits on the floor of the knife mount's top-seat hole.
 KNIFE_MOUNT_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP  # 999.7: clamped, gap 0
 CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + top_frame.RING_HEIGHT
-HANGER_SEAT_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP  # 1029.7
-HANGER_STUD_Y = HANGER_SEAT_Y - hanger_screw.UNDERHEAD_LEN  # 991.6 (thread tip)
-# The screw's nominal reach into the knife-mount top tap: 8.10.
-HANGER_REACH = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y
-# Its print-worst reach (drawing-guidelines.md rule 17 (walls and webs)): the shortest screw in the longest grip,
-# 37.084 - 30.8 = 6.284, and the longest in the shortest, 38.1 - 29.2 = 8.90.
-# The grip prints from the faced underside, which is faced before the
-# counterbore is cut: a later cut would shorten it, eating the tip clearance.
-HANGER_REACH_MIN = hanger_screw.LENGTH_MIN - (
-    top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL
+HANGER_SPOTFACE_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP  # 1035.2
+HANGER_WASHER_Y = HANGER_SPOTFACE_Y  # washer lower bearing face, local Y=0
+HANGER_UNDERHEAD_Y = HANGER_WASHER_Y + hanger_washer.THICKNESS  # 1036.4827
+HANGER_STUD_Y = HANGER_UNDERHEAD_Y - hanger_screw.LENGTH  # 990.7827 (cut tip)
+HANGER_REACH = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y  # 8.9173
+# Worst-case stack (drawing-guidelines.md rules 18–19): cut length +/-0.15,
+# finished-underface grip +/-0.05, and catalogue washer thickness limits
+# all enter independently; 8.349..9.4856.
+HANGER_REACH_MIN = (
+    hanger_screw.LENGTH_MIN
+    - (top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL)
+    - hanger_washer.THICKNESS_MAX
 )
-HANGER_REACH_MAX = hanger_screw.LENGTH_MAX - (
-    top_frame.HANGER_GRIP - top_frame.HANGER_GRIP_TOL
+HANGER_REACH_MAX = (
+    hanger_screw.LENGTH_MAX
+    - (top_frame.HANGER_GRIP - top_frame.HANGER_GRIP_TOL)
+    - hanger_washer.THICKNESS_MIN
 )
-# Full thread engaged at the shortest reach (the flat tip's first pitch is not
-# a full thread), 6.284 - 0.794 = 5.49, against the 1.5 D floor, 5.258.
-HANGER_ENGAGEMENT_MIN = HANGER_REACH_MIN - hanger_screw.PITCH
+# Charge the cut end's maximum incomplete lead, one pitch:
+# 7.2906667 >= 1.5D = 7.239.
+HANGER_ENGAGEMENT_MIN = HANGER_REACH_MIN - hanger_screw.INCOMPLETE_TIP_LEN_MAX
 HANGER_ENGAGEMENT_FLOOR = hanger_screw.ENGAGEMENT_MIN_D * hanger_screw.SHANK_DIA
-# The longest reach under the shallowest full thread (.XX): 8.91 - 8.90 = 0.01.
+# Longest reach under the shallowest full tap: 9.52 - 9.4856 = 0.0344 air.
 HANGER_TIP_CLEARANCE = knife_mount.STUD_TAP_THREAD_DEPTH_MIN - HANGER_REACH_MAX
-# The plain shank stays in the crossbar: 19.05 of thread covers the 8.90 reach.
-HANGER_THREAD_SPARE = hanger_screw.THREAD_LENGTH - HANGER_REACH_MAX
-# Diametral clearance of the screw in the crossbar's #6 loose hole: 1.194.
-HANGER_SCREW_CLEARANCE = top_frame.HANGER_CLEARANCE_DIA - hanger_screw.SHANK_DIA
+# Modified-part inspection acceptance, not a vendor thread-to-head claim:
+# the useful full-form tail (10.62 less one incomplete pitch) spans 9.4856.
+HANGER_THREAD_SPARE = (
+    hanger_screw.THREAD_LENGTH_MIN - hanger_screw.INCOMPLETE_TIP_LEN_MAX
+) - HANGER_REACH_MAX
+HANGER_SCREW_CLEARANCE = top_frame.HANGER_CLEARANCE_DIA_MIN - hanger_screw.SHANK_DIA
 # Each dowel's pressed end on its hole floor: 990.2, standing PROUD 9.55 into
 # the crossbar's slip hole or slot.
 KNIFE_DOWEL_Y = KNIFE_MOUNT_TOP_Y - knife_dowel.PRESS_DEPTH
-# The pair's stations from the screw axis, -X (slot) first: 7.100 along X.
+# Pair stations from the bolt axis, -X (slot) first: 7.632 along X.
 KNIFE_DOWEL_X_OFFSETS = knife_mount.PIN_HOLE_XS
-# The screw must still pass the crossbar's #6 clearance hole (drawing-guidelines.md rule 17 (walls and webs)) when
+# The bolt must pass the crossbar's #10 clearance hole at the printed-band
+# worst case (drawing-guidelines.md rule 19 (absorb stacks)) when
 # every station sits at its limit.  Along the dowel line (X): the crossbar's
 # round-hole station (.XXX, 0.13), the knife mount's half-span band (0.065),
 # its tap's position zone radius (0.05) and the round-hole pin across its
@@ -175,27 +182,22 @@ HANGER_SCREW_MISMATCH_Z = (
     + _KNIFE_DOWEL_PAIR_SHIFT / 2.0
 )  # 0.239
 HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATCH_Z)
-# The crossbar's #6 hole is drilled from the faced underside, where the dowel
-# holes are located from it, and the counterbore is piloted on it from the
-# top: its axis is true at the underside and wanders by the deep-drill
-# allowance up the longest .X grip, tan 0.3 deg x 30.8 = 0.161 at the head
-# end.  The screw axis is the knife mount's tap, so the mismatch and that
-# drift together must stay inside the 0.597 float: 0.376 + 0.161 = 0.537,
-# 0.059 spare.
+# The hole is drilled from the finished underside. Prove drift over the FULL
+# crossbar body through its as-cast top, not only to the shallow spotface:
+# tan(0.3 deg) * (36.5 + 0.8) = 0.19530413. The #10 loose hole's 0.6095
+# radial float covers this plus the station mismatch, with 0.03762327 spare.
 HANGER_SCREW_DRIFT = top_frame.DRILL_DRIFT_PER_MM * (
-    top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL
+    top_frame.RING_HEIGHT + top_frame.PRINTED_LINEAR_BAND_MM[1]
 )
 HANGER_SCREW_FLOAT_SPARE = top_frame.HANGER_SCREW_FLOAT - (
     HANGER_SCREW_MISMATCH + HANGER_SCREW_DRIFT
 )
-# The free rock the knife-edge keeps at the drawing-guidelines.md rule 17 (walls and webs) worst case (the
-# 2026-10-09 ruling: >= 5.0 deg).  The pair yaws the block about the screw by
-# the slot pin's worst offset over the shortest span, atan(0.117 / 14.07) =
-# 0.478 deg; across the deepest .X block (14.8) that walks the bore's far end
-# 0.124 off the ridge line, and the bore's ⊥Ø0.05|B zone adds 0.05:
-# t = 0.174.  The trunnion is judged at its widest, lowest .XXX section
-# (8.21 x 10.138) in the smallest reamed bore (Ø12.00): 6.31 deg.  The faced
-# seat adds no term: its form tilts the block, it does not yaw the bore.
+# Free rock at the printed-band worst case (drawing-guidelines.md rule 19
+# (absorb stacks), and the 2026-10-09 ruling: >=5.0 deg).
+# The pair's worst transverse shift acts over its shortest 15.134 span.
+# Across the deepest .X block (14.8) that yaw walks the bore's far end;
+# the bore's perpendicularity zone adds another 0.05. Judge the trunnion
+# at its widest, lowest .XXX section in the smallest reamed bore.
 KNIFE_DOWEL_SPAN_MIN = knife_mount.PIN_HOLE_SPAN - knife_mount.PIN_HOLE_SPAN_TOL
 KNIFE_MOUNT_YAW_DEG = math.degrees(
     math.atan(_KNIFE_DOWEL_PAIR_SHIFT / KNIFE_DOWEL_SPAN_MIN)
@@ -226,6 +228,40 @@ def _assert_hanger_axis_positive_y(name: str, transform: list[float]) -> None:
         )
 
 
+def _assert_hanger_seat_placement(
+    screw: str,
+    washer: str,
+    station_z: float,
+    screw_transform: list[float],
+    washer_transform: list[float],
+) -> list[float]:
+    """Gate actual instance transforms against the two bearing-face seats."""
+    _assert_hanger_axis_positive_y(screw, screw_transform)
+    _assert_hanger_axis_positive_y(washer, washer_transform)
+    screw_o = [value * 1000.0 for value in screw_transform[9:12]]
+    washer_o = [value * 1000.0 for value in washer_transform[9:12]]
+    if abs(screw_o[0] - KNIFE[0]) > 1e-6 or abs(screw_o[2] - station_z) > 1e-6:
+        raise RuntimeError(f"{screw}: axis off the intended knife station")
+    if abs(washer_o[0] - screw_o[0]) > 1e-6 or abs(washer_o[2] - screw_o[2]) > 1e-6:
+        raise RuntimeError(f"{washer}: washer is not coaxial with {screw}")
+    if abs(washer_o[1] - HANGER_SPOTFACE_Y) > 1e-6:
+        raise RuntimeError(
+            f"{washer}: lower-face/spotface-floor gap "
+            f"{washer_o[1] - HANGER_SPOTFACE_Y:.6f} mm"
+        )
+    under_head_y = screw_o[1] + hanger_screw.UNDERHEAD_LEN
+    washer_top_y = washer_o[1] + hanger_washer.THICKNESS
+    if abs(under_head_y - washer_top_y) > 1e-6:
+        raise RuntimeError(
+            f"{screw}: under-head/washer-upper-face gap "
+            f"{under_head_y - washer_top_y:.6f} mm"
+        )
+    reach = KNIFE_MOUNT_TOP_Y - screw_o[1]
+    if abs(reach - HANGER_REACH) > 1e-6:
+        raise RuntimeError(f"{screw}: knife-mount reach drifted to {reach:.6f} mm")
+    return screw_o
+
+
 def _assert_knife_hanger_stack() -> None:
     """Gate the purchased screw/dowel stack, print-worst, before any COM
     insertion."""
@@ -233,17 +269,23 @@ def _assert_knife_hanger_stack() -> None:
         raise RuntimeError(
             f"knife-mount top seat must be clamped to the casting: MOUNT_GAP {MOUNT_GAP}"
         )
-    cbore_floor_y = CROSSBAR_TOP_Y - top_frame.HANGER_CBORE_DEPTH
-    if abs(cbore_floor_y - HANGER_SEAT_Y) > 1e-9:
+    spotface_floor_y = CROSSBAR_TOP_Y - top_frame.HANGER_SPOTFACE_DEPTH
+    if abs(spotface_floor_y - HANGER_SPOTFACE_Y) > 1e-9:
         raise RuntimeError(
-            f"knife-hanger counterbore floor y {cbore_floor_y:.4f} is not the "
-            f"HANGER_GRIP seat y {HANGER_SEAT_Y:.4f}"
+            f"knife-hanger spotface floor y {spotface_floor_y:.4f} is not the "
+            f"finished-underface HANGER_GRIP seat y {HANGER_SPOTFACE_Y:.4f}"
+        )
+    if abs(HANGER_WASHER_Y - spotface_floor_y) > 1e-9:
+        raise RuntimeError(
+            f"knife-hanger washer lower face {HANGER_WASHER_Y:.4f} is not on "
+            f"the spotface floor {spotface_floor_y:.4f}"
         )
     under_head_y = HANGER_STUD_Y + hanger_screw.UNDERHEAD_LEN
-    if abs(under_head_y - HANGER_SEAT_Y) > 1e-9:
+    washer_top_y = HANGER_WASHER_Y + hanger_washer.THICKNESS
+    if abs(under_head_y - washer_top_y) > 1e-9:
         raise RuntimeError(
-            f"knife-hanger screw under-head face {under_head_y:.4f} is not on the "
-            f"counterbore floor {HANGER_SEAT_Y:.4f}"
+            f"knife-hanger bolt under-head face {under_head_y:.4f} is not on "
+            f"the washer upper face {washer_top_y:.4f}"
         )
     if HANGER_ENGAGEMENT_MIN < HANGER_ENGAGEMENT_FLOOR:
         raise RuntimeError(
@@ -258,8 +300,9 @@ def _assert_knife_hanger_stack() -> None:
         )
     if HANGER_THREAD_SPARE < 0.0:
         raise RuntimeError(
-            f"knife-hanger screw's {hanger_screw.THREAD_LENGTH:.3f} mm thread is "
-            f"shorter than its {HANGER_REACH_MAX:.3f} mm reach"
+            f"knife-hanger bolt's useful full-form tail "
+            f"{hanger_screw.THREAD_LENGTH_MIN - hanger_screw.INCOMPLETE_TIP_LEN_MAX:.6f} mm "
+            f"does not span its {HANGER_REACH_MAX:.6f} mm reach"
         )
     if HANGER_SCREW_CLEARANCE <= 0.0:
         raise RuntimeError(
@@ -304,7 +347,8 @@ def _assert_knife_hanger_stack() -> None:
         )
     log(
         f"knife-hanger stack: seat {KNIFE_MOUNT_TOP_Y:.4f} (gap {MOUNT_GAP}), "
-        f"screw head {HANGER_SEAT_Y:.4f}, tip {HANGER_STUD_Y:.4f}; reach "
+        f"washer {HANGER_WASHER_Y:.4f}, bolt under-head {HANGER_UNDERHEAD_Y:.4f}, "
+        f"tip {HANGER_STUD_Y:.4f}; reach "
         f"{HANGER_REACH:.3f} ({HANGER_REACH_MIN:.3f}..{HANGER_REACH_MAX:.3f}); "
         f"full thread {HANGER_ENGAGEMENT_MIN:.3f} >= {HANGER_ENGAGEMENT_FLOOR:.3f}; "
         f"tip {HANGER_TIP_CLEARANCE:.3f} under the thread; crossbar clearance "
@@ -463,19 +507,29 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         label="knife-mount (back)",
     )
-    # Purchased knife-hanger hardware on each mount centreline: one #6-32
-    # screw, its under-head face exactly on the crossbar's counterbore floor
-    # (no washer), clamping the block's top seat to the crossbar underside; and
-    # two dowels, their pressed ends exactly on the floors of the block's
-    # top-seat holes HANGER_OFFSET either side along X, standing proud into the
-    # crossbar's slot (-X) and round slip hole (+X).  Every part is independently fixed at the authored transform, so
-    # this structural stack contributes no operational DOF.
+    # One cut #10-24 hex bolt and one SAE washer per mount: washer lower
+    # face on the crossbar spotface, bolt under-head on the washer upper face.
+    # The two dowels stand proud into the underside slot (-X) and round hole
+    # (+X), their pressed ends on the block's top-seat hole floors. Every
+    # hardware instance is independently fixed; no operational DOF is added.
     hanger_screws: list[str] = []
+    hanger_washers: list[str] = []
     knife_dowels: list[str] = []
     for side, station_z in (
         ("front", SUMMING_Z + HEX_Z_MID),
         ("back", SUMMING_Z - HEX_Z_MID),
     ):
+        hanger_washers.append(
+            await place_component(
+                adapter,
+                "vn-knife-hanger-washer",
+                [KNIFE[0], HANGER_WASHER_Y, station_z],
+                [0.0, 0.0, 0.0],
+                IDENTITY,
+                ground=True,
+                label=f"knife-hanger-washer ({side})",
+            )
+        )
         hanger_screws.append(
             await place_component(
                 adapter,
@@ -501,10 +555,11 @@ async def build(adapter) -> dict[str, str]:
             )
 
     # Count the live top-level instances, not just the placement requests:
-    # exactly two stock screws and four dowels must survive insertion.
+    # Exactly two cut bolts, two new washers and four dowels must survive.
     live_names = component_names(adapter)
     for stem, inserted, count in (
         ("vn-knife-hanger-stud", hanger_screws, 2),
+        ("vn-knife-hanger-washer", hanger_washers, 2),
         ("vn-knife-mount-dowel", knife_dowels, knife_dowel.QUANTITY),
     ):
         live = [
@@ -516,33 +571,28 @@ async def build(adapter) -> dict[str, str]:
                 f"{sorted(live)}"
             )
 
-    # Read back both physical stacks.  This catches a per-instance station
-    # typo that the shared scalar derivation alone cannot: each screw must
-    # stand on the knife axis with its head on the counterbore floor and the
-    # exact nominal reach, and each dowel must sit at its station either side
-    # of its screw, at the same z, its pressed end on the hole floor.
+    # Read back both physical stacks: each washer's lower bearing face on
+    # the spotface, each bolt's head on its own washer, coaxial at the
+    # intended knife station. Check each dowel's offset and hole-floor seat.
     per_mount = knife_dowel.PER_MOUNT
     dowel_pairs = [
         knife_dowels[index : index + per_mount]
         for index in range(0, len(knife_dowels), per_mount)
     ]
-    for screw, pair in zip(hanger_screws, dowel_pairs, strict=True):
-        screw_transform = component_transform(adapter, screw)
-        _assert_hanger_axis_positive_y(screw, screw_transform)
-        screw_o = [value * 1000.0 for value in screw_transform[9:12]]
-        screw_under_head_y = screw_o[1] + hanger_screw.UNDERHEAD_LEN
-        reach = KNIFE_MOUNT_TOP_Y - screw_o[1]
-        if abs(screw_o[0] - KNIFE[0]) > 1e-6:
-            raise RuntimeError(
-                f"{screw}: axis {screw_o[0] - KNIFE[0]:.6f} mm off the knife x"
-            )
-        if abs(screw_under_head_y - HANGER_SEAT_Y) > 1e-6:
-            raise RuntimeError(
-                f"{screw}: under-head/counterbore-floor gap "
-                f"{screw_under_head_y - HANGER_SEAT_Y:.6f} mm"
-            )
-        if abs(reach - HANGER_REACH) > 1e-6:
-            raise RuntimeError(f"{screw}: knife-mount reach drifted to {reach:.6f} mm")
+    for screw, washer, pair, station_z in zip(
+        hanger_screws,
+        hanger_washers,
+        dowel_pairs,
+        (SUMMING_Z + HEX_Z_MID, SUMMING_Z - HEX_Z_MID),
+        strict=True,
+    ):
+        screw_o = _assert_hanger_seat_placement(
+            screw,
+            washer,
+            station_z,
+            component_transform(adapter, screw),
+            component_transform(adapter, washer),
+        )
         for dowel, x_offset in zip(pair, KNIFE_DOWEL_X_OFFSETS, strict=True):
             dowel_transform = component_transform(adapter, dowel)
             _assert_hanger_axis_positive_y(dowel, dowel_transform)

@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the knife-mount bearing block.
 
-A machined, heat-treated steel block (25 wide x ~29.6 tall x 14 deep) with a
+A machined, heat-treated steel block (25.4 wide x ~29.6 tall x 14 deep) with a
 single Ø12 bore.  The bore is the knife-edge bearing: the summing-lever
 trunnion's top vertex rides its upper inner wall in line contact (ch18 p.42:
 unpainted hardened steel, close bore -- 2026-09-02 user re-read).  Every face
@@ -14,11 +14,13 @@ A-A, cut from the top view through the tap and dowel axes (drawing-guidelines.md
 floor is hidden in the front view, so it is dimensioned where the cut shows
 it).  The pattern is located on the block's +X side and front faces at
 general tolerance in the top view; the tap axis, run on through the bore's
-centre, stands BASIC 7.100 from the -X dowel axis in section A-A.  The reamed
+centre, stands BASIC 7.632 from the -X dowel axis in section A-A.  The reamed
 bore carries a position frame to the top seat (datum A) and the dowel pattern
 (B) with a perpendicularity frame to B stacked under it, its centre a BASIC
-height under A; the #6-32 tap a position frame to the same A|B, its full
-thread at the general .XX and its drill depth banded on its hole callout.
+height under A; the #10-24 tap a position frame to the same A|B, its #25
+pilot at three places with its own +0.10/0, its full thread at the general
+.XXX, its drill depth banded, its drill point dimensioned (under the general
+angular band) and its mating bolt named on its hole callout.
 The bore carries Ra 1.6, the top seat Ra 3.2.  Every view is
 hidden-lines-removed.
 
@@ -99,11 +101,18 @@ from sm_knife_mount_spec import (
     PIN_HOLE_X,
     R_BORE,
     STUD_TAP_DIA,
+    STUD_TAP_DIA_BAND,
+    STUD_TAP_DIA_PLACES,
     STUD_TAP_DRILL_DEPTH,
     STUD_TAP_DRILL_DEPTH_BAND,
+    STUD_TAP_DRILL_DEPTH_PLACES,
+    STUD_TAP_POINT_ANGLE_DEG,
+    STUD_TAP_POINT_ANGLE_PLACES,
     STUD_TAP_THREAD_DEPTH,
+    STUD_TAP_THREAD_DEPTH_PLACES,
     SUPPORT_Z_THICK,
     SURFACE_FINISHES,
+    TAP_MATE_CALLOUT,
 )
 
 
@@ -182,7 +191,7 @@ SECTION_KEEP = {
     ),
 }
 # The tap and bore frames both reference B, the dowel pair, so the tap axis
-# stands BASIC 7.100 from the -X dowel axis (blind machinist review,
+# stands BASIC 7.632 from the -X dowel axis (blind machinist review,
 # 2026-10-10: the implied centre left the tap and bore with no explicit
 # horizontal location).  It is dimensioned in section A-A, the one view that
 # cuts the tap, the bore and the dowel hole together, between two owned
@@ -194,7 +203,7 @@ SECTION_AXIS_OVERRUN_MM = 2.0
 SECTION_AXIS_TAIL_MM = 1.0
 # The dimension line stands 8 mm over the cut top seat, in the open band
 # under the isometric's caption.  Its boxed value (~14 mm) all but fills the
-# 14.2 mm between the axes, so it parks on a leader left of the -X axis
+# 15.3 mm between the axes, so it parks on a leader left of the -X axis
 # (draw_fr_top_frame's F-F station precedent: text past the arrows
 # otherwise rides the dimension line).
 TAP_STATION_TEXT_XY = (_section_x(-PIN_HOLE_X / 2.0), _section_y(BLK_TOP) + 0.008)
@@ -214,8 +223,8 @@ PIN_CALLOUT_HALF_WIDTH = 0.04225
 PIN_CALLOUT_SHOULDER_OVERHANG = 0.0016
 PIN_CALLOUT_SHOULDER_DROP = 0.01286
 PIN_CALLOUT_SHOULDER_START = (_sheet_x(BLK_HALF_X) + 0.006, TOP_CENTER[1] - 0.010)
-# The pair's BASIC 14.200 span runs above the top view, between the hole axes,
-# its box 3 mm left of centre so the side-face 5.40's left arrow (a row up)
+# The pair's BASIC 15.264 span runs above the top view, between the hole axes,
+# its box 3 mm left of centre so the side-face 5.07's left arrow (a row up)
 # stands clear of it.
 PIN_SPAN_TEXT_XY = (TOP_CENTER[0] - 0.003, TOP_CENTER[1] + TOP_HALF_Z + 0.0075)
 # The pattern's face locations (blind machinist review, 2026-10-09), both in
@@ -273,38 +282,84 @@ PIN_DATUM_B_XY = (
     PIN_FRAME_XY[0] + PIN_FRAME_SIZE[0] / 2.0,
     PIN_FRAME_XY[1] - PIN_FRAME_SIZE[1] - 0.005 - DATUM_TAG_BOX,
 )
-# The #6-32 bottoming tap is stated once, on its Hole Wizard callout in the
+# The #10-24 bottoming tap is stated once, on its Hole Wizard callout in the
 # top view (fr-top-frame's KEEPER TAP precedent), not in a note.  The
 # process rides the thread row's prefix and names its depth the full thread
-# (blind machinist review, 2026-10-09).  The full thread prints at the
-# title block's .XX; only the drill depth carries an explicit band, the
-# loosest the crown web and the tap's runout leave
-# (sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH_BAND).  Three 4.3 mm rows, the widest
-# the process (27 characters, ~76 mm at the 20261009T204136744Z render's
-# 2.82 mm a character).  The block parks in the band between the top view
-# and the front view's datum-A tag (its top at y 0.1951), its right end where
-# the three-row block's stood (x ~0.095), so the leader climbs steeply to the
-# tap's lower rim as before: ~14 mm over the part against a 12 mm approach
-# from the view's lower edge, a ~2 mm detour
-# (_layout_audit.LEADER_DETOUR_PROVISIONAL_M is 10).
+# (blind machinist review, 2026-10-09).  The #25 pilot prints at three
+# places with its own native +0.10/0 (sm_knife_mount_spec.STUD_TAP_DIA_BAND),
+# the full thread at the title block's .XXX, and the drill depth an explicit
+# +/-0.05, the band the crown web and the tap's runout leave between them
+# (sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH_BAND).  The drill row also
+# dimensions the drill's point -- SolidWorks' drill-angle variable after the
+# drill depth, ``X 118°`` -- so the title block's angular band governs the
+# point the crown web charges (sm_knife_mount_spec.STUD_TAP_POINT_ANGLE_MIN_DEG).
+# A fourth row, the callout's native below text, names the bolt the full
+# thread holds (sm_knife_mount_spec.TAP_MATE_CALLOUT).
+# Four 4.3 mm rows.  The process (27 characters) measured ~76 mm at the
+# 20261009T204136744Z render's 2.82 mm a character; the drill row is now the
+# widest: its 27 glyphs (Ø3.797 ▽ 11.24 ±0.05 X 118°) at that pitch plus the
+# pilot's stacked +0.10/0, taken as wide as the bore's measured +0.03/0.00
+# (~10.8 mm, BORE_DIA_TEXT_HALF_WIDTH): ~87 mm, an estimate, unmeasured.  The
+# block parks in the band between the top view and the front view's datum-A
+# tag (its top at y 0.1951), its bottom where the three-row block's stood so
+# the frame under it keeps its station, its left end 1.9 mm inside the
+# 12.7 mm inner border (drawing-guidelines.md rule 13 (stay inside the
+# border)).  That moves its right end, where the leader leaves, 9 mm right of
+# the three-row block's (face + 0.004, the 20261009T164113078Z run's 0.0947
+# root), so the leader climbs more steeply to the tap's lower rim and runs
+# less of its length over the part.
 TAP_CALLOUT_PROCESS = "BOTTOMING TAP - FULL THREAD\n"
-TAP_CALLOUT_HALF_WIDTH = 0.039
-TAP_CALLOUT_HALF_HEIGHT = 0.0065
-TAP_CALLOUT_XY = (_sheet_x(-BLK_HALF_X) - 0.035, TOP_CENTER[1] - TOP_HALF_Z - 0.014)
-TAP_CALLOUT_DEPTH_BANDS: dict[str, tuple[float, float | None]] = {
+TAP_CALLOUT_HALF_WIDTH = 0.044
+TAP_CALLOUT_HALF_HEIGHT = 0.0086
+TAP_CALLOUT_XY = (_sheet_x(-BLK_HALF_X) - 0.031, TOP_CENTER[1] - TOP_HALF_Z - 0.012)
+# Each native length the callout prints and its own band, (upper, lower) mm;
+# ``None``: the title block's .XXX governs (the full thread).  The pilot's
+# band is bilateral, +0.10/0; the drill depth's symmetric, +/-0.05.
+TAP_CALLOUT_BANDS: dict[str, tuple[float, tuple[float, float] | None]] = {
+    "hw-tapdrldia": (STUD_TAP_DIA, STUD_TAP_DIA_BAND),
     "hw-threaddepth": (STUD_TAP_THREAD_DEPTH, None),
-    "hw-tapdrldepth": (STUD_TAP_DRILL_DEPTH, STUD_TAP_DRILL_DEPTH_BAND),
+    "hw-tapdrldepth": (
+        STUD_TAP_DRILL_DEPTH,
+        (STUD_TAP_DRILL_DEPTH_BAND, -STUD_TAP_DRILL_DEPTH_BAND),
+    ),
 }
-# The full thread's places: two, the .XX its general band needs.
-TAP_THREAD_DEPTH_PLACES = 2
+# Both bands print their deviations at two places, +0.10/0 and ±0.05.
+TAP_CALLOUT_BAND_PLACES = 2
+# swTolType_e: no band of its own, bilateral, symmetric.
+_TOL_NONE = 0
+_TOL_BILATERAL = 2
+_TOL_SYMMETRIC = 4
+# The callout's places, the spec's: the pilot at three (its band governs; at
+# two, Ø3.80 +0.10/0 would reject the #25 drill), the full thread at three
+# (the .XXX its general band needs), the drill depth at two (its explicit
+# band).
+TAP_CALLOUT_PLACES = {
+    "hw-tapdrldia": STUD_TAP_DIA_PLACES,
+    "hw-threaddepth": STUD_TAP_THREAD_DEPTH_PLACES,
+    "hw-tapdrldepth": STUD_TAP_DRILL_DEPTH_PLACES,
+}
+# swDimensionTextParts_e: a hole callout's definitions (5-8: prefix, suffix,
+# callout above, callout below) and the writable part each is set through
+# (1-4), the draw_mg_output_fixture._reference_thread_depth precedent.  The
+# mate rides the below definition, a row under the native thread row
+# (draw_ch_rocker_arm_tl_profile_fixture._locate_pivot_tap_depths).
+_CALLOUT_DEFINITION_PARTS = {5: 1, 6: 2, 7: 3, 8: 4}
+_CALLOUT_BELOW_DEFINITION = 8
+TAP_DRILL_DEPTH_TOKEN = "<hw-tapdrldepth>"
+# SolidWorks' documented "Drill Angle" callout variable (calloutformat.txt;
+# swCalloutVariable_e.swCalloutVariable_Drill_Angle, an angle variable).
+TAP_POINT_ANGLE_VARIABLE = "hw-drlang"
+TAP_POINT_ANGLE_TOKEN = f"<{TAP_POINT_ANGLE_VARIABLE}>"
+_CALLOUT_ANGLE_VARIABLE = 2  # swCalloutVariableType_e.swCalloutVariableType_Angle
+_DRILL_ANGLE_VARIABLE = 16  # swCalloutVariable_e.swCalloutVariable_Drill_Angle
 # The tap's position frame hangs under its callout block, on its own leader
 # to the tap.  The two leaders land on the tap's two lower rims (model x
 # side): the callout's on the lower-left, nearer its block, the frame's on
 # the lower-right, so the frame's leader, climbing from the frame's right
 # end, stays right of the callout's.  Both on the lower-left rim, it crossed
 # the callout's 2 mm short of the tip (leader-crosses-leader, farm run
-# 20261009T164113078Z).  The frame keeps its station when the wider callout
-# moves left, so its leader stays right of the callout's.
+# 20261009T164113078Z).  The frame keeps its station under the four-row
+# block, its root right of the callout's, so its leader stays right of it.
 TAP_FRAME_XY = (
     _sheet_x(-BLK_HALF_X) - 0.022,
     TAP_CALLOUT_XY[1] - TAP_CALLOUT_HALF_HEIGHT - 0.007,
@@ -463,56 +518,177 @@ def _look_section_along_minus_z(adapter: Any, section: Any) -> None:
         )
 
 
-def _band_tap_callout_depths(callout: Any) -> None:
-    """Author the tap's drill-depth band on its hole callout; prove the
-    full thread's depth carries none (``None``: the title block's .XX).
+def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """The callout's definitions with the drill's point dimensioned right
+    after the drill depth, ``<hw-tapdrldepth> X <hw-drlang>``, and the bolt
+    the full thread holds named on the last row (``TAP_MATE_CALLOUT``
+    closing the below definition); every other character as it was.
+
+    The drill depth must be defined exactly once, and neither the drill
+    angle nor the mate yet.  The variable stays in the definition, so the
+    printed angle is the Hole Wizard feature's own drill point.
+    """
+    joined = "\n".join(definitions.values())
+    if (
+        joined.count(TAP_DRILL_DEPTH_TOKEN) != 1
+        or TAP_POINT_ANGLE_TOKEN in joined
+        or TAP_MATE_CALLOUT in joined
+    ):
+        raise RuntimeError(
+            f"expected one {TAP_DRILL_DEPTH_TOKEN}, no {TAP_POINT_ANGLE_TOKEN} and no "
+            f"{TAP_MATE_CALLOUT!r} in the knife-hanger tap callout's definitions: "
+            f"{definitions!r}"
+        )
+    wanted = {
+        part: text.replace(
+            TAP_DRILL_DEPTH_TOKEN, f"{TAP_DRILL_DEPTH_TOKEN} X {TAP_POINT_ANGLE_TOKEN}"
+        )
+        for part, text in definitions.items()
+    }
+    below = wanted[_CALLOUT_BELOW_DEFINITION].rstrip()
+    wanted[_CALLOUT_BELOW_DEFINITION] = (
+        f"{below}\n{TAP_MATE_CALLOUT}" if below else TAP_MATE_CALLOUT
+    )
+    return wanted
+
+
+def _write_tap_callout_definitions(adapter: Any, callout: Any) -> None:
+    """Write the drill's point and the mating bolt into the native callout.
+
+    Only the definitions that change are written; the readback must hold
+    all four, the process prefix included.
+    """
+    before = {
+        part: str(callout.GetText(part) or "") for part in _CALLOUT_DEFINITION_PARTS
+    }
+    wanted = tap_callout_definitions(before)
+    written = {part: text for part, text in wanted.items() if text != before[part]}
+    for part, text in written.items():
+        callout.SetText(_CALLOUT_DEFINITION_PARTS[part], text)
+    after = {
+        part: str(callout.GetText(part) or "") for part in _CALLOUT_DEFINITION_PARTS
+    }
+    if after != wanted:
+        raise RuntimeError(
+            "knife-hanger tap drill point and mate did not persist: wanted "
+            f"{wanted!r}, read {after!r}"
+        )
+    rebuild_drawing(adapter, label="knife-hanger tap drill point and mate")
+    _telemetry.info(f"knife-hanger tap callout definitions written: {written!r}")
+
+
+def tap_callout_tolerance(band: tuple[float, float]) -> tuple[int, float, float]:
+    """The swTolType_e and (lower, upper) deviations, mm, a callout band
+    writes: symmetric when its limits mirror, else bilateral."""
+    lower, upper = min(band), max(band)
+    kind = _TOL_SYMMETRIC if math.isclose(lower, -upper) else _TOL_BILATERAL
+    return kind, lower, upper
+
+
+def _band_tap_callout(callout: Any) -> None:
+    """Author the tap's bands on its hole callout -- the pilot's +0.10/0,
+    the drill depth's +/-0.05 -- prove the full thread's depth carries none
+    (``None``: the title block's .XXX), and the drill point its 118 deg.
 
     A hole callout variable carries its OWN tolerance (SW 2016+:
-    ``ICalloutVariable.ToleranceType``), so the band is set and read back
-    on the callout, the draw_sm_summing_lever bracket-tap precedent: the
-    title block's .XX on the drill too would leave under one pitch of drill
-    past the deepest full thread, or break the crown web.  The full thread
-    stays a plain .XX value, under the title block's band.
+    ``ICalloutVariable.ToleranceType``), so each band is set and read back
+    on the callout (the draw_sm_summing_lever bracket-tap and
+    draw_fr_top_frame hanger-clearance precedents): three unbanded places
+    on the pilot would claim the general .XXX, and the title block's band
+    on the drill depth would leave under one pitch of drill past the
+    deepest full thread, or break the crown web.
     """
     from win32com.client.dynamic import Dispatch as dynamic_dispatch
 
-    required = dict(TAP_CALLOUT_DEPTH_BANDS)
+    required = dict(TAP_CALLOUT_BANDS)
+    points: list[Any] = []
     for raw in callout.GetHoleCalloutVariables() or ():
         # Concrete callout interfaces alias the generic metadata DISPIDs.
         variable = dynamic_dispatch(raw._oleobj_)
         variable_name = str(variable.VariableName)
+        if variable_name == TAP_POINT_ANGLE_VARIABLE:
+            points.append(raw)
+            continue
         if variable_name not in required:
             continue
-        depth, band = required.pop(variable_name)
+        nominal, band = required.pop(variable_name)
         length = _early_bound(raw, "ICalloutLengthVariable")
-        if abs(float(length.Length) * 1000.0 - depth) > 1e-5:
+        actual = float(length.Length) * 1000.0
+        if variable_name == "hw-tapdrldia":
+            # The wizard's #25 drill may carry its inch size's fourth place
+            # (0.1495 in); the sheet's contract is the Ø it prints.
+            places = TAP_CALLOUT_PLACES[variable_name]
+            mismatch = round(actual, places) != round(nominal, places)
+        else:
+            mismatch = abs(actual - nominal) > 1e-5
+        if mismatch:
             raise RuntimeError(
                 f"knife-hanger tap callout {variable_name} reads "
-                f"{float(length.Length) * 1000.0:g}, expected {depth:g} mm"
+                f"{actual:g}, expected {nominal:g} mm"
             )
         if band is None:
-            variable.ToleranceType = 0  # swTolType_e.swTolNONE
-            if int(variable.ToleranceType) != 0:
+            variable.ToleranceType = _TOL_NONE
+            if int(variable.ToleranceType) != _TOL_NONE:
                 raise RuntimeError(
                     f"knife-hanger tap callout {variable_name} keeps a tolerance"
                 )
             continue
-        variable.ToleranceType = 4  # swTolType_e.swTolSYMMETRIC
-        variable.ToleranceMin = -band / 1000.0
-        variable.ToleranceMax = band / 1000.0
-        length.TolerancePrecision = 2
+        kind, lower, upper = tap_callout_tolerance(band)
+        variable.ToleranceType = kind
+        variable.ToleranceMin = lower / 1000.0
+        variable.ToleranceMax = upper / 1000.0
+        length.TolerancePrecision = TAP_CALLOUT_BAND_PLACES
         if (
-            int(variable.ToleranceType) != 4
-            or abs(float(variable.ToleranceMin) * 1000.0 + band) > 1e-5
-            or abs(float(variable.ToleranceMax) * 1000.0 - band) > 1e-5
-            or int(length.TolerancePrecision) != 2
+            int(variable.ToleranceType) != kind
+            or abs(float(variable.ToleranceMin) * 1000.0 - lower) > 1e-5
+            or abs(float(variable.ToleranceMax) * 1000.0 - upper) > 1e-5
+            or int(length.TolerancePrecision) != TAP_CALLOUT_BAND_PLACES
         ):
             raise RuntimeError(
                 f"knife-hanger tap callout band for {variable_name} did not "
-                f"persist: wanted symmetric {band} mm at 2 places"
+                f"persist: wanted swTolType_e {kind}, deviations {(lower, upper)} mm at "
+                f"{TAP_CALLOUT_BAND_PLACES} places"
             )
     if required:
-        raise RuntimeError(f"knife-hanger tap callout omits native depths: {required}")
+        raise RuntimeError(f"knife-hanger tap callout omits native lengths: {required}")
+    if len(points) != 1:
+        raise RuntimeError(
+            f"knife-hanger tap callout carries {len(points)} native drill points, not one"
+        )
+    _prove_tap_point(points[0])
+
+
+def _prove_tap_point(raw: Any) -> None:
+    """The callout's drill point is SolidWorks' drill-angle variable reading
+    the feature's 118 deg, printed in whole degrees with no band of its own,
+    so the title block's angular tolerance governs it (the crown web charges
+    its 117 deg limit, sm_knife_mount_spec.STUD_TAP_POINT_ANGLE_MIN_DEG)."""
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch
+
+    variable = dynamic_dispatch(raw._oleobj_)
+    kinds = (int(variable.Type), int(variable.VariableType))
+    if kinds != (_CALLOUT_ANGLE_VARIABLE, _DRILL_ANGLE_VARIABLE):
+        raise RuntimeError(
+            f"knife-hanger tap callout {TAP_POINT_ANGLE_VARIABLE} is type {kinds}, "
+            f"not the drill angle {(_CALLOUT_ANGLE_VARIABLE, _DRILL_ANGLE_VARIABLE)}"
+        )
+    angle = _early_bound(raw, "ICalloutAngleVariable")
+    degrees = math.degrees(float(angle.Angle))
+    if abs(degrees - STUD_TAP_POINT_ANGLE_DEG) > 1e-5:
+        raise RuntimeError(
+            f"knife-hanger tap drill point reads {degrees:g} deg, "
+            f"expected {STUD_TAP_POINT_ANGLE_DEG:g}"
+        )
+    variable.ToleranceType = _TOL_NONE
+    angle.Precision = STUD_TAP_POINT_ANGLE_PLACES
+    if (
+        int(variable.ToleranceType) != _TOL_NONE
+        or int(angle.Precision) != STUD_TAP_POINT_ANGLE_PLACES
+    ):
+        raise RuntimeError(
+            "knife-hanger tap drill point did not persist unbanded at "
+            f"{STUD_TAP_POINT_ANGLE_PLACES} places"
+        )
 
 
 # Section A-A cuts the tap on its axis: SolidWorks' cosmetic-thread
@@ -572,7 +748,7 @@ def _layer_cosmetic_threads(
 
 
 def _tap_lower_rim(adapter: Any, top: Any, x_side: float) -> tuple[float, float]:
-    """The #6-32 tap's drill rim at 45 deg on model ``x_side``, below its
+    """The #10-24 tap's drill rim at 45 deg on model ``x_side``, below its
     centre in the top view: picked on whichever side of the cutting line
     model -Z/+Z projects below it."""
     rim_mm = STUD_TAP_DIA / 2.0 / math.sqrt(2.0)
@@ -718,7 +894,7 @@ async def build(adapter: Any) -> dict[str, str]:
             visible=False,
             label=f"{view_label} view hidden tap thread",
         )
-    # SolidWorks pins its own raw "#6-32 Tapped Hole" note to a view that
+    # SolidWorks pins its own raw "#10-24 Tapped Hole" note to a view that
     # imports from the tapped part (the dda9a33a8 render put it on the top
     # view, through the dowel callout).  The tap is stated once, on its hole
     # callout below (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), so every such note goes.  Which views receive
@@ -733,14 +909,15 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         edge_xy=tap_rim,
         callout_xy=TAP_CALLOUT_XY,
-        label="knife-hanger screw bottoming tap",
+        label="knife-hanger bolt bottoming tap",
         process=TAP_CALLOUT_PROCESS,
     )
-    _band_tap_callout_depths(tap_callout)
+    _write_tap_callout_definitions(adapter, tap_callout)
+    _band_tap_callout(tap_callout)
     set_hole_callout_precision(
         tap_callout,
-        {"hw-threaddepth": TAP_THREAD_DEPTH_PLACES},
-        label="knife-hanger tap full-thread depth",
+        TAP_CALLOUT_PLACES,
+        label="knife-hanger tap pilot and depths",
     )
     # One arrow on the bore's near (upper-left) rim, its leader short from
     # the text on the left; native, the Ø line ran rim to rim through the
@@ -942,7 +1119,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_basic_dimension(adapter, station, label="dowel hole from tap axis")
 
     # Datum A = the block top seat (clamped to the top-frame casting underside;
-    # carries the #6-32 knife-hanger-screw tap and the MHA-VN-051 dowel
+    # carries the #10-24 knife-hanger-bolt tap and the MHA-VN-051 dowel
     # holes); datum B = the dowel pair, its symbol on the position frame
     # under their 2X Ø (a tag on the dimension attaches to nothing, farm run
     # 20261009T155421516Z).  Ra 1.6
@@ -998,7 +1175,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The bore: Ø0.20 located to A|B; under it, ⊥Ø0.05 to B holds its axis
     # square to the dowel pattern, so the trunnion axis stands square to the
     # knife edge (sm_knife_mount_spec: one Ø zone bounds yaw and tilt).  Its
-    # centre is BASIC under A; across, BASIC 7.100 from a dowel axis.
+    # centre is BASIC under A; across, BASIC 7.632 from a dowel axis.
     add_feature_control_frame(
         adapter,
         front,
@@ -1034,7 +1211,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     _set_sheet_precision(bore_basic, label="knife-bore centre from top seat")
     set_basic_dimension(adapter, bore_basic, label="knife-bore centre from top seat")
-    # The #6-32 tap: Ø0.10 to A|B, the screw axis the crossbar's clearance
+    # The #10-24 tap: Ø0.10 to A|B, the bolt axis the crossbar's clearance
     # hole floats round (build_sm_summing_assembly's knife-hanger stack).
     add_feature_control_frame(
         adapter,

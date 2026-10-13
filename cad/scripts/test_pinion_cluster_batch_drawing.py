@@ -312,13 +312,16 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
     summing = _interference_contracts.allowed_interference_pairs("sm-summing")
     assert summing == pytest.approx(
         {
-            # 91251A157 #6-32 in the #36 drill over its 8.10 nominal reach.
+            # Cut 92314A253 #10-24 in the #25 drill over 8.9173 nominal reach.
             frozenset(("vn-knife-hanger-stud-1", "sm-knife-mount-1")): _annulus_limit(
-                3.505, 2.705, 8.10
+                4.826, 3.797, 8.9173
             ),
             frozenset(("vn-knife-hanger-stud-2", "sm-knife-mount-2")): _annulus_limit(
-                3.505, 2.705, 8.10
+                4.826, 3.797, 8.9173
             ),
+            # Exact head-to-washer bearing contacts: no solid overlap allowed.
+            frozenset(("vn-knife-hanger-stud-1", "vn-knife-hanger-washer-1")): 0.0,
+            frozenset(("vn-knife-hanger-stud-2", "vn-knife-hanger-washer-2")): 0.0,
             # 98381A473 at its largest (3.18262) in the smallest Ø3.165 ream,
             # pressed 9.5 deep (the models are line to line); two per mount,
             # the front mount's pair first.
@@ -472,16 +475,18 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
         },
         "sm-summing": {
-            # Stock 91251A157: #6-32 major, #36 drill, 8.10 nominal reach.
+            # Cut 92314A253: #10-24 major, #25 drill, 8.9173 nominal reach.
             **_expected_numbered_pairs(
                 "vn-knife-hanger-stud",
                 range(1, 3),
                 "sm-knife-mount",
-                3.505,
-                2.705,
-                8.10,
+                4.826,
+                3.797,
+                8.9173,
                 second_number=None,
             ),
+            frozenset(("vn-knife-hanger-stud-1", "vn-knife-hanger-washer-1")): 0.0,
+            frozenset(("vn-knife-hanger-stud-2", "vn-knife-hanger-washer-2")): 0.0,
             # Stock 98381A473 pressed 9.5 into the Ø3.175 +0/-0.010 ream,
             # two per knife mount.
             **_expected_numbered_pairs(
@@ -655,6 +660,21 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
         },
         "ha-harmonic-analyzer": {
+            # Exact nested bearing contacts, NOT manufactured interference.
+            **{
+                frozenset((
+                    f"sm-summing-1/vn-knife-hanger-stud-{number}",
+                    f"sm-summing-1/vn-knife-hanger-washer-{number}",
+                )): 0.0
+                for number in (1, 2)
+            },
+            **{
+                frozenset((
+                    f"sm-summing-1/vn-knife-hanger-washer-{number}",
+                    "fr-frame-1/fr-top-frame-1",
+                )): 0.0
+                for number in (1, 2)
+            },
             **_expected_numbered_pairs(
                 "mg-magnifier-1/vn-magnifying-bracket-screw",
                 range(1, 3),
@@ -777,7 +797,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         assert set(allowed) == set(expected_threaded) | special_pairs.get(name, set())
         for pair, expected_limit in expected_threaded.items():
             assert allowed[pair] == pytest.approx(expected_limit)
-        assert all(limit > 0.0 and math.isfinite(limit) for limit in allowed.values())
+        assert all(limit >= 0.0 and math.isfinite(limit) for limit in allowed.values())
 
     drive_train_allowed = _interference_contracts.allowed_interference_pairs(
         "dt-drive-train"

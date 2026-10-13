@@ -17,13 +17,14 @@ Cross-subassembly fits proven by the top-level interference check:
   the plate where the spring's lower eye links on and each trimmed shank
   stopping 1/16 in above the plate's underside -- gated analytically by
   build_ch_channel_assembly._assert_spring_mount;
-* knife-hanger screws (sm-summing.SLDASM) drop through the #6 counterbores in
-  the top-frame casting's integral crossbar (fr-frame.SLDASM) with O4.318
-  clearance, each head seated on its counterbore floor, and each pressed
-  knife-mount dowel stands in the crossbar underside's O3.24 slip hole short
-  of its floor; the knife-mount top seats touch the underside face to face
-  (gap 0), coincident contact the gate does not count as interference.  The
-  casting's set screw grips the gooseneck post at the east-rail hub;
+* cut #10-24 plain hex bolts (sm-summing.SLDASM) pass the top-frame crossbar's
+  O6.045 loose clearance holes (fr-frame.SLDASM); each under-head face seats
+  on its new SAE washer, whose lower bearing face seats on the shallow
+  spotface 35.50 above the finished underside. Each pressed knife-mount
+  dowel stands in the underside's O3.24 slip hole or slot short of its floor.
+  Knife-mount top seats touch the underside face to face (gap 0); bearing
+  contacts allow zero solid overlap. The casting's set screw grips the
+  gooseneck post at the east-rail hub;
 * column-clamps (magnifier + paper-drive) ride the Ø25.4 columns (frame) with
   a 25.6 bore;
 * the pen-hanger (pn-pen.SLDASM) clamps the wheel-bar (mg-magnifier.SLDASM), and the

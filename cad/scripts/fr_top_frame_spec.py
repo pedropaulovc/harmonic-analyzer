@@ -19,13 +19,18 @@ from math import radians, sqrt, tan
 
 import _config
 import vn_knife_hanger_stud_spec as HANGER_SCREW
+import vn_knife_hanger_washer_spec as HANGER_WASHER
 import vn_knife_mount_dowel_spec as KNIFE_DOWEL
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SEAT_UM, SurfaceFinishControl
-from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z
+from dt_cone_pivot_post_installation import (
+    FRAME_FRONT_COLUMN_Z,
+    FRAME_REAR_COLUMN_Z,
+    SUMMING_Z,
+)
 from fr_frame_attachment_spec import CAP_RECESS_DEPTH, COLUMN_SOCKET_DIAMETER
 from ch_fulcrum_keeper_spec import KEEPER_SEAT_FLATNESS_BUDGET_MM
 
@@ -41,6 +46,8 @@ FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z  # -112
 REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z  # +112
 RING_HEIGHT = 36.5  # rail band (ch30 p002 36.7 / p006 37.0 / ch19 img03 35.6)
 HALF_H = RING_HEIGHT / 2.0  # 18.25; band local y -18.25..+18.25
+HANGER_CROSSBAR_WIDTH = 25.0
+HANGER_CROSSBAR_WIDTH_PLACES = 1
 FLANGE_THICKNESS_MM = 8.0  # final top flange, including the faced right rail top
 FLANGE_THICKNESS_PLACES = 1
 BOSS_ABOVE = 4.5  # boss proud of the rail top (corner-crop step)
@@ -77,61 +84,76 @@ def _sag(radius: float) -> float:
     return radius - sqrt(radius**2 - (SET_SCREW_MAJOR_DIA / 2.0) ** 2)
 
 
-# --- Knife-hanger screw counterbores and dowel slip holes (crossbar) ---------
+# --- Knife-hanger hex-bolt spotfaces and dowel slip holes (crossbar) ----------
 #
-# Each MHA-SM-002 knife mount hangs under the integral crossbar on one stock
-# #6-32 socket head cap screw (MHA-VN-024) dropped through a counterbore from
-# the crossbar top; the screw clamps the block's top seat to the crossbar
-# underside.  The two MHA-VN-051 dowels pressed in the block's top seat,
-# HANGER_PIN_X either side of the screw axis along X, key the block against
-# turning about the screw: the +X dowel slips into a round blind hole (the
-# block's locator), the -X dowel into a blind slot of the same slip width
-# whose length absorbs the pair's spacing mismatch (drawing-guidelines.md rule 19 (absorb stacks at fit-up, not with tighter bands)).
+# Each MHA-SM-002 knife mount hangs under the integral crossbar on one
+# cut-to-length #10-24 plain hex bolt (MHA-VN-024). Its SAE washer bears on
+# a shallow TOP spotface; the block's top seat bears on the FINISHED
+# underside. The two MHA-VN-051 dowels retain their round-hole/slot scheme:
+# +X locates in a round blind slip hole, -X in a blind slip-width slot.
+# Slot travel absorbs the pair's spacing mismatch (drawing-guidelines.md
+# rule 19 (absorb stacks at fit-up, not with tighter bands)).
 _X = float(str(_config.title_block("linear_1pl")["display"]).lstrip("\u00b1"))
 _XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("\u00b1"))
 _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
 # The title block's DRILLED HOLES row: a drilled hole cuts up to this oversize.
 DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
-# The loose #6 fit: its float about the shank carries the dowel pair's
-# spacing mismatch plus the hole's drill drift over the grip (below).
-HANGER_CLEARANCE_DIA = CLEARANCE_MM[("#6", "loose")]  # 4.699
-HANGER_CBORE_DIA = 7.0  # .XX
-HANGER_CBORE_DEPTH = 6.5  # .XX, from the crossbar top
+# ASME B18.2.8 Table 2: #10 loose, .238 in = 6.0452 mm, rounded to the
+# repository's three-place clearance-table precision.
+HANGER_CLEARANCE_DIA = CLEARANCE_MM[("#10", "loose")]  # 6.045
+HANGER_CLEARANCE_DIA_PLACES = 3
+# Explicit manufactured acceptance: never undersize the ANSI loose minimum.
+HANGER_CLEARANCE_DIA_BAND = (0.13, 0.0)  # (upper, lower), not a supplier guarantee
+HANGER_CLEARANCE_DIA_MIN = HANGER_CLEARANCE_DIA + min(HANGER_CLEARANCE_DIA_BAND)
+HANGER_CLEARANCE_DIA_MAX = HANGER_CLEARANCE_DIA + max(HANGER_CLEARANCE_DIA_BAND)
+# The underside-to-spotfloor grip, not a depth from an as-cast top, controls
+# the bolt reach. The model owns it: HangerGrip, a driving dimension in the
+# hidden HangerGripReference sketch, sets the Hole Wizard spotface depth
+# ("RingHeight" - HangerGrip) and carries the +/-0.05 band; the sheet imports it.
+HANGER_GRIP = 35.50
+HANGER_GRIP_PLACES = 2
+HANGER_GRIP_TOL = 0.05
+HANGER_GRIP_CALLOUT = "2X SPOTFACE FLOOR\nFROM FINISHED UNDERSIDE"
+HANGER_GRIP_SKETCH = "HangerGripReference"
+# Hidden model sketches whose driving dimensions the sheet imports per view.
+REFERENCE_SKETCHES = (HANGER_GRIP_SKETCH,)
+HANGER_SPOTFACE_DIA = 17.0
+HANGER_SPOTFACE_DIA_PLACES = 2
+HANGER_SPOTFACE_DEPTH = RING_HEIGHT - HANGER_GRIP  # 1.0 nominal only
+HANGER_SPOTFACE_FLOOR_Y = -HALF_H + HANGER_GRIP  # +17.25
+HANGER_SPOTFACE_DIA_MIN = HANGER_SPOTFACE_DIA - _XX  # 16.49
+HANGER_SPOTFACE_DIA_MAX = HANGER_SPOTFACE_DIA + _XX  # 17.51
+HANGER_SPOTFACE_CLEANUP_MIN = RING_HEIGHT - _X - (HANGER_GRIP + HANGER_GRIP_TOL)
 HANGER_HOLE_SPEC = HoleSpec(
-    "counterbore_socket",
-    "#6",
+    "counterbore_hex",
+    "#10",
+    fit="loose",
     overrides_mm={
         "HoleDiameter": HANGER_CLEARANCE_DIA,
-        "CounterBoreDiameter": HANGER_CBORE_DIA,
-        "CounterBoreDepth": HANGER_CBORE_DEPTH,
+        "CounterBoreDiameter": HANGER_SPOTFACE_DIA,
+        "CounterBoreDepth": HANGER_SPOTFACE_DEPTH,
     },
 )
-# The counterbore floor (the screw's bearing face) above the crossbar
-# underside: the screw's grip.  The sheet dimensions it from the underside as
-# a sheet-derived reference at one place, so the reach stack in
-# ``build_sm_summing_assembly`` judges it at the .X band.
-HANGER_GRIP = RING_HEIGHT - HANGER_CBORE_DEPTH  # 30.0
-HANGER_GRIP_PLACES = 1
-HANGER_GRIP_TOL = _X  # 0.8
-# Print-worst checks (drawing-guidelines.md rule 17 (walls and webs)), the dt_cone_swing_platform hold-down's: the
-# head clears the smallest counterbore and stays under the crossbar top, and
-# bears beyond the largest drilled clearance hole.
-HANGER_CBORE_HEAD_CLEARANCE = HANGER_CBORE_DIA - _XX - HANGER_SCREW.HEAD_DIA  # 0.75
-HANGER_HEAD_RECESS = HANGER_CBORE_DEPTH - _XX - HANGER_SCREW.HEAD_H  # 2.48
-HANGER_HEAD_BEARING = (
-    HANGER_SCREW.HEAD_DIA - (HANGER_CLEARANCE_DIA + DRILL_OVERSIZE)
-) / 2.0  # 0.47
-for _label, _value in (
-    ("head in counterbore", HANGER_CBORE_HEAD_CLEARANCE),
-    ("head recess", HANGER_HEAD_RECESS),
-    ("head bearing", HANGER_HEAD_BEARING),
-):
-    if _value <= 0.0:
-        raise AssertionError(f"knife-hanger counterbore {_label}: {_value:.3f}")
+# A native counterbore-shaped Hole Wizard override represents the spotface.
+# The drawing retains its associative diameters but removes the cast-top
+# depth: the finished-underside grip is its sole axial specification.
+HANGER_SPOTFACE_CALLOUT_PRECISION = {
+    "hw-thruholedia": HANGER_CLEARANCE_DIA_PLACES,
+    "hw-cbdia": HANGER_SPOTFACE_DIA_PLACES,
+}
+# Washer bounds are ASME B18.21.1 Table 11, owned by the purchased-part spec.
+# Full washer float uses the sourced UNC 2A minimum shank diameter, not
+# nominal thread-major geometry, charging the full washer eccentricity.
+HANGER_WASHER_FLOAT_MAX = (HANGER_WASHER.ID_MAX - HANGER_SCREW.SHANK_DIA_MIN) / 2.0
+HANGER_WASHER_CONCENTRIC_ANNULUS_MIN = (
+    HANGER_WASHER.OD_MIN - HANGER_CLEARANCE_DIA_MAX
+) / 2.0
+if HANGER_SPOTFACE_CLEANUP_MIN <= 0.0 or HANGER_WASHER_CONCENTRIC_ANNULUS_MIN <= 0.0:
+    raise AssertionError("knife-hanger spotface lacks cleanup or washer bearing")
 # The dowel slip hole: a slip on the pin's catalogue diameter at 0.02..0.10
 # diametral clearance (the dt_pinion_cam_spec slip band), reamed to an
 # explicit +/-0.03 band and printed .XXX: 0.0274..0.0925.
-HANGER_PIN_X = KNIFE_DOWEL.HANGER_OFFSET  # 7.100 either side of the screw axis
+HANGER_PIN_X = KNIFE_DOWEL.HANGER_OFFSET  # 7.632 either side of the bolt axis
 # The pair's stations from the screw axis in the dowel spec's order: the -X
 # slot, then the +X round hole.
 HANGER_PIN_XS = (-HANGER_PIN_X, HANGER_PIN_X)
@@ -155,11 +177,17 @@ if HANGER_PIN_SLIP_CLEARANCE_MIN < 0.02 or HANGER_PIN_SLIP_CLEARANCE_MAX > 0.10:
         f"{HANGER_PIN_SLIP_CLEARANCE_MAX} is outside 0.02-0.10"
     )
 # Manufacturing GD&T limits consumed by the part's drawing projection: each
-# slot to the round hole beside it (datum B front, C rear) at the BASIC
-# 14.200 between them, oriented by the other round hole with its location
-# released (translation modifier), so the two mounts' dowel lines stay square
-# to the B-C line.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {"knife-hanger slot position": "0.05"}
+# slot to its round hole (datum B front, C rear), at their BASIC span,
+# oriented by the other round hole with its location released (translation
+# modifier), so the two mounts' dowel lines stay square to the B-C line.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "knife-hanger slot position": "0.05",
+    "knife-hanger crossbar centring": "0.10",
+}
+HANGER_CROSSBAR_CENTER_ZONE = float(
+    GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"]
+)
+HANGER_CROSSBAR_CENTER_TOL = HANGER_CROSSBAR_CENTER_ZONE / 2.0
 HANGER_SLOT_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"])
 # The slot's station from its round hole, BASIC (codex review of 080fda97:
 # the frames need a basic location): the frame's zone holds the slot's width
@@ -168,27 +196,20 @@ HANGER_SLOT_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger slot posi
 # not reach that direction, codex review of 0bb6ba81; +-0.025 there read as
 # over-specification, 50fe7633).  From the screw axis it sits at the round
 # hole's .XXX band plus its own: 0.26.
-HANGER_SLOT_FROM_ROUND = HANGER_ROUND_X - HANGER_SLOT_X  # 14.200, BASIC
+HANGER_SLOT_FROM_ROUND = HANGER_ROUND_X - HANGER_SLOT_X  # 15.264, BASIC
 HANGER_SLOT_FROM_ROUND_PLACES = 3
 HANGER_SLOT_ALONG_TOL = _XXX  # 0.13
 HANGER_SLOT_ALONG_CALLOUT = f"CENTRE \u00b1{HANGER_SLOT_ALONG_TOL:g} ALONG SLOT"
 HANGER_SLOT_STATION_TOL = HANGER_PIN_X_TOL + HANGER_SLOT_ALONG_TOL
-# The -X dowel's blind slot: the round hole's reamed slip width (so the pin
-# keeps the same 0.0274..0.0925 slip across it), held to the round hole
-# beside it by the position frame and note above, and its length (along X,
-# the dowel line) printed .XXX.  The slot takes up the spacing mismatch: its
-# centre's 0.13 along it, the knife mount's .XXX span (0.13) and the
-# round-hole pin across its loosest slip (0.046), either way: 3.183 + 2 x
-# 0.306 = 3.795 under the 4.070 shortest (0.275 spare).  The length's .XXX
-# band is functional, not a default: the longest slot sets the slot's wall to
-# the screw clearance hole (``build_fr_top_frame.SLOT_SCREW_WALL``, 2.141), and
-# at .XX the shortest slot must grow to 4.31 for the same travel, its longest
-# leaving 1.90 there, under drawing-guidelines.md rule 17 (walls and webs)'s 2.0 (codex review of 080fda97 asked for
-# a one-place length: 4.6 +-0.8 leaves 1.61).
+# The -X dowel's blind slot retains the round hole's slip width and depth.
+# Its shortest 3.820 takes the required 3.79508 travel. The functional .XXX
+# length limits the longest slot to 4.080; together with the spread dowels
+# and 25.0 crossbar, this retains the 2.0 wall guards at the printed bands
+# (drawing-guidelines.md rule 17 (walls and webs)).
 HANGER_SLOT_WIDTH = HANGER_PIN_HOLE_DIA
 HANGER_SLOT_WIDTH_BAND = HANGER_PIN_HOLE_DIA_BAND
 HANGER_SLOT_WIDTH_PLACES = HANGER_PIN_HOLE_DIA_PLACES
-HANGER_SLOT_LENGTH = 4.20
+HANGER_SLOT_LENGTH = 3.95
 HANGER_SLOT_LENGTH_PLACES = 3
 HANGER_SLOT_LENGTH_TOL = _XXX  # 0.13, functional (above)
 HANGER_SLOT_DEPTH = HANGER_PIN_HOLE_DEPTH
@@ -202,11 +223,10 @@ if HANGER_SLOT_LENGTH - HANGER_SLOT_LENGTH_TOL < HANGER_SLOT_LENGTH_REQUIRED:
         f" at its shortest does not take the dowel's"
         f" {HANGER_SLOT_LENGTH_REQUIRED:.3f} travel"
     )
-# The drilled #6 hole's float about the screw shank: (4.699 - 3.505) / 2.  The
-# knife-hanger stack in ``build_sm_summing_assembly`` (which owns the knife
-# mount's tap position term) proves the dowel stations' mismatch, plus the
-# hole's drift over the grip, stays inside.
-HANGER_SCREW_FLOAT = (HANGER_CLEARANCE_DIA - HANGER_SCREW.SHANK_DIA) / 2.0  # 0.597
+# The drilled #10 hole's float about the bolt shank is 0.6095 radial.
+# The assembly proves the tap/dowel mismatch plus underside-entry drill
+# drift stays inside that float.
+HANGER_SCREW_FLOAT = (HANGER_CLEARANCE_DIA - HANGER_SCREW.SHANK_DIA) / 2.0
 # Suffixes on the model's own slip-hole and slot sizes and the depth they
 # share (drawing-guidelines.md rule 7 (notes: few, flagged, never a method) and drawing-guidelines.md rule 12 (hole and slot callouts say what to do): count, process and purpose; the size and its band
 # print natively): section F-F carries the round holes' size, the depth of
@@ -248,7 +268,7 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
 
 # --- Machining-required surfaces ---------------------------------------------
 #
-# These six faces own native finish controls. The right (west) rail top
+# These eight faces own native finish controls. The right (west) rail top
 # between its bosses, which seats both MHA-CH-007 keepers, and the underside
 # plane between the bosses, which seats both MHA-SM-002 knife mounts, carry
 # SEAT_UM in the linked facing notes below: each is one plane, so its note
@@ -264,13 +284,14 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
 #   is pinched by the set screw against it.
 # * The set-screw boss's spot face is the machined face the set tap starts
 #   square from, so the cup point bears on the post along the tap axis.
+# * Both top washer spotfloors are functional SEAT 3.2 lands; the existing
+#   MASK SEATS coating instruction therefore keeps them bare and lightly oiled.
 #
 # SEAT grade throughout: nothing runs on these surfaces continuously, so the
-# commercial machine finish is what the fit needs. The part authors one native
-# symbol per one of these six controlled faces; each sheet states it ONCE, and the
-# target text names the family so a single symbol cannot be misread as one
-# instance (harmonic-base FLANGE_PERIMETER_TARGET precedent).
+# commercial machine finish is what the fit needs. Each controlled face has
+# a native model symbol; each drawing family appears once with a target label.
 SOCKET_BORE_TARGET = "TUBE SOCKET BORES, 4X"
+HANGER_SPOTFACE_TARGET = "WASHER SPOTFACES, 2X"
 SURFACE_FINISHES = tuple(
     SurfaceFinishControl(
         f"socket_{rail}_{end}",
@@ -291,6 +312,19 @@ SURFACE_FINISHES = tuple(
         SEAT_UM,
         PlanarFace((-1.0, 0.0, 0.0), HUB_SET_SPOT_FROM_AXIS - GOOSENECK_X),
     ),
+) + tuple(
+    SurfaceFinishControl(
+        f"hanger_spotface_{end}",
+        SEAT_UM,
+        PlanarFace(
+            (0.0, 1.0, 0.0),
+            HANGER_SPOTFACE_FLOOR_Y,
+            contains_x_mm=-15.0,
+            contains_z_mm=z,
+        ),
+        production_method=HANGER_SPOTFACE_TARGET,
+    )
+    for end, z in (("front", SUMMING_Z - 87.06), ("rear", SUMMING_Z + 87.06))
 )
 
 
@@ -326,7 +360,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SetSpotProfile": {"SetSpotDia"},
     "GooseneckTap": {"SetTapZ"},
     "GooseneckProfile": {"GnDia", "GnX", "GnZ"},
-    # The hanger-counterbore and keeper-tap placement dims (StudFrontX ...,
+    # The hanger-spotface and keeper-tap placement dims (StudFrontX ...,
     # KeeperFrontX ...) are NOT marked: a Hole Wizard placement sketch
     # measures from the origin -- mid-air on the print -- so sheet 3
     # dimensions those stations from the socket bore axes with sheet-derived
@@ -340,6 +374,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HangerPinProfile": {"HangerPinHoleDia"},
     "HangerPinHoles": {"HangerPinHoleDepth"},
     "HangerSlotProfile": {"HangerSlotWidth"},
+    HANGER_GRIP_SKETCH: {"HangerGrip"},
 }
 
 
@@ -376,6 +411,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HangerPinProfile": {"HangerPinHoleDia": HANGER_PIN_HOLE_DIA_PLACES},
     "HangerPinHoles": {"HangerPinHoleDepth": HANGER_PIN_HOLE_DEPTH_PLACES},
     "HangerSlotProfile": {"HangerSlotWidth": HANGER_SLOT_WIDTH_PLACES},
+    HANGER_GRIP_SKETCH: {"HangerGrip": HANGER_GRIP_PLACES},
 }
 
 # The drawing reads this flat view back off the sheet: a dimension name is
@@ -464,13 +500,11 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "set-screw thread length": 1,
     "set-screw boss face from bore axis": 1,
     # Sheet 6, UNDERSIDE: the junction lands and the knife-hanger section F-F
-    # -- the counterbore floor (the screw's grip) above the crossbar underside,
-    # the dowel slip hole's station from the screw axis, the slot's BASIC
-    # station from the round hole, and the slot's length.
+    # -- the native spotfloor grip is imported, while dowel stations and slot
+    # length are measured associatively from their visible model features.
     "crossbar junction land": 1,
     "crossbar pocket length": 1,
     "underside gusset thickness": 1,
-    "hanger counterbore floor from underside": HANGER_GRIP_PLACES,
     "dowel hole from hanger axis": HANGER_PIN_X_PLACES,
     "dowel slot from dowel hole": HANGER_SLOT_FROM_ROUND_PLACES,
     "dowel slot length": HANGER_SLOT_LENGTH_PLACES,
