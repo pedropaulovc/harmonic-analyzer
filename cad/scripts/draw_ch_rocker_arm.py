@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import copy
 import json
 import math
 import re
 import struct
 import sys
+from fractions import Fraction
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -92,6 +94,7 @@ from _layout_audit import (
     polygon_segments,
     polyline_segments,
     arc_segments,
+    arrowhead_segments,
     triangle_segments,
     calibrate_sheet_advance,
 )
@@ -251,9 +254,11 @@ PIN_X_TEXT_XY = (0.219, 0.197)
 PIN_Y_TEXT_XY = (0.267, 0.162)
 LAND_ANGLE_TEXT_REACH = 0.032
 LAND_ANGLE_WITNESS_LENGTH = 0.008
-# Outward 95.23-degree bisector from R23's fixed arc midpoint, not across the
-# x343.497 mm vertical witness. Native ink, not this request, proves the route.
-LAND_ANGLE_OFFSET_XY = (0.339, 0.1661)
+# OffsetText retains the pre-offset native text/extension-arc attachment.
+# Seed that native arc first, beyond the R23 left-arrow footprint, using the
+# thumbnut sequence; then move only text. Neither requested point proves ink.
+LAND_ANGLE_SEED_DEG = 109.0
+LAND_ANGLE_OFFSET_XY = (0.327, 0.1661)
 TAPER_WITNESS_LENGTH = 0.008
 LAND_DATUM_STANDOFF = 0.014
 STRAP_OFFSET_TEXT_XY = (RIGHT_CENTER[0] - 0.018, RIGHT_CENTER[1] + 0.030)
@@ -999,10 +1004,16 @@ def _capture_caption_failure(adapter: Any, label: str, exc: Exception) -> None:
 def _capture_layout_failure(adapter: Any, phase: str, exc: Exception) -> None:
     """Use the existing drawing/PNG capture before any R24 refusal closes it."""
     try:
+        native_contexts = {}
+        for key, attribute in (("land_angle_native", "land_angle_native_context"),
+                               ("rod_dot_native", "rod_dot_native_context")):
+            native_context = getattr(exc, attribute, None)
+            if native_context:
+                native_contexts[key] = native_context
         _seat_forensics.capture_com_failure(
             adapter, f"{PART_STEM}-post-caption-finalize", str(exc),
             api="rocker post-caption audit/finalize", exception=exc, sheet_png=True,
-            phase=phase,
+            phase=phase, **native_contexts,
         )
     except Exception as capture_exc:  # noqa: BLE001 - always retain the original guard
         if capture_exc is not exc:
@@ -1701,8 +1712,8 @@ def _pivot_finish_placement(
 
 # Every marked model dimension has exactly one face-view owner.
 FRONT_KEEP = {
-    "TopRadius": (0.130, 0.190),
-    "BottomRadius": (0.130, 0.126),
+    "TopRadius": (0.145, 0.136),
+    "BottomRadius": (0.169, 0.128),
     "TopAbovePivot": (0.165, 0.191),
 }
 
@@ -2226,10 +2237,6 @@ def _require_radius_exterior(adapter: Any, front: Any) -> None:
         matches = [ann for ann in annotations if dimension_name(adapter, ann) == name]
         if len(matches) != 1:
             raise RuntimeError(f"{name}: expected one native BASIC radius")
-        if name == "TopRadius":
-            record, geometry = _r24_record(adapter, matches[0], label=name)
-            _require_top_radius_off_part(adapter, front, record, geometry)
-            continue
         record = _dump_annotation(reader, matches[0])
         errors = reader.take_errors()
         if record is None or errors:
@@ -2691,20 +2698,6 @@ def _r24_no_arc_crossings(
                 raise RuntimeError(f"{label}: native connector crosses actual arc at {point!r}")
 
 
-def _land_angle_span(record: dict[str, Any], centre: tuple[float, float], arrows: list[tuple[float, float]]) -> tuple[float, float]:
-    reference = math.atan2(sum(p[1] - centre[1] for p in arrows),
-                           sum(p[0] - centre[0] for p in arrows))
-    angles = []
-    for row in record["display"].get("arcs", ()):
-        start = math.atan2(row[5] - centre[1], row[4] - centre[0])
-        end = math.atan2(row[8] - centre[1], row[7] - centre[0])
-        _r24_arc_sweep(row)
-        angles.extend((angle - reference + math.pi) % math.tau - math.pi for angle in (start, end))
-    if not angles:
-        raise RuntimeError("land angle: missing native angular span")
-    return min(angles), max(angles)
-
-
 def _land_angle_fixed_ink(record: dict[str, Any], geometry: Any) -> dict[str, Any]:
     arrows = record["display"].get("arrows", ())
     arcs = record["display"].get("arcs", ())
@@ -2722,9 +2715,10 @@ def _land_angle_fixed_ink(record: dict[str, Any], geometry: Any) -> dict[str, An
         for row in arcs
     ):
         raise RuntimeError("land angle: inconsistent native angular arc")
+    for row in arcs:
+        _r24_arc_sweep(row)
     tips = [tuple(row[:2]) for row in arrows]
-    return {"centre": centre, "radius": radius, "arrows": tips,
-            "span": _land_angle_span(record, centre, tips), "witnesses": witnesses}
+    return {"centre": centre, "radius": radius, "arrows": tips, "witnesses": witnesses}
 
 
 def _r24_no_crossings(source: list[Segment], target: list[Segment], *, label: str) -> None:
@@ -2740,10 +2734,10 @@ def _r24_no_crossings(source: list[Segment], target: list[Segment], *, label: st
         raise RuntimeError(f"{label}: native connector crosses line: {crossings[0].describe()}")
 
 
-def _require_land_angle_route(
+def _require_land_angle_fixed_ink(
     record: dict[str, Any], geometry: Any, fixed: dict[str, Any],
-    cluster: list[tuple[dict[str, Any], Any]], *, obstacles: list[tuple[str, Box, float]] = (),
-) -> None:
+) -> list[Segment]:
+    """Text seeding/offset may change finite ink, never the native geometry."""
     arcs = record["display"].get("arcs", ())
     arrows = record["display"].get("arrows", ())
     if len(arrows) != 2 or not arcs or any(
@@ -2755,19 +2749,72 @@ def _require_land_angle_route(
         or abs(math.dist(tuple(row[7:9]), fixed["centre"]) - fixed["radius"]) > DETAIL_GEOMETRY_TOL_M
         for row in arcs
     ):
-        raise RuntimeError("land angle: text offset moved the native arc/arrows")
-    span = _land_angle_span(record, fixed["centre"], fixed["arrows"])
-    if any(abs(actual - expected) * fixed["radius"] > DETAIL_GEOMETRY_TOL_M
-           for actual, expected in zip(span, fixed["span"], strict=True)):
-        raise RuntimeError("land angle: text offset moved the native angular span")
+        raise RuntimeError("land angle: native text placement moved the arc/arrows")
+    for row in arcs:
+        _r24_arc_sweep(row)
+    if any(not any(
+        _r24_arc_contains(row, tip)
+        or min(math.dist(tip, tuple(row[4:6])), math.dist(tip, tuple(row[7:9]))) <= DETAIL_GEOMETRY_TOL_M
+        for row in arcs
+    ) for tip in fixed["arrows"]):
+        raise RuntimeError("land angle: current native arc does not support both fixed arrowtips")
     ink = _r24_nonframe_lines(record, geometry)
     witnesses = []
     for expected in fixed["witnesses"]:
         matches = [s for s in ink if math.dist((s.x0, s.y0), (expected.x0, expected.y0)) <= DETAIL_GEOMETRY_TOL_M
                    and math.dist((s.x1, s.y1), (expected.x1, expected.y1)) <= DETAIL_GEOMETRY_TOL_M]
         if not matches:
-            raise RuntimeError("land angle: text offset moved a capped native witness")
+            raise RuntimeError("land angle: text placement moved a capped native witness")
         witnesses.extend(matches)
+    return witnesses
+
+
+def _require_land_angle_arrow_clearance(connectors: list[Segment], arrows: Any) -> None:
+    """No arrowhead-body/edge waiver, including at the classified arc terminal."""
+    for row in arrows:
+        edges = arrowhead_segments(row)
+        if row[6] <= 0.0 or row[7] <= 0.0 or len(edges) != 3 or any(s.length <= 0.0 for s in edges):
+            raise RuntimeError("land angle: unreadable own native arrowhead footprint")
+        # Exact predicates over arrowhead_segments' computed float vertices:
+        # deterministic closed contact, not extra physical/native-row accuracy.
+        vertices = [(Fraction(edge.x0), Fraction(edge.y0)) for edge in edges]
+        exact_edges = [(x0, y0, x1 - x0, y1 - y0)
+                       for (x0, y0), (x1, y1) in zip(
+                           vertices, [*vertices[1:], vertices[0]], strict=True)]
+        orientation = exact_edges[0][2] * exact_edges[1][3] - exact_edges[0][3] * exact_edges[1][2]
+        if orientation == 0:
+            raise RuntimeError("land angle: degenerate own native arrowhead footprint")
+        sign = 1 if orientation > 0 else -1
+        for segment in connectors:
+            x0, y0, x1, y1 = (Fraction(value) for value in
+                              (segment.x0, segment.y0, segment.x1, segment.y1))
+            # Clip against the CLOSED triangle. Rational divisions preserve
+            # a shared corner parameter instead of rounding it to opposite
+            # sides of the interval. No geometric epsilon or contact waiver.
+            low, high = Fraction(0), Fraction(1)
+            for ex, ey, dx, dy in exact_edges:
+                first = sign * (dx * (y0 - ey) - dy * (x0 - ex))
+                last = sign * (dx * (y1 - ey) - dy * (x1 - ex))
+                if first < 0 and last < 0:
+                    break
+                if first < 0:
+                    low = max(low, first / (first - last))
+                elif last < 0:
+                    high = min(high, first / (first - last))
+                if low > high:
+                    break
+            else:
+                raise RuntimeError("land angle: native connector intersects its own arrowhead body/edge")
+
+
+def _require_land_angle_route(
+    record: dict[str, Any], geometry: Any, fixed: dict[str, Any],
+    cluster: list[tuple[dict[str, Any], Any]], *, obstacles: list[tuple[str, Box, float]] = (),
+) -> None:
+    arcs = record["display"].get("arcs", ())
+    arrows = record["display"].get("arrows", ())
+    witnesses = _require_land_angle_fixed_ink(record, geometry, fixed)
+    ink = _r24_nonframe_lines(record, geometry)
     connectors = list(dict.fromkeys(s for s in ink if s not in witnesses))
     arc_ink = [s for row in arcs for s in arc_segments(row)]
     if not connectors or any(s.length <= 0.0 for s in connectors) or not arc_ink:
@@ -2802,6 +2849,7 @@ def _require_land_angle_route(
     _r24_no_crossings(connectors, witnesses, label="land angle own dimension witnesses")
     _r24_no_arc_crossings(connectors, arcs, label="land angle own dimension",
                          landing_terminals=landings)
+    _require_land_angle_arrow_clearance(connectors, arrows)
     _r24_no_crossings(connectors, [s for _r, g in cluster for s in g.segments],
                       label="land angle 5.59/C cluster")
     clearances = [("witnesses", witnesses, 0.0128), ("arc", arc_ink, 0.0138)]
@@ -2821,30 +2869,77 @@ def _require_land_angle_route(
 
 
 def _offset_land_angle(adapter: Any, display: Any) -> dict[str, Any]:
-    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    record, geometry = _r24_record(adapter, annotation, label="land angle before offset")
-    fixed = _land_angle_fixed_ink(record, geometry)
-    attached = tuple(annotation.GetAttachedEntities3() or ())
-    fixed["attached"] = attached
-    name = dimension_name(adapter, annotation)
-    offset_dimension_text(adapter, [annotation], {name: LAND_ANGLE_OFFSET_XY})
-    adapter.currentModel.GraphicsRedraw2()
-    position = annotation.GetPosition()
-    if (display.OffsetText is not True or not _native_finite_row(position) or len(position) != 3
-            or math.dist(tuple(position[:2]), LAND_ANGLE_OFFSET_XY) > 1e-5
-            or not _native_finite_scalar(display.MaxWitnessLineLength)
-            or abs(display.MaxWitnessLineLength - LAND_ANGLE_WITNESS_LENGTH) > 1e-9):
-        raise RuntimeError("land angle: offset text/fixed witness readback did not persist")
-    after = tuple(annotation.GetAttachedEntities3() or ())
-    if (len(after) != 2 or any(entity is None for entity in after) or annotation.IsDangling()
-            or any(not any(int(adapter.swApp.IsSame(actual, expected)) == 1 for actual in after)
-                   for expected in attached)):
-        raise RuntimeError("land angle: offset changed exact land/local vertical attachments")
-    record, geometry = _r24_record(adapter, annotation, label="land angle after offset")
-    # Actual Detail E neighbours are checked again after all callouts exist.
-    _require_land_angle_route(record, geometry, fixed, [], obstacles=())
-    return fixed
-
+    """Seed native finite extension ink, then offset only text; prove actual ink."""
+    native_context: dict[str, Any] = {}
+    try:
+        display = _early_bound(display, "IDisplayDimension")
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        record, geometry = _r24_record(adapter, annotation, label="land angle before seed")
+        with contextlib.suppress(Exception):
+            native_context["before_seed"] = copy.deepcopy(record)
+        fixed = _land_angle_fixed_ink(record, geometry)
+        with contextlib.suppress(Exception):
+            native_context["fixed_ink"] = {
+                "centre": fixed["centre"], "radius": fixed["radius"],
+                "arrows": fixed["arrows"],
+                "witnesses": [(s.x0, s.y0, s.x1, s.y1) for s in fixed["witnesses"]],
+                "terminal_attachment_tolerance_m": DETAIL_GEOMETRY_TOL_M,
+            }
+        attached = tuple(annotation.GetAttachedEntities3() or ())
+        if len(attached) != 2 or any(entity is None for entity in attached) or annotation.IsDangling():
+            raise RuntimeError("land angle: missing exact land/local vertical attachments before seed")
+        fixed["attached"] = attached
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        value = dimension.SystemValue
+        if not _native_finite_scalar(value):
+            raise RuntimeError("land angle: unreadable native value before seed")
+        angle = math.radians(LAND_ANGLE_SEED_DEG)
+        seed = tuple(c + fixed["radius"] * component
+                     for c, component in zip(fixed["centre"], (math.cos(angle), math.sin(angle)), strict=True))
+        native_context["seed_requested_xy"] = seed
+        native_context["native_value_before_seed"] = value
+        # Native-proven thumbnut sequence. SetPosition2 with OffsetText=False
+        # changes native arc/text placement; the extension endpoint can clamp.
+        display.OffsetText = False
+        if display.OffsetText is not False:
+            raise RuntimeError("land angle: native text offset could not be reset before seed")
+        if not annotation.SetPosition2(*seed, record["pos"][2]):
+            raise RuntimeError("land angle: native arc seed SetPosition2 refused")
+        rebuild_drawing(adapter, label="land angle native extension-arc seed")
+        record, geometry = _r24_record(adapter, annotation, label="land angle after seed")
+        with contextlib.suppress(Exception):
+            native_context["after_seed"] = copy.deepcopy(record)
+        _require_land_angle_fixed_ink(record, geometry, fixed)
+        if (display.OffsetText is not False or math.dist(tuple(record["pos"][:2]), seed) > 1e-5
+                or dimension.SystemValue != value):
+            raise RuntimeError("land angle: native arc seed position/offset/value did not persist")
+        seeded_attached = tuple(annotation.GetAttachedEntities3() or ())
+        if (len(seeded_attached) != 2 or any(entity is None for entity in seeded_attached) or annotation.IsDangling()
+                or any(not any(int(adapter.swApp.IsSame(actual, expected)) == 1 for actual in seeded_attached)
+                       for expected in attached)):
+            raise RuntimeError("land angle: seed changed exact land/local vertical attachments")
+        name = dimension_name(adapter, annotation)
+        offset_dimension_text(adapter, [annotation], {name: LAND_ANGLE_OFFSET_XY})
+        adapter.currentModel.GraphicsRedraw2()
+        record, geometry = _r24_record(adapter, annotation, label="land angle after offset")
+        with contextlib.suppress(Exception):
+            native_context["after_offset"] = copy.deepcopy(record)
+        if (display.OffsetText is not True or math.dist(tuple(record["pos"][:2]), LAND_ANGLE_OFFSET_XY) > 1e-5
+                or dimension.SystemValue != value
+                or not _native_finite_scalar(display.MaxWitnessLineLength)
+                or abs(display.MaxWitnessLineLength - LAND_ANGLE_WITNESS_LENGTH) > 1e-9):
+            raise RuntimeError("land angle: offset text/fixed witness/value readback did not persist")
+        after = tuple(annotation.GetAttachedEntities3() or ())
+        if (len(after) != 2 or any(entity is None for entity in after) or annotation.IsDangling()
+                or any(not any(int(adapter.swApp.IsSame(actual, expected)) == 1 for actual in after)
+                       for expected in attached)):
+            raise RuntimeError("land angle: offset changed exact land/local vertical attachments")
+        _require_land_angle_route(record, geometry, fixed, [], obstacles=())
+        return fixed
+    except Exception as exc:  # noqa: BLE001 - add evidence, retain the native refusal
+        with contextlib.suppress(Exception):
+            exc.land_angle_native_context = native_context
+        raise
 
 
 def _rod_tip_witness_gaps(display: Any) -> tuple[float, float]:
@@ -2878,59 +2973,91 @@ def _rod_position_frame_signature(gtol: Any) -> Any:
     return gtol_frame_signature(xml)
 
 
+def _record_rod_dot_failure(adapter: Any, annotation: Any, exc: Exception, record: Any = None) -> None:
+    """Failure-only actual leader/style evidence; diagnostics never replace refusal."""
+    with contextlib.suppress(Exception):
+        if getattr(exc, "rod_dot_native_context", None):
+            return
+        context = {}
+        for key, member, args in (
+            ("leader_points", "GetLeaderPointsAtIndex", (0,)),
+            ("leader_count", "GetLeaderCount", ()),
+            ("leader_side", "GetLeaderSide", ()),
+            ("leader_style", "GetLeaderStyle", ()),
+            ("arrow_style", "GetArrowHeadStyleAtIndex", (0,)),
+            ("smart_arrowhead", "GetSmartArrowHeadStyle", ()),
+        ):
+            with contextlib.suppress(Exception):
+                context[key] = copy.deepcopy(getattr(annotation, member)(*args))
+        with contextlib.suppress(Exception):
+            if record is None:
+                record, _geometry = _r24_record(adapter, annotation, label="rod-pin DOT failure")
+            context["record"] = copy.deepcopy(record)
+        exc.rod_dot_native_context = context
+
+
 def _configure_rod_position_dot(adapter: Any, gtol: Any, edge: Any, landing: tuple[float, float]) -> Any:
     """Official/generated GTol route; new native behavior must pass every readback."""
     annotation = _early_bound(_early_bound(gtol, "IGtol").GetAnnotation(), "IAnnotation")
     if annotation is None:
         raise RuntimeError("rod-pin DOT: missing native annotation")
-    signature = _rod_position_frame_signature(gtol)
-    if annotation.GetLeaderAllAround() is not False:
-        raise RuntimeError("rod-pin DOT: unexpected all-around control")
-    status = annotation.SetLeader3(2, 2, False, False, False, False)  # BENT, RIGHT
-    if type(status) is not int or status != 0:
-        raise RuntimeError(f"rod-pin DOT: SetLeader3 status={status!r}")
-    status = annotation.SetArrowHeadStyleAtIndex(0, 3)  # swDOT_ARROWHEAD: filled circle
-    if type(status) is not int or status != 0:
-        raise RuntimeError(f"rod-pin DOT: SetArrowHeadStyleAtIndex status={status!r}")
-    adapter.currentModel.GraphicsRedraw2()
-    rebuild_drawing(adapter, label="rod-pin DOT native readback")
-    _require_rod_position_dot(adapter, gtol, edge, landing, signature)
-    return signature
+    try:
+        signature = _rod_position_frame_signature(gtol)
+        if annotation.GetLeaderAllAround() is not False:
+            raise RuntimeError("rod-pin DOT: unexpected all-around control")
+        status = int(annotation.SetLeader3(2, 2, False, False, False, False))  # BENT, RIGHT
+        if status != 0:
+            raise RuntimeError(f"rod-pin DOT: SetLeader3 status={status!r}")
+        status = int(annotation.SetArrowHeadStyleAtIndex(0, 3))  # swDOT_ARROWHEAD
+        if status != 0:
+            raise RuntimeError(f"rod-pin DOT: SetArrowHeadStyleAtIndex status={status!r}")
+        adapter.currentModel.GraphicsRedraw2()
+        rebuild_drawing(adapter, label="rod-pin DOT native readback")
+        _require_rod_position_dot(adapter, gtol, edge, landing, signature)
+        return signature
+    except Exception as exc:
+        _record_rod_dot_failure(adapter, annotation, exc)
+        raise
 
 
 def _require_rod_position_dot(adapter: Any, gtol: Any, edge: Any, landing: tuple[float, float], signature: Any) -> None:
     annotation = _early_bound(_early_bound(gtol, "IGtol").GetAnnotation(), "IAnnotation")
     if annotation is None:
         raise RuntimeError("rod-pin DOT: missing native annotation")
-    expected = {
-        "GetArrowHeadStyleAtIndex": (3, (0,)), "GetArrowHeadCount": (1, ()),
-        "GetLeaderCount": (1, ()), "GetLeaderStyle": (2, ()), "GetLeaderSide": (2, ()),
-        "GetSmartArrowHeadStyle": (False, ()), "GetLeaderAllAround": (False, ()),
-        "GetLeaderPerpendicular": (False, ()), "GetDashedLeader": (False, ()),
-        "GetAttachedEntityCount3": (1, ()),
-    }
-    for member, (wanted, args) in expected.items():
-        actual = getattr(annotation, member)(*args)
-        if type(actual) is not type(wanted) or actual != wanted:
-            raise RuntimeError(f"rod-pin DOT: {member}={actual!r}, required={wanted!r}")
-    points = annotation.GetLeaderPointsAtIndex(0)
-    if not _native_finite_row(points) or len(points) != 9:
-        raise RuntimeError("rod-pin DOT: missing native bent leader polyline")
-    types = annotation.GetAttachedEntityTypes()
-    if (type(types) not in (list, tuple) or len(types) != 1
-            or type(types[0]) is not int or types[0] != 1):  # swSelEDGES
-        raise RuntimeError("rod-pin DOT: invalid native attached edge type")
-    _assert_attached_to(adapter, annotation, edge, entity_type="EDGE", what="rod-pin DOT", label="position")
-    _assert_leader_lands(annotation, landing, what="rod-pin DOT", label="position", tolerance=5e-5)
-    if _rod_position_frame_signature(gtol) != signature:
-        raise RuntimeError("rod-pin DOT: frame semantics changed")
-    record, _geometry = _r24_record(adapter, annotation, label="rod-pin DOT")
-    arrows = record["display"].get("arrows", ())
-    if len(arrows) != 1 or arrows[0][8] != 3 or math.dist(tuple(arrows[0][:2]), landing) > 5e-5:
-        raise RuntimeError("rod-pin DOT: native display arrow style/landing disagrees")
-    position = record["pos"]
-    if math.dist(tuple(position[:2]), FCF_XY) > 1e-5:
-        raise RuntimeError("rod-pin DOT: native frame position moved")
+    record = None
+    try:
+        expected = {
+            "GetArrowHeadStyleAtIndex": (3, (0,)), "GetArrowHeadCount": (1, ()),
+            "GetLeaderCount": (1, ()), "GetLeaderStyle": (2, ()), "GetLeaderSide": (2, ()),
+            "GetSmartArrowHeadStyle": (False, ()), "GetLeaderAllAround": (False, ()),
+            "GetLeaderPerpendicular": (False, ()), "GetDashedLeader": (False, ()),
+            "GetAttachedEntityCount3": (1, ()),
+        }
+        for member, (wanted, args) in expected.items():
+            actual = getattr(annotation, member)(*args)
+            if type(actual) is not type(wanted) or actual != wanted:
+                raise RuntimeError(f"rod-pin DOT: {member}={actual!r}, required={wanted!r}")
+        points = annotation.GetLeaderPointsAtIndex(0)
+        if not _native_finite_row(points) or len(points) != 9:
+            raise RuntimeError("rod-pin DOT: missing native bent leader polyline")
+        types = annotation.GetAttachedEntityTypes()
+        if (type(types) not in (list, tuple) or len(types) != 1
+                or type(types[0]) is not int or types[0] != 1):  # swSelEDGES
+            raise RuntimeError("rod-pin DOT: invalid native attached edge type")
+        _assert_attached_to(adapter, annotation, edge, entity_type="EDGE", what="rod-pin DOT", label="position")
+        _assert_leader_lands(annotation, landing, what="rod-pin DOT", label="position", tolerance=5e-5)
+        if _rod_position_frame_signature(gtol) != signature:
+            raise RuntimeError("rod-pin DOT: frame semantics changed")
+        record, _geometry = _r24_record(adapter, annotation, label="rod-pin DOT")
+        arrows = record["display"].get("arrows", ())
+        if len(arrows) != 1 or arrows[0][8] != 3 or math.dist(tuple(arrows[0][:2]), landing) > 5e-5:
+            raise RuntimeError("rod-pin DOT: native display arrow style/landing disagrees")
+        position = record["pos"]
+        if math.dist(tuple(position[:2]), FCF_XY) > 1e-5:
+            raise RuntimeError("rod-pin DOT: native frame position moved")
+    except Exception as exc:
+        _record_rod_dot_failure(adapter, annotation, exc, record)
+        raise
 
 
 def _require_rod_tip_endpoints(
@@ -3036,227 +3163,46 @@ def _require_rod_tip_endpoints(
 
 def _require_rod_dot_route(adapter: Any, end: Any, gtol: Any, landing: tuple[float, float]) -> None:
     annotation = _early_bound(_early_bound(gtol, "IGtol").GetAnnotation(), "IAnnotation")
-    record, geometry = _r24_record(adapter, annotation, label="rod-pin DOT route")
-    centre, south = _project(
-        adapter, end,
-        ((ROD_HOLE_X / 1000.0, ROD_HOLE_Y / 1000.0, 0.0),
-         (ROD_HOLE_X / 1000.0, (ROD_HOLE_Y - _ROD_HOLE_DIA / 2.0) / 1000.0, 0.0)),
-        label="detail E actual circular edge south rim",
-    )
-    if math.dist(landing, south) > 5e-5:
-        raise RuntimeError("rod-pin DOT: landing is not the actual circular edge south rim")
-    arms = []
-    for mark in _bound_view_annotations(end, label="rod-pin DOT printed centre-mark arm"):
-        if mark.GetType() != 13:
-            continue
-        display = _center_mark_display(mark, {})
-        for row in display.get("lines", ()):
-            s = Segment(row[4], row[5], row[7], row[8])
-            if (point_segment_distance(centre, s) <= 5e-5
-                    and point_segment_distance(landing, s) <= 5e-5
-                    and min(s.y0, s.y1) < centre[1]):
-                arms.append(s)
-    if len(arms) != 1:
-        raise RuntimeError("rod-pin DOT: south-rim landing is not on one actual printed centre-mark arm")
-    tapered = scan_view_edges(end, label="detail E DOT taper").exact_line_through(
-        ((ROD_TIP_X + BOT_END_X) / 2.0, (_ROD_TIP_Y + _BOT_END_Y) / 2.0, ARM_THICKNESS / 2.0),
-        label="+Z actual taper boundary",
-    )
-    points = _project(adapter, end, [tuple(v / 1000.0 for v in p) for p in tapered.line],
-                      label="detail E actual taper boundary")
-    taper = Segment(*points[0], *points[1])
-    route = _registered_leaders(record)
-    if len(route) != 2 or any(s.length <= 0.0 for s in route):
-        raise RuntimeError("rod-pin DOT: unreadable native bent route")
-    _r24_no_crossings(_r24_straight_ink(record), [taper], label="rod-pin DOT frame/route taper")
-    _telemetry.info(f"rod-pin DOT: native_south_arm={arms!r}, native_route={route!r}, "
-                    f"actual_taper={taper!r}, display_dot_size={record['display']['arrows'][0][6:8]!r}")
-
-
-def _r24_contour_arc(
-    centre: tuple[float, float], start: tuple[float, float], end: tuple[float, float], radius: float,
-) -> list[float]:
-    first = math.atan2(start[1] - centre[1], start[0] - centre[0])
-    last = math.atan2(end[1] - centre[1], end[0] - centre[0])
-    start = (centre[0] + radius * math.cos(first), centre[1] + radius * math.sin(first))
-    end = (centre[0] + radius * math.cos(last), centre[1] + radius * math.sin(last))
-    direction = 1.0 if (last - first) % math.tau <= math.pi else 0.0
-    return [0.0, 0.0, 0.0, 0.0, *start, 0.0, *end, 0.0, *centre, 0.0, 0.0, 0.0, 1.0, direction]
-
-
-def _r24_manufactured_outline(
-    adapter: Any, front: Any,
-) -> tuple[list[list[float]], list[Segment], tuple[float, float, float]]:
-    """Actual visible +Z curves/vertices projected by the existing native helpers."""
-    scan = scan_view_edges(front, label="R24 actual manufactured outline")
-    z = ARM_THICKNESS / 2.0
-    top = scan.circle_at((0.0, CENTER_Y, z), R_TOP, axis=(0.0, 0.0, 1.0), label="+Z actual R800")
-    bottom = scan.circle_at((0.0, CENTER_Y, z), R_BOTTOM, axis=(0.0, 0.0, 1.0), label="+Z actual R816")
-    hub = scan.circle_at((0.0, PIVOT_MID_Y, HUB_LENGTH / 2.0), HUB_DIA / 2.0,
-                         axis=(0.0, 0.0, 1.0), label="+Z actual hub rim")
-    sides = []
-    for sign in (-1.0, 1.0):
-        upper = (sign * TOP_END_X, TOP_END_Y, z)
-        tip = (sign * ROD_TIP_X, _ROD_TIP_Y, z)
-        lower = (sign * BOT_END_X, _BOT_END_Y, z)
-        land = scan.exact_line_through(tuple((a + b) / 2.0 for a, b in zip(upper, tip, strict=True)),
-                                      label=f"actual {sign:+g} tip face")
-        taper = scan.exact_line_through(tuple((a + b) / 2.0 for a, b in zip(tip, lower, strict=True)),
-                                       label=f"actual {sign:+g} lower taper")
-        actual_upper = min(land.line, key=lambda p: math.dist(p, upper))
-        actual_tip = min(land.line, key=lambda p: math.dist(p, tip))
-        actual_taper_tip = min(taper.line, key=lambda p: math.dist(p, tip))
-        actual_lower = min(taper.line, key=lambda p: math.dist(p, lower))
-        sides.append((actual_upper, actual_tip, actual_taper_tip, actual_lower))
-    centres = [tuple(edge.circle[:3]) for edge in (top, bottom, hub)]
-    rims = [(edge.circle[0] + edge.circle[6], edge.circle[1], edge.circle[2])
-            for edge in (top, bottom, hub)]
-    projected = _project(adapter, front,
-                         [tuple(v / 1000.0 for v in point)
-                          for point in (*centres, *rims, *sides[0], *sides[1])],
-                         label="R24 actual manufactured contour")
-    top_centre, bottom_centre, hub_centre, top_rim, bottom_rim, hub_rim = projected[:6]
-    left_upper, left_tip, left_taper_tip, left_lower, right_upper, right_tip, right_taper_tip, right_lower = projected[6:]
-    top_radius, bottom_radius = math.dist(top_centre, top_rim), math.dist(bottom_centre, bottom_rim)
-    if (any(abs(math.dist(top_centre, p) - top_radius) > DETAIL_GEOMETRY_TOL_M for p in (left_upper, right_upper))
-            or any(abs(math.dist(bottom_centre, p) - bottom_radius) > DETAIL_GEOMETRY_TOL_M for p in (left_lower, right_lower))
-            or math.dist(left_tip, left_taper_tip) > DETAIL_GEOMETRY_TOL_M
-            or math.dist(right_tip, right_taper_tip) > DETAIL_GEOMETRY_TOL_M):
-        raise RuntimeError("R24: actual finite contour endpoints do not join their native curves")
-    arcs = [_r24_contour_arc(top_centre, left_upper, right_upper, top_radius),
-            _r24_contour_arc(bottom_centre, right_lower, left_lower, bottom_radius)]
-    lines = [Segment(*left_upper, *left_tip), Segment(*left_taper_tip, *left_lower),
-             Segment(*right_upper, *right_tip), Segment(*right_taper_tip, *right_lower)]
-    return arcs, lines, (*hub_centre, math.dist(hub_centre, hub_rim))
-
-
-def _r24_point_in_part(
-    point: tuple[float, float], arcs: list[list[float]], lines: list[Segment], hub: tuple[float, float, float],
-) -> bool:
-    if math.dist(point, hub[:2]) <= hub[2]:
-        return True
-    arithmetic = 8.0 * sum(math.ulp(v) for v in point)
-    if any(point_segment_distance(point, s) <= arithmetic for s in lines):
-        return True
-    crossings = 0
-    for s in lines:
-        if (s.y0 > point[1]) != (s.y1 > point[1]):
-            x = s.x0 + (point[1] - s.y0) * (s.x1 - s.x0) / (s.y1 - s.y0)
-            crossings += x > point[0]
-    for arc in arcs:
-        cx, cy = arc[10:12]
-        radius = math.dist((cx, cy), tuple(arc[4:6]))
-        if abs(math.dist(point, (cx, cy)) - radius) <= arithmetic and _r24_arc_contains(arc, point):
-            return True
-        square = radius * radius - (point[1] - cy) ** 2
-        if square <= 0.0:  # A ray tangent to the arc does not change parity.
-            continue
-        offset = math.sqrt(square)
-        start, sign, _sweep = _r24_arc_sweep(arc)
-        end = math.atan2(arc[8] - cy, arc[7] - cx)
-        for x in (cx - offset, cx + offset):
-            candidate = (x, point[1])
-            if x <= point[0] or not _r24_arc_contains(arc, candidate):
-                continue
-            # Half-open endpoint convention, matching the adjacent line rays.
-            if math.dist(candidate, tuple(arc[4:6])) <= arithmetic and sign * math.cos(start) <= 0.0:
-                continue
-            if math.dist(candidate, tuple(arc[7:9])) <= arithmetic and -sign * math.cos(end) <= 0.0:
-                continue
-            crossings += 1
-    return crossings % 2 == 1
-
-
-def _require_top_radius_off_part(adapter: Any, front: Any, record: dict[str, Any], geometry: Any) -> None:
-    """Centre-side R800 ink is outside the manufactured part, not its full circle."""
-    arcs, lines, hub = _r24_manufactured_outline(adapter, front)
-    frame = _r24_frame_border(record, geometry)
-    box = union_boxes([s.box() for s in frame])
-    corners = [(box.xmin, box.ymin), (box.xmin, box.ymax), (box.xmax, box.ymin), (box.xmax, box.ymax)]
-    if (any(_r24_point_in_part(p, arcs, lines, hub) for p in corners)
-            or any(segment_box_distance(s, box) <= 0.0 for s in lines)
-            or math.hypot(max(box.xmin - hub[0], hub[0] - box.xmax, 0.0),
-                          max(box.ymin - hub[1], hub[1] - box.ymax, 0.0)) - hub[2] <= 0.0
-            or any(box.xmin <= arc[4] <= box.xmax and box.ymin <= arc[5] <= box.ymax for arc in arcs)
-            or any(_r24_arc_intersections(s, arc) for s in frame for arc in arcs)):
-        raise RuntimeError("TopRadius: native BASIC frame/text lies on the actual manufactured part")
-    arrows = record["display"].get("arrows", ())
-    if len(arrows) != 1:
-        raise RuntimeError("TopRadius: missing single native radius arrow")
-    tip = tuple(arrows[0][:2])
-    top_centre = tuple(arcs[0][10:12])
-    top_radius = math.dist(top_centre, tuple(arcs[0][4:6]))
-    if (abs(math.dist(tip, top_centre) - top_radius) > DETAIL_GEOMETRY_TOL_M
-            or not (_r24_arc_contains(arcs[0], tip)
-                    or min(math.dist(tip, tuple(arcs[0][4:6])), math.dist(tip, tuple(arcs[0][7:9]))) <= DETAIL_GEOMETRY_TOL_M)):
-        raise RuntimeError("TopRadius: native arrow misses finite supported R800 contour")
-    route = _r24_nonframe_lines(record, geometry)
-    terminals = _r24_terminals(route)
-    landing = [p for p in terminals if math.dist(p, tip) <= DETAIL_GEOMETRY_TOL_M]
-    incident = [s for s in route if min(math.dist(tip, (s.x0, s.y0)), math.dist(tip, (s.x1, s.y1))) <= DETAIL_GEOMETRY_TOL_M]
-    if len(landing) != 1 or len(incident) != 1:
-        raise RuntimeError("TopRadius: finite arrow is not the native radial leader terminal")
-    leader = incident[0]
-    cross = ((tip[0] - top_centre[0]) * (leader.y1 - leader.y0)
-             - (tip[1] - top_centre[1]) * (leader.x1 - leader.x0))
-    if abs(cross) / leader.length > DETAIL_GEOMETRY_TOL_M:
-        raise RuntimeError("TopRadius: native leader is not radial to the actual R800 centre")
-    _r24_no_crossings(route, lines, label="R800 actual tip/taper contours")
-    _r24_no_arc_crossings(route, [arcs[0]], label="R800 actual upper contour", landing_terminals=landing)
-    _r24_no_arc_crossings(route, [arcs[1]], label="R800 actual finite lower contour")
-    if any(segment_circle_distance(s, hub) <= 0.0 for s in route):
-        raise RuntimeError("TopRadius: native radial leader lies on the actual hub")
-    for segment in route:
-        for p in ((segment.x0, segment.y0), segment.point_at(0.5), (segment.x1, segment.y1)):
-            if min(math.dist(p, terminal) for terminal in landing) <= DETAIL_GEOMETRY_TOL_M:
-                continue
-            if _r24_point_in_part(p, arcs, lines, hub):
-                raise RuntimeError("TopRadius: native radial leader lies on the actual manufactured strap")
-    _telemetry.info(f"TopRadius: native_actual_part_exclusion, frame={box!r}, native_radial_route={route!r}, finite_arrow={tip!r}")
-
-
-def _require_radius_routes(adapter: Any, front: Any) -> None:
-    """Finite supported arc landings and independent routes, not full-circle guesses."""
-    annotations = _bound_view_annotations(front, label="R24 radius routes")
-    records = [_r24_record(adapter, ann, label=dimension_name(adapter, ann) or "front callout")
-               for ann in annotations if ann.GetType() not in (1, 13, 15) and ann.Visible == 1]
-    for name, radius, limit in (("TopRadius", R_TOP, TOP_END_X), ("BottomRadius", R_BOTTOM, BOT_END_X)):
-        matches = [(r, g) for r, g in records if r["name"] == name]
-        if len(matches) != 1:
-            raise RuntimeError(f"{name}: missing native radius route")
-        record, geometry = matches[0]
-        if name == "TopRadius":
-            _require_top_radius_off_part(adapter, front, record, geometry)
-        centre, rim, left, right = _project(
-            adapter, front,
-            ((0.0, CENTER_Y / 1000.0, 0.0), (radius / 1000.0, CENTER_Y / 1000.0, 0.0),
-             (-limit / 1000.0, (CENTER_Y - math.sqrt(radius**2 - limit**2)) / 1000.0, 0.0),
-             (limit / 1000.0, (CENTER_Y - math.sqrt(radius**2 - limit**2)) / 1000.0, 0.0)),
-            label=f"{name} finite supported contour",
+    record = None
+    try:
+        record, geometry = _r24_record(adapter, annotation, label="rod-pin DOT route")
+        centre, south = _project(
+            adapter, end,
+            ((ROD_HOLE_X / 1000.0, ROD_HOLE_Y / 1000.0, 0.0),
+             (ROD_HOLE_X / 1000.0, (ROD_HOLE_Y - _ROD_HOLE_DIA / 2.0) / 1000.0, 0.0)),
+            label="detail E actual circular edge south rim",
         )
-        arrows = record["display"].get("arrows", ())
-        if (len(arrows) != 1 or abs(math.dist(tuple(arrows[0][:2]), centre) - math.dist(centre, rim)) > 5e-5
-                or not (min(left[0], right[0]) <= arrows[0][0] <= max(left[0], right[0])
-                        or min(math.dist(tuple(arrows[0][:2]), endpoint) for endpoint in (left, right)) <= DETAIL_GEOMETRY_TOL_M)
-                or arrows[0][1] >= centre[1]):
-            raise RuntimeError(f"{name}: native arrow misses finite supported arc")
-        if (arrows[0][6] <= 0.0 or arrows[0][7] <= 0.0
-                or math.hypot(arrows[0][3], arrows[0][4]) == 0.0):
-            raise RuntimeError(f"{name}: unreadable native arrow footprint")
-        route = _r24_nonframe_lines(record, geometry)
-        if not route or min(point_segment_distance(tuple(arrows[0][:2]), s) for s in route) > 5e-5:
-            raise RuntimeError(f"{name}: native leader does not reach its own arc arrow")
-        if any(text_overlap(s, geometry, box)[0] > 0.0
-               for s in route for box in geometry.text_boxes):
-            raise RuntimeError(f"{name}: native leader crosses its own text")
-        others = [(r, g) for r, g in records if r is not record]
-        _r24_no_crossings(route, [s for _r, g in others for s in g.segments],
-                          label=f"{name} independent leader")
-        for _other, target in others:
-            for box in target.text_boxes:
-                if any(text_overlap(s, target, box)[0] > 0.0 for s in route):
-                    raise RuntimeError(f"{name}: native leader crosses another callout's text")
-        _telemetry.info(f"{name}: native_arrow={arrows[0]!r}, supported_arc_endpoints={left,right}, native_route={route!r}")
+        if math.dist(landing, south) > 5e-5:
+            raise RuntimeError("rod-pin DOT: landing is not the actual circular edge south rim")
+        arms = []
+        for mark in _bound_view_annotations(end, label="rod-pin DOT printed centre-mark arm"):
+            if mark.GetType() != 13:
+                continue
+            display = _center_mark_display(mark, {})
+            for row in display.get("lines", ()):
+                s = Segment(row[4], row[5], row[7], row[8])
+                if (point_segment_distance(centre, s) <= 5e-5
+                        and point_segment_distance(landing, s) <= 5e-5
+                        and min(s.y0, s.y1) < centre[1]):
+                    arms.append(s)
+        if len(arms) != 1:
+            raise RuntimeError("rod-pin DOT: south-rim landing is not on one actual printed centre-mark arm")
+        tapered = scan_view_edges(end, label="detail E DOT taper").exact_line_through(
+            ((ROD_TIP_X + BOT_END_X) / 2.0, (_ROD_TIP_Y + _BOT_END_Y) / 2.0, ARM_THICKNESS / 2.0),
+            label="+Z actual taper boundary",
+        )
+        points = _project(adapter, end, [tuple(v / 1000.0 for v in p) for p in tapered.line],
+                          label="detail E actual taper boundary")
+        taper = Segment(*points[0], *points[1])
+        route = _registered_leaders(record)
+        if len(route) != 2 or any(s.length <= 0.0 for s in route):
+            raise RuntimeError("rod-pin DOT: unreadable native bent route")
+        _r24_no_crossings(_r24_straight_ink(record), [taper], label="rod-pin DOT frame/route taper")
+        _telemetry.info(f"rod-pin DOT: native_south_arm={arms!r}, native_route={route!r}, "
+                        f"actual_taper={taper!r}, display_dot_size={record['display']['arrows'][0][6:8]!r}")
+    except Exception as exc:
+        _record_rod_dot_failure(adapter, annotation, exc, record)
+        raise
 
 
 def _require_r24_detail_layout(
@@ -3304,7 +3250,28 @@ def _require_r24_detail_layout(
     captions = [ann for ann in _bound_view_annotations(end, label="R24 E caption") if ann.GetType() == 6]
     caption_note = _early_bound(captions[0].GetSpecificAnnotation(), "INote")
     obstacles.append(("detail E caption", Box(*_note_extent(adapter, caption_note, label="R24 E caption")), 0.003))
-    _require_land_angle_route(record, geometry, fixed, cluster, obstacles=obstacles)
+    try:
+        _require_land_angle_route(record, geometry, fixed, cluster, obstacles=obstacles)
+    except Exception as exc:
+        # A later rebuild can change native arrow mode/arc intervals. Retain
+        # the EXISTING final readbacks too, without any extra COM or replacing
+        # the original proof failure if snapshotting/capture itself refuses.
+        with contextlib.suppress(Exception):
+            exc.land_angle_native_context = {
+                "after_regeneration": copy.deepcopy(record),
+                "neighbours": copy.deepcopy([r for r, _g in cluster]),
+                "strap_thickness": copy.deepcopy(_r),
+                "fixed_ink": copy.deepcopy({
+                    key: fixed[key] for key in ("centre", "radius", "arrows", "witnesses")
+                }),
+                "terminal_attachment_tolerance_m": DETAIL_GEOMETRY_TOL_M,
+                "text_obstacles": [
+                    {"label": label, "box": (box.xmin, box.ymin, box.xmax, box.ymax),
+                     "required_air_m": required}
+                    for label, box, required in obstacles
+                ],
+            }
+        raise
     crop = _detail_crop(adapter, end, label="E")
     circle = ((crop[0] + crop[2]) / 2.0, (crop[1] + crop[3]) / 2.0, (crop[2] - crop[0]) / 2.0)
     for box in geometry.text_boxes:
@@ -3826,8 +3793,6 @@ async def build(adapter: Any) -> dict[str, str]:
         _require_rod_position_dot(adapter, rod_position_gtol, rod_hole_edge,
                                   rod_position_landing, rod_position_signature)
         _require_rod_dot_route(adapter, end, rod_position_gtol, rod_position_landing)
-        phase = "R24 native radius routes"
-        _require_radius_routes(adapter, front)
         phase = "shared layout"
         check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
 

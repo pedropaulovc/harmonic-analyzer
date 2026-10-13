@@ -7,6 +7,7 @@ import json
 import math
 import re
 from dataclasses import replace
+from fractions import Fraction
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -269,19 +270,31 @@ def test_profile_nominals_are_kept_natively_without_note_only_duplicates() -> No
     assert "_add_arc_profiles(adapter, front)" in source
 
 
-def test_basic_radius_contract_keeps_bottom_exterior_and_allows_top_centre_side() -> None:
-    """Approved hypotheses only; native finite manufactured-outline guard is authoritative."""
-    centre = _front_xy(0.0, drawing.CENTER_Y)
-    top_radius = math.dist(centre, _front_xy(drawing.R_TOP, drawing.CENTER_Y))
-    bottom_radius = math.dist(centre, _front_xy(drawing.R_BOTTOM, drawing.CENTER_Y))
-    assert math.dist(centre, drawing.FRONT_KEEP["TopRadius"]) < top_radius
-    assert math.dist(centre, drawing.FRONT_KEEP["BottomRadius"]) > bottom_radius
+def test_basic_radius_text_positions_are_outside_their_parent_circles() -> None:
+    """Inside-circle R800 placement retained a centre tail on the native sheet."""
+    centre_model_y = (
+        drawing.PIVOT_MID_Y + ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT + drawing.R_TOP
+    )
+    centre = _front_xy(0.0, centre_model_y)
+    for name, radius in (
+        ("TopRadius", drawing.R_TOP),
+        ("BottomRadius", drawing.R_BOTTOM),
+    ):
+        rendered_radius = math.dist(
+            centre, _front_xy(0.0, centre_model_y + radius)
+        )
+        assert math.dist(centre, drawing.FRONT_KEEP[name]) > rendered_radius
+    # Negative control: the former top label lay inside the same nominal circle.
+    top_rendered_radius = math.dist(
+        centre, _front_xy(0.0, centre_model_y + drawing.R_TOP)
+    )
+    assert math.dist(centre, (0.130, 0.218)) < top_rendered_radius
 
 
 def test_radius_text_and_profile_requests_use_the_approved_clearance_corridors() -> None:
     """Source placement hypotheses, NOT current native clearance evidence."""
-    assert drawing.FRONT_KEEP["TopRadius"] == (0.130, 0.190)
-    assert drawing.FRONT_KEEP["BottomRadius"] == (0.130, 0.126)
+    assert drawing.FRONT_KEEP["TopRadius"] == (0.145, 0.136)
+    assert drawing.FRONT_KEEP["BottomRadius"] == (0.169, 0.128)
     assert drawing.ARC_PROFILE_FRAME_XY == {
         "TopRadius": (0.130, 0.207), "BottomRadius": (0.020, 0.160),
     }
@@ -319,7 +332,7 @@ def test_r20_local_requests_leave_views_geometry_and_strict_caption_air_unchange
     # Hole callout and DOT FCF requests: physical circular edge remains unchanged.
     pin_xy = _end_xy(drawing.ROD_HOLE_X, drawing.ROD_HOLE_Y)
     assert math.dist(drawing.ROD_CALLOUT_XY, pin_xy) < math.dist((0.270, 0.145), pin_xy)
-    assert drawing.LAND_ANGLE_OFFSET_XY == (0.339, 0.1661)
+    assert drawing.LAND_ANGLE_OFFSET_XY == (0.327, 0.1661)
 
 
 def test_datum_b_moves_above_pin_text_without_changing_its_broad_face_attachment() -> None:
@@ -4582,57 +4595,70 @@ def test_native_projection_fails_closed_on_missing_or_invalid_coordinates(bound,
     assert events == ["barrier"]
 
 
-@pytest.mark.parametrize("defect", [None, "inside-bottom-circle", "missing-radius", "zero-projection", "invalid-position"])
-def test_basic_radius_ink_uses_native_parent_circle_projection(r24_radii, monkeypatch, defect):
-    case = r24_radii
-    annotations = list(case.annotations.values())
-    if defect == "inside-bottom-circle":
-        case.annotations["BottomRadius"].data.texts[0]["pos"][:2] = [0.130, 0.218]
+@pytest.mark.parametrize("defect", [None, "inside-circle", "missing-radius", "zero-projection", "invalid-position"])
+def test_basic_radius_ink_uses_native_parent_circle_projection(native_profile_clearance, bound, monkeypatch, defect):
+    case = native_profile_clearance
+    annotations = []
+    for name in ("TopRadius", "BottomRadius"):
+        xy = drawing.FRONT_KEEP[name]
+        text = _ClearanceDisplayData([{"t": "R800" if name == "TopRadius" else "R816",
+                                      "pos": [*xy, 0.0], "h": 0.0035}], [])
+        annotations.append(_ClearanceAnnotation(name, (*xy, 0.0), text, kind=4, hole_callout=False))
+    if defect == "inside-circle":
+        annotations[0].data.texts[0]["pos"][:2] = [0.130, 0.218]
     elif defect == "missing-radius":
         annotations.pop(0)
     elif defect == "invalid-position":
         annotations[0].position = (float("nan"), 0.136, 0.0)
-    case.view.GetAnnotations = lambda: annotations
-    case.view.GetAnnotationCount = lambda: len(annotations)
+    case.front.GetAnnotations = lambda: annotations
+    case.front.GetAnnotationCount = lambda: len(annotations)
     events = []
-    case.view.UpdateViewDisplayGeometry = lambda: events.append("barrier")
-    monkeypatch.setattr(drawing, "_project", case.native_project)
+    case.front.UpdateViewDisplayGeometry = lambda: events.append("barrier")
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, ann: ann.name)
     def native_project(_adapter, _view, points, **_kwargs):
-        assert events and events[-1] == "barrier"
+        assert events == ["barrier"]
         return [_front_xy(0.0 if defect == "zero-projection" else x * 1000.0, y * 1000.0)
                 for x, y, _z in points]
     monkeypatch.setattr(drawing, "model_points_in_view", native_project)
     if defect is None:
-        drawing._require_radius_exterior(case.adapter, case.view)
+        drawing._require_radius_exterior(case.adapter, case.front)
         logs = "\n".join(case.logs)
-        assert "TopRadius: native_actual_part_exclusion" in logs
+        assert "native_circle_radius_mm=400.000" in logs
         assert "native_circle_radius_mm=408.000" in logs
-        assert logs.count("actual_exterior_air_mm=") == 1
-        assert events == ["barrier", "barrier"]
+        assert logs.count("actual_exterior_air_mm=") == 2
     else:
         with pytest.raises((RuntimeError, ValueError)):
-            drawing._require_radius_exterior(case.adapter, case.view)
+            drawing._require_radius_exterior(case.adapter, case.front)
 
 
 def test_radius_dimension_name_receives_bound_native_annotations(
-    r24_radii, native_annotation_binding, monkeypatch,
+    native_profile_clearance, native_annotation_binding, monkeypatch,
 ):
-    case, binding = r24_radii, native_annotation_binding
-    annotations = list(case.annotations.values())
+    case, binding = native_profile_clearance, native_annotation_binding
+    annotations = []
+    for name in ("TopRadius", "BottomRadius"):
+        xy = drawing.FRONT_KEEP[name]
+        data = _ClearanceDisplayData([{"t": "R800" if name == "TopRadius" else "R816",
+                                      "pos": [*xy, 0.0], "h": 0.0035}], [])
+        annotations.append(_ClearanceAnnotation(name, (*xy, 0.0), data, kind=4, hole_callout=False))
     raw = [binding.raw(ann, "IAnnotation") for ann in annotations]
-    case.view.GetAnnotations = lambda: raw
-    case.view.GetAnnotationCount = lambda: len(raw)
+    case.front.GetAnnotations = lambda: raw
+    case.front.GetAnnotationCount = lambda: len(raw)
+    case.front.UpdateViewDisplayGeometry = lambda: None
+    monkeypatch.setattr(drawing, "model_points_in_view",
+                        lambda _adapter, _view, points, **_kwargs: [_front_xy(x * 1000.0, y * 1000.0) for x, y, _z in points])
     reads = []
+
     def read_name(_adapter, annotation):
         assert annotation in annotations
         reads.append(annotation)
         return annotation.name
+
     monkeypatch.setattr(drawing, "dimension_name", read_name)
-    drawing._require_radius_exterior(case.adapter, case.view)
+    drawing._require_radius_exterior(case.adapter, case.front)
     assert reads == annotations * 2
     assert [ann for interface, ann in binding.calls if interface == "IAnnotation"] == annotations
-    assert sum("actual_exterior_air_mm=" in log for log in case.logs) == 1
-    assert sum("native_actual_part_exclusion" in log for log in case.logs) == 1
+    assert sum("actual_exterior_air_mm=" in log for log in case.logs) == 2
 
 
 @pytest.mark.parametrize("properties", [None, (), (0.0, 0.0, 1.0)])
@@ -5639,7 +5665,7 @@ def test_source_height_normalization_then_quantized_native_caption_seating_keeps
 _POST_CAPTION_PHASES = (
     "rebuild", "dimension census", "REAM clearance", "front-detail air",
     "radius exterior", "arc profile clearance",
-    "R24 detail layout", "R24 DOT state", "R24 DOT route", "R24 radius routes",
+    "R24 detail layout", "R24 DOT state", "R24 DOT route",
     "shared layout", "finalize",
 )
 
@@ -5692,7 +5718,7 @@ def post_caption_block():
         "rebuild_drawing", "_require_dimension_census", "_require_ream_clearance",
         "_require_front_detail_air", "_require_radius_exterior",
         "_require_arc_profile_clearance", "_require_r24_detail_layout",
-        "_require_rod_position_dot", "_require_rod_dot_route", "_require_radius_routes",
+        "_require_rod_position_dot", "_require_rod_dot_route",
         "check_drawing_layout",
     ), _POST_CAPTION_PHASES[:-1], strict=True):
         namespace[name] = step(phase)
@@ -5749,8 +5775,7 @@ def test_post_caption_refusals_capture_before_seat_close_and_preserve_identity(p
                            "capture", "seat-close"]
     assert len(case.calls) == _POST_CAPTION_PHASES.index(phase) + 1
     # Distinct injectable steps retain the production detail/radius forensic phases.
-    reported_phase = ("R24 native radius routes" if phase == "R24 radius routes"
-                      else "R24 native detail routes" if phase.startswith("R24 ") else phase)
+    reported_phase = "R24 native detail routes" if phase.startswith("R24 ") else phase
     assert case.captures == [(
         "ch-rocker-arm-post-caption-finalize", str(case.original),
         {"api": "rocker post-caption audit/finalize", "exception": case.original,
@@ -5790,7 +5815,6 @@ def test_post_caption_success_keeps_order_arguments_result_and_skips_capture(pos
         ((adapter, ns["rod_position_gtol"], ns["rod_hole_edge"],
           ns["rod_position_landing"], ns["rod_position_signature"]), {}),
         ((adapter, ns["end"], ns["rod_position_gtol"], ns["rod_position_landing"]), {}),
-        ((adapter, ns["front"]), {}),
         ((adapter,), {"layout": ns["SPEC"].layout, "stem": ns["PART_STEM"]}),
         ((adapter, ns["OUTPUTS"]), {
             "pdf_title": "Rocker Arm Manufacturing Drawing",
@@ -7673,7 +7697,7 @@ class _R24AngleDisplay:
 
 @pytest.fixture
 def r24_angle(bound, monkeypatch):
-    """R23 rounded fixture controls only, not runtime precision or native proof."""
+    """Actual rounded R23 ink plus labelled synthetic native seed/offset controls."""
     from solidworks_mcp.adapters import sw_type_info
     import _drawing_dimensions
 
@@ -7685,45 +7709,113 @@ def r24_angle(bound, monkeypatch):
         primitives={
             "arcs": [_r24_arc((0.3497831, 0.1488092), (0.3434973, 0.1494326)),
                      _r24_arc((0.3376877, 0.1489008), (0.3316196, 0.1471466))],
-            "arrows": [[0.3434973, 0.1494326, 0, 1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1],
-                       [0.3376877, 0.1489008, 0, -1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1]],
+            "arrows": [[0.3434973, 0.1494326, 0, 0.9984694, -0.0553072, 0, 0.003556, 0.000762, 0, 0, 0, 1],
+                       [0.3376877, 0.1489008, 0, -0.9718355, -0.2356603, 0, 0.003556, 0.000762, 0, 0, 0, 1]],
         },
     )
     entities = (object(), object())
     ann = _R24Annotation("D1", (0.3405804, 0.1492994, 0.0), data, attached=entities)
     display = _R24AngleDisplay(ann)
     ann.display = display
-    case = SimpleNamespace(annotation=ann, display=display, data=data, events=[], defect=None)
+    case = SimpleNamespace(annotation=ann, display=display, data=data, events=[],
+                           defect=None, arrow_mode="outside", seed_terminal_degrees=None)
     case.adapter = SimpleNamespace(
         _attempt=lambda fn: fn(), swApp=_APP,
         currentModel=_native("IModelDoc2", GraphicsRedraw2=lambda: case.events.append("redraw")),
     )
 
     def move(x, y, z):
-        case.events.append(("move", display.OffsetText, x, y, z))
+        offset = display.OffsetText
+        case.events.append(("move", offset, x, y, z))
         if case.defect == "ignored-position":
             return True
-        if case.defect == "offset-reset":
+        if not offset and case.defect == "seed-setter-false":
+            return False
+        if offset and case.defect == "offset-reset":
             display.OffsetText = False
         ann.position = (x, y, z)
         data.texts[0]["pos"] = [x - 0.0067521, y - 0.0027781, z]
         data.lines[2:6] = _r24_border(Box(x - 0.0078185, y - 0.0027781, x + 0.0078185, y + 0.0027781))
-        # Moving offset text closes the former text gap: three arcs instead of
-        # two, with the same reconstructed centre/radius/span and arrow tips.
-        data.primitives["arcs"].insert(1, _r24_arc((0.3434973, 0.1494326), (0.3376877, 0.1489008)))
-        data.primitives["polylines"] = [_r24_polyline([
-            (x, y - 0.0027781), (0.33905, 0.155), (0.3405804, 0.1492994),
-        ])]
+        # Synthetic native producer controls: OffsetText retains the SEEDED
+        # extension endpoint. It never invents a radial-to-offset-text landing.
+        # A clamped extension endpoint can differ from the requested seed.
+        if not offset:
+            case.seed_base_arcs = json.loads(json.dumps(data.primitives["arcs"]))
+            case.seed_base_arrows = json.loads(json.dumps(data.primitives["arrows"]))
+            centre = tuple(case.seed_base_arcs[0][10:12])
+            radius = math.dist(centre, tuple(case.seed_base_arcs[0][4:6]))
+            if case.seed_terminal_degrees is None:
+                case.seed_terminal = (x, y)
+            else:
+                angle = math.radians(case.seed_terminal_degrees)
+                case.seed_terminal = (centre[0] + radius * math.cos(angle),
+                                      centre[1] + radius * math.sin(angle))
+        centre = tuple(case.seed_base_arcs[0][10:12])
+        radius = math.dist(centre, tuple(case.seed_base_arcs[0][4:6]))
+        data.primitives["arrows"] = json.loads(json.dumps(case.seed_base_arrows))
+        if case.arrow_mode == "inside":
+            data.primitives["arcs"] = [
+                _r24_arc((0.3434973, 0.1494326), (0.3376877, 0.1489008)),
+                _r24_arc((0.3376877, 0.1489008), case.seed_terminal),
+            ]
+            # Explicit synthetic inside-arrow directions follow the CURRENT
+            # central arc. Their lengths/tips remain the actual R23 values.
+            for arrow, sign in zip(data.primitives["arrows"], (1.0, -1.0), strict=True):
+                tip = tuple(arrow[:2])
+                angle = math.atan2(tip[1] - centre[1], tip[0] - centre[0])
+                angle += sign * 2.0 * math.asin(arrow[6] / (2.0 * radius))
+                base = (centre[0] + radius * math.cos(angle), centre[1] + radius * math.sin(angle))
+                length = math.dist(tip, base)
+                arrow[3:6] = [(base[0] - tip[0]) / length, (base[1] - tip[1]) / length, 0.0]
+        else:
+            data.primitives["arcs"] = json.loads(json.dumps(case.seed_base_arcs))
+            left = data.primitives["arcs"][-1]
+            index = 7 if math.dist(tuple(left[4:6]), (0.3376877, 0.1489008)) < 1e-7 else 4
+            left[index:index + 2] = case.seed_terminal
+        copies = getattr(case, "current_arc_copies", 1)
+        if copies > 1:
+            # Explicit synthetic duplicate native rows at EACH current stage,
+            # before the defect mutates them; no stale seed/base alias.
+            data.primitives["arcs"] = [row[:] for row in data.primitives["arcs"] for _ in range(copies)]
+        if not offset:
+            data.primitives.pop("polylines", None)
+            if case.defect == "seed-offset-stuck":
+                display.OffsetText = True
+            elif case.defect == "seed-value":
+                display.model.SystemValue += 0.001
+            elif case.defect == "seed-attachment":
+                ann.attached = (entities[0], object())
+            elif case.defect == "seed-arc-moved":
+                data.primitives["arcs"][0][10] += 0.001
+            elif case.defect == "seed-arrow-moved":
+                data.primitives["arrows"][0][0] += 0.001
+            elif case.defect == "seed-witness-moved":
+                data.lines[0][4] += 0.001
+                data.lines[0][7] += 0.001
+            return True
+        case.route_start = (x + 0.0078185, y - 0.0027781)
+        case.landing = case.seed_terminal
+        data.primitives["polylines"] = [_r24_polyline([case.route_start, case.landing])]
         if case.defect == "attachment":
             ann.attached = (entities[0], object())
         elif case.defect == "arc-moved":
             for row in data.primitives["arcs"]:
                 row[10] += 0.001
-        elif case.defect == "span-changed":
+        elif case.defect == "drawn-extent-changed":
             row = data.primitives["arcs"][0]
             angle = math.atan2(row[5] - row[11], row[4] - row[10]) + 0.01
             radius = math.dist(row[4:6], row[10:12])
             row[4:6] = (row[10] + radius * math.cos(angle), row[11] + radius * math.sin(angle))
+        elif case.defect == "arc-misses-arrowtip":
+            tip = (0.3376877, 0.1489008)
+            # In inside mode BOTH the central arc and extension support this
+            # tip. Remove all of that actual finite exposure, not just one row.
+            for row in data.primitives["arcs"]:
+                radius = math.dist(row[4:6], row[10:12])
+                for index, direction in ((4, 1.0), (7, -1.0)):
+                    if math.dist(row[index:index + 2], tip) < 1e-7:
+                        angle = math.atan2(row[index + 1] - row[11], row[index] - row[10]) + direction * 0.01
+                        row[index:index + 2] = (row[10] + radius * math.cos(angle), row[11] + radius * math.sin(angle))
         elif case.defect == "witness-moved":
             data.lines[0][4] += 0.001
             data.lines[0][7] += 0.001
@@ -7735,7 +7827,7 @@ def r24_angle(bound, monkeypatch):
             data.primitives["polylines"][0][-3:] = [0.340, 0.154, 0.0]
         elif case.defect == "cross-own-343.5":
             data.primitives["polylines"] = [_r24_polyline([
-                (x, y - 0.0027781), (0.349, 0.151), (0.3405804, 0.1492994),
+                case.route_start, (0.349, 0.151), case.landing,
             ])]
         elif case.defect == "disjoint":
             data.primitives["polylines"].append(_r24_polyline([(0.36, 0.16), (0.37, 0.16)]))
@@ -7758,7 +7850,7 @@ def r24_angle(bound, monkeypatch):
 
 
 @pytest.mark.parametrize("boolean,normal,reverse", [(-1.0, 1.0, False), (0.0, 1.0, True), (0.0, -1.0, False)])
-def test_r24_native_arc_boolean_and_normal_representations_preserve_reconstructed_span(r24_angle, boolean, normal, reverse):
+def test_r24_native_arc_boolean_and_normal_representations_preserve_current_finite_ink(r24_angle, boolean, normal, reverse):
     for row in r24_angle.data.primitives["arcs"]:
         row[15], row[16] = normal, boolean
         if reverse:
@@ -7766,15 +7858,259 @@ def test_r24_native_arc_boolean_and_normal_representations_preserve_reconstructe
     drawing._offset_land_angle(r24_angle.adapter, r24_angle.display)
 
 
-@pytest.mark.parametrize("defect", [None, "encoded-noise"])
-def test_r24_offset_uses_real_helper_and_accepts_repartitioned_native_arc(r24_angle, defect):
+@pytest.mark.parametrize("mode", ["outside", "inside"])
+def test_r26_synthetic_arrow_mode_change_uses_actual_current_arc_ink_not_old_envelope(r24_angle, mode):
+    # R23 outside rows are actual; post-offset routes and the inside-mode row
+    # are explicit synthetic controls, not claimed native R25/R26 outcomes.
+    case = r24_angle
+    case.arrow_mode = mode
+    original_arcs = json.loads(json.dumps(case.data.primitives["arcs"]))
+    original_tips = [tuple(row[:2]) for row in case.data.primitives["arrows"]]
+    original_directions = [tuple(row[3:6]) for row in case.data.primitives["arrows"]]
+    attached = case.annotation.attached
+    fixed = drawing._offset_land_angle(case.adapter, case.display)
+    record, geometry = drawing._r24_record(case.adapter, case.annotation, label="synthetic current arrow mode")
+    assert drawing.LAND_ANGLE_OFFSET_XY == (0.327, 0.1661)
+    assert [tuple(row[:2]) for row in record["display"]["arrows"]] == original_tips
+    assert fixed["attached"] == case.annotation.attached == attached
+    assert case.display.MaxWitnessLineLength == 0.008
+    assert case.display.model.SystemValue == ch_rocker_arm_spec._ALPHA_TOP
+    assert case.landing == case.seed_terminal
+    assert case.route_start == pytest.approx((0.3348185, 0.1633219), abs=1e-12)
+    assert record["display"]["arcs"][-1][7:9] == list(case.seed_terminal)
+    if mode == "outside":
+        assert record["display"]["arcs"][0] == original_arcs[0]
+        assert [tuple(row[3:6]) for row in record["display"]["arrows"]] == original_directions
+    else:
+        assert len(record["display"]["arcs"]) == 2  # Central ink plus seeded extension.
+        assert record["display"]["arcs"][0][4:6] == list(original_tips[0])
+        assert record["display"]["arcs"][0][7:9] == list(original_tips[1])
+        assert record["display"]["arcs"][1][4:6] == list(original_tips[1])
+        assert [tuple(row[3:6]) for row in record["display"]["arrows"]] != original_directions
+    drawing._require_land_angle_route(record, geometry, fixed, [])
+
+
+@pytest.mark.parametrize("mode", ["outside", "inside"])
+def test_r26_arrow_mode_flip_cannot_borrow_a_terminal_from_the_other_modes_arc(r24_angle, mode):
+    case = r24_angle
+    case.arrow_mode = mode
+    fixed = drawing._offset_land_angle(case.adapter, case.display)
+    other_terminal = ((0.3405804, 0.1492994) if mode == "outside"
+                      else (0.3497831, 0.1488092))
+    case.data.primitives["polylines"] = [_r24_polyline([case.route_start, other_terminal])]
+    record, geometry = drawing._r24_record(case.adapter, case.annotation, label="wrong current finite arc")
+    with pytest.raises(RuntimeError, match="native connector does not land on its arc"):
+        drawing._require_land_angle_route(record, geometry, fixed, [])
+
+
+@pytest.mark.parametrize("mode", ["outside", "inside"])
+@pytest.mark.parametrize("offset_m", [-0.000051, -0.000049, 0.000049, 0.000051])
+def test_r26_current_arc_terminal_retains_exact_existing_fifty_micron_classification(
+    r24_angle, mode, offset_m,
+):
+    case = r24_angle
+    case.arrow_mode = mode
+    fixed = drawing._offset_land_angle(case.adapter, case.display)
+    radius = math.dist(case.landing, fixed["centre"])
+    shifted = tuple(c + (p - c) * (radius + offset_m) / radius
+                    for c, p in zip(fixed["centre"], case.landing, strict=True))
+    # Isolate the 50um joint classification with an explicitly synthetic
+    # radial LAST segment; the real native OffsetText route is not assumed
+    # radial. A radial 49um displacement on an oblique segment can put its
+    # actual circle intersection more than 50um from the terminal.
+    elbow = tuple(c + (p - c) * (radius + 0.001) / radius
+                  for c, p in zip(fixed["centre"], case.landing, strict=True))
+    case.data.primitives["polylines"] = [_r24_polyline([case.route_start, elbow, shifted])]
+    record, geometry = drawing._r24_record(case.adapter, case.annotation, label="classified terminal boundary")
+    if abs(offset_m) > drawing.DETAIL_GEOMETRY_TOL_M:
+        with pytest.raises(RuntimeError, match="native connector does not land on its arc"):
+            drawing._require_land_angle_route(record, geometry, fixed, [])
+    else:
+        drawing._require_land_angle_route(record, geometry, fixed, [])
+
+
+@pytest.mark.parametrize("points,contact", [
+    (((0.001, 0.0), (0.002, 0.0)), "inside"),
+    (((-0.001, 0.0), (0.005, 0.0)), "through"),
+    (((-0.001, -0.00025), (0.005, 0.00125)), "edge"),
+    (((-0.001, 0.001), (0.001, -0.001)), "tip"),
+])
+def test_r26_own_arrow_closed_footprint_has_no_body_corner_or_edge_waiver(points, contact):
+    """Synthetic controls on computed binary vertices, not recovered native rows."""
+    arrow = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.004, 0.002, 0.0, 0.0, 0.0, 1.0]
+    edge = drawing.arrowhead_segments(arrow)[0]
+    if contact == "tip":
+        assert all((Fraction(first) + Fraction(last)) / 2 == Fraction(corner)
+                   for first, last, corner in zip(
+                       *points, (edge.x0, edge.y0), strict=True))
+    elif contact == "edge":
+        ax, ay, bx, by = map(Fraction, (edge.x0, edge.y0, edge.x1, edge.y1))
+        assert all((bx - ax) * (Fraction(y) - ay) == (by - ay) * (Fraction(x) - ax)
+                   for x, y in points)
+        assert points[0][0] < edge.x0 < edge.x1 < points[1][0]
+    with pytest.raises(RuntimeError, match="own arrowhead body/edge"):
+        drawing._require_land_angle_arrow_clearance([Segment(*points[0], *points[1])], [arrow])
+
+
+@pytest.mark.parametrize("height", [0.002, 0.00100001])
+def test_r26_own_arrow_clearance_does_not_inflate_the_actual_footprint(height):
+    arrow = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.004, 0.002, 0.0, 0.0, 0.0, 1.0]
+    drawing._require_land_angle_arrow_clearance([Segment(-0.001, height, 0.005, height)], [arrow])
+
+
+@pytest.mark.parametrize("label,text_position,arrow_tips,connector", [
+    ("dt-cylinder-gear/FaceWidth", (0.225, 0.220),
+     ((0.2102924, 0.220), (0.2057924, 0.220)),
+     [0.0, 0.0, 0.0, 0.0, 0.2080424, 0.220, 0.0464999, 0.2127281, 0.2172219, 0.0]),
+    ("dt-crank-handle-pivot-screw/ReliefDia", (0.1155, 0.144),
+     ((0.08575, 0.162225), (0.08575, 0.167775)),
+     [0.0, 0.0, 0.0, 0.0, 0.08575, 0.165, -0.0003, 0.0908542, 0.138417, 0.0]),
+    ("sm-gooseneck-spring-screw/ReliefDia", (0.23005, 0.1495),
+     ((0.202, 0.1606), (0.202, 0.1694)),
+     [0.0, 0.0, 0.0, 0.0, 0.202, 0.165, -0.0004, 0.2028181, 0.143917, 0.0]),
+    ("fr-top-frame/PocketRise", (0.0422, 0.0785),
+     ((0.070, 0.091875), (0.070, 0.099875)),
+     [0.0, 0.0, 0.0, 0.0, 0.070, 0.095875, 0.107, 0.0656719, 0.0673875, -0.0]),
+])
+def test_r26_actual_four_native_linear_offset_samples_keep_dimension_midpoint_attachment(
+    label, text_position, arrow_tips, connector,
+):
+    # Actual rows from C:/farm-runs/ms-stop/
+    # 20261012T055029190Z-4b5f6c488dce44489a438169e748265c.out/reports/layout-audit/
+    # <label before slash>.json. PocketRise is on a later sheet, Drawing View11.
+    terminal = tuple(connector[4:6])
+    midpoint = tuple((a + b) / 2.0 for a, b in zip(*arrow_tips, strict=True))
+    assert terminal == pytest.approx(midpoint, abs=1e-12), label
+    assert math.dist(terminal, text_position) > 0.001
+    assert tuple(connector[7:9]) != terminal
+
+
+def test_r26_actual_thumbnut_seeded_angular_offset_joins_extension_end_not_text_radial_ray():
+    # Actual CountersinkHalfAngle in Section View A-A:
+    # C:/src/dt-logs/farm-runs/
+    # 20261011T114502461Z-b17da3779d86439b884ba5c0e52d7d26.out/reports/layout-audit/
+    # pd-transgear-thumbnut.json. Recipe seed/reset sequence is lines 313–339.
+    extension = [
+        0.0, 0.0, -1.0, -1.0, 0.223649, 0.139050, 0.015675,
+        0.2263005, 0.1430182, 0.015675, 0.215, 0.147699, 0.015675,
+        0.0, 0.0, 1.0, 1.0,
+    ]
+    connector = [
+        0.0, 0.0, 0.0, 0.0, 0.2263005, 0.1430182, 0.015675,
+        0.2530941, 0.1300719, 0.0,
+    ]
+    terminal, centre, text = tuple(connector[4:6]), tuple(extension[10:12]), (0.264, 0.132850)
+    assert terminal == tuple(extension[7:9])
+    assert drawing._r24_arc_contains(extension, terminal)
+    radius = math.dist(centre, tuple(extension[4:6]))
+    reach = math.dist(centre, text)
+    radial_guess = tuple(c + (p - c) * radius / reach for c, p in zip(centre, text, strict=True))
+    assert math.dist(terminal, radial_guess) > 0.001
+    assert math.degrees(math.atan2(terminal[1] - centre[1], terminal[0] - centre[0])) == pytest.approx(-22.5, abs=0.001)
+
+
+@pytest.mark.parametrize("offset_x", [0.339, 0.327])
+def test_r26_actual_r23_d1_midgap_attachment_refuses_both_unseeded_text_targets(r24_angle, offset_x):
+    # Replay actual R23 D1's four arc rows and original annotation point.
+    # The added moved-text route models the observed OffsetText mechanism;
+    # it is NOT a recovered unrounded R25 connector row.
+    case = r24_angle
+    case.data.primitives["arcs"] *= 2
+    record, geometry = drawing._r24_record(case.adapter, case.annotation, label="actual R23 D1 before offset")
+    fixed = drawing._land_angle_fixed_ink(record, geometry)
+    original_text_point = tuple(case.annotation.position[:2])
+    assert original_text_point == (0.3405804, 0.1492994)
+    case.annotation.position = (offset_x, 0.1661, 0.0)
+    case.data.texts[0]["pos"] = [offset_x - 0.0067521, 0.1633219, 0.0]
+    case.data.lines[2:6] = _r24_border(Box(offset_x - 0.0078185, 0.1633219,
+                                        offset_x + 0.0078185, 0.1688781))
+    case.data.primitives["polylines"] = [_r24_polyline([
+        (offset_x + 0.0078185, 0.1633219), original_text_point,
+    ])]
+    record, geometry = drawing._r24_record(case.adapter, case.annotation, label="unseeded R23 midpoint route")
+    assert len(record["display"]["arcs"]) == 4
+    assert not any(drawing._r24_arc_contains(row, original_text_point) for row in record["display"]["arcs"])
+    with pytest.raises(RuntimeError, match="native connector does not land on its arc"):
+        drawing._require_land_angle_route(record, geometry, fixed, [])
+
+
+@pytest.mark.parametrize("mode", ["outside", "inside"])
+@pytest.mark.parametrize("clamped_degrees", [108.2, 109.0, 109.8])
+def test_r26_seed_then_offset_retains_actual_clamped_extension_terminal_not_a_radial_guess(
+    r24_angle, mode, clamped_degrees,
+):
+    case = r24_angle
+    case.arrow_mode, case.seed_terminal_degrees = mode, clamped_degrees
+    fixed = drawing._offset_land_angle(case.adapter, case.display)
+    moves = [event for event in case.events if isinstance(event, tuple)]
+    assert len(moves) == 2 and moves[0][1] is False and moves[1][1] is True
+    assert moves[0][2:4] == pytest.approx((
+        fixed["centre"][0] + fixed["radius"] * math.cos(math.radians(109)),
+        fixed["centre"][1] + fixed["radius"] * math.sin(math.radians(109)),
+    ))
+    assert moves[1][2:4] == drawing.LAND_ANGLE_OFFSET_XY
+    assert case.landing == case.seed_terminal
+    ray_length = math.dist(fixed["centre"], drawing.LAND_ANGLE_OFFSET_XY)
+    radial_guess = tuple(c + (p - c) * fixed["radius"] / ray_length
+                         for c, p in zip(fixed["centre"], drawing.LAND_ANGLE_OFFSET_XY, strict=True))
+    assert math.dist(case.landing, radial_guess) > drawing.DETAIL_GEOMETRY_TOL_M
+    assert case.events == [moves[0], "rebuild", moves[1], "rebuild", "redraw"]
+
+
+@pytest.mark.parametrize("mode", ["outside", "inside"])
+@pytest.mark.parametrize("defect", [
+    "seed-setter-false", "seed-offset-stuck", "seed-value", "seed-attachment",
+    "seed-arc-moved", "seed-arrow-moved", "seed-witness-moved",
+])
+def test_r26_failed_seed_cannot_proceed_to_offset_or_lose_original_native_context(r24_angle, mode, defect):
+    case = r24_angle
+    case.arrow_mode, case.defect = mode, defect
+    with pytest.raises(RuntimeError) as caught:
+        drawing._offset_land_angle(case.adapter, case.display)
+    context = caught.value.land_angle_native_context
+    assert "before_seed" in context
+    assert "after_offset" not in context
+    assert all(event[1] is False for event in case.events if isinstance(event, tuple))
+    if defect != "seed-setter-false":
+        assert "after_seed" in context
+
+
+@pytest.mark.parametrize("mode,degrees", [("outside", 104.0), ("inside", 98.0)])
+def test_r26_current_finite_arc_landing_inside_own_arrowhead_is_fatal(r24_angle, mode, degrees):
+    case = r24_angle
+    case.arrow_mode = mode
+    fixed = drawing._offset_land_angle(case.adapter, case.display)
+    angle = math.radians(degrees)
+    terminal = (fixed["centre"][0] + fixed["radius"] * math.cos(angle),
+                fixed["centre"][1] + fixed["radius"] * math.sin(angle))
+    case.data.primitives["polylines"] = [_r24_polyline([case.route_start, terminal])]
+    record, geometry = drawing._r24_record(case.adapter, case.annotation, label="own native arrow body")
+    assert any(drawing._r24_arc_contains(row, terminal) for row in record["display"]["arcs"])
+    with pytest.raises(RuntimeError, match="own arrowhead"):
+        drawing._require_land_angle_route(record, geometry, fixed, [])
+
+
+def test_r26_clamped_seed_extension_under_actual_r23_104_degree_arrowbody_captures_and_refuses(r24_angle):
+    case = r24_angle
+    case.seed_terminal_degrees = 104.0
+    with pytest.raises(RuntimeError, match="own arrowhead") as caught:
+        drawing._offset_land_angle(case.adapter, case.display)
+    context = caught.value.land_angle_native_context
+    assert context["after_seed"]["display"]["arcs"][-1][7:9] == list(case.seed_terminal)
+    assert context["after_offset"]["display"]["polylines"][0][-3:-1] == list(case.seed_terminal)
+
+
+@pytest.mark.parametrize("defect", [None, "encoded-noise", "drawn-extent-changed"])
+def test_r26_offset_uses_real_helper_and_proves_current_native_finite_arc(r24_angle, defect):
     case = r24_angle
     case.defect = defect
     fixed = drawing._offset_land_angle(case.adapter, case.display)
     assert case.annotation.position[:2] == drawing.LAND_ANGLE_OFFSET_XY
-    assert case.events[0][0:2] == ("move", True)
+    assert [event[0:2] for event in case.events if isinstance(event, tuple)] == [
+        ("move", False), ("move", True),
+    ]
     assert case.events[-1] == "redraw"
-    assert len(case.data.primitives["arcs"]) == 3
+    assert len(case.data.primitives["arcs"]) == 2
     assert fixed["attached"] == case.annotation.attached
     assert case.display.model.SystemValue == ch_rocker_arm_spec._ALPHA_TOP
     assert case.display.MaxWitnessLineLength == 0.008
@@ -7784,21 +8120,219 @@ def test_r24_offset_uses_real_helper_and_accepts_repartitioned_native_arc(r24_an
         _bind_owner(case.display, "IAnnotation")
 
 
+@pytest.mark.parametrize("mode", ["outside", "inside"])
 @pytest.mark.parametrize("defect", [
-    "ignored-position", "offset-reset", "attachment", "arc-moved", "span-changed", "witness-moved",
+    "ignored-position", "offset-reset", "attachment", "arc-moved", "arc-misses-arrowtip", "witness-moved",
     "arrow-moved", "no-connector", "no-landing", "cross-own-343.5", "disjoint",
 ])
-def test_r24_offset_refuses_native_noops_wrong_fixed_ink_and_343_point_5_crossing(r24_angle, defect):
-    r24_angle.defect = defect
+def test_r26_offset_refuses_native_noops_wrong_fixed_ink_and_343_point_5_crossing(r24_angle, defect, mode):
+    r24_angle.defect, r24_angle.arrow_mode = defect, mode
     with pytest.raises(RuntimeError):
         drawing._offset_land_angle(r24_angle.adapter, r24_angle.display)
 
 
+@pytest.mark.parametrize("mode", ["outside", "inside"])
+def test_r26_missing_arrowtip_support_mutates_all_duplicate_current_arc_rows(r24_angle, mode):
+    case = r24_angle
+    case.arrow_mode, case.defect, case.current_arc_copies = mode, "arc-misses-arrowtip", 2
+    with pytest.raises(RuntimeError, match="current native arc does not support both fixed arrowtips") as raised:
+        drawing._offset_land_angle(case.adapter, case.display)
+    context = raised.value.land_angle_native_context
+    arcs = context["after_offset"]["display"]["arcs"]
+    assert len(context["after_seed"]["display"]["arcs"]) == len(arcs) == 4
+    tip = tuple(context["fixed_ink"]["arrows"][1])
+    assert not any(drawing._r24_arc_contains(row, tip)
+                   or min(math.dist(tip, row[4:6]), math.dist(tip, row[7:9])) <= drawing.DETAIL_GEOMETRY_TOL_M
+                   for row in arcs)
+
+
+@pytest.mark.parametrize("defect,message", [
+    ("no-landing", "land angle: native connector does not land on its arc"),
+    ("cross-own-343.5", "land angle own dimension witnesses.*crosses line"),
+])
+@pytest.mark.parametrize("capture_mode", [
+    "success", "rethrow original", "different error", "telemetry error",
+])
+def test_r25_angular_refusal_capture_keeps_raw_records_without_new_reads(
+    r24_angle, monkeypatch, defect, message, capture_mode,
+):
+    # The recovered R25 capture.json has this phase/message, but NO angular
+    # rows. R23-derived controlled rows exercise capture, not a claimed R25
+    # route reproduction or proof of why its native connector was refused.
+    case = r24_angle
+    case.defect = defect
+    attached = case.annotation.attached
+    case.data.lines[0][4] += 3e-8
+    case.data.lines[0][7] += 3e-8
+    unrounded_x = case.data.lines[0][4]
+    records, captures, warnings = [], [], []
+    original_read = drawing._r24_record
+
+    def read(*args, **kwargs):
+        record, geometry = original_read(*args, **kwargs)
+        records.append((kwargs["label"], json.loads(json.dumps(record))))
+        return record, geometry
+
+    secondary = OSError("R25 forensic capture refused")
+
+    def capture(adapter, label, actual_message, **context):
+        assert adapter is case.adapter
+        assert label == "ch-rocker-arm-post-caption-finalize"
+        assert actual_message == str(context["exception"])
+        captures.append(context)
+        if capture_mode == "rethrow original":
+            raise context["exception"]
+        if capture_mode in ("different error", "telemetry error"):
+            raise secondary
+
+    def warn(actual_message):
+        warnings.append(actual_message)
+        if capture_mode == "telemetry error":
+            raise RuntimeError("R25 telemetry refused")
+
+    monkeypatch.setattr(drawing, "_r24_record", read)
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    monkeypatch.setattr(drawing._telemetry, "warn", warn)
+    with pytest.raises(RuntimeError, match=message) as caught:
+        try:
+            drawing._offset_land_angle(case.adapter, case.display)
+        except Exception as exc:
+            drawing._capture_layout_failure(case.adapter, "R24 native angular offset", exc)
+            raise
+    assert [label for label, _record in records] == [
+        "land angle before seed", "land angle after seed", "land angle after offset",
+    ]
+    assert len(captures) == 1
+    context = captures[0]
+    assert context["exception"] is caught.value
+    assert context["phase"] == "R24 native angular offset"
+    assert context["sheet_png"] is True
+    native = context["land_angle_native"]
+    assert json.loads(json.dumps(native["before_seed"])) == records[0][1]
+    assert json.loads(json.dumps(native["after_seed"])) == records[1][1]
+    assert json.loads(json.dumps(native["after_offset"])) == records[2][1]
+    assert native["before_seed"]["display"]["lines"][0][4] == unrounded_x
+    assert len(native["before_seed"]["display"]["arcs"]) == 2
+    assert len(native["after_seed"]["display"]["arcs"]) == 2
+    assert len(native["after_offset"]["display"]["arcs"]) == 2
+    assert "polylines" not in native["before_seed"]["display"]
+    assert "polylines" not in native["after_seed"]["display"]
+    assert native["after_offset"]["display"]["polylines"] == case.data.primitives["polylines"]
+    assert native["fixed_ink"]["terminal_attachment_tolerance_m"] == 0.00005
+    assert native["fixed_ink"]["witnesses"] == [
+        tuple(row[index] for index in (4, 5, 7, 8))
+        for row in native["before_seed"]["display"]["lines"][:2]
+    ]
+    # The snapshots cannot drift when a later rebuild or controlled producer
+    # mutates its source arrays; tuple/list readback shape remains untouched.
+    case.data.lines[0][4] += 0.001
+    case.data.primitives["arcs"][0][10] += 0.001
+    assert native["before_seed"]["display"]["lines"][0][4] == unrounded_x
+    assert native["before_seed"]["display"]["arcs"][0][10] == records[0][1]["display"]["arcs"][0][10]
+    assert native["after_seed"]["display"]["arcs"][0][10] == records[1][1]["display"]["arcs"][0][10]
+    assert native["after_offset"]["display"]["arcs"][0][10] == records[2][1]["display"]["arcs"][0][10]
+    assert bool(warnings) is (capture_mode in ("different error", "telemetry error"))
+    assert case.annotation.attached == attached
+    assert case.display.OffsetText is True
+    assert case.display.MaxWitnessLineLength == 0.008
+
+
+def test_r25_native_snapshot_failure_cannot_replace_the_original_route_refusal(r24_angle, monkeypatch):
+    case = r24_angle
+    case.defect = "no-landing"
+    calls = []
+
+    def refuse_snapshot(record):
+        calls.append(record["name"])
+        raise OSError("raw record snapshot refused")
+
+    monkeypatch.setattr(drawing.copy, "deepcopy", refuse_snapshot)
+    with pytest.raises(RuntimeError, match="native connector does not land on its arc") as caught:
+        drawing._offset_land_angle(case.adapter, case.display)
+    assert calls == ["land angle before seed", "land angle after seed", "land angle after offset"]
+    assert set(caught.value.land_angle_native_context) == {
+        "fixed_ink", "seed_requested_xy", "native_value_before_seed",
+    }
+
+
+def test_r25_unwritable_exception_context_cannot_replace_the_original_refusal(r24_angle, monkeypatch):
+    class NativeRefusal(RuntimeError):
+        def __setattr__(self, name, value):
+            raise OSError("native exception rejects diagnostic attributes")
+
+    original = NativeRefusal("R25 angular route refusal")
+
+    def refuse(*_args, **_kwargs):
+        raise original
+
+    monkeypatch.setattr(drawing, "_require_land_angle_route", refuse)
+    with pytest.raises(NativeRefusal) as caught:
+        drawing._offset_land_angle(r24_angle.adapter, r24_angle.display)
+    assert caught.value is original
+
+
+def test_r25_positive_offset_keeps_existing_native_reads_and_skips_failure_capture(r24_angle, monkeypatch):
+    case = r24_angle
+    labels = []
+    original_read = drawing._r24_record
+    attached = case.annotation.attached
+    value = case.display.model.SystemValue
+
+    def read(*args, **kwargs):
+        labels.append(kwargs["label"])
+        return original_read(*args, **kwargs)
+
+    def unexpected_capture(*_args, **_kwargs):
+        raise AssertionError("valid native route must not capture")
+
+    monkeypatch.setattr(drawing, "_r24_record", read)
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", unexpected_capture)
+    fixed = drawing._offset_land_angle(case.adapter, case.display)
+    assert labels == ["land angle before seed", "land angle after seed", "land angle after offset"]
+    assert set(fixed) == {"centre", "radius", "arrows", "witnesses", "attached"}
+    assert fixed["attached"] == case.annotation.attached == attached
+    assert case.display.model.SystemValue == value
+    assert case.annotation.position[:2] == drawing.LAND_ANGLE_OFFSET_XY
+    assert case.display.OffsetText is True
+    assert case.display.MaxWitnessLineLength == 0.008
+
+
+def test_r25_outer_stub_only_arc_cannot_borrow_a_landing_from_the_missing_middle(r24_angle):
+    # R25's actual PNG shows only the outer stubs. These rounded R23 native
+    # coordinates are a controlled geometric refusal fixture, NOT recovered
+    # R25 rows: the centre/radius/tips stay fixed but the middle is absent.
+    case = r24_angle
+    original_move = case.annotation.SetPosition2
+
+    def move(x, y, z):
+        was_offset = case.display.OffsetText
+        result = original_move(x, y, z)
+        if was_offset:
+            case.data.primitives["polylines"] = [_r24_polyline([
+                case.route_start, (0.3405804, 0.1492994),
+            ])]
+        return result
+
+    case.annotation.SetPosition2 = move
+    with pytest.raises(RuntimeError, match="native connector does not land on its arc") as caught:
+        drawing._offset_land_angle(case.adapter, case.display)
+    native = caught.value.land_angle_native_context
+    terminal = tuple(native["after_offset"]["display"]["polylines"][0][-3:-1])
+    fixed = native["fixed_ink"]
+    # A point on the parent CIRCLE is not a terminal on its actual finite ink.
+    assert abs(math.dist(terminal, fixed["centre"]) - fixed["radius"]) < drawing.DETAIL_GEOMETRY_TOL_M
+    assert not any(drawing._r24_arc_contains(row, terminal)
+                   for row in native["after_offset"]["display"]["arcs"])
+    assert len(native["before_seed"]["display"]["arcs"]) == 2
+    assert len(native["after_offset"]["display"]["arcs"]) == 2
+
+
 def test_r24_connector_crossing_343_point_5_cluster_line_is_fatal(r24_angle):
+    """Synthetic cluster crossing after the own arrow/witness/arc predicates clear."""
     case = r24_angle
     fixed = drawing._offset_land_angle(case.adapter, case.display)
     case.data.primitives["polylines"] = [_r24_polyline([
-        (0.339, 0.1633219), (0.346, 0.155), (0.3405804, 0.1492994),
+        case.route_start, (0.346, 0.155), (0.333, 0.155), case.landing,
     ])]
     record, geometry = drawing._r24_record(case.adapter, case.annotation, label="angle")
     cluster_data = _ClearanceDisplayData(
@@ -8154,12 +8688,68 @@ def test_r24_dot_official_order_int_status_style_entity_frame_arm_and_taper_read
 
 @pytest.mark.parametrize("setter,value", [
     ("setter_status", -2), ("setter_status", True), ("setter_status", None),
-    ("arrow_status", -3), ("arrow_status", False), ("arrow_status", None),
+    ("arrow_status", -3), ("arrow_status", True), ("arrow_status", None),
 ])
-def test_r24_dot_no_bool_or_nonzero_native_setter_status_can_pass(r24_dot, setter, value):
+def test_r26_dot_int_status_nonzero_or_unconvertible_still_refuses(r24_dot, setter, value):
     setattr(r24_dot.annotation, setter, value)
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, TypeError, ValueError)):
         drawing._configure_rod_position_dot(r24_dot.adapter, r24_dot.gtol, r24_dot.edge, r24_dot.landing)
+
+
+@pytest.mark.parametrize("setter", ["setter_status", "arrow_status"])
+@pytest.mark.parametrize("status", [0, 0.0, "0", False])
+def test_r26_dot_status_conversion_matches_proven_gdt_int_convention(r24_dot, setter, status):
+    setattr(r24_dot.annotation, setter, status)
+    drawing._configure_rod_position_dot(r24_dot.adapter, r24_dot.gtol, r24_dot.edge, r24_dot.landing)
+
+
+@pytest.mark.parametrize("failure", ["setter", "style", "route"])
+@pytest.mark.parametrize("capture_mode", ["success", "different error", "telemetry error"])
+def test_r26_dot_failure_records_actual_leader_side_style_and_preserves_refusal(
+    r24_dot, monkeypatch, failure, capture_mode,
+):
+    case = r24_dot
+    if failure == "setter":
+        case.annotation.setter_status = -2
+    else:
+        signature = drawing._configure_rod_position_dot(case.adapter, case.gtol, case.edge, case.landing)
+        if failure == "style":
+            case.annotation.side = 0
+        else:
+            case.mark_data.lines = []
+    captures = []
+
+    def capture(_adapter, _label, _message, **context):
+        captures.append(context)
+        if capture_mode != "success":
+            raise OSError("DOT forensic capture refused")
+
+    def warn(_message):
+        if capture_mode == "telemetry error":
+            raise RuntimeError("DOT telemetry refused")
+
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    monkeypatch.setattr(drawing._telemetry, "warn", warn)
+    with pytest.raises(RuntimeError) as caught:
+        try:
+            if failure == "setter":
+                drawing._configure_rod_position_dot(case.adapter, case.gtol, case.edge, case.landing)
+            elif failure == "style":
+                drawing._require_rod_position_dot(case.adapter, case.gtol, case.edge, case.landing, signature)
+            else:
+                drawing._require_rod_dot_route(case.adapter, case.view, case.gtol, case.landing)
+        except Exception as exc:
+            drawing._capture_layout_failure(case.adapter, "R24 native rod-pin DOT", exc)
+            raise
+    assert len(captures) == 1 and captures[0]["exception"] is caught.value
+    context = captures[0]["rod_dot_native"]
+    assert context["leader_points"] == case.annotation.leaders[0]
+    assert context["leader_side"] == case.annotation.side
+    assert context["leader_style"] == case.annotation.style
+    assert context["arrow_style"] == case.annotation.arrow
+    assert context["record"]["leaders"] == case.annotation.leaders
+    case.annotation.leaders[0][0] += 0.001
+    assert context["leader_points"] != case.annotation.leaders[0]
 
 
 @pytest.mark.parametrize("member,value", [
@@ -8255,12 +8845,14 @@ def test_r24_production_wires_all_native_local_guards_without_banned_fcf_setter_
     calls = [node.func.id for node in ast.walk(definitions["build"])
              if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
     for name in ("_offset_land_angle", "_require_rod_tip_endpoints", "_configure_rod_position_dot",
-                 "_require_r24_detail_layout", "_require_rod_position_dot", "_require_rod_dot_route", "_require_radius_routes"):
+                 "_require_r24_detail_layout", "_require_rod_position_dot", "_require_rod_dot_route"):
         assert calls.count(name) == 1
     assert "SetLeaderAttachmentPointAtIndex" not in source
     assert "STEM_ENFORCED_KINDS" not in source
     assert "SetWitnessLineGap" not in source
     assert "_place_rod_tip_witnesses" not in definitions
+    assert {"_require_radius_routes", "_require_top_radius_off_part", "_r24_contour_arc",
+            "_r24_manufactured_outline", "_r24_point_in_part"}.isdisjoint(definitions)
     assert "_require_rod_tip_witness_gaps" not in definitions
     assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 13
     assert "COMMON ARC CENTRE ABOVE A" in ch_rocker_arm_notes.DRAWING_NOTES
@@ -8269,140 +8861,103 @@ def test_r24_production_wires_all_native_local_guards_without_banned_fcf_setter_
     assert drawing.ARC_PROFILE_PICK_X_MM == {"TopRadius": -130.0, "BottomRadius": -110.0}
 
 
-def _r24_part_edges():
-    from _drawing_edges import ViewEdge
-    z = drawing.ARM_THICKNESS / 2.0
-    rows = [ViewEdge(object(), None, (0.0, drawing.CENTER_Y, z, 0.0, 0.0, 1.0, radius), None)
-            for radius in (drawing.R_TOP, drawing.R_BOTTOM)]
-    rows.append(ViewEdge(object(), None,
-                         (0.0, drawing.PIVOT_MID_Y, drawing.HUB_LENGTH / 2.0, 0.0, 0.0, 1.0, drawing.HUB_DIA / 2.0), None))
-    for sign in (-1.0, 1.0):
-        top = (sign * drawing.TOP_END_X, drawing.TOP_END_Y, z)
-        tip = (sign * drawing.ROD_TIP_X, drawing._ROD_TIP_Y, z)
-        bottom = (sign * drawing.BOT_END_X, drawing._BOT_END_Y, z)
-        rows.extend((ViewEdge(object(), (top, tip), None, (object(), object())),
-                     ViewEdge(object(), (tip, bottom), None, (object(), object()))))
-    return rows
 
-
-def _r24_reposition_radius(case, name, xy):
-    x, y = xy
-    radius = drawing.R_TOP if name == "TopRadius" else drawing.R_BOTTOM
-    centre = _front_xy(0.0, drawing.CENTER_Y)
-    rim = _front_xy(radius, drawing.CENTER_Y)
-    elbow = (x + 0.0115382, y - 0.0038266)
-    vector = (elbow[0] - centre[0], elbow[1] - centre[1])
-    length = math.hypot(*vector)
-    scale = math.dist(centre, rim) / length
-    arrow = (centre[0] + vector[0] * scale, centre[1] + vector[1] * scale)
-    direction = (elbow[0] - arrow[0], elbow[1] - arrow[1])
-    advance = math.hypot(*direction)
-    ann = case.annotations[name]
-    ann.position = (x, y, 0)
-    ann.data.texts[0]["pos"] = [x - 0.0085288, y - 0.0027781, 0]
-    ann.data.lines = [*_r24_border(Box(x - 0.0095952, y - 0.0027781, x + 0.0095952, y + 0.0027781)),
-                      _native_line(*arrow, *elbow), _native_line(*elbow, x - 0.0099507, elbow[1])]
-    ann.data.primitives["arrows"] = [[*arrow, 0, direction[0] / advance, direction[1] / advance, 0,
-                                     0.003556, 0.000762, 0, 0, 0, 1]]
+def _r26_native_radius_rows(name, *, inside=False):
+    # Copied coordinate rows, NOT a recomputed exterior-style radius fixture.
+    # R23: prechips/20261013T124514403Z.../layout-audit/ch-rocker-arm.json.
+    # Inside R800: prechips/20261011T220808877Z... from the a8dcea067 failure.
+    if inside:
+        assert name == "TopRadius"
+        position = (0.130, 0.218, 5e-5)
+        segments = [
+            (0.1204048, 0.2152219, 0.1204048, 0.2207781),
+            (0.1204048, 0.2207781, 0.1395952, 0.2207781),
+            (0.1395952, 0.2207781, 0.1395952, 0.2152219),
+            (0.1395952, 0.2152219, 0.1204048, 0.2152219),
+            (0.180, 0.5756763, 0.1303884, 0.2207781),
+            (0.124622, 0.1795283, 0.1296116, 0.2152219),
+            (0.124622, 0.1795283, 0.1237429, 0.1732394),
+        ]
+        arrow = [0.124622, 0.1795283, 5e-5, -0.138445, -0.9903701, 0.0,
+                 0.003556, 0.000762, 0.0, 0.0, -0.0, -1.0]
+        text_position = (0.1214712, 0.2152219, 5e-5)
+    elif name == "TopRadius":
+        position = (0.145, 0.136, 5e-5)
+        segments = [
+            (0.1354048, 0.1332219, 0.1354048, 0.1387781),
+            (0.1354048, 0.1387781, 0.1545952, 0.1387781),
+            (0.1545952, 0.1387781, 0.1545952, 0.1332219),
+            (0.1545952, 0.1332219, 0.1354048, 0.1332219),
+            (0.1588691, 0.1762349, 0.1565382, 0.1321734),
+            (0.1565382, 0.1321734, 0.1350493, 0.1321734),
+        ]
+        arrow = [0.1588691, 0.1762349, 5e-5, -0.0528273, -0.9986037, 0.0,
+                 0.003556, 0.000762, 0.0, 0.0, -0.0, -1.0]
+        text_position = (0.1364712, 0.1332219, 5e-5)
+    else:
+        assert name == "BottomRadius"
+        position = (0.169, 0.128, 5e-5)
+        segments = [
+            (0.1594048, 0.1252219, 0.1594048, 0.1307781),
+            (0.1594048, 0.1307781, 0.1785952, 0.1307781),
+            (0.1785952, 0.1307781, 0.1785952, 0.1252219),
+            (0.1785952, 0.1252219, 0.1594048, 0.1252219),
+            (0.1804863, 0.1676766, 0.1805382, 0.1241734),
+            (0.1805382, 0.1241734, 0.1590493, 0.1241734),
+        ]
+        arrow = [0.1804863, 0.1676766, 5e-5, 0.001192, -0.9999993, 0.0,
+                 0.003556, 0.000762, 0.0, 0.0, -0.0, -1.0]
+        text_position = (0.1604712, 0.1252219, 5e-5)
+    lines = [[0.0, 0.0, 0.0, 0.0, x0, y0, 5e-5, x1, y1, 5e-5]
+             for x0, y0, x1, y1 in segments]
+    text = {"t": "R800.00" if name == "TopRadius" else "R816.00",
+            "pos": list(text_position), "h": 0.0035, "ref": 1, "ang": 0.0,
+            "font": "Century Gothic", "ls": 0.001, "w": 0.0170576}
+    return position, _ClearanceDisplayData([text], lines, primitives={"arrows": [arrow]})
 
 
 @pytest.fixture
 def r24_radii(bound, monkeypatch):
-    """Separate native annotation/display/data producers and finite CAD projections."""
-    edges = {"TopRadius": object(), "BottomRadius": object()}
+    """Actual R23 native pair for the restored legacy exterior guard."""
     annotations = {}
-    displays = {}
-    for name, radius in (("TopRadius", drawing.R_TOP), ("BottomRadius", drawing.R_BOTTOM)):
-        x, y = drawing.FRONT_KEEP[name]
-        centre = _front_xy(0.0, drawing.CENTER_Y)
-        elbow = (x + 0.0115382, y - 0.0038266)
-        vector = (elbow[0] - centre[0], elbow[1] - centre[1])
-        scale = math.dist(centre, _front_xy(radius, drawing.CENTER_Y)) / math.hypot(*vector)
-        arrow = (centre[0] + vector[0] * scale, centre[1] + vector[1] * scale)
-        direction = (elbow[0] - arrow[0], elbow[1] - arrow[1])
-        length = math.hypot(*direction)
-        data = _ClearanceDisplayData(
-            [_r24_text(f"R{radius:.2f}", (x - 0.0085288, y - 0.0027781), width=0.0170576)],
-            [*_r24_border(Box(x - 0.0095952, y - 0.0027781, x + 0.0095952, y + 0.0027781)),
-             _native_line(*arrow, *elbow), _native_line(*elbow, x - 0.0099507, elbow[1])],
-            primitives={"arrows": [[*arrow, 0, direction[0] / length, direction[1] / length, 0,
-                                    0.003556, 0.000762, 0, 0, 0, 1]]},
-        )
-        ann = _R24Annotation(name, (x, y, 0), data, attached=(edges[name],))
-        display = _native("IDisplayDimension", GetAnnotation=lambda ann=ann: ann, IsHoleCallout=lambda: False)
-        ann.display = display
+    for name in ("TopRadius", "BottomRadius"):
+        position, data = _r26_native_radius_rows(name)
+        ann = _R24Annotation(name, position, data)
+        ann.display = _native("IDisplayDimension", GetAnnotation=lambda ann=ann: ann, IsHoleCallout=lambda: False)
         annotations[name] = ann
-        displays[name] = display
-    case = SimpleNamespace(annotations=annotations, displays=displays, edges=edges, foreign=[])
-    from _drawing_edges import ViewEdges
-    case.part_rows, case.logs, case.native_project = _r24_part_edges(), [], drawing._project
-    monkeypatch.setattr(drawing, "scan_view_edges", lambda *_a, **_k: ViewEdges("native actual front contour", tuple(case.part_rows)))
-    monkeypatch.setattr(drawing._telemetry, "info", case.logs.append)
-    case.adapter = SimpleNamespace(swApp=_APP)
-    case.view = _native("IView", GetAnnotations=lambda: [*annotations.values(), *case.foreign],
-                        GetAnnotationCount=lambda: len(annotations) + len(case.foreign))
+    case = SimpleNamespace(annotations=annotations, adapter=SimpleNamespace(swApp=_APP), logs=[])
+    case.view = _native("IView", GetAnnotations=lambda: list(annotations.values()),
+                        GetAnnotationCount=lambda: len(annotations))
     monkeypatch.setattr(drawing, "dimension_name", lambda _a, ann: _bind_owner(ann, "IAnnotation").name)
-    monkeypatch.setattr(drawing, "visible_circle_edge", lambda _a, _v, diameter: edges["TopRadius" if diameter == 2 * drawing.R_TOP else "BottomRadius"])
+    monkeypatch.setattr(drawing._telemetry, "info", case.logs.append)
     monkeypatch.setattr(drawing, "_project", lambda _a, _v, points, **_k: [_front_xy(x * 1000, y * 1000) for x, y, _z in points])
     return case
 
 
-def test_r24_radius_routes_keep_off_part_top_exterior_bottom_and_distinct_supported_landings(r24_radii):
+def test_r26_actual_r23_radius_pair_passes_restored_exterior_guard_and_has_no_crossing(r24_radii):
     case = r24_radii
+    assert drawing.FRONT_KEEP["TopRadius"] == (0.145, 0.136)
+    assert drawing.FRONT_KEEP["BottomRadius"] == (0.169, 0.128)
     drawing._require_radius_exterior(case.adapter, case.view)
-    drawing._require_radius_routes(case.adapter, case.view)
-    for name in ("TopRadius", "BottomRadius"):
-        assert case.annotations[name].attached == (case.edges[name],)
+    top, top_geometry = drawing._r24_record(case.adapter, case.annotations["TopRadius"], label="actual R23 R800")
+    bottom, bottom_geometry = drawing._r24_record(case.adapter, case.annotations["BottomRadius"], label="actual R23 R816")
+    top_route = drawing._r24_nonframe_lines(top, top_geometry)
+    bottom_route = drawing._r24_nonframe_lines(bottom, bottom_geometry)
+    drawing._r24_no_crossings(top_route, bottom_geometry.segments, label="actual R23 Top/Bottom pair")
+    drawing._r24_no_crossings(bottom_route, top_geometry.segments, label="actual R23 Bottom/Top pair")
+    for route, geometry in ((top_route, bottom_geometry), (bottom_route, top_geometry)):
+        assert all(drawing.text_overlap(segment, geometry, box)[0] == 0.0
+                   for segment in route for box in geometry.text_boxes)
 
 
-@pytest.mark.parametrize("defect", ["extrapolated-circle", "lower-arc-as-top",
-                                    "missing-border", "own-text", "foreign-leader", "lower-contour"])
-def test_r24_radius_native_domain_and_independent_ink_cannot_be_waived(r24_radii, defect):
+def test_r26_actual_inside_r800_tail_and_strap_extension_refuse_restored_legacy_exterior_guard(r24_radii):
     case = r24_radii
     ann = case.annotations["TopRadius"]
-    arrow = ann.data.primitives["arrows"][0]
-    if defect == "extrapolated-circle":
-        model_x = -200.0  # On the full R800 circle but outside its actual finite support.
-        arrow[:2] = _front_xy(model_x, drawing.CENTER_Y - math.sqrt(drawing.R_TOP**2 - model_x**2))
-    elif defect == "lower-arc-as-top":
-        arrow[:2] = _front_xy(-140.0, drawing.CENTER_Y - math.sqrt(drawing.R_BOTTOM**2 - 140.0**2))
-    elif defect == "missing-border":
-        ann.data.lines = ann.data.lines[4:]
-    elif defect == "own-text":
-        ann.data.lines[4] = _native_line(*drawing.FRONT_KEEP["TopRadius"], *arrow[:2])
-    elif defect == "foreign-leader":
-        row = ann.data.lines[4]
-        midpoint = ((row[4] + row[7]) / 2.0, (row[5] + row[8]) / 2.0)
-        foreign = _R24Annotation("LowerProfile", (0.02, 0.16, 0),
-                                _ClearanceDisplayData([_r24_text("0.5", (0.020, 0.154), width=0.008)],
-                                                      [_native_line(midpoint[0] - 0.010, midpoint[1], midpoint[0] + 0.010, midpoint[1])]),
-                                kind=5)
-        case.foreign.append(foreign)
-    elif defect == "lower-contour":
-        arrow[:2] = _front_xy(0.0, drawing.CENTER_Y - drawing.R_TOP)
-        ann.data.lines[4] = _native_line(0.0985382, 0.1731734, 0.0985382, 0.150)
-        ann.data.primitives["polylines"] = [_r24_polyline([(0.0985382, 0.150), tuple(arrow[:2])])]
-        # Keep the independent lower radius route out of this isolated
-        # lower-contour counterexample; both native arrow landings remain valid.
-        bottom = case.annotations["BottomRadius"].data
-        bottom_tip = _front_xy(10.0, drawing.CENTER_Y - math.sqrt(drawing.R_BOTTOM**2 - 10.0**2))
-        bottom.primitives["arrows"][0][:2] = bottom_tip
-        bottom.lines[4] = _native_line(*bottom_tip, 0.1415382, 0.1221734)
-    with pytest.raises(RuntimeError):
-        drawing._require_radius_routes(case.adapter, case.view)
-
-
-def test_r24_radius_does_not_enable_a_new_two_mm_arrow_text_threshold(r24_radii):
-    case = r24_radii
-    arrow = case.annotations["TopRadius"].data.primitives["arrows"][0]
-    bx = arrow[0] + arrow[3] * arrow[6] + arrow[4] * 0.0018
-    by = arrow[1] + arrow[4] * arrow[6] - arrow[3] * 0.0018
-    text = _r24_text("X", (bx, by), width=0.0004)
-    text["h"] = 0.001
-    foreign = _R24Annotation("NearbyText", (bx, by, 0),
-                            _ClearanceDisplayData([text], []), kind=6)
-    case.foreign.append(foreign)
-    drawing._require_radius_routes(case.adapter, case.view)
+    ann.position, ann.data = _r26_native_radius_rows("TopRadius", inside=True)
+    assert ann.data.lines[4][4:6] == [0.180, 0.5756763]
+    assert len(ann.data.lines) == 7  # Actual centre tail AND arrow/strap extension.
+    with pytest.raises(RuntimeError, match="TopRadius:.*actual_exterior_air_mm"):
+        drawing._require_radius_exterior(case.adapter, case.view)
 
 
 @pytest.fixture
@@ -8465,23 +9020,6 @@ def test_r24_dot_frame_census_cannot_hide_an_extra_or_missing_tolerance_frame(r2
         drawing._configure_rod_position_dot(r24_dot.adapter, r24_dot.gtol, r24_dot.edge, r24_dot.landing)
 
 
-def test_r24_radius_does_not_assume_imported_model_dimension_owns_one_solid_edge(r24_radii, monkeypatch):
-    def unproven_probe(*_args, **_kwargs):
-        pytest.fail("Imported model radius ownership is not an authorized native probe")
-    for annotation in r24_radii.annotations.values():
-        annotation.GetAttachedEntities3 = unproven_probe
-    monkeypatch.setattr(drawing, "visible_circle_edge", unproven_probe)
-    drawing._require_radius_routes(r24_radii.adapter, r24_radii.view)
-
-
-@pytest.mark.parametrize("field", [3, 6, 7])
-def test_r24_radius_arrow_direction_and_footprint_must_have_native_extent(r24_radii, field):
-    row = r24_radii.annotations["TopRadius"].data.primitives["arrows"][0]
-    row[field] = 0.0
-    if field == 3:
-        row[4] = 0.0
-    with pytest.raises(RuntimeError, match="arrow footprint"):
-        drawing._require_radius_routes(r24_radii.adapter, r24_radii.view)
 
 
 def test_r24_raw_text_metrics_are_unrounded_and_zero_table_width_remains_an_estimate(r24_angle):
@@ -8504,12 +9042,8 @@ def test_r24_planning_gaps_are_diagnostics_not_additional_fatal_thresholds(r24_a
                              _ClearanceDisplayData([_r24_text("C", (0.37, 0.13), width=0.003)],
                                                    [_native_line(0.341, 0.152, 0.347, 0.152)]), kind=2)
     cluster_record = drawing._r24_record(case.adapter, cluster, label="5.59/C")
-    # Keep the connector to the left of this finite cluster segment, then
-    # meet its own arc below it; actual non-crossing and termination still apply.
-    case.data.primitives["polylines"] = [_r24_polyline([
-        (0.335, 0.1633219), (0.329, 0.154), (0.3405804, 0.1492994),
-    ])]
-    record, geometry = drawing._r24_record(case.adapter, case.annotation, label="angle")
+    # The approved candidate's controlled route stays left of this finite
+    # cluster segment and terminates on its own actual exposed stub.
     drawing._require_land_angle_route(record, geometry, fixed, [cluster_record])
 
 
@@ -8532,13 +9066,15 @@ def r24_final_layout(r24_angle, r24_tip, r24_taper, monkeypatch):
     caption = _R24Annotation("Detail E", (0.330, 0.064, 0),
                              _ClearanceDisplayData([_r24_text("DETAIL E (2:1)", (0.309, 0.064), width=0.042)], []), kind=6)
     caption.display = _native("INote", GetExtent=lambda: (*state.caption_box[:2], 0, *state.caption_box[2:], 0))
-    thickness = _R24Annotation("StrapThickness", (0.368, 0.166, 0),
-                               _ClearanceDisplayData([_r24_text("18.00", (0.356, 0.164), width=0.012)], []))
+    # Actual R23 2.500 text metrics; no fictitious 18 mm thickness neighbour.
+    thickness = _R24Annotation("StrapThickness", (0.317, 0.175, 0.1461546),
+                               _ClearanceDisplayData(
+                                   [_r24_text(" 2.500 ±0.025 ", (0.302142, 0.1722219), width=0.029716)], []))
     state.end_annotations = [angle.annotation, tip.annotation, datum, caption]
     state.end = _native("IView", GetAnnotations=lambda: state.end_annotations,
                         GetAnnotationCount=lambda: len(state.end_annotations))
     state.right = _native("IView", GetAnnotations=lambda: [thickness], GetAnnotationCount=lambda: 1)
-    state.iso_box = (0.280, 0.180, 0.317, 0.197)
+    state.iso_box = (0.3129339, 0.1811365, 0.3770661, 0.2288635)
     state.iso = _native("IView", GetOutline=lambda: state.iso_box)
     monkeypatch.setattr(drawing, "dimension_name", lambda _a, ann: _bind_owner(ann, "IAnnotation").name)
     state.invoke = lambda: drawing._require_r24_detail_layout(
@@ -8550,6 +9086,99 @@ def r24_final_layout(r24_angle, r24_tip, r24_taper, monkeypatch):
 
 def test_r24_final_native_layout_rechecks_offset_cluster_endpoints_caption_iso_and_taper(r24_final_layout):
     r24_final_layout.invoke()
+
+
+@pytest.mark.parametrize("mode", ["outside", "inside"])
+def test_r26_final_regeneration_proves_synthetic_current_mode_with_original_circle_tips_and_witnesses(
+    r24_final_layout, mode,
+):
+    case = r24_final_layout
+    case.angle.arrow_mode = mode
+    # Synthetic rebuild control: original attachments/value/capped witnesses
+    # are retained while the current native-shaped arc rows/directions change.
+    case.angle.annotation.SetPosition2(*case.angle.annotation.position)
+    case.invoke()
+
+
+@pytest.mark.parametrize("capture_mode", [
+    "success", "rethrow original", "different error", "telemetry error", "snapshot error",
+])
+def test_r26_final_finite_arc_failure_captures_existing_current_mode_rows_and_preserves_exception(
+    r24_final_layout, monkeypatch, capture_mode,
+):
+    case = r24_final_layout
+    case.angle.arrow_mode = "inside"
+    case.angle.annotation.SetPosition2(*case.angle.annotation.position)
+    # A former outside-stub landing cannot survive an inside-mode rebuild.
+    case.angle.data.primitives["polylines"] = [_r24_polyline([
+        case.angle.route_start, (0.3497831, 0.1488092),
+    ])]
+    unrounded_x = case.angle.data.lines[0][4] + 3e-8
+    case.angle.data.lines[0][4] = unrounded_x
+    reads, captures, warnings = [], [], []
+    original_read = drawing._r24_record
+
+    def read(*args, **kwargs):
+        record, geometry = original_read(*args, **kwargs)
+        reads.append((kwargs["label"], json.loads(json.dumps(record))))
+        return record, geometry
+
+    def capture(adapter, label, actual_message, **context):
+        assert adapter is case.angle.adapter
+        assert label == "ch-rocker-arm-post-caption-finalize"
+        assert actual_message == str(context["exception"])
+        captures.append(context)
+        if capture_mode == "rethrow original":
+            raise context["exception"]
+        if capture_mode in ("different error", "telemetry error"):
+            raise OSError("final native capture refused")
+
+    def warn(message):
+        warnings.append(message)
+        if capture_mode == "telemetry error":
+            raise RuntimeError("final capture telemetry refused")
+
+    def refuse_snapshot(_record):
+        raise RuntimeError("final native snapshot refused")
+
+    monkeypatch.setattr(drawing, "_r24_record", read)
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    monkeypatch.setattr(drawing._telemetry, "warn", warn)
+    if capture_mode == "snapshot error":
+        monkeypatch.setattr(drawing.copy, "deepcopy", refuse_snapshot)
+    with pytest.raises(RuntimeError, match="native connector does not land on its arc") as caught:
+        try:
+            case.invoke()
+        except Exception as exc:
+            existing_read_count = len(reads)
+            drawing._capture_layout_failure(case.angle.adapter, "R24 final native layout", exc)
+            assert len(reads) == existing_read_count
+            raise
+    assert len(captures) == 1
+    context = captures[0]
+    assert context["exception"] is caught.value
+    assert context["phase"] == "R24 final native layout"
+    assert context["sheet_png"] is True
+    if capture_mode == "snapshot error":
+        assert "land_angle_native" not in context
+    else:
+        native = context["land_angle_native"]
+        assert json.loads(json.dumps(native["after_regeneration"])) in [record for _label, record in reads]
+        assert native["after_regeneration"]["display"]["lines"][0][4] == unrounded_x
+        assert len(native["after_regeneration"]["display"]["arcs"]) == 2
+        assert native["after_regeneration"]["display"]["polylines"] == case.angle.data.primitives["polylines"]
+        assert len(native["neighbours"]) == 3
+        assert native["strap_thickness"]["display"]["texts"][0]["t"] == " 2.500 ±0.025 "
+        assert native["fixed_ink"] == {
+            key: case.fixed[key] for key in ("centre", "radius", "arrows", "witnesses")
+        }
+        assert native["terminal_attachment_tolerance_m"] == 0.00005
+        assert [obstacle["label"] for obstacle in native["text_obstacles"]] == [
+            "isometric", "detail E caption",
+        ]
+        case.angle.data.primitives["arcs"][0][10] += 0.001
+        assert native["after_regeneration"]["display"]["arcs"][0][10] == 0.3434973
+    assert bool(warnings) is (capture_mode in ("different error", "telemetry error"))
 
 
 @pytest.mark.parametrize("gaps,use_doc", [
@@ -8593,19 +9222,6 @@ def test_r24_final_native_regeneration_cannot_bypass_approved_local_guards(r24_f
         case.invoke()
 
 
-def test_r24_finite_radius_endpoint_allows_existing_native_readback_encoding_precision_only(r24_radii):
-    case = r24_radii
-    data = case.annotations["TopRadius"].data
-    endpoint = _front_xy(-drawing.TOP_END_X, drawing.TOP_END_Y)
-    encoded = (endpoint[0] + 3e-8, endpoint[1])  # Stay clear of the adjacent actual tip face.
-    centre = _front_xy(0.0, drawing.CENTER_Y)
-    elbow = (centre[0] + (encoded[0] - centre[0]) * 0.975,
-             centre[1] + (encoded[1] - centre[1]) * 0.975)
-    x, y = elbow[0] - 0.0115382, elbow[1] + 0.0038266
-    _r24_reposition_radius(case, "TopRadius", (x, y))
-    data.primitives["arrows"][0][:2] = encoded
-    data.lines[4] = _native_line(*encoded, *elbow)
-    drawing._require_radius_routes(case.adapter, case.view)
 
 
 @pytest.mark.parametrize("field,value", [
@@ -8663,7 +9279,7 @@ def test_r24_offset_accepts_continuous_or_duplicated_native_arc_encoding(r24_ang
         return result
     case.annotation.SetPosition2 = move
     drawing._offset_land_angle(case.adapter, case.display)
-    assert len(case.data.primitives["arcs"]) == (1 if partition == "continuous" else 6)
+    assert len(case.data.primitives["arcs"]) == (1 if partition == "continuous" else 4)
 
 
 @pytest.mark.parametrize("border", ["right", "top"])
@@ -8674,7 +9290,7 @@ def test_r24_connector_joins_the_actual_native_basic_border_not_a_padded_glyph_b
     frame = drawing._r24_frame_border(record, geometry)
     box = drawing.union_boxes([s.box() for s in frame])
     join = (box.xmax, box.ymin + 0.001) if border == "right" else ((box.xmin + box.xmax) / 2.0, box.ymax)
-    case.data.primitives["polylines"] = [_r24_polyline([join, (0.33905, 0.155), (0.3405804, 0.1492994)])]
+    case.data.primitives["polylines"] = [_r24_polyline([join, (0.3335, 0.155), case.landing])]
     record, geometry = drawing._r24_record(case.adapter, case.annotation, label="angle")
     drawing._require_land_angle_route(record, geometry, fixed, [])
 
@@ -8701,15 +9317,33 @@ def test_r24_analytic_own_arc_crossing_detects_real_intersection_between_sampled
     assert drawing._r24_arc_intersections(outside_sweep, row) == []
 
 
-def test_r24_arc_contact_at_a_degree_two_elbow_is_not_a_terminal_join_waiver(r24_angle):
+@pytest.mark.parametrize("mode", ["outside", "inside"])
+def test_r26_arc_contact_at_a_degree_two_elbow_is_not_a_terminal_join_waiver(r24_angle, mode):
+    """Synthetic route against the current R23-derived arc, NOT an R800 replay."""
     case = r24_angle
+    case.arrow_mode = mode
     fixed = drawing._offset_land_angle(case.adapter, case.display)
-    centre, radius = (0.3434973, 0.1174326), 0.032
-    def point(degrees, length):
-        angle = math.radians(degrees)
+    # Use the CURRENT native row's own radius. R23's left row is
+    # 0.03199998536562166m, so a guessed 0.032m elbow is 14.634nm outside
+    # its circle and is not a contact, despite the terminal's 50um allowance.
+    arc = case.data.primitives["arcs"][0 if mode == "inside" else -1]
+    centre = tuple(arc[10:12])
+    radius = math.dist(centre, tuple(arc[4:6]))
+    start, sign, sweep = drawing._r24_arc_sweep(arc)
+    def point(fraction, length):
+        angle = start + sign * sweep * fraction
         return (centre[0] + length * math.cos(angle), centre[1] + length * math.sin(angle))
+    elbow = point(0.875, radius)
+    # Control the fixture: this degree-two elbow must really contact its
+    # current finite arc, not a guessed parent circle outside the drawn ink.
+    assert drawing._r24_arc_contains(arc, elbow)
+    contacts = drawing._r24_arc_intersections(Segment(*case.route_start, *elbow), arc)
+    arithmetic = 8.0 * sum(math.ulp(value) for value in (*centre, *elbow, radius))
+    assert any(math.dist(contact, elbow) <= arithmetic for contact in contacts)
+    terminal = point(0.96875, radius)
+    assert math.dist(elbow, terminal) > 2.0 * drawing.DETAIL_GEOMETRY_TOL_M
     case.data.primitives["polylines"] = [_r24_polyline([
-        (0.339, 0.1633219), point(99.0, radius), point(95.23, radius + 0.001), point(95.23, radius),
+        case.route_start, elbow, point(0.96875, radius + 0.001), terminal,
     ])]
     record, geometry = drawing._r24_record(case.adapter, case.annotation, label="angle")
     with pytest.raises(RuntimeError, match="own.*arc"):
@@ -8720,7 +9354,7 @@ def test_r24_arc_contact_at_a_degree_two_elbow_is_not_a_terminal_join_waiver(r24
 def test_r24_cluster_primitive_crossings_and_near_terminal_crossings_are_fatal(r24_angle, primitive):
     case = r24_angle
     fixed = drawing._offset_land_angle(case.adapter, case.display)
-    px, py = (0.33905 + 0.3405804) / 2.0, (0.155 + 0.1492994) / 2.0
+    px, py = ((a + b) / 2.0 for a, b in zip(case.route_start, case.landing, strict=True))
     rows, lines = {}, []
     if primitive == "triangles":
         # Official native schema: v1XYZ, v2XYZ, v3XYZ, isFilled, lineType.
@@ -8731,7 +9365,8 @@ def test_r24_cluster_primitive_crossings_and_near_terminal_crossings_are_fatal(r
     else:
         # A real crossing less than 50um from the approved own-arc terminal is
         # still fatal: native attachment tolerance is not a cluster allowance.
-        lines = [_native_line(0.3405803, 0.149, 0.3405803, 0.150)]
+        lines = [_native_line(case.landing[0] + 1e-7, case.landing[1] - 0.001,
+                              case.landing[0] + 1e-7, case.landing[1] + 0.001)]
     cluster = _R24Annotation("5.59/C", (0.377, 0.130, 0),
                             _ClearanceDisplayData([_r24_text("5.59", (0.373, 0.130), width=0.011)], lines, primitives=rows))
     native_cluster = drawing._r24_record(case.adapter, cluster, label="5.59/C")
@@ -8747,38 +9382,6 @@ def test_r24_cluster_primitive_crossings_and_near_terminal_crossings_are_fatal(r
         drawing._require_land_angle_route(record, geometry, fixed, [native_cluster])
 
 
-def test_r24_old_full_circle_exterior_position_on_the_actual_strap_is_fatal(r24_radii):
-    case = r24_radii
-    _r24_reposition_radius(case, "TopRadius", (0.130, 0.174))
-    _record, geometry = drawing._r24_record(case.adapter, case.annotations["TopRadius"], label="TopRadius")
-    centre = _front_xy(0.0, drawing.CENTER_Y)
-    radius = math.dist(centre, _front_xy(drawing.R_TOP, drawing.CENTER_Y))
-    # This used to satisfy the exterior-circle predicate, yet ink is on material.
-    for box in geometry.text_boxes:
-        assert math.hypot(max(box.xmin - centre[0], centre[0] - box.xmax, 0.0),
-                          max(box.ymin - centre[1], centre[1] - box.ymax, 0.0)) > radius
-    with pytest.raises(RuntimeError, match="actual manufactured part"):
-        drawing._require_radius_exterior(case.adapter, case.view)
-
-
-def test_r24_approved_top_radius_is_inside_the_full_circle_but_outside_the_actual_finite_part(r24_radii):
-    case = r24_radii
-    centre = _front_xy(0.0, drawing.CENTER_Y)
-    radius = math.dist(centre, _front_xy(drawing.R_TOP, drawing.CENTER_Y))
-    assert math.dist(drawing.FRONT_KEEP["TopRadius"], centre) < radius
-    drawing._require_radius_exterior(case.adapter, case.view)
-    drawing._require_radius_routes(case.adapter, case.view)
-    assert any("native_actual_part_exclusion" in message for message in case.logs)
-
-
-def test_r24_top_radius_nonradial_route_refuses_even_with_valid_finite_arrow_and_offpart_text(r24_radii):
-    case = r24_radii
-    data = case.annotations["TopRadius"].data
-    tip = data.primitives["arrows"][0][:2]
-    data.lines[4] = _native_line(*tip, 0.135, 0.1861734)
-    data.lines[5] = _native_line(0.135, 0.1861734, 0.1200493, 0.1861734)
-    with pytest.raises(RuntimeError, match="not radial"):
-        drawing._require_radius_routes(case.adapter, case.view)
 
 
 def test_r24_final_cluster_self_exclusion_does_not_require_unproven_annotation_is_same(r24_final_layout):

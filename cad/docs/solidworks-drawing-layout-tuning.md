@@ -200,16 +200,15 @@ leader points, attached-entity identity and unchanged frame XML after redraw.
 The actual route must miss the taper; a success status alone is not evidence.
 Do not use `SetLeaderAttachmentPointAtIndex` on the frame.
 
-Radius leaders must land on their **finite manufactured arc**, not just the
-corresponding complete circle. R800's text belongs on the concave, centre side
-above the finite top arc, clear of the actual manufactured outline. Requiring
-it outside the complete R800 circle was wrong: that forced a radial leader
-through the strap or onto an extrapolated arc. Only TopRadius replaces that
-old predicate. Its complete text and radial leader must miss the actual part,
-the overall/offset dimensions, top profile frame and leader, pin-axis basics
-and top-height basic; its arrow terminates inside the finite top-arc span.
-R816 retains its complete-circle exterior check and stays clear of the
-taper-dimension and D corridors.
+R800 retains R23's native-proven **145/136 mm** text position and its
+complete-circle exterior guard. The inside-circle attempt recorded by
+`a8dcea067` drew a roughly 355 mm off-sheet centre tail and a 6.3 mm outside
+arrow extension onto the strap, despite the expected radial leader flags.
+The proposed 130/190 mm position shares that unproven mechanism; a fabricated
+tail-free fixture does not establish native behaviour. C1's finite-top-arc
+landing clarity therefore remains open, rather than claiming an off-part
+leader proof. R816 also retains R23's native-proven **169/128 mm** position and
+complete-circle exterior guard; C1/C2 stay open for the current blind review.
 The 5.59 land dimension retains both real corner attachments and the unchanged
 E crop, with both actual native witnesses visible. A standard extension-line
 gap is not a missing attachment: validate the authoritative native gap and
@@ -218,9 +217,9 @@ connection and positive visible portion inside the crop. R24 on SP4 returned
 True from `SetWitnessLineGap(index, False, 0.0)` but then read
 `(True, True, 0.001)` after rebuild; the requested zero override did not persist.
 Zero itself is not the readability requirement. Do not change the document-wide
-gap or ignore
-that readback. R23's measured 1 mm gap leaves visible upper/lower witness ink
-of approximately 1.47/7.47 mm. Readability still needs the rendered-sheet review.
+gap or ignore that readback. R25's actual native geometry at the 1 mm effective
+gap passed both witness routes, with upper/lower crop-visible portions
+2.016936/7.715339 mm. Readability still needs the rendered-sheet review.
 The parent taper witness must miss E's source circle without changing its value
 or endpoints. Note 2 states
 explicitly that the top basic is **ABOVE A** and the common arc centre is
@@ -483,29 +482,46 @@ dimension: `ArcExtensionLineOrOppositeSide` (radial only,
 Broken)` (`types/IDisplayDimension/SetBrokenLeader2.md`). Re-read the geometry
 from `GetDisplayData` afterwards; the render is not the evidence.
 
-For an **angular** dimension, use the existing thumbnut convention instead:
-`OffsetText = True` before `IAnnotation::SetPosition2` moves only the native
-text and its connector, preserving the dimension arc and witness attachments.
-Do not copy the thumbnut's separate `OffsetText = False` arc-placement step
-when the current arc and capped 8 mm witnesses must stay fixed. A cap readback
-is not proof of the drawn witness lengths. R23 rocker's on-arc BASIC 10.46°
-box still intersected both its witness and arc after the inline MIRROR row was
-removed; moving a free-floating note or translating only an offline box would
-not fix that native dimension.
+For an **angular** dimension, the native OffsetText leader retains its
+**pre-offset text anchor**, not the radial projection of the moved text.
+Four native linear samples and the thumbnut's native extension-arc end
+establish this attachment model. Use the complete thumbnut sequence: seed
+`OffsetText = False` with `IAnnotation::SetPosition2` on the original roughly
+32 mm circle beyond the left arrow's footprint (about 108–110 degrees here),
+rebuild and read the actual extension-arc ink, then use the existing
+`offset_dimension_text` mechanism to place the text at 327/166.1 mm.
+SOLIDWORKS can clamp the extension end: the requested seed is not a readback.
+This is native annotation layout, not a model-geometry or tolerance change.
 
-R24's rocker-local contract uses an outward, approximately bisector-aligned
-text position, away from the capped witness pair, with at least 3 mm air to
-the isometric caption. From validated native display readback, account for the
-connector polyline, preserve both 8 mm witnesses and the model attachments,
-and refuse any connector crossing of a witness, dimension arc or the
-5.59/datum-C cluster. Certify arc membership analytically from radius and sweep,
-not distance to a sampled chord. Only a classified degree-one connector
-terminal may join its own arc within the existing 50 um attachment tolerance;
-all witness, cluster and other connector crossings remain strict. The other
-terminal joins the actual native text-frame border, not an estimated glyph box.
-Empty, truncated or unclassified primitive data cannot certify a clean route.
-Native anchor conventions and regenerated connector geometry must be checked,
-not inferred from `SetPosition2` returning success.
+The rocker's local contract preserves the geometric circle, both actual arrow
+tips, capped 8 mm witnesses, native attachments and value across the seed and
+offset. A cap property readback is not proof of the drawn witness lengths.
+Account for the actual connector polyline and refuse every crossing of its
+own witnesses, arcs, arrowhead footprint or the 5.59/datum-C cluster. A terminal
+inside its own arrowhead is not a clean landing (the 104-degree native-row
+refusal control proves this). Keep at least 3 mm air to the isometric caption.
+Certify membership analytically from each current native arc's radius and
+sweep, not distance to a sampled chord or an assumed radial projection.
+Only a classified degree-one terminal may join its own actual finite arc
+within the existing 50 um attachment tolerance; all other crossings remain
+strict. The opposite terminal joins the actual native text-frame border, not
+an estimated glyph box. Empty, truncated or unclassified primitives cannot
+certify a route, and neither a seed nor an offset setter's success certifies it.
+
+Automatic inside/outside-arrow changes can alter the displayed arc segments.
+Keep the circle, arrow tips, witnesses, attachments and value invariant, but
+certify against the current native arc ink rather than frozen stub angles or
+an earlier span envelope. Both fixed arrow tips must remain supported by that
+current finite arc ink.
+
+Do not infer arc ink across native display gaps from the circle or arrow-tip
+envelope: the terminal must join a genuinely displayed finite arc segment.
+R25 refused that terminal after both native witnesses had passed. Its early
+failure bundle held only the phase and a 1024 x 598 bitmap; at the logged
+2.098 px/mm, 50 um is 0.105 pixel and the bitmap cannot resolve the attachment
+contract. Preserve the actual pre/post native primitive rows and the pure route
+classification in the existing failure-capture context, before a fatal check.
+This uses already-read data, not new COM probes or a weaker geometric predicate.
 
 **b. `IView::SetDisplayMode4` refusing HLR on a native detail view.**
 Don't: read `False` as "detail views can't do HLR". Two causes, both documented
