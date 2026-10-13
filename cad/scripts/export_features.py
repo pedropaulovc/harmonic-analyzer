@@ -439,6 +439,7 @@ def feature_selectors(stem: str) -> dict[str, tuple[FaceSpec, ...]]:
 
 
 def _rocker_features() -> dict[str, dict[str, Any]]:
+    """Cite the printed angular row alongside the computed land-angle geometry."""
     p = rocker_notes.DEFAULT_DRAWING_PRECISION
     hub_p = rocker_notes.DRAWING_PRECISION["Hub"]["HubLength"]
     top_p = rocker_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"]
@@ -525,6 +526,7 @@ def _rocker_features() -> dict[str, dict[str, Any]]:
             "radial_tip_end": ([sign * tip[0], tip[1]], ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
             "top_edge_feature": ("top_edge", ("R_TOP",)),
         }, precision={"tip_land": p, "land_angle_deg": 0})
+        result[name]["cite"]["land_angle_deg"] += _source_cite("angular")
     result["tip_land_pos_x"]["datum"] = "C"
     result["tip_land_pos_x"]["cite"]["datum"] = _source_cite("rocker_datum_c")
     notes_cite = _cite(rocker_notes, "DRAWING_NOTES")
