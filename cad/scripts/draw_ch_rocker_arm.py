@@ -22,6 +22,7 @@ import contextlib
 import json
 import math
 import re
+import struct
 import sys
 from typing import Any
 
@@ -1273,8 +1274,53 @@ def _validated_center_mark_crop(crop: Any) -> tuple[float, float, float, float]:
     return tuple(crop)
 
 
-def _center_mark_bucket(position: Any, display: dict[str, Any], crop: Any) -> str:
-    """Exactly PRINTED (all data contained) or GHOST (zero data, outside anchor)."""
+def _display_coordinate_ulp_m(actual: float, boundary: float) -> float:
+    """One positive float32 spacing at float32(max(abs(actual), abs(boundary)))."""
+    if not _native_finite_scalar(actual) or not _native_finite_scalar(boundary):
+        raise ValueError(f"invalid native display precision coordinates: {actual!r}, {boundary!r}")
+    magnitude = max(abs(actual), abs(boundary))
+    try:
+        # '>f' rounds to IEEE-754 binary32, including exponent-boundary carries.
+        bits = struct.unpack(">I", struct.pack(">f", magnitude))[0]
+    except (OverflowError, struct.error) as exc:
+        raise ValueError(f"cannot certify native float32 display precision at {magnitude!r}") from exc
+    if bits >= 0x7F7FFFFF:
+        # The largest finite float32's next value is infinity; spacing is not
+        # a finite containment allowance. Overflow must never admit a row.
+        raise ValueError(f"nonfinite native float32 display spacing at {magnitude!r}")
+    exponent = (bits >> 23) & 0xFF
+    return math.ldexp(1.0, -149 if exponent == 0 else exponent - 150)
+
+
+def _display_bbox_comparisons(box: Box, crop: Any) -> list[dict[str, Any]]:
+    """Apply the display-only one-float32-ULP rule separately to all four sides."""
+    comparisons = []
+    for coordinate, actual, boundary, lower in (
+        ("xmin", box.xmin, crop[0], True), ("ymin", box.ymin, crop[1], True),
+        ("xmax", box.xmax, crop[2], False), ("ymax", box.ymax, crop[3], False),
+    ):
+        overrun = max(0.0, boundary - actual if lower else actual - boundary)
+        tolerance, error = None, None
+        try:
+            tolerance = _display_coordinate_ulp_m(actual, boundary)
+            if not math.isfinite(overrun):
+                raise ValueError("nonfinite native display coordinate overrun")
+        except (TypeError, ValueError, OverflowError) as exc:
+            error = str(exc)
+        comparisons.append({
+            "coordinate": coordinate, "actual_m": actual, "crop_m": boundary,
+            "tolerance_m": tolerance, "overrun_m": overrun,
+            "accepted": error is None and overrun <= tolerance,
+            "precision_error": error,
+        })
+    return comparisons
+
+
+def _center_mark_bucket(
+    position: Any, display: dict[str, Any], crop: Any, *,
+    primitive_evidence: list[dict[str, Any]] | None = None,
+) -> str:
+    """PRINTED uses display precision only; empty-display ghost anchors stay exact."""
     crop = _validated_center_mark_crop(crop)
     if not _native_finite_row(position) or len(position) != 3:
         raise ValueError(f"invalid native centre-mark GetPosition={position!r}")
@@ -1288,38 +1334,56 @@ def _center_mark_bucket(position: Any, display: dict[str, Any], crop: Any) -> st
         if crop[0] <= position[0] <= crop[2] and crop[1] <= position[1] <= crop[3]:
             raise ValueError("empty native centre-mark display inside crop")
         return "GHOST"
-    checked = 0
+    checked, failures = 0, []
     for key, rows in display.items():
         for index, row in enumerate(rows):
             box = _center_mark_primitive_box(key, row)
             if (not all(math.isfinite(v) for v in (box.xmin, box.ymin, box.xmax, box.ymax))
                     or box.xmin > box.xmax or box.ymin > box.ymax):
                 raise ValueError(f"invalid native {key} primitive bbox={box!r}")
-            if box.xmin < crop[0] or box.ymin < crop[1] or box.xmax > crop[2] or box.ymax > crop[3]:
+            comparisons = _display_bbox_comparisons(box, crop)
+            accepted = all(item["accepted"] for item in comparisons)
+            if primitive_evidence is not None:
+                primitive_evidence.append({
+                    "kind": key, "index": index, "raw": row, "bbox": box,
+                    "crop": crop, "accepted": accepted, "comparisons": comparisons,
+                })
+            checked += 1
+            precision_errors = [item["precision_error"] for item in comparisons if item["precision_error"]]
+            if precision_errors:
+                failures.append(
+                    f"cannot certify primitive containment: native {key} #{index} "
+                    f"display precision failed: {precision_errors!r}; raw={row!r}, bbox={box!r}, crop={crop!r}"
+                )
+                continue
+            if not accepted:
                 endpoints_inside = key in ("arcs", "ellipses") and all(
                     crop[0] <= row[offset] <= crop[2] and crop[1] <= row[offset + 1] <= crop[3]
                     for offset in (4, 7)
                 )
                 if key == "ellipses" and endpoints_inside and row[4:7] != row[7:10]:
-                    raise ValueError(
-                        f"cannot certify primitive containment: partial native ellipses #{index} "
-                        f"has no encoded sweep direction; raw={row!r}, envelope={box!r}, crop={crop!r}"
+                    reason = f"partial native ellipses #{index} has no encoded sweep direction"
+                elif key == "arcs" and endpoints_inside and row[4:7] != row[7:10]:
+                    reason = f"partial native arcs #{index} has a full-circle envelope crossing crop with endpoints inside"
+                elif key == "arrows" and crop[0] <= row[0] <= crop[2] and crop[1] <= row[1] <= crop[3]:
+                    reason = f"native arrows #{index} has a two-sided envelope crossing crop with tip inside"
+                else:
+                    extent_status = (
+                        "envelope not certified inside crop within one float32 ULP"
+                        if key in ("arcs", "ellipses", "arrows")
+                        else "outside crop beyond one float32 ULP"
                     )
-                if key == "arcs" and endpoints_inside and row[4:7] != row[7:10]:
-                    raise ValueError(
-                        f"cannot certify primitive containment: partial native arcs #{index} "
-                        f"has a full-circle envelope crossing crop with endpoints inside; raw={row!r}, envelope={box!r}, crop={crop!r}"
+                    failures.append(
+                        f"nonempty native centre-mark {key} #{index} {extent_status}: "
+                        f"raw={row!r}, bbox={box!r}, crop={crop!r}, comparisons={comparisons!r}"
                     )
-                if key == "arrows" and crop[0] <= row[0] <= crop[2] and crop[1] <= row[1] <= crop[3]:
-                    raise ValueError(
-                        f"cannot certify primitive containment: native arrows #{index} "
-                        f"has a two-sided envelope crossing crop with tip inside; raw={row!r}, envelope={box!r}, crop={crop!r}"
-                    )
-                raise ValueError(
-                    f"nonempty native centre-mark {key} #{index} outside crop: "
-                    f"raw={row!r}, bbox={box!r}, crop={crop!r}"
+                    continue
+                failures.append(
+                    f"cannot certify primitive containment: {reason}; "
+                    f"raw={row!r}, envelope={box!r}, crop={crop!r}, comparisons={comparisons!r}"
                 )
-            checked += 1
+    if failures:
+        raise ValueError("; ".join(failures))
     if checked == 0:
         raise ValueError("nonempty native centre-mark display has no accounted primitives")
     return "PRINTED"
@@ -1351,6 +1415,7 @@ def _require_center_mark_census(
         evidence: dict[str, Any] = {
             "id": f"annotation #{index}", "position": "unreadable", "line_count": "unreadable",
         }
+        primitive_evidence: list[dict[str, Any]] = []
         try:
             kind = annotation.GetType()
             if type(kind) is not int or not 1 <= kind <= 19:
@@ -1364,7 +1429,9 @@ def _require_center_mark_census(
             evidence["id"] = name
             evidence["position"] = annotation.GetPosition()
             display = _center_mark_display(annotation, evidence)
-            bucket = _center_mark_bucket(evidence["position"], display, crop)
+            bucket = _center_mark_bucket(
+                evidence["position"], display, crop, primitive_evidence=primitive_evidence,
+            )
             if bucket not in ("PRINTED", "GHOST"):
                 raise RuntimeError(f"native centre-mark bucket fallthrough: {bucket!r}")
         except Exception as exc:
@@ -1377,6 +1444,19 @@ def _require_center_mark_census(
             f"primitive_counts={evidence.get('primitive_counts')!r}, crop={crop!r}"
             + (f", reason={failures[-1]}" if bucket == "FAIL" else "")
         )
+        for primitive in primitive_evidence:
+            coordinate_details = "; ".join(
+                f"{item['coordinate']}: actual_m={item['actual_m']!r}, crop_m={item['crop_m']!r}, "
+                f"tolerance_m={item['tolerance_m']!r}, overrun_m={item['overrun_m']!r}, "
+                f"accepted={item['accepted']}, precision_error={item['precision_error']!r}"
+                for item in primitive["comparisons"]
+            )
+            _telemetry.info(
+                f"{label} centre-mark primitive id={evidence['id']!r}, "
+                f"kind={primitive['kind']}, index={primitive['index']}, accepted={primitive['accepted']}, "
+                f"bbox={primitive['bbox']!r}, crop={primitive['crop']!r}, raw={primitive['raw']!r}, "
+                f"coordinate_comparisons=[{coordinate_details}]"
+            )
     counts = _center_mark_census_totals(buckets, len(annotations))
     _telemetry.info(
         f"{label} centre-mark totals: total_view_annotations={len(annotations)}, "

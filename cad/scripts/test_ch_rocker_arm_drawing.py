@@ -6773,7 +6773,7 @@ def test_r19_full_four_record_lists_do_not_ship_duplicate_printed_marks(mark_cen
 
 
 @pytest.mark.parametrize("label", ["D", "E"])
-def test_r19_crop_and_rows_share_serialization_intervals_without_runtime_padding(label):
+def test_r19_crop_and_rows_have_explicit_serialization_intervals_not_a_runtime_allowance(label):
     quantum = 1e-7  # _drawing_layout_audit._round: 0.1 um serialized coordinates.
     native = _R19_NATIVE_MARK_CROPS[label]
     serialized = tuple(round(value, 7) for value in native)
@@ -6781,18 +6781,21 @@ def test_r19_crop_and_rows_share_serialization_intervals_without_runtime_padding
         assert observed - quantum / 2.0 <= boundary <= observed + quantum / 2.0
     record = next(record for record in _R19_MARK_RECORDS[label] if record[2] is not None)
     assert drawing._center_mark_bucket(record[1], {"lines": _R19_MARK_LINES[label]}, serialized) == "PRINTED"
-    if label == "D":
-        # Rounded .1531/.0681 differ from the full-precision fence by a few ULP.
-        # This proves only that JSON cannot recover native boundary membership.
-        with pytest.raises(ValueError, match="outside crop"):
-            drawing._center_mark_bucket(record[1], {"lines": _R19_MARK_LINES[label]}, native)
+    # Mixed readback/serialized coordinates differ by a few float64 ULP in D.
+    # R23's display-only float32 spacing admits that difference, not the much
+    # larger 0.1 um serialization interval; the interval is fixture evidence.
+    assert drawing._center_mark_bucket(record[1], {"lines": _R19_MARK_LINES[label]}, native) == "PRINTED"
+    row = list(_R19_MARK_LINES[label][0])
+    row[4], row[7] = native[0] - quantum / 2.0, native[0] + 0.001
+    with pytest.raises(ValueError, match="outside crop"):
+        drawing._center_mark_bucket(record[1], {"lines": [row]}, native)
 
 
-def test_center_mark_containment_rejects_even_one_ulp_outside_without_new_padding():
+def test_center_mark_containment_rejects_two_float32_ulp_without_fixture_padding():
     crop = (0.0, 0.0, 0.1, 0.1)
     row = _native_line(0.05, 0.05, crop[2], 0.05)
     assert drawing._center_mark_bucket((0.05, 0.05, 0), {"lines": [row]}, crop) == "PRINTED"
-    row[7] = math.nextafter(crop[2], math.inf)
+    row[7] = crop[2] + 2.0 * math.ldexp(1.0, -27)  # Float32 spacing at 0.1 m.
     with pytest.raises(ValueError, match="outside crop"):
         drawing._center_mark_bucket((0.05, 0.05, 0), {"lines": [row]}, crop)
 
@@ -6928,9 +6931,12 @@ def test_one_outside_primitive_fails_even_with_inside_anchor_and_other_inside_li
     display = {"lines": [_native_line(0.04, 0.05, 0.06, 0.05)]}
     display.setdefault(key, []).append(row)
     case = mark_census([("outside-primitive", (0.05, 0.05, 0), display)])
-    with pytest.raises(RuntimeError, match=f"{key}.*outside crop") as caught:
+    refusal = "envelope not certified inside" if key in ("arcs", "ellipses", "arrows") else "outside crop"
+    with pytest.raises(RuntimeError, match=f"{key}.*{refusal}") as caught:
         drawing._require_center_mark_census(object(), case.view, label="front", required=1)
     assert "raw=" in str(caught.value) and "crop=(0.0, 0.0, 0.1, 0.1)" in str(caught.value)
+    if key in ("arcs", "ellipses", "arrows"):
+        assert "outside crop" not in str(caught.value)
 
 
 @pytest.mark.parametrize("row", [
@@ -6999,7 +7005,7 @@ def test_center_mark_invalid_decoded_bbox_cannot_count_as_printed(mark_census, m
 @pytest.mark.parametrize("bucket", [None, "", "OTHER", "NON_MARK", "FAIL"])
 def test_center_mark_bucket_fallthrough_is_fatal_and_accounted(mark_census, monkeypatch, bucket):
     case = mark_census([("fallthrough", (0.5, 0.05, 0), {})])
-    monkeypatch.setattr(drawing, "_center_mark_bucket", lambda *_args: bucket)
+    monkeypatch.setattr(drawing, "_center_mark_bucket", lambda *_args, **_kwargs: bucket)
     with pytest.raises(RuntimeError, match="bucket fallthrough"):
         drawing._require_center_mark_census(object(), case.view, label="front", required=0)
     assert any("total_view_annotations=1, non_mark=0, printed=0, ghost=0, fail=1" in log for log in case.logs)
@@ -7137,7 +7143,7 @@ def test_center_mark_arc_certifies_full_circle_without_guessing_sweep_or_normal_
 def test_center_mark_closed_arc_bounds_every_cardinal_extremum():
     row = [-1, 0, 0, 0, 0.05, 0.05, 0, 0.05, 0.05, 0,
            0, 0.05, 0, 0, 0, 1, 1]
-    with pytest.raises(ValueError, match="arcs.*outside crop"):
+    with pytest.raises(ValueError, match="arcs.*envelope not certified inside"):
         drawing._center_mark_bucket((0, 0.05, 0), {"arcs": [row]}, (0, 0, 0.1, 0.1))
 
 
@@ -7154,7 +7160,7 @@ def test_center_mark_ellipse_uses_analytic_rotated_envelope_not_axis_endpoints()
     row = [-1, 0, 0, 0, 0.08, 0.08, 0, 0.08, 0.08, 0,
            0.05, 0.05, 0, 0.08, 0.08, 0, 0.02, 0.08, 0]
     assert drawing._center_mark_bucket((0.05, 0.05, 0), {"ellipses": [row]}, (0, 0, 0.1, 0.1)) == "PRINTED"
-    with pytest.raises(ValueError, match="ellipses.*outside crop"):
+    with pytest.raises(ValueError, match="ellipses.*envelope not certified inside"):
         drawing._center_mark_bucket((0.05, 0.05, 0), {"ellipses": [row]}, (0.02, 0.02, 0.08, 0.08))
 
 
@@ -7246,7 +7252,8 @@ def test_center_mark_inconsistent_arc_radii_are_fatal_even_when_an_estimated_box
     assert "outside crop" not in str(caught.value)
 
 
-def test_nearly_closed_arc_one_ulp_endpoint_difference_never_gets_an_endpoint_only_certificate():
+def test_arc_subnormal_float64_endpoint_delta_keeps_strict_full_envelope_requirement():
+    # This is the strict curve certificate, not the display bbox's float32 allowance.
     row = [-1, 0, 0, 0, 0.05, 0, 0, 0.05, math.nextafter(0.0, math.inf), 0,
            0, 0, 0, 0, 0, 1, 1]
     assert math.dist(row[4:6], row[10:12]) == math.dist(row[7:9], row[10:12])
@@ -7296,3 +7303,167 @@ def test_center_mark_and_callout_schema_ownership_remains_separate():
     assert "_validate_center_mark_display" not in called_names
     assert "_native_finite_row" not in called_names
     assert "_native_finite_scalar" not in called_names
+    assert "_display_coordinate_ulp_m" not in called_names
+    assert "_display_bbox_comparisons" not in called_names
+
+
+@pytest.mark.parametrize("magnitude,spacing_exponent", [
+    (0.0, -149),
+    (math.nextafter(0.0, math.inf), -149),
+    (math.ldexp(1.0, -150), -149),  # Half a subnormal rounds to zero.
+    (math.ldexp(1.0, -149), -149),
+    (math.ldexp(1.0, -126), -149),  # Minimum normal float32.
+    (math.ldexp(1.0, -125), -148),
+    (math.nextafter(math.ldexp(1.0, -125), 0.0), -148),
+    (0.5, -24),
+    (1.0 - math.ldexp(1.0, -24), -24),  # Previous float32 before 1.
+    (math.nextafter(1.0, 0.0), -23),  # Float64 below 1 rounds UP to float32 1.
+    (1.0, -23),
+    (math.nextafter(2.0, 0.0), -22),
+    (2.0, -22),
+    (0.1, -27),
+    (0.1531, -26),
+])
+@pytest.mark.parametrize("sign", [-1.0, 1.0])
+@pytest.mark.parametrize("larger_operand", ["actual", "boundary"])
+def test_display_coordinate_spacing_rounds_float32_before_deriving_ulp(
+    magnitude, spacing_exponent, sign, larger_operand,
+):
+    actual, boundary = (sign * magnitude, 0.0) if larger_operand == "actual" else (0.0, sign * magnitude)
+    assert drawing._display_coordinate_ulp_m(actual, boundary) == math.ldexp(1.0, spacing_exponent)
+
+
+@pytest.mark.parametrize("actual,boundary", [
+    (False, 0.1), (0.1, True), ("0.1", 0.1), (0.1, None),
+    (math.nan, 0.1), (0.1, math.inf), (-math.inf, 0.1),
+    (1e40, 0.1), (0.1, -1e40),
+    (float.fromhex("0x1.fffffep+127"), 0.1),
+    (0.1, math.nextafter(float.fromhex("0x1.fffffep+127"), 0.0)),
+])
+def test_display_coordinate_spacing_refuses_invalid_overflow_or_infinite_successor(actual, boundary):
+    with pytest.raises(ValueError, match="display precision|display spacing"):
+        drawing._display_coordinate_ulp_m(actual, boundary)
+
+
+def test_display_bbox_allowance_is_per_side_not_a_global_padding():
+    crop = (0.125, 0.125, 0.25, 0.25)
+    low_ulp, high_ulp = math.ldexp(1.0, -26), math.ldexp(1.0, -25)
+    box = Box(crop[0] - low_ulp, crop[1] - low_ulp, crop[2] + high_ulp, crop[3] + high_ulp)
+    comparisons = drawing._display_bbox_comparisons(box, crop)
+    assert [item["coordinate"] for item in comparisons] == ["xmin", "ymin", "xmax", "ymax"]
+    assert [item["tolerance_m"] for item in comparisons] == [low_ulp, low_ulp, high_ulp, high_ulp]
+    assert [item["overrun_m"] for item in comparisons] == [low_ulp, low_ulp, high_ulp, high_ulp]
+    assert all(item["accepted"] and item["precision_error"] is None for item in comparisons)
+
+
+@pytest.mark.parametrize("side", range(4))
+def test_display_bbox_each_side_rejects_two_float32_ulp(side):
+    crop = (0.125, 0.125, 0.25, 0.25)
+    coordinates = list(crop)
+    ulp = math.ldexp(1.0, -26 if side < 2 else -25)
+    coordinates[side] += (-2.0 if side < 2 else 2.0) * ulp
+    comparisons = drawing._display_bbox_comparisons(Box(*coordinates), crop)
+    assert comparisons[side]["overrun_m"] == 2.0 * ulp
+    assert comparisons[side]["accepted"] is False
+    assert all(item["accepted"] for index, item in enumerate(comparisons) if index != side)
+
+
+_R22_NATIVE_D_ROW_5 = [
+    -1, 0, -1, 0, 0.16000000044703483, 0.09500000025714497, 0,
+    0.15309999912977218, 0.09500000025714497, 0,
+]
+
+
+def test_r22_unrounded_native_row_and_persisted_crop_pass_with_coordinate_telemetry(mark_census, monkeypatch):
+    crop = _R19_NATIVE_MARK_CROPS["D"]  # Exact persisted D crop also captured in R22.
+    case = mark_census([
+        ("native-row-replay", (0.16, 0.095, 0), {"lines": [_R22_NATIVE_D_ROW_5]}),
+        ("empty-native-ghost", (0.7086834, 0.1270803, 0.005), {}),
+    ], crop=crop)
+    def persisted_crop(_adapter, view, *, label):
+        assert view is case.view and label == "D"
+        return crop  # Unrounded task-log readback, never the 7dp JSON crop.
+    monkeypatch.setattr(drawing, "_detail_crop", persisted_crop)
+    counts = drawing._require_center_mark_census(object(), case.view, label="D", required=1, detail="D")
+    assert counts == {"NON_MARK": 0, "PRINTED": 1, "GHOST": 1, "FAIL": 0}
+    row_logs = [log for log in case.logs if "centre-mark primitive" in log]
+    assert len(row_logs) == 1
+    log = row_logs[0]
+    assert "id='native-row-replay', kind=lines, index=0, accepted=True" in log
+    assert f"crop={crop!r}" in log and f"raw={_R22_NATIVE_D_ROW_5!r}" in log
+    bbox = drawing._center_mark_primitive_box("lines", _R22_NATIVE_D_ROW_5)
+    comparisons = drawing._display_bbox_comparisons(bbox, crop)
+    assert comparisons[0]["overrun_m"] == crop[0] - _R22_NATIVE_D_ROW_5[7]
+    assert comparisons[0]["overrun_m"] * 1e9 == pytest.approx(0.8702278898)
+    assert comparisons[0]["tolerance_m"] == math.ldexp(1.0, -26)
+    for item in comparisons:
+        assert f"{item['coordinate']}: actual_m={item['actual_m']!r}, crop_m={item['crop_m']!r}" in log
+        assert f"tolerance_m={item['tolerance_m']!r}, overrun_m={item['overrun_m']!r}" in log
+
+
+@pytest.mark.parametrize("overrun", [2.0 * math.ldexp(1.0, -26), 1e-6])
+def test_r22_row_larger_overrun_is_fatal_and_all_compared_rows_are_logged(mark_census, overrun):
+    crop = _R19_NATIVE_MARK_CROPS["D"]
+    outside = list(_R22_NATIVE_D_ROW_5)
+    outside[7] = crop[0] - overrun
+    case = mark_census([
+        ("native-row-replay", (0.16, 0.095, 0), {"lines": [_R22_NATIVE_D_ROW_5, outside, _R22_NATIVE_D_ROW_5]}),
+        ("empty-native-ghost", (0.7086834, 0.1270803, 0.005), {}),
+    ], crop=crop)
+    with pytest.raises(RuntimeError, match="lines #1 outside crop beyond one float32 ULP"):
+        drawing._require_center_mark_census(object(), case.view, label="D-row-replay", required=1)
+    row_logs = [log for log in case.logs if "centre-mark primitive" in log]
+    assert len(row_logs) == 3
+    assert [f"index={index}, accepted={accepted}" in log
+            for index, accepted, log in zip(range(3), (True, False, True), row_logs)] == [True, True, True]
+    for log in row_logs:
+        assert "id='native-row-replay', kind=lines" in log and f"crop={crop!r}" in log
+        assert log.count("tolerance_m=") == 4 and log.count("overrun_m=") == 4
+    assert any("total_view_annotations=2, non_mark=0, printed=0, ghost=1, fail=1" in log for log in case.logs)
+
+
+def test_float32_precision_failure_never_produces_infinite_acceptance(mark_census):
+    maximum = float.fromhex("0x1.fffffep+127")
+    crop = (0.0, 0.0, maximum, maximum)
+    case = mark_census([("unverifiable-spacing", (0.5, 0.5, 0), {
+        "lines": [_native_line(0.25, 0.5, 0.75, 0.5)],
+    })], crop=crop)
+    with pytest.raises(RuntimeError, match="display precision failed.*nonfinite native float32 display spacing"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=1)
+    row_log = next(log for log in case.logs if "centre-mark primitive" in log)
+    assert "accepted=False" in row_log
+    assert "tolerance_m=None" in row_log
+    assert "precision_error='nonfinite native float32 display spacing" in row_log
+    assert "tolerance_m=inf" not in row_log
+
+
+def test_display_precision_allowance_does_not_change_exact_empty_ghost_anchors():
+    crop = (0.0, 0.0, 0.1, 0.1)
+    assert drawing._center_mark_bucket((math.nextafter(crop[2], math.inf), 0.05, 0), {}, crop) == "GHOST"
+    for anchor_x in (crop[2], math.nextafter(crop[2], 0.0)):
+        with pytest.raises(ValueError, match="empty native centre-mark display inside crop"):
+            drawing._center_mark_bucket((anchor_x, 0.05, 0), {}, crop)
+
+
+def test_display_containment_rejects_one_and_a_quarter_ulp_not_rounded_ulp_distance():
+    crop = (0.0, 0.0, 0.125, 0.125)
+    row = _native_line(0.1, 0.05, crop[2] + 1.25 * math.ldexp(1.0, -26), 0.05)
+    evidence = []
+    with pytest.raises(ValueError, match="lines #0 outside crop beyond one float32 ULP"):
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"lines": [row]}, crop, primitive_evidence=evidence)
+    upper_x = evidence[0]["comparisons"][2]
+    assert upper_x["overrun_m"] == 1.25 * math.ldexp(1.0, -26)
+    assert upper_x["tolerance_m"] == math.ldexp(1.0, -26)
+    assert upper_x["accepted"] is False
+
+
+def test_display_containment_rejects_two_subnormal_steps_outside_zero_boundary():
+    crop = (0.0, 0.0, 0.1, 0.1)
+    row = _native_line(0.0, 0.05, -math.ldexp(1.0, -148), 0.05)
+    evidence = []
+    with pytest.raises(ValueError, match="lines #0 outside crop beyond one float32 ULP"):
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"lines": [row]}, crop, primitive_evidence=evidence)
+    lower_x = evidence[0]["comparisons"][0]
+    assert lower_x["overrun_m"] == math.ldexp(1.0, -148)
+    assert lower_x["tolerance_m"] == math.ldexp(1.0, -149)
+    assert lower_x["accepted"] is False

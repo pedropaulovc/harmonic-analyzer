@@ -162,15 +162,33 @@ ghosts, not missing holes or ink that should be deleted.
 
 Classify every centre-mark annotation exactly once and log its native id,
 position and line count. `PRINTED` requires non-empty display with every
-primitive inside the persisted crop; only these count toward 2/1/1. `GHOST`
-requires **both** empty display and an anchor outside the crop. Empty inside,
-non-empty primitives outside, unreadable data or malformed/truncated arrays
-must refuse, not become zero ink. Account for the entire annotation array with
-non-centre marks plus printed/ghost buckets, and preserve the exact printed
+primitive inside the persisted crop, subject only to the display encoding
+precision below; only these count toward 2/1/1. `GHOST` requires **both** empty
+display and an anchor outside the crop, with no anchor tolerance. Empty inside,
+non-empty primitives beyond encoding precision, unreadable data or
+malformed/truncated arrays must refuse, not become zero ink. Account for the
+entire annotation array with non-centre marks plus printed/ghost buckets, and
+preserve the exact printed
 counts. Ghosts remain untouched: deleting an invisible object adds native
 risk without improving the sheet. The R19 dump rounds coordinates to 0.1 um;
 replay fixtures must state that quantization rather than silently adding
 runtime crop padding.
+
+R22 at `db94ffe29a8878fe6aab46181b0f66fa483cf393`, run
+`20261013T111844759Z-1c357921c6af4a77806cd9dc0d20a5bf`, confirmed the ghost
+bucket but refused a printed D arm by 0.8702278898 nm. Its native endpoint
+`0.15309999912977218` m is exactly `0.18 - float32(0.0269)`, while the persisted
+double-precision crop starts at `0.15310000000000007` m. The display arrays
+carry single-precision local offsets: a sub-ULP overrun is encoding, not ink,
+and this arm is clipped at the crop circle by construction. Main ruled that
+each **display primitive versus persisted crop** coordinate comparison gets
+one derived float32 ULP at the magnitude of its larger operand:
+`float64(spacing(float32(max(abs(a), abs(b)))))`, or an equivalent IEEE-754
+calculation. Log the per-row tolerances and overruns. This is not a fixed
+epsilon, rounding of native rows, crop expansion or a global audit allowance.
+Two-ULP and 1 um overruns still refuse; ghost, inside-empty and malformed-data
+rules are unchanged. The shared exact-zero **crop versus outline** containment
+and independent 50 um F5 equation remain unchanged (double versus double).
 
 
 ## What is readable from the API (stop guessing)
