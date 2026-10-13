@@ -27,7 +27,14 @@ def test_carriage_cg_hangs_on_the_rod_axis() -> None:
 def test_every_carriage_point_stands_off_the_paper() -> None:
     points = g.paper_side_points()
     assert max(points.values()) <= PAPER_LIMIT_Z
-    assert g.MARKER_POS[2] == pytest.approx(PAPER_FRONT_Z - g.CLEARANCE)
+    # The yawed nib's paper-most point is on its flank, not its axial tip
+    # (the top-assembly interference gate caught a 0.03 mm flank overlap).
+    sin = math.sin(math.radians(g.PEN_BLOCK_YAW_DEG))
+    nib_paper_most = max(
+        g.machine_z(g.MARKER_NIB_LOCAL_X + y, vb.BLOCK_DEPTH / 2.0) + r * sin
+        for y, r in g.marker.PROFILE
+    )
+    assert nib_paper_most == pytest.approx(PAPER_FRONT_Z - g.CLEARANCE)
 
 
 def test_rod_line_is_the_paper_most_tenth_that_clears_the_paper() -> None:

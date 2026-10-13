@@ -102,9 +102,14 @@ NUT_POS = (PEN_ROD_X, ROD_SQUARE_TOP_REST_Y, PEN_Z_MID)
 # Marker local +Y (nib -> back end) -> block local +X, local +X -> block -Y.
 MARKER_ROWS = [[-v for v in BLOCK_ROWS[1]], list(BLOCK_ROWS[0]), list(BLOCK_ROWS[2])]
 # Nib on the paper: machine z of local (x, ., D/2) is VBLOCK_POS.z - x*cos + D/2*sin.
+# The yawed nib reaches the paper on its rounded flank, not its axial tip: a
+# profile station (y, r) sits r*sin - y*cos paper-ward of the tip (piecewise
+# linear, so a station is the extreme). The paper-most station stands
+# PEN_PAPER_CLEARANCE_MM off the paper.
+MARKER_NIB_REACH = max(r * _S - y * _C for y, r in marker.PROFILE)
 MARKER_NIB_LOCAL_X = (
     -(
-        (PAPER_FRONT_Z - PEN_PAPER_CLEARANCE_MM)
+        (PAPER_FRONT_Z - PEN_PAPER_CLEARANCE_MM - MARKER_NIB_REACH)
         - VBLOCK_POS[2]
         - (vb.BLOCK_DEPTH / 2.0) * _S
     )
