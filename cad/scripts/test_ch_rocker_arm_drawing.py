@@ -4127,7 +4127,7 @@ def test_native_profile_guard_diagnoses_actual_radius_leader_crossing(native_pro
     "bool-kind", "string-kind", "invalid-low", "invalid-high",
 ])
 def test_each_face_retains_only_its_template_marks_without_batch_reinsertion(
-    bound, view_index, defect,
+    mark_census, monkeypatch, view_index, defect,
 ):
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     build = next(
@@ -4140,11 +4140,15 @@ def test_each_face_retains_only_its_template_marks_without_batch_reinsertion(
         and any(
             isinstance(call, ast.Call)
             and isinstance(call.func, ast.Name)
-            and call.func.id == "_bound_view_annotations"
+            and call.func.id == "_require_center_mark_census"
             for call in ast.walk(node)
         )
     ]
     assert len(loops) == 1
+    assert [
+        (entry.elts[0].value, entry.elts[1].id, entry.elts[2].value, entry.elts[3].value)
+        for entry in loops[0].iter.elts
+    ] == [("front", "front", 2, None), ("detail D", "hub", 1, "D"), ("detail E", "end", 1, "E")]
     assert not hasattr(drawing, "auto_center_marks")
     assert not any(
         isinstance(call, ast.Call)
@@ -4164,21 +4168,48 @@ def test_each_face_retains_only_its_template_marks_without_batch_reinsertion(
         kinds_by_view[view_index].append(13)
     elif defect in invalid_kinds:
         kinds_by_view[view_index].append(invalid_kinds[defect])
+
+    adapter, hub = _native_crop_fixture(monkeypatch, "D")
+    _adapter, end = _native_crop_fixture(monkeypatch, "E")
+    centres = (drawing.FRONT_CENTER, hub.physical, end.physical)
     views = []
-    for kinds in kinds_by_view:
-        annotations = [
-            _native("IAnnotation", GetType=lambda kind=kind: kind) for kind in kinds
+    for index, (kinds, (x, y)) in enumerate(zip(kinds_by_view, centres, strict=True)):
+        records = [
+            (f"template-{index}-{ordinal}", (x + ordinal * 0.002, y, 0.0),
+             {"lines": [_native_line(x + ordinal * 0.002 - 0.0005, y,
+                                     x + ordinal * 0.002 + 0.0005, y)]})
+            for ordinal, kind in enumerate(kinds) if type(kind) is int and kind == 13
         ]
-        views.append(_native("IView", GetAnnotationCount=lambda items=annotations: len(items), GetAnnotations=lambda items=annotations: items,))
+        case = mark_census(records, crop=(0.100, 0.150, 0.260, 0.200))
+        printed_raws = iter(case.raws)
+        raw_annotations = [
+            next(printed_raws) if type(kind) is int and kind == 13 else
+            case.binding.raw(_native("IAnnotation", GetType=lambda kind=kind: kind), "IAnnotation")
+            for kind in kinds
+        ]
+        if index and not (defect == "empty" and index == view_index):
+            # Native details retain a readable off-crop zero-ink ghost. It
+            # must not count as printed and must not be deleted by the loop.
+            ghost = mark_census([(f"ghost-{index}", (0.700, 0.127, 0.005), {})])
+            raw_annotations.extend(ghost.raws)
+        if index:
+            native_view = (hub, end)[index - 1]
+            native_view.annotations = raw_annotations
+            views.append(case.binding.raw(native_view, "IView"))
+        else:
+            case.raws[:] = raw_annotations
+            views.append(case.view)
     reads = []
+    counted_annotations = drawing._bound_view_annotations
 
-    def census(view, *, label):
+    def record_counted_read(view, *, label):
         reads.append(view)
-        return drawing._bound_view_annotations(view, label=label)
+        return counted_annotations(view, label=label)
 
+    monkeypatch.setattr(drawing, "_bound_view_annotations", record_counted_read)
     namespace = dict(
-        front=views[0], hub=views[1], end=views[2],
-        _bound_view_annotations=census,
+        adapter=adapter, front=views[0], hub=views[1], end=views[2],
+        _require_center_mark_census=drawing._require_center_mark_census,
     )
     module = ast.Module(body=loops, type_ignores=[])
     code = compile(ast.fix_missing_locations(module), drawing.__file__, "exec")
@@ -6515,3 +6546,753 @@ def test_actual_gdt_producers_keep_specific_frame_and_annotation_members_disjoin
     ):
         with pytest.raises(RuntimeError, match="native owner mismatch"):
             case.binding.bind(native, wrong)
+
+
+# R19 layout-audit replay (20261013T051541021Z-0456b55b4ef7424793cb5fdafaf10c41).
+# The shared JSON rounds coordinates to 7dp. These are serialized fixtures,
+# never unrounded COM evidence and never a production containment allowance.
+_R19_NATIVE_MARK_CROPS = {
+    "D": (0.15310000000000007, 0.0681000000000001,
+          0.20689999999999992, 0.12189999999999995),
+    "E": (0.30616186089949615, 0.08616186089949626,
+          0.35383813910050377, 0.13383813910050388),
+}
+_R19_FRONT_OUTLINE = (0.1012847, 0.1620883, 0.2587153, 0.1879117)
+
+
+def _r19_mark_lines(rows):
+    return [[-1.0, 0.0, style, 0.0, x0, y0, 0.0, x1, y1, 0.0]
+            for style, x0, y0, x1, y1 in rows]
+
+
+_R19_MARK_LINES = {
+    "front-pivot": _r19_mark_lines((
+        (0, 0.18, 0.1716763, 0.18, 0.1729263),
+        (0, 0.18, 0.1716763, 0.17875, 0.1716763),
+        (0, 0.18, 0.1716763, 0.18, 0.1704263),
+        (0, 0.18, 0.1716763, 0.18125, 0.1716763),
+        (-1, 0.18, 0.1741763, 0.18, 0.1754763),
+        (-1, 0.1775, 0.1716763, 0.1762, 0.1716763),
+        (-1, 0.18, 0.1691763, 0.18, 0.1678763),
+        (-1, 0.1825, 0.1716763, 0.1838, 0.1716763),
+    )),
+    "front-pin": _r19_mark_lines((
+        (0, 0.2465337, 0.1759044, 0.2465337, 0.1771544),
+        (0, 0.2465337, 0.1759044, 0.2452837, 0.1759044),
+        (0, 0.2465337, 0.1759044, 0.2465337, 0.1746544),
+        (0, 0.2465337, 0.1759044, 0.2477837, 0.1759044),
+        (-1, 0.2465337, 0.1771544, 0.2465337, 0.1776528),
+        (-1, 0.2452837, 0.1759044, 0.2447852, 0.1759044),
+        (-1, 0.2465337, 0.1746544, 0.2465337, 0.1741559),
+        (-1, 0.2477837, 0.1759044, 0.2482822, 0.1759044),
+    )),
+    "D": _r19_mark_lines((
+        (0, 0.18, 0.095, 0.18, 0.105),
+        (0, 0.18, 0.095, 0.17, 0.095),
+        (0, 0.18, 0.095, 0.18, 0.085),
+        (0, 0.18, 0.095, 0.19, 0.095),
+        (-1, 0.18, 0.115, 0.18, 0.1219),
+        (-1, 0.16, 0.095, 0.1531, 0.095),
+        (-1, 0.18, 0.075, 0.18, 0.0681),
+        (-1, 0.2, 0.095, 0.2069, 0.095),
+    )),
+    "E": _r19_mark_lines((
+        (0, 0.317123, 0.1027457, 0.317123, 0.1077457),
+        (0, 0.317123, 0.1027457, 0.312123, 0.1027457),
+        (0, 0.317123, 0.1027457, 0.317123, 0.0977457),
+        (0, 0.317123, 0.1027457, 0.322123, 0.1027457),
+        (-1, 0.317123, 0.1077457, 0.317123, 0.1097396),
+        (-1, 0.312123, 0.1027457, 0.3101291, 0.1027457),
+        (-1, 0.317123, 0.0977457, 0.317123, 0.0957518),
+        (-1, 0.322123, 0.1027457, 0.3241169, 0.1027457),
+    )),
+}
+_R19_MARK_RECORDS = {
+    "front": (
+        ("DetailItem347", (0.1781134, 0.1699608, 0.0017641), "front-pivot"),
+        ("DetailItem349", (0.2462447, 0.1754982, 0.000625), "front-pin"),
+        ("DetailItem359", (0.1781134, 0.1699608, -0.0017641), "front-pivot"),
+        ("DetailItem361", (0.2462447, 0.1754982, 0.000625), "front-pin"),
+    ),
+    "D": (
+        ("DetailItem352", (0.1616543, 0.0860784, -0.014113), "D"),
+        ("DetailItem354", (0.7086834, 0.1270803, 0.005), None),
+        ("DetailItem362", (0.1616329, 0.0861226, 0.014113), "D"),
+        ("DetailItem364", (0.7083548, 0.1280648, 0.005), None),
+    ),
+    "E": (
+        ("DetailItem356", (0.0417128, 0.0815902, -0.0070565), None),
+        ("DetailItem358", (0.3153098, 0.1019162, 0.0025), "E"),
+        ("DetailItem365", (0.0453988, 0.0773014, 0.0070565), None),
+        ("DetailItem367", (0.3153176, 0.1018994, 0.0025), "E"),
+    ),
+}
+
+
+class _MarkDisplayData:
+    """Closed IDisplayData surface, with explicit authoritative zero counts."""
+    _native_interfaces = ("IDisplayData",)
+    _primitives = {
+        "lines": ("GetLineCount", ("GetLineAtIndex3", "GetLineAtIndex2")),
+        "arcs": ("GetArcCount", ("GetArcAtIndex2",)),
+        "arrows": ("GetArrowHeadCount", ("GetArrowHeadAtIndex2",)),
+        "polylines": ("GetPolyLineCount", ("GetPolylineAtIndex2",)),
+        "polygons": ("GetPolygonCount", ("GetPolygonAtIndex",)),
+        "triangles": ("GetTriangleCount", ("GetTriangleAtIndex",)),
+        "ellipses": ("GetEllipseCount", ("GetEllipseAtIndex2",)),
+    }
+
+    def __init__(self, display):
+        self.display = display
+        self.overrides, self.reads = {}, []
+
+    def _answer(self, member, default, args):
+        self.reads.append((member, args))
+        value = self.overrides.get(member, default)
+        if isinstance(value, Exception):
+            raise value
+        return value(*args) if callable(value) else value
+
+    def __getattr__(self, member):
+        for key, (count_member, getters) in self._primitives.items():
+            if member == count_member:
+                return lambda: self._answer(member, len(self.display.get(key, ())), ())
+            if member in getters:
+                return lambda index: self._answer(
+                    member, lambda i: self.display.get(key, ())[i], (index,),
+                )
+        if member == "GetTextCount":
+            return lambda: self._answer(member, len(self.display.get("texts", ())), ())
+        raise AttributeError(f"IDisplayData does not own {member}")
+
+
+class _MarkAnnotation:
+    """IAnnotation owns the dispatch hop; it never owns display-data methods."""
+    _native_interfaces = ("IAnnotation",)
+
+    def __init__(self, name, position, data):
+        self.name, self.position, self.data = name, position, data
+
+    def GetType(self):
+        return 13
+
+    def GetName(self):
+        return self.name
+
+    def GetPosition(self):
+        return self.position
+
+    def GetDisplayData(self):
+        return self.data
+
+
+@pytest.fixture
+def mark_census(monkeypatch, native_annotation_binding):
+    """Actual census and decoders, opaque native dispatches at both owner hops."""
+    binding = native_annotation_binding
+    logs = []
+    monkeypatch.setattr(drawing._telemetry, "info", logs.append)
+
+    def make(records, *, crop=(0.0, 0.0, 0.1, 0.1)):
+        annotations, datas, raws = [], [], []
+        for name, position, display in records:
+            data = _MarkDisplayData(display)
+            annotation = _MarkAnnotation(name, position, binding.raw(data, "IDisplayData"))
+            datas.append(data)
+            annotations.append(annotation)
+            raws.append(binding.raw(annotation, "IAnnotation"))
+        view = _native(
+            "IView", GetAnnotationCount=lambda: len(raws), GetAnnotations=lambda: tuple(raws),
+            GetOutline=lambda: crop,
+        )
+        return SimpleNamespace(
+            annotations=annotations, datas=datas, raws=raws, native_view=view,
+            view=binding.raw(view, "IView"), logs=logs, binding=binding, crop=crop,
+        )
+    return make
+
+
+def _r19_mark_census(mark_census, label, *, manual=False):
+    records = _R19_MARK_RECORDS[label]
+    records = records if manual else records[:2]
+    crop = (_R19_FRONT_OUTLINE if label == "front"
+            else tuple(round(value, 7) for value in _R19_NATIVE_MARK_CROPS[label]))
+    return mark_census([
+        (name, position, {} if key is None else {"lines": _R19_MARK_LINES[key]})
+        for name, position, key in records
+    ], crop=crop)
+
+
+@pytest.mark.parametrize("label,required", [("front", 2), ("D", 1), ("E", 1)])
+def test_r19_original_marks_count_printed_ink_not_all_type13_objects(mark_census, monkeypatch, label, required):
+    case = _r19_mark_census(mark_census, label)
+    crop_reads = []
+    def crop(_adapter, view, *, label):
+        assert view is case.view
+        crop_reads.append(label)
+        return case.crop  # Explicitly quantized replay, not a native crop substitute.
+    monkeypatch.setattr(drawing, "_detail_crop", crop)
+    counts = drawing._require_center_mark_census(
+        object(), case.view, label=label, required=required,
+        detail=None if label == "front" else label,
+    )
+    assert counts == {"NON_MARK": 0, "PRINTED": required, "GHOST": 2 - required, "FAIL": 0}
+    assert len(case.raws) == 2
+    assert sum(annotation.GetType() == 13 for annotation in case.annotations) == 2
+    assert crop_reads == ([] if label == "front" else [label])
+    expected_getters = {value[0] for value in _MarkDisplayData._primitives.values()} | {"GetTextCount"}
+    for data in case.datas:
+        assert expected_getters <= {member for member, _args in data.reads}
+    assert [owner for interface, owner in case.binding.calls if interface == "IDisplayData"] == case.datas
+    for annotation, data in zip(case.annotations, case.datas):
+        log = next(log for log in case.logs if f"id={annotation.name!r}" in log)
+        assert f"position={annotation.position!r}" in log
+        assert f"line_count={len(data.display.get('lines', ()))!r}" in log
+        assert f"class={'PRINTED' if data.display else 'GHOST'}" in log
+    assert any(f"total_view_annotations=2, non_mark=0, printed={required}, ghost={2-required}, fail=0" in log
+               for log in case.logs)
+
+
+@pytest.mark.parametrize("label,required", [("front", 2), ("D", 1), ("E", 1)])
+def test_r19_full_four_record_lists_do_not_ship_duplicate_printed_marks(mark_census, monkeypatch, label, required):
+    case = _r19_mark_census(mark_census, label, manual=True)
+    def crop(_adapter, view, *, label):
+        assert view is case.view and label in ("D", "E")
+        return case.crop  # Same 7dp coordinate domain as the serialized rows.
+    monkeypatch.setattr(drawing, "_detail_crop", crop)
+    with pytest.raises(RuntimeError, match=f"expected {required}.*PRINTED hole center marks, found {2*required}"):
+        drawing._require_center_mark_census(
+            object(), case.view, label=label, required=required,
+            detail=None if label == "front" else label,
+        )
+    assert len(case.raws) == 4  # No deletion, move, or position-based coalescing.
+    assert sum("class=PRINTED" in log for log in case.logs) == 2 * required
+    assert sum("class=GHOST" in log for log in case.logs) == 4 - 2 * required
+    assert any(f"total_view_annotations=4, non_mark=0, printed={2*required}, ghost={4-2*required}, fail=0" in log
+               for log in case.logs)
+
+
+@pytest.mark.parametrize("label", ["D", "E"])
+def test_r19_crop_and_rows_share_serialization_intervals_without_runtime_padding(label):
+    quantum = 1e-7  # _drawing_layout_audit._round: 0.1 um serialized coordinates.
+    native = _R19_NATIVE_MARK_CROPS[label]
+    serialized = tuple(round(value, 7) for value in native)
+    for observed, boundary in zip(serialized, native):
+        assert observed - quantum / 2.0 <= boundary <= observed + quantum / 2.0
+    record = next(record for record in _R19_MARK_RECORDS[label] if record[2] is not None)
+    assert drawing._center_mark_bucket(record[1], {"lines": _R19_MARK_LINES[label]}, serialized) == "PRINTED"
+    if label == "D":
+        # Rounded .1531/.0681 differ from the full-precision fence by a few ULP.
+        # This proves only that JSON cannot recover native boundary membership.
+        with pytest.raises(ValueError, match="outside crop"):
+            drawing._center_mark_bucket(record[1], {"lines": _R19_MARK_LINES[label]}, native)
+
+
+def test_center_mark_containment_rejects_even_one_ulp_outside_without_new_padding():
+    crop = (0.0, 0.0, 0.1, 0.1)
+    row = _native_line(0.05, 0.05, crop[2], 0.05)
+    assert drawing._center_mark_bucket((0.05, 0.05, 0), {"lines": [row]}, crop) == "PRINTED"
+    row[7] = math.nextafter(crop[2], math.inf)
+    with pytest.raises(ValueError, match="outside crop"):
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"lines": [row]}, crop)
+
+
+@pytest.mark.parametrize("label", ["D", "E"])
+def test_center_mark_census_uses_actual_persisted_detail_crop_not_padded_outline(mark_census, monkeypatch, label):
+    adapter, native_view = _native_crop_fixture(monkeypatch, label)
+    x, y = native_view.physical
+    case = mark_census([
+        ("printed", (x, y, 0), {"lines": [_native_line(x - 0.001, y, x + 0.001, y)]}),
+        ("ghost", (x + 1.0, y, 0), {}),
+    ])
+    native_view.annotations = case.raws
+    view = case.binding.raw(native_view, "IView")
+    counts = drawing._require_center_mark_census(adapter, view, label=label, required=1, detail=label)
+    assert counts == {"NON_MARK": 0, "PRINTED": 1, "GHOST": 1, "FAIL": 0}
+    assert native_view.outline_reads == 1  # The persisted crop's existing independent read.
+    assert native_view.crop_circle.NoOutline is (label == "D")
+    # Ink in the padding is outside the physical crop and must remain fatal.
+    outside = x + native_view.radius + native_view.padding / 2.0
+    case.datas[0].display["lines"] = [_native_line(x, y, outside, y)]
+    with pytest.raises(RuntimeError, match="outside crop"):
+        drawing._require_center_mark_census(adapter, view, label=label, required=1, detail=label)
+
+
+def test_center_mark_census_accounts_nonmark_and_all_marks_even_after_failure(mark_census):
+    case = mark_census([
+        ("inside-empty", (0.05, 0.05, 0), {}),
+        ("outside-ghost", (0.5, 0.05, 0), {}),
+        ("printed", (0.05, 0.05, 0), {"lines": [_native_line(0.04, 0.05, 0.06, 0.05)]}),
+    ])
+    nonmark = _native("IAnnotation", GetType=lambda: 6)
+    case.raws.append(case.binding.raw(nonmark, "IAnnotation"))
+    with pytest.raises(RuntimeError, match="inside-empty.*empty native centre-mark display inside crop"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=1)
+    assert sum("class=FAIL" in log for log in case.logs) == 1
+    assert sum("class=GHOST" in log for log in case.logs) == 1
+    assert sum("class=PRINTED" in log for log in case.logs) == 1
+    assert any("total_view_annotations=4, non_mark=1, printed=1, ghost=1, fail=1" in log for log in case.logs)
+    assert len(case.raws) == 4
+
+
+@pytest.mark.parametrize("position", [(0.05, 0.05, 0), (0, 0, 0), (0.1, 0.1, 0)])
+def test_empty_center_mark_inside_or_on_crop_is_fatal(mark_census, position):
+    case = mark_census([("inside-empty", position, {})])
+    with pytest.raises(RuntimeError, match="empty native centre-mark display inside crop"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=0)
+
+
+@pytest.mark.parametrize("position", [(0.05, 0.05, 0), (0.5, 0.05, 0)])
+@pytest.mark.parametrize("failure", [None, RuntimeError("COM refused GetDisplayData")])
+def test_null_or_unreadable_display_is_never_a_ghost(mark_census, position, failure):
+    case = mark_census([("unreadable", position, {})])
+    def unreadable():
+        if isinstance(failure, Exception):
+            raise failure
+        return failure
+    case.annotations[0].GetDisplayData = unreadable
+    with pytest.raises(RuntimeError, match="GetDisplayData"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=0)
+    assert any("class=FAIL" in log for log in case.logs)
+    assert not any("class=GHOST" in log for log in case.logs)
+
+
+@pytest.mark.parametrize("count_member", [
+    "GetLineCount", "GetArcCount", "GetArrowHeadCount", "GetPolyLineCount",
+    "GetPolygonCount", "GetTriangleCount", "GetEllipseCount", "GetTextCount",
+])
+@pytest.mark.parametrize("answer", [None, False, True, -1, 0.0, 1.5, "0", RuntimeError("COM refused count")])
+def test_every_display_count_is_required_integer_not_permissive_false_to_zero(mark_census, count_member, answer):
+    case = mark_census([("outside-empty", (0.5, 0.05, 0), {})])
+    case.datas[0].overrides[count_member] = answer
+    with pytest.raises(RuntimeError, match=count_member):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=0)
+    assert any("class=FAIL" in log for log in case.logs)
+
+
+@pytest.mark.parametrize("key", tuple(_NATIVE_CALLOUT_ROWS))
+@pytest.mark.parametrize("failure", [None, RuntimeError("COM refused row")])
+def test_counted_primitive_row_cannot_disappear_as_ghost(mark_census, key, failure):
+    case = mark_census([("counted", (0.5, 0.05, 0), {key: [list(_NATIVE_CALLOUT_ROWS[key])]})])
+    for getter in _MarkDisplayData._primitives[key][1]:
+        case.datas[0].overrides[getter] = failure
+    with pytest.raises(RuntimeError, match="unreadable native Get.*row #0"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=1)
+    assert any("class=FAIL" in log for log in case.logs)
+
+
+@pytest.mark.parametrize("key", tuple(_NATIVE_CALLOUT_ROWS))
+@pytest.mark.parametrize("defect", ["empty", "short", "long", "nonfinite", "bool", "string", "false-row"])
+def test_center_mark_malformed_rows_fail_before_any_tolerant_decoding(mark_census, key, defect):
+    row = list(_NATIVE_CALLOUT_ROWS[key])
+    if defect == "empty":
+        row = []
+    elif defect == "short":
+        row.pop()
+    elif defect == "long":
+        row.append(0.0)
+    elif defect == "nonfinite":
+        row[-1] = math.nan
+    elif defect == "bool":
+        row[-1] = False
+    elif defect == "string":
+        row[-1] = "0"
+    else:
+        row = False
+    case = mark_census([("malformed", (0.05, 0.05, 0), {key: [row]})])
+    with pytest.raises(RuntimeError, match=f"invalid native {key}|unreadable native Get"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=1)
+
+
+@pytest.mark.parametrize("key", tuple(_NATIVE_CALLOUT_ROWS))
+def test_center_mark_counts_every_supported_primitive_family(mark_census, key):
+    row = list(_NATIVE_CALLOUT_ROWS[key])
+    case = mark_census([("primitive", (0.5, 0.05, 0), {key: [row]})])
+    counts = drawing._require_center_mark_census(object(), case.view, label="front", required=1)
+    assert counts["PRINTED"] == 1 and counts["GHOST"] == 0
+    assert any("class=PRINTED" in log and f"'{key}': 1" in log for log in case.logs)
+
+
+@pytest.mark.parametrize("key,index", [
+    ("lines", 7), ("arcs", 7), ("arrows", 0), ("polylines", 7),
+    ("polygons", 5), ("triangles", 0), ("ellipses", 13),
+])
+def test_one_outside_primitive_fails_even_with_inside_anchor_and_other_inside_lines(mark_census, key, index):
+    row = list(_NATIVE_CALLOUT_ROWS[key])
+    if key == "arcs":
+        # Exact binary fractions preserve the audited equal-radius contract.
+        row = [-1, 0, 0, 0, 0.1875, 0.0625, 0, 0.0625, 0.1875, 0,
+               0.0625, 0.0625, 0, 0, 0, 1, 1]
+    else:
+        row[index] = 0.2
+    display = {"lines": [_native_line(0.04, 0.05, 0.06, 0.05)]}
+    display.setdefault(key, []).append(row)
+    case = mark_census([("outside-primitive", (0.05, 0.05, 0), display)])
+    with pytest.raises(RuntimeError, match=f"{key}.*outside crop") as caught:
+        drawing._require_center_mark_census(object(), case.view, label="front", required=1)
+    assert "raw=" in str(caught.value) and "crop=(0.0, 0.0, 0.1, 0.1)" in str(caught.value)
+
+
+@pytest.mark.parametrize("row", [
+    {"t": "X", "pos": [0.05, 0.05, 0], "h": 0.0035, "ref": 1, "ang": 0.0, "w": 0.004},
+    {}, None, False, {"t": "", "w": 0},
+])
+def test_center_mark_nonempty_text_count_is_fatal_without_speculative_text_extent_reads(mark_census, row):
+    case = mark_census([("with-text", (0.5, 0.05, 0), {"texts": [row]})])
+    with pytest.raises(RuntimeError, match="cannot certify primitive containment.*GetTextCount=1"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=1)
+    assert any("class=FAIL" in log and "'texts': 1" in log for log in case.logs)
+    assert not any("class=GHOST" in log for log in case.logs)
+    assert {member for member, _args in case.datas[0].reads if member.startswith("GetText")} == {"GetTextCount"}
+
+
+def test_pure_center_mark_text_data_cannot_use_relative_positions_as_absolute_bounds():
+    text = {"t": "X", "pos": [0.05, 0.05, 0], "h": 0.0035, "ref": 1, "ang": 0.0, "w": 0.004}
+    with pytest.raises(ValueError, match="cannot certify primitive containment.*text"):
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"texts": [text]}, (0, 0, 0.1, 0.1))
+
+
+@pytest.mark.parametrize("refusal", [None, [], (), RuntimeError("old overload refused")])
+def test_center_mark_uses_only_existing_line3_to_line2_refusal_route(mark_census, refusal):
+    case = mark_census([("fallback", (0.05, 0.05, 0), {"lines": [_native_line(0.04, 0.05, 0.06, 0.05)]})])
+    case.datas[0].overrides["GetLineAtIndex3"] = refusal
+    assert drawing._require_center_mark_census(object(), case.view, label="front", required=1)["PRINTED"] == 1
+    assert ("GetLineAtIndex3", (0,)) in case.datas[0].reads
+    assert ("GetLineAtIndex2", (0,)) in case.datas[0].reads
+
+
+@pytest.mark.parametrize("malformed", [False, 0, [0.0], [0.0] * 9, [0.0] * 11])
+def test_center_mark_malformed_line3_does_not_fall_back_and_hide_bad_data(mark_census, malformed):
+    case = mark_census([("bad-overload", (0.05, 0.05, 0), {"lines": [_native_line(0.04, 0.05, 0.06, 0.05)]})])
+    case.datas[0].overrides["GetLineAtIndex3"] = malformed
+    with pytest.raises(RuntimeError, match="invalid native lines"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=1)
+    assert ("GetLineAtIndex2", (0,)) not in case.datas[0].reads
+
+
+@pytest.mark.parametrize("position", [
+    None, (), (0.5, 0.05), (0.5, 0.05, math.nan), (0.5, math.inf, 0),
+    (False, 0.5, 0), ("0.5", 0.5, 0),
+])
+def test_ghost_requires_a_readable_finite_three_coordinate_anchor(mark_census, position):
+    case = mark_census([("bad-position", position, {})])
+    with pytest.raises(RuntimeError, match="GetPosition"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=0)
+
+
+@pytest.mark.parametrize("bbox", [
+    None, (), (0, 0, 1), (0.1, 0, 0, 0.1), (0, 0.1, 0.1, 0),
+    (0, 0, 0, 0.1), (0, 0, 0.1, math.nan), (False, 0, 0.1, 0.1),
+])
+def test_center_mark_invalid_or_inverted_crop_is_fatal(bbox):
+    with pytest.raises(ValueError, match="crop bbox"):
+        drawing._center_mark_bucket((0.5, 0.05, 0), {}, bbox)
+
+
+def test_center_mark_invalid_decoded_bbox_cannot_count_as_printed(mark_census, monkeypatch):
+    case = mark_census([("inverted", (0.05, 0.05, 0), {"lines": [_native_line(0.04, 0.05, 0.06, 0.05)]})])
+    monkeypatch.setattr(drawing, "_center_mark_primitive_box", lambda *_args: Box(0.06, 0.05, 0.04, 0.05))
+    with pytest.raises(RuntimeError, match="invalid native lines primitive bbox"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=1)
+
+
+@pytest.mark.parametrize("bucket", [None, "", "OTHER", "NON_MARK", "FAIL"])
+def test_center_mark_bucket_fallthrough_is_fatal_and_accounted(mark_census, monkeypatch, bucket):
+    case = mark_census([("fallthrough", (0.5, 0.05, 0), {})])
+    monkeypatch.setattr(drawing, "_center_mark_bucket", lambda *_args: bucket)
+    with pytest.raises(RuntimeError, match="bucket fallthrough"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=0)
+    assert any("total_view_annotations=1, non_mark=0, printed=0, ghost=0, fail=1" in log for log in case.logs)
+
+
+@pytest.mark.parametrize("buckets,total", [
+    ([], 1), (["PRINTED"], 0), (["PRINTED", "GHOST"], 3), (["OTHER"], 1),
+])
+def test_center_mark_accounting_guard_rejects_count_mismatch_or_unknown_bucket(buckets, total):
+    with pytest.raises(RuntimeError, match="bucket/count mismatch|bucket fallthrough"):
+        drawing._center_mark_census_totals(buckets, total)
+
+
+@pytest.mark.parametrize("reported", [0, 2, None, False])
+def test_center_mark_native_annotation_count_is_not_inferred_from_array(mark_census, reported):
+    case = mark_census([("ghost", (0.5, 0.05, 0), {})])
+    case.native_view.GetAnnotationCount = lambda: reported
+    with pytest.raises(RuntimeError, match="annotation (array length|count)|invalid native annotation count"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=0)
+
+
+@pytest.mark.parametrize("wrong_owner", ["view", "annotation", "display-data"])
+def test_center_mark_census_refuses_foreign_interface_owners(mark_census, wrong_owner):
+    case = mark_census([("ghost", (0.5, 0.05, 0), {})])
+    if wrong_owner == "view":
+        case.view = case.annotations[0]
+    elif wrong_owner == "annotation":
+        case.raws[0] = case.binding.raw(case.datas[0], "IDisplayData")
+    else:
+        case.annotations[0].data = case.binding.raw(case.annotations[0], "IAnnotation")
+    with pytest.raises((RuntimeError, AssertionError)):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=0)
+
+
+def test_center_mark_fakes_keep_owners_and_member_surfaces_disjoint(mark_census):
+    case = mark_census([("ghost", (0.5, 0.05, 0), {})])
+    annotation, data = case.annotations[0], case.datas[0]
+    assert not hasattr(annotation, "GetLineCount")
+    assert not hasattr(annotation, "GetTextCount")
+    assert not hasattr(data, "GetDisplayData")
+    assert not hasattr(data, "GetType")
+    assert not hasattr(data, "GetAnnotations")
+    assert not hasattr(data, "GetSpecificAnnotation")
+    assert not hasattr(data, "IGetDisplayData")
+    for native, interface in ((annotation, "IDisplayData"), (data, "IAnnotation"), (data, "IView")):
+        with pytest.raises(RuntimeError, match="native owner mismatch"):
+            _bind_owner(native, interface)
+
+
+@pytest.mark.parametrize("required", [1, 2])
+def test_printed_count_goals_remain_fatal_even_when_every_annotation_is_accounted(mark_census, required):
+    records = [("ghost", (0.5, 0.05, 0), {})]
+    if required == 2:
+        records.append(("printed", (0.05, 0.05, 0), {"lines": [_native_line(0.04, 0.05, 0.06, 0.05)]}))
+    case = mark_census(records)
+    with pytest.raises(RuntimeError, match=f"expected {required}.*PRINTED hole center marks, found {required-1}"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=required)
+    assert any(f"printed={required-1}, ghost=1, fail=0" in log for log in case.logs)
+
+
+@pytest.mark.parametrize("member,answer", [
+    ("GetName", None), ("GetName", ""), ("GetName", False),
+    ("GetPosition", RuntimeError("COM refused GetPosition")),
+    ("GetType", None), ("GetType", False), ("GetType", 0), ("GetType", 20),
+])
+def test_center_mark_native_identity_refusals_are_fatal(mark_census, member, answer):
+    case = mark_census([("bad-identity", (0.5, 0.05, 0), {})])
+    def read():
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+    setattr(case.annotations[0], member, read)
+    with pytest.raises(RuntimeError, match="GetName|GetPosition|annotation type"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=0)
+    assert any("total_view_annotations=1, non_mark=0, printed=0, ghost=0, fail=1" in log for log in case.logs)
+
+
+def test_counted_missing_row_is_fatal_not_a_smaller_primitive_set(mark_census):
+    case = mark_census([("count-mismatch", (0.5, 0.05, 0), {})])
+    case.datas[0].overrides["GetPolygonCount"] = 1
+    with pytest.raises(RuntimeError, match="GetPolygonAtIndex.*row #0"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=0)
+    assert any("'polygons': 1" in log and "class=FAIL" in log for log in case.logs)
+
+
+@pytest.mark.parametrize("key,index", [("polylines", 6), ("polygons", 4)])
+@pytest.mark.parametrize("count", [-1, 1.5, False, math.inf])
+def test_center_mark_variable_point_count_is_strict(mark_census, key, index, count):
+    row = list(_NATIVE_CALLOUT_ROWS[key])
+    row[index] = count
+    case = mark_census([("bad-point-count", (0.05, 0.05, 0), {key: [row]})])
+    with pytest.raises(RuntimeError, match=f"invalid native {key}"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=1)
+
+
+@pytest.mark.parametrize("key,header", [("polylines", 7), ("polygons", 5)])
+def test_center_mark_nonempty_zero_point_primitive_is_not_silently_removed(mark_census, key, header):
+    row = list(_NATIVE_CALLOUT_ROWS[key][:header])
+    row[-1] = 0
+    case = mark_census([("zero-point", (0.5, 0.05, 0), {key: [row]})])
+    with pytest.raises(RuntimeError, match=f"unmeasurable native {key}: no points"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=0)
+
+
+@pytest.mark.parametrize("key,header", [("polylines", 7), ("polygons", 5)])
+def test_center_mark_one_point_primitive_has_bounds_and_cannot_disappear(key, header):
+    row = list(_NATIVE_CALLOUT_ROWS[key][:header + 3])
+    row[header - 1] = 1
+    assert drawing._center_mark_bucket((0.5, 0.05, 0), {key: [row]}, (0, 0, 0.1, 0.1)) == "PRINTED"
+    row[header] = 0.2
+    with pytest.raises(ValueError, match="outside crop"):
+        drawing._center_mark_bucket((0.05, 0.05, 0), {key: [row]}, (0, 0, 0.1, 0.1))
+
+
+def test_center_mark_degenerate_line_still_accounts_its_native_coordinates():
+    row = _native_line(0.05, 0.05, 0.05, 0.05)
+    assert drawing._center_mark_bucket((0.5, 0.05, 0), {"lines": [row]}, (0, 0, 0.1, 0.1)) == "PRINTED"
+    row[4] = row[7] = 0.2
+    with pytest.raises(ValueError, match="outside crop"):
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"lines": [row]}, (0, 0, 0.1, 0.1))
+
+
+@pytest.mark.parametrize("direction,normal_z", [(1, 1), (0, 1), (1, -1), (-1, 1)])
+def test_center_mark_arc_certifies_full_circle_without_guessing_sweep_or_normal_convention(direction, normal_z):
+    row = [-1, 0, 0, 0, 0.1, 0.05, 0, 0, 0.05, 0,
+           0.05, 0.05, 0, 0, 0, normal_z, direction]
+    assert drawing._center_mark_bucket((0.05, 0.05, 0), {"arcs": [row]}, (-0.1, -0.1, 0.2, 0.2)) == "PRINTED"
+    # A partial sweep could fit, but a nearly closed circle is not distinguished
+    # without inventing a threshold. The complete envelope must certify it.
+    with pytest.raises(ValueError, match="cannot certify primitive containment.*partial native arcs") as caught:
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"arcs": [row]}, (-0.1, -0.1, 0.2, 0.075))
+    assert "outside crop" not in str(caught.value)
+
+
+def test_center_mark_closed_arc_bounds_every_cardinal_extremum():
+    row = [-1, 0, 0, 0, 0.05, 0.05, 0, 0.05, 0.05, 0,
+           0, 0.05, 0, 0, 0, 1, 1]
+    with pytest.raises(ValueError, match="arcs.*outside crop"):
+        drawing._center_mark_bucket((0, 0.05, 0), {"arcs": [row]}, (0, 0, 0.1, 0.1))
+
+
+@pytest.mark.parametrize("index,value", [(13, 1), (14, 1), (15, 0), (16, 2), (6, 1), (9, 1), (12, 1)])
+def test_center_mark_arc_refuses_unmeasurable_plane_or_direction(index, value):
+    row = list(_NATIVE_CALLOUT_ROWS["arcs"])
+    row[index] = value
+    with pytest.raises(ValueError, match="arcs plane/direction"):
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"arcs": [row]}, (0, 0, 0.1, 0.1))
+
+
+def test_center_mark_ellipse_uses_analytic_rotated_envelope_not_axis_endpoints():
+    # X/Y axis extrema lie beyond the individually contained major/minor points.
+    row = [-1, 0, 0, 0, 0.08, 0.08, 0, 0.08, 0.08, 0,
+           0.05, 0.05, 0, 0.08, 0.08, 0, 0.02, 0.08, 0]
+    assert drawing._center_mark_bucket((0.05, 0.05, 0), {"ellipses": [row]}, (0, 0, 0.1, 0.1)) == "PRINTED"
+    with pytest.raises(ValueError, match="ellipses.*outside crop"):
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"ellipses": [row]}, (0.02, 0.02, 0.08, 0.08))
+
+
+def test_center_mark_invalid_ellipse_axes_do_not_fall_through():
+    row = list(_NATIVE_CALLOUT_ROWS["ellipses"])
+    row[16:19] = row[13:16]
+    with pytest.raises(ValueError, match="ellipses axes"):
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"ellipses": [row]}, (0, 0, 0.1, 0.1))
+
+
+@pytest.mark.parametrize("display", [None, [], {"unknown": []}, {"lines": None}])
+def test_center_mark_unrecognized_display_data_is_fatal_not_empty(display):
+    with pytest.raises(ValueError, match="invalid native"):
+        drawing._center_mark_bucket((0.5, 0.05, 0), display, (0, 0, 0.1, 0.1))
+
+
+def test_build_center_mark_census_keeps_exact_native_goals_without_any_authoring_calls():
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    module = ast.parse(source)
+    build = next(node for node in module.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    census_loop = next(node for node in ast.walk(build) if isinstance(node, ast.For)
+                       and any(isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+                               and call.func.id == "_require_center_mark_census" for call in ast.walk(node)))
+    assert [(entry.elts[0].value, entry.elts[2].value, entry.elts[3].value)
+            for entry in census_loop.iter.elts] == [
+        ("front", 2, None), ("detail D", 1, "D"), ("detail E", 1, "E"),
+    ]
+    call = next(node for node in ast.walk(census_loop) if isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name) and node.func.id == "_require_center_mark_census")
+    assert {keyword.arg for keyword in call.keywords} == {"label", "required", "detail"}
+    methods = {node.func.attr for node in ast.walk(census_loop)
+               if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)}
+    assert not methods  # No delete/insert/position/mark-specific native APIs.
+
+
+@pytest.mark.parametrize("bbox", [None, (0.1, 0, 0, 0.1), (False, 0, 0.1, 0.1), ("0", 0, 0.1, 0.1)])
+def test_front_native_outline_is_read_on_view_without_float_coercing_malformed_data(mark_census, bbox):
+    case = mark_census([("ghost", (0.5, 0.05, 0), {})], crop=bbox)
+    with pytest.raises(ValueError, match="invalid native centre-mark crop bbox"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=0)
+    assert ("IView", case.native_view) in case.binding.calls
+
+
+@pytest.mark.parametrize("data_size", [0, 7, 12])
+def test_center_mark_type1_polyline_cannot_guess_undocumented_geomdata_layout(data_size):
+    row = list(_NATIVE_CALLOUT_ROWS["polylines"])
+    row[:2] = [1, data_size]
+    with pytest.raises(ValueError, match="cannot certify primitive containment.*polylines type-1 GeomData"):
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"polylines": [row]}, (0, 0, 0.1, 0.1))
+    row.append(0.05)
+    with pytest.raises(ValueError, match="invalid native polylines"):
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"polylines": [row]}, (0, 0, 0.1, 0.1))
+
+
+@pytest.mark.parametrize("style", [0, 1])
+def test_center_mark_reuses_contracted_triangular_arrow_styles(style):
+    row = list(_NATIVE_CALLOUT_ROWS["arrows"])
+    row[8] = style
+    assert drawing._center_mark_bucket((0.05, 0.05, 0), {"arrows": [row]}, (0, 0, 0.1, 0.1)) == "PRINTED"
+
+
+@pytest.mark.parametrize("style", [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, -1, 0.5, 13])
+def test_center_mark_uncontracted_arrow_glyph_does_not_use_triangle_as_fake_envelope(mark_census, style):
+    row = list(_NATIVE_CALLOUT_ROWS["arrows"])
+    row[8] = style
+    case = mark_census([("uncertifiable-arrow", (0.05, 0.05, 0), {"arrows": [row]})])
+    with pytest.raises(RuntimeError, match="cannot certify primitive containment.*arrows style|invalid native arrows"):
+        drawing._require_center_mark_census(object(), case.view, label="front", required=1)
+    assert any("class=FAIL" in log for log in case.logs)
+    assert not any("class=GHOST" in log for log in case.logs)
+
+
+def test_center_mark_partial_ellipse_accepts_only_proved_full_envelope_certificate():
+    row = [-1, 0, 0, 0, 0.08, 0.08, 0, 0.02, 0.08, 0,
+           0.05, 0.05, 0, 0.08, 0.08, 0, 0.02, 0.08, 0]
+    assert drawing._center_mark_bucket((0.05, 0.05, 0), {"ellipses": [row]}, (0, 0, 0.1, 0.1)) == "PRINTED"
+    with pytest.raises(ValueError, match="cannot certify primitive containment.*partial native ellipses") as caught:
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"ellipses": [row]}, (0.02, 0.02, 0.08, 0.08))
+    assert "raw=" in str(caught.value) and "crop=" in str(caught.value)
+    assert "outside crop" not in str(caught.value)  # Sweep direction is unobserved.
+
+
+@pytest.mark.parametrize("crop", [(-0.1, -0.1, 0.2, 0.2), (-0.1, -0.1, 0.2, 0.075)])
+def test_center_mark_inconsistent_arc_radii_are_fatal_even_when_an_estimated_box_would_fit(crop):
+    row = [-1, 0, 0, 0, 0.1, 0.05, 0, 0.025, 0.05, 0,
+           0.05, 0.05, 0, 0, 0, 1, 1]
+    with pytest.raises(ValueError, match="invalid native arcs radius: inconsistent endpoint radii") as caught:
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"arcs": [row]}, crop)
+    assert "outside crop" not in str(caught.value)
+
+
+def test_nearly_closed_arc_one_ulp_endpoint_difference_never_gets_an_endpoint_only_certificate():
+    row = [-1, 0, 0, 0, 0.05, 0, 0, 0.05, math.nextafter(0.0, math.inf), 0,
+           0, 0, 0, 0, 0, 1, 1]
+    assert math.dist(row[4:6], row[10:12]) == math.dist(row[7:9], row[10:12])
+    assert drawing._center_mark_bucket((0, 0, 0), {"arcs": [row]}, (-0.1, -0.1, 0.1, 0.1)) == "PRINTED"
+    with pytest.raises(ValueError, match="cannot certify primitive containment.*partial native arcs"):
+        drawing._center_mark_bucket((0, 0, 0), {"arcs": [row]}, (-0.1, -1e-100, 0.1, 1e-100))
+
+
+@pytest.mark.parametrize("index,value", [
+    (3, 0), (5, 1), (6, -1), (7, -1), (8, -1), (8, 0.5), (8, 13),
+    (9, 1), (10, 1), (11, 0),
+])
+def test_center_mark_arrow_certificate_requires_valid_planar_direction_size_and_known_style(index, value):
+    row = list(_NATIVE_CALLOUT_ROWS["arrows"])
+    row[index] = value
+    with pytest.raises(ValueError, match="invalid native arrows"):
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"arrows": [row]}, (0, 0, 0.1, 0.1))
+
+
+def test_center_mark_arrow_two_sided_certificate_does_not_rely_on_empirical_base_convention():
+    row = list(_NATIVE_CALLOUT_ROWS["arrows"])
+    row[0:2] = [0.098, 0.05]
+    # The historical triangle points left and would fit, but the documented
+    # dimensions alone do not seat its base side. Refuse, do not claim outside.
+    with pytest.raises(ValueError, match="cannot certify primitive containment.*native arrows") as caught:
+        drawing._center_mark_bucket((0.05, 0.05, 0), {"arrows": [row]}, (0, 0, 0.1, 0.1))
+    assert "outside crop" not in str(caught.value)
+
+
+def test_center_mark_schema_cannot_spill_into_preexisting_callout_guards(native_callout_record, monkeypatch):
+    def census_schema_must_not_run(*_args):
+        pytest.fail("census-only schema reached a downstream callout guard")
+    monkeypatch.setattr(drawing, "_validate_center_mark_display", census_schema_must_not_run)
+    record = native_callout_record.dump()
+    row = list(_NATIVE_CALLOUT_ROWS["polylines"])
+    row[:2] = [1.0, 7.0]
+    record["display"]["polylines"] = [row]
+    assert drawing._arc_callout_geometry(record, 0.62).text_boxes
+
+
+def test_center_mark_and_callout_schema_ownership_remains_separate():
+    module = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    callout = next(node for node in module.body
+                   if isinstance(node, ast.FunctionDef) and node.name == "_arc_callout_geometry")
+    called_names = {node.func.id for node in ast.walk(callout)
+                    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)}
+    assert "_validate_center_mark_display" not in called_names
+    assert "_native_finite_row" not in called_names
+    assert "_native_finite_scalar" not in called_names

@@ -72,7 +72,7 @@ from _drawing_gdt import add_datum_feature, add_feature_control_frame
 # view that imports its dimension.
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
-from _drawing_layout_audit import _Reader, _dump_annotation, _dump_display
+from _drawing_layout_audit import _DISPLAY_PRIMITIVES, _Reader, _dump_annotation, _dump_display
 from _drawing_layout_collect import check_drawing_layout
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_notes import add_property_linked_note
@@ -86,6 +86,9 @@ from _layout_audit import (
     _detail_circles,
     _registered_leaders,
     annotation_geometry,
+    polygon_segments,
+    polyline_segments,
+    triangle_segments,
     calibrate_sheet_advance,
 )
 from _layout_geometry import Box, segment_box_distance, text_overlap, union_boxes
@@ -1126,6 +1129,270 @@ def _bound_view_annotations(view: Any, *, label: str) -> tuple[Any, ...]:
     return tuple(annotations)
 
 
+def _center_mark_display(annotation: Any, evidence: dict[str, Any]) -> dict[str, Any]:
+    """Read every native count and row without the shared dump's lossy filtering."""
+    def read(member: str, *args: Any) -> Any:
+        try:
+            value = getattr(data, member)(*args)
+        except Exception as exc:
+            raise RuntimeError(f"unreadable native {member}{args!r}: {exc}") from exc
+        if value is None:
+            raise RuntimeError(f"unreadable native {member}{args!r}: NULL")
+        return value
+
+    raw = annotation.GetDisplayData()
+    if raw is None:
+        raise RuntimeError("unreadable native IAnnotation.GetDisplayData: NULL")
+    data = _early_bound(raw, "IDisplayData")
+    if data is None:
+        raise RuntimeError("unreadable native IDisplayData binding: NULL")
+    counts = {}
+    for key, member, _getters in (*_DISPLAY_PRIMITIVES, ("texts", "GetTextCount", ())):
+        count = read(member)
+        if type(count) is not int or count < 0:
+            raise RuntimeError(f"invalid native {member} count={count!r}")
+        counts[key] = count
+        if key == "lines":
+            evidence["line_count"] = count
+    evidence["primitive_counts"] = counts
+    if counts["texts"]:
+        # Text positions are display-origin offsets, not absolute sheet points;
+        # text-in-box width is a table-cell property, not an annotation extent.
+        raise RuntimeError(
+            f"cannot certify primitive containment: native centre-mark GetTextCount={counts['texts']} "
+            "has no contracted absolute text bounds"
+        )
+    display: dict[str, Any] = {}
+    for key, _member, getters in _DISPLAY_PRIMITIVES:
+        rows = []
+        for index in range(counts[key]):
+            row = None
+            for getter in getters:
+                try:
+                    candidate = getattr(data, getter)(index)
+                except Exception:
+                    continue
+                if candidate is None or (type(candidate) in (tuple, list) and not candidate):
+                    continue
+                # Only the contracted line 3 -> 2 refusal route may fall back.
+                # False/0 and malformed nonempty rows are data failures, not refusals.
+                row = candidate
+                break
+            if row is None:
+                raise RuntimeError(f"unreadable native {'/'.join(getters)} row #{index}")
+            try:
+                _validate_center_mark_display({key: [row]})
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ValueError(f"native {getter} row #{index}: {exc}") from exc
+            rows.append(row)
+        display[key] = rows
+    display["texts"] = []
+    _validate_center_mark_display(display)
+    if any(len(display[key]) != count for key, count in counts.items()):
+        raise RuntimeError(f"native display row/count mismatch: {counts!r}")
+    return display
+
+
+def _center_mark_primitive_box(key: str, row: Any) -> Box:
+    """Bound a validated native primitive, never a sampled curve or just its centre."""
+    if key == "lines":
+        return Box.from_points(((row[4], row[5]), (row[7], row[8])))
+    if key == "arcs":
+        start, end, centre = (row[4], row[5]), (row[7], row[8]), (row[10], row[11])
+        if (row[13] != 0.0 or row[14] != 0.0 or row[15] == 0.0
+                or row[16] not in (-1.0, 0.0, 1.0) or not row[6] == row[9] == row[12]):
+            raise ValueError(f"invalid native arcs plane/direction={row!r}")
+        radius, end_radius = math.dist(start, centre), math.dist(end, centre)
+        if not math.isfinite(radius) or radius <= 0.0 or radius != end_radius:
+            raise ValueError(f"invalid native arcs radius: inconsistent endpoint radii; raw={row!r}")
+        # A nearly closed native circle can have unequal start/end points.
+        # Certify the complete circle analytically; never infer a tiny sweep
+        # or invent a closure tolerance or a normal-sign convention.
+        return Box(centre[0] - radius, centre[1] - radius,
+                   centre[0] + radius, centre[1] + radius)
+    if key == "ellipses":
+        # The row has no sweep direction. The complete analytic envelope safely
+        # bounds a partial ellipse too, without guessing which arc was rendered.
+        cx, cy = row[10], row[11]
+        major = (row[13] - cx, row[14] - cy)
+        minor = (row[16] - cx, row[17] - cy)
+        if major[0] * minor[1] == major[1] * minor[0]:
+            raise ValueError(f"invalid native ellipses axes={row!r}")
+        rx, ry = math.hypot(major[0], minor[0]), math.hypot(major[1], minor[1])
+        return Box.from_points((
+            (cx - rx, cy - ry), (cx + rx, cy + ry),
+            (row[4], row[5]), (row[7], row[8]),
+        ))
+    if key == "arrows":
+        length = math.hypot(row[3], row[4])
+        if (not math.isfinite(length) or length == 0.0 or row[5] != 0.0 or row[6] < 0.0 or row[7] < 0.0
+                or row[9] != 0.0 or row[10] != 0.0 or row[11] == 0.0
+                or row[8] != int(row[8]) or not 0 <= row[8] <= 12):
+            raise ValueError(f"invalid native arrows direction/size/plane/style={row!r}")
+        if row[8] not in (0.0, 1.0):
+            raise ValueError(
+                f"cannot certify primitive containment: native arrows style={row[8]!r} "
+                f"has no contracted glyph envelope; raw={row!r}"
+            )
+        # For open/filled arrows, width is along the direction and height
+        # across it. This two-sided certificate covers either base side and
+        # any tip placement within that documented width/height rectangle.
+        ux, uy = row[3] / length, row[4] / length
+        return Box.from_points([
+            (row[0] + along * ux - across * uy, row[1] + along * uy + across * ux)
+            for along in (-row[6], row[6]) for across in (-row[7], row[7])
+        ])
+    if key == "polylines" and (row[0] != 0.0 or row[1] != 0.0):
+        raise ValueError(
+            "cannot certify primitive containment: native polylines type-1 GeomData "
+            f"layout is unproved without an additional size read; raw={row!r}"
+        )
+    decoders = {
+        "polylines": polyline_segments, "polygons": polygon_segments,
+        "triangles": triangle_segments,
+    }
+    if key in ("polylines", "polygons"):
+        offset = 7 if key == "polylines" else 5
+        if len(row) == offset:
+            raise ValueError(f"unmeasurable native {key}: no points")
+        # A one-point sequence is still present data and must not disappear.
+        if len(row) == offset + 3:
+            return Box.from_points(((row[offset], row[offset + 1]),))
+    segments = decoders[key](row)
+    if not segments:
+        raise ValueError(f"unmeasurable native {key} primitive={row!r}")
+    return Box.from_points([
+        point for segment in segments
+        for point in ((segment.x0, segment.y0), (segment.x1, segment.y1))
+    ])
+
+
+def _validated_center_mark_crop(crop: Any) -> tuple[float, float, float, float]:
+    if not _native_finite_row(crop) or len(crop) != 4 or crop[0] >= crop[2] or crop[1] >= crop[3]:
+        raise ValueError(f"invalid native centre-mark crop bbox={crop!r}")
+    return tuple(crop)
+
+
+def _center_mark_bucket(position: Any, display: dict[str, Any], crop: Any) -> str:
+    """Exactly PRINTED (all data contained) or GHOST (zero data, outside anchor)."""
+    crop = _validated_center_mark_crop(crop)
+    if not _native_finite_row(position) or len(position) != 3:
+        raise ValueError(f"invalid native centre-mark GetPosition={position!r}")
+    _validate_center_mark_display(display)
+    if display.get("texts"):
+        raise ValueError(
+            "cannot certify primitive containment: native centre-mark text "
+            f"has no contracted absolute bounds; raw={display['texts']!r}"
+        )
+    if not any(display.values()):
+        if crop[0] <= position[0] <= crop[2] and crop[1] <= position[1] <= crop[3]:
+            raise ValueError("empty native centre-mark display inside crop")
+        return "GHOST"
+    checked = 0
+    for key, rows in display.items():
+        for index, row in enumerate(rows):
+            box = _center_mark_primitive_box(key, row)
+            if (not all(math.isfinite(v) for v in (box.xmin, box.ymin, box.xmax, box.ymax))
+                    or box.xmin > box.xmax or box.ymin > box.ymax):
+                raise ValueError(f"invalid native {key} primitive bbox={box!r}")
+            if box.xmin < crop[0] or box.ymin < crop[1] or box.xmax > crop[2] or box.ymax > crop[3]:
+                endpoints_inside = key in ("arcs", "ellipses") and all(
+                    crop[0] <= row[offset] <= crop[2] and crop[1] <= row[offset + 1] <= crop[3]
+                    for offset in (4, 7)
+                )
+                if key == "ellipses" and endpoints_inside and row[4:7] != row[7:10]:
+                    raise ValueError(
+                        f"cannot certify primitive containment: partial native ellipses #{index} "
+                        f"has no encoded sweep direction; raw={row!r}, envelope={box!r}, crop={crop!r}"
+                    )
+                if key == "arcs" and endpoints_inside and row[4:7] != row[7:10]:
+                    raise ValueError(
+                        f"cannot certify primitive containment: partial native arcs #{index} "
+                        f"has a full-circle envelope crossing crop with endpoints inside; raw={row!r}, envelope={box!r}, crop={crop!r}"
+                    )
+                if key == "arrows" and crop[0] <= row[0] <= crop[2] and crop[1] <= row[1] <= crop[3]:
+                    raise ValueError(
+                        f"cannot certify primitive containment: native arrows #{index} "
+                        f"has a two-sided envelope crossing crop with tip inside; raw={row!r}, envelope={box!r}, crop={crop!r}"
+                    )
+                raise ValueError(
+                    f"nonempty native centre-mark {key} #{index} outside crop: "
+                    f"raw={row!r}, bbox={box!r}, crop={crop!r}"
+                )
+            checked += 1
+    if checked == 0:
+        raise ValueError("nonempty native centre-mark display has no accounted primitives")
+    return "PRINTED"
+
+
+def _center_mark_census_totals(buckets: Any, total: int) -> dict[str, int]:
+    counts = dict.fromkeys(("NON_MARK", "PRINTED", "GHOST", "FAIL"), 0)
+    for bucket in buckets:
+        if bucket not in counts:
+            raise RuntimeError(f"native centre-mark bucket fallthrough: {bucket!r}")
+        counts[bucket] += 1
+    if len(buckets) != total or sum(counts.values()) != total:
+        raise RuntimeError(f"native centre-mark bucket/count mismatch: total={total}, buckets={counts!r}")
+    return counts
+
+
+def _require_center_mark_census(
+    adapter: Any, view: Any, *, label: str, required: int, detail: str | None = None,
+) -> dict[str, int]:
+    """Account for every native annotation; retained zero-ink ghosts never count."""
+    # Ordinary front outline only; D/E retain the existing persisted-crop proof.
+    # Do not float-coerce a malformed native bbox into apparently valid numbers.
+    raw_crop = (_early_bound(view, "IView").GetOutline() if detail is None
+                else _detail_crop(adapter, view, label=detail))
+    crop = _validated_center_mark_crop(raw_crop)
+    annotations = _bound_view_annotations(view, label=f"{label} template center marks")
+    buckets, failures = [], []
+    for index, annotation in enumerate(annotations):
+        evidence: dict[str, Any] = {
+            "id": f"annotation #{index}", "position": "unreadable", "line_count": "unreadable",
+        }
+        try:
+            kind = annotation.GetType()
+            if type(kind) is not int or not 1 <= kind <= 19:
+                raise RuntimeError(f"invalid native annotation type={kind!r}")
+            if kind != 13:  # swAnnotationType_e.swCenterMarkSym
+                buckets.append("NON_MARK")
+                continue
+            name = annotation.GetName()
+            if type(name) is not str or not name:
+                raise RuntimeError(f"unreadable native IAnnotation.GetName={name!r}")
+            evidence["id"] = name
+            evidence["position"] = annotation.GetPosition()
+            display = _center_mark_display(annotation, evidence)
+            bucket = _center_mark_bucket(evidence["position"], display, crop)
+            if bucket not in ("PRINTED", "GHOST"):
+                raise RuntimeError(f"native centre-mark bucket fallthrough: {bucket!r}")
+        except Exception as exc:
+            bucket = "FAIL"
+            failures.append(f"{evidence['id']!r}: {exc}")
+        buckets.append(bucket)
+        _telemetry.info(
+            f"{label} centre-mark id={evidence['id']!r}, position={evidence['position']!r}, "
+            f"line_count={evidence['line_count']!r}, class={bucket}, "
+            f"primitive_counts={evidence.get('primitive_counts')!r}, crop={crop!r}"
+            + (f", reason={failures[-1]}" if bucket == "FAIL" else "")
+        )
+    counts = _center_mark_census_totals(buckets, len(annotations))
+    _telemetry.info(
+        f"{label} centre-mark totals: total_view_annotations={len(annotations)}, "
+        f"non_mark={counts['NON_MARK']}, printed={counts['PRINTED']}, ghost={counts['GHOST']}, "
+        f"fail={counts['FAIL']}, required_printed={required}"
+    )
+    if failures:
+        raise RuntimeError(f"{label} centre-mark census FAIL: {failures!r}; totals={counts!r}")
+    if counts["PRINTED"] != required:
+        raise RuntimeError(
+            f"expected {required} {label} PRINTED hole center marks, found {counts['PRINTED']}; "
+            f"totals={counts!r}"
+        )
+    return counts
+
+
 def _require_dimension_census(adapter: Any, views: Any) -> None:
     marked = set().union(*DRAWING_DIMENSIONS.values())
     total = []
@@ -1971,6 +2238,64 @@ def _add_arc_profiles(adapter: Any, front: Any) -> dict[str, Any]:
     return profiles
 
 
+def _native_finite_scalar(value: Any) -> bool:
+    """Native numbers only: False, strings and coercible objects are not zero."""
+    return type(value) in (int, float) and math.isfinite(value)
+
+
+def _native_finite_row(values: Any) -> bool:
+    return type(values) in (list, tuple) and all(_native_finite_scalar(v) for v in values)
+
+
+def _validate_center_mark_display(display: Any) -> None:
+    """Census-only strict row schemas; downstream callout guards stay independent."""
+    def count(value: float) -> bool:
+        # SAFEARRAY counts become doubles in _dump_display's _round.
+        return value >= 0.0 and value == int(value)
+
+    if not isinstance(display, dict):
+        raise ValueError(f"invalid native display data={display!r}")
+    texts = display.get("texts", ())
+    if not isinstance(texts, (list, tuple)):
+        raise ValueError(f"invalid native texts collection={texts!r}")
+    # Official IDisplayData rows: both line overloads have ten doubles.
+    # Empty primitive sets are omitted by the dump; no class must be present.
+    lengths = {"lines": 10, "arcs": 17, "arrows": 12, "triangles": 11, "ellipses": 19}
+    for key, rows in display.items():
+        if key == "texts":
+            continue
+        if key not in {item[0] for item in _DISPLAY_PRIMITIVES}:
+            raise ValueError(f"invalid native display primitive class={key!r}")
+        if not isinstance(rows, (list, tuple)):
+            raise ValueError(f"invalid native {key} collection={rows!r}")
+        for row in rows:
+            if not _native_finite_row(row):
+                raise ValueError(f"invalid native {key} geometry={row!r}")
+            if key in lengths and len(row) != lengths[key]:
+                raise ValueError(f"invalid native {key} geometry={row!r}")
+            if key == "polylines":
+                # GetPolylineAtIndex2 lists seven header values, then N XYZs.
+                # DataSize names GeomData but documents no extra payload/offset.
+                if (
+                    len(row) < 7
+                    or row[0] not in (0.0, 1.0)
+                    or not count(row[1])
+                    or (row[0] == 0.0 and row[1] != 0.0)
+                    or not count(row[6])
+                    or len(row) != 7 + 3 * int(row[6])
+                ):
+                    raise ValueError(
+                        f"invalid native polylines geometry: header={row[:7]!r}, "
+                        f"type={row[0] if row else None!r}, "
+                        f"DataSize={row[1] if len(row) > 1 else None!r}, "
+                        f"N={row[6] if len(row) > 6 else None!r}, row_length={len(row)}; "
+                        f"documented length=7+3*N; type1 GeomData layout unproven; row={row!r}"
+                    )
+            elif key == "polygons":
+                if len(row) < 5 or not count(row[4]) or len(row) != 5 + 3 * int(row[4]):
+                    raise ValueError(f"invalid native polygons geometry={row!r}")
+
+
 def _arc_callout_geometry(record: dict[str, Any], advance: float) -> Any:
     """Validate required native data before the audit's tolerant geometry parser."""
     def finite_scalar(value: Any) -> bool:
@@ -2411,31 +2736,17 @@ async def build(adapter: Any) -> dict[str, str]:
                 raise RuntimeError("hub length identity callout did not persist")
     _add_strap_offset_dimension(adapter, right)
 
-    # Template marks already exist in all three face views. Repeating the batch
-    # insert doubles their printed ink; D/E's small anchor drift hid that from
-    # the duplicate-position classifier. Retain and prove each native set.
-    for label, view, required in (
-        ("front", front, 2),
-        ("detail D", hub, 1),
-        ("detail E", end, 1),
+    # Template marks already exist. Count printed primitives, not type-13
+    # objects: native detail arrays also retain readable, zero-ink off-crop
+    # ghosts. Do not delete those ghosts or repeat the duplicate batch insert.
+    for label, view, required, detail in (
+        ("front", front, 2, None),
+        ("detail D", hub, 1, "D"),
+        ("detail E", end, 1, "E"),
     ):
-        center_mark_count = 0
-        for annotation in _bound_view_annotations(
-            view,
-            label=f"{label} template center marks",
-        ):
-            kind = annotation.GetType()
-            if type(kind) is not int or not 1 <= kind <= 19:
-                raise RuntimeError(
-                    f"{label} center mark census has invalid annotation type: {kind!r}"
-                )
-            if kind == 13:  # swAnnotationType_e.swCenterMarkSym
-                center_mark_count += 1
-        if center_mark_count != required:
-            raise RuntimeError(
-                f"expected {required} {label} hole center marks, "
-                f"found {center_mark_count}"
-            )
+        _require_center_mark_census(
+            adapter, view, label=label, required=required, detail=detail,
+        )
 
     # E's native wizard-hole callout keeps the source through condition.
     rod_hole_edge = visible_circle_edge(adapter, end, _ROD_HOLE_DIA)

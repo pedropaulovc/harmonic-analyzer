@@ -137,7 +137,8 @@ position and witness reach; bind its actual angle explicitly to DETAIL E and
 MIRROR PLANE in Manufacturing Notes instead of a dimension row struck by its
 own witness/arc. Move R816 away from the taper arrow. Remove automatic
 centre-mark reinsertion on front/D/E while strictly retaining the native
-2/1/1 centre-mark census, rather than merely deleting the observed front pair.
+2/1/1 **printed** centre-mark census, rather than counting every allocated
+annotation or merely deleting the observed front pair.
 An isolated translated box is only an offline predicate control, never native
 after-fix proof. Detail D uses the existing non-feature `NoOutline` convention;
 do not alter its circular crop geometry. Its outline-style flags are
@@ -146,8 +147,30 @@ Preserve all model/spec/nominal/tolerance values, view centres and scales,
 physical A/C datum checks, E at Y110, 3 mm fatal caption air and 4 mm target,
 the strict 3.5 mm Manufacturing Notes source font, and the shared persisted
 profile/crop guards (including signed four-edge F5 deltas and exact zero-slack
-crop containment). Only after native R20 shows zero does the parent add the
-six real classes above to `STEM_ENFORCED_KINDS["ch-rocker-arm"]`.
+crop containment). Only after the current native sheet shows zero does the
+parent add the six real classes above to `STEM_ENFORCED_KINDS["ch-rocker-arm"]`.
+
+R21 at `3d771e59d3d2e5afc42763ff6e056693ff06da3e`, run
+`20261013T095135303Z-94e3c17bba524633997e55a0bf8a0cef`, passed the corrected
+width owner and D's `NoOutline`/persisted-crop checks on SP4, then refused
+because detail D had two type-13 annotations rather than one. R19's native
+records explain why: D's template `DetailItem352` has eight printed lines,
+whereas `DetailItem354` has readable empty display data and an anchor at
+(708.6834, 127.0803) mm, outside its crop. E similarly retains printed
+`DetailItem358` and off-crop, empty `DetailItem356`. These are native cropped-out
+ghosts, not missing holes or ink that should be deleted.
+
+Classify every centre-mark annotation exactly once and log its native id,
+position and line count. `PRINTED` requires non-empty display with every
+primitive inside the persisted crop; only these count toward 2/1/1. `GHOST`
+requires **both** empty display and an anchor outside the crop. Empty inside,
+non-empty primitives outside, unreadable data or malformed/truncated arrays
+must refuse, not become zero ink. Account for the entire annotation array with
+non-centre marks plus printed/ghost buckets, and preserve the exact printed
+counts. Ghosts remain untouched: deleting an invisible object adds native
+risk without improving the sheet. The R19 dump rounds coordinates to 0.1 um;
+replay fixtures must state that quantization rather than silently adding
+runtime crop padding.
 
 
 ## What is readable from the API (stop guessing)
