@@ -592,6 +592,16 @@ centre could not prove its source identity: neither justifies relaxed
 dimension-type or identity guards. The optional REF and its exclusive
 selection code are removed; the complete mounting-coordinate ink guard stays.
 
+The arm's controlling 3.00 locates its Y=-3 face, not the opposite Y=+4.5
+face: label it `NEAR ARM FACE TO BORE AXIS`. Put `VIEW ON MOUNTING FACE`
+below the lower view it describes, rather than in the gap above it where
+it reads as the upper view's title. Read the rebuilt caption, controls and
+manufacturing-note extents to prove the lower placement remains clear.
+The added drill/counterbore process had two standalone rows; it was not
+an inherited five-row Hole Wizard limitation. Combine those into one
+truthful `C'BORE OPP. MOUNTING FACE` row, retaining the native
+hole association, size and tolerance stack.
+
 Put the junction's 7.50 width and 3.35 edge location on the bottom view,
 where its footprint is visible, without a second controlling copy in the
 side view. Short inside-arrow spans can overlap their arrowheads even after
@@ -645,6 +655,25 @@ start moves to y193.6, retaining 68.4 mm of witness. After rebuild require
 one complete witness at each length endpoint and at least 2 mm measured
 separation from every radius stroke to both witnesses; the readback allowance
 does not discount that minimum. Do not suppress the final layout audit.
+
+The next accepted native render still printed `R1.20 +/-0.05` through the
+spigot-diameter's top extension. Inspect the actual enlarged PNG as well
+as the audit boxes: this one crossed the glyphs, not merely their bounds.
+Move the radius text to the model-derived (167.5,200.4) mm keep and retain
+its genuine material-arc leader. The full shoulder is then at y197.6;
+the same OverallLength gap solve gives 2.8 mm and a witness start at
+y195.2, preserving 2.4 mm leader clearance. The actual text-to-diameter
+witness clearance is 0.556 mm: the coordinator accepted that collision-free
+text gap, not a claim of 2 mm text clearance. No extra diameter-witness
+gap mechanism is warranted.
+The fixture recipe must refuse every remaining `text-on-line` finding
+in its existing completed audit report, not only findings naming the
+radius. Reuse those collected findings after finalization; do not add a
+second geometric parser or change the fleet-wide enforced-kind registry,
+which would re-key every other drawing for a one-sheet guard. Missing,
+malformed or wrong-stem audit output cannot count as a clean sheet.
+The known 0.18 mm model-edge collector false positives remain reports;
+they do not justify suppressing actual text crossings.
 
 ## The sheet-split rule
 

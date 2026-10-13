@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,6 +15,8 @@ import draw_mg_output_fixture as drawing
 import mg_output_fixture_geom as geom
 import mg_output_fixture_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
+from _layout_audit import LayoutAuditMode, audit_dump, audit_report
+from _layout_geometry import Box, Segment as AuditSegment, segment_box_distance
 from _printed_tolerance import printed_band_mm
 
 SCRIPTS = Path(geom.__file__).resolve().parent
@@ -728,10 +731,11 @@ def test_turned_diameters_stack_right_of_the_face_smaller_inside() -> None:
     assert spigot_box[1] - root_box[3] >= _TEXT_HEIGHT
     # The spigot's text clears the rotated end view's left-standing AF line.
     assert spigot_box[2] < drawing.END_KEEP["HexAf"][0] - 0.005
-    # Overall length stays under the view.  The radius text is lowered to
-    # the arc-centre height: its measured elbow is 2.8 mm below the request.
+    # Overall length stays under the view.  The radius shoulder is below the
+    # spigot mouth, but its text sits above the Ø's top witness.
     assert drawing.SIDE_KEEP["OverallLength"][1] < drawing._SIDE_BOTTOM
-    assert drawing.SIDE_KEEP["GrooveRadius"][1] == drawing._side_y(geom.GROOVE_CENTRE_R)
+    assert drawing.SIDE_KEEP["GrooveRadius"] == drawing.RADIUS_TEXT_XY
+    assert drawing.RADIUS_TEXT_XY[1] - drawing.RADIUS_SHOULDER_DROP < od_high
 
 
 def _function(tree: ast.Module, name: str) -> ast.AST:
@@ -1566,11 +1570,302 @@ _NATIVE14_OVERALL_FACE_WITNESS = ((0.1604, 0.1970), (0.1604, 0.1252))
 _NATIVE14_RADIUS_TIP = (0.1516288709508015, 0.19752974314855273)
 
 
+# Native15 audit (20261013T091530503Z): printed glyphs, not the wider COM row.
+_NATIVE15_RADIUS_KEEP = (0.1724, 0.1988)
+_NATIVE15_RADIUS_TEXT_BOX = Box(0.1604289, 0.1969558, 0.1845905, 0.2005212)
+_NATIVE15_SPIGOT_TOP_WITNESS = ((0.1614, 0.198), (0.2003, 0.198))
+# Every native extension line on the sheet.  The bore/tap radial leaders
+# and radius shoulder are not extensions; no dimension's extension is omitted.
+_NATIVE15_EXTENSION_LINES = {
+    "RodStation": [
+        ((0.0896, 0.179), (0.0896, 0.1471719)),
+        ((0.1096, 0.179), (0.1096, 0.1471719)),
+    ],
+    "HexLength": [
+        ((0.0896, 0.181), (0.0896, 0.2222719)),
+        ((0.1336, 0.199), (0.1336, 0.2222719)),
+    ],
+    "OverallLength": [
+        ((0.0896, 0.179), (0.0896, 0.1251719)),
+        ((0.1604, 0.1936), (0.1604, 0.1251719)),
+    ],
+    "GrooveStation": [
+        ((0.0896, 0.181), (0.0896, 0.2322719)),
+        ((0.147, 0.2018), (0.147, 0.2322719)),
+    ],
+    "GrooveRootDia": [
+        ((0.148, 0.166), (0.1803, 0.166)),
+        ((0.148, 0.194), (0.1803, 0.194)),
+    ],
+    "SpigotDia": [
+        ((0.1614, 0.162), (0.2003, 0.162)),
+        _NATIVE15_SPIGOT_TOP_WITNESS,
+    ],
+    "HexAf": [
+        ((0.2500015, 0.19905), (0.226003, 0.19905)),
+        ((0.2719985, 0.16095), (0.226003, 0.16095)),
+    ],
+}
+
+
+def _proposed_radius_text_box() -> Box:
+    dx, dy = (drawing.RADIUS_TEXT_XY[i] - _NATIVE15_RADIUS_KEEP[i] for i in range(2))
+    old = _NATIVE15_RADIUS_TEXT_BOX
+    return Box(old.xmin + dx, old.ymin + dy, old.xmax + dx, old.ymax + dy)
+
+
+def _audit_line(stroke: tuple) -> AuditSegment:
+    (x0, y0), (x1, y1) = stroke
+    return AuditSegment(x0, y0, x1, y1, "ext-line")
+
+
+def test_radius_text_clears_every_native15_sheet_extension_at_the_new_keep() -> None:
+    box = _proposed_radius_text_box()
+    assert (box.xmin, box.ymin, box.xmax, box.ymax) == pytest.approx((
+        0.1555289, 0.1985558, 0.1796905, 0.2021212,
+    ))
+    extensions = {name: list(strokes) for name, strokes in _NATIVE15_EXTENSION_LINES.items()}
+    extensions["OverallLength"] = _overall_witness_ink()
+    distances = {
+        name: min(segment_box_distance(_audit_line(stroke), box) for stroke in strokes)
+        for name, strokes in extensions.items()
+    }
+    assert sum(len(strokes) for strokes in extensions.values()) == 14
+    assert all(distance > 0.0 for distance in distances.values())
+    assert min(distances.values()) == pytest.approx(0.0005558)
+    assert distances["SpigotDia"] == pytest.approx(0.0005558)
+    assert distances["GrooveRootDia"] == pytest.approx(0.0045558)
+    assert distances["GrooveStation"] == pytest.approx(0.0085289)
+    assert distances["OverallLength"] == pytest.approx(0.0033558)
+    # In this native shoulder convention, a material-arc elbow must stay
+    # below the mouth.  Even at the mouth, the glyph-to-witness gap is under
+    # 2 mm; the ≥2 mm requirement remains strict for the actual leader ink.
+    glyph_above_shoulder = _NATIVE15_RADIUS_TEXT_BOX.ymin - 0.1960219
+    assert glyph_above_shoulder == pytest.approx(0.0009339)
+    assert glyph_above_shoulder < drawing.RADIUS_STATION_CLEARANCE
+
+
+def _native15_radius_spigot_dump(*, proposed: bool = False) -> dict:
+    """Replay the actual COM row, PDF glyph box and both Ø9 witnesses."""
+    keep = drawing.RADIUS_TEXT_XY if proposed else _NATIVE15_RADIUS_KEEP
+    dx, dy = (keep[i] - _NATIVE15_RADIUS_KEEP[i] for i in range(2))
+    if proposed:
+        radius_ink, tip, _station, centre = _material_radius_ink()
+    else:
+        centre = (0.147, 0.1988)
+        tip = (0.1516289, 0.1975297)
+        radius_ink = [
+            (tip, (0.1571236, 0.1960219)),
+            (centre, tip),
+            ((0.1571236, 0.1960219), (0.1860889, 0.1960219)),
+        ]
+
+    def line(stroke: tuple, *, z: float = 0.0004) -> list:
+        (x0, y0), (x1, y1) = stroke
+        return [0.0, 0.0, 0.0, 0.0, x0, y0, z, x1, y1, z]
+
+    direction = tuple((tip[i] - centre[i]) / math.dist(tip, centre) for i in range(2))
+    radius = {
+        "type": 4, "name": "GrooveRadius", "visible": 1, "owner_type": 0,
+        "pos": [*keep, 0.0004],
+        "display": {
+            "lines": [line(stroke) for stroke in radius_ink],
+            "arrows": [[*tip, 0.0004, *direction, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, -1.0]],
+            "texts": [{
+                "t": " R1.20 ±0.05 ", "pos": [0.1587111 + dx, 0.1960219 + dy, 0.0004],
+                "h": 0.0035, "ref": 1, "ang": 0.0, "w": 0.0273778,
+            }],
+        },
+        "dim": {"hole_callout": False},
+    }
+    spigot = {
+        "type": 4, "name": "SpigotDia", "visible": 1, "owner_type": 0,
+        "pos": [0.1993, 0.185, -0.0004],
+        "display": {
+            "lines": [line(stroke, z=-0.0004) for stroke in [
+                *_NATIVE15_EXTENSION_LINES["SpigotDia"],
+                ((0.1993, 0.162), (0.1993, 0.1821951)),
+                ((0.1993, 0.198), (0.1993, 0.1878049)),
+            ]],
+            "arrows": [
+                [0.1993, 0.162, -0.0004, 0.0, 1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+                [0.1993, 0.198, -0.0004, 0.0, -1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+            ],
+            "texts": [
+                {"t": " ", "pos": [0.1843889, 0.1822486, -0.0004], "h": 0.0035, "ref": 1, "ang": 0.0, "w": 0.0012931},
+                {"t": "<MOD-DIAM>", "pos": [0.185682, 0.1821951, -0.0004], "h": 0.0035, "ref": 1, "ang": 0.0, "w": 0.0052784},
+                {"t": "9.00 ±0.05 ", "pos": [0.1909604, 0.1822486, -0.0004], "h": 0.0035, "ref": 1, "ang": 0.0, "w": 0.0232507},
+            ],
+        },
+        "dim": {"hole_callout": False},
+    }
+    old = _NATIVE15_RADIUS_TEXT_BOX
+    return {
+        "schema": 1, "stem": drawing.PART_STEM, "sheet": "Sheet1",
+        "width": 0.4318, "height": 0.2794,
+        "zone": {"left": 0.0127, "right": 0.0127, "bottom": 0.0127, "top": 0.0127},
+        "title_block": [0.216, 0.0, 0.4318, 0.066],
+        "views": [{
+            "name": "Drawing View1", "type": 7, "orientation": "*Top", "pictorial": False,
+            "outline": [0.084012, 0.155362, 0.165988, 0.204638],
+            "annotations": [radius, spigot],
+        }],
+        "sheet_annotations": [], "tables": [], "read_errors": {},
+        "ink": {"spans": [
+            ["R1.20±0.05", old.xmin + dx, old.ymin + dy, old.xmax + dx, old.ymax + dy],
+            ["9.00±0.05", 0.1911891, 0.1831825, 0.2127127, 0.1867479],
+        ], "strokes": []},
+    }
+
+
+def _write_fixture_audit(tmp_path: Path, dump: dict) -> tuple[Path, dict]:
+    content, _gating = audit_report(drawing.PART_STEM, LayoutAuditMode.REPORT, [dump])
+    report = tmp_path / f"{drawing.PART_STEM}.json"
+    report.write_text(json.dumps(content), encoding="utf-8")
+    return report, content
+
+
+def test_real_text_crossing_is_not_waived_by_a_report_severity_label(tmp_path: Path) -> None:
+    report, content = _write_fixture_audit(tmp_path, _native15_radius_spigot_dump())
+    (crossing,) = [finding for finding in content["findings"] if finding["kind"] == "text-on-line"]
+    crossing["severity"] = "advisory"
+    content["summary"]["gating"] -= 1
+    report.write_text(json.dumps(content), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="text-on-line"):
+        drawing._enforce_fixture_text_on_line(report)
+
+
+def test_native15_actual_radius_text_crossing_fails_the_local_report_gate(tmp_path: Path) -> None:
+    dump = _native15_radius_spigot_dump()
+    findings = audit_dump(dump)
+    (crossing,) = [finding for finding in findings if finding.kind == "text-on-line"]
+    assert crossing.a.startswith("dim GrooveRadius ")
+    assert crossing.b.startswith("dim SpigotDia ")
+    assert "'s ext-line (161.4,198.0)->(200.3,198.0)mm" in crossing.detail
+    assert crossing.extra["overlap_mm"] == pytest.approx(23.1905)
+    report, content = _write_fixture_audit(tmp_path, dump)
+    assert content["mode"] == "report"
+    with pytest.raises(RuntimeError, match="text-on-line.*\\n.*GrooveRadius.*SpigotDia"):
+        drawing._enforce_fixture_text_on_line(report)
+
+
+def test_proposed_layout_passes_the_same_gate_without_waiving_view_edge_false_positive(
+    tmp_path: Path,
+) -> None:
+    report, content = _write_fixture_audit(tmp_path, _native15_radius_spigot_dump(proposed=True))
+    assert not any(finding["kind"] == "text-on-line" for finding in content["findings"])
+    assert any(finding["kind"] == "view-edges-missing" for finding in content["findings"])
+    drawing._enforce_fixture_text_on_line(report)
+
+
+@pytest.mark.parametrize("sheet", ["Sheet1", "AnotherSheet"])
+def test_local_text_gate_refuses_unrelated_dimension_names_and_text_on_any_sheet(
+    tmp_path: Path, sheet: str,
+) -> None:
+    dump = _native15_radius_spigot_dump()
+    dump["sheet"] = sheet
+    target, source = dump["views"][0]["annotations"]
+    target["name"] = "UnrelatedWidth"
+    target["display"]["texts"][0]["t"] = " 42.00 "
+    dump["ink"]["spans"][0][0] = "42.00"
+    source["name"] = "CounterboreDepth"
+    report, content = _write_fixture_audit(tmp_path, dump)
+    (crossing,) = [finding for finding in content["findings"] if finding["kind"] == "text-on-line"]
+    assert crossing["sheet"] == sheet
+    assert "UnrelatedWidth" in crossing["a"] and "CounterboreDepth" in crossing["b"]
+    with pytest.raises(RuntimeError, match="UnrelatedWidth.*CounterboreDepth"):
+        drawing._enforce_fixture_text_on_line(report)
+
+
+@pytest.mark.parametrize("case", [
+    "missing-file", "invalid-json", "not-object", "schema", "stem", "mode",
+    "missing-findings", "findings-type", "finding-type", "kind-type", "detail-type",
+    "finding-stem", "finding-sheet", "finding-severity", "sheets-type", "empty-sheets",
+    "sheet-type", "sheet-stem", "sheet-name", "duplicate-sheet", "summary-type",
+    "missing-counts", "counts-type", "counts-value", "count-mismatch", "sheet-count",
+    "gating-count", "bool-schema", "bool-count", "bool-sheet-count", "bool-gating-count",
+])
+def test_local_text_gate_fails_loud_on_missing_malformed_or_incomplete_reports(
+    tmp_path: Path, case: str,
+) -> None:
+    report, content = _write_fixture_audit(tmp_path, _native15_radius_spigot_dump())
+    if case == "missing-file":
+        report.unlink()
+    elif case == "invalid-json":
+        report.write_text("{", encoding="utf-8")
+    else:
+        if case == "not-object":
+            content = []
+        elif case in ("schema", "bool-schema"):
+            content["schema"] = True if case == "bool-schema" else 99
+        elif case in ("stem", "mode"):
+            content[case] = "unrelated"
+        elif case == "missing-findings":
+            content.pop("findings")
+        elif case == "findings-type":
+            content["findings"] = {}
+        elif case == "finding-type":
+            content["findings"][0] = None
+        elif case in ("kind-type", "detail-type"):
+            content["findings"][0][case.removesuffix("-type")] = None
+        elif case.startswith("finding-"):
+            content["findings"][0][case.removeprefix("finding-")] = "unrelated"
+        elif case == "sheets-type":
+            content["sheets"] = {}
+        elif case == "empty-sheets":
+            content["sheets"] = []
+        elif case == "sheet-type":
+            content["sheets"][0] = None
+        elif case == "sheet-stem":
+            content["sheets"][0]["stem"] = "unrelated"
+        elif case == "sheet-name":
+            content["sheets"][0]["sheet"] = None
+        elif case == "duplicate-sheet":
+            content["sheets"].append(content["sheets"][0])
+        elif case == "summary-type":
+            content["summary"] = []
+        elif case == "missing-counts":
+            content["summary"].pop("findings")
+        elif case == "counts-type":
+            content["summary"]["findings"] = []
+        elif case in ("counts-value", "bool-count"):
+            content["summary"]["findings"]["text-on-line"] = True if case == "bool-count" else "1"
+        elif case == "count-mismatch":
+            content["findings"].pop(0)
+        elif case in ("sheet-count", "bool-sheet-count"):
+            content["summary"]["sheets"] = True if case == "bool-sheet-count" else 2
+        elif case in ("gating-count", "bool-gating-count"):
+            content["summary"]["gating"] = True if case == "bool-gating-count" else 0
+        else:
+            raise AssertionError(case)
+        report.write_text(json.dumps(content), encoding="utf-8")
+    with pytest.raises((RuntimeError, OSError, json.JSONDecodeError)):
+        drawing._enforce_fixture_text_on_line(report)
+
+
+def test_local_text_gate_consumes_the_completed_finalizer_report_once() -> None:
+    assert _build_calls_in_order({"finalize_drawing", "_enforce_fixture_text_on_line"}) == [
+        "finalize_drawing", "_enforce_fixture_text_on_line",
+    ]
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = _function(tree, "build")
+    assert isinstance(build.body[-1], ast.Return)
+    assert ast.unparse(build.body[-1].value) == "artifacts"
+    source = ast.unparse(_function(tree, "_enforce_fixture_text_on_line"))
+    assert "audit_dump(" not in source and "collect_sheet_dumps(" not in source
+
+
 def _material_radius_ink() -> tuple[list, tuple[float, float], list, tuple[float, float]]:
+    """A complete 29 mm native-style shoulder at the new keep, not an elbow stub."""
     centre = (drawing._side_x(geom.GROOVE_X), drawing._side_y(geom.GROOVE_CENTRE_R))
-    tip = _NATIVE14_RADIUS_TIP
-    elbow = _NATIVE14_RADIUS_SHOULDER[0]
-    ink = [(centre, tip), (tip, elbow), _NATIVE14_RADIUS_SHOULDER]
+    x, y = drawing.RADIUS_TEXT_XY
+    elbow = (x - drawing.RADIUS_SHOULDER_RUN_IN, y - drawing.RADIUS_SHOULDER_DROP)
+    radius = geom.GROOVE_RADIUS * drawing._S / 1000.0
+    run = math.dist(centre, elbow)
+    assert run > radius
+    tip = tuple(centre[i] + (elbow[i] - centre[i]) * radius / run for i in range(2))
+    shoulder = (elbow, (elbow[0] + math.dist(*_NATIVE14_RADIUS_SHOULDER), elbow[1]))
+    ink = [(centre, tip), (tip, elbow), shoulder]
     station = [
         (
             (centre[0], centre[1] + drawing.GROOVE_STATION_GAP),
@@ -1600,10 +1895,11 @@ def _overall_witness_ink() -> list:
     ]
 
 
-def test_native14_full_radius_shoulder_clears_both_overall_witnesses() -> None:
+def test_full_radius_shoulder_clears_both_overall_witnesses_at_the_new_keep() -> None:
     ink, tip, station, centre = _material_radius_ink()
     shoulder = ink[-1]
     old = _NATIVE14_OVERALL_FACE_WITNESS
+    assert drawing.segments_cross(_NATIVE14_RADIUS_SHOULDER, old)
     assert drawing.segments_cross(shoulder, old)
     # Both endpoints are outside x160.4: an elbow-only assertion missed it.
     assert shoulder[0][0] < old[0][0] < shoulder[1][0]
@@ -1617,15 +1913,16 @@ def test_native14_full_radius_shoulder_clears_both_overall_witnesses() -> None:
     ))
     witnesses = _overall_witness_ink()
     face = witnesses[1]
-    assert drawing.OVERALL_FACE_WITNESS_GAP == pytest.approx(0.0044)
-    assert face[0][1] == pytest.approx(0.1936)
+    assert drawing.OVERALL_FACE_WITNESS_GAP == pytest.approx(0.0028)
+    assert drawing.OVERALL_FACE_WITNESS_GAP >= drawing.EXTENSION_START_GAP >= 0.0
+    assert face[0][1] == pytest.approx(0.1952)
     assert face[1] == pytest.approx(old[1])
     assert old[1][1] < face[0][1] < old[0][1]
     # New ink is a strict subset of the old witness, so this local gap
     # cannot add a collision with another dimension or text.
     for point in face:
         assert drawing.distance_to_point(old, point) == pytest.approx(0.0)
-    assert math.dist(*face) == pytest.approx(0.0684)
+    assert math.dist(*face) == pytest.approx(0.0700)
     measured_clearance = drawing.distance_to_point(shoulder, face[0])
     assert measured_clearance == pytest.approx(
         drawing.RADIUS_STATION_CLEARANCE + drawing.RADIUS_INK_SLOP
@@ -1634,13 +1931,14 @@ def test_native14_full_radius_shoulder_clears_both_overall_witnesses() -> None:
     for witness in witnesses:
         assert not any(drawing.segments_cross(stroke, witness) for stroke in ink)
     assert drawing._radius_overall_witness_ink_problem(ink, witnesses) is None
-    # The proven native14 associative material landing and station proof stay.
-    assert tip == _NATIVE14_RADIUS_TIP
-    assert ink[-1] == _NATIVE14_RADIUS_SHOULDER
-    assert drawing.SIDE_KEEP["GrooveRadius"] == pytest.approx((
-        drawing._side_x(geom.SPIGOT_FACE_X) + 0.012,
-        drawing._side_y(geom.GROOVE_CENTRE_R),
-    ))
+    # The new ray is still on the genuine face-side material arc, not its
+    # extension in air, and the station retains its exact 3 mm local gap.
+    assert math.dist(tip, centre) == pytest.approx(geom.GROOVE_RADIUS * drawing._S / 1000.0)
+    assert tip[0] > centre[0]
+    assert drawing._side_y(geom.GROOVE_ROOT_DIA / 2.0) < tip[1] < drawing._side_y(geom.SPIGOT_DIA / 2.0)
+    assert drawing.SIDE_KEEP["GrooveRadius"] == pytest.approx((0.1675, 0.2004))
+    assert shoulder[0] == pytest.approx((0.1522, 0.1976))
+    assert shoulder[1] == pytest.approx((0.1812, 0.1976))
     assert drawing._groove_radius_ink_problem(ink, tip, station, centre) is None
     assert drawing.GROOVE_STATION_GAP == 0.003
     assert drawing.RADIUS_STATION_CLEARANCE == 0.002
@@ -1778,6 +2076,7 @@ def _radius_readback_fakes(
     display.ArcExtensionLineOrOppositeSide = False
     display.data = _ArrowData(tip, count=count, complete=complete)
     radius, station = _RadialAnnotation(display), _RootAnnotation(_station_display())
+    radius.ink = ink
     overall = _RootAnnotation(_overall_display())
     overall.ink = _overall_witness_ink()
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
@@ -1787,7 +2086,7 @@ def _radius_readback_fakes(
 
     def segments(annotation: _RootAnnotation) -> list:
         if annotation is radius:
-            return ink
+            return radius.ink
         if annotation is station:
             return station_ink
         assert annotation is overall
@@ -1808,6 +2107,13 @@ def test_rebuilt_radius_proof_refuses_native14_full_shoulder_crossing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     radius, station, overall = _radius_readback_fakes(monkeypatch)
+    centre = (drawing._side_x(geom.GROOVE_X), drawing._side_y(geom.GROOVE_CENTRE_R))
+    radius.ink = [
+        (centre, _NATIVE14_RADIUS_TIP),
+        (_NATIVE14_RADIUS_TIP, _NATIVE14_RADIUS_SHOULDER[0]),
+        _NATIVE14_RADIUS_SHOULDER,
+    ]
+    radius.display.data = _ArrowData(_NATIVE14_RADIUS_TIP)
     overall.ink[1] = _NATIVE14_OVERALL_FACE_WITNESS
     with pytest.raises(RuntimeError, match="does not clear the overall length"):
         drawing._prove_groove_radius(object(), object(), radius, station, overall)

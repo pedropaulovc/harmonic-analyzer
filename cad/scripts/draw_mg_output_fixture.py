@@ -29,9 +29,12 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import re
 import sys
+from collections import Counter
+from pathlib import Path
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -63,10 +66,11 @@ from _drawing_dimensions import (
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leaders import Segment, dimension_segments, distance_to_point, segments_cross
 from _drawing_notes import add_property_linked_note
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME, layout_report_path
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
+from _layout_audit import REPORT_SCHEMA
 from _session import run_build
 import _telemetry
 from _gear_drawing_entities import visible_circle_edge
@@ -160,10 +164,10 @@ BORE_CALLOUT_HALF_HEIGHT = 0.0073  # shoulder to the +0.03 row's top: 14.6 mm
 # the hex and groove stations stack over it, each text mid-span.  The
 # overall length runs under the view, outermost; its witness hangs from the
 # spigot face's top corner down the face, with a local gap below the radius
-# shoulder.  The groove's radius reads beyond the face, with its elbow BELOW
-# the arc centre so the arrow meets the material arc, never its extension in
-# air.  The bore's station (a 20 mm span under a 22 mm text) reads outside,
-# left of the free end.
+# shoulder.  The groove's radius reads above the turned Ø witnesses, with
+# its elbow BELOW the arc mouth so the arrow meets the material arc, never
+# its extension in air.  The bore's station (a 20 mm span under a 22 mm text)
+# reads outside, left of the free end.
 #
 # The two turned Ø stack right of the face, the smaller inside: the groove
 # root's extension lines run from the two roots across the face-side lip to
@@ -184,6 +188,23 @@ _STACKED_DIA_PITCH = 0.020
 _STACKED_DIA_STAGGER = 0.005
 _GROOVE_ROOT_DIA_X = _FACE_SHEET_X + _TEXT_TO_FACE + TURNED_DIA_TEXT_HALF_WIDTH
 _HEX_MID_X = _side_x((FREE_END_X + SHOULDER_X) / 2.0)
+# Native15's radius keep (172.4, 198.8) mm printed its letters across the
+# spigot Ø's top witness at y198 mm.  Its full shoulder starts 15.3 mm left
+# and 2.8 mm below the keep.  Put that elbow just outboard of the projected
+# radius, below the spigot mouth by the ink slop: the radial ray still lands
+# on material while the measured text (0.934 mm above its shoulder) clears
+# the top witness.  The station's x147 mm witness stays left of all the text.
+RADIUS_INK_SLOP = 0.0004
+RADIUS_STATION_CLEARANCE = 0.002
+RADIUS_SHOULDER_DROP = 0.0028
+RADIUS_SHOULDER_RUN_IN = 0.0153
+RADIUS_TEXT_XY = (
+    _side_x(GROOVE_X)
+    + GROOVE_RADIUS * _S / 1000.0
+    + RADIUS_INK_SLOP
+    + RADIUS_SHOULDER_RUN_IN,
+    _side_y(SPIGOT_DIA / 2.0) - RADIUS_INK_SLOP + RADIUS_SHOULDER_DROP,
+)
 SIDE_KEEP = {
     "RodBoreDia": (_HEX_MID_X, _SIDE_TOP + 0.011),
     "HexLength": (_HEX_MID_X, _SIDE_TOP + 0.025),
@@ -195,7 +216,7 @@ SIDE_KEEP = {
         _GROOVE_ROOT_DIA_X + _STACKED_DIA_PITCH,
         SIDE_CENTER[1] + _STACKED_DIA_STAGGER,
     ),
-    "GrooveRadius": (_FACE_SHEET_X + 0.012, _side_y(GROOVE_CENTRE_R)),
+    "GrooveRadius": RADIUS_TEXT_XY,
 }
 # The groove's root Ø is a doubled distance, the groove's axis to its root
 # point (build_mg_output_fixture._groove_profile: AddSpecificDimension
@@ -278,25 +299,18 @@ AUTO_TAPPED_HOLE_NOTES = 0
 PROJECTION_ANGLE_SLOP = 1e-6
 PROJECTION_SLOP_M = 1e-5
 BORE_FACE_SLOP_M = 1e-8
-# The radius's window ink must distinguish the material arc from retry12's
-# extension in air (~2.4 mm sheet above the mouth).  A 0.4 mm sheet bound
-# allows a pixel without admitting that wrong branch of the circle.
-RADIUS_INK_SLOP = 0.0004
-RADIUS_STATION_CLEARANCE = 0.002
 # Only GrooveStation's centre-side witness gets this local gap.  The root Ø
 # retains EXTENSION_START_GAP and its strict root-to-root ink proof.
 GROOVE_STATION_GAP = 0.003
-# Native14's complete radius shoulder ran (157.1, 196.0)->(186.1, 196.0)
-# mm, 2.8 mm below its keep, across the overall face witness at x160.4 mm.
-# Keep that proven material-arc leader unchanged.  Only the OverallLength
-# face-side witness's native gap changes: its start moves from y197.0 to
-# y193.6 mm, 2 mm clear of the shoulder plus the existing 0.4 mm ink slop.
-RADIUS_SHOULDER_DROP = 0.0028
-OVERALL_FACE_WITNESS_GAP = (
+# The complete 29 mm shoulder still spans the overall face witness's x.
+# End that downward witness at least 2 mm plus the readback slop below the
+# new shoulder; never request a negative gap if the model's face is lower.
+OVERALL_FACE_WITNESS_GAP = max(
+    EXTENSION_START_GAP,
     _side_y(SPIGOT_DIA / 2.0)
-    - (SIDE_KEEP["GrooveRadius"][1] - RADIUS_SHOULDER_DROP)
+    - (RADIUS_TEXT_XY[1] - RADIUS_SHOULDER_DROP)
     + RADIUS_STATION_CLEARANCE
-    + RADIUS_INK_SLOP
+    + RADIUS_INK_SLOP,
 )
 
 
@@ -962,6 +976,76 @@ def _prove_rod_bore_axis(adapter: Any, view: Any, axis: Any, face: Any, tap_mark
     )
 
 
+def _enforce_fixture_text_on_line(report: Path) -> None:
+    """Gate the existing audit's whole-sheet text-on-line findings locally.
+
+    finalize_drawing has already collected/audited the exported PDF and
+    written its declared report.  Consume those findings, never recollect
+    COM or interpret text/line geometry a second way.  Native15's real
+    radius/spigot crossing must fail even in REPORT mode; missing 0.25 mm
+    view edges on this 0.18 mm sheet are unrelated and remain report-only.
+    """
+    content = json.loads(report.read_text(encoding="utf-8"))
+    if (
+        not isinstance(content, dict)
+        or type(content.get("schema")) is not int
+        or content["schema"] != REPORT_SCHEMA
+        or content.get("stem") != PART_STEM
+        or content.get("mode") not in ("report", "gate")
+        or not isinstance(content.get("findings"), list)
+        or not isinstance(content.get("sheets"), list)
+        or not content["sheets"]
+        or not isinstance(content.get("summary"), dict)
+    ):
+        raise RuntimeError("fixture layout audit report is missing or malformed")
+    sheets = content["sheets"]
+    if any(
+        not isinstance(sheet, dict)
+        or sheet.get("stem") != PART_STEM
+        or not isinstance(sheet.get("sheet"), str)
+        or not sheet["sheet"]
+        for sheet in sheets
+    ):
+        raise RuntimeError("fixture layout audit report has malformed sheets")
+    sheet_names = {sheet["sheet"] for sheet in sheets}
+    findings = content["findings"]
+    if any(
+        not isinstance(finding, dict)
+        or finding.get("stem") != PART_STEM
+        or finding.get("severity") not in ("gating", "advisory")
+        or any(
+            not isinstance(finding.get(key), str)
+            for key in ("kind", "sheet", "a", "b", "detail")
+        )
+        or not finding["kind"]
+        or finding["sheet"] not in sheet_names
+        for finding in findings
+    ):
+        raise RuntimeError("fixture layout audit report has malformed findings")
+    summary = content["summary"]
+    counts = summary.get("findings")
+    if (
+        len(sheet_names) != len(sheets)
+        or type(summary.get("sheets")) is not int
+        or summary["sheets"] != len(sheets)
+        or not isinstance(counts, dict)
+        or any(
+            not isinstance(kind, str) or type(count) is not int or count <= 0
+            for kind, count in counts.items()
+        )
+        or counts != Counter(finding["kind"] for finding in findings)
+        or type(summary.get("gating")) is not int
+        or summary["gating"] != sum(finding["severity"] == "gating" for finding in findings)
+    ):
+        raise RuntimeError("fixture layout audit report is incomplete")
+    crossed = [finding for finding in findings if finding["kind"] == "text-on-line"]
+    if crossed:
+        raise RuntimeError(
+            f"fixture layout audit failed: {len(crossed)} text-on-line finding(s):\n"
+            + "\n".join(f"  - {finding['detail']}" for finding in crossed)
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1074,7 +1158,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _prove_groove_root_diameter(side_by_name["GrooveRootDia"])
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
-    return await finalize_drawing(
+    artifacts = await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Output Fixture Manufacturing Drawing",
@@ -1085,6 +1169,8 @@ async def build(adapter: Any) -> dict[str, str]:
         redundant_note_substrings=(TAPPED_HOLE_NOTE,),
         expected_redundant_notes=AUTO_TAPPED_HOLE_NOTES,
     )
+    _enforce_fixture_text_on_line(layout_report_path(PART_STEM))
+    return artifacts
 
 
 def _parse_args() -> argparse.Namespace:

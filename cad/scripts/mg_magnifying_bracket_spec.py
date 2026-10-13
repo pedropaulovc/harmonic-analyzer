@@ -42,7 +42,8 @@ from mg_lever_press_fit_geom import PRESS_INSTALLATION_NOTES
 # collar length with its band (COLLAR_LENGTH_BAND: the press contact is the
 # collar's length less the lever's dome), to the front view.  The blanked
 # ArmSection witness (Right plane) imports to the same side view: the arm's
-# lower face from the bore axis (controlling), the flange's mounting face
+# face nearest the bore axis (Y -3 versus the other face at Y +4.5,
+# controlling ArmBelowAxis), the flange's mounting face
 # from the bore axis and the arm's end past that face -- the ONE toleranced
 # chain along Z (mreview10 blocker 2); its thickness and offset copies and
 # its closing dimension (the flange above the arm) stay unmarked.  The

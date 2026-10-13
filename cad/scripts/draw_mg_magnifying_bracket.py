@@ -69,6 +69,8 @@ from _drawing_leaders import (
     Segment,
     assert_leaders_clear,
     dimension_segments,
+    dimension_text_points,
+    distance_to_box,
     distance_to_line,
     segments_cross,
     set_near_side_diameter,
@@ -178,8 +180,8 @@ FRONT_KEEP = {
 #     row hung off a short vertical span prints beside its column on a
 #     shoulder 2.78 mm under the requested y, on whichever hand SolidWorks
 #     takes: the bottom view's 6.35, retry09/10): " 3.35 " (12.2 mm) at y
-#     97.5..101 mm over x 137.8..162.2 mm at most, 2.65 mm under the
-#     hole-datum witnesses; the run from the shoulder up to y 103.65 mm,
+#     97.1..100.6 mm over x 137.8..162.2 mm at most; the 0.4 mm lower drop
+#     clears retry15's flange-height witness by 2.03 mm on its native text;
 #     the upper tail y 107..113.35 mm, 1.15 mm short of the thickness'
 #     upper witness; the counterbore callout's leader passes x <= 132.5 mm
 #     at the row's height, 5 mm left of its widest reach;
@@ -204,24 +206,21 @@ FRONT_KEEP = {
 # y 172 mm.
 BOTTOM_KEEP = {"FlangeHeight": (0.166, 0.1263)}
 BOTTOM_FOOTPRINT_KEEP = {
-    "FootprintOffset": (0.150, 0.1003),
+    "FootprintOffset": (0.150, 0.0999),
     "FootprintThickness": (0.175, 0.11178),
 }
-# The bottom view is captioned for its direction (Main, retry11: a plan
-# view of a bracket whose mounting face is the one the plate sees).  Its
-# caption hangs ABOVE the view's measured outline, centred, 1.5 mm up
-# (the outline already stands 5.5 mm clear of the flange's top): below the
-# view the holes' X coordinates' witnesses (x 91, 95 and 108.7 mm, down to
-# y 80 mm) and the counterbore callout's leader cross every row wide
-# enough for the words.  Over the outline (y 121.9 mm) the caption's row
-# (y ~123.4..126.9 mm, x ~86.5..143.5 mm) stays 4.5 mm under the arm
-# width's witness ends (y 131.4 mm; proven on the rebuilt ink, a text
-# height at least) and 8.3 mm left of the flange height's left-hand row.
+# The caption belongs BELOW the lower view, not between it and the front view.
+# Centre it on the measured bottom-view outline, below that view's lowest
+# coordinate witness/text (retry15: MountingX1 ends at y 80.02 mm). Its native
+# extent, not the insertion point, must clear the linked manufacturing notes
+# (retry15: top y 70.12 mm). The callout block is to the right; its diagonal
+# leader is independently proven clear of the caption's actual extent.
 BOTTOM_CAPTION = "VIEW ON MOUNTING FACE"
-BOTTOM_CAPTION_XY = (0.0865, 0.1234)
-BOTTOM_CAPTION_GAP_M = 0.0015
+BOTTOM_CAPTION_XY = (0.0865, 0.0774)
+BOTTOM_CAPTION_GAP_M = 0.002
 # INote.GetExtent reads ~0.3 mm apart between sessions; settle within twice.
 CAPTION_SETTLE_M = 0.0006
+MANUFACTURING_NOTES_XY = (0.020, 0.070)
 # The mounting holes' coordinates on the bottom view (viewer +Z: x = 134 + X,
 # y = 110 + Y mm; the flange's west end at x 91 mm, its lower face at y 103.65
 # mm, the holes at x 95 and 108.7 mm, y 110 mm).  Each coordinate sketch
@@ -333,15 +332,14 @@ SIDE_KEEP = {
 # now control the arm in the BOTTOM view, where the arm's end face is seen
 # (BOTTOM_FOOTPRINT_KEEP), and the 3.00 stands alone with its arrows
 # OUTSIDE (no 3 mm span fits two 3.556 mm arrowheads inside: retry11 rule,
-# no inside-arrowhead overlap): line y 134.44 mm, hung RIGHT: "ARM FROM
-# BORE AXIS" (18 characters; letter rows measured 2.6..2.85 mm a character,
-# so 47..51 mm) centred on x 264 mm, over x ~240.5..287.5 mm (at widest
-# ~238.5..289.5 mm), y 134.44..137.94 mm, "3.00" over it to y 143.5 mm,
-# 4.35 mm under the arm end's witness (y 147.85 mm, the reference's,
-# which runs right from x 231 mm) and 4 mm and more right of the flange's
-# corner witness (x 234.35 mm, the 3.11's, which ends at y 149.96 mm, above
-# these rows); the rows end 5.2 mm and more left of the isometric's outline
-# (x 294.7 mm).  The line runs from the rows' near end left through both
+# no inside-arrowhead overlap): "NEAR ARM FACE / TO BORE AXIS" names the
+# Y -3 face, nearer the bore axis than the opposite Y +4.5 face. Its two
+# label rows keep the native 3.00 block to three rows, still centred at
+# x 264 mm with the value at y 140 mm; the lowest row/line at y 128.89 mm
+# spans x ~245.5..282.5 mm at the widest observed letter pitch. It stays
+# right of the flange's witnesses, left of the isometric and a text height
+# under the arm end's witness (y 147.85 mm).
+# The line runs from the rows' near end left through both
 # witnesses to its tail at x 221.65 mm, clear of the overhang's column at
 # x 212 mm and the mounting face's at x 198 mm.  The overhang's labelled
 # block hangs well under this line; the counterbore callout ends at y ~95
@@ -409,19 +407,19 @@ SIDE_CALLOUTS = {
 # under the side view without reaching the bottom view's east-stack ink.
 # The footprint pair's face-on witnesses still name their actual edges.
 SECTION_CALLOUTS = {
-    "ArmBelowAxis": "ARM FROM BORE AXIS",
+    "ArmBelowAxis": "NEAR ARM FACE\nTO BORE AXIS",
     "SeatToAxis": "MOUNTING FACE\nTO BORE AXIS",
     "ArmPastSeat": "ARM PAST\nMOUNTING\nFACE",
 }
 # The counterbore callout names the entry face in the sheet's own words: the
 # bottom view looks at the mounting face (the one the plate sees, named on
-# the 55.19), and the counterbores enter from the opposite, -Z face.  Two
-# process rows of their own (a process ending in a line break puts the
-# native size on its own row, compose_hole_callout_prefix), each no wider
-# than the native counterbore row, so the leader leaving the lowest row's
-# near end climbs clear of every row above it (mreview10 clarity: "FAR
-# SIDE" named no face).
-COUNTERBORE_PROCESS = "DRILL / COUNTERBORE FROM\nFACE OPPOSITE MOUNTING FACE\n"
+# the 55.19), and the counterbores enter from the opposite, -Z face.
+# One short process row keeps that certainty without Native15's extra row:
+# the native counterbore tolerance stack itself takes two physical rows,
+# so two process rows made five total. The trailing break keeps the native
+# size on its own row (compose_hole_callout_prefix), with four physical rows
+# including the thru row and the untouched native tolerance stack.
+COUNTERBORE_PROCESS = "C'BORE OPP. MOUNTING FACE\n"
 
 # Third-angle projection of the side view: model +Z (down the front view)
 # points down the sheet, model +Y left (the viewer is at +X, the front view's
@@ -691,57 +689,105 @@ def _assert_dimensions_clear(
     _telemetry.success(f"{label}: no dimension line over a foreign witness {summary}")
 
 
-# A text height (metres): the clearance the caption keeps from front-view ink.
+# The native sheet's default caption height; inherited rather than overridden.
 TEXT_HEIGHT_M = 0.0035
 
 
-def _place_bottom_caption(adapter: Any, view: Any, front_annotations: Sequence[Any]) -> None:
-    """Hang the bottom view's caption, centred, above the view's measured
-    outline, then prove it a text height under the front view's lowest ink.
+def _note_extent(note: Any, label: str) -> tuple[float, ...]:
+    extent = tuple(float(value) for value in _early_bound(note, "INote").GetExtent())
+    if (
+        len(extent) != 6
+        or not all(math.isfinite(value) for value in extent)
+        or extent[3] <= extent[0]
+        or extent[4] <= extent[1]
+    ):
+        raise RuntimeError(f"{label}: note has no rendered extent: {extent!r}")
+    return extent
 
-    Both boxes are measured (``IView.GetOutline``, ``INote.GetExtent``), as the
-    transgear feed pinion's rear caption is.  The sheet scale is pinned first
-    so finalization re-applying it cannot move the view after this readback.
-    The front view's lowest ink is the arm width's hung line, read from its
-    rebuilt annotation rather than assumed from the retry10 sheet."""
+
+def _place_bottom_caption(
+    adapter: Any,
+    view: Any,
+    annotations: Sequence[Any],
+    manufacturing_note: Any,
+    hole_callout: Any,
+) -> None:
+    """Centre the caption below the lower view's actual outline and ink.
+
+    All lower-view controls contribute their rebuilt witnesses and text
+    positions. The caption's top clears their lowest extent; its bottom
+    clears the linked notes' exact top. No view centre or projection moves.
+    """
     sheet = _early_bound(
         _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
     )
     if sheet.SetScale(*SHEET_SCALE, False, False) is not True:
         raise RuntimeError("cannot pin the sheet scale before the bottom view caption")
     outline = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
-    target = ((outline[0] + outline[2]) / 2.0, outline[3] + BOTTOM_CAPTION_GAP_M)
+    if (
+        len(outline) != 4
+        or not all(math.isfinite(value) for value in outline)
+        or outline[2] <= outline[0]
+        or outline[3] <= outline[1]
+    ):
+        raise RuntimeError(f"bottom view has an invalid outline: {outline!r}")
+    lowest = outline[1]
+    if not annotations:
+        raise RuntimeError("the bottom view has no controls to clear the caption from")
+    for annotation in annotations:
+        lines = dimension_segments(annotation)
+        texts = dimension_text_points(annotation)
+        if not lines or not texts:
+            raise RuntimeError("a bottom view control drew no witness/text to clear the caption from")
+        lowest = min(lowest, *(p[1] for s in lines for p in s), *(p[1] for p in texts))
+    target = (
+        (outline[0] + outline[2]) / 2.0,
+        lowest - BOTTOM_CAPTION_GAP_M - CAPTION_SETTLE_M,
+    )
     raw_note = add_note(adapter, BOTTOM_CAPTION, *BOTTOM_CAPTION_XY)
     if raw_note is None:
         raise RuntimeError("the bottom view caption was not inserted")
     note = _early_bound(raw_note, "INote")
+    text = note.GetText()
+    if type(text) is not str or text != BOTTOM_CAPTION:
+        raise RuntimeError(f"bottom view caption text did not persist: {text!r}")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    if annotation is None:
+        raise RuntimeError("bottom view caption has no annotation")
+    text_format = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
+    if text_format is None or not math.isclose(
+        float(text_format.CharHeight), TEXT_HEIGHT_M, abs_tol=1e-6
+    ):
+        raise RuntimeError("bottom view caption did not keep the sheet's native text height")
     for _attempt in range(4):
-        extent = tuple(float(value) for value in note.GetExtent())
-        error = (target[0] - (extent[0] + extent[3]) / 2.0, target[1] - extent[1])
+        extent = _note_extent(note, "bottom view caption")
+        error = (target[0] - (extent[0] + extent[3]) / 2.0, target[1] - extent[4])
         if max(abs(error[0]), abs(error[1])) < CAPTION_SETTLE_M:
             break
-        move_annotation(adapter, note.GetAnnotation(), *error, label="bottom view caption")
+        move_annotation(adapter, annotation, *error, label="bottom view caption")
     else:
         raise RuntimeError(
-            f"bottom view caption stayed at {extent}, its bottom centre requested at {target}"
+            f"bottom view caption stayed at {extent}, its top centre requested at {target}"
         )
-    front_ink = [
-        point[1]
-        for annotation in front_annotations
-        if dimension_name(adapter, annotation) == "ArmWidth"
-        for segment in dimension_segments(annotation)
-        for point in segment
-    ]
-    if not front_ink:
-        raise RuntimeError("the front view's arm width drew no ink to clear the caption from")
-    if min(front_ink) - extent[4] < TEXT_HEIGHT_M:
+    notes_extent = _note_extent(manufacturing_note, "manufacturing notes")
+    if (
+        lowest - extent[4] < BOTTOM_CAPTION_GAP_M
+        or extent[1] - notes_extent[4] < BOTTOM_CAPTION_GAP_M
+    ):
         raise RuntimeError(
-            f"bottom view caption {extent} is within a text height of the arm width's "
-            f"ink (lowest y {min(front_ink)})"
+            f"bottom view caption {extent} does not fit below its controls (y {lowest}) "
+            f"and above manufacturing notes {notes_extent}"
         )
+    callout_annotation = _early_bound(hole_callout, "IDisplayDimension").GetAnnotation()
+    callout_ink = dimension_segments(callout_annotation)
+    box = (extent[0], extent[1], extent[3], extent[4])
+    if not callout_ink or any(
+        distance_to_box(segment, box) < BOTTOM_CAPTION_GAP_M for segment in callout_ink
+    ):
+        raise RuntimeError("bottom view caption crowds the native counterbore leader")
     _telemetry.info(
-        f"bottom view caption: outline {outline}, extent {extent}, "
-        f"arm width ink from y {min(front_ink)}"
+        f"bottom view caption: outline {outline}, lowest control y {lowest}, "
+        f"extent {extent}, manufacturing notes extent {notes_extent}"
     )
 
 
@@ -821,6 +867,30 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
     applied = display.GetText(4)
     if type(applied) is not str or applied.replace("\r", "") != text:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
+
+
+def _label_near_arm_face(adapter: Any, annotation: Any) -> None:
+    """Label the existing model control from the arm's Y -3 face to the axis.
+
+    ArmSection owns the witness (end.start at ArmY0, axis.start at Y 0);
+    no sheet dimension or new reference is created. 'Near' means nearest
+    the bore axis, not nearest the side-view observer (+X).
+    """
+    if not 0.0 < -ARM_Y[0] < ARM_Y[1]:
+        raise RuntimeError("ArmBelowAxis does not identify the arm face nearest the bore axis")
+    display = _early_bound(annotation, "IAnnotation").GetSpecificAnnotation()
+    if display is None:
+        raise RuntimeError("ArmBelowAxis: controlling dimension has no display annotation")
+    display = _early_bound(display, "IDisplayDimension")
+    kind = display.Type2
+    if type(kind) is not int or kind not in _LINEAR_DIMENSION_TYPES:
+        raise RuntimeError(f"ArmBelowAxis: expected a linear dimension, got type {kind!r}")
+    # The targeted ArmSection import owns the model identity/attachments;
+    # this is its value readback, not a new pair of drawing-entity picks.
+    assert_dimension_measures(
+        adapter, display, expected_mm=-ARM_Y[0], label="ArmBelowAxis"
+    )
+    _set_callout_below(display, SECTION_CALLOUTS["ArmBelowAxis"], "ArmBelowAxis")
 
 
 def _arm_end_reference(adapter: Any, side: Any, edges: ViewEdges) -> Any:
@@ -1021,6 +1091,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError(
             f"arm section imported {sorted(section)}, expected {sorted(SIDE_SECTION_KEEP)}"
         )
+    _label_near_arm_face(adapter, section["ArmBelowAxis"])
     overhang_display = section["ArmPastSeat"].GetSpecificAnnotation()
     if overhang_display is None:
         raise RuntimeError("ArmPastSeat: controlling dimension has no display annotation")
@@ -1043,40 +1114,24 @@ async def build(adapter: Any) -> dict[str, str]:
     bottom_edges = scan_view_edges(bottom, label="bracket mounting face")
     rims = _mounting_rims(bottom_edges)
 
-    add_native_hole_callout(
+    hole_callout = add_native_hole_callout(
         adapter,
         bottom,
-        # The east hole (x 108.7 mm), nearer the block.  AddHoleCallout2
-        # (retry09, requested (337, 78) mm) prints the thru row ("2X Ø 2.59
-        # THRU ALL", 43.8 mm) above the counterbore row (bare, ~70 mm: the
-        # prefixed "DRILL / COUNTERBORE ⌴ Ø 3.80 +0.10/0.00 ↧ 1.55±0.05" was
-        # 117.9 mm), the rows 5.56 mm apart and the block centred on the
-        # requested x, 1 mm under the requested y (the harmonic base's
-        # hb-callout-cal: a callout's text block centres on its anchor); the
-        # leader's shoulder runs along the lowest row's baseline from an
-        # elbow 1.5 mm before its end nearer the hole, and the leader runs
-        # from that elbow to the hole's rim.  The two process rows (24 and 27
-        # characters, ~62 and ~70 mm, neither wider than the counterbore row
-        # by more than the leader's drift per row) make a FOUR-row block,
-        # 20.2 mm tall: requested at (212, 86) mm its rows span y ~74.9..95.1
-        # mm, the counterbore row lowest, x ~174..250 mm for the widest --
-        # over the title block (y >= 66 mm) and the notes (top row y 69.5 mm)
-        # by 5.4 mm, under the bottom view's east stack (the offset's row
-        # ends at x 162.2 mm at widest, 11.8 mm left of the block; the
-        # flange height's lower tail ends at y 97.3 mm, the thickness' at
-        # 100.65 mm, 5.5 mm over the block's top) and ~45 mm left of the
-        # isometric's outline (x 294.7 mm).
-        # The leader from the elbow at ~(175.5, 74.9) mm to the hole at
-        # (108.7, 110) mm climbs left faster (1.9 mm per mm) than any row
-        # above the lowest widens, so it runs under no row of its own; it
-        # passes the 17.70's line (y 81 mm, ending at x 115.1 mm) at x ~164
-        # mm and the 4.00's (y 89 mm, ending at x 101.4 mm) at x ~149 mm,
-        # crosses the offset's column (x 150 mm) at y ~88 mm, 9 mm under its
-        # run's foot (y 97.5 mm), reaches the offset's row height (y 97.5
-        # mm) at x ~132.5 mm, 5 mm left of the row's widest reach, and
-        # leaves the flange through its lower face (y 103.65 mm) at x ~121
-        # mm, between the hole's own witness (x 108.7 mm) and the east
-        # stack's (x 140 mm on).
+        # The east hole (x 108.7 mm), nearer the block. Native15's untouched
+        # thru row, counterbore row and counterbore tolerance stack occupied
+        # three physical rows; two separate process rows made FIVE. Keep one
+        # compact, face-specific process row (25 characters, shorter than the
+        # former 27-character face row), for four physical rows total.
+        # Native15's block at this anchor spanned y 73.11..96.83 mm. Removing
+        # one process row shrinks it inside the existing y 74.9..95.1 mm
+        # clearance envelope; the native sizes, bands and leader style stay.
+        # The widest row stays within x ~174..250 mm, right of the offset's
+        # text (x <= 162.2 mm), above the linked notes and left of the iso.
+        # The leader leaves the lowest row's near end and climbs left toward
+        # the hole, clear of its own upper rows, both mounting X dimensions,
+        # the offset's shoulder and the caption under the coordinate stack.
+        # Those witness/caption clearances still have their native readbacks;
+        # no hole variable, tolerance or shared callout helper is rewritten.
         edge=rims[1].edge,
         callout_xy=(0.212, 0.086),
         label="two bracket counterbores",
@@ -1119,14 +1174,19 @@ async def build(adapter: Any) -> dict[str, str]:
     rebuild_drawing(adapter, label="bottom view annotations")
     _assert_dimensions_clear(east, BOTTOM_AXES, label="bottom view east stack")
     _assert_dimensions_clear(west, BOTTOM_WEST_AXES, label="bottom view mounting coordinates")
-    _place_bottom_caption(adapter, bottom, front_annotations)
 
     # The collar bore's ASME centre mark is the template's, placed with the
     # end view: the sheet proves it (one, on the axis) rather than adding a
     # second over it.
     _prove_collar_centre_mark(adapter, side, bore_axis)
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
+    manufacturing_note = add_property_linked_note(
+        adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_XY
+    )
+    rebuild_drawing(adapter, label="bottom caption clearance")
+    _place_bottom_caption(
+        adapter, bottom, [*east_annotations, *hole_annotations], manufacturing_note, hole_callout
+    )
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.095)
 
     return await finalize_drawing(

@@ -383,15 +383,19 @@ def test_counterbore_callout_rides_the_aligned_bottom_view() -> None:
     assert "BACK_CENTER" not in source and "BACK_KEEP" not in source
     assert 'process="' not in source
     assert "process=COUNTERBORE_PROCESS" in source
-    assert drawing.COUNTERBORE_PROCESS.startswith("DRILL / COUNTERBORE")
+    assert drawing.COUNTERBORE_PROCESS.startswith("C'BORE")
     # mreview10 clarity: "FAR SIDE" named no face.  The entry face is named
     # against the one the view looks at (the mounting face, named on the
-    # 55.19), on two process rows of their own; the trailing break puts the
-    # native counterbore row under them (compose_hole_callout_prefix).
+    # 55.19), on ONE process row; the trailing break puts the native
+    # counterbore row under it (compose_hole_callout_prefix).
     assert "FAR SIDE" not in drawing.COUNTERBORE_PROCESS
     assert drawing.COUNTERBORE_PROCESS.endswith("\n")
     rows = drawing.COUNTERBORE_PROCESS.rstrip("\n").split("\n")
-    assert rows == ["DRILL / COUNTERBORE FROM", "FACE OPPOSITE MOUNTING FACE"]
+    assert rows == ["C'BORE OPP. MOUNTING FACE"]
+    # Native15 has thru + counterbore + the native stacked-tolerance row.
+    # Our second process row caused the fifth physical row; do not restore it.
+    assert 3 + len(rows) == 4
+    assert len(rows[0]) <= 25
     assert "MOUNTING FACE" in drawing.SECTION_CALLOUTS["SeatToAxis"]
     assert "edge=rims[1].edge" in source  # the east hole, nearer the block
     assert '"MountingCoordinates": ("MountingX0", "MountingX1", "MountingY0")' in source
@@ -399,10 +403,10 @@ def test_counterbore_callout_rides_the_aligned_bottom_view() -> None:
     # The callout block (retry09, requested (337, 78) mm, two rows): rows
     # centred on the requested x, the block centred 1 mm under the requested
     # y, the elbow 1.5 mm before the lowest row's end nearer the hole, the
-    # leader from that elbow to the hole.  Four rows now: the thru row (43.8
-    # mm measured), the two process rows (at most ~2.62 mm a character) and
-    # the bare native counterbore row (retry09's prefixed row was 117.9 mm;
-    # its bare width is taken anywhere from 66 to 72 mm).
+    # leader from that elbow to the hole. Four physical rows now: the thru
+    # row (43.8 mm measured), one process row and the native counterbore
+    # row with its unchanged stacked tolerance. Three row pitches plus a cap
+    # height conservatively bound the block; no tolerance is flattened.
     import magnifying_bracket_joint_layout as joint
     assert "callout_xy=(0.212, 0.086)" in source
     callout_x, callout_y = 0.212, 0.086
@@ -410,7 +414,7 @@ def test_counterbore_callout_rides_the_aligned_bottom_view() -> None:
     block = 3 * pitch + text
     bottom = callout_y - 0.001 - block / 2.0
     top = bottom + block
-    widths = [0.0438, len(rows[0]) * char, len(rows[1]) * char]  # top down, above the lowest
+    widths = [0.0438, len(rows[0]) * char]  # thru and process above native counterbore
     assert max(widths) < 0.0708
     hole = (
         drawing.BOTTOM_CENTER[0] + 0.019 + joint.BRACKET_HOLE_POINTS[1][0] / 1000.0,
@@ -453,7 +457,7 @@ def test_counterbore_callout_rides_the_aligned_bottom_view() -> None:
         # At the 17.70's line (y 81 mm, to x 115.1 mm) and the 4.00's (y 89
         # mm, to x 101.4 mm) it is right of both line ends by a text height;
         # it crosses the offset's column (x 150 mm) under that dimension's
-        # run (its foot, the hung row's shoulder, at y 97.5 mm) and reaches
+        # run (its foot, the hung row's shoulder, at y 97.1 mm) and reaches
         # the row's height a text height left of the row's widest reach.
         offset_shoulder = offset_y - 0.00278
         assert leader_x(x1_line) > hole[0] + 0.0064 + text
@@ -672,19 +676,23 @@ def test_arm_section_is_native_and_locates_the_bore_axis() -> None:
     assert "set_reference_dimensions(" not in drawing_source
     assert drawing_source.count("set_reference_dimension(") == 1  # arm-end sheet reference only
     assert "set_reference_dimension(adapter, annotation, label=ARM_END_REFERENCE)" in drawing_source
-    # The arm face is named (blocker 1: "3.00 FROM BORE AXIS" named no far
-    # end): the arm face from the axis.
-    assert drawing.SECTION_CALLOUTS["ArmBelowAxis"] == "ARM FROM BORE AXIS"
+    # ArmBelowAxis is the Y -3 face, nearer the bore axis than Y +4.5.
+    # In the turned side view it prints on the right (x 231 versus 223.5).
+    assert -part.ARM_Y[0] < part.ARM_Y[1]
+    assert SIDE_OX - part.ARM_Y[0] > SIDE_OX - part.ARM_Y[1]
+    assert drawing.SECTION_CALLOUTS["ArmBelowAxis"] == "NEAR ARM FACE\nTO BORE AXIS"
     # The physical overhang is named, but remains the model's ordinary .XX
     # control: no new tight band and no closing model dimension.
     assert drawing.SECTION_CALLOUTS["SeatToAxis"] == "MOUNTING FACE\nTO BORE AXIS"
     assert drawing.SECTION_CALLOUTS["ArmPastSeat"].replace("\n", " ") == "ARM PAST MOUNTING FACE"
     assert "SEAT FACE" not in "".join(drawing.SECTION_CALLOUTS.values())
     assert drawing.SECTION_CALLOUTS.keys() == section
-    # A one-row callout across the arm: its two-row block hung on the right
-    # must fit under the arm's end.
-    assert "\n" not in drawing.SECTION_CALLOUTS["ArmBelowAxis"]
-    assert len(drawing.SECTION_CALLOUTS["ArmBelowAxis"]) <= 18
+    # Value plus two explicit face-label rows: at most four rows, with each
+    # row shorter than the previous ambiguous one-line label.
+    arm_rows = drawing.SECTION_CALLOUTS["ArmBelowAxis"].splitlines()
+    assert arm_rows == ["NEAR ARM FACE", "TO BORE AXIS"]
+    assert 1 + len(arm_rows) <= 4
+    assert max(map(len, arm_rows)) <= 13
 
 
 def test_arm_footprint_controls_the_arm_in_the_bottom_view() -> None:
@@ -758,8 +766,8 @@ def test_side_view_section_hangs_clear_under_the_arm_end() -> None:
     the bottom view (test_bottom_view_east_stack_stands_clear) and the 3.00
     stands alone under the arm.  Turned into projection it is HORIZONTAL,
     so it obeys retry09's horizontal rule: rows centred on the requested x,
-    the lowest row's bottom on the line (5.56 mm under the requested y for
-    two rows), the line running from the rows' far end through both
+    the lowest row's bottom on the line (11.12 mm under the requested y for
+    three rows), the line running from the rows' far end through both
     witnesses and, with OUTSIDE arrows, on to a tail 6.4 mm past the far
     witness.  The witnesses drop from the arm's end."""
     arm_x = (SIDE_OX - part.ARM_Y[1], SIDE_OX - part.ARM_Y[0])
@@ -773,7 +781,7 @@ def test_side_view_section_hangs_clear_under_the_arm_end() -> None:
     keep = drawing.SIDE_SECTION_KEEP
     assert set(keep) == {"SeatToAxis", "ArmPastSeat", "ArmBelowAxis"}
     below_x, below_y = _side_mm("ArmBelowAxis", keep)
-    below_line = below_y - pitch
+    below_line = below_y - len(drawing.SECTION_CALLOUTS["ArmBelowAxis"].splitlines()) * pitch
     # Its 3 mm span (x 228..231) fits no two 3.556 mm arrowheads inside, so
     # the arrows stand OUTSIDE (retry11: no inside-arrowhead overlap), forced
     # so the proven ink is the drawn ink; the left tail ends in air at x
@@ -784,17 +792,18 @@ def test_side_view_section_hangs_clear_under_the_arm_end() -> None:
     tail_end = arm_x[1] - 3.0 - tail
     assert round(tail_end, 2) == 221.6
     assert arm_x[1] + tail < iso_left
-    # A two-row block (callout on the line, value 5.56 mm up, 9.06 mm tall)
+    # A three-row block (two face-label rows under the native value)
     # hung RIGHT, under nothing (the flange ends at y 150.96 mm, the arm at
     # 147.85 mm): its rows a 2 mm arrow clearance and more right of the
     # 3.11's far witness (the flange's corner, x 234.35 mm) and a text height
     # left of the isometric's outline at the widest letter pitch retry09/10
     # measured (2.85 mm a character); the block's top a text height under
     # the arm end's witness (y 147.85 mm, the reference's).
-    half_row = 18 * 2.85 / 2.0  # "ARM FROM BORE AXIS"
+    arm_rows = drawing.SECTION_CALLOUTS["ArmBelowAxis"].splitlines()
+    half_row = max(map(len, arm_rows)) * 2.85 / 2.0
     assert below_x - half_row > flange_x[1] + 2.0
     assert below_x + half_row < iso_left - text
-    assert below_line + pitch + text + text <= arm_end
+    assert below_line + len(arm_rows) * pitch + text + text <= arm_end
     # The labelled 3.11 hangs below this line, not beside its witnesses.
     # Its column stops short of the 3.00's tail; the widest callout row
     # clears the bottom view's east stack on EITHER hand of that column.
@@ -1149,76 +1158,166 @@ def test_bottom_view_east_stack_stands_clear() -> None:
     assert '_assert_dimensions_clear(east, BOTTOM_AXES, label="bottom view east stack")' in source
 
 
-def test_bottom_view_caption_names_the_mounting_face_above_the_view() -> None:
-    """Retry11 (Main): the bottom view is captioned for its direction.  The
-    caption hangs ABOVE the view's measured outline (top y 121.9 mm, retry10),
-    centred on it (x 85.4..144.6 mm): below the view the holes' X witnesses
-    (x 91, 95, 108.7 mm down to y 80 mm) and the counterbore leader cross
-    every row wide enough for the words.  Its top stays a text height under
-    the arm width's witness ends (y 131.4 mm) and its right end a text
-    height and more left of the flange height's left-hand row (x 151.8 mm);
-    the build proves the clearance on the rebuilt arm width ink."""
+def test_bottom_view_caption_names_the_mounting_face_below_the_lower_view() -> None:
+    """The caption belongs under the lower view and its coordinate witnesses,
+    not above it between two views. Native15's exact caption height and notes
+    top leave room without changing the view centre, projection or controls."""
     assert drawing.BOTTOM_CAPTION == "VIEW ON MOUNTING FACE"
-    outline = (0.0854, 0.0981, 0.1446, 0.121938)
-    bottom = outline[3] + drawing.BOTTOM_CAPTION_GAP_M
-    top = bottom + TEXT_HEIGHT
-    centre = (outline[0] + outline[2]) / 2.0
-    half = len(drawing.BOTTOM_CAPTION) * 0.00285 / 2.0
-    arm_width_line = drawing.FRONT_KEEP["ArmWidth"][1] - ROW_PITCH
-    assert drawing.BOTTOM_CAPTION_GAP_M >= 0.0015
-    assert top + TEXT_HEIGHT < arm_width_line - 0.001
-    height_x = drawing.BOTTOM_KEEP["FlangeHeight"][0]
-    assert centre + half + TEXT_HEIGHT < height_x - 0.0142
-    assert centre - half > 0.0127 + TEXT_HEIGHT  # the inner border
-    # The first drop lands near the target; the note is then settled on the
-    # measured outline and extent (bottom centre), within CAPTION_SETTLE_M.
-    assert abs(drawing.BOTTOM_CAPTION_XY[1] - bottom) < 0.006
-    assert abs(drawing.BOTTOM_CAPTION_XY[0] - (centre - half)) < 0.006
+    outline = (0.085412, 0.098062, 0.144588, 0.121938)
+    lowest_witness = 0.0800219  # native MountingX1, not the front's ArmWidth
+    caption_height = 0.0042891  # native INote.GetExtent, not cap height
+    top = lowest_witness - drawing.BOTTOM_CAPTION_GAP_M - drawing.CAPTION_SETTLE_M
+    bottom = top - caption_height
+    assert top + drawing.BOTTOM_CAPTION_GAP_M < outline[1]
+    assert top + drawing.BOTTOM_CAPTION_GAP_M < lowest_witness
+    assert bottom - 0.070121 > drawing.BOTTOM_CAPTION_GAP_M
+    assert drawing.BOTTOM_CAPTION_GAP_M >= 0.002
+    assert drawing.MANUFACTURING_NOTES_XY == (0.020, 0.070)
     assert drawing.CAPTION_SETTLE_M == 0.0006
+    assert abs(drawing.BOTTOM_CAPTION_XY[1] - top) < 0.001
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_place_bottom_caption(adapter, bottom, front_annotations)" in source
-    assert "outline[3] + BOTTOM_CAPTION_GAP_M" in source
-    assert "target[1] - extent[1]" in source
-    assert 'dimension_name(adapter, annotation) == "ArmWidth"' in source
-    assert "min(front_ink) - extent[4] < TEXT_HEIGHT_M" in source
+    assert "adapter, bottom, [*east_annotations, *hole_annotations], manufacturing_note, hole_callout" in source
+    assert "lowest = outline[1]" in source
+    assert "lowest - BOTTOM_CAPTION_GAP_M - CAPTION_SETTLE_M" in source
+    assert "target[1] - extent[4]" in source
+    assert "outline[3] + BOTTOM_CAPTION_GAP_M" not in source
     assert "sheet.SetScale(*SHEET_SCALE, False, False)" in source
+    assert "front_annotations" not in source[source.index("def _place_bottom_caption("):source.index("_OD_LANDING")]
+
+
+def _bottom_caption_fixture(monkeypatch, *, scale_result=True, ignore_move=False):
+    from types import SimpleNamespace
+
+    outline = (0.085412, 0.098062, 0.144588, 0.121938)
+    extent = [0.0848436, 0.1234967, 0.0, 0.1448913, 0.1277858, 0.0]
+    annotation = SimpleNamespace(
+        GetTextFormat=lambda index: SimpleNamespace(CharHeight=drawing.TEXT_HEIGHT_M)
+    )
+    note = SimpleNamespace(
+        GetExtent=lambda: tuple(extent),
+        GetText=lambda: drawing.BOTTOM_CAPTION,
+        GetAnnotation=lambda: annotation,
+    )
+    manufacturing_note = SimpleNamespace(
+        GetExtent=lambda: (0.0195538, 0.0520114, 0.0, 0.1625243, 0.070121, 0.0)
+    )
+    controls = ["MountingX1"]
+    control_lines = [((0.091, 0.10265), (0.091, 0.0800219))]
+    control_texts = [(0.0614351, 0.0810219)]
+    hole_lines = [((0.1098238, 0.1093554), (0.1730087, 0.0731132))]
+    hole_callout = SimpleNamespace(GetAnnotation=lambda: "RD1")
+    moves = []
+
+    def move(adapter, target, dx, dy, *, label):
+        assert target is annotation
+        assert label == "bottom view caption"
+        moves.append((dx, dy))
+        if not ignore_move:
+            for index in (0, 3):
+                extent[index] += dx
+            for index in (1, 4):
+                extent[index] += dy
+
+    sheet = SimpleNamespace(SetScale=lambda *args: scale_result)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet))
+    view = SimpleNamespace(GetOutline=lambda: outline)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing, "add_note", lambda *args: note)
+    monkeypatch.setattr(drawing, "move_annotation", move)
+    monkeypatch.setattr(
+        drawing, "dimension_segments",
+        lambda item: hole_lines if item == "RD1" else control_lines,
+    )
+    monkeypatch.setattr(drawing, "dimension_text_points", lambda item: control_texts)
+    monkeypatch.setattr(drawing._telemetry, "info", lambda *args: None)
+    return SimpleNamespace(
+        args=(adapter, view, controls, manufacturing_note, hole_callout),
+        note=note,
+        annotation=annotation,
+        extent=extent,
+        outline=outline,
+        control_lines=control_lines,
+        control_texts=control_texts,
+        hole_lines=hole_lines,
+        moves=moves,
+    )
 
 
 @pytest.mark.parametrize("scale_result", [True, False, None, 1, object()])
 def test_bottom_caption_requires_a_real_scale_success(monkeypatch, scale_result) -> None:
-    from types import SimpleNamespace
-
-    outline = (0.0854, 0.0981, 0.1446, 0.121938)
-    caption_bottom = outline[3] + drawing.BOTTOM_CAPTION_GAP_M
-    caption_centre = (outline[0] + outline[2]) / 2.0
-    note = SimpleNamespace(
-        GetExtent=lambda: (
-            caption_centre - 0.029,
-            caption_bottom,
-            0.0,
-            caption_centre + 0.029,
-            caption_bottom + drawing.TEXT_HEIGHT_M,
-            0.0,
-        ),
-    )
-    sheet = SimpleNamespace(SetScale=lambda *args: scale_result)
-    adapter = SimpleNamespace(
-        currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet)
-    )
-    view = SimpleNamespace(GetOutline=lambda: outline)
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(drawing, "add_note", lambda *args: note)
-    monkeypatch.setattr(drawing, "dimension_name", lambda *args: "ArmWidth")
-    monkeypatch.setattr(
-        drawing, "dimension_segments", lambda annotation: [((0.1, 0.14), (0.15, 0.14))]
-    )
-    monkeypatch.setattr(drawing._telemetry, "info", lambda *args: None)
-
+    fixture = _bottom_caption_fixture(monkeypatch, scale_result=scale_result)
     if scale_result is True:
-        drawing._place_bottom_caption(adapter, view, [object()])
+        drawing._place_bottom_caption(*fixture.args)
+        assert fixture.moves
+        assert fixture.extent[4] < fixture.outline[1]
+        assert (fixture.extent[0] + fixture.extent[3]) / 2.0 == pytest.approx(
+            (fixture.outline[0] + fixture.outline[2]) / 2.0
+        )
     else:
         with pytest.raises(RuntimeError, match="cannot pin the sheet scale"):
-            drawing._place_bottom_caption(adapter, view, [object()])
+            drawing._place_bottom_caption(*fixture.args)
+        assert not fixture.moves
+
+
+def test_bottom_caption_uses_the_lower_views_actual_text_and_witness_extent(monkeypatch) -> None:
+    fixture = _bottom_caption_fixture(monkeypatch)
+    # A lower native text row than its witness must lower the caption further.
+    fixture.control_texts[:] = [(0.0614351, 0.0797)]
+    drawing._place_bottom_caption(*fixture.args)
+    assert fixture.extent[4] == pytest.approx(
+        0.0797 - drawing.BOTTOM_CAPTION_GAP_M - drawing.CAPTION_SETTLE_M
+    )
+    assert fixture.extent[4] < fixture.outline[1]
+    assert fixture.extent[1] > 0.070121 + drawing.BOTTOM_CAPTION_GAP_M
+
+
+def test_bottom_caption_refuses_an_ignored_move_above_the_view(monkeypatch) -> None:
+    fixture = _bottom_caption_fixture(monkeypatch, ignore_move=True)
+    with pytest.raises(RuntimeError, match="top centre requested"):
+        drawing._place_bottom_caption(*fixture.args)
+    assert fixture.extent[1] > fixture.outline[3]
+    assert len(fixture.moves) == 4
+
+
+@pytest.mark.parametrize("returned", [None, "", True, 1, object(), "WRONG VIEW"])
+def test_bottom_caption_requires_native_text_readback(monkeypatch, returned) -> None:
+    fixture = _bottom_caption_fixture(monkeypatch)
+    fixture.note.GetText = lambda: returned
+    with pytest.raises(RuntimeError, match="caption text did not persist"):
+        drawing._place_bottom_caption(*fixture.args)
+
+
+@pytest.mark.parametrize("height", [0.0, 0.0025, float("nan")])
+def test_bottom_caption_preserves_native_sheet_text_height(monkeypatch, height) -> None:
+    from types import SimpleNamespace
+
+    fixture = _bottom_caption_fixture(monkeypatch)
+    fixture.annotation.GetTextFormat = lambda index: SimpleNamespace(CharHeight=height)
+    with pytest.raises(RuntimeError, match="native text height"):
+        drawing._place_bottom_caption(*fixture.args)
+
+
+@pytest.mark.parametrize("extent", [
+    (0.1, 0.1, 0.0),
+    (0.1, 0.1, 0.0, 0.1, 0.11, 0.0),
+    (0.1, 0.1, 0.0, 0.2, float("nan"), 0.0),
+])
+def test_bottom_caption_requires_positive_finite_native_extent(monkeypatch, extent) -> None:
+    fixture = _bottom_caption_fixture(monkeypatch)
+    fixture.note.GetExtent = lambda: extent
+    with pytest.raises(RuntimeError, match="note has no rendered extent"):
+        drawing._place_bottom_caption(*fixture.args)
+
+
+def test_bottom_caption_refuses_notes_or_counterbore_leader_overlap(monkeypatch) -> None:
+    fixture = _bottom_caption_fixture(monkeypatch)
+    fixture.control_lines[:] = [((0.091, 0.10265), (0.091, 0.075))]
+    with pytest.raises(RuntimeError, match="above manufacturing notes"):
+        drawing._place_bottom_caption(*fixture.args)
+    fixture = _bottom_caption_fixture(monkeypatch)
+    fixture.hole_lines[:] = [((0.09, 0.073), (0.14, 0.078))]
+    with pytest.raises(RuntimeError, match="counterbore leader"):
+        drawing._place_bottom_caption(*fixture.args)
 
 
 def test_native_counterbore_dimensions_keep_names_and_route_annotations(monkeypatch) -> None:
@@ -1390,8 +1489,8 @@ def test_section_crossings_reports_retry10_and_clears_both_stacks() -> None:
         ("ArmBelowAxis", "ArmThickness"),
     ]
     side = {
-        "ArmBelowAxis": _mm((238.4, 134.44), (228.0, 134.44), (221.6, 134.44))
-        + _mm((228.0, 146.85), (228.0, 133.44)) + _mm((231.0, 146.85), (231.0, 133.44)),
+        "ArmBelowAxis": _mm((282.5, 128.89), (228.0, 128.89), (221.6, 128.89))
+        + _mm((228.0, 146.85), (228.0, 127.89)) + _mm((231.0, 146.85), (231.0, 127.89)),
         "SeatToAxis": _mm((198.0, 206.15), (198.0, 185.0)) + _mm((198.0, 170.0), (198.0, 150.96))
         + _mm((227.0, 206.15), (197.0, 206.15)) + _mm((220.65, 150.96), (197.0, 150.96)),
         "ArmPastSeat": _mm((212.0, 157.36), (212.0, 100.04), (234.8, 100.04))
@@ -1407,7 +1506,7 @@ def test_section_crossings_reports_retry10_and_clears_both_stacks() -> None:
     # cross the two empty spans and the collinear hole-datum witnesses meet.
     bottom = {
         "FootprintOffset": _mm((140.0, 103.65), (151.0, 103.65)) + _mm((140.0, 107.0), (151.0, 107.0))
-        + _mm((150.0, 103.65), (150.0, 97.52), (162.2, 97.52)) + _mm((150.0, 107.0), (150.0, 113.35)),
+        + _mm((150.0, 103.65), (150.0, 97.12), (162.2, 97.12)) + _mm((150.0, 107.0), (150.0, 113.35)),
         "FlangeHeight": _mm((140.0, 103.65), (167.0, 103.65)) + _mm((140.0, 116.35), (167.0, 116.35))
         + _mm((166.0, 116.35), (166.0, 123.52), (151.8, 123.52)) + _mm((166.0, 103.65), (166.0, 97.3)),
         "FootprintThickness": _mm((140.0, 107.0), (176.0, 107.0)) + _mm((140.0, 114.5), (176.0, 114.5))
@@ -1748,8 +1847,9 @@ def test_bottom_mounting_coordinates_keep_the_rebuilt_full_stack_proof() -> None
     rebuild = 'rebuild_drawing(adapter, label="bottom view annotations")'
     east_proof = '_assert_dimensions_clear(east, BOTTOM_AXES, label="bottom view east stack")'
     west_proof = '_assert_dimensions_clear(west, BOTTOM_WEST_AXES, label="bottom view mounting coordinates")'
-    caption = "_place_bottom_caption(adapter, bottom, front_annotations)"
-    assert source.index(rebuild) < source.index(east_proof) < source.index(west_proof) < source.index(caption)
+    caption = "adapter, bottom, [*east_annotations, *hole_annotations], manufacturing_note, hole_callout"
+    notes = 'adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_XY'
+    assert source.index(rebuild) < source.index(east_proof) < source.index(west_proof) < source.index(notes) < source.index(caption)
 
 
 @pytest.mark.parametrize("returned", [None, "", True, 1, object()])
@@ -1778,3 +1878,74 @@ def test_physical_overhang_remains_one_native_control_with_readback() -> None:
     assert drawing.SIDE_SECTION_KEEP["ArmPastSeat"] == pytest.approx((0.212, 0.1195))
     assert part.DRAWING_PRECISION["ArmSection"]["ArmPastSeat"] == 2
     assert "ArmPastSeat" not in mg_magnifying_bracket_spec.DRAWING_REFERENCE_PRECISION
+
+
+@pytest.mark.parametrize("kind", [2, 11, 12, 3, True, False, None, 2.0, object()])
+def test_near_arm_face_label_keeps_strict_native_linear_control(monkeypatch, kind) -> None:
+    from types import SimpleNamespace
+
+    labels, measures = [], []
+    display = SimpleNamespace(Type2=kind)
+    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(
+        drawing, "assert_dimension_measures",
+        lambda adapter, native, **kwargs: measures.append((native, kwargs)),
+    )
+    monkeypatch.setattr(
+        drawing, "_set_callout_below",
+        lambda native, text, label: labels.append((native, text, label)),
+    )
+    if type(kind) is int and kind in (2, 11, 12):
+        drawing._label_near_arm_face(object(), annotation)
+        assert measures == [(display, {"expected_mm": 3.0, "label": "ArmBelowAxis"})]
+        assert labels == [(display, "NEAR ARM FACE\nTO BORE AXIS", "ArmBelowAxis")]
+    else:
+        with pytest.raises(RuntimeError, match="expected a linear dimension"):
+            drawing._label_near_arm_face(object(), annotation)
+        assert measures == [] and labels == []
+
+
+def test_near_arm_face_label_refuses_a_changed_model_value_or_face(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    display = SimpleNamespace(
+        Type2=11, GetDimension2=lambda index: SimpleNamespace(SystemValue=0.0045)
+    )
+    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    import _drawing_edge_dimensions
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(
+        _drawing_edge_dimensions._sw_type_info, "early_bound_or_flag",
+        lambda obj, *args: obj,
+    )
+    with pytest.raises(RuntimeError, match="measures 4.5 mm, expected 3 mm"):
+        drawing._label_near_arm_face(object(), annotation)
+    monkeypatch.setattr(drawing, "ARM_Y", (-4.5, 3.0))
+    with pytest.raises(RuntimeError, match="nearest the bore axis"):
+        drawing._label_near_arm_face(object(), annotation)
+
+
+def test_arm_face_label_is_applied_before_the_existing_full_witness_proof() -> None:
+    import inspect
+
+    source = inspect.getsource(drawing.build)
+    label = '_label_near_arm_face(adapter, section["ArmBelowAxis"])'
+    rebuild = 'rebuild_drawing(adapter, label="side view annotations")'
+    proof = '_assert_dimensions_clear(section, SECTION_AXES, label="side arm section")'
+    assert source.index(label) < source.index(rebuild) < source.index(proof)
+
+
+def test_footprint_offset_nudge_keeps_the_native_two_millimetre_text_gap() -> None:
+    # Native15's actual ink top was y 102.0211 mm, 1.6289 mm below the
+    # flange-height witness. Only the existing label position moves 0.4 mm;
+    # witnesses, arrow sides and every full-stack crossing proof stay intact.
+    old_y = 0.1003
+    new_y = drawing.BOTTOM_FOOTPRINT_KEEP["FootprintOffset"][1]
+    assert old_y - new_y == pytest.approx(0.0004)
+    native_gap = 0.0016289 + old_y - new_y
+    assert native_gap >= 0.002
+    assert drawing.BOTTOM_FOOTPRINT_KEEP["FootprintOffset"][0] == 0.150
+    assert drawing.BOTTOM_KEEP["FlangeHeight"] == (0.166, 0.1263)
+    assert drawing.BOTTOM_ARROW_SIDES["FootprintOffset"] == drawing._ARROWS_OUTSIDE
