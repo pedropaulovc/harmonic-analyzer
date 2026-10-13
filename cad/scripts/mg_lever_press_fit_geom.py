@@ -15,7 +15,8 @@ with the collar's outer face.
 p.46 "firmly affixed to the summing lever" (user ruling 2026-10-11; LIGHT PRESS
 approved by Main): the rod's last PRESS_ZONE_LENGTH seats end-flush in the
 bracket collar. Its cylindrical COLLAR_ENGAGEMENT is a LIGHT PRESS retained with
-Loctite 638. The R3 dome is not part of the banded cylindrical zone.
+Loctite 638. The R3 dome is not part of the banded cylindrical zone, but the
+partial hemisphere still larger than the bore contributes press contact.
 The rod is modelled at nominal diameter; the cylinder's stock-select/lap band
 and collar-bore band are native (upper, lower) ``_fit_deviations`` on their prints.
 ``_interference_contracts`` restates the print-worst triple
@@ -30,9 +31,14 @@ The collar OD carries no native band: its two-place print inherits the title
 block's .XX ±0.51 (COLLAR_OD_BAND). Strength and press force are therefore
 evaluated at independently conservative print corners: the thinnest wall
 (COLLAR_OD_MIN) for bore stress, the stiffest wall (COLLAR_OD_MAX) for contact
-pressure and press-in force, each with the tightest interference. The force
-acts over the print-worst contact COLLAR_ENGAGEMENT_MAX (Lmax 7.003): the rod
-stock may itself be Ø6.000, so no clearance outside the selected land is assumed.
+pressure and press-in force, each with the tightest interference. Total force
+adds full-pressure dome axial normal force over its projected annulus to the
+full-pressure friction over COLLAR_ENGAGEMENT_MAX (Lmax 7.2078194326718075),
+including partial hemisphere contact. Maximum cylinder length uses the minimum
+dome radius; maximum dome extension and projected area use the maximum radius
+and minimum bore, independently conservative corners rather than one physical
+rod. Stock may itself be Ø6.000, so no clearance outside the selected land is
+assumed.
 """
 
 from __future__ import annotations
@@ -57,12 +63,37 @@ COLLAR_BORE_BAND = (0.006, 0.0)  # (upper, lower)
 # tip), is gripped from the collar's inner face over this much STRAIGHT rod;
 # the dome's shrinking diameter is not full-diameter cylindrical engagement.
 COLLAR_ENGAGEMENT = PRESS_ZONE_LENGTH - ROD_DIA / 2.0
-# Full-hemisphere tangent: its radius is derived from the selected press OD,
-# not an independently toleranced R3. Contact = collar length - dome radius.
-# Body stock may also be Ø6.000, so extra collar length cannot be assumed clear.
-COLLAR_ENGAGEMENT_MAX = (
-    COLLAR_LENGTH + COLLAR_LENGTH_BAND[0]
-    - (PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[1]) / 2.0
+
+
+def _press_contact_envelope(rod_min: float, rod_max: float, bore_min: float) -> float:
+    """Bound end-flush cylinder plus partial-hemisphere contact, in mm.
+
+    The hemisphere radius follows the selected rod OD. Maximum cylinder
+    length uses the longest collar and minimum radius; the dome stays wider
+    than the bore for ``sqrt(radius_max**2 - bore_radius_min**2)`` past its
+    tangent. Combining those radius corners is independently conservative,
+    not the contact length of one physical rod. Full tight-corner pressure
+    over this entire length bounds friction without integrating the taper.
+
+    A candidate bore at or above the maximum rod OD has no dome contact.
+    Keep its cylindrical envelope so the budget's slip guard can reject it,
+    rather than failing while evaluating a negative square-root argument.
+    """
+    dome_radius_min = rod_min / 2.0
+    dome_radius_max = rod_max / 2.0
+    bore_radius_min = bore_min / 2.0
+    dome_extension = (
+        math.sqrt(dome_radius_max**2 - bore_radius_min**2)
+        if bore_radius_min < dome_radius_max
+        else 0.0
+    )
+    return COLLAR_LENGTH + COLLAR_LENGTH_BAND[0] - dome_radius_min + dome_extension
+
+
+COLLAR_ENGAGEMENT_MAX = _press_contact_envelope(
+    PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[1],
+    PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[0],
+    COLLAR_BORE_DIA + COLLAR_BORE_BAND[1],
 )
 # ANSI B4.1 table 8, class FN2 (medium drive fit) for the rod's size range
 # 0.12..0.24 in: 0.2 .. 1.0 thou of diametral interference. A CAP only: the
@@ -121,7 +152,7 @@ def press_fit_budget(
     collar_bore_band: tuple[float, float] = COLLAR_BORE_BAND,
 ) -> dict[str, float]:
     """Worst-case diametral interference of the collar press (mm) from the two
-    printed bands, the straight engagement it acts over, and the collar stress
+    printed bands, the whole-contact envelope it acts over, and collar stress
     and press-in force at the TIGHT corner. ``interference_min`` is the loosest
     corner (smallest rod in the largest bore); ``interference_max`` the
     tightest. The keyword arguments default to the printed fit; a caller can
@@ -137,29 +168,41 @@ def press_fit_budget(
     ``contact_pressure_mpa`` is the MAXIMUM pressure, at
     ``force_outer_diameter_mm`` (COLLAR_OD_MAX), and both press forces use it.
 
-    Contact length is collar length minus the full-hemisphere radius, derived
-    from the selected zone OD: the print-worst Lmax is 7.003 (longest collar,
-    smallest hemisphere). The stock OD can also be Ø6.000, so collar length
-    outside the qualified land is not assumed to be a clearance fit; the
-    explicit collar-length band therefore bounds the contact. ``mu * p * pi *
-    d * L`` at the maximum-pressure corner and Lmax gives ``press_force_min_n``
-    and ``press_force_max_n`` across PRESS_FRICTION -- the friction range at
-    that corner, not a range across collar-OD corners. The model's nominal
-    engagement remains 7 mm."""
+    The contact envelope includes the cylinder and the partial hemisphere
+    still larger than the bore. The longest collar and minimum dome radius
+    maximize cylinder length; the maximum radius and minimum bore maximize
+    dome extension. Combining those independent corners bounds every physical
+    part, giving print-worst Lmax 7.2078194326718075 rather than one coupled
+    corner's contact length. Stock OD can also be Ø6.000, so collar length
+    outside the qualified land is not assumed clear; the explicit collar-length
+    band bounds contact. ``mu * p * pi * d * L`` bounds friction over this
+    envelope. Add the dome's axial normal-force bound, ``p * pi *
+    (radius_max**2 - bore_radius_min**2)``, using its projected annulus and the
+    same full maximum pressure, without taper-pressure integration. Both
+    ``press_force_min_n`` and ``press_force_max_n`` are TOTAL force across
+    PRESS_FRICTION, not a range across collar-OD corners. Nominal straight
+    cylindrical engagement remains 7 mm. Candidate slip fits remain evaluable
+    for ``check_press_fit_budget`` to reject; a bore at or above the largest
+    rod has zero dome projected area."""
     rod_max = PRESS_ZONE_DIA + press_zone_dia_band[0]
     rod_min = PRESS_ZONE_DIA + press_zone_dia_band[1]
-    # A conservative envelope combines the tightest diameter fit with the
-    # longest collar / smallest hemisphere. The collar length and tip-to-land
-    # station share a +0/-0.05 band; neither is a loose title-block dimension.
-    engagement_max = COLLAR_LENGTH + COLLAR_LENGTH_BAND[0] - rod_min / 2.0
     bore_max = collar_bore_dia + collar_bore_band[0]
     bore_min = collar_bore_dia + collar_bore_band[1]
+    engagement_max = _press_contact_envelope(rod_min, rod_max, bore_min)
     interference_max = rod_max - bore_min
     strength_pressure, collar_hoop, collar_von_mises = _collar_lame(
         interference_max, COLLAR_OD_MIN
     )
     force_pressure, _, _ = _collar_lame(interference_max, COLLAR_OD_MAX)
     seat_area = math.pi * PRESS_ZONE_DIA * engagement_max
+    # Projected dome annulus bounds axial normal force at the same full pressure.
+    # No-contact candidate fits keep zero dome area for the existing slip guard.
+    dome_projected_area = (
+        math.pi * ((rod_max / 2.0)**2 - (bore_min / 2.0)**2)
+        if bore_min < rod_max
+        else 0.0
+    )
+    dome_normal_force = force_pressure * dome_projected_area
     friction_low, friction_high = PRESS_FRICTION
     return {
         "interference_nominal": PRESS_ZONE_DIA - collar_bore_dia,
@@ -172,8 +215,8 @@ def press_fit_budget(
         "collar_von_mises_mpa": collar_von_mises,
         "force_outer_diameter_mm": COLLAR_OD_MAX,
         "contact_pressure_mpa": force_pressure,
-        "press_force_min_n": friction_low * force_pressure * seat_area,
-        "press_force_max_n": friction_high * force_pressure * seat_area,
+        "press_force_min_n": friction_low * force_pressure * seat_area + dome_normal_force,
+        "press_force_max_n": friction_high * force_pressure * seat_area + dome_normal_force,
     }
 
 
@@ -203,9 +246,9 @@ if COLLAR_ENGAGEMENT <= 0.0 or COLLAR_ENGAGEMENT >= PRESS_ZONE_LENGTH:
 if not 0.0 < COLLAR_ENGAGEMENT <= COLLAR_ENGAGEMENT_MAX < COLLAR_LENGTH:
     raise AssertionError("print-worst dome contact must remain inside the collar")
 
-# Conservatively round the maximum-pressure, Lmax, high-friction force upward
-# to one decimal kN for the shop instruction. The force reacts through a rod
-# held near its end, never through the unsupported lever as a compression column.
+# Conservatively round the maximum-pressure, Lmax, high-friction PLUS dome-normal
+# total force upward to one decimal kN for the shop instruction. The force reacts
+# through a rod held near its end, never through the unsupported lever as a column.
 PRESS_FORCE_MAX_KN = math.ceil(PRESS_FIT_BUDGET["press_force_max_n"] / 100.0) / 10.0
 PRESS_INSTALLATION_NOTES = "\n".join(
     (

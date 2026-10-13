@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -151,9 +152,17 @@ def test_press_zone_is_a_native_band_from_the_config_free_press_contract() -> No
     assert budget["interference_min"] == pytest.approx(0.002)
     assert budget["interference_max"] == pytest.approx(0.014)
     assert budget["engagement"] == press.COLLAR_ENGAGEMENT_MAX
+    # Whole-contact envelope with independent, deliberately conservative corners:
+    # the longest collar less the smallest dome radius (the straight cylinder at
+    # its longest), plus the part of the largest dome still outside the smallest
+    # bore. Not one physical part (the coupled tight corner is 7.204819).
+    collar_max, dome_min = 10.0 + 0.0, (6.0 - 0.006) / 2.0
+    dome_max, bore_min = (6.0 + 0.0) / 2.0, (5.986 + 0.0) / 2.0
     assert budget["engagement"] == pytest.approx(
-        (10.0 + 0.0) - (6.0 - 0.006) / 2.0
+        collar_max - dome_min + math.sqrt(dome_max**2 - bore_min**2)
     )
+    assert budget["engagement"] == pytest.approx(7.2078194326718075, abs=1e-9)
+    assert press.COLLAR_ENGAGEMENT < budget["engagement"] < press.COLLAR_LENGTH
     assert 0.0 < budget["interference_min"] <= budget["interference_max"]
     # ANSI B4.1 FN2 for 0.12..0.24 in: 1.0 thou at the tightest.
     assert press.PRESS_INTERFERENCE_MAX_FN2 == pytest.approx(0.0254)

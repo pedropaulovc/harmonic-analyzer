@@ -466,7 +466,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(
                 ("mg-magnifying-lever-1", "mg-magnifying-bracket-1")
             ): _annulus_limit(
-                6.0, 5.986, 7.003  # maximum collar length minus minimum dome radius
+                # Whole-contact envelope, independent corners (see
+                # _interference_contracts._MG_LEVER_PRESS_TRIPLE_MM).
+                6.0, 5.986, 7.2078194326718075
             ),
         },
         "sm-summing": {

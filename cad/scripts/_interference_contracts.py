@@ -283,11 +283,18 @@ _FRAME_ALLOWED_PAIRS = {
 # would re-key every assembly for an unrelated fixture station or groove edit.
 # test_mg_fixture_installation pins these triples to their geometry owners.
 # Keep the ruled light-press triple in one place; tests pin it to the band owner.
-_MG_LEVER_PRESS_TRIPLE_MM = (6.0, 5.986, 7.003)
+# Its third value is the conservative WHOLE-CONTACT envelope, not the nominal
+# 7 mm straight cylinder (mg_lever_press_fit_geom.COLLAR_ENGAGEMENT): the longest
+# straight cylinder, 10.00 - 2.997 = 7.003, plus the part of the R3 hemisphere
+# still outside the smallest bore, sqrt(3.000**2 - 2.993**2) = 0.2048.
+# The two corners are chosen independently on purpose (the smallest dome sets
+# the longest cylinder; the largest dome sets the deepest penetration). This is
+# an envelope, not one physical part: its coupled tight corner is 7.204819 mm.
+_MG_LEVER_PRESS_TRIPLE_MM = (6.0, 5.986, 7.2078194326718075)
 _MG_FIXTURE_THREAD_TRIPLE_MM = (2.8448, 2.261, 10.1)
 
-# Bound the print-worst press annulus over the straight contact:
-# collar length maximum 10.00 minus selected hemisphere radius minimum 2.997.
+# Bound the press annulus over that whole conservative contact envelope (the
+# straight cylinder plus the partial dome: the triple's third value).
 # Both diameter maxima/minima are nominal for these bands.
 _MG_LEVER_PRESS_LIMIT = _smooth_annulus_limit_mm3(
     *_MG_LEVER_PRESS_TRIPLE_MM

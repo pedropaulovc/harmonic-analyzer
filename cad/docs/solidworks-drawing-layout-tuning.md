@@ -568,9 +568,21 @@ and the dimension from the buried start is unmarked. The collar's OD, with no
 band of its own, inherits the title block's `.XX` ±0.51. The named OD print
 corners in `mg_lever_press_fit_geom` are conservative independently: strength
 uses Ø11.49 (330.8 MPa von Mises, below the 333 MPa limit), while maximum
-pressure and press force use Ø12.51. With the explicit 7.003 mm maximum
-contact, the latter needs 2.8446 kN; the shared note rounds that upward to
-**2.9 kN MAX**. `test_mg_fixture_installation` checks both corners and the
+pressure and press force use Ø12.51. The press force is the friction term over the
+whole conservative contact envelope, not the nominal 7 mm straight cylinder, plus
+the normal reaction on the partial dome. The longest straight cylinder is
+10.00 − 2.997 = 7.003 mm; the part of the R3 hemisphere still outside the smallest
+(5.986) bore adds sqrt(3.000² − 2.993²) = 0.204819 mm, so the explicit maximum is
+7.207819 mm. Friction (μ 0.10–0.15, p 143.66 MPa, d 6.000, L 7.207819 mm) gives
+1951.871–2927.806 N, and the projected dome axial-normal reaction bound adds
+18.933819 N, so the total press force is 1970.804504–2946.739847 N
+(1.970805–2.946740 kN). The two corners are chosen independently on purpose
+(the smallest dome sets the longest cylinder, the largest dome the deepest
+penetration), so this is an envelope, not one physical part; its coupled tight
+corner is 7.204819 mm. The shared note rounds the high total upward to
+**3.0 kN MAX**. The 2.9 kN prints from native 16 are source-specific evidence for
+the old 7.003 mm, friction-only note; they do not prove this 3.0 kN note.
+`test_mg_fixture_installation` checks both corners and the
 ceiling independently. A safe low-OD stress corner does not justify using
 the nominal OD to cap force, nor an unnecessary second OD band.
 For the bracket the actual seat is local Z55.1875877804, not the arm's
