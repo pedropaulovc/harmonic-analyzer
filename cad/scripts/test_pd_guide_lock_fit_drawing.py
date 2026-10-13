@@ -354,3 +354,22 @@ def test_one_lock_size_retains_the_platen_on_both_rails(monkeypatch) -> None:
     )
     with pytest.raises(AssertionError, match="top plates"):
         assembly._assert_lock_retention()
+
+
+def test_the_height_band_is_tight_because_retention_needs_it(monkeypatch) -> None:
+    """The height prints .XX, not the general .X, and the sheet says why under
+    the value: at -0.8 the lifted top plates would lap the bar under the
+    retention floor (machinist review of 40e51b9a7 flagged it unstated)."""
+    import build_pd_paper_drive_assembly as assembly
+    import draw_pd_guide_lock as drawing
+    from _printed_tolerance import printed_deviations
+
+    assert lock.DRAWING_PRECISION_BY_NAME["Height"] == 2
+    assert drawing.DIMENSION_CALLOUTS_BELOW == {"Height": drawing.HEIGHT_BAND_CALLOUT}
+    assert "BAR OVERLAP" in drawing.HEIGHT_BAND_CALLOUT
+    monkeypatch.setattr(
+        assembly, "_LOCK_HEIGHT_DEV", printed_deviations(lock.LOCK_HEIGHT, 1)
+    )
+    monkeypatch.setattr(assembly, "log", lambda *_a: None)
+    with pytest.raises(AssertionError, match="top plates"):
+        assembly._assert_lock_retention()

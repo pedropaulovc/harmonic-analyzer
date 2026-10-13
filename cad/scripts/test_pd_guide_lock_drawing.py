@@ -120,6 +120,44 @@ def test_the_hole_y_text_stays_inside_the_border_and_under_the_plate() -> None:
     assert x + half < drawing.LEFT_EDGE_X  # clear of Hole1X's extension
 
 
+def test_the_hole_1_x_text_stands_outboard_of_its_extension_lines() -> None:
+    """Machinist review of 40e51b9a7: between its extension lines the 4.000's
+    text sat on hole 1's own extension line. It now stands left of the plate's
+    left edge, under the 2X hole Y text and clear of it."""
+    x, y = drawing.FRONT_KEEP["Hole1X"]
+    half = len("4.000 ±0.035") * _CHAR_WIDTH / 2.0
+    assert x + half < drawing.LEFT_EDGE_X - 0.002
+    assert y < drawing.FRONT_KEEP["Hole1Y"][1] - 0.007
+    assert y > drawing.FRONT_KEEP["Hole2X"][1] + 0.004
+
+
+def test_the_height_band_callout_fits_left_of_the_plate() -> None:
+    """The .XX height's reason prints in two lines under the value, left of
+    the plate and above the hole Y extension line (the hole Y dimension line
+    stops at that extension, below the callout), under the top-edge one."""
+    lines = drawing.HEIGHT_BAND_CALLOUT.split("\n")
+    assert len(lines) == 2
+    x, y = drawing.FRONT_KEEP["Height"]
+    half = max(len(line) for line in lines) * _CHAR_WIDTH / 2.0
+    assert x - half > 0.0127
+    assert x + half < drawing.LEFT_EDGE_X - 0.002
+    line_pitch = 0.0045
+    assert y + 0.004 < drawing._sheet_y(pd_guide_lock_spec.LOCK_HEIGHT)
+    assert y - 3 * line_pitch > drawing.HOLE_Y_SHEET + 0.002
+
+
+def test_the_views_sit_centred_between_the_border_and_title_block() -> None:
+    """Machinist review of 40e51b9a7: the group sat low and left under an
+    empty upper field. The dimension stack's bottom (Width) and the top
+    (4X R, the stock callout) stand about equally off the title block's top
+    and the border."""
+    border_top, title_top = 0.279 - 0.0127, 0.065
+    bottom = drawing.FRONT_KEEP["Width"][1]
+    top = max(drawing.FRONT_KEEP["CornerR"][1], drawing.RIGHT_KEEP["Depth"][1] + 0.006)
+    assert abs((bottom - title_top) - (border_top - top)) < 0.015
+    assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
+
+
 def test_the_four_rounded_corners_print_once_4x_clear_of_the_holes() -> None:
     """2026-10-11 (user): the plate's corners are rounded per the ch22 back
     photo (R ~1.75 measured -> R1.8); one printed 4X radius at .X, and the

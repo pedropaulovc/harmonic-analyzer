@@ -73,12 +73,15 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (4.0, 1.0)
 
 # Sheet layout (meters).  The front view's model bbox is 22 x 9.5 (the plate
-# face); at 4:1 the view is 88 x 38 mm, x 0.091..0.179, y 0.131..0.169.
+# face); at 4:1 the view is 88 x 38 mm, x 0.106..0.194, y 0.156..0.194.
 # Third angle: the right view (the 1/16 sheet edge-on) sits to its right,
-# past the hole callout; the isometric rides top-right.
-FRONT_CENTER = (0.135, 0.150)
-RIGHT_CENTER = (0.265, 0.150)
-ISO_CENTER = (0.340, 0.200)
+# past the hole callout; the isometric rides top-right.  The whole group sits
+# centred between the border and the title block (it sat 25 mm low and 15 mm
+# left under an empty upper field, machinist review of 40e51b9a7).
+FRONT_CENTER = (0.150, 0.175)
+RIGHT_CENTER = (0.280, 0.175)
+ISO_CENTER = (0.355, 0.225)
+ISO_NOTE_XY = (0.330, 0.185)
 
 
 def _sheet_x(model_x_mm: float) -> float:
@@ -101,31 +104,43 @@ HOLE_2_X_SHEET = _sheet_x(HOLE_XY[1][0])
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Width stacks below the front view under the two hole X
-# coordinates; Height sits left of the plate and the shared hole Y outboard
-# of it, its text under the plate's bottom-left corner; the 4X corner radius
-# stands off the top-right corner, its leader landing on that arc clear of
-# the Height's extension lines on the left and the hole callout below; the
-# sheet thickness rides above the right view, its one-line as-supplied stock
-# callout in the clear field above the value.
+# coordinates, the 4.000's text outboard of the plate's left edge (between
+# its extension lines the hole's own extension cut through it); Height sits
+# left of the plate, its text high so the two-line callout under it stays
+# between the hole Y and top-edge extension lines, and the shared hole Y
+# outboard of it, its text under the plate's bottom-left corner; the 4X
+# corner radius stands off the top-right corner, its leader landing on that
+# arc clear of the Height's extension lines on the left and the hole callout
+# below; the sheet thickness rides above the right view, its one-line
+# as-supplied stock callout in the clear field above the value.
 FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], 0.100),
-    "Height": (0.071, FRONT_CENTER[1]),
-    "Hole1X": (0.103, 0.116),
-    "Hole2X": (0.127, 0.108),
-    "Hole1Y": (0.061, 0.122),
-    "CornerR": (0.200, 0.186),
+    "Width": (FRONT_CENTER[0], 0.125),
+    "Height": (0.086, FRONT_CENTER[1] + 0.012),
+    "Hole1X": (0.087, 0.138),
+    "Hole2X": (0.142, 0.133),
+    "Hole1Y": (0.076, 0.147),
+    "CornerR": (0.215, 0.211),
 }
-RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.184)}
+RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.209)}
 # Both holes stand on the one Y coordinate the part prints (Hole1Y); the one
 # printed fillet stands for all four equal corners (CornerR). A custom prefix
 # replaces SolidWorks' own radius "R", so it carries it ("4X 1.8" printed
 # without, farm run 20261012T061737079Z).
 DIMENSION_PREFIXES = {"Hole1Y": "2X ", "CornerR": "4X R"}
 DIMENSION_CALLOUTS = {"Depth": LOCK_STOCK_CALLOUT}
+# The height's .XX band is tighter than the general .X because at -0.8 the
+# lifted top plates would lap the support bar 0.47, under the 0.5 retention
+# floor (pd_guide_lock_spec.DRAWING_PRECISION,
+# build_pd_paper_drive_assembly._assert_lock_retention); machinist review of
+# 40e51b9a7 flagged it unstated, so the print says why below the value, in
+# two short lines (an above-callout cannot break lines) that fit left of the
+# plate between the hole Y and top-edge extension lines.
+HEIGHT_BAND_CALLOUT = "BAND KEEPS\nBAR OVERLAP"
+DIMENSION_CALLOUTS_BELOW = {"Height": HEIGHT_BAND_CALLOUT}
 # The bent leader elbows at the text's LEFT end and enters hole 2 from its
 # upper-right quadrant, crossing only the plate's right edge; the text stands
 # between that edge and the right view.
-HOLE_CALLOUT_XY = (0.215, 0.160)
+HOLE_CALLOUT_XY = (0.230, 0.185)
 HOLE_CALLOUT_PROCESS = "DRILL"
 
 
@@ -207,6 +222,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="above")
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS_BELOW)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -222,7 +238,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="guide-lock screw holes",
         process=HOLE_CALLOUT_PROCESS,
     )
-    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.160)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,
