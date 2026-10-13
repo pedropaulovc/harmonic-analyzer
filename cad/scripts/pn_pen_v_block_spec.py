@@ -50,7 +50,9 @@ CHAMFER = 6.0  # 45 deg top corners (the photo's bevelled top edges)
 # --- V-groove (grip seat), x 0..RELIEF_X0 ---
 V_ANGLE_DEG = 90.0
 V_APEX_Y = 6.0  # apex height above the bottom face, centred in Z
-V_MOUTH_WIDTH = 2.0 * V_APEX_Y * math.tan(math.radians(V_ANGLE_DEG / 2.0))  # 12.0
+V_MOUTH_WIDTH = round(
+    2.0 * V_APEX_Y * math.tan(math.radians(V_ANGLE_DEG / 2.0)), 6
+)  # 12.0
 # A barrel of radius r in the V: axis r/sin(half-angle) below the apex, the two
 # contact lines r*sin(half-angle) below it.
 _HALF = math.radians(V_ANGLE_DEG / 2.0)
@@ -71,7 +73,9 @@ PIVOT_BORE_X = 12.5  # chosen with LIGHTENING_X by the CG solve (pn_pen_carriage
 # --- Rod set screw: #4-40 tapped from the front face into the pivot bore ---
 SET_SCREW_TAP_SPEC = HoleSpec("tapped", rod_set_screw.THREAD, end="through_next")
 SET_SCREW_Y = 12.0
-SET_SCREW_TAP_LENGTH = BLOCK_DEPTH / 2.0 - PIVOT_BORE_DIA / 2.0  # front face to bore wall
+SET_SCREW_TAP_LENGTH = (
+    BLOCK_DEPTH / 2.0 - PIVOT_BORE_DIA / 2.0
+)  # front face to bore wall
 
 # --- Free-end lightening bore: 5/16 drill through into the relief slot ---
 LIGHTENING_SPEC = HoleSpec("drilled_fractional", "5/16", end="through_all")
@@ -94,7 +98,9 @@ if RELIEF_HEIGHT - (MARKER_AXIS_Y + _BODY_R) < 0.25 or RELIEF_HEIGHT <= V_APEX_Y
 if PIVOT_BORE_X - PIVOT_BORE_DIA / 2.0 <= RELIEF_X0:
     raise AssertionError("pivot bore must drop wholly into the relief slot")
 if SET_SCREW_TAP_LENGTH < 1.5 * THREAD_MAJOR_MM[rod_set_screw.THREAD]:
-    raise AssertionError("rod set-screw tap is under drawing-guidelines.md rule 18 (1.5 D)")
+    raise AssertionError(
+        "rod set-screw tap is under drawing-guidelines.md rule 18 (1.5 D)"
+    )
 if rod_set_screw.LENGTH > SET_SCREW_TAP_LENGTH:
     raise AssertionError("rod set screw stands proud of the front face")
 if BLOCK_HEIGHT - SET_SCREW_Y - TAP_DRILL_MM[rod_set_screw.THREAD] / 2.0 < _WALL:
@@ -102,9 +108,18 @@ if BLOCK_HEIGHT - SET_SCREW_Y - TAP_DRILL_MM[rod_set_screw.THREAD] / 2.0 < _WALL
 if LIGHTENING_X - LIGHTENING_DIA / 2.0 - (PIVOT_BORE_X + PIVOT_BORE_DIA / 2.0) < _WALL:
     raise AssertionError("lightening bore runs into the pivot bore")
 # Free-end chamfer plane x + y = BLOCK_LENGTH + BLOCK_HEIGHT - CHAMFER.
-if (BLOCK_LENGTH + BLOCK_HEIGHT - CHAMFER - BLOCK_HEIGHT - (LIGHTENING_X + LIGHTENING_DIA / 2.0)) / math.sqrt(2.0) < _WALL:
+if (
+    BLOCK_LENGTH
+    + BLOCK_HEIGHT
+    - CHAMFER
+    - BLOCK_HEIGHT
+    - (LIGHTENING_X + LIGHTENING_DIA / 2.0)
+) / math.sqrt(2.0) < _WALL:
     raise AssertionError("lightening bore breaks the free-end chamfer")
-if LIGHTENING_X - LIGHTENING_DIA / 2.0 <= RELIEF_X0 or LIGHTENING_DIA > RELIEF_WIDTH - 2.0 * _WALL:
+if (
+    LIGHTENING_X - LIGHTENING_DIA / 2.0 <= RELIEF_X0
+    or LIGHTENING_DIA > RELIEF_WIDTH - 2.0 * _WALL
+):
     raise AssertionError("lightening bore must open wholly into the relief slot")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -117,7 +132,7 @@ if LIGHTENING_X - LIGHTENING_DIA / 2.0 <= RELIEF_X0 or LIGHTENING_DIA > RELIEF_W
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OutlineProfile": {"Length", "Height", "Chamfer2dx"},
     "Block": {"Depth"},
-    "VGrooveProfile": {"VApexY", "VAngle"},
+    "VGrooveProfile": {"VApexY", "VMouth"},
     "VGroove": {"VLength"},
     "ReliefProfile": {"ReliefWidth"},
     "Relief": {"ReliefHeight"},
@@ -132,7 +147,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutlineProfile": {"Length": 1, "Height": 1, "Chamfer2dx": 1},
     "Block": {"Depth": 1},
-    "VGrooveProfile": {"VApexY": 2, "VAngle": 0},
+    "VGrooveProfile": {"VApexY": 2, "VMouth": 2},
     "VGroove": {"VLength": 1},
     "ReliefProfile": {"ReliefWidth": 2},
     "Relief": {"ReliefHeight": 1},

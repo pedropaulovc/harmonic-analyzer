@@ -163,11 +163,11 @@ FRONT_KEEP = {
     "SetScrewY": (_fx(0.0) + 0.010, _fy(SET_SCREW_Y / 2.0)),
     "SetScrewX": (_fx(PIVOT_BORE_X / 4.0), _fy(0.0) - 0.012),
 }
-# Paper end: the depth under the view, the V's angle just under its mouth, the
+# Paper end: the depth under the view, the V's mouth width just under it, the
 # apex height right of the view.
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], _ry(0.0) - 0.020),
-    "VAngle": (RIGHT_CENTER[0], _ry(0.0) - 0.007),
+    "VMouth": (RIGHT_CENTER[0], _ry(0.0) - 0.007),
     "VApexY": (_rz(BLOCK_DEPTH) + 0.012, _ry(V_APEX_Y / 2.0)),
 }
 # Bottom: the bore station above the view (the gap under the front view), the

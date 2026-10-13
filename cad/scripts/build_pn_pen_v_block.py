@@ -86,7 +86,6 @@ from pn_pen_v_block_spec import (
     RELIEF_X0,
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
-    V_ANGLE_DEG,
     V_APEX_Y,
     V_MOUTH_WIDTH,
 )
@@ -190,8 +189,12 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
     LA runs front mouth -> apex, LB apex -> back mouth, LC back mouth -> front
     mouth along the bottom face.  Relations: LC horizontal, its front mouth on
     the origin's level, LA = LB (the V symmetric about the apex).  Dims: the
-    apex across the depth and above the bottom, and the included angle --
-    6 DOF less 3 relations + 3 dims = 0.
+    apex across the depth and above the bottom, and the mouth width (which
+    with the apex height sets the included angle) -- 6 DOF less 3 relations +
+    3 dims = 0.  The mouth is a point-pair distance, not an adapter "angular"
+    dimension: that one selects a segment and its vertex, dimensions the flank
+    against the sketch axes, and left the farm's first native run (c0b95549c)
+    over-defined ('no_solution').
     """
     half = V_MOUTH_WIDTH / 2.0
     points = [(-(_Z_MID - half), 0.0), (-_Z_MID, V_APEX_Y), (-(_Z_MID + half), 0.0)]
@@ -227,11 +230,15 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
         "V apex height",
     )
     dims.record("VApexY", '"VApexY"')
-    check(
-        "V included angle",
-        await adapter.add_sketch_dimension(flank_a, flank_b, "angular", V_ANGLE_DEG),
+    await dimension_between(
+        adapter,
+        f"{flank_a}.start",
+        f"{flank_b}.end",
+        "horizontal_distance",
+        V_MOUTH_WIDTH,
+        "V mouth width",
     )
-    dims.record("VAngle", '"VAngle"')
+    dims.record("VMouth", '"VMouth"')
 
 
 async def build(adapter) -> dict[str, str]:
@@ -248,6 +255,7 @@ async def build(adapter) -> dict[str, str]:
         ("BlockDepth", BLOCK_DEPTH),
         ("Chamfer", CHAMFER),
         ("VApexY", V_APEX_Y),
+        ("VMouth", V_MOUTH_WIDTH),
         ("ReliefX0", RELIEF_X0),
         ("ReliefWidth", RELIEF_WIDTH),
         ("ReliefHeight", RELIEF_HEIGHT),
@@ -257,7 +265,6 @@ async def build(adapter) -> dict[str, str]:
         ("LighteningX", LIGHTENING_X),
     ):
         await set_global(adapter, name, f"{value}mm")
-    await set_global(adapter, "VAngle", f"{V_ANGLE_DEG}deg")
 
     # Each sketch records its dim names + drive equations in emission order;
     # the equations are applied in one deferred batch once the model exists.
