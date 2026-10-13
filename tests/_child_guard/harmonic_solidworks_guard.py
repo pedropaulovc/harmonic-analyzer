@@ -232,15 +232,87 @@ def program(args):
     return ntpath.basename(words[0].strip('"')).lower() if words else ""
 
 
+_POWERSHELL_HOSTS = frozenset({"powershell", "powershell.exe", "pwsh", "pwsh.exe"})
+_HOST_FLAGS = frozenset(
+    {
+        "-noprofile",
+        "-nop",
+        "-nologo",
+        "-nol",
+        "-noninteractive",
+        "-noni",
+        "-noexit",
+        "-noe",
+        "-mta",
+        "-sta",
+        "-login",
+        "-l",
+    }
+)
+# Host options whose next word is their value, not the script.
+_HOST_VALUE_OPTIONS = frozenset(
+    {
+        "-executionpolicy",
+        "-ep",
+        "-ex",
+        "-exec",
+        "-workingdirectory",
+        "-wd",
+        "-windowstyle",
+        "-w",
+        "-inputformat",
+        "-if",
+        "-outputformat",
+        "-of",
+        "-configurationname",
+        "-psconsolefile",
+        "-version",
+        "-settingsfile",
+    }
+)
+_HOST_FILE_OPTIONS = frozenset({"-f", "-fi", "-fil", "-file"})
+
+
+def _runs_a_script_file(args, shell):
+    """Whether ``args`` starts a PowerShell host on a script file.
+
+    Only then is the rest the script's parameters, not code: ``-File`` (or a
+    ``.ps1`` path) among the host's own options, before any ``-Command``. A
+    host started through a shell may be followed by more commands, so never.
+    Any option not known here ends the scan: unknown means code.
+    """
+    if shell:
+        return False
+    words = list(args) if isinstance(args, (list, tuple)) else str(args).split()
+    if not words or program(words) not in _POWERSHELL_HOSTS:
+        return False
+    rest = iter(words[1:])
+    for word in rest:
+        option = str(word).lower()
+        if option in _HOST_FILE_OPTIONS:
+            return True
+        if option in _HOST_VALUE_OPTIONS:
+            next(rest, None)
+        elif option not in _HOST_FLAGS:
+            return not option.startswith("-") and option.endswith(".ps1")
+    return False
+
+
 def launches_solidworks(args, executable=None, shell=False):
     """Whether starting ``args`` could start SolidWorks or shell-open anything.
 
     ``shell`` says the command runs under ``cmd /c`` (``os.system``, popen).
     """
     first = program(args)
-    # Windows starts ``executable`` when given, whatever ``args[0]`` says.
-    if first in _READ_ONLY_PROGRAMS and (
-        executable is None or program([_text([], executable)]) in _READ_ONLY_PROGRAMS
+    # Windows starts ``executable`` when given, whatever ``args[0]`` says; a
+    # shell runs whatever follows ``&``/``|`` too.
+    if (
+        not shell
+        and first in _READ_ONLY_PROGRAMS
+        and (
+            executable is None
+            or program([_text([], executable)]) in _READ_ONLY_PROGRAMS
+        )
     ):
         return False
     text = _text(args, executable)
@@ -252,9 +324,9 @@ def launches_solidworks(args, executable=None, shell=False):
         return True
     if not (shell or words & SHELLS):
         return False
-    # ``-File`` hands the rest to a script as parameters, not code: only what
-    # names a document or launcher class counts there.
-    verbs = words & SHELL_OPEN_WORDS if not words & {"-file", "-f"} else ()
+    # A script file takes the rest as parameters, not code: only what names a
+    # document or launcher class counts there.
+    verbs = () if _runs_a_script_file(args, shell) else words & SHELL_OPEN_WORDS
     return bool(
         verbs
         or any(marker in text for marker in COM_MARKERS)

@@ -617,6 +617,18 @@ _RUNTIME_TARGET = "('X:\\never-exists\\' + 'p.SLD' + 'PRT')"
         (f'cmd /c "{MISSING_PART}"', False),
         ("probe.SLDASM", True),
         (["uv", "run", "pwsh", "-c", "saps probe"], False),
+        # A shell runs what follows ``&``: tasklist is no exemption there.
+        ("tasklist & start probe", True),
+        ('tasklist /FI "PID eq 0" | start probe', True),
+        # ``-f`` inside a -Command script is Start-Process's -FilePath.
+        (["pwsh", "-c", "Start-Process -f $env:PROBE"], False),
+        (["pwsh", "-NoProfile", "-Command", "saps -f probe"], False),
+        ("pwsh -Command Start-Process -f probe", False),
+        # Not the host's own -File: a cmd chain, or after -Command.
+        (["cmd", "/c", "pwsh", "-File", "s.ps1", "&", "start", "probe"], False),
+        (["pwsh", "-Command", "start probe", "-File", "s.ps1"], False),
+        (["pwsh", "-UnknownOption", "-File", "s.ps1", "start"], False),
+        ("pwsh -File s.ps1 & start probe", True),
     ],
 )
 def test_a_shell_told_to_open_something_counts(args, shell):
@@ -635,6 +647,22 @@ def test_a_shell_told_to_open_something_counts(args, shell):
         (["pwsh", "-c", "(Get-CimInstance Win32_Process).ParentProcessId"], False),
         (["python", "-m", "pytest", "-k", "start"], False),
         (["tasklist", "/FI", "IMAGENAME eq SLDWORKS.exe"], False),
+        # The host's -File: the rest is the script's parameters.
+        (
+            [
+                "pwsh",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "s.ps1",
+                "-Mode",
+                "start",
+            ],
+            False,
+        ),
+        (["powershell.exe", "-nop", "-f", "s.ps1", "start"], False),
+        (["pwsh", "s.ps1", "-Action", "Start-Process"], False),
     ],
 )
 def test_an_ordinary_command_does_not_count(args, shell):
@@ -653,8 +681,19 @@ def test_an_ordinary_command_does_not_count(args, shell):
         ),
         lambda: os.system(f"echo {MISSING_PART}"),
         lambda: __import__("nt").system(f"echo {MISSING_PART}"),
+        # tasklist, then an echo: inert even unguarded.
+        lambda: os.system('tasklist /NH /FI "PID eq 0" & echo start'),
+        lambda: __import__("nt").system('tasklist /NH /FI "PID eq 0" & echo start'),
     ],
-    ids=["cmd-document", "shell-true", "powershell-verb", "os.system", "nt.system"],
+    ids=[
+        "cmd-document",
+        "shell-true",
+        "powershell-verb",
+        "os.system",
+        "nt.system",
+        "os.system-tasklist-chain",
+        "nt.system-tasklist-chain",
+    ],
 )
 def test_a_shell_open_through_a_real_entry_point_is_refused(
     solidworks_launch_refusals, call
