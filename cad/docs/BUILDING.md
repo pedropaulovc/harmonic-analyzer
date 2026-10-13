@@ -71,8 +71,10 @@ the same task names select the same closure.
 # The one fully-safe build: every part + assembly + every gate (= default task)
 uv run python -m doit
 
-# Same, but fan the SolidWorks-free check:* gates out across 4 workers while the
-# COM build/verify stream stays serial (safe — see "Parallelism" below)
+# Local seat only: fan the SolidWorks-free check:* gates out across 4 workers while
+# the COM build/verify stream stays serial (safe — see "Parallelism" below).
+# Farm (`build.py --executor farm`): pass no -n; build.py keeps 8 leaves in flight
+# so all five workers stay busy, and a hand-passed -n 4 leaves one idle.
 uv run python -m doit -n 4
 
 # Quick rebuild — parts + assemblies only, no gates or export

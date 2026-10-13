@@ -42,8 +42,8 @@ Install (this repo is a uv project -- pyproject.toml + uv.lock at the root)::
 Run through uv (SolidWorks already open for the COM tasks)::
 
     uv run python -m doit                       # = `build`: every part + assembly + every gate
-    uv run python -m doit -n 4                  # same, fanning out the SolidWorks-free checks
-    uv run python build.py --verbosity warning -n 4  # concise console output
+    uv run python -m doit -n 4                  # local seat only: fan out the SolidWorks-free checks
+    uv run python build.py --verbosity warning  # concise console output; farm: no -n (build.py keeps 8 leaves in flight)
 
     uv run python -m doit build_bare            # quick: parts + assemblies only, no gates
     uv run python -m doit assembly:pd_paper_drive  # just that assembly + its stale prereqs
