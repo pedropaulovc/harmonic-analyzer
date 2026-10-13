@@ -1135,14 +1135,58 @@ def _seat_detail_caption(adapter: Any, view: Any, sheet: Any, *, label: str) -> 
         raise
 
 
+def _bound_view_annotations(view: Any, *, label: str) -> tuple[Any, ...]:
+    """Read the counted native annotation array and bind without fallbacks."""
+    native = _early_bound(view, "IView")
+    count = native.GetAnnotationCount()
+    if type(count) is not int or count < 0:
+        raise RuntimeError(f"{label}: invalid native annotation count: {count!r}")
+    raw = native.GetAnnotations()
+    if raw is None:
+        _telemetry.info(f"{label}: native GetAnnotationCount={count}, GetAnnotations=None")
+        if count != 0:
+            raise RuntimeError(f"{label}: native annotation count {count} returned no annotation array")
+        return ()
+    if type(raw) not in (tuple, list):
+        raise RuntimeError(f"{label}: invalid native annotation array for count {count}: {raw!r}")
+    _telemetry.info(f"{label}: native GetAnnotationCount={count}, GetAnnotations length={len(raw)}")
+    if len(raw) != count:
+        raise RuntimeError(f"{label}: native annotation array length {len(raw)}, expected count {count}")
+    annotations = []
+    for index, item in enumerate(raw):
+        if item is None:
+            raise RuntimeError(f"{label}: native annotation #{index} is null")
+        annotations.append(_early_bound(item, "IAnnotation"))
+    return tuple(annotations)
+
+
 def _require_dimension_census(adapter: Any, views: Any) -> None:
     marked = set().union(*DRAWING_DIMENSIONS.values())
     total = []
     for label, view, keep in views:
-        names = [dimension_name(adapter, ann)
-                 for ann in (_early_bound(view, "IView").GetAnnotations() or ())]
-        names = [name for name in names if name in marked]
-        _telemetry.info(f"rocker {label} native marked-dimension census={names!r}")
+        annotations = _bound_view_annotations(view, label=f"rocker {label}")
+        names = []
+        for index, annotation in enumerate(annotations):
+            name = dimension_name(adapter, annotation)
+            if not name:
+                kind = annotation.GetType()
+                if type(kind) is not int or not 1 <= kind <= 19:
+                    raise RuntimeError(f"rocker {label}: native annotation #{index} has invalid type: {kind!r}")
+                if kind == 4:  # swAnnotationType_e.swDisplayDimension
+                    specific = annotation.GetSpecificAnnotation()
+                    if specific is None:
+                        raise RuntimeError(f"rocker {label}: native dimension #{index} has no native display dimension")
+                    display = _early_bound(specific, "IDisplayDimension")
+                    if display.GetDimension2(0) is not None:
+                        raise RuntimeError(f"rocker {label}: native dimension #{index} has no readable name")
+                    hole_callout = display.IsHoleCallout()
+                    if type(hole_callout) is not bool:
+                        raise RuntimeError(f"rocker {label}: native dimension #{index} has invalid hole-callout identity: {hole_callout!r}")
+                    if hole_callout is not True:
+                        raise RuntimeError(f"rocker {label}: native dimension #{index} has no underlying model dimension")
+            if name in marked:
+                names.append(name)
+        _telemetry.info(f"rocker {label} native annotations={len(annotations)} marked-dimension census={names!r}")
         if sorted(names) != sorted(keep):
             raise RuntimeError(f"rocker {label}: native dimension owners {names!r}, expected {sorted(keep)!r}")
         total.extend(names)
@@ -1760,7 +1804,7 @@ def _require_ream_clearance(
 ) -> None:
     """Prove actual native REAM text clears D and the seated notes by 1 mm."""
     reader = _Reader(adapter)
-    annotations = tuple(_early_bound(hub, "IView").GetAnnotations() or ())
+    annotations = _bound_view_annotations(hub, label="detail D REAM")
     matches = [ann for ann in annotations if dimension_name(adapter, ann) == "PivotDia"]
     if len(matches) != 1:
         raise RuntimeError("detail D: expected one native pivot REAM dimension")
@@ -1791,30 +1835,35 @@ def _require_front_detail_air(adapter: Any, front: Any, hub: Any, end: Any) -> N
     """Every actual front-callout text box clears both settled detail crops."""
     reader = _Reader(adapter)
     records = [_dump_annotation(reader, ann)
-               for ann in (_early_bound(front, "IView").GetAnnotations() or ())]
+               for ann in _bound_view_annotations(front, label="front/detail text air")]
     errors = reader.take_errors()
     if not records or any(record is None for record in records) or errors:
         raise RuntimeError(f"front/detail text air cannot be measured: {errors!r}")
     advance = calibrate_sheet_advance(records)
     obstacles = (("D", Box(*_detail_crop(adapter, hub, label="D"))),
                  ("E", Box(*_detail_crop(adapter, end, label="E"))))
+    checked_boxes = 0
     for record in records:
         if record.get("visible") in (2, 3) or record.get("type") in (13, 15):
             continue
         geometry = _arc_callout_geometry(record, advance)
         for box in geometry.text_boxes:
+            checked_boxes += 1
             for label, obstacle in obstacles:
                 air = _box_air(box, obstacle)
                 detail = f"front {record.get('name')!r}: actual_GetPosition={record.get('pos')}, native_text_bbox_mm={box.format_mm()}, detail_{label}_crop_mm={obstacle.format_mm()}, actual_air_mm={air * 1000.0:.3f}, required_air_mm=1.000"
                 _telemetry.info(detail)
                 if air < 0.001 - 1e-12:
                     raise RuntimeError(detail)
+    if checked_boxes == 0:
+        raise RuntimeError("front/detail text air: no visible native callout text was checked")
+    _telemetry.info(f"front/detail text air: checked_text_boxes={checked_boxes}, detail_crops=2, required_air_mm=1.000")
 
 
 def _require_radius_exterior(adapter: Any, front: Any) -> None:
     """Native projected parent circles, not front-only scale predictions."""
     reader = _Reader(adapter)
-    annotations = tuple(_early_bound(front, "IView").GetAnnotations() or ())
+    annotations = _bound_view_annotations(front, label="BASIC radius parent circles")
     centre, top_rim, bottom_rim = _project(
         adapter, front,
         ((0.0, CENTER_Y / 1000.0, 0.0),
@@ -1950,30 +1999,83 @@ def _add_arc_profiles(adapter: Any, front: Any) -> dict[str, Any]:
 
 def _arc_callout_geometry(record: dict[str, Any], advance: float) -> Any:
     """Validate required native data before the audit's tolerant geometry parser."""
+    def finite_scalar(value: Any) -> bool:
+        # The dump contains actual numbers, not bools or float-coercible objects.
+        return type(value) in (int, float) and math.isfinite(value)
+
+    def finite_row(values: Any) -> bool:
+        return isinstance(values, (list, tuple)) and all(finite_scalar(v) for v in values)
+
+    def count(value: float) -> bool:
+        # SAFEARRAY counts become doubles in _dump_display's _round.
+        return value >= 0.0 and value == int(value)
+
     position = record.get("pos", ())
-    if len(position) != 3 or not all(math.isfinite(v) for v in position):
+    if not finite_row(position) or len(position) != 3:
         raise ValueError(f"invalid native GetPosition={position!r}")
     display = record.get("display") or {}
+    if not isinstance(display, dict):
+        raise ValueError(f"invalid native display data={display!r}")
     texts = display.get("texts", ())
-    if not texts or not any(item["t"].strip() for item in texts):
+    if not isinstance(texts, (list, tuple)) or not texts:
         raise ValueError("missing native callout text")
     for item in texts:
         if (
-            len(item["pos"]) != 3
-            or not all(math.isfinite(v) for v in item["pos"])
-            or not math.isfinite(item["h"]) or item["h"] <= 0.0
-            or not math.isfinite(item["ang"])
-            or item["ref"] not in range(6)
+            not isinstance(item, dict)
+            or type(item.get("t")) is not str
+            or not finite_row(item.get("pos"))
+            or len(item["pos"]) != 3
+            or not finite_scalar(item.get("h")) or item["h"] <= 0.0
+            or not finite_scalar(item.get("ang"))
+            or type(item.get("ref")) is not int or item["ref"] not in range(6)
+            or ("w" in item and (not finite_scalar(item["w"]) or item["w"] < 0.0))
+            or ("ls" in item and not finite_scalar(item["ls"]))
         ):
             raise ValueError(f"invalid native text geometry={item!r}")
+    if not any(item["t"].strip() for item in texts):
+        raise ValueError("missing native callout text")
+    # Official IDisplayData rows: both line overloads have ten doubles.
+    # Empty primitive sets are omitted by the dump; no class must be present.
+    lengths = {"lines": 10, "arcs": 17, "arrows": 12, "triangles": 11, "ellipses": 19}
     for key, rows in display.items():
         if key == "texts":
             continue
+        if not isinstance(rows, (list, tuple)):
+            raise ValueError(f"invalid native {key} collection={rows!r}")
         for row in rows:
-            if not all(math.isfinite(v) for v in row):
+            if not finite_row(row):
                 raise ValueError(f"invalid native {key} geometry={row!r}")
-            if key == "lines" and len(row) != 10:
-                raise ValueError(f"invalid native line geometry={row!r}")
+            if key in lengths and len(row) != lengths[key]:
+                raise ValueError(f"invalid native {key} geometry={row!r}")
+            if key == "polylines":
+                # GetPolylineAtIndex2 lists seven header values, then N XYZs.
+                # DataSize names GeomData but documents no extra payload/offset.
+                if (
+                    len(row) < 7
+                    or row[0] not in (0.0, 1.0)
+                    or not count(row[1])
+                    or (row[0] == 0.0 and row[1] != 0.0)
+                    or not count(row[6])
+                    or len(row) != 7 + 3 * int(row[6])
+                ):
+                    raise ValueError(
+                        f"invalid native polylines geometry: header={row[:7]!r}, "
+                        f"type={row[0] if row else None!r}, "
+                        f"DataSize={row[1] if len(row) > 1 else None!r}, "
+                        f"N={row[6] if len(row) > 6 else None!r}, row_length={len(row)}; "
+                        f"documented length=7+3*N; type1 GeomData layout unproven; row={row!r}"
+                    )
+            elif key == "polygons":
+                if len(row) < 5 or not count(row[4]) or len(row) != 5 + 3 * int(row[4]):
+                    raise ValueError(f"invalid native polygons geometry={row!r}")
+    leaders = record.get("leaders", ())
+    if not isinstance(leaders, (list, tuple)):
+        raise ValueError(f"invalid native leader collection={leaders!r}")
+    for row in leaders:
+        # GetLeaderPointsAtIndex: straight/underlined or bent. The dump omits
+        # zero-point/no-leader rows; ordinary leader collections may be empty.
+        if not finite_row(row) or len(row) not in (6, 9):
+            raise ValueError(f"invalid native leader geometry={row!r}")
     geometry = annotation_geometry(record, owner="front", advance=advance)
     if geometry is None or not geometry.text_boxes:
         raise ValueError("missing native callout text bbox")
@@ -2016,8 +2118,7 @@ def _require_arc_profile_clearance(
     if len(set(profile_names.values())) != len(profile_names):
         problems.append("native arc-profile frames have duplicate annotation names")
     try:
-        view = reader.bind(front, "IView")
-        raw_annotations = reader.need(lambda: view.GetAnnotations(), ())
+        raw_annotations = _bound_view_annotations(front, label="arc profile front annotations")
         for raw in raw_annotations:
             try:
                 record = _dump_annotation(reader, raw)
@@ -2430,24 +2531,45 @@ async def build(adapter: Any) -> dict[str, str]:
     _seat_detail_caption(adapter, hub, sheet, label="D")
     _seat_detail_caption(adapter, end, sheet, label="E")
     # The shared gate: no overlaps, border crossings or leader crossings.
-    rebuild_drawing(adapter, label="rocker-arm layout audit")
-    _require_dimension_census(adapter, (
-        ("front", front, FRONT_KEEP), ("detail D", hub, HUB_KEEP),
-        ("detail E", end, END_KEEP), ("right", right, RIGHT_KEEP), ("iso", iso, {}),
-    ))
-    _require_ream_clearance(adapter, hub, notes_box)
-    _require_front_detail_air(adapter, front, hub, end)
-    _require_radius_exterior(adapter, front)
-    _require_arc_profile_clearance(adapter, front, arc_profiles)
-    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
+    try:
+        phase = "rebuild"
+        rebuild_drawing(adapter, label="rocker-arm layout audit")
+        phase = "dimension census"
+        _require_dimension_census(adapter, (
+            ("front", front, FRONT_KEEP), ("detail D", hub, HUB_KEEP),
+            ("detail E", end, END_KEEP), ("right", right, RIGHT_KEEP), ("iso", iso, {}),
+        ))
+        phase = "REAM clearance"
+        _require_ream_clearance(adapter, hub, notes_box)
+        phase = "front-detail air"
+        _require_front_detail_air(adapter, front, hub, end)
+        phase = "radius exterior"
+        _require_radius_exterior(adapter, front)
+        phase = "arc profile clearance"
+        _require_arc_profile_clearance(adapter, front, arc_profiles)
+        phase = "shared layout"
+        check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
 
-    return await finalize_drawing(
-        adapter,
-        OUTPUTS,
-        pdf_title="Rocker Arm Manufacturing Drawing",
-        scale=SHEET_SCALE,
-        layout=SPEC.layout,
-    )
+        phase = "finalize"
+        return await finalize_drawing(
+            adapter,
+            OUTPUTS,
+            pdf_title="Rocker Arm Manufacturing Drawing",
+            scale=SHEET_SCALE,
+            layout=SPEC.layout,
+        )
+    except Exception as exc:  # noqa: BLE001 - capture before the native seat closes
+        try:
+            _seat_forensics.capture_com_failure(
+                adapter, f"{PART_STEM}-post-caption-finalize", str(exc),
+                api="rocker post-caption audit/finalize", exception=exc, sheet_png=True,
+                phase=phase,
+            )
+        except Exception as capture_exc:  # noqa: BLE001 - always retain the original guard
+            if capture_exc is not exc:
+                with contextlib.suppress(Exception):
+                    _telemetry.warn(f"rocker post-caption/finalize secondary capture failure: phase={phase}, {capture_exc!r}")
+        raise
 
 
 def _parse_args() -> argparse.Namespace:

@@ -450,8 +450,9 @@ def _native_line(x0, y0, x1, y1):
 class _ClearanceDisplayData:
     """Method-shaped native reads; the real dump/parser are NOT replaced."""
 
-    def __init__(self, texts, lines):
+    def __init__(self, texts, lines, *, primitives=None):
         self.texts, self.lines = texts, lines
+        self.primitives = {} if primitives is None else primitives
 
     def GetLineCount(self):  # noqa: N802
         return len(self.lines)
@@ -484,15 +485,23 @@ class _ClearanceDisplayData:
         return 0.0
 
     def GetTextInBoxWidthAtIndex(self, index):  # noqa: N802
-        return 0.0
+        return self.texts[index].get("w", 0.0)
 
     def __getattr__(self, name):
         # Unused primitive classes have an authoritative zero count, not None.
-        if name in {
-            "GetArcCount", "GetArrowHeadCount", "GetPolyLineCount",
-            "GetPolygonCount", "GetTriangleCount", "GetEllipseCount",
-        }:
-            return lambda: 0
+        primitives = {
+            "GetArcCount": ("arcs", "GetArcAtIndex2"),
+            "GetArrowHeadCount": ("arrows", "GetArrowHeadAtIndex2"),
+            "GetPolyLineCount": ("polylines", "GetPolylineAtIndex2"),
+            "GetPolygonCount": ("polygons", "GetPolygonAtIndex"),
+            "GetTriangleCount": ("triangles", "GetTriangleAtIndex"),
+            "GetEllipseCount": ("ellipses", "GetEllipseAtIndex2"),
+        }
+        for count_name, (key, getter_name) in primitives.items():
+            if name == count_name:
+                return lambda: len(self.primitives.get(key, ()))
+            if name == getter_name:
+                return lambda index: self.primitives.get(key, ())[index]
         raise AttributeError(name)
 
 
@@ -526,12 +535,333 @@ class _ClearanceAnnotation:
         return SimpleNamespace(IsHoleCallout=lambda: self.hole_callout)
 
 
+# IDisplayData's documented rows, not shortened fixtures accepted by tolerant
+# parsers. Metadata is unitless; all point/size values below are in metres.
+_NATIVE_CALLOUT_ROWS = {
+    "lines": _native_line(0.03, 0.04, 0.05, 0.04),
+    "arcs": [-1, 0, 0, 0, 0.03, 0.04, 0, 0.04, 0.05, 0,
+             0.03, 0.05, 0, 0, 0, 1, -1],
+    "polylines": [0, 0, 0, 0, 0, 0, 3,
+                  0.03, 0.04, 0, 0.05, 0.04, 0, 0.06, 0.05, 0],
+    "polygons": [0, 0, 0, 0, 3,
+                 0.03, 0.04, 0, 0.05, 0.04, 0, 0.06, 0.05, 0],
+    "triangles": [0.03, 0.04, 0, 0.05, 0.04, 0, 0.06, 0.05, 0, -1, 0],
+    "arrows": [0.06, 0.05, 0, -1, 0, 0, 0.003, 0.002, 0, 0, 0, 1],
+    "ellipses": [-1, 0, 0, 0, 0.03, 0.04, 0, 0.03, 0.04, 0,
+                 0.04, 0.04, 0, 0.05, 0.04, 0, 0.04, 0.045, 0],
+}
+
+
+@pytest.fixture
+def native_callout_record(monkeypatch):
+    """Exercise actual record production without importing/activating COM."""
+    import _drawing_layout_audit
+
+    monkeypatch.setattr(_drawing_layout_audit, "_early_bound", lambda obj, _iface: obj)
+    data = _ClearanceDisplayData(
+        [{"t": "REAM +0.03", "pos": [0.08, 0.09, 0],
+          "h": 0.0035, "ref": 1, "ang": 0.0}],
+        [],
+    )
+    annotation = _ClearanceAnnotation("OrdinaryCallout", (0.08, 0.09, 0), data, kind=4)
+
+    def dump():
+        reader = _drawing_layout_audit._Reader(object())
+        record = _drawing_layout_audit._dump_annotation(reader, annotation)
+        assert reader.take_errors() == {}
+        assert record is not None
+        return record
+
+    return SimpleNamespace(data=data, annotation=annotation, dump=dump)
+
+
+def test_arc_callout_accepts_native_empty_primitive_sets_and_no_leaders(native_callout_record):
+    record = native_callout_record.dump()
+    assert set(record["display"]) == {"texts"}
+    assert "leaders" not in record
+    geometry = drawing._arc_callout_geometry(record, 0.62)
+    assert geometry.text_boxes
+    assert geometry.segments == ()
+
+
+@pytest.mark.parametrize("key", tuple(_NATIVE_CALLOUT_ROWS))
+def test_arc_callout_accepts_each_documented_primitive_without_array_alignment(
+    native_callout_record, key,
+):
+    case = native_callout_record
+    row = list(_NATIVE_CALLOUT_ROWS[key])
+    if key == "lines":
+        case.data.lines = [row, list(row)]
+    else:
+        case.data.primitives[key] = [row, list(row)]
+    record = case.dump()
+    assert len(record["display"][key]) == 2
+    assert len(record["display"]["texts"]) == 1
+    expected = drawing.annotation_geometry(record, owner="front", advance=0.62)
+    snapshot = json.dumps(record, sort_keys=True)
+    actual = drawing._arc_callout_geometry(record, 0.62)
+    assert actual == expected
+    assert json.dumps(record, sort_keys=True) == snapshot
+
+
+def test_arc_callout_accepts_documented_line_fallback(native_callout_record):
+    case = native_callout_record
+    row = _native_line(0.03, 0.04, 0.05, 0.04)
+    case.data.lines = [row]
+    case.data.GetLineAtIndex3 = lambda _index: None
+    case.data.GetLineAtIndex2 = lambda index: case.data.lines[index]
+    record = case.dump()
+    assert record["display"]["lines"] == [row]
+    assert drawing._arc_callout_geometry(record, 0.62).segments
+
+
+@pytest.mark.parametrize("container", [list, tuple])
+def test_arc_callout_accepts_explicit_empty_dump_collections(native_callout_record, container):
+    record = native_callout_record.dump()
+    for key in _NATIVE_CALLOUT_ROWS:
+        record["display"][key] = container()
+    record["leaders"] = container()
+    assert drawing._arc_callout_geometry(record, 0.62).text_boxes
+
+
+@pytest.mark.parametrize("key", tuple(_NATIVE_CALLOUT_ROWS))
+@pytest.mark.parametrize("defect", ["empty", "short", "long", "nonfinite", "bool", "string"])
+def test_arc_callout_rejects_malformed_primitive_before_tolerant_parser(
+    native_callout_record, monkeypatch, key, defect,
+):
+    record = native_callout_record.dump()
+    row = list(_NATIVE_CALLOUT_ROWS[key])
+    if defect == "empty":
+        row = []
+    elif defect == "short":
+        row.pop()
+    elif defect == "long":
+        row.append(0.0)
+    elif defect == "nonfinite":
+        row[-1] = float("inf")
+    elif defect == "bool":
+        row[-1] = True
+    elif defect == "string":
+        row[-1] = "0.0"
+    record["display"][key] = [row]
+    monkeypatch.setattr(
+        drawing, "annotation_geometry",
+        lambda *_a, **_k: pytest.fail("malformed primitive reached tolerant parser"),
+    )
+    with pytest.raises(ValueError, match=f"invalid native {key} geometry"):
+        drawing._arc_callout_geometry(record, 0.62)
+
+
+@pytest.mark.parametrize("key,index,header", [
+    ("polylines", 6, 7), ("polygons", 4, 5),
+])
+@pytest.mark.parametrize("points", [0, 1, 2, 3])
+def test_arc_callout_accepts_complete_variable_point_sequences(
+    native_callout_record, key, index, header, points,
+):
+    record = native_callout_record.dump()
+    row = list(_NATIVE_CALLOUT_ROWS[key][:header + 3 * points])
+    row[index] = float(points)
+    record["display"][key] = [row]
+    assert drawing._arc_callout_geometry(record, 0.62).text_boxes
+
+
+@pytest.mark.parametrize("key,index", [("polylines", 6), ("polygons", 4)])
+@pytest.mark.parametrize("invalid_count", [-1.0, 1.5, float("nan"), float("inf"), True, "3"])
+def test_arc_callout_rejects_invalid_variable_counts(native_callout_record, key, index, invalid_count):
+    record = native_callout_record.dump()
+    row = list(_NATIVE_CALLOUT_ROWS[key])
+    row[index] = invalid_count
+    record["display"][key] = [row]
+    with pytest.raises(ValueError, match=f"invalid native {key} geometry"):
+        drawing._arc_callout_geometry(record, 0.62)
+
+
+@pytest.mark.parametrize("key,index,header", [
+    ("polylines", 6, 7), ("polygons", 4, 5),
+])
+@pytest.mark.parametrize("defect", ["missing-header", "missing-point", "extra-point", "extra-scalar"])
+def test_arc_callout_rejects_incomplete_or_extra_variable_sequences(
+    native_callout_record, key, index, header, defect,
+):
+    record = native_callout_record.dump()
+    row = list(_NATIVE_CALLOUT_ROWS[key])
+    if defect == "missing-header":
+        row = row[:header - 1]
+    elif defect == "missing-point":
+        row = row[:-3]
+    elif defect == "extra-point":
+        row.extend([0.07, 0.06, 0.0])
+    elif defect == "extra-scalar":
+        row.append(0.0)
+    record["display"][key] = [row]
+    with pytest.raises(ValueError, match=f"invalid native {key} geometry") as caught:
+        drawing._arc_callout_geometry(record, 0.62)
+    if key == "polylines":
+        for evidence in ("header=", "type=", "DataSize=", "N=", f"row_length={len(row)}",
+                         "documented length=7+3*N", "GeomData layout unproven"):
+            assert evidence in str(caught.value)
+
+
+@pytest.mark.parametrize("kind,data_size", [(1.0, 0.0), (1.0, 7.0), (1.0, 12.0)])
+def test_arc_callout_accepts_documented_polyline_header_without_guessing_geomdata(
+    native_callout_record, kind, data_size,
+):
+    record = native_callout_record.dump()
+    row = list(_NATIVE_CALLOUT_ROWS["polylines"])
+    row[:2] = [kind, data_size]
+    record["display"]["polylines"] = [row]
+    assert drawing._arc_callout_geometry(record, 0.62).text_boxes
+
+
+@pytest.mark.parametrize("index,value", [
+    (0, -1.0), (0, 0.5), (0, 2.0), (0, True),
+    (1, -1.0), (1, 0.5), (1, 1.0), (1, float("inf")), (1, True),
+])
+def test_arc_callout_rejects_invalid_polyline_type_or_data_size(native_callout_record, index, value):
+    record = native_callout_record.dump()
+    row = list(_NATIVE_CALLOUT_ROWS["polylines"])
+    row[index] = value
+    record["display"]["polylines"] = [row]
+    with pytest.raises(ValueError, match="invalid native polylines geometry"):
+        drawing._arc_callout_geometry(record, 0.62)
+
+
+@pytest.mark.parametrize("points", [0, 2, 3])
+def test_arc_callout_accepts_only_documented_leader_point_shapes(native_callout_record, points):
+    record = native_callout_record.dump()
+    row = [0.03, 0.04, 0, 0.05, 0.04, 0, 0.06, 0.05, 0][:3 * points]
+    record["leaders"] = [row] if points else []
+    geometry = drawing._arc_callout_geometry(record, 0.62)
+    assert sum(segment.role == "leader" for segment in geometry.segments) == max(0, points - 1)
+
+
+@pytest.mark.parametrize("row", [
+    [], [0.0], [0.0] * 3, [0.0] * 5, [0.0] * 7, [0.0] * 8, [0.0] * 10, [0.0] * 12,
+    [0.0, 0.0, 0.0, float("nan"), 0.0, 0.0],
+    [0.0, 0.0, 0.0, 0.0, float("inf"), 0.0, 0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0, True, 0.0, 0.0],
+    [0.0, 0.0, 0.0, "0.1", 0.0, 0.0],
+])
+def test_arc_callout_rejects_truncated_nonfinite_or_non_scalar_leaders(
+    native_callout_record, monkeypatch, row,
+):
+    record = native_callout_record.dump()
+    record["leaders"] = [row]
+    monkeypatch.setattr(
+        drawing, "annotation_geometry",
+        lambda *_a, **_k: pytest.fail("malformed leader reached tolerant parser"),
+    )
+    with pytest.raises(ValueError, match="invalid native leader geometry"):
+        drawing._arc_callout_geometry(record, 0.62)
+
+
+@pytest.mark.parametrize("reference", range(6))
+@pytest.mark.parametrize("angle", [0.0, math.pi / 2, -math.pi])
+def test_arc_callout_accepts_every_documented_text_reference_and_radian_angle(
+    native_callout_record, reference, angle,
+):
+    record = native_callout_record.dump()
+    record["display"]["texts"][0].update(ref=reference, ang=angle)
+    assert drawing._arc_callout_geometry(record, 0.62).text_boxes
+
+
+@pytest.mark.parametrize("width", [None, 0.0, 0.021])
+def test_arc_callout_accepts_absent_or_nonnegative_optional_width(native_callout_record, width):
+    record = native_callout_record.dump()
+    if width is not None:
+        record["display"]["texts"][0]["w"] = width
+    assert drawing._arc_callout_geometry(record, 0.62).text_boxes
+
+
+@pytest.mark.parametrize("field,value", [
+    ("t", None), ("t", 17), ("t", lambda: "REAM"), ("t", " \n "),
+    ("pos", []), ("pos", [0.08, 0.09]), ("pos", [0.08, 0.09, 0.0, 0.0]),
+    ("pos", [0.08, float("nan"), 0.0]), ("pos", [0.08, True, 0.0]),
+    ("pos", [0.08, "0.09", 0.0]),
+    ("h", 0.0), ("h", -0.001), ("h", float("inf")), ("h", True), ("h", "0.0035"),
+    ("ang", float("nan")), ("ang", True), ("ang", "0.0"),
+    ("ref", -1), ("ref", 6), ("ref", 1.0), ("ref", True), ("ref", "1"),
+    ("w", -0.001), ("w", float("nan")), ("w", float("inf")), ("w", True), ("w", "0.02"),
+    ("ls", float("nan")), ("ls", float("inf")), ("ls", True), ("ls", "0.0"),
+])
+def test_arc_callout_rejects_invalid_text_fields_before_tolerant_parser(
+    native_callout_record, monkeypatch, field, value,
+):
+    record = native_callout_record.dump()
+    record["display"]["texts"][0][field] = value
+    monkeypatch.setattr(
+        drawing, "annotation_geometry",
+        lambda *_a, **_k: pytest.fail("malformed text reached tolerant parser"),
+    )
+    with pytest.raises(ValueError, match="invalid native text geometry|missing native callout text"):
+        drawing._arc_callout_geometry(record, 0.62)
+
+
+@pytest.mark.parametrize("field", ["t", "pos", "h", "ang", "ref"])
+def test_arc_callout_rejects_missing_required_text_fields(native_callout_record, field):
+    record = native_callout_record.dump()
+    del record["display"]["texts"][0][field]
+    with pytest.raises(ValueError, match="invalid native text geometry"):
+        drawing._arc_callout_geometry(record, 0.62)
+
+
+@pytest.mark.parametrize("position", [
+    None, [], [0.0, 0.0], [0.0] * 4, [float("inf"), 0.0, 0.0],
+    [0.0, True, 0.0], [0.0, "0.1", 0.0],
+])
+def test_arc_callout_rejects_invalid_annotation_position(native_callout_record, position):
+    record = native_callout_record.dump()
+    record["pos"] = position
+    with pytest.raises(ValueError, match="invalid native GetPosition"):
+        drawing._arc_callout_geometry(record, 0.62)
+
+
+def test_arc_callout_preserves_native_null_rows_for_zero_counts(native_callout_record):
+    case = native_callout_record
+    for member in (
+        "GetLineAtIndex3", "GetLineAtIndex2", "GetArcAtIndex2", "GetArrowHeadAtIndex2",
+        "GetPolylineAtIndex2", "GetPolygonAtIndex", "GetTriangleAtIndex", "GetEllipseAtIndex2",
+    ):
+        setattr(case.data, member, lambda _index: None)
+    case.annotation.GetLeaderPointsAtIndex = lambda _index: None
+    record = case.dump()
+    assert set(record["display"]) == {"texts"}
+    assert "leaders" not in record
+    assert drawing._arc_callout_geometry(record, 0.62).text_boxes
+
+
+def test_arc_callout_preserves_documented_degenerate_primitive_rows(native_callout_record):
+    record = native_callout_record.dump()
+    record["display"]["lines"] = [_native_line(0.0, 0.0, 0.0, 0.0)]
+    record["leaders"] = [[0.0] * 6]
+    assert drawing._arc_callout_geometry(record, 0.62).text_boxes
+
+
+@pytest.mark.parametrize("key", tuple(_NATIVE_CALLOUT_ROWS))
+@pytest.mark.parametrize("row", [None, 3.0, "row", {}, [0.0, [0.0]]])
+def test_arc_callout_rejects_non_array_or_nested_primitive_rows(native_callout_record, key, row):
+    record = native_callout_record.dump()
+    record["display"][key] = [row]
+    with pytest.raises(ValueError, match=f"invalid native {key} geometry"):
+        drawing._arc_callout_geometry(record, 0.62)
+
+
+@pytest.mark.parametrize("texts", [[], None, "REAM", {}, [None], [17], ["REAM"]])
+def test_arc_callout_rejects_malformed_text_collection(native_callout_record, texts):
+    record = native_callout_record.dump()
+    record["display"]["texts"] = texts
+    with pytest.raises(ValueError, match="missing native callout text|invalid native text geometry"):
+        drawing._arc_callout_geometry(record, 0.62)
+
+
 @pytest.fixture
 def native_profile_clearance(monkeypatch):
     # Historical native records intentionally stay independent of R10 anchors.
     import _drawing_layout_audit
 
     monkeypatch.setattr(_drawing_layout_audit, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
     logs = []
     monkeypatch.setattr(drawing._telemetry, "info", logs.append)
 
@@ -577,7 +907,7 @@ def native_profile_clearance(monkeypatch):
         kind=4, hole_callout=False,
     )
     annotations = [top, bottom, ream, r816]
-    front = SimpleNamespace(GetAnnotations=lambda: annotations)
+    front = SimpleNamespace(GetAnnotationCount=lambda: len(annotations), GetAnnotations=lambda: annotations)
     profiles = {
         "TopRadius": SimpleNamespace(GetAnnotation=lambda: top),
         "BottomRadius": SimpleNamespace(GetAnnotation=lambda: bottom),
@@ -694,6 +1024,7 @@ def test_native_profile_guard_fails_closed(native_profile_clearance, defect):
         case.profiles["BottomRadius"].GetAnnotation = lambda: None
     elif defect == "empty-view":
         case.front.GetAnnotations = lambda: []
+        case.front.GetAnnotationCount = lambda: 0
     elif defect == "refused-view":
         case.front.GetAnnotations = lambda: None
     elif defect == "missing-leader":
@@ -738,9 +1069,13 @@ def test_native_profile_guard_fails_closed(native_profile_clearance, defect):
         case.bottom.name = case.top.name
     elif defect == "zero-frame-lines":
         case.bottom.data.lines = [_native_line(0.020, 0.129, 0.020, 0.129)]
-    with pytest.raises(RuntimeError, match="rocker arc-profile native clearance failed") as exc:
+    # Count/array disagreement refuses before individual frame records exist.
+    expected = ("arc profile front annotations: native annotation count 4 returned no annotation array"
+                if defect == "refused-view" else "rocker arc-profile native clearance failed")
+    with pytest.raises(RuntimeError, match=expected) as exc:
         drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
-    assert "BottomRadius" in str(exc.value)
+    if defect != "refused-view":
+        assert "BottomRadius" in str(exc.value)
     assert case.logs or defect in ("empty-view", "refused-view")
 
 
@@ -2548,6 +2883,9 @@ class _DetailView:
     def GetNotes(self):
         return tuple(self.notes)
 
+    def GetAnnotationCount(self):
+        return len(self.annotations)
+
     def GetAnnotations(self):
         return tuple(self.annotations)
 
@@ -3104,24 +3442,331 @@ def test_end_caption_fails_closed_without_real_ink_and_three_mm_air(bound, monke
     assert captures == [caught.value]
 
 
+class _CensusAnnotation:
+    def __init__(self, name, *, kind=4, specific=None):
+        self.name, self.kind, self.specific = name, kind, specific
+
+    def GetType(self):  # noqa: N802
+        return self.kind
+
+    def GetSpecificAnnotation(self):  # noqa: N802
+        return self.specific
+
+
+class _CensusDisplayDimension:
+    def __init__(self, dimension, *, hole_callout=False):
+        self.dimension, self.hole_callout = dimension, hole_callout
+
+    def GetDimension2(self, index):  # noqa: N802
+        assert index == 0
+        return self.dimension
+
+    def IsHoleCallout(self):  # noqa: N802
+        return self.hole_callout
+
+
+@pytest.fixture
+def native_annotation_binding(monkeypatch):
+    """Opaque raw dispatches cannot expose members of their bound interfaces."""
+    wrappers, calls = {}, []
+
+    def raw(native, interface):
+        dispatch = object()
+        wrappers[id(dispatch)] = (dispatch, interface, native)
+        return dispatch
+
+    def bind(dispatch, interface):
+        entry = wrappers.get(id(dispatch))
+        if entry is None:
+            assert interface not in ("IAnnotation", "IDisplayDimension")
+            return dispatch
+        assert entry[0] is dispatch and entry[1] == interface
+        calls.append((interface, entry[2]))
+        return entry[2]
+
+    monkeypatch.setattr(drawing, "_early_bound", bind)
+    return SimpleNamespace(raw=raw, calls=calls)
+
+
+@pytest.fixture
+def raw_dimension_census(monkeypatch, native_annotation_binding):
+    keeps = [list(keep) for keep in (
+        drawing.FRONT_KEEP, drawing.HUB_KEEP, drawing.END_KEEP, drawing.RIGHT_KEEP,
+    )]
+    annotations = [[_CensusAnnotation(name) for name in keep] for keep in keeps]
+    raws = [[native_annotation_binding.raw(ann, "IAnnotation") for ann in row]
+            for row in annotations]
+    native_views = [SimpleNamespace(GetAnnotationCount=lambda row=row: len(row), GetAnnotations=lambda row=row: row)
+                    for row in raws]
+    views = [(label, native_annotation_binding.raw(view, "IView"), keep)
+             for label, view, keep in zip(("front", "D", "E", "right"), native_views, keeps)]
+    reads, logs = [], []
+
+    def read_name(_adapter, annotation):
+        reads.append(annotation)
+        return annotation.name if isinstance(annotation, _CensusAnnotation) else ""
+
+    monkeypatch.setattr(drawing, "dimension_name", read_name)
+    monkeypatch.setattr(drawing._telemetry, "info", logs.append)
+    return SimpleNamespace(
+        annotations=annotations, raws=raws, native_views=native_views, views=views,
+        keeps=keeps, reads=reads, logs=logs, binding=native_annotation_binding,
+    )
+
+
 @pytest.mark.parametrize("defect", [None, "missing", "duplicate", "wrong-owner"])
-def test_actual_per_view_dimension_census_is_an_exact_marked_union(bound, monkeypatch, defect):
-    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, ann: ann)
-    keeps = [drawing.FRONT_KEEP, drawing.HUB_KEEP, drawing.END_KEEP, drawing.RIGHT_KEEP]
-    names = [list(keep) for keep in keeps]
+def test_actual_per_view_dimension_census_is_an_exact_marked_union(raw_dimension_census, defect):
+    case = raw_dimension_census
     if defect == "missing":
-        names[1].remove("PivotDia")
+        case.raws[1].pop(case.keeps[1].index("PivotDia"))
     elif defect == "duplicate":
-        names[2].append("RodTipLen")
+        case.raws[2].append(case.raws[2][0])
     elif defect == "wrong-owner":
-        names[0].append(names[2].pop())
-    views = [(str(i), SimpleNamespace(GetAnnotations=lambda row=row: row), keep)
-             for i, (row, keep) in enumerate(zip(names, keeps))]
+        case.raws[0].append(case.raws[2].pop())
     if defect is None:
-        drawing._require_dimension_census(object(), views)
+        drawing._require_dimension_census(object(), case.views)
+        expected = [ann for row in case.annotations for ann in row]
+        assert case.reads == expected
+        assert [ann for interface, ann in case.binding.calls if interface == "IAnnotation"] == expected
+        census_logs = [log for log in case.logs if "marked-dimension census=" in log]
+        count_logs = [log for log in case.logs if "native GetAnnotationCount=" in log]
+        assert len(census_logs) == len(count_logs) == len(case.views)
+        assert all(f"native annotations={len(row)}" in log for row, log in zip(case.raws, census_logs))
+        assert all(f"GetAnnotationCount={len(row)}, GetAnnotations length={len(row)}" in log
+                   for row, log in zip(case.raws, count_logs))
     else:
         with pytest.raises(RuntimeError, match="native dimension owners"):
-            drawing._require_dimension_census(object(), views)
+            drawing._require_dimension_census(object(), case.views)
+
+
+@pytest.mark.parametrize("defect", ["missing", "duplicate"])
+def test_census_union_refuses_even_when_each_native_view_matches_its_keep(raw_dimension_census, defect):
+    case = raw_dimension_census
+    if defect == "missing":
+        index = case.keeps[1].index("PivotDia")
+        case.raws[1].pop(index)
+        case.keeps[1].pop(index)
+    else:
+        case.raws[1].append(case.raws[0][case.keeps[0].index("TopRadius")])
+        case.keeps[1].append("TopRadius")
+    with pytest.raises(RuntimeError, match="marked-dimension union is not exact"):
+        drawing._require_dimension_census(object(), case.views)
+
+
+@pytest.mark.parametrize("defect", ["unreadable", "hidden-duplicate", "hidden-wrong-owner"])
+@pytest.mark.parametrize("hole_callout", [False, True])
+def test_census_refuses_every_unnamed_actual_model_dimension(raw_dimension_census, defect, hole_callout):
+    case = raw_dimension_census
+    name = "PivotDia" if defect == "hidden-wrong-owner" else "TopRadius"
+    display = _CensusDisplayDimension(SimpleNamespace(Name=name), hole_callout=hole_callout)
+    annotation = _CensusAnnotation("", specific=case.binding.raw(display, "IDisplayDimension"))
+    raw = case.binding.raw(annotation, "IAnnotation")
+    if defect == "unreadable":
+        case.raws[0][case.keeps[0].index("TopRadius")] = raw
+    else:
+        case.raws[0].append(raw)
+    with pytest.raises(RuntimeError, match=r"rocker front: native dimension #\d+ has no readable name"):
+        drawing._require_dimension_census(object(), case.views)
+    assert ("IDisplayDimension", display) in case.binding.calls
+
+
+@pytest.mark.parametrize("kind", [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+def test_census_skips_documented_nondimension_annotations(raw_dimension_census, kind):
+    case = raw_dimension_census
+    annotation = _CensusAnnotation("", kind=kind)
+    annotation.GetSpecificAnnotation = lambda: pytest.fail("non-dimension specific object was read")
+    case.raws[0].append(case.binding.raw(annotation, "IAnnotation"))
+    drawing._require_dimension_census(object(), case.views)
+    assert case.reads[-1] is case.annotations[-1][-1]
+    assert annotation in case.reads
+
+
+def test_census_skips_native_hole_callout_with_null_underlying_dimension(raw_dimension_census):
+    case = raw_dimension_census
+    display = _CensusDisplayDimension(None, hole_callout=True)
+    annotation = _CensusAnnotation("", specific=case.binding.raw(display, "IDisplayDimension"))
+    case.raws[0].append(case.binding.raw(annotation, "IAnnotation"))
+    drawing._require_dimension_census(object(), case.views)
+    assert ("IDisplayDimension", display) in case.binding.calls
+
+
+@pytest.mark.parametrize("identity", [False, None, 0, 1, "True", lambda: True])
+def test_census_refuses_null_model_without_actual_hole_callout_identity(raw_dimension_census, identity):
+    case = raw_dimension_census
+    display = _CensusDisplayDimension(None, hole_callout=identity)
+    annotation = _CensusAnnotation("", specific=case.binding.raw(display, "IDisplayDimension"))
+    case.raws[0].append(case.binding.raw(annotation, "IAnnotation"))
+    expected = "no underlying model dimension" if identity is False else "invalid hole-callout identity"
+    with pytest.raises(RuntimeError, match=expected):
+        drawing._require_dimension_census(object(), case.views)
+
+
+def test_census_refuses_null_specific_display_dimension(raw_dimension_census):
+    case = raw_dimension_census
+    case.raws[0].append(case.binding.raw(_CensusAnnotation(""), "IAnnotation"))
+    with pytest.raises(RuntimeError, match="has no native display dimension"):
+        drawing._require_dimension_census(object(), case.views)
+
+
+@pytest.mark.parametrize("kind", [None, True, False, 4.0, 4.5, "4", lambda: 4, 0, -1, 20])
+def test_census_refuses_malformed_native_annotation_type(raw_dimension_census, kind):
+    case = raw_dimension_census
+    annotation = _CensusAnnotation("", kind=kind)
+    annotation.GetSpecificAnnotation = lambda: pytest.fail("malformed annotation type was accepted")
+    case.raws[0].append(case.binding.raw(annotation, "IAnnotation"))
+    with pytest.raises(RuntimeError, match="has invalid type"):
+        drawing._require_dimension_census(object(), case.views)
+
+
+@pytest.mark.parametrize("stage", [
+    "GetAnnotationCount", "GetAnnotations", "GetType", "GetSpecificAnnotation", "GetDimension2",
+    "IsHoleCallout", "dimension_name", "bind-view", "bind-annotation", "bind-display",
+])
+def test_census_preserves_original_native_and_binding_exceptions(raw_dimension_census, monkeypatch, stage):
+    case = raw_dimension_census
+    display = _CensusDisplayDimension(None, hole_callout=True)
+    annotation = _CensusAnnotation("", specific=case.binding.raw(display, "IDisplayDimension"))
+    case.raws[0].append(case.binding.raw(annotation, "IAnnotation"))
+    failure = OSError(f"native refusal at {stage}")
+
+    def refuse(*_args, **_kwargs):
+        raise failure
+
+    if stage.startswith("bind-"):
+        original = drawing._early_bound
+        refused_interface = {
+            "bind-view": "IView", "bind-annotation": "IAnnotation", "bind-display": "IDisplayDimension",
+        }[stage]
+        def bind(raw, interface):
+            return refuse() if interface == refused_interface else original(raw, interface)
+        monkeypatch.setattr(drawing, "_early_bound", bind)
+    else:
+        target = {
+            "GetAnnotationCount": case.native_views[0], "GetAnnotations": case.native_views[0],
+            "GetType": annotation, "GetSpecificAnnotation": annotation,
+            "GetDimension2": display, "IsHoleCallout": display, "dimension_name": drawing,
+        }[stage]
+        monkeypatch.setattr(target, stage, refuse)
+    with pytest.raises(OSError) as caught:
+        drawing._require_dimension_census(object(), case.views)
+    assert caught.value is failure
+
+
+@pytest.mark.parametrize("raw", [None, (), []])
+def test_bound_view_annotations_accepts_native_empty_array(native_annotation_binding, monkeypatch, raw):
+    events, logs = [], []
+    def count():
+        events.append("GetAnnotationCount")
+        return 0
+    def annotations():
+        events.append("GetAnnotations")
+        return raw
+    view = SimpleNamespace(GetAnnotationCount=count, GetAnnotations=annotations)
+    monkeypatch.setattr(drawing._telemetry, "info", logs.append)
+    assert drawing._bound_view_annotations(view, label="test view") == ()
+    assert events == ["GetAnnotationCount", "GetAnnotations"]
+    assert native_annotation_binding.calls == []
+    array_evidence = "GetAnnotations=None" if raw is None else "GetAnnotations length=0"
+    assert logs == [f"test view: native GetAnnotationCount=0, {array_evidence}"]
+
+
+@pytest.mark.parametrize("array", [tuple, list])
+def test_bound_view_annotations_binds_each_native_array_item(native_annotation_binding, monkeypatch, array):
+    binding = native_annotation_binding
+    annotations = [_CensusAnnotation("TopRadius"), _CensusAnnotation("BottomRadius")]
+    raw = array(binding.raw(ann, "IAnnotation") for ann in annotations)
+    events = []
+    original = drawing._early_bound
+    def bind(dispatch, interface):
+        events.append(f"bind {interface}")
+        return original(dispatch, interface)
+    def count():
+        events.append("GetAnnotationCount")
+        return len(raw)
+    def read():
+        events.append("GetAnnotations")
+        return raw
+    view = SimpleNamespace(GetAnnotationCount=count, GetAnnotations=read)
+    monkeypatch.setattr(drawing, "_early_bound", bind)
+    assert drawing._bound_view_annotations(binding.raw(view, "IView"), label="test view") == tuple(annotations)
+    assert binding.calls == [("IView", view), *(("IAnnotation", ann) for ann in annotations)]
+    assert events == ["bind IView", "GetAnnotationCount", "GetAnnotations", "bind IAnnotation", "bind IAnnotation"]
+
+
+@pytest.mark.parametrize("raw", [False, 0, "", {}, object(), iter(())])
+def test_bound_view_annotations_refuses_nonarray_native_shape(native_annotation_binding, raw):
+    view = SimpleNamespace(GetAnnotationCount=lambda: 0, GetAnnotations=lambda: raw)
+    with pytest.raises(RuntimeError, match="test view: invalid native annotation array"):
+        drawing._bound_view_annotations(view, label="test view")
+    assert native_annotation_binding.calls == []
+
+
+@pytest.mark.parametrize("array", [tuple, list])
+@pytest.mark.parametrize("index", [0, 1])
+def test_bound_view_annotations_refuses_null_array_item(native_annotation_binding, array, index):
+    binding = native_annotation_binding
+    raw = [binding.raw(_CensusAnnotation("TopRadius"), "IAnnotation"), None] if index else [None]
+    view = SimpleNamespace(GetAnnotationCount=lambda: len(raw), GetAnnotations=lambda: array(raw))
+    with pytest.raises(RuntimeError, match=rf"test view: native annotation #{index} is null"):
+        drawing._bound_view_annotations(view, label="test view")
+
+
+@pytest.mark.parametrize("count", [1, 2])
+def test_bound_view_annotations_refuses_positive_count_with_null_array(native_annotation_binding, monkeypatch, count):
+    view = SimpleNamespace(GetAnnotationCount=lambda: count, GetAnnotations=lambda: None)
+    logs = []
+    monkeypatch.setattr(drawing._telemetry, "info", logs.append)
+    with pytest.raises(RuntimeError, match=rf"native annotation count {count} returned no annotation array"):
+        drawing._bound_view_annotations(view, label="test view")
+    assert native_annotation_binding.calls == []
+    assert logs == [f"test view: native GetAnnotationCount={count}, GetAnnotations=None"]
+
+
+@pytest.mark.parametrize("array", [tuple, list])
+@pytest.mark.parametrize("count,size", [(0, 1), (1, 0), (1, 2), (2, 1)])
+def test_bound_view_annotations_refuses_count_array_length_mismatch(
+    native_annotation_binding, monkeypatch, array, count, size,
+):
+    binding = native_annotation_binding
+    raw = array(binding.raw(_CensusAnnotation("TopRadius"), "IAnnotation") for _ in range(size))
+    view = SimpleNamespace(GetAnnotationCount=lambda: count, GetAnnotations=lambda: raw)
+    logs = []
+    monkeypatch.setattr(drawing._telemetry, "info", logs.append)
+    with pytest.raises(RuntimeError, match=rf"native annotation array length {size}, expected count {count}"):
+        drawing._bound_view_annotations(view, label="test view")
+    assert binding.calls == []
+    assert logs == [f"test view: native GetAnnotationCount={count}, GetAnnotations length={size}"]
+
+
+@pytest.mark.parametrize("count", [None, True, False, -1, 1.0, "1", lambda: 1, object()])
+def test_bound_view_annotations_refuses_malformed_count_before_array_read(native_annotation_binding, count):
+    view = SimpleNamespace(
+        GetAnnotationCount=lambda: count,
+        GetAnnotations=lambda: pytest.fail("GetAnnotations called after invalid native count"),
+    )
+    with pytest.raises(RuntimeError, match="test view: invalid native annotation count"):
+        drawing._bound_view_annotations(view, label="test view")
+    assert native_annotation_binding.calls == []
+
+
+@pytest.mark.parametrize("stage", ["GetAnnotationCount", "GetAnnotations"])
+def test_bound_view_annotations_preserves_native_exception_identity_and_read_order(native_annotation_binding, stage):
+    events = []
+    failure = OSError(f"native refusal at {stage}")
+    def count():
+        events.append("GetAnnotationCount")
+        if stage == "GetAnnotationCount":
+            raise failure
+        return 1
+    def annotations():
+        events.append("GetAnnotations")
+        raise failure
+    view = SimpleNamespace(GetAnnotationCount=count, GetAnnotations=annotations)
+    with pytest.raises(OSError) as caught:
+        drawing._bound_view_annotations(view, label="test view")
+    assert caught.value is failure
+    assert events == (["GetAnnotationCount"] if stage == "GetAnnotationCount" else ["GetAnnotationCount", "GetAnnotations"])
+    assert native_annotation_binding.calls == []
 
 
 @pytest.mark.parametrize("axis", ["X", "Y"])
@@ -3171,6 +3816,7 @@ def test_every_front_native_text_row_is_guarded_against_detail_crops(native_prof
     case = native_profile_clearance
     # Native records are historical detector inputs, not a current-coordinate proof.
     case.front.GetAnnotations = lambda: [case.r816]
+    case.front.GetAnnotationCount = lambda: 1
     case.r816.data.texts = [{"t": "R816", "pos": [0.170, 0.128, 0], "h": 0.0035}]
     case.adapter, hub = _native_crop_fixture(monkeypatch, "D")
     hub.Position = hub.physical = (0.180, 0.128 - air - hub.radius)
@@ -3487,10 +4133,33 @@ def test_ream_native_text_clears_actual_detail_and_seated_notes(native_profile_c
             drawing._require_ream_clearance(case.adapter, hub, notes)
 
 
+def test_ream_dimension_name_receives_bound_native_annotation(
+    native_profile_clearance, native_annotation_binding, monkeypatch,
+):
+    case, binding = native_profile_clearance, native_annotation_binding
+    case.ream.data.texts = [{"t": "REAM +0.03", "pos": [0.094, 0.082, 0], "h": 0.0036}]
+    case.ream.position = (0.120, 0.086, 0)
+    case.adapter, hub = _native_crop_fixture(monkeypatch, "D")
+    hub.annotations = [binding.raw(case.ream, "IAnnotation")]
+    reads = []
+
+    def read_name(_adapter, annotation):
+        assert annotation is case.ream
+        reads.append(annotation)
+        return "PivotDia"
+
+    monkeypatch.setattr(drawing, "dimension_name", read_name)
+    drawing._require_ream_clearance(case.adapter, hub, (0.020, 0.016, 0.150, 0.070))
+    assert reads == [case.ream]
+    assert ("IAnnotation", case.ream) in binding.calls
+    assert any("required_air_mm=1.000" in log for log in case.logs)
+
+
 @pytest.mark.parametrize("defect", ["empty-view", "invalid-crop", "invalid-text"])
 def test_front_detail_text_guard_cannot_pass_missing_native_geometry(native_profile_clearance, bound, monkeypatch, defect):
     case = native_profile_clearance
     case.front.GetAnnotations = lambda: [] if defect == "empty-view" else [case.r816]
+    case.front.GetAnnotationCount = lambda: 0 if defect == "empty-view" else 1
     if defect == "invalid-text":
         case.r816.data.texts[0]["pos"][1] = float("nan")
     case.adapter, hub = _native_crop_fixture(monkeypatch, "D", defect="invalid-bbox" if defect == "invalid-crop" else None)
@@ -3525,6 +4194,7 @@ def test_basic_radius_ink_uses_native_parent_circle_projection(native_profile_cl
     elif defect == "invalid-position":
         annotations[0].position = (float("nan"), 0.136, 0.0)
     case.front.GetAnnotations = lambda: annotations
+    case.front.GetAnnotationCount = lambda: len(annotations)
     events = []
     case.front.UpdateViewDisplayGeometry = lambda: events.append("barrier")
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, ann: ann.name)
@@ -3542,6 +4212,36 @@ def test_basic_radius_ink_uses_native_parent_circle_projection(native_profile_cl
     else:
         with pytest.raises((RuntimeError, ValueError)):
             drawing._require_radius_exterior(case.adapter, case.front)
+
+
+def test_radius_dimension_name_receives_bound_native_annotations(
+    native_profile_clearance, native_annotation_binding, monkeypatch,
+):
+    case, binding = native_profile_clearance, native_annotation_binding
+    annotations = []
+    for name in ("TopRadius", "BottomRadius"):
+        xy = drawing.FRONT_KEEP[name]
+        data = _ClearanceDisplayData([{"t": "R800" if name == "TopRadius" else "R816",
+                                      "pos": [*xy, 0.0], "h": 0.0035}], [])
+        annotations.append(_ClearanceAnnotation(name, (*xy, 0.0), data, kind=4, hole_callout=False))
+    raw = [binding.raw(ann, "IAnnotation") for ann in annotations]
+    case.front.GetAnnotations = lambda: raw
+    case.front.GetAnnotationCount = lambda: len(raw)
+    case.front.UpdateViewDisplayGeometry = lambda: None
+    monkeypatch.setattr(drawing, "model_points_in_view",
+                        lambda _adapter, _view, points, **_kwargs: [_front_xy(x * 1000.0, y * 1000.0) for x, y, _z in points])
+    reads = []
+
+    def read_name(_adapter, annotation):
+        assert annotation in annotations
+        reads.append(annotation)
+        return annotation.name
+
+    monkeypatch.setattr(drawing, "dimension_name", read_name)
+    drawing._require_radius_exterior(case.adapter, case.front)
+    assert reads == annotations * 2
+    assert [ann for interface, ann in binding.calls if interface == "IAnnotation"] == annotations
+    assert sum("actual_exterior_air_mm=" in log for log in case.logs) == 2
 
 
 @pytest.mark.parametrize("properties", [None, (), (0.0, 0.0, 1.0)])
@@ -4541,3 +5241,204 @@ def test_source_height_normalization_then_quantized_native_caption_seating_keeps
     assert box[1] - (BORDER_BOTTOM if label == "D" else 0.066) >= 0.003
     assert case.views["E"].Position[1] == 0.110
     assert case.captures == []
+
+
+_POST_CAPTION_PHASES = (
+    "rebuild", "dimension census", "REAM clearance", "front-detail air",
+    "radius exterior", "arc profile clearance", "shared layout", "finalize",
+)
+
+
+@pytest.fixture
+def post_caption_block():
+    """Execute only the real final build guard, without native build setup."""
+    import asyncio
+    import contextlib
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    (guard,) = [
+        node for node in build.body if isinstance(node, ast.Try)
+        and any(isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+                and call.func.id == "finalize_drawing" for call in ast.walk(node))
+    ]
+    function = ast.parse("async def run_post_caption():\n    pass\n").body[0]
+    function.body = [guard]
+    code = compile(ast.fix_missing_locations(ast.Module(body=[function], type_ignores=[])),
+                   drawing.__file__, "exec")
+    events, calls, captures, warnings = [], [], [], []
+    original = RuntimeError("post-caption refusal")
+    secondary = OSError("forensic PNG refused")
+    result = {"drawing": "unchanged output"}
+    state = SimpleNamespace(failure_phase=None, capture_mode="success", seat_open=True)
+    namespace = {
+        name: object() for name in (
+            "adapter", "front", "hub", "end", "right", "iso", "notes_box", "arc_profiles",
+            "FRONT_KEEP", "HUB_KEEP", "END_KEEP", "RIGHT_KEEP", "OUTPUTS", "SHEET_SCALE",
+        )
+    }
+    namespace.update(contextlib=contextlib, PART_STEM="ch-rocker-arm",
+                     SPEC=SimpleNamespace(layout=object()))
+
+    def step(phase):
+        def call(*args, **kwargs):
+            assert state.seat_open
+            events.append(phase)
+            calls.append((args, kwargs))
+            if state.failure_phase == phase:
+                raise original
+        return call
+
+    for name, phase in zip((
+        "rebuild_drawing", "_require_dimension_census", "_require_ream_clearance",
+        "_require_front_detail_air", "_require_radius_exterior",
+        "_require_arc_profile_clearance", "check_drawing_layout",
+    ), _POST_CAPTION_PHASES):
+        namespace[name] = step(phase)
+
+    async def finalize(*args, **kwargs):
+        step("finalize")(*args, **kwargs)
+        return result
+
+    def capture(adapter, label, message, **context):
+        assert state.seat_open
+        assert adapter is namespace["adapter"]
+        events.append("capture")
+        captures.append((label, message, context))
+        if state.capture_mode == "rethrow original":
+            raise original
+        if state.capture_mode in ("different error", "telemetry error"):
+            raise secondary
+
+    def warn(message):
+        assert state.seat_open
+        warnings.append(message)
+        if state.capture_mode == "telemetry error":
+            raise RuntimeError("telemetry refused")
+
+    namespace.update(finalize_drawing=finalize,
+                     _seat_forensics=SimpleNamespace(capture_com_failure=capture),
+                     _telemetry=SimpleNamespace(warn=warn))
+    exec(code, namespace)
+
+    def run():
+        try:
+            return asyncio.run(namespace["run_post_caption"]())
+        finally:
+            state.seat_open = False
+            events.append("seat-close")
+
+    return SimpleNamespace(run=run, state=state, events=events, calls=calls,
+                           captures=captures, warnings=warnings, original=original,
+                           secondary=secondary, result=result, namespace=namespace)
+
+
+@pytest.mark.parametrize("phase", _POST_CAPTION_PHASES)
+@pytest.mark.parametrize("capture_mode", [
+    "success", "rethrow original", "different error", "telemetry error",
+])
+def test_post_caption_refusals_capture_before_seat_close_and_preserve_identity(post_caption_block, phase, capture_mode):
+    case = post_caption_block
+    case.state.failure_phase = phase
+    case.state.capture_mode = capture_mode
+    with pytest.raises(RuntimeError) as caught:
+        case.run()
+    assert caught.value is case.original
+    assert case.events == [*_POST_CAPTION_PHASES[:_POST_CAPTION_PHASES.index(phase) + 1],
+                           "capture", "seat-close"]
+    assert len(case.calls) == _POST_CAPTION_PHASES.index(phase) + 1
+    assert case.captures == [(
+        "ch-rocker-arm-post-caption-finalize", str(case.original),
+        {"api": "rocker post-caption audit/finalize", "exception": case.original,
+         "sheet_png": True, "phase": phase},
+    )]
+    if capture_mode in ("different error", "telemetry error"):
+        assert len(case.warnings) == 1
+        assert repr(case.secondary) in case.warnings[0]
+        assert f"phase={phase}" in case.warnings[0]
+    else:
+        assert case.warnings == []
+
+
+def test_post_caption_success_keeps_order_arguments_result_and_skips_capture(post_caption_block):
+    case = post_caption_block
+    assert case.run() is case.result
+    assert case.events == [*_POST_CAPTION_PHASES, "seat-close"]
+    assert case.captures == []
+    assert case.warnings == []
+    ns = case.namespace
+    adapter = ns["adapter"]
+    assert case.calls == [
+        ((adapter,), {"label": "rocker-arm layout audit"}),
+        ((adapter, (
+            ("front", ns["front"], ns["FRONT_KEEP"]),
+            ("detail D", ns["hub"], ns["HUB_KEEP"]),
+            ("detail E", ns["end"], ns["END_KEEP"]),
+            ("right", ns["right"], ns["RIGHT_KEEP"]),
+            ("iso", ns["iso"], {}),
+        )), {}),
+        ((adapter, ns["hub"], ns["notes_box"]), {}),
+        ((adapter, ns["front"], ns["hub"], ns["end"]), {}),
+        ((adapter, ns["front"]), {}),
+        ((adapter, ns["front"], ns["arc_profiles"]), {}),
+        ((adapter,), {"layout": ns["SPEC"].layout, "stem": ns["PART_STEM"]}),
+        ((adapter, ns["OUTPUTS"]), {
+            "pdf_title": "Rocker Arm Manufacturing Drawing",
+            "scale": ns["SHEET_SCALE"], "layout": ns["SPEC"].layout,
+        }),
+    ]
+
+
+@pytest.mark.parametrize("guard", ["front-detail", "arc-profile"])
+def test_downstream_clearance_guards_bind_every_native_annotation(
+    native_profile_clearance, native_annotation_binding, monkeypatch, guard,
+):
+    case, binding = native_profile_clearance, native_annotation_binding
+    case.front.GetAnnotations = lambda: [binding.raw(ann, "IAnnotation") for ann in case.annotations]
+    original = drawing._dump_annotation
+    reads = []
+    def dump(reader, annotation):
+        assert annotation in case.annotations
+        reads.append(annotation)
+        return original(reader, annotation)
+    monkeypatch.setattr(drawing, "_dump_annotation", dump)
+    if guard == "arc-profile":
+        drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
+    else:
+        case.adapter, hub = _native_crop_fixture(monkeypatch, "D")
+        _adapter, end = _native_crop_fixture(monkeypatch, "E")
+        drawing._require_front_detail_air(case.adapter, case.front, hub, end)
+    assert reads == case.annotations
+    assert [ann for interface, ann in binding.calls if interface == "IAnnotation"] == case.annotations
+
+
+@pytest.mark.parametrize("guard", ["front-detail", "arc-profile"])
+@pytest.mark.parametrize("raw", [None, (), [], False, 1, "", {}, [None]])
+def test_downstream_clearance_guards_refuse_empty_or_malformed_annotation_arrays(
+    native_profile_clearance, monkeypatch, guard, raw,
+):
+    case = native_profile_clearance
+    case.front.GetAnnotations = lambda: raw
+    case.front.GetAnnotationCount = lambda: len(raw) if type(raw) in (tuple, list) else len(case.annotations)
+    with pytest.raises(RuntimeError):
+        if guard == "arc-profile":
+            drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
+        else:
+            drawing._require_front_detail_air(case.adapter, case.front, object(), object())
+
+
+@pytest.mark.parametrize("skip", ["half-hidden", "hidden", "center-mark", "center-line"])
+def test_front_detail_text_air_cannot_pass_with_zero_checked_boxes(
+    native_profile_clearance, monkeypatch, skip,
+):
+    case = native_profile_clearance
+    case.front.GetAnnotations = lambda: [case.r816]
+    case.front.GetAnnotationCount = lambda: 1
+    if skip in ("half-hidden", "hidden"):
+        case.r816.Visible = 2 if skip == "half-hidden" else 3
+    else:
+        case.r816.kind = 13 if skip == "center-mark" else 15
+    case.adapter, hub = _native_crop_fixture(monkeypatch, "D")
+    _adapter, end = _native_crop_fixture(monkeypatch, "E")
+    with pytest.raises(RuntimeError, match="no visible native callout text was checked"):
+        drawing._require_front_detail_air(case.adapter, case.front, hub, end)

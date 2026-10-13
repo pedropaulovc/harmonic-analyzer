@@ -108,6 +108,36 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   declares (the late-binding fallback was deliberately removed). `GetViews` is
   `IDrawingDoc`; `GetAnnotations`/`GetOutline` are `IView`; `GetExtent` is
   `INote`; `GetProperties2` is `ISheet`. Bind the owning interface at each hop.
+- **An annotation array still contains opaque dispatches.** Bind the view to
+  `IView`, call `GetAnnotationCount()` **before** `GetAnnotations()` as the
+  official remarks require, and match the actual nonnegative integer count to
+  the returned tuple/list length. Null is legitimate only for count zero,
+  including a deliberately undimensioned isometric. Bind every nonnull item to
+  `IAnnotation` before passing it to a best-effort dimension-name helper.
+  Otherwise a failed `GetSpecificAnnotation` can be
+  swallowed into an empty name and a valid drawing appears to have no marked
+  dimensions. The rocker R17 native census reported `front=[]` after successful
+  import/curation and caption seating; the binding explanation is an inference,
+  not a logged native exception. Keep exact per-view ownership, duplicate and
+  global-union checks, and log both annotation count and resolved marked names.
+  An unnamed actual display dimension is not permission to omit it: read
+  `GetType()` as an actual `swAnnotationType_e` integer, then bind its nonnull
+  specific object to `IDisplayDimension`. A nonnull `GetDimension2(0)` with an
+  unreadable name is fatal. Null underlying model data may be skipped only with
+  an actual `IsHoleCallout() == True`; null alone is not a documented hole-callout
+  identity. Preserve original native/binding exceptions.
+- **Sweep past the last failed native guard before another farm round.**
+  Check every remaining collection/count/primitive shape, unit and null policy
+  through save, PDF and PNG. A present truncated row is not an empty primitive
+  set, and a nonempty view whose text is entirely skipped is not a clearance
+  proof. Do not apply a raster-pixel tolerance to exact format metadata, or use
+  exact metadata tolerances for a measured quantized extent. Capture late
+  audit/finalize refusals while the native seat remains open, with phase and
+  original exception; secondary forensic or telemetry failures must never
+  replace that refusal. Shared collector/primitive omission paths discovered
+  in this sweep are tracked separately in
+  [#1419](https://github.com/pedropaulovc/harmonic-analyzer/issues/1419), because
+  changing shared behavior needs full-farm sheet-diff/rule-#1362 coverage.
 - **Properties are not methods.** `IView::Name`, `Type`, `ScaleRatio`,
   `Position`, `Sheet`, `ModelToViewTransform`; `IAnnotation::OwnerType`,
   `Visible`, `Layer`; `ITableAnnotation::RowCount`/`ColumnCount`;
