@@ -1622,7 +1622,7 @@ def _audit_line(stroke: tuple) -> AuditSegment:
 def test_radius_text_clears_every_native15_sheet_extension_at_the_new_keep() -> None:
     box = _proposed_radius_text_box()
     assert (box.xmin, box.ymin, box.xmax, box.ymax) == pytest.approx((
-        0.1555289, 0.1985558, 0.1796905, 0.2021212,
+        0.154952880015449, 0.1985339, 0.179114480015449, 0.2020993,
     ))
     extensions = {name: list(strokes) for name, strokes in _NATIVE15_EXTENSION_LINES.items()}
     extensions["OverallLength"] = _overall_witness_ink()
@@ -1632,11 +1632,11 @@ def test_radius_text_clears_every_native15_sheet_extension_at_the_new_keep() -> 
     }
     assert sum(len(strokes) for strokes in extensions.values()) == 14
     assert all(distance > 0.0 for distance in distances.values())
-    assert min(distances.values()) == pytest.approx(0.0005558)
-    assert distances["SpigotDia"] == pytest.approx(0.0005558)
-    assert distances["GrooveRootDia"] == pytest.approx(0.0045558)
-    assert distances["GrooveStation"] == pytest.approx(0.0085289)
-    assert distances["OverallLength"] == pytest.approx(0.0033558)
+    assert min(distances.values()) == pytest.approx(0.0005339)
+    assert distances["SpigotDia"] == pytest.approx(0.0005339)
+    assert distances["GrooveRootDia"] == pytest.approx(0.0045339)
+    assert distances["GrooveStation"] == pytest.approx(0.007952880015449)
+    assert distances["OverallLength"] == pytest.approx(0.0033339)
     # In this native shoulder convention, a material-arc elbow must stay
     # below the mouth.  Even at the mouth, the glyph-to-witness gap is under
     # 2 mm; the ≥2 mm requirement remains strict for the actual leader ink.
@@ -1861,11 +1861,11 @@ def _material_radius_ink() -> tuple[list, tuple[float, float], list, tuple[float
     x, y = drawing.RADIUS_TEXT_XY
     elbow = (x - drawing.RADIUS_SHOULDER_RUN_IN, y - drawing.RADIUS_SHOULDER_DROP)
     radius = geom.GROOVE_RADIUS * drawing._S / 1000.0
-    run = math.dist(centre, elbow)
-    assert run > radius
-    tip = tuple(centre[i] + (elbow[i] - centre[i]) * radius / run for i in range(2))
+    assert math.dist(centre, elbow) == pytest.approx(radius)
+    tip = elbow
+    assert tip == pytest.approx(drawing.RADIUS_MATERIAL_TIP_XY)
     shoulder = (elbow, (elbow[0] + math.dist(*_NATIVE14_RADIUS_SHOULDER), elbow[1]))
-    ink = [(centre, tip), (tip, elbow), shoulder]
+    ink = [(centre, tip), shoulder]
     station = [
         (
             (centre[0], centre[1] + drawing.GROOVE_STATION_GAP),
@@ -1900,7 +1900,8 @@ def test_full_radius_shoulder_clears_both_overall_witnesses_at_the_new_keep() ->
     shoulder = ink[-1]
     old = _NATIVE14_OVERALL_FACE_WITNESS
     assert drawing.segments_cross(_NATIVE14_RADIUS_SHOULDER, old)
-    assert drawing.segments_cross(shoulder, old)
+    assert not drawing.segments_cross(shoulder, old)
+    assert shoulder[0][1] > max(point[1] for point in old)
     # Both endpoints are outside x160.4: an elbow-only assertion missed it.
     assert shoulder[0][0] < old[0][0] < shoulder[1][0]
     assert math.dist(*shoulder) == pytest.approx(0.029)
@@ -1936,13 +1937,24 @@ def test_full_radius_shoulder_clears_both_overall_witnesses_at_the_new_keep() ->
     assert math.dist(tip, centre) == pytest.approx(geom.GROOVE_RADIUS * drawing._S / 1000.0)
     assert tip[0] > centre[0]
     assert drawing._side_y(geom.GROOVE_ROOT_DIA / 2.0) < tip[1] < drawing._side_y(geom.SPIGOT_DIA / 2.0)
-    assert drawing.SIDE_KEEP["GrooveRadius"] == pytest.approx((0.1675, 0.2004))
-    assert shoulder[0] == pytest.approx((0.1522, 0.1976))
-    assert shoulder[1] == pytest.approx((0.1812, 0.1976))
+    assert drawing.SIDE_KEEP["GrooveRadius"] == pytest.approx((0.166923980015449, 0.2003781))
+    assert shoulder[0] == pytest.approx((0.151647580015449, 0.1976))
+    assert shoulder[1] == pytest.approx((0.180647580015449, 0.1976))
     assert drawing._groove_radius_ink_problem(ink, tip, station, centre) is None
     assert drawing.GROOVE_STATION_GAP == 0.003
     assert drawing.RADIUS_STATION_CLEARANCE == 0.002
     assert drawing.RADIUS_INK_SLOP == 0.0004
+
+
+def test_radius_material_arc_line_meets_the_full_shoulder_without_an_elbow_jog() -> None:
+    ink, tip, station, centre = _material_radius_ink()
+    assert len(ink) == 2
+    assert ink[0] == (centre, tip)
+    assert ink[1][0] == tip
+    assert abs(ink[0][1][1] - ink[0][0][1]) > drawing.RADIUS_INK_SLOP
+    assert math.dist(*ink[1]) == pytest.approx(0.029)
+    assert drawing._groove_radius_ink_problem(ink, tip, station, centre) is None
+    assert drawing._radius_overall_witness_ink_problem(ink, _overall_witness_ink()) is None
 
 
 @pytest.mark.parametrize(
@@ -2101,6 +2113,105 @@ def test_rebuilt_radius_proof_reads_native_arrow_tip_and_model_identity(
 ) -> None:
     radius, station, overall = _radius_readback_fakes(monkeypatch)
     drawing._prove_groove_radius(object(), object(), radius, station, overall)
+
+
+@pytest.mark.parametrize("case", [
+    "0.07mm-jog", "disconnected-shoulder", "other-centre", "missing-radial",
+    "tilted-shoulder",
+])
+def test_native_direct_radius_junction_refuses_jogs_and_disconnected_or_wrong_ink(
+    monkeypatch: pytest.MonkeyPatch, case: str,
+) -> None:
+    radius, station, overall = _radius_readback_fakes(monkeypatch)
+    radial, shoulder = radius.ink
+    tip = radial[1]
+    if case == "0.07mm-jog":
+        joint = (tip[0] + 0.00007, tip[1])
+        radius.ink = [radial, (tip, joint), (joint, shoulder[1])]
+    elif case == "disconnected-shoulder":
+        radius.ink[1] = (
+            (shoulder[0][0] + 0.00007, shoulder[0][1]),
+            (shoulder[1][0] + 0.00007, shoulder[1][1]),
+        )
+    elif case == "other-centre":
+        radius.ink[0] = ((radial[0][0] + 0.00007, radial[0][1]), tip)
+    elif case == "missing-radial":
+        radius.ink.pop(0)
+    else:
+        radius.ink[1] = (shoulder[0], (shoulder[1][0], shoulder[1][1] + 0.00007))
+    assert drawing.RADIUS_JUNCTION_EPSILON == 1e-6
+    # All existing material/station/overall proofs precede this stricter,
+    # independent junction proof; none gets relaxed to accommodate a jog.
+    with pytest.raises(RuntimeError, match="does not have a direct junction"):
+        drawing._prove_groove_radius(object(), object(), radius, station, overall)
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_native_direct_junction_accepts_connected_ink_in_either_collection_order(
+    monkeypatch: pytest.MonkeyPatch, reverse: bool,
+) -> None:
+    radius, station, overall = _radius_readback_fakes(monkeypatch)
+    if reverse:
+        radius.ink = [stroke[::-1] for stroke in reversed(radius.ink)]
+    drawing._prove_groove_radius(object(), object(), radius, station, overall)
+
+
+def test_native_direct_junction_accepts_exactly_zero_unprinted_records(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    radius, station, overall = _radius_readback_fakes(monkeypatch)
+    radius.ink.append(((0.0, 0.0), (0.0, 0.0)))
+    drawing._prove_groove_radius(object(), object(), radius, station, overall)
+
+
+@pytest.mark.parametrize(
+    ("residual_mm", "accepted"),
+    [(0.0005, True), (0.000999, True), (0.001001, False), (0.07, False)],
+)
+def test_native_junction_normalizes_rounding_residuals_but_not_real_jogs(
+    monkeypatch: pytest.MonkeyPatch, residual_mm: float, accepted: bool,
+) -> None:
+    radius, station, overall = _radius_readback_fakes(monkeypatch)
+    radial, shoulder = radius.ink
+    tip = radial[1]
+    joint = (tip[0] + residual_mm / 1000.0, tip[1])
+    radius.ink = [radial, (tip, joint), (joint, shoulder[1])]
+    if accepted:
+        drawing._prove_groove_radius(object(), object(), radius, station, overall)
+    else:
+        with pytest.raises(RuntimeError, match="does not have a direct junction"):
+            drawing._prove_groove_radius(object(), object(), radius, station, overall)
+
+
+@pytest.mark.parametrize("member", ["radial-centre", "shoulder-start", "shoulder-end-y"])
+@pytest.mark.parametrize(("residual_mm", "accepted"), [(0.000999, True), (0.001001, False)])
+def test_native_junction_endpoint_matches_use_the_same_calibration_boundary(
+    monkeypatch: pytest.MonkeyPatch, member: str, residual_mm: float, accepted: bool,
+) -> None:
+    radius, station, overall = _radius_readback_fakes(monkeypatch)
+    radial, shoulder = radius.ink
+    delta = residual_mm / 1000.0
+    if member == "radial-centre":
+        radius.ink[0] = ((radial[0][0] + delta, radial[0][1]), radial[1])
+    elif member == "shoulder-start":
+        radius.ink[1] = ((shoulder[0][0] + delta, shoulder[0][1]), shoulder[1])
+    else:
+        radius.ink[1] = (shoulder[0], (shoulder[1][0], shoulder[1][1] + delta))
+    if accepted:
+        drawing._prove_groove_radius(object(), object(), radius, station, overall)
+    else:
+        with pytest.raises(RuntimeError, match="does not have a direct junction"):
+            drawing._prove_groove_radius(object(), object(), radius, station, overall)
+
+
+def test_numerically_zero_junction_residual_still_obeys_raw_overall_witness_clearance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    radius, station, overall = _radius_readback_fakes(monkeypatch)
+    x, start_y = overall.ink[1][0]
+    radius.ink.append(((x, start_y + 0.001), (x + 0.0000005, start_y + 0.001)))
+    with pytest.raises(RuntimeError, match="does not clear the overall length.*not clear"):
+        drawing._prove_groove_radius(object(), object(), radius, station, overall)
 
 
 def test_rebuilt_radius_proof_refuses_native14_full_shoulder_crossing(

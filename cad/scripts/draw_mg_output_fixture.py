@@ -189,21 +189,31 @@ _STACKED_DIA_STAGGER = 0.005
 _GROOVE_ROOT_DIA_X = _FACE_SHEET_X + _TEXT_TO_FACE + TURNED_DIA_TEXT_HALF_WIDTH
 _HEX_MID_X = _side_x((FREE_END_X + SHOULDER_X) / 2.0)
 # Native15's radius keep (172.4, 198.8) mm printed its letters across the
-# spigot Ø's top witness at y198 mm.  Its full shoulder starts 15.3 mm left
-# and 2.8 mm below the keep.  Put that elbow just outboard of the projected
-# radius, below the spigot mouth by the ink slop: the radial ray still lands
-# on material while the measured text (0.934 mm above its shoulder) clears
-# the top witness.  The station's x147 mm witness stays left of all the text.
+# spigot Ø's top witness at y198 mm.  Its full shoulder starts 15.2764 mm
+# left and 2.7781 mm below the keep.  Put that start ON the face-side
+# material circle, below the spigot mouth by the ink slop: the radial line
+# meets the full shoulder directly, without a tiny elbow jog.  Its printed
+# text clears the top witness and stays right of the station's x147 witness.
 RADIUS_INK_SLOP = 0.0004
 RADIUS_STATION_CLEARANCE = 0.002
-RADIUS_SHOULDER_DROP = 0.0028
-RADIUS_SHOULDER_RUN_IN = 0.0153
+# Native15's calibration offsets come from a 0.1 um-rounded dump.  A 1 um
+# junction allowance is 20 times its half-step uncertainty, still far below
+# printed ink.  Use it for both endpoint matches and numerical-zero legs;
+# a real 0.07 mm jog is 70 times larger and must fail.
+RADIUS_JUNCTION_EPSILON = 1e-6
+RADIUS_SHOULDER_DROP = 0.0027781
+RADIUS_SHOULDER_RUN_IN = 0.0152764
+_RADIUS_SHOULDER_Y = _side_y(SPIGOT_DIA / 2.0) - RADIUS_INK_SLOP
+RADIUS_MATERIAL_TIP_XY = (
+    _side_x(GROOVE_X) + math.sqrt(
+        (GROOVE_RADIUS * _S / 1000.0) ** 2
+        - (_side_y(GROOVE_CENTRE_R) - _RADIUS_SHOULDER_Y) ** 2
+    ),
+    _RADIUS_SHOULDER_Y,
+)
 RADIUS_TEXT_XY = (
-    _side_x(GROOVE_X)
-    + GROOVE_RADIUS * _S / 1000.0
-    + RADIUS_INK_SLOP
-    + RADIUS_SHOULDER_RUN_IN,
-    _side_y(SPIGOT_DIA / 2.0) - RADIUS_INK_SLOP + RADIUS_SHOULDER_DROP,
+    RADIUS_MATERIAL_TIP_XY[0] + RADIUS_SHOULDER_RUN_IN,
+    RADIUS_MATERIAL_TIP_XY[1] + RADIUS_SHOULDER_DROP,
 )
 SIDE_KEEP = {
     "RodBoreDia": (_HEX_MID_X, _SIDE_TOP + 0.011),
@@ -508,6 +518,34 @@ def _radius_overall_witness_ink_problem(
     return None
 
 
+def _radius_direct_junction_ink_problem(
+    segments: list[Segment], tip: tuple[float, float], centre: tuple[float, float]
+) -> str | None:
+    """The real centre-to-tip line must meet the full shoulder without a jog."""
+    epsilon = RADIUS_JUNCTION_EPSILON
+    # Normalize only at-most-1 um calibration residuals at this junction.
+    # Every raw stroke still passes the station and overall-clearance proofs
+    # before this helper; numerical normalization never spends their 2 mm floor.
+    ink = [stroke for stroke in segments if math.dist(*stroke) > epsilon]
+    if len(ink) != 2:
+        return "radius does not draw only its radial line and full shoulder"
+    radial = [
+        index for index, stroke in enumerate(ink)
+        if any(
+            math.dist(start, centre) <= epsilon and math.dist(end, tip) <= epsilon
+            for start, end in (stroke, stroke[::-1])
+        )
+    ]
+    if len(radial) != 1:
+        return "radius has no unique real centre-to-tip segment"
+    shoulder = ink[1 - radial[0]]
+    if abs(shoulder[1][1] - shoulder[0][1]) > epsilon:
+        return "radius shoulder is not a straight horizontal stroke"
+    if min(math.dist(point, tip) for point in shoulder) > epsilon:
+        return "radius shoulder endpoint does not meet the material arrow tip"
+    return None
+
+
 def _place_groove_radius(adapter: Any, radius: Any, station: Any, overall: Any) -> None:
     display = _model_display(radius, "GrooveRadius", "GrooveProfile", GROOVE_RADIUS)
     if int(display.Type2) != 5 or display.Diametric is not False:  # swRadialDimension
@@ -572,8 +610,11 @@ def _prove_groove_radius(
     problem = _radius_overall_witness_ink_problem(radius_ink, dimension_segments(overall))
     if problem is not None:
         raise RuntimeError(f"GrooveRadius does not clear the overall length: {problem}")
+    problem = _radius_direct_junction_ink_problem(radius_ink, (arrow[0], arrow[1]), centre)
+    if problem is not None:
+        raise RuntimeError(f"GrooveRadius does not have a direct junction: {problem}")
     _telemetry.success(
-        f"genuine GrooveRadius material-arc tip {(arrow[0], arrow[1])}; "
+        f"genuine GrooveRadius material-arc tip {(arrow[0], arrow[1])}, direct shoulder junction; "
         f"station witness gap {GROOVE_STATION_GAP * 1000:g} mm, "
         f"leader clearance >= {RADIUS_STATION_CLEARANCE * 1000:g} mm "
         "from the station and both overall length witnesses"

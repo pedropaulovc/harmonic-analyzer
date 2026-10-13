@@ -659,13 +659,17 @@ does not discount that minimum. Do not suppress the final layout audit.
 The next accepted native render still printed `R1.20 +/-0.05` through the
 spigot-diameter's top extension. Inspect the actual enlarged PNG as well
 as the audit boxes: this one crossed the glyphs, not merely their bounds.
-Move the radius text to the model-derived (167.5,200.4) mm keep and retain
-its genuine material-arc leader. The full shoulder is then at y197.6;
-the same OverallLength gap solve gives 2.8 mm and a witness start at
-y195.2, preserving 2.4 mm leader clearance. The actual text-to-diameter
-witness clearance is 0.556 mm: the coordinator accepted that collision-free
-text gap, not a claim of 2 mm text clearance. No extra diameter-witness
-gap mechanism is warranted.
+Join the model's material circle directly to the full shoulder, without a
+sub-millimetre jog or a new shoulder-span heuristic. At y197.6 the radius
+circle is x147 + sqrt(4.8^2 - 1.2^2) =151.647580 mm. Using the actual
+native keep-to-elbow offsets 15.2764/2.7781 mm derives the
+(166.923980,200.3781) mm text keep. The same OverallLength gap solve
+gives 2.8 mm and a witness start at y195.2, preserving 2.4 mm leader
+clearance. The expected text-to-diameter witness gap is 0.534 mm:
+collision-free text, not a 2 mm text-clearance claim. The native run
+must prove that the genuine material arrow and direct junction persisted;
+do not weaken the existing single-shoulder identity. No extra diameter-
+witness gap mechanism is warranted.
 The fixture recipe must refuse every remaining `text-on-line` finding
 in its existing completed audit report, not only findings naming the
 radius. Reuse those collected findings after finalization; do not add a
