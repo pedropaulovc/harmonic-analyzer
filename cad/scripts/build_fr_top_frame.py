@@ -41,11 +41,13 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   bottoms 6.3 below it and the hub boss and V-gussets 8.0 below stay off
   it. 999.7 is the FINISHED plane: the cut comes out of casting allowance,
   so the model, its bands and every stack read from it unchanged. It is
-  faced first. The slip holes and slots are cut blind from it and located
-  from the #6 clearance hole's axis where that hole meets it (sheet 6
-  dimensions them in the underside view). So whichever face the #6 hole is
-  drilled from, each axis is true at the knife-mount seat, and its drift
-  grows toward the top. The counterbores open on the top face.
+  faced first. The #6 clearance holes are drilled through from it (Q7
+  option C, approved by the user 2026-10-13); the slip holes and slots are
+  cut blind from it and located from each #6 hole's axis there (sheet 6
+  dimensions them in the underside view). Each axis is therefore true at
+  the knife-mount seat and its drift grows toward the top. The frame is
+  then turned over and each counterbore is cut from the top, piloted on its
+  drilled hole (sheet 3's hanger callout states both entries).
   Their depths are judged from the faced plane, and a later facing cut
   would shorten the 30.0 grip and the 12.0 slip depth one for one against
   the 0.01 #6 tip clearance and the 0.596 dowel slip margin.
@@ -500,10 +502,10 @@ if STUD_Z_REAR + HANGER_CBORE_DIA / 2.0 >= INNER_Z + GUSSET:
 # largest drilled screw clearance hole with the round hole's station at its
 # .XXX limit and the slot's at that plus its own .XXX from the round hole
 # (0.26); their blind floors stay below the counterbore floor, so neither
-# meets the screw's bearing face.  The slip holes and slots are cut blind
-# from the faced underside and located from the #6 hole's axis at that face,
-# whichever face the #6 hole was drilled from (sheet 6 dimensions them in
-# the underside view).  So each axis's drift is nil at the seat and greatest
+# meets the screw's bearing face.  The #6 holes are drilled from the faced
+# underside and the slip holes and slots cut blind from it, located from the
+# #6 hole's axis at that face (sheet 6 dimensions them in the underside
+# view).  So each axis's drift is nil at the seat and greatest
 # at the blind floors: every wall is judged at the deepest printed floor,
 # less the drift of each hole on either side of it (the #6 hole's and the
 # slip hole's or slot's, toward each other).  All four meet the 2.0 target.
@@ -564,7 +566,7 @@ for _label, _value in (
 # each pocket end a full band of its printed .X length out (the length's
 # band, then as much again for the pocket's centring), the largest printed
 # hole and the 0.3 deg drill drift from the faced underside, where the
-# hanger holes are located: the #6 hole's at the pocket roof (y +10.25), the
+# hanger holes enter: the #6 hole's at the pocket roof (y +10.25), the
 # counterbore's at the top face, where it is piloted on that hole, and the
 # slip hole's and slot's over their depth. The counterbore wall is taken in
 # plan although its floor (y +11.75) stands above the pocket roof.
@@ -2608,9 +2610,13 @@ async def build(adapter) -> dict[str, str]:
     v_gn = math.pi * (GOOSENECK_BORE_DIA / 2.0) ** 2 * (RING_HEIGHT + HUB_BOSS_DROP)
     volume = await volume_check(adapter, "gooseneck bore", volume - v_gn, 60.0)
 
-    # 12. Knife-hanger #6 SHCS counterbores, drilled from the crossbar top
-    #     (one wizard feature, both stations). The rear counterbore reaches
-    #     0.65 past the window face into the rail flange -- material
+    # 12. Knife-hanger #6 SHCS counterbores: one wizard feature, both
+    #     stations, authored from the crossbar top.  The shop drills the
+    #     through hole from the faced underside and cuts the counterbore from
+    #     the top (sheet 3's callout); the finished solid is the same either
+    #     way, and one top-face counterbore feature is what the native callout
+    #     reads its drill and counterbore rows from.  The rear counterbore
+    #     reaches 0.65 past the window face into the rail flange -- material
     #     continues, so each removal is a full clearance cylinder through the
     #     ring plus a full counterbore annulus either way.
     wizard_holes(

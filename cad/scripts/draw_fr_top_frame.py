@@ -301,6 +301,13 @@ INK_CLEARANCE = 0.002
 ROUND_OUT = 0.0001
 # The native arrowhead is 0.762 mm across (b49e1 dump, IDisplayData arrows).
 ARROW_HALF_WIDTH = 0.000381
+# The #6 hanger holes are drilled through from the faced underside and each
+# counterbore is then cut from the top (Q7 option C, approved by the user
+# 2026-10-13).  The callout says both entries: "DRILL FROM UNDERSIDE" alone
+# read as the counterbore's side too (codex review of 59f405ab).  The
+# trailing newline puts the native size and counterbore rows under it: four
+# rows in all.
+HANGER_DRILL_CALLOUT = "DRILL FROM UNDERSIDE;\nC'BORE FROM TOP:\n"
 # Transfer fit-up owns these locations; the nominal model holes and their
 # sheet coordinates are references, not independent inspection requirements.
 # The trailing newline keeps the native thread/drill/depth on separate rows
@@ -2462,8 +2469,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _checked_dimension(
         adapter, detail_top,
-        # Left sockets, not right (clears leader-crosses-line HANGER DRILL x
-        # 224.00): extension lines run from the left bores to the x 40.5 lane.
+        # Left sockets, not right (clears leader-crosses-line hanger callout
+        # x 224.00): extension lines run from the left bores to the x 40.5 lane.
         p0=(-COLUMN_X - BORE_DIA/2, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z),
         p1=(-COLUMN_X - BORE_DIA/2, HALF_H + BOSS_ABOVE, REAR_COLUMN_Z),
         text_xy=SOCKET_VERTICAL_PITCH_LINE_XY, label="socket vertical pitch",
@@ -2489,10 +2496,12 @@ async def build(adapter: Any) -> dict[str, str]:
         detail_top,
         edge_xy=stud_edge,
         # Right of the 182.0 hanger-X row's end, so the leader reaches the
-        # hole past that row instead of across it (codex round 5).
-        callout_xy=(0.262, 0.258),
+        # hole past that row instead of across it (codex round 5).  Two rows
+        # centred here printed 262.6..253.4 mm (762a8de5); four need it 3.5
+        # mm lower to keep under the frame's 266.7 top (70ac591e: 264.6).
+        callout_xy=(0.262, 0.2545),
         label="2X #6 SHCS hanger counterbores",
-        process="HANGER DRILL",
+        process=HANGER_DRILL_CALLOUT,
     )
     # #946: RD4 reads off the rear keeper tap, from the rail's outer side.
     rear_keeper = (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR)

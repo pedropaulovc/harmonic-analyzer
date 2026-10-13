@@ -488,8 +488,8 @@ KEEPER_TAP_CALLOUT_PRECISION = {
 # Rule 12 receiver-wall stack: realistic angular drift through the FULL
 # printed cylindrical pilot depth, without relying on a precision drill jig.
 KEEPER_TAP_DRILL_WANDER_DEG = 0.3
-# The same allowance as a lateral drift per mm from the face where a hole is
-# located: the knife-hanger holes, located at the faced underside, charge it
+# The same allowance as a lateral drift per mm from a hole's entry face: the
+# knife-hanger holes, drilled from the faced underside, charge it
 # at the depth each wall is judged (``build_fr_top_frame``).
 DRILL_DRIFT_PER_MM = tan(radians(KEEPER_TAP_DRILL_WANDER_DEG))  # 0.00524
 

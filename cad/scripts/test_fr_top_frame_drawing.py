@@ -1890,8 +1890,9 @@ def test_dowel_slot_contract() -> None:
 
 
 def test_hanger_walls_meet_the_target_after_drift() -> None:
-    """Q7 option C: the slip holes and slots are cut from the faced
-    underside and located from the #6 hole's axis there, so each hole's
+    """Q7 option C: the #6 holes are drilled from the faced underside and
+    the slip holes and slots cut from it, located from the #6 hole's axis
+    there, so each hole's
     0.3 deg drift is nil at the seat and largest at the blind floors.  Every
     wall round a slip hole or slot, at the print-worst bands and the deepest
     printed floor, less the drift of each hole either side of it, meets rule
@@ -2568,6 +2569,39 @@ def test_build_places_the_hanger_section_on_the_underside_sheet() -> None:
     underside = source[source.index('ddoc.ActivateSheet("UNDERSIDE")') :]
     assert "_hanger_section(adapter, hub_bottom_parent)" in underside
     assert "imported_annotations += hanger_dimensions" in underside
+
+
+def test_hanger_drill_callout_states_both_entries() -> None:
+    """Q7 option C (user, 2026-10-13): the #6 holes are drilled from the
+    underside and the counterbores cut from the top.  Sheet 3's callout says
+    both, so neither reads as the other's side, with the native size and
+    counterbore rows on their own rows: four rows at most (rule 6)."""
+    import ast
+
+    import _drawing_hole_callout
+
+    native = "<hw-hole-dia> THRU ALL\n<hw-cbore-dia> <hw-cbore-depth>"
+    prefixed = _drawing_hole_callout.compose_hole_callout_prefix(
+        drawing.HANGER_DRILL_CALLOUT, native
+    )
+    assert prefixed == "DRILL FROM UNDERSIDE;\nC'BORE FROM TOP:\n" + native
+    assert len(prefixed.splitlines()) <= 4
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    (callout,) = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "add_native_hole_callout"
+        and any(
+            keyword.arg == "label"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "2X #6 SHCS hanger counterbores"
+            for keyword in node.keywords
+        )
+    ]
+    process = next(k.value for k in callout.keywords if k.arg == "process")
+    assert isinstance(process, ast.Name) and process.id == "HANGER_DRILL_CALLOUT"
 
 
 def test_keeper_transfer_prefix_preserves_the_native_hole_definition() -> None:

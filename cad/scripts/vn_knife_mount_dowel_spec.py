@@ -68,8 +68,9 @@ MOUNTS = 2
 QUANTITY = PER_MOUNT * MOUNTS
 # 7.100, not the original 1/4 in: at 6.350 the crossbar's blind slot left
 # under 2.0 of wall to the #6 clearance hole at the print-worst plus drill
-# drift (codex machinist review of fr_top_frame 4d11a94e; Q7 option C,
-# chosen by the coordinator 2026-10-12 after the user's ask timed out).
+# drift (codex machinist review of fr_top_frame 4d11a94e).  Q7 option C,
+# approved as built by the user 2026-10-13 (#1348): 14.200 BASIC span,
+# 24 crossbar, 25 block, Ø4.699 #6 hole drilled from the underside.
 # 7.1 rather than 7.0 so the wall holds 2.0 with both the clearance hole
 # and the slot charged their drift toward each other.
 HANGER_OFFSET = 7.1

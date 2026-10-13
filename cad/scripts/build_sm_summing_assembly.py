@@ -175,7 +175,7 @@ HANGER_SCREW_MISMATCH_Z = (
     + _KNIFE_DOWEL_PAIR_SHIFT / 2.0
 )  # 0.239
 HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATCH_Z)
-# The crossbar's #6 hole is located at the faced underside, where the dowel
+# The crossbar's #6 hole is drilled from the faced underside, where the dowel
 # holes are located from it, and the counterbore is piloted on it from the
 # top: its axis is true at the underside and wanders by the deep-drill
 # allowance up the longest .X grip, tan 0.3 deg x 30.8 = 0.161 at the head
