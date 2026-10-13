@@ -105,17 +105,21 @@ HOLE_2_X_SHEET = _sheet_x(HOLE_XY[1][0])
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Width stacks below the front view under the two hole X
 # coordinates, the 4.000's text outboard of the plate's left edge (between
-# its extension lines the hole's own extension cut through it); Height sits
-# left of the plate, its text high so the two-line callout under it stays
-# between the hole Y and top-edge extension lines, and the shared hole Y
-# outboard of it, its text under the plate's bottom-left corner; the 4X
+# its extension lines the hole's own extension cut through it); the shared
+# hole Y stands left of the plate, its text under the plate's bottom-left
+# corner, and Height outboard of it (smaller dimension nearer the part): its
+# value and two-line callout centre as one block on the keep, mid-way between
+# the top and bottom extension lines and left of the hole Y dimension line,
+# where the hole Y extension stops (inboard of it, the 9.50 sat on the top
+# extension line and the callout crowded the hole Y extension, machinist
+# review of 1c9f9b2a6); the 4X
 # corner radius stands off the top-right corner, its leader landing on that
 # arc clear of the Height's extension lines on the left and the hole callout
 # below; the sheet thickness rides above the right view, its one-line
 # as-supplied stock callout in the clear field above the value.
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], 0.125),
-    "Height": (0.086, FRONT_CENTER[1] + 0.012),
+    "Height": (0.057, FRONT_CENTER[1]),
     "Hole1X": (0.087, 0.138),
     "Hole2X": (0.142, 0.133),
     "Hole1Y": (0.076, 0.147),
@@ -132,9 +136,8 @@ DIMENSION_CALLOUTS = {"Depth": LOCK_STOCK_CALLOUT}
 # lifted top plates would lap the support bar 0.47, under the 0.5 retention
 # floor (pd_guide_lock_spec.DRAWING_PRECISION,
 # build_pd_paper_drive_assembly._assert_lock_retention); machinist review of
-# 40e51b9a7 flagged it unstated, so the print says why below the value, in
-# two short lines (an above-callout cannot break lines) that fit left of the
-# plate between the hole Y and top-edge extension lines.
+# 40e51b9a7 flagged it unstated, so the print says why in two short lines
+# below the value (an above-callout cannot break lines).
 HEIGHT_BAND_CALLOUT = "BAND KEEPS\nBAR OVERLAP"
 DIMENSION_CALLOUTS_BELOW = {"Height": HEIGHT_BAND_CALLOUT}
 # The bent leader elbows at the text's LEFT end and enters hole 2 from its

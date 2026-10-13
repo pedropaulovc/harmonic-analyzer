@@ -131,19 +131,23 @@ def test_the_hole_1_x_text_stands_outboard_of_its_extension_lines() -> None:
     assert y > drawing.FRONT_KEEP["Hole2X"][1] + 0.004
 
 
-def test_the_height_band_callout_fits_left_of_the_plate() -> None:
-    """The .XX height's reason prints in two lines under the value, left of
-    the plate and above the hole Y extension line (the hole Y dimension line
-    stops at that extension, below the callout), under the top-edge one."""
-    lines = drawing.HEIGHT_BAND_CALLOUT.split("\n")
-    assert len(lines) == 2
+def test_the_height_text_block_sits_between_its_extension_lines() -> None:
+    """Machinist review of 1c9f9b2a6: inboard of the hole Y dimension the
+    9.50 sat on the plate's top-edge extension line and its two-line callout
+    crowded the hole Y extension. SolidWorks centres the value and callout as
+    one block on the keep (farm run 20261013T031858107Z: lines 5.7 mm apart),
+    so the block now centres between the top and bottom extension lines,
+    left of the hole Y dimension line, where the hole Y extension stops."""
+    lines = ["9.50", *drawing.HEIGHT_BAND_CALLOUT.split("\n")]
+    assert len(lines) == 3
     x, y = drawing.FRONT_KEEP["Height"]
-    half = max(len(line) for line in lines) * _CHAR_WIDTH / 2.0
-    assert x - half > 0.0127
-    assert x + half < drawing.LEFT_EDGE_X - 0.002
-    line_pitch = 0.0045
-    assert y + 0.004 < drawing._sheet_y(pd_guide_lock_spec.LOCK_HEIGHT)
-    assert y - 3 * line_pitch > drawing.HOLE_Y_SHEET + 0.002
+    half_w = max(len(line) for line in lines) * _CHAR_WIDTH / 2.0
+    assert x - half_w > 0.0127
+    assert x + half_w < drawing.FRONT_KEEP["Hole1Y"][0] - 0.002
+    line_pitch, glyph = 0.0058, 0.0035
+    half_h = line_pitch * (len(lines) - 1) / 2.0 + glyph / 2.0
+    assert y + half_h < drawing._sheet_y(pd_guide_lock_spec.LOCK_HEIGHT) - 0.003
+    assert y - half_h > drawing.BOTTOM_EDGE_Y + 0.003
 
 
 def test_the_views_sit_centred_between_the_border_and_title_block() -> None:
