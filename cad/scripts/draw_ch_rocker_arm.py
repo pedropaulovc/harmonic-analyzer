@@ -27,7 +27,6 @@ from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     dimension_name,
     place_view,
     view_name,
@@ -61,6 +60,7 @@ from _drawing_dimensions import (
     assert_imported_precision,
     set_arc_endpoints_to_center,
     set_basic_dimension,
+    set_dimension_callouts,
     set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
@@ -176,10 +176,15 @@ HUB_CENTER = (0.180, 0.095)
 END_CENTER = (0.330, 0.110)
 HUB_SCALE = (4.0, 1.0)
 END_SCALE = (2.0, 1.0)
-DETAIL_LETTER_XY = {"D": (0.167, 0.155), "E": (0.264, 0.148)}
-# The rod-pin FCF lands on the southeast rim, clear of the acute land angle.
-FCF_XY = (0.365, 0.090)
-ROD_CALLOUT_XY = (0.270, 0.145)
+DETAIL_LETTER_XY = {"D": (0.167, 0.155), "E": (0.264, 0.155)}
+# D's crop is a view boundary, not a third concentric manufactured diameter.
+# Keep its persisted circular fence; omit only the printed detail-view outline.
+DETAIL_NO_OUTLINE = {"D": True, "E": False}
+# Short position leader keeps the same southeast hole-rim attachment, crossing
+# the taper steeply instead of visually extending that material boundary.
+FCF_XY = (0.3445, 0.0885)
+# Short leftward hole leader exits E without tracing the tapered material edge.
+ROD_CALLOUT_XY = (0.279, 0.115)
 # The iso caption's top-left, under the iso's right half and right of the end
 # view. Beside the end view (0.315, 0.150) it read as that
 # view's label, 0.4 mm from HubLength's "+0.05" (r743-p1s-B2 render).
@@ -343,17 +348,21 @@ def _detail_crop(adapter: Any, view: Any, *, label: str) -> tuple[float, float, 
     detail_circle = _early_bound(view.GetDetail(), "IDetailCircle")
     if detail_circle is None:
         raise RuntimeError(f"detail {label}: missing persisted detail circle")
-    # These full-circle/display flags remain ROCKER-owned. NoOutline details in
-    # other recipes cannot safely read HasFullOutline/JaggedOutline.
+    # Full/jagged outline accessors are valid only when NoOutline is False.
+    # D uses the cone-gear-shaft non-feature boundary convention; E stays full.
     no_outline = detail_circle.NoOutline
-    if no_outline is not False:
+    required_no_outline = DETAIL_NO_OUTLINE[label]
+    if no_outline is not required_no_outline:
         raise RuntimeError(f"detail {label}: actual circle NoOutline={no_outline!r}, "
-                           f"required=False, native_view_bbox={bbox}")
-    actual_flags = (detail_circle.GetLabel(), int(detail_circle.GetDisplay()),
-                    no_outline, detail_circle.JaggedOutline, detail_circle.HasFullOutline())
-    if actual_flags != (label, 1, False, False, True):
+                           f"required={required_no_outline!r}, native_view_bbox={bbox}")
+    actual_flags = (detail_circle.GetLabel(), int(detail_circle.GetDisplay()), no_outline)
+    required_flags = (label, 1, required_no_outline)
+    if not no_outline:
+        actual_flags += (detail_circle.JaggedOutline, detail_circle.HasFullOutline())
+        required_flags += (False, True)
+    if actual_flags != required_flags:
         raise RuntimeError(f"detail {label}: actual circle label/display/outline flags={actual_flags!r}, "
-                           f"required={(label, 1, False, False, True)!r}, native_view_bbox={bbox}")
+                           f"required={required_flags!r}, native_view_bbox={bbox}")
     if readback.label != label:
         raise RuntimeError(f"detail {label}: persisted native circle label changed to {readback.label!r}")
     parent = readback.parent
@@ -470,8 +479,9 @@ def _create_detail(
     data.View = parent
     if _early_bound(circle, "ISketchSegment").Select4(False, data) is not True:
         raise RuntimeError(f"detail {label}: cannot select parent fence")
+    no_outline = DETAIL_NO_OUTLINE[label]
     native = drawing.CreateDetailViewAt4(
-        *target, 0.0, 0, *scale, label, 1, True, False, False, 5,
+        *target, 0.0, 0, *scale, label, 1, not no_outline, False, no_outline, 5,
     )
     draw.ClearSelection2(True)
     if native is None:
@@ -1320,7 +1330,7 @@ def _pivot_finish_placement(
 # Every marked model dimension has exactly one face-view owner.
 FRONT_KEEP = {
     "TopRadius": (0.145, 0.136),
-    "BottomRadius": (0.170, 0.128),
+    "BottomRadius": (0.169, 0.128),
     "TopAbovePivot": (0.165, 0.191),
 }
 
@@ -1372,16 +1382,14 @@ HUB_KEEP = {
     "HubDia": (0.210, 0.122),
 }
 END_KEEP = {"RodTipLen": (0.377, 0.130)}
-# The hub length (+0.05/0, #743 PR2) under the end view, where the hub shows
-# its full length (the end view is 1:1, centred on the pivot mid-depth).
-# The strap thickness (+/-0.025, ARM_THICKNESS_BAND, Main ruling 2026-10
-# option b) right of the end view, its line across the strap ABOVE the hub
-# and 3 mm above datum B's attachment (broad_face, RIGHT_CENTER y + 0.007),
-# so its outside arrows clear datum B's down-left leader; the text sits under
-# the iso caption (top y 0.183) and right of the end view.
+# Hub length's entire value/tolerance/above-label stack sits left of both native
+# witnesses and E's full-outline circle. Adding the above row shifts the value
+# down natively; the left corridor accommodates that complete three-row block.
+# Strap thickness stays right of the end view and below the isometric caption;
+# datum B sits above the pin text but below the strap-offset reference witnesses.
 STRAP_THICKNESS_TEXT_XY = (RIGHT_CENTER[0] + 0.017, RIGHT_CENTER[1] + 0.010)
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
-    "HubLength": (RIGHT_CENTER[0], RIGHT_CENTER[1] - (PIVOT_MID_Y + 12.0) / 1000.0),
+    "HubLength": (0.280, 0.137),
     "StrapThickness": STRAP_THICKNESS_TEXT_XY,
 }
 
@@ -1643,9 +1651,13 @@ def _add_land_angle(adapter: Any, view: Any, land: ViewEdge) -> Any:
     display.MaxWitnessLineLength = LAND_ANGLE_WITNESS_LENGTH
     if abs(float(display.MaxWitnessLineLength) - LAND_ANGLE_WITNESS_LENGTH) > 1e-9:
         raise RuntimeError("land angle retained crossing full-height witnesses")
-    display.SetText(4, "TO MIRROR PLANE")
-    if str(display.GetText(4) or "") != "TO MIRROR PLANE":
-        raise RuntimeError("land angle direction callout did not persist")
+    # A second row shifts the BASIC value into the 8 mm witnesses/arc. Bind the
+    # angle's mirror-plane identity in the notes and retain one clean native row.
+    callouts = (str(display.GetText(3) or ""), str(display.GetText(4) or ""))
+    if callouts != ("", ""):
+        raise RuntimeError(
+            f"land angle must retain one native BASIC row: {callouts!r}"
+        )
     return display
 
 
@@ -1678,6 +1690,8 @@ def _add_rocker_outline_dimensions(adapter: Any, front: Any) -> None:
         adapter, width, expected_mm=2.0 * ROD_TIP_X, label="rocker overall width",
         entities=vertices, entity_types=("VERTEX", "VERTEX"),
     )
+    # Overall span is derived from the controlled profile, not a second size band.
+    set_reference_dimension(adapter, width, label="rocker overall width")
     pivot = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
     taper_point = (BOT_END_X, _BOT_END_Y, ARM_THICKNESS / 2.0)
     taper = edges.exact_vertex_at(taper_point, label="+Z taper/lower-arc intersection")
@@ -2383,17 +2397,41 @@ async def build(adapter: Any) -> dict[str, str]:
             "StrapThickness": STRAP_DATUM_B.precision["thickness"],
         },
     )
+    set_dimension_callouts(
+        adapter, right_annotations, {"HubLength": "HUB LENGTH"}, location="above",
+    )
+    for annotation in right_annotations:
+        if dimension_name(adapter, annotation) == "HubLength":
+            display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+            if str(display.GetText(3) or "") != "HUB LENGTH":
+                raise RuntimeError("hub length identity callout did not persist")
     _add_strap_offset_dimension(adapter, right)
 
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    for label, view in (("front", front), ("detail D", hub), ("detail E", end)):
-        if drawing.ActivateView(view_name(adapter, view)) is not True:
-            raise RuntimeError(f"failed to activate {label} before center marks")
-        active = _early_bound(drawing.ActiveDrawingView, "IView")
-        if active is None or int(adapter.swApp.IsSame(active, view)) != 1:
-            raise RuntimeError(f"no matching active native view for {label} center marks")
-        if auto_center_marks(adapter, active, holes=True, size=0.0025) is not True:
-            raise RuntimeError(f"failed to add ASME center marks to {label}")
+    # Template marks already exist in all three face views. Repeating the batch
+    # insert doubles their printed ink; D/E's small anchor drift hid that from
+    # the duplicate-position classifier. Retain and prove each native set.
+    for label, view, required in (
+        ("front", front, 2),
+        ("detail D", hub, 1),
+        ("detail E", end, 1),
+    ):
+        center_mark_count = 0
+        for annotation in _bound_view_annotations(
+            view,
+            label=f"{label} template center marks",
+        ):
+            kind = annotation.GetType()
+            if type(kind) is not int or not 1 <= kind <= 19:
+                raise RuntimeError(
+                    f"{label} center mark census has invalid annotation type: {kind!r}"
+                )
+            if kind == 13:  # swAnnotationType_e.swCenterMarkSym
+                center_mark_count += 1
+        if center_mark_count != required:
+            raise RuntimeError(
+                f"expected {required} {label} hole center marks, "
+                f"found {center_mark_count}"
+            )
 
     # E's native wizard-hole callout keeps the source through condition.
     rod_hole_edge = visible_circle_edge(adapter, end, _ROD_HOLE_DIA)
@@ -2453,7 +2491,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=broad_face,
-        symbol_xy=(broad_face[0] - 0.016, broad_face[1] - 0.014),
+        symbol_xy=(broad_face[0] - 0.016, broad_face[1] + 0.004),
         datum=STRAP_DATUM_B.fields["datum"][0],
         label="broad face",
     )

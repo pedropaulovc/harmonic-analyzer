@@ -61,6 +61,95 @@ Exit 1 means findings. The dump lists, per sheet: size, inner border from
 `ISheet::GetZoneMargin`, the title-block keep-out, every view's outline / scale /
 display mode, and every annotation's text box, `GetPosition`, and line segments.
 
+## REPORT findings versus per-drawing enforcement
+
+The canonical policy is
+[`_layout_audit.py`](../scripts/_layout_audit.py): `severity()` classifies a
+finding with `GATING_KINDS`; `enforced(mode, gating, *, stem)` decides whether
+it refuses the leaf. These are **different decisions**. `GATE` enforces every
+gating finding. `REPORT` still records all findings, but refuses only kinds in
+`ENFORCED_KINDS` or `STEM_ENFORCED_KINDS[stem]`.
+[`_drawing_layout_audit.run_layout_audit`](../scripts/_drawing_layout_audit.py)
+writes the report before refusing those selected findings.
+[`finalize_drawing`](../scripts/_drawing_common.py) normally uses `REPORT`;
+a successful export is therefore not evidence of zero gating findings.
+
+Use the artifact stem from
+[`_drawing_registry.py`](../scripts/_drawing_registry.py), not the recipe's
+underscored name, for per-drawing enforcement (`ch-rocker-arm`, not
+`ch_rocker_arm`). Add the kinds to the existing immutable mapping's **dict
+literal**, only after a native build and printed-sheet inspection demonstrate
+zero real findings in those classes. Do not switch the whole fleet to `GATE`,
+demote a genuine collision, loosen thresholds, or add a runtime allowance to
+get one drawing through.
+
+### Rocker R19 regression and local placement contract
+
+R19 at `81ac56b26598b63c0c9a11a467208ac4176ce646`, farm run
+`20261013T051541021Z-0456b55b4ef7424793cb5fdafaf10c41`, exported successfully
+with 18 gating records. At that point the rocker had no per-stem entry, and
+none of those records' kinds was globally enforced in `REPORT`. The four
+visible collision pairs were **already detected**, not missing audit coverage.
+The twelve real records, numbered in R19 gating order, are:
+
+| R19 records | Existing gating kind | Actual native/printed defect |
+| --- | --- | --- |
+| 1, 2, 3 | `text-clearance` | B against PIN AXIS; E inside #47 DRILL; HubLength value/stack against the drill's lower row |
+| 4, 5 | `text-on-line` | B's box line through PIN AXIS; PIN AXIS shoulder through B |
+| 8, 9 | `extension-through-own-text` | HubLength witnesses through its own value/stack; angular witness through TO MIRROR PLANE |
+| 10 | `dim-line-through-own-text` | The native angular arc through TO MIRROR PLANE |
+| 11, 12 | `arrow-near-text` | Taper arrow 1.6205 mm from R816; HubLength outside-arrow tail 1.7251 mm from the drill row (2 mm rule) |
+| 17, 18 | `duplicate-annotation` | Identical front-view centre-mark pairs at (178.1134, 169.9608) and (246.2447, 175.4982) mm |
+
+[`test_layout_audit.py`](../scripts/test_layout_audit.py) keeps a compact
+`_rocker_r19_dump()` extracted from the actual report's `sheets[0]`: native
+display coordinates, circle-label data, duplicate anchors and actual PDF text
+spans, in **sheet metres**. It calls the existing `audit_dump` and own-text
+finder with their unchanged thresholds. `ROCKER_R19_REAL_RECORDS` identifies
+all twelve; `_rocker_r19_real_findings()` is the replay interface for a separate
+per-stem refusal test after R20 native acceptance. The unified audit keeps
+one finding per `(kind, a, b)`; the own-text finder also stops at the first
+striking line per row. Isolating each recorded native HubLength witness proves
+both the left witness through 7.056 and the right witness through the stack
+without inventing a new drawing or claiming an R20 render.
+
+The six other R19 gating records were classified from native/PDF/PNG evidence,
+**not demoted**: 6/7 are padded-outline `text-on-view` phantoms above detail D;
+13 is the printed U inside native `<CL-U>` that the text claim key misses;
+14–16 are printed 0.18 mm model edges the classifier expects at 0.25 mm.
+Their shared collector/claim/edge-classification follow-up is
+[#1419](https://github.com/pedropaulovc/harmonic-analyzer/issues/1419#issuecomment-6139402807).
+Keep those classes outside this rocker's six-class cutover; do not hide their
+reports or weaken a real predicate. `report_sheet()` strips PDF strokes to a
+count: a stroke-less replay cannot prove model-edge absence or repair an
+outline phantom. Use the actual cached PDF with
+[`diagnostics/layout_calibration.py`](../scripts/diagnostics/layout_calibration.py)
+`--pdf-dir` for that evidence, not fabricated strokes.
+
+R20 placement changes belong in the rocker recipe, not the shared audit:
+move B's complete symbol/box/leader clear of PIN AXIS and its shoulder while
+keeping the attachment on its actual broad face; move E's letter clear of both
+drill rows; place the **whole** HubLength value/stack to the left, outside both
+witnesses and clear of the drill and arrow tail. A rightward move is not a
+clearance proof: an above-callout row can reflow the lower tolerance into E's
+full circle. Keep the land-angle dimension's numeric BASIC row at its existing
+position and witness reach; bind its actual angle explicitly to DETAIL E and
+MIRROR PLANE in Manufacturing Notes instead of a dimension row struck by its
+own witness/arc. Move R816 away from the taper arrow. Remove automatic
+centre-mark reinsertion on front/D/E while strictly retaining the native
+2/1/1 centre-mark census, rather than merely deleting the observed front pair.
+An isolated translated box is only an offline predicate control, never native
+after-fix proof. Detail D uses the existing non-feature `NoOutline` convention;
+do not alter its circular crop geometry. Its outline-style flags are
+conditional on `NoOutline`, while E retains its full-outline display checks.
+Preserve all model/spec/nominal/tolerance values, view centres and scales,
+physical A/C datum checks, E at Y110, 3 mm fatal caption air and 4 mm target,
+the strict 3.5 mm Manufacturing Notes source font, and the shared persisted
+profile/crop guards (including signed four-edge F5 deltas and exact zero-slack
+crop containment). Only after native R20 shows zero does the parent add the
+six real classes above to `STEM_ENFORCED_KINDS["ch-rocker-arm"]`.
+
+
 ## What is readable from the API (stop guessing)
 
 | Question | API | Evidence |

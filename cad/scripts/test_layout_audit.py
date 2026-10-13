@@ -3538,6 +3538,366 @@ def test_rocker_fix3_defects_gate_in_the_shared_audit(build, kind, a, b):
     assert hits(build(True)) == []
 
 
+# --------------------------------------------------------------------------
+# Rocker arm, R19 at 81ac56b26598b63c0c9a11a467208ac4176ce646:
+# farm run 20261013T051541021Z-0456b55b4ef7424793cb5fdafaf10c41,
+# reports/layout-audit/ch-rocker-arm.json, sheets[0]. These are the selected
+# native display coordinates and actual PDF text spans, all in SHEET METRES.
+# Straight lines/text are projected to XY (native model depth is irrelevant);
+# arrows/arcs and centre-mark anchors retain their native arrays. No synthetic
+# PDF, render, COM object, or R20 native result is represented here.
+#
+# report_sheet removes PDF strokes. These tests replay only stroke-independent
+# real findings, not text-on-view/view-edges-missing. In R19 all twelve were
+# GATING but REPORT did not enforce them: none was in ENFORCED_KINDS and there
+# was no ch-rocker-arm entry in STEM_ENFORCED_KINDS. Parent integration uses
+# _rocker_r19_real_findings() with enforced(REPORT, ..., stem="ch-rocker-arm")
+# only after native R20 proves zero; do not freeze the historical absent key.
+# --------------------------------------------------------------------------
+
+
+def _rocker_r19_annotation(name, texts, *, lines=(), arrows=(), arcs=(), kind=4, pos=None, hole_callout=False):
+    """Compact native XY projection; every retained text fragment is 3.5 mm."""
+    annotation = {
+        "type": kind,
+        "name": name,
+        "visible": 1,
+        "owner_type": 0,
+        "display": {
+            "lines": [_line(*line) for line in lines],
+            "arrows": list(arrows),
+            "arcs": list(arcs),
+            "texts": [{"t": t, "pos": [x, y, 0.0], "h": 0.0035, "ref": 1, "ang": 0.0} for t, x, y in texts],
+        },
+    }
+    if kind == 4:
+        annotation["dim"] = {"hole_callout": hole_callout}
+    if pos is not None:
+        annotation["pos"] = list(pos)
+    return annotation
+
+
+ROCKER_R19_BOTTOM_RADIUS = _rocker_r19_annotation(
+    "BottomRadius", [("R816.00", 0.1614712, 0.1252219)],
+    lines=[
+        (0.1604048, 0.1252219, 0.1604048, 0.1307781),
+        (0.1604048, 0.1307781, 0.1795952, 0.1307781),
+        (0.1795952, 0.1307781, 0.1795952, 0.1252219),
+        (0.1795952, 0.1252219, 0.1604048, 0.1252219),
+        (0.18139, 0.1676787, 0.1815382, 0.1241734),
+        (0.1815382, 0.1241734, 0.1600493, 0.1241734),
+    ],
+    arrows=[[0.18139, 0.1676787, 0.00005, 0.0034068, -0.9999942, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, -1.0]],
+)
+ROCKER_R19_TAPER = _rocker_r19_annotation(
+    "RD2", [("132.76", 0.2118882, 0.132), ("R816/TAPER", 0.2059139, 0.1264437)],
+    lines=[
+        (0.18, 0.1706763, 0.18, 0.1254438),
+        (0.2463786, 0.1721122, 0.2463786, 0.1254438),
+        (0.18, 0.1264438, 0.2463786, 0.1264438),
+    ],
+    arrows=[
+        [0.18, 0.1264438, 0.0, 1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+        [0.2463786, 0.1264438, 0.0, -1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+    ],
+)
+ROCKER_R19_PIN_AXIS = _rocker_r19_annotation(
+    "RD4", [("8.46", 0.2715913, 0.1642225), ("PIN AXIS", 0.267, 0.1586662)],
+    lines=[
+        (0.2705249, 0.1642225, 0.2705249, 0.1697787),
+        (0.2705249, 0.1697787, 0.2817091, 0.1697787),
+        (0.2817091, 0.1697787, 0.2817091, 0.1642225),
+        (0.2817091, 0.1642225, 0.2705249, 0.1642225),
+        (0.181, 0.1716763, 0.268, 0.1716763),
+        (0.2475337, 0.1759044, 0.268, 0.1759044),
+        (0.285234, 0.1586663, 0.267, 0.1586663),
+        (0.267, 0.1586663, 0.267, 0.1716763),
+        (0.267, 0.1759044, 0.267, 0.1822544),
+    ],
+    arrows=[
+        [0.267, 0.1716763, 0.0, 0.0, -1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+        [0.267, 0.1759044, 0.0, 0.0, 1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+    ],
+)
+ROCKER_R19_HUB_LENGTH = _rocker_r19_annotation(
+    "HubLength",
+    [
+        (" 7.056 ", 0.2863014, 0.1405278), ("+", 0.300525, 0.145),
+        (" ", 0.3012931, 0.1404743), ("0.05", 0.3033542, 0.145),
+        ("0.00", 0.3033542, 0.1404743), (" ", 0.3124056, 0.1405278),
+    ],
+    lines=[
+        (0.3035282, 0.1573527, 0.3035282, 0.1394743),
+        (0.2964718, 0.1573527, 0.2964718, 0.1394743),
+        (0.3035282, 0.1404743, 0.3098782, 0.1404743),
+        (0.3035282, 0.1404743, 0.2964718, 0.1404743),
+        (0.2964718, 0.1404743, 0.2901218, 0.1404743),
+    ],
+    arrows=[
+        [0.3035282, 0.1404743, 0.005, 1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+        [0.2964718, 0.1404743, 0.005, -1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+    ],
+)
+ROCKER_R19_DATUM_B = _rocker_r19_annotation(
+    "DetailItem370", [("B", 0.2779108, 0.1552219)], kind=2,
+    lines=[
+        (0.29875, 0.158, 0.28275, 0.158),
+        (0.29875, 0.1612244, 0.29875, 0.1556),
+        (0.28275, 0.1545, 0.27575, 0.1545),
+        (0.27575, 0.1545, 0.27575, 0.1615),
+        (0.27575, 0.1615, 0.28275, 0.1615),
+        (0.28275, 0.1615, 0.28275, 0.1545),
+    ],
+)
+ROCKER_R19_DATUM_B["display"]["triangles"] = [
+    [0.29875, 0.1566, 0.1293908, 0.29875, 0.1594, 0.1293908, 0.2963, 0.158, 0.1293908, 1.0, 0.0]
+]
+ROCKER_R19_ANGLE = _rocker_r19_annotation(
+    "D1", [("10.46°", 0.3338283, 0.1492994), ("TO MIRROR PLANE", 0.3201564, 0.1437431)],
+    lines=[
+        (0.3327619, 0.1492994, 0.3327619, 0.1548557),
+        (0.3327619, 0.1548557, 0.3483989, 0.1548557),
+        (0.3483989, 0.1548557, 0.3483989, 0.1492994),
+        (0.3483989, 0.1492994, 0.3327619, 0.1492994),
+        (0.3434973, 0.1424326, 0.3434973, 0.1504326),
+        (0.3389586, 0.1420172, 0.3375062, 0.1498842),
+    ],
+    arrows=[
+        [0.3434973, 0.1494326, 0.0, 0.9984694, -0.0553072, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+        [0.3376877, 0.1489008, 0.0, -0.9718355, -0.2356603, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+    ],
+    arcs=[
+        [0.0, 0.0, -1.0, -1.0, 0.3497831, 0.1488092, 0.0, 0.3434973, 0.1494326, 0.0, 0.3434973, 0.1174326, 0.0, 0.0, 0.0, 1.0, 1.0],
+        [0.0, 0.0, -1.0, -1.0, 0.3376877, 0.1489008, 0.0, 0.3316196, 0.1471466, 0.0, 0.3434973, 0.1174326, 0.0, 0.0, 0.0, 1.0, 1.0],
+        [0.0, 0.0, -1.0, -1.0, 0.3497831, 0.1488092, 0.0, 0.3434973, 0.1494326, 0.0, 0.3434973, 0.1174326, 0.0, 0.0, 0.0, 1.0, 1.0],
+        [0.0, 0.0, -1.0, -1.0, 0.3376877, 0.1489008, 0.0, 0.3316196, 0.1471466, 0.0, 0.3434973, 0.1174326, 0.0, 0.0, 0.0, 1.0, 1.0],
+    ],
+)
+ROCKER_R19_DRILL = _rocker_r19_annotation(
+    "RD1",
+    [
+        ("#47 DRILL", 0.2592545, 0.1450267), ("<MOD-DIAM>", 0.251482, 0.139417),
+        (" 1.99 THRU ALL", 0.2567604, 0.1394705),
+    ],
+    hole_callout=True,
+    lines=[
+        (0.3159403, 0.104351, 0.2901055, 0.139417),
+        (0.3183057, 0.1011405, 0.3159403, 0.104351),
+        (0.2901055, 0.139417, 0.251482, 0.139417),
+    ],
+    arrows=[[0.3159403, 0.104351, 0.0, -0.5931494, 0.8050924, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, -1.0]],
+)
+ROCKER_R19_CENTER_MARKS = [
+    {
+        "type": 13, "name": name, "visible": 1, "owner_type": 0, "pos": list(pos),
+        "display": {"lines": lines},
+    }
+    for names, positions, lines in [
+        (
+            ("DetailItem347", "DetailItem359"),
+            ((0.1781134, 0.1699608, 0.0017641), (0.1781134, 0.1699608, -0.0017641)),
+            [
+                [-1.0, 0.0, 0.0, 0.0, 0.18, 0.1716763, 0.0, 0.18, 0.1729263, 0.0],
+                [-1.0, 0.0, 0.0, 0.0, 0.18, 0.1716763, 0.0, 0.17875, 0.1716763, 0.0],
+                [-1.0, 0.0, 0.0, 0.0, 0.18, 0.1716763, 0.0, 0.18, 0.1704263, 0.0],
+                [-1.0, 0.0, 0.0, 0.0, 0.18, 0.1716763, 0.0, 0.18125, 0.1716763, 0.0],
+                [-1.0, 0.0, -1.0, 0.0, 0.18, 0.1741763, 0.0, 0.18, 0.1754763, 0.0],
+                [-1.0, 0.0, -1.0, 0.0, 0.1775, 0.1716763, 0.0, 0.1762, 0.1716763, 0.0],
+                [-1.0, 0.0, -1.0, 0.0, 0.18, 0.1691763, 0.0, 0.18, 0.1678763, 0.0],
+                [-1.0, 0.0, -1.0, 0.0, 0.1825, 0.1716763, 0.0, 0.1838, 0.1716763, 0.0],
+            ],
+        ),
+        (
+            ("DetailItem349", "DetailItem361"),
+            ((0.2462447, 0.1754982, 0.000625), (0.2462447, 0.1754982, 0.000625)),
+            [
+                [-1.0, 0.0, 0.0, 0.0, 0.2465337, 0.1759044, 0.0, 0.2465337, 0.1771544, 0.0],
+                [-1.0, 0.0, 0.0, 0.0, 0.2465337, 0.1759044, 0.0, 0.2452837, 0.1759044, 0.0],
+                [-1.0, 0.0, 0.0, 0.0, 0.2465337, 0.1759044, 0.0, 0.2465337, 0.1746544, 0.0],
+                [-1.0, 0.0, 0.0, 0.0, 0.2465337, 0.1759044, 0.0, 0.2477837, 0.1759044, 0.0],
+                [-1.0, 0.0, -1.0, 0.0, 0.2465337, 0.1771544, 0.0, 0.2465337, 0.1776528, 0.0],
+                [-1.0, 0.0, -1.0, 0.0, 0.2452837, 0.1759044, 0.0, 0.2447852, 0.1759044, 0.0],
+                [-1.0, 0.0, -1.0, 0.0, 0.2465337, 0.1746544, 0.0, 0.2465337, 0.1741559, 0.0],
+                [-1.0, 0.0, -1.0, 0.0, 0.2477837, 0.1759044, 0.0, 0.2482822, 0.1759044, 0.0],
+            ],
+        ),
+    ]
+    for name, pos in zip(names, positions, strict=True)
+]
+ROCKER_R19_DETAIL_CIRCLES = [
+    2.0,
+    -1.0, 0.18, 0.1716763, 0.0, 0.1833625, 0.1716763, 0.0, 0.1833625, 0.1716763, 0.0,
+    3.0, 0.1653837, 0.157333, 0.0, 0.0035, 0.0,
+    -1.0, 0.249753, 0.1777179, 0.0, 0.2557125, 0.1777179, 0.0, 0.2557125, 0.1777179, 0.0,
+    3.0, 0.2626037, 0.1501845, 0.0, 0.0035, 0.0,
+    *([0.0] * 36),  # R19's actual unused native allocation, not extra circles.
+]
+ROCKER_R19_SPANS = [
+    ["R816.00", 0.161896, 0.1261558, 0.1783795, 0.1297211],
+    ["132.76", 0.212551, 0.1329339, 0.2259064, 0.1364992],
+    ["R816/TAPER", 0.2063386, 0.1270043, 0.2318247, 0.130943],
+    ["8.46", 0.2717501, 0.1651564, 0.2804373, 0.1687217],
+    ["PINAXIS", 0.2674059, 0.1596002, 0.2849354, 0.1631655],
+    ["D", 0.1657183, 0.1536617, 0.1685406, 0.1570637],
+    ["E", 0.2631863, 0.1466534, 0.2651106, 0.1500554],
+    ["7.056", 0.2879306, 0.1414617, 0.2990266, 0.145027],
+    ["+", 0.3007865, 0.1465452, 0.3030928, 0.1488739],
+    ["0.05", 0.3035035, 0.1459339, 0.3122001, 0.1494993],
+    ["0.00", 0.3035035, 0.1414082, 0.3122562, 0.1449736],
+    ["B", 0.2783261, 0.1562351, 0.2803373, 0.1596371],
+    ["#47DRILL", 0.2596744, 0.1459607, 0.2806242, 0.14954],
+    ["1.99THRUALL", 0.2587158, 0.1404044, 0.2883967, 0.1439697],
+    ["10.46°", 0.3344911, 0.1502333, 0.3471877, 0.1537987],
+    ["TOMIRRORPLANE", 0.3202311, 0.1446771, 0.3608364, 0.1482424],
+]
+# R19 gating-record order, exact native annotation labels and measured extras.
+ROCKER_R19_REAL_RECORDS = [
+    (1, "text-clearance", "dim RD4 '8.46'", "datum DetailItem370 'B'", "gap_mm", -0.0369),
+    (2, "text-clearance", "detail-circle Drawing View1 #2", "hole-callout RD1 '#47 DRILL'", "gap_mm", -2.8866),
+    (3, "text-clearance", "dim HubLength '+0.05'", "hole-callout RD1 '#47 DRILL'", "gap_mm", -0.4661),
+    (4, "text-on-line", "dim RD4 '8.46'", "datum DetailItem370 'B'", "overlap_mm", 1.8998),
+    (5, "text-on-line", "datum DetailItem370 'B'", "dim RD4 '8.46'", "overlap_mm", 2.0112),
+    (8, "extension-through-own-text", "dim HubLength '+0.05'", "dim HubLength '+0.05'", "overlap_mm", 3.1654),
+    (9, "extension-through-own-text", "dim D1 '10.46°'", "dim D1 '10.46°'", "overlap_mm", 3.1653),
+    (10, "dim-line-through-own-text", "dim D1 '10.46°'", "dim D1 '10.46°'", "overlap_mm", 2.7577287788628406),
+    (11, "arrow-near-text", "dim RD2 '132.76'", "dim BottomRadius 'R816.00'", "gap_mm", 1.6205),
+    (12, "arrow-near-text", "dim HubLength '+0.05'", "hole-callout RD1 '#47 DRILL'", "gap_mm", 1.7251),
+    (17, "duplicate-annotation", "center-mark DetailItem347", "center-mark DetailItem359", "identical", True),
+    (18, "duplicate-annotation", "center-mark DetailItem349", "center-mark DetailItem361", "identical", True),
+]
+
+
+def _rocker_r19_dump():
+    dump = _dump(
+        views=[
+            _view(
+                "Drawing View1", (0.1012847, 0.1620883, 0.2587153, 0.1879117),
+                [ROCKER_R19_BOTTOM_RADIUS, ROCKER_R19_TAPER, ROCKER_R19_PIN_AXIS, *ROCKER_R19_CENTER_MARKS],
+                detail_circles_info=ROCKER_R19_DETAIL_CIRCLES,
+            ),
+            _view(
+                "Drawing View2", (0.2908838, 0.1447647, 0.3091162, 0.1852353),
+                [ROCKER_R19_HUB_LENGTH, ROCKER_R19_DATUM_B],
+            ),
+            _view(
+                "Detail View E (2 : 1)", (0.2958063, 0.0758063, 0.3641937, 0.1441938),
+                [ROCKER_R19_ANGLE, ROCKER_R19_DRILL],
+            ),
+        ],
+    )
+    # Bypass _dump's idealized _printed: only R19's actual PDF boxes belong here.
+    return {**dump, "stem": "ch-rocker-arm", "sheet": "Sheet1", "ink": {"spans": ROCKER_R19_SPANS}}
+
+
+def _rocker_r19_real_findings():
+    expected = {(kind, a, b) for _record, kind, a, b, _metric, _value in ROCKER_R19_REAL_RECORDS}
+    return [f for f in audit_dump(_rocker_r19_dump()) if (f.kind, f.a, f.b) in expected]
+
+
+@pytest.fixture(scope="module")
+def rocker_r19_real_findings():
+    return _rocker_r19_real_findings()
+
+
+@pytest.mark.parametrize(
+    ("record", "kind", "a", "b", "metric", "value"),
+    ROCKER_R19_REAL_RECORDS,
+    ids=[f"R19-{record}-{kind}" for record, kind, _a, _b, _metric, _value in ROCKER_R19_REAL_RECORDS],
+)
+def test_rocker_r19_each_real_record_is_detected_and_gating(rocker_r19_real_findings, record, kind, a, b, metric, value):
+    [finding] = [f for f in rocker_r19_real_findings if (f.kind, f.a, f.b) == (kind, a, b)]
+    assert severity(finding) is FindingSeverity.GATING, f"R19 record {record}"
+    if metric == "identical":
+        assert finding.extra == {"owner": "Drawing View1", "identical": value}
+    else:
+        assert finding.extra[metric] == pytest.approx(value, abs=1e-6)
+
+
+def test_rocker_r19_real_records_cover_all_six_classes(rocker_r19_real_findings):
+    assert len(rocker_r19_real_findings) == 12
+    assert set(_kinds(rocker_r19_real_findings)) == {
+        "text-clearance", "text-on-line", "extension-through-own-text",
+        "dim-line-through-own-text", "arrow-near-text", "duplicate-annotation",
+    }
+
+
+def test_rocker_r19_historical_report_policy_detects_without_enforcing(rocker_r19_real_findings, monkeypatch):
+    """Replay R19's absent local entry, not an assertion that it stays absent.
+
+    Production per-stem refusal is a separate integration test once native R20
+    is clear. This historical policy replay must survive that literal landing.
+    """
+    from types import MappingProxyType
+
+    import _layout_audit
+
+    monkeypatch.setattr(
+        _layout_audit,
+        "STEM_ENFORCED_KINDS",
+        MappingProxyType({stem: kinds for stem, kinds in _layout_audit.STEM_ENFORCED_KINDS.items() if stem != "ch-rocker-arm"}),
+    )
+    assert _layout_audit.enforced(LayoutAuditMode.REPORT, rocker_r19_real_findings, stem="ch-rocker-arm") == []
+    assert _layout_audit.enforced(LayoutAuditMode.GATE, rocker_r19_real_findings, stem="ch-rocker-arm") == rocker_r19_real_findings
+
+
+def test_rocker_r19_b_pin_axis_pair_has_overlap_and_both_line_strikes(rocker_r19_real_findings):
+    """The finding labelled '8.46' concerns its PIN AXIS row, not the basic digits."""
+    hits = [f for f in rocker_r19_real_findings if {f.a, f.b} == {"dim RD4 '8.46'", "datum DetailItem370 'B'"}]
+    assert [(f.kind, f.a) for f in hits] == [
+        ("text-clearance", "dim RD4 '8.46'"),
+        ("text-on-line", "dim RD4 '8.46'"),
+        ("text-on-line", "datum DetailItem370 'B'"),
+    ]
+    assert hits[0].extra["gap_mm"] < 0.0
+    assert hits[1].extra["segment"] == (0.27575, 0.1545, 0.27575, 0.1615)
+    assert hits[2].extra["segment"] == (0.285234, 0.1586663, 0.267, 0.1586663)
+
+
+def test_rocker_r19_e_drill_pair_rejects_the_letter_inside_the_drill_row(rocker_r19_real_findings):
+    [finding] = [f for f in rocker_r19_real_findings if f.a == "detail-circle Drawing View1 #2"]
+    assert finding.kind == "text-clearance" and finding.b == "hole-callout RD1 '#47 DRILL'"
+    assert finding.extra["gap_mm"] == pytest.approx(-2.8866, abs=1e-6)
+    assert finding.at_mm == pytest.approx((264.14845, 148.0967), abs=1e-6)
+
+
+def test_rocker_r19_hub_length_stack_witness_and_drill_pair_rejects_all_encroachments(rocker_r19_real_findings):
+    from dataclasses import replace
+
+    from _layout_audit import find_lines_through_own_text
+
+    label = "dim HubLength '+0.05'"
+    hits = [f for f in rocker_r19_real_findings if f.a == label]
+    assert {f.kind for f in hits} == {"text-clearance", "extension-through-own-text", "arrow-near-text"}
+    # The report deduplicates the two struck rows to one record. The finder
+    # itself stops at the first witness through each row; isolate each ACTUAL
+    # native witness (same native boxes) to expose the left witness through
+    # 7.056 as well as the right witness through +0.05 and 0.00.
+    sheet = sheet_model(_rocker_r19_dump()).geometry
+    hub = next(a for a in sheet.annotations if a.label == label)
+    witnesses = [s for s in hub.segments if s.role == "ext-line" and s.x0 == s.x1]
+    assert sorted(s.x0 for s in witnesses) == [0.2964718, 0.3035282]
+    own = [
+        f
+        for witness in witnesses
+        for f in find_lines_through_own_text(
+            replace(sheet, annotations=(replace(hub, segments=(witness,)),))
+        )
+    ]
+    assert len(own) == 3
+    assert all(f.kind == "extension-through-own-text" for f in own)
+    assert sorted(f.at_mm[0] for f in own) == pytest.approx([296.4718, 303.5282, 303.5282], abs=1e-6)
+    assert sorted(f.at_mm[1] for f in own) == pytest.approx([143.2176, 143.2176, 147.7166], abs=1e-6)
+    assert all(f.extra["overlap_mm"] > 3.0 for f in own)
+
+
+def test_rocker_r19_angular_mirror_pair_rejects_its_witness_and_native_arc(rocker_r19_real_findings):
+    hits = [f for f in rocker_r19_real_findings if f.a == "dim D1 '10.46°'"]
+    assert [f.kind for f in hits] == ["extension-through-own-text", "dim-line-through-own-text"]
+    assert hits[0].at_mm == pytest.approx((343.4973, 146.45975), abs=1e-6)
+    assert hits[1].at_mm == pytest.approx((332.9236989521817, 147.59448193737202), abs=1e-6)
+    assert all(f.extra["overlap_mm"] > 2.7 for f in hits)
+
+
 def test_a_hole_callout_over_the_top_border_gates_estimated_or_printed():
     """swing's S1 case (#929 ac4fa6dd0, cone_swing_platform leaf 81d64de9faef):
     RD2, a four-row native hole callout, printed its top row to y 269.9 mm,

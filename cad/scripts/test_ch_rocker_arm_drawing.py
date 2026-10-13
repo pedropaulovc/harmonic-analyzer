@@ -108,19 +108,45 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "PIVOT HOLE: REAM" not in notes
     assert "16.00 REF" not in notes
     assert "ALL HOLES THRU" not in notes
-    # Profile nominals print once, as native BASIC dimensions, not as prose.
+    # Native BASIC nominals stay authoritative; the note identifies the 8.00.
     assert "808.00 REF FROM THE PIVOT" not in notes
     assert "INTEGRAL HUB DIA" not in notes
     assert "HUB LENGTH SETS THE PITCH" in " ".join(notes.split())
     assert "ARC LENGTHS" not in notes
     assert "EACH END:" not in notes
-    assert re.findall(r"^(\d+)\.", notes, re.MULTILINE) == ["1", "2", "3", "4"]
-    assert "UPPER ARC: AMPLITUDE-BAR CONTACT." in notes
-    assert "LOWER ARC: MOVING STRAP ENVELOPE." in notes
-    assert "ROD-PIN SETS CONNECTING-ROD GEOMETRY." in notes
+    assert re.findall(r"^(\d+)\.", notes, re.MULTILINE) == ["1", "2", "3", "4", "5"]
+    assert "UPPER BAR CONTACT; LOWER STRAP ENVELOPE" in notes
+    assert "ROD-PIN SETS CONNECTING-ROD GEOMETRY." not in notes
     assert (
-        f"HUB OD COAXIAL WITH PIVOT BORE WITHIN Ø{ch_rocker_arm_spec.HUB_COAXIALITY_DIA:.2f} (TURN HUB AND REAM BORE IN ONE SETUP)"
+        f"DETAIL E: {math.degrees(ch_rocker_arm_spec._ALPHA_TOP):.2f}° BASIC IS MEASURED"
+        in notes
+    )
+    assert "FROM THE NOMINAL MIRROR PLANE." in notes
+    assert len(notes.splitlines()) == 13
+    notes_tree = ast.parse(Path(ch_rocker_arm_notes.__file__).read_text(encoding="utf-8"))
+    angle_note = next(
+        node for node in ast.walk(notes_tree)
+        if isinstance(node, ast.JoinedStr)
+        and isinstance(node.values[0], ast.Constant)
+        and node.values[0].value == "5. DETAIL E: "
+    )
+    assert ast.dump(angle_note.values[1].value) == ast.dump(
+        ast.parse("math.degrees(_ALPHA_TOP)", mode="eval").body
+    )
+    assert any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "ch_rocker_arm_spec"
+        and any(alias.name == "_ALPHA_TOP" for alias in node.names)
+        for node in notes_tree.body
+    )
+    assert (
+        f"HUB OD COAXIAL WITH PIVOT BORE WITHIN Ø{ch_rocker_arm_spec.HUB_COAXIALITY_DIA:.2f}."
         in " ".join(line.strip() for line in notes.splitlines())
+    )
+    assert "TURN HUB" not in notes and "ONE SETUP" not in notes
+    assert (
+        f"BASIC {ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT:.2f}: TOP ARC FROM A."
+        in notes
     )
     assert "11.5 IN" not in notes
     assert "0.22 IN" not in notes
@@ -241,11 +267,103 @@ def test_basic_radius_text_positions_are_outside_their_parent_circles() -> None:
 def test_radius_text_and_profile_requests_use_the_approved_clearance_corridors() -> None:
     """Source placement hypotheses, NOT current native clearance evidence."""
     assert drawing.FRONT_KEEP["TopRadius"] == (0.145, 0.136)
-    assert drawing.FRONT_KEEP["BottomRadius"] == (0.170, 0.128)
+    assert drawing.FRONT_KEEP["BottomRadius"] == (0.169, 0.128)
     assert drawing.ARC_PROFILE_FRAME_XY == {
         "TopRadius": (0.130, 0.207), "BottomRadius": (0.020, 0.160),
     }
     assert drawing.ARC_PROFILE_PICK_X_MM == {"TopRadius": -130.0, "BottomRadius": -110.0}
+
+
+def test_r20_local_requests_leave_views_geometry_and_strict_caption_air_unchanged() -> None:
+    """Placement hypotheses from R19 ink, not proof of the next native render."""
+    assert drawing.FRONT_CENTER == (0.180, 0.175)
+    assert drawing.RIGHT_CENTER == (0.300, 0.165)
+    assert drawing.ISO_CENTER == (0.345, 0.205)
+    assert drawing.HUB_CENTER == (0.180, 0.095)
+    assert drawing.END_CENTER == (0.330, 0.110)
+    assert drawing.HUB_SCALE == (4.0, 1.0)
+    assert drawing.END_SCALE == (2.0, 1.0)
+    assert drawing.DETAIL_NO_OUTLINE == {"D": True, "E": False}
+    assert drawing.DETAIL_LETTER_XY == {"D": (0.167, 0.155), "E": (0.264, 0.155)}
+    assert drawing.ROD_CALLOUT_XY == (0.279, 0.115)
+    assert drawing.FCF_XY == (0.3445, 0.0885)
+    assert drawing.RIGHT_KEEP["HubLength"] == (0.280, 0.137)
+    assert drawing.LAND_ANGLE_WITNESS_LENGTH == 0.008
+    assert drawing._DETAIL_CAPTION_TARGET_AIR_M == 0.004
+    assert drawing.DETAIL_GEOMETRY_TOL_M == 0.00005
+    # A native above row shifts the value downward. The complete three-row
+    # block is left of both witnesses AND E's printed full-outline circle.
+    hub_x = drawing.RIGHT_KEEP["HubLength"][0]
+    predicted_block = Box(hub_x - 0.014, 0.1306, hub_x + 0.014, 0.1432)
+    assert 0.2964718 - predicted_block.xmax >= 0.002
+    assert 0.3061619 - predicted_block.xmax >= 0.010
+    assert predicted_block.ymin - 0.1195 >= 0.010  # Moved drill's top.
+    assert 0.1515 - predicted_block.ymax >= 0.008  # Moved E letter's bottom.
+    # R816 moves left; the RD2 arrow and full witness stay at physical A's X.
+    radius_dx = drawing.FRONT_KEEP["BottomRadius"][0] - 0.170
+    assert 0.180 - (0.1784 + radius_dx) >= 0.002
+    # Both hole-annotation heads are closer to the unchanged physical pin.
+    pin_xy = _end_xy(drawing.ROD_HOLE_X, drawing.ROD_HOLE_Y)
+    assert math.dist(drawing.ROD_CALLOUT_XY, pin_xy) < math.dist((0.270, 0.145), pin_xy)
+    assert math.dist(drawing.FCF_XY, pin_xy) < math.dist((0.365, 0.090), pin_xy)
+    # R19 caption bounds and the unchanged E fence predict >=2 mm of air.
+    assert drawing.FCF_XY[0] - 0.3421907 >= 0.002
+    assert drawing.FCF_XY[1] - 0.0035 - 0.0820352 >= 0.002
+    _centre, radius_mm = drawing._detail_fence("E")
+    radius = radius_mm / 1000.0 * drawing.END_SCALE[0] / drawing.END_SCALE[1]
+    assert math.dist(drawing.FCF_XY, drawing.END_CENTER) - radius >= 0.002
+
+
+def test_datum_b_moves_above_pin_text_without_changing_its_broad_face_attachment() -> None:
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(
+        node for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    broad = next(
+        node for node in build.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "broad_face"
+            for target in node.targets
+        )
+    )
+    call = next(
+        node for node in ast.walk(build)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "add_datum_feature"
+        and any(
+            keyword.arg == "datum"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "B"
+            for keyword in node.keywords
+        )
+    )
+    calls = []
+    namespace = dict(
+        adapter=object(), right=object(), RIGHT_CENTER=drawing.RIGHT_CENTER,
+        ARM_THICKNESS=drawing.ARM_THICKNESS, ARM_DEPTH=drawing.ARM_DEPTH,
+        PIVOT_MID_Y=drawing.PIVOT_MID_Y,
+        add_datum_feature=lambda *_args, **kwargs: calls.append(kwargs),
+    )
+    module = ast.Module(body=[broad, ast.Expr(value=call)], type_ignores=[])
+    exec(compile(ast.fix_missing_locations(module), drawing.__file__, "exec"), namespace)
+    assert len(calls) == 1
+    edge_xy = (
+        drawing.RIGHT_CENTER[0] - drawing.ARM_THICKNESS / 2000.0,
+        drawing.RIGHT_CENTER[1] + (drawing.ARM_DEPTH - 1.0 - drawing.PIVOT_MID_Y) / 1000.0,
+    )
+    assert calls[0]["edge_xy"] == edge_xy
+    assert calls[0]["symbol_xy"] == (edge_xy[0] - 0.016, edge_xy[1] + 0.004)
+    # Predicted native B frame stays above PIN AXIS's BASIC frame and below
+    # the existing strap-offset witnesses, on the printed broad-face edge.
+    symbol_y = calls[0]["symbol_xy"][1]
+    assert symbol_y - 0.0035 - 0.1697787 >= 0.002
+    assert 0.1832219 - (symbol_y + 0.0035) >= 0.003
+    assert symbol_y + 0.0035 < 0.17975
+    assert symbol_y - 0.1722219 >= 0.003
+
 
 
 class _ProfileDisplay:
@@ -2419,6 +2537,7 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
         display.attached = entities
         if kwargs["orientation"] == "angular":
             display.Type2 = 3
+            display.text[3] = ""  # Newly created ordinary native angle has no above row.
         if state.defect_label == label:
             if state.defect == "creation":
                 raise RuntimeError(f"native dimension refused: {label}")
@@ -2436,7 +2555,9 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
                 display.GetAnnotation = lambda: None
             elif state.defect == "basic":
                 display.model.SetToleranceType = lambda _kind: True
-            elif state.defect == "text":
+            elif state.defect == "above-row":
+                display.text[3] = "unexpected direction row"
+            elif state.defect == "below-row":
                 display.ignored_text = 4
         state.displays[label] = display
         return display
@@ -2489,7 +2610,12 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
         DRAWABLE.xmin <= x <= DRAWABLE.xmax and DRAWABLE.ymin <= y <= DRAWABLE.ymax
         for x, y in vertical_points
     )
-    assert state.displays["radial land angle to mirror axis"].text[4] == "TO MIRROR PLANE"
+    angle_display = state.displays["radial land angle to mirror axis"]
+    assert (angle_display.text[3], angle_display.text[4]) == ("", "")
+    assert angle_display.writes == [(4, "")]  # BASIC clears below; no second row is added.
+    width_display = state.displays["rocker overall width"]
+    assert (width_display.text[1], width_display.text[2]) == ("(", ")")
+    assert width_display.model.GetToleranceType() == 0
     assert state.displays["radial land angle to mirror axis"].model.GetToleranceType() == 1
     assert state.displays["taper intersection X"].text[4] == "R816/TAPER"
 
@@ -2824,11 +2950,22 @@ class _DetailProfile:
 
 
 class _DetailCropCircle:
-    __slots__ = ("label", "profiles", "NoOutline", "JaggedOutline", "full", "display")
+    __slots__ = ("label", "profiles", "NoOutline", "_jagged", "full", "display")
 
     def __init__(self, label, profile):
         self.label, self.profiles = label, (profile,)
-        self.NoOutline, self.JaggedOutline, self.full, self.display = False, False, True, 1
+        self.NoOutline = label == "D"
+        self._jagged, self.full, self.display = False, True, 1
+
+    @property
+    def JaggedOutline(self):
+        if self.NoOutline:
+            raise AssertionError("JaggedOutline is undefined with NoOutline=True")
+        return self._jagged
+
+    @JaggedOutline.setter
+    def JaggedOutline(self, value):
+        self._jagged = value
 
     def GetLabel(self):
         return self.label
@@ -2837,6 +2974,8 @@ class _DetailCropCircle:
         return self.display
 
     def HasFullOutline(self):
+        if self.NoOutline:
+            raise AssertionError("HasFullOutline is undefined with NoOutline=True")
         return self.full
 
     def GetProfileItems(self):
@@ -2936,12 +3075,13 @@ class _DetailView:
             self.physical = self._position
 
 
+@pytest.mark.parametrize("label", ["D", "E"])
 @pytest.mark.parametrize("defect", [None, "activation", "parent", "scale", "move", "ignored-move", "stale", "missing-position", "fence", "selection", "creation", "source-radius", "source-centre", "profile-radius", "profile-centre", "near-profile-centre", "partial", "missing-profile", "outline-flags", "projection-scale"])
-def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, monkeypatch, defect):
+def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, monkeypatch, label, defect):
     parent = _DetailParent()
     if defect == "projection-scale":
         parent.projection_scale = 0.7
-    detail = _DetailView(parent, defect=defect)
+    detail = _DetailView(parent, label=label, defect=defect)
     created = []
     class Manager:
         __slots__ = ("AddToDB",)
@@ -2970,14 +3110,15 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
         elif defect == "profile-centre":
             profile.centre = (profile.centre[0] + 0.01, profile.centre[1], profile.centre[2])
         elif defect == "near-profile-centre":
-            profile.centre = (profile.centre[0] + 0.00002, profile.centre[1], profile.centre[2])
+            shift = 0.00002 if label == "D" else 0.00004
+            profile.centre = (profile.centre[0] + shift, profile.centre[1], profile.centre[2])
         elif defect == "partial":
             profile.complete = 0
-        detail.crop_circle = _DetailCropCircle("D", profile)
+        detail.crop_circle = _DetailCropCircle(label, profile)
         if defect == "missing-profile":
             detail.crop_circle.profiles = ()
         elif defect == "outline-flags":
-            detail.crop_circle.full = False
+            detail.crop_circle.NoOutline = label != "D"
         return None if defect == "creation" else detail
     doc = SimpleNamespace(
         ActivateView=lambda _name: defect != "activation", ClearSelection2=lambda _all: None,
@@ -2995,20 +3136,21 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
     monkeypatch.setattr(drawing, "view_name", lambda *_a: "front")
     monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_a: None)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
-    kwargs = dict(centre=(0.0, drawing.PIVOT_MID_Y / 1000.0, 0.0),
-                  radius_mm=drawing.HUB_DIA / 2 + drawing.PIVOT_HOLE_DIA / 4,
-                  target=drawing.HUB_CENTER, scale=drawing.HUB_SCALE, label="D")
+    centre, radius_mm = drawing._detail_fence(label)
+    target = drawing.HUB_CENTER if label == "D" else drawing.END_CENTER
+    scale = drawing.HUB_SCALE if label == "D" else drawing.END_SCALE
+    kwargs = dict(centre=centre, radius_mm=radius_mm, target=target, scale=scale, label=label)
     if defect is None:
         assert drawing._create_detail(adapter, parent, **kwargs) is detail
-        assert detail.Position == pytest.approx(drawing.HUB_CENTER, rel=0.0, abs=1e-12)
-        assert detail.physical == pytest.approx(drawing.HUB_CENTER, rel=0.0, abs=1e-12)
-        assert tuple(detail.ScaleRatio) == drawing.HUB_SCALE
+        assert detail.Position == pytest.approx(target, rel=0.0, abs=1e-12)
+        assert detail.physical == pytest.approx(target, rel=0.0, abs=1e-12)
+        assert tuple(detail.ScaleRatio) == scale
         assert detail.events.count("move") == 1
         assert detail.events.count("barrier") >= 4
-        assert detail.GetOutline()[3] > drawing.HUB_CENTER[1] + detail.radius
-        assert created[0].radius == pytest.approx(0.006725)  # Nonidentity sketch scale 2.
+        assert detail.GetOutline()[3] > target[1] + detail.radius
+        assert created[0].radius == pytest.approx(radius_mm / 1000.0)  # Nonidentity sketch scale 2.
         assert parent.transform.inverse_calls >= 2
-        assert calls[0][7:] == (1, True, False, False, 5)
+        assert calls[0][7:] == (1, label == "E", False, label == "D", 5)
     else:
         with pytest.raises(RuntimeError):
             drawing._create_detail(adapter, parent, **kwargs)
@@ -3063,6 +3205,37 @@ def test_crop_reads_persisted_circle_not_padded_or_offset_native_view_bbox(bound
     assert view.crop_circle.profiles[0].GetRadius() != pytest.approx(view.radius)
     assert view.parent.ScaleRatio == (1.0, 2.0)  # Parent .5, native D 4 / E 2.
     assert view.parent.transform.inverse_calls == 1
+
+
+@pytest.mark.parametrize("label", ["D", "E"])
+@pytest.mark.parametrize("no_outline", [None, 0, 1, False, True])
+def test_detail_outline_mode_is_label_owned_and_identity_strict(
+    bound, monkeypatch, label, no_outline,
+):
+    adapter, view = _native_crop_fixture(monkeypatch, label)
+    view.crop_circle.NoOutline = no_outline
+    if no_outline is (label == "D"):
+        drawing._detail_crop(adapter, view, label=label)
+    else:
+        with pytest.raises(RuntimeError, match="NoOutline"):
+            drawing._detail_crop(adapter, view, label=label)
+
+
+@pytest.mark.parametrize("defect", ["jagged", "partial-outline"])
+def test_e_retains_full_outline_while_d_skips_undefined_flag_reads(
+    bound, monkeypatch, defect,
+):
+    adapter, end = _native_crop_fixture(monkeypatch, "E")
+    end.crop_circle.JaggedOutline = defect == "jagged"
+    end.crop_circle.full = defect != "partial-outline"
+    with pytest.raises(RuntimeError, match="outline flags"):
+        drawing._detail_crop(adapter, end, label="E")
+    adapter, hub = _native_crop_fixture(monkeypatch, "D")
+    # D's fake refuses these native reads altogether, per their documented scope.
+    hub.crop_circle.JaggedOutline = True
+    hub.crop_circle.full = False
+    drawing._detail_crop(adapter, hub, label="D")
+
 
 
 @pytest.mark.parametrize("label", ["D", "E"])
@@ -3137,7 +3310,7 @@ def test_crop_accepts_shared_box_drift_only_within_unchanged_tolerance(bound, mo
 @pytest.mark.parametrize("defect", [
     "radius", "nan-radius", "zero-radius", "centre", "off-sheet-plane", "missing-centre", "partial", "segment",
     "empty", "missing-items", "multiple", "missing-segment",
-    "missing-circle", "missing-parent", "no-outline", "jagged", "full-outline", "display", "label",
+    "missing-circle", "missing-parent", "no-outline", "display", "label",
     "inverse", "matrix", "missing-sketch", "missing-transform", "missing-utility", "parent-scale", "parent-scale-shape", "projection-scale",
     "detail-scale", "detail-scale-shape", "parent-scale-link", "sheet-scale-link", "invalid-bbox",
 ])
@@ -3170,11 +3343,7 @@ def test_native_crop_refuses_wrong_persisted_geometry_flags_or_coordinate_frame(
     elif defect == "missing-parent":
         view.parent = None
     elif defect == "no-outline":
-        circle.NoOutline = True
-    elif defect == "jagged":
-        circle.JaggedOutline = True
-    elif defect == "full-outline":
-        circle.full = False
+        circle.NoOutline = False
     elif defect == "display":
         circle.display = 0
     elif defect == "label":
@@ -3911,86 +4080,133 @@ def test_native_profile_guard_diagnoses_actual_radius_leader_crossing(native_pro
         drawing._require_arc_profile_clearance(case.adapter, case.front, case.profiles)
 
 
-@pytest.mark.parametrize("defect", [None, "activation", "missing-active", "wrong-active", "marks"])
-def test_center_marks_activate_and_read_the_authoritative_native_view(bound, defect):
+@pytest.mark.parametrize("view_index", range(3))
+@pytest.mark.parametrize("defect", [
+    None, "empty", "missing", "duplicate",
+    "bool-kind", "string-kind", "invalid-low", "invalid-high",
+])
+def test_each_face_retains_only_its_template_marks_without_batch_reinsertion(
+    bound, view_index, defect,
+):
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    build = next(
+        node for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
     loops = [
-        node for node in ast.walk(build) if isinstance(node, ast.For)
+        node for node in build.body
+        if isinstance(node, ast.For)
         and any(
-            isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
-            and call.func.id == "auto_center_marks" for call in ast.walk(node)
+            isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Name)
+            and call.func.id == "_bound_view_annotations"
+            for call in ast.walk(node)
         )
     ]
     assert len(loops) == 1
-    # Execute the actual local document binding, not a test-injected global:
-    # otherwise a missing binding in build() passes this native-call fake.
-    bindings = [
-        node for node in ast.walk(build) if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "drawing" for target in node.targets)
-        and node.lineno < loops[0].lineno
-    ]
-    assert len(bindings) == 1
-    code = compile(
-        ast.fix_missing_locations(ast.Module(body=[*bindings, *loops], type_ignores=[])),
-        drawing.__file__, "exec",
+    assert not hasattr(drawing, "auto_center_marks")
+    assert not any(
+        isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Name)
+        and call.func.id == "auto_center_marks"
+        for call in ast.walk(build)
     )
-    views = tuple(object() for _ in range(3))
-    names = dict(zip(views, ("front", "D", "E")))
-    events = []
+    kinds_by_view = [[13, 13, 4], [13, 4], [13, 4]]
+    invalid_kinds = {
+        "bool-kind": True, "string-kind": "13", "invalid-low": 0, "invalid-high": 20,
+    }
+    if defect == "empty":
+        kinds_by_view[view_index] = []
+    elif defect == "missing":
+        kinds_by_view[view_index].remove(13)
+    elif defect == "duplicate":
+        kinds_by_view[view_index].append(13)
+    elif defect in invalid_kinds:
+        kinds_by_view[view_index].append(invalid_kinds[defect])
+    views = []
+    for kinds in kinds_by_view:
+        annotations = [
+            SimpleNamespace(GetType=lambda kind=kind: kind) for kind in kinds
+        ]
+        views.append(SimpleNamespace(
+            GetAnnotationCount=lambda items=annotations: len(items),
+            GetAnnotations=lambda items=annotations: items,
+        ))
+    reads = []
 
-    class NativeDrawing:
-        __slots__ = ("active",)
-
-        def __init__(self):
-            self.active = None
-
-        def ActivateView(self, name):
-            events.append(("activate", name))
-            if defect == "activation":
-                return False
-            self.active = next(view for view in views if names[view] == name)
-            return True
-
-        @property
-        def ActiveDrawingView(self):
-            events.append(("active", self.active))
-            if defect == "missing-active":
-                return None
-            return object() if defect == "wrong-active" else self.active
-
-        @property
-        def IActiveDrawingView(self):
-            pytest.fail("center marks must use the documented Automation ActiveDrawingView")
-
-    native = NativeDrawing()
-
-    def same(actual, expected):
-        assert actual is not None and expected is not None
-        events.append(("same", actual, expected))
-        return 1 if actual is expected else 0
-
-    adapter = SimpleNamespace(currentModel=native, swApp=SimpleNamespace(IsSame=same))
-
-    def marks(actual_adapter, view, *, holes, size):
-        assert actual_adapter is adapter
-        assert view is native.active and holes is True and size == 0.0025
-        events.append(("marks", view))
-        return defect != "marks"
+    def census(view, *, label):
+        reads.append(view)
+        return drawing._bound_view_annotations(view, label=label)
 
     namespace = dict(
-        adapter=adapter, front=views[0], hub=views[1], end=views[2],
-        _early_bound=drawing._early_bound, view_name=lambda _adapter, view: names[view],
-        auto_center_marks=marks,
+        front=views[0], hub=views[1], end=views[2],
+        _bound_view_annotations=census,
     )
+    module = ast.Module(body=loops, type_ignores=[])
+    code = compile(ast.fix_missing_locations(module), drawing.__file__, "exec")
     if defect is None:
         exec(code, namespace)
-        assert [event[0] for event in events] == ["activate", "active", "same", "marks"] * 3
-        assert [event[1] for event in events if event[0] == "marks"] == list(views)
+        assert reads == views
     else:
         with pytest.raises(RuntimeError):
             exec(code, namespace)
-        assert len([event for event in events if event[0] == "marks"]) == (1 if defect == "marks" else 0)
+        assert reads == views[:view_index + 1]
+
+
+@pytest.mark.parametrize("defect", [None, "missing", "null-display", "ignored"])
+def test_hub_identity_label_is_above_the_whole_stack_and_preserves_native_size(
+    monkeypatch, defect,
+):
+    adapter, _imported = _imported_native_quantities(monkeypatch)
+    hub = _NativeQuantity("HubLength", ch_rocker_arm_spec.HUB_LENGTH, precision=3)
+    hub.band = tuple(value / 1000.0 for value in ch_rocker_arm_spec.HUB_LENGTH_BAND)
+    hub.tolerance_type = 4
+    strap = _NativeQuantity("StrapThickness", ch_rocker_arm_spec.ARM_THICKNESS, precision=3)
+    before = (hub.model.SystemValue, hub.band, hub.tolerance_type, hub.precision)
+    if defect == "null-display":
+        hub.GetSpecificAnnotation = lambda: None
+    elif defect == "ignored":
+        hub.ignored_text = 3
+    annotations = [strap] if defect == "missing" else [hub, strap]
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(
+        node for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    start = next(
+        index for index, node in enumerate(build.body)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "right_annotations"
+            for target in node.targets
+        )
+    )
+    stop = next(
+        index for index, node in enumerate(build.body)
+        if isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == "_add_strap_offset_dimension"
+    )
+    assert start < stop
+    namespace = dict(
+        adapter=adapter, right=object(), RIGHT_KEEP=drawing.RIGHT_KEEP,
+        DRAWING_DIMENSIONS=drawing.DRAWING_DIMENSIONS,
+        curate_view_dimensions=lambda *_args, **_kwargs: annotations,
+        set_dimension_callouts=drawing.set_dimension_callouts,
+        dimension_name=drawing.dimension_name, _early_bound=drawing._early_bound,
+    )
+    module = ast.Module(body=build.body[start:stop], type_ignores=[])
+    code = compile(ast.fix_missing_locations(module), drawing.__file__, "exec")
+    if defect is None:
+        exec(code, namespace)
+        assert hub.writes == [(3, "HUB LENGTH")]
+        assert strap.writes == []
+    else:
+        with pytest.raises(RuntimeError):
+            exec(code, namespace)
+    assert (hub.model.SystemValue, hub.band, hub.tolerance_type, hub.precision) == before
+
 
 
 def test_land_vertical_early_binds_view_and_refuses_null_native_sketch(monkeypatch):
@@ -4053,8 +4269,21 @@ def test_details_keep_native_scale_source_census_and_unclipped_overall_contract(
     wrapper_calls = [node.func.id for node in ast.walk(definitions["_detail_crop"])
                      if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
     assert wrapper_calls.count("read_circular_detail_crop") == 1 and "_outline" not in wrapper_calls
-    build_attributes = {node.attr for node in ast.walk(definitions["build"]) if isinstance(node, ast.Attribute)}
-    assert "GetText" not in build_attributes  # Hole callouts cannot use resolved text compartments.
+    # GetText is valid only on the ordinary HubLength display, not the native
+    # wizard-hole callout. Retain the guard while admitting its audited label.
+    hub_label_branch = next(
+        node for node in ast.walk(definitions["build"])
+        if isinstance(node, ast.If)
+        and ast.unparse(node.test) == "dimension_name(adapter, annotation) == 'HubLength'"
+    )
+    build_text_calls = [
+        node for node in ast.walk(definitions["build"])
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "GetText"
+    ]
+    assert len(build_text_calls) == 1
+    assert build_text_calls[0] in list(ast.walk(hub_label_branch))
+    assert ast.unparse(build_text_calls[0]) == "display.GetText(3)"
     assert sum(node.func.id == "_require_rod_through_callout" for node in build_calls) == 1
     through_attributes = {node.attr for node in ast.walk(definitions["_require_rod_through_callout"]) if isinstance(node, ast.Attribute)}
     assert {"GetDisplayData", "GetTextCount", "GetTextAtIndex"} <= through_attributes
@@ -4188,8 +4417,8 @@ def test_rod_through_condition_cannot_pass_unreadable_or_non_through_native_ink(
         drawing._require_rod_through_callout(callout)
 
 
-@pytest.mark.parametrize("defect", ["basic", "text"])
-def test_end_clocking_refuses_lost_basicness_or_unretained_direction(native_front, defect):
+@pytest.mark.parametrize("defect", ["basic", "above-row", "below-row"])
+def test_end_clocking_refuses_lost_basicness_or_an_extra_native_row(native_front, defect):
     native_front.defect_label = "radial land angle to mirror axis"
     native_front.defect = defect
     with pytest.raises(RuntimeError):

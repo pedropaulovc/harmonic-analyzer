@@ -19,11 +19,12 @@ from ch_rocker_arm_spec import (
     PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
     STRAP_HUB_SYMMETRY,
+    TOP_EDGE_ABOVE_PIVOT,
+    _ALPHA_TOP,
 )
 
 # Coaxiality is owned by the spec, including its eccentricity in the hub's OD
-# floor. This plain note prints that same source; turning the hub and reaming
-# the bore in one setup is the retained manufacturing instruction.
+# floor. The note controls the result without prescribing the machining setup.
 
 
 # True free-text instructions only; geometry / datum structure / roughness live
@@ -87,21 +88,24 @@ DRAWING_NOTES = "\n".join(
         "   THROUGH DATUM AXIS A, NORMAL TO LENGTH;",
         "   ROD-PIN HOLE (1X) AT THE END SHOWN.",
         "2. NOMINAL ARCS CONCENTRIC ON THAT PLANE.",
+        f"   BASIC {TOP_EDGE_ABOVE_PIVOT:.{DEFAULT_DRAWING_PRECISION}f}: TOP ARC FROM A.",
         # #948 ruling R: the rod's float on the arm is taken from the hub's
         # mid-plane, so the strap's offset from it is held.
         "3. STRAP SYMMETRIC TO HUB WITHIN "
         f"{STRAP_HUB_SYMMETRY:.{DEFAULT_DRAWING_PRECISION}f};",
         "   INTEGRAL HUB LENGTH SETS THE PITCH",
         "   (NO SPACERS). HUB OD COAXIAL WITH PIVOT",
-        f"   BORE WITHIN Ø{HUB_COAXIALITY_DIA:.{DEFAULT_DRAWING_PRECISION}f} (TURN HUB AND REAM",
-        "   BORE IN ONE SETUP).",
+        f"   BORE WITHIN Ø{HUB_COAXIALITY_DIA:.{DEFAULT_DRAWING_PRECISION}f}.",
         f"   {HUB_WALL_NOTE}.",
         # Source context: channel_kinematics.arc_geometry/solve_state and
         # build_ch_rocker_arm's chapter-30 profile reconstruction. The lower
         # arc is not a second amplitude-bar contact or independent gain control.
-        "4. UPPER ARC: AMPLITUDE-BAR CONTACT.",
-        "   LOWER ARC: MOVING STRAP ENVELOPE.",
-        "   ROD-PIN SETS CONNECTING-ROD GEOMETRY.",
+        # Preserve upper amplitude-bar contact and lower moving-strap envelope
+        # intent in one line. The removed rod-pin geometry sentence repeated
+        # note 1's identified hole plus its native basics/callout/position FCF.
+        "4. UPPER BAR CONTACT; LOWER STRAP ENVELOPE",
+        f"5. DETAIL E: {math.degrees(_ALPHA_TOP):.2f}° BASIC IS MEASURED",
+        "   FROM THE NOMINAL MIRROR PLANE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
