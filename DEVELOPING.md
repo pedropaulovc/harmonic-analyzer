@@ -1149,6 +1149,8 @@ authoring lives in `_drawing_notes`, `_drawing_leader_notes`, `_drawing_gdt`,
 `_drawing_finish`, `_drawing_sections`, `_drawing_centerline`,
 `_drawing_hole_callout`, `_drawing_dimension_import`, `_drawing_dimensions`,
 `_drawing_edge_dimensions`, `_drawing_tables` and `_drawing_balloons`.
+`move_model_dimension` belongs to `_drawing_dimensions`; drawing scripts import
+dimension-transfer helpers there, never from another part's drawing module.
 Hole-callout selection probes live in `_drawing_hole_callout`; annotation style
 and attachment assertions in `_drawing_attachment`; GD&T layout and element
 collection in `_drawing_layout_collect`. Selection, projection, visible edges,
