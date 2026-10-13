@@ -373,3 +373,34 @@ def test_the_height_band_is_tight_because_retention_needs_it(monkeypatch) -> Non
     monkeypatch.setattr(assembly, "log", lambda *_a: None)
     with pytest.raises(AssertionError, match="top plates"):
         assembly._assert_lock_retention()
+
+
+def test_the_bar_bands_are_authored_on_the_model() -> None:
+    """Codex P1 on #1353: the bottom-rail clearance and lock retention spend
+    the bar's ±0.13 height band (and the pivot floor its ±0.13 thickness
+    band), so the bar build authors both natively at .XXX on Height@BarProfile
+    and Depth@Bar (the helper reads each tolerance back), after the equation
+    drives so nothing resets them."""
+    import inspect
+
+    import build_pd_support_bar as support
+    import pd_support_bar_spec as bar
+
+    assert (bar.BAR_HEIGHT_BAND, bar.BAR_DEPTH_BAND) == (0.13, 0.13)
+    assert bar.BAR_BAND_PLACES == 3
+    source = inspect.getsource(support.build)
+    height = (
+        'set_dimension_symmetric_tolerance(adapter, "BarProfile", "Height", '
+        "BAR_HEIGHT_BAND)"
+    )
+    depth = 'set_dimension_symmetric_tolerance(adapter, "Bar", "Depth", BAR_DEPTH_BAND)'
+    precision = (
+        '{"BarProfile": {"Height": BAR_BAND_PLACES}, "Bar": {"Depth": BAR_BAND_PLACES}}'
+    )
+    for call in (height, depth, precision):
+        assert source.count(call) == 1
+    assert 'name_depth="Height"' in source
+    assert 'name_dimensions(adapter, "Bar", ["Depth"])' in source
+    driven = source.index("drive_dimension(")
+    assert driven < source.index(precision) < source.index(height)
+    assert source.index(height) < source.index(depth)

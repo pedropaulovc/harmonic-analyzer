@@ -39,12 +39,15 @@ from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 # 5 rail + ~3 bar overlap, top and bottom).
 BAR_HEIGHT = 28.0
 # The bar's .XXX height band: the bottom rail's running clearance under the
-# bar spends it (build_pd_paper_drive_assembly._assert_bottom_rail_clearance).
+# bar spends it (build_pd_paper_drive_assembly._assert_lock_retention).
+# build_pd_support_bar authors it natively on Height@BarProfile.
 BAR_HEIGHT_BAND = 0.13
 BAR_DEPTH = 9.0  # deep (Z) -- front face rubs the platen back (low)
 # The pivot floor and the latch-hook-bracket-screw (MHA-VN-043) tips need the bar's
 # thickness at 9.000 ±0.13 (.XXX); at .XX the floor would be 1.69 worst.
+# build_pd_support_bar authors it natively on Depth@Bar.
 BAR_DEPTH_BAND = 0.13
+BAR_BAND_PLACES = 3  # both bands print .XXX
 BACK_FACE_Z = BAR_DEPTH / 2.0
 
 HANGER_TAP_Y = -0.5  # machine y 303.234 on the 303.734 bar centre
