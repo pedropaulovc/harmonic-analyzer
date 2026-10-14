@@ -156,7 +156,39 @@ def test_plain_shank_diameter_prints_as_a_reference() -> None:
     assert spec.REFERENCE_DIMENSIONS <= spec.DRAWING_DIMENSIONS["ThreadLimitReference"]
     source = _source(part)
     assert 'dims.record("ShankDia", \'"ThreadDia"\')' in source
-    assert 'adapter, axis, witness, (THREAD_R + 3.0, witness_y), "ShankDia"' in source
+    # The proven diametric recipe (StudProfile, butt cup): the centerline
+    # spans the witness along the axis, the pick stands beyond the witness at
+    # its mid-height. A centerline ending short of the line made a plain
+    # linear dimension on the farm (run 20261014T002650255Z).
+    calls = [
+        call
+        for call in _calls(part, "add_diametric_linear_dimension")
+        if ast.literal_eval(call.args[-1]) == "ShankDia"
+    ]
+    (shank_dia,) = calls
+    assert [ast.unparse(arg) for arg in shank_dia.args[1:4]] == [
+        "shank_axis",
+        "witness",
+        "(THREAD_R + 3.0, witness_y + _SHANK_WITNESS_LEN / 2.0)",
+    ]
+    (shank_axis,) = (
+        call
+        for call in _calls(part, "add_centerline")
+        if [ast.unparse(arg) for arg in call.args]
+        == ["0.0", "FULL_THREAD_LENGTH", "0.0", "SHANK_LENGTH"]
+    )
+    witness_lo = spec.FULL_THREAD_LENGTH + part._SHANK_WITNESS_GAP
+    witness_hi = witness_lo + part._SHANK_WITNESS_LEN
+    assert spec.FULL_THREAD_LENGTH < witness_lo < witness_hi < spec.SHANK_LENGTH
+    drives = {
+        call.args[0].value: call.args[1].value
+        for call in _calls(part, "record")
+        if all(isinstance(arg, ast.Constant) for arg in call.args[:2])
+        and call.args[0].value
+    }
+    assert drives["PlainShankAxis"] == (
+        '"OverallLength" - "HeadHeight" - "FullThreadLength"'
+    )
     draw_source = _source(drawing)
     assert "for name in sorted(REFERENCE_DIMENSIONS):" in draw_source
     assert "diameter=True" in draw_source

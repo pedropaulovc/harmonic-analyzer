@@ -267,13 +267,10 @@ def test_views_and_scales_are_explicit() -> None:
     assert spec.BOTTOM_VIEW_NOTE == "BOTTOM VIEW SCALE 2:1"
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
     assert not hasattr(spec, "RIGHT_VIEW_NOTE")
-    # The pictorial is precise Shaded With Edges; only the orthographic views
-    # are hidden-lines-removed.
-    assert (
-        'set_high_quality_shaded_with_edges(adapter, iso, label="pictorial isometric")'
-        in (source)
-    )
-    assert "for view in (front, bottom):" in source
+    # finalize_drawing owns the pictorial's Shaded With Edges; an early call
+    # read cosmetic-thread quality False on the farm (run 20261014T002650255Z).
+    assert "set_high_quality_shaded_with_edges" not in source
+    assert "for view in (front, bottom, iso):" in source
 
 
 def test_isometric_stays_clear_of_the_front_view_border_and_title_block() -> None:

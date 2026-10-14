@@ -151,10 +151,19 @@ async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
     One Right-plane sketch: a centerline up the axis from the threaded end to
     the thread limit (its length, driven by FullThreadLength, is never
     marked), a real cross line centred on its top end that projects both
-    ways into a full ring on the shank cylinder, and a construction witness
-    on the plain shank's flank whose doubled distance from the axis is the
-    marked reference ShankDia (driven by ThreadDia: the plain shank is the
-    thread blank).
+    ways into a full ring on the shank cylinder, a second centerline on up
+    the axis over the plain shank to the shoulder, and a construction witness
+    on the plain shank's flank whose doubled distance from that centerline is
+    the marked reference ShankDia (driven by ThreadDia: the plain shank is
+    the thread blank).
+
+    The diametric dimension copies the StudProfile / butt-cup recipe: the
+    centerline spans the witness along the axis and the pick point stands
+    beyond the witness at its mid-height. In farm run 20261014T002650255Z the
+    first form, dimensioned against a centerline that ended 0.5 mm short of
+    the witness with the pick at the witness's end, came back non-diametric
+    ("ShankDia: new dimension is not diametric"); the span and the pick are
+    the only differences from every working use.
     """
     reach = THREAD_R + _SPLIT_OVERHANG
     witness_y = FULL_THREAD_LENGTH + _SHANK_WITNESS_GAP
@@ -164,6 +173,10 @@ async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
     axis = check(
         "thread limit axis",
         await adapter.add_centerline(0.0, 0.0, 0.0, FULL_THREAD_LENGTH),
+    )
+    shank_axis = check(
+        "plain shank axis",
+        await adapter.add_centerline(0.0, FULL_THREAD_LENGTH, 0.0, SHANK_LENGTH),
     )
     split = check(
         "thread limit split line",
@@ -182,6 +195,7 @@ async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
         raise RuntimeError("plain shank witness did not take the construction flag")
     for entity, relation in (
         (axis, "vertical"),
+        (shank_axis, "vertical"),
         (split, "horizontal"),
         (witness, "vertical"),
     ):
@@ -192,6 +206,12 @@ async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
     check(
         "thread limit split centred on the axis",
         await adapter.add_sketch_constraint(f"{axis}.end", split, "midpoint"),
+    )
+    check(
+        "plain shank axis continues the thread limit axis",
+        await adapter.add_sketch_constraint(
+            f"{shank_axis}.start", f"{axis}.end", "coincident"
+        ),
     )
     await anchor_point_to_origin(
         adapter, f"{axis}.start", 0.0, 0.0, "thread limit axis on the threaded end"
@@ -216,6 +236,15 @@ async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
     dims.record(None, None)
     await dimension_between(
         adapter,
+        f"{shank_axis}.start",
+        f"{shank_axis}.end",
+        "vertical_distance",
+        PLAIN_SHANK,
+        "plain shank axis length",
+    )
+    dims.record("PlainShankAxis", '"OverallLength" - "HeadHeight" - "FullThreadLength"')
+    await dimension_between(
+        adapter,
         f"{axis}.end",
         f"{witness}.start",
         "vertical_distance",
@@ -233,7 +262,11 @@ async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
     )
     dims.record(None, None)
     await add_diametric_linear_dimension(
-        adapter, axis, witness, (THREAD_R + 3.0, witness_y), "ShankDia"
+        adapter,
+        shank_axis,
+        witness,
+        (THREAD_R + 3.0, witness_y + _SHANK_WITNESS_LEN / 2.0),
+        "ShankDia",
     )
     dims.record("ShankDia", '"ThreadDia"')
     await ensure_fully_defined(adapter, "thread limit sketch")

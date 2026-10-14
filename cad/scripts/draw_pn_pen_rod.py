@@ -52,7 +52,8 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
-from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -191,15 +192,16 @@ FRONT_KEEP = {
 # upper one runs along the 112.0's own, the lower one passes under the
 # 112.0's (which stops at the shoulder, y 0.0993).
 OVERALL_REF_XY = (_fx(-_HALF) - 0.026, _fy(SQUARE_LENGTH / 4.0))
-# Picks: the top face's edge 1.0 in from the left corner (the tap mouth and
-# its cosmetic thread stop at x 0.76), and the pivot end's edge 1.0 in from
-# its left silhouette -- each the only edge at that point.
-OVERALL_TOP_PICK_MM = (-_HALF + 1.0, SQUARE_LENGTH, _HALF)
-OVERALL_END_PICK_MM = (
-    -PIVOT_DIA / 2.0 + 1.0,
-    -PIVOT_LENGTH,
-    math.sqrt((PIVOT_DIA / 2.0) ** 2 - (PIVOT_DIA / 2.0 - 1.0) ** 2),
-)
+# Picks are ENTITIES from the front view's edge scan, not sheet hit-tests:
+# the pivot end is a circular edge seen edge-on, and a SelectByID2 point on
+# it found nothing (farm leaf 20261014T002718Z: "failed to select pen-rod
+# overall length reference edge 1 at sheet (0.069, 0.08875)").  The top face's
+# front edge is the visible straight edge across the square at y 112; the
+# pivot end is the circle of the pivot's diameter about the rod axis at
+# y -10.5.  The sheet points passed beside them only document the layout.
+OVERALL_TOP_SHEET_XY = (_fx(-_HALF + 1.0), _fy(SQUARE_LENGTH))
+OVERALL_END_SHEET_XY = (_fx(-PIVOT_DIA / 2.0 + 1.0), _fy(-PIVOT_LENGTH))
+_EDGE_TOL_MM = 1e-4
 # Top view: the banded depth (and its mate callout) right of the square.
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + _END_HALF_M + 0.035, TOP_CENTER[1]),
@@ -393,23 +395,80 @@ def _dress_shoulder_radius(adapter: Any, annotations: list[Any]) -> None:
     )
 
 
+def _edge_inventory(edges: ViewEdges, y_mm: float) -> str:
+    """The scan's lines and circles within 1 mm of model y ``y_mm``, so a
+    failed pick names what the view really holds there."""
+    rows = []
+    for item in edges.edges:
+        if item.line is not None:
+            start, end = item.line
+            if min(abs(start[1] - y_mm), abs(end[1] - y_mm)) <= 1.0:
+                rows.append(f"line {start}-{end}")
+        elif item.circle is not None:
+            if abs(item.circle[1] - y_mm) <= 1.0:
+                rows.append(f"circle {item.circle}")
+    return f"{len(rows)} of {len(edges.edges)} edges near y {y_mm:g}: {rows}"
+
+
+def _top_face_edge(edges: ViewEdges) -> Any:
+    """The square's top-face edge nearest the viewer: the visible straight
+    edge from (-S/2, SQUARE_LENGTH, +S/2) to (+S/2, SQUARE_LENGTH, +S/2)
+    (the far edge at z -S/2 projects onto it, so z pins the one picked)."""
+    ends = ((-_HALF, SQUARE_LENGTH, _HALF), (_HALF, SQUARE_LENGTH, _HALF))
+    found = [
+        item
+        for item in edges.lines
+        if all(
+            any(math.dist(point, end) <= _EDGE_TOL_MM for end in ends)
+            for point in item.line
+        )
+        and item.length_mm > ROD_SECTION / 2.0
+    ]
+    if len(found) != 1:
+        raise RuntimeError(
+            f"expected one visible top-face edge across the square, found "
+            f"{len(found)}; {_edge_inventory(edges, SQUARE_LENGTH)}"
+        )
+    return found[0].edge
+
+
+def _pivot_end_edge(edges: ViewEdges) -> Any:
+    """The pivot's end-face rim: the Ø PIVOT_DIA circle on the rod axis at
+    y -PIVOT_LENGTH, seen edge-on in the front view."""
+    try:
+        return edges.circle_at(
+            (0.0, -PIVOT_LENGTH, 0.0),
+            PIVOT_DIA / 2.0,
+            axis=(0.0, 1.0, 0.0),
+            label="pivot end rim",
+        ).edge
+    except RuntimeError as error:
+        raise RuntimeError(
+            f"{error}; {_edge_inventory(edges, -PIVOT_LENGTH)}"
+        ) from error
+
+
 @_telemetry.traced("drawing.pen_rod.overall_reference")
 def _overall_reference(adapter: Any, front: Any) -> None:
     """(122.5): top face to pivot end, a reference the square and pivot
-    lengths own (rule 10); a drawing-added edge dimension, readback-proved."""
+    lengths own (rule 10); a drawing-added edge dimension between two
+    scanned entities, proved attached to exactly them and measuring
+    TOTAL_LENGTH before it is parenthesised."""
     label = "pen-rod overall length reference"
+    # Scanned after every display change to the front view (HLR) and after
+    # DETAIL A, whose fence is a sketch circle, not an edge.
+    edges = scan_view_edges(front, label="pen-rod front")
+    picks = (_top_face_edge(edges), _pivot_end_edge(edges))
     display = add_edge_dimension(
         adapter,
         front,
-        p0=model_point_in_view(
-            adapter, front, _mm_to_m(OVERALL_TOP_PICK_MM), label=f"{label} top pick"
-        ),
-        p1=model_point_in_view(
-            adapter, front, _mm_to_m(OVERALL_END_PICK_MM), label=f"{label} end pick"
-        ),
+        # Documentation only: both picks are by entity.
+        p0=OVERALL_TOP_SHEET_XY,
+        p1=OVERALL_END_SHEET_XY,
         text_xy=OVERALL_REF_XY,
         label=label,
         orientation="vertical",
+        entities=picks,
     )
     display = _early_bound(display, "IDisplayDimension")
     dimension_type = int(display.Type2)
@@ -418,16 +477,16 @@ def _overall_reference(adapter: Any, front: Any) -> None:
         raise RuntimeError(
             f"{label}: expected a linear dimension, got type {dimension_type}"
         )
-    # Only the top face and the pivot end are TOTAL_LENGTH apart (the
-    # shoulder is 112.0 from one, 10.5 from the other): the value proves the
-    # picks.
-    measured_mm = abs(
-        float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0
+    # The rim lies in the plane y -10.5, so any arc end condition reads the
+    # same distance; the attachments and the value prove the picks.
+    assert_dimension_measures(
+        adapter,
+        display,
+        expected_mm=TOTAL_LENGTH,
+        label=label,
+        entities=picks,
+        tolerance_mm=1e-3,
     )
-    if abs(measured_mm - TOTAL_LENGTH) > 1e-3:
-        raise RuntimeError(
-            f"{label} measured {measured_mm:g}, expected {TOTAL_LENGTH:g}"
-        )
     set_reference_dimension(adapter, display.GetAnnotation(), label=label)
     display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
     if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:

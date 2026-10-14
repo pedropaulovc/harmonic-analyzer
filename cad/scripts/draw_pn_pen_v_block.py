@@ -59,7 +59,6 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_centerline import add_view_centerline
 from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import scan_view_edges
@@ -246,8 +245,8 @@ BOTTOM_KEEP = {
 # * the relief height right of the cut, from the near wall's foot to the
 #   roof, as before.
 # * the pivot station 8 mm over the top face (y 0.236), from the front face's
-#   top corner (x 0.396) to the bore axis (x 0.360, a centreline added
-#   below); its extension lines top out near y 0.2375.
+#   top corner (x 0.396) to the bore axis (x 0.360, a sketched centreline
+#   from y 0.179 to 0.231); its extension lines top out near y 0.2375.
 # * the chamfer size on the bore's far rim (x 0.351..0.352, the z 11 side),
 #   its "0.3 MIN" (~14 mm wide) centred 12 mm left of that rim and 12 mm up
 #   (y 0.240): its dimension line runs left, away from PivotZ's extension
@@ -392,14 +391,8 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to the {label} view")
     # PivotZ's extension line rises from the bore axis at the top face: the
-    # axis's centreline, picked on the bore's far wall (z 10, y 15: above the
-    # tap, below the chamfer), is the geometry it lands on.
-    add_view_centerline(
-        adapter,
-        section,
-        face_xy=(_sz(_CZ + 1.0), _sy(15.0)),
-        label="section A-A pivot-bore axis",
-    )
+    # axis's centreline is the geometry it lands on.
+    _add_pivot_axis_centerline(adapter, section)
 
     # Native Hole Wizard callouts on each hole's visible rim: the tap's mouth on
     # the front face, the lightening bore where it breaks through the relief roof.
@@ -454,6 +447,80 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         redundant_note_substrings=(f"{SET_SCREW_TAP_SPEC.size} Tapped Hole",),
         expected_redundant_notes=1,
+    )
+
+
+# ASME Y14.2 runs a centreline a short, uniform distance past its feature: 3 mm
+# on paper, 0.75 model mm at 4:1.  Above the top face it runs on under PivotZ's
+# axis extension line (which continues from it); below the roof it ends in the
+# relief's open air.
+_CENTERLINE_OVERSHOOT_MM = 3.0 / (VIEW_SCALE[0] / VIEW_SCALE[1])
+_SW_LINE_CENTER = 4  # swLineStyles_e.swLineCENTER
+
+
+def _add_pivot_axis_centerline(adapter: Any, section: Any) -> None:
+    """Draw the pivot bore's axis through section A-A, from the relief roof to
+    the top face plus the overshoot.
+
+    Farm 2229cc4db: ``InsertCenterLine2`` on the bore face picked at (z 10,
+    y 15) returned None; in this cut the bore wall is split by the tap on the
+    near side and trimmed by the chamfer on top, so neither a face nor a
+    wall-edge pair is a dependable handle.  dt_cone_pivot_post's section
+    recipe instead: the model axis projected through the section's own
+    transform into sheet space, a sheet-owned centreline between the ends,
+    black in the CENTER font, read back.
+    """
+    ends = [
+        model_point_in_view(
+            adapter,
+            section,
+            (PIVOT_BORE_X / 1000.0, y / 1000.0, _CZ / 1000.0),
+            label=f"section A-A pivot axis at y {y:g}",
+        )
+        for y in (
+            RELIEF_HEIGHT - _CENTERLINE_OVERSHOOT_MM,
+            BLOCK_HEIGHT + _CENTERLINE_OVERSHOOT_MM,
+        )
+    ]
+    length = BLOCK_HEIGHT - RELIEF_HEIGHT + 2.0 * _CENTERLINE_OVERSHOOT_MM
+    # The axis must print square to the top face and at true length.
+    if (
+        abs(ends[0][0] - ends[1][0]) > 1e-6
+        or abs((ends[1][1] - ends[0][1]) - length * _S) > 1e-6
+    ):
+        raise RuntimeError(f"section A-A pivot axis projects as {ends!r}")
+    middle = ((ends[0][0] + ends[1][0]) / 2.0, (ends[0][1] + ends[1][1]) / 2.0)
+    outline = tuple(float(v) for v in _early_bound(section, "IView").GetOutline())
+    if not (
+        outline[0] < middle[0] < outline[2] and outline[1] < middle[1] < outline[3]
+    ):
+        raise RuntimeError(
+            f"section A-A pivot axis {middle!r} falls outside the section {outline!r}"
+        )
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    # EditSheet makes the line sheet-owned; the ends are already in sheet space.
+    drawing.EditSheet()
+    sketch_manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    centerline = sketch_manager.CreateCenterLine(
+        ends[0][0], ends[0][1], 0.0, ends[1][0], ends[1][1], 0.0
+    )
+    if centerline is None:
+        raise RuntimeError("failed to create the pivot-bore centreline in section A-A")
+    # A sheet sketch line otherwise prints in the under-defined sketch blue.
+    segment = _early_bound(centerline, "ISketchSegment")
+    segment.Color = 0  # COLORREF black
+    segment.Style = _SW_LINE_CENTER
+    adapter.currentModel.ClearSelection2(True)
+    rebuild_drawing(adapter, label="section A-A pivot axis")
+    if int(segment.Color) != 0 or int(segment.Style) != _SW_LINE_CENTER:
+        raise RuntimeError(
+            "pivot-bore centreline did not keep black centreline font: "
+            f"color={int(segment.Color)}, style={int(segment.Style)}"
+        )
+    # Against the keep maps' arithmetic (x 0.360): logged, not gated.
+    _telemetry.info(
+        f"section A-A pivot axis drawn {ends[0]!r} -> {ends[1]!r}; "
+        f"keep-map axis x {_sz(_CZ):.4f}, off by {middle[0] - _sz(_CZ):+.5f} m"
     )
 
 

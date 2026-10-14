@@ -268,18 +268,53 @@ def test_overall_length_is_one_parenthesised_reference() -> None:
     assert ast.unparse(edge.args[1]) == "front"
     assert keywords["orientation"] == "'vertical'"
     assert keywords["text_xy"] == "OVERALL_REF_XY"
-    assert "abs(measured_mm - TOTAL_LENGTH) > 1e-3" in _DRAWING_SOURCE
+    assert keywords["entities"] == "picks"
+    assert "picks = (_top_face_edge(edges), _pivot_end_edge(edges))" in (
+        _DRAWING_SOURCE
+    )
+    assert "expected_mm=TOTAL_LENGTH" in _DRAWING_SOURCE
     assert "set_reference_dimension(adapter, display.GetAnnotation()" in (
         _DRAWING_SOURCE
     )
-    # Picks: the top face's edge and the pivot end's edge, each clear of the
-    # tap mouth (cosmetic thread r 0.76) and the corners.
-    top_x, top_y, _ = drawing.OVERALL_TOP_PICK_MM
-    end_x, end_y, end_z = drawing.OVERALL_END_PICK_MM
-    assert top_y == spec.SQUARE_LENGTH and abs(top_x) > 0.76 + 0.2
-    assert abs(top_x) < spec.ROD_SECTION / 2.0 - 0.5
-    assert end_y == -spec.PIVOT_LENGTH
-    assert abs(end_x**2 + end_z**2 - (spec.PIVOT_DIA / 2.0) ** 2) < 1e-9
+    # No sheet hit-test: leaf 20261014T002718Z could not select the edge-on
+    # pivot rim at sheet (0.069, 0.08875).
+    assert "OVERALL_TOP_PICK_MM" not in _DRAWING_SOURCE
+    assert drawing.OVERALL_END_SHEET_XY[1] == drawing._fy(-spec.PIVOT_LENGTH)
+    assert drawing.OVERALL_TOP_SHEET_XY[1] == drawing._fy(spec.SQUARE_LENGTH)
+    # Outside the 112.0's dimension line, inside the sheet border.
+    assert 0.0127 + 0.010 < drawing.OVERALL_REF_XY[0] < drawing.FRONT_KEEP["Length"][0]
+
+
+def test_overall_picks_resolve_from_the_scanned_edges() -> None:
+    from _drawing_edges import ViewEdge, ViewEdges
+
+    half, top, end = spec.ROD_SECTION / 2.0, spec.SQUARE_LENGTH, -spec.PIVOT_LENGTH
+
+    def line(name, a, b):
+        return ViewEdge(edge=name, line=(a, b), circle=None, vertices=(None, None))
+
+    def circle(name, y, r):
+        return ViewEdge(
+            edge=name, line=None, circle=(0.0, y, 0.0, 0.0, -1.0, 0.0, r), vertices=None
+        )
+
+    edges = ViewEdges(
+        label="fake front",
+        edges=(
+            line("far top", (-half, top, -half), (half, top, -half)),
+            line("near top", (half, top, half), (-half, top, half)),
+            line("left side", (-half, 0.0, half), (-half, top, half)),
+            circle("shoulder rim", 0.0, spec.PIVOT_DIA / 2.0 + spec.SHOULDER_FILLET_R),
+            circle("pivot end", end, spec.PIVOT_DIA / 2.0),
+        ),
+    )
+    assert drawing._top_face_edge(edges) == "near top"
+    assert drawing._pivot_end_edge(edges) == "pivot end"
+    missing = ViewEdges(label="fake front", edges=edges.edges[:4])
+    with pytest.raises(RuntimeError, match="edges near y -10.5"):
+        drawing._pivot_end_edge(missing)
+    with pytest.raises(RuntimeError, match="found 0"):
+        drawing._top_face_edge(ViewEdges(label="fake front", edges=edges.edges[2:]))
     # Outside the 112.0's dimension line, inside the sheet border.
     assert 0.0127 + 0.010 < drawing.OVERALL_REF_XY[0] < drawing.FRONT_KEEP["Length"][0]
 

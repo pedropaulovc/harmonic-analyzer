@@ -107,7 +107,29 @@ def test_every_feature_is_located_from_the_front_face() -> None:
     assert marks < hide < _PART_SOURCE.index("save_part_and_images(adapter")
     assert "segment.ConstructionGeometry = True" in _PART_SOURCE
     # PivotZ's extension line lands on the section's bore-axis centreline.
-    assert "add_view_centerline(" in _DRAWING_SOURCE
+    # Farm 2229cc4db: InsertCenterLine2 on a picked bore face returned None in
+    # this section, so the axis is sketched between projected model points
+    # (dt_cone_pivot_post's section recipe), black, CENTER font, read back.
+    assert "add_view_centerline" not in _DRAWING_SOURCE
+    assert "_add_pivot_axis_centerline(adapter, section)" in _DRAWING_SOURCE
+    body = _DRAWING_SOURCE[_DRAWING_SOURCE.index("def _add_pivot_axis_centerline(") :]
+    body = body[: body.index("\ndef ")]
+    for needle in (
+        "model_point_in_view(",
+        "PIVOT_BORE_X / 1000.0",
+        "_CZ / 1000.0",
+        "drawing.EditSheet()",
+        "CreateCenterLine(",
+        "segment.Style = _SW_LINE_CENTER",
+        "GetOutline()",
+    ):
+        assert needle in body, needle
+    # 3 mm past each end on paper.
+    assert drawing._CENTERLINE_OVERSHOOT_MM * drawing._S == pytest.approx(0.003)
+    # Drawn after the section is cut and curated.
+    assert _DRAWING_SOURCE.index("keep=SECTION_KEEP") < _DRAWING_SOURCE.index(
+        "_add_pivot_axis_centerline(adapter, section)"
+    )
 
 
 def test_hidden_reference_dimensions_reach_their_views() -> None:

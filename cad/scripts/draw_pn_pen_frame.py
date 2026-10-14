@@ -39,7 +39,6 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_high_quality_shaded_with_edges,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
@@ -253,12 +252,11 @@ async def build(adapter: Any) -> dict[str, str]:
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     # The tapped hole is fully defined by its callout (drawing-guidelines.md
-    # rule 9): neither orthographic view needs hidden lines.  The pictorial is
-    # precise Shaded With Edges (rule 8), so its tap mouth and window fillets
-    # render round rather than faceted.
-    for view in (front, bottom):
+    # rule 9): no view needs hidden lines.  finalize_drawing turns the
+    # pictorial into precise Shaded With Edges (rule 8); at 2:1 its tap mouth
+    # and window fillets read round rather than faceted.
+    for view in (front, bottom, iso):
         set_hidden_lines_removed(adapter, view)
-    set_high_quality_shaded_with_edges(adapter, iso, label="pictorial isometric")
 
     annotations = [
         *curate_view_dimensions(
