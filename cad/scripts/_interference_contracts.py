@@ -306,11 +306,14 @@ _MG_FIXTURE_THREAD_LIMIT = _smooth_annulus_limit_mm3(
 )
 
 _MAGNIFIER_ALLOWED_PAIRS = {
+    # 1.25 in screw - 9.0 wheel bar - 17.9 front arc - 0.5 grip gap (the back
+    # arc's mating face stops short of the column axis,
+    # sh_column_clamp_back_geom.GRIP_OFFSET) = 4.35 in the back arc's tap.
     **_numbered_pairs(
         "vn-clamp-screw",
         range(1, 3),
         "sh-column-clamp-back",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 4.85),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 4.35),
     ),
     frozenset(("vn-thumb-screw-1", "mg-magnifying-clamp-1")): _smooth_annulus_limit_mm3(
         2.8448, 2.261, 3.9
@@ -482,18 +485,20 @@ _RING_PRONG_SHARE = 3.0 * math.atan(0.75) / (2.0 * math.pi)
 # face under the MHA-VN-043 heads, their shanks through its Ø3.2 holes, and
 # the MHA-VN-042 pin through its Ø3.3 pin hole.
 _PAPER_DRIVE_ALLOWED_PAIRS = {
+    # The bar-clamp screws: the receiver length past bar, front arc and the
+    # 0.5 grip gap (build_pd_paper_drive_assembly's clamp stack).
     **_numbered_pairs(
         "vn-clamp-screw",
         range(1, 3),
         "sh-column-clamp-back",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 9.0124),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 8.5124),
         second_number=2,
     ),
     **_numbered_pairs(
         "vn-clamp-screw",
         range(3, 5),
         "sh-column-clamp-back",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 9.0124),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 8.5124),
     ),
     # MHA-VN-059 #2-56 clip screws: 6.35 shank - 0.8 clip sheet = 5.55 in the
     # platen's through tap (3.85 plate + 1.70 rear boss).
