@@ -155,8 +155,9 @@ def test_bracket_hole_ligaments_keep_the_floor_at_worst_case() -> None:
 
 
 def test_bracket_lengths_along_the_foot_carry_their_bands_on_the_model() -> None:
-    """No in-repo sheet prints MHA-CH-008: the S4 fixture plan and any later
-    drawing take the +/-0.10 lengths from the saved model's dimensions."""
+    """The S4 fixture plan and the MHA-CH-008 sheet take the +/-0.10 lengths
+    from the saved model's dimensions; the tap station and the reamed bore
+    carry the drawing contract's bands beside them."""
     from _drawing_contract import model_toleranced_dimensions
 
     assert (bracket.FOOT_LEN_BAND, bracket.EAR_T_BAND, bracket.STATION_BAND) == (
@@ -168,6 +169,8 @@ def test_bracket_lengths_along_the_foot_carry_their_bands_on_the_model() -> None
         ("FootProfile", "FootLen"): "FOOT_LEN_BAND",
         ("Ear", "EarThick"): "EAR_T_BAND",
         ("HoleProfile", "HoleStation"): "STATION_BAND",
+        ("SetScrewReference", "SetScrewLocation"): "SET_SCREW_STATION_BAND",
+        ("ShaftBoreProfile", "ShaftBoreDia"): "*deviations(BORE_DIA_BAND)",
     }
 
 
