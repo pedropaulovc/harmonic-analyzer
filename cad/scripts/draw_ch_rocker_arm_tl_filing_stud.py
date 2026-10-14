@@ -108,15 +108,17 @@ PROFILE_KEEP = {
     "SeatStation": (_row(0.0, 2)[0] - 0.002, _row(0.0, 2)[1]),
     "HeadBackStation": _row(-HEAD_LENGTH, 3),
     "TailEndStation": _row(-TAIL_END, 4),
-    # Corner radii (the fillet dimensions land on the upper silhouette, as
-    # on vn_cone_tip_collar and dt_cone_gear_shaft). The seat's MAX stands
-    # just up and right of its corner, under the relief roots' "2X" pair;
-    # both sit between the seat's and the shoulder's extension lines, below
-    # the shoulder row. The tail root's text stands up and left of its step,
-    # its leader passing above the head diameter's text.
-    "SeatFilletR": (SEAT_X + 0.014, PROFILE_CENTER[1] + 0.015),
-    "ReliefRootR": (SEAT_X + 0.015, PROFILE_CENTER[1] + 0.024),
-    "TailRootR": (SEAT_X - 0.043, PROFILE_CENTER[1] + 0.056),
+    # Corner radii (the fillet dimensions land on the lower corners). The
+    # seat's MAX stands just up and right of its corner and the relief roots'
+    # "2X" pair a full text gap above it, so each reads as its own block
+    # (round-4 layout audit: 2.66 mm read as one); both sit between the
+    # seat's and the shoulder's extension lines, below the shoulder row. The
+    # tail root's text stands below and left of its step, under the tail and
+    # clear of the head diameter's text (round 4: led from above, its leader
+    # crossed that text).
+    "SeatFilletR": (SEAT_X + 0.014, PROFILE_CENTER[1] + 0.0135),
+    "ReliefRootR": (SEAT_X + 0.015, PROFILE_CENTER[1] + 0.026),
+    "TailRootR": (SEAT_X - 0.021, PROFILE_CENTER[1] - 0.023),
 }
 # swDimensionArrowsSide_e.swDimArrowsInside on the two shortest rows: left to
 # the document's arrows outside, the relief end's dimension line ran left
