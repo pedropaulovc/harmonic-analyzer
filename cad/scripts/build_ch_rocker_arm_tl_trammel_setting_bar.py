@@ -25,7 +25,10 @@ from _appearance import apply_material
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
-from _drawing_dimension_insert import add_diametric_linear_dimension
+from _drawing_dimension_insert import (
+    add_angular_reference_dimension,
+    add_diametric_linear_dimension,
+)
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -67,6 +70,7 @@ from ch_rocker_arm_tl_trammel_setting_bar_spec import (
     SEAT_CONE_DEPTH,
     SEAT_DIA,
     SEAT_FLANK_ANGLE_DEG,
+    SEAT_HALF_ANGLE_DEG,
 )
 
 PART_NAME = "ch-rocker-arm-tl-trammel-setting-bar"
@@ -188,15 +192,35 @@ async def _seat(
         label=f"{sketch} mouth diameter",
     )
     dims.record(names.get("dia"), '"SeatDia"')
-    # The adapter's angular dimension needs a shared vertex: the mouth (seat
-    # face) to the cone flank, 90 deg less the half-angle.
-    check(
-        f"{sketch} flank angle",
-        await adapter.add_sketch_dimension(
-            mouth, cone, "angular", SEAT_FLANK_ANGLE_DEG
-        ),
+    # The cone's depth below the face fixes the flank, not a driving angular
+    # dimension: the adapter's angular form left this profile under-defined
+    # on the farm (run 20261014T195954719Z), as it did the magnifying wheel's
+    # tie 2 and the arm plate's countersinks. The drive keeps the 60 deg seat
+    # when SeatDia or PilotDia moves; the printed angle is a driven reference.
+    await dimension_between(
+        adapter,
+        f"{mouth}.end",
+        f"{cone}.end",
+        "vertical_distance",
+        SEAT_CONE_DEPTH,
+        f"{sketch} cone depth",
     )
-    dims.record(names.get("angle"), '"SeatFlankAngle"')
+    dims.record(
+        "SeatConeDepth",
+        f'("SeatDia" - "PilotDia") / 2 / tan({SEAT_HALF_ANGLE_DEG:g})',
+    )
+    # Text inside the face-to-flank wedge at the mouth vertex under either
+    # reading of the location (sketch (u, v), or model with u collapsing to
+    # the axis on the Right plane).
+    await add_angular_reference_dimension(
+        adapter,
+        mouth,
+        cone,
+        (s + _RM - 2.6, -1.5),
+        f"{sketch} flank angle",
+        expected_degrees=SEAT_FLANK_ANGLE_DEG,
+    )
+    dims.record(names.get("angle"))
     await add_diametric_linear_dimension(
         adapter,
         axis,
@@ -276,7 +300,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "H800", f"{H800}mm")
     await set_global(adapter, "H816", f"{H816}mm")
     await set_global(adapter, "SeatDia", f"{SEAT_DIA}mm")
-    await set_global(adapter, "SeatFlankAngle", f"{SEAT_FLANK_ANGLE_DEG}deg")
     await set_global(adapter, "PilotDia", f"{PILOT_DIA}mm")
 
     # Top plane (u, v) = (x, -z): the bar from H0_FROM_END left of H0, centred
@@ -334,7 +357,8 @@ async def build(adapter) -> dict[str, str]:
             {"station": "H816SeatX", "station_drive": '"H816"'},
         ),
     ):
-        names = {**(seat_names if station == 0.0 else {}), **extra}
+        # Every seat follows the globals; only H0's are marked for the sheet.
+        names = {**seat_names, **extra}
         drive_jobs += await _seat(
             adapter, sketch=sketch, plane=plane, station=station, names=names
         )

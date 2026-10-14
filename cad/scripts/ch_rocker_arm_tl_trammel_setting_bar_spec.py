@@ -52,8 +52,8 @@ _XX = printed_band_mm(2)
 # #2 combined drill and countersink: 3/16 body, 5/64 pilot, 60 deg included.
 CENTRE_DRILL_BODY_DIA = 3.0 / 16.0 * INCH
 SEAT_HALF_ANGLE_DEG = 30.0
-# Printed from the seat face to the flank (the sketch's shared-vertex angle):
-# for a 60 deg included cone it reads the included angle's own 60.
+# Printed from the seat face to the flank (a driven reference in the seat
+# sketch): for a 60 deg included cone it reads the included angle's own 60.
 SEAT_FLANK_ANGLE_DEG = 90.0 - SEAT_HALF_ANGLE_DEG
 # Title-block general angular band (no native tolerance on the angle).
 SEAT_ANGLE_BAND = (angular_band_deg(), -angular_band_deg())
