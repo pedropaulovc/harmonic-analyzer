@@ -214,12 +214,10 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("PivotHoleProfile", "PivotDia"): PIVOT_HOLE_BAND,
 }
 
-DRAWING_NOTES = "\n".join(
-    (
-        "LAYOUT AND PROFILE GAUGE FOR THE ROCKER ARM.",
-        "ARC AND TIP-LAND EDGES ARE SCRIBING EDGES: SHARP, EXEMPT FROM TITLE-BLOCK EDGE-BREAK REQUIREMENT.",
-    )
-)
+# The scribing edges' SHARP requirement rides the radius and tip-land
+# callouts of the edges it applies to, not a general note.
+DRAWING_NOTES = "LAYOUT AND PROFILE GAUGE FOR THE ROCKER ARM."
+SHARP_EDGE_CALLOUT = "SHARP EDGE"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:4"
 
 # prechips models a fixture as boxes and cylinders only, so the bound shop
