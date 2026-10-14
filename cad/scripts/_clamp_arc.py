@@ -11,10 +11,13 @@ ear-hole diameter (clearance vs thread) differ, so one builder takes the
 deltas.
 
 Local frame (inherited from the retired one-piece collar): clamp axis (screw line) along
-+X, column axis along Y through the origin, ears flanking at local z +-17.5;
+X, column axis along Y through the origin, ears flanking at local z +-17.5;
 the assembly rotates local +X to machine -Z. The FRONT arc spans local
-x 0..DEPTH (relief opening -X, back face on the column-axis plane), the BACK
-arc spans x -DEPTH..0 (relief opening +X).
+x 0..DEPTH (relief opening -X, mating face on the column-axis plane), the BACK
+arc spans x -DEPTH..-GRIP_OFFSET (relief opening +X): its mating face stops
+``grip_offset`` short of the column axis so the two mating faces stay apart
+when the screws close both half-bores onto the column (a split clamp whose
+faces meet before the bores do cannot grip).
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from typing import Any
 
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _check import check
-from _dimensions import drive_dimension, set_global
+from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -48,11 +51,22 @@ async def build_arc(
     depth: float,
     front: bool,
     hole_spec: HoleSpec,
+    grip_offset: float = 0.0,
 ) -> dict[str, str]:
     """Build one semi-arc shell: ``front=True`` spans local x 0..depth (relief
-    cut opening -X toward the column), ``front=False`` spans x -depth..0. Each
-    caller passes its own ear-hole ``HoleSpec`` (the back arc's ears are tapped
-    for the clamp screw, the front arc's are clearance)."""
+    cut opening -X toward the column), ``front=False`` spans x
+    -depth..-grip_offset. Each caller passes its own ear-hole ``HoleSpec`` (the
+    back arc's ears are tapped for the clamp screw, the front arc's are
+    clearance). ``grip_offset`` is the back arc's alone (the front's mating face
+    stays on the column-axis plane), and it must be positive there. Both arcs
+    name their height (``Height@Block``) and ear-hole stations from the bore
+    axis (``EarHole1Z``/``EarHole2Z@EarHoles``) for their prints."""
+    if front and grip_offset != 0.0:
+        raise ValueError("only the back arc's mating face is offset from the axis")
+    if not front and not 0.0 < grip_offset < COLUMN_BORE / 2.0:
+        raise ValueError(
+            f"back arc grip offset {grip_offset} must lie inside the bore radius"
+        )
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
@@ -65,16 +79,21 @@ async def build_arc(
     await set_global(adapter, "ArcWidth", f"{ARC_WIDTH}mm")
     await set_global(adapter, "ArcHalfH", f"{ARC_HALF_H}mm")
     await set_global(adapter, "ColumnBore", f"{COLUMN_BORE}mm")
+    await set_global(adapter, "EarHoleZ", f"{EAR_HOLE_Z}mm")
+    if not front:
+        await set_global(adapter, "ArcGripOffset", f"{grip_offset}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    x0, x1 = (0.0, depth) if front else (-depth, 0.0)
+    x0, x1 = (0.0, depth) if front else (-depth, -grip_offset)
 
     # Block footprint on the Top plane (x depth, z lateral), extruded the
     # collar height about the bar's centre plane. Emission order (rectilinear
-    # chain, anchor vertex 0 at (x0, -W/2)): seg0 depth, seg1 width, then the
-    # non-zero anchor coords -- x only when the block starts off the column
-    # plane (the back arc), z always.
+    # chain): seg0 depth, seg1 width, then the non-zero anchor coords. The
+    # front anchors vertex 0 (x0, -W/2) on the column-axis plane (z only); the
+    # back anchors vertex 1 (x1, -W/2) on its mating face, so the face's
+    # offset from the column axis is one direct dimension (GripOffset), not
+    # the difference of two others.
     block = SketchDims()
     check("create_sketch block", await adapter.create_sketch("Top"))
     rect = [
@@ -84,12 +103,20 @@ async def build_arc(
         (x0, ARC_WIDTH / 2.0),
     ]
     lines = await add_line_chain(adapter, rect)
-    anchor_names = ["AnchorZ"] if front else ["AnchorX", "AnchorZ"]
-    anchor_drives = ['"ArcWidth" / 2'] if front else ['"ArcDepth"', '"ArcWidth" / 2']
+    if front:
+        anchor = 0
+        anchor_names = ["AnchorZ"]
+        anchor_drives = ['"ArcWidth" / 2']
+        depth_drive = '"ArcDepth"'
+    else:
+        anchor = 1
+        anchor_names = ["GripOffset", "AnchorZ"]
+        anchor_drives = ['"ArcGripOffset"', '"ArcWidth" / 2']
+        depth_drive = '"ArcDepth" - "ArcGripOffset"'
     await define_rectilinear_chain(
-        adapter, lines, rect, label="block", dims=block,
+        adapter, lines, rect, anchor, label="block", dims=block,
         names=["Depth", "Width", *anchor_names],
-        drives=['"ArcDepth"', '"ArcWidth"', *anchor_drives],
+        drives=[depth_drive, '"ArcWidth"', *anchor_drives],
     )
     await ensure_fully_defined(adapter, "block sketch")
     check("exit_sketch block", await adapter.exit_sketch())
@@ -102,12 +129,16 @@ async def build_arc(
         ),
     )
     name_last_feature(adapter, "Block")
-    expected = depth * ARC_WIDTH * 2.0 * ARC_HALF_H
+    drive_jobs.append(
+        (name_dimensions(adapter, "Block", ["Height"])[0], '"ArcHalfH" * 2')
+    )
+    expected = (x1 - x0) * ARC_WIDTH * 2.0 * ARC_HALF_H
     await volume_check(adapter, "block", expected, 0.005 * expected)
 
     # Column relief: the Ø25.6 cylinder about the origin Y axis cut through.
-    # The block sits on one side of the column-axis plane, so exactly the
-    # half-disc leaves the mating face.
+    # The block sits on one side of the column-axis plane, so the circular
+    # segment beyond the mating face leaves it: the half-disc for the front,
+    # the segment past the chord grip_offset from the axis for the back.
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Top"))
     await define_circle(
@@ -126,29 +157,45 @@ async def build_arc(
         ),
     )
     name_last_feature(adapter, "ColumnRelief")
-    expected -= math.pi * (COLUMN_BORE / 2.0) ** 2 / 2.0 * 2.0 * ARC_HALF_H
+    # Circular segment past the mating-face chord, `mating_d` from the axis.
+    bore_r = COLUMN_BORE / 2.0
+    mating_d = 0.0 if front else grip_offset
+    segment_area = bore_r**2 * math.acos(mating_d / bore_r) - mating_d * math.sqrt(
+        bore_r**2 - mating_d**2
+    )
+    expected -= segment_area * 2.0 * ARC_HALF_H
     await volume_check(adapter, "column relief", expected, 0.01 * expected)
 
     # Ear screw holes: ONE native Hole Wizard feature (2 instances) along the
     # clamp axis (local X) at z +-EAR_HOLE_Z, bar centre height, drilled
     # through the outer block face. The ears are outside the bore, so each
-    # hole removes a full-depth (block DEPTH) cylinder at the ANSI-inch table
-    # diameter. Placed while the body is still prismatic (block + half-cylinder
+    # hole removes a full-length (block x1 - x0) cylinder at the ANSI-inch
+    # table diameter. Placed while the body is still prismatic (block + bore
     # relief), before any face-exploding feature. The outward normal is the
     # block's outer X face: +X for the front arc (x 0..depth), -X for the back
-    # arc (x -depth..0).
+    # arc (x -depth..-grip_offset). On either X face the placement sketch's x
+    # runs along model z and its y along model y (build_fr_top_frame's
+    # GooseneckTap on -X, build_dt_cone_tip_block's PinchBore on +X), so each
+    # ear's station from the bore axis is a named sketch-x dimension; the
+    # height stays the origin relation (the bar's centre plane).
     ear_normal = (1.0, 0.0, 0.0) if front else (-1.0, 0.0, 0.0)
     ear_face_x = depth if front else -depth
-    wizard_holes(
+    ear_placement = [
+        (("EarHole1Z", '"EarHoleZ"'), (None, None)),
+        (("EarHole2Z", '"EarHoleZ"'), (None, None)),
+    ]
+    ears = wizard_holes(
         adapter,
         hole_spec,
         [[ear_face_x, 0.0, EAR_HOLE_Z], [ear_face_x, 0.0, -EAR_HOLE_Z]],
         ear_normal,
         f"clamp ear holes ({hole_spec.size} {hole_spec.kind})",
         name="EarHoles",
+        placement_dims=ear_placement,
     )
+    drive_jobs += ears.placement_drive_jobs
     ear_dia = blind_cut_dia_mm(hole_spec)
-    expected -= 2.0 * math.pi * (ear_dia / 2.0) ** 2 * depth
+    expected -= 2.0 * math.pi * (ear_dia / 2.0) ** 2 * (x1 - x0)
     await volume_check(adapter, "ear holes", expected, 0.01 * expected)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to

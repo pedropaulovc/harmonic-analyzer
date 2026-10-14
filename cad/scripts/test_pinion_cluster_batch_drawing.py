@@ -279,7 +279,7 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
         pair = frozenset(
             (f"vn-clamp-screw-{screw_number}", f"sh-column-clamp-back-{back_number}")
         )
-        assert paper_drive[pair] == pytest.approx(42.217366426182714)
+        assert paper_drive[pair] == pytest.approx(39.87518418692443)
 
     # The MHA-VN-006 guide screws alone: seed -1, then the grid -2..-10.
     guide_receivers_and_limits = {
@@ -453,7 +453,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "sh-column-clamp-back",
                 4.1656,
                 3.454,
-                4.85,
+                4.35,
             ),
             frozenset(("vn-thumb-screw-1", "mg-magnifying-clamp-1")): _annulus_limit(
                 2.8448, 2.261, 3.9
@@ -536,7 +536,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "sh-column-clamp-back",
                 4.1656,
                 3.454,
-                9.0124,
+                8.5124,
                 second_number=2,
             ),
             **_expected_numbered_pairs(
@@ -545,7 +545,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "sh-column-clamp-back",
                 4.1656,
                 3.454,
-                9.0124,
+                8.5124,
             ),
             # MHA-VN-059 #2-56 clip screws, 5.55 in the platen's through tap.
             **_expected_numbered_pairs(
