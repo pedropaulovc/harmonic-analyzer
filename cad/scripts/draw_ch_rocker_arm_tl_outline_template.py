@@ -81,11 +81,11 @@ EXTERIOR_RADII = ("TopRadius", "BottomRadius")
 FRONT_KEEP = {
     "TopRadius": (0.095, 0.140),
     "BottomRadius": (0.305, 0.140),
-    "BottomBelowPivot": (0.188, 0.146),
+    "BottomBelowPivot": (0.188, 0.137),
     "PivotDia": (0.240, 0.140),
     "BottomTailX": (0.133, 0.118),
     "BottomRodX": (0.267, 0.118),
-    "TopAbovePivot": (0.222, 0.198),
+    "TopAbovePivot": (0.222, 0.190),
     "TopTailX": (0.128, 0.207),
     "TopRodX": (0.272, 0.207),
     "TailTipLen": (0.033, 0.197),
@@ -97,9 +97,10 @@ RIGHT_KEEP = {"Thick": (0.392, 0.225)}
 # Both arc centres lie on the bore's vertical centreline, off the sheet
 # above; the apex heights land on each arc's low point there, and the tip
 # lands run radially from those centres.  Each scribing edge carries its
-# SHARP requirement and each apex height the rocker edge it sets.  The apex
-# blocks sit higher than their single-line places so the second line clears
-# the 132.757 text below and the top arc.
+# SHARP requirement and each apex height the rocker edge it sets.  SOLIDWORKS
+# centres each apex block on its position, so the extra line grows it upward:
+# the positions sit low enough that each +0.03 keeps its single-line height,
+# clear of the bottom arc and the 145.240 line.
 CALLOUTS_BELOW = {
     "TopRadius": f"{ARC_CENTER_CALLOUT}\n{SHARP_EDGE_CALLOUT}",
     "BottomRadius": f"{ARC_CENTER_CALLOUT}\n{SHARP_EDGE_CALLOUT}",
