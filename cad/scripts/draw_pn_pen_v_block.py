@@ -278,13 +278,13 @@ RIGHT_KEEP = {
     "VApexY": (_rz(BLOCK_DEPTH) + 0.012, _ry(V_APEX_Y / 2.0)),
 }
 # Bottom: all three stations from the paper end below the view, a baseline
-# stack nested shortest-innermost (relief step x 0.144, pivot axis 0.134,
+# stack nested shortest-innermost (relief step x 0.148, pivot axis 0.134,
 # lightening axis 0.092; rows 10 mm apart down to y 0.024, 11 mm above the
 # border) so no extension line crosses a dimension line under it.  That frees
 # the gap above the view for the relief corner's radius: its text sits 45 deg
-# up-right of the front-face corner arc (centre x 0.140, y 0.112), so the
+# up-right of the front-face corner arc (centre x 0.144, y 0.112), so the
 # radial leader runs out from the arc's midpoint across only the bottom face's
-# land; the text (x 0.153..0.168) is clear of the front view's SetScrewX line
+# land; the text (x ~0.157..0.172) is clear of the front view's SetScrewX line
 # (y 0.142) above and the reamed diameter's callout (from x 0.188) right.  The
 # lightening bore's depth station left of the free end, its extension lines
 # from that end's front-face corner (x 0.040, y 0.126) and from the bore's

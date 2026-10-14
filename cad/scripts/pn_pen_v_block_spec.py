@@ -71,7 +71,12 @@ MARKER_AXIS_Y = V_APEX_Y - (marker.BARREL_DIA / 2.0) / math.sin(_HALF)
 V_CONTACT_Y = V_APEX_Y - (marker.BARREL_DIA / 2.0) * math.sin(_HALF)
 
 # --- Relief slot (body clearance), x RELIEF_X0..BLOCK_LENGTH ---
-RELIEF_X0 = 10.0
+# The step stands far enough toward the paper end that the reamed pivot bore
+# drops wholly into the slot at the printed limits (guard below): at 10.0 the
+# bore's edge stood 0.5 off the step, and at the limits the ream broke into
+# the step wall in a crescent (machinist review final4).  The V, and so the
+# grip's seat, is this long: 9 of the grip's 14.5 (it was 10).
+RELIEF_X0 = 9.0
 # Both walls are baseline stations from the front face; the width follows.
 RELIEF_Z0 = 2.5  # near (front) wall
 RELIEF_Z1 = 15.5  # far (back) wall
@@ -169,7 +174,7 @@ if (
     raise AssertionError("lightening bore must open wholly into the relief slot")
 # The relief corners stand RELIEF_CORNER_R into the slot from each wall at the
 # step.  The grip seats in the V and may run on past the step (the carriage
-# places it 1.5 past); it is widest in the slot at the bottom face (its axis
+# places it 2.5 past); it is widest in the slot at the bottom face (its axis
 # is below the block), so the corner must stand clear of it there wherever it
 # ends.  The body (wider) must start past x = RELIEF_X0 + RELIEF_CORNER_R; the
 # carriage layout owns where it starts.
@@ -304,6 +309,17 @@ RELIEF_FAR_WALL_PRINTED_MIN = (BLOCK_DEPTH - _band("Depth")) - (
 )  # 1.57 with the depth at .X
 if min(RELIEF_NEAR_WALL_PRINTED_MIN, RELIEF_FAR_WALL_PRINTED_MIN) < _WALL:
     raise AssertionError("a printed relief wall falls under the rule 17 1.5 floor")
+# The pivot bore must leave the brass wholly into the slot: its paper-side
+# edge (station and reamed diameter at their limits) stays past the step at
+# its far limit, or the ream breaks into the step wall in a crescent.
+PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN = (
+    PIVOT_BORE_X
+    - _band("PivotX")
+    - (PIVOT_BORE_DIA + PIVOT_BORE_BAND[0]) / 2.0
+    - (RELIEF_X0 + _band("ReliefX0"))
+)  # 0.18
+if PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN < 0.0:
+    raise AssertionError("at its printed limits the pivot bore breaks the step wall")
 
 
 def _body_half_chord_at_bottom(angle_deg: float, mouth: float) -> float:

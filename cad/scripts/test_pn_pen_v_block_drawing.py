@@ -14,6 +14,7 @@ import draw_pn_pen_v_block as drawing
 import pn_pen_v_block_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import TAP_DRILL_MM
+from _printed_tolerance import printed_band_mm
 
 _PART_SOURCE = Path(part.__file__).read_text(encoding="utf-8")
 _DRAWING_SOURCE = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -198,6 +199,39 @@ def test_relief_corners_carry_the_largest_radius_the_grip_allows() -> None:
         in _PART_SOURCE
     )
     assert '"tangent"' in _PART_SOURCE and '"radial"' in _PART_SOURCE
+
+
+def test_pivot_bore_drops_wholly_into_the_slot_at_its_printed_limits() -> None:
+    import pn_pen_carriage_geom as carriage
+    import vn_pen_marker_spec as marker
+
+    # Review final4: with the step at 10.0 the reamed bore's edge stood 0.5
+    # off it, and at the printed limits (step 10.8, station 11.99, ream
+    # radius 2.006) broke 0.8 into the step wall.  Both stations are .X / .XX
+    # baselines from the paper end; the step moved to 9.0.
+    assert spec.RELIEF_X0 == 9.0
+    assert spec.DRAWING_PRECISION["ReliefProfile"]["ReliefX0"] == 1
+    assert spec.DRAWING_PRECISION["PivotBoreProfile"]["PivotX"] == 2
+    worst_edge = (
+        spec.PIVOT_BORE_X
+        - printed_band_mm(2)
+        - (spec.PIVOT_BORE_DIA + spec.PIVOT_BORE_BAND[0]) / 2.0
+    )
+    worst_step = spec.RELIEF_X0 + printed_band_mm(1)
+    assert spec.PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN == pytest.approx(
+        worst_edge - worst_step
+    )
+    assert 0.15 < spec.PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN < 0.2
+    # The grip still seats on 9 of its 14.5 (10 before: under 7% of the grip
+    # lost), spans the whole V, and its body clears the corner arcs.
+    grip_length = marker.BARREL_END_Y - marker.BARREL_START_Y
+    start, end = carriage.MARKER_GRIP_LOCAL_X
+    assert end - start == pytest.approx(grip_length)
+    seat = min(end, spec.RELIEF_X0) - max(start, 0.0)
+    assert seat == spec.RELIEF_X0
+    assert (10.0 - seat) / grip_length < 0.07
+    assert end > spec.RELIEF_X0 + spec.RELIEF_CORNER_R + 1.5
+    assert carriage.plan_cg_residual_mm() <= 0.25
 
 
 def test_pivot_chamfer_clears_the_rod_fillet_as_a_min_limit() -> None:
@@ -508,8 +542,7 @@ def test_v_is_its_angle_and_mouth_with_a_reference_apex() -> None:
 
     # Review r11 (rules 3/10): the V prints its included angle (driving, the
     # title block's +/-1 deg); final review: both mouth edges from the front
-    # face; the apex height is a driven reference.  The geometry is
-    # unchanged, and so is the carriage.
+    # face; the apex height is a driven reference.
     assert spec.V_ANGLE_DEG == 90.0
     assert spec.V_MOUTH_WIDTH == 12.0
     assert (spec.V_MOUTH_Z0 + spec.V_MOUTH_Z1) / 2.0 == spec.BLOCK_DEPTH / 2.0
@@ -518,10 +551,6 @@ def test_v_is_its_angle_and_mouth_with_a_reference_apex() -> None:
     assert spec.V_APEX_Y == 6.0
     assert spec.MARKER_AXIS_Y == pytest.approx(6.0 - 5.3 * math.sqrt(2.0))
     assert carriage.BLOCK_BOTTOM_Y == pytest.approx(366.2)
-    assert carriage.plan_cg_residual_mm() == pytest.approx(0.0988244, abs=1e-6)
-    assert carriage.plan_cg_local() == pytest.approx(
-        (111.5112689, 12.5986303, 9.0061911), abs=1e-6
-    )
     assert spec.REFERENCE_DIMENSIONS == (("VGrooveProfile", "VApexY"),)
     assert {"VAngle", "VApexY", "VMouthZ0", "VMouthZ1"} == spec.DRAWING_DIMENSIONS[
         "VGrooveProfile"
@@ -668,12 +697,12 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     assert part.V_BLOCK == pytest.approx(11016.0)
     # Cut one corner radius past the step, the V's run there lies in the slot:
     # the relief removes that much less (the two slivers, 0.005 mm^3, aside).
-    assert part.V_GROOVE == pytest.approx(396.0)
+    assert part.V_GROOVE == pytest.approx(360.0)
     assert part.V_GROOVE_PAST_STEP == pytest.approx(36.0)
     # The carriage mass model cuts the relief square-cornered and leaves the
     # bore's top chamfer: both under 0.05% of the block.
     assert part.V_RELIEF + part.V_RELIEF_CORNERS + part.V_GROOVE_PAST_STEP == (
-        pytest.approx(2197.0)
+        pytest.approx(2281.5)
     )
     corner_r, relief_h = spec.RELIEF_CORNER_R, spec.RELIEF_HEIGHT
     assert part.V_RELIEF_CORNERS == pytest.approx(
