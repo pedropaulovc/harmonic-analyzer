@@ -36,10 +36,15 @@ _OD_MIN, _OD_MAX = [round(OD + deviation, 12) for deviation in printed_deviation
 _HUB_MIN, _HUB_MAX = [round(rocker.HUB_DIA + deviation, 12) for deviation in printed_deviations(rocker.HUB_DIA, 2)]
 if not (_HUB_MIN <= _OD_MIN and _OD_MAX <= _HUB_MAX):
     raise AssertionError("filing-button rim band leaves the hub's printed O.D. band")
-# "O.D. round and true to bore": the inventory's receipt limit for the rim's
-# runout to its bore (hub-filing-buttons button_runout_mm). The stud's hub
-# coaxiality budget spends it.
+# The rim's runout to its bore: the inventory's receipt limit
+# (hub-filing-buttons button_runout_mm), printed as a measurable acceptance on
+# the O.D. (drawing-simplicity-policy: the button is off the GD&T allowlist,
+# so plain runout wording, no frame or datum). The stud's hub coaxiality
+# budget spends it.
 OD_RUNOUT_TIR = 0.02
+OD_RUNOUT_PLACES = 2
+if round(OD_RUNOUT_TIR, OD_RUNOUT_PLACES) != OD_RUNOUT_TIR:
+    raise AssertionError("the rim runout does not print at its places")
 
 # The bore prints as a reference and its fit to the stud governs (callout).
 # BORE_BAND is the design intent of that fit for the stud's stack checks
@@ -80,14 +85,16 @@ if round((_OD_MIN - BORE_DIA) / 2.0, 2) != RIM_WALL_MIN:
 # Pending exception ruling: MHA-CH-006-TL-04 rim wall 1.78 MIN (#1369).
 RIM_WALL_NOTE = f"RIM WALL {RIM_WALL_MIN:.2f} MIN."
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
-# each three-place size names its mate on its own dimension (callout below).
+# each three-place size names its mate on its own dimension (callout below);
+# the O.D. carries its runout acceptance above its value.
 OD_CALLOUT = "SETS FILED MHA-CH-006 HUB"
+OD_RUNOUT_CALLOUT = f"RUNOUT {OD_RUNOUT_TIR:.{OD_RUNOUT_PLACES}f} TIR TO BORE"
 THICKNESS_CALLOUT = "STACKS MHA-CH-006 HUB"
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the
 # title block's edge break does not apply to the rim; a leadered note on the
 # rim edge says so.
 RIM_CORNER_NOTE = "BOTH RIM CORNERS SHARP"
-DRAWING_NOTES = f"O.D. ROUND AND TRUE TO BORE.\n{RIM_WALL_NOTE}"
+DRAWING_NOTES = RIM_WALL_NOTE
 REFERENCE_DIMENSIONS = frozenset({"BoreDia"})
 REFERENCE_CALLOUTS = {"BoreDia": BORE_FIT_CALLOUT}
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

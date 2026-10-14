@@ -132,6 +132,34 @@ if _BODY_LEN_MIN <= _HUB_TOP_MAX:
 UPPER_BUTTON_SUPPORT_MIN = round(_BODY_LEN_MIN - _HUB_TOP_MAX, 12)
 if UPPER_BUTTON_SUPPORT_MIN < _BUTTON_MIN / 2.0:
     raise AssertionError("filing-stud body does not carry the upper button")
+
+# Internal corner radii (Main's round-4 ruling on codex's root-radius
+# blocker). The relief's two roots and the head-to-tail step take a turning
+# tool's nose radius, R0.3 with a symmetric band on its model dimension: never
+# sharp at the band's floor, and its ceiling still fits the relief depth under
+# the thread, the worst-case relief width and the head-to-tail step. The
+# button seat is a clearance limit instead: R0.2 MAX (a sharp corner is
+# acceptable there), under the title block's 0.25 edge break on the lower
+# button's bore (the kit test reads the row), so the button bears on the
+# head face.
+ROOT_RADIUS = 0.3
+ROOT_RADIUS_TOL = 0.1
+ROOT_RADIUS_PLACES = 1
+_ROOT_RADIUS_MAX = ROOT_RADIUS + ROOT_RADIUS_TOL
+if _ROOT_RADIUS_MAX > (THREAD_MODEL_DIA - RELIEF_DIA) / 2.0:
+    raise AssertionError("filing-stud relief root radius is deeper than the relief")
+if 2.0 * _ROOT_RADIUS_MAX > RELIEF_WIDTH_MIN:
+    raise AssertionError("filing-stud relief roots overlap at the narrowest relief")
+if _ROOT_RADIUS_MAX > (HEAD_DIA - TAIL_DIA) / 2.0:
+    raise AssertionError("filing-stud tail root radius is taller than the head step")
+SEAT_FILLET_RADIUS = 0.2
+SEAT_FILLET_PLACES = 1
+SEAT_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints the model value + MAX
+if round(SEAT_FILLET_RADIUS, SEAT_FILLET_PLACES) != SEAT_FILLET_RADIUS:
+    raise AssertionError(
+        "filing-stud seat fillet MAX does not print as its model value"
+    )
+RELIEF_ROOTS_CALLOUT = "2X"
 # Bought clamping nut: McMaster 90264A425, zinc-plated steel hex coupling
 # nut, #10-24, 3/4 in long, 5/16 in across flats, fully threaded (verified
 # live 2026-10-14). The inventory's M5 DIN 934 nut is 0.8D tall; the coupling
@@ -217,6 +245,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ThreadProfile": {"ThreadDia"},
     "ReliefProfile": {"ReliefDia"},
     "StationReference": set(_STATIONS),
+    "SeatFillet": {"SeatFilletR"},
+    "ReliefRoots": {"ReliefRootR"},
+    "TailRoot": {"TailRootR"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HeadProfile": {"HeadDia": HEAD_PLACES},
@@ -225,6 +256,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ThreadProfile": {"ThreadDia": 2},
     "ReliefProfile": {"ReliefDia": RELIEF_PLACES},
     "StationReference": dict(_STATIONS),
+    "SeatFillet": {"SeatFilletR": SEAT_FILLET_PLACES},
+    "ReliefRoots": {"ReliefRootR": ROOT_RADIUS_PLACES},
+    "TailRoot": {"TailRootR": ROOT_RADIUS_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

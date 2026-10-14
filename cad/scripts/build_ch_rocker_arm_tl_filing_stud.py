@@ -38,7 +38,8 @@ from _sketch import (
 )
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -56,6 +57,10 @@ from ch_rocker_arm_tl_filing_stud_spec import (
     ISOMETRIC_VIEW_NOTE,
     RELIEF_DIA,
     RELIEF_WIDTH,
+    ROOT_RADIUS,
+    ROOT_RADIUS_TOL,
+    SEAT_FILLET_RADIUS,
+    SEAT_FILLET_TOL_TYPE,
     TAIL_DIA,
     TAIL_END,
     THREAD_END,
@@ -115,6 +120,15 @@ def _require_one_solid_body(adapter, *, label: str) -> None:
         )
 
 
+def _seat_fillet_max_limit(adapter) -> None:
+    """SeatFilletR as a single MAX limit: the print shows the model value."""
+    _, dimension = _named_dimension(adapter, "SeatFillet", "SeatFilletR")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = SEAT_FILLET_TOL_TYPE
+    if int(tolerance.Type) != SEAT_FILLET_TOL_TYPE:
+        raise RuntimeError("SeatFilletR@SeatFillet: MAX tolerance type did not persist")
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
@@ -127,6 +141,8 @@ async def build(adapter) -> dict[str, str]:
         await set_global(adapter, length_knob, f"{length}mm")
     await set_global(adapter, "ReliefDia", f"{RELIEF_DIA}mm")
     await set_global(adapter, "ReliefWidth", f"{RELIEF_WIDTH}mm")
+    await set_global(adapter, "SeatFilletR", f"{SEAT_FILLET_RADIUS}mm")
+    await set_global(adapter, "RootR", f"{ROOT_RADIUS}mm")
 
     drive_jobs: list[tuple[str, str]] = []
     for profile, feature, dia_knob, length_knob, dia, length, reverse in _STEPS:
@@ -206,6 +222,46 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Relief")
     relief_width = name_dimensions(adapter, "Relief", ["ReliefWidth"])[0]
     drive_jobs.append((relief_width, '"ReliefWidth"'))
+
+    # Internal corner radii (spec: ROOT_RADIUS, SEAT_FILLET_RADIUS). Each pick
+    # lies on its corner's circle in the Right-plane frame (x along the axis,
+    # radius on +Y); the nearest other edge is >= 0.5 mm away. The seat
+    # corner is head face to body, the relief roots are the body shoulder and
+    # the thread end to the relief floor, the tail root is the head's back
+    # face to the tail. Together they add about 1 mm^3 to ~2480 mm^3, inside
+    # the volume gate's 0.5 %: it checks no step was eaten.
+    for feature, dimension, radius, picks, drive in (
+        (
+            "SeatFillet",
+            "SeatFilletR",
+            SEAT_FILLET_RADIUS,
+            [[0.0, BODY_DIA / 2.0, 0.0]],
+            '"SeatFilletR"',
+        ),
+        (
+            "ReliefRoots",
+            "ReliefRootR",
+            ROOT_RADIUS,
+            [
+                [BODY_LENGTH, RELIEF_DIA / 2.0, 0.0],
+                [BODY_LENGTH + RELIEF_WIDTH, RELIEF_DIA / 2.0, 0.0],
+            ],
+            '"RootR"',
+        ),
+        (
+            "TailRoot",
+            "TailRootR",
+            ROOT_RADIUS,
+            [[-HEAD_LENGTH, TAIL_DIA / 2.0, 0.0]],
+            '"RootR"',
+        ),
+    ):
+        check(
+            f"fillet {feature}",
+            await adapter.add_fillet(radius, picks, propagate=False),
+        )
+        name_last_feature(adapter, feature)
+        drive_jobs.append((name_dimensions(adapter, feature, [dimension])[0], drive))
     await volume_check(adapter, "stud", V_TOTAL, 0.005 * V_TOTAL)
     _require_one_solid_body(adapter, label="stud")
 
@@ -295,6 +351,12 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    _seat_fillet_max_limit(adapter)
+    for feature, dimension in (
+        ("ReliefRoots", "ReliefRootR"),
+        ("TailRoot", "TailRootR"),
+    ):
+        set_dimension_symmetric_tolerance(adapter, feature, dimension, ROOT_RADIUS_TOL)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

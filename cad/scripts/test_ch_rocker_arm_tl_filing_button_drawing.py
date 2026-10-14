@@ -90,8 +90,9 @@ def test_every_exported_nominal_lies_inside_its_band(stem: str) -> None:
 
 
 # Each printed toleranced dimension -> the exported feature and requirement
-# that owns its band. Reference sizes governed by a matched-fit callout and
-# the thread designation own no band.
+# that owns its band. Reference sizes governed by a matched-fit callout, the
+# thread designation and the corner radii (tool-form sizes read with a radius
+# gauge, as vn_cone_tip_collar's shoulder root) own no band.
 PRINTED_OWNERS = {
     BUTTON: (
         button,
@@ -113,7 +114,7 @@ PRINTED_OWNERS = {
             "TailDia": ("vise_tail", "dia"),
             "ReliefDia": ("thread_relief", "dia"),
         },
-        {"BodyDia", "ThreadDia"},
+        {"BodyDia", "ThreadDia", "SeatFilletR", "ReliefRootR", "TailRootR"},
     ),
 }
 
@@ -256,3 +257,28 @@ def test_notes_follow_the_simplicity_policy(notes: str) -> None:
     # The only figure a note may carry is a named exception's stated shortfall.
     assert not re.search(r"\d", notes.replace(button.RIM_WALL_NOTE, ""))
     assert "GROUND" not in notes and "GRIND" not in notes
+
+
+def test_corner_radii_fit_their_corners_and_clear_the_button() -> None:
+    """Main's round-4 ruling: R0.3 +/-0.1 roots (never sharp; the ceiling
+    fits the relief and the head step) and an R0.2 MAX seat corner inside the
+    title block's edge break on the button bore."""
+    high = stud.ROOT_RADIUS + stud.ROOT_RADIUS_TOL
+    assert stud.ROOT_RADIUS - stud.ROOT_RADIUS_TOL > 0
+    assert high <= (stud.THREAD_MODEL_DIA - stud.RELIEF_DIA) / 2
+    assert 2 * high <= stud.RELIEF_WIDTH_MIN
+    assert high <= (stud.HEAD_DIA - stud.TAIL_DIA) / 2
+    edge_break = float(_config.title_block("edge_break")["chamfer_max_mm"])
+    assert stud.SEAT_FILLET_RADIUS < edge_break
+    assert stud.SEAT_FILLET_TOL_TYPE == 6
+    assert stud.DRAWING_PRECISION_BY_NAME["SeatFilletR"] == 1
+    assert stud_drawing.PROFILE_KEEP.keys() >= {
+        "SeatFilletR",
+        "ReliefRootR",
+        "TailRootR",
+    }
+
+
+def test_rim_runout_prints_as_its_receipt_limit() -> None:
+    assert button.OD_RUNOUT_CALLOUT == "RUNOUT 0.02 TIR TO BORE"
+    assert "TRUE TO BORE" not in button.DRAWING_NOTES

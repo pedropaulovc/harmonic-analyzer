@@ -45,6 +45,7 @@ from ch_rocker_arm_tl_filing_button_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     OD_CALLOUT,
+    OD_RUNOUT_CALLOUT,
     REFERENCE_CALLOUTS,
     REFERENCE_DIMENSIONS,
     RIM_CORNER_NOTE,
@@ -257,6 +258,9 @@ async def build(adapter: Any) -> dict[str, str]:
         annotations,
         {"DiscDia": OD_CALLOUT, "DiscThick": THICKNESS_CALLOUT},
         location="below",
+    )
+    set_dimension_callouts(
+        adapter, annotations, {"DiscDia": OD_RUNOUT_CALLOUT}, location="above"
     )
     add_attached_note(
         adapter,

@@ -15,6 +15,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -53,6 +54,7 @@ from ch_rocker_arm_tl_filing_stud_spec import (
     HEAD_LENGTH,
     REFERENCE_CALLOUTS,
     REFERENCE_DIMENSIONS,
+    RELIEF_ROOTS_CALLOUT,
     RELIEF_WIDTH,
     STACK_CALLOUT,
     SURFACE_FINISHES,
@@ -106,7 +108,22 @@ PROFILE_KEEP = {
     "SeatStation": (_row(0.0, 2)[0] - 0.002, _row(0.0, 2)[1]),
     "HeadBackStation": _row(-HEAD_LENGTH, 3),
     "TailEndStation": _row(-TAIL_END, 4),
+    # Corner radii (the fillet dimensions land on the upper silhouette, as
+    # on vn_cone_tip_collar and dt_cone_gear_shaft). The seat's MAX stands
+    # just up and right of its corner, under the relief roots' "2X" pair;
+    # both sit between the seat's and the shoulder's extension lines, below
+    # the shoulder row. The tail root's text stands up and left of its step,
+    # its leader passing above the head diameter's text.
+    "SeatFilletR": (SEAT_X + 0.014, PROFILE_CENTER[1] + 0.015),
+    "ReliefRootR": (SEAT_X + 0.015, PROFILE_CENTER[1] + 0.024),
+    "TailRootR": (SEAT_X - 0.043, PROFILE_CENTER[1] + 0.056),
 }
+# swDimensionArrowsSide_e.swDimArrowsInside on the two shortest rows: left to
+# the document's arrows outside, the relief end's dimension line ran left
+# across the shoulder's extension line (round-3 layout audit) and the
+# shoulder row's ran toward the relief roots' text.
+ARROWS_INSIDE = 0
+INSIDE_ARROW_ROWS = ("ReliefEndStation", "ShoulderStation")
 
 
 _AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
@@ -235,8 +252,10 @@ PROFILE_DIAMETER_XY = {
     # 15): the fit callout on the journal (seat to shoulder), the relief floor
     # in its groove and the thread on the threaded tip (relief end to the
     # tip), all below so no leader crosses a row. The relief's value sits
-    # under the thread's so its dimension line passes left of that text.
-    "BodyDia": (SEAT_X + BODY_LENGTH / 2.0 * _S, PROFILE_CENTER[1] - 0.065),
+    # under the thread's so its dimension line passes left of that text. The
+    # journal's line stands near the shoulder: the finish symbol hangs under
+    # the journal's seat end (the corner radii took the space above it).
+    "BodyDia": (SEAT_X + (BODY_LENGTH - 2.5) * _S, PROFILE_CENTER[1] - 0.065),
     "ReliefDia": (
         SEAT_X + (BODY_LENGTH + RELIEF_WIDTH / 2.0) * _S,
         PROFILE_CENTER[1] - 0.045,
@@ -371,6 +390,18 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, annotations, {"SeatStation": STACK_CALLOUT}, location="below"
     )
+    set_dimension_callouts(
+        adapter, annotations, {"ReliefRootR": RELIEF_ROOTS_CALLOUT}, location="above"
+    )
+    for name in INSIDE_ARROW_ROWS:
+        matches = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one filing-stud {name} station dimension")
+        annotation = _early_bound(matches[0], "IAnnotation")
+        row = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        row.ArrowSide = ARROWS_INSIDE
+        if int(row.ArrowSide) != ARROWS_INSIDE:
+            raise RuntimeError(f"filing stud {name} did not keep its arrows inside")
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [a for a in annotations if dimension_name(adapter, a) == name]
         if len(matches) != 1:
@@ -391,14 +422,15 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, profile, face_xy=PROFILE_CENTER, label="stud turning axis"
     )
     # The sliding journal is a required machined surface (codex round 14):
-    # on its upper silhouette, symbol between the seat and thread-start lines.
-    body_pick = (SEAT_X + 0.006, PROFILE_CENTER[1] + BODY_DIA / 2.0 * _S)
+    # on its lower silhouette near the seat, symbol hanging below it, left of
+    # the journal's fit-callout line (the corner radii stand above).
+    body_pick = (SEAT_X + 0.006, PROFILE_CENTER[1] - BODY_DIA / 2.0 * _S)
     add_surface_finish(
         adapter,
         profile,
         edge_xy=body_pick,
         entity_type="SILHOUETTE",
-        symbol_xy=(SEAT_X + 0.008, PROFILE_CENTER[1] + 0.012),
+        symbol_xy=(SEAT_X + 0.004, PROFILE_CENTER[1] - 0.022),
         leader_attach_xy=body_pick,
         control=surface_finish_by_key(SURFACE_FINISHES, "locating_body"),
         label="filing stud locating diameter finish",
