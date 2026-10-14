@@ -649,6 +649,17 @@ HANGER_SECTION_KEEP = {
     ),
     "HangerGrip": HANGER_GRIP_TEXT_XY,
 }
+# F-F runs two targeted imports, one per owner set.  Before the faced top,
+# F-F imported HangerPinHoles + HangerPinProfile on their own (and then beside
+# the hidden grip sketch) and printed the slip hole's size.  With the Crossbar
+# BODYFEATURE in the SAME InsertModelAnnotations3 selection, the farm
+# delivered HangerGrip and HangerPinHoleDepth but no HangerPinHoleDia
+# (fd0350a85746, leaf 20261014T203505Z-1-494a6e80).  HangerPinProfile is a
+# consumed profile, not a hidden childless sketch, so visibility does not
+# explain it.  The grip goes first: its unrequested BarProfile dimensions are
+# deleted and the grip re-placed before the pin pair, which owns only its two
+# marked dimensions, lands as it always did.
+HANGER_SECTION_IMPORTS = (("HangerGrip",), ("HangerPinHoleDia", "HangerPinHoleDepth"))
 HANGER_SECTION_CALLOUTS = {
     "HangerPinHoleDia": HANGER_PIN_HOLE_CALLOUT,
     "HangerPinHoleDepth": HANGER_PIN_DEPTH_CALLOUT,
@@ -1925,7 +1936,8 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     plain clearance hole and blind slip hole are exposed as solid cut lines.
     F-F imports the model's driving HangerGrip (finished top to finished
     underside, the crossbar's own extrude depth with the band authored on
-    it) and only reads it back; no sheet-side grip exists. This section
+    it) in a targeted import of its own (HANGER_SECTION_IMPORTS) and only
+    reads it back; no sheet-side grip exists. This section
     also adds the slip hole's
     station from the screw axis, the slot's BASIC station from the slip hole
     and the slot's length -- and
@@ -2022,12 +2034,16 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         suffix=HANGER_SLOT_LENGTH_CALLOUT,
         offset_text=SLOT_LENGTH_OFFSET_XY,
     )
-    dimensions = curate_view_dimensions(
-        adapter, view,
-        keep=HANGER_SECTION_KEEP,
-        view_label="knife-hanger section F-F",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
+    dimensions = [
+        dimension
+        for names in HANGER_SECTION_IMPORTS
+        for dimension in curate_view_dimensions(
+            adapter, view,
+            keep={name: HANGER_SECTION_KEEP[name] for name in names},
+            view_label="knife-hanger section F-F",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
+    ]
     _require_model_hanger_grip(adapter, dimensions)
     set_dimension_callouts(adapter, dimensions, HANGER_SECTION_CALLOUTS)
     # Four lines cannot stand between extension lines 3.24 apart: park the

@@ -2740,7 +2740,9 @@ def test_finished_grip_is_the_crossbars_own_driving_depth() -> None:
         assert "_set_tolerance_precision" not in text
     assert "floor_edge" not in section
     assert "underside_edge" not in section
-    assert "dimensions = curate_view_dimensions(" in section
+    assert "for names in HANGER_SECTION_IMPORTS" in section
+    assert "keep={name: HANGER_SECTION_KEEP[name] for name in names}" in section
+    assert "keep=HANGER_SECTION_KEEP," not in section
     assert "_require_model_hanger_grip(adapter, dimensions)" in section
     assert 'owner != ["HangerGrip", "Crossbar"]' in helper
     # No hidden sketch is shown for F-F: it cuts the crossbar extrude itself.
@@ -2808,6 +2810,33 @@ def test_section_reads_the_model_grip_back_without_writing_it(monkeypatch) -> No
     ):
         with pytest.raises(RuntimeError, match=match):
             drawing._require_model_hanger_grip(None, dimensions)
+
+
+def test_section_imports_the_grip_apart_from_the_slip_hole() -> None:
+    """fd0350a85746 leaf 20261014T203505Z-1-494a6e80: ONE targeted import
+    selecting Crossbar, HangerPinHoles and HangerPinProfile delivered
+    HangerGrip and HangerPinHoleDepth but no HangerPinHoleDia.  F-F imports
+    the grip's owner alone, first, then exactly the pin pair it imported on
+    its own before the faced top; no pass mixes the two owner sets."""
+    from _drawing_dimension_import import _features_owning
+
+    groups = drawing.HANGER_SECTION_IMPORTS
+    names = [name for group in groups for name in group]
+    assert len(names) == len(set(names))
+    assert set(names) == set(drawing.HANGER_SECTION_KEEP) == {
+        "HangerGrip", "HangerPinHoleDia", "HangerPinHoleDepth",
+    }
+    owners = [
+        _features_owning(spec.DRAWING_DIMENSIONS, group, view_label="F-F")
+        for group in groups
+    ]
+    assert owners == [("Crossbar",), ("HangerPinHoles", "HangerPinProfile")]
+    assert not set(owners[0]) & set(owners[1])
+    # Every pass's annotations reach the combined list the grip-ownership and
+    # precision checks read.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    section = source[source.index("def _hanger_section("):]
+    assert "dimensions = [\n        dimension\n        for names in HANGER_SECTION_IMPORTS" in section
 
 
 def test_dowel_slip_hole_contract() -> None:
