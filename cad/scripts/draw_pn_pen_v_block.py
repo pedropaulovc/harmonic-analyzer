@@ -20,19 +20,21 @@ face); every feature is located across the depth from the body's front face
 * right (third angle, right of the ``*Back`` face): ``*Left``, the paper end,
   shows the neck's end face with the V in solid lines and the body's wider
   faces beyond it.  Under it, one baseline row from the body's front face:
-  the V's two mouth edges and the depth; inside the groove's 45 deg wedge at
-  the back mouth corner, the flanks' "2X 45°" to the bottom face; over the
-  view, its apex flat's width and, up the back round's bisector, the
-  rounds' single-limit radius; right of it, the flat's reference height.
+  the V's two mouth edges; at the back mouth corner, out of the view in the
+  wedge vertically opposite the groove's, the flanks' "2X 45°" to the bottom
+  face, its short arc at the corner and its text offset right of the view;
+  over the view, its apex flat's width and, up the back round's bisector,
+  the rounds' single-limit radius; right of it, the flat's reference height.
   Through the V it looks along
   the open relief slot: the V is cut on past the step
   (``pn_pen_v_block_spec.V_CUT_LENGTH``), so no brass shows inside it.
 * bottom: ``*Bottom`` turned 180 degrees to keep the front view's X, looking
   up into the V and the relief; through the relief the roof shows the pivot
-  bore.  It carries the overall length, the neck's two faces from the body's
-  front face (right of the paper end, where the neck's step is an outline
-  change), the relief's start station and corner radius, and the pivot bore
-  (station and reamed, banded diameter).
+  bore.  It carries the stations from the paper end and the overall length
+  under it, the relief's corner radius over it, the neck's two faces and the
+  body's back face from the body's front face (right of the paper end, where
+  the neck's step is an outline change) and the pivot bore's reamed, banded
+  diameter.
 * section A-A through the pivot-bore axis: bore, tap and relief in one cut,
   looking toward the free end as the paper-end view does (front face on the
   left in both); it carries both relief walls from the body's front face and
@@ -76,7 +78,11 @@ from _drawing_common import (
 )
 from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import import_cosmetic_threads
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+)
 from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_hole_callout import add_native_hole_callout
@@ -107,7 +113,6 @@ from pn_pen_v_block_spec import (
     PIVOT_BORE_DIA,
     PIVOT_BORE_TOP_CHAMFER,
     PIVOT_BORE_X,
-    RELIEF_CORNER_R,
     RELIEF_HEIGHT,
     RELIEF_X0,
     RELIEF_Z0,
@@ -152,9 +157,9 @@ _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
 # 18 x 18 chamfered block computed 38.2 wide against the 38.3 farm
 # 20261014T005925878Z measured); at 3:2, 52.5 x 52.4.  Centred at (0.315,
 # 0.097), its ink centred 1.8 mm under it as measured, it fills x
-# 0.289..0.341, y 0.069..0.121: 79 mm right of the reamed diameter's callout
-# (to x ~0.210), 4 mm over the title block (top 0.0651), right of the end
-# view's depth extension line (x 0.276, down to ~0.131).
+# 0.289..0.341, y 0.069..0.121: 78 mm right of the reamed diameter's callout
+# (to x ~0.213), 4 mm over the title block (top 0.0651), under the flank
+# angle's text (x ~0.283..0.297, from y ~0.146).
 # Its scale note (top-left anchor, ~58 mm wide) beside it at mid-height, from
 # x 0.350 (9 mm right of the ink) to ~0.408, 11 mm inside the border (0.4188),
 # under the caption and over the title block.
@@ -235,24 +240,27 @@ FRONT_KEEP = {
 # Paper end: one baseline row under the view from the body's front face (the
 # view's left edge, x 0.188), nested shortest-innermost 7 mm apart so no
 # extension line crosses a dimension line it does not end on: the V's front
-# and back mouth edges (x 0.208, 0.256) and the depth (x 0.276).  Every
-# station stands right of the last, so each outer extension line passes right
-# of every inner span.  The lowest line, the depth's, at ~0.133.  The neck's
-# faces print in the bottom view, where its step is an outline change (blind
-# review final8: here, edge-on beyond the neck's end face, they read as ribs).
+# and back mouth edges (x 0.208, 0.256).  The back edge stands right of the
+# front, so its extension line passes right of the front's span; its line,
+# the lower, at ~0.140.  The neck's faces and the depth print in the bottom
+# view, where its step is an outline change (blind review final8: here,
+# edge-on beyond the neck's end face, they read as ribs; final9: the depth
+# closes their row there, so the back face's "20.10" no longer reads as the
+# overall).
 # * the flanks' angle to the bottom face, "2X 45°", measured at the back
-#   mouth corner (x 0.256, y 0.156) in the 45 deg wedge inside the groove,
-#   between the back flank and the mouth's line along the bottom face, where
-#   the build's sketch measures it (blind review final8: from outside the
-#   wedge, SOLIDWORKS ran the arc 40 mm about the corner from the flank round
-#   through the depth row's text to its own).  Its text (~14 mm, x
-#   ~0.233..0.246, y ~0.159..0.162) stands 17 mm up the wedge, off the part in
-#   the groove's open mouth: 3 mm left of the back flank, 2.6 mm over the
-#   mouth's line (which the flat height's lower extension line draws).  Its
-#   arc, 17 mm about the corner, lands on the back flank (17 mm along it,
-#   12 mm up) and on the mouth's line (x 0.239); 6 mm of brass above the
-#   flank and of sheet over the back-edge row's text leave room for outside
-#   arrows should SOLIDWORKS flip them.
+#   mouth corner (x 0.256, y 0.156) in the wedge vertically opposite the
+#   groove's: under the bottom face, between the flank's and the face's
+#   continuations past the corner, where the build's sketch measures it.  Its
+#   arc stands on that wedge's bisector 12 mm about the corner, out of the
+#   view (x ~0.264..0.268, y ~0.148..0.156), right of the back edge's
+#   extension line (x 0.256, straight down from the corner); its text,
+#   offset off the arc on a leader (draw_pd_transgear_thumbnut's countersink
+#   angle), stands right of the view under the bottom face's line: ~14 mm at
+#   x ~0.283..0.297, y ~0.146..0.150, 6 mm under the flat height's lower
+#   extension line (y 0.156) and 9 mm left of section A-A (x 0.306).  Blind
+#   review final9: in the groove's wedge the arc, through the text, ran into
+#   its "4"; final8: placed outside the wedge it measures, SOLIDWORKS swept
+#   the arc 40 mm about the corner through the depth row's text.
 # * the apex flat's width over the view (its line ~6 mm over the top face,
 #   y ~0.234; text ~0.2355..0.239), its extension lines rising from the
 #   flat's ends (x 0.228 / 0.236) across the end face: 8 mm under the tap's
@@ -276,15 +284,18 @@ _ROUND_CENTRE = (
     _ry(V_FLAT_Y - V_APEX_FILLET_R),
 )
 _ROUND_TEXT_RUN = 0.070
-_FLANK_TEXT_RUN = 0.017
-_FLANK_TEXT_BEARING = math.radians(165.0)
+# The flank's continuation past the corner runs down-right at the flank's
+# angle under the bottom face's line; the arc stands on the bisector between.
+_FLANK_ARC_BEARING = -math.radians(90.0 - V_ANGLE_DEG / 2.0) / 2.0
+_FLANK_ARC_RUN = 0.012
+FLANK_ANGLE_TEXT_XY = (_rz(BODY_Z1) + 0.0135, _ry(0.0) - 0.008)
 RIGHT_KEEP = {
     "VMouthZ0": ((_rz(BODY_Z0) + _rz(V_MOUTH_Z0)) / 2.0, _ry(0.0) - 0.006),
     "VMouthZ1": (_rz(_CZ), _ry(0.0) - 0.006 - _END_ROW),
-    "Depth": (_rz(_CZ), _ry(0.0) - 0.006 - 2 * _END_ROW),
+    # The arc's position: the text is offset to FLANK_ANGLE_TEXT_XY after.
     "VFlankAngle": (
-        _rz(V_MOUTH_Z1) + _FLANK_TEXT_RUN * math.cos(_FLANK_TEXT_BEARING),
-        _ry(0.0) + _FLANK_TEXT_RUN * math.sin(_FLANK_TEXT_BEARING),
+        _rz(V_MOUTH_Z1) + _FLANK_ARC_RUN * math.cos(_FLANK_ARC_BEARING),
+        _ry(0.0) + _FLANK_ARC_RUN * math.sin(_FLANK_ARC_BEARING),
     ),
     "VFlatWidth": (RIGHT_CENTER[0], _ry(BLOCK_HEIGHT) + 0.0093),
     "VFlatY": (_rz(BODY_Z1) + 0.012, _ry(V_FLAT_Y / 2.0)),
@@ -295,48 +306,59 @@ RIGHT_KEEP = {
 }
 # Bottom (front faces at the top, y 0.128 for the body's, 0.1196 for the
 # neck's):
-# * the overall length above the view, its extension lines rising from the
-#   paper end's and the free end's front corners through the air in front of
-#   the block; its text toward the free end (x ~0.065..0.076) and its line
-#   (~0.132) under the front view's SetScrewX extension lines (ends ~0.139,
-#   x 0.105 / 0.155).
-# * both stations from the paper end below the view, a baseline pair nested
-#   shortest-innermost (relief step, pivot axis; 9 mm apart, the pivot's line
-#   ~5 mm above the border).
-# * the relief corner's radius: its text in the notch in front of the neck
-#   (x ~0.127..0.143, between the neck's front edge at y 0.1196 and the
-#   body's front level at 0.128), up-right of the front-face corner arc
-#   (centre x 0.115, y 0.112), so the radial leader runs out from the arc's
-#   midpoint across only the bottom face's land.
-# * the neck's two faces right of the paper end, a baseline pair from the
-#   body's front face nested shortest-innermost 7 mm apart, where the neck's
-#   step from the body is an outline change on both long edges: the front
-#   face's "2.10" inside its 8.4 mm span (x ~0.156..0.166, its arrows
-#   outside), the back face's "20.10" at mid-span (x ~0.162..0.174).  The
-#   datum's extension line runs from the step's corner on the body's front
-#   edge (x 0.119) through the air in front of the neck, 2.7 mm over the
-#   corner radius's text.
+# * the stations from the paper end under the view, one baseline row nested
+#   shortest-innermost 6.5 mm apart: the relief step, the pivot axis and the
+#   overall length (lines ~0.030, ~0.023, ~0.017, the last 4 mm over the
+#   border).  The length's extension lines drop from the paper end's and the
+#   free end's back corners; its text toward the free end (x ~0.065..0.076).
+#   Over the view, from the front corners, its line fenced off the air in
+#   front of the block, where the relief corner's radius now prints.
+# * the relief corner's radius over the view (blind review final9: in the
+#   notch in front of the neck it was squeezed): its text (~16 mm, x
+#   ~0.135..0.151, y ~0.133..0.136) 3.7 mm over the neck faces' datum
+#   extension line (y 0.128), 5 mm under the front view's tap station (its
+#   line ~0.141, its extension lines down to ~0.139 at x 0.105 / 0.155).
+#   The radial leader, from its shoulder 3.3 mm left of the text, runs ~50
+#   deg down to the front corner's arc (centre x 0.1146, y 0.1116), across
+#   the datum's extension line and the neck's front edge 2.7 mm right of the
+#   step.
+# * the neck's two faces and the body's back face right of the paper end,
+#   one baseline row from the body's front face at the step, nested
+#   shortest-innermost: the front face's "2.10" inside its 8.4 mm span (x
+#   ~0.156..0.165, its arrows outside; nothing rises from the paper end's
+#   front corner beside it now that the length prints under the view), the
+#   back face's "20.10" 7 mm right at mid-span (x ~0.161..0.173, y ~0.088)
+#   and the depth 8 mm further, its line 2 mm clear of "20.10"'s end, its
+#   "22.2" lower, halfway between the neck's back edge and the mid-depth (x
+#   ~0.171..0.179, y ~0.066).  The datum's extension line runs from the
+#   step's corner on the body's front edge (x 0.119) through the air in front
+#   of the neck; the depth's from the body's back corner at the step (y
+#   0.039) through the air behind it.
 # * the reamed diameter's callout below them, wholly right of the paper end,
 #   its single arrow on the near rim (set_near_side_diameter), so no leader
-#   crosses the bore.  Five rows, ~34 mm wide and ~31 mm tall about its keep:
-#   x ~0.176..0.210, y ~0.022..0.054, 6 mm right of the neck faces' extension
-#   lines (to x ~0.170), 6 mm left of the title block (x 0.216) and 8 mm over
-#   the border.  Its leader, from the rim down-right to the block's lower
-#   left, leaves the view through the neck's back edge and passes the paper
-#   end's extension line ~8 mm under the neck's back corner (y 0.0476) and
-#   ~13 mm over the relief step's dimension line (~0.025), so it crosses no
+#   crosses the bore.  Five rows, ~34 mm wide and ~32 mm tall about its keep:
+#   x ~0.178..0.212, y ~0.025..0.057, 2.5 mm right of the depth's line (x
+#   0.175) and 1 mm right of its extension line's end (~0.1765), 4 mm left of
+#   the title block (x 0.216) and 12 mm over the border.  Its leader, from
+#   the rim down-right to the block's lower left, leaves the view through the
+#   neck's back edge, passes the paper end's extension line ~4 mm under the
+#   neck's back corner (y 0.0476), then crosses the depth's extension line (y
+#   0.0392) and passes ~12 mm under the depth line's end, so it crosses no
 #   dimension line.
+_PAPER_ROW = 0.0065
+_NECK_ROW_X = _fx(0.0) + 0.0055
 BOTTOM_KEEP = {
-    "Length": (_fx(BLOCK_LENGTH) + 0.025, _bz(BODY_Z0) + 0.0075),
-    "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BODY_Z1) - 0.009),
-    "PivotX": (_fx(PIVOT_BORE_X / 2.0), _bz(BODY_Z1) - 0.018),
-    "ReliefCornerR": (
-        _fx(RELIEF_X0 + RELIEF_CORNER_R) + 0.020,
-        _bz(RELIEF_Z0 + RELIEF_CORNER_R) + 0.012,
+    "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BODY_Z1) - _PAPER_ROW),
+    "PivotX": (_fx(PIVOT_BORE_X / 2.0), _bz(BODY_Z1) - 2 * _PAPER_ROW),
+    "Length": (_fx(BLOCK_LENGTH) + 0.025, _bz(BODY_Z1) - 3 * _PAPER_ROW),
+    "ReliefCornerR": (_fx(RELIEF_X0) + 0.0245, _bz(BODY_Z0) + 0.0065),
+    "NeckZ0": (_NECK_ROW_X, (_bz(BODY_Z0) + _bz(0.0)) / 2.0),
+    "NeckZ1": (_NECK_ROW_X + _END_ROW, (_bz(BODY_Z0) + _bz(NECK_DEPTH)) / 2.0),
+    "Depth": (
+        _NECK_ROW_X + _END_ROW + 0.008,
+        (_bz(NECK_DEPTH) + _bz(DEPTH_MID_Z)) / 2.0,
     ),
-    "NeckZ0": (_fx(0.0) + 0.0065, (_bz(BODY_Z0) + _bz(0.0)) / 2.0),
-    "NeckZ1": (_fx(0.0) + 0.0135, (_bz(BODY_Z0) + _bz(NECK_DEPTH)) / 2.0),
-    "PivotDia": (_fx(0.0) + 0.0385, _bz(NECK_DEPTH) - 0.0096),
+    "PivotDia": (_fx(0.0) + 0.040, _bz(NECK_DEPTH) - 0.0067),
 }
 # Section A-A looks the same way as the paper-end view beside it: the body's
 # front face at x 0.306 on the LEFT, the bottom face at y 0.156, the top at
@@ -395,6 +417,45 @@ SECTION_CAPTION_XY = (SECTION_CENTER[0], _sy(0.0) - 0.023)
 SECTION_THREAD_LAYER = "TAP-THREAD-SECTION"
 TAPPED_HOLE_NOTE = f"{SET_SCREW_TAP_SPEC.size} Tapped Hole"
 _COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
+
+
+def _place_flank_angle(adapter: Any, annotations: list[Any]) -> None:
+    """Keep the flanks' angle arc short at the back mouth corner and move only
+    its text off the part (draw_pd_transgear_thumbnut's countersink angle).
+
+    An angular dimension's arc runs through its text's position: the arc
+    goes first (no offset, RIGHT_KEEP), then the text, offset on a leader.
+    Both positions are read back.
+    """
+    name = "VFlankAngle"
+    matches = [item for item in annotations if dimension_name(adapter, item) == name]
+    if len(matches) != 1:
+        raise RuntimeError(f"v-block needs one native {name}, got {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    # An inherited offset would move only the text, leaving the arc behind.
+    display.OffsetText = False
+    if bool(display.OffsetText):
+        raise RuntimeError("v-block flank angle offset could not be reset")
+    if not annotation.SetPosition2(*RIGHT_KEEP[name], 0.0):
+        raise RuntimeError("failed to position the v-block flank angle arc")
+    arc_position = annotation.GetPosition()
+    if (
+        not arc_position
+        or math.dist((float(arc_position[0]), float(arc_position[1])), RIGHT_KEEP[name])
+        > 1e-5
+    ):
+        raise RuntimeError(f"v-block flank angle arc did not persist: {arc_position!r}")
+    offset_dimension_text(adapter, [annotation], {name: FLANK_ANGLE_TEXT_XY})
+    if not bool(display.OffsetText):
+        raise RuntimeError("v-block flank angle text did not stay offset")
+    position = annotation.GetPosition()
+    if (
+        not position
+        or math.dist((float(position[0]), float(position[1])), FLANK_ANGLE_TEXT_XY)
+        > 1e-5
+    ):
+        raise RuntimeError(f"v-block flank angle text did not persist: {position!r}")
 
 
 def _section_thread_on_visible_layer(adapter: Any, section: Any) -> None:
@@ -582,6 +643,9 @@ async def build(adapter: Any) -> dict[str, str]:
     if len(pivot_dia) != 1:
         raise RuntimeError(f"expected one PivotDia dimension, found {len(pivot_dia)}")
     set_near_side_diameter(pivot_dia[0], "reamed pivot-bore diameter")
+    # The flanks' angle: its short arc at the back mouth corner, out of the
+    # view, and its text offset right of the view.
+    _place_flank_angle(adapter, annotations)
     # Places (and the pivot band) are authored on the part; the sheet only
     # proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

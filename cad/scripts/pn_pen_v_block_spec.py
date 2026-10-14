@@ -246,16 +246,16 @@ if round(PIVOT_BORE_TOP_CHAMFER, PIVOT_CHAMFER_PLACES) != PIVOT_BORE_TOP_CHAMFER
 # never chained: the neck's faces (NeckZ0 / NeckZ1), the body's back face
 # (Depth), the V's two mouth edges (VMouthZ0 / VMouthZ1), the relief's two walls
 # (ReliefZ0 / ReliefZ1) and the pivot bore (PivotZ) are each a baseline from it.
-# The plan outline (OutlineProfile, Top plane) prints the length and the neck's
-# two faces in the bottom view, where the neck's step from the body is an
-# outline change on both long edges (blind review final8, the third time:
+# The plan outline (OutlineProfile, Top plane) prints the length and, in one
+# baseline row from the body's front face, the neck's two faces and the
+# body's back face in the bottom view, where the neck's step from the body is
+# an outline change on both long edges (blind review final8, the third time:
 # printed in the paper-end view, the step's faces read as thin ribs between
-# the neck's end face and the body's beyond it); the block's extrusion its
-# height.  The V's sketch (Right plane, the paper end) carries construction
-# stubs on the body's front face (the datum's foot) and its back face, so the
-# paper-end view prints the V's edges and the depth from the datum in one
-# baseline row (the outline's own body depth, driven by the same global,
-# stays unprinted).
+# the neck's end face and the body's beyond it; final9: without the depth
+# closing that row, the neck's back face read as the overall); the block's
+# extrusion its height.  The V's sketch (Right plane, the paper end) carries
+# a construction stub on the body's front face (the datum's foot), so the
+# paper-end view prints the V's edges from the datum in one baseline row.
 # Section A-A shows the relief and the pivot bore across the depth, but their
 # sketches lie in the Top plane and project edge-on there.  ReliefReference
 # and PivotReference lie IN section A-A's cutting plane (x = PIVOT_BORE_X,
@@ -271,7 +271,7 @@ if round(PIVOT_BORE_TOP_CHAMFER, PIVOT_CHAMFER_PLACES) != PIVOT_BORE_TOP_CHAMFER
 # saved hidden; the drawing shows them in section A-A
 # (``_drawing_hidden_sketches``) while the part shows them at the cut. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "OutlineProfile": {"Length", "NeckZ0", "NeckZ1"},
+    "OutlineProfile": {"Length", "NeckZ0", "NeckZ1", "Depth"},
     "Block": {"Height"},
     "VGrooveProfile": {
         "VFlankAngle",
@@ -279,7 +279,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "VFlatY",
         "VMouthZ0",
         "VMouthZ1",
-        "Depth",
     },
     "VApexFillets": {"VApexFilletR"},
     "ReliefProfile": {"ReliefX0", "ReliefCornerR"},
@@ -307,7 +306,7 @@ SECTION_REFERENCE_SKETCHES = REFERENCE_SKETCHES
 # runs into the bore wherever it stands, and the set screw locks the pen's
 # angle).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "OutlineProfile": {"Length": 1, "NeckZ0": 2, "NeckZ1": 2},
+    "OutlineProfile": {"Length": 1, "NeckZ0": 2, "NeckZ1": 2, "Depth": 1},
     "Block": {"Height": 1},
     "VGrooveProfile": {
         "VFlankAngle": 0,
@@ -315,7 +314,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "VFlatY": 1,
         "VMouthZ0": 1,
         "VMouthZ1": 1,
-        "Depth": 1,
     },
     "VApexFillets": {"VApexFilletR": V_APEX_FILLET_PLACES},
     "ReliefProfile": {"ReliefX0": 1, "ReliefCornerR": 1},

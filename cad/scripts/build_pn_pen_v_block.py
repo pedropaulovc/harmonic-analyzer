@@ -204,15 +204,17 @@ async def _outline(adapter, dims: SketchDims) -> None:
     N the neck's depth.  Relations: L0 starts on the origin; the even lines
     horizontal, the odd vertical.  Dims: the step's station on both neck faces
     (unprinted, the "ReliefX0" global: the print states it once, on the slot's
-    step, in line with these), the overall length along the front (printed in
-    the bottom view, above it: its extension lines rise from the paper end's
-    and the free end's front corners into the air in front of the block), and
-    the depth-wise faces as baselines from the body's front face (L2): the
-    neck's front face and its back face (NeckZ0 / NeckZ1, printed in the
-    bottom view right of the paper end, where the neck's step is an outline
-    change on both long edges) and the body's back face (unprinted: the V's
-    sketch prints the depth in the paper-end view, driven by the same global)
-    -- 16 point DOF less 2 + 8 relations + 6 dims = 0.
+    step, in line with these), the overall length along the back (printed in
+    the bottom view under it, the outermost of the paper end's baseline row:
+    its extension lines drop from the paper end's and the free end's back
+    corners into the air behind the block, so the air in front of it is free
+    for the relief corner's radius), and the depth-wise faces as baselines
+    from the body's front face at the step (L2's start): the neck's front face
+    and its back face (NeckZ0 / NeckZ1) and the body's back face at the step
+    (Depth), one row printed in the bottom view right of the paper end, where
+    the neck's step is an outline change on both long edges and the overall
+    depth closes the row (blind review final9: without it the neck's "20.10"
+    read as the overall) -- 16 point DOF less 2 + 8 relations + 6 dims = 0.
     """
     step, side = RELIEF_X0, BODY_SIDE_STEP
     points = [
@@ -237,8 +239,8 @@ async def _outline(adapter, dims: SketchDims) -> None:
         )
     paper_front, step_front = f"{lines[0]}.start", f"{lines[0]}.end"
     datum = f"{lines[2]}.start"  # the body's front face, at the step
-    free_front, free_back = f"{lines[3]}.start", f"{lines[3]}.end"
     paper_back = f"{lines[6]}.end"
+    free_back, body_back = f"{lines[3]}.end", f"{lines[4]}.end"
     step_back = f"{lines[6]}.start"
     for first, second, kind, value, name, drive, label in (
         (
@@ -260,8 +262,8 @@ async def _outline(adapter, dims: SketchDims) -> None:
             "neck back face length",
         ),
         (
-            paper_front,
-            free_front,
+            paper_back,
+            free_back,
             "horizontal_distance",
             BLOCK_LENGTH,
             "Length",
@@ -287,25 +289,30 @@ async def _outline(adapter, dims: SketchDims) -> None:
             "neck back face from the body's front face",
         ),
         (
-            free_front,
-            free_back,
+            datum,
+            body_back,
             "vertical_distance",
             BODY_DEPTH,
-            "BodyDepth",
+            "Depth",
             '"BlockDepth"',
-            "body depth",
+            "body back face from the body's front face",
         ),
     ):
         await dimension_between(adapter, first, second, kind, value, label)
         dims.record(name, drive)
 
 
-# Sketch (u, v) of a point inside the groove just over each mouth corner,
-# front then back: where that flank's angle to the bottom face goes, which
-# picks the wedge it is measured in (AddSpecificDimension takes the region
-# holding its text point).
+# Sketch (u, v) of each flank's angle text point, front then back: it picks
+# the wedge that flank's angle to the bottom face is measured in
+# (AddSpecificDimension takes the region holding its text point).  The front
+# one stands in the groove just over its mouth corner (unprinted).  The
+# printed back one stands in the vertically opposite wedge, under the bottom
+# face and beyond the back mouth corner, between the flank's and the bottom
+# face's continuations past the corner: the same 45 deg, so the drawing keeps
+# the angle's arc out of the view, short, at the corner (blind review final9:
+# in the groove the arc struck its own text).
 def _flank_angle_text_points() -> tuple[tuple[float, float], tuple[float, float]]:
-    return ((-(V_MOUTH_Z0 + 1.5), 0.5), (-(V_MOUTH_Z1 - 1.5), 0.5))
+    return ((-(V_MOUTH_Z0 + 1.5), 0.5), (-(V_MOUTH_Z1 + 1.5), -0.6))
 
 
 def _add_driving_flank_angle(
@@ -369,25 +376,23 @@ def _make_driven(adapter, dimension_id: str, label: str) -> None:
 async def _v_groove(adapter, dims: SketchDims) -> None:
     """The V on the Right plane, sketch (u, v) = model (-Z, Y).
 
-    Construction stubs stand on the depth-wise faces from their feet on the
-    bottom face: on the body's front face (the depth datum, beyond the neck
-    in the paper-end view; its foot from the origin and its length,
-    unprinted), and on the body's back face, its foot level with the datum's
-    and printed from it (Depth; the neck's faces print in the bottom view,
-    from the outline).  The V is a trapezoid: LA runs front mouth -> the
-    flat's front end, LF along the apex flat, LB the flat's back end -> back
-    mouth, LC back mouth -> front mouth along the bottom face.  Relations:
-    each stub's foot on the origin's level and the stub vertical, LC and LF
-    horizontal, the front mouth on the origin's level.  Driving dims: both
-    mouth edges from the datum's foot (real edges on the bottom face,
-    baselines from the face the print locates everything from, so neither is
-    chained from the other and the V is not placed by the depth's symmetry),
-    the flat's width and each flank's angle to LC (the bottom face), so each
-    flank is fixed on its own -- 2 x 4 + 8 DOF less 7 relations + 9 dims =
-    0.  The flat's height is what they leave: a DRIVEN dimension the print
-    shows as a reference.  It is made driven before the angles exist, so the
-    sketch is never over-defined.  The stubs are construction geometry: the
-    cut takes only the trapezoid.
+    A construction stub stands on the body's front face (the depth datum,
+    beyond the neck in the paper-end view) from its foot on the bottom face:
+    its foot from the origin and its length, unprinted.  The neck's faces and
+    the depth print in the bottom view, from the outline.  The V is a
+    trapezoid: LA runs front mouth -> the flat's front end, LF along the apex
+    flat, LB the flat's back end -> back mouth, LC back mouth -> front mouth
+    along the bottom face.  Relations: the stub's foot on the origin's level
+    and the stub vertical, LC and LF horizontal, the front mouth on the
+    origin's level.  Driving dims: both mouth edges from the datum's foot
+    (real edges on the bottom face, baselines from the face the print locates
+    everything from, so neither is chained from the other and the V is not
+    placed by the depth's symmetry), the flat's width and each flank's angle
+    to LC (the bottom face), so each flank is fixed on its own -- 1 x 4 + 8
+    DOF less 5 relations + 7 dims = 0.  The flat's height is what they leave:
+    a DRIVEN dimension the print shows as a reference.  It is made driven
+    before the angles exist, so the sketch is never over-defined.  The stub
+    is construction geometry: the cut takes only the trapezoid.
     """
     datum = await _construction_chord(
         adapter, "VGrooveProfile", (_DATUM_U, 0.0), (_DATUM_U, _STUB)
@@ -409,37 +414,6 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
         "V datum stub",
     )
     dims.record("VDatumStub")
-    back = await _construction_chord(
-        adapter, "VGrooveProfile", (-BODY_Z1, 0.0), (-BODY_Z1, _STUB)
-    )
-    check(
-        "V back stub foot level with the datum",
-        await adapter.add_sketch_constraint(
-            f"{back}.start", f"{datum}.start", "horizontal_points"
-        ),
-    )
-    await dimension_between(
-        adapter,
-        f"{datum}.start",
-        f"{back}.start",
-        "horizontal_distance",
-        depth_station(BODY_Z1),
-        "V sketch depth from the front face",
-    )
-    dims.record("Depth", '"BlockDepth"')
-    check(
-        "V back stub vertical",
-        await adapter.add_sketch_constraint(back, None, "vertical"),
-    )
-    await dimension_between(
-        adapter,
-        f"{back}.start",
-        f"{back}.end",
-        "vertical_distance",
-        _STUB,
-        "V back stub",
-    )
-    dims.record("VBodyBackStub")
     flat_half = V_FLAT_WIDTH / 2.0
     points = [
         (-V_MOUTH_Z0, 0.0),
