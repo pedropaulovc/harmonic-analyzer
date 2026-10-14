@@ -613,9 +613,11 @@ def test_section_shows_the_tap_thread_on_a_visible_thin_layer() -> None:
         "annotation.Layer = SECTION_THREAD_LAYER",
         'if str(annotation.Layer or "") != SECTION_THREAD_LAYER:',
         "if moved < 1:",
-        "remove_notes_matching(adapter, TAPPED_HOLE_NOTE)",
     ):
         assert needle in body, needle
+    # finalize_drawing's sweep alone removes the one automatic tap note.
+    assert "remove_notes_matching" not in body
+    assert "expected_redundant_notes=1" in _DRAWING_SOURCE
     assert drawing._COSMETIC_THREAD_ANNOTATION == 1
     caption = _DRAWING_SOURCE.index("position_section_caption(")
     threads = _DRAWING_SOURCE.index(

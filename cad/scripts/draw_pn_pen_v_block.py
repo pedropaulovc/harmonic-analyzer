@@ -53,7 +53,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
-    remove_notes_matching,
     view_name,
 )
 
@@ -421,14 +420,13 @@ def _section_thread_on_visible_layer(adapter: Any, section: Any) -> None:
     if moved < 1:
         raise RuntimeError("section A-A lists no cosmetic-thread annotation to layer")
     rebuild_drawing(adapter, label=f"cosmetic threads to {SECTION_THREAD_LAYER}")
-    # The import pins SolidWorks' own "#4-40 Tapped Hole" note to the view;
-    # the tap's hole callout states the tap (rule 7).  Which views receive one
-    # is SolidWorks' choice, so the count is logged; finalize_drawing's sweep
-    # then counts the iso's alone.
-    removed = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
+    # SolidWorks' own "#4-40 Tapped Hole" note (the tap's hole callout states
+    # the tap, rule 7) is swept once by finalize_drawing: farm r16 (no section
+    # import) and r17 (section import, then a sweep here) each found exactly
+    # one on the sheet, so the import adds none and the final sweep owns it.
     _telemetry.info(
         f"section A-A cosmetic threads: seeds/instances={threads!r}, {moved} on "
-        f"{SECTION_THREAD_LAYER}; removed {removed} automatic tapped-hole note(s)"
+        f"{SECTION_THREAD_LAYER}"
     )
 
 
