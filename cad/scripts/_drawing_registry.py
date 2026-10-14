@@ -999,6 +999,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="pd_support_bar",
+        part="pd_support_bar",
+        artifact_stem="pd-support-bar",
+        script_name="draw_pd_support_bar.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="vn_pedestal_hold_down_screw",
         part="vn_pedestal_hold_down_screw",
         artifact_stem="vn-pedestal-hold-down-screw",

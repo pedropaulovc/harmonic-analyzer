@@ -35,20 +35,37 @@ import sys
 
 from _appearance import apply_material
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
-from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
-from _sketch import SketchDims, ensure_fully_defined
+from _sketch import (
+    SketchDims,
+    anchor_point_to_origin,
+    blank_reference_sketches,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_circle import define_circle
 from _sketch_rectangle import define_centered_rectangle
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _holes import wizard_holes
 from _visibility import blank_reference_geometry
+import _telemetry
 from vn_clamp_screw_spec import HEAD_H as CLAMP_HEAD_H
 from pd_support_bar_spec import (
     BACK_FACE_Z,
@@ -61,10 +78,23 @@ from pd_support_bar_spec import (
     BRACKET_TAP_SPEC,
     BRACKET_TAP_X,
     HANGER_TAP_Y,
+    HOLE_POSITION_BAND,
     PIVOT_TAP_CSK_DIA,
     PIVOT_TAP_DRILL_DEPTH,
+    PIVOT_TAP_DRILL_DEPTH_LIMITS,
     PIVOT_TAP_DRILL_DIA,
+    PIVOT_TAP_FULL_THREAD_MIN,
     PIVOT_TAP_X,
+)
+from pd_support_bar_drawing_spec import (
+    CLAMP_STATION_NAMES,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    HANGER_STATION_NAMES,
+    ISOMETRIC_VIEW_NOTE,
+    SHEET_PRECISION,
+    TOL_MAX,
+    TOL_MIN,
 )
 
 PART_NAME = "pd-support-bar"
@@ -96,6 +126,197 @@ CLAMP_HOLE_SPEC = HoleSpec(
 CLAMP_HOLE_X = tuple(
     s * (COLUMN_X + d) for s in (-1.0, 1.0) for d in (-CLAMP_SCREW_DX, CLAMP_SCREW_DX)
 )
+
+# --- Print rows (pd_support_bar_drawing_spec) ---------------------------------
+# The hanger holes on the back face: stations from the left end, the row's
+# height from the TOP face, which carries the platen's top rail.
+LEFT_END_X = -BAR_LENGTH / 2.0
+HANGER_ROW_HEIGHT = BAR_HEIGHT / 2.0 - HANGER_TAP_Y
+HANGER_STATIONS = tuple(x - LEFT_END_X for x in (PIVOT_TAP_X, *BRACKET_TAP_X))
+# The clamp holes on the front face, which the front-face view shows mirrored:
+# stations from the +X end (the sheet's left there), height from the top face.
+CLAMP_ROW_START_X = BAR_LENGTH / 2.0
+CLAMP_ROW_HEIGHT = BAR_HEIGHT / 2.0
+CLAMP_ROW_X = tuple(sorted(CLAMP_HOLE_X, reverse=True))
+CLAMP_STATIONS = tuple(CLAMP_ROW_START_X - x for x in CLAMP_ROW_X)
+# The pivot tap's full-thread minimum, drawn along the tap axis in its section
+# plane from the back face.
+PIVOT_SECTION_PLANE = "PivotSectionPlane"
+REFERENCE_SKETCHES = (
+    "HangerRowReference",
+    "ClampRowReference",
+    "CountersinkReference",
+    "PivotThreadReference",
+)
+
+
+def _as_construction(adapter, entity_id: str, label: str) -> None:
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{label} did not take the construction flag")
+
+
+async def _author_row(
+    adapter,
+    feature: str,
+    *,
+    rise_x: float,
+    row_y: float,
+    start_x: float,
+    holes: tuple[tuple[str, float, float], ...],
+    height_name: str,
+    prefix: str,
+) -> list[tuple[str, str]]:
+    """One hole row as model dimensions on a hidden Front-plane sketch (the
+    build_mg_wheel_bar BoreRowReference pattern): a construction chain on the
+    row from the bar end at ``start_x`` through each hole (``holes``: name,
+    model x, station from that end) to a rise at ``rise_x`` that drops from
+    the top face to the row, so the stations read from the end and the row's
+    height from the top face."""
+    top_y = BAR_HEIGHT / 2.0
+    row_xs = (start_x, *(x for _, x, _ in holes), rise_x)
+    row = SketchDims()
+    check(f"create_sketch {feature}", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    rise = check(
+        f"{feature} rise", await adapter.add_line(rise_x, top_y, rise_x, row_y)
+    )
+    legs = [
+        check(f"{feature} leg {index}", await adapter.add_line(x0, row_y, x1, row_y))
+        for index, (x0, x1) in enumerate(zip(row_xs, row_xs[1:]))
+    ]
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, rise, f"{feature} rise")
+    check(
+        f"{feature} rise vertical",
+        await adapter.add_sketch_constraint(rise, None, "vertical"),
+    )
+    for index, leg in enumerate(legs):
+        _as_construction(adapter, leg, f"{feature} leg {index}")
+        check(
+            f"{feature} leg {index} horizontal",
+            await adapter.add_sketch_constraint(leg, None, "horizontal"),
+        )
+    for index, (leg, after) in enumerate(zip(legs, [*legs[1:], None])):
+        end = f"{rise}.end" if after is None else f"{after}.start"
+        check(
+            f"{feature} leg {index} chained",
+            await adapter.add_sketch_constraint(f"{leg}.end", end, "coincident"),
+        )
+    await anchor_point_to_origin(
+        adapter, f"{rise}.start", rise_x, top_y, f"{feature} top corner"
+    )
+    row.record(f"{prefix}RiseX", '"BarLength" / 2')
+    row.record(f"{prefix}RiseY", '"BarHeight" / 2')
+    await dimension_between(
+        adapter,
+        f"{rise}.start",
+        f"{rise}.end",
+        "vertical_distance",
+        top_y - row_y,
+        f"{feature} height",
+    )
+    row.record(height_name)
+    start = f"{legs[0]}.start"
+    await dimension_between(
+        adapter, start, "origin", "horizontal_distance", abs(start_x), f"{feature} end"
+    )
+    row.record(f"{prefix}StartX", '"BarLength" / 2')
+    # Each hole ends one leg; the last leg runs on to the rise.
+    for leg, (name, _x, station) in zip(legs[:-1], holes, strict=True):
+        await dimension_between(
+            adapter, start, f"{leg}.end", "horizontal_distance", station, name
+        )
+        row.record(name)
+    await ensure_fully_defined(adapter, f"{feature} sketch")
+    check(f"exit_sketch {feature}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    return row.apply(adapter, feature)
+
+
+def _model_to_sketch(
+    adapter, model_mm: tuple[float, float, float]
+) -> tuple[float, float]:
+    """``model_mm`` in the active sketch's own axes (``ModelToSketchTransform``;
+    build_dt_cone_pivot_post_tl_bond_cradle's reader), which must hold it."""
+    from solidworks_mcp.adapters.com_variant import double_array
+
+    sketch = _early_bound(adapter.currentModel.SketchManager.ActiveSketch, "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    point = _early_bound(
+        utility.CreatePoint(double_array([v / 1000.0 for v in model_mm])), "IMathPoint"
+    )
+    moved = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+    x, y, z = (float(v) * 1000.0 for v in moved.ArrayData)
+    if abs(z) > 1e-6:
+        raise RuntimeError(f"{model_mm} lies {z:g} mm off the active sketch plane")
+    return x, y
+
+
+async def _author_thread_reference(adapter) -> list[tuple[str, str]]:
+    """The pivot tap's full-thread minimum as a model dimension: a
+    construction line down the tap axis from the back face, in a plane through
+    the axis that section A-A cuts on."""
+    sketch = SketchDims()
+    check(
+        "create_sketch PivotThreadReference",
+        await adapter.create_sketch(PIVOT_SECTION_PLANE),
+    )
+    ax, ay = _model_to_sketch(adapter, (PIVOT_TAP_X, HANGER_TAP_Y, BACK_FACE_Z))
+    bx, by = _model_to_sketch(
+        adapter,
+        (PIVOT_TAP_X, HANGER_TAP_Y, BACK_FACE_Z - PIVOT_TAP_FULL_THREAD_MIN),
+    )
+    if min(abs(ax), abs(ay)) < 1e-6:
+        raise RuntimeError(f"the pivot tap mouth maps onto a sketch axis ({ax}, {ay})")
+    along_x = abs(bx - ax) > abs(by - ay)
+    set_sketch_direct_db(adapter, True)
+    line = check("pivot thread line", await adapter.add_line(ax, ay, bx, by))
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, line, "pivot thread line")
+    check(
+        "pivot thread line along the tap axis",
+        await adapter.add_sketch_constraint(
+            line, None, "horizontal" if along_x else "vertical"
+        ),
+    )
+    await anchor_point_to_origin(adapter, f"{line}.start", ax, ay, "pivot tap mouth")
+    sketch.record("ThreadMouthU")
+    sketch.record("ThreadMouthV")
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "horizontal_distance" if along_x else "vertical_distance",
+        PIVOT_TAP_FULL_THREAD_MIN,
+        "pivot full thread",
+    )
+    sketch.record("ThreadMin")
+    await ensure_fully_defined(adapter, "PivotThreadReference sketch")
+    check("exit_sketch PivotThreadReference", await adapter.exit_sketch())
+    name_last_feature(adapter, "PivotThreadReference")
+    return sketch.apply(adapter, "PivotThreadReference")
+
+
+def _single_limit(
+    adapter, feature: str, name: str, nominal: float, tol_type: int
+) -> None:
+    """A dimension printed as a single MIN or MAX limit: SOLIDWORKS prints the
+    nominal then the limit word, so the model value is the limit itself."""
+    label = f"{name}@{feature}"
+    _, dimension = _named_dimension(adapter, feature, name)
+    if not math.isclose(float(dimension.SystemValue), nominal / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {float(dimension.SystemValue) * 1000.0:.7f} is not "
+            f"the limit {nominal:.7f}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = tol_type
+    if not tolerance.SetValues(0.0, 0.0) or int(tolerance.Type) != tol_type:
+        raise RuntimeError(f"{label}: cannot retain the single limit {tol_type}")
+    _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -231,6 +452,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "PivotTap")
+    name_dimensions(adapter, "PivotTap", ["DrillDepth"])
     r_pivot = PIVOT_TAP_DRILL_DIA / 2.0
     v_pivot = math.pi * r_pivot**2 * PIVOT_TAP_DRILL_DEPTH
     expected -= v_pivot
@@ -248,7 +470,81 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "pivot-tap countersink", expected, 0.03 * v_pivot_csk + 0.05
     )
-    blank_reference_geometry(adapter, (("BackFace", "PLANE"),))
+
+    # Drawing references, hidden in the part (blank_reference_sketches) and
+    # shown per view by the drawing: the countersinks' MAX diameters on the
+    # back face, the pivot's full-thread MIN down its axis, and each hole row's
+    # stations and height.
+    countersinks = SketchDims()
+    check("create_sketch CountersinkReference", await adapter.create_sketch("BackFace"))
+    for x, dia, label, names in (
+        (
+            PIVOT_TAP_X,
+            PIVOT_TAP_CSK_DIA,
+            "pivot countersink",
+            ("PivotCskX", "PivotCskY", "PivotCskDia"),
+        ),
+        (
+            BRACKET_TAP_X[0],
+            BRACKET_TAP_CSK_DIA,
+            "bracket countersink",
+            ("BracketCskX", "BracketCskY", "BracketCskDia"),
+        ),
+    ):
+        await define_circle(
+            adapter,
+            x,
+            HANGER_TAP_Y,
+            dia / 2.0,
+            label,
+            dims=countersinks,
+            names=names,
+            drives=(None, None, None),
+        )
+    await ensure_fully_defined(adapter, "CountersinkReference sketch")
+    check("exit_sketch CountersinkReference", await adapter.exit_sketch())
+    name_last_feature(adapter, "CountersinkReference")
+    drive_jobs += countersinks.apply(adapter, "CountersinkReference")
+    check(
+        f"create_plane {PIVOT_SECTION_PLANE} (Right Plane, {PIVOT_TAP_X})",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Right Plane", offset=PIVOT_TAP_X
+            )
+        ),
+    )
+    name_last_feature(adapter, PIVOT_SECTION_PLANE)
+    drive_jobs += await _author_thread_reference(adapter)
+    drive_jobs += await _author_row(
+        adapter,
+        "HangerRowReference",
+        rise_x=BAR_LENGTH / 2.0,
+        row_y=HANGER_TAP_Y,
+        start_x=LEFT_END_X,
+        holes=tuple(
+            zip(
+                HANGER_STATION_NAMES,
+                (PIVOT_TAP_X, *BRACKET_TAP_X),
+                HANGER_STATIONS,
+                strict=True,
+            )
+        ),
+        height_name="HangerRowHeight",
+        prefix="Hanger",
+    )
+    drive_jobs += await _author_row(
+        adapter,
+        "ClampRowReference",
+        rise_x=-BAR_LENGTH / 2.0,
+        row_y=0.0,
+        start_x=CLAMP_ROW_START_X,
+        holes=tuple(zip(CLAMP_STATION_NAMES, CLAMP_ROW_X, CLAMP_STATIONS, strict=True)),
+        height_name="ClampRowHeight",
+        prefix="Clamp",
+    )
+    blank_reference_geometry(
+        adapter, (("BackFace", "PLANE"), (PIVOT_SECTION_PLANE, "PLANE"))
+    )
 
     # Apply the deferred drive equations after the model exists, then re-check:
     # every equation evaluates to the value just built, so geometry must not move.
@@ -268,6 +564,41 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_symmetric_tolerance(adapter, "BarProfile", "Height", BAR_HEIGHT_BAND)
     set_dimension_symmetric_tolerance(adapter, "Bar", "Depth", BAR_DEPTH_BAND)
+
+    # The rest of the print's places, then its bands and limits: the hanger
+    # holes' row and stations carry the pivot and hook positions'
+    # HOLE_POSITION_BAND (paper_drive_geom, transgear_hanger_joints); the
+    # pivot drill's depth its spec limits; the full thread and countersinks
+    # their single limits.
+    apply_drawing_precision(adapter, SHEET_PRECISION)
+    for name in ("HangerRowHeight", *HANGER_STATION_NAMES):
+        set_dimension_symmetric_tolerance(
+            adapter, "HangerRowReference", name, HOLE_POSITION_BAND
+        )
+    set_dimension_bilateral_tolerance(
+        adapter, "PivotTap", "DrillDepth", *PIVOT_TAP_DRILL_DEPTH_LIMITS, places=1
+    )
+    _single_limit(
+        adapter, "PivotThreadReference", "ThreadMin", PIVOT_TAP_FULL_THREAD_MIN, TOL_MIN
+    )
+    _single_limit(
+        adapter, "CountersinkReference", "PivotCskDia", PIVOT_TAP_CSK_DIA, TOL_MAX
+    )
+    _single_limit(
+        adapter, "CountersinkReference", "BracketCskDia", BRACKET_TAP_CSK_DIA, TOL_MAX
+    )
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
