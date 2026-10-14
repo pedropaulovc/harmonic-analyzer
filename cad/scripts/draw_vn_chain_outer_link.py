@@ -1,4 +1,4 @@
-"""Create the four-view purchased-reference sheet for McMaster-Carr 6261K171 / 6261K108, ANSI #25 roller-chain outer link.
+"""Create the four-view purchased-reference sheet for McMaster-Carr 6261K171, ANSI #25 roller-chain outer link.
 
 Identification only: the part as installed, its stock and ordering SKU, and
 its cut-length or fitting note; no fabrication dimensions.
