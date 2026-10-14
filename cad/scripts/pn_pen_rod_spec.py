@@ -90,12 +90,15 @@ DRAWING_REFERENCE_PRECISION = 1
 if round(TOTAL_LENGTH, DRAWING_REFERENCE_PRECISION) != TOTAL_LENGTH:
     raise AssertionError("the overall reference must print exactly at its places")
 
-# Front view (1:1): the square's width and length, the pivot length and the
-# shoulder root's MAX radius (a 10:1 detail only enlarges that corner). Top
-# view (4:1): the square's depth and the stud-tap wizard callout. Bottom view
-# (4:1): the pivot diameter, seen end-on inside the square.
+# Side view (1:1, rod axis horizontal as in the lathe): the square's length,
+# the pivot's length and banded diameter, and the shoulder root's MAX radius.
+# End view (4:1) of the tapped top face: the square's banded depth, which the
+# SQ in its callout makes the size of both flats (Section and Depth are one
+# "RodSection" global, so the model holds the square), and the stud-tap
+# wizard callout.  Section keeps its model band but is not printed: one SQ
+# size defines a square (fr_rocker_arm_support's WinWidth "SQ POCKET").
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "RodProfile": {"Section", "Length"},
+    "RodProfile": {"Length"},
     "Rod": {"Depth"},
     "PivotProfile": {"PivotDia"},
     "Pivot": {"PivotLength"},
@@ -106,7 +109,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # the v-block relief roof) are near-enough sizes; the shoulder radius prints
 # its MAX limit at one place.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "RodProfile": {"Section": 2, "Length": 1},
+    "RodProfile": {"Length": 1},
     "Rod": {"Depth": 2},
     "PivotProfile": {"PivotDia": 3},
     "Pivot": {"PivotLength": 1},
@@ -122,20 +125,21 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
     for feature, names in DRAWING_DIMENSIONS.items()
 ):
     raise AssertionError("every marked pen-rod dimension needs authored places")
-# (feature, dimension) -> (upper, lower) native band.
+# (feature, dimension) -> (upper, lower) native band.  Section (the width)
+# keeps its band on the model; the sheet states it through Depth's SQ.
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("RodProfile", "Section"): SECTION_BAND,
     ("Rod", "Depth"): SECTION_BAND,
     ("PivotProfile", "PivotDia"): PIVOT_BAND,
 }
+if DRAWING_BANDS[("RodProfile", "Section")] != DRAWING_BANDS[("Rod", "Depth")]:
+    raise AssertionError("one SQ size can only state a square whose flats share a band")
 # Every tight band names its mate on the dimension it governs (rule 4); the
 # shoulder radius names the part its seat face lands on.
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "Section": f"SLIDING FIT IN PEN HANGER\n{PEN_HANGER_NUMBER} GUIDES",
-    "Depth": f"SLIDING FIT IN PEN HANGER\n{PEN_HANGER_NUMBER} GUIDES",
+    "Depth": f"SQ, SLIDING FIT IN PEN\nHANGER {PEN_HANGER_NUMBER} GUIDES",
     "PivotDia": f"SLIP FIT IN PEN V-BLOCK\n{PEN_V_BLOCK_NUMBER} PIVOT BORE",
     "ShoulderRadius": f"SEATS ON PEN V-BLOCK\n{PEN_V_BLOCK_NUMBER}",
 }
 
-TOP_VIEW_NOTE = "TOP VIEW SCALE 4:1"
-BOTTOM_VIEW_NOTE = "BOTTOM VIEW SCALE 4:1"
+END_VIEW_NOTE = "END VIEW SCALE 4:1"

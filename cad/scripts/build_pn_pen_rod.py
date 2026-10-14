@@ -48,10 +48,10 @@ from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from _holes import blind_hole_volume_mm3, wizard_holes
 from pn_pen_rod_spec import (
-    BOTTOM_VIEW_NOTE,
     DRAWING_BANDS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    END_VIEW_NOTE,
     PIVOT_DIA,
     PIVOT_LENGTH,
     ROD_SECTION,
@@ -61,7 +61,6 @@ from pn_pen_rod_spec import (
     SQUARE_LENGTH,
     STUD_TAP_DRILL_DIA,
     STUD_TAP_SPEC,
-    TOP_VIEW_NOTE,
 )
 
 PART_NAME = "pn-pen-rod"
@@ -271,14 +270,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Top View Note": TOP_VIEW_NOTE,
-            "Bottom View Note": BOTTOM_VIEW_NOTE,
-        },
-    )
+    apply_drawing_properties(adapter, PART_NAME, {"End View Note": END_VIEW_NOTE})
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
@@ -287,8 +279,7 @@ async def build(adapter) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Top View Note",
-            "Bottom View Note",
+            "End View Note",
         ),
     )
     return artefacts
