@@ -39,6 +39,8 @@ from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _gtol_cone import ConeFace
+from _gtol_face_resolve import resolve_faces
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -81,6 +83,13 @@ CONE_FLANK = (
     (APEX[0] + CONE_BASE_X) / 2.0,
     FRONT_CENTER[1] + _HALF_DIA / 2.0,
 )
+# The tip runout controls the conical tip: its ONE cone face, resolved on the
+# part the front view references and attached as that model FACE, with the
+# leader landing on the flank at CONE_FLANK.  Not a SILHOUETTE pick: every
+# SOLIDWORKS 34.4.0 seat rejects the flank silhouette (InsertGtol leaves the
+# frame unattached and IAnnotation::SetAttachedEntities returns False), while
+# all 34.3.0 seats accepted it (issue #1123).
+TIP_CONE_FACE = ConeFace(math.degrees(math.atan2(BARREL_DIA / 2.0, CONE_H)))
 
 FRONT_KEEP = {
     "ConeH": (APEX[0] + 0.005, FRONT_CENTER[1] - 0.030),
@@ -273,16 +282,21 @@ async def build(adapter: Any) -> dict[str, str]:
     # smart leader side then leaves the frame's LEFT end, its 6.35 mm stub ends
     # at x ~0.0457 and it drops almost vertically onto the flank at x 0.0452,
     # 5.2 mm right of the extension line. The Ra body starts at x ~0.128.
+    tip_cone = resolve_faces(
+        _early_bound(_early_bound(front, "IView").ReferencedDocument, "IModelDoc2"),
+        {"marker tip runout": TIP_CONE_FACE},
+    )["marker tip runout"]
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=CONE_FLANK,
+        entity=tip_cone,
+        leader_attach_xy=CONE_FLANK,
         frame_xy=(APEX[0] + 0.012, FRONT_CENTER[1] + 0.032),
         characteristic="circular_runout",
         tolerance=GEOMETRIC_TOLERANCES_MM["marker tip runout"],
         datums=("A",),
         label="marker tip runout",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
     )
     # In the band ABOVE the barrel, between the barrel top (0.188) and the 60.00
     # dimension line (~0.221) -- NOT above that dimension, where an early pass

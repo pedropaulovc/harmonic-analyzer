@@ -77,6 +77,23 @@ def test_native_gdt_controls_tip_runout_and_barrel_finish() -> None:
     assert source.count("add_surface_finish(") == 1
 
 
+def test_tip_runout_attaches_to_the_tip_cone_face() -> None:
+    # SOLIDWORKS 34.4.0 rejects the flank silhouette; the frame attaches to
+    # the one cone face whose half-angle is the tip's atan(radius / height).
+    half_angle = math.degrees(
+        math.atan((pn_pen_marker_spec.BARREL_DIA / 2.0) / pn_pen_marker_spec.CONE_H)
+    )
+    assert abs(drawing.TIP_CONE_FACE.half_angle_degrees - half_angle) < 1e-9
+    assert drawing.TIP_CONE_FACE.contains_x_mm is None
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    frame_call = source[source.index("add_feature_control_frame(\n") :]
+    frame_call = frame_call[: frame_call.index("\n    )")]
+    assert "entity=tip_cone" in frame_call
+    assert "leader_attach_xy=CONE_FLANK" in frame_call
+    assert 'entity_type="FACE"' in frame_call
+    assert "SILHOUETTE" not in frame_call
+
+
 def test_view_scales_are_explicit_and_profile_is_rotated() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
