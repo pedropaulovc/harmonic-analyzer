@@ -18,6 +18,8 @@ what is left in length: the die's run-out (rule 16), never dimensioned. Its
 diameter is the thread's basic major, printed once as a reference so the
 plain section is not left without a size. A projected split line rings the
 shank at the thread limit, so the side view shows where the thread stops.
+The shoulder's internal corner is a modelled fillet (``ShoulderFillet``)
+printed as a single MAX radius.
 
 Drawing contract: ``build_pn_pen_adjust_screw`` marks exactly
 ``DRAWING_DIMENSIONS`` and authors ``DRAWING_PRECISION`` natively on the part;
@@ -36,7 +38,7 @@ from __future__ import annotations
 
 from _hole_spec import HoleSpec, NUMBER_DRILL_MM, THREAD_MAJOR_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
-from pn_pen_rod_spec import STUD_ENGAGEMENT, STUD_THREAD
+from pn_pen_rod_spec import STUD_ENGAGEMENT, STUD_TAP_SPEC, STUD_THREAD
 from mg_magnifying_wheel_geom import PEN_WIRE_DIA
 import vn_pen_adjust_nut_spec as jam_nut
 
@@ -99,6 +101,41 @@ if (
 if PLAIN_SHANK - 3.0 * _LENGTH_BAND < THREAD_PITCH:
     raise AssertionError("full thread runs into the head's shoulder")
 
+# Shoulder root (drawing-guidelines.md rule 16, internal corners): the corner
+# where the plain shank meets the head's underside carries a modelled radius,
+# printed as a single MAX limit (sharp is good, anything up to the limit is
+# good). Nothing seats on the head's underside: the jam nut bears on the rod
+# top, and even with the stud run in to the bottom of its tap drill at the
+# worst-case short shank the nut stands clear of the shoulder (asserted
+# below), so the radius is bounded only by the die's run-out: at the
+# worst-case plain length the fillet must still leave the die a pitch of
+# plain shank. 0.2 is the largest one-place value inside that bound (0.28).
+SHOULDER_FILLET_R = 0.2
+# (upper, lower) deviations: the nominal IS the limit, down to sharp.
+SHOULDER_FILLET_BAND = (0.0, -SHOULDER_FILLET_R)
+SHOULDER_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.2 MAX"
+SHOULDER_FILLET_PLACES = 1
+SHOULDER_FILLET_R_LIMIT = PLAIN_SHANK - 3.0 * _LENGTH_BAND - THREAD_PITCH
+if SHOULDER_FILLET_BAND[0] != 0.0 or SHOULDER_FILLET_BAND[1] != -SHOULDER_FILLET_R:
+    raise AssertionError("the shoulder radius band must run from sharp to the nominal")
+if round(SHOULDER_FILLET_R, SHOULDER_FILLET_PLACES) != SHOULDER_FILLET_R:
+    raise AssertionError("the shoulder radius must print exactly at its places")
+if SHOULDER_FILLET_R > SHOULDER_FILLET_R_LIMIT:
+    raise AssertionError("the shoulder radius eats the die's worst-case run-out")
+if SHOULDER_FILLET_R + 10.0**-SHOULDER_FILLET_PLACES <= SHOULDER_FILLET_R_LIMIT:
+    raise AssertionError("a larger one-place shoulder radius still fits the run-out")
+if THREAD_MAJOR / 2.0 + SHOULDER_FILLET_R >= (HEAD_DIA - _LENGTH_BAND) / 2.0:
+    raise AssertionError("shoulder fillet must end inside the head's underside")
+# The shoulder's lowest station over the rod top: the shortest printed shank
+# (overall short, head long) with the stud bottomed in the rod's tap drill.
+SHOULDER_OVER_ROD_TOP_MIN = (
+    (OVERALL_LENGTH - _LENGTH_BAND)
+    - (HEAD_HEIGHT + _LENGTH_BAND)
+    - STUD_TAP_SPEC.depth_mm
+)
+if SHOULDER_OVER_ROD_TOP_MIN <= jam_nut.THICKNESS:
+    raise AssertionError("the jam nut can reach the head's shoulder")
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StudProfile": {
         "ThreadDia",
@@ -109,6 +146,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "PlainDia",
     },
     "EyeStationReference": {"EyeFromHeadEnd"},
+    "ShoulderFillet": {"ShoulderRadius"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StudProfile": {
@@ -121,6 +159,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PlainDia": 2,
     },
     "EyeStationReference": {"EyeFromHeadEnd": 1},
+    "ShoulderFillet": {"ShoulderRadius": SHOULDER_FILLET_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

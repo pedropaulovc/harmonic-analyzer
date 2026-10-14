@@ -132,6 +132,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
             "PlainDia",
         },
         "EyeStationReference": {"EyeFromHeadEnd"},
+        "ShoulderFillet": {"ShoulderRadius"},
     }
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.SIDE_KEEP) == marked
@@ -146,7 +147,59 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "OverallLength": 1,
         "PlainDia": 2,
         "EyeFromHeadEnd": 1,
+        "ShoulderRadius": 1,
     }
+
+
+def test_shoulder_root_is_a_modelled_max_radius() -> None:
+    """Rule 16: the shank-to-head corner is a modelled fillet printed as R MAX,
+    not a note and not sharp. Nothing seats on the head's underside (the jam
+    nut bears on the rod top and never reaches the shoulder), so the radius
+    is bounded by the die's worst-case run-out alone; 0.2 is the largest one
+    place value inside it. No callout: there is no mate to name."""
+    import vn_pen_adjust_nut_spec as jam_nut
+    from _printed_tolerance import printed_band_mm
+
+    band = printed_band_mm(1)
+    assert spec.SHOULDER_FILLET_R == 0.2
+    assert spec.SHOULDER_FILLET_BAND == (0.0, -spec.SHOULDER_FILLET_R)
+    assert spec.SHOULDER_FILLET_TOL_TYPE == 6  # swTolMAX
+    assert spec.SHOULDER_FILLET_PLACES == 1
+    limit = spec.PLAIN_SHANK - 3.0 * band - spec.THREAD_PITCH
+    assert spec.SHOULDER_FILLET_R_LIMIT == pytest.approx(limit)
+    assert spec.SHOULDER_FILLET_R <= limit < spec.SHOULDER_FILLET_R + 0.1
+    assert spec.THREAD_MAJOR / 2.0 + spec.SHOULDER_FILLET_R < (
+        (spec.HEAD_DIA - band) / 2.0
+    )
+    shortest_shank = (spec.OVERALL_LENGTH - band) - (spec.HEAD_HEIGHT + band)
+    assert spec.SHOULDER_OVER_ROD_TOP_MIN == pytest.approx(
+        shortest_shank - pn_pen_rod_spec.STUD_TAP_SPEC.depth_mm
+    )
+    assert spec.SHOULDER_OVER_ROD_TOP_MIN > jam_nut.THICKNESS
+    assert "ShoulderRadius" not in spec.DIMENSION_CALLOUTS
+    (fillet,) = _calls(part, "add_fillet")
+    assert [ast.unparse(arg) for arg in fillet.args] == [
+        "SHOULDER_FILLET_R",
+        "[[THREAD_R, SHANK_LENGTH, 0.0]]",
+    ]
+    source = _source(part)
+    assert '("ShoulderRadius", SHOULDER_FILLET_R),' in source
+    assert 'name_dimensions(adapter, "ShoulderFillet", ["ShoulderRadius"])' in source
+    assert "'\"ShoulderRadius\"'" in source
+    assert "tolerance.Type = SHOULDER_FILLET_TOL_TYPE" in source
+    build_body = source[source.index("async def build(") :]
+    assert build_body.index(
+        "apply_drawing_precision(adapter, DRAWING_PRECISION)"
+    ) < build_body.index("_shoulder_fillet_max_limit(adapter)")
+    # The sheet proves the import kept the MAX type and the radial form, and
+    # lays the radius out for whichever corner arc SolidWorks hung it on.
+    draw_source = _source(drawing)
+    assert "_dress_shoulder_radius(adapter, drawing_model, by_name, spt)" in (
+        draw_source
+    )
+    assert "int(tolerance.Type) != SHOULDER_FILLET_TOL_TYPE" in draw_source
+    assert "display.ArcExtensionLineOrOppositeSide = False" in draw_source
+    assert set(drawing.UPPER_ARC_KEEP) == {"ShoulderRadius", "PlainDia"}
 
 
 def test_plain_shank_diameter_prints_as_a_reference() -> None:
@@ -281,6 +334,7 @@ def test_feature_names_are_the_contract() -> None:
             "StudProfile",
             "Stud",
             "ThreadLimitReference",
+            "ShoulderFillet",
             "EyeStationPlane",
             "EyeStationReference",
         ]
@@ -290,6 +344,7 @@ def test_feature_names_are_the_contract() -> None:
     assert (
         build_body.index('"Stud")')
         < build_body.index("_add_thread_limit(adapter)")
+        < build_body.index('"ShoulderFillet")')
         < build_body.index('"EyeStationPlane")')
     )
     (eye,) = _calls(part, "wizard_hole_on_cylinder")
@@ -335,12 +390,19 @@ def test_volumes_are_analytic() -> None:
     )
     # The eye is smaller than the full drill cylinder through the head.
     assert part.V_EYE < math.pi * (spec.EYE_DIA / 2.0) ** 2 * spec.HEAD_DIA
-    assert part.V_TOTAL == pytest.approx(stud - part.V_EYE)
+    r_fillet = spec.SHOULDER_FILLET_R
+    spandrel = r_fillet**2 * (1.0 - math.pi / 4.0)
+    centroid_r = r_thread + r_fillet * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi))
+    assert part.V_FILLET == pytest.approx(2.0 * math.pi * centroid_r * spandrel)
+    # A sliver (~0.04 mm^3) of a ~260 mm^3 stud.
+    assert 0.0 < part.V_FILLET < 0.1
+    assert part.V_TOTAL == pytest.approx(stud + part.V_FILLET - part.V_EYE)
     source = _source(part)
     assert 'volume_check(adapter, "stud", V_STUD,' in source
     assert 'volume_check(adapter, "eye cross hole", V_TOTAL,' in source
     assert '"cosmetic thread cuts nothing", driven, 1e-6' in source
     assert 'stud_volume = await volume_check(adapter, "stud", V_STUD,' in source
+    assert '"shoulder root fillet", stud_volume + V_FILLET, 0.5 * V_FILLET' in source
 
 
 def test_cosmetic_thread_runs_the_full_thread_only() -> None:
@@ -494,3 +556,39 @@ def test_side_view_layout_reads_like_the_lathe() -> None:
     # The isometric's ~145 mm height stays inside the border and title block.
     assert drawing.ISO_CENTER[1] - 0.075 > 0.065
     assert drawing.ISO_CENTER[1] + 0.075 < 0.267
+
+
+def test_shoulder_radius_layout_for_either_corner_arc() -> None:
+    """The positions the R MAX comment derives, from the 20261014T061028487Z
+    sheet: FULL THREAD extension line x 0.162 down to y ~0.1264, head-height
+    extension line x 0.180 from y ~0.1292, the 15.0's line y ~0.1275, the
+    26.0's text top y ~0.1166; "R0.2 MAX" ~18.4 mm wide, ~3.4 mm tall,
+    centred on its keep; (Ø1.52) hangs from its keep x, keep y -0.5..+4 mm."""
+    full_thread_ext_bottom, row1_line, row2_text_top = 0.1264, 0.1275, 0.1166
+    head_ext_top = drawing.AXIS_Y - drawing.HEAD_HALF - 0.001
+    width, height = 0.0184, 0.0034
+    # Lower arc: the text under row 1, clear of both rows' ink.
+    r_x, r_y = drawing.SIDE_KEEP["ShoulderRadius"]
+    assert r_y - height / 2.0 > row2_text_top + 0.002
+    assert r_y + height / 2.0 < min(full_thread_ext_bottom, row1_line) - 0.002
+    right_end = r_x + width / 2.0
+    corner = (drawing.SHOULDER_X, drawing.AXIS_Y - drawing.THREAD_HALF)
+    # The leader climbs from the text's right end to the corner, left of the
+    # head-height extension line by >= 2 mm all along it and right of the
+    # FULL THREAD extension line.
+    shoulder_y = r_y - height / 2.0
+    t = (head_ext_top - shoulder_y) / (corner[1] - shoulder_y)
+    x_at_ext_top = right_end + t * (corner[0] - right_end)
+    assert x_at_ext_top < drawing.SHOULDER_X - 0.002
+    assert right_end > drawing.FULL_THREAD_X + 0.010
+    # Upper arc: R text up-left of the corner, under the eye callout, left of
+    # the head; (Ø1.52) in the band under row 1.
+    u_x, u_y = drawing.UPPER_ARC_KEEP["ShoulderRadius"]
+    assert u_x + width / 2.0 < drawing.SHOULDER_X - 0.010
+    assert drawing.AXIS_Y + drawing.THREAD_HALF + 0.010 < u_y - height / 2.0
+    assert u_y + height / 2.0 < drawing.EYE_CALLOUT_XY[1] - 0.008
+    p_x, p_y = drawing.UPPER_ARC_KEEP["PlainDia"]
+    assert p_x == drawing.SIDE_KEEP["PlainDia"][0]
+    assert drawing.FULL_THREAD_X < p_x < drawing.SHOULDER_X
+    assert p_y - 0.0005 > row2_text_top + 0.002
+    assert p_y + 0.004 < full_thread_ext_bottom - 0.002

@@ -27,7 +27,8 @@ its printed station EyeFromHeadEnd (from the head's faced end) rides the
 hidden Right-plane reference sketch EyeStationReference, because the wizard's
 cylindrical placement sketch carries no dimension. The thread carries a
 blind cosmetic #0-80 over the full-thread length so the isometric matches the
-callout.
+callout. The shoulder's internal corner carries a modelled fillet
+(ShoulderFillet, its ShoulderRadius banded as a single MAX limit).
 
 Run (SolidWorks already open)::
 
@@ -39,6 +40,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
@@ -64,7 +66,8 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
+from _fit_deviations import deviations
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
@@ -82,6 +85,9 @@ from pn_pen_adjust_screw_spec import (
     OVERALL_LENGTH,
     PLAIN_SHANK,
     SHANK_LENGTH,
+    SHOULDER_FILLET_BAND,
+    SHOULDER_FILLET_R,
+    SHOULDER_FILLET_TOL_TYPE,
     THREAD,
     THREAD_MAJOR,
 )
@@ -105,9 +111,17 @@ HEAD_R = HEAD_DIA / 2.0
 V_SHANK = math.pi * THREAD_R**2 * SHANK_LENGTH
 V_HEAD = math.pi * HEAD_R**2 * HEAD_HEIGHT
 V_STUD = V_SHANK + V_HEAD
+# Shoulder root fillet (Pappus): the corner spandrel r^2 (1 - pi/4), its
+# centroid r (10 - 3 pi) / (3 (4 - pi)) out from the shank surface, revolved
+# about the stud axis.
+_SPANDREL = SHOULDER_FILLET_R**2 * (1.0 - math.pi / 4.0)
+_SPANDREL_R = THREAD_R + SHOULDER_FILLET_R * (10.0 - 3.0 * math.pi) / (
+    3.0 * (4.0 - math.pi)
+)
+V_FILLET = 2.0 * math.pi * _SPANDREL_R * _SPANDREL
 # The through drill crosses the full head diameter on its axis.
 V_EYE = cross_hole_volume_mm3(EYE_DIA, HEAD_DIA)
-V_TOTAL = V_STUD - V_EYE
+V_TOTAL = V_STUD + V_FILLET - V_EYE
 
 # Thread-limit split sketch: the cross line overhangs the shank so its
 # projection rings the whole cylinder.
@@ -140,6 +154,35 @@ def _shank_face_areas(adapter) -> list[tuple[object, float]]:
                 faces.append((face, area))
             face = _early_bound(face, "IFace2").GetNextFace()
     return faces
+
+
+def _shoulder_fillet_max_limit(adapter) -> None:
+    """ShoulderRadius as a MAX single limit carrying the band's deviations
+    (build_pn_pen_rod._shoulder_fillet_max_limit's recipe)."""
+    lower, upper = deviations(SHOULDER_FILLET_BAND)
+    _, dimension = _named_dimension(adapter, "ShoulderFillet", "ShoulderRadius")
+    label = "ShoulderRadius@ShoulderFillet"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, SHOULDER_FILLET_R / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
+            f"{SHOULDER_FILLET_R}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = SHOULDER_FILLET_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != SHOULDER_FILLET_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {SHOULDER_FILLET_R:g} MAX")
 
 
 async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
@@ -261,6 +304,7 @@ async def build(adapter) -> dict[str, str]:
         ("HeadDia", HEAD_DIA),
         ("HeadHeight", HEAD_HEIGHT),
         ("OverallLength", OVERALL_LENGTH),
+        ("ShoulderRadius", SHOULDER_FILLET_R),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -370,6 +414,26 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += await _add_thread_limit(adapter)
     await volume_check(
         adapter, "thread-limit split cuts nothing", stud_volume, 1e-6 * stud_volume
+    )
+
+    # Shoulder root (drawing-guidelines.md rule 16): the internal corner where
+    # the plain shank meets the head's underside gets the tool-nose radius the
+    # print allows (R MAX). Picked on the circular shoulder edge at +X: the
+    # only edge through that point (the thread-limit ring is at y 15, the eye
+    # at y 22).
+    check(
+        "fillet shoulder root",
+        await adapter.add_fillet(SHOULDER_FILLET_R, [[THREAD_R, SHANK_LENGTH, 0.0]]),
+    )
+    name_last_feature(adapter, "ShoulderFillet")
+    drive_jobs.append(
+        (
+            name_dimensions(adapter, "ShoulderFillet", ["ShoulderRadius"])[0],
+            '"ShoulderRadius"',
+        )
+    )
+    await volume_check(
+        adapter, "shoulder root fillet", stud_volume + V_FILLET, 0.5 * V_FILLET
     )
 
     # The #54 eye: a native Hole Wizard drill radially into the head's
@@ -488,6 +552,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _shoulder_fillet_max_limit(adapter)
     apply_drawing_properties(adapter, PART_NAME)
     # The reference sketch owns a printed dimension but no geometry: hide it
     # so no assembly instance renders it; the drawing shows it in the side
