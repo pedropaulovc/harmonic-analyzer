@@ -58,8 +58,10 @@ SECTION_SCALE = (4, 1)
 ISO_SCALE = (1, 10)
 # The broad (seat) face, the edge view under it (third angle) carrying the
 # cutting line through H0, the section to the right, the isometric below.
-TOP_CENTER = (0.150, 0.215)
-FRONT_CENTER = (0.150, 0.165)
+# x 0.160 leaves the pivot seat's two-line callout room between the border
+# and the H0 extension line.
+TOP_CENTER = (0.160, 0.215)
+FRONT_CENTER = (0.160, 0.165)
 SECTION_CENTER = (0.330, 0.150)
 ISO_CENTER = (0.150, 0.105)
 ISO_NOTE_XY = (0.020, 0.118)
@@ -70,7 +72,7 @@ TOP_OFFSETS = {
     # Above the bar, clear of both extension lines.
     "BarWidth": (0.252, 0.012),
     # Outside the end's extension line: the H0 station chains on from it.
-    "H0FromEnd": (-0.022, 0.011),
+    "H0FromEnd": (-0.019, 0.011),
     # Left of the bar's end and under it, clear of both extension lines.
     "H0FromSide": (-0.020, -0.010),
     "H800X": (0.102, 0.011),
@@ -89,12 +91,13 @@ SECTION_OFFSETS = {
 }
 THICKNESS_TEXT_GAP = 0.010
 
-# Functional acceptance sits on the dimension it governs, not in the notes.
+# Functional acceptance sits on the dimension it governs, not in the notes;
+# each seat names the trammel part it holds.
 CALLOUTS_ABOVE = {
-    "H0FromEnd": "PIVOT SEAT",
+    "H0FromEnd": "PIVOT SEAT FOR\nMHA-CH-006-TL-18",
     "H0FromSide": "3X",
-    "H800X": "INNER SCRIBER SEAT",
-    "H816X": "OUTER SCRIBER SEAT",
+    "H800X": "INNER SCRIBER SEAT FOR MHA-CH-006-TL-16",
+    "H816X": "OUTER SCRIBER SEAT FOR MHA-CH-006-TL-16",
     "SeatDia": "3X",
     "PilotDia": "3X",
 }

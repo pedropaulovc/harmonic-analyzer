@@ -79,8 +79,10 @@ def test_notes_follow_the_simplicity_policy() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     assert 1 <= len(lines) <= 4
     assert not re.search(r"\d", spec.DRAWING_NOTES)
+    # Callouts carry counts and mate part numbers, never a dimension.
     for callout in (*drawing.CALLOUTS_ABOVE.values(), *drawing.CALLOUTS_BELOW.values()):
-        assert not re.search(r"\d(?!X\b)", callout), callout
+        bare = re.sub(r"MHA-CH-006-TL-\d\d\b", "", callout)
+        assert not re.search(r"\d(?!X\b)", bare), callout
 
 
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:
