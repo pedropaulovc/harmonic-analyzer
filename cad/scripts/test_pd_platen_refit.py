@@ -120,7 +120,7 @@ def test_platen_clip_spring_rail_follows_its_knobs() -> None:
     # the build names them by value, so the three values must be distinct.
     drives = {name: (value, expr) for name, value, expr in clip.SPRING_RAIL_DRIVES}
     assert drives == {
-        "RailWidth": (clip.SPRING_RAIL_WIDTH, '"SpringRailW"'),
+        "SpringRailWidth": (clip.SPRING_RAIL_WIDTH, '"SpringRailW"'),
         "StartOffset": (clip.SPRING_RAIL_Y0, '"SpringRailY0"'),
         "WallT": (clip.SHEET_T, '"SheetT"'),
     }

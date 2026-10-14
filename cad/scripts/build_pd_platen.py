@@ -36,6 +36,12 @@ from _appearance import apply_material, apply_color, PANEL_BLACK
 from _bore_axis import name_bore_axis
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _drawing_precision import apply_drawing_precision
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
@@ -45,16 +51,23 @@ from _session import run_build
 from _sketch import SketchDims, add_line_chain, ensure_fully_defined
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
-from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from _holes import HoleSpec, SharedCoordinate, blind_cut_dia_mm, wizard_holes
 from pd_platen_spec import (
+    BACK_VIEW_NOTE,
     CBORE_DEPTH,
     CBORE_DIA,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
     GUIDE_HOLE_DIA,
     GUIDE_HOLE_FIT,
+    GUIDE_HOLE_X,
     GUIDE_HOLE_XY,
+    GUIDE_HOLE_Y,
+    ISOMETRIC_VIEW_NOTE,
     PLATE_HEIGHT,
     PLATE_THICKNESS,
     PLATE_WIDTH,
+    RIGHT_VIEW_NOTE,
     SOCKET_BOSS_DIA,
     SOCKET_BOSS_H,
     SOCKET_SPEC,
@@ -70,6 +83,39 @@ MATERIAL = "Brass"  # see _appearance.apply_material docstring
 # The plate envelope, the clip-screw receivers and the counterbored
 # guide-screw through-holes live in pd_platen_spec.py, which the clip, the guide
 # rails and the paper-drive assembly read without importing this builder.
+
+# Hole Wizard placement order and printed coordinates (pd_platen_spec
+# .DRAWING_DIMENSIONS).  Sockets: the lower right one carries both coordinates
+# (its X extension runs down clear of every other hole), the upper right one
+# its own Y, the lower left one its own X; every other coordinate is a sketch
+# relation to those.  Guide holes: y-major, the bottom row's five X and each
+# row's first Y.
+SOCKET_ORDER = (
+    SOCKET_XY[2],  # (264.2472, 58.5104)
+    SOCKET_XY[3],  # (264.2472, 127.6296)
+    SOCKET_XY[0],  # (5.3928, 58.5104)
+    SOCKET_XY[1],  # (5.3928, 127.6296)
+)
+SOCKET_PLACEMENT = [
+    (("Socket1X", '"SocketX2"'), ("Socket1Y", '"SocketY1"')),
+    (SharedCoordinate(0), ("Socket2Y", '"SocketY2"')),
+    (("Socket3X", '"SocketX1"'), SharedCoordinate(0)),
+    (SharedCoordinate(2), SharedCoordinate(1)),
+]
+GUIDE_PLACEMENT = [
+    (
+        (f"Guide{column + 1}X", f'"GuideX{column + 1}"')
+        if row == 0
+        else SharedCoordinate(column),
+        (f"Guide{row * len(GUIDE_HOLE_X) + 1}Y", f'"GuideY{row + 1}"')
+        if column == 0
+        else SharedCoordinate(row * len(GUIDE_HOLE_X)),
+    )
+    for row in range(len(GUIDE_HOLE_Y))
+    for column in range(len(GUIDE_HOLE_X))
+]
+if [(x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X] != list(GUIDE_HOLE_XY):
+    raise AssertionError("guide-hole placement assumes the y-major GUIDE_HOLE_XY order")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -89,6 +135,15 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PlateThickness", f"{PLATE_THICKNESS}mm")
     await set_global(adapter, "SocketBossDia", f"{SOCKET_BOSS_DIA}mm")
     await set_global(adapter, "SocketBossH", f"{SOCKET_BOSS_H}mm")
+    # The printed hole stations (SOCKET_PLACEMENT / GUIDE_PLACEMENT).
+    for index, value in enumerate(sorted({x for x, _ in SOCKET_XY}), start=1):
+        await set_global(adapter, f"SocketX{index}", f"{value}mm")
+    for index, value in enumerate(sorted({y for _, y in SOCKET_XY}), start=1):
+        await set_global(adapter, f"SocketY{index}", f"{value}mm")
+    for index, value in enumerate(GUIDE_HOLE_X, start=1):
+        await set_global(adapter, f"GuideX{index}", f"{value}mm")
+    for index, value in enumerate(GUIDE_HOLE_Y, start=1):
+        await set_global(adapter, f"GuideY{index}", f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -119,6 +174,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=PLATE_THICKNESS)),
     )
     name_last_feature(adapter, "Plate")
+    depth_dim = name_dimensions(adapter, "Plate", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"PlateThickness"')]
     v_plate = PLATE_WIDTH * PLATE_HEIGHT * PLATE_THICKNESS
     await volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
 
@@ -164,12 +221,14 @@ async def build(adapter) -> dict[str, str]:
     # stock shank as thread and its tip finishes flush at the boss's rear face
     # rather than bottoming in a blind socket.
     pre = await adapter.get_mass_properties()
-    wizard_holes(
+    sockets = wizard_holes(
         adapter, SOCKET_SPEC,
-        [[x, y, 0.0] for x, y in SOCKET_XY],
+        [[x, y, 0.0] for x, y in SOCKET_ORDER],
         (0.0, 0.0, -1.0),
         "clip-screw through-tapped receivers (#2-56)", name="Sockets",
+        placement_dims=SOCKET_PLACEMENT,
     )
+    drive_jobs += sockets.placement_drive_jobs
     post = await adapter.get_mass_properties()
     v_sockets = (
         len(SOCKET_XY)
@@ -184,12 +243,12 @@ async def build(adapter) -> dict[str, str]:
 
     # Guide-screw through-holes + head counterbores: ONE native Hole Wizard
     # counterbored #4 FILLISTER feature (10 points) from the front face. The
-    # Ø3 shanks pass through into the guide rails and the Ø6.5 x 2.9178
+    # #4 loose shanks pass through into the guide rails and the Ø6.5 x 2.9178
     # counterbores hold the stock heads exactly 0.2 sub-flush.
-    # The through Ø3 and counterbore Ø6.5 artefact diameters are preserved as
-    # explicit overrides; only depth follows the exact purchased head.
+    # The through Ø (#4 loose) and the counterbore Ø6.5 artefact diameter are
+    # explicit overrides; the depth follows the exact purchased head.
     pre = post
-    wizard_holes(
+    guide_holes = wizard_holes(
         adapter,
         HoleSpec("counterbore_fillister", "#4", fit=GUIDE_HOLE_FIT, overrides_mm={
             "HoleDiameter": GUIDE_HOLE_DIA,
@@ -199,7 +258,9 @@ async def build(adapter) -> dict[str, str]:
         [[x, y, 0.0] for x, y in GUIDE_HOLE_XY],
         (0.0, 0.0, -1.0),
         "guide-screw counterbored holes (#4 loose)", name="GuideHoles",
+        placement_dims=GUIDE_PLACEMENT,
     )
+    drive_jobs += guide_holes.placement_drive_jobs
     post = await adapter.get_mass_properties()
     v_guide = len(GUIDE_HOLE_XY) * (
         math.pi * (GUIDE_HOLE_DIA / 2.0) ** 2 * PLATE_THICKNESS
@@ -229,7 +290,25 @@ async def build(adapter) -> dict[str, str]:
     # kills the residual spin, an X distance snapshot pins the feed position.
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "slide axis")
 
+    # Manufacturing drawing support: every printed dimension's places live on
+    # the model (drawing-simplicity-policy.md `How the repository implements
+    # the guidelines`), then mark exactly the print's dimensions (the drawing
+    # imports the marked set and must find every one) and stamp the view notes.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await report_mass_properties(adapter)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "Right View Note": RIGHT_VIEW_NOTE,
+            "Back View Note": BACK_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

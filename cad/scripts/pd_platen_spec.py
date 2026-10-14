@@ -11,6 +11,7 @@ keys (#880).
 from __future__ import annotations
 
 from _hole_spec import CLEARANCE_MM, HoleSpec
+from _printed_tolerance import printed_band_mm
 from vn_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 
 PLATE_WIDTH = 269.64  # ch30-p002 Pose Studio: 300 * 0.8988 (user fit)
@@ -59,3 +60,69 @@ GUIDE_HOLE_XY = tuple((x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X)
 HEAD_RECESS = 0.2
 CBORE_DIA = 6.5
 CBORE_DEPTH = FILLISTER_HEAD_H + HEAD_RECESS
+
+# --- Drawing contract.  ``build_pd_platen`` marks exactly these dimensions and
+# authors their places; ``draw_pd_platen`` keeps exactly their union across its
+# views.  Hole sizes ship as native Hole Wizard callouts.  The socket and the
+# guide-hole coordinates print once per shared station (the other instances'
+# coordinates are sketch relations to these), from the plate's bottom-left
+# corner. ---
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "PlateProfile": {"Width", "Height"},
+    "Plate": {"Depth"},
+    "SocketBossProfile": {"Boss1Dia"},
+    "SocketBosses": {"BossH"},
+    "Sockets": {"Socket1X", "Socket1Y", "Socket2Y", "Socket3X"},
+    "GuideHoles": {
+        "Guide1X",
+        "Guide2X",
+        "Guide3X",
+        "Guide4X",
+        "Guide5X",
+        "Guide1Y",
+        "Guide6Y",
+    },
+}
+# Places.  The outline prints .X: the clips and guides locate from the holes,
+# not the edges.  The thickness and boss height are the clip-screw thread
+# stack (SOCKET_THREAD_ENGAGEMENT), the boss Ø its wall round the tap, and
+# every hole coordinate is spent by the fixed-screw float over the clip's and
+# the guides' patterns (test_pd_platen_refit): all .XXX.
+POSITION_PLACES = 3
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "PlateProfile": {"Width": 1, "Height": 1},
+    "Plate": {"Depth": 3},
+    "SocketBossProfile": {"Boss1Dia": 3},
+    "SocketBosses": {"BossH": 3},
+    "Sockets": {name: POSITION_PLACES for name in DRAWING_DIMENSIONS["Sockets"]},
+    "GuideHoles": {name: POSITION_PLACES for name in DRAWING_DIMENSIONS["GuideHoles"]},
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
+    set(DRAWING_PRECISION[feature]) != names
+    for feature, names in DRAWING_DIMENSIONS.items()
+):
+    raise AssertionError("every marked platen dimension needs authored places")
+
+# The counterbored guide-hole callout's native variables: the loose through
+# hole and the head-recess depth at .XXX, the counterbore Ø at .X (the head
+# clears it by more than the .X band).
+GUIDE_CALLOUT_PRECISION = {"hw-thruholedia": 3, "hw-cbdia": 1, "hw-cbdepth": 3}
+# The shallowest printed counterbore still sinks the stock fillister head.
+HEAD_RECESS_MIN = (
+    round(CBORE_DEPTH, GUIDE_CALLOUT_PRECISION["hw-cbdepth"])
+    - printed_band_mm(GUIDE_CALLOUT_PRECISION["hw-cbdepth"])
+    - FILLISTER_HEAD_H
+)
+if HEAD_RECESS_MIN <= 0.0:
+    raise AssertionError(
+        f"guide-screw heads stand proud at the shallowest counterbore: {HEAD_RECESS_MIN}"
+    )
+
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+RIGHT_VIEW_NOTE = "ENLARGED RIGHT VIEW SCALE 1:1"
+BACK_VIEW_NOTE = "BACK VIEW"
