@@ -3063,6 +3063,7 @@ def task_check():
         # Shared native gear-gap authoring/status contracts use bounded fakes.
         SCRIPTS_DIR / "test_gear.py",
         SCRIPTS_DIR / "test_process_plans.py",
+        SCRIPTS_DIR / "test_process_shop.py",
         SCRIPTS_DIR / "test_prechips_traveler.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_render_offline.py",
@@ -3354,6 +3355,8 @@ def task_check():
                 str(_process_plans.plan_path(stem).resolve())
                 for stem in _process_plans.TRAVELER_STEMS
             ),
+            # The shop-data contract reads the tracked shop inputs at runtime.
+            *(str(path.resolve()) for path in _process_plans.shop_paths()),
             # module_deps_of only walks cad/scripts; comparison tests import
             # sibling tools (and load render_diff via importlib) outside it.
             *(

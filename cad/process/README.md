@@ -43,7 +43,14 @@ fixture dimensions in the inventory.
 removes the HA-only `cad` key before prechips reads it. Policy and cutting data
 remain shared inputs. Shop values need a vendor/catalogue or measurement source;
 unverified measurements must remain explicitly unverified. Do not change a
-value merely to make a rule pass.
+value merely to make a rule pass. The shop data seeded from the rocker trial
+marks each unmeasured fact as a realistic placeholder,
+`measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", … }`;
+these are test inputs, not shop metrology, and must be remeasured before shop use.
+`cad/scripts/test_process_shop.py` (in `check:recipe`) validates the three files
+under the pinned prechips models and through `bind_shop`, requires a `by` on every
+`measured` record, and rejects part-named inventory tables other than the
+shop-made rocker fixtures.
 
 ## Add or migrate a part
 
