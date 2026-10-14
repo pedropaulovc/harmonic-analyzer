@@ -1,4 +1,4 @@
-r"""Shared builder for the two roller-chain link parts (book ch. 23/30).
+r"""Shared builder for the three roller-chain link parts (book ch. 23/30).
 
 A roller chain is alternating INNER links (2 inner plates + 2 bushings) and
 OUTER links (2 outer plates + 2 pins). Both are an obround side-plate pair
@@ -12,9 +12,10 @@ Axis2 at the x=P station -- are the chain pattern's PathLink1/PathLink2 (their
 spacing IS the pattern pitch). See _chain.py for the clearance rationale (all
 gaps >= 0.25 mm; the links float as disconnected multibody solids).
 
-Both links are bought: McMaster-Carr ANSI #25 roller chain cut to the loop's
-pitch count, closed by one connecting link that serves as an outer link. Each
-part stamps its registry stock identity and a one-line note for its
+All three links are bought: McMaster-Carr ANSI #25 roller chain cut to the
+loop's pitch count with an inner link at each end, closed by one connecting
+link (the OUTER-link stand-in; its spring clip is not modelled). Each part
+stamps its registry stock identity and a one-line note for its
 purchased-part reference sheet (``_purchased_part_drawing``).
 """
 
@@ -57,10 +58,14 @@ import _telemetry
 _ROWS = {
     "vn-chain-inner-link": _config.parts("vn-chain-inner-link"),
     "vn-chain-outer-link": _config.parts("vn-chain-outer-link"),
+    "vn-chain-connecting-link": _config.parts("vn-chain-connecting-link"),
 }
-CHAIN_SKU, CONNECTING_LINK_SKU = _ROWS["vn-chain-outer-link"]["supplier_skus"]
-if _ROWS["vn-chain-inner-link"]["supplier_skus"] != [CHAIN_SKU]:
-    raise AssertionError("inner links come only in the cut roller chain")
+(CHAIN_SKU,) = _ROWS["vn-chain-inner-link"]["supplier_skus"]
+if _ROWS["vn-chain-outer-link"]["supplier_skus"] != [CHAIN_SKU]:
+    raise AssertionError("outer links come only in the cut roller chain")
+(CONNECTING_LINK_SKU,) = _ROWS["vn-chain-connecting-link"]["supplier_skus"]
+# Inner links per loop; the cut chain holds one outer link fewer, and the
+# connecting link closes the loop as the last outer link.
 LINKS_PER_KIND = LINK_COUNT // 2
 # The chain is sold by the foot; the loop is LINK_COUNT whole pitches of it.
 CHAIN_ORDER_FEET = math.ceil(LINK_COUNT * LINK_PITCH / 304.8)
@@ -73,8 +78,10 @@ DRAWING_NOTES = {
         f"{LINK_COUNT} PITCHES."
     ),
     "vn-chain-outer-link": (
-        f"{LINKS_PER_KIND} PER LOOP: {LINKS_PER_KIND - 1} IN THE CUT {CHAIN_SKU} "
-        f"+ 1 {CONNECTING_LINK_SKU} CONNECTING LINK."
+        f"{LINKS_PER_KIND - 1} PER LOOP, ALL IN THE CUT {CHAIN_SKU} CHAIN."
+    ),
+    "vn-chain-connecting-link": (
+        f"1 PER LOOP: JOINS THE TWO INNER-LINK ENDS OF THE CUT {CHAIN_SKU}."
     ),
 }
 # Everything the purchased-part sheet reads from the saved part.
@@ -273,3 +280,6 @@ OUTER_LINK = dict(
     body_bore_r=None,
     body_half_len=PIN_HALF_LEN,
 )
+# The connecting link is modelled as the outer-link stand-in: the same
+# plates and pins at the same pitch, without the vendor's spring clip.
+CONNECTING_LINK = dict(OUTER_LINK)

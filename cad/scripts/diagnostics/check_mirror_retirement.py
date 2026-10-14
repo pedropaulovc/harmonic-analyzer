@@ -1129,11 +1129,16 @@ except Exception as e:
     fails.append(("chain seed lookup", repr(e)))
     _link_ok = False
 if _link_ok and not fails:
+    # The pattern fills stations 2..65; the closing inner link and the
+    # connecting link are seated at 66 and 67.
     for k in range(1, p.LINK_COUNT // 2):
         _link_expect(f"vn-chain-inner-link-{k + 1}", 2 * k, f"chain inner @{2 * k}")
+    for k in range(1, p.LINK_COUNT // 2 - 1):
         _link_expect(
             f"vn-chain-outer-link-{k + 1}", 2 * k + 1, f"chain outer @{2 * k + 1}"
         )
+    closing = p.LINK_COUNT - 1
+    _link_expect("vn-chain-connecting-link-1", closing, f"chain connecting @{closing}")
 
 if fails:
     for f in fails:

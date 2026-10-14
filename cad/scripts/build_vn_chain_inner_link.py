@@ -5,7 +5,9 @@ at the pin stations -- the inner half of the drive chain that loops the two
 mounted removable gears (T12 crank shaft -> T24 knob shaft). The outer links
 (build_vn_chain_outer_link.py) alternate with these along the centreline loop via
 the two-group Connected-Linkage chain component pattern in
-build_pd_paper_drive_assembly.py. Geometry and clearances: _chain.py / _chain_link.py.
+build_pd_paper_drive_assembly.py, and the connecting link
+(build_vn_chain_connecting_link.py) joins the cut chain's two inner-link ends.
+Geometry and clearances: _chain.py / _chain_link.py.
 
 Run (SolidWorks already open)::
 

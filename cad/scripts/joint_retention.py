@@ -665,6 +665,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "ch_bar_pivot_pin",  # plain 5/64 drill-rod pin pressed in the bar cheeks, runs in the lever
         "vn_chain_inner_link",  # roller-chain plate, no thread
         "vn_chain_outer_link",  # roller-chain plate, no thread
+        "vn_chain_connecting_link",  # clip-retained roller-chain link, no thread
         "ch_channel_lever",  # Ø6.5 fulcrum bore, #47 bar-pin hole, #21 spring-eye hole; no taps
         "vn_channel_spring_installed",  # 9432K31 extension spring, hook ends in lever hole / eyebolt eye
         "sh_column_clamp_front",  # #8 CLEARANCE ear holes only; clamped in the screw stack
@@ -760,7 +761,8 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_channel_spring_installed": "extension spring; its hook ends hang in plain holes and eyes",
     "vn_counter_spring": "extension spring; its hook ends hang in plain holes and eyes",
     "vn_chain_inner_link": "roller-chain link; its rollers ride sprocket teeth, carrying no thread",
-    "vn_chain_outer_link": "roller-chain or clip-retained connecting link; pins only, no thread",
+    "vn_chain_outer_link": "roller-chain link; pins only, no thread",
+    "vn_chain_connecting_link": "clip-retained roller-chain link; pins only, no thread",
     "vn_keeper_chain": "chain; its end links hang on screws and eyes, carrying no thread",
     "vn_crank_seat_drive_pin": "dowel pin pressed into a plain hole",
     "vn_keeper_chain_link": "plain chain link",

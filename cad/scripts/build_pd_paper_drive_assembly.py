@@ -2003,11 +2003,20 @@ def _assert_chain_slack_clearance() -> None:
     )
 
 
+# Every link family the closed loop holds (instance names start with these).
+_CHAIN_PARTS = (
+    "vn-chain-inner-link",
+    "vn-chain-outer-link",
+    "vn-chain-connecting-link",
+)
+
+
 async def _place_chain_seed(adapter, part: str, station: int) -> str:
-    """Seat ONE chain-pattern seed link at path ``station``, oriented along the
-    forward CHORD (pin0->pin1) so both pin axes sit ~on the loop -- the connected
-    -linkage chain pattern then fills the rest of the loop. ``_chain`` holds the
-    loop in the PRE-MIRROR frame (anchor ``CHAIN_KNOB_CENTRE`` at machine +X), so
+    """Seat ONE chain link at path ``station``, oriented along the forward CHORD
+    (pin0->pin1) so both pin axes sit ~on the loop: the two pattern seeds, and
+    the two closing links the connected-linkage chain pattern does not fill.
+    ``_chain`` holds the loop in the PRE-MIRROR frame (anchor
+    ``CHAIN_KNOB_CENTRE`` at machine +X), so
     ``mirror_x=True`` reflects each point to the machine (-X) chain plane -- the
     exact machine pose place_component now inserts directly (no mirror layer). The
     achiral link's local-z symmetry keeps that a pure-Z rotation, so the plates
@@ -2038,17 +2047,26 @@ async def _place_chain_seed(adapter, part: str, station: int) -> str:
 
 async def _insert_roller_chain(adapter) -> None:
     """The drive chain: a native CHAIN COMPONENT PATTERN (connected linkage) of
-    alternating inner/outer links along the _chain.py loop.
+    alternating inner/outer links along the _chain.py loop, closed by the
+    purchased chain's connecting link.
 
     Ch. 23: the chain rides the two selected mounted removables' teeth (knob and
     crank shafts). The loop centreline is authored as a single CLOSED SPLINE
     (one sketch segment) on an offset plane at the chain plane (z = CHAIN_MID_Z);
     two seed links (chain-inner-link @ station 0, chain-outer-link @ station 1)
     are placed tangent; SolidWorks' native ``FeatureChainPattern`` (connected
-    linkage, via ``adapter.pattern_components_chain``) fills the loop with the
-    alternating INNER (plates + bushings) / OUTER (plates + pins) links. Each
-    link's two pin axes (Axis1/Axis2) are the group's path-links, so the pattern
-    keeps every plate flat in the chain plane and tangent to the loop.
+    linkage, via ``adapter.pattern_components_chain``) fills all but the last
+    two stations with the alternating INNER (plates + bushings) / OUTER (plates
+    + pins) links. Each link's two pin axes (Axis1/Axis2) are the group's
+    path-links, so the pattern keeps every plate flat in the chain plane and
+    tangent to the loop.
+
+    The bought chain is cut with an inner link at each end and closed by one
+    connecting link (MHA-VN-068), so the loop holds one outer link fewer than
+    inner links. The pattern takes one count per inner/outer PAIR and cannot
+    skip an instance, so it stops one pair short; the cut chain's last inner
+    link and the connecting link are seated at the two closing stations on the
+    straight taut run, the same way as the seeds.
 
     The path MUST be one connected segment: SolidWorks never treats the 3-arc +
     taut-line contour as connected (the segments share coordinates but carry no
@@ -2122,10 +2140,11 @@ async def _insert_roller_chain(adapter) -> None:
                 group2_plane=f"Front Plane@{outer}",
                 # Preserve the inherited visual's explicit per-group count.
                 # Fill-path reserves a seam; count/on-path are visual checks,
-                # not a physical standard-pitch seating certificate.
+                # not a physical standard-pitch seating certificate. One pair
+                # short: the closing inner link and connecting link follow.
                 pitch_method="connected_linkage",
                 fill_path=False,
-                count=LINK_COUNT // 2,
+                count=LINK_COUNT // 2 - 1,
                 spacing=LINK_PITCH,
                 align_method="tangent",
                 options="dynamic",
@@ -2151,17 +2170,18 @@ async def _insert_roller_chain(adapter) -> None:
     reledger_to_solved(adapter, inner)
     reledger_to_solved(adapter, outer)
 
+    # The cut chain's closing inner link and the connecting link that joins
+    # it to the seed inner link, on the straight taut run.
+    await _place_chain_seed(adapter, "vn-chain-inner-link", LINK_COUNT - 2)
+    await _place_chain_seed(adapter, "vn-chain-connecting-link", LINK_COUNT - 1)
+
     # Hide the path spline: it is construction scaffolding for the pattern, not a
     # rendered feature.
     check("blank chain path sketch", await adapter.blank_sketch("chain-path"))
     blank_reference_geometry(adapter, ((plane_name, "PLANE"),))
 
     # 4. Gates: enough links, on the chain plane, on the loop centreline.
-    links = [
-        n
-        for n in component_names(adapter)
-        if n.startswith(("vn-chain-inner-link", "vn-chain-outer-link"))
-    ]
+    links = [n for n in component_names(adapter) if n.startswith(_CHAIN_PARTS)]
     # Selected component count only. The continuous guide's arc length does
     # not prove that a real pinned cycle closes or seats on either sprocket.
     if len(links) != LINK_COUNT:

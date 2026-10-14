@@ -74,7 +74,7 @@ def test_note_is_one_short_line_that_closes_the_loop_count() -> None:
     assert " MM" not in note
     quantity = int(ROW["quantity"])
     # Broken to whole links, an inner link at each end; the connecting link
-    # (one of the outer links) closes the loop's pitch count.
+    # (MHA-VN-068, the loop's last outer link) closes the loop's pitch count.
     assert (
         f"{_chain_link.CHAIN_SKU} TO {quantity} INNER + {quantity - 1} OUTER LINKS"
         in note
