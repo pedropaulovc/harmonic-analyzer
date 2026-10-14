@@ -243,6 +243,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="sh_column_clamp_back",
+        part="sh_column_clamp_back",
+        artifact_stem="sh-column-clamp-back",
+        script_name="draw_sh_column_clamp_back.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="dt_pinion_pivot_block",
         part="dt_pinion_pivot_block",
         artifact_stem="dt-pinion-pivot-block",

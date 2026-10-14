@@ -8,6 +8,7 @@ import sh_column_clamp_front_spec as spec
 import draw_sh_column_clamp_front as drawing
 import build_sh_column_clamp_front as part
 import _clamp_arc
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 
@@ -20,6 +21,7 @@ def test_required_drawing_paths() -> None:
         DRAWINGS_BY_NAME["sh_column_clamp_front"].script
         == Path(drawing.__file__).resolve()
     )
+    assert "draw_sh_column_clamp_front.py" in PRECISION_MIGRATED_DRAWINGS
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
@@ -28,13 +30,18 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     # spec), and the drawing keeps exactly its union across the per-view keep-maps --
     # a rename in one script that isn't mirrored in the other fails here, offline.
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
+    assert part.DRAWING_PRECISION is spec.DRAWING_PRECISION
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = (
-        set(drawing.TOP_KEEP) | set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
-    )
+    kept = set(drawing.TOP_KEEP) | set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
     # A callout can only annotate a dimension the print actually shows.
-    assert set(drawing.DIMENSION_CALLOUTS) <= kept
+    annotated = (
+        set(drawing.DIMENSION_CALLOUTS)
+        | set(drawing.ABOVE_CALLOUTS)
+        | set(drawing.DIMENSION_PREFIXES)
+        | set(drawing.REFERENCE_DIMENSIONS)
+    )
+    assert annotated <= kept
 
 
 def test_geometry_and_hole_contracts_are_part_owned() -> None:
@@ -55,60 +62,46 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 1)" in source  # the isometric override
+    assert "for view in (right, iso):" in source
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
-    notes = spec.DRAWING_NOTES
-    assert "#8 CLEARANCE" in notes
-    assert "#8-32" in notes
-    assert "MHA-SH-002" in notes  # the mating back arc the pair is bored with
-    # General tolerances live in the title block ONLY -- a second general
-    # tolerance in the notes would conflict with it.
-    assert "LINEAR +/-" not in notes
-    assert "HOLE CENTRES" not in notes
-    # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
-    # the period British Association series ("BACK ARC" is not a BA thread).
-    assert "0BA" not in notes and "2BA" not in notes and "4BA" not in notes
-    assert "X.XX" not in notes
+def test_bore_prints_the_grip_budget_on_the_column() -> None:
+    # #970: the bore is matched to the purchased column at the clearance the
+    # pair's grip budget allows (sh_column_clamp_fit), not "bored as a pair".
+    bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert "DIAMETRAL" in bore and "MHA-FR-003" in bore
+    assert f"{spec.BORE_DIAMETRAL_CLEARANCE[1]:.2f}" in bore
+    assert spec.BORE_DIAMETRAL_CLEARANCE[1] <= 0.30
+    assert "MHA-SH-002" in drawing.ABOVE_CALLOUTS["EarHole1Z"]
+    assert min(spec.WALLS_WORST.values()) >= spec.WALL_TARGET
+
+
+def test_sheet_has_no_gdt_notes_or_drawing_precision() -> None:
+    # Clamps are not on the drawing-simplicity GD&T allowlist; the ear holes
+    # locate by +/- from the bore axis, authored on the part.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "_NOTES_" not in source
-
-
-def test_hole_states_are_annotated() -> None:
-    callouts = drawing.DIMENSION_CALLOUTS
-    assert callouts["BoreDia"].startswith("THRU")
-    assert "25.4" in callouts["BoreDia"]  # the column the relief slips on
-
-
-def test_native_gdt_replaces_form_orientation_notes() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 2
-    assert "characteristic=\"parallelism\"" in source
-    assert "characteristic=\"position\"" in source
-    assert "quantity=\"2X\"" in source  # both ear holes under one FCF
-
-
-def test_wizard_holes_are_not_fake_marked_dimensions() -> None:
-    # The ear holes are ONE native Hole Wizard feature: their size lives in an
-    # associative hole callout, never a marked sketch dimension.
-    assert "EarHoles" not in spec.DRAWING_DIMENSIONS
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_native_hole_callout(" in drawing_source
+    assert "add_datum_feature(" not in source
+    assert "add_feature_control_frame(" not in source
+    assert "set_basic_dimension(" not in source
+    assert "set_dimension_precision" not in source
+    assert '"Manufacturing Notes"' not in source
+    assert not hasattr(spec, "DRAWING_NOTES")
+    assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
+    assert "add_native_hole_callout(" in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
     assert "clear_dimensions_for_drawing" in source
+    assert "EAR_STATION_BAND" in source
     import _config
 
     row = _config.parts("sh-column-clamp-front")
     assert row["material_specification"]
-    assert row["finish"]
+    assert "oiled" in row["finish"]
     # One clamp pair per front column: two on the paper-drive platen bar plus
     # one at the magnifier wheel bar.
     assert int(row["quantity"]) == 3
