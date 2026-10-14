@@ -4718,6 +4718,7 @@ length_mm = { value = 816, measured = { status = "measured", by = "placeholder (
 name = "Trial shop-made 1018 trammel setting bar, quarter-inch by one-inch"
 # Source access: original Online Metals product URL returned HTTP 403 on 2026-10-12; original citation remains historical, not falsely claimed live verification.
 kind = "setting_bar"
+cad = "ch_rocker_arm_tl_trammel_setting_bar"
 shop_made = true
 # Historical note (retained, superseded by the trial identity below): "Holes at 0, 800.00 and 816.00 set by the X DRO in three shifts of the bar; good to about +/-0.05 only if the DRO scale is right (checklist A4). Not yet made (verify = true)."
 # Identity/ownership: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "hypothetical visual identity, package-label and shop-shelf inspection".
