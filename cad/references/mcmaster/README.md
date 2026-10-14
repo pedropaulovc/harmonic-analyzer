@@ -530,10 +530,17 @@ Catalog specifications checked on September 10, 2026:
   92314A253. After the bolt's trim equations, its deburr revolve explicitly
   selects the completed closed sketch (mark 0) and captured construction
   axis (mark 4), rather than relying on incidental post-edit selections.
-  The coordinator's second run on e5ad7dcd passed the bolt part and drawing
-  and created the top-frame spotfaces at the expected volume, but exposed
-  the internal-sketch ownership check above. Successful final-source
-  spotface driving/readbacks and downstream layout still require rerun.
+  Coordinator R3 on 37a3382d9 passed the top-frame part, the knife-mount
+  drawing and the frame/summing/top assemblies and soundness; the bolt part
+  and drawing had already passed R2. Only the top-frame drawing failed:
+  `IAnnotation.Select3` threw while selecting its native crossbar width.
+  The drawing now re-resolves that width by its native selection name after
+  the text-offset rebuild, uses the documented `SelectByID2` dimension
+  channel, and records annotation name/type and selection identity before
+  inserting datum D. Exactly-one selection and the original dimension-
+  attachment, label and dangling guards remain mandatory. Stale handles
+  are a possibility, not a demonstrated root cause; the final-source
+  selection and median-plane datum layout require the scoped native proof.
   The washer seats on a **SPOTFACE Ø17.0 ±0.51**, floor **35.50 ±0.05 mm
   above the faced crossbar underside**. With the cut bolt, nominal tip
   reach is 8.9173 mm, bounded by 8.349–9.4856 mm. Subtracting one #10-24

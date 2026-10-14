@@ -32,6 +32,7 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -1171,22 +1172,101 @@ def _require_model_hanger_grip(adapter: Any, dimensions: list[Any]) -> Any:
 def _crossbar_median_datum(adapter: Any, view: Any, width: Any) -> None:
     """Attach D to the native width size, establishing BOTH-face median plane.
 
-    IAnnotation.Select3 selects the dimension annotation; InsertDatumTag2
-    attaches the native tag to it. Unlike the edge-only generic helper,
-    this part-specific path requires swSelDIMENSIONS (14) and the SAME
-    IDisplayDimension/IDimension, not an edge or an unattached tag.
+    ``width`` was captured before ``offset_dimension_text`` rebuilt the sheet,
+    so it supplies identity only: its selection name and its FullName.  The
+    display dimension actually selected is re-resolved from the view's own
+    GetDisplayDimensions (exactly one match, annotation type 4, same
+    FullName) and selected by IModelDocExtension.SelectByID2 on the documented
+    DIMENSION channel -- the call GetNameForSelection exists to feed.  The
+    selection is read back (one swSelDIMENSIONS item, same name and FullName)
+    before InsertDatumTag2 attaches the native tag to it.  Unlike the
+    edge-only generic helper, this part-specific path then requires the tag
+    on swSelDIMENSIONS (14) and the SAME IDisplayDimension/IDimension, not an
+    edge or an unattached tag.
     """
-    display = _early_bound(width, "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    width_annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    width = _early_bound(width, "IDisplayDimension")
+    width_name = width.GetNameForSelection()
+    width_full_name = _early_bound(width.GetDimension2(0), "IDimension").FullName
+    if not isinstance(width_name, str) or not width_name:
+        raise RuntimeError(f"crossbar width has no selection name: {width_name!r}")
+    if not isinstance(width_full_name, str) or not width_full_name:
+        raise RuntimeError(f"crossbar width has no FullName: {width_full_name!r}")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     if not _early_bound(model, "IDrawingDoc").ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate crossbar width datum view")
     model.ClearSelection2(True)
-    data = _early_bound(model.SelectionManager, "ISelectionMgr").CreateSelectData()
-    data.View = view
-    if not width_annotation.Select3(False, data):
-        raise RuntimeError("failed to select crossbar width for median-plane datum")
+    matches = [
+        display
+        for display in (
+            _early_bound(raw, "IDisplayDimension")
+            for raw in _early_bound(view, "IView").GetDisplayDimensions() or ()
+        )
+        if display.GetNameForSelection() == width_name
+    ]
+    annotation_type, annotation_name, full_name = 0, "", ""
+    if len(matches) == 1:
+        display = matches[0]
+        raw_annotation = display.GetAnnotation()
+        raw_dimension = display.GetDimension2(0)
+        if raw_annotation is None or raw_dimension is None:
+            raise RuntimeError(f"crossbar width {width_name!r} has no annotation or dimension")
+        width_annotation = _early_bound(raw_annotation, "IAnnotation")
+        dimension = _early_bound(raw_dimension, "IDimension")
+        annotation_type = int(width_annotation.GetType())
+        annotation_name = str(width_annotation.GetName())
+        full_name = dimension.FullName
+    _telemetry.event(
+        "drawing.crossbar_width.target",
+        selection_name=width_name,
+        matches=len(matches),
+        annotation_type=annotation_type,
+        annotation_name=annotation_name,
+        full_name=str(full_name),
+        expected_full_name=width_full_name,
+    )
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"expected one crossbar width {width_name!r} in its view, found {len(matches)}"
+        )
+    # swAnnotationType_e.swDisplayDimension = 4.
+    if annotation_type != 4 or full_name != width_full_name:
+        raise RuntimeError(
+            f"crossbar width {width_name!r} re-resolved as annotation type "
+            f"{annotation_type}, {full_name!r}; expected type 4, {width_full_name!r}"
+        )
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    if extension.SelectByID2(
+        width_name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    ) is not True:
+        raise RuntimeError(
+            f"failed to select crossbar width {width_name!r} for median-plane datum"
+        )
+    selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+    count = int(selection.GetSelectedObjectCount2(-1))
+    kind = int(selection.GetSelectedObjectType3(count, -1)) if count else 0
+    picked = selection.GetSelectedObject6(count, -1) if count else None
+    picked_name, picked_full_name = "", ""
+    if kind == 14 and picked is not None:  # swSelDIMENSIONS -> IDisplayDimension
+        picked = _early_bound(picked, "IDisplayDimension")
+        picked_name = picked.GetNameForSelection()
+        picked_dimension = picked.GetDimension2(0)
+        if picked_dimension is not None:
+            picked_full_name = _early_bound(picked_dimension, "IDimension").FullName
+    _telemetry.event(
+        "drawing.crossbar_width.selection",
+        count=count, type=kind, selection_name=str(picked_name),
+        full_name=str(picked_full_name),
+    )
+    if (
+        count != 1 or kind != 14
+        or picked_name != width_name or picked_full_name != width_full_name
+    ):
+        model.ClearSelection2(True)
+        raise RuntimeError(
+            f"selecting crossbar width selected {count} object(s), type {kind}, "
+            f"name {picked_name!r}, FullName {picked_full_name!r}; expected one "
+            f"DIMENSION {width_name!r}, {width_full_name!r}"
+        )
     raw_tag = model.InsertDatumTag2()
     if raw_tag is None:
         raise RuntimeError("failed to insert crossbar median-plane datum D")
@@ -1200,6 +1280,14 @@ def _crossbar_median_datum(adapter: Any, view: Any, width: Any) -> None:
     rebuild_drawing(adapter, label="crossbar median-plane datum D")
     kinds = tuple(int(value) for value in annotation.GetAttachedEntityTypes() or ())
     entities = tuple(annotation.GetAttachedEntities3() or ())
+    # The object GetAttachedEntities3 returns for a dimension is undocumented;
+    # its type separates selected-but-unattachable from a selection failure.
+    _telemetry.event(
+        "drawing.crossbar_width.attachment",
+        count=int(annotation.GetAttachedEntityCount3()),
+        types=str(kinds),
+        objects=str(tuple(type(entity).__name__ for entity in entities)),
+    )
     if kinds != (14,) or len(entities) != 1 or entities[0] is None:
         raise RuntimeError(f"median-plane datum D is not attached to the width: {kinds}")
     attached = _early_bound(entities[0], "IDisplayDimension")

@@ -1956,45 +1956,154 @@ def test_crossbar_median_control_cancels_the_socket_station_chain() -> None:
 
 
 def test_crossbar_datum_requires_the_exact_native_width_attachment(monkeypatch) -> None:
+    import inspect
     from types import SimpleNamespace
 
     monkeypatch.setattr(drawing, "_early_bound", lambda entity, _kind: entity)
     monkeypatch.setattr(drawing, "view_name", lambda *_args: "GEOMETRY")
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
-    dimension = SimpleNamespace(FullName="CrossbarWidth@Drawing")
-    width_annotation = SimpleNamespace(Select3=lambda *_args: True)
-    width = SimpleNamespace(
-        GetDimension2=lambda _index: dimension, GetAnnotation=lambda: width_annotation,
+    callout = object()
+    monkeypatch.setattr(drawing, "null_callout", lambda: callout)
+    events: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs)),
     )
-    state = {"types": (14,), "attached": width}
+    name, full_name = "RD1@Drawing View1", "CrossbarWidth@Drawing"
+
+    def stale_select(*_args):
+        raise AssertionError("pre-rebuild width: IAnnotation.Select3 server fault")
+
+    # _checked_dimension's handle, captured before offset_dimension_text's
+    # rebuild: it supplies identity only; selecting through it is R3's fault.
+    width = SimpleNamespace(
+        GetNameForSelection=lambda: name,
+        GetDimension2=lambda _index: SimpleNamespace(FullName=full_name),
+        GetAnnotation=lambda: SimpleNamespace(Select3=stale_select),
+    )
+
+    def display(selection_name=name, dimension_name=full_name, annotation_type=4):
+        return SimpleNamespace(
+            GetNameForSelection=lambda: selection_name,
+            GetDimension2=lambda _index: SimpleNamespace(FullName=dimension_name),
+            GetAnnotation=lambda: SimpleNamespace(
+                GetType=lambda: annotation_type, GetName=lambda: "RD1",
+            ),
+        )
+
+    fresh = display()
+    state: dict = {}
+    calls: list = []
+
+    def reset(**changes) -> None:
+        state.update(
+            displays=(display("RD2@Drawing View1", "OtherWidth@Drawing"), fresh),
+            selected=True, count=1, kind=14, picked=fresh, types=(14,), attached=fresh,
+        )
+        state.update(changes)
+        calls.clear()
+        events.clear()
+
     annotation = SimpleNamespace(
         SetPosition2=lambda *_args: True,
         GetAttachedEntityTypes=lambda: state["types"],
         GetAttachedEntities3=lambda: (state["attached"],),
+        GetAttachedEntityCount3=lambda: 1,
         IsDangling=lambda: False,
     )
     tag = SimpleNamespace(
         SetLabel=lambda text: text == "D", GetLabel=lambda: "D",
         GetAnnotation=lambda: annotation,
     )
+
+    def select(*args):
+        calls.append(("SelectByID2", args))
+        return state["selected"]
+
+    def insert():
+        calls.append("InsertDatumTag2")
+        return tag
+
     model = SimpleNamespace(
-        ActivateView=lambda _name: True, ClearSelection2=lambda _all: None,
-        InsertDatumTag2=lambda: tag,
-        SelectionManager=SimpleNamespace(CreateSelectData=lambda: SimpleNamespace()),
+        ActivateView=lambda _name: True,
+        ClearSelection2=lambda _all: calls.append("ClearSelection2"),
+        InsertDatumTag2=insert,
+        Extension=SimpleNamespace(SelectByID2=select),
+        SelectionManager=SimpleNamespace(
+            # A real ISelectionMgr member: the old path reaches the stale Select3.
+            CreateSelectData=lambda: SimpleNamespace(),
+            GetSelectedObjectCount2=lambda _mark: state["count"],
+            GetSelectedObjectType3=lambda _index, _mark: state["kind"],
+            GetSelectedObject6=lambda _index, _mark: state["picked"],
+        ),
     )
     adapter = SimpleNamespace(
         currentModel=model, swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)),
     )
-    drawing._crossbar_median_datum(adapter, object(), width)
-    state["types"] = (1,)
+    view = SimpleNamespace(GetDisplayDimensions=lambda: state["displays"])
+
+    reset()
+    drawing._crossbar_median_datum(adapter, view, width)
+    assert calls == [
+        "ClearSelection2",
+        ("SelectByID2", (name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, callout, 0)),
+        "InsertDatumTag2",
+        "ClearSelection2",
+    ]
+    assert events == [
+        ("drawing.crossbar_width.target", {
+            "selection_name": name, "matches": 1, "annotation_type": 4,
+            "annotation_name": "RD1", "full_name": full_name,
+            "expected_full_name": full_name,
+        }),
+        ("drawing.crossbar_width.selection", {
+            "count": 1, "type": 14, "selection_name": name, "full_name": full_name,
+        }),
+        ("drawing.crossbar_width.attachment", {
+            "count": 1, "types": "(14,)", "objects": "('SimpleNamespace',)",
+        }),
+    ]
+    body = inspect.getsource(drawing._crossbar_median_datum)
+    assert "Select3" not in body and "CreateSelectData" not in body and ".View =" not in body
+
+    # Fresh re-resolution refuses before anything is selected.
+    for changes, matches, message in (
+        ({"displays": ()}, 0, "found 0"),
+        ({"displays": (fresh, display())}, 2, "found 2"),
+        ({"displays": (display(annotation_type=1),)}, 1, "annotation type 1"),
+        ({"displays": (display(dimension_name="OtherWidth@Drawing"),)}, 1, "re-resolved"),
+    ):
+        reset(**changes)
+        with pytest.raises(RuntimeError, match=message):
+            drawing._crossbar_median_datum(adapter, view, width)
+        assert calls == ["ClearSelection2"]
+        assert [event[1]["matches"] for event in events] == [matches]
+
+    reset(selected=False)
+    with pytest.raises(RuntimeError, match="failed to select crossbar width"):
+        drawing._crossbar_median_datum(adapter, view, width)
+    assert "InsertDatumTag2" not in calls
+
+    # The read-back must be the ONE width, by name AND FullName, before D.
+    for changes in (
+        {"count": 0},
+        {"count": 2},
+        {"kind": 13},
+        {"picked": display("RD2@Drawing View1")},
+        {"picked": display(dimension_name="OtherWidth@Drawing")},
+    ):
+        reset(**changes)
+        with pytest.raises(RuntimeError, match="selecting crossbar width selected"):
+            drawing._crossbar_median_datum(adapter, view, width)
+        assert "InsertDatumTag2" not in calls and calls[-1] == "ClearSelection2"
+
+    reset(types=(1,))
     with pytest.raises(RuntimeError, match="not attached to the width"):
-        drawing._crossbar_median_datum(adapter, object(), width)
-    state["types"] = (14,)
-    state["attached"] = SimpleNamespace(
-        GetDimension2=lambda _index: SimpleNamespace(FullName="DifferentWidth@Drawing"),
-    )
-    with pytest.raises(RuntimeError, match="exact crossbar width attachment"):
-        drawing._crossbar_median_datum(adapter, object(), width)
+        drawing._crossbar_median_datum(adapter, view, width)
+    # Equal FullName is not enough: D must sit on the re-resolved display.
+    for attached in (display(dimension_name="DifferentWidth@Drawing"), width):
+        reset(attached=attached)
+        with pytest.raises(RuntimeError, match="exact crossbar width attachment"):
+            drawing._crossbar_median_datum(adapter, view, width)
 
 
 def test_spotface_floor_grip_is_the_models_driving_dimension() -> None:
