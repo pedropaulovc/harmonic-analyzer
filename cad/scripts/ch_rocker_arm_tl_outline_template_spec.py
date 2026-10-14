@@ -114,8 +114,8 @@ if printed_band_mm(END_PLACES) > 0.26 * printed_band_mm(2):
 PIVOT_HOLE_DIA = rocker.PIVOT_HOLE_DIA
 PIVOT_HOLE_BAND = (0.015, 0.0)
 PIVOT_PLACES = 3
-# The fit's mate is named on the bore's own callout.
-PIVOT_CALLOUT = "REAM FOR PIVOT PIN GAUGE"
+# The fit and its mate are named on the bore's own callout.
+PIVOT_CALLOUT = "REAM, SLIP FIT ON PIN GAUGE"
 # Both arcs' shared centre lies on the pivot bore's vertical centreline,
 # CENTER_Y above the bore: off any sheet, so the radius callouts say so.
 ARC_CENTER_CALLOUT = "CENTER ON PIVOT CL"

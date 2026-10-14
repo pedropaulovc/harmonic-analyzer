@@ -81,18 +81,18 @@ FRONT_KEEP = {
     "TopRadius": (0.095, 0.140),
     "BottomRadius": (0.305, 0.140),
     "BottomBelowPivot": (0.188, 0.140),
-    "PivotDia": (0.230, 0.140),
+    "PivotDia": (0.240, 0.140),
     "BottomTailX": (0.133, 0.118),
     "BottomRodX": (0.267, 0.118),
     "TopAbovePivot": (0.222, 0.192),
     "TopTailX": (0.128, 0.207),
     "TopRodX": (0.272, 0.207),
-    "TailTipLen": (0.035, 0.190),
-    "RodTipLen": (0.365, 0.190),
+    "TailTipLen": (0.033, 0.197),
+    "RodTipLen": (0.367, 0.197),
 }
 # Above the edge view so the stock callout clears the rod tip-land text and
 # the sheet border.
-RIGHT_KEEP = {"Thick": (0.392, 0.215)}
+RIGHT_KEEP = {"Thick": (0.392, 0.225)}
 # Both arc centres lie on the bore's vertical centreline, off the sheet
 # above; the apex heights land on each arc's low point there, and the tip
 # lands run radially from those centres.
