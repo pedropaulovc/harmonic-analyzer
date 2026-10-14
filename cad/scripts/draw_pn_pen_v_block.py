@@ -17,9 +17,9 @@ feature is located across the depth from the front face:
   the pivot-bore axis.
 * right (third angle, right of the ``*Back`` face): ``*Left``, the paper end,
   shows the V in solid lines -- both its mouth edges from the front face,
-  included angle, reference apex height, and the block depth.
-  Tangent edges are off there: through the V the relief's corner arcs would
-  otherwise draw two short lines at the mouth corners.
+  included angle, reference apex height, and the block depth.  Through the V
+  it looks along the open relief slot: the V is cut on past the step
+  (``pn_pen_v_block_spec.V_CUT_LENGTH``), so no brass shows inside it.
 * bottom: ``*Bottom`` turned 180 degrees to keep the front view's X, looking
   up into the V and the relief; through the relief the roof shows both
   vertical bores.  It carries the relief's start station and corner radius,
@@ -29,7 +29,8 @@ feature is located across the depth from the front face:
   looking toward the free end as the paper-end view does (front face on the
   left in both); it carries both relief walls from the front face and their
   height, the pivot bore's station from the front face, and the bore's top
-  chamfer.
+  chamfer.  The tap, cut on its axis, shows its cosmetic thread's major
+  diameter as thin solid lines.
 
 No datums, frames, basic dimensions or roughness (drawing-simplicity-policy.md
 rules 5 and 6), no note block: material and finish ride the title block.  The
@@ -52,6 +53,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    remove_notes_matching,
     view_name,
 )
 
@@ -359,6 +361,75 @@ SECTION_KEEP = {
 # (~0.1305): its rows ~0.1205..0.1268 and ~0.112..0.116, over the iso's note
 # (top 0.097) and 10 mm clear of the iso's sloping top at its left end.
 SECTION_CAPTION_XY = (SECTION_CENTER[0], _sy(0.0) - 0.029)
+# Section A-A cuts the set-screw tap on its axis: its cosmetic thread's major
+# diameter prints there as two lines 5.7 mm either side of the axis (y 0.204,
+# so 0.198 / 0.210) from the front face (x 0.324) to the bore wall (x 0.352),
+# inside the section's ink, clear of every dimension (PivotZ's extension lines
+# start at the top face, y 0.228; the bore axis's centreline at x 0.360).
+# SolidWorks prints a section's thread annotation dashed, as a hidden thread
+# (draw_sm_knife_mount, MHA review 2026-10-09), so it moves onto a visible
+# thin continuous layer of its own.
+SECTION_THREAD_LAYER = "TAP-THREAD-SECTION"
+TAPPED_HOLE_NOTE = f"{SET_SCREW_TAP_SPEC.size} Tapped Hole"
+_COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
+
+
+def _section_thread_on_visible_layer(adapter: Any, section: Any) -> None:
+    """Import section A-A's cosmetic thread and print it thin and solid.
+
+    draw_fr_harmonic_base's section import (at least one native instance
+    required) and draw_sm_knife_mount._layer_cosmetic_threads' layer: created
+    thin continuous (``ILayerMgr::AddLayer``), its state and every thread
+    annotation's layer read back.
+    """
+    threads = import_cosmetic_threads(adapter, section)
+    if threads[1] < 1:
+        raise RuntimeError("section A-A has no native cosmetic-thread instance")
+    draw = adapter.currentModel
+    manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
+    layer = manager.GetLayer(SECTION_THREAD_LAYER)
+    if layer is None:
+        # COLORREF black, swLineCONTINUOUS (0), swLW_THIN (0).
+        if (
+            int(
+                manager.AddLayer(
+                    SECTION_THREAD_LAYER, "section A-A tap thread", 0, 0, 0
+                )
+            )
+            != 1
+        ):
+            raise RuntimeError(f"failed to add layer {SECTION_THREAD_LAYER}")
+        layer = manager.GetLayer(SECTION_THREAD_LAYER)
+    layer = _early_bound(layer, "ILayer")
+    layer.Visible = True
+    if not bool(layer.Visible) or int(layer.Style) != 0 or int(layer.Width) != 0:
+        raise RuntimeError(
+            f"layer {SECTION_THREAD_LAYER} reads visible={layer.Visible!r}, style "
+            f"{layer.Style!r}, width {layer.Width!r}; wanted visible thin continuous"
+        )
+    moved = 0
+    for raw_annotation in _early_bound(section, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != _COSMETIC_THREAD_ANNOTATION:
+            continue
+        annotation.Layer = SECTION_THREAD_LAYER
+        if str(annotation.Layer or "") != SECTION_THREAD_LAYER:
+            raise RuntimeError(
+                f"a cosmetic thread refused layer {SECTION_THREAD_LAYER}"
+            )
+        moved += 1
+    if moved < 1:
+        raise RuntimeError("section A-A lists no cosmetic-thread annotation to layer")
+    rebuild_drawing(adapter, label=f"cosmetic threads to {SECTION_THREAD_LAYER}")
+    # The import pins SolidWorks' own "#4-40 Tapped Hole" note to the view;
+    # the tap's hole callout states the tap (rule 7).  Which views receive one
+    # is SolidWorks' choice, so the count is logged; finalize_drawing's sweep
+    # then counts the iso's alone.
+    removed = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
+    _telemetry.info(
+        f"section A-A cosmetic threads: seeds/instances={threads!r}, {moved} on "
+        f"{SECTION_THREAD_LAYER}; removed {removed} automatic tapped-hole note(s)"
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -410,15 +481,6 @@ async def build(adapter: Any) -> dict[str, str]:
     _orient_bottom_view(adapter, bottom)
     for view in (front, right, bottom):
         set_hidden_lines_removed(adapter, view)
-    # Through the V the paper-end view looks into the relief: each step-corner
-    # arc's tangent edge with the step (z 3.5 / 14.5, 0.5 inside a mouth
-    # corner) drew a short line from the bottom face to the flank (r11), two
-    # small triangles that read as features at the V's mouth.  The arcs are
-    # dimensioned in the bottom view; here their tangent edges carry nothing.
-    right.SetDisplayTangentEdges2(0)  # swDisplayTangentEdges_e: removed
-    if int(right.GetDisplayTangentEdges2()) != 0:
-        raise RuntimeError("failed to hide the paper-end view's tangent edges")
-    right.UpdateViewDisplayGeometry()
     annotations = [
         annotation
         for view, keep, label in (
@@ -480,6 +542,7 @@ async def build(adapter: Any) -> dict[str, str]:
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="v-block section A-A"
     )
+    _section_thread_on_visible_layer(adapter, section)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     # The iso too: a new view already reads Shaded With Edges, so
     # finalize_drawing's SetDisplayMode4 is a no-op that leaves its cosmetic
@@ -561,7 +624,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Pen V-Block Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        redundant_note_substrings=(f"{SET_SCREW_TAP_SPEC.size} Tapped Hole",),
+        redundant_note_substrings=(TAPPED_HOLE_NOTE,),
         expected_redundant_notes=1,
     )
 

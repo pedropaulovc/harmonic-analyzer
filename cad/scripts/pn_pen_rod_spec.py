@@ -90,9 +90,9 @@ DRAWING_REFERENCE_PRECISION = 1
 if round(TOTAL_LENGTH, DRAWING_REFERENCE_PRECISION) != TOTAL_LENGTH:
     raise AssertionError("the overall reference must print exactly at its places")
 
-# Side view (1:1, rod axis horizontal as in the lathe): the square's length,
+# Side view (2:1, rod axis horizontal as in the lathe): the square's length,
 # the pivot's length and banded diameter, and the shoulder root's MAX radius.
-# End view (4:1) of the tapped top face: the square's banded depth, which the
+# End view (5:1) of the tapped top face: the square's banded depth, which the
 # SQ in its callout makes the size of both flats (Section and Depth are one
 # "RodSection" global, so the model holds the square), and the stud-tap
 # wizard callout.  Section keeps its model band but is not printed: one SQ
@@ -142,4 +142,5 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     "ShoulderRadius": f"SEATS ON PEN V-BLOCK\n{PEN_V_BLOCK_NUMBER}",
 }
 
-END_VIEW_NOTE = "END VIEW SCALE 4:1"
+END_VIEW_NOTE = "END VIEW SCALE 5:1"
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

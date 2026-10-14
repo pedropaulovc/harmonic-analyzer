@@ -568,23 +568,62 @@ def test_v_is_its_angle_and_mouth_with_a_reference_apex() -> None:
     assert drawing._ry(0.0) + 0.006 < angle_y < drawing._ry(spec.V_APEX_Y) - 0.006
 
 
-def test_paper_end_view_drops_the_relief_corners_tangent_edges() -> None:
-    # Review r11: through the V the relief's corner arcs drew two short
-    # tangent-edge lines at the mouth corners.  The end view hides tangent
-    # edges, read back, after hidden-line removal and before curation.
-    for needle in (
-        "right.SetDisplayTangentEdges2(0)",
-        "int(right.GetDisplayTangentEdges2()) != 0",
-        "right.UpdateViewDisplayGeometry()",
-    ):
-        assert needle in _DRAWING_SOURCE, needle
-    hlr = _DRAWING_SOURCE.index("set_hidden_lines_removed(adapter, view)")
-    tangent = _DRAWING_SOURCE.index("right.SetDisplayTangentEdges2(0)")
-    assert hlr < tangent < _DRAWING_SOURCE.index("keep=keep,")
-    # The edge it hides stands inside a mouth corner, under the flank.
+def test_v_runs_past_the_step_so_no_knife_edge_shows_in_the_end_view() -> None:
+    # Review final2: a closed triangle at each V mouth lip in the paper-end
+    # view, which hiding tangent edges did not remove.  It was brass: stopped
+    # at the step, the V left a sliver under each flank where the corner arc
+    # curves away from the step (0.5 tall at the mouth, thinning to nothing).
     corner_z = spec.RELIEF_Z0 + spec.RELIEF_CORNER_R
-    mouth_z = spec.V_MOUTH_Z0
-    assert mouth_z < corner_z < spec.BLOCK_DEPTH / 2.0
+    assert spec.V_MOUTH_Z0 < corner_z < spec.BLOCK_DEPTH / 2.0
+    sliver_height = corner_z - spec.V_MOUTH_Z0  # the 90 deg flank rises 1:1
+    assert sliver_height == pytest.approx(0.5)
+    arc_x_at_mouth = (
+        spec.RELIEF_X0
+        + spec.RELIEF_CORNER_R
+        - math.sqrt(spec.RELIEF_CORNER_R**2 - sliver_height**2)
+    )
+    assert 0.0 < arc_x_at_mouth - spec.RELIEF_X0 < 0.15
+    # The cut runs to where both corner arcs end, so every sliver goes; R1.0
+    # stays, and past the step the V lies wholly inside the slot.
+    assert spec.RELIEF_CORNER_R == 1.0
+    assert spec.V_CUT_LENGTH == spec.RELIEF_X0 + spec.RELIEF_CORNER_R
+    assert spec.RELIEF_Z0 < spec.V_MOUTH_Z0 < spec.V_MOUTH_Z1 < spec.RELIEF_Z1
+    assert spec.V_APEX_Y < spec.RELIEF_HEIGHT
+    assert "ExtrusionParameters(depth=V_CUT_LENGTH)" in _PART_SOURCE
+    assert '\'"ReliefX0" + "ReliefCornerR"\'' in _PART_SOURCE
+    # Geometry, not display: the end view no longer hides its tangent edges.
+    assert "SetDisplayTangentEdges2" not in _DRAWING_SOURCE
+
+
+def test_section_shows_the_tap_thread_on_a_visible_thin_layer() -> None:
+    # Review final2: section A-A drew the tapped hole as a plain drill.  The
+    # section imports its cosmetic thread (at least one instance) and moves
+    # it onto a thin continuous visible layer, read back; SolidWorks' own
+    # tapped-hole note from that import is deleted there.
+    body = _DRAWING_SOURCE[
+        _DRAWING_SOURCE.index("def _section_thread_on_visible_layer(") :
+    ]
+    body = body[: body.index("\nasync def build(")]
+    for needle in (
+        "import_cosmetic_threads(adapter, section)",
+        "if threads[1] < 1:",
+        "manager.AddLayer(",
+        "layer.Visible = True",
+        "int(layer.Style) != 0 or int(layer.Width) != 0",
+        "annotation.Layer = SECTION_THREAD_LAYER",
+        'if str(annotation.Layer or "") != SECTION_THREAD_LAYER:',
+        "if moved < 1:",
+        "remove_notes_matching(adapter, TAPPED_HOLE_NOTE)",
+    ):
+        assert needle in body, needle
+    assert drawing._COSMETIC_THREAD_ANNOTATION == 1
+    caption = _DRAWING_SOURCE.index("position_section_caption(")
+    threads = _DRAWING_SOURCE.index(
+        "_section_thread_on_visible_layer(adapter, section)"
+    )
+    iso = _DRAWING_SOURCE.index("import_cosmetic_threads(adapter, iso)")
+    assert caption < threads < iso
+    assert drawing.TAPPED_HOLE_NOTE == "#4-40 Tapped Hole"
 
 
 def test_end_view_rows_stack_without_crossing() -> None:
@@ -625,10 +664,15 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     import pn_pen_carriage_geom as carriage
 
     assert part.V_BLOCK == pytest.approx(11016.0)
-    assert part.V_GROOVE == pytest.approx(360.0)
+    # Cut one corner radius past the step, the V's run there lies in the slot:
+    # the relief removes that much less (the two slivers, 0.005 mm^3, aside).
+    assert part.V_GROOVE == pytest.approx(396.0)
+    assert part.V_GROOVE_PAST_STEP == pytest.approx(36.0)
     # The carriage mass model cuts the relief square-cornered and leaves the
     # bore's top chamfer: both under 0.05% of the block.
-    assert part.V_RELIEF + part.V_RELIEF_CORNERS == pytest.approx(2197.0)
+    assert part.V_RELIEF + part.V_RELIEF_CORNERS + part.V_GROOVE_PAST_STEP == (
+        pytest.approx(2197.0)
+    )
     corner_r, relief_h = spec.RELIEF_CORNER_R, spec.RELIEF_HEIGHT
     assert part.V_RELIEF_CORNERS == pytest.approx(
         2.0 * (1.0 - math.pi / 4.0) * corner_r**2 * relief_h

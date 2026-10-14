@@ -21,7 +21,8 @@ Features, in tree order:
 * ``VGrooveProfile`` (Right plane, sketch (u, v) = model (-Z, Y)) ->
   ``VGroove``: the V triangle, its included angle and both mouth edges (each
   from the front face) driving and its apex height a driven reference, cut +X
-  from the paper end to ``RELIEF_X0``.
+  from the paper end to ``V_CUT_LENGTH``, one corner radius past the relief's
+  step, so no knife edge stays where the corner arcs meet the flanks.
 * ``ReliefProfile`` (Top plane, sketch (u, v) = model (X, -Z)) -> ``Relief``:
   the slot from ``RELIEF_X0`` to the free end, both walls stationed from the
   front face, its two step corners the end mill's ``RELIEF_CORNER_R`` arcs,
@@ -117,6 +118,7 @@ from pn_pen_v_block_spec import (
     SET_SCREW_Y,
     V_ANGLE_DEG,
     V_APEX_Y,
+    V_CUT_LENGTH,
     V_MOUTH_WIDTH,
     V_MOUTH_Z0,
     V_MOUTH_Z1,
@@ -137,10 +139,18 @@ _STUB = 1.0
 
 # Analytic volumes (mm^3) of each feature, checked after it is built.
 V_BLOCK = (BLOCK_LENGTH * BLOCK_HEIGHT - CHAMFER**2) * BLOCK_DEPTH
-V_GROOVE = V_APEX_Y * V_MOUTH_WIDTH / 2.0 * RELIEF_X0
+V_GROOVE = V_APEX_Y * V_MOUTH_WIDTH / 2.0 * V_CUT_LENGTH
 # Each step corner leaves its R x R square less the quarter disc standing.
 V_RELIEF_CORNERS = 2.0 * (1.0 - math.pi / 4.0) * RELIEF_CORNER_R**2 * RELIEF_HEIGHT
-V_RELIEF = RELIEF_WIDTH * RELIEF_HEIGHT * (BLOCK_LENGTH - RELIEF_X0) - V_RELIEF_CORNERS
+# The V's run past the step lies inside the slot, already void when the
+# relief is cut, less the two knife-edge slivers under its flanks at the
+# corner arcs (0.005 mm^3 together, inside every volume check's tolerance).
+V_GROOVE_PAST_STEP = V_APEX_Y * V_MOUTH_WIDTH / 2.0 * (V_CUT_LENGTH - RELIEF_X0)
+V_RELIEF = (
+    RELIEF_WIDTH * RELIEF_HEIGHT * (BLOCK_LENGTH - RELIEF_X0)
+    - V_RELIEF_CORNERS
+    - V_GROOVE_PAST_STEP
+)
 # Both vertical bores remove brass only from the relief roof to the top face.
 V_PIVOT_BORE = math.pi * (PIVOT_BORE_DIA / 2.0) ** 2 * (BLOCK_HEIGHT - RELIEF_HEIGHT)
 # A 45 deg chamfer of leg c round a bore of radius r: the c x c / 2 triangle
@@ -788,7 +798,9 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "block", V_BLOCK, 0.001 * V_BLOCK)
 
     # 2. The grip's V-groove, cut +X (the Right plane's normal) from the paper
-    # end face to the relief's start.
+    # end face one corner radius past the relief's start: stopped at the step,
+    # it left a knife-edge sliver under each flank where the corner arcs curve
+    # away from it (review final2's mouth triangles).
     groove = SketchDims()
     check("create_sketch V-groove", await adapter.create_sketch("Right"))
     await _v_groove(adapter, groove)
@@ -798,10 +810,15 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += groove.apply(adapter, "VGrooveProfile")
     check(
         "cut V-groove",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=RELIEF_X0)),
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=V_CUT_LENGTH)),
     )
     name_last_feature(adapter, "VGroove")
-    drive_jobs += [(name_dimensions(adapter, "VGroove", ["VLength"])[0], '"ReliefX0"')]
+    drive_jobs += [
+        (
+            name_dimensions(adapter, "VGroove", ["VLength"])[0],
+            '"ReliefX0" + "ReliefCornerR"',
+        )
+    ]
     volume = await volume_check(adapter, "V-groove", volume - V_GROOVE, 0.01 * V_GROOVE)
 
     # 3. The body's relief slot, cut +Y (the Top plane's normal) up to its roof.

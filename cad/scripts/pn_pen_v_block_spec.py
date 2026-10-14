@@ -83,6 +83,15 @@ RELIEF_HEIGHT = 6.5
 # at the bottom face the step is only (V mouth - relief) / 2 = 0.5 wide beside
 # the V, so a rolling-ball fillet would run off it.
 RELIEF_CORNER_R = 1.0
+# The V is cut on one corner radius past the step, to where the corner arcs
+# end.  Past the step its whole section lies inside the slot's (guard below),
+# so it removes only what each corner arc leaves under a flank: stopped at
+# the step, the cut left a knife edge there, 0.13 thick at most and 0.5 tall
+# (machinist review final2: a closed triangle at each mouth lip in the
+# paper-end view), a web far under the rule 17 floor.
+V_CUT_LENGTH = RELIEF_X0 + RELIEF_CORNER_R
+if not (RELIEF_Z0 < V_MOUTH_Z0 and V_MOUTH_Z1 < RELIEF_Z1 and V_APEX_Y < RELIEF_HEIGHT):
+    raise AssertionError("past the step the V must lie inside the relief slot")
 
 # --- Pivot bore (rod's turned end): a sketched cut from the top face down
 # into the relief slot, reamed to the band ---
@@ -195,10 +204,11 @@ if round(PIVOT_BORE_TOP_CHAMFER, PIVOT_CHAMFER_PLACES) != PIVOT_BORE_TOP_CHAMFER
 # bore are Hole Wizard features: their sizes print as native hole callouts,
 # their stations as the marked placement dimensions (SetScrewX repeats the
 # pivot station on the face the tap is drilled from).  The V's length prints as
-# the relief's start station (ReliefX0, the same "ReliefX0" global): the
-# V-groove cut's own depth dimension projects off the paper end in the bottom
-# view, away from the brass it measures.  Every feature is located across the
-# depth from the FRONT face (z 0), never by the depth's symmetry, and the V and
+# the relief's start station (ReliefX0, the same "ReliefX0" global): the V
+# runs into the slot (V_CUT_LENGTH), so the step is where its brass ends, and
+# the V-groove cut's own depth dimension would hang in the slot's air.  Every
+# feature is located across the depth from the FRONT face (z 0), never by the
+# depth's symmetry, and the V and
 # the relief by both their edges as baselines from it (VMouthZ0 / VMouthZ1,
 # ReliefZ0 / ReliefZ1): no edge is chained from another.  Three features' own
 # depth stations would print off real geometry, so hidden reference sketches

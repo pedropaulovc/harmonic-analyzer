@@ -88,8 +88,9 @@ def test_side_view_is_turned_and_proved_before_any_import() -> None:
     assert order == sorted(order)
     # Model +Y (the axis) -> sheet +x, model +X -> sheet -y, centred on the
     # bounding box: the pivot end left, the tapped top face right.
+    scale = drawing.SIDE_SCALE[0] / drawing.SIDE_SCALE[1]
     assert drawing._sx(spec.SQUARE_LENGTH) - drawing._sx(-spec.PIVOT_LENGTH) == (
-        pytest.approx(spec.TOTAL_LENGTH / 1000.0)
+        pytest.approx(spec.TOTAL_LENGTH * scale / 1000.0)
     )
     mid = (drawing._sx(-spec.PIVOT_LENGTH) + drawing._sx(spec.SQUARE_LENGTH)) / 2.0
     assert mid == pytest.approx(drawing.SIDE_CENTER[0])
@@ -138,49 +139,101 @@ def test_shoulder_root_is_a_modelled_max_radius() -> None:
 
 def test_side_view_layout_stays_clear() -> None:
     """The positions SIDE_KEEP's comment derives; block sizes are the farm
-    audit's (20261014T045316872Z: R MAX block x keep-0.0281..keep+0.0265,
+    audit's (20261014T053239477Z: R MAX block x keep-0.0281..keep+0.0265,
     shoulder 8.35 mm under its anchor; Ø block 55.8 mm wide, hanging one
-    side of its line, keep y -0.0101..+0.010; (122.5) text top ~0.2136)."""
+    side of its line, keep y -0.0101..+0.010; (122.5) text top 1.6 mm over
+    its anchor; 10.5 text 11.6 mm wide)."""
     border, air = 0.0127, 0.0015
     keep = drawing.SIDE_KEEP
     sx, sy, half = drawing._sx, drawing._sy, spec.ROD_SECTION / 2.0
     square_top, square_bottom = sy(-half), sy(half)
     pivot_end, shoulder = sx(-spec.PIVOT_LENGTH), sx(0.0)
+    # Rule 15: 2:1 lays the rod ~245 mm long, inside the border.
+    assert drawing.SIDE_SCALE == (2, 1)
+    assert sx(spec.SQUARE_LENGTH) - pivot_end == pytest.approx(0.245)
     # Three rows above the rod, 10 mm apart, the overall the outermost.
     rows = [keep["Length"][1], keep["PivotLength"][1], drawing.OVERALL_REF_XY[1]]
     assert rows == sorted(rows)
     assert rows[0] - square_top > 0.008
     assert all(b - a >= 0.0099 for a, b in zip(rows, rows[1:]))
     assert shoulder < keep["Length"][0] < sx(spec.SQUARE_LENGTH)
-    # The 10.5's ~11.6 mm text stands outside RIGHT of its span, clear of
-    # the shoulder's extension line, its arrows forced inside: nothing of it
-    # runs left of the pivot end.
-    assert keep["PivotLength"][0] - 0.0058 > shoulder + air
-    assert drawing.PIVOT_LENGTH_ARROW_SIDE == 0  # swDimArrowsInside
-    assert "_stand_pivot_length_arrows_inside(adapter, annotations)" in (
-        _DRAWING_SOURCE
-    )
+    # The 10.5's text stands centred over its 21 mm span, clear of both
+    # extension lines, its arrows forced inside: nothing of it runs left of
+    # the pivot end.
+    text_x = keep["PivotLength"][0]
+    assert text_x - 0.0058 > pivot_end + air
+    assert text_x + 0.0058 < shoulder - air
+    assert drawing.ARROW_SIDES == {"PivotLength": 0, "Depth": 1}
+    assert "_set_arrow_sides(adapter, annotations)" in _DRAWING_SOURCE
     # The Ø's line stands left of the pivot end, where every row's lines
     # start, and rises to its block ABOVE the rows, so it meets the block
     # only at its shoulder (never beside a row of text).
     dia_x, dia_y = keep["PivotDia"]
     assert dia_x < pivot_end - 0.005
     dia_bottom, dia_top = dia_y - 0.0101, dia_y + 0.010
-    overall_text_top = drawing.OVERALL_REF_XY[1] + 0.0016  # 0.2136 at 0.212
+    overall_text_top = drawing.OVERALL_REF_XY[1] + 0.0016
     assert dia_bottom > overall_text_top + 0.005
     assert dia_top < 0.2794 - border - 0.010
     # Hanging either side of its line, the block stays inside the border.
-    assert dia_x - 0.0558 > border + 0.003
+    assert dia_x - 0.0558 > border + 0.005
     # The R MAX block stands down-right of the root, alone under the rod.
     r_x, r_y = keep["ShoulderRadius"]
     r_box = (r_x - 0.0281, r_y - 0.00835, r_x + 0.0265, r_y + 0.00835)
     assert r_box[0] > shoulder + 0.030
     assert r_box[3] < square_bottom - 0.008
-    # The end view stands right of the side view, the iso right of it.
-    end_left = drawing.END_CENTER[0] - drawing._END_HALF_M
-    assert sx(spec.SQUARE_LENGTH) + 0.030 < end_left
-    assert drawing.END_KEEP["Depth"][0] + 0.030 < drawing.ISO_CENTER[0] - 0.008
-    assert drawing.TAP_CALLOUT_XY[0] + 0.023 < drawing.ISO_CENTER[0] - 0.008
+    # The iso stands right of the rod's top face, inside the border, its
+    # note under it, above the title block.
+    iso_half_w, iso_half_h = 0.0091, 0.0577
+    assert sx(spec.SQUARE_LENGTH) + 0.030 < drawing.ISO_CENTER[0] - iso_half_w
+    assert drawing.ISO_CENTER[1] + iso_half_h < 0.2794 - border - 0.010
+    note_x, note_y = drawing.ISO_NOTE_XY
+    assert note_y < drawing.ISO_CENTER[1] - iso_half_h - 0.005
+    assert note_y - 0.0045 > 0.0655 + 0.010
+    assert note_x + 0.060 < 0.4318 - border - 0.005
+
+
+def test_end_view_layout_stays_clear() -> None:
+    """Final review 2026-10-14: at 4:1 the SQ size's bottom row sat on its
+    lower extension line.  At 5:1 the four-row block (keep y -10.08 to
+    +9.06 mm, 66.6 mm wide, centred on its line) stands between the
+    extension lines with air, and the group stays in the lower-left field,
+    under everything the side view draws below the rod."""
+    border, air = 0.0127, 0.0015
+    cx, cy = drawing.END_CENTER
+    half = drawing._END_HALF_M
+    assert drawing.END_SCALE == (5, 1)
+    line_x, keep_y = drawing.END_KEEP["Depth"]
+    block = (line_x - 0.0333, keep_y - 0.01008, line_x + 0.0333, keep_y + 0.00906)
+    assert block[1] > cy - half + air
+    assert block[3] < cy + half - air
+    assert block[0] > cx + half + 0.005  # past the centre mark's arm
+    # Tap callout (centred on keep x, 45.6 mm wide, shoulder 5.6 mm under
+    # keep y) over the square and the block, left of the SQ line's arrow.
+    tap_x, tap_y = drawing.TAP_CALLOUT_XY
+    tap = (tap_x - 0.0228, tap_y - 0.0056, tap_x + 0.0228, tap_y + 0.0035)
+    assert tap[1] > cy + half + 0.010
+    assert tap[1] > block[3] + 0.010
+    assert tap[2] < line_x - 0.005
+    # Scale note (text 4.5 mm under its anchor, ~45 mm) under the square,
+    # left of the SQ line's lower arrow, inside the border.
+    note_x, note_y = drawing.END_NOTE_XY
+    assert note_y < cy - half - 0.005
+    assert note_y - 0.0045 > border + 0.010
+    assert note_x + 0.046 < line_x - air
+    assert note_x > border + 0.005
+    # Lower-left field: left of the title block, under the side view's
+    # lowest ink over the group (the R MAX leader and the Ø's tail).
+    sx, sy = drawing._sx, drawing._sy
+    assert block[2] < 0.2155 - 0.010
+    r_x, r_y = drawing.SIDE_KEEP["ShoulderRadius"]
+    r_left, r_shoulder = r_x - 0.0281, r_y - 0.00835
+    root = (sx(0.0), sy(spec.PIVOT_DIA / 2.0 + spec.SHOULDER_FILLET_R))
+    slope = (root[1] - r_shoulder) / (root[0] - r_left)
+    leader_y_at_tap = r_shoulder + slope * (tap[2] - r_left)
+    assert tap[3] < leader_y_at_tap - 0.010
+    assert block[2] < r_left or block[3] < r_shoulder - 0.010
+    dia_tail_y = sy(spec.PIVOT_DIA / 2.0) - 0.00635
+    assert tap[3] < dia_tail_y - 0.010
 
 
 def test_bands_are_model_owned_and_name_their_mates() -> None:
@@ -418,14 +471,18 @@ def test_no_free_manufacturing_note() -> None:
     assert "Manufacturing Notes" not in _PART_SOURCE
     assert "Manufacturing Notes" not in _DRAWING_SOURCE
     assert "NOTES_XY =" not in _DRAWING_SOURCE
-    assert not re.search(r"\d\.\d|\+/-|±", spec.END_VIEW_NOTE)
+    for note in (spec.END_VIEW_NOTE, spec.ISOMETRIC_VIEW_NOTE):
+        assert not re.search(r"\d\.\d|\+/-|±", note), note
 
 
 def test_view_scales_and_notes_are_explicit() -> None:
-    assert drawing.SHEET_SCALE == (1.0, 1.0)
-    assert drawing.SIDE_SCALE == (1, 1)
-    assert drawing.END_SCALE == (4, 1)
-    assert spec.END_VIEW_NOTE == "END VIEW SCALE 4:1"
+    assert drawing.SHEET_SCALE == (2.0, 1.0)
+    assert drawing.SIDE_SCALE == (2, 1)
+    assert drawing.END_SCALE == (5, 1)
+    assert drawing.ISO_SCALE == (1, 1)
+    # Every view off the sheet scale says its own scale.
+    assert spec.END_VIEW_NOTE == "END VIEW SCALE 5:1"
+    assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
     for retired in ("TOP_VIEW_NOTE", "BOTTOM_VIEW_NOTE"):
         assert not hasattr(spec, retired)
     views = {
@@ -440,8 +497,9 @@ def test_view_scales_and_notes_are_explicit() -> None:
     for retired in ("Top View Note", "Bottom View Note"):
         assert retired not in _DRAWING_SOURCE
         assert retired not in _PART_SOURCE
-    assert 'add_property_linked_note(adapter, "End View Note"' in _DRAWING_SOURCE
-    assert '"End View Note": ' in _PART_SOURCE
+    for note in ("End View Note", "Isometric View Note"):
+        assert f'add_property_linked_note(adapter, "{note}"' in _DRAWING_SOURCE
+        assert f'"{note}": ' in _PART_SOURCE
 
 
 def test_isometric_starts_hidden_lines_removed() -> None:

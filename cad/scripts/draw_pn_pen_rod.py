@@ -6,13 +6,13 @@ overall-length reference and the property-linked view notes; sheet/template
 and export behavior lives in ``_drawing_common``.  Places, bands and mate
 callouts are authored on the part (``pn_pen_rod_spec``).
 
-The side view (1:1) lays the rod axis horizontal, as the bar sits in the
-lathe (drawing-guidelines.md rule 11), and carries the square's and the
-pivot's lengths from the shoulder, the pivot's banded diameter between its
-flanks, the shoulder root's R MAX and the (122.5) end-to-end reference; the
-end view (4:1) looks at the tapped top face and carries the square's banded
-SQ size and the native Hole Wizard callout of the #0-80 stud tap; the shaded
-isometric sits right.
+The side view (2:1, the sheet scale) lays the rod axis horizontal, as the
+bar sits in the lathe (drawing-guidelines.md rule 11), and carries the
+square's and the pivot's lengths from the shoulder, the pivot's banded
+diameter between its flanks, the shoulder root's R MAX and the (122.5)
+end-to-end reference; the labelled end view (5:1) under it looks at the
+tapped top face and carries the square's banded SQ size and the native Hole
+Wizard callout of the #0-80 stud tap; the labelled 1:1 isometric sits right.
 
 Run with SolidWorks open::
 
@@ -88,10 +88,15 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 1.0)  # the 122.5-long rod fits the sheet at full size
-SIDE_SCALE = (1, 1)
-END_SCALE = (4, 1)  # the 5 mm square's end: tap callout and SQ band need room
-ISO_SCALE = (1, 1)
+# Rule 15: at 1:1 the side view stood 5 mm tall in the top half of the sheet
+# (final review 2026-10-14); 2:1 lays the rod 245 mm long and 10 mm tall.
+SHEET_SCALE = (2.0, 1.0)
+SIDE_SCALE = (2, 1)
+# The 5 mm square's end at 5:1 (25 mm) holds the SQ size's four-row block
+# BETWEEN its extension lines with air; at 4:1 (20 mm) the 19.1 mm block's
+# bottom row sat on the lower one (final review: read as an underline).
+END_SCALE = (5, 1)
+ISO_SCALE = (1, 1)  # 115 mm tall; labelled, as the fleet labels its isos
 # The rod is modelled axis-along-+Y (its assembly pose), so the side view is
 # "*Front" turned -90 deg before any import (IView.Angle,
 # draw_dt_cylinder_gear_shaft's PROFILE_ROTATION): model +Y -> sheet +x,
@@ -105,13 +110,14 @@ _SIDE_K = SIDE_SCALE[0] / SIDE_SCALE[1] / 1000.0
 # back before anything is placed by it.
 _CY = (SQUARE_LENGTH - PIVOT_LENGTH) / 2.0
 
-# Sheet layout (meters; title block x >= 0.2155, y <= 0.0655).  The side view
-# spans the left half on y 0.180; the 4:1 end view of the top face stands on
-# the same axis to its right, as a right-end projection would; the shaded
-# isometric at the far right.
-SIDE_CENTER = (0.140, 0.180)
-END_CENTER = (0.255, 0.180)
-ISO_CENTER = (0.375, 0.170)
+# Sheet layout (meters; border 0.0127, title block x >= 0.2155, y <= 0.0655).
+# The 2:1 side view spans the sheet's left three quarters on y 0.170, its
+# dimension rows and pin callout above, the R MAX below; the labelled 5:1
+# end view fills the lower-left field under it; the 1:1 isometric stands
+# at the right, its note under it.
+SIDE_CENTER = (0.205, 0.170)
+END_CENTER = (0.080, 0.075)
+ISO_CENTER = (0.380, 0.175)
 
 
 def _sx(model_y_mm: float) -> float:
@@ -131,8 +137,8 @@ def _end_x(center: tuple[float, float], model_x_mm: float) -> float:
 _HALF = ROD_SECTION / 2.0
 _END_HALF_M = _HALF * END_SCALE[0] / END_SCALE[1] / 1000.0
 
-# Side view stations: pivot end x 0.07875, shoulder x 0.08925, top face
-# x 0.20125; square y 0.1775..0.1825, pivot flanks y 0.178/0.182.
+# Side view stations: pivot end x 0.0825, shoulder x 0.1035, top face
+# x 0.3275; square y 0.165..0.175, pivot flanks y 0.166/0.174.
 #
 # A vertical dimension whose text stands off its span runs its line to a
 # shoulder under the text's bottom row, the block hanging to ONE side of
@@ -145,43 +151,45 @@ _END_HALF_M = _HALF * END_SCALE[0] / END_SCALE[1] / 1000.0
 # of draw_dt_cone_gear_shaft does.
 #
 # Above the rod, three rows baselined from the shoulder / end faces, each
-# sharing its extension lines with the row below at the common face:
-#   row 1 (y 0.192, 9.5 mm over the square): 112.0, shoulder to top face,
-#     text mid-span (x 0.145);
-#   row 2 (y 0.202): 10.5, pivot end to shoulder.  The 10.5 mm span takes no
-#     text (~11.6 mm wide), so it stands outside RIGHT, centred on x 0.09775
-#     (0.0920..0.1035, 2.7 mm right of the shoulder's extension line), its
-#     line under it; the arrows are FORCED inside the span (PIVOT_LENGTH_
-#     ARROW_SIDE; the green sheet drew them there) so no outside tail runs
-#     left of the pivot end toward the Ø's line;
-#   row 3 (y 0.212): the (122.5) reference, end face to end face, its line
-#     at y 0.2092 and its text ~0.2101..0.2136 (audit).
+# sharing its extension lines with the row below at the common face (text
+# offsets are sheet millimetres, as on the green 1:1 sheet):
+#   row 1 (y 0.1845, 9.5 mm over the square): 112.0, shoulder to top face,
+#     text mid-span (x 0.2155);
+#   row 2 (y 0.1945): 10.5, pivot end to shoulder.  At 2:1 the span is
+#     21 mm, so the ~11.6 mm text stands centred over it (x 0.0872..0.0988,
+#     4.7 mm from each extension line), its arrows FORCED inside
+#     (ARROW_SIDES) so no outside tail runs left toward the Ø's line;
+#   row 3 (y 0.2045): the (122.5) reference, end face to end face, its line
+#     at y ~0.2017 and its text ~0.2026..0.2061 (audit offsets).
 # Ø4.000 -0.010/-0.025 between the pivot flanks: its line stands 5.75 mm
-#   left of the pivot end (x 0.073), the flanks' extension lines reaching it,
-#   so it rises past every row clear of their lines (all start at the pivot
-#   end, x 0.07875, or right of it) to the four-row ~56 x 20 mm block
-#   centred at y 0.230: shoulder y ~0.2199 (6.3 mm over the (122.5) text,
-#   10.7 mm over its line), top ~0.240.  Hanging left it spans x
-#   0.0172..0.073 (4.5 mm inside the border), hanging right 0.073..0.1288;
-#   either way only its bottom row's end meets the line, at the shoulder.
-#   Under the rod its outside-arrow tail (6.35 mm on the green sheet) runs
-#   to y ~0.1716 at x 0.073, where nothing else is.
+#   left of the pivot end (x 0.07675), the flanks' extension lines reaching
+#   it, so it rises past every row clear of their lines (all start at the
+#   pivot end or right of it) to the four-row ~56 x 20 mm block centred at
+#   y 0.2225: shoulder y ~0.2124 (6.3 mm over the (122.5) text), top
+#   ~0.2325.  Hanging left it spans x 0.0210..0.0768 (8.3 mm inside the
+#   border), hanging right 0.0768..0.1326; either way only its bottom row's
+#   end meets the line, at the shoulder.  Under the rod its outside-arrow
+#   tail (6.35 mm) runs to y ~0.1597 at x 0.0768, where nothing else is.
 # Below the rod, where the ShoulderRadius's arc is (model +X, the root the
 # vertical layout's leader found):
 #   R0.2 MAX / SEATS ON PEN V-BLOCK / MHA-PN-005 down-right of the root:
-#     farm audit 20261014T045316872Z drew that block x 0.1269..0.1815 with
-#     its shoulder at y 0.1517 for keep (0.155, 0.160), 9.1 mm under the
-#     square, and its leader from the shoulder's left end up-left at ~35 deg
-#     to the root (0.0892, 0.1777); nothing else is below the rod.
+#     farm audit 20261014T053239477Z drew that block x keep-0.0281..
+#     keep+0.0265 with its shoulder 8.35 mm under the anchor, so at
+#     (0.16925, 0.1475) it spans x 0.1412..0.1958, y 0.1392..0.1559 (9.1 mm
+#     under the square), its leader from the shoulder's left end up-left at
+#     ~35 deg to the root (0.1035, 0.1656), over everything else below the
+#     rod (the end view's tap callout tops out at y 0.1135, x <= 0.1248).
 SIDE_KEEP = {
     "Length": (_sx(SQUARE_LENGTH / 2.0), _sy(-_HALF) + 0.0095),
-    "PivotLength": (_sx(0.0) + 0.0085, _sy(-_HALF) + 0.0195),
+    "PivotLength": (_sx(-PIVOT_LENGTH / 2.0), _sy(-_HALF) + 0.0195),
     "PivotDia": (_sx(-PIVOT_LENGTH) - 0.00575, _sy(-_HALF) + 0.0475),
     "ShoulderRadius": (_sx(0.0) + 0.06575, _sy(_HALF) - 0.0175),
 }
-# swDimensionArrowsSide_e swDimArrowsInside, read back
-# (draw_dt_cone_tip_block's _set_arrow_sides).
-PIVOT_LENGTH_ARROW_SIDE = 0
+# swDimensionArrowsSide_e (swDimArrowsInside 0, swDimArrowsOutside 1), read
+# back (draw_dt_cone_tip_block's _set_arrow_sides): the 10.5's inside its
+# 21 mm span; the SQ size's outside its 25 mm span, so only its text stands
+# between the extension lines (the green 4:1 sheet drew them outside too).
+ARROW_SIDES = {"PivotLength": 0, "Depth": 1}
 OVERALL_REF_XY = (_sx(_CY), _sy(-_HALF) + 0.0295)
 # Picks are ENTITIES from the side view's edge scan, not sheet hit-tests:
 # the pivot end is a circular edge seen edge-on, and a SelectByID2 point on
@@ -197,20 +205,29 @@ _EDGE_TOL_MM = 1e-4
 # every position above is computed in before the build stops.
 _FRAME_TOL_M = 2.5e-4
 
-# End view (square 0.245..0.265 x 0.170..0.190) keeps the previous sheet's
-# 4:1 top view offsets, which the farm PNG of run 20261014T004931233Z shows
-# clear: the banded SQ size (and its two-row mate callout) right of the
-# square, its ~60 x 20 mm block (x ~0.270..0.330) standing between its own
-# extension lines; the tap callout up-right, its ~46 mm text centred on
-# x 0.277 (0.254..0.300, y 0.213..0.222, left of the iso at x >= 0.367), its
-# leader dropping almost straight to the drill rim; the scale note (anchored
-# at its top left) 7 mm under the square, x ~0.235..0.279, y ~0.159..0.163,
-# left of and below the SQ block.
+# End view (5:1, square 0.0675..0.0925 x 0.0625..0.0875).  The SQ size's
+# four-row block centres on its dimension line (audit 20261014T053239477Z:
+# rows 66.6 mm wide at most, from keep y - 10.08 to keep y + 9.06 mm), so
+# keep y = centre + 0.51 mm centres it: y 0.0654..0.0846, 2.9 mm inside
+# each extension line (0.0625/0.0875).  Its line 52 mm right of the
+# centre puts the block at x 0.0987..0.1653, 6.2 mm right of the square
+# and ~3 mm past the centre mark's extended arm.  The tap callout keeps the
+# green sheet's offsets from the hole (text centred on keep x, 45.6 mm wide,
+# shoulder 5.6 mm under keep y): x 0.0792..0.1248, y 0.1044..0.1135, 17 mm
+# over the square, 18 mm over the block, 7 mm left of the SQ line's upper
+# arrow piece (x 0.132, to y ~0.0939); its leader drops almost straight to
+# the drill rim.  The scale note (anchored top-left, text 4.5 mm under its
+# anchor, ~45 mm long) 7 mm under the square: x 0.060..0.105, y
+# 0.051..0.0545, left of the SQ line's lower arrow piece (to y ~0.0561).
 END_KEEP = {
-    "Depth": (END_CENTER[0] + _END_HALF_M + 0.035, END_CENTER[1]),
+    "Depth": (END_CENTER[0] + 0.052, END_CENTER[1] + 0.00051),
 }
-TAP_CALLOUT_XY = (END_CENTER[0] + 0.022, END_CENTER[1] + 0.033)
-END_NOTE_XY = (END_CENTER[0] - 0.020, END_CENTER[1] - 0.017)
+TAP_CALLOUT_XY = (END_CENTER[0] + 0.022, END_CENTER[1] + 0.035)
+END_NOTE_XY = (END_CENTER[0] - 0.020, END_CENTER[1] - _END_HALF_M - 0.007)
+# The isometric (1:1 outline 18.2 x 115.3 mm: x 0.3709..0.3891, y
+# 0.1174..0.2327, 43 mm right of the top face's extension lines) takes its
+# ~60 mm scale note 8 mm under it: x 0.350..0.410, y ~0.1050..0.1085.
+ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.0577 - 0.008)
 
 
 def _lay_side_view_horizontal(adapter: Any, side: Any) -> None:
@@ -254,24 +271,25 @@ def _prove_side_view_frame(adapter: Any, side: Any) -> None:
     _telemetry.info(f"pen-rod side view frame: {dict(zip(stations, projected))}")
 
 
-def _stand_pivot_length_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
-    """Force the 10.5's arrows inside its span (PIVOT_LENGTH_ARROW_SIDE) and
-    read the side back: an outside tail left of the pivot end would run
-    toward the Ø's dimension line (draw_dt_cone_tip_block's _set_arrow_sides)."""
-    found = [
-        annotation
-        for annotation in annotations
-        if dimension_name(adapter, annotation) == "PivotLength"
-    ]
-    if len(found) != 1:
+def _set_arrow_sides(adapter: Any, annotations: list[Any]) -> None:
+    """Stand each ARROW_SIDES dimension's arrows on its side and read the
+    side back (draw_dt_cone_tip_block's _set_arrow_sides): the layout above
+    is proven against those arrows, not the sheet's automatic choice."""
+    remaining = dict(ARROW_SIDES)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        side = remaining.pop(name)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArrowSide = side
+        if int(display.ArrowSide) != side:
+            raise RuntimeError(f"{name} did not keep its arrows on side {side}")
+    if remaining:
         raise RuntimeError(
-            f"expected one PivotLength on the side view, found {len(found)}"
+            f"no pen-rod dimension to set arrow sides: {sorted(remaining)}"
         )
-    annotation = _early_bound(found[0], "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    display.ArrowSide = PIVOT_LENGTH_ARROW_SIDE
-    if int(display.ArrowSide) != PIVOT_LENGTH_ARROW_SIDE:
-        raise RuntimeError("PivotLength did not keep its arrows inside its span")
 
 
 def _dress_shoulder_radius(adapter: Any, annotations: list[Any]) -> None:
@@ -435,6 +453,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "End View Note",
+            "Isometric View Note",
         ),
         required=(
             "Number",
@@ -442,6 +461,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "End View Note",
+            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -495,7 +515,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _dress_shoulder_radius(adapter, annotations)
-    _stand_pivot_length_arrows_inside(adapter, annotations)
+    _set_arrow_sides(adapter, annotations)
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
@@ -517,6 +537,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _overall_reference(adapter, side)
 
     add_property_linked_note(adapter, "End View Note", *END_NOTE_XY)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     # Materialize the iso's cosmetic thread before the strict final note cleanup;
     # otherwise its descriptive label first appears during the native drawing save.

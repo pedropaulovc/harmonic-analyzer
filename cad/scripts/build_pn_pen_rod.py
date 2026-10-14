@@ -52,6 +52,7 @@ from pn_pen_rod_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     END_VIEW_NOTE,
+    ISOMETRIC_VIEW_NOTE,
     PIVOT_DIA,
     PIVOT_LENGTH,
     ROD_SECTION,
@@ -270,7 +271,14 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    apply_drawing_properties(adapter, PART_NAME, {"End View Note": END_VIEW_NOTE})
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "End View Note": END_VIEW_NOTE,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
@@ -280,6 +288,7 @@ async def build(adapter) -> dict[str, str]:
             "Finish",
             "Quantity",
             "End View Note",
+            "Isometric View Note",
         ),
     )
     return artefacts
