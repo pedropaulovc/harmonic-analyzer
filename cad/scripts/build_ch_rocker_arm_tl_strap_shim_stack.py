@@ -65,6 +65,9 @@ _SAVED_DRAWING_PROPERTIES = (
 
 V_SHIM = STACK_LENGTH * STACK_WIDTH * SHIM_THICK
 V_STRIP = STACK_LENGTH * STACK_WIDTH * STRIP_THICK
+# The ground piece's rectangle is drawn at this fraction of full size: its
+# edges then sit 3 x 1.8 mm inside the pack's, beyond any inference snap.
+STRIP_SEED = 0.7
 
 
 def _body_boxes(adapter) -> list[tuple[float, ...]]:
@@ -92,13 +95,17 @@ def _require_layers(adapter, *, label: str) -> None:
         )
 
 
-async def _profile(adapter, label: str, feature: str) -> list[tuple[str, str]]:
+async def _profile(
+    adapter, label: str, feature: str, seed: float = 1.0
+) -> list[tuple[str, str]]:
+    """A centred StackLength x StackWidth rectangle on Front, drawn at ``seed``
+    times its size; the equations take it to full size."""
     dims = SketchDims()
     check(f"create_sketch {label}", await adapter.create_sketch("Front"))
     await define_centered_rectangle(
         adapter,
-        STACK_LENGTH / 2.0,
-        STACK_WIDTH / 2.0,
+        seed * STACK_LENGTH / 2.0,
+        seed * STACK_WIDTH / 2.0,
         label,
         dims=dims,
         name_width="StackLength",
@@ -133,10 +140,14 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append(
         (name_dimensions(adapter, "ShimPack", ["ShimThick"])[0], '"ShimThick"')
     )
-    volume = await volume_check(adapter, "shim pack", V_SHIM, 0.005 * V_SHIM)
+    await volume_check(adapter, "shim pack", V_SHIM, 0.005 * V_SHIM)
 
-    # The ground piece: one separate solid on the pack.
-    drive_jobs += await _profile(adapter, "ground piece", "StripProfile")
+    # The ground piece: one separate solid on the pack. Its outline is the
+    # pack's, on the same Front plane: drawn there at full size, inference ties
+    # the new rectangle to the pack's bottom edges and its dimensions turn
+    # driven, which the equations then reject (farm rounds 1 and 2). Drawn at
+    # STRIP_SEED clear of those edges, the equations bring it to full size.
+    drive_jobs += await _profile(adapter, "ground piece", "StripProfile", STRIP_SEED)
     extrude_at_offset(adapter, STRIP_THICK, SHIM_THICK, merge_result=False)
     name_last_feature(adapter, "Strip")
     # Offset bosses expose depth first and start offset second. Only the depth
@@ -145,15 +156,16 @@ async def build(adapter) -> dict[str, str]:
     # _require_layers proves it seats the piece on the pack.
     strip_thick = name_dimensions(adapter, "Strip", ["StripThick", "StripSeat"])[0]
     drive_jobs.append((strip_thick, '"StripThick"'))
-    volume = await volume_check(adapter, "stack", volume + V_STRIP, 0.005 * V_STRIP)
-    _require_layers(adapter, label="stack")
+    seed_strip = STRIP_SEED * STRIP_SEED * V_STRIP
+    await volume_check(adapter, "seed stack", V_SHIM + seed_strip, 0.005 * seed_strip)
+    _require_layers(adapter, label="seed stack")
 
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
         await drive_dimension(adapter, dimension_name, expression)
     await force_rebuild(adapter)
     await volume_check(
-        adapter, "driven stack (equations neutral)", volume, 0.002 * volume
+        adapter, "driven stack", V_SHIM + V_STRIP, 0.002 * (V_SHIM + V_STRIP)
     )
     _require_layers(adapter, label="driven stack")
 
