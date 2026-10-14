@@ -6,11 +6,9 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     place_view,
-    view_name,
 )
 
 from _check import check
@@ -91,46 +89,18 @@ EDGE_XY = {"DiscDia": (0.245, 0.180)}
 RIM_PICK = (FACE_CENTER[0] - 0.0144, FACE_CENTER[1] - 0.0144)
 RIM_NOTE_XY = (0.025, 0.145)
 
-# swCenterMarkStyle_e.swCenterMark_Single: AutoInsertCenterMarks2 marks the
-# concentric O.D. and bore circles separately, one mark printed over the other
-# (round-4 layout audit: DetailItem347/349 at one point;
-# draw_pd_transgear_front_bushing).
-CENTER_MARK_SINGLE = 2
+# The template centre-marks the bore as the face view is placed, so the
+# explicit AutoInsertCenterMarks2 printed a second, identical mark over it
+# (round-4 layout audit: DetailItem347/349 at one point; round 6: the view
+# arrived marked; draw_sm_knife_mount #913). The sheet adds none; it proves
+# the one.
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 
 
-def _center_marks(view: Any) -> tuple[Any, ...]:
-    return tuple(
+def _prove_one_bore_mark(view: Any) -> None:
+    marks = (
         _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
     )
-
-
-def _mark_bore_axis(adapter: Any, view: Any) -> None:
-    """One centre mark on the bore, picked on its -X point; prove the one."""
-    if _center_marks(view):
-        raise RuntimeError("the button face view arrived with a centre mark")
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate the button face view")
-    draw.ClearSelection2(True)
-    if not draw.Extension.SelectByID2(
-        "",
-        "EDGE",
-        FACE_CENTER[0] - part_spec.BORE_DIA * VIEW_SCALE[0] / VIEW_SCALE[1] / 2000.0,
-        FACE_CENTER[1],
-        0.0,
-        False,
-        0,
-        null_callout(),
-        0,
-    ):
-        raise RuntimeError("failed to select the button bore circle")
-    mark = drawing.InsertCenterMark3(CENTER_MARK_SINGLE, False, False)
-    draw.ClearSelection2(True)
-    if mark is None:
-        raise RuntimeError("failed to centre-mark the button bore")
-    marks = _center_marks(view)
     if len(marks) != 1:
         raise RuntimeError(f"expected one button-bore centre mark, found {len(marks)}")
 
@@ -282,7 +252,7 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
         label="filing button bore finish",
     )
-    _mark_bore_axis(adapter, face)
+    _prove_one_bore_mark(face)
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [a for a in annotations if dimension_name(adapter, a) == name]
         if len(matches) != 1:
