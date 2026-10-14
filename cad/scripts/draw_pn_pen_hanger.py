@@ -6,7 +6,7 @@ the property-linked notes; sheet/template and export behavior lives in
 ``_drawing_common``.  Dimension import and curation live in
 ``_drawing_dimension_import``; places and bands are authored on the part.
 
-The pen hanger is a black tapered steel strap (3 thick, 16 -> 10 wide, 170
+The pen hanger is a black tapered steel strap (3 thick, 16 -> 12 wide, 170
 tall) with two open U guide plates brazed across its front face; the pen rod
 hangs in both slots.  The front view (1:1, ``*Back``: looking at the strap's
 front face and the plates from the machine front, as note 1 names it) carries
@@ -150,10 +150,10 @@ if round(_OVERHANG_AT_CUT, DRAWING_REFERENCE_PRECISION) != round(
     )
 # The cutting line overruns that silhouette so each arrow's letter (5.5 mm
 # wide, 15-20 mm under the line on the 20261014T002650255Z sheet) stands
-# clear of the slanted strap edge below it: about 1.9 mm on the +x side,
-# and on the -x side 2.2 mm from the strap edge and 1.5 mm from the
-# StrapTaperDx extension line (sheet x 0.0855) beyond it.
-SECTION_LINE_OVERRUN = 4.0
+# clear of the slanted strap edge below it: about 1.5 mm on the +x side,
+# and on the -x side 1.6 mm from the strap edge and 1.3 mm from the
+# StrapTaperDx extension line beyond it.
+SECTION_LINE_OVERRUN = 3.5
 SECTION_LINE_MODEL_MM = (
     (_SECTION_X[1] + SECTION_LINE_OVERRUN, SECTION_Y, 0.0),
     (_SECTION_X[0] - SECTION_LINE_OVERRUN, SECTION_Y, 0.0),

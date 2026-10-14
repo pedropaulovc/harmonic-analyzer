@@ -37,11 +37,13 @@ PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
 HANGER_POS = (PEN_ROD_X, round(WHEEL_BAR_Y + BAR_SIDE / 2.0, 6), BAR_FRONT_Z)
 ROD_AXIS_Z = round(PEN_Z_MID - BAR_FRONT_Z, 6)  # local z of the rod line
 
-# --- Strap (photo: tapers 16 -> 10, black, flat on the bar). ---
+# --- Strap (photo: tapers 16 -> 10, black, flat on the bar).  Its foot is as
+# wide as the guide plates below (12, not the photo's 10), so the lower plate
+# sits flush with both foot corners (note 1) and needs no lateral dimension.
 STRAP_T = 3.0
 STRAP_Z = (-STRAP_T, 0.0)
 STRAP_TOP_X = (-16.0, 0.0)  # 16 wide at the bar (low)
-STRAP_BOT_X = (-5.0, 5.0)  # 10 wide at the foot, centred on the rod (low)
+STRAP_BOT_X = (-6.0, 6.0)  # 12 wide at the foot, centred on the rod (low)
 # 170 below the bar top: the strap stays flat on the bar plane, which the
 # platen and paper also cross (platen z -142.75..-138.9), so its foot stops
 # just above the platen top instead of running past the paper top (photo
@@ -68,7 +70,13 @@ GUIDE_PITCH = 40.0  # lower-plate bottom to upper-plate bottom (photo ~42)
 GUIDE_PLATE_YS = (STRAP_BOT_Y, STRAP_BOT_Y + GUIDE_PITCH)  # bottom faces, local
 # Each plate's top face below the strap top edge: the extrude's start offset.
 GUIDE_PLATE_DROPS = tuple(-(y + GUIDE_PLATE_T) for y in GUIDE_PLATE_YS)
-GUIDE_PLATE_WIDTH = 10.0
+# Wide enough that both slot walls keep rule 17's floor at the .X worst case
+# (guarded with the drawing's places below); as wide as the strap's foot.
+GUIDE_PLATE_WIDTH = 12.0
+if not math.isclose(STRAP_BOT_X[1] - STRAP_BOT_X[0], GUIDE_PLATE_WIDTH):
+    raise AssertionError(
+        "the lower guide plate is no longer flush with both foot corners"
+    )
 GUIDE_SPAN_Y = (
     round(HANGER_POS[1] + GUIDE_PLATE_YS[0], 6),
     round(HANGER_POS[1] + GUIDE_PLATE_YS[1] + GUIDE_PLATE_T, 6),
@@ -222,6 +230,22 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("UpperGuideProfile", "SlotWidth"): SLOT_WIDTH_BAND,
 }
+# drawing-guidelines.md rule 17: both slot walls keep the 1.5 floor at the
+# worst case of the PRINTED bands.  Section A-A prints the plate width, the
+# near (+x) arm and the banded slot; the far arm is what that chain leaves.
+SLOT_WALL_FLOOR = 1.5
+_plate = round(GUIDE_PLATE_WIDTH, DRAWING_PRECISION_BY_NAME["PlateWidth"])
+_plate_band = printed_band_mm(DRAWING_PRECISION_BY_NAME["PlateWidth"])
+_arm = round(ARM_WIDTH, DRAWING_PRECISION_BY_NAME["ArmWidth"])
+_arm_band = printed_band_mm(DRAWING_PRECISION_BY_NAME["ArmWidth"])
+_slot = round(SLOT_WIDTH, DRAWING_PRECISION_BY_NAME["SlotWidth"])
+NEAR_ARM_MIN = _arm - _arm_band
+FAR_ARM_MIN = (_plate - _plate_band) - (_arm + _arm_band) - (_slot + SLOT_WIDTH_BAND[0])
+if min(NEAR_ARM_MIN, FAR_ARM_MIN) < SLOT_WALL_FLOOR:
+    raise AssertionError(
+        f"guide slot walls {NEAR_ARM_MIN:.2f}/{FAR_ARM_MIN:.2f} at the printed "
+        f"worst case (< {SLOT_WALL_FLOOR})"
+    )
 # Every tight band names its mate on the dimension it governs.
 DIMENSION_CALLOUTS: dict[str, str] = {
     "SlotWidth": f"2X SLIDING FIT ON\nPEN ROD {PEN_ROD_NUMBER}",

@@ -85,6 +85,25 @@ def test_slots_centre_on_the_rod_line_with_a_running_fit() -> None:
     assert spec.ROD_AXIS_Z - rod_max / 2.0 - spec.PLATE_FRONT_Z == pytest.approx(1.5)
 
 
+def test_both_slot_walls_keep_the_floor_at_the_printed_worst_case() -> None:
+    # drawing-guidelines.md rule 17: printed 12.0 plate, 3.5 near arm and
+    # 5.05 +0.05/0 slot, all .X bands from the title block.
+    band = printed_band_mm(1)
+    assert spec.GUIDE_PLATE_WIDTH == 12.0
+    assert round(spec.ARM_WIDTH, 1) == 3.5
+    near = 3.5 - band
+    far = (12.0 - band) - (3.5 + band) - (spec.SLOT_WIDTH + spec.SLOT_WIDTH_BAND[0])
+    assert spec.NEAR_ARM_MIN == pytest.approx(near) == pytest.approx(2.7)
+    assert spec.FAR_ARM_MIN == pytest.approx(far) == pytest.approx(1.8)
+    assert min(near, far) >= spec.SLOT_WALL_FLOOR == 1.5
+    # The slot stays centred on the rod line, the plate flush with both foot
+    # corners (note 1).
+    assert spec.STRAP_BOT_X == (
+        -spec.GUIDE_PLATE_WIDTH / 2.0,
+        spec.GUIDE_PLATE_WIDTH / 2.0,
+    )
+
+
 def test_strap_foot_stays_above_the_platen() -> None:
     import paper_drive_geom as paper
     import pd_platen_spec as platen
@@ -126,7 +145,7 @@ def test_drawing_keeps_exactly_the_marked_dimensions() -> None:
 def test_front_view_looks_at_the_plates_and_keeps_the_taper_outside() -> None:
     # *Back: model +x prints left, so the strap's wide (-x) top corner is right.
     assert draw._fx(spec.STRAP_TOP_X[0]) > draw._fx(spec.STRAP_TOP_X[1])
-    assert draw._fx(draw._X[0]) - draw._fx(draw._X[1]) == pytest.approx(0.021)
+    assert draw._fx(draw._X[0]) - draw._fx(draw._X[1]) == pytest.approx(0.022)
     # The taper's dimension sits under the view, beside the bottom width, so
     # its long extension line drops from the top outer corner outside the
     # strap instead of running down through it.
@@ -150,8 +169,8 @@ def test_section_looks_down_onto_the_upper_plate_and_spans_its_silhouette() -> N
     # strap edge it cuts still reads the plate's overhang to the printed place.
     assert top + 0.5 <= draw.SECTION_Y < top + 1.0
     places = spec.DRAWING_REFERENCE_PRECISION
-    assert round(draw._OVERHANG_AT_CUT, places) == 1.2
-    assert round(spec.UPPER_PLATE_OVERHANG, places) == 1.2
+    assert round(draw._OVERHANG_AT_CUT, places) == 1.5
+    assert round(spec.UPPER_PLATE_OVERHANG, places) == 1.5
     source = inspect.getsource(draw._create_section)
     assert "SetDisplayOnlySurfaceCut(False)" in source
     strap = draw._strap_x_at(draw.SECTION_Y)
