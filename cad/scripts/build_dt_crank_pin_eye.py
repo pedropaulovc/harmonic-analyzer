@@ -12,6 +12,12 @@ Modelled as a torus about an X-parallel axis LOOP_R along -Z from the origin
 along +Y from the origin. Both bodies share the Top-plane wire circle at the
 origin.
 
+``EyeReference`` (blanked, on the Right plane, the eye's own plane): a circle
+on the loop's inside edge and the tail's axis, whose diameter and whose
+loop-centre-to-tail-end height carry the eye's controlling sizes, since a
+torus has no edge to dimension; the drawing's side view prints them
+(``dt_crank_pin_eye_notes``).
+
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_dt_crank_pin_eye.py
@@ -25,22 +31,44 @@ import sys
 from _appearance import apply_material
 from _check import check
 from _dimensions import drive_dimension, set_global
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _drawing_precision import apply_drawing_precision
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
+from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
 from _sketch import (
     SketchDims,
     anchor_point_to_origin,
+    blank_reference_sketches,
+    dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
+from dt_crank_pin_eye_notes import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    DRAWING_PRECISION,
+    LOOP_ID,
+)
 from dt_crank_pin_eye_spec import LOOP_R, TAIL_LEN, V_LOOP, V_TAIL, WIRE_DIA
 
 PART_NAME = "dt-crank-pin-eye"
 MATERIAL = "Brass"
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+)
 
 def _tail_loop_overlap(steps: int = 64) -> float:
     """Volume the tail shares with the loop, by midpoint integration.
@@ -128,6 +156,48 @@ async def build(adapter) -> dict[str, str]:
     if float(mass.data.center_of_mass[1]) <= 0.0:
         raise RuntimeError("tail extruded along -Y, away from the screw -- flip the extrude")
 
+    # REFERENCE sketch, in the eye's own (Right) plane: a Right-plane sketch
+    # maps (x, y) -> global (-Z, Y), so the loop centre (Z = -LoopR) is at
+    # sketch (LoopR, 0) and the tail runs up the sketch's y axis from the
+    # origin. The loop's inside circle and the tail's axis carry the side
+    # view's two sizes; the tail is measured from the loop centre, the eye's
+    # one real feature centre.
+    ref = SketchDims()
+    check("create_sketch eye reference", await adapter.create_sketch("Right"))
+    loop_inside = await define_circle(
+        adapter,
+        LOOP_R,
+        0.0,
+        LOOP_ID / 2.0,
+        "loop inside",
+        dims=ref,
+        names=("LoopCx", None, "LoopID"),
+        drives=('"LoopR"', None, '2 * "LoopR" - "WireDia"'),
+    )
+    set_sketch_direct_db(adapter, True)
+    tail_axis = check(
+        "tail axis", await adapter.add_centerline(0.0, 0.0, 0.0, TAIL_LEN)
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "tail axis vertical",
+        await adapter.add_sketch_constraint(tail_axis, None, "vertical"),
+    )
+    await anchor_point_to_origin(adapter, f"{tail_axis}.start", 0.0, 0.0, "tail root")
+    await dimension_between(
+        adapter,
+        f"{loop_inside}.center",
+        f"{tail_axis}.end",
+        "vertical_distance",
+        TAIL_LEN,
+        "eye TailLen",
+    )
+    ref.record("TailLen", '"TailLen"')
+    await ensure_fully_defined(adapter, "eye reference sketch")
+    check("exit_sketch eye reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "EyeReference")
+    drive_jobs += ref.apply(adapter, "EyeReference")
+
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
@@ -136,7 +206,16 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
+    blank_reference_sketches(adapter, ("EyeReference",))
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
 
 
 if __name__ == "__main__":
