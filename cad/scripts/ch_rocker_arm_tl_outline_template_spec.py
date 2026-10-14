@@ -116,6 +116,9 @@ PIVOT_HOLE_BAND = (0.015, 0.0)
 PIVOT_PLACES = 3
 # The fit's mate is named on the bore's own callout.
 PIVOT_CALLOUT = "REAM FOR PIVOT PIN GAUGE"
+# Both arcs' shared centre lies on the pivot bore's vertical centreline,
+# CENTER_Y above the bore: off any sheet, so the radius callouts say so.
+ARC_CENTER_CALLOUT = "CENTER ON PIVOT CL"
 PIN_GAUGE_MIN = round((0.2550 - 0.0002) * 25.4, 3)  # 6.472
 PIN_GAUGE_MAX = round(0.2550 * 25.4, 3)  # 6.477
 if PIN_GAUGE_MAX >= PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]:

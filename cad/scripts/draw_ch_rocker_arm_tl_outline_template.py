@@ -45,6 +45,7 @@ from _printed_limits import limits
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_outline_template_spec import (
+    ARC_CENTER_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIVOT_CALLOUT,
@@ -72,12 +73,14 @@ ISO_CENTER = (0.330, 0.240)
 ISO_NOTE_XY = (0.250, 0.258)
 # Radius text stays outside both circles (below the outline) and each radius
 # keeps its arrow outside the arc with no solid leader, so its leader runs
-# from the text to its arc and stops: never on to the off-sheet centre.
+# from the text to its arc and stops: never on to the off-sheet centre.  The
+# radius blocks sit inboard of the 132.757 extension lines; the bottom apex
+# block sits just left of the centreline so the R800 block clears it.
 EXTERIOR_RADII = ("TopRadius", "BottomRadius")
 FRONT_KEEP = {
-    "TopRadius": (0.085, 0.140),
-    "BottomRadius": (0.315, 0.140),
-    "BottomBelowPivot": (0.178, 0.140),
+    "TopRadius": (0.095, 0.140),
+    "BottomRadius": (0.305, 0.140),
+    "BottomBelowPivot": (0.188, 0.140),
     "PivotDia": (0.230, 0.140),
     "BottomTailX": (0.133, 0.118),
     "BottomRodX": (0.267, 0.118),
@@ -90,9 +93,12 @@ FRONT_KEEP = {
 # Above the edge view so the stock callout clears the rod tip-land text and
 # the sheet border.
 RIGHT_KEEP = {"Thick": (0.392, 0.215)}
-# The apex heights land on each arc's low point, which puts both arc centres
-# on the bore's vertical centreline; the tip lands run radially from them.
+# Both arc centres lie on the bore's vertical centreline, off the sheet
+# above; the apex heights land on each arc's low point there, and the tip
+# lands run radially from those centres.
 CALLOUTS_BELOW = {
+    "TopRadius": ARC_CENTER_CALLOUT,
+    "BottomRadius": ARC_CENTER_CALLOUT,
     "TopAbovePivot": "TO TOP ARC LOW POINT",
     "BottomBelowPivot": "TO BOTTOM ARC LOW POINT",
     "PivotDia": PIVOT_CALLOUT,
