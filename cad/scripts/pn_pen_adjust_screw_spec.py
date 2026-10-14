@@ -27,9 +27,9 @@ marked dimension lives in a Right-plane sketch, so all of them import into
 the *Right side view, where the eye is seen end-on. The eye's station rides
 a hidden reference sketch (``EyeStationReference``): the Hole Wizard's
 cylindrical placement sketch carries no printable dimension. The plain
-shank's diameter is not a model dimension: the drawing adds it between the
-plain shank's two flank silhouettes and parenthesises it, its places from
-``DRAWING_REFERENCE_PRECISION``.
+shank's diameter (``PlainDia``) is a StudProfile dimension on the plain
+shank's own profile segment, driven by ThreadDia and printed as a
+parenthesised reference (``REFERENCE_DIMENSIONS``).
 """
 
 from __future__ import annotations
@@ -106,6 +106,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "HeadDia",
         "HeadHeight",
         "OverallLength",
+        "PlainDia",
     },
     "EyeStationReference": {"EyeFromHeadEnd"},
 }
@@ -116,6 +117,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "HeadDia": 1,
         "HeadHeight": 1,
         "OverallLength": 1,
+        # A reference size carries no band; two places read the basic 1.524.
+        "PlainDia": 2,
     },
     "EyeStationReference": {"EyeFromHeadEnd": 1},
 }
@@ -128,9 +131,11 @@ if {
     feature: set(names) for feature, names in DRAWING_PRECISION.items()
 } != DRAWING_DIMENSIONS:
     raise AssertionError("every marked adjuster dimension needs authored places")
-# The plain shank is turned with the thread blank: the sheet adds its Ø
-# between the plain shank's flanks as a reference, (Ø1.52), no band.
-DRAWING_REFERENCE_PRECISION = 2
+# The plain shank is turned with the thread blank: its Ø prints once,
+# parenthesised, (Ø1.52), no band.
+REFERENCE_DIMENSIONS = frozenset({"PlainDia"})
+if not REFERENCE_DIMENSIONS <= DRAWING_DIMENSIONS["StudProfile"]:
+    raise AssertionError("a printed reference must be a marked StudProfile dimension")
 
 # The thread's major-diameter dimension prints as its designation (the
 # title block's THREADS row owns the class), so the print never states the

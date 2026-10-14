@@ -129,6 +129,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
             "HeadDia",
             "HeadHeight",
             "OverallLength",
+            "PlainDia",
         },
         "EyeStationReference": {"EyeFromHeadEnd"},
     }
@@ -143,92 +144,48 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "HeadDia": 1,
         "HeadHeight": 1,
         "OverallLength": 1,
+        "PlainDia": 2,
         "EyeFromHeadEnd": 1,
     }
 
 
 def test_plain_shank_diameter_prints_as_a_reference() -> None:
-    """The plain shank's Ø is the thread blank: a drawing-added dimension
-    between the plain shank's two flank silhouettes, proved attached and
-    measuring THREAD_MAJOR, printed parenthesised with no band. Two model
-    diametric attempts in the thread-limit sketch came back non-diametric on
-    the farm, so the build carries no ShankDia."""
-    assert spec.DRAWING_REFERENCE_PRECISION == 2
-    assert not hasattr(spec, "REFERENCE_DIMENSIONS")
-    assert "ShankDia" not in _source(part)
+    """The plain shank's Ø is the thread blank: a StudProfile diametric
+    dimension on the plain segment (the ThreadDia recipe, same axis and pick
+    offset), driven by ThreadDia, printed parenthesised with no band. The
+    drawing adds no dimension of its own: the silhouette route failed twice
+    on the farm (no lower flank through the pick; AddDimension refused the
+    pair)."""
+    assert spec.REFERENCE_DIMENSIONS == frozenset({"PlainDia"})
+    assert spec.REFERENCE_DIMENSIONS <= spec.DRAWING_DIMENSIONS["StudProfile"]
+    assert not hasattr(spec, "DRAWING_REFERENCE_PRECISION")
+    source = _source(part)
+    assert 'profile.record("PlainDia", \'"ThreadDia"\')' in source
+    calls = {
+        ast.literal_eval(call.args[-1]): [ast.unparse(arg) for arg in call.args[1:4]]
+        for call in _calls(part, "add_diametric_linear_dimension")
+    }
+    assert calls["ThreadDia"] == [
+        "axis",
+        "thread",
+        "(THREAD_R + 4.0, FULL_THREAD_LENGTH / 2.0)",
+    ]
+    # Same axis, same pick offset, on the plain segment's mid-height; to its
+    # free (shoulder) end, which replaces the segment's vertical relation.
+    assert calls["PlainDia"] == [
+        "axis",
+        "f'{shank}.end'",
+        "(THREAD_R + 4.0, FULL_THREAD_LENGTH + PLAIN_SHANK / 2.0)",
+    ]
+    assert '("plain shank", shank, "vertical")' not in source
+    assert "ShankDia" not in source
     assert not model_toleranced_dimensions(part)
-    (face,) = _calls(drawing, "CylinderFace")
-    assert ast.unparse(face) == "CylinderFace(THREAD_MAJOR, contains_y_mm=station_mm)"
-    # The station lies on the plain shank, off the threaded face's span.
-    station = spec.FULL_THREAD_LENGTH + spec.PLAIN_SHANK / 2.0
-    assert spec.FULL_THREAD_LENGTH + 0.05 < station < spec.SHANK_LENGTH - 0.05
-    # Both flanks by face alone: the farm read both silhouettes back at the
-    # upper flank, so a sheet-point filter cannot pick the lower one.
-    assert not _calls(drawing, "face_silhouettes_through")
-    (pair,) = _calls(drawing, "_face_silhouette_pair")
-    assert [ast.unparse(arg) for arg in pair.args] == ["side", "face"]
-    (dimension,) = _calls(drawing, "add_edge_dimension")
-    assert ast.literal_eval(_keyword(dimension, "orientation")) == "vertical"
-    assert ast.unparse(_keyword(dimension, "entity_types")) == "kinds"
-    assert ast.unparse(_keyword(dimension, "entities")) == "picks"
-    (measured,) = _calls(drawing, "assert_dimension_measures")
-    assert ast.unparse(_keyword(measured, "expected_mm")) == "THREAD_MAJOR"
-    assert ast.unparse(_keyword(measured, "entities")) == "picks"
-    assert ast.unparse(_keyword(measured, "entity_types")) == "kinds"
     draw_source = _source(drawing)
-    assert 'kinds = ("SILHOUETTE", "SILHOUETTE")' in draw_source
+    for gone in ("add_edge_dimension", "_face_silhouette_pair", "SetPrecision3"):
+        assert gone not in draw_source
+    assert "for name in sorted(REFERENCE_DIMENSIONS):" in draw_source
     (reference,) = _calls(drawing, "set_reference_dimension")
-    assert ast.unparse(reference.args[1]) == "display.GetAnnotation()"
     assert ast.literal_eval(_keyword(reference, "diameter")) is True
-    assert (
-        "display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)" in draw_source
-    )
-    # Added after HLR and the curated imports, before the eye's center mark.
-    build_body = draw_source[draw_source.index("async def build(") :]
-    assert (
-        build_body.index("set_hidden_lines_removed(")
-        < build_body.index("set_dimension_callouts(")
-        < build_body.index("_plain_shank_reference(")
-        < build_body.index("auto_center_marks(")
-    )
-
-
-def test_the_shank_pair_is_both_silhouettes_of_the_plain_shank_face(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Every silhouette whose face is the plain shank, whatever its endpoint
-    readback; the threaded and head faces never match; anything but two
-    fails loud."""
-    from types import SimpleNamespace
-
-    from _gtol_face import SURFACE_CYLINDER, FaceGeometry
-
-    def cylinder(dia: float, y0: float, y1: float) -> FaceGeometry:
-        r = dia / 2000.0
-        return FaceGeometry(
-            face=None,
-            identity=SURFACE_CYLINDER,
-            parameters=(0.0, 0.0, 0.0, 0.0, 1.0, 0.0, r),
-            outward_normal=None,
-            box=(-r, y0 / 1000.0, -r, r, y1 / 1000.0, r),
-        )
-
-    thread = cylinder(spec.THREAD_MAJOR, 0.0, spec.FULL_THREAD_LENGTH)
-    plain = cylinder(spec.THREAD_MAJOR, spec.FULL_THREAD_LENGTH, spec.SHANK_LENGTH)
-    head = cylinder(spec.HEAD_DIA, spec.SHANK_LENGTH, spec.OVERALL_LENGTH)
-    faces = [thread, thread, plain, plain, head, head]
-    sweep = [SimpleNamespace(face=f) for f in faces]
-    monkeypatch.setattr(drawing, "visible_view_entities", lambda *a, **k: sweep)
-    monkeypatch.setattr(drawing, "_com_invoke", lambda obj, *_a: obj.face)
-    monkeypatch.setattr(drawing, "face_geometry", lambda face: face)
-    face = drawing.CylinderFace(
-        spec.THREAD_MAJOR,
-        contains_y_mm=spec.FULL_THREAD_LENGTH + spec.PLAIN_SHANK / 2.0,
-    )
-    assert drawing._face_silhouette_pair(None, face, label="t") == (sweep[2], sweep[3])
-    del sweep[3]
-    with pytest.raises(RuntimeError, match="draws 1 silhouettes"):
-        drawing._face_silhouette_pair(None, face, label="t")
 
 
 def test_every_marked_dimension_is_created_and_named_by_the_build() -> None:
@@ -287,7 +244,9 @@ def test_profile_splits_the_thread_limit_off_the_plain_shank() -> None:
         "end, thread, shank, shoulder, head, top, closure = await add_line_chain("
         in source
     )
-    assert '("plain shank", shank, "vertical"),' in source
+    # The plain segment's x rides PlainDia (to its shoulder end), not a
+    # vertical relation: its start is the thread's end.
+    assert '("thread", thread, "vertical"),' in source
 
 
 def test_a_split_line_rings_the_shank_at_the_thread_limit() -> None:
@@ -402,12 +361,7 @@ def test_no_gdt_no_pmi_no_roughness() -> None:
             "author_part_pmi",
             "PART_DATUMS",
             "GEOMETRIC_CONTROLS",
-            # GD&T authoring; _gtol_cylinder's CylinderFace is only the face
-            # identity the plain shank's reference picks its silhouettes by.
-            "_gtol_frame",
-            "_gtol_controls",
-            "_gtol_symbols",
-            "from _gtol_face import",
+            "_gtol",
             "add_datum_feature(",
             "add_feature_control_frame(",
             "set_basic_dimension",
@@ -520,7 +474,7 @@ def test_side_view_layout_reads_like_the_lathe() -> None:
     # The plain shank's reference Ø: above the plain shank (below it the
     # FULL THREAD extension line drops to row 1), over the head's top
     # silhouette, under the eye callout's text row.
-    shank_x, shank_y = drawing.SHANK_DIA_XY
+    shank_x, shank_y = keep["PlainDia"]
     assert drawing.FULL_THREAD_X < shank_x < drawing.SHOULDER_X
     assert head_top < shank_y < drawing.EYE_CALLOUT_XY[1] - 0.008
     # The eye callout: text right end left of the eye's centre (the station

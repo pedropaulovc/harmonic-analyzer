@@ -10,17 +10,17 @@ axis, +Y up the axis, the eye's cross hole along X at y = EYE_Y. Axis1 is the
 stud axis (Front Plane x Right Plane) for the coaxial mate with the rod's tap.
 
 Built as ONE Right-plane half-profile revolved 360 degrees (StudProfile ->
-Stud): the thread's major diameter, its usable full-thread length, the
-head's diameter and height and the overall length are its named dimensions;
-the plain shank under the head is what is left. The revolve merges the
+Stud): the thread's major diameter, its usable full-thread length, the plain
+shank's diameter (PlainDia, driven by ThreadDia and printed as a reference),
+the head's diameter and height and the overall length are its named
+dimensions; the plain shank's length is what is left. The revolve merges the
 collinear thread and plain-shank segments into one cylinder, so a projected
 split line (ThreadLimitSplit, from the Right-plane sketch
 ThreadLimitReference) rings the shank at the thread limit: the side view
-draws a real edge where the full thread stops, and the plain shank becomes
-its own face, whose flank silhouettes the drawing dimensions as the (Ø)
-reference. The profile sits on the Right plane (sketch u -> model -Z, v ->
-model Y) rather than the Front, so the *Right side view -- the one that sees
-the X cross hole end-on as a circle -- imports every marked dimension
+draws a real edge where the full thread stops. The profile sits on the Right
+plane (sketch u -> model -Z, v -> model Y) rather than the Front, so the
+*Right side view -- the one that sees the X cross hole end-on as a circle --
+imports every marked dimension
 (pn_pen_adjust_screw_spec.DRAWING_DIMENSIONS). The #54 eye is a native Hole
 Wizard drill (EyeHole) radially through the head, placed on EyeStationPlane;
 its printed station EyeFromHeadEnd (from the head's faced end) rides the
@@ -152,9 +152,8 @@ async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
 
     It carries no diameter: twice on the farm (runs 20261014T002650255Z and
     20261014T003549547Z) a diametric dimension from a centerline to a
-    construction witness in this sketch came back non-diametric, so the
-    plain shank's reference Ø is the drawing's, between the flank
-    silhouettes of the face this split leaves.
+    construction witness line in this sketch came back non-diametric. The
+    plain shank's Ø is StudProfile's PlainDia.
     """
     reach = THREAD_R + _SPLIT_OVERHANG
     dims = SketchDims()
@@ -301,7 +300,6 @@ async def build(adapter) -> dict[str, str]:
     for label, entity, relation in (
         ("threaded end", end, "horizontal"),
         ("thread", thread, "vertical"),
-        ("plain shank", shank, "vertical"),
         ("shoulder", shoulder, "horizontal"),
         ("head", head, "vertical"),
         ("top", top, "horizontal"),
@@ -322,6 +320,22 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(thread, None, "linear", FULL_THREAD_LENGTH),
     )
     profile.record("FullThreadLength", '"FullThreadLength"')
+    # The plain shank's Ø (the thread blank, printed as a reference): the
+    # ThreadDia recipe on the same axis, picked at the plain segment's
+    # mid-height, but to the segment's top end (the shoulder corner) rather
+    # than the line -- the point form build_mg_magnifying_lever's RodDia and
+    # PressZoneDia use. The segment's start is the thread's end, so a
+    # line-to-axis diameter would restate ThreadDia (over-defined); to the
+    # free end it replaces the segment's vertical relation instead, and
+    # driving it by ThreadDia keeps the two segments collinear.
+    await add_diametric_linear_dimension(
+        adapter,
+        axis,
+        f"{shank}.end",
+        (THREAD_R + 4.0, FULL_THREAD_LENGTH + PLAIN_SHANK / 2.0),
+        "PlainDia",
+    )
+    profile.record("PlainDia", '"ThreadDia"')
     await add_diametric_linear_dimension(
         adapter,
         axis,
@@ -352,7 +366,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Stud")
     stud_volume = await volume_check(adapter, "stud", V_STUD, 0.005 * V_STUD)
     # Thread limit (drawing-guidelines.md rule 16): the split ring the
-    # FullThreadLength extension line lands on, and the plain shank's Ø.
+    # FullThreadLength extension line lands on.
     drive_jobs += await _add_thread_limit(adapter)
     await volume_check(
         adapter, "thread-limit split cuts nothing", stud_volume, 1e-6 * stud_volume
