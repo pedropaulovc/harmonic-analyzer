@@ -1,0 +1,10 @@
+ch-rocker-arm-tl-trammel-pivot-block:
+  title: Rocker Template Trammel Pivot Block
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-14
+  material: 1018 cold-rolled steel
+  material_specification: 1018 cold-rolled flat bar, 3/4 x 1-1/2 in, ASTM A108
+  finish: as machined, edges broken
+  quantity: 1
+  tolerance_class: machined_block
+  process: "saw to length; mill the bar slot; drill and ream the point hole; saw the slit; drill and tap the set screws and the pinch screw, then drill the pinch clearance; break edges"

@@ -1,0 +1,10 @@
+ch-rocker-arm-tl-trammel-pivot-plate:
+  title: Rocker Template Trammel Pivot Plate
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-19
+  material: AISI 1018 cold-rolled steel
+  material_specification: AISI 1018 cold-rolled flat bar, 3/4 x 1-1/2 in (offcut of the trammel block bar)
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  process: "saw offcut and face ends to length; drill 5/64 pilot blind; No. 2 centre drill the 60 degree seat; drill #16 through and countersink 90 degrees for the screws; break edges"

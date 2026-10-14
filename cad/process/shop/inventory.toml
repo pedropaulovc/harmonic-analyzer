@@ -4689,6 +4689,7 @@ name = "Trial shop-made rocker template trammel, 1018 quarter-inch square bar"
 # Source access: All Metals 3/4 x 1-1/2 1018 page read 2026-10-12 confirms section; Abrams product URL returned unrelated GTC PDF, so no O1 product dimensions were freshly verified.
 kind = "trammel"
 shop_made = true
+cad = "ch_rocker_arm_tl_trammel"
 # Historical note (retained, superseded by the trial identity below): "Shop-made, not yet made (verify = true). Pivot pin 25 from the pivot-end face; R800 scriber at 825, R816 scriber at 841. Proven on the setting bar (H0/H800/H816) before and after scribing."
 # Identity/ownership: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "hypothetical visual identity, package-label and shop-shelf inspection".
 # Basis: Pedro-authorized trial ownership/identity assumption (#1413); not a real receipt, owned-tool sighting or shop measurement.
@@ -4749,6 +4750,19 @@ length_mm = { value = 800, measured = { status = "measured", by = "placeholder (
 [gauges.rocker-trammel-setting-bar.members."H0-H816"]
 # Basis: gauges.rocker-trammel-setting-bar.members."H0-H816".length_mm: Exact authored nominal centre-to-scriber radius or centre-to-centre setting span, offset zero; authorized finished-tool trial estimate, not surveyed shop geometry.
 length_mm = { value = 816, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-13", instrument = "digital position readout and fitted setting pins, successive transfers along bar" } }
+
+# Template-making extra (route 2.1 "Pivot plate"; Pedro 2026-10-14: every shop-made item the
+# route uses gets CAD). An offcut of the approved 1018 3/4 x 1-1/2 bar, screwed to the MDF
+# scribing board; the trammel's 60 degree pivot point runs in its centre-drilled 60 degree cone.
+# Geometry comes from the CAD spec; not yet made, so verify = true.
+[fixtures.trammel-pivot-plate]
+name = "Trial shop-made rocker trammel pivot plate, 1018 offcut with a No. 2 centre-drilled cone"
+kind = "custom"
+shop_made = true
+cad = "ch_rocker_arm_tl_trammel_pivot_plate"
+verify = true
+material = "1018 cold-rolled steel"
+note = "Template-making extra (CAD part ch_rocker_arm_tl_trammel_pivot_plate, MHA-CH-006-TL-19): screwed to the MDF scribing board; the trammel pivot point (MHA-CH-006-TL-18) runs in its 60 degree centre-drilled cone while R800/R816 are scribed. Not yet made."
 
 [fixtures.trammel-board-mdf]
 name = "MDF scribing board 3/4 in, 2 x 4 ft, cut to 1000 x 610 on the owned bench"
