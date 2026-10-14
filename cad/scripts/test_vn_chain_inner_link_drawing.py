@@ -27,14 +27,14 @@ def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
     assert spec.layout is DrawingLayout.LANDSCAPE
     calls = []
 
-    async def fake(adapter, drawn):
-        calls.append((adapter, drawn))
+    async def fake(adapter, drawn, *, hidden_lines_removed=False):
+        calls.append((adapter, drawn, hidden_lines_removed))
         return {"pdf": "x"}
 
     monkeypatch.setattr(draw, "build_purchased_part_drawing", fake)
     adapter = object()
     assert asyncio.run(draw.build(adapter)) == {"pdf": "x"}
-    assert calls == [(adapter, spec)]
+    assert calls == [(adapter, spec, True)]
 
 
 def test_registry_row_is_the_bought_chain_not_a_machined_part() -> None:
@@ -72,8 +72,14 @@ def test_note_is_one_short_line_that_closes_the_loop_count() -> None:
     assert "\n" not in note and len(note) <= 80
     assert " MM" not in note
     quantity = int(ROW["quantity"])
-    # Cut to the loop's pitch count, an inner link at each cut end.
-    assert f"{_chain_link.CHAIN_SKU} TO {_chain.LINK_COUNT} PITCHES" in note
-    assert "INNER LINK AT EACH END" in note
-    assert f"{quantity} PER LOOP" in note
+    # Broken to whole links, an inner link at each end; the connecting link
+    # (one of the outer links) closes the loop's pitch count.
+    assert (
+        f"{_chain_link.CHAIN_SKU} TO {quantity} INNER + {quantity - 1} OUTER LINKS"
+        in note
+    )
+    assert (
+        f"{_chain_link.CONNECTING_LINK_SKU} CLOSES {_chain.LINK_COUNT} PITCHES" in note
+    )
+    assert quantity + quantity == _chain.LINK_COUNT
     assert _chain_link.CHAIN_ORDER_FEET * 304.8 >= _chain.LINK_COUNT * _chain.LINK_PITCH
