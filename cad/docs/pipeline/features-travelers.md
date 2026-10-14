@@ -51,8 +51,10 @@ swDetailingDiameterDimension)`. The effective value must match
 `PIVOT_BORE.precision["dia"]`; missing or unreadable values fail closed.
 The guard does not change the sheet-wide units-decimal setting. The other
 three dimensions (`TopAbovePivot`, `HubLength`, `StrapThickness`) retain the
-strict explicit part-owned precision assertion; none of these guards rewrites
-the imported dimension. Other return values may remain inspection-only;
+strict explicit part-owned precision assertion. The front annotations are returned
+by the outline helper that imports them and combined with the detail and right
+annotations; they are not re-imported for these checks. None of these guards
+rewrites the imported dimension. Other return values may remain inspection-only;
 colocation alone is not a printed-callout drift check.
 `faces` contains the existing geometry selectors;
 `requirements` preserves the ordered acceptance-field names, including explicit
@@ -106,9 +108,14 @@ model nominal coordinates are separate; BASIC and REF dimensions do not acquire
 invented general-tolerance bands. Explicit native tolerance bands retain the
 exact authored nominal where native display rounding has not been proved.
 Precision alone does not justify a private rounding convention.
-The rocker's zero-place `land_angle_deg` band is centred on
-`round(land_angle_nominal_deg, 0)` plus/minus the printed title-block angular
-tolerance; the separate nominal remains the unrounded geometry value.
+The rocker's `land_angle_deg` is the two-place BASIC mirror-plane clock angle
+from `_ALPHA_TOP`, printed in Manufacturing Note 1, not the retired zero-place
+land-perpendicularity band. BASIC radii and height remain nominal scalars;
+arc lengths remain geometry-only metadata, not separate acceptance bands.
+The consumer schema does not expose unequally disposed surface-profile fields:
+the sourced profile control is retained in each arc feature's `note` and its
+acceptance identity remains explicitly `unknown`, never silently omitted or
+replaced with a size band.
 
 Turned-feature `z_mm` intervals describe nominal geometry along the feature's
 source-frame Z axis, not an acceptance band. Shaft grooves overlay the journal

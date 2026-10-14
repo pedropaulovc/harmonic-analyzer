@@ -24,6 +24,9 @@ the reason the 2026-09-17 ``logo ring extrude failed`` leaf could only be called
   answers an unknown id with a plausible ``False``);
 * seat provenance says WHICH sldworks.exe ran the leaf and whether this build
   started it.
+* failure exports, teardown directory access and sketch-manager flags use
+  disjoint, closed native owners; injecting another interface cannot export a
+  document, overwrite approved outputs or replace the caller's exception.
 
     python -m pytest cad/scripts/test_failure_forensics.py
 """
@@ -94,6 +97,8 @@ class _Sketch:
     permissive than COM and would green-light a census field that is blank on
     every seat.
     """
+    __slots__ = ("_contours", "_points")
+    _native_interfaces = ("ISketch",)
 
     def __init__(self, *, contours: int, points: list[tuple[float, float, float]]):
         self._contours = contours
@@ -127,11 +132,16 @@ class _Sketch:
 class _Model:
     """An ``IModelDoc2`` that can save a copy and a BMP, like a real seat."""
 
+    __slots__ = ("_root", "saved", "bmp_saved", "ActiveView", "Extension", "SketchManager")
+    _native_interfaces = ("IModelDoc2",)
+
     def __init__(self, tmp_path: Path):
         self._root = tmp_path
         self.saved: list[tuple[str, int, int]] = []
+        self.bmp_saved: list[tuple[str, int, int]] = []
         self.ActiveView = _View()
         self.Extension = None
+        self.SketchManager = _SketchManager()
 
     def GetTitle(self) -> str:
         return "91247A720"
@@ -157,8 +167,36 @@ class _Model:
         return 0
 
     def SaveBMP(self, path: str, width: int, height: int) -> bool:
+        self.bmp_saved.append((path, width, height))
         Path(path).write_bytes(b"BM")
         return True
+
+
+class _FailureDrawing(_Model):
+    """Native drawing save/export contract, without a SolidWorks seat."""
+
+    __slots__ = ("unsaved", "refuse", "events")
+
+    def __init__(self, tmp_path, *, unsaved=False, refuse=None):
+        super().__init__(tmp_path)
+        self.unsaved, self.refuse = unsaved, refuse
+        self.events = []
+
+    def GetPathName(self):
+        return "" if self.unsaved else str(self._root / "ch-rocker-arm.SLDDRW")
+
+    def GetType(self):
+        return 3
+
+    def SaveAs3(self, path, version, options):
+        assert options == _seat_forensics._SAVE_AS_SILENT_COPY
+        self.saved.append((path, version, options))
+        suffix = Path(path).suffix
+        self.events.append(suffix)
+        if suffix == self.refuse:
+            raise OSError(f"{suffix} capture refused")
+        Path(path).write_bytes(b"\x89PNG\r\n\x1a\n" if suffix == ".png" else b"SLDDRW")
+        return 0
 
 
 class _View:
@@ -167,6 +205,8 @@ class _View:
     ``ProjectModelPoint`` is what makes px/mm MEASURED rather than inferred from
     ``Scale2``; this double projects 1 mm to 20 px along x and y.
     """
+    __slots__ = ("_px", "Scale2", "FrameWidth", "FrameHeight", "FrameState")
+    _native_interfaces = ("IModelView",)
 
     def __init__(self, *, px_per_mm: float = 20.0):
         self._px = px_per_mm
@@ -190,6 +230,9 @@ class _View:
 class _SketchManager:
     """``ISketchManager``'s sticky per-session bag."""
 
+    __slots__ = ("AddToDB", "AutoInference", "AutoSolve", "DisplayWhenAdded")
+    _native_interfaces = ("ISketchManager",)
+
     def __init__(self, *, add_to_db: bool = False):
         self.AddToDB = add_to_db
         self.AutoInference = True
@@ -201,6 +244,9 @@ class _Frame:
     """``IFrame``: ``GetHWndx64`` (dispid 16, VT_I8) is the handle the probes
     read; ``GetHWnd`` (VT_I4) is the 32-bit form and deliberately absent."""
 
+    __slots__ = ()
+    _native_interfaces = ("IFrame",)
+
     def GetHWndx64(self) -> int:
         return 0x1234
 
@@ -208,10 +254,28 @@ class _Frame:
 class _Seat:
     """An ``ISldWorks``: a pid, a revision and readable user preferences."""
 
-    def __init__(self, *, pid: int = 4242, toggles: dict[int, Any] | None = None):
+    __slots__ = (
+        "_pid", "_toggles", "_frame", "_working_directory",
+        "working_directory_reads", "working_directory_moves",
+    )
+    _native_interfaces = ("ISldWorks",)
+
+    def __init__(
+        self,
+        *,
+        pid: int = 4242,
+        toggles: dict[int, Any] | None = None,
+        working_directory: str = r"C:\harmonic\work\sources\6621e07a\workspace\cad\out\sldprt\\",
+    ):
         self._pid = pid
         self._toggles = toggles or {}
-        self.Frame = _Frame()
+        self._frame = _Frame()
+        self._working_directory = working_directory
+        self.working_directory_reads: list[str] = []
+        self.working_directory_moves: list[str] = []
+
+    def Frame(self) -> _Frame:
+        return self._frame
 
     def GetProcessID(self) -> int:
         return self._pid
@@ -220,7 +284,13 @@ class _Seat:
         return "34.3.0"
 
     def GetCurrentWorkingDirectory(self) -> str:
-        return r"C:\harmonic\work\sources\6621e07a\workspace\cad\out\sldprt\\"
+        self.working_directory_reads.append(self._working_directory)
+        return self._working_directory
+
+    def SetCurrentWorkingDirectory(self, path: str) -> bool:
+        self.working_directory_moves.append(path)
+        self._working_directory = path
+        return True
 
     def GetUserPreferenceToggle(self, pref: int) -> Any:
         if pref in self._toggles:
@@ -277,6 +347,24 @@ def offline_seat(monkeypatch, tmp_path):
     monkeypatch.setattr(_seat_forensics, "_process_session_id", lambda pid: 1)
     monkeypatch.setattr(_seat_forensics, "_session_connect_state", lambda session: "active")
     yield
+
+
+@pytest.fixture
+def strict_forensic_owners(monkeypatch):
+    """Bind only the producer's declared interface, never a duck-typed cast."""
+    bindings = []
+
+    def bind_owner(native, interface):
+        if native is None:
+            return None
+        owners = getattr(native, "_native_interfaces", ())
+        if interface not in owners:
+            raise RuntimeError(f"native owner mismatch: {owners!r} cannot bind {interface}")
+        bindings.append((native, interface))
+        return native
+
+    monkeypatch.setattr(_com, "_early_bound", bind_owner)
+    return bindings
 
 
 @pytest.fixture
@@ -394,7 +482,7 @@ def test_one_step_failing_does_not_stop_the_others(tmp_path, monkeypatch):
     assert report["document"]["title"] == "91247A720"
 
 
-def test_artefacts_land_beside_the_report(tmp_path):
+def test_artefacts_land_beside_the_report(tmp_path, strict_forensic_owners):
     """The document copy, the seat image and capture.json are the evidence a
     disposable worker must leave behind."""
     adapter = _unmerged_profile(tmp_path)
@@ -410,6 +498,9 @@ def test_artefacts_land_beside_the_report(tmp_path):
     assert (out / "capture.json").is_file()
     assert (out / "logo-ring-extrude.SLDPRT").is_file()
     assert (out / "logo-ring-extrude.bmp").is_file()
+    report = json.loads((out / "capture.json").read_text())
+    assert report["document_copy"]["save_rc"] == 0
+    assert adapter.currentModel.bmp_saved == [(str(out / "logo-ring-extrude.bmp"), 1600, 1000)]
     # Saved SILENT and as a COPY, so the live document keeps its own path and a
     # headless leaf can never block on a save dialog.
     (_path, version, options) = adapter.currentModel.saved[0]
@@ -417,6 +508,243 @@ def test_artefacts_land_beside_the_report(tmp_path):
         _seat_forensics._SAVE_AS_CURRENT_VERSION,
         _seat_forensics._SAVE_AS_SILENT_COPY,
     )
+
+
+@pytest.mark.parametrize("unsaved", [False, True])
+def test_failed_caption_capture_saves_native_drawing_and_sheet_png_as_failure_artefacts(
+    tmp_path, dodo_failures, unsaved, strict_forensic_owners,
+):
+    label = "ch-rocker-arm-detail-e-caption"
+    model = _FailureDrawing(tmp_path, unsaved=unsaved)
+    adapter = _Adapter(sw=_Seat(), model=model, sketch_manager=model.SketchManager)
+    original = RuntimeError("detail E: actual caption cannot fit")
+    before_path = model.GetPathName()
+    with pytest.raises(RuntimeError) as caught:
+        try:
+            _seat_forensics.capture_com_failure(
+                adapter, label, str(original), exception=original, sheet_png=True,
+            )
+        finally:
+            model.events.append("seat-close")
+    assert caught.value is original
+    assert model.events == [".SLDDRW", ".png", "seat-close"]
+    assert model.GetPathName() == before_path
+    out = _failure_dir(tmp_path, label)
+    report = json.loads((out / "capture.json").read_text())
+    native = Path(report["document_copy"]["document_copy"])
+    png = Path(report["sheet_png"]["sheet_png"])
+    assert native == out / f"{label}.SLDDRW"
+    assert png == out / f"{label}.png"
+    assert native.read_bytes() == b"SLDDRW"
+    assert png.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    assert report["document_copy"]["save_rc"] == report["sheet_png"]["save_rc"] == 0
+    assert model.bmp_saved == [(str(out / f"{label}.bmp"), 1600, 1000)]
+    assert report["sketch_manager"] == {
+        "scope": "session", "AddToDB": False, "AutoInference": True,
+        "AutoSolve": True, "DisplayWhenAdded": True,
+    }
+    assert strict_forensic_owners
+    # The real task-failure manifest classifies BOTH produced paths by the
+    # failure namespace, never as approved drawing/png task outputs.
+    failures = set(dodo_failures._failure_artefacts(0.0))
+    assert {native, png, out / "capture.json"} <= failures
+    assert all(path.is_relative_to(dodo_failures.FAILURES) for path in failures)
+    assert all(version == 0 and options == 3 for _path, version, options in model.saved)
+
+
+@pytest.mark.parametrize("refuse", [".png", ".SLDDRW"])
+def test_one_failed_drawing_export_does_not_mask_guard_or_stop_other_evidence(
+    tmp_path, refuse, strict_forensic_owners,
+):
+    label = "ch-rocker-arm-detail-e-caption"
+    model = _FailureDrawing(tmp_path, refuse=refuse)
+    original = ValueError("caption native extent refused")
+    with pytest.raises(ValueError) as caught:
+        _seat_forensics.capture_com_failure(
+            _Adapter(model=model), label, str(original), exception=original, sheet_png=True,
+        )
+    assert caught.value is original
+    report = json.loads((_failure_dir(tmp_path, label) / "capture.json").read_text())
+    if refuse == ".png":
+        assert "failure sheet PNG SaveAs3 produced no file" in report["sheet_png"]["capture_error"]
+        assert Path(report["document_copy"]["document_copy"]).is_file()
+    else:
+        assert report["document_copy"]["document_copy"] is None
+        assert Path(report["sheet_png"]["sheet_png"]).is_file()
+    assert Path(report["seat_image"]["seat_image"]).is_file()
+
+
+def test_sheet_png_is_opt_in_and_cannot_export_a_part_as_a_drawing(
+    tmp_path, strict_forensic_owners,
+):
+    adapter = _unmerged_profile(tmp_path)
+    with pytest.raises(RuntimeError):
+        _seat_forensics.capture_com_failure(adapter, "default-capture", "original")
+    report = json.loads((_failure_dir(tmp_path, "default-capture") / "capture.json").read_text())
+    assert "sheet_png" not in report
+    assert [Path(path).suffix for path, _version, _options in adapter.currentModel.saved] == [".SLDPRT"]
+    original = RuntimeError("caption guard")
+    with pytest.raises(RuntimeError) as caught:
+        _seat_forensics.capture_com_failure(
+            adapter, "wrong-active-model", str(original), exception=original, sheet_png=True,
+        )
+    assert caught.value is original
+    report = json.loads((_failure_dir(tmp_path, "wrong-active-model") / "capture.json").read_text())
+    assert report["sheet_png"]["capture_error"] == "RuntimeError: failure sheet PNG requires an active drawing"
+    assert not list(_failure_dir(tmp_path, "wrong-active-model").glob("*.png"))
+
+
+@pytest.mark.parametrize("owner_role", ["ISldWorks", "ISketch", "ISketchManager", "IModelView"])
+def test_wrong_active_interface_cannot_export_failure_or_approved_outputs(
+    tmp_path, owner_role, strict_forensic_owners,
+):
+    """The actual capture rejects a non-document before any export can run."""
+    owners = {
+        "ISldWorks": _Seat(),
+        "ISketch": _Sketch(contours=0, points=[]),
+        "ISketchManager": _SketchManager(),
+        "IModelView": _View(),
+    }
+    wrong_model = owners[owner_role]
+    assert wrong_model._native_interfaces == (owner_role,)
+    for member in ("GetType", "GetPathName", "SaveAs3", "SaveBMP"):
+        assert not hasattr(wrong_model, member)
+        with pytest.raises(AttributeError):
+            setattr(wrong_model, member, lambda *args: True)
+    with pytest.raises(RuntimeError, match="native owner mismatch"):
+        _com._early_bound(wrong_model, "IModelDoc2")
+
+    label = "wrong-native-owner"
+    approved = tmp_path / "approved"
+    approved.mkdir()
+    approved_paths = [approved / f"{label}{suffix}" for suffix in (".SLDDRW", ".png", ".bmp")]
+    for path in approved_paths:
+        path.write_bytes(b"approved output must survive")
+    original = ValueError("caption native extent refused")
+    with pytest.raises(ValueError) as caught:
+        _seat_forensics.capture_com_failure(
+            _Adapter(sw=_Seat(), model=wrong_model, sketch_manager=_SketchManager()),
+            label, str(original), exception=original, sheet_png=True,
+        )
+    assert caught.value is original
+    out = _failure_dir(tmp_path, label)
+    report = json.loads((out / "capture.json").read_text())
+    assert report["sheet_png"]["capture_error"] == (
+        "RuntimeError: failure sheet PNG requires an active drawing"
+    )
+    # The native-copy/BMP probes are best-effort: an absent owner method is
+    # swallowed by _attempt and reported as no artefact, never as success.
+    assert report["document_copy"]["document_copy"] is None
+    assert report["seat_image"]["seat_image"] is None
+    assert {path.name for path in out.iterdir()} == {"capture.json"}
+    assert all(path.read_bytes() == b"approved output must survive" for path in approved_paths)
+
+
+@pytest.mark.parametrize("doc_type", [None, True, "3"])
+def test_failure_png_refuses_unusable_document_type_before_saveas3(
+    tmp_path, doc_type, strict_forensic_owners,
+):
+    class _UnusableTypeDrawing(_FailureDrawing):
+        __slots__ = ()
+
+        def GetType(self):
+            return doc_type
+
+    model = _UnusableTypeDrawing(tmp_path)
+    original = RuntimeError("caption guard")
+    with pytest.raises(RuntimeError) as caught:
+        _seat_forensics.capture_com_failure(
+            _Adapter(model=model), "unusable-document-type",
+            str(original), exception=original, sheet_png=True,
+        )
+    assert caught.value is original
+    assert model.events == [".SLDDRW"]
+    out = _failure_dir(tmp_path, "unusable-document-type")
+    report = json.loads((out / "capture.json").read_text())
+    assert report["sheet_png"]["capture_error"] == (
+        "RuntimeError: failure sheet PNG requires an active drawing"
+    )
+    assert Path(report["document_copy"]["document_copy"]).is_file()
+    assert Path(report["seat_image"]["seat_image"]).is_file()
+    assert not list(out.glob("*.png"))
+
+
+def test_teardown_directory_reads_and_moves_only_the_sldworks_owner(tmp_path, monkeypatch):
+    target = tmp_path / "parked"
+    target.mkdir()
+    monkeypatch.setattr(_seat_forensics, "_seat_park_directory", lambda: target)
+    before = str(tmp_path / "disposable")
+    seat = _Seat(working_directory=before)
+    assert seat._native_interfaces == ("ISldWorks",)
+    assert _seat_forensics.release_seat_working_directory(seat) == str(target)
+    assert seat.working_directory_moves == [str(target)]
+    assert seat.working_directory_reads == [before, str(target)]
+    assert _seat_forensics._seat_working_directory(_Adapter(sw=seat)) == {
+        "seat_working_directory": str(target),
+    }
+
+
+@pytest.mark.parametrize("owner_role", ["IModelDoc2", "ISketch", "ISketchManager", "IModelView"])
+def test_teardown_directory_rejects_other_closed_owners_before_a_move(
+    tmp_path, monkeypatch, owner_role,
+):
+    monkeypatch.setattr(_seat_forensics, "_seat_park_directory", lambda: tmp_path)
+    wrong_seat = {
+        "IModelDoc2": _Model(tmp_path),
+        "ISketch": _Sketch(contours=0, points=[]),
+        "ISketchManager": _SketchManager(),
+        "IModelView": _View(),
+    }[owner_role]
+    for member in ("GetCurrentWorkingDirectory", "SetCurrentWorkingDirectory"):
+        assert not hasattr(wrong_seat, member)
+        with pytest.raises(AttributeError):
+            setattr(wrong_seat, member, lambda *args: True)
+    with pytest.raises(AttributeError, match="GetCurrentWorkingDirectory"):
+        _seat_forensics.release_seat_working_directory(wrong_seat)
+    assert _seat_forensics._seat_working_directory(_Adapter(sw=wrong_seat)) == {}
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("move_result", [False, None, 1, True])
+def test_teardown_directory_requires_native_boolean_and_directory_readback(
+    tmp_path, monkeypatch, move_result,
+):
+    class _RefusingMoveSeat(_Seat):
+        __slots__ = ()
+
+        def SetCurrentWorkingDirectory(self, path):
+            self.working_directory_moves.append(path)
+            return move_result
+
+    target = tmp_path / "parked"
+    target.mkdir()
+    monkeypatch.setattr(_seat_forensics, "_seat_park_directory", lambda: target)
+    before = str(tmp_path / "disposable")
+    seat = _RefusingMoveSeat(working_directory=before)
+    refusal = "did not move" if move_result is True else "refused working directory"
+    with pytest.raises(RuntimeError, match=refusal):
+        _seat_forensics.release_seat_working_directory(seat)
+    assert seat.working_directory_moves == [str(target)]
+    assert seat.working_directory_reads == [before] * (2 if move_result is True else 1)
+
+
+@pytest.mark.parametrize("owner_role", ["IModelDoc2", "ISldWorks", "ISketch", "IModelView"])
+def test_sketch_flags_cannot_be_read_from_other_closed_native_owners(tmp_path, owner_role):
+    wrong_manager = {
+        "IModelDoc2": _Model(tmp_path),
+        "ISldWorks": _Seat(),
+        "ISketch": _Sketch(contours=0, points=[]),
+        "IModelView": _View(),
+    }[owner_role]
+    for member in ("AddToDB", "AutoInference", "AutoSolve", "DisplayWhenAdded"):
+        assert not hasattr(wrong_manager, member)
+        with pytest.raises(AttributeError):
+            setattr(wrong_manager, member, True)
+    assert _seat_forensics.sketch_manager_state(_Adapter(sketch_manager=wrong_manager)) == {
+        "scope": "session", "AddToDB": "unreadable", "AutoInference": "unreadable",
+        "AutoSolve": "unreadable", "DisplayWhenAdded": "unreadable",
+    }
+    assert not list(tmp_path.iterdir())
 
 
 def test_unmerged_endpoints_are_visible_in_the_capture(tmp_path):
@@ -2556,20 +2884,24 @@ def test_a_retried_pivot_bore_pick_can_succeed_without_an_error_log(
 
     class _SheetView:
         def UpdateViewDisplayGeometry(self):  # noqa: N802
-            return True
+            return None  # Native UpdateViewDisplayGeometry is VT_VOID.
 
     spans, logs = capture_telemetry
     drawing = _Drawing()
-    centre = (0.2, 0.15)
+    centre = draw_ch_rocker_arm.HUB_CENTER
+    projected_bore_radius = (
+        draw_ch_rocker_arm.PIVOT_HOLE_DIA / 2000.0
+        * draw_ch_rocker_arm.HUB_SCALE[0] / draw_ch_rocker_arm.HUB_SCALE[1]
+    )
     monkeypatch.setattr(_drawing_selection, "view_name", lambda adapter, view: "Drawing View2")
     monkeypatch.setattr(_seat_forensics, "_frame_geometry", lambda adapter: {})
     with _telemetry.span("drawing.pivot_datum"):
         xy = draw_ch_rocker_arm._pick_pivot_bore(
-            _Adapter(sw=_PickSeat(), model=drawing), _SheetView(), bore, centre
+            _Adapter(sw=_PickSeat(), model=drawing), _SheetView(), bore, centre, projected_bore_radius
         )
     picked_xy = [args[2:4] for args in drawing.picks]
     assert [
-        math.dist(point, centre) / draw_ch_rocker_arm.PIVOT_BORE_SHEET_R for point in picked_xy
+        math.dist(point, centre) / projected_bore_radius for point in picked_xy
     ] == pytest.approx(draw_ch_rocker_arm.PIVOT_PICK_FRACTIONS)
     assert xy == picked_xy[-1]
     events = [e for s in spans.get_finished_spans() for e in s.events]

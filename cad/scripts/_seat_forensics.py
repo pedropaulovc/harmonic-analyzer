@@ -16,8 +16,9 @@ artefact, which ``check:inert`` (``test_recipe_inert.py``) enforces:
   ``_drawing_selection._select_view_entity`` (it always raises), and
   ``capture_com_failure`` as a terminal failure call (it always raises).
 - No COM mutator runs here except three pinned ones, each after the artefact
-  is settled: ``SaveAs3``/``SaveBMP`` of a failing document (only under the
-  always-raising ``capture_com_failure``) and ``SetCurrentWorkingDirectory``
+  is settled: ``SaveAs3`` (native copy and opt-in failed-sheet PNG) /
+  ``SaveBMP`` of a failing document (only under the always-raising
+  ``capture_com_failure``) and ``SetCurrentWorkingDirectory``
   (only at teardown).
 - This module reads ``_com``, ``_paths``, ``_preferences``, ``_rebuild``,
   ``_session`` and ``_sketch_closure`` through pinned module attributes only,
@@ -65,8 +66,8 @@ import _telemetry
 import _watchdog
 
 # Forensic artefacts of a failed COM build step: a saved copy of the failing
-# document, a BMP of the seat and the capture.json that indexes them, one
-# directory per failure label AND per capture instant -- a retried failure must
+# document, a BMP of the seat, an opt-in drawing-sheet PNG and the capture.json,
+# one directory per failure label AND per capture instant -- a retried failure must
 # not erase the evidence of the failure it is retrying (see
 # :func:`capture_com_failure`).
 OUT_FAILURES = Path(__file__).resolve().parents[1] / "out" / "reports" / "failures"
@@ -1539,23 +1540,34 @@ def _document_state(adapter: Any) -> dict[str, Any]:
     return state
 
 
-def _save_failure_document(adapter: Any, out_dir: Path, slug: str) -> dict[str, Any]:
+def _save_failure_document(
+    adapter: Any, out_dir: Path, slug: str, *, sheet_png: bool = False
+) -> dict[str, Any]:
     """Save a COPY of the failing document into the failure directory.
 
     The document is the evidence: with it, the profile can be opened and the
     failing feature retried on any seat. Saved as a silent copy in the live
     document's own format (the extension comes from the document, so a part,
-    assembly and drawing each land native).
+    assembly and drawing each land native). ``sheet_png`` reuses this same
+    extension-driven SaveAs3 export, as ``save_drawing`` does for PNG, but only
+    for an active drawing. It is sheet evidence, not SaveBMP's viewport capture.
+    Both formats use Silent|Copy, keeping the live document's path unchanged.
     """
     model = adapter.currentModel
+    key = "sheet_png" if sheet_png else "document_copy"
     if model is None:
-        return {"document_copy": None}
-    suffix = Path(str(_com._read_member(model, "GetPathName") or "")).suffix
-    if not suffix:
-        doc_type = _com._read_member(model, "GetType")
-        suffix = _DOC_SUFFIX.get(
-            doc_type if isinstance(doc_type, int) else 0, ".SLDPRT"
-        )
+        return {key: None}
+    if sheet_png:
+        if _com._read_member(model, "GetType") != 3:
+            raise RuntimeError("failure sheet PNG requires an active drawing")
+        suffix = ".png"
+    else:
+        suffix = Path(str(_com._read_member(model, "GetPathName") or "")).suffix
+        if not suffix:
+            doc_type = _com._read_member(model, "GetType")
+            suffix = _DOC_SUFFIX.get(
+                doc_type if isinstance(doc_type, int) else 0, ".SLDPRT"
+            )
     out_dir.mkdir(parents=True, exist_ok=True)
     target = out_dir / f"{slug}{suffix}"
     target.unlink(missing_ok=True)
@@ -1566,9 +1578,11 @@ def _save_failure_document(adapter: Any, out_dir: Path, slug: str) -> dict[str, 
         default=None,
     )
     saved = target.exists()
+    if sheet_png and not saved:
+        raise RuntimeError(f"failure sheet PNG SaveAs3 produced no file: {target}; save_rc={rc!r}")
     return {
-        "document_copy": str(target) if saved else None,
-        "document_copy_bytes": target.stat().st_size if saved else None,
+        key: str(target) if saved else None,
+        f"{key}_bytes": target.stat().st_size if saved else None,
         "save_rc": _com._scalar(rc),
     }
 
@@ -1616,6 +1630,8 @@ def capture_com_failure(
     sketch: Any | None = None,
     expected_points: int | None = None,
     exc_type: type[BaseException] = RuntimeError,
+    exception: Exception | None = None,
+    sheet_png: bool = False,
     **context: Any,
 ) -> NoReturn:
     """Capture the seat's state behind a COM call that returned ``None``, then raise.
@@ -1638,16 +1654,16 @@ def capture_com_failure(
 
     Three guarantees, in order of importance:
 
-    1. It ALWAYS raises ``exc_type(message)``, with ``message`` unchanged. Every
-       capture step is guarded individually and the capture as a whole is guarded
-       again, so forensics can neither mask the failure's message nor convert a
-       clear geometry failure into an unrelated crash.
+    1. It ALWAYS raises the supplied ``exception`` unchanged, or
+       ``exc_type(message)`` when omitted. Every capture step is guarded
+       individually and the capture as a whole is guarded again, so forensics
+       can neither mask the failure nor convert it into an unrelated crash.
     2. Everything captured lands as ``com.failure.<step>`` span events on a
        ``com.failure <label>`` span AND in exactly ONE ERROR log record (the
        whole capture as JSON), so the evidence reaches App Insights and
        ``logs.jsonl`` -- not just a disposable worker's disk.
     3. The artefacts (a copy of the failing document, a BMP of the seat,
-       ``capture.json``) land under
+       opt-in native drawing-sheet PNG, ``capture.json``) land under
        ``cad/out/reports/failures/<label>/<UTC timestamp>/``. The timestamp
        directory is not cosmetic: on 2026-09-17 the successful RETRY overwrote
        the failing attempt's leaf log, and the whole diagnosis had to be
@@ -1668,6 +1684,11 @@ def capture_com_failure(
     the artefact state the discrepancy instead of leaving the reader to count.
     Extra keyword arguments are recorded as attributes on the span, the events
     and the log record.
+
+    ``sheet_png`` is opt-in for a drawing guard that failed BEFORE normal
+    export. It saves the still-active partial sheet under the failure namespace;
+    no approved output is written, and no layout/rebuild guard is re-entered.
+    Its failure is a separate capture step and cannot prevent the native copy.
     """
     slug = _slug(label)
     stamp = datetime.now(UTC)
@@ -1705,6 +1726,11 @@ def capture_com_failure(
             _capture_step(
                 report, "document_copy", lambda: _save_failure_document(adapter, out_dir, slug)
             )
+            if sheet_png:
+                _capture_step(
+                    report, "sheet_png",
+                    lambda: _save_failure_document(adapter, out_dir, slug, sheet_png=True),
+                )
             _capture_step(
                 report, "seat_image", lambda: _save_seat_image(adapter, out_dir, slug)
             )
@@ -1722,7 +1748,7 @@ def capture_com_failure(
                 "capture": json.dumps(report, default=str, sort_keys=True),
             },
         )
-    raise exc_type(message)
+    raise exception if exception is not None else exc_type(message)
 
 
 def _describe_rows(rows: list[dict[str, Any]]) -> str:

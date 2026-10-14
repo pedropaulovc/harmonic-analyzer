@@ -7,6 +7,8 @@ import re
 from collections import Counter
 from pathlib import Path
 
+import pytest
+
 
 SCRIPTS = Path(__file__).parent
 FCF_HELPER = "add_feature_control_frame"
@@ -97,6 +99,88 @@ def _mapping_reference_keys(
     )
 
 
+def _require_part_band_profile(
+    tree: ast.Module, call: ast.Call, spec_tree: ast.Module, spec_module: str,
+) -> None:
+    """Allow a profile zone projected from a part's positive one-sided band."""
+    characteristic = _keyword(call, "characteristic")
+    assert isinstance(characteristic, ast.Constant)
+    assert characteristic.value == "profile_surface"
+    tolerance = _keyword(call, "tolerance")
+    seen: set[str] = set()
+    while isinstance(tolerance, ast.Name):
+        name = tolerance.id
+        assert name not in seen, "cyclic profile tolerance assignment"
+        seen.add(name)
+        definitions = [
+            node.value for node in tree.body
+            if (
+                isinstance(node, ast.Assign)
+                and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id == name
+            ) or (
+                isinstance(node, ast.AnnAssign)
+                and isinstance(node.target, ast.Name)
+                and node.target.id == name
+            )
+        ]
+        assert len(definitions) == 1, "profile tolerance needs one module assignment"
+        stores = [
+            node for node in ast.walk(tree)
+            if (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store) and node.id == name)
+            or (isinstance(node, ast.arg) and node.arg == name)
+        ]
+        assert len(stores) == 1, "profile tolerance assignment is shadowed"
+        tolerance = definitions[0]
+    assert isinstance(tolerance, ast.JoinedStr) and len(tolerance.values) == 1
+    formatted = tolerance.values[0]
+    assert isinstance(formatted, ast.FormattedValue) and formatted.conversion == -1
+    assert isinstance(formatted.format_spec, ast.JoinedStr)
+    assert len(formatted.format_spec.values) == 1
+    format_value = formatted.format_spec.values[0]
+    assert isinstance(format_value, ast.Constant) and format_value.value == "g"
+    band = formatted.value
+    assert isinstance(band, ast.Subscript) and isinstance(band.value, ast.Name)
+    assert isinstance(band.slice, ast.Constant) and type(band.slice.value) is int
+    assert band.slice.value == 0, "profile total zone must use the upper endpoint"
+    local_name = band.value.id
+    imports = [
+        (node, alias) for node in tree.body if isinstance(node, ast.ImportFrom)
+        for alias in node.names if (alias.asname or alias.name) == local_name
+    ]
+    assert len(imports) == 1, "profile band needs one direct part-spec import"
+    imported, alias = imports[0]
+    assert imported.level == 0 and imported.module == spec_module
+    assert alias.name.endswith("_BAND")
+    assert not any(
+        (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store) and node.id == local_name)
+        or (isinstance(node, ast.arg) and node.arg == local_name)
+        for node in ast.walk(tree)
+    ), "part band import is shadowed"
+    definitions = [
+        node.value for node in spec_tree.body
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == alias.name
+        ) or (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == alias.name
+        )
+    ]
+    assert len(definitions) == 1
+    value = definitions[0]
+    assert isinstance(value, ast.Tuple) and len(value.elts) == 2
+    assert all(isinstance(endpoint, ast.Constant) for endpoint in value.elts)
+    upper, lower = (endpoint.value for endpoint in value.elts)
+    assert type(upper) in (int, float) and type(lower) in (int, float)
+    assert upper > 0 and lower == 0
+
+
+
 def test_all_drawing_fcf_values_come_from_part_specs() -> None:
     projected = 0
     for drawing in sorted(SCRIPTS.glob("draw_*.py")):
@@ -112,18 +196,21 @@ def test_all_drawing_fcf_values_come_from_part_specs() -> None:
         assert all(re.fullmatch(r"\d+(?:\.\d+)?", value) for value in mapping.values())
         assert all(float(value) > 0.0 for value in mapping.values())
         loop_bindings = _loop_string_bindings(tree)
+        spec_tree = ast.parse(spec_path.read_text(encoding="utf-8"))
 
         for call in calls:
             tolerance = _keyword(call, "tolerance")
-            assert isinstance(tolerance, ast.Subscript), (
-                f"{drawing}:{call.lineno}: FCF tolerance is drawing-owned"
-            )
-            assert isinstance(tolerance.value, ast.Name)
-            assert tolerance.value.id == TOLERANCE_MAPPING
-            assert all(
-                key in mapping
-                for key in _mapping_reference_keys(tolerance, loop_bindings)
-            )
+            if (
+                isinstance(tolerance, ast.Subscript)
+                and isinstance(tolerance.value, ast.Name)
+                and tolerance.value.id == TOLERANCE_MAPPING
+            ):
+                assert all(
+                    key in mapping
+                    for key in _mapping_reference_keys(tolerance, loop_bindings)
+                )
+            else:
+                _require_part_band_profile(tree, call, spec_tree, spec_path.stem)
             projected += 1
 
         references: list[str] = []
@@ -141,6 +228,58 @@ def test_all_drawing_fcf_values_come_from_part_specs() -> None:
         )
 
     assert projected > 0
+
+
+@pytest.mark.parametrize("assignment", [
+    "ZONE = f'{HEIGHT_BAND[0]:g}'",
+    "BASE = f'{HEIGHT_BAND[0]:g}'\nZONE = BASE",
+    "BASE: str = f'{HEIGHT_BAND[0]:g}'\nZONE: str = BASE",
+])
+def test_profile_zone_accepts_only_part_band_projection(assignment: str) -> None:
+    tree = ast.parse(
+        "from sample_spec import HEIGHT_BAND\n" + assignment
+        + "\nadd_feature_control_frame(characteristic='profile_surface', tolerance=ZONE)"
+    )
+    _require_part_band_profile(
+        tree, _fcf_calls(tree)[0], ast.parse("HEIGHT_BAND = (0.5, 0.0)"), "sample_spec",
+    )
+
+
+@pytest.mark.parametrize(("source", "spec"), [
+    ("ZONE = '0.5'", "HEIGHT_BAND = (0.5, 0.0)"),
+    ("ZONE = f'{0.5:g}'", "HEIGHT_BAND = (0.5, 0.0)"),
+    ("HEIGHT_BAND = (0.5, 0.0)\nZONE = f'{HEIGHT_BAND[0]:g}'", "HEIGHT_BAND = (0.5, 0.0)"),
+    ("from notes import HEIGHT_BAND\nZONE = f'{HEIGHT_BAND[0]:g}'", "HEIGHT_BAND = (0.5, 0.0)"),
+    ("from sample_spec import HEIGHT_BAND\nZONE = f'{HEIGHT_BAND[1]:g}'", "HEIGHT_BAND = (0.5, 0.0)"),
+    ("from sample_spec import HEIGHT_BAND\nZONE = f'{HEIGHT_BAND[0]:.1f}'", "HEIGHT_BAND = (0.5, 0.0)"),
+    ("from sample_spec import HEIGHT_BAND\nZONE = f'zone {HEIGHT_BAND[0]:g}'", "HEIGHT_BAND = (0.5, 0.0)"),
+    ("from sample_spec import HEIGHT_BAND\nZONE = f'{HEIGHT_BAND[0]:g}'", ""),
+    ("from sample_spec import HEIGHT_BAND\nZONE = f'{HEIGHT_BAND[0]:g}'", "HEIGHT_BAND = (0.5, -0.1)"),
+    ("from sample_spec import HEIGHT_BAND\nZONE = f'{HEIGHT_BAND[0]:g}'", "HEIGHT_BAND = (0.0, 0.0)"),
+    ("from sample_spec import HEIGHT_BAND\nZONE = f'{HEIGHT_BAND[0]:g}'", "HEIGHT_BAND = OTHER"),
+    ("from sample_spec import HEIGHT_BAND\nZONE = f'{HEIGHT_BAND[0]:g}'\nZONE = '0.5'", "HEIGHT_BAND = (0.5, 0.0)"),
+    ("from sample_spec import HEIGHT_BAND\nZONE = f'{HEIGHT_BAND[0]:g}'\ndef local(HEIGHT_BAND): pass", "HEIGHT_BAND = (0.5, 0.0)"),
+    ("ZONE = OTHER\nOTHER = ZONE", "HEIGHT_BAND = (0.5, 0.0)"),
+])
+def test_profile_zone_rejects_unproven_or_invalid_band_sources(source: str, spec: str) -> None:
+    tree = ast.parse(
+        source + "\nadd_feature_control_frame(characteristic='profile_surface', tolerance=ZONE)"
+    )
+    with pytest.raises(AssertionError):
+        _require_part_band_profile(tree, _fcf_calls(tree)[0], ast.parse(spec), "sample_spec")
+
+
+@pytest.mark.parametrize("characteristic", ["position", "profile_line", "flatness"])
+def test_part_band_projection_cannot_supply_other_characteristics(characteristic: str) -> None:
+    tree = ast.parse(
+        "from sample_spec import HEIGHT_BAND\nZONE = f'{HEIGHT_BAND[0]:g}'\n"
+        f"add_feature_control_frame(characteristic={characteristic!r}, tolerance=ZONE)"
+    )
+    with pytest.raises(AssertionError):
+        _require_part_band_profile(
+            tree, _fcf_calls(tree)[0], ast.parse("HEIGHT_BAND = (0.5, 0.0)"), "sample_spec",
+        )
+
 
 
 def test_within_limits_are_not_literal_drawing_values() -> None:

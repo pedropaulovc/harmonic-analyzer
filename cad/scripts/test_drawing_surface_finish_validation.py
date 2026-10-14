@@ -596,6 +596,11 @@ def _translated_frame(
     *,
     accepts: Any = lambda _xml: True,
     reads_back: Any = _unescaped,
+    characteristic: str = "position",
+    tolerance: str = "0.05",
+    translated: tuple[str, ...] = ("B",),
+    outside_disposition: str | None = None,
+    migrated: bool = False,
 ) -> tuple[Any, list[str]]:
     """add_feature_control_frame on a fake seat for the slot frame C|B▷.
 
@@ -635,11 +640,31 @@ def _translated_frame(
             return _DisplayData(prints(frame.xml))
 
     class _Gtol:
+        converted = not migrated
+
+        def SetFrameSymbols2(self, *_args: Any) -> None:
+            pass
+
+        def SetFrameValues2(
+            self, _index: int, value: str, _second: str, *datums: str
+        ) -> bool:
+            frame.xml = gtol_frame_xml(
+                characteristic, value, datums=tuple(d for d in datums if d)
+            )
+            return True
+
+        def CanConvertFormat(self) -> bool:
+            return True
+
+        def ConvertFormat(self) -> int:
+            self.converted = True
+            return 0
+
         def GetFrameCount(self) -> int:
             return 1
 
-        def GetFrame(self, _index: int) -> _XmlFrame:
-            return frame
+        def GetFrame(self, _index: int) -> _XmlFrame | None:
+            return frame if self.converted else None
 
         def GetFormat(self) -> int:
             return 2
@@ -664,8 +689,9 @@ def _translated_frame(
     monkeypatch.setattr(_drawing_gdt, "_assert_attached_to", lambda *_, **__: None)
     _drawing_gdt.add_feature_control_frame(
         type("_Adapter", (), {"currentModel": _Draw()})(), None,
-        edge_xy=(0.1, 0.2), frame_xy=(0.078, 0.218), characteristic="position",
-        tolerance="0.05", datums=("C", "B"), translated=("B",),
+        edge_xy=(0.1, 0.2), frame_xy=(0.078, 0.218), characteristic=characteristic,
+        tolerance=tolerance, datums=("C", "B"), translated=translated,
+        outside_disposition=outside_disposition,
         label="knife-hanger rear dowel slot position",
     )
     return gtol, handed
@@ -715,6 +741,68 @@ def test_translated_frame_fails_closed_unless_it_prints_the_glyph_alone(
     with pytest.raises(RuntimeError, match=match):
         _translated_frame(
             monkeypatch, lambda _xml: prints, accepts=accepts, reads_back=reads_back
+        )
+
+
+
+@pytest.mark.parametrize("migrated", (False, True))
+@pytest.mark.parametrize("outside", (None, "0", "0.5"))
+def test_profile_frame_applies_native_u_including_after_migration(
+    monkeypatch, migrated: bool, outside: str | None
+) -> None:
+    gtol, handed = _translated_frame(
+        monkeypatch, lambda _xml: [], characteristic="profile_surface",
+        tolerance="0.5", translated=(), outside_disposition=outside,
+        migrated=migrated,
+    )
+    expected = gtol_frame_xml(
+        "profile_surface", "0.5", datums=("C", "B"), outside_disposition=outside
+    )
+    assert handed == ([] if migrated and outside is None else [expected])
+    assert _drawing_gdt._gtol_frame_persisted(gtol.GetFrame(1).GetSymbolXml(), expected)
+
+
+@pytest.mark.parametrize("migrated", (False, True))
+@pytest.mark.parametrize("outside", ("0", "0.5"))
+@pytest.mark.parametrize("corruption", ("lost", "changed", "duplicate", "invalid"))
+def test_profile_frame_fails_closed_when_u_readback_changes(
+    monkeypatch, migrated: bool, outside: str, corruption: str
+) -> None:
+    node = f"<OutsideDisposition>{outside}</OutsideDisposition>"
+
+    def readback(xml: str) -> str:
+        replacement = {
+            "lost": "",
+            "changed": "<OutsideDisposition>0.25</OutsideDisposition>",
+            "duplicate": node + node,
+            "invalid": "<OutsideDisposition>NaN</OutsideDisposition>",
+        }[corruption]
+        return xml.replace(node, replacement)
+
+    with pytest.raises(RuntimeError, match="feature-control frame did not persist"):
+        _translated_frame(
+            monkeypatch, lambda _xml: [], characteristic="profile_surface",
+            tolerance="0.5", translated=(), outside_disposition=outside,
+            migrated=migrated, reads_back=readback,
+        )
+
+
+@pytest.mark.parametrize("migrated", (False, True))
+@pytest.mark.parametrize("outside", ("0", "0.5"))
+def test_profile_frame_checks_native_xml_rejection(monkeypatch, migrated, outside) -> None:
+    with pytest.raises(RuntimeError, match="rejected feature-control frame XML"):
+        _translated_frame(
+            monkeypatch, lambda _xml: [], characteristic="profile_surface",
+            tolerance="0.5", translated=(), outside_disposition=outside,
+            migrated=migrated, accepts=lambda _xml: False,
+        )
+
+
+def test_profile_modifier_is_validated_before_native_side_effects() -> None:
+    with pytest.raises(ValueError, match="non-diametral profile"):
+        _drawing_gdt.add_feature_control_frame(
+            None, None, frame_xy=(0.1, 0.2), characteristic="position",
+            tolerance="0.5", outside_disposition="0", label="invalid profile",
         )
 
 

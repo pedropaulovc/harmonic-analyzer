@@ -61,11 +61,182 @@ Exit 1 means findings. The dump lists, per sheet: size, inner border from
 `ISheet::GetZoneMargin`, the title-block keep-out, every view's outline / scale /
 display mode, and every annotation's text box, `GetPosition`, and line segments.
 
+## REPORT findings versus per-drawing enforcement
+
+The canonical policy is
+[`_layout_audit.py`](../scripts/_layout_audit.py): `severity()` classifies a
+finding with `GATING_KINDS`; `enforced(mode, gating, *, stem)` decides whether
+it refuses the leaf. These are **different decisions**. `GATE` enforces every
+gating finding. `REPORT` still records all findings, but refuses only kinds in
+`ENFORCED_KINDS` or `STEM_ENFORCED_KINDS[stem]`.
+[`_drawing_layout_audit.run_layout_audit`](../scripts/_drawing_layout_audit.py)
+writes the report before refusing those selected findings.
+[`finalize_drawing`](../scripts/_drawing_common.py) normally uses `REPORT`;
+a successful export is therefore not evidence of zero gating findings.
+
+Use the artifact stem from
+[`_drawing_registry.py`](../scripts/_drawing_registry.py), not the recipe's
+underscored name, for per-drawing enforcement (`ch-rocker-arm`, not
+`ch_rocker_arm`). Add the kinds to the existing immutable mapping's **dict
+literal**, only after a native build and printed-sheet inspection demonstrate
+zero real findings in those classes. Do not switch the whole fleet to `GATE`,
+demote a genuine collision, loosen thresholds, or add a runtime allowance to
+get one drawing through.
+
+### Rocker R19 regression and local placement contract
+
+R19 at `81ac56b26598b63c0c9a11a467208ac4176ce646`, farm run
+`20261013T051541021Z-0456b55b4ef7424793cb5fdafaf10c41`, exported successfully
+with 18 gating records. At that point the rocker had no per-stem entry, and
+none of those records' kinds was globally enforced in `REPORT`. The four
+visible collision pairs were **already detected**, not missing audit coverage.
+The twelve real records, numbered in R19 gating order, are:
+
+| R19 records | Existing gating kind | Actual native/printed defect |
+| --- | --- | --- |
+| 1, 2, 3 | `text-clearance` | B against PIN AXIS; E inside #47 DRILL; HubLength value/stack against the drill's lower row |
+| 4, 5 | `text-on-line` | B's box line through PIN AXIS; PIN AXIS shoulder through B |
+| 8, 9 | `extension-through-own-text` | HubLength witnesses through its own value/stack; angular witness through TO MIRROR PLANE |
+| 10 | `dim-line-through-own-text` | The native angular arc through TO MIRROR PLANE |
+| 11, 12 | `arrow-near-text` | Taper arrow 1.6205 mm from R816; HubLength outside-arrow tail 1.7251 mm from the drill row (2 mm rule) |
+| 17, 18 | `duplicate-annotation` | Identical front-view centre-mark pairs at (178.1134, 169.9608) and (246.2447, 175.4982) mm |
+
+[`test_layout_audit.py`](../scripts/test_layout_audit.py) keeps a compact
+`_rocker_r19_dump()` extracted from the actual report's `sheets[0]`: native
+display coordinates, circle-label data, duplicate anchors and actual PDF text
+spans, in **sheet metres**. It calls the existing `audit_dump` and own-text
+finder with their unchanged thresholds. `ROCKER_R19_REAL_RECORDS` identifies
+all twelve; `_rocker_r19_real_findings()` is the replay interface for a separate
+per-stem refusal test after R20 native acceptance. The unified audit keeps
+one finding per `(kind, a, b)`; the own-text finder also stops at the first
+striking line per row. Isolating each recorded native HubLength witness proves
+both the left witness through 7.056 and the right witness through the stack
+without inventing a new drawing or claiming an R20 render.
+
+The six other R19 gating records were classified from native/PDF/PNG evidence,
+**not demoted**: 6/7 are padded-outline `text-on-view` phantoms above detail D;
+13 is the printed U inside native `<CL-U>` that the text claim key misses;
+14–16 are printed 0.18 mm model edges the classifier expects at 0.25 mm.
+Their shared collector/claim/edge-classification follow-up is
+[#1419](https://github.com/pedropaulovc/harmonic-analyzer/issues/1419#issuecomment-6139402807).
+Keep those classes outside this rocker's six-class cutover; do not hide their
+reports or weaken a real predicate. `report_sheet()` strips PDF strokes to a
+count: a stroke-less replay cannot prove model-edge absence or repair an
+outline phantom. Use the actual cached PDF with
+[`diagnostics/layout_calibration.py`](../scripts/diagnostics/layout_calibration.py)
+`--pdf-dir` for that evidence, not fabricated strokes.
+
+R20 placement changes belong in the rocker recipe, not the shared audit:
+move B's complete symbol/box/leader clear of PIN AXIS and its shoulder while
+keeping the attachment on its actual broad face; move E's letter clear of both
+drill rows; place the **whole** HubLength value/stack to the left, outside both
+witnesses and clear of the drill and arrow tail. A rightward move is not a
+clearance proof: an above-callout row can reflow the lower tolerance into E's
+full circle. R23's numeric angular BASIC box still crossed its witness and
+arc. Pedro's superseding R27 ruling removes that angular dimension entirely:
+Manufacturing Note 1 carries **AT 10.46° BASIC TO DATUM C**, and note 5 refers
+to that datum-defined mirror plane. Do not replace the removed dimension
+with another offset, seed or route mechanism. Retain R23's R800/R816 positions;
+their C1/C2 clarity findings remain open. Remove automatic
+centre-mark reinsertion on front/D/E while strictly retaining the native
+2/1/1 **printed** centre-mark census, rather than counting every allocated
+annotation or merely deleting the observed front pair.
+An isolated translated box is only an offline predicate control, never native
+after-fix proof. Detail D uses the existing non-feature `NoOutline` convention;
+do not alter its circular crop geometry. Its outline-style flags are
+conditional on `NoOutline`, while E retains its full-outline display checks.
+Preserve all model/spec/nominal/tolerance values, view centres and scales,
+physical A/C datum checks, E at Y110, 3 mm fatal caption air and 4 mm target,
+the strict 3.5 mm Manufacturing Notes source font, and the shared persisted
+profile/crop guards (including signed four-edge F5 deltas and exact zero-slack
+crop containment). Only after the current native sheet shows zero does the
+parent add the six real classes above to `STEM_ENFORCED_KINDS["ch-rocker-arm"]`.
+
+R21 at `3d771e59d3d2e5afc42763ff6e056693ff06da3e`, run
+`20261013T095135303Z-94e3c17bba524633997e55a0bf8a0cef`, passed the corrected
+width owner and D's `NoOutline`/persisted-crop checks on SP4, then refused
+because detail D had two type-13 annotations rather than one. R19's native
+records explain why: D's template `DetailItem352` has eight printed lines,
+whereas `DetailItem354` has readable empty display data and an anchor at
+(708.6834, 127.0803) mm, outside its crop. E similarly retains printed
+`DetailItem358` and off-crop, empty `DetailItem356`. These are native cropped-out
+ghosts, not missing holes or ink that should be deleted.
+
+Classify every centre-mark annotation exactly once and log its native id,
+position and line count. `PRINTED` requires non-empty display with every
+primitive inside the persisted crop, subject only to the display encoding
+precision below; only these count toward 2/1/1. `GHOST` requires **both** empty
+display and an anchor outside the crop, with no anchor tolerance. Empty inside,
+non-empty primitives beyond encoding precision, unreadable data or
+malformed/truncated arrays must refuse, not become zero ink. Account for the
+entire annotation array with non-centre marks plus printed/ghost buckets, and
+preserve the exact printed
+counts. Ghosts remain untouched: deleting an invisible object adds native
+risk without improving the sheet. The R19 dump rounds coordinates to 0.1 um;
+replay fixtures must state that quantization rather than silently adding
+runtime crop padding.
+
+R22 at `db94ffe29a8878fe6aab46181b0f66fa483cf393`, run
+`20261013T111844759Z-1c357921c6af4a77806cd9dc0d20a5bf`, confirmed the ghost
+bucket but refused a printed D arm by 0.8702278898 nm. Its native endpoint
+`0.15309999912977218` m is exactly `0.18 - float32(0.0269)`, while the persisted
+double-precision crop starts at `0.15310000000000007` m. The display arrays
+carry single-precision local offsets: a sub-ULP overrun is encoding, not ink,
+and this arm is clipped at the crop circle by construction. Main ruled that
+each **display primitive versus persisted crop** coordinate comparison gets
+one derived float32 ULP at the magnitude of its larger operand:
+`float64(spacing(float32(max(abs(a), abs(b)))))`, or an equivalent IEEE-754
+calculation. Log the per-row tolerances and overruns. This is not a fixed
+epsilon, rounding of native rows, crop expansion or a global audit allowance.
+Two-ULP and 1 um overruns still refuse; ghost, inside-empty and malformed-data
+rules are unchanged. The shared exact-zero **crop versus outline** containment
+and independent 50 um F5 equation remain unchanged (double versus double).
+
+R24's remaining repairs are local to the rocker recipe. The rod-hole position
+frame retains its circular-edge attachment, but uses a short right-sided bent
+leader with a filled-dot arrowhead on the south rim where the printed
+centre-mark arm passes through it. Read back the leader side/style, disabled
+smart-arrow state, dot style in both annotation and display data, complete
+leader points, attached-entity identity and unchanged frame XML after redraw.
+The actual route must miss the taper; a success status alone is not evidence.
+Do not use `SetLeaderAttachmentPointAtIndex` on the frame.
+
+R800 retains R23's native-proven **145/136 mm** text position and its
+complete-circle exterior guard. The inside-circle attempt recorded by
+`a8dcea067` drew a roughly 355 mm off-sheet centre tail and a 6.3 mm outside
+arrow extension onto the strap, despite the expected radial leader flags.
+The proposed 130/190 mm position shares that unproven mechanism; a fabricated
+tail-free fixture does not establish native behaviour. C1's finite-top-arc
+landing clarity therefore remains open, rather than claiming an off-part
+leader proof. R816 also retains R23's native-proven **169/128 mm** position and
+complete-circle exterior guard; C1/C2 stay open for the current blind review.
+The 5.59 land dimension retains both real corner attachments and the unchanged
+E crop, with both actual native witnesses visible. A standard extension-line
+gap is not a missing attachment: validate the authoritative native gap and
+the outward, collinear witness start from each projected corner, its arrow
+connection and positive visible portion inside the crop. R24 on SP4 returned
+True from `SetWitnessLineGap(index, False, 0.0)` but then read
+`(True, True, 0.001)` after rebuild; the requested zero override did not persist.
+Zero itself is not the readability requirement. Do not change the document-wide
+gap or ignore that readback. R25's actual native geometry at the 1 mm effective
+gap passed both witness routes, with upper/lower crop-visible portions
+2.016936/7.715339 mm. Readability still needs the rendered-sheet review.
+The parent taper witness must miss E's source circle without changing its value
+or endpoints. Note 2 states
+explicitly that the top basic is **ABOVE A** and the common arc centre is
+above A. The approved B2-1 reference clarification defines the mirror plane
+through datum axis A, perpendicular to datum B and at the source-derived
+10.46° BASIC angle to datum C; note 5 refers to that datum-defined plane.
+The familiar pin coordinates and arc basics remain unchanged and are thereby
+chained to A|B|C. None of these presentation/reference controls changes a
+datum feature, geometry, zone or manufacturing tolerance.
+
+
 ## What is readable from the API (stop guessing)
 
 | Question | API | Evidence |
 | --- | --- | --- |
-| A view's sheet box, metres | `IView::GetOutline` -> `[xmin, ymin, xmax, ymax]` | `types/IView/GetOutline.md` |
+| A view's native extent, metres (not a detail's bare circular crop) | `IView::GetOutline` -> `[xmin, ymin, xmax, ymax]` | `types/IView/GetOutline.md` |
 | An annotation's sheet origin, and WHICH corner that is | `IAnnotation::GetPosition` | `types/IAnnotation/GetPosition.md` (note = upper-left of text box; display dimension = leader attachment / centre of text box's bottom border; GD&T = upper-left; surface finish = lower-left; table = per `ITableAnnotation::AnchorType`) |
 | A note's EXACT box | `INote::GetExtent` -> 6 doubles, lower-left then upper-right, sheet space | `types/INote/GetExtent.md` |
 | Real rendered lines (dimension line, witness lines, leader) | `IAnnotation::GetDisplayData` -> `IDisplayData::GetLineCount` / `GetLineAtIndex3` -> `[color, lineType, lineStyle, lineWeight, startPt[3], endPt[3]]` | `types/IAnnotation/GetDisplayData.md`, `types/IDisplayData/GetLineAtIndex3.md` |
@@ -108,6 +279,45 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   declares (the late-binding fallback was deliberately removed). `GetViews` is
   `IDrawingDoc`; `GetAnnotations`/`GetOutline` are `IView`; `GetExtent` is
   `INote`; `GetProperties2` is `ISheet`. Bind the owning interface at each hop.
+  The registered [`test_drawing_layout_check.py`](../scripts/test_drawing_layout_check.py)
+  contracts use explicit producer owners and closed interface member surfaces,
+  never identity-cast fallbacks. Notes, annotations and text formats stay separate;
+  a sketch profile may support both segment and arc QI, but each binding exposes
+  only its own methods. Wrong-owner returns injected into the actual note factory,
+  crop and collector routes must refuse before borrowing a member. Keep native
+  properties as values (`IView.Type` is get-only), and math points separate from
+  transforms despite their shared `ArrayData` name. These offline contracts do
+  not establish native transform frames, rendered geometry or print acceptance.
+- **An annotation array still contains opaque dispatches.** Bind the view to
+  `IView`, call `GetAnnotationCount()` **before** `GetAnnotations()` as the
+  official remarks require, and match the actual nonnegative integer count to
+  the returned tuple/list length. Null is legitimate only for count zero,
+  including a deliberately undimensioned isometric. Bind every nonnull item to
+  `IAnnotation` before passing it to a best-effort dimension-name helper.
+  Otherwise a failed `GetSpecificAnnotation` can be
+  swallowed into an empty name and a valid drawing appears to have no marked
+  dimensions. The rocker R17 native census reported `front=[]` after successful
+  import/curation and caption seating; the binding explanation is an inference,
+  not a logged native exception. Keep exact per-view ownership, duplicate and
+  global-union checks, and log both annotation count and resolved marked names.
+  An unnamed actual display dimension is not permission to omit it: read
+  `GetType()` as an actual `swAnnotationType_e` integer, then bind its nonnull
+  specific object to `IDisplayDimension`. A nonnull `GetDimension2(0)` with an
+  unreadable name is fatal. Null underlying model data may be skipped only with
+  an actual `IsHoleCallout() == True`; null alone is not a documented hole-callout
+  identity. Preserve original native/binding exceptions.
+- **Sweep past the last failed native guard before another farm round.**
+  Check every remaining collection/count/primitive shape, unit and null policy
+  through save, PDF and PNG. A present truncated row is not an empty primitive
+  set, and a nonempty view whose text is entirely skipped is not a clearance
+  proof. Do not apply a raster-pixel tolerance to exact format metadata, or use
+  exact metadata tolerances for a measured quantized extent. Capture late
+  audit/finalize refusals while the native seat remains open, with phase and
+  original exception; secondary forensic or telemetry failures must never
+  replace that refusal. Shared collector/primitive omission paths discovered
+  in this sweep are tracked separately in
+  [#1419](https://github.com/pedropaulovc/harmonic-analyzer/issues/1419), because
+  changing shared behavior needs full-farm sheet-diff/rule-#1362 coverage.
 - **Properties are not methods.** `IView::Name`, `Type`, `ScaleRatio`,
   `Position`, `Sheet`, `ModelToViewTransform`; `IAnnotation::OwnerType`,
   `Visible`, `Layer`; `ITableAnnotation::RowCount`/`ColumnCount`;
@@ -155,6 +365,97 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   1.59 and 1.89 px high (2026-10-01; run 20261010T073339590Z). Bring a ring
   inside the zoomed window (place it at fit first) before reading the
   anchor-to-ring offset zoomed.
+- **Generated native caption separators inherit document font sources.**
+  The rocker R15 native failure (artifact 3130) retained a standalone space
+  between `SCALE` and its ratio at **0.00635 m**, despite the documented
+  annotation rich-text reset and a successful local 3.5 mm write. Its existing
+  Manufacturing Notes displayed uniformly at **0.0035 m in Century Gothic**;
+  `GetTextFormat(0)` agreed, with `GetUseDocTextFormat(0) == True` and
+  `IsHeightSpecifiedInPts() == False`. A local caption-format write therefore
+  does not prove that generated separators changed.
+  [`IAnnotation.GetTextFormat`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IAnnotation~GetTextFormat.html)
+  also warns that its format may not represent embedded rich text.
+
+  Source the height and face from **every** uniform, positive native
+  [`IDisplayData.GetTextHeightAtIndex`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IDisplayData~GetTextHeightAtIndex.html)
+  and `GetTextFontAtIndex` fragment of the existing Manufacturing Notes.
+  Only then obtain its actual `ITextFormat`, require matching metre height,
+  face, and native height authority, and pass that **unmodified format** to
+  the drawing's
+  [`IModelDocExtension.SetUserPreferenceTextFormat`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IModelDocExtension~SetUserPreferenceTextFormat.html).
+  Create and seat that same linked source note at its existing coordinates
+  after the front/property view exists, and pin the inherited defaults
+  **before creating D/E's native detail views and circles**. Existing generated
+  runs are not documented to re-read changed defaults; do not rely on a late
+  font write to repair them.
+
+  The official **Document Properties > Views** table scopes
+  `swDetailingViewTextFormat` **18** to `swDetailingNoOptionSpecified` **0**.
+  **Document Properties > Views > Detail** scopes
+  `swDetailingDetailTextFormat` **3** and
+  `swDetailingDetailView_Name/Label/Scale/DelimiterTextFormat` **42/43/44/45**
+  to `swDetailingDetailView` **301**. Pin and read back exactly those six
+  `(preference, option)` pairs. Do not substitute option 0 for detail-specific
+  slots or use legacy `swDetailingDetailLabelTextFormat` 9, whose document
+  scope is not documented. Numeric values come from installed SW2026 Interop
+  enum literal metadata (34.4.0.78), not a claim about an exact worker seat.
+
+  Each setter must return actual `True`; immediately obtain a fresh
+  [`IModelDocExtension.GetUserPreferenceTextFormat`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IModelDocExtension~GetUserPreferenceTextFormat.html)
+  and check its height, face, and `IsHeightSpecifiedInPts()` authority.
+  Repeat readbacks after rebuild/redraw and after creation/normalization.
+  Document formats do not expose annotation `useDoc` authority; do not invent
+  that boolean. The audited generated SW2026 bindings make `Extension` a
+  read-only dispatch property and Get/Set methods (DISPID 166/167), with
+  `(I4, I4)` and `(I4, I4, DISPATCH)` inputs and no out parameters; the setter
+  returns BOOL. No application/seat-global preference is changed.
+
+  Require the resulting native caption's actual `GetUseDocTextFormat(0)` to
+  be `True`, `HasMultipleFonts` to be `False`, and **every native fragment**
+  (including blank spaces) to match the source height and face. Preserve the
+  complete linked string, `<VLNAME>/<VLLABEL>/<VLSCALE>/<VLSCALEV>` identities,
+  order and counts, resolved native glyphs, caption identity, native view
+  ownership, scales, and view/caption positions. `INote.GetText` returning
+  spaces is not resolved glyph proof. Source note format/content/position
+  must remain unchanged; never replace it with a fixed size or app default.
+  Parent-circle letters retain their existing local
+  [`IDetailCircle.SetTextFormat`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IDetailCircle~SetTextFormat.html)
+  normalization and independent `GetDetailCircleInfo2` height readback after
+  both writes, with native label/position/ownership guards. Uniform caption
+  inheritance, especially the generated separator, still requires farm
+  proof; passing preference readbacks alone is not success. Retain later
+  whole-string stability and fatal clearance guards, and capture refusals
+  before closing the seat. The rocker keeps E at Y110, the fatal 3 mm air
+  requirement, and its 4 mm caption target.
+
+- **Native detail-circle arrays describe allocation, not just used records.**
+  The rocker R16 farm run `20261012T230027778Z-c441f84fade64106b64bfe9537883c2b`
+  at `556f06825161ed9fde16f434d78da13638ea694f`
+  ([native evidence](https://github.com/pedropaulovc/harmonic-analyzer/pull/1354#issuecomment-6134936171))
+  verified both complete 3.5 mm Century Gothic captions with
+  `HasMultipleFonts == False` and both 3.5 mm source-circle formats. Its only
+  refusal was the assumption that the parsed circle records must consume
+  the entire `GetDetailCircleInfo2` array: the native array contained **69
+  finite doubles**, with count 2, two complete 16-double zero-arrow records,
+  both displayed heights 0.0035 m, and **36 unused zero doubles**.
+
+  Read the authoritative
+  [`IView.GetDetailCircleCount2`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IView~GetDetailCircleCount2.html)
+  return/out pair `(count, Size)` and require an actual two-integer tuple:
+  count must be exactly 2 and `Size` must equal the complete info-array
+  length. The official
+  [Get Detail Circle Information VBA example](https://help.solidworks.com/2026/english/api/sldworksapi/Get_Detail_Circle_Information_Example_VB.htm)
+  asserts count equals `info[0]` and `Size == UBound(info) + 1`, then walks
+  only the declared circles/arrows; it does **not** assert the final record
+  index equals the allocated length. Follow that count-driven traversal,
+  rejecting every nonnumeric/nonfinite value, incomplete 16-double circle
+  header, nonintegral/negative arrow count, and incomplete nine-double arrow
+  record, including the last circle's arrows, before using the shared decoder.
+  Accept unused declared allocation **only if every value is exactly zero**;
+  nonzero data, NaN, garbage, and undeclared appended zeros remain fatal.
+  Zero-filled unused allocation is observed R16 evidence, **not a documented
+  zero-padding guarantee** or an assumed fixed capacity. Keep the existing
+  1e-7 m displayed-height tolerance and original-exception forensic capture.
 
 ## Refusal catalogue — do / don't
 
@@ -181,6 +482,16 @@ dimension: `ArcExtensionLineOrOppositeSide` (radial only,
 `types/IDisplayDimension/DisplayAsLinear.md`), and `SetBrokenLeader2(UseDoc,
 Broken)` (`types/IDisplayDimension/SetBrokenLeader2.md`). Re-read the geometry
 from `GetDisplayData` afterwards; the render is not the evidence.
+
+The rocker's abandoned angular-offset attempt is not a reusable placement
+contract. R26's false-offset 109-degree seed did not determine its final
+connector: offset restored the old stubs and landed at 105.690091123 degrees,
+inside its own arrowhead. Its boxed BASIC carrier also overhung the lower
+border, unlike the native thumbnut's unboxed carrier. Pedro's R27 ruling
+removes the rocker angular dimension and its dedicated offset/seed/route
+guards instead of adding another layout mechanism. The source-derived
+10.46° BASIC remains in Manufacturing Note 1; no datum, geometry or tolerance
+changes accompany that presentation-only removal.
 
 **b. `IView::SetDisplayMode4` refusing HLR on a native detail view.**
 Don't: read `False` as "detail views can't do HLR". Two causes, both documented
@@ -372,22 +683,48 @@ away and `Position` reads 99 mm from where `SetViewPosition` later has to put
 it (cone_swing_platform detail B, leaf 20260928T075849Z-1-882b4704). A loop
 that "corrects" the projection moves a correct view off the sheet target and
 needs a second move to recover; on three #1105 leaves it never did.
-Do: place by the outline centre (`GetOutline` is the ink; `SetViewPosition`
-moves it by the delta from the `Position` it reads), then read the projection
-behind `IView::UpdateViewDisplayGeometry` before hanging anything on the
-view (`_drawing_detail_projection.settle_detail_projection`). Don't settle
-it with a count of `EditRebuild3` calls. Rebuilds, re-reads and idle time
-each catch the transform up only some of the time. Detail B's first read was
-stale in 41 of 41 leaves, and it was still stale after three rebuilds on 4 of
-them (#1336). With the barrier in front of every read, the cone-gear-shaft tip
-detail read current first time in 15 of 15 leaves, against 3 of 35 without
-it. On seat-probe leaf 20261013T052718Z-1-4b76316f, 20 throwaway details all
-read stale first and all 4 behind the barrier then read current. The same
-leaf's real detail B, settled the old way, stayed stale through three rebuilds
-and failed. The settle span records `reads`, `rebuilds`, `waited_s` and the
-unrefreshed control offset. If the barrier ever fails to refresh the transform,
-the span shows it as more than one read, inside a time budget.
-The same holds for a section after `IDrSection::SetReversedCutDirection`:
+The cone-swing workaround placed by the outline centre, then re-read the
+projection before hanging anything on the view. Do not generalize that
+centre: the profile fixture's outline was 5 mm off its physical bore centre.
+Refresh parent and detail with `UpdateViewDisplayGeometry` before reading
+their transforms or the one outline used for containment/classification.
+Use `_drawing_detail_projection.settle_detail_projection` for projection
+settling; don't settle it with a count of `EditRebuild3` calls. Rebuilds,
+re-reads and idle time each catch the transform up only some of the time.
+Detail B's first read was stale in 41 of 41 leaves, and it was still stale
+after three rebuilds on 4 of them (#1336). With the barrier in front of every
+read, the cone-gear-shaft tip detail read current first time in 15 of 15 leaves,
+against 3 of 35 without it. On seat-probe leaf 20261013T052718Z-1-4b76316f,
+20 throwaway details all read stale first and all 4 behind the barrier then
+read current. The same leaf's real detail B, settled the old way, stayed
+stale through three rebuilds and failed. The settle span records `reads`,
+`rebuilds`, `waited_s` and the unrefreshed control offset. If the barrier ever
+fails to refresh the transform, the span shows it as more than one read,
+inside a time budget.
+The historical swing log also shows a transient 38 x 40 mm outline becoming
+68.776 mm square around its 48 mm circle; even containment is unreliable if
+the outline is read before the display-geometry barrier.
+
+For shared layout collection, `_drawing_detail_crop.read_circular_detail_crop`
+uses the persisted complete sketch circle, its sketch inverse, and the
+parent/detail native transforms and scale ratios. `IView.Type == 3`
+(`swDrawingDetailView`) selects this path, not the generated view name.
+Missing, duplicate, invalid or non-contained crop data raises with the view
+name; it never falls back to `GetOutline` or disappears through an attempted
+read. The geometric crop box must be contained in the same refreshed native
+outline with **exactly zero slack**: equality is allowed, one ULP outside
+refuses, and no clipping or guessed padding is applied. Log both boxes.
+Only the view's occupied box changes. Keep its original outline for small
+note classification, and retain all annotation/table/title-block/leader
+objects, scopes and collision policies. Incidental coverage from a padded
+view box is not the annotation's contract; the native/PDF audit still reads
+those objects. Every other view kind retains its existing outline.
+The rocker additionally compares all four shared crop edges, in both
+directions, with its independent source-fence formula within the existing
+50 micrometres. That check must stay: synthetic math fixtures do not prove
+the new cross-view inverse step on a real seat. No new optional ownership,
+broken-view, depth-parallelism or outline-style probes are implied here.
+A section's projection can also lag after `IDrSection::SetReversedCutDirection`:
 the reversal stood thumbnut A-A rim-up, yet `SetViewPosition` on its
 creation target left the seat projected one nut length (48.3 mm at 3:1)
 above where a centred rim-up section puts it (run 20261001T142942518Z).

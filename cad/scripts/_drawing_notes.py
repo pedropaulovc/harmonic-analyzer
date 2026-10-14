@@ -46,7 +46,7 @@ def add_property_linked_note(
     if text_format is None:
         raise RuntimeError(f"linked drawing note {property_name!r} has no text format")
     text_format.CharHeight = float(char_height)
-    if not annotation.SetTextFormat(0, False, text_format):
+    if annotation.SetTextFormat(0, False, text_format) is not True:
         raise RuntimeError(
             f"failed to set linked drawing note {property_name!r} text height"
         )

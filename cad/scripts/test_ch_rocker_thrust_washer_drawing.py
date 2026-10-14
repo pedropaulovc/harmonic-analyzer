@@ -119,13 +119,23 @@ def test_title_block_material_prints_the_ruled_sheet() -> None:
 
 
 def test_od_is_the_hub_od_over_its_own_wall_floor() -> None:
-    """Main 2026-09-26: one O10.20 for hub and washer, each over its own
-    drawing-guidelines.md rule 17 (walls and webs) floor (bore max + 2 x 1.5 + the .XX band), computed in its spec."""
+    """Hub and washer retain O10.20 over their own rule-12 floors; the hub's
+    floor also includes coaxial eccentricity (PR #1354), unlike the washer's."""
     band = _config.title_block("linear_2pl")["value_in"] * 25.4
     assert ch_rocker_arm_spec.LINEAR_2PL == pytest.approx(band)
     assert spec.OD == ch_rocker_arm_spec.HUB_DIA
     assert spec.OD_MIN == pytest.approx(10.11)
-    assert ch_rocker_arm_spec.HUB_DIA_MIN == pytest.approx(10.04)
+    hub_required_od = (
+        ch_rocker_arm_spec.PIVOT_HOLE_DIA
+        + ch_rocker_arm_spec.PIVOT_HOLE_BAND[0]
+        + 2.0 * (
+            ch_rocker_arm_spec.RULE12_WALL_FLOOR
+            + ch_rocker_arm_spec.HUB_COAXIALITY_DIA / 2.0
+        )
+        + band
+    )
+    assert ch_rocker_arm_spec.HUB_DIA_MIN >= hub_required_od
+    assert ch_rocker_arm_spec.HUB_DIA_MIN == pytest.approx(10.14)
     wall = (spec.OD - band - (spec.BORE_DIA + spec.BORE_BAND[0])) / 2.0
     assert wall >= ch_rocker_arm_spec.RULE12_WALL_FLOOR
 

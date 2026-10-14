@@ -6,6 +6,7 @@ separately from imported model dimensions.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Literal
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -45,6 +46,10 @@ def add_edge_dimension(
     ``"vertical"`` force the X/Y component — required when a hole is located by
     coordinate components off a datum rather than a slant centre distance (a
     slant reads ambiguous for holes not collinear with their datum).
+
+    ``"angular"`` explicitly requests swAngularDimension through the documented
+    AddSpecificDimension API. Exact mixed edge/owned-centreline selections keep
+    their supplied selection points, so the caller can choose an on-sheet wedge.
 
     ``entities`` may identify either pick exactly; a ``None`` entry retains the
     corresponding coordinate pick. Explicit entities avoid ambiguous hit-test
@@ -106,12 +111,31 @@ def add_edge_dimension(
                     f"{label} {selected_type.lower()} {index} changed the "
                     f"selection count to {count}"
                 )
+            if orientation == "angular" and manager.SetSelectionPoint2(
+                index + 1, -1, x, y, 0.0
+            ) is not True:
+                raise RuntimeError(f"failed to set {label} angular selection point {index}")
     if orientation == "horizontal":
         dimension = draw.AddHorizontalDimension2(text_xy[0], text_xy[1], 0.0)
     elif orientation == "vertical":
         dimension = draw.AddVerticalDimension2(text_xy[0], text_xy[1], 0.0)
     elif orientation == "smart":
         dimension = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
+    elif orientation == "angular":
+        extension = _early_bound(draw.Extension, "IModelDocExtension")
+        dimension, status = extension.AddSpecificDimension(
+            text_xy[0], text_xy[1], 0.0, 3, 0  # swAngularDimension
+        )
+        if dimension is None or status != 0:
+            raise RuntimeError(f"failed to add {label} angular dimension ({status})")
+        model_dimension = _early_bound(
+            _early_bound(dimension, "IDisplayDimension").GetDimension2(0), "IDimension"
+        )
+        if model_dimension is None:
+            raise RuntimeError(f"failed to read {label} angular model dimension")
+        model_dimension.DrivenState = 1  # swDimensionDriven
+        if int(model_dimension.DrivenState) != 1:
+            raise RuntimeError(f"{label} angular dimension did not become driven")
     else:
         raise ValueError(f"unknown dimension orientation {orientation!r}")
     draw.ClearSelection2(True)
@@ -222,9 +246,15 @@ def assert_dimension_measures(
                 f"unmatched picks={unmatched}, extra attachments={len(attached)}, "
                 f"types={types}, dangling={dangling}"
             )
-    model_dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    measured_mm = abs(float(model_dimension.SystemValue)) * 1000.0
-    if abs(measured_mm - expected_mm) > tolerance_mm:
+    native_dimension = display.GetDimension2(0)
+    if native_dimension is None:
+        raise RuntimeError(f"{label} has no native model dimension")
+    model_dimension = _early_bound(native_dimension, "IDimension")
+    value = model_dimension.SystemValue
+    if value is None:
+        raise RuntimeError(f"{label} has no measured native value")
+    measured_mm = abs(float(value)) * 1000.0
+    if not math.isfinite(measured_mm) or abs(measured_mm - expected_mm) > tolerance_mm:
         raise RuntimeError(
             f"{label} measures {measured_mm:g} mm, expected {expected_mm:g} mm: "
             "a pick resolved to the wrong entity"

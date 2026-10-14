@@ -241,6 +241,7 @@ def _drawing_features(
     return result
 
 
+
 def _construction(module: ModuleType) -> tuple[str, list[str]]:
     permission = getattr(module, "BUILT_UP_PERMISSION_NOTE", None)
     if permission is None:

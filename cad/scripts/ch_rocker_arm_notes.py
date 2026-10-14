@@ -10,38 +10,34 @@ the offline drawing test.
 
 from __future__ import annotations
 
+import math
+
+from _printed_tolerance import printed_band_mm
 from ch_rocker_arm_spec import (
-    ARM_DEPTH,
-    BOT_ARC_LEN,
-    CENTER_Y,
-    PIVOT_MID_Y,
-    R_BOTTOM,
-    R_TOP,
-    STRAP_HUB_SYMMETRY,
-    TIP_FACE,
-    TOP_ARC_LEN,
+    HUB_COAXIALITY_DIA,
     HUB_DIA,
+    PIVOT_HOLE_BAND,
+    PIVOT_HOLE_DIA,
+    STRAP_HUB_SYMMETRY,
+    TOP_EDGE_ABOVE_PIVOT,
+    _ALPHA_TOP,
 )
 
-# The top edge's one-sided height over the pivot is a model dimension with
-# its band on the part (rocker_arm_spec.TOP_EDGE_BAND, drawing-simplicity-policy.md `How the repository implements the guidelines`), so no
-# note carries it. The hub is the other end of that chain: an OD off the bore
-# axis by e lifts its top e toward the cheeks, and nothing else relates the two features. A
-# plain note, not a frame (Main 2026-09-26); turning the hub and reaming the
-# bore in one setup meets it without measuring. Its radius comes off the
-# cheek-over-hub air in test_rocker_bank_layout.
-HUB_COAXIALITY_DIA = 0.50
+# Coaxiality is owned by the spec, including its eccentricity in the hub's OD
+# floor. The note controls the result without prescribing the machining setup.
+
 
 # True free-text instructions only; geometry / datum structure / roughness live
-# in native dimensions / datum tags / FCFs / surface symbols.  Hole sizes ride
-# their native callouts (Ø6.50 dim, Ø1.99 THRU ALL) -- the notes state process,
-# fit and count, never a second copy of a sheet dimension.  16.00 depth is a
-# REF: it is fixed by the concentric R800/R816 edges.
+# in native dimensions / datum tags / FCFs / surface symbols. Hole process,
+# size and through condition ride the native callouts; outline dimensions
+# define the ends. BASIC radii and top height feed the arc-system profile
+# frames directly.
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_rocker_arm marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "StrapProfile": {"TopRadius", "BottomRadius"},
+    "StrapProfile": {"TopRadius", "BottomRadius", "RodTipLen"},
     "PivotHoleProfile": {"PivotDia"},
+    "HubProfile": {"HubDia"},
     # #743 PR2: the hub length carries its +0.05/0 band natively; the 20-arm
     # stack acceptance (rocker_bank_layout) caps the sum.
     "Hub": {"HubLength"},
@@ -60,9 +56,25 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DEFAULT_DRAWING_PRECISION = 2
 DRAWING_PRECISION = {
     "Hub": {"HubLength": 3},
+    "HubProfile": {"HubDia": DEFAULT_DRAWING_PRECISION},
     "TopEdgeReference": {"TopAbovePivot": DEFAULT_DRAWING_PRECISION},
     "Strap": {"StrapThickness": 3},
 }
+
+# Judge the minimum wall against the metric band the shop actually reads,
+# not the underlying 0.508 mm inch class: title_block.yaml prints ±0.51.
+_HUB_WALL_WORST = (
+    round(HUB_DIA, DEFAULT_DRAWING_PRECISION)
+    - printed_band_mm(DEFAULT_DRAWING_PRECISION)
+    - (round(PIVOT_HOLE_DIA, DEFAULT_DRAWING_PRECISION) + PIVOT_HOLE_BAND[0])
+) / 2.0 - HUB_COAXIALITY_DIA / 2.0
+# Round DOWN at the sheet's normal precision; never overstate the minimum.
+HUB_WALL_MIN = (
+    math.floor(_HUB_WALL_WORST * 10**DEFAULT_DRAWING_PRECISION + 1e-9)
+    / 10**DEFAULT_DRAWING_PRECISION
+)
+# Named exception: MHA-CH-006 hub wall
+HUB_WALL_NOTE = f"MIN HUB WALL {HUB_WALL_MIN:.{DEFAULT_DRAWING_PRECISION}f}"
 
 # BUILT_UP_PERMISSION_NOTE may be supplied only as exact explicit permission
 # text in DRAWING_NOTES. None/absence means one_piece, never inferred permission.
@@ -70,33 +82,30 @@ BUILT_UP_PERMISSION_NOTE = None
 
 DRAWING_NOTES = "\n".join(
     (
-        # r743-3: the 21-line block rendered 0.76 over NOTES_CEILING; notes
-        # 1-2 say the same in two fewer lines (test_rocker_arm_drawing keeps a
-        # full line of headroom at the measured pitch).
-        "1. MIRROR-SYMMETRIC ABOUT THE PIVOT AXIS;",
+        # B2-1: the same CAD mirror plane is now reconstructible from A|B|C.
+        # This changes its note reference only, not the plane, geometry or zones.
+        "1. MIRROR PLANE: THROUGH DATUM AXIS A,",
+        "   PERPENDICULAR TO DATUM B, AT",
+        f"   {math.degrees(_ALPHA_TOP):.2f}° BASIC TO DATUM C.",
         "   ROD-PIN HOLE (1X) AT THE END SHOWN.",
-        "2. ALL HOLES THRU.",
-        f"3. TOP EDGE R{R_TOP:.{DEFAULT_DRAWING_PRECISION}f}, "
-        f"BOTTOM EDGE R{R_BOTTOM:.{DEFAULT_DRAWING_PRECISION}f},",
-        "   CONCENTRIC; COMMON CENTRE ON THE",
-        f"   MIRROR AXIS, {CENTER_Y - PIVOT_MID_Y:.{DEFAULT_DRAWING_PRECISION}f} REF FROM THE PIVOT",
-        f"   AXIS (STRAP DEPTH {ARM_DEPTH:.{DEFAULT_DRAWING_PRECISION}f} REF).",
-        f"4. ARC LENGTHS {TOP_ARC_LEN:.{DEFAULT_DRAWING_PRECISION}f} TOP / "
-        f"{BOT_ARC_LEN:.{DEFAULT_DRAWING_PRECISION}f} BOTTOM",
-        "   DEFINE THE ARC ENDPOINTS.",
-        f"5. EACH END: {TIP_FACE:.{DEFAULT_DRAWING_PRECISION}f} RADIAL LAND PERP TO",
-        "   TOP EDGE; STRAIGHT TAPER TO BOTTOM ARC.",
-        # REAM is the fit bore's process requirement (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); its
-        # +0.03/0 band rides the O6.50 natively and its Ra the bore's symbol.
-        "6. PIVOT HOLE: REAM.",
+        "2. COMMON ARC CENTRE ABOVE A ON THE PLANE.",
+        f"   BASIC {TOP_EDGE_ABOVE_PIVOT:.{DEFAULT_DRAWING_PRECISION}f}: TOP ARC ABOVE A.",
         # #948 ruling R: the rod's float on the arm is taken from the hub's
         # mid-plane, so the strap's offset from it is held.
-        "7. STRAP SYMMETRIC TO HUB WITHIN "
+        "3. STRAP SYMMETRIC TO HUB WITHIN "
         f"{STRAP_HUB_SYMMETRY:.{DEFAULT_DRAWING_PRECISION}f};",
-        f"   INTEGRAL HUB DIA {HUB_DIA:.{DEFAULT_DRAWING_PRECISION}f} SETS THE PITCH",
+        "   INTEGRAL HUB LENGTH SETS THE PITCH",
         "   (NO SPACERS). HUB OD COAXIAL WITH PIVOT",
-        f"   BORE WITHIN Ø{HUB_COAXIALITY_DIA:.{DEFAULT_DRAWING_PRECISION}f} (TURN HUB AND REAM",
-        "   BORE IN ONE SETUP).",
+        f"   BORE WITHIN Ø{HUB_COAXIALITY_DIA:.{DEFAULT_DRAWING_PRECISION}f}. {HUB_WALL_NOTE}.",
+        # Source context: channel_kinematics.arc_geometry/solve_state and
+        # build_ch_rocker_arm's chapter-30 profile reconstruction. The lower
+        # arc is not a second amplitude-bar contact or independent gain control.
+        # Preserve upper amplitude-bar contact and lower moving-strap envelope
+        # intent in one line. The removed rod-pin geometry sentence repeated
+        # note 1's identified hole plus its native basics/callout/position FCF.
+        "4. UPPER BAR CONTACT; LOWER STRAP ENVELOPE",
+        "5. DATUM C: STRAP END LAND IN DETAIL E.",
+        "   MIRROR PLANE IS DEFINED BY NOTE 1.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

@@ -17,6 +17,7 @@ from solidworks_mcp.adapters.solidworks.drawing import iter_views, view_name
 from _com import _early_bound
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_common import is_pictorial_orientation
+from _drawing_detail_crop import read_circular_detail_crop
 from _drawing_layout_audit import annotation_display
 from _drawing_layout_check import (
     CollisionScope,
@@ -36,6 +37,9 @@ import _telemetry
 # free-standing layout element (the general-notes block, schedule cells). Tables
 # are enumerated separately via IView.GetTableAnnotations.
 _ANNOT_NOTE = 6
+
+
+_VIEW_DETAIL = 3  # swDrawingViewTypes_e.swDrawingDetailView (official enum)
 
 
 # swAnnotationType_e for the native GD&T symbols the recipes place at explicit
@@ -669,17 +673,39 @@ def collect_layout_elements(
     tables: dict[str, LayoutElement] = {}
     for view in iter_views(adapter):
         name = view_name(adapter, view)
-        outline = adapter._attempt(
-            lambda v=view: adapter._get_attr_or_call(v, "GetOutline")
-        )
+        native_view = _early_bound(view, "IView")
+        try:
+            view_type = native_view.Type
+        except Exception as exc:
+            raise RuntimeError(f"{name}: cannot read native IView.Type for layout") from exc
+        if type(view_type) is not int:
+            raise RuntimeError(f"{name}: invalid native IView.Type={view_type!r}; required non-bool int")
         view_box: tuple[float, float, float, float] | None = None
-        if outline:
-            view_box = tuple(float(v) for v in outline)  # xmin,ymin,xmax,ymax
+        occupied_box: tuple[float, float, float, float] | None = None
+        if view_type == _VIEW_DETAIL:
+            try:
+                readback = read_circular_detail_crop(adapter, native_view, label=name)
+            except Exception as exc:
+                raise RuntimeError(
+                    f"{name}: circular detail crop readback refused: {exc}"
+                ) from exc
+            # Classification retains the SAME native outline. Only the view's
+            # occupied box changes; labels, scopes, owners and policies do not.
+            view_box = readback.outline
+            occupied_box = readback.crop
+        else:
+            outline = adapter._attempt(
+                lambda v=view: adapter._get_attr_or_call(v, "GetOutline")
+            )
+            if outline:
+                view_box = tuple(float(v) for v in outline)  # xmin,ymin,xmax,ymax
+                occupied_box = view_box
+        if occupied_box is not None:
             elements.append(
                 LayoutElement(
                     name,
                     "view",
-                    *view_box,
+                    *occupied_box,
                     scope=_view_scope(adapter, view),
                 )
             )

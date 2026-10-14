@@ -1,8 +1,11 @@
 """Offline contract: the rod fork straddles its rocker arm in one plane, and
 the MHA-CH-010 pin is pressed into the fork's reamed tines and runs in the
-arm, with every fit held at the worst case of its printed bands (drawing-guidelines.md rule 17 (walls and webs)
-). Press fit, ends dressed flush: the user's ruling (2026-10-09, PR #1292
-review F1), the MHA-CH-011 bar pin's joint (``test_ch_bar_pivot_fit``).
+arm. The printed BASIC/profile controls and fork bands prove the crotch fit;
+the pin spec's older radius-band budget is a separate regression, not the
+current arc acceptance. Press fit, ends dressed flush: the user's ruling
+(2026-10-09, PR #1292 review F1), the MHA-CH-011 bar pin's joint
+(``test_ch_bar_pivot_fit``). Drawing-guidelines.md rule 17 (walls and webs)
+governs the remaining fits.
 
 ``ch_rod_pivot_pin_spec`` reads only the two parts it joins; the restated
 floors and the swing it designs for are pinned to their sources here.
@@ -10,8 +13,10 @@ floors and the swing it designs for are pinned to their sources here.
 
 from __future__ import annotations
 
+import ast
 import itertools
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -28,7 +33,9 @@ import ch_rocker_arm_notes as arm_notes
 import ch_rocker_arm_spec as arm
 import ch_rod_pivot_pin_spec as pin
 import dt_cylinder_gear_spec as gear
+import draw_ch_rocker_arm as arm_drawing
 import rocker_bank_layout as bank
+from _drawing_hidden_sketches import curate_view_dimensions
 from _hole_spec import NUMBER_DRILL_MM
 
 
@@ -91,7 +98,11 @@ def test_worst_case_joint_budget() -> None:
     assert b["tine_bearing_land_min"] == b["tine_min"]
     assert b["tine_bearing_land_min"] >= pin.RULE12_WALL_FLOOR
     assert b["crown_wall_min"] >= pin.RULE12_WALL_TARGET
-    assert b["crotch_clearance_min"] == pytest.approx(1.2029, abs=1e-4)
+    # Base 2ff1897d5: 1.2097559454 mm with RELATIVE_SWING_DEG=(-8.61, 1.01).
+    # Main's raised-drive-axis closure changes ch_rod_pivot_pin_spec's swing
+    # to (-8.67, 1.07): -0.0068964928 mm. This PR changes no legacy radius
+    # budget input (delta 0); the independent profile-zone proof is below.
+    assert b["crotch_clearance_min"] == pytest.approx(1.2028594525413179, abs=1e-9)
     assert b["crotch_clearance_min"] >= pin.CROTCH_CLEARANCE_MIN
     assert b["bridge_min"] == pytest.approx(2.234, abs=1e-6)
     assert b["bridge_min"] >= pin.BRIDGE_TARGET
@@ -243,11 +254,332 @@ def test_restated_swing_brackets_the_solved_loop() -> None:
     assert hi - 0.01 <= max(rel) <= hi
 
 
+def _profile_normal_limits(
+    zone: float, outside: float
+) -> tuple[float, float]:
+    """Signed displacement along the outward material normal: [U-zone, U]."""
+    assert 0.0 <= outside <= zone
+    return outside - zone, outside
+
+
+def _printed_profile_limits() -> tuple[tuple[float, float], tuple[float, float]]:
+    zone = float(arm_drawing.ARC_PROFILE_ZONE_MM)
+    return tuple(
+        _profile_normal_limits(zone, float(arm_drawing.ARC_PROFILE_OUTSIDE_MM[name]))
+        for name in ("TopRadius", "BottomRadius")
+    )
+
+
+def test_printed_profile_controls_are_their_sources() -> None:
+    assert arm_notes.DRAWING_DIMENSIONS["StrapProfile"] == {
+        "TopRadius", "BottomRadius", "RodTipLen"
+    }
+    assert arm_notes.DRAWING_DIMENSIONS["TopEdgeReference"] == {"TopAbovePivot"}
+    assert arm_drawing.BASIC_PROFILE_DIMENSIONS == {
+        "TopRadius", "BottomRadius", "TopAbovePivot"
+    }
+    assert arm_drawing.BASIC_PROFILE_DIMENSIONS == arm_drawing.FRONT_KEEP.keys()
+    assert set(arm_drawing.END_KEEP) == {"RodTipLen"}
+    assert "RodTipLen" not in arm_drawing.HUB_KEEP
+    assert "RodTipLen" not in arm_drawing.RIGHT_KEEP
+    assert arm_drawing._ALPHA_TOP == arm._ALPHA_TOP
+    assert arm_drawing.DRAWING_DIMENSIONS is arm_notes.DRAWING_DIMENSIONS
+    assert arm_drawing.curate_view_dimensions is curate_view_dimensions
+    # A non-empty owner map alone does not prove the native dimension prints.
+    # Require the strict targeted importer to consume it and its marked source.
+    tree = ast.parse(Path(arm_drawing.__file__).read_text(encoding="utf-8"))
+    end_imports = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "curate_view_dimensions"
+        and any(
+            keyword.arg == "keep" and ast.unparse(keyword.value) == "END_KEEP"
+            for keyword in node.keywords
+        )
+    ]
+    assert len(end_imports) == 1
+    assert ast.unparse(end_imports[0].args[1]) == "end"
+    keywords = {
+        keyword.arg: ast.unparse(keyword.value) for keyword in end_imports[0].keywords
+    }
+    assert keywords["dimensions_by_feature"] == "DRAWING_DIMENSIONS"
+    assert (arm_drawing.R_TOP, arm_drawing.R_BOTTOM, arm_drawing.CENTER_Y) == (
+        arm.R_TOP, arm.R_BOTTOM, arm.CENTER_Y
+    )
+    assert arm_drawing.TOP_EDGE_BAND is arm.TOP_EDGE_BAND
+    assert arm_drawing.ARC_PROFILE_ZONE_MM == f"{arm.TOP_EDGE_BAND[0]:g}"
+    assert arm_drawing.ARC_PROFILE_OUTSIDE_MM == {
+        "TopRadius": arm_drawing.ARC_PROFILE_ZONE_MM,
+        "BottomRadius": f"{arm.TOP_EDGE_BAND[1]:g}",
+    }
+    top, bottom = _printed_profile_limits()
+    assert top == (arm.TOP_EDGE_BAND[1], arm.TOP_EDGE_BAND[0])
+    assert bottom == (-arm.TOP_EDGE_BAND[0], arm.TOP_EDGE_BAND[1])
+    # At the mirror station n_top=+Y and n_bottom=-Y. Height is the SAME
+    # normal zone evaluated here, not another independent centre translation.
+    assert arm.CENTER_Y - arm.R_TOP - arm.PIVOT_MID_Y == arm.TOP_EDGE_ABOVE_PIVOT
+    assert tuple(
+        arm.CENTER_Y - (arm.R_TOP - d) - arm.PIVOT_MID_Y for d in top
+    ) == pytest.approx(tuple(arm.TOP_EDGE_ABOVE_PIVOT + d for d in top))
+    assert arm_notes.DEFAULT_DRAWING_PRECISION == 2
+    assert "RodTipLen" not in arm_notes.DRAWING_PRECISION.get("StrapProfile", {})
+    assert "SlotDepth" in rod_notes.DRAWING_DIMENSIONS["ForkSlotProfile"]
+    assert "ForkWidthDim" in rod_notes.DRAWING_DIMENSIONS["ForkProfile"]
+    assert "SlotDepth" not in rod_notes.DRAWING_PRECISION.get("ForkSlotProfile", {})
+    assert "ForkWidthDim" not in rod_notes.DRAWING_PRECISION.get("ForkProfile", {})
+
+
+def _profile_endpoints(
+    top_outward: float,
+    bottom_outward: float,
+    tip_x: float,
+    land_length: float,
+    land_angle: float,
+    taper_x: float,
+) -> np.ndarray:
+    """Top/land/taper joins on normal-limit circles about the BASIC centre.
+
+    The overall width sets tip_x; the printed land length/angle locate its
+    upper endpoint. Taper intersection X locates the lower endpoint. Neither
+    arc's nominal arc-length/radius ratio is recomputed after a normal offset.
+    Only the arcs carry profile: the land and taper remain straight segments
+    joining these endpoints, not independently profile-offset faces.
+    """
+    top_x = tip_x - land_length * math.sin(land_angle)
+    top_y = arm.CENTER_Y - math.sqrt((arm.R_TOP - top_outward) ** 2 - top_x**2)
+    bottom_y = arm.CENTER_Y - math.sqrt(
+        (arm.R_BOTTOM + bottom_outward) ** 2 - taper_x**2
+    )
+    return np.array([
+        (top_x, top_y),
+        (tip_x, top_y - land_length * math.cos(land_angle)),
+        (taper_x, bottom_y),
+    ])
+
+
+def test_profile_limits_move_independently_and_bound_only_the_arcs() -> None:
+    top, bottom = _printed_profile_limits()
+    angle = arm_drawing._ALPHA_TOP
+    nominal_args = (arm.ROD_TIP_X, arm.TIP_FACE, angle, arm.BOT_END_X)
+    nominal = _profile_endpoints(0.0, 0.0, *nominal_args)
+    assert nominal == pytest.approx(np.array([
+        (arm.TOP_END_X, arm.TOP_END_Y),
+        (arm.ROD_TIP_X, arm.TOP_END_Y - arm.TIP_FACE * math.cos(angle)),
+        (arm.BOT_END_X, arm.CENTER_Y - math.sqrt(arm.R_BOTTOM**2 - arm.BOT_END_X**2)),
+    ]))
+    top_only = _profile_endpoints(top[1], 0.0, *nominal_args)
+    bottom_only = _profile_endpoints(0.0, bottom[0], *nominal_args)
+    assert np.array_equal(top_only[2], nominal[2])
+    assert np.array_equal(bottom_only[:2], nominal[:2])
+    assert top_only[0, 1] > nominal[0, 1]
+    assert bottom_only[2, 1] > nominal[2, 1]
+
+    two_place = arm.LINEAR_2PL
+    # Mirror symmetry splits the overall-width band between the two tips.
+    # C clocking defines the nominal orientation in the A|B|C DRF: the land
+    # angle is BASIC, not subject to the title block's general angular band.
+    # The remaining independent corners are a superset: no correlation between
+    # the printed outline controls is used to gain clearance.
+    for top_d, bottom_d, tip_x, length, land_angle, taper_x in itertools.product(
+        top,
+        bottom,
+        (arm.ROD_TIP_X - two_place / 2.0, arm.ROD_TIP_X + two_place / 2.0),
+        (arm.TIP_FACE - two_place, arm.TIP_FACE + two_place),
+        (angle,),
+        (arm.BOT_END_X - two_place, arm.BOT_END_X + two_place),
+    ):
+        endpoints = _profile_endpoints(top_d, bottom_d, tip_x, length, land_angle, taper_x)
+        radius = arm.R_BOTTOM + bottom_d
+        # Triangle inequality bounds even intermediate lengths at the BASIC
+        # land angle; disc convexity then bounds the whole straight taper.
+        assert arm.R_TOP - top_d + length < radius
+        assert np.all(np.linalg.norm(endpoints - (0.0, arm.CENTER_Y), axis=1) <= radius + 1e-9)
+        assert np.all(endpoints[:, 1] < arm.CENTER_Y)
+        assert endpoints[2, 0] < endpoints[0, 0] < endpoints[1, 0]
+
+
+def _joint_translation_allowance() -> float:
+    hole_wander = (
+        float(rod.GEOMETRIC_TOLERANCES_MM["rocker pin hole position"])
+        + float(arm.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"])
+    ) / 2.0
+    arm_hole_max = (
+        NUMBER_DRILL_MM[arm.ROD_HOLE_SPEC.size]
+        + _config.title_block("drilled_hole")["plus_mm"]
+    )
+    pin_drop = (arm_hole_max - (pin.PIN_DIA - pin.PIN_DIA_TOLERANCE)) / 2.0
+    # A square enclosing both position discs and the running-clearance disc:
+    # expand the X window AND subtract the Y loss. This is conservative even
+    # for lateral wander; a pressed pin has no additional drop in the tines.
+    return hole_wander + pin_drop
+
+
+def _continued_circle_clearance(
+    radius: float, width: float, depth: float, centre_y: float
+) -> float:
+    """Exact continuous-swing lower bound, not a sampled outline minimum."""
+    loss = _joint_translation_allowance()
+    half_window = width / 2.0 + loss
+    vx, vy = -arm.ROD_HOLE_X, centre_y - arm.ROD_HOLE_Y
+    lo, hi = map(math.radians, pin.RELATIVE_SWING_DEG)
+    assert -math.pi / 2.0 < lo <= hi < math.pi / 2.0
+    cy_min = vy * min(math.cos(lo), math.cos(hi)) - abs(vx) * max(
+        abs(math.sin(lo)), abs(math.sin(hi))
+    )
+    assert cy_min > 0.0
+    # cx'=-cy<0, so the leftmost-window condition holds throughout the swing.
+    assert vx * math.cos(lo) - vy * math.sin(lo) < -half_window
+    cx = vx * math.cos(hi) - vy * math.sin(hi)
+    cy = vx * math.sin(hi) + vy * math.cos(hi)
+    assert half_window - cx < radius
+    assert radius > math.hypot(vx, vy)
+    # q=sqrt(R²-(h+cx)²)>cy since R>|c| and cx<-h.
+    # low'=cx-(h+cx)*cy/q=[cx*(q-cy)-h*cy]/q<0.
+    # Thus +hi is the true minimum for EVERY angle in the restated interval.
+    low = cy - math.sqrt(radius**2 - (half_window + cx) ** 2)
+    return low - (width / 2.0 - depth) - loss
+
+
+def _profile_crotch_clearance(
+    top: tuple[float, float], bottom: tuple[float, float]
+) -> float:
+    """Independent normal limits, plus all fork width/depth band corners.
+
+    The largest bottom-limit circle encloses arbitrary, independently varying
+    normal deviations, not only circular manufactured surfaces. The top and
+    land also lie inside it (triangle inequality), hence so does every straight
+    taper joining them to the bottom arc. Its continued lower arc is a proven
+    conservative bound, NOT an assertion that the taper carries profile.
+    """
+    two_place = arm.LINEAR_2PL
+    slot_depth = rod.FORK_TOP_Y - rod.FORK_CROTCH_Y
+    worst = math.inf
+    for top_d, bottom_d, width, depth in itertools.product(
+        top,
+        bottom,
+        (rod.FORK_WIDTH - two_place, rod.FORK_WIDTH + two_place),
+        (slot_depth - two_place, slot_depth + two_place),
+    ):
+        radius = arm.R_BOTTOM + bottom_d
+        assert arm.R_TOP - top_d + arm.TIP_FACE + two_place < radius
+        worst = min(worst, _continued_circle_clearance(radius, width, depth, arm.CENTER_Y))
+    return worst
+
+
+def test_crotch_clears_the_arm_through_the_whole_swing() -> None:
+    """Printed BASIC centre/radii/height, independent top/bottom normal zones.
+
+    No centre-height perturbation is added to top profile. The fixed centre is
+    PIVOT_MID_Y+BASIC height+R_TOP. The top zone controls that height at the mirror
+    station; the bottom U0 zone only removes material. Straight end faces are
+    covered by endpoint/convex-disc containment using the printed land length,
+    overall width, BASIC C-clocked land angle and taper-intersection X in the
+    A|B|C DRF. This is a planar fit bound, not a new taper-form, datum-error,
+    or channel-closure tolerance model.
+
+    Legacy containment is geometric: its low-height/short-top-radius corner
+    moves the centre down t=.508 and grows the lower radius by t. The current
+    entire inside-zone outline lies in the BASIC R_BOTTOM disc, and
+    distance(C,C_legacy)+R_BOTTOM = t+R_BOTTOM = R_legacy. Thus that continued
+    legacy circle contains it at every rotation. This does NOT turn the old
+    radius/height bands into printed controls or couple the two actual profiles.
+    """
+    top, bottom = _printed_profile_limits()
+    assert bottom[1] == 0.0
+    current_radius = arm.R_BOTTOM + max(bottom)
+    legacy_centre = arm.PIVOT_MID_Y + arm.TOP_EDGE_ABOVE_PIVOT - arm.LINEAR_2PL + arm.R_TOP
+    legacy_radius = arm.R_BOTTOM + arm.LINEAR_2PL
+    assert abs(arm.CENTER_Y - legacy_centre) + current_radius <= legacy_radius + 1e-9
+    assert _profile_crotch_clearance(top, bottom) >= pin.CROTCH_CLEARANCE_MIN
+
+
+def test_inside_zone_widening_cannot_worsen_crotch_clearance() -> None:
+    top, bottom = _printed_profile_limits()
+    zone = float(arm_drawing.ARC_PROFILE_ZONE_MM)
+    outside = float(arm_drawing.ARC_PROFILE_OUTSIDE_MM["BottomRadius"])
+    assert outside == 0.0
+    wider = _profile_normal_limits(2.0 * zone, outside)
+    slot_depth = rod.FORK_TOP_Y - rod.FORK_CROTCH_Y
+    width, depth = rod.FORK_WIDTH + arm.LINEAR_2PL, slot_depth - arm.LINEAR_2PL
+    # At every normal station the added permitted deviations are inward.
+    # The limiting inside circle improves; nominal offset zero remains allowed.
+    original_inside = _continued_circle_clearance(
+        arm.R_BOTTOM + bottom[0], width, depth, arm.CENTER_Y
+    )
+    wider_inside = _continued_circle_clearance(
+        arm.R_BOTTOM + wider[0], width, depth, arm.CENTER_Y
+    )
+    assert wider_inside > original_inside
+    assert _profile_crotch_clearance(top, wider) == pytest.approx(
+        _profile_crotch_clearance(top, bottom), abs=1e-12
+    )
+
+
+def test_same_width_outside_allocation_fault_reduces_air_but_still_clears() -> None:
+    """Named drawing fault: reverse bottom U0 to wholly OUTSIDE at printed width.
+
+    This is not an interference negative control: the real 0.5-wide fault still
+    clears. Do not enlarge it or reverse an unnamed normal just to force failure.
+    It does exercise the physical material-adding sign and clearance sensitivity.
+    """
+    top, bottom = _printed_profile_limits()
+    zone = float(arm_drawing.ARC_PROFILE_ZONE_MM)
+    outside_fault = _profile_normal_limits(zone, zone)
+    correct = _profile_crotch_clearance(top, bottom)
+    fault = _profile_crotch_clearance(top, outside_fault)
+    assert fault < correct
+    assert fault >= pin.CROTCH_CLEARANCE_MIN
+
+
+@pytest.mark.parametrize(
+    "required_clearance",
+    (0.0, pin.CROTCH_CLEARANCE_MIN),
+    ids=("physical-nonstrike-bound", "required-clearance"),
+)
+def test_outside_fault_fit_predicate_rejects_a_raised_source_floor(
+    monkeypatch: pytest.MonkeyPatch, required_clearance: float
+) -> None:
+    """Recompute the source-driven sweep on both sides of each real predicate.
+
+    Zero tests the conservative physical nonstrike bound; CROTCH_CLEARANCE_MIN
+    tests the required running air. Losing the former guarantee is not proof
+    of an exact geometric strike: the bound encloses the position discs in a
+    square. The 0.05 mm perturbation is test sensitivity, not a printed band.
+    """
+    top, _bottom = _printed_profile_limits()
+    zone = float(arm_drawing.ARC_PROFILE_ZONE_MM)
+    outside_fault = _profile_normal_limits(zone, zone)
+    fault_clearance = _profile_crotch_clearance(top, outside_fault)
+    assert fault_clearance >= required_clearance
+    excess = fault_clearance - required_clearance
+    sensitivity = 0.05
+    original_floor = rod.FORK_CROTCH_Y
+
+    # Raise the actual source floor, rather than subtracting a shift from the
+    # previously computed result. Both calls must reread slot depth and sweep
+    # all profile/fork corners with the modified geometry.
+    monkeypatch.setattr(rod, "FORK_CROTCH_Y", original_floor + excess - sensitivity)
+    passing_clearance = _profile_crotch_clearance(top, outside_fault)
+    assert passing_clearance == pytest.approx(
+        required_clearance + sensitivity, abs=1e-9
+    )
+    assert passing_clearance >= required_clearance
+
+    monkeypatch.setattr(rod, "FORK_CROTCH_Y", original_floor + excess + sensitivity)
+    with pytest.raises(AssertionError):
+        assert _profile_crotch_clearance(top, outside_fault) >= required_clearance
+    failing_clearance = _profile_crotch_clearance(top, outside_fault)
+    assert failing_clearance == pytest.approx(
+        required_clearance - sensitivity, abs=1e-9
+    )
+
+
 def _arm_bottom_silhouette(
     r_top: float, r_bottom: float, top_above_pivot: float
 ) -> np.ndarray:
-    """Arm-frame points along the arm's lower outline near the rod pin: the
-    bottom arc, then the straight taper to the tip land (arm notes 3-5)."""
+    """Legacy lower-arc/straight-taper silhouette near the rod pin, in the
+    arm frame, for the unchanged pin.BUDGET regression only."""
     cy = arm.PIVOT_MID_Y + top_above_pivot + r_top
     a_bot = arm.BOT_ARC_LEN / 2.0 / r_bottom
     a_top = arm.TOP_ARC_LEN / 2.0 / r_top
@@ -264,18 +596,14 @@ def _arm_bottom_silhouette(
     return np.concatenate([arc, bot_end + t * (tip - bot_end)])
 
 
-def test_crotch_clears_the_arm_through_the_whole_swing() -> None:
-    """Every printed-band corner of the arm's curved lower outline and the
-    fork's slot floor, at every solved pose of one cam turn: the floor stays
-    CROTCH_CLEARANCE_MIN below the arm with both pin holes wandered and the
-    arm dropped on the pin by its running clearance (the pin is pressed in
-    the tines, so it does not drop in them)."""
+def test_legacy_radius_band_sweep_regresses_the_spec_budget() -> None:
+    """The unchanged pin.BUDGET's legacy radius/height perturbation model.
+
+    This sampled lower-outline construction independently regresses its closed
+    form. R800/R816 +/-LINEAR_2PL and independently shifted top height are NOT
+    the current drawing's BASIC/profile controls; the printed proof is above.
+    """
     two_place = arm.LINEAR_2PL
-    # The bands the sweep reads are the ones the sheets print.
-    assert "SlotDepth" not in rod_notes.DRAWING_PRECISION.get("ForkSlotProfile", {})
-    assert "ForkWidthDim" not in rod_notes.DRAWING_PRECISION.get("ForkProfile", {})
-    assert arm_notes.DRAWING_DIMENSIONS["StrapProfile"] == {"TopRadius", "BottomRadius"}
-    assert arm_notes.DEFAULT_DRAWING_PRECISION == 2
     rad = np.radians(np.array(_relative_swing_deg()))
     cos, sin = np.cos(rad)[:, None], np.sin(rad)[:, None]
     hole = np.array([arm.ROD_HOLE_X, arm.ROD_HOLE_Y])
@@ -306,7 +634,7 @@ def test_crotch_clears_the_arm_through_the_whole_swing() -> None:
     pin_drop = b["running_clearance_max"] / 2.0
     clearance = worst - hole_wander - pin_drop
     assert clearance >= pin.CROTCH_CLEARANCE_MIN
-    # The spec's closed-form budget is the same envelope, on its restated swing.
+    # The legacy closed form uses the same old envelope on its restated swing.
     assert b["crotch_clearance_min"] == pytest.approx(clearance, abs=0.005)
     assert b["crotch_clearance_min"] <= clearance
 

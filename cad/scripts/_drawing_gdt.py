@@ -90,6 +90,7 @@ def add_datum_feature(
     position_tolerance_m: float = 0.02,
     callout_below: str = "",
     expected_entity: Any | None = None,
+    leader_attach_xy: tuple[float, float] | None = None,
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
 
@@ -120,6 +121,11 @@ def add_datum_feature(
     rejects good placements; and in the authoring session
     ``IDatumTag::GetLineAtIndex`` stays frozen at the insertion geometry through
     a rebuild, so it cannot serve as a readback here.
+
+    ``leader_attach_xy`` sets the selected entity's insertion point, never a
+    coordinate hit-test or a post-insertion attachment setter. Its rendered
+    landing is read back through ``IAnnotation::GetDisplayData`` after rebuild:
+    datum-feature triangles are not registered leaders (GetLeaderCount is 0).
     """
     draw = adapter.currentModel
     selected = _select_annotation_entity(
@@ -139,6 +145,12 @@ def add_datum_feature(
         what=f"datum {datum}",
         label=label,
     )
+    if leader_attach_xy is not None:
+        manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        if manager.SetSelectionPoint2(
+            1, -1, leader_attach_xy[0], leader_attach_xy[1], 0.0
+        ) is not True:
+            raise RuntimeError(f"failed to set datum {datum} landing ({label})")
     tag = draw.InsertDatumTag2()
     if tag is None:
         raise RuntimeError(f"failed to insert datum {datum} ({label})")
@@ -220,7 +232,61 @@ def add_datum_feature(
         label=label,
         expected_leaders=0,
     )
+    if leader_attach_xy is not None:
+        assert_datum_landing(
+            adapter, tag, expected_xy=leader_attach_xy, label=label
+        )
     return tag
+
+
+def assert_datum_landing(
+    adapter: Any,
+    tag: Any,
+    *,
+    expected_xy: tuple[float, float],
+    label: str,
+    tolerance_m: float = 0.00005,
+) -> tuple[float, float]:
+    """Prove a datum triangle's explicit sheet-space landing from rendered ink.
+
+    Reuse the layout audit's documented GetDisplayData decoder, not the frozen
+    IDatumTag primitives or GetLeaderPointsAtIndex (datum tags have no registered
+    leaders). SOLIDWORKS exposes the triangle as an arrowhead, triangle, or line
+    vertices; each representation includes the actual feature-side tip.
+    """
+    from _drawing_layout_audit import annotation_display
+
+    annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    if annotation is None:
+        raise RuntimeError(f"datum landing has no annotation ({label})")
+    if annotation.IsDangling():
+        raise RuntimeError(f"datum landing is dangling ({label})")
+    display, refused = annotation_display(adapter, annotation)
+    if refused or not display:
+        raise RuntimeError(f"datum landing has no readable display data ({label}): {refused}")
+    points = []
+    for raw in display.get("arrows", ()):
+        if len(raw) >= 3:
+            points.append((float(raw[0]), float(raw[1])))
+    for raw in display.get("triangles", ()):
+        if len(raw) >= 9:
+            points.extend((float(raw[i]), float(raw[i + 1])) for i in (0, 3, 6))
+    # Datum tags can draw their open triangle as line primitives instead.
+    for raw in display.get("lines", ()):
+        if len(raw) >= 8:
+            points.extend(
+                ((float(raw[-6]), float(raw[-5])), (float(raw[-3]), float(raw[-2])))
+            )
+    if not points or not all(math.isfinite(v) for point in points for v in point):
+        raise RuntimeError(f"datum landing has no finite rendered tip ({label})")
+    actual = min(points, key=lambda point: math.dist(point, expected_xy))
+    error = math.dist(actual, expected_xy)
+    if not math.isfinite(error) or error > tolerance_m:
+        raise RuntimeError(
+            f"datum landing moved ({label}): actual={actual}, requested={expected_xy}, "
+            f"error={error:g} m, limit={tolerance_m:g} m"
+        )
+    return actual
 
 
 @_telemetry.traced("drawing.feature_control_frame", label_param="label")
@@ -243,6 +309,7 @@ def add_feature_control_frame(
     entity: Any | None = None,
     leader_attach_xy: tuple[float, float] | None = None,
     translated: Sequence[str] = (),
+    outside_disposition: str | None = None,
     lower_frame: tuple[str, str, Sequence[str]] | None = None,
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
@@ -252,6 +319,9 @@ def add_feature_control_frame(
     stacked frame ``(characteristic, tolerance, datums)`` on the same leader
     (``IGtol.AddFrame``), printed with its own symbol -- not composite
     (``GetCompositeFrame2(1)`` must read False) -- its XML read back.
+
+    ``outside_disposition`` applies the native circled-U profile modifier to
+    the upper frame (None: symmetric; "0": wholly inside; total: wholly outside).
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.  Only the kinds
@@ -268,7 +338,6 @@ def add_feature_control_frame(
     attached entity (GetAttachedEntityCount3 1 -> 0, types (EDGE,) -> ())
     while IGtol.IsAttached kept reading True with one non-dangling leader.
     """
-    draw = adapter.currentModel
     if entity_type.upper() not in _ATTACHMENT_SELECT_TYPES:
         raise ValueError(
             f"feature-control frame cannot attach to a {entity_type} ({label})"
@@ -280,7 +349,9 @@ def add_feature_control_frame(
         diameter=diameter,
         projected_zone_height_mm=projected_zone_height_mm,
         translated=translated,
+        outside_disposition=outside_disposition,
     )
+    draw = adapter.currentModel
     expected_signature = _gtol_frame_signature(xml)
     edge = _select_annotation_entity(
         adapter,
@@ -366,10 +437,10 @@ def add_feature_control_frame(
     frame = _sw_type_info.early_bound_or_flag(
         frame, "IGtolFrame", "SetSymbolXml", "GetSymbolXml"
     )
-    # The legacy seed preserves ordinary migration but carries no translation
-    # modifier, and projection must be applied through current-frame XML even
-    # when the frame was just converted; the current-format XML states both.
-    if not migrated or translated or projected_zone_height_mm is not None:
+    # The legacy seed carries neither translation, projection nor unequal-profile
+    # modifiers; requested modifiers must use current-format XML after migration.
+    if (not migrated or translated or projected_zone_height_mm is not None
+            or outside_disposition is not None):
         if frame.SetSymbolXml(xml) is not True:
             raise RuntimeError(f"SOLIDWORKS rejected feature-control frame XML ({label})")
     applied = frame.GetSymbolXml()

@@ -96,7 +96,8 @@ frames and no datums.
 - **Cams.** The pinion-cam eccentric-axis position, and any future cam.
 - **Channel consistency.** At most one control per channel part (rocker arm,
   channel lever, amplitude bar, connecting rod) where a coordinate ± would let
-  the 20 channels scatter.
+  the 20 channels scatter, except the rocker-arm arc-system control described
+  below.
 - **Crank mesh.** MHA-DT-005's crank bore: one diametral angularity frame to
   the cone-journal bore (datum A), clocked by the foot seat (datum B), with the
   plan angle basic. The fixed-centre 16T:64T crossed mesh loses running
@@ -143,6 +144,89 @@ frames and no datums.
   spot, shake at every tooth). Keep numerical limits in the shared functional
   source, not a generic multi-line Manufacturing Notes block.
 
+   **Rocker arm MHA-CH-006 (Pedro, 2026-10-11):** retain the rod-pin
+   position Ø0.20 to A|B|C **and** one arc-system surface-profile control,
+   represented by two frames, one for each arc. The rod-pin coordinates set
+   the connecting-rod lever length and angle: changing them changes the
+   cam-to-rocker closure and neutral pose
+   ([`channel_kinematics.py`](../scripts/channel_kinematics.py), `arc_geometry`;
+   [`ch_rocker_arm_spec.py`](../scripts/ch_rocker_arm_spec.py), `ROD_HOLE_X/Y`).
+   Independently, the R800 upper surface carries the amplitude-bar foot:
+   its form and height set the sliding-contact locus as the rocker swings,
+   closing the rocker–bar–lever chain (`solve_state` and J5 in
+   [`build_ch_channel_assembly.py`](../scripts/build_ch_channel_assembly.py)).
+   The R816 lower arc completes the nominal concentric 16 mm-deep moving
+   strap envelope ([`build_ch_rocker_arm.py`](../scripts/build_ch_rocker_arm.py),
+   opening source rationale and chapter-30 sketch reconstruction). The bottom
+   arc is not a second amplitude-bar contact surface; no separate gain-criticality
+   claim is made for it. The historic [GD&T assessment](tolerance-gdt-assessment.md),
+   §5.2, identifies the R800 form as a profile requirement; its older production
+   tolerance suggestions do not override this ruling.
+
+   A radius size band does not state the accepted form: R800 ±0.51 over a
+   292 mm chord allows only about ±0.009 mm of sagitta. BASIC R800/R816 and
+   BASIC top height 8.00 instead feed 0.5 mm surface-profile zones to the
+   existing reachable A (pivot bore), B (strap face), C (+X land) datums.
+   Top Ⓤ0.5 puts the entire zone outside material; bottom Ⓤ0 puts it inside.
+   The material sides oppose, so a single frame cannot specify both zones.
+   At the nominal mirror plane through datum axis A, normal to the arm's
+   length (`x = 0` in the CAD), the upper edge remains 8.00..8.50 above the
+   pivot and the lower edge 0.00..0.50 above the model bottom origin,
+   preserving the model's `TOP_EDGE_BAND` and derived concentric-arc placement.
+   Away from that station the zone follows the surface normal, not a rigid
+   vertical translation, and does not require identical deviations on both
+   actual surfaces. Profile of a surface, rather than of a line, controls the
+   entire narrow edge face through the strap thickness, not just selected
+   cross-sections (ASME Y14.5-2018). The shop template's ±0.03 DTI-station
+   acceptance about the 8.25-height aim is separate from the part's 0.5 zone.
+   This is a drawing-tolerance cutover; model geometry remains unchanged.
+
+   Frame placement is a sheet-layout decision, not part tolerance. Requested
+   positions and guessed frame widths do not prove a clear native bent-leader
+   route. After final view curation and rebuild, the recipe reads back native
+   positions, frame-body ink boxes, leader points and physical landings.
+   Every profile leader must have at least **1 mm of sheet-space air** to
+   every other callout's text box, excluding its own frame text. Missing or
+   invalid required geometry, crossings and sub-1 mm gaps fail closed before
+   export. The native row-width model is not exact exported glyph geometry;
+   the final PDF ink audit and blind rendered-sheet review remain required.
+   Layout-run forensics belong in the PR history, not this tolerance policy.
+
+   The same scoped exception puts the outline on native views: overall width,
+   radial end-land length and taper-to-lower-arc intersection, read back against
+   existing spec geometry. Manufacturing Note 1 alone carries the BASIC clock
+   angle from the spec's `_ALPHA_TOP`, relating the datum-defined mirror plane
+   to datum C. Pedro's superseding ruling removes the angular dimension from
+   DETAIL E rather than adding another layout mechanism. The main front view
+   carries BASIC R800/R816/8.00 and both BASIC pin-axis coordinates from physical
+   datum A, plus one native horizontal BASIC A-to-datum-C-land location from
+   the centred pivot bore to the physical +X tip corner. Its value is the
+   spec-derived `ROD_TIP_X`, not a typed nominal; the `DATUM C LAND` row uses
+   the existing capped-witness mechanism and feeds the retained A|B|C controls
+   without adding geometry or a tolerance requirement. Parent-linked DETAIL D
+   owns native `PivotDia@PivotHoleProfile` and
+   `HubDia@HubProfile`, the pivot-bore datum A and bore finish; DETAIL E owns
+   `RodTipLen@StrapProfile`, datum C, DRILL THRU callout
+   and unchanged rod-pin position frame. Hub OD retains its two-place general
+   tolerance class. The side-view strap offset from the hub end face is a
+   measured, parenthesized REFERENCE at normal sheet precision, checked
+   against `(HUB_LENGTH - ARM_THICKNESS) / 2` in
+   [`ch_rocker_arm_spec.py`](../scripts/ch_rocker_arm_spec.py); it adds no
+   acceptance band and spans the projected end planes, not a radius endpoint.
+   Native REAM/DRILL callouts state through condition, replacing duplicated
+   arc-length, end-shape and hole-process notes. Integral hub **length**, not
+   OD, sets channel pitch (`HUB_LENGTH` and the hub-face assembly stack).
+   Hub coaxiality is now Ø0.10 from the authoritative spec; the named hub-wall
+   exception below records that ruling. The inherited strap-to-hub symmetry
+   0.10 and one-setup wording remain pending
+   [#1391](https://github.com/pedropaulovc/harmonic-analyzer/issues/1391), as do
+   the other deferred over-specification questions; no retained control is
+   removed here. Notes describe nominal mirror symmetry about that plane and
+   nominal concentric arcs on it, not mirror symmetry about the pivot axis.
+   Brief functional context distinguishes upper-arc amplitude-bar contact,
+   lower-arc moving envelope and rod-pin connecting-rod geometry; this is not
+   a whole-sheet policy migration or a new lower-arc gain/contact claim.
+
 A new entry needs a user ruling.
 
 ## Named exceptions
@@ -177,6 +261,8 @@ recorded on the same issues.
 
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|
+| MHA-CH-006 rocker arm integral pivot hub (the sheet states MIN HUB WALL 1.53) | Bore-to-hub wall 1.53 MIN at the worst printed limits: (Ø10.20 −0.51 − Ø6.53 maximum bore) / 2 −0.05 radial eccentricity from Ø0.10 coaxiality; below the 2.0 target, above the unchanged 1.5 floor | The OD ceiling is set by the amplitude-bar foot cheeks at rest (`channel_kinematics.bar_bottom`, `test_rocker_bank_layout`), so the shared hub/washer nominal Ø10.20 remains unchanged. The spec's minimum OD includes twice the radial eccentricity. This is scoped to the approved R28 sheet; it does not restore any reset exception. | Pedro, explicit Ship with issues disposition for PR #1354; prior option-A record 2026-10-12 |
+
 
 ## The gate
 
