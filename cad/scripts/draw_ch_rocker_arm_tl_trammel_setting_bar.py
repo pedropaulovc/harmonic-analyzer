@@ -58,8 +58,8 @@ SECTION_SCALE = (4, 1)
 ISO_SCALE = (1, 10)
 # The broad (seat) face, the edge view under it (third angle) carrying the
 # cutting line through H0, the section to the right, the isometric below.
-# x 0.160 leaves the pivot seat's two-line callout room between the border
-# and the H0 extension line.
+# x 0.160 leaves the pivot seat's callout clear of the border and the H0
+# extension line.
 TOP_CENTER = (0.160, 0.215)
 FRONT_CENTER = (0.160, 0.165)
 SECTION_CENTER = (0.330, 0.150)
@@ -72,7 +72,7 @@ TOP_OFFSETS = {
     # Above the bar, clear of both extension lines.
     "BarWidth": (0.252, 0.012),
     # Outside the end's extension line: the H0 station chains on from it.
-    "H0FromEnd": (-0.019, 0.011),
+    "H0FromEnd": (-0.022, 0.011),
     # Left of the bar's end and under it, clear of both extension lines.
     "H0FromSide": (-0.020, -0.010),
     "H800X": (0.102, 0.011),
@@ -92,16 +92,19 @@ SECTION_OFFSETS = {
 THICKNESS_TEXT_GAP = 0.010
 
 # Functional acceptance sits on the dimension it governs, not in the notes;
-# each seat names the trammel part it holds.
+# each scriber seat names the trammel part it holds. The pivot seat's mate
+# (MHA-CH-006-TL-18) stays off its callout: above, it ran past the border in
+# round 4; below, it would land on the bar and the 3X 12.7 extension line.
 CALLOUTS_ABOVE = {
-    "H0FromEnd": "PIVOT SEAT FOR\nMHA-CH-006-TL-18",
+    "H0FromEnd": "PIVOT SEAT",
     "H0FromSide": "3X",
     "H800X": "INNER SCRIBER SEAT FOR MHA-CH-006-TL-16",
     "H816X": "OUTER SCRIBER SEAT FOR MHA-CH-006-TL-16",
     "SeatDia": "3X",
     "PilotDia": "3X",
 }
-CALLOUTS_BELOW = {"PilotDia": "DRILL THRU"}
+# The thickness is the supply stock's, read at its exact 1/4 in size.
+CALLOUTS_BELOW = {"PilotDia": "DRILL THRU", "BarThickness": "STOCK"}
 
 _DOWN = [0.0, -1.0, 0.0]
 

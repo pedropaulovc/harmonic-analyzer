@@ -5,7 +5,7 @@ ch-rocker-arm-tl-trammel-setting-bar:
   # The gauge needs only a straight, flat bar: any low-carbon grade serves
   # (SolidWorks material Plain Carbon Steel); the shop stock is the 1018 CF
   # bar below.
-  material: LOW-CARBON STEEL FLAT, ANY GRADE
+  material: LOW-CARBON STEEL FLAT
   material_specification: AISI 1018 cold-finished steel flat bar, 1/4 x 1 x 36 in (Online Metals 7465)
   finish: faces as supplied
   quantity: 1
