@@ -45,13 +45,22 @@ def _measurements(node: Any, path: str = "") -> Iterator[tuple[str, Any]]:
             yield from _measurements(value, f"{path}[{index}]")
 
 
+def _without_cad(node: Any) -> Any:
+    """Drop the HA-only fixture ``cad`` tag; the bound-shop test covers its solids."""
+    if isinstance(node, dict):
+        return {k: _without_cad(v) for k, v in node.items() if k != "cad"}
+    if isinstance(node, list):
+        return [_without_cad(value) for value in node]
+    return node
+
+
 def test_tracked_shop_files_are_the_bound_set():
     assert tuple(MODELS) == plans.SHOP_FILES
 
 
 @pytest.mark.parametrize("name", list(MODELS))
 def test_shop_file_validates_under_pinned_prechips(name):
-    MODELS[name].model_validate(_shop(name))
+    MODELS[name].model_validate(_without_cad(_shop(name)))
 
 
 def test_bound_shop_validates_and_preserves_tracked_inventory(tmp_path):
