@@ -45,6 +45,12 @@ from _dimensions import (
     set_global,
 )
 from _feature_tree import _feature_by_name, feature_name_by_type, name_last_feature
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _drawing_precision import apply_drawing_precision
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -58,9 +64,9 @@ from _sketch import (
 )
 from _sketch_circle import define_circle
 from _hole_spec import THREAD_MAJOR_MM
-from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
+from _holes import CLEARANCE_MM, HoleSpec, SharedCoordinate, wizard_holes
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
-from vn_platen_clip_screw_spec import HEAD_DIA, SHANK_DIA, SHANK_LEN, THREAD
+from vn_platen_clip_screw_spec import HEAD_DIA, PITCH, SHANK_DIA, SHANK_LEN, THREAD
 from pd_platen_spec import PLATE_THICKNESS, SOCKET_BOSS_H, SOCKET_THREAD_ENGAGEMENT
 
 PART_NAME = "pd-platen-clip"
@@ -130,6 +136,15 @@ SLIT_LIGAMENT_MIN = (
     SCREW_RAIL_WIDTH - _POSITION_BAND - (HOLE_Y + _POSITION_BAND) - HOLE_DIA_MAX / 2.0
 )
 END_LIGAMENT_MIN = HOLE_INSET - _POSITION_BAND - HOLE_DIA_MAX / 2.0
+# The far hole stands at its own .XXX station from the near end, so the far
+# end's ligament also spends the overall length's printed band.
+LENGTH_PLACES = 1
+FAR_END_LIGAMENT_MIN = (
+    CLIP_LENGTH
+    - printed_band_mm(LENGTH_PLACES)
+    - (CLIP_LENGTH - HOLE_INSET + _POSITION_BAND)
+    - HOLE_DIA_MAX / 2.0
+)
 # Fixed-fastener float: each pattern's two .XXX coordinates bound its holes
 # to a diametral zone of 2 * sqrt(2) * band; the clip's hole and the platen's
 # tap share the smallest hole's clearance over the shank.
@@ -138,6 +153,20 @@ HOLE_FLOAT_MIN = HOLE_DIA - SHANK_DIA
 # The catalogue head over the largest drilled hole, concentric: the least
 # bearing land (an offset head only uncovers less of the hole).
 HEAD_BEARING_LAND_MIN = (HEAD_DIA - HOLE_DIA_MAX) / 2.0
+# Clip-joint thread engagement at the worst case (drawing-guidelines.md rule
+# 18): the shortest catalogue screw (ASME B18.6.3, to 1 in: +0/-0.03 in) under
+# the thickest printed sheet reaches the least into the platen's through tap,
+# less one pitch of incomplete lead and the tap mouth's title-block edge break.
+SCREW_LENGTH_MINUS = 0.03 * 25.4
+TAP_MOUTH_BREAK = 0.25
+SHEET_PLACES = 3
+CLIP_SCREW_ENGAGEMENT_MIN = (
+    SHANK_LEN
+    - SCREW_LENGTH_MINUS
+    - (SHEET_T + printed_band_mm(SHEET_PLACES))
+    - PITCH
+    - TAP_MOUTH_BREAK
+)
 
 # Spring rail section (local X, Z) as its sheet MID-SURFACE: the free tip lies
 # flat from its end-round centre out to the screw station, then each free half
@@ -167,7 +196,7 @@ BOSS_DRIVES = {
 # The spring rail's thin extrusion carries three display dimensions, matched
 # by their built value (all distinct): (name, value mm, driving expression).
 SPRING_RAIL_DRIVES = (
-    ("RailWidth", SPRING_RAIL_WIDTH, '"SpringRailW"'),
+    ("SpringRailWidth", SPRING_RAIL_WIDTH, '"SpringRailW"'),
     ("StartOffset", SPRING_RAIL_Y0, '"SpringRailY0"'),
     ("WallT", SHEET_T, '"SheetT"'),
 )
@@ -182,6 +211,61 @@ EQUATION_FLEX = (
 _CORNER_LOSS = (
     (1.0 - math.pi / 4.0) * 2.0 * (SCREW_RAIL_END_RADIUS**2 + SCREW_RAIL_SLIT_RADIUS**2)
 )
+
+# --- Drawing contract: feature -> the parametric dimension NAMES the print
+# shows.  The build marks exactly these and authors their places;
+# ``draw_pd_platen_clip`` keeps exactly their union across its views.  The plan
+# carries the blank: the overall length, the screw rail's width, the spring
+# rail's start and width from the same outer edge (the slit is what lies
+# between), the bridge, the corner radii and the hole stations; the formed
+# profile carries the sheet, the bow stations and the bend radius.  The hole
+# size ships as a native Hole Wizard callout. ---
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "FlatSheetProfile": {
+        "Length",
+        "RailWidth",
+        "BridgeX0",
+        "BridgeLength",
+        "EndR1",
+        "SlitCornerR1",
+    },
+    "FlatSheet": {"SheetDepth"},
+    "SpringRail": {"SpringRailWidth", "StartOffset"},
+    "SpringRailPath": {"BowStartX", "FarBowEndX", "BendR1"},
+    "ScrewHoles": {"LeftX", "RightX", "LeftZ"},
+}
+# Places.  The hole stations and the rail widths that hold the hole's
+# ligaments and the slit print .XXX (POSITION_PLACES), as does the sheet the
+# screw's engagement spends (SHEET_PLACES); the spring rail's own width .XX;
+# the outline, the bridge, the bows and the radii only shape the spring.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "FlatSheetProfile": {
+        "Length": LENGTH_PLACES,
+        "RailWidth": POSITION_PLACES,
+        "BridgeX0": 1,
+        "BridgeLength": 1,
+        "EndR1": 1,
+        "SlitCornerR1": 2,
+    },
+    "FlatSheet": {"SheetDepth": SHEET_PLACES},
+    "SpringRail": {"SpringRailWidth": 2, "StartOffset": POSITION_PLACES},
+    "SpringRailPath": {"BowStartX": 1, "FarBowEndX": 1, "BendR1": 1},
+    "ScrewHoles": {name: POSITION_PLACES for name in ("LeftX", "RightX", "LeftZ")},
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
+    set(DRAWING_PRECISION[feature]) != names
+    for feature, names in DRAWING_DIMENSIONS.items()
+):
+    raise AssertionError("every marked platen-clip dimension needs authored places")
+# The clearance hole's native Ø variable prints the #2 loose size the
+# ligaments and the float above are taken off.
+HOLE_CALLOUT_PRECISION = {"hw-diam": 3}
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
 
 def clip_volumes(
@@ -257,12 +341,27 @@ if SOCKET_THREAD_ENGAGEMENT + 1e-9 < 1.5 * THREAD_MAJOR_MM[THREAD]:
     )
 if HOLE_DIA < SHANK_DIA:
     raise AssertionError("stock fillister shank does not clear the clip")
-if min(EDGE_LIGAMENT_MIN, SLIT_LIGAMENT_MIN, END_LIGAMENT_MIN) < LIGAMENT_FLOOR:
+if (
+    min(EDGE_LIGAMENT_MIN, SLIT_LIGAMENT_MIN, END_LIGAMENT_MIN, FAR_END_LIGAMENT_MIN)
+    < LIGAMENT_FLOOR
+):
     raise AssertionError(
         "platen clip screw-hole ligaments at the printed worst case "
         f"(edge {EDGE_LIGAMENT_MIN:.3f}, slit {SLIT_LIGAMENT_MIN:.3f}, end "
-        f"{END_LIGAMENT_MIN:.3f}) under the {LIGAMENT_FLOOR} floor "
-        "(drawing-guidelines.md rule 17)"
+        f"{END_LIGAMENT_MIN:.3f}, far end {FAR_END_LIGAMENT_MIN:.3f}) under the "
+        f"{LIGAMENT_FLOOR} floor (drawing-guidelines.md rule 17)"
+    )
+# The slit is what the screw rail's and the spring rail's printed widths from
+# the outer edge leave between them; it stays open at their worst case.
+SLIT_WIDTH_MIN = (SPRING_RAIL_Y0 - _POSITION_BAND) - (SCREW_RAIL_WIDTH + _POSITION_BAND)
+if SLIT_WIDTH_MIN <= 0.0:
+    raise AssertionError(
+        f"platen clip slit closes at the printed worst case: {SLIT_WIDTH_MIN}"
+    )
+if CLIP_SCREW_ENGAGEMENT_MIN < 1.5 * THREAD_MAJOR_MM[THREAD]:
+    raise AssertionError(
+        f"clip {THREAD} worst-case engagement {CLIP_SCREW_ENGAGEMENT_MIN:.3f} < 1.5D "
+        "(drawing-guidelines.md rule 18 (thread engagement))"
     )
 if HOLE_FLOAT_MIN < 2.0 * PATTERN_POSITION_ZONE:
     raise AssertionError(
@@ -360,11 +459,16 @@ async def _flat_sheet_outline(adapter) -> SketchDims:
         adapter, f"{bottom}.start", ro, 0.0, "outer edge start"
     )
     dims.record("EdgeStartX", '"ScrewRailEndR"')
-    check(
-        "outer edge length",
-        await adapter.add_sketch_dimension(bottom, None, "linear", length - 2.0 * ro),
+    # The overall length, end to end (the print's one length dimension).
+    await dimension_between(
+        adapter,
+        f"{left}.start",
+        f"{right}.start",
+        "horizontal_distance",
+        length,
+        "clip length",
     )
-    dims.record("EdgeLength", '"ClipLength" - 2 * "ScrewRailEndR"')
+    dims.record("Length", '"ClipLength"')
     for name, arc, radius, expr in (
         ("EndR1", c_br, ro, '"ScrewRailEndR"'),
         ("EndR2", c_bl, ro, '"ScrewRailEndR"'),
@@ -379,7 +483,7 @@ async def _flat_sheet_outline(adapter) -> SketchDims:
     await dimension_between(
         adapter,
         f"{bottom}.start",
-        f"{top_r}.start",
+        f"{top_l}.end",
         "vertical_distance",
         rail,
         "screw rail width",
@@ -467,11 +571,17 @@ async def _spring_mid_surface(adapter) -> SketchDims:
     await anchor_point_to_origin(adapter, f"{tip_l}.start", tip_x0, s0, "tip start")
     dims.record("PathStartX", '"SpringEndR"')
     dims.record("PathStartZ", '"SheetT" / 2')
-    check(
-        "near tip flat length",
-        await adapter.add_sketch_dimension(tip_l, None, "linear", TIP_FLAT_LENGTH),
+    # The bow's start station from the near end (the tip flat's length is what
+    # it leaves past the end round).
+    await dimension_between(
+        adapter,
+        "origin",
+        f"{tip_l}.end",
+        "horizontal_distance",
+        HOLE_INSET,
+        "near bow start",
     )
-    dims.record("TipFlatL1", '"HoleInset" - "SpringEndR"')
+    dims.record("BowStartX", '"HoleInset"')
     for index, arc in enumerate((a1, a2, a3, a4, a5, a6), start=1):
         check(
             f"bend {index} radius",
@@ -752,7 +862,7 @@ async def build(adapter) -> dict[str, str]:
         name="ScrewHoles",
         placement_dims=[
             (("LeftX", '"HoleInset"'), ("LeftZ", '"HoleY"')),
-            (("RightX", '"HoleFarX"'), ("RightZ", '"HoleY"')),
+            (("RightX", '"HoleFarX"'), SharedCoordinate(0)),
         ],
     )
     drive_jobs += hole_cut.placement_drive_jobs
@@ -784,7 +894,19 @@ async def build(adapter) -> dict[str, str]:
         _check_z_span(adapter, f"{knob} restored", SHEET_T)
 
     await apply_material(adapter, MATERIAL)
+
+    # Manufacturing drawing support: every printed dimension's places live on
+    # the model (drawing-simplicity-policy.md `How the repository implements
+    # the guidelines`), then mark exactly the print's dimensions (the drawing
+    # imports the marked set and must find every one) and stamp the view note.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     await report_mass_properties(adapter)
+    apply_drawing_properties(
+        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

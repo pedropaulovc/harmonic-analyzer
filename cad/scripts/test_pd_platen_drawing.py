@@ -1,0 +1,197 @@
+"""Offline contract checks for the platen manufacturing drawing (MHA-PD-002)."""
+
+from __future__ import annotations
+
+import math
+
+import pytest
+
+import build_pd_platen as build
+import draw_pd_platen as draw
+import pd_platen_spec as spec
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
+from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _hole_spec import blind_cut_dia_mm
+from _holes import SharedCoordinate
+from _printed_tolerance import printed_band_mm
+from vn_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
+
+# ASME B landscape field and title block (sheet metres).
+BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
+TITLE_BLOCK = (0.216, 0.0127, 0.4191, 0.066)
+# Half extent of one printed dimension value (about 2.5 mm a character).
+TEXT_HALF_H = 0.002
+
+
+def _inside(xy, box) -> bool:
+    return box[0] <= xy[0] <= box[2] and box[1] <= xy[1] <= box[3]
+
+
+def _view_boxes() -> dict[str, tuple[float, float, float, float]]:
+    w, h = spec.PLATE_WIDTH * draw._S / 2.0, spec.PLATE_HEIGHT * draw._S / 2.0
+    depth = (spec.PLATE_THICKNESS + spec.SOCKET_BOSS_H) * draw._RIGHT_S / 2.0
+    right_h = spec.PLATE_HEIGHT * draw._RIGHT_S / 2.0
+    return {
+        "front": (
+            draw.FRONT_CENTER[0] - w,
+            draw.FRONT_CENTER[1] - h,
+            draw.FRONT_CENTER[0] + w,
+            draw.FRONT_CENTER[1] + h,
+        ),
+        "back": (
+            draw.BACK_CENTER[0] - w,
+            draw.BACK_CENTER[1] - h,
+            draw.BACK_CENTER[0] + w,
+            draw.BACK_CENTER[1] + h,
+        ),
+        "right": (
+            draw.RIGHT_CENTER[0] - depth,
+            draw.RIGHT_CENTER[1] - right_h,
+            draw.RIGHT_CENTER[0] + depth,
+            draw.RIGHT_CENTER[1] + right_h,
+        ),
+    }
+
+
+def test_registry_row_names_the_platen_sheet():
+    row = DRAWINGS_BY_NAME["pd_platen"]
+    assert row.part == "pd_platen"
+    assert row.script_name == "draw_pd_platen.py"
+    assert row.layout is DrawingLayout.LANDSCAPE
+    assert draw.PART_STEM == "pd-platen"
+    assert draw.OUTPUTS.pdf == row.outputs["pdf"]
+    assert "draw_pd_platen.py" in PRECISION_MIGRATED_DRAWINGS
+
+
+def test_views_keep_exactly_the_marked_dimensions_once():
+    keeps = (draw.FRONT_KEEP, draw.RIGHT_KEEP, draw.BACK_KEEP)
+    names = [name for keep in keeps for name in keep]
+    assert len(names) == len(set(names))
+    assert set(names) == set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert set(draw.DIMENSION_PREFIXES) <= set(names)
+    assert set(spec.DRAWING_PRECISION_BY_NAME) == set(names)
+
+
+def test_outline_prints_one_place_and_every_station_three():
+    places = spec.DRAWING_PRECISION_BY_NAME
+    assert places["Width"] == places["Height"] == 1
+    stations = (
+        spec.DRAWING_DIMENSIONS["Sockets"] | spec.DRAWING_DIMENSIONS["GuideHoles"]
+    )
+    assert {places[name] for name in stations} == {3}
+    assert places["Depth"] == places["BossH"] == places["Boss1Dia"] == 3
+
+
+def _placed_coordinates(points, placement, drives):
+    """Each point's (x, y) as the printed drives and shared relations give it."""
+    resolved: list[list[float]] = []
+    for point, axes in zip(points, placement):
+        coordinate = []
+        for axis, dim in enumerate(axes):
+            if isinstance(dim, SharedCoordinate):
+                assert dim.point < len(resolved)
+                coordinate.append(resolved[dim.point][axis])
+            else:
+                coordinate.append(drives[dim[1].strip('"')])
+        assert coordinate == pytest.approx(list(point), abs=1e-9)
+        resolved.append(coordinate)
+    return resolved
+
+
+def test_printed_stations_place_every_hole():
+    xs = sorted({x for x, _ in spec.SOCKET_XY})
+    ys = sorted({y for _, y in spec.SOCKET_XY})
+    drives = {
+        **{f"SocketX{i}": v for i, v in enumerate(xs, start=1)},
+        **{f"SocketY{i}": v for i, v in enumerate(ys, start=1)},
+        **{f"GuideX{i}": v for i, v in enumerate(spec.GUIDE_HOLE_X, start=1)},
+        **{f"GuideY{i}": v for i, v in enumerate(spec.GUIDE_HOLE_Y, start=1)},
+    }
+    sockets = _placed_coordinates(build.SOCKET_ORDER, build.SOCKET_PLACEMENT, drives)
+    guides = _placed_coordinates(spec.GUIDE_HOLE_XY, build.GUIDE_PLACEMENT, drives)
+    assert sorted(map(tuple, sockets)) == sorted(spec.SOCKET_XY)
+    assert len(guides) == 10
+
+    def printed(placement):
+        return {
+            dim[0]
+            for axes in placement
+            for dim in axes
+            if not isinstance(dim, SharedCoordinate)
+        }
+
+    assert printed(build.SOCKET_PLACEMENT) == spec.DRAWING_DIMENSIONS["Sockets"]
+    assert printed(build.GUIDE_PLACEMENT) == spec.DRAWING_DIMENSIONS["GuideHoles"]
+
+
+def test_shallowest_printed_counterbore_still_sinks_the_head():
+    places = spec.GUIDE_CALLOUT_PRECISION["hw-cbdepth"]
+    shallowest = round(spec.CBORE_DEPTH, places) - printed_band_mm(places)
+    assert shallowest - FILLISTER_HEAD_H == pytest.approx(spec.HEAD_RECESS_MIN)
+    assert spec.HEAD_RECESS_MIN > 0.0
+    # The counterbore Ø prints .X: the head still clears its smallest Ø.
+    assert spec.GUIDE_CALLOUT_PRECISION["hw-cbdia"] == 1
+    assert spec.CBORE_DIA - printed_band_mm(1) > 4.6482
+
+
+def test_views_and_annotations_stay_in_the_field():
+    boxes = _view_boxes()
+    names = list(boxes)
+    for i, a in enumerate(names):
+        for b in names[i + 1 :]:
+            box_a, box_b = boxes[a], boxes[b]
+            assert (
+                box_a[2] < box_b[0]
+                or box_b[2] < box_a[0]
+                or (box_a[3] < box_b[1] or box_b[3] < box_a[1])
+            ), (a, b)
+    for box in boxes.values():
+        assert _inside(box[:2], BORDER) and _inside(box[2:], BORDER)
+        assert box[1] > TITLE_BLOCK[3] or box[2] < TITLE_BLOCK[0]
+    points = [
+        *draw.FRONT_KEEP.values(),
+        *draw.RIGHT_KEEP.values(),
+        *draw.BACK_KEEP.values(),
+        draw.ISO_CENTER,
+        draw.ISO_NOTE_XY,
+        draw.RIGHT_NOTE_XY,
+        draw.BACK_NOTE_XY,
+        draw.GUIDE_CALLOUT_XY,
+        draw.SOCKET_CALLOUT_XY,
+    ]
+    for xy in points:
+        assert _inside(xy, BORDER), xy
+        assert not _inside(xy, TITLE_BLOCK), xy
+
+
+def test_x_stations_stack_smallest_nearest_below_the_front_view():
+    values = {
+        "Socket3X": min(x for x, _ in spec.SOCKET_XY),
+        "Socket1X": max(x for x, _ in spec.SOCKET_XY),
+        **{f"Guide{i}X": x for i, x in enumerate(spec.GUIDE_HOLE_X, start=1)},
+        "Width": spec.PLATE_WIDTH,
+    }
+    rows = sorted(values, key=values.get)
+    heights = [draw.FRONT_KEEP[name][1] for name in rows]
+    assert heights == sorted(heights, reverse=True)
+    assert heights[0] < draw.BOTTOM_EDGE_Y - TEXT_HALF_H
+    assert all(a - b >= 0.006 for a, b in zip(heights, heights[1:]))
+    # Every row clears the back view below the stack.
+    assert heights[-1] - TEXT_HALF_H > _view_boxes()["back"][3]
+
+
+def test_callout_picks_lie_on_their_hole_rims():
+    guide = (draw._front_x(spec.GUIDE_HOLE_X[0]), draw._front_y(spec.GUIDE_HOLE_Y[1]))
+    assert math.dist(draw.GUIDE_EDGE_XY, guide) == pytest.approx(
+        spec.CBORE_DIA / 2.0 * draw._S
+    )
+    socket = (
+        draw._front_x(max(x for x, _ in spec.SOCKET_XY)),
+        draw._front_y(max(y for _, y in spec.SOCKET_XY)),
+    )
+    assert math.dist(draw.SOCKET_EDGE_XY, socket) == pytest.approx(
+        blind_cut_dia_mm(spec.SOCKET_SPEC) / 2.0 * draw._S
+    )
+    # Both callouts stand above the plate.
+    assert draw.GUIDE_CALLOUT_XY[1] > draw.TOP_EDGE_Y
+    assert draw.SOCKET_CALLOUT_XY[1] > draw.TOP_EDGE_Y
