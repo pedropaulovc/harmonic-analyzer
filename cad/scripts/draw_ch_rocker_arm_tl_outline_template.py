@@ -49,6 +49,7 @@ from ch_rocker_arm_tl_outline_template_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIVOT_CALLOUT,
+    PROFILE_CALLOUT,
     SHARP_EDGE_CALLOUT,
     THICK_CALLOUT,
 )
@@ -91,9 +92,9 @@ FRONT_KEEP = {
     "TailTipLen": (0.033, 0.197),
     "RodTipLen": (0.367, 0.197),
 }
-# Above the edge view so the stock callout clears the rod tip-land text and
-# the sheet border.
-RIGHT_KEEP = {"Thick": (0.392, 0.225)}
+# Below the edge view and left of its extension lines (the text is far wider
+# than the 3.175 span), clear of the front view's rod tip and the isometric.
+RIGHT_KEEP = {"Thick": (0.370, 0.140)}
 # Both arc centres lie on the bore's vertical centreline, off the sheet
 # above; the apex heights land on each arc's low point there, and the tip
 # lands run radially from those centres.  Each scribing edge carries its
@@ -108,8 +109,17 @@ CALLOUTS_BELOW = {
     "BottomBelowPivot": "TO BOTTOM ARC LOW POINT\nSETS ROCKER BOTTOM EDGE",
     "PivotDia": PIVOT_CALLOUT,
     "Thick": THICK_CALLOUT,
+    "BottomTailX": PROFILE_CALLOUT,
+    "BottomRodX": PROFILE_CALLOUT,
 }
-CALLOUTS_ABOVE = {"TailTipLen": "RADIAL, SHARP", "RodTipLen": "RADIAL, SHARP"}
+# The top stations and tip lands take their profile flag above the value:
+# below, it would land on the apex block or the tip-land dimension line.
+CALLOUTS_ABOVE = {
+    "TopTailX": PROFILE_CALLOUT,
+    "TopRodX": PROFILE_CALLOUT,
+    "TailTipLen": f"{PROFILE_CALLOUT}\nRADIAL, SHARP",
+    "RodTipLen": f"{PROFILE_CALLOUT}\nRADIAL, SHARP",
+}
 
 _Z = [0.0, 0.0, 1.0]
 _PRECISION = DRAWING_PRECISION_BY_NAME
