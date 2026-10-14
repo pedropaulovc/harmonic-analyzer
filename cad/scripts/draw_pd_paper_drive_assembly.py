@@ -1237,11 +1237,13 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "chain-closed": (
             f"LOOP {chain.LINK_COUNT} PITCHES OF ANSI #25 CHAIN, "
-            f"{_N['vn-chain-inner-link']} INNER AND {_N['vn-chain-outer-link']} OUTER "
-            f"LINKS, OVER THE {sprocket.KNOB_CONFIG} AND THE {sprocket.CRANK_CONFIG}; "
-            "JOIN THE ENDS WITH A #25 CONNECTING LINK, MCMASTER "
+            f"{CHAIN_QUANTITIES['vn-chain-inner-link']} {_N['vn-chain-inner-link']} INNER "
+            f"AND {CHAIN_QUANTITIES['vn-chain-outer-link'] - 1} {_N['vn-chain-outer-link']} "
+            f"OUTER LINKS, OVER THE {sprocket.KNOB_CONFIG} AND THE {sprocket.CRANK_CONFIG}; "
+            f"JOIN THE ENDS WITH THE LAST {_N['vn-chain-outer-link']}, THE #25 "
+            "CONNECTING LINK, MCMASTER "
             f"{_config.parts('vn-chain-outer-link')['supplier_skus'][1]}, "
-            "AS ONE OUTER LINK, ITS CLIP'S CLOSED END LEADING "
+            "ITS CLIP'S CLOSED END LEADING "
             "IN THE DIRECTION OF TRAVEL. THE CENTRES ARE FIXED: NO TENSIONING, "
             "THE SLACK RUN HANGS FREE."
         ),
