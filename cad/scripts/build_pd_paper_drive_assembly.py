@@ -1109,7 +1109,7 @@ def _assert_fastener_stacks() -> None:
     valid_engagement("clamp #8-32 engagement", clamp_engagement, CLAMP_SCREW_DIA)
     nonnegative("clamp receiver tip clearance", ARC_BACK_BLOCK_DEPTH - clamp_engagement)
     if abs(CLAMP_CBORE_DEPTH - CLAMP_SCREW_HEAD_H - CLAMP_HEAD_RECESS) > 1e-9:
-        raise AssertionError("clamp head is not recessed by the specified 0.2 mm")
+        raise AssertionError("clamp head is not recessed by CLAMP_HEAD_RECESS")
 
     # 90114A511 guide screws: exact head recess, positive shank clearance,
     # 5.4178-mm engagement, and positive blind-bottom clearance.
