@@ -13,9 +13,14 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -60,11 +65,15 @@ SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
 ISO_SCALE = (1, 4)
 FRONT_CENTER = (0.200, 0.165)
-RIGHT_CENTER = (0.405, 0.165)
+RIGHT_CENTER = (0.400, 0.165)
+# Notes start above the title block's top edge so both lines clear it.
+NOTES_XY = (0.020, 0.088)
 ISO_CENTER = (0.330, 0.240)
 ISO_NOTE_XY = (0.250, 0.258)
-# Radius text stays outside both circles (below the outline), so each
-# radial leader runs only to its arc, never to the off-sheet centre.
+# Radius text stays outside both circles (below the outline) and each radius
+# keeps its arrow outside the arc with no solid leader, so its leader runs
+# from the text to its arc and stops: never on to the off-sheet centre.
+EXTERIOR_RADII = ("TopRadius", "BottomRadius")
 FRONT_KEEP = {
     "TopRadius": (0.085, 0.140),
     "BottomRadius": (0.315, 0.140),
@@ -78,7 +87,9 @@ FRONT_KEEP = {
     "TailTipLen": (0.035, 0.190),
     "RodTipLen": (0.365, 0.190),
 }
-RIGHT_KEEP = {"Thick": (0.405, 0.195)}
+# Above the edge view so the stock callout clears the rod tip-land text and
+# the sheet border.
+RIGHT_KEEP = {"Thick": (0.392, 0.215)}
 # Functional intent rides the dimension it governs, not the notes.
 CALLOUTS_BELOW = {
     "TopAbovePivot": "SETS ROCKER TOP EDGE",
@@ -317,12 +328,13 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     ]
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
+    _radius_leaders_to_arc(adapter, annotations)
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add the center mark to the template pivot hole")
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
@@ -332,6 +344,30 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )
+
+
+def _radius_leaders_to_arc(adapter: Any, annotations: list[Any]) -> None:
+    """The rocker's exterior-radius dress: text-to-arc leaders only."""
+    remaining = set(EXTERIOR_RADII)
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ShortenedRadius = False
+        display.ArcExtensionLineOrOppositeSide = False
+        display.ArrowSide = 1  # swDimArrowsOutside
+        display.SolidLeader = False
+        if (
+            bool(display.ShortenedRadius)
+            or bool(display.ArcExtensionLineOrOppositeSide)
+            or int(display.ArrowSide) != 1
+            or bool(display.SolidLeader)
+        ):
+            raise RuntimeError(f"{name} retained its centre-directed radius leader")
+        remaining.remove(name)
+    if remaining:
+        raise RuntimeError(f"exterior radii missing: {sorted(remaining)}")
 
 
 def _parse_args() -> argparse.Namespace:
