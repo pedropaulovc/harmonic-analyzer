@@ -14,11 +14,13 @@ to (raw + hub length) / 2 above the raw underside, and the lower hub face is
 the hub length below it, (raw - hub length) / 2 above the raw underside. That
 is the pedestal's step over the end blocks.
 
-Frame: origin on the bench top under the rocker's pivot axis, +X along the
-blank, +Y as the rocker frame ``top`` (pivot axis X0 Y0), +Z up. The pieces sit
-at their S5 stations. The inventory's fixture frame
-(fixtures.rocker-filing-stand: Z0 = end-block tops = raw blank underside) is
-this frame lowered by BLOCK_HEIGHT; PRECHIPS_SOLIDS states the set there.
+SolidWorks part frame: +Y up, origin on the bench top, the pieces laid out
+side by side along +X for the sheet (LAYOUT_*, not their S5 stations; the
+spacing is not a requirement). Every face requirement is a top face (+Y).
+PRECHIPS_SOLIDS states the set at its S5 stations in the inventory's fixture
+frame (fixtures.rocker-filing-stand: origin under the rocker's pivot axis,
++X along the blank, +Y as the rocker frame ``top``, +Z up, Z0 = end-block
+tops = raw blank underside).
 """
 
 from __future__ import annotations
@@ -75,15 +77,24 @@ if abs(PEDESTAL_LENGTH - BLOCK_HEIGHT - STEP) > 1e-9:
         "filing-stand pedestal length is not the block height plus the step"
     )
 
+# Sheet arrangement only (the drawing's views, never a requirement): the two
+# blocks side by side, then the pedestal, each standing on the bench (Y0), in
+# Top-plane sketch coordinates (sketch y is model -Z).
+LAYOUT_BLOCK_WEST_X = (0.0, 30.0)  # left block, right block
+LAYOUT_PEDESTAL_X = 70.0
+LAYOUT_PEDESTAL_Y = BLOCK_WIDTH / 2.0
+if LAYOUT_PEDESTAL_X - PEDESTAL_DIA / 2.0 <= LAYOUT_BLOCK_WEST_X[1] + BLOCK_LENGTH:
+    raise AssertionError("filing-stand layout overlaps the pedestal and a block")
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "BlockProfiles": {"BlockLength", "BlockWidth"},
-    "Blocks": {"BlockHeight"},
+    "LeftBlockProfile": {"BlockLength", "BlockWidth"},
+    "LeftBlock": {"BlockHeight"},
     "PedestalProfile": {"PedestalDia"},
     "Pedestal": {"PedestalLength"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "BlockProfiles": {"BlockLength": 1, "BlockWidth": 1},
-    "Blocks": {"BlockHeight": 1},
+    "LeftBlockProfile": {"BlockLength": 1, "BlockWidth": 1},
+    "LeftBlock": {"BlockHeight": 1},
     "PedestalProfile": {"PedestalDia": 2},
     "Pedestal": {"PedestalLength": 2},
 }
@@ -99,8 +110,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # and rule 19 (absorb stacks at fit-up): the pedestal's length is a reference;
 # what is held is its step over the end blocks, on the dimension it governs,
 # naming the face it carries. The pedestal round is stock-sized. Short lines:
-# the callout sits in the elevation's open middle, between the pedestal and
-# the right end block.
+# the callout sits right of the pedestal, inside its length.
 ROCKER_NUMBER = "MHA-CH-006"
 PEDESTAL_LENGTH_CALLOUT = "\n".join(
     (
@@ -116,10 +126,10 @@ SURFACE_FINISHES = ()
 DRAWING_NOTES = "\n".join(
     (
         "LOOSE SET: TWO END BLOCKS AND ONE PEDESTAL.",
-        "VIEWS SHOW THE SET STANDING ON THE FITTING BENCH IN USE.",
+        "VIEW SPACING IS NOT A REQUIREMENT.",
     )
 )
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 
 # The fitting bench top under the set: clearance envelope only, never made.
 BENCH_SIZE = (500.0, 160.0, 30.0)

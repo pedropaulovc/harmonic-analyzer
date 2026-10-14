@@ -1,9 +1,9 @@
 r"""Create the drawing for the rocker arm filing stand (MHA-CH-006-TL-12).
 
-The loose set at its S5 stations: a plan (``*Front``, looking down on the
-bench) carries the block outline and the pedestal diameter, and the elevation
-(``*Bottom``, third-angle below it, +Z up) the block height and the pedestal's
-reference length with its step over the blocks.
+The loose set laid out side by side: a plan (``*Top``, looking down on the
+bench) carries the left block's outline and the pedestal diameter, and the
+elevation (``*Front``, third-angle below it, +Y up) the left block's height
+and the pedestal's reference length with its step over the blocks.
 """
 
 from __future__ import annotations
@@ -54,27 +54,29 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# The set spans the 336 blank: 1:2 fits it across the sheet with both views
-# stacked left of the isometric.
-SHEET_SCALE = (1.0, 2.0)
-VIEW_SCALE = (1, 2)
-# Plan: blocks at sheet x 0.066-0.076 and 0.224-0.234, y 0.2055-0.2245.
-PLAN_CENTER = (0.150, 0.215)
-# Elevation: bench line at y 0.1424, block tops 0.1574.
-ELEVATION_CENTER = (0.150, 0.150)
-ISO_CENTER = (0.340, 0.185)
-ISO_SCALE = (1, 4)
-ISO_NOTE_XY = (0.300, 0.235)
+# The set is 75 long and 38 deep: full size, both views stacked left of the
+# isometric.
+SHEET_SCALE = (1.0, 1.0)
+VIEW_SCALE = (1, 1)
+# Plan: left block at sheet x 0.0726-0.0926, right 0.1026-0.1226, pedestal
+# centre 0.1424; y 0.186-0.224.
+PLAN_CENTER = (0.110, 0.205)
+# Elevation: bench line at y 0.1148, block tops 0.1448, pedestal top 0.1452.
+ELEVATION_CENTER = (0.110, 0.130)
+ISO_CENTER = (0.300, 0.185)
+ISO_SCALE = (1, 2)
+ISO_NOTE_XY = (0.265, 0.235)
 PLAN_KEEP = {
     # The left block carries the 2X outline sizes.
-    "BlockLength": (0.071, 0.236),
-    "BlockWidth": (0.045, 0.215),
-    "PedestalDia": (0.185, 0.245),
+    "BlockLength": (0.0826, 0.236),
+    "BlockWidth": (0.055, 0.205),
+    "PedestalDia": (0.172, 0.240),
 }
 ELEVATION_KEEP = {
-    "BlockHeight": (0.045, 0.150),
-    # Right of the pedestal, in the open middle; the step callout below it.
-    "PedestalLength": (0.175, 0.153),
+    "BlockHeight": (0.055, 0.130),
+    # Right of the pedestal, clear of it, the value high in the 30 span so
+    # the step callout below it stays between the extension lines.
+    "PedestalLength": (0.184, 0.139),
 }
 CALLOUTS_ABOVE = {
     "BlockLength": BLOCK_COUNT_CALLOUT,
@@ -89,21 +91,19 @@ CALLOUTS_BELOW = {
 
 part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
 
-for side, centre_x in (
-    ("left", -part_spec.BLOCK_OUTER_X + part_spec.BLOCK_LENGTH / 2.0),
-    ("right", part_spec.BLOCK_OUTER_X - part_spec.BLOCK_LENGTH / 2.0),
-):
+for side, west_x in zip(("left", "right"), part_spec.LAYOUT_BLOCK_WEST_X, strict=True):
+    centre_x = west_x + part_spec.BLOCK_LENGTH / 2.0
     requirement(
         f"{side}_end_block_top",
         kind="face",
         faces=(
-            PlanarFace((0.0, 0.0, 1.0), part_spec.BLOCK_HEIGHT, contains_x_mm=centre_x),
+            PlanarFace((0.0, 1.0, 0.0), part_spec.BLOCK_HEIGHT, contains_x_mm=centre_x),
         ),
         requirements=("height", "length", "width"),
         fields={
-            "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
+            "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
             "plane": (
-                {"frame": "model", "axis": "z", "value": part_spec.BLOCK_HEIGHT},
+                {"frame": "model", "axis": "y", "value": part_spec.BLOCK_HEIGHT},
                 ("BLOCK_HEIGHT",),
             ),
             "height": (limits(part_spec.BLOCK_HEIGHT, 1), ("BLOCK_HEIGHT",)),
@@ -122,12 +122,12 @@ for side, centre_x in (
 requirement(
     "pedestal_top",
     kind="face",
-    faces=(PlanarFace((0.0, 0.0, 1.0), part_spec.PEDESTAL_LENGTH),),
+    faces=(PlanarFace((0.0, 1.0, 0.0), part_spec.PEDESTAL_LENGTH),),
     requirements=("height", "dia"),
     fields={
-        "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
+        "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
         "plane": (
-            {"frame": "model", "axis": "z", "value": part_spec.PEDESTAL_LENGTH},
+            {"frame": "model", "axis": "y", "value": part_spec.PEDESTAL_LENGTH},
             ("PEDESTAL_LENGTH",),
         ),
         # The held size: the pedestal top's height over the end-block tops.
@@ -194,9 +194,9 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    plan = place_view(adapter, str(SOURCE), "*Front", *PLAN_CENTER, scale=VIEW_SCALE)
+    plan = place_view(adapter, str(SOURCE), "*Top", *PLAN_CENTER, scale=VIEW_SCALE)
     elevation = place_view(
-        adapter, str(SOURCE), "*Bottom", *ELEVATION_CENTER, scale=VIEW_SCALE
+        adapter, str(SOURCE), "*Front", *ELEVATION_CENTER, scale=VIEW_SCALE
     )
     # finalize_drawing shades the pictorial isometric with edges; set it HLR
     # first so the shading is applied to a precision view, not the default.

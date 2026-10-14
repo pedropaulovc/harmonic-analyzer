@@ -4,10 +4,11 @@ Two steel end blocks and a steel pedestal standing loose on the fitting bench:
 the blocks carry the raw blank ends and the pedestal the lower hub face while
 the rocker arm is sawn free and filed (``ch_rocker_arm_tl_filing_stand_spec``).
 
-Layout (the spec's frame, origin on the bench top under the pivot axis): both
-block outlines are one Front-plane sketch extruded +Z by the block height; the
-pedestal is a circle at the origin extruded +Z by its own length, a separate
-body. The part is the loose set, three bodies at their S5 stations.
+Layout (the spec's SolidWorks frame, +Y up, origin on the bench top): each
+block outline is its own Top-plane sketch extruded +Y by the block height, so
+the left block alone carries the printed sizes; the pedestal is a circle
+extruded +Y by its own length. The part is the loose set, three bodies laid
+out side by side for the sheet.
 
 Run (SolidWorks already open)::
 
@@ -41,13 +42,14 @@ from _saved_part_guard import require_saved_drawing_properties
 from ch_rocker_arm_tl_filing_stand_spec import (
     BLOCK_HEIGHT,
     BLOCK_LENGTH,
-    BLOCK_SOUTH_Y,
-    BLOCK_WEST_X,
     BLOCK_WIDTH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
+    LAYOUT_BLOCK_WEST_X,
+    LAYOUT_PEDESTAL_X,
+    LAYOUT_PEDESTAL_Y,
     PEDESTAL_DIA,
     PEDESTAL_LENGTH,
 )
@@ -64,7 +66,7 @@ _SAVED_DRAWING_PROPERTIES = (
 )
 BODY_COUNT = 3  # two end blocks and the pedestal
 
-V_BLOCKS = 2.0 * BLOCK_LENGTH * BLOCK_WIDTH * BLOCK_HEIGHT
+V_BLOCK = BLOCK_LENGTH * BLOCK_WIDTH * BLOCK_HEIGHT
 V_PEDESTAL = math.pi / 4.0 * PEDESTAL_DIA**2 * PEDESTAL_LENGTH
 
 
@@ -91,16 +93,20 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PedestalDia", f"{PEDESTAL_DIA}mm")
     await set_global(adapter, "PedestalLength", f"{PEDESTAL_LENGTH}mm")
 
-    # Both block outlines in one sketch: each anchored at its south-west
-    # corner; the right block's size follows the same two globals.
-    profile = SketchDims()
-    check("create_sketch end blocks", await adapter.create_sketch("Front"))
-    for side, west_x in zip(("Left", "Right"), BLOCK_WEST_X, strict=True):
+    # One sketch and extrusion per block, each anchored at its south-west
+    # corner; the right block's sizes follow the same three globals.
+    drive_jobs = []
+    volume = 0.0
+    for count, (side, west_x) in enumerate(
+        zip(("Left", "Right"), LAYOUT_BLOCK_WEST_X, strict=True), start=1
+    ):
+        profile = SketchDims()
+        check(f"create_sketch {side} block", await adapter.create_sketch("Top"))
         points = [
-            (west_x, BLOCK_SOUTH_Y),
-            (west_x + BLOCK_LENGTH, BLOCK_SOUTH_Y),
-            (west_x + BLOCK_LENGTH, BLOCK_SOUTH_Y + BLOCK_WIDTH),
-            (west_x, BLOCK_SOUTH_Y + BLOCK_WIDTH),
+            (west_x, 0.0),
+            (west_x + BLOCK_LENGTH, 0.0),
+            (west_x + BLOCK_LENGTH, BLOCK_WIDTH),
+            (west_x, BLOCK_WIDTH),
         ]
         lines = await add_line_chain(adapter, points)
         prefix = "" if side == "Left" else side
@@ -118,27 +124,37 @@ async def build(adapter) -> dict[str, str]:
             ],
             drives=['"BlockLength"', '"BlockWidth"', None, None],
         )
-    await ensure_fully_defined(adapter, "end-block profiles")
-    check("exit_sketch end blocks", await adapter.exit_sketch())
-    name_last_feature(adapter, "BlockProfiles")
-    drive_jobs = profile.apply(adapter, "BlockProfiles")
-    check(
-        "extrude end blocks",
-        await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
-    )
-    name_last_feature(adapter, "Blocks")
-    drive_jobs.append(
-        (name_dimensions(adapter, "Blocks", ["BlockHeight"])[0], '"BlockHeight"')
-    )
-    volume = await volume_check(adapter, "end blocks", V_BLOCKS, 0.002 * V_BLOCKS)
-    _require_bodies(adapter, 2, label="end blocks")
+        await ensure_fully_defined(adapter, f"{side.lower()} end-block profile")
+        check(f"exit_sketch {side} block", await adapter.exit_sketch())
+        name_last_feature(adapter, f"{side}BlockProfile")
+        drive_jobs += profile.apply(adapter, f"{side}BlockProfile")
+        check(
+            f"extrude {side} block",
+            await adapter.create_extrusion(
+                ExtrusionParameters(depth=BLOCK_HEIGHT, merge_result=False)
+            ),
+        )
+        name_last_feature(adapter, f"{side}Block")
+        drive_jobs.append(
+            (
+                name_dimensions(adapter, f"{side}Block", [f"{prefix}BlockHeight"])[0],
+                '"BlockHeight"',
+            )
+        )
+        volume = await volume_check(
+            adapter,
+            f"{side.lower()} end block",
+            count * V_BLOCK,
+            0.002 * count * V_BLOCK,
+        )
+        _require_bodies(adapter, count, label=f"{side.lower()} end block")
 
     pedestal = SketchDims()
-    check("create_sketch pedestal", await adapter.create_sketch("Front"))
+    check("create_sketch pedestal", await adapter.create_sketch("Top"))
     await define_circle(
         adapter,
-        0.0,
-        0.0,
+        LAYOUT_PEDESTAL_X,
+        LAYOUT_PEDESTAL_Y,
         PEDESTAL_DIA / 2.0,
         "pedestal",
         dims=pedestal,
@@ -163,7 +179,7 @@ async def build(adapter) -> dict[str, str]:
         )
     )
     volume = await volume_check(
-        adapter, "pedestal", volume + V_PEDESTAL, 0.002 * (V_BLOCKS + V_PEDESTAL)
+        adapter, "pedestal", volume + V_PEDESTAL, 0.002 * (2.0 * V_BLOCK + V_PEDESTAL)
     )
     _require_bodies(adapter, BODY_COUNT, label="filing stand")
 
