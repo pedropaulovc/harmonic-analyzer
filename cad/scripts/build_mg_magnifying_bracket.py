@@ -539,7 +539,7 @@ async def build(adapter) -> dict[str, str]:
     # the hole-datum face (FootprintOffset) and the thickness
     # (FootprintThickness), every one driven by the globals so an edited
     # flange or arm moves the witness with the body.
-    if ARM_HALF_X != FLANGE_X[1]:
+    if abs(ARM_HALF_X - FLANGE_X[1]) > 1e-9:  # shared face; mm float noise only
         raise RuntimeError(
             "the arm footprint witness lies on the flange's east end, which the "
             f"arm's +X face must share: ARM_HALF_X {ARM_HALF_X} != FLANGE_X[1] {FLANGE_X[1]}"
