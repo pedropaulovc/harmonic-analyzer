@@ -205,6 +205,105 @@ def test_pivot_chamfer_clears_the_rod_fillet_as_a_min_limit() -> None:
         assert not re.search(r"\d\.\d", text)
 
 
+def test_printed_bands_keep_both_relief_walls_and_clear_the_marker_body() -> None:
+    import _config
+    from _printed_tolerance import printed_band_mm
+
+    places = spec.DRAWING_PRECISION_BY_NAME
+    # Review r3 (rule 17): at .X depth and .XX stations the far wall left of
+    # 18 - 2.50 - 13.00 fell to 1.44.  The body's four stations print .XXX,
+    # the depth .XX.
+    for name in ("ReliefZ0", "ReliefWidth", "VMouthZ", "VMouth"):
+        assert places[name] == 3, name
+    assert places["Depth"] == 2
+    band = {name: printed_band_mm(n) for name, n in places.items()}
+    z0 = (spec.BLOCK_DEPTH - spec.RELIEF_WIDTH) / 2.0
+    mouth_z = (spec.BLOCK_DEPTH - spec.V_MOUTH_WIDTH) / 2.0
+    near_wall = z0 - band["ReliefZ0"]
+    far_wall = (
+        spec.BLOCK_DEPTH
+        - band["Depth"]
+        - (z0 + band["ReliefZ0"])
+        - (spec.RELIEF_WIDTH + band["ReliefWidth"])
+    )
+    assert spec.RELIEF_NEAR_WALL_PRINTED_MIN == pytest.approx(near_wall)
+    assert spec.RELIEF_FAR_WALL_PRINTED_MIN == pytest.approx(far_wall)
+    assert near_wall == pytest.approx(2.37)
+    assert far_wall == pytest.approx(1.73)
+    assert min(near_wall, far_wall) >= 1.5
+    # The seated body's widest chord over the V's printed corners.
+    body_r = spec.marker.BODY_FRONT_DIA / 2.0
+    grip_r = spec.marker.BARREL_DIA / 2.0
+    chords = []
+    for apex in (-band["VApexY"], band["VApexY"]):
+        for mouth in (-band["VMouth"], band["VMouth"]):
+            a = spec.V_APEX_Y + apex
+            m = spec.V_MOUTH_WIDTH + mouth
+            axis_y = a - grip_r * math.hypot(a, m / 2.0) / (m / 2.0)
+            chords.append(math.sqrt(body_r**2 - axis_y**2))
+    chord = max(chords)
+    assert spec.BODY_HALF_CHORD_PRINTED_MAX == pytest.approx(chord)
+    near = (
+        (mouth_z - band["VMouthZ"])
+        + (spec.V_MOUTH_WIDTH - band["VMouth"]) / 2.0
+        - chord
+        - (z0 + band["ReliefZ0"])
+    )
+    far = (
+        (z0 - band["ReliefZ0"])
+        + (spec.RELIEF_WIDTH - band["ReliefWidth"])
+        - (mouth_z + band["VMouthZ"])
+        - (spec.V_MOUTH_WIDTH + band["VMouth"]) / 2.0
+        - chord
+    )
+    assert spec.BODY_NEAR_CLEARANCE_PRINTED_MIN == pytest.approx(near)
+    assert spec.BODY_FAR_CLEARANCE_PRINTED_MIN == pytest.approx(far)
+    assert min(near, far) > 0.0
+    # One functional callout on the governing width, naming the mate; no
+    # dimension in its text.
+    callout = spec.DIMENSION_CALLOUTS["ReliefWidth"]
+    assert callout.startswith("CLEARS MARKER BODY")
+    assert _config.parts("vn-pen-marker")["number"] in callout
+    assert not re.search(r"\d\.\d", callout)
+    for name in ("ReliefZ0", "VMouthZ", "VMouth"):
+        assert name not in spec.DIMENSION_CALLOUTS
+
+
+def test_section_looks_the_same_way_as_the_paper_end_view() -> None:
+    # Review r3 (rule 10 clarity): A-A mirrored the end view, so the V and the
+    # relief read as located from opposite faces.  Both now put z 0 left.
+    assert drawing._rz(0.0) < drawing._rz(spec.BLOCK_DEPTH)
+    assert drawing._sz(0.0) < drawing._sz(spec.BLOCK_DEPTH)
+    assert drawing._sz(drawing._CZ) == pytest.approx(drawing.SECTION_CENTER[0])
+    cut = _DRAWING_SOURCE.index("section = create_section_view(")
+    orient = _DRAWING_SOURCE.index("_orient_section(adapter, section)")
+    centre = _DRAWING_SOURCE.index("_centre_section(adapter, section)")
+    curate = _DRAWING_SOURCE.index("keep=SECTION_KEEP")
+    assert cut < orient < centre < curate
+    body = _DRAWING_SOURCE[_DRAWING_SOURCE.index("def _orient_section(") :]
+    body = body[: body.index("\ndef ")]
+    assert "SetReversedCutDirection(" in body
+    assert "GetReversedCutDirection()" in body
+    # Keeps mirror with it: the near-wall text left of the front face, the
+    # height right of the far wall, the chamfer text right of its far rim.
+    keep = drawing.SECTION_KEEP
+    assert keep["ReliefZ0"][0] < drawing._sz(0.0)
+    far_wall_z = (spec.BLOCK_DEPTH + spec.RELIEF_WIDTH) / 2.0
+    assert keep["ReliefHeight"][0] > drawing._sz(spec.BLOCK_DEPTH)
+    rim = drawing._sz(
+        drawing._CZ + spec.PIVOT_BORE_DIA / 2.0 + spec.PIVOT_BORE_TOP_CHAMFER
+    )
+    assert keep["PivotChamferSize"][0] > rim
+    # ...so the printed ReliefHeight is the far wall's chord in the build.
+    assert (
+        '["ReliefZ0", "ReliefNearWall", "ReliefWidth", "ReliefHeight"]' in _PART_SOURCE
+    )
+    assert drawing._sz(far_wall_z) < keep["ReliefHeight"][0]
+    # The caption drops under the width's two callout rows.
+    assert "position_section_caption(" in _DRAWING_SOURCE
+    assert drawing.SECTION_CAPTION_XY[1] < keep["ReliefWidth"][1] - 0.015
+
+
 def test_holes_are_native_wizard_features_with_native_callouts() -> None:
     assert spec.SET_SCREW_TAP_SPEC.kind == "tapped"
     assert spec.SET_SCREW_TAP_SPEC.end == "through_next"

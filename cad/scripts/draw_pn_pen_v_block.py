@@ -23,9 +23,10 @@ feature is located across the depth from the front face:
   vertical bores.  It carries the relief's start station and corner radius,
   the pivot bore (station and reamed, banded diameter) and the lightening
   bore's two stations with its native callout.
-* section A-A through the pivot-bore axis: bore, tap and relief in one cut;
-  it carries the relief's near wall, width and height, the pivot bore's
-  station from the front face, and the bore's top chamfer.
+* section A-A through the pivot-bore axis: bore, tap and relief in one cut,
+  looking toward the free end as the paper-end view does (front face on the
+  left in both); it carries the relief's near wall, width and height, the
+  pivot bore's station from the front face, and the bore's top chamfer.
 
 No datums, frames, basic dimensions or roughness (drawing-simplicity-policy.md
 rules 5 and 6), no note block: material and finish ride the title block.  The
@@ -43,6 +44,7 @@ import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
@@ -59,6 +61,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import scan_view_edges
@@ -66,13 +69,14 @@ from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import TAP_DRILL_MM
 from _paths import CAD_ROOT
+from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 from pn_pen_v_block_spec import (
@@ -121,14 +125,18 @@ _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
 # front and bottom views and 72 x 72 in the end view and the section.  The
 # front (x 0.040..0.184, y 0.156..0.228) stacks over the bottom view (y
 # 0.054..0.126), both left of the title block (x 0.216); the end view
-# (x 0.219..0.291) and section A-A (x 0.324..0.396) share the front's row; the
-# isometric sits over the title block.
+# (x 0.219..0.291) and section A-A (x 0.324..0.396) share the front's row.
+# The isometric (~39 x 34 mm of ink at 1:1) sits under the gap between them,
+# x ~0.293..0.332, y ~0.081..0.115: right of the reamed diameter's callout
+# (to x 0.276), under the end view's depth row (y ~0.133), left of section
+# A-A's lowered caption (from x ~0.337); its scale note under it, above the
+# title block (y 0.065).
 FRONT_CENTER = (0.112, 0.192)
 BOTTOM_CENTER = (FRONT_CENTER[0], 0.090)
 RIGHT_CENTER = (0.255, FRONT_CENTER[1])
 SECTION_CENTER = (0.360, FRONT_CENTER[1])
-ISO_CENTER = (0.375, 0.105)
-ISO_NOTE_XY = (0.350, 0.074)
+ISO_CENTER = (0.312, 0.099)
+ISO_NOTE_XY = (0.283, 0.074)
 TAP_CALLOUT_XY = (0.235, 0.252)
 # Above-left of the bottom view, the lightening bore's near (upper-left) rim
 # 13 mm down-right of the text: one arrow there, no line through the bore
@@ -173,9 +181,10 @@ def _ry(model_y_mm: float) -> float:
 
 
 def _sz(model_z_mm: float) -> float:
-    """Sheet X of a model-Z point in section A-A: it looks toward the paper end,
-    so z 0 (the front face, where the tap enters) is on its RIGHT."""
-    return SECTION_CENTER[0] - (model_z_mm - _CZ) * _S
+    """Sheet X of a model-Z point in section A-A: it looks toward the free end
+    (+X), as the paper-end view beside it does, so z 0 (the front face, where
+    the tap enters) is on its LEFT in both (``_orient_section``)."""
+    return SECTION_CENTER[0] + (model_z_mm - _CZ) * _S
 
 
 def _sy(model_y_mm: float) -> float:
@@ -197,14 +206,15 @@ FRONT_KEEP = {
 }
 # Paper end: the depth under the view; one row above it the V's front mouth
 # edge from the front face (z 0, the view's left edge) chained with the mouth
-# width.  The 3.00's 12 mm span would cramp its text between the arrows, so
-# it sits 8 mm left of the z 0 corner, in the gap to the front view (whose
-# right edge is at x 0.184; its SetScrewY text is at y 0.180, above).  The
-# apex height right of the view.
+# width.  The 3.000's 12 mm span would cramp its text (~13 mm) between the
+# arrows, so it sits 10 mm left of the z 0 corner (x ~0.203..0.215), in the
+# gap to the front view (whose right edge is at x 0.184; its SetScrewY text is
+# at y 0.180, above), 4 mm clear of the corner's extension line.  The apex
+# height right of the view.
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], _ry(0.0) - 0.020),
     "VMouth": (RIGHT_CENTER[0], _ry(0.0) - 0.007),
-    "VMouthZ": (_rz(0.0) - 0.008, _ry(0.0) - 0.007),
+    "VMouthZ": (_rz(0.0) - 0.010, _ry(0.0) - 0.007),
     "VApexY": (_rz(BLOCK_DEPTH) + 0.012, _ry(V_APEX_Y / 2.0)),
 }
 # Bottom: all three stations from the paper end below the view, a baseline
@@ -233,36 +243,43 @@ BOTTOM_KEEP = {
     ),
     "PivotDia": (_fx(0.0) + 0.048, _bz(0.0) - 0.008),
 }
-# Section A-A (z 0 at x 0.396 on the right, the bottom face at y 0.156, the
-# top at 0.228; the caption sits ~0.017 under the view).  Its two reference
-# sketches show here (they lie in the cut), every chord on a drawn edge: both
-# relief walls, stubs down the front face and the bore axis from the top
-# face, and the far chamfer face.
+# Section A-A looks the same way as the paper-end view beside it: z 0 at
+# x 0.324 on the LEFT, the bottom face at y 0.156, the top at 0.228.  Its two
+# reference sketches show here (they lie in the cut), every chord on a drawn
+# edge: both relief walls, stubs down the front face and the bore axis from
+# the top face, and the far chamfer face.
 # * the relief's near wall from the front face and its width, one chain 7 mm
-#   under the bottom face, their extension lines on the wall feet; the 2.50's
-#   10 mm span is too short for its text, which sits just right of the z 0
-#   foot (x 0.405) under the relief height's lower end (y 0.156).
-# * the relief height right of the cut, from the near wall's foot to the
-#   roof, as before.
+#   under the bottom face, their extension lines on the wall feet; the
+#   2.500's 10 mm span is too short for its text (~13 mm), which sits left of
+#   the z 0 foot (x ~0.309..0.321, y 0.149), clear of the end view's apex
+#   height (x 0.303, y 0.156 up).  The width's two-row function callout
+#   (~46 mm wide, centred under 13.000) stays between the wall feet's
+#   extension lines (x 0.334 / 0.386) and ends ~0.136.
+# * the relief height right of the cut, on the far wall (z 15.5, x 0.386)
+#   from its foot to the roof.
 # * the pivot station 8 mm over the top face (y 0.236), from the front face's
-#   top corner (x 0.396) to the bore axis (x 0.360, a sketched centreline
+#   top corner (x 0.324) to the bore axis (x 0.360, a sketched centreline
 #   from y 0.179 to 0.231); its extension lines top out near y 0.2375.
-# * the chamfer size on the bore's far rim (x 0.351..0.352, the z 11 side),
-#   its "0.3 MIN" (~14 mm wide) centred 12 mm left of that rim and 12 mm up
-#   (y 0.240): its dimension line runs left, away from PivotZ's extension
-#   line at x 0.360; the angle callout below stays left of x 0.35; the
-#   functional note above (~70 mm wide, y ~0.245) clears every extension
-#   line's top and the tap callout's right end (x 0.266).
+# * the chamfer size on the bore's far rim (x 0.364..0.365, the z 11 side),
+#   its "0.3 MIN" (~14 mm wide) centred 12 mm right of that rim and 12 mm up
+#   (x 0.377, y 0.240): its dimension line runs right, away from PivotZ's
+#   extension line at x 0.360; the angle callout below starts right of
+#   x 0.367; the two-row functional note above (~43 mm wide, x ~0.356..0.399,
+#   y ~0.244 up) clears every extension line's top and the sheet border
+#   (x 0.419).
 SECTION_KEEP = {
-    "ReliefZ0": (_sz(0.0) + 0.009, _sy(0.0) - 0.007),
+    "ReliefZ0": (_sz(0.0) - 0.009, _sy(0.0) - 0.007),
     "ReliefWidth": (_sz(_CZ), _sy(0.0) - 0.007),
-    "ReliefHeight": (_sz(0.0) + 0.012, _sy(RELIEF_HEIGHT / 2.0)),
+    "ReliefHeight": (_sz(BLOCK_DEPTH) + 0.012, _sy(RELIEF_HEIGHT / 2.0)),
     "PivotZ": (_sz(_CZ / 2.0), _sy(BLOCK_HEIGHT) + 0.008),
     "PivotChamferSize": (
-        _sz(_CZ + PIVOT_BORE_DIA / 2.0 + PIVOT_BORE_TOP_CHAMFER) - 0.012,
+        _sz(_CZ + PIVOT_BORE_DIA / 2.0 + PIVOT_BORE_TOP_CHAMFER) + 0.012,
         _sy(BLOCK_HEIGHT) + 0.012,
     ),
 }
+# The native SECTION A-A / SCALE caption's top centre, lowered 25 mm under the
+# bottom face (default ~17 mm) so the width's callout rows clear it.
+SECTION_CAPTION_XY = (SECTION_CENTER[0], _sy(0.0) - 0.025)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -359,7 +376,12 @@ async def build(adapter: Any) -> dict[str, str]:
             scale=VIEW_SCALE,
             label="pivot bore and set-screw tap section",
         )
+        # Look along +X like the paper-end view beside it, so the front face
+        # is on the left in both; a section shows no hidden lines (rule 9),
+        # set before centring so the display change cannot shift the ink.
+        _orient_section(adapter, section)
         set_hidden_lines_removed(adapter, section)
+        _centre_section(adapter, section)
         annotations += curate_view_dimensions(
             adapter,
             section,
@@ -367,6 +389,9 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label="section A-A",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
+    position_section_caption(
+        adapter, section, SECTION_CAPTION_XY, label="v-block section A-A"
+    )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     # The iso too: a new view already reads Shaded With Edges, so
     # finalize_drawing's SetDisplayMode4 is a no-op that leaves its cosmetic
@@ -458,6 +483,103 @@ _CENTERLINE_OVERSHOOT_MM = 3.0 / (VIEW_SCALE[0] / VIEW_SCALE[1])
 _SW_LINE_CENTER = 4  # swLineStyles_e.swLineCENTER
 
 
+def _section_axes(
+    adapter: Any, native: Any
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Sheet directions of model +z and +y (1 mm each) in section A-A, read
+    behind the projection barrier (``_drawing_detail_projection``)."""
+    native.UpdateViewDisplayGeometry()
+    x = PIVOT_BORE_X / 1000.0
+    origin, plus_z, plus_y = model_points_in_view(
+        adapter,
+        native,
+        (
+            (x, _CY / 1000.0, _CZ / 1000.0),
+            (x, _CY / 1000.0, (_CZ + 1.0) / 1000.0),
+            (x, (_CY + 1.0) / 1000.0, _CZ / 1000.0),
+        ),
+        label="v-block section A-A axes",
+        names=("origin", "plus z", "plus y"),
+    )
+    return (
+        (plus_z[0] - origin[0], plus_z[1] - origin[1]),
+        (plus_y[0] - origin[0], plus_y[1] - origin[1]),
+    )
+
+
+def _orient_section(adapter: Any, section: Any) -> None:
+    """Look along +X, toward the free end, as the paper-end view does: +z to
+    the sheet's right, +y up, so the front face (z 0) is on the left in both.
+
+    SolidWorks cuts A-A looking toward the paper end (farm 20261014T003549Z:
+    front face on the right), which mirrors the end view beside it and reads
+    the V and the relief as located from opposite faces.  Looking along +X
+    with +y up puts +z on the right, a right-handed pair on the sheet; a
+    left-handed pair is the cut looking the other way, so the cut direction
+    is reversed, then the view turned until +z reads right
+    (draw_pn_pen_hanger ``_orient_section``).
+    """
+    native = _early_bound(section, "IView")
+    right, up = _section_axes(adapter, native)
+    if right[0] * up[1] - right[1] * up[0] < 0.0:
+        cut = _early_bound(native.GetSection(), "IDrSection")
+        reversed_cut = not bool(cut.GetReversedCutDirection())
+        cut.SetReversedCutDirection(reversed_cut)
+        rebuild_drawing(adapter, label="v-block section reversed")
+        if bool(cut.GetReversedCutDirection()) != reversed_cut:
+            raise RuntimeError("v-block section A-A cut direction did not persist")
+        right, up = _section_axes(adapter, native)
+    native.Angle = float(native.Angle) - math.atan2(right[1], right[0])
+    rebuild_drawing(adapter, label="v-block section turned")
+    right, up = _section_axes(adapter, native)
+    tolerance = 1e-7
+    if (
+        right[0] <= 0.0
+        or abs(right[1]) > tolerance
+        or up[1] <= 0.0
+        or abs(up[0]) > tolerance
+    ):
+        raise RuntimeError(
+            f"v-block section A-A does not look along +X: {right=}, {up=}"
+        )
+    _telemetry.info(f"v-block section A-A angle={float(native.Angle):.6f} rad")
+
+
+def _centre_section(adapter: Any, section: Any) -> None:
+    """Land the cut's centre (the bore axis at mid-height) on SECTION_CENTER.
+
+    Placed by projection, not by outline: every SECTION_KEEP position is
+    computed from where that point projects, and a reversed cut may leave the
+    view off its creation target (draw_pd_transgear_thumbnut).
+    ``SetViewPosition`` moves the ink by the difference from the Position it
+    reads (draw_pn_pen_hanger ``_centre_section``).
+    """
+    native = _early_bound(section, "IView")
+    anchor = (PIVOT_BORE_X / 1000.0, _CY / 1000.0, _CZ / 1000.0)
+    for attempt in range(4):
+        native.UpdateViewDisplayGeometry()
+        projected = model_point_in_view(
+            adapter, native, anchor, label=f"v-block section A-A centre, pass {attempt}"
+        )
+        if math.dist(projected, SECTION_CENTER) <= 1e-4:
+            break
+        position = tuple(float(value) for value in native.Position)
+        moved = [
+            position[axis] + SECTION_CENTER[axis] - projected[axis] for axis in (0, 1)
+        ]
+        if not native.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to re-centre v-block section A-A")
+        rebuild_drawing(adapter, label="v-block section re-centred")
+    settle_detail_projection(
+        adapter,
+        native,
+        anchor,
+        ink_xy=SECTION_CENTER,
+        tolerance_xy=(0.0005, 0.0005),
+        label="v-block section A-A",
+    )
+
+
 def _add_pivot_axis_centerline(adapter: Any, section: Any) -> None:
     """Draw the pivot bore's axis through section A-A, from the relief roof to
     the top face plus the overshoot.
@@ -470,6 +592,7 @@ def _add_pivot_axis_centerline(adapter: Any, section: Any) -> None:
     transform into sheet space, a sheet-owned centreline between the ends,
     black in the CENTER font, read back.
     """
+    _early_bound(section, "IView").UpdateViewDisplayGeometry()
     ends = [
         model_point_in_view(
             adapter,

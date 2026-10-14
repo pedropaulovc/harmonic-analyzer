@@ -42,6 +42,7 @@ import math
 
 import _config
 from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
+from _printed_tolerance import printed_band_mm
 import pn_pen_rod_spec as rod
 import vn_pen_marker_spec as marker
 import vn_pen_rod_set_screw_spec as rod_set_screw
@@ -194,9 +195,10 @@ if round(PIVOT_BORE_TOP_CHAMFER, PIVOT_CHAMFER_PLACES) != PIVOT_BORE_TOP_CHAMFER
 # and PivotReference lie IN section A-A's cutting plane (x = PIVOT_BORE_X,
 # the bond cradle's recipe), each chord on an edge the section draws:
 # ReliefReference runs both relief walls from the bottom face to the roof
-# (ReliefHeight; the Relief cut's own depth vector stops in air), the near
-# foot from the front face's foot (ReliefZ0) and the far foot from the near
-# one (ReliefWidth); PivotReference holds stubs down the front face and the
+# (ReliefHeight on the far wall, which section A-A draws on its right, outside
+# the chain under it; the Relief cut's own depth vector stops in air), the
+# near foot from the front face's foot (ReliefZ0) and the far foot from the
+# near one (ReliefWidth); PivotReference holds stubs down the front face and the
 # bore axis from the top face (PivotZ between their tops) and the bore's top
 # chamfer leg on the far (z 11) side: the chamfer feature's own dimension may
 # attach on the near side, under PivotZ.  The lightening bore's placement
@@ -221,16 +223,22 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 REFERENCE_SKETCHES = ("ReliefReference", "PivotReference", "LighteningReference")
 SECTION_REFERENCE_SKETCHES = ("ReliefReference", "PivotReference")
 # Places carry the title block's tolerance (drawing-guidelines.md rule 3).
-# .XX where a fit depends on it: the V's mouth and apex set the marker axis,
-# the relief's near wall and width keep its 0.53-a-side body clearance, the
-# pivot bore's depth station sits it on the V's axis, and the tap must meet
-# the bore it locks (both stations from the paper end).
+# .XX where a fit depends on it: the V's apex sets the marker axis, the pivot
+# bore's depth station sits it on the V's axis, and the tap must meet the bore
+# it locks (both stations from the paper end).  .XXX (+/-0.13) on the four
+# across-the-depth stations that keep the marker body off both relief walls:
+# the V's front mouth edge and mouth (the body's centre) and the relief's near
+# wall and width; at .XX their bands alone (4 x 0.51) exceed the 0.53-a-side
+# nominal clearance (guarded below).  The depth at .XX: at .X the far relief
+# wall, left over from Depth - ReliefZ0 - ReliefWidth, falls under rule 17's
+# 1.5 (guarded below); the depth is fixed by the frame window the block passes
+# and the slot by the body, so geometry cannot buy the wall.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutlineProfile": {"Length": 1, "Height": 1, "Chamfer2dx": 1},
-    "Block": {"Depth": 1},
-    "VGrooveProfile": {"VApexY": 2, "VMouth": 2, "VMouthZ": 2},
+    "Block": {"Depth": 2},
+    "VGrooveProfile": {"VApexY": 2, "VMouth": 3, "VMouthZ": 3},
     "ReliefProfile": {"ReliefX0": 1, "ReliefCornerR": 1},
-    "ReliefReference": {"ReliefZ0": 2, "ReliefWidth": 2, "ReliefHeight": 1},
+    "ReliefReference": {"ReliefZ0": 3, "ReliefWidth": 3, "ReliefHeight": 1},
     "PivotBoreProfile": {"PivotX": 2, "PivotDia": 3},
     "PivotReference": {"PivotZ": 2, "PivotChamferSize": PIVOT_CHAMFER_PLACES},
     "SetScrewHole": {"SetScrewX": 2, "SetScrewY": 1},
@@ -247,6 +255,61 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
     for feature, names in DRAWING_DIMENSIONS.items()
 ):
     raise AssertionError("every marked pen v-block dimension needs authored places")
+
+
+def _band(name: str) -> float:
+    """The title-block +/- the named dimension prints at."""
+    return printed_band_mm(DRAWING_PRECISION_BY_NAME[name])
+
+
+# --- Printed worst case (every band at its limit at once) ---
+# The depth-wise stations as the print states them: each from the front face.
+_V_MOUTH_Z = (BLOCK_DEPTH - V_MOUTH_WIDTH) / 2.0
+_RELIEF_Z0 = (BLOCK_DEPTH - RELIEF_WIDTH) / 2.0
+# Rule 17: the relief's near wall is ReliefZ0 itself; the far wall is what
+# the print leaves of the depth.
+RELIEF_NEAR_WALL_PRINTED_MIN = _RELIEF_Z0 - _band("ReliefZ0")
+RELIEF_FAR_WALL_PRINTED_MIN = (
+    (BLOCK_DEPTH - _band("Depth"))
+    - (_RELIEF_Z0 + _band("ReliefZ0"))
+    - (RELIEF_WIDTH + _band("ReliefWidth"))
+)  # 1.73
+if min(RELIEF_NEAR_WALL_PRINTED_MIN, RELIEF_FAR_WALL_PRINTED_MIN) < _WALL:
+    raise AssertionError("a printed relief wall falls under the rule 17 1.5 floor")
+
+
+def _body_half_chord_at_bottom(apex_y: float, mouth: float) -> float:
+    """The marker body's half-width at the bottom face, its grip seated in a
+    V of this apex height and mouth (both flanks touching the grip)."""
+    half = math.atan2(mouth / 2.0, apex_y)
+    axis_y = apex_y - (marker.BARREL_DIA / 2.0) / math.sin(half)
+    return math.sqrt(_BODY_R**2 - axis_y**2)
+
+
+# The V's apex and mouth at their printed limits move the seated axis; the
+# widest body chord at the bottom face over the four corners (6.018 at .XX
+# apex, 5.965 nominal).
+BODY_HALF_CHORD_PRINTED_MAX = max(
+    _body_half_chord_at_bottom(V_APEX_Y + apex, V_MOUTH_WIDTH + mouth)
+    for apex in (-_band("VApexY"), _band("VApexY"))
+    for mouth in (-_band("VMouth"), _band("VMouth"))
+)
+# The body's centre is the V's: VMouthZ + VMouth / 2 from the front face.
+BODY_NEAR_CLEARANCE_PRINTED_MIN = (
+    (_V_MOUTH_Z - _band("VMouthZ"))
+    + (V_MOUTH_WIDTH - _band("VMouth")) / 2.0
+    - BODY_HALF_CHORD_PRINTED_MAX
+    - (_RELIEF_Z0 + _band("ReliefZ0"))
+)  # 0.16 (0.21 on the nominal chord)
+BODY_FAR_CLEARANCE_PRINTED_MIN = (
+    (_RELIEF_Z0 - _band("ReliefZ0"))
+    + (RELIEF_WIDTH - _band("ReliefWidth"))
+    - (_V_MOUTH_Z + _band("VMouthZ"))
+    - (V_MOUTH_WIDTH + _band("VMouth")) / 2.0
+    - BODY_HALF_CHORD_PRINTED_MAX
+)  # 0.03 (0.08 on the nominal chord)
+if min(BODY_NEAR_CLEARANCE_PRINTED_MIN, BODY_FAR_CLEARANCE_PRINTED_MIN) <= 0.0:
+    raise AssertionError("a printed relief wall may touch the marker body")
 # (feature, dimension) -> (upper, lower) native band.
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("PivotBoreProfile", "PivotDia"): PIVOT_BORE_BAND,
@@ -255,13 +318,19 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 # chamfer reads "0.3 MIN" over its angle; why it has a floor rides above it,
 # clear of the extension lines below (draw_pn_pen_v_block's SECTION_KEEP).
 PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
+MARKER_NUMBER = _config.parts("vn-pen-marker")["number"]
+# The relief's four .XXX stations share one function, stated once on the
+# slot's width; two short rows stay between its extension lines.
 DIMENSION_CALLOUTS: dict[str, str] = {
     "PivotDia": f"REAM THRU\nSLIP FIT ON PEN ROD PIVOT {PEN_ROD_NUMBER}",
     "Chamfer2dx": "X 45 DEG, 2 PLACES",
     "PivotChamferSize": "X 45 DEG",
+    "ReliefWidth": f"CLEARS MARKER BODY\n{MARKER_NUMBER}",
 }
+# Two rows, so the callout stays inside the sheet's right border over the far
+# rim (draw_pn_pen_v_block's SECTION_KEEP).
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
-    "PivotChamferSize": f"CLEARS ROD {PEN_ROD_NUMBER} FILLET",
+    "PivotChamferSize": f"CLEARS ROD\n{PEN_ROD_NUMBER} FILLET",
 }
 # Both relief corners are one radius; the printed one stands for the pair.  A
 # custom prefix replaces SolidWorks' own radius "R", so it carries it

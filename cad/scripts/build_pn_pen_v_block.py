@@ -365,10 +365,12 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
     the depth project edge-on in the section, and its cut depth is a vector
     that ends in air.  A shown reference sketch prints, so its chords lie only
     on the section's own edges, never across the open mouth: the near wall
-    from its foot to the roof (ReliefHeight), its foot from the origin, the
-    front face's foot (ReliefZ0), and the far wall, whose foot is ReliefWidth
-    from the near one along the bottom face.  2 x 4 DOF less the near foot's
-    level, both chords vertical, the far foot's level (4) and 4 dims = 0.
+    from its foot to the roof, its foot from the origin, the front face's foot
+    (ReliefZ0), and the far wall, whose foot is ReliefWidth from the near one
+    along the bottom face and whose height is the printed ReliefHeight (the
+    section draws the far wall on its right, outside the chain under it).
+    2 x 4 DOF less the near foot's level, both chords vertical, the far foot's
+    level (4) and 4 dims = 0.
     """
     feature = "ReliefReference"
     z0 = (BLOCK_DEPTH - RELIEF_WIDTH) / 2.0
@@ -415,14 +417,14 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
     check(f"exit sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
     _require_on_section_plane(adapter, feature)
-    z0_name, height, width, far_wall = name_dimensions(
-        adapter, feature, ["ReliefZ0", "ReliefHeight", "ReliefWidth", "ReliefFarWall"]
+    z0_name, near_wall, width, height = name_dimensions(
+        adapter, feature, ["ReliefZ0", "ReliefNearWall", "ReliefWidth", "ReliefHeight"]
     )
     return [
         (z0_name, '("BlockDepth" - "ReliefWidth") / 2'),
-        (height, '"ReliefHeight"'),
+        (near_wall, '"ReliefHeight"'),
         (width, '"ReliefWidth"'),
-        (far_wall, '"ReliefHeight"'),
+        (height, '"ReliefHeight"'),
     ]
 
 
