@@ -73,6 +73,7 @@ def test_build_authors_every_marked_feature_and_dimension_name() -> None:
         "Block",
         "VGrooveProfile",
         "VGroove",
+        "VApexFillets",
         "ReliefProfile",
         "Relief",
         "PivotBoreProfile",
@@ -215,7 +216,10 @@ def test_hidden_reference_dimensions_reach_their_views() -> None:
 def test_relief_corners_carry_the_largest_radius_the_grip_allows() -> None:
     assert spec.RELIEF_CORNER_R == 1.0
     assert spec._GRIP_GAP_AT_BOTTOM - spec.RELIEF_CORNER_R >= 0.25
-    assert spec.DIMENSION_PREFIXES == {("ReliefProfile", "ReliefCornerR"): "2X R"}
+    assert spec.DIMENSION_PREFIXES == {
+        ("VApexFillets", "VApexFilletR"): "2X R",
+        ("ReliefProfile", "ReliefCornerR"): "2X R",
+    }
     assert (
         "set_dimension_prefix(adapter, feature_name, dimension_name, prefix)"
         in _PART_SOURCE
@@ -266,8 +270,16 @@ def test_pivot_chamfer_clears_the_rod_fillet_as_a_min_limit() -> None:
     largest = spec.PIVOT_BORE_TOP_CHAMFER + spec.PIVOT_CHAMFER_BAND[0]
     assert mouth_r + largest < (rod.ROD_SECTION + rod.SECTION_BAND[1]) / 2.0
     assert spec.PIVOT_CHAMFER_TOL_TYPE == 5  # swTolMIN
-    assert "tolerance.Type = PIVOT_CHAMFER_TOL_TYPE" in _PART_SOURCE
-    assert _PART_SOURCE.index("_pivot_chamfer_min_limit(adapter)\n") < (
+    assert (
+        "PivotReference",
+        "PivotChamferSize",
+        spec.PIVOT_BORE_TOP_CHAMFER,
+        spec.PIVOT_CHAMFER_BAND,
+        spec.PIVOT_CHAMFER_TOL_TYPE,
+        "MIN",
+    ) in part._SINGLE_LIMITS
+    assert "tolerance.Type = tol_type" in _PART_SOURCE
+    assert _PART_SOURCE.index("_single_limits(adapter)\n") < (
         _PART_SOURCE.index("clear_dimensions_for_drawing(adapter)")
     )
     rod_number = _config.parts("pn-pen-rod")["number"]
@@ -655,6 +667,91 @@ def test_v_is_its_angle_mouth_and_apex_flat_with_a_reference_height() -> None:
     assert abs(u - apex_u) < half_width
 
 
+def test_apex_flat_corners_are_rounds_at_a_max_limit_clear_of_the_grip() -> None:
+    # Blind re-review (rule 16): the flat met the flanks in sharp internal
+    # corners.  Each takes any chamfer-mill tip or end-mill corner up to
+    # R0.5, printed "2X R0.5 MAX": swTolMAX prints the nominal, so the model
+    # carries the limit and its band runs from sharp to it.
+    from _printed_tolerance import angular_band_deg
+
+    assert spec.V_APEX_FILLET_R == 0.5
+    assert spec.V_APEX_FILLET_BAND == (0.0, -spec.V_APEX_FILLET_R)
+    assert spec.V_APEX_FILLET_TOL_TYPE == 6  # swTolMAX
+    assert spec.DRAWING_DIMENSIONS["VApexFillets"] == {"VApexFilletR"}
+    assert spec.DRAWING_PRECISION["VApexFillets"]["VApexFilletR"] == 1
+    assert (
+        "VApexFillets",
+        "VApexFilletR",
+        spec.V_APEX_FILLET_R,
+        spec.V_APEX_FILLET_BAND,
+        spec.V_APEX_FILLET_TOL_TYPE,
+        "MAX",
+    ) in part._SINGLE_LIMITS
+    # The build rounds both flat edges mid-neck, at the limit, from a global.
+    assert "await adapter.add_fillet(\n            V_APEX_FILLET_R," in _PART_SOURCE
+    assert '("VApexFilletR", V_APEX_FILLET_R)' in _PART_SOURCE
+    assert "(fillet_dim[0], '\"VApexFilletR\"')" in _PART_SOURCE
+    # Worst case: the rounds at R0.5, the flat and the angle at either printed
+    # limit.  The grip clears them by 0.81 (the flat by 0.75), and the
+    # narrowest flat (1.2) still runs straight between the two tangent points.
+    clearance = spec.V_APEX_FILLET_GRIP_CLEARANCE_PRINTED_MIN
+    assert clearance == pytest.approx(0.810, abs=1e-3)
+    assert min(clearance, spec.V_FLAT_GRIP_CLEARANCE_PRINTED_MIN) >= 0.25
+    grip_r = spec.marker.BARREL_DIA / 2.0
+    for angle in (-angular_band_deg(), angular_band_deg()):
+        for width in (-printed_band_mm(1), printed_band_mm(1)):
+            half = math.radians(spec.V_ANGLE_DEG + angle) / 2.0
+            flat = spec.V_FLAT_WIDTH + width
+            # Sampled along the arc, its centre r under the flat and r off
+            # the flank, from the flank's normal (half) up to the flat's.
+            tangent = spec.V_APEX_FILLET_R * math.tan(math.pi / 4.0 - half / 2.0)
+            assert 2.0 * tangent < flat
+            centre = (
+                flat / 2.0 - tangent,
+                -(flat / 2.0) / math.tan(half) - spec.V_APEX_FILLET_R,
+            )
+            axis_y = -grip_r / math.sin(half)
+            nearest = min(
+                math.hypot(
+                    centre[0] + spec.V_APEX_FILLET_R * math.cos(bearing),
+                    centre[1] + spec.V_APEX_FILLET_R * math.sin(bearing) - axis_y,
+                )
+                for step in range(201)
+                for bearing in [half + (math.pi / 2.0 - half) * step / 200]
+            )
+            assert nearest - grip_r >= clearance - 1e-9
+    # The rounds' section and the groove's finished section feed the volumes.
+    assert spec.V_APEX_FILLET_AREA == pytest.approx(
+        2.0 * 0.25 * (math.tan(math.pi / 8.0) - math.pi / 8.0)
+    )
+    assert spec.V_GROOVE_SECTION == pytest.approx(35.0 - spec.V_APEX_FILLET_AREA)
+
+
+def test_apex_round_radius_text_stays_off_the_part_in_the_end_view() -> None:
+    # Rule 14: over the top face, up the back round's bisector so the radial
+    # leader lands square on its arc; right of the flat width's outside arrow,
+    # under the tap's callout rows (from ~0.247), left of section A-A.
+    keep = drawing.RIGHT_KEEP
+    x, y = keep["VApexFilletR"]
+    half_text = 0.014  # "2X R0.5 MAX", 11 characters at ~2.5 mm
+    assert y - 0.0018 > drawing._ry(spec.BLOCK_HEIGHT) + 0.008
+    assert y + 0.0017 < drawing.TAP_CALLOUT_XY[1] - 0.003 - 0.004
+    assert (
+        x - half_text > drawing._rz(spec.DEPTH_MID_Z + spec.V_FLAT_WIDTH / 2.0) + 0.01
+    )
+    assert x + half_text < drawing._sz(spec.BODY_Z0) - 0.025
+    bearing = math.degrees(
+        math.atan2(y - drawing._ROUND_CENTRE[1], x - drawing._ROUND_CENTRE[0])
+    )
+    assert bearing == pytest.approx(67.5)
+    assert drawing._ROUND_CENTRE == pytest.approx(
+        (
+            drawing._rz(spec.DEPTH_MID_Z + 1.0 - 0.5 * math.tan(math.pi / 8.0)),
+            drawing._ry(4.5),
+        )
+    )
+
+
 def test_v_dimension_text_stays_off_the_part_in_the_end_view() -> None:
     # Blind review (rule 14): the angle's text sat in the V.  It now sits on
     # the V's axis under the bottom face (y 0.156), its arc wholly inside the
@@ -747,9 +844,11 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     assert part.V_BLOCK == pytest.approx(10228.68)
     # Cut one corner radius past the step, the V's run there lies in the slot:
     # the relief removes that much less.  The apex flat leaves its 2 x 1 tip
-    # standing: 35 of the sharp V's 36 mm^2.
+    # standing: 35 of the sharp V's 36 mm^2; its two R0.5 rounds give back
+    # 0.011 mm^2 more along the whole cut.
     assert part.V_GROOVE == pytest.approx(350.0)
-    assert part.V_GROOVE_PAST_STEP == pytest.approx(35.0)
+    assert part.V_APEX_FILLETS == pytest.approx(0.1076, abs=1e-4)
+    assert part.V_GROOVE_PAST_STEP == pytest.approx(34.989, abs=1e-3)
     # The carriage mass model cuts the relief square-cornered and leaves the
     # bore's top chamfer: both under 0.05% of the block.
     assert part.V_RELIEF + part.V_RELIEF_CORNERS + part.V_GROOVE_PAST_STEP == (

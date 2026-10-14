@@ -27,6 +27,8 @@ Features, in tree order:
   a driven reference,
   cut +X from the paper end to ``V_CUT_LENGTH``, one corner radius past the
   relief's step.
+* ``VApexFillets``: the rounds where the apex flat meets the flanks, at the
+  ``V_APEX_FILLET_R`` limit; the sheet prints it "2X R0.5 MAX".
 * ``ReliefProfile`` (Top plane) -> ``Relief``: the slot from ``RELIEF_X0`` to
   the free end, its two step corners the end mill's ``RELIEF_CORNER_R`` arcs,
   cut +Y to the roof.
@@ -119,10 +121,15 @@ from pn_pen_v_block_spec import (
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
     V_ANGLE_DEG,
+    V_APEX_FILLET_AREA,
+    V_APEX_FILLET_BAND,
+    V_APEX_FILLET_R,
+    V_APEX_FILLET_TOL_TYPE,
     V_CUT_LENGTH,
     V_FLAT_WIDTH,
     V_FLAT_Y,
     V_GROOVE_AREA,
+    V_GROOVE_SECTION,
     V_MOUTH_Z0,
     V_MOUTH_Z1,
     depth_station,
@@ -149,11 +156,13 @@ V_BLOCK = (
     RELIEF_X0 * NECK_DEPTH + (BLOCK_LENGTH - RELIEF_X0) * BODY_DEPTH
 ) * BLOCK_HEIGHT
 V_GROOVE = V_GROOVE_AREA * V_CUT_LENGTH
+# The apex rounds give back their corners along the whole cut.
+V_APEX_FILLETS = V_APEX_FILLET_AREA * V_CUT_LENGTH
 # Each step corner leaves its R x R square less the quarter disc standing.
 V_RELIEF_CORNERS = 2.0 * (1.0 - math.pi / 4.0) * RELIEF_CORNER_R**2 * RELIEF_HEIGHT
 # The V's run past the step lies inside the slot (the corner arcs stand
 # outside its mouth), already void when the relief is cut.
-V_GROOVE_PAST_STEP = V_GROOVE_AREA * (V_CUT_LENGTH - RELIEF_X0)
+V_GROOVE_PAST_STEP = V_GROOVE_SECTION * (V_CUT_LENGTH - RELIEF_X0)
 V_RELIEF = (
     RELIEF_WIDTH * RELIEF_HEIGHT * (BLOCK_LENGTH - RELIEF_X0)
     - V_RELIEF_CORNERS
@@ -176,7 +185,13 @@ V_SET_SCREW_TAP = (
     - cross_hole_volume_mm3(TAP_DRILL_DIA, PIVOT_BORE_DIA) / 2.0
 )
 V_TOTAL = (
-    V_BLOCK - V_GROOVE - V_RELIEF - V_PIVOT_BORE - V_PIVOT_CHAMFER - V_SET_SCREW_TAP
+    V_BLOCK
+    - V_GROOVE
+    + V_APEX_FILLETS
+    - V_RELIEF
+    - V_PIVOT_BORE
+    - V_PIVOT_CHAMFER
+    - V_SET_SCREW_TAP
 )
 
 
@@ -795,33 +810,65 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
     ]
 
 
-def _pivot_chamfer_min_limit(adapter) -> None:
-    """PivotChamferSize as a MIN single limit carrying the band's deviations
-    (build_pn_pen_rod._shoulder_fillet_max_limit's recipe, MIN for MAX)."""
-    lower, upper = deviations(PIVOT_CHAMFER_BAND)
-    _, dimension = _named_dimension(adapter, "PivotReference", "PivotChamferSize")
-    label = "PivotChamferSize@PivotReference"
-    value = float(dimension.SystemValue)
-    if not math.isclose(value, PIVOT_BORE_TOP_CHAMFER / 1000.0, abs_tol=1e-9):
-        raise RuntimeError(
-            f"{label}: nominal {value * 1000.0:.7f} is not the band's min "
-            f"{PIVOT_BORE_TOP_CHAMFER}"
-        )
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = PIVOT_CHAMFER_TOL_TYPE
-    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
-    if (
-        int(tolerance.Type) != PIVOT_CHAMFER_TOL_TYPE
-        or not math.isclose(
-            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
-        )
-    ):
-        raise RuntimeError(f"{label}: MIN-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {PIVOT_BORE_TOP_CHAMFER:g} MIN")
+# (feature, dimension, the limit the model carries, its native band,
+# swTolType_e, the word it prints): the pivot bore's chamfer has a floor, the
+# V's apex rounds a ceiling.
+_SINGLE_LIMITS = (
+    (
+        "PivotReference",
+        "PivotChamferSize",
+        PIVOT_BORE_TOP_CHAMFER,
+        PIVOT_CHAMFER_BAND,
+        PIVOT_CHAMFER_TOL_TYPE,
+        "MIN",
+    ),
+    (
+        "VApexFillets",
+        "VApexFilletR",
+        V_APEX_FILLET_R,
+        V_APEX_FILLET_BAND,
+        V_APEX_FILLET_TOL_TYPE,
+        "MAX",
+    ),
+)
+
+
+def _single_limits(adapter) -> None:
+    """Each ``_SINGLE_LIMITS`` dimension as a single limit carrying its band's
+    deviations (build_pn_pen_rod._shoulder_fillet_max_limit's recipe): the
+    native type prints the nominal, so the nominal is the limit."""
+    for (
+        feature_name,
+        dimension_name,
+        limit,
+        limit_band,
+        tol_type,
+        word,
+    ) in _SINGLE_LIMITS:
+        lower, upper = deviations(limit_band)
+        _, dimension = _named_dimension(adapter, feature_name, dimension_name)
+        label = f"{dimension_name}@{feature_name}"
+        value = float(dimension.SystemValue)
+        if not math.isclose(value, limit / 1000.0, abs_tol=1e-9):
+            raise RuntimeError(
+                f"{label}: nominal {value * 1000.0:.7f} is not the band's "
+                f"{word.lower()} {limit}"
+            )
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = tol_type
+        if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+            raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+        if (
+            int(tolerance.Type) != tol_type
+            or not math.isclose(
+                float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+            )
+            or not math.isclose(
+                float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+            )
+        ):
+            raise RuntimeError(f"{label}: {word}-limit tolerance readback changed")
+        _telemetry.success(f"{label}: single limit {limit:g} {word}")
 
 
 def _author_reference_dimensions(adapter) -> None:
@@ -873,6 +920,7 @@ async def build(adapter) -> dict[str, str]:
         ("PivotBoreX", PIVOT_BORE_X),
         ("PivotBoreDia", PIVOT_BORE_DIA),
         ("PivotChamfer", PIVOT_BORE_TOP_CHAMFER),
+        ("VApexFilletR", V_APEX_FILLET_R),
         ("SetScrewY", SET_SCREW_Y),
     ):
         await set_global(adapter, name, f"{value}mm")
@@ -922,6 +970,27 @@ async def build(adapter) -> dict[str, str]:
         )
     ]
     volume = await volume_check(adapter, "V-groove", volume - V_GROOVE, 0.01 * V_GROOVE)
+
+    # 2b. The rounds where the apex flat meets the flanks, at the radius the
+    # print allows (R MAX): each edge picked mid-neck on its flat end, the
+    # only edge through that point.  They add ~0.1 mm^3, under the mass
+    # properties' resolution: the check proves the round ate nothing else.
+    check(
+        "fillet V apex flat corners",
+        await adapter.add_fillet(
+            V_APEX_FILLET_R,
+            [
+                [RELIEF_X0 / 2.0, V_FLAT_Y, _Z_MID - V_FLAT_WIDTH / 2.0],
+                [RELIEF_X0 / 2.0, V_FLAT_Y, _Z_MID + V_FLAT_WIDTH / 2.0],
+            ],
+        ),
+    )
+    name_last_feature(adapter, "VApexFillets")
+    fillet_dim = name_dimensions(adapter, "VApexFillets", ["VApexFilletR"])
+    drive_jobs += [(fillet_dim[0], '"VApexFilletR"')]
+    volume = await volume_check(
+        adapter, "V apex fillets", volume + V_APEX_FILLETS, 0.01 * V_GROOVE
+    )
 
     # 3. The body's relief slot, cut +Y (the Top plane's normal) up to its roof.
     # Sketch (u, v) = model (X, -Z).  Drawn counter-clockwise (add_arc runs
@@ -1137,7 +1206,7 @@ async def build(adapter) -> dict[str, str]:
             adapter, feature_name, dimension_name, *deviations(band)
         )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    _pivot_chamfer_min_limit(adapter)
+    _single_limits(adapter)
     _author_reference_dimensions(adapter)
     for (feature_name, dimension_name), prefix in DIMENSION_PREFIXES.items():
         set_dimension_prefix(adapter, feature_name, dimension_name, prefix)

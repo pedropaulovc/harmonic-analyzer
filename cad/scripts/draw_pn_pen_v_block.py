@@ -21,7 +21,8 @@ face); every feature is located across the depth from the body's front face
   shows the neck's end face with the V in solid lines and the body's wider
   faces beyond it.  Under it, one baseline row from the body's front face:
   the neck's two faces, the V's two mouth edges and the depth; under the V's
-  mouth, its included angle; over the view, its apex flat's width; right of
+  mouth, its included angle; over the view, its apex flat's width and, up
+  the back round's bisector, the rounds' single-limit radius; right of
   it, the flat's reference height.  Through the V it looks along
   the open relief slot: the V is cut on past the step
   (``pn_pen_v_block_spec.V_CUT_LENGTH``), so no brass shows inside it.
@@ -109,6 +110,9 @@ from pn_pen_v_block_spec import (
     SECTION_REFERENCE_SKETCHES,
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
+    V_ANGLE_DEG,
+    V_APEX_FILLET_R,
+    V_FLAT_WIDTH,
     V_FLAT_Y,
     V_MOUTH_Z0,
 )
@@ -245,7 +249,23 @@ FRONT_KEEP = {
 #   callout (from y ~0.247).
 # * the flat's height, a reference "(5.0)", right of the view (x
 #   ~0.283..0.294), 12 mm clear of section A-A (from x 0.306).
+# * the apex rounds' "2X R0.5 MAX" over the view, 70 mm up the back round's
+#   bisector (67.5 deg) from its centre (x 0.2352, y 0.174), so the radial
+#   leader meets the arc square on and crosses only the end face: its text
+#   (~28 mm, x ~0.248..0.276, y ~0.237..0.241) 5 mm right of the flat
+#   width's outside arrow (to ~0.243), 6 mm under the tap's callout (from y
+#   ~0.247) and 30 mm left of section A-A.
 _END_ROW = 0.007
+_ROUND_BEARING = math.radians((90.0 + V_ANGLE_DEG / 2.0) / 2.0)
+_ROUND_CENTRE = (
+    _rz(
+        _CZ
+        + V_FLAT_WIDTH / 2.0
+        - V_APEX_FILLET_R * math.tan(math.radians(45.0 - V_ANGLE_DEG / 4.0))
+    ),
+    _ry(V_FLAT_Y - V_APEX_FILLET_R),
+)
+_ROUND_TEXT_RUN = 0.070
 RIGHT_KEEP = {
     "NeckZ0": (_rz(BODY_Z0) - 0.008, _ry(0.0) - 0.006),
     "VMouthZ0": (
@@ -258,6 +278,10 @@ RIGHT_KEEP = {
     "VAngle": (RIGHT_CENTER[0], _ry(0.0) - 0.006),
     "VFlatWidth": (RIGHT_CENTER[0], _ry(BLOCK_HEIGHT) + 0.0093),
     "VFlatY": (_rz(BODY_Z1) + 0.012, _ry(V_FLAT_Y / 2.0)),
+    "VApexFilletR": (
+        _ROUND_CENTRE[0] + _ROUND_TEXT_RUN * math.cos(_ROUND_BEARING),
+        _ROUND_CENTRE[1] + _ROUND_TEXT_RUN * math.sin(_ROUND_BEARING),
+    ),
 }
 # Bottom (front faces at the top, y 0.128 for the body's, 0.1196 for the
 # neck's):

@@ -233,7 +233,7 @@ def plan_mass_items() -> list[tuple[str, float, float, float]]:
         # over the seat length.
         (
             "V-groove",
-            -vb.V_GROOVE_AREA * vb.RELIEF_X0,
+            -vb.V_GROOVE_SECTION * vb.RELIEF_X0,
             vb.RELIEF_X0 / 2.0,
             zc,
         ),

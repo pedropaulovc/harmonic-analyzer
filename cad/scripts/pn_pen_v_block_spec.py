@@ -99,6 +99,23 @@ V_FLAT_Y = round(V_APEX_Y - (V_FLAT_WIDTH / 2.0) / math.tan(_HALF), 6)  # 5.0
 V_GROOVE_AREA = (
     V_APEX_Y * V_MOUTH_WIDTH / 2.0 - V_FLAT_WIDTH * (V_APEX_Y - V_FLAT_Y) / 2.0
 )  # 35.0
+# The flat meets each flank in an internal corner no cutter leaves sharp: each
+# takes the tip radius of a chamfer mill or the corner of an end mill, up to
+# V_APEX_FILLET_R.  It prints as the single limit "2X R0.5 MAX"; swTolMAX
+# prints the nominal, so the model carries the limit (pn_pen_rod_spec's
+# shoulder root).
+V_APEX_FILLET_R = 0.5
+V_APEX_FILLET_BAND = (0.0, -V_APEX_FILLET_R)
+V_APEX_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "2X R0.5 MAX"
+V_APEX_FILLET_PLACES = 1
+# Each round turns through 90 deg - half-angle (flat to flank) and fills
+# r^2 (tan(turn/2) - turn/2) of its corner.
+_APEX_TURN = math.pi / 2.0 - _HALF
+V_APEX_FILLET_AREA = (
+    2.0 * V_APEX_FILLET_R**2 * (math.tan(_APEX_TURN / 2.0) - _APEX_TURN / 2.0)
+)  # 0.011
+# The groove's finished section: the trapezoid less the rounds in its corners.
+V_GROOVE_SECTION = V_GROOVE_AREA - V_APEX_FILLET_AREA
 
 # --- Relief slot (body clearance), x RELIEF_X0..BLOCK_LENGTH ---
 # The step stands far enough toward the paper end that the reamed pivot bore
@@ -260,6 +277,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "NeckZ1",
         "Depth",
     },
+    "VApexFillets": {"VApexFilletR"},
     "ReliefProfile": {"ReliefX0", "ReliefCornerR"},
     "ReliefReference": {"ReliefZ0", "ReliefZ1", "ReliefHeight"},
     "PivotBoreProfile": {"PivotX", "PivotDia"},
@@ -271,7 +289,8 @@ SECTION_REFERENCE_SKETCHES = REFERENCE_SKETCHES
 # Places carry the title block's tolerance (drawing-guidelines.md rule 3),
 # .X by default.  The V prints as its included angle (whole degrees, the
 # title block's +/-1), its two mouth edges and its apex flat's width; the
-# flat's height they leave is a reference, (5.0), driven in the sketch.  .XX,
+# flat's height they leave is a reference, (5.0), driven in the sketch.  The
+# flat's two rounds print their single limit, R0.5 MAX.  .XX,
 # the title block's routine location row, where a mate needs it:
 # * the tap's and the pivot bore's station from the paper end (SetScrewX,
 #   PivotX): the tap must meet the bore it locks, and the bore must drop
@@ -295,6 +314,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "NeckZ1": 2,
         "Depth": 1,
     },
+    "VApexFillets": {"VApexFilletR": V_APEX_FILLET_PLACES},
     "ReliefProfile": {"ReliefX0": 1, "ReliefCornerR": 1},
     "ReliefReference": {"ReliefZ0": 1, "ReliefZ1": 1, "ReliefHeight": 1},
     "PivotBoreProfile": {"PivotX": 2, "PivotDia": 3},
@@ -426,6 +446,47 @@ if V_FLAT_GRIP_CLEARANCE_PRINTED_MIN < 0.25:
     raise AssertionError("at its printed limits the apex flat may touch the grip")
 if V_FLAT_WIDTH - _band("VFlatWidth") <= 0.0:
     raise AssertionError("at its printed limits the apex flat vanishes")
+
+
+def _apex_fillet_grip_clearance(
+    angle_deg: float, flat_width: float, radius: float
+) -> float:
+    """The seated grip's clearance to one flat/flank round.  The round's arc
+    faces its corner, away from the grip's axis below it, so its nearest point
+    is a tangent point: on the flat or on the flank.  Frame: the theoretical
+    apex at the origin, the V's axis along y."""
+    half = math.radians(angle_deg / 2.0)
+    tangent = radius * math.tan((math.pi / 2.0 - half) / 2.0)
+    corner = (flat_width / 2.0, -(flat_width / 2.0) / math.tan(half))
+    axis_y = -_GRIP_R / math.sin(half)
+    on_flat = (corner[0] - tangent, corner[1])
+    on_flank = (
+        corner[0] + tangent * math.sin(half),
+        corner[1] - tangent * math.cos(half),
+    )
+    return min(math.hypot(x, y - axis_y) for x, y in (on_flat, on_flank)) - _GRIP_R
+
+
+# The rounds at their MAX, at either printed flat width and angle: the grip
+# clears them by 0.81 (the widest flat, the widest angle), and the narrowest
+# flat still runs straight between them.
+_APEX_FILLET_LIMITS = [
+    (V_ANGLE_DEG + angle, V_FLAT_WIDTH + width)
+    for angle in (-angular_band_deg(), angular_band_deg())
+    for width in (-_band("VFlatWidth"), _band("VFlatWidth"))
+]
+V_APEX_FILLET_GRIP_CLEARANCE_PRINTED_MIN = min(
+    _apex_fillet_grip_clearance(angle, width, V_APEX_FILLET_R)
+    for angle, width in _APEX_FILLET_LIMITS
+)  # 0.81
+if V_APEX_FILLET_GRIP_CLEARANCE_PRINTED_MIN < 0.25:
+    raise AssertionError("at its printed limits an apex round may touch the grip")
+if any(
+    2.0 * V_APEX_FILLET_R * math.tan((math.pi / 2.0 - math.radians(angle / 2.0)) / 2.0)
+    >= width
+    for angle, width in _APEX_FILLET_LIMITS
+):
+    raise AssertionError("at its printed limits the apex rounds meet across the flat")
 # (feature, dimension) -> (upper, lower) native band.
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("PivotBoreProfile", "PivotDia"): PIVOT_BORE_BAND,
@@ -447,10 +508,11 @@ DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
 }
 if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
     raise AssertionError("an above-callout line break would not print")
-# Both relief corners are one radius; the printed one stands for the pair.  A
-# custom prefix replaces SolidWorks' own radius "R", so it carries it
-# (pn_pen_hanger_spec's slot corners).
+# Both relief corners are one radius, and both apex rounds one; the printed
+# one stands for the pair.  A custom prefix replaces SolidWorks' own radius
+# "R", so it carries it (pn_pen_hanger_spec's slot corners).
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
+    ("VApexFillets", "VApexFilletR"): "2X R",
     ("ReliefProfile", "ReliefCornerR"): "2X R",
 }
 
