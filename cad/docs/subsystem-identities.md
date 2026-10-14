@@ -298,6 +298,13 @@ next free Number in its category and has no old stem or old Number.
 | retired | `vn-latch-hook-rivet` | MHA-VN-045 | no replacement: the one-piece MHA-PD-014 latch hook has no riveted joint |
 | retired | `vn-knife-hanger-washer` (old 1/2-inch family) | MHA-VN-026 | retired with the former 90126A211 washer; the new #10 washer has Number MHA-VN-060, not a revived VN-026 |
 | retired | `vn-transgear-collar-cross-pin` | MHA-VN-037 | no replacement: the MHA-PD-022 drive collar's true D-bore carries the torque on the knob shaft's D-flat |
+| retired | `ch-rocker-arm-tl-vise-stop` | MHA-CH-006-TL-01 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
+| retired | `ch-rocker-arm-tl-profile-fixture` | MHA-CH-006-TL-02 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
+| retired | `ch-rocker-arm-tl-diamond-pin` | MHA-CH-006-TL-03 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
+| retired | `ch-rocker-arm-tl-pivot-screw` | MHA-CH-006-TL-06 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
+| retired | `ch-rocker-arm-tl-pivot-washer` | MHA-CH-006-TL-07 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
+| retired | `ch-rocker-arm-tl-inspection-box` | MHA-CH-006-TL-08 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
+| retired | `ch-rocker-arm-tl-c-stop-bar` | MHA-CH-006-TL-09 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
 | added | `vn-magnifying-bracket-screw` | MHA-VN-050 | screws the MHA-MG-001 magnifying bracket to the MHA-SM-003 summing lever |
 | added | `vn-knife-mount-dowel` | MHA-VN-051 | keys each MHA-SM-002 knife mount to the MHA-FR-002 crossbar |
 | added | `mg-wheel-drum` | MHA-MG-010 | brass drum pressed on the MHA-MG-005 wheel spigot; carries the lever wire |

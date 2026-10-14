@@ -333,15 +333,6 @@ def test_changed_process_is_detected_instead_of_accepting_stale_native_text(monk
         _assert_rocker_print_authority()
 
 
-def test_ground_finish_keeps_its_declared_authority_without_a_seat_grade_citation() -> None:
-    import ch_rocker_arm_tl_pivot_screw_spec as screw
-
-    shoulder = exporter.requirement_manifest("ch_rocker_arm_tl_pivot_screw")["features"]["shoulder"]
-    assert shoulder["finish_ra"] == exporter._surface_finish.GROUND_UM
-    assert set(exporter._cite(screw, "SURFACE_FINISHES")) <= set(shoulder["cite"]["finish_ra"])
-    assert not set(exporter._cite(exporter._surface_finish, "SEAT_UM")) & set(shoulder["cite"]["finish_ra"])
-
-
 @pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
 def test_draw_import_registers_declarations_without_starting_solidworks(monkeypatch, stem: str) -> None:
     module = _fresh_draw(monkeypatch, stem)

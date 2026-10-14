@@ -698,27 +698,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="ch_rocker_arm_tl_pivot_screw",
-        part="ch_rocker_arm_tl_pivot_screw",
-        artifact_stem="ch-rocker-arm-tl-pivot-screw",
-        script_name="draw_ch_rocker_arm_tl_pivot_screw.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="ch_rocker_arm_tl_pivot_washer",
-        part="ch_rocker_arm_tl_pivot_washer",
-        artifact_stem="ch-rocker-arm-tl-pivot-washer",
-        script_name="draw_ch_rocker_arm_tl_pivot_washer.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="ch_rocker_arm_tl_profile_fixture",
-        part="ch_rocker_arm_tl_profile_fixture",
-        artifact_stem="ch-rocker-arm-tl-profile-fixture",
-        script_name="draw_ch_rocker_arm_tl_profile_fixture.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="dt_cone_pivot_post_tl_bond_cradle",
         part="dt_cone_pivot_post_tl_bond_cradle",
         artifact_stem="dt-cone-pivot-post-tl-bond-cradle",
@@ -744,13 +723,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="dt_cone_pivot_post_tl_saw_cradle",
         artifact_stem="dt-cone-pivot-post-tl-saw-cradle",
         script_name="draw_dt_cone_pivot_post_tl_saw_cradle.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="ch_rocker_arm_tl_vise_stop",
-        part="ch_rocker_arm_tl_vise_stop",
-        artifact_stem="ch-rocker-arm-tl-vise-stop",
-        script_name="draw_ch_rocker_arm_tl_vise_stop.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -803,20 +775,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="ch_rocker_arm_tl_inspection_box",
-        part="ch_rocker_arm_tl_inspection_box",
-        artifact_stem="ch-rocker-arm-tl-inspection-box",
-        script_name="draw_ch_rocker_arm_tl_inspection_box.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="ch_rocker_arm_tl_c_stop_bar",
-        part="ch_rocker_arm_tl_c_stop_bar",
-        artifact_stem="ch-rocker-arm-tl-c-stop-bar",
-        script_name="draw_ch_rocker_arm_tl_c_stop_bar.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="ch_rocker_arm_tl_riser_block",
         part="ch_rocker_arm_tl_riser_block",
         artifact_stem="ch-rocker-arm-tl-riser-block",
@@ -842,13 +800,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="ch_rocker_arm_tl_trammel_setting_bar",
         artifact_stem="ch-rocker-arm-tl-trammel-setting-bar",
         script_name="draw_ch_rocker_arm_tl_trammel_setting_bar.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="ch_rocker_arm_tl_diamond_pin",
-        part="ch_rocker_arm_tl_diamond_pin",
-        artifact_stem="ch-rocker-arm-tl-diamond-pin",
-        script_name="draw_ch_rocker_arm_tl_diamond_pin.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

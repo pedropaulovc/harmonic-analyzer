@@ -63,9 +63,6 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         "each",
     ),
     # Fixture builders apply the same bands their specs publish on the sheet.
-    ("build_ch_rocker_arm_tl_c_stop_bar", "band"): ("DRAWING_BANDS", "values"),
-    ("build_ch_rocker_arm_tl_diamond_pin", "band"): ("DRAWING_BANDS", "values"),
-    ("build_ch_rocker_arm_tl_inspection_box", "band"): ("DRAWING_BANDS", "values"),
     ("build_ch_rocker_arm_tl_outline_template", "band"): ("DRAWING_BANDS", "values"),
     ("build_ch_rocker_arm_tl_trammel_setting_bar", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_hanger", "band"): ("DRAWING_BANDS", "values"),
@@ -312,38 +309,14 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the finished cut-to-length hex bolt's inspection band: indexed into "
         "LENGTH_MIN/LENGTH_MAX and its native CutLength control"
     ),
-    ("ch_rocker_arm_tl_profile_fixture_spec", "ROD_PIN_XY_BAND"): (
-        "indexed for the symmetric rod-pin coordinate tolerance and position budget"
-    ),
-    ("ch_rocker_arm_tl_profile_fixture_spec", "DRILLED_BAND"): (
-        "indexed by _printed_limits.limits for drilled-hole inspection limits"
-    ),
-    ("ch_rocker_arm_tl_vise_stop_spec", "SCREW_LENGTH_BAND"): (
-        "indexed for the ISO 4762 screw's minimum engagement and maximum protrusion"
-    ),
     ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"): (
         "indexed by _printed_limits.limits for the stud-drill inspection limits"
-    ),
-    ("ch_rocker_arm_tl_c_stop_bar_spec", "DRILLED_BAND"): (
-        "indexed by _printed_limits.limits for screw-hole inspection limits"
-    ),
-    ("ch_rocker_arm_tl_inspection_box_spec", "DRILLED_BAND"): (
-        "indexed by _printed_limits.limits for tap-drill inspection limits"
     ),
     ("ch_rocker_arm_tl_filing_button_spec", "BORE_BAND"): (
         "matched-fit design intent, indexed by filing_stud_spec for bore clearance"
     ),
     ("ch_rocker_arm_tl_filing_stud_spec", "BODY_BAND"): (
         "matched-fit design intent, indexed for the rocker and filing-button clearances"
-    ),
-    ("ch_rocker_arm_tl_pivot_screw_spec", "SHOULDER_BAND"): (
-        "matched-fit design intent, indexed for the rocker and fixture-bore clearances"
-    ),
-    ("ch_rocker_arm_tl_pivot_screw_spec", "HEAD_BAND"): (
-        "matched-fit design intent, indexed for the outline-template bush clearance"
-    ),
-    ("ch_rocker_arm_tl_profile_fixture_spec", "STAND_DROP_BAND"): (
-        "indexed for the hub-shim gap, strap air and stand-pocket engagement"
     ),
 }
 
@@ -435,13 +408,7 @@ def _resolve(use: BandUse) -> list[tuple[str, Any]]:
 @pytest.mark.parametrize(
     ("module_name", "expected"),
     [
-        ("build_ch_rocker_arm_tl_c_stop_bar", "DRAWING_BANDS"),
-        ("build_ch_rocker_arm_tl_inspection_box", "DRAWING_BANDS"),
         ("build_ch_rocker_arm_tl_outline_template", "DRAWING_BANDS"),
-        (
-            "build_ch_rocker_arm_tl_diamond_pin",
-            "(LAND_BAND, LAND_HEIGHT_BAND, SHANK_BAND, NECK_BAND, REAM_BAND, COLLAR_END_BAND)",
-        ),
     ],
 )
 def test_fixture_local_sources_cover_every_band(module_name: str, expected: str) -> None:
@@ -451,7 +418,6 @@ def test_fixture_local_sources_cover_every_band(module_name: str, expected: str)
     resolved = _resolve(BandUse(module_name, 0, "band", "upper_lower"))
     assert [band for _, band in resolved] == bands
     assert all(any(band is actual for _, actual in resolved) for band in bands)
-
 
 def _check_band(label: str, band: Any, order: str) -> None:
     assert isinstance(band, tuple) and len(band) == 2, f"{label}: not a 2-tuple: {band!r}"
@@ -489,24 +455,10 @@ def test_band_uses_are_found() -> None:
     assert "build_dt_cone_gear_shaft:band" in ids, (
         "missing band consumer anchor: build_dt_cone_gear_shaft:band"
     )
-    # Per-source anchors: neither the new fixture builders nor their exported
-    # limit consumers may disappear behind a rich unrelated source's count.
-    for module in (
-        "build_ch_rocker_arm_tl_c_stop_bar",
-        "build_ch_rocker_arm_tl_diamond_pin",
-        "build_ch_rocker_arm_tl_inspection_box",
-    ):
-        assert f"{module}:band" in ids, f"missing band consumer anchor: {module}:band"
-    for module in (
-        "draw_ch_rocker_arm_tl_c_stop_bar",
-        "draw_ch_rocker_arm_tl_inspection_box",
-        "draw_ch_rocker_arm_tl_profile_fixture",
-        "draw_ch_rocker_arm_tl_vise_stop",
-        "draw_dt_cone_pivot_post_tl_saw_cradle",
-    ):
-        assert f"{module}:part_spec.DRILLED_BAND" in ids, (
-            f"missing band consumer anchor: {module}:part_spec.DRILLED_BAND"
-        )
+    # Per-source anchor: an exported limit consumer may not disappear behind a
+    # rich unrelated source's count.
+    anchor = "draw_dt_cone_pivot_post_tl_saw_cradle:part_spec.DRILLED_BAND"
+    assert anchor in ids, f"missing band consumer anchor: {anchor}"
 
 
 def test_known_bad_ids_are_live() -> None:
@@ -596,16 +548,8 @@ def test_classification_lists_are_current() -> None:
     assert ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND") in inventory, (
         "missing band inventory anchor: dt_cylinder_gear_spec:OVERALL_THICKNESS_BAND"
     )
-    for module, name in (
-        ("ch_rocker_arm_tl_c_stop_bar_spec", "BAR_HEIGHT_BAND"),
-        ("ch_rocker_arm_tl_diamond_pin_spec", "LAND_BAND"),
-        ("ch_rocker_arm_tl_inspection_box_spec", "DRILLED_BAND"),
-        ("ch_rocker_arm_tl_profile_fixture_spec", "ROD_PIN_XY_BAND"),
-        ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"),
-    ):
-        assert (module, name) in inventory, (
-            f"missing band inventory anchor: {module}:{name}"
-        )
+    anchor = ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND")
+    assert anchor in inventory, f"missing band inventory anchor: {anchor[0]}:{anchor[1]}"
     for listing in (NOT_FIT_BANDS, INDEXED_FIT_BANDS):
         stale = set(listing) - inventory
         assert not stale, f"listed constants that are gone: {sorted(stale)}"
@@ -618,13 +562,6 @@ def band_use_source_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Pat
     anchors = {
         "build_dt_crank_drive_gear": "BORE_DIA_BAND",
         "build_dt_cone_gear_shaft": "band",
-        "build_ch_rocker_arm_tl_c_stop_bar": "band",
-        "build_ch_rocker_arm_tl_diamond_pin": "band",
-        "build_ch_rocker_arm_tl_inspection_box": "band",
-        "draw_ch_rocker_arm_tl_c_stop_bar": "part_spec.DRILLED_BAND",
-        "draw_ch_rocker_arm_tl_inspection_box": "part_spec.DRILLED_BAND",
-        "draw_ch_rocker_arm_tl_profile_fixture": "part_spec.DRILLED_BAND",
-        "draw_ch_rocker_arm_tl_vise_stop": "part_spec.DRILLED_BAND",
         "draw_dt_cone_pivot_post_tl_saw_cradle": "part_spec.DRILLED_BAND",
     }
     for module, expression in anchors.items():
@@ -656,13 +593,6 @@ def test_band_uses_anchor_rejects_no_match(
     [
         ("build_dt_crank_drive_gear", "BORE_DIA_BAND"),
         ("build_dt_cone_gear_shaft", "band"),
-        ("build_ch_rocker_arm_tl_c_stop_bar", "band"),
-        ("build_ch_rocker_arm_tl_diamond_pin", "band"),
-        ("build_ch_rocker_arm_tl_inspection_box", "band"),
-        ("draw_ch_rocker_arm_tl_c_stop_bar", "part_spec.DRILLED_BAND"),
-        ("draw_ch_rocker_arm_tl_inspection_box", "part_spec.DRILLED_BAND"),
-        ("draw_ch_rocker_arm_tl_profile_fixture", "part_spec.DRILLED_BAND"),
-        ("draw_ch_rocker_arm_tl_vise_stop", "part_spec.DRILLED_BAND"),
         ("draw_dt_cone_pivot_post_tl_saw_cradle", "part_spec.DRILLED_BAND"),
     ],
 )
@@ -692,10 +622,6 @@ def band_inventory_source_tree(
     """AST-only assignments satisfy real lists without importing their owners."""
     names = set(NOT_FIT_BANDS) | set(INDEXED_FIT_BANDS) | {
         ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND"),
-        ("ch_rocker_arm_tl_c_stop_bar_spec", "BAR_HEIGHT_BAND"),
-        ("ch_rocker_arm_tl_diamond_pin_spec", "LAND_BAND"),
-        ("ch_rocker_arm_tl_inspection_box_spec", "DRILLED_BAND"),
-        ("ch_rocker_arm_tl_profile_fixture_spec", "ROD_PIN_XY_BAND"),
         ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"),
     }
     by_module: dict[str, list[str]] = {}
@@ -729,10 +655,6 @@ def test_inventory_anchor_rejects_no_match(
     ("module", "name"),
     [
         ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND"),
-        ("ch_rocker_arm_tl_c_stop_bar_spec", "BAR_HEIGHT_BAND"),
-        ("ch_rocker_arm_tl_diamond_pin_spec", "LAND_BAND"),
-        ("ch_rocker_arm_tl_inspection_box_spec", "DRILLED_BAND"),
-        ("ch_rocker_arm_tl_profile_fixture_spec", "ROD_PIN_XY_BAND"),
         ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"),
     ],
 )

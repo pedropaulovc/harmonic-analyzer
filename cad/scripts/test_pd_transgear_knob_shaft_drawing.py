@@ -252,8 +252,6 @@ def test_model_bands_and_source_linked_properties() -> None:
     assert bands[("JournalProfile", "JournalDia")] == "*deviations(JOURNAL_DIA_BAND)"
     assert bands[("CoreFlatProfile", "FlatToAxis")] == "*deviations(CORE_FLAT_BAND)"
     assert bands[("StudProfile", "OutsideDia")] == "*deviations(OUTSIDE_DIA_BAND)"
-    # Main precedent: test_ch_rocker_arm_tl_profile_fixture_drawing (registry
-    # membership and the drawing-specification purity scan).
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
     assert not drawing_specification_violations(source, filename=drawing.__file__)
