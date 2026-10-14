@@ -59,6 +59,7 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _hole_spec import THREAD_MAJOR_MM
 from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from vn_platen_clip_screw_spec import HEAD_DIA, SHANK_DIA, SHANK_LEN, THREAD
 from pd_platen_spec import PLATE_THICKNESS, SOCKET_BOSS_H, SOCKET_THREAD_ENGAGEMENT
 
@@ -68,15 +69,24 @@ MATERIAL = "Brass"  # see _appearance.apply_material docstring
 CLIP_LENGTH = (
     83.5  # ch22 p.55 rear photo: 86.7 of the 140 mm plate (0.619) x PLATE_HEIGHT 134.82
 )
-CLIP_WIDTH = 8.988  # ch30-p002 Pose Studio: 10 * 0.8988
+# ch30-p002 Pose Studio: the photographed clip is 10 * 0.8988 wide.
+PHOTO_CLIP_WIDTH = 8.988
 SHEET_T = 0.8  # photo-backed brass sheet thickness
 CLIP_THICKNESS = SHEET_T  # assembly stand-off: one sheet, not a face stack
 
-# ch22 img03 (one clip, 603 x 68 px of brass): the screw rail and the spring
-# rail are each 32 px wide and the slit between them 4 px.
-SCREW_RAIL_WIDTH = CLIP_WIDTH * 32.0 / 68.0
-NOTCH_WIDTH = CLIP_WIDTH * 4.0 / 68.0
-SPRING_RAIL_WIDTH = CLIP_WIDTH - SCREW_RAIL_WIDTH - NOTCH_WIDTH
+# ch22 img03 (one clip, 603 x 68 px of brass): the spring rail is 32 px wide
+# and the slit beside it 4 px, of the photographed width.
+NOTCH_WIDTH = PHOTO_CLIP_WIDTH * 4.0 / 68.0
+SPRING_RAIL_WIDTH = PHOTO_CLIP_WIDTH * 32.0 / 68.0
+# The photographed 32-px (4.23) screw rail cannot hold a #2 clearance hole
+# with the rule-17 1.5 mm ligament on both sides (user ruling 2026-10-14,
+# option A: widen the screw rail, keep the spring rail and slit).  With the
+# hole centred at half the rail, its station and the rail width each printed
+# at .XXX and the hole DRILLED, the slit side is the binding ligament:
+# W - band - (W/2 + band) - r_max >= 1.5, so W >= 2 * (1.5 + r_max + 2 * band),
+# 6.566 for the #2 loose hole; 6.6 holds it.
+SCREW_RAIL_WIDTH = 6.6
+CLIP_WIDTH = SCREW_RAIL_WIDTH + NOTCH_WIDTH + SPRING_RAIL_WIDTH
 SPRING_RAIL_Y0 = SCREW_RAIL_WIDTH + NOTCH_WIDTH
 # img03: the slits stop 77 px apart on their centreline; with their full
 # half-round ends (radius NOTCH_WIDTH / 2, 2 px) the tangent points sit
@@ -100,9 +110,34 @@ ARCH_RISE = 1.5  # shallow outward bow; editable as ArchRise in Tools > Equation
 HOLE_INSET = 7.1904  # ch30-p002 Pose Studio: 8 * 0.8988 from each end
 HOLE_Y = SCREW_RAIL_WIDTH / 2.0
 CLEARANCE_SIZE = THREAD.split("-")[0]  # "#2"
-HOLE_DIA = CLEARANCE_MM[(CLEARANCE_SIZE, "normal")]
+# #2 LOOSE (user ruling 2026-10-14): the screws are fixed in the platen's
+# taps, so the hole's float over the shank must hold both patterns' printed
+# positions (HOLE_FLOAT_MIN below).
+HOLE_FIT = "loose"
+HOLE_SPEC = HoleSpec("clearance", CLEARANCE_SIZE, fit=HOLE_FIT)
+HOLE_DIA = CLEARANCE_MM[(CLEARANCE_SIZE, HOLE_FIT)]
 HEAD_TO_SPRING_RAIL = SPRING_RAIL_Y0 - (HOLE_Y + HEAD_DIA / 2.0)
 HEAD_RAIL_MARGIN = (SCREW_RAIL_WIDTH - HEAD_DIA) / 2.0
+
+# Worst case of the printed sheet (drawing-guidelines.md rule 17): the hole
+# stations and the screw-rail width print at .XXX, the holes are DRILLED.
+POSITION_PLACES = 3
+_POSITION_BAND = printed_band_mm(POSITION_PLACES)
+HOLE_DIA_MAX = HOLE_DIA + drilled_oversize_mm()
+LIGAMENT_FLOOR = 1.5
+EDGE_LIGAMENT_MIN = HOLE_Y - _POSITION_BAND - HOLE_DIA_MAX / 2.0
+SLIT_LIGAMENT_MIN = (
+    SCREW_RAIL_WIDTH - _POSITION_BAND - (HOLE_Y + _POSITION_BAND) - HOLE_DIA_MAX / 2.0
+)
+END_LIGAMENT_MIN = HOLE_INSET - _POSITION_BAND - HOLE_DIA_MAX / 2.0
+# Fixed-fastener float: each pattern's two .XXX coordinates bound its holes
+# to a diametral zone of 2 * sqrt(2) * band; the clip's hole and the platen's
+# tap share the smallest hole's clearance over the shank.
+PATTERN_POSITION_ZONE = 2.0 * math.sqrt(2.0) * _POSITION_BAND
+HOLE_FLOAT_MIN = HOLE_DIA - SHANK_DIA
+# The catalogue head over the largest drilled hole, concentric: the least
+# bearing land (an offset head only uncovers less of the hole).
+HEAD_BEARING_LAND_MIN = (HEAD_DIA - HOLE_DIA_MAX) / 2.0
 
 # Spring rail section (local X, Z) as its sheet MID-SURFACE: the free tip lies
 # flat from its end-round centre out to the screw station, then each free half
@@ -222,6 +257,20 @@ if SOCKET_THREAD_ENGAGEMENT + 1e-9 < 1.5 * THREAD_MAJOR_MM[THREAD]:
     )
 if HOLE_DIA < SHANK_DIA:
     raise AssertionError("stock fillister shank does not clear the clip")
+if min(EDGE_LIGAMENT_MIN, SLIT_LIGAMENT_MIN, END_LIGAMENT_MIN) < LIGAMENT_FLOOR:
+    raise AssertionError(
+        "platen clip screw-hole ligaments at the printed worst case "
+        f"(edge {EDGE_LIGAMENT_MIN:.3f}, slit {SLIT_LIGAMENT_MIN:.3f}, end "
+        f"{END_LIGAMENT_MIN:.3f}) under the {LIGAMENT_FLOOR} floor "
+        "(drawing-guidelines.md rule 17)"
+    )
+if HOLE_FLOAT_MIN < 2.0 * PATTERN_POSITION_ZONE:
+    raise AssertionError(
+        f"platen clip {CLEARANCE_SIZE} {HOLE_FIT} hole floats {HOLE_FLOAT_MIN:.3f} "
+        f"over the shank, under the two patterns' {2.0 * PATTERN_POSITION_ZONE:.3f}"
+    )
+if HEAD_BEARING_LAND_MIN <= 0.0:
+    raise AssertionError("platen clip screw head pulls through the largest hole")
 
 
 def _bow_points(x0: float, s0: float) -> dict[str, tuple[float, float]]:
@@ -693,13 +742,13 @@ async def build(adapter) -> dict[str, str]:
     # from the screw rail's outer face at local z = 0, where the heads seat.
     hole_cut = wizard_holes(
         adapter,
-        HoleSpec("clearance", CLEARANCE_SIZE),
+        HOLE_SPEC,
         [
             [HOLE_INSET, HOLE_Y, 0.0],
             [CLIP_LENGTH - HOLE_INSET, HOLE_Y, 0.0],
         ],
         (0.0, 0.0, -1.0),
-        f"flat-rail screw holes ({CLEARANCE_SIZE} clearance)",
+        f"flat-rail screw holes ({CLEARANCE_SIZE} {HOLE_FIT} clearance)",
         name="ScrewHoles",
         placement_dims=[
             (("LeftX", '"HoleInset"'), ("LeftZ", '"HoleY"')),

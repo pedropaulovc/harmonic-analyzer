@@ -10,9 +10,9 @@ build_pd_platen_guide.py). Fastener holes:
   left/right edges (x 5.3928/264.2472), matching the resized clips'
   7.1904-inset end holes at local y 29.6604/127.6296, each tapped on
   through a Ø7 x 1.70 boss on the back face for >= 1.5D engagement;
-* ten O3 guide-screw through-holes in two rows of 5 (ch22 front photo)
-  at the guide rail centrelines: bottom row y 13, top row y 47 (machine
-  318 / 352 with the plate at y 305).
+* ten #4 loose (Ø3.658) counterbored guide-screw through-holes in two rows
+  of 5 (ch22 front photo) at the guide rail centrelines: bottom row y 13,
+  top row y 47 (machine 318 / 352 with the plate at y 305).
 
 Dimensions: the ch30-p002 Pose Studio fit sets the width to 269.64 mm and
 the user-confirmed front-face proportion to height:width = 1:2, hence
@@ -50,6 +50,7 @@ from pd_platen_spec import (
     CBORE_DEPTH,
     CBORE_DIA,
     GUIDE_HOLE_DIA,
+    GUIDE_HOLE_FIT,
     GUIDE_HOLE_XY,
     PLATE_HEIGHT,
     PLATE_THICKNESS,
@@ -190,14 +191,14 @@ async def build(adapter) -> dict[str, str]:
     pre = post
     wizard_holes(
         adapter,
-        HoleSpec("counterbore_fillister", "#4", overrides_mm={
+        HoleSpec("counterbore_fillister", "#4", fit=GUIDE_HOLE_FIT, overrides_mm={
             "HoleDiameter": GUIDE_HOLE_DIA,
             "CounterBoreDiameter": CBORE_DIA,
             "CounterBoreDepth": CBORE_DEPTH,
         }),
         [[x, y, 0.0] for x, y in GUIDE_HOLE_XY],
         (0.0, 0.0, -1.0),
-        "guide-screw counterbored holes (#4)", name="GuideHoles",
+        "guide-screw counterbored holes (#4 loose)", name="GuideHoles",
     )
     post = await adapter.get_mass_properties()
     v_guide = len(GUIDE_HOLE_XY) * (

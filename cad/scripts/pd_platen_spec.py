@@ -10,7 +10,7 @@ keys (#880).
 
 from __future__ import annotations
 
-from _hole_spec import HoleSpec
+from _hole_spec import CLEARANCE_MM, HoleSpec
 from vn_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 
 PLATE_WIDTH = 269.64  # ch30-p002 Pose Studio: 300 * 0.8988 (user fit)
@@ -42,8 +42,13 @@ SOCKET_XY = (
 
 # Guide-screw through-holes: 2 rows of 5 (heads on the front face, shanks
 # into the guide rails on the back). ONE counterbored #4 fillister Hole
-# Wizard feature; the artefact through/cbore dims are preserved as overrides.
-GUIDE_HOLE_DIA = 3.0  # artefact through Ø (override); #4 fillister shank passes
+# Wizard feature; the artefact counterbore dims are preserved as overrides.
+# #4 LOOSE through (user ruling 2026-10-14, rule-21 float stack): the screws
+# are fixed in the guides' taps, so each hole's float over the shank must hold
+# the guide's tap position and this plate's own .XXX hole coordinates
+# (test_pd_platen_refit); the artefact Ø3.0 floated 0.155 against 0.20.
+GUIDE_HOLE_FIT = "loose"
+GUIDE_HOLE_DIA = CLEARANCE_MM[("#4", GUIDE_HOLE_FIT)]  # 3.658
 GUIDE_HOLE_X = (26.964, 80.892, 134.82, 188.748, 242.676)
 GUIDE_HOLE_Y = (13.0, 47.0)  # bottom / top rail centrelines (machine 318 / 352)
 GUIDE_HOLE_XY = tuple((x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X)
