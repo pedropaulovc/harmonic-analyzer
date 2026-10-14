@@ -435,9 +435,17 @@ def add_feature_control_frame(
         "GetLeaderPointsAtIndex",
         "GetDisplayData",
     )
-    if int(annotation.GetAttachedEntityCount3()) != 1:
+    attached_count = int(annotation.GetAttachedEntityCount3())
+    if attached_count != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
-            raise RuntimeError(f"failed to attach feature-control frame ({label})")
+            pick = edge_xy if edge_xy is not None else leader_attach_xy
+            raise RuntimeError(
+                f"failed to attach feature-control frame ({label}): InsertGtol "
+                f"left {attached_count} attached entities (types "
+                f"{tuple(annotation.GetAttachedEntityTypes() or ())}) and "
+                f"SetAttachedEntities rejected the {entity_type.upper()} "
+                f"selected at {pick}"
+            )
     # Bent leaders keep ordinary feature attachments out of neighbouring views.
     leader_status = int(
         annotation.SetLeader3(
