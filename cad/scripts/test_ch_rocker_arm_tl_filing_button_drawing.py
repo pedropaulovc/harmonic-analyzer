@@ -170,7 +170,8 @@ def test_kit_holds_the_hub_coaxiality_and_filed_band() -> None:
         + button.OD_RUNOUT_TIR / 2
     )
     assert shift == pytest.approx(stud.HUB_CENTRE_SHIFT_MAX)
-    assert 2 * shift <= rocker.HUB_COAXIALITY_DIA
+    # The rim runout spends the whole budget, so the shift meets it exactly.
+    assert 2 * shift <= rocker.HUB_COAXIALITY_DIA + 1e-9
     rim_low, rim_high = _features(BUTTON)["rim"]["dia"]
     hub_low, hub_high = limits(rocker.HUB_DIA, 2)
     assert hub_low <= rim_low - 2 * shift and rim_high + 2 * shift <= hub_high
@@ -260,18 +261,17 @@ def test_notes_follow_the_simplicity_policy(notes: str) -> None:
 
 
 def test_corner_radii_fit_their_corners_and_clear_the_button() -> None:
-    """Main's round-4 ruling: R0.3 +/-0.1 roots (never sharp; the ceiling
-    fits the relief and the head step) and an R0.2 MAX seat corner inside the
-    title block's edge break on the button bore."""
-    high = stud.ROOT_RADIUS + stud.ROOT_RADIUS_TOL
-    assert stud.ROOT_RADIUS - stud.ROOT_RADIUS_TOL > 0
-    assert high <= (stud.THREAD_MODEL_DIA - stud.RELIEF_DIA) / 2
-    assert 2 * high <= stud.RELIEF_WIDTH_MIN
-    assert high <= (stud.HEAD_DIA - stud.TAIL_DIA) / 2
+    """Main's round-6 ruling: every internal corner prints a MAX radius on its
+    model value; the roots fit the relief and leave a head step face, and the
+    seat corner stays inside the title block's edge break on the button bore."""
+    assert stud.RADIUS_TOL_TYPE == 6
+    assert stud.ROOT_RADIUS < (stud.THREAD_MODEL_DIA - stud.RELIEF_DIA) / 2
+    assert 2 * stud.ROOT_RADIUS < stud.RELIEF_WIDTH_MIN
+    assert stud.TAIL_ROOT_RADIUS < (stud.HEAD_DIA - stud.TAIL_DIA) / 2
     edge_break = float(_config.title_block("edge_break")["chamfer_max_mm"])
     assert stud.SEAT_FILLET_RADIUS < edge_break
-    assert stud.SEAT_FILLET_TOL_TYPE == 6
-    assert stud.DRAWING_PRECISION_BY_NAME["SeatFilletR"] == 1
+    for name in ("SeatFilletR", "ReliefRootR", "TailRootR"):
+        assert stud.DRAWING_PRECISION_BY_NAME[name] == stud.RADIUS_PLACES == 1
     assert stud_drawing.PROFILE_KEEP.keys() >= {
         "SeatFilletR",
         "ReliefRootR",
@@ -279,6 +279,19 @@ def test_corner_radii_fit_their_corners_and_clear_the_button() -> None:
     }
 
 
-def test_rim_runout_prints_as_its_receipt_limit() -> None:
-    assert button.OD_RUNOUT_CALLOUT == "RUNOUT 0.02 TIR TO BORE"
+def test_shoulder_station_keeps_three_places_for_its_stack() -> None:
+    """At the title block's .X band the relief would narrow under one pitch,
+    so the shoulder keeps three places and its callout says why."""
+    assert stud.DRAWING_PRECISION_BY_NAME["ShoulderStation"] == 3
+    band_x = limits(stud.SHOULDER_STATION, 1)
+    assert band_x[0] - (stud.RELIEF_END_STATION + 0.8) < stud._THREAD_PITCH
+    assert stud.SHOULDER_CALLOUT == "BODY UNDER STACK TOP"
+
+
+def test_rim_runout_is_the_hub_coaxiality_remainder() -> None:
+    assert button.OD_RUNOUT_TIR <= stud.RIM_RUNOUT_BUDGET_TIR + 1e-9
+    assert button.OD_RUNOUT_TIR + 0.001 > stud.RIM_RUNOUT_BUDGET_TIR + 1e-9
+    assert button.OD_RUNOUT_CALLOUT == "RUNOUT 0.025 TIR TO BORE"
+    assert "HUB COAXIALITY" in button.OD_CALLOUT
+    assert "\n" not in button.OD_RUNOUT_CALLOUT
     assert "TRUE TO BORE" not in button.DRAWING_NOTES

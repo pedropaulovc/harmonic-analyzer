@@ -56,6 +56,7 @@ from ch_rocker_arm_tl_filing_stud_spec import (
     REFERENCE_DIMENSIONS,
     RELIEF_ROOTS_CALLOUT,
     RELIEF_WIDTH,
+    SHOULDER_CALLOUT,
     STACK_CALLOUT,
     SURFACE_FINISHES,
     TAIL_END,
@@ -99,27 +100,36 @@ def _row(station_x_mm: float, row: int) -> tuple[float, float]:
 
 
 # Shortest span lowest so no extension line crosses another row's text. The
-# seat's value and stack callout sit a little left of their span's middle:
-# the callout is wider than the value, and the tip's extension line rises
-# past it to the upper rows.
+# seat's value and stack callout sit in the middle of their span, the
+# callout's ends clear of the seat's and the tip's extension lines (Claude
+# review: 2 mm left, the seat's line ran into "HOLDS"). The shoulder's value
+# and its function callout are wider than its span: they stand right of the
+# tip's extension line, clear of the profile.
+_SHOULDER_TEXT_X = _TIP_X + 0.031
 PROFILE_KEEP = {
     "ReliefEndStation": _row(BODY_LENGTH + RELIEF_WIDTH, 0),
-    "ShoulderStation": _row(BODY_LENGTH, 1),
-    "SeatStation": (_row(0.0, 2)[0] - 0.002, _row(0.0, 2)[1]),
+    "ShoulderStation": (_SHOULDER_TEXT_X, _row(BODY_LENGTH, 1)[1]),
+    "SeatStation": _row(0.0, 2),
     "HeadBackStation": _row(-HEAD_LENGTH, 3),
     "TailEndStation": _row(-TAIL_END, 4),
-    # Corner radii (the fillet dimensions land on the lower corners). The
-    # seat's MAX stands just up and right of its corner and the relief roots'
-    # "2X" pair a full text gap above it, so each reads as its own block
-    # (round-4 layout audit: 2.66 mm read as one); both sit between the
-    # seat's and the shoulder's extension lines, below the shoulder row. The
-    # tail root's text stands below and left of its step, under the tail and
-    # clear of the head diameter's text (round 4: led from above, its leader
-    # crossed that text).
+    # Corner radii, each a MAX. The seat's stands just up and right of its
+    # corner and the relief roots' "2X" pair a full text gap above it, so
+    # each reads as its own block (round-4 layout audit: 2.66 mm read as
+    # one); both sit between the seat's and the shoulder's extension lines,
+    # below the shoulder row. The tail root's text stands below and left of
+    # its lower step corner, under the tail and clear of the head diameter's
+    # text (round 4: led from above, its leader crossed that text).
     "SeatFilletR": (SEAT_X + 0.014, PROFILE_CENTER[1] + 0.0135),
     "ReliefRootR": (SEAT_X + 0.015, PROFILE_CENTER[1] + 0.026),
     "TailRootR": (SEAT_X - 0.021, PROFILE_CENTER[1] - 0.023),
 }
+# The diameter sketches sit on the seat plane (X0), so the tail's and the
+# thread's extension lines ran from the seat through the head and the body
+# and read as phantom steps (Claude review). Capped from their dimension
+# lines (draw_dt_pinion_cam's _limit_witness_lines), each stays on its own
+# step's silhouette: the tail's from its mid-length, the thread's within its
+# ten-millimetre run (sheet metres).
+WITNESS_CAPS = {"TailDia": 0.008, "ThreadDia": 0.006}
 # swDimensionArrowsSide_e.swDimArrowsInside on the two shortest rows: left to
 # the document's arrows outside, the relief end's dimension line ran left
 # across the shoulder's extension line (round-3 layout audit) and the
@@ -390,11 +400,25 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_text(adapter, annotations, DIMENSION_TEXT)
     # drawing-guidelines.md rule 4: the seat station's stack reason rides it.
     set_dimension_callouts(
-        adapter, annotations, {"SeatStation": STACK_CALLOUT}, location="below"
+        adapter,
+        annotations,
+        {"SeatStation": STACK_CALLOUT, "ShoulderStation": SHOULDER_CALLOUT},
+        location="below",
     )
     set_dimension_callouts(
         adapter, annotations, {"ReliefRootR": RELIEF_ROOTS_CALLOUT}, location="above"
     )
+    for name, length in WITNESS_CAPS.items():
+        matches = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one filing-stud {name} diameter dimension")
+        display = _early_bound(
+            _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        display.MaxWitnessLineLength = length
+        if abs(float(display.MaxWitnessLineLength) - length) > 1e-9:
+            raise RuntimeError(f"filing stud {name}: witness-line cap did not persist")
     for name in INSIDE_ARROW_ROWS:
         matches = [a for a in annotations if dimension_name(adapter, a) == name]
         if len(matches) != 1:

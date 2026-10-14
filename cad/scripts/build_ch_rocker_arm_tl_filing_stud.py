@@ -39,7 +39,6 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -57,10 +56,10 @@ from ch_rocker_arm_tl_filing_stud_spec import (
     ISOMETRIC_VIEW_NOTE,
     RELIEF_DIA,
     RELIEF_WIDTH,
+    RADIUS_TOL_TYPE,
     ROOT_RADIUS,
-    ROOT_RADIUS_TOL,
     SEAT_FILLET_RADIUS,
-    SEAT_FILLET_TOL_TYPE,
+    TAIL_ROOT_RADIUS,
     TAIL_DIA,
     TAIL_END,
     THREAD_END,
@@ -120,13 +119,15 @@ def _require_one_solid_body(adapter, *, label: str) -> None:
         )
 
 
-def _seat_fillet_max_limit(adapter) -> None:
-    """SeatFilletR as a single MAX limit: the print shows the model value."""
-    _, dimension = _named_dimension(adapter, "SeatFillet", "SeatFilletR")
+def _max_limit(adapter, feature: str, dimension_name: str) -> None:
+    """A corner radius as a single MAX limit: the print shows the model value."""
+    _, dimension = _named_dimension(adapter, feature, dimension_name)
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = SEAT_FILLET_TOL_TYPE
-    if int(tolerance.Type) != SEAT_FILLET_TOL_TYPE:
-        raise RuntimeError("SeatFilletR@SeatFillet: MAX tolerance type did not persist")
+    tolerance.Type = RADIUS_TOL_TYPE
+    if int(tolerance.Type) != RADIUS_TOL_TYPE:
+        raise RuntimeError(
+            f"{dimension_name}@{feature}: MAX tolerance type did not persist"
+        )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -143,6 +144,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ReliefWidth", f"{RELIEF_WIDTH}mm")
     await set_global(adapter, "SeatFilletR", f"{SEAT_FILLET_RADIUS}mm")
     await set_global(adapter, "RootR", f"{ROOT_RADIUS}mm")
+    await set_global(adapter, "TailRootR", f"{TAIL_ROOT_RADIUS}mm")
 
     drive_jobs: list[tuple[str, str]] = []
     for profile, feature, dia_knob, length_knob, dia, length, reverse in _STEPS:
@@ -223,7 +225,8 @@ async def build(adapter) -> dict[str, str]:
     relief_width = name_dimensions(adapter, "Relief", ["ReliefWidth"])[0]
     drive_jobs.append((relief_width, '"ReliefWidth"'))
 
-    # Internal corner radii (spec: ROOT_RADIUS, SEAT_FILLET_RADIUS). Each pick
+    # Internal corner radii (spec: ROOT_RADIUS, TAIL_ROOT_RADIUS,
+    # SEAT_FILLET_RADIUS), each the printed MAX. Each pick
     # lies on its corner's circle in the Right-plane frame (x along the axis,
     # radius on +Y); the nearest other edge is >= 0.5 mm away. The seat
     # corner is head face to body, the relief roots are the body shoulder and
@@ -251,9 +254,9 @@ async def build(adapter) -> dict[str, str]:
         (
             "TailRoot",
             "TailRootR",
-            ROOT_RADIUS,
+            TAIL_ROOT_RADIUS,
             [[-HEAD_LENGTH, TAIL_DIA / 2.0, 0.0]],
-            '"RootR"',
+            '"TailRootR"',
         ),
     ):
         check(
@@ -351,12 +354,12 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    _seat_fillet_max_limit(adapter)
     for feature, dimension in (
+        ("SeatFillet", "SeatFilletR"),
         ("ReliefRoots", "ReliefRootR"),
         ("TailRoot", "TailRootR"),
     ):
-        set_dimension_symmetric_tolerance(adapter, feature, dimension, ROOT_RADIUS_TOL)
+        _max_limit(adapter, feature, dimension)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

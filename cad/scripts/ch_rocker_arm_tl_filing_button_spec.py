@@ -36,13 +36,14 @@ _OD_MIN, _OD_MAX = [round(OD + deviation, 12) for deviation in printed_deviation
 _HUB_MIN, _HUB_MAX = [round(rocker.HUB_DIA + deviation, 12) for deviation in printed_deviations(rocker.HUB_DIA, 2)]
 if not (_HUB_MIN <= _OD_MIN and _OD_MAX <= _HUB_MAX):
     raise AssertionError("filing-button rim band leaves the hub's printed O.D. band")
-# The rim's runout to its bore: the inventory's receipt limit
-# (hub-filing-buttons button_runout_mm), printed as a measurable acceptance on
-# the O.D. (drawing-simplicity-policy: the button is off the GD&T allowlist,
-# so plain runout wording, no frame or datum). The stud's hub coaxiality
-# budget spends it.
-OD_RUNOUT_TIR = 0.02
-OD_RUNOUT_PLACES = 2
+# The rim's runout to its bore, printed as a measurable acceptance on the
+# O.D. (drawing-simplicity-policy: the button is off the GD&T allowlist, so
+# plain runout wording, no frame or datum) with its reason. It is the whole
+# remainder of the arm's hub coaxiality budget after the two body fits; the
+# stud spec, which owns that budget, asserts it is the largest TIR at these
+# places (Main's round-6 ruling).
+OD_RUNOUT_TIR = 0.025
+OD_RUNOUT_PLACES = 3
 if round(OD_RUNOUT_TIR, OD_RUNOUT_PLACES) != OD_RUNOUT_TIR:
     raise AssertionError("the rim runout does not print at its places")
 
@@ -87,7 +88,10 @@ RIM_WALL_NOTE = f"RIM WALL {RIM_WALL_MIN:.2f} MIN."
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
 # each three-place size names its mate on its own dimension (callout below);
 # the O.D. carries its runout acceptance above its value.
-OD_CALLOUT = "SETS FILED MHA-CH-006 HUB"
+# The runout's reason rides under the O.D.'s mate: one line above (a broken
+# above-callout does not print, draw_dt_cone_gear_shaft), and in one line the
+# reason would reach the edge view and the isometric.
+OD_CALLOUT = "SETS FILED MHA-CH-006 HUB\nRUNOUT HOLDS HUB COAXIALITY"
 OD_RUNOUT_CALLOUT = f"RUNOUT {OD_RUNOUT_TIR:.{OD_RUNOUT_PLACES}f} TIR TO BORE"
 THICKNESS_CALLOUT = "STACKS MHA-CH-006 HUB"
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the

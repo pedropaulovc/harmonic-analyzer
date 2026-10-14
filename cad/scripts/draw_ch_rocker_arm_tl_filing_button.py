@@ -6,13 +6,15 @@ import argparse
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -89,6 +91,49 @@ EDGE_XY = {"DiscDia": (0.245, 0.180)}
 RIM_PICK = (FACE_CENTER[0] - 0.0144, FACE_CENTER[1] - 0.0144)
 RIM_NOTE_XY = (0.025, 0.145)
 
+# swCenterMarkStyle_e.swCenterMark_Single: AutoInsertCenterMarks2 marks the
+# concentric O.D. and bore circles separately, one mark printed over the other
+# (round-4 layout audit: DetailItem347/349 at one point;
+# draw_pd_transgear_front_bushing).
+CENTER_MARK_SINGLE = 2
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+
+
+def _center_marks(view: Any) -> tuple[Any, ...]:
+    return tuple(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
+
+
+def _mark_bore_axis(adapter: Any, view: Any) -> None:
+    """One centre mark on the bore, picked on its -X point; prove the one."""
+    if _center_marks(view):
+        raise RuntimeError("the button face view arrived with a centre mark")
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the button face view")
+    draw.ClearSelection2(True)
+    if not draw.Extension.SelectByID2(
+        "",
+        "EDGE",
+        FACE_CENTER[0] - part_spec.BORE_DIA * VIEW_SCALE[0] / VIEW_SCALE[1] / 2000.0,
+        FACE_CENTER[1],
+        0.0,
+        False,
+        0,
+        null_callout(),
+        0,
+    ):
+        raise RuntimeError("failed to select the button bore circle")
+    mark = drawing.InsertCenterMark3(CENTER_MARK_SINGLE, False, False)
+    draw.ClearSelection2(True)
+    if mark is None:
+        raise RuntimeError("failed to centre-mark the button bore")
+    marks = _center_marks(view)
+    if len(marks) != 1:
+        raise RuntimeError(f"expected one button-bore centre mark, found {len(marks)}")
+
 
 _AXIS = ([0.0, 0.0, 1.0], ("__frame__",))
 
@@ -126,9 +171,12 @@ requirement("bore",
     precision={"finish_ra": 1},
 )
 
-# Above the bore's fit callout so the thickness's mate callout clears it.
+# Close above the edge view, under the bore's fit callout: the thickness's
+# mate callout stands above its value, so the dimension line runs under the
+# value and clear of the callout (Claude review: below the value, the line
+# struck the callout).
 EDGE_KEEP = {
-    "DiscThick": (0.200, 0.250),
+    "DiscThick": (0.200, 0.218),
 }
 
 
@@ -221,8 +269,10 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="edge view",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Lower right on the bore circle, clear of the bore dimension's leader.
-    bore_pick = (FACE_CENTER[0] + 0.0092, FACE_CENTER[1] - 0.0092)
+    # Lower right on the bore circle, past the end of the bore dimension's
+    # diameter line (Claude review: at 45 degrees the two arrows met there)
+    # and clear of the vertical centre mark.
+    bore_pick = (FACE_CENTER[0] + 0.00445, FACE_CENTER[1] - 0.01223)
     add_surface_finish(
         adapter,
         face,
@@ -232,8 +282,7 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
         label="filing button bore finish",
     )
-    if not auto_center_marks(adapter, face, holes=True, size=0.0025):
-        raise RuntimeError("failed to add the center mark to the button face view")
+    _mark_bore_axis(adapter, face)
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [a for a in annotations if dimension_name(adapter, a) == name]
         if len(matches) != 1:
@@ -254,13 +303,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(
-        adapter,
-        annotations,
-        {"DiscDia": OD_CALLOUT, "DiscThick": THICKNESS_CALLOUT},
-        location="below",
+        adapter, annotations, {"DiscDia": OD_CALLOUT}, location="below"
     )
     set_dimension_callouts(
-        adapter, annotations, {"DiscDia": OD_RUNOUT_CALLOUT}, location="above"
+        adapter,
+        annotations,
+        {"DiscDia": OD_RUNOUT_CALLOUT, "DiscThick": THICKNESS_CALLOUT},
+        location="above",
     )
     add_attached_note(
         adapter,

@@ -133,33 +133,34 @@ UPPER_BUTTON_SUPPORT_MIN = round(_BODY_LEN_MIN - _HUB_TOP_MAX, 12)
 if UPPER_BUTTON_SUPPORT_MIN < _BUTTON_MIN / 2.0:
     raise AssertionError("filing-stud body does not carry the upper button")
 
-# Internal corner radii (Main's round-4 ruling on codex's root-radius
-# blocker). The relief's two roots and the head-to-tail step take a turning
-# tool's nose radius, R0.3 with a symmetric band on its model dimension: never
-# sharp at the band's floor, and its ceiling still fits the relief depth under
-# the thread, the worst-case relief width and the head-to-tail step. The
-# button seat is a clearance limit instead: R0.2 MAX (a sharp corner is
-# acceptable there), under the title block's 0.25 edge break on the lower
-# button's bore (the kit test reads the row), so the button bears on the
-# head face.
+# Internal corner radii (Main's round-6 ruling: both reviewer families ask
+# for a largest acceptable radius, which still states one at every corner).
+# Each prints as a MAX on its model dimension (swTolMAX: the print shows the
+# model value), so the model carries the worst-case corner. The relief's two
+# roots stay inside the relief depth under the thread and do not meet at the
+# worst-case relief width; the held-only tail's step root leaves a flat on
+# the head's back face; the button seat corner stays under the title block's
+# 0.25 edge break on the lower button's bore (the kit test reads the row), so
+# the button bears on the head face.
+RADIUS_PLACES = 1
+RADIUS_TOL_TYPE = 6  # swTolType_e.swTolMAX
 ROOT_RADIUS = 0.3
-ROOT_RADIUS_TOL = 0.1
-ROOT_RADIUS_PLACES = 1
-_ROOT_RADIUS_MAX = ROOT_RADIUS + ROOT_RADIUS_TOL
-if _ROOT_RADIUS_MAX > (THREAD_MODEL_DIA - RELIEF_DIA) / 2.0:
-    raise AssertionError("filing-stud relief root radius is deeper than the relief")
-if 2.0 * _ROOT_RADIUS_MAX > RELIEF_WIDTH_MIN:
-    raise AssertionError("filing-stud relief roots overlap at the narrowest relief")
-if _ROOT_RADIUS_MAX > (HEAD_DIA - TAIL_DIA) / 2.0:
-    raise AssertionError("filing-stud tail root radius is taller than the head step")
+TAIL_ROOT_RADIUS = 0.4
 SEAT_FILLET_RADIUS = 0.2
-SEAT_FILLET_PLACES = 1
-SEAT_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints the model value + MAX
-if round(SEAT_FILLET_RADIUS, SEAT_FILLET_PLACES) != SEAT_FILLET_RADIUS:
-    raise AssertionError(
-        "filing-stud seat fillet MAX does not print as its model value"
-    )
+for _radius in (ROOT_RADIUS, TAIL_ROOT_RADIUS, SEAT_FILLET_RADIUS):
+    if round(_radius, RADIUS_PLACES) != _radius:
+        raise AssertionError("filing-stud corner MAX does not print as its model value")
+if ROOT_RADIUS >= (THREAD_MODEL_DIA - RELIEF_DIA) / 2.0:
+    raise AssertionError("filing-stud relief root radius is deeper than the relief")
+if 2.0 * ROOT_RADIUS >= RELIEF_WIDTH_MIN:
+    raise AssertionError("filing-stud relief roots meet at the narrowest relief")
+if TAIL_ROOT_RADIUS >= (HEAD_DIA - TAIL_DIA) / 2.0:
+    raise AssertionError("filing-stud tail root radius leaves no head step face")
 RELIEF_ROOTS_CALLOUT = "2X"
+# The shoulder station stays at three places: at the title block's .X band
+# the relief would narrow under one pitch and the body could stand proud of
+# the stack, so its callout states the function.
+SHOULDER_CALLOUT = "BODY UNDER STACK TOP"
 # Bought clamping nut: McMaster 90264A425, zinc-plated steel hex coupling
 # nut, #10-24, 3/4 in long, 5/16 in across flats, fully threaded (verified
 # live 2026-10-14). The inventory's M5 DIN 934 nut is 0.8D tall; the coupling
@@ -208,14 +209,22 @@ if round(HEAD_BACK + printed_deviations(HEAD_BACK, STOCK_PLACES)[0], 12) - _SEAT
 # bore-on-body clearance, plus half the button-bore-on-body clearance, plus
 # half the rim's runout to its own bore. Both buttons ride the body, so the
 # worst-case diametral shift is inside the arm's printed hub coaxiality and
-# the filed O.D. inside its printed band.
+# the filed O.D. inside its printed band. The button prints the whole
+# remainder as its rim runout: the largest TIR at its places that the budget
+# allows (Main's round-6 ruling).
 _BODY_MIN = BODY_DIA + BODY_BAND[1]
-HUB_CENTRE_SHIFT_MAX = (
-    (rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[0] - _BODY_MIN) / 2.0
-    + (button.BORE_DIA + button.BORE_BAND[0] - _BODY_MIN) / 2.0
-    + button.OD_RUNOUT_TIR / 2.0
-)
-if 2.0 * HUB_CENTRE_SHIFT_MAX > rocker.HUB_COAXIALITY_DIA:
+_FIT_SHIFT_MAX = (
+    rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[0] - _BODY_MIN
+) / 2.0 + (button.BORE_DIA + button.BORE_BAND[0] - _BODY_MIN) / 2.0
+RIM_RUNOUT_BUDGET_TIR = 2.0 * (rocker.HUB_COAXIALITY_DIA / 2.0 - _FIT_SHIFT_MAX)
+_RUNOUT_STEP = 10.0**-button.OD_RUNOUT_PLACES
+if not (
+    button.OD_RUNOUT_TIR <= RIM_RUNOUT_BUDGET_TIR + 1e-9
+    and button.OD_RUNOUT_TIR + _RUNOUT_STEP > RIM_RUNOUT_BUDGET_TIR + 1e-9
+):
+    raise AssertionError("filing-button rim runout is not the hub coaxiality remainder")
+HUB_CENTRE_SHIFT_MAX = _FIT_SHIFT_MAX + button.OD_RUNOUT_TIR / 2.0
+if 2.0 * HUB_CENTRE_SHIFT_MAX > rocker.HUB_COAXIALITY_DIA + 1e-9:
     raise AssertionError("filing kit cannot hold the hub coaxiality to the pivot bore")
 _BUTTON_OD_MAX = round(
     button.OD + printed_deviations(button.OD, button.OD_PLACES)[1], 12
@@ -256,9 +265,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ThreadProfile": {"ThreadDia": 2},
     "ReliefProfile": {"ReliefDia": RELIEF_PLACES},
     "StationReference": dict(_STATIONS),
-    "SeatFillet": {"SeatFilletR": SEAT_FILLET_PLACES},
-    "ReliefRoots": {"ReliefRootR": ROOT_RADIUS_PLACES},
-    "TailRoot": {"TailRootR": ROOT_RADIUS_PLACES},
+    "SeatFillet": {"SeatFilletR": RADIUS_PLACES},
+    "ReliefRoots": {"ReliefRootR": RADIUS_PLACES},
+    "TailRoot": {"TailRootR": RADIUS_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
