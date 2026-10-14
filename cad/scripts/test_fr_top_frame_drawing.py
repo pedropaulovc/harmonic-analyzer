@@ -2084,7 +2084,7 @@ def test_spotface_floor_grip_is_the_models_driving_dimension() -> None:
     ]
 
 
-def _fake_wizard(*dimensions):
+def _fake_wizard(*dimensions, name="StudHoles", subs=()):
     from types import SimpleNamespace
 
     displays = [SimpleNamespace(GetDimension2=lambda _i, d=d: d) for d in dimensions]
@@ -2093,10 +2093,16 @@ def _fake_wizard(*dimensions):
         index = next(i for i, item in enumerate(displays) if item is display) + 1
         return displays[index] if index < len(displays) else None
 
+    children = list(subs)
+    for index, child in enumerate(children):
+        child.GetNextSubFeature = (
+            lambda after=index: children[after + 1] if after + 1 < len(children) else None
+        )
     return SimpleNamespace(
-        Name="StudHoles",
+        Name=name,
         GetFirstDisplayDimension=lambda: displays[0] if displays else None,
         GetNextDisplayDimension=following,
+        GetFirstSubFeature=lambda: children[0] if children else None,
     )
 
 
@@ -2120,6 +2126,44 @@ def test_spotface_depth_resolves_the_one_native_wizard_depth(monkeypatch) -> Non
     foreign = dim("CBORE Depth@OtherHoles@fr-top-frame.Part", spec.HANGER_SPOTFACE_DEPTH)
     with pytest.raises(RuntimeError, match="not owned by StudHoles"):
         part._hanger_spotface_depth_name(_fake_wizard(foreign))
+
+
+def test_spotface_depth_may_live_in_the_wizards_own_profile_sketch(monkeypatch) -> None:
+    """Farm e5ad7dcd: the wizard reported its depth as
+    ["C'Bore Depth", "Sketch18", ...] -- the internal profile sketch made
+    between GooseneckProfile (Sketch17) and the placement Sketch19. The SDK
+    feature walk includes sub-feature dimensions, so a sub-feature of
+    StudHoles whose own walk holds the dimension is the genuine owner; any
+    other sketch is still foreign."""
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
+
+    def dim(full_name, mm):
+        return SimpleNamespace(FullName=full_name, SystemValue=mm / 1000.0)
+
+    through = dim("Thru Hole Dia.@Sketch18@Part39.Part", spec.HANGER_CLEARANCE_DIA)
+    depth = dim("C'Bore Depth@Sketch18@Part39.Part", spec.HANGER_SPOTFACE_DEPTH)
+    profile = _fake_wizard(through, depth, name="Sketch18")
+    placement = _fake_wizard(name="Sketch19")
+    wizard = _fake_wizard(through, depth, subs=(placement, profile))
+    assert part._hanger_spotface_depth_name(wizard) == "C'Bore Depth@Sketch18"
+    # A sketch outside StudHoles' sub-features is not its owner.
+    with pytest.raises(RuntimeError, match="not owned by StudHoles"):
+        part._hanger_spotface_depth_name(_fake_wizard(through, depth, subs=(placement,)))
+    # Nor is a same-named sub-feature whose own walk lacks the dimension.
+    empty = _fake_wizard(through, name="Sketch18")
+    with pytest.raises(RuntimeError, match="not owned by StudHoles"):
+        part._hanger_spotface_depth_name(
+            _fake_wizard(through, depth, subs=(placement, empty))
+        )
+    # The builder binds the RESOLVED name, never a literal sketch.
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "Sketch18" not in source.replace(
+        source[source.index("def _hanger_spotface_depth_name("):source.index(
+            "\nasync def _author_hanger_grip_reference("
+        )], ""
+    )
 
 
 _DEPTH = "CBORE Depth@StudHoles"

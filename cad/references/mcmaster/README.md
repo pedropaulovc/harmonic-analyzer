@@ -517,6 +517,11 @@ Catalog specifications checked on September 10, 2026:
   Hole Wizard spotface depth is equation-driven by `RingHeight` minus that
   dimension; the sheet imports the stored size and band unchanged. It is
   neither an unrelated witness nor a drawing-created tolerance.
+  Hole Wizard may store that depth on an internal profile sketch. The
+  builder proves ownership through the wizard's actual sub-features and
+  their dimension walks before binding the equation; it does not assume
+  that the dimension's owner token equals the outer feature name or pin
+  an unstable generated sketch number.
   The native washer-spotface feature seeds the ANSI-inch socket-cap table:
   the installed hex-bolt table starts at 1/4 in and has no numbered #10 row.
   This is a Hole Wizard database seed, not a socket-head hardware choice;
@@ -525,8 +530,10 @@ Catalog specifications checked on September 10, 2026:
   92314A253. After the bolt's trim equations, its deburr revolve explicitly
   selects the completed closed sketch (mark 0) and captured construction
   axis (mark 4), rather than relying on incidental post-edit selections.
-  The reported farm failures motivated these repairs; successful native
-  execution of the repaired features remains unverified until rerun.
+  The coordinator's second run on e5ad7dcd passed the bolt part and drawing
+  and created the top-frame spotfaces at the expected volume, but exposed
+  the internal-sketch ownership check above. Successful final-source
+  spotface driving/readbacks and downstream layout still require rerun.
   The washer seats on a **SPOTFACE Ø17.0 ±0.51**, floor **35.50 ±0.05 mm
   above the faced crossbar underside**. With the cut bolt, nominal tip
   reach is 8.9173 mm, bounded by 8.349–9.4856 mm. Subtracting one #10-24

@@ -2029,34 +2029,65 @@ HANGER_GRIP_PROBE_VOLUME = (
 )
 
 
+def _carries_dimension(feature, full_name: str) -> bool:
+    """Whether ``feature``'s own display-dimension walk holds ``full_name``."""
+    display = feature.GetFirstDisplayDimension()
+    while display is not None:
+        display = _early_bound(display, "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        if str(dimension.FullName) == full_name:
+            return True
+        display = feature.GetNextDisplayDimension(display)
+    return False
+
+
 def _hanger_spotface_depth_name(feature) -> str:
-    """The StudHoles wizard's own spotface-depth dimension, as ``name@feature``.
+    """The StudHoles wizard's own spotface-depth dimension, as ``name@owner``.
 
     The build_mg_magnifying_bracket CounterBoreDepth criterion: the ONE
     display dimension whose native name holds "depth" and whose value is the
     1.0 nominal spotface depth. Both parts of the name are the ones
     SolidWorks reports; no internal dimension name is manufactured.
+
+    IFeature::GetFirstDisplayDimension walks "all dimensions on this feature
+    [and] its sub-features"; a Hole Wizard keeps its cut dimensions in its
+    internal profile sketch (farm R2e5ad7dcd: ["C'Bore Depth", "Sketch18"]).
+    The owner must therefore be StudHoles itself or one of ITS sub-features,
+    found by GetFirstSubFeature/GetNextSubFeature, and that sub-feature's own
+    walk (the SDK: a sub-feature returns only its sketch's dimensions) must
+    hold the same dimension. Any other owner is foreign and fails.
     """
     matches = []
     display = feature.GetFirstDisplayDimension()
     while display is not None:
         display = _early_bound(display, "IDisplayDimension")
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        native = str(dimension.FullName).split("@")
+        full_name = str(dimension.FullName)
+        native = full_name.split("@")
         mm = float(dimension.SystemValue) * 1000.0
         if "depth" in native[0].lower() and abs(mm - HANGER_SPOTFACE_DEPTH) < 1e-5:
-            matches.append(native)
+            matches.append((full_name, native))
         display = feature.GetNextDisplayDimension(display)
     if len(matches) != 1:
         raise RuntimeError(
-            f"hanger wizard has {len(matches)} spotface-depth matches: {matches}"
+            f"hanger wizard has {len(matches)} spotface-depth matches: "
+            f"{[native for _full, native in matches]}"
         )
-    native = matches[0]
-    if len(native) < 2 or native[1] != str(feature.Name):
-        raise RuntimeError(
-            f"hanger spotface depth {native} is not owned by {feature.Name}"
-        )
-    return f"{native[0]}@{native[1]}"
+    full_name, native = matches[0]
+    owner = native[1] if len(native) >= 2 else ""
+    if owner != str(feature.Name):
+        subs = {}
+        sub = feature.GetFirstSubFeature()
+        while sub is not None:
+            sub = _early_bound(sub, "IFeature")
+            subs[str(sub.Name)] = sub
+            sub = sub.GetNextSubFeature()
+        if owner not in subs or not _carries_dimension(subs[owner], full_name):
+            raise RuntimeError(
+                f"hanger spotface depth {native} is not owned by {feature.Name} "
+                f"or its sub-features {sorted(subs)}"
+            )
+    return f"{native[0]}@{owner}"
 
 
 async def _author_hanger_grip_reference(

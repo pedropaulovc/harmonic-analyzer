@@ -161,8 +161,12 @@ maximum. That envelope is charged, not accepted: nothing is drilled,
 inspected or passed to Ø3.927. The row also dimensions the physical point
 using the native drill-angle variable (`<hw-drlang>`,
 `swCalloutVariable_Drill_Angle`):
-**Ø3.797 +0.10/0 ▽ 11.24 ±0.05 ×118°**. Its native mate row reads
-**FOR MHA-VN-024 HEX BOLT** (`TAP_MATE_CALLOUT`).
+**Ø3.797 +0.10/0 ▽ 11.24 ±0.05 ×118°**. The mate identifier is folded into
+the native process row **BOTTOMING TAP FOR MHA-VN-024**, rather than a
+separate fifth row. The thread row still controls full-thread depth; the
+native drill angle and diameter/depth bands are unchanged. Its placement
+is derived to clear the logged block-height stroke; the final native layout
+audit remains active and must prove the rebuilt sheet.
 The now-dimensioned point takes the title block's **angular ±1°**, giving
 117°–119°; the proof charges **MIN 117°**. This is not a claim that an
 undimensioned tool point was already governed by the general angular grade.

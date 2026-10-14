@@ -297,12 +297,18 @@ if STUD_TAP_THREAD_DEPTH_MIN < STUD_TAP_ENGAGEMENT_MIN_D * STUD_THREAD_MAJOR:
         f" is under {STUD_TAP_ENGAGEMENT_MIN_D:g} D"
         f" ({STUD_TAP_ENGAGEMENT_MIN_D * STUD_THREAD_MAJOR:.3f})"
     )
-# The full thread holds the bolt, so the tap's callout names its mate on a
-# row of its own under the thread (drawing-guidelines.md rule 4 (tighten only
-# for function, and name the mate)); draw_sm_knife_mount writes it into the
-# native callout's below definition.
+# The full thread holds the bolt, so the tap's callout names its mate
+# (drawing-guidelines.md rule 4 (tighten only for function, and name the
+# mate)) on its process row, the row draw_sm_knife_mount writes into the
+# native callout's prefix ahead of the thread.  The 1.41 mm adverse runout is
+# under a plug tap's chamfered lead, so the process is a bottoming tap; the
+# thread row's depth is its full thread (ASME Y14.6), so no row restates it.
+# Folding the mate there keeps the callout at four printed rows with the
+# pilot's stacked band (layout audit tall-block, farm build
+# 20261013T225639.450330Z: five rows with the mate on its own).  The trailing
+# break puts the native thread on its own row.
 BOLT_NUMBER = "MHA-VN-024"
-TAP_MATE_CALLOUT = f"FOR {BOLT_NUMBER} HEX BOLT"
+TAP_CALLOUT_PROCESS = f"BOTTOMING TAP FOR {BOLT_NUMBER}\n"
 
 # MHA-VN-051 dowels: two blind flat-bottom reamed holes in the top seat at
 # DOWEL.HANGER_OFFSET either side of the tap axis along local X, at mid-depth.
