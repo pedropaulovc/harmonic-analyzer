@@ -353,9 +353,9 @@ def test_datum_b_moves_above_pin_text_without_changing_its_broad_face_attachment
         and isinstance(node.func, ast.Name)
         and node.func.id == "add_datum_feature"
         and any(
-            keyword.arg == "datum"
+            keyword.arg == "label"
             and isinstance(keyword.value, ast.Constant)
-            and keyword.value.value == "B"
+            and keyword.value.value == "broad face"
             for keyword in node.keywords
         )
     )
@@ -364,11 +364,13 @@ def test_datum_b_moves_above_pin_text_without_changing_its_broad_face_attachment
         adapter=object(), right=object(), RIGHT_CENTER=drawing.RIGHT_CENTER,
         ARM_THICKNESS=drawing.ARM_THICKNESS, ARM_DEPTH=drawing.ARM_DEPTH,
         PIVOT_MID_Y=drawing.PIVOT_MID_Y,
+        STRAP_DATUM_B=drawing.STRAP_DATUM_B,
         add_datum_feature=lambda *_args, **kwargs: calls.append(kwargs),
     )
     module = ast.Module(body=[broad, ast.Expr(value=call)], type_ignores=[])
     exec(compile(ast.fix_missing_locations(module), drawing.__file__, "exec"), namespace)
     assert len(calls) == 1
+    assert calls[0]["datum"] == drawing.STRAP_DATUM_B.fields["datum"][0] == "B"
     edge_xy = (
         drawing.RIGHT_CENTER[0] - drawing.ARM_THICKNESS / 2000.0,
         drawing.RIGHT_CENTER[1] + (drawing.ARM_DEPTH - 1.0 - drawing.PIVOT_MID_Y) / 1000.0,
@@ -1518,6 +1520,14 @@ def bound(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
 
 
+@pytest.fixture
+def pivot_precision_bound(monkeypatch: pytest.MonkeyPatch, bound: None) -> None:
+    """Keep shared dimension-name lookup offline with explicit native owners."""
+    from solidworks_mcp.adapters import sw_type_info
+
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", _bind_owner)
+
+
 class _PrecisionAdapter:
     @staticmethod
     def _attempt(operation, default=None):
@@ -1532,9 +1542,11 @@ class _PrecisionAdapter:
 
 
 class _PrecisionDisplay:
+    _native_interfaces = ("IDisplayDimension",)
+
     def __init__(self, primary, name="PivotDia") -> None:
         self.primary = primary
-        self.dimension = SimpleNamespace(Name=name)
+        self.dimension = _native("IDimension", Name=name)
 
     def GetDimension(self):
         return self.dimension
@@ -1544,6 +1556,8 @@ class _PrecisionDisplay:
 
 
 class _PrecisionAnnotation:
+    _native_interfaces = ("IAnnotation",)
+
     def __init__(self, display) -> None:
         self.display = display
 
@@ -1552,6 +1566,8 @@ class _PrecisionAnnotation:
 
 
 class _PrecisionExtension:
+    _native_interfaces = ("IModelDocExtension",)
+
     def __init__(self, precision) -> None:
         self.precision = precision
         self.calls: list[tuple[int, int]] = []
@@ -1566,19 +1582,19 @@ def _pivot_precision_case(primary, document_precision=2, name="PivotDia"):
     display = _PrecisionDisplay(primary, name)
     annotation = _PrecisionAnnotation(display)
     extension = _PrecisionExtension(document_precision)
-    model = SimpleNamespace(Extension=extension)
+    model = _native("IModelDoc2", Extension=extension)
     return _PrecisionAdapter(), model, annotation, extension
 
 
 @pytest.mark.parametrize("primary", [2, -2], ids=["explicit", "inherited"])
-def test_pivot_precision_matching_two_places_passes(bound: None, primary) -> None:
+def test_pivot_precision_matching_two_places_passes(pivot_precision_bound: None, primary) -> None:
     adapter, model, annotation, extension = _pivot_precision_case(primary)
     drawing._assert_pivot_precision(adapter, model, [annotation])
     assert extension.calls == ([(24, 204)] if primary == -2 else [])
 
 
 @pytest.mark.parametrize("primary", [3, -2], ids=["explicit", "inherited"])
-def test_pivot_precision_three_places_fails(bound: None, primary) -> None:
+def test_pivot_precision_three_places_fails(pivot_precision_bound: None, primary) -> None:
     adapter, model, annotation, extension = _pivot_precision_case(primary, 3)
     with pytest.raises(RuntimeError, match="PivotDia.*expected 2.*effective 3"):
         drawing._assert_pivot_precision(adapter, model, [annotation])
@@ -1595,7 +1611,7 @@ def test_pivot_precision_three_places_fails(bound: None, primary) -> None:
     ids=["raw-missing", "document-missing", "document-still-sentinel"],
 )
 def test_pivot_precision_missing_readback_fails(
-    bound: None, primary, document_precision, calls
+    pivot_precision_bound: None, primary, document_precision, calls
 ) -> None:
     adapter, model, annotation, extension = _pivot_precision_case(
         primary, document_precision
@@ -1612,7 +1628,7 @@ def test_pivot_precision_missing_readback_fails(
     ids=["bool", "float", "string", "mock", "bound-method"],
 )
 def test_pivot_precision_never_coerces_unreadable_values(
-    bound: None, inherited: bool, unreadable
+    pivot_precision_bound: None, inherited: bool, unreadable
 ) -> None:
     adapter, model, annotation, extension = _pivot_precision_case(
         -2 if inherited else unreadable, unreadable
@@ -1623,7 +1639,7 @@ def test_pivot_precision_never_coerces_unreadable_values(
 
 
 @pytest.mark.parametrize("empty", [True, False], ids=["empty", "other-dimension"])
-def test_pivot_precision_missing_dimension_fails(bound: None, empty: bool) -> None:
+def test_pivot_precision_missing_dimension_fails(pivot_precision_bound: None, empty: bool) -> None:
     adapter, model, annotation, extension = _pivot_precision_case(
         2, name="TopAbovePivot"
     )
@@ -1634,7 +1650,7 @@ def test_pivot_precision_missing_dimension_fails(bound: None, empty: bool) -> No
 
 @pytest.mark.parametrize("stage", ["annotation", "dimension", "primary", "document"])
 def test_pivot_precision_getter_exceptions_fail_closed(
-    bound: None, monkeypatch: pytest.MonkeyPatch, stage: str
+    pivot_precision_bound: None, monkeypatch: pytest.MonkeyPatch, stage: str
 ) -> None:
     adapter, model, annotation, extension = _pivot_precision_case(-2)
 
@@ -1654,7 +1670,7 @@ def test_pivot_precision_getter_exceptions_fail_closed(
 
 @pytest.mark.parametrize("stage", ["display", "dimension", "name", "extension"])
 def test_pivot_precision_unavailable_native_state_fails_closed(
-    bound: None, stage: str
+    pivot_precision_bound: None, stage: str
 ) -> None:
     adapter, model, annotation, extension = _pivot_precision_case(-2)
     if stage == "display":
@@ -1675,7 +1691,7 @@ def test_pivot_precision_unavailable_native_state_fails_closed(
     ["IAnnotation", "IDisplayDimension", "IModelDoc2", "IModelDocExtension"],
 )
 def test_pivot_precision_binding_failures_fail_closed(
-    monkeypatch: pytest.MonkeyPatch, interface: str
+    pivot_precision_bound: None, monkeypatch: pytest.MonkeyPatch, interface: str
 ) -> None:
     adapter, model, annotation, _extension = _pivot_precision_case(-2)
 
@@ -4244,7 +4260,16 @@ def test_hub_identity_label_is_above_the_whole_stack_and_preserves_native_size(
         and isinstance(node.value.func, ast.Name)
         and node.value.func.id == "_add_strap_offset_dimension"
     )
-    assert start < stop
+    label_start = next(
+        index for index, node in enumerate(build.body)
+        if isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == "set_dimension_callouts"
+        and isinstance(node.value.args[1], ast.Name)
+        and node.value.args[1].id == "right_annotations"
+    )
+    assert start < label_start < stop
     namespace = dict(
         adapter=adapter, right=object(), RIGHT_KEEP=drawing.RIGHT_KEEP,
         DRAWING_DIMENSIONS=drawing.DRAWING_DIMENSIONS,
@@ -4252,7 +4277,11 @@ def test_hub_identity_label_is_above_the_whole_stack_and_preserves_native_size(
         set_dimension_callouts=drawing.set_dimension_callouts,
         dimension_name=drawing.dimension_name, _early_bound=drawing._early_bound,
     )
-    module = ast.Module(body=build.body[start:stop], type_ignores=[])
+    # This label test owns the right import and identity/readback block, not
+    # the preceding all-view precision checks and their other-view inputs.
+    module = ast.Module(
+        body=[build.body[start], *build.body[label_start:stop]], type_ignores=[],
+    )
     code = compile(ast.fix_missing_locations(module), drawing.__file__, "exec")
     if defect is None:
         exec(code, namespace)
