@@ -1441,7 +1441,7 @@ sections:
       HOOK_Z −137.95 exactly as the accepted installation datum. Hook X,
       yaw, wire length, drum tangent and yoke offset are derived in
       cad/scripts/mg_output_fixture_geom.py and mg_lever_wire_geom.py.
-      The drum end is at z −154.91 in the pressed brass drum's middle.
+      The drum end is at z −173.51 (PEN_Z_MID −162.5 − 11.01) in the pressed brass drum's middle.
       The drawing-free route checks clearance behind the rim, spokes and boss.
       The straight rest wire
       clears the fixture groove flanks, spigot and screw head numerically,
@@ -1483,8 +1483,8 @@ sections:
         - counted on the full-page photo p.51 (and photogrammetry `195607299`); an earlier extraction said 5 — wrong
         - stated
         - high
-      - - Wheel axle and stack (rev 10, 2026-10-10)
-        - 'steel 3/16 drill-rod pin (`mg-wheel-axle`, Ø4.7625) pressed into a reamed Ø.1865 bore through `mg-wheel-bar` until the shank-to-thread step stands 19.50 ±0.05 off the bar front face, back end 0.85 proud to 1.05 sunk in the bar back face (no head, no flange; nothing behind it within 10 mm); shank 28.4 (.X) from the gauged step to the back end, then #4-40 UNC × 8.17 ±0.25 from the gauged step (full thread clear of the step run-out and the dome''s last pitch; at most 2.9 of thread past the locknut, user option (c) 2026-10-12) and a domed tip, 37.37 overall. Stack from the bar front: brass #10 washer (`vn-wheel-axle-back-washer` MHA-VN-057, 92916A480); cast-iron wheel hub Ø25 boss + Ø14.0 spigot, 19.6 long, reamed Ø.1890 bore running on the pin; brass drum Ø18.9 / Ø14.0 × 9 pressed on the spigot (`mg-wheel-drum` MHA-MG-010); brass #4 washer (`vn-wheel-axle-front-washer` MHA-VN-058, 92916A250); brass #4-40 hex nut + jam nut (`vn-wheel-axle-nut` MHA-VN-025, 92671A005, qty 2). Endshake 0.05–0.15 set with the nut'
+      - - Wheel axle and stack (rev 10, 2026-10-10; spacer added in the pn-pen re-derive)
+        - 'steel 3/16 drill-rod pin (`mg-wheel-axle`, Ø4.7625) pressed into a reamed Ø.1865 bore through `mg-wheel-bar` until the shank-to-thread step stands 38.10 ±0.05 off the bar front face (the rev-10 19.50 plus the spacer), back end 0.85 proud to 1.05 sunk in the bar back face (no head, no flange; nothing behind it within 10 mm); shank 47.0 (.X) from the gauged step to the back end, then #4-40 UNC × 8.20 ±0.25 from the gauged step (full thread clear of the step run-out and the dome''s last pitch; at most 2.9 of thread past the locknut, user option (c) 2026-10-12) and a domed tip, 56.0 overall. Stack from the bar front: turned brass spacer (`mg-wheel-axle-spacer` MHA-MG-011, Ø11.0 × 18.6 ±0.03, drilled Ø4.9 clearance; its length is derived from the pen-rod line PEN_Z_MID −162.5 so the wheel mid-plane lands on it); brass #10 washer (`vn-wheel-axle-back-washer` MHA-VN-057, 92916A480); cast-iron wheel hub Ø25 boss + Ø14.0 spigot, 19.6 long, spokes'' mid-plane 4.09 off its back face, reamed Ø.1890 bore running on the pin; brass drum Ø18.9 / Ø14.0 × 9 pressed on the spigot (`mg-wheel-drum` MHA-MG-010); brass #4 washer (`vn-wheel-axle-front-washer` MHA-VN-058, 92916A250); brass #4-40 hex nut + jam nut (`vn-wheel-axle-nut` MHA-VN-025, 92671A005, qty 2). Endshake 0.05–0.15 set with the nut'
         - —
         - p.50–51
         - scaled
@@ -1509,8 +1509,10 @@ sections:
       the rim groove → 5× motion magnification). Six tapered spokes. Hex-nut axle on
       a horizontal support bar. The two annotated diameters self-validate against
       the stated magnification — strongest-sourced part in chapters 18–21.
-      M6.4 placement: wheel at machine x −53 on the y-575.7 bar, wheel mid-plane
-      z −146.9 (back washer on the bar front −138.9).
+      M6.4 placement: wheel at machine x −53 on the y-575.7 bar. pn-pen re-derive
+      (user Option C): the wheel mid-plane is the pen-rod line PEN_Z_MID (−162.5),
+      so the pen wire leaves the rim groove plumb onto the rod-top stud; the
+      MHA-MG-011 spacer carries the stack 23.6 forward of the bar front −138.9.
 
       Rev 10 wheel (2026-10-10): gray cast-iron spider, Ø25 hub boss and integral
       Ø14.0 spigot carrying the pressed brass Ø18.9 drum; six tapered, filleted
@@ -1523,10 +1525,10 @@ sections:
       Wires modeled (2026-07-04, re-derived rev 10): the two amplification wires are
       geometry — straight rest-pose Ø0.8 steel rods (`mg-lever-wire` MHA-MG-009:
       fixture's derived spigot-groove front tangent → tangent to the drum at about
-      2:25 seen from the front, on the pen side, at the drum mid-plane z −154.91;
+      2:25 seen from the front, on the pen side, at the drum mid-plane z −173.51;
       hook z −137.95 is retained by mg_output_fixture_geom.py;
-      `pn-pen-wire` MHA-PN-006: rim groove 3-o'clock tangent at x 3.8 →
-      pen-rod wire hole at y 513). The lever-wire ARTICULATES (ball joint at the
+      `pn-pen-wire` MHA-PN-006: rim groove 3-o'clock tangent at x 3.8 → plumb
+      down 60.5 to the pen-rod adjuster stud's eye head at y 515.2). The lever-wire ARTICULATES (ball joint at the
       hook + axis-axis stand-off tangency to the drum) and carries the WIRE-1
       yoke coupling to the wheel; wraps/tie-offs and compliance stay unmodeled;
       every run stands ≥0.25 off its neighbours. Wire Ø photo-scaled
@@ -1623,6 +1625,13 @@ sections:
       horizontal travel); two brass clips (left/right) retain the recording paper;
       gearing can be unlatched from the rack for free repositioning/reset (the
       whole transgear cluster tilts away — see ch. 23 rework notes).
+      Deviation from the ch30 photo's centred sheet: the 233.2386-wide recording
+      paper sits 14.6 from the platen's machine −X edge (21.8 on the +X side),
+      3.6 off centre and still clear of both edge clips. The ch24 pen rod line
+      puts the nib at x −15.2, so a centred sheet's far edge would sweep 2.58
+      past the finite rack's engaged-feed window. 14.6 is the most-centred 0.1
+      step that keeps the full located sweep 1.0 inside it
+      (`paper_drive_geom.RECORDING_PAPER_LEFT_INSET_MM`).
       Current rack mesh (`paper_drive_geom`, `pd_transgear_feed_pinion_spec`):
       purchased 32DP PA20 teeth-down rack, nominal CAD crests y 270.6996859
       and pitch line y 271.4934359. Fixed feed stud S is (0, 266.2001746);
@@ -1883,47 +1892,59 @@ sections:
         - scaled
         - low
       - - Square rod length
-        - 150 mm, #47 wire hole 5 below the top
-        - ~5.9
-        - 'p.64 inset; 2026-09 photo re-derive: the rod runs from the hanger guide (y 505) down into the v-block bore at paper mid-height (y 368), so 120 no longer reaches'
+        - '112 square + Ø4 × 10.5 turned pivot end (122.5 overall); #0-80 blind tap 6 deep (4.5 full thread) in the top face for the adjuster stud'
+        - ~4.8
+        - 'p.64 inset; 2026-10 re-derive (engineerguy 4/4 t046): the turned pivot end drops into the v-block''s pivot bore and the square''s shoulder seats on the block top (y 384.2); the square runs up through both hanger U guides to y 496.2, staying ≥ 3 inside the upper guide (y 452.2) at the bottom of the ±15 travel. The old #47 wire cross-hole is gone: the wire ties to the adjuster stud''s eye'
         - scaled + derived
         - low
       - - Frame (stirrup)
-        - ~26 × 40 × 10; side rails 4 (long sides), end rails 5; #4-40 thumb-screw hole up through the bottom rail
+        - 28 × 40 × 8 ring; side rails 4, end rails 6; #4-40 thumb-screw tap up through the bottom rail
         - —
-        - 'p.64–65 + v4_t00591/t00612 vs 5 mm rod: the ring WRAPS the v-block''s 16 × 18 end section (window 18 wide, 1.0 a side), its plane perpendicular to the block length, standing 1.0 forward of the rod; the thumb screw presses the marker up into the block groove. Was 22 wide lying flat on the block top (M6.4 read, refuted by the video)'
+        - 'p.64–65 + t046: the ring WRAPS the v-block''s 18 × 18 end section (window 20 wide, 1.0 a side), flush with the block''s PAPER end face, its plane perpendicular to the block length, top rail 0.1 above the block top; 0.96 clear of the rod''s square diagonal. End rail 6 gives the thumb screw 1.5 D of thread'
         - scaled
         - low
       - - V-block
-        - 36 × 18 × 16; 6 mm 45° top chamfers; 2 × Ø8 vertical bores at x = 10 (rod, paper end) / 26 (spare pen seat); bottom marker groove 8.5 wide × 4.5 deep along the full length, centred across the depth; Ø2.5 rod set-screw hole on the rod-bore axis
+        - '27.3 long × 18 tall, a simplified E in plan: an 18-deep neck over x 0–9 from the paper end (it passes the stirrup''s window) and a 22.2-deep body (2.1 proud each side) from the step to the free end; V-groove of two flanks each 45° to the bottom face (theoretical apex 6.0 up, 12 wide at the bottom face, its apex cut as a 2.0-wide flat 5.0 up, clear over the seated grip, its two internal corners R0.5 MAX) along the neck seating the marker grip, run on into a 16 × 6.5 flat-roofed relief slot from the step to the free end clearing the marker body; Ø4.0 +0.012/0 pivot bore at x 12.5, centred across the depth; #4-40 tap from the body''s front face (y 12) into the pivot bore for the rod set screw. Every depth-wise station prints at the title block''s .X from the body''s front face (the neck''s faces .XX for the window): relief walls 2.3 / 1.5 and V lands 1.69 at the printed limits'
         - —
-        - 'p.60/65 close-ups + v4_t00579/t00612: the block HANGS on the rod (rod 14 into the bore, side set screw), its length at 45° to the paper (t00603 nib callout), the marker running through the bottom groove. The old p.65 read of the end-face notch as a stopped flexure slit is refuted by t00612 (marker passes right through)'
-        - scaled
+        - 'p.60/65 close-ups + t046 (green grip in the block, body leaving the far end; through-hole at the free end): the block HANGS on the rod''s pivot end, its length at 45° to the paper. Pivot station 12.5 and the 27.3 length put the carriage CG on the rod axis (pn_pen_carriage_geom.plan_cg_residual_mm 0.013 in plan) so the pen hangs level; the lightening bore is dropped'
+        - scaled + derived
         - low
-      - - Set screw
+      - - Set screw (thumb screw)
         - Ø9 × 5 knurled knob + Ø3 × 15 shank
         - —
-        - 'p.64–65; M4: knob reeded (22 × Ø1 grooves), cosmetic M3 thread on shank'
+        - 'p.64–65; McMaster 99607A213 knurled #4-40 thumb screw up through the stirrup''s bottom rail; its tip presses the grip into the V'
         - scaled
         - low
-      - - Pen hanger (M6.4)
-        - black strap (3 thick, tapering 16 → 10 wide) flat on the wheel-bar front face (z −138.9), descending from the bar band (y 560..570) to a 12 × 12 guide block (z −161.0..−138.9, 22.1 deep) with a 5.4-square VERTICAL channel (cut along Y, centre z −157.0) the pen rod slides in
+      - - Rod set screw (MHA-VN-061, purchased)
+        - '#4-40 × 3/16 cup point (McMaster 91375A105) in the v-block front-face tap, cup on the rod''s pivot end'
         - —
-        - p.60–63
+        - 'p.60 (side set screw pins the block to the rod); tap length 7.0, screw recessed 2.24 below the face'
+        - catalog + derived
+        - med
+      - - Pen-height adjuster (pn-pen-adjust-screw + MHA-VN-062 jam nut)
+        - 'turned brass eye stud: #0-80 × 18 thread, Ø5 × 5 head with a #54 eye cross-hole 2.5 below its top, 23 overall; threaded 4.0 into the rod top; McMaster 92671A115 brass #0-80 hex jam nut on the rod''s top face'
+        - —
+        - 't046 / engineerguy 4/4 9:15–10:34 (the wire ties to a stud on the rod top); #0-80 is the only thread whose tap leaves the 5-square rod a ≥1.5 wall. Head top y 515.2 at rest, 51.6 under the rim at the top of travel'
+        - derived
+        - low
+      - - Pen hanger (M6.4; 2026-10 re-derive)
+        - 'black strap (3 thick, tapering 16 → 10 wide, 170 tall) flat on the wheel-bar front face (z −138.9) from the bar top (y 580.7) down to y 410.7, 2.6 above the platen top (the strap cannot pass the paper top without leaving the bar plane the platen also crosses). Two open U guide plates 1.5 thick × 10 wide, 40 apart (y 410.7..412.2 and 450.7..452.2), silver-brazed across its front face and reaching 4.0 past the rod axis; each slot 5.05 +0.05/0 on the 5.0 rod (0.05..0.15 running clearance, ≤ 0.21° lean between the plates), bottom 0.5 behind the rod''s back face, opening forward (−z) so the rod lifts out. The rod line (x `PEN_ROD_X`, z `PEN_Z_MID`) is derived from `paper_drive_geom`'
+        - —
+        - p.60–63; engineerguy 4/4 9:15–10:34
         - scaled + derived
         - low
-      - - Hanger screw ×1 (M6.10)
-        - 'McMaster 93075A194 hex-head #8-32 screw, driven from behind the wheel bar into the tapped pen-hanger strap. Hole station: wheel-bar local x −112, machine (x, y) = (−3, 575.7), hanger local x −6. The bar''s Ø4.572 close-clearance hole is centred 5.0 from the fixed free end (machine x −8), leaving 2.714 nominal end wall; the strap receiver remains #8-32.'
+      - - Hanger screw ×1, nut ×1 and jam nut ×1 (M6.10)
+        - 'McMaster 93075A199 hex-head #8-32 × 1 screw, driven from behind the wheel bar through the pen-hanger strap''s Ø4.572 #8 close-clearance hole into a McMaster 90480A009 zinc-plated steel #8-32 hex nut (MHA-VN-063, 11/32 AF × 1/8) bearing on the strap front, locked by a McMaster 90760A009 zinc-plated steel #8-32 small-pattern nut (MHA-VN-064, 1/4 AF × 3/32) jammed against it; 7.2 of full thread stands past the jam nut (≥ 2 pitches, tip chamfer excluded; a 3/4 screw would leave 0.8), the tip stops 3.2 short of the magnifying-wheel rim, and the nut''s corners clear the rim radially by 0.96. Hole station: wheel-bar local x −112, machine (x, y) = (−3, 575.7), 5.0 below the strap top. The bar''s Ø4.572 close-clearance hole is centred 5.0 from the fixed free end (machine x −8), leaving 2.714 nominal end wall.'
         - —
-        - 'p.60–63 (the strap is bolted to the bar); stock wrapper `cad/scripts/build_vn_hanger_screw.py`; station and end wall from `cad/scripts/build_mg_wheel_bar.py` / `cad/scripts/mg_wheel_bar_geom.py`; receiver from `cad/scripts/build_pn_pen_hanger.py`'
+        - 'p.60–63 (the strap is bolted to the bar); stock wrappers `cad/scripts/build_vn_hanger_screw.py` / `cad/scripts/build_vn_pen_hanger_nut.py` / `cad/scripts/build_vn_pen_hanger_jam_nut.py`; station and end wall from `cad/scripts/build_mg_wheel_bar.py` / `cad/scripts/mg_wheel_bar_geom.py`; clearance hole from `cad/scripts/build_pn_pen_hanger.py`; stack from `cad/scripts/build_pn_pen_assembly.py`'
         - scaled + derived
         - low
-      - - Pen marker
-        - 'Ø8 barrel, 5-tall conical tip, 110 overall (a full-length marker: ~75 shows in front of the block on ch30 p002/p004 and v4_t00612); collar/ferrule detail omitted'
+      - - Pen marker (MHA-VN-065, purchased)
+        - 'Sharpie permanent marker, fine point (Sharpie 30051), used uncapped: Ø10.6 cap-seat grip in the v-block groove, body Ø12.3 tapering to Ø11.0, 123 overall uncapped, 7 g barrel with ink; nib, nose cone and the dome''s start station estimated. Brazil''s same-format markers (Oval PY230200, Brasfort ponta fina) are assumed to match. Envelope in `cad/scripts/vn_pen_marker_spec.py`'
         - —
-        - p.60–63, ch30 p002/p004, v4_t00612
-        - scaled
-        - low
+        - 'jetpens.com Sharpie Fine 30051 (grip Ø10.6, uncapped 123, barrel with ink 7 g); sharpie.com Mini item 35111 product photo with artsupplycritic.com (the Mini keeps the regular diameters) for the body and dome profile; v4_t042/t046 (cap off, grip in the groove)'
+        - catalog + scaled
+        - high stock identity; med scaled envelope
   - prose: |2
 
       Notes: brass frame holds the marker in a v-block; v-block on a square brass rod
@@ -1933,21 +1954,22 @@ sections:
       book photos is a modern replacement designed/built by Mike Harland and Tom
       Wilson. Model the replacement (it is what the photos document).
 
-      Pen layout (machine coords, 2026-09 photo re-derive — build_pn_pen_assembly):
-      pen rod vertical at x 3, z −157.0 band (rod z −159.5..−154.5), y 368..518,
-      #47 wire hole at y 513 just above the hanger block top (511); the rod line
-      sits 5.5 forward of the old −151.5 so the 45° block's paper-side corner
-      (z −144.3) clears the paper front (−143.25). V-block origin (−9.73, 364,
-      −155.59), yawed +45° about Y (its length runs forward + east): the rod bore
-      (local x 10, z 8) on the rod axis with the rod 14 into it; marker in the
-      bottom groove along the block length, axis 0.25 under the groove roof,
-      nib at (−10.50, 364.25, −143.50) = 0.25 off the paper front at paper
-      mid-height, barrel running 110 forward to (67.25, ., −221.25). Stirrup frame
-      yawed −45° with its window round the block section (1.0 a side, top rail
-      0.1 above the block top), 1.0 forward of the rod's front face; thumb screw
-      stood on end (+X → +Y) on the frame's screw axis, knob outer face y 340,
-      tip 0.25 under the marker. All carriage parts lock-mated to the rod; the
-      rod's Y travel is the freed DOF.
+      Pen layout (machine coords, 2026-10 re-derive — pn_pen_carriage_geom /
+      build_pn_pen_assembly): pen rod vertical on the magnifying wheel's rim
+      tangent, x 3.8 (`PEN_ROD_X`), z −162.5 (`PEN_Z_MID`, the wheel mid-plane, so
+      the pen wire hangs plumb onto the rod axis); shoulder y 384.2, square top
+      496.2, adjuster stud head top 515.2, pen wire 60.5 up to the rim tangent at
+      y 575.7. PEN_Z_MID is the paper-most 0.1 mm line keeping the stirrup's
+      paper-side corner (z −143.76) ≥ 0.5 off the paper front (−143.25). V-block
+      origin (−11.40, 366.2, −160.03), yawed +45° about Y (its length runs forward
+      + east from the paper end): the pivot bore (local x 12.5, z 9) on the rod
+      axis; marker grip in the V, axis 1.50 below the block bottom at paper
+      mid-height (y 364.70), nib at (−15.20, ., −143.50) = 0.25 off the paper
+      front, body running out of the free end to (35.29, ., −193.99). Stirrup
+      flush on the block's paper end, top rail 0.1 above the block top; thumb
+      screw stood on end on its axis, knob outer face y 337.2, tip on the grip
+      underside. Rod set screw cup on the pivot at y 378.2. All carriage parts
+      lock-mated to the rod; the rod's Y travel (±15) is the freed DOF.
 - heading: Chapter 25 — Pinion Gear (pp. 66–69)
   elements:
   - prose: ''

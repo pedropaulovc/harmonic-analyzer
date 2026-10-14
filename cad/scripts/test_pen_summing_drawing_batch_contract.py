@@ -7,8 +7,11 @@ import vn_boss_hook_spec
 import sm_gooseneck_spec
 import ms_stick_spec
 import mg_output_fixture_spec
+import pn_pen_adjust_screw_spec
 import pn_pen_frame_spec
 import pn_pen_hanger_spec
+import pn_pen_rod_spec
+import pn_pen_v_block_spec
 import pn_pen_wire_spec
 
 
@@ -19,6 +22,9 @@ SHEETS = (
     ("mg-output-fixture", mg_output_fixture_spec),
     ("pn-pen-frame", pn_pen_frame_spec),
     ("pn-pen-hanger", pn_pen_hanger_spec),
+    ("pn-pen-rod", pn_pen_rod_spec),
+    ("pn-pen-v-block", pn_pen_v_block_spec),
+    ("pn-pen-adjust-screw", pn_pen_adjust_screw_spec),
     ("pn-pen-wire", pn_pen_wire_spec),
 )
 
@@ -38,7 +44,7 @@ TITLE_BLOCK_OWNED_NOTE_TEXT = (
 
 def test_notes_do_not_repeat_title_block_metadata() -> None:
     for part_name, spec in SHEETS:
-        notes = spec.DRAWING_NOTES.upper()
+        notes = getattr(spec, "DRAWING_NOTES", "").upper()
         for duplicate in TITLE_BLOCK_OWNED_NOTE_TEXT:
             assert duplicate not in notes, f"{part_name}: {duplicate}"
 

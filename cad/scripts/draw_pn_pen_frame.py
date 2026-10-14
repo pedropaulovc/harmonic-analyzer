@@ -1,14 +1,19 @@
-r"""Create the curated machinist drawing for the pen frame (stirrup yoke).
+r"""Create the curated machinist drawing for the pen frame (stirrup).
 
 The SLDPRT remains authoritative.  This recipe supplies only the frame's views,
-the outer + window dimensions, and machining notes;
-sheet/template and export behavior lives in ``_drawing_common``.
-Dimension import and curation live in ``_drawing_dimension_import``.
+the dimension layout and the tapped-hole callout; sheet/template and export
+behavior lives in ``_drawing_common``.  Dimension import and curation live in
+``_drawing_dimension_import``.
 
-The pen frame is a brass yoke: a flat 22 x 40 rectangular ring, 10 thick, with a
-window (4-wide side rails, 5-wide end rails), the platen-side edge trimmed back
-0.75, and a #4-40 set-screw tapped up through the bottom rail.  It is small, so
-the sheet runs 2:1; the isometric stays 1:1.
+The pen frame is a flat rectangular brass ring with a centred, corner-filleted
+window and a #4-40 thumb-screw hole tapped up through the bottom rail.  Every
+size is a native associative dimension marked on the part
+(``pn_pen_frame_spec``): the front view carries the outer envelope, the
+window's size, its lower-left corner from the left and bottom faces and the
+4X window-corner radius; the bottom view, looking up at the tapped rail,
+carries the depth, the hole's two coordinates from the outer faces and the
+hole's native Hole Wizard callout.  No datums, no frames (drawing-guidelines.md
+rule 5), no note block.  The sheet runs 2:1; the isometric stays 1:1.
 
 Run with SolidWorks open::
 
@@ -21,9 +26,14 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -32,13 +42,28 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision
+from _drawing_edges import scan_view_edges
+from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_view_display import set_hidden_lines_removed
+from _hole_callout_thread_class import omit_title_block_thread_class
+from _hole_spec import blind_cut_dia_mm
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from build_pn_pen_frame import OUTER_HEIGHT, OUTER_WIDTH
+from pn_pen_frame_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    FRAME_DEPTH,
+    OUTER_HEIGHT,
+    OUTER_WIDTH,
+    RAIL_END,
+    RAIL_SIDE,
+    SET_SCREW_TAP_SPEC,
+    WINDOW_CORNER_R,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["pn_pen_frame"]
@@ -53,27 +78,130 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (2.0, 1.0)  # 2:1 whole sheet (small 22 x 40 ring)
-VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 2.0 sheet-mm per model-mm
+SHEET_SCALE = (2.0, 1.0)
+VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm
 
-# Sheet layout (meters).  The front ring face is the main view; the isometric
-# (1:1) sits to its right.  The outer envelope dims frame the view (width above,
-# height left) and the window opening dims sit right/below, all keyed off the
-# real envelope so they clear the sheet border and the lower-left note block.
-FRONT_CENTER = (0.115, 0.165)
-ISO_CENTER = (0.325, 0.175)
-RIGHT_CENTER = (0.220, 0.165)
+# Sheet layout (meters).  Third angle: the bottom view projects straight
+# below the front view (model X shared); the isometric rides to the right.
+# Both orthographic views are bbox-centred: the front on the 28 x 40 ring face
+# (x 0.087..0.143, y 0.145..0.225), the bottom on the 28 x 8 underside
+# (x 0.087..0.143, y 0.097..0.113), whose centre IS the tapped hole's axis.
+FRONT_CENTER = (0.115, 0.185)
+BOTTOM_CENTER = (0.115, 0.105)
+# The pictorial runs 2:1 like the sheet: at 1:1 the 2.26 tap mouth and the R1.0
+# window fillets read as polygons and banded shading (machinist review r1).
+# A true isometric of the 28 x 40 x 8 ring spans (28 + 8) cos 45 = 25.5 wide
+# and 40 x 0.816 + (28 + 8) x 0.408 = 47.3 tall, so at 2:1 about 51 x 95 mm:
+# centred at (0.320, 0.180) it fills x 0.295..0.345, y 0.133..0.228, clear of
+# the front view's 40.0 dimension (x 0.173), its note (ends ~x 0.23), the top
+# border (0.267) and the title block (top 0.065).
+ISO_SCALE = (2, 1)
+ISO_CENTER = (0.320, 0.180)
+ISO_HALF_EXTENT = (
+    (OUTER_WIDTH + FRAME_DEPTH) * 0.7071 * ISO_SCALE[0] / ISO_SCALE[1] / 2000.0,
+    (OUTER_HEIGHT * 0.8165 + (OUTER_WIDTH + FRAME_DEPTH) * 0.4082)
+    * ISO_SCALE[0]
+    / ISO_SCALE[1]
+    / 2000.0,
+)
 
+
+def _front_xy(model_x_mm: float, model_y_mm: float) -> tuple[float, float]:
+    """Sheet point of a model (x, y) in the front view (bbox-centred)."""
+    return (
+        FRONT_CENTER[0] + (model_x_mm - OUTER_WIDTH / 2.0) * VIEW_SCALE / 1000.0,
+        FRONT_CENTER[1] + (model_y_mm - OUTER_HEIGHT / 2.0) * VIEW_SCALE / 1000.0,
+    )
+
+
+def _bottom_xy(model_x_mm: float, model_z_mm: float) -> tuple[float, float]:
+    """Sheet point of a model (x, z) in the bottom view: model X across, model
+    +Z up (the face nearer the front view's viewer stands nearer it)."""
+    return (
+        BOTTOM_CENTER[0] + (model_x_mm - OUTER_WIDTH / 2.0) * VIEW_SCALE / 1000.0,
+        BOTTOM_CENTER[1] + (model_z_mm - FRAME_DEPTH / 2.0) * VIEW_SCALE / 1000.0,
+    )
+
+
+FRONT_LEFT_X, FRONT_BOTTOM_Y = _front_xy(0.0, 0.0)
+FRONT_RIGHT_X, FRONT_TOP_Y = _front_xy(OUTER_WIDTH, OUTER_HEIGHT)
+BOTTOM_LEFT_X, BOTTOM_LOW_Y = _bottom_xy(0.0, 0.0)
+BOTTOM_RIGHT_X, BOTTOM_HIGH_Y = _bottom_xy(OUTER_WIDTH, FRAME_DEPTH)
+HOLE_CENTER_MM = (OUTER_WIDTH / 2.0, 0.0, FRAME_DEPTH / 2.0)
+HOLE_SHEET_XY = _bottom_xy(HOLE_CENTER_MM[0], HOLE_CENTER_MM[2])
+HOLE_R_SHEET = blind_cut_dia_mm(SET_SCREW_TAP_SPEC) * VIEW_SCALE / 2000.0
+# The printed (top-right) window-corner fillet's arc centre.
+CORNER_ARC_CENTER_XY = _front_xy(
+    OUTER_WIDTH - RAIL_SIDE - WINDOW_CORNER_R, OUTER_HEIGHT - RAIL_END - WINDOW_CORNER_R
+)
+
+# Per-view survivors of the marked-dimension import: parametric name -> sheet
+# text position.  Front view (ring x 0.087..0.143, y 0.145..0.225; window
+# x 0.095..0.135, y 0.157..0.213):
+# - The 28.0 width rides above, alone: no other dimension leaves the top.
+# - The window corner's two location dims and its two sizes all leave from
+#   the window's left and bottom edges (build_pn_pen_frame's chain order), so
+#   they stack left and below, each smaller one nearer the ring: the 28.0
+#   window height 10 mm left (its text 4.5 mm off the left face), the 6.00
+#   bottom wall 24 mm left with its text between its own extension lines; the
+#   20.00 window width 8 mm below, the 4.00 left wall 17 mm below with its
+#   text outboard left as before.  Each pair shares the extension line from
+#   the window's bottom-left corner, so neither crosses the other's
+#   dimension line.
+# - The top-right corner is the one no extension line leaves from: the 4X R1.0
+#   text stands 14 mm right of the ring, 6 mm under its top (clear of the
+#   40.0's top extension line), so its leader runs from the arc out through
+#   the right rail, ~20-30 deg above horizontal from the arc centre (inside the
+#   arc's 0-90 deg span), crossing only the ring's right face.
+# - The 40.0 height moves 30 mm right (was 16) to leave that text 6 mm clear
+#   of its dimension line.
+# Bottom view: the hole's X coordinate below, its Z coordinate left, the depth
+# right; the hole callout stands above-right, between the bottom view and the
+# front view's height dimension.
 FRONT_KEEP = {
-    "OuterHeightDim": (
-        FRONT_CENTER[0] - OUTER_WIDTH * VIEW_SCALE / 2000.0 - 0.016,
-        FRONT_CENTER[1],
-    ),
-    "OuterSpanX": (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + OUTER_HEIGHT * VIEW_SCALE / 2000.0 + 0.014,
-    ),
+    "OuterSpanX": (FRONT_CENTER[0], FRONT_TOP_Y + 0.014),
+    "OuterHeightDim": (FRONT_RIGHT_X + 0.030, FRONT_CENTER[1]),
+    "WindowHeight": (FRONT_LEFT_X - 0.010, FRONT_CENTER[1]),
+    "BottomWall": (FRONT_LEFT_X - 0.024, _front_xy(0.0, RAIL_END / 2.0)[1]),
+    "WindowWidth": (FRONT_CENTER[0], FRONT_BOTTOM_Y - 0.008),
+    "LeftWall": (FRONT_LEFT_X - 0.012, FRONT_BOTTOM_Y - 0.017),
+    "WindowCornerR": (FRONT_RIGHT_X + 0.014, FRONT_TOP_Y - 0.006),
 }
+BOTTOM_KEEP = {
+    "ScrewX": (_bottom_xy(OUTER_WIDTH / 4.0, 0.0)[0], BOTTOM_LOW_Y - 0.010),
+    "ScrewZ": (BOTTOM_LEFT_X - 0.010, _bottom_xy(0.0, FRAME_DEPTH / 4.0)[1]),
+    "Depth": (BOTTOM_RIGHT_X + 0.016, BOTTOM_CENTER[1]),
+}
+# The one printed fillet stands for all four equal window corners.  A custom
+# prefix replaces SolidWorks' own radius "R", so it carries it
+# (draw_pd_guide_lock: "4X 1.8" printed without).
+DIMENSION_PREFIXES = {"WindowCornerR": "4X R"}
+HOLE_CALLOUT_XY = (0.165, 0.128)
+HOLE_CALLOUT_PROCESS = "TAP"
+
+FRONT_VIEW_NOTE_XY = (0.175, 0.240)
+BOTTOM_VIEW_NOTE_XY = (0.070, 0.072)
+# The note's left end; its ~60 mm text centres under the isometric (x 0.320),
+# ~15 mm below the view's lowest corner (y 0.133).
+ISO_VIEW_NOTE_XY = (0.290, 0.116)
+
+
+def _set_dimension_prefixes(
+    adapter: Any, annotations: list[Any], prefixes: dict[str, str]
+) -> None:
+    """Write a native prefix on named imported dimensions and read it back."""
+    remaining = dict(prefixes)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        prefix = remaining.pop(dimension_name(adapter, annotation), None)
+        if prefix is None:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(1, prefix)  # swDimensionTextPrefix
+        if str(display.GetText(1) or "") != prefix:
+            raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
+    if remaining:
+        raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -90,9 +218,8 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Front View Note",
-            "Right View Note",
+            "Bottom View Note",
             "Isometric View Note",
         ),
         required=(
@@ -100,9 +227,8 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Front View Note",
-            "Right View Note",
+            "Bottom View Note",
             "Isometric View Note",
         ),
     )
@@ -116,25 +242,65 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pen Frame Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pen frame; brass stirrup yoke; set-screw rail",
+            3: "pen frame; brass stirrup; #4-40 thumb-screw tap",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    # Explicit per-view scale: a view placed without one can silently
+    # auto-scale, which shifts every coordinate-based pick on it.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, iso):
+    bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(2, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    # The tapped hole is fully defined by its callout (drawing-guidelines.md
+    # rule 9): no view needs hidden lines.  finalize_drawing turns the
+    # pictorial into precise Shaded With Edges (rule 8); at 2:1 its tap mouth
+    # and window fillets read round rather than faceted.
+    for view in (front, bottom, iso):
         set_hidden_lines_removed(adapter, view)
-    # The third-angle right-side view makes the 10 mm depth and the upward
-    # set-screw axis explicit; hidden lines show the blind-to-window thread path.
-    set_hidden_lines_visible(adapter, right)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    annotations = [
+        *curate_view_dimensions(
+            adapter,
+            front,
+            keep=FRONT_KEEP,
+            view_label="front",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+        *curate_view_dimensions(
+            adapter,
+            bottom,
+            keep=BOTTOM_KEEP,
+            view_label="bottom",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+    ]
+    # Places are authored on the part; the sheet only proves the import kept them.
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.090)
-    add_property_linked_note(adapter, "Front View Note", 0.040, 0.036)
-    add_property_linked_note(adapter, "Right View Note", 0.184, 0.105)
-    add_property_linked_note(adapter, "Isometric View Note", 0.288, 0.096)
+    if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to the bottom view")
+    hole_rim = scan_view_edges(bottom, label="bottom").circle_at(
+        HOLE_CENTER_MM,
+        blind_cut_dia_mm(SET_SCREW_TAP_SPEC) / 2.0,
+        axis=(0.0, 1.0, 0.0),
+        label="thumb-screw tap mouth",
+    )
+    tap_callout = add_native_hole_callout(
+        adapter,
+        bottom,
+        edge=hole_rim.edge,
+        callout_xy=HOLE_CALLOUT_XY,
+        label="thumb-screw tapped hole",
+        process=HOLE_CALLOUT_PROCESS,
+    )
+    # The title block's THREADS row owns the 2B class (drawing-guidelines.md
+    # rule 2): the callout reads TAP 4-40 UNC THRU.
+    omit_title_block_thread_class(tap_callout, label="thumb-screw tapped hole")
+
+    add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)
+    add_property_linked_note(adapter, "Bottom View Note", *BOTTOM_VIEW_NOTE_XY)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_VIEW_NOTE_XY)
 
     return await finalize_drawing(
         adapter,
@@ -142,6 +308,12 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Pen Frame Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # SolidWorks pins its own "#4-40 Tapped Hole" note to the bottom view
+        # once the tap carries a hole callout; the callout already states the
+        # thread, and the note sat under it with the callout's leader through
+        # it (farm c0b95549c: merged-blocks + leader-through-text).
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 

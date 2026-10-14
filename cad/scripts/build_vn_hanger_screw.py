@@ -1,4 +1,4 @@
-"""Build the hanger screw from McMaster 93075A194."""
+"""Build the hanger screw from McMaster 93075A199 (#8-32 x 1")."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from _simplified_part import save_simplified_part
-from _mcmaster_93075a194 import HX_UNDERSIDE
-from diagnostics.diag_build_93075A194 import build_93075A194
+from _mcmaster_93075a199 import HX_UNDERSIDE
+from diagnostics.diag_build_93075A199 import build_93075A199
 
 PART_NAME = "vn-hanger-screw"
 SPEC = fastener(PART_NAME)
@@ -23,8 +23,8 @@ async def build(adapter) -> dict[str, str]:
         part_name=PART_NAME,
         components=(
             StockComponent(
-                "93075A194",
-                build_93075A194,
+                "93075A199",
+                build_93075A199,
                 RigidTransform(
                     translation_mm=(0.0, 0.0, -HX_UNDERSIDE),
                     rotation_radians=(math.pi / 2.0, 0.0, 0.0),

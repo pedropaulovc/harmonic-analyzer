@@ -47,12 +47,16 @@ WIRE_RATIO = RIM_WIRE_R / DRUM_WIRE_R  # 4.995, the wheel's magnification
 # --- hub: Ø25 boss, then the drum spigot -----------------------------------------
 HUB_DIA = 25.0
 HUB_LEN = 19.6  # back face to spigot front face, both faced
-HUB_BACK_Z = 7.09  # back face above the spokes' mid-plane (stack: d 0.91)
+# The hub sits off-centre toward the pen, its back face 0.09 proud of the
+# rim's back face (RIM_AXIAL / 2), so the lever wire's slant down to the drum
+# clears the rim's pen face (mg_lever_wire_geom.RUN_GAPS) with the wheel on the
+# pen-rod line; at 7.09 (hub about centred) that run hit the rim.
+HUB_BACK_Z = 4.09
 SPIGOT_DIA = DRUM_BORE
 SPIGOT_LEN = DRUM_LEN  # nominally flush with the drum's front face
-HUB_STEP_Z = round(HUB_BACK_Z - (HUB_LEN - SPIGOT_LEN), 6)  # -3.51, boss front face
-HUB_FRONT_Z = round(HUB_BACK_Z - HUB_LEN, 6)  # -12.51, spigot front face
-DRUM_MID_Z = round((HUB_STEP_Z + HUB_FRONT_Z) / 2.0, 6)  # -8.01, where the drum sits
+HUB_STEP_Z = round(HUB_BACK_Z - (HUB_LEN - SPIGOT_LEN), 6)  # -6.51, boss front face
+HUB_FRONT_Z = round(HUB_BACK_Z - HUB_LEN, 6)  # -15.51, spigot front face
+DRUM_MID_Z = round((HUB_STEP_Z + HUB_FRONT_Z) / 2.0, 6)  # -11.01, where the drum sits
 # Reamed to a stated running clearance on the finished axle (mg_wheel_group
 # HUB_RUNNING), so the Ø prints as a reference nominal.
 BORE_DIA = round(0.1890 * 25.4, 6)  # 4.8006

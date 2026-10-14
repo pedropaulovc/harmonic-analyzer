@@ -1,9 +1,9 @@
 pn-pen-hanger:
   number: MHA-PN-002
-  material: AISI 1018 cold-finished steel
-  material_specification: "AISI 1018 cold-finished steel"
+  material: Low-carbon steel, 1018 or equiv
+  material_specification: "Low-carbon steel, 1018 or equiv"
   finish: "black oxide per MIL-DTL-13924 Class 1, oil sealed"
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "machined (steel)"
+  process: "machined (steel); guide plates silver-brazed to the strap"

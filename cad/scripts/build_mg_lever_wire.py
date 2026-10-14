@@ -19,9 +19,9 @@ part's length is the distance between them); ``build_mg_magnifier_assembly``
 imports ``WIRE_START``/``WIRE_END``/``WIRE_LEN`` from THERE and asserts them
 against its own layout anchors, so a layout move fails loud instead of
 leaving a floating wire -- while this script's drawing-contract imports stay
-out of the assembly/wheel recipe closures. The drum-end Z (DRUM_END_Z
--154.91) is the drum's axial middle, between the boss front face (-150.41)
-and the spigot front end (-159.41).
+out of the assembly/wheel recipe closures. The drum-end Z (DRUM_END_Z) is the
+drum's axial middle, between the boss front face and the spigot front end,
+all read off the wheel mid-plane (the pen-rod line ``paper_drive_geom.PEN_Z_MID``).
 
 The wire is also the CARRIER of the WIRE-1 coupling: ``YokePlane``, a named
 reference plane parallel to Top (perpendicular to the wire axis) through the

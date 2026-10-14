@@ -516,11 +516,17 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
         },
         "pn-pen": {
+            # #4-40 thumb screw through the stirrup's 6.0 bottom rail.
             frozenset(("vn-pen-set-screw-1", "pn-pen-frame-1")): _annulus_limit(
-                2.8448, 2.261, 5.0
+                2.8448, 2.261, 6.0
             ),
-            frozenset(("vn-hanger-screw-1", "pn-pen-hanger-1")): _annulus_limit(
-                4.1656, 3.454, 3.0
+            # #4-40 x 3/16 rod set screw wholly in the v-block tap.
+            frozenset(("vn-pen-rod-set-screw-1", "pn-pen-v-block-1")): _annulus_limit(
+                2.8448, 2.261, 4.7625
+            ),
+            # #0-80 adjuster stud 4.0 into the rod top.
+            frozenset(("pn-pen-adjust-screw-1", "pn-pen-rod-1")): _annulus_limit(
+                1.524, 1.191, 4.0
             ),
         },
         "pd-paper-drive": {

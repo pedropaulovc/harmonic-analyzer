@@ -51,7 +51,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (2.0, 1.0)  # 2:1 whole sheet (hair-thin 62.7 mm wire)
+SHEET_SCALE = (2.0, 1.0)  # 2:1 whole sheet (hair-thin ~60 mm wire)
 
 # Sheet layout (meters).  The elevation (front) is the sole ortho view -- the
 # vertical wire -- with the run length to its left; the isometric sits mid-right;

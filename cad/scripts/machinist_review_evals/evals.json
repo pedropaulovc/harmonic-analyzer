@@ -4334,47 +4334,6 @@
       ]
     },
     {
-      "id": 68,
-      "name": "pn-pen-marker-rules",
-      "package": "pn_pen_marker",
-      "kind": "part",
-      "release": "v40",
-      "prompt": "Blind machinist review of the pn-pen-marker part package.",
-      "expected_output": "Rule-coverage case (rules 5, 7, 16): reports each negative finding in the stated category and raises no positive-case item.",
-      "expectations": [
-        {
-          "text": "An over_specification finding flags the circular-runout frame '↗ 0.10 | A' on the pen-marker tip cone relative to the Ø8.00 barrel (rule 5)",
-          "check": {
-            "category": "over_specification"
-          },
-          "rule": 5,
-          "polarity": "negative",
-          "confidence": "medium",
-          "evidence": "MHA-PN-003 sheet 1: ↗|0.10|A at the tip cone, datum A on the Ø8.00 barrel (110.00 long). A brass pen marker clamped in the V-block is not in the knife-edge/cam/pattern/gear-mesh list; turning barrel and cone in one setup holds it anyway."
-        },
-        {
-          "text": "An over_specification finding flags the note 'TURN BARREL AND TIP CONE IN ONE SETUP; TIP POINT 0.2 MAX FLAT.' as a method and as a tolerance that belongs on the tip feature (rule 7)",
-          "check": {
-            "category": "over_specification"
-          },
-          "rule": 7,
-          "polarity": "negative",
-          "confidence": "high",
-          "evidence": "MHA-PN-003 sheet 1 notes: 'TURN BARREL AND TIP CONE IN ONE SETUP; TIP POINT 0.2 MAX FLAT. TIP CONE RUNS TO FULL BARREL DIAMETER (INCLUDED ANGLE 77.3 REF).' This is a method plus a dimension and tolerance in a general note."
-        },
-        {
-          "text": "No blocker says the tip cone is an undefined sharp point: the note says 'TIP POINT 0.2 MAX FLAT' (included angle 77.3 REF)",
-          "check": {
-            "absent_from": "blockers"
-          },
-          "rule": 16,
-          "polarity": "positive",
-          "confidence": "medium",
-          "evidence": "Sheet 1 note: 'TURN BARREL AND TIP CONE IN ONE SETUP; TIP POINT 0.2 MAX FLAT. TIP CONE RUNS TO FULL BARREL DIAMETER (INCLUDED ANGLE 77.3 REF).' Rule 16: truncate an acute point with a small stated flat."
-        }
-      ]
-    },
-    {
       "id": 69,
       "name": "pn-pen-rod-rules",
       "package": "pn_pen_rod",

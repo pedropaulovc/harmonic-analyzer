@@ -66,6 +66,14 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ("build_ch_rocker_arm_tl_c_stop_bar", "band"): ("DRAWING_BANDS", "values"),
     ("build_ch_rocker_arm_tl_diamond_pin", "band"): ("DRAWING_BANDS", "values"),
     ("build_ch_rocker_arm_tl_inspection_box", "band"): ("DRAWING_BANDS", "values"),
+    ("build_pn_pen_hanger", "band"): ("DRAWING_BANDS", "values"),
+    ("build_pn_pen_rod", "band"): ("DRAWING_BANDS", "values"),
+    ("build_pn_pen_v_block", "band"): ("DRAWING_BANDS", "values"),
+    # _single_limits passes each single-limit band (MIN chamfer, MAX rounds).
+    ("build_pn_pen_v_block", "limit_band"): (
+        "tuple(limit[3] for limit in _SINGLE_LIMITS)",
+        "each",
+    ),
     # def _printed_limits(nominal, places): ... GENERAL_BAND_BY_PLACES[places]
     ("dt_cone_tip_block_spec", "GENERAL_BAND_BY_PLACES[places]"): (
         "GENERAL_BAND_BY_PLACES",

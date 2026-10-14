@@ -123,7 +123,7 @@ async def main():
 
     sl, _ = _find_one(adapter, "sm-summing-lever-1")
     wh, _ = _find_one(adapter, "mg-magnifying-wheel-1")
-    marker, _ = _find_one(adapter, "pn-pen-marker")
+    marker, _ = _find_one(adapter, "vn-pen-marker")
     base = {}
     for t in TIMES:
         await adapter.set_motion_time(MotionTimeParameters(time=t, study_name=""))

@@ -848,11 +848,13 @@ def test_pen_gain_runs_on_the_wire_moment_arm_not_the_clamp_station(nom):
     arm_min = eb.wire_moment_arm(nom, nom.lever_r_min)
     arm_max = eb.wire_moment_arm(nom, nom.lever_r_max)
     # the offset's sign is load-bearing: at the clamp station (offset 0) the
-    # built arm grows by more than the offset's size
+    # built arm grows by more than the offset's size, seen along the wire's
+    # horizontal run (the run drops ~6 deg to the drum on the pen-rod line, so
+    # the XY arm carries that direction cosine)
     at_clamp = eb.wire_moment_arm(
         dataclasses.replace(nom, hook_offset_x=0.0), nom.lever_r_built
     )
-    assert at_clamp - arm_built > -nom.hook_offset_x
+    assert at_clamp - arm_built > -nom.hook_offset_x * math.hypot(u[0], u[1])
     flipped = eb.wire_moment_arm(
         dataclasses.replace(nom, hook_offset_x=-nom.hook_offset_x), nom.lever_r_min
     )

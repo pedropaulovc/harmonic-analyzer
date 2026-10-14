@@ -38,6 +38,7 @@ from mg_output_fixture_geom import (
     WIRE_DIA,
     WIRE_CLEARANCE as CLEARANCE,
 )
+from paper_drive_geom import PEN_Z_MID
 
 assert math.isclose(WIRE_DIA, LEVER_WIRE_DIA, abs_tol=1e-12), (
     "fixture groove and wheel drum must carry the same lever wire diameter"
@@ -49,8 +50,9 @@ assert math.isclose(WIRE_DIA, LEVER_WIRE_DIA, abs_tol=1e-12), (
 # line -- this wire, the wheel, the rim wire, the pen rod -- as ONE plumb
 # vertical at the machine front. The hook hangs just behind the wheel bar's
 # front face; the wire drops to the drum on the wheel's pen side, crossing the
-# rim's axial band only outside the rim (``run_gaps``): ~17 mm of z over the
-# ~350 run = 2.8 deg, visually plumb.
+# rim's axial band only outside the rim (``run_gaps``). With the wheel on the
+# pen-rod line (Option C) the drop is about a tenth of the ~356 run (~6 deg):
+# the ch21 photo's wire, slanting forward over the rim to the front drum.
 CLAMP_X = 150.0  # sliding clamp / vertical rod / fixture line
 # The wire wraps the output fixture's turned spigot groove and leaves its
 # front tangent at screw-axis height. The fixture yaws about the vertical rod
@@ -61,10 +63,12 @@ HOOK_Y = FIXTURE_AXIS_Y
 HOOK_Z = HOOK_TARGET_Z
 WHEEL_X = 53.0  # magnifying-wheel centre
 WHEEL_BAR_Y = 575.7  # ch30 p002 re-anchor (was 565.0)
-WHEEL_MID_Z = -146.9  # wheel mid-plane (build_mg_magnifier_assembly.WHEEL_MID_Z)
+# Wheel mid-plane = the pen-rod line (mg_wheel_group asserts the stack closes
+# on it; build_mg_magnifier_assembly places the wheel there).
+WHEEL_MID_Z = PEN_Z_MID
 DRUM_DIA = DRUM_OD
 # Drum-end Z: the drum's axial middle, so the tangency sits mid-lane.
-DRUM_END_Z = round(WHEEL_MID_Z + _DRUM_MID_LOCAL_Z, 6)  # -154.91
+DRUM_END_Z = round(WHEEL_MID_Z + _DRUM_MID_LOCAL_Z, 6)
 
 # XY tangent from the hook to the drum circle inflated by wire r + clearance.
 # +acos picks the tangent on the drum's right seen from the front (~2:25):

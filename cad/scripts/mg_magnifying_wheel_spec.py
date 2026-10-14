@@ -242,7 +242,7 @@ for _name, _wall in WALLS.items():
         raise AssertionError(f"wheel wall {_name} {_wall:.3f} < {MIN_WALL}")
 
 # The web and rim locate off the spigot face at .X (HubFrontZ).  Moved the
-# whole row (and the 12.51 printed as 12.5) toward the pen side, the rim's
+# whole row (and the 15.51 printed as 15.5) toward the pen side, the rim's
 # and the spokes' pen faces still clear the lever wire's run; the boss, the
 # spigot and the drum lane are hub stations the row does not move.  The pen
 # wire leaves the groove plumb, so the groove's shift only leans it.

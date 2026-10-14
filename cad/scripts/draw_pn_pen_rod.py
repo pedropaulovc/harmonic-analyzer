@@ -1,4 +1,23 @@
-r"""Create the curated machinist drawing for the pen square rod."""
+r"""Create the curated machinist drawing for the pen square rod.
+
+The SLDPRT remains authoritative.  This recipe supplies only the rod's views,
+the placement of its imported model dimensions, the stud-tap callout, the
+overall-length reference and the property-linked view notes; sheet/template
+and export behavior lives in ``_drawing_common``.  Places, bands and mate
+callouts are authored on the part (``pn_pen_rod_spec``).
+
+The side view (2:1, the sheet scale) lays the rod axis horizontal, as the
+bar sits in the lathe (drawing-guidelines.md rule 11), and carries the
+square's and the pivot's lengths from the shoulder, the pivot's banded
+diameter between its flanks, the shoulder root's R MAX and the (122.5)
+end-to-end reference; the labelled end view (5:1) under it looks at the
+tapped top face and carries the square's banded SQ size and the native Hole
+Wizard callout of the #0-80 stud tap; the labelled 1:1 isometric sits right.
+
+Run with SolidWorks open::
+
+    uv run python cad\scripts\draw_pn_pen_rod.py pn-pen-rod
+"""
 
 from __future__ import annotations
 
@@ -9,6 +28,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -19,32 +39,40 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import set_arc_endpoints_to_center, set_dimension_callouts
-from _drawing_edge_dimensions import add_edge_dimension
-from _drawing_edges import _edge_endpoint_key, visible_view_entities
-from _drawing_finish import add_surface_finish
-from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
+from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
-from _gear_drawing_entities import visible_circle_edge
-from _hole_spec import blind_cut_dia_mm
+from _drawing_view_display import set_hidden_lines_removed
+from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 from _session import run_build
-from _surface_finish import surface_finish_by_key
 import _telemetry
 from pn_pen_rod_spec import (
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
-    ROD_LENGTH,
+    DIMENSION_CALLOUTS,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
+    PIVOT_DIA,
+    PIVOT_LENGTH,
     ROD_SECTION,
-    SURFACE_FINISHES,
-    WIRE_HOLE_SPEC,
-    WIRE_HOLE_Y,
+    SHOULDER_FILLET_R,
+    SHOULDER_FILLET_TOL_TYPE,
+    SQUARE_LENGTH,
+    STUD_TAP_DRILL_DIA,
+    STUD_TAP_SPEC,
+    TOTAL_LENGTH,
 )
 
 
@@ -59,102 +87,355 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
-_WIRE_HOLE_DIA = blind_cut_dia_mm(WIRE_HOLE_SPEC)
 
-SHEET_SCALE = (1.0, 1.0)
-TOP_VIEW_SCALE = 4.0
-FRONT_CENTER = (0.070, 0.150)
-RIGHT_CENTER = (0.140, 0.150)
-TOP_CENTER = (0.070, 0.245)
-ISO_CENTER = (0.340, 0.195)
+# Rule 15: at 1:1 the side view stood 5 mm tall in the top half of the sheet
+# (final review 2026-10-14); 2:1 lays the rod 245 mm long and 10 mm tall.
+SHEET_SCALE = (2.0, 1.0)
+SIDE_SCALE = (2, 1)
+# The 5 mm square's end at 5:1 (25 mm) holds the SQ size's four-row block
+# BETWEEN its extension lines with air; at 4:1 (20 mm) the 19.1 mm block's
+# bottom row sat on the lower one (final review: read as an underline).
+END_SCALE = (5, 1)
+ISO_SCALE = (1, 1)  # 115 mm tall; labelled, as the fleet labels its isos
+# The rod is modelled axis-along-+Y (its assembly pose), so the side view is
+# "*Front" turned -90 deg before any import (IView.Angle,
+# draw_dt_cylinder_gear_shaft's PROFILE_ROTATION): model +Y -> sheet +x,
+# model +X -> sheet -y.  Pivot end left, tapped top face right; the shoulder
+# (model y 0) both axial dimensions start from is near the left end.
+SIDE_ROTATION = -math.pi / 2.0
+_SIDE_K = SIDE_SCALE[0] / SIDE_SCALE[1] / 1000.0
 
-FRONT_KEEP = {
-    "Length": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1]),
-    # x offset -0.034 (the Depth spelling below), NOT the view centre: Section
-    # measures the 5 mm square across, so at 1:1 its two extension lines land
-    # 4.7 mm apart (measured x=0.0679 and x=0.0726) while the toleranced text
-    # renders 24.5 mm wide. Centred on FRONT_CENTER[0] the text spanned
-    # 0.0580..0.0820, so BOTH extension lines ran through it and struck out
-    # "+0.00/-0.05". text_xy is the text CENTRE, so -0.034 puts the run at
-    # 0.0238..0.0483: clear of the left extension line by 19.6 mm and of the
-    # drawn border rule (gray, x=~0.0126) by ~11.2 mm. No gate sees this -- a
-    # dimension exposes no GetExtent, so only the render shows it.
-    "Section": (
-        FRONT_CENTER[0] - 0.034,
-        FRONT_CENTER[1] - ROD_LENGTH / 2000.0 - 0.012,
-    ),
+# The view centres on the part's bounding box: model y -PIVOT_LENGTH to
+# SQUARE_LENGTH, x and z +/- S/2.  _prove_side_view_frame reads the frame
+# back before anything is placed by it.
+_CY = (SQUARE_LENGTH - PIVOT_LENGTH) / 2.0
+
+# Sheet layout (meters; border 0.0127, title block x >= 0.2155, y <= 0.0655).
+# The 2:1 side view spans the sheet's left three quarters on y 0.170, its
+# dimension rows and pin callout above, the R MAX below; the labelled 5:1
+# end view fills the lower-left field under it; the 1:1 isometric stands
+# at the right, its note under it.
+SIDE_CENTER = (0.205, 0.170)
+END_CENTER = (0.080, 0.075)
+ISO_CENTER = (0.380, 0.175)
+
+
+def _sx(model_y_mm: float) -> float:
+    """Sheet x of a station along the rod axis (model y) in the side view."""
+    return SIDE_CENTER[0] + (model_y_mm - _CY) * _SIDE_K
+
+
+def _sy(model_x_mm: float) -> float:
+    """Sheet y of a model x in the side view (model +X points down)."""
+    return SIDE_CENTER[1] - model_x_mm * _SIDE_K
+
+
+def _end_x(center: tuple[float, float], model_x_mm: float) -> float:
+    return center[0] + model_x_mm * END_SCALE[0] / END_SCALE[1] / 1000.0
+
+
+_HALF = ROD_SECTION / 2.0
+_END_HALF_M = _HALF * END_SCALE[0] / END_SCALE[1] / 1000.0
+
+# Side view stations: pivot end x 0.0825, shoulder x 0.1035, top face
+# x 0.3275; square y 0.165..0.175, pivot flanks y 0.166/0.174.
+#
+# A vertical dimension whose text stands off its span runs its line to a
+# shoulder under the text's bottom row, the block hanging to ONE side of
+# that line with its edge ON it (farm audit 20261014T045316872Z, PivotDia
+# keep (0.084, 0.142): line x 0.0840, "MHA-PN-005 PIVOT BORE" 0.02821 +
+# 0.05579 = 0.0840, shoulder y 0.13192 = keep y - 0.0101, top row's top
+# ~0.152 = keep y + 0.010).  Text BELOW its span therefore has the line run
+# up the block's whole edge (the review's "E struck by the line"); text
+# ABOVE meets it only at the shoulder's end, as every side-view diameter
+# of draw_dt_cone_gear_shaft does.
+#
+# Above the rod, three rows baselined from the shoulder / end faces, each
+# sharing its extension lines with the row below at the common face (text
+# offsets are sheet millimetres, as on the green 1:1 sheet):
+#   row 1 (y 0.1845, 9.5 mm over the square): 112.0, shoulder to top face,
+#     text mid-span (x 0.2155);
+#   row 2 (y 0.1945): 10.5, pivot end to shoulder.  At 2:1 the span is
+#     21 mm, so the ~11.6 mm text stands centred over it (x 0.0872..0.0988,
+#     4.7 mm from each extension line), its arrows FORCED inside
+#     (ARROW_SIDES) so no outside tail runs left toward the Ø's line;
+#   row 3 (y 0.2045): the (122.5) reference, end face to end face, its line
+#     at y ~0.2017 and its text ~0.2026..0.2061 (audit offsets).
+# Ø4.000 -0.010/-0.025 between the pivot flanks: its line stands 5.75 mm
+#   left of the pivot end (x 0.07675), the flanks' extension lines reaching
+#   it, so it rises past every row clear of their lines (all start at the
+#   pivot end or right of it) to the four-row ~56 x 20 mm block centred at
+#   y 0.2225: shoulder y ~0.2124 (6.3 mm over the (122.5) text), top
+#   ~0.2325.  Hanging left it spans x 0.0210..0.0768 (8.3 mm inside the
+#   border), hanging right 0.0768..0.1326; either way only its bottom row's
+#   end meets the line, at the shoulder.  Under the rod its outside-arrow
+#   tail (6.35 mm) runs to y ~0.1597 at x 0.0768, where nothing else is.
+# Below the rod, where the ShoulderRadius's arc is (model +X, the root the
+# vertical layout's leader found):
+#   R0.2 MAX / SEATS ON PEN V-BLOCK / MHA-PN-005 down-right of the root:
+#     farm audit 20261014T053239477Z drew that block x keep-0.0281..
+#     keep+0.0265 with its shoulder 8.35 mm under the anchor, so at
+#     (0.16925, 0.1475) it spans x 0.1412..0.1958, y 0.1392..0.1559 (9.1 mm
+#     under the square), its leader from the shoulder's left end up-left at
+#     ~35 deg to the root (0.1035, 0.1656), over everything else below the
+#     rod (the end view's tap callout tops out at y 0.1135, x <= 0.1248).
+SIDE_KEEP = {
+    "Length": (_sx(SQUARE_LENGTH / 2.0), _sy(-_HALF) + 0.0095),
+    "PivotLength": (_sx(-PIVOT_LENGTH / 2.0), _sy(-_HALF) + 0.0195),
+    "PivotDia": (_sx(-PIVOT_LENGTH) - 0.00575, _sy(-_HALF) + 0.0475),
+    "ShoulderRadius": (_sx(0.0) + 0.06575, _sy(_HALF) - 0.0175),
 }
-TOP_KEEP = {
-    "Depth": (TOP_CENTER[0] - 0.034, TOP_CENTER[1]),
+# swDimensionArrowsSide_e (swDimArrowsInside 0, swDimArrowsOutside 1), read
+# back (draw_dt_cone_tip_block's _set_arrow_sides): the 10.5's inside its
+# 21 mm span; the SQ size's outside its 25 mm span, so only its text stands
+# between the extension lines (the green 4:1 sheet drew them outside too).
+ARROW_SIDES = {"PivotLength": 0, "Depth": 1}
+OVERALL_REF_XY = (_sx(_CY), _sy(-_HALF) + 0.0295)
+# Picks are ENTITIES from the side view's edge scan, not sheet hit-tests:
+# the pivot end is a circular edge seen edge-on, and a SelectByID2 point on
+# it found nothing (farm leaf 20261014T002718Z: "failed to select pen-rod
+# overall length reference edge 1 at sheet (0.069, 0.08875)").  The top face's
+# near edge is the visible straight edge across the square at y 112; the
+# pivot end is the circle of the pivot's diameter about the rod axis at
+# y -10.5.  The sheet points passed beside them only document the layout.
+OVERALL_TOP_SHEET_XY = (_sx(SQUARE_LENGTH), _sy(-_HALF + 1.0))
+OVERALL_END_SHEET_XY = (_sx(-PIVOT_LENGTH), _sy(-PIVOT_DIA / 2.0 + 1.0))
+_EDGE_TOL_MM = 1e-4
+# How far the side view's projected stations may sit from the _sx/_sy frame
+# every position above is computed in before the build stops.
+_FRAME_TOL_M = 2.5e-4
+
+# End view (5:1, square 0.0675..0.0925 x 0.0625..0.0875).  The SQ size's
+# four-row block centres on its dimension line (audit 20261014T053239477Z:
+# rows 66.6 mm wide at most, from keep y - 10.08 to keep y + 9.06 mm), so
+# keep y = centre + 0.51 mm centres it: y 0.0654..0.0846, 2.9 mm inside
+# each extension line (0.0625/0.0875).  Its line 52 mm right of the
+# centre puts the block at x 0.0987..0.1653, 6.2 mm right of the square
+# and ~3 mm past the centre mark's extended arm.  The tap callout keeps the
+# green sheet's offsets from the hole (text centred on keep x, 45.6 mm wide,
+# shoulder 5.6 mm under keep y): x 0.0792..0.1248, y 0.1044..0.1135, 17 mm
+# over the square, 18 mm over the block, 7 mm left of the SQ line's upper
+# arrow piece (x 0.132, to y ~0.0939); its leader drops almost straight to
+# the drill rim.  The scale note (anchored top-left, text 4.5 mm under its
+# anchor, ~45 mm long) 7 mm under the square: x 0.060..0.105, y
+# 0.051..0.0545, left of the SQ line's lower arrow piece (to y ~0.0561).
+END_KEEP = {
+    "Depth": (END_CENTER[0] + 0.052, END_CENTER[1] + 0.00051),
 }
-# No-oversize bands on both functional slide dimensions live on the source model.
-DIMENSION_CALLOUTS: dict[str, str] = {}
-TOP_DIMENSION_CALLOUTS: dict[str, str] = {}
+TAP_CALLOUT_XY = (END_CENTER[0] + 0.022, END_CENTER[1] + 0.035)
+END_NOTE_XY = (END_CENTER[0] - 0.020, END_CENTER[1] - _END_HALF_M - 0.007)
+# The isometric (1:1 outline 18.2 x 115.3 mm: x 0.3709..0.3891, y
+# 0.1174..0.2327, 43 mm right of the top face's extension lines) takes its
+# ~60 mm scale note 8 mm under it: x 0.350..0.410, y ~0.1050..0.1085.
+ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.0577 - 0.008)
 
 
-@_telemetry.traced("drawing.verify_dimension_value", label_param="label")
-def _require_dimension_value(display: Any, expected_mm: float, *, label: str) -> None:
-    """Fail if SolidWorks dimensioned a different projected edge."""
-    display = _early_bound(display, "IDisplayDimension")
-    raw_dimension = display.GetDimension2(0)
-    if raw_dimension is None:
-        raise RuntimeError(f"{label}: display has no dimension")
-    dimension = _early_bound(raw_dimension, "IDimension")
-    measured_mm = abs(float(dimension.SystemValue) * 1000.0)
-    if not math.isclose(measured_mm, expected_mm, rel_tol=0.0, abs_tol=1e-5):
+def _lay_side_view_horizontal(adapter: Any, side: Any) -> None:
+    """Turn "*Front" by SIDE_ROTATION (rod axis horizontal) and read it back."""
+    native = _early_bound(side, "IView")
+    native.Angle = SIDE_ROTATION
+    rebuild_drawing(adapter, label="lay pen-rod side view horizontal")
+    applied = float(native.Angle)
+    if abs(math.remainder(applied - SIDE_ROTATION, 2.0 * math.pi)) > 1e-9:
         raise RuntimeError(
-            f"{label}: measured {measured_mm:g}, expected {expected_mm:g} mm"
+            f"pen-rod side view rotation did not take: {applied!r} rad, "
+            f"expected {SIDE_ROTATION!r}"
         )
 
 
-@_telemetry.traced("drawing.pick_pen_rod_datum_edges")
-def _visible_front_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
-    """Return the visible bottom and left edges for locating the front-view hole.
-
-    Each datum has coincident edges at z=0 and z=ROD_SECTION. Because the part
-    extrudes +Z from its Front sketch, the canonical maximum is nearest *Front.
-    """
-    half_section_m = ROD_SECTION / 2000.0
-    section_m = ROD_SECTION / 1000.0
-    length_m = ROD_LENGTH / 1000.0
-    bottom: list[tuple[tuple[float, ...], Any]] = []
-    left: list[tuple[tuple[float, ...], Any]] = []
-    edges = visible_view_entities(view, 1, label="pen-rod front edges")
-    for raw_edge in edges:
-        edge = _early_bound(raw_edge, "IEdge")
-        endpoints = _edge_endpoint_key(adapter, edge)
-        if endpoints is None:
-            continue
-        x0, y0, z0, x1, y1, z1 = endpoints
-        geometry = tuple(sorted((endpoints[:3], endpoints[3:])))
-        key = geometry[0] + geometry[1]
-        if (
-            abs(y0) <= 1e-6
-            and abs(y1) <= 1e-6
-            and abs(abs(x1 - x0) - section_m) <= 1e-6
-            and abs(z1 - z0) <= 1e-6
-        ):
-            bottom.append((key, edge))
-        if (
-            abs(x0 + half_section_m) <= 1e-6
-            and abs(x1 + half_section_m) <= 1e-6
-            and abs(abs(y1 - y0) - length_m) <= 1e-6
-            and abs(z1 - z0) <= 1e-6
-        ):
-            left.append((key, edge))
-
-    span = _telemetry.trace.get_current_span()
-    span.set_attribute("edges", len(edges))
-    span.set_attribute("bottom_matches", len(bottom))
-    span.set_attribute("left_matches", len(left))
-    if not bottom:
-        raise RuntimeError("pen-rod front view has no exact bottom edge")
-    if not left:
-        raise RuntimeError("pen-rod front view has no exact left edge")
-    return (
-        max(bottom, key=lambda candidate: candidate[0])[1],
-        max(left, key=lambda candidate: candidate[0])[1],
+def _prove_side_view_frame(adapter: Any, side: Any) -> None:
+    """Every side-view keep, pick and text position is computed in the
+    _sx/_sy frame; project the stations it rests on through the turned view
+    (ModelToViewTransform) and stop if any lands off it -- the end faces
+    prove the axis runs +x at scale and the view centres on its bounding
+    box, the square's +X flat at the shoulder that model +X points down."""
+    stations = {
+        "pivot end": ((0.0, -PIVOT_LENGTH, 0.0), (_sx(-PIVOT_LENGTH), _sy(0.0))),
+        "top face": ((0.0, SQUARE_LENGTH, 0.0), (_sx(SQUARE_LENGTH), _sy(0.0))),
+        "shoulder +X flat": ((_HALF, 0.0, 0.0), (_sx(0.0), _sy(_HALF))),
+    }
+    projected = model_points_in_view(
+        adapter,
+        side,
+        [tuple(value / 1000.0 for value in model) for model, _ in stations.values()],
+        label="pen-rod side view frame",
+        names=list(stations),
     )
+    misses = {
+        name: (sheet, expected)
+        for (name, (_, expected)), sheet in zip(stations.items(), projected)
+        if math.dist(sheet, expected) > _FRAME_TOL_M
+    }
+    if misses:
+        raise RuntimeError(f"pen-rod side view is not in its layout frame: {misses}")
+    _telemetry.info(f"pen-rod side view frame: {dict(zip(stations, projected))}")
+
+
+def _set_arrow_sides(adapter: Any, annotations: list[Any]) -> None:
+    """Stand each ARROW_SIDES dimension's arrows on its side and read the
+    side back (draw_dt_cone_tip_block's _set_arrow_sides): the layout above
+    is proven against those arrows, not the sheet's automatic choice."""
+    remaining = dict(ARROW_SIDES)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        side = remaining.pop(name)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArrowSide = side
+        if int(display.ArrowSide) != side:
+            raise RuntimeError(f"{name} did not keep its arrows on side {side}")
+    if remaining:
+        raise RuntimeError(
+            f"no pen-rod dimension to set arrow sides: {sorted(remaining)}"
+        )
+
+
+def _dress_shoulder_radius(adapter: Any, annotations: list[Any]) -> None:
+    """Prove the side view's imported ShoulderRadius prints the part's R MAX
+    with its callout, and stop its leader at the corner.
+
+    Read back: radial (not a diameter), measuring SHOULDER_FILLET_R, the
+    native swTolMAX the part set, and the mate callout under the value.  The
+    text stands down-right of the corner (the vertical layout's up-right,
+    turned with the view), outside the arc's own quadrant, so the leader
+    ends on the arc's extension; ``ArcExtensionLineOrOppositeSide`` False
+    keeps it from running on through the arc centre into the pivot
+    (draw_dt_arbor_pedestal's crown, draw_fr_harmonic_base's corner arcs).
+    """
+    found = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "ShoulderRadius"
+    ]
+    if len(found) != 1:
+        raise RuntimeError(
+            f"expected one ShoulderRadius on the side view, found {len(found)}"
+        )
+    annotation = _early_bound(found[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric):
+        raise RuntimeError("the imported shoulder radius is not radial")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(tolerance.Type) != SHOULDER_FILLET_TOL_TYPE:
+        raise RuntimeError(
+            f"ShoulderRadius lost its native MAX type: {int(tolerance.Type)}"
+        )
+    if not math.isclose(
+        float(dimension.SystemValue), SHOULDER_FILLET_R / 1000.0, abs_tol=1e-9
+    ):
+        raise RuntimeError("ShoulderRadius does not measure the shoulder fillet")
+    callout = str(display.GetText(4) or "")  # swDimensionTextCalloutBelow
+    if callout != DIMENSION_CALLOUTS["ShoulderRadius"]:
+        raise RuntimeError(f"ShoulderRadius callout did not persist: {callout!r}")
+    display.ArcExtensionLineOrOppositeSide = False
+    if display.ArcExtensionLineOrOppositeSide is not False:
+        raise RuntimeError("ShoulderRadius leader still runs to the opposite side")
+    _telemetry.info(
+        f"shoulder radius: text {display.GetText(1)!r}, MAX type, callout {callout!r}"
+    )
+
+
+def _edge_inventory(edges: ViewEdges, y_mm: float) -> str:
+    """The scan's lines and circles near model y ``y_mm`` (1 mm either
+    side), so a failed pick names what the view really holds there."""
+    rows = []
+    for item in edges.edges:
+        if item.line is not None:
+            start, end = item.line
+            if min(abs(start[1] - y_mm), abs(end[1] - y_mm)) <= 1.0:
+                rows.append(f"line {start}-{end}")
+        elif item.circle is not None:
+            if abs(item.circle[1] - y_mm) <= 1.0:
+                rows.append(f"circle {item.circle}")
+    return f"{len(rows)} of {len(edges.edges)} edges near y {y_mm:g}: {rows}"
+
+
+def _top_face_edge(edges: ViewEdges) -> Any:
+    """The square's top-face edge nearest the viewer: the visible straight
+    edge from (-S/2, SQUARE_LENGTH, +S/2) to (+S/2, SQUARE_LENGTH, +S/2)
+    (the far edge at z -S/2 projects onto it, so z pins the one picked)."""
+    ends = ((-_HALF, SQUARE_LENGTH, _HALF), (_HALF, SQUARE_LENGTH, _HALF))
+    found = [
+        item
+        for item in edges.lines
+        if all(
+            any(math.dist(point, end) <= _EDGE_TOL_MM for end in ends)
+            for point in item.line
+        )
+        and item.length_mm > ROD_SECTION / 2.0
+    ]
+    if len(found) != 1:
+        raise RuntimeError(
+            f"expected one visible top-face edge across the square, found "
+            f"{len(found)}; {_edge_inventory(edges, SQUARE_LENGTH)}"
+        )
+    return found[0].edge
+
+
+def _pivot_end_edge(edges: ViewEdges) -> Any:
+    """The pivot's end-face rim: the Ø PIVOT_DIA circle on the rod axis at
+    y -PIVOT_LENGTH, seen edge-on in the side view."""
+    try:
+        return edges.circle_at(
+            (0.0, -PIVOT_LENGTH, 0.0),
+            PIVOT_DIA / 2.0,
+            axis=(0.0, 1.0, 0.0),
+            label="pivot end rim",
+        ).edge
+    except RuntimeError as error:
+        raise RuntimeError(
+            f"{error}; {_edge_inventory(edges, -PIVOT_LENGTH)}"
+        ) from error
+
+
+@_telemetry.traced("drawing.pen_rod.overall_reference")
+def _overall_reference(adapter: Any, side: Any) -> None:
+    """(122.5): top face to pivot end, a reference the square and pivot
+    lengths own (rule 10); a drawing-added edge dimension between two
+    scanned entities, proved attached to exactly them and measuring
+    TOTAL_LENGTH before it is parenthesised."""
+    label = "pen-rod overall length reference"
+    # Scanned after every display change to the side view (turn, HLR).
+    edges = scan_view_edges(side, label="pen-rod side")
+    picks = (_top_face_edge(edges), _pivot_end_edge(edges))
+    display = add_edge_dimension(
+        adapter,
+        side,
+        # Documentation only: both picks are by entity.
+        p0=OVERALL_TOP_SHEET_XY,
+        p1=OVERALL_END_SHEET_XY,
+        text_xy=OVERALL_REF_XY,
+        label=label,
+        # SHEET horizontal: the turned view's axis runs along sheet x (a
+        # turned view's vertical measured its sheet-vertical model +Z in
+        # draw_mg_magnifying_bracket's _arm_end_reference).
+        orientation="horizontal",
+        entities=picks,
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    dimension_type = int(display.Type2)
+    # swLinearDimension, swHorLinearDimension
+    if dimension_type not in (2, 11):
+        raise RuntimeError(
+            f"{label}: expected a linear dimension, got type {dimension_type}"
+        )
+    # The rim lies in the plane y -10.5, so any arc end condition reads the
+    # same distance; the attachments and the value prove the picks.
+    assert_dimension_measures(
+        adapter,
+        display,
+        expected_mm=TOTAL_LENGTH,
+        label=label,
+        entities=picks,
+        tolerance_mm=1e-3,
+    )
+    set_reference_dimension(adapter, display.GetAnnotation(), label=label)
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+        raise RuntimeError(f"{label} precision did not persist")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -171,16 +452,16 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
-            "Top View Note",
+            "End View Note",
+            "Isometric View Note",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
-            "Top View Note",
+            "End View Note",
+            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -193,144 +474,74 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pen Rod Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pen rod; square brass slide rod; wire hole",
+            3: "pen rod; square brass slide rod; turned pivot end; tapped top",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(4, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, top, iso):
+    side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=SIDE_SCALE)
+    # Turned before HLR, the edge scan and every import, so each lands in
+    # the horizontal frame; proved against _sx/_sy before anything uses it.
+    _lay_side_view_horizontal(adapter, side)
+    _prove_side_view_frame(adapter, side)
+    end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=END_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    # The iso too: a new view already reads Shaded With Edges, so
+    # finalize_drawing's SetDisplayMode4 is a no-op that leaves its cosmetic
+    # threads at draft quality (farm c0b95549c readback cosmetic_threads=False).
+    # From HLR the shading call really changes the mode and takes precision.
+    for view in (side, end, iso):
         set_hidden_lines_removed(adapter, view)
-    set_hidden_lines_visible(adapter, right)
 
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="top"
-    )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    set_dimension_callouts(adapter, top_annotations, TOP_DIMENSION_CALLOUTS)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to the wire hole")
-    wire_hole_edge = visible_circle_edge(adapter, front, _WIRE_HOLE_DIA)
-    bottom_edge, left_edge = _visible_front_datum_edges(adapter, front)
+    # PivotDia imports straight into the side view: every farm leaf of the
+    # vertical layout logged its targeted *Front import delivering it
+    # (unrequested, then deleted), so the turned pivot's banded diameter is
+    # dimensioned between its flanks where the lathe reads it (rule 11).
+    annotations = [
+        *curate_view_dimensions(
+            adapter,
+            side,
+            keep=SIDE_KEEP,
+            view_label="side",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+        *curate_view_dimensions(
+            adapter,
+            end,
+            keep=END_KEEP,
+            view_label="end",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+    ]
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _dress_shoulder_radius(adapter, annotations)
+    _set_arrow_sides(adapter, annotations)
+    # Places (and so each dimension's tolerance) are authored on the part; the
+    # sheet only proves the import kept them.
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center mark to the stud tap")
 
-    front_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - ROD_LENGTH / 2000.0)
-    front_side = (FRONT_CENTER[0] - 0.0025, FRONT_CENTER[1])
-    front_far_side = (FRONT_CENTER[0] + 0.0025, FRONT_CENTER[1])
-    hole_center_y = front_bottom[1] + WIRE_HOLE_Y / 1000.0
-    hole_center = (FRONT_CENTER[0], hole_center_y)
+    # Pick the tap-drill rim, not the cosmetic thread or the hole centre.
+    stud_callout = add_native_hole_callout(
+        adapter,
+        end,
+        edge_xy=(_end_x(END_CENTER, STUD_TAP_DRILL_DIA / 2.0), END_CENTER[1]),
+        callout_xy=TAP_CALLOUT_XY,
+        label="adjuster stud blind tap",
+        process="TAP",
+    )
+    # The title block's THREADS row owns the general thread class (rule 2).
+    omit_title_block_thread_class(stud_callout, label="adjuster stud blind tap")
 
-    wire_hole_y = add_edge_dimension(
-        adapter,
-        front,
-        p0=front_bottom,
-        p1=hole_center,
-        text_xy=(FRONT_CENTER[0] + 0.032, FRONT_CENTER[1] + 0.030),
-        label="wire-hole length location",
-        orientation="vertical",
-        entities=(bottom_edge, wire_hole_edge),
-    )
-    set_arc_endpoints_to_center(
-        adapter, wire_hole_y, label="wire-hole length location"
-    )
-    _require_dimension_value(
-        wire_hole_y, WIRE_HOLE_Y, label="wire-hole length location"
-    )
-    # Locate the wire hole ACROSS the square section too: the native callout gives
-    # only the drill size, so without this the cross-hole could sit off-centre and
-    # still satisfy every shown dimension. Both references are exact model edges,
-    # and the 2.50 mm value is verified.
-    wire_hole_x = add_edge_dimension(
-        adapter,
-        front,
-        p0=front_side,
-        p1=hole_center,
-        text_xy=(FRONT_CENTER[0] - 0.030, hole_center_y + 0.020),
-        label="wire-hole centerline location",
-        orientation="horizontal",
-        entities=(left_edge, wire_hole_edge),
-    )
-    set_arc_endpoints_to_center(
-        adapter, wire_hole_x, label="wire-hole centerline location"
-    )
-    _require_dimension_value(
-        wire_hole_x, ROD_SECTION / 2.0, label="wire-hole centerline location"
-    )
-    # Text up-RIGHT of the top view, not beside it: at (+0.034, +0.017) the
-    # leader climbed 45 deg into the 4:1 top view's outline (audit
-    # leader-crosses-view, View3). (+0.046, +0.015) puts the shoulder at
-    # y ~0.2322 from x ~0.0959, so the 25 deg leader passes 1.9 mm under the top
-    # view's padded outline corner (85.6, 229.4) and 9 mm from its square; the
-    # text (x 0.0975..0.1344, y 0.2331..0.2367) sits 2.5 mm above the right
-    # view's outline and 12 mm right of the top view's.
-    add_native_hole_callout(
-        adapter,
-        front,
-        edge=wire_hole_edge,
-        callout_xy=(FRONT_CENTER[0] + 0.046, hole_center_y + 0.015),
-        label="pen-rod wire hole",
-    )
+    _overall_reference(adapter, side)
 
-    # GD&T is model PMI (pen_rod_spec.PART_DATUMS/GEOMETRIC_CONTROLS, authored
-    # by build_pen_rod) — project it and place it where the hand-authored
-    # symbols used to sit. All three annotations land in the single front view,
-    # and the projection fails loud on any mismatch. The squareness frame stays BELOW the rod: up-right
-    # of its target its leader crossed the Ra's leader in an X at the rod's
-    # bottom corner; from below the two run on opposite sides of that corner.
-    project_part_pmi(
-        adapter,
-        placements={
-            "datum:A": PmiDrawingPlacement(
-                view=front,
-                position=(front_side[0] - 0.016, FRONT_CENTER[1] - 0.030),
-                attachment_xy=front_side,
-            ),
-            "opposite_slide_face_parallelism": PmiDrawingPlacement(
-                view=front,
-                position=(FRONT_CENTER[0] + 0.032, FRONT_CENTER[1] - 0.018),
-                attachment_xy=front_far_side,
-            ),
-            "bottom_end_squareness": PmiDrawingPlacement(
-                view=front,
-                position=(FRONT_CENTER[0] + 0.005, FRONT_CENTER[1] - 0.070),
-                attachment_xy=front_bottom,
-            ),
-        },
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        label="pen rod PMI",
-    )
-    # LEFT of the rod, at the fleet's 2.5 mm Ra height: from (0.170, 0.068) at
-    # the default height the leader ran 100 mm back across the right view and
-    # the 145.00 dimension line (audit leader-crosses-line / leader-crosses-view).
-    # The slide face is the rod's -X face, seen edge-on as its LEFT edge
-    # (x 0.0675), so the only uncrossed approach is from the band between the
-    # front view's outline (x 0.0619) and the 150.00 dimension line (x 0.040) --
-    # 22 mm, too narrow for the default ~42 mm body, wide enough for the 2.5 mm
-    # one (~17 mm: x-0.0022 to x+0.0147, y to y+0.0072). Target down-RIGHT of
-    # the anchor, so the bent leader's 7.6 mm stub runs right under the open ▽
-    # and drops 4.7 mm onto the face -- away from the body, never through it.
-    # Body x 0.0426..0.0595 keeps 2.6 mm off the 150.00 line and 2.4 mm off the
-    # view outline; its top (0.1121) stays 4.4 mm under datum A's box.
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=(front_side[0], FRONT_CENTER[1] - 0.050),
-        symbol_xy=(0.0448, 0.105),
-        control=surface_finish_by_key(SURFACE_FINISHES, "slide_face"),
-        label="pen-rod slide face finish",
-        char_height=0.0025,
-    )
+    add_property_linked_note(adapter, "End View Note", *END_NOTE_XY)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
-    # The manufacturing note is wider than most sheets' notes. Keep its anchor
-    # near the left zone margin; the layout audit owns the title-block clearance.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.015, 0.058)
-    add_property_linked_note(adapter, "Top View Note", 0.036, 0.266)
+    # Materialize the iso's cosmetic thread before the strict final note cleanup;
+    # otherwise its descriptive label first appears during the native drawing save.
+    import_cosmetic_threads(adapter, iso)
 
     return await finalize_drawing(
         adapter,
@@ -338,6 +549,8 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Pen Rod Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        redundant_note_substrings=(f"{STUD_TAP_SPEC.size} Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 

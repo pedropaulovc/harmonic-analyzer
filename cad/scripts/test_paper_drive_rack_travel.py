@@ -72,6 +72,28 @@ def test_the_located_paper_sweep_fits_and_a_moved_pen_line_overruns(domain):
         )
 
 
+def test_paper_inset_is_the_most_centred_grid_value_with_a_1mm_sweep_margin(domain):
+    """The sheet is held off centre only as far as the rack forces: the pen line's
+    tight end keeps >= 1.0 inside the window, and one 0.1 step back toward
+    centre would not."""
+    _low, high = domain.axis_from_left_end_limits_mm
+    bands = geometry.recording_paper_sweep_bands_mm()
+    nominal = geometry.RECORDING_PAPER_LEFT_INSET_MM
+    assert nominal * 10 == pytest.approx(round(nominal * 10))
+    centred = (geometry.platen.PLATE_WIDTH - geometry.RECORDING_PAPER_WIDTH_MM) / 2.0
+    assert nominal <= centred
+
+    def far_edge(inset: float) -> float:
+        spread = bands["paper_left_inset_band_mm"][1] - nominal
+        pen_low = bands["pen_x_from_running_axis_band_mm"][0]
+        return inset + spread + bands["paper_width_band_mm"][1] - pen_low
+
+    distances = domain.require_recording_paper_sweep_mm(**bands)
+    assert distances[1] == pytest.approx(far_edge(nominal))
+    assert far_edge(nominal) <= high - 1.0
+    assert nominal + 0.1 > centred or far_edge(nominal + 0.1) > high - 1.0
+
+
 def test_oversize_cut_section_refuses_the_one_pitch_end_reserve():
     with pytest.raises(ValueError, match="cut-end finish exceeds"):
         travel.rack_operating_domain_mm(

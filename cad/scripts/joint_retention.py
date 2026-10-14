@@ -252,6 +252,15 @@ RULINGS: dict[str, Ruling] = {
             "re-set when it drifts, so the screw stays bare in the hub boss's spot-faced tap"
         ),
     ),
+    "U-MHA-VN-061-no-lock": Ruling(
+        joint="pn-pen/rod-set-screw-in-v-block",
+        granted=(
+            "user, 2026-10-14, joint-specific drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) ruling on PR #1436: "
+            "no lock; the MHA-VN-061 set screw is an operator adjustment and a light clamp, and the "
+            "v-block's 7.0 tap leaves no room for a jam screw. Period-faithful to the 1898 machine: "
+            "the plain 91375A105 cup point goes in bare, nothing added to its thread"
+        ),
+    ),
 }
 
 
@@ -602,7 +611,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "sm_gooseneck_spring_screw",  # made MHA-SM-004 fillister: clamps the counter-spring upper eye to the plug
         "vn_gooseneck_set_screw",  # 1/4-20 UNC x 3/4 square-head cup point (91410A540), member: into top_frame hub boss tap, grips summing gooseneck
         "vn_guide_lock_screw",  # #4-40 slotted pan head (McMaster 91792A108, MHA-VN-046, R9-31), member: 8 into the platen_guide rear through taps
-        "vn_hanger_screw",  # #8-32 UNC x 1/2 hex head (McMaster 93075A194), member into the pen-hanger strap tap
+        "vn_hanger_screw",  # #8-32 UNC x 1 hex head (McMaster 93075A199), member through the pen-hanger strap's clearance hole into the hanger nut and jam nut
         "fr_harmonic_base",  # receiver: #10-32 cross taps, 1/4-20 hold-down seats, #4-40 nameplate seats, and the drive_train screws' seats (top-level rows)
         "vn_knife_hanger_stud",  # #10-24 UNC cut plain hex bolt (McMaster 92314A253 x 2), member into the knife-mount top tap
         "sm_knife_mount",  # #10-24 UNC-2B bottoming tap (9.65 full thread, 11.24 drill) in the top seat, receiver of the knife-hanger bolt; two plain reamed dowel holes
@@ -616,9 +625,14 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "mg_output_fixture",  # #4-40 UNC axial tap from the spigot face into the rod bore (mg_output_fixture_spec.TAP_SPEC), receiver of the 2nd thumb_screw
         "vn_pedestal_hold_down_screw",  # #8-32 x 3/4 fillister (90280A197, MHA-VN-032), member: 2 arbor-pedestal seats in harmonic_base, 2 pivot-bracket seats in rocker_arm_support
         "pn_pen_frame",  # #4-40 UNC-2B tapped hole up through the bottom rail, receiver of pen_set_screw
-        "pn_pen_hanger",  # #8-32 tapped hole in the strap, receiver of hanger_screw
+        "vn_pen_hanger_jam_nut",  # McMaster 90760A009 thin #8-32 hex nut (MHA-VN-064), member: jammed against the hanger nut on hanger_screw
+        "vn_pen_hanger_nut",  # McMaster 90480A009 #8-32 hex nut (MHA-VN-063), receiver of hanger_screw on the strap front
         "vn_pen_set_screw",  # #4-40 UNC (McMaster 99607A213 knurled thumb screw), member into the pen-frame rail
-        "pn_pen_v_block",  # receiver: Ø2.5 rod set-screw hole drilled thru, "THREAD/FIT TO SUIT SET SCREW AT ASSEMBLY"; the screw is not modelled
+        "vn_pen_rod_set_screw",  # #4-40 UNC x 3/16 cup-point set screw (McMaster 91375A105, MHA-VN-061), member into the pen v-block's tap, cup on the rod's pivot end
+        "vn_pen_adjust_nut",  # McMaster 92671A115 brass #0-80 hex nut (MHA-VN-062), member: jam nut on the pen rod's top adjuster stud
+        "pn_pen_v_block",  # receiver: #4-40 UNC-2B Hole Wizard tap through the front face into the pivot bore, receiver of pen_rod_set_screw
+        "pn_pen_rod",  # receiver: #0-80 UNF-2B blind tap in the square's top face, receiver of pen_adjust_screw
+        "pn_pen_adjust_screw",  # made MHA-PN brass eye stud, #0-80 UNF member into the pen rod's top tap; carries the jam nut
         "dt_pinion_cam",  # M2.5 x 0.45 6H tap + supplied ISO 4026 M2.5 x 5 flat-point set screw, member (collar) gripping pinion_lift_rod
         "pd_platen",  # #2-56 tapped through (pd_platen_spec.SOCKET_SPEC), receiver of the 4 clip screws
         "pd_platen_guide",  # #4-40 front bottoming taps (guide screws) + rear through taps (guide-lock screws, R9-48), receiver
@@ -688,11 +702,11 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "mg_magnifying_vertical_rod",  # plain Ø5 domed rod
         "mg_magnifying_wheel",  # reamed .1890 running bore + two Ø1 wire-tie holes; no thread
         "mg_wheel_drum",  # MHA-MG-010 brass drum pressed on the wheel's spigot; no thread
+        "mg_wheel_axle_spacer",  # MHA-MG-011 brass sleeve, drilled clearance on the wheel axle; no thread
         "ms_stick",  # MHA-MS-001 plain 8 x 3 brass bar; the stop's thumbscrew tip pinches it
         "ms_stop_plate",  # MHA-MS-003 brass cover plate: 2 plain clearance holes for the #2-56 screws; no thread
         "fr_nameplate",  # brass plate, #4 clearance holes only
-        "pn_pen_marker",  # plain barrel; the thumb-screw tip bears on it (no thread)
-        "pn_pen_rod",  # square brass bar; #47 drilled wire hole only
+        "vn_pen_marker",  # purchased Sharpie Fine Point; plain barrel, the thumb-screw tip bears on it (no thread)
         "pn_pen_wire",  # Ø0.80 wire, tied off (tie-off not modelled)
         "dt_pinion_arbor",  # journal + grip head, crossrod bonded, collar spring-pinned
         "dt_pinion_arbor_collar",  # spring-pinned by MHA-VN-033 (arbor-collar-pinned)
@@ -736,7 +750,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "vn_tube_frame_cap",  # McMaster 9275K141 push-on cap (MHA-FR-000 STEP 7)
         "vn_wheel_axle_back_washer",  # MHA-VN-057 brass #10 washer (McMaster 92916A480) loose on the axle pin; no thread
         "vn_wheel_axle_front_washer",  # MHA-VN-058 brass #4 washer (McMaster 92916A250) loose on the axle's #4-40 end; no thread
-        "mg_wheel_bar",  # #8 clearance holes (clamp screws) + #8 close clearance (pen-hanger screw, which threads into pen_hanger in pen.SLDASM) + the reamed .1865 axle-pin press bore
+        "mg_wheel_bar",  # #8 clearance holes (clamp screws) + #8 close clearance (pen-hanger screw, which runs into the hanger nut and jam nut in pen.SLDASM) + the reamed .1865 axle-pin press bore
+        "pn_pen_hanger",  # #8 close-clearance strap hole for the hanger screw; slots and brazed plates, no thread
     }
 )
 
@@ -761,6 +776,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_tube_frame_cap": "push-on round cap over the column end",
     "vn_wheel_axle_back_washer": "plain washer loose on the wheel-axle pin; no thread",
     "vn_wheel_axle_front_washer": "plain washer loose on the wheel-axle's threaded end; no thread",
+    "vn_pen_marker": "felt-tip marker; its barrel lies in the v-block groove under the thumb screw; no thread",
 }
 
 JOINTS: tuple[Joint, ...] = (
@@ -1518,33 +1534,69 @@ JOINTS: tuple[Joint, ...] = (
         ),
     ),
     Joint(
-        id="pn-pen/hanger-screw-in-hanger",
+        id="pn-pen/hanger-screw-in-nut",
         assembly="pn_pen",
         member="vn_hanger_screw",
-        receiver="pn_pen_hanger",
+        receiver="vn_pen_hanger_nut",
         thread="#8-32 UNC",
         quantity=1,
         installed_at="",
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
             "the single screw is the only thing holding the hanger to the wheel bar, and the pen rod "
-            "reciprocates up and down through the hanger's guide block 6 mm across from the screw axis "
-            "(guide x +3, screw x -3), so the rod's sliding friction applies a reversing moment about the "
-            "screw axis"
+            "reciprocates up and down through the hanger's two U guide slots about 7 mm across from the "
+            "screw axis (rod line x PEN_ROD_X, screw x -3), so the rod's sliding friction applies a "
+            "reversing moment about the screw axis"
         ),
         axial_capture=(
-            "hex head (93075A194, #8-32 x 1/2) on the wheel-bar back face; shank through the bar's #8 close "
-            "clearance hole into the strap tap, clamping bar between head and strap; thread protrudes past "
-            "the strap front"
+            "hex head (93075A199, #8-32 x 1) on the wheel-bar back face; shank through the bar's #8 close "
+            "clearance hole and the strap's #8 close clearance hole into the 90480A009 hex nut bearing on "
+            "the strap front, clamping bar and strap between head and nut; two full pitches past the jam nut"
         ),
+        lock=Lock.JAM_NUT,
+        lock_part="vn_pen_hanger_jam_nut",
+        lock_binds=("vn_hanger_screw", "vn_pen_hanger_nut"),
+        lock_step=(
+            "nut held on the strap front while the screw is tightened from behind the bar, then the thin "
+            "90760A009 nut jammed against it (vn-pen-hanger-nut.yaml / vn-pen-hanger-jam-nut.yaml "
+            "installation_notes; drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads))"
+        ),
+        evidence=(
+            "build_pn_pen_assembly.py: M6.10 fastener block (HANGER_SCREW_POS, HANGER_NUT_POS, "
+            "HANGER_JAM_NUT_POS, HANGER_THREAD_PAST_NUT >= THREAD_PAST_MIN_PITCHES pitches past the jam "
+            "nut, HANGER_NUT_RIM_RADIAL, HANGER_TIP_TO_RIM), build() hanger-screw mates and the two nut "
+            "lock_mates; pn_pen_hanger_spec.py: SCREW_HOLE_SPEC HoleSpec('clearance','#8',fit='close'), "
+            "SCREW_HOLE_XY, nut flats inside SCREW_HOLE_EDGE_DISTANCE; mg_wheel_bar_geom.PEN_HANGER_HOLE_SPEC "
+            "(clearance #8); vn-hanger-screw.yaml (93075A199, mcmaster.com/93075A199 read live 2026-10-14: "
+            "8-32 x 1, fully threaded); vn-pen-hanger-nut.yaml (90480A009, McMaster 8-32 hex-nut listing "
+            "read live 2026-10-14: zinc-plated steel, 11/32 wide, 1/8 high); vn-pen-hanger-jam-nut.yaml "
+            "(90760A009, McMaster 8-32 narrow-profile listing read live 2026-10-14: zinc-plated steel, "
+            "1/4 wide, 3/32 high)"
+        ),
+    ),
+    Joint(
+        id="pn-pen/hanger-jam-nut-on-screw",
+        assembly="pn_pen",
+        member="vn_pen_hanger_jam_nut",
+        receiver="vn_hanger_screw",
+        thread="#8-32 UNC",
+        quantity=1,
+        installed_at="",
+        exposure=Exposure.STATIC_CLAMP,
+        exposure_reason=(
+            "the jam nut bears only on the hanger nut's outer face; once jammed, screw, nut and jam nut "
+            "act as one body, and the rod's reversing moment reaches that body only through the strap "
+            "face under the hanger nut and the bar face under the screw head -- no operating torque acts "
+            "on the jam nut's own faces"
+        ),
+        axial_capture="thin hex nut jammed on the hanger nut's outer face, against the screw's thread flanks",
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
-            "build_pn_pen_assembly.py: M6.10 fastener block (HANGER_SCREW_POS, HANGER_THREAD_PROTRUSION), "
-            "build() hanger-screw mates; build_pn_pen_hanger.py: SCREW_TAP_SPEC HoleSpec('tapped','#8-32'), "
-            "SCREW_HOLE_XY; mg_wheel_bar_geom.PEN_HANGER_HOLE_SPEC (clearance #8); vn-hanger-screw.yaml (93075A194)"
+            "build_pn_pen_assembly.py HANGER_JAM_NUT_POS and its lock_mate; vn_pen_hanger_jam_nut_spec.py; "
+            "vn-pen-hanger-jam-nut.yaml (90760A009)"
         ),
     ),
     Joint(
@@ -1557,54 +1609,112 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="",
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
-            "the thumb screw rides the reciprocating pen carriage and its flat tip holds the marker in the "
-            "v-block groove; the pen's up/down travel reverses the nib drag on the paper and the marker's "
-            "inertia ALONG the screw axis every stroke, cycling the only preload the joint has (a hand-set "
-            "clamp, but not a stationary one)"
+            "the thumb screw rides the reciprocating pen carriage and its flat tip holds the marker grip in "
+            "the v-block's V-groove; the pen's up/down travel reverses the nib drag on the paper and the "
+            "marker's inertia ALONG the screw axis every stroke, cycling the only preload the joint has (a "
+            "hand-set clamp, but not a stationary one)"
         ),
         axial_capture=(
-            "knurled thumb screw (99607A213) threaded up through the bottom-rail tap; its flat tip bears on "
-            "the marker barrel underside (tangent), reacting against the groove roof -- the tip contact is "
-            "the only preload"
+            "knurled thumb screw (99607A213) threaded up through the stirrup's bottom-rail tap; its flat tip "
+            "bears on the marker grip underside (tangent) and presses the grip into the V flanks -- the tip "
+            "contact is the only preload"
         ),
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
-            "build_pn_pen_assembly.py: module docstring ('pen-set-screw threads UP through its bottom rail and "
-            "presses the marker'), SET_SCREW_POS/_SCREW_TIP_LOCAL_Y, riders lock_mate (CAD only); "
-            "build_pn_pen_frame.py: SET_SCREW_TAP_SPEC HoleSpec('tapped','#4-40'); pn_pen_frame_spec.py note 2; "
-            "vn-pen-set-screw.yaml (99607A213)"
+            "build_pn_pen_assembly.py: module docstring ('vn-pen-set-screw (the thumb screw) threads up "
+            "through its bottom rail and presses the grip into the V'), RIDERS lock_mate (CAD only); "
+            "pn_pen_carriage_geom.py THUMB_SCREW_POS/THUMB_SCREW_REACH; pn_pen_frame_spec.py "
+            "SET_SCREW_TAP_SPEC HoleSpec('tapped','#4-40'); vn-pen-set-screw.yaml (99607A213)"
         ),
     ),
     Joint(
-        id="pn-pen/v-block-set-screw-on-rod",
+        id="pn-pen/rod-set-screw-in-v-block",
         assembly="pn_pen",
-        member=UNMODELLED,
+        member="vn_pen_rod_set_screw",
         receiver="pn_pen_v_block",
-        thread="unresolved: Ø2.5 drill, thread or fit to suit the set screw at assembly",
+        thread="#4-40 UNC",
         quantity=1,
         installed_at="",
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
-            "the side set screw is the only thing pinning the v-block, and with it the marker, to the "
-            "bottom of the reciprocating pen rod; the block rides the rod's up/down travel and the nib "
-            "drag on the paper reverses with pen direction, so the load the screw carries reverses every "
-            "stroke"
+            "the cup-point set screw is the only thing holding the v-block (and with it the marker's yaw, "
+            "45 deg to the paper) on the rod's turned pivot end; the block hangs from it as the wire lifts "
+            "the rod, rides the rod's up/down travel, and the nib drag on the paper reverses with pen "
+            "direction, so the load it reacts reverses every stroke"
         ),
         axial_capture=(
-            "none modelled: the rod drops 13 into the block's rod bore and the block is lock-mated to the "
-            "rod; the set screw the drawing calls for is not a part, so no BOM row, length, point or lock "
-            "exists"
+            "#4-40 x 3/16 cup point (91375A105) in the block's front-face tap, recessed below the face, its "
+            "cup biting the Ø4 pivot end inside the pivot bore and carrying the hanging carriage; the "
+            "square's shoulder seats on the block top and sets the height"
         ),
         lock=Lock.NONE,
+        lock_part="",
+        lock_binds=(),
+        lock_step="",
+        exception="U-MHA-VN-061-no-lock",
         evidence=(
-            "pn_pen_v_block_spec.py: comment 'a side set screw (front face, over that bore) pins it', "
-            "SCREW_HOLE_DIA/SCREW_HOLE_XY, DRAWING_NOTES ('ROD SET-SCREW HOLE Ø2.5 DRILL THRU ... "
-            "THREAD/FIT TO SUIT SET SCREW AT ASSEMBLY'); build_pn_pen_assembly.py module docstring "
-            "('a side set screw pins it in the real device', 'lock-mated to the rod'); "
-            "build_pn_pen_v_block.py docstring ('a small front hole for the rod set screw')"
+            "pn_pen_v_block_spec.py SET_SCREW_TAP_SPEC HoleSpec('tapped', '#4-40', end='through_next'), "
+            "SET_SCREW_Y/PIVOT_BORE_X; pn_pen_carriage_geom.py ROD_SET_SCREW_POS (cup on the bore wall); "
+            "build_pn_pen_assembly.py RIDERS lock_mate; vn-pen-rod-set-screw.yaml (91375A105). The 7.0 "
+            "tap holds the 4.76 screw with no room for a second jam screw; the user waived "
+            "drawing-guidelines.md rule 23 for this joint (U-MHA-VN-061-no-lock)"
+        ),
+    ),
+    Joint(
+        id="pn-pen/adjust-screw-in-rod",
+        assembly="pn_pen",
+        member="pn_pen_adjust_screw",
+        receiver="pn_pen_rod",
+        thread="#0-80 UNF",
+        quantity=1,
+        installed_at="",
+        exposure=Exposure.ADJUSTER,
+        exposure_reason=(
+            "the eye stud sets the pen height on the wire (screwed in or out of the rod top at setup) and "
+            "then carries the whole carriage's weight and the pen wire's reversing pull every stroke"
+        ),
+        axial_capture=(
+            "#0-80 stud threaded 4.0 (2.6 D) into the rod's blind top tap; the wire ties through the eye "
+            "head above the jam nut"
+        ),
+        lock=Lock.JAM_NUT,
+        lock_part="vn_pen_adjust_nut",
+        lock_binds=("pn_pen_adjust_screw", "pn_pen_rod"),
+        lock_step=(
+            "brass #0-80 jam nut run down the stud and tightened on the rod's top face once the pen height "
+            "is set (drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads))"
+        ),
+        evidence=(
+            "pn_pen_rod_spec.py STUD_TAP_SPEC/STUD_ENGAGEMENT; pn_pen_adjust_screw_spec.py THREAD; "
+            "pn_pen_carriage_geom.py STUD_POS/NUT_POS (nut seated on the rod top); "
+            "build_pn_pen_assembly.py RIDERS lock_mate; vn-pen-adjust-nut.yaml (92671A115)"
+        ),
+    ),
+    Joint(
+        id="pn-pen/adjust-nut-on-stud",
+        assembly="pn_pen",
+        member="vn_pen_adjust_nut",
+        receiver="pn_pen_adjust_screw",
+        thread="#0-80 UNF",
+        quantity=1,
+        installed_at="",
+        exposure=Exposure.STATIC_CLAMP,
+        exposure_reason=(
+            "the jam nut is tightened against the rod's top face; nut, stud and rod then ride as one body, "
+            "and the only operating load, the pen wire's pull at the eye, acts ALONG the stud axis -- no "
+            "operating torque acts about the thread axis"
+        ),
+        axial_capture="hex nut bearing on the rod's top face, jammed against the stud's thread flanks",
+        lock=Lock.NONE,
+        lock_part="",
+        lock_binds=(),
+        lock_step="",
+        evidence=(
+            "pn_pen_carriage_geom.py NUT_POS/NUT_ROWS; vn_pen_adjust_nut_spec.py; "
+            "build_pn_pen_assembly.py RIDERS lock_mate; vn-pen-adjust-nut.yaml (92671A115)"
         ),
     ),
     Joint(
@@ -1739,7 +1849,7 @@ JOINTS: tuple[Joint, ...] = (
         axial_capture=(
             "first nut run down on the MHA-VN-058 washer at the spigot face until the wheel turns free "
             "without rattle (endshake 0.05-0.15, mg_wheel_group.ENDSHAKE); the back washer MHA-VN-057 "
-            "seats the hub on the bar front face"
+            "seats the hub on the MHA-MG-011 axle spacer, which seats on the bar front face"
         ),
         lock=Lock.JAM_NUT,
         lock_part="vn_wheel_axle_nut:locknut",
@@ -2189,14 +2299,23 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "sm-summing/gooseneck-spring-screw": Occurrence(
         "sm_summing", "build_sm_summing_assembly.py", '"sm-gooseneck-spring-screw"'
     ),
-    "pn-pen/hanger-screw-in-hanger": Occurrence(
-        "pn_pen", "build_pn_pen_assembly.py", "HANGER_SCREW_POS"
+    "pn-pen/hanger-screw-in-nut": Occurrence(
+        "pn_pen", "build_pn_pen_assembly.py", "HANGER_NUT_POS"
+    ),
+    "pn-pen/hanger-jam-nut-on-screw": Occurrence(
+        "pn_pen", "build_pn_pen_assembly.py", "HANGER_JAM_NUT_POS"
     ),
     "pn-pen/thumb-screw-in-stirrup": Occurrence(
-        "pn_pen", "build_pn_pen_assembly.py", "SET_SCREW_POS"
+        "pn_pen", "build_pn_pen_assembly.py", '"vn-pen-set-screw", THUMB_SCREW_POS'
     ),
-    "pn-pen/v-block-set-screw-on-rod": Occurrence(
-        "pn_pen", "pn_pen_v_block_spec.py", "SCREW_HOLE_DIA"
+    "pn-pen/rod-set-screw-in-v-block": Occurrence(
+        "pn_pen", "build_pn_pen_assembly.py", '"vn-pen-rod-set-screw", ROD_SET_SCREW_POS'
+    ),
+    "pn-pen/adjust-screw-in-rod": Occurrence(
+        "pn_pen", "build_pn_pen_assembly.py", '"pn-pen-adjust-screw", STUD_POS'
+    ),
+    "pn-pen/adjust-nut-on-stud": Occurrence(
+        "pn_pen", "build_pn_pen_assembly.py", '"vn-pen-adjust-nut", NUT_POS'
     ),
     "ha-harmonic-analyzer/magnifying-bracket-screws": Occurrence(
         "ha_harmonic_analyzer", "build_mg_magnifier_assembly.py", "BRACKET_SCREW_POSITIONS"

@@ -96,31 +96,28 @@ _telemetry.debug("SKIP static golden poses: counter-spring/gooseneck use native 
 import build_pn_pen_assembly as p
 
 expect("pn-pen", "pn-pen-hanger-1", list(p.HANGER_POS), IDENTITY, "pn-pen-hanger")
-expect("pn-pen", "pn-pen-v-block-1", list(p.VBLOCK_POS), ROT_Y_180, "pn-pen-v-block")
 expect("pn-pen", "pn-pen-rod-1", list(p.PEN_ROD_POS), IDENTITY, "pn-pen-rod")
+for _stem, _pos, _rows in p.RIDERS:
+    expect("pn-pen", f"{_stem}-1", list(_pos), _rows, _stem)
+expect("pn-pen", "vn-hanger-screw-1", list(p.HANGER_SCREW_POS), IDENTITY, "vn-hanger-screw")
+expect("pn-pen", "vn-pen-hanger-nut-1", list(p.HANGER_NUT_POS), IDENTITY, "vn-pen-hanger-nut")
 expect(
     "pn-pen",
-    "pn-pen-marker-1",
-    [p.MARKER_X, p.MARKER_TIP_Y, p.PEN_Z_MID],
+    "vn-pen-hanger-jam-nut-1",
+    list(p.HANGER_JAM_NUT_POS),
     IDENTITY,
-    "pn-pen-marker",
+    "vn-pen-hanger-jam-nut",
 )
-expect("pn-pen", "pn-pen-wire-1", list(p.PEN_WIRE_BOTTOM), IDENTITY, "pn-pen-wire")
-expect("pn-pen", "pn-pen-frame-1", list(p.FRAME_POS), p.FRAME_ROWS, "pn-pen-frame")
-expect("pn-pen", "vn-pen-set-screw-1", list(p.SET_SCREW_POS), ROT_Y_180, "vn-pen-set-screw")
-expect("pn-pen", "vn-hanger-screw-1", list(p.HANGER_SCREW_POS), IDENTITY, "vn-hanger-screw")
 
-# pen-frame euler must agree with rows
-from _transforms import rows_from_euler
+# Each rider's placement euler (derived in the assembly) must reproduce its rows.
+from _transforms import euler_from_rows, rows_from_euler
 
-fr = rows_from_euler([-90.0, 90.0, 0.0])
-d = max(abs(a - b) for ra, rb in zip(fr, p.FRAME_ROWS) for a, b in zip(ra, rb))
-_status(
-    d < 1e-9,
-    f"{'OK ' if d < 1e-9 else 'FAIL'} pen-frame euler [-90,90,0] vs FRAME_ROWS      drow={d:.2e}",
-)
-if d >= 1e-9:
-    fails.append(("pen-frame euler", fr, p.FRAME_ROWS))
+for _stem, _pos, _rows in p.RIDERS:
+    fr = rows_from_euler(euler_from_rows(_rows))
+    d = max(abs(a - b) for ra, rb in zip(fr, _rows) for a, b in zip(ra, rb))
+    _status(d < 1e-9, f"{'OK ' if d < 1e-9 else 'FAIL'} {_stem} euler vs rows drow={d:.2e}")
+    if d >= 1e-9:
+        fails.append((f"{_stem} euler", fr, _rows))
 
 # ---- magnifier ------------------------------------------------------------
 import build_mg_magnifier_assembly as m
@@ -886,7 +883,7 @@ for i, (_sx, clip_x, clip_y, rz) in enumerate(p.CLIP_PLACEMENTS):
         f"platen-clip x{clip_x:+.0f} Rz{rz:+.0f}",
         **_SOLV,
     )
-_paper_side = (p.PLATE_WIDTH - paper_drive_geom.RECORDING_PAPER_WIDTH_MM) / 2.0
+_paper_side = paper_drive_geom.RECORDING_PAPER_LEFT_INSET_MM
 _paper_y = p.PLATE_Y0 + p.PLATE_HEIGHT - paper_drive_geom.RECORDING_PAPER_HEIGHT_MM - 3.0
 expect(
     PD,

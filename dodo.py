@@ -3195,6 +3195,9 @@ def task_check():
         # Its YAML reads ride the gate's _CONFIG_YAMLS deps; its module imports
         # ride module_deps_of.
         SCRIPTS_DIR / "test_ms_measuring_stick_assembly.py",
+        # The pen carriage's CG-on-rod-axis balance, paper stand-off and rider
+        # layout (pn_pen_carriage_geom) that build_pn_pen_assembly places from.
+        SCRIPTS_DIR / "test_pn_pen_carriage_geom.py",
         # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
         # its three drive-train support pins red with every gate green.
         SCRIPTS_DIR / "test_dt_drive_train_support_layout.py",
@@ -3245,6 +3248,8 @@ def task_check():
         SCRIPTS_DIR / "test_cylinder_bank_layout.py",
         # ... and MHA-VN-055, the fulcrum keepers' #1-72 cup-point set screw.
         SCRIPTS_DIR / "test_vn_fulcrum_set_screw.py",
+        # ... and MHA-VN-007, the pen hanger's #8-32 screw (McMaster 93075A199).
+        SCRIPTS_DIR / "test_vn_hanger_screw.py",
         # ... and #936: the rocker-bank stack, the support's bracket seats, the
         # channel's cross-bank axial budget and the hole-callout process line.
         SCRIPTS_DIR / "test_channel_axial_budget.py",

@@ -139,7 +139,7 @@ CHANNELS = _config.active_count()
 # the pen tip traces truth_model.pen_y -- the computed-not-simulated summation,
 # with no force solver (cad/docs/motion-policy.md).
 MOTION_OWNER = "pn-pen"
-PEN_MARKER_STEM = "pn-pen-marker"  # the carriage tip whose Y traces the curve
+PEN_MARKER_STEM = "vn-pen-marker"  # the carriage tip whose Y traces the curve
 # CrankDeg angles to sample; spans a full fundamental period (0..360) so both
 # stroke extremes (the square-wave preset peaks at 0 and 180) are exercised.
 _MOTION_SWEEP_DEG = [0.0, 30.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0, 360.0]
@@ -212,7 +212,7 @@ _COMPONENT_BAND = {
     # two cut #10-24 hex bolts, two NEW 96659A104 SAE washers, four dowels,
     # lever, boss hook, counter spring, gooseneck and spring-clamp screw.
     "mg-magnifier": (11, 13),  # ch 20-21, measured 12 (+lever-wire, 2026-07-04)
-    "pn-pen": (7, 9),  # ch 24, measured 8 (+pen-wire, 2026-07-04)
+    "pn-pen": (10, 12),  # ch 24, expected 11 (2026-10 re-derivation: + rod set screw, adjuster stud + jam nut)
     "pd-paper-drive": (112, 120),  # ch 22-23-25, expected 116 (54 placed + 62-link
     # chain; the paper-drive rework replaced the two rails + pinion-bar topology
     # with one bar + two-piece clamps + the hanging-platen furniture and its

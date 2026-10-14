@@ -40,7 +40,6 @@ casting_green_parts:
   - fr-rocker-arm-support
   - fr-top-frame
   - sm-summing-lever  # ch17/ch18 macros: same green paint as the frame (2026-07-08)
-  - pn-pen-v-block    # ch24 macro: green-painted cradle over the brass mass model
 
 # Default SolidWorks materials by part class (per-part override lives in parts.yaml).
 materials:

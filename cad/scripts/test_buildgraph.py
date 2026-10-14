@@ -121,9 +121,11 @@ _INSERTED_SOURCES = {
     "sm_summing": "vn_boss_hook vn_counter_spring sm_gooseneck sm_gooseneck_spring_screw vn_knife_hanger_stud vn_knife_hanger_washer vn_knife_mount_dowel sm_knife_mount sm_summing_lever",
     "mg_magnifier": "vn_clamp_screw sh_column_clamp_back sh_column_clamp_front mg_lever_wire "
     "mg_magnifying_bracket vn_magnifying_bracket_screw mg_magnifying_clamp mg_magnifying_lever mg_magnifying_vertical_rod "
-    "mg_magnifying_wheel mg_output_fixture vn_thumb_screw mg_wheel_axle vn_wheel_axle_back_washer "
+    "mg_magnifying_wheel mg_output_fixture vn_thumb_screw mg_wheel_axle mg_wheel_axle_spacer vn_wheel_axle_back_washer "
     "vn_wheel_axle_front_washer vn_wheel_axle_nut mg_wheel_bar mg_wheel_drum",
-    "pn_pen": "vn_hanger_screw pn_pen_frame pn_pen_hanger pn_pen_marker pn_pen_rod vn_pen_set_screw pn_pen_v_block pn_pen_wire",
+    "pn_pen": "vn_hanger_screw pn_pen_adjust_screw vn_pen_adjust_nut pn_pen_frame pn_pen_hanger "
+    "vn_pen_hanger_jam_nut vn_pen_hanger_nut vn_pen_marker "
+    "pn_pen_rod vn_pen_rod_set_screw vn_pen_set_screw pn_pen_v_block pn_pen_wire",
     "pd_paper_drive": "vn_chain_inner_link vn_chain_outer_link vn_clamp_screw "
     "sh_column_clamp_back sh_column_clamp_front vn_fillister_screw pd_guide_lock vn_guide_lock_screw pd_latch_hook "
     "vn_latch_hook_bracket_screw vn_platen_clip_screw "
@@ -1526,12 +1528,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ),
     ("build_pd_paper_drive_assembly.py", "build_pd_support_bar"): (
         "dtrefactor: reads BAR_DEPTH, BAR_HEIGHT, CLAMP_CBORE_DEPTH, CLAMP_CBORE_DIA, CLAMP_HEAD_RECESS, CLAMP_HOLE_DIA, CLAMP_HOLE_X"
-    ),
-    ("build_pn_pen_assembly.py", "build_pn_pen_frame"): (
-        "dtrefactor: reads FRAME_DEPTH, OUTER_HEIGHT, OUTER_WIDTH, RAIL_END, RAIL_SIDE"
-    ),
-    ("build_pn_pen_assembly.py", "build_pn_pen_hanger"): (
-        "dtrefactor: reads SCREW_HOLE_XY, STRAP_Z"
     ),
     ("build_sm_summing_assembly.py", "build_sm_knife_mount"): (
         "dtrefactor: reads CASTING_UNDERSIDE_Y, MOUNT_GAP"

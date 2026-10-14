@@ -30,11 +30,14 @@ recipes:
 | 90280A201 | `vn-clamp-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A203 | `vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `vn-frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90480A009 | `vn-pen-hanger-nut` (catalogue-only; no vendor model) | Low-Strength Zinc-Plated Steel Hex Nut |
+| 90760A009 | `vn-pen-hanger-jam-nut` (catalogue-only; no vendor model) | Zinc-Plated Steel Narrow-Profile Hex Nut |
 | 91247A720 | — (diagnostic recipe; a former `vn-knife-hanger-stud`) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A157 | — (catalogue-only diagnostic recipe; former `vn-knife-hanger-stud`) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91255A106 | — (diagnostic recipe; a former `vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
+| 91375A105 | `vn-pen-rod-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
 | 91375A106 | `vn-arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
 | 91375A942 | `vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | — (diagnostic recipe; `vn-gooseneck-set-screw` until 2026-10-12) | Steel Square-Head Cup-Point Set Screw |
@@ -53,13 +56,15 @@ recipes:
 | 91882A425 | — (diagnostic recipe; `vn-cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `vn-tube-frame-cap` | Metal Round Cap |
 | 92671A005 | `vn-wheel-axle-nut` (catalogue-only; no vendor model) | Brass Hex Nut |
+| 92671A115 | `vn-pen-adjust-nut` (catalogue-only; no vendor model) | Brass Hex Nut |
 | 9414T1 | — (historical MHA-VN-016 until the 2026-10-08 terminal redesign) | Set Screw Shaft Collar for 1/16" Diameter |
 | 94355A213 | `vn-cone-tip-collar` set screw, fitted as supplied | 18-8 Stainless Steel Flat-Tip Set Screw, #2-56 x 5/16" |
 | 92865A585 | `vn-hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 92916A250 | `vn-wheel-axle-front-washer` (catalogue-only; no vendor model) | Brass Washer for Number 4 Screw Size |
 | 96659A104 | `vn-knife-hanger-washer` (MHA-VN-060; catalogue-only, no vendor model) | 18-8 Stainless Steel SAE Washer for Number 10 Screw Size |
 | 92916A480 | `vn-wheel-axle-back-washer` (catalogue-only; no vendor model) | Brass Washer for Number 10 Screw Size |
-| 93075A194 | `vn-hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
+| 93075A194 | — (diagnostic recipe; `vn-hanger-screw` until the 2026-10-14 through-strap nut stack) | Low-Strength Zinc-Plated Steel Hex Head Screw |
+| 93075A199 | `vn-hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93585A190 | `vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
@@ -836,7 +841,7 @@ Catalog specifications checked on September 10, 2026:
   [92916A250](https://www.mcmaster.com/92916A250/)
   (`vn-wheel-axle-front-washer`, MHA-VN-058, one) carry the magnifying wheel
   on the 3/16 mg-wheel-axle (mg wheel rev 10). The back washer sits between
-  the mg-wheel-bar's front face and the hub; the front washer sits on the
+  the MHA-MG-011 axle spacer (on the mg-wheel-bar's front face) and the hub; the front washer sits on the
   #4-40 end against the spigot face, the first nut is run down until the
   wheel turns free without rattle (0.05-0.15 endshake) and the second jams
   it. All three pages were checked live on October 10, 2026: 92671A005 is a
@@ -849,6 +854,52 @@ Catalog specifications checked on September 10, 2026:
   the ID x OD annulus at the range's nominal thickness. No vendor model was
   fetched, so all three are catalogue-only: no replica gate, and their
   standalone diagnostics are catalog-only runs.
+- [91375A105](https://www.mcmaster.com/91375A105/) (`vn-pen-rod-set-screw`,
+  MHA-VN-061, one) locks the pen rod's turned pivot end in the MHA-PN-005
+  v-block, and [92671A115](https://www.mcmaster.com/92671A115/)
+  (`vn-pen-adjust-nut`, MHA-VN-062, one) jams the #0-80 adjuster stud on the
+  MHA-PN-004 pen rod's top. Both pages were read live in a browser on
+  October 13, 2026. 91375A105 is an alloy steel cup-tip set screw, black
+  oxide, 4-40 UNC Class 3A, 3/16 in long, 0.050 in hex drive, Rockwell C45,
+  ASME B18.3 / ASTM F912; it is the MHA-VN-034 91375A106 cut 1/16 in shorter,
+  so `diag_build_91375A105.py` imports every length-independent law from the
+  vendor-verified `diag_build_91375A106.py` and changes only the length and
+  helix height. 92671A115 is a brass hex nut, standard profile, 0-80 UNF
+  Class 2B, 5/32 in across flats, 3/64 in high; `diag_build_92671A115.py`
+  extrudes the hexagon with a plain bore at the #0-80 basic major. #0-80 is
+  the stud thread because the 5 mm square rod keeps a 1.71 wall around it
+  where #2-56 leaves 1.38 and #4-40 1.05, under the 1.5 floor of
+  drawing-guidelines.md rule 17 (walls and webs). Each page offers only a
+  2-D PDF, so both are catalogue-only: no replica gate, and their standalone
+  diagnostics are catalog-only runs.
+- [93075A199](https://www.mcmaster.com/93075A199/) (`vn-hanger-screw`,
+  MHA-VN-007, one), [90480A009](https://www.mcmaster.com/90480A009/)
+  (`vn-pen-hanger-nut`, MHA-VN-063, one) and
+  [90760A009](https://www.mcmaster.com/90760A009/) (`vn-pen-hanger-jam-nut`,
+  MHA-VN-064, one) hold the MHA-PN-002 pen hanger on the MHA-MG-008 wheel
+  bar. All three were read live on October 14, 2026 (the nuts from the
+  McMaster 8-32 hex-nut and narrow-profile hex-nut listings, whose product
+  pages need a login). The 3.0 strap was a #8-32 tapped receiver for
+  93075A194, under the 1.5D engagement of drawing-guidelines.md rule 18
+  (thread engagement), so the strap now takes a #8 close-clearance hole and
+  the thread is the nuts'. 90480A009 is a low-strength zinc-plated steel hex
+  nut, ASME B18.2.2, 8-32, 11/32 in across flats, 1/8 in high; it bears on
+  the strap front. 90760A009 is a zinc-plated steel narrow-profile
+  (small-pattern) hex nut, 8-32 right-hand, 1/4 in across flats, 3/32 in
+  high; it is jammed against 90480A009 as the joint's rule 23 lock.
+  McMaster's only 8-32 thin-profile hex nuts are left-hand thread, so the
+  thinner small-pattern nut is the jam nut. 93075A199 is the 93075A194
+  family screw at 1 in (8-32 UNC Class 2A, fully threaded, flat tip, 1/4 in
+  head width, 7/64 in head height, ASME B18.6.3). The family lists 8-32
+  lengths of 3/8, 1/2, 5/8, 3/4, 1, 1-1/4 and 1-1/2 in; 7/8 in is not
+  offered, and 3/4 in (93075A197) would leave 0.8 of full thread past the
+  jam nut, under two pitches, once its tip chamfer is excluded. At 1 in,
+  7.2 of full thread stands past the jam nut and the tip stops 3.2 short of
+  the magnifying-wheel rim. `diag_build_93075A199.py` runs the shared
+  hex-head family builder at the catalogue dimensions; no vendor solid is
+  committed. Neither nut has a solid used here: `diag_build_90480A009.py`
+  and `diag_build_90760A009.py` extrude the hexagon with a plain bore at the
+  #8-32 basic major, so both are catalogue-only.
 - [90114A124](https://www.mcmaster.com/90114A124/)
   (`vn-ms-stop-plate-screw`, MHA-VN-054, two) retains the MHA-MS-003 plate
   on MHA-MS-002. The product table and 2-D PDF were read live on October 9,

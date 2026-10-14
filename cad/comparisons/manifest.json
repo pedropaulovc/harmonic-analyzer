@@ -528,7 +528,7 @@
         "dy_px": 0
       },
       "component_focus": [
-        "pn_pen_marker",
+        "vn_pen_marker",
         "pn_pen_rod",
         "pn_pen_v_block",
         "pd_platen",

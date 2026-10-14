@@ -160,14 +160,18 @@ class StackDetail:
 
 # The free field right of the isometric, above the title block. The gauge
 # detail spans the bar's front face to past the step; its lowest edge is the
-# bar's underside, the bore row height below the axle. The endshake detail
+# bar's underside, the bore row height below the axle. Its circle frames the
+# gauge with this much of the bar behind the front face and of the axle past
+# the step, so it grows with the spacer the gauge carries (about 38 long, the
+# circle about 101 across at 2:1). The endshake detail
 # spans the spigot face to the axle's tip; the hub and drum fill the circle
 # up to the spigot face, so its lowest edge is the circle's chord there.
+_PRESSED_MARGIN = 6.25
 PRESSED = StackDetail(
     "AXLE AS PRESSED",
     (2, 1),
     stack.PRESS_GAUGE / 2.0,
-    16.0,
+    stack.PRESS_GAUGE / 2.0 + _PRESSED_MARGIN,
     (0.330, 0.200),
     frozenset({"mg-wheel-bar", "mg-wheel-axle"}),
     BORE_ROW_HEIGHT,

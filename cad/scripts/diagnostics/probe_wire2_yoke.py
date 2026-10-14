@@ -176,7 +176,7 @@ async def main():
     adapter._attempt(lambda: top.EditRebuild3(), default=None)
     check("calc", await adapter.calculate_motion(MotionStudyRefParameters(name="")))
 
-    marker, _ = _find_one(adapter, "pn-pen-marker")
+    marker, _ = _find_one(adapter, "vn-pen-marker")
     sl, _ = _find_one(adapter, "sm-summing-lever-1")
     wh, _ = _find_one(adapter, "mg-magnifying-wheel-1")
     base, spans, ys = {}, {}, []

@@ -1,17 +1,23 @@
 r"""Reproduction script: pen frame / stirrup (book ch. 24, pp. 64-65).
 
-The rectangular brass yoke that wraps the v-block and marker; the set
-screw threads up through its bottom rail to set the pen angle. Nested
-sketch contours (outer + inner rectangle) extrude directly into the ring.
+The plain rectangular brass ring that hangs over the v-block's paper end: its
+top rail rests on the block top, the marker barrel passes through the window
+under the block, and the #4-40 thumb screw threaded up through the bottom rail
+presses the barrel into the V-groove. Nested sketch contours (outer + inner
+rectangle) extrude directly into the ring; the window's four internal corners
+are then filleted.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 24" — scaled from the p.64-65
-photos vs the ~5 mm square rod (low). Side rails 4, end rails 5 (the
-window must span the marker + pen rod when the frame lies flat on the
-v-block, long axis along machine X -- see build_pn_pen_assembly.py).
+Geometry and the drawing contract live in ``pn_pen_frame_spec`` (pure data,
+shared with ``pn_pen_carriage_geom`` and ``draw_pn_pen_frame``).
 
-Layout: width along +X, height along +Y from the origin corner, depth
-extruded +Z; set-screw hole cut along Y from a Top-plane sketch with a
-mid-plane depth short enough to spare the top rail.
+Part frame (the assembly's placement contract): ring in the XY plane, origin
+at the bottom-left outer corner of the sketch (Front-plane) face, width along
++X (0..OUTER_WIDTH), height along +Y (0..OUTER_HEIGHT), depth extruded +Z
+(0..FRAME_DEPTH). The window is centred in X, so the ring is symmetric about
+x = OUTER_WIDTH / 2 and cannot be mounted mirrored. The #4-40 tapped hole is a
+Hole Wizard feature drilled up from the bottom face (y = 0) at
+(OUTER_WIDTH / 2, 0, FRAME_DEPTH / 2), through the bottom rail into the
+window; its axis is the named reference axis ``SetScrewAxis``.
 
 Run (SolidWorks already open)::
 
@@ -26,58 +32,63 @@ import sys
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _dimensions import drive_dimension, set_global
-from _feature_tree import name_last_feature
-from _part_checks import report_mass_properties, volume_check
-from _part_save import save_part_and_images
-from _rebuild import force_rebuild
-from _session import run_build
-from _sketch import (
-    SketchDims,
-    add_line_chain,
-    ensure_fully_defined,
-    set_sketch_direct_db,
-)
-from _sketch_chains import define_rectilinear_chain
+from _dimensions import drive_dimension, name_dimensions, set_global
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _holes import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec, wizard_holes
+from _drawing_precision import apply_drawing_precision
+from _feature_tree import name_last_feature
+from _holes import wizard_holes
+from _part_checks import report_mass_properties, volume_check
+from _part_save import save_part_and_images
+from _rebuild import force_rebuild
+from _saved_part_guard import require_saved_drawing_properties
+from _session import run_build
+from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _sketch_chains import define_rectilinear_chain
 from pn_pen_frame_spec import (
+    BOTTOM_VIEW_NOTE,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
+    DRAWING_PRECISION,
+    FRAME_DEPTH,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
-    RIGHT_VIEW_NOTE,
+    OUTER_HEIGHT,
+    OUTER_WIDTH,
+    RAIL_END,
+    RAIL_SIDE,
+    SET_SCREW_TAP_DRILL_DIA,
+    SET_SCREW_TAP_SPEC,
+    WINDOW_CORNER_R,
+    WINDOW_HEIGHT,
+    WINDOW_WIDTH,
 )
 
 PART_NAME = "pn-pen-frame"
 MATERIAL = "Brass"  # see _appearance.apply_material docstring
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Front View Note",
+    "Bottom View Note",
+    "Isometric View Note",
+)
 
-OUTER_WIDTH = 26.0  # X: the window must pass the 16-deep v-block with 1.0 a side
-# (v4_t00591/t00612 -- the stirrup wraps the block's end section, the block
-# hanging on the rod beside it); was 22 when the ring lay flat on the block
-OUTER_HEIGHT = 40.0  # Y
-RAIL_SIDE = 4.0  # long-side rails (local X): read thinner in the photo; the
-# extra 1 mm of window also clears the marker barrel at the platen side in
-# the M6.4 flat-on-the-v-block layout
-RAIL_END = 5.0  # end rails (local Y); the screw rail keeps thread depth
-TRIM_NEAR = 0.75  # local x = 0 edge pulled back: that rail faces the platen
-# (machine z = -143 - local x) and must clear the recording paper's front
-# face at -143.25 by the 0.25+ margin (M6.8 platen-paper)
-FRAME_DEPTH = 10.0  # Z
-# The set screw threads INTO the bottom rail, so its hole is an exact #4-40
-# tapped Hole Wizard feature drilled up from the bottom face. THROUGH_NEXT
-# (not through-all) stops at the window cavity so the top rail is spared.
-SET_SCREW_TAP_SPEC = HoleSpec("tapped", "#4-40", end="through_next")
-SET_SCREW_RADIAL_WALL = min(
-    OUTER_WIDTH / 2.0 - TRIM_NEAR,
-    FRAME_DEPTH / 2.0,
-) - THREAD_MAJOR_MM[SET_SCREW_TAP_SPEC.size] / 2.0
-if SET_SCREW_RADIAL_WALL <= 0.0:
-    raise AssertionError("stock #4-40 thread breaks through the pen-frame rail")
+# Analytic volumes (mm^3): the ring is the outer rectangle less the window,
+# extruded FRAME_DEPTH; each concave window-corner fillet ADDS back its R x R
+# square less the quarter disc; the tapped hole pierces only the bottom rail
+# (y 0..RAIL_END) at the tap-drill diameter.
+V_RING = (OUTER_WIDTH * OUTER_HEIGHT - WINDOW_WIDTH * WINDOW_HEIGHT) * FRAME_DEPTH
+V_WINDOW_CORNER = (
+    WINDOW_CORNER_R**2 - math.pi * WINDOW_CORNER_R**2 / 4.0
+) * FRAME_DEPTH
+V_SCREW_HOLE = math.pi * (SET_SCREW_TAP_DRILL_DIA / 2.0) ** 2 * RAIL_END
+V_FINAL = V_RING + 4.0 * V_WINDOW_CORNER - V_SCREW_HOLE
+
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
@@ -85,58 +96,65 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
     # Editable knobs (Tools > Equations): the outer envelope, the two rail
-    # widths, the near-edge trim and the depth, plus the set-screw diameter. The
-    # mm suffix is load-bearing -- this is an INCH document and the equation
-    # manager reads BARE numbers in document units (an unsuffixed 22 = 22 in,
-    # blowing the part up 25.4x in-plane).
+    # widths, the window corner radius and the depth. The mm suffix is
+    # load-bearing -- this is an INCH document and the equation manager reads
+    # BARE numbers in document units (an unsuffixed 28 = 28 in, blowing the
+    # part up 25.4x in-plane).
     await set_global(adapter, "OuterWidth", f"{OUTER_WIDTH}mm")
     await set_global(adapter, "OuterHeight", f"{OUTER_HEIGHT}mm")
     await set_global(adapter, "RailSide", f"{RAIL_SIDE}mm")
     await set_global(adapter, "RailEnd", f"{RAIL_END}mm")
-    await set_global(adapter, "TrimNear", f"{TRIM_NEAR}mm")
     await set_global(adapter, "FrameDepth", f"{FRAME_DEPTH}mm")
-    # (The old ScrewHoleDia knob is gone: the set-screw hole is now a native
-    # Hole Wizard #4-40 tapped feature placed by point.)
+    await set_global(adapter, "WindowCornerR", f"{WINDOW_CORNER_R}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Outer + inner rectangles in one sketch -> ring on extrude. Inference
-    # OFF for the outer chain: the TRIM_NEAR corners sit 0.75 from the
-    # origin/axes and snap back to x = 0 with it on (caught by the extrude
-    # volume reading untrimmed 4600). One SketchDims spans BOTH chains in
-    # emission order: outer first (width-span, height, anchor-X -- anchor at
-    # (TrimNear, 0) emits only X; 3 dims), then inner (width-span, height,
-    # anchor-X, anchor-Z -- anchor at (RailSide, RailEnd) emits both; 4 dims):
-    # seven display dims on the one RingProfile feature.
+    # Outer + inner rectangles in one sketch -> ring on extrude. One SketchDims
+    # spans BOTH chains in emission order: outer first (width span, height; its
+    # anchor vertex IS the origin, so no anchor dims -- 2 dims), then inner. The
+    # inner chain starts at the window's top-left corner and runs down, so its
+    # two span dims sit on the window's LEFT edge (height) and BOTTOM edge
+    # (width) -- the sheet prints them left of and below the ring, their
+    # extension lines crossing only the rail they measure past -- and it is
+    # anchored at its bottom-left corner (vertex 1): the left wall and the
+    # bottom wall, each from a real outer face (drawing-guidelines.md rule 10).
+    # Six dims fully define both rectangles; the right and top walls follow.
     ring = SketchDims()
     check("create_sketch ring", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
     outer_rect = [
-        (TRIM_NEAR, 0.0),
+        (0.0, 0.0),
         (OUTER_WIDTH, 0.0),
         (OUTER_WIDTH, OUTER_HEIGHT),
-        (TRIM_NEAR, OUTER_HEIGHT),
+        (0.0, OUTER_HEIGHT),
     ]
     outer = await add_line_chain(adapter, outer_rect)
-    set_sketch_direct_db(adapter, False)
     inner_rect = [
+        (RAIL_SIDE, OUTER_HEIGHT - RAIL_END),
         (RAIL_SIDE, RAIL_END),
         (OUTER_WIDTH - RAIL_SIDE, RAIL_END),
         (OUTER_WIDTH - RAIL_SIDE, OUTER_HEIGHT - RAIL_END),
-        (RAIL_SIDE, OUTER_HEIGHT - RAIL_END),
     ]
     inner = await add_line_chain(adapter, inner_rect)
     await define_rectilinear_chain(
-        adapter, outer, outer_rect, label="outer ring", dims=ring,
-        names=["OuterSpanX", "OuterHeightDim", "OuterAnchorX"],
-        drives=['"OuterWidth" - "TrimNear"', '"OuterHeight"', '"TrimNear"'],
+        adapter,
+        outer,
+        outer_rect,
+        label="outer ring",
+        dims=ring,
+        names=["OuterSpanX", "OuterHeightDim"],
+        drives=['"OuterWidth"', '"OuterHeight"'],
     )
     await define_rectilinear_chain(
-        adapter, inner, inner_rect, label="inner ring", dims=ring,
-        names=["InnerSpanX", "InnerSpanY", "InnerAnchorX", "InnerAnchorY"],
+        adapter,
+        inner,
+        inner_rect,
+        anchor=1,
+        label="inner ring",
+        dims=ring,
+        names=["WindowHeight", "WindowWidth", "LeftWall", "BottomWall"],
         drives=[
-            '"OuterWidth" - 2 * "RailSide"',
             '"OuterHeight" - 2 * "RailEnd"',
+            '"OuterWidth" - 2 * "RailSide"',
             '"RailSide"',
             '"RailEnd"',
         ],
@@ -150,37 +168,66 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=FRAME_DEPTH)),
     )
     name_last_feature(adapter, "Ring")
-    ring_expected = (
-        (OUTER_WIDTH - TRIM_NEAR) * OUTER_HEIGHT
-        - (OUTER_WIDTH - 2.0 * RAIL_SIDE) * (OUTER_HEIGHT - 2.0 * RAIL_END)
-    ) * FRAME_DEPTH
-    # volume_check fails loud on mismatch -- same guard the old explicit raise
-    # served (a TRIM_NEAR corner snapping back to x = 0 reads untrimmed).
-    await volume_check(adapter, "ring", ring_expected, 0.005 * ring_expected)
+    depth_dim = name_dimensions(adapter, "Ring", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"FrameDepth"')]
+    await volume_check(adapter, "ring", V_RING, 0.005 * V_RING)
 
-    # Set-screw hole: ONE native Hole Wizard #4-40 tapped feature drilled up
-    # from the bottom face (Y=0, outward normal -Y). THROUGH_NEXT stops at the
-    # window cavity so only the bottom rail is pierced (the top rail is spared),
-    # matching the old mid-plane cut. The hole sits at the rail mid-span in X
-    # and the depth mid-plane in Z.
+    # Window internal corners (pn_pen_frame_spec.WINDOW_CORNER_R), each concave
+    # fillet adding back its R x R square less the quarter disc. The printed 4X
+    # radius belongs to "WindowCorner", a fillet on the TOP-RIGHT window edge
+    # alone: an imported fillet dimension attaches to its feature's first edge
+    # (pd_guide_lock's farm run 20261012T061737079Z), and the top-right corner
+    # is the one no window dimension's extension line leaves from, so the
+    # sheet's radius leader runs out through the right rail without crossing
+    # one. The other three corners are one unprinted fillet driven by the same
+    # WindowCornerR. Edge points sit at mid-depth on each corner's Z edge.
+    window_x = (RAIL_SIDE, OUTER_WIDTH - RAIL_SIDE)
+    window_y = (RAIL_END, OUTER_HEIGHT - RAIL_END)
+    corner_features = (
+        ("WindowCorner", "WindowCornerR", ((window_x[1], window_y[1]),)),
+        (
+            "OtherWindowCorners",
+            "OtherWindowCornerR",
+            (
+                (window_x[0], window_y[0]),
+                (window_x[1], window_y[0]),
+                (window_x[0], window_y[1]),
+            ),
+        ),
+    )
+    v_after = V_RING
+    for feature, dimension, corners in corner_features:
+        edges = [[x, y, FRAME_DEPTH / 2.0] for x, y in corners]
+        check(f"fillet {feature}", await adapter.add_fillet(WINDOW_CORNER_R, edges))
+        name_last_feature(adapter, feature)
+        corner_dim = name_dimensions(adapter, feature, [dimension])
+        drive_jobs.append((corner_dim[0], '"WindowCornerR"'))
+        v_corners = len(corners) * V_WINDOW_CORNER
+        v_after += v_corners
+        await volume_check(adapter, f"ring with {feature}", v_after, 0.1 * v_corners)
+
+    # Thumb-screw hole: ONE native Hole Wizard #4-40 tapped feature drilled up
+    # from the bottom face (y = 0, outward normal -Y). THROUGH_NEXT stops at
+    # the window cavity so only the bottom rail is pierced (the top rail is
+    # spared). The hole sits at the rail mid-span in X and the depth mid-plane
+    # in Z, each located from the origin corner's faces.
     screw_cut = wizard_holes(
         adapter,
         SET_SCREW_TAP_SPEC,
         [[OUTER_WIDTH / 2.0, 0.0, FRAME_DEPTH / 2.0]],
         (0.0, -1.0, 0.0),
-        "set-screw tapped hole (#4-40)", name="ScrewHole",
-        placement_dims=[(
-            ("ScrewX", '"OuterWidth" / 2'),
-            ("ScrewZ", '"FrameDepth" / 2'),
-        )],
+        "thumb-screw tapped hole (#4-40)",
+        name="ScrewHole",
+        placement_dims=[
+            (
+                ("ScrewX", '"OuterWidth" / 2'),
+                ("ScrewZ", '"FrameDepth" / 2'),
+            )
+        ],
     )
     drive_jobs += screw_cut.placement_drive_jobs
-    # The tapped column pierces only the bottom rail (Y 0..RailEnd), so it
-    # removes pi*r^2*RailEnd at the tap-drill diameter. Loose tol for the
-    # rounding / mesh at the cut walls.
-    v_screw = math.pi * (TAP_DRILL_MM[SET_SCREW_TAP_SPEC.size] / 2.0) ** 2 * RAIL_END
-    v_final = ring_expected - v_screw
-    await volume_check(adapter, "screw hole", v_final, 15.0)
+    # Loose tol for the rounding / mesh at the cut walls.
+    await volume_check(adapter, "screw hole", V_FINAL, 15.0)
 
     await name_bore_axis(
         adapter,
@@ -188,7 +235,7 @@ async def build(adapter) -> dict[str, str]:
         OUTER_WIDTH / 2.0,
         "Front Plane",
         FRAME_DEPTH / 2.0,
-        "set-screw hole",
+        "thumb-screw hole",
     )
     name_last_feature(adapter, "SetScrewAxis")
 
@@ -199,10 +246,13 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven pen frame (equations neutral)", v_final, 15.0)
+    await volume_check(adapter, "driven pen frame (equations neutral)", V_FINAL, 15.0)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    # Printed places live on the model (the sheet only reads them back); then
+    # mark exactly the print's dimensions and stamp the title-block properties.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -210,13 +260,14 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Manufacturing Notes": DRAWING_NOTES,
             "Front View Note": FRONT_VIEW_NOTE,
-            "Right View Note": RIGHT_VIEW_NOTE,
+            "Bottom View Note": BOTTOM_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
 
 
 if __name__ == "__main__":

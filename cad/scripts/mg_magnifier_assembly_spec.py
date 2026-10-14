@@ -12,6 +12,7 @@ chain is blanked, so it prints only in the drawing view that dimensions it.
 from __future__ import annotations
 
 import mg_wheel_axle_spec as _pin
+import mg_wheel_bar_geom as _bar
 import mg_wheel_group as _group
 from mg_lever_wire_geom import WHEEL_BAR_Y, WHEEL_X
 
@@ -19,7 +20,7 @@ from mg_lever_wire_geom import WHEEL_BAR_Y, WHEEL_X
 # bar's front face forward (-z), station d at z = BAR_FRONT_Z - d.
 AXLE_X = WHEEL_X
 AXLE_Y = WHEEL_BAR_Y
-BAR_FRONT_Z = _group.BAR_FRONT_Z
+BAR_FRONT_Z = _bar.BAR_FRONT_Z
 
 PRESS_GAUGE = _pin.PRESS_GAUGE
 PRESS_GAUGE_TOL = _pin.PRESS_GAUGE_TOL

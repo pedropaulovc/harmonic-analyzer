@@ -1172,15 +1172,17 @@ def _assert_fastener_stacks() -> None:
     if abs(clip_tip_clearance) > 1e-9:
         raise AssertionError("clip screw tip is not flush with the socket boss")
 
-    # The raised heads remain wholly outside the recording-paper side margins.
-    paper_side_margin = (PLATE_WIDTH - PAPER_GEOMETRY.RECORDING_PAPER_WIDTH_MM) / 2.0
+    # The raised heads remain wholly outside the recording-paper side margins
+    # (the sheet sits off centre: paper_drive_geom.RECORDING_PAPER_LEFT_INSET_MM).
     left_head_extent = PLATEN_SOCKET_XY[0][0] + CLIP_SCREW_HEAD_DIA / 2.0
     right_head_extent = PLATE_WIDTH - PLATEN_SOCKET_XY[2][0] + CLIP_SCREW_HEAD_DIA / 2.0
     nonnegative(
-        "left clip head-to-paper clearance", paper_side_margin - left_head_extent
+        "left clip head-to-paper clearance",
+        PAPER_GEOMETRY.RECORDING_PAPER_LEFT_INSET_MM - left_head_extent,
     )
     nonnegative(
-        "right clip head-to-paper clearance", paper_side_margin - right_head_extent
+        "right clip head-to-paper clearance",
+        PAPER_GEOMETRY.RECORDING_PAPER_RIGHT_INSET_MM - right_head_extent,
     )
 
     # Hanger joints: transgear_hanger_joints owns the stacks; re-prove them
@@ -2600,7 +2602,7 @@ async def build(adapter) -> dict[str, str]:
     # Recording paper over the platen front face: front 0.5 proud, clear of the
     # edge clips, with the fitted side/top margins. The 0.25-thick sheet leaves 0.25 air
     # behind it (build_pd_platen_paper) so no face lands coplanar on the platen.
-    paper_side_margin = (PLATE_WIDTH - PAPER_GEOMETRY.RECORDING_PAPER_WIDTH_MM) / 2.0
+    paper_left_margin = PAPER_GEOMETRY.RECORDING_PAPER_LEFT_INSET_MM
     paper_top_margin = (
         3.0  # ch30-p002: the sheet's top edge sits just under the plate top
     )
@@ -2608,7 +2610,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         "pd-platen-paper",
         [
-            PLATE_X0 + paper_side_margin,
+            PLATE_X0 + paper_left_margin,
             PLATE_Y0 + PLATE_HEIGHT - PAPER_GEOMETRY.RECORDING_PAPER_HEIGHT_MM - paper_top_margin,
             PLATE_FRONT_Z - 0.5,
         ],

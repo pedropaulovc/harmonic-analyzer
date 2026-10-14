@@ -1,26 +1,25 @@
-r"""Reproduction script: pen hanger (book ch. 24, pp. 60-63).
+r"""Reproduction script: pen hanger (book ch. 24, pp. 60-63; engineerguy 4/4
+9:15-10:34).
 
-The black tapered strap bolted to the wheel support bar that hangs the
-pen rod's upper guide: a flat strap (3 thick) tapering 16 -> 10 wide,
-lying on the bar's front face and descending to a deep guide block with
-a 5.4 square channel the 5-square pen rod slides in -- the rod is
-VERTICAL, so the channel is cut along Y through the block (an M6.4 fix:
-the first build wrongly tunnelled it along Z). The block reaches
-forward (-Z in the machine) so the pen rod hangs clear of the platen
-paper plane while the strap stays flush on the bar. The M6.10 fastener pass
-adds a #8-32 tap near the strap top (local (-6, 70.7) = machine
-(-3, 575.7): placed IDENTITY at machine x +3, locals map directly)
-for the hanger-screw shank coming through the bar FROM BEHIND (the
-magnifying wheel's rim back face passes 1.0 in front of the strap, so no
-front-side head fits).
+The black tapered strap bolted to the wheel support bar that guides the pen
+rod: a flat strap (3 thick) tapering 16 -> 10 wide, lying on the bar's front
+face and running 170 down from the bar top to just above the platen, with two
+thin open U guide plates brazed across its front face 40 apart.  Each plate's
+slot opens forward (-Z), so the square pen rod hangs on its wire inside both
+slots and lifts straight out of them; the slot sides are the rod's only
+lateral guide, and the slot's two milled bottom corners carry a radius.  The
+lower plate is flush with the strap's bottom end.  A #8 close-clearance
+hole near the strap top passes the hanger screw coming through the bar FROM
+BEHIND (the magnifying wheel's rim passes in front of the strap, so no
+front-side head fits) into a hex nut and jam nut on the strap front.
 
-Layout: origin at the guide block centre (machine (+3, 505, -157));
-block z -4..+18.1 (back face flush with the bar front at machine
-z -138.9), strap in the z = 15.1..18.1 band rising +Y to the bar band.
-The part is authored MACHINE-handed and placed
-IDENTITY, so local axes are machine axes (the strap's sideways lean, its
-only x-asymmetric feature, runs toward machine east = local -x).
-Dimensions: cad/DIMENSIONS.md ch. 24 (M6.4, low).
+Layout: origin at the strap's top-right BACK corner -- on the bar's front
+face, level with the bar top, on the rod line's x (machine ``HANGER_POS``;
+all of the geometry lives in ``pn_pen_hanger_spec``).  The part is authored
+MACHINE-handed and placed IDENTITY, so local axes are machine axes: the strap
+occupies y -170..0, z -3..0, its top edge leaning toward machine east (-x);
+the rod axis is local (0, ., ROD_AXIS_Z).
+Dimensions: cad/DIMENSIONS.md ch. 24.
 
 Run (SolidWorks already open)::
 
@@ -32,10 +31,10 @@ from __future__ import annotations
 import math
 import sys
 
-from _appearance import PANEL_BLACK, apply_color, apply_material
+from _appearance import BAR_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _dimensions import drive_dimension, set_global
+from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -48,25 +47,45 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-from _sketch_chains import define_polygon_chain
-from _sketch_rectangle import define_centered_rectangle
+from _sketch_chains import define_polygon_chain, define_rectilinear_chain
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _holes import TAP_DRILL_MM, HoleSpec, wizard_holes
-from vn_hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA
-from mg_wheel_bar_geom import (
-    HANGER_SCREW_LOCAL_X,
-    HANGER_STRAP_TOP_LEFT_X,
-)
+from _drawing_precision import apply_drawing_precision
+from _drawing_prefix import set_dimension_prefix
+from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _fit_deviations import deviations
+from _holes import wizard_holes
 from pn_pen_hanger_spec import (
+    DIMENSION_PREFIXES,
+    DRAWING_BANDS,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     FRONT_VIEW_NOTE,
+    GUIDE_PLATE_DROPS,
+    GUIDE_PLATE_T,
+    GUIDE_PLATE_WIDTH,
+    GUIDE_PLATE_YS,
     ISOMETRIC_VIEW_NOTE,
-    TOP_VIEW_NOTE,
+    PLATE_FRONT_Z,
+    PLATE_REACH,
+    SCREW_HOLE_DIA,
+    SCREW_HOLE_SPEC,
+    SCREW_HOLE_XY,
+    SLOT_BOTTOM,
+    SLOT_BOTTOM_Z,
+    SLOT_CORNER_R,
+    SLOT_DEPTH,
+    SLOT_WIDTH,
+    STRAP_BOT_X,
+    STRAP_OUTLINE,
+    STRAP_RISE,
+    STRAP_T,
+    STRAP_TOP_X,
+    STRAP_Z,
 )
 
 import _telemetry
@@ -74,47 +93,60 @@ import _telemetry
 PART_NAME = "pn-pen-hanger"
 MATERIAL = "Plain Carbon Steel"  # black hardware
 
-BLOCK_HALF = 6.0  # guide block 12 x 12 (low)
-BLOCK_Z = (-4.0, 18.1)  # deep block: back face on the bar front (derived); the
-# rod line moved 5.5 forward of the bar (build_pn_pen_assembly PEN_Z_MID) so the
-# 45-degree v-block clears the paper, and the block deepens to keep the strap
-# flush on the bar
-GUIDE_HOLE_HALF = 2.7  # 5.4 square: the 5-square pen rod slides (derived)
-STRAP_Z = (15.1, 18.1)  # strap 3 thick, flush with the block back (derived)
-STRAP_TOP_Y = 75.7  # machine 580.7: bar top after the ch30 p002 wheel-bar
-# re-anchor (y 575.7) -- the strap stretches up to the raised bar while the
-# guide block stays put on the pen line (the pen geometry did not move)
-STRAP_TOP_X = (HANGER_STRAP_TOP_LEFT_X, 0.0)  # 16 wide at the bar (low)
-STRAP_BOT_X = (-5.0, 5.0)  # 10 wide at the block (low)
-# M6.10: the selected hanger screw threads into the strap near its top through
-# an exact #8-32 tapped Hole Wizard feature.
-SCREW_TAP_SPEC = HoleSpec("tapped", "#8-32")
-SCREW_HOLE_XY = (HANGER_SCREW_LOCAL_X, 70.7)
-# Exact tapered-land bounds at the tap centre. The clearance bore's bar-end
-# ligament is checked in build_mg_wheel_bar; the receiver uses the thread major
-# diameter here, not the tap-drill diameter.
-
-_STRAP_RISE = STRAP_TOP_Y - BLOCK_HALF
-_STRAP_T = (SCREW_HOLE_XY[1] - BLOCK_HALF) / _STRAP_RISE
-_STRAP_LEFT_X = STRAP_BOT_X[0] + _STRAP_T * (STRAP_TOP_X[0] - STRAP_BOT_X[0])
-_STRAP_RIGHT_X = STRAP_BOT_X[1] + _STRAP_T * (STRAP_TOP_X[1] - STRAP_BOT_X[1])
-# Perpendicular distances to the four straight edges, not horizontal slices:
-# a circular thread envelope must remain inside the whole tapered polygon.
-HANGER_THREAD_STRAP_WALL = min(
-    (SCREW_HOLE_XY[0] - _STRAP_LEFT_X)
-    / math.hypot(1.0, (STRAP_TOP_X[0] - STRAP_BOT_X[0]) / _STRAP_RISE),
-    (_STRAP_RIGHT_X - SCREW_HOLE_XY[0])
-    / math.hypot(1.0, (STRAP_TOP_X[1] - STRAP_BOT_X[1]) / _STRAP_RISE),
-    SCREW_HOLE_XY[1] - BLOCK_HALF,
-    STRAP_TOP_Y - SCREW_HOLE_XY[1],
-) - HANGER_SCREW_DIA / 2.0
-if HANGER_THREAD_STRAP_WALL <= 0.0:
-    raise AssertionError("stock #8 hanger thread breaks through the tapered strap")
-
 
 async def _volume(adapter) -> float:
     res = await adapter.get_mass_properties()
     return res.data.volume if res.is_success else float("nan")
+
+
+async def _guide_plate(adapter, prefix: str, drop: float) -> list[tuple[str, str]]:
+    """One open U plate: a Top-plane outline ((u, v) = model (x, -z)) extruded
+    down from ``drop`` below the strap top.  Emission (rectilinear chain):
+    slot width, slot depth, right arm, right reach, plate width, left reach,
+    then the slot-bottom-left anchor (x, then the strap-back-face distance);
+    the left arm and the slot's left side close the chain."""
+    v_back, v_bot, v_front = -STRAP_Z[0], SLOT_BOTTOM, -PLATE_FRONT_Z
+    half_slot, half_plate = SLOT_WIDTH / 2.0, GUIDE_PLATE_WIDTH / 2.0
+    points = [
+        (-half_slot, v_bot),
+        (half_slot, v_bot),
+        (half_slot, v_front),
+        (half_plate, v_front),
+        (half_plate, v_back),
+        (-half_plate, v_back),
+        (-half_plate, v_front),
+        (-half_slot, v_front),
+    ]
+    sketch = SketchDims()
+    check(f"create_sketch {prefix} guide", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    lines = await add_line_chain(adapter, points)
+    set_sketch_direct_db(adapter, False)
+    await define_rectilinear_chain(
+        adapter, lines, points, label=f"{prefix} guide", dims=sketch,
+        names=["SlotWidth", "SlotDepth", "ArmWidth", "PlateReach",
+               "PlateWidth", "PlateReachLeft", "SlotX", "SlotBottom"],
+        drives=['"SlotWidth"',
+                '"PlateReach" + "StrapThick" - "SlotBottom"',
+                '("PlateWidth" - "SlotWidth") / 2',
+                '"PlateReach"',
+                '"PlateWidth"',
+                '"PlateReach"',
+                '"SlotWidth" / 2',
+                '"SlotBottom"'],
+    )
+    await ensure_fully_defined(adapter, f"{prefix} guide sketch")
+    check(f"exit_sketch {prefix} guide", await adapter.exit_sketch())
+    profile = f"{prefix}GuideProfile"
+    name_last_feature(adapter, profile)
+    jobs = sketch.apply(adapter, profile)
+    extrude_at_offset(adapter, GUIDE_PLATE_T, drop, flip=True)
+    feature = f"{prefix}Guide"
+    name_last_feature(adapter, feature)
+    thick, offset = name_dimensions(
+        adapter, feature, ["PlateThick", f"{prefix}PlateDrop"]
+    )
+    return [*jobs, (thick, '"PlateThick"'), (offset, f'"{prefix}PlateDrop"')]
 
 
 async def build(adapter) -> dict[str, str]:
@@ -123,145 +155,127 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
     # Editable knobs (Tools > Equations). mm suffix load-bearing: this is an INCH
-    # document and the equation manager reads BARE numbers in document units (an
-    # unsuffixed 65 = 65 in, a 25.4x in-plane blow-up). The strap-edge X knobs and
-    # the screw-hole X hold SIGNED machine coordinates; the dims they drive are
-    # UNSIGNED distances, so the drive expressions below negate / difference them
-    # so each evaluates POSITIVE.
-    await set_global(adapter, "BlockHalf", f"{BLOCK_HALF}mm")
-    await set_global(adapter, "GuideHoleHalf", f"{GUIDE_HOLE_HALF}mm")
-    await set_global(adapter, "StrapTopY", f"{STRAP_TOP_Y}mm")
-    await set_global(adapter, "StrapBotXMin", f"{STRAP_BOT_X[0]}mm")
-    await set_global(adapter, "StrapBotXMax", f"{STRAP_BOT_X[1]}mm")
-    await set_global(adapter, "StrapTopXMin", f"{STRAP_TOP_X[0]}mm")
-    await set_global(adapter, "StrapTopXMax", f"{STRAP_TOP_X[1]}mm")
+    # document and the equation manager reads BARE numbers in document units.
+    # The strap-edge and screw-hole knobs hold SIGNED local coordinates; the dims
+    # they drive are UNSIGNED distances, so the drives negate them positive.
+    await set_global(adapter, "StrapTopLeftX", f"{STRAP_TOP_X[0]}mm")
+    await set_global(adapter, "StrapBotHalf", f"{STRAP_BOT_X[1]}mm")
+    await set_global(adapter, "StrapRise", f"{STRAP_RISE}mm")
+    await set_global(adapter, "StrapThick", f"{STRAP_T}mm")
     await set_global(adapter, "ScrewHoleX", f"{SCREW_HOLE_XY[0]}mm")
     await set_global(adapter, "ScrewHoleY", f"{SCREW_HOLE_XY[1]}mm")
-    # (The old ScrewHoleDia/ScrewHoleX/ScrewHoleY knobs are gone: the hole is
-    # now a native Hole Wizard #8-32 tapped feature placed by point.)
+    await set_global(adapter, "PlateThick", f"{GUIDE_PLATE_T}mm")
+    await set_global(adapter, "PlateWidth", f"{GUIDE_PLATE_WIDTH}mm")
+    await set_global(adapter, "PlateReach", f"{PLATE_REACH}mm")
+    await set_global(adapter, "SlotWidth", f"{SLOT_WIDTH}mm")
+    await set_global(adapter, "SlotBottom", f"{SLOT_BOTTOM}mm")
+    await set_global(adapter, "LowerPlateDrop", f"{GUIDE_PLATE_DROPS[0]}mm")
+    await set_global(adapter, "UpperPlateDrop", f"{GUIDE_PLATE_DROPS[1]}mm")
+    await set_global(adapter, "SlotCornerR", f"{SLOT_CORNER_R}mm")
 
     # Drive equations collected as dims are recorded, applied in one deferred
     # batch after the whole model + a rebuild exists (every target must resolve).
     drive_jobs: list[tuple[str, str]] = []
 
-    # 1. Solid guide block: an origin-centred 12 x 12 square -- use
-    # define_centered_rectangle (width/depth/corner named directly).
-    block = SketchDims()
-    check("create_sketch block", await adapter.create_sketch("Front"))
-    await define_centered_rectangle(
-        adapter, BLOCK_HALF, BLOCK_HALF, "block", dims=block,
-        name_width="BlockWidth", drive_width='2 * "BlockHalf"',
-        name_depth="BlockDepth", drive_depth='2 * "BlockHalf"',
-    )
-    await ensure_fully_defined(adapter, "block sketch")
-    check("exit_sketch block", await adapter.exit_sketch())
-    name_last_feature(adapter, "BlockProfile")
-    drive_jobs += block.apply(adapter, "BlockProfile")
-    extrude_at_offset(adapter, BLOCK_Z[1] - BLOCK_Z[0], BLOCK_Z[0])
-    name_last_feature(adapter, "Block")
-    expected = (2.0 * BLOCK_HALF) ** 2 * (BLOCK_Z[1] - BLOCK_Z[0])
-    vol = await _volume(adapter)
-    _telemetry.info(f"volume after block: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.005 * expected:
-        raise RuntimeError(f"block volume {vol:.1f} != {expected:.1f}")
-
-    # 1b. Square rod channel cut along Y (the pen rod hangs vertically).
-    # The +-2.7 footprint stays inside the block's z -4..18.1 band (BLOCK_Z) and
-    # well clear of the strap's z 15.1..18.1 band (STRAP_Z), so a through cut
-    # is safe.
-    channel = SketchDims()
-    check("create_sketch channel", await adapter.create_sketch("Top"))
-    await define_centered_rectangle(
-        adapter, GUIDE_HOLE_HALF, GUIDE_HOLE_HALF, "channel", dims=channel,
-        name_width="ChannelWidth", drive_width='2 * "GuideHoleHalf"',
-        name_depth="ChannelDepth", drive_depth='2 * "GuideHoleHalf"',
-    )
-    await ensure_fully_defined(adapter, "channel sketch")
-    check("exit_sketch channel", await adapter.exit_sketch())
-    name_last_feature(adapter, "ChannelProfile")
-    drive_jobs += channel.apply(adapter, "ChannelProfile")
-    check(
-        "cut channel",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=4.0 * BLOCK_HALF, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "Channel")
-    expected -= (2.0 * GUIDE_HOLE_HALF) ** 2 * 2.0 * BLOCK_HALF
-    vol = await _volume(adapter)
-    _telemetry.info(f"volume after channel: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.005 * expected:
-        raise RuntimeError(f"channel volume {vol:.1f} != {expected:.1f}")
-
-    # 2. Tapered strap rising to the support bar. Polygon-chain emission order:
-    # anchor vertex 0 = (STRAP_BOT_X[0], BLOCK_HALF) is off both axes -> 2 anchor
-    # dims (x then z), THEN the kept segments' offsets in line order (the segment
-    # ending at the anchor vertex is skipped, closure supplies it):
-    #   seg0 (bottom edge, axis-aligned) -> 1 dim (bottom width)
-    #   seg1 (right taper, general)      -> 2 dims (dx, dy)
-    #   seg2 (top edge, axis-aligned)    -> 1 dim (top run)
-    # = 6 display dims. Anchor/segment dims are UNSIGNED distances; the strap-edge
-    # X knobs are signed, so the drives below difference/negate them to positive.
+    # 1. Tapered strap from the origin corner. Polygon-chain emission order
+    # (anchor vertex 0 on the origin -> no anchor dims): seg0 top run, seg1
+    # (general) taper dx then rise, seg2 bottom width; the closing right edge
+    # is supplied by closure.
     strap = SketchDims()
     check("create_sketch strap", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    strap_pts = [
-        (STRAP_BOT_X[0], BLOCK_HALF),
-        (STRAP_BOT_X[1], BLOCK_HALF),
-        (STRAP_TOP_X[1], STRAP_TOP_Y),
-        (STRAP_TOP_X[0], STRAP_TOP_Y),
-    ]
-    strap_lines = await add_line_chain(adapter, strap_pts)
+    strap_lines = await add_line_chain(adapter, list(STRAP_OUTLINE))
     set_sketch_direct_db(adapter, False)
     await define_polygon_chain(
-        adapter, strap_lines, strap_pts, label="strap", dims=strap,
-        names=["StrapAnchorX", "StrapAnchorZ", "StrapBotWidth",
-               "StrapTaperDx", "StrapTaperDy", "StrapTopRun"],
-        drives=['-"StrapBotXMin"', '"BlockHalf"',
-                '"StrapBotXMax" - "StrapBotXMin"',
-                '"StrapBotXMax" - "StrapTopXMax"',
-                '"StrapTopY" - "BlockHalf"',
-                '"StrapTopXMax" - "StrapTopXMin"'],
+        adapter, strap_lines, list(STRAP_OUTLINE), label="strap", dims=strap,
+        names=["StrapTopRun", "StrapTaperDx", "StrapRise", "StrapBotWidth"],
+        drives=['-"StrapTopLeftX"',
+                '-"StrapBotHalf" - "StrapTopLeftX"',
+                '"StrapRise"',
+                '2 * "StrapBotHalf"'],
     )
     await ensure_fully_defined(adapter, "strap sketch")
     check("exit_sketch strap", await adapter.exit_sketch())
     name_last_feature(adapter, "StrapProfile")
     drive_jobs += strap.apply(adapter, "StrapProfile")
-    extrude_at_offset(adapter, STRAP_Z[1] - STRAP_Z[0], STRAP_Z[0])
-    name_last_feature(adapter, "Strap")
-    bot_w = STRAP_BOT_X[1] - STRAP_BOT_X[0]
-    top_w = STRAP_TOP_X[1] - STRAP_TOP_X[0]
-    v_strap = (
-        (bot_w + top_w) / 2.0 * (STRAP_TOP_Y - BLOCK_HALF) * (STRAP_Z[1] - STRAP_Z[0])
+    # Reversed: from the bar seat (z 0) forward to the strap front face (-3).
+    check(
+        "extrude strap",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=STRAP_T, reverse_direction=True)
+        ),
     )
-    before = expected
-    vol = await _volume(adapter)
-    added = vol - before
-    _telemetry.info(f"volume after strap: {vol:.1f} mm^3 (+{added:.1f}, solid {v_strap:.1f})")
-    if abs(added - v_strap) > 0.02 * v_strap:
-        raise RuntimeError(f"strap: added {added:.1f}, expected {v_strap:.1f}")
-    expected = vol
+    name_last_feature(adapter, "Strap")
+    drive_jobs.append(
+        (name_dimensions(adapter, "Strap", ["StrapThick"])[0], '"StrapThick"')
+    )
+    top_w = STRAP_TOP_X[1] - STRAP_TOP_X[0]
+    bot_w = STRAP_BOT_X[1] - STRAP_BOT_X[0]
+    v_strap = (top_w + bot_w) / 2.0 * STRAP_RISE * STRAP_T
+    vol = await volume_check(adapter, "strap", v_strap, 0.002 * v_strap)
 
-    # 3. Native #8-32 through tap in the deepened hanger's 3-mm strap.
-    # Drill from local z STRAP_Z[0] (15.1), outward normal -Z; the screw
-    # enters from behind the bar through the opposite face at STRAP_Z[1].
-    screw_dia = TAP_DRILL_MM[SCREW_TAP_SPEC.size]
+    # 2. The two guide plates, each butting the strap front face.
+    v_plate = GUIDE_PLATE_T * (
+        GUIDE_PLATE_WIDTH * PLATE_REACH - SLOT_WIDTH * SLOT_DEPTH
+    )
+    for prefix, drop in zip(("Lower", "Upper"), GUIDE_PLATE_DROPS, strict=True):
+        drive_jobs += await _guide_plate(adapter, prefix, drop)
+        vol = await volume_check(
+            adapter, f"{prefix.lower()} guide plate", vol + v_plate, 0.01 * v_plate
+        )
+
+    # 2b. The slot's milled bottom corners (drawing-guidelines.md rule 16),
+    # each adding the square R x R less its quarter disc back to the plate.
+    # The vertical corner edges run through each plate's thickness at the slot
+    # bottom.  The printed 2X radius belongs to "UpperSlotCorner", a fillet on
+    # the upper plate's -x corner ALONE: an imported fillet dimension attaches
+    # to its feature's first edge (build_pd_guide_lock), and section A-A cuts
+    # the upper plate and carries the radius off that corner.  The other three
+    # corners are one unprinted fillet driven by the same SlotCornerR.
+    lower_mid = GUIDE_PLATE_YS[0] + GUIDE_PLATE_T / 2.0
+    upper_mid = GUIDE_PLATE_YS[1] + GUIDE_PLATE_T / 2.0
+    half_slot = SLOT_WIDTH / 2.0
+    corner_features = (
+        ("UpperSlotCorner", "SlotCornerR", ((-half_slot, upper_mid),)),
+        (
+            "OtherSlotCorners",
+            "OtherSlotCornerR",
+            ((half_slot, upper_mid), (-half_slot, lower_mid), (half_slot, lower_mid)),
+        ),
+    )
+    v_corner = (SLOT_CORNER_R**2 - math.pi * SLOT_CORNER_R**2 / 4.0) * GUIDE_PLATE_T
+    for feature, dimension, corners in corner_features:
+        edges = [[x, y, SLOT_BOTTOM_Z] for x, y in corners]
+        check(f"fillet {feature}", await adapter.add_fillet(SLOT_CORNER_R, edges))
+        name_last_feature(adapter, feature)
+        corner_dim = name_dimensions(adapter, feature, [dimension])
+        drive_jobs.append((corner_dim[0], '"SlotCornerR"'))
+        v_corners = len(corners) * v_corner
+        vol = await volume_check(
+            adapter, f"hanger with {feature}", vol + v_corners, 0.1 * v_corners
+        )
+
+    # 3. Native #8 close-clearance hole through the strap, drilled from its
+    # front face (outward normal -Z); the screw enters from behind the bar
+    # through the back face and takes the nuts on the front.
+    screw_dia = SCREW_HOLE_DIA
     screw_cut = wizard_holes(
         adapter,
-        SCREW_TAP_SPEC,
+        SCREW_HOLE_SPEC,
         [[SCREW_HOLE_XY[0], SCREW_HOLE_XY[1], STRAP_Z[0]]],
         (0.0, 0.0, -1.0),
-        "hanger-screw tapped hole (#8-32)",
+        "hanger-screw hole (#8 clearance)",
         name="ScrewHole",
+        expect_dia_mm=SCREW_HOLE_DIA,
         placement_dims=[
             (
                 ("ScrewX", '-"ScrewHoleX"'),
-                ("ScrewY", '"ScrewHoleY"'),
+                ("ScrewY", '-"ScrewHoleY"'),
             )
         ],
     )
     drive_jobs += screw_cut.placement_drive_jobs
-    expected -= math.pi * (screw_dia / 2.0) ** 2 * (STRAP_Z[1] - STRAP_Z[0])
+    expected = vol - math.pi * (screw_dia / 2.0) ** 2 * STRAP_T
     vol = await _volume(adapter)
     _telemetry.info(f"volume after screw hole: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 1.0:
@@ -287,10 +301,20 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven pen hanger (equations neutral)", vol, 1.0)
 
     await apply_material(adapter, MATERIAL)
-    # ch21 p.52 (img03) / ch30 plates: the hanger strap is BLACK-oxide steel
-    # (the dark bar the brass pen rod runs beside), not bright.
-    await apply_color(adapter, PANEL_BLACK)
+    # ch21 p.52 (img03) / ch30 plates: the hanger is BLACK-oxide steel, but
+    # PANEL_BLACK shaded its 1:1 iso solid black with the black edges lost
+    # (r12 review, rule 8).  BAR_STEEL, the darkest named tone light enough
+    # for black edges to read, as sm_gooseneck_spring_screw's black-oxide
+    # finish already renders in a named steel grey (POLISHED_STEEL).
+    await apply_color(adapter, BAR_STEEL)
     await report_mass_properties(adapter)
+    for (feature_name, dimension_name), band in DRAWING_BANDS.items():
+        set_dimension_bilateral_tolerance(
+            adapter, feature_name, dimension_name, *deviations(band)
+        )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    for (feature_name, dimension_name), prefix in DIMENSION_PREFIXES.items():
+        set_dimension_prefix(adapter, feature_name, dimension_name, prefix)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -300,7 +324,6 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Front View Note": FRONT_VIEW_NOTE,
-            "Top View Note": TOP_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

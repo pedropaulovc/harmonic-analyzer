@@ -1,0 +1,8 @@
+pn-pen-adjust-screw:
+  number: MHA-PN-007
+  material: Brass
+  material_specification: C36000 free-machining brass rod
+  finish: plain; no coating
+  quantity: 1
+  tolerance_class: machined_block
+  process: "turned (brass)"

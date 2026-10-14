@@ -1,54 +1,56 @@
-r"""Reproduction script: pen subassembly (book ch. 24).
+r"""Reproduction script: pen subassembly (book ch. 24; engineerguy 4/4, 9:15-10:34).
 
 The machine's output transducer: the pen carriage that writes the Fourier sum
 onto the recording paper, in machine coordinates (assembly origin = base
 origin; the output side is -Z). The square pen rod slides vertically through
-the hanger's guide block; the magnifying wheel's wire (pen-wire, WIRE 2 --
+the hanger's two U guides; the magnifying wheel's wire (pen-wire, WIRE 2 --
 modeled as its straight rest-pose run only) raises and lowers it to trace
-the curve. Everything below the guide rides the rod (ch24 pp.60-65 and the
-4/4 video frames v4_t00579..t00645):
+the curve. Everything below the guides rides the rod:
 
-* pen-hanger (ground) on the wheel-bar -- the fixed guide.
-* pen-rod -- a Y-prismatic; its travel is the sub's single FREED operational
+* pn-pen-hanger (ground) on the wheel bar -- the fixed U guides.
+* pn-pen-rod -- a Y-prismatic; its travel is the sub's single FREED operational
   DOF: its drive spec is recorded into the DOF manifest, never authored, so
   the saved model slides freely and carries NO pen-driver equation.
   verify:kinematics replays the recorded spec and installs the F5
   chained-Fourier driver transiently (reproduces truth_model.pen_y from a
   CrankDeg global, no force solver).
-* pen-v-block -- the brass block HANGING on the rod's bottom end (the rod
-  drops 13 into the bore nearest the paper; a side set screw pins it in the
-  real device). Its length runs at 45 degrees to the paper (the "45 deg" nib
-  callout of v4_t00603), lock-mated to the rod.
-* pen-marker -- the full-length marker lying in the block's bottom groove
-  along the block's length, nib on the paper, body sticking out forward and
-  east of the machine; lock-mated to the rod.
-* pen-frame -- the brass stirrup wrapping the block's end section (its plane
-  perpendicular to the block length, beside the rod), lock-mated to the rod;
-  pen-set-screw threads UP through its bottom rail and presses the marker
-  into the groove.
-* pen-wire -- WIRE 2's straight rest-pose run from the wheel-rim tangent down
-  to the rod's wire hole, locked to the rod so it rides the pen travel. The
-  rim wrap and tie-off are not modeled; the kinematic coupling stays a
-  Motion-study mate (cad/docs/motion-policy.md).
-* hanger-screw -- fastens the pen-hanger from behind the wheel bar.
+* pn-pen-v-block -- the brass block HANGING on the rod: the rod's turned pivot
+  end drops into the block's pivot bore and its square shoulder rests on the
+  block top; vn-pen-rod-set-screw (front face) locks the pen's yaw, which is
+  PEN_BLOCK_YAW_DEG to the paper.
+* vn-pen-marker -- the purchased Sharpie Fine Point, its grip in the block's V-groove,
+  nib on the paper, body running out forward and east.
+* pn-pen-frame -- the stirrup flush on the block's PAPER end; vn-pen-set-screw
+  (the thumb screw) threads up through its bottom rail and presses the grip
+  into the V.
+* pn-pen-adjust-screw + vn-pen-adjust-nut -- the height adjuster on the rod
+  top: the stud threads into the rod's #0-80 tap, the jam nut locks it, and
+  the pen wire ties through its eye.
+* pn-pen-wire -- WIRE 2's straight rest-pose run hanging PLUMB from the wheel
+  rim's 3 o'clock tangent onto the stud's eye head (the rod line is the rim's
+  mid-plane), locked to the rod so it rides the pen travel. The rim wrap and
+  tie-off are not modeled; the kinematic coupling stays a Motion-study mate
+  (cad/docs/motion-policy.md).
+* vn-hanger-screw + vn-pen-hanger-nut + vn-pen-hanger-jam-nut -- fasten the
+  pen-hanger: the screw from behind the wheel bar through the strap's
+  clearance hole, the nut on the strap front and the thin jam nut jammed
+  against it, locking it.
+
+The carriage layout and its plan balance live in ``pn_pen_carriage_geom``
+(pure): the rod line PEN_Z_MID and the v-block's pivot-bore station put the
+carriage CG on the rod axis, so the pen hangs level and its yaw is held by the
+set screw, not by the guides.
 
 Cross-subassembly fits (checked at the top level): the pen-hanger clamps the
-wheel-bar (mg-magnifier.SLDASM) and the wheel rim -> pen-rod wire couples the
-pen to the magnifier; the v-block's paper-side corner and the nib stand off
-the recording paper's front face (pd-paper-drive.SLDASM).
-
-History: until the 2026-09 photo re-derivation the v-block was a GROUNDED
-green cradle with vertical bores and the marker hung plumb 8.6 in front of
-the paper (documented simplification). Every ch24/ch30 plate and the video
-show the block riding the rod with the marker horizontal in its groove, so
-the carriage is now authored as the photos have it. The rod line moved 5.5
-forward of the wheel-bar plane (PEN_Z_MID -151.5 -> -157.0) so the 45-degree
-block's rear corner clears the paper; the hanger guide deepened to match.
+wheel bar (mg-magnifier.SLDASM) and the wheel rim -> pen wire couples the pen
+to the magnifier; the stirrup's paper-side corner and the nib stand off the
+recording paper's front face (pd-paper-drive.SLDASM).
 
 Fix-all strategy (M6.2): the hanger inserted at its exact final transform and
 fixed; the rod left free and constrained by mates (its Y-travel recorded into
 the DOF manifest, never authored); the carriage parts placed on-solution and
-lock-mated to the rod; transforms asserted by read-back; zero interference.
+lock-mated to the rod; transforms asserted by read-back; zero interference
+beyond the thread-envelope allowances in ``_interference_contracts``.
 
 Dimensions: cad/config/dimensions.yaml ch. 24.
 
@@ -84,226 +86,144 @@ from _assembly import (
     save_assembly_and_images,
     write_dof_manifest,
 )
-from _transforms import IDENTITY, euler_from_rows, rot_z_rows
+from _transforms import IDENTITY, euler_from_rows
 from _interference_contracts import allowed_interference_pairs
 from vn_hanger_screw_spec import SHANK_LEN as HANGER_SHANK_LEN
-from pn_pen_wire_geom import WHEEL_BAR_Y, WHEEL_MID_Z
+from vn_hanger_screw_spec import THREAD_PITCH as HANGER_THREAD_PITCH
+from vn_hanger_screw_spec import TIP_CHAMFER as HANGER_TIP_CHAMFER
+from vn_pen_hanger_jam_nut_spec import (
+    THREAD_PAST_MIN_PITCHES as HANGER_THREAD_PAST_PITCHES,
+)
+from vn_pen_hanger_jam_nut_spec import THICKNESS as HANGER_JAM_NUT_T
+from vn_pen_hanger_nut_spec import ACROSS_CORNERS as HANGER_NUT_ACROSS_CORNERS
+from vn_pen_hanger_nut_spec import THICKNESS as HANGER_NUT_T
+from mg_magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
+from mg_magnifying_wheel_geom import RIM_OUTER_DIA as WHEEL_RIM_OUTER_DIA
 from mg_wheel_bar_geom import BAR_DEPTH as WHEEL_BAR_DEPTH
 from mg_wheel_bar_geom import HANGER_SCREW_MACHINE_X
-from build_pn_pen_hanger import SCREW_HOLE_XY as HANGER_TAP_XY
-from build_pn_pen_hanger import STRAP_Z as HANGER_STRAP_Z
-from _mcmaster_99607a213 import HEAD_STACK_LEN as PEN_SET_HEAD_STACK_LEN
-from _mcmaster_99607a213 import SHANK_LEN as PEN_SET_SHANK_LEN
-from _mcmaster_99607a213 import SHANK_DIA as PEN_SET_SHANK_DIA
-from _mcmaster_99607a213 import TIP_CHAMFER as PEN_SET_TIP_CHAMFER
-from mg_magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
-from paper_drive_geom import (
-    PAPER_FRONT_Z,
-    PEN_BLOCK_YAW_DEG,
-    PEN_PAPER_CLEARANCE_MM,
-    PEN_ROD_X,
-    PEN_Z_MID,
+from mg_wheel_bar_geom import WHEEL_X
+from pn_pen_hanger_spec import (
+    GUIDE_ENGAGE_MARGIN,
+    GUIDE_SPAN_Y,
+    HANGER_POS,
+    SCREW_HOLE_XY as HANGER_HOLE_XY,
+    STRAP_Z as HANGER_STRAP_Z,
+)
+from pn_pen_wire_geom import (
+    WHEEL_BAR_Y,
+    WHEEL_MID_Z,
+    WIRE_BOTTOM as PEN_WIRE_BOTTOM,
+    WIRE_LEN as PEN_WIRE_LEN,
+)
+from pn_pen_carriage_geom import (
+    BLOCK_ROWS,
+    CARRIAGE_TOP_Y,
+    FRAME_POS,
+    FRAME_ROWS,
+    MARKER_POS,
+    MARKER_ROWS,
+    NUT_POS,
+    NUT_ROWS,
+    ROD_POS as PEN_ROD_POS,
+    ROD_SET_SCREW_POS,
+    ROD_SET_SCREW_ROWS,
+    ROD_SQUARE_TOP_Y,
+    STUD_HEAD_TOP_Y,
+    STUD_POS,
+    THUMB_SCREW_POS,
+    THUMB_SCREW_ROWS,
+    VBLOCK_POS,
 )
 
 ASM_NAME = "pn-pen"
 
-# --- machine anchors ---------------------------------------------------------
-CLEARANCE = 0.25  # interference-gate margin convention
-
-# --- pen rod line -------------------------------------------------------------
-ROD_SECTION = 5.0  # pn_pen_rod_spec.ROD_SECTION (asserted below)
-HANGER_POS = (PEN_ROD_X, 505.0, PEN_Z_MID)
-# The rod's bottom end sits 13 into the v-block's 18-tall rod bore -- its end
-# face 0.5 above the groove roof (18 - 13 = 5.0 > GROOVE_DEPTH 4.5), clear of the
-# marker barrel that fills the groove below it (a 14 engagement dipped 0.5 into
-# the groove: interference-gate proven, 2.81 mm^3 rod/marker) -- putting the
-# marker axis (block bottom + 0.25) near paper mid-height: paper y 324.5..405
-# (build_pd_paper_drive_assembly), centre 364.75 -> marker axis 363.25.
-ROD_BORE_ENGAGEMENT = 13.0
-BLOCK_BOTTOM_Y = 363.0
-PEN_ROD_POS = (PEN_ROD_X, BLOCK_BOTTOM_Y + 5.0, PEN_Z_MID - ROD_SECTION / 2.0)
-
-# --- v-block on the rod --------------------------------------------------------
-# Block-local frame (build_pn_pen_v_block): length X 0..36, height Y 0..18, depth
-# Z 0..16; rod bore at local (BORE_X[0], z 8); marker groove along X at the
-# bottom, centred in Z. The block's local +X (its length) points FORWARD and
-# EAST at 45 degrees -- machine (+sin, 0, -cos) of BLOCK_YAW about +Y -- so the
-# rod bore (the paper end, local x 10) is the rear bore and the marker exits
-# the local x 0 end face onto the paper.
-from pn_pen_v_block_spec import (  # noqa: E402
-    BLOCK_DEPTH,
-    BLOCK_HEIGHT,
-    BLOCK_LENGTH,
-    BORE_X,
-    GROOVE_DEPTH,
-    GROOVE_WIDTH,
-)
-from pn_pen_marker_spec import BARREL_DIA, BARREL_TOP_Y  # noqa: E402
-from build_pn_pen_frame import (  # noqa: E402
-    FRAME_DEPTH,
-    OUTER_HEIGHT,
-    OUTER_WIDTH,
-    RAIL_END,
-    RAIL_SIDE,
-)
-
-_C = math.cos(math.radians(PEN_BLOCK_YAW_DEG))
-_S = math.sin(math.radians(PEN_BLOCK_YAW_DEG))
-# Images of the block's local axes (rows convention of place_component):
-BLOCK_ROWS = [[_S, 0.0, -_C], [0.0, 1.0, 0.0], [_C, 0.0, _S]]
-BLOCK_ROT = euler_from_rows(BLOCK_ROWS)  # [0, 45, 0]
-ROD_BORE_LOCAL = (BORE_X[0], BLOCK_DEPTH / 2.0)  # (x, z) of the rod bore axis
-
-
-def _block_to_machine(local: tuple[float, float, float]) -> list[float]:
-    """Machine point of a v-block-local point (block origin VBLOCK_POS)."""
-    x, y, z = local
-    return [
-        VBLOCK_POS[0] + x * BLOCK_ROWS[0][0] + z * BLOCK_ROWS[2][0],
-        VBLOCK_POS[1] + y,
-        VBLOCK_POS[2] + x * BLOCK_ROWS[0][2] + z * BLOCK_ROWS[2][2],
-    ]
-
-
-# Block origin: the rod bore axis lands on the rod line.
-VBLOCK_POS = (
-    PEN_ROD_X - ROD_BORE_LOCAL[0] * _S - ROD_BORE_LOCAL[1] * _C,
-    BLOCK_BOTTOM_Y,
-    PEN_Z_MID + ROD_BORE_LOCAL[0] * _C - ROD_BORE_LOCAL[1] * _S,
-)
-assert math.isclose(PEN_ROD_POS[1], VBLOCK_POS[1] + BLOCK_HEIGHT - ROD_BORE_ENGAGEMENT)
-# The block's paper-side corner (local x 0, z 16) must stand off the paper.
-_REAR_CORNER_Z = _block_to_machine((0.0, 0.0, BLOCK_DEPTH))[2]
-assert _REAR_CORNER_Z <= PAPER_FRONT_Z - 2 * CLEARANCE, (
-    f"v-block rear corner z {_REAR_CORNER_Z:.2f} too close to the paper {PAPER_FRONT_Z}"
-)
-
-# --- marker in the groove --------------------------------------------------------
-# Barrel O8 in the 8.5 x 4.5 groove: axis CLEARANCE below the groove roof,
-# centred in Z; the nib (marker local origin, +Y along the barrel) reaches
-# past the block's rear end face to CLEARANCE off the paper front.
-MARKER_AXIS_LOCAL_Y = GROOVE_DEPTH - BARREL_DIA / 2.0 - CLEARANCE  # 0.25
-assert GROOVE_WIDTH >= BARREL_DIA + 2 * CLEARANCE
-# Solve the nib's block-local x from the paper stand-off: machine z of a
-# local (x, ., 8) point is VBLOCK_POS.z - x*cos + 8*sin.
-MARKER_TIP_LOCAL_X = (
-    -((PAPER_FRONT_Z - PEN_PAPER_CLEARANCE_MM) - VBLOCK_POS[2]
-      - (BLOCK_DEPTH / 2.0) * _S) / _C
-)
-assert MARKER_TIP_LOCAL_X < 0.0 < MARKER_TIP_LOCAL_X + BARREL_TOP_Y - BLOCK_LENGTH, (
-    "marker must pass right through the block: nib past the rear face, body past the front"
-)
-MARKER_POS = _block_to_machine(
-    (MARKER_TIP_LOCAL_X, MARKER_AXIS_LOCAL_Y, BLOCK_DEPTH / 2.0)
-)
-# Marker local +Y -> block local +X (the barrel runs forward along the groove):
-# spin -90 about Z (Y -> X) then the block's yaw.
-_YAW_ROWS = BLOCK_ROWS
-MARKER_ROWS = [
-    [sum(rot_z_rows(-90.0)[i][k] * _YAW_ROWS[k][j] for k in range(3)) for j in range(3)]
-    for i in range(3)
-]
-MARKER_ROT = euler_from_rows(MARKER_ROWS)
-
-# --- stirrup frame + thumb screw ---------------------------------------------------
-# Frame-local (build_pn_pen_frame): width X (TRIM_NEAR..OUTER_WIDTH), height Y
-# 0..OUTER_HEIGHT, depth Z 0..FRAME_DEPTH; window X RAIL_SIDE..W-RAIL_SIDE,
-# Y RAIL_END..H-RAIL_END; set-screw tapped hole up through the bottom rail at
-# (W/2, ., D/2). Placed with its plane perpendicular to the block length:
-# frame X -> block Z (across the depth), frame Y -> up, frame Z -> block -X
-# (rearward), which is a yaw of -45 (right-handed). The window straddles the
-# block section with 1.0 a side, its top rail FRAME_TOP_GAP above the block
-# top, and the ring sits FRAME_ROD_GAP forward of the rod's front face.
-FRAME_TOP_GAP = 0.1
-# The rod is a machine-axis-aligned 5-square inside the 45-degree-yawed block, so
-# along the block length it spans the rod's DIAGONAL (+/-3.54 about the bore
-# axis), not +/-2.5: the stirrup's rear face stands FRAME_ROD_GAP past that
-# (a 1.0 gap measured from the flat left 0.04 of overlap, 0.01 mm^3).
-FRAME_ROD_GAP = 1.0
-ROD_HALF_DIAGONAL = ROD_SECTION / math.sqrt(2.0)  # 3.54
-FRAME_X_CENTER_LOCAL = (
-    ROD_BORE_LOCAL[0] + ROD_HALF_DIAGONAL + FRAME_ROD_GAP + FRAME_DEPTH / 2.0
-)
-assert OUTER_WIDTH - 2 * RAIL_SIDE >= BLOCK_DEPTH + 2.0, (
-    "stirrup window must pass the block"
-)
-assert FRAME_X_CENTER_LOCAL + FRAME_DEPTH / 2.0 < BLOCK_LENGTH, (
-    "stirrup off the block end"
-)
-_FRAME_ORIGIN_LOCAL = (
-    FRAME_X_CENTER_LOCAL + FRAME_DEPTH / 2.0,  # frame z 0 is its rear face
-    BLOCK_HEIGHT + FRAME_TOP_GAP + RAIL_END - OUTER_HEIGHT,  # bottom outer face
-    BLOCK_DEPTH / 2.0 - OUTER_WIDTH / 2.0,  # frame x 0 (window centred on the block)
-)
-FRAME_POS = _block_to_machine(_FRAME_ORIGIN_LOCAL)
-FRAME_ROWS = [[_C, 0.0, _S], [0.0, 1.0, 0.0], [-_S, 0.0, _C]]  # yaw -45
-FRAME_ROT = euler_from_rows(FRAME_ROWS)
-# Stock thumb screw: local +X runs from the outer head face through the
-# head/shoulder stack and shank. Turn +X upward on the frame's screw axis;
-# its flat tip is tangent to the underside of the centred marker barrel.
-SET_SCREW_ROWS = rot_z_rows(90.0)  # X -> +Y
-SET_SCREW_ROT = euler_from_rows(SET_SCREW_ROWS)
-_MARKER_BOTTOM_LOCAL_Y = MARKER_AXIS_LOCAL_Y - BARREL_DIA / 2.0
-_SCREW_TIP_LOCAL_Y = _MARKER_BOTTOM_LOCAL_Y
-PEN_SET_OVERALL_REACH = PEN_SET_HEAD_STACK_LEN + PEN_SET_SHANK_LEN
-PEN_SET_TIP_RADIUS = PEN_SET_SHANK_DIA / 2.0 - PEN_SET_TIP_CHAMFER
-if PEN_SET_TIP_RADIUS <= 0.0:
-    raise AssertionError("pen-set stock tip chamfer consumes its tip face")
-SET_SCREW_POS = _block_to_machine(
-    (
-        FRAME_X_CENTER_LOCAL,
-        _SCREW_TIP_LOCAL_Y - PEN_SET_OVERALL_REACH,
-        BLOCK_DEPTH / 2.0,
+# --- hanger guides: the rod square stays in both U guides over the full travel,
+# and nothing riding the rod reaches the lower guide --------------------------------
+if ROD_SQUARE_TOP_Y[0] < GUIDE_SPAN_Y[1] + GUIDE_ENGAGE_MARGIN:
+    raise AssertionError(
+        "pen-rod square leaves the upper U guide at the bottom of travel"
     )
-)
-assert _SCREW_TIP_LOCAL_Y - PEN_SET_SHANK_LEN < _FRAME_ORIGIN_LOCAL[1], (
-    "the knob must stand below the stirrup's bottom rail"
-)
+if CARRIAGE_TOP_Y[1] > GUIDE_SPAN_Y[0] - GUIDE_ENGAGE_MARGIN:
+    raise AssertionError("pen carriage reaches the lower U guide at the top of travel")
 
-# --- amplification wire 2 (rim -> pen rod) -----------------------------------
-# Endpoints + length live in pn_pen_wire_geom (the part's length IS the run);
-# assert them against THIS script's anchors so a layout move fails loud.
-# pn_pen_wire_geom, NOT build_pn_pen_wire: the part build's import closure carries
-# pn_pen_wire_spec's drawing prose, which would fold note edits into this
-# assembly's full-rebuild recipe (codex #361).
-from pn_pen_wire_geom import (  # noqa: E402
-    WIRE_BOTTOM as PEN_WIRE_BOTTOM,
-    WIRE_LEN as PEN_WIRE_LEN,
+# --- amplification wire 2 (rim -> stud eye) ---------------------------------------
+# The run's top rides the rim groove's tangent at the wheel-axis height; it hangs
+# plumb onto the stud's eye head, which stays below the rim at the top of travel.
+if not math.isclose(PEN_WIRE_BOTTOM[1] + PEN_WIRE_LEN, WHEEL_BAR_Y, abs_tol=1e-9):
+    raise AssertionError("pen-wire top drifted from the wheel-axis tangent height")
+_RIM_R = WHEEL_RIM_OUTER_DIA / 2.0
+_RIM_LOW_Y_AT_WIRE = WHEEL_BAR_Y - math.sqrt(
+    _RIM_R**2 - (WHEEL_X - PEN_WIRE_BOTTOM[0]) ** 2
 )
-from pn_pen_rod_spec import (  # noqa: E402
-    ROD_SECTION as _SPEC_ROD_SECTION,
-    WIRE_HOLE_Y as ROD_WIRE_HOLE_Y,
-)
-
-assert math.isclose(ROD_SECTION, _SPEC_ROD_SECTION), "pen-rod section drifted"
-assert math.isclose(
-    PEN_WIRE_BOTTOM[1], PEN_ROD_POS[1] + ROD_WIRE_HOLE_Y, abs_tol=1e-9
-), "pen-wire bottom drifted from the pen-rod wire hole"
-assert math.isclose(PEN_WIRE_BOTTOM[1] + PEN_WIRE_LEN, WHEEL_BAR_Y, abs_tol=1e-9), (
-    "pen-wire top drifted from the wheel-axis tangent height"
-)
+if STUD_HEAD_TOP_Y[1] > _RIM_LOW_Y_AT_WIRE - 2.0:
+    raise AssertionError(
+        "adjuster stud eye reaches the magnifying-wheel rim at the top of travel"
+    )
 
 # --- M6.10 fastener ----------------------------------------------------------
 # Pen-hanger screw from BEHIND the bar. Its under-head frame follows the shared
-# wheel-bar back face; the exact stock shank passes through the 9 mm bar and
-# 3 mm strap, then retains clearance to the magnifying-wheel rim.
+# wheel-bar back face; the exact stock shank passes through the 9 mm bar, the
+# 3 mm strap's clearance hole, the nut on the strap front and the jam nut on
+# that, then stands clear of the magnifying-wheel rim.
 BAR_BACK_Z = HANGER_POS[2] + max(HANGER_STRAP_Z) + WHEEL_BAR_DEPTH
 HANGER_SCREW_POS = (
-    HANGER_POS[0] + HANGER_TAP_XY[0],
-    HANGER_POS[1] + HANGER_TAP_XY[1],
+    HANGER_POS[0] + HANGER_HOLE_XY[0],
+    HANGER_POS[1] + HANGER_HOLE_XY[1],
     BAR_BACK_Z,
 )
 assert math.isclose(HANGER_SCREW_POS[0], HANGER_SCREW_MACHINE_X, abs_tol=1e-9)
 assert math.isclose(HANGER_SCREW_POS[1], WHEEL_BAR_Y, abs_tol=1e-9)
 HANGER_SCREW_TIP_Z = HANGER_SCREW_POS[2] - HANGER_SHANK_LEN
 HANGER_STRAP_FRONT_Z = HANGER_POS[2] + min(HANGER_STRAP_Z)
+# Both nuts' frames span local z 0..T (vn_pen_hanger_nut_spec,
+# vn_pen_hanger_jam_nut_spec): the nut placed un-rotated at the strap front
+# less its T bears on the strap with its z = T face; the jam nut, placed at
+# the nut's z = 0 face less its own T, bears on the nut the same way.
+HANGER_NUT_POS = (
+    HANGER_SCREW_POS[0],
+    HANGER_SCREW_POS[1],
+    HANGER_STRAP_FRONT_Z - HANGER_NUT_T,
+)
+HANGER_JAM_NUT_POS = (
+    HANGER_SCREW_POS[0],
+    HANGER_SCREW_POS[1],
+    HANGER_NUT_POS[2] - HANGER_JAM_NUT_T,
+)
 WHEEL_RIM_BACK_Z = WHEEL_MID_Z + WHEEL_RIM_AXIAL / 2.0
-HANGER_THREAD_PROTRUSION = HANGER_STRAP_FRONT_Z - HANGER_SCREW_TIP_Z
+# Full thread standing past the jam nut's outer face, the tip chamfer excluded.
+HANGER_THREAD_PAST_NUT = HANGER_JAM_NUT_POS[2] - HANGER_SCREW_TIP_Z - HANGER_TIP_CHAMFER
 HANGER_TIP_TO_RIM = HANGER_SCREW_TIP_Z - WHEEL_RIM_BACK_Z
-if HANGER_THREAD_PROTRUSION <= 0.0:
-    raise AssertionError("stock hanger screw does not pass through the tapped strap")
+# The wider nut's corners against the rim, radially from the wheel axis.
+HANGER_NUT_RIM_RADIAL = (
+    math.hypot(HANGER_SCREW_POS[0] - WHEEL_X, HANGER_SCREW_POS[1] - WHEEL_BAR_Y)
+    - HANGER_NUT_ACROSS_CORNERS / 2.0
+    - _RIM_R
+)
+if HANGER_THREAD_PAST_NUT < HANGER_THREAD_PAST_PITCHES * HANGER_THREAD_PITCH:
+    raise AssertionError(
+        "stock hanger screw stands under two full pitches past the jam nut"
+    )
 if HANGER_TIP_TO_RIM <= 0.0:
     raise AssertionError("stock hanger screw tip reaches the magnifying-wheel rim")
+if HANGER_NUT_RIM_RADIAL <= 0.0:
+    raise AssertionError("hanger nut corners reach the magnifying-wheel rim")
+
+# Every part that rides the rod: (stem, position, rows). Each is placed at its
+# exact pose and LOCKED to the rod (a Lock mate freezes the full relative
+# transform, so one mate per rider). Threaded riders (thumb screw, rod set
+# screw, stud, nut) sit on their tapped-hole axes by construction -- the same
+# block/rod stations the parts' hole features resolve to; an extra coaxial mate
+# on top of the Lock would only over-constrain the solve.
+RIDERS = (
+    ("pn-pen-v-block", VBLOCK_POS, BLOCK_ROWS),
+    ("vn-pen-marker", MARKER_POS, MARKER_ROWS),
+    ("pn-pen-frame", FRAME_POS, FRAME_ROWS),
+    ("vn-pen-set-screw", THUMB_SCREW_POS, THUMB_SCREW_ROWS),
+    ("vn-pen-rod-set-screw", ROD_SET_SCREW_POS, ROD_SET_SCREW_ROWS),
+    ("pn-pen-adjust-screw", STUD_POS, IDENTITY),
+    ("vn-pen-adjust-nut", NUT_POS, NUT_ROWS),
+    ("pn-pen-wire", PEN_WIRE_BOTTOM, IDENTITY),
+)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -314,7 +234,7 @@ async def build(adapter) -> dict[str, str]:
     reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
 
-    # The pen carriage slides vertically through the hanger's guide block: the
+    # The pen carriage slides vertically through the hanger's U guides: the
     # magnifying wheel's wire (flexible, not modeled as geometry --
     # dimensions.yaml ch24) raises/lowers it to trace the curve. The rod runs
     # as a Y-prismatic -- its local slide axis held parallel to the Front +
@@ -328,7 +248,12 @@ async def build(adapter) -> dict[str, str]:
         adapter, "pn-pen-hanger", list(HANGER_POS), [0.0, 0.0, 0.0], IDENTITY
     )
     pen_rod = await place_component(
-        adapter, "pn-pen-rod", list(PEN_ROD_POS), [0.0, 0.0, 0.0], IDENTITY, ground=False
+        adapter,
+        "pn-pen-rod",
+        list(PEN_ROD_POS),
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
     )
     rod_o = component_origin(adapter, pen_rod)
     await distance_driver(
@@ -369,51 +294,17 @@ async def build(adapter) -> dict[str, str]:
         free_dof_key="pen_travel",
     )
 
-    # The carriage: v-block hanging on the rod, marker in its groove, stirrup
-    # frame round the block section, thumb screw up through the frame -- each
-    # placed at its exact pose and LOCKED to the rod (a Lock mate freezes the
-    # full relative transform, so one mate per rider).
-    riders = [
-        ("pn-pen-v-block", list(VBLOCK_POS), BLOCK_ROT, BLOCK_ROWS),
-        ("pn-pen-marker", list(MARKER_POS), MARKER_ROT, MARKER_ROWS),
-        ("pn-pen-frame", list(FRAME_POS), FRAME_ROT, FRAME_ROWS),
-        ("vn-pen-set-screw", list(SET_SCREW_POS), SET_SCREW_ROT, SET_SCREW_ROWS),
-    ]
-    placed: dict[str, str] = {}
-    for part, pos, rot, rows in riders:
-        name = await place_component(adapter, part, pos, rot, rows, ground=False)
-        placed[part] = name
+    for part, pos, rows in RIDERS:
+        name = await place_component(
+            adapter, part, list(pos), euler_from_rows(rows), rows, ground=False
+        )
         await lock_mate(
             adapter,
             named_ref(f"Front Plane@{name}", "PLANE"),
             named_ref(f"Front Plane@{pen_rod}", "PLANE"),
             label=f"{part} locked to rod",
         )
-        assert_component_placed(adapter, name, pos, rows)
-    # The thumb screw sits on the stirrup's tapped-hole axis by construction
-    # (SET_SCREW_POS is derived from FRAME_X_CENTER_LOCAL / the block depth
-    # centre, the same block-local station the frame's ScrewX/ScrewZ resolve
-    # to); a coincident axis mate on top of the two Locks would only
-    # over-constrain the solve.
-
-    # Amplification wire 2: the straight rest-pose run hanging off the wheel
-    # rim's 3 o'clock tangent down to the rod's wire hole level (the tie-off
-    # is implied -- module docstring). Locked to the rod so it rides the pen
-    # travel with the carriage.
-    pen_wire = await place_component(
-        adapter,
-        "pn-pen-wire",
-        list(PEN_WIRE_BOTTOM),
-        [0.0, 0.0, 0.0],
-        IDENTITY,
-        ground=False,
-    )
-    await lock_mate(
-        adapter,
-        named_ref(f"Front Plane@{pen_wire}", "PLANE"),
-        named_ref(f"Front Plane@{pen_rod}", "PLANE"),
-        label="pen-wire locked to rod",
-    )
+        assert_component_placed(adapter, name, list(pos), rows)
 
     # Kinematic pen driver (plan F5): re-drives the Y-travel mate from a
     # CrankDeg global through the chained Fourier sum, so the pose reproduces
@@ -436,7 +327,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"ScrewAxis@{hanger_screw}", "AXIS"),
         named_ref(f"HangerScrewAxis@{hanger}", "AXIS"),
-        label="hanger screw coaxial with strap tapped hole",
+        label="hanger screw coaxial with strap clearance hole",
         verify=(hanger_screw, list(HANGER_SCREW_POS)),
     )
     await distance_driver(
@@ -456,21 +347,37 @@ async def build(adapter) -> dict[str, str]:
     )
     assert_component_placed(adapter, hanger_screw, list(HANGER_SCREW_POS), IDENTITY)
 
+    # The nut on the strap front and the jam nut on the nut: each placed on
+    # the screw axis at its exact pose and locked to the fixed hanger -- one
+    # Lock mate, like the riders; a coaxial mate on top would only
+    # over-constrain the solve.
+    for stem, pos, label in (
+        ("vn-pen-hanger-nut", HANGER_NUT_POS, "hanger nut locked to hanger"),
+        (
+            "vn-pen-hanger-jam-nut",
+            HANGER_JAM_NUT_POS,
+            "hanger jam nut locked to hanger",
+        ),
+    ):
+        nut = await place_component(
+            adapter, stem, list(pos), [0.0, 0.0, 0.0], IDENTITY, ground=False
+        )
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{nut}", "PLANE"),
+            named_ref(f"Front Plane@{hanger}", "PLANE"),
+            label=label,
+        )
+        assert_component_placed(adapter, nut, list(pos), IDENTITY)
+
     # Certify the AS-BUILT model. Necessity only: the freed pen travel is
-    # genuinely free; the lock-mated carriage + pen-wire MUST read
-    # under-constrained WITH the rod -- with the neutral preset the motion
-    # sweep reads got == want == 0 even if a rider were disconnected.
+    # genuinely free; the lock-mated riders MUST read under-constrained WITH
+    # the rod -- with the neutral preset the motion sweep reads got == want == 0
+    # even if a rider were disconnected.
     assert_free_dof_necessity(
         adapter,
         1,
-        required_stems=(
-            "pn-pen-rod",
-            "pn-pen-marker",
-            "pn-pen-wire",
-            "pn-pen-v-block",
-            "pn-pen-frame",
-            "vn-pen-set-screw",
-        ),
+        required_stems=("pn-pen-rod", *(part for part, *_ in RIDERS)),
     )
     write_dof_manifest(ASM_NAME)
     check_no_interference(
