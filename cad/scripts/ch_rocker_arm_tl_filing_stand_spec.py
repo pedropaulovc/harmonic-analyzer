@@ -77,26 +77,23 @@ if abs(PEDESTAL_LENGTH - BLOCK_HEIGHT - STEP) > 1e-9:
         "filing-stand pedestal length is not the block height plus the step"
     )
 
-# Sheet arrangement only (the drawing's views, never a requirement): the two
-# blocks side by side, then the pedestal, each standing on the bench (Y0), in
-# Top-plane sketch coordinates (sketch y is model -Z).
-LAYOUT_BLOCK_WEST_X = (0.0, 30.0)  # left block, right block
-LAYOUT_PEDESTAL_X = 70.0
-LAYOUT_PEDESTAL_Y = BLOCK_WIDTH / 2.0
-if LAYOUT_PEDESTAL_X - PEDESTAL_DIA / 2.0 <= LAYOUT_BLOCK_WEST_X[1] + BLOCK_LENGTH:
+# Sheet arrangement only (the drawing's views, never a requirement): the
+# pedestal's axis on the model Y axis (a revolved round, so the elevation
+# carries its diameter, rule 11), the two blocks side by side west of it,
+# all standing on the bench (Y0) and centred on Z0.
+LAYOUT_BLOCK_WEST_X = (-75.0, -45.0)  # left block, right block
+if -PEDESTAL_DIA / 2.0 <= LAYOUT_BLOCK_WEST_X[1] + BLOCK_LENGTH:
     raise AssertionError("filing-stand layout overlaps the pedestal and a block")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LeftBlockProfile": {"BlockLength", "BlockWidth"},
     "LeftBlock": {"BlockHeight"},
-    "PedestalProfile": {"PedestalDia"},
-    "Pedestal": {"PedestalLength"},
+    "PedestalProfile": {"PedestalDia", "PedestalLength"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LeftBlockProfile": {"BlockLength": 1, "BlockWidth": 1},
     "LeftBlock": {"BlockHeight": 1},
-    "PedestalProfile": {"PedestalDia": 2},
-    "Pedestal": {"PedestalLength": 2},
+    "PedestalProfile": {"PedestalDia": 2, "PedestalLength": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

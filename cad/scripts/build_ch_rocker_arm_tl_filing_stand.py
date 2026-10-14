@@ -4,11 +4,12 @@ Two steel end blocks and a steel pedestal standing loose on the fitting bench:
 the blocks carry the raw blank ends and the pedestal the lower hub face while
 the rocker arm is sawn free and filed (``ch_rocker_arm_tl_filing_stand_spec``).
 
-Layout (the spec's SolidWorks frame, +Y up, origin on the bench top): each
-block outline is its own Top-plane sketch extruded +Y by the block height, so
-the left block alone carries the printed sizes; the pedestal is a circle
-extruded +Y by its own length. The part is the loose set, three bodies laid
-out side by side for the sheet.
+Layout (the spec's SolidWorks frame, +Y up, origin on the bench top under the
+pedestal axis): each block outline is its own Top-plane sketch, centred on
+Z0, extruded +Y by the block height, so the left block alone carries the
+printed sizes; the pedestal is a Front-plane half profile revolved about the
+Y axis, so the elevation carries its diameter and length. The part is the
+loose set, three bodies laid out side by side for the sheet.
 
 Run (SolidWorks already open)::
 
@@ -29,9 +30,15 @@ from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
-from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_chains import define_rectilinear_chain
-from _sketch_circle import define_circle
+from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
@@ -48,8 +55,6 @@ from ch_rocker_arm_tl_filing_stand_spec import (
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     LAYOUT_BLOCK_WEST_X,
-    LAYOUT_PEDESTAL_X,
-    LAYOUT_PEDESTAL_Y,
     PEDESTAL_DIA,
     PEDESTAL_LENGTH,
 )
@@ -81,7 +86,7 @@ def _require_bodies(adapter, count: int, *, label: str) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
 
@@ -102,11 +107,12 @@ async def build(adapter) -> dict[str, str]:
     ):
         profile = SketchDims()
         check(f"create_sketch {side} block", await adapter.create_sketch("Top"))
+        south_y = -BLOCK_WIDTH / 2.0  # Top-plane sketch y is model -Z
         points = [
-            (west_x, 0.0),
-            (west_x + BLOCK_LENGTH, 0.0),
-            (west_x + BLOCK_LENGTH, BLOCK_WIDTH),
-            (west_x, BLOCK_WIDTH),
+            (west_x, south_y),
+            (west_x + BLOCK_LENGTH, south_y),
+            (west_x + BLOCK_LENGTH, south_y + BLOCK_WIDTH),
+            (west_x, south_y + BLOCK_WIDTH),
         ]
         lines = await add_line_chain(adapter, points)
         prefix = "" if side == "Left" else side
@@ -149,35 +155,57 @@ async def build(adapter) -> dict[str, str]:
         )
         _require_bodies(adapter, count, label=f"{side.lower()} end block")
 
+    # Half profile about the Y axis on the Front plane (sketch = model X, Y).
+    radius = PEDESTAL_DIA / 2.0
     pedestal = SketchDims()
-    check("create_sketch pedestal", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter,
-        LAYOUT_PEDESTAL_X,
-        LAYOUT_PEDESTAL_Y,
-        PEDESTAL_DIA / 2.0,
-        "pedestal",
-        dims=pedestal,
-        names=(None, None, "PedestalDia"),
-        drives=(None, None, '"PedestalDia"'),
+    check("create_sketch pedestal", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "pedestal axis", await adapter.add_centerline(0.0, 0.0, 0.0, PEDESTAL_LENGTH)
     )
+    points = [
+        (0.0, 0.0),
+        (radius, 0.0),
+        (radius, PEDESTAL_LENGTH),
+        (0.0, PEDESTAL_LENGTH),
+    ]
+    lines = await add_line_chain(adapter, points)
+    set_sketch_direct_db(adapter, False)
+    for index, line in enumerate(lines):
+        p0 = points[index]
+        p1 = points[(index + 1) % len(points)]
+        relation = "horizontal" if p0[1] == p1[1] else "vertical"
+        check(
+            f"pedestal profile {relation} {line}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
+    check(
+        "pedestal axis vertical",
+        await adapter.add_sketch_constraint(axis, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{lines[0]}.start", 0.0, 0.0, "pedestal origin"
+    )
+    await add_diametric_linear_dimension(
+        adapter, axis, lines[1], (radius + 4.0, PEDESTAL_LENGTH / 2.0), "PedestalDia"
+    )
+    pedestal.record("PedestalDia", '"PedestalDia"')
+    check(
+        "pedestal length",
+        await adapter.add_sketch_dimension(lines[1], None, "linear", PEDESTAL_LENGTH),
+    )
+    pedestal.record("PedestalLength", '"PedestalLength"')
     await ensure_fully_defined(adapter, "pedestal profile")
     check("exit_sketch pedestal", await adapter.exit_sketch())
     name_last_feature(adapter, "PedestalProfile")
     drive_jobs += pedestal.apply(adapter, "PedestalProfile")
     check(
-        "extrude pedestal",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=PEDESTAL_LENGTH, merge_result=False)
+        "revolve pedestal",
+        await adapter.create_revolve(
+            RevolveParameters(angle=360.0, merge_result=False)
         ),
     )
     name_last_feature(adapter, "Pedestal")
-    drive_jobs.append(
-        (
-            name_dimensions(adapter, "Pedestal", ["PedestalLength"])[0],
-            '"PedestalLength"',
-        )
-    )
     volume = await volume_check(
         adapter, "pedestal", volume + V_PEDESTAL, 0.002 * (2.0 * V_BLOCK + V_PEDESTAL)
     )

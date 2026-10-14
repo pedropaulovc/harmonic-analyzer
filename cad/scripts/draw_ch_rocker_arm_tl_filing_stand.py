@@ -1,9 +1,9 @@
 r"""Create the drawing for the rocker arm filing stand (MHA-CH-006-TL-12).
 
 The loose set laid out side by side: a plan (``*Top``, looking down on the
-bench) carries the left block's outline and the pedestal diameter, and the
-elevation (``*Front``, third-angle below it, +Y up) the left block's height
-and the pedestal's reference length with its step over the blocks.
+bench) carries the left block's outline, and the elevation (``*Front``,
+third-angle below it, +Y up) the left block's height and the pedestal's
+diameter and reference length with its step over the blocks.
 """
 
 from __future__ import annotations
@@ -54,12 +54,12 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# The set is 75 long and 38 deep: full size, both views stacked left of the
+# The set is 80 long and 38 deep: full size, both views stacked left of the
 # isometric.
 SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
-# Plan: left block at sheet x 0.0726-0.0926, right 0.1026-0.1226, pedestal
-# centre 0.1424; y 0.186-0.224.
+# Plan: left block at sheet x 0.0701-0.0901, right 0.1001-0.1201, pedestal
+# 0.1404-0.1499; y 0.186-0.224.
 PLAN_CENTER = (0.110, 0.205)
 # Elevation: bench line at y 0.1148, block tops 0.1448, pedestal top 0.1452.
 ELEVATION_CENTER = (0.110, 0.130)
@@ -68,24 +68,27 @@ ISO_SCALE = (1, 2)
 ISO_NOTE_XY = (0.265, 0.235)
 PLAN_KEEP = {
     # The left block carries the 2X outline sizes.
-    "BlockLength": (0.0826, 0.236),
+    "BlockLength": (0.0801, 0.236),
     "BlockWidth": (0.055, 0.205),
-    "PedestalDia": (0.172, 0.240),
 }
 ELEVATION_KEEP = {
     "BlockHeight": (0.055, 0.130),
-    # Right of the pedestal, clear of it, the value high in the 30 span so
-    # the step callout below it stays between the extension lines.
-    "PedestalLength": (0.184, 0.139),
+    # The pedestal reads like the lathe (rule 11): its diameter on the side
+    # view, above its top, clear of the plan.
+    "PedestalDia": (0.1451, 0.161),
+    # Right of the pedestal, clear of it. SolidWorks centres the whole text
+    # block (value plus the step callout, about 22 tall) on this point, so
+    # mid-span keeps it between the extension lines (y 0.1148-0.1452).
+    "PedestalLength": (0.184, 0.130),
 }
 CALLOUTS_ABOVE = {
     "BlockLength": BLOCK_COUNT_CALLOUT,
     "BlockWidth": BLOCK_COUNT_CALLOUT,
     "BlockHeight": BLOCK_COUNT_CALLOUT,
+    "PedestalDia": PEDESTAL_DIA_CALLOUT,
 }
 CALLOUTS_BELOW = {
     "PedestalLength": PEDESTAL_LENGTH_CALLOUT,
-    "PedestalDia": PEDESTAL_DIA_CALLOUT,
 }
 
 
