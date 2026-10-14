@@ -269,13 +269,12 @@ def test_the_thumbnut_rocked_by_the_free_t24_is_waived_only_by_its_ruling() -> N
     assert f"\u00b1{rock:.1f}\u00b0 per reversal" in jr.RULINGS[row.exception].granted
 
 
-def test_the_knife_hanger_is_a_threadlocked_clamp_keyed_by_its_dowel() -> None:
-    """The #6-32 knife hanger clamps each knife mount to the crossbar (gap 0)
-    and the pressed MHA-VN-051 dowel keys it, so no operating torque acts about
-    the screw; the screw's installation notes call for the threadlocker the row
-    cites, and the retired MHA-VN-026 washer is classified nowhere."""
+def test_the_knife_hanger_is_a_threadlocked_clamp_keyed_by_its_two_dowels() -> None:
+    """The cut #10-24 hex bolt clamps through a new SAE washer; the two
+    pressed dowels react torque, so the removable threadlocker-only policy
+    remains unchanged. The plain washer is not a mechanical thread lock."""
     (row,) = [j for j in jr.JOINTS if j.id == "sm-summing/knife-hanger-in-mount"]
-    assert row.thread == "#6-32 UNC"
+    assert row.thread == "#10-24 UNC"
     assert row.exposure is Exposure.STATIC_CLAMP
     assert row.lock is Lock.THREADLOCKER_ONLY
     sentence = "USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER."
@@ -286,9 +285,24 @@ def test_the_knife_hanger_is_a_threadlocked_clamp_keyed_by_its_dowel() -> None:
     assert jr.UNTHREADED_STOCK["vn_knife_mount_dowel"] == (
         "dowel pin pressed into a reamed hole"
     )
-    retired = "vn_knife_hanger_washer"
-    assert retired not in jr.THREADED_PARTS | jr.UNTHREADED_PARTS
-    assert retired not in jr.UNTHREADED_STOCK
+    washer = "vn_knife_hanger_washer"
+    assert washer in jr.UNTHREADED_PARTS
+    assert washer not in jr.THREADED_PARTS
+    assert jr.UNTHREADED_STOCK[washer] == (
+        "plain SAE washer under the knife-hanger hex head; no thread"
+    )
+    assert row.quantity == 2
+    assert not row.lock_part and not row.lock_binds
+    assert "two pressed MHA-VN-051 dowels" in row.exposure_reason
+    assert "92314A253" in row.axial_capture
+    assert "96659A104" in row.axial_capture
+    assert "spotface" in row.axial_capture
+    assert "45.70 +/-0.15" in row.axial_capture
+    assert "8.9173 nominal (8.349..9.4856 worst case)" in row.axial_capture
+    assert "9.65 +/-0.13" in row.axial_capture
+    assert "0.0760667 spare" in row.axial_capture
+    assert "7.2906667 full engagement" in row.axial_capture
+    assert "0.0344 minimum tip air" in row.axial_capture
 
 
 def test_the_channel_apex_set_screws_are_waived_only_by_their_ruling() -> None:

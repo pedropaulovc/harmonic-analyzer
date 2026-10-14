@@ -5,8 +5,8 @@ closure.  Four are used, two per knife mount: each is pressed chamfer end
 first to the flat floor of a blind reamed hole in the MHA-SM-002 top seat and
 slips, at assembly, into the underside of the MHA-FR-002 crossbar, one into a
 round hole, the other into a slot along the dowel line.  The pair keys the
-block against turning about its #6-32 knife-hanger screw (MHA-VN-024): the
-screw clamps the seat to the casting underside, the pins react the torque and
+block against turning about its #10-24 knife-hanger hex bolt (MHA-VN-024): the
+bolt clamps the seat to the casting underside, the pins react the torque and
 hold the block's yaw.
 
 Catalogue: 1/8 x 3/4 alloy-steel dowel, Round x Chamfer ends, diameter
@@ -61,19 +61,26 @@ _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
 # machine X: the mounts are placed unrotated).  The crossbar prints each
 # station .XXX from its screw axis (HANGER_OFFSET_TOL); the knife mount holds
 # the pair as its datum pattern B -- the 2X ream carries a position frame to
-# the top seat, its SPAN BASIC -- and positions its tap to it.  The crossbar's slot takes up the spacing, its #6 clearance hole the
-# rest (``fr_top_frame_spec``, ``build_sm_summing_assembly``).
+# the top seat, its SPAN BASIC -- and positions its tap to it.  The crossbar's
+# slot takes up the spacing, its #10 clearance hole the rest
+# (``fr_top_frame_spec``, ``build_sm_summing_assembly``).
 PER_MOUNT = 2
 MOUNTS = 2
 QUANTITY = PER_MOUNT * MOUNTS
-# 7.100, not the original 1/4 in: at 6.350 the crossbar's blind slot left
-# under 2.0 of wall to the #6 clearance hole at the print-worst plus drill
-# drift (codex machinist review of fr_top_frame 4d11a94e).  Q7 option C,
-# approved as built by the user 2026-10-13 (#1348): 14.200 BASIC span,
-# 24 crossbar, 25 block, Ø4.699 #6 hole drilled from the underside.
-# 7.1 rather than 7.0 so the wall holds 2.0 with both the clearance hole
-# and the slot charged their drift toward each other.
-HANGER_OFFSET = 7.1
+# 7.632 for the #10-24 hex bolt that replaced the #6-32 screw (the user's
+# knife-hanger regression fix): the crossbar's Ø6.045 #10 loose clearance
+# hole, drilled from the underside under a shallow top spotface, and its slot,
+# shortened to 3.95, each keep 2.0 of wall at the print-worst plus drill
+# drift, inside to the hole and outside to the 25 crossbar's face
+# (``build_fr_top_frame``'s slot and hole walls); the block widens to 25.4 so
+# its -X dowel keeps 2.0 to the far face round the 15.264 BASIC span
+# (``sm_knife_mount_spec.PIN_HOLE_FAR_SIDE_WEB``).  History: 7.100, not the
+# original 1/4 in, because at 6.350 the crossbar's blind slot left under 2.0
+# of wall to the then #6 clearance hole at the print-worst plus drill drift
+# (codex machinist review of fr_top_frame 4d11a94e); Q7 option C, approved as
+# built by the user 2026-10-13 (#1348): 14.200 BASIC span, 24 crossbar, 25
+# block, Ø4.699 #6 hole drilled from the underside.
+HANGER_OFFSET = 7.632
 HANGER_OFFSET_PLACES = 3
 HANGER_OFFSET_TOL = _XXX  # 0.13
 # The pair's centre-to-centre span along the dowel line, BASIC.  Each hole's
@@ -82,7 +89,7 @@ HANGER_OFFSET_TOL = _XXX  # 0.13
 # (``sm_knife_mount_spec.GEOMETRIC_TOLERANCES_MM``, which asserts it equals
 # SPAN_TOL) keeps the 0.13 the .XXX span gave, and with it every stack the
 # pair feeds (the 2026-10-09 ruling).
-SPAN = 2.0 * HANGER_OFFSET  # 14.200
+SPAN = 2.0 * HANGER_OFFSET  # 15.264
 SPAN_PLACES = 3
 SPAN_TOL = 0.13
 # Pressed to the flat floor of the knife mount's blind hole, printed .X.

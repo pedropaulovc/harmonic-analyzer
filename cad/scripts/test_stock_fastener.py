@@ -39,8 +39,10 @@ def test_every_recipe_declares_the_thread_it_cuts() -> None:
     }
     # Anchors: a scan that found nothing (or everything) must not pass.
     assert scanned["91375A106"] and scanned["90280A194"] and not scanned["98381A473"]
-    # The partial-thread SHCS cuts its groove in the shared socket-head helper.
-    assert scanned["91251A157"] and scanned["91251A108"]
+    # Production hex stock cuts its groove in the shared hex helper; the
+    # unrelated socket screw and historical catalogue recipe remain valid.
+    assert scanned["92314A253"] and not scanned["96659A104"]
+    assert scanned["91251A108"] and scanned["91251A157"]
     assert declared == scanned
 
 

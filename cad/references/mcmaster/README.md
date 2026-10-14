@@ -32,7 +32,7 @@ recipes:
 | 90280A837 | `vn-frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 91247A720 | — (diagnostic recipe; a former `vn-knife-hanger-stud`) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
-| 91251A157 | `vn-knife-hanger-stud` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
+| 91251A157 | — (catalogue-only diagnostic recipe; former `vn-knife-hanger-stud`) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91255A106 | — (diagnostic recipe; a former `vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91375A106 | `vn-arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
@@ -48,6 +48,7 @@ recipes:
 | 92240A540 | `vn-lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A205 | `vn-transgear-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 91829A560 | `vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
+| 92314A253 | `vn-knife-hanger-stud` (modified stock; catalogue-only, no vendor model) | 18-8 Stainless Steel Hex Head Screw, #10-24 × 2 in, cut to length |
 | 91882A221 | `vn-thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | — (diagnostic recipe; `vn-cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `vn-tube-frame-cap` | Metal Round Cap |
@@ -56,6 +57,7 @@ recipes:
 | 94355A213 | `vn-cone-tip-collar` set screw, fitted as supplied | 18-8 Stainless Steel Flat-Tip Set Screw, #2-56 x 5/16" |
 | 92865A585 | `vn-hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 92916A250 | `vn-wheel-axle-front-washer` (catalogue-only; no vendor model) | Brass Washer for Number 4 Screw Size |
+| 96659A104 | `vn-knife-hanger-washer` (MHA-VN-060; catalogue-only, no vendor model) | 18-8 Stainless Steel SAE Washer for Number 10 Screw Size |
 | 92916A480 | `vn-wheel-axle-back-washer` (catalogue-only; no vendor model) | Brass Washer for Number 10 Screw Size |
 | 93075A194 | `vn-hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93585A190 | `vn-cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
@@ -462,21 +464,102 @@ Catalog specifications checked on September 10, 2026:
   minimum key engagement, 0.055 in, and a plain cylindrical head. It is
   catalogue-only: no vendor model is downloaded or kept here, so it has no
   replica gate, and its standalone diagnostic is a catalog-only run.
-- [91251A157](https://www.mcmaster.com/91251A157/) (`vn-knife-hanger-stud`,
-  MHA-VN-024, two) hangs each MHA-SM-002 knife mount from the MHA-FR-002
-  crossbar: it drops through the crossbar's counterbore, its head on the
-  counterbore floor, into a #6-32 bottoming tap in the mount's top seat. It
-  replaced the 1/2-13 hex bolt 91247A720 and its washer 90126A211. The
-  product page was read live in October 2026: black-oxide alloy steel socket
-  head screw, 6-32 UNC class 3A, right hand, 1-1/2 in under the head,
-  partially threaded with a 3/4 in minimum thread length, flat tip, head
-  Ø0.226 in x 0.138 in, 7/64 in hex drive, 170 ksi, Rockwell C37, ASTM A574.
-  The page gives no socket depth; `diag_build_91251A157.py` takes ASME
-  B18.3's #6 minimum key engagement, 0.064 in, and a plain cylindrical head,
-  on the socket-head recipe it shares with 91251A108
-  (`diag_mcmaster_socket_head.py`). It is catalogue-only: no vendor model is
-  downloaded or kept here, so it has no replica gate, and its standalone
-  diagnostic is a catalog-only run.
+- [91251A157](https://www.mcmaster.com/91251A157/) formerly supplied
+  `vn-knife-hanger-stud`, MHA-VN-024, two, in the superseded #6-32 route.
+  Each screw dropped through the MHA-FR-002 crossbar counterbore and seated
+  directly on its floor, threading into the MHA-SM-002 mount's top seat.
+  That route had replaced the 1/2-13 hex bolt 91247A720 and washer 90126A211;
+  all three SKUs remain historical/diagnostic records, not current hanger
+  hardware. The product page was read live in October 2026: black-oxide
+  alloy steel socket head screw, 6-32 UNC class 3A, right hand, 1-1/2 in
+  under the head, partially threaded with a 3/4 in minimum thread length,
+  flat tip, head Ø0.226 in × 0.138 in, 7/64 in hex drive, 170 ksi,
+  Rockwell C37, ASTM A574. The page gave no socket depth;
+  `diag_build_91251A157.py` used ASME B18.3's #6 minimum key engagement,
+  0.064 in, and a plain cylindrical head on the socket-head recipe shared
+  with 91251A108 (`diag_mcmaster_socket_head.py`). It remains catalogue-only,
+  with no vendor model or replica gate.
+- [92314A253](https://www.mcmaster.com/92314A253/) is the current modified
+  stock for `vn-knife-hanger-stud`, MHA-VN-024, drawing title **Bolt**, two.
+  Live on 2026-10-13: 18-8 stainless steel external hex head, #10-24 UNC
+  class 2A, fully threaded, 2 in (50.8 mm) nominal under-head length,
+  80 ksi tensile strength, nominal AF 5/16 in (7.9375 mm) and head height
+  1/8 in (3.175 mm). This SKU's table omits dimensional tolerances and
+  a conformity standard; no supplier head tolerance or under-head bearing
+  circle bound is inferred. The ordinary hex-head-on-SAE-washer joint is
+  accepted practice, not a guaranteed stress or material allowable.
+  Cut the under-head length to **45.70 ±0.15 mm**. Finished-part acceptance
+  retains a threaded tail **MIN 10.62 mm from the cut end**, with
+  **MAX 1 P cut chamfer**, leaving at least 9.561667 mm full-form tail.
+  These are manufactured acceptance constraints, not vendor grades.
+  Retain the native cut-end prep **RADIAL 0.60 ±0.05 mm ×45 ±1°** and
+  independently inspect the finished length, tail and
+  #10-24 class 2A thread; none is a new supplied SKU length or tolerance.
+  The head bears on the new washer, not the obsolete #6 counterbore floor.
+- [96659A104](https://www.mcmaster.com/96659A104/) supplies the new
+  `vn-knife-hanger-washer`, **MHA-VN-060**, two; the retired 1/2-inch
+  washer's MHA-VN-026 Number is never reused. Live on 2026-10-13: 18-8
+  stainless SAE No. 10 flat washer, ASME B18.21.1, nominal ID 5.5626 mm
+  and OD 12.7 mm, published thickness 0.9144–1.651 mm. The model's
+  1.2827 mm thickness is a nominal midpoint, not a guaranteed thickness.
+  [ASME B18.21.1-2009, Table 11](https://ssmalloys.com/wp-content/uploads/2024/10/ASME-B18.21.1.pdf)
+  gives actual ID 5.4356–5.7658 mm and OD 12.573–13.081 mm; §4.5's
+  OD-to-ID runout is included conservatively as 0.3302 mm radial eccentricity.
+  Full washer float uses the #10-24 class 2A external-major limits
+  **MIN 4.61772 / MAX 4.8006 mm** (0.1818 / 0.1890 in;
+  [sourced thread chart](https://www.engineersedge.com/screw_threads_chart.htm)),
+  not the nominal thread major. Radial float is 0.57404 mm; maximum washer
+  OD offset including location and eccentricity is 1.476116732 mm.
+  The Ø17 spotface retains 0.228383268 mm spare and 1.722883268 mm actual
+  continuous floor bearing, without a new neck or radial-play inspection.
+  The governing grip is the model-owned driving dimension
+  `HangerGrip@HangerGripReference`, toleranced in the part builder. The real
+  Hole Wizard spotface depth is equation-driven by `RingHeight` minus that
+  dimension; the sheet imports the stored size and band unchanged. It is
+  neither an unrelated witness nor a drawing-created tolerance.
+  Hole Wizard may store that depth on an internal profile sketch. The
+  builder proves ownership through the wizard's actual sub-features and
+  their dimension walks before binding the equation; it does not assume
+  that the dimension's owner token equals the outer feature name or pin
+  an unstable generated sketch number.
+  The native washer-spotface feature seeds the ANSI-inch socket-cap table:
+  the installed hex-bolt table starts at 1/4 in and has no numbered #10 row.
+  This is a Hole Wizard database seed, not a socket-head hardware choice;
+  explicit bore diameter, spotface diameter and depth overrides retain the
+  approved finished geometry and readbacks. The external-hex bolt remains
+  92314A253. After the bolt's trim equations, its deburr revolve explicitly
+  selects the completed closed sketch (mark 0) and captured construction
+  axis (mark 4), rather than relying on incidental post-edit selections.
+  Coordinator R3 on 37a3382d9 passed the top-frame part, the knife-mount
+  drawing and the frame/summing/top assemblies and soundness; the bolt part
+  and drawing had already passed R2. Only the top-frame drawing failed:
+  `IAnnotation.Select3` threw while selecting its native crossbar width.
+  The drawing now re-resolves that width by its native selection name after
+  the text-offset rebuild, uses the documented `SelectByID2` dimension
+  channel, and records annotation name/type and selection identity before
+  inserting datum D. Exactly-one selection and the original dimension-
+  attachment, label and dangling guards remain mandatory. Stale handles
+  are a possibility, not a demonstrated root cause; the final-source
+  selection and median-plane datum layout require the scoped native proof.
+  The washer seats on a **SPOTFACE Ø17.0 ±0.51**, floor **35.50 ±0.05 mm
+  above the faced crossbar underside**. With the cut bolt, nominal tip
+  reach is 8.9173 mm, bounded by 8.349–9.4856 mm. Subtracting one #10-24
+  pitch gives minimum full-form engagement 7.290667 mm, above 1.5D =
+  7.239 mm. Full-thread depth **9.65 ±0.13 mm** (MIN 9.52) leaves
+  0.0344 mm tip air at maximum reach; the inspected full-form tail leaves
+  9.561667 − 9.4856 = 0.076066667 mm coverage beyond maximum reach.
+  These are the stated stack margins, not extra tolerance reserves.
+  The receiver's cylindrical drill depth is **11.24 ±0.05 mm**. Its
+  corrected crown proof charges physical pilot oversize and point-angle
+  variation, not nominal diameter and an exact point angle; see the
+  [machining route and charged bounds](../../docs/machining-dfm.md#summing-lever--knife-edge-t1--least-forgiving-interface).
+  The SKU tables and 2-D reference PDFs were recovered in a browser:
+  PDF fetching succeeded after direct HTTP 403 failures. The drawings state
+  that dimensions are for reference only and add no screw tolerance.
+  No vendor CAD download, hash, or measured vendor geometry is claimed.
+  R3 proved the prior native joint geometry and assembly soundness; the
+  revised datum and machinist-driven sheet edits require a fresh scoped
+  native proof and sheet review before they are reported verified.
 - [91255A106](https://www.mcmaster.com/91255A106/) (`vn-guide-lock-screw`,
   MHA-VN-046, eight) holds the four guide locks to the platen guides per ruling
   R9-31 (September 30, 2026): these screws ride the platen, and the MHA-VN-006

@@ -372,9 +372,9 @@ def test_counterbore_and_cross_tap_volumes_match_smooth_integrals() -> None:
 def test_top_rim_chamfers_cover_new_corners_and_window_mitres() -> None:
     outer, window = part._top_rim_removal()
     assert outer == pytest.approx(2296.176445206839)
-    # 2774.35 on the 22-wide crossbar: the 24-wide bar shortens the two
-    # window rims by 4.0 of C2 (2.0 mm^2 a mm).
-    assert window == pytest.approx(2766.3499756456845)
+    # The 25-wide bar shortens the two window rims by another 2 mm of C2
+    # compared with the former 24-wide section (2 mm^2 per mm).
+    assert window == pytest.approx(2762.3499756456845)
     assert part.WEB_T == 13.0
     root_chord = math.sqrt((part.BOSS_DIA / 2.0) ** 2 - (part.WEB_T / 2.0) ** 2)
     side_run = 2.0 * (abs(part.FRONT_COLUMN_Z) - root_chord)
@@ -415,7 +415,7 @@ def test_crossbar_t_keeps_the_hanger_holes_in_the_full_depth_junctions() -> None
     band = spec.PRINTED_LINEAR_BAND_MM[1]
     pocket_end = part.BAR_POCKET_Z + 2.0 * band
     for station in (part.STUD_Z_FRONT, part.STUD_Z_REAR):
-        largest_hole_r = (part.HANGER_CBORE_DIA + spec.PRINTED_LINEAR_BAND_MM[2]) / 2.0
+        largest_hole_r = spec.HANGER_SPOTFACE_DIA_MAX / 2.0
         wall = abs(station) - band - largest_hole_r - pocket_end
         assert wall >= 2.0
     assert min(part.BAR_POCKET_HOLE_WALLS.values()) >= 2.0
@@ -423,8 +423,8 @@ def test_crossbar_t_keeps_the_hanger_holes_in_the_full_depth_junctions() -> None
 
 def test_knife_seat_footprints_cover_every_printed_extreme() -> None:
     # Each print-worst hull holds the nominal block and reaches at least the
-    # unskewed stack: the station at its .X band and half the slip, the
-    # worse .X row-to-face reach.
+    # unskewed stack: D's .X location band, the hanger's centring zone, half
+    # the dowel slip and the worse .X row-to-face reach.
     import sm_knife_mount_spec as mount
 
     reach = max(
@@ -452,6 +452,24 @@ def test_knife_seat_footprints_cover_every_printed_extreme() -> None:
         zs = [abs(z) for _x, z in hull]
         assert min(zs) <= abs(station) - band - slip - reach
         assert max(zs) >= abs(station) + band + slip + reach
+
+
+def test_knife_seat_footprint_charges_axis_centring_from_d(monkeypatch) -> None:
+    original = part._knife_seat_footprint(
+        part.STUD_Z_FRONT, "front hanger z from upper sockets"
+    )
+    monkeypatch.setattr(
+        part, "HANGER_CROSSBAR_CENTER_TOL", spec.HANGER_CROSSBAR_CENTER_TOL + 0.01
+    )
+    expanded = part._knife_seat_footprint(
+        part.STUD_Z_FRONT, "front hanger z from upper sockets"
+    )
+    assert min(x for x, _z in expanded) == pytest.approx(
+        min(x for x, _z in original) - 0.01
+    )
+    assert max(x for x, _z in expanded) == pytest.approx(
+        max(x for x, _z in original) + 0.01
+    )
 
 
 def test_c2_breaks_stay_clear_of_both_print_worst_knife_seats() -> None:
@@ -542,7 +560,7 @@ def test_c2_chains_leave_no_sliver_between_features(monkeypatch) -> None:
     assert part._segment_gap((0, 0, 0), (1, 0, 0), (3, 0, 0), (4, 0, 0)) == 2.0
     # The nearest two breaks that do not meet stand 5.0 apart (the hub rail's
     # flange-underside run and the set-screw boss's; the pocket ends, 4.5
-    # apart on the 22-wide crossbar, are 5.5 on the 24); demanding a land
+    # apart on the 22-wide crossbar, are 6.0 on the 25); demanding a land
     # that wide trips the guard.
     monkeypatch.setattr(part, "C2_SLIVER_MIN", 1.1)
     with pytest.raises(AssertionError, match="sliver"):
@@ -1334,8 +1352,8 @@ def test_b_outer_arrow_keeps_off_the_window_width() -> None:
 # render (sheet m): each width's left arrow tail, the plan's top edge, the
 # 359.8 line, its left extension, the 152.9 line and the front view's top.
 # The crossbar flange's tail is that render's 0.13275 moved with the
-# crossbar's -X face, 1.0 further out since (24.0 wide, was 22.0), at 1:3.
-_CROSSBAR_FLANGE_ARROW_TAIL_X = 0.13275 - 1.0 * _PLAN_S
+# crossbar's -X face, 1.5 further out since (25.0 wide, was 22.0), at 1:3.
+_CROSSBAR_FLANGE_ARROW_TAIL_X = 0.13275 - 1.5 * _PLAN_S
 _GUSSET_RUN_ARROW_TAIL_X = 0.14009
 _PLAN_TOP_Y = 0.21216
 _WIN_WIDTH_LINE_Y = 0.22772
@@ -1348,7 +1366,7 @@ _FRONT_VIEW_TOP_Y = 0.09666
     ("xy", "lines", "left", "below", "above", "right"),
     (
         (
-            drawing.CROSSBAR_FLANGE_TEXT_OFFSET_XY, ("24.0", "CROSSBAR FLANGE"),
+            drawing.CROSSBAR_FLANGE_TEXT_OFFSET_XY, ("25.0", "CROSSBAR FLANGE"),
             drawing.SHEET_FRAME[0], _FRONT_VIEW_TOP_Y, _WINDOW_WIDTH_LINE_Y,
             _CROSSBAR_FLANGE_ARROW_TAIL_X,
         ),
@@ -1358,7 +1376,7 @@ _FRONT_VIEW_TOP_Y = 0.09666
             _GUSSET_RUN_ARROW_TAIL_X,
         ),
     ),
-    ids=("crossbar-flange-24.0", "gusset-run-18.0"),
+    ids=("crossbar-flange-25.0", "gusset-run-18.0"),
 )
 def test_short_plan_width_text_parks_clear_of_its_extension_lines(
     xy, lines, left, below, above, right
@@ -1788,51 +1806,1105 @@ def test_build_cuts_each_section_at_its_derived_ends() -> None:
         assert placed in source, placed
 
 
-# --- Knife hanger: #6 SHCS counterbore + MHA-VN-051 dowel slip hole --------
+# --- Knife hanger: #10 loose clearance / washer spotface and dowels --------
 
 
-def test_knife_hanger_is_a_6_shcs_counterbore_on_the_knife_line() -> None:
+def test_knife_hanger_is_a_10_loose_hole_and_washer_spotface() -> None:
     import spring_mount_geom
 
     hole = spec.HANGER_HOLE_SPEC
-    assert (hole.kind, hole.size, hole.end) == ("counterbore_socket", "#6", "through_all")
+    assert (hole.kind, hole.size, hole.fit, hole.end) == (
+        "counterbore_socket", "#10", "loose", "through_all",
+    )
     assert hole.overrides_mm == {
         "HoleDiameter": spec.HANGER_CLEARANCE_DIA,
-        "CounterBoreDiameter": spec.HANGER_CBORE_DIA,
-        "CounterBoreDepth": spec.HANGER_CBORE_DEPTH,
+        "CounterBoreDiameter": spec.HANGER_SPOTFACE_DIA,
+        "CounterBoreDepth": spec.HANGER_SPOTFACE_DEPTH,
     }
-    assert spec.HANGER_CLEARANCE_DIA == pytest.approx(4.699)
-    assert spec.HANGER_SCREW_FLOAT == pytest.approx(0.597)
-    assert (spec.HANGER_CBORE_DIA, spec.HANGER_CBORE_DEPTH) == (7.0, 6.5)
+    assert spec.HANGER_CLEARANCE_DIA == pytest.approx(6.045)
+    assert spec.HANGER_SCREW_FLOAT == pytest.approx(0.6095)
+    assert (spec.HANGER_SPOTFACE_DIA, spec.HANGER_SPOTFACE_DEPTH) == (17.0, 1.0)
     # The 1/2 hanger-stud clearance is gone, not aliased.
     assert not hasattr(part, "STUD_HOLE_SPEC") and not hasattr(part, "STUD_HOLE_DIA")
     # Both stations sit on the knife line, centred on the crossbar.
     assert part.HANGER_X == spring_mount_geom.KNIFE[0] == (part.BAR_X0 + part.BAR_X1) / 2.0
     assert drawing.HANGER_X == part.HANGER_X
-    # The counterbore stays inside the junction material at the rear station.
-    assert part.STUD_Z_REAR + spec.HANGER_CBORE_DIA / 2.0 < part.INNER_Z + part.GUSSET
-    # Print-worst head checks (drawing-guidelines.md rule 17 (walls and webs)).
-    assert spec.HANGER_CBORE_HEAD_CLEARANCE == pytest.approx(0.7496)
-    assert spec.HANGER_HEAD_RECESS == pytest.approx(2.4848)
-    assert spec.HANGER_HEAD_BEARING == pytest.approx(0.4707)
+    assert (part.BAR_X0, part.BAR_X1) == (-27.5, -2.5)
+    assert spec.HANGER_CROSSBAR_WIDTH == part.BAR_X1-part.BAR_X0 == 25.0
+    # Washer bounds are parent-verified ASME Table 11 exports, not head guesses.
+    assert (spec.HANGER_WASHER.OD_MIN, spec.HANGER_WASHER.OD_MAX) == (12.573, 13.081)
+    assert spec.HANGER_WASHER.OD_ID_RUNOUT_MAX == pytest.approx(0.3302)
+    assert spec.HANGER_WASHER_CONCENTRIC_ANNULUS_MIN == pytest.approx(3.199)
+    assert part.STUD_Z_REAR + spec.HANGER_SPOTFACE_DIA_MAX/2 < part.INNER_Z+part.GUSSET
 
 
-def test_counterbore_floor_is_the_screw_grip_at_one_place() -> None:
-    assert spec.HANGER_GRIP == 30.0 == part.RING_HEIGHT - spec.HANGER_CBORE_DEPTH
-    assert spec.HANGER_GRIP_PLACES == 1
-    assert spec.HANGER_GRIP_TOL == float(
-        str(_config.title_block("linear_1pl")["display"]).lstrip("\u00b1")
+def test_knife_hanger_wizard_seed_is_a_native_numbered_counterbore_row() -> None:
+    """Farm c673e62: InitializeHole(counterbore, ANSI Inch, HexBolt, "#10")
+    made CreateFeature return None. The installed ANSI Inch Hex Bolt
+    counterbore table (AI_DATA_HBOLT) starts at 1/4; the socket-head one
+    carries #10. The seed takes the main-built numbered socket counterbore
+    pattern and stays a pure table identity: every cut is overridden."""
+    import _holes
+    import ch_rocker_arm_tl_c_stop_bar_spec as stop_bar
+    import dt_cone_swing_platform_spec as platform
+
+    hole = spec.HANGER_HOLE_SPEC
+    assert hole.kind != "counterbore_hex"
+    # swWzdCounterBore, swStandardAnsiInchSocketCapScrew.
+    assert _holes._KINDS[hole.kind] == (0, 9)
+    for precedent, size in (
+        (stop_bar.SCREW_HOLE_SPEC, "#8"),
+        (platform.HOLDDOWN_HOLE_SPEC, "#4"),
+    ):
+        assert (precedent.kind, precedent.size, precedent.end) == (
+            hole.kind, size, hole.end,
+        )
+        assert set(precedent.overrides_mm) == set(hole.overrides_mm)
+    # One feature, one spec: the build passes the shared spec, pins the
+    # through diameter, and binds the overridden depth to HangerGrip.
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    call = source[source.index("hanger_wizard = wizard_holes(") :]
+    call = call[: call.index("\n    )\n")]
+    assert "HANGER_HOLE_SPEC," in call
+    assert "expect_dia_mm=HANGER_CLEARANCE_DIA" in call
+    assert "HoleSpec(" not in call
+    assert part.HANGER_SPOTFACE_DEPTH_DRIVE == '"RingHeight" - "HangerGrip@HangerGripReference"'
+    assert "drive_jobs.append((hanger_depth, HANGER_SPOTFACE_DEPTH_DRIVE))" in source
+
+
+def test_hanger_through_diameter_has_a_native_unilateral_band(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    assert spec.HANGER_CLEARANCE_DIA_BAND == (0.13, 0.0)
+    assert spec.HANGER_CLEARANCE_DIA_MIN == pytest.approx(6.045)
+    assert spec.HANGER_CLEARANCE_DIA_MAX == pytest.approx(6.175)
+    monkeypatch.setattr(part, "_early_bound", lambda entity, _kind: entity)
+    monkeypatch.setattr(drawing, "_early_bound", lambda entity, _kind: entity)
+    precisions = []
+    monkeypatch.setattr(
+        part, "_set_tolerance_precision",
+        lambda *_args, **kwargs: precisions.append(kwargs),
     )
+
+    class Tolerance:
+        Type = 0
+        minimum = maximum = 0.0
+
+        def SetValues(self, minimum, maximum):
+            self.minimum, self.maximum = minimum, maximum
+            return True
+
+        def GetMinValue(self):
+            return self.minimum
+
+        def GetMaxValue(self):
+            return self.maximum
+
+    def display(name, value):
+        dimension = SimpleNamespace(FullName=name, SystemValue=value, Tolerance=Tolerance())
+        return SimpleNamespace(GetDimension2=lambda _index: dimension)
+
+    # Deliberately put spot diameter and axial depth before the through dia.
+    displays = [
+        display("CounterBore Dia.@StudHoles", 0.017),
+        display("CounterBore Depth@StudHoles", 0.001),
+        display("Thru Hole Dia.@StudHoles", 0.006045),
+    ]
+    feature = SimpleNamespace(
+        GetFirstDisplayDimension=lambda: displays[0],
+        GetNextDisplayDimension=lambda value: (
+            displays[displays.index(value)+1] if value is not displays[-1] else None
+        ),
+    )
+    part._tolerance_hanger_clearance(feature)
+    native = displays[-1].GetDimension2(0).Tolerance
+    assert native.Type == 2
+    assert (native.GetMinValue(), native.GetMaxValue()) == pytest.approx(
+        (0.0, 0.00013), abs=1e-12,
+    )
+    assert displays[0].GetDimension2(0).Tolerance.Type == 0
+    assert displays[1].GetDimension2(0).Tolerance.Type == 0
+    assert precisions[-1]["places"] == 3
+
+    from win32com.client import dynamic
+
+    def length_interface(raw, kind):
+        assert kind == "ICalloutLengthVariable"
+        return raw
+
+    monkeypatch.setattr(drawing, "_early_bound", length_interface)
+    monkeypatch.setattr(dynamic, "Dispatch", lambda pointer: pointer)
+    clearance = SimpleNamespace(VariableName="hw-thruholedia")
+    spot = SimpleNamespace(VariableName="hw-cbdia", ToleranceType=0)
+    # Only the late object exposes metadata; the concrete interface exposes
+    # length precision. Binding it as generic ICalloutVariable must fail.
+    raw_clearance = SimpleNamespace(_oleobj_=clearance, TolerancePrecision=0)
+    raw_spot = SimpleNamespace(_oleobj_=spot, TolerancePrecision=0)
+    callout = SimpleNamespace(
+        GetHoleCalloutVariables=lambda: (raw_spot, raw_clearance)
+    )
+    drawing._tolerance_hanger_callout_clearance(callout)
+    assert clearance.ToleranceType == 2
+    assert (clearance.ToleranceMin, clearance.ToleranceMax) == pytest.approx(
+        (0.0, 0.00013), abs=1e-12,
+    )
+    assert raw_clearance.TolerancePrecision == 3
+    assert spot.ToleranceType == 0 and raw_spot.TolerancePrecision == 0
+    with pytest.raises(RuntimeError, match="through-diameter variable"):
+        drawing._tolerance_hanger_callout_clearance(
+            SimpleNamespace(GetHoleCalloutVariables=lambda: (raw_spot,)),
+        )
+
+
+def test_crossbar_median_control_cancels_the_socket_station_chain() -> None:
+    assert spec.HANGER_CROSSBAR_CENTER_ZONE == 0.10
+    assert spec.HANGER_CROSSBAR_CENTER_TOL == 0.05
+    assert part.HANGER_BAR_HALF_WIDTH_MIN == pytest.approx(12.1)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_crossbar_median_datum(adapter, geometry_top, crossbar_width)" in source
+    assert 'kinds != (14,)' in source
+    assert "attached_dimension.FullName" in source and "adapter.swApp.IsSame(attached, display)" in source
+    assert 'datums=("D",), quantity=HANGER_CENTER_QUALIFIER' in source
+    assert 'tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"]' in source
+    assert "characteristic=\"position\"" in source
+    # The native zone is linear, no diameter prefix; X only, Z unchanged.
+    frame = source[source.index('hanger_hole_edge ='):source.index('# #946:', source.index('hanger_hole_edge ='))]
+    assert "diameter=True" not in frame
+    assert "HANGER_CLEARANCE_DIA / 2.0" in frame and "HANGER_SPOTFACE_FLOOR_Y" in frame
+    # The axes' BASIC zero on D is stated by the frame's own qualifier, with
+    # the hardware it serves; no numeric note or zero-length dimension.
+    assert "BASIC ZERO ON D" in drawing.HANGER_CENTER_QUALIFIER
+    assert "MHA-VN-024" in drawing.HANGER_CENTER_QUALIFIER
+    assert "set_basic_dimension" not in frame
+
+
+def test_hanger_x_locates_datum_d_not_a_hole() -> None:
+    """182.0 runs from the upper-left socket axis to D's trace -- the native
+    centreline between the crossbar's two side-face edges -- a plain .X
+    locator; no competing hole-axis X dimension survives."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    block = source[source.index("# D's own station"):source.index("# #946:")]
+    assert "crossbar_median_x = (BAR_X0 + BAR_X1) / 2.0" in block
+    assert "_insert_crossbar_median(" in block and "_add_view_centerlines(" not in block
+    # Sheet 2's proven flange-width picks: the two side faces' top edges.
     assert (
-        spec.DRAWING_REFERENCE_PRECISION["hanger counterbore floor from underside"]
-        == spec.HANGER_GRIP_PLACES
+        "((BAR_X0, HALF_H-EDGE_CHAMFER, 0.0), (BAR_X1, HALF_H-EDGE_CHAMFER, 0.0))"
+        in block
     )
+    assert 'label="hanger x from left sockets"' in block
+    assert "expected_mm=COLUMN_X + crossbar_median_x" in block
+    # Typed coordinate pick (the documented CENTERLINE select type) at the
+    # mid-bar point, clear of both holes; no entity re-key of the helper.
+    assert 'entity_types=("EDGE", "CENTERLINE")' in block
+    assert "p1=(crossbar_median_x, HALF_H, 0.0)" in block
+    assert "entities=" not in block[block.index("_checked_dimension("):]
+    assert part.STUD_Z_FRONT + spec.HANGER_SPOTFACE_DIA < 0.0 < part.STUD_Z_REAR - spec.HANGER_SPOTFACE_DIA
+    assert "center=True" in block
+    assert "reference=" not in block and "set_basic_dimension" not in block
+    assert drawing.CROSSBAR_MEDIAN_SUFFIX.endswith(", D")
+    assert (part.BAR_X0 + part.BAR_X1) / 2.0 == pytest.approx(part.HANGER_X)
+    # The general .X band the seat-footprint stack charges.
+    assert spec.DRAWING_REFERENCE_PRECISION["hanger x from left sockets"] == 1
+
+
+def test_crossbar_median_is_the_native_centreline_of_both_sides(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda entity, _kind: entity)
+    monkeypatch.setattr(drawing, "view_name", lambda *_args: "DETAIL TOP")
+    state: dict = {}
+    calls: list = []
+
+    def side(name):
+        def select4(append, data):
+            calls.append(("Select4", name, append, data.View))
+            state["count"] += state["per_pick"]
+            return state["selected"]
+
+        return SimpleNamespace(Select4=select4)
+
+    sides = (side("left"), side("right"))
+    annotation = SimpleNamespace(IsDangling=lambda: state["dangling"])
+    centerline = SimpleNamespace(GetAnnotation=lambda: annotation)
+
+    def insert():
+        calls.append("InsertCenterLine2")
+        state["centrelines"] += state["added"]
+        return state["centerline"]
+
+    model = SimpleNamespace(
+        ActivateView=lambda _name: True,
+        ClearSelection2=lambda _all: None,
+        InsertCenterLine2=insert,
+        SelectionManager=SimpleNamespace(
+            CreateSelectData=lambda: SimpleNamespace(),
+            GetSelectedObjectCount2=lambda _mark: state["count"],
+        ),
+    )
+    adapter = SimpleNamespace(currentModel=model)
+    view = SimpleNamespace(GetCenterLineCount=lambda: state["centrelines"])
+
+    def reset(**changes) -> None:
+        state.update(
+            count=0, per_pick=1, selected=True, centrelines=3, added=1,
+            centerline=centerline, dangling=False,
+        )
+        state.update(changes)
+        calls.clear()
+
+    reset()
+    assert drawing._insert_crossbar_median(adapter, view, sides) is None
+    assert calls == [
+        ("Select4", "left", False, view),
+        ("Select4", "right", True, view),
+        "InsertCenterLine2",
+    ]
+    assert state["centrelines"] == 4
+    for changes, message in (
+        ({"selected": False}, "failed to select crossbar side 0"),
+        ({"per_pick": 2}, "holds 4 entities, not 2"),
+        ({"centerline": None}, "failed to insert"),
+        ({"added": 0}, "with 3 centrelines, expected 4"),
+        ({"added": 2}, "with 5 centrelines, expected 4"),
+        ({"dangling": True}, "centreline is dangling"),
+    ):
+        reset(**changes)
+        with pytest.raises(RuntimeError, match=message):
+            drawing._insert_crossbar_median(adapter, view, sides)
+
+
+def test_hanger_callout_and_frame_clear_the_border_and_each_other() -> None:
+    """R4: the callout's +0.130 stack struck the 266.7 border and the frame
+    sat on the upper-right boss.  Both now stand in the top band right of
+    the 182.0 extension line, the frame's top under the border."""
+    frame_x, frame_y = drawing.HANGER_CENTER_FRAME_XY
+    callout_x, callout_y = drawing.HANGER_CALLOUT_XY
+    assert frame_y < drawing.SHEET_FRAME[3] - 0.002
+    # Frame box (5.5 mm) and qualifier row stand above the callout block.
+    assert frame_y - 0.011 > callout_y + 0.009
+    # The frame's leader leaves from its left end, left of the callout.
+    assert frame_x < callout_x - 0.031 - 0.005
+    # Right of the 182.0 (x 162 mm text) row's end at the hanger axis.
+    assert frame_x > 0.190
+    # The qualifier stays on the sheet (about 2.75 mm per glyph).
+    assert frame_x + 0.00275 * len(drawing.HANGER_CENTER_QUALIFIER) < drawing.SHEET_FRAME[2]
+
+
+# R5's native HOLES-SOCKETS leader runs (sheet m) behind its one enforced
+# leader-crosses-leader: the spotface callout's diameter run and the
+# centring frame's run to its default clearance-rim landing.
+R5_HANGER_CALLOUT_RUN = ((0.1800, 0.1997), (0.1872, 0.2042))
+R5_HANGER_FRAME_RUN = ((0.1936, 0.2605), (0.1826, 0.2009))
+
+
+def _segment_crossing(a, b):
+    (x1, y1), (x2, y2) = a
+    (x3, y3), (x4, y4) = b
+    det = (x2 - x1) * (y4 - y3) - (y2 - y1) * (x4 - x3)
+    if det == 0.0:
+        return None
+    t = ((x3 - x1) * (y4 - y3) - (y3 - y1) * (x4 - x3)) / det
+    u = ((x3 - x1) * (y2 - y1) - (y3 - y1) * (x2 - x1)) / det
+    if not (0.0 <= t <= 1.0 and 0.0 <= u <= 1.0):
+        return None
+    return (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
+
+
+def _point_to_segment(p, segment):
+    (x1, y1), (x2, y2) = segment
+    dx, dy = x2 - x1, y2 - y1
+    t = max(0.0, min(1.0, ((p[0] - x1) * dx + (p[1] - y1) * dy) / (dx * dx + dy * dy)))
+    return math.dist(p, (x1 + t * dx, y1 + t * dy))
+
+
+def test_hanger_frame_lands_on_the_rim_clear_of_the_callout_leader() -> None:
+    """R5: the frame's default landing on the clearance rim put its leader
+    across the spotface callout's diameter run at (182.7,201.4) mm.  It now
+    lands on the same rim up-right of the axis, the frame's side of that run,
+    and right of D's trace (the 182.0 extension line)."""
+    centre = _plan(part.HANGER_X, part.STUD_Z_FRONT)
+    radius = spec.HANGER_CLEARANCE_DIA / 2.0 * _S
+    callout_a, callout_b = R5_HANGER_CALLOUT_RUN
+    frame_start, old_landing = R5_HANGER_FRAME_RUN
+    # The logged runs: a spotface diameter through the axis, and a run to the
+    # clearance rim, crossing where R5 reported.
+    assert math.dist(
+        ((callout_a[0] + callout_b[0]) / 2.0, (callout_a[1] + callout_b[1]) / 2.0), centre
+    ) < 0.0002
+    assert math.dist(callout_a, callout_b) == pytest.approx(spec.HANGER_SPOTFACE_DIA * _S, abs=0.0002)
+    assert math.dist(old_landing, centre) == pytest.approx(radius, abs=0.0002)
+    assert _segment_crossing(R5_HANGER_CALLOUT_RUN, R5_HANGER_FRAME_RUN) == pytest.approx(
+        (0.1827, 0.2014), abs=1e-4,
+    )
+    # The landing: a real point on the selected clearance rim at the spotface
+    # floor, at the declared bearing, between the callout's run and D's trace.
+    x, y, z = drawing.hanger_center_landing()
+    assert y == spec.HANGER_SPOTFACE_FLOOR_Y
+    assert math.hypot(x - part.HANGER_X, z - part.STUD_Z_FRONT) == pytest.approx(
+        spec.HANGER_CLEARANCE_DIA / 2.0
+    )
+    landing = _plan(x, z)
+    assert math.dist(landing, centre) == pytest.approx(radius)
+    bearing = math.degrees(math.atan2(landing[1] - centre[1], landing[0] - centre[0]))
+    assert bearing == pytest.approx(drawing.HANGER_CENTER_LANDING_DEG)
+    callout_bearing = math.degrees(
+        math.atan2(callout_b[1] - callout_a[1], callout_b[0] - callout_a[0])
+    )
+    assert callout_bearing + 15.0 < bearing < 90.0
+    # A different rim point from R5's default, not a nudge of it.
+    assert math.dist(landing, old_landing) > radius
+
+    def side(p):
+        return (callout_b[0] - callout_a[0]) * (p[1] - callout_a[1]) - (
+            callout_b[1] - callout_a[1]
+        ) * (p[0] - callout_a[0])
+
+    # R5's landing sat across the callout's diameter from the frame; the new
+    # one shares the frame's side, so the run cannot cross it.
+    assert side(old_landing) < 0.0 < side(frame_start)
+    assert side(landing) > 0.0
+    rerouted = (frame_start, landing)
+    assert _segment_crossing(R5_HANGER_CALLOUT_RUN, rerouted) is None
+    gap = min(
+        *(_point_to_segment(p, R5_HANGER_CALLOUT_RUN) for p in rerouted),
+        *(_point_to_segment(p, rerouted) for p in R5_HANGER_CALLOUT_RUN),
+    )
+    assert gap > 0.0005 > drawing.ARROW_HALF_WIDTH
+    # Wholly right of D's trace: the 182.0 extension line is never reached.
+    assert min(landing[0], frame_start[0]) - centre[0] > drawing.ARROW_HALF_WIDTH
+
+
+def test_hanger_frame_keeps_its_exact_edge_and_lands_by_selection_point() -> None:
+    import ast
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    (frame,) = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "add_feature_control_frame"
+        and any(
+            keyword.arg == "label"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "hanger axes on crossbar median plane"
+            for keyword in node.keywords
+        )
+    ]
+    keywords = {k.arg: k.value for k in frame.keywords}
+    names = {
+        arg: keywords[arg].id
+        for arg in ("edge_entity", "leader_attach_xy", "frame_xy", "quantity")
+        if isinstance(keywords[arg], ast.Name)
+    }
+    assert names == {
+        "edge_entity": "hanger_hole_edge",
+        "leader_attach_xy": "hanger_center_landing_xy",
+        "frame_xy": "HANGER_CENTER_FRAME_XY",
+        "quantity": "HANGER_CENTER_QUALIFIER",
+    }
+    assert ast.literal_eval(keywords["datums"]) == ("D",)
+    assert "diameter" not in keywords and "edge_xy" not in keywords
+    (landing,) = [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and [getattr(t, "id", None) for t in node.targets] == ["hanger_center_landing_xy"]
+    ]
+    assert isinstance(landing, ast.Call) and landing.func.id == "model_point_in_view"
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "hanger_center_landing"
+        for node in ast.walk(landing)
+    )
+
+
+def test_crossbar_datum_requires_the_exact_native_width_attachment(monkeypatch) -> None:
+    import inspect
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda entity, _kind: entity)
+    monkeypatch.setattr(drawing, "view_name", lambda *_args: "GEOMETRY")
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    callout = object()
+    monkeypatch.setattr(drawing, "null_callout", lambda: callout)
+    monkeypatch.setattr(drawing, "dispatch_array", list)
+    events: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs)),
+    )
+    name, full_name = "RD1@Drawing View1", "CrossbarWidth@Drawing"
+
+    def stale_select(*_args):
+        raise AssertionError("pre-rebuild width: IAnnotation.Select3 server fault")
+
+    # _checked_dimension's handle, captured before offset_dimension_text's
+    # rebuild: it supplies identity only; selecting through it is R3's fault.
+    width = SimpleNamespace(
+        GetNameForSelection=lambda: name,
+        GetDimension2=lambda _index: SimpleNamespace(FullName=full_name),
+        GetAnnotation=lambda: SimpleNamespace(Select3=stale_select),
+    )
+
+    def display(selection_name=name, dimension_name=full_name, annotation_type=4):
+        # One IAnnotation per display: the clearance guard reads it by identity.
+        annotation = SimpleNamespace(GetType=lambda: annotation_type, GetName=lambda: "RD1")
+        return SimpleNamespace(
+            GetNameForSelection=lambda: selection_name,
+            GetDimension2=lambda _index: SimpleNamespace(FullName=dimension_name),
+            GetAnnotation=lambda: annotation,
+        )
+
+    fresh = display()
+    state: dict = {}
+    calls: list = []
+
+    def reset(**changes) -> None:
+        state.update(
+            displays=(display("RD2@Drawing View1", "OtherWidth@Drawing"), fresh),
+            selected=True, count=1, kind=14, picked=fresh, types=(14,), attached=fresh,
+            attached_count=1, accepts=(),
+        )
+        state.update(changes)
+        calls.clear()
+        events.clear()
+
+    def set_attached(entities) -> bool:
+        (target,) = entities
+        calls.append(("SetAttachedEntities", target))
+        if target in state["accepts"]:
+            state["attached_count"] = 1
+            return True
+        return False
+
+    annotation = SimpleNamespace(
+        SetPosition2=lambda *_args: True,
+        GetAttachedEntityTypes=lambda: state["types"],
+        GetAttachedEntities3=lambda: (state["attached"],),
+        GetAttachedEntityCount3=lambda: state["attached_count"],
+        SetAttachedEntities=set_attached,
+        IsDangling=lambda: False,
+    )
+    tag = SimpleNamespace(
+        SetLabel=lambda text: text == "D", GetLabel=lambda: "D",
+        GetAnnotation=lambda: annotation,
+    )
+
+    def select(*args):
+        calls.append(("SelectByID2", args))
+        return state["selected"]
+
+    def insert():
+        calls.append("InsertDatumTag2")
+        return tag
+
+    model = SimpleNamespace(
+        ActivateView=lambda _name: True,
+        ClearSelection2=lambda _all: calls.append("ClearSelection2"),
+        InsertDatumTag2=insert,
+        Extension=SimpleNamespace(SelectByID2=select),
+        SelectionManager=SimpleNamespace(
+            # A real ISelectionMgr member: the old path reaches the stale Select3.
+            CreateSelectData=lambda: SimpleNamespace(),
+            GetSelectedObjectCount2=lambda _mark: state["count"],
+            GetSelectedObjectType3=lambda _index, _mark: state["kind"],
+            GetSelectedObject6=lambda _index, _mark: state["picked"],
+        ),
+    )
+    adapter = SimpleNamespace(
+        currentModel=model, swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)),
+    )
+    view = SimpleNamespace(GetDisplayDimensions=lambda: state["displays"])
+
+    tag_display, width_display = _r6_crossbar_datum_display_data()
+
+    def read_display(_adapter, entity):
+        if entity is annotation:
+            calls.append(("annotation_display", "D"))
+            return tag_display, {}
+        assert entity is fresh.GetAnnotation()
+        calls.append(("annotation_display", "crossbar width"))
+        return width_display, {}
+
+    monkeypatch.setattr(drawing, "annotation_display", read_display)
+
+    reset()
+    drawing._crossbar_median_datum(adapter, view, width)
+    assert calls == [
+        "ClearSelection2",
+        ("SelectByID2", (name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, callout, 0)),
+        "InsertDatumTag2",
+        "ClearSelection2",
+        ("annotation_display", "D"),
+        ("annotation_display", "crossbar width"),
+    ]
+    assert events == [
+        ("drawing.crossbar_width.target", {
+            "selection_name": name, "matches": 1, "annotation_type": 4,
+            "annotation_name": "RD1", "full_name": full_name,
+            "expected_full_name": full_name,
+        }),
+        ("drawing.crossbar_width.selection", {
+            "count": 1, "type": 14, "selection_name": name, "full_name": full_name,
+        }),
+        ("drawing.crossbar_width.attach_attempts", {"inserted_count": 1, "attempts": ""}),
+        ("drawing.crossbar_width.attachment", {
+            "count": 1, "types": "(14,)", "objects": "('SimpleNamespace',)",
+        }),
+        ("drawing.crossbar_width.datum_clearance", {
+            "datum_box": "122.67/106.00/135.83/113.00",
+            "rows": "crossbar width row 0 '25.0' 103.97/104.60/113.03/108.10; "
+            "crossbar width row 1 'CROSSBAR FLANGE' 86.76/99.04/130.24/102.54",
+        }),
+    ]
+    body = inspect.getsource(drawing._crossbar_median_datum)
+    assert "Select3" not in body and "CreateSelectData" not in body and ".View =" not in body
+
+    # Fresh re-resolution refuses before anything is selected.
+    for changes, matches, message in (
+        ({"displays": ()}, 0, "found 0"),
+        ({"displays": (fresh, display())}, 2, "found 2"),
+        ({"displays": (display(annotation_type=1),)}, 1, "annotation type 1"),
+        ({"displays": (display(dimension_name="OtherWidth@Drawing"),)}, 1, "re-resolved"),
+    ):
+        reset(**changes)
+        with pytest.raises(RuntimeError, match=message):
+            drawing._crossbar_median_datum(adapter, view, width)
+        assert calls == ["ClearSelection2"]
+        assert [event[1]["matches"] for event in events] == [matches]
+
+    reset(selected=False)
+    with pytest.raises(RuntimeError, match="failed to select crossbar width"):
+        drawing._crossbar_median_datum(adapter, view, width)
+    assert "InsertDatumTag2" not in calls
+
+    # The read-back must be the ONE width, by name AND FullName, before D.
+    for changes in (
+        {"count": 0},
+        {"count": 2},
+        {"kind": 13},
+        {"picked": display("RD2@Drawing View1")},
+        {"picked": display(dimension_name="OtherWidth@Drawing")},
+    ):
+        reset(**changes)
+        with pytest.raises(RuntimeError, match="selecting crossbar width selected"):
+            drawing._crossbar_median_datum(adapter, view, width)
+        assert "InsertDatumTag2" not in calls and calls[-1] == "ClearSelection2"
+
+    reset(types=(1,))
+    with pytest.raises(RuntimeError, match="not attached to the width"):
+        drawing._crossbar_median_datum(adapter, view, width)
+    # An unattached tag is offered the display dimension, then its annotation;
+    # the first accepted attachment stops the attempts.
+    reset(attached_count=0, accepts=(fresh,))
+    drawing._crossbar_median_datum(adapter, view, width)
+    assert [call for call in calls if call[0] == "SetAttachedEntities"] == [
+        ("SetAttachedEntities", fresh),
+    ]
+    assert ("drawing.crossbar_width.attach_attempts", {
+        "inserted_count": 0, "attempts": "display_dimension:True:1",
+    }) in events
+    # Both rejected: both are tried, and the readback still refuses.
+    reset(attached_count=0, types=())
+    with pytest.raises(RuntimeError, match="not attached to the width"):
+        drawing._crossbar_median_datum(adapter, view, width)
+    assert len([call for call in calls if call[0] == "SetAttachedEntities"]) == 2
+    assert ("drawing.crossbar_width.attach_attempts", {
+        "inserted_count": 0, "attempts": "display_dimension:False:0,annotation:False:0",
+    }) in events
+    # Equal FullName is not enough: D must sit on the re-resolved display.
+    for attached in (display(dimension_name="DifferentWidth@Drawing"), width):
+        reset(attached=attached)
+        with pytest.raises(RuntimeError, match="exact crossbar width attachment"):
+            drawing._crossbar_median_datum(adapter, view, width)
+
+
+def _r6_crossbar_datum_display_data(*, text_y=None):
+    # Native IDisplayData from R6, 20261014T055244900Z, GEOMETRY sheet RD6
+    # and DetailItem389.  Move only the two width-text rows, not D's default
+    # drop or attachment.  Coordinates are sheet metres, not PNG estimates.
+    if text_y is None:
+        text_y = drawing.CROSSBAR_FLANGE_TEXT_OFFSET_XY[1]
+    shift = text_y - 0.108
+    datum = {
+        "lines": [
+            [0, 0, 0, 0, 0.1358333, 0.1095, 0, 0.1296667, 0.1095, 0],
+            [0, 0, 0, 0, 0.1296667, 0.106, 0, 0.1226667, 0.106, 0],
+            [0, 0, 0, 0, 0.1226667, 0.106, 0, 0.1226667, 0.113, 0],
+            [0, 0, 0, 0, 0.1226667, 0.113, 0, 0.1296667, 0.113, 0],
+            [0, 0, 0, 0, 0.1296667, 0.113, 0, 0.1296667, 0.106, 0],
+        ],
+        "triangles": [[
+            0.1358333, 0.1081, 0, 0.1358333, 0.1109, 0,
+            0.1333833, 0.1095, 0, 1, 0,
+        ]],
+        "texts": [{
+            "t": "D", "pos": [0.1244312, 0.1067219, 0],
+            "h": 0.0035, "w": 0.0034708, "ang": 0.0, "ref": 1,
+        }],
+    }
+    width = {"texts": [
+        {
+            "t": "25.0", "pos": [0.1039743, 0.108 + shift, 0],
+            "h": 0.0035, "w": 0.0090514, "ang": 0.0, "ref": 1,
+        },
+        {
+            "t": "CROSSBAR FLANGE", "pos": [0.0867635, 0.1024437 + shift, 0],
+            "h": 0.0035, "w": 0.0434729, "ang": 0.0, "ref": 1,
+        },
+    ]}
+    return datum, width
+
+
+def _check_crossbar_datum_ink(monkeypatch, datum_display, width_display, *, refused=None):
+    datum, width = object(), object()
+
+    def read_display(_adapter, annotation):
+        index = 0 if annotation is datum else 1
+        assert annotation is datum or annotation is width
+        return (datum_display, width_display)[index], (refused or ({}, {}))[index]
+
+    monkeypatch.setattr(drawing, "annotation_display", read_display)
+    drawing._require_datum_d_clear_of_width_text(object(), datum, width)
+
+
+def test_crossbar_datum_ink_refuses_the_native_r6_overprint(monkeypatch) -> None:
+    datum, width = _r6_crossbar_datum_display_data(text_y=0.108)
+    with pytest.raises(RuntimeError, match="datum D ink.*CROSSBAR FLANGE"):
+        _check_crossbar_datum_ink(monkeypatch, datum, width)
+
+
+def test_crossbar_datum_ink_clears_each_moved_width_row_not_the_block(monkeypatch) -> None:
+    from _drawing_annotation_extent import boxes_clear
+    from _layout_audit import display_box
+
+    assert drawing.CROSSBAR_FLANGE_TEXT_OFFSET_XY == (0.1085, 0.1046)
+    datum, width = _r6_crossbar_datum_display_data()
+    tag_box, block_box = display_box(datum), display_box(width)
+    assert tag_box is not None and block_box is not None
+    # The 25.0 row remains level with D but safely to its left; the wide
+    # suffix is below D.  Their union box falsely reports a collision.
+    assert not boxes_clear(
+        (tag_box.xmin, tag_box.ymin, tag_box.xmax, tag_box.ymax),
+        (block_box.xmin, block_box.ymin, block_box.xmax, block_box.ymax),
+    )
+    suffix = display_box({"texts": [width["texts"][1]]})
+    assert suffix is not None
+    assert tag_box.ymin - suffix.ymax == pytest.approx(0.0034563)
+    _check_crossbar_datum_ink(monkeypatch, datum, width)
+
+
+@pytest.mark.parametrize("gap", (0.002, 0.002001, 0.001999))
+def test_crossbar_datum_ink_keeps_the_two_mm_clearance(monkeypatch, gap) -> None:
+    datum, width = _r6_crossbar_datum_display_data()
+    width["texts"][1]["pos"][1] = 0.106 - 0.0035 - gap
+    if gap < 0.002:
+        with pytest.raises(RuntimeError, match="datum D ink.*CROSSBAR FLANGE"):
+            _check_crossbar_datum_ink(monkeypatch, datum, width)
+    else:
+        _check_crossbar_datum_ink(monkeypatch, datum, width)
+
+
+@pytest.mark.parametrize("index", (0, 1), ids=("datum-D", "crossbar-width"))
+def test_crossbar_datum_ink_refuses_unreadable_native_data(monkeypatch, index) -> None:
+    displays = list(_r6_crossbar_datum_display_data())
+    refused = [{}, {}]
+    refused[index] = {"GetDisplayData": 1}
+    with pytest.raises(RuntimeError, match="both native display reads.*refused"):
+        _check_crossbar_datum_ink(monkeypatch, *displays, refused=refused)
+    displays[index] = {}
+    with pytest.raises(RuntimeError, match="both native display reads.*empty"):
+        _check_crossbar_datum_ink(monkeypatch, *displays)
+
+
+@pytest.mark.parametrize("index", (0, 1), ids=("datum-D", "crossbar-width"))
+@pytest.mark.parametrize("reported_width", (None, 0.0, -0.001))
+def test_crossbar_datum_ink_refuses_estimated_native_widths(
+    monkeypatch, index, reported_width
+) -> None:
+    displays = list(_r6_crossbar_datum_display_data())
+    displays[index]["texts"][0]["w"] = reported_width
+    with pytest.raises(RuntimeError, match="reported no width"):
+        _check_crossbar_datum_ink(monkeypatch, *displays)
+
+
+def test_crossbar_datum_ink_requires_the_D_label(monkeypatch) -> None:
+    datum, width = _r6_crossbar_datum_display_data()
+    datum["texts"][0]["t"] = "B"
+    with pytest.raises(RuntimeError, match="prints no 'D'"):
+        _check_crossbar_datum_ink(monkeypatch, datum, width)
+
+
+@pytest.mark.parametrize(("field", "value"), (("h", 0.0), ("pos", [])))
+def test_crossbar_datum_ink_requires_visible_D_text(monkeypatch, field, value) -> None:
+    datum, width = _r6_crossbar_datum_display_data()
+    datum["texts"][0][field] = value
+    with pytest.raises(RuntimeError, match="prints no 'D'"):
+        _check_crossbar_datum_ink(monkeypatch, datum, width)
+
+
+@pytest.mark.parametrize("invalid", ("no-rows", "empty-row", "no-height", "no-position"))
+def test_crossbar_datum_ink_refuses_missing_width_text(monkeypatch, invalid) -> None:
+    datum, width = _r6_crossbar_datum_display_data()
+    if invalid == "no-rows":
+        width["texts"] = []
+        message = "prints no text"
+    else:
+        row = width["texts"][1]
+        if invalid == "empty-row":
+            row["t"] = ""
+        elif invalid == "no-height":
+            row["h"] = 0.0
+        else:
+            row["pos"] = []
+        message = "text run 1 draws nothing"
+    with pytest.raises(RuntimeError, match=message):
+        _check_crossbar_datum_ink(monkeypatch, datum, width)
+
+
+def test_spotface_floor_grip_is_the_models_driving_dimension() -> None:
+    assert spec.HANGER_GRIP == 35.50 == part.RING_HEIGHT-spec.HANGER_SPOTFACE_DEPTH
+    assert spec.HANGER_GRIP_PLACES == 2
+    assert spec.HANGER_GRIP_TOL == 0.05
+    assert spec.HANGER_SPOTFACE_FLOOR_Y == pytest.approx(17.25)
+    assert spec.HANGER_SPOTFACE_CLEANUP_MIN == pytest.approx(0.15)
+    # The model owns the grip, its places and its band; the sheet imports it.
+    assert spec.HANGER_GRIP_SKETCH == "HangerGripReference"
+    assert spec.REFERENCE_SKETCHES == (spec.HANGER_GRIP_SKETCH,)
+    assert spec.DRAWING_DIMENSIONS[spec.HANGER_GRIP_SKETCH] == {"HangerGrip"}
+    assert spec.DRAWING_PRECISION_BY_NAME["HangerGrip"] == spec.HANGER_GRIP_PLACES
+    assert (
+        "hanger spotface floor from finished underside"
+        not in spec.DRAWING_REFERENCE_PRECISION
+    )
+    # The grip drives the wizard's own spotface depth: not a witness.
+    assert part.HANGER_GRIP_DIMENSION == "HangerGrip@HangerGripReference"
+    assert part.HANGER_SPOTFACE_DEPTH_DRIVE == (
+        '"RingHeight" - "HangerGrip@HangerGripReference"'
+    )
+    build = Path(part.__file__).read_text(encoding="utf-8")
+    compact = "".join(build.split())
+    assert 'set_global(adapter,"HangerGrip",f"{HANGER_GRIP}mm")' in compact
+    assert 'grip.record("HangerGripUnderside",\'"RingHeight"/2\')' in compact
+    assert 'grip.record("HangerGrip",\'"HangerGrip"\')' in compact
+    assert "name_last_feature(adapter,HANGER_GRIP_SKETCH)" in compact
+    body = compact[compact.index("asyncdefbuild("):]
+    steps = [
+        "drive_jobs+=await_author_hanger_grip_reference(adapter,grip_plane_name)",
+        "drive_jobs.append((hanger_depth,HANGER_SPOTFACE_DEPTH_DRIVE))",
+        "fordim_name,exprindrive_jobs:awaitdrive_dimension(adapter,dim_name,expr)",
+        'set_dimension_symmetric_tolerance(adapter,HANGER_GRIP_SKETCH,"HangerGrip",HANGER_GRIP_TOL)',
+        "await_assert_hanger_grip_drives_spotface(adapter,hanger_depth,volume)",
+        "blank_reference_sketches(adapter,REFERENCE_SKETCHES)",
+        "save_part_and_images(adapter,PART_NAME)",
+    ]
+    assert all(body.count(step) == 1 for step in steps)
+    assert [body.index(step) for step in steps] == sorted(
+        body.index(step) for step in steps
+    )
+    # The sheet only reads the model's grip back: no drawing-owned band.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_tolerance_hanger_grip" not in source
+    start = source.index("def _hanger_section(")
+    section = source[start:source.index("\ndef ", start+1)]
+    helper_start = source.index("def _require_model_hanger_grip(")
+    helper = source[helper_start:source.index("\ndef ", helper_start+1)]
+    for text in (section, helper):
+        assert ".Type =" not in text
+        assert "SetValues" not in text
+        assert "_set_tolerance_precision" not in text
+    assert "floor_edge" not in section
+    assert "underside_edge" not in section
+    assert "dimensions = curate_hidden_sketch_dimensions(" in section
+    assert "_require_model_hanger_grip(adapter, dimensions)" in section
+    assert "source_model = adapter.currentModel" in source
+    import ast
+
+    wrappers = [
+        (node, item.context_expr)
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.With)
+        for item in node.items
+        if isinstance(item.context_expr, ast.Call)
+        and isinstance(item.context_expr.func, ast.Name)
+        and item.context_expr.func.id == "part_sketches_shown"
+    ]
+    assert len(wrappers) == 1
+    block, context = wrappers[0]
+    assert [ast.unparse(argument) for argument in context.args] == [
+        "adapter", "source_model", "REFERENCE_SKETCHES",
+    ]
+    keywords = {keyword.arg: keyword.value for keyword in context.keywords}
+    assert ast.literal_eval(keywords["label"]) == "knife-hanger grip"
+    assert ast.unparse(keywords["base_view"]) == "hub_bottom_parent"
+    section_calls = [
+        node for statement in block.body for node in ast.walk(statement)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_hanger_section"
+    ]
+    assert len(section_calls) == 1
+    assert [ast.unparse(argument) for argument in section_calls[0].args] == [
+        "adapter", "hub_bottom_parent",
+    ]
+
+
+def _fake_wizard(*dimensions, name="StudHoles", subs=()):
+    from types import SimpleNamespace
+
+    displays = [SimpleNamespace(GetDimension2=lambda _i, d=d: d) for d in dimensions]
+
+    def following(display):
+        index = next(i for i, item in enumerate(displays) if item is display) + 1
+        return displays[index] if index < len(displays) else None
+
+    children = list(subs)
+    for index, child in enumerate(children):
+        child.GetNextSubFeature = (
+            lambda after=index: children[after + 1] if after + 1 < len(children) else None
+        )
+    return SimpleNamespace(
+        Name=name,
+        GetFirstDisplayDimension=lambda: displays[0] if displays else None,
+        GetNextDisplayDimension=following,
+        GetFirstSubFeature=lambda: children[0] if children else None,
+    )
+
+
+def test_spotface_depth_resolves_the_one_native_wizard_depth(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
+
+    def dim(full_name, mm):
+        return SimpleNamespace(FullName=full_name, SystemValue=mm / 1000.0)
+
+    through = dim("Hole Dia@StudHoles@fr-top-frame.Part", spec.HANGER_CLEARANCE_DIA)
+    spot = dim("CBORE Dia@StudHoles@fr-top-frame.Part", spec.HANGER_SPOTFACE_DIA)
+    depth = dim("CBORE Depth@StudHoles@fr-top-frame.Part", spec.HANGER_SPOTFACE_DEPTH)
+    wizard = _fake_wizard(through, spot, depth)
+    assert part._hanger_spotface_depth_name(wizard) == "CBORE Depth@StudHoles"
+    with pytest.raises(RuntimeError, match="0 spotface-depth"):
+        part._hanger_spotface_depth_name(_fake_wizard(through, spot))
+    with pytest.raises(RuntimeError, match="2 spotface-depth"):
+        part._hanger_spotface_depth_name(_fake_wizard(depth, through, depth))
+    foreign = dim("CBORE Depth@OtherHoles@fr-top-frame.Part", spec.HANGER_SPOTFACE_DEPTH)
+    with pytest.raises(RuntimeError, match="not owned by StudHoles"):
+        part._hanger_spotface_depth_name(_fake_wizard(foreign))
+
+
+def test_spotface_depth_may_live_in_the_wizards_own_profile_sketch(monkeypatch) -> None:
+    """Farm e5ad7dcd: the wizard reported its depth as
+    ["C'Bore Depth", "Sketch18", ...] -- the internal profile sketch made
+    between GooseneckProfile (Sketch17) and the placement Sketch19. The SDK
+    feature walk includes sub-feature dimensions, so a sub-feature of
+    StudHoles whose own walk holds the dimension is the genuine owner; any
+    other sketch is still foreign."""
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
+
+    def dim(full_name, mm):
+        return SimpleNamespace(FullName=full_name, SystemValue=mm / 1000.0)
+
+    through = dim("Thru Hole Dia.@Sketch18@Part39.Part", spec.HANGER_CLEARANCE_DIA)
+    depth = dim("C'Bore Depth@Sketch18@Part39.Part", spec.HANGER_SPOTFACE_DEPTH)
+    profile = _fake_wizard(through, depth, name="Sketch18")
+    placement = _fake_wizard(name="Sketch19")
+    wizard = _fake_wizard(through, depth, subs=(placement, profile))
+    assert part._hanger_spotface_depth_name(wizard) == "C'Bore Depth@Sketch18"
+    # A sketch outside StudHoles' sub-features is not its owner.
+    with pytest.raises(RuntimeError, match="not owned by StudHoles"):
+        part._hanger_spotface_depth_name(_fake_wizard(through, depth, subs=(placement,)))
+    # Nor is a same-named sub-feature whose own walk lacks the dimension.
+    empty = _fake_wizard(through, name="Sketch18")
+    with pytest.raises(RuntimeError, match="not owned by StudHoles"):
+        part._hanger_spotface_depth_name(
+            _fake_wizard(through, depth, subs=(placement, empty))
+        )
+    # The builder binds the RESOLVED name, never a literal sketch.
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "Sketch18" not in source.replace(
+        source[source.index("def _hanger_spotface_depth_name("):source.index(
+            "\nasync def _author_hanger_grip_reference("
+        )], ""
+    )
+
+
+_DEPTH = "CBORE Depth@StudHoles"
+
+
+class _GripModel:
+    """A part whose wizard depth follows HangerGrip only while ``linked``."""
+
+    def __init__(self, *, linked=True, reference=False, equations=None):
+        self.grip = part.HANGER_GRIP
+        self.depth = part.RING_HEIGHT - self.grip
+        self.linked = linked
+        self.reference = reference
+        self.equations = equations if equations is not None else {
+            f'"{part.HANGER_GRIP_DIMENSION}"': [
+                f'"{part.HANGER_GRIP_DIMENSION}" = "HangerGrip"'
+            ],
+            f'"{_DEPTH}"': [f'"{_DEPTH}"= {part.HANGER_SPOTFACE_DEPTH_DRIVE}'],
+        }
+
+    def rebuild(self):
+        if self.linked:
+            self.depth = part.RING_HEIGHT - self.grip
+
+    def volume(self):
+        deeper = self.depth - spec.HANGER_SPOTFACE_DEPTH
+        return 1.0e6 - deeper / part.HANGER_GRIP_PROBE_MM * part.HANGER_GRIP_PROBE_VOLUME
+
+    def Parameter(self, name):
+        from types import SimpleNamespace
+
+        value = {part.HANGER_GRIP_DIMENSION: self.grip, _DEPTH: self.depth}.get(name)
+        if value is None:
+            return None
+        return SimpleNamespace(
+            IsReference=lambda: self.reference, SystemValue=value / 1000.0
+        )
+
+
+def _prove_grip(monkeypatch, model):
+    import asyncio
+    from types import SimpleNamespace
+
+    async def set_global(_adapter, name, expr):
+        assert name == "HangerGrip"
+        model.grip = float(expr.removesuffix("mm"))
+
+    async def force_rebuild(_adapter):
+        model.rebuild()
+
+    async def volume_check(_adapter, label, expected, tol):
+        if abs(model.volume() - expected) > tol:
+            raise RuntimeError(f"volume {label}")
+        return model.volume()
+
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(part, "set_global", set_global)
+    monkeypatch.setattr(part, "force_rebuild", force_rebuild)
+    monkeypatch.setattr(part, "volume_check", volume_check)
+    monkeypatch.setattr(
+        part, "_equations_naming", lambda _adapter, lhs: model.equations.get(lhs, [])
+    )
+    adapter = SimpleNamespace(currentModel=model)
+    asyncio.run(part._assert_hanger_grip_drives_spotface(adapter, _DEPTH, model.volume()))
+
+
+def test_hanger_grip_proof_accepts_the_live_driving_link(monkeypatch) -> None:
+    model = _GripModel()
+    _prove_grip(monkeypatch, model)
+    # The probe restored the as-built grip.
+    assert (model.grip, model.depth) == (part.HANGER_GRIP, spec.HANGER_SPOTFACE_DEPTH)
+
+
+def test_hanger_grip_proof_rejects_a_witness_that_drives_nothing(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match="live link"):
+        _prove_grip(monkeypatch, _GripModel(linked=False))
+
+
+def test_hanger_grip_proof_rejects_a_reference_grip(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match="is a reference dimension"):
+        _prove_grip(monkeypatch, _GripModel(reference=True))
+
+
+@pytest.mark.parametrize(
+    ("lhs", "equations", "match"),
+    [
+        (f'"{_DEPTH}"', [], "expected one equation"),
+        (f'"{_DEPTH}"', [f'"{_DEPTH}" = 1.0mm'], "owned by"),
+        (f'"{_DEPTH}"', [f'"{_DEPTH}" = "RingHeight" - "HangerGrip"'], "owned by"),
+        (
+            f'"{part.HANGER_GRIP_DIMENSION}"',
+            [f'"{part.HANGER_GRIP_DIMENSION}" = 35.5mm'],
+            "owned by",
+        ),
+        (
+            f'"{part.HANGER_GRIP_DIMENSION}"',
+            [f'"{part.HANGER_GRIP_DIMENSION}" = "HangerGrip"'] * 2,
+            "expected one equation",
+        ),
+    ],
+)
+def test_hanger_grip_proof_rejects_a_wrong_equation(monkeypatch, lhs, equations, match) -> None:
+    model = _GripModel()
+    model.equations[lhs] = equations
+    with pytest.raises(RuntimeError, match=match):
+        _prove_grip(monkeypatch, model)
+
+
+def test_hanger_grip_proof_rejects_an_off_nominal_grip(monkeypatch) -> None:
+    model = _GripModel()
+    model.grip = part.HANGER_GRIP - 0.01
+    with pytest.raises(RuntimeError, match="reads"):
+        _prove_grip(monkeypatch, model)
+
+
+class _ReadOnlyTolerance:
+    """A model band the sheet may read but never write."""
+
+    def __init__(self, kind, low_m, high_m):
+        object.__setattr__(self, "_band", (kind, low_m, high_m))
+
+    @property
+    def Type(self):
+        return self._band[0]
+
+    def GetMinValue(self):
+        return self._band[1]
+
+    def GetMaxValue(self):
+        return self._band[2]
+
+    def SetValues(self, *_args):
+        raise AssertionError("the sheet re-toleranced the model's grip")
+
+    def __setattr__(self, name, _value):
+        raise AssertionError(f"the sheet wrote the model grip's {name}")
+
+
+def _imported_grip(
+    *, full_name="HangerGrip@HangerGripReference@fr-top-frame.Part",
+    mm=35.50, kind=4, band_mm=0.05, name="HangerGrip",
+):
+    from types import SimpleNamespace
+
+    dimension = SimpleNamespace(
+        FullName=full_name, SystemValue=mm / 1000.0,
+        Tolerance=_ReadOnlyTolerance(kind, -band_mm / 1000.0, band_mm / 1000.0),
+    )
+    display = SimpleNamespace(GetDimension2=lambda _index: dimension)
+    return SimpleNamespace(name=name, GetSpecificAnnotation=lambda: display)
+
+
+def test_section_reads_the_model_grip_back_without_writing_it(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    other = _imported_grip(name="HangerPinHoleDia")
+    grip = _imported_grip()
+    assert drawing._require_model_hanger_grip(None, [other, grip]) is grip
+    for dimensions, match in (
+        ([other], "imported 0 HangerGrip"),
+        ([grip, _imported_grip()], "imported 2 HangerGrip"),
+        ([_imported_grip(full_name="HangerGrip@Drawing View7@x")], "not the model's"),
+        ([_imported_grip(full_name="D1@HangerGripReference@x")], "not the model's"),
+        ([_imported_grip(mm=35.45)], "reads"),
+        ([_imported_grip(kind=2)], "symmetric band"),
+        ([_imported_grip(band_mm=0.04)], "symmetric band"),
+    ):
+        with pytest.raises(RuntimeError, match=match):
+            drawing._require_model_hanger_grip(None, dimensions)
 
 
 def test_dowel_slip_hole_contract() -> None:
-    assert part.PIN_HOLE_X == pytest.approx(-7.9)
+    assert part.PIN_HOLE_X == pytest.approx(-7.368)
     assert part.PIN_HOLE_X - part.HANGER_X == pytest.approx(spec.HANGER_PIN_X)
-    assert spec.HANGER_PIN_X == 7.1
+    assert spec.HANGER_PIN_X == 7.632
     assert spec.HANGER_PIN_X_PLACES == 3
     assert spec.DRAWING_REFERENCE_PRECISION["dowel hole from hanger axis"] == 3
     assert (spec.HANGER_PIN_HOLE_DIA, spec.HANGER_PIN_HOLE_DIA_BAND) == (3.24, (0.03, -0.03))
@@ -1842,41 +2914,43 @@ def test_dowel_slip_hole_contract() -> None:
     assert 0.02 <= spec.HANGER_PIN_SLIP_CLEARANCE_MIN < spec.HANGER_PIN_SLIP_CLEARANCE_MAX <= 0.10
     # drawing-guidelines.md rule 17 (walls and webs) walls and floor, print-worst (the station at its .XXX limit)
     # and after drill drift (test_hanger_walls_meet_the_target_after_drift).
-    assert part.PIN_HOLE_BAR_WALL == pytest.approx(3.068, abs=5e-4)
-    assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.8015, abs=5e-4)
-    assert part.PIN_HOLE_FLOOR_MARGIN == pytest.approx(18.0)
+    assert part.PIN_HOLE_BAR_WALL == pytest.approx(2.585978744247038)
+    assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.645457488494077)
+    assert part.PIN_HOLE_FLOOR_MARGIN == pytest.approx(22.65)
     assert spec.HANGER_PIN_HOLE_DEPTH < spec.HANGER_GRIP
     # The model owns the size, band and depth; the drawing imports them.
     assert spec.DRAWING_DIMENSIONS["HangerPinProfile"] == {"HangerPinHoleDia"}
     assert spec.DRAWING_DIMENSIONS["HangerPinHoles"] == {"HangerPinHoleDepth"}
     assert spec.DRAWING_PRECISION_BY_NAME["HangerPinHoleDia"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["HangerPinHoleDepth"] == 1
-    assert set(drawing.HANGER_SECTION_KEEP) == {"HangerPinHoleDia", "HangerPinHoleDepth"}
+    assert set(drawing.HANGER_SECTION_KEEP) == {
+        "HangerPinHoleDia", "HangerPinHoleDepth", "HangerGrip",
+    }
 
 
 def test_dowel_slot_contract() -> None:
     # The slot stands -X of each screw axis, the round hole +X: the knife
-    # mount's two dowels at +/-7.100.
-    assert part.SLOT_X == pytest.approx(-22.1)
+    # mount's two unchanged-SKU dowels now at +/-7.632.
+    assert part.SLOT_X == pytest.approx(-22.632)
     assert part.SLOT_X - part.HANGER_X == pytest.approx(spec.HANGER_SLOT_X)
-    assert spec.HANGER_SLOT_X == -7.1
+    assert spec.HANGER_SLOT_X == -7.632
     assert spec.HANGER_PIN_XS == (spec.HANGER_SLOT_X, spec.HANGER_ROUND_X)
     # Slip width = the round hole's ream; length .XXX; floor = the hole's.
     assert (spec.HANGER_SLOT_WIDTH, spec.HANGER_SLOT_WIDTH_BAND) == (3.24, (0.03, -0.03))
-    assert (spec.HANGER_SLOT_LENGTH, spec.HANGER_SLOT_LENGTH_TOL) == (4.20, 0.13)
+    assert (spec.HANGER_SLOT_LENGTH, spec.HANGER_SLOT_LENGTH_TOL) == (3.95, 0.13)
     assert spec.HANGER_SLOT_LENGTH - spec.HANGER_SLOT_LENGTH_TOL > spec.HANGER_SLOT_LENGTH_REQUIRED
     assert spec.HANGER_SLOT_DEPTH == spec.HANGER_PIN_HOLE_DEPTH
-    assert part.SLOT_FLAT == pytest.approx(0.96)
-    # The slot stands BASIC 14.200 from its round hole, its centre +-0.13
-    # along the slot; from the screw axis it carries both .XXX bands.
-    assert spec.HANGER_SLOT_FROM_ROUND == pytest.approx(14.2)
+    assert part.SLOT_FLAT == pytest.approx(0.71)
+    # BASIC 15.264 span, centre +/-0.13 along slot; from the bolt axis
+    # the slot carries both .XXX bands.
+    assert spec.HANGER_SLOT_FROM_ROUND == pytest.approx(15.264)
     assert spec.HANGER_SLOT_STATION_TOL == pytest.approx(0.26)
     # drawing-guidelines.md rule 17 (walls and webs) walls and floor, print-worst and after drill drift: both meet
     # the 2.0 target.
-    assert part.SLOT_BAR_WALL == pytest.approx(2.408, abs=5e-4)
-    assert part.SLOT_SCREW_WALL == pytest.approx(2.1415, abs=5e-4)
+    assert part.SLOT_BAR_WALL == pytest.approx(2.050978744247038)
+    assert part.SLOT_SCREW_WALL == pytest.approx(2.1104574884940767)
     assert part.SLOT_SCREW_WALL >= 2.0
-    assert part.SLOT_FLOOR_MARGIN == pytest.approx(18.0)
+    assert part.SLOT_FLOOR_MARGIN == pytest.approx(22.65)
     # The model owns the width and its band (front slot, on the underside
     # locator); F-F derives the station and the length.
     assert spec.DRAWING_DIMENSIONS["HangerSlotProfile"] == {"HangerSlotWidth"}
@@ -1890,8 +2964,8 @@ def test_dowel_slot_contract() -> None:
 
 
 def test_hanger_walls_meet_the_target_after_drift() -> None:
-    """Q7 option C: the #6 holes are drilled from the faced underside and
-    the slip holes and slots cut from it, located from the #6 hole's axis
+    """Q7 option C: the #10 holes are drilled from the faced underside and
+    the slip holes and slots cut from it, located from the #10 hole's axis
     there, so each hole's
     0.3 deg drift is nil at the seat and largest at the blind floors.  Every
     wall round a slip hole or slot, at the print-worst bands and the deepest
@@ -1903,10 +2977,12 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
     assert part.HANGER_DRIFT_AT_SLIP_FLOOR == pytest.approx(drift)
     assert drift == pytest.approx(0.0670, abs=1e-4)
     hole_r = (spec.HANGER_PIN_HOLE_DIA + max(spec.HANGER_PIN_HOLE_DIA_BAND)) / 2.0
-    clearance_r = (spec.HANGER_CLEARANCE_DIA + spec.DRILL_OVERSIZE) / 2.0
+    clearance_r = spec.HANGER_CLEARANCE_DIA_MAX/2
     slot_half = (spec.HANGER_SLOT_LENGTH + spec.HANGER_SLOT_LENGTH_TOL) / 2.0
     hole_off = spec.HANGER_PIN_X_TOL
     slot_off = hole_off + spec.HANGER_SLOT_ALONG_TOL
+    outer_loss = spec.PRINTED_LINEAR_BAND_MM[spec.HANGER_CROSSBAR_WIDTH_PLACES]/2
+    outer_loss += spec.HANGER_CROSSBAR_CENTER_TOL
     walls = {
         "round hole | screw hole": (
             spec.HANGER_PIN_X - hole_off - hole_r - clearance_r,
@@ -1914,7 +2990,7 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
             part.PIN_HOLE_SCREW_WALL,
         ),
         "round hole | bar +X face": (
-            part.BAR_X1 - (part.PIN_HOLE_X + hole_off) - hole_r,
+            part.BAR_X1 - (part.PIN_HOLE_X+hole_off) - hole_r - outer_loss,
             drift,
             part.PIN_HOLE_BAR_WALL,
         ),
@@ -1924,7 +3000,7 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
             part.SLOT_SCREW_WALL,
         ),
         "slot | bar -X face": (
-            part.SLOT_X - slot_off - slot_half - part.BAR_X0,
+            part.SLOT_X - slot_off - slot_half - part.BAR_X0 - outer_loss,
             drift,
             part.SLOT_BAR_WALL,
         ),
@@ -1932,19 +3008,41 @@ def test_hanger_walls_meet_the_target_after_drift() -> None:
     for label, (print_worst, charged, wall) in walls.items():
         assert wall == pytest.approx(print_worst - charged), label
         assert wall >= 2.0, label
-    # The pocket walls take the #6 hole's drift from the same underside
-    # entry: at the pocket roof for the hole, at the top face for the
-    # counterbore piloted on it.
+    # Entry wander at the deepest pocket roof and highest as-cast top.
     pocket = part.BAR_POCKET_HOLE_WALLS
     station = part._POCKET_STATION - part._POCKET_END
     assert pocket["hanger clearance hole"] == pytest.approx(
-        station - clearance_r - per_mm * (part.RING_HEIGHT - part.FLANGE)
+        station-clearance_r-per_mm*(part.RING_HEIGHT+0.8-(part.FLANGE-0.8))
     )
-    assert pocket["hanger counterbore"] == pytest.approx(
-        station
-        - (spec.HANGER_CBORE_DIA + spec.PRINTED_LINEAR_BAND_MM[2]) / 2.0
-        - per_mm * part.RING_HEIGHT
+    assert pocket["hanger spotface"] == pytest.approx(
+        station-spec.HANGER_SPOTFACE_DIA_MAX/2-per_mm*(part.RING_HEIGHT+0.8)
     )
+    assert pocket["hanger spotface"] == pytest.approx(3.6221080914808637)
+    assert pocket["hanger clearance hole"] == pytest.approx(9.327307547841905)
+    assert pocket["dowel slip hole"] == pytest.approx(10.740390963820517)
+    assert pocket["dowel slot"] == pytest.approx(10.715390963820517)
+
+
+def test_spotface_support_and_floor_webs_charge_all_printed_limits() -> None:
+    assert (spec.HANGER_SPOTFACE_DIA_MIN, spec.HANGER_SPOTFACE_DIA_MAX) == (16.49, 17.51)
+    assert part.HANGER_SPOTFACE_BAR_WALL == pytest.approx(3.0996958719073833)
+    assert part.HANGER_SPOTFACE_POCKET_ROOF_WEB == pytest.approx(5.35)
+    assert part.HANGER_SEAT_BOLT_MISMATCH == pytest.approx(0.4117704770864468)
+    assert spec.HANGER_WASHER_FLOAT_MAX == pytest.approx(
+        (spec.HANGER_WASHER.ID_MAX-spec.HANGER_SCREW.SHANK_DIA_MIN)/2,
+    )
+    assert spec.HANGER_WASHER_FLOAT_MAX == pytest.approx(0.57404)
+    assert spec.HANGER_WASHER_FLOAT_MAX > (
+        spec.HANGER_WASHER.ID_MAX-spec.HANGER_SCREW.SHANK_DIA
+    )/2
+    assert part.HANGER_SPOTFACE_WASHER_OFFSET_MAX == pytest.approx(1.5113146051790616)
+    assert part.HANGER_SPOTFACE_WASHER_SUPPORT_MIN == pytest.approx(0.1931853948209379)
+    assert part.HANGER_WASHER_BEARING_MIN == pytest.approx(1.6876853948209381)
+    assert part.HANGER_WASHER_BEARING_MIN > 0
+    assert part.HANGER_SPOTFACE_OUTER_END_WALL == pytest.approx(30.19210809148086)
+    # The largest spot fits; the smallest supports the eccentric largest washer.
+    assert min(part.HANGER_SPOTFACE_BAR_WALL, part.HANGER_SPOTFACE_POCKET_ROOF_WEB) >= 2
+    assert part.HANGER_SPOTFACE_WASHER_SUPPORT_MIN > 0
 
 
 def test_dowel_slot_sketch_contours_never_cross() -> None:
@@ -2002,7 +3100,7 @@ def test_dowel_slot_stadium_closes_counter_clockwise(along_u: bool) -> None:
 def test_slots_are_positioned_to_the_round_holes_with_translation() -> None:
     # drawing-guidelines.md rule 5 (avoid excessive GD&T) (knife-edge system): datum B the front round hole, C the
     # rear; each slot 0.05 to its own station's hole, the other translated.
-    assert spec.GEOMETRIC_TOLERANCES_MM == {"knife-hanger slot position": "0.05"}
+    assert spec.GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"] == "0.05"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     underside = source[source.index('ddoc.ActivateSheet("UNDERSIDE")') :]
     assert underside.count("add_datum_feature(") == 1
@@ -2196,10 +3294,10 @@ def test_slot_frames_stand_above_the_plan_clear_of_every_line() -> None:
     # F-F as run 20261009T174542021Z printed it: arrows x 91.33 / 118.67 from
     # the cutting line at y 230.05 mm, each running 12 mm sheet-down, its
     # letter [-1.2, +1.8] x [-20.25, -14.15] mm about the line's end.  The
-    # 24-wide crossbar moves each end 1.0 further out (0.33 mm at 1:3).
+    # The 25-wide crossbar moves each end 1.5 out (0.50 mm at 1:3).
     cut_y = centre[1] + drawing.HANGER_SECTION_Z * m_per_mm
     arrows = [centre[0] + x * m_per_mm for x in drawing.HANGER_SECTION_CUT_X]
-    assert arrows == pytest.approx([0.09100, 0.11900], abs=5e-5)
+    assert arrows == pytest.approx([0.0908333, 0.1191667], abs=5e-5)
     assert cut_y == pytest.approx(0.23005, abs=5e-5)
     lines = {"F-F cutting line": Segment(arrows[0], cut_y, arrows[1], cut_y)}
     boxes = {}
@@ -2443,6 +3541,19 @@ def test_slip_hole_callout_states_process_and_purpose_briefly() -> None:
     assert drawing.HANGER_SECTION_CALLOUTS["HangerPinHoleDia"] == text
 
 
+def test_spotfloor_grip_band_names_its_function_and_mate() -> None:
+    """Rule 4 (tighten only for function, and name the mate): the 35.50
+    +/-0.05 grip sets the MHA-VN-024 bolt's reach into the knife mount's
+    tap; the callout says so at the dimension, in four short rows."""
+    text = spec.HANGER_GRIP_CALLOUT
+    assert (spec.HANGER_GRIP, spec.HANGER_GRIP_TOL) == (35.50, 0.05)
+    assert "MHA-VN-024" in text and "THREAD ENGAGEMENT" in text
+    assert "FINISHED UNDERSIDE" in text and text.startswith("2X SPOTFACE FLOOR")
+    assert len(text.splitlines()) <= 4
+    assert max(len(line) for line in text.splitlines()) <= 23
+    assert drawing.HANGER_SECTION_CALLOUTS["HangerGrip"] == text
+
+
 def test_hanger_section_cuts_the_crossbar_from_window_to_window() -> None:
     """F-F cuts the rear station across the crossbar and its gussets only:
     both ends stand in open window, past the gussets' reach at that z and
@@ -2559,7 +3670,7 @@ def test_slip_hole_callout_is_parked_clear_of_the_section() -> None:
     # Clear of the caption, which stands left of the section.
     assert x - half_w > drawing.HANGER_SECTION_CAPTION_XY[0] + 0.025
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '{"HangerPinHoleDia": HANGER_PIN_DIA_OFFSET_XY}' in source, (
+    assert '{"HangerPinHoleDia": HANGER_PIN_DIA_OFFSET_XY, "HangerGrip": ' in source, (
         "the slip-hole size must be offset onto its leader"
     )
 
@@ -2571,22 +3682,26 @@ def test_build_places_the_hanger_section_on_the_underside_sheet() -> None:
     assert "imported_annotations += hanger_dimensions" in underside
 
 
-def test_hanger_drill_callout_states_both_entries() -> None:
-    """Q7 option C (user, 2026-10-13): the #6 holes are drilled from the
-    underside and the counterbores cut from the top.  Sheet 3's callout says
-    both, so neither reads as the other's side, with the native size and
-    counterbore rows on their own rows: four rows at most (drawing-guidelines.md rule 7 (notes: few, flagged, never a method))."""
+def test_hanger_callout_names_the_spotface_side_without_a_method() -> None:
+    """The native callout keeps its variable-driven diameter/extent rows,
+    names the spotface side as geometry (TOP SPOTFACE) and carries no
+    drilling method (drawing-guidelines.md rule 7 (notes: few, flagged,
+    never a method)) and no cast-top depth."""
     import ast
 
-    import _drawing_hole_callout
-
-    native = "<hw-hole-dia> THRU ALL\n<hw-cbore-dia> <hw-cbore-depth>"
-    prefixed = _drawing_hole_callout.compose_hole_callout_prefix(
-        drawing.HANGER_DRILL_CALLOUT, native
+    native = (
+        "<MOD-DIAM> <hw-thruholedia> <hw-thru>\n"
+        "<HOLE-SPOT><MOD-DIAM> <hw-cbdia> <HOLE-DEPTH> <hw-cbdepth>"
     )
-    assert prefixed == "DRILL FROM UNDERSIDE;\nC'BORE FROM TOP:\n" + native
-    assert len(prefixed.splitlines()) <= 4
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    definitions = {5: native, 6: "", 7: "", 8: ""}
+    rewritten = drawing._hanger_spotface_callout_definitions(definitions)
+    assert rewritten[5] == (
+        "<MOD-DIAM> <hw-thruholedia> <hw-thru>\nTOP SPOTFACE <MOD-DIAM> <hw-cbdia>"
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "DRILL FROM UNDERSIDE" not in source
+    assert not hasattr(drawing, "HANGER_DRILL_CALLOUT")
+    tree = ast.parse(source)
     (callout,) = [
         node
         for node in ast.walk(tree)
@@ -2596,12 +3711,14 @@ def test_hanger_drill_callout_states_both_entries() -> None:
         and any(
             keyword.arg == "label"
             and isinstance(keyword.value, ast.Constant)
-            and keyword.value.value == "2X #6 SHCS hanger counterbores"
+            and keyword.value.value == "2X #10 loose hanger washer spotfaces"
             for keyword in node.keywords
         )
     ]
-    process = next(k.value for k in callout.keywords if k.arg == "process")
-    assert isinstance(process, ast.Name) and process.id == "HANGER_DRILL_CALLOUT"
+    keywords = {k.arg: k.value for k in callout.keywords}
+    assert "process" not in keywords
+    assert isinstance(keywords["callout_xy"], ast.Name)
+    assert keywords["callout_xy"].id == "HANGER_CALLOUT_XY"
 
 
 def test_keeper_transfer_prefix_preserves_the_native_hole_definition() -> None:
@@ -2708,7 +3825,9 @@ def test_keeper_locations_are_reference_but_hanger_locations_remain_manufacturin
         compile(ast.Module(body=loops, type_ignores=[]), "<station-contract>", "exec"),
         environment,
     )
-    assert len(captured) == 6
+    # Hanger X is D's own station (test_hanger_x_locates_datum_d_not_a_hole).
+    assert len(captured) == 5
+    assert "hanger x from left sockets" not in {entry["label"] for entry in captured}
     by_label = {entry["label"]: entry for entry in captured}
     for label in (
         "keeper x from left sockets",
@@ -2719,12 +3838,6 @@ def test_keeper_locations_are_reference_but_hanger_locations_remain_manufacturin
         assert by_label[label]["center"] is True
         assert label in spec.DRAWING_REFERENCE_PRECISION
     hanger_expectations = (
-        (
-            "hanger x from left sockets",
-            "2X HANGER X",
-            (0.162, 0.240),
-            part.COLUMN_X + environment["hanger_x"],
-        ),
         (
             "front hanger z from upper sockets",
             "FRONT HANGER Z",
@@ -2859,7 +3972,8 @@ def test_transfer_plan_and_station_fields_remain_inside_the_hole_sheet() -> None
         < frame[3] - drawing.INK_CLEARANCE
     )
     stations = _hole_sheet_stations()
-    assert len(stations) == 6
+    # Hanger X is D's own station, outside the loop.
+    assert len(stations) == 5
     _callout, callout_box = _keeper_callout_placed()
     left, _down, right, _up = drawing.KEEPER_CALLOUT_EXTENT
     # Estimated field allowances, not measured render ink: 2 mm per qualifier
@@ -3104,13 +4218,16 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     assert margin == pytest.approx(3.58)
     # Faced in place: the rail-top plane stays put.
     assert part.HALF_H - part.FLANGE_BOT_Y == pytest.approx(spec.FLANGE_THICKNESS_MM)
-    # The six native socket, hub-bore and set-screw spot-face finishes (user
-    # ruling 2026-10-12 added the spot face); the faced rail top's SEAT_UM
-    # rides on the linked note B.  The cap-recess floors carry none: the caps
-    # seat on the tube ends, clear of the floors.
+    # Native socket and hub-bore/set-screw spotface finishes. The faced rail
+    # top's SEAT_UM rides on linked note B; the cap-recess floors carry none
+    # because caps seat on the tube ends, clear of the floors; the washer
+    # spotfloors carry none because a clamp face neither runs nor locates.
     assert [c.key for c in spec.SURFACE_FINISHES] == [
         f"socket_{rail}_{end}" for rail in ("east", "west") for end in ("front", "rear")
     ] + ["hub_bore", "hub_set_spot_face"]
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "washer spotface seat finish" not in source
+    assert not hasattr(spec, "HANGER_SPOTFACE_TARGET")
 
 
 def test_top_frame_drawing_is_six_sheets() -> None:

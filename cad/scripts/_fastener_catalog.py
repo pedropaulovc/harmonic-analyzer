@@ -156,9 +156,15 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     ),
     "vn-knife-hanger-stud": _stock(
         "vn-knife-hanger-stud",
-        "Black-Oxide Alloy Steel Socket Head Screw",
-        "91251A157",
-        material="Alloy Steel",
+        "Knife-Hanger Bolt (18-8 Stainless Hex Screw, Cut to Length)",
+        "92314A253",
+        material="AISI 304",
+    ),
+    "vn-knife-hanger-washer": _stock(
+        "vn-knife-hanger-washer",
+        "18-8 Stainless Steel SAE No. 10 Flat Washer",
+        "96659A104",
+        material="AISI 304",
     ),
     "vn-knife-mount-dowel": _stock(
         "vn-knife-mount-dowel",

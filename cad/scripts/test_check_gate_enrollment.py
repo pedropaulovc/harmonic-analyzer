@@ -39,7 +39,6 @@ PENDING_TRIAGE: frozenset[str] = frozenset(
         "test_or_flag_fallback_names.py",
         "test_owned_assembly_health_session.py",
         "test_stock_spring_mounts.py",
-        "test_summing_hanger_stack.py",
         "test_targeted_model_items.py",
         "test_vm2_rack_source_save.py",
     }

@@ -337,11 +337,11 @@ _CHANNEL_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(
     blind_cut_dia_mm(sm_summing_lever_spec.HOLE_SPEC),
     sm_summing_lever_spec.PLATE_T,
 )
-# MHA-VN-024 #6-32 (91251A157) in each knife mount's #36 tap drill over its
-# nominal reach, 8.10: the 30.0 crossbar grip under the 38.1 screw
-# (build_sm_summing_assembly.HANGER_REACH; a literal, test-pinned, so a
-# knife-mount or top-frame edit does not re-key every assembly).
-_KNIFE_HANGER_REACH = 8.10
+# MHA-VN-024 #10-24 cut hex bolt (92314A253) in each knife mount's #25 tap
+# drill over its 8.9173 nominal reach: 45.70 cut length less 35.50 grip
+# and the 96659A104 washer's 1.2827 nominal thickness. Keep this literal,
+# test-pinned to build_sm_summing_assembly, to avoid broad recipe cache keys.
+_KNIFE_HANGER_REACH = 8.9173
 # Each MHA-VN-051 dowel pressed to the floor of its knife mount's Ø3.175 ream
 # (sm_knife_mount_spec.PIN_HOLE_DIA, band +0/-0.010: smallest 3.165), its
 # largest catalogue diameter 3.18262 over its 9.5 press depth
@@ -364,14 +364,24 @@ _KNIFE_DOWEL_PRESS_LIMIT = _smooth_annulus_limit_mm3(
 # its owner like _KNIFE_HANGER_REACH, so a screw or gooseneck edit does not
 # re-key every assembly that imports this module.
 _GOOSENECK_PLUG_LENGTH = 8.0
+# Bearing seats are exact face contacts, NOT interference fits. Zero volume
+# permits a reported coincidence but no unmeasured kernel sliver allowance.
+_KNIFE_HANGER_SEAT_OVERLAP_LIMIT = 0.0
 _SUMMING_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "vn-knife-hanger-stud",
         range(1, 3),
         "sm-knife-mount",
         _smooth_annulus_limit_mm3(
-            THREAD_MAJOR_MM["#6-32"], TAP_DRILL_MM["#6-32"], _KNIFE_HANGER_REACH
+            THREAD_MAJOR_MM["#10-24"], TAP_DRILL_MM["#10-24"], _KNIFE_HANGER_REACH
         ),
+        second_number=None,
+    ),
+    **_numbered_pairs(
+        "vn-knife-hanger-stud",
+        range(1, 3),
+        "vn-knife-hanger-washer",
+        _KNIFE_HANGER_SEAT_OVERLAP_LIMIT,
         second_number=None,
     ),
     **_numbered_pairs(
@@ -627,6 +637,19 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
 # envelope. Bound its exact nested tap engagement by the same conservative
 # smooth-annulus contract as every other migrated stock thread.
 _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
+    **_numbered_pairs(
+        "sm-summing-1/vn-knife-hanger-stud",
+        range(1, 3),
+        "sm-summing-1/vn-knife-hanger-washer",
+        _KNIFE_HANGER_SEAT_OVERLAP_LIMIT,
+        second_number=None,
+    ),
+    **_numbered_pairs(
+        "sm-summing-1/vn-knife-hanger-washer",
+        range(1, 3),
+        "fr-frame-1/fr-top-frame",
+        _KNIFE_HANGER_SEAT_OVERLAP_LIMIT,
+    ),
     frozenset(
         ("mg-magnifier-1/vn-thumb-screw-2", "mg-magnifier-1/mg-output-fixture-1")
     ): _MG_FIXTURE_THREAD_LIMIT,
