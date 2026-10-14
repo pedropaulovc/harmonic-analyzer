@@ -2248,12 +2248,12 @@ def test_crossbar_datum_requires_the_exact_native_width_attachment(monkeypatch) 
     )
 
     def display(selection_name=name, dimension_name=full_name, annotation_type=4):
+        # One IAnnotation per display: the clearance guard reads it by identity.
+        annotation = SimpleNamespace(GetType=lambda: annotation_type, GetName=lambda: "RD1")
         return SimpleNamespace(
             GetNameForSelection=lambda: selection_name,
             GetDimension2=lambda _index: SimpleNamespace(FullName=dimension_name),
-            GetAnnotation=lambda: SimpleNamespace(
-                GetType=lambda: annotation_type, GetName=lambda: "RD1",
-            ),
+            GetAnnotation=lambda: annotation,
         )
 
     fresh = display()
@@ -2317,6 +2317,18 @@ def test_crossbar_datum_requires_the_exact_native_width_attachment(monkeypatch) 
     )
     view = SimpleNamespace(GetDisplayDimensions=lambda: state["displays"])
 
+    tag_display, width_display = _r6_crossbar_datum_display_data()
+
+    def read_display(_adapter, entity):
+        if entity is annotation:
+            calls.append(("annotation_display", "D"))
+            return tag_display, {}
+        assert entity is fresh.GetAnnotation()
+        calls.append(("annotation_display", "crossbar width"))
+        return width_display, {}
+
+    monkeypatch.setattr(drawing, "annotation_display", read_display)
+
     reset()
     drawing._crossbar_median_datum(adapter, view, width)
     assert calls == [
@@ -2324,6 +2336,8 @@ def test_crossbar_datum_requires_the_exact_native_width_attachment(monkeypatch) 
         ("SelectByID2", (name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, callout, 0)),
         "InsertDatumTag2",
         "ClearSelection2",
+        ("annotation_display", "D"),
+        ("annotation_display", "crossbar width"),
     ]
     assert events == [
         ("drawing.crossbar_width.target", {
@@ -2337,6 +2351,11 @@ def test_crossbar_datum_requires_the_exact_native_width_attachment(monkeypatch) 
         ("drawing.crossbar_width.attach_attempts", {"inserted_count": 1, "attempts": ""}),
         ("drawing.crossbar_width.attachment", {
             "count": 1, "types": "(14,)", "objects": "('SimpleNamespace',)",
+        }),
+        ("drawing.crossbar_width.datum_clearance", {
+            "datum_box": "122.67/106.00/135.83/113.00",
+            "rows": "crossbar width row 0 '25.0' 103.97/104.60/113.03/108.10; "
+            "crossbar width row 1 'CROSSBAR FLANGE' 86.76/99.04/130.24/102.54",
         }),
     ]
     body = inspect.getsource(drawing._crossbar_median_datum)
@@ -2399,6 +2418,149 @@ def test_crossbar_datum_requires_the_exact_native_width_attachment(monkeypatch) 
         reset(attached=attached)
         with pytest.raises(RuntimeError, match="exact crossbar width attachment"):
             drawing._crossbar_median_datum(adapter, view, width)
+
+
+def _r6_crossbar_datum_display_data(*, text_y=None):
+    # Native IDisplayData from R6, 20261014T055244900Z, GEOMETRY sheet RD6
+    # and DetailItem389.  Move only the two width-text rows, not D's default
+    # drop or attachment.  Coordinates are sheet metres, not PNG estimates.
+    if text_y is None:
+        text_y = drawing.CROSSBAR_FLANGE_TEXT_OFFSET_XY[1]
+    shift = text_y - 0.108
+    datum = {
+        "lines": [
+            [0, 0, 0, 0, 0.1358333, 0.1095, 0, 0.1296667, 0.1095, 0],
+            [0, 0, 0, 0, 0.1296667, 0.106, 0, 0.1226667, 0.106, 0],
+            [0, 0, 0, 0, 0.1226667, 0.106, 0, 0.1226667, 0.113, 0],
+            [0, 0, 0, 0, 0.1226667, 0.113, 0, 0.1296667, 0.113, 0],
+            [0, 0, 0, 0, 0.1296667, 0.113, 0, 0.1296667, 0.106, 0],
+        ],
+        "triangles": [[
+            0.1358333, 0.1081, 0, 0.1358333, 0.1109, 0,
+            0.1333833, 0.1095, 0, 1, 0,
+        ]],
+        "texts": [{
+            "t": "D", "pos": [0.1244312, 0.1067219, 0],
+            "h": 0.0035, "w": 0.0034708, "ang": 0.0, "ref": 1,
+        }],
+    }
+    width = {"texts": [
+        {
+            "t": "25.0", "pos": [0.1039743, 0.108 + shift, 0],
+            "h": 0.0035, "w": 0.0090514, "ang": 0.0, "ref": 1,
+        },
+        {
+            "t": "CROSSBAR FLANGE", "pos": [0.0867635, 0.1024437 + shift, 0],
+            "h": 0.0035, "w": 0.0434729, "ang": 0.0, "ref": 1,
+        },
+    ]}
+    return datum, width
+
+
+def _check_crossbar_datum_ink(monkeypatch, datum_display, width_display, *, refused=None):
+    datum, width = object(), object()
+
+    def read_display(_adapter, annotation):
+        index = 0 if annotation is datum else 1
+        assert annotation is datum or annotation is width
+        return (datum_display, width_display)[index], (refused or ({}, {}))[index]
+
+    monkeypatch.setattr(drawing, "annotation_display", read_display)
+    drawing._require_datum_d_clear_of_width_text(object(), datum, width)
+
+
+def test_crossbar_datum_ink_refuses_the_native_r6_overprint(monkeypatch) -> None:
+    datum, width = _r6_crossbar_datum_display_data(text_y=0.108)
+    with pytest.raises(RuntimeError, match="datum D ink.*CROSSBAR FLANGE"):
+        _check_crossbar_datum_ink(monkeypatch, datum, width)
+
+
+def test_crossbar_datum_ink_clears_each_moved_width_row_not_the_block(monkeypatch) -> None:
+    from _drawing_annotation_extent import boxes_clear
+    from _layout_audit import display_box
+
+    assert drawing.CROSSBAR_FLANGE_TEXT_OFFSET_XY == (0.1085, 0.1046)
+    datum, width = _r6_crossbar_datum_display_data()
+    tag_box, block_box = display_box(datum), display_box(width)
+    assert tag_box is not None and block_box is not None
+    # The 25.0 row remains level with D but safely to its left; the wide
+    # suffix is below D.  Their union box falsely reports a collision.
+    assert not boxes_clear(
+        (tag_box.xmin, tag_box.ymin, tag_box.xmax, tag_box.ymax),
+        (block_box.xmin, block_box.ymin, block_box.xmax, block_box.ymax),
+    )
+    suffix = display_box({"texts": [width["texts"][1]]})
+    assert suffix is not None
+    assert tag_box.ymin - suffix.ymax == pytest.approx(0.0034563)
+    _check_crossbar_datum_ink(monkeypatch, datum, width)
+
+
+@pytest.mark.parametrize("gap", (0.002, 0.002001, 0.001999))
+def test_crossbar_datum_ink_keeps_the_two_mm_clearance(monkeypatch, gap) -> None:
+    datum, width = _r6_crossbar_datum_display_data()
+    width["texts"][1]["pos"][1] = 0.106 - 0.0035 - gap
+    if gap < 0.002:
+        with pytest.raises(RuntimeError, match="datum D ink.*CROSSBAR FLANGE"):
+            _check_crossbar_datum_ink(monkeypatch, datum, width)
+    else:
+        _check_crossbar_datum_ink(monkeypatch, datum, width)
+
+
+@pytest.mark.parametrize("index", (0, 1), ids=("datum-D", "crossbar-width"))
+def test_crossbar_datum_ink_refuses_unreadable_native_data(monkeypatch, index) -> None:
+    displays = list(_r6_crossbar_datum_display_data())
+    refused = [{}, {}]
+    refused[index] = {"GetDisplayData": 1}
+    with pytest.raises(RuntimeError, match="both native display reads.*refused"):
+        _check_crossbar_datum_ink(monkeypatch, *displays, refused=refused)
+    displays[index] = {}
+    with pytest.raises(RuntimeError, match="both native display reads.*empty"):
+        _check_crossbar_datum_ink(monkeypatch, *displays)
+
+
+@pytest.mark.parametrize("index", (0, 1), ids=("datum-D", "crossbar-width"))
+@pytest.mark.parametrize("reported_width", (None, 0.0, -0.001))
+def test_crossbar_datum_ink_refuses_estimated_native_widths(
+    monkeypatch, index, reported_width
+) -> None:
+    displays = list(_r6_crossbar_datum_display_data())
+    displays[index]["texts"][0]["w"] = reported_width
+    with pytest.raises(RuntimeError, match="reported no width"):
+        _check_crossbar_datum_ink(monkeypatch, *displays)
+
+
+def test_crossbar_datum_ink_requires_the_D_label(monkeypatch) -> None:
+    datum, width = _r6_crossbar_datum_display_data()
+    datum["texts"][0]["t"] = "B"
+    with pytest.raises(RuntimeError, match="prints no 'D'"):
+        _check_crossbar_datum_ink(monkeypatch, datum, width)
+
+
+@pytest.mark.parametrize(("field", "value"), (("h", 0.0), ("pos", [])))
+def test_crossbar_datum_ink_requires_visible_D_text(monkeypatch, field, value) -> None:
+    datum, width = _r6_crossbar_datum_display_data()
+    datum["texts"][0][field] = value
+    with pytest.raises(RuntimeError, match="prints no 'D'"):
+        _check_crossbar_datum_ink(monkeypatch, datum, width)
+
+
+@pytest.mark.parametrize("invalid", ("no-rows", "empty-row", "no-height", "no-position"))
+def test_crossbar_datum_ink_refuses_missing_width_text(monkeypatch, invalid) -> None:
+    datum, width = _r6_crossbar_datum_display_data()
+    if invalid == "no-rows":
+        width["texts"] = []
+        message = "prints no text"
+    else:
+        row = width["texts"][1]
+        if invalid == "empty-row":
+            row["t"] = ""
+        elif invalid == "no-height":
+            row["h"] = 0.0
+        else:
+            row["pos"] = []
+        message = "text run 1 draws nothing"
+    with pytest.raises(RuntimeError, match=message):
+        _check_crossbar_datum_ink(monkeypatch, datum, width)
 
 
 def test_spotface_floor_grip_is_the_models_driving_dimension() -> None:

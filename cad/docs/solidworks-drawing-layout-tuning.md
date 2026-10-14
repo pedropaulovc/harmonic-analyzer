@@ -640,6 +640,19 @@ prints there. Keep the guard at its 20 mm default and tighten it only where the
 leader itself is shorter than 20 mm (a snap-back would pass otherwise:
 channel_lever, platen_guide, rocker_arm, cone_tip_block E).
 
+For a datum defining a width's median plane, keep the native attachment to
+the width dimension, not either side edge. On `fr-top-frame` sheet 2,
+run `20261014T055244900Z` proved D stayed on that dimension but ignored the
+requested `(142, 95)` mm placement: its native box was at X122.7–129.7,
+Y106.0–113.0 mm and overprinted **CROSSBAR FLANGE**. Move the associative
+width text within its existing clear band instead of loosening attachment
+checks. Read both annotations' native display data after rebuilding and
+require 2 mm between D's ink and **each** width-text row; a combined two-row
+box falsely collides because the value lies left of D while the suffix lies
+below it. The local recipe check refuses missing display reads or estimated
+text widths; the fleet audit's REPORT mode and nominal datum fallback stay
+unchanged. A native build and eye pass must still prove the new placement.
+
 **i. Moving a leader after the symbol is inserted.**
 Don't: land a surface-finish symbol's or feature-control frame's leader with
 `IAnnotation::SetLeaderAttachmentPointAtIndex`. It returns True, moves the

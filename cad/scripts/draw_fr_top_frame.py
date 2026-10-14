@@ -43,6 +43,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
+from _drawing_annotation_extent import require_clear
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -70,6 +71,7 @@ from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
+from _drawing_layout_audit import annotation_display
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -85,6 +87,7 @@ from _drawing_sheets import (
 )
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _gtol_face_resolve import resolve_faces
+from _layout_audit import display_box, estimated_text_runs
 from _mcmaster_90280a837 import (
     SHANK_DIA as CROSS_SCREW_SHANK_DIA,
     SHANK_LEN as CROSS_SCREW_SHANK_LEN,
@@ -943,7 +946,14 @@ GEOMETRY_CALLOUTS = {
 # the left-window line (y 115.2) and the front view (96.7); the 18.0's
 # between the plan's top edge (212.2) and the 359.8 line (227.7), right of
 # that line's left extension (x 85.0).  Ink measured on the ca7edf4d render.
-CROSSBAR_FLANGE_TEXT_OFFSET_XY = (0.1085, 0.1080)
+# The crossbar's y was 0.1080 until R6 (run 20261014T055244900Z): datum D
+# hangs on this width and lands at SolidWorks' default drop, its box at
+# y 106.0-113.0 mm.  The "CROSSBAR FLANGE" row's native display cap was only
+# 0.06 mm below the box; its rendered glyphs crossed the box's lower edge.
+# At 0.1046 the native cap is 3.46 mm below D and its baseline is 2.38 mm
+# above the front view.  _crossbar_median_datum reads the native ink back
+# and requires CLEAR_GAP_M (2 mm) to each width row.
+CROSSBAR_FLANGE_TEXT_OFFSET_XY = (0.1085, 0.1046)
 GUSSET_RUN_TEXT_OFFSET_XY = (0.1145, 0.2205)
 
 # The plan's rail outlines -- the 428.2 x 262.0 flange extents and the
@@ -1264,7 +1274,10 @@ def _crossbar_median_datum(adapter: Any, view: Any, width: Any) -> None:
     before InsertDatumTag2 attaches the native tag to it.  Unlike the
     edge-only generic helper, this part-specific path then requires the tag
     on swSelDIMENSIONS (14) and the SAME IDisplayDimension/IDimension, not an
-    edge or an unattached tag.
+    edge or an unattached tag.  Last, the attached tag's rendered ink is read
+    back and must clear each printed width row
+    (``_require_datum_d_clear_of_width_text``): the position request is not
+    honoured for a dimension-attached tag, so where D lands is only known here.
     """
     width = _early_bound(width, "IDisplayDimension")
     width_name = width.GetNameForSelection()
@@ -1403,6 +1416,72 @@ def _crossbar_median_datum(adapter: Any, view: Any, width: Any) -> None:
         or int(adapter.swApp.IsSame(attached, display)) != 1
     ):
         raise RuntimeError("median-plane datum D lost the exact crossbar width attachment")
+    _require_datum_d_clear_of_width_text(adapter, annotation, width_annotation)
+
+
+def _require_datum_d_clear_of_width_text(adapter: Any, datum: Any, width: Any) -> None:
+    """Refuse datum D's rendered ink within CLEAR_GAP_M (2 mm) of either
+    printed row of the crossbar width it hangs on.
+
+    D is dimension-attached: SolidWorks drops it at its own default off the
+    width's left arrow and ignores the SetPosition2 request (R6, farm run
+    20261014T055244900Z: requested (142, 95) mm, box landed x 122.7-129.7,
+    y 106.0-113.0, only 0.06 mm above the native cap of "CROSSBAR FLANGE";
+    its rendered glyphs crossed the lower box edge).  Neither gate saw it:
+    finalize_drawing audits in REPORT mode
+    and the layout collector boxes a dimension-attached datum nominally.  So
+    both annotations' IDisplayData are read after the rebuild through the
+    audit's own reader (``annotation_display``) and checked here, row by row:
+    the 25.0 sits left of D while the suffix runs under it, so one block box
+    over both rows would crowd D even when each row clears.  Anything
+    estimated fails closed: a refused accessor, empty display data, a run
+    SolidWorks reported no width for, a run that draws nothing.
+    """
+    tag, tag_refused = annotation_display(adapter, datum)
+    text, text_refused = annotation_display(adapter, width)
+    if tag_refused or text_refused or not tag or not text:
+        raise RuntimeError(
+            "datum D clearance needs both native display reads: datum D "
+            f"{'empty' if not tag else 'read'}, refused {tag_refused}; crossbar width "
+            f"{'empty' if not text else 'read'}, refused {text_refused}"
+        )
+    if not any(
+        str(raw.get("t", "")).strip() == "D"
+        and display_box({"texts": [raw]}) is not None
+        for raw in tag.get("texts", ())
+    ):
+        raise RuntimeError("datum D clearance: the datum's display data prints no 'D'")
+    for label, display in (("datum D", tag), ("crossbar width", text)):
+        estimated = estimated_text_runs(display)
+        if estimated:
+            raise RuntimeError(
+                f"datum D clearance: {label} reported no width for {estimated} text run(s)"
+            )
+    datum_box = display_box(tag)
+    if datum_box is None:
+        raise RuntimeError("datum D clearance: the datum's display data draws nothing")
+    rows: dict[str, tuple[float, float, float, float]] = {}
+    for index, raw in enumerate(text.get("texts", ())):
+        box = display_box({"texts": [raw]})
+        if box is None:
+            raise RuntimeError(
+                f"datum D clearance: crossbar width text run {index} draws nothing"
+            )
+        label = f"crossbar width row {index} {str(raw.get('t', ''))!r}"
+        rows[label] = (box.xmin, box.ymin, box.xmax, box.ymax)
+    if not rows:
+        raise RuntimeError("datum D clearance: crossbar width prints no text")
+
+    def mm(box: tuple[float, float, float, float]) -> str:
+        return "/".join(f"{value * 1000.0:.2f}" for value in box)
+
+    datum_ink = (datum_box.xmin, datum_box.ymin, datum_box.xmax, datum_box.ymax)
+    _telemetry.event(
+        "drawing.crossbar_width.datum_clearance",
+        datum_box=mm(datum_ink),
+        rows="; ".join(f"{label} {mm(box)}" for label, box in rows.items()),
+    )
+    require_clear("datum D ink", datum_ink, rows)
 
 
 def _set_derived_precision(display: Any, *, label: str) -> int:
