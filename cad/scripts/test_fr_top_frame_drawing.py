@@ -1964,6 +1964,7 @@ def test_crossbar_datum_requires_the_exact_native_width_attachment(monkeypatch) 
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
     callout = object()
     monkeypatch.setattr(drawing, "null_callout", lambda: callout)
+    monkeypatch.setattr(drawing, "dispatch_array", list)
     events: list[tuple[str, dict]] = []
     monkeypatch.setattr(
         drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs)),
@@ -1998,16 +1999,26 @@ def test_crossbar_datum_requires_the_exact_native_width_attachment(monkeypatch) 
         state.update(
             displays=(display("RD2@Drawing View1", "OtherWidth@Drawing"), fresh),
             selected=True, count=1, kind=14, picked=fresh, types=(14,), attached=fresh,
+            attached_count=1, accepts=(),
         )
         state.update(changes)
         calls.clear()
         events.clear()
 
+    def set_attached(entities) -> bool:
+        (target,) = entities
+        calls.append(("SetAttachedEntities", target))
+        if target in state["accepts"]:
+            state["attached_count"] = 1
+            return True
+        return False
+
     annotation = SimpleNamespace(
         SetPosition2=lambda *_args: True,
         GetAttachedEntityTypes=lambda: state["types"],
         GetAttachedEntities3=lambda: (state["attached"],),
-        GetAttachedEntityCount3=lambda: 1,
+        GetAttachedEntityCount3=lambda: state["attached_count"],
+        SetAttachedEntities=set_attached,
         IsDangling=lambda: False,
     )
     tag = SimpleNamespace(
@@ -2058,6 +2069,7 @@ def test_crossbar_datum_requires_the_exact_native_width_attachment(monkeypatch) 
         ("drawing.crossbar_width.selection", {
             "count": 1, "type": 14, "selection_name": name, "full_name": full_name,
         }),
+        ("drawing.crossbar_width.attach_attempts", {"inserted_count": 1, "attempts": ""}),
         ("drawing.crossbar_width.attachment", {
             "count": 1, "types": "(14,)", "objects": "('SimpleNamespace',)",
         }),
@@ -2099,6 +2111,24 @@ def test_crossbar_datum_requires_the_exact_native_width_attachment(monkeypatch) 
     reset(types=(1,))
     with pytest.raises(RuntimeError, match="not attached to the width"):
         drawing._crossbar_median_datum(adapter, view, width)
+    # An unattached tag is offered the display dimension, then its annotation;
+    # the first accepted attachment stops the attempts.
+    reset(attached_count=0, accepts=(fresh,))
+    drawing._crossbar_median_datum(adapter, view, width)
+    assert [call for call in calls if call[0] == "SetAttachedEntities"] == [
+        ("SetAttachedEntities", fresh),
+    ]
+    assert ("drawing.crossbar_width.attach_attempts", {
+        "inserted_count": 0, "attempts": "display_dimension:True:1",
+    }) in events
+    # Both rejected: both are tried, and the readback still refuses.
+    reset(attached_count=0, types=())
+    with pytest.raises(RuntimeError, match="not attached to the width"):
+        drawing._crossbar_median_datum(adapter, view, width)
+    assert len([call for call in calls if call[0] == "SetAttachedEntities"]) == 2
+    assert ("drawing.crossbar_width.attach_attempts", {
+        "inserted_count": 0, "attempts": "display_dimension:False:0,annotation:False:0",
+    }) in events
     # Equal FullName is not enough: D must sit on the re-resolved display.
     for attached in (display(dimension_name="DifferentWidth@Drawing"), width):
         reset(attached=attached)

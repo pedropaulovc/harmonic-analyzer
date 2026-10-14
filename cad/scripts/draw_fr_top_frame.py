@@ -31,7 +31,7 @@ import re
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.com_variant import dispatch_array, double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -1274,6 +1274,28 @@ def _crossbar_median_datum(adapter: Any, view: Any, width: Any) -> None:
     if not tag.SetLabel("D"):
         raise RuntimeError("failed to label crossbar median-plane datum D")
     annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    # InsertDatumTag2 on a selected dimension leaves the tag attached to
+    # nothing (count 0): run 20261009T155421516Z (knife-mount datum B), the
+    # vm2 datum probe, and this sheet's run 20261014T032231012Z (RD6 selected
+    # as one swSelDIMENSIONS, tag types ()).  IAnnotation::SetAttachedEntities
+    # is documented as per-kind experimental: offer it the re-resolved display
+    # dimension, then that dimension's own annotation.  The checks below still
+    # demand one type-14 attachment that IS this display.
+    inserted_count = int(annotation.GetAttachedEntityCount3())
+    attempts: list[str] = []
+    if inserted_count == 0:
+        for target_kind, target in (
+            ("display_dimension", display), ("annotation", width_annotation),
+        ):
+            accepted = bool(annotation.SetAttachedEntities(dispatch_array([target])))
+            attached_count = int(annotation.GetAttachedEntityCount3())
+            attempts.append(f"{target_kind}:{accepted}:{attached_count}")
+            if accepted and attached_count:
+                break
+    _telemetry.event(
+        "drawing.crossbar_width.attach_attempts",
+        inserted_count=inserted_count, attempts=",".join(attempts),
+    )
     if not annotation.SetPosition2(*CROSSBAR_MEDIAN_DATUM_XY, 0.0):
         raise RuntimeError("failed to position crossbar median-plane datum D")
     model.ClearSelection2(True)
