@@ -759,6 +759,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
 UNTHREADED_STOCK: dict[str, str] = {
     "vn_channel_spring_installed": "extension spring; its hook ends hang in plain holes and eyes",
     "vn_counter_spring": "extension spring; its hook ends hang in plain holes and eyes",
+    "vn_chain_inner_link": "roller-chain link; its rollers ride sprocket teeth, carrying no thread",
+    "vn_chain_outer_link": "roller-chain or clip-retained connecting link; pins only, no thread",
     "vn_keeper_chain": "chain; its end links hang on screws and eyes, carrying no thread",
     "vn_crank_seat_drive_pin": "dowel pin pressed into a plain hole",
     "vn_keeper_chain_link": "plain chain link",
