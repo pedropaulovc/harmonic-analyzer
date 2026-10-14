@@ -90,13 +90,15 @@ FRONT_KEEP = {
 # Above the edge view so the stock callout clears the rod tip-land text and
 # the sheet border.
 RIGHT_KEEP = {"Thick": (0.392, 0.215)}
-# Functional intent rides the dimension it governs, not the notes.
+# The apex heights land on each arc's low point, which puts both arc centres
+# on the bore's vertical centreline; the tip lands run radially from them.
 CALLOUTS_BELOW = {
-    "TopAbovePivot": "SETS ROCKER TOP EDGE",
-    "BottomBelowPivot": "SETS ROCKER BOTTOM EDGE",
+    "TopAbovePivot": "TO TOP ARC LOW POINT",
+    "BottomBelowPivot": "TO BOTTOM ARC LOW POINT",
     "PivotDia": PIVOT_CALLOUT,
     "Thick": THICK_CALLOUT,
 }
+CALLOUTS_ABOVE = {"TailTipLen": "RADIAL", "RodTipLen": "RADIAL"}
 
 _Z = [0.0, 0.0, 1.0]
 _PRECISION = DRAWING_PRECISION_BY_NAME
@@ -328,6 +330,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     ]
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
+    set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     _radius_leaders_to_arc(adapter, annotations)
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
