@@ -105,10 +105,13 @@ BAR_LENGTH = 452.0  # ends at x +-226, ~29 past each Ø25.4 column (ch30 p002)
 COLUMN_X = 197.0  # frame column line (frame assembly)
 CLAMP_SCREW_DX = 17.5  # clamp screws flank each column
 # The stock 90280A201 #8-32 clamp screws pass through #8 clearance holes.
-# Their 3.9624-mm heads are recessed exactly 0.2 below the bar front: the
-# right-shifted platen travels across the east clamp line, so proud heads
-# would block its slide.
-CLAMP_HEAD_RECESS = 0.2
+# Their 3.9624-mm heads sit below the bar front: the right-shifted platen
+# travels across the east clamp line, so proud heads would block its slide.
+# The recess is 0.35 so the depth's printed .XXX band
+# (pd_support_bar_drawing_spec.CLAMP_CBORE_DEPTH_PLACES) still leaves the head
+# about 0.22 under the face at the shallowest; at 0.2 under the .XX band the
+# head stood 0.31 proud (Main ruling on the r1 machinist blocker).
+CLAMP_HEAD_RECESS = 0.35
 CLAMP_CBORE_DIA = 8.5
 CLAMP_CBORE_DEPTH = CLAMP_HEAD_H + CLAMP_HEAD_RECESS
 CLAMP_THROUGH_HOLE_SPEC = HoleSpec("clearance", "#8")

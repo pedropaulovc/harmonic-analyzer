@@ -217,3 +217,16 @@ def test_isometric_is_drawn_hidden_lines_removed() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "for view in (face, back, iso):" in source
     assert "set_hidden_lines_removed(adapter, view)" in source
+
+
+def test_clamp_heads_stay_under_the_front_face_at_the_printed_worst_case() -> None:
+    from _printed_tolerance import printed_band_mm
+
+    places = sheet_spec.CLAMP_CBORE_DEPTH_PLACES
+    printed = round(part.CLAMP_CBORE_DEPTH, places)
+    band = printed_band_mm(places)
+    shallowest, deepest = printed - band, printed + band
+    # The platen slides across the front face: the head never stands proud.
+    assert part.CLAMP_HEAD_H < shallowest
+    # Rule 17: the floor under the deepest counterbore in the thinnest bar.
+    assert (spec.BAR_DEPTH - spec.BAR_DEPTH_BAND) - deepest >= 2.0
