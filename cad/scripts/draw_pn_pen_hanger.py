@@ -45,8 +45,13 @@ from _drawing_common import (
 )
 from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+)
 from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -73,6 +78,7 @@ from pn_pen_hanger_spec import (
     STRAP_BOT_Y,
     STRAP_TOP_X,
     STRAP_Z,
+    UPPER_PLATE_LOCATION_CALLOUT,
 )
 
 
@@ -133,9 +139,10 @@ SECTION_LINE_MODEL_MM = (
 # Sheet layout (meters).  The tall front view hugs the left margin (its
 # stacked top dimensions under the border, its bottom pair over its label);
 # the tap callout sits right of its top, in the gap before section A-A; the
-# section stands right of the callout with its width rows, fit callout and
-# native caption stacked below it, the notes under the caption clear of the
-# title block; the isometric to the right.
+# section stands right of the callout with its width rows and native caption
+# stacked below it and the slot width's text block parked right of it, the
+# notes under the caption clear of the title block; the isometric to the
+# right.
 FRONT_CENTER = (0.075, 0.150)
 SECTION_CENTER = (0.230, 0.195)
 ISO_CENTER = (0.370, 0.175)
@@ -147,6 +154,12 @@ NOTES_XY = (0.110, 0.094)
 CALLOUT_XY = (0.137, 0.215)
 # Under the front view's StrapTaperDx row (its text at y 0.045).
 FRONT_NOTE_XY = (0.030, 0.034)
+# The upper plate's "in line" callout (rule 10): its text top-left right of
+# the StrapTaperDx extension line (sheet x 0.0855), its straight leader
+# dropping left onto the plate's top edge, passing over the A-A cutting
+# line's right end (y 0.1058 at x 0.0786) about 5 mm clear, under the tap
+# callout and above the notes.
+UPPER_PLATE_NOTE_XY = (0.090, 0.124)
 
 
 def _fx(model_x_mm: float) -> float:
@@ -192,18 +205,42 @@ FRONT_KEEP = {
         _fy(STRAP_BOT_Y) - 0.020,
     ),
 }
-# Section A-A: the U's widths stacked under its plate front, the arm nearest
-# (its value left of the U), the plate width next (its value right of the U,
-# off the slot's extension lines), the slot width outermost and centred with
-# its fit callout below, free of every other row; the plate reach and,
-# outside it, the slot bottom from the strap back face, on the left; the
-# strap stock thickness right of the strap end; the corner radius's text
-# up-right of the -x corner it is attached to, so its leader leaves the arc
-# outward through the arm and crosses no other ink.
+# Section A-A: the U's widths stacked under its plate front, rows 9 mm apart
+# (drawing-guidelines.md rule 14): the slot nearest,
+# the arm next (its value left of the U), the plate width outermost with its
+# value centred between the plate's extension lines, which no other line
+# reaches -- the slot's extension lines stop at the slot row, the arm's at
+# the arm row.  The plate edges' extension lines run past the inner rows
+# OUTSIDE their spans, so no extension line crosses a dimension line.  The
+# slot width's 10 mm span cannot hold its banded value and fit callout, so
+# its text is offset onto a leader, right of the section beyond every
+# extension line (SLOT_WIDTH_TEXT_XY).  The plate reach and, outside it, the
+# slot bottom from the strap back face, on the left; the strap stock
+# thickness right of the strap end; the corner radius's text up-right of the
+# -x corner it is attached to, so its leader leaves the arc outward through
+# the arm and crosses no other ink.
+_PLATE_FRONT_SHEET_Y = _az(PLATE_FRONT_Z)
+# Dimension-line rows below the plate front.  A single-line value prints
+# with its centre 2.7 mm above its line (native sheet run
+# 20261013T234201871Z: 2.5 and 10.0 each read 2.7-2.8 mm above).
+SECTION_ROW_Y = {
+    "SlotWidth": _PLATE_FRONT_SHEET_Y - 0.0065,
+    "ArmWidth": _PLATE_FRONT_SHEET_Y - 0.0155,
+    "PlateWidth": _PLATE_FRONT_SHEET_Y - 0.0245,
+}
+_VALUE_ABOVE_LINE = 0.0027
+# The slot width's position fixes its dimension line before its text is
+# offset; its banded value stacks two rows, so its centre stands about 5 mm
+# above its line (the 20261013T234201871Z block centre stood 10.5 mm above
+# with two callout rows under the value).
+_BANDED_VALUE_ABOVE_LINE = 0.005
 SECTION_KEEP = {
-    "ArmWidth": (_ax(_HALF_PLATE) - 0.006, _az(PLATE_FRONT_Z) - 0.008),
-    "PlateWidth": (_ax(-_HALF_PLATE) + 0.008, _az(PLATE_FRONT_Z) - 0.016),
-    "SlotWidth": (_ax(0.0), _az(PLATE_FRONT_Z) - 0.026),
+    "SlotWidth": (_ax(0.0), SECTION_ROW_Y["SlotWidth"] + _BANDED_VALUE_ABOVE_LINE),
+    "ArmWidth": (
+        _ax(_HALF_PLATE) - 0.006,
+        SECTION_ROW_Y["ArmWidth"] + _VALUE_ABOVE_LINE,
+    ),
+    "PlateWidth": (_ax(0.0), SECTION_ROW_Y["PlateWidth"] + _VALUE_ABOVE_LINE),
     "PlateReach": (
         _ax(_HALF_PLATE) - 0.008,
         _az((PLATE_FRONT_Z + SLOT_BOTTOM_Z) / 2.0),
@@ -212,9 +249,19 @@ SECTION_KEEP = {
     "StrapThick": (_ax(_SECTION_X[0]) + 0.008, _az((STRAP_Z[0] + STRAP_Z[1]) / 2.0)),
     "SlotCornerR": (_ax(-_HALF_PLATE) + 0.015, _az(SLOT_BOTTOM_Z) + 0.012),
 }
-# The native SECTION A-A / SCALE 2 : 1 caption's top centre, under the slot
-# width's fit callout.
-SECTION_CAPTION_XY = (SECTION_CENTER[0], _az(PLATE_FRONT_Z) - 0.049)
+# The slot width's offset text block (value, band and two callout rows,
+# about 49 x 15 mm, positioned by its centre): its left end 4 mm right of
+# the section's rightmost ink (the strap end), centred just below the slot
+# row so the leader runs nearly level to the dimension line, crossing only
+# the plate's -x extension line.
+_SLOT_TEXT_HALF_WIDTH = 0.0245
+SLOT_WIDTH_TEXT_XY = (
+    _ax(_SECTION_X[0]) + 0.004 + _SLOT_TEXT_HALF_WIDTH,
+    SECTION_ROW_Y["SlotWidth"] - 0.004,
+)
+# The native SECTION A-A / SCALE 2 : 1 caption's top centre, under the plate
+# width row.
+SECTION_CAPTION_XY = (SECTION_CENTER[0], SECTION_ROW_Y["PlateWidth"] - 0.012)
 
 
 def _create_section(adapter: Any, front: Any) -> Any:
@@ -417,6 +464,10 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
+    # Offset the slot width's text while it is still the bare banded value:
+    # its dimension line stays on its row, and the callout rows added next
+    # grow the parked block, not the span between the slot walls.
+    offset_dimension_text(adapter, annotations, {"SlotWidth": SLOT_WIDTH_TEXT_XY})
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
@@ -444,6 +495,17 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Front View Note", *FRONT_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    # Rule 10: the upper plate's lateral station is the lower plate's.  The
+    # leader tip sits on the plate's top edge, on its -x half inside the
+    # strap, clear of the A-A cutting line 0.75 mm below that edge.
+    add_leader_note(
+        adapter,
+        UPPER_PLATE_LOCATION_CALLOUT,
+        text_xy=UPPER_PLATE_NOTE_XY,
+        attach_xy=(_fx(-_HALF_PLATE / 2.0), _fy(_UPPER_TOP_Y)),
+        label="upper guide plate in line with the lower",
+        view=front,
+    )
 
     # Materialize the iso's cosmetic thread before the strict final note cleanup;
     # otherwise its descriptive label first appears during the native drawing save.

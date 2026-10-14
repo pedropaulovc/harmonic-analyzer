@@ -39,6 +39,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_high_quality_shaded_with_edges,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
@@ -82,13 +83,28 @@ SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm
 
 # Sheet layout (meters).  Third angle: the bottom view projects straight
-# below the front view (model X shared); the 1:1 isometric rides to the right.
+# below the front view (model X shared); the isometric rides to the right.
 # Both orthographic views are bbox-centred: the front on the 28 x 40 ring face
 # (x 0.087..0.143, y 0.145..0.225), the bottom on the 28 x 8 underside
 # (x 0.087..0.143, y 0.097..0.113), whose centre IS the tapped hole's axis.
 FRONT_CENTER = (0.115, 0.185)
 BOTTOM_CENTER = (0.115, 0.105)
-ISO_CENTER = (0.320, 0.185)
+# The pictorial runs 2:1 like the sheet: at 1:1 the 2.26 tap mouth and the R1.0
+# window fillets read as polygons and banded shading (machinist review r1).
+# A true isometric of the 28 x 40 x 8 ring spans (28 + 8) cos 45 = 25.5 wide
+# and 40 x 0.816 + (28 + 8) x 0.408 = 47.3 tall, so at 2:1 about 51 x 95 mm:
+# centred at (0.320, 0.180) it fills x 0.295..0.345, y 0.133..0.228, clear of
+# the front view's 40.0 dimension (x 0.173), its note (ends ~x 0.23), the top
+# border (0.267) and the title block (top 0.065).
+ISO_SCALE = (2, 1)
+ISO_CENTER = (0.320, 0.180)
+ISO_HALF_EXTENT = (
+    (OUTER_WIDTH + FRAME_DEPTH) * 0.7071 * ISO_SCALE[0] / ISO_SCALE[1] / 2000.0,
+    (OUTER_HEIGHT * 0.8165 + (OUTER_WIDTH + FRAME_DEPTH) * 0.4082)
+    * ISO_SCALE[0]
+    / ISO_SCALE[1]
+    / 2000.0,
+)
 
 
 def _front_xy(model_x_mm: float, model_y_mm: float) -> tuple[float, float]:
@@ -166,7 +182,9 @@ HOLE_CALLOUT_PROCESS = "TAP"
 
 FRONT_VIEW_NOTE_XY = (0.175, 0.240)
 BOTTOM_VIEW_NOTE_XY = (0.070, 0.072)
-ISO_VIEW_NOTE_XY = (0.290, 0.140)
+# The note's left end; its ~60 mm text centres under the isometric (x 0.320),
+# ~15 mm below the view's lowest corner (y 0.133).
+ISO_VIEW_NOTE_XY = (0.290, 0.116)
 
 
 def _set_dimension_prefixes(
@@ -233,11 +251,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # auto-scale, which shifts every coordinate-based pick on it.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(2, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     # The tapped hole is fully defined by its callout (drawing-guidelines.md
-    # rule 9): no view needs hidden lines.
-    for view in (front, bottom, iso):
+    # rule 9): neither orthographic view needs hidden lines.  The pictorial is
+    # precise Shaded With Edges (rule 8), so its tap mouth and window fillets
+    # render round rather than faceted.
+    for view in (front, bottom):
         set_hidden_lines_removed(adapter, view)
+    set_high_quality_shaded_with_edges(adapter, iso, label="pictorial isometric")
 
     annotations = [
         *curate_view_dimensions(

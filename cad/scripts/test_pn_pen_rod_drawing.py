@@ -45,26 +45,38 @@ def test_drawing_keeps_exactly_the_marked_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     assert drawing.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    keeps = (
-        drawing.FRONT_KEEP,
-        drawing.TOP_KEEP,
-        drawing.BOTTOM_KEEP,
-        drawing.DETAIL_KEEP,
-    )
+    keeps = (drawing.FRONT_KEEP, drawing.TOP_KEEP, drawing.BOTTOM_KEEP)
     assert sum(len(keep) for keep in keeps) == len(marked)  # no name kept twice
     assert set().union(*keeps) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert drawing.DRAWING_PRECISION_BY_NAME is spec.DRAWING_PRECISION_BY_NAME
-    # The dimension each view can show: the Front-sketch profile and the pivot's
-    # length in the front view, the mid-plane depth in the top view, the
-    # Top-sketch pivot circle end-on in the bottom view, the shoulder fillet's
-    # radius in the 10:1 detail of the front view.
-    assert set(drawing.FRONT_KEEP) == {"Section", "Length", "PivotLength"}
+    # The dimension each view can show: the Front-sketch profile, the pivot's
+    # length and the shoulder fillet's radius in the front view, the mid-plane
+    # depth in the top view, the Top-sketch pivot circle end-on in the bottom
+    # view.
+    assert set(drawing.FRONT_KEEP) == {
+        "Section",
+        "Length",
+        "PivotLength",
+        "ShoulderRadius",
+    }
     assert set(drawing.TOP_KEEP) == {"Depth"}
     assert set(drawing.BOTTOM_KEEP) == {"PivotDia"}
-    assert set(drawing.DETAIL_KEEP) == {"ShoulderRadius"}
-    assert "keep=DETAIL_KEEP," in _DRAWING_SOURCE
-    assert "annotations += detail_annotations" in _DRAWING_SOURCE
+
+
+def test_no_model_dimension_is_imported_into_the_detail() -> None:
+    """A detail view takes no model dimension (farm leaf 20261013T234242Z:
+    targeted import empty; DragModelDimension refused fleet-wide), so DETAIL A
+    only enlarges the corner the front view's R MAX points at."""
+    assert not hasattr(drawing, "DETAIL_KEEP")
+    assert "detail_annotations" not in _DRAWING_SOURCE
+    curated = [
+        ast.unparse(call.args[1])
+        for call in _calls(ast.parse(_DRAWING_SOURCE), "curate_view_dimensions")
+    ]
+    assert curated == ["front", "top", "bottom"]
+    assert "DragModelDimension(" not in _DRAWING_SOURCE
+    assert "move_model_dimension(" not in _DRAWING_SOURCE
 
 
 def test_shoulder_root_is_a_modelled_max_radius() -> None:
@@ -92,34 +104,40 @@ def test_shoulder_root_is_a_modelled_max_radius() -> None:
     )
     assert "tolerance.Type = SHOULDER_FILLET_TOL_TYPE" in _PART_SOURCE
     assert "_shoulder_fillet_max_limit(adapter)" in _PART_SOURCE
-    # The sheet proves the import kept the MAX type and the radial form.
-    assert "_dress_shoulder_radius(adapter, detail_annotations)" in _DRAWING_SOURCE
+    # The sheet proves the import kept the MAX type, the radial form and the
+    # callout, on the front view's own annotations.
+    assert "_dress_shoulder_radius(adapter, annotations)" in _DRAWING_SOURCE
     assert "int(tolerance.Type) != SHOULDER_FILLET_TOL_TYPE" in _DRAWING_SOURCE
-    # The fence holds the right root only, so one arc carries the radius.
+    assert 'DIMENSION_CALLOUTS["ShoulderRadius"]' in _DRAWING_SOURCE
+    assert _DRAWING_SOURCE.index(
+        "set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)"
+    ) < _DRAWING_SOURCE.index("_dress_shoulder_radius(adapter, annotations)")
+    # The fence holds the right root only, so one arc shows in the detail.
     fence_x, _ = drawing.DETAIL_FENCE_MM
     assert fence_x - drawing.DETAIL_FENCE_RADIUS_MM > 0.0
     assert drawing.DETAIL_SCALE == (10, 1)
 
 
-def test_detail_layout_stays_clear_of_the_title_block_and_its_fence() -> None:
-    title_block_left, title_block_top = 0.2155, 0.0655
+def test_shoulder_layout_stays_clear() -> None:
+    title_block_left = 0.2155
     centre, radius = drawing.DETAIL_CENTER, drawing._DETAIL_RADIUS_M
     assert centre[0] + radius < title_block_left
-    text_x, text_y = drawing.DETAIL_KEEP["ShoulderRadius"]
-    arc_x, arc_y = drawing._SHOULDER_ARC_CENTRE_XY
-    # Down-right of the arc centre: the open air of the detail, so the leader
-    # never crosses the part.
-    assert text_x > arc_x and text_y < arc_y
-    # The ~57 x 17 mm callout block clears the fence and the title block.
-    half_w, half_h = 0.0285, 0.0085
-    assert text_x + half_w < title_block_left
-    assert text_y + half_h < title_block_top
-    corner = (text_x - half_w, text_y + half_h)
-    assert ((corner[0] - centre[0]) ** 2 + (corner[1] - centre[1]) ** 2) ** 0.5 > (
-        radius + 0.005
-    )
     # The label (~32 mm wide, anchored top centre) stands left of the fence.
     assert drawing.DETAIL_LABEL_XY[0] + 0.016 < centre[0] - radius
+    # The R MAX block (~57 x 17 mm) stands up-right of the right shoulder
+    # corner, its bottom above the 10.5's upper extension line (the shoulder)
+    # and its right end left of the bottom view's note.
+    corner = (drawing._fx(spec.PIVOT_DIA / 2.0), drawing._fy(0.0))
+    text_x, text_y = drawing.FRONT_KEEP["ShoulderRadius"]
+    half_w, half_h = 0.0285, 0.0085
+    assert text_x - half_w > drawing._fx(spec.ROD_SECTION / 2.0) + 0.005
+    assert text_y - half_h > corner[1] + 0.003
+    assert text_x + half_w < drawing.BOTTOM_NOTE_XY[0] - 0.015
+    # The fence letter sits between the 10.5's extension lines, clear of its
+    # text and under the R MAX leader.
+    letter_x, letter_y = drawing.DETAIL_LETTER_XY
+    assert drawing._fy(-spec.PIVOT_LENGTH) + 0.002 < letter_y < corner[1] - 0.002
+    assert letter_x + 0.004 < drawing.FRONT_KEEP["PivotLength"][0] - 0.0035
 
 
 def test_bands_are_model_owned_and_name_their_mates() -> None:

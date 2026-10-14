@@ -90,10 +90,10 @@ DRAWING_REFERENCE_PRECISION = 1
 if round(TOTAL_LENGTH, DRAWING_REFERENCE_PRECISION) != TOTAL_LENGTH:
     raise AssertionError("the overall reference must print exactly at its places")
 
-# Front view (1:1): the square's width and length, the pivot length. Top view
-# (4:1): the square's depth and the stud-tap wizard callout. Bottom view (4:1):
-# the pivot diameter, seen end-on inside the square. Shoulder detail (10:1):
-# the shoulder root's MAX radius.
+# Front view (1:1): the square's width and length, the pivot length and the
+# shoulder root's MAX radius (a 10:1 detail only enlarges that corner). Top
+# view (4:1): the square's depth and the stud-tap wizard callout. Bottom view
+# (4:1): the pivot diameter, seen end-on inside the square.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"Section", "Length"},
     "Rod": {"Depth"},

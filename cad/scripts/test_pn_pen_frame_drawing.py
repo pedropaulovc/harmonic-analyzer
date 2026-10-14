@@ -260,11 +260,37 @@ def test_views_and_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     source = inspect.getsource(drawing.build)
     assert source.count("scale=(2, 1)") == 2
+    assert "scale=ISO_SCALE" in source
+    assert drawing.ISO_SCALE == (2, 1)
     assert '"*Right"' not in source
     assert spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 2:1"
     assert spec.BOTTOM_VIEW_NOTE == "BOTTOM VIEW SCALE 2:1"
-    assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
+    assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
     assert not hasattr(spec, "RIGHT_VIEW_NOTE")
+    # The pictorial is precise Shaded With Edges; only the orthographic views
+    # are hidden-lines-removed.
+    assert (
+        'set_high_quality_shaded_with_edges(adapter, iso, label="pictorial isometric")'
+        in (source)
+    )
+    assert "for view in (front, bottom):" in source
+
+
+def test_isometric_stays_clear_of_the_front_view_border_and_title_block() -> None:
+    cx, cy = drawing.ISO_CENTER
+    hx, hy = drawing.ISO_HALF_EXTENT
+    assert hx == pytest.approx(0.0255, abs=0.001)
+    assert hy == pytest.approx(0.0473, abs=0.001)
+    # Right of the 40.0 dimension line and the front view's note.
+    assert cx - hx > drawing.FRONT_KEEP["OuterHeightDim"][0] + 0.05
+    front_note_end = drawing.FRONT_VIEW_NOTE_XY[0] + len(spec.FRONT_VIEW_NOTE) * 0.0025
+    assert cx - hx > front_note_end + 0.03
+    assert cy + hy < 0.267 - 0.02  # under the top border
+    # Its note sits below the view, centred under it, well above the title block.
+    nx, ny = drawing.ISO_VIEW_NOTE_XY
+    note_width = len(spec.ISOMETRIC_VIEW_NOTE) * 0.0025
+    assert abs(nx + note_width / 2.0 - cx) < 0.006
+    assert cy - hy - 0.010 > ny > 0.065 + 0.03
 
 
 def test_bottom_view_projects_under_the_front_view_on_the_hole_axis() -> None:
@@ -372,5 +398,6 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material"] == "C36000 free-machining brass"
     assert config["material"] == config["material_specification"]
     assert "brass" in str(config["material_specification"]).lower()
-    assert config["finish"]
+    # No face runs or locates on a lay: the fleet's plain finish, no method.
+    assert config["finish"] == "as machined"
     assert int(config["quantity"]) == 1

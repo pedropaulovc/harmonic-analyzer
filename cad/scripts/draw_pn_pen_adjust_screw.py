@@ -5,10 +5,12 @@ One side view, the *Right view turned so the stud lies as it is turned
 cross hole seen end-on as a circle with its center mark and native #54 DRILL
 callout. Every marked dimension (pn_pen_adjust_screw_spec.DRAWING_DIMENSIONS)
 lives in a Right-plane sketch and imports here: the thread's major diameter
-(printed as its #0-80 UNF designation), its usable full-thread length, the
-head's diameter and height, the overall length, and the eye's station from the
-head's faced end (the hidden EyeStationReference sketch, shown in this view
-only). A shaded isometric at the sheet scale completes the package (rule 8).
+(printed as its #0-80 UNF designation), its usable full-thread length to the
+thread-limit split edge, the plain shank's diameter as a parenthesised
+reference, the head's diameter and height, the overall length, and the eye's
+station from the head's faced end (the hidden EyeStationReference sketch,
+shown in this view only). A shaded isometric at the sheet scale completes the
+package (rule 8).
 No datums, frames or roughness symbols: the stud is not on the GD&T allowlist
 (rule 5) and nothing on it runs or locates (rule 6). No general note: the
 title block says all the stud needs.
@@ -21,7 +23,11 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
 
 from _check import check
 from _com import _early_bound
@@ -38,6 +44,7 @@ from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
     set_dimension_text,
+    set_reference_dimension,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
@@ -59,6 +66,8 @@ from pn_pen_adjust_screw_spec import (
     FULL_THREAD_LENGTH,
     HEAD_DIA,
     OVERALL_LENGTH,
+    PLAIN_SHANK,
+    REFERENCE_DIMENSIONS,
     SHANK_LENGTH,
     THREAD_CALLOUT,
     THREAD_MAJOR,
@@ -78,7 +87,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # Every view prints at the sheet scale, so none needs a caption. 6:1 lays the
-# 23 mm stud 138 mm long, its Ø5 head 30 mm across and the #54 eye 8 mm.
+# 26 mm stud 156 mm long, its Ø6 head 36 mm across and the #54 eye 8 mm.
 SHEET_SCALE = (6.0, 1.0)
 VIEW_SCALE = (6, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0  # sheet metres per model mm
@@ -87,7 +96,11 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0  # sheet metres per model mm
 # (threaded end -> head) to paper right.
 SIDE_CENTER = (0.150, 0.165)
 SIDE_VIEW_ANGLE = -math.pi / 2.0
-ISO_CENTER = (0.335, 0.190)
+# 26 mm along model Y foreshortens to ~127 mm on the isometric; with the head
+# ellipses it spans ~145 mm, so its centre sits 5 mm under the old 0.190 to
+# keep ~10 mm from the top border (y 0.267) and clear of the title block
+# (top y 0.065).
+ISO_CENTER = (0.335, 0.185)
 AXIS_Y = SIDE_CENTER[1]
 
 
@@ -105,6 +118,7 @@ TOP_X = sheet_x(OVERALL_LENGTH)
 THREAD_HALF = THREAD_MAJOR / 2.0 * _S
 HEAD_HALF = HEAD_DIA / 2.0 * _S
 EYE_HALF = EYE_DIA / 2.0 * _S
+PLAIN_MID_X = sheet_x(FULL_THREAD_LENGTH + PLAIN_SHANK / 2.0)
 
 # Lengths (rules 10/11), all below the profile except the eye's station, so
 # the profile's half-section dimensions (drawn on the sheet's lower half) send
@@ -120,15 +134,25 @@ EYE_HALF = EYE_DIA / 2.0 * _S
 # the faced end. The thread's Ø line (printed as the thread designation)
 # stands below the thread, short of row 1; the head's Ø right of the faced
 # end, between its extension lines.
+# The plain shank's reference Ø stands ABOVE the plain shank, on its
+# mid-station (the ThreadLimitReference witness spans it, so the dimension
+# line rises from the shank with no extension line): below it, the
+# FullThreadLength extension line drops from the split edge to row 1 and
+# would strike its text. 26 mm over the axis puts the text 8 mm above the
+# head's top silhouette (AXIS_Y + 18 mm), left of the head (shoulder at
+# PLAIN_MID_X + 9 mm) and 12 mm under the eye callout's text row; the eye
+# leader leaves that text at EYE_X - 20 mm, 13 mm right of this line.
 _ROW_1_Y = AXIS_Y - 0.032
 _ROW_2_Y = AXIS_Y - 0.050
 _ROW_ABOVE_Y = AXIS_Y + 0.035
+_SHANK_DIA_Y = AXIS_Y + 0.026
 SIDE_KEEP = {
     "FullThreadLength": ((THREAD_END_X + FULL_THREAD_X) / 2.0, _ROW_1_Y),
     "HeadHeight": ((SHOULDER_X + TOP_X) / 2.0, _ROW_1_Y),
     "OverallLength": ((THREAD_END_X + TOP_X) / 2.0, _ROW_2_Y),
     "EyeFromHeadEnd": ((EYE_X + TOP_X) / 2.0, _ROW_ABOVE_Y),
     "ThreadDia": (sheet_x(6.0), AXIS_Y - 0.016),
+    "ShankDia": (PLAIN_MID_X, _SHANK_DIA_Y),
     "HeadDia": (TOP_X + 0.021, AXIS_Y),
 }
 # The eye callout stands up and LEFT of the eye, above the bare thread (the
@@ -230,6 +254,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # says what it bounds.
     set_dimension_text(adapter, annotations, DIMENSION_TEXT)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="below")
+    # The plain shank is the thread blank: its Ø prints once, parenthesised
+    # as a reference with no band.
+    by_name = {dimension_name(adapter, a): a for a in annotations}
+    for name in sorted(REFERENCE_DIMENSIONS):
+        set_reference_dimension(
+            adapter, by_name[name], label=f"MHA-PN-007 {name}", diameter=True
+        )
     if not auto_center_marks(adapter, side, holes=True, size=0.0025):
         raise RuntimeError("failed to add the ASME center mark to the eye")
     add_view_centerline(

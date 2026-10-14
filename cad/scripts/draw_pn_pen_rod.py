@@ -6,13 +6,13 @@ overall-length reference and the property-linked view notes; sheet/template
 and export behavior lives in ``_drawing_common``.  Places, bands and mate
 callouts are authored on the part (``pn_pen_rod_spec``).
 
-The front view (1:1) carries the square's width and length, the pivot length
-and the (122.5) end-to-end reference; the top view (4:1) looks down on the
-tapped top face and carries the square's depth and the native Hole Wizard
-callout of the #0-80 stud tap; the bottom view (4:1) shows the turned pivot
-end-on inside the square and carries its banded diameter; DETAIL A (10:1) of
-the front view's right shoulder carries the shoulder root's R MAX; the shaded
-isometric sits right.
+The front view (1:1) carries the square's width and length, the pivot length,
+the shoulder root's R MAX and the (122.5) end-to-end reference; the top view
+(4:1) looks down on the tapped top face and carries the square's depth and the
+native Hole Wizard callout of the #0-80 stud tap; the bottom view (4:1) shows
+the turned pivot end-on inside the square and carries its banded diameter;
+DETAIL A (10:1) enlarges the front view's right shoulder root so the radius
+the R MAX points at can be seen; the shaded isometric sits right.
 
 Run with SolidWorks open::
 
@@ -133,54 +133,55 @@ def _end_x(center: tuple[float, float], model_x_mm: float) -> float:
 _HALF = ROD_SECTION / 2.0
 _END_HALF_M = _HALF * END_SCALE[0] / END_SCALE[1] / 1000.0
 
-# DETAIL A fences the RIGHT shoulder root only, so the fillet face shows ONE
-# arc in it and its imported radius has one place to attach: centred
-# between the arc's ends (2.2, -0.1), r 1.5 reaches 0.7 <= x <= 3.7, clear of
-# the left root at x -2.2.  Inside it: the pivot side (x 2.0) below, the
-# 0.3-wide seat face and the square's side (x 2.5) above, open air right.
+# DETAIL A fences the RIGHT shoulder root only, so the fillet shows as ONE arc
+# in it: centred between the arc's ends (2.2, -0.1), r 1.5 reaches
+# 0.7 <= x <= 3.7, clear of the left root at x -2.2.  Inside it: the pivot
+# side (x 2.0) below, the 0.3-wide seat face and the square's side (x 2.5)
+# above, open air right.  The detail carries NO dimension: neither the
+# targeted import (farm leaf 20261013T234242Z drawing:pn_pen_rod: "shoulder
+# detail view is missing model dimensions: ['ShoulderRadius']; available=[]")
+# nor DragModelDimension (draw_dt_cone_gear_shaft TIP_DETAIL,
+# test_dt_pinion_arbor_drawing) lands a model dimension in a detail view, so
+# the R MAX stays on the front view, where a fillet radius on a turned
+# shoulder imports (draw_vn_cone_tip_collar's ShoulderRadius), and the detail
+# only enlarges the corner it points at.
 DETAIL_FENCE_MM = (PIVOT_DIA / 2.0 + SHOULDER_FILLET_R, -SHOULDER_FILLET_R / 2.0)
 DETAIL_FENCE_RADIUS_MM = 1.5
 _DETAIL_K = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 _DETAIL_RADIUS_M = DETAIL_FENCE_RADIUS_MM * _DETAIL_K  # 0.015 on the sheet
-
-
-def _detail_xy(model_x_mm: float, model_y_mm: float) -> tuple[float, float]:
-    """Sheet point of a front-plane model point in DETAIL A (fence centre on
-    DETAIL_CENTER; the detail keeps the front view's +X right, +Y up)."""
-    return (
-        DETAIL_CENTER[0] + (model_x_mm - DETAIL_FENCE_MM[0]) * _DETAIL_K,
-        DETAIL_CENTER[1] + (model_y_mm - DETAIL_FENCE_MM[1]) * _DETAIL_K,
-    )
-
-
-# The fillet arc's centre (2.2, -0.2) lands at (0.130, 0.061); the arc runs
-# from (0.128, 0.061) on the pivot side to (0.130, 0.063) on the seat face, so
-# the open air of the detail is everything right of x 0.128 below y 0.063.
-_SHOULDER_ARC_CENTRE_XY = _detail_xy(
-    PIVOT_DIA / 2.0 + SHOULDER_FILLET_R, -SHOULDER_FILLET_R
-)
 # The native detail label anchors at its top centre and prints DETAIL A over
 # SCALE 10 : 1, about 32 x 15 mm (dt-pinion-lift-rod's 5:1 label on the
 # farm PNG).  Left of the fence (left edge x 0.115): x 0.079..0.111,
-# y 0.0545..0.0695 -- below the front view's pivot end (y 0.089), clear of
-# the radius callout's lower-right field.
+# y 0.0545..0.0695 -- below the front view's pivot end (y 0.089).
 DETAIL_LABEL_XY = (
     DETAIL_CENTER[0] - _DETAIL_RADIUS_M - 0.020,
     DETAIL_CENTER[1] + 0.0075,
 )
-# The front view's fence (r 1.5 about (0.0722, 0.0992)) takes its letter up and
-# right: 5 mm right of the square's side, 5 mm above the shoulder, so clear of
-# the 10.5 pivot length's upper extension line (y 0.0993) and its text
-# (y 0.094).
-DETAIL_LETTER_XY = (_fx(_HALF + 5.0), _fy(5.0))
+# The front view's fence (r 1.5 about (0.0722, 0.0992)) takes its letter
+# below-right, between the 10.5's extension lines (y 0.0888 and 0.0993): at
+# (0.0775, 0.094) the ~3.6 mm letter spans x 0.0757..0.0793, 2.4 mm under the
+# upper extension line, 5.7 mm left of the 10.5 text, and under the R MAX
+# leader, which leaves the corner up-right (y >= 0.099).
+DETAIL_LETTER_XY = (_fx(_HALF + 5.0), _fy(-PIVOT_LENGTH / 2.0))
 
 # Front view: the length left of the square, the pivot length right of the
 # pivot, the banded width (and its mate callout) above the top face, offset
-# right so neither extension line runs through the toleranced text.
+# right so neither extension line runs through the toleranced text.  The
+# pivot length's text stands 16 mm right of the square's side (x 0.0885,
+# ~0.085..0.092) to leave the detail letter room between it and the pivot.
+# The shoulder root's R MAX (R0.2 MAX / SEATS ON PEN V-BLOCK / MHA-PN-005,
+# ~57 x 17 mm) stands up-right of the right shoulder: centred at
+# (0.110, 0.11125) it spans x 0.0815..0.1385, y 0.103..0.120 -- 3.5 mm above
+# the 10.5's upper extension line (y 0.0993), 9 mm right of the square, 19 mm
+# left of the bottom view's note (x >= 0.1575).  Its leader leaves the text's
+# left end at ~52 deg down to the corner (0.0722, 0.0990), crossing only the
+# fence it shares the corner with, never the 10.5's lines (it stays above
+# y 0.0993 until x 0.0724, left of where that extension line starts).
 FRONT_KEEP = {
     "Length": (_fx(-_HALF) - 0.012, _fy(SQUARE_LENGTH / 2.0)),
-    "PivotLength": (_fx(_HALF) + 0.012, _fy(-PIVOT_LENGTH / 2.0)),
+    "PivotLength": (_fx(_HALF) + 0.016, _fy(-PIVOT_LENGTH / 2.0)),
     "Section": (_fx(0.0) + 0.040, _fy(SQUARE_LENGTH) + 0.010),
+    "ShoulderRadius": (_fx(_HALF) + 0.0375, _fy(12.0)),
 }
 # The (122.5) end-to-end reference stands OUTSIDE the 112.0 (dimension line
 # x 0.0555): its line at x 0.0415, about 20 mm of text centred there
@@ -211,18 +212,6 @@ TOP_KEEP = {
 # note (0.198).
 BOTTOM_KEEP = {
     "PivotDia": (BOTTOM_CENTER[0] + _END_HALF_M + 0.035, BOTTOM_CENTER[1] + 0.014),
-}
-# DETAIL A: the R MAX callout (R0.2 MAX / SEATS ON PEN V-BLOCK / MHA-PN-005,
-# ~57 x 17 mm) out in the open air down-right of the arc centre: x
-# 0.1465..0.2035, y 0.029..0.046, its nearest corner 23 mm from the fence
-# centre (r 15), 12 mm left of the title block.  The leader runs from it at
-# -28 deg toward the arc centre through the open air only and lands on the
-# arc from its concave side.
-DETAIL_KEEP = {
-    "ShoulderRadius": (
-        _SHOULDER_ARC_CENTRE_XY[0] + 0.045,
-        _SHOULDER_ARC_CENTRE_XY[1] - 0.024,
-    ),
 }
 _DETAIL_PLACE_TOL_M = 1e-4
 
@@ -317,8 +306,8 @@ def _shoulder_detail(adapter: Any, front: Any) -> Any:
             f"shoulder detail outline centre stayed at {landed}, "
             f"requested {DETAIL_CENTER}"
         )
-    # DETAIL_KEEP's radius text is laid out from the fence centre landing on
-    # DETAIL_CENTER: prove it once the detail's transform has caught up.
+    # The fence centre must land on DETAIL_CENTER, where DETAIL_LABEL_XY and
+    # the layout were computed from: prove it once the transform has caught up.
     settle_detail_projection(
         adapter,
         detail,
@@ -360,13 +349,15 @@ def _place_detail_letter(adapter: Any, front: Any) -> None:
 
 
 def _dress_shoulder_radius(adapter: Any, annotations: list[Any]) -> None:
-    """Prove the imported ShoulderRadius is the radial R MAX and route its
-    leader through the arc centre onto the concave side of the arc.
+    """Prove the front view's imported ShoulderRadius prints the part's R MAX
+    with its callout, and stop its leader at the corner.
 
-    The text stands in the open air on the far side of the arc centre (no
-    part of the arc faces it), so the leader must extend to the OPPOSITE side
-    to reach the arc: ``ArcExtensionLineOrOppositeSide`` True
-    (types/IDisplayDimension/ArcExtensionLineOrOppositeSide.md).
+    Read back: radial (not a diameter), measuring SHOULDER_FILLET_R, the
+    native swTolMAX the part set, and the mate callout under the value.  The
+    text stands up-right of the corner, outside the arc's own quadrant, so
+    the leader ends on the arc's extension; ``ArcExtensionLineOrOppositeSide``
+    False keeps it from running on through the arc centre into the pivot
+    (draw_dt_arbor_pedestal's crown, draw_fr_harmonic_base's corner arcs).
     """
     found = [
         annotation
@@ -375,7 +366,7 @@ def _dress_shoulder_radius(adapter: Any, annotations: list[Any]) -> None:
     ]
     if len(found) != 1:
         raise RuntimeError(
-            f"expected one ShoulderRadius on DETAIL A, found {len(found)}"
+            f"expected one ShoulderRadius on the front view, found {len(found)}"
         )
     annotation = _early_bound(found[0], "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
@@ -391,9 +382,15 @@ def _dress_shoulder_radius(adapter: Any, annotations: list[Any]) -> None:
         float(dimension.SystemValue), SHOULDER_FILLET_R / 1000.0, abs_tol=1e-9
     ):
         raise RuntimeError("ShoulderRadius does not measure the shoulder fillet")
-    display.ArcExtensionLineOrOppositeSide = True
-    if display.ArcExtensionLineOrOppositeSide is not True:
-        raise RuntimeError("ShoulderRadius leader did not keep its opposite-side run")
+    callout = str(display.GetText(4) or "")  # swDimensionTextCalloutBelow
+    if callout != DIMENSION_CALLOUTS["ShoulderRadius"]:
+        raise RuntimeError(f"ShoulderRadius callout did not persist: {callout!r}")
+    display.ArcExtensionLineOrOppositeSide = False
+    if display.ArcExtensionLineOrOppositeSide is not False:
+        raise RuntimeError("ShoulderRadius leader still runs to the opposite side")
+    _telemetry.info(
+        f"shoulder radius: text {display.GetText(1)!r}, MAX type, callout {callout!r}"
+    )
 
 
 @_telemetry.traced("drawing.pen_rod.overall_reference")
@@ -514,21 +511,15 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
-    detail = _shoulder_detail(adapter, front)
-    set_hidden_lines_removed(adapter, detail)
-    detail_annotations = curate_view_dimensions(
-        adapter,
-        detail,
-        keep=DETAIL_KEEP,
-        view_label="shoulder detail",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    _dress_shoulder_radius(adapter, detail_annotations)
-    annotations += detail_annotations
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _dress_shoulder_radius(adapter, annotations)
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # DETAIL A enlarges the corner the R MAX points at; it carries no
+    # dimension (a detail view takes none -- see DETAIL_FENCE_MM).
+    detail = _shoulder_detail(adapter, front)
+    set_hidden_lines_removed(adapter, detail)
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the stud tap")
 

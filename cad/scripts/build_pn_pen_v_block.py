@@ -32,11 +32,15 @@ Features, in tree order:
   pivot bore (``through_next``); built after the bore so it stops there.
 * ``LighteningBore``: Hole Wizard 5/16 drill from the top face, through all;
   it opens into the relief.
-* ``ReliefReference`` / ``PivotReference`` (Right plane) and
-  ``LighteningReference`` (Top plane), all hidden: construction chords owning
-  each feature's station across the depth from the front face, and the relief
-  height from the bottom face to the roof, on edges the sheet shows
-  (``pn_pen_v_block_spec`` contract).
+* ``SectionAPlane``: parallel to the Right plane through the pivot-bore axis,
+  section A-A's cutting plane (hidden).
+* ``ReliefReference`` / ``PivotReference`` (on ``SectionAPlane``) and
+  ``LighteningReference`` (Top plane), all hidden: construction chords on
+  edges the sheet shows, owning each feature's station across the depth from
+  the front face and the relief height from the bottom face to the roof
+  (``pn_pen_v_block_spec`` contract).  The section's two lie IN its cutting
+  plane (the bond cradle's recipe): the drawing cuts the section while the
+  part shows them, which is how a section imports a hidden sketch's dims.
 
 Run (SolidWorks already open)::
 
@@ -50,7 +54,7 @@ import sys
 
 from _appearance import apply_material
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _drawing_marks import (
     apply_drawing_properties,
@@ -60,7 +64,7 @@ from _drawing_marks import (
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_bilateral_tolerance
-from _feature_tree import name_last_feature
+from _feature_tree import _feature_by_name, name_last_feature
 from _fit_deviations import deviations
 from _holes import TAP_DRILL_MM, cross_hole_volume_mm3, wizard_holes
 from _part_checks import report_mass_properties, volume_check
@@ -72,12 +76,13 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    blank_reference_sketches,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
-from _visibility import blank_sketch_feature
+from _visibility import blank_reference_geometry
 import _telemetry
 from pn_pen_v_block_spec import (
     BLOCK_DEPTH,
@@ -97,6 +102,7 @@ from pn_pen_v_block_spec import (
     PIVOT_BORE_X,
     PIVOT_CHAMFER_BAND,
     PIVOT_CHAMFER_TOL_TYPE,
+    REFERENCE_SKETCHES,
     RELIEF_CORNER_R,
     RELIEF_HEIGHT,
     RELIEF_WIDTH,
@@ -113,6 +119,12 @@ MATERIAL = "Brass"  # see _appearance.apply_material docstring
 THROUGH_CUT_DEPTH = 80.0  # mid-plane total; > any extent crossed
 TAP_DRILL_DIA = TAP_DRILL_MM[SET_SCREW_TAP_SPEC.size]
 _Z_MID = BLOCK_DEPTH / 2.0
+# Section A-A's cutting plane (the drawing cuts at x = PIVOT_BORE_X): the
+# section's reference sketches lie in it.
+SECTION_PLANE = "SectionAPlane"
+# Length of the pivot reference's two marker chords (front face, bore axis);
+# unprinted, short enough to stay on the front face above the set-screw tap.
+_STUB = 1.0
 
 # Analytic volumes (mm^3) of each feature, checked after it is built.
 V_BLOCK = (BLOCK_LENGTH * BLOCK_HEIGHT - CHAMFER**2) * BLOCK_DEPTH
@@ -291,118 +303,205 @@ async def _construction_chord(
     return line
 
 
-async def _relief_reference(adapter) -> list[tuple[str, str]]:
-    """The relief's depth-wise location, width and height on section A-A's edges.
+def _plane_frame(adapter, name: str) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """(rotation, origin mm) of a reference plane, read back from
+    ``IRefPlane::Transform`` (diag_build_1330K524._plane_frame's layout:
+    nine rotation doubles, then the translation in metres)."""
+    feature = _early_bound(_feature_by_name(adapter, name), "IFeature")
+    plane = _early_bound(feature.GetSpecificFeature2(), "IRefPlane")
+    data = [
+        float(v) for v in _read_member(_read_member(plane, "Transform"), "ArrayData")
+    ]
+    return tuple(data[0:9]), tuple(v * 1000.0 for v in data[9:12])
 
-    Right plane, sketch (u, v) = model (-Z, Y), construction only and hidden
-    after marking.  The relief is cut from a Top-plane profile, whose stations
-    across the depth project edge-on in the section, and its cut depth is a
-    vector from the bottom-face plane that ends in air.  These chords sit on
-    the section's real edges instead: the mouth chord along the bottom face
-    from the near wall's foot to the far wall's (ReliefWidth), anchored to the
-    front face's foot (ReliefZ0, the origin), and the wall chord up the near
-    wall from its foot to the roof (ReliefHeight).  4 + 4 DOF less horizontal,
-    on-level, vertical and the shared foot (1 + 1 + 1 + 2) and 3 dims = 0.
+
+async def _section_plane(adapter) -> None:
+    """Section A-A's cutting plane: the Right plane carried +X to the pivot-bore
+    axis.  Read back against the Right plane: the same rotation (so a sketch on
+    it keeps the Right plane's (u, v) = model (-Z, Y)) and an origin shifted by
+    exactly PIVOT_BORE_X along +X; anything else raises before a chord is laid.
+    """
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    check(
+        f"create plane {SECTION_PLANE}",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Right Plane", offset=PIVOT_BORE_X
+            )
+        ),
+    )
+    name_last_feature(adapter, SECTION_PLANE)
+    right_rotation, right_origin = _plane_frame(adapter, "Right Plane")
+    rotation, origin = _plane_frame(adapter, SECTION_PLANE)
+    shift = tuple(o - r for o, r in zip(origin, right_origin))
+    if any(abs(a - b) > 1e-9 for a, b in zip(rotation, right_rotation)) or any(
+        abs(s - e) > 1e-6 for s, e in zip(shift, (PIVOT_BORE_X, 0.0, 0.0))
+    ):
+        raise RuntimeError(
+            f"{SECTION_PLANE}: rotation {rotation} / origin shift {shift} mm, "
+            f"expected the Right plane's {right_rotation} shifted "
+            f"({PIVOT_BORE_X}, 0, 0)"
+        )
+
+
+def _require_on_section_plane(adapter, sketch: str) -> None:
+    """create_sketch falls back to a standard plane when a named one fails to
+    select; the sketch's parents must name SECTION_PLANE."""
+    feature = _early_bound(_feature_by_name(adapter, sketch), "IFeature")
+    parents = [
+        str(_early_bound(parent, "IFeature").Name)
+        for parent in (feature.GetParents() or ())
+    ]
+    if SECTION_PLANE not in parents:
+        raise RuntimeError(f"{sketch} is not on {SECTION_PLANE}: parents {parents}")
+
+
+async def _relief_reference(adapter) -> list[tuple[str, str]]:
+    """The relief's depth-wise location, width and height in section A-A.
+
+    On SECTION_PLANE, sketch (u, v) = model (-Z, Y), construction only and
+    hidden.  The relief is cut from a Top-plane profile whose stations across
+    the depth project edge-on in the section, and its cut depth is a vector
+    that ends in air.  A shown reference sketch prints, so its chords lie only
+    on the section's own edges, never across the open mouth: the near wall
+    from its foot to the roof (ReliefHeight), its foot from the origin, the
+    front face's foot (ReliefZ0), and the far wall, whose foot is ReliefWidth
+    from the near one along the bottom face.  2 x 4 DOF less the near foot's
+    level, both chords vertical, the far foot's level (4) and 4 dims = 0.
     """
     feature = "ReliefReference"
     z0 = (BLOCK_DEPTH - RELIEF_WIDTH) / 2.0
-    check(f"create sketch {feature}", await adapter.create_sketch("Right"))
-    mouth = await _construction_chord(
-        adapter, feature, (-z0, 0.0), (-(z0 + RELIEF_WIDTH), 0.0)
-    )
-    check(feature, await adapter.add_sketch_constraint(mouth, None, "horizontal"))
-    await dimension_between(
-        adapter,
-        f"{mouth}.start",
-        f"{mouth}.end",
-        "horizontal_distance",
-        RELIEF_WIDTH,
-        f"{feature} width",
-    )
+    z1 = z0 + RELIEF_WIDTH
+    check(f"create sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
+    near = await _construction_chord(adapter, feature, (-z0, 0.0), (-z0, RELIEF_HEIGHT))
     await anchor_point_to_origin(
-        adapter, f"{mouth}.start", -z0, 0.0, f"{feature} near wall foot"
+        adapter, f"{near}.start", -z0, 0.0, f"{feature} near wall foot"
     )
-    wall = await _construction_chord(adapter, feature, (-z0, 0.0), (-z0, RELIEF_HEIGHT))
-    check(feature, await adapter.add_sketch_constraint(wall, None, "vertical"))
-    check(
-        feature,
-        await adapter.add_sketch_constraint(
-            f"{wall}.start", f"{mouth}.start", "coincident"
-        ),
-    )
+    check(feature, await adapter.add_sketch_constraint(near, None, "vertical"))
     await dimension_between(
         adapter,
-        f"{wall}.start",
-        f"{wall}.end",
+        f"{near}.start",
+        f"{near}.end",
         "vertical_distance",
         RELIEF_HEIGHT,
         f"{feature} height",
     )
+    far = await _construction_chord(adapter, feature, (-z1, 0.0), (-z1, RELIEF_HEIGHT))
+    check(
+        feature,
+        await adapter.add_sketch_constraint(
+            f"{far}.start", f"{near}.start", "horizontal_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{near}.start",
+        f"{far}.start",
+        "horizontal_distance",
+        RELIEF_WIDTH,
+        f"{feature} width",
+    )
+    check(feature, await adapter.add_sketch_constraint(far, None, "vertical"))
+    await dimension_between(
+        adapter,
+        f"{far}.start",
+        f"{far}.end",
+        "vertical_distance",
+        RELIEF_HEIGHT,
+        f"{feature} far wall",
+    )
     await ensure_fully_defined(adapter, feature)
     check(f"exit sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
-    width, z0_name, height = name_dimensions(
-        adapter, feature, ["ReliefWidth", "ReliefZ0", "ReliefHeight"]
+    _require_on_section_plane(adapter, feature)
+    z0_name, height, width, far_wall = name_dimensions(
+        adapter, feature, ["ReliefZ0", "ReliefHeight", "ReliefWidth", "ReliefFarWall"]
     )
     return [
-        (width, '"ReliefWidth"'),
         (z0_name, '("BlockDepth" - "ReliefWidth") / 2'),
         (height, '"ReliefHeight"'),
+        (width, '"ReliefWidth"'),
+        (far_wall, '"ReliefHeight"'),
     ]
 
 
 async def _pivot_reference(adapter) -> list[tuple[str, str]]:
     """The pivot bore's depth-wise station and top chamfer, in section A-A.
 
-    Right plane, sketch (u, v) = model (-Z, Y), construction only and hidden
-    after marking.  The bore's own Top-plane station projects edge-on in the
-    section; the first chord runs along the top face from the front face's
-    top edge to the bore axis (the section's centreline), its height on the
-    top face held by an unprinted station dim.  The second is the chamfer's
-    face on the bore's FAR (z 11) side, from its rim on the top face to its
-    foot on the bore wall: its run is the printed chamfer size, so the
-    extension lines rise from the chamfer's own vertices left of the bore
-    axis, clear of PivotZ (the chamfer feature's dimension could attach on
-    either side).  4 + 4 DOF less horizontal, the start on the origin's
-    vertical and 2 dims (span, station); less the rim on the top-face level,
-    the foot's offset from the axis (the bore radius), and the run and drop
-    = 0.
+    On SECTION_PLANE, sketch (u, v) = model (-Z, Y), construction only and
+    hidden.  The bore's own Top-plane station projects edge-on in the section.
+    A shown reference sketch prints, so no chord crosses the bore's open
+    mouth: a _STUB chord down the front face from its top edge, another down
+    the bore axis (the section's centreline) from the top face, PivotZ between
+    their tops; and the chamfer's face on the bore's FAR (z 11) side, from its
+    rim on the top face to its foot on the bore wall, whose run is the printed
+    chamfer size (its extension lines rise from the chamfer's own vertices,
+    clear of PivotZ's span).  3 x 4 DOF less: the front top on the origin's
+    vertical, both stubs vertical, the axis top and the rim level with the
+    front top (5); and 7 dims (station, two stub lengths, PivotZ, the foot's
+    offset from the axis, run, drop) = 0.
     """
     feature = "PivotReference"
     radius = PIVOT_BORE_DIA / 2.0
     chamfer = PIVOT_BORE_TOP_CHAMFER
-    check(f"create sketch {feature}", await adapter.create_sketch("Right"))
-    chord = await _construction_chord(
-        adapter, feature, (0.0, BLOCK_HEIGHT), (-_Z_MID, BLOCK_HEIGHT)
+    top = BLOCK_HEIGHT
+    check(f"create sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
+    front = await _construction_chord(adapter, feature, (0.0, top), (0.0, top - _STUB))
+    await anchor_point_to_origin(
+        adapter, f"{front}.start", 0.0, top, f"{feature} front face top edge"
     )
-    check(feature, await adapter.add_sketch_constraint(chord, None, "horizontal"))
+    check(feature, await adapter.add_sketch_constraint(front, None, "vertical"))
     await dimension_between(
         adapter,
-        f"{chord}.start",
-        f"{chord}.end",
-        "horizontal_distance",
-        _Z_MID,
-        f"{feature} bore axis from the front face",
+        f"{front}.start",
+        f"{front}.end",
+        "vertical_distance",
+        _STUB,
+        f"{feature} front stub",
     )
-    await anchor_point_to_origin(
-        adapter, f"{chord}.start", 0.0, BLOCK_HEIGHT, f"{feature} top-face station"
-    )
-    leg = await _construction_chord(
-        adapter,
-        feature,
-        (-(_Z_MID + radius + chamfer), BLOCK_HEIGHT),
-        (-(_Z_MID + radius), BLOCK_HEIGHT - chamfer),
+    axis = await _construction_chord(
+        adapter, feature, (-_Z_MID, top), (-_Z_MID, top - _STUB)
     )
     check(
         feature,
         await adapter.add_sketch_constraint(
-            f"{leg}.start", f"{chord}.start", "horizontal_points"
+            f"{axis}.start", f"{front}.start", "horizontal_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{front}.start",
+        f"{axis}.start",
+        "horizontal_distance",
+        _Z_MID,
+        f"{feature} bore axis from the front face",
+    )
+    check(feature, await adapter.add_sketch_constraint(axis, None, "vertical"))
+    await dimension_between(
+        adapter,
+        f"{axis}.start",
+        f"{axis}.end",
+        "vertical_distance",
+        _STUB,
+        f"{feature} axis stub",
+    )
+    leg = await _construction_chord(
+        adapter,
+        feature,
+        (-(_Z_MID + radius + chamfer), top),
+        (-(_Z_MID + radius), top - chamfer),
+    )
+    check(
+        feature,
+        await adapter.add_sketch_constraint(
+            f"{leg}.start", f"{front}.start", "horizontal_points"
         ),
     )
     await dimension_between(
         adapter,
         f"{leg}.end",
-        f"{chord}.end",
+        f"{axis}.start",
         "horizontal_distance",
         radius,
         f"{feature} chamfer foot on the bore wall",
@@ -426,20 +525,24 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
     await ensure_fully_defined(adapter, feature)
     check(f"exit sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
-    pivot_z, station, bore_r, run, drop = name_dimensions(
+    _require_on_section_plane(adapter, feature)
+    # The stubs' lengths are fixed: nothing in the part sets them.
+    station, _, pivot_z, _, bore_r, run, drop = name_dimensions(
         adapter,
         feature,
         [
-            "PivotZ",
             "PivotStation",
+            "PivotFrontStub",
+            "PivotZ",
+            "PivotAxisStub",
             "PivotChamferBoreR",
             "PivotChamferSize",
             "PivotChamferDrop",
         ],
     )
     return [
-        (pivot_z, '"BlockDepth" / 2'),
         (station, '"BlockHeight"'),
+        (pivot_z, '"BlockDepth" / 2'),
         (bore_r, '"PivotBoreDia" / 2'),
         (run, '"PivotChamfer"'),
         (drop, '"PivotChamfer"'),
@@ -450,61 +553,62 @@ async def _lightening_reference(adapter) -> list[tuple[str, str]]:
     """The lightening bore's depth-wise station from the front face.
 
     Top plane (the bottom face), sketch (u, v) = model (X, -Z), construction
-    only and hidden after marking.  The bore's own placement dimension runs to
-    the placement sketch's origin, the paper end's front corner, so in the
-    bottom view its extension line would lie along the whole front edge.  This
-    chord runs from the free end's front corner (a real vertex there) to the
-    bore's centre, so LighteningZ's extension lines leave that corner and the
-    centre mark.  4 DOF less the start on the origin's level and 3 dims (the
-    corner's station, and the chord's run and drop) = 0.
+    only and hidden.  The bore's own placement dimension runs to the placement
+    sketch's origin, the paper end's front corner, so in the bottom view its
+    extension line would lie along the whole front edge.  A shown reference
+    sketch prints, so its chords lie on what the bottom view already draws:
+    one up the free end's edge from its front corner to the bore's level
+    (LighteningZ: extension lines from that corner and that level), one along
+    the bore's centreline from there to its centre.  2 x 4 DOF less the
+    corner on the origin's level, both chords' directions, the shared point
+    (2) and 3 dims (the corner's station, LighteningZ, the run) = 0.
     """
     feature = "LighteningReference"
     check(f"create sketch {feature}", await adapter.create_sketch("Top"))
-    chord = await _construction_chord(
-        adapter, feature, (BLOCK_LENGTH, 0.0), (LIGHTENING_X, -_Z_MID)
+    edge = await _construction_chord(
+        adapter, feature, (BLOCK_LENGTH, 0.0), (BLOCK_LENGTH, -_Z_MID)
     )
     await anchor_point_to_origin(
-        adapter, f"{chord}.start", BLOCK_LENGTH, 0.0, f"{feature} free-end corner"
+        adapter, f"{edge}.start", BLOCK_LENGTH, 0.0, f"{feature} free-end corner"
     )
+    check(feature, await adapter.add_sketch_constraint(edge, None, "vertical"))
     await dimension_between(
         adapter,
-        f"{chord}.start",
-        f"{chord}.end",
+        f"{edge}.start",
+        f"{edge}.end",
+        "vertical_distance",
+        _Z_MID,
+        f"{feature} bore level from the front face",
+    )
+    centre = await _construction_chord(
+        adapter, feature, (BLOCK_LENGTH, -_Z_MID), (LIGHTENING_X, -_Z_MID)
+    )
+    check(
+        feature,
+        await adapter.add_sketch_constraint(
+            f"{centre}.start", f"{edge}.end", "coincident"
+        ),
+    )
+    check(feature, await adapter.add_sketch_constraint(centre, None, "horizontal"))
+    await dimension_between(
+        adapter,
+        f"{centre}.start",
+        f"{centre}.end",
         "horizontal_distance",
         BLOCK_LENGTH - LIGHTENING_X,
         f"{feature} bore from the free end",
     )
-    await dimension_between(
-        adapter,
-        f"{chord}.start",
-        f"{chord}.end",
-        "vertical_distance",
-        _Z_MID,
-        f"{feature} bore from the front face",
-    )
     await ensure_fully_defined(adapter, feature)
     check(f"exit sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
-    corner, run, drop = name_dimensions(
-        adapter, feature, ["LighteningFreeEnd", "LighteningRun", "LighteningZ"]
+    corner, lightening_z, run = name_dimensions(
+        adapter, feature, ["LighteningFreeEnd", "LighteningZ", "LighteningRun"]
     )
     return [
         (corner, '"BlockLength"'),
+        (lightening_z, '"BlockDepth" / 2'),
         (run, '"BlockLength" - "LighteningX"'),
-        (drop, '"BlockDepth" / 2'),
     ]
-
-
-def _hide_references(adapter) -> None:
-    """Blank the reference sketches once their dimensions are marked."""
-    model = _early_bound(adapter.currentModel, "IPartDoc")
-    for name in ("ReliefReference", "PivotReference", "LighteningReference"):
-        feature = model.FeatureByName(name)
-        if feature is None:
-            raise RuntimeError(f"missing pen v-block reference sketch {name}")
-        blank_sketch_feature(
-            adapter.currentModel, _early_bound(feature, "IFeature"), name
-        )
 
 
 def _pivot_chamfer_min_limit(adapter) -> None:
@@ -800,6 +904,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # 7. The hidden depth-wise references the sheet prints (no solid change).
+    await _section_plane(adapter)
     drive_jobs += await _relief_reference(adapter)
     drive_jobs += await _pivot_reference(adapter)
     drive_jobs += await _lightening_reference(adapter)
@@ -833,7 +938,9 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    _hide_references(adapter)
+    # Saved hidden: the drawing shows them per view (_drawing_hidden_sketches).
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
+    blank_reference_geometry(adapter, ((SECTION_PLANE, "PLANE"),))
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )

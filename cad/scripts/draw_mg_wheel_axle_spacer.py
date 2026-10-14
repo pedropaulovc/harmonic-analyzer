@@ -76,10 +76,9 @@ DRAWING_PRECISION_BY_NAME = {
 # through the centre: two would cross there.  The bore keeps the face view,
 # its one-line callout up and right of it; the O.D. is a donor there and
 # moves onto the side view, right of the sleeve (drawing-guidelines.md rule
-# 11 (turned parts read like the lathe)).  The length hangs under the side
-# view, its two-line callout ABOVE the value: the value then sits on the
-# dimension line as every value does, and no callout text touches a line (a
-# below-callout stacked the callout's last line onto the dimension line).
+# 11 (turned parts read like the lathe)).  The length and its two-line
+# callout hang under the side view, centred between its extension lines;
+# each callout line stays narrower than that span (spec LENGTH_CALLOUT).
 FRONT_KEEP = {
     "SpacerOd": (0.050, 0.100),
     "SpacerBore": (0.130, 0.205),
@@ -93,8 +92,6 @@ OD_ON_SIDE = (RIGHT_CENTER[0] + LENGTH / 2.0 * _S + 0.030, RIGHT_CENTER[1])
 # function, and name the mate)).
 DIMENSION_CALLOUTS = {
     "SpacerBore": BORE_CALLOUT,
-}
-DIMENSION_CALLOUTS_ABOVE = {
     "SpacerLength": LENGTH_CALLOUT,
 }
 
@@ -168,9 +165,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    set_dimension_callouts(
-        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
-    )
 
     return await finalize_drawing(
         adapter,

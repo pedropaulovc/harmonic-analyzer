@@ -190,17 +190,22 @@ if round(PIVOT_BORE_TOP_CHAMFER, PIVOT_CHAMFER_PLACES) != PIVOT_BORE_TOP_CHAMFER
 # front mouth edge (VMouthZ).  Three features' own depth stations would print
 # off real geometry, so hidden reference sketches own those values instead.
 # Section A-A shows the relief and the pivot bore across the depth, but their
-# sketches lie in the Top plane and project edge-on there; ReliefReference
-# (Right plane) chains the near wall (ReliefZ0) and the width along the
-# bottom face and runs the height up the near wall to the roof (the Relief
-# cut's own depth vector starts on the bottom-face plane and stops in air);
-# PivotReference (Right plane) runs the front face's top edge to the bore
-# axis, and owns the bore's top chamfer leg on the far (z 11) side: the
-# chamfer feature's own dimension may attach on the near side, under PivotZ.
-# The lightening bore's placement dimension runs to the paper-end corner,
-# whose extension line would lie along the bottom view's whole front edge;
-# LighteningReference (Top plane) measures it from the free end's front
-# corner instead. ---
+# sketches lie in the Top plane and project edge-on there.  ReliefReference
+# and PivotReference lie IN section A-A's cutting plane (x = PIVOT_BORE_X,
+# the bond cradle's recipe), each chord on an edge the section draws:
+# ReliefReference runs both relief walls from the bottom face to the roof
+# (ReliefHeight; the Relief cut's own depth vector stops in air), the near
+# foot from the front face's foot (ReliefZ0) and the far foot from the near
+# one (ReliefWidth); PivotReference holds stubs down the front face and the
+# bore axis from the top face (PivotZ between their tops) and the bore's top
+# chamfer leg on the far (z 11) side: the chamfer feature's own dimension may
+# attach on the near side, under PivotZ.  The lightening bore's placement
+# dimension runs to the paper-end corner, whose extension line would lie along
+# the bottom view's whole front edge; LighteningReference (Top plane) runs up
+# the free end's edge from its front corner (LighteningZ) and along the bore's
+# centreline to its centre.  All three are saved hidden; the drawing shows each
+# in the view that dimensions it (``_drawing_hidden_sketches``), the section's
+# two while the part shows them at the cut. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OutlineProfile": {"Length", "Height", "Chamfer2dx"},
     "Block": {"Depth"},
@@ -213,6 +218,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LighteningBore": {"LighteningX"},
     "LighteningReference": {"LighteningZ"},
 }
+REFERENCE_SKETCHES = ("ReliefReference", "PivotReference", "LighteningReference")
+SECTION_REFERENCE_SKETCHES = ("ReliefReference", "PivotReference")
 # Places carry the title block's tolerance (drawing-guidelines.md rule 3).
 # .XX where a fit depends on it: the V's mouth and apex set the marker axis,
 # the relief's near wall and width keep its 0.53-a-side body clearance, the

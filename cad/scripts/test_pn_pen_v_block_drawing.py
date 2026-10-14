@@ -82,7 +82,9 @@ def test_build_authors_every_marked_feature_and_dimension_name() -> None:
         "LighteningBore",
     ]
     positions = [_PART_SOURCE.index(f'"{name}"') for name in tree_order]
-    # The reference sketches' helpers sit above build(); their calls come last.
+    # The reference sketches' helpers sit above build(); their calls come
+    # last, the section's after its cutting plane.
+    positions.append(_PART_SOURCE.index("await _section_plane(adapter)"))
     positions += [
         _PART_SOURCE.index(f"drive_jobs += await _{helper}_reference(adapter)")
         for helper in ("relief", "pivot", "lightening")
@@ -96,15 +98,55 @@ def test_every_feature_is_located_from_the_front_face() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert {"VMouthZ", "ReliefZ0", "PivotZ", "LighteningZ"} <= marked
     assert '"VApexZ"' not in _PART_SOURCE
-    for feature in ("ReliefReference", "PivotReference", "LighteningReference"):
+    assert set(spec.REFERENCE_SKETCHES) <= set(spec.DRAWING_DIMENSIONS)
+    for feature in spec.REFERENCE_SKETCHES:
         assert f'"{feature}"' in _PART_SOURCE
     # Hidden only once marked, before the save that the drawing opens.
     marks = _PART_SOURCE.index("mark_dimensions_for_drawing(adapter, feature_name")
-    hide = _PART_SOURCE.index("_hide_references(adapter)\n")
+    hide = _PART_SOURCE.index("blank_reference_sketches(adapter, REFERENCE_SKETCHES)")
     assert marks < hide < _PART_SOURCE.index("save_part_and_images(adapter")
     assert "segment.ConstructionGeometry = True" in _PART_SOURCE
     # PivotZ's extension line lands on the section's bore-axis centreline.
     assert "add_view_centerline(" in _DRAWING_SOURCE
+
+
+def test_hidden_reference_dimensions_reach_their_views() -> None:
+    # Farm e7b8b6928: the plain targeted import delivered none of a hidden
+    # sketch's dimensions (LighteningZ missing from the bottom view).  Every
+    # view curates through _drawing_hidden_sketches, which shows a hidden
+    # owner per view; the section, a derived view, is cut and curated while
+    # the part shows its sketches, which lie in its cutting plane.
+    assert (
+        "from _drawing_hidden_sketches import curate_view_dimensions, "
+        "part_sketches_shown" in _DRAWING_SOURCE
+    )
+    assert "from _drawing_dimension_import import curate_view_dimensions" not in (
+        _DRAWING_SOURCE
+    )
+    assert set(spec.SECTION_REFERENCE_SKETCHES) <= set(spec.REFERENCE_SKETCHES)
+    section_names = set().union(
+        *(spec.DRAWING_DIMENSIONS[s] for s in spec.SECTION_REFERENCE_SKETCHES)
+    )
+    assert section_names <= set(drawing.SECTION_KEEP)
+    for sketch in set(spec.REFERENCE_SKETCHES) - set(spec.SECTION_REFERENCE_SKETCHES):
+        assert not spec.DRAWING_DIMENSIONS[sketch] & set(drawing.SECTION_KEEP)
+    block = _DRAWING_SOURCE.index("with part_sketches_shown(")
+    assert "SECTION_REFERENCE_SKETCHES" in _DRAWING_SOURCE[block : block + 200]
+    assert "base_view=front" in _DRAWING_SOURCE[block : block + 250]
+    cut = _DRAWING_SOURCE.index("section = create_section_view(")
+    curate = _DRAWING_SOURCE.index("keep=SECTION_KEEP")
+    iso = _DRAWING_SOURCE.index('"*Isometric"')
+    assert block < cut < curate < iso
+    # The cutting line and the sketches' plane are the same x.
+    assert {point[0] for point in drawing.SECTION_LINE_MODEL_MM} == {spec.PIVOT_BORE_X}
+    assert 'base_plane="Right Plane", offset=PIVOT_BORE_X' in _PART_SOURCE
+    for helper in ("_relief_reference", "_pivot_reference"):
+        body = _PART_SOURCE[_PART_SOURCE.index(f"async def {helper}(") :]
+        body = body[: body.index("\nasync def ")]
+        assert "create_sketch(SECTION_PLANE)" in body
+    assert 'blank_reference_geometry(adapter, ((SECTION_PLANE, "PLANE"),))' in (
+        _PART_SOURCE
+    )
 
 
 def test_relief_corners_carry_the_largest_radius_the_grip_allows() -> None:

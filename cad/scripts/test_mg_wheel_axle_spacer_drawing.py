@@ -97,8 +97,8 @@ def test_spacer_passes_the_pin_and_clears_the_tie_tail() -> None:
 
 def test_each_callout_states_its_need() -> None:
     assert not hasattr(spec, "DRAWING_NOTES")
-    assert drawing.DIMENSION_CALLOUTS == {"SpacerBore": "DRILL THRU"}
-    assert drawing.DIMENSION_CALLOUTS_ABOVE == {
+    assert drawing.DIMENSION_CALLOUTS == {
+        "SpacerBore": "DRILL THRU",
         "SpacerLength": "SETS WHEEL STACK\nON AXLE MHA-MG-007",
     }
 

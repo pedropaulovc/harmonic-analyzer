@@ -155,13 +155,54 @@ def test_section_cuts_the_upper_plate_and_spans_its_silhouette() -> None:
     assert draw._az(spec.STRAP_Z[1]) > draw._az(spec.PLATE_FRONT_Z)
     centre = (draw._ax(draw._SX), draw._az(draw._SZ))
     assert centre == pytest.approx(draw.SECTION_CENTER)
-    # The width rows stack under the plate front, the slot width outermost.
+    # The width rows stack under the plate front: slot, arm, plate, each at
+    # least 9 mm apart; the caption under the outermost.
     front = draw._az(spec.PLATE_FRONT_Z)
     rows = [
-        draw.SECTION_KEEP[name][1] for name in ("ArmWidth", "PlateWidth", "SlotWidth")
+        draw.SECTION_ROW_Y[name] for name in ("SlotWidth", "ArmWidth", "PlateWidth")
     ]
     assert front > rows[0] > rows[1] > rows[2]
+    assert min(a - b for a, b in zip(rows, rows[1:])) >= 0.009 - 1e-12
     assert draw.SECTION_CAPTION_XY[1] < rows[2]
+    # The plate width's value stands centred between the plate's extension
+    # lines; the arm's value outside the U on the left.
+    plate_x = sorted((draw._ax(-draw._HALF_PLATE), draw._ax(draw._HALF_PLATE)))
+    assert draw.SECTION_KEEP["PlateWidth"][0] == pytest.approx(sum(plate_x) / 2.0)
+    assert draw.SECTION_KEEP["ArmWidth"][0] < plate_x[0]
+
+
+def test_slot_width_text_is_parked_clear_of_every_extension_line() -> None:
+    # Every vertical extension line of the width rows lies inside the plate,
+    # and the section's rightmost ink is the strap end: the slot width's
+    # ~49 mm text block starts right of both.
+    rightmost_ink = draw._ax(draw._SECTION_X[0])
+    left_end = draw.SLOT_WIDTH_TEXT_XY[0] - draw._SLOT_TEXT_HALF_WIDTH
+    assert left_end > rightmost_ink > draw._ax(-draw._HALF_PLATE)
+    # ... and ends left of the isometric's silhouette.
+    assert draw.SLOT_WIDTH_TEXT_XY[0] + draw._SLOT_TEXT_HALF_WIDTH < 0.355
+    source = inspect.getsource(draw.build)
+    assert source.index("offset_dimension_text(") < source.index(
+        "set_dimension_callouts("
+    )
+
+
+def test_upper_plate_location_callout_stays_off_lines() -> None:
+    assert not re.search(r"\d", spec.UPPER_PLATE_LOCATION_CALLOUT)
+    text_x, text_y = draw.UPPER_PLATE_NOTE_XY
+    tip = (draw._fx(-draw._HALF_PLATE / 2.0), draw._fy(draw._UPPER_TOP_Y))
+    taper_extension_x = draw._fx(spec.STRAP_TOP_X[0])
+    assert text_x > taper_extension_x
+    # The tip is on the plate's top edge inside the strap's silhouette.
+    left, right = draw._strap_x_at(draw._UPPER_TOP_Y)
+    assert draw._fx(right) < tip[0] < draw._fx(left)
+    # The straight leader passes above the cutting line's right end.
+    line_y = draw._fy(draw.SECTION_Y)
+    line_end_x = draw._fx(draw.SECTION_LINE_MODEL_MM[1][0])
+    lowest_start_y = text_y - 0.010  # the bottom of the two-line block
+    t = (line_end_x - tip[0]) / (text_x - tip[0])
+    assert tip[1] + t * (lowest_start_y - tip[1]) > line_y + 0.002
+    # Above the general notes.
+    assert lowest_start_y > draw.NOTES_XY[1]
 
 
 def test_tap_callout_omits_the_title_block_thread_class() -> None:

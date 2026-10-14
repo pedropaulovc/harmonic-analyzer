@@ -4,8 +4,9 @@ The SLDPRT remains authoritative.  This recipe supplies only the v-block's
 views, the placement of its imported model dimensions, the two native hole
 callouts and the isometric's scale note; sheet/template and export behavior
 lives in ``_drawing_common``.  Dimension import and curation live in
-``_drawing_dimension_import``; places and the pivot band are authored on the
-part (``pn_pen_v_block_spec``).
+``_drawing_hidden_sketches`` (the part saves its reference sketches hidden;
+each shows in the view that dimensions it); places and the pivot band are
+authored on the part (``pn_pen_v_block_spec``).
 
 The views follow the part frame (x 0 the paper end, z 0 the front face); every
 feature is located across the depth from the front face:
@@ -59,9 +60,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_centerline import add_view_centerline
-from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import scan_view_edges
+from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
@@ -92,6 +94,7 @@ from pn_pen_v_block_spec import (
     RELIEF_HEIGHT,
     RELIEF_WIDTH,
     RELIEF_X0,
+    SECTION_REFERENCE_SKETCHES,
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
     V_APEX_Y,
@@ -214,10 +217,12 @@ RIGHT_KEEP = {
 # radial leader runs out from the arc's midpoint across only the bottom face's
 # land; the text (x 0.153..0.168) is clear of the front view's SetScrewX line
 # (y 0.142) above and the reamed diameter's callout (from x 0.188) right.  The
-# lightening bore's depth station left of the free end, from that end's
-# front-face corner (x 0.040, y 0.126) to its centre mark.  The reamed
-# diameter's wide callout wholly right of the paper end, its single arrow on
-# the near rim (set_near_side_diameter), so no leader crosses the bore.
+# lightening bore's depth station left of the free end, its extension lines
+# from that end's front-face corner (x 0.040, y 0.126) and from the bore's
+# level on the same edge (y 0.090), whose reference chord (shown here, on the
+# free end's edge) carries on along the centreline to the centre mark.  The
+# reamed diameter's wide callout wholly right of the paper end, its single
+# arrow on the near rim (set_near_side_diameter), so no leader crosses the bore.
 BOTTOM_KEEP = {
     "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BLOCK_DEPTH) - 0.010),
     "PivotX": (_fx(PIVOT_BORE_X / 2.0), _bz(BLOCK_DEPTH) - 0.020),
@@ -230,7 +235,10 @@ BOTTOM_KEEP = {
     "PivotDia": (_fx(0.0) + 0.048, _bz(0.0) - 0.008),
 }
 # Section A-A (z 0 at x 0.396 on the right, the bottom face at y 0.156, the
-# top at 0.228; the caption sits ~0.017 under the view):
+# top at 0.228; the caption sits ~0.017 under the view).  Its two reference
+# sketches show here (they lie in the cut), every chord on a drawn edge: both
+# relief walls, stubs down the front face and the bore axis from the top
+# face, and the far chamfer face.
 # * the relief's near wall from the front face and its width, one chain 7 mm
 #   under the bottom face, their extension lines on the wall feet; the 2.50's
 #   10 mm span is too short for its text, which sits just right of the z 0
@@ -263,6 +271,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open pen-v-block source", await adapter.open_model(str(SOURCE)))
+    source_model = adapter.currentModel
     read_required_properties(
         adapter.currentModel,
         (
@@ -304,41 +313,14 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=VIEW_SCALE
     )
     _orient_bottom_view(adapter, bottom)
-    line = [
-        model_point_in_view(
-            adapter,
-            front,
-            tuple(value / 1000.0 for value in point),
-            label="section line",
-        )
-        for point in SECTION_LINE_MODEL_MM
-    ]
-    section = create_section_view(
-        adapter,
-        front,
-        line_start=line[0],
-        line_end=line[1],
-        view_xy=SECTION_CENTER,
-        section_label="A",
-        scale=VIEW_SCALE,
-        label="pivot bore and set-screw tap section",
-    )
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    # The iso too: a new view already reads Shaded With Edges, so
-    # finalize_drawing's SetDisplayMode4 is a no-op that leaves its cosmetic
-    # threads at draft quality (farm c0b95549c readback cosmetic_threads=False
-    # on the hanger and rod). From HLR the shading call really changes the mode
-    # and takes precision.
-    for view in (front, right, bottom, section, iso):
+    for view in (front, right, bottom):
         set_hidden_lines_removed(adapter, view)
-
     annotations = [
         annotation
         for view, keep, label in (
             (front, FRONT_KEEP, "front"),
             (right, RIGHT_KEEP, "paper end"),
             (bottom, BOTTOM_KEEP, "bottom"),
-            (section, SECTION_KEEP, "section A-A"),
         )
         for annotation in curate_view_dimensions(
             adapter,
@@ -348,6 +330,51 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
     ]
+    # The section's reference sketches lie in its cutting plane, saved hidden:
+    # a derived view takes them from the part as it stands when it is cut,
+    # and selects them through its base view, so the section is cut and
+    # curated while the part shows them (the bond cradle's recipe).
+    line = [
+        model_point_in_view(
+            adapter,
+            front,
+            tuple(value / 1000.0 for value in point),
+            label="section line",
+        )
+        for point in SECTION_LINE_MODEL_MM
+    ]
+    with part_sketches_shown(
+        adapter,
+        source_model,
+        SECTION_REFERENCE_SKETCHES,
+        label="section A-A references",
+        base_view=front,
+    ):
+        section = create_section_view(
+            adapter,
+            front,
+            line_start=line[0],
+            line_end=line[1],
+            view_xy=SECTION_CENTER,
+            section_label="A",
+            scale=VIEW_SCALE,
+            label="pivot bore and set-screw tap section",
+        )
+        set_hidden_lines_removed(adapter, section)
+        annotations += curate_view_dimensions(
+            adapter,
+            section,
+            keep=SECTION_KEEP,
+            view_label="section A-A",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    # The iso too: a new view already reads Shaded With Edges, so
+    # finalize_drawing's SetDisplayMode4 is a no-op that leaves its cosmetic
+    # threads at draft quality (farm c0b95549c readback cosmetic_threads=False
+    # on the hanger and rod). From HLR the shading call really changes the mode
+    # and takes precision.
+    set_hidden_lines_removed(adapter, iso)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"

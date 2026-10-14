@@ -10,13 +10,17 @@ axis, +Y up the axis, the eye's cross hole along X at y = EYE_Y. Axis1 is the
 stud axis (Front Plane x Right Plane) for the coaxial mate with the rod's tap.
 
 Built as ONE Right-plane half-profile revolved 360 degrees (StudProfile ->
-Stud): the thread's major diameter, its usable full-thread length (the
-silhouette is split there, so the revolve leaves the thread-limit edge the
-length dimensions from), the head's diameter and height and the overall
-length are its named dimensions; the plain shank under the head is what is
-left. The profile sits on the Right plane (sketch u -> model -Z, v -> model
-Y) rather than the Front, so the *Right side view -- the one that sees the X
-cross hole end-on as a circle -- imports every marked dimension
+Stud): the thread's major diameter, its usable full-thread length, the
+head's diameter and height and the overall length are its named dimensions;
+the plain shank under the head is what is left. The revolve merges the
+collinear thread and plain-shank segments into one cylinder, so a projected
+split line (ThreadLimitSplit, from the Right-plane sketch
+ThreadLimitReference) rings the shank at the thread limit: the side view
+draws a real edge where the full thread stops, and the same sketch carries
+the plain shank's reference diameter ShankDia on a construction witness. The
+profile sits on the Right plane (sketch u -> model -Z, v -> model Y) rather
+than the Front, so the *Right side view -- the one that sees the X cross hole
+end-on as a circle -- imports every marked dimension
 (pn_pen_adjust_screw_spec.DRAWING_DIMENSIONS). The #54 eye is a native Hole
 Wizard drill (EyeHole) radially through the head, placed on EyeStationPlane;
 its printed station EyeFromHeadEnd (from the head's faced end) rides the
@@ -38,9 +42,9 @@ import sys
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _early_bound
+from _com import _com_invoke, _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
-from _feature_tree import name_last_feature
+from _feature_tree import _feature_by_name, feature_name_by_type, name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -64,6 +68,7 @@ from _drawing_precision import apply_drawing_precision
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from pn_pen_adjust_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -75,6 +80,7 @@ from pn_pen_adjust_screw_spec import (
     HEAD_DIA,
     HEAD_HEIGHT,
     OVERALL_LENGTH,
+    PLAIN_SHANK,
     SHANK_LENGTH,
     THREAD,
     THREAD_MAJOR,
@@ -103,6 +109,173 @@ V_STUD = V_SHANK + V_HEAD
 V_EYE = cross_hole_volume_mm3(EYE_DIA, HEAD_DIA)
 V_TOTAL = V_STUD - V_EYE
 
+# Thread-limit split sketch: the cross line overhangs the shank so its
+# projection rings the whole cylinder; the ShankDia witness spans the middle
+# of the plain shank so the reference's extension lines land on it.
+_SPLIT_OVERHANG = 0.5
+_SHANK_WITNESS_GAP = 0.5  # thread limit to the witness's start
+_SHANK_WITNESS_LEN = PLAIN_SHANK - 2.0 * _SHANK_WITNESS_GAP
+_CYLINDER_IDENTITY = 4002  # swSurfaceTypes_e.CYLINDER_TYPE
+_THREAD_FACE_AREA = math.pi * THREAD_MAJOR * FULL_THREAD_LENGTH
+_PLAIN_FACE_AREA = math.pi * THREAD_MAJOR * PLAIN_SHANK
+
+
+def _shank_face_areas(adapter) -> list[tuple[object, float]]:
+    """Every Ø THREAD_MAJOR cylinder face of the body with its area in mm^2."""
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    faces: list[tuple[object, float]] = []
+    for body in part.GetBodies2(0, False) or ():
+        face = _early_bound(body, "IBody2").GetFirstFace()
+        while face is not None:
+            surface = _com_invoke(face, "IFace2", "GetSurface")
+            if (
+                surface is not None
+                and int(_com_invoke(surface, "ISurface", "Identity"))
+                == _CYLINDER_IDENTITY
+                and math.isclose(
+                    float(tuple(_com_invoke(surface, "ISurface", "CylinderParams"))[6])
+                    * 1000.0,
+                    THREAD_R,
+                    abs_tol=1e-4,
+                )
+            ):
+                area = float(_early_bound(face, "IFace2").GetArea()) * 1e6
+                faces.append((face, area))
+            face = _early_bound(face, "IFace2").GetNextFace()
+    return faces
+
+
+async def _add_thread_limit(adapter) -> list[tuple[str, str]]:
+    """Ring the shank at the thread limit and carry the plain shank's Ø.
+
+    One Right-plane sketch: a centerline up the axis from the threaded end to
+    the thread limit (its length, driven by FullThreadLength, is never
+    marked), a real cross line centred on its top end that projects both
+    ways into a full ring on the shank cylinder, and a construction witness
+    on the plain shank's flank whose doubled distance from the axis is the
+    marked reference ShankDia (driven by ThreadDia: the plain shank is the
+    thread blank).
+    """
+    reach = THREAD_R + _SPLIT_OVERHANG
+    witness_y = FULL_THREAD_LENGTH + _SHANK_WITNESS_GAP
+    dims = SketchDims()
+    check("create_sketch thread limit", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "thread limit axis",
+        await adapter.add_centerline(0.0, 0.0, 0.0, FULL_THREAD_LENGTH),
+    )
+    split = check(
+        "thread limit split line",
+        await adapter.add_line(-reach, FULL_THREAD_LENGTH, reach, FULL_THREAD_LENGTH),
+    )
+    witness = check(
+        "plain shank diameter witness",
+        await adapter.add_line(
+            THREAD_R, witness_y, THREAD_R, witness_y + _SHANK_WITNESS_LEN
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("plain shank witness did not take the construction flag")
+    for entity, relation in (
+        (axis, "vertical"),
+        (split, "horizontal"),
+        (witness, "vertical"),
+    ):
+        check(
+            f"thread limit {entity} {relation}",
+            await adapter.add_sketch_constraint(entity, None, relation),
+        )
+    check(
+        "thread limit split centred on the axis",
+        await adapter.add_sketch_constraint(f"{axis}.end", split, "midpoint"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{axis}.start", 0.0, 0.0, "thread limit axis on the threaded end"
+    )
+    await dimension_between(
+        adapter,
+        f"{axis}.start",
+        f"{axis}.end",
+        "vertical_distance",
+        FULL_THREAD_LENGTH,
+        "thread limit station",
+    )
+    dims.record("ThreadLimitStation", '"FullThreadLength"')
+    await dimension_between(
+        adapter,
+        f"{split}.start",
+        f"{split}.end",
+        "horizontal_distance",
+        2.0 * reach,
+        "thread limit split reach",
+    )
+    dims.record(None, None)
+    await dimension_between(
+        adapter,
+        f"{axis}.end",
+        f"{witness}.start",
+        "vertical_distance",
+        _SHANK_WITNESS_GAP,
+        "plain shank witness station",
+    )
+    dims.record(None, None)
+    await dimension_between(
+        adapter,
+        f"{witness}.start",
+        f"{witness}.end",
+        "vertical_distance",
+        _SHANK_WITNESS_LEN,
+        "plain shank witness length",
+    )
+    dims.record(None, None)
+    await add_diametric_linear_dimension(
+        adapter, axis, witness, (THREAD_R + 3.0, witness_y), "ShankDia"
+    )
+    dims.record("ShankDia", '"ThreadDia"')
+    await ensure_fully_defined(adapter, "thread limit sketch")
+    check("exit_sketch thread limit", await adapter.exit_sketch())
+    name_last_feature(adapter, "ThreadLimitReference")
+    drive_jobs = dims.apply(adapter, "ThreadLimitReference")
+
+    # Projected split line: the sketch at mark 4, the shank cylinder at mark 1.
+    before = _shank_face_areas(adapter)
+    if len(before) != 1:
+        raise RuntimeError(
+            f"ThreadLimitSplit: expected the one merged shank cylinder, got {len(before)}"
+        )
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        "ThreadLimitReference", "SKETCH", 0.0, 0.0, 0.0, False, 4, null_callout(), 0
+    ):
+        raise RuntimeError("ThreadLimitSplit: failed to select the split sketch")
+    selection_manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+    selection_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")
+    selection_data.Mark = 1
+    if not _early_bound(before[0][0], "IEntity").Select4(True, selection_data):
+        raise RuntimeError("ThreadLimitSplit: failed to select the shank cylinder")
+    previous = feature_name_by_type(adapter, "PLine")
+    model.InsertSplitLineProject(False, False)  # both directions: a full ring
+    model.ClearSelection2(True)
+    created = feature_name_by_type(adapter, "PLine")
+    if not created or created == previous:
+        raise RuntimeError("ThreadLimitSplit: projected split line was not created")
+    _feature_by_name(adapter, created).Name = "ThreadLimitSplit"
+    areas = sorted(area for _face, area in _shank_face_areas(adapter))
+    expected = sorted((_PLAIN_FACE_AREA, _THREAD_FACE_AREA))
+    if len(areas) != 2 or any(
+        abs(got - want) > 0.01 * want for got, want in zip(areas, expected)
+    ):
+        raise RuntimeError(
+            f"ThreadLimitSplit: shank faces {areas} mm^2, expected {expected} "
+            "(full thread and plain shank)"
+        )
+    return drive_jobs
+
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
@@ -129,10 +302,11 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # Half-section on the Right plane (sketch u = -z, v = y): the flat threaded
-    # end on the origin, the full thread at its basic major, the plain shank
-    # (same diameter, its own segment so the revolve leaves the thread-limit
-    # edge) up to the head's shoulder, the head, the faced top, and the
-    # closure back down the axis.
+    # end on the origin, the full thread at its basic major (its own segment,
+    # the one FullThreadLength measures; the revolve merges it with the plain
+    # shank, so ThreadLimitSplit supplies the edge), the plain shank up to the
+    # head's shoulder, the head, the faced top, and the closure back down the
+    # axis.
     profile = SketchDims()
     check("create_sketch stud profile", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
@@ -210,7 +384,13 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += profile.apply(adapter, "StudProfile")
     check("revolve stud", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Stud")
-    await volume_check(adapter, "stud", V_STUD, 0.005 * V_STUD)
+    stud_volume = await volume_check(adapter, "stud", V_STUD, 0.005 * V_STUD)
+    # Thread limit (drawing-guidelines.md rule 16): the split ring the
+    # FullThreadLength extension line lands on, and the plain shank's Ø.
+    drive_jobs += await _add_thread_limit(adapter)
+    await volume_check(
+        adapter, "thread-limit split cuts nothing", stud_volume, 1e-6 * stud_volume
+    )
 
     # The #54 eye: a native Hole Wizard drill radially into the head's
     # cylinder at +X, through-all so it leaves by the far wall. Its station

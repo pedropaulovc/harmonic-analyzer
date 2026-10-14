@@ -235,10 +235,16 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
 DRAWING_NOTES = "\n".join(
     (
         "1. TWO GUIDE PLATES ALIKE, SILVER-BRAZED (BAg-7) TO STRAP",
-        "   FRONT FACE; LOWER PLATE FLUSH WITH STRAP BOTTOM END.",
+        "   FRONT FACE; LOWER PLATE FLUSH WITH STRAP BOTTOM END",
+        "   AND BOTH ITS CORNERS.",
         f"2. SLOTS IN LINE: PEN ROD {PEN_ROD_NUMBER} SLIDES FREELY",
         "   THROUGH BOTH UNDER ITS OWN WEIGHT.",
     )
 )
+# Leadered on the upper plate in the front view: its lateral station is the
+# lower plate's (both centred on the rod line), which the strap's foot
+# corners fix (note 1).  A dimension instead would need a long extension
+# line beside the tapered edge or a reference value off that taper.
+UPPER_PLATE_LOCATION_CALLOUT = "IN LINE WITH\nLOWER PLATE"
 FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:1"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

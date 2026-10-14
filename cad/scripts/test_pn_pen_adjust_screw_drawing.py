@@ -58,16 +58,42 @@ def test_spec_is_the_turned_brass_stud() -> None:
     assert spec.THREAD == pn_pen_rod_spec.STUD_THREAD == "#0-80"
     assert spec.THREAD_MAJOR == pytest.approx(1.524)
     assert spec.THREAD_PITCH == pytest.approx(25.4 / 80.0)
-    assert spec.OVERALL_LENGTH == 23.0
-    assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == (5.0, 5.0)
+    assert spec.OVERALL_LENGTH == pytest.approx(26.0)
+    assert (spec.HEAD_DIA, spec.HEAD_HEIGHT) == (6.0, 8.0)
     assert spec.SHANK_LENGTH == pytest.approx(18.0)
     assert spec.FULL_THREAD_LENGTH == 15.0
     assert spec.PLAIN_SHANK == pytest.approx(3.0)
     assert spec.EYE_SPEC == HoleSpec("drilled_number", "#54")
     assert spec.EYE_DIA == pytest.approx(1.397)
-    assert spec.EYE_FROM_HEAD_END == pytest.approx(2.5)
-    assert spec.EYE_Y == pytest.approx(20.5)
+    assert spec.EYE_FROM_HEAD_END == pytest.approx(4.0)
+    assert spec.EYE_Y == pytest.approx(22.0)
     assert spec.THREAD_CALLOUT == "#0-80 UNF"
+
+
+def test_every_wall_round_the_eye_clears_rule_17_at_worst_case() -> None:
+    """drawing-guidelines.md rule 17: the eye's end, shoulder-side and side
+    walls at the worst case of the printed bands (.X on the station, the head
+    height and the head Ø; DRILLED HOLES +0.10 on the #54) stay >= 1.5."""
+    from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+
+    band = printed_band_mm(1)
+    eye_r = (spec.EYE_DIA + drilled_oversize_mm()) / 2.0
+    end = spec.EYE_FROM_HEAD_END - band - eye_r
+    shoulder = (spec.HEAD_HEIGHT - band) - (spec.EYE_FROM_HEAD_END + band) - eye_r
+    side = (spec.HEAD_DIA - band) / 2.0 - eye_r
+    assert (
+        spec.EYE_END_WALL_MIN,
+        spec.EYE_SHOULDER_WALL_MIN,
+        spec.EYE_SIDE_WALL_MIN,
+    ) == (
+        pytest.approx(end),
+        pytest.approx(shoulder),
+        pytest.approx(side),
+    )
+    assert end == pytest.approx(2.45, abs=0.01)
+    assert shoulder == pytest.approx(1.65, abs=0.01)
+    assert side == pytest.approx(1.85, abs=0.01)
+    assert min(end, shoulder, side) >= 1.5
 
 
 def test_full_thread_covers_engagement_nut_and_adjustment() -> None:
@@ -105,6 +131,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
             "OverallLength",
         },
         "EyeStationReference": {"EyeFromHeadEnd"},
+        "ThreadLimitReference": {"ShankDia"},
     }
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.SIDE_KEEP) == marked
@@ -118,7 +145,22 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "HeadHeight": 1,
         "OverallLength": 1,
         "EyeFromHeadEnd": 1,
+        "ShankDia": 2,
     }
+
+
+def test_plain_shank_diameter_prints_as_a_reference() -> None:
+    """The plain shank's Ø is the thread blank: a native diametric model
+    dimension driven by ThreadDia, printed parenthesised with no band."""
+    assert spec.REFERENCE_DIMENSIONS == frozenset({"ShankDia"})
+    assert spec.REFERENCE_DIMENSIONS <= spec.DRAWING_DIMENSIONS["ThreadLimitReference"]
+    source = _source(part)
+    assert 'dims.record("ShankDia", \'"ThreadDia"\')' in source
+    assert 'adapter, axis, witness, (THREAD_R + 3.0, witness_y), "ShankDia"' in source
+    draw_source = _source(drawing)
+    assert "for name in sorted(REFERENCE_DIMENSIONS):" in draw_source
+    assert "diameter=True" in draw_source
+    assert not model_toleranced_dimensions(part)
 
 
 def test_every_marked_dimension_is_created_and_named_by_the_build() -> None:
@@ -137,6 +179,8 @@ def test_every_marked_dimension_is_created_and_named_by_the_build() -> None:
     assert 'station.record("EyeFromHeadEnd", EYE_FROM_HEAD_END_EXPR)' in source
     assert 'drive_jobs += profile.apply(adapter, "StudProfile")' in source
     assert 'drive_jobs += station.apply(adapter, "EyeStationReference")' in source
+    assert 'drive_jobs = dims.apply(adapter, "ThreadLimitReference")' in source
+    assert "drive_jobs += await _add_thread_limit(adapter)" in source
     assert part.EYE_Y_EXPR == '"OverallLength" - "HeadHeight" / 2'
     assert part.EYE_FROM_HEAD_END_EXPR == '"HeadHeight" / 2'
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
@@ -150,7 +194,11 @@ def test_the_eye_station_is_located_from_the_head_end() -> None:
     """drawing-guidelines.md rule 11: the head's features from its own faced
     end. The reference line runs from the eye up to the head end; only its
     length (the eye's station from that face) is marked."""
-    (line,) = _calls(part, "add_line")
+    (line,) = (
+        call
+        for call in _calls(part, "add_line")
+        if [ast.unparse(arg) for arg in call.args][1] == "EYE_Y"
+    )
     assert [ast.unparse(arg) for arg in line.args] == [
         "0.0",
         "EYE_Y",
@@ -161,9 +209,8 @@ def test_the_eye_station_is_located_from_the_head_end() -> None:
 
 
 def test_profile_splits_the_thread_limit_off_the_plain_shank() -> None:
-    """The full thread and the plain shank are separate profile segments, so
-    the revolve leaves the thread-limit edge the FullThreadLength dimension
-    lands on; the shoulder sits at the shank length."""
+    """The full thread is its own profile segment (FullThreadLength measures
+    it); the shoulder sits at the shank length."""
     source = _source(part)
     assert "(THREAD_R, FULL_THREAD_LENGTH)," in source
     assert "(THREAD_R, SHANK_LENGTH)," in source
@@ -175,9 +222,53 @@ def test_profile_splits_the_thread_limit_off_the_plain_shank() -> None:
     assert '("plain shank", shank, "vertical"),' in source
 
 
+def test_a_split_line_rings_the_shank_at_the_thread_limit() -> None:
+    """The revolve merges the collinear thread and plain-shank segments, so a
+    projected split line (both directions: a full ring) at FullThreadLength
+    leaves the real edge the side view draws and the FULL THREAD extension
+    line lands on; the build checks the two faces' areas."""
+    source = _source(part)
+    assert "model.InsertSplitLineProject(False, False)" in source
+    assert '_feature_by_name(adapter, created).Name = "ThreadLimitSplit"' in source
+    assert 'dims.record("ThreadLimitStation", \'"FullThreadLength"\')' in source
+    (split,) = (
+        call
+        for call in _calls(part, "add_line")
+        if [ast.unparse(arg) for arg in call.args]
+        == ["-reach", "FULL_THREAD_LENGTH", "reach", "FULL_THREAD_LENGTH"]
+    )
+    assert part._PLAIN_FACE_AREA == pytest.approx(
+        math.pi * spec.THREAD_MAJOR * spec.PLAIN_SHANK
+    )
+    assert part._THREAD_FACE_AREA == pytest.approx(
+        math.pi * spec.THREAD_MAJOR * spec.FULL_THREAD_LENGTH
+    )
+    # The ShankDia witness lies wholly on the plain shank.
+    assert part._SHANK_WITNESS_GAP > 0.0 and part._SHANK_WITNESS_LEN > 0.0
+    assert 2.0 * part._SHANK_WITNESS_GAP + part._SHANK_WITNESS_LEN == pytest.approx(
+        spec.PLAIN_SHANK
+    )
+    assert '"thread-limit split cuts nothing", stud_volume' in source
+
+
 def test_feature_names_are_the_contract() -> None:
     named = [_literal_args(call)[0] for call in _calls(part, "name_last_feature")]
-    assert named == ["StudProfile", "Stud", "EyeStationPlane", "EyeStationReference"]
+    assert sorted(named) == sorted(
+        [
+            "StudProfile",
+            "Stud",
+            "ThreadLimitReference",
+            "EyeStationPlane",
+            "EyeStationReference",
+        ]
+    )
+    source = _source(part)
+    build_body = source[source.index("async def build(") :]
+    assert (
+        build_body.index('"Stud")')
+        < build_body.index("_add_thread_limit(adapter)")
+        < build_body.index('"EyeStationPlane")')
+    )
     (eye,) = _calls(part, "wizard_hole_on_cylinder")
     assert ast.literal_eval(_keyword(eye, "name")) == "EyeHole"
     assert ast.literal_eval(_keyword(eye, "point_planes")) == (
@@ -196,7 +287,7 @@ def test_every_sketch_faces_the_side_view() -> None:
     """All marked dimensions live on Right-plane sketches: the *Right side
     view, which sees the X eye end-on, imports them natively."""
     source = _source(part)
-    assert source.count('create_sketch("Right")') == 2
+    assert source.count('create_sketch("Right")') == 3
     assert 'create_sketch("Front")' not in source
     assert 'create_sketch("Top")' not in source
     draw_source = _source(drawing)
@@ -226,6 +317,7 @@ def test_volumes_are_analytic() -> None:
     assert 'volume_check(adapter, "stud", V_STUD,' in source
     assert 'volume_check(adapter, "eye cross hole", V_TOTAL,' in source
     assert '"cosmetic thread cuts nothing", driven, 1e-6' in source
+    assert 'stud_volume = await volume_check(adapter, "stud", V_STUD,' in source
 
 
 def test_cosmetic_thread_runs_the_full_thread_only() -> None:
@@ -356,6 +448,12 @@ def test_side_view_layout_reads_like_the_lathe() -> None:
     assert keep["EyeFromHeadEnd"][1] > head_top
     assert drawing.EYE_X < keep["EyeFromHeadEnd"][0] < drawing.TOP_X
     assert keep["HeadDia"][0] > drawing.TOP_X
+    # The plain shank's reference Ø: above the plain shank (below it the
+    # FULL THREAD extension line drops to row 1), over the head's top
+    # silhouette, under the eye callout's text row.
+    shank_x, shank_y = keep["ShankDia"]
+    assert drawing.FULL_THREAD_X < shank_x < drawing.SHOULDER_X
+    assert head_top < shank_y < drawing.EYE_CALLOUT_XY[1] - 0.008
     # The eye callout: text right end left of the eye's centre (the station
     # dimension's extension line), above the head, clear of the threaded end.
     half_width = drawing._EYE_CALLOUT_TEXT_WIDTH / 2.0
@@ -370,3 +468,6 @@ def test_side_view_layout_reads_like_the_lathe() -> None:
     # through the eye's centre.
     assert rim_x < drawing.EYE_X and rim_y > drawing.AXIS_Y
     assert drawing.THREAD_END_X > 0.020
+    # The isometric's ~145 mm height stays inside the border and title block.
+    assert drawing.ISO_CENTER[1] - 0.075 > 0.065
+    assert drawing.ISO_CENTER[1] + 0.075 < 0.267
