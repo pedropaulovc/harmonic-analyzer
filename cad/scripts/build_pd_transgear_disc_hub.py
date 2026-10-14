@@ -21,7 +21,7 @@ overall, spigot end to hub front face, is the cluster fit's model length
 is two Front-plane cuts: the D-bore (its flat on local -Y) forward through
 flange and body, and the round bore back through the spigot.  The three
 screw holes lie on a construction bolt circle whose driving diameter is the
-printed Ø19.  The radial oil hole is a Top-plane cut toward +Y through one
+printed Ø3/4 in.  The radial oil hole is a Top-plane cut toward +Y through one
 wall, centred on the hub body by a construction station line from the hub
 front face (R9-60).  ``Axis1`` is the gear axis (Top Plane ∩ Right Plane);
 the paper-drive assembly mates it to the sleeve's axis and the Front Plane

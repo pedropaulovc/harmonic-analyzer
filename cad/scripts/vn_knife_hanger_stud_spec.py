@@ -20,7 +20,7 @@ this static clamp needs one 18-8 grade. ``_fastener_catalog`` keeps AISI 304
 only as the SOLIDWORKS library stand-in for rendering and mass; it is not a
 supplier grade.
 
-Part frame: finished tip Y=0, axis +Y, bearing face Y=45.70.
+Part frame: finished tip Y=0, axis +Y, bearing face Y=LENGTH (1-25/32 in).
 """
 
 import math
@@ -34,6 +34,7 @@ from _mcmaster_92314a253 import (
     THREAD_MAJOR_MAX,
     THREAD_MAJOR_MIN,
 )
+from _inch import inch
 from _printed_tolerance import angular_band_deg, printed_band_mm
 
 SKU = DIMS.part_no
@@ -44,7 +45,10 @@ SHANK_DIA_MIN = THREAD_MAJOR_MIN
 SHANK_DIA_MAX = THREAD_MAJOR_MAX
 PITCH = DIMS.pitch
 CATALOG_LENGTH = DIMS.length
-LENGTH = 45.70
+# 1-25/32 (1/32): with the 1-3/8 grip and the 1.2827 washer, 1-3/4 leaves
+# under 1.5D engagement and 1-13/16 bottoms in the knife-mount tap.  This
+# length needs that tap's thread at 9.75 +/-0.13 (sm_knife_mount_spec).
+LENGTH = inch(1 + 25 / 32)
 UNDERHEAD_LEN = LENGTH
 LENGTH_BAND = (0.15, -0.15)  # Finished part, (upper, lower), mm.
 LENGTH_MIN = LENGTH + LENGTH_BAND[1]
@@ -52,7 +56,7 @@ LENGTH_MAX = LENGTH + LENGTH_BAND[0]
 HEAD_AF = DIMS.head_af
 HEAD_H = DIMS.head_h
 THREAD_LENGTH = LENGTH  # Nominal catalogue fully-threaded depiction.
-THREAD_LENGTH_MIN = 10.62  # Tail measured from the finished tip.
+THREAD_LENGTH_MIN = inch(7, 16)  # Tail measured from the finished tip.
 INCOMPLETE_TIP_LEN_MAX = PITCH
 FULL_FORM_TAIL_MIN = THREAD_LENGTH_MIN - INCOMPLETE_TIP_LEN_MAX
 # The drawing-guidelines.md rule 18 (thread engagement) thread engagement floor.

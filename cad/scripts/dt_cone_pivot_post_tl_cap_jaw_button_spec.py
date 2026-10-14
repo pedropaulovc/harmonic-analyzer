@@ -12,25 +12,29 @@ Frame: the button axis is model +X, the jaw face at X0 and the spigot end at
 
 from __future__ import annotations
 
+import math
+
 import _config
 import dt_cone_pivot_post_spec as post
+from _inch import inch
 from _printed_tolerance import printed_deviations
 
 # Face (the jaw-to-cap spacer) and spigot (the centring stub). Both axial
 # sizes print from the faced jaw face: the shoulder and the overall length.
-FACE_DIA = 15.0
-FACE_THICK = 3.0
-SPIGOT_DIA = 12.2
-SPIGOT_LENGTH = 2.0
+FACE_DIA = inch(9, 16)
+FACE_THICK = inch(1, 8)
+SPIGOT_LENGTH = inch(1, 16)
 OVERALL_LENGTH = FACE_THICK + SPIGOT_LENGTH
 
 # The spigot drops into the post's journal bore by hand: its largest size stays
 # a hand clearance under the smallest bore the post's running band allows. Its
 # smallest only lets the button float sideways, and the shoulder still lands
-# on the cap annulus (below).
+# on the cap annulus (below).  The spigot is a fit against that bore, so it is
+# the largest two-place size that keeps the hand clearance, not an inch size.
 SPIGOT_BAND = (0.0, -0.05)  # (upper, lower) deviations
 _BORE_MIN = post.BORE_DIA + post.RUNNING_BORE_BAND[1]
 SPIGOT_HAND_CLEARANCE_MIN = 0.05
+SPIGOT_DIA = math.floor((_BORE_MIN - SPIGOT_HAND_CLEARANCE_MIN - SPIGOT_BAND[0]) * 100.0 + 1e-9) / 100.0
 if SPIGOT_DIA + SPIGOT_BAND[0] > _BORE_MIN - SPIGOT_HAND_CLEARANCE_MIN:
     raise AssertionError("cap jaw-button spigot does not drop into the smallest journal bore")
 

@@ -3,14 +3,14 @@ r"""Reproduction script: translational-gearing reducer disc MHA-PD-006 (book ch.
 The large thin brass reducer disc retains the narrated 120 physical teeth,
 cut by the finite PA20 48DP stock #2/reference-55 master. It does not
 touch the rack: the finite stock #8/reference-12 knob pinion drives it 12:120.
-Its bore pilots on the brass hub's Ø13.1 spigot, and three #0-80 fillister
+Its bore pilots on the brass hub's Ø1/2 in spigot, and three #0-80 fillister
 screws (MHA-VN-039) clamp it to that hub's flange (MHA-PD-017).
 
 Every size is ``pd_rack_pinion_spec``'s; the screw pattern is
 ``pd_transgear_disc_hub_geometry``'s (the one authority the flange shares).
 
 Layout (part frame): gear axis = Z through the origin; the Front plane is
-the disc's FRONT face (z = 0, the flange seat), the body runs z = 0..3 and
+the disc's FRONT face (z = 0, the flange seat), the body runs z = 0..FACE_WIDTH and
 +Z is machine rearward.
 
 Features: ``GearBlank`` / ``GearBlankProfile`` (the toothed disc's blank,

@@ -25,10 +25,11 @@ import pd_transgear_pin_spec as PIN
 import vn_transgear_retaining_ring_spec as RING
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
+from _inch import inch
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
-OD = 12.0
+OD = inch(1, 2)
 OD_PLACES = 1
 BORE_DIA = PIN.DIA
 BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower), the sleeve's running band
@@ -43,7 +44,8 @@ BORE_CALLOUT = (
 # 45 deg, on the ring face's O.D. edge: a single MAX limit (the MHA-160
 # precedent).  Only its largest size matters: it must leave the MHA-VN-047
 # ring a full bearing flat (checked below).
-FRONT_CHAMFER = 0.5
+# 1/32 in: 1/16 would triple this sub-1/4 in break (the 1/32 rule).
+FRONT_CHAMFER = inch(1, 32)
 FRONT_CHAMFER_BAND = (0.0, -0.3)  # (upper, lower)
 FRONT_CHAMFER_TOL_TYPE = 6  # swTolType_e.swTolMAX
 FRONT_CHAMFER_PLACES = 1
@@ -76,7 +78,7 @@ GAP_MAX = FIT.FRONT_BUSHING_FITTED_MAX
 LENGTH = FIT.FRONT_BUSHING_MODEL
 
 FACING_ALLOWANCE = 0.10
-BLANK_LENGTH_MIN = 6.10
+BLANK_LENGTH_MIN = inch(5, 16)
 if BLANK_LENGTH_MIN < GAP_MAX + FACING_ALLOWANCE - 1e-9:
     raise AssertionError(
         f"MHA-PD-025 blank {BLANK_LENGTH_MIN:.2f} MIN leaves no {FACING_ALLOWANCE} "

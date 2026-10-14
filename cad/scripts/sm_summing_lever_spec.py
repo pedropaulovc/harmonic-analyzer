@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import math
 from _hole_spec import HoleSpec
+from _inch import inch
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
 
@@ -33,15 +34,20 @@ SUM_H = 3.0 * MM_PER_IN  # 76.20 summation reach (-X)
 ANCHOR_R = 0.375 * MM_PER_IN  # 9.525 summation-anchor outer radius
 ANCHOR_H = 0.75 * MM_PER_IN  # 19.05 summation-anchor boss height (Y)
 
-# hex knife-edge trunnion (vertex-up).  HEX_W was 8.653 (118.6 deg ridge);
-# narrowed to 8.080 (115.1 deg ridge) so the trunnion still rocks >= 5.0 deg
-# inside the sm-knife-mount Ø12 close bore at the worst case of BOTH parts'
-# bands (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``).  Both section
-# sizes print .XXX, so the title block holds them to HEX_BAND.
-HEX_W = 8.080
-HEX_H = 10.268
+# hex knife-edge trunnion (vertex-up).  All-inch: 5/16 across the flats x 11/32
+# vertex to vertex (122.4 deg ridge; was 8.080 x 10.268, 115.1 deg) x 7/8 deep.
+# 11/32 (1/32), not the nearest 3/8: the knife station stays at its spring-
+# calibrated (-15.0, 979.7) under the 999.33125 casting underside, and a 3/8 hex
+# ridge leaves the sm-knife-mount #10-24 tap point a 1.91 web over the bore
+# crown (< 2.0); 11/32 raises the block top to 15.266 (web 2.31).
+# The trunnion still rocks >= 5.0 deg inside the sm-knife-mount Ø1/2 close bore
+# at the worst case of BOTH parts' bands
+# (``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG``, 5.44 deg).  Both
+# section sizes print .XXX, so the title block holds them to HEX_BAND.
+HEX_W = inch(5, 16)  # 7.9375
+HEX_H = inch(11, 32)  # 8.73125
 HEX_BAND = 0.13  # title-block .XXX band on HEX_W and HEX_H
-HEX_DEPTH = 21.717
+HEX_DEPTH = inch(7, 8)  # 22.225
 # Included angle of the knife-edge ridge (the top vertex of the hexagon).
 RIDGE_ANGLE_DEG = 2.0 * math.degrees(math.atan2(HEX_W / 2.0, HEX_H / 4.0))
 
@@ -98,7 +104,7 @@ HOLE_EDGE_OFFSET = PLATE_W - HOLE_X  # 4.60 from the free +X plate edge
 HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0  # from the -Z end
 HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # from the +Z end
 HEX_Z_INNER = PLATE_L / 2.0  # trunnion inboard face flush with the body end (76.20)
-HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
+HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (98.425)
 
 # Drawing prose + marked-dimension contract (DRAWING_DIMENSIONS /
 # DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) live in ``sm_summing_lever_notes`` --

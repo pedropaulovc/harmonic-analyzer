@@ -329,7 +329,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "adjuster countersinks", volume - v_csk, 0.03 * v_csk + 0.05
     )
 
-    # Top slit + perpendicular pinch screw: the 1.2-wide slit runs below the
+    # Top slit + perpendicular pinch screw: the SLIT_W-wide slit runs below the
     # cross-bore so the exact McMaster 91794A112 #4-40 screw can squeeze the
     # two jaws around the adjuster thread.
     check("create_plane BlockTop", await adapter.create_plane(

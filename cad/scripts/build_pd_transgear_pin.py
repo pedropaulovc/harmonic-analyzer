@@ -6,7 +6,7 @@ from the rear.  Dimensions and the derived fit facts live in
 
 Layout: one stepped revolve about local +Z on the Right plane, origin at the
 head's underside (the seat on the arm's rear face, the Front Plane).  From
-the rear: the Ø5.0 head land, the Ø3.900 ground shank, the MHA-VN-047 ring
+the rear: the Ø3/16 head land, the Ø.1540 ground shank, the MHA-VN-047 ring
 groove (its FRONT wall, the load wall, at ``GROOVE_STATION`` from the seat)
 and the plain land in front of it.  The two spherical ends are separate
 revolves on the same plane.  The named plane ``GrooveLoadWall`` and
@@ -231,7 +231,7 @@ async def build(adapter) -> dict[str, str]:
     ]
     lines = await add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
-    # The land in front of the groove is the same Ø3.900 cylinder as the
+    # The land in front of the groove is the same ground cylinder as the
     # shank: collinear with it (one ground diameter, one dimension), not a
     # second horizontal with its own Ø.
     front_land_index = 7

@@ -13,7 +13,7 @@ to the bore (datum A) over the face the arm seats on: the sheet carries
 those two frames.
 
 Local frame: lathe axis +Z, origin on the axis at the face that bears on the
-bar (the FRONT face, machine z -129.9); the rear face (on the arm) at
+bar (the FRONT face, machine z -130.175); the rear face (on the arm) at
 z = LENGTH.  Front Plane (z = 0) and the RearFace plane (z = LENGTH) are the
 mating planes, Axis1 the bore axis.
 """
@@ -24,9 +24,10 @@ import math
 
 import vn_transgear_pivot_screw_spec as SCREW
 from _gtol_planar import PlanarFace
+from _inch import inch
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
-OD = 8.6
+OD = inch(5, 16)  # 7.9375 (was 8.6)
 OD_BAND = 0.13  # ±0.13: 0.142 worst to the lock stations, floating (R9-61)
 # The bore is a light press on the Ø4.7625 -0.0254/0 shoulder, so it is a
 # reamed fit bore (drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the callout states the process) under an
@@ -36,9 +37,10 @@ BORE_DIA = 4.727
 BORE_DIA_BAND = (0.008, 0.0)  # (upper, lower) deviations, reamed
 BORE_DIA_MAX = round(BORE_DIA + BORE_DIA_BAND[0], 6)
 BORE_DIA_MIN = round(BORE_DIA + BORE_DIA_BAND[1], 6)
-BORE_CALLOUT = "REAM THRU"
-LENGTH = 5.5
-LENGTH_BAND = 0.05  # spring room 0.70..0.95 with the floor and shoulder
+# 7/32 (1/32 grid): with the arm's 1/4 spot-face floor no 1/16 length keeps
+# the MHA-VN-049 room inside the spring's working range (3/16 -> 1.59 room).
+LENGTH = inch(7, 32)  # 5.55625 (was 5.5)
+LENGTH_BAND = 0.05  # spring room 0.69..0.94 with the floor and shoulder
 # (loosest, tightest): the smallest shoulder in the largest ream, and the
 # reverse.
 _SHOULDER_DIA_MIN = SCREW.SHOULDER_DIA + SCREW.SHOULDER_DIA_LIMITS[0]

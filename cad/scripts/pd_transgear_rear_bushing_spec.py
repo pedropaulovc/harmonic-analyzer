@@ -19,10 +19,11 @@ import math
 import transgear_cluster_fit as FIT
 import pd_transgear_pin_spec as PIN
 from _gtol_planar import PlanarFace
+from _inch import inch
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
-OD = 9.0
+OD = inch(3, 8)
 OD_PLACES = 1
 BORE_DIA = PIN.DIA
 BORE_DIA_BAND = FIT.BORE_DIA_BAND  # (upper, lower), the sleeve's running band
@@ -50,14 +51,15 @@ LENGTH = FIT.REAR_BUSHING_MODEL
 # Supplied as a blank faced both sides, one face faced again to fit.  The
 # blank is a MIN: FACING_ALLOWANCE (one finishing cut) over the longest fit.
 FACING_ALLOWANCE = 0.10
-BLANK_LENGTH_MIN = 6.85
+BLANK_LENGTH_MIN = inch(1, 4)
 if BLANK_LENGTH_MIN < GAP_MAX + FACING_ALLOWANCE - 1e-9:
     raise AssertionError(
         f"MHA-PD-024 blank {BLANK_LENGTH_MIN:.2f} MIN leaves no {FACING_ALLOWANCE} "
         f"facing allowance over the {GAP_MAX:.3f} longest fit"
     )
-if not math.isclose(LENGTH, 6.0, abs_tol=1e-6):
-    raise AssertionError(f"MHA-PD-024 model length {LENGTH} left the rev 5 B 6.0")
+# The cluster's re-solved model length at the inch stack (was 6.0).
+if not math.isclose(LENGTH, 5.10625, abs_tol=1e-6):
+    raise AssertionError(f"MHA-PD-024 model length {LENGTH} left the inch 5.10625")
 
 # The sheet: the modelled length prints as a REFERENCE; the callout under it
 # is the requirement, and the blank is the make-to size.  The MHA-PD-000 step

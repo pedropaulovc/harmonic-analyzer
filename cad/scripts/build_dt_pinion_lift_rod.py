@@ -69,8 +69,8 @@ MATERIAL = "Plain Carbon Steel"  # bright steel (p.68)
 # dt_pinion_lift_rod_spec.py, the dimensional contract the drawing shares.
 
 ROD_R = ROD_DIA / 2.0
-CAP_R = (ROD_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 4.80 crown sphere radius
-V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 19.85
+CAP_R = (ROD_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 4.76 (3/16 in) crown sphere radius
+V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0
 
 V_ROD = math.pi * ROD_R**2 * ROD_LEN
 

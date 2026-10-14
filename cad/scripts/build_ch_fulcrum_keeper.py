@@ -12,9 +12,9 @@ screw (MHA-VN-022) seated flush in a counterbore.
 
 Layout (part frame): +X along the shaft, OUTBOARD (away from the lever
 bank; the lug mid-plane / set-screw axis is x = 0); +Y up from the seat
-(y = 0 lands on the rail top face, machine 1036.2); +Z across the 14 width.
-The lug spans x -3..+3 from the seat up; the foot runs outboard from the
-lug's outer face to x = +13.5, and the whole underside x -3..+13.5 is the
+(y = 0 lands on the rail top face, machine 1035.84375); +Z across the 9/16 width.
+The lug spans x -1/8..+1/8 from the seat up; the foot runs outboard from the
+lug's outer face to x = +12.7, and the whole underside x -3.175..+12.7 is the
 flat seat.
 
 One part serves both ends: the assembly places the +Z (rear) end keeper

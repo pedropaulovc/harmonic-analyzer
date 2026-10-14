@@ -19,9 +19,9 @@ rotation about Z):
   that seats on the arm's rear face (machine z -116.4625);
 * +X and +Y are the arm's +X (toward its square end) and +Y (toward its upper
   tangent edge); the plate's long axis runs along -Y;
-* +Z toward the rear (machine +Z): the over-arm section spans z 0..5, the
-  section below the arm z -7.9375..5, the front hub z -20.5375..-7.9375 and
-  the rear boss z 5..8.5.
+* +Z toward the rear (machine +Z): the over-arm section spans z 0..5.55625,
+  the section below the arm z -7.9375..5.55625, the front hub
+  z -20.6375..-7.9375 and the rear boss z 5.55625..8.73125.
 
 Keep drawing-only notes out of this module.
 """
@@ -31,6 +31,7 @@ from __future__ import annotations
 import math
 
 import pd_transgear_arm_geometry as ARM
+from _inch import inch
 from _printed_tolerance import angular_band_deg, printed_band_mm, printed_deviations
 
 # --- Where the bore sits on the arm (arm frame, mm) -------------------------
@@ -40,13 +41,15 @@ BORE_STATION = ARM.KNOB_BORE_STATION
 BORE_OFFSET = ARM.KNOB_BORE_OFFSET
 
 # --- Section ----------------------------------------------------------------
-END_R = 12.5  # full round about K; both tapers are tangent to it
-WIDTH = 38.1  # 1-1/2 in bar, symmetric about K
-THICKNESS_OVER_ARM = 5.0  # unchanged nominal; .XX bounds the locator dowel span
+END_R = inch(1, 2)  # 12.7 (was 12.5): full round about K; both tapers are tangent to it
+WIDTH = inch(1.5)  # 1-1/2 in bar, symmetric about K
+# 7/32 (1/32 grid): 3/16 leaves the MHA-VN-040 screws 1.46D worst engagement
+# (< 1.5D, transgear_hanger_joints); 1/4 would move it 27%.
+THICKNESS_OVER_ARM = inch(7, 32)  # 5.55625 (was 5.0); .XX bounds the locator dowel span
 THICKNESS_OVER_ARM_PLACES = 2
 THICKNESS_OVER_ARM_BAND = printed_band_mm(THICKNESS_OVER_ARM_PLACES)
 NOTCH_DEPTH = ARM.THICKNESS  # the section below the arm reaches its front face
-THICKNESS_BELOW_ARM = THICKNESS_OVER_ARM + NOTCH_DEPTH  # 12.9375
+THICKNESS_BELOW_ARM = THICKNESS_OVER_ARM + NOTCH_DEPTH  # 13.49375
 
 # Edges along the plate's long axis, in the plate frame (x from K): the
 # outline is symmetric about the long axis through K, so the screws' midpoint
@@ -55,8 +58,8 @@ EDGE_PLUS_X = WIDTH / 2.0
 EDGE_MINUS_X = -WIDTH / 2.0
 # Each edge runs parallel to the long axis down to its kink, then straight
 # to tangency with the end round.  [INFERENCE] kink station from the notch
-# crop (row ≈ 790): arm y -20.
-KINK_Y = -20.0 - BORE_OFFSET
+# crop (row ≈ 790): arm y -13/16 (was -20).
+KINK_Y = -inch(13, 16) - BORE_OFFSET
 
 
 def arm_upper_edge_y(x: float) -> float:
@@ -72,7 +75,8 @@ def arm_lower_edge_y(x: float) -> float:
 # The matched locating dowels register the plate; mounting screws clamp ONLY.
 # The notch is clearance, not a third locator. A nominal/graded reference
 # clearance is not a whole-body certificate inferred from pin-end geometry.
-NOTCH_RELIEF = 2.5
+# 3/32 (1/32 grid): the 1/16 grid's 1/8 would move this sub-1/4 relief 27%.
+NOTCH_RELIEF = inch(3, 32)  # 2.38125 (was 2.5)
 
 
 def notch_face_y(x: float) -> float:
@@ -94,23 +98,25 @@ if NOTCH_LEFT[1] <= KINK[1]:
     raise AssertionError("the relieved notch face drops below the -X edge's kink")
 
 # --- Knob-shaft bearing: bore, front hub, rear boss (contract 1.10) ---------
-BORE_DIA = 6.0
-BORE_DIA_LIMITS = (0.0, 0.012)  # 6 H7 over the 6 g6 (-0.004/-0.012) journal
-HUB_DIA = 13.2  # .XX
-# The hub stands 12.6 proud of the arm's front face, which puts its face (the
-# thrust ring's seat) at machine z -137.0 whatever the arm stock (R9-25): the
-# mounting face to the hub face is 20.5375 on the 7.9375 arm.  .XXX: the
+# The knob shaft's journal and this bore share the 1/4 nominal (was 6.0);
+# the H7-over-g6 bands are unchanged.
+BORE_DIA = inch(1, 4)  # 6.35
+BORE_DIA_LIMITS = (0.0, 0.012)  # H7 over the g6 (-0.004/-0.012) journal
+HUB_DIA = inch(1, 2)  # 12.7 (was 13.2), .XX
+# The hub stands 1/2 proud of the arm's front face, which puts its face (the
+# thrust ring's seat) 1/2 forward of the arm whatever the arm stock (R9-25):
+# the mounting face to the hub face is 20.6375 on the 7.9375 arm.  .XXX: the
 # chain-plane station (contract §13).
-HUB_LENGTH = 12.6
-HUB_FACE_TO_MOUNTING = NOTCH_DEPTH + HUB_LENGTH  # 20.5375
+HUB_LENGTH = inch(1, 2)  # 12.7 (was 12.6)
+HUB_FACE_TO_MOUNTING = NOTCH_DEPTH + HUB_LENGTH  # 20.6375
 # The chain-plane station prints .XXX (contract §13). Keep its existing
 # title-block config reader here, not in the richer drawing/annotation spec:
 # ARM.BAND_XXX is a hard-coded wall band, not this station's printed grade.
 HUB_STATION_PLACES = 3
 HUB_FACE_TO_MOUNTING_BAND = printed_band_mm(HUB_STATION_PLACES)
-BOSS_DIA = 20.0  # .X
-BOSS_HEIGHT = 3.5
-HUB_TO_BOSS = HUB_FACE_TO_MOUNTING + THICKNESS_OVER_ARM + BOSS_HEIGHT  # 29.0375
+BOSS_DIA = inch(13, 16)  # 20.6375 (was 20.0), .X
+BOSS_HEIGHT = inch(1, 8)  # 3.175 (was 3.5)
+HUB_TO_BOSS = HUB_FACE_TO_MOUNTING + THICKNESS_OVER_ARM + BOSS_HEIGHT  # 29.36875
 HUB_TO_BOSS_BAND = 0.05  # knob float
 HUB_FACE_Z = -HUB_FACE_TO_MOUNTING
 REAR_FACE_Z = THICKNESS_OVER_ARM
@@ -130,7 +136,7 @@ FRONT_FACE_Z = -NOTCH_DEPTH
 # Clearance, drilled +0.10/0. Accommodate the published ASME maximum
 # under-head fillet: basic shank radius + 15% basic diameter, with room for
 # the projected axes. Matched dowels alone locate.
-SCREW_HOLE_DIA = 5.8
+SCREW_HOLE_DIA = inch(228, 1000)  # #1 drill, .2280 = 5.7912 (was 5.8)
 CSK_DIA = 7.9248  # 0.312 in, the head's Ø at the top of the bevel
 CSK_ANGLE_DEG = 82.0
 CSK_DIA_PLACES = 1  # ordinary row now retains the true 2 mm floor with the larger clearance

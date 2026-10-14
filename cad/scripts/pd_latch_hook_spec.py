@@ -6,7 +6,7 @@ closure.  Geometry and frame: ``pd_latch_hook_geometry``.
 
 One formed 0.8 (0.032 in) 1095 spring-steel part: a base on the support
 bar's back face under two #4-40 screws (MHA-VN-043), a 90 deg ear at its +X
-end, and an arm hanging from the ear's lower edge, rolled R80 flatwise to
+end, and an arm hanging from the ear's lower edge, rolled R3-1/8 flatwise to
 lie square to the MHA-VN-042 latch pin, with a pin hole and a finger tab.
 Latching: pull the tab along +U, the arm flexes flatwise and the strip slides
 off the pin; lift the hanger and the pin's crowned end rides up the tab and
@@ -33,12 +33,12 @@ How the sheet locates things:
   paper-drive assembly's check) and the screw holes' y-edge walls;
 * the ear height and the arm's two front-edge heights (its z band, from the
   base's underside) at .X;
-* the inside bend radius R1.2 +0.3/-0.2 (R1.5 the largest the screw head
+* the inside bend radius R1/16 +0.3/-0.2 (the +0.3 limit the screw head
   clears); the 90 deg bend at the title block's angular row;
 * every formed arm feature (roll, straight, tab) ±FORMED_BAND at .X, the
   radii to the inside surface; the far face at the pin, located in X and Y
   from the origin, only as a reference (REFERENCE_DIMENSIONS): a hand-rolled
-  R80 holds no tighter band there, and the fit-up sets the strip on the pin
+  R3-1/8 holds no tighter band there, and the fit-up sets the strip on the pin
   (square, its face at that station) before the hole is match-drilled;
 * the pin hole: size only, drilled +0.10/0, match-drilled at assembly from
   the pin (the model keeps it at the geometry's nominal);
@@ -92,7 +92,7 @@ HOLE_PLACES = 2
 CLEARANCE_RADIAL_MIN = (SCREW_HOLE_DIA - MAJOR_DIA) / 2.0
 BAR_TAP_RADIAL = math.hypot(BAR_TAP_BAND, BAR_TAP_BAND)
 POSITION_PLACES = 2
-WIDTH_TOL = 0.10  # ± on the 8.00 width (sheared blank): the lock sweep
+WIDTH_TOL = 0.10  # ± on the 5/16 width (sheared blank): the lock sweep
 WIDTH_PLACES = 2
 BASE_LENGTH_TOL = 0.25  # ±: the far screw hole's -X edge wall
 BASE_LENGTH_PLACES = 2
@@ -108,7 +108,7 @@ BEND_TOL_DEG = angular_band_deg()  # the ear's 90 deg bend, title-block row
 BEND_R_PLACES = 1
 BEND_R_BAND = (INSIDE_BEND_R_MAX - INSIDE_BEND_R, -0.2)  # (upper, lower)
 ROOT_R_PLACES = 1
-ROUND_R_PLACES = 2  # the full round, half the 11.50 low band
+ROUND_R_PLACES = 2  # the full round, half the 7/16 low band
 FLAT_PLACES = 1  # the flat pattern's lengths
 
 WALL_TARGET = 2.0
@@ -143,7 +143,7 @@ _POSITION_STEPS = max(
     ),
     default=0,
 )
-# ± on the screw-hole positions: 0.05 (0.06 would reach 0.180 > 0.178).
+# ± on the screw-hole positions: 0.05 (0.06 would overrun the 0.165 radial clearance).
 POSITION_TOL = round(_POSITION_STEPS * _POSITION_STEP, POSITION_PLACES)
 if POSITION_TOL <= 0.0:
     raise AssertionError(
@@ -281,9 +281,9 @@ PIN_HOLE_CALLOUT = "MATCH-DRILL"
 ROUND_CALLOUT = "FULL ROUND"
 FLAT_ROUND_CALLOUT = "TO FULL-ROUND CENTRE"
 # drawing-guidelines.md rule 10 (dimension from a real feature): the formed overall height, the ear's top edge to the full round's
-# tip, a reference left of the side view (the front view's 70.4 to the pin
+# tip, a reference left of the side view (the front view's pin dimension
 # stays its own dimension).
-OVERALL_HEIGHT = BBOX_Y[1] - BBOX_Y[0]  # 96.5
+OVERALL_HEIGHT = BBOX_Y[1] - BBOX_Y[0]  # 91.3
 DRAWING_REFERENCE_PRECISION = 1
 
 # The flat pattern: a hidden reference sketch on the Right plane, beside the

@@ -9,26 +9,25 @@ Route (shop-additions.md section 2): O1 drill rod, drilled and parted off,
 used as supplied (annealed), faced both sides; it only clamps.
 
 Frame (the inventory's fixture frame, rocker-inv:1735-1751): origin on the
-pivot axis at the upper hub face, +Z up; the washer sits Z0..1.5.
+pivot axis at the upper hub face, +Z up; the washer sits Z0..3/32.
 """
 
 from __future__ import annotations
 
 import ch_rocker_arm_tl_pivot_screw_spec as screw
+from _inch import inch
 from _printed_tolerance import printed_band_mm
 
-# AUTHOR'S CHOICE: Ø10 stock O1 drill rod with its OD left as supplied (the
-# inventory's 9.0 would leave a 1.2 wall); the head still bears inside it and
-# its rim may overhang the Ø10.2 hub edge, which carries nothing. The OD
-# prints as the stock with the stock's own diameter tolerance, +/-0.013 for
-# 4-12 mm metric O1 drill rod
-# (https://store.diesupplies.com/o1-drill-rod-oil-hardening-tool-steel-oilcrat-pm-metric-p114.aspx),
-# not the title block's .X band.
-OUTER_DIA = 10.0
-OUTER_BAND = (0.013, -0.013)
+# AUTHOR'S CHOICE: 13/32 stock O1 drill rod with its OD left as supplied
+# (3/8 would leave a 1.33 wall); the head still bears inside it and its rim
+# sits on the 13/32 hub edge, which carries nothing. The OD prints as the
+# stock with the stock's own diameter tolerance, +/-0.0005 in for inch O1
+# drill rod, not the title block's .X band.
+OUTER_DIA = inch(13, 32)
+OUTER_BAND = (inch(0.0005), -inch(0.0005))
 OUTER_PLACES = 3
 OUTER_CALLOUT = "DRILL ROD AS SUPPLIED"
-BORE_DIA = 6.6
+BORE_DIA = inch(17, 64)  # 17/64 drill: passes the 6.49 shoulder
 # The thickness is a link in the pivot screw's axial stack (shoulder clear
 # of the plate bore floor, full thread engagement): it prints at .XXX.
 THICK = screw.WASHER_THICK
@@ -69,8 +68,8 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked pivot-washer dimension needs authored places")
 
-# Pending exception ruling: MHA-CH-006-TL-07 wall 1.64 MIN (#1370).
-WALL_STATED_MIN = 1.64
+# Pending exception ruling: MHA-CH-006-TL-07 wall 1.73 MIN (#1370).
+WALL_STATED_MIN = 1.73
 if round(WALL_MIN, 2) != WALL_STATED_MIN:
     raise AssertionError("pivot-washer stated wall drifted from its geometry")
 WALL_NOTE = f"WALL {WALL_STATED_MIN:.2f} MIN."

@@ -105,7 +105,7 @@ from sm_summing_lever_spec import (  # noqa: E402
     HEX_Z_OUTER,
 )
 
-HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
+HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.3125)
 
 # --- knife-hanger hardware (two #10-24 hex bolts, washers and dowel pairs) ----
 # The top-frame, knife-mount and purchased hardware specs own every term.
@@ -115,16 +115,16 @@ HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 # The knife mount remains clamped face-to-face to that underside, gap 0,
 # with no bedding allowance. Each dowel's pressed end (local Y=0, axis +Y)
 # sits on the floor of the knife mount's top-seat hole.
-KNIFE_MOUNT_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP  # 999.7: clamped, gap 0
+KNIFE_MOUNT_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP  # 999.33125: clamped, gap 0
 CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + top_frame.RING_HEIGHT
-HANGER_SPOTFACE_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP  # 1035.2
+HANGER_SPOTFACE_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP  # 1034.25625
 HANGER_WASHER_Y = HANGER_SPOTFACE_Y  # washer lower bearing face, local Y=0
-HANGER_UNDERHEAD_Y = HANGER_WASHER_Y + hanger_washer.THICKNESS  # 1036.4827
-HANGER_STUD_Y = HANGER_UNDERHEAD_Y - hanger_screw.LENGTH  # 990.7827 (cut tip)
-HANGER_REACH = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y  # 8.9173
+HANGER_UNDERHEAD_Y = HANGER_WASHER_Y + hanger_washer.THICKNESS  # 1035.53895
+HANGER_STUD_Y = HANGER_UNDERHEAD_Y - hanger_screw.LENGTH  # 990.2952 (cut tip)
+HANGER_REACH = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y  # 9.03605
 # Worst-case stack (drawing-guidelines.md rules 18–19): cut length +/-0.15,
 # finished-underface grip +/-0.05, and catalogue washer thickness limits
-# all enter independently; 8.349..9.4856.
+# all enter independently; 8.46775..9.60435.
 HANGER_REACH_MIN = (
     hanger_screw.LENGTH_MIN
     - (top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL)
@@ -136,13 +136,13 @@ HANGER_REACH_MAX = (
     - hanger_washer.THICKNESS_MIN
 )
 # Charge the cut end's maximum incomplete lead, one pitch:
-# 7.2906667 >= 1.5D = 7.239.
+# 7.4094167 >= 1.5D = 7.239.
 HANGER_ENGAGEMENT_MIN = HANGER_REACH_MIN - hanger_screw.INCOMPLETE_TIP_LEN_MAX
 HANGER_ENGAGEMENT_FLOOR = hanger_screw.ENGAGEMENT_MIN_D * hanger_screw.SHANK_DIA
-# Longest reach under the shallowest full tap: 9.52 - 9.4856 = 0.0344 air.
+# Longest reach under the shallowest full tap: 9.62 - 9.60435 = 0.01565 air.
 HANGER_TIP_CLEARANCE = knife_mount.STUD_TAP_THREAD_DEPTH_MIN - HANGER_REACH_MAX
 # Modified-part inspection acceptance, not a vendor thread-to-head claim:
-# the useful full-form tail (10.62 less one incomplete pitch) spans 9.4856.
+# the useful full-form tail less one incomplete pitch spans 9.60435 + 0.4498.
 HANGER_THREAD_SPARE = (
     hanger_screw.THREAD_LENGTH_MIN - hanger_screw.INCOMPLETE_TIP_LEN_MAX
 ) - HANGER_REACH_MAX
@@ -184,8 +184,8 @@ HANGER_SCREW_MISMATCH_Z = (
 HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATCH_Z)
 # The hole is drilled from the finished underside. Prove drift over the FULL
 # crossbar body through its as-cast top, not only to the shallow spotface:
-# tan(0.3 deg) * (36.5 + 0.8) = 0.19530413. The #10 loose hole's 0.6095
-# radial float covers this plus the station mismatch, with 0.00242539 spare.
+# tan(0.3 deg) * (36.5125 + 0.8) = 0.19537. The #10 loose hole's 0.6095
+# radial float covers this plus the station mismatch, with 0.00236 spare.
 HANGER_SCREW_DRIFT = top_frame.DRILL_DRIFT_PER_MM * (
     top_frame.RING_HEIGHT + top_frame.PRINTED_LINEAR_BAND_MM[1]
 )

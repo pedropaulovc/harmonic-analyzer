@@ -17,13 +17,14 @@ from _hole_spec import HoleSpec, drill_process
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _inch import inch
 from dt_cone_pivot_post_spec import CRANK_BORE_DIA as JOURNAL_BORE_DIA
+from dt_cone_pivot_post_spec import CRANK_BOSS_NORTH_FACE
 from dt_cone_pivot_post_spec import RUNNING_BORE_BAND as JOURNAL_BORE_BAND
 import dt_crank_pinion_spec
 import vn_crank_seat_drive_pin_spec
 import pd_transgear_removable_spec
 from dt_crank_hub_geometry import (
-    CRANK_FACE_SHIFT,
     FIDUCIAL_MODEL_DEPTH,  # noqa: F401 -- re-exported to the drawing contract
     FIDUCIAL_MODEL_DIA,  # noqa: F401 -- re-exported to the drawing contract
     HUB_LENGTH,
@@ -36,9 +37,16 @@ from dt_crank_hub_geometry import (
 )
 
 
-# The restored v36 post's north boss face, measured from the shifted dome root.
-# Keep this independent of the post's rebuild closure; assembly checks the mate.
-POST_BORE_END = cone_line.cone_station(cone_line.POST_STATION)[2] + 183.0 + 21.3753
+# The restored v36 post's north boss face, measured from the shifted dome root
+# (the drive train's CRANK_FACE_Z, machine -183.0). Read from the post spec's
+# own published face; the assembly checks the mate.
+POST_BORE_END = (
+    cone_line.cone_station(cone_line.POST_STATION)[2]
+    - dt_crank_pinion_spec.CRANK_FACE_Z
+    + CRANK_BOSS_NORTH_FACE
+)
+if abs(POST_BORE_END - dt_crank_pinion_spec.POST_BOSS_NORTH_LOCAL) > 1e-9:
+    raise AssertionError("the 16T boss was sized on a different post north face")
 SEAT_PINION = POST_BORE_END + dt_crank_pinion_spec.SEAT_FEELER_MM
 if SEAT_PINION <= POST_BORE_END:
     raise AssertionError("the 16T seat must clear the restored post boss north face")
@@ -79,7 +87,8 @@ JOURNAL_DIA_BAND = (
     round(JOURNAL_BORE_DIA + JOURNAL_BORE_BAND[0] - _RUNNING_CLEARANCE[1] - JOURNAL_DIA, 3),
 )
 JOURNAL_CLEARANCE = JOURNAL_BORE_DIA - JOURNAL_DIA
-JOURNAL_START = 32.755105572 + CRANK_FACE_SHIFT
+# The outboard journal's south end, printed from the far end like every
+# station (JournalOutboardStation); defined after the station grid below.
 _JOURNAL_CLEARANCE_LOW = JOURNAL_BORE_BAND[1] - JOURNAL_DIA_BAND[0] + JOURNAL_CLEARANCE
 _JOURNAL_CLEARANCE_HIGH = JOURNAL_BORE_BAND[0] - JOURNAL_DIA_BAND[1] + JOURNAL_CLEARANCE
 JOURNAL_DIAMETRAL_CLEARANCE_MM = (_JOURNAL_CLEARANCE_LOW, _JOURNAL_CLEARANCE_HIGH)
@@ -104,7 +113,7 @@ def local_station(far_end_station: float) -> float:
     return SHAFT_LENGTH - far_end_station
 
 
-# RULING (b), Main 2026-09-26 (#906): the 16T sits on a Ø9.0 seat, a step down
+# RULING (b), Main 2026-09-26 (#906): the 16T sits on an 11/32 in seat, a step down
 # from the 3/8 in shaft at the far end's side of the post bore.  The pinion is
 # still set on its feeler and pinned, so the step never locates it; the step
 # only has to stay out from under the pinion's nominal seat.  An accepted step
@@ -113,9 +122,9 @@ def local_station(far_end_station: float) -> float:
 # more; together they must stay inside the seat gap's north range, which the
 # pin-wall and recess stacks already carry.  So the step sits south of the
 # seat, not at it: at SEAT_PINION it would print to 1.05 of standoff.
-PINION_SEAT_DIA = dt_crank_pinion_spec.SEAT_DIA
+PINION_SEAT_DIA = dt_crank_pinion_spec.SEAT_DIA  # 11/32 in
 PINION_SEAT_DIA_BAND = SHAFT_DIA_BAND  # the through shaft's turned-fit band
-PINION_SEAT_STATION = 25.9  # far end to the step
+PINION_SEAT_STATION = inch(1)  # far end to the step
 SEAT_STEP = local_station(PINION_SEAT_STATION)
 STEP_CORNER_RADIUS_MAX = 0.25  # the title block's R0.25 edge break
 SEAT_STEP_STANDOFF_WORST = SEAT_STEP + STATION_ROW + STEP_CORNER_RADIUS_MAX - SEAT_PINION
@@ -129,18 +138,25 @@ if SEAT_STEP_STANDOFF_WORST > SEAT_GAP_NORTH_RANGE + 1e-9:
 # Restore the two bearing lands and the relieved middle. Printed stations
 # remain baseline dimensions from the faced far end, at the routine .X band.
 WEB_TARGET_MM = 2.0
-JOURNAL_INBOARD_STATION = 29.5
+JOURNAL_INBOARD_STATION = inch(19, 16)
 JOURNAL_END = local_station(JOURNAL_INBOARD_STATION)
-JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START
 # Both ends print from the far end, so the web is their printed difference.
 STEP_WEB_WORST = JOURNAL_INBOARD_STATION - PINION_SEAT_STATION - 2.0 * STATION_ROW
+# Ø10.4 stays in mm: no inch nominal fits the .X window between the core and
+# the journal at RELIEF_DIA_PLACES (13/32 is not proud of the core at -0.8,
+# 7/16 is not under the journal at +0.8).
 RELIEF_DIA = 10.4
 RELIEF_DIA_PLACES = 1
-# The post bore's south rim and the general edge breaks leave the outboard
-# land's real contact short at 82.8; inset only this relief end by 0.7 mm on
-# the one-place station grid. Outer journal ends, seats and fits are unchanged.
-RELIEF_OUTBOARD_STATION = 82.1
-RELIEF_INBOARD_STATION = 44.5
+# The post bore's south rim and the general edge breaks shorten the outboard
+# land's real contact; the relief's outboard end sits on the 1/16 grid
+# nearest its former 82.1 inset. Outer journal ends, seats and fits are unchanged.
+RELIEF_OUTBOARD_STATION = inch(3.25)
+RELIEF_INBOARD_STATION = inch(1.75)
+# The outboard journal's south end, from the far end: south of the post
+# bore's south rim, so the land covers the bore's whole outboard end.
+JOURNAL_OUTBOARD_STATION = inch(61, 16)
+JOURNAL_START = local_station(JOURNAL_OUTBOARD_STATION)
+JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START
 RELIEF_START = local_station(RELIEF_OUTBOARD_STATION)
 RELIEF_END = local_station(RELIEF_INBOARD_STATION)
 RELIEF_LENGTH = RELIEF_END - RELIEF_START
@@ -220,33 +236,35 @@ PIN_HOLE_SPEC = HoleSpec("drilled_number", "#9")
 PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
 
 # --- ch. 23 crank seat (CONTRACT-crank): the integral collar replaces the
-# plain 5-mm T12 band.  Its front is a Ø17.5 seat spigot whose face is
-# MHA-PD-009's seat, at the removable's SEAT_FACE_Z, stepping up to the Ø20.6
-# collar body; the turned MHA-DT-036 thrust washer rides behind the body to the
-# post boss south face.  The #25 plates wrapping the T12 pass over the spigot
-# and in front of the body's front face: long enough that a bought chain's
-# envelope, floated rearmost on the thinnest wheel
-# (pd_transgear_removable_spec.chain_reach_rear, 3.59 behind the seat), keeps
-# air to the body at the spigot's print-worst length (the drive train asserts
-# it, with the radial air for the CAD link and a real ANSI plate).  The seat
-# diameter is the interface both shafts share, so it is the removable spec's.
+# plain 5-mm T12 band.  Its front is a seat spigot (the removable's
+# SEAT_SPIGOT_DIA, 11/16 in) whose face is MHA-PD-009's seat, at the
+# removable's SEAT_FACE_Z, stepping up to the 13/16 in collar body; the turned
+# MHA-DT-036 thrust washer rides behind the body to the post boss south face.
+# The #25 plates wrapping the T12 pass over the spigot and in front of the
+# body's front face: long enough that a bought chain's envelope, floated
+# rearmost on the thinnest wheel (pd_transgear_removable_spec.chain_reach_rear,
+# behind the seat), keeps air to the body at the spigot's print-worst length
+# (the drive train asserts it, with the radial air for the CAD link and a real
+# ANSI plate).  The seat diameter is the interface both shafts share, so it is
+# the removable spec's.
 SPIGOT_DIA = pd_transgear_removable_spec.SEAT_SPIGOT_DIA
 # User ruling 2026-09-30: the seat face moved 1.8 forward with the shared
-# band and the Ø20.6 body's front face stayed put, so the spigot grew
-# 4.0 -> 5.8 and the collar 8.5 -> 10.3.  User ruling 2026-09-30 (MHA-DT-036
-# floor 0.5) then took 0.5 off the body's rear, 10.3 -> 9.8: the body is 4.0
-# long (3.75 at print-worst) and the rear face stands far enough forward that
-# the MHA-DT-036 washer, faced to fit at assembly, never goes under its 0.5 floor
+# band, so the spigot grew; MHA-DT-036's 0.5 floor then took the body's rear
+# forward.  All-inch: a 1/4 in spigot (was 5.8) and a 3/8 in collar (was 9.8)
+# leave a 1/8 in body; the rear face stands far enough forward that the
+# MHA-DT-036 washer, faced to fit at assembly, never goes under its 0.5 floor
 # (dt_crank_seat_washer_spec).
-SPIGOT_LENGTH = 5.8
-COLLAR_DIA = 20.6
-COLLAR_LENGTH = 9.8  # seat face to rear face, spigot included
-# Local stations from the dome root (the crank face, machine -183.0 as the
-# drive train's CRANK_FACE_Z): 28.7 behind it is SEAT_FACE_Z -154.3, which
+SPIGOT_LENGTH = inch(1, 4)
+COLLAR_DIA = inch(13, 16)
+COLLAR_LENGTH = inch(3, 8)  # seat face to rear face, spigot included
+# Local stations from the dome root (the crank face, the drive train's
+# CRANK_FACE_Z): the seat face is the removable's SEAT_FACE_Z, which
 # build_dt_drive_train_assembly asserts from both sides.
-SEAT_COLLAR = 28.7
-SPIGOT_END = SEAT_COLLAR + SPIGOT_LENGTH  # the body's front face, -148.5
-COLLAR_REAR = SEAT_COLLAR + COLLAR_LENGTH  # -144.5
+SEAT_COLLAR = round(
+    pd_transgear_removable_spec.SEAT_FACE_Z - dt_crank_pinion_spec.CRANK_FACE_Z, 9
+)  # 28.7
+SPIGOT_END = SEAT_COLLAR + SPIGOT_LENGTH  # the body's front face
+COLLAR_REAR = SEAT_COLLAR + COLLAR_LENGTH
 # Two pressed MHA-VN-044 dowels on the wheel's pin circle at its +/-Y holes,
 # which the placed shaft (local z = machine -y) carries on local -/+Z.  The
 # pins' pressed ends bear on the blind holes' flat floor, so the depth is set
@@ -325,7 +343,7 @@ _PIN_HOLE_OUTER_R_WORST = (
     + DRIVE_PIN_OFFSET_TOL
     + (DRIVE_PIN_HOLE_DIA + DRIVE_PIN_HOLE_BAND[0]) / 2.0
 )
-# Pin hole to the spigot rim: under the 1.5 floor at nominal (0.56) and at
+# Pin hole to the spigot rim: under the 1.5 floor at nominal and at
 # the printed worst case, rounded DOWN so a sheet never states more rim than
 # the limits give.
 DRIVE_PIN_SPIGOT_RIM = pd_transgear_removable_spec.SEAT_SPIGOT_RIM
@@ -345,7 +363,7 @@ if (
 # clearance (the wheel's pin holes drilled to their largest over the
 # smallest stock dowel) plus a pin centre and its hole's centre each
 # DRIVE_PIN_OFFSET_TOL off nominal, the other way: along the pins' line
-# both pairs can lie so at once.  The Ø10.3 bore caps it only where its
+# both pairs can lie so at once.  The wheel's bore caps it only where its
 # own loosest clearance on the pilot is smaller, and it is not.  The chain
 # wrapping the wheel moves with it, so the drive train's radial chain air
 # takes this off.
@@ -358,22 +376,23 @@ _WHEEL_BORE_FLOAT = (
     + _DRILL_OVERSIZE
     - (SHAFT_DIA + SHAFT_DIA_BAND[1])
 ) / 2.0
-WHEEL_SEAT_FLOAT = min(_WHEEL_PIN_FLOAT, _WHEEL_BORE_FLOAT)  # 0.158
+WHEEL_SEAT_FLOAT = min(_WHEEL_PIN_FLOAT, _WHEEL_BORE_FLOAT)
 _PROUD = vn_crank_seat_drive_pin_spec.LENGTH - DRIVE_PIN_DEPTH
 DRIVE_PIN_PROUD_RANGE = (
     _PROUD - DRIVE_PIN_DEPTH_TOL - DRIVE_PIN_LENGTH_GRADE,
     _PROUD + DRIVE_PIN_DEPTH_TOL + DRIVE_PIN_LENGTH_GRADE,
-)  # 2.046 .. 2.754
+)
 if not 0.0 < DRIVE_PIN_PROUD_RANGE[0] < DRIVE_PIN_PROUD_RANGE[1]:
     raise AssertionError("a pressed drive pin sinks below the seat face at print-worst")
 
 
 # What the proud tips can meet.  Nothing bears on the T12's front face: the
 # first thing in front of it is the crank hub's rear face (the end face of
-# its Ø16.5 relief, which covers the pin circle), the drive train's gap B
+# its relief, about flush with the pin holes' outer edge; a tip past it meets
+# the barrel shoulder further forward, so the air only grows), the drive train's gap B
 # away.  The hub is set flush with the dome root, so its rear face sits at
 # local HUB_LENGTH +/-HUB_LENGTH_TOL.  The longest pin stands past the
-# THINNEST wheel's front face (2.754 > 2.7) into that gap, which is harmless;
+# THINNEST wheel's front face into that gap, which is harmless;
 # what must hold is the tip's air to the hub (seat forward, hub long) and,
 # with the thinnest wheel floated forward onto the hub (seat aft, hub short),
 # the shortest pin's reach into the wheel's hole.
@@ -412,7 +431,7 @@ DRIVE_PIN_HUB_AIR_WORST, DRIVE_PIN_ENGAGEMENT_WORST = drive_pin_front_clearances
     hub_rear=HUB_LENGTH,
     hub_rear_tol=HUB_LENGTH_TOL,
     plate_min=pd_transgear_removable_spec.PLATE + min(pd_transgear_removable_spec.PLATE_BAND),
-)  # 0.146, 1.046
+)
 # The collar stays clear of the outboard journal land at both print limits.
 if COLLAR_REAR + COLLAR_STATION_TOL >= JOURNAL_START - STATION_ROW:
     raise AssertionError(
@@ -429,7 +448,7 @@ SHAFT_CORE_LANDS = (
 )
 if any(start >= end for start, end in SHAFT_CORE_LANDS):
     raise AssertionError("every bare Ø9.525 core land must have a length")
-# Both Ø11.388 lands run in MHA-DT-005 and therefore need their own Ra 1.6
+# Both journal lands run in MHA-DT-005 and therefore need their own Ra 1.6
 # control on the native cylindrical face and their own drawing leader.  The
 # collar's rear face runs against the fitted MHA-DT-036 thrust washer, so it
 # carries the running grade too; the wheel's seat face is a static sprocket

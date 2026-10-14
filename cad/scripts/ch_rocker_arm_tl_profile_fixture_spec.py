@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import math
 
+from _inch import inch
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_notes as rocker_notes
@@ -43,17 +44,17 @@ PAD_TOP_Z = -(rocker.HUB_LENGTH / 2.0 + rocker.ARM_THICKNESS / 2.0)
 # Pad tops above the plate top: the gauge stack under the granite. It prints
 # at three places, and the model carries exactly the printed value (FixtureCAD
 # one-fact ruling: a band qualifies the model nominal, so the nominal must be
-# the printed one), which leaves the plate top within 0.0005 of Z-15.
-PLATE_DROP = round(PAD_TOP_Z + 15.0, 3)
+# the printed one).
+PLATE_DROP = inch(3, 8)
 PLATE_TOP_Z = PAD_TOP_Z - PLATE_DROP
-PLATE_THICK = 25.4  # 1 in plate, as rolled
+PLATE_THICK = inch(1)  # 1 in plate, as rolled
 PLATE_BOTTOM_Z = PLATE_TOP_Z - PLATE_THICK
 
 # --- Plate outline ----------------------------------------------------------------
-PLATE_WEST_X = -180.0
-PLATE_EAST_X = 180.0
-PLATE_SOUTH_Y = -70.0
-PLATE_NORTH_Y = 75.0
+PLATE_WEST_X = -inch(113, 16)
+PLATE_EAST_X = inch(113, 16)
+PLATE_SOUTH_Y = -inch(11, 4)
+PLATE_NORTH_Y = inch(47, 16)
 PLATE_LENGTH = PLATE_EAST_X - PLATE_WEST_X
 PLATE_WIDTH = PLATE_NORTH_Y - PLATE_SOUTH_Y
 
@@ -79,7 +80,7 @@ def _side_bond_line_min(pocket: float, part: float) -> float:
 # locates nothing (each part is centred in its pocket), so it prints at one
 # place (codex review of run 20261007T205522920Z: .XXX lengths were
 # over-specified): the pocket's straight run less this end gap at each end,
-# rounded down to the tenth. The worst case is the longest part in the
+# rounded down to the sixteenth inch. The worst case is the longest part in the
 # shortest pocket with the widest end radius, and it still ends clear.
 POCKET_END_GAP = 0.55
 PART_LENGTH_PLACES = 1
@@ -89,7 +90,7 @@ def _part_length(pocket_length: float, pocket_width: float, length_band: float =
     """``length_band``: the pocket length's printed band; a looser one than
     the .XXX the end gap was sized for shortens the part by the difference."""
     room = pocket_length - pocket_width - 2.0 * POCKET_END_GAP - (length_band - _XXX)
-    return math.floor(room * 10.0 + 1e-9) / 10.0
+    return math.floor(room / inch(1, 16) + 1e-9) * inch(1, 16)
 
 
 def _end_gap_min(
@@ -110,22 +111,22 @@ def _end_gap_min(
 # wider band so it still ends clear.
 # Each pad stands at least PAD_OUTLINE_MARGIN inside the arm's finished outline
 # (the inventory's "~6 mm inside, outside the end mills' swept bands") and is
-# at least 2 mm wide at the .XXX band. The inventory's 20 mm pads lost width to
-# the strap's curvature (A4/B4 1.9, A5/B5 1.4); the pads now end short of their
-# pocket ends, so those two take the width the shorter span leaves.
+# at least 2 mm wide at the .XXX band. On the 5/8 in strap the 6 mm margin
+# leaves no room for a 1/8 in pad (1/16 grid), so every pad is 3/32 wide, and
+# the outer stations (4-6) shorten to 5/8 in to follow the strap's curvature.
 _RIGHT_STATIONS = (
-    ("1", 10.0, 20.0, -1.35, 3.3),
-    ("2", 30.0, 20.0, -0.35, 2.8),
-    ("3", 50.0, 20.0, 1.15, 2.3),
-    ("4", 70.0, 20.0, 2.85, 2.3),
-    ("5", 90.0, 20.0, 5.17, 2.15),
-    ("6", 110.0, 12.0, 7.25, 2.3),
+    ("1", inch(3, 8), inch(13, 16), -inch(1, 32), inch(3, 32)),
+    ("2", inch(19, 16), inch(13, 16), 0.0, inch(3, 32)),
+    ("3", inch(2), inch(3, 4), inch(1, 32), inch(3, 32)),
+    ("4", inch(11, 4), inch(5, 8), inch(3, 32), inch(3, 32)),
+    ("5", inch(7, 2), inch(5, 8), inch(3, 16), inch(3, 32)),
+    ("6", inch(17, 4), inch(5, 8), inch(9, 32), inch(3, 32)),
 )
 PAD_POCKET_LENGTH_PLACES = 1
 _PAD_POCKET_LENGTH_BAND = printed_band_mm(PAD_POCKET_LENGTH_PLACES)
-POCKET_END_WALL = 1.55
-PAD_HEIGHT = 11.6
-PAD_POCKET_DEPTH = 2.0
+POCKET_END_WALL = inch(1, 16)
+PAD_HEIGHT = inch(7, 16)
+PAD_POCKET_DEPTH = inch(1, 8)
 PAD_OUTLINE_MARGIN = 6.0
 
 # (tag, centre X, centre Y, length X, width Y) per pocket and per pad, each at
@@ -220,13 +221,13 @@ if PAD_TILT_SWING_MAX > PARENT_BAND_SHARE * (
 # +-(120..140), standing where the S4 op 25/27 collet nose clears the rail
 # clamps by 3 mm (prechips afe9a14).
 _REST_POCKETS = (
-    ("C1", 20.0, 32.2, 20.0, 4.3),
-    ("C2", -40.0, 32.2, 20.0, 4.3),
-    ("C3", 120.0, -27.5, 20.0, 5.0),
-    ("C4", -140.0, -27.5, 20.0, 5.0),
+    ("C1", inch(13, 16), inch(5, 4), inch(13, 16), inch(3, 16)),
+    ("C2", -inch(13, 8), inch(5, 4), inch(13, 16), inch(3, 16)),
+    ("C3", inch(19, 4), -inch(17, 16), inch(13, 16), inch(3, 16)),
+    ("C4", -inch(89, 16), -inch(17, 16), inch(13, 16), inch(3, 16)),
 )
-REST_HEIGHT = 4.0
-REST_POCKET_DEPTH = 1.0
+REST_HEIGHT = inch(3, 16)
+REST_POCKET_DEPTH = inch(1, 16)
 # The rest tops above the plate top print at two places: a rest seated on its
 # floor stacks its .XXX height on its pocket's .XXX depth, and that stack sits
 # inside the .XX band, so the three sizes never disagree.
@@ -235,7 +236,7 @@ REST_TOP_Z = PLATE_TOP_Z + REST_TOP_HEIGHT
 if 2.0 * _XXX > _XX:
     raise AssertionError("a seated rail rest can miss its printed top height")
 REST_POCKETS: tuple[tuple[str, float, float, float, float], ...] = tuple(
-    (tag, round(x0 + length / 2.0, 3), round(y0 + width / 2.0, 3), length, width)
+    (tag, round(x0 + length / 2.0, 3), round(y0 + width / 2.0, 3), round(length, 3), round(width, 3))
     for tag, x0, y0, length, width in _REST_POCKETS
 )
 # A rest pocket's length neither locates its centred rest nor neighbours a
@@ -299,16 +300,18 @@ _HUB_STEP_MAX = (
 _HUB_STEP_MIN = (
     rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[1] - (rocker.ARM_THICKNESS + _STRAP_BAND)
 ) / 2.0
-STAND_DROP = 2.700
+STAND_DROP = inch(1, 8)
 STAND_DROP_BAND = (_XXX, -_XXX)  # the title block's .XXX, not printed explicitly
 STAND_TOP_Z = PAD_TOP_Z - STAND_DROP
-STAND_OD = 12.5
-STAND_BORE = 8.0  # drilled: the title block's DRILLED HOLES band
+STAND_OD = inch(1, 2)  # the 1/2 in bar, turned clean
+STAND_BORE = inch(5, 16)  # drilled: the title block's DRILLED HOLES band
 # StandHeight loses what StandDrop gains, so the floor gap and the bond
 # engagement below hold in the same counterbore.
-STAND_HEIGHT = 9.0
-STAND_POCKET_DIA = 12.8
-STAND_POCKET_DEPTH = 2.2
+STAND_HEIGHT = inch(5, 16)
+# The counterbore is the stand plus the pads' bonded side clearance (a fit,
+# not a stock size), so its bond line matches the pads'.
+STAND_POCKET_DIA = STAND_OD + 2.0 * POCKET_SIDE_CLEARANCE
+STAND_POCKET_DEPTH = inch(1, 8)
 # The hub shim stack never goes negative: the highest stand still sits below
 # the lowest accepted hub face when the strap rests on the pads.
 HUB_SHIM_GAP_MIN = STAND_DROP + STAND_DROP_BAND[1] - _HUB_STEP_MAX
@@ -346,7 +349,7 @@ if STAND_ENGAGEMENT_MIN < 1.0:
 # the tap below the bore floor (the inventory's M5 maps to #10-24 UNC-2B).
 LOCATING_BORE_DIA = rocker.PIVOT_HOLE_DIA
 LOCATING_BORE_BAND = (0.012, 0.0)
-LOCATING_BORE_DEPTH = 6.0  # from the plate top; floor at Z-21
+LOCATING_BORE_DEPTH = inch(1, 4)  # from the plate top
 # The bore depth sets where the pivot screw's thread starts in the tap, so it
 # prints at .XXX (FixtureCAD ruling B): at the .XX band the TL-06 pivot screw
 # could not reach 1.5D full thread at worst case. The pivot screw's spec
@@ -354,8 +357,11 @@ LOCATING_BORE_DEPTH = 6.0  # from the plate top; floor at Z-21
 LOCATING_BORE_DEPTH_PLACES = 3
 LOCATING_BORE_DEPTH_BAND = printed_band_mm(LOCATING_BORE_DEPTH_PLACES)
 LOCATING_BORE_FLOOR_Z = PLATE_TOP_Z - LOCATING_BORE_DEPTH
-PIVOT_TAP_THREAD_DEPTH = 10.0  # full thread from the bore floor, to Z-31
-PIVOT_TAP_DRILL_DEPTH = 13.0
+# 7/16, not 3/8: the TL-06 pivot screw's worst-case stack spans about 2.1
+# between its shallowest full engagement (1.5D) and its deepest thread run, and
+# 3/8 leaves 9.0 of full tap thread at the .XX band.
+PIVOT_TAP_THREAD_DEPTH = inch(7, 16)  # full thread from the bore floor
+PIVOT_TAP_DRILL_DEPTH = inch(1, 2)
 PIVOT_TAP_SPEC = HoleSpec(
     "tapped",
     "#10-24",
@@ -386,9 +392,9 @@ if (
     raise AssertionError("pivot tap drill point leaves under the drawing-guidelines.md rule 17 (walls and webs) floor wall")
 
 # --- Rod-pin hole (agreed with the MHA-CH-006-TL diamond pin) ------------------------
-ROD_PIN_HOLE_DIA = 3.0
+ROD_PIN_HOLE_DIA = inch(1, 8)  # the shop's 1/8 reamer
 ROD_PIN_HOLE_BAND = (0.010, 0.0)
-ROD_PIN_HOLE_DEPTH = 7.0
+ROD_PIN_HOLE_DEPTH = inch(9, 32)
 # The rocker's rod hole from the pivot, at the schedule's three places: the
 # model, the print and the export carry one value (the rounding moves it under
 # 0.0005, against its +/-0.015 band).
@@ -424,12 +430,12 @@ ROD_PIN_XY_PRINTED = tuple(
 )
 
 # --- Hold-down and clamp-stud holes ------------------------------------------------
-# PM-30MV table: 14 mm T-slots on 63.5 centres. The 9/16 T-slot clamping kit's
+# PM-30MV table: 14 mm T-slots on 2-1/2 in centres. The 9/16 T-slot clamping kit's
 # T-nuts are tapped 1/2-13 (vendor interface, kept), so the hold-downs are
 # 1/2-13 socket head cap screws in counterbored clearance holes over the two
 # outer slots, at each end of the plate.
-HOLD_DOWN_SLOT_PITCH = 63.5
-HOLD_DOWN_X = 165.0
+HOLD_DOWN_SLOT_PITCH = inch(5, 2)
+HOLD_DOWN_X = inch(13, 2)
 _PLATE_MID_Y = (PLATE_NORTH_Y + PLATE_SOUTH_Y) / 2.0
 HOLD_DOWN_YS = (
     _PLATE_MID_Y - HOLD_DOWN_SLOT_PITCH / 2.0,
@@ -447,14 +453,14 @@ HOLD_DOWN_X_PLACES = 1
 HOLD_DOWN_Y_PLACES = 2
 _HOLD_DOWN_SCREW_MAJOR = THREAD_MAJOR_MM["1/2-13"]
 # 1/2-13 socket head cap screw, ASME B18.3: head 0.750 dia x 0.500 high.
-HOLD_DOWN_SCREW_HEAD_DIA = 0.750 * 25.4
-HOLD_DOWN_SCREW_HEAD_H = 0.500 * 25.4
+HOLD_DOWN_SCREW_HEAD_DIA = inch(3, 4)
+HOLD_DOWN_SCREW_HEAD_H = inch(1, 2)
 # The callout prints the clearance at two places, and the model cuts exactly
 # that value (FixtureCAD one-fact ruling: the drilled band qualifies the model
 # nominal), 0.002 over the 1/2 normal-fit table value.
 HOLD_DOWN_CLEARANCE_DIA = round(CLEARANCE_MM[("1/2", "normal")], 2)
 HOLD_DOWN_CBORE_DIA = 20.64
-HOLD_DOWN_CBORE_DEPTH = 13.5
+HOLD_DOWN_CBORE_DEPTH = inch(9, 16)
 HOLD_DOWN_HOLE_SPEC = HoleSpec(
     "counterbore_socket",
     "1/2",
@@ -477,19 +483,19 @@ CLAMP_STUD_SPEC = HoleSpec(
     "tapped",
     "3/8-16",
     end="blind",
-    depth_mm=19.5,
-    overrides_mm={"ThreadDepth": 16.5},
+    depth_mm=inch(3, 4),
+    overrides_mm={"ThreadDepth": inch(21, 32)},
 )
 CLAMP_STUD_POINTS = (
-    (-130.0, -36.0),
-    (130.0, -36.0),
-    (-70.0, 45.0),
-    (70.0, 45.0),
-    (-30.0, 45.0),
-    (30.0, 45.0),
+    (-inch(41, 8), -inch(23, 16)),
+    (inch(41, 8), -inch(23, 16)),
+    (-inch(11, 4), inch(57, 32)),
+    (inch(11, 4), inch(57, 32)),
+    (-inch(19, 16), inch(57, 32)),
+    (inch(19, 16), inch(57, 32)),
 )
 CLAMP_STUD_DRILL_DIA = TAP_DRILL_MM[CLAMP_STUD_SPEC.size]
-_CLAMP_STUD_PITCH = 25.4 / 16.0
+_CLAMP_STUD_PITCH = inch(1, 16)
 # Full thread at least 1.5 diameters deep at the .XX band even if the shop
 # counts one incomplete thread inside the printed depth (codex review of run
 # 20261007T211013161Z: 15.00 left 0.2 over 1.5 D at the band), and the tap
@@ -504,8 +510,9 @@ if 2.0 * _XX > HOLD_DOWN_CLEARANCE_DIA - _HOLD_DOWN_SCREW_MAJOR:
 # The studs only anchor strap clamps, which slide to the arm: one place.
 CLAMP_STUD_PLACES = 1
 # Deeper would break the floor wall (run 20261007T215120209Z's 21.0 drill
-# left about 0.7 under its point on the thinnest plate); 16.5 of thread still
-# clears 1.5 D above, and the tap keeps 3.0 of lead.
+# left about 0.7 under its point on the thinnest plate); 21/32 of thread
+# still clears 1.5 D above (11/16 would leave the tap one pitch of lead under
+# the 3/4 drill), and the tap keeps 3/32 of lead.
 if _blind_drill_floor_wall(CLAMP_STUD_SPEC.depth_mm + _XX, CLAMP_STUD_DRILL_DIA) < 2.0:
     raise AssertionError("clamp-stud drill point leaves under the drawing-guidelines.md rule 17 (walls and webs) floor wall")
 
@@ -790,7 +797,6 @@ FEATURE_SCHEDULE: tuple[tuple[str, ...], ...] = (
         )
     ),
 )
-_PAD_STOCK = {3.3: "O1 FLAT 3/16 X 1/2"}
 PART_SCHEDULE_TITLE = "BONDED PART SCHEDULE, SIZES BEFORE BONDING"
 PART_SCHEDULE_HEADER = ("TAG", "PART", "STOCK", "LENGTH X", "WIDTH Y", "HEIGHT")
 
@@ -817,7 +823,7 @@ def _part_row(
 PART_SCHEDULE: tuple[tuple[str, ...], ...] = (
     *(
         _part_row(
-            a, b, "Pad", "PAD", _PAD_STOCK.get(round(a[4], 3), "O1 FLAT 1/8 X 1/2"),
+            a, b, "Pad", "PAD", "O1 FLAT 1/8 X 1/2",
             PAD_HEIGHT, "PadHeight",
         )
         for a, b in zip(PADS[:6], PADS[6:], strict=True)

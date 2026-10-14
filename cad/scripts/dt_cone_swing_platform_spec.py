@@ -18,6 +18,7 @@ from __future__ import annotations
 import math
 
 import _config
+from _inch import inch
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
@@ -25,6 +26,7 @@ from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 import cone_line
 import dt_cone_gear_shaft_spec as cone_shaft
 import dt_cone_pivot_post_spec
+import dt_cone_tip_block_spec
 import dt_crank_drive_gear_spec as gear64
 import dt_post_mount_stack as post_mount
 from cone_stack_end_play import CONE_FLOAT_NORTH
@@ -45,11 +47,12 @@ PLATE_STOCK_BAND = 0.13
 # last line, beside the dimension's top arrowhead, is the short one and sits
 # back from it (aa9766da: "AS SUPPLIED" ran its D into the arrow).
 PLATE_STOCK_CALLOUT = "1/4 PLATE AS\nSUPPLIED"
-# The top relief is 10.50 wide, round-ended about the pivot and OPEN through
-# the north edge (drawing-guidelines.md rule 17 (walls and webs) W18, Main 2026-09-23, option (d)): as a closed
-# Ø10.50 spotface 7.0 from that edge it left a 1.75 web.  The width keeps the
-# stock 3/8 head's radial clearance (BDT reads it as the relief diameter).
-PIVOT_BEARING_RELIEF_DIAMETER = 10.50
+# The top relief is 7/16 wide (a stock end mill), round-ended about the pivot
+# and OPEN through the north edge (drawing-guidelines.md rule 17 (walls and
+# webs) W18, Main 2026-09-23, option (d)): as a closed spotface 7.0 from that
+# edge it left a 1.75 web.  The width keeps at least the stock 3/8 head's
+# radial clearance below (BDT reads it as the relief diameter).
+PIVOT_BEARING_RELIEF_DIAMETER = inch(7, 16)
 PIVOT_BEARING_RELIEF_DEPTH = 0.25  # Reference nominal; the finished matched fit governs.
 PIVOT_HEAD_RADIAL_CLEARANCE = 0.4875
 PIVOT_BEARING_THICKNESS = PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH
@@ -191,18 +194,17 @@ POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT = (
 # (asserted equal by build_dt_drive_train_assembly).  Same frame and sign as the
 # pivot-origin plate: -z runs south from the pivot along the cone axis.
 HOLDDOWN_LOCAL_Z = -cone_line.TIP_BLOCK_PIVOT_OFFSET
-# 1.00 to -x of the cone-axis line, with the block's foot tap the same 1.00
-# to -x of its adjuster axis (dt_cone_tip_block_spec.FOOT_TAP_OFFSET_X), so the
-# block body still stands centred on the cone line.  The offset exists only
-# so the hole's lateral station is a real dimension (HoldDownX): on the line
-# it was a zero-valued placement, which a sketch can hold only as a relation,
-# and so it printed at the .XX +/-0.51 the tip block's containment and
-# lateral stacks cannot absorb (user ruling 2026-09-29: HoldDownX +/-0.10
-# from the pivot bore).  -x (east) rather than +x because it leaves the larger
-# webs on both parts: the hole's web to the narrow west edge grows from 6.3
-# on the line to 7.3 (5.3 at +x), and the block's foot tap moves off its +X
-# side, where the width's band sits, keeping a 5.98 least web (5.85 at +x).
-HOLDDOWN_LOCAL_X = -1.0
+# 1/32 in to -x of the cone-axis line (the tip block's owner sets it), with the
+# block's foot tap the same offset to -x of its adjuster axis
+# (dt_cone_tip_block_spec.FOOT_TAP_OFFSET_X, imported: the hole receives that
+# block's screw), so the block body still stands centred on the cone line.
+# The offset exists only so the hole's lateral station is a real dimension
+# (HoldDownX): on the line it was a zero-valued placement, which a sketch can
+# hold only as a relation, and so it printed at the .XX +/-0.51 the tip
+# block's containment and lateral stacks cannot absorb (user ruling
+# 2026-09-29: HoldDownX +/-0.10 from the pivot bore).  -x (east) rather than
+# +x because it leaves the larger webs on both parts.
+HOLDDOWN_LOCAL_X = dt_cone_tip_block_spec.FOOT_TAP_OFFSET_X
 # The explicit band on both printed stations from the pivot bore (HoldDownX,
 # HoldDownZ): the block's lateral and axial stacks need +/-0.10 rather than
 # the .XX +/-0.51.
@@ -219,8 +221,12 @@ HOLDDOWN_SCREW_HEAD_H = 0.112 * 25.4
 _DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
 # #4 CLOSE clearance, drilled: the title block's DRILLED HOLES +0.10/0 row.
 HOLDDOWN_CLEARANCE_DIA = CLEARANCE_MM[("#4", "close")]
-HOLDDOWN_CBORE_DIA = 5.56  # .XX
-HOLDDOWN_CBORE_DEPTH = 3.50  # .XX, from the underside
+# 7/32 is the standard #4 socket-head counterbore.  The depth sits in a
+# 3.46-3.71 window (head recess >= 0.1 at .XX, ledge >= 2.0 at the stock band
+# and .XX) that no 1/16 or 1/32 step reaches (1/8 recesses -0.18, 5/32 leaves
+# a 1.74 ledge), so it takes 9/64 (.140).
+HOLDDOWN_CBORE_DIA = inch(7, 32)  # .XX
+HOLDDOWN_CBORE_DEPTH = inch(9, 64)  # .XX, from the underside
 HOLDDOWN_HOLE_SPEC = HoleSpec(
     "counterbore_socket",
     "#4",

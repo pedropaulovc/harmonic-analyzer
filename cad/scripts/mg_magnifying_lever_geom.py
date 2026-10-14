@@ -21,22 +21,28 @@ window is asserted to BE that zone, the rod's tip flush with its outer face.
 from __future__ import annotations
 
 import _config
+from _inch import inch
 from mg_lever_press_fit_geom import PRESS_ZONE_LENGTH
 
 # --- rod nominals (DIMENSIONS.md ch20) ----------------------------------------
-ROD_LENGTH = 165.0  # calibrated p1, x -200..-35 (med; supersedes the 310 "4x" guess)
+# calibrated p1, x -200..-35 (med; supersedes the 310 "4x" guess); all-inch
+# 6-1/2 (was 165.0)
+ROD_LENGTH = inch(6.5)
 
 # --- knife-edge pivot axis (KnifeAxis = Axis2) --------------------------------
 # The lever does NOT spin in the bracket collar: it EXTENDS FROM the pivoted
 # summing bar and pivots WITH it about the knife-edge ridge (engineerguy video
 # 2/4 + 4/4; the tip draws a ~6 mm arc, and the clamp's position along the rod --
 # the radius from this pivot -- is what sets the <=4x magnification). The ridge
-# line runs along Z at machine (pre-mirror) (15, 984.834); in lever-local coords
-# (assembly placement (-200, 979.7, -128.3), rod along +X) that is (215, 5.134).
+# line runs along Z at machine (pre-mirror) (15, 984.065625); in lever-local
+# coords (assembly placement (-200.9, 979.7, z), rod along +X) that is
+# (215.9, 4.365625).
 # Duplicated literals -- build_mg_magnifier_assembly asserts them against
 # build_sm_summing_assembly's KNIFE/KNIFE_CONTACT_Y and its own placement.
-KNIFE_LOCAL_X = 215.0
-KNIFE_LOCAL_Y = 5.134
+# All-inch: 8-1/2 = collar station 6-5/16 + the bracket's 2-3/16 offset from
+# the knife line (was 215.0); 11/64 = summing HEX_H 11/32 / 2 (was 5.134).
+KNIFE_LOCAL_X = inch(8.5)
+KNIFE_LOCAL_Y = inch(11, 64)
 
 # --- clamp travel along the rod = the magnification range ---------------------
 # The sliding clamp (mg_magnifying_clamp_geom.BLOCK_DEPTH along the rod) rides the

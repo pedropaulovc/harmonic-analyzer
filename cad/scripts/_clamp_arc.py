@@ -33,11 +33,12 @@ from _sketch import SketchDims, add_line_chain, ensure_fully_defined
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from _inch import inch
 
-ARC_WIDTH = 48.0  # lateral (Z) span, ear tip to ear tip (old collar OD)
-ARC_HALF_H = 8.0  # 16 tall along the column, like the old one-piece collar
-COLUMN_BORE = 25.6  # half-cylinder relief: slides on the Ø25.4 column
-EAR_HOLE_Z = 17.5  # ear screw line flanks the column (ch30 p002 heads)
+ARC_WIDTH = inch(15, 8)  # 1-7/8 = 47.625: lateral (Z) span, ear tip to ear tip (was 48.0)
+ARC_HALF_H = inch(5, 16)  # 7.9375: 5/8 tall along the column (was 8.0)
+COLUMN_BORE = 25.6  # half-cylinder relief: slides on the Ø25.4 column (fit, exempt)
+EAR_HOLE_Z = inch(11, 16)  # 17.4625: ear screw line flanks the column (was 17.5)
 MATERIAL = "Gray Cast Iron"  # black casting (ch30 p005)
 
 

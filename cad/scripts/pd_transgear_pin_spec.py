@@ -23,6 +23,7 @@ import math
 import pd_transgear_arm_geometry as ARM
 import vn_transgear_retaining_ring_spec as RING
 from _gtol_cylinder import CylinderFace
+from _inch import inch
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -31,13 +32,15 @@ ARM_NUMBER = "MHA-PD-018"
 RING_NUMBER = "MHA-VN-047"
 
 # The head seats on the arm's rear face.
-HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -116.4625
+HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -116.68125
 
 # --- Shank: the running journal and the press in the arm -----------------------
-# The sleeve and both bushings run on it (their bores Ø3.900 +0.030/+0.012,
-# 0.012..0.038 diametral); the arm's REAM Ø3.874 +0.008/0 holds it by a
+# The sleeve and both bushings run on it (their bores on this Ø, +0.030/+0.012,
+# 0.012..0.038 diametral); the arm's REAM (Ø less 0.026) +0.008/0 holds it by a
 # 0.010..0.026 press (``pd_transgear_arm_geometry``), named on this sheet.
-DIA = 3.900
+# A standard #23 drill-rod size, .1540 in (the arm geometry's PIN_ROD_DIA):
+# 5/32 would break the feed sleeve's root wall.
+DIA = ARM.PIN_ROD_DIA  # 3.9116 (was 3.900)
 DIA_BAND = (0.0, -0.008)  # (upper, lower) deviations, ground
 DIA_MIN = round(DIA + DIA_BAND[1], 6)
 DIA_MAX = round(DIA + DIA_BAND[0], 6)
@@ -48,21 +51,21 @@ PRESS_INTERFERENCE = (
     round(DIA_MAX - ARM.PIN_BORE_DIA_MIN, 6),
 )  # 0.010, 0.026
 
-# --- Head: Ø5.0, a 2.10 land then a spherical dome, 2.9 proud of the arm ------
+# --- Head: Ø3/16, a 3/32 land then a spherical dome, 1/8 proud of the arm ------
 # The head stops the press and, pulled forward by the ring's thrust on the
 # load wall, holds the pin in the arm; nothing bears on its dome.  The land
 # is a wall held to the policy's 1.5 hard floor at its printed lower limit:
-# it prints .XX, so 2.10 leaves 1.59 (1.20 left 0.69, review of e0ac6477e; a
-# 0.5 land at .X went to -0.3, review of 6de7230aa).  The dome stays 0.8
-# high on top, so the apex stands 2.9 proud, less than the MHA-VN-041 head.
+# it prints .XX, so 3/32 leaves 1.87 (1/16 would leave 1.08: 1/32 grid).
+# The dome stays 1/32 high on top, so the apex stands 1/8 proud, less than
+# the MHA-VN-041 head.
 WALL_FLOOR = 1.5
-HEAD_DIA = 5.0
-HEAD_LAND = 2.10
+HEAD_DIA = inch(3, 16)  # 4.7625 (was 5.0)
+HEAD_LAND = inch(3, 32)  # 2.38125 (was 2.10)
 HEAD_LAND_PLACES = 2
-HEAD_LAND_MIN = round(HEAD_LAND - printed_band_mm(HEAD_LAND_PLACES), 6)  # 1.59
+HEAD_LAND_MIN = round(HEAD_LAND - printed_band_mm(HEAD_LAND_PLACES), 6)  # 1.87
 HEAD_LAND_FLOOR = WALL_FLOOR
-HEAD_DOME_SAG = 0.8
-HEAD_HEIGHT = HEAD_LAND + HEAD_DOME_SAG  # 2.9 proud of the arm's rear face
+HEAD_DOME_SAG = inch(1, 32)  # 0.79375 (was 0.8)
+HEAD_HEIGHT = HEAD_LAND + HEAD_DOME_SAG  # 1/8 proud of the arm's rear face
 HEAD_DOME_R = ((HEAD_DIA / 2.0) ** 2 + HEAD_DOME_SAG**2) / (2.0 * HEAD_DOME_SAG)
 
 # --- Ring groove -------------------------------------------------------------
@@ -70,7 +73,7 @@ HEAD_DOME_R = ((HEAD_DIA / 2.0) ** 2 + HEAD_DOME_SAG**2) / (2.0 * HEAD_DOME_SAG)
 # the front bushing on the ring and the ring on this wall.  Its station from
 # the head's underside is the pin's one functional length; it prints .XXX
 # and the front bushing is faced to fit over its band (transgear_cluster_fit).
-GROOVE_STATION = 47.25  # head underside to the groove's front (load) wall
+GROOVE_STATION = inch(15, 8)  # 47.625 (was 47.25): head underside to the load wall
 GROOVE_STATION_PLACES = 3
 GROOVE_STATION_BAND = printed_band_mm(GROOVE_STATION_PLACES)
 GROOVE_DIA = RING.GROOVE_DIA
@@ -83,19 +86,18 @@ GROOVE_REAR_STATION = round(GROOVE_STATION - GROOVE_WIDTH, 6)
 # The land in front of the groove carries the ring's thrust, so it is a wall
 # held at its PRINTED lower limit to the larger of the policy's 1.5 hard
 # floor and three groove depths (ASSUMPTION from the ring maker's edge-margin
-# guidance: 0.4768 x 3 = 1.4304).  Nothing mates on it, so it prints .XX:
-# 2.10 leaves 1.59 (1.600 at .XXX left 1.470, review of e0ac6477e; at .X the
-# title block's +/-0.8 left 0.7, Codex P2).
-FRONT_LAND = 2.10  # groove load wall to the dome's base
+# guidance: 0.4826 x 3 = 1.4478).  Nothing mates on it, so it prints .XX:
+# 3/32 leaves 1.87 (1/16 would leave 1.08: 1/32 grid).
+FRONT_LAND = inch(3, 32)  # 2.38125 (was 2.10): groove load wall to the dome's base
 FRONT_LAND_PLACES = 2
 FRONT_LAND_BAND = printed_band_mm(FRONT_LAND_PLACES)
-FRONT_LAND_MIN = round(FRONT_LAND - FRONT_LAND_BAND, 6)  # 1.59
-TIP_DOME_SAG = 1.5
+FRONT_LAND_MIN = round(FRONT_LAND - FRONT_LAND_BAND, 6)  # 1.87
+TIP_DOME_SAG = inch(1, 16)  # 1.5875 (was 1.5)
 TIP_DOME_R = ((DIA / 2.0) ** 2 + TIP_DOME_SAG**2) / (2.0 * TIP_DOME_SAG)
-LENGTH = round(GROOVE_STATION + FRONT_LAND + TIP_DOME_SAG, 6)  # 50.85
-OVERALL_LENGTH = round(LENGTH + HEAD_HEIGHT, 6)  # 53.75, apex to tip
-TIP_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - LENGTH, 6)  # -167.3125
-HEAD_APEX_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z + HEAD_HEIGHT, 6)  # -113.5625
+LENGTH = round(GROOVE_STATION + FRONT_LAND + TIP_DOME_SAG, 6)  # 51.59375
+OVERALL_LENGTH = round(LENGTH + HEAD_HEIGHT, 6)  # 54.76875, apex to tip
+TIP_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - LENGTH, 6)  # -168.275
+HEAD_APEX_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z + HEAD_HEIGHT, 6)  # -113.50625
 GROOVE_LOAD_WALL_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - GROOVE_STATION, 6)
 
 GROOVE_DEPTH = (DIA - GROOVE_DIA) / 2.0
@@ -156,8 +158,8 @@ for _ok, _what in (
     ),
     (GROOVE_DIA < DIA_MIN, "the groove does not cut below the shank"),
     (
-        math.isclose(HEAD_APEX_MACHINE_Z, -113.5625, abs_tol=1e-6),
-        "the head apex is not 2.9 proud of the arm's rear face",
+        math.isclose(HEAD_APEX_MACHINE_Z - HEAD_SEAT_MACHINE_Z, inch(1, 8), abs_tol=1e-6),
+        "the head apex is not 1/8 proud of the arm's rear face",
     ),
     (
         HEAD_LAND_MIN >= HEAD_LAND_FLOOR,

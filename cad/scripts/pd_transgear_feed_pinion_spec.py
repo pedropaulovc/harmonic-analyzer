@@ -1,8 +1,8 @@
 r"""Pure-data dimensional contract shared by the feed-pinion sleeve and its drawing.
 
 The transgear pinion sleeve (MHA-PD-010, R9-68): one turned steel sleeve that
-runs on the MHA-PD-023 pin's Ø3.9 shank and carries, rear to front, the
-independent 12T 32DP PA20 finite stock-form feed pinion and the Ø8.2 h6 boss.
+runs on the MHA-PD-023 pin's Ø.154 in shank and carries, rear to front, the
+independent 12T 32DP PA20 finite stock-form feed pinion and the Ø5/16 in h6 boss.
 The pinion meshes the purchased standard platen rack. The brass hub
 slides on the boss; its rear spigot passes through
 the 120T disc's (MHA-PD-006) bore, which pilots on it, and seats its end on the
@@ -38,6 +38,7 @@ import pd_rack_pinion_spec
 import pd_transgear_pin_spec
 from _fit_deviations import deviations
 from _gear_fit_limits import gear_tip_band_mm
+from _inch import inch
 from _gear_quality import toothspace_runout_tir_mm
 from _gtol_cylinder import CylinderFace
 from _printed_tolerance import printed_band_mm
@@ -232,15 +233,18 @@ RACK_AXIS_DISTANCE = PITCH_DIA / 2.0 + RACK_MESH_EXTENSION
 # hub are faced to fit over both bands).
 STATION_TOL = 0.05
 STATION_PLACES = 2
-FACE_WIDTH = 13.60  # the tooth length: rear face to the step onto the boss
+FACE_WIDTH = inch(9, 16)  # the tooth length: rear face to the step onto the boss
 FACE_WIDTH_PLACES = 3
 FACE_WIDTH_BAND = printed_band_mm(FACE_WIDTH_PLACES)
-OVERALL_LENGTH = 27.35
+OVERALL_LENGTH = inch(17, 16)  # 1-1/16
 
 # --- diameters -----------------------------------------------------------------
 # The boss is the hub's locating fit: turned h6 under the matching H7 bore
 # (pd_transgear_disc_hub_spec consumes this diameter and checks the pair).
-BOSS_DIA = 8.2
+# 5/16: the pin's #23 drill-rod shank (.1540) under the G7 bore leaves the
+# 2.0 boss wall at the h6 low limit (2.0005); a larger boss rides the form
+# cutter's run-out further over the boss (RUNOUT_RISE_WORST).
+BOSS_DIA = inch(5, 16)
 BOSS_DIA_BAND = (0.0, -0.009)  # (upper, lower) deviations, h6
 BOSS_DIA_PLACES = 3
 
@@ -270,19 +274,22 @@ STEP_FACE_PERPENDICULARITY_ZONE_DIA = OUTSIDE_DIA
 # The hub drives through it.  The flat plane prints from the boss axis with
 # its own (0, −0.015): the hub's flat sits 0.020..0.050 off it (the hub owns
 # its band and checks the pair).
-FLAT_TO_AXIS = 3.5
+# 9/64 (1/64): with the 5/16 boss the 1/16 and 1/32 stations either leave the
+# D-flat wall under its 1.5 floor (1/8) or no flat at all (5/32 = the boss
+# radius).
+FLAT_TO_AXIS = inch(9, 64)
 FLAT_TO_AXIS_BAND = (0.0, -0.015)  # (upper, lower) deviations
 FLAT_TO_AXIS_PLACES = 3
-FLAT_DEPTH = BOSS_DIA / 2.0 - FLAT_TO_AXIS  # 1.0
+FLAT_DEPTH = BOSS_DIA / 2.0 - FLAT_TO_AXIS  # 1/64 in, 0.397
 # The flat runs from the nose rearward to an end wall at FLAT_END_STATION,
 # cut by an end mill on an axis parallel to the sleeve's, plunged from the
 # nose.  The wall stops nothing: the hub's flat starts at its flange's rear
 # face, the spigot's length ahead of the step, so the wall stands clear
 # behind it (pd_transgear_disc_hub_spec.FLAT_END_CLEARANCE_WORST).
-FLAT_END_STATION = 16.60
-FLAT_LENGTH = OVERALL_LENGTH - FLAT_END_STATION  # 10.75
-FLAT_LENGTH_MAX = FLAT_LENGTH + 2.0 * STATION_TOL  # 10.85
-FLAT_CUTTER_FLUTE_MIN = 12.0
+FLAT_END_STATION = inch(5, 8)
+FLAT_LENGTH = OVERALL_LENGTH - FLAT_END_STATION  # 7/16, 11.1125
+FLAT_LENGTH_MAX = FLAT_LENGTH + 2.0 * STATION_TOL  # 11.2125
+FLAT_CUTTER_FLUTE_MIN = inch(1, 2)  # a 1/2 in length-of-cut end mill
 if FLAT_CUTTER_FLUTE_MIN < FLAT_LENGTH_MAX + 0.5:
     raise AssertionError("the flat's end mill cannot reach the end wall on its flutes")
 
@@ -319,12 +326,12 @@ _BAND = {places: printed_band_mm(places) for places in (1, 2, 3)}
 # the hub's spec takes the worst case with the tilts).  The disc's bore is
 # the spigot's, outside the 12T's tips, so the two never overlap radially.
 DISC_THICKNESS = pd_rack_pinion_spec.FACE_WIDTH
-DISC_FRONT_STATION = FACE_WIDTH + SPIGOT_LENGTH  # 17.25, the hub flange's seat
+DISC_FRONT_STATION = FACE_WIDTH + SPIGOT_LENGTH  # 18.256, the hub flange's seat
 DISC_FRONT_STATION_BAND = FACE_WIDTH_BAND + SPIGOT_LENGTH_BAND  # 0.26
-DISC_REAR_STATION = DISC_FRONT_STATION - DISC_THICKNESS  # 14.25
+DISC_REAR_STATION = DISC_FRONT_STATION - DISC_THICKNESS  # 15.081
 DISC_REAR_MIN = (
     DISC_FRONT_STATION - DISC_FRONT_STATION_BAND - pd_rack_pinion_spec.FACE_WIDTH_MAX
-)  # 13.86
+)  # 14.691
 if pd_rack_pinion_spec.BORE_DIA_MIN <= OUTSIDE_DIA + OUTSIDE_DIA_BAND[0]:
     raise AssertionError("the disc's bore overlaps the 12T's tips radially")
 
@@ -334,9 +341,9 @@ if pd_rack_pinion_spec.BORE_DIA_MIN <= OUTSIDE_DIA + OUTSIDE_DIA_BAND[0]:
 # remaining face has partial-depth gaps, not full-depth analytic teeth.
 # CUTTER_RUNOUT_MAX is the retained native maximum station; the geometric
 # endpoint over the boss uses the deepest template X, never a root norm.
-FULL_DEPTH = 10.15
+FULL_DEPTH = inch(7, 16)
 FULL_DEPTH_PLACES = 3
-CUTTER_RUNOUT_MAX = 13.80  # from the rear face, a limit
+CUTTER_RUNOUT_MAX = inch(1, 2)  # from the rear face, a limit
 CUTTER_RUNOUT_PLACES = 2
 CUTTER_DIA_MAX_IN = 2.25
 CUTTER_DIA_MAX = CUTTER_DIA_MAX_IN * MM_PER_IN
@@ -503,7 +510,7 @@ for _name, _nominal, _worst in WALLS:
 # are unchanged; the smaller G7 bore raises rather than spends that margin.
 FLAT_WALL = FLAT_TO_AXIS - BORE_DIA / 2.0
 FLAT_WALL_WORST = round(FLAT_TO_AXIS + FLAT_TO_AXIS_BAND[1] - _BORE_MAX / 2.0, 6)
-FLAT_WALL_PRINTED = math.floor(FLAT_WALL_WORST * 100.0) / 100.0  # 1.52
+FLAT_WALL_PRINTED = math.floor(FLAT_WALL_WORST * 100.0) / 100.0  # 1.59
 if FLAT_WALL_WORST < WALL_FLOOR:
     raise AssertionError(f"the D-flat wall {FLAT_WALL_WORST:.3f} is under the floor")
 

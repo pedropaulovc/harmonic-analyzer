@@ -163,17 +163,18 @@ _ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 8.0 * 1.10
 _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(("dt-crank-pin-1", "dt-crank-hub-1")): 1.10 * _CRANK_PIN_HUB_MM3,
     frozenset(("dt-crank-pin-1", "dt-crankshaft-1")): 1.10 * _CRANK_PIN_SHAFT_MM3,
-    # Stock 6.35 shank minus the 1.0 eye wire and 0.02 face clearance.
+    # Stock 6.35 shank minus the 1.016 (0.040-in) eye wire and 0.02 face clearance.
     frozenset(("vn-fillister-screw-1", "dt-crank-arm-1")): _smooth_annulus_limit_mm3(
-        2.8448, 2.261, 5.33
+        2.8448, 2.261, 5.314
     ),
-    # MHA-DT-032 #6-32 major in the arm's #36 tap drill: the full thread past the
-    # 1.5 relief (6.5 of the 8.0 arm) plus its 0.5 lead cone.  The size is
+    # MHA-DT-032 #4-40 major in the arm's tap drill: the full thread past the
+    # 2.38125 (3/32-in) relief (5.55625 of the 7.9375 (5/16-in) arm) plus a 0.5
+    # lead-cone allowance.  The size is
     # named here, not imported from dt_crank_handle_pivot_screw_spec, so every
     # assembly's recipe stays clear of the handle specs; the MHA-DT-032 tests pin
     # it to that spec's THREAD_SIZE.
     frozenset(("dt-crank-handle-pivot-screw-1", "dt-crank-arm-1")): _smooth_annulus_limit_mm3(
-        THREAD_MAJOR_MM["#4-40"], TAP_DRILL_MM["#4-40"], 7.0
+        THREAD_MAJOR_MM["#4-40"], TAP_DRILL_MM["#4-40"], 6.05625
     ),
     # drawing-guidelines.md rule 18 (thread engagement) E11: #10-32 94025A164 in the tapped block, observed above.
     frozenset(
@@ -265,18 +266,19 @@ _FRAME_ALLOWED_PAIRS = {
         _FRAME_CROSS_GATE_LIMIT_MM3,
     ),
     # MHA-VN-023 / 91410A540 1/4-20 (major 6.35, #7 drill 5.105): thread from
-    # the hub's spot face, 21.0 from the bore axis (fr_top_frame_spec
-    # HUB_SET_SPOT_FROM_AXIS), to the cup tip 8.15 from the axis (0.15 clear of
-    # the O16 post): 12.5 to the O17 bore wall plus the tip's 0.35 into the bore.
+    # the hub's spot face, 21.43125 (27/32) from the bore axis (fr_top_frame_spec
+    # HUB_SET_SPOT_FROM_AXIS), to the cup tip 8.0875 from the axis (0.15 clear of
+    # the 5/8 post): 12.898 to the 43/64 bore wall plus the tip's 0.445 into the
+    # bore = 13.34375 (all-inch; was 12.85).
     frozenset(("vn-gooseneck-set-screw-1", "fr-top-frame-1")): _smooth_annulus_limit_mm3(
-        6.35, 5.105, 12.85
+        6.35, 5.105, 13.34375
     ),
-    # Four nameplate corners: 6.35-mm stock shank through the 1.5-mm plate.
+    # Four nameplate corners: 6.35-mm stock shank through the 1/16 in plate.
     **_numbered_pairs(
         "vn-fillister-screw",
         range(1, 5),
         "fr-harmonic-base",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 4.85),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 4.7625),
     ),
 }
 # Independent runtime oracles: importing the magnifier's fit/pose modules here
@@ -284,14 +286,15 @@ _FRAME_ALLOWED_PAIRS = {
 # test_mg_fixture_installation pins these triples to their geometry owners.
 # Keep the ruled light-press triple in one place; tests pin it to the band owner.
 # Its third value is the conservative WHOLE-CONTACT envelope, not the nominal
-# 7 mm straight cylinder (mg_lever_press_fit_geom.COLLAR_ENGAGEMENT): the longest
-# straight cylinder, 10.00 - 2.997 = 7.003, plus the part of the R3 hemisphere
-# still outside the smallest bore, sqrt(3.000**2 - 2.993**2) = 0.2048.
+# 6.35 mm (1/4 in) straight cylinder (mg_lever_press_fit_geom.COLLAR_ENGAGEMENT):
+# the longest straight cylinder, 9.525 - 3.172 = 6.353, plus the part of the
+# R3.175 hemisphere still outside the smallest bore,
+# sqrt(3.175**2 - 3.168**2) = 0.2107.
 # The two corners are chosen independently on purpose (the smallest dome sets
 # the longest cylinder; the largest dome sets the deepest penetration). This is
-# an envelope, not one physical part: its coupled tight corner is 7.204819 mm.
-_MG_LEVER_PRESS_TRIPLE_MM = (6.0, 5.986, 7.2078194326718075)
-_MG_FIXTURE_THREAD_TRIPLE_MM = (2.8448, 2.261, 10.1)
+# an envelope, not one physical part.
+_MG_LEVER_PRESS_TRIPLE_MM = (6.35, 6.336, 6.563715447938681)
+_MG_FIXTURE_THREAD_TRIPLE_MM = (2.8448, 2.261, 10.2108)
 
 # Bound the press annulus over that whole conservative contact envelope (the
 # straight cylinder plus the partial dome: the triple's third value).
@@ -300,7 +303,7 @@ _MG_LEVER_PRESS_LIMIT = _smooth_annulus_limit_mm3(
     *_MG_LEVER_PRESS_TRIPLE_MM
 )
 # Only the major/thread-drill annulus from the spigot face to the rod-bore
-# breakout (10.1 mm), not the tangent screw tip or screw/rod overlap, is allowed.
+# breakout (10.2108 mm), not the tangent screw tip or screw/rod overlap, is allowed.
 _MG_FIXTURE_THREAD_LIMIT = _smooth_annulus_limit_mm3(
     *_MG_FIXTURE_THREAD_TRIPLE_MM
 )
@@ -310,16 +313,18 @@ _MAGNIFIER_ALLOWED_PAIRS = {
         "vn-clamp-screw",
         range(1, 3),
         "sh-column-clamp-back",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 4.85),
+        # 1-1/4 shank - front arc 11/16 - wheel bar 3/8 = 3/16 into the back
+        # clamp's tap (was 31.75 - 17.9 - 9.0 = 4.85).
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 4.7625),
     ),
     frozenset(("vn-thumb-screw-1", "mg-magnifying-clamp-1")): _smooth_annulus_limit_mm3(
-        2.8448, 2.261, 3.9
+        2.8448, 2.261, 3.0861
     ),
     # MHA-MG-007 drill-rod pin (Ø4.7625, mg_wheel_axle_spec.PIN_DIA) pressed in
     # the wheel bar's Ø4.7371 reamed bore (mg_wheel_bar_geom.AXLE_BORE_DIA)
-    # through the bar's 9.0 depth: the press.
+    # through the bar's 9.525 (3/8 in) depth: the press.
     frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): _smooth_annulus_limit_mm3(
-        4.7625, 4.7371, 9.0
+        4.7625, 4.7371, 9.525
     ),
     frozenset(("vn-thumb-screw-2", "mg-output-fixture-1")): _MG_FIXTURE_THREAD_LIMIT,
     frozenset(
@@ -338,10 +343,11 @@ _CHANNEL_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(
     sm_summing_lever_spec.PLATE_T,
 )
 # MHA-VN-024 #10-24 cut hex bolt (92314A253) in each knife mount's #25 tap
-# drill over its 8.9173 nominal reach: 45.70 cut length less 35.50 grip
-# and the 96659A104 washer's 1.2827 nominal thickness. Keep this literal,
-# test-pinned to build_sm_summing_assembly, to avoid broad recipe cache keys.
-_KNIFE_HANGER_REACH = 8.9173
+# drill over its 9.03605 nominal reach: 1-25/32 (45.24375) cut length less
+# the 1-3/8 (34.925) grip and the 96659A104 washer's 1.2827 nominal
+# thickness. Keep this literal, test-pinned to build_sm_summing_assembly, to
+# avoid broad recipe cache keys.
+_KNIFE_HANGER_REACH = 9.03605
 # Each MHA-VN-051 dowel pressed to the floor of its knife mount's Ø3.175 ream
 # (sm_knife_mount_spec.PIN_HOLE_DIA, band +0/-0.010: smallest 3.165), its
 # largest catalogue diameter 3.18262 over its 9.5 press depth
@@ -405,10 +411,10 @@ _SUMMING_ALLOWED_PAIRS = {
 
 _PEN_ALLOWED_PAIRS = {
     frozenset(("vn-pen-set-screw-1", "pn-pen-frame-1")): _smooth_annulus_limit_mm3(
-        2.8448, 2.261, 5.0
+        2.8448, 2.261, 4.7625  # pen-frame bottom rail RAIL_END 3/16 (was 5.0)
     ),
     frozenset(("vn-hanger-screw-1", "pn-pen-hanger-1")): _smooth_annulus_limit_mm3(
-        4.1656, 3.454, 3.0
+        4.1656, 3.454, 2.38125  # pen-hanger strap STRAP_T 3/32 (was 3.0)
     ),
 }
 
@@ -444,7 +450,7 @@ def _cross_pin_overlap_mm3(pin_od: float, pin_id: float, shaft_d: float) -> floa
 # (its ends stay inside the cup's O.D.).
 _CUP_PIN_OD = 25.4 / 16.0
 _CUP_PIN_ID = _CUP_PIN_OD - 2.0 * 0.012 * 25.4
-_CUP_PIN_JOURNAL_MM3 = _cross_pin_overlap_mm3(_CUP_PIN_OD, _CUP_PIN_ID, 6.0)
+_CUP_PIN_JOURNAL_MM3 = _cross_pin_overlap_mm3(_CUP_PIN_OD, _CUP_PIN_ID, 6.35)
 _CUP_PIN_CUP_MM3 = (
     math.pi / 4.0 * (_CUP_PIN_OD**2 - _CUP_PIN_ID**2) * (5.0 * 25.4 / 8.0)
     - _CUP_PIN_JOURNAL_MM3
@@ -468,76 +474,79 @@ _RING_PRONG_SHARE = 3.0 * math.atan(0.75) / (2.0 * math.pi)
 # Pairs with NO row, modelled line to line or with clearance, which the gate
 # reads as contact: the MHA-PD-017 hub's D-bore on the sleeve's Ø9 boss and
 # D-flat, the MHA-VN-042 dowel in the arm's Ø3.175 ream, the sleeve and both
-# bushings on the MHA-PD-023 pin (Ø3.9), the disc bore on the boss (Ø9), the
-# knob journal in the plate bore (Ø6), the D-collar bore on the core
+# bushings on the MHA-PD-023 pin (Ø3.9116), the disc bore on the boss (Ø9), the
+# knob journal in the plate bore (Ø6.35), the D-collar bore on the core
 # (Ø4.9), the MHA-VN-038 dowels in the T24's Ø2.5 holes, every screw in its
 # clearance hole, and the MHA-PD-014 latch hook: its base on the bar's back
-# face under the MHA-VN-043 heads, their shanks through its Ø3.2 holes, and
-# the MHA-VN-042 pin through its Ø3.3 pin hole.
+# face under the MHA-VN-043 heads, their shanks through its Ø3.175 holes, and
+# the MHA-VN-042 pin through its Ø3.2639 pin hole.
 _PAPER_DRIVE_ALLOWED_PAIRS = {
+    # MHA-VN-021 #8-32 x 1-1/4 clamp screws: 31.75 - (9.525 bar - 4.1624
+    # counterbore + 17.4625 front arc) = 8.9249 in the back arc's tap.
     **_numbered_pairs(
         "vn-clamp-screw",
         range(1, 3),
         "sh-column-clamp-back",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 9.0124),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 8.9249),
         second_number=2,
     ),
     **_numbered_pairs(
         "vn-clamp-screw",
         range(3, 5),
         "sh-column-clamp-back",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 9.0124),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 8.9249),
     ),
-    # MHA-VN-059 #2-56 clip screws: 6.35 shank - 0.8 clip sheet = 5.55 in the
-    # platen's through tap (3.85 plate + 1.70 rear boss).
+    # MHA-VN-059 #2-56 clip screws: 6.35 shank - 0.8128 (.032) clip sheet =
+    # 5.5372 in the platen's through tap (1/8 plate + 2.3622 rear boss).
     **_numbered_pairs(
         "vn-platen-clip-screw",
         range(1, 5),
         "pd-platen",
         _smooth_annulus_limit_mm3(
-            THREAD_MAJOR_MM["#2-56"], TAP_DRILL_MM["#2-56"], 5.55
+            THREAD_MAJOR_MM["#2-56"], TAP_DRILL_MM["#2-56"], 6.35 - 0.8128
         ),
     ),
     # MHA-VN-006 guide screws: seed -1, then the grid -2..-10, alternating
-    # between the two guide rails.
+    # between the two guide rails; 6.35 shank - the 0.2572 platen passage
+    # under the counterbore (1/8 plate - 2.9178).
     **_numbered_pairs(
         "vn-fillister-screw",
         range(1, 11, 2),
         "pd-platen-guide",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 5.4178),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 6.35 - 0.2572),
     ),
     **_numbered_pairs(
         "vn-fillister-screw",
         range(2, 11, 2),
         "pd-platen-guide",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 5.4178),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 6.35 - 0.2572),
         second_number=2,
     ),
     # MHA-VN-046 guide-lock screws (R9-31, R9-48): seeds -1/-2, then the grid
-    # -3..-8; each 9.525 shank passes the 1.5875 (1/16 sheet) lock plate into
+    # -3..-8; each 9.525 shank passes the 1.016 (.040 sheet) lock plate into
     # the guide's rear through tap.
     **_numbered_pairs(
         "vn-guide-lock-screw",
         (1, 2, 4, 7),
         "pd-platen-guide",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 7.9375),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 1.016),
     ),
     **_numbered_pairs(
         "vn-guide-lock-screw",
         (3, 5, 6, 8),
         "pd-platen-guide",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 7.9375),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 1.016),
         second_number=2,
     ),
     # MHA-VN-040 #8-32 x 5/8 (vn_transgear_arm_plate_screw_spec; from the top of the
-    # oval head's bevel, flush in the plate's countersink) through the 5.0
-    # plate's Ø4.5 clearance, cut flush with the arm's front face (R9-44): the
-    # cut length 12.9375 - 5.0 = the arm's 7.9375 in its #29 through tap.
+    # oval head's bevel, flush in the plate's countersink) through the 5.55625
+    # plate's clearance, cut flush with the arm's front face (R9-44): the
+    # cut length 13.49375 - 5.55625 = the arm's 7.9375 in its #29 through tap.
     **_numbered_pairs(
         "vn-transgear-arm-plate-screw",
         range(1, 3),
         "pd-transgear-arm",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 12.9375 - 5.0),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 13.49375 - 5.55625),
     ),
     # MHA-VN-041 (vn_transgear_pivot_screw_spec) in the support bar's blind #8-32
     # tap: its 4.7625 thread less the 1.1938 neck flat under the shoulder,
@@ -550,33 +559,36 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         4.1656, 3.454, 4.7625 - 1.1938
     ),
     # MHA-VN-043 #4-40 x 3/8 (vn_latch_hook_bracket_screw_spec) through the
-    # MHA-PD-014 hook's 0.8 base (Ø3.2 clearance): 9.525 - 0.8 = 8.725 in the
-    # support bar's #43 taps.
+    # MHA-PD-014 hook's .032 (0.8128) base (Ø3.175 clearance): 9.525 - 0.8128
+    # = 8.7122 in the support bar's #43 taps.
     **_numbered_pairs(
         "vn-latch-hook-bracket-screw",
         range(1, 3),
         "pd-support-bar",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 0.8),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 0.8128),
     ),
-    # MHA-PD-023 (pd_transgear_pin_spec, Ø3.900) pressed through the arm's Ø3.874
-    # ream (pd_transgear_arm_geometry) over the whole 7.9375 stock: the press.
+    # MHA-PD-023 (pd_transgear_pin_spec, Ø3.9116 #23 rod) pressed through the
+    # arm's Ø3.8856 ream (pd_transgear_arm_geometry) over the whole 7.9375
+    # stock: the press.
     frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): _smooth_annulus_limit_mm3(
-        3.9, 3.874, 7.9375
+        3.9116, 3.8856, 7.9375
     ),
-    # The two MHA-VN-056 dowels (vn_transgear_arm_plate_locating_pin_spec,
-    # Ø2.0 model) pressed into the arm's Ø1.995 blind reams
-    # (pd_transgear_arm_geometry) over their 6.0 - 1.70 proud insertion: the
-    # press. They slip in the plate's Ø2.015 holes, so that pair has no row.
+    # The two MHA-VN-056 98381A434 3/32 x 1/4 dowels (Ø2.38125 model,
+    # vn_transgear_arm_plate_locating_pin_spec) pressed into the arm's
+    # Ø2.37625 mean-limit blind reams (pd_transgear_arm_geometry) over their
+    # 6.35 - 1.5875 proud insertion: the press. They slip in the plate's slip
+    # holes, so that pair has no row. Literals, as the rows above.
     **_numbered_pairs(
         "vn-transgear-arm-plate-locating-pin",
         range(1, 3),
         "pd-transgear-arm",
-        _smooth_annulus_limit_mm3(2.0, 1.995, 6.0 - 1.70),
+        _smooth_annulus_limit_mm3(2.38125, 2.37625, 6.35 - 1.5875),
     ),
     # MHA-PD-020 (pd_transgear_pivot_spacer_spec, Ø4.727 ream) pressed on the
-    # MHA-VN-041 Ø4.7625 shoulder over its whole 5.5 length (R9-71): the press.
+    # MHA-VN-041 Ø4.7625 shoulder over its whole 5.55625 (7/32) length (R9-71):
+    # the press.
     frozenset(("pd-transgear-pivot-spacer-1", "vn-transgear-pivot-screw-1")): (
-        _smooth_annulus_limit_mm3(4.7625, 4.727, 5.5)
+        _smooth_annulus_limit_mm3(4.7625, 4.727, 5.55625)
     ),
     # MHA-VN-047 (vn_transgear_retaining_ring_spec) in the MHA-PD-023 groove: the
     # vendor replica is the ring as McMaster ships it, its prongs on the
@@ -587,14 +599,14 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     frozenset(("vn-transgear-retaining-ring-1", "pd-transgear-pin-1")): _RING_PRONG_SHARE
     * _smooth_annulus_limit_mm3(2.9464, 2.8956, 0.635),
     # MHA-VN-039 #0-80 x 1/4 (vn_transgear_disc_screw_spec) through the hub
-    # flange's Ø1.7 clearance into the disc's 3/64 taps (pd_rack_pinion_spec),
-    # cut at assembly (R9-47) to 5.3 under the head: 5.3 - 2.4 = 2.9 of the
-    # 3.0 face.
+    # flange's #51 clearance into the disc's 3/64 taps (pd_rack_pinion_spec),
+    # cut at assembly (R9-47) to 4.6625 under the head: 4.6625 - 1.5875 = 3.075
+    # of the 3.175 (1/8 in) face.
     **_numbered_pairs(
         "vn-transgear-disc-screw",
         range(1, 4),
         "pd-rack-pinion",
-        _smooth_annulus_limit_mm3(1.524, 1.191, 5.3 - 2.4),
+        _smooth_annulus_limit_mm3(1.524, 1.191, 4.6625 - 1.5875),
     ),
     # MHA-VN-048 through the knob shaft's journal and the cup (above).
     frozenset(("vn-transgear-knob-cup-pin-1", "pd-transgear-knob-shaft-1")): 1.10
@@ -613,13 +625,13 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         1.10 * 0.00809042475,
     ),
     # MHA-PD-013's #8-32 tap drill 3.454 on MHA-PD-008's Ø4.070 thread blank:
-    # at the nominal fitted collar length 6.2, whose rear face reacts on F,
+    # at the nominal fitted collar length 5.86875, whose rear face reacts on F,
     # the nut seats on the pilot 2.9 in front of the wheel seat. The overlap
-    # is 23.9 - 6.2 - 2.9 = 14.8, entirely on the blank, which starts 7.5
-    # in front of F, behind the nut's seat at 9.1.
+    # is 23.8125 - 5.86875 - 2.9 = 15.04375, entirely on the blank, which starts
+    # 7.9375 in front of F, behind the nut's seat at 8.76875.
     frozenset(
         ("pd-transgear-thumbnut-1", "pd-transgear-knob-shaft-1")
-    ): _smooth_annulus_limit_mm3(4.070, 3.454, 23.9 - 6.2 - 2.9),
+    ): _smooth_annulus_limit_mm3(4.070, 3.454, 23.8125 - 5.86875 - 2.9),
     # The two MHA-VN-038 dowels pressed into the MHA-PD-022 collar's through reams,
     # the crank-seat twin (the collar's PIN_HOLE_DIA is the seat interface's
     # DRIVE_PIN_HOLE_DIA): the pin's length behind the seat face.
@@ -712,8 +724,8 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "fr-frame-1/fr-harmonic-base",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 8.725),
     ),
-    # U34c: the #8-32 x 3/4 (19.05) MHA-VN-032 hold-downs pass the 5.0 pedestal
-    # ledge and engage 14.05 of the transferred base seats.
+    # U34c: the #8-32 x 3/4 (19.05) MHA-VN-032 hold-downs pass the 3/16 (4.7625)
+    # pedestal ledge and engage 14.2875 of the transferred base seats.
     **_numbered_pairs(
         "dt-drive-train-1/vn-pedestal-hold-down-screw",
         range(1, 3),
@@ -723,17 +735,17 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         ),
     ),
     # The two #2-56 x 7/16 (11.1125) MHA-VN-022 keeper foot screws: the head
-    # sits flush in the 8.0 foot's 2.1082 counterbore, so 11.1125 - (8.0 -
-    # 2.1082) = 5.2207 enters the top frame's tap (ch_fulcrum_keeper_spec).
+    # sits flush in the 7.9375 foot's 2.1082 counterbore, so 11.1125 - (7.9375 -
+    # 2.1082) = 5.2832 enters the top frame's tap (ch_fulcrum_keeper_spec).
     **_numbered_pairs(
         "ch-channel-1/vn-frame-side-screw",
         range(1, 3),
         "fr-frame-1/fr-top-frame",
-        _smooth_annulus_limit_mm3(2.1844, 1.778, 5.2207),
+        _smooth_annulus_limit_mm3(2.1844, 1.778, 5.2832),
     ),
     # #743 PR2: the two #8-32 x 3/4 (19.05) MHA-VN-032 rocker-bracket hold-downs
-    # (one per bracket since the 2026-10-09 flip) pass the 6.0 bracket foot
-    # and engage 13.05 of the support's transferred seats. Literals, like the
+    # (one per bracket since the 2026-10-09 flip) pass the 6.35 bracket foot
+    # and engage 12.7 of the support's transferred seats. Literals, like the
     # rows above, so every assembly does not re-key on the rocker bank's
     # layout; test_rocker_bracket_seat_layout pins them to
     # rocker_bracket_seat_layout.
@@ -741,26 +753,26 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "ch-channel-1/vn-pedestal-hold-down-screw",
         range(1, 3),
         "fr-frame-1/fr-rocker-arm-support",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 19.05 - 6.0),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 19.05 - 6.35),
     ),
 }
 
 # The MHA-CH-011 bar pivot pins (ch_bar_pivot_pin_spec), Ø1.984375 drill rod
 # pressed into each MHA-CH-001 bar's Ø1.968 top-pin ream through both
-# top-notch cheeks: 6.35 bar less the 3.20 notch. Channel j's pin and bar are
+# top-notch cheeks: 6.35 bar less the 3.38 notch. Channel j's pin and bar are
 # both its (j + 1)th instance (build_ch_channel_assembly inserts one pin per
 # channel in channel order; _copied_chain_instances pins the bar's number).
 # Literals, like the rows above, so every assembly does not re-key on the pin
 # spec; test_ch_bar_pivot_fit pins them to it.
-BAR_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.35 - 3.20)
+BAR_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.35 - 3.38)
 # The MHA-CH-010 rod pivot pins (ch_rod_pivot_pin_spec), the same drill rod
 # pressed into each MHA-CH-003 rod's Ø1.968 fork ream through both tines:
-# 6.075 fork less the 2.625 slot (user ruling 2026-10-09, PR #1292 review F1).
+# 5.9944 (.236) fork less the 2.50625 slot (user ruling 2026-10-09, PR #1292 review F1).
 # Channel j's pin and rod are both its (j + 1)th instance, as the bar pin's
 # are; test_ch_rod_pivot_fit pins the literals to the pin spec.
-ROD_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.075 - 2.625)
+ROD_PIVOT_PIN_PRESS = (1.984375, 1.968, 5.9944 - 2.50625)
 # The MHA-VN-034 #4-40 apex set screws (user, 2026-10-10), one down through
-# each MHA-CH-008 ear's R8 arch into its Ø6.5 bore, the tap cut at its drill.
+# each MHA-CH-008 ear's R 21/64 arch into its Ø6.5 bore, the tap cut at its drill.
 # The thread's major envelope crosses no longer a metal column than the arch
 # radius less the bore's height at the envelope's edge, so the smooth annulus
 # over that column bounds the overlap; the cup on the modelled shaft flat is
@@ -769,7 +781,7 @@ ROD_PIVOT_PIN_PRESS = (1.984375, 1.968, 6.075 - 2.625)
 # assembly does not re-key on the bracket spec; test_ch_channel_assembly_drawing
 # pins them to ch_pivot_bracket_spec. #911: re-pin to the measured overlap x
 # 1.10 from the first channel leaf.
-PIVOT_EAR_ARCH_AND_BORE = (8.0, 6.5)
+PIVOT_EAR_ARCH_AND_BORE = (8.334375, 6.5)
 _PIVOT_EAR_TAP_COLUMN = PIVOT_EAR_ARCH_AND_BORE[0] - math.sqrt(
     (PIVOT_EAR_ARCH_AND_BORE[1] / 2.0) ** 2
     - (THREAD_MAJOR_MM[_ARBOR_SET_SCREW_THREAD] / 2.0) ** 2
@@ -818,14 +830,14 @@ _CHANNEL_ALLOWED_PAIRS = {
 }
 
 # The MHA-MS-000 stop: the #4-40 MHA-VN-011 thumbscrew fills the block's whole
-# 8.6 tapped wall (ms_stop_spec.FLOOR_THICKNESS) up to the window, and each
-# #2-56 x 1/4 MHA-VN-054 plate screw passes the 1.0 cover and engages 5.35 of
-# its Ø1.85 (#49) blind tap. Everything else is contact (bar on the roof, tip
+# 7.9375 (5/16) tapped wall (ms_stop_spec.FLOOR_THICKNESS) up to the window, and each
+# #2-56 x 1/4 MHA-VN-054 plate screw passes the 1/16 cover and engages 4.7625 of
+# its Ø1.8542 (#49) blind tap. Everything else is contact (bar on the roof, tip
 # on the bar's underside, cover on the block) or clear. Literals, like the rows
 # above, so every assembly does not re-key on the stop's layout;
 # test_ms_measuring_stick_assembly pins them to the specs.
-MS_THUMB_SCREW_THREAD = (2.8448, 2.261, 8.6)
-MS_PLATE_SCREW_THREAD = (2.1844, 1.85, 6.35 - 1.0)
+MS_THUMB_SCREW_THREAD = (2.8448, 2.261, 7.9375)
+MS_PLATE_SCREW_THREAD = (2.1844, 1.8542, 6.35 - 1.5875)
 _MS_MEASURING_STICK_ALLOWED_PAIRS = {
     frozenset(("vn-thumb-screw-1", "ms-stop-block-1")): _smooth_annulus_limit_mm3(
         *MS_THUMB_SCREW_THREAD

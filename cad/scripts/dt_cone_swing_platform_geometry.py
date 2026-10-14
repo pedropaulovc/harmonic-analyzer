@@ -18,6 +18,7 @@ import vn_cone_pivot_screw_spec as pivot_stock
 import vn_swing_stop_screw_spec as stop_stock
 from vn_cone_lock_knob_spec import HEAD_DIA as LOCK_HEAD_DIA
 import _config
+from _inch import inch
 from cone_line import (
     COS_I as _COS_I,
     INCLINE_DEG,
@@ -44,15 +45,17 @@ from dt_cone_swing_platform_spec import (
 from dt_cone_swing_platform_pivot_spec import PIVOT_HOLE_DIA
 
 PLATE_T = PLATE_THICKNESS  # 1/4" plate
-HALF_WIDTH_N = 16.0  # north (pivot/tip) half-width, EAST side (the lock-slot
-# region keeps its full seat)
-WEST_HALF_N = 8.0  # north half-width, WEST side.  The recentered north arbor
-# pedestal otherwise clips the flared edge; 8.0 leaves 0.37 mm exact plan
-# clearance while retaining the close photo relationship in ch12 img09.
-EAST_HALF_S = 24.0  # widened for the v2 post's Ø42.011 casting foot
-WEST_HALF_S = 37.0  # west half-width at the south end: the flare that makes
-# the pivot -> lock-knob line solid plate (covers the notch seat + knob head)
-NORTH_OVERHANG = 7.0  # pivot -> north edge (plate continues past the pivot)
+HALF_WIDTH_N = inch(5, 8)  # north (pivot/tip) half-width, EAST side (the
+# lock-slot region keeps its full seat)
+WEST_HALF_N = inch(3, 8)  # north half-width, WEST side.  Trimmed for the
+# recentered north arbor pedestal (the drive train holds its 0.25 mm plan
+# floor, close to the photo relationship in ch12 img09); 5/16 left the tip
+# block's +X face only 0.30 of the 0.50 print-worst containment it needs.
+EAST_HALF_S = inch(15, 16)  # widened for the v2 post's casting foot
+WEST_HALF_S = inch(23, 16)  # west half-width at the south end: the flare that
+# makes the pivot -> lock-knob line solid plate (covers the notch seat + knob
+# head)
+NORTH_OVERHANG = inch(1, 4)  # pivot -> north edge (plate continues past the pivot)
 
 if abs(PLATE_T - PIVOT_BEARING_RELIEF_DEPTH - PIVOT_BEARING_THICKNESS) > 1e-9:
     raise AssertionError(
@@ -68,16 +71,18 @@ if abs(PLATE_T - PIVOT_BEARING_RELIEF_DEPTH - PIVOT_BEARING_THICKNESS) > 1e-9:
 # platform's local (x, z), without a frozen former pivot station.
 POST_MAIN_DIA = POST_BLOCK_DIA
 POST_LOCAL_Z = POST_STATION - PIVOT_STATION
-POST_SOUTH_MARGIN = 3.175  # 1/8 in clearance beyond the post's south rim
-PLATE_SOUTH_Z = POST_LOCAL_Z - POST_MAIN_DIA / 2.0 - POST_SOUTH_MARGIN
-PLATE_LEN = NORTH_OVERHANG - PLATE_SOUTH_Z
+# Overall length, north edge to south edge: the plate stops about 1/8 in past
+# the post's south rim (the containment check below holds the floor).
+PLATE_LEN = inch(145, 16)
+PLATE_SOUTH_Z = NORTH_OVERHANG - PLATE_LEN
+POST_SOUTH_MARGIN = POST_LOCAL_Z - POST_MAIN_DIA / 2.0 - PLATE_SOUTH_Z
 # Rounded native plan corners. Shared with the manufactured stop-fence
 # enclosure; the southwest radius clears the relocated lock notch.
 PLATE_CORNERS = (
-    ("NE", -HALF_WIDTH_N, NORTH_OVERHANG, 10.0),
-    ("NW", WEST_HALF_N, NORTH_OVERHANG, 8.0),
-    ("SW", WEST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 5.0),
-    ("SE", -EAST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 12.0),
+    ("NE", -HALF_WIDTH_N, NORTH_OVERHANG, inch(3, 8)),
+    ("NW", WEST_HALF_N, NORTH_OVERHANG, inch(5, 16)),
+    ("SW", WEST_HALF_S, NORTH_OVERHANG - PLATE_LEN, inch(3, 16)),
+    ("SE", -EAST_HALF_S, NORTH_OVERHANG - PLATE_LEN, inch(1, 2)),
 )
 POST_MOUNT_HALF_PITCH = POST_ATTACHMENT_SPACING / 2.0
 POST_MOUNT_X = POST_MOUNT_HALF_PITCH * _COS_I
@@ -186,19 +191,21 @@ if min(HOLDDOWN_WEBS.values()) < 2.0:
 # (train._plate_local_to_machine), under which local +x maps to machine WEST
 # at the engaged pose -- every west-side feature below (the flare, the lock
 # notch) is authored at local +x, east-side features at local -x.
-SLOT_W = 8.0  # Ø6.35 stud clearance plus chord-vs-arc slack
+SLOT_W = inch(5, 16)  # Ø6.35 stud clearance plus chord-vs-arc slack
 # The notch seat was placed for the former stock O25.4-head knob (91882A425):
 # the northern solution beside the post cleared the post but overlapped the
-# T120/64T gear row, so the stud moved west to x 33.0 on the southern solution
-# where that head kept a 2 mm post gap.  The O15.875 93585A190 head keeps the
+# T120/64T gear row, so the stud moved west to the southern solution where
+# that head kept a 2 mm post gap.  The O15.875 93585A190 head keeps the
 # same seat (plate and base unchanged) with a wider post gap; the drive train
 # re-checks the head against the post, gears and stop at import.
-SLOT_E_X = 33.0
+SLOT_E_X = inch(21, 16)
+SLOT_E_Z = -inch(135, 16)
 LOCK_HEAD_POST_CLEARANCE = 2.0
-SLOT_E_Z = POST_LOCAL_Z - math.sqrt(
-    (POST_MAIN_DIA / 2.0 + 25.4 / 2.0 + LOCK_HEAD_POST_CLEARANCE) ** 2
-    - SLOT_E_X**2
-)
+if (
+    math.hypot(SLOT_E_X, SLOT_E_Z - POST_LOCAL_Z) - POST_MAIN_DIA / 2.0 - 25.4 / 2.0
+    < LOCK_HEAD_POST_CLEARANCE
+):
+    raise AssertionError("lock-notch seat no longer keeps the former O25.4 head off the post")
 SLOT_R = math.hypot(SLOT_E_X, SLOT_E_Z)
 # The plate swings toward disengage (big end away from the drum), so in PLATE
 # coords the fixed stud sweeps the INVERSE rotation: unit direction (-z, x)/R
@@ -225,7 +232,7 @@ def _chord_exit_travel(x0: float, z0: float) -> float:
 # the plate; the shared hardware calculation adds the knob head radius to
 # derive the disengaged pose.
 NOTCH_EXIT_TRAVEL = _chord_exit_travel(SLOT_E_X, SLOT_E_Z)
-_MOUTH_OVERSHOOT = 4.0  # cut ends past the edge so the mouth opens clean
+_MOUTH_OVERSHOOT = inch(3, 16)  # cut ends past the edge so the mouth opens clean
 SLOT_OUT_X = SLOT_E_X + (NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT) * SLOT_TX
 SLOT_OUT_Z = SLOT_E_Z + (NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT) * SLOT_TZ
 # Plan angle of the notch run off the plate's east-west line (the run is the
@@ -234,7 +241,7 @@ SLOT_OUT_Z = SLOT_E_Z + (NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT) * SLOT_TZ
 # is what the sketch geometry pins.
 NOTCH_RUN_DEG = math.degrees(math.atan2(SLOT_TZ, SLOT_TX))
 
-STOP_LOCAL_Z = -105.0
+STOP_LOCAL_Z = -inch(33, 8)
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,10 +259,11 @@ class SwingHardwareGeometry:
 # disengaged stop, so the knob can be tightened onto bare base to fence the
 # mouth.  Sized so the linear worst case keeps >= 2.0 mm (U27) with the plate
 # outline at .X (+/-0.8) and the base stop/stud holes at .XX (+/-0.51/axis):
-# east edge at the stop 2 x 0.8 (lever 105.6 vs SLOT_R 208.4), west edge at the
-# mouth 0.99 x 0.8, stop hole ~1.1, stud hole ~0.59, head/shank ~0.35 -- 4.41
-# in all.  The base derives its swing-stop hole from this function.
-DISENGAGE_HEAD_MARGIN = 6.5
+# east edge at the stop 2 x 0.8, west edge at the mouth 0.8, stop hole ~1.1,
+# stud hole ~0.59, head/shank ~0.35 -- about 4.46 in all, so 1/4 in leaves
+# 1.89 and the margin takes 9/32 (2.68).  The base derives its swing-stop hole
+# from this function.
+DISENGAGE_HEAD_MARGIN = inch(9, 32)
 
 
 def swing_hardware_geometry(

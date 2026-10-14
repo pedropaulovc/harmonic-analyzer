@@ -1,6 +1,6 @@
 r"""Pure-data contract for MHA-DT-032, the crank handle pivot screw (user ruling U33).
 
-A made slotted shoulder screw turned from 1/4-in cold-finished rod.  The oak
+A made slotted shoulder screw turned from 5/16-in cold-finished rod.  The oak
 handle MHA-DT-008 spins on the shoulder; the thread screws into the crank arm
 MHA-DT-006's #4-40 tapped through hole and the shoulder seats tight on the arm
 face, so the shoulder length alone sets the handle's end play.  The tip is
@@ -24,6 +24,7 @@ import math
 
 from _gtol_cylinder import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM
+from _inch import inch
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_crank_handle_butt_cup_spec import (
     BODY_DIA as CUP_BODY_DIA,
@@ -32,7 +33,6 @@ from dt_crank_handle_butt_cup_spec import (
     POCKET_CLEARANCE as CUP_POCKET_CLEARANCE,
     POCKET_DEPTH as CUP_POCKET_DEPTH,
     POCKET_DEPTH_TOL as CUP_POCKET_DEPTH_TOL,
-    POCKET_DIA as CUP_POCKET_DIA,
     POCKET_WALL_FLOOR_MM as CUP_POCKET_WALL_FLOOR_MM,
     WALL_FLOOR_MM,
 )
@@ -51,31 +51,34 @@ from dt_crank_hub_geometry import (
 )
 
 
-STOCK_DIA = 0.25 * MM_PER_IN
+# 5/16 in: the 1/4-in head plus its band no longer turns from 1/4-in rod.
+STOCK_DIA = inch(5, 16)
 
 # User ruling 2026-09-29 (ch11 p.14): the head sits recessed in the MHA-DT-035
 # butt cup's pocket, which is bored to suit it, and bears on the cup floor.
 # Its +/-0.10 band keeps a bearing annulus outside the drilled floor hole at
-# the worst case, after an edge break on each.  Ø6 (user ruling 2026-09-30,
-# ch30 eight-views-4): the photographed head, which lets the cup and the butt
-# shrink to the photographed size.
-HEAD_DIA = 6.0
+# the worst case, after an edge break on each.  Ø1/4 in (user ruling
+# 2026-09-30, ch30 eight-views-4, formerly Ø6): the photographed head, which
+# lets the cup and the butt shrink to the photographed size.
+HEAD_DIA = inch(1, 4)
 HEAD_DIA_TOL = 0.10
-# A 4.0 head (user ruling 2026-09-29, MHA-DT-032 machinist review): with the
-# slot's own band below, the worst case leaves 2.0 of head under the slot,
+# A 3/16-in head (user ruling 2026-09-29, MHA-DT-032 machinist review): with
+# the slot's own band below, the worst case leaves 2.0 of head under the slot,
 # not 0.4.  Banded (Codex P2 on #1139, user ruling 2026-09-30): at .X the
 # longest head, at the widest fitted end play, stood 1.6 proud of the cup.
-HEAD_LENGTH = 4.0
+HEAD_LENGTH = inch(3, 16)
 HEAD_LENGTH_TOL = 0.10
-SLOT_WIDTH = 1.0
+# 1/32 in: a sub-1/4 slot the 1/16 grid would move 59 %.
+SLOT_WIDTH = inch(1, 32)
 # Banded (MHA-DT-032 re-review): at .X the slot could print as nothing.
-SLOT_DEPTH = 1.0
+# 1/32 in: a sub-1/4 depth the 1/16 grid would move 59 %.
+SLOT_DEPTH = inch(1, 32)
 SLOT_DEPTH_TOL = 0.20
 
 # The running surface under the oak bore.  (upper, lower) deviations from the
-# Ø4.00 nominal; the model carries the band natively (drawing-simplicity-policy.md `How the repository implements the guidelines`).  Ø4.00
-# (user ruling 2026-09-30): the tenon keeps 1.5 of oak over its bore.
-SHOULDER_DIA = 4.00
+# Ø5/32 nominal; the model carries the band natively (drawing-simplicity-policy.md `How the repository implements the guidelines`).  Ø5/32
+# (user ruling 2026-09-30, formerly Ø4.00): the tenon keeps 1.5 of oak over its bore.
+SHOULDER_DIA = inch(5, 32)
 SHOULDER_DIA_BAND = (-0.03, -0.08)
 # The shoulder's thread-end face is the seat on the arm face.  Under the
 # title block's 0.25 edge break on it and on the tapped mouth, a #6-32 left no
@@ -105,13 +108,13 @@ THREAD_SIZE = "#4-40"
 # The threaded section is modelled as a plain cylinder at the basic #6 major
 # diameter, the fleet convention for a stock screw in a tap-drill-modelled hole.
 THREAD_MODEL_DIA = THREAD_MAJOR_MM[THREAD_SIZE]
-# 10.0 +0/-0.5: the shortest thread section, 9.5, less the relief and 1.5
+# 3/8 in +0/-0.5: the shortest thread section less the relief and 1.5
 # pitches of die run-in still carries full thread across the arm's 7.94
 # (5/16-in) stock thickness, so the ARM governs the worst-case engagement,
 # not the screw (the 9.0 of U33b left the MHA-DT-032 machinist review short).
 # The tip is cut proud of the arm's inboard face and filed flush at assembly
 # (below).
-THREAD_LENGTH = 10.0
+THREAD_LENGTH = inch(3, 8)
 THREAD_LENGTH_BAND = (0.0, -0.5)
 # 45-degree thread-start chamfer on the tip, inside the 0.39 thread depth.
 # Like the relief lead, the model holds the 45 degrees by equation and the
@@ -162,17 +165,18 @@ THREAD_FIT_OFFSET_MAX = round(
 # band.
 # Banded (Codex P1 on #1139): at .X the relief could stand above the thread
 # root (no die run-out) and, with the lead, reach past the shoulder's seat.
-# Ø1.85 +/-0.05 keeps the largest relief under the deepest die-cut root
-# estimated above, Ø1.937 (local reviews of 747487c71 and 21bb244c5).
-RELIEF_DIA = 1.85
+# Ø1/16 in +/-0.05 keeps the largest relief under the deepest die-cut root
+# estimated above, Ø1.937 (local reviews of 747487c71 and 21bb244c5); the next
+# grid size up, 3/32, stands above it.
+RELIEF_DIA = inch(1, 16)
 RELIEF_DIA_TOL = 0.05
 RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_TOL, 6)
-# Routine at 2.2 (the MHA-DT-032 machinist review of crank-v4-16 called a
+# Routine at 3/32 in (the MHA-DT-032 machinist review of crank-v4-16 called a
 # +/-0.10 band over-specification): at .X the straight floor past the
-# longest lead, 1.4 - 0.4 = 1.0, keeps 1.5 #4-40 pitches of die run-out
-# (local review of 20dac9d3f: the lead is not floor), and the widest 3.0
-# still leaves the 1.5D engagement.
-RELIEF_WIDTH = 2.2
+# longest lead keeps 1.5 #4-40 pitches of die run-out (local review of
+# 20dac9d3f: the lead is not floor), and the widest still leaves the 1.5D
+# engagement.  1/32 grid: the 1/16 grid moves this sub-1/4 groove 28 %.
+RELIEF_WIDTH = inch(3, 32)
 # A 45-degree lead from the relief floor up into the seat face, so the groove
 # leaves no sharp inside corner.  0.3 keeps the lead inside the Ø2.845 thread
 # major, i.e. inside the arm's tapped hole, so the whole seat annulus that
@@ -274,7 +278,7 @@ DIAMETRAL_CLEARANCE_MAX = round(HANDLE_BORE_MAX - SHOULDER_DIA_MIN, 6)
 ENGAGEMENT_RULE_D = 1.5
 ENGAGEMENT_FLOOR = ENGAGEMENT_RULE_D * THREAD_MODEL_DIA
 # The arm is 5/16-in cold-finished flat bar left at stock thickness
-# (dt_crank_hub_geometry.ARM_STOCK_THICKNESS).  Its sheet prints the 8.0 as a
+# (dt_crank_hub_geometry.ARM_STOCK_THICKNESS).  Its sheet prints the thickness as a
 # reference to that stock (Codex #892: a toleranced 8.0 took the .X band and
 # accepted a 7.2 arm, 1.02D), so the thinnest accepted arm is the mill's
 # ARM_STOCK_THICKNESS_MIN.  The thick side keeps the .X band as a bound on

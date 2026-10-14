@@ -5,12 +5,13 @@ steel bar clamped across the two front columns by the two-piece column
 clamps (build_sh_column_clamp_front.py and build_sh_column_clamp_back.py), carrying the hanging platen
 (guides + locks on the platen back) and, on its own back face, the ch. 23
 transgear hanger (pivot screw MHA-VN-041) and the latch hook (MHA-PD-014).
-Cross-section 28 tall x 9 deep (it fills the platen's guide channel to a
-1.0 bottom-rail clearance; ``pd_support_bar_spec.BAR_HEIGHT`` carries the
-photo chain); 452 long so the ends run ~29 past each column (ch30 p002).
+Cross-section 1-1/8 tall x 3/8 deep flat bar (it fills the platen's guide
+channel to a 1/32 bottom-rail clearance; ``pd_support_bar_spec.BAR_HEIGHT``
+carries the photo chain); 17-13/16 long so the ends run ~1-1/8 past each
+column (ch30 p002).
 
 Holes (all along local Z, the machine front-back axis):
-* 4x clamp-screw counterbores flanking each column (x +-197 -+ 17.5):
+* 4x clamp-screw counterbores flanking each column (x +-7-3/4 -+ 11/16):
   the screw heads sit sub-flush in the BAR's front face so the refitted platen
   can slide across the east clamp, and thread into the back clamp arc.
 * the hanger's #8-32 blind pivot tap and the latch hook's two #4-40 base-screw
@@ -20,7 +21,7 @@ The hanger holes make the bar x-ASYMMETRIC, so it is authored MACHINE-
 handed and placed on its exact machine transform.
 
 Layout: bar axis along X, origin at the bar centre; height along Y,
-depth along Z (front face local z -4.5, back face +4.5; named plane
+depth along Z (front face local z -3/16, back face +3/16; named plane
 ``BackFace``). Dimensions: memory/paper-drive-rework.md E1/E2.
 
 Run (SolidWorks already open)::
@@ -49,6 +50,7 @@ from _sketch_rectangle import define_centered_rectangle
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _holes import wizard_holes
 from _visibility import blank_reference_geometry
+from _inch import inch
 from vn_clamp_screw_spec import HEAD_H as CLAMP_HEAD_H
 from pd_support_bar_spec import (
     BACK_FACE_Z,
@@ -70,16 +72,17 @@ from pd_support_bar_spec import (
 PART_NAME = "pd-support-bar"
 MATERIAL = "Plain Carbon Steel"
 
-BAR_LENGTH = 452.0  # ends at x +-226, ~29 past each Ø25.4 column (ch30 p002)
+BAR_LENGTH = inch(17 + 13 / 16)  # ends ~1-1/8 past each Ø1 column (ch30 p002)
 
-COLUMN_X = 197.0  # frame column line (frame assembly)
-CLAMP_SCREW_DX = 17.5  # clamp screws flank each column
+# Frame column line, restated from the frame assembly (InchFR-2: inch(7.75)).
+COLUMN_X = inch(7 + 3 / 4)
+CLAMP_SCREW_DX = inch(11, 16)  # clamp screws flank each column (ear holes)
 # The stock 90280A201 #8-32 clamp screws pass through #8 clearance holes.
 # Their 3.9624-mm heads are recessed exactly 0.2 below the bar front: the
 # right-shifted platen travels across the east clamp line, so proud heads
 # would block its slide.
 CLAMP_HEAD_RECESS = 0.2
-CLAMP_CBORE_DIA = 8.5
+CLAMP_CBORE_DIA = inch(5, 16)  # the #8 fillister head's standard counterbore
 CLAMP_CBORE_DEPTH = CLAMP_HEAD_H + CLAMP_HEAD_RECESS
 CLAMP_THROUGH_HOLE_SPEC = HoleSpec("clearance", "#8")
 CLAMP_HOLE_DIA = blind_cut_dia_mm(CLAMP_THROUGH_HOLE_SPEC)

@@ -24,6 +24,7 @@ from vn_lag_screw_spec import (
 from vn_pedestal_hold_down_screw_spec import SHANK_LEN as PEDESTAL_SCREW_LEN
 from fr_rocker_arm_support_section_spec import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
 from fr_frame_attachment_spec import CASTING_FULL_THREAD_DEPTH, CASTING_TAP_DRILL_DEPTH
+from _inch import inch
 
 IN = 25.4
 
@@ -131,8 +132,8 @@ PEDESTAL_SCREW_ENGAGEMENT = PEDESTAL_SCREW_LEN - PEDESTAL_FLANGE_THICKNESS
 # deck (its back face at STACK_HEIGHT, gap 0 -- asserted below), so each
 # screw axis runs -Y straight from the plate's front face into the deck.
 NAMEPLATE_SCREW_XZ = fr_nameplate_spec.MOUNT_HOLE_XZ
-# The stock brass fillister's 6.35-mm shank passes through the 1.5-mm plate,
-# engaging 4.85 mm of the existing 6.0-mm #4-40 thread. The drill extends
-# 3.0 mm deeper for the bottoming tap's two-pitch lead (1.27 mm).
-NAMEPLATE_SCREW_HOLE_DEPTH = 6.0
-NAMEPLATE_SCREW_DRILL_DEPTH = 9.0
+# The stock brass fillister's 6.35-mm shank passes through the 1/16 in plate,
+# engaging 4.76 mm of the 1/4 in #4-40 thread. The drill extends 1/8 in
+# deeper for the bottoming tap's two-pitch lead (1.27 mm).
+NAMEPLATE_SCREW_HOLE_DEPTH = inch(1, 4)  # 6.35 (was 6.0)
+NAMEPLATE_SCREW_DRILL_DEPTH = inch(3, 8)  # 9.525 (was 9.0)

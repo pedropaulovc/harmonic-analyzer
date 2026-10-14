@@ -14,8 +14,8 @@ shop); no heat treatment.
 
 Frame (the inventory's fixture frame, rocker-inv:1735-1748): origin on the
 pivot axis at the upper hub face, +Z up; S4 poses it at the rocker frame-A
-origin. The washer sits Z0..2, the head Z2..6, the shoulder Z-18..2 and the
-thread Z-30.3..-18. The head length prints from the faced head top; the
+origin. The washer sits Z0..3/32, the head 3/16 above it, the shoulder
+25/32 below the underhead and the thread to 1-5/16 below it. The head length prints from the faced head top; the
 shoulder length and the length under the head print from the underhead, the
 face that clamps the washer, because they set the axial stack into the plate.
 """
@@ -26,17 +26,19 @@ import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_profile_fixture_spec as profile
 from _gtol_cylinder import CylinderFace
+from _inch import inch
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
 from _surface_finish import GROUND_UM, MACHINED_UM, SurfaceFinishControl
 
 # --- stations (fixture frame, mm) -------------------------------------------
-# The MHA-CH-006-TL-07 washer under the head. 2.0, not the inventory's 1.5:
-# at .XXX its thinnest stays over the drawing-guidelines.md rule 17 (walls and webs) floor.
-WASHER_THICK = 2.0
+# The MHA-CH-006-TL-07 washer under the head. 3/32, not the inventory's 1.5:
+# at .XXX its thinnest stays over the drawing-guidelines.md rule 17 (walls and webs)
+# floor (1/16 would not).
+WASHER_THICK = inch(3, 32)
 WASHER_THICK_PLACES = 3
-HEAD_DIA = 8.0
-HEAD_LENGTH = 4.0
+HEAD_DIA = inch(5, 16)
+HEAD_LENGTH = inch(3, 16)
 SHOULDER_DIA = 6.49
 # Shop-to-shop thread follows the HA US-customary fastener policy (UNC, 2A per
 # the title block): the inventory's M5x0.8 maps to #10-24. The thread runs
@@ -53,15 +55,17 @@ TIP_CHAMFER = round(THREAD_ROOT_DEPTH, 2)
 CHAMFER_CALLOUT = "X 45 DEG TO THREAD ROOT"
 TIP_CHAMFER_NOTE = f"TIP CHAMFER ({TIP_CHAMFER}) {CHAMFER_CALLOUT}"
 # The two direct axial sizes the stack rides on, both from the underhead
-# (the face that clamps the washer), both at .XXX.
-SHOULDER_LENGTH = 20.0  # underhead to shoulder end
-UNDER_HEAD_LENGTH = 32.3  # underhead to tip
+# (the face that clamps the washer), both at .XXX. The shoulder takes 1/32:
+# 3/4 barely enters the plate bore and 13/16 puts the run-out on its floor.
+SHOULDER_LENGTH = inch(25, 32)  # underhead to shoulder end
+UNDER_HEAD_LENGTH = inch(21, 16)  # underhead to tip
 AXIAL_PLACES = 3
 THREAD_LENGTH = round(UNDER_HEAD_LENGTH - SHOULDER_LENGTH, 6)
-SLOT_WIDTH = 1.0
-# 0.9 deep (route said 1.5): at the one-place general band
+# Slot width and depth are 1/32: 1/16 more than doubles either.
+SLOT_WIDTH = inch(1, 32)
+# 1/32 deep (route said 1.5): at the one-place general band
 # the worst head left behind the slot stays over the drawing-guidelines.md rule 17 (walls and webs) floor.
-SLOT_DEPTH = 0.9
+SLOT_DEPTH = inch(1, 32)
 
 UNDERHEAD_Z = WASHER_THICK
 HEAD_TOP_Z = UNDERHEAD_Z + HEAD_LENGTH
@@ -153,9 +157,10 @@ if min(BORE_A_CLEARANCE[0], PLATE_CLEARANCE[0]) < LOCATING_CLEARANCE_MIN - 1e-9:
     raise AssertionError("pivot-screw shoulder does not slide into bore A and the plate bore")
 
 # The head carries the outline-template bush. No template constant exists
-# yet, so its bore is the inventory value (rocker-inv:1752: 8.000-8.015).
-TEMPLATE_BUSH_BORE_LIMITS = (8.000, 8.015)
-HEAD_BAND = (0.0, -0.005)  # (upper, lower): 7.995-8.000, ring-lapped
+# yet, so its bore is the inventory's 0.015 band (rocker-inv:1752) on the
+# 5/16 head nominal.
+TEMPLATE_BUSH_BORE_LIMITS = (inch(5, 16), inch(5, 16) + 0.015)
+HEAD_BAND = (0.0, -0.005)  # (upper, lower): ring-lapped to the 5/16 nominal
 HEAD_PLACES = 3
 if HEAD_DIA + HEAD_BAND[0] > TEMPLATE_BUSH_BORE_LIMITS[0] + 1e-9:
     raise AssertionError("pivot-screw head does not enter the outline-template bush")

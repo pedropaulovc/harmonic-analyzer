@@ -9,7 +9,7 @@ north face.
 
 It is a CUSTOM part, turned from bar, not a stock washer: it cannot pass the
 collar forward, so it goes on over the shaft's rear end, which carries the
-Ø11.388 outboard journal land.  A stock washer for the 3/8 in shaft (bore
+outboard journal land.  A stock washer for the 3/8 in shaft (bore
 10.31 at most) cannot pass that land; this bore clears it at print-worst.
 The O.D. is the collar's, so the washer covers the collar's rear face.
 
@@ -31,11 +31,12 @@ import dt_crankshaft_spec
 from _gtol_planar import PlanarFace
 from _printed_tolerance import printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _inch import inch
 from dt_crankshaft_spec import COLLAR_DIA, JOURNAL_DIA, JOURNAL_DIA_BAND
 
-OD = COLLAR_DIA  # the collar body's Ø20.6
-ID = 11.6
-# Slips over the journal land, never under the bore: an Ø11.60 jobber drill
+OD = COLLAR_DIA  # the collar body's 13/16 in, turned from 13/16 in bar
+ID = inch(31, 64)  # 12.303, a fractional jobber drill
+# Slips over the journal land, never under the bore: a 31/64 in jobber drill
 # through the blank, so the band is the title block's DRILLED HOLES row.
 ID_BAND = (float(_config.title_block("drilled_hole")["plus_mm"]), 0.0)
 BORE_CALLOUT = "DRILL THRU"
@@ -109,7 +110,11 @@ THICKNESS = GAP_NOMINAL
 # facing.  Its MIN keeps FACING_ALLOWANCE -- one finishing cut -- over the
 # thickest fit, so the fitted face is always freshly cut.
 FACING_ALLOWANCE = 0.10
-BLANK_THICKNESS_MIN = math.ceil((GAP_MAX + FACING_ALLOWANCE - 1e-9) * 100) / 100
+# The blank is bought on the 1/16 in grid: the next 1/16 in over the thickest
+# fit plus one finishing cut.
+BLANK_THICKNESS_MIN = inch(
+    math.ceil((GAP_MAX + FACING_ALLOWANCE - 1e-9) / inch(1, 16)), 16
+)
 
 
 def check_fit_up(gap_min: float, gap_max: float, blank_min: float) -> None:

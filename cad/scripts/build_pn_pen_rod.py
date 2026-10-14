@@ -5,7 +5,7 @@ magnifying wheel ties into the cross hole near its top, so the rod (and
 pen) mirror the summed motion vertically.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 24" — ~5 mm square photo-scaled
-(low); length ~120 from the p.64 inset (low).
+(low), authored as 3/16 square bar stock, 5-7/8 long (pn_pen_rod_spec).
 
 Layout: length along +Y from the origin (assembly orientation), section
 centred on the origin in X, extruded +Z; wire hole along Z near the top.
@@ -114,7 +114,7 @@ async def build(adapter) -> dict[str, str]:
     v_rod = ROD_SECTION * ROD_SECTION * ROD_LENGTH
     await volume_check(adapter, "rod", v_rod, 0.005 * v_rod)
 
-    # Wire tie-off hole near the top, drilled +Z through the 5 mm square section
+    # Wire tie-off hole near the top, drilled +Z through the 3/16 square section
     # (Z 0..ROD_SECTION) at (0, WIRE_HOLE_Y). Through-all is geometrically
     # identical to the old mid-plane both-directions cut.
     wire_cut = wizard_holes(

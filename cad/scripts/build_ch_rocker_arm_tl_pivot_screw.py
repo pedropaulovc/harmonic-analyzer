@@ -2,8 +2,8 @@ r"""Build the rocker arm's pivot shoulder screw (MHA-CH-006-TL-06; shop fixture)
 
 A slotted shoulder screw turned and ring-lapped from 4140 bar
 (``ch_rocker_arm_tl_pivot_screw_spec``). One revolve about model +Z in the
-inventory's fixture frame: head top at Z5.5, under-head face at Z1.5 (the
-washer's top), shoulder to Z-20, M5 thread to the Z-27.2 tip with a 45-degree
+inventory's fixture frame: head top at Z9/32, under-head face at Z3/32 (the
+washer's top), shoulder to Z-11/16, #10-24 thread to the Z-1-7/32 tip with a 45-degree
 start chamfer. Every axial size baselines from the faced head top. The
 driver slot is sketched on a plane at the head top and cut down into the head.
 
@@ -122,7 +122,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # Stepped revolve profile on the Right plane: sketch (u, v) maps to model
-    # (-Z, Y), so the head top (Z5.5) is u = -5.5 and the tip runs to +u.
+    # (-Z, Y), so the head top (Z HEAD_TOP_Z) is u = -HEAD_TOP_Z and the tip runs to +u.
     profile = SketchDims()
     u_top = -HEAD_TOP_Z
     u_tip = u_top + OVERALL_LENGTH

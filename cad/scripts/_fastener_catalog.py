@@ -258,9 +258,9 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     ),
     "vn-transgear-arm-plate-locating-pin": _stock(
         "vn-transgear-arm-plate-locating-pin",
-        "Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin",
-        "93600A189",
-        material="AISI 304",  # native library stand-in; purchased grade remains 316
+        "Alloy Steel Dowel Pin",
+        "98381A434",
+        material="Alloy Steel",
     ),
     "vn-transgear-pivot-screw": _stock(
         "vn-transgear-pivot-screw",

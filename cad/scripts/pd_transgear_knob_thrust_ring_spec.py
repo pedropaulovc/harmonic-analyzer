@@ -1,7 +1,7 @@
 r"""MHA-PD-015 transgear-knob-thrust-ring: the loose brass ring in front of the plate hub.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  The ring rides the knob shaft's (MHA-PD-008) Ø6 g6 journal between the
+closure.  The ring rides the knob shaft's (MHA-PD-008) 1/4 in g6 journal between the
 12T's rear face and the arm plate's front hub face (contract §1.7, round 6
 K5: the journal runs straight in the steel plate, no bushing).  It is loose:
 located by the journal, it rotates with the shaft or not.  Its length is the
@@ -19,17 +19,19 @@ face) is y = LENGTH.
 from __future__ import annotations
 
 from _gtol_planar import PlanarFace
+from _inch import inch
 from _printed_tolerance import printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
-OD = 13.6
-# 6.05 (a stock metric drill), not 6.1: the knob pinion's 0.05 tooth-space
-# TIR moves the ring off the tooth ends, and the smaller bore keeps the
-# charged rear tooth-end bearing above 1.0 mm^2 (1.36 at the 6.15 maximum).
-ID = 6.05
+OD = inch(9, 16)
+# A 1/4 in (letter E) drill over the 1/4 in g6 journal: the smallest stock
+# drill that clears it.  The knob pinion's 0.05 tooth-space TIR moves the
+# ring off the tooth ends; on the larger journal the charged rear tooth-end
+# bearing falls to 0.53 mm^2 at the 6.45 maximum (1.36 on the old Ø6.05).
+ID = inch(1, 4)
 # Clears the journal; drilled, never under size (drilled-hole class).
 ID_BAND = (0.10, 0.0)  # (upper, lower) deviations
-LENGTH = 5.2
+LENGTH = inch(3, 16)
 # The forward stop of the knob's end float (contract §12): explicit ± band.
 LENGTH_TOL = 0.05
 

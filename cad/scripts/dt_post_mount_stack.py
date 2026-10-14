@@ -9,10 +9,14 @@ cut-to-fit acceptance guards remain with the owning part specifications.
 # Common raised station law: both journals translate rigidly in Y, keeping
 # the crossed mesh's centre, plan, phase and support lengths unchanged.
 # The unrelieved-plate printed/service budget lives in the platform spec.
+# AXIS_RAISE_MM is the derived journal raise other raised parts still read.
+# All-inch experiment: the post body is 3-3/4 in (was 90 + raise = 94.732;
+# the crank axis height is gear_train.yaml's, not the body's) and the
+# fillister counterbore 1/4 in deep (was the 0.237 in head height).
 CONE_AXIS_HEIGHT_MM = 1.5 * 25.4
 AXIS_RAISE_MM = CONE_AXIS_HEIGHT_MM - 33.368
-POST_BODY_HEIGHT_MM = 90.0 + AXIS_RAISE_MM
-POST_MOUNT_COUNTERBORE_DEPTH_MM = 6.0198
+POST_BODY_HEIGHT_MM = 3.75 * 25.4
+POST_MOUNT_COUNTERBORE_DEPTH_MM = 0.25 * 25.4
 PLATFORM_THICKNESS_MM = 6.35
 CUT_TO_FIT_SHORT_MM = 0.3
 CUT_LENGTH_PLACES = 1

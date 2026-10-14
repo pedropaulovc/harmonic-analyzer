@@ -27,6 +27,7 @@ import cone_shaft_land_bands
 import gear_seat_fit
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _inch import inch
 from stock_form_cutter import (
     StockFormProfile,
     template_for_teeth,
@@ -281,11 +282,13 @@ if BORE_AF is None:
 # chamfer, not merely the cutter runout alone. With Rcutter < Rshaft that
 # sum increases monotonically from the flat midpoint to a chord corner;
 # using the upper shaft diameter and lower shaft AF is print-worst.
-MIN_FLAT_CUTTER_RADIUS = 4.0  # ≥Ø8 end mill
-BORE_SOUTH_CHAMFER = 1.00
+MIN_FLAT_CUTTER_RADIUS = inch(5, 32)  # ≥5/16 in end mill
+# All-inch: 1/16 in (was 1.00); the next 1/32 under it, 1/32 in, is smaller
+# than the crescent it must swallow.
+BORE_SOUTH_CHAMFER = inch(1, 16)
 # The south entry is functional: .X's general band could accept a chamfer
 # smaller than the cutter crescent. A native +0.10/-0.00 leg band preserves
-# the full 1.00-mm minimum without constraining the harmless upper end.
+# the full minimum without constraining the harmless upper end.
 BORE_SOUTH_CHAMFER_BAND = (0.10, 0.00)
 # The shaft's nominal Sec1 Ø is BORE_DIA; the drawing contract tests it
 # against dt_cone_gear_shaft_spec.SECTION_DIAS[1] without a circular import.

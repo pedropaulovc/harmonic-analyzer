@@ -54,6 +54,7 @@ from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawin
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
+from _inch import inch
 from dt_cone_pivot_post_spec import INCLINE_DEG
 from dt_cone_pivot_post_tl_bond_cradle_spec import (
     BASE_END_Y,
@@ -118,7 +119,7 @@ _BASE_TOP_U = -BASE_TOP_Z
 _BASE_BOTTOM_U = -BASE_TOP_Z + BASE_THICK
 _BLOCK_TOP_U = -BLOCK_TOP_Z
 # The gauge line of the section reference drops this far below the base top.
-_GAUGE_LINE = 12.0
+_GAUGE_LINE = inch(1, 2)
 
 
 def _segment_area(radius: float, chord_offset: float) -> float:

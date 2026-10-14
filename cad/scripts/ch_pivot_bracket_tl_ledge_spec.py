@@ -32,7 +32,7 @@ from _printed_tolerance import drilled_oversize_mm, printed_deviations
 # 1-2-3 block to the foot's free end. Wider than the 16 foot it carries so its
 # two screw holes, spread for head clearance, keep the drawing-guidelines.md rule 17 (walls and webs) 2.0 walls at
 # general tolerance; its ends stay clear of the bridge's stud nuts.
-LEDGE_WIDTH = 22.6
+LEDGE_WIDTH = 25.4 * 15.0 / 16.0  # 15/16 (was 22.6; 7/8 leaves a 1.24 end ligament under the 2.0 wall)
 LEDGE_THICK = bracket.FOOT_H  # 6.0
 # 26.9, under the bracket's foot at the stack's worst case (angle-plate spec)
 LEDGE_HEIGHT = round(plate.LEDGE_TOP_Y - plate.BLOCK_HEIGHT, 6)

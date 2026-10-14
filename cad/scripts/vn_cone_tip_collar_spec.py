@@ -44,6 +44,7 @@ from cone_shaft_land_bands import (
     TIP_COLLAR_TAP_STATION_MM,
     TIP_COLLAR_FREE_EDGE_BREAK_MAX_MM,
 )
+from _inch import inch
 from gear_seat_fit import seat_bore_band
 
 IN = 25.4
@@ -62,7 +63,8 @@ BORE_FINISHED_DIA_LIMITS_MM = (
     BORE_PRINTED_DIA_MM + BORE_MODEL_DIA_BAND[0],
 )
 INSTALLED_BORE_AXIS_OFFSET_MM = (BORE_MODEL_DIA_MM - TERMINAL_DIA_MM) / 2.0
-NOSE_DIA = 6.40
+# 9/32, not 1/4: at 1/4 the nose wall over the bore falls to 1.98 (< 2.0 target).
+NOSE_DIA = inch(9, 32)
 NOSE_LENGTH = TIP_COLLAR_NOSE_LENGTH_MM
 WIDTH = TIP_COLLAR_WIDTH_MM
 WIDTH_BAND_MM = TIP_COLLAR_WIDTH_BAND_MM
@@ -73,7 +75,7 @@ SHOULDER_ROOT_RADIUS = 0.25
 # The title block's free-edge break: the wall, thread and contact budgets
 # book it, but the model leaves the edges sharp (the title block prints it).
 EDGE_BREAK = TIP_COLLAR_FREE_EDGE_BREAK_MAX_MM
-FLAT_DISTANCE = 7.0
+FLAT_DISTANCE = inch(1, 4)
 ROUTINE_BAND_MM = printed_band_mm(2)
 # Width, nose and tap station: the title block's .XXX (cone_shaft_land_bands).
 AXIAL_PLACES = TIP_COLLAR_AXIAL_PLACES
@@ -129,8 +131,8 @@ TAP_ANGLE_RAD = math.radians(float(_config.title_block("angular")["value_deg"]))
 SET_SCREW_MAX_AXIS_ANGLE_RAD = TAP_ANGLE_RAD + math.atan(
     2.0 * SET_SCREW_THREAD_RADIAL_PLAY_MM / REQUIRED_FULL_ENGAGEMENT_MM
 )
-# The smallest shop-readable custom body that retains the 2.0 wall target at
-# every printed limit.
+# The smallest 1/16-in custom body that retains the 2.0 wall target at every
+# printed limit.
 BODY_RADIUS_REQUIREMENTS_MM = {
     "round bore wall": BORE_FINISHED_DIA_LIMITS_MM[1]/2.0 + 2.0*EDGE_BREAK + WALL_TARGET_MM,
     "tap to flat side rims": math.hypot(
@@ -138,7 +140,9 @@ BODY_RADIUS_REQUIREMENTS_MM = {
         WALL_TARGET_MM+THREAD_ENVELOPE_DIA/2.0+EDGE_BREAK+TAP_LATERAL_BAND_MM,
     ),
 }
-OUTER_DIA = math.ceil((2.0*max(BODY_RADIUS_REQUIREMENTS_MM.values())+ROUTINE_BAND_MM)*100.0)/100.0
+OUTER_DIA = inch(11, 16)
+if OUTER_DIA < 2.0*max(BODY_RADIUS_REQUIREMENTS_MM.values()) + ROUTINE_BAND_MM:
+    raise AssertionError("11/16 collar body misses its radius requirements")
 
 _BORE_MAX = BORE_FINISHED_DIA_LIMITS_MM[1]
 _LAND_MIN = TERMINAL_FINISHED_DIA_LIMITS_MM[0]

@@ -14,6 +14,7 @@ assembly's d = 0); the pin runs y = BACK_Y (back end) .. TIP_Y.
 from __future__ import annotations
 
 import mg_wheel_bar_geom as _bar
+from _inch import inch
 from _gtol_cylinder import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
@@ -28,7 +29,7 @@ PIN_DIA_TOL = 0.005
 # behind the bar's back face within 10 mm of the axle (the nearest part, the
 # pen-hanger screw head, sits 56 mm along the bar), so it prints .X and the
 # back end lands in the window below.
-SHANK_LEN = 28.4
+SHANK_LEN = inch(1 + 3 / 16)  # was 28.4; back end nominally flush with the back face
 SHANK_LEN_PLACES = 1
 THREAD = "#4-40"
 THREAD_CALLOUT = "#4-40 UNC"
@@ -44,17 +45,19 @@ TIP_INCOMPLETE = THREAD_PITCH  # 0.635
 # shank's band stays out of the thread's stack. ±0.25 is the user's option
 # (c) of 2026-10-12: 8.17 is the shortest .XX length whose FULL thread still
 # clears the locknut's outer face at the worst corner, and its long corner
-# leaves at most 2.9 of thread past the locknut (mg_wheel_group).
-THREAD_LEN = 8.17
+# leaves at most 2.9 of thread past the locknut (mg_wheel_group). All-inch:
+# .320 in decimal (was 8.17): the stack window is 8.068..8.163 with the 13/16
+# hub and gauge, narrower than any fraction step.
+THREAD_LEN = inch(0.320)
 THREAD_LEN_BAND = (0.25, -0.25)
-DOME_H = 0.8
-PIN_LEN = SHANK_LEN + THREAD_LEN + DOME_H  # 37.37, a reference: the dome sets it
+DOME_H = inch(1, 32)  # was 0.8 (1/32: sub-1/4 feature)
+PIN_LEN = SHANK_LEN + THREAD_LEN + DOME_H  # 39.084, a reference: the dome sets it
 # The spherical tip through the thread-major edge, DOME_H high.
-DOME_R = ((THREAD_MAJOR / 2.0) ** 2 + DOME_H**2) / (2.0 * DOME_H)  # 1.665
+DOME_R = ((THREAD_MAJOR / 2.0) ** 2 + DOME_H**2) / (2.0 * DOME_H)  # 1.672
 
 # The press gauge: the step stands this far off the bar's front face, so the
 # bar's depth leaves the stack on the pin (mg_wheel_group).
-PRESS_GAUGE = 19.5
+PRESS_GAUGE = inch(13, 16)  # was 19.5
 PRESS_GAUGE_TOL = 0.05
 
 # Where the back end lands on the bar's back face: the shank and the gauge
@@ -64,19 +67,19 @@ BACK_END_PROUD_MAX = (
     (SHANK_LEN + _SHANK_TOL)
     - (PRESS_GAUGE - PRESS_GAUGE_TOL)
     - (_bar.BAR_DEPTH + _bar.BAR_DEPTH_BAND[1])
-)  # 0.85
+)  # 0.75
 BACK_END_SUNK_MAX = (_bar.BAR_DEPTH + _bar.BAR_DEPTH_BAND[0]) - (
     (SHANK_LEN - _SHANK_TOL) - (PRESS_GAUGE + PRESS_GAUGE_TOL)
-)  # 1.05
+)  # 0.95
 
-STEP_Y = PRESS_GAUGE  # 19.5
-BACK_Y = STEP_Y - SHANK_LEN  # -8.9: 0.10 inside the bar's back face
-THREAD_END_Y = STEP_Y + THREAD_LEN  # 27.67
-TIP_Y = THREAD_END_Y + DOME_H  # 28.47
+STEP_Y = PRESS_GAUGE  # 20.6375
+BACK_Y = STEP_Y - SHANK_LEN  # -9.525: flush with the bar's back face
+THREAD_END_Y = STEP_Y + THREAD_LEN  # 28.7655
+TIP_Y = THREAD_END_Y + DOME_H  # 29.55925
 # Full thread runs from the die's runout at the step to one pitch short of
 # the dome.
-FULL_THREAD_START_Y = STEP_Y + DIE_RUNOUT  # 20.4525
-FULL_THREAD_END_Y = THREAD_END_Y - TIP_INCOMPLETE  # 27.035
+FULL_THREAD_START_Y = STEP_Y + DIE_RUNOUT  # 21.59
+FULL_THREAD_END_Y = THREAD_END_Y - TIP_INCOMPLETE  # 28.1305
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "ShankLength", "ThreadLength", "PinLength", "DomeR"},

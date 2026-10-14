@@ -1,6 +1,6 @@
 """Column/socket interface stations shared by the frame castings.
 
-PURE DATA with no imports, deliberately: ``harmonic_base_spec`` authors the
+PURE DATA with no imports beyond the leaf ``_inch`` helper, deliberately: ``harmonic_base_spec`` authors the
 four socket-bore surface-finish controls (they are part-owned specification,
 which the drawing purity gate requires it to read from a ``*_spec`` module),
 and those controls need both the column X station and the socket bore size.
@@ -13,15 +13,17 @@ importers.
 
 from __future__ import annotations
 
+from _inch import inch
+
 # Frame column line (frame.SLDASM); the four columns sit at (+/-COLUMN_X, +/-Z).
-COLUMN_X = 197.0
+COLUMN_X = inch(7.75)  # 7-3/4 in = 196.85 (was 197.0)
 
 # Blind socket the column tube enters in the base casting. Bore diameters are
 # nominal CAD geometry only: production sockets are match-fit to their assigned
 # actual MHA-FR-003 tubes, not to a fixed diameter band.
-# The mouth is on the green land 3.0 below the deck (user ruling 2026-10-09),
-# so 22.4 keeps the socket floor, and the seated tube end, at y 25.4.
-COLUMN_SOCKET_DEPTH = 22.4
+# The mouth is on the green land 1/8 in below the deck (user ruling 2026-10-09),
+# so 7/8 in keeps the socket floor, and the seated tube end, at y 25.4 (1 in).
+COLUMN_SOCKET_DEPTH = inch(7, 8)  # 22.225 (was 22.4)
 COLUMN_SOCKET_DIAMETER = 25.5
 # Functional ceiling, not a vendor tolerance, and never printed: a slip fit
 # on a 1 in tube looser than 0.6 diametral is rejected at fit-up (it rocks,

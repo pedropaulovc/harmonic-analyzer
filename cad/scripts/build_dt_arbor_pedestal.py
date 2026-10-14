@@ -15,9 +15,9 @@ Layout: foot flange standing on the Top plane, centred on X in plan
 (inner) face so the flange extends -Z only -- the casting is an L in side
 view, not an upside-down T (PR7 review item; v4_pinion_008 shows the strap
 rising from one end of the foot with the hold-down screw on the exposed
-flange). The strap band keeps local z -2..+8 about the origin; U34c grew
-the foot OUTBOARD only, to an 18 ledge (local z -20..-2) centred on one
-#8 close-clearance hole (ch12 p.18 img09). Dome + bore along Z at
+flange). The strap band keeps local z -1/16..+5/16 in about the origin; U34c
+grew the foot OUTBOARD only, to a 3/4 in ledge (local z -13/16..-1/16 in)
+centred on one #8 close-clearance hole (ch12 p.18 img09). Dome + bore along Z at
 y = BORE_HEIGHT.
 The strap profile is a trapezoid + a full circle boss (its upper half
 proud of the trapezoid = the dome) -- no arcs, only proven primitives
@@ -103,13 +103,13 @@ CAD_APPEARANCE = (0.28, 0.28, 0.30)  # neutral charcoal keeps drawing edges legi
 # marked dimensions — so a spec correction rebuilds the SLDPRT from the same
 # values the print annotates (foot envelope, strap, dome, journal bore).
 #
-# STRAP_T: band local z STRAP_ROOT_Z..STRAP_INNER_Z = -2..+8, unchanged by
-# U34c. The -Z ledge carries a #8 close-clearance hole for the MHA-VN-032
+# STRAP_T: band local z STRAP_ROOT_Z..STRAP_INNER_Z = -1/16..+5/16 in, unchanged
+# by U34c. The -Z ledge carries a #8 close-clearance hole for the MHA-VN-032
 # #8-32 x 3/4 fillister (McMaster 90280A197); the base seat under it is
 # transfer-punched through this hole at assembly.
-# SCREW_Z (spec): hole centre on the ledge, local z -11.
+# SCREW_Z (spec): hole centre on the ledge, local z -7/16 in.
 # SET_SCREW_Z (spec): the #4-40 apex tap for the MHA-VN-034 set screw (#743),
-# radial through the crown at the strap's mid-depth, local z +3.
+# radial through the crown at the strap's mid-depth, local z +1/8 in.
 
 BORE_RADIUS = BORE_DIA / 2.0
 
@@ -277,8 +277,8 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # Foot flange on the Top plane (sketch y = global -Z): X-centred, its far
-    # edge on the strap inner face (z +8) and running 28 outboard to z -20, so
-    # the rectangle is anchored at its inner-west corner rather than centred.
+    # edge on the strap inner face (z +5/16 in) and running 1-1/8 in outboard,
+    # so the rectangle is anchored at its inner-west corner rather than centred.
     foot = SketchDims()
     check("create_sketch foot", await adapter.create_sketch("Top"))
     half_width = FOOT_WIDTH / 2.0
@@ -313,8 +313,8 @@ async def build(adapter) -> dict[str, str]:
     v_foot = FOOT_WIDTH * FOOT_DEPTH * FOOT_HEIGHT
     volume = await volume_check(adapter, "foot", v_foot, 0.005 * v_foot)
 
-    # True tangent strap: the sides start flush with the 24 mm foot and meet
-    # the concentric R10 crown without a tolerance-sized step or visual kink.
+    # True tangent strap: the sides start flush with the 15/16 in foot and meet
+    # the concentric crown without a tolerance-sized step or visual kink.
     half_root = FOOT_WIDTH / 2.0
     half_tangent = TAPER_TANGENT_X
     tangent_y = TAPER_TANGENT_Y
@@ -377,8 +377,8 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch strap", await adapter.exit_sketch())
     name_last_feature(adapter, "StrapProfile")
     drive_jobs += strap.apply(adapter, "StrapProfile")
-    # L, not T: the strap band hugs the foot's +Z face (local z -2..+8), so
-    # the extrude starts at an offset instead of straddling the mid-plane.
+    # L, not T: the strap band hugs the foot's +Z face (local z -1/16..+5/16 in),
+    # so the extrude starts at an offset instead of straddling the mid-plane.
     extrude_at_offset(adapter, STRAP_T, STRAP_ROOT_Z)
     name_last_feature(adapter, "Strap")
     a_strap = (FOOT_WIDTH + 2.0 * half_tangent) / 2.0 * strap_rise
@@ -440,7 +440,7 @@ async def build(adapter) -> dict[str, str]:
         "cut bore",
         await adapter.create_cut_extrude(
             # Mid-plane TOTAL about the Front sketch plane: the strap band
-            # sits offset (-2..+8), so the cut spans generously past it.
+            # sits offset (-1/16..+5/16 in), so the cut spans generously past it.
             ExtrusionParameters(depth=2.0 * FOOT_DEPTH, both_directions=True)
         ),
     )

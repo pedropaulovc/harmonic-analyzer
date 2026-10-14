@@ -181,13 +181,15 @@ from build_sh_column_clamp_back import (  # noqa: E402
     HOLE_SPEC as CLAMP_RECEIVER_SPEC,
 )
 
-COLUMN_X = 197.0
+from _inch import inch  # noqa: E402
+
+COLUMN_X = inch(7.75)  # 7-3/4: the frame column line (fr, restated)
 COLUMN_Z = FRAME_FRONT_COLUMN_Z
-# Depth chain: the front arc's front face (-129.9) carries the bar's back
-# face; the bar's front face (-138.9) carries the platen's back face.
-BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -129.9
-BAR_FRONT_Z = BAR_BACK_Z - BAR_DEPTH  # -138.9
-BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.4 bar centre
+# Depth chain: the front arc's front face (-5-1/8) carries the bar's back
+# face; the bar's front face (-5-1/2) carries the platen's back face.
+BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -130.175
+BAR_FRONT_Z = BAR_BACK_Z - BAR_DEPTH  # -139.7
+BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # bar centre
 
 # --- platen (hangs on the bar) ----------------------------------------------
 from pd_platen_spec import (  # noqa: E402
@@ -292,7 +294,7 @@ from pd_platen_rack_spec import (  # noqa: E402
 )
 import paper_drive_geom as PAPER_GEOMETRY  # noqa: E402
 
-PLATE_X0_PHOTO = -33.213
+PLATE_X0_PHOTO = -inch(21, 16)  # -1-5/16 (photo fit -33.213, snapped)
 # ch30-p002 Pose Studio refit (2026-07-23): the platen's top-left reference
 # corner was hand-aligned at (-33.213, 408.054) in the current assembly. The
 # width is 300 * 0.8988 and the user-confirmed H:W ratio is 1:2, so preserving
@@ -303,12 +305,18 @@ PLATE_Y0 = PAPER_GEOMETRY.PLATEN_BOTTOM_Y
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.75
 
 # The platen hangs: the bar's top edge carries the top guide's underside.
-GUIDE_Y = (283.734, 317.734)  # bottom / top rail seats (machine y)
-BAR_TOP_Y = GUIDE_Y[1]
-BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0  # 303.734
+# The bar top stands 10-1/2 above the base deck (the fit-up value,
+# pd_paper_drive_assembly_steps.BAR_TOP_ABOVE_DECK); the rails sit where the
+# platen's guide-hole rows put their centrelines.
+BAR_TOP_Y = BASE_DECK_Y + inch(10.5)
+GUIDE_Y = (  # bottom / top rail seats (machine y)
+    BAR_TOP_Y - (PLATEN_GUIDE_HOLE_Y[1] - PLATEN_GUIDE_HOLE_Y[0]),
+    BAR_TOP_Y,
+)
+BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0
 # The bar fills the channel between the rails down to this running clearance
 # over the bottom rail's top edge (pd_support_bar_spec.BAR_HEIGHT).
-BOTTOM_RAIL_CLEARANCE = 1.0
+BOTTOM_RAIL_CLEARANCE = inch(1, 32)  # 1/32: 1/16 leaves no 1/16-grid bar/rail stack
 if (
     abs(BAR_TOP_Y - BAR_HEIGHT - GUIDE_Y[0] - GUIDE_HEIGHT - BOTTOM_RAIL_CLEARANCE)
     > 1e-9
@@ -316,6 +324,11 @@ if (
     raise AssertionError(
         "the support bar's bottom edge is off the bottom rail's clearance"
     )
+if any(
+    abs(PLATE_Y0 + hole_y - (gy + GUIDE_HEIGHT / 2.0)) > 1e-9
+    for hole_y, gy in zip(PLATEN_GUIDE_HOLE_Y, GUIDE_Y, strict=True)
+):
+    raise AssertionError("the platen's guide-hole rows are off the rail centrelines")
 LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.9: lock plates on the guide backs,
 # 1.0 behind the bar's back face -- they bridge the bar so the platen cannot
 # fall off it.
@@ -904,7 +917,7 @@ assert math.isclose(
 # X=140 (was 160): the black deck now ends at X=167 (user ruling 2026-10-09),
 # and at X=160 the tip envelope (to X=180) straddled its 3.0 step; from 140 it
 # spans X 120..160, flat on the deck and west of the rocker-support foot.
-SPARE_GEAR_POS = (140.0, BASE_DECK_Y, -75.0)
+SPARE_GEAR_POS = (inch(5.5), BASE_DECK_Y, -inch(47, 16))  # 5-1/2, deck, -2-15/16
 
 # --- fasteners ----------------------------------------------------------------
 # Platen-clip screws (vn-platen-clip-screw): heads on the clips' flat sheet,
@@ -2602,7 +2615,7 @@ async def build(adapter) -> dict[str, str]:
     # behind it (build_pd_platen_paper) so no face lands coplanar on the platen.
     paper_side_margin = (PLATE_WIDTH - PAPER_GEOMETRY.RECORDING_PAPER_WIDTH_MM) / 2.0
     paper_top_margin = (
-        3.0  # ch30-p002: the sheet's top edge sits just under the plate top
+        inch(1, 8)  # ch30-p002: the sheet's top edge sits just under the plate top
     )
     paper = await place_component(
         adapter,

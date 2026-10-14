@@ -23,11 +23,13 @@ from cone_shaft_land_bands import (  # noqa: F401  re-exported for the shaft bui
     LAND_AF_PLACES,
     RUNNING_DIA_BAND,
     SECTION_DIA_BANDS,
+    SECTION_DIA_IN,
     SECTION_FLAT_AF,
     TERMINAL_DIA_IN,
     TERMINAL_DIA_PLACES,
     TERMINAL_FLAT_EDGE_BREAK_MAX,
 )
+from _inch import inch
 from cone_stack_end_play import COLLAR_FEELER, MARGIN_SPARE, SHAFT_END_PLAY
 from vn_cone_tip_collar_spec import WIDTH as TIP_COLLAR_WIDTH
 from _mcmaster_94025a164 import CUP_DEPTH
@@ -41,10 +43,13 @@ from gear_seat_fit import flat_bore_af_band, seat_bore_band
 
 MM_PER_IN = 25.4
 
-# The manually rederived v2 pivot post has a Ø12.2808 bearing bore spanning
-# 42.011 mm along the cone axis.  The shaft begins 1.0 mm proud of the post's
-# front face, so the integral journal is one millimetre longer than the post
-# body and runs with 0.05 mm diametral clearance.
+# The pivot post's reamed Ø15/32 in bearing bore spans its 1-5/8 in body
+# along the cone axis (dt_cone_pivot_post_spec).  The shaft begins 1/16 in
+# proud of the post's front face (the drive train requires >= 1.0), so the
+# integral journal is that much longer
+# than the post body and runs with 0.05 mm diametral clearance: the journal
+# is turned to the reamed bore, so its nominal is the bore's less the
+# clearance, not a fraction of its own.
 JOURNAL_BORE_DIA = dt_cone_pivot_post_spec.BORE_DIA
 JOURNAL_CLEARANCE = 0.05
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
@@ -53,7 +58,7 @@ JOURNAL_DIAMETRAL_CLEARANCE_MM = (
     JOURNAL_BORE_DIA + POST_JOURNAL_BORE_BAND[1] - JOURNAL_DIA - RUNNING_DIA_BAND[0],
     JOURNAL_BORE_DIA + POST_JOURNAL_BORE_BAND[0] - JOURNAL_DIA - RUNNING_DIA_BAND[1],
 )
-JOURNAL_PROUD = 1.0
+JOURNAL_PROUD = inch(1, 16)
 JOURNAL_END = dt_cone_pivot_post_spec.CONE_BOSS_LENGTH + JOURNAL_PROUD
 
 # The post's cone station and boss length locate its front face.  The shaft
@@ -67,19 +72,21 @@ FRONT_STUB = (
 
 # Axial capture (#914, user ruling 2026-09-25).  The tip adjuster pushes the
 # shaft south, toward the post; nothing reacted it until the 64T met the post
-# boss 1.681 further on.  An integral collar fills that gap: its south face
-# bears on the post's north boss face (flush with the journal end) and the
-# gear stack is pushed onto its north face (dt_cone_gear_stack).  The collar
-# bears on the boss annulus outside the Ø12.2808 bore and inside the Ø17.2
-# boss.
+# boss.  An integral collar fills that gap: its south face bears on the
+# post's north boss face (flush with the journal end) and the gear stack is
+# pushed onto its north face (dt_cone_gear_stack).  The collar bears on the
+# boss annulus outside the post bore and inside the post's cone boss.
 #
 # The 64T's SOUTH face sits SOUTH_FACE_SHIFT_NORTH north of where the 8.0
-# layout face on the 19.9 station put it (#1126), so the collar is the 1.681
-# web under that layout face plus the shift: 3.181, above drawing-guidelines.md rule 17 (walls and webs)'s 2.0 target
-# at its low limit.  The solid stack (user ruling 2026-09-28) grows the 64T
-# NORTH from that face to bear on T120, so the collar does not move.  The 64T
-# centre is the drive-train's physical 64T station (the shaft tests pin the
-# two equal).
+# layout face on the 19.9 station put it (#1126); the solid stack (user
+# ruling 2026-09-28) grows the 64T NORTH from that face to bear on T120.  The
+# collar web is therefore a closure: the 64T's south face (fixed by the gear
+# family's placement) less the post's north boss face (fixed by POST_STATION
+# and the post's boss length).  3.181 with the old 42.011 boss; 3.549 with
+# the 1-5/8 in boss.  It must stay above drawing-guidelines.md rule 17 (walls
+# and webs)'s 2.0 target at its low limit (checked under the precision
+# table).  The 64T centre is the drive-train's physical 64T station (the
+# shaft tests pin the two equal).
 GEAR64_SOUTH_FACE_STATION = (
     GEAR64_LAYOUT_CENTRE_STATION
     + GEAR_AXIS_SHIFT
@@ -93,18 +100,10 @@ GEAR64_NORTH_FACE_STATION = GEAR64_SOUTH_FACE_STATION + GEAR64_FACE_WIDTH
 COLLAR_START_STATION = JOURNAL_END
 COLLAR_END_STATION = FRONT_STUB + GEAR64_SOUTH_FACE_STATION
 COLLAR_THICKNESS = COLLAR_END_STATION - COLLAR_START_STATION
-_COLLAR_THICKNESS_UNDER_8_FACE = 1.681218417601599
-if (
-    abs(GEAR64_CENTER_STATION - GEAR64_FACE_WIDTH / 2.0 - GEAR64_SOUTH_FACE_STATION) > 1e-9
-    or abs(
-        COLLAR_THICKNESS - (_COLLAR_THICKNESS_UNDER_8_FACE + GEAR64_SOUTH_FACE_SHIFT_NORTH)
-    )
-    > 1e-9
-    or abs(COLLAR_THICKNESS - 3.181) > 5e-4
-):
+if abs(GEAR64_CENTER_STATION - GEAR64_FACE_WIDTH / 2.0 - GEAR64_SOUTH_FACE_STATION) > 1e-9:
     raise AssertionError(
-        f"the collar {COLLAR_THICKNESS:.4f} must stay the #1126 3.181 under the 64T's "
-        f"unchanged south face {GEAR64_SOUTH_FACE_STATION:.4f} (user ruling 2026-09-28)"
+        f"the collar's north face {COLLAR_END_STATION - FRONT_STUB:.4f} is not the "
+        f"64T's south face {GEAR64_SOUTH_FACE_STATION:.4f} (user ruling 2026-09-28)"
     )
 
 # The collar's diameter is the 5/8 in cold-finished bar's own, as supplied:
@@ -216,7 +215,8 @@ T006_TIP_STATION = ADJUSTER_CUP_RIM_STATION + CUP_DEPTH
 # gear then overhangs its land by the setback; the smaller one sits wholly on
 # its own land.  The import-time proof below the precision table shows the
 # step and its root fillet stay south of the smaller gear at print-worst.
-SEAT_STEP_SETBACK = 1.0
+# All-inch: 1/16 in -- 1/32 fails that proof by up to 0.14.
+SEAT_STEP_SETBACK = inch(1, 16)
 SEAT_STEP_GEARS = (15, 16, 17)
 
 
@@ -233,17 +233,18 @@ TIP_STUB_START_STATION = TIP_LAND_START_STATION
 TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 
 # (diameter in inches, section end station in mm from the front stub end).
-# Intermediate seats keep the retained sizes and fit classes. The terminal
-# size lives in cone_shaft_land_bands and the gear family checks its web
-# against the current cutter-owned printed MIN floors, not an old snapshot.
-# Tailstock support remains required for the now more slender terminal land.
+# The gear lands' nominal sizes live in cone_shaft_land_bands.SECTION_DIA_IN
+# (the gear bores derive from the same table); the journal is the post's
+# reamed bore less the running clearance.  The terminal land's web is checked
+# by the gear family against the current cutter-owned printed MIN floors.
+# Tailstock support remains required for the slender terminal land.
 # Diameters decrease toward the tip for tip-first assembly.
 SECTIONS: tuple[tuple[float, float], ...] = (
-    (JOURNAL_DIA / MM_PER_IN, JOURNAL_END),  # integral v2-post bearing journal
-    (0.375, FRONT_STUB + seat_step_station(15)),  # 64T + T120..T030 seats
-    (0.25, FRONT_STUB + seat_step_station(16)),  # T024 seat
-    (0.125, FRONT_STUB + TIP_LAND_START_STATION),  # T018 seat
-    (TERMINAL_DIA_IN, FRONT_STUB + T006_TIP_STATION),  # T012/T006, collar, tip
+    (JOURNAL_DIA / MM_PER_IN, JOURNAL_END),  # integral post bearing journal
+    (SECTION_DIA_IN[1], FRONT_STUB + seat_step_station(15)),  # 64T + T120..T030 seats
+    (SECTION_DIA_IN[2], FRONT_STUB + seat_step_station(16)),  # T024 seat
+    (SECTION_DIA_IN[3], FRONT_STUB + TIP_LAND_START_STATION),  # T018 seat
+    (SECTION_DIA_IN[4], FRONT_STUB + T006_TIP_STATION),  # T012/T006, collar, tip
 )
 
 SECTION_DIAS = tuple(dia_in * MM_PER_IN for dia_in, _end in SECTIONS)
@@ -341,7 +342,7 @@ FILLET_RADIUS = 0.10
 # build_dt_cone_gear_shaft), one fillet feature, one radius dimension.
 FILLET_CALLOUT = "3X"
 
-# Surface texture, on the two lands that bear: the Ø12.2308 journal turns in
+# Surface texture, on the two lands that bear: the journal turns in
 # the pivot post bore, and the terminal land's round carries the MHA-VN-016
 # thrust spacer's round bore and ends in the adjuster's cup.  (It is a D, not
 # a running journal, since its flat runs out through the tip.)  The three
@@ -474,6 +475,14 @@ def printed_band(name: str) -> float:
     """The title-block band a marked length prints at its own places."""
     return printed_band_mm(DRAWING_PRECISION_BY_NAME[name])
 
+# The collar web closure (above) at its printed low limit keeps
+# drawing-guidelines.md rule 17 (walls and webs)'s 2.0 target.
+COLLAR_WEB_TARGET_MM = 2.0
+if COLLAR_THICKNESS - printed_band("CollarWidth") < COLLAR_WEB_TARGET_MM:
+    raise AssertionError(
+        f"the thrust collar web {COLLAR_THICKNESS:.4f} falls under the "
+        f"{COLLAR_WEB_TARGET_MM} rule-17 target at its printed low limit"
+    )
 
 # Guaranteed cylindrical support across the ENTIRE retained shaft stroke.
 # The integral collar starts seated on the actual post north face; north q

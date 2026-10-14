@@ -44,6 +44,8 @@ from __future__ import annotations
 
 import math
 
+from _inch import inch
+
 MM_PER_IN = 25.4
 
 # --- ANSI #25 roller chain ---------------------------------------------------
@@ -136,15 +138,20 @@ def chain_reach_rear(plate: float) -> float:
 CHAIN_REACH_REAR_WORST = chain_reach_rear(PLATE + min(PLATE_BAND))  # 3.587
 if PLATE + max(PLATE_BAND) >= ANSI_ROLLER_WIDTH:
     raise AssertionError("the #25 inner plates must straddle the thickest wheel")
-BORE_DIA = 10.3  # 13/32 in, 0.39 radial clear of the Ø9.525 shaft/pilot
-PIN_HOLE_DIA = 2.5  # slip over the Ø2.38 drive pins (0.06 radial)
-PIN_CIRCLE_DIA = 14.0
+# Letter W drill (.386 in): 0.14 radial clear of the Ø3/8 pilot at its
+# largest.  W, #40 and the 17/32 circle are the drill-chart set that keeps
+# both the wheel's float on its pins (crank's chain-air gate) and the
+# sheet's 0.47 worst-case bore/pin web.
+BORE_DIA = 0.386 * MM_PER_IN
+# #40 drill (.098 in): slips over the 3/32 drive pins (0.054 radial).
+PIN_HOLE_DIA = 0.098 * MM_PER_IN
+PIN_CIRCLE_DIA = inch(17, 32)
 PIN_CIRCLE_RADIUS = PIN_CIRCLE_DIA / 2.0
 # Two holes at 180 deg on the part's (and the shafts') +/-Y: 12 and 6 o'clock.
 PIN_HOLE_ANGLES_DEG = (90.0, 270.0)
 # Each drive pin (in either shaft's seat) and each of these holes is located
 # +/-0.025 from the axis, printed at .XXX: the holes slip over the pins with
-# 0.119 diametral clearance, which absorbs the spacing error of both parts,
+# 0.108 diametral clearance, which absorbs the spacing error of both parts,
 # each spending half of it.  The shafts read these (dt_crankshaft_spec).
 DRIVE_PIN_OFFSET_PLACES = 3
 DRIVE_PIN_OFFSET_TOL = 0.025
@@ -154,7 +161,7 @@ DRIVE_PIN_OFFSET_TOL = 0.025
 # in #1377. Its printed worst
 # case is sheet text (pd_transgear_removable_notes.BORE_PIN_WEB_WORST): it reads
 # the title block's drilled-hole row, which this module's importers must not.
-BORE_PIN_WEB = PIN_CIRCLE_RADIUS - PIN_HOLE_DIA / 2.0 - BORE_DIA / 2.0  # 0.60
+BORE_PIN_WEB = PIN_CIRCLE_RADIUS - PIN_HOLE_DIA / 2.0 - BORE_DIA / 2.0  # 0.600
 
 CONFIGS: tuple[tuple[str, int], ...] = (("T12", 12), ("T18", 18), ("T24", 24))
 TEETH = dict(CONFIGS)
@@ -243,26 +250,28 @@ CHAIN_MID_Z = SEAT_FACE_Z - PLATE / 2.0  # -155.7, the ONE chain plane
 # MHA-VN-044), 3/16 in the knob shaft (transgear-knob-drive-pin, MHA-VN-038).  Their
 # lengths and press depths are the shafts'; the diameter is the interface's.
 DRIVE_PIN_DIA = 3.0 / 32.0 * MM_PER_IN  # 2.38125; each pin spec asserts its own
-DRIVE_PIN_PROUD = 2.4  # standing out of the seat face
-DRIVE_PIN_TIP_Z = SEAT_FACE_Z - DRIVE_PIN_PROUD  # -156.7
+# 3/32 in: 1/8 puts the pin's tip in front of the T24's plate (the 1/32 rule).
+DRIVE_PIN_PROUD = inch(3, 32)  # standing out of the seat face
+DRIVE_PIN_TIP_Z = SEAT_FACE_Z - DRIVE_PIN_PROUD  # -156.68
 DRIVE_PIN_HOLE_DIA = 2.38  # reamed for the press (3/32 nominal)
 
 # --- shaft seat face (both shafts carry the same seat) -----------------------
-# The flat face the wheel's rear face beds on: a Ø17.5 spigot on the crank
-# collar, the whole Ø17.5 collar on the knob shaft.  Small enough that the
+# The flat face the wheel's rear face beds on: a Ø11/16 spigot on the crank
+# collar, the whole Ø11/16 collar on the knob shaft.  Small enough that the
 # #25 plates wrapping the T12 clear it (Main's ruling, 2026-09-30).
-SEAT_SPIGOT_DIA = 17.5
+SEAT_SPIGOT_DIA = inch(11, 16)
 # Pin hole to the spigot's rim: under the 1.5 wall floor (pending ruling #991).
 SEAT_SPIGOT_RIM = (
     SEAT_SPIGOT_DIA / 2.0 - PIN_CIRCLE_RADIUS - DRIVE_PIN_HOLE_DIA / 2.0
-)  # 0.56
+)  # 0.79
 
 if not BAND_FRONT_Z < DRIVE_PIN_TIP_Z < SEAT_FACE_Z:
     raise AssertionError("drive-pin tips must end inside the wheel's plate")
 if PIN_HOLE_DIA <= DRIVE_PIN_DIA:
     raise AssertionError("the wheel's pin holes must slip over the drive pins")
-if abs(BORE_PIN_WEB - 0.6) > 1e-9:
-    raise AssertionError("bore/pin-hole web moved off the contracted 0.60")
+# 17/64 - 0.049 - 0.193 = 0.023625 in.
+if abs(BORE_PIN_WEB - 0.023625 * MM_PER_IN) > 1e-9:
+    raise AssertionError("bore/pin-hole web moved off the contracted 0.600")
 if SEAT_SPIGOT_RIM <= 0.0:
     raise AssertionError("the seat spigot must enclose the drive-pin holes")
 

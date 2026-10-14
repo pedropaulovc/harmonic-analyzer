@@ -16,15 +16,17 @@ permitted route.
 
 Frame: model axes are the inventory's saw-cradle frame (cone plan frame B6:
 post axis along -X, head top X0, cone cross-bore +Z up), re-based to a
-touchable corner and turned Y-up for ASME views. The mapping is
+touchable corner and turned Y-up for ASME views. The all-inch experiment
+snaps the re-basing to inch stations (B6_X_AT_END, B6_Z_AT_UNDERSIDE,
+B6_Y_AT_SIDE), so the mapping is
 
-    model X = B6 X - 2      (the base's kerf-side end face, B6 X2)
-    model Y = B6 Z + 49     (the base underside, B6 Z-49)
-    model Z = 50 - B6 Y     (the base side face at B6 Y+50)
+    model X = B6 X - 1/16 in    (the base's kerf-side end face)
+    model Y = B6 Z + 1-15/16 in (the base underside)
+    model Z = 2 in - B6 Y       (the base side face; the axis centres the 4 in bar)
 
-so a nominal post's axis lies on model Y49, Z50, the seat bottoms on model
-Y27.9945, and the cone axis at model X50.632. Z stations and Z heights run
-from the base side face (model Z0).
+so a nominal post's axis lies on model Y 1-15/16 in, Z 2 in, the seat bottoms
+on model Y 1-1/8 in, and the cone axis at model X 2-3/16 in. Z stations and Z
+heights run from the base side face (model Z0).
 """
 
 from __future__ import annotations
@@ -34,28 +36,30 @@ import math
 import _config
 import dt_cone_pivot_post_spec as post
 from _hole_spec import THREAD_MAJOR_MM, TAP_DRILL_MM, HoleSpec
+from _inch import inch
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 
 # --- Frame (B6 -> model) -------------------------------------------------------
-B6_X_AT_END = 2.0
-B6_Z_AT_UNDERSIDE = -49.0
-B6_Y_AT_SIDE = 50.0
+B6_X_AT_END = inch(1, 16)
+B6_Z_AT_UNDERSIDE = -inch(31, 16)
+B6_Y_AT_SIDE = inch(2)
 
 # --- Base: the vise grips its long sides; the studs thread into it ------------
-BASE_LENGTH = 95.0
-BASE_WIDTH = 100.0
-BASE_HT = 19.0
+# Milled from 4 in wide 1018 bar, which sets the as-supplied width.
+BASE_LENGTH = inch(15, 4)
+BASE_WIDTH = inch(4)
+BASE_HT = inch(3, 4)
 
 # --- Saddles: two blocks on the base, bored together for the post body --------
-OVERALL_HT = 39.0
-HEAD_SADDLE_X = (26.5, 39.5)
-FOOT_SADDLE_X = (64.0, 78.0)
-SADDLE_Z = (26.0, 74.0)
+OVERALL_HT = inch(25, 16)
+HEAD_SADDLE_X = (inch(9, 8), inch(13, 8))
+FOOT_SADDLE_X = (inch(21, 8), inch(51, 16))
+SADDLE_Z = (B6_Y_AT_SIDE - inch(15, 16), B6_Y_AT_SIDE + inch(15, 16))
 # The head saddle sits on the body between the head shoulder and the cone
 # boss; it is narrowed from the inventory's 14 so its widest .X print still
-# fits the narrowest gap the post's print allows (below).
+# fits the narrowest gap the post's print allows (below).  The foot saddle
+# starts clear of the cone boss's cap lens below the body (checked below).
 SADDLE_X_PLACES = 1
-
 # The cone axis crosses the post axis BORE_HEIGHT above foot B; B6 X0 is the
 # head top, BLOCK_HEIGHT above the foot.
 CONE_AXIS_X = post.BLOCK_HEIGHT - post.BORE_HEIGHT - B6_X_AT_END
@@ -69,7 +73,8 @@ SEAT_PLACES = 1
 BODY_DIA_MAX = round(
     post.BLOCK_DIA + printed_deviations(post.BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])[1], 12
 )
-SEAT_DIA = 43.6
+# The next 1/16 in below, 1-11/16 in, is smaller than the largest post body.
+SEAT_DIA = inch(7, 4)
 if round(SEAT_DIA + printed_deviations(SEAT_DIA, SEAT_PLACES)[0], 12) < BODY_DIA_MAX - 1e-9:
     raise AssertionError("the smallest saw-cradle seat is smaller than the largest post body")
 SEAT_BOTTOM_Y = -B6_Z_AT_UNDERSIDE - post.BLOCK_DIA / 2.0
@@ -89,8 +94,8 @@ SEAT_Z = POST_AXIS_Z
 # quarter-inch cutter room to either saddle; its Z ends stop short of the
 # bridge studs, and its length covers the largest printed cap at the post's
 # worst float in the seat (checked below).
-PAD_WIDTH = 8.0
-PAD_LENGTH = 28.0
+PAD_WIDTH = inch(5, 16)
+PAD_LENGTH = inch(9, 8)
 PAD_X = CONE_AXIS_X
 PAD_X0 = PAD_X - PAD_WIDTH / 2.0
 PAD_X1 = PAD_X + PAD_WIDTH / 2.0
@@ -114,7 +119,7 @@ CAP_OFFSET_MAX = max(
 )
 # AUTHOR'S CHOICE: half a millimetre of fitting stock over the highest cap.
 PAD_FIT_STOCK_MIN = 0.5
-PAD_HT = 30.0
+PAD_HT = inch(5, 4)
 # The pad is milled down to its fit; the callout, not the method, is printed.
 PAD_PROCESS = "mill"
 # The unfitted top stands above the highest compliant cap: the seats bored
@@ -136,7 +141,7 @@ STUD_DRILL_PRINTED = round(STUD_TAP_DRILL, STUD_DRILL_PLACES)
 # Title-block DRILLED HOLES: plus allowance, zero minus (_printed_tolerance).
 DRILLED_BAND = (drilled_oversize_mm(), 0.0)
 STUD_X = CONE_AXIS_X
-STUD_Z = (POST_AXIS_Z - 30.0, POST_AXIS_Z + 30.0)
+STUD_Z = (POST_AXIS_Z - inch(19, 16), POST_AXIS_Z + inch(19, 16))
 STUD_MIN_ENGAGEMENT_D = 1.5
 
 # --- Print-worst checks ----------------------------------------------------------

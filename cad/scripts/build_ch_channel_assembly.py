@@ -10,15 +10,15 @@ the lever tips, each retained by a stock eyebolt threaded into the plate.
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
 
-* pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z; a plain rod whose
+* pivot-shaft x1 (rocker bank at (73.025, 254.0), along Z; a plain rod whose
   cylinder spans both ears' outer faces, each end domed, held axially and in
   rotation by two set screws on flats milled at the ears -- rocker_bank_layout)
 * rocker-thrust-washer x2 (MHA-CH-009: north, between rocker 19's hub and the
   north ear, the bank's datum; south, on rocker 0's hub) +
   vn-rocker-bank-spring x1 (MHA-VN-053, the wave disc spring between the
   south washer and the south ear that preloads the bank north; #948 ruling R)
-  + fulcrum-shaft x1 (lever bank at (199.9, 1061.4); plain Ø6.35 x 161.35,
-  domed 0.5 proud of each keeper lug, set-screw flats up)
+  + fulcrum-shaft x1 (lever bank at (200.025, 1061.24375); plain Ø6.35 x 163.5125,
+  domed 1/32 proud of each keeper lug, set-screw flats up)
 * pivot-bracket x2 (2026-09 photo re-derive, ch14 page002_img01/img07: the
   black foot-and-ear brackets on the rocker-arm-support's top, at the
   fit-up-located S/N stations (the old chrome pivot-ball-mount pair is retired
@@ -32,11 +32,11 @@ the M6.8 mirror layer is gone).
   apex onto the shaft's flat)
 * fulcrum-keeper x2 + frame-side-screw x2 + fulcrum-set-screw x2 (the black
   shaft-END brackets on the top-frame west rail top face -- ch17 p.40
-  bottom-left / ch30 p008; lug mid-planes at (199.9, STACK_MID_Z +- 74.0), the
+  bottom-left / ch30 p008; lug mid-planes at (200.025, STACK_MID_Z +- 74.6125), the
   shaft through their reamed bores; one #1-72 cup-point set screw down
   through each crown onto the shaft's flat (its only axial and rotational
   location); feet outboard, screwed down into the rail's tapped #2-56 holes
-  at STACK_MID_Z +- 82.25 (the lever-bank mid-plane, z -0.504); replaces
+  at STACK_MID_Z +- 82.55 (the lever-bank mid-plane, z -0.504); replaces
   the photo-refuted chrome baluster lever pair, 2026-08-02)
 * rocker-arm x20, connecting-rod x20, amplitude-bar x20, channel-lever
   x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose faces
@@ -347,7 +347,7 @@ if abs(BAR_PIN_LENGTH - BAR_WIDTH) > 1e-9:
     )
 
 # --- lever bank -------------------------------------------------------------
-# FULCRUM (199.9, 1061.4): the lever fulcrum shaft axis -- imported from channel_frame_geom.
+# FULCRUM (200.025, 1061.24375): the lever fulcrum shaft axis -- imported from channel_frame_geom.
 # The lever's two transfer arms -- imported, NOT copied, for the budget's sake
 # (ch_channel_lever_spec is what error_budget.nominal() reads).
 from ch_channel_lever_spec import (  # noqa: E402
@@ -356,8 +356,8 @@ from ch_channel_lever_spec import (  # noqa: E402
 
 # the lever bank ends at x ~ -30 in the ch. 30 front view and the 32 mm
 # springs must reach the summing plate at x ~ -22..-27)
-LEVER_TAB_HALF = 3.0  # spring hole sits in the lever's 6.0-tall end tab
-LEVER_THICKNESS = 3.0
+from ch_channel_lever_spec import TAB_HALF as LEVER_TAB_HALF  # noqa: E402  # 1/8: the 1/4-tall end tab
+from ch_channel_lever_spec import LEVER_THICKNESS  # noqa: E402  # 1/8
 
 # --- supports / mounts ------------------------------------------------------
 SUPPORT_APEX_Y = 228.6
@@ -516,9 +516,9 @@ if [z for _x, z in BRACKET_SCREW_XZ] != [
     _bracket_sides.HOLE_MACHINE_Z[name] for name in _bracket_sides.SIDES
 ]:
     raise AssertionError("the hold-down screws are not over the brackets' holes")
-RAIL_TOP_Y = 1036.2  # new top-frame casting top face (was 1040.7; the rederive
-# dropped the rail top 4.5 -- the keeper seats and the whole fulcrum chain
-# follow)
+RAIL_TOP_Y = 1035.84375  # top-frame casting top face (all-inch: was 1036.2;
+# build_fr_top_frame's rail top -- the keeper seats and the whole fulcrum
+# chain follow)
 # The fulcrum shaft and both end keepers centre on the lever bank's mid-plane
 # (ch_fulcrum_keeper_spec, one source with the top frame's keeper taps).
 FULCRUM_SHAFT_Z = FULCRUM_KEEPER_CENTRE_Z
@@ -1060,8 +1060,8 @@ async def build(adapter) -> dict[str, str]:
         label="fulcrum-shaft (lever bank)",
     )
     await _locate_to_datum(adapter, fulcrum)
-    pivot_w = (PIVOT[0], PIVOT[1])  # (72.9, 253.8) machine world
-    fulc_w = (FULCRUM[0], FULCRUM[1])  # (199.9, 1061.4) machine world
+    pivot_w = (PIVOT[0], PIVOT[1])  # (73.025, 254.0) machine world
+    fulc_w = (FULCRUM[0], FULCRUM[1])  # (200.025, 1061.24375) machine world
     # The rockers and levers ride the shafts' named axes.  A point on a shaft's
     # O.D. is a view-dependent pick (#916): in the standard views it grazes the
     # silhouette, 0.075 mm from the bores' edges, and a hub at z = 0 (channel 9)

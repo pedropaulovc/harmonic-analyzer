@@ -132,7 +132,7 @@ if TIP_CHAMFER > FIRST_THREAD_LOSS:
 
 # --- as installed: cut to fit (R9-47) ------------------------------------------
 # The platen slides close behind the 120T disc, and the longest stock on the
-# thinnest flange and disc stands STOCK_TIP_PROUD_MAX (1.21) proud of the
+# thinnest flange and disc stands STOCK_TIP_PROUD_MAX (1.85) proud of the
 # disc's rear face.  So each tip is cut at assembly to sit this far under
 # the rear face, (min, max), the cut end broken 45 deg CUT_END_BREAK_MAX at
 # most.  A stock tip already inside the window stays uncut.
@@ -142,7 +142,7 @@ CUT_END_BREAK_MAX = 0.1
 # What the A06 cut step and the part sheet print for it.
 CUT_END_BREAK_TEXT = f"{CUT_END_BREAK_MAX:.1f} MAX"
 # The model is the installed screw, its tip mid-window under the nominal
-# flange and disc: 2.4 + 3.0 - 0.1 = 5.3.  Placement, interference and the
+# flange and disc: 1/16 + 1/8 - 0.1 = 4.6625.  Placement, interference and the
 # assembly's tip checks read LENGTH.
 TIP_BELOW_REAR_FACE_MODEL = sum(TIP_BELOW_REAR_FACE) / 2.0
 CUT_LENGTH = FLANGE_THICK + FACE_WIDTH - TIP_BELOW_REAR_FACE_MODEL
@@ -153,9 +153,9 @@ _FLANGE_BAND = printed_band_mm(FLANGE_THICK_PLACES)
 STOCK_TIP_PROUD_MAX = (
     SHANK_LEN + STOCK_LENGTH_BAND[0] - (FLANGE_THICK - _FLANGE_BAND) - FACE_WIDTH_MIN
 )
-# The shortest stock on the thickest flange and disc stops this far inside
-# the rear face uncut (0.072): already in the window, so every stock screw
-# reaches it and none is ever too short.
+# The shortest stock on the thickest flange and disc: negative means its tip
+# still stands proud (-0.566 on the 1/16 flange and 1/8 disc), so every stock
+# screw is cut to the window and none is ever too short.
 STOCK_TIP_INSIDE_REAR_MAX = (
     FLANGE_THICK + _FLANGE_BAND + FACE_WIDTH_MAX - (SHANK_LEN - STOCK_LENGTH_BAND[1])
 )

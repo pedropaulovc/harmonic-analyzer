@@ -40,7 +40,7 @@ MM_PER_IN = 25.4
 
 SHAFT_DIA = 0.25 * MM_PER_IN
 SHAFT_DIA_BAND = SHAFT_H
-DOME_HEIGHT = 1.5  # both ends, like the cylinder arbor's (user, #743 Q4)
+DOME_HEIGHT = 0.0625 * MM_PER_IN  # 1/16 both ends (was 1.5), like the cylinder arbor's (user, #743 Q4)
 DOME_SPHERE_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + DOME_HEIGHT**2) / (2.0 * DOME_HEIGHT)
 if not 0.0 < DOME_HEIGHT <= SHAFT_DIA / 2.0:
     raise AssertionError("an end crown must be a dome, never past a hemisphere")
@@ -67,13 +67,14 @@ NORTH_FLAT_STATION = EAR_T / 2.0
 FLAT_STATION_BAND = LINEAR_2PL  # stations print at .XX
 # The cup the flat must take whole: the screw's 45 deg x one-pitch point.
 SET_SCREW_CUP_DIA = SET_SCREW_POINT_DIA  # 1.575
-# Depth: 0.5, the common set-screw flat on a 1/4 shaft (about 0.08D). It
-# prints as the across-flat, which a micrometer reads, at .XXX, so the depth
-# runs 0.37..0.63; at its shallowest the flat's chord (2.97) still takes
-# the cup with 0.5 to spare each side, the screw itself rolling the flat
-# square under it as it is driven.
-FLAT_DEPTH = 0.5
-FLAT_AF = SHAFT_DIA - FLAT_DEPTH  # 5.850
+# Depth: .020 in (was 0.5), the common set-screw flat on a 1/4 shaft (about
+# 0.08D); a 3-place inch decimal because 1/32 (0.79) would move this sub-1/4
+# feature +56%. It prints as the across-flat (.230), which a micrometer
+# reads, at .XXX, so the depth runs 0.38..0.64; at its shallowest the flat's
+# chord still takes the cup with 0.5 to spare each side, the screw itself
+# rolling the flat square under it as it is driven.
+FLAT_DEPTH = 0.020 * MM_PER_IN
+FLAT_AF = SHAFT_DIA - FLAT_DEPTH  # 5.842 (.230)
 FLAT_DEPTH_RANGE = (FLAT_DEPTH - LINEAR_3PL, FLAT_DEPTH + LINEAR_3PL)
 
 
@@ -85,12 +86,12 @@ def flat_chord(depth: float) -> float:
 
 if flat_chord(FLAT_DEPTH_RANGE[0]) < SET_SCREW_CUP_DIA + 2.0 * 0.5:
     raise AssertionError("a shallow flat is too narrow for the set-screw cup")
-# Length: 5.0 at .XX (4.49..5.51). The cup must stay wholly on the flat over
-# the fit-up's axial wander (rocker_bank_layout checks it: 2.11 of the 2.245
-# half length at the south ear, which .X's 2.1 could not hold once the north
-# ear's thickness band joined the south chain), and no rocker hub may ride
-# over the flat's edge (also checked there).
-FLAT_LENGTH = 5.0
+# Length: 3/16 (was 5.0) at .XX. The cup must stay wholly on the flat over
+# the fit-up's axial wander (rocker_bank_layout checks it at the south ear,
+# which .X could not hold once the north ear's thickness band joined the
+# south chain), and no rocker hub may ride over the flat's edge (also
+# checked there).
+FLAT_LENGTH = 0.1875 * MM_PER_IN
 FLAT_LENGTH_RANGE = (FLAT_LENGTH - LINEAR_2PL, FLAT_LENGTH + LINEAR_2PL)
 
 # Probe station (part z, mm) that names the O6.35 face: the body clear of the
@@ -155,7 +156,7 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # A 159:6.35 slender bar is turned between centres; both flats face the same
 # way, because one screw on each ear sets the shaft's roll; the plain end is
 # cut and domed at assembly, so the shop supplies it long.
-STOCK_LENGTH = 175
+STOCK_LENGTH = 174.625  # 6-7/8 in (was 175)
 DRAWING_NOTES = "\n".join(
     (
         "CENTRES OK.",

@@ -125,6 +125,7 @@ from _transforms import (
     rot_z_rows,
     rows_from_euler,
 )
+from _inch import inch
 from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, SUMMING_Z
 from sm_summing_lever_spec import PLATE_L
 from magnifying_bracket_joint_layout import (
@@ -138,10 +139,11 @@ BRACKET_SCREW_POSITIONS = SCREW_POSITIONS
 BRACKET_SCREW_ROWS = ROT_X_NEG90
 
 # --- machine anchors ---------------------------------------------------------
-WHEEL_BAR_Y = 575.7  # ch30 p002 front-view re-anchor (2026-07-17): the wheel
+WHEEL_BAR_Y = inch(22 + 11 / 16)  # ch30 p002 front-view re-anchor (2026-07-17): the wheel
 # + bar + column clamps sit 10.7 higher than the old 565.0 -- the photo shows
-# the rim clearing the platen box top, which 565.0 left overlapped
-COLUMN_X = 197.0  # the WEST column (machine +x is west; the crank side -x is east)
+# the rim clearing the platen box top, which 565.0 left overlapped (all-inch:
+# 22-11/16, was 575.7)
+COLUMN_X = inch(7.75)  # the WEST column (machine +x is west; the crank side -x is east)
 COLUMN_Z = FRAME_FRONT_COLUMN_Z
 # Depth chain -- the SAME two-piece clamp seat as the platen support bar
 # (paper-drive PR #196 E2): the front arc's front face (-129.9) carries the
@@ -155,9 +157,10 @@ from mg_wheel_bar_geom import (  # noqa: E402
     WHEEL_BAR_X0,
 )
 
-BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -129.9
-BAR_FRONT_Z = BAR_BACK_Z - WHEEL_BAR_DEPTH  # -138.9: bar front = platen-back plane
-BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.4 bar centre
+BAR_BACK_Z = round(COLUMN_Z - ARC_FRONT_DEPTH, 6)  # -130.175
+# -139.7: bar front = platen-back plane
+BAR_FRONT_Z = round(BAR_BACK_Z - WHEEL_BAR_DEPTH, 6)
+BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.9375 bar centre
 
 # --- magnifying group --------------------------------------------------------
 # Rod at the plate centreline (979.7 -- the whole summing chain dropped 10.3
@@ -173,16 +176,20 @@ LEVER_ROD_Y = 979.7
 # for the one-piece top-frame casting (front rail z -93..-131, band
 # y 999.7..1036.2): the exact-stock thumb-screw reach, derived and asserted
 # below, keeps its outer head face beyond the required casting clearance, so
-# the rail imposes NO depth bound at all. The lever rod (Ø6) must clear the
-# front column surface -124.7 by 0.25 (axis <= -127.95); the retained -128.3
-# axis gives a 0.6 surface gap. Keep the accepted lever, vertical-rod and hook
-# datums while the current drum route proves its own rim/spoke/boss clearance
-# through mg_lever_wire_geom.RUN_GAPS; the old hub-lane rim-depth cap no longer
-# describes that route. VROD_Z = -134.8 (clamp's 6.5 skew bore); hook -137.95;
-# the bracket arm reaches back to the unchanged plate flange.
-LEVER_ROD_Z = -128.3
-LEVER_X0 = 200.0  # lever part origin (rod west dome tip; rod spans +35..+200,
-# placed Ry(180) so the part's local +x runs east toward the summing knife)
+# the rail imposes NO depth bound at all. The lever rod (Ø1/4) must clear the
+# front column surface -125.4125 by 0.25 (axis <= -128.8375); the all-inch
+# seat-plane offset (magnifying_bracket_joint_layout: 2-1/4 in front of the
+# summing plate) puts the axis at -130.2624, a 1.67 surface gap. Keep the
+# accepted lever, vertical-rod and hook datums while the current drum route
+# proves its own rim/spoke/boss clearance through mg_lever_wire_geom.RUN_GAPS;
+# the old hub-lane rim-depth cap no longer describes that route. VROD_Z =
+# LEVER_ROD_Z - 1/4 (clamp's skew bore); the bracket arm reaches back to the
+# unchanged plate flange.
+LEVER_ROD_Z = SEAT_PLANE_Z - inch(2.25)
+# Lever part origin (rod west dome tip; rod spans +35.8..+200.9, placed Ry(180)
+# so the part's local +x runs east toward the summing knife): the knife line
+# plus the lever's 8-1/2 knife station (was 200.0).
+LEVER_X0 = -15.0 + inch(8.5)
 
 # Knife-edge pivot (engineerguy video 2/4 + 4/4): the lever rod EXTENDS FROM
 # the pivoted summing bar and pivots WITH it about the knife-edge ridge line
@@ -211,7 +218,7 @@ from _mcmaster_91882a221 import (  # noqa: E402
     SHANK_LEN as THUMB_SHANK_LEN,
 )
 
-TOP_FRAME_RAIL_UNDERSIDE_Y = 999.7
+TOP_FRAME_RAIL_UNDERSIDE_Y = 999.33125  # restated from build_fr_top_frame (was 999.7)
 _MIN_THUMB_RAIL_CLEARANCE = 0.25
 THUMB_SCREW_TIP_Y = LEVER_ROD_Y + LEVER_ROD_DIA / 2.0
 THUMB_SCREW_OUTER_FACE_Y = THUMB_SCREW_TIP_Y + THUMB_SHANK_LEN + THUMB_HEAD_STACK_LEN
@@ -223,8 +230,8 @@ assert THUMB_SCREW_RAIL_CLEARANCE >= _MIN_THUMB_RAIL_CLEARANCE, (
 # Sliding clamp default position (p.46/48 insets) and the bracket collar, both
 # derived from the lever-local stations error_budget.py reads for the
 # magnification range (Ry(180): machine x = LEVER_X0 - local x).
-CLAMP_X = LEVER_X0 - CLAMP_LOCAL_X  # 150
-BRACKET_X = LEVER_X0 - COLLAR_LOCAL_X  # 40
+CLAMP_X = LEVER_X0 - CLAMP_LOCAL_X  # 151.6875
+BRACKET_X = LEVER_X0 - COLLAR_LOCAL_X  # 40.5625
 assert math.isclose(SEAT_PLANE_Z, SUMMING_Z - PLATE_L / 2.0, abs_tol=1e-9), (
     "magnifying-bracket seat drifted from the summing-lever front face"
 )
@@ -248,8 +255,10 @@ CLAMP_POS = (
     LEVER_ROD_Y - CLAMP_BORE_Y,
     LEVER_ROD_Z,
 )
-VROD_Z = LEVER_ROD_Z - CLAMP_ROD_DX  # -134.8 (local +x -> machine -z)
-VROD_TOP_Y = LEVER_ROD_Y + 5.0  # dome inside the clamp's rod bore (rides the rod)
+VROD_Z = LEVER_ROD_Z - CLAMP_ROD_DX  # -136.6124 (local +x -> machine -z)
+# dome inside the clamp's rod bore (rides the rod); 3/16 above the lever axis
+# (was 5.0)
+VROD_TOP_Y = LEVER_ROD_Y + inch(3, 16)
 from mg_output_fixture_geom import (  # noqa: E402
     FIXTURE_AXIS_Y,
     FIXTURE_YAW_DEG,
@@ -279,7 +288,7 @@ FIXTURE_SCREW_POSITION = tuple(
 assert FIXTURE_SCREW_STANDOFF > 0.0, "fixture screw collar must stand off the spigot"
 
 # --- wheel -------------------------------------------------------------------
-WHEEL_X = 53.0
+WHEEL_X = inch(2 + 1 / 16)  # was 53.0
 # Clamp screws flank the column line, closing the stack bar -> front arc ->
 # back arc with heads on the bar's front face (ch30 p002 / support-bar idiom).
 # (west screw first -- keeps the component instance order of the mirrored-era
@@ -334,7 +343,7 @@ for _geom in (_lever_wire, _pen_wire):
     assert math.isclose(_geom.WHEEL_MID_Z, WHEEL_MID_Z, abs_tol=1e-9), (
         f"{_geom.__name__}.WHEEL_MID_Z drifted from mg_wheel_group.WHEEL_MID_Z"
     )
-DRUM_Z = WHEEL_MID_Z + DRUM_MID_Z  # -154.91: drum centre (drum frame mid-plane)
+DRUM_Z = WHEEL_MID_Z + DRUM_MID_Z  # drum centre (drum frame mid-plane)
 
 # Transform the model-owned groove front tangent, rather than assuming an
 # x-symmetric collar: its nonzero local X must be rotated exactly once.

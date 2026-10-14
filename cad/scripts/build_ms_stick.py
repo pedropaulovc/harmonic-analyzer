@@ -1,14 +1,15 @@
 r"""Reproduction script: measuring stick (book ch. 16, pp. 34-37).
 
 Ruled brass gauge (Wm. Gaertner & Co.) used to position the amplitude bars.
-The unchanged 0-10 scale spans 142 mm at the configured 14.2 mm pitch.
+The 0-10 scale spans 142.875 mm (5-5/8 in) at the configured 9/16 in pitch.
 The longer half-division tick follows the book. The stop is a separate brass
 block, cover and stock hardware in the ms-measuring-stick assembly.
 
-The annotated bar is 200 mm long and 8 mm wide; thickness is photo-derived.
+The annotated bar is 200 mm long and 8 mm wide; thickness is photo-derived
+(all-inch experiment: 7-7/8 x 5/16 x 1/8 in).
 
 Layout: bar along +X with the bottom-left corner on the origin; graduations
-engraved 0.5 mm deep into the back face (z=0), tick 0 at x=56.5 following the
+engraved 0.5 mm deep into the back face (z=0), tick 0 at x=55.5625 (2-3/16 in) following the
 2026-10-10 user Option B ruling: keep the blank and shift the whole scale left.
 
 Numerals: the 0..10 values are engraved beside their full ticks (page001_img01:
@@ -433,7 +434,7 @@ async def build(adapter) -> dict[str, str]:
     # one pattern keeps every feature a plain cut or pattern.) The pattern's
     # own spacing dim is driven from DivisionSpacing below, resolved by VALUE
     # rather than by the D3 index (CodeRabbit #651: a static pitch would
-    # leave the patterned tenths at 14.2 after a GUI DivisionSpacing edit).
+    # leave the patterned tenths at the old pitch after a GUI DivisionSpacing edit).
     minor_names = []
     for k in range(1, MINOR_PER_DIVISION):
         minor_names.append(
@@ -552,15 +553,15 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven measuring-stick (equations neutral)", v_built, 0.005 * v_built
     )
 
-    # Verify the annotated 200 mm length and the untouched front face
-    # (the 14.2 mm tick spacing is driven by the linear pattern's spacing).
+    # Verify the annotated (7-7/8 in) length and the untouched front face
+    # (the 9/16 in tick spacing is driven by the linear pattern's spacing).
     # End faces are edge-on in the active view (point picking is
     # screen-projected) — measure the uncut front-bottom edge instead;
     # the ticks only engrave the back face from the top edge down.
     mid_y = BODY_WIDTH / 2.0
     await measure_check(
         adapter,
-        "body length (annotated 200)",
+        "body length (annotated 7-7/8 in)",
         [{"entity_type": "EDGE", "point": [BODY_LENGTH / 2.0, 0.0, BODY_THICKNESS]}],
         "length",
         BODY_LENGTH,

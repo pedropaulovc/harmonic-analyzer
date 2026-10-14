@@ -7,6 +7,8 @@ remaining collinear with the post's rederived inclined journal.
 
 from __future__ import annotations
 
+from _inch import inch
+
 
 POST_ROTATION_Y_DEG = 180.0
 
@@ -15,6 +17,9 @@ POST_ROTATION_Y_DEG = 180.0
 # face bears on the post's north cone-boss end face, and the 64T abuts the
 # collar's north face.  The cone line projects these fixed installation
 # anchors along the configured journal incline to recenter the channel/bank.
+# All-inch experiment: these gear-family anchors are a closure fitted to the
+# fixed post and the 48DP mesh (cone seats must lie on the post's journal
+# line), so they stay computed decimals rather than snapped fractions.
 GEAR_AXIS_SHIFT = -33.114642580298394
 MECHANISM_X_SHIFT = -5.69360213488344
 MECHANISM_Z_SHIFT = 3.0875877804265315
@@ -25,9 +30,10 @@ DRUM_X = FORMER_DRUM_X + MECHANISM_X_SHIFT
 FORMER_CHANNEL_Z0 = -67.1
 CHANNEL_Z0 = FORMER_CHANNEL_Z0 + MECHANISM_Z_SHIFT
 
-# The rocker support and frame columns retain their pre-cascade locations.
-FRAME_FRONT_COLUMN_Z = -112.0
-FRAME_REAR_COLUMN_Z = 112.0
+# The rocker support and frame columns retain their pre-cascade locations
+# (all-inch: +/-112.0 snapped to +/-4-7/16 in with the frame's column grid).
+FRAME_FRONT_COLUMN_Z = -inch(4 * 16 + 7, 16)
+FRAME_REAR_COLUMN_Z = inch(4 * 16 + 7, 16)
 FRAME_COLUMN_Z_CENTER = (
     FRAME_FRONT_COLUMN_Z + FRAME_REAR_COLUMN_Z
 ) / 2.0

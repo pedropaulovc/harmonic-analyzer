@@ -16,7 +16,7 @@ the curve. Everything below the guide rides the rod (ch24 pp.60-65 and the
   chained-Fourier driver transiently (reproduces truth_model.pen_y from a
   CrankDeg global, no force solver).
 * pen-v-block -- the brass block HANGING on the rod's bottom end (the rod
-  drops 13 into the bore nearest the paper; a side set screw pins it in the
+  drops 1/2 into the bore nearest the paper; a side set screw pins it in the
   real device). Its length runs at 45 degrees to the paper (the "45 deg" nib
   callout of v4_t00603), lock-mated to the rod.
 * pen-marker -- the full-length marker lying in the block's bottom groove
@@ -85,6 +85,7 @@ from _assembly import (
     write_dof_manifest,
 )
 from _transforms import IDENTITY, euler_from_rows, rot_z_rows
+from _inch import inch
 from _interference_contracts import allowed_interference_pairs
 from vn_hanger_screw_spec import SHANK_LEN as HANGER_SHANK_LEN
 from pn_pen_wire_geom import WHEEL_BAR_Y, WHEEL_MID_Z
@@ -111,24 +112,23 @@ ASM_NAME = "pn-pen"
 CLEARANCE = 0.25  # interference-gate margin convention
 
 # --- pen rod line -------------------------------------------------------------
-ROD_SECTION = 5.0  # pn_pen_rod_spec.ROD_SECTION (asserted below)
-HANGER_POS = (PEN_ROD_X, 505.0, PEN_Z_MID)
-# The rod's bottom end sits 13 into the v-block's 18-tall rod bore -- its end
-# face 0.5 above the groove roof (18 - 13 = 5.0 > GROOVE_DEPTH 4.5), clear of the
-# marker barrel that fills the groove below it (a 14 engagement dipped 0.5 into
+ROD_SECTION = inch(3, 16)  # pn_pen_rod_spec.ROD_SECTION (asserted below)
+HANGER_POS = (PEN_ROD_X, inch(19.875), PEN_Z_MID)  # guide block centre y 19-7/8
+# The rod's bottom end sits 1/2 into the v-block's 11/16-tall rod bore -- its end
+# face level with the groove roof (11/16 - 1/2 = 3/16 = GROOVE_DEPTH), clear of
+# the marker barrel CLEARANCE below it (a 14 mm engagement once dipped 0.5 into
 # the groove: interference-gate proven, 2.81 mm^3 rod/marker) -- putting the
-# marker axis (block bottom + 0.25) near paper mid-height: paper y 324.5..405
-# (build_pd_paper_drive_assembly), centre 364.75 -> marker axis 363.25.
-ROD_BORE_ENGAGEMENT = 13.0
-BLOCK_BOTTOM_Y = 363.0
-PEN_ROD_POS = (PEN_ROD_X, BLOCK_BOTTOM_Y + 5.0, PEN_Z_MID - ROD_SECTION / 2.0)
+# marker axis (block bottom + MARKER_AXIS_LOCAL_Y) near paper mid-height: paper
+# y 324.5..405 (build_pd_paper_drive_assembly), centre 364.8 -> marker axis 364.08.
+ROD_BORE_ENGAGEMENT = inch(1, 2)
+BLOCK_BOTTOM_Y = inch(229, 16)  # 14-5/16
 
 # --- v-block on the rod --------------------------------------------------------
-# Block-local frame (build_pn_pen_v_block): length X 0..36, height Y 0..18, depth
-# Z 0..16; rod bore at local (BORE_X[0], z 8); marker groove along X at the
-# bottom, centred in Z. The block's local +X (its length) points FORWARD and
+# Block-local frame (build_pn_pen_v_block): length X 0..1-7/16, height Y 0..11/16,
+# depth Z 0..5/8; rod bore at local (BORE_X[0], z 5/16); marker groove along X at
+# the bottom, centred in Z. The block's local +X (its length) points FORWARD and
 # EAST at 45 degrees -- machine (+sin, 0, -cos) of BLOCK_YAW about +Y -- so the
-# rod bore (the paper end, local x 10) is the rear bore and the marker exits
+# rod bore (the paper end, local x 3/8) is the rear bore and the marker exits
 # the local x 0 end face onto the paper.
 from pn_pen_v_block_spec import (  # noqa: E402
     BLOCK_DEPTH,
@@ -145,6 +145,16 @@ from build_pn_pen_frame import (  # noqa: E402
     OUTER_WIDTH,
     RAIL_END,
     RAIL_SIDE,
+)
+
+_ROD_END_LOCAL_Y = BLOCK_HEIGHT - ROD_BORE_ENGAGEMENT
+assert _ROD_END_LOCAL_Y >= GROOVE_DEPTH - 1e-9, (
+    "pen-rod end dips into the marker groove"
+)
+PEN_ROD_POS = (
+    PEN_ROD_X,
+    BLOCK_BOTTOM_Y + _ROD_END_LOCAL_Y,
+    PEN_Z_MID - ROD_SECTION / 2.0,
 )
 
 _C = math.cos(math.radians(PEN_BLOCK_YAW_DEG))
@@ -179,13 +189,13 @@ assert _REAR_CORNER_Z <= PAPER_FRONT_Z - 2 * CLEARANCE, (
 )
 
 # --- marker in the groove --------------------------------------------------------
-# Barrel O8 in the 8.5 x 4.5 groove: axis CLEARANCE below the groove roof,
+# Barrel 5/16 in the 3/8 x 3/16 groove: axis CLEARANCE below the groove roof,
 # centred in Z; the nib (marker local origin, +Y along the barrel) reaches
 # past the block's rear end face to CLEARANCE off the paper front.
-MARKER_AXIS_LOCAL_Y = GROOVE_DEPTH - BARREL_DIA / 2.0 - CLEARANCE  # 0.25
+MARKER_AXIS_LOCAL_Y = GROOVE_DEPTH - BARREL_DIA / 2.0 - CLEARANCE  # 0.54375
 assert GROOVE_WIDTH >= BARREL_DIA + 2 * CLEARANCE
 # Solve the nib's block-local x from the paper stand-off: machine z of a
-# local (x, ., 8) point is VBLOCK_POS.z - x*cos + 8*sin.
+# local (x, ., D/2) point is VBLOCK_POS.z - x*cos + (D/2)*sin.
 MARKER_TIP_LOCAL_X = (
     -((PAPER_FRONT_Z - PEN_PAPER_CLEARANCE_MM) - VBLOCK_POS[2]
       - (BLOCK_DEPTH / 2.0) * _S) / _C
@@ -212,15 +222,16 @@ MARKER_ROT = euler_from_rows(MARKER_ROWS)
 # (W/2, ., D/2). Placed with its plane perpendicular to the block length:
 # frame X -> block Z (across the depth), frame Y -> up, frame Z -> block -X
 # (rearward), which is a yaw of -45 (right-handed). The window straddles the
-# block section with 1.0 a side, its top rail FRAME_TOP_GAP above the block
-# top, and the ring sits FRAME_ROD_GAP forward of the rod's front face.
+# block section with clearance a side, its top rail FRAME_TOP_GAP (a modelling
+# clearance, not a print dimension) above the block top, and the ring sits
+# FRAME_ROD_GAP forward of the rod's front face.
 FRAME_TOP_GAP = 0.1
-# The rod is a machine-axis-aligned 5-square inside the 45-degree-yawed block, so
-# along the block length it spans the rod's DIAGONAL (+/-3.54 about the bore
-# axis), not +/-2.5: the stirrup's rear face stands FRAME_ROD_GAP past that
-# (a 1.0 gap measured from the flat left 0.04 of overlap, 0.01 mm^3).
-FRAME_ROD_GAP = 1.0
-ROD_HALF_DIAGONAL = ROD_SECTION / math.sqrt(2.0)  # 3.54
+# The rod is a machine-axis-aligned 3/16-square inside the 45-degree-yawed block,
+# so along the block length it spans the rod's DIAGONAL (+/-3.37 about the bore
+# axis), not +/-2.38: the stirrup's rear face stands FRAME_ROD_GAP past that
+# (a gap measured from the flat once left 0.04 of overlap, 0.01 mm^3).
+FRAME_ROD_GAP = inch(1, 16)
+ROD_HALF_DIAGONAL = ROD_SECTION / math.sqrt(2.0)  # 3.37
 FRAME_X_CENTER_LOCAL = (
     ROD_BORE_LOCAL[0] + ROD_HALF_DIAGONAL + FRAME_ROD_GAP + FRAME_DEPTH / 2.0
 )
@@ -285,8 +296,8 @@ assert math.isclose(PEN_WIRE_BOTTOM[1] + PEN_WIRE_LEN, WHEEL_BAR_Y, abs_tol=1e-9
 
 # --- M6.10 fastener ----------------------------------------------------------
 # Pen-hanger screw from BEHIND the bar. Its under-head frame follows the shared
-# wheel-bar back face; the exact stock shank passes through the 9 mm bar and
-# 3 mm strap, then retains clearance to the magnifying-wheel rim.
+# wheel-bar back face; the exact stock shank passes through the bar and the
+# strap, then retains clearance to the magnifying-wheel rim.
 BAR_BACK_Z = HANGER_POS[2] + max(HANGER_STRAP_Z) + WHEEL_BAR_DEPTH
 HANGER_SCREW_POS = (
     HANGER_POS[0] + HANGER_TAP_XY[0],

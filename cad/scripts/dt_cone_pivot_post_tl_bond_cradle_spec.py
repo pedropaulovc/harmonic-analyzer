@@ -10,8 +10,8 @@ north face on the two crank pins.
 Frame: the cone pivot post's model frame R0, unchanged (make-data section 1.2:
 the cradle frame IS the post frame, so a prechips pose of the post in the
 cradle is the identity). Post axis +Y through X0 Z0 with foot B, the
-foot-stop face, at Y0; crank socket axis +Z (up). The base top is at Z -30
-and the base bottom at Z -40. Block heights and the seat axes print from the
+foot-stop face, at Y0; crank socket axis +Z (up). The base top is at
+Z -1-3/16 in and the base bottom 3/8 in below it. Block heights and the seat axes print from the
 base top, every station along the post from foot B, and every pin top from
 the post axis: a pin top sets a sleeve face against that axis.
 
@@ -33,24 +33,25 @@ import _config
 import dt_cone_pivot_post_spec as post
 from _gtol_cylinder import CylinderFace
 from _printed_tolerance import angular_band_deg, printed_band_mm
+from _inch import inch
 from _surface_finish import SEAT_UM, SurfaceFinishControl, surface_finish_by_key
 
-# Base plate, foot stop and the two saddles (inventory cone-bond-cradle rows).
-BASE_WIDTH = 80.0
-BASE_LENGTH = 134.0
-BASE_THICK = 10.0
-BASE_TOP_Z = -30.0
-BASE_END_Y = -12.0
-STOP_WIDTH = 30.0
+# Base plate, foot stop and the two saddles (inventory cone-bond-cradle rows),
+# snapped to inch plate and block sizes for the all-inch experiment.
+BASE_WIDTH = inch(25, 8)
+BASE_LENGTH = inch(21, 4)
+BASE_THICK = inch(3, 8)
+BASE_TOP_Z = -inch(19, 16)
+BASE_END_Y = -inch(1, 2)
+STOP_WIDTH = inch(19, 16)
 STOP_THICK = -BASE_END_Y  # flush with the base end; its +Y face is foot B
-BLOCK_HEIGHT = 15.0  # the stop and both saddles, above the base top
+BLOCK_HEIGHT = inch(9, 16)  # the stop and both saddles, above the base top
 BLOCK_TOP_Z = BASE_TOP_Z + BLOCK_HEIGHT
-SADDLE_WIDTH = 60.0
-BODY_SADDLE_Y = 10.0
-BODY_SADDLE_THICK = 10.0
-TAIL_SADDLE_Y = 100.0
-TAIL_SADDLE_THICK = 20.0
-
+SADDLE_WIDTH = inch(19, 8)
+BODY_SADDLE_Y = inch(3, 8)
+BODY_SADDLE_THICK = inch(3, 8)
+TAIL_SADDLE_Y = inch(63, 16)
+TAIL_SADDLE_THICK = inch(13, 16)
 # Seats: on the post axis, SEAT_AXIS_HEIGHT above the base top. The body seat
 # takes the post's turned body; the tail seat the raw bar the tail is left at
 # (cone-plan stock component "body", dia_mm 44.45). Both are MATCHED FITS
@@ -71,11 +72,11 @@ SEAT_OVERRUN = 1.0  # each seat cut runs past both saddle faces
 # The bed under a NOMINAL body; a matched seat moves it with the body, never
 # the axis.
 BED_HEIGHT = BASE_THICK + SEAT_AXIS_HEIGHT - BODY_SEAT_DIA / 2.0
-if abs(BED_HEIGHT - 18.9945) > 1e-9:
-    raise AssertionError("body seat bed height left the inventory's 18.9945")
+if abs(BED_HEIGHT - inch(3, 4)) > 1e-9:
+    raise AssertionError("body seat bed height left its 3/4 in")
 
-# Pins: hardened O4 m6 dowels pressed into reamed holes in the base.
-PIN_DIA = 4.0
+# Pins: hardened 5/32 in stock dowels pressed into reamed holes in the base.
+PIN_DIA = inch(5, 32)
 PIN_RADIUS = PIN_DIA / 2.0
 
 # Every pin top prints from the post axis at PIN_TOP_PLACES under an explicit
@@ -89,12 +90,12 @@ PIN_TOP_ROUNDING = 0.5 * 10.0**-PIN_TOP_PLACES
 
 # Crank pins: vertical, under the crank sleeve's north face, at the crank
 # socket's station from foot B.
-CRANK_PIN_X = 6.0
+CRANK_PIN_X = inch(1, 4)
 CRANK_PIN_Y = post.CRANK_BORE_HEIGHT
 CRANK_PIN_TOP_Z = -round(post.CRANK_BOSS_NORTH_FACE, PIN_TOP_PLACES)
 CRANK_PIN_HEIGHT = CRANK_PIN_TOP_Z - BASE_TOP_Z
-if abs(round(CRANK_PIN_HEIGHT, 2) - 8.62) > 1e-9:
-    raise AssertionError("crank pin height left the plan's 8.62")
+if abs(round(CRANK_PIN_HEIGHT, 2) - 8.73) > 1e-9:
+    raise AssertionError("crank pin height left the plan's 8.73")
 
 # Cone pins: tilted with the cone journal, axis n = (sin i, 0, cos i), the
 # reverse of the post's north-cap normal. Both stand at the journal station,
@@ -105,15 +106,16 @@ if abs(round(CRANK_PIN_HEIGHT, 2) - 8.62) > 1e-9:
 # square tops lie in the north-cap plane, CONE_BOSS_LENGTH / 2 below the
 # journal centre along n. Each pin is a stock dowel reaching its own length
 # from its top down n into the base: the east (+X) top stands lower, so it
-# takes the shorter one (prechips cone-pin-1 4x16, cone-pin-2 4x20).
-# CN-B5's bought dowels have a ground Ø3.2 end flat inside the Ø4 stock
+# takes the shorter one (5/32 x 5/8 and 5/32 x 3/4 stock dowels; prechips
+# cone-pin-1 4x16, cone-pin-2 4x20 before the all-inch experiment).
+# CN-B5's bought dowels have a ground end flat inside the stock dowel
 # envelope modeled here. Contact is partial annulus/edge bearing, not a
 # full-face Ø4 disk: its ±0.5-degree setup-error example bounds axial motion
 # by 1.6 * tan(0.5 degrees) < 0.014. The source accepts a blued dry fit on
 # both pin tops and refusal of a 0.05 feeler under the cap at either pin.
 # Those process checks do not turn the stock envelope into a contact patch.
 CONE_PIN_Y = post.BORE_HEIGHT
-CONE_PIN_SPREAD = 7.4
+CONE_PIN_SPREAD = inch(5, 16)
 if not post.BORE_DIA / 2.0 < CONE_PIN_SPREAD < post.CONE_BOSS_DIA / 2.0:
     raise AssertionError("cone pin tops left the north cap's annulus")
 _INCLINE = math.radians(post.INCLINE_DEG)
@@ -157,8 +159,8 @@ class ConePin:
         return self.top_z - self.length * CONE_PIN_AXIS[2]
 
 
-CONE_PIN_EAST = ConePin(side=1, length=16.0)
-CONE_PIN_WEST = ConePin(side=-1, length=20.0)
+CONE_PIN_EAST = ConePin(side=1, length=inch(5, 8))
+CONE_PIN_WEST = ConePin(side=-1, length=inch(3, 4))
 CONE_PINS = {"east": CONE_PIN_EAST, "west": CONE_PIN_WEST}
 
 

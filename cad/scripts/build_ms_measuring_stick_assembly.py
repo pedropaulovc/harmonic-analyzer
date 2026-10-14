@@ -9,7 +9,7 @@ Authored in the stop frame of ``ms_stop_spec`` (X along the stick, Y up the
 thumbscrew axis from its face to the roof, Z from the cover into the block),
 which the block and cover share, so both sit at the identity. Every other pose
 is ``ms_measuring_stick_assembly_spec``'s, derived from the part contracts:
-the bar bears on the roof graduations up, centred across the 8.4 window, its
+the bar bears on the roof graduations up, centred across the 11/32 in window, its
 2.0 division on the thumbscrew axis; the thumbscrew's tip sits on the bar's
 underside; each plate screw's bearing plane sits on the cover's outer face.
 The clamped stop has no operational freedom, so every component is fixed

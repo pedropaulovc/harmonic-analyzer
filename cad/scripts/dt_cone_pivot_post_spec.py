@@ -16,6 +16,7 @@ from __future__ import annotations
 import math
 
 import _config
+from _inch import inch
 from _gtol_cylinder import CylinderFace
 from _gtol_controls import GeometricControl, PartDatum
 from _gtol_planar import PlanarFace
@@ -29,42 +30,46 @@ from dt_post_mount_stack import (
 
 MM_PER_IN = 25.4
 
-# Main casting: the upper 26.6 mm is a very slightly larger head around the
-# main body; both cylinders share the vertical body/swing axis.  HEAD_DIA is
-# v36's harvested 42.7506 (user ruling 2026-09-28: MHA-DT-005's v36 post geometry
-# is restored, and with it the Ø44 as-cast collar reading is withdrawn).  The
-# head is a one-place reference size -- nothing mates on it; the body below it
-# is the locating/bore cylinder and keeps its turned size.
-BLOCK_DIA = 42.011
+# Main casting: the upper 1-1/16 in is a very slightly larger head around the
+# main body; both cylinders share the vertical body/swing axis.  All-inch
+# experiment: the body is 1-5/8 in (was 42.011) and the head 1-11/16 in (was
+# v36's harvested 42.7506, user ruling 2026-09-28).  The head is a one-place
+# reference size -- nothing mates on it; the body below it is the
+# locating/bore cylinder and keeps its turned size.
+BLOCK_DIA = inch(13, 8)
 BLOCK_HEIGHT = POST_BODY_HEIGHT_MM
-HEAD_DIA = 42.7506
-HEAD_HEIGHT = 26.6
+HEAD_DIA = inch(27, 16)
+HEAD_HEIGHT = inch(17, 16)
 HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
-
 # Straight crank/sprocket journal in the harvested PART frame.  It starts at
-# local -Z and projects along local +Z to +50.6591.  The assembly's exact
-# Ry(180) installation maps that long boss toward machine -Z.  Keep Pedro's
-# corrected source dimension in inches: 2.8360 in replaces the 2.85086614 in
-# initial derivation.
+# local -Z and projects along local +Z.  The assembly's exact Ry(180)
+# installation maps that long boss toward machine -Z.  All-inch experiment:
+# the boss runs 2-13/16 in (Pedro's corrected 2.8360 in source dimension,
+# snapped).
 #
 # v36 geometry (user ruling 2026-09-28): the crankshaft MHA-DT-011 runs directly
-# in the Ø11.438 crank bore, whose height follows the crossed-crank config
+# in the crank bore, whose height follows the crossed-crank config
 # above the unchanged foot -- no eccentric bushing, no drop, fixed centres.
 # The boss starts at the head's tangent plane, so its north face stands
 # HEAD_DIA / 2 from the post
-# axis, and runs the harvested 2.8360 in from there; nothing stands proud of
+# axis, and runs CRANK_BOSS_LENGTH from there; nothing stands proud of
 # that face inside the boss disc, so there is no spot face, retreat or run-out.
 # The north face is the boss's machined end, stationed from the post axis on
 # the print.
-CRANK_BOSS_DIA = 21.93
-CRANK_BORE_DIA = 11.438
+# The running bore is 15/32 in, the same reamer as the cone journal (1/32: the
+# nearest 1/16, 7/16 in, leaves the crankshaft's relieved middle no room
+# between its Ø3/8 through shaft and the journal at print-worst).
+CRANK_BOSS_DIA = inch(7, 8)
+CRANK_BORE_DIA = inch(15, 32)
 CRANK_BORE_HEIGHT = _config.machine("gear_train", "crank_axis_height_mm")
 CRANK_BORE_OFFSET = 0.0
 CRANK_BOSS_NORTH_FACE = HEAD_DIA / 2.0
 CRANK_BOSS_START_Z = -CRANK_BOSS_NORTH_FACE
-CRANK_BOSS_LENGTH_IN = 2.8360
-CRANK_BOSS_LENGTH = CRANK_BOSS_LENGTH_IN * MM_PER_IN
+CRANK_BOSS_LENGTH = inch(45, 16)
+CRANK_BOSS_LENGTH_IN = CRANK_BOSS_LENGTH / MM_PER_IN
 CRANK_BOSS_END_Z = CRANK_BOSS_START_Z + CRANK_BOSS_LENGTH
+if CRANK_BOSS_END_Z <= CRANK_BOSS_NORTH_FACE:
+    raise AssertionError("crank boss no longer runs through the whole head")
 
 # The boss must lie wholly in the head's nominal height band: the independent
 # boss-overlap volume oracle clips it against HEAD_DIA, never the lower body.
@@ -81,8 +86,11 @@ if CRANK_BOSS_HEAD_MARGIN_MM <= 0.0:
 INCLINE_DEG = _config.machine("cone_incline", "derived_incline_deg")
 CONE_AXIS_VIEW = "CONE JOURNAL"
 BORE_HEIGHT = CONE_AXIS_HEIGHT_MM
-CONE_BOSS_DIA = 17.2
-BORE_DIA = 12.2808
+# Cone boss 11/16 in (was 17.2); the journal is reamed 15/32 in (was 12.2808;
+# 1/32: the nearest 1/16, 1/2 in, leaves the cone shaft's 5/8 in collar a
+# thrust ring with no room for its edge breaks over the rule-17 floor).
+CONE_BOSS_DIA = inch(11, 16)
+BORE_DIA = inch(15, 32)
 CONE_BOSS_LENGTH = BLOCK_DIA
 
 # Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the top face.
@@ -90,13 +98,13 @@ CONE_BOSS_LENGTH = BLOCK_DIA
 # local east/west axes to the opposite platform names.
 #
 # MHA-VN-031 must provide a shank long enough to reach the platform from the
-# counterbore floor, BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH.  The unchanged
-# dia 11.509 x 6.02 counterbore takes its ASME B18.6.3 fillister head; the
+# counterbore floor, BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH.  The 29/64 x 1/4
+# deep counterbore takes its ASME B18.6.3 fillister head (0.237 in high) over a
+# 9/32 close-fit drill for the 1/4-20 shank (inch drill chart); the
 # purchased-stock spec owns the actual head envelope, stock-length,
-# cut-to-fit and engagement guards.  Raising the casting also raises that
-# floor, so the former 3-1/2-inch stock is no longer long enough.
-ATTACHMENT_THRU_DIA = 7.14248
-ATTACHMENT_CBORE_DIA = 11.50874
+# cut-to-fit and engagement guards.
+ATTACHMENT_THRU_DIA = inch(9, 32)
+ATTACHMENT_CBORE_DIA = inch(29, 64)
 ATTACHMENT_CBORE_DEPTH = POST_MOUNT_COUNTERBORE_DEPTH_MM
 WEB_FLOOR_MM = 1.5
 
@@ -105,52 +113,87 @@ def _row(places: int) -> float:
     return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
 
 
-# R2: a nominal v36 hole centre at 13.44 leaves only 1.04 mm to the restored
-# head OD at the printed limits.  The head prints Ø42.8 (.X); the machined
-# counterbore's native hole callout prints Ø11.51 (.XX), unlike its twist-drilled
-# through hole (+0.10 / 0).  Each centre prints .XX.  Move the complete matched
-# post/platform pattern inward by the least printable amount that retains the
-# policy's 1.5 mm hard floor at all three closing corners.
+# R2: the mounting-hole centres must keep the policy's 1.5 mm hard floor to
+# the head OD at the printed limits.  The head prints Ø42.9 (.X); the machined
+# counterbore's native hole callout prints Ø11.51 (.XX), unlike its
+# twist-drilled through hole (+0.10 / 0).  Each centre prints .XX.  All-inch
+# experiment: the matched post/platform pattern stands on the outermost 1/16 in
+# station that retains the floor at all three closing corners (1/2 in each
+# side of the axis, 1 in apart).
 _HEAD_R_PRINT_MIN = (round(HEAD_DIA, 1) - _row(1)) / 2.0
 _CBORE_R_PRINT_MAX = (round(ATTACHMENT_CBORE_DIA, 2) + _row(2)) / 2.0
 _ATTACHMENT_X_MAX = (
     _HEAD_R_PRINT_MIN - _CBORE_R_PRINT_MAX - _row(2) - WEB_FLOOR_MM
 )
-ATTACHMENT_X = math.floor((_ATTACHMENT_X_MAX + 1e-10) * 100.0) / 100.0
+ATTACHMENT_X = inch(1, 2)
 ATTACHMENT_SPACING = 2.0 * ATTACHMENT_X
 MOUNT_HEAD_WEB_WORST = _HEAD_R_PRINT_MIN - (ATTACHMENT_X + _row(2)) - _CBORE_R_PRINT_MAX
 if MOUNT_HEAD_WEB_WORST + 1e-9 < WEB_FLOOR_MM:
     raise AssertionError("mounting counterbore breaches the head's print-worst wall")
-if MOUNT_HEAD_WEB_WORST - 0.01 >= WEB_FLOOR_MM:
-    raise AssertionError("mounting holes are farther inward than the printable floor requires")
+if ATTACHMENT_X + inch(1, 16) <= _ATTACHMENT_X_MAX + 1e-9:
+    raise AssertionError("mounting holes are farther inward than the 1/16 in grid requires")
 
 # Final solid volume, the sum of the per-feature analytic terms the build
 # checks natively one feature at a time (build_dt_cone_pivot_post.py asserts
-# the sum at import):
+# the sum at import against its own Simpson quadrature):
 #
 #   body      pi*(BLOCK_DIA/2)^2*BLOCK_HEIGHT
 #   head      pi*((HEAD_DIA/2)^2 - (BLOCK_DIA/2)^2)*HEAD_HEIGHT
-#   crank boss outside the head cylinder            = + 11 611.2487
-#   crank bore pi*5.719^2*72.0344                    = -  7 401.6750
-#   cone pads outside the body cylinder             = +    209.0550
-#   cone bore pi*6.1404^2*42.011                     = -  4 976.2961
+#   crank boss outside the head cylinder  pi*rb^2*Lb - S(rb, HEAD_DIA/2)
+#   crank bore pi*(CRANK_BORE_DIA/2)^2*Lb
+#   cone pads outside the body cylinder   pi*rc^2*Lc - S(rc, BLOCK_DIA/2)
+#   cone bore pi*(BORE_DIA/2)^2*Lc
 #   2x (thru pi*(ATTACHMENT_THRU_DIA/2)^2*(BLOCK_HEIGHT-cbore_depth)
 #       + cbore pi*(ATTACHMENT_CBORE_DIA/2)^2*cbore_depth)
 #
-# The old v36 constant, harvested from v2's B-rep rather
-# than summed, read 112 302.9406: 2.05 mm^3 (0.002%) apart.  The feature sum
-# is the authority, as it has been since the 2026-09-21 farm build of a
-# Ø44-collar recipe read 121 575.3 against its constant: that recipe had never
-# bored the crank boss (7 401.7), because the bore cut's default direction
-# (opposite the sketch normal) found the collar to bite instead of flipping
-# into the boss.  The build still reverses that cut explicitly.  Mass at gray
-# iron 7.20 g/cc.
-# Growing the 86 mm feature-sum reference adds only the body column less the
-# two through drills.  The head shell's height and the contained boss/pad/bore
-# intersections are unchanged; the builder independently recomputes them.
-HARVESTED_VOLUME_MM3 = 112_300.8902 + math.pi * (
-    (BLOCK_DIA / 2.0) ** 2 - 2.0 * (ATTACHMENT_THRU_DIA / 2.0) ** 2
-) * (BLOCK_HEIGHT - 86.0)
+# S(r, R) is the closed-form intersection of two perpendicular cylinders of
+# radii r <= R crossing on axis (the boss starts on the head's tangent plane
+# and the pads end on the body's, so each overlap is the whole bicylinder):
+# 8R/3 * ((R^2 + r^2) E(m) - (R^2 - r^2) K(m)), m = (r/R)^2.  The 2026-09-21
+# farm build of a Ø44-collar recipe read 121 575.3 against its constant: that
+# recipe had never bored the crank boss, because the bore cut's default
+# direction (opposite the sketch normal) found the collar to bite instead of
+# flipping into the boss.  The build still reverses that cut explicitly.
+# Mass at gray iron 7.20 g/cc.
+
+
+def _elliptic_k_e(m: float) -> tuple[float, float]:
+    """Complete elliptic integrals K(m), E(m) by the arithmetic-geometric mean."""
+    a, b = 1.0, math.sqrt(1.0 - m)
+    c_sq_sum = m / 2.0  # 2^(n-1) c_n^2 at n = 0, c_0^2 = m
+    weight = 0.5
+    while abs(a - b) > 1e-15:
+        c = (a - b) / 2.0
+        a, b = (a + b) / 2.0, math.sqrt(a * b)
+        weight *= 2.0
+        c_sq_sum += weight * c * c
+    k = math.pi / (2.0 * a)
+    return k, k * (1.0 - c_sq_sum)
+
+
+def _bicylinder_mm3(r: float, big_r: float) -> float:
+    """Volume common to two perpendicular cylinders of radii r < big_r whose axes cross."""
+    if not 0.0 < r < big_r:
+        raise AssertionError("bicylinder closed form needs the smaller radius first")
+    k, e = _elliptic_k_e((r / big_r) ** 2)
+    return 8.0 * big_r / 3.0 * ((big_r**2 + r**2) * e - (big_r**2 - r**2) * k)
+
+
+HARVESTED_VOLUME_MM3 = (
+    math.pi * (BLOCK_DIA / 2.0) ** 2 * BLOCK_HEIGHT
+    + math.pi * ((HEAD_DIA / 2.0) ** 2 - (BLOCK_DIA / 2.0) ** 2) * HEAD_HEIGHT
+    + math.pi * (CRANK_BOSS_DIA / 2.0) ** 2 * CRANK_BOSS_LENGTH
+    - _bicylinder_mm3(CRANK_BOSS_DIA / 2.0, HEAD_DIA / 2.0)
+    - math.pi * (CRANK_BORE_DIA / 2.0) ** 2 * CRANK_BOSS_LENGTH
+    + math.pi * (CONE_BOSS_DIA / 2.0) ** 2 * CONE_BOSS_LENGTH
+    - _bicylinder_mm3(CONE_BOSS_DIA / 2.0, BLOCK_DIA / 2.0)
+    - math.pi * (BORE_DIA / 2.0) ** 2 * CONE_BOSS_LENGTH
+    - 2.0
+    * (
+        math.pi * (ATTACHMENT_THRU_DIA / 2.0) ** 2 * (BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH)
+        + math.pi * (ATTACHMENT_CBORE_DIA / 2.0) ** 2 * ATTACHMENT_CBORE_DEPTH
+    )
+)
 HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
 
 # Both bores are running journals, so both carry the SAME size band -- the one
@@ -272,7 +315,7 @@ for _name, _web in MOUNT_OTHER_WEBS_WORST.items():
 # geometry -- ConeShaftNormal's angle -- but no face carries it into a view.
 # Two construction rays and a driving angular dimension use the same
 # ConeIncline owner as the actual plane.
-JOURNAL_REFERENCE_LENGTH = 40.0
+JOURNAL_REFERENCE_LENGTH = inch(25, 16)
 JOURNAL_REFERENCE_X = JOURNAL_REFERENCE_LENGTH * math.sin(math.radians(INCLINE_DEG))
 JOURNAL_REFERENCE_Z = JOURNAL_REFERENCE_LENGTH * math.cos(math.radians(INCLINE_DEG))
 CRANK_BOSS_NEAR_Z = abs(CRANK_BOSS_START_Z)

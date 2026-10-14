@@ -26,8 +26,8 @@ from cone_shaft_land_bands import (
     FLAT_AF_BAND,
     SECTION_CONE_GEAR_TEETH,
     SECTION_DIA_BANDS,
+    SECTION_DIAS_MM,
     SECTION_FLAT_AF,
-    TERMINAL_DIA_MM,
 )
 from gear_seat_fit import flat_bore_af_band, seat_bore_band
 from stock_form_cutter import (
@@ -289,7 +289,27 @@ def custom_six_over_pins_limits_mm() -> tuple[float, float]:
     return math.ceil(min(readings) * 1e3) / 1e3, math.floor(max(readings) * 1e3) / 1e3
 
 
-BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
+def land_section(teeth: int) -> int:
+    """Index of the MHA-DT-004 land (cone_shaft_land_bands) carrying ``teeth``."""
+    _require_member(teeth)
+    for section, carried in enumerate(SECTION_CONE_GEAR_TEETH):
+        if teeth in carried:
+            return section
+    raise AssertionError(f"no MHA-DT-004 land carries the T{teeth:03d} cone gear")
+
+
+def bore_dia_mm(teeth: int) -> float:
+    """Return the configured bore: the nominal Ø of the stepped-shaft land
+    carrying ``teeth`` (cone_shaft_land_bands owns it; imported, not restated).
+    T006/T012 share the terminal land; their strength acceptance is rederived
+    below from the current cutter-owned printed floor MINs."""
+    diameter = SECTION_DIAS_MM[land_section(teeth)]
+    if diameter is None:
+        raise AssertionError(f"the T{teeth:03d} land has no gear-seat diameter")
+    return diameter
+
+
+BORE_DIA = bore_dia_mm(TEETH)  # 9.525 (3/8") at T120; smaller on the tip gears
 # Face width (user ruling 2026-09-28): the cone set is a solid stack.  Every
 # gear is one seat pitch thick, so each bears on its neighbour and the stack
 # on MHA-DT-007 sets every station (dt_cone_gear_stack); no gear is bonded.  The
@@ -334,20 +354,6 @@ def gap_floor_deviations_mm(teeth: int) -> tuple[float, float]:
     minimum, maximum = floor_limits_mm(teeth)
     nominal = 2.0 * floor_radius_min_mm(teeth)
     return minimum - nominal, maximum - nominal
-
-
-def bore_dia_mm(teeth: int) -> float:
-    """Return the configured bore that fits the matching stepped-shaft land."""
-    _require_member(teeth)
-    # T006/T012 share the actual terminal reader. Their strength acceptance
-    # is rederived below from the current cutter-owned printed floor MINs.
-    if teeth <= 12:
-        return TERMINAL_DIA_MM
-    if teeth == 18:
-        return 0.125 * MM_PER_IN
-    if teeth == 24:
-        return 0.25 * MM_PER_IN
-    return BORE_DIA
 
 
 def material_specification(teeth: int) -> str:
@@ -430,15 +436,6 @@ def terminal_web_mm(teeth: int) -> float:
 # so one BoreAF tolerance serves every configuration.
 BORE_AF_BAND = flat_bore_af_band(FLAT_AF_BAND)  # (+0.020, +0.010)
 BORE_AF_PLACES = 3
-
-
-def land_section(teeth: int) -> int:
-    """Index of the MHA-DT-004 land (cone_shaft_land_bands) carrying ``teeth``."""
-    _require_member(teeth)
-    for section, carried in enumerate(SECTION_CONE_GEAR_TEETH):
-        if teeth in carried:
-            return section
-    raise AssertionError(f"no MHA-DT-004 land carries the T{teeth:03d} cone gear")
 
 
 def bore_flat_af_mm(teeth: int) -> float:

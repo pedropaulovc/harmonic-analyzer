@@ -4,8 +4,8 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` import.  The disc is
 driven 12:120 by the knob shaft's finite #8/reference-12 PA20 48DP form and
 screwed to the brass hub's flange (MHA-PD-017, ``pd_transgear_disc_hub_spec``) by three #0-80 fillister
 screws (MHA-VN-039, McMaster 91794A055; the joint is
-``pd_transgear_disc_hub_geometry``'s).  Its Ø13.1 H7 bore pilots on the hub's
-Ø13.1 h6 spigot, which passes it and seats on the pinion sleeve's (MHA-PD-010)
+``pd_transgear_disc_hub_geometry``'s).  Its Ø1/2 in H7 bore pilots on the hub's
+Ø1/2 in h6 spigot, which passes it and seats on the pinion sleeve's (MHA-PD-010)
 step face; its front face, clamped by the hub's flange, stands the spigot's
 length ahead of that step, and its rear face stands in air ahead of the
 sleeve's 12T, radially clear of its tips (R9-68).
@@ -192,7 +192,7 @@ for _profile in _PROFILE_CORNERS:
 
 # One certified pin, re-seated in every physical space, measures pattern
 # eccentricity on a radial indicator. A freely translated span cannot do so.
-TOOTH_SPACE_GAUGE_PIN_DIA_MM = 1.0  # nominal; use the actual certified diameter
+TOOTH_SPACE_GAUGE_PIN_DIA_MM = 0.040 * MM_PER_IN  # .040 in gauge pin, nominal; use the actual certified diameter
 TOOTH_SPACE_RUNOUT_TIR_MM = toothspace_runout_tir_mm()  # assembled cluster, inclusive of pilot float
 
 
@@ -240,11 +240,11 @@ STANDARD_CENTRE_DISTANCE = (TEETH + MESH_PINION_TEETH) * MODULE_MM / 2.0
 CENTRE_EXTENSION = CENTRE_DISTANCE - STANDARD_CENTRE_DISTANCE
 
 # --- disc body -----------------------------------------------------------------
-FACE_WIDTH = 3.0
+FACE_WIDTH = 0.125 * MM_PER_IN
 # Printed .XXX, functional (R9-5): the hub may never stand proud of the
 # sleeve nose, and that stack reads the disc thickness.
 FACE_WIDTH_PLACES = 3
-BORE_DIA = SPIGOT_DIA  # 13.1
+BORE_DIA = SPIGOT_DIA  # 12.70 (1/2 in)
 # Pilots on the hub's spigot (MHA-PD-017, pd_transgear_disc_hub_geometry): one ISO
 # fit, the bore reamed H7 at 10-18 mm over the spigot's h6, a locational
 # clearance that assembles by hand, so the disc never binds and sits at most
@@ -303,7 +303,7 @@ TAP_CENTRES = screw_centres()
 
 # No countersink (R9-63): a 90° countersink opening past the 1.524 major
 # costs at least (1.524 - 1.191) / 2 = 0.167 of full thread at its mouth on
-# the 3.0 disc, so both mouths carry a burr break only (not modelled).  Full
+# the 1/8 in disc, so both mouths carry a burr break only (not modelled).  Full
 # thread starts where the break's 45° leg meets the tap drill.
 MOUTH_BREAK_MAX = 0.10
 

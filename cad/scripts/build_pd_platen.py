@@ -6,18 +6,17 @@ strips, and the two back-side guide rails the platen hangs on are
 separate parts (build_pd_platen_rack.py / build_pd_platen_clip.py /
 build_pd_platen_guide.py). Fastener holes:
 
-* four clip-screw #2-56 through receivers at the resized plate's extreme
-  left/right edges (x 5.3928/264.2472), matching the resized clips'
-  7.1904-inset end holes at local y 29.6604/127.6296, each tapped on
-  through a Ø7 x 1.70 boss on the back face for >= 1.5D engagement;
-* ten O3 guide-screw through-holes in two rows of 5 (ch22 front photo)
-  at the guide rail centrelines: bottom row y 13, top row y 47 (machine
-  318 / 352 with the plate at y 305).
+* four clip-screw #2-56 through receivers at the plate's extreme
+  left/right edges (x 3/16 in from each side), matching the clips'
+  5/16-inset end holes at local y 2-5/16 / 5, each tapped on through a
+  Ø1/4 boss on the back face for >= 1.5D engagement;
+* ten Ø1/8 guide-screw through-holes in two rows of 5 (ch22 front photo)
+  at the guide rail centrelines: bottom row y 1/2, top row y 1-27/32.
 
-Dimensions: the ch30-p002 Pose Studio fit sets the width to 269.64 mm and
-the user-confirmed front-face proportion to height:width = 1:2, hence
-134.82 mm high. Thickness: the p.55 edge-on-photo estimate (~4 mm), thinned
-to 3.85 (R9-68) for disc-to-platen air.
+Dimensions: the ch30-p002 Pose Studio fit set the width to 269.64 mm, snapped
+to 10-5/8 in, and the user-confirmed front-face proportion height:width =
+1:2, hence 5-5/16 high. Thickness: the p.55 edge-on-photo estimate (~4 mm),
+1/8 in brass plate in the all-inch build.
 
 Layout: width along +X, height along +Y from the origin corner, thickness
 extruded +Z.
@@ -127,7 +126,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "plate height (1:2 front-face ratio)", "y", PLATE_HEIGHT
     )
 
-    # Clip-screw receiver bosses: four Ø7 integral bosses on the back face
+    # Clip-screw receiver bosses: four Ø1/4 integral bosses on the back face
     # (z = PlateThickness), sketched on the front plane and extruded from that
     # offset, so the through taps below gain the boss height of thread.
     bosses = SketchDims()
@@ -159,7 +158,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Clip-screw receivers: ONE native Hole Wizard #2-56 through-tapped
     # feature (4 points) from the front face. The heads sit on the clip's flat
-    # 0.8 sheet, so the 3.85 plate plus the 1.70 rear boss take the rest of the
+    # .032 sheet, so the 1/8 plate plus the rear boss take the rest of the
     # stock shank as thread and its tip finishes flush at the boss's rear face
     # rather than bottoming in a blind socket.
     pre = await adapter.get_mass_properties()
@@ -183,10 +182,10 @@ async def build(adapter) -> dict[str, str]:
 
     # Guide-screw through-holes + head counterbores: ONE native Hole Wizard
     # counterbored #4 FILLISTER feature (10 points) from the front face. The
-    # Ø3 shanks pass through into the guide rails and the Ø6.5 x 2.9178
+    # shanks pass the Ø1/8 holes into the guide rails and the Ø1/4 x 2.9178
     # counterbores hold the stock heads exactly 0.2 sub-flush.
-    # The through Ø3 and counterbore Ø6.5 artefact diameters are preserved as
-    # explicit overrides; only depth follows the exact purchased head.
+    # The through Ø1/8 and counterbore Ø1/4 diameters are explicit
+    # overrides; only depth follows the exact purchased head.
     pre = post
     wizard_holes(
         adapter,

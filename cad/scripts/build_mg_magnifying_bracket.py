@@ -88,21 +88,23 @@ from magnifying_bracket_joint_layout import (
     SIDE_PLATE_THICKNESS,
 )
 from _holes import wizard_holes
+from _inch import inch
 
 PART_NAME = "mg-magnifying-bracket"
 MATERIAL = "Plain Carbon Steel"  # black hardware
 
-COLLAR_OD = 12.0  # rod collar (low)
-# The bore is the press seat for the O6 lever rod: nominal and band come from
+COLLAR_OD = inch(1, 2)  # rod collar (low; was 12.0)
+# The bore is the press seat for the O1/4 lever rod: nominal and band come from
 # mg_lever_press_fit_geom (ONE config-free read point for the joint).
 # Half the collar length along X. CONFIG owns it
 # (output.magnifier_collar_half_len_mm): the error
 # budget derives the magnifier's minimum pose from the collar face, so the
 # config value must drive the CAD, not merely be asserted equal to it.
 COLLAR_HALF_LEN = LEVER_COLLAR_HALF_LEN
-ARM_HALF_X = 5.0  # arm 10 wide (x), y -3..+4.5 (low)
-ARM_Y = (-3.0, 4.5)
-ARM_Z = (4.0, 58.3)
+ARM_HALF_X = inch(3, 16)  # arm 3/8 wide (x), y -1/8..+3/16 (low; was 10, -3..+4.5)
+ARM_Y = (-inch(1, 8), inch(3, 16))
+# Starts inside the collar; ends 1/8 past the 2-1/4 seat plane (was 4.0..58.3).
+ARM_Z = (inch(3, 16), inch(2 + 3 / 8))
 
 async def _volume(adapter) -> float:
     res = await adapter.get_mass_properties()
@@ -537,7 +539,7 @@ async def build(adapter) -> dict[str, str]:
     # the hole-datum face (FootprintOffset) and the thickness
     # (FootprintThickness), every one driven by the globals so an edited
     # flange or arm moves the witness with the body.
-    if ARM_HALF_X != FLANGE_X[1]:
+    if abs(ARM_HALF_X - FLANGE_X[1]) > 1e-9:  # shared face; mm float noise only
         raise RuntimeError(
             "the arm footprint witness lies on the flange's east end, which the "
             f"arm's +X face must share: ARM_HALF_X {ARM_HALF_X} != FLANGE_X[1] {FLANGE_X[1]}"

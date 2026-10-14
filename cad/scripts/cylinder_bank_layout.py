@@ -44,6 +44,7 @@ from __future__ import annotations
 import math
 
 import _config
+from _inch import inch
 import dt_arbor_pedestal_spec as _pedestal
 import vn_arbor_set_screw_spec as _screw
 import ch_connecting_rod_spec as _rod
@@ -195,7 +196,7 @@ STRAP_OUTER_SPAN = STRAP_INNER_SPAN + 2.0 * _pedestal.STRAP_T
 # ARBOR_DOME_HEIGHT proud of its strap's outer face. Its cylinder IS the span
 # over both straps, the length the fitter measures and cuts to (#743,
 # superseding U34b's "span less 6.0").
-ARBOR_DOME_HEIGHT = 1.5
+ARBOR_DOME_HEIGHT = inch(1, 16)
 ARBOR_LENGTH = STRAP_OUTER_SPAN
 ARBOR_SOUTH_Z = FRONT_STRAP_INNER_Z - _pedestal.STRAP_T
 ARBOR_OVERALL_LENGTH = ARBOR_LENGTH + 2.0 * ARBOR_DOME_HEIGHT

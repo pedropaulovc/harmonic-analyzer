@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_filing_button_spec as button
+from _inch import inch
 from _printed_tolerance import printed_deviations
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -37,8 +38,10 @@ if button.BORE_DIA + button.BORE_BAND[1] - _BODY_MAX < BODY_CLEARANCE_MIN:
 
 # The head seat carries the lower button; the head stays inside the button
 # face and outside the button bore.
-HEAD_DIA = 9.0
-HEAD_LENGTH = 3.5  # collar: two millimetres left at the worst-case stations
+HEAD_DIA = inch(3, 8)
+# Collar: two millimetres left at the worst-case stations. 5/32: 1/8 leaves
+# under two at the .X and .XX bands.
+HEAD_LENGTH = inch(5, 32)
 if not (
     button.BORE_DIA + button.BORE_BAND[0]
     < HEAD_DIA
@@ -56,17 +59,19 @@ if not (
 # the body length is their difference, checked at worst case below.
 STATION_PLACES = 2  # thread start and head seat: the stack reads from them
 STOCK_PLACES = 1  # head back face and vise end: stock only
-BODY_LENGTH = 12.8  # model: seat face to the thread start (derived on print)
-THREAD_END = 29.0  # seat face to the faced tip; printed tip to seat
+BODY_LENGTH = inch(9, 16)  # model: seat face to the thread start (derived on print)
+# Seat face to the faced tip; printed tip to seat. 1-1/4: 1-3/16 leaves the
+# nut under 1.5D of full thread on the thickest 3/16 button stack.
+THREAD_END = inch(5, 4)
 THREAD_START = THREAD_END - BODY_LENGTH  # printed: tip to the thread start
-TAIL_END = 45.0  # seat face to the vise end: head plus a forty-two vise tail
+TAIL_END = inch(7, 4)  # seat face to the vise end: head plus a 1-19/32 vise tail
 HEAD_BACK = THREAD_END + HEAD_LENGTH  # printed: tip to the head's back face
 OVERALL_LENGTH = TAIL_END + THREAD_END  # printed: tip to the vise end
-TAIL_DIA = 8.0  # stout in the vise; clear of the thread and body sizes
+TAIL_DIA = inch(5, 16)  # stout in the vise; clear of the thread and body sizes
 # HA fastener policy (memory/fastener-policy-us-customary.md): the
 # inventory's M6 maps to 1/4-20 UNC; an external thread is class 2A.
 THREAD = "1/4-20 UNC-2A"
-THREAD_MODEL_DIA = 6.35
+THREAD_MODEL_DIA = inch(1, 4)
 
 _BUTTON_MIN, _BUTTON_MAX = [
     round(button.THICKNESS + deviation, 12)
@@ -92,8 +97,8 @@ if _BODY_LEN_MIN <= _HUB_TOP_MAX:
 # pitches beyond the thread start), whichever is higher; it ends one pitch
 # short of the faced tip (the tip chamfer) or at the nut's far chamfer.
 NUT_SKU = "90264A435"
-NUT_LENGTH = 7.0 / 8.0 * 25.4
-_THREAD_PITCH = 25.4 / 20.0
+NUT_LENGTH = inch(7, 8)
+_THREAD_PITCH = inch(1, 20)
 _NUT_CHAMFER = _THREAD_PITCH
 _DIE_RUNOUT = 1.5 * _THREAD_PITCH
 _TIP_CHAMFER = _THREAD_PITCH

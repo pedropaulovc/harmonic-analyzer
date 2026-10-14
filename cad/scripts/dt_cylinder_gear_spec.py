@@ -19,6 +19,7 @@ from _gear_fit_limits import gear_tip_band_mm
 from _printed_tolerance import printed_deviations
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _inch import inch
 from stock_form_cutter import CutterTemplate, StockFormProfile
 
 
@@ -75,10 +76,10 @@ BORE_DIAMETRAL_CLEARANCE_MM = (0.030, 0.070)  # (minimum, maximum), matched fit
 # Representative finished geometry at the midpoint of the matched running fit.
 # Manufacturing still matches every bore to the actual finished arbor.
 BORE_DIA = arbor.SHAFT_DIA + sum(BORE_DIAMETRAL_CLEARANCE_MM) / 2.0
-FACE_WIDTH = 3.0
+FACE_WIDTH = inch(1, 8)
 # Face width controls mesh engagement across the mating cone-gear family.
 FACE_WIDTH_TOLERANCE_MM = 0.05
-CAM_DIA = 30.6  # integral eccentric cam disc
+CAM_DIA = inch(19, 16)  # integral eccentric cam disc
 CAM_DIA_BAND = (0.0, -0.05)  # (upper, lower) deviations
 # Solid stack (#743): the overall thickness, cam face to back face, IS the
 # channel station pitch (machine channels.station_pitch_mm, pinned by
@@ -92,7 +93,7 @@ CAM_DIA_BAND = (0.0, -0.05)  # (upper, lower) deviations
 OVERALL_THICKNESS = 7.0565
 OVERALL_THICKNESS_BAND = (0.025, -0.025)  # (upper, lower) deviations
 CAM_THICKNESS = OVERALL_THICKNESS - FACE_WIDTH  # reference: the closed rod slot
-ECCENTRICITY = 8.64  # cam axis offset from the bore axis
+ECCENTRICITY = inch(5, 16)  # cam axis offset from the bore axis
 # The cam must merge wholly into the actual uncut web, not a fictitious
 # actual-N circular root blank.  The native builder checks this same margin.
 CAM_ROOT_WEB_MIN_MM = STOCK_FORM.root_radius_min_mm - (CAM_DIA / 2.0 + ECCENTRICITY)
@@ -102,9 +103,9 @@ SET_ECCENTRICITY_RANGE_MM = 0.025
 # datum); error_budget.yaml cam_phase. Carried on the native NotchPhase
 # angular dimension (build_dt_cylinder_gear), lobe axis to notch radial.
 CAM_PHASE_TOLERANCE_DEG = 0.25
-NOTCH_WIDTH = 0.4  # alignment saw-kerf
+NOTCH_WIDTH = inch(1, 64)  # alignment saw-kerf: a standard 1/64 in slitting saw
 NOTCH_WIDTH_BAND = (0.10, 0.0)  # (upper, lower) deviations
-NOTCH_DEPTH = 3.0
+NOTCH_DEPTH = inch(1, 8)
 NOTCH_DEPTH_TOLERANCE_MM = 0.2
 TIP_RADIUS = OUTSIDE_DIA / 2.0
 NOTCH_FLOOR_RADIUS = TIP_RADIUS - NOTCH_DEPTH
@@ -187,7 +188,7 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # The one sheet-derived dimension: the parenthesised cam thickness (overall
 # less face width, #743), a read-only difference with no model dimension to
 # import.  Two places: it is the closed rod slot, and one place would print
-# 4.1 for the 4.0565 the ring runs in.  Its places are still specification,
+# 3.9 for the 3.8815 the ring runs in.  Its places are still specification,
 # so the sheet reads them here.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {"cam thickness reference": 2}
 

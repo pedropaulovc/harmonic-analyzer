@@ -11,33 +11,37 @@ drive equations; cam, alignment notch and bore are parametric too.
 
 Features, in order:
 
-1. Gear blank: disc at the finite-support-derived tip radius, face width 3 mm,
-   extruded z = 0..3 from the Front plane. The face width comes from the
-   M6 axial-budget resolution (Appendix C #6): face/pitch = 0.38 measured
-   on the p.22 stack macro x the 7.5 mm axial pitch.
+1. Gear blank: disc at the finite-support-derived tip radius, face width
+   1/8 in (3.175 mm), extruded z = 0..3.175 from the Front plane. The face
+   width comes from the M6 axial-budget resolution (Appendix C #6): face/pitch
+   = 0.38 measured on the p.22 stack macro x the 7.5 mm axial pitch (3.0 mm),
+   snapped to the inch fraction (all-inch experiment).
 2. One finite stock tooth gap, with translated reference involute flanks
    and an off-centre root arc, cut through and circular-patterned at the
    PHYSICAL 120 teeth. No unsupported upper-flank continuation.
 3. Integral eccentric cam (book ch. 13, pp. 22-25): one of the 20 cams that
    convert each gear's rotation into the near-sinusoidal reciprocation of its
-   connecting rod (displacement = ECCENTRICITY x sin(theta)). Disc OD 30.6 mm,
-   centre offset +Y by the 8.64 mm eccentricity, boss-extruded from the Front
+   connecting rod (displacement = ECCENTRICITY x sin(theta)). Disc OD 1-3/16 in
+   (30.1625 mm), centre offset +Y by the 5/16 in (7.9375 mm) eccentricity,
+   boss-extruded from the Front
    plane through the blank to the OVERALL thickness z = 0..7.0565 (#743: the
    overall thickness is the station pitch, so the bank stacks cam face on back
    face and the cam fills the connecting-rod slot; the cam's own thickness,
-   4.0565, is a reference). Cam disc centred on the bore, offset +Y by the
+   3.8815, is a reference). Cam disc centred on the bore, offset +Y by the
    eccentricity -- the
    lobe points +Y, the NOTCH side: the ch14 end views prove the rocker tips sit
    at the TOP of their stroke at notch-up/0-cranks, so lobe-up is the cos-mode
-   home pose; the pre-ROM-fit build authored it -Y, 180 deg off). The throw is
-   MEASURED from the ch14 end-view ROM fit (tip half-amplitude 9.458 mm x
-   127.37/139.5); the real machine drives the rod with a CUT TEMPLATE cam (the
+   home pose; the pre-ROM-fit build authored it -Y, 180 deg off). The throw
+   was MEASURED from the ch14 end-view ROM fit (tip half-amplitude 9.458 mm x
+   127.37/139.5 = 8.64 mm) and is snapped to 5/16 in (all-inch experiment);
+   the real machine drives the rod with a CUT TEMPLATE cam (the
    p.25 teardrop outline; Michelson 1898 closing note), modeled here as the
    kinematically-equivalent circular eccentric-and-strap -- the ring centre
    follows the same simple-harmonic orbit the template was cut to produce.
    (This is the former standalone ``build_eccentric_cam.py`` / ``eccentric-cam``
    part, MHA-029, now folded into the gear -- the cam was always integral.)
-4. Alignment notch: 3 mm deep saw KERF cut between two teeth (the p.23
+4. Alignment notch: 1/8 in (3.175 mm) deep, 1/64 in slitting-saw KERF cut
+   between two teeth (the p.23
    "notch" photo shows a thin kerf -- the real gears keep all 120 teeth, NOT
    a missing tooth). +Y (90 deg = 30*gamma) is a tooth crest at 120 T, so the
    kerf is seated in the adjacent root valley (90 deg + gamma/2); the flanking
@@ -50,14 +54,14 @@ Features, in order:
    refutation"). The legacy keyway was fiction and was removed in M6.2.
 
 Every feature's volume delta is asserted against its actual geometry oracle,
-except the notch kerf, whose ~2.2 mm^3 is below the mass-property noise of the
+except the notch kerf, whose ~2.6 mm^3 is below the mass-property noise of the
 spline-toothed body: its floor and wall faces are read back against material
 classified by that same finite repeated-tooth profile.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 13".
 
-Layout: gear axis = Z through the origin, gear z = 0..3 mm, cam z = 3..7.0565,
-cam lobe +Y, notch +Y (lobe on the notch side).
+Layout: gear axis = Z through the origin, gear z = 0..3.175 mm, cam z =
+3.175..7.0565, cam lobe +Y, notch +Y (lobe on the notch side).
 
 Run (SolidWorks already open)::
 
@@ -353,7 +357,7 @@ async def build(adapter) -> dict[str, str]:
     volume = v_teeth
 
     # ------------------------------------------------------------------
-    # Integral cam on the far gear face (z = 3..OVERALL), lobe +Y (notch side).
+    # Integral cam on the far gear face (z = FACE_WIDTH..OVERALL), lobe +Y (notch side).
     # It is extruded from the Front plane THROUGH the blank so its one depth
     # dimension is the overall thickness -- the station pitch the solid bank
     # stacks on (#743), carrying the print band.  The cam lies wholly inside
@@ -468,7 +472,8 @@ async def build(adapter) -> dict[str, str]:
     # The construction witness makes the depth a real, source-driven model
     # dimension.  Its start is the floor midpoint and its end is the actual
     # +Y tooth crest, so the imported drawing dimension has deterministic
-    # extension origins and reads 3.0 rather than selecting a nearby involute.
+    # extension origins and reads 3.2 (1/8 in at one place) rather than
+    # selecting a nearby involute.
     check(
         "notch witness floor midpoint",
         await adapter.add_sketch_constraint(
@@ -613,8 +618,8 @@ async def build(adapter) -> dict[str, str]:
 
     # ------------------------------------------------------------------
     # Shaft bore through gear + cam (the bore circle is fully inside the
-    # eccentric cam disc: ecc 8.64 + bore_r 4.76 = 13.40 < cam_r 15.3,
-    # a 1.90 mm wall at the thin side).
+    # eccentric cam disc: ecc 7.9375 + bore_r 4.7875 = 12.725 < cam_r 15.081,
+    # a 2.356 mm wall at the thin side).
     # ------------------------------------------------------------------
     # Shaft bore: ordinary on-axis circle (origin centre -> no centre dims, just
     # the diameter), driven by the BoreDiameter knob.

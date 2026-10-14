@@ -34,7 +34,7 @@ Every gear land's flat (SECTION_FLAT_AF, across flat) runs the whole land;
 the terminal land's runs out through the tip, so its end face is a D.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- the journal comes from the
-manually rederived v2 post bore and its 42.011 axial body; the gear-seat
+pivot post's reamed bore and its axial body (dt_cone_pivot_post_spec); the gear-seat
 stations and diameters remain the legacy/derived stack (Appendix C #7).
 
 Build: coaxial circles extruded along +Z to each section's end station with
@@ -157,7 +157,7 @@ async def build(adapter) -> dict[str, str]:
     # Editable knobs (Tools > Equations): one diameter + one end station per
     # section. The mm suffix is load-bearing -- this is an INCH document and the
     # equation manager reads BARE numbers in document units. The section diameters
-    # come from SECTIONS in inches (the first is the metric v2 journal converted
+    # come from SECTIONS in inches (the first is the post-bore journal converted
     # to inches by the pure-data spec). The end stations are extrude DEPTHS
     # (feature parameters); each is named Sec{i}End and driven by its SecEnd{i}
     # global below, so the knobs really reshape the shaft AND the stations are

@@ -15,7 +15,7 @@ with the collar's outer face.
 p.46 "firmly affixed to the summing lever" (user ruling 2026-10-11; LIGHT PRESS
 approved by Main): the rod's last PRESS_ZONE_LENGTH seats end-flush in the
 bracket collar. Its cylindrical COLLAR_ENGAGEMENT is a LIGHT PRESS retained with
-Loctite 638. The R3 dome is not part of the banded cylindrical zone, but the
+Loctite 638. The R1/8 dome is not part of the banded cylindrical zone, but the
 partial hemisphere still larger than the bore contributes press contact.
 The rod is modelled at nominal diameter; the cylinder's stock-select/lap band
 and collar-bore band are native (upper, lower) ``_fit_deviations`` on their prints.
@@ -33,11 +33,11 @@ evaluated at independently conservative print corners: the thinnest wall
 (COLLAR_OD_MIN) for bore stress, the stiffest wall (COLLAR_OD_MAX) for contact
 pressure and press-in force, each with the tightest interference. Total force
 adds full-pressure dome axial normal force over its projected annulus to the
-full-pressure friction over COLLAR_ENGAGEMENT_MAX (Lmax 7.2078194326718075),
+full-pressure friction over COLLAR_ENGAGEMENT_MAX (Lmax 6.563715447938681),
 including partial hemisphere contact. Maximum cylinder length uses the minimum
 dome radius; maximum dome extension and projected area use the maximum radius
 and minimum bore, independently conservative corners rather than one physical
-rod. Stock may itself be Ø6.000, so no clearance outside the selected land is
+rod. Stock may itself be Ø6.350, so no clearance outside the selected land is
 assumed.
 """
 
@@ -45,17 +45,21 @@ from __future__ import annotations
 
 import math
 
-# --- rod stock (DIMENSIONS.md ch20; Ø6 photo-scaled, low) ---------------------
-ROD_DIA = 6.0  # round brass rod, modelled at nominal end to end
+from _inch import inch
+
+# --- rod stock (DIMENSIONS.md ch20; Ø6 photo-scaled, low; all-inch 1/4) -------
+ROD_DIA = inch(1, 4)  # round brass rod, modelled at nominal end to end (was 6.0)
 
 # --- press zone (the rod's east end) and the collar bore it enters -----------
-PRESS_ZONE_LENGTH = 10.0  # the rod's last 10 = the collar's length
+PRESS_ZONE_LENGTH = inch(3, 8)  # the rod's last 3/8 = the collar's length (was 10.0)
 PRESS_ZONE_LENGTH_BAND = (0.0, -0.05)  # tip to the start of the selected/lapped land
 COLLAR_LENGTH = PRESS_ZONE_LENGTH  # end-flush collar, modelled at its maximum length
 COLLAR_LENGTH_BAND = (0.0, -0.05)
-PRESS_ZONE_DIA = ROD_DIA  # the model's rod, 6.000
+PRESS_ZONE_DIA = ROD_DIA  # the model's rod, 6.350
 PRESS_ZONE_DIA_BAND = (0.0, -0.006)  # (upper, lower): select or lap the stock
-COLLAR_BORE_DIA = 5.986  # bored to size on the bracket
+# Bored to size on the bracket: the rod nominal less the unchanged 0.014 fit
+# allowance (was 5.986 on the Ø6 rod).
+COLLAR_BORE_DIA = round(ROD_DIA - 0.014, 6)  # 6.336
 COLLAR_BORE_BAND = (0.006, 0.0)  # (upper, lower)
 # End-flush: the rod's east dome tip sits flush with the collar's outer face
 # (mg_magnifying_lever_geom asserts its configured window ends there), so the
@@ -96,14 +100,14 @@ COLLAR_ENGAGEMENT_MAX = _press_contact_envelope(
     COLLAR_BORE_DIA + COLLAR_BORE_BAND[1],
 )
 # ANSI B4.1 table 8, class FN2 (medium drive fit) for the rod's size range
-# 0.12..0.24 in: 0.2 .. 1.0 thou of diametral interference. A CAP only: the
+# 0.24..0.40 in: 0.4 .. 1.4 thou of diametral interference. A CAP only: the
 # collar's strength below binds well inside it.
 MM_PER_IN = 25.4
-_FN2_SIZE_RANGE_IN = (0.12, 0.24)
-PRESS_INTERFERENCE_MAX_FN2 = 0.0010 * MM_PER_IN
+_FN2_SIZE_RANGE_IN = (0.24, 0.40)
+PRESS_INTERFERENCE_MAX_FN2 = 0.0014 * MM_PER_IN
 
 # --- collar section and materials for the Lamé check (MPa, mm) ---------------
-COLLAR_OD = 12.0  # the bracket's steel collar (build_mg_magnifying_bracket)
+COLLAR_OD = inch(1, 2)  # the bracket's steel collar (build_mg_magnifying_bracket; was 12.0)
 # CollarOd prints at two places with no native band, so the title block's
 # inherited .XX ±0.51 governs it (upper, lower). Restated, not read from
 # _config, to keep this module config-free; the tests pin it to the block.
@@ -172,8 +176,8 @@ def press_fit_budget(
     still larger than the bore. The longest collar and minimum dome radius
     maximize cylinder length; the maximum radius and minimum bore maximize
     dome extension. Combining those independent corners bounds every physical
-    part, giving print-worst Lmax 7.2078194326718075 rather than one coupled
-    corner's contact length. Stock OD can also be Ø6.000, so collar length
+    part, giving print-worst Lmax 6.563715447938681 rather than one coupled
+    corner's contact length. Stock OD can also be Ø6.350, so collar length
     outside the qualified land is not assumed clear; the explicit collar-length
     band bounds contact. ``mu * p * pi * d * L`` bounds friction over this
     envelope. Add the dome's axial normal-force bound, ``p * pi *
@@ -181,7 +185,7 @@ def press_fit_budget(
     same full maximum pressure, without taper-pressure integration. Both
     ``press_force_min_n`` and ``press_force_max_n`` are TOTAL force across
     PRESS_FRICTION, not a range across collar-OD corners. Nominal straight
-    cylindrical engagement remains 7 mm. Candidate slip fits remain evaluable
+    cylindrical engagement remains 6.35 mm (1/4). Candidate slip fits remain evaluable
     for ``check_press_fit_budget`` to reject; a bore at or above the largest
     rod has zero dome projected area."""
     rod_max = PRESS_ZONE_DIA + press_zone_dia_band[0]
@@ -239,7 +243,7 @@ PRESS_FIT_BUDGET = press_fit_budget()
 if not (
     _FN2_SIZE_RANGE_IN[0] * MM_PER_IN < PRESS_ZONE_DIA <= _FN2_SIZE_RANGE_IN[1] * MM_PER_IN
 ):
-    raise AssertionError("PRESS_INTERFERENCE_MAX_FN2 is the 0.12..0.24 in row")
+    raise AssertionError("PRESS_INTERFERENCE_MAX_FN2 is the 0.24..0.40 in row")
 check_press_fit_budget(PRESS_FIT_BUDGET)
 if COLLAR_ENGAGEMENT <= 0.0 or COLLAR_ENGAGEMENT >= PRESS_ZONE_LENGTH:
     raise AssertionError("the dome must start inside the collar, past its inner face")

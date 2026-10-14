@@ -1,7 +1,13 @@
 vn-crank-hub-pin:
   number: MHA-VN-029
-  material: 4 mm m6 steel dowel pin, ISO 2338
-  material_specification: 4 mm m6 steel dowel pin, ISO 2338
+  stock_name: Alloy Steel Dowel Pin
+  supplier: McMaster-Carr
+  supplier_skus: [98381A487]
+  material: Alloy steel dowel pin, 5/32 in, cut to length
+  material_specification: "Alloy steel dowel pin, 5/32 x 1/2, Round x Chamfer ends, diameter +0.0001/+0.0003 in; McMaster-Carr 98381A487"
+  # https://www.mcmaster.com/98381A487/
+  # Live primary page verified 2026-10-14 (in stock). All-inch swap from the
+  # metric 4 mm m6 ISO 2338 dowel stock.
   finish: ends faced, deburred, oiled
   quantity: 1
   tolerance_class: machined_block

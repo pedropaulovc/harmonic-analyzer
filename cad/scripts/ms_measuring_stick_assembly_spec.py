@@ -42,8 +42,8 @@ Rows = tuple[tuple[float, float, float], ...]
 IDENTITY_ROWS: Rows = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
 
 # --- Stick ------------------------------------------------------------------
-# ms-stick's frame: X along the 200 bar, Y across its 8 width (the ticks hang
-# from the y=8 edge), Z through its 3 thickness from the graduated z=0 face
+# ms-stick's frame: X along the 7-7/8 in bar, Y across its 5/16 in width (the
+# ticks hang from the y=BODY_WIDTH edge), Z through its 1/8 in thickness from the graduated z=0 face
 # (outward normal -Z). Graduations up against the roof: part -Z -> +Y, i.e.
 # part Z -> -Y; part X stays along the stop; part Y runs across into +Z.
 STICK_ROWS: Rows = ((1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, -1.0, 0.0))

@@ -11,9 +11,9 @@ Part frame (``pd_transgear_arm_plate_geometry``): origin on the knob-shaft bore
 axis K on the MOUNTING face (the Front Plane, which seats on the MHA-PD-018
 arm's rear face); +X and +Y are the arm's axes, the long axis runs along -Y
 from the screws to the end round about K; +Z to the rear.  The over-arm
-section spans z 0..5, the section below the arm z -7.9375..5 (the arm's
-stock thickness), the front hub z -20.5375..-7.9375 and the rear boss
-z 5..8.5.
+section spans z 0..5.55625, the section below the arm z -7.9375..5.55625
+(the arm's stock thickness), the front hub z -20.6375..-7.9375 and the rear
+boss z 5.55625..8.73125.
 
 [INFERENCE] items the sheet prints as they are modelled: the -X edge's kink
 station (``KINK``, read off the book's notch crop) and the rear boss

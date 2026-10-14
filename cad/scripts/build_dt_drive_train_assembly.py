@@ -439,7 +439,10 @@ from dt_crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER  # noqa: E
 from dt_cone_pivot_post_spec import CRANK_BOSS_START_Z as POST_CRANK_BOSS_START_Z  # noqa: E402
 from dt_crankshaft_spec import SEAT_PINION as CRANK_PINION_SEAT  # noqa: E402
 
-CRANK_FACE_Z = -183.0
+# The photo-anchored crank face (machine -183.0) is published once, by the 16T
+# spec that sizes its boss off it; the crankshaft spec reads the same value.
+from dt_crank_pinion_spec import CRANK_FACE_Z  # noqa: E402
+
 _PPOST = cone_station(POST_STATION)
 _POST_BOSS_NORTH = _PPOST[2] - POST_CRANK_BOSS_START_Z
 PINION_TOOTH_Z = _POST_BOSS_NORTH + PINION_SEAT_FEELER + PINION_FACE / 2.0
@@ -536,8 +539,8 @@ CRANK_HUB_PIN_ORIGIN = [
     CRANK_FACE_Z,
 ]
 # The common crank face keeps its photo-backed station.  The arm occupies
-# -183..-175 and the hub continues behind it to its rear face.
-# The shaft cylinder starts flush at -183; only its dome projects outboard.
+# CRANK_FACE_Z..CRANK_ARM_ORIGIN_Z and the hub continues behind it to its rear face.
+# The shaft cylinder starts flush at CRANK_FACE_Z; only its dome projects outboard.
 if abs(CRANK_ARM_ORIGIN_Z - (CRANK_FACE_Z + HUB_SEAT_LENGTH)) > 1e-9:
     raise AssertionError("arm inboard face left the hub shoulder station")
 
@@ -570,8 +573,8 @@ CRANK_SEAT_WASHER_REAR_Z = CRANK_SEAT_WASHER_Z0 + SEAT_WASHER.THICKNESS
 # body; the hub's rear Ø16.5 relief runs from its barrel's rear shoulder to
 # the hub rear face.  Both let the #25 plates wrapping the crank sprocket pass inside
 # the collar/barrel diameters (Main's ruling, 2026-09-30).
-CRANK_SPIGOT_FRONT_Z = CRANKSHAFT_Z0 + SPIGOT_END  # body front face, -148.5
-CRANK_HUB_BARREL_REAR_Z = CRANK_HUB_REAR_Z - HUB_RELIEF_LENGTH  # -161.65
+CRANK_SPIGOT_FRONT_Z = CRANKSHAFT_Z0 + SPIGOT_END  # body front face
+CRANK_HUB_BARREL_REAR_Z = CRANK_HUB_REAR_Z - HUB_RELIEF_LENGTH
 # Chain-plate clearance: the plate's inner edge against the spigot
 # (print-worst, largest) and the hub relief, radially, for the CAD link and a
 # real ANSI #25 plate; axially, a bought chain's envelope (REMOVABLE.ANSI_*)
@@ -791,8 +794,8 @@ if END_DISC_SOUTH_Z0 - ARBOR_STRAP_SOUTH_Z < 0.25:
     raise AssertionError("south thrust washer reaches the south pedestal strap")
 if abs(ARBOR_STRAP_NORTH_Z - (END_DISC_NORTH_Z0 + END_DISC_THICK)) > 1e-9:
     raise AssertionError("north thrust washer does not bear on the datum strap")
-# Plan overlap, not z alone, against the rocker-arm-support foot (x 41.15..
-# 104.65 about SUPPORT_WORLD_X, z +-88.9): the north foot shares its z band but
+# Plan overlap, not z alone, against the rocker-arm-support foot (SUPPORT_WORLD_X
+# +-WIDE in x, z +-88.9): the north foot shares its z band but
 # stands ~89.5 away in x (study rev 3 section 6; the z-only test fired falsely).
 from build_dt_arbor_pedestal import FOOT_WIDTH as _PED_FOOT_WIDTH  # noqa: E402
 from fr_rocker_arm_support_section_spec import WIDE as _SUPPORT_FOOT_HALF_X  # noqa: E402
@@ -845,7 +848,7 @@ from vn_fillister_screw_spec import (  # noqa: E402
 )
 import vn_keeper_chain_spec  # noqa: E402
 
-CRANK_PIN_Z = CRANK_FACE_Z + PIN_HOLE_HEIGHT  # -169.4: behind the 8-mm arm
+CRANK_PIN_Z = CRANK_FACE_Z + PIN_HOLE_HEIGHT  # behind the arm
 CRANK_PIN_X0 = X_CRANK - HUB_BARREL_DIA / 2.0 - PIN_PROUD
 # The ring lies in machine YZ. Its straight local-Z leg is concentric with the
 # pin's machine-Z cross-hole; its bends and return hang toward machine -Y.
@@ -903,8 +906,8 @@ if ANCHOR_THREAD_ENGAGEMENT < 2.0:
     raise AssertionError("anchor screw has under 2.0 thread engagement in the arm")
 if ANCHOR_TIP_RESERVE < 0.5:
     raise AssertionError("anchor screw tip stands within 0.5 of the arm's inboard face")
-# The plate origin is its inboard face (-175): the Ry(180)-composed pose maps
-# the +z extrusion toward machine -z, filling the arm from -175 to -183.
+# The plate origin is its inboard face (CRANK_ARM_ORIGIN_Z): the Ry(180)-composed
+# pose maps the +z extrusion toward machine -z, filling the arm to CRANK_FACE_Z.
 
 if abs(CS_SHAFT_LENGTH - CRANKSHAFT_LENGTH) > 1e-9:
     raise AssertionError("crankshaft part length does not cover the moved pinion")
@@ -1188,6 +1191,8 @@ from dt_pinion_lever_geometry import (  # noqa: E402
 from dt_pinion_lever_pin_geometry import (  # noqa: E402
     INSTALLED_CONFIG as LEVER_PIN_INSTALLED_CONFIG,
 )
+from dt_pinion_lift_rod_spec import ROD_DIA as LIFT_ROD_DIA  # noqa: E402
+from dt_pinion_pivot_shaft_spec import SHAFT_DIA as PIVOT_SHAFT_DIA  # noqa: E402
 from dt_pinion_handle_geometry import (  # noqa: E402
     ROD_DIA as HANDLE_ROD_DIA,
     ROD_DIA_BAND as HANDLE_ROD_DIA_BAND,
@@ -3059,11 +3064,11 @@ if (
     < _GEAR64_TIP_R + TIP_APINION + 0.25
 ):
     raise AssertionError("pinion drum crowds the 64T crank-drive gear")
-if STRAP_C2C < TIP_APINION + 3.175 + 0.25:
+if STRAP_C2C < TIP_APINION + PIVOT_SHAFT_DIA / 2.0 + 0.25:
     raise AssertionError("pivot shaft fouls the pinion drum tips")
-if math.hypot(LIFT_X - APINION_X, APINION_Y - PIVOT_Y) < TIP_APINION + 3.175 + 0.25:
+if math.hypot(LIFT_X - APINION_X, APINION_Y - PIVOT_Y) < TIP_APINION + LIFT_ROD_DIA / 2.0 + 0.25:
     raise AssertionError("lift rod fouls the pinion drum tips")
-if abs(LIFT_X - PIVOT_X) < STRAP_R_END + 3.175 + 0.25:
+if abs(LIFT_X - PIVOT_X) < STRAP_R_END + LIFT_ROD_DIA / 2.0 + 0.25:
     raise AssertionError("lift rod fouls the strap's swinging pivot end cap")
 if LEVER_Z + LEVER_HUB_LEN / 2.0 > BLOCK_FRONT_Z0 - 0.25:
     raise AssertionError("lever hub reaches the front pivot block")
@@ -3087,7 +3092,7 @@ else:
     )
 # Where the rod plane shares the collar's z band, the Ø15 collar -- not the
 # Ø8 shaft -- is what the lever passes.
-_LEV_ROD_Z = (LEVER_Z - 3.0, LEVER_Z + 3.0)
+_LEV_ROD_Z = (LEVER_Z - LEVER_ROD_DIA / 2.0, LEVER_Z + LEVER_ROD_DIA / 2.0)
 _ARBOR_DIA_AT_LEVER = (
     ARBOR_COLLAR_OD
     if _LEV_ROD_Z[0] < ARBOR_COLLAR_Z[1] + 0.25 and _LEV_ROD_Z[1] > ARBOR_COLLAR_Z[0] - 0.25
@@ -3224,8 +3229,8 @@ if abs(FPIN_DIA - STRAP_PIN_BORE) > 1e-9:
 if abs(FPIN_SEAT - FPIN_SEAT_LEN) > 1e-9:
     raise AssertionError("pin SEAT_LEN disagrees with the bracket PIN_SEAT")
 # U27 slip fit: the set-screwed cam needs only 0.02-0.10 diametral clearance on
-# the Ø6.35 lift rod (dt_pinion_cam_spec proves it at the printed limits).
-if not 0.02 <= CAM_BORE_DIA - 6.35 <= 0.10:
+# the lift rod (dt_pinion_cam_spec proves it at the printed limits).
+if not 0.02 <= CAM_BORE_DIA - LIFT_ROD_DIA <= 0.10:
     raise AssertionError("cam bore nominal is outside its 0.02-0.10 slip clearance")
 if CAM_THIN_SIDE_WALL < 1.5:
     raise AssertionError("cam thin-side wall is below the 1.5 mm U27 floor")
@@ -3374,7 +3379,7 @@ if _PIN_SEAT_REMAINING_WALL < _PIN_SEAT_R:
 _CAM_SWEEP_R = CAM_ECC + CAM_OD / 2.0  # 9.3: U28 boss deleted, bare collar
 if LIFT_Y - _CAM_SWEEP_R - Y_BASE_TOP < 0.25:
     raise AssertionError("cam collar sweep reaches the base top")
-if math.hypot(PIVOT_X - LIFT_X, PIVOT_Y - LIFT_Y) - _CAM_SWEEP_R - 3.175 < 0.25:
+if math.hypot(PIVOT_X - LIFT_X, PIVOT_Y - LIFT_Y) - _CAM_SWEEP_R - PIVOT_SHAFT_DIA / 2.0 < 0.25:
     raise AssertionError("cam sweep reaches the pivot shaft")
 # The return spring stands east of the strap and the lift rod west of it,
 # the collar's sweep spanning the blade's height.  The whole leaf -- foot,
@@ -3398,7 +3403,7 @@ _SPR_WEST_X = max(
 )
 SPRING_TO_LIFT_ROD = (
     LIFT_X
-    - max(3.175, _CAM_SWEEP_R)
+    - max(LIFT_ROD_DIA / 2.0, _CAM_SWEEP_R)
     - _SPR_WEST_X
     - sum(SPRING_WEST_SHIFT_STACK.values())
 )
@@ -3927,12 +3932,12 @@ if ARBOR_COLLAR_Z[1] > RIG.STRAP_Z_OUTER[0] - 0.25:
 if ARBOR_COLLAR_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
     raise AssertionError("arbor collar reaches the integral grip head's neck")
 for _lo, _hi, _axis_xy, _r, _what in (
-    (LIFT_ROD_Z0, LIFT_ROD_Z0 + RIG.LIFT_ROD_LEN, (LIFT_X, LIFT_Y), 3.175, "lift rod"),
+    (LIFT_ROD_Z0, LIFT_ROD_Z0 + RIG.LIFT_ROD_LEN, (LIFT_X, LIFT_Y), LIFT_ROD_DIA / 2.0, "lift rod"),
     (
         PIVOT_SHAFT_Z0,
         PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN,
         (PIVOT_X, PIVOT_Y),
-        3.175,
+        PIVOT_SHAFT_DIA / 2.0,
         "pivot shaft",
     ),
 ):
@@ -3970,8 +3975,8 @@ if not (ARBOR_DIA == DRUM_BORE_DIA == STRAP_ARBOR_BORE):
 # the assembly only needs the shared nominal it places both parts at.
 if abs(HANDLE_ROD_DIA - ARBOR_CROSS_HOLE_DIA) > 1e-9:
     raise AssertionError("grip crossrod and head hole no longer share a nominal")
-if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
-    raise AssertionError("strap pivot bore no longer rides the O6.35 shaft")
+if abs(STRAP_PIVOT_BORE - PIVOT_SHAFT_DIA) > 1e-9:
+    raise AssertionError("strap pivot bore no longer rides the torque shaft")
 # Block screws: the catalog-owned #8-32 fully threaded stock screws pass
 # through normal #8 clearance holes. Engagement follows the current raised
 # block height and the matching blind base seat, not the retired stock length.
@@ -5181,7 +5186,7 @@ async def build(adapter) -> dict[str, str]:
     # handle reads "down" in all eight roll angles, which only a -Y arm does,
     # since a downward vector lies on the views' vertical rotation axis). The
     # arm's local +x maps to machine -Y, while local +z maps toward machine -Z;
-    # its origin is the inboard face at -175 and the plate fills -183..-175.
+    # its origin is the inboard face, CRANK_ARM_ORIGIN_Z, and the plate fills to CRANK_FACE_Z.
     arm = await place_component(
         adapter,
         "dt-crank-arm",
@@ -5191,7 +5196,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
     )
     # Taper pin MHA-DT-009 crosses the separate hub's rear barrel and crankshaft
-    # at station -169.4, behind the arm.  Its big end stands PIN_PROUD outside
+    # at CRANK_PIN_Z, behind the arm.  Its big end stands PIN_PROUD outside
     # the hub's -X face; the brass keeper ring hangs from the head cross-hole.
     # The hub #14 and shaft #9 pilots are match-reamed together to the pin's
     # 1:48 taper, so those two overlaps alone are volume-bounded allowed pairs

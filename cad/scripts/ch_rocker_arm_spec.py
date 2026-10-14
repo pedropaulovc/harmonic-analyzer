@@ -16,27 +16,42 @@ import math
 from _hole_spec import HoleSpec
 
 
-from dt_cone_pivot_post_installation import MECHANISM_X_SHIFT
+import channel_frame_geom
+import dt_cylinder_gear_spec
+from _inch import inch
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
-# --- Nominal geometry (DIMENSIONS.md "Chapter 14"). These MUST match the
+# --- Nominal geometry (DIMENSIONS.md "Chapter 14"), all-inch experiment:
+# every independent length is an inch fraction. These MUST match the
 # constants in build_ch_rocker_arm.py (the test cross-checks the load-bearing
 # ones), so the drawing's view math reads the same solid the part builds. ---
-CURVE_RADIUS = 800.0  # top-edge arc radius = amplitude-bar length (stated)
-ARM_DEPTH = 16.0  # perpendicular top-to-bottom depth (p.29 callout)
-ARM_THICKNESS = 2.5  # plate thickness, Z (p.27 callout)
+CURVE_RADIUS = inch(31.5)  # top-edge arc radius ~ amplitude-bar length (was R800)
+ARM_DEPTH = inch(5, 8)  # perpendicular top-to-bottom depth (was 16.0)
+# Plate thickness, Z (was 2.5): 1/32 grid -- the 1/16 grid's 1/8 grows this
+# sub-1/4 feature 27 % and the inter-arm gap could not hold the two tines.
+ARM_THICKNESS = inch(3, 32)
 # Milled strap faces either side of the integral hub, micrometer-checked
 # (process plan op 20), printed 3-place natively on the strap's thickness
 # (Main ruling 2026-10, option b): each inter-arm gap holds one tine of each
 # neighbouring rod fork (ch_rod_pivot_pin_spec.joint_budget).
 ARM_THICKNESS_BAND = (0.025, -0.025)  # (upper, lower) deviations
-TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view)
-BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
-TIP_FACE = 5.588  # 0.22" tip face, perpendicular to the top edge
-PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft
-ROD_HOLE_X = 127.3738 - MECHANISM_X_SHIFT
-ROD_HOLE_ABOVE_BOTTOM = 5.53312035905  # preserves the level-pose pin Y after X shift
+TOP_ARC_LEN = inch(11.5)  # top edge arc length (ch.30 back view)
+BOT_ARC_LEN = inch(10.5)  # bottom edge arc length (ch.30 back-view sketch)
+TIP_FACE = inch(1, 4)  # tip face, perpendicular to the top edge (was 0.22 in)
+PIVOT_HOLE_DIA = 6.5  # rides the 1/4 in pivot shaft: the existing running fit
+# Rod-pin hole X: a CLOSURE OUTPUT, not an authored fraction. The rod hangs
+# plumb onto the phased cam lobe with the arm level (ch30 photos, ch14 end
+# views), so the pin sits directly above the cam centre: pivot x less the cam
+# centre's x (the drum axis + the eccentricity at the lock phase).
+ROD_HOLE_X = channel_frame_geom.ROCKER_PIVOT_XY[0] - (
+    channel_frame_geom.CAM_SHAFT_XY[0]
+    + dt_cylinder_gear_spec.ECCENTRICITY
+    * math.sin(math.radians(channel_frame_geom.CYLINDER_LOCK_PHASE_DEG))
+)
+# Rod-pin hole height over the pivot bore's axis (was 8.456, held off the
+# curved bottom edge).
+ROD_HOLE_ABOVE_PIVOT = inch(5, 16)
 ROD_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 
 SURFACE_FINISHES = (
@@ -58,10 +73,12 @@ BOT_END_X = R_BOTTOM * math.sin(_ALPHA_BOT)
 _RAD_X = TOP_END_X / R_TOP
 ROD_TIP_X = TOP_END_X + TIP_FACE * _RAD_X  # widest half-span (~146.25)
 
-# Rod-pin hole Y (low in the strap, ch14 fan photo).
-ROD_HOLE_Y = (
+# Rod-pin hole Y (low in the strap, ch14 fan photo), from the pivot axis at
+# the strap's mid-depth; its height over the curved bottom edge is reference.
+ROD_HOLE_Y = ARM_DEPTH / 2.0 + ROD_HOLE_ABOVE_PIVOT
+ROD_HOLE_ABOVE_BOTTOM = ROD_HOLE_Y - (
     CENTER_Y - math.sqrt(R_BOTTOM**2 - ROD_HOLE_X * ROD_HOLE_X)
-) + ROD_HOLE_ABOVE_BOTTOM
+)
 
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -74,7 +91,7 @@ ROD_HOLE_Y = (
 # The pivot bore rides at the strap mid-depth; assemblies place the arm off
 # this (imported from here, never from build_ch_rocker_arm, so drawing-only edits
 # stay out of assembly rebuild closures -- codex #354).
-PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
+PIVOT_MID_Y = ARM_DEPTH / 2.0  # 5/16
 
 # The amplitude bar's foot rides the top edge, and at d = 0 its cheeks pass
 # over this arm's hub, so the print controls the edge's height over the pivot
@@ -89,7 +106,7 @@ PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 # drawing-simplicity-policy.md `How the repository implements the guidelines` (Codex #936 PRRT_kwDOPHDy386mV3AO): the band is the part's,
 # on a model dimension -- build_ch_rocker_arm's hidden TopEdgeReference sketch,
 # whose one printed dimension IS this height and drives the arcs' centre.
-TOP_EDGE_ABOVE_PIVOT = CENTER_Y - PIVOT_MID_Y - R_TOP  # 8.0
+TOP_EDGE_ABOVE_PIVOT = CENTER_Y - PIVOT_MID_Y - R_TOP  # 5/16
 TOP_EDGE_BAND = (0.50, 0.0)  # (upper, lower)
 
 # Drawing prose (DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) lives in
@@ -122,7 +139,8 @@ _HUB_FLOOR = (
     + LINEAR_2PL
 )
 HUB_DIA_MIN = math.ceil(round(_HUB_FLOOR * 100.0, 9)) / 100.0  # 10.14
-HUB_DIA = 10.2
+# 13/32 (was 10.2): 1/32 grid -- the 1/16 grid's 3/8 falls under the wall floor.
+HUB_DIA = inch(13, 32)
 if HUB_DIA < HUB_DIA_MIN:
     raise AssertionError(
         f"hub O{HUB_DIA:.2f} is under its drawing-guidelines.md rule 17 (walls and webs) wall floor O{HUB_DIA_MIN:.2f}"

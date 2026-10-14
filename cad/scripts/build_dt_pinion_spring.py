@@ -21,10 +21,10 @@ deg crest turning back west, the straight blade leaning BLADE_LEAN_DEG west of
 vertical, an R_BEND bend, and the FOOT_LEN foot heading EAST to its free end.
 Traced that way the one-sided thin wall lands right of travel -- west of the
 blade, under the foot -- so the blade's west face is the contact face.  The
-pad-merge volume gate proves the foot side and a west-extreme probe the
-blade side.  Thin mid-plane extrude, WIDTH symmetric about z 0, plus a square
-screw pad (PAD_WIDTH x PAD_LEN) at the foot's free end, cut with the flat
-blank.
+pad-merge volume gate proves the foot side and an extreme-point probe along
+the flank contact normal the crest side.  Thin mid-plane extrude, WIDTH
+symmetric about z 0, plus a square screw pad (PAD_WIDTH x PAD_LEN) at the
+foot's free end, cut with the flat blank.
 
 The model is the INSTALLED, parked shape (O2); the maker forms the free shape,
 PRESET_DEG more bend (dt_pinion_spring_geometry).
@@ -92,6 +92,7 @@ from dt_pinion_spring_geometry import (
     BEND_CX,
     BEND_CY,
     BEND_EXIT,
+    CREST,
     FLAT_TIP,
     FOOT_END,
     FOOT_TAN,
@@ -108,6 +109,7 @@ from dt_pinion_spring_geometry import (
     KINK_EXIT,
     KINK_START,
     PAD_VOLUME,
+    STRAP_N,
     VOLUME,
 )
 
@@ -135,8 +137,10 @@ _SAVED_DRAWING_PROPERTIES = (
 )
 
 
-def _extreme_mm(adapter, direction: tuple[float, float, float], axis: int) -> float:
-    """The solid's extreme coordinate (mm) along ``direction`` on ``axis``.
+def _extreme_point_mm(
+    adapter, direction: tuple[float, float, float]
+) -> tuple[float, float, float]:
+    """The solid's extreme point (mm) along ``direction``.
 
     ``IBody2::GetExtremePoint`` is exact (``GetBodyBox`` is approximate); the
     early-bound wrapper returns (ok, x, y, z) in metres.
@@ -149,7 +153,7 @@ def _extreme_mm(adapter, direction: tuple[float, float, float], axis: int) -> fl
     res = adapter._attempt(lambda: body.GetExtremePoint(*direction), default=None)
     if not res or len(res) < 4:
         raise RuntimeError("spring: GetExtremePoint failed")
-    return float(res[1 + axis]) * 1000.0
+    return (float(res[1]) * 1000.0, float(res[2]) * 1000.0, float(res[3]) * 1000.0)
 
 
 INSTALLED_PATH = {
@@ -340,16 +344,26 @@ async def build(adapter) -> dict[str, str]:
         (name_dimensions(adapter, "Spring", ["StripWidth"])[0], '"StripWidth"')
     ]
     volume = await volume_check(adapter, "spring", VOLUME, 0.01 * VOLUME)
-    # Blade side: with the wall west of the path the crest's outer face is the
-    # part's westmost point; on the wrong side it would read THICK further east
-    # and every contact number would be off by the strip.
-    west = _extreme_mm(adapter, (-1.0, 0.0, 0.0), axis=0)
-    want = KINK_C[0] - (R_KINK + THICK)
-    if abs(west - want) > 0.05:
+    # Blade side, read on the crest's outer face itself: the extreme point
+    # along the flank contact normal (-STRAP_N, which the geometry module
+    # asserts falls on the crest arc) is the parked contact CREST when the
+    # wall lies west of the path.  On the wrong side that face would stand
+    # THICK short of it and every contact number would be off by the strip.
+    # Not the global westmost point: once the blade leans east of vertical
+    # (the inch rig's 13.54 deg strap lean) that is the bend's outer face.
+    normal = (-STRAP_N[0], -STRAP_N[1])
+    face = _extreme_point_mm(adapter, (normal[0], normal[1], 0.0))
+    reach = face[0] * normal[0] + face[1] * normal[1]
+    want = CREST[0] * normal[0] + CREST[1] * normal[1]
+    if abs(reach - want) > 0.05 or math.dist(face[:2], CREST) > 0.05:
         raise RuntimeError(
-            f"spring wall on the wrong side: westmost x {west:.3f}, want {want:.3f}"
+            f"spring wall on the wrong side: crest face at ({face[0]:.3f}, "
+            f"{face[1]:.3f}) reaches {reach:.3f} along the contact normal, want "
+            f"({CREST[0]:.3f}, {CREST[1]:.3f}) reaching {want:.3f}"
         )
-    _telemetry.success(f"spring wall west of the blade: westmost x {west:.3f}")
+    _telemetry.success(
+        f"spring wall west of the blade: crest face at ({face[0]:.3f}, {face[1]:.3f})"
+    )
 
     # Screw pad: a PAD_WIDTH x PAD_LEN square in from the foot's free end,
     # flush with the strip's aft edge, local -z (machine +z once placed

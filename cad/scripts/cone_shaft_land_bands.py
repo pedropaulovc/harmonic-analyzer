@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 
+from _inch import inch
 from _printed_tolerance import printed_band_mm
 from gear_seat_fit import seat_bore_band
 from _fit_shaft_h import SHAFT_H
@@ -61,6 +62,15 @@ def land_finished_dia_limits_mm(native_diameter_mm: float, section: int) -> tupl
 MM_PER_IN = 25.4
 TERMINAL_DIA_IN = 1.0 / 32.0
 TERMINAL_DIA_MM = TERMINAL_DIA_IN * MM_PER_IN
+# Nominal land diameters (inches), index-aligned with SECTION_DIA_BANDS.  The
+# gear family derives its bores from these.  Sec0 is the pivot journal: it is
+# turned to the post's reamed bore (dt_cone_pivot_post_spec.BORE_DIA less the
+# running clearance, in dt_cone_gear_shaft_spec), so it has no entry here --
+# reading the post from this leaf would close a shaft -> gear -> post cycle.
+SECTION_DIA_IN: tuple[float | None, ...] = (None, 0.375, 0.25, 0.125, TERMINAL_DIA_IN)
+SECTION_DIAS_MM: tuple[float | None, ...] = tuple(
+    None if dia_in is None else dia_in * MM_PER_IN for dia_in in SECTION_DIA_IN
+)
 # Manufacturing limits follow the ACTUAL displayed size, not hidden model
 # digits. Exact native 1/32 representation is retained separately above.
 TERMINAL_DIA_PLACES = LAND_DIA_PLACES[4]
@@ -79,19 +89,15 @@ TERMINAL_FLAT_AF_MM = 0.42
 TERMINAL_FLAT_EDGE_BREAK_MAX = 0.020
 # Collar geometry the shaft spec reads, so the collar's width, nose and tap
 # station cannot fork between the two parts.
-# Single coupled owned-geometry delta: move the large collar material, tip
-# and pivot together without changing the gear stations or any retained band.
-# Selected .50-mm coupled shift: parent-authorized full-P1 engineering DESIGN
-# covered all 2400 closed material-pair cells. Not a stock/native qualification
-# or a global minimum outside the released [.50,1.00]-mm candidate domain.
-TIP_COLLAR_BODY_NORTH_SHIFT_MM = 0.50
-TIP_COLLAR_WIDTH_MM = 11.0 + TIP_COLLAR_BODY_NORTH_SHIFT_MM
+# All-inch: the custom collar is 7/16 wide with a 1/8 nose; the stock
+# screw's tap stays centred on the body between them.
+TIP_COLLAR_WIDTH_MM = inch(7, 16)
 # The collar's width, nose and tap station print at the title block's .XXX
 # (+/-0.13, ordinary lathe facing and spotting): at .XX the stock screw's
 # tapped hole leaves less than the collar's 2.0 wall to its faces.
 TIP_COLLAR_AXIAL_PLACES = 3
 TIP_COLLAR_WIDTH_BAND_MM = printed_band_mm(TIP_COLLAR_AXIAL_PLACES)
-TIP_COLLAR_NOSE_LENGTH_MM = 3.0 + TIP_COLLAR_BODY_NORTH_SHIFT_MM
+TIP_COLLAR_NOSE_LENGTH_MM = inch(1, 8)
 TIP_COLLAR_TAP_STATION_MM = (TIP_COLLAR_NOSE_LENGTH_MM + TIP_COLLAR_WIDTH_MM) / 2.0
 TIP_COLLAR_FREE_EDGE_BREAK_MAX_MM = 0.25
 _COLLAR_BORE_BAND = seat_bore_band(RUNNING_DIA_BAND)

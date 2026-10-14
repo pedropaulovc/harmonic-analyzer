@@ -3,8 +3,8 @@ r"""Reproduction script: translational-gearing feed-pinion sleeve (book ch. 23).
 The independent feed stage has 12 teeth and a finite standard 32DP PA20
 stock #8 master translated rigidly, not a generated profile shift. The
 teeth mesh the matching platen rack and are integral with the rear end of
-one turned steel sleeve (MHA-PD-010), running on the MHA-PD-023 pin's Ø3.9
-shank. Ahead of the teeth, the Ø8.2 h6 boss carries the brass hub and drives
+one turned steel sleeve (MHA-PD-010), running on the MHA-PD-023 pin's Ø.154 in
+shank. Ahead of the teeth, the Ø5/16 in h6 boss carries the brass hub and drives
 it through its unchanged D-flat; the hub's spigot seats on the step.
 
 Layout: origin at the sleeve's rear face, +Z toward the machine front.
@@ -137,7 +137,7 @@ V_OIL_HOLE = (
 ) / 2.0
 _R_BOSS = BOSS_DIA / 2.0
 # The D-flat: the boss's circular segment beyond the flat plane, nose to its
-# end wall (the bore, 1.95 off the axis, stays under the 3.5 flat).
+# end wall (the bore, 1.96 off the axis, stays under the 9/64 in flat).
 V_FLAT = (
     _R_BOSS**2 * math.acos(FLAT_TO_AXIS / _R_BOSS)
     - FLAT_TO_AXIS * math.sqrt(_R_BOSS**2 - FLAT_TO_AXIS**2)

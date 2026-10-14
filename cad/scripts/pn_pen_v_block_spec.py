@@ -25,6 +25,7 @@ run without SolidWorks in ~1 s.
 from __future__ import annotations
 
 from _gtol_cylinder import CylinderFace
+from _inch import inch
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 24", all scaled from the p.65
@@ -38,17 +39,19 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 # frame's thumb screw presses it up into that groove. The old read of the
 # p.60 notch as a stopped flexure slit is refuted by t00612 (the marker runs
 # through the groove, block level).
-BLOCK_LENGTH = 36.0  # X, along the marker (t00612: ~2.2x the 16 end face)
-BLOCK_HEIGHT = 18.0  # Y
-BLOCK_DEPTH = 16.0  # Z
-CHAMFER = 6.0  # 45 deg top corners
-BORE_DIA = 8.0  # two vertical pen bores
-BORE_X = (10.0, 26.0)  # rod bore (paper end) / spare pen seat (free end)
-GROOVE_WIDTH = 8.5  # bottom marker groove, across Z (O8 barrel + 0.25 each side)
-GROOVE_DEPTH = 4.5  # groove rise from the bottom face (the barrel stands 3.5 proud)
-GROOVE_Z0 = (BLOCK_DEPTH - GROOVE_WIDTH) / 2.0  # 3.75: centred across the depth
-SCREW_HOLE_DIA = 2.5  # front-face rod set-screw hole, over the rod bore
-SCREW_HOLE_XY = (BORE_X[0], 11.0)
+BLOCK_LENGTH = inch(23, 16)  # 1-7/16 X, along the marker (t00612: ~2.2x the end face)
+BLOCK_HEIGHT = inch(11, 16)  # Y
+BLOCK_DEPTH = inch(5, 8)  # Z
+CHAMFER = inch(1, 4)  # 45 deg top corners
+BORE_DIA = inch(5, 16)  # two vertical pen bores (5/16 drill)
+BORE_X = (inch(3, 8), inch(1))  # rod bore (paper end) / spare pen seat (free end)
+# Bottom marker groove, across Z: 3/8 for the 5/16 barrel (the nearest 1/16,
+# 5/16, leaves no side clearance); centred, so GrooveZ0 lands on 1/8.
+GROOVE_WIDTH = inch(3, 8)
+GROOVE_DEPTH = inch(3, 16)  # groove rise from the bottom face (the barrel stands proud)
+GROOVE_Z0 = (BLOCK_DEPTH - GROOVE_WIDTH) / 2.0  # 1/8: centred across the depth
+SCREW_HOLE_DIA = round(0.0980 * 25.4, 6)  # #40 drill (2.4892): front-face rod set-screw hole
+SCREW_HOLE_XY = (BORE_X[0], inch(7, 16))  # over the rod bore
 
 _UPPER_BORE_Y = (GROOVE_DEPTH + BLOCK_HEIGHT) / 2.0
 SURFACE_FINISHES = tuple(

@@ -214,7 +214,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += [(groove_depth_dim[0], '"GrooveDepth"')]
     # The groove crosses the two vertical bores, so the removed volume is the
     # channel prism minus the bore cylinders already absent over the groove
-    # band (each bore is fully inside the groove width: O8 in 8.5).
+    # band (each bore is fully inside the groove width: 5/16 in 3/8).
     v_groove = (
         GROOVE_WIDTH * GROOVE_DEPTH * BLOCK_LENGTH
         - len(BORE_X) * math.pi * (BORE_DIA / 2.0) ** 2 * GROOVE_DEPTH

@@ -13,16 +13,16 @@ confidence: low
 notes: >
   Fan amplitudes are a linear ramp across the channels (the p.30 plate shows the
   bars leaning progressively, tops together at the levers); the exact per-channel
-  values are not readable, so the ramp tops out at the square preset's 80 mm.
+  values are not readable, so the ramp tops out at the square preset's 79.375 mm (3-1/8 in).
   The sinusoid pose is the ch14 p.28 middle end view: 6 crank turns, so cylinder
   gear k stands at 360 * 6 * k / 80 deg from notch-up (gear law, ch29).
 
 amplitude_fan:
   configuration: amplitude-fan
   # a_j for channel j = 0..19 (mm along the rocker arc from the pivot, +X lifting side)
-  amplitude_mm: [0.0, 4.2105, 8.4211, 12.6316, 16.8421, 21.0526, 25.2632, 29.4737,
-                 33.6842, 37.8947, 42.1053, 46.3158, 50.5263, 54.7368, 58.9474,
-                 63.1579, 67.3684, 71.5789, 75.7895, 80.0]
+  amplitude_mm: [0.0, 4.1776, 8.3553, 12.5329, 16.7105, 20.8882, 25.0658, 29.2434,
+                 33.4211, 37.5987, 41.7763, 45.9539, 50.1316, 54.3092, 58.4868,
+                 62.6645, 66.8421, 71.0197, 75.1974, 79.375]
 
 sinusoid:
   configuration: sinusoid-6-cranks

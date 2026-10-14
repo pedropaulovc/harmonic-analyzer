@@ -10,8 +10,11 @@ keeps in lockstep (``test_dt_pinion_pivot_shaft_drawing.py``).
 
 from __future__ import annotations
 
+import math
+
 from _fit_shaft_h import SHAFT_H
 from _gtol_cylinder import CylinderFace
+from _inch import inch
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 import vn_pinion_strap_pin_spec as _strap_pin
 from pinion_rig_layout import (
@@ -24,10 +27,13 @@ SHAFT_DIA = 6.35  # 1/4 in: rides both pivot blocks' east bores and the straps
 # block inboard to the front strap (pinion_rig_layout), 192 -> 182.0, then
 # the worst fitted stack (Codex #854 P1) made it long enough that the
 # shortest shaft still bears 9.5 of the front block
-# (pinion_rig_layout.torque_shaft_bearing_stack).
+# (pinion_rig_layout.torque_shaft_bearing_stack); all-inch, rounded UP to
+# the next 1/16 in.
 SHAFT_LEN = TORQUE_SHAFT_LEN
-CAP_SAG = 1.2  # shallow spherical crown height at each end
-CAP_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
+# Shallow spherical crown at each end: the print's SR governs (DRAWING_NOTES),
+# the sagitta is its reference height on the 1/4 in body.
+CAP_RADIUS = inch(3, 16)
+CAP_SAG = CAP_RADIUS - math.sqrt(CAP_RADIUS**2 - (SHAFT_DIA / 2.0) ** 2)  # 1.21
 SHAFT_DIA_BAND = SHAFT_H
 # U27 (Main, 2026-09-24): the length carries the title-block .X band (+/-0.8),
 # not a tight one.  Pinned to the straps (option E-a) the shaft rides the

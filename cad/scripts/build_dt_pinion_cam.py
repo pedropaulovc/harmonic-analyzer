@@ -5,16 +5,17 @@ The eccentric steel collar pinned to the lift rod at each strap station
 ON its OD from above, so turning the lever (rod + both cams spin as
 one) raises the surface under the pin and swings the drum into mesh.
 
-U28 (user, 2026-09-23): Ø14.6 OD, eccentricity 2.0 (4.0 full lift), so the
-thin side keeps 2.10 of wall over the Ø6.40 bore (U27 target 2.0, 2.01 at
-the printed worst case).  The former raised set-pin dome is gone -- a pad
-proud of a turned OD cannot be turned -- and an M2.5 set screw now sits
-sub-flush in the 6.1-thick heavy side, which never meets the follower.
+U28 (user, 2026-09-23), all-inch: Ø9/16 OD, eccentricity 1/16 (1/8 full
+lift), so the thin side keeps 2.36 of wall over the Ø6.40 bore (U27 target
+2.0; dt_pinion_cam_geometry.THIN_SIDE_WALL).  The former raised set-pin dome
+is gone -- a pad proud of a turned OD cannot be turned -- and an M2.5 set
+screw now sits sub-flush in the 5.5-thick heavy side, which never meets the
+follower.
 
 Layout: bore axis Z through the ORIGIN (rides the rod), authored in the
 PARK pose -- collar centre at (0, -ECC), heavy side and the set-screw
 hole straight DOWN, so the OD top is at its lowest (disengaged rest).
-Collar z 0..9; tapped hole along -Y at z SET_SCREW_Z = 4.5.
+Collar z 0..CAM_LEN (3/8 in); tapped hole along -Y at z SET_SCREW_Z (mid-length).
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 

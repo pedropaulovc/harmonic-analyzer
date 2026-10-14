@@ -10,6 +10,7 @@ silently drift.
 
 from __future__ import annotations
 
+from _inch import inch
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import SEAT_UM, SurfaceFinishControl
@@ -24,17 +25,16 @@ BOTTOM_THICKNESS = 0.5 * MM_PER_IN  # 12.7
 TOP_LENGTH = 17.5 * MM_PER_IN  # 444.5 (0.25 in reveal per side)
 TOP_THICKNESS = 1.5 * MM_PER_IN  # 38.1
 # The pad DEPTH is set by the column stations, not by the ch6 28 cm callout.
-# The sockets sit at x = +/-197 and z = +/-112, so a pad centred on the part
-# origin leaves an EQUAL socket-to-pad-edge land on all four sides only at
-# TOP_WIDTH = TOP_LENGTH - 2 * (197 - 112) = 274.5. The former 10.5 in pad
-# (266.7) left 1.6 mm of land in Z against 5.5 in X, and the 2026-09 blind
-# machinist review rejected that asymmetry as a blocker: no tolerance stack
-# behind the hole-table coordinate scheme can hold a 1.0 MIN finished land
-# off a 1.6 mm nominal. build_fr_harmonic_base asserts the land is equal on
-# both axes and proves its worst case -- it owns COLUMN_X and the socket
-# stations, so
-# deriving TOP_WIDTH from them here would be circular.
-TOP_WIDTH = 274.5
+# The sockets sit at x = +/-7-3/4 in and z = +/-4-7/16 in, so a pad centred on
+# the part origin leaves an EQUAL socket-to-pad-edge land (1 in) on all four
+# sides only at TOP_WIDTH = TOP_LENGTH - 2 * (7-3/4 - 4-7/16) = 10-7/8 in. The
+# former 10.5 in pad left 1.6 mm of land in Z against 5.5 in X, and the 2026-09
+# blind machinist review rejected that asymmetry as a blocker: no tolerance
+# stack behind the hole-table coordinate scheme can hold a 1.0 MIN finished
+# land off a 1.6 mm nominal. build_fr_harmonic_base asserts the land is equal
+# on both axes and proves its worst case -- it owns COLUMN_X and the socket
+# stations, so deriving TOP_WIDTH from them here would be circular.
+TOP_WIDTH = 10.875 * MM_PER_IN  # 276.225 (was 274.5)
 # The flange keeps the same 0.25 in reveal per side that it has in X.
 BOTTOM_WIDTH = TOP_WIDTH + (BOTTOM_LENGTH - TOP_LENGTH)  # 287.2
 BOTTOM_FRONT_Z = -BOTTOM_WIDTH / 2.0
@@ -49,16 +49,19 @@ STACK_HEIGHT = BOTTOM_THICKNESS + TOP_THICKNESS  # 50.8: the deck top, overall h
 # raised machined pad DECK_RISE proud of the green casting top, centred on the
 # pad; everything on the pad top outside it is the green land at GREEN_TOP.
 # The deck top stays at STACK_HEIGHT, so nothing seated on the deck moves.
-DECK_RISE = 3.0
-GREEN_TOP = STACK_HEIGHT - DECK_RISE  # 47.8: green land, socket mouths
-DECK_LENGTH = 334.0  # x -167.0..+167.0 (the nameplate's west edge is 4.0 inside)
-DECK_LAND = 7.0  # green land in front of and behind the deck (z)
-DECK_WIDTH = TOP_WIDTH - 2.0 * DECK_LAND  # 260.5: z -130.25..+130.25
+DECK_RISE = MM_PER_IN / 8.0  # 3.175 (was 3.0)
+GREEN_TOP = STACK_HEIGHT - DECK_RISE  # 47.625: green land, socket mouths
+DECK_LENGTH = inch(105, 8)  # 13-1/8 = 333.375 (was 334.0): x -166.69..+166.69
+# 5/16, not the nearer 1/4: it keeps the deck 10-1/4 wide (was 260.5), and at
+# 1/4 the deck edge would fall exactly on the cross rib's and the lock pad's
+# mid-wall ends (POCKET_WALL / 2), the inference trap of the 2026-10-10 leaf.
+DECK_LAND = inch(5, 16)  # 7.9375 (was 7.0): green land in front of and behind the deck (z)
+DECK_WIDTH = TOP_WIDTH - 2.0 * DECK_LAND  # 10-1/4 = 260.35: z -130.175..+130.175
 DECK_HALF_X = DECK_LENGTH / 2.0
 DECK_HALF_Z = DECK_WIDTH / 2.0
 # Plan corners 1/4 in, the casting's rounded-corner language (the photographed
 # black panel reads round-cornered); the top edge takes a 1/32 in x 45 break,
-# half the plates' 1/16 in rim break, so 2.2 of the 3.0 step stays square.
+# half the plates' 1/16 in rim break, so 2.38 of the 3.18 step stays square.
 DECK_CORNER_R = 0.25 * MM_PER_IN  # 6.35
 DECK_EDGE_BREAK = MM_PER_IN / 32.0  # 0.79375 legs
 
@@ -68,26 +71,31 @@ DECK_EDGE_BREAK = MM_PER_IN / 32.0  # 0.79375 legs
 # RIB_RELIEF above the underside and hung with bosses under every blind deck
 # seat. Each column socket stands in a full-height SOCKET_BOSS_DIA boss merged
 # into the walls; the casting fillets round the pocket's reentrant edges.
-POCKET_WALL = 12.0
-POCKET_HALF_X = TOP_LENGTH / 2.0 - POCKET_WALL  # 210.25
-POCKET_HALF_Z = TOP_WIDTH / 2.0 - POCKET_WALL  # 125.25
-POCKET_SKIN = 12.0
-POCKET_CEILING_Y = STACK_HEIGHT - POCKET_SKIN  # 38.8: also the pocket depth
-GREEN_SKIN = GREEN_TOP - POCKET_CEILING_Y  # 9.0
-RIB_THICKNESS = 10.0
-RIB_RELIEF = 3.0  # rib bottoms clear the bench by this much
-SOCKET_BOSS_DIA = 41.5
-HANGING_BOSS_MIN_DIA = 16.0  # max(this, 2.5 x tap drill) per seat
+POCKET_WALL = inch(1, 2)  # 12.7 (was 12.0)
+POCKET_HALF_X = TOP_LENGTH / 2.0 - POCKET_WALL  # 209.55
+POCKET_HALF_Z = TOP_WIDTH / 2.0 - POCKET_WALL  # 125.4125
+# 7/16, not the nearer 1/2: at 1/2 the ceiling (38.1) lands exactly ON the
+# cross-tap axis (BASE_SCREW_Y 38.1), so the ceiling-above-axis proof in
+# build_fr_harmonic_base would hang on float rounding with zero margin.
+POCKET_SKIN = inch(7, 16)  # 11.1125 (was 12.0)
+POCKET_CEILING_Y = STACK_HEIGHT - POCKET_SKIN  # 39.6875: also the pocket depth
+GREEN_SKIN = GREEN_TOP - POCKET_CEILING_Y  # 7.9375 (5/16)
+RIB_THICKNESS = inch(3, 8)  # 9.525 (was 10.0)
+RIB_RELIEF = inch(1, 8)  # 3.175 (was 3.0): rib bottoms clear the bench by this much
+SOCKET_BOSS_DIA = inch(13, 8)  # 1-5/8 = 41.275 (was 41.5)
+HANGING_BOSS_MIN_DIA = inch(5, 8)  # 15.875 (was 16.0): max(this, 2.5 x tap drill) per seat
 # Hanging bosses and lugs end on one of two cast levels above the underside:
 # each seat takes the higher level that still leaves its drill tip 1.5D of
 # metal (build_fr_harmonic_base proves it), so the pattern carries two boss
 # lengths instead of one per seat.
 # The shallow level backs the raised pinion block's seat: its #8-32 x 1-1/2
-# screw runs 13.38 deep at the shortest printed block, so the 16.8 drill's
-# tip stands 32.96 up and needs 1.5D (6.25) under it: 26.71 at most.
-DEEP_BOSS_BOTTOM_Y = 12.0
-SHALLOW_BOSS_BOTTOM_Y = 26.5
-CASTING_FILLET_R = 6.0
+# screw's drill tip at the shortest printed block needs 1.5D (6.25) of metal
+# under it, which caps the level near 26.7 -- so 1 in, not the nearer 1-1/16.
+# 7/16, not the nearer 1/2: at 1/2 the cone lock's drill tip keeps 9.32 of
+# metal, under its 1.5D (9.53).
+DEEP_BOSS_BOTTOM_Y = inch(7, 16)  # 11.1125 (was 12.0)
+SHALLOW_BOSS_BOTTOM_Y = inch(1)  # 25.4 (was 26.5)
+CASTING_FILLET_R = inch(1, 4)  # 6.35 (was 6.0)
 
 if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
     raise AssertionError("base plates are not centred")

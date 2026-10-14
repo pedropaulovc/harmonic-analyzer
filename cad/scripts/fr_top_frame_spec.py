@@ -26,11 +26,13 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SEAT_UM, SurfaceFinishControl
+from _inch import inch
 from dt_cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
 )
 from fr_frame_attachment_spec import CAP_RECESS_DEPTH, COLUMN_SOCKET_DIAMETER
+from frame_column_stations import COLUMN_X as FRAME_COLUMN_X
 from ch_fulcrum_keeper_spec import KEEPER_SEAT_FLATNESS_BUDGET_MM
 
 # --- Machined-surface geometry ------------------------------------------------
@@ -40,23 +42,32 @@ from ch_fulcrum_keeper_spec import KEEPER_SEAT_FLATNESS_BUDGET_MM
 # provenance-checked against the very face spec the casting authors -- see
 # ``_drawing_contract``'s drawing-surface-finish-provenance rule. Everything
 # else about the plan geometry stays in the build script.
-COLUMN_X = 197.0  # column stations (fr-frame.SLDASM)
-FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z  # -112
-REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z  # +112
-RING_HEIGHT = 36.5  # rail band (ch30 p002 36.7 / p006 37.0 / ch19 img03 35.6)
-HALF_H = RING_HEIGHT / 2.0  # 18.25; band local y -18.25..+18.25
-HANGER_CROSSBAR_WIDTH = 25.0
+COLUMN_X = FRAME_COLUMN_X  # 7-3/4 in = 196.85 column stations (was 197.0)
+FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z  # -4-7/16 in = -112.7125
+REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z  # +4-7/16 in = +112.7125
+# Rail band (ch30 p002 36.7 / p006 37.0 / ch19 img03 35.6).
+RING_HEIGHT = inch(23, 16)  # 1-7/16 in = 36.5125 (was 36.5)
+HALF_H = RING_HEIGHT / 2.0  # 18.25625; band local y -HALF_H..+HALF_H
+HANGER_CROSSBAR_WIDTH = inch(1)  # 25.4 (was 25.0)
 HANGER_CROSSBAR_WIDTH_PLACES = 1
-FLANGE_THICKNESS_MM = 8.0  # final top flange, including the faced right rail top
+# Final top flange, including the faced right rail top.
+FLANGE_THICKNESS_MM = inch(5, 16)  # 7.9375 (was 8.0)
 FLANGE_THICKNESS_PLACES = 1
-BOSS_ABOVE = 4.5  # boss proud of the rail top (corner-crop step)
-BOSS_DIA = (
-    45.0  # user ruling: all four upper/lower bosses clear the outward keeper feet
-)
+BOSS_ABOVE = inch(3, 16)  # 4.7625 (was 4.5): boss proud of the rail top
+# User ruling: all four upper/lower bosses clear the outward keeper feet.
+# 1-13/16 would leave the front keeper foot tip under its 1.0 boss margin.
+BOSS_DIA = inch(1.75)  # 44.45 (was 45.0)
 BORE_DIA = COLUMN_SOCKET_DIAMETER
-CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.45
-GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)
-GOOSENECK_BORE_DIA = 17.0  # O16 post slides through
+CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 7.9375
+# East rail, -X crank side: summing's counter-spring post station. Left in
+# mm and decoupled from COLUMN_X (196.85) by coordinator ruling: the post
+# station is stamped by the spring calibration (build_sm_summing_assembly),
+# so it stays at the pre-inch -197.0; the hub sits 0.15 outboard of the
+# east-rail web centre (build_fr_top_frame re-proves the web margins).
+GOOSENECK_X = -197.0
+# The 5/8 (15.875) post slides through: clearance fit, cut with the standard
+# 43/64 fractional drill (17.0656; was 17.0 on the O16 post), 1.19 diametral.
+GOOSENECK_BORE_DIA = inch(43, 64)
 
 # --- Gooseneck set-screw boss (east-rail hub) ---------------------------------
 #
@@ -67,11 +78,15 @@ GOOSENECK_BORE_DIA = 17.0  # O16 post slides through
 # to the tap. The spot face starts the thread square on a machined face (the
 # head stands proud of it: the cup point bites the post first); it prints .X
 # from the bore axis the screw pinches across.
-HUB_SET_SPOT_FROM_AXIS = 21.0  # .X
+# 27/32 (1/32): 13/16 leaves the 1/4-20 thread 1.45D at the printed worst
+# case (SET_SCREW_ENGAGEMENT_D below needs 1.5D).
+HUB_SET_SPOT_FROM_AXIS = inch(27, 32)  # 21.43125 (was 21.0), .X
 HUB_SET_SPOT_PLACES = 1
-HUB_SET_BOSS_FROM_AXIS = 22.0  # cast face: 1.0 stock over the spot face
-HUB_SET_SPOT_DIA = 10.0  # clears the 1/4 square head's 8.98 diagonal at its .X minimum
-HUB_SET_BOSS_W = 18.0  # along the rail, centred on the tap (spot land: build)
+HUB_SET_BOSS_FROM_AXIS = inch(7, 8)  # 22.225 (was 22.0): cast face, 1/32 stock
+# 13/32 (1/32): clears the 1/4 square head's 8.98 diagonal at its .X
+# minimum (3/8 would not); 7/16 breaks into the boss C2 land.
+HUB_SET_SPOT_DIA = inch(13, 32)  # 10.31875 (was 10.0)
+HUB_SET_BOSS_W = inch(11, 16)  # 17.4625 (was 18.0): along the rail, on the tap
 SET_SCREW_THREAD = "1/4-20"
 SET_SCREW_MAJOR_DIA = THREAD_MAJOR_MM[SET_SCREW_THREAD]  # 6.350
 SET_SCREW_PITCH = 25.4 / 20.0
@@ -109,7 +124,8 @@ HANGER_CLEARANCE_DIA_MAX = HANGER_CLEARANCE_DIA + max(HANGER_CLEARANCE_DIA_BAND)
 # the bolt reach. The model owns it: HangerGrip, a driving dimension in the
 # hidden HangerGripReference sketch, sets the Hole Wizard spotface depth
 # ("RingHeight" - HangerGrip) and carries the +/-0.05 band; the sheet imports it.
-HANGER_GRIP = 35.50
+# 1-3/8 (1/16): 1-13/32 leaves no .X spotface cleanup (assert below).
+HANGER_GRIP = inch(1.375)  # 34.925 (was 35.50)
 HANGER_GRIP_PLACES = 2
 HANGER_GRIP_TOL = 0.05
 # The band sets the bolt's reach into the knife mount's tap
@@ -120,12 +136,12 @@ HANGER_GRIP_CALLOUT = (
 HANGER_GRIP_SKETCH = "HangerGripReference"
 # Hidden model sketches whose driving dimensions the sheet imports per view.
 REFERENCE_SKETCHES = (HANGER_GRIP_SKETCH,)
-HANGER_SPOTFACE_DIA = 17.0
+HANGER_SPOTFACE_DIA = inch(11, 16)  # 17.4625 (was 17.0)
 HANGER_SPOTFACE_DIA_PLACES = 2
-HANGER_SPOTFACE_DEPTH = RING_HEIGHT - HANGER_GRIP  # 1.0 nominal only
-HANGER_SPOTFACE_FLOOR_Y = -HALF_H + HANGER_GRIP  # +17.25
-HANGER_SPOTFACE_DIA_MIN = HANGER_SPOTFACE_DIA - _XX  # 16.49
-HANGER_SPOTFACE_DIA_MAX = HANGER_SPOTFACE_DIA + _XX  # 17.51
+HANGER_SPOTFACE_DEPTH = RING_HEIGHT - HANGER_GRIP  # 1/16 = 1.5875 nominal only
+HANGER_SPOTFACE_FLOOR_Y = -HALF_H + HANGER_GRIP  # +16.66875
+HANGER_SPOTFACE_DIA_MIN = HANGER_SPOTFACE_DIA - _XX  # 16.9525
+HANGER_SPOTFACE_DIA_MAX = HANGER_SPOTFACE_DIA + _XX  # 17.9725
 HANGER_SPOTFACE_CLEANUP_MIN = RING_HEIGHT - _X - (HANGER_GRIP + HANGER_GRIP_TOL)
 # The wizard seed only names a native table row, not the hardware (the hex
 # bolt above on its washer): every cut diameter/depth below is an explicit
@@ -309,7 +325,7 @@ SURFACE_FINISHES = tuple(
         CylinderFace(BORE_DIA, contains_x_mm=x, contains_z_mm=z),
         production_method=SOCKET_BORE_TARGET,
     )
-    for rail, x in (("east", GOOSENECK_X), ("west", COLUMN_X))
+    for rail, x in (("east", -COLUMN_X), ("west", COLUMN_X))
     for end, z in (("front", FRONT_COLUMN_Z), ("rear", REAR_COLUMN_Z))
 ) + (
     SurfaceFinishControl(
@@ -484,8 +500,8 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "top bore mouth chamfer": 1,
     "opposed counterbore floor separation": 1,
     "cross screw axis from boss top": 1,
-    # .XX, the floor at 16.35 (fr_frame_attachment_spec.TOP_SCREW_SEAT_Z):
-    # 2.04 to the cap recess at every printed corner
+    # .XX, the floor at 15.875 (fr_frame_attachment_spec.TOP_SCREW_SEAT_Z):
+    # 2.27 to the cap recess at every printed corner
     # (build_fr_top_frame.COUNTERBORE_PRINTED_CAP_LIGAMENT).
     "counterbore floor from socket axis": 2,
     # Sheet 5, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the

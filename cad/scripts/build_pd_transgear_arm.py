@@ -9,11 +9,11 @@ its square end (``pd_transgear_arm_geometry``; the sheet's contract is
 Layout (part frame of ``pd_transgear_arm_geometry``: origin on P at the FRONT
 face, +X to the square end, +Z to the rear face):
 
-* ``ArmOutline`` (Front plane): the R12.5 pivot round, the two straight edges
-  tangent to it, cut square at the tip station by the 14-wide end face;
+* ``ArmOutline`` (Front plane): the R1/2 pivot round, the two straight edges
+  tangent to it, cut square at the tip station by the square end face;
   extruded ``THICKNESS`` toward +Z as ``Arm``.
 * ``PivotBore``: the Ø4.9 running bore through at P.
-* ``PinBore``: the Ø3.874 reamed press bore through at S for the MHA-PD-023
+* ``PinBore``: the reamed press bore (Ø.1540 rod less 0.026) through at S for the MHA-PD-023
   pin, cut normal to the faces (the pin's head seats on the rear face).
 * ``PlateTaps``: native Hole Wizard taps through from the rear face, with
   ``PlateTapRearEntryBreaks`` and ``PlateTapFrontExitBreaks`` at 0.10 MAX.
@@ -298,10 +298,10 @@ async def build(adapter: Any) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # --- Outline: R12.5 about P, tangent edges, square 14-wide end ----------
+    # --- Outline: R1/2 about P, tangent edges, square-cut end -----------------
     # Equal tangent lengths from the two end corners put them symmetric about
     # the centreline; the end width, the tip station and the pivot radius
-    # then fix the lean the geometry module derives from the r7 round.
+    # then fix the lean the geometry module derives from the R1/4 tip round.
     outline = SketchDims()
     check("create_sketch arm outline", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)

@@ -1,11 +1,12 @@
 pd-guide-lock:
   number: MHA-PD-012
-  # 2026-10-11 (user): 1/16 in steel sheet, thickness as supplied; the
+  # 2026-10-11 (user): steel sheet, thickness as supplied (all-inch: .040 in,
+  # not 1/16, for the arm-plate sweep; SKU not yet selected); the
   # sheet's +/-0.005 in mill band is the one the lock-station sweep and the
   # screw engagement spend (pd_guide_lock_spec.LOCK_THICK_BAND).
-  material: A36 GROUND SHEET 1/16 in
-  material_specification: ASTM A36 precision-ground sheet, 1/16 in, +/-0.005 in (McMaster-Carr 1388K196); thickness as supplied
+  material: GROUND STEEL SHEET .040 in
+  material_specification: tight-tolerance low-carbon steel sheet, .040 in, +/-0.005 in (SKU not yet selected; McMaster-Carr 1388K196 is the 1/16 in sheet); thickness as supplied
   finish: black oxide
   quantity: 4
   tolerance_class: machined_block
-  process: "cut from 1/16 in sheet: saw and file the outline, file the four corner radii, drill the screw holes (steel)"
+  process: "cut from .040 in sheet: saw and file the outline, file the four corner radii, drill the screw holes (steel)"

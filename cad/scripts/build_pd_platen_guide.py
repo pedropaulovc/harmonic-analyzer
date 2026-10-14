@@ -6,7 +6,7 @@ the platen HANGS on the bar by these. Each is fastened by a row of 5 screws
 whose heads show on the platen front (ch22 front photo; counterbored flush so
 the paper lies flat, shanks threading into the rail) and carries 2 lock
 plates (build_pd_guide_lock.py) that bridge behind the bar so the platen cannot
-fall off. 10 deep so the lock plates clear the 9-deep bar.
+fall off. 7/16 deep so the lock plates clear the 3/8-deep bar.
 
 Layout: length along +X, height along +Y from the origin corner, depth
 extruded -Z so native Front looks directly at the hole-entry face. The
@@ -57,10 +57,16 @@ from pd_platen_guide_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     GEOMETRIC_TOLERANCES_MM,
+    GUIDE_DEPTH,
     GUIDE_DEPTH_BAND,
     GUIDE_DEPTH_PLACES,
+    GUIDE_HEIGHT,
+    GUIDE_LENGTH,
     LOCK_GAP_FIT,
+    LOCK_SCREW_DX,
+    LOCK_STATION_X,
     LOCK_TAP_SPEC,
+    SCREW_STATION_X,
     SURFACE_FINISHES,
     TAPPED_HOLE_SPEC,
 )
@@ -69,12 +75,8 @@ from pd_support_bar_spec import BAR_DEPTH, BAR_DEPTH_BAND
 PART_NAME = "pd-platen-guide"
 MATERIAL = "Plain Carbon Steel"
 
-GUIDE_LENGTH = 269.64  # = resized platen width (ch30-p002 Pose Studio)
-GUIDE_HEIGHT = 5.0
-GUIDE_DEPTH = 10.0  # 1.0 past the 9-deep bar so the lock plates clear it
-LOCK_STATION_X = (80.892, 188.748)  # 30% / 70%; inboard of the east column clamp
-LOCK_SCREW_DX = 7.0  # 2 screws per lock flank its centre
-
+# GUIDE_LENGTH/HEIGHT/DEPTH, LOCK_STATION_X, LOCK_SCREW_DX and SCREW_STATION_X
+# live in pd_platen_guide_spec (COM-free) and are re-exported from here.
 HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCREW_DX))
 
 # The front row receives the ten guide screws (MHA-VN-006 fillisters) after each
@@ -83,7 +85,7 @@ HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCRE
 # pan heads, rulings R9-31, R9-48) after each shank passes through a 1/16
 # sheet lock plate. Both are #4-40 tapped through (R9-64, R9-48), the tips
 # stopping inside the rail.
-SCREW_STATION_X = (26.964, 80.892, 134.82, 188.748, 242.676)
+# SCREW_STATION_X: the platen's guide-hole columns (pd_platen_guide_spec).
 GUIDE_SCREW_PASSAGE = PLATE_THICKNESS - PLATEN_CBORE_DEPTH
 # The stock 1/4 in shank (length band +0) is the screw's reach into the rail:
 # all of it engages full thread.
@@ -233,8 +235,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Fastening-screw receivers: ONE native Hole Wizard #4-40 tapped THROUGH
     # feature (5 points) from the front face (R9-64). The deeper stock-head
-    # counterbore leaves 1.0822 mm of platen passage, so the 6.35-mm shank
-    # engages 5.2678 mm of full thread and stops inside the rail.
+    # counterbore leaves 0.2572 mm of the 1/8 platen as passage, so the
+    # 6.35-mm shank engages 6.0928 mm of full thread and stops inside the rail.
     screw_spec = TAPPED_HOLE_SPEC
     wizard_holes(
         adapter,

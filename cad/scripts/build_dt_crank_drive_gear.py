@@ -243,9 +243,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Both south (z=0) bore edges must be selected: the round major arc at
     # -X and the D-flat chord on +X. The north rim stays square against T120.
-    # A ≥Ø8 end mill leaves at most MAX_FLAT_CRESCENT (≈0.960 mm at print
+    # A ≥5/16 in end mill leaves at most MAX_FLAT_CRESCENT (≈0.97 mm at print
     # worst) of horn + axial runout where the shaft flat meets its collar;
-    # the minimum 1.00-mm, 45° chamfer swallows it. A single native feature
+    # the minimum 1/16 in, 45° chamfer swallows it. A single native feature
     # removes both sides of that crescent, not just the easy round arc.
     check(
         "chamfer south D-bore entry",

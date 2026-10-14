@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import math
 
+from _inch import inch
+
 from mg_wheel_drum_geom import (
     DRUM_BORE,
     DRUM_BORE_BAND,
@@ -28,31 +30,38 @@ from mg_wheel_drum_geom import (
     DRUM_WIRE_R,
 )
 
-# --- rim (DIMENSIONS.md ch21: Ø100 annotated) ----------------------------------
-RIM_OUTER_DIA = 100.0
-RIM_RING_RADIAL = 6.0
-RIM_AXIAL = 8.0  # centred on the spokes' mid-plane
-RIM_INNER_DIA = RIM_OUTER_DIA - 2 * RIM_RING_RADIAL  # 88
-# Pen-wire U-groove on the rim's mid-plane: a R0.6 bottom with straight walls.
-GROOVE_R = 0.6
-GROOVE_DEPTH = 1.2
-GROOVE_BOTTOM_DIA = RIM_OUTER_DIA - 2 * GROOVE_DEPTH  # 97.6
+# --- rim (DIMENSIONS.md ch21: Ø100 annotated; all-inch 3-15/16) -----------------
+RIM_OUTER_DIA = inch(3 + 15 / 16)  # was 100.0
+RIM_RING_RADIAL = inch(1, 4)  # was 6.0
+RIM_AXIAL = inch(5, 16)  # was 8.0; centred on the spokes' mid-plane
+RIM_INNER_DIA = RIM_OUTER_DIA - 2 * RIM_RING_RADIAL  # 87.3125 (3-7/16)
+# Pen-wire U-groove on the rim's mid-plane: a R1/32 bottom with straight walls
+# (1/32 step: the nearest 1/16 more than doubles a sub-1/4 feature).
+GROOVE_R = inch(1, 32)  # was 0.6
+GROOVE_DEPTH = inch(1, 16)  # was 1.2
+GROOVE_BOTTOM_DIA = RIM_OUTER_DIA - 2 * GROOVE_DEPTH  # 96.8375
 # Printed bands, (upper, lower): the seat proof is mg_magnifying_wheel_spec's.
 GROOVE_R_BAND = (0.10, -0.10)
 GROOVE_BOTTOM_BAND = (0.10, -0.10)
-PEN_WIRE_DIA = 0.8  # the pen wire the groove carries (pn_pen_wire_geom)
-RIM_WIRE_R = round(GROOVE_BOTTOM_DIA / 2.0 + PEN_WIRE_DIA / 2.0, 6)  # 49.2
-WIRE_RATIO = RIM_WIRE_R / DRUM_WIRE_R  # 4.995, the wheel's magnification
+PEN_WIRE_DIA = inch(0.032)  # .032 music wire (was 0.8; pn_pen_wire_geom)
+RIM_WIRE_R = round(GROOVE_BOTTOM_DIA / 2.0 + PEN_WIRE_DIA / 2.0, 6)  # 48.825
+WIRE_RATIO = RIM_WIRE_R / DRUM_WIRE_R  # 4.916, the wheel's magnification
 
-# --- hub: Ø25 boss, then the drum spigot -----------------------------------------
-HUB_DIA = 25.0
-HUB_LEN = 19.6  # back face to spigot front face, both faced
-HUB_BACK_Z = 7.09  # back face above the spokes' mid-plane (stack: d 0.91)
+# --- hub: Ø1 boss, then the drum spigot -------------------------------------------
+HUB_DIA = inch(1)  # was 25.0
+# back face to spigot front face, both faced; 13/16 (was 19.6): the nearest
+# 3/4 with the 9/32 back face pulled the drum toward the rim and the lever
+# wire off the shifted web below its 0.25 clearance (mg_magnifying_wheel_spec).
+HUB_LEN = inch(13, 16)
+# back face above the spokes' mid-plane; 9/32 (was 7.09; 1/32 step): the
+# nearest 1/4 left the pen-hanger screw tip 0.12 off the rim's back face, less
+# than the back washer's thin-corner 0.17, so the rim could reach the tip.
+HUB_BACK_Z = inch(9, 32)
 SPIGOT_DIA = DRUM_BORE
 SPIGOT_LEN = DRUM_LEN  # nominally flush with the drum's front face
-HUB_STEP_Z = round(HUB_BACK_Z - (HUB_LEN - SPIGOT_LEN), 6)  # -3.51, boss front face
-HUB_FRONT_Z = round(HUB_BACK_Z - HUB_LEN, 6)  # -12.51, spigot front face
-DRUM_MID_Z = round((HUB_STEP_Z + HUB_FRONT_Z) / 2.0, 6)  # -8.01, where the drum sits
+HUB_STEP_Z = round(HUB_BACK_Z - (HUB_LEN - SPIGOT_LEN), 6)  # -3.96875, boss front face
+HUB_FRONT_Z = round(HUB_BACK_Z - HUB_LEN, 6)  # -13.49375, spigot front face
+DRUM_MID_Z = round((HUB_STEP_Z + HUB_FRONT_Z) / 2.0, 6)  # -8.73125, where the drum sits
 # Reamed to a stated running clearance on the finished axle (mg_wheel_group
 # HUB_RUNNING), so the Ø prints as a reference nominal.
 BORE_DIA = round(0.1890 * 25.4, 6)  # 4.8006
@@ -78,35 +87,37 @@ DRUM_PRESS = (0.005, 0.034)
 if DRUM_PRESS[0] <= 0.0:
     raise AssertionError(f"the drum is not a press fit on the spigot: {DRUM_PRESS}")
 # The finished spigot over every H7 bore: its smallest in the smallest bore.
-SPIGOT_DIA_MIN = DRUM_BORE + DRUM_BORE_BAND[1] + DRUM_PRESS[0]  # 14.005
+SPIGOT_DIA_MIN = DRUM_BORE + DRUM_BORE_BAND[1] + DRUM_PRESS[0]  # 13.49875
 
 # --- spokes ------------------------------------------------------------------------
 SPOKE_COUNT = 6  # counted on the p.51 full-page photo; 0 and 180 deg on the bar
-SPOKE_AXIAL = 4.0
-SPOKE_OVERLAP = 1.0  # the sketched spoke runs this far into the hub and rim
+SPOKE_AXIAL = inch(3, 16)  # was 4.0
+SPOKE_OVERLAP = 1.0  # modelling overlap: the sketched spoke runs into hub/rim
 # Taper: the sketched root end (inside the hub) and tip end (inside the rim).
-SPOKE_ROOT_WIDTH = 6.5
-SPOKE_TIP_WIDTH = 5.0
-SPOKE_X0 = HUB_DIA / 2.0 - SPOKE_OVERLAP  # 11.5
-SPOKE_X1 = RIM_INNER_DIA / 2.0 + SPOKE_OVERLAP  # 45.0
-HUB_FILLET_R = 3.0
-RIM_FILLET_R = 4.0
+SPOKE_ROOT_WIDTH = inch(1, 4)  # was 6.5
+SPOKE_TIP_WIDTH = inch(3, 16)  # was 5.0
+SPOKE_X0 = HUB_DIA / 2.0 - SPOKE_OVERLAP  # 11.7
+SPOKE_X1 = RIM_INNER_DIA / 2.0 + SPOKE_OVERLAP  # 44.65625
+HUB_FILLET_R = inch(1, 8)  # was 3.0
+# 5/32 (was 4.0; 1/32 step): the nearest 3/16 leaves TIE 2's worst wall to the
+# rim-fillet foot 1.59 < 2.0 (mg_magnifying_wheel_spec).
+RIM_FILLET_R = inch(5, 32)
 # The rim bore's two edges (the spoke faces stay sharp). TIE 2 breaks into the
 # bore at mid-width, so a bigger round eats its ligament to the rim side faces
 # (mg_magnifying_wheel_spec): the R prints as a single limit, R0.8 MAX, so no
 # round is larger and a sharp edge falls under the title block's edge break.
 # Section A-A cannot import a fillet radius whose arc is the cut, so the R is
 # a sheet radial on the cut arc (user, option (a), 2026-10-12).
-CAST_ROUND_R = 0.80
+CAST_ROUND_R = inch(1, 32)  # was 0.80 (1/32: sub-1/4 feature)
 
 # --- wire ties ---------------------------------------------------------------------
 # Both ties are drilled: the title block's DRILLED HOLES row governs their
 # size (mg_magnifying_wheel_spec takes its plus in every wall).
-TIE_HOLE_DIA = 1.0
+TIE_HOLE_DIA = inch(0.040)  # #60 drill (was 1.0)
 TIE_POSITION_TOL = 0.05
 # TIE 1 (lever wire): straight axial hole through the Ø25 boss on the drum's
 # wire-centre radius, 6 o'clock from the front at rest.
-TIE1_R = DRUM_WIRE_R  # 9.85
+TIE1_R = DRUM_WIRE_R  # 9.9314
 TIE1_CLOCK_DEG = -90.0
 # TIE 2 (pen wire): radial hole, groove bottom to rim ID, about 4:30 from the
 # front (photographed); 2 deg short of it so the worst printed casting keeps a

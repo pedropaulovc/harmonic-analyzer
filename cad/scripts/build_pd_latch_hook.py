@@ -1,10 +1,10 @@
 r"""Reproduction script: latch hook (MHA-PD-014; book ch. 23 pp. 58-63; video 4/4).
 
 The "small latch that allows the operator to disengage the gearing from the
-platen" (ch23 text; p.58 "latch" callout): ONE formed 0.8 (0.032 in) 1095
+platen" (ch23 text; p.58 "latch" callout): ONE formed .032 in (0.8128) 1095
 spring-steel part.  A base lies on the MHA-PD-007 support bar's back face
 under two #4-40 screws (MHA-VN-043); a 90 deg ear rises at its +X end; an arm
-hangs from the ear's lower edge, rolled R80 flatwise until it lies square to
+hangs from the ear's lower edge, rolled R3-1/8 flatwise until it lies square to
 the MHA-VN-042 latch pin, with the pin hole and a finger tab below it.
 Geometry and frame: ``pd_latch_hook_geometry``; printed bands, walls, notes
 and the marked dimensions: ``pd_latch_hook_spec``.
@@ -17,10 +17,10 @@ the part by translation to ``PART_ORIGIN_MACHINE``):
   extruded +Y by the width (``BaseEar``); ``InsideBend`` / ``OutsideBend``
   the concentric bend radii;
 * ``ArmProfile``: the arm's Front-plane outline -- the ear-high top, the
-  vertical, the R80 roll, the straight (split at the far face where the pin
-  crosses it), the R10 tab and its radial end -- extruded over the arm's z
+  vertical, the R3-1/8 roll, the straight (split at the far face where the pin
+  crosses it), the R3/8 tab and its radial end -- extruded over the arm's z
   band from a start offset (``Arm``);
-* ``TaperProfile`` / ``Taper``: the front edge's 10 -> 11.5 taper, cut
+* ``TaperProfile`` / ``Taper``: the front edge's 3/8 -> 7/16 taper, cut
   through on the Right Plane (sketch x = model -Z);
 * ``RootRelief``: the inside corner where the arm's front edge meets the
   ear's lower edge;
@@ -176,7 +176,7 @@ V_SHARP_L = (BASE_LENGTH + EAR_HEIGHT - SHEET_T) * SHEET_T * WIDTH
 # The arm's far (+U) face where the pin crosses it: the outer straight is
 # split there so the sheet locates the latching face from the origin.
 FAR_FACE_POINT = to_local(*on_arm(FAR_FACE_STATION))
-ARM_FRONT_Z = z_local(Z_FRONT)  # the front edge above the taper: 6.0
+ARM_FRONT_Z = z_local(Z_FRONT)  # the front edge above the taper: 1/4
 
 # Right-Plane sketches: sketch (x, y) = (-Z, Y).
 _TAPER_POINTS = [
@@ -617,7 +617,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append((width_dim[0], '"Width"'))
     await volume_check(adapter, "sharp L", V_SHARP_L, 0.005 * V_SHARP_L)
 
-    # The bend: inside R1.2 in the re-entrant corner, outside R2.0 on the
+    # The bend: inside R1/16 in the re-entrant corner, outside R1/16 + sheet on the
     # outer corner, about one centre.
     check(
         "fillet inside bend",
@@ -655,7 +655,7 @@ async def build(adapter) -> dict[str, str]:
     expected += V_ARM_PRISM - V_ARM_ON_EAR
     await volume_check(adapter, "arm", expected, 0.005 * expected)
 
-    # --- The taper: the front edge 1.5 forward of the guide-lock screw heads
+    # --- The taper: the front edge 1/16 forward of the guide-lock screw heads
     # down to TAPER_L[0], then out to the low band at TAPER_L[1].  Cut
     # through along X; the region stops at the ear's lower edge (y = 0).
     taper = SketchDims()

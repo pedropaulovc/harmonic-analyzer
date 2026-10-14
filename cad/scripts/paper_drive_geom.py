@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import math
 
+from _inch import inch
+
 import pd_rack_pinion_spec
 import pd_transgear_feed_pinion_spec
 import pd_transgear_knob_shaft_spec
@@ -21,6 +23,7 @@ import pd_support_bar_spec as bar
 import pd_transgear_arm_geometry as arm
 from pd_latch_hook_geometry import BAR_CENTRE_Y
 import pd_platen_spec as platen
+import pd_platen_guide_spec as platen_guide
 import pd_latch_hook_geometry as hook
 import pd_transgear_pivot_spacer_spec as spacer
 import vn_transgear_latch_pin_spec as latch_pin
@@ -63,7 +66,12 @@ COARSE_FEED_RATIO = (1.0 / CHAIN_RATIO) ** 2
 
 # Keep the existing pivot/latch/stud pose. Mount the stock rack and backer at
 # the shifted feed pitch line; relocate only the reducer's knob bearing.
-PLATEN_BOTTOM_Y = 273.234
+# The platen hangs from the bar's top edge by its top rail, whose centreline
+# the platen's upper guide-hole row locates (build_pd_paper_drive_assembly).
+PLATEN_BOTTOM_Y = (
+    BAR_CENTRE_Y + bar.BAR_HEIGHT / 2.0
+    - platen.GUIDE_HOLE_Y[1] + platen_guide.GUIDE_HEIGHT / 2.0
+)
 PIVOT_XY = (bar.PIVOT_TAP_X, BAR_CENTRE_Y + bar.HANGER_TAP_Y)
 STUD_XY = (
     arm.STUD_MACHINE_X,
@@ -84,14 +92,14 @@ RACK_CREST_DROP = PLATEN_BOTTOM_Y - RACK_TIP_Y
 
 # Actual recording geometry, shared with the paper and pen native builders.
 # These are source anchors, not a reduced paper stroke or nominal-only gate.
-RECORDING_PAPER_WIDTH_MM = 233.2386
-RECORDING_PAPER_HEIGHT_MM = 80.5
+RECORDING_PAPER_WIDTH_MM = inch(147, 16)  # 9-3/16
+RECORDING_PAPER_HEIGHT_MM = inch(51, 16)  # 3-3/16
 RECORDING_PAPER_LEFT_INSET_MM = (platen.PLATE_WIDTH - RECORDING_PAPER_WIDTH_MM) / 2.0
 PAPER_FRONT_Z = (
     hook.BAR_BACK_FACE_Z - bar.BAR_DEPTH - platen.PLATE_THICKNESS - 0.5
 )
-PEN_ROD_X = 3.0
-PEN_Z_MID = -157.0
+PEN_ROD_X = inch(1, 8)
+PEN_Z_MID = -inch(99, 16)  # -6-3/16
 PEN_BLOCK_YAW_DEG = 45.0
 PEN_PAPER_CLEARANCE_MM = 0.25
 PEN_NIB_X_MM = PEN_ROD_X - math.tan(math.radians(PEN_BLOCK_YAW_DEG)) * (

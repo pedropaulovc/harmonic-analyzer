@@ -32,6 +32,7 @@ import math
 import ch_amplitude_bar_spec as _bar
 import ch_channel_lever_spec as _lever
 from _hole_spec import NUMBER_DRILL_MM
+from _inch import inch
 
 MM_PER_IN = 25.4
 
@@ -45,8 +46,9 @@ PIN_DIA = 5.0 / 64.0 * MM_PER_IN  # 1.984
 PIN_DIA_TOLERANCE = 0.005  # +/-, drill-rod grind
 PIN_INSTALLED_LENGTH = _bar.BAR_WIDTH  # dressed flush with both bar faces
 # Cut length of the blank: the bar plus dressing stock at each end. 2-place,
-# printed on the pin sheet with its band.
-PIN_BLANK_LENGTH = 6.60
+# printed on the pin sheet with its band. 9/32 (was 6.60): 1/32 grid -- the
+# 1/16 grid's 1/4 equals the bar and leaves no dressing stock.
+PIN_BLANK_LENGTH = inch(9, 32)
 PIN_BLANK_LENGTH_BAND = (0.13, -0.13)  # (upper, lower) deviations
 # Dressed ends stand nothing proud of the bar faces: the top-notch stack
 # below leaves 0.1065 against the 0.10 running floor (#1038).

@@ -6,9 +6,9 @@ platen cannot fall off it: the plate overlaps the guide on one long edge
 (the 2 screw holes) and cantilevers past the bar's back face on the other.
 
 Layout: width along +X, height along +Y from the origin corner, thickness
-extruded +Z; the y = 0 edge is the guide-side edge (screw holes 2.5 above
+extruded +Z; the y = 0 edge is the guide-side edge (screw holes 1/8 above
 it), and its four plan corners are rounded. Bottom-rail copies mount as
-authored and bridge UP across the 1.0 running clearance onto the bar;
+authored and bridge UP across the 1/32 running clearance onto the bar;
 top-rail copies are flipped Rz180 by the assembly and hang DOWN over the bar
 the top rail rides on.
 
@@ -65,17 +65,17 @@ MATERIAL = "Plain Carbon Steel"
 # LOCK_WIDTH/LOCK_HEIGHT/LOCK_THICK/HOLE_XY live in pd_guide_lock_spec.py (the
 # dimensional contract shared with draw_pd_guide_lock.py; re-exported here for
 # build_pd_paper_drive_assembly). One plate serves both rails (user ruling
-# 2026-10-11): R9-59's 1.0 lip past the rail's outer edge (the screw holes'
-# edge ligament) + 5 rail + the overlap behind the bar. The 28-tall bar
-# (pd_support_bar_spec) closes the old 7 open channel to a 1.0 running
+# 2026-10-11): R9-59's 1/32 lip past the rail's outer edge (the screw holes'
+# edge ligament) + 3/16 rail + the overlap behind the bar. The 1-1/8 bar
+# (pd_support_bar_spec) closes the old 7 open channel to a 1/32 running
 # clearance over the bottom rail and carries the top rail on its top edge, so
-# the 9.6 plate overlaps the bar 2.6 at the bottom stations and 3.6 at the
+# the 3/8 plate overlaps the bar 1/8 at the bottom stations and 5/32 at the
 # top (2026-07-07 field report: a 12-tall plate across the 7 channel topped
 # out AT the bar's bottom edge and retained nothing at the bottom stations;
 # its 15.65 successor stood 9.65 over the bar at the top, toward the latch
 # hook).
 # Stock 91792A108 slotted pan head shanks (MHA-VN-046, rulings R9-31, R9-48)
-# pass through the 1/16 sheet plates before threading into the guide's
+# pass through the .040 sheet plates before threading into the guide's
 # rear-face #4-40 through taps. The part-owned 1/8 drill (R9-49) carries both
 # printed hole positions over the screw majors
 # (vn_guide_lock_screw_spec.LOCK_SET_OFFSET).
