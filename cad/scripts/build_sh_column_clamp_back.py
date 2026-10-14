@@ -6,7 +6,7 @@ back half and its two #8-32 tapped ear holes take the clamp-screw threads (the
 screw stack is bar -> front arc -> this shell). Depth 15.5 spans the
 column-axis plane (machine z -112) to the back face at z -96.5, a 2.7 back
 wall past the Ø25.6 bore; the mating face stops 0.5 short of the column axis
-so the clamp grips (user ruling 2026-10-14; sh_column_clamp_back_geom).
+so the clamp grips (user ruling 2026-10-14; sh_column_clamp_fit).
 Geometry: _clamp_arc.py; layout: memory/paper-drive-rework.md E2.
 
 Run (SolidWorks already open)::
@@ -19,14 +19,32 @@ from __future__ import annotations
 import sys
 
 from _clamp_arc import build_arc
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _part_save import save_part_and_images
 from _session import run_build
-from sh_column_clamp_back_geom import DEPTH, GRIP_OFFSET, HOLE_SPEC
+from sh_column_clamp_back_spec import (
+    DEPTH,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    EAR_STATION_BAND,
+    EAR_STATION_DIMENSIONS,
+    GRIP_OFFSET,
+    GRIP_OFFSET_BAND,
+    HOLE_SPEC,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 PART_NAME = "sh-column-clamp-back"
 
 
 async def build(adapter) -> dict[str, str]:
-    return await build_arc(
+    await build_arc(
         adapter,
         part_name=PART_NAME,
         depth=DEPTH,
@@ -34,6 +52,27 @@ async def build(adapter) -> dict[str, str]:
         hole_spec=HOLE_SPEC,
         grip_offset=GRIP_OFFSET,
     )
+    # Manufacturing drawing support, applied AFTER the shared builder's gated
+    # save (as build_sh_column_clamp_front does): the explicit bands (the grip
+    # offset and the ear stations, sh_column_clamp_fit) and every printed
+    # dimension's places live on the model, then mark exactly the print's
+    # dimensions and stamp the make-critical title-block properties, and
+    # re-save so the shipped SLDPRT carries them.
+    set_dimension_symmetric_tolerance(
+        adapter, "BlockProfile", "GripOffset", GRIP_OFFSET_BAND
+    )
+    for dimension_name in EAR_STATION_DIMENSIONS:
+        set_dimension_symmetric_tolerance(
+            adapter, "EarHoles", dimension_name, EAR_STATION_BAND
+        )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
+    )
+    return await save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

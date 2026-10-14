@@ -1,5 +1,7 @@
 sh-column-clamp-back:
   number: MHA-SH-002
   material_family: ferrous_noncritical
+  finish: black enamel; bore + tapped ear holes masked, bare surfaces oiled
+  quantity: 3
   tolerance_class: machined_block
   process: "machined from solid stock or casting"

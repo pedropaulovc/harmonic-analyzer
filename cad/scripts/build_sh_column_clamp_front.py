@@ -24,11 +24,15 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from sh_column_clamp_front_spec import (
     ARC_DEPTH,
     DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
     EAR_HOLE_SPEC,
-    DRAWING_NOTES,
+    EAR_STATION_BAND,
+    EAR_STATION_DIMENSIONS,
     ISOMETRIC_VIEW_NOTE,
 )
 
@@ -48,20 +52,20 @@ async def build(adapter) -> dict[str, str]:
         hole_spec=EAR_HOLE_SPEC,
     )
     # Manufacturing drawing support, applied AFTER the shared builder's gated
-    # save (the marks live only in this front arc, so the shared _clamp_arc
-    # stays untouched and the back arc's recipe digest never moves): mark
-    # exactly the print's dimensions, stamp the make-critical title-block
-    # properties, then re-save so the shipped SLDPRT carries both.
+    # save (as build_sh_column_clamp_back does): the ear stations' band
+    # (sh_column_clamp_fit) and every printed dimension's places live on the
+    # model, then mark exactly the print's dimensions, stamp the make-critical
+    # title-block properties, and re-save so the shipped SLDPRT carries them.
+    for dimension_name in EAR_STATION_DIMENSIONS:
+        set_dimension_symmetric_tolerance(
+            adapter, "EarHoles", dimension_name, EAR_STATION_BAND
+        )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
     return await save_part_and_images(adapter, PART_NAME)
 
