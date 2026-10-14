@@ -40,6 +40,7 @@ def test_number_is_the_parent_number_plus_tool_suffix_thirteen() -> None:
         _config.parts("ch-rocker-arm-tl-outline-template")["number"]
         == f"{parent}-TL-13"
     )
+    assert spec.ROCKER_NUMBER == parent
 
 
 def test_notes_follow_the_simplicity_policy() -> None:

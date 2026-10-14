@@ -51,6 +51,7 @@ from ch_rocker_arm_tl_outline_template_spec import (
     PIVOT_CALLOUT,
     PROFILE_CALLOUT,
     SHARP_EDGE_CALLOUT,
+    STATION_CALLOUT,
     THICK_CALLOUT,
 )
 
@@ -109,16 +110,21 @@ CALLOUTS_BELOW = {
     "BottomBelowPivot": "TO BOTTOM ARC LOW POINT\nSETS ROCKER BOTTOM EDGE",
     "PivotDia": PIVOT_CALLOUT,
     "Thick": THICK_CALLOUT,
-    "BottomTailX": PROFILE_CALLOUT,
-    "BottomRodX": PROFILE_CALLOUT,
+    "BottomTailX": STATION_CALLOUT,
+    "BottomRodX": STATION_CALLOUT,
+    # Each tip land's flag fits between the sheet border (tail) or the
+    # 145.240 extension line (rod) and its own extension lines, below the
+    # value; its end-face direction rides above.
+    "TailTipLen": PROFILE_CALLOUT,
+    "RodTipLen": PROFILE_CALLOUT,
 }
-# The top stations and tip lands take their profile flag above the value:
-# below, it would land on the apex block or the tip-land dimension line.
+# The top stations take their profile flag above the value: below, it would
+# land on the apex block.
 CALLOUTS_ABOVE = {
-    "TopTailX": PROFILE_CALLOUT,
-    "TopRodX": PROFILE_CALLOUT,
-    "TailTipLen": f"{PROFILE_CALLOUT}\nRADIAL, SHARP",
-    "RodTipLen": f"{PROFILE_CALLOUT}\nRADIAL, SHARP",
+    "TopTailX": STATION_CALLOUT,
+    "TopRodX": STATION_CALLOUT,
+    "TailTipLen": "RADIAL, SHARP",
+    "RodTipLen": "RADIAL, SHARP",
 }
 
 _Z = [0.0, 0.0, 1.0]

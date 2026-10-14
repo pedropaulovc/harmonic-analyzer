@@ -219,8 +219,13 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 DRAWING_NOTES = "LAYOUT AND PROFILE GAUGE FOR THE ROCKER ARM."
 SHARP_EDGE_CALLOUT = "SHARP EDGE"
 # The outline stations and tip lands are the rocker arm's own profile
-# stations: the flag names that function at each three-place callout.
+# stations: the flag names that function at each three-place callout.  The
+# stations also name the rocker's drawing; the tip lands sit between the
+# sheet border and the station extension lines, with room for the short flag
+# only.
 PROFILE_CALLOUT = "ROCKER PROFILE"
+ROCKER_NUMBER = "MHA-CH-006"
+STATION_CALLOUT = f"{PROFILE_CALLOUT}, {ROCKER_NUMBER}"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:4"
 
 # prechips models a fixture as boxes and cylinders only, so the bound shop
