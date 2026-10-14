@@ -1796,7 +1796,7 @@ def test_knife_hanger_is_a_10_loose_hole_and_washer_spotface() -> None:
 
     hole = spec.HANGER_HOLE_SPEC
     assert (hole.kind, hole.size, hole.fit, hole.end) == (
-        "counterbore_hex", "#10", "loose", "through_all",
+        "counterbore_socket", "#10", "loose", "through_all",
     )
     assert hole.overrides_mm == {
         "HoleDiameter": spec.HANGER_CLEARANCE_DIA,
@@ -1818,6 +1818,40 @@ def test_knife_hanger_is_a_10_loose_hole_and_washer_spotface() -> None:
     assert spec.HANGER_WASHER.OD_ID_RUNOUT_MAX == pytest.approx(0.3302)
     assert spec.HANGER_WASHER_CONCENTRIC_ANNULUS_MIN == pytest.approx(3.199)
     assert part.STUD_Z_REAR + spec.HANGER_SPOTFACE_DIA_MAX/2 < part.INNER_Z+part.GUSSET
+
+
+def test_knife_hanger_wizard_seed_is_a_native_numbered_counterbore_row() -> None:
+    """Farm c673e62: InitializeHole(counterbore, ANSI Inch, HexBolt, "#10")
+    made CreateFeature return None. The installed ANSI Inch Hex Bolt
+    counterbore table (AI_DATA_HBOLT) starts at 1/4; the socket-head one
+    carries #10. The seed takes the main-built numbered socket counterbore
+    pattern and stays a pure table identity: every cut is overridden."""
+    import _holes
+    import ch_rocker_arm_tl_c_stop_bar_spec as stop_bar
+    import dt_cone_swing_platform_spec as platform
+
+    hole = spec.HANGER_HOLE_SPEC
+    assert hole.kind != "counterbore_hex"
+    # swWzdCounterBore, swStandardAnsiInchSocketCapScrew.
+    assert _holes._KINDS[hole.kind] == (0, 9)
+    for precedent, size in (
+        (stop_bar.SCREW_HOLE_SPEC, "#8"),
+        (platform.HOLDDOWN_HOLE_SPEC, "#4"),
+    ):
+        assert (precedent.kind, precedent.size, precedent.end) == (
+            hole.kind, size, hole.end,
+        )
+        assert set(precedent.overrides_mm) == set(hole.overrides_mm)
+    # One feature, one spec: the build passes the shared spec, pins the
+    # through diameter, and binds the overridden depth to HangerGrip.
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    call = source[source.index("hanger_wizard = wizard_holes(") :]
+    call = call[: call.index("\n    )\n")]
+    assert "HANGER_HOLE_SPEC," in call
+    assert "expect_dia_mm=HANGER_CLEARANCE_DIA" in call
+    assert "HoleSpec(" not in call
+    assert part.HANGER_SPOTFACE_DEPTH_DRIVE == '"RingHeight" - "HangerGrip@HangerGripReference"'
+    assert "drive_jobs.append((hanger_depth, HANGER_SPOTFACE_DEPTH_DRIVE))" in source
 
 
 def test_hanger_through_diameter_has_a_native_unilateral_band(monkeypatch) -> None:

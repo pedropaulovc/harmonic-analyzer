@@ -2995,9 +2995,10 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "gooseneck bore", volume - v_gn, 60.0)
 
     # 12. Native #10 loose clearance plus shallow washer spotfaces, both
-    #     stations in one top-face hex-bolt wizard feature. Q7 preserves the
-    #     shop's underside-entry through drilling and TOP spotfacing; the
-    #     finished solid is independent of that machining sequence.
+    #     stations in one top-face counterbore wizard feature (a #10
+    #     socket-head table seed, every cut overridden: HANGER_HOLE_SPEC).
+    #     Q7 preserves the shop's underside-entry through drilling and TOP
+    #     spotfacing; the finished solid is independent of that sequence.
     #     A full spotface annulus remains inside the bar/rail union, including
     #     the rear rim extending into the rail above its pocket roof.
     hanger_wizard = wizard_holes(

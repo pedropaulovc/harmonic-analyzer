@@ -124,8 +124,16 @@ HANGER_SPOTFACE_FLOOR_Y = -HALF_H + HANGER_GRIP  # +17.25
 HANGER_SPOTFACE_DIA_MIN = HANGER_SPOTFACE_DIA - _XX  # 16.49
 HANGER_SPOTFACE_DIA_MAX = HANGER_SPOTFACE_DIA + _XX  # 17.51
 HANGER_SPOTFACE_CLEANUP_MIN = RING_HEIGHT - _X - (HANGER_GRIP + HANGER_GRIP_TOL)
+# The wizard seed only names a native table row, not the hardware (the hex
+# bolt above on its washer): every cut diameter/depth below is an explicit
+# override, read back after the build. The installed ANSI Inch Hex Bolt counterbore
+# table (swStandardAnsiInchHexBolt, AI_DATA_HBOLT) starts at 1/4 and has no
+# #10 row, so CreateFeature returned None for it on the farm. The socket-head
+# counterbore table (AI_DATA_SHCSCREW) carries #10, in the through-all,
+# three-override pattern of the #4/#8 socket counterbores on main
+# (dt_cone_swing_platform_spec, ch_rocker_arm_tl_c_stop_bar_spec).
 HANGER_HOLE_SPEC = HoleSpec(
-    "counterbore_hex",
+    "counterbore_socket",
     "#10",
     fit="loose",
     overrides_mm={

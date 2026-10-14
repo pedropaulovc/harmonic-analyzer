@@ -4,6 +4,9 @@ Finished frame: tip Y=0, bearing face Y=45.70, screw axis +Y. The stock
 recipe is positioned before cutting, so both the solid and its native
 manufacturing/inspection sketches share that frame without a body-only move.
 The catalogue's factory helix survives the actual trim; no socket is added.
+The closed deburr cutter stays on the positive-radius side of the shank axis.
+After its equations are solved, select the completed sketch with mark 0 and
+its construction centreline with mark 4; create_revolve does not select them.
 """
 
 from __future__ import annotations
@@ -27,7 +30,7 @@ from _drawing_tolerances import (
     set_dimension_symmetric_tolerance,
 )
 from _fastener_catalog import fastener
-from _feature_tree import name_last_feature
+from _feature_tree import _feature_by_name, name_last_feature
 from _rebuild import force_rebuild
 from _session import run_build
 from _simplified_part import save_simplified_part
@@ -139,6 +142,7 @@ async def _trim_stock(adapter) -> None:
                 (radius + chamfer, chamfer),
                 (radius, chamfer),
             ],
+            close=True,
         )
         dims = SketchDims()
         for line, direction in zip(
@@ -241,6 +245,20 @@ async def _trim_stock(adapter) -> None:
             "CutEndFromBearing@StockDeburrProfile",
             '"CutLength@StockTrimProfile"',
         )
+        # FeatureRevolve2 consumes selections; the adapter does not recover a
+        # profile/axis after equation solving. Do not rely on exit-sketch state.
+        # exit_sketch also resets the registry, so select the captured native
+        # centreline rather than its now-expired axis_id.
+        model.ClearSelection2(True)
+        if not _feature_by_name(adapter, "StockDeburrProfile").Select2(False, 0):
+            raise RuntimeError("cannot select stock deburr profile")
+        selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+        data = _early_bound(selection.CreateSelectData(), "ISelectData")
+        if data is None:
+            raise RuntimeError("cannot create stock deburr axis selection")
+        data.Mark = 4  # FeatureRevolve2: axis of revolution.
+        if not _early_bound(axis, "ISketchSegment").Select4(True, data):
+            raise RuntimeError("cannot select stock deburr axis")
         check(
             "deburr trimmed stock",
             await adapter.create_revolve(RevolveParameters(angle=360, is_cut=True)),

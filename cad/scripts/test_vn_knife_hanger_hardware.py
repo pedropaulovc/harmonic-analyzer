@@ -407,7 +407,29 @@ def test_route_and_inspection_notes_are_consumed_native_part_properties(monkeypa
     assert angular == [("StockDeburrProfile", "ChamferAngle", 1.0)]
 
 
-def test_trim_recipe_emits_real_cut_and_deburr_with_native_length(monkeypatch):
+@pytest.mark.parametrize(
+    "fault",
+    [
+        None,
+        "missing_profile",
+        "wrong_profile",
+        "profile_mark",
+        "missing_axis",
+        "axis_mark",
+        "axis_replaces_profile",
+        "edit_mode",
+        "open_profile",
+        "crosses_axis",
+        "nonconstruction_axis",
+        "profile_select_failed",
+        "axis_select_failed",
+        "select_data_missing",
+    ],
+)
+def test_trim_recipe_emits_real_cut_and_deburr_with_native_length(monkeypatch, fault):
+    """Exercise the vendored revolve at its API boundary, not a geometry stand-in."""
+    from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
+    from solidworks_mcp.adapters.solidworks import features as sdk_features
     from solidworks_mcp.adapters.solidworks import sketch as sdk_sketch
 
     seen = []
@@ -417,38 +439,173 @@ def test_trim_recipe_emits_real_cut_and_deburr_with_native_length(monkeypatch):
 
     class Recorder:
         def __init__(self):
+            self.selection = []
+            self.sketch_open = False
+            self.profiles = []
+            self._sketch_entities = {}
+            self.constants = {"swEndCondBlind": 0}
+            self.swApp = SimpleNamespace(RevisionNumber=lambda: "34.4.0")
+            self.axis = SimpleNamespace(
+                ConstructionGeometry=fault != "nonconstruction_axis",
+                Select4=self.select_axis,
+            )
+            self.profile = SimpleNamespace(Select2=self.select_profile)
+            self.sketch_manager = SimpleNamespace(
+                CreatePoint=self.create_point,
+                CreateCenterLine=self.create_axis,
+            )
             self.currentModel = SimpleNamespace(
-                ClearSelection2=lambda _all: None,
+                ClearSelection2=self.clear_selection,
+                SelectionManager=SimpleNamespace(CreateSelectData=self.select_data),
+                FeatureManager=SimpleNamespace(FeatureRevolve2=self.native_revolve),
                 Extension=SimpleNamespace(
                     AddSpecificDimension=lambda *_args: (display, 0)
                 ),
             )
-            self.currentSketchManager = SimpleNamespace(
-                CreatePoint=self.create_point,
-                CreateCenterLine=lambda *_args: object(),
-            )
+            self.currentSketchManager = None
+
+        @staticmethod
+        def result(data=None):
+            return AdapterResult(status=AdapterResultStatus.SUCCESS, data=data)
+
+        @staticmethod
+        def _attempt(operation, default=None):
+            try:
+                return operation()
+            except Exception:
+                return default
+
+        @staticmethod
+        def _get_attr_or_call(value, name):
+            member = getattr(value, name)
+            return member() if callable(member) else member
+
+        @staticmethod
+        def _get_feature_id(feature):
+            return feature.Name
+
+        def _handle_com_operation(self, name, operation):
+            try:
+                return self.result(operation())
+            except Exception as error:
+                return AdapterResult(
+                    status=AdapterResultStatus.ERROR, error=f"Error in {name}: {error}"
+                )
+
+        def clear_selection(self, _all):
+            self.selection.clear()
+
+        def select_data(self):
+            return None if fault == "select_data_missing" else SimpleNamespace(Mark=0)
+
+        def select_profile(self, append, mark):
+            seen.append(("select_profile", append, mark))
+            if fault == "profile_select_failed":
+                return False
+            if not append:
+                self.selection.clear()
+            if fault != "missing_profile":
+                name = (
+                    "StockTrimProfile"
+                    if fault == "wrong_profile"
+                    else "StockDeburrProfile"
+                )
+                self.selection.append((name, 1 if fault == "profile_mark" else mark))
+            return True
+
+        def select_axis(self, append, data):
+            seen.append(("select_axis", append, data.Mark))
+            if fault == "axis_select_failed":
+                return False
+            if not append or fault == "axis_replaces_profile":
+                self.selection.clear()
+            if fault != "missing_axis":
+                self.selection.append(
+                    (self.axis, 0 if fault == "axis_mark" else data.Mark)
+                )
+            return True
+
+        def create_axis(self, *points):
+            seen.append(("axis", points))
+            self.axis_points = points
+            return self.axis
 
         def create_point(self, *point):
             seen.append(("point", point))
             return object()
 
-        def _register_sketch_entity(self, kind, _entity):
+        def _register_sketch_entity(self, kind, entity):
+            self._sketch_entities[kind] = entity
             return kind
 
         async def create_sketch(self, plane):
+            assert not self.sketch_open
+            self.sketch_open = True
+            self.currentSketchManager = self.sketch_manager
             seen.append(("plane", plane))
+            return self.result()
 
         async def exit_sketch(self):
-            pass
+            self.sketch_open = fault == "edit_mode" and len(self.profiles) == 2
+            self.currentSketchManager = None
+            # Match the vendored exit_sketch: IDs cannot select a closed sketch.
+            self._sketch_entities.clear()
+            self.selection.clear()
+            return self.result()
 
         async def add_sketch_constraint(self, *_args):
-            pass
+            return self.result()
 
         async def create_cut_extrude(self, parameters):
+            assert not self.sketch_open
             seen.append(("cut", parameters))
+            return self.result()
+
+        def native_revolve(self, *arguments):
+            # Official FeatureRevolve2 signature and the actual SW 2026 adapter.
+            assert len(arguments) == 20
+            assert arguments[:8] == (True, True, False, True, False, False, 0, 0)
+            assert arguments[8] == pytest.approx(2 * math.pi)
+            assert arguments[9:] == (
+                0.0,
+                False,
+                False,
+                0.0,
+                0.0,
+                0,
+                0.0,
+                0.0,
+                True,
+                False,
+                True,
+            )
+            seen.append(("native_revolve", tuple(self.selection)))
+            segments = self.profiles[-1]
+            closed = all(
+                end == next_start
+                for (_start, end), (next_start, _next_end) in zip(
+                    segments, segments[1:] + segments[:1], strict=True
+                )
+            )
+            ax, _ay, az, bx, _by, bz = self.axis_points
+            if (
+                self.sketch_open
+                or self.selection != [("StockDeburrProfile", 0), (self.axis, 4)]
+                or not closed
+                or not self.axis.ConstructionGeometry
+                or ax != bx
+                or az != 0
+                or bz != 0
+                or any(
+                    x <= ax * 1000 for start, end in segments for x, _y in (start, end)
+                )
+            ):
+                return None
+            return SimpleNamespace(Name="Cut-Revolve2")
 
         async def create_revolve(self, parameters):
             seen.append(("revolve", parameters))
+            return sdk_features._create_revolve_impl(self, parameters)
 
     class Dimensions:
         def record(self, name):
@@ -457,9 +614,23 @@ def test_trim_recipe_emits_real_cut_and_deburr_with_native_length(monkeypatch):
         def apply(self, _adapter, feature):
             seen.append(("dimension_owner", feature))
 
-    async def chain(_adapter, points, close=True):
+    async def chain(adapter, points, close=True):
         seen.append(("chain", points, close))
-        return [f"Line{i}" for i in range(len(points) if close else len(points) - 1)]
+        vertices = list(points) + ([points[0]] if close else [])
+        segments = list(zip(vertices, vertices[1:]))
+        if len(adapter.profiles) == 1:
+            if fault == "open_profile":
+                start, (x, y) = segments[-1]
+                segments[-1] = (start, (x, y + bolt.CHAMFER_WIDTH))
+            elif fault == "crosses_axis":
+                _start, end = segments[0]
+                segments[0] = ((-bolt.CHAMFER_WIDTH, 0.0), end)
+                start, _end = segments[-1]
+                segments[-1] = (start, segments[0][0])
+        adapter.profiles.append(segments)
+        ids = [f"Line{i}" for i in range(len(segments))]
+        adapter._sketch_entities.update(zip(ids, segments))
+        return ids
 
     async def between(_adapter, _first, _second, kind, value, _label):
         seen.append(("dimension", kind, value))
@@ -467,11 +638,19 @@ def test_trim_recipe_emits_real_cut_and_deburr_with_native_length(monkeypatch):
     async def nothing(*_args):
         pass
 
-    async def equation(_adapter, name, expression):
+    async def equation(adapter, name, expression):
         equations.append((name, expression))
+        seen.append(("equation", name))
+        # Deliberately lose incidental exit-sketch selections during solving.
+        # The recipe must establish its inputs afterwards, not assume retention.
+        adapter.currentModel.ClearSelection2(True)
 
     async def anchor(_adapter, point, x, y, label):
         seen.append(("anchor", point, x, y, label))
+
+    def select_angle(adapter, ids, mark):
+        assert adapter.sketch_open and mark == 0 and ids == ["Line0", "Line3"]
+        assert all(entity in adapter._sketch_entities for entity in ids)
 
     monkeypatch.setattr(bolt_part, "SketchDims", Dimensions)
     monkeypatch.setattr(bolt_part, "add_line_chain", chain)
@@ -479,8 +658,12 @@ def test_trim_recipe_emits_real_cut_and_deburr_with_native_length(monkeypatch):
     monkeypatch.setattr(bolt_part, "dimension_between", between)
     monkeypatch.setattr(bolt_part, "ensure_fully_defined", nothing)
     monkeypatch.setattr(bolt_part, "drive_dimension", equation)
-    monkeypatch.setattr(bolt_part, "check", lambda *_args: None)
     monkeypatch.setattr(bolt_part, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        bolt_part,
+        "_feature_by_name",
+        lambda adapter, name: adapter.profile if name == "StockDeburrProfile" else None,
+    )
     monkeypatch.setattr(
         bolt_part,
         "name_last_feature",
@@ -489,12 +672,31 @@ def test_trim_recipe_emits_real_cut_and_deburr_with_native_length(monkeypatch):
     monkeypatch.setattr(
         bolt_part, "no_sketch_inference", lambda _adapter: contextlib.nullcontext()
     )
-    monkeypatch.setattr(sdk_sketch, "_select_sketch_entities", lambda *_args: None)
+    monkeypatch.setattr(sdk_sketch, "_select_sketch_entities", select_angle)
+    if fault is not None:
+        message = {
+            "profile_select_failed": "cannot select stock deburr profile",
+            "axis_select_failed": "cannot select stock deburr axis",
+            "select_data_missing": "cannot create stock deburr axis selection",
+        }.get(fault, "Failed to create revolve feature")
+        with pytest.raises(RuntimeError, match=message):
+            asyncio.run(bolt_part._trim_stock(Recorder()))
+        assert ("feature", "StockDeburr") not in seen
+        return
     asyncio.run(bolt_part._trim_stock(Recorder()))
     (cut,) = [entry[1] for entry in seen if entry[0] == "cut"]
     (deburr,) = [entry[1] for entry in seen if entry[0] == "revolve"]
     assert cut.both_directions and cut.depth > 2 * bolt.SHANK_DIA
     assert deburr.is_cut and deburr.angle == 360
+    assert [entry[2] for entry in seen if entry[0] == "chain"] == [True, True]
+    assert ("select_profile", False, 0) in seen
+    assert ("select_axis", True, 4) in seen
+    assert next(
+        i for i, entry in enumerate(seen) if entry[0] == "select_profile"
+    ) > max(i for i, entry in enumerate(seen) if entry[0] == "equation")
+    assert [entry[1] for entry in seen if entry[0] == "axis"] == [
+        (0, -bolt.CHAMFER_WIDTH / 1000, 0, 0, 2 * bolt.CHAMFER_WIDTH / 1000, 0)
+    ]
     trim, prep = [entry[1] for entry in seen if entry[0] == "chain"]
     assert trim[2][1] == trim[3][1] == bolt.TIP_Y
     assert trim[0][1] < bolt.LENGTH - bolt.CATALOG_LENGTH
