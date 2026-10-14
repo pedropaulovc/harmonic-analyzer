@@ -528,9 +528,6 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("pn-pen-adjust-screw-1", "pn-pen-rod-1")): _annulus_limit(
                 1.524, 1.191, 4.0
             ),
-            frozenset(("vn-hanger-screw-1", "pn-pen-hanger-1")): _annulus_limit(
-                4.1656, 3.454, 3.0
-            ),
         },
         "pd-paper-drive": {
             **_expected_numbered_pairs(

@@ -1244,6 +1244,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_pen_hanger_locknut",
+        part="vn_pen_hanger_locknut",
+        artifact_stem="vn-pen-hanger-locknut",
+        script_name="draw_vn_pen_hanger_locknut.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="vn_post_mount_screw",
         part="vn_post_mount_screw",
         artifact_stem="vn-post-mount-screw",

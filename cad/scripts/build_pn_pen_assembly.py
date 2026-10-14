@@ -31,7 +31,9 @@ the curve. Everything below the guides rides the rod:
   mid-plane), locked to the rod so it rides the pen travel. The rim wrap and
   tie-off are not modeled; the kinematic coupling stays a Motion-study mate
   (cad/docs/motion-policy.md).
-* vn-hanger-screw -- fastens the pen-hanger from behind the wheel bar.
+* vn-hanger-screw + vn-pen-hanger-locknut -- fasten the pen-hanger: the screw
+  from behind the wheel bar through the strap's clearance hole, the
+  nylon-insert locknut on the strap front locking it.
 
 The carriage layout and its plan balance live in ``pn_pen_carriage_geom``
 (pure): the rod line PEN_Z_MID and the v-block's pivot-bore station put the
@@ -86,6 +88,12 @@ from _assembly import (
 from _transforms import IDENTITY, euler_from_rows
 from _interference_contracts import allowed_interference_pairs
 from vn_hanger_screw_spec import SHANK_LEN as HANGER_SHANK_LEN
+from vn_hanger_screw_spec import THREAD_PITCH as HANGER_THREAD_PITCH
+from vn_hanger_screw_spec import TIP_CHAMFER as HANGER_TIP_CHAMFER
+from vn_pen_hanger_locknut_spec import THICKNESS as HANGER_LOCKNUT_T
+from vn_pen_hanger_locknut_spec import (
+    THREAD_PAST_MIN_PITCHES as HANGER_LOCKNUT_PAST_PITCHES,
+)
 from mg_magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
 from mg_magnifying_wheel_geom import RIM_OUTER_DIA as WHEEL_RIM_OUTER_DIA
 from mg_wheel_bar_geom import BAR_DEPTH as WHEEL_BAR_DEPTH
@@ -95,7 +103,7 @@ from pn_pen_hanger_spec import (
     GUIDE_ENGAGE_MARGIN,
     GUIDE_SPAN_Y,
     HANGER_POS,
-    SCREW_HOLE_XY as HANGER_TAP_XY,
+    SCREW_HOLE_XY as HANGER_HOLE_XY,
     STRAP_Z as HANGER_STRAP_Z,
 )
 from pn_pen_wire_geom import (
@@ -151,23 +159,34 @@ if STUD_HEAD_TOP_Y[1] > _RIM_LOW_Y_AT_WIRE - 2.0:
 
 # --- M6.10 fastener ----------------------------------------------------------
 # Pen-hanger screw from BEHIND the bar. Its under-head frame follows the shared
-# wheel-bar back face; the exact stock shank passes through the 9 mm bar and
-# 3 mm strap, then retains clearance to the magnifying-wheel rim.
+# wheel-bar back face; the exact stock shank passes through the 9 mm bar, the
+# 3 mm strap's clearance hole and the locknut on the strap front, then stands
+# clear of the magnifying-wheel rim.
 BAR_BACK_Z = HANGER_POS[2] + max(HANGER_STRAP_Z) + WHEEL_BAR_DEPTH
 HANGER_SCREW_POS = (
-    HANGER_POS[0] + HANGER_TAP_XY[0],
-    HANGER_POS[1] + HANGER_TAP_XY[1],
+    HANGER_POS[0] + HANGER_HOLE_XY[0],
+    HANGER_POS[1] + HANGER_HOLE_XY[1],
     BAR_BACK_Z,
 )
 assert math.isclose(HANGER_SCREW_POS[0], HANGER_SCREW_MACHINE_X, abs_tol=1e-9)
 assert math.isclose(HANGER_SCREW_POS[1], WHEEL_BAR_Y, abs_tol=1e-9)
 HANGER_SCREW_TIP_Z = HANGER_SCREW_POS[2] - HANGER_SHANK_LEN
 HANGER_STRAP_FRONT_Z = HANGER_POS[2] + min(HANGER_STRAP_Z)
+# The locknut's frame spans local z 0..T (vn_pen_hanger_locknut_spec): placed
+# un-rotated at the strap front less T, its z = T face bears on the strap.
+HANGER_LOCKNUT_POS = (
+    HANGER_SCREW_POS[0],
+    HANGER_SCREW_POS[1],
+    HANGER_STRAP_FRONT_Z - HANGER_LOCKNUT_T,
+)
 WHEEL_RIM_BACK_Z = WHEEL_MID_Z + WHEEL_RIM_AXIAL / 2.0
-HANGER_THREAD_PROTRUSION = HANGER_STRAP_FRONT_Z - HANGER_SCREW_TIP_Z
+# Full thread standing past the nut's insert end, the tip chamfer excluded.
+HANGER_THREAD_PAST_NUT = HANGER_LOCKNUT_POS[2] - HANGER_SCREW_TIP_Z - HANGER_TIP_CHAMFER
 HANGER_TIP_TO_RIM = HANGER_SCREW_TIP_Z - WHEEL_RIM_BACK_Z
-if HANGER_THREAD_PROTRUSION <= 0.0:
-    raise AssertionError("stock hanger screw does not pass through the tapped strap")
+if HANGER_THREAD_PAST_NUT < HANGER_LOCKNUT_PAST_PITCHES * HANGER_THREAD_PITCH:
+    raise AssertionError(
+        "stock hanger screw stands under two full pitches past the locknut"
+    )
 if HANGER_TIP_TO_RIM <= 0.0:
     raise AssertionError("stock hanger screw tip reaches the magnifying-wheel rim")
 
@@ -290,7 +309,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"ScrewAxis@{hanger_screw}", "AXIS"),
         named_ref(f"HangerScrewAxis@{hanger}", "AXIS"),
-        label="hanger screw coaxial with strap tapped hole",
+        label="hanger screw coaxial with strap clearance hole",
         verify=(hanger_screw, list(HANGER_SCREW_POS)),
     )
     await distance_driver(
@@ -309,6 +328,25 @@ async def build(adapter) -> dict[str, str]:
         verify=(hanger_screw, list(HANGER_SCREW_POS)),
     )
     assert_component_placed(adapter, hanger_screw, list(HANGER_SCREW_POS), IDENTITY)
+
+    # The locknut on the strap front: placed on the screw axis at its exact
+    # pose and locked to the fixed hanger -- one Lock mate, like the riders;
+    # a coaxial mate on top would only over-constrain the solve.
+    hanger_locknut = await place_component(
+        adapter,
+        "vn-pen-hanger-locknut",
+        list(HANGER_LOCKNUT_POS),
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{hanger_locknut}", "PLANE"),
+        named_ref(f"Front Plane@{hanger}", "PLANE"),
+        label="hanger locknut locked to hanger",
+    )
+    assert_component_placed(adapter, hanger_locknut, list(HANGER_LOCKNUT_POS), IDENTITY)
 
     # Certify the AS-BUILT model. Necessity only: the freed pen travel is
     # genuinely free; the lock-mated riders MUST read under-constrained WITH

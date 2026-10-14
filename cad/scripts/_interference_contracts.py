@@ -416,9 +416,6 @@ _PEN_ALLOWED_PAIRS = {
     frozenset(("pn-pen-adjust-screw-1", "pn-pen-rod-1")): _smooth_annulus_limit_mm3(
         1.524, 1.191, 4.0
     ),
-    frozenset(("vn-hanger-screw-1", "pn-pen-hanger-1")): _smooth_annulus_limit_mm3(
-        4.1656, 3.454, 3.0
-    ),
 }
 
 

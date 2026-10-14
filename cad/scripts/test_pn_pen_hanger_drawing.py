@@ -13,13 +13,13 @@ import pn_pen_hanger_spec as spec
 from _printed_tolerance import printed_band_mm
 
 
-def test_hanger_tap_lands_on_the_bar_screw_axis() -> None:
+def test_hanger_screw_hole_lands_on_the_bar_screw_axis() -> None:
     import build_mg_magnifier_assembly as magnifier
     import build_mg_wheel_bar as bar
     import build_pn_pen_assembly as pen
 
     assert pen.HANGER_POS == spec.HANGER_POS
-    tap_axis = (
+    hole_axis = (
         spec.HANGER_POS[0] + spec.SCREW_HOLE_XY[0],
         spec.HANGER_POS[1] + spec.SCREW_HOLE_XY[1],
     )
@@ -27,32 +27,40 @@ def test_hanger_tap_lands_on_the_bar_screw_axis() -> None:
         magnifier.WHEEL_BAR_X0 + bar.SCREW_HOLE_X,
         magnifier.WHEEL_BAR_Y,
     )
-    assert tap_axis == pytest.approx(bar_axis)
+    assert hole_axis == pytest.approx(bar_axis)
     # The strap seats on the bar front face, its top flush with the bar top.
     assert spec.HANGER_POS[2] + spec.STRAP_Z[1] == pytest.approx(magnifier.BAR_FRONT_Z)
     assert spec.HANGER_POS[1] == pytest.approx(
         magnifier.WHEEL_BAR_Y + bar.BAR_SIDE / 2.0
     )
-    # Receiver thickness and the rear-entry stock-screw stack are unchanged.
+    # The 3.0 strap carries no thread: the screw passes its #8 clearance hole
+    # into the locknut, which leaves at least two full pitches beyond it.
     assert spec.STRAP_Z[1] - spec.STRAP_Z[0] == pytest.approx(3.0)
-    assert pen.HANGER_THREAD_PROTRUSION == pytest.approx(0.7)
+    assert spec.SCREW_HOLE_SPEC.kind == "clearance"
+    assert spec.SCREW_HOLE_DIA > spec.HANGER_SCREW_DIA
+    assert pen.HANGER_THREAD_PAST_NUT >= 2.0 * pen.HANGER_THREAD_PITCH
 
 
-def test_hanger_thread_envelope_fits_all_four_tapered_strap_edges() -> None:
+def test_screw_hole_and_locknut_fit_all_four_tapered_strap_edges() -> None:
     point = spec.SCREW_HOLE_XY
     vertices = spec.STRAP_OUTLINE
     # Signed point-to-edge distances in the CCW outline measure the complete
-    # circular thread envelope, including the top edge and inclined sides.
-    walls = []
+    # circular hole, including the top edge and inclined sides.
+    distances = []
     for start, end in zip(vertices, vertices[1:] + vertices[:1]):
         dx, dy = end[0] - start[0], end[1] - start[1]
-        distance = (
-            dx * (point[1] - start[1]) - dy * (point[0] - start[0])
-        ) / math.hypot(dx, dy)
-        walls.append(distance - spec.HANGER_SCREW_DIA / 2.0)
-    # The top edge governs: 5.0 below it less the #8 major radius.
-    assert min(walls) == pytest.approx(5.0 - spec.HANGER_SCREW_DIA / 2.0)
-    assert min(walls) == pytest.approx(spec.HANGER_THREAD_STRAP_WALL)
+        distances.append(
+            (dx * (point[1] - start[1]) - dy * (point[0] - start[0]))
+            / math.hypot(dx, dy)
+        )
+    # The top edge governs, 5.0 above the axis.
+    assert min(distances) == pytest.approx(5.0)
+    assert min(distances) == pytest.approx(spec.SCREW_HOLE_EDGE_DISTANCE)
+    assert spec.LOCKNUT_ACROSS_FLATS / 2.0 < min(distances)
+    # Rule 17 at the printed worst case: the .X station band and the drilled
+    # hole's upper limit (title block +0.10).
+    assert spec.SCREW_HOLE_WALL_MIN == pytest.approx(5.0 - 0.8 - (4.572 + 0.10) / 2.0)
+    assert spec.SCREW_HOLE_WALL_MIN >= spec.SLOT_WALL_FLOOR
 
 
 def test_slots_centre_on_the_rod_line_with_a_running_fit() -> None:
@@ -140,6 +148,30 @@ def test_drawing_keeps_exactly_the_marked_dimensions() -> None:
     assert spec.DIMENSION_PREFIXES == {("UpperSlotCorner", "SlotCornerR"): "2X R"}
     for feature, name in spec.DIMENSION_PREFIXES:
         assert name in spec.DRAWING_DIMENSIONS[feature]
+    # The plates' thickness is sheet stock: an unbanded reference that names
+    # its stock, never a machined size under the title-block band.
+    assert spec.REFERENCE_DIMENSIONS == {"PlateThick"}
+    assert "PlateThick" in spec.DRAWING_DIMENSIONS["LowerGuide"]
+    assert not any(name == "PlateThick" for _, name in spec.DRAWING_BANDS)
+    assert spec.DIMENSION_CALLOUTS["PlateThick"] == "SHEET STOCK"
+    source = inspect.getsource(draw.build)
+    assert "set_reference_dimension(" in source
+    assert source.index("set_dimension_callouts(") < source.index(
+        "set_reference_dimension("
+    )
+
+
+def test_plate_stock_callout_row_clears_the_bottom_width_row() -> None:
+    # PlateThick's line stands left of the plate edge and its two-row block
+    # under the foot ends above the bottom width's row, whose value is right.
+    foot = draw._fy(spec.STRAP_BOT_Y)
+    thick_x, thick_y = draw.FRONT_KEEP["PlateThick"]
+    width_x, width_y = draw.FRONT_KEEP["StrapBotWidth"]
+    assert width_y < thick_y < foot
+    assert thick_x < draw._fx(draw._X[1])
+    # A 27 mm row centred about 5 mm left of the line ends left of the
+    # bottom width's ~8 mm value.
+    assert thick_x - 0.005 + 0.0135 < width_x - 0.004
 
 
 def test_front_view_looks_at_the_plates_and_keeps_the_taper_outside() -> None:
@@ -153,7 +185,7 @@ def test_front_view_looks_at_the_plates_and_keeps_the_taper_outside() -> None:
     taper_x, taper_y = draw.FRONT_KEEP["StrapTaperDx"]
     assert taper_y < draw.FRONT_KEEP["StrapBotWidth"][1] < bottom
     assert draw._fx(spec.STRAP_BOT_X[0]) < taper_x < draw._fx(spec.STRAP_TOP_X[0])
-    # The tap callout and its leader stay right of the strap; every dimension
+    # The hole callout and its leader stay right of the strap; every dimension
     # stacked beside the strap is on its left.
     right_edge = draw._fx(draw._X[0])
     assert draw.CALLOUT_XY[0] > right_edge
@@ -260,12 +292,22 @@ def test_upper_plate_location_callout_stays_off_lines() -> None:
     assert "view=section" in inspect.getsource(draw.build)
 
 
-def test_tap_callout_omits_the_title_block_thread_class() -> None:
-    source = inspect.getsource(draw)
-    assert (
-        'omit_title_block_thread_class(tap_callout, label="hanger-screw through tap")'
-        in source
+def test_screw_hole_callout_is_a_native_drill_callout() -> None:
+    source = inspect.getsource(draw.build)
+    assert 'process="DRILL"' in source
+    assert "SCREW_HOLE_DIA / 2.0" in source
+    assert "omit_title_block_thread_class" not in inspect.getsource(draw)
+    assert "redundant_note_substrings" not in source
+
+
+def test_isometric_fills_the_right_of_the_sheet_at_full_size() -> None:
+    assert draw.ISO_SCALE == (1, 1)
+    assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
+    # Right of the slot width's parked text block, the note under the view.
+    assert draw.ISO_CENTER[0] - 0.021 > (
+        draw.SLOT_WIDTH_TEXT_XY[0] + draw._SLOT_TEXT_HALF_WIDTH
     )
+    assert draw.ISO_NOTE_XY[1] < draw.ISO_CENTER[1] - 0.079
 
 
 def test_notes_carry_no_dimensions() -> None:

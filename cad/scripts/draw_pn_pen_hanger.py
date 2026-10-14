@@ -1,8 +1,8 @@
 r"""Create the curated machinist drawing for the pen hanger.
 
 The SLDPRT remains authoritative.  This recipe supplies only the hanger's views,
-the placement of its imported model dimensions, the hanger-screw callout, and
-the property-linked notes; sheet/template and export behavior lives in
+the placement of its imported model dimensions, the hanger-screw hole callout,
+and the property-linked notes; sheet/template and export behavior lives in
 ``_drawing_common``.  Dimension import and curation live in
 ``_drawing_dimension_import``; places and bands are authored on the part.
 
@@ -10,11 +10,12 @@ The pen hanger is a black tapered steel strap (3 thick, 16 -> 12 wide, 170
 tall) with two open U guide plates brazed across its front face; the pen rod
 hangs in both slots.  The front view (1:1, ``*Back``: looking at the strap's
 front face and the plates from the machine front, as note 1 names it) carries
-the strap outline, the tap station, the upper plate's drop and the plates'
-thickness; section A-A (2:1) cuts the strap just above the upper plate and
-looks down onto its U, carrying the slot, its corner radius, the strap stock,
-the plate's overhang past the strap (a reference) and its in-line callout;
-the shaded isometric sits right.
+the strap outline, the screw-hole station, the upper plate's drop and the
+plates' sheet-stock thickness (a reference); section A-A (2:1) cuts the strap
+just above the upper plate and looks down onto its U, carrying the slot, its
+corner radius, the strap stock, the plate's overhang past the strap (a
+reference) and its in-line callout; the shaded isometric (1:1) fills the
+right of the sheet.
 
 Run with SolidWorks open::
 
@@ -31,6 +32,7 @@ from typing import Any
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -45,7 +47,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_detail_projection import settle_detail_projection
-from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
@@ -60,8 +62,6 @@ from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
-from _hole_callout_thread_class import omit_title_block_thread_class
-from _holes import TAP_DRILL_MM
 from _paths import CAD_ROOT
 from _section_axis import position_section_caption
 from _session import run_build
@@ -75,8 +75,9 @@ from pn_pen_hanger_spec import (
     GUIDE_PLATE_WIDTH,
     GUIDE_PLATE_YS,
     PLATE_FRONT_Z,
+    REFERENCE_DIMENSIONS,
+    SCREW_HOLE_DIA,
     SCREW_HOLE_XY,
-    SCREW_TAP_SPEC,
     SLOT_BOTTOM_Z,
     STRAP_BOT_X,
     STRAP_BOT_Y,
@@ -102,7 +103,10 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)  # the 170-tall strap fits the sheet at full size
 FRONT_SCALE = (1, 1)
 SECTION_SCALE = (2, 1)  # the slot's 0.05 band and its corner radius need room
-ISO_SCALE = (1, 2)
+# The black-oxide strap shades nearly black; at 1:1 its edges, slots and
+# plates read in the empty right half of the sheet (the 1:2 iso read as a
+# silhouette).  No drawing-view-only lighting exists to lift the shade.
+ISO_SCALE = (1, 1)
 _FRONT_M_PER_MM = FRONT_SCALE[0] / FRONT_SCALE[1] / 1000.0
 _SECTION_M_PER_MM = SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
 
@@ -161,17 +165,23 @@ SECTION_LINE_MODEL_MM = (
 
 # Sheet layout (meters).  The tall front view hugs the left margin (its
 # stacked top dimensions under the border, its bottom pair over its label);
-# the tap callout sits right of its top, in the gap before section A-A; the
-# section stands right of the callout with its width rows and native caption
-# stacked below it and the slot width's text block parked right of it, the
-# notes under the caption clear of the title block; the isometric to the
-# right.
+# the screw-hole callout sits right of its top, in the gap before section
+# A-A; the section stands right of the callout with its width rows and native
+# caption stacked below it and the slot width's text block parked right of
+# it, the notes under the caption clear of the title block; the isometric to
+# the right.
 FRONT_CENTER = (0.075, 0.150)
 SECTION_CENTER = (0.230, 0.195)
-ISO_CENTER = (0.370, 0.175)
-ISO_NOTE_XY = (0.340, 0.104)
+# The 1:1 iso is about 42 wide x 158 tall on the sheet (twice the 1:2 view's
+# 21 x 76 on the 20261014T010321468Z sheet): centred at y 0.166 it spans
+# y 0.087..0.245, under the top border (0.267) and above its note; its left
+# edge (x 0.341) stands 40 mm right of the slot width's text block (x 0.298).
+ISO_CENTER = (0.362, 0.166)
+# The note's top-left: its ~60 mm line (x 0.340..0.400) sits under the iso
+# and 12 mm above the title block's top edge (y 0.065 for x >= 0.216).
+ISO_NOTE_XY = (0.340, 0.080)
 NOTES_XY = (0.110, 0.094)
-# Text centre: the leader leaves the tap-drill rim on the sheet-right side and
+# Text centre: the leader leaves the hole's rim on the sheet-right side and
 # drops gently right, crossing only the strap's tapered edge and the
 # StrapTaperDx extension line beside it -- no dimension line lies there.
 CALLOUT_XY = (0.137, 0.215)
@@ -199,9 +209,9 @@ def _az(model_z_mm: float) -> float:
     return SECTION_CENTER[1] + (model_z_mm - _SZ) * _SECTION_M_PER_MM
 
 
-# Front view: the tap station and the strap's top run stacked above it (the
-# station's value left of the origin corner, outside the run's extension
-# lines); the tap height, the upper plate's drop and the strap's rise stacked
+# Front view: the screw-hole station and the strap's top run stacked above it
+# (the station's value left of the origin corner, outside the run's extension
+# lines); the hole height, the upper plate's drop and the strap's rise stacked
 # left, shortest nearest; the lower plate's thickness at the bottom left, its
 # value under the plate, far from section A-A's cutting line just above the
 # upper plate; the strap's bottom width and its taper under the view, so the
@@ -213,7 +223,14 @@ FRONT_KEEP = {
     "ScrewY": (_fx(_X[1]) - 0.008, _fy(SCREW_HOLE_XY[1] / 2.0)),
     "UpperPlateDrop": (_fx(_X[1]) - 0.018, _fy(_UPPER_TOP_Y / 2.0)),
     "StrapRise": (_fx(_X[1]) - 0.030, _fy(_CY)),
-    "PlateThick": (_fx(_X[1]) - 0.008, _fy(STRAP_BOT_Y) - 0.006),
+    # The 1.5 span holds no text, so SolidWorks shelves the value just left
+    # of the dimension line (20261014T010321468Z: "1.5" centred 5 mm left of
+    # the line, 6.3 under the foot for a keep 6 below).  The SHEET STOCK row
+    # under "(1.5)" is ~27 mm wide: the line 12 mm left of the plate edge and
+    # the block 4 mm under the foot end that row ~4 mm left of the
+    # StrapBotWidth text and ~3 mm above its dimension line's left tail; the
+    # value's top stays ~2 mm under the StrapRise extension line at the foot.
+    "PlateThick": (_fx(_X[1]) - 0.012, _fy(STRAP_BOT_Y) - 0.004),
     "StrapBotWidth": (_fx(0.0), _fy(STRAP_BOT_Y) - 0.010),
     "StrapTaperDx": (
         _fx((STRAP_TOP_X[0] + STRAP_BOT_X[0]) / 2.0),
@@ -520,9 +537,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     # The iso too: a new view already reads Shaded With Edges, so
-    # finalize_drawing's SetDisplayMode4 is a no-op that leaves its cosmetic
-    # threads at draft quality (farm c0b95549c readback cosmetic_threads=False).
-    # From HLR the shading call really changes the mode and takes precision.
+    # finalize_drawing's SetDisplayMode4 is a no-op that leaves the view at
+    # draft quality (farm c0b95549c readback).  From HLR the shading call
+    # really changes the mode and takes precision.
     set_hidden_lines_removed(adapter, iso)
 
     annotations = [
@@ -546,6 +563,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # grow the parked block, not the span between the slot walls.
     offset_dimension_text(adapter, annotations, {"SlotWidth": SLOT_WIDTH_TEXT_XY})
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    # The guide plates' thickness is the sheet stock's, printed as a reference
+    # (no band) over its SHEET STOCK callout row.
+    references = [
+        item
+        for item in annotations
+        if dimension_name(adapter, item) in REFERENCE_DIMENSIONS
+    ]
+    if len(references) != len(REFERENCE_DIMENSIONS):
+        raise RuntimeError("expected one native guide-plate stock thickness")
+    for item in references:
+        set_reference_dimension(adapter, item, label="guide-plate stock thickness")
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
@@ -553,22 +581,20 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the hanger-screw hole")
 
-    # Pick the tap-drill rim on its sheet-right side (model -x under *Back),
-    # not the cosmetic thread or the hole centre: the leader leaves toward
-    # CALLOUT_XY without crossing the dimensions stacked left of the strap.
-    tap_callout = add_native_hole_callout(
+    # Pick the hole's rim on its sheet-right side (model -x under *Back), not
+    # the hole centre: the leader leaves toward CALLOUT_XY without crossing
+    # the dimensions stacked left of the strap.
+    add_native_hole_callout(
         adapter,
         front,
         edge_xy=(
-            _fx(SCREW_HOLE_XY[0] - TAP_DRILL_MM[SCREW_TAP_SPEC.size] / 2.0),
+            _fx(SCREW_HOLE_XY[0] - SCREW_HOLE_DIA / 2.0),
             _fy(SCREW_HOLE_XY[1]),
         ),
         callout_xy=CALLOUT_XY,
-        label="hanger-screw through tap",
-        process="TAP",
+        label="hanger-screw clearance hole",
+        process="DRILL",
     )
-    # The title block's THREADS row owns the general thread class (rule 2).
-    omit_title_block_thread_class(tap_callout, label="hanger-screw through tap")
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Front View Note", *FRONT_NOTE_XY)
@@ -584,18 +610,12 @@ async def build(adapter: Any) -> dict[str, str]:
         view=section,
     )
 
-    # Materialize the iso's cosmetic thread before the strict final note cleanup;
-    # otherwise its descriptive label first appears during the native drawing save.
-    import_cosmetic_threads(adapter, iso)
-
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Pen Hanger Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        redundant_note_substrings=("#8-32 Tapped Hole",),
-        expected_redundant_notes=1,
     )
 
 

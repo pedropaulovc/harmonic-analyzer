@@ -100,6 +100,13 @@ expect("pn-pen", "pn-pen-rod-1", list(p.PEN_ROD_POS), IDENTITY, "pn-pen-rod")
 for _stem, _pos, _rows in p.RIDERS:
     expect("pn-pen", f"{_stem}-1", list(_pos), _rows, _stem)
 expect("pn-pen", "vn-hanger-screw-1", list(p.HANGER_SCREW_POS), IDENTITY, "vn-hanger-screw")
+expect(
+    "pn-pen",
+    "vn-pen-hanger-locknut-1",
+    list(p.HANGER_LOCKNUT_POS),
+    IDENTITY,
+    "vn-pen-hanger-locknut",
+)
 
 # Each rider's placement euler (derived in the assembly) must reproduce its rows.
 from _transforms import euler_from_rows, rows_from_euler

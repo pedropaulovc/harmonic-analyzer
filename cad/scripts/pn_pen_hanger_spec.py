@@ -19,14 +19,15 @@ from __future__ import annotations
 import math
 
 import _config
-from _hole_spec import HoleSpec
-from _printed_tolerance import printed_band_mm
+from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from mg_lever_wire_geom import WHEEL_BAR_Y
 from mg_wheel_bar_geom import BAR_FRONT_Z, BAR_SIDE, HANGER_SCREW_MACHINE_X
 from paper_drive_geom import PEN_ROD_X, PEN_Z_MID, PLATEN_BOTTOM_Y
 from pd_platen_spec import PLATE_HEIGHT as PLATEN_HEIGHT
 from pn_pen_rod_spec import ROD_SECTION, SECTION_BAND as ROD_SECTION_BAND
 from vn_hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA
+from vn_pen_hanger_locknut_spec import ACROSS_FLATS as LOCKNUT_ACROSS_FLATS
 
 
 PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
@@ -143,9 +144,15 @@ GUIDE_ARM_COVER_MIN = GUIDE_NOSE - _ROD_MAX / 2.0 - printed_band_mm(1)
 if GUIDE_ARM_COVER_MIN <= 0.0:
     raise AssertionError("guide plate arms can stop short of the rod's front face")
 
-# --- M6.10: the selected hanger screw threads into the strap near its top
-# through an exact #8-32 tapped Hole Wizard feature, on the bar's screw axis. ---
-SCREW_TAP_SPEC = HoleSpec("tapped", "#8-32")
+# --- M6.10: the selected hanger screw passes through a #8 close-clearance
+# Hole Wizard hole near the strap top, on the bar's screw axis, into the
+# MHA-VN-063 nylon-insert locknut on the strap front (rule 23: the insert locks
+# the joint the pen rod's reversing friction loads; rule 18: the nut, not the
+# 3.0 strap, carries the thread). ---
+SCREW_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
+SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)
+if SCREW_HOLE_DIA <= HANGER_SCREW_DIA:
+    raise AssertionError("hanger screw hole does not clear the #8 thread")
 SCREW_HOLE_XY = (
     round(HANGER_SCREW_MACHINE_X - HANGER_POS[0], 6),
     round(WHEEL_BAR_Y - HANGER_POS[1], 6),
@@ -153,7 +160,7 @@ SCREW_HOLE_XY = (
 
 
 def _edge_distance(start: tuple[float, float], end: tuple[float, float]) -> float:
-    """Signed distance from the tap axis to one outline edge (+ inside)."""
+    """Signed distance from the hole axis to one outline edge (+ inside)."""
     (x1, y1), (x2, y2) = start, end
     px, py = SCREW_HOLE_XY
     return ((x2 - x1) * (py - y1) - (y2 - y1) * (px - x1)) / math.hypot(
@@ -161,23 +168,21 @@ def _edge_distance(start: tuple[float, float], end: tuple[float, float]) -> floa
     )
 
 
-# Perpendicular distances to all four straight strap edges: a circular thread
-# envelope must remain inside the whole tapered outline.  The clearance bore's
-# bar-end ligament is checked in build_mg_wheel_bar; the receiver uses the
-# thread major diameter here.
-HANGER_THREAD_STRAP_WALL = (
-    min(
-        _edge_distance(a, b)
-        for a, b in zip(STRAP_OUTLINE, STRAP_OUTLINE[1:] + STRAP_OUTLINE[:1])
-    )
-    - HANGER_SCREW_DIA / 2.0
+# Perpendicular distances to all four straight strap edges (the top edge
+# governs, 5.0 above the axis): the hole and the locknut's flats must both sit
+# inside the whole tapered outline.  The wall is judged at the printed worst
+# case below, once the station's places are authored.
+SCREW_HOLE_EDGE_DISTANCE = min(
+    _edge_distance(a, b)
+    for a, b in zip(STRAP_OUTLINE, STRAP_OUTLINE[1:] + STRAP_OUTLINE[:1])
 )
-if HANGER_THREAD_STRAP_WALL <= 0.0:
-    raise AssertionError("stock #8 hanger thread breaks through the tapered strap")
+if LOCKNUT_ACROSS_FLATS / 2.0 >= SCREW_HOLE_EDGE_DISTANCE:
+    raise AssertionError("hanger locknut flats overhang the strap edge")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  Front view (looking at the plates): the strap outline, the tap
-# station, the upper plate's drop and the (alike) lower plate's thickness.
+# print shows.  Front view (looking at the plates): the strap outline, the
+# screw-hole station, the upper plate's drop and the (alike) lower plate's
+# thickness.
 # Section A-A just above the upper plate, looking down onto it: its U
 # outline, the slot-corner radius and the strap stock thickness (the lower
 # plate is identical and flush with the strap bottom end -- notes). ---
@@ -246,12 +251,33 @@ if min(NEAR_ARM_MIN, FAR_ARM_MIN) < SLOT_WALL_FLOOR:
         f"guide slot walls {NEAR_ARM_MIN:.2f}/{FAR_ARM_MIN:.2f} at the printed "
         f"worst case (< {SLOT_WALL_FLOOR})"
     )
+# Rule 17: the screw hole's wall to the strap's nearest edge keeps the floor
+# with the hole at its DRILLED HOLES upper limit and its printed station at
+# the far end of its .X band.
+_station_band = max(
+    printed_band_mm(DRAWING_PRECISION_BY_NAME[name]) for name in ("ScrewX", "ScrewY")
+)
+SCREW_HOLE_WALL_MIN = (
+    SCREW_HOLE_EDGE_DISTANCE
+    - _station_band
+    - (SCREW_HOLE_DIA + drilled_oversize_mm()) / 2.0
+)
+if SCREW_HOLE_WALL_MIN < SLOT_WALL_FLOOR:
+    raise AssertionError(
+        f"hanger screw hole wall {SCREW_HOLE_WALL_MIN:.2f} at the printed worst "
+        f"case (< {SLOT_WALL_FLOOR})"
+    )
 # Every tight band names its mate on the dimension it governs.
 DIMENSION_CALLOUTS: dict[str, str] = {
     "SlotWidth": f"2X SLIDING FIT ON\nPEN ROD {PEN_ROD_NUMBER}",
     # "2X" counts the two corners of one slot, not the two plates.
     "SlotCornerR": "EACH SLOT",
+    # The plates' thickness is the sheet's as supplied, not a machined size:
+    # printed as a reference (parenthesised) with the stock named under it.
+    "PlateThick": "SHEET STOCK",
 }
+# Model dimensions the sheet parenthesises as reference (the stock governs).
+REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"PlateThick"})
 # (feature, dimension) -> native prefix.  A custom radius prefix replaces
 # SolidWorks' own "R", so it carries it: the section's two slot corners.
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
@@ -284,4 +310,4 @@ DRAWING_REFERENCE_PRECISION = 1
 if UPPER_PLATE_OVERHANG <= 0.0:
     raise AssertionError("the upper guide plate no longer overhangs the strap edge")
 FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:1"
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

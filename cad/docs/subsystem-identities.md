@@ -271,6 +271,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | `vn-pen-marker` | — | MHA-VN-060 |
 | part | — | `vn-pen-rod-set-screw` | — | MHA-VN-061 |
 | part | — | `vn-pen-adjust-nut` | — | MHA-VN-062 |
+| part | — | `vn-pen-hanger-locknut` | — | MHA-VN-063 |
 | part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
 | part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
 | assembly | `frame` | `fr-frame` | MHA-A04 | MHA-FR-000 |
@@ -305,6 +306,7 @@ next free Number in its category and has no old stem or old Number.
 | added | `vn-knife-hanger-washer` (new #10 family) | MHA-VN-060 | 18-8 SAE washer 96659A104 under the modified #10-24 hex-head MHA-VN-024 Bolt on the MHA-FR-002 spotface; functional stem reused, retired Number never reused |
 | retired | `pn-pen-marker` | MHA-PN-003 | replaced by the purchased MHA-VN-060 Sharpie Mini marker |
 | added | `vn-pen-marker` | MHA-VN-060 | purchased Sharpie Mini permanent marker, fine point, used uncapped; its cap-seat grip lies in the MHA-PN-005 v-block groove |
-| added | `vn-pen-rod-set-screw` | MHA-VN-061 | #4-40 x 3/16 cup-point set screw in the MHA-PN-005 v-block, locking the MHA-PN-004 pen rod's pivot end |
+| added | `vn-pen-rod-set-screw` | MHA-VN-061 | #4-40 x 3/16 thread-locking (nylon-patch) cup-point set screw in the MHA-PN-005 v-block, locking the MHA-PN-004 pen rod's pivot end |
 | added | `vn-pen-adjust-nut` | MHA-VN-062 | brass #0-80 jam nut on the MHA-PN-007 adjuster stud in the MHA-PN-004 pen rod's top |
 | added | `pn-pen-adjust-screw` | MHA-PN-007 | turned brass #0-80 eye stud in the MHA-PN-004 pen rod's top, locked by the MHA-VN-062 jam nut; the MHA-PN-006 pen wire ties through its eye |
+| added | `vn-pen-hanger-locknut` | MHA-VN-063 | steel #8-32 nylon-insert locknut on the strap front; holds the MHA-PN-002 pen hanger on the MHA-VN-007 hanger screw through the strap's clearance hole |

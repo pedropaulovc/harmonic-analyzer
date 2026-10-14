@@ -1,10 +1,10 @@
-r"""McMaster 91375A105 -- alloy steel cup-tip set screw, #4-40 x 3/16 (MHA-VN-061).
+r"""McMaster 91385A105 -- thread-locking alloy steel cup-tip set screw, #4-40 x 3/16 (MHA-VN-061).
 
 Catalogue-only: no vendor model has been harvested, so there is no pinned
 VENDOR_* truth and no replica gate. The catalogue facts are
-``_mcmaster_91375a105``'s (read live 2026-10-13): #4-40 UNC-3A, 3/16 in
+``_mcmaster_91385a105``'s (read live 2026-10-13): #4-40 UNC-3A, 3/16 in
 (4.7625) long, black-oxide alloy steel, Rockwell C45, 0.050 in hex drive.
-Class 3A is not modelled (nominal UN cutter).
+Class 3A is not modelled (nominal UN cutter), nor is the nylon patch.
 
 Family assumption: this is the vendor-verified 91375A106 (#4-40 x 1/4)
 1/16 in shorter. Every length-independent law is restated from
@@ -20,7 +20,7 @@ y = -L/2; build_vn_pen_rod_set_screw lifts the cup end onto y = 0.
 
 Run standalone (SolidWorks open); without a vendor file this is catalogue-only::
 
-    uv run python cad\scripts\diagnostics\diag_build_91375A105.py
+    uv run python cad\scripts\diagnostics\diag_build_91385A105.py
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import _telemetry  # noqa: E402
 from _check import check  # noqa: E402
 from _feature_tree import name_last_feature  # noqa: E402
-from _mcmaster_91375a105 import HEX_AF, LENGTH, MAJOR_DIA, PITCH  # noqa: E402
+from _mcmaster_91385a105 import HEX_AF, LENGTH, MAJOR_DIA, PITCH  # noqa: E402
 from _part_checks import volume_check  # noqa: E402
 from _session import run_build  # noqa: E402
 from _stock_recipe import stock_recipe  # noqa: E402
@@ -120,11 +120,11 @@ def revolved_volume() -> float:
 
 
 if web_between_apexes() <= 0.0:
-    raise ValueError("91375A105 socket drill point breaks into the cup")
+    raise ValueError("91385A105 socket drill point breaks into the cup")
 
 
-@stock_recipe("91375A105", threaded=True)
-async def build_91375A105(adapter, truth=None):
+@stock_recipe("91385A105", threaded=True)
+async def build_91385A105(adapter, truth=None):
     from _com import _early_bound, _read_member
     from _feature_tree import _feature_by_name
     from _sketch import add_line_chain
@@ -144,7 +144,7 @@ async def build_91375A105(adapter, truth=None):
             sk_mgr.CreateCenterLine(0.0, HALF / 1000.0, 0.0, 0.0, -HALF / 1000.0, 0.0)
             is None
         ):
-            raise RuntimeError("91375A105 profile: CreateCenterLine failed")
+            raise RuntimeError("91385A105 profile: CreateCenterLine failed")
         await add_line_chain(
             adapter,
             [
@@ -197,7 +197,7 @@ async def build_91375A105(adapter, truth=None):
         0, 0.0, False, False,
     )  # fmt: skip
     if feat is None:
-        raise RuntimeError("91375A105 hex socket cut failed")
+        raise RuntimeError("91385A105 hex socket cut failed")
     name_last_feature(adapter, "HexSocket")
     v = await volume_check(
         adapter, "hex socket", v - socket_volume(), 0.01 * socket_volume()
@@ -317,7 +317,7 @@ async def build_91375A105(adapter, truth=None):
     check("exit_sketch cutter", await adapter.exit_sketch())
     name_last_feature(adapter, "ThreadCutter")
     if len(bodies(adapter)) != 1:
-        raise RuntimeError("91375A105: expected one body before the thread cut")
+        raise RuntimeError("91385A105: expected one body before the thread cut")
     thread_sweep_cut_modern(adapter, "ThreadCutter", "ThreadHelix", "ThreadGroove")
 
     # Family assumption: the 91375A106 vendor frame (socket end +z).
@@ -326,20 +326,20 @@ async def build_91375A105(adapter, truth=None):
 
 async def build_catalog(adapter) -> dict[str, str]:
     """Build and save the catalogue recipe without claiming vendor equivalence."""
-    with _telemetry.span("catalog.build", label="91375A105"):
-        check("create_part 91375A105", await adapter.create_part())
-        assert_seat_sketch_baseline(adapter, "91375A105")
-        await build_91375A105(adapter)
+    with _telemetry.span("catalog.build", label="91385A105"):
+        check("create_part 91385A105", await adapter.create_part())
+        assert_seat_sketch_baseline(adapter, "91385A105")
+        await build_91385A105(adapter)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
-            raise RuntimeError("91375A105 catalogue build has no solid volume")
+            raise RuntimeError("91385A105 catalogue build has no solid volume")
         OUT_DIR.mkdir(parents=True, exist_ok=True)
-        path = OUT_DIR / "91375A105-catalog.SLDPRT"
+        path = OUT_DIR / "91385A105-catalog.SLDPRT"
         check(f"save -> {path}", await adapter.save_file(str(path.resolve())))
         artefacts = {"sldprt": str(path)}
-        artefacts.update(await export_views(adapter, "91375A105-catalog"))
+        artefacts.update(await export_views(adapter, "91385A105-catalog"))
         _telemetry.success(
-            f"91375A105 catalogue build saved: volume {props['volume_mm3']:.4f} mm^3"
+            f"91385A105 catalogue build saved: volume {props['volume_mm3']:.4f} mm^3"
         )
         await close_all(adapter)
     return artefacts

@@ -8,10 +8,10 @@ thin open U guide plates brazed across its front face 40 apart.  Each plate's
 slot opens forward (-Z), so the square pen rod hangs on its wire inside both
 slots and lifts straight out of them; the slot sides are the rod's only
 lateral guide, and the slot's two milled bottom corners carry a radius.  The
-lower plate is flush with the strap's bottom end.  A #8-32
-tap near the strap top takes the hanger screw coming through the bar FROM
+lower plate is flush with the strap's bottom end.  A #8 close-clearance
+hole near the strap top passes the hanger screw coming through the bar FROM
 BEHIND (the magnifying wheel's rim passes in front of the strap, so no
-front-side head fits).
+front-side head fits) into a nylon-insert locknut on the strap front.
 
 Layout: origin at the strap's top-right BACK corner -- on the bar's front
 face, level with the bar top, on the rod line's x (machine ``HANGER_POS``;
@@ -57,7 +57,7 @@ from _drawing_precision import apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
-from _holes import TAP_DRILL_MM, wizard_holes
+from _holes import wizard_holes
 from pn_pen_hanger_spec import (
     DIMENSION_PREFIXES,
     DRAWING_BANDS,
@@ -72,8 +72,9 @@ from pn_pen_hanger_spec import (
     ISOMETRIC_VIEW_NOTE,
     PLATE_FRONT_Z,
     PLATE_REACH,
+    SCREW_HOLE_DIA,
+    SCREW_HOLE_SPEC,
     SCREW_HOLE_XY,
-    SCREW_TAP_SPEC,
     SLOT_BOTTOM,
     SLOT_BOTTOM_Z,
     SLOT_CORNER_R,
@@ -254,17 +255,18 @@ async def build(adapter) -> dict[str, str]:
             adapter, f"hanger with {feature}", vol + v_corners, 0.1 * v_corners
         )
 
-    # 3. Native #8-32 through tap in the strap, drilled from its front face
-    # (outward normal -Z); the screw enters from behind the bar through the
-    # back face.
-    screw_dia = TAP_DRILL_MM[SCREW_TAP_SPEC.size]
+    # 3. Native #8 close-clearance hole through the strap, drilled from its
+    # front face (outward normal -Z); the screw enters from behind the bar
+    # through the back face and takes the locknut on the front.
+    screw_dia = SCREW_HOLE_DIA
     screw_cut = wizard_holes(
         adapter,
-        SCREW_TAP_SPEC,
+        SCREW_HOLE_SPEC,
         [[SCREW_HOLE_XY[0], SCREW_HOLE_XY[1], STRAP_Z[0]]],
         (0.0, 0.0, -1.0),
-        "hanger-screw tapped hole (#8-32)",
+        "hanger-screw hole (#8 clearance)",
         name="ScrewHole",
+        expect_dia_mm=SCREW_HOLE_DIA,
         placement_dims=[
             (
                 ("ScrewX", '-"ScrewHoleX"'),

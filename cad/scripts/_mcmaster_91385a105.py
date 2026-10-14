@@ -1,11 +1,13 @@
-"""Pure McMaster 91375A105 catalogue dimensions for its recipe and assemblies.
+"""Pure McMaster 91385A105 catalogue dimensions for its recipe and assemblies.
 
-McMaster 91375A105 product page read live on 2026-10-13:
-https://www.mcmaster.com/91375A105/. Alloy steel cup-tip set screw, black
-oxide, 4-40 UNC Class 3A, 3/16 in long, 0.050 in hex drive, Rockwell C45,
-ASME B18.3 / ASTM F912. Only a 2-D PDF is offered; no vendor solid was
-harvested. It is the 1/4 in long 91375A106 (MHA-VN-034, vendor-verified
-replica) cut 1/16 in shorter, so the recipe takes that replica's laws.
+McMaster 91385A105 product page read live on 2026-10-13:
+https://www.mcmaster.com/91385A105/. Thread-locking alloy steel cup-tip set
+screw, black oxide, 4-40 UNC Class 3A, 3/16 in long, 0.050 in hex drive,
+Rockwell C45, ASME B18.3 / ASTM F912, with a pre-applied nylon-patch
+threadlocker bonded to the threads (-50 to 250 F). Only a 2-D PDF is offered;
+no vendor solid was harvested and the patch is not modelled. It is the 1/4 in
+long 91375A106 (MHA-VN-034, vendor-verified replica) cut 1/16 in shorter, so
+the recipe takes that replica's laws.
 
 Frame of the recipe: axis +Y, origin mid-length; the stock part lifts the
 cup end onto y = 0 with the socket face at y = +LENGTH.
@@ -18,7 +20,7 @@ import math
 MM_PER_IN = 25.4
 ALLOY_STEEL_G_PER_MM3 = 7.7e-3  # SOLIDWORKS "Alloy Steel"
 
-SKU = "91375A105"
+SKU = "91385A105"
 THREAD = "#4-40"
 MAJOR_DIA = 0.112 * MM_PER_IN  # 2.8448, "Screw Size Decimal Equivalent"
 PITCH = MM_PER_IN / 40.0

@@ -144,10 +144,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Steel Square-Head Cup-Point Set Screw",
         "91410A540",
     ),
+    # #8-32 x 1 through the pen-hanger strap's clearance hole into the
+    # MHA-VN-063 locknut on the strap front.
     "vn-hanger-screw": _stock(
         "vn-hanger-screw",
         "Low-Strength Zinc-Plated Steel Hex Head Screw",
-        "93075A194",
+        "93075A199",
     ),
     "vn-hex-bolt": _stock(
         "vn-hex-bolt",
@@ -195,11 +197,11 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         material="AISI 304",
     ),
     # The C45 black-oxide cup point, #4-40 x 3/16, locking the pen rod's
-    # turned pivot end in the v-block.
+    # turned pivot end in the v-block; its nylon patch locks the thread.
     "vn-pen-rod-set-screw": _stock(
         "vn-pen-rod-set-screw",
-        "Alloy Steel Cup-Tip Set Screw",
-        "91375A105",
+        "Thread-Locking Alloy Steel Cup-Tip Set Screw",
+        "91385A105",
         material="Alloy Steel",
     ),
     # Brass #0-80 jam nut on the pen rod's top adjuster stud.
@@ -208,6 +210,13 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Brass Hex Nut",
         "92671A115",
         material="Brass",
+    ),
+    # Zinc-plated steel #8-32 nylon-insert locknut on the hanger screw at the
+    # pen-hanger strap's front face; its insert locks the screw.
+    "vn-pen-hanger-locknut": _stock(
+        "vn-pen-hanger-locknut",
+        "Low-Strength Steel Nylon-Insert Locknut",
+        "90631A009",
     ),
     # The four platen-clip screws: brass #2-56 x 1/4, whose 0.14 head stays
     # inside the clip's rail where the MHA-VN-006 #4-40 head would overhang.
