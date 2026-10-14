@@ -208,7 +208,7 @@ def test_pivot_chamfer_clears_the_rod_fillet_as_a_min_limit() -> None:
 
 def test_printed_bands_keep_both_relief_walls_and_clear_the_marker_body() -> None:
     import _config
-    from _printed_tolerance import printed_band_mm
+    from _printed_tolerance import angular_band_deg, printed_band_mm
 
     places = spec.DRAWING_PRECISION_BY_NAME
     # Review r3 (rule 17): at .X depth and .XX stations the far wall left of
@@ -217,7 +217,9 @@ def test_printed_bands_keep_both_relief_walls_and_clear_the_marker_body() -> Non
     for name in ("ReliefZ0", "ReliefWidth", "VMouthZ", "VMouth"):
         assert places[name] == 3, name
     assert places["Depth"] == 2
-    band = {name: printed_band_mm(n) for name, n in places.items()}
+    # Linear bands; the V's angle prints whole degrees on the angular row.
+    band = {name: printed_band_mm(n) for name, n in places.items() if name != "VAngle"}
+    assert places["VAngle"] == 0
     z0 = (spec.BLOCK_DEPTH - spec.RELIEF_WIDTH) / 2.0
     mouth_z = (spec.BLOCK_DEPTH - spec.V_MOUTH_WIDTH) / 2.0
     near_wall = z0 - band["ReliefZ0"]
@@ -232,18 +234,29 @@ def test_printed_bands_keep_both_relief_walls_and_clear_the_marker_body() -> Non
     assert near_wall == pytest.approx(2.37)
     assert far_wall == pytest.approx(1.73)
     assert min(near_wall, far_wall) >= 1.5
-    # The seated body's widest chord over the V's printed corners.
+    # Review r11 (rule 3): the depth's .XX is load-bearing -- at .X the far
+    # wall prints 1.44, under the floor -- so it is in the named exception and
+    # states that function under its value.
+    far_wall_at_x = far_wall + band["Depth"] - printed_band_mm(1)
+    assert far_wall_at_x == pytest.approx(1.44)
+    assert far_wall_at_x < 1.5
+    assert spec.DIMENSION_CALLOUTS["Depth"] == "HOLDS FAR SLOT WALL"
+    # The seated body's widest chord over the V's printed corners: its angle
+    # (the title block's +/-1 deg) and mouth; the apex height is their
+    # reference and carries no band.
     body_r = spec.marker.BODY_FRONT_DIA / 2.0
     grip_r = spec.marker.BARREL_DIA / 2.0
     chords = []
-    for apex in (-band["VApexY"], band["VApexY"]):
+    for angle in (-angular_band_deg(), angular_band_deg()):
         for mouth in (-band["VMouth"], band["VMouth"]):
-            a = spec.V_APEX_Y + apex
+            half = math.radians(spec.V_ANGLE_DEG + angle) / 2.0
             m = spec.V_MOUTH_WIDTH + mouth
-            axis_y = a - grip_r * math.hypot(a, m / 2.0) / (m / 2.0)
+            a = (m / 2.0) / math.tan(half)
+            axis_y = a - grip_r / math.sin(half)
             chords.append(math.sqrt(body_r**2 - axis_y**2))
     chord = max(chords)
     assert spec.BODY_HALF_CHORD_PRINTED_MAX == pytest.approx(chord)
+    assert chord == pytest.approx(5.991, abs=5e-4)
     near = (
         (mouth_z - band["VMouthZ"])
         + (spec.V_MOUTH_WIDTH - band["VMouth"]) / 2.0
@@ -283,18 +296,23 @@ def test_printed_bands_keep_both_relief_walls_and_clear_the_marker_body() -> Non
         callout = spec.DIMENSION_CALLOUTS[name]
         assert not re.search(r"\d\.\d", callout), name
     assert spec.DIMENSION_CALLOUTS["ReliefZ0"] == "CLEARS\nMARKER BODY"
-    assert spec.DIMENSION_CALLOUTS["VMouthZ"] == "CENTRES\nMARKER"
-    assert spec.DIMENSION_CALLOUTS["VMouth"] == "CENTRES MARKER"
+    # Review r11: the V's two stations name the grip they seat.
+    marker_number = _config.parts("vn-pen-marker")["number"]
+    assert spec.DIMENSION_CALLOUTS["VMouthZ"] == "CENTRES\nMARKER\nGRIP"
+    assert spec.DIMENSION_CALLOUTS["VMouth"] == f"CENTRES MARKER\nGRIP {marker_number}"
     width = spec.DIMENSION_CALLOUTS["ReliefWidth"]
     assert width.startswith("CLEARS MARKER\nBODY")
-    assert _config.parts("vn-pen-marker")["number"] in width
+    assert marker_number in width
+    assert not re.search(r"\d\.\d", spec.DIMENSION_CALLOUTS["Depth"])
     # Row widths (~3 mm a character at the sheet's text height) fit the room
     # draw_pn_pen_v_block's keeps give them: the two stations beside their
-    # views ~31 mm, the mouth 48 mm between its extension lines, the width 52.
-    room = {"ReliefZ0": 11, "VMouthZ": 11, "VMouth": 15, "ReliefWidth": 16}
+    # views ~31 mm, the mouth 48 mm between its extension lines, the width 52,
+    # the depth 72 (one row of ~56 mm).
+    room = {"ReliefZ0": 11, "VMouthZ": 11, "VMouth": 15, "ReliefWidth": 16, "Depth": 19}
     for name, chars in room.items():
         rows = spec.DIMENSION_CALLOUTS[name].split("\n")
         assert max(len(row) for row in rows) <= chars, name
+    assert "\n" not in spec.DIMENSION_CALLOUTS["Depth"]
     # The two beside-view blocks (centred on their keeps) stay between the
     # extension lines either side: the end view's depth (x _rz(18)) and the
     # section's z 0 foot for the near wall; the front view's SetScrewX line
@@ -397,6 +415,140 @@ def test_pivot_callout_names_its_mate_and_says_ream() -> None:
     assert not re.search(r"\d\.\d", callout)
 
 
+def test_tap_callout_ends_in_the_pivot_bore() -> None:
+    # Review r11 (rule 12): "TAP 4-40 UNC THRU" read as drilled through the
+    # block.  Both native rows end INTO PIVOT BORE; only the extent variable
+    # changes, so size and thread stay associative.
+    original = {
+        5: "TAP <hw-threaddesc> <hw-thru>",
+        6: "",
+        7: "<MOD-DIAM><hw-tapdrldia> <hw-thru>",
+        8: "",
+    }
+    rewritten = drawing._tap_into_bore_definitions(original)
+    assert rewritten == {
+        5: "TAP <hw-threaddesc> INTO PIVOT BORE",
+        6: "",
+        7: "<MOD-DIAM><hw-tapdrldia> INTO PIVOT BORE",
+        8: "",
+    }
+    for bad in (
+        {5: "TAP <hw-threaddesc> <hw-thru>", 6: "", 7: "", 8: ""},
+        {5: "<hw-thru>", 6: "", 7: "<hw-thru>", 8: ""},
+        {5: "TAP <hw-threaddesc> <hw-thru>", 7: "<hw-thru>"},
+    ):
+        with pytest.raises(RuntimeError):
+            drawing._tap_into_bore_definitions(bad)
+    assert not re.search(r"\d", drawing._TAP_END)
+    # After the thread class leaves, on the tap's callout only.
+    omit = _DRAWING_SOURCE.index(
+        'omit_title_block_thread_class(tap_callout, label="rod set-screw tap")'
+    )
+    rewrite = _DRAWING_SOURCE.index("_set_tap_into_bore_text(tap_callout)")
+    assert omit < rewrite < _DRAWING_SOURCE.index("lightening_rim = ")
+    assert _DRAWING_SOURCE.count("_set_tap_into_bore_text(") == 2  # def + call
+
+
+def test_v_is_its_angle_and_mouth_with_a_reference_apex() -> None:
+    import pn_pen_carriage_geom as carriage
+
+    # Review r11 (rules 3/10): the V prints its included angle (driving, the
+    # title block's +/-1 deg) and mouth; the apex height is a driven
+    # reference.  The geometry is unchanged, and so is the carriage.
+    assert spec.V_ANGLE_DEG == 90.0
+    assert spec.V_MOUTH_WIDTH == 12.0
+    assert spec.V_APEX_Y == 6.0
+    assert spec.MARKER_AXIS_Y == pytest.approx(6.0 - 5.3 * math.sqrt(2.0))
+    assert carriage.BLOCK_BOTTOM_Y == pytest.approx(366.2)
+    assert carriage.plan_cg_residual_mm() == pytest.approx(0.0988244, abs=1e-6)
+    assert carriage.plan_cg_local() == pytest.approx(
+        (111.5112689, 12.5986303, 9.0061911), abs=1e-6
+    )
+    assert spec.REFERENCE_DIMENSIONS == (("VGrooveProfile", "VApexY"),)
+    assert {"VAngle", "VApexY", "VMouth", "VMouthZ"} == spec.DRAWING_DIMENSIONS[
+        "VGrooveProfile"
+    ]
+    assert spec.DRAWING_PRECISION["VGrooveProfile"]["VApexY"] == 1
+    # The build: the apex is made driven before the angle drives, so the
+    # sketch is never over-defined; the angle follows a "VAngle" global in
+    # degrees; the reference display (parentheses, no tolerance) is read back.
+    body = _PART_SOURCE[_PART_SOURCE.index("async def _v_groove(") :]
+    body = body[: body.index("\nasync def ")]
+    driven = body.index('_make_driven(adapter, apex, "V apex height")')
+    angle = body.index("_add_driving_v_angle(adapter, flank_a, flank_b)")
+    assert driven < angle
+    assert 'dims.record("VApexY")\n' in body
+    assert 'dims.record("VAngle", \'"VAngle"\')' in body
+    assert '"vertical_distance"' in body and '"horizontal_distance"' in body
+    assert 'set_global(adapter, "VAngle", f"{V_ANGLE_DEG}deg")' in _PART_SOURCE
+    assert '("VApexY", V_APEX_Y)' not in _PART_SOURCE
+    assert "dimension.DrivenState = 2" in _PART_SOURCE
+    assert "dimension.DrivenState = 1" in _PART_SOURCE
+    assert "_author_reference_dimensions(adapter)\n" in _PART_SOURCE
+    assert _PART_SOURCE.index("_author_reference_dimensions(adapter)\n") < (
+        _PART_SOURCE.index("clear_dimensions_for_drawing(adapter)")
+    )
+    # The angle's text point (which picks the wedge it measures) lies inside
+    # the V: under the apex, over the mouth, between the flanks.
+    u, v = part._v_angle_text_point()
+    apex_u = -spec.BLOCK_DEPTH / 2.0
+    assert 0.0 < v < spec.V_APEX_Y
+    half_width = (spec.V_APEX_Y - v) * math.tan(math.radians(spec.V_ANGLE_DEG / 2))
+    assert abs(u - apex_u) < half_width
+    # On the sheet the angle sits in the V's void, between the mouth's
+    # value (top ~0.1548) and the apex (y 0.180).
+    angle_x, angle_y = drawing.RIGHT_KEEP["VAngle"]
+    assert angle_x == pytest.approx(drawing._rz(drawing._CZ))
+    assert drawing._ry(0.0) + 0.006 < angle_y < drawing._ry(spec.V_APEX_Y) - 0.006
+
+
+def test_paper_end_view_drops_the_relief_corners_tangent_edges() -> None:
+    # Review r11: through the V the relief's corner arcs drew two short
+    # tangent-edge lines at the mouth corners.  The end view hides tangent
+    # edges, read back, after hidden-line removal and before curation.
+    for needle in (
+        "right.SetDisplayTangentEdges2(0)",
+        "int(right.GetDisplayTangentEdges2()) != 0",
+        "right.UpdateViewDisplayGeometry()",
+    ):
+        assert needle in _DRAWING_SOURCE, needle
+    hlr = _DRAWING_SOURCE.index("set_hidden_lines_removed(adapter, view)")
+    tangent = _DRAWING_SOURCE.index("right.SetDisplayTangentEdges2(0)")
+    assert hlr < tangent < _DRAWING_SOURCE.index("keep=keep,")
+    # The edge it hides stands inside a mouth corner, under the flank.
+    corner_z = (spec.BLOCK_DEPTH - spec.RELIEF_WIDTH) / 2.0 + spec.RELIEF_CORNER_R
+    mouth_z = (spec.BLOCK_DEPTH - spec.V_MOUTH_WIDTH) / 2.0
+    assert mouth_z < corner_z < spec.BLOCK_DEPTH / 2.0
+
+
+def test_end_view_rows_stack_without_crossing() -> None:
+    # The mouth's three rows over the mouth edge's four over the depth's two,
+    # each block's line under its last row (RIGHT_KEEP's row maths): no
+    # extension line runs through a lower block, and the reamed diameter's
+    # callout drops under the depth's line.
+    keep = drawing.RIGHT_KEEP
+    bottom_face = drawing._ry(0.0)
+    row = 0.0056
+
+    def top(name: str) -> float:
+        rows = 1 + spec.DIMENSION_CALLOUTS[name].count("\n") + 1
+        return keep[name][1] - 0.0023 + (rows - 1) * row / 2.0 + 0.004
+
+    def line(name: str) -> float:
+        rows = 1 + spec.DIMENSION_CALLOUTS[name].count("\n") + 1
+        return keep[name][1] - 0.0023 - (rows - 1) * row / 2.0 - 0.001
+
+    assert top("VMouth") < bottom_face - 0.0005
+    assert top("VMouthZ") < bottom_face - 0.0005
+    # The depth's value and function rows stay under both upper blocks'
+    # extension lines (which end ~1 mm under their dimension lines).
+    assert top("Depth") < line("VMouth") - 0.002
+    assert top("Depth") - row < line("VMouthZ") - 0.001 - 0.002
+    pivot_top = drawing.BOTTOM_KEEP["PivotDia"][1] + 0.009
+    assert pivot_top < line("Depth") - 0.003
+    assert drawing.BOTTOM_KEEP["PivotDia"][1] - 0.010 > 0.0651 + 0.03
+
+
 def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     import pn_pen_carriage_geom as carriage
 
@@ -449,7 +601,7 @@ def test_sheet_runs_at_4_to_1_with_3_to_2_isometric() -> None:
     left, right = drawing.ISO_CENTER[0] - half_w, drawing.ISO_CENTER[0] + half_w
     assert left > 0.2764 + 0.005
     assert ink_cy - half_h > 0.0651 + 0.003
-    assert ink_cy + half_h < 0.132  # the end view's depth row
+    assert ink_cy + half_h < 0.1239  # the end view's depth line
     assert drawing.ISO_NOTE_XY[0] > right + 0.004
     assert drawing.ISO_NOTE_XY[0] + 0.059 < 0.4188 - 0.005
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in _DRAWING_SOURCE

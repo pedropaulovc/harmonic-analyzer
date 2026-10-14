@@ -162,16 +162,21 @@ def test_drawing_keeps_exactly_the_marked_dimensions() -> None:
 
 
 def test_plate_stock_callout_row_clears_the_bottom_width_row() -> None:
-    # PlateThick's line stands left of the plate edge and its two-row block
-    # under the foot ends above the bottom width's row, whose value is right.
+    # PlateThick's line stands left of the plate edge; its two-row block,
+    # shelved left of that line and centred on the keep's height, sits under
+    # the foot's extension line (and the 170.0 arrowhead on it) and ends
+    # left of the bottom width's row, whose value is right.
     foot = draw._fy(spec.STRAP_BOT_Y)
     thick_x, thick_y = draw.FRONT_KEEP["PlateThick"]
     width_x, width_y = draw.FRONT_KEEP["StrapBotWidth"]
     assert width_y < thick_y < foot
     assert thick_x < draw._fx(draw._X[1])
-    # A 27 mm row centred about 5 mm left of the line ends left of the
-    # bottom width's ~8 mm value.
-    assert thick_x - 0.005 + 0.0135 < width_x - 0.004
+    # The block is ~10.7 mm tall (20261014T024823419Z sheet): its top stays
+    # at least 3 mm under the foot line that struck "(1.5)" at keep 4 under.
+    assert foot - (thick_y + 0.0107 / 2.0) >= 0.003
+    # The ~27 mm block ends at its dimension line, left of the bottom
+    # width's ~8 mm value.
+    assert thick_x < width_x - 0.004
 
 
 def test_front_view_looks_at_the_plates_and_keeps_the_taper_outside() -> None:

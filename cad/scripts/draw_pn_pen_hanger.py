@@ -103,9 +103,10 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)  # the 170-tall strap fits the sheet at full size
 FRONT_SCALE = (1, 1)
 SECTION_SCALE = (2, 1)  # the slot's 0.05 band and its corner radius need room
-# The black-oxide strap shades nearly black; at 1:1 its edges, slots and
-# plates read in the empty right half of the sheet (the 1:2 iso read as a
-# silhouette).  No drawing-view-only lighting exists to lift the shade.
+# At 1:1 the strap's edges, slots and plates read in the empty right half of
+# the sheet (the 1:2 iso read as a silhouette).  No drawing-view-only
+# lighting exists, so the part's own colour (BAR_STEEL, not PANEL_BLACK:
+# build_pn_pen_hanger) is what keeps the shaded faces lighter than the edges.
 ISO_SCALE = (1, 1)
 _FRONT_M_PER_MM = FRONT_SCALE[0] / FRONT_SCALE[1] / 1000.0
 _SECTION_M_PER_MM = SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
@@ -223,14 +224,17 @@ FRONT_KEEP = {
     "ScrewY": (_fx(_X[1]) - 0.008, _fy(SCREW_HOLE_XY[1] / 2.0)),
     "UpperPlateDrop": (_fx(_X[1]) - 0.018, _fy(_UPPER_TOP_Y / 2.0)),
     "StrapRise": (_fx(_X[1]) - 0.030, _fy(_CY)),
-    # The 1.5 span holds no text, so SolidWorks shelves the value just left
-    # of the dimension line (20261014T010321468Z: "1.5" centred 5 mm left of
-    # the line, 6.3 under the foot for a keep 6 below).  The SHEET STOCK row
-    # under "(1.5)" is ~27 mm wide: the line 12 mm left of the plate edge and
-    # the block 4 mm under the foot end that row ~4 mm left of the
-    # StrapBotWidth text and ~3 mm above its dimension line's left tail; the
-    # value's top stays ~2 mm under the StrapRise extension line at the foot.
-    "PlateThick": (_fx(_X[1]) - 0.012, _fy(STRAP_BOT_Y) - 0.004),
+    # The 1.5 span holds no text, so SolidWorks shelves the two-row block
+    # just left of the dimension line, centred on the keep's height
+    # (20261014T024823419Z: keep 4 under the foot put the block at
+    # y 0.0554..0.0661, x 0.0232..0.0507, its "(1.5)" struck by the StrapRise
+    # foot extension line at y 0.065 and the 170.0 arrowhead).  Keep 9 under
+    # the foot drops the ~10.7 mm block to about y 0.050..0.061: its top
+    # ~4 mm under that extension line and the 170.0 arrowhead, its shelf
+    # ~2 mm under the StrapBotWidth row (y 0.0522), whose line starts at
+    # x 0.058, ~7 mm right of the block.  The line stays 12 mm left of the
+    # plate edge; its downward tail to the shelf crosses no other line.
+    "PlateThick": (_fx(_X[1]) - 0.012, _fy(STRAP_BOT_Y) - 0.009),
     "StrapBotWidth": (_fx(0.0), _fy(STRAP_BOT_Y) - 0.010),
     "StrapTaperDx": (
         _fx((STRAP_TOP_X[0] + STRAP_BOT_X[0]) / 2.0),

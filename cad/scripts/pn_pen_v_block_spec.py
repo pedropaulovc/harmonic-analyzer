@@ -42,7 +42,7 @@ import math
 
 import _config
 from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import angular_band_deg, printed_band_mm
 import pn_pen_rod_spec as rod
 import vn_pen_marker_spec as marker
 import vn_pen_rod_set_screw_spec as rod_set_screw
@@ -53,14 +53,17 @@ BLOCK_DEPTH = 18.0  # Z: the relief slot passes the Ø12.3 body with 2.5 legs
 CHAMFER = 6.0  # 45 deg top corners (the photo's bevelled top edges)
 
 # --- V-groove (grip seat), x 0..RELIEF_X0 ---
+# The print defines the V by what seats the grip: its included angle and its
+# mouth on the bottom face (both driving in VGrooveProfile).  The apex height
+# follows from them and prints as a reference.
 V_ANGLE_DEG = 90.0
-V_APEX_Y = 6.0  # apex height above the bottom face, centred in Z
-V_MOUTH_WIDTH = round(
-    2.0 * V_APEX_Y * math.tan(math.radians(V_ANGLE_DEG / 2.0)), 6
-)  # 12.0
+V_MOUTH_WIDTH = 12.0
+_HALF = math.radians(V_ANGLE_DEG / 2.0)
+V_APEX_Y = round(
+    (V_MOUTH_WIDTH / 2.0) / math.tan(_HALF), 6
+)  # 6.0: apex height above the bottom face, centred in Z
 # A barrel of radius r in the V: axis r/sin(half-angle) below the apex, the two
 # contact lines r*sin(half-angle) below it.
-_HALF = math.radians(V_ANGLE_DEG / 2.0)
 MARKER_AXIS_Y = V_APEX_Y - (marker.BARREL_DIA / 2.0) / math.sin(_HALF)
 V_CONTACT_Y = V_APEX_Y - (marker.BARREL_DIA / 2.0) * math.sin(_HALF)
 
@@ -211,7 +214,7 @@ if round(PIVOT_BORE_TOP_CHAMFER, PIVOT_CHAMFER_PLACES) != PIVOT_BORE_TOP_CHAMFER
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OutlineProfile": {"Length", "Height", "Chamfer2dx"},
     "Block": {"Depth"},
-    "VGrooveProfile": {"VApexY", "VMouth", "VMouthZ"},
+    "VGrooveProfile": {"VAngle", "VApexY", "VMouth", "VMouthZ"},
     "ReliefProfile": {"ReliefX0", "ReliefCornerR"},
     "ReliefReference": {"ReliefZ0", "ReliefWidth", "ReliefHeight"},
     "PivotBoreProfile": {"PivotX", "PivotDia"},
@@ -223,30 +226,39 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 REFERENCE_SKETCHES = ("ReliefReference", "PivotReference", "LighteningReference")
 SECTION_REFERENCE_SKETCHES = ("ReliefReference", "PivotReference")
 # Places carry the title block's tolerance (drawing-guidelines.md rule 3).
-# .XX where a fit depends on it: the V's apex sets the marker axis, the pivot
-# bore's depth station sits it on the V's axis, and the tap must meet the bore
-# it locks (both stations from the paper end).  .XXX (+/-0.13) on the four
-# across-the-depth stations that keep the marker body off both relief walls:
-# the V's front mouth edge and mouth (the body's centre) and the relief's near
-# wall and width; at .XX their bands alone (4 x 0.51) exceed the 0.53-a-side
-# nominal clearance (guarded below).  The depth at .XX: at .X the far relief
-# wall, left over from Depth - ReliefZ0 - ReliefWidth, falls under rule 17's
-# 1.5 (guarded below); the depth is fixed by the frame window the block passes
-# and the slot by the body, so geometry cannot buy the wall.
+# The V prints as its included angle (whole degrees, the title block's +/-1)
+# and its mouth; the apex height they leave is a reference, (6.0), driven in
+# the sketch.  .XX on the tap's station from the paper end: it must meet the
+# pivot bore it locks (PivotX, SetScrewX).  The pivot bore's depth station
+# prints .X: no fit depends on it (the tap runs into the bore wherever it
+# stands, and the set screw locks the pen's angle).  .XXX (+/-0.13)
+# on the four across-the-depth stations that keep the marker body off both
+# relief walls: the V's front mouth edge and mouth (the body's centre) and the
+# relief's near wall and width; at .XX their bands alone (4 x 0.51) exceed the
+# 0.53-a-side nominal clearance (guarded below).  The depth at .XX: at .X the
+# far relief wall, left over from Depth - ReliefZ0 - ReliefWidth, falls to
+# 1.44, under rule 17's 1.5 (guarded below); the depth is fixed by the frame
+# window the block passes and the slot by the body, so geometry cannot buy
+# the wall.
 # Named exception: MHA-PN-005 pn-pen-v-block, the four .XXX depth stations
-# (drawing-simplicity-policy.md, Named exceptions).
+# and the .XX depth (drawing-simplicity-policy.md, Named exceptions).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutlineProfile": {"Length": 1, "Height": 1, "Chamfer2dx": 1},
     "Block": {"Depth": 2},
-    "VGrooveProfile": {"VApexY": 2, "VMouth": 3, "VMouthZ": 3},
+    "VGrooveProfile": {"VAngle": 0, "VApexY": 1, "VMouth": 3, "VMouthZ": 3},
     "ReliefProfile": {"ReliefX0": 1, "ReliefCornerR": 1},
     "ReliefReference": {"ReliefZ0": 3, "ReliefWidth": 3, "ReliefHeight": 1},
     "PivotBoreProfile": {"PivotX": 2, "PivotDia": 3},
-    "PivotReference": {"PivotZ": 2, "PivotChamferSize": PIVOT_CHAMFER_PLACES},
+    "PivotReference": {"PivotZ": 1, "PivotChamferSize": PIVOT_CHAMFER_PLACES},
     "SetScrewHole": {"SetScrewX": 2, "SetScrewY": 1},
     "LighteningBore": {"LighteningX": 1},
     "LighteningReference": {"LighteningZ": 1},
 }
+# The one driven sketch dimension the print shows, parenthesised as a
+# reference (no tolerance): the V's apex height, which its angle and mouth fix.
+REFERENCE_DIMENSIONS: tuple[tuple[str, str], ...] = (("VGrooveProfile", "VApexY"),)
+if round(V_APEX_Y, DRAWING_PRECISION["VGrooveProfile"]["VApexY"]) != V_APEX_Y:
+    raise AssertionError("the V's reference apex height must print exactly")
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
@@ -278,22 +290,32 @@ RELIEF_FAR_WALL_PRINTED_MIN = (
 )  # 1.73
 if min(RELIEF_NEAR_WALL_PRINTED_MIN, RELIEF_FAR_WALL_PRINTED_MIN) < _WALL:
     raise AssertionError("a printed relief wall falls under the rule 17 1.5 floor")
+# The depth's .XX is load-bearing: at the title block's .X the far wall
+# prints 1.44.
+if (
+    (BLOCK_DEPTH - printed_band_mm(1))
+    - (_RELIEF_Z0 + _band("ReliefZ0"))
+    - (RELIEF_WIDTH + _band("ReliefWidth"))
+) >= _WALL:
+    raise AssertionError("the depth holds the far relief wall at .X; drop its .XX")
 
 
-def _body_half_chord_at_bottom(apex_y: float, mouth: float) -> float:
+def _body_half_chord_at_bottom(angle_deg: float, mouth: float) -> float:
     """The marker body's half-width at the bottom face, its grip seated in a
-    V of this apex height and mouth (both flanks touching the grip)."""
-    half = math.atan2(mouth / 2.0, apex_y)
+    V of this included angle and mouth (both flanks touching the grip)."""
+    half = math.radians(angle_deg / 2.0)
+    apex_y = (mouth / 2.0) / math.tan(half)
     axis_y = apex_y - (marker.BARREL_DIA / 2.0) / math.sin(half)
     return math.sqrt(_BODY_R**2 - axis_y**2)
 
 
-# The V's apex and mouth at their printed limits move the seated axis; the
-# widest body chord at the bottom face over the four corners (6.018 at .XX
-# apex, 5.965 nominal).
+# The V's printed angle (the title block's +/-1 deg) and mouth move the seated
+# axis; the widest body chord at the bottom face over the four corners (5.991
+# at 89 deg and the widest mouth, 5.965 nominal).  The apex height is their
+# reference and adds no band of its own.
 BODY_HALF_CHORD_PRINTED_MAX = max(
-    _body_half_chord_at_bottom(V_APEX_Y + apex, V_MOUTH_WIDTH + mouth)
-    for apex in (-_band("VApexY"), _band("VApexY"))
+    _body_half_chord_at_bottom(V_ANGLE_DEG + angle, V_MOUTH_WIDTH + mouth)
+    for angle in (-angular_band_deg(), angular_band_deg())
     for mouth in (-_band("VMouth"), _band("VMouth"))
 )
 # The body's centre is the V's: VMouthZ + VMouth / 2 from the front face.
@@ -302,14 +324,14 @@ BODY_NEAR_CLEARANCE_PRINTED_MIN = (
     + (V_MOUTH_WIDTH - _band("VMouth")) / 2.0
     - BODY_HALF_CHORD_PRINTED_MAX
     - (_RELIEF_Z0 + _band("ReliefZ0"))
-)  # 0.16 (0.21 on the nominal chord)
+)  # 0.18 (0.21 on the nominal chord)
 BODY_FAR_CLEARANCE_PRINTED_MIN = (
     (_RELIEF_Z0 - _band("ReliefZ0"))
     + (RELIEF_WIDTH - _band("ReliefWidth"))
     - (_V_MOUTH_Z + _band("VMouthZ"))
     - (V_MOUTH_WIDTH + _band("VMouth")) / 2.0
     - BODY_HALF_CHORD_PRINTED_MAX
-)  # 0.03 (0.08 on the nominal chord)
+)  # 0.05 (0.08 on the nominal chord)
 if min(BODY_NEAR_CLEARANCE_PRINTED_MIN, BODY_FAR_CLEARANCE_PRINTED_MIN) <= 0.0:
     raise AssertionError("a printed relief wall may touch the marker body")
 # (feature, dimension) -> (upper, lower) native band.
@@ -322,19 +344,22 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
 MARKER_NUMBER = _config.parts("vn-pen-marker")["number"]
 # Named exception: MHA-PN-005 pn-pen-v-block, the four .XXX depth stations
-# (drawing-simplicity-policy.md, Named exceptions).  Each states its own
-# function under its value: taken to .XX alone, each one lets a printed relief
-# wall touch the marker body (the body clearance stack above); the near wall
-# and the width also carry the far wall.  The V's two stations seat the
-# marker's centre, the relief's two put both walls clear of its body.  Rows
-# stay short enough to sit between their own extension lines or in the gap
-# beside the view (draw_pn_pen_v_block's RIGHT_KEEP / SECTION_KEEP).
+# and the .XX depth (drawing-simplicity-policy.md, Named exceptions).  Each
+# states its own function under its value: taken to .XX alone, each station
+# lets a printed relief wall touch the marker body (the body clearance stack
+# above); the near wall and the width also carry the far wall, and the depth
+# at .X takes that wall under the floor.  The V's two stations seat the
+# marker's grip and name it (the body runs on into the relief), the relief's
+# two put both walls clear of its body.  Rows stay short enough to sit
+# between their own extension lines or in the gap beside the view
+# (draw_pn_pen_v_block's RIGHT_KEEP / SECTION_KEEP).
 DIMENSION_CALLOUTS: dict[str, str] = {
     "PivotDia": f"REAM THRU\nSLIP FIT ON PEN ROD PIVOT {PEN_ROD_NUMBER}",
     "Chamfer2dx": "X 45 DEG, 2 PLACES",
     "PivotChamferSize": "X 45 DEG",
-    "VMouthZ": "CENTRES\nMARKER",
-    "VMouth": "CENTRES MARKER",
+    "Depth": "HOLDS FAR SLOT WALL",
+    "VMouthZ": "CENTRES\nMARKER\nGRIP",
+    "VMouth": f"CENTRES MARKER\nGRIP {MARKER_NUMBER}",
     "ReliefZ0": "CLEARS\nMARKER BODY",
     "ReliefWidth": f"CLEARS MARKER\nBODY {MARKER_NUMBER}",
 }

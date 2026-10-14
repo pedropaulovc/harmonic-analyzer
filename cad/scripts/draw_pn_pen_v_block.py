@@ -17,7 +17,9 @@ feature is located across the depth from the front face:
   the pivot-bore axis.
 * right (third angle, right of the ``*Back`` face): ``*Left``, the paper end,
   shows the V in solid lines -- its front mouth edge from the front face,
-  mouth width, apex height, and the block depth.
+  mouth width, included angle, reference apex height, and the block depth.
+  Tangent edges are off there: through the V the relief's corner arcs would
+  otherwise draw two short lines at the mouth corners.
 * bottom: ``*Bottom`` turned 180 degrees to keep the front view's X, looking
   up into the V and the relief; through the relief the roof shows both
   vertical bores.  It carries the relief's start station and corner radius,
@@ -135,8 +137,8 @@ _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
 # 34.5 mm the 1:1 view measured on farm 20261014T005925878Z, 57.5 x 51.8,
 # centred 1.8 mm above its ink.  Centred at (0.315, 0.097) it fills x
 # 0.286..0.344, y 0.069..0.121: 9.8 mm right of the reamed diameter's callout
-# (to x 0.2764, y 0.100 up), 4 mm over the title block (top 0.0651), under the
-# end view's depth row (y 0.132, to x 0.287) and section A-A's 2.500 (y 0.138
+# (to x 0.2764, y 0.101 up), 4 mm over the title block (top 0.0651), under the
+# end view's depth line (y ~0.124, to x 0.287) and section A-A's 2.500 (y 0.138
 # up).  Its silhouette slopes down to the right from its top vertex (45%
 # across), so at the caption's left end (x 0.330) its ink tops out ~0.110,
 # 10 mm under the caption (bottom ~0.120 there).  2:1 (77 x 69 mm) fits
@@ -151,6 +153,11 @@ RIGHT_CENTER = (0.251, FRONT_CENTER[1])
 SECTION_CENTER = (0.360, FRONT_CENTER[1])
 ISO_CENTER = (0.315, 0.097)
 ISO_NOTE_XY = (0.350, 0.097)
+# The tap's callout rows centre on this point (r11: "TAP 4-40 UNC THRU", 17
+# characters, 42.8 mm wide, x 0.2136..0.2564).  Ending "INTO PIVOT BORE" the
+# thread row runs 28 characters, ~71 mm: x ~0.200..0.270 at y ~0.246, 16 mm
+# right of the front view's paper end (x 0.184) and 42 mm left of the pivot
+# chamfer's line (from x ~0.312, SECTION_KEEP).
 TAP_CALLOUT_XY = (0.235, 0.252)
 # Above-left of the bottom view, the lightening bore's near (upper-left) rim
 # 13 mm down-right of the text: one arrow there, no line through the bore
@@ -218,29 +225,41 @@ FRONT_KEEP = {
     "SetScrewY": (_fx(0.0) + 0.010, _fy(SET_SCREW_Y / 2.0)),
     "SetScrewX": (_fx(PIVOT_BORE_X / 4.0), _fy(0.0) - 0.012),
 }
-# Paper end: the depth under the view; one row above it the V's front mouth
-# edge from the front face (z 0, the view's left edge) chained with the mouth
-# width.  Both are .XXX, so each carries its function under its value
-# (pn_pen_v_block_spec.DIMENSION_CALLOUTS), the text block centred on its
-# keep point, rows 5.6 mm apart, the dimension line ~1 mm under the last row
-# (r9 sheet 20261014T011745149Z).
-# * the mouth's "12.000" / "CENTRES MARKER" (~40 mm) centred between its
-#   extension lines (x 0.227 / 0.275, 48 mm apart) at y 0.149: value row in
-#   the V's mouth, the function row ~0.1445..0.148, its line ~0.1435, 6 mm
-#   over the depth's "18.00" (top 0.1377).
+# Paper end: the depth under the view; above it the V's front mouth edge from
+# the front face (z 0, the view's left edge) chained with the mouth width.
+# All three are named-exception places, so each carries its function under
+# its value (pn_pen_v_block_spec.DIMENSION_CALLOUTS), the text block centred
+# on its keep point: rows 5.6 mm apart, their mean ~2.3 mm under the keep, a
+# row's ink from ~0.5 mm over its position to ~4 mm over it, the dimension
+# line ~1 mm under the last row (r9 / r11 sheets 20261014T011745149Z,
+# 20261014T023836943Z).
+# * the mouth's "12.000" / "CENTRES MARKER" / "GRIP MHA-VN-060" (~44 mm)
+#   centred between its extension lines (x 0.227 / 0.275, 48 mm apart) at
+#   y 0.1475: the value's top ~0.1548, under the V's open mouth (the bottom
+#   face line, y 0.156, stops at the mouth corners); its line ~0.1386.
 # * the mouth edge's 12 mm span would cramp its text, so "3.000" /
-#   "CENTRES" / "MARKER" (~21 mm wide) sits left of the z 0 corner, its right
-#   end 3.5 mm short of the corner's extension line (x 0.215): x ~0.191..0.212,
-#   rows from ~0.1538 (1 mm under the front view's SetScrewY extension line,
-#   y 0.156, which ends at x 0.195) down to ~0.139, its line at ~0.138, 6 mm
-#   over the depth's line (0.132) and 10 mm over the reamed diameter's
-#   callout (top 0.128); the front view's SetScrewX extension line (x 0.184)
-#   stays 6.5 mm left.
-# The apex height right of the view.
+#   "CENTRES" / "MARKER" / "GRIP" (~21 mm wide) sits left of the z 0 corner,
+#   its right end 3.5 mm short of the corner's extension line (x 0.215):
+#   x ~0.191..0.212, keep y 0.145, rows from ~0.1551 (under the front view's
+#   SetScrewY extension line, y 0.156, which ends at x 0.195) down to
+#   ~0.1348, its line ~0.1333, its extension lines (x 0.215 / 0.227) down to
+#   ~0.1323; the front view's SetScrewX extension line (x 0.184, down to
+#   y 0.1402) stays 6.5 mm left.
+# * the depth's "18.00" / "HOLDS FAR SLOT WALL" (~56 mm, x ~0.223..0.279)
+#   centred under the view at y 0.130: the value (~15 mm wide) tops out
+#   ~0.1345, 4 mm under the mouth's line; the function row ~0.1254..0.1289,
+#   3.4 mm under the mouth edge's extension lines, so the 0.227 one ends
+#   above it, not through it; its line ~0.1239 runs x 0.215..0.287, 3.9 mm
+#   over the reamed diameter's callout (BOTTOM_KEEP, top ~0.120).
+# * the included angle inside the V on its axis, half way up (y 0.168): its
+#   arc spans the wedge 12 mm under the apex (y 0.180), the "90°" (~9 mm) in
+#   the 24 mm-wide void there, ~11 mm over the mouth's value.
+# * the apex height, a reference "(6.0)", right of the view.
 RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], _ry(0.0) - 0.020),
-    "VMouth": (RIGHT_CENTER[0], _ry(0.0) - 0.007),
-    "VMouthZ": (_rz(0.0) - 0.014, _ry(0.0) - 0.0095),
+    "Depth": (RIGHT_CENTER[0], _ry(0.0) - 0.026),
+    "VMouth": (RIGHT_CENTER[0], _ry(0.0) - 0.0085),
+    "VMouthZ": (_rz(0.0) - 0.014, _ry(0.0) - 0.011),
+    "VAngle": (RIGHT_CENTER[0], _ry(V_APEX_Y / 2.0)),
     "VApexY": (_rz(BLOCK_DEPTH) + 0.012, _ry(V_APEX_Y / 2.0)),
 }
 # Bottom: all three stations from the paper end below the view, a baseline
@@ -258,6 +277,9 @@ RIGHT_KEEP = {
 # free end's edge) carries on along the centreline to the centre mark.  The
 # reamed diameter's wide callout wholly right of the paper end, its single
 # arrow on the near rim (set_near_side_diameter), so no leader crosses the bore.
+# Its block (r11: 0.108..0.127 at keep y 0.118) sits at keep y 0.111, so
+# ~0.101..0.120: under the end view's depth line (~0.1239) with 3.9 mm to
+# spare, right of the bottom view (x 0.184) and 9.8 mm left of the iso.
 BOTTOM_KEEP = {
     "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BLOCK_DEPTH) - 0.010),
     "PivotX": (_fx(PIVOT_BORE_X / 2.0), _bz(BLOCK_DEPTH) - 0.020),
@@ -267,7 +289,7 @@ BOTTOM_KEEP = {
         _fx(RELIEF_X0 + RELIEF_CORNER_R) + 0.020,
         _bz((BLOCK_DEPTH - RELIEF_WIDTH) / 2.0 + RELIEF_CORNER_R) + 0.020,
     ),
-    "PivotDia": (_fx(0.0) + 0.048, _bz(0.0) - 0.008),
+    "PivotDia": (_fx(0.0) + 0.048, _bz(0.0) - 0.015),
 }
 # Section A-A looks the same way as the paper-end view beside it: z 0 at
 # x 0.324 on the LEFT, the bottom face at y 0.156, the top at 0.228.  Its two
@@ -281,7 +303,7 @@ BOTTOM_KEEP = {
 #   ~1 mm under the last row.  The 2.500's 10 mm span is too short for its
 #   text, so "2.500" / "CLEARS" / "MARKER BODY" (~31 mm wide) sits left of
 #   the z 0 foot, x ~0.290..0.322: 3 mm right of the end view's depth
-#   extension line (x 0.287, down to y 0.132), 2 mm short of the foot's; its
+#   extension line (x 0.287, down to y ~0.123), 2 mm short of the foot's; its
 #   value's top (~0.1538) 2 mm under the end view's apex-height arrow and
 #   extension line (y 0.156, to x 0.300); its line at ~0.138.  The width's
 #   "13.000" / "CLEARS MARKER" / "BODY MHA-VN-060" (~42 mm) centred between
@@ -301,10 +323,10 @@ BOTTOM_KEEP = {
 #   "CLEARS ROD ... FILLET" above (~72 mm).  Centred 21 mm left of the rim
 #   (x 0.348) the "0.3 min." / "X 45 DEG" rows (~24 mm) end 6 mm short of
 #   the extension lines and the line runs x ~0.312..0.374 at y ~0.2425, 4.8
-#   mm over PivotZ's "9.00" (top 0.2377) and 8 mm over both of its extension
+#   mm over PivotZ's "9.0" (top 0.2377) and 8 mm over both of its extension
 #   lines' tops (0.2345), crossing neither; the block (keep y 0.251, rows
 #   from the line up to ~0.2585) stays 8 mm under the top border (0.2667)
-#   and ~56 mm right of the tap callout (to x 0.2563).
+#   and ~40 mm right of the tap callout (to x ~0.270; TAP_CALLOUT_XY).
 SECTION_KEEP = {
     "ReliefZ0": (_sz(0.0) - 0.018, _sy(0.0) - 0.0095),
     "ReliefWidth": (_sz(_CZ), _sy(0.0) - 0.013),
@@ -371,6 +393,15 @@ async def build(adapter: Any) -> dict[str, str]:
     _orient_bottom_view(adapter, bottom)
     for view in (front, right, bottom):
         set_hidden_lines_removed(adapter, view)
+    # Through the V the paper-end view looks into the relief: each step-corner
+    # arc's tangent edge with the step (z 3.5 / 14.5, 0.5 inside a mouth
+    # corner) drew a short line from the bottom face to the flank (r11), two
+    # small triangles that read as features at the V's mouth.  The arcs are
+    # dimensioned in the bottom view; here their tangent edges carry nothing.
+    right.SetDisplayTangentEdges2(0)  # swDisplayTangentEdges_e: removed
+    if int(right.GetDisplayTangentEdges2()) != 0:
+        raise RuntimeError("failed to hide the paper-end view's tangent edges")
+    right.UpdateViewDisplayGeometry()
     annotations = [
         annotation
         for view, keep, label in (
@@ -477,6 +508,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The title block's THREADS row owns the general thread class (rule 2).
     omit_title_block_thread_class(tap_callout, label="rod set-screw tap")
+    # Both rows end where the hole does: in the pivot bore, not through.
+    _set_tap_into_bore_text(tap_callout)
     lightening_rim = scan_view_edges(bottom, label="bottom").circle_at(
         (LIGHTENING_X, RELIEF_HEIGHT, _CZ),
         LIGHTENING_DIA / 2.0,
@@ -513,6 +546,57 @@ async def build(adapter: Any) -> dict[str, str]:
         redundant_note_substrings=(f"{SET_SCREW_TAP_SPEC.size} Tapped Hole",),
         expected_redundant_notes=1,
     )
+
+
+# The tap runs from the front face into the pivot bore (Hole Wizard "up to
+# next"), which the native callout prints as THRU on both its drill row
+# ("Ø2.26 THRU", callout-above) and its thread row ("TAP 4-40 UNC THRU",
+# prefix).  The block is not drilled through, so both rows name where the hole
+# ends instead (draw_dt_cone_tip_block's pinch-thread "TO SLOT" recipe): only
+# the extent variable is replaced, the size and thread variables stay live.
+_TAP_END = "INTO PIVOT BORE"
+_THRU_TOKEN = "<hw-thru>"
+# swDimensionTextParts_e: each definition part and the part SetText writes.
+_DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
+
+
+def _tap_into_bore_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Replace the native THRU extent on both rows with ``_TAP_END``."""
+    if set(definitions) != set(_DEFINITION_TO_WRITABLE):
+        raise RuntimeError(f"unexpected tap callout definition parts: {definitions!r}")
+    original = "\n".join(definitions.values())
+    if original.count(_THRU_TOKEN) != 2 or "<hw-threaddesc>" not in original:
+        raise RuntimeError(f"unexpected native tap callout definition: {definitions!r}")
+    updated = {
+        part: text.replace(_THRU_TOKEN, _TAP_END) for part, text in definitions.items()
+    }
+    rewritten = "\n".join(updated.values())
+    if rewritten.count(_TAP_END) != 2 or "<hw-threaddesc>" not in rewritten:
+        raise RuntimeError(f"tap callout rewrite lost its rows: {updated!r}")
+    return updated
+
+
+def _set_tap_into_bore_text(display: Any) -> None:
+    """Write the into-bore extent on the native callout and read it back."""
+    native = _early_bound(display, "IDisplayDimension")
+    definitions = {
+        part: str(native.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
+    }
+    updated = _tap_into_bore_definitions(definitions)
+    for definition_part, writable_part in _DEFINITION_TO_WRITABLE.items():
+        if updated[definition_part] != definitions[definition_part]:
+            native.SetText(writable_part, updated[definition_part])  # void return
+    persisted = {
+        part: str(native.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
+    }
+    resolved = "\n".join(
+        str(native.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE.values()
+    )
+    if persisted != updated or resolved.count(_TAP_END) != 2 or "THRU" in resolved:
+        raise RuntimeError(
+            "tap callout into-bore extent did not persist: "
+            f"definitions={persisted!r}, resolved={resolved!r}"
+        )
 
 
 # ASME Y14.2 runs a centreline a short, uniform distance past its feature: 3 mm

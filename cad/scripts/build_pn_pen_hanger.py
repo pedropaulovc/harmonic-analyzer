@@ -31,7 +31,7 @@ from __future__ import annotations
 import math
 import sys
 
-from _appearance import PANEL_BLACK, apply_color, apply_material
+from _appearance import BAR_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
@@ -301,9 +301,12 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven pen hanger (equations neutral)", vol, 1.0)
 
     await apply_material(adapter, MATERIAL)
-    # ch21 p.52 (img03) / ch30 plates: the hanger is BLACK-oxide steel (the
-    # dark strap the brass pen rod runs beside), not bright.
-    await apply_color(adapter, PANEL_BLACK)
+    # ch21 p.52 (img03) / ch30 plates: the hanger is BLACK-oxide steel, but
+    # PANEL_BLACK shaded its 1:1 iso solid black with the black edges lost
+    # (r12 review, rule 8).  BAR_STEEL, the darkest named tone light enough
+    # for black edges to read, as sm_gooseneck_spring_screw's black-oxide
+    # finish already renders in a named steel grey (POLISHED_STEEL).
+    await apply_color(adapter, BAR_STEEL)
     await report_mass_properties(adapter)
     for (feature_name, dimension_name), band in DRAWING_BANDS.items():
         set_dimension_bilateral_tolerance(

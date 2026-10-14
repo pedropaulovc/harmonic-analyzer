@@ -19,7 +19,8 @@ Features, in tree order:
 * ``OutlineProfile`` (Front plane) -> ``Block``: the chamfered end outline,
   extruded +Z by the depth.
 * ``VGrooveProfile`` (Right plane, sketch (u, v) = model (-Z, Y)) ->
-  ``VGroove``: the V triangle, cut +X from the paper end to ``RELIEF_X0``.
+  ``VGroove``: the V triangle, its included angle and mouth driving and its
+  apex height a driven reference, cut +X from the paper end to ``RELIEF_X0``.
 * ``ReliefProfile`` (Top plane, sketch (u, v) = model (X, -Z)) -> ``Relief``:
   the slot from ``RELIEF_X0`` to the free end, its two step corners the end
   mill's ``RELIEF_CORNER_R`` arcs, cut +Y to the roof.
@@ -102,6 +103,7 @@ from pn_pen_v_block_spec import (
     PIVOT_BORE_X,
     PIVOT_CHAMFER_BAND,
     PIVOT_CHAMFER_TOL_TYPE,
+    REFERENCE_DIMENSIONS,
     REFERENCE_SKETCHES,
     RELIEF_CORNER_R,
     RELIEF_HEIGHT,
@@ -109,6 +111,7 @@ from pn_pen_v_block_spec import (
     RELIEF_X0,
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
+    V_ANGLE_DEG,
     V_APEX_Y,
     V_MOUTH_WIDTH,
 )
@@ -229,20 +232,81 @@ async def _outline(adapter, dims: SketchDims) -> None:
         dims.record(f"Chamfer{corner}dy", '"Chamfer"')
 
 
+# Sketch (u, v) of a point inside the V's wedge, under the apex on its axis:
+# where the included angle's text goes, which picks the wedge the angle is
+# measured in (AddSpecificDimension takes the region holding its text point).
+def _v_angle_text_point() -> tuple[float, float]:
+    return (-_Z_MID, V_APEX_Y / 2.0)
+
+
+def _add_driving_v_angle(adapter, flank_a: str, flank_b: str) -> None:
+    """The V's included angle between its two flanks, as a DRIVING dimension.
+
+    ``build_dt_cone_pivot_post._add_driving_plan_incline``'s recipe: both
+    flanks selected as segments (the adapter's "angular" route selects one
+    segment and its vertex and left the farm's first native run, c0b95549c,
+    over-defined), the text point inside the wedge, passed as sketch (u, v)
+    in the x / y slots and as the model point (Z = -u) in the z slot, so it
+    lands in the wedge whichever space SOLIDWORKS reads it in (the Right
+    plane's normal, model X, projects away).  The measured value is checked
+    before the dimension is made driving.
+    """
+    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+
+    label = "V included angle"
+    u, v = (value / 1000.0 for value in _v_angle_text_point())
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    _select_sketch_entities(adapter, [flank_a, flank_b], 0)
+    extension = _sw_type_info.early_bound_or_flag(
+        model.Extension, "IModelDocExtension", "AddSpecificDimension"
+    )
+    display, status = extension.AddSpecificDimension(
+        u,
+        v,
+        -u,
+        3,  # swDimensionType_e.swAngularDimension
+        0,
+    )
+    model.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"{label}: AddSpecificDimension(angular) failed ({status})")
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    actual_rad = abs(float(dimension.SystemValue))
+    if abs(actual_rad - math.radians(V_ANGLE_DEG)) > 1e-8:
+        raise RuntimeError(
+            f"{label}: measured {math.degrees(actual_rad):.6f} deg, "
+            f"expected {V_ANGLE_DEG:.6f} deg"
+        )
+    dimension.DrivenState = 2  # swDimensionDrivenState_e.swDimensionDriving
+    if int(dimension.DrivenState) != 2:
+        raise RuntimeError(f"{label}: angular dimension did not become driving")
+    _telemetry.success(f"driving {label}: {V_ANGLE_DEG:g} deg")
+
+
+def _make_driven(adapter, dimension_id: str, label: str) -> None:
+    """Turn a just-made sketch dimension into a DRIVEN (reference) one."""
+    display = _early_bound(adapter._sketch_entities[dimension_id], "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    dimension.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
+    if int(dimension.DrivenState) != 1:
+        raise RuntimeError(f"{label}: dimension did not become driven")
+
+
 async def _v_groove(adapter, dims: SketchDims) -> None:
     """The V triangle on the Right plane, sketch (u, v) = model (-Z, Y).
 
     LA runs front mouth -> apex, LB apex -> back mouth, LC back mouth -> front
     mouth along the bottom face.  Relations: LC horizontal, its front mouth on
-    the origin's level, LA = LB (the V symmetric about the apex).  Dims: the
-    front mouth edge from the front face (a real edge on the bottom face, so
-    the V is located from the front face, not by the depth's symmetry), the
-    apex above the bottom, and the mouth width (which with the apex height
-    sets the included angle) -- 6 DOF less 3 relations + 3 dims = 0.  The
-    mouth is a point-pair distance, not an adapter "angular" dimension: that
-    one selects a segment and its vertex, dimensions the flank against the
-    sketch axes, and left the farm's first native run (c0b95549c)
-    over-defined ('no_solution').
+    the origin's level, LA = LB (the V symmetric about the apex).  Driving
+    dims: the front mouth edge from the front face (a real edge on the bottom
+    face, so the V is located from the front face, not by the depth's
+    symmetry), the mouth width and the included angle -- 6 DOF less 3
+    relations + 3 dims = 0.  The apex height is what those two leave: a
+    DRIVEN dimension the print shows as a reference.  It is made driven
+    before the angle exists, so the sketch is never over-defined.
     """
     half = V_MOUTH_WIDTH / 2.0
     points = [(-(_Z_MID - half), 0.0), (-_Z_MID, V_APEX_Y), (-(_Z_MID + half), 0.0)]
@@ -269,7 +333,7 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
         "V front mouth from the front face",
     )
     dims.record("VMouthZ", '("BlockDepth" - "VMouth") / 2')
-    await dimension_between(
+    apex = await dimension_between(
         adapter,
         f"{flank_a}.end",
         "origin",
@@ -277,7 +341,8 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
         V_APEX_Y,
         "V apex height",
     )
-    dims.record("VApexY", '"VApexY"')
+    _make_driven(adapter, apex, "V apex height")
+    dims.record("VApexY")
     await dimension_between(
         adapter,
         f"{flank_a}.start",
@@ -287,6 +352,8 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
         "V mouth width",
     )
     dims.record("VMouth", '"VMouth"')
+    _add_driving_v_angle(adapter, flank_a, flank_b)
+    dims.record("VAngle", '"VAngle"')
 
 
 async def _construction_chord(
@@ -642,6 +709,29 @@ def _pivot_chamfer_min_limit(adapter) -> None:
     _telemetry.success(f"{label}: single limit {PIVOT_BORE_TOP_CHAMFER:g} MIN")
 
 
+def _author_reference_dimensions(adapter) -> None:
+    """Show each driven dimension as a reference: no tolerance, "(6.0)"
+    (build_ms_stop_block._author_plate_location_references' recipe)."""
+    for feature_name, dimension_name in REFERENCE_DIMENSIONS:
+        display, dimension = _named_dimension(adapter, feature_name, dimension_name)
+        label = f"{dimension_name}@{feature_name}"
+        if int(dimension.DrivenState) != 1:
+            raise RuntimeError(f"{label}: a reference dimension must be driven")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = 0  # swTolType_e.swTolNONE; property put, no success retval
+        # The native prefix/suffix channel around the live model value, not
+        # ShowParenthesis (which brackets above-line text).
+        display.SetText(1, "(")
+        display.SetText(2, ")")
+        if (
+            int(tolerance.Type) != 0
+            or (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+            != ("(", ")")
+            or not bool(display.ShowDimensionValue)
+        ):
+            raise RuntimeError(f"{label}: reference display did not persist")
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -655,7 +745,6 @@ async def build(adapter) -> dict[str, str]:
         ("BlockHeight", BLOCK_HEIGHT),
         ("BlockDepth", BLOCK_DEPTH),
         ("Chamfer", CHAMFER),
-        ("VApexY", V_APEX_Y),
         ("VMouth", V_MOUTH_WIDTH),
         ("ReliefX0", RELIEF_X0),
         ("ReliefWidth", RELIEF_WIDTH),
@@ -668,6 +757,8 @@ async def build(adapter) -> dict[str, str]:
         ("LighteningX", LIGHTENING_X),
     ):
         await set_global(adapter, name, f"{value}mm")
+    # The V's included angle drives its sketch (degrees, not mm).
+    await set_global(adapter, "VAngle", f"{V_ANGLE_DEG}deg")
 
     # Each sketch records its dim names + drive equations in emission order;
     # the equations are applied in one deferred batch once the model exists.
@@ -935,6 +1026,7 @@ async def build(adapter) -> dict[str, str]:
         )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _pivot_chamfer_min_limit(adapter)
+    _author_reference_dimensions(adapter)
     for (feature_name, dimension_name), prefix in DIMENSION_PREFIXES.items():
         set_dimension_prefix(adapter, feature_name, dimension_name, prefix)
     clear_dimensions_for_drawing(adapter)
