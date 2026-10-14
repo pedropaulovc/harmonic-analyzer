@@ -88,8 +88,9 @@ def test_notes_follow_the_simplicity_policy() -> None:
     assert 1 <= len(lines) <= 4
     assert not re.search(r"\d", spec.DRAWING_NOTES)
     assert not re.search(r"GROUND|LAPP|GRIND|MILL|SAW", spec.DRAWING_NOTES.upper())
+    # Callouts may name a mating part's Number, never a value.
     for text in [*drawing.CALLOUTS_ABOVE.values(), *drawing.CALLOUTS_BELOW.values()]:
-        assert not re.search(r"\d", text)
+        assert not re.search(r"\d", re.sub(r"MHA-[A-Z]+-\d{3}", "", text))
 
 
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:

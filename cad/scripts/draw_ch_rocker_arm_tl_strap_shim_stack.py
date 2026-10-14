@@ -66,12 +66,14 @@ FACE_KEEP = {
 # dimension line meets the value first), the pack's below the bottom one.
 EDGE_KEEP = {
     "StripThick": (0.200, 0.122),
-    "ShimThick": (0.060, 0.088),
+    "ShimThick": (0.075, 0.088),
 }
 CALLOUTS_ABOVE = {"StripThick": "FLAT STOCK AS SUPPLIED"}
 CALLOUTS_BELOW = {
     "StackWidth": "UNDER THE ARM STRAP",
-    "ShimThick": "SHIM PACK, SET PER BLANK",
+    # The acceptance and the mate (codex): the pack is built per blank until
+    # the stack bears on the rocker blank's strap face.
+    "ShimThick": "SHIM TO BEAR ON MHA-CH-006 STRAP FACE",
 }
 
 
