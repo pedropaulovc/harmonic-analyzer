@@ -26,7 +26,8 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     assert not set(drawing.FACE_KEEP) & set(drawing.EDGE_KEEP)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert set(spec.REFERENCE_DIMENSIONS) <= set(drawing.EDGE_KEEP)
-    assert set(drawing.CALLOUTS_BELOW) <= marked
+    assert not set(drawing.CALLOUTS_ABOVE) & set(drawing.CALLOUTS_BELOW)
+    assert set(drawing.CALLOUTS_ABOVE) | set(drawing.CALLOUTS_BELOW) <= marked
 
 
 def test_stack_height_seats_the_centred_strap_on_the_raw_ends() -> None:
@@ -87,7 +88,7 @@ def test_notes_follow_the_simplicity_policy() -> None:
     assert 1 <= len(lines) <= 4
     assert not re.search(r"\d", spec.DRAWING_NOTES)
     assert not re.search(r"GROUND|LAPP|GRIND|MILL|SAW", spec.DRAWING_NOTES.upper())
-    for text in drawing.CALLOUTS_BELOW.values():
+    for text in [*drawing.CALLOUTS_ABOVE.values(), *drawing.CALLOUTS_BELOW.values()]:
         assert not re.search(r"\d", text)
 
 

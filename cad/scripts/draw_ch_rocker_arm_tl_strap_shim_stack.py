@@ -58,16 +58,20 @@ ISO_CENTER = (0.310, 0.175)
 ISO_NOTE_XY = (0.275, 0.235)
 FACE_KEEP = {
     "StackLength": (0.130, 0.228),
-    "StackWidth": (0.070, 0.185),
+    # Far enough left that the callout clears the length's extension line.
+    "StackWidth": (0.050, 0.185),
 }
+# Neither thickness fits its text between its extension lines: the piece's
+# text sits above the view's top extension line (callout above, so the
+# dimension line meets the value first), the pack's below the bottom one.
 EDGE_KEEP = {
-    "StripThick": (0.190, 0.108),
-    "ShimThick": (0.070, 0.098),
+    "StripThick": (0.200, 0.122),
+    "ShimThick": (0.060, 0.088),
 }
+CALLOUTS_ABOVE = {"StripThick": "FLAT STOCK AS SUPPLIED"}
 CALLOUTS_BELOW = {
-    "StackWidth": "STAYS UNDER THE ARM STRAP",
-    "StripThick": "FLAT STOCK AS SUPPLIED",
-    "ShimThick": "SHIM PACK, NOMINAL: MAKES UP EACH BLANK'S GAP",
+    "StackWidth": "UNDER THE ARM STRAP",
+    "ShimThick": "SHIM PACK, SET PER BLANK",
 }
 
 
@@ -173,7 +177,8 @@ async def build(adapter: Any) -> dict[str, str]:
                 f"expected one strap shim stack {name} reference dimension"
             )
         set_reference_dimension(adapter, matches[0], label=f"strap shim stack {name}")
-    set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
+    set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+    set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW, location="below")
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
