@@ -19,11 +19,13 @@ Features, in tree order:
 * ``OutlineProfile`` (Front plane) -> ``Block``: the chamfered end outline,
   extruded +Z by the depth.
 * ``VGrooveProfile`` (Right plane, sketch (u, v) = model (-Z, Y)) ->
-  ``VGroove``: the V triangle, its included angle and mouth driving and its
-  apex height a driven reference, cut +X from the paper end to ``RELIEF_X0``.
+  ``VGroove``: the V triangle, its included angle and both mouth edges (each
+  from the front face) driving and its apex height a driven reference, cut +X
+  from the paper end to ``RELIEF_X0``.
 * ``ReliefProfile`` (Top plane, sketch (u, v) = model (X, -Z)) -> ``Relief``:
-  the slot from ``RELIEF_X0`` to the free end, its two step corners the end
-  mill's ``RELIEF_CORNER_R`` arcs, cut +Y to the roof.
+  the slot from ``RELIEF_X0`` to the free end, both walls stationed from the
+  front face, its two step corners the end mill's ``RELIEF_CORNER_R`` arcs,
+  cut +Y to the roof.
 * ``PivotBoreProfile`` (Top plane) -> ``PivotBore``: the reamed bore, a
   sketched through cut; it removes brass only between the top face and the
   relief roof.  Its diameter carries the H7 band.
@@ -109,11 +111,15 @@ from pn_pen_v_block_spec import (
     RELIEF_HEIGHT,
     RELIEF_WIDTH,
     RELIEF_X0,
+    RELIEF_Z0,
+    RELIEF_Z1,
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
     V_ANGLE_DEG,
     V_APEX_Y,
     V_MOUTH_WIDTH,
+    V_MOUTH_Z0,
+    V_MOUTH_Z1,
 )
 
 PART_NAME = "pn-pen-v-block"
@@ -301,15 +307,15 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
     LA runs front mouth -> apex, LB apex -> back mouth, LC back mouth -> front
     mouth along the bottom face.  Relations: LC horizontal, its front mouth on
     the origin's level, LA = LB (the V symmetric about the apex).  Driving
-    dims: the front mouth edge from the front face (a real edge on the bottom
-    face, so the V is located from the front face, not by the depth's
-    symmetry), the mouth width and the included angle -- 6 DOF less 3
-    relations + 3 dims = 0.  The apex height is what those two leave: a
-    DRIVEN dimension the print shows as a reference.  It is made driven
-    before the angle exists, so the sketch is never over-defined.
+    dims: both mouth edges from the front face (real edges on the bottom face,
+    baselines from the face the print locates everything from, so neither is
+    chained from the other and the V is not placed by the depth's symmetry)
+    and the included angle -- 6 DOF less 3 relations + 3 dims = 0.  The mouth
+    width is their difference and the apex height what they leave: a DRIVEN
+    dimension the print shows as a reference.  It is made driven before the
+    angle exists, so the sketch is never over-defined.
     """
-    half = V_MOUTH_WIDTH / 2.0
-    points = [(-(_Z_MID - half), 0.0), (-_Z_MID, V_APEX_Y), (-(_Z_MID + half), 0.0)]
+    points = [(-V_MOUTH_Z0, 0.0), (-_Z_MID, V_APEX_Y), (-V_MOUTH_Z1, 0.0)]
     flank_a, flank_b, mouth = await add_line_chain(adapter, points)
     check(
         "V mouth horizontal",
@@ -329,10 +335,10 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
         f"{flank_a}.start",
         "origin",
         "horizontal_distance",
-        _Z_MID - half,
-        "V front mouth from the front face",
+        V_MOUTH_Z0,
+        "V front mouth edge from the front face",
     )
-    dims.record("VMouthZ", '("BlockDepth" - "VMouth") / 2')
+    dims.record("VMouthZ0", '"VMouthFrontZ"')
     apex = await dimension_between(
         adapter,
         f"{flank_a}.end",
@@ -345,13 +351,13 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
     dims.record("VApexY")
     await dimension_between(
         adapter,
-        f"{flank_a}.start",
         f"{flank_b}.end",
+        "origin",
         "horizontal_distance",
-        V_MOUTH_WIDTH,
-        "V mouth width",
+        V_MOUTH_Z1,
+        "V back mouth edge from the front face",
     )
-    dims.record("VMouth", '"VMouth"')
+    dims.record("VMouthZ1", '"VMouthBackZ"')
     _add_driving_v_angle(adapter, flank_a, flank_b)
     dims.record("VAngle", '"VAngle"')
 
@@ -425,7 +431,7 @@ def _require_on_section_plane(adapter, sketch: str) -> None:
 
 
 async def _relief_reference(adapter) -> list[tuple[str, str]]:
-    """The relief's depth-wise location, width and height in section A-A.
+    """The relief's depth-wise walls and height in section A-A.
 
     On SECTION_PLANE, sketch (u, v) = model (-Z, Y), construction only and
     hidden.  The relief is cut from a Top-plane profile whose stations across
@@ -433,15 +439,14 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
     that ends in air.  A shown reference sketch prints, so its chords lie only
     on the section's own edges, never across the open mouth: the near wall
     from its foot to the roof, its foot from the origin, the front face's foot
-    (ReliefZ0), and the far wall, whose foot is ReliefWidth from the near one
-    along the bottom face and whose height is the printed ReliefHeight (the
-    section draws the far wall on its right, outside the chain under it).
-    2 x 4 DOF less the near foot's level, both chords vertical, the far foot's
-    level (4) and 4 dims = 0.
+    (ReliefZ0), and the far wall, whose foot is ReliefZ1 from the same origin
+    (a baseline, not chained from the near wall) and whose height is the
+    printed ReliefHeight (the section draws the far wall on its right, outside
+    the stations under it).  2 x 4 DOF less the near foot's level, both chords
+    vertical, the far foot's level (4) and 4 dims = 0.
     """
     feature = "ReliefReference"
-    z0 = (BLOCK_DEPTH - RELIEF_WIDTH) / 2.0
-    z1 = z0 + RELIEF_WIDTH
+    z0, z1 = RELIEF_Z0, RELIEF_Z1
     check(f"create sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
     near = await _construction_chord(adapter, feature, (-z0, 0.0), (-z0, RELIEF_HEIGHT))
     await anchor_point_to_origin(
@@ -465,11 +470,11 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
     )
     await dimension_between(
         adapter,
-        f"{near}.start",
         f"{far}.start",
+        "origin",
         "horizontal_distance",
-        RELIEF_WIDTH,
-        f"{feature} width",
+        z1,
+        f"{feature} far wall from the front face",
     )
     check(feature, await adapter.add_sketch_constraint(far, None, "vertical"))
     await dimension_between(
@@ -484,13 +489,13 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
     check(f"exit sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
     _require_on_section_plane(adapter, feature)
-    z0_name, near_wall, width, height = name_dimensions(
-        adapter, feature, ["ReliefZ0", "ReliefNearWall", "ReliefWidth", "ReliefHeight"]
+    z0_name, near_wall, z1_name, height = name_dimensions(
+        adapter, feature, ["ReliefZ0", "ReliefNearWall", "ReliefZ1", "ReliefHeight"]
     )
     return [
-        (z0_name, '("BlockDepth" - "ReliefWidth") / 2'),
+        (z0_name, '"ReliefFrontZ"'),
         (near_wall, '"ReliefHeight"'),
-        (width, '"ReliefWidth"'),
+        (z1_name, '"ReliefBackZ"'),
         (height, '"ReliefHeight"'),
     ]
 
@@ -745,9 +750,11 @@ async def build(adapter) -> dict[str, str]:
         ("BlockHeight", BLOCK_HEIGHT),
         ("BlockDepth", BLOCK_DEPTH),
         ("Chamfer", CHAMFER),
-        ("VMouth", V_MOUTH_WIDTH),
+        ("VMouthFrontZ", V_MOUTH_Z0),
+        ("VMouthBackZ", V_MOUTH_Z1),
         ("ReliefX0", RELIEF_X0),
-        ("ReliefWidth", RELIEF_WIDTH),
+        ("ReliefFrontZ", RELIEF_Z0),
+        ("ReliefBackZ", RELIEF_Z1),
         ("ReliefHeight", RELIEF_HEIGHT),
         ("ReliefCornerR", RELIEF_CORNER_R),
         ("PivotBoreX", PIVOT_BORE_X),
@@ -807,8 +814,7 @@ async def build(adapter) -> dict[str, str]:
     # the sheet prints ("2X"); the back one is driven by the same global.
     relief = SketchDims()
     check("create_sketch relief", await adapter.create_sketch("Top"))
-    z0 = (BLOCK_DEPTH - RELIEF_WIDTH) / 2.0
-    z1 = z0 + RELIEF_WIDTH
+    z0, z1 = RELIEF_Z0, RELIEF_Z1
     corner_r = RELIEF_CORNER_R
     x1 = RELIEF_X0 + corner_r
     set_sketch_direct_db(adapter, True)
@@ -859,11 +865,17 @@ async def build(adapter) -> dict[str, str]:
         "relief length",
     )
     relief.record("ReliefLength", '"BlockLength" - "ReliefX0"')
-    check(
-        "relief width",
-        await adapter.add_sketch_dimension(free_end, None, "linear", RELIEF_WIDTH),
+    # The back wall from the front face, a baseline like the front wall's
+    # below: neither wall is chained from the other.
+    await dimension_between(
+        adapter,
+        f"{back}.start",
+        "origin",
+        "vertical_distance",
+        z1,
+        "relief back wall from the front face",
     )
-    relief.record("ReliefWidth", '"ReliefWidth"')
+    relief.record("ReliefZ1", '"ReliefBackZ"')
     # The station runs from the paper end to the step's far (z 14.5) end, so
     # its extension line leaves the step's own edge, not the corner arc.
     await dimension_between(
@@ -883,7 +895,7 @@ async def build(adapter) -> dict[str, str]:
         z0,
         "relief front wall from the front face",
     )
-    relief.record("ReliefZ0", '("BlockDepth" - "ReliefWidth") / 2')
+    relief.record("ReliefZ0", '"ReliefFrontZ"')
     for name, arc in (
         ("ReliefCornerR", front_corner),
         ("OtherReliefCornerR", back_corner),

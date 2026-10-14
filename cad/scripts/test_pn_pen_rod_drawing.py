@@ -138,38 +138,44 @@ def test_shoulder_root_is_a_modelled_max_radius() -> None:
 
 def test_side_view_layout_stays_clear() -> None:
     """The positions SIDE_KEEP's comment derives; block sizes are the farm
-    PNG's/audit's (R MAX block 54.6 mm wide with its shoulder 8.35 mm under
-    the anchor, leaf 20261014T003619Z; the Ø block ~56 x 20 mm)."""
-    border, title_block_top = 0.0127, 0.0655
+    audit's (20261014T045316872Z: R MAX block x keep-0.0281..keep+0.0265,
+    shoulder 8.35 mm under its anchor; Ø block 55.8 mm wide, hanging one
+    side of its line, keep y -0.0101..+0.010; (122.5) text top ~0.2136)."""
+    border, air = 0.0127, 0.0015
     keep = drawing.SIDE_KEEP
     sx, sy, half = drawing._sx, drawing._sy, spec.ROD_SECTION / 2.0
     square_top, square_bottom = sy(-half), sy(half)
+    pivot_end, shoulder = sx(-spec.PIVOT_LENGTH), sx(0.0)
     # Three rows above the rod, 10 mm apart, the overall the outermost.
     rows = [keep["Length"][1], keep["PivotLength"][1], drawing.OVERALL_REF_XY[1]]
     assert rows == sorted(rows)
     assert rows[0] - square_top > 0.008
     assert all(b - a >= 0.0099 for a, b in zip(rows, rows[1:]))
-    assert sx(0.0) < keep["Length"][0] < sx(spec.SQUARE_LENGTH)
-    # The 10.5's text stands outside left of its 10.5 mm span.
-    assert border + 0.010 < keep["PivotLength"][0] < sx(-spec.PIVOT_LENGTH) - 0.008
-    # The Ø block centres on mid-pivot, below the rod, above the title band.
+    assert shoulder < keep["Length"][0] < sx(spec.SQUARE_LENGTH)
+    # The 10.5's ~11.6 mm text stands outside RIGHT of its span, clear of
+    # the shoulder's extension line, its arrows forced inside: nothing of it
+    # runs left of the pivot end.
+    assert keep["PivotLength"][0] - 0.0058 > shoulder + air
+    assert drawing.PIVOT_LENGTH_ARROW_SIDE == 0  # swDimArrowsInside
+    assert "_stand_pivot_length_arrows_inside(adapter, annotations)" in (
+        _DRAWING_SOURCE
+    )
+    # The Ø's line stands left of the pivot end, where every row's lines
+    # start, and rises to its block ABOVE the rows, so it meets the block
+    # only at its shoulder (never beside a row of text).
     dia_x, dia_y = keep["PivotDia"]
-    assert sx(-spec.PIVOT_LENGTH) < dia_x < sx(0.0)
-    dia_box = (dia_x - 0.028, dia_y - 0.010, dia_x + 0.028, dia_y + 0.010)
-    assert dia_box[0] > border and dia_box[1] > title_block_top
-    assert dia_box[3] < square_bottom - 0.020
-    # The R MAX block stands down-right of the root, clear of the Ø block,
-    # and its leader (shoulder's left end to the root) stays right of the Ø's
-    # dimension line and above the Ø block.
+    assert dia_x < pivot_end - 0.005
+    dia_bottom, dia_top = dia_y - 0.0101, dia_y + 0.010
+    overall_text_top = drawing.OVERALL_REF_XY[1] + 0.0016  # 0.2136 at 0.212
+    assert dia_bottom > overall_text_top + 0.005
+    assert dia_top < 0.2794 - border - 0.010
+    # Hanging either side of its line, the block stays inside the border.
+    assert dia_x - 0.0558 > border + 0.003
+    # The R MAX block stands down-right of the root, alone under the rod.
     r_x, r_y = keep["ShoulderRadius"]
     r_box = (r_x - 0.0281, r_y - 0.00835, r_x + 0.0265, r_y + 0.00835)
-    assert r_box[0] > dia_box[2] + 0.010
+    assert r_box[0] > shoulder + 0.030
     assert r_box[3] < square_bottom - 0.008
-    root = (sx(0.0), sy(spec.PIVOT_DIA / 2.0 + spec.SHOULDER_FILLET_R))
-    assert root[0] > dia_x + 0.004
-    slope = (root[1] - r_box[1]) / (root[0] - r_box[0])
-    leader_y_at_dia_box = r_box[1] + slope * (dia_box[2] - r_box[0])
-    assert leader_y_at_dia_box > dia_box[3] + 0.008
     # The end view stands right of the side view, the iso right of it.
     end_left = drawing.END_CENTER[0] - drawing._END_HALF_M
     assert sx(spec.SQUARE_LENGTH) + 0.030 < end_left

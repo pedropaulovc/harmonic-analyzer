@@ -16,8 +16,8 @@ feature is located across the depth from the front face:
   coordinates, the tap's native callout, and section A-A's cutting line on
   the pivot-bore axis.
 * right (third angle, right of the ``*Back`` face): ``*Left``, the paper end,
-  shows the V in solid lines -- its front mouth edge from the front face,
-  mouth width, included angle, reference apex height, and the block depth.
+  shows the V in solid lines -- both its mouth edges from the front face,
+  included angle, reference apex height, and the block depth.
   Tangent edges are off there: through the V the relief's corner arcs would
   otherwise draw two short lines at the mouth corners.
 * bottom: ``*Bottom`` turned 180 degrees to keep the front view's X, looking
@@ -27,8 +27,9 @@ feature is located across the depth from the front face:
   bore's two stations with its native callout.
 * section A-A through the pivot-bore axis: bore, tap and relief in one cut,
   looking toward the free end as the paper-end view does (front face on the
-  left in both); it carries the relief's near wall, width and height, the
-  pivot bore's station from the front face, and the bore's top chamfer.
+  left in both); it carries both relief walls from the front face and their
+  height, the pivot bore's station from the front face, and the bore's top
+  chamfer.
 
 No datums, frames, basic dimensions or roughness (drawing-simplicity-policy.md
 rules 5 and 6), no note block: material and finish ride the title block.  The
@@ -99,8 +100,8 @@ from pn_pen_v_block_spec import (
     PIVOT_BORE_X,
     RELIEF_CORNER_R,
     RELIEF_HEIGHT,
-    RELIEF_WIDTH,
     RELIEF_X0,
+    RELIEF_Z0,
     SECTION_REFERENCE_SKETCHES,
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
@@ -139,7 +140,7 @@ _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
 # centred 1.8 mm above its ink.  Centred at (0.315, 0.097) it fills x
 # 0.286..0.344, y 0.069..0.121: 9.8 mm right of the reamed diameter's callout
 # (to x 0.2764, y 0.101 up), 4 mm over the title block (top 0.0651), under the
-# end view's depth line (y ~0.124, to x 0.287) and section A-A's 2.500 (y 0.138
+# end view's depth line (y ~0.1235, to x 0.287) and section A-A's 2.500 (y 0.138
 # up).  Its silhouette slopes down to the right from its top vertex (45%
 # across), so at the caption's left end (x 0.330) its ink tops out ~0.110,
 # 10 mm under the caption (bottom ~0.120 there).  2:1 (77 x 69 mm) fits
@@ -234,40 +235,44 @@ FRONT_KEEP = {
     "SetScrewY": (_fx(0.0) + 0.010, _fy(SET_SCREW_Y / 2.0)),
     "SetScrewX": (_fx(PIVOT_BORE_X / 4.0), _fy(0.0) - 0.012),
 }
-# Paper end: the depth under the view; above it the V's front mouth edge from
-# the front face (z 0, the view's left edge) chained with the mouth width.
-# All three are named-exception places, so each carries its function under
-# its value (pn_pen_v_block_spec.DIMENSION_CALLOUTS), the text block centred
-# on its keep point: rows 5.6 mm apart, their mean ~2.3 mm under the keep, a
+# Paper end: a baseline stack under the view from the front face (z 0, the
+# view's left edge, x 0.215), nested shortest-innermost so no extension line
+# crosses a dimension line it does not end on: the V's front mouth edge
+# (x 0.227), its back mouth edge (x 0.275), the depth (x 0.287).  The two V
+# edges are named-exception places, so each carries its function under its
+# value (pn_pen_v_block_spec.DIMENSION_CALLOUTS), the text block centred on
+# its keep point: rows 5.6 mm apart, their mean ~2.3 mm under the keep, a
 # row's ink from ~0.5 mm over its position to ~4 mm over it, the dimension
 # line ~1 mm under the last row (r9 / r11 sheets 20261014T011745149Z,
-# 20261014T023836943Z).
-# * the mouth's "12.000" / "CENTRES MARKER" / "GRIP MHA-VN-060" (~44 mm)
-#   centred between its extension lines (x 0.227 / 0.275, 48 mm apart) at
-#   y 0.1475: the value's top ~0.1548, under the V's open mouth (the bottom
-#   face line, y 0.156, stops at the mouth corners); its line ~0.1386.
-# * the mouth edge's 12 mm span would cramp its text, so "3.000" /
-#   "CENTRES" / "MARKER" / "GRIP" (~21 mm wide) sits left of the z 0 corner,
-#   its right end 3.5 mm short of the corner's extension line (x 0.215):
-#   x ~0.191..0.212, keep y 0.145, rows from ~0.1551 (under the front view's
-#   SetScrewY extension line, y 0.156, which ends at x 0.195) down to
-#   ~0.1348, its line ~0.1333, its extension lines (x 0.215 / 0.227) down to
-#   ~0.1323; the front view's SetScrewX extension line (x 0.184, down to
-#   y 0.1402) stays 6.5 mm left.
-# * the depth's "18.00" / "HOLDS FAR SLOT WALL" (~56 mm, x ~0.223..0.279)
-#   centred under the view at y 0.130: the value (~15 mm wide) tops out
-#   ~0.1345, 4 mm under the mouth's line; the function row ~0.1254..0.1289,
-#   3.4 mm under the mouth edge's extension lines, so the 0.227 one ends
-#   above it, not through it; its line ~0.1239 runs x 0.215..0.287, 3.9 mm
-#   over the reamed diameter's callout (BOTTOM_KEEP, top ~0.120).
+# 20261014T023836943Z): line = keep - 2.3 - 2.8 (rows - 1) - 1 mm, top =
+# keep - 2.3 + 2.8 (rows - 1) + 4 mm.
+# * the front edge's 12 mm span would cramp its text, so "3.000" / "CENTRES"
+#   / "GRIP" (~21 mm wide) sits left of the z 0 corner, its right end 3.5 mm
+#   short of the corner's extension line (x 0.215): x ~0.191..0.212, keep
+#   y 0.1475, rows from ~0.1548 (under the front view's SetScrewY extension
+#   line, y 0.156, which ends at x 0.195) down, its line ~0.1386 (x
+#   0.191..0.227), its x 0.227 extension line down to ~0.1376; the front
+#   view's SetScrewX extension line (x 0.184, down to y 0.1402) stays 6.5 mm
+#   left.
+# * the back edge's "15.000" / "CENTRES" / "MARKER GRIP" / "MHA-VN-060"
+#   (~32 mm) centred 1 mm right of the view's axis (x ~0.236..0.268) at
+#   y 0.1427: rows from ~0.1528 (under the V's open mouth; the bottom face
+#   line, y 0.156, stops at the mouth corners) down, 8.5 mm right of the
+#   front edge's x 0.227 extension line and 7 mm left of its own at x 0.275;
+#   its line ~0.131 runs x 0.215..0.275, 6.6 mm under the front edge's, so
+#   the 0.227 extension line ends above it, not through it.
+# * the depth's "18.0" (~12 mm, one row) centred under the view at y 0.1268:
+#   ink ~0.1245..0.1285, 2.5 mm under the back edge's line; its line ~0.1235
+#   runs x 0.215..0.287, 3.5 mm over the reamed diameter's callout
+#   (BOTTOM_KEEP, top ~0.120).
 # * the included angle inside the V on its axis, half way up (y 0.168): its
 #   arc spans the wedge 12 mm under the apex (y 0.180), the "90°" (~9 mm) in
-#   the 24 mm-wide void there, ~11 mm over the mouth's value.
+#   the 24 mm-wide void there, ~13 mm over the back edge's value.
 # * the apex height, a reference "(6.0)", right of the view.
 RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], _ry(0.0) - 0.026),
-    "VMouth": (RIGHT_CENTER[0], _ry(0.0) - 0.0085),
-    "VMouthZ": (_rz(0.0) - 0.014, _ry(0.0) - 0.011),
+    "VMouthZ0": (_rz(0.0) - 0.014, _ry(0.0) - 0.0085),
+    "VMouthZ1": (_rz(_CZ) + 0.001, _ry(0.0) - 0.0133),
+    "Depth": (RIGHT_CENTER[0], _ry(0.0) - 0.0292),
     "VAngle": (RIGHT_CENTER[0], _ry(V_APEX_Y / 2.0)),
     "VApexY": (_rz(BLOCK_DEPTH) + 0.012, _ry(V_APEX_Y / 2.0)),
 }
@@ -287,7 +292,7 @@ RIGHT_KEEP = {
 # reamed diameter's wide callout wholly right of the paper end, its single
 # arrow on the near rim (set_near_side_diameter), so no leader crosses the bore.
 # Its block (r11: 0.108..0.127 at keep y 0.118) sits at keep y 0.111, so
-# ~0.101..0.120: under the end view's depth line (~0.1239) with 3.9 mm to
+# ~0.101..0.120: under the end view's depth line (~0.1235) with 3.5 mm to
 # spare, right of the bottom view (x 0.184) and 9.8 mm left of the iso.
 BOTTOM_KEEP = {
     "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BLOCK_DEPTH) - 0.010),
@@ -296,7 +301,7 @@ BOTTOM_KEEP = {
     "LighteningZ": (_fx(BLOCK_LENGTH) - 0.012, _bz(_CZ / 2.0)),
     "ReliefCornerR": (
         _fx(RELIEF_X0 + RELIEF_CORNER_R) + 0.020,
-        _bz((BLOCK_DEPTH - RELIEF_WIDTH) / 2.0 + RELIEF_CORNER_R) + 0.020,
+        _bz(RELIEF_Z0 + RELIEF_CORNER_R) + 0.020,
     ),
     "PivotDia": (_fx(0.0) + 0.048, _bz(0.0) - 0.015),
 }
@@ -305,20 +310,23 @@ BOTTOM_KEEP = {
 # reference sketches show here (they lie in the cut), every chord on a drawn
 # edge: both relief walls, stubs down the front face and the bore axis from
 # the top face, and the far chamfer face.
-# * the relief's near wall from the front face and its width, a chain under
-#   the bottom face, their extension lines on the wall feet.  Both are .XXX
-#   and carry their function under the value (pn_pen_v_block_spec), the text
+# * the relief's two walls from the front face, a baseline pair under the
+#   bottom face, their extension lines on the wall feet.  Both are .XXX and
+#   carry their function under the value (pn_pen_v_block_spec), the text
 #   block centred on its keep point, rows 5.6 mm apart, the dimension line
-#   ~1 mm under the last row.  The 2.500's 10 mm span is too short for its
-#   text, so "2.500" / "CLEARS" / "MARKER BODY" (~31 mm wide) sits left of
-#   the z 0 foot, x ~0.290..0.322: 3 mm right of the end view's depth
-#   extension line (x 0.287, down to y ~0.123), 2 mm short of the foot's; its
-#   value's top (~0.1538) 2 mm under the end view's apex-height arrow and
-#   extension line (y 0.156, to x 0.300); its line at ~0.138.  The width's
-#   "13.000" / "CLEARS MARKER" / "BODY MHA-VN-060" (~42 mm) centred between
-#   the wall feet's extension lines (x 0.334 / 0.386, 5 mm a side) one notch
-#   lower, its line at ~0.1346: 3.5 mm under the 2.500's, so neither line
-#   runs along the other (r9 printed the width's arrows outside its span).
+#   ~1 mm under the last row.  The near wall's 10 mm span is too short for
+#   its text, so "2.500" / "CLEARS" / "MARKER BODY" (~31 mm wide) sits left
+#   of the z 0 foot, x ~0.290..0.322: 3 mm right of the end view's depth
+#   extension line (x 0.287, down to y ~0.1225), 2 mm short of the foot's;
+#   its value's top (~0.1538) 2 mm under the end view's apex-height arrow
+#   and extension line (y 0.156, to x 0.300); its line at ~0.138, its x 0.334
+#   extension line down to ~0.137.  The far wall's "15.500" / "CLEARS
+#   MARKER" / "BODY MHA-VN-060" (~42 mm) centred on the section's axis
+#   (x ~0.339..0.381: 5 mm right of the near wall's extension line, 5 mm
+#   left of its own at x 0.386) one notch lower, its line at ~0.1305 runs x
+#   0.324..0.386, under the near wall's line and the end of its 0.334
+#   extension line, so neither line runs along the other and no extension
+#   line crosses it (r9 printed a chained width's arrows outside its span).
 # * the relief height right of the cut, on the far wall (z 15.5, x 0.386)
 #   from its foot to the roof.
 # * the pivot station 8 mm over the top face (y 0.236), from the front face's
@@ -338,7 +346,7 @@ BOTTOM_KEEP = {
 #   and ~40 mm right of the tap callout (to x ~0.270; TAP_CALLOUT_XY).
 SECTION_KEEP = {
     "ReliefZ0": (_sz(0.0) - 0.018, _sy(0.0) - 0.0095),
-    "ReliefWidth": (_sz(_CZ), _sy(0.0) - 0.013),
+    "ReliefZ1": (_sz(_CZ), _sy(0.0) - 0.013),
     "ReliefHeight": (_sz(BLOCK_DEPTH) + 0.012, _sy(RELIEF_HEIGHT / 2.0)),
     "PivotZ": (_sz(_CZ / 2.0), _sy(BLOCK_HEIGHT) + 0.008),
     "PivotChamferSize": (
@@ -347,8 +355,8 @@ SECTION_KEEP = {
     ),
 }
 # The native SECTION A-A / SCALE caption's top centre, lowered 29 mm under the
-# bottom face (default ~17 mm) so it stands ~8 mm under the width's line
-# (~0.1346): its rows ~0.1205..0.1268 and ~0.112..0.116, over the iso's note
+# bottom face (default ~17 mm) so it stands ~3.5 mm under the far wall's line
+# (~0.1305): its rows ~0.1205..0.1268 and ~0.112..0.116, over the iso's note
 # (top 0.097) and 10 mm clear of the iso's sloping top at its left end.
 SECTION_CAPTION_XY = (SECTION_CENTER[0], _sy(0.0) - 0.029)
 

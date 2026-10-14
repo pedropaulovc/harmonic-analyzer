@@ -134,35 +134,54 @@ _END_HALF_M = _HALF * END_SCALE[0] / END_SCALE[1] / 1000.0
 # Side view stations: pivot end x 0.07875, shoulder x 0.08925, top face
 # x 0.20125; square y 0.1775..0.1825, pivot flanks y 0.178/0.182.
 #
+# A vertical dimension whose text stands off its span runs its line to a
+# shoulder under the text's bottom row, the block hanging to ONE side of
+# that line with its edge ON it (farm audit 20261014T045316872Z, PivotDia
+# keep (0.084, 0.142): line x 0.0840, "MHA-PN-005 PIVOT BORE" 0.02821 +
+# 0.05579 = 0.0840, shoulder y 0.13192 = keep y - 0.0101, top row's top
+# ~0.152 = keep y + 0.010).  Text BELOW its span therefore has the line run
+# up the block's whole edge (the review's "E struck by the line"); text
+# ABOVE meets it only at the shoulder's end, as every side-view diameter
+# of draw_dt_cone_gear_shaft does.
+#
 # Above the rod, three rows baselined from the shoulder / end faces, each
 # sharing its extension lines with the row below at the common face:
 #   row 1 (y 0.192, 9.5 mm over the square): 112.0, shoulder to top face,
 #     text mid-span (x 0.145);
 #   row 2 (y 0.202): 10.5, pivot end to shoulder.  The 10.5 mm span takes no
-#     text, so it stands outside left (x 0.066, ~0.0615..0.0705); its
-#     outside arrow past the shoulder reaches ~x 0.096, clear of row 1's
-#     extension lines, which stop ~1 mm over y 0.192;
-#   row 3 (y 0.212): the (122.5) reference, end face to end face.
+#     text (~11.6 mm wide), so it stands outside RIGHT, centred on x 0.09775
+#     (0.0920..0.1035, 2.7 mm right of the shoulder's extension line), its
+#     line under it; the arrows are FORCED inside the span (PIVOT_LENGTH_
+#     ARROW_SIDE; the green sheet drew them there) so no outside tail runs
+#     left of the pivot end toward the Ø's line;
+#   row 3 (y 0.212): the (122.5) reference, end face to end face, its line
+#     at y 0.2092 and its text ~0.2101..0.2136 (audit).
+# Ø4.000 -0.010/-0.025 between the pivot flanks: its line stands 5.75 mm
+#   left of the pivot end (x 0.073), the flanks' extension lines reaching it,
+#   so it rises past every row clear of their lines (all start at the pivot
+#   end, x 0.07875, or right of it) to the four-row ~56 x 20 mm block
+#   centred at y 0.230: shoulder y ~0.2199 (6.3 mm over the (122.5) text,
+#   10.7 mm over its line), top ~0.240.  Hanging left it spans x
+#   0.0172..0.073 (4.5 mm inside the border), hanging right 0.073..0.1288;
+#   either way only its bottom row's end meets the line, at the shoulder.
+#   Under the rod its outside-arrow tail (6.35 mm on the green sheet) runs
+#   to y ~0.1716 at x 0.073, where nothing else is.
 # Below the rod, where the ShoulderRadius's arc is (model +X, the root the
 # vertical layout's leader found):
-#   Ø4.000 -0.010/-0.025 between the pivot flanks: the dimension line at
-#     mid-pivot (x 0.084) runs down to the four-row block centred on
-#     (0.084, 0.142), ~56 x 20 mm (farm PNG of the old bottom view):
-#     x 0.056..0.112, y 0.132..0.152;
 #   R0.2 MAX / SEATS ON PEN V-BLOCK / MHA-PN-005 down-right of the root:
-#     farm audit 20261014T003619Z measured that block x a-0.0281..a+0.0265
-#     with its shoulder 8.35 mm under the anchor, so at (0.155, 0.160) it
-#     spans x 0.1269..0.1815, y 0.1517..0.1684 (9.1 mm under the square), and
-#     its leader runs from the shoulder's left end (0.1269, 0.1517) up-left at
-#     ~35 deg to the root (0.0893, 0.1779): right of the Ø's dimension line
-#     (x 0.084) all the way, and at the Ø block's right edge (x 0.112) it is
-#     at y ~0.162, 10 mm over that block's top.
+#     farm audit 20261014T045316872Z drew that block x 0.1269..0.1815 with
+#     its shoulder at y 0.1517 for keep (0.155, 0.160), 9.1 mm under the
+#     square, and its leader from the shoulder's left end up-left at ~35 deg
+#     to the root (0.0892, 0.1777); nothing else is below the rod.
 SIDE_KEEP = {
     "Length": (_sx(SQUARE_LENGTH / 2.0), _sy(-_HALF) + 0.0095),
-    "PivotLength": (_sx(-PIVOT_LENGTH) - 0.01275, _sy(-_HALF) + 0.0195),
-    "PivotDia": (_sx(-PIVOT_LENGTH / 2.0), _sy(PIVOT_DIA / 2.0) - 0.036),
+    "PivotLength": (_sx(0.0) + 0.0085, _sy(-_HALF) + 0.0195),
+    "PivotDia": (_sx(-PIVOT_LENGTH) - 0.00575, _sy(-_HALF) + 0.0475),
     "ShoulderRadius": (_sx(0.0) + 0.06575, _sy(_HALF) - 0.0175),
 }
+# swDimensionArrowsSide_e swDimArrowsInside, read back
+# (draw_dt_cone_tip_block's _set_arrow_sides).
+PIVOT_LENGTH_ARROW_SIDE = 0
 OVERALL_REF_XY = (_sx(_CY), _sy(-_HALF) + 0.0295)
 # Picks are ENTITIES from the side view's edge scan, not sheet hit-tests:
 # the pivot end is a circular edge seen edge-on, and a SelectByID2 point on
@@ -233,6 +252,26 @@ def _prove_side_view_frame(adapter: Any, side: Any) -> None:
     if misses:
         raise RuntimeError(f"pen-rod side view is not in its layout frame: {misses}")
     _telemetry.info(f"pen-rod side view frame: {dict(zip(stations, projected))}")
+
+
+def _stand_pivot_length_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
+    """Force the 10.5's arrows inside its span (PIVOT_LENGTH_ARROW_SIDE) and
+    read the side back: an outside tail left of the pivot end would run
+    toward the Ø's dimension line (draw_dt_cone_tip_block's _set_arrow_sides)."""
+    found = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "PivotLength"
+    ]
+    if len(found) != 1:
+        raise RuntimeError(
+            f"expected one PivotLength on the side view, found {len(found)}"
+        )
+    annotation = _early_bound(found[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.ArrowSide = PIVOT_LENGTH_ARROW_SIDE
+    if int(display.ArrowSide) != PIVOT_LENGTH_ARROW_SIDE:
+        raise RuntimeError("PivotLength did not keep its arrows inside its span")
 
 
 def _dress_shoulder_radius(adapter: Any, annotations: list[Any]) -> None:
@@ -456,6 +495,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _dress_shoulder_radius(adapter, annotations)
+    _stand_pivot_length_arrows_inside(adapter, annotations)
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

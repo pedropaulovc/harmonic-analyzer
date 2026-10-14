@@ -53,11 +53,14 @@ BLOCK_DEPTH = 18.0  # Z: the relief slot passes the Ø12.3 body with 2.5 legs
 CHAMFER = 6.0  # 45 deg top corners (the photo's bevelled top edges)
 
 # --- V-groove (grip seat), x 0..RELIEF_X0 ---
-# The print defines the V by what seats the grip: its included angle and its
-# mouth on the bottom face (both driving in VGrooveProfile).  The apex height
-# follows from them and prints as a reference.
+# The print defines the V by what seats the grip: its included angle and both
+# mouth edges on the bottom face, each a baseline station from the front face
+# (all three driving in VGrooveProfile).  The mouth width and the apex height
+# follow from them; the apex height prints as a reference.
 V_ANGLE_DEG = 90.0
-V_MOUTH_WIDTH = 12.0
+V_MOUTH_Z0 = 3.0  # front mouth edge from the front face
+V_MOUTH_Z1 = 15.0  # back mouth edge from the front face
+V_MOUTH_WIDTH = V_MOUTH_Z1 - V_MOUTH_Z0
 _HALF = math.radians(V_ANGLE_DEG / 2.0)
 V_APEX_Y = round(
     (V_MOUTH_WIDTH / 2.0) / math.tan(_HALF), 6
@@ -69,7 +72,10 @@ V_CONTACT_Y = V_APEX_Y - (marker.BARREL_DIA / 2.0) * math.sin(_HALF)
 
 # --- Relief slot (body clearance), x RELIEF_X0..BLOCK_LENGTH ---
 RELIEF_X0 = 10.0
-RELIEF_WIDTH = 13.0
+# Both walls are baseline stations from the front face; the width follows.
+RELIEF_Z0 = 2.5  # near (front) wall
+RELIEF_Z1 = 15.5  # far (back) wall
+RELIEF_WIDTH = RELIEF_Z1 - RELIEF_Z0
 RELIEF_HEIGHT = 6.5
 # The slot's two internal corners at the step (x = RELIEF_X0) keep the end
 # mill's radius: the largest the grip allows (guard below), a 2 mm cutter
@@ -108,11 +114,17 @@ LIGHTENING_DIA = FRACTIONAL_DRILL_MM[LIGHTENING_SPEC.size]
 LIGHTENING_X = 23.0
 
 _WALL = 1.5  # drawing-guidelines.md rule 17 (walls and webs) floor
-if V_MOUTH_WIDTH + 2.0 * 2.0 > BLOCK_DEPTH:
+# The carriage hangs the marker on the block's mid-depth: the V and the relief
+# both centre on it (pn_pen_carriage_geom, its mass model).
+if (V_MOUTH_Z0 + V_MOUTH_Z1) / 2.0 != BLOCK_DEPTH / 2.0:
+    raise AssertionError("the V's mouth edges must centre on the block's depth")
+if (RELIEF_Z0 + RELIEF_Z1) / 2.0 != BLOCK_DEPTH / 2.0:
+    raise AssertionError("the relief's walls must centre on the block's depth")
+if min(V_MOUTH_Z0, BLOCK_DEPTH - V_MOUTH_Z1) < 2.0:
     raise AssertionError("V-groove leaves under 2.0 lands on the bottom face")
 if not 1.0 <= V_CONTACT_Y < V_APEX_Y:
     raise AssertionError("grip contact lines must lie inside the V flanks")
-if (BLOCK_DEPTH - RELIEF_WIDTH) / 2.0 < 2.0:
+if min(RELIEF_Z0, BLOCK_DEPTH - RELIEF_Z1) < 2.0:
     raise AssertionError("relief slot legs under the rule 17 2.0 target")
 _BODY_R = marker.BODY_FRONT_DIA / 2.0
 _BODY_HALF_CHORD_AT_BOTTOM = math.sqrt(_BODY_R**2 - MARKER_AXIS_Y**2)
@@ -154,15 +166,11 @@ if (
 # carriage layout owns where it starts.
 _GRIP_R = marker.BARREL_DIA / 2.0
 _GRIP_GAP_AT_BOTTOM = (
-    BLOCK_DEPTH / 2.0
-    - math.sqrt(_GRIP_R**2 - MARKER_AXIS_Y**2)
-    - (BLOCK_DEPTH - RELIEF_WIDTH) / 2.0
+    BLOCK_DEPTH / 2.0 - math.sqrt(_GRIP_R**2 - MARKER_AXIS_Y**2) - RELIEF_Z0
 )
 if _GRIP_GAP_AT_BOTTOM - RELIEF_CORNER_R < 0.25:
     raise AssertionError("relief corner radius reaches the marker grip")
-if (BLOCK_DEPTH - RELIEF_WIDTH) / 2.0 + RELIEF_CORNER_R >= (
-    BLOCK_DEPTH - PIVOT_BORE_DIA
-) / 2.0 - _WALL:
+if RELIEF_Z0 + RELIEF_CORNER_R >= (BLOCK_DEPTH - PIVOT_BORE_DIA) / 2.0 - _WALL:
     raise AssertionError("relief corner radius crowds the pivot bore")
 # The rod's shoulder fillet (R MAX) is a quarter round on the pivot; with the
 # pivot against the bore wall its arc stands at most R * (2 - sqrt 2) proud of
@@ -190,18 +198,20 @@ if round(PIVOT_BORE_TOP_CHAMFER, PIVOT_CHAMFER_PLACES) != PIVOT_BORE_TOP_CHAMFER
 # the relief's start station (ReliefX0, the same "ReliefX0" global): the
 # V-groove cut's own depth dimension projects off the paper end in the bottom
 # view, away from the brass it measures.  Every feature is located across the
-# depth from the FRONT face (z 0), never by the depth's symmetry: the V by its
-# front mouth edge (VMouthZ).  Three features' own depth stations would print
-# off real geometry, so hidden reference sketches own those values instead.
+# depth from the FRONT face (z 0), never by the depth's symmetry, and the V and
+# the relief by both their edges as baselines from it (VMouthZ0 / VMouthZ1,
+# ReliefZ0 / ReliefZ1): no edge is chained from another.  Three features' own
+# depth stations would print off real geometry, so hidden reference sketches
+# own those values instead.
 # Section A-A shows the relief and the pivot bore across the depth, but their
 # sketches lie in the Top plane and project edge-on there.  ReliefReference
 # and PivotReference lie IN section A-A's cutting plane (x = PIVOT_BORE_X,
 # the bond cradle's recipe), each chord on an edge the section draws:
 # ReliefReference runs both relief walls from the bottom face to the roof
 # (ReliefHeight on the far wall, which section A-A draws on its right, outside
-# the chain under it; the Relief cut's own depth vector stops in air), the
-# near foot from the front face's foot (ReliefZ0) and the far foot from the
-# near one (ReliefWidth); PivotReference holds stubs down the front face and the
+# the stations under it; the Relief cut's own depth vector stops in air), the
+# near foot (ReliefZ0) and the far foot (ReliefZ1), each from the front face's
+# foot; PivotReference holds stubs down the front face and the
 # bore axis from the top face (PivotZ between their tops) and the bore's top
 # chamfer leg on the far (z 11) side: the chamfer feature's own dimension may
 # attach on the near side, under PivotZ.  The lightening bore's placement
@@ -214,9 +224,9 @@ if round(PIVOT_BORE_TOP_CHAMFER, PIVOT_CHAMFER_PLACES) != PIVOT_BORE_TOP_CHAMFER
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OutlineProfile": {"Length", "Height", "Chamfer2dx"},
     "Block": {"Depth"},
-    "VGrooveProfile": {"VAngle", "VApexY", "VMouth", "VMouthZ"},
+    "VGrooveProfile": {"VAngle", "VApexY", "VMouthZ0", "VMouthZ1"},
     "ReliefProfile": {"ReliefX0", "ReliefCornerR"},
-    "ReliefReference": {"ReliefZ0", "ReliefWidth", "ReliefHeight"},
+    "ReliefReference": {"ReliefZ0", "ReliefZ1", "ReliefHeight"},
     "PivotBoreProfile": {"PivotX", "PivotDia"},
     "PivotReference": {"PivotZ", "PivotChamferSize"},
     "SetScrewHole": {"SetScrewX", "SetScrewY"},
@@ -227,27 +237,24 @@ REFERENCE_SKETCHES = ("ReliefReference", "PivotReference", "LighteningReference"
 SECTION_REFERENCE_SKETCHES = ("ReliefReference", "PivotReference")
 # Places carry the title block's tolerance (drawing-guidelines.md rule 3).
 # The V prints as its included angle (whole degrees, the title block's +/-1)
-# and its mouth; the apex height they leave is a reference, (6.0), driven in
-# the sketch.  .XX on the tap's station from the paper end: it must meet the
-# pivot bore it locks (PivotX, SetScrewX).  The pivot bore's depth station
-# prints .X: no fit depends on it (the tap runs into the bore wherever it
-# stands, and the set screw locks the pen's angle).  .XXX (+/-0.13)
-# on the four across-the-depth stations that keep the marker body off both
-# relief walls: the V's front mouth edge and mouth (the body's centre) and the
-# relief's near wall and width; at .XX their bands alone (4 x 0.51) exceed the
-# 0.53-a-side nominal clearance (guarded below).  The depth at .XX: at .X the
-# far relief wall, left over from Depth - ReliefZ0 - ReliefWidth, falls to
-# 1.44, under rule 17's 1.5 (guarded below); the depth is fixed by the frame
-# window the block passes and the slot by the body, so geometry cannot buy
-# the wall.
-# Named exception: MHA-PN-005 pn-pen-v-block, the four .XXX depth stations
-# and the .XX depth (drawing-simplicity-policy.md, Named exceptions).
+# and its two mouth edges; the apex height they leave is a reference, (6.0),
+# driven in the sketch.  .XX on the tap's station from the paper end: it must
+# meet the pivot bore it locks (PivotX, SetScrewX).  The pivot bore's depth
+# station prints .X: no fit depends on it (the tap runs into the bore wherever
+# it stands, and the set screw locks the pen's angle).  .XXX (+/-0.13) on the
+# four baseline stations that keep the marker body off both relief walls: the
+# V's two mouth edges (whose mean is the body's centre and whose difference is
+# the mouth that sets the body's height) and the relief's two walls; at .XX
+# the body clearance goes negative (guarded below).  The depth prints .X: the
+# far relief wall is Depth - ReliefZ1 alone, 1.57 at its worst.
+# Named exception: MHA-PN-005 pn-pen-v-block, the four .XXX baseline stations
+# across the depth (drawing-simplicity-policy.md, Named exceptions).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutlineProfile": {"Length": 1, "Height": 1, "Chamfer2dx": 1},
-    "Block": {"Depth": 2},
-    "VGrooveProfile": {"VAngle": 0, "VApexY": 1, "VMouth": 3, "VMouthZ": 3},
+    "Block": {"Depth": 1},
+    "VGrooveProfile": {"VAngle": 0, "VApexY": 1, "VMouthZ0": 3, "VMouthZ1": 3},
     "ReliefProfile": {"ReliefX0": 1, "ReliefCornerR": 1},
-    "ReliefReference": {"ReliefZ0": 3, "ReliefWidth": 3, "ReliefHeight": 1},
+    "ReliefReference": {"ReliefZ0": 3, "ReliefZ1": 3, "ReliefHeight": 1},
     "PivotBoreProfile": {"PivotX": 2, "PivotDia": 3},
     "PivotReference": {"PivotZ": 1, "PivotChamferSize": PIVOT_CHAMFER_PLACES},
     "SetScrewHole": {"SetScrewX": 2, "SetScrewY": 1},
@@ -255,7 +262,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LighteningReference": {"LighteningZ": 1},
 }
 # The one driven sketch dimension the print shows, parenthesised as a
-# reference (no tolerance): the V's apex height, which its angle and mouth fix.
+# reference (no tolerance): the V's apex height, which its angle and mouth
+# edges fix.
 REFERENCE_DIMENSIONS: tuple[tuple[str, str], ...] = (("VGrooveProfile", "VApexY"),)
 if round(V_APEX_Y, DRAWING_PRECISION["VGrooveProfile"]["VApexY"]) != V_APEX_Y:
     raise AssertionError("the V's reference apex height must print exactly")
@@ -277,27 +285,15 @@ def _band(name: str) -> float:
 
 
 # --- Printed worst case (every band at its limit at once) ---
-# The depth-wise stations as the print states them: each from the front face.
-_V_MOUTH_Z = (BLOCK_DEPTH - V_MOUTH_WIDTH) / 2.0
-_RELIEF_Z0 = (BLOCK_DEPTH - RELIEF_WIDTH) / 2.0
-# Rule 17: the relief's near wall is ReliefZ0 itself; the far wall is what
-# the print leaves of the depth.
-RELIEF_NEAR_WALL_PRINTED_MIN = _RELIEF_Z0 - _band("ReliefZ0")
-RELIEF_FAR_WALL_PRINTED_MIN = (
-    (BLOCK_DEPTH - _band("Depth"))
-    - (_RELIEF_Z0 + _band("ReliefZ0"))
-    - (RELIEF_WIDTH + _band("ReliefWidth"))
-)  # 1.73
+# Every station across the depth is a baseline from the front face, so no band
+# adds through another edge.  Rule 17: the near wall is ReliefZ0 itself, the
+# far wall Depth - ReliefZ1.
+RELIEF_NEAR_WALL_PRINTED_MIN = RELIEF_Z0 - _band("ReliefZ0")  # 2.37
+RELIEF_FAR_WALL_PRINTED_MIN = (BLOCK_DEPTH - _band("Depth")) - (
+    RELIEF_Z1 + _band("ReliefZ1")
+)  # 1.57 with the depth at .X
 if min(RELIEF_NEAR_WALL_PRINTED_MIN, RELIEF_FAR_WALL_PRINTED_MIN) < _WALL:
     raise AssertionError("a printed relief wall falls under the rule 17 1.5 floor")
-# The depth's .XX is load-bearing: at the title block's .X the far wall
-# prints 1.44.
-if (
-    (BLOCK_DEPTH - printed_band_mm(1))
-    - (_RELIEF_Z0 + _band("ReliefZ0"))
-    - (RELIEF_WIDTH + _band("ReliefWidth"))
-) >= _WALL:
-    raise AssertionError("the depth holds the far relief wall at .X; drop its .XX")
 
 
 def _body_half_chord_at_bottom(angle_deg: float, mouth: float) -> float:
@@ -309,29 +305,31 @@ def _body_half_chord_at_bottom(angle_deg: float, mouth: float) -> float:
     return math.sqrt(_BODY_R**2 - axis_y**2)
 
 
-# The V's printed angle (the title block's +/-1 deg) and mouth move the seated
-# axis; the widest body chord at the bottom face over the four corners (5.991
-# at 89 deg and the widest mouth, 5.965 nominal).  The apex height is their
-# reference and adds no band of its own.
+# The V's centre (the body's) is the mean of its two edge stations, +/- the
+# mean of their bands; its mouth is their difference, +/- the sum.  Taken as
+# independent (a bound: one edge cannot both widen the mouth and pull the
+# centre toward the wall it does not move), the widest body chord at the
+# bottom face is over the printed angle (the title block's +/-1 deg) and that
+# mouth band: 6.006 at 89 deg and the widest mouth, 5.965 nominal.  The apex
+# height is their reference and adds no band of its own.
+V_CENTRE_BAND = (_band("VMouthZ0") + _band("VMouthZ1")) / 2.0
+V_MOUTH_BAND = _band("VMouthZ0") + _band("VMouthZ1")
 BODY_HALF_CHORD_PRINTED_MAX = max(
     _body_half_chord_at_bottom(V_ANGLE_DEG + angle, V_MOUTH_WIDTH + mouth)
     for angle in (-angular_band_deg(), angular_band_deg())
-    for mouth in (-_band("VMouth"), _band("VMouth"))
+    for mouth in (-V_MOUTH_BAND, V_MOUTH_BAND)
 )
-# The body's centre is the V's: VMouthZ + VMouth / 2 from the front face.
+_V_CENTRE_Z = (V_MOUTH_Z0 + V_MOUTH_Z1) / 2.0
 BODY_NEAR_CLEARANCE_PRINTED_MIN = (
-    (_V_MOUTH_Z - _band("VMouthZ"))
-    + (V_MOUTH_WIDTH - _band("VMouth")) / 2.0
+    (_V_CENTRE_Z - V_CENTRE_BAND)
     - BODY_HALF_CHORD_PRINTED_MAX
-    - (_RELIEF_Z0 + _band("ReliefZ0"))
-)  # 0.18 (0.21 on the nominal chord)
+    - (RELIEF_Z0 + _band("ReliefZ0"))
+)  # 0.23
 BODY_FAR_CLEARANCE_PRINTED_MIN = (
-    (_RELIEF_Z0 - _band("ReliefZ0"))
-    + (RELIEF_WIDTH - _band("ReliefWidth"))
-    - (_V_MOUTH_Z + _band("VMouthZ"))
-    - (V_MOUTH_WIDTH + _band("VMouth")) / 2.0
+    (RELIEF_Z1 - _band("ReliefZ1"))
+    - (_V_CENTRE_Z + V_CENTRE_BAND)
     - BODY_HALF_CHORD_PRINTED_MAX
-)  # 0.05 (0.08 on the nominal chord)
+)  # 0.23
 if min(BODY_NEAR_CLEARANCE_PRINTED_MIN, BODY_FAR_CLEARANCE_PRINTED_MIN) <= 0.0:
     raise AssertionError("a printed relief wall may touch the marker body")
 # (feature, dimension) -> (upper, lower) native band.
@@ -343,25 +341,23 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 # clear of the extension lines below (draw_pn_pen_v_block's SECTION_KEEP).
 PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
 MARKER_NUMBER = _config.parts("vn-pen-marker")["number"]
-# Named exception: MHA-PN-005 pn-pen-v-block, the four .XXX depth stations
-# and the .XX depth (drawing-simplicity-policy.md, Named exceptions).  Each
-# states its own function under its value: taken to .XX alone, each station
-# lets a printed relief wall touch the marker body (the body clearance stack
-# above); the near wall and the width also carry the far wall, and the depth
-# at .X takes that wall under the floor.  The V's two stations seat the
-# marker's grip and name it (the body runs on into the relief), the relief's
-# two put both walls clear of its body.  Rows stay short enough to sit
-# between their own extension lines or in the gap beside the view
-# (draw_pn_pen_v_block's RIGHT_KEEP / SECTION_KEEP).
+# Named exception: MHA-PN-005 pn-pen-v-block, the four .XXX baseline stations
+# across the depth (drawing-simplicity-policy.md, Named exceptions).  Each
+# states its function under its value: taken to .XX alone, a relief wall's
+# station lets the body touch it (and ReliefZ1 takes the far wall under the
+# floor), a V edge's leaves 0.005 (the body clearance stack above).  The V's
+# two edges centre the marker's grip, the outer one naming it (the body runs
+# on into the relief); the relief's two clear its body, the outer one naming
+# it.  Rows stay short enough to sit beside the view or between extension
+# lines they do not cross (draw_pn_pen_v_block's RIGHT_KEEP / SECTION_KEEP).
 DIMENSION_CALLOUTS: dict[str, str] = {
     "PivotDia": f"REAM THRU\nSLIP FIT ON PEN ROD PIVOT {PEN_ROD_NUMBER}",
     "Chamfer2dx": "X 45 DEG, 2 PLACES",
     "PivotChamferSize": "X 45 DEG",
-    "Depth": "HOLDS FAR SLOT WALL",
-    "VMouthZ": "CENTRES\nMARKER\nGRIP",
-    "VMouth": f"CENTRES MARKER\nGRIP {MARKER_NUMBER}",
+    "VMouthZ0": "CENTRES\nGRIP",
+    "VMouthZ1": f"CENTRES\nMARKER GRIP\n{MARKER_NUMBER}",
     "ReliefZ0": "CLEARS\nMARKER BODY",
-    "ReliefWidth": f"CLEARS MARKER\nBODY {MARKER_NUMBER}",
+    "ReliefZ1": f"CLEARS MARKER\nBODY {MARKER_NUMBER}",
 }
 # One row: SolidWorks stores a line break in the above compartment but prints
 # nothing of it, while the dimension line still runs under the unprinted text
