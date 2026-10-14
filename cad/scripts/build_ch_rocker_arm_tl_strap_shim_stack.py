@@ -139,11 +139,12 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += await _profile(adapter, "ground piece", "StripProfile")
     extrude_at_offset(adapter, STRIP_THICK, SHIM_THICK, merge_result=False)
     name_last_feature(adapter, "Strip")
-    # Offset bosses expose depth first and start offset second.
-    strip_thick, strip_seat = name_dimensions(
-        adapter, "Strip", ["StripThick", "StripSeat"]
-    )
-    drive_jobs += [(strip_thick, '"StripThick"'), (strip_seat, '"ShimThick"')]
+    # Offset bosses expose depth first and start offset second. Only the depth
+    # is equation-driven: like the other offset bosses, the start offset stays
+    # a plain value (an equation on it failed the rebuild on the farm), and
+    # _require_layers proves it seats the piece on the pack.
+    strip_thick = name_dimensions(adapter, "Strip", ["StripThick", "StripSeat"])[0]
+    drive_jobs.append((strip_thick, '"StripThick"'))
     volume = await volume_check(adapter, "stack", volume + V_STRIP, 0.005 * V_STRIP)
     _require_layers(adapter, label="stack")
 
