@@ -8,9 +8,9 @@ vn-knife-hanger-washer:
   material_specification: "18-8 stainless steel, ASME B18.21.1; McMaster-Carr 96659A104"
   finish: AS SUPPLIED
   installation_notes: |-
-    INSTALLATION - MHA-FR-002 KNIFE-HANGER SPOTFACE
+    INSTALLATION - MHA-FR-002 CROSSBAR FACED TOP
     ONE WASHER UNDER EACH MHA-VN-024 HEX BOLT;
-    BOTTOM FACE SEATS ON THE CROSSBAR SPOTFACE FLOOR.
+    BOTTOM FACE SEATS ON THE FACED CROSSBAR TOP.
   quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance

@@ -694,7 +694,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "vn_keeper_chain",  # bead chain
         "vn_keeper_chain_link",  # snap loop link
         "vn_knife_mount_dowel",  # MHA-VN-051 1/8 dowels, two pressed into each knife mount's reamed top-seat holes, slip in the crossbar hole and slot
-        "vn_knife_hanger_washer",  # new 18-8 SAE washer (McMaster 96659A104), hex-head bearing on the crossbar spotface; no thread
+        "vn_knife_hanger_washer",  # new 18-8 SAE washer (McMaster 96659A104), hex-head bearing on the faced crossbar top; no thread
         "pd_latch_hook",  # MHA-PD-014 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
         "vn_lever_wire",  # wire, wrapped in the fixture's spigot groove; no thread
         "mg_magnifying_bracket",  # 1018 steel MHA-MG-003 collar light-press seat with Loctite 638; flange has two counterbored normal #2 clearance holes, no thread
@@ -1444,9 +1444,9 @@ JOINTS: tuple[Joint, ...] = (
             "cyclic tension and shear, never as torque about its own axis"
         ),
         axial_capture=(
-            "plain hex head (92314A253, cut to 45.70 +/-0.15 under the head) seated on a new "
-            "18-8 SAE washer (96659A104), whose lower bearing face seats on the crossbar spotface "
-            "35.50 +/-0.05 above the finished underside; the bolt passes the O6.045 clearance "
+            "plain hex head (92314A253, cut to 46.70 +/-0.15 under the head) seated on a new "
+            "18-8 SAE washer (96659A104), whose lower bearing face seats on the crossbar's faced top "
+            "36.50 +/-0.05 above the finished underside; the bolt passes the O6.045 clearance "
             "hole and reaches 8.9173 nominal (8.349..9.4856 worst case) into the 9.65 +/-0.13 "
             "full thread of the #10-24 bottoming tap, drawing the block up against the casting. "
             "The independently inspected full-form cut tail covers the longest reach with "
@@ -1461,7 +1461,7 @@ JOINTS: tuple[Joint, ...] = (
             "build_sm_summing_assembly.py: module docstring, HANGER_STUD_Y/HANGER_REACH_MIN/HANGER_REACH_MAX, "
             "_assert_knife_hanger_stack; build_sm_knife_mount.py: MOUNT_GAP; sm_knife_mount_spec.py "
             "STUD_TAP_SPEC/STUD_TAP_THREAD_DEPTH_MIN/PIN_HOLE_X; fr_top_frame_spec.py HANGER_GRIP/"
-            "HANGER_SPOTFACE_DEPTH/HANGER_PIN_X; vn_knife_mount_dowel_spec.py; "
+            "HANGER_GRIP_TOL/HANGER_PIN_X; vn_knife_mount_dowel_spec.py; "
             "vn_knife_hanger_washer_spec.py; vn_knife_hanger_stud_spec.py THREAD_LENGTH_MIN/"
             "INCOMPLETE_TIP_LEN_MAX; cad/config/parts/vn-knife-hanger-stud.yaml "
             "(92314A253) installation_notes ('USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.')"

@@ -338,9 +338,10 @@ _CHANNEL_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(
     sm_summing_lever_spec.PLATE_T,
 )
 # MHA-VN-024 #10-24 cut hex bolt (92314A253) in each knife mount's #25 tap
-# drill over its 8.9173 nominal reach: 45.70 cut length less 35.50 grip
-# and the 96659A104 washer's 1.2827 nominal thickness. Keep this literal,
-# test-pinned to build_sm_summing_assembly, to avoid broad recipe cache keys.
+# drill over its 8.9173 nominal reach: 46.70 cut length less the 36.50 grip
+# to the faced top and the 96659A104 washer's 1.2827 nominal thickness. Keep
+# this literal, test-pinned to build_sm_summing_assembly, to avoid broad
+# recipe cache keys.
 _KNIFE_HANGER_REACH = 8.9173
 # Each MHA-VN-051 dowel pressed to the floor of its knife mount's Ø3.175 ream
 # (sm_knife_mount_spec.PIN_HOLE_DIA, band +0/-0.010: smallest 3.165), its

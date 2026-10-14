@@ -494,8 +494,8 @@ Catalog specifications checked on September 10, 2026:
   a conformity standard; no supplier head tolerance or under-head bearing
   circle bound is inferred. The ordinary hex-head-on-SAE-washer joint is
   accepted practice, not a guaranteed stress or material allowable.
-  Cut the under-head length to **45.70 ±0.15 mm**. Finished-part acceptance
-  retains a threaded tail **MIN 10.62 mm from the cut end**, with
+  Cut the under-head length to **46.70 ±0.15 mm** from the 50.8 mm stock.
+  Finished-part acceptance retains a threaded tail **MIN 10.62 mm from the cut end**, with
   **MAX 1 P cut chamfer**, leaving at least 9.561667 mm full-form tail.
   These are manufactured acceptance constraints, not vendor grades.
   Retain the native cut-end prep **RADIAL 0.60 ±0.05 mm ×45 ±1°** and
@@ -514,25 +514,17 @@ Catalog specifications checked on September 10, 2026:
   Full washer float uses the #10-24 class 2A external-major limits
   **MIN 4.61772 / MAX 4.8006 mm** (0.1818 / 0.1890 in;
   [sourced thread chart](https://www.engineersedge.com/screw_threads_chart.htm)),
-  not the nominal thread major. Radial float is 0.57404 mm; maximum washer
-  OD offset including location and eccentricity is 1.476116732 mm.
-  The Ø17 spotface retains 0.228383268 mm spare and 1.722883268 mm actual
-  continuous floor bearing, without a new neck or radial-play inspection.
-  The governing grip is the model-owned driving dimension
-  `HangerGrip@HangerGripReference`, toleranced in the part builder. The real
-  Hole Wizard spotface depth is equation-driven by `RingHeight` minus that
-  dimension; the sheet imports the stored size and band unchanged. It is
-  neither an unrelated witness nor a drawing-created tolerance.
-  Hole Wizard may store that depth on an internal profile sketch. The
-  builder proves ownership through the wizard's actual sub-features and
-  their dimension walks before binding the equation; it does not assume
-  that the dimension's owner token equals the outer feature name or pin
-  an unstable generated sketch number.
-  The native washer-spotface feature seeds the ANSI-inch socket-cap table:
-  the installed hex-bolt table starts at 1/4 in and has no numbered #10 row.
-  This is a Hole Wizard database seed, not a socket-head hardware choice;
-  explicit bore diameter, spotface diameter and depth overrides retain the
-  approved finished geometry and readbacks. The external-hex bolt remains
+  not the nominal thread major. Radial float is 0.57404 mm; the frame builder
+  adds hanger-pattern mismatch, through-hole drift and washer eccentricity
+  in its top-seat support proof.
+  The washer seats on the frame's whole faced top, except the four proud
+  corner bosses. The governing **36.50 ±0.05 mm** top-to-finished-underside
+  grip is the model's actual `HangerGrip@Crossbar` driving dimension,
+  toleranced in the part builder and imported unchanged by section F-F.
+  There are no hanger spotfaces, separate floor driver or cleanup offset.
+  The two Ø6.045 +0.13/0 clearance holes are drilled from the finished
+  underside; their charged drift grows toward the top washer seat.
+  The external-hex bolt remains
   92314A253. After the bolt's trim equations, its deburr revolve explicitly
   selects the completed closed sketch (mark 0) and captured construction
   axis (mark 4), rather than relying on incidental post-edit selections.
@@ -547,8 +539,8 @@ Catalog specifications checked on September 10, 2026:
   attachment, label and dangling guards remain mandatory. Stale handles
   are a possibility, not a demonstrated root cause; the final-source
   selection and median-plane datum layout require the scoped native proof.
-  The washer seats on a **SPOTFACE Ø17.0 ±0.51**, floor **35.50 ±0.05 mm
-  above the faced crossbar underside**. With the cut bolt, nominal tip
+  The washer seats on the **whole faced top**, **36.50 ±0.05 mm
+  above the finished crossbar underside**. With the 46.70 mm cut bolt, nominal tip
   reach is 8.9173 mm, bounded by 8.349–9.4856 mm. Subtracting one #10-24
   pitch gives minimum full-form engagement 7.290667 mm, above 1.5D =
   7.239 mm. Full-thread depth **9.65 ±0.13 mm** (MIN 9.52) leaves

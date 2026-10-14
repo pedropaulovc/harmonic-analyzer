@@ -29,27 +29,29 @@ def _transform(rotation_rows: list[list[float]]) -> list[float]:
     ]
 
 
-def test_cut_hex_bolt_seats_on_the_new_washer_and_shallow_spotface() -> None:
+def test_cut_hex_bolt_seats_on_the_new_washer_and_faced_crossbar_top() -> None:
     assert hanger_screw.CATALOG_LENGTH == pytest.approx(50.8)
-    assert hanger_screw.LENGTH == hanger_screw.UNDERHEAD_LEN == pytest.approx(45.70)
+    assert hanger_screw.LENGTH == hanger_screw.UNDERHEAD_LEN == pytest.approx(46.70)
     assert hanger_screw.LENGTH_BAND == pytest.approx((0.15, -0.15))
-    assert hanger_screw.LENGTH_MIN == pytest.approx(45.55)
-    assert hanger_screw.LENGTH_MAX == pytest.approx(45.85)
+    assert hanger_screw.LENGTH_MIN == pytest.approx(46.55)
+    assert hanger_screw.LENGTH_MAX == pytest.approx(46.85)
     assert hanger_washer.THICKNESS == pytest.approx(
         (hanger_washer.THICKNESS_MIN + hanger_washer.THICKNESS_MAX) / 2.0
     )
-    assert asm.HANGER_SPOTFACE_Y == pytest.approx(
+    assert not hasattr(asm, "HANGER_SPOTFACE_Y")
+    assert asm.HANGER_WASHER_Y == pytest.approx(
         CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP
     )
-    assert asm.HANGER_WASHER_Y == pytest.approx(asm.HANGER_SPOTFACE_Y)
+    assert asm.HANGER_WASHER_Y == pytest.approx(asm.CROSSBAR_TOP_Y)
+    assert top_frame.HANGER_GRIP == pytest.approx(top_frame.RING_HEIGHT)
     assert asm.HANGER_UNDERHEAD_Y == pytest.approx(
         asm.HANGER_WASHER_Y + hanger_washer.THICKNESS
     )
     assert asm.HANGER_STUD_Y + hanger_screw.UNDERHEAD_LEN == pytest.approx(
         asm.HANGER_UNDERHEAD_Y
     )
-    assert asm.HANGER_WASHER_Y == pytest.approx(1035.2)
-    assert asm.HANGER_UNDERHEAD_Y == pytest.approx(1036.4827)
+    assert asm.HANGER_WASHER_Y == pytest.approx(1036.2)
+    assert asm.HANGER_UNDERHEAD_Y == pytest.approx(1037.4827)
     assert asm.HANGER_STUD_Y == pytest.approx(990.7827)
 
 
@@ -75,7 +77,7 @@ def test_reach_extrema_include_every_cut_length_grip_and_washer_corner() -> None
 @pytest.mark.parametrize(
     ("constant", "value", "message"),
     [
-        ("HANGER_WASHER_Y", 1035.3, "washer lower face"),
+        ("HANGER_WASHER_Y", 1036.3, "washer lower face"),
         ("HANGER_STUD_Y", 990.8, "bolt under-head face"),
         ("HANGER_THREAD_SPARE", -0.01, "useful full-form tail"),
     ],
@@ -120,7 +122,7 @@ def test_instance_readback_seats_both_bearing_faces_at_each_station(
         ("screw", 2, "intended knife station"),
         ("washer", 0, "not coaxial"),
         ("washer", 2, "not coaxial"),
-        ("washer", 1, "lower-face/spotface-floor gap"),
+        ("washer", 1, "lower-face/faced-top gap"),
         ("screw", 1, "under-head/washer-upper-face gap"),
     ],
 )
@@ -209,13 +211,13 @@ def test_washer_seat_pairs_allow_exact_contacts_but_no_solid_overlap() -> None:
         )
         assert summing[pair] == 0.0
         assert harmonic[frozenset(f"sm-summing-1/{part}" for part in pair)] == 0.0
-        floor_pair = frozenset(
+        seat_pair = frozenset(
             (
                 f"sm-summing-1/vn-knife-hanger-washer-{number}",
                 "fr-frame-1/fr-top-frame-1",
             )
         )
-        assert harmonic[floor_pair] == 0.0
+        assert harmonic[seat_pair] == 0.0
 
 
 def test_hanger_axis_validation_accepts_authored_positive_y_axis() -> None:

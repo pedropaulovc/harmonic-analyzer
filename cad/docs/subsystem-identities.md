@@ -306,7 +306,7 @@ next free Number in its category and has no old stem or old Number.
 | added | `mg-wheel-axle-spacer` | MHA-MG-011 | brass sleeve on the MHA-MG-007 axle between the MHA-MG-008 wheel bar and the MHA-VN-057 back washer; its length puts the MHA-MG-005 wheel's rim on the pen-rod line |
 | added | `sm-gooseneck-spring-screw` | MHA-SM-004 | shop-turned slotted fillister screw clamps the counter spring's upper eye to MHA-SM-001's brazed, #6-32 through-tapped end plug |
 | added | `vn-platen-clip-screw` | MHA-VN-059 | four brass #2-56 fillister screws hold the MHA-PD-003 platen clip to the MHA-PD-002 platen in place of MHA-VN-006 |
-| added | `vn-knife-hanger-washer` (new #10 family) | MHA-VN-060 | 18-8 SAE washer 96659A104 under the modified #10-24 hex-head MHA-VN-024 Bolt on the MHA-FR-002 spotface; functional stem reused, retired Number never reused |
+| added | `vn-knife-hanger-washer` (new #10 family) | MHA-VN-060 | 18-8 SAE washer 96659A104 under the modified #10-24 hex-head MHA-VN-024 Bolt on the MHA-FR-002 faced top; functional stem reused, retired Number never reused |
 | retired | `pn-pen-marker` | MHA-PN-003 | replaced by the purchased MHA-VN-065 Sharpie marker |
 | added | `vn-pen-marker` | MHA-VN-065 | purchased Sharpie permanent marker, fine point (regular size), used uncapped; its cap-seat grip lies in the MHA-PN-005 v-block groove |
 | added | `vn-pen-rod-set-screw` | MHA-VN-061 | #4-40 x 3/16 cup-point set screw in the MHA-PN-005 v-block, locking the MHA-PN-004 pen rod's pivot end |

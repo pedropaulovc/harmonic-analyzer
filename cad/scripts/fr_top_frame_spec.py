@@ -83,11 +83,11 @@ def _sag(radius: float) -> float:
     return radius - sqrt(radius**2 - (SET_SCREW_MAJOR_DIA / 2.0) ** 2)
 
 
-# --- Knife-hanger hex-bolt spotfaces and dowel slip holes (crossbar) ----------
+# --- Knife-hanger hex-bolt clearance holes and dowel slip holes (crossbar) ----
 #
 # Each MHA-SM-002 knife mount hangs under the integral crossbar on one
 # cut-to-length #10-24 plain hex bolt (MHA-VN-024). Its SAE washer bears on
-# a shallow TOP spotface; the block's top seat bears on the FINISHED
+# the FACED top plane; the block's top seat bears on the FINISHED
 # underside. The two MHA-VN-051 dowels retain their round-hole/slot scheme:
 # +X locates in a round blind slip hole, -X in a blind slip-width slot.
 # Slot travel absorbs the pair's spacing mismatch (drawing-guidelines.md
@@ -105,53 +105,24 @@ HANGER_CLEARANCE_DIA_PLACES = 3
 HANGER_CLEARANCE_DIA_BAND = (0.13, 0.0)  # (upper, lower), not a supplier guarantee
 HANGER_CLEARANCE_DIA_MIN = HANGER_CLEARANCE_DIA + min(HANGER_CLEARANCE_DIA_BAND)
 HANGER_CLEARANCE_DIA_MAX = HANGER_CLEARANCE_DIA + max(HANGER_CLEARANCE_DIA_BAND)
-# The underside-to-spotfloor grip, not a depth from an as-cast top, controls
-# the bolt reach. The model owns it: HangerGrip, a driving dimension in the
-# hidden HangerGripReference sketch, sets the Hole Wizard spotface depth
-# ("RingHeight" - HangerGrip) and carries the +/-0.05 band; the sheet imports it.
-HANGER_GRIP = 35.50
+# The finished top-to-underside grip controls the bolt reach. User ruling
+# 2026-10-14: the whole top except the four corner bosses is faced on the
+# plane the model already carries, so the grip is the crossbar's own
+# full-height extrude, HangerGrip@Crossbar. It is driven by the "RingHeight"
+# global, carries the +/-0.05 band, and the sheet imports it in section F-F.
+HANGER_GRIP = RING_HEIGHT
 HANGER_GRIP_PLACES = 2
 HANGER_GRIP_TOL = 0.05
 # The band sets the bolt's reach into the knife mount's tap
 # (build_sm_summing_assembly HANGER_REACH_MIN/MAX), so the callout names it.
 HANGER_GRIP_CALLOUT = (
-    "2X SPOTFACE FLOOR FROM\nFINISHED UNDERSIDE;\nSETS MHA-VN-024\nTHREAD ENGAGEMENT"
+    "FINISHED TOP AND\nUNDERSIDE SEATS;\nSETS MHA-VN-024\nTHREAD ENGAGEMENT"
 )
-HANGER_GRIP_SKETCH = "HangerGripReference"
-# Hidden model sketches whose driving dimensions the sheet imports per view.
-REFERENCE_SKETCHES = (HANGER_GRIP_SKETCH,)
-HANGER_SPOTFACE_DIA = 17.0
-HANGER_SPOTFACE_DIA_PLACES = 2
-HANGER_SPOTFACE_DEPTH = RING_HEIGHT - HANGER_GRIP  # 1.0 nominal only
-HANGER_SPOTFACE_FLOOR_Y = -HALF_H + HANGER_GRIP  # +17.25
-HANGER_SPOTFACE_DIA_MIN = HANGER_SPOTFACE_DIA - _XX  # 16.49
-HANGER_SPOTFACE_DIA_MAX = HANGER_SPOTFACE_DIA + _XX  # 17.51
-HANGER_SPOTFACE_CLEANUP_MIN = RING_HEIGHT - _X - (HANGER_GRIP + HANGER_GRIP_TOL)
-# The wizard seed only names a native table row, not the hardware (the hex
-# bolt above on its washer): every cut diameter/depth below is an explicit
-# override, read back after the build. The installed ANSI Inch Hex Bolt counterbore
-# table (swStandardAnsiInchHexBolt, AI_DATA_HBOLT) starts at 1/4 and has no
-# #10 row, so CreateFeature returned None for it on the farm. The socket-head
-# counterbore table (AI_DATA_SHCSCREW) carries #10, in the through-all,
-# three-override pattern of the #4/#8 socket counterbores on main
-# (dt_cone_swing_platform_spec, ch_rocker_arm_tl_c_stop_bar_spec).
-HANGER_HOLE_SPEC = HoleSpec(
-    "counterbore_socket",
-    "#10",
-    fit="loose",
-    overrides_mm={
-        "HoleDiameter": HANGER_CLEARANCE_DIA,
-        "CounterBoreDiameter": HANGER_SPOTFACE_DIA,
-        "CounterBoreDepth": HANGER_SPOTFACE_DEPTH,
-    },
-)
-# A native counterbore-shaped Hole Wizard override represents the spotface.
-# The drawing retains its associative diameters but removes the cast-top
-# depth: the finished-underside grip is its sole axial specification.
-HANGER_SPOTFACE_CALLOUT_PRECISION = {
-    "hw-thruholedia": HANGER_CLEARANCE_DIA_PLACES,
-    "hw-cbdia": HANGER_SPOTFACE_DIA_PLACES,
-}
+# A plain native Hole Wizard clearance row, drilled through from the faced
+# underside. A plain hole ignores HoleFit, so _holes.wizard_holes writes the
+# pinned #10 loose 6.045 to both diameter knobs whenever the table seeds
+# another size; the build reads the exact cut diameter back.
+HANGER_HOLE_SPEC = HoleSpec("clearance", "#10", fit="loose")
 # Washer bounds are ASME B18.21.1 Table 11, owned by the purchased-part spec.
 # Full washer float uses the sourced UNC 2A minimum shank diameter, not
 # nominal thread-major geometry, charging the full washer eccentricity.
@@ -159,8 +130,8 @@ HANGER_WASHER_FLOAT_MAX = (HANGER_WASHER.ID_MAX - HANGER_SCREW.SHANK_DIA_MIN) / 
 HANGER_WASHER_CONCENTRIC_ANNULUS_MIN = (
     HANGER_WASHER.OD_MIN - HANGER_CLEARANCE_DIA_MAX
 ) / 2.0
-if HANGER_SPOTFACE_CLEANUP_MIN <= 0.0 or HANGER_WASHER_CONCENTRIC_ANNULUS_MIN <= 0.0:
-    raise AssertionError("knife-hanger spotface lacks cleanup or washer bearing")
+if HANGER_WASHER_CONCENTRIC_ANNULUS_MIN <= 0.0:
+    raise AssertionError("knife-hanger washer lacks a bearing annulus round its hole")
 # The dowel slip hole: a slip on the pin's catalogue diameter at 0.02..0.10
 # diametral clearance (the dt_pinion_cam_spec slip band), reamed to an
 # explicit +/-0.03 band and printed .XXX: 0.0274..0.0925.
@@ -279,12 +250,13 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
 
 # --- Machining-required surfaces ---------------------------------------------
 #
-# These six faces own native finish controls. The right (west) rail top
-# between its bosses, which seats both MHA-CH-007 keepers, and the underside
-# plane between the bosses, which seats both MHA-SM-002 knife mounts, carry
-# SEAT_UM in the linked facing notes below: each is one plane, so its note
-# names the extent instead of a split-line region. The locating-seat finish
-# is not a general grade.
+# These six faces own native finish controls. The top plane between the
+# corner bosses, which seats both MHA-CH-007 keepers on the right (west) rail
+# and both MHA-VN-060 washers on the crossbar, and the underside plane between
+# the bosses, which seats both MHA-SM-002 knife mounts, carry SEAT_UM in the
+# linked facing notes below: each is one plane, so its note names the extent
+# instead of a split-line region. The locating-seat finish is not a general
+# grade.
 #
 # * The four tube-socket bores take the MHA-FR-003 columns on a match-fitted close
 #   hand-slip; a cast bore wall cannot hold that fit and would score the tube.
@@ -295,8 +267,6 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
 #   is pinched by the set screw against it.
 # * The set-screw boss's spot face is the machined face the set tap starts
 #   square from, so the cup point bears on the post along the tap axis.
-# * The two top washer spotfloors carry no finish: each MHA-VN-060 washer
-#   clamps there, a face that neither runs nor locates.
 #
 # SEAT grade throughout: nothing runs on these surfaces continuously, so the
 # commercial machine finish is what the fit needs. Each controlled face has
@@ -337,7 +307,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "WebInnerWidth",
         "WebInnerDepth",
     },
-    "WebRing": {"RingHeight"},
+    "Crossbar": {"HangerGrip"},
     "BossUpProfile": {"C0Dia"},
     "BossesUpper": {"BossTopExtent"},
     "BossesLower": {"BossBottomExtent"},
@@ -357,7 +327,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SetSpotProfile": {"SetSpotDia"},
     "GooseneckTap": {"SetTapZ"},
     "GooseneckProfile": {"GnDia", "GnX", "GnZ"},
-    # The hanger-spotface and keeper-tap placement dims (StudFrontX ...,
+    # The hanger-hole and keeper-tap placement dims (StudFrontX ...,
     # KeeperFrontX ...) are NOT marked: a Hole Wizard placement sketch
     # measures from the origin -- mid-air on the print -- so sheet 3
     # dimensions those stations from the socket bore axes with sheet-derived
@@ -371,7 +341,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HangerPinProfile": {"HangerPinHoleDia"},
     "HangerPinHoles": {"HangerPinHoleDepth"},
     "HangerSlotProfile": {"HangerSlotWidth"},
-    HANGER_GRIP_SKETCH: {"HangerGrip"},
 }
 
 
@@ -389,11 +358,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # fit-up-located keeper feet, not independently located to the general band.
 # More places appear only where a fit lives there -- the cap recess diameter
 # and depth carry the bilateral bands above, the gooseneck bore prints the
-# clearance a purchased post is set into, and the dowel slip hole and slot
-# width are reamed to their own +/-0.03 band at three places.
+# clearance a purchased post is set into, the finished grip sets the hanger
+# bolt's thread engagement, and the dowel slip hole and slot width are reamed
+# to their own +/-0.03 band at three places.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OuterProfile": {"Width": 1, "Depth": 1, "WinWidth": 1, "WinDepth": 1},
-    "WebRing": {"RingHeight": 1},
+    "Crossbar": {"HangerGrip": HANGER_GRIP_PLACES},
     "BossUpProfile": {"C0Dia": 1},
     "BoreProfile": {"B0Dia": 1},
     "CounterboreRearProfile": {"CB1Dia": 1},
@@ -408,7 +378,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HangerPinProfile": {"HangerPinHoleDia": HANGER_PIN_HOLE_DIA_PLACES},
     "HangerPinHoles": {"HangerPinHoleDepth": HANGER_PIN_HOLE_DEPTH_PLACES},
     "HangerSlotProfile": {"HangerSlotWidth": HANGER_SLOT_WIDTH_PLACES},
-    HANGER_GRIP_SKETCH: {"HangerGrip": HANGER_GRIP_PLACES},
 }
 
 # The drawing reads this flat view back off the sheet: a dimension name is
@@ -499,7 +468,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "set-screw thread length": 1,
     "set-screw boss face from bore axis": 1,
     # Sheet 6, UNDERSIDE: the junction lands and the knife-hanger section F-F
-    # -- the native spotfloor grip is imported, while dowel stations and slot
+    # -- the native finished-top grip is imported, while dowel stations and slot
     # length are measured associatively from their visible model features.
     "crossbar junction land": 1,
     "crossbar pocket length": 1,
@@ -543,17 +512,19 @@ DRAWING_NOTES = (
     "RETAIN CORNER AND ORIENTATION MATCH MARKS.\n"
     "CONVEX CASTING EDGES C2 X 45 UNLESS NOTED; HOLE EDGES PER TITLE BLOCK."
 )
-# User ruling 2026-10-11: the whole right (west) rail top between the two
-# corner bosses is faced, so both keeper feet land on one flat face wherever
-# fit-up puts them; no split-line regions.  Its own property, placed beside
-# the keeper callout on HOLES-SOCKETS.  The last row states why the flatness
-# is held: the two keepers' lug bores carry one fulcrum shaft in a running fit
-# (blind machinist review, farm 0fbfc4d75).
+# User rulings 2026-10-11 and 2026-10-14: the whole top plane between the four
+# corner bosses is faced, so both keeper feet land on one flat right-rail face
+# wherever fit-up puts them and both washers bear on the crossbar's faced top;
+# no split-line regions and no geometry change: the model's top is the
+# finished plane.  Its own property, placed beside the keeper callout on
+# HOLES-SOCKETS.  The flatness stays on the keeper rail and the last row
+# states why it is held: the two keepers' lug bores carry one fulcrum shaft
+# in a running fit (blind machinist review, farm 0fbfc4d75).
 DRAWING_NOTES_B = (
-    "RIGHT RAIL TOP BETWEEN BOSSES\n"
-    "(MHA-CH-007 KEEPER SEATS):\n"
-    f"FLAT WITHIN {KEEPER_SEAT_FLATNESS_BUDGET_MM:.2f}, Ra {SEAT_UM:.1f} UM,\n"
-    "SO BOTH KEEPER BORES ALIGN."
+    "WHOLE TOP EXCEPT 4 BOSSES:\n"
+    f"Ra {SEAT_UM:.1f} UM; RIGHT RAIL FLAT\n"
+    f"WITHIN {KEEPER_SEAT_FLATNESS_BUDGET_MM:.2f} SO BOTH KEEPER\n"
+    "(MHA-CH-007) BORES ALIGN."
 )
 # User ruling 2026-10-12 (reading (i)): every face on the 999.7 underside
 # plane between the bosses is faced at the seat finish -- the rail web

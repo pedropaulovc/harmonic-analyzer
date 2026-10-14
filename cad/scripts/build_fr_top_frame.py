@@ -18,18 +18,19 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   The O25.5 column bores and O27.5 cap recesses stay unchanged. Four
   stock 1-3/4 in cross screws seat flush in front/rear O9 counterbores and clear
   both tube walls into the far casting wall/web through #10-32 taps.
-* The whole side-rail TOP FLANGE top of the keeper rail, between its two
-  corner bosses, is faced flat within the keeper-owned 0.04 zone at the
-  Ra 3.2 locating-seat finish (user ruling 2026-10-11), so both keeper feet
+* The whole TOP plane between the four corner bosses -- rail flange tops,
+  crossbar and gussets -- is faced at the Ra 3.2 locating-seat finish (user
+  rulings 2026-10-11 and 2026-10-14, one linked manufacturing note), the
+  keeper rail flat within the keeper-owned 0.04 zone so both keeper feet
   land on one face wherever fit-up puts them. The nominal rail-top plane
   stays fixed; the B-B top flange thickness (TYP, .X, minimum 7.2) is the
   finished flange under it.
 * Integral crossbar 25 wide at x -27.5..-2.5 spanning the window along Z,
   flush with BOTH faces at its junctions (the faced underside 999.7 is the
   knife-mount seat plane), with 18 x 18 plan gussets at all four rail
-  junctions and, at z 3.088 -/+ 87.06, a #10 loose through-hole with a
-  washer spotface per knife mount. The cut-to-length #10-24 hex bolt bears
-  on a 96659A104 washer; the unchanged 98381A473 dowel slips into the
+  junctions and, at z 3.088 -/+ 87.06, a plain #10 loose through-hole per
+  knife mount. The cut-to-length #10-24 hex bolt bears on a 96659A104
+  washer on the faced top; the unchanged 98381A473 dowel slips into the
   blind underside hole/slot. Over its middle (|z| <= 69, short of the
   knife-mount seats) the bar is a T like the rails: the 25-wide, 8-tall
   top flange over a 13.0 web centred on the knife line through the
@@ -45,12 +46,9 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   option C); the slip holes and slots are cut blind from it and located
   from each #10 hole's axis there (sheet 6
   dimensions them in the underside view). Each axis is therefore true at
-  the knife-mount seat and its drift grows toward the top. The frame is
-  then turned over and each washer spotface is cut from the top, piloted
-  on its drilled hole (sheet 3 states both entries). The native spotfloor
-  grip is 35.50 +/-0.05 from the FINISHED underside, not from the cast top:
-  HangerGrip, a driving dimension in the hidden HangerGripReference sketch,
-  sets the spotface wizard's depth ("RingHeight" - HangerGrip) and carries
+  the knife-mount seat and its drift grows toward the top. The finished
+  top-to-underside grip is 36.50 +/-0.05: HangerGrip, the crossbar's own
+  full-height extrude depth, is driven by the RingHeight global and carries
   the band the sheet imports.
   Datum D on the native crossbar width establishes BOTH-face median plane;
   the hanger axes' linear position zone centres them within +/-0.05 of it.
@@ -73,11 +71,12 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   every other external convex edge (flange undersides, web bottoms, lands,
   crossbar, hub rib, boss rims), and C1 x 45 lead-ins on the bore TOP ends
   only. The R22.5 bosses bulge 5.4 beyond the side rails and 3.5 beyond
-  the front/rear rails, but no longer reach the plan corners (25.56 from
-  their centres): window corners and short outer-corner rim runs remain.
-  Edges too short, too close to a feature or under a knife-mount seat for
-  C2 stay sharp (listed in _external_edge_breaks); hole and bore low ends
-  stay sharp.
+  the front/rear rails, but do not reach the rectangular flange's plan
+  corners (25.56 from their centres), so each corner is cropped back to its
+  boss barrel (user ruling 2026-10-14): window corners remain square and
+  the outer rim runs die into the barrels. Edges too short, too close to
+  a feature or under a knife-mount seat for C2 stay sharp (listed in
+  _external_edge_breaks); hole and bore low ends stay sharp.
 
 Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 (rails y -18.25..+18.25 local). Sketches on the Top plane use the
@@ -86,15 +85,14 @@ Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 planes mirror sketch x -- see the gusset/boss sites). Build order
 (ADDITIVE T-section -- the web/flange rings are extruded, not pocketed):
 web ring -> crossbar junction lands -> top-flange ring -> hub rib
-restore -> crossbar+gussets -> crossbar T pockets -> corner bosses
-(up/down pair) -> hub boss + V-gussets -> set-screw boss + spot face ->
-counterbores -> column bores -> gooseneck bore -> wizard holes (#10 loose
-hanger holes / washer spotfaces) -> HangerGrip reference -> dowel slip
-holes -> wizard holes (side-screw
-taps, set-screw tap, keeper taps) -> internal T-root fillets (R3) ->
-external top-rim breaks (C2) -> C1 bore top lead-ins -> remaining
-external edge breaks (C2, one feature per connected chain: rail runs,
-crossbar, west window, hub rail, outer corners, boss rims).
+restore -> crossbar+gussets -> crossbar T pockets -> flange corner
+crops -> corner bosses (up/down pair) -> hub boss + V-gussets ->
+set-screw boss and spot face -> counterbores -> column bores -> gooseneck
+bore -> wizard holes (#10 loose hanger clearance holes) -> dowel slip holes -> wizard
+holes (side-screw taps, set-screw tap, keeper taps) -> internal T-root
+fillets (R3) -> external top-rim breaks (C2) -> C1 bore top lead-ins ->
+remaining external edge breaks (C2, one feature per connected chain: rail
+runs, crossbar, west window, hub rail, boss rims).
 Wizard holes come after the face cuts so every seat face is final; the
 edge breaks follow the solid features.
 Analytic volume checks after every feature; boss additions and top-rim
@@ -126,7 +124,6 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
-    blank_reference_sketches,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
@@ -171,7 +168,6 @@ from fr_top_frame_spec import (
     DRAWING_PRECISION,
     DRAWING_REFERENCE_PRECISION,
     FLANGE_THICKNESS_MM,
-    FLANGE_THICKNESS_PLACES,
     HANGER_CROSSBAR_WIDTH,
     HANGER_CROSSBAR_WIDTH_PLACES,
     HANGER_CROSSBAR_CENTER_TOL,
@@ -183,10 +179,6 @@ from fr_top_frame_spec import (
     HUB_SET_BOSS_W,
     HUB_SET_SPOT_DIA,
     HUB_SET_SPOT_FROM_AXIS,
-    HANGER_SPOTFACE_DEPTH,
-    HANGER_SPOTFACE_DIA,
-    HANGER_SPOTFACE_DIA_MIN,
-    HANGER_SPOTFACE_DIA_MAX,
     HANGER_WASHER,
     HANGER_WASHER_FLOAT_MAX,
     HANGER_WASHER_CONCENTRIC_ANNULUS_MIN,
@@ -196,7 +188,6 @@ from fr_top_frame_spec import (
     HANGER_CLEARANCE_DIA_PLACES,
     HANGER_GRIP,
     HANGER_GRIP_TOL,
-    HANGER_GRIP_SKETCH,
     HANGER_HOLE_SPEC,
     HANGER_PIN_HOLE_DEPTH,
     HANGER_PIN_HOLE_DEPTH_PLACES,
@@ -219,7 +210,6 @@ from fr_top_frame_spec import (
     PRINTED_LINEAR_BAND_MM,
     HANGER_PIN_SLIP_CLEARANCE_MAX,
     REAR_COLUMN_Z,
-    REFERENCE_SKETCHES,
     SET_SCREW_THREAD,
     RING_HEIGHT,
     SURFACE_FINISHES,
@@ -475,6 +465,67 @@ BAR_WEB_X0 = HANGER_X - WEB_T / 2.0  # -21.5
 BAR_WEB_X1 = HANGER_X + WEB_T / 2.0  # -8.5
 BAR_POCKET_Z = 69.0  # pocket length 138.0, centred on the crossbar
 
+# Flange corner crops (user ruling 2026-10-14): the R22.5 corner bosses stop
+# short of the rectangular flange's plan corners, 25.56 from each boss axis,
+# which left a flange nib outside every barrel -- bounded by the two outer
+# faces from their barrel intersections to the corner and by the barrel arc
+# between them. Each corner is cropped by one triangle cut through the band
+# before the bosses: its chord ends CORNER_CROP_INSET inside each outer
+# face's barrel intersection, so the whole chord lies inside the barrel, and
+# its apex and legs overrun the plan corner by CORNER_CROP_OVERRUN, so no
+# sketch edge lies on a face. The boss union then restores the barrel
+# segment inside the chord: no flange stays outside a barrel, and the
+# barrels, counterbores and bores are unchanged.
+_BOSS_R = BOSS_DIA / 2.0
+CORNER_SIDE_CUT = math.sqrt(_BOSS_R**2 - (RAIL_W_SIDE / 2.0) ** 2)  # 14.623
+CORNER_FR_CUT = math.sqrt(_BOSS_R**2 - (RAIL_W_FR / 2.0) ** 2)  # 12.052
+CORNER_CROP_INSET = 0.5
+CORNER_CROP_OVERRUN = 1.0
+# The chord's ends, as plan offsets (x, z) from the boss axis outward: on the
+# side-rail face below its barrel intersection, on the front/rear face
+# inboard of its own.
+_CROP_SIDE_END = (RAIL_W_SIDE / 2.0, CORNER_SIDE_CUT - CORNER_CROP_INSET)
+_CROP_FR_END = (CORNER_FR_CUT - CORNER_CROP_INSET, RAIL_W_FR / 2.0)
+_CROP_SLOPE = (_CROP_FR_END[1] - _CROP_SIDE_END[1]) / (
+    _CROP_SIDE_END[0] - _CROP_FR_END[0]
+)
+# The sketched triangle: apex past the plan corner, then the chord carried
+# past the side and front/rear faces.
+CORNER_CROP_TRIANGLE = (
+    (RAIL_W_SIDE / 2.0 + CORNER_CROP_OVERRUN, RAIL_W_FR / 2.0 + CORNER_CROP_OVERRUN),
+    (
+        RAIL_W_SIDE / 2.0 + CORNER_CROP_OVERRUN,
+        _CROP_SIDE_END[1] - CORNER_CROP_OVERRUN * _CROP_SLOPE,
+    ),
+    (
+        _CROP_FR_END[0] - CORNER_CROP_OVERRUN / _CROP_SLOPE,
+        RAIL_W_FR / 2.0 + CORNER_CROP_OVERRUN,
+    ),
+)
+# Flange the triangle removes (its part inside the plan rectangle), the nib
+# outside the barrel, and the difference the boss union restores.
+CORNER_CROP_AREA = (
+    (RAIL_W_FR / 2.0 - _CROP_SIDE_END[1]) * (RAIL_W_SIDE / 2.0 - _CROP_FR_END[0]) / 2.0
+)  # 13.528
+_NIB_CHORD = math.hypot(
+    RAIL_W_SIDE / 2.0 - CORNER_FR_CUT, RAIL_W_FR / 2.0 - CORNER_SIDE_CUT
+)
+_NIB_ANGLE = 2.0 * math.asin(_NIB_CHORD / BOSS_DIA)
+CORNER_NIB_AREA = (RAIL_W_FR / 2.0 - CORNER_SIDE_CUT) * (
+    RAIL_W_SIDE / 2.0 - CORNER_FR_CUT
+) / 2.0 - _BOSS_R**2 / 2.0 * (_NIB_ANGLE - math.sin(_NIB_ANGLE))  # 9.935
+CORNER_CROP_IN_BOSS = CORNER_CROP_AREA - CORNER_NIB_AREA  # 3.593
+if not (
+    math.hypot(RAIL_W_SIDE / 2.0, RAIL_W_FR / 2.0) > _BOSS_R
+    and math.hypot(*_CROP_SIDE_END) < _BOSS_R
+    and math.hypot(*_CROP_FR_END) < _BOSS_R
+    and min(min(point) for point in CORNER_CROP_TRIANGLE) > WEB_T / 2.0
+):
+    raise AssertionError(
+        "flange corner crop needs a plan corner outside the barrel, its chord"
+        " inside it and the triangle clear of the web ring"
+    )
+
 THROUGH_CUT_DEPTH = 110.0  # mid-plane total; > boss stack (47.3)
 
 # --- Edge finishing ----------------------------------------------------------
@@ -522,14 +573,14 @@ for _label, _land in SET_SPOT_LAND_MIN.items():
 
 if abs(FRONT_COLUMN_Z + REAR_COLUMN_Z) > 1e-12 or abs(FRAME_CENTER_Z) > 1e-12:
     raise AssertionError("top-frame assumes a symmetric column span about z 0")
-if STUD_Z_REAR + HANGER_SPOTFACE_DIA_MAX / 2.0 >= INNER_Z + GUSSET:
-    raise AssertionError("rear hanger spotface escapes the junction material")
+if STUD_Z_REAR + HANGER_WASHER.OD_MAX / 2.0 >= INNER_Z + GUSSET:
+    raise AssertionError("rear hanger washer overhangs the junction material")
 # Dowel slip holes and slots (drawing-guidelines.md rule 17 (walls and webs),
 # print-worst): the largest reamed hole
 # and the longest slot keep a wall to the crossbar's +X / -X face and to the
 # largest drilled screw clearance hole with the round hole's station at its
 # .XXX limit and the slot's at that plus its own .XXX from the round hole
-# (0.26); their blind floors stay below the spotface floor, so neither
+# (0.26); their blind floors stay below the finished top, so neither
 # meets the washer seat. The #10 holes are drilled from the faced underside
 # and the dowel holes/slots cut from it. Every hole's drift is greatest at
 # the deepest printed blind floor; charge both axes toward each other.
@@ -592,8 +643,8 @@ for _label, _value in (
             f"knife-mount dowel slip {_label}: {_value:.3f} after drill drift"
         )
 for _label, _value in (
-    ("hole floor below the spotface floor", PIN_HOLE_FLOOR_MARGIN),
-    ("slot floor below the spotface floor", SLOT_FLOOR_MARGIN),
+    ("hole floor below the finished top", PIN_HOLE_FLOOR_MARGIN),
+    ("slot floor below the finished top", SLOT_FLOOR_MARGIN),
 ):
     if _value < 2.0:
         raise AssertionError(f"knife-mount dowel slip {_label}: {_value:.3f}")
@@ -603,56 +654,22 @@ for _label, _value in (
 # each pocket end a full band of its printed .X length out (the length's
 # band, then as much again for the pocket's centring), the largest printed
 # hole and the 0.3 deg drill drift from the faced underside. The through
-# hole's longest path to the highest pocket roof is charged; the top
-# spotface is piloted on the hole after its full as-cast-height drift.
+# hole's longest path to the highest pocket roof is charged.
 _POCKET_STATION = min(abs(STUD_Z_FRONT), abs(STUD_Z_REAR)) - PRINTED_LINEAR_BAND_MM[1]
 _POCKET_LENGTH_PLACES = DRAWING_REFERENCE_PRECISION["crossbar pocket length"]
 _POCKET_END = (
     round(2.0 * BAR_POCKET_Z, _POCKET_LENGTH_PLACES) / 2.0
     + 2.0 * PRINTED_LINEAR_BAND_MM[_POCKET_LENGTH_PLACES]
 )  # 70.6
-HANGER_DRIFT_AT_TOP = DRILL_DRIFT_PER_MM * (RING_HEIGHT + PRINTED_LINEAR_BAND_MM[1])
-HANGER_SPOTFACE_BAR_WALL = (
-    HANGER_BAR_HALF_WIDTH_MIN
-    - HANGER_CROSSBAR_CENTER_TOL
-    - HANGER_SPOTFACE_DIA_MAX / 2.0
-    - HANGER_DRIFT_AT_TOP
-)
+# The plain through hole's drift is greatest at the finished top, its
+# farthest printed height above the underside entry.
+HANGER_DRIFT_AT_TOP = DRILL_DRIFT_PER_MM * (HANGER_GRIP + HANGER_GRIP_TOL)
 # Fore/aft outer rail faces: charge the half-width band and, conservatively,
 # the full socket-pitch band for the far face measured from the upper socket.
 _FR_RAIL_HALF_WIDTH_MIN = (
     RAIL_W_FR
     - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["front rear flange width"]]
 ) / 2.0
-_HANGER_Z_RADIAL_ENVELOPE = (
-    PRINTED_LINEAR_BAND_MM[1] + HANGER_SPOTFACE_DIA_MAX / 2.0 + HANGER_DRIFT_AT_TOP
-)
-_HANGER_SPOTFACE_FRONT_END_WALL = min(
-    station - FRONT_COLUMN_Z + _FR_RAIL_HALF_WIDTH_MIN - _HANGER_Z_RADIAL_ENVELOPE
-    for station in (STUD_Z_FRONT, STUD_Z_REAR)
-)
-HANGER_SPOTFACE_OUTER_END_WALL = min(
-    _HANGER_SPOTFACE_FRONT_END_WALL,
-    *(
-        REAR_COLUMN_Z
-        - station
-        + _FR_RAIL_HALF_WIDTH_MIN
-        - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["socket vertical pitch"]]
-        - _HANGER_Z_RADIAL_ENVELOPE
-        for station in (STUD_Z_FRONT, STUD_Z_REAR)
-    ),
-)
-# The blind dowels overlap the spotface in plan only; the axial floor web
-# above them is proven separately. The pockets also stay below the seat.
-HANGER_SPOTFACE_POCKET_ROOF_WEB = (
-    HANGER_GRIP
-    - HANGER_GRIP_TOL
-    - (
-        RING_HEIGHT
-        + PRINTED_LINEAR_BAND_MM[1]
-        - (FLANGE - PRINTED_LINEAR_BAND_MM[FLANGE_THICKNESS_PLACES])
-    )
-)
 # Match the assembly's tap/dowel mismatch without importing a COM recipe.
 _HANGER_PAIR_SHIFT = HANGER_PIN_SLIP_CLEARANCE_MAX + HANGER_SLOT_POSITION_TOL / 2.0
 HANGER_SEAT_BOLT_MISMATCH = math.hypot(
@@ -664,41 +681,64 @@ HANGER_SEAT_BOLT_MISMATCH = math.hypot(
     + KNIFE_MOUNT.STUD_TAP_POSITION_TOL / 2.0
     + _HANGER_PAIR_SHIFT / 2.0,
 )
-HANGER_SPOTFACE_WASHER_OFFSET_MAX = (
+# The washer's centre wanders from the nominal axis by its own float on the
+# bolt, the bolt's seat mismatch, the hole's drift at the top and the
+# washer's own OD/ID runout.
+HANGER_WASHER_OFFSET_MAX = (
     HANGER_WASHER_FLOAT_MAX
     + HANGER_SEAT_BOLT_MISMATCH
     + HANGER_DRIFT_AT_TOP
     + HANGER_WASHER.OD_ID_RUNOUT_MAX
 )
-HANGER_SPOTFACE_WASHER_SUPPORT_MIN = (
-    HANGER_SPOTFACE_DIA_MIN - HANGER_WASHER.OD_MAX
-) / 2.0 - HANGER_SPOTFACE_WASHER_OFFSET_MAX
+_HANGER_WASHER_REACH = HANGER_WASHER.OD_MAX / 2.0 + HANGER_WASHER_OFFSET_MAX
+# Each washer bears wholly on the faced top, inside the crossbar's top-rim
+# C2 at its widest printed leg: conservatively the plain bar's narrowest
+# printed half width, ignoring the gusset spread at both stations.
+HANGER_WASHER_BAR_TOP_MARGIN = (
+    HANGER_BAR_HALF_WIDTH_MIN
+    - HANGER_CROSSBAR_CENTER_TOL
+    - (
+        round(EDGE_CHAMFER, DRAWING_REFERENCE_PRECISION["top rim chamfer"])
+        + PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["top rim chamfer"]]
+    )
+    - _HANGER_WASHER_REACH
+)
+_HANGER_WASHER_Z_REACH = PRINTED_LINEAR_BAND_MM[1] + _HANGER_WASHER_REACH
+_HANGER_WASHER_FRONT_END_WALL = min(
+    station - FRONT_COLUMN_Z + _FR_RAIL_HALF_WIDTH_MIN - _HANGER_WASHER_Z_REACH
+    for station in (STUD_Z_FRONT, STUD_Z_REAR)
+)
+HANGER_WASHER_OUTER_END_WALL = min(
+    _HANGER_WASHER_FRONT_END_WALL,
+    *(
+        REAR_COLUMN_Z
+        - station
+        + _FR_RAIL_HALF_WIDTH_MIN
+        - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["socket vertical pitch"]]
+        - _HANGER_WASHER_Z_REACH
+        for station in (STUD_Z_FRONT, STUD_Z_REAR)
+    ),
+)
 # Pure full-annulus contact geometry, not a preload/material strength claim.
 HANGER_WASHER_BEARING_MIN = (
-    HANGER_WASHER_CONCENTRIC_ANNULUS_MIN - HANGER_SPOTFACE_WASHER_OFFSET_MAX
+    HANGER_WASHER_CONCENTRIC_ANNULUS_MIN - HANGER_WASHER_OFFSET_MAX
 )
 for _label, _value, _minimum in (
-    ("spotface to crossbar faces", HANGER_SPOTFACE_BAR_WALL, 2.0),
-    ("spotface to outer rail ends", HANGER_SPOTFACE_OUTER_END_WALL, 2.0),
-    ("spotface over pocket roof", HANGER_SPOTFACE_POCKET_ROOF_WEB, 2.0),
     (
-        "washer full support on smallest spotface",
-        HANGER_SPOTFACE_WASHER_SUPPORT_MIN,
+        "washer full support inside the crossbar top breaks",
+        HANGER_WASHER_BAR_TOP_MARGIN,
         0.0,
     ),
+    ("washer to outer rail ends", HANGER_WASHER_OUTER_END_WALL, 2.0),
     ("washer continuous bearing annulus", HANGER_WASHER_BEARING_MIN, 0.0),
 ):
     if _value < _minimum:
         raise AssertionError(f"knife-hanger {_label}: {_value:.3f} below {_minimum:g}")
 BAR_POCKET_HOLE_WALLS = {
-    "hanger spotface": _POCKET_STATION
-    - HANGER_SPOTFACE_DIA_MAX / 2.0
-    - HANGER_DRIFT_AT_TOP
-    - _POCKET_END,
     "hanger clearance hole": _POCKET_STATION
     - _CLEARANCE_MAX_R
     - DRILL_DRIFT_PER_MM
-    * (RING_HEIGHT + PRINTED_LINEAR_BAND_MM[1] - (FLANGE - PRINTED_LINEAR_BAND_MM[1]))
+    * (HANGER_GRIP + HANGER_GRIP_TOL - (FLANGE - PRINTED_LINEAR_BAND_MM[1]))
     - _POCKET_END,
     "dowel slip hole": _POCKET_STATION
     - HANGER_PIN_X_TOL  # SAME Z at the round hole's general .XXX band
@@ -1215,14 +1255,6 @@ def _in_web_plan(x: float, z: float) -> bool:
     )
 
 
-def _in_flange_plan(x: float, z: float) -> bool:
-    """Top-flange ring plan membership."""
-    ax, az = abs(x), abs(z)
-    return (INNER_X <= ax <= OUTER_X and az <= OUTER_Z) or (
-        INNER_Z <= az <= OUTER_Z and ax <= OUTER_X
-    )
-
-
 def _circle_cap_area(radius: float, offset: float) -> float:
     """Area beyond a chord ``offset`` from the circle centre."""
     if offset >= radius:
@@ -1237,9 +1269,11 @@ def _boss_add_volumes() -> tuple[float, float]:
 
     The centred ring's outer rectangle clips the NE circle quadrant; its
     inner window clips the equal SW quadrant. Their corner overlaps cancel,
-    leaving circle area minus the two outer-face circular caps. Web material
-    spans the full band, flange-only material spans its top 8 mm, and the
-    remaining caps have no rail material. All four corners match by symmetry.
+    leaving circle area minus the two outer-face circular caps, less the
+    flange corner crop's part inside the chord (CORNER_CROP_IN_BOSS), which
+    the boss refills. Web material spans the full band, flange-only material
+    spans its top 8 mm, and the remaining caps and the cropped segment have
+    no rail material. All four corners match by symmetry.
     """
     radius = BOSS_DIA / 2.0
     circle = math.pi * radius**2
@@ -1248,6 +1282,7 @@ def _boss_add_volumes() -> tuple[float, float]:
         circle
         - _circle_cap_area(radius, RAIL_W_SIDE / 2.0)
         - _circle_cap_area(radius, RAIL_W_FR / 2.0)
+        - CORNER_CROP_IN_BOSS
     )
     up = (
         BOSS_ABOVE * web
@@ -1388,12 +1423,13 @@ def _top_rim_removal() -> tuple[float, float]:
     """Exact (outer, window) C2 x 45 removals for the smaller-boss topology.
 
     R22.5 < hypot(17.1, 19) = 25.56: neither window corner nor outer rail
-    corner ends on a boss. Outer faces intersect the barrel only near its
-    centre, leaving four central runs PLUS eight short corner runs. The
-    window rims are uninterrupted up to their square corners. Even their
-    2 mm expanded chamfer corners miss the boss: hypot(15.1, 17) > R22.5.
-    Outer strip areas exclude the proud cylinders analytically; the square
-    outer corners and the windows' 90/135-degree mitres are included.
+    corner reaches a boss, and the flange corner crops leave no flange
+    outside the barrels, so each outer face runs barrel to barrel: four
+    runs, each the boss-centre to boss-centre strip less the half of each
+    barrel's chamfer cap on its side. The window rims are uninterrupted up
+    to their square corners. Even their 2 mm expanded chamfer corners miss
+    the boss: hypot(15.1, 17) > R22.5. Outer strip areas exclude the proud
+    cylinders analytically; the windows' 90/135-degree mitres are included.
     """
     radius = BOSS_DIA / 2.0
     chamfer = EDGE_CHAMFER
@@ -1415,11 +1451,8 @@ def _top_rim_removal() -> tuple[float, float]:
             - chamfer * _circle_cap_area(radius, offset)
         )
 
-    outer_perimeter = 4.0 * (OUTER_X + OUTER_Z)
-    outer = (
-        outer_perimeter * chamfer**2 / 2.0
-        - 4.0 * chamfer**3 / 3.0
-        - 4.0 * (cap_integral(a) + cap_integral(b))
+    outer = 4.0 * (abs(FRONT_COLUMN_Z) + COLUMN_X) * chamfer**2 / 2.0 - 2.0 * (
+        cap_integral(a) + cap_integral(b)
     )
     side_run = 2.0 * INNER_Z
     east_fr = INNER_X - (abs(BAR_X0) + GUSSET)
@@ -1432,25 +1465,6 @@ def _top_rim_removal() -> tuple[float, float]:
     # Each six-sided window has two 90-degree and four 135-degree corners.
     window_mitres = 2.0 * (2.0 + 4.0 * (math.sqrt(2.0) - 1.0))
     return outer, window_perimeter * chamfer**2 / 2.0 + window_mitres * chamfer**3 / 3.0
-
-
-def _outer_corner_top_edges() -> list[list[float]]:
-    """Midpoints of the eight rim edges outside the Ø45 boss barrels."""
-    side_cut = math.sqrt((BOSS_DIA / 2.0) ** 2 - (RAIL_W_SIDE / 2.0) ** 2)
-    fr_cut = math.sqrt((BOSS_DIA / 2.0) ** 2 - (RAIL_W_FR / 2.0) ** 2)
-    return [
-        point
-        for sx in (-1.0, 1.0)
-        for sz in (-1.0, 1.0)
-        for point in (
-            [
-                sx * OUTER_X,
-                HALF_H,
-                sz * (abs(FRONT_COLUMN_Z) + side_cut + OUTER_Z) / 2.0,
-            ],
-            [sx * (COLUMN_X + fr_cut + OUTER_X) / 2.0, HALF_H, sz * OUTER_Z],
-        )
-    ]
 
 
 def _t_root_add() -> float:
@@ -1489,15 +1503,22 @@ def _bore_chamfer_removal() -> float:
 def _casting_occupies(x: float, y: float, z: float) -> bool:
     """Whether the solid casting, as the C2 breaks find it, holds (x, y, z).
 
-    The rail T-ring, hub rib with its set-screw boss (spot face out),
-    junction lands, crossbar with its gussets and T pockets, corner bosses
-    and hub boss -- exact around every C2 pick (bores, holes, V-gussets and
-    the earlier top breaks lie clear of them).
+    The rail T-ring with its flange corners cropped to the barrels, hub rib
+    with its set-screw boss (spot face out), junction lands, crossbar with
+    its gussets and T pockets, corner bosses and hub boss -- exact around
+    every C2 pick (bores, holes, V-gussets and the earlier top breaks lie
+    clear of them).
     """
     ax, az = abs(x), abs(z)
     in_ring_height = -HALF_H <= y <= HALF_H
     if FLANGE_BOT_Y <= y <= HALF_H and ax <= OUTER_X and az <= OUTER_Z:
-        if not (ax < INNER_X and az < INNER_Z):
+        # The crop leaves exactly the plan-corner nib outside each barrel empty.
+        cropped = (
+            ax > COLUMN_X
+            and az > abs(FRONT_COLUMN_Z)
+            and math.hypot(ax - COLUMN_X, az - abs(FRONT_COLUMN_Z)) > BOSS_DIA / 2.0
+        )
+        if not (ax < INNER_X and az < INNER_Z) and not cropped:
             return True
     if in_ring_height:
         if WEB_IN_X <= ax <= WEB_OUT_X and az <= WEB_OUT_Z:
@@ -1637,17 +1658,18 @@ def _external_edge_breaks() -> tuple[
     and each knife seat's least clearance to them.
 
     Every external convex edge the top-rim and bore-top breaks left, once
-    the T-section crossbar exists: the flange undersides (outer, window and
-    the eight short outer-corner runs), the four outer vertical corners, the
-    web bottoms, the junction lands' free edges, the crossbar web bottoms,
-    pocket-end bottoms and outer corners, the hub rib's free corners and
-    side bottoms, and the corner/hub boss rims.
+    the T-section crossbar exists: the flange undersides (outer and window;
+    the corner crops leave no outer-corner runs or vertical corners, every
+    outer run dying into a boss barrel at both ends), the web bottoms, the
+    junction lands' free edges, the crossbar web bottoms, pocket-end bottoms
+    and outer corners, the hub rib's free corners and side bottoms, and the
+    corner/hub boss rims.
     Straight edges remove ``c^2 sin(angle) / 2`` per mm over their run to the
     face that ends them; outer rims remove ``pi c^2 (R - c/3)``. Corner
     patches and the ends dying into boss barrels are left to the tolerance.
 
     Groups are the connected chains of breaks, long simple runs first and
-    the outer corners and boss rims last, so a native failure names its
+    the boss rims last, so a native failure names its
     chain and each chain's volume is proved on its own. Breaks that share a
     vertex must sit in one group (SolidWorks blends that corner only within
     a feature); any other two breaks keep ``2c + C2_SLIVER_MIN`` apart, or
@@ -1676,8 +1698,7 @@ def _external_edge_breaks() -> tuple[
     z_col = abs(FRONT_COLUMN_Z)
     r_boss = BOSS_DIA / 2.0
     r_hub = HUB_BOSS_DIA / 2.0
-    side_cut = math.sqrt(r_boss**2 - (RAIL_W_SIDE / 2.0) ** 2)  # 14.624
-    fr_cut = math.sqrt(r_boss**2 - (RAIL_W_FR / 2.0) ** 2)  # 12.052
+    side_cut, fr_cut = CORNER_SIDE_CUT, CORNER_FR_CUT  # 14.623, 12.052
     web_cut = math.sqrt(r_boss**2 - (WEB_T / 2.0) ** 2)  # 21.540
     rib_lo = GOOSENECK_Z - HUB_RIB_W / 2.0
     rib_hi = GOOSENECK_Z + HUB_RIB_W / 2.0
@@ -1854,15 +1875,6 @@ def _external_edge_breaks() -> tuple[
         along_z(SET_BOSS_FACE_X, y_side, boss_lo, boss_hi)
         for z_side in (boss_lo, boss_hi):
             along_x(z_side, y_side, SET_BOSS_FACE_X, -OUTER_X)
-    start("OuterCornerBreaks")
-    # Per plan corner: the two short flange-underside runs outside the boss
-    # barrel and the vertical corner up to the top-rim break, which all meet
-    # at the corner's underside vertex.
-    for sx in (-1.0, 1.0):
-        for sz in (-1.0, 1.0):
-            along_z(sx * OUTER_X, y_under, sz * (z_col + side_cut), sz * OUTER_Z)
-            along_x(sz * OUTER_Z, y_under, sx * (COLUMN_X + fr_cut), sx * OUTER_X)
-            along_y(sx * OUTER_X, sz * OUTER_Z, y_under, HALF_H - c)
     # Boss rims: the four corner bosses top and bottom, and the hub boss --
     # closed circles that meet no other break.
     start("BossRimBreaks")
@@ -2014,246 +2026,64 @@ def _model_to_sketch(adapter, sketch):
     return to_sketch
 
 
-# The governing grip is the model's own driving dimension; the StudHoles
-# wizard's spotface depth is bound to it, so the floor follows it alone.
-HANGER_GRIP_DIMENSION = f"HangerGrip@{HANGER_GRIP_SKETCH}"
-HANGER_SPOTFACE_DEPTH_DRIVE = f'"RingHeight" - "{HANGER_GRIP_DIMENSION}"'
-# A linear global keeps 8 document (inch) places: 5e-9 in, 1.3e-7 mm.
-HANGER_GRIP_READBACK_MM = 1e-5
-# The live-link probe: a 0.10 shorter grip deepens both spotfaces by 0.10.
-HANGER_GRIP_PROBE_MM = 0.10
-HANGER_GRIP_PROBE_VOLUME = (
-    2.0
-    * math.pi
-    * ((HANGER_SPOTFACE_DIA / 2.0) ** 2 - (HANGER_CLEARANCE_DIA / 2.0) ** 2)
-    * HANGER_GRIP_PROBE_MM
-)
+# The finished solid's outermost point along each plan diagonal is its corner
+# boss barrel; a flange corner left outside the barrel reached 345.1 less its
+# C2 vertical break. IBody2::GetExtremePoint returns the solid's furthest point.
+CORNER_BOSS_SUPPORT = COLUMN_X + abs(FRONT_COLUMN_Z) + _BOSS_R * math.sqrt(2.0)
+CORNER_SUPPORT_TOL_MM = 1e-3  # far inside the nib's 2.28 mm excess
 
 
-def _carries_dimension(feature, full_name: str) -> bool:
-    """Whether ``feature``'s own display-dimension walk holds ``full_name``."""
-    display = feature.GetFirstDisplayDimension()
-    while display is not None:
-        display = _early_bound(display, "IDisplayDimension")
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        if str(dimension.FullName) == full_name:
-            return True
-        display = feature.GetNextDisplayDimension(display)
-    return False
+def _corner_support_problems(
+    extremes: dict[tuple[float, float], tuple],
+) -> list[str]:
+    """Why the finished solid reaches past a corner boss barrel.
 
-
-def _hanger_spotface_depth_name(feature) -> str:
-    """The StudHoles wizard's own spotface-depth dimension, as ``name@owner``.
-
-    The build_mg_magnifying_bracket CounterBoreDepth criterion: the ONE
-    display dimension whose native name holds "depth" and whose value is the
-    1.0 nominal spotface depth. Both parts of the name are the ones
-    SolidWorks reports; no internal dimension name is manufactured.
-
-    IFeature::GetFirstDisplayDimension walks "all dimensions on this feature
-    [and] its sub-features"; a Hole Wizard keeps its cut dimensions in its
-    internal profile sketch (farm R2e5ad7dcd: ["C'Bore Depth", "Sketch18"]).
-    The owner must therefore be StudHoles itself or one of ITS sub-features,
-    found by GetFirstSubFeature/GetNextSubFeature, and that sub-feature's own
-    walk (the SDK: a sub-feature returns only its sketch's dimensions) must
-    hold the same dimension. Any other owner is foreign and fails.
+    ``extremes`` maps each plan diagonal ``(sx, sz)`` to
+    ``IBody2::GetExtremePoint(sx, 0, sz)``'s ``(ok, x, y, z)`` in metres; its
+    support ``sx * x + sz * z`` must be the barrel's CORNER_BOSS_SUPPORT.
     """
-    matches = []
-    display = feature.GetFirstDisplayDimension()
-    while display is not None:
-        display = _early_bound(display, "IDisplayDimension")
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        full_name = str(dimension.FullName)
-        native = full_name.split("@")
-        mm = float(dimension.SystemValue) * 1000.0
-        if "depth" in native[0].lower() and abs(mm - HANGER_SPOTFACE_DEPTH) < 1e-5:
-            matches.append((full_name, native))
-        display = feature.GetNextDisplayDimension(display)
-    if len(matches) != 1:
-        raise RuntimeError(
-            f"hanger wizard has {len(matches)} spotface-depth matches: "
-            f"{[native for _full, native in matches]}"
-        )
-    full_name, native = matches[0]
-    owner = native[1] if len(native) >= 2 else ""
-    if owner != str(feature.Name):
-        subs = {}
-        sub = feature.GetFirstSubFeature()
-        while sub is not None:
-            sub = _early_bound(sub, "IFeature")
-            subs[str(sub.Name)] = sub
-            sub = sub.GetNextSubFeature()
-        if owner not in subs or not _carries_dimension(subs[owner], full_name):
-            raise RuntimeError(
-                f"hanger spotface depth {native} is not owned by {feature.Name} "
-                f"or its sub-features {sorted(subs)}"
-            )
-    return f"{native[0]}@{owner}"
-
-
-async def _author_hanger_grip_reference(
-    adapter, plane_name: str
-) -> list[tuple[str, str]]:
-    """Author HangerGrip, the underside-to-spotfloor grip, as ONE driving
-    model dimension; return the sketch's deferred drive jobs.
-
-    ``plane_name`` is the rear station's Front-offset plane -- section F-F's
-    cutting plane -- so the sheet imports the dimension in F-F. A
-    construction centreline on the rear screw axis runs from the finished
-    underside up to the washer spotface floor; its length is driven by the
-    HangerGrip global and, through HANGER_SPOTFACE_DEPTH_DRIVE, drives the
-    wizard's spotface depth. The plane's sketch axes are mapped, not assumed.
-    """
-    check(
-        "create_sketch hanger grip reference", await adapter.create_sketch(plane_name)
-    )
-    active = adapter.currentModel.GetActiveSketch2()
-    if active is None:
-        raise RuntimeError("hanger grip reference: no active sketch")
-    to_sketch = _model_to_sketch(adapter, _early_bound(active, "ISketch"))
-    underside = to_sketch((HANGER_X, -HALF_H, STUD_Z_REAR))
-    floor = to_sketch((HANGER_X, -HALF_H + HANGER_GRIP, STUD_Z_REAR))
-    (u0, v0, w0), (u1, v1, w1) = underside, floor
-    if (
-        max(abs(w0), abs(w1)) > 1e-4
-        or abs(u1 - u0) > 1e-4
-        or abs(abs(v1 - v0) - HANGER_GRIP) > 1e-4
-        or abs(abs(v0) - HALF_H) > 1e-4
-        or abs(abs(u0) - abs(HANGER_X)) > 1e-4
-    ):
-        raise RuntimeError(
-            "hanger grip reference plane does not carry the rear screw axis "
-            f"along sketch v: underside {underside}, floor {floor}"
-        )
-    grip = SketchDims()
-    set_sketch_direct_db(adapter, True)
-    grip_line = check(
-        "hanger grip centerline", await adapter.add_centerline(u0, v0, u1, v1)
-    )
-    set_sketch_direct_db(adapter, False)
-    check(
-        "hanger grip centerline vertical",
-        await adapter.add_sketch_constraint(grip_line, None, "vertical"),
-    )
-    await dimension_between(
-        adapter,
-        f"{grip_line}.start",
-        "origin",
-        "horizontal_distance",
-        abs(u0),
-        "hanger grip screw axis",
-    )
-    grip.record("HangerGripAxisX")
-    await dimension_between(
-        adapter,
-        f"{grip_line}.start",
-        "origin",
-        "vertical_distance",
-        abs(v0),
-        "hanger grip finished underside",
-    )
-    grip.record("HangerGripUnderside", '"RingHeight" / 2')
-    await dimension_between(
-        adapter,
-        f"{grip_line}.start",
-        f"{grip_line}.end",
-        "vertical_distance",
-        HANGER_GRIP,
-        "hanger grip underside to spotface floor",
-    )
-    grip.record("HangerGrip", '"HangerGrip"')
-    await ensure_fully_defined(adapter, "hanger grip reference sketch")
-    check("exit_sketch hanger grip reference", await adapter.exit_sketch())
-    name_last_feature(adapter, HANGER_GRIP_SKETCH)
-    return grip.apply(adapter, HANGER_GRIP_SKETCH)
-
-
-def _equations_naming(adapter, lhs: str) -> list[str]:
-    """Every equation whose left-hand side is ``lhs`` (whitespace-blind)."""
-    from solidworks_mcp.adapters.solidworks.parametrics import (
-        _equation_manager,
-        _read_member,
-    )
-
-    manager = _equation_manager(adapter)
-    wanted = "".join(lhs.split())
-    matches = []
-    for index in range(int(_read_member(manager, "GetCount") or 0)):
-        text = str(manager.Equation(index) or "")
-        if "".join(text.partition("=")[0].split()) == wanted:
-            matches.append(text)
-    return matches
-
-
-def _hanger_grip_problems(adapter, depth_name: str, grip_mm: float) -> list[str]:
-    """Why HangerGrip does not singly drive the spotface depth at ``grip_mm``."""
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
     problems = []
-    for name, rhs, expected_mm in (
-        (HANGER_GRIP_DIMENSION, '"HangerGrip"', grip_mm),
-        (depth_name, HANGER_SPOTFACE_DEPTH_DRIVE, RING_HEIGHT - grip_mm),
-    ):
-        equations = _equations_naming(adapter, f'"{name}"')
-        if len(equations) != 1:
-            problems.append(f"{name}: expected one equation, found {equations}")
-        elif "".join(equations[0].partition("=")[2].split()) != "".join(rhs.split()):
-            problems.append(f"{name}: owned by {equations[0]!r}, not {rhs}")
-        dimension = model.Parameter(name)
-        if dimension is None:
-            problems.append(f"{name}: not found")
+    for (sx, sz), result in extremes.items():
+        if not result or len(result) < 4 or not result[0]:
+            problems.append(f"({sx:+.0f}, {sz:+.0f}): GetExtremePoint failed")
             continue
-        dimension = _early_bound(dimension, "IDimension")
-        if bool(dimension.IsReference()):
-            problems.append(f"{name}: is a reference dimension")
-        value_mm = float(dimension.SystemValue) * 1000.0
-        _telemetry.info(f"hanger grip {name} = {value_mm:.6f} mm ({equations})")
-        if abs(value_mm - expected_mm) > HANGER_GRIP_READBACK_MM:
-            problems.append(f"{name}: reads {value_mm:.6f} mm, expected {expected_mm}")
+        support = (sx * float(result[1]) + sz * float(result[3])) * 1000.0
+        if abs(support - CORNER_BOSS_SUPPORT) > CORNER_SUPPORT_TOL_MM:
+            problems.append(
+                f"({sx:+.0f}, {sz:+.0f}): reaches {support:.4f} mm, the boss"
+                f" barrel {CORNER_BOSS_SUPPORT:.4f} mm"
+            )
     return problems
 
 
-async def _assert_hanger_grip_drives_spotface(
-    adapter, depth_name: str, volume: float
-) -> None:
-    """Prove HangerGrip is the live, single control on the spotface floor.
-
-    After the deferred equations: each of HangerGrip and the wizard depth has
-    exactly one equation (global -> grip -> "RingHeight" - grip), neither is a
-    reference dimension, and both read nominal. Then the HangerGrip global is
-    shortened by HANGER_GRIP_PROBE_MM: the depth must follow and the solid
-    must lose both deeper spotface annuli, before the global is restored and
-    the as-built state re-proven. A witness that drives nothing fails here.
-    """
-    problems = _hanger_grip_problems(adapter, depth_name, HANGER_GRIP)
+def _assert_flange_corners_cropped(adapter) -> None:
+    """Prove on the finished solid that no flange corner stands outside its
+    boss barrel: along every plan diagonal the barrel is outermost."""
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    bodies = tuple(part.GetBodies2(0, False) or ())
+    if len(bodies) != 1:
+        raise RuntimeError(f"top frame must be one solid body, found {len(bodies)}")
+    body = _early_bound(bodies[0], "IBody2")
+    extremes = {
+        (sx, sz): body.GetExtremePoint(sx, 0.0, sz)
+        for sx in (-1.0, 1.0)
+        for sz in (-1.0, 1.0)
+    }
+    problems = _corner_support_problems(extremes)
     if problems:
-        raise RuntimeError("hanger grip ownership: " + "; ".join(problems))
-    probe_mm = HANGER_GRIP - HANGER_GRIP_PROBE_MM
-    await set_global(adapter, "HangerGrip", f"{probe_mm}mm")
-    await force_rebuild(adapter)
-    problems = _hanger_grip_problems(adapter, depth_name, probe_mm)
-    if problems:
-        raise RuntimeError("hanger grip live link: " + "; ".join(problems))
-    await volume_check(
-        adapter,
-        "hanger grip probe (spotfaces follow HangerGrip)",
-        volume - HANGER_GRIP_PROBE_VOLUME,
-        0.25 * HANGER_GRIP_PROBE_VOLUME,
+        raise RuntimeError("flange corner outside its boss barrel: " + "; ".join(problems))
+    _telemetry.success(
+        f"all four flange corners end on their barrels ({CORNER_BOSS_SUPPORT:.4f} mm)"
     )
-    await set_global(adapter, "HangerGrip", f"{HANGER_GRIP}mm")
-    await force_rebuild(adapter)
-    problems = _hanger_grip_problems(adapter, depth_name, HANGER_GRIP)
-    if problems:
-        raise RuntimeError("hanger grip restore: " + "; ".join(problems))
-    await volume_check(adapter, "hanger grip restored", volume, 1.0)
-    _telemetry.success(f"{HANGER_GRIP_DIMENSION} drives {depth_name}")
 
 
 def _tolerance_hanger_clearance(feature) -> None:
-    """Band the through diameter, NOT the spot diameter or the depth.
+    """Band the plain wizard's one through diameter at its exact 6.045.
 
-    Counterbore-shaped wizards have multiple "Dia" dimensions, unlike the
-    generic one-diameter hook. Reuse that native name criterion, additionally
-    resolving the unique actual 6.045 diameter; never assume dimension order
+    The generic hook's native "Dia" name criterion, additionally resolving
+    the actual cut diameter to the pinned HANGER_CLEARANCE_DIA (the wizard's
+    drift path writes it over the table seed), so a seed size fails here;
+    the band is read back and its places set. Never assume dimension order
     or manufacture an internal SOLIDWORKS dimension name.
     """
     matches = []
@@ -2363,7 +2193,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HangerSlotWidth", f"{HANGER_SLOT_WIDTH}mm")
     await set_global(adapter, "HangerSlotLength", f"{HANGER_SLOT_LENGTH}mm")
     await set_global(adapter, "HangerSlotDepth", f"{HANGER_SLOT_DEPTH}mm")
-    await set_global(adapter, "HangerGrip", f"{HANGER_GRIP}mm")
     await set_global(adapter, "OuterX", '"ColumnX" + "RailWSide" / 2')
     await set_global(adapter, "OuterZ", '"ColumnZ" + "RailWFR" / 2')
     await set_global(adapter, "InnerX", '"ColumnX" - "RailWSide" / 2')
@@ -2575,6 +2404,10 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Crossbar")
+    # The full-height extrude depth is the finished top-to-underside grip at
+    # the hanger holes; RingHeight drives it with the ring.
+    grip_dim = name_dimensions(adapter, "Crossbar", ["HangerGrip"])
+    drive_jobs.append((grip_dim[0], '"RingHeight"'))
     bar_area = (BAR_X1 - BAR_X0) * 2.0 * INNER_Z + 4.0 * GUSSET * GUSSET / 2.0
     v_bar = bar_area * RING_HEIGHT
     volume = await volume_check(adapter, "crossbar", volume + v_bar, 500.0)
@@ -2631,6 +2464,47 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(
         adapter, "crossbar pockets", volume - v_bar_pockets, 50.0
     )
+
+    # 5c. Flange corner crops: one triangle per plan corner, cut through the
+    #     band before the bosses (CORNER_CROP_TRIANGLE), so the boss union
+    #     leaves no flange nib outside any barrel. Sketch z flipped:
+    #     (x, y) -> (X, -Z).
+    crops = SketchDims()
+    check("create_sketch corner crops", await adapter.create_sketch("Top"))
+    for k, (sx, sz) in enumerate(((1.0, 1.0), (1.0, -1.0), (-1.0, -1.0), (-1.0, 1.0))):
+        crop_pts = [
+            (sx * (COLUMN_X + px), -sz * (abs(FRONT_COLUMN_Z) + pz))
+            for px, pz in CORNER_CROP_TRIANGLE
+        ]
+        crop_lines = await add_line_chain(adapter, crop_pts)
+        await define_polygon_chain(
+            adapter,
+            crop_lines,
+            crop_pts,
+            anchor=0,
+            label=f"corner crop {k}",
+            dims=crops,
+            names=[
+                f"CC{k}X",
+                f"CC{k}Z",
+                f"CC{k}Leg",
+                f"CC{k}ChordRun",
+                f"CC{k}ChordRise",
+            ],
+        )
+    await ensure_fully_defined(adapter, "corner crops sketch")
+    check("exit_sketch corner crops", await adapter.exit_sketch())
+    name_last_feature(adapter, "CornerCropProfile")
+    drive_jobs += crops.apply(adapter, "CornerCropProfile")
+    check(
+        "cut corner crops",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "CornerCrop")
+    v_crops = 4.0 * CORNER_CROP_AREA * FLANGE  # 432.9
+    volume = await volume_check(adapter, "flange corner crops", volume - v_crops, 1.0)
 
     # 6. Corner bosses: one circle set extruded UP to the boss top, a second
     #    identical set extruded DOWN to the boss bottom (one-direction pair;
@@ -3022,19 +2896,16 @@ async def build(adapter) -> dict[str, str]:
     v_gn = math.pi * (GOOSENECK_BORE_DIA / 2.0) ** 2 * (RING_HEIGHT + HUB_BOSS_DROP)
     volume = await volume_check(adapter, "gooseneck bore", volume - v_gn, 60.0)
 
-    # 12. Native #10 loose clearance plus shallow washer spotfaces, both
-    #     stations in one top-face counterbore wizard feature (a #10
-    #     socket-head table seed, every cut overridden: HANGER_HOLE_SPEC).
-    #     Q7 preserves the shop's underside-entry through drilling and TOP
-    #     spotfacing; the finished solid is independent of that sequence.
-    #     A full spotface annulus remains inside the bar/rail union, including
-    #     the rear rim extending into the rail above its pocket roof.
+    # 12. Native #10 loose plain clearance holes, both stations in one
+    #     underside-entry wizard feature (the shop drills them from the
+    #     underside, so drift grows toward the faced top; HANGER_HOLE_SPEC).
+    #     The washers bear on the faced top plane round each hole.
     hanger_wizard = wizard_holes(
         adapter,
         HANGER_HOLE_SPEC,
-        [[HANGER_X, HALF_H, STUD_Z_FRONT], [HANGER_X, HALF_H, STUD_Z_REAR]],
-        (0.0, 1.0, 0.0),
-        "knife-hanger washer spotfaces",
+        [[HANGER_X, -HALF_H, STUD_Z_FRONT], [HANGER_X, -HALF_H, STUD_Z_REAR]],
+        (0.0, -1.0, 0.0),
+        "knife-hanger clearance holes",
         name="StudHoles",
         expect_dia_mm=HANGER_CLEARANCE_DIA,
         placement_dims=[
@@ -3048,35 +2919,10 @@ async def build(adapter) -> dict[str, str]:
     if hanger_feature is None:
         raise RuntimeError("native hanger wizard feature disappeared")
     _tolerance_hanger_clearance(_early_bound(hanger_feature, "IFeature"))
-    v_hangers = 2.0 * (
-        math.pi * (HANGER_CLEARANCE_DIA / 2.0) ** 2 * RING_HEIGHT
-        + math.pi
-        * ((HANGER_SPOTFACE_DIA / 2.0) ** 2 - (HANGER_CLEARANCE_DIA / 2.0) ** 2)
-        * HANGER_SPOTFACE_DEPTH
-    )
+    v_hangers = 2.0 * math.pi * (HANGER_CLEARANCE_DIA / 2.0) ** 2 * RING_HEIGHT
     volume = await volume_check(
-        adapter, "knife-hanger washer spotfaces", volume - v_hangers, 10.0
+        adapter, "knife-hanger clearance holes", volume - v_hangers, 10.0
     )
-
-    # 12a. HangerGrip: the governing 35.50 +/-0.05 underside-to-spotfloor
-    #      grip is ONE native driving dimension in a hidden reference sketch
-    #      on section F-F's cutting plane (the rear station), and the wizard's
-    #      own spotface depth is bound to "RingHeight" - HangerGrip, so the
-    #      floor follows that dimension alone. Its band is applied below; the
-    #      sheet imports it unmodified.
-    hanger_depth = _hanger_spotface_depth_name(_early_bound(hanger_feature, "IFeature"))
-    grip_plane = check(
-        "create_plane hanger grip reference",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset", base_plane="Front Plane", offset=STUD_Z_REAR
-            )
-        ),
-    )
-    grip_plane_name = str(getattr(grip_plane, "name", grip_plane))
-    ref_planes.append(grip_plane_name)
-    drive_jobs += await _author_hanger_grip_reference(adapter, grip_plane_name)
-    drive_jobs.append((hanger_depth, HANGER_SPOTFACE_DEPTH_DRIVE))
 
     # 12b. Round dowel slip holes: blind, flat-bottomed (a plain cut-extrude
     #      -- a wizard drill point would leave a cone where the reamer
@@ -3353,11 +3199,9 @@ async def build(adapter) -> dict[str, str]:
 
     # 17. External top-face rim breaks: C2 x 45 on the outer rail rim and
     #     both windows' rims. The Ø45 bosses no longer reach the rail plan
-    #     corners: window rims meet at real square corners, and each outer
-    #     corner has two short rim edges outside the boss barrel. Select
-    #     those eight edges explicitly as well as the four central runs.
+    #     corners: window rims meet at real square corners, and the corner
+    #     crops leave each outer face one run from barrel to barrel.
     v_outer, v_window = _top_rim_removal()
-    outer_corner_edges = _outer_corner_top_edges()
     check(
         "chamfer top rims",
         await adapter.add_chamfer(
@@ -3381,8 +3225,7 @@ async def build(adapter) -> dict[str, str]:
                 [BAR_X0 - GUSSET / 2.0, HALF_H, -(INNER_Z - GUSSET / 2.0)],
                 [BAR_X1 + GUSSET / 2.0, HALF_H, INNER_Z - GUSSET / 2.0],
                 [BAR_X1 + GUSSET / 2.0, HALF_H, -(INNER_Z - GUSSET / 2.0)],
-            ]
-            + outer_corner_edges,
+            ],
         ),
     )
     name_last_feature(adapter, "TopRimBreaks")
@@ -3413,10 +3256,11 @@ async def build(adapter) -> dict[str, str]:
         adapter, "bore top breaks", volume - v_breaks, 0.02 * v_breaks + 10.0
     )
 
-    # 18b. C2 x 45 on every remaining external convex edge (75 edges), one
-    #      chamfer feature per connected chain so a native failure names its
-    #      chain and each chain's volume is proved on its own (see
-    #      _external_edge_breaks for the chains and the edges left unbroken).
+    # 18b. C2 x 45 on every remaining external convex edge (62 edges and 9
+    #      boss rims), one chamfer feature per connected chain so a native
+    #      failure names its chain and each chain's volume is proved on its
+    #      own (see _external_edge_breaks for the chains and the edges left
+    #      unbroken).
     #      Each pair of breaks meeting at a vertex adds half a c^3 corner
     #      patch to the tolerance; barrel-end error sits inside the 3%.
     for feature, (picks, v_chain, shared) in EXTERNAL_EDGE_BREAKS.items():
@@ -3467,14 +3311,12 @@ async def build(adapter) -> dict[str, str]:
             slot_width_name,
             *deviations(HANGER_SLOT_WIDTH_BAND),
         )
-    # The governing grip's band lives on the model's own driving dimension.
-    set_dimension_symmetric_tolerance(
-        adapter, HANGER_GRIP_SKETCH, "HangerGrip", HANGER_GRIP_TOL
-    )
+    # The finished grip's band lives on the model's own driving dimension.
+    set_dimension_symmetric_tolerance(adapter, "Crossbar", "HangerGrip", HANGER_GRIP_TOL)
     volume = await volume_check(
         adapter, "driven casting (equations neutral)", volume, 200.0
     )
-    await _assert_hanger_grip_drives_spotface(adapter, hanger_depth, volume)
+    _assert_flange_corners_cropped(adapter)
 
     # Hide the construction offset planes -- shown reference geometry renders
     # in the part PNG and every assembly instance (fix_shown_sketches idiom).
@@ -3490,9 +3332,6 @@ async def build(adapter) -> dict[str, str]:
     # marked dimension and only reads its precision back, so the part is the
     # single place a place count is authored (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # The grip reference sketch is saved hidden (read back); the sheet shows
-    # it per view to import HangerGrip.
-    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     _qualify_machined_faces(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(

@@ -130,7 +130,7 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`sm-summing-lever`** | modeled **Gray Cast Iron casting**; organic first-class lever ~120×28×196 | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× hex knife trunnions (edges = top-vertex ridges) protruding 21.717 each end; 20× #6-32 tapped anchor seats through the 5.08 plate @ 7.0565 pitch (web ~5.06, Ø2.705 tap drill); one #10-24 tap through the Ø19.05×19.05 summation-anchor boss — both purchased spring anchors thread straight in, no nuts | knife-edge ridge **delicate** (the precision line); trunnion slender cantilever → **chatter**; organic 3-pt-arc leaf/rib profiles hard to mill; turning Ø25.4 with cantilevered plates; 20 small through-taps in a 5.08 web → **tap breakage**, use a tapping head | **4–5 from bar** (2 sketch planes + turn) | **CAST or fabricate**, don't hog; knife edge → hardened insert (§6) |
-| **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.7973 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth 11.24 ±0.05, full thread 9.65 ±0.13; fully charged drill-point crown web 2.0077656525, no break-in (conservative proof envelope Ø3.927, above accepted MAX Ø3.8973; point MIN 117°); 2× Ø3.175 reamed dowel press holes ×9.5 at ±7.632 from the tap axis (span 15.264 BASIC, pair ⌖Ø0.13 to top seat datum A, datum pattern B; row 7.0 from front face; tap ⌖Ø0.15 to A and B); bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or manual. Modified #10-24 hex-head Bolt MHA-VN-024 (92314A253, cut under head to 45.70 ±0.15) and new 18-8 SAE washer MHA-VN-060 (96659A104) clamp the block to the top-frame's integral crossbar through Ø6.045 #10 loose clearance. Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat SPOTFACE Ø17.0 ±0.51 with floor 35.50 ±0.05 above faced underside. Nominal reach 8.9173, range 8.349–9.4856; full-form engagement MIN 7.290667 ≥7.239, tip air MIN 0.0344. Retain removable medium-strength threadlocker. Unchanged MHA-VN-051 dowels (98381A473, 1/8 ×3/4) enter Ø3.24 ±0.03 ×12.0 blind round hole and 3.24 ±0.03 wide ×3.95 ±0.13 long ×12.0 blind slot, BASIC 15.264 from and ⌖0.05 to round hole. One native linear pattern position control ⌖0.10 to the bar's two-face width median datum D limits X shift to ±0.05, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
+| **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.7973 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth 11.24 ±0.05, full thread 9.65 ±0.13; fully charged drill-point crown web 2.0077656525, no break-in (conservative proof envelope Ø3.927, above accepted MAX Ø3.8973; point MIN 117°); 2× Ø3.175 reamed dowel press holes ×9.5 at ±7.632 from the tap axis (span 15.264 BASIC, pair ⌖Ø0.13 to top seat datum A, datum pattern B; row 7.0 from front face; tap ⌖Ø0.15 to A and B); bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or manual. Modified #10-24 hex-head Bolt MHA-VN-024 (92314A253, cut under head to 46.70 ±0.15) and new 18-8 SAE washer MHA-VN-060 (96659A104) clamp the block to the top-frame's integral crossbar through Ø6.045 #10 loose clearance. Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat on the whole faced top (no SPOTFACE), 36.50 ±0.05 above faced underside. Nominal reach 8.9173, range 8.349–9.4856; full-form engagement MIN 7.290667 ≥7.239, tip air MIN 0.0344. Retain removable medium-strength threadlocker. Unchanged MHA-VN-051 dowels (98381A473, 1/8 ×3/4) enter Ø3.24 ±0.03 ×12.0 blind round hole and 3.24 ±0.03 wide ×3.95 ±0.13 long ×12.0 blind slot, BASIC 15.264 from and ⌖0.05 to round hole. One native linear pattern position control ⌖0.10 to the bar's two-face width median datum D limits X shift to ±0.05, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
 
 The Ø6.045 hanger clearance hole carries a **native explicit +0.13/0
 diameter band** (MIN 6.045, MAX 6.175), not the symmetric general ±0.13
@@ -139,27 +139,28 @@ the worst-case screw-to-round-dowel web is 2.645457488 mm and
 screw-to-slot web is 2.110457488 mm; outer round-dowel and slot webs
 are respectively 2.585978744 and 2.050978744 mm.
 
-The washer-seat grip is the model-owned driving dimension
-`HangerGrip@HangerGripReference`. The real Hole Wizard spotface depth is
-equation-driven by `RingHeight` minus that dimension; the builder authors
-its **35.50 ±0.05 mm** band, and section F-F imports it unchanged from the
-hidden reference sketch. The reference is the actual floor driver, not an
-independent witness or a drawing-owned tolerance. Casting height variation
-therefore does not add a second ±0.8 mm to the specified floor grip.
+The washer-seat grip is the model's actual driving thickness dimension
+`HangerGrip@Crossbar`, **36.50 ±0.05 mm** from the finished underside to
+the whole faced top, except the four corner bosses that remain 4.5 mm proud.
+The builder authors its native band and section F-F imports it unchanged;
+there is no hanger spotface, separate floor driver or cleanup-stock offset.
+The whole top except the four corner bosses is finished Ra 3.2 µm. The right
+(west) rail alone remains flat within 0.04 so both MHA-CH-007 keeper bores
+align. The finished underside and knife-mount pose remain unchanged.
 
-The floor callout identifies its function: it sets **MHA-VN-024 thread
-engagement**. The washer spotface is a clamp face, not a running or locating
-surface, so it has no separate roughness requirement. The crossbar median
-datum D controls the hanger axes in X only: their BASIC X location is on D.
+The grip callout identifies its function: it sets **MHA-VN-024 thread
+engagement**. The crossbar median datum D controls the hanger axes in X only:
+their BASIC X location is on D.
 The socket-to-D locator retains its ordinary location band; the front and
 rear Z station dimensions likewise remain ordinary toleranced dimensions.
 
 The mount's tap position is **Ø0.15 A B**, the loosest two-place zone that
 the existing clearance can absorb. Its radius adds to both mismatch legs:
-**hypot(0.31623, 0.26373) = 0.4117704771 mm**. Full-crossbar drill drift is
-**0.1953041281 mm**; together they consume **0.6070746052 mm** of the
-**0.6095 mm** radial float, leaving **0.0024253948 mm**. A Ø0.16 zone would
-give **−0.0046173631 mm** spare; Ø0.25 gives **−0.0680394708 mm**. The
+**hypot(0.31623, 0.26373) = 0.4117704771 mm**. Full-crossbar drill drift
+charges the finished **36.50 ±0.05 mm** thickness and is **0.1913771014 mm**;
+together they consume **0.6031475785 mm** of the **0.6095 mm** radial float,
+leaving **0.0063524215 mm**. A Ø0.16 zone would give **−0.0006903364 mm**
+spare; Ø0.25 gives **−0.0641124441 mm**. The
 dowel pattern's datum-B position frame explicitly applies to **2X holes**.
 
 The earlier 2.020267 mm crown-web proof was undercharged: it used the
@@ -201,7 +202,7 @@ adverse depth limits.
 **Modified hanger-bolt shop route (MHA-VN-024, two).** Source McMaster
 92314A253, 18-8 stainless plain external-hex #10-24 UNC-2A ×2 in stock;
 retain the supplied head. Cut and finish the under-head length to
-**45.70 ±0.15 mm**, restore the cut-end chamfer to **RADIAL 0.60 ±0.05 mm
+**46.70 ±0.15 mm**, restore the cut-end chamfer to **RADIAL 0.60 ±0.05 mm
 ×45 ±1°**, and deburr the thread start. Retain the conservative inspection
 limit **MAX 1 P incomplete tip** (P = 1.058333 mm). The minimum radial
 chamfer gives tip-flat Ø3.726, below the #25 drill Ø3.797; the maximum
@@ -214,18 +215,17 @@ and height 3.175 mm do not imply a supplier head tolerance or under-head
 bearing-circle bound. The ordinary hex-head-on-SAE-washer joint is accepted
 practice, not a guaranteed stress or material allowable; no head-minimum,
 neck or radial-play inspection is required. Assemble with washer 96659A104
-seated on the specified spotface, not on as-cast skin.
+seated on the whole faced top, not on as-cast skin.
 The washer's actual ASME B18.21.1 bounds are ID 5.4356–5.7658,
 OD 12.573–13.081 and thickness 0.9144–1.651 mm; use the full conservative
 0.3302 mm radial OD-to-ID runout in the support/clearance stack.
-The spotface charges full washer float over the sourced #10-24 class 2A
-external-thread major-diameter limits **4.61772–4.8006 mm**
+The top-seat support proof charges full washer float over the sourced
+#10-24 class 2A external-thread major-diameter limits **4.61772–4.8006 mm**
 (0.1818–0.1890 in; [thread chart](https://www.engineersedge.com/screw_threads_chart.htm)).
-Washer-to-thread radial float is 0.57404 mm. Including the location and
-washer eccentricity terms, maximum washer OD offset is 1.511314605 mm,
-leaving 0.193185395 mm spotface spare and 1.687685395 mm actual continuous
-floor bearing. This does not create a neck or radial-play inspection.
-The revised cut range is 45.55–45.85 mm; independently inspect the finished
+Washer-to-thread radial float is 0.57404 mm. The frame builder additionally
+charges hanger-pattern mismatch, through-hole drift and washer eccentricity
+against the actual top-face edge. No neck or radial-play inspection is added.
+The revised cut range is 46.55–46.85 mm; independently inspect the finished
 length, threaded tail and thread gauge acceptance rather
 than treating these as new SKU dimensions or vendor tolerances. Useful-tail
 coverage beyond maximum reach is 9.561667 − 9.4856 = 0.076066667 mm.
@@ -282,7 +282,7 @@ run. No COM, farm, or generated-traveler certification is claimed here.
    critical interface.
 3. ~~**Model the `sm-knife-mount` mounting holes**~~ — RESOLVED (top-frame rederive, 2026-08-02; #10-24 hex-head cutover, 2026-10-13): the
    block is clamped to the top-frame casting's integral crossbar by the cut-to-length 18-8 hex-head Bolt
-   and new #10 SAE washer on a machined spotface, into a #10-24 bottoming tap and keyed by two blind pressed dowels; the current route is documented above, with native COM validation still unverified.
+   and new #10 SAE washer on the whole faced top, into a #10-24 bottoming tap and keyed by two blind pressed dowels; the current route is documented above. Its revised native wizard and dimension import require the scoped farm proof; offline tests alone are not native evidence.
 4. **Reconcile the `ch-rocker-arm` R800 vs book 812.8 mm** (already a §4 Finding) before it becomes a
    drawing callout — but note the good news from this pass: it's a *profile* dimension, cheap to change.
 5. **Consider enlarging the tip cone gears** (T006–T012) — the model already flags them marginal and a

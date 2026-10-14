@@ -96,7 +96,7 @@ frames and no datums.
   to D** (no Ø), where D is the median plane of the two crossbar width
   faces, not a single side face. It bounds X shift to ±0.05 while retaining
   the Z socket station, preserving the ≥2.0 mm screw/slot and side webs of
-  the 25.0 ±0.8 crossbar with its Ø17.0 ±0.51 washer spotface. This narrow
+  the 25.0 ±0.8 crossbar, whose faced top seats the washers. This narrow
   knife-edge-system permission does not extend to unrelated frames.
   The summing-lever knife seat and its 20-hole spring pattern carry one
   pattern position frame.

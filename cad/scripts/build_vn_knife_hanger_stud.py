@@ -1,6 +1,6 @@
 """Build MHA-VN-024 from complete 92314A253 hex stock, then trim and deburr.
 
-Finished frame: tip Y=0, bearing face Y=45.70, screw axis +Y. The stock
+Finished frame: tip Y=0, bearing face Y=46.70, screw axis +Y. The stock
 recipe is positioned before cutting, so both the solid and its native
 manufacturing/inspection sketches share that frame without a body-only move.
 The catalogue's factory helix survives the actual trim; no socket is added.
