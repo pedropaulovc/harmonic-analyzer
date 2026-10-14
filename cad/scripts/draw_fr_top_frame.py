@@ -324,10 +324,32 @@ HANGER_SPOTFACE_SIDE = "TOP SPOTFACE "
 # border and the position frame over the upper-right boss.  Two rows now
 # centre lower, clear of the boss; the frame (top-left corner here) stands
 # above them, its 5.5 mm box and one qualifier row ending about 11 mm under
-# frame_xy.  Its leader drops near-vertically to the front hole, left of the
-# callout, steeper than the callout's own leader, so they cannot cross.
+# frame_xy.
 HANGER_CALLOUT_XY = (0.262, 0.238)
 HANGER_CENTER_FRAME_XY = (0.200, 0.264)
+# The callout's native leader runs a diameter of the 17 spotface, lower-left
+# arrow up-right through the axis (R5: (180.0,199.7)->(187.2,204.2) mm, 32
+# deg).  The frame's default landing on the 6.045 clearance rim sat on that
+# diameter's lower-left side, so its leader from (193.6,260.5) mm crossed it
+# at (182.7,201.4).  It lands instead on the same selected rim 60 deg up-right
+# of the axis on the sheet: the frame's side of the callout's diameter, and
+# right of the 182.0's extension line on D's trace, so its leader meets
+# neither.  Sheet up is model -Z (the plan's front is up).
+HANGER_CENTER_LANDING_DEG = 60.0
+
+
+def hanger_center_landing() -> tuple[float, float, float]:
+    """Model point (mm) on the front clearance rim at the spotface floor,
+    ``HANGER_CENTER_LANDING_DEG`` anticlockwise from sheet +X."""
+    radius = HANGER_CLEARANCE_DIA / 2.0
+    angle = math.radians(HANGER_CENTER_LANDING_DEG)
+    return (
+        HANGER_X + radius * math.cos(angle),
+        HANGER_SPOTFACE_FLOOR_Y,
+        STUD_Z_FRONT - radius * math.sin(angle),
+    )
+
+
 # The linear (non-diameter) zone is two planes about D's median: X only.
 # The axes are drawn ON D, an implied BASIC zero (ASME Y14.5-2018); no
 # zero-length dimension exists to box, so the qualifier states it, with the
@@ -2834,8 +2856,15 @@ async def build(adapter: Any) -> dict[str, str]:
         (HANGER_X, HANGER_SPOTFACE_FLOOR_Y, STUD_Z_FRONT), HANGER_CLEARANCE_DIA / 2.0,
         axis=(0.0, 1.0, 0.0), label="front hanger clearance at spotfloor",
     ).edge
+    # Same selected rim, landed up-right of the axis, clear of the callout's
+    # spotface diameter (HANGER_CENTER_LANDING_DEG); the helper reads it back.
+    hanger_center_landing_xy = model_point_in_view(
+        adapter, detail_top, tuple(v / 1000.0 for v in hanger_center_landing()),
+        label="front hanger clearance rim, up-right of the axis",
+    )
     add_feature_control_frame(
         adapter, detail_top, edge_entity=hanger_hole_edge,
+        leader_attach_xy=hanger_center_landing_xy,
         frame_xy=HANGER_CENTER_FRAME_XY,
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"],

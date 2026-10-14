@@ -267,11 +267,14 @@ DIMENSION_CALLOUTS = {
 CALLOUTS_ABOVE = {"PinHoleDia": PIN_HOLE_PAIR_CALLOUT}
 # The pair's position frame hangs under that callout's shoulder, its left
 # edge on the shoulder's near end, on its own leader to the same hole; the
-# bore's frame stands ~30 mm lower.  Printed: 29.4 x 7.0 mm, sheet x
-# 146.6..176.0, y 212.0..219.0 (farm run 20261009T171439353Z).
+# bore's frame stands ~25 mm lower.  Printed: 29.4 x 7.0 mm, sheet x
+# 146.6..176.0, y 212.0..219.0 with its top 6 mm under the shoulder start
+# (farm run 20261009T171439353Z).  It now stands PIN_FRAME_DROP under it, a
+# further 5 mm down, so its above-frame 2X clears the shoulder (below).
+PIN_FRAME_DROP = 0.011
 PIN_FRAME_XY = (
     PIN_CALLOUT_SHOULDER_START[0] + PIN_CALLOUT_SHOULDER_OVERHANG,
-    PIN_CALLOUT_SHOULDER_START[1] - 0.006,
+    PIN_CALLOUT_SHOULDER_START[1] - PIN_FRAME_DROP,
 )
 PIN_FRAME_SIZE = (0.0294, 0.0070)
 # Datum B's symbol hangs under that frame, at the middle of its width (Y14.5
@@ -284,30 +287,45 @@ PIN_DATUM_B_XY = (
     PIN_FRAME_XY[0] + PIN_FRAME_SIZE[0] / 2.0,
     PIN_FRAME_XY[1] - PIN_FRAME_SIZE[1] - 0.005 - DATUM_TAG_BOX,
 )
-# The frame states its own count, 2X, as native below-frame text
-# (``add_feature_control_frame(quantity=...)``, read back by
-# ``IGtol.GetBelowFrameTextAt``): B is the datum feature symbol on a frame
-# that controls two holes, the pattern, not the +X hole its leader lands on
-# (blind machinist review R4).  Below-frame text prints left-aligned 1.1 mm
-# under the outline, 3.4 mm tall, 2.6 mm a glyph (draw_fr_top_frame's
-# pn-pen-v-block measurement), so "2X" spans the frame's first 5.3 mm,
-# 4.5 mm down: left of datum B's stem and box (from 11.2 mm along the frame,
-# top 5 mm down) by PIN_FRAME_QUANTITY_CLEARANCE.
+# The frame states its own count, 2X, as native above-frame text
+# (``IGtol.SetText(swGTolTextCalloutAbove, ...)``, read back by
+# ``IGtol.GetText``): B is the datum feature symbol on a frame that controls
+# two holes, the pattern, not the +X hole its leader lands on (blind machinist
+# review R4).  Not below it: R5's below-frame 2X
+# (``add_feature_control_frame(quantity=...)``) moved the native attachment
+# floor of the tag hung under the frame, and B printed at (161.37, 206.28) mm
+# for its (160.97, 200.72), 5.6 mm off, past add_frame_datum_feature's 3 mm.
+# Above the frame nothing hangs, so B keeps the tag placement proven before
+# the count, its offset from the frame's bottom unchanged.  SolidWorks 2026's
+# IGtol has no InsertAboveFrameTextAt; the above callout is its one
+# above-frame channel.  The above line is taken to print as the measured
+# below-frame one does (draw_fr_top_frame's pn-pen-v-block): left-aligned,
+# 1.1 mm off the outline, 3.4 mm tall, 2.6 mm a glyph, so "2X" spans the
+# frame's first 5.3 mm, its top 4.5 mm over the frame.  The 2X Ø callout's
+# shoulder, its lowest row sitting on it, printed at y 222.21 mm (farm run
+# 20261014T010316127Z): the 2X's top stands PIN_FRAME_QUANTITY_TOP_CLEARANCE
+# under it, more than a 3.5 mm text height (the layout audit's
+# TEXT_SEPARATION_HEIGHTS, wider than the 2.06 mm between a block's own rows),
+# so the 2X reads as the frame's and not as a sixth row of the Ø callout.  The
+# A-A cutting line runs at the hole centres' height and ends 2.6 mm left of
+# the frame, its arrows and letters above it:
+# PIN_FRAME_QUANTITY_SECTION_CLEARANCE under it.
 PIN_FRAME_QUANTITY = PIN_HOLE_PAIR_CALLOUT
-_BELOW_FRAME_TEXT_INSET = 0.0001
-_BELOW_FRAME_GLYPH = 0.0026
-PIN_FRAME_QUANTITY_RIGHT = (
-    PIN_FRAME_XY[0]
-    + _BELOW_FRAME_TEXT_INSET
-    + _BELOW_FRAME_GLYPH * len(PIN_FRAME_QUANTITY)
+_GTOL_TEXT_CALLOUT_ABOVE = 3  # swGTolTextParts_e.swGTolTextCalloutAbove
+_FRAME_TEXT_GAP = 0.0011
+_FRAME_TEXT_HEIGHT = 0.0034
+PIN_CALLOUT_SHOULDER_PRINTED_Y = 0.22221
+PIN_FRAME_QUANTITY_TOP = PIN_FRAME_XY[1] + _FRAME_TEXT_GAP + _FRAME_TEXT_HEIGHT
+PIN_FRAME_QUANTITY_TOP_CLEARANCE = (
+    PIN_CALLOUT_SHOULDER_PRINTED_Y - PIN_FRAME_QUANTITY_TOP
 )
-PIN_FRAME_QUANTITY_CLEARANCE = (
-    PIN_DATUM_B_XY[0] - DATUM_TAG_BOX / 2.0 - PIN_FRAME_QUANTITY_RIGHT
-)
-if PIN_FRAME_QUANTITY_CLEARANCE < 0.002:
+PIN_FRAME_QUANTITY_SECTION_CLEARANCE = TOP_CENTER[1] - PIN_FRAME_QUANTITY_TOP
+if min(PIN_FRAME_QUANTITY_TOP_CLEARANCE, PIN_FRAME_QUANTITY_SECTION_CLEARANCE) < 0.0035:
     raise AssertionError(
-        f"the dowel frame's {PIN_FRAME_QUANTITY} runs within "
-        f"{PIN_FRAME_QUANTITY_CLEARANCE * 1000.0:.1f} mm of datum B's box"
+        f"the dowel frame's above-frame {PIN_FRAME_QUANTITY} stands within "
+        f"{PIN_FRAME_QUANTITY_TOP_CLEARANCE * 1000.0:.1f} mm of the 2X Ø "
+        f"callout's shoulder or {PIN_FRAME_QUANTITY_SECTION_CLEARANCE * 1000.0:.1f} "
+        "mm of the A-A cutting line"
     )
 # The frame's leader lands on the +X hole's rim this far round from the
 # view's +X (sheet degrees, below the cutting line), on its own point, not
@@ -1233,8 +1251,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # callout's own leader lands; datum B is the symbol on that frame
     # (add_frame_datum_feature: the frame's datum identifier read "B" back and
     # printed nothing, run 20261009T171439353Z).  The frame carries its own
-    # 2X (PIN_FRAME_QUANTITY), so B reads as the two-hole pattern, not the
-    # one hole its leader lands on (blind machinist review R4).
+    # 2X (PIN_FRAME_QUANTITY) as above-frame text, so B reads as the two-hole
+    # pattern, not the one hole its leader lands on (blind machinist review
+    # R4); not below it, where it moved B's tag off its place (R5).
     pin_frame_angle = math.radians(PIN_FRAME_RIM_DEG)
     pin_hole_r_mm = PIN_HOLE_DIA / 2.0
     pin_frame_rim = min(
@@ -1263,9 +1282,20 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance=GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"],
         datums=("A",),
         diameter=True,
-        quantity=PIN_FRAME_QUANTITY,
         label="dowel hole pattern position",
     )
+    pin_gtol = _early_bound(pin_frame, "IGtol")
+    if not pin_gtol.SetText(_GTOL_TEXT_CALLOUT_ABOVE, PIN_FRAME_QUANTITY):
+        raise RuntimeError(
+            f"failed to set the dowel frame's above-frame {PIN_FRAME_QUANTITY!r}"
+        )
+    rebuild_drawing(adapter, label="dowel hole pattern frame count")
+    pin_frame_count = str(pin_gtol.GetText(_GTOL_TEXT_CALLOUT_ABOVE) or "")
+    if pin_frame_count != PIN_FRAME_QUANTITY:
+        raise RuntimeError(
+            f"the dowel frame's above-frame count read back {pin_frame_count!r}, "
+            f"expected {PIN_FRAME_QUANTITY!r}"
+        )
     add_frame_datum_feature(
         adapter,
         top,

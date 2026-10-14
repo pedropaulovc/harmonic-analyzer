@@ -384,8 +384,10 @@ def test_dowel_frame_leader_lands_apart_from_the_dowel_diameter_leader() -> None
     # Blind machinist review R3 (farm run 20261014T010316127Z): the 2X Ø's
     # arrowhead and datum B's frame's landed on the +X hole's lower-right rim
     # 0.10 mm apart, so the two leaders read as one.  The points below are
-    # that run's printed ones (sheet metres); the frame's elbow stands
-    # 6.35 mm left of its left end, at its middle height.
+    # that run's printed ones (sheet metres); the frame's elbow stood 6.35 mm
+    # left of its left end, at its middle height, its top then 6 mm under the
+    # Ø's shoulder start.  The frame has since dropped to PIN_FRAME_DROP under
+    # it (room for its above-frame 2X), its elbow with it.
     from _layout_audit import _segment_crossing
     from _layout_geometry import Segment
 
@@ -393,8 +395,11 @@ def test_dowel_frame_leader_lands_apart_from_the_dowel_diameter_leader() -> None
     run_frame_tip, run_frame_elbow = (0.13268, 0.23294), (0.14164, 0.21548)
     assert math.dist(run_dia_tip, run_frame_tip) < 0.0002
     frame_left, frame_top = drawing.PIN_FRAME_XY
+    run_frame_top = drawing.PIN_CALLOUT_SHOULDER_START[1] - 0.006
+    run_elbow = (frame_left - 0.00635, run_frame_top - drawing.PIN_FRAME_SIZE[1] / 2.0)
+    assert math.dist(run_elbow, run_frame_elbow) < 0.0003
+    assert run_frame_top - frame_top == pytest.approx(0.005)
     elbow = (frame_left - 0.00635, frame_top - drawing.PIN_FRAME_SIZE[1] / 2.0)
-    assert math.dist(elbow, run_frame_elbow) < 0.0003
     centre = (drawing._sheet_x(sm_knife_mount_spec.PIN_HOLE_X), drawing.TOP_CENTER[1])
     rim = sm_knife_mount_spec.PIN_HOLE_DIA / 2.0 * drawing.SHEET_SCALE[0] / 1000.0
     assert math.dist(centre, run_dia_tip) == pytest.approx(rim, abs=0.0002)
@@ -591,33 +596,62 @@ def test_native_gdt_and_bore_geometry() -> None:
     }
     assert sm_knife_mount_spec.KNIFE_BORE_ORIENTATION_TOL == 0.05
     # R4 blocker: datum B is the 2X pattern.  The pattern's frame -- the one
-    # datum B's symbol is attached to -- prints its own native 2X below-frame
-    # quantity (read back in add_feature_control_frame), and it is the only
-    # frame that does.
+    # datum B's symbol is attached to -- prints its own native 2X above-frame
+    # text (IGtol.SetText(swGTolTextCalloutAbove), read back after a rebuild
+    # before B attaches).  R5: the below-frame quantity moved B's tag 5.6 mm
+    # off its place, so no frame takes ``quantity=`` any more.
     assert drawing.PIN_FRAME_QUANTITY == sm_knife_mount_spec.PIN_HOLE_PAIR_CALLOUT
     assert drawing.PIN_FRAME_QUANTITY == f"{sm_knife_mount_spec.PIN_HOLE_COUNT}X"
     assert sm_knife_mount_spec.PIN_HOLE_COUNT == 2
-    assert source.count("quantity=PIN_FRAME_QUANTITY,") == 1
-    assert sum(
+    assert drawing._GTOL_TEXT_CALLOUT_ABOVE == 3  # swGTolTextCalloutAbove
+    assert "quantity=PIN_FRAME_QUANTITY" not in source
+    assert not any(
         keyword.arg == "quantity" for frame in frames for keyword in frame.keywords
-    ) == 1
+    )
     pin_frame = source[source.index("    pin_frame = add_feature_control_frame(") :]
     pin_frame = pin_frame[: pin_frame.index("    )\n")]
-    assert "quantity=PIN_FRAME_QUANTITY," in pin_frame
     assert 'GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"]' in pin_frame
+    count = source[source.index("    pin_gtol = _early_bound(pin_frame, \"IGtol\")") :]
+    count = count[: count.index("    add_frame_datum_feature(")]
+    assert source.count("_GTOL_TEXT_CALLOUT_ABOVE, PIN_FRAME_QUANTITY") == 1
+    assert "if not pin_gtol.SetText(_GTOL_TEXT_CALLOUT_ABOVE, PIN_FRAME_QUANTITY):" in count
+    assert count.index("SetText(") < count.index("rebuild_drawing(") < count.index(
+        "GetText(_GTOL_TEXT_CALLOUT_ABOVE)"
+    )
+    assert "if pin_frame_count != PIN_FRAME_QUANTITY:\n        raise RuntimeError(" in count
+    assert source.index("    pin_gtol = _early_bound(") < source.index(
+        "    add_frame_datum_feature("
+    )
     datum_b = source[source.index("    add_frame_datum_feature(") :]
     datum_b = datum_b[: datum_b.index("    )\n")]
     assert "pin_frame," in datum_b and 'datum="B"' in datum_b
-    # The 2X (left-aligned 1.1 mm under the frame, 2.6 mm a glyph) ends left
-    # of datum B's box, hung at the frame's mid-width.
-    assert drawing.PIN_FRAME_QUANTITY_RIGHT == pytest.approx(
-        drawing.PIN_FRAME_XY[0] + 0.0001 + 2 * 0.0026
+    assert "symbol_xy=PIN_DATUM_B_XY," in datum_b
+    assert "position_tolerance_m" not in datum_b
+    # The 2X (left-aligned 1.1 mm over the frame, 3.4 mm tall, as the
+    # measured below-frame line) tops out a text height and more under the
+    # 2X Ø callout's shoulder, printed at y 222.21 mm (farm run
+    # 20261014T010316127Z), and well under the A-A cutting line.
+    from _layout_audit import TEXT_SEPARATION_HEIGHTS
+
+    assert drawing.PIN_CALLOUT_SHOULDER_PRINTED_Y == pytest.approx(0.22221)
+    assert drawing.PIN_FRAME_QUANTITY_TOP == pytest.approx(
+        drawing.PIN_FRAME_XY[1] + 0.0011 + 0.0034
     )
+    assert drawing.PIN_FRAME_QUANTITY_TOP_CLEARANCE == pytest.approx(0.00371)
+    assert drawing.PIN_FRAME_QUANTITY_TOP_CLEARANCE >= TEXT_SEPARATION_HEIGHTS * 0.0035
+    assert drawing.PIN_FRAME_QUANTITY_SECTION_CLEARANCE == pytest.approx(0.0165)
+    section_end_x = drawing._sheet_x(
+        sm_knife_mount_spec.BLK_HALF_X + drawing.SECTION_LINE_OVERRUN_MM
+    )
+    assert drawing.PIN_FRAME_XY[0] - section_end_x == pytest.approx(0.0026)
+    # B keeps its proven tag placement: 5 mm of stem under the frame's
+    # bottom, at its mid-width, through the shared helper's default gate.
     assert drawing.PIN_DATUM_B_XY[0] - drawing.DATUM_TAG_BOX / 2.0 == pytest.approx(
         drawing.PIN_FRAME_XY[0] + 0.0112
     )
-    assert drawing.PIN_FRAME_QUANTITY_CLEARANCE == pytest.approx(0.0059)
-    assert drawing.PIN_FRAME_QUANTITY_CLEARANCE >= 0.002
+    assert drawing.PIN_DATUM_B_XY[1] == pytest.approx(
+        drawing.PIN_FRAME_XY[1] - drawing.PIN_FRAME_SIZE[1] - 0.005 - 0.007
+    )
     # Sheet-added: the block depth, the dowel span, the tap axis's station
     # from a dowel axis and the bore centre's height under A (all BASIC), and
     # the pattern's two face locations; the

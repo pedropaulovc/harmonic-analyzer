@@ -2090,6 +2090,136 @@ def test_hanger_callout_and_frame_clear_the_border_and_each_other() -> None:
     assert frame_x + 0.00275 * len(drawing.HANGER_CENTER_QUALIFIER) < drawing.SHEET_FRAME[2]
 
 
+# R5's native HOLES-SOCKETS leader runs (sheet m) behind its one enforced
+# leader-crosses-leader: the spotface callout's diameter run and the
+# centring frame's run to its default clearance-rim landing.
+R5_HANGER_CALLOUT_RUN = ((0.1800, 0.1997), (0.1872, 0.2042))
+R5_HANGER_FRAME_RUN = ((0.1936, 0.2605), (0.1826, 0.2009))
+
+
+def _segment_crossing(a, b):
+    (x1, y1), (x2, y2) = a
+    (x3, y3), (x4, y4) = b
+    det = (x2 - x1) * (y4 - y3) - (y2 - y1) * (x4 - x3)
+    if det == 0.0:
+        return None
+    t = ((x3 - x1) * (y4 - y3) - (y3 - y1) * (x4 - x3)) / det
+    u = ((x3 - x1) * (y2 - y1) - (y3 - y1) * (x2 - x1)) / det
+    if not (0.0 <= t <= 1.0 and 0.0 <= u <= 1.0):
+        return None
+    return (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
+
+
+def _point_to_segment(p, segment):
+    (x1, y1), (x2, y2) = segment
+    dx, dy = x2 - x1, y2 - y1
+    t = max(0.0, min(1.0, ((p[0] - x1) * dx + (p[1] - y1) * dy) / (dx * dx + dy * dy)))
+    return math.dist(p, (x1 + t * dx, y1 + t * dy))
+
+
+def test_hanger_frame_lands_on_the_rim_clear_of_the_callout_leader() -> None:
+    """R5: the frame's default landing on the clearance rim put its leader
+    across the spotface callout's diameter run at (182.7,201.4) mm.  It now
+    lands on the same rim up-right of the axis, the frame's side of that run,
+    and right of D's trace (the 182.0 extension line)."""
+    centre = _plan(part.HANGER_X, part.STUD_Z_FRONT)
+    radius = spec.HANGER_CLEARANCE_DIA / 2.0 * _S
+    callout_a, callout_b = R5_HANGER_CALLOUT_RUN
+    frame_start, old_landing = R5_HANGER_FRAME_RUN
+    # The logged runs: a spotface diameter through the axis, and a run to the
+    # clearance rim, crossing where R5 reported.
+    assert math.dist(
+        ((callout_a[0] + callout_b[0]) / 2.0, (callout_a[1] + callout_b[1]) / 2.0), centre
+    ) < 0.0002
+    assert math.dist(callout_a, callout_b) == pytest.approx(spec.HANGER_SPOTFACE_DIA * _S, abs=0.0002)
+    assert math.dist(old_landing, centre) == pytest.approx(radius, abs=0.0002)
+    assert _segment_crossing(R5_HANGER_CALLOUT_RUN, R5_HANGER_FRAME_RUN) == pytest.approx(
+        (0.1827, 0.2014), abs=1e-4,
+    )
+    # The landing: a real point on the selected clearance rim at the spotface
+    # floor, at the declared bearing, between the callout's run and D's trace.
+    x, y, z = drawing.hanger_center_landing()
+    assert y == spec.HANGER_SPOTFACE_FLOOR_Y
+    assert math.hypot(x - part.HANGER_X, z - part.STUD_Z_FRONT) == pytest.approx(
+        spec.HANGER_CLEARANCE_DIA / 2.0
+    )
+    landing = _plan(x, z)
+    assert math.dist(landing, centre) == pytest.approx(radius)
+    bearing = math.degrees(math.atan2(landing[1] - centre[1], landing[0] - centre[0]))
+    assert bearing == pytest.approx(drawing.HANGER_CENTER_LANDING_DEG)
+    callout_bearing = math.degrees(
+        math.atan2(callout_b[1] - callout_a[1], callout_b[0] - callout_a[0])
+    )
+    assert callout_bearing + 15.0 < bearing < 90.0
+    # A different rim point from R5's default, not a nudge of it.
+    assert math.dist(landing, old_landing) > radius
+
+    def side(p):
+        return (callout_b[0] - callout_a[0]) * (p[1] - callout_a[1]) - (
+            callout_b[1] - callout_a[1]
+        ) * (p[0] - callout_a[0])
+
+    # R5's landing sat across the callout's diameter from the frame; the new
+    # one shares the frame's side, so the run cannot cross it.
+    assert side(old_landing) < 0.0 < side(frame_start)
+    assert side(landing) > 0.0
+    rerouted = (frame_start, landing)
+    assert _segment_crossing(R5_HANGER_CALLOUT_RUN, rerouted) is None
+    gap = min(
+        *(_point_to_segment(p, R5_HANGER_CALLOUT_RUN) for p in rerouted),
+        *(_point_to_segment(p, rerouted) for p in R5_HANGER_CALLOUT_RUN),
+    )
+    assert gap > 0.0005 > drawing.ARROW_HALF_WIDTH
+    # Wholly right of D's trace: the 182.0 extension line is never reached.
+    assert min(landing[0], frame_start[0]) - centre[0] > drawing.ARROW_HALF_WIDTH
+
+
+def test_hanger_frame_keeps_its_exact_edge_and_lands_by_selection_point() -> None:
+    import ast
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    (frame,) = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "add_feature_control_frame"
+        and any(
+            keyword.arg == "label"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "hanger axes on crossbar median plane"
+            for keyword in node.keywords
+        )
+    ]
+    keywords = {k.arg: k.value for k in frame.keywords}
+    names = {
+        arg: keywords[arg].id
+        for arg in ("edge_entity", "leader_attach_xy", "frame_xy", "quantity")
+        if isinstance(keywords[arg], ast.Name)
+    }
+    assert names == {
+        "edge_entity": "hanger_hole_edge",
+        "leader_attach_xy": "hanger_center_landing_xy",
+        "frame_xy": "HANGER_CENTER_FRAME_XY",
+        "quantity": "HANGER_CENTER_QUALIFIER",
+    }
+    assert ast.literal_eval(keywords["datums"]) == ("D",)
+    assert "diameter" not in keywords and "edge_xy" not in keywords
+    (landing,) = [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and [getattr(t, "id", None) for t in node.targets] == ["hanger_center_landing_xy"]
+    ]
+    assert isinstance(landing, ast.Call) and landing.func.id == "model_point_in_view"
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "hanger_center_landing"
+        for node in ast.walk(landing)
+    )
+
+
 def test_crossbar_datum_requires_the_exact_native_width_attachment(monkeypatch) -> None:
     import inspect
     from types import SimpleNamespace
