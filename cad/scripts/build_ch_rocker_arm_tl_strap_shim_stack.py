@@ -29,8 +29,7 @@ from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
-from _sketch import SketchDims, ensure_fully_defined
-from _sketch_rectangle import define_centered_rectangle
+from _sketch import SketchDims, add_line_chain, dimension_between, ensure_fully_defined
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
@@ -65,9 +64,6 @@ _SAVED_DRAWING_PROPERTIES = (
 
 V_SHIM = STACK_LENGTH * STACK_WIDTH * SHIM_THICK
 V_STRIP = STACK_LENGTH * STACK_WIDTH * STRIP_THICK
-# The ground piece's rectangle is drawn at this fraction of full size: its
-# edges then sit 3 x 1.8 mm inside the pack's, beyond any inference snap.
-STRIP_SEED = 0.7
 
 
 def _body_boxes(adapter) -> list[tuple[float, ...]]:
@@ -95,24 +91,67 @@ def _require_layers(adapter, *, label: str) -> None:
         )
 
 
-async def _profile(
-    adapter, label: str, feature: str, seed: float = 1.0
-) -> list[tuple[str, str]]:
-    """A centred StackLength x StackWidth rectangle on Front, drawn at ``seed``
-    times its size; the equations take it to full size."""
+async def _profile(adapter, label: str, feature: str) -> list[tuple[str, str]]:
+    """An origin-centred StackLength x StackWidth rectangle on Front, authored
+    with sketch inference bypassed (``AddToDB``), as the square branch of
+    ``define_centered_rectangle`` does. The ground piece's outline lies exactly
+    on the pack's bottom edges: drawn through the inference engine (that
+    helper's non-square ``CreateCenterRectangle`` path), it was tied to those
+    model edges and its dimensions turned driven, which the equations reject
+    (farm rounds 1 and 2)."""
+    half_x, half_z = STACK_LENGTH / 2.0, STACK_WIDTH / 2.0
+    points = [
+        (-half_x, -half_z),
+        (half_x, -half_z),
+        (half_x, half_z),
+        (-half_x, half_z),
+    ]
     dims = SketchDims()
     check(f"create_sketch {label}", await adapter.create_sketch("Front"))
-    await define_centered_rectangle(
-        adapter,
-        seed * STACK_LENGTH / 2.0,
-        seed * STACK_WIDTH / 2.0,
-        label,
-        dims=dims,
-        name_width="StackLength",
-        name_depth="StackWidth",
-        drive_width='"StackLength"',
-        drive_depth='"StackWidth"',
+    edges = await add_line_chain(adapter, points)
+    sketch_mgr = adapter.currentSketchManager
+    previous_add_to_db = bool(sketch_mgr.AddToDB)
+    sketch_mgr.AddToDB = True
+    try:
+        diagonal_id = check(
+            f"add construction diagonal {label}",
+            await adapter.add_line(*points[0], *points[2]),
+        )
+        # ConstructionGeometry is declared on ISketchSegment, not ISketchLine.
+        _early_bound(
+            adapter._sketch_entities[diagonal_id], "ISketchSegment"
+        ).ConstructionGeometry = True
+    finally:
+        sketch_mgr.AddToDB = previous_add_to_db
+    for edge, direction in zip(
+        edges, ("horizontal", "vertical", "horizontal", "vertical"), strict=True
+    ):
+        check(
+            f"{label} {direction} {edge}",
+            await adapter.add_sketch_constraint(edge, None, direction),
+        )
+    check(
+        f"{label} midpoint -> origin",
+        await adapter.add_sketch_constraint("origin", diagonal_id, "midpoint"),
     )
+    await dimension_between(
+        adapter,
+        f"{edges[0]}.start",
+        f"{edges[0]}.end",
+        "horizontal_distance",
+        STACK_LENGTH,
+        f"{label} width",
+    )
+    dims.record("StackLength", '"StackLength"')
+    await dimension_between(
+        adapter,
+        f"{edges[1]}.start",
+        f"{edges[1]}.end",
+        "vertical_distance",
+        STACK_WIDTH,
+        f"{label} depth",
+    )
+    dims.record("StackWidth", '"StackWidth"')
     await ensure_fully_defined(adapter, f"{label} sketch")
     check(f"exit_sketch {label}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
@@ -142,12 +181,8 @@ async def build(adapter) -> dict[str, str]:
     )
     await volume_check(adapter, "shim pack", V_SHIM, 0.005 * V_SHIM)
 
-    # The ground piece: one separate solid on the pack. Its outline is the
-    # pack's, on the same Front plane: drawn there at full size, inference ties
-    # the new rectangle to the pack's bottom edges and its dimensions turn
-    # driven, which the equations then reject (farm rounds 1 and 2). Drawn at
-    # STRIP_SEED clear of those edges, the equations bring it to full size.
-    drive_jobs += await _profile(adapter, "ground piece", "StripProfile", STRIP_SEED)
+    # The ground piece: one separate solid on the pack.
+    drive_jobs += await _profile(adapter, "ground piece", "StripProfile")
     extrude_at_offset(adapter, STRIP_THICK, SHIM_THICK, merge_result=False)
     name_last_feature(adapter, "Strip")
     # Offset bosses expose depth first and start offset second. Only the depth
@@ -156,16 +191,17 @@ async def build(adapter) -> dict[str, str]:
     # _require_layers proves it seats the piece on the pack.
     strip_thick = name_dimensions(adapter, "Strip", ["StripThick", "StripSeat"])[0]
     drive_jobs.append((strip_thick, '"StripThick"'))
-    seed_strip = STRIP_SEED * STRIP_SEED * V_STRIP
-    await volume_check(adapter, "seed stack", V_SHIM + seed_strip, 0.005 * seed_strip)
-    _require_layers(adapter, label="seed stack")
+    volume = await volume_check(
+        adapter, "stack", V_SHIM + V_STRIP, 0.005 * (V_SHIM + V_STRIP)
+    )
+    _require_layers(adapter, label="stack")
 
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
         await drive_dimension(adapter, dimension_name, expression)
     await force_rebuild(adapter)
     await volume_check(
-        adapter, "driven stack", V_SHIM + V_STRIP, 0.002 * (V_SHIM + V_STRIP)
+        adapter, "driven stack (equations neutral)", volume, 0.002 * volume
     )
     _require_layers(adapter, label="driven stack")
 
