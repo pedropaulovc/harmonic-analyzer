@@ -901,6 +901,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.PORTRAIT,
     ),
     DrawingSpec(
+        name="fr_nameplate",
+        part="fr_nameplate",
+        artifact_stem="fr-nameplate",
+        script_name="draw_fr_nameplate.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="dt_cone_swing_platform",
         part="dt_cone_swing_platform",
         artifact_stem="dt-cone-swing-platform",

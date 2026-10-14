@@ -73,6 +73,8 @@ from fr_frame_attachment_spec import (
     TOP_SCREW_Y,
     TUBE_CROSS_HOLE_DIAMETER,
 )
+from fr_harmonic_base_spec import DECK_HALF_X
+from fr_nameplate_spec import MOUNT_POS as NAMEPLATE_MOUNT_POS
 from vn_frame_cross_screw_spec import (
     HEAD_DIA as CROSS_SCREW_HEAD_DIA,
     SHANK_DIA as CROSS_SCREW_SHANK_DIA,
@@ -92,6 +94,11 @@ OUTPUTS = DrawingOutputs(
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
+
+# Step 9 sets MHA-FR-004 before its base seats are spotted through it (#628):
+# the plate's lower edge as lettered (plate y = 0) lies at machine x =
+# MOUNT_POS[0], parallel to the deck's MHA-FR-004 end at DECK_HALF_X.
+NAMEPLATE_END_INSET = DECK_HALF_X - NAMEPLATE_MOUNT_POS[0]
 
 
 SHEET_NAMES = (
@@ -237,8 +244,11 @@ ASSEMBLY_STEPS = "\n".join(
         "   INSIDE SEAT.",
         "8. SEAT MHA-FR-005 ON DECK, WINDOWS TOWARD LONG SIDES; INSTALL FOUR",
         "   MHA-VN-009 TOP-DOWN AND DRAW DOWN EVENLY UNTIL ALL HEADS SEAT.",
-        "9. INSTALL MHA-FR-004 DECORATED FACE UP; SEAT ALL FOUR MHA-VN-006",
-        "   HEADS.",
+        "9. SET MHA-FR-004 DECORATED FACE UP, CENTRED FRONT TO REAR, ITS LOWER",
+        f"   EDGE AS LETTERED {NAMEPLATE_END_INSET:.1f} INSIDE THE DECK'S "
+        "MHA-FR-004 END, PARALLEL;",
+        "   CLAMP. SPOT MHA-FR-001 THROUGH ITS FOUR HOLES; DRILL AND TAP EACH",
+        "   PER ITS MHA-FR-001 TRANSFER CALLOUT. SEAT ALL FOUR MHA-VN-006 HEADS.",
         "10. START MHA-VN-023 IN THE GOOSENECK HUB; LEAVE ITS CUP POINT CLEAR.",
     )
 )

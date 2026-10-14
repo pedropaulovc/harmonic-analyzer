@@ -248,6 +248,12 @@ PEDESTAL_CALLOUT_XY = (0.200, 0.252)
 BLOCK_CALLOUT_XY = (0.272, 0.252)
 SPRING_CALLOUT_XY = (0.315, 0.1448)
 CROSS_TAP_CALLOUT_XY = (0.285, 0.120)
+# The nameplate callout (#628): three rows, its top row level with the block
+# callout's, right of it in the band above the plan and high over section
+# arrow A's head and letter. Its near, left shoulder end stands over the
+# rear-east nameplate tap, so its leader drops almost straight onto it, east
+# of E4's tag and west of section arrow A's shank.
+NAMEPLATE_CALLOUT_XY = (0.362, 0.255)
 # The holes-sheet plan's view label, top-left corner. Centred over the plan it
 # sat under the transfer callouts, and the MHA-DT-002 leader, which has to reach
 # the pedestal seats beneath it, ran through "TOP" (hb-render-2 eye pass).
@@ -387,7 +393,8 @@ HOLE_TAG_POSITIONS = {
     # The transferred pinion-rig seats left the table (U28 corollary), and
     # with U34c the arbor-pedestal seats followed them, taking the last #4-40
     # rows (the former E) along. The native tags re-letter: the
-    # rocker-support taps are now E and the nameplate seats are now F.
+    # rocker-support taps are now E; the nameplate seats, the former F, are
+    # transferred too (#628).
     # North-east of its tap, short of E3's tap and west of the nameplate's
     # rear-west tap, whose mark the former (0.306, 0.187) box sat on.
     "E1": (0.297, 0.1895),
@@ -395,34 +402,6 @@ HOLE_TAG_POSITIONS = {
     "E3": (0.312, 0.173),
     "E4": (0.312, 0.214),
 }
-# The nameplate taps sit on the plate's DXF screw marks, about 2 mm (at 1:4)
-# inside the deck's east edge with section line A 7.5 mm east of that, so a
-# tag east of section A's line crosses it (F3/F4 at ec323b4eb: crossed
-# section line A and each other). Nor do four tags fit inside the 9 x 23 mm
-# four-tap quad: two tags whose columns overlap read as one block unless a
-# full row pitch (5.4 mm) separates them (enforced merged-blocks, ab1f78504),
-# and E4 already stands over the quad. So the west taps' tags read just east
-# of their taps, inside the quad -- the front one stepped down a row pitch
-# under E4, the rear one stepped down away from E1, whose box ends beside
-# that tap -- and the east taps' tags read in the open pad strip between the
-# deck's east edge and section line A, a row pitch clear of A3 and A4. Placed
-# from each tag's own table row, not its letter, so a re-lettered or
-# re-sorted table still lands each tag beside its own tap.
-# (east tap, rear tap) -> (tap centre to tag box's left edge, tap centre to
-# tag mid-height), sheet m. A tag's insertion point is its box's top-left: F3
-# at (342.5, 181.0) mm started its leader at (342.5, 179.2), mid-height of a
-# 3.5 mm tag.
-NAMEPLATE_TAG_OFFSETS = {
-    (False, False): (0.0025, -0.0040),
-    (False, True): (0.0025, -0.0020),
-    (True, False): (0.0033, -0.0036),
-    (True, True): (0.0033, 0.0010),
-}
-_HOLE_TAG_HALF_HEIGHT_M = 0.00175
-_NAMEPLATE_QUAD_CENTRE_XZ = (
-    sum(x for x, _ in NAMEPLATE_SCREW_XZ) / len(NAMEPLATE_SCREW_XZ),
-    sum(z for _, z in NAMEPLATE_SCREW_XZ) / len(NAMEPLATE_SCREW_XZ),
-)
 
 # Hole-table origin is the finished plate's lower-left theoretical sharp
 # corner. The physical corner is filleted, so the native table is seeded from
@@ -446,24 +425,6 @@ def _plan_xy(
 def _hole_rim(x_mm: float, z_mm: float, diameter_mm: float) -> tuple[float, float]:
     """Sheet pick on a hole-sheet plan rim, offset in machine +X."""
     return _plan_xy(x_mm + diameter_mm / 2.0, z_mm, center=HOLE_TOP_CENTER)
-
-
-def _nameplate_tag_position(
-    table_mm: tuple[float, float],
-) -> tuple[float, float] | None:
-    """Tag insertion point for the nameplate tap at hole-table ``table_mm``,
-    or ``None`` when that row is not a nameplate tap."""
-    x_mm = table_mm[0] - BOTTOM_LENGTH / 2.0
-    z_mm = BOTTOM_REAR_Z - table_mm[1]
-    # The table prints two places, so a row matches its tap within 0.01 mm.
-    if not any(
-        abs(x_mm - x) < 0.01 and abs(z_mm - z) < 0.01 for x, z in NAMEPLATE_SCREW_XZ
-    ):
-        return None
-    hole_x, hole_y = _plan_xy(x_mm, z_mm, center=HOLE_TOP_CENTER)
-    centre_x, centre_z = _NAMEPLATE_QUAD_CENTRE_XZ
-    dx, dy = NAMEPLATE_TAG_OFFSETS[(x_mm > centre_x, z_mm > centre_z)]
-    return (hole_x + dx, hole_y + dy + _HOLE_TAG_HALF_HEIGHT_M)
 
 
 @_telemetry.traced("drawing.base_cross_tap_edge")
@@ -685,19 +646,7 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
             float(table.DisplayedText2(row, column, False))
             for column in (1, 2)
         )
-    nameplate_tags = {
-        tag: position
-        for tag, location in table_locations.items()
-        if (position := _nameplate_tag_position(location)) is not None
-    }
-    if len(nameplate_tags) != len(NAMEPLATE_SCREW_XZ):
-        raise RuntimeError(
-            f"hole table carries {sorted(nameplate_tags)} for the "
-            f"{len(NAMEPLATE_SCREW_XZ)} nameplate taps: {table_locations!r}"
-        )
-    if overlap := set(nameplate_tags) & set(HOLE_TAG_POSITIONS):
-        raise RuntimeError(f"nameplate tags also placed by letter: {sorted(overlap)}")
-    remaining = {**HOLE_TAG_POSITIONS, **nameplate_tags}
+    remaining = dict(HOLE_TAG_POSITIONS)
     found = set()
     for raw in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw, "IAnnotation")
@@ -718,7 +667,7 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
             raise RuntimeError(f"failed to reposition native hole tag {tag}")
         if str(note.GetText()).strip() != tag:
             raise RuntimeError(f"moving native hole tag changed its text: {tag}")
-        if tag in ("D1", "E1", "E3") or tag in nameplate_tags:
+        if tag in ("D1", "E1", "E3"):
             points = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
             if len(points) < 6 or len(points) % 3:
                 raise RuntimeError(f"native hole tag {tag} has no complete leader: {points!r}")
@@ -769,6 +718,18 @@ TRANSFER_PEDESTAL_HOLES = tuple(
 TRANSFER_BLOCK_CALLOUT = f"TRANSFER FROM MHA-DT-018\n{TRANSFER_AFTER_RIG_SET}\n"
 TRANSFER_SPRING_CALLOUT = f"TRANSFER FROM MHA-DT-024\n{TRANSFER_AFTER_RIG_SET}"
 TRANSFER_PEDESTAL_CALLOUT = "TRANSFER FROM MHA-DT-002\nAT ASSEMBLY;\n"
+# #628 (Main ruling, option A): the base's #4-40 nameplate taps are spotted
+# through the finished MHA-FR-004 plate's corner holes, its frame-assembly
+# step setting the plate first. Like the spring callout, the instruction joins
+# the thread line, so the callout stays three rows in the band above the plan.
+TRANSFER_NAMEPLATE_HOLES = tuple(
+    (x, z, NAMEPLATE_SCREW_HOLE_DIA) for x, z in NAMEPLATE_SCREW_XZ
+)
+TRANSFER_NAMEPLATE_CALLOUT = "TRANSFER FROM MHA-FR-004\nAT ASSEMBLY;"
+# Its leader lands on the rear-east tap (right and upper on the plan).
+TRANSFER_NAMEPLATE_LEADER_HOLE = max(
+    TRANSFER_NAMEPLATE_HOLES, key=lambda hole: (round(hole[0], 1), -hole[1])
+)
 # The RIG SET note heads the sheet-2 notes column, under the hole table and
 # short of the 38.1 cross-screw-axis callout.  The sheet-2 callout check
 # measures its read-back ink like a callout's: against every callout AND every
@@ -810,7 +771,12 @@ PIVOT_SEAT_NOTE_XY = (0.020, 0.078)
 # CENTRES" was a location, now the CrossTapX/CrossTapPitch dimensions, and
 # the spotface callout's 4X FRONT/REAR already counts the faces.
 CROSS_TAP_PROCESS = "THRU BOTH WALLS, SINGLE CONTINUOUS THREAD\n"
-TRANSFER_HOLES = (*TRANSFER_BLOCK_HOLES, TRANSFER_SPRING_HOLE, *TRANSFER_PEDESTAL_HOLES)
+TRANSFER_HOLES = (
+    *TRANSFER_BLOCK_HOLES,
+    TRANSFER_SPRING_HOLE,
+    *TRANSFER_PEDESTAL_HOLES,
+    *TRANSFER_NAMEPLATE_HOLES,
+)
 
 # One row per native Hole Wizard tapped-seat FEATURE build_harmonic_base cuts
 # down into the deck (its SupportHoldDownSeats call plus its seat-group loop),
@@ -936,7 +902,7 @@ _SHALLOW_ROUND_BOSSES = sum(shape[0] == "disc" for shape in SHALLOW_BOSS_SHAPES)
 if _DEEP_ROUND_BOSSES != len(HOLE_XZ) + len(FOOT_SCREW_XZ):
     raise AssertionError("the deep round bosses are not E1-E4 and the foot boss")
 if _SHALLOW_ROUND_BOSSES != len(SHALLOW_BOSS_CENTRES):
-    raise AssertionError("the shallow round bosses are not B1, D1 and F1-F4")
+    raise AssertionError("the shallow round bosses are not B1, D1 and MHA-FR-004's")
 # Each level is named, not typed: section B-B prints its height (DEEP LEVEL /
 # SHALLOW LEVEL under the model's DeepBossBottom and ShallowBossBottom).
 UNDERSIDE_BOTTOM_CALLOUTS = {
@@ -949,7 +915,7 @@ UNDERSIDE_BOTTOM_CALLOUTS = {
         f"{_DEEP_ROUND_BOSSES}X BOSSES UNDER\nE1-E4, MHA-DT-024\nTO DEEP LEVEL"
     ),
     "ShallowBoss4Dia": (
-        f"{_SHALLOW_ROUND_BOSSES}X BOSSES UNDER\nB1, D1, F1-F4\nTO SHALLOW LEVEL"
+        f"{_SHALLOW_ROUND_BOSSES}X BOSSES UNDER\nB1, D1, MHA-FR-004\nTO SHALLOW LEVEL"
     ),
 }
 # Section B-B texts as MACHINE (Y, Z) points in the cut plane, projected
@@ -2111,12 +2077,16 @@ async def build(adapter: Any) -> dict[str, str]:
             TRANSFER_BLOCK_HOLES[1],
             TRANSFER_SPRING_HOLE,
             TRANSFER_PEDESTAL_HOLES[0],
+            TRANSFER_NAMEPLATE_LEADER_HOLE,
         ),
     )
     hole_entities = rim_entities[: len(TABLE_HOLES)]
-    transfer_block_rim, transfer_spring_rim, transfer_pedestal_rim = rim_entities[
-        len(TABLE_HOLES) :
-    ]
+    (
+        transfer_block_rim,
+        transfer_spring_rim,
+        transfer_pedestal_rim,
+        transfer_nameplate_rim,
+    ) = rim_entities[len(TABLE_HOLES) :]
     hole_table = insert_hole_table(
         adapter,
         hole_top,
@@ -2170,7 +2140,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # the block one so their leaders fan apart onto the rear seats. The
     # spring callout keeps the band between the plan's bottom edge and the
     # cross-screw callout, left of the section-A arrow (render r4 had it
-    # colliding with the 4X cross-screw callout).
+    # colliding with the 4X cross-screw callout). The 4X nameplate callout
+    # (#628) takes the same band right of the block one.
     block_callout = add_native_hole_callout(
         adapter,
         hole_top,
@@ -2194,6 +2165,14 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=SPRING_CALLOUT_XY,
         label="pinion-spring transfer seat",
         process=TRANSFER_SPRING_CALLOUT,
+    )
+    nameplate_callout = add_native_hole_callout(
+        adapter,
+        hole_top,
+        edge=transfer_nameplate_rim,
+        callout_xy=NAMEPLATE_CALLOUT_XY,
+        label="nameplate transfer seats",
+        process=TRANSFER_NAMEPLATE_CALLOUT,
     )
     tap_callout = add_native_hole_callout(
         adapter,
@@ -2401,6 +2380,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "MHA-DT-018 block transfer": block_callout,
         "MHA-DT-002 pedestal transfer": pedestal_callout,
         "MHA-DT-024 spring transfer": spring_callout,
+        "MHA-FR-004 nameplate transfer": nameplate_callout,
         "MHA-VN-027 cross-tap": tap_callout,
     }
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):

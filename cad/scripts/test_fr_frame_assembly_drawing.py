@@ -547,3 +547,23 @@ def test_short_balloon_restores_fit_when_zooming_or_positioning_fails(
     zoomed = 2 * drawing._SHORT_BALLOON_ZOOM_HALF
     expected = [None, pytest.approx(zoomed)] if fault == "position" else [None]
     assert [span for _xy, span in placed_at] == expected
+
+
+def test_step_9_sets_the_nameplate_then_spots_its_base_seats_through_it() -> None:
+    # #628: the base sheet prints the four nameplate seats as TRANSFER FROM
+    # MHA-FR-004 AT ASSEMBLY, so the step locates the plate on the deck, then
+    # spots, drills and taps through it before the screws go in.
+    import build_fr_harmonic_base as base
+
+    steps = drawing.ASSEMBLY_STEPS.splitlines()
+    start = next(i for i, line in enumerate(steps) if line.startswith("9. "))
+    end = next(i for i, line in enumerate(steps) if line.startswith("10. "))
+    step = " ".join(line.strip() for line in steps[start:end])
+    assert drawing.NAMEPLATE_END_INSET == pytest.approx(base.NAMEPLATE_DECK_CLEARANCE)
+    assert (
+        f"{base.NAMEPLATE_DECK_CLEARANCE:.1f} INSIDE THE DECK'S MHA-FR-004 END" in step
+    )
+    spot = step.index("SPOT MHA-FR-001 THROUGH ITS FOUR HOLES")
+    assert step.index("CLAMP.") < spot < step.index("TRANSFER CALLOUT")
+    assert step.index("TRANSFER CALLOUT") < step.index("SEAT ALL FOUR MHA-VN-006 HEADS")
+    assert max(map(len, steps)) <= 72
