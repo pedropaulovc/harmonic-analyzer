@@ -3248,6 +3248,8 @@ def task_check():
         SCRIPTS_DIR / "test_cylinder_bank_layout.py",
         # ... and MHA-VN-055, the fulcrum keepers' #1-72 cup-point set screw.
         SCRIPTS_DIR / "test_vn_fulcrum_set_screw.py",
+        # ... and MHA-VN-007, the pen hanger's #8-32 screw (McMaster 93075A199).
+        SCRIPTS_DIR / "test_vn_hanger_screw.py",
         # ... and #936: the rocker-bank stack, the support's bracket seats, the
         # channel's cross-bank axial budget and the hole-callout process line.
         SCRIPTS_DIR / "test_channel_axial_budget.py",
