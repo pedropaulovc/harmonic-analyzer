@@ -327,11 +327,15 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     "PivotChamferSize": "X 45 DEG",
     "ReliefWidth": f"CLEARS MARKER BODY\n{MARKER_NUMBER}",
 }
-# Two rows, so the callout stays inside the sheet's right border over the far
-# rim (draw_pn_pen_v_block's SECTION_KEEP).
+# One row: SolidWorks stores a line break in the above compartment but prints
+# nothing of it, while the dimension line still runs under the unprinted text
+# (farm 20261014T005925878Z: no rod callout, the chamfer's line out to the
+# right border; draw_pd_transgear_pin ``_printable_above_callouts``).
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
-    "PivotChamferSize": f"CLEARS ROD\n{PEN_ROD_NUMBER} FILLET",
+    "PivotChamferSize": f"CLEARS ROD {PEN_ROD_NUMBER} FILLET",
 }
+if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
+    raise AssertionError("an above-callout line break would not print")
 # Both relief corners are one radius; the printed one stands for the pair.  A
 # custom prefix replaces SolidWorks' own radius "R", so it carries it
 # (pn_pen_hanger_spec's slot corners).
@@ -341,4 +345,10 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
 
 # Material and finish ride the title block; nothing else needs saying.
 DRAWING_NOTES = ""
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+# The pictorial runs 3:2: at 1:1 the 2.26 tap mouth and the reamed bore read as
+# polygons (machinist review r5; pn_pen_frame_spec's 2:1 fix).  2:1 does not
+# fit between section A-A and the title block (draw_pn_pen_v_block).
+ISOMETRIC_VIEW_SCALE = (3, 2)
+ISOMETRIC_VIEW_NOTE = (
+    f"ISOMETRIC VIEW SCALE {ISOMETRIC_VIEW_SCALE[0]}:{ISOMETRIC_VIEW_SCALE[1]}"
+)

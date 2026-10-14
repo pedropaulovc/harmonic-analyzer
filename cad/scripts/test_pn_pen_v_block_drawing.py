@@ -285,7 +285,7 @@ def test_section_looks_the_same_way_as_the_paper_end_view() -> None:
     assert "SetReversedCutDirection(" in body
     assert "GetReversedCutDirection()" in body
     # Keeps mirror with it: the near-wall text left of the front face, the
-    # height right of the far wall, the chamfer text right of its far rim.
+    # height right of the far wall.
     keep = drawing.SECTION_KEEP
     assert keep["ReliefZ0"][0] < drawing._sz(0.0)
     far_wall_z = (spec.BLOCK_DEPTH + spec.RELIEF_WIDTH) / 2.0
@@ -293,8 +293,18 @@ def test_section_looks_the_same_way_as_the_paper_end_view() -> None:
     rim = drawing._sz(
         drawing._CZ + spec.PIVOT_BORE_DIA / 2.0 + spec.PIVOT_BORE_TOP_CHAMFER
     )
-    assert keep["PivotChamferSize"][0] > rim
-    # ...so the printed ReliefHeight is the far wall's chord in the build.
+    # Review r5: with its text right of the far rim the chamfer's line ran
+    # under its whole text block to 1 mm off the border.  Text left: the
+    # line runs out to the left end of its ~72 mm above-row, clear of the
+    # tap callout (to x 0.2563), over PivotZ's text (top 0.2377) and its
+    # extension lines, the block 5 mm or more under the top border (0.2667).
+    chamfer_x, chamfer_y = keep["PivotChamferSize"]
+    assert chamfer_x + 0.012 < rim
+    assert chamfer_x - 0.036 > 0.2563 + 0.005
+    assert chamfer_y - 0.0084 > 0.2377 + 0.004
+    assert chamfer_y + 0.0075 < 0.2667 - 0.005
+    assert chamfer_y > keep["PivotZ"][1] + 0.012
+    # The printed ReliefHeight is the far wall's chord in the build.
     assert (
         '["ReliefZ0", "ReliefNearWall", "ReliefWidth", "ReliefHeight"]' in _PART_SOURCE
     )
@@ -376,13 +386,26 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     )
 
 
-def test_sheet_runs_at_4_to_1_with_1_to_1_isometric() -> None:
+def test_sheet_runs_at_4_to_1_with_3_to_2_isometric() -> None:
     assert drawing.SHEET_SCALE == (4.0, 1.0)
     assert drawing.VIEW_SCALE == (4, 1)
-    assert drawing.ISO_SCALE == (1, 1)
+    # Review r5: at 1:1 the iso's tap mouth and bore read as polygons.
+    assert drawing.ISO_SCALE == spec.ISOMETRIC_VIEW_SCALE == (3, 2)
     assert _DRAWING_SOURCE.count("scale=VIEW_SCALE") == 4  # three projections + A-A
     assert _DRAWING_SOURCE.count("scale=ISO_SCALE") == 1
-    assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
+    assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 3:2"
+    # Its ink (1.5x the 38.3 x 34.5 mm measured at 1:1, centred 1.8 mm above
+    # it) clears the ream callout (to x 0.2764), the title block (top
+    # 0.0651) and the caption (from x 0.337, bottom 0.116); the note beside
+    # it stays 5 mm inside the border (0.4188).
+    half_w, half_h = 0.0383 * 1.5 / 2.0, 0.0345 * 1.5 / 2.0
+    ink_cy = drawing.ISO_CENTER[1] - 0.0018
+    left, right = drawing.ISO_CENTER[0] - half_w, drawing.ISO_CENTER[0] + half_w
+    assert left > 0.2764 + 0.005
+    assert ink_cy - half_h > 0.0651 + 0.003
+    assert ink_cy + half_h < 0.132  # the end view's depth row
+    assert drawing.ISO_NOTE_XY[0] > right + 0.004
+    assert drawing.ISO_NOTE_XY[0] + 0.059 < 0.4188 - 0.005
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in _DRAWING_SOURCE
     assert '"*Back"' in _DRAWING_SOURCE and '"*Left"' in _DRAWING_SOURCE
     assert "create_section_view(" in _DRAWING_SOURCE

@@ -88,6 +88,7 @@ from pn_pen_v_block_spec import (
     DIMENSION_CALLOUTS_ABOVE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    ISOMETRIC_VIEW_SCALE,
     LIGHTENING_DIA,
     LIGHTENING_X,
     PIVOT_BORE_DIA,
@@ -118,7 +119,7 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
-ISO_SCALE = (1, 1)
+ISO_SCALE = ISOMETRIC_VIEW_SCALE
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
 
 # Sheet layout (meters).  At 4:1 the 36 x 18 x 18 block is 144 x 72 mm in the
@@ -126,17 +127,25 @@ _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
 # front (x 0.040..0.184, y 0.156..0.228) stacks over the bottom view (y
 # 0.054..0.126), both left of the title block (x 0.216); the end view
 # (x 0.219..0.291) and section A-A (x 0.324..0.396) share the front's row.
-# The isometric (~39 x 34 mm of ink at 1:1) sits under the gap between them,
-# x ~0.293..0.332, y ~0.081..0.115: right of the reamed diameter's callout
-# (to x 0.276), under the end view's depth row (y ~0.133), left of section
-# A-A's lowered caption (from x ~0.337); its scale note under it, above the
-# title block (y 0.065).
+# The isometric runs 3:2 (pn_pen_v_block_spec): its ink is 1.5x the 38.3 x
+# 34.5 mm the 1:1 view measured on farm 20261014T005925878Z, 57.5 x 51.8,
+# centred 1.8 mm above its ink.  Centred at (0.315, 0.097) it fills x
+# 0.286..0.344, y 0.069..0.121: 9.8 mm right of the reamed diameter's callout
+# (to x 0.2764, y 0.100 up), 4 mm over the title block (top 0.0651), under the
+# end view's depth row (y 0.132, to x 0.291) and section A-A's 2.500 (y 0.145
+# up).  Its silhouette slopes down to the right from its top vertex (45%
+# across), so at the caption's left end (x 0.337) its ink tops out ~0.105,
+# 11 mm under the caption (bottom 0.116).  2:1 (77 x 69 mm) fits nowhere
+# between the views, the caption and the title block (65 mm tall at most).
+# Its scale note (top-left anchor, ~58 mm wide) beside it at mid-height, from
+# x 0.350 (6 mm right of the ink) to ~0.408, 11 mm inside the border (0.4188),
+# under the caption and over the title block.
 FRONT_CENTER = (0.112, 0.192)
 BOTTOM_CENTER = (FRONT_CENTER[0], 0.090)
 RIGHT_CENTER = (0.255, FRONT_CENTER[1])
 SECTION_CENTER = (0.360, FRONT_CENTER[1])
-ISO_CENTER = (0.312, 0.099)
-ISO_NOTE_XY = (0.283, 0.074)
+ISO_CENTER = (0.315, 0.097)
+ISO_NOTE_XY = (0.350, 0.097)
 TAP_CALLOUT_XY = (0.235, 0.252)
 # Above-left of the bottom view, the lightening bore's near (upper-left) rim
 # 13 mm down-right of the text: one arrow there, no line through the bore
@@ -260,21 +269,26 @@ BOTTOM_KEEP = {
 # * the pivot station 8 mm over the top face (y 0.236), from the front face's
 #   top corner (x 0.324) to the bore axis (x 0.360, a sketched centreline
 #   from y 0.179 to 0.231); its extension lines top out near y 0.2375.
-# * the chamfer size on the bore's far rim (x 0.364..0.365, the z 11 side),
-#   its "0.3 MIN" (~14 mm wide) centred 12 mm right of that rim and 12 mm up
-#   (x 0.377, y 0.240): its dimension line runs right, away from PivotZ's
-#   extension line at x 0.360; the angle callout below starts right of
-#   x 0.367; the two-row functional note above (~43 mm wide, x ~0.356..0.399,
-#   y ~0.244 up) clears every extension line's top and the sheet border
-#   (x 0.419).
+# * the chamfer size on the bore's far rim (x 0.368..0.369, the z 11 side; its
+#   extension lines stand at x 0.366..0.371), its text LEFT of that rim so the
+#   dimension line runs left, away from the border (farm 20261014T005925878Z:
+#   text right put the line's end 1 mm off it).  The line runs under the
+#   whole text block, out to the far end of its widest row, the one-row
+#   "CLEARS ROD ... FILLET" above (~72 mm).  Centred 21 mm left of the rim
+#   (x 0.348) the "0.3 min." / "X 45 DEG" rows (~24 mm) end 6 mm short of
+#   the extension lines and the line runs x ~0.312..0.374 at y ~0.2425, 4.8
+#   mm over PivotZ's "9.00" (top 0.2377) and 8 mm over both of its extension
+#   lines' tops (0.2345), crossing neither; the block (keep y 0.251, rows
+#   from the line up to ~0.2585) stays 8 mm under the top border (0.2667)
+#   and ~56 mm right of the tap callout (to x 0.2563).
 SECTION_KEEP = {
     "ReliefZ0": (_sz(0.0) - 0.009, _sy(0.0) - 0.007),
     "ReliefWidth": (_sz(_CZ), _sy(0.0) - 0.007),
     "ReliefHeight": (_sz(BLOCK_DEPTH) + 0.012, _sy(RELIEF_HEIGHT / 2.0)),
     "PivotZ": (_sz(_CZ / 2.0), _sy(BLOCK_HEIGHT) + 0.008),
     "PivotChamferSize": (
-        _sz(_CZ + PIVOT_BORE_DIA / 2.0 + PIVOT_BORE_TOP_CHAMFER) + 0.012,
-        _sy(BLOCK_HEIGHT) + 0.012,
+        _sz(_CZ + PIVOT_BORE_DIA / 2.0 + PIVOT_BORE_TOP_CHAMFER) - 0.021,
+        _sy(BLOCK_HEIGHT) + 0.023,
     ),
 }
 # The native SECTION A-A / SCALE caption's top centre, lowered 25 mm under the
