@@ -30,7 +30,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
-from _com import _early_bound
+from _com import _com_invoke, _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -47,13 +47,14 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
-from _drawing_edges import face_silhouettes_through
+from _drawing_edges import visible_view_entities
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_cylinder import CylinderFace
+from _gtol_face_read import face_geometry
 from _hole_spec import drill_process
 from _paths import CAD_ROOT
 from _session import run_build
@@ -188,9 +189,44 @@ def _shift(
     return {name: (x + dx, y + dy) for name, (x, y) in points.items()}
 
 
+_SILHOUETTE_ENTITY = 4  # swViewEntityType_SilhouetteEdge
+
+
+def _face_silhouette_pair(
+    view: Any, face: CylinderFace, *, label: str
+) -> tuple[Any, Any]:
+    """The two silhouettes ``face`` draws in ``view``, by face alone.
+
+    No sheet-point filter: on run 20261014T004931233Z the plain shank's face
+    returned exactly two silhouettes but read BOTH back at the upper flank,
+    (180.000, 169.572)-(162.000, 169.572) mm twice, so
+    ``_drawing_edges.face_silhouettes_through`` found nothing through the
+    lower flank (the arbor's land showed the same twin read). Their endpoint
+    readback cannot tell the flanks apart; the dimension's value does: the
+    caller proves the pair measures the diameter.
+    """
+    silhouettes = visible_view_entities(view, _SILHOUETTE_ENTITY, label=label)
+    matched = []
+    for silhouette in silhouettes:
+        owner = _com_invoke(silhouette, "ISilhouetteEdge", "GetFace")
+        geometry = face_geometry(owner) if owner is not None else None
+        if geometry is not None and face.matches(geometry):
+            matched.append(silhouette)
+    _telemetry.annotate(silhouettes=len(silhouettes), face_matched=len(matched))
+    if len(matched) != 2:
+        raise RuntimeError(
+            f"{label}: {face!r} draws {len(matched)} silhouettes, want its 2 flanks "
+            f"({len(silhouettes)} silhouettes in the view)"
+        )
+    return matched[0], matched[1]
+
+
 @_telemetry.traced("drawing.pen_adjust_screw.plain_shank_reference")
 def _plain_shank_reference(
-    adapter: Any, side: Any, text_xy: tuple[float, float]
+    adapter: Any,
+    side: Any,
+    flank_xy: tuple[tuple[float, float], tuple[float, float]],
+    text_xy: tuple[float, float],
 ) -> None:
     """(Ø1.52): the plain shank between its two flank silhouettes.
 
@@ -198,40 +234,23 @@ def _plain_shank_reference(
     so it prints once as a reference with no band (rule 10). It is not a model
     dimension: two diametric dimensions in the thread-limit sketch came back
     non-diametric on the farm (build_pn_pen_adjust_screw._add_thread_limit).
-    A revolved flank is a silhouette, not a model edge, so both picks resolve
-    by the plain shank's own face (the split leaves it its own cylinder, so
-    the threaded face cannot match) through a point projected onto each flank
-    at the plain shank's mid-station; the dimension is proved attached to that
-    face's silhouettes and measuring THREAD_MAJOR before it is parenthesised.
+    A revolved flank is a silhouette, not a model edge, so both picks are the
+    plain shank's own face's two silhouettes (the split leaves it its own
+    cylinder, so the threaded face cannot match); the dimension is proved
+    attached to that face's silhouettes and measuring THREAD_MAJOR -- one
+    flank twice would read 0 -- before it is parenthesised.
     """
     label = "MHA-PN-007 plain shank diameter reference"
     station_mm = FULL_THREAD_LENGTH + PLAIN_SHANK / 2.0
     face = CylinderFace(THREAD_MAJOR, contains_y_mm=station_mm)
-    # Right-plane profile: sketch u -> model -Z, so the flanks sit at z = +-r
-    # (model metres).
-    flank_xy = {
-        key: model_point_in_view(
-            adapter,
-            side,
-            (0.0, station_mm / 1000.0, sign * THREAD_MAJOR / 2000.0),
-            label=f"{label} {key} flank",
-        )
-        for key, sign in (("near", 1.0), ("far", -1.0))
-    }
-    silhouettes = face_silhouettes_through(
-        adapter,
-        side,
-        {key: (face, xy) for key, xy in flank_xy.items()},
-        label=label,
-    )
-    picks = (silhouettes["near"], silhouettes["far"])
+    picks = _face_silhouette_pair(side, face, label=label)
     kinds = ("SILHOUETTE", "SILHOUETTE")
     display = add_edge_dimension(
         adapter,
         side,
         # Documentation only: both picks are by entity.
-        p0=flank_xy["near"],
-        p1=flank_xy["far"],
+        p0=flank_xy[0],
+        p1=flank_xy[1],
         text_xy=text_xy,
         label=label,
         # The stud lies along the sheet X, so its Ø spans the sheet Y.
@@ -335,8 +354,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # says what it bounds.
     set_dimension_text(adapter, annotations, DIMENSION_TEXT)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="below")
-    # After HLR (the silhouette sweep reads the view as displayed).
-    _plain_shank_reference(adapter, side, spt(*SHANK_DIA_XY))
+    # After HLR (the silhouette sweep reads the view as displayed). The flank
+    # points only document the picks (both are by entity).
+    _plain_shank_reference(
+        adapter,
+        side,
+        (
+            spt(PLAIN_MID_X, AXIS_Y + THREAD_HALF),
+            spt(PLAIN_MID_X, AXIS_Y - THREAD_HALF),
+        ),
+        spt(*SHANK_DIA_XY),
+    )
     if not auto_center_marks(adapter, side, holes=True, size=0.0025):
         raise RuntimeError("failed to add the ASME center mark to the eye")
     add_view_centerline(

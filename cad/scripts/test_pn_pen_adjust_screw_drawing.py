@@ -162,7 +162,11 @@ def test_plain_shank_diameter_prints_as_a_reference() -> None:
     # The station lies on the plain shank, off the threaded face's span.
     station = spec.FULL_THREAD_LENGTH + spec.PLAIN_SHANK / 2.0
     assert spec.FULL_THREAD_LENGTH + 0.05 < station < spec.SHANK_LENGTH - 0.05
-    assert len(_calls(drawing, "face_silhouettes_through")) == 1
+    # Both flanks by face alone: the farm read both silhouettes back at the
+    # upper flank, so a sheet-point filter cannot pick the lower one.
+    assert not _calls(drawing, "face_silhouettes_through")
+    (pair,) = _calls(drawing, "_face_silhouette_pair")
+    assert [ast.unparse(arg) for arg in pair.args] == ["side", "face"]
     (dimension,) = _calls(drawing, "add_edge_dimension")
     assert ast.literal_eval(_keyword(dimension, "orientation")) == "vertical"
     assert ast.unparse(_keyword(dimension, "entity_types")) == "kinds"
@@ -184,9 +188,47 @@ def test_plain_shank_diameter_prints_as_a_reference() -> None:
     assert (
         build_body.index("set_hidden_lines_removed(")
         < build_body.index("set_dimension_callouts(")
-        < build_body.index("_plain_shank_reference(adapter, side, spt(*SHANK_DIA_XY))")
+        < build_body.index("_plain_shank_reference(")
         < build_body.index("auto_center_marks(")
     )
+
+
+def test_the_shank_pair_is_both_silhouettes_of_the_plain_shank_face(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every silhouette whose face is the plain shank, whatever its endpoint
+    readback; the threaded and head faces never match; anything but two
+    fails loud."""
+    from types import SimpleNamespace
+
+    from _gtol_face import SURFACE_CYLINDER, FaceGeometry
+
+    def cylinder(dia: float, y0: float, y1: float) -> FaceGeometry:
+        r = dia / 2000.0
+        return FaceGeometry(
+            face=None,
+            identity=SURFACE_CYLINDER,
+            parameters=(0.0, 0.0, 0.0, 0.0, 1.0, 0.0, r),
+            outward_normal=None,
+            box=(-r, y0 / 1000.0, -r, r, y1 / 1000.0, r),
+        )
+
+    thread = cylinder(spec.THREAD_MAJOR, 0.0, spec.FULL_THREAD_LENGTH)
+    plain = cylinder(spec.THREAD_MAJOR, spec.FULL_THREAD_LENGTH, spec.SHANK_LENGTH)
+    head = cylinder(spec.HEAD_DIA, spec.SHANK_LENGTH, spec.OVERALL_LENGTH)
+    faces = [thread, thread, plain, plain, head, head]
+    sweep = [SimpleNamespace(face=f) for f in faces]
+    monkeypatch.setattr(drawing, "visible_view_entities", lambda *a, **k: sweep)
+    monkeypatch.setattr(drawing, "_com_invoke", lambda obj, *_a: obj.face)
+    monkeypatch.setattr(drawing, "face_geometry", lambda face: face)
+    face = drawing.CylinderFace(
+        spec.THREAD_MAJOR,
+        contains_y_mm=spec.FULL_THREAD_LENGTH + spec.PLAIN_SHANK / 2.0,
+    )
+    assert drawing._face_silhouette_pair(None, face, label="t") == (sweep[2], sweep[3])
+    del sweep[3]
+    with pytest.raises(RuntimeError, match="draws 1 silhouettes"):
+        drawing._face_silhouette_pair(None, face, label="t")
 
 
 def test_every_marked_dimension_is_created_and_named_by_the_build() -> None:
