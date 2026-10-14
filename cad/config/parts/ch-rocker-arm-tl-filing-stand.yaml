@@ -1,0 +1,10 @@
+ch-rocker-arm-tl-filing-stand:
+  title: Rocker Arm Filing Stand
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-12
+  material: Plain Carbon Steel
+  material_specification: low-carbon steel offcuts, AISI 1018 or 1020 (end blocks and pedestal)
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  process: "saw two end blocks and a pedestal from steel offcuts; face to height"
