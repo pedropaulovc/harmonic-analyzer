@@ -97,14 +97,15 @@ if H0_FROM_END - _X - (SEAT_DIA + _XX) / 2.0 < 2.0:
     )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "BarProfile": {"BarLength", "BarWidth", "H0FromEnd"},
+    # H0FromSide locates every seat across the bar from its long edge.
+    "BarProfile": {"BarLength", "BarWidth", "H0FromEnd", "H0FromSide"},
     "Bar": {"BarThickness"},
     "H0SeatProfile": {"SeatDia", "SeatFlankAngle", "PilotDia"},
     "H800Reference": {"H800X"},
     "H816Reference": {"H816X"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "BarProfile": {"BarLength": 1, "BarWidth": 1, "H0FromEnd": 1},
+    "BarProfile": {"BarLength": 1, "BarWidth": 1, "H0FromEnd": 1, "H0FromSide": 1},
     "Bar": {"BarThickness": 2},
     "H0SeatProfile": {"SeatDia": 2, "SeatFlankAngle": 0, "PilotDia": 2},
     "H800Reference": {"H800X": 2},
@@ -126,7 +127,7 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 REFERENCE_SKETCHES = ("H800Reference", "H816Reference")
 
 SURFACE_FINISHES = ()
-DRAWING_NOTES = "NO NICKS OR BURRS AT THE SEATS.\nSTOCK FACES AS SUPPLIED."
+DRAWING_NOTES = "NO NICKS OR BURRS AT THE SEATS."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:10"
 
 # prechips fixture solids (prechips.model.FixtureSolid), model frame: the bar

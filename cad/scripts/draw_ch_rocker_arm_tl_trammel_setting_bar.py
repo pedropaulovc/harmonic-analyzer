@@ -6,7 +6,7 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 from _check import check
 from _com import _early_bound
@@ -67,11 +67,14 @@ NOTES_XY = (0.020, 0.090)
 # Top-view text offsets (sheet m) from H0's centre.
 TOP_OFFSETS = {
     "BarLength": (0.102, -0.017),
-    "BarWidth": (0.252, 0.0),
+    # Above the bar, clear of both extension lines.
+    "BarWidth": (0.252, 0.012),
     # Outside the end's extension line: the H0 station chains on from it.
     "H0FromEnd": (-0.022, 0.011),
+    # Left of the bar's end and under it, clear of both extension lines.
+    "H0FromSide": (-0.020, -0.010),
     "H800X": (0.102, 0.011),
-    "H816X": (0.102, 0.025),
+    "H816X": (0.102, 0.030),
 }
 # Cutting line through H0 on the edge view: past both faces.
 CUT_OVERRUN = 0.008
@@ -82,19 +85,20 @@ CUT_OVERRUN = 0.008
 SECTION_OFFSETS = {
     "SeatFlankAngle": (0.020, 0.010),
     "PilotDia": (-0.035, 0.010),
-    "SeatDia": (-0.035, 0.024),
+    "SeatDia": (-0.035, 0.029),
 }
 THICKNESS_TEXT_GAP = 0.010
 
 # Functional acceptance sits on the dimension it governs, not in the notes.
 CALLOUTS_ABOVE = {
     "H0FromEnd": "PIVOT SEAT",
+    "H0FromSide": "3X",
     "H800X": "INNER SCRIBER SEAT",
     "H816X": "OUTER SCRIBER SEAT",
     "SeatDia": "3X",
     "PilotDia": "3X",
 }
-CALLOUTS_BELOW = {"BarWidth": "SEATS ON CENTERLINE", "PilotDia": "THRU"}
+CALLOUTS_BELOW = {"PilotDia": "DRILL THRU"}
 
 _DOWN = [0.0, -1.0, 0.0]
 
@@ -324,8 +328,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
-        raise RuntimeError("failed to add center marks to the setting bar seats")
+    # No explicit centre marks: the round-2 auto-insert printed identical
+    # duplicate marks at H800 and H816 (layout audit, duplicate-annotation).
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
