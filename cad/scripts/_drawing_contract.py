@@ -103,6 +103,7 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_ch_rocker_arm_tl_inspection_box.py",
         "draw_ch_rocker_arm_tl_c_stop_bar.py",
         "draw_ch_rocker_arm_tl_riser_block.py",
+        "draw_ch_rocker_arm_tl_outline_template.py",
         "draw_dt_cone_pivot_post_tl_soft_jaw.py",
         "draw_ch_rocker_arm_tl_diamond_pin.py",
         "draw_ch_rocker_arm_tl_strap_shim_stack.py",

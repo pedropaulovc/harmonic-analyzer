@@ -4533,6 +4533,7 @@ note = 'Illustrative metric leaf radius gauge, including R7.0; compare the upper
 [gauges.arm-outline-template]
 name = "arm outline template (MHA-CH-006), shop-made: ch_rocker_arm_tl_outline_template"
 kind = "profile_gauge"
+cad = "ch_rocker_arm_tl_outline_template"
 # Basis: gauges.arm-outline-template.range_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1920 (gauges.arm-outline-template.range_mm) authored profile_gauge geometry baseline [8, 817] mm, offset [+0, +0] mm = [8, 817] mm. Range endpoints are not extended beyond the declared source span; lower endpoint is a minimum, upper endpoint a maximum.
 # Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "marked gauge range and comparison against size or roughness reference"; scalar/vector-only schema.
 range_mm = [8.0, 817.0]

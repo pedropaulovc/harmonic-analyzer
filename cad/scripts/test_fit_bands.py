@@ -66,6 +66,7 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     ("build_ch_rocker_arm_tl_c_stop_bar", "band"): ("DRAWING_BANDS", "values"),
     ("build_ch_rocker_arm_tl_diamond_pin", "band"): ("DRAWING_BANDS", "values"),
     ("build_ch_rocker_arm_tl_inspection_box", "band"): ("DRAWING_BANDS", "values"),
+    ("build_ch_rocker_arm_tl_outline_template", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_hanger", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_rod", "band"): ("DRAWING_BANDS", "values"),
     ("build_pn_pen_v_block", "band"): ("DRAWING_BANDS", "values"),
@@ -435,6 +436,7 @@ def _resolve(use: BandUse) -> list[tuple[str, Any]]:
     [
         ("build_ch_rocker_arm_tl_c_stop_bar", "DRAWING_BANDS"),
         ("build_ch_rocker_arm_tl_inspection_box", "DRAWING_BANDS"),
+        ("build_ch_rocker_arm_tl_outline_template", "DRAWING_BANDS"),
         (
             "build_ch_rocker_arm_tl_diamond_pin",
             "(LAND_BAND, LAND_HEIGHT_BAND, SHANK_BAND, NECK_BAND, REAM_BAND, COLLAR_END_BAND)",
