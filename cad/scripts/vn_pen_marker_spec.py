@@ -1,4 +1,4 @@
-r"""Pure-data envelope of the purchased pen marker, a Sharpie Fine Point (MHA-VN-060).
+r"""Pure-data envelope of the purchased pen marker, a Sharpie Fine Point (MHA-VN-065).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: ``build_vn_pen_marker`` revolves ``PROFILE`` and the pen assembly

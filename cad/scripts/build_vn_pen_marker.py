@@ -1,4 +1,4 @@
-r"""Purchased pen marker: Sharpie permanent marker, fine point (MHA-VN-060).
+r"""Purchased pen marker: Sharpie permanent marker, fine point (MHA-VN-065).
 
 The stock marker that writes the curve (engineerguy 4/4 video 9:15-10:34
 used the Mini; this build takes the regular Fine Point, the format Brazil's

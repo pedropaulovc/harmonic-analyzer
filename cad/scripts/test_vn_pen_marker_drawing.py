@@ -1,4 +1,4 @@
-"""Sharpie Fine Point pen marker (MHA-VN-060) contracts, SolidWorks-free."""
+"""Sharpie Fine Point pen marker (MHA-VN-065) contracts, SolidWorks-free."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ STEM = "vn-pen-marker"
 
 def test_registry_row_is_the_purchased_sharpie_fine_point() -> None:
     row = _config.parts(STEM)
-    assert row["number"] == "MHA-VN-060"
+    assert row["number"] == "MHA-VN-065"
     assert row["process"] == "purchased"
     assert row["supplier"] == spec.SUPPLIER
     assert row["supplier_skus"] == [spec.SKU] == ["30051"]

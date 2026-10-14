@@ -1939,7 +1939,7 @@ sections:
         - 'p.60–63 (the strap is bolted to the bar); stock wrappers `cad/scripts/build_vn_hanger_screw.py` / `cad/scripts/build_vn_pen_hanger_nut.py` / `cad/scripts/build_vn_pen_hanger_jam_nut.py`; station and end wall from `cad/scripts/build_mg_wheel_bar.py` / `cad/scripts/mg_wheel_bar_geom.py`; clearance hole from `cad/scripts/build_pn_pen_hanger.py`; stack from `cad/scripts/build_pn_pen_assembly.py`'
         - scaled + derived
         - low
-      - - Pen marker (MHA-VN-060, purchased)
+      - - Pen marker (MHA-VN-065, purchased)
         - 'Sharpie permanent marker, fine point (Sharpie 30051), used uncapped: Ø10.6 cap-seat grip in the v-block groove, body Ø12.3 tapering to Ø11.0, 123 overall uncapped, 7 g barrel with ink; nib, nose cone and the dome''s start station estimated. Brazil''s same-format markers (Oval PY230200, Brasfort ponta fina) are assumed to match. Envelope in `cad/scripts/vn_pen_marker_spec.py`'
         - —
         - 'jetpens.com Sharpie Fine 30051 (grip Ø10.6, uncapped 123, barrel with ink 7 g); sharpie.com Mini item 35111 product photo with artsupplycritic.com (the Mini keeps the regular diameters) for the body and dome profile; v4_t042/t046 (cap off, grip in the groove)'

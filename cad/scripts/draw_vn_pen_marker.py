@@ -1,4 +1,4 @@
-"""Create the four-view purchased-reference sheet for the Sharpie Fine Point pen marker (MHA-VN-060).
+"""Create the four-view purchased-reference sheet for the Sharpie Fine Point pen marker (MHA-VN-065).
 
 Identification only: the marker as installed (uncapped), its stock and
 ordering item number, and its fitting note on a leader to the grip band; no
