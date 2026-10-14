@@ -20,17 +20,19 @@ face); every feature is located across the depth from the body's front face
 * right (third angle, right of the ``*Back`` face): ``*Left``, the paper end,
   shows the neck's end face with the V in solid lines and the body's wider
   faces beyond it.  Under it, one baseline row from the body's front face:
-  the neck's two faces, the V's two mouth edges and the depth; right of the
-  back mouth corner, below the bottom face, the flanks' "2X 45°" to it; over
-  the view, its apex flat's width and, up the back round's bisector, the
+  the V's two mouth edges and the depth; inside the groove's 45 deg wedge at
+  the back mouth corner, the flanks' "2X 45°" to the bottom face; over the
+  view, its apex flat's width and, up the back round's bisector, the
   rounds' single-limit radius; right of it, the flat's reference height.
   Through the V it looks along
   the open relief slot: the V is cut on past the step
   (``pn_pen_v_block_spec.V_CUT_LENGTH``), so no brass shows inside it.
 * bottom: ``*Bottom`` turned 180 degrees to keep the front view's X, looking
   up into the V and the relief; through the relief the roof shows the pivot
-  bore.  It carries the overall length, the relief's start station and
-  corner radius, and the pivot bore (station and reamed, banded diameter).
+  bore.  It carries the overall length, the neck's two faces from the body's
+  front face (right of the paper end, where the neck's step is an outline
+  change), the relief's start station and corner radius, and the pivot bore
+  (station and reamed, banded diameter).
 * section A-A through the pivot-bore axis: bore, tap and relief in one cut,
   looking toward the free end as the paper-end view does (front face on the
   left in both); it carries both relief walls from the body's front face and
@@ -101,6 +103,7 @@ from pn_pen_v_block_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     ISOMETRIC_VIEW_SCALE,
+    NECK_DEPTH,
     PIVOT_BORE_DIA,
     PIVOT_BORE_TOP_CHAMFER,
     PIVOT_BORE_X,
@@ -149,9 +152,9 @@ _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
 # 18 x 18 chamfered block computed 38.2 wide against the 38.3 farm
 # 20261014T005925878Z measured); at 3:2, 52.5 x 52.4.  Centred at (0.315,
 # 0.097), its ink centred 1.8 mm under it as measured, it fills x
-# 0.289..0.341, y 0.069..0.121: 42 mm right of the reamed diameter's callout
-# (to x 0.247), 4 mm over the title block (top 0.0651), right of the end
-# view's depth extension line (x 0.276, down to ~0.118).
+# 0.289..0.341, y 0.069..0.121: 79 mm right of the reamed diameter's callout
+# (to x ~0.210), 4 mm over the title block (top 0.0651), right of the end
+# view's depth extension line (x 0.276, down to ~0.131).
 # Its scale note (top-left anchor, ~58 mm wide) beside it at mid-height, from
 # x 0.350 (9 mm right of the ink) to ~0.408, 11 mm inside the border (0.4188),
 # under the caption and over the title block.
@@ -231,26 +234,25 @@ FRONT_KEEP = {
 }
 # Paper end: one baseline row under the view from the body's front face (the
 # view's left edge, x 0.188), nested shortest-innermost 7 mm apart so no
-# extension line crosses a dimension line it does not end on: the neck's
-# front face (x 0.196), the V's front and back mouth edges (x 0.208, 0.256),
-# the neck's back face (x 0.268) and the depth (x 0.276).  Every station
-# stands right of the last, so each outer extension line passes right of
-# every inner span.  The neck's front face's 8.4 mm span would cramp its
-# text, so its value sits left of the datum's extension line, x ~0.174..0.185,
-# right of the front view's SetScrewX text (to x ~0.148).  The lowest line,
-# the depth's, at ~0.119.
+# extension line crosses a dimension line it does not end on: the V's front
+# and back mouth edges (x 0.208, 0.256) and the depth (x 0.276).  Every
+# station stands right of the last, so each outer extension line passes right
+# of every inner span.  The lowest line, the depth's, at ~0.133.  The neck's
+# faces print in the bottom view, where its step is an outline change (blind
+# review final8: here, edge-on beyond the neck's end face, they read as ribs).
 # * the flanks' angle to the bottom face, "2X 45°", measured at the back
-#   mouth corner (x 0.256, y 0.156) in the wedge opposite the groove's: under
-#   the bottom face, between its line run on to the right and the back
-#   flank's line run on down-right, outside the part (rule 14).  Its arc, 40
-#   mm about the corner, runs x ~0.284..0.296, y ~0.128..0.156, clear right
-#   of the depth's extension line (x 0.276); it meets the bottom face's run
-#   on (which the flat height's lower extension line shares) 8 mm right of
-#   that height's arrow (x 0.288).  Its text (~15 mm, x ~0.285..0.300, y
-#   ~0.137..0.141) stands 15 mm under the bottom face, 6 mm left of section
-#   A-A (from x 0.306) and 16 mm over the iso (top ~0.121).  The
-#   flank's run on crosses the neck's back face's and the depth's extension
-#   lines (x 0.268 / 0.276) only.
+#   mouth corner (x 0.256, y 0.156) in the 45 deg wedge inside the groove,
+#   between the back flank and the mouth's line along the bottom face, where
+#   the build's sketch measures it (blind review final8: from outside the
+#   wedge, SOLIDWORKS ran the arc 40 mm about the corner from the flank round
+#   through the depth row's text to its own).  Its text (~14 mm, x
+#   ~0.233..0.246, y ~0.159..0.162) stands 17 mm up the wedge, off the part in
+#   the groove's open mouth: 3 mm left of the back flank, 2.6 mm over the
+#   mouth's line (which the flat height's lower extension line draws).  Its
+#   arc, 17 mm about the corner, lands on the back flank (17 mm along it,
+#   12 mm up) and on the mouth's line (x 0.239); 6 mm of brass above the
+#   flank and of sheet over the back-edge row's text leave room for outside
+#   arrows should SOLIDWORKS flip them.
 # * the apex flat's width over the view (its line ~6 mm over the top face,
 #   y ~0.234; text ~0.2355..0.239), its extension lines rising from the
 #   flat's ends (x 0.228 / 0.236) across the end face: 8 mm under the tap's
@@ -274,17 +276,12 @@ _ROUND_CENTRE = (
     _ry(V_FLAT_Y - V_APEX_FILLET_R),
 )
 _ROUND_TEXT_RUN = 0.070
-_FLANK_TEXT_RUN = 0.040
-_FLANK_TEXT_BEARING = math.radians(-25.0)
+_FLANK_TEXT_RUN = 0.017
+_FLANK_TEXT_BEARING = math.radians(165.0)
 RIGHT_KEEP = {
-    "NeckZ0": (_rz(BODY_Z0) - 0.008, _ry(0.0) - 0.006),
-    "VMouthZ0": (
-        (_rz(BODY_Z0) + _rz(V_MOUTH_Z0)) / 2.0,
-        _ry(0.0) - 0.006 - _END_ROW,
-    ),
-    "VMouthZ1": (_rz(_CZ), _ry(0.0) - 0.006 - 2 * _END_ROW),
-    "NeckZ1": (_rz(_CZ), _ry(0.0) - 0.006 - 3 * _END_ROW),
-    "Depth": (_rz(_CZ), _ry(0.0) - 0.006 - 4 * _END_ROW),
+    "VMouthZ0": ((_rz(BODY_Z0) + _rz(V_MOUTH_Z0)) / 2.0, _ry(0.0) - 0.006),
+    "VMouthZ1": (_rz(_CZ), _ry(0.0) - 0.006 - _END_ROW),
+    "Depth": (_rz(_CZ), _ry(0.0) - 0.006 - 2 * _END_ROW),
     "VFlankAngle": (
         _rz(V_MOUTH_Z1) + _FLANK_TEXT_RUN * math.cos(_FLANK_TEXT_BEARING),
         _ry(0.0) + _FLANK_TEXT_RUN * math.sin(_FLANK_TEXT_BEARING),
@@ -311,12 +308,24 @@ RIGHT_KEEP = {
 #   body's front level at 0.128), up-right of the front-face corner arc
 #   (centre x 0.115, y 0.112), so the radial leader runs out from the arc's
 #   midpoint across only the bottom face's land.
-# * the reamed diameter's wide callout wholly right of the paper end, its
-#   single arrow on the near rim (set_near_side_diameter), so no leader
-#   crosses the bore.  Its block (r11: keep -0.010..+0.009, ~88 mm wide) at
-#   keep (0.203, 0.104) runs x ~0.159..0.247, y ~0.094..0.113: 4 mm right of
-#   the bottom view, 6 mm under the end view's depth line (~0.119) and 42 mm
-#   left of the iso.
+# * the neck's two faces right of the paper end, a baseline pair from the
+#   body's front face nested shortest-innermost 7 mm apart, where the neck's
+#   step from the body is an outline change on both long edges: the front
+#   face's "2.10" inside its 8.4 mm span (x ~0.156..0.166, its arrows
+#   outside), the back face's "20.10" at mid-span (x ~0.162..0.174).  The
+#   datum's extension line runs from the step's corner on the body's front
+#   edge (x 0.119) through the air in front of the neck, 2.7 mm over the
+#   corner radius's text.
+# * the reamed diameter's callout below them, wholly right of the paper end,
+#   its single arrow on the near rim (set_near_side_diameter), so no leader
+#   crosses the bore.  Five rows, ~34 mm wide and ~31 mm tall about its keep:
+#   x ~0.176..0.210, y ~0.022..0.054, 6 mm right of the neck faces' extension
+#   lines (to x ~0.170), 6 mm left of the title block (x 0.216) and 8 mm over
+#   the border.  Its leader, from the rim down-right to the block's lower
+#   left, leaves the view through the neck's back edge and passes the paper
+#   end's extension line ~8 mm under the neck's back corner (y 0.0476) and
+#   ~13 mm over the relief step's dimension line (~0.025), so it crosses no
+#   dimension line.
 BOTTOM_KEEP = {
     "Length": (_fx(BLOCK_LENGTH) + 0.025, _bz(BODY_Z0) + 0.0075),
     "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BODY_Z1) - 0.009),
@@ -325,7 +334,9 @@ BOTTOM_KEEP = {
         _fx(RELIEF_X0 + RELIEF_CORNER_R) + 0.020,
         _bz(RELIEF_Z0 + RELIEF_CORNER_R) + 0.012,
     ),
-    "PivotDia": (_fx(0.0) + 0.048, _bz(0.0) - 0.016),
+    "NeckZ0": (_fx(0.0) + 0.0065, (_bz(BODY_Z0) + _bz(0.0)) / 2.0),
+    "NeckZ1": (_fx(0.0) + 0.0135, (_bz(BODY_Z0) + _bz(NECK_DEPTH)) / 2.0),
+    "PivotDia": (_fx(0.0) + 0.0385, _bz(NECK_DEPTH) - 0.0096),
 }
 # Section A-A looks the same way as the paper-end view beside it: the body's
 # front face at x 0.306 on the LEFT, the bottom face at y 0.156, the top at

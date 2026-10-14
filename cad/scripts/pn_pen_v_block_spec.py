@@ -246,14 +246,16 @@ if round(PIVOT_BORE_TOP_CHAMFER, PIVOT_CHAMFER_PLACES) != PIVOT_BORE_TOP_CHAMFER
 # never chained: the neck's faces (NeckZ0 / NeckZ1), the body's back face
 # (Depth), the V's two mouth edges (VMouthZ0 / VMouthZ1), the relief's two walls
 # (ReliefZ0 / ReliefZ1) and the pivot bore (PivotZ) are each a baseline from it.
-# The plan outline (OutlineProfile, Top plane) prints only the length, in the
-# bottom view; the block's extrusion its height.  The V's sketch (Right plane,
-# the paper end) carries construction stubs on the body's front face (the
-# datum's foot) and on the neck's and the body's other faces, so the paper-end
-# view, where the body's faces show beyond the neck's, prints the whole
-# depth-wise stack from the datum in one baseline row: the neck's faces, the
-# V's edges and the depth (the outline's own depth-wise dimensions, driven by
-# the same globals, stay unprinted).
+# The plan outline (OutlineProfile, Top plane) prints the length and the neck's
+# two faces in the bottom view, where the neck's step from the body is an
+# outline change on both long edges (blind review final8, the third time:
+# printed in the paper-end view, the step's faces read as thin ribs between
+# the neck's end face and the body's beyond it); the block's extrusion its
+# height.  The V's sketch (Right plane, the paper end) carries construction
+# stubs on the body's front face (the datum's foot) and its back face, so the
+# paper-end view prints the V's edges and the depth from the datum in one
+# baseline row (the outline's own body depth, driven by the same global,
+# stays unprinted).
 # Section A-A shows the relief and the pivot bore across the depth, but their
 # sketches lie in the Top plane and project edge-on there.  ReliefReference
 # and PivotReference lie IN section A-A's cutting plane (x = PIVOT_BORE_X,
@@ -269,7 +271,7 @@ if round(PIVOT_BORE_TOP_CHAMFER, PIVOT_CHAMFER_PLACES) != PIVOT_BORE_TOP_CHAMFER
 # saved hidden; the drawing shows them in section A-A
 # (``_drawing_hidden_sketches``) while the part shows them at the cut. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "OutlineProfile": {"Length"},
+    "OutlineProfile": {"Length", "NeckZ0", "NeckZ1"},
     "Block": {"Height"},
     "VGrooveProfile": {
         "VFlankAngle",
@@ -277,8 +279,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "VFlatY",
         "VMouthZ0",
         "VMouthZ1",
-        "NeckZ0",
-        "NeckZ1",
         "Depth",
     },
     "VApexFillets": {"VApexFilletR"},
@@ -307,7 +307,7 @@ SECTION_REFERENCE_SKETCHES = REFERENCE_SKETCHES
 # runs into the bore wherever it stands, and the set screw locks the pen's
 # angle).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "OutlineProfile": {"Length": 1},
+    "OutlineProfile": {"Length": 1, "NeckZ0": 2, "NeckZ1": 2},
     "Block": {"Height": 1},
     "VGrooveProfile": {
         "VFlankAngle": 0,
@@ -315,8 +315,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "VFlatY": 1,
         "VMouthZ0": 1,
         "VMouthZ1": 1,
-        "NeckZ0": 2,
-        "NeckZ1": 2,
         "Depth": 1,
     },
     "VApexFillets": {"VApexFilletR": V_APEX_FILLET_PLACES},
@@ -557,9 +555,12 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 # Every tight band or limit names its mate on the dimension it governs.  The
 # chamfer reads "0.3 MIN" over its angle; why it has a floor rides above it,
 # clear of the extension lines below (draw_pn_pen_v_block's SECTION_KEEP).
+# The reamed diameter's mate runs three short rows: its callout stands in the
+# bottom view's corner, between the neck's depth dimensions and the title
+# block (draw_pn_pen_v_block's BOTTOM_KEEP).
 PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "PivotDia": f"REAM THRU\nSLIP FIT ON PEN ROD PIVOT {PEN_ROD_NUMBER}",
+    "PivotDia": f"REAM THRU\nSLIP FIT ON\nPEN ROD PIVOT\n{PEN_ROD_NUMBER}",
     "PivotChamferSize": "X 45 DEG",
 }
 # One row: SolidWorks stores a line break in the above compartment but prints

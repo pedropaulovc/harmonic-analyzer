@@ -115,20 +115,33 @@ def test_every_feature_is_located_from_the_front_face() -> None:
     assert spec.depth_station(spec.BODY_Z0) == 0.0
     assert spec.depth_station(0.0) == spec.BODY_SIDE_STEP
     assert spec.depth_station(spec.BODY_Z1) == spec.BODY_DEPTH
-    # The paper-end view prints the whole depth-wise stack in one row: the V's
-    # sketch carries the neck's and the body's faces as stubs from the datum.
-    assert {"NeckZ0", "NeckZ1", "Depth"} <= spec.DRAWING_DIMENSIONS["VGrooveProfile"]
-    assert spec.DRAWING_DIMENSIONS["OutlineProfile"] == {"Length"}
+    # Blind review final8 (the third time): printed in the paper-end view,
+    # the neck's faces read as thin ribs.  The bottom view prints them, where
+    # the neck's step is an outline change, from the outline's own baselines
+    # off the body's front face; the V's sketch keeps only the datum's and
+    # the body's back face's stubs, for the depth in the paper-end row.
+    assert spec.DRAWING_DIMENSIONS["OutlineProfile"] == {"Length", "NeckZ0", "NeckZ1"}
+    assert "Depth" in spec.DRAWING_DIMENSIONS["VGrooveProfile"]
+    assert not {"NeckZ0", "NeckZ1"} & spec.DRAWING_DIMENSIONS["VGrooveProfile"]
+    outline = _PART_SOURCE[_PART_SOURCE.index("async def _outline(") :]
+    outline = outline[: outline.index("\nasync def ")]
+    for needle in (
+        "datum,\n            paper_front,",
+        '"NeckZ0",\n            \'"NeckFrontZ"\',',
+        "datum,\n            paper_back,",
+        '"NeckZ1",\n            \'"NeckBackZ"\',',
+    ):
+        assert needle in outline, needle
     v_groove = _PART_SOURCE[_PART_SOURCE.index("async def _v_groove(") :]
     v_groove = v_groove[: v_groove.index("\nasync def ")]
     for needle in (
-        '(0.0, "NeckZ0", \'"NeckFrontZ"\', "VNeckFrontStub")',
-        '(NECK_DEPTH, "NeckZ1", \'"NeckBackZ"\', "VNeckBackStub")',
-        '(BODY_Z1, "Depth", \'"BlockDepth"\', "VBodyBackStub")',
-        "depth_station(z)",
+        "(-BODY_Z1, 0.0), (-BODY_Z1, _STUB)",
+        "depth_station(BODY_Z1)",
+        'dims.record("Depth", \'"BlockDepth"\')',
         '"horizontal_points"',
     ):
         assert needle in v_groove, needle
+    assert "NeckZ" not in v_groove and "VNeck" not in _PART_SOURCE
     assert '"VApexZ"' not in _PART_SOURCE
     assert set(spec.REFERENCE_SKETCHES) <= set(spec.DRAWING_DIMENSIONS)
     for feature in spec.REFERENCE_SKETCHES:
@@ -466,8 +479,8 @@ def test_end_view_prints_the_depth_stack_in_one_baseline_row() -> None:
     # station right of and each row under the last, so an outer extension
     # line never crosses an inner dimension line.
     keep = drawing.RIGHT_KEEP
-    order = ("NeckZ0", "VMouthZ0", "VMouthZ1", "NeckZ1", "Depth")
-    stations = (0.0, spec.V_MOUTH_Z0, spec.V_MOUTH_Z1, spec.NECK_DEPTH, spec.BODY_Z1)
+    order = ("VMouthZ0", "VMouthZ1", "Depth")
+    stations = (spec.V_MOUTH_Z0, spec.V_MOUTH_Z1, spec.BODY_Z1)
     xs = [drawing._rz(z) for z in stations]
     assert xs == sorted(xs)
     rows = [keep[name][1] for name in order]
@@ -475,21 +488,60 @@ def test_end_view_prints_the_depth_stack_in_one_baseline_row() -> None:
     for upper, lower in zip(rows, rows[1:], strict=False):
         assert upper - lower == pytest.approx(drawing._END_ROW)
     assert rows[0] < drawing._ry(0.0) - 0.005
-    # ~3 mm a character at the sheet's text height.  The neck front face's
-    # "2.10" stands left of the datum's extension line, right of the front
-    # view's SetScrewX "12.50"; the V's front edge's "5.1" inside its span.
+    # ~3 mm a character at the sheet's text height: the V's front edge's
+    # "5.1" inside its span.
     datum = drawing._rz(spec.BODY_Z0)
-    neck_text = keep["NeckZ0"][0]
-    assert neck_text + 0.006 < datum - 0.001
-    assert neck_text - 0.006 > drawing.FRONT_KEEP["SetScrewX"][0] + 0.0075 + 0.005
     mouth_text = keep["VMouthZ0"][0]
     assert datum + 0.001 < mouth_text - 0.0045
     assert mouth_text + 0.0045 < drawing._rz(spec.V_MOUTH_Z0) - 0.001
-    # The lowest row's line (~3.3 mm under its text) stays over the reamed
-    # diameter's callout block (keep +0.009 at the top).
-    assert (
-        keep["Depth"][1] - 0.0033 > drawing.BOTTOM_KEEP["PivotDia"][1] + 0.009 + 0.003
-    )
+    # The lowest row's line (~3.3 mm under its text) stays over the bottom
+    # view's front edge and the neck faces' datum extension line (y 0.128).
+    assert keep["Depth"][1] - 0.0033 > drawing._bz(spec.BODY_Z0) + 0.003
+
+
+def test_bottom_view_prints_the_neck_step_where_it_is_an_outline_change() -> None:
+    # Blind review final8, the third time: in the paper-end view the neck's
+    # faces (edge-on lines inside the body's outline) read as thin ribs,
+    # 0.79 thick at worst case.  The bottom view shows the step on both long
+    # edges; its faces print there, a baseline pair from the body's front
+    # face right of the paper end, nested shortest-innermost.
+    keep = drawing.BOTTOM_KEEP
+    paper_end = drawing._fx(0.0)
+    front = drawing._bz(spec.BODY_Z0)
+    neck_front = drawing._bz(0.0)
+    neck_back = drawing._bz(spec.NECK_DEPTH)
+    (x0, y0), (x1, y1) = keep["NeckZ0"], keep["NeckZ1"]
+    assert paper_end < x0 < x1
+    assert x1 - x0 == pytest.approx(drawing._END_ROW)
+    # "2.10" (~9.5 mm) inside its 8.4 mm span, off the paper end and left of
+    # the back face's line; "20.10" at mid-span.
+    half_neck_text = 0.00475
+    assert x0 - half_neck_text > paper_end + 0.0015
+    assert x0 + half_neck_text < x1 - 0.002
+    assert y0 - 0.0019 > neck_front + 0.002
+    assert y0 + 0.0019 < front - 0.002
+    assert y1 == pytest.approx((front + neck_back) / 2.0)
+    # The datum's extension line runs from the step's corner on the body's
+    # front edge through the air in front of the neck, over the corner
+    # radius's text.
+    assert keep["ReliefCornerR"][1] + 0.0017 < front - 0.002
+    # The reamed diameter's five-row callout (~34 x 31 mm about its keep)
+    # stands below them: right of their extension lines (~2 mm past the
+    # outer line), left of the title block (x 0.2158), over the border.
+    pivot_x, pivot_y = keep["PivotDia"]
+    left, bottom = pivot_x - 0.017, pivot_y - 0.016
+    assert left > x1 + 0.002 + 0.004
+    assert pivot_x + 0.017 < 0.2158 - 0.005
+    assert bottom > 0.0127 + 0.005
+    assert spec.DIMENSION_CALLOUTS["PivotDia"].count("\n") == 3
+    # Its leader, from the bore's near rim to the block's lower left, passes
+    # the paper end's extension line under the neck's back corner and over
+    # the relief step's row, crossing no dimension line.
+    centre = (drawing._fx(spec.PIVOT_BORE_X), drawing._bz(drawing._CZ))
+    slope = (bottom - centre[1]) / (left - centre[0])
+    at_paper_end = centre[1] + slope * (paper_end - centre[0])
+    assert at_paper_end < neck_back - 0.005
+    assert at_paper_end > keep["ReliefX0"][1] + 0.0017 + 0.005
 
 
 def test_section_looks_the_same_way_as_the_paper_end_view() -> None:
@@ -691,8 +743,6 @@ def test_v_is_its_flank_angles_mouth_and_apex_flat_with_a_reference_height() -> 
         "VFlatY",
         "VMouthZ0",
         "VMouthZ1",
-        "NeckZ0",
-        "NeckZ1",
         "Depth",
     } == spec.DRAWING_DIMENSIONS["VGrooveProfile"]
     assert spec.DRAWING_DIMENSIONS["ReliefReference"] == {
@@ -850,29 +900,47 @@ def test_apex_round_radius_text_stays_off_the_part_in_the_end_view() -> None:
 
 
 def test_v_dimension_text_stays_off_the_part_in_the_end_view() -> None:
-    # Blind review (rule 14): the angle's text sat in the V.  The flanks'
-    # "2X 45°" now measures the back flank at its mouth corner in the wedge
-    # opposite the groove's (between the bottom face's line and the flank's,
-    # both run on), under the bottom face and right of the body; the flat's
-    # width prints over the top face and its height right of the body.
+    # Blind review final8 (rule 14): from under the bottom face, outside the
+    # wedge it measures, the flanks' "2X 45°" drew its arc 40 mm about the
+    # back mouth corner, from the flank round through the depth row's text to
+    # its own.  Its text now stands in that 45 deg wedge inside the groove's
+    # open mouth, between the back flank and the mouth's line along the
+    # bottom face, where the build's sketch measures it; the flat's width
+    # prints over the top face and its height right of the body.
     keep = drawing.RIGHT_KEEP
     angle_x, angle_y = keep["VFlankAngle"]
     corner = (drawing._rz(spec.V_MOUTH_Z1), drawing._ry(0.0))
     bearing = math.degrees(math.atan2(angle_y - corner[1], angle_x - corner[0]))
-    assert -spec.V_FLANK_ANGLE_DEG < bearing < 0.0
-    half_text = 0.0075  # "2X 45°", 6 characters at ~2.5 mm
-    assert angle_y + 0.0017 < drawing._ry(0.0) - 0.003
-    assert angle_x - half_text > drawing._rz(spec.BODY_Z1) + 0.001
-    assert angle_x + half_text < drawing._sz(spec.BODY_Z0) - 0.003
-    # Over the iso (top ~0.121) and right of the rows' lines, which end at
-    # the body's back face (the depth's) or left of it.
-    assert angle_y - 0.0018 > 0.121 + 0.01
-    # The arc, about the corner through the text, runs clear right of the
-    # depth's extension line (the body's back face) from the bottom face's
-    # line down to the flank's.
+    assert 180.0 - spec.V_FLANK_ANGLE_DEG < bearing < 180.0
+    # The sketch's text point (u = -z, v = y) picks the same wedge.
+    _front_text, (u, v) = part._flank_angle_text_points()
+    sketch_bearing = math.degrees(math.atan2(v, -u - spec.V_MOUTH_Z1))
+    assert 180.0 - spec.V_FLANK_ANGLE_DEG < sketch_bearing < 180.0
+    # "2X 45°" ~13.6 x 3.8 mm (final8): over the mouth's line (the flat
+    # height's lower extension line draws it), left of the back flank at its
+    # top, right of the front flank, under the apex flat.
+    half_w, half_h = 0.007, 0.0019
+    top = angle_y + half_h - corner[1]
+    assert angle_y - half_h > corner[1] + 0.002
+    assert angle_x + half_w < corner[0] - top - 0.002
+    assert angle_x - half_w > drawing._rz(spec.V_MOUTH_Z0) + top + 0.002
+    assert angle_y + half_h < drawing._ry(spec.V_FLAT_Y) - 0.005
+    # The arc, about the corner through the text, is short: it lands on the
+    # flank's straight run (short of the apex round's tangent point) and on
+    # the mouth's line between the corners.
     run = math.hypot(angle_x - corner[0], angle_y - corner[1])
-    flank_end_x = corner[0] + run * math.cos(math.radians(spec.V_FLANK_ANGLE_DEG))
-    assert flank_end_x > drawing._rz(spec.BODY_Z1) + 0.005
+    assert run < 0.02
+    flank = math.radians(spec.V_FLANK_ANGLE_DEG)
+    straight = spec.V_FLAT_Y / math.sin(flank) - spec.V_APEX_FILLET_R * math.tan(
+        flank / 2.0
+    )
+    assert run < straight * drawing._S - 0.005
+    assert corner[0] - run > drawing._rz(spec.V_MOUTH_Z0) + 0.006
+    # Arrows outside, each stub (~6 mm) past its line: the lower one drops
+    # under the bottom face over the V's back-edge row's text, the upper
+    # one stays under the flat height's upper extension line.
+    assert keep["VMouthZ1"][1] + 0.0017 < corner[1] - 0.006 - 0.002
+    assert corner[1] + run * math.sin(flank) + 0.006 < drawing._ry(spec.V_FLAT_Y)
     # The flat's width: its line over the top face, its text under the tap's
     # callout rows (~0.249 / 0.255, from ~0.247).
     width_x, width_y = keep["VFlatWidth"]
@@ -1003,7 +1071,7 @@ def test_sheet_runs_at_4_to_1_with_3_to_2_isometric() -> None:
     half_w, half_h = 0.0350 * 1.5 / 2.0, 0.0349 * 1.5 / 2.0
     ink_cy = drawing.ISO_CENTER[1] - 0.0018
     left, right = drawing.ISO_CENTER[0] - half_w, drawing.ISO_CENTER[0] + half_w
-    assert left > drawing.BOTTOM_KEEP["PivotDia"][0] + 0.044 + 0.005
+    assert left > drawing.BOTTOM_KEEP["PivotDia"][0] + 0.017 + 0.005
     assert left > drawing._rz(spec.BODY_Z1) + 0.005
     assert ink_cy - half_h > 0.0651 + 0.003
     top_vertex_x = left + 0.45 * 2.0 * half_w
