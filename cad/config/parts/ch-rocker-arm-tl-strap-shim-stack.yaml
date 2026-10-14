@@ -1,0 +1,10 @@
+ch-rocker-arm-tl-strap-shim-stack:
+  title: Rocker Strap Shim Stack
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-11
+  material: AISI O1 tool steel on steel shim stock
+  material_specification: "AISI O1 precision ground flat stock, 3/32 x 3/4 in (Abrams Industries), as supplied (annealed); steel shim stock 0.001-0.031 in assortment (Precision Brand, MSC 86798816)"
+  finish: protect with ISO VG 32 machine-oil film
+  quantity: 4
+  tolerance_class: machined_block
+  process: "saw from the flat stock; mill both sawn ends and both long edges to size, faces as supplied; break edges; cut the shim pack from the assortment to the same outline and build it to each blank's gap"
