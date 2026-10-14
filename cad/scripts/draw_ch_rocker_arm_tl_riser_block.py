@@ -85,10 +85,10 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {"BlockWidth": (RIGHT_CENTER[0], RIGHT_CENTER[1] + _HALF_HEIGHT + 0.0145)}
 # The height governs all six blocks of both lengths; the set requirement
-# rides on it. The width is the bar's own.
-CALLOUTS_ABOVE = {"BlockHeight": "FACED TOGETHER AS A SET"}
+# rides on it as the result, not the method. The width is the bar's own.
+CALLOUTS_ABOVE = {"BlockHeight": "MATCHED SET OF SIX"}
 CALLOUTS_BELOW = {
-    "BlockHeight": f"ALL SIX EQUAL WITHIN {SET_EQUALITY:.2f}",
+    "BlockHeight": f"EQUAL WITHIN {SET_EQUALITY:.2f}",
     "BlockWidth": "STOCK",
 }
 
