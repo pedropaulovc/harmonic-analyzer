@@ -17,14 +17,14 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | `dt` / `DT` | Drive train | 36 |
 | `fr` / `FR` | Frame | 5 |
 | `mg` / `MG` | Magnifier | 10 |
-| `pd` / `PD` | Paper drive | 24 |
+| `pd` / `PD` | Paper drive | 23 |
 | `pn` / `PN` | Pen | 5 |
 | `ms` / `MS` | Measuring stick | 3 |
 | `sm` / `SM` | Summing | 4 |
-| `vn` / `VN` | Vendor parts | 64 |
+| `vn` / `VN` | Vendor parts | 63 |
 | `sh` / `SH` | Shared fabricated parts | 2 |
 
-Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. The retained orphan chain sprocket belongs to PD by its translational-gearing and platen-chain evidence; the retained orphan hex bolt belongs to VN by catalog evidence. Wheel axle nut is VN by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
+Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. Wheel axle nut is VN by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
 
 Purchased ANSI #25 inner and outer chain links and finished ISO 2338 m6 crank
 hub dowel stock are VN, including cut-to-length modifications. Pins machined
@@ -176,7 +176,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | `mg-wheel-axle-spacer` | — | MHA-MG-011 |
 | part | `chain-inner-link` | `vn-chain-inner-link` | MHA-006 | MHA-VN-002 |
 | part | `chain-outer-link` | `vn-chain-outer-link` | MHA-007 | MHA-VN-003 |
-| part | `chain-sprocket` | `pd-chain-sprocket` | MHA-008 | MHA-PD-001 |
+| retired part | `chain-sprocket` | `pd-chain-sprocket` | MHA-008 | MHA-PD-001 (retired; never reissued) |
 | part | `platen` | `pd-platen` | MHA-066 | MHA-PD-002 |
 | part | `platen-clip` | `pd-platen-clip` | MHA-067 | MHA-PD-003 |
 | part | `platen-paper` | `pd-platen-paper` | MHA-068 | MHA-PD-004 |
@@ -217,7 +217,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `counter-spring` | `vn-counter-spring` | MHA-019 | MHA-VN-005 |
 | part | `fillister-screw` | `vn-fillister-screw` | MHA-030 | MHA-VN-006 |
 | part | `hanger-screw` | `vn-hanger-screw` | MHA-034 | MHA-VN-007 |
-| part | `hex-bolt` | `vn-hex-bolt` | MHA-036 | MHA-VN-008 |
+| retired part | `hex-bolt` | `vn-hex-bolt` | MHA-036 | MHA-VN-008 (retired; never reissued) |
 | part | `lag-screw` | `vn-lag-screw` | MHA-039 | MHA-VN-009 |
 | part | `pen-set-screw` | `vn-pen-set-screw` | MHA-052 | MHA-VN-010 |
 | part | `thumb-screw` | `vn-thumb-screw` | MHA-075 | MHA-VN-011 |
@@ -294,6 +294,8 @@ next free Number in its category and has no old stem or old Number.
 
 | Change | Canonical stem | Number | Note |
 |---|---|---|---|
+| retired | `pd-chain-sprocket` | MHA-PD-001 | orphan removed from assemblies in `29025dd34`; superseded by the MHA-PD-009 `pd-transgear-removable` sprocket configurations (#68; delivery #507 retired) |
+| retired | `vn-hex-bolt` | MHA-VN-008 | orphan removed from the frame in `2ab7dc109`; no assembly uses this family (delivery #543 retired) |
 | retired | `pd-latch-hook-bracket` | MHA-PD-021 | replaced by the one-piece formed spring-steel MHA-PD-014 latch hook, screwed to the support bar by the two MHA-VN-043 screws |
 | retired | `vn-latch-hook-rivet` | MHA-VN-045 | no replacement: the one-piece MHA-PD-014 latch hook has no riveted joint |
 | retired | `vn-knife-hanger-washer` (old 1/2-inch family) | MHA-VN-026 | retired with the former 90126A211 washer; the new #10 washer has Number MHA-VN-060, not a revived VN-026 |
