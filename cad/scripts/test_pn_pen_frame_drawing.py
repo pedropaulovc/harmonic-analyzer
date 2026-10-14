@@ -76,8 +76,8 @@ def test_spec_is_the_single_source_of_geometry_and_marked_dimensions() -> None:
     assert drawing.WINDOW_CORNER_R is spec.WINDOW_CORNER_R
     assert part.SET_SCREW_TAP_SPEC is spec.SET_SCREW_TAP_SPEC
     assert drawing.SET_SCREW_TAP_SPEC is spec.SET_SCREW_TAP_SPEC
-    # The frame spec's copy of the block depth it passes stays the block's.
-    assert spec.V_BLOCK_DEPTH == v_block.BLOCK_DEPTH
+    # The frame spec's copy of the neck depth it passes stays the block's.
+    assert spec.V_BLOCK_DEPTH == v_block.NECK_DEPTH
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
     local = {
         target.id
@@ -215,7 +215,7 @@ def test_printed_worst_case_keeps_the_window_rails_thread_and_tap_wall() -> None
     # The window width prints directly: it passes the block at both parts'
     # loosest printed limits.
     assert spec.WINDOW_WIDTH_PRINTED_MIN == pytest.approx(spec.WINDOW_WIDTH - two)
-    assert spec.WINDOW_WIDTH_PRINTED_MIN > v_block.BLOCK_DEPTH + one
+    assert spec.WINDOW_WIDTH_PRINTED_MIN > v_block.NECK_WIDTH_PRINTED_MAX
     # The unprinted right and top rails meet the rule 17 2.0 target.
     assert spec.RIGHT_WALL_PRINTED_MIN == pytest.approx(
         (spec.OUTER_WIDTH - one) - (spec.RAIL_SIDE + two) - (spec.WINDOW_WIDTH + two)
@@ -252,7 +252,7 @@ def test_window_height_band_keeps_the_thumb_screw_throw() -> None:
 def test_window_corner_radius_clears_the_v_block_top_edges() -> None:
     # The window's top edge seats on the block top; a corner radius larger
     # than the side gap would ride on the block's top edges.
-    side_gap = (spec.WINDOW_WIDTH - v_block.BLOCK_DEPTH) / 2.0
+    side_gap = (spec.WINDOW_WIDTH - v_block.NECK_DEPTH) / 2.0
     assert spec.WINDOW_CORNER_R == pytest.approx(side_gap) == pytest.approx(1.0)
 
 

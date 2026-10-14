@@ -18,7 +18,7 @@ the curve. Everything below the guides rides the rod:
   end drops into the block's pivot bore and its square shoulder rests on the
   block top; vn-pen-rod-set-screw (front face) locks the pen's yaw, which is
   PEN_BLOCK_YAW_DEG to the paper.
-* vn-pen-marker -- the purchased Sharpie Mini, its grip in the block's V-groove,
+* vn-pen-marker -- the purchased Sharpie Fine Point, its grip in the block's V-groove,
   nib on the paper, body running out forward and east.
 * pn-pen-frame -- the stirrup flush on the block's PAPER end; vn-pen-set-screw
   (the thumb screw) threads up through its bottom rail and presses the grip

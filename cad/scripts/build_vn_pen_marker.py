@@ -1,7 +1,8 @@
-r"""Purchased pen marker: Sharpie Mini permanent marker, fine point (MHA-VN-060).
+r"""Purchased pen marker: Sharpie permanent marker, fine point (MHA-VN-060).
 
-The stock marker that writes the curve (engineerguy 4/4 video 9:15-10:34,
-"insert the mini-sharpie pen"), modelled uncapped as it is used: one solid
+The stock marker that writes the curve (engineerguy 4/4 video 9:15-10:34
+used the Mini; this build takes the regular Fine Point, the format Brazil's
+markers share), modelled uncapped as it is used: one solid
 of revolution through the ``vn_pen_marker_spec.PROFILE`` stations (nib,
 nose cone, the cap-seat grip that lies in the v-block groove, the tapered
 silver body and its domed back end). The spec records which stations are

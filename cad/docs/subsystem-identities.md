@@ -305,8 +305,8 @@ next free Number in its category and has no old stem or old Number.
 | added | `sm-gooseneck-spring-screw` | MHA-SM-004 | shop-turned slotted fillister screw clamps the counter spring's upper eye to MHA-SM-001's brazed, #6-32 through-tapped end plug |
 | added | `vn-platen-clip-screw` | MHA-VN-059 | four brass #2-56 fillister screws hold the MHA-PD-003 platen clip to the MHA-PD-002 platen in place of MHA-VN-006 |
 | added | `vn-knife-hanger-washer` (new #10 family) | MHA-VN-060 | 18-8 SAE washer 96659A104 under the modified #10-24 hex-head MHA-VN-024 Bolt on the MHA-FR-002 spotface; functional stem reused, retired Number never reused |
-| retired | `pn-pen-marker` | MHA-PN-003 | replaced by the purchased MHA-VN-060 Sharpie Mini marker |
-| added | `vn-pen-marker` | MHA-VN-060 | purchased Sharpie Mini permanent marker, fine point, used uncapped; its cap-seat grip lies in the MHA-PN-005 v-block groove |
+| retired | `pn-pen-marker` | MHA-PN-003 | replaced by the purchased MHA-VN-060 Sharpie marker |
+| added | `vn-pen-marker` | MHA-VN-060 | purchased Sharpie permanent marker, fine point (regular size), used uncapped; its cap-seat grip lies in the MHA-PN-005 v-block groove |
 | added | `vn-pen-rod-set-screw` | MHA-VN-061 | #4-40 x 3/16 cup-point set screw in the MHA-PN-005 v-block, locking the MHA-PN-004 pen rod's pivot end |
 | added | `vn-pen-adjust-nut` | MHA-VN-062 | brass #0-80 jam nut on the MHA-PN-007 adjuster stud in the MHA-PN-004 pen rod's top |
 | added | `pn-pen-adjust-screw` | MHA-PN-007 | turned brass #0-80 eye stud in the MHA-PN-004 pen rod's top, locked by the MHA-VN-062 jam nut; the MHA-PN-006 pen wire ties through its eye |

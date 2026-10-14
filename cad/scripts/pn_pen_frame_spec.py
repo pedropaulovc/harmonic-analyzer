@@ -23,8 +23,8 @@ from __future__ import annotations
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
 
-# The window passes the 18-deep v-block with 1.0 a side (the frame spec stays
-# free of the block's spec; test_pn_pen_frame_drawing pins the copy).
+# The window passes the v-block's 18-deep neck with 1.0 a side (the frame spec
+# stays free of the block's spec; test_pn_pen_frame_drawing pins the copy).
 V_BLOCK_DEPTH = 18.0
 OUTER_WIDTH = 28.0  # X (across the block depth)
 RAIL_SIDE = 4.0  # side rails (local X)
@@ -40,8 +40,8 @@ WINDOW_WIDTH = OUTER_WIDTH - 2.0 * RAIL_SIDE
 WINDOW_HEIGHT = OUTER_HEIGHT - 2.0 * RAIL_END
 # The window's internal corners (drawing-guidelines.md rule 16: no sharp
 # internal corner; as large as function allows).  The window's top edge seats
-# on the v-block top with 1.0 a side (pn_pen_carriage_geom asserts the side
-# gap), so a radius over 1.0 would ride on the block's top edges and lift the
+# on the v-block neck's top with 1.0 a side (pn_pen_carriage_geom asserts the
+# side gap), so a radius over 1.0 would ride on the neck's top edges and lift the
 # stirrup; 1.0 is that largest radius, and a 2.0 end mill cuts it.
 WINDOW_CORNER_R = 1.0
 if WINDOW_CORNER_R > (WINDOW_WIDTH - V_BLOCK_DEPTH) / 2.0:
@@ -109,10 +109,10 @@ def _band(name: str) -> float:
     return printed_band_mm(DRAWING_PRECISION_BY_NAME[name])
 
 
-# The window passes the v-block at both parts' printed worst case: the window
-# at its own band, the block at the loosest (.X) title-block row.
+# The window passes the v-block's neck at both parts' printed worst case: the
+# window at its own band, the neck's two faces at the block's .XX row.
 WINDOW_WIDTH_PRINTED_MIN = WINDOW_WIDTH - _band("WindowWidth")
-if WINDOW_WIDTH_PRINTED_MIN <= V_BLOCK_DEPTH + printed_band_mm(1):
+if WINDOW_WIDTH_PRINTED_MIN <= V_BLOCK_DEPTH + 2.0 * printed_band_mm(2):
     raise AssertionError("printed window width may not pass the v-block")
 # The two unprinted rails (right, top) at the printed worst case: the outer
 # size small, the window's corner station and size large (rule 17).

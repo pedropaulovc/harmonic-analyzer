@@ -1,51 +1,52 @@
-r"""Pure-data envelope of the purchased pen marker, a Sharpie Mini (MHA-VN-060).
+r"""Pure-data envelope of the purchased pen marker, a Sharpie Fine Point (MHA-VN-060).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: ``build_vn_pen_marker`` revolves ``PROFILE`` and the pen assembly
-reads the seat, length and mass from here.
+reads the seat, length, mass and CG from here.
 
-The pen is a stock Sharpie Mini permanent marker, fine point (engineerguy
-4/4 video 9:15-10:34: "insert the mini-sharpie pen and secure it"). It is
-used with the cap taken off: frame t042 shows the bare barrel with its domed
-back end going into the stirrup, and t046 shows the coloured cap-seat
-section lying in the v-block groove, with the barrel shoulder at the back
-face of the block and the nose and nib standing just proud of the front
-face. The model is the uncapped marker.
+The pen is a stock regular-size Sharpie permanent marker, fine point (item
+30051), used with the cap taken off. The engineerguy 4/4 video (9:15-10:34)
+used a Sharpie Mini; this build takes the regular Fine Point instead, so the
+same-format markers sold in Brazil fit the v-block: Oval PY230200 and the
+Brasfort "caneta marcador permanente ponta fina". Their dimensions are not
+published; they are assumed to match the Sharpie Fine Point format.
+Masterprint MP616 does not fit: it has a chisel tip and a 127 x 18 x 20 mm
+body.
+
+As in the video (frames t042/t046), the cap-seat section (the grip under
+the cap) lies in the v-block groove, the body shoulder stands at the
+block's paper-end section, and the nose and nib stand proud of the paper
+end. The body runs back through the relief slot and out of the free end.
 
 Evidence (all read 2026-10-13):
 
-- sharpie.com, item 35111 (Sharpie Consumer Care): "The Sharpie Mini Markers
-  are 3-1/2"-long"; fine tip; plastic barrel; cap with a key-ring clip.
-- artsupplycritic.com review of the Sharpie Mini (2016): "the same starting
-  and ending diameters as the regular sized Sharpie"; the snap-on key ring
-  sits on the cap's tip.
-- jetpens.com, Sharpie Fine Point 30051 (the regular marker): grip Ø10.6,
-  barrel with ink 7 g, cap 2 g, uncapped 123 long.
-- The Sharpie product photograph
+- jetpens.com, Sharpie Fine Point 30051: grip Ø10.6, barrel with ink 7 g,
+  cap 2 g, uncapped 123 long.
+- The Sharpie Mini (sharpie.com item 35111) product photograph
   ``s7d1.scene7.com/is/image/NewellBrands/35111-sharpie-permanent-mini-item-front``
-  (2000 px), scaled by the 3-1/2" overall length taken over the key ring
-  (1367 px). Taken without the ring, the barrel would come out Ø13.0, above
-  the regular Sharpie's 13.1 maximum (which includes its clip), so the ring
-  is counted.
+  and the artsupplycritic.com review of the Mini (2016: "the same starting
+  and ending diameters as the regular sized Sharpie"). Together they give
+  the shared front end and the body's diameters.
 
 Source of each number:
 
-- SOURCED: ``CAPPED_LENGTH`` from sharpie.com; ``BARREL_DIA``, the
-  Ø10.6 cap seat, from the regular grip Ø10.6 on jetpens.com together with
-  the review's "same diameters".
-- PHOTO-SCALED, about ±0.5: the body (silver barrel) length 45.8, its taper
-  from Ø12.3 at the shoulder to Ø11.0, the domed back end, and the
-  cap-shell length that bounds the seat and nose.
-- ESTIMATED, not published by any source found: the cap-seat length
-  (14.5), the nose cone (Ø3.2 to Ø7.2 over 8.0) and the nib (Ø2.0 standing
-  3.0 proud). These are sized to fit inside the photographed cap shell
-  (28.6 long, behind the 9.5 key-ring tip piece) with about 2 of clearance
-  ahead of the nib.
-- MASS: no vendor mass is published. The native model is a solid envelope
-  of polypropylene ("PP Copolymer", 0.89 g/cm^3, the SOLIDWORKS library
-  material), which gives ``MASS_G``, about 5.2 g. For comparison, the
-  regular Sharpie's 7 g barrel scaled by length (71.4/123) gives 4.1 g, so
-  the model is about 1 g heavy.
+- SOURCED: ``OVERALL_LENGTH`` (123, uncapped), ``BARREL_DIA`` (the Ø10.6
+  cap seat that lies in the V) and ``MASS_G`` (7 g, the barrel with its
+  ink), all from jetpens.com.
+- PHOTO-SCALED from the Mini, about ±0.5, through the review's "same
+  diameters": the body's Ø12.3 at the shoulder and Ø11.0 where the back
+  dome begins, and the dome's profile.
+- ESTIMATED, not published by any source found: the cap-seat length (14.5),
+  the nose cone (Ø3.2 to Ø7.2 over 8.0) and the nib (Ø2.0 standing 3.0
+  proud), all kept from the Mini; the body's straight taper from the
+  shoulder to the dome; and the dome's start station (``BODY_TAPER_END_Y``),
+  which carries the Mini's photographed dome to the 123 overall length.
+- MASS and CG: the carriage balance (``pn_pen_carriage_geom``) uses the
+  published ``MASS_G`` at the envelope's centroid ``CG_Y``, which assumes
+  uniform density (ESTIMATED: the ink reservoir and the hollow barrel are
+  not modelled). The native part is the solid envelope in polypropylene
+  ("PP Copolymer", the SOLIDWORKS library material, 0.89 g/cm^3). It weighs
+  more than 7 g and is not used for the balance.
 
 Part frame: the origin is at the nib tip on the marker axis, and +Y runs
 along the axis toward the back end. ``PROFILE`` lists the (y, radius)
@@ -56,14 +57,9 @@ from __future__ import annotations
 
 import math
 
-MM_PER_IN = 25.4
-
 SUPPLIER = "Newell Brands (Sharpie)"
-SKU = "35111"  # Sharpie Mini Permanent Marker, Fine Point (sharpie.com)
-MATERIAL = "PP Copolymer"  # SOLIDWORKS library polypropylene
-DENSITY_G_PER_MM3 = 0.89e-3  # PP Copolymer, 890 kg/m^3
-
-CAPPED_LENGTH = 3.5 * MM_PER_IN  # 88.9, sharpie.com, including the key ring
+SKU = "30051"  # Sharpie Permanent Marker, Fine Point (jetpens.com)
+MATERIAL = "PP Copolymer"  # SOLIDWORKS library polypropylene (the native envelope)
 
 # Nib: felt bullet, estimated.
 NIB_DIA = 2.0
@@ -75,11 +71,11 @@ NOSE_BASE_DIA = 7.2
 BARREL_DIA = 10.6
 BARREL_START_Y = 11.0  # nose base
 BARREL_END_Y = 25.5  # shoulder up to the silver body
-# Body (silver barrel), photo-scaled.
+# Body (silver barrel): photo-scaled diameters, estimated stations.
 BODY_FRONT_DIA = 12.3  # at the shoulder
 BODY_BACK_DIA = 11.0  # where the dome begins to roll over
-BODY_TAPER_END_Y = 59.0
-OVERALL_LENGTH = 71.4  # uncapped, as used: nib tip to the domed back end
+BODY_TAPER_END_Y = 110.6
+OVERALL_LENGTH = 123.0  # uncapped, as used: nib tip to the domed back end
 
 MAX_DIA = BODY_FRONT_DIA  # uncapped: the body at the shoulder
 
@@ -95,9 +91,9 @@ PROFILE: tuple[tuple[float, float], ...] = (
     (BARREL_END_Y, BARREL_DIA / 2.0),
     (BARREL_END_Y, BODY_FRONT_DIA / 2.0),  # shoulder
     (BODY_TAPER_END_Y, BODY_BACK_DIA / 2.0),
-    (65.4, 5.05),  # domed back end, photo-scaled
-    (68.0, 4.4),
-    (70.6, 2.8),
+    (117.0, 5.05),  # domed back end, photo-scaled from the Mini
+    (119.6, 4.4),
+    (122.2, 2.8),
     (OVERALL_LENGTH, 0.0),
 )
 
@@ -118,6 +114,7 @@ def volume_and_cg_y() -> tuple[float, float]:
 
 
 VOLUME_MM3, CG_Y = volume_and_cg_y()
-MASS_G = VOLUME_MM3 * DENSITY_G_PER_MM3
+# jetpens.com: the barrel with its ink, uncapped as used.
+MASS_G = 7.0
 
 DRAWING_NOTES = "USED UNCAPPED; THE GRIP UNDER THE CAP SEATS IN THE V-BLOCK GROOVE."

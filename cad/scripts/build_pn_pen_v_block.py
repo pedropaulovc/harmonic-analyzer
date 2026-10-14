@@ -1,50 +1,50 @@
 r"""Reproduction script: pen v-block (MHA-PN-005), re-derived per
 ``pn_pen_v_block_spec``.
 
-The bright brass block that hangs on the pen rod and carries the marker: 45
-degree chamfered top corners; a 90 degree V-groove under the paper end that
-seats the marker's grip; a flat-roofed relief slot over the rest of the length
-that passes the marker's body; the rod's reamed pivot bore from the top face
-down into the relief; a #4-40 set-screw tap from the front face into that bore;
-and a 5/16 lightening bore at the free end, also opening into the relief.
+The bright brass block that hangs on the pen rod and carries the marker, a
+"simplified E" in plan: a neck at the paper end that the stirrup straddles,
+with a 90 degree V-groove under it that seats the marker's grip; then a body
+wider by BODY_SIDE_STEP each side, with a flat-roofed relief slot that passes
+the marker's body; the rod's reamed pivot bore from the top face down into the
+relief; and a #4-40 set-screw tap from the body's front face into that bore.
 
 Part frame (the assembly places the part by its origin and Front/Top/Right
 planes, so this is a contract): X 0..BLOCK_LENGTH along the marker, x 0 the
-PAPER end face; Y 0..BLOCK_HEIGHT up, y 0 the bottom face; Z 0..BLOCK_DEPTH
-across the depth, z 0 the FRONT face (away from the paper). The origin is the
-bottom/paper-end/front corner.
+PAPER end face; Y 0..BLOCK_HEIGHT up, y 0 the bottom face; Z across the depth,
+z 0 the neck's FRONT face (away from the paper), the neck z 0..NECK_DEPTH and
+the body BODY_Z0..BODY_Z1. The origin is the bottom/paper-end/front corner of
+the neck.  The print's depth datum is the body's front face (z BODY_Z0): every
+station across the depth is a baseline from it, so each sketch that prints one
+carries a construction foot on that face.
 
 Features, in tree order:
 
-* ``OutlineProfile`` (Front plane) -> ``Block``: the chamfered end outline,
-  extruded +Z by the depth.
+* ``OutlineProfile`` (Top plane, sketch (u, v) = model (X, -Z)) -> ``Block``:
+  the plan outline, neck and body, extruded +Y by the height.
 * ``VGrooveProfile`` (Right plane, sketch (u, v) = model (-Z, Y)) ->
   ``VGroove``: the V triangle, its included angle and both mouth edges (each
-  from the front face) driving and its apex height a driven reference, cut +X
-  from the paper end to ``V_CUT_LENGTH``, one corner radius past the relief's
-  step, so no knife edge stays where the corner arcs meet the flanks.
-* ``ReliefProfile`` (Top plane, sketch (u, v) = model (X, -Z)) -> ``Relief``:
-  the slot from ``RELIEF_X0`` to the free end, both walls stationed from the
-  front face, its two step corners the end mill's ``RELIEF_CORNER_R`` arcs,
+  from the body's front face) driving and its apex height a driven reference,
+  cut +X from the paper end to ``V_CUT_LENGTH``, one corner radius past the
+  relief's step.
+* ``ReliefProfile`` (Top plane) -> ``Relief``: the slot from ``RELIEF_X0`` to
+  the free end, its two step corners the end mill's ``RELIEF_CORNER_R`` arcs,
   cut +Y to the roof.
 * ``PivotBoreProfile`` (Top plane) -> ``PivotBore``: the reamed bore, a
   sketched through cut; it removes brass only between the top face and the
   relief roof.  Its diameter carries the H7 band.
 * ``PivotBoreChamfer``: 45 deg on the bore's top edge (it clears the rod's
   shoulder-root fillet); ``PivotReference`` prints its size, a single MIN limit.
-* ``SetScrewHole``: Hole Wizard #4-40 tap from the front face, up to the
-  pivot bore (``through_next``); built after the bore so it stops there.
-* ``LighteningBore``: Hole Wizard 5/16 drill from the top face, through all;
-  it opens into the relief.
+* ``SetScrewHole``: Hole Wizard #4-40 tap from the body's front face, up to
+  the pivot bore (``through_next``); built after the bore so it stops there.
 * ``SectionAPlane``: parallel to the Right plane through the pivot-bore axis,
   section A-A's cutting plane (hidden).
-* ``ReliefReference`` / ``PivotReference`` (on ``SectionAPlane``) and
-  ``LighteningReference`` (Top plane), all hidden: construction chords on
-  edges the sheet shows, owning each feature's station across the depth from
-  the front face and the relief height from the bottom face to the roof
-  (``pn_pen_v_block_spec`` contract).  The section's two lie IN its cutting
-  plane (the bond cradle's recipe): the drawing cuts the section while the
-  part shows them, which is how a section imports a hidden sketch's dims.
+* ``ReliefReference`` / ``PivotReference`` (on ``SectionAPlane``), hidden:
+  construction chords on edges the sheet shows, owning each feature's station
+  across the depth from the body's front face and the relief height from the
+  bottom face to the roof (``pn_pen_v_block_spec`` contract).  Both lie IN
+  the section's cutting plane (the bond cradle's recipe): the drawing cuts the
+  section while the part shows them, which is how a section imports a hidden
+  sketch's dims.
 
 Run (SolidWorks already open)::
 
@@ -89,18 +89,19 @@ from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 import _telemetry
 from pn_pen_v_block_spec import (
-    BLOCK_DEPTH,
     BLOCK_HEIGHT,
     BLOCK_LENGTH,
-    CHAMFER,
+    BODY_DEPTH,
+    BODY_SIDE_STEP,
+    BODY_Z0,
+    BODY_Z1,
+    DEPTH_MID_Z,
     DIMENSION_PREFIXES,
     DRAWING_BANDS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
-    LIGHTENING_DIA,
-    LIGHTENING_SPEC,
-    LIGHTENING_X,
+    NECK_DEPTH,
     PIVOT_BORE_DIA,
     PIVOT_BORE_TOP_CHAMFER,
     PIVOT_BORE_X,
@@ -122,6 +123,7 @@ from pn_pen_v_block_spec import (
     V_MOUTH_WIDTH,
     V_MOUTH_Z0,
     V_MOUTH_Z1,
+    depth_station,
 )
 
 PART_NAME = "pn-pen-v-block"
@@ -129,29 +131,33 @@ MATERIAL = "Brass"  # see _appearance.apply_material docstring
 
 THROUGH_CUT_DEPTH = 80.0  # mid-plane total; > any extent crossed
 TAP_DRILL_DIA = TAP_DRILL_MM[SET_SCREW_TAP_SPEC.size]
-_Z_MID = BLOCK_DEPTH / 2.0
+_Z_MID = DEPTH_MID_Z
+# The body's front face in the Right plane's and the section's sketch (u =
+# -Z): the depth datum's foot, where each depth-wise sketch anchors a stub.
+_DATUM_U = BODY_SIDE_STEP
 # Section A-A's cutting plane (the drawing cuts at x = PIVOT_BORE_X): the
 # section's reference sketches lie in it.
 SECTION_PLANE = "SectionAPlane"
-# Length of the pivot reference's two marker chords (front face, bore axis);
-# unprinted, short enough to stay on the front face above the set-screw tap.
+# Length of the datum stubs and the pivot reference's axis chord; unprinted,
+# short enough to stay on the front face clear of the set-screw tap.
 _STUB = 1.0
 
 # Analytic volumes (mm^3) of each feature, checked after it is built.
-V_BLOCK = (BLOCK_LENGTH * BLOCK_HEIGHT - CHAMFER**2) * BLOCK_DEPTH
+V_BLOCK = (
+    RELIEF_X0 * NECK_DEPTH + (BLOCK_LENGTH - RELIEF_X0) * BODY_DEPTH
+) * BLOCK_HEIGHT
 V_GROOVE = V_APEX_Y * V_MOUTH_WIDTH / 2.0 * V_CUT_LENGTH
 # Each step corner leaves its R x R square less the quarter disc standing.
 V_RELIEF_CORNERS = 2.0 * (1.0 - math.pi / 4.0) * RELIEF_CORNER_R**2 * RELIEF_HEIGHT
-# The V's run past the step lies inside the slot, already void when the
-# relief is cut, less the two knife-edge slivers under its flanks at the
-# corner arcs (0.005 mm^3 together, inside every volume check's tolerance).
+# The V's run past the step lies inside the slot (the corner arcs stand
+# outside its mouth), already void when the relief is cut.
 V_GROOVE_PAST_STEP = V_APEX_Y * V_MOUTH_WIDTH / 2.0 * (V_CUT_LENGTH - RELIEF_X0)
 V_RELIEF = (
     RELIEF_WIDTH * RELIEF_HEIGHT * (BLOCK_LENGTH - RELIEF_X0)
     - V_RELIEF_CORNERS
     - V_GROOVE_PAST_STEP
 )
-# Both vertical bores remove brass only from the relief roof to the top face.
+# The vertical bore removes brass only from the relief roof to the top face.
 V_PIVOT_BORE = math.pi * (PIVOT_BORE_DIA / 2.0) ** 2 * (BLOCK_HEIGHT - RELIEF_HEIGHT)
 # A 45 deg chamfer of leg c round a bore of radius r: the c x c / 2 triangle
 # swept about the axis at its centroid's radius r + c / 3.
@@ -160,92 +166,119 @@ V_PIVOT_CHAMFER = (
     * PIVOT_BORE_TOP_CHAMFER**2
     * (PIVOT_BORE_DIA / 2.0 + PIVOT_BORE_TOP_CHAMFER / 3.0)
 )
-# The tap runs from the front face to where its whole profile is inside the
-# bore: the drill cylinder to the bore axis less its near half of the
+# The tap runs from the body's front face to where its whole profile is inside
+# the bore: the drill cylinder to the bore axis less its near half of the
 # drill-through-bore intersection (already void).
 V_SET_SCREW_TAP = (
-    math.pi * (TAP_DRILL_DIA / 2.0) ** 2 * _Z_MID
+    math.pi * (TAP_DRILL_DIA / 2.0) ** 2 * (_Z_MID - BODY_Z0)
     - cross_hole_volume_mm3(TAP_DRILL_DIA, PIVOT_BORE_DIA) / 2.0
 )
-V_LIGHTENING = math.pi * (LIGHTENING_DIA / 2.0) ** 2 * (BLOCK_HEIGHT - RELIEF_HEIGHT)
 V_TOTAL = (
-    V_BLOCK
-    - V_GROOVE
-    - V_RELIEF
-    - V_PIVOT_BORE
-    - V_PIVOT_CHAMFER
-    - V_SET_SCREW_TAP
-    - V_LIGHTENING
+    V_BLOCK - V_GROOVE - V_RELIEF - V_PIVOT_BORE - V_PIVOT_CHAMFER - V_SET_SCREW_TAP
 )
 
 
 async def _outline(adapter, dims: SketchDims) -> None:
-    """The chamfered end outline on the Front plane, from the origin corner.
+    """The plan outline on the Top plane, sketch (u, v) = model (X, -Z).
 
-    Lines L0..L5 run (0,0) -> (L,0) -> (L,H-C) -> (L-C,H) -> (C,H) -> (0,H-C).
-    Relations: L0 starts on the origin; L0/L3 horizontal, L1/L5 vertical.
-    Dims: the overall length and height (top flat from the bottom), then each
-    chamfer's two legs -- 12 point DOF less 2 + 4 relations + 6 dims = 0.
+    Lines L0..L7 run from the origin round the neck and the body: (0,0) ->
+    (X0,0) -> (X0,s) -> (L,s) -> (L,-Z1) -> (X0,-Z1) -> (X0,-N) -> (0,-N),
+    with X0 the step (RELIEF_X0), s the body's side step, Z1 its back face and
+    N the neck's depth.  Relations: L0 starts on the origin; the even lines
+    horizontal, the odd vertical.  Dims: the step's station on both neck faces
+    (unprinted, the "ReliefX0" global: the print states it once, on the slot's
+    step, in line with these), the overall length along the front (printed in
+    the bottom view, above it: its extension lines rise from the paper end's
+    and the free end's front corners into the air in front of the block), and
+    the depth-wise faces as baselines from the body's front face (L2): the
+    neck's front face, its back face and the body's back face (unprinted: the
+    V's sketch prints the depth-wise stack in the paper-end view, driven by
+    the same globals) -- 16 point DOF less 2 + 8 relations + 6 dims = 0.
     """
+    step, side = RELIEF_X0, BODY_SIDE_STEP
     points = [
         (0.0, 0.0),
-        (BLOCK_LENGTH, 0.0),
-        (BLOCK_LENGTH, BLOCK_HEIGHT - CHAMFER),
-        (BLOCK_LENGTH - CHAMFER, BLOCK_HEIGHT),
-        (CHAMFER, BLOCK_HEIGHT),
-        (0.0, BLOCK_HEIGHT - CHAMFER),
+        (step, 0.0),
+        (step, side),
+        (BLOCK_LENGTH, side),
+        (BLOCK_LENGTH, -BODY_Z1),
+        (step, -BODY_Z1),
+        (step, -NECK_DEPTH),
+        (0.0, -NECK_DEPTH),
     ]
     lines = await add_line_chain(adapter, points)
     await anchor_point_to_origin(
         adapter, f"{lines[0]}.start", 0.0, 0.0, "outline origin corner"
     )
-    for index, relation in (
-        (0, "horizontal"),
-        (1, "vertical"),
-        (3, "horizontal"),
-        (5, "vertical"),
-    ):
+    for index, line in enumerate(lines):
+        relation = "vertical" if index % 2 else "horizontal"
         check(
             f"outline L{index} {relation}",
-            await adapter.add_sketch_constraint(lines[index], None, relation),
+            await adapter.add_sketch_constraint(line, None, relation),
         )
-    await dimension_between(
-        adapter,
-        f"{lines[0]}.start",
-        f"{lines[0]}.end",
-        "horizontal_distance",
-        BLOCK_LENGTH,
-        "block length",
-    )
-    dims.record("Length", '"BlockLength"')
-    await dimension_between(
-        adapter,
-        f"{lines[0]}.start",
-        f"{lines[3]}.end",
-        "vertical_distance",
-        BLOCK_HEIGHT,
-        "block height",
-    )
-    dims.record("Height", '"BlockHeight"')
-    for corner, line in ((2, lines[2]), (4, lines[4])):
-        await dimension_between(
-            adapter,
-            f"{line}.start",
-            f"{line}.end",
+    paper_front, step_front = f"{lines[0]}.start", f"{lines[0]}.end"
+    datum = f"{lines[2]}.start"  # the body's front face, at the step
+    free_front, free_back = f"{lines[3]}.start", f"{lines[3]}.end"
+    paper_back = f"{lines[6]}.end"
+    step_back = f"{lines[6]}.start"
+    for first, second, kind, value, name, drive, label in (
+        (
+            paper_front,
+            step_front,
             "horizontal_distance",
-            CHAMFER,
-            f"chamfer {corner} dx",
-        )
-        dims.record(f"Chamfer{corner}dx", '"Chamfer"')
-        await dimension_between(
-            adapter,
-            f"{line}.start",
-            f"{line}.end",
+            step,
+            "NeckLength",
+            '"ReliefX0"',
+            "neck front face length",
+        ),
+        (
+            paper_back,
+            step_back,
+            "horizontal_distance",
+            step,
+            "NeckBackLength",
+            '"ReliefX0"',
+            "neck back face length",
+        ),
+        (
+            paper_front,
+            free_front,
+            "horizontal_distance",
+            BLOCK_LENGTH,
+            "Length",
+            '"BlockLength"',
+            "block length",
+        ),
+        (
+            datum,
+            paper_front,
             "vertical_distance",
-            CHAMFER,
-            f"chamfer {corner} dy",
-        )
-        dims.record(f"Chamfer{corner}dy", '"Chamfer"')
+            side,
+            "NeckFrontFace",
+            '"NeckFrontZ"',
+            "neck front face from the body's front face",
+        ),
+        (
+            datum,
+            paper_back,
+            "vertical_distance",
+            depth_station(NECK_DEPTH),
+            "NeckBackFace",
+            '"NeckBackZ"',
+            "neck back face from the body's front face",
+        ),
+        (
+            free_front,
+            free_back,
+            "vertical_distance",
+            BODY_DEPTH,
+            "BodyDepth",
+            '"BlockDepth"',
+            "body depth",
+        ),
+    ):
+        await dimension_between(adapter, first, second, kind, value, label)
+        dims.record(name, drive)
 
 
 # Sketch (u, v) of a point inside the V's wedge, under the apex on its axis:
@@ -314,17 +347,81 @@ def _make_driven(adapter, dimension_id: str, label: str) -> None:
 async def _v_groove(adapter, dims: SketchDims) -> None:
     """The V triangle on the Right plane, sketch (u, v) = model (-Z, Y).
 
-    LA runs front mouth -> apex, LB apex -> back mouth, LC back mouth -> front
-    mouth along the bottom face.  Relations: LC horizontal, its front mouth on
-    the origin's level, LA = LB (the V symmetric about the apex).  Driving
-    dims: both mouth edges from the front face (real edges on the bottom face,
-    baselines from the face the print locates everything from, so neither is
-    chained from the other and the V is not placed by the depth's symmetry)
-    and the included angle -- 6 DOF less 3 relations + 3 dims = 0.  The mouth
-    width is their difference and the apex height what they leave: a DRIVEN
-    dimension the print shows as a reference.  It is made driven before the
-    angle exists, so the sketch is never over-defined.
+    Construction stubs stand on the depth-wise faces from their feet on the
+    bottom face: on the body's front face (the depth datum, beyond the neck
+    in the paper-end view; its foot from the origin and its length,
+    unprinted), and on the neck's front and back faces and the body's back
+    face, each foot level with the datum's and printed from it (NeckZ0,
+    NeckZ1, Depth).  LA runs front mouth -> apex, LB apex -> back mouth, LC
+    back mouth -> front mouth along the bottom face.  Relations: each stub's
+    foot on the origin's level and the stub vertical, LC horizontal, its front
+    mouth on the origin's level, LA = LB (the V symmetric about the apex).
+    Driving dims: both mouth edges from the datum's foot (real edges on the
+    bottom face, baselines from the face the print locates everything from,
+    so neither is chained from the other and the V is not placed by the
+    depth's symmetry) and the included angle -- 4 x 4 + 6 DOF less 11
+    relations + 11 dims = 0.  The mouth width is their difference and the
+    apex height what they leave: a DRIVEN dimension the print shows as a
+    reference.  It is made driven before the angle exists, so the sketch is
+    never over-defined.  The stubs are construction geometry: the cut takes
+    only the triangle.
     """
+    datum = await _construction_chord(
+        adapter, "VGrooveProfile", (_DATUM_U, 0.0), (_DATUM_U, _STUB)
+    )
+    await anchor_point_to_origin(
+        adapter, f"{datum}.start", _DATUM_U, 0.0, "V datum foot on the front face"
+    )
+    dims.record("VDatumZ", '"NeckFrontZ"')
+    check(
+        "V datum stub vertical",
+        await adapter.add_sketch_constraint(datum, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{datum}.start",
+        f"{datum}.end",
+        "vertical_distance",
+        _STUB,
+        "V datum stub",
+    )
+    dims.record("VDatumStub")
+    for z, name, drive, stub_name in (
+        (0.0, "NeckZ0", '"NeckFrontZ"', "VNeckFrontStub"),
+        (NECK_DEPTH, "NeckZ1", '"NeckBackZ"', "VNeckBackStub"),
+        (BODY_Z1, "Depth", '"BlockDepth"', "VBodyBackStub"),
+    ):
+        face = await _construction_chord(
+            adapter, "VGrooveProfile", (-z, 0.0), (-z, _STUB)
+        )
+        check(
+            f"V {name} foot level with the datum",
+            await adapter.add_sketch_constraint(
+                f"{face}.start", f"{datum}.start", "horizontal_points"
+            ),
+        )
+        await dimension_between(
+            adapter,
+            f"{datum}.start",
+            f"{face}.start",
+            "horizontal_distance",
+            depth_station(z),
+            f"V sketch {name} from the front face",
+        )
+        dims.record(name, drive)
+        check(
+            f"V {name} stub vertical",
+            await adapter.add_sketch_constraint(face, None, "vertical"),
+        )
+        await dimension_between(
+            adapter,
+            f"{face}.start",
+            f"{face}.end",
+            "vertical_distance",
+            _STUB,
+            f"V {name} stub",
+        )
+        dims.record(stub_name)
     points = [(-V_MOUTH_Z0, 0.0), (-_Z_MID, V_APEX_Y), (-V_MOUTH_Z1, 0.0)]
     flank_a, flank_b, mouth = await add_line_chain(adapter, points)
     check(
@@ -342,10 +439,10 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
     )
     await dimension_between(
         adapter,
+        f"{datum}.start",
         f"{flank_a}.start",
-        "origin",
         "horizontal_distance",
-        V_MOUTH_Z0,
+        depth_station(V_MOUTH_Z0),
         "V front mouth edge from the front face",
     )
     dims.record("VMouthZ0", '"VMouthFrontZ"')
@@ -361,10 +458,10 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
     dims.record("VApexY")
     await dimension_between(
         adapter,
+        f"{datum}.start",
         f"{flank_b}.end",
-        "origin",
         "horizontal_distance",
-        V_MOUTH_Z1,
+        depth_station(V_MOUTH_Z1),
         "V back mouth edge from the front face",
     )
     dims.record("VMouthZ1", '"VMouthBackZ"')
@@ -447,20 +544,48 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
     hidden.  The relief is cut from a Top-plane profile whose stations across
     the depth project edge-on in the section, and its cut depth is a vector
     that ends in air.  A shown reference sketch prints, so its chords lie only
-    on the section's own edges, never across the open mouth: the near wall
-    from its foot to the roof, its foot from the origin, the front face's foot
-    (ReliefZ0), and the far wall, whose foot is ReliefZ1 from the same origin
+    on the section's own edges, never across the open mouth: a _STUB up the
+    body's front face from its foot (the depth datum; the origin, the neck's
+    front face, lies inside the near wall here), its foot from the origin;
+    the near wall from its foot to the roof, its foot ReliefZ0 from the front
+    face's foot; and the far wall, whose foot is ReliefZ1 from the same foot
     (a baseline, not chained from the near wall) and whose height is the
     printed ReliefHeight (the section draws the far wall on its right, outside
-    the stations under it).  2 x 4 DOF less the near foot's level, both chords
-    vertical, the far foot's level (4) and 4 dims = 0.
+    the stations under it).  3 x 4 DOF less the three feet's level, the three
+    chords vertical (6) and 6 dims = 0.
     """
     feature = "ReliefReference"
     z0, z1 = RELIEF_Z0, RELIEF_Z1
     check(f"create sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
-    near = await _construction_chord(adapter, feature, (-z0, 0.0), (-z0, RELIEF_HEIGHT))
+    front = await _construction_chord(
+        adapter, feature, (_DATUM_U, 0.0), (_DATUM_U, _STUB)
+    )
     await anchor_point_to_origin(
-        adapter, f"{near}.start", -z0, 0.0, f"{feature} near wall foot"
+        adapter, f"{front}.start", _DATUM_U, 0.0, f"{feature} front face foot"
+    )
+    check(feature, await adapter.add_sketch_constraint(front, None, "vertical"))
+    await dimension_between(
+        adapter,
+        f"{front}.start",
+        f"{front}.end",
+        "vertical_distance",
+        _STUB,
+        f"{feature} front stub",
+    )
+    near = await _construction_chord(adapter, feature, (-z0, 0.0), (-z0, RELIEF_HEIGHT))
+    check(
+        feature,
+        await adapter.add_sketch_constraint(
+            f"{near}.start", f"{front}.start", "horizontal_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{front}.start",
+        f"{near}.start",
+        "horizontal_distance",
+        depth_station(z0),
+        f"{feature} near wall from the front face",
     )
     check(feature, await adapter.add_sketch_constraint(near, None, "vertical"))
     await dimension_between(
@@ -475,15 +600,15 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
     check(
         feature,
         await adapter.add_sketch_constraint(
-            f"{far}.start", f"{near}.start", "horizontal_points"
+            f"{far}.start", f"{front}.start", "horizontal_points"
         ),
     )
     await dimension_between(
         adapter,
+        f"{front}.start",
         f"{far}.start",
-        "origin",
         "horizontal_distance",
-        z1,
+        depth_station(z1),
         f"{feature} far wall from the front face",
     )
     check(feature, await adapter.add_sketch_constraint(far, None, "vertical"))
@@ -499,10 +624,21 @@ async def _relief_reference(adapter) -> list[tuple[str, str]]:
     check(f"exit sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
     _require_on_section_plane(adapter, feature)
-    z0_name, near_wall, z1_name, height = name_dimensions(
-        adapter, feature, ["ReliefZ0", "ReliefNearWall", "ReliefZ1", "ReliefHeight"]
+    # The stub's length is fixed: nothing in the part sets it.
+    front_face, _, z0_name, near_wall, z1_name, height = name_dimensions(
+        adapter,
+        feature,
+        [
+            "ReliefFrontFace",
+            "ReliefFrontStub",
+            "ReliefZ0",
+            "ReliefNearWall",
+            "ReliefZ1",
+            "ReliefHeight",
+        ],
     )
     return [
+        (front_face, '"NeckFrontZ"'),
         (z0_name, '"ReliefFrontZ"'),
         (near_wall, '"ReliefHeight"'),
         (z1_name, '"ReliefBackZ"'),
@@ -516,24 +652,26 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
     On SECTION_PLANE, sketch (u, v) = model (-Z, Y), construction only and
     hidden.  The bore's own Top-plane station projects edge-on in the section.
     A shown reference sketch prints, so no chord crosses the bore's open
-    mouth: a _STUB chord down the front face from its top edge, another down
-    the bore axis (the section's centreline) from the top face, PivotZ between
-    their tops; and the chamfer's face on the bore's FAR (z 11) side, from its
-    rim on the top face to its foot on the bore wall, whose run is the printed
-    chamfer size (its extension lines rise from the chamfer's own vertices,
-    clear of PivotZ's span).  3 x 4 DOF less: the front top on the origin's
-    vertical, both stubs vertical, the axis top and the rim level with the
-    front top (5); and 7 dims (station, two stub lengths, PivotZ, the foot's
-    offset from the axis, run, drop) = 0.
+    mouth: a _STUB chord down the body's front face (the depth datum) from its
+    top edge, another down the bore axis (the section's centreline) from the
+    top face, PivotZ between their tops; and the chamfer's face on the bore's
+    FAR side, from its rim on the top face to its foot on the bore wall, whose
+    run is the printed chamfer size (its extension lines rise from the
+    chamfer's own vertices, clear of PivotZ's span).  3 x 4 DOF less: both
+    stubs vertical, the axis top and the rim level with the front top (4); and
+    8 dims (the front top's two from the origin, two stub lengths, PivotZ, the
+    foot's offset from the axis, run, drop) = 0.
     """
     feature = "PivotReference"
     radius = PIVOT_BORE_DIA / 2.0
     chamfer = PIVOT_BORE_TOP_CHAMFER
     top = BLOCK_HEIGHT
     check(f"create sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
-    front = await _construction_chord(adapter, feature, (0.0, top), (0.0, top - _STUB))
+    front = await _construction_chord(
+        adapter, feature, (_DATUM_U, top), (_DATUM_U, top - _STUB)
+    )
     await anchor_point_to_origin(
-        adapter, f"{front}.start", 0.0, top, f"{feature} front face top edge"
+        adapter, f"{front}.start", _DATUM_U, top, f"{feature} front face top edge"
     )
     check(feature, await adapter.add_sketch_constraint(front, None, "vertical"))
     await dimension_between(
@@ -558,7 +696,7 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
         f"{front}.start",
         f"{axis}.start",
         "horizontal_distance",
-        _Z_MID,
+        depth_station(_Z_MID),
         f"{feature} bore axis from the front face",
     )
     check(feature, await adapter.add_sketch_constraint(axis, None, "vertical"))
@@ -611,10 +749,11 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
     name_last_feature(adapter, feature)
     _require_on_section_plane(adapter, feature)
     # The stubs' lengths are fixed: nothing in the part sets them.
-    station, _, pivot_z, _, bore_r, run, drop = name_dimensions(
+    front_face, station, _, pivot_z, _, bore_r, run, drop = name_dimensions(
         adapter,
         feature,
         [
+            "PivotFrontFace",
             "PivotStation",
             "PivotFrontStub",
             "PivotZ",
@@ -625,73 +764,12 @@ async def _pivot_reference(adapter) -> list[tuple[str, str]]:
         ],
     )
     return [
+        (front_face, '"NeckFrontZ"'),
         (station, '"BlockHeight"'),
         (pivot_z, '"BlockDepth" / 2'),
         (bore_r, '"PivotBoreDia" / 2'),
         (run, '"PivotChamfer"'),
         (drop, '"PivotChamfer"'),
-    ]
-
-
-async def _lightening_reference(adapter) -> list[tuple[str, str]]:
-    """The lightening bore's depth-wise station from the front face.
-
-    Top plane (the bottom face), sketch (u, v) = model (X, -Z), construction
-    only and hidden.  The bore's own placement dimension runs to the placement
-    sketch's origin, the paper end's front corner, so in the bottom view its
-    extension line would lie along the whole front edge.  A shown reference
-    sketch prints, so its chords lie on what the bottom view already draws:
-    one up the free end's edge from its front corner to the bore's level
-    (LighteningZ: extension lines from that corner and that level), one along
-    the bore's centreline from there to its centre.  2 x 4 DOF less the
-    corner on the origin's level, both chords' directions, the shared point
-    (2) and 3 dims (the corner's station, LighteningZ, the run) = 0.
-    """
-    feature = "LighteningReference"
-    check(f"create sketch {feature}", await adapter.create_sketch("Top"))
-    edge = await _construction_chord(
-        adapter, feature, (BLOCK_LENGTH, 0.0), (BLOCK_LENGTH, -_Z_MID)
-    )
-    await anchor_point_to_origin(
-        adapter, f"{edge}.start", BLOCK_LENGTH, 0.0, f"{feature} free-end corner"
-    )
-    check(feature, await adapter.add_sketch_constraint(edge, None, "vertical"))
-    await dimension_between(
-        adapter,
-        f"{edge}.start",
-        f"{edge}.end",
-        "vertical_distance",
-        _Z_MID,
-        f"{feature} bore level from the front face",
-    )
-    centre = await _construction_chord(
-        adapter, feature, (BLOCK_LENGTH, -_Z_MID), (LIGHTENING_X, -_Z_MID)
-    )
-    check(
-        feature,
-        await adapter.add_sketch_constraint(
-            f"{centre}.start", f"{edge}.end", "coincident"
-        ),
-    )
-    check(feature, await adapter.add_sketch_constraint(centre, None, "horizontal"))
-    await dimension_between(
-        adapter,
-        f"{centre}.start",
-        f"{centre}.end",
-        "horizontal_distance",
-        BLOCK_LENGTH - LIGHTENING_X,
-        f"{feature} bore from the free end",
-    )
-    await ensure_fully_defined(adapter, feature)
-    check(f"exit sketch {feature}", await adapter.exit_sketch())
-    name_last_feature(adapter, feature)
-    corner, lightening_z, run = name_dimensions(
-        adapter, feature, ["LighteningFreeEnd", "LighteningZ", "LighteningRun"]
-    )
-    return [
-        (corner, '"BlockLength"'),
-        (lightening_z, '"BlockDepth" / 2'),
-        (run, '"BlockLength" - "LighteningX"'),
     ]
 
 
@@ -758,20 +836,21 @@ async def build(adapter) -> dict[str, str]:
     for name, value in (
         ("BlockLength", BLOCK_LENGTH),
         ("BlockHeight", BLOCK_HEIGHT),
-        ("BlockDepth", BLOCK_DEPTH),
-        ("Chamfer", CHAMFER),
-        ("VMouthFrontZ", V_MOUTH_Z0),
-        ("VMouthBackZ", V_MOUTH_Z1),
+        # Stations across the depth from the body's front face (the datum).
+        ("BlockDepth", BODY_DEPTH),
+        ("NeckFrontZ", depth_station(0.0)),
+        ("NeckBackZ", depth_station(NECK_DEPTH)),
+        ("VMouthFrontZ", depth_station(V_MOUTH_Z0)),
+        ("VMouthBackZ", depth_station(V_MOUTH_Z1)),
         ("ReliefX0", RELIEF_X0),
-        ("ReliefFrontZ", RELIEF_Z0),
-        ("ReliefBackZ", RELIEF_Z1),
+        ("ReliefFrontZ", depth_station(RELIEF_Z0)),
+        ("ReliefBackZ", depth_station(RELIEF_Z1)),
         ("ReliefHeight", RELIEF_HEIGHT),
         ("ReliefCornerR", RELIEF_CORNER_R),
         ("PivotBoreX", PIVOT_BORE_X),
         ("PivotBoreDia", PIVOT_BORE_DIA),
         ("PivotChamfer", PIVOT_BORE_TOP_CHAMFER),
         ("SetScrewY", SET_SCREW_Y),
-        ("LighteningX", LIGHTENING_X),
     ):
         await set_global(adapter, name, f"{value}mm")
     # The V's included angle drives its sketch (degrees, not mm).
@@ -781,9 +860,10 @@ async def build(adapter) -> dict[str, str]:
     # the equations are applied in one deferred batch once the model exists.
     drive_jobs: list[tuple[str, str]] = []
 
-    # 1. Chamfered outline, extruded +Z by the depth.
+    # 1. The plan outline, neck and body, extruded +Y (the Top plane's normal)
+    # by the height.
     outline = SketchDims()
-    check("create_sketch outline", await adapter.create_sketch("Front"))
+    check("create_sketch outline", await adapter.create_sketch("Top"))
     await _outline(adapter, outline)
     await ensure_fully_defined(adapter, "block outline")
     check("exit_sketch outline", await adapter.exit_sketch())
@@ -791,16 +871,15 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += outline.apply(adapter, "OutlineProfile")
     check(
         "extrude block",
-        await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_DEPTH)),
+        await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
     )
     name_last_feature(adapter, "Block")
-    drive_jobs += [(name_dimensions(adapter, "Block", ["Depth"])[0], '"BlockDepth"')]
+    drive_jobs += [(name_dimensions(adapter, "Block", ["Height"])[0], '"BlockHeight"')]
     volume = await volume_check(adapter, "block", V_BLOCK, 0.001 * V_BLOCK)
 
     # 2. The grip's V-groove, cut +X (the Right plane's normal) from the paper
-    # end face one corner radius past the relief's start: stopped at the step,
-    # it left a knife-edge sliver under each flank where the corner arcs curve
-    # away from it (review final2's mouth triangles).
+    # end face one corner radius past the relief's start, so the step face
+    # never ends in a sliver under a flank (review final2's mouth triangles).
     groove = SketchDims()
     check("create_sketch V-groove", await adapter.create_sketch("Right"))
     await _v_groove(adapter, groove)
@@ -828,7 +907,9 @@ async def build(adapter) -> dict[str, str]:
     # then the step between the two end-mill corner arcs, whose centres stand
     # one radius into the slot.  Exact-coordinate endpoints merge in the
     # sketch DB (inference off).  The front-face corner's radius is the one
-    # the sheet prints ("2X"); the back one is driven by the same global.
+    # the sheet prints ("2X"); the back one is driven by the same global.  The
+    # walls' unprinted stations run from the origin (the neck's front face);
+    # the print's, from the body's front face, are ReliefReference's.
     relief = SketchDims()
     check("create_sketch relief", await adapter.create_sketch("Top"))
     z0, z1 = RELIEF_Z0, RELIEF_Z1
@@ -882,18 +963,16 @@ async def build(adapter) -> dict[str, str]:
         "relief length",
     )
     relief.record("ReliefLength", '"BlockLength" - "ReliefX0"')
-    # The back wall from the front face, a baseline like the front wall's
-    # below: neither wall is chained from the other.
     await dimension_between(
         adapter,
         f"{back}.start",
         "origin",
         "vertical_distance",
         z1,
-        "relief back wall from the front face",
+        "relief back wall from the origin",
     )
-    relief.record("ReliefZ1", '"ReliefBackZ"')
-    # The station runs from the paper end to the step's far (z 14.5) end, so
+    relief.record("ReliefZ1", '"ReliefBackZ" - "NeckFrontZ"')
+    # The station runs from the paper end to the step's far (z 16) end, so
     # its extension line leaves the step's own edge, not the corner arc.
     await dimension_between(
         adapter,
@@ -910,9 +989,9 @@ async def build(adapter) -> dict[str, str]:
         "origin",
         "vertical_distance",
         z0,
-        "relief front wall from the front face",
+        "relief front wall from the origin",
     )
-    relief.record("ReliefZ0", '"ReliefFrontZ"')
+    relief.record("ReliefZ0", '"ReliefFrontZ" - "NeckFrontZ"')
     for name, arc in (
         ("ReliefCornerR", front_corner),
         ("OtherReliefCornerR", back_corner),
@@ -950,7 +1029,7 @@ async def build(adapter) -> dict[str, str]:
         "pivot bore",
         dims=pivot,
         names=("PivotX", "PivotZ", "PivotDia"),
-        drives=('"PivotBoreX"', '"BlockDepth" / 2', '"PivotBoreDia"'),
+        drives=('"PivotBoreX"', '"BlockDepth" / 2 - "NeckFrontZ"', '"PivotBoreDia"'),
     )
     await ensure_fully_defined(adapter, "pivot bore sketch")
     check("exit_sketch pivot bore", await adapter.exit_sketch())
@@ -989,12 +1068,13 @@ async def build(adapter) -> dict[str, str]:
         0.1 * V_PIVOT_CHAMFER + 0.05,
     )
 
-    # 5. The rod set-screw tap: front face (outward normal -Z) up to the pivot
-    # bore it locks the rod's pivot in.  Placement sketch on the z 0 face.
+    # 5. The rod set-screw tap: the body's front face (outward normal -Z) up
+    # to the pivot bore it locks the rod's pivot in.  Placement sketch on that
+    # face, z BODY_Z0.
     tap = wizard_holes(
         adapter,
         SET_SCREW_TAP_SPEC,
-        [[PIVOT_BORE_X, SET_SCREW_Y, 0.0]],
+        [[PIVOT_BORE_X, SET_SCREW_Y, BODY_Z0]],
         (0.0, 0.0, -1.0),
         f"rod set-screw tap ({SET_SCREW_TAP_SPEC.size} into the pivot bore)",
         name="SetScrewHole",
@@ -1002,34 +1082,14 @@ async def build(adapter) -> dict[str, str]:
         placement_dims=[(("SetScrewX", '"PivotBoreX"'), ("SetScrewY", '"SetScrewY"'))],
     )
     drive_jobs += tap.placement_drive_jobs
-    volume = await volume_check(
+    await volume_check(
         adapter, "set-screw tap", volume - V_SET_SCREW_TAP, 0.03 * V_SET_SCREW_TAP
     )
 
-    # 6. The free-end lightening bore: top face (outward normal +Y), through
-    # all, opening into the relief.  Placement sketch (x, y) = model (X, Z).
-    lightening = wizard_holes(
-        adapter,
-        LIGHTENING_SPEC,
-        [[LIGHTENING_X, BLOCK_HEIGHT, _Z_MID]],
-        (0.0, 1.0, 0.0),
-        f"free-end lightening bore ({LIGHTENING_SPEC.size} drill)",
-        name="LighteningBore",
-        expect_dia_mm=LIGHTENING_DIA,
-        placement_dims=[
-            (("LighteningX", '"LighteningX"'), ("LighteningZ", '"BlockDepth" / 2'))
-        ],
-    )
-    drive_jobs += lightening.placement_drive_jobs
-    await volume_check(
-        adapter, "lightening bore", volume - V_LIGHTENING, 0.01 * V_LIGHTENING
-    )
-
-    # 7. The hidden depth-wise references the sheet prints (no solid change).
+    # 6. The hidden depth-wise references the sheet prints (no solid change).
     await _section_plane(adapter)
     drive_jobs += await _relief_reference(adapter)
     drive_jobs += await _pivot_reference(adapter)
-    drive_jobs += await _lightening_reference(adapter)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just

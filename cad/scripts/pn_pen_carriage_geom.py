@@ -7,7 +7,7 @@ bottom end), the hanger's engagement test and ``test_pn_pen_carriage_geom``.
 The carriage hangs from the rod (engineerguy 4/4, 9:15-10:34; design brief
 option C): the rod's square shoulder rests on the v-block top and its turned
 pivot end drops into the block's pivot bore, locked by the v-block set screw.
-The Sharpie Mini's grip lies in the block's V-groove, yawed PEN_BLOCK_YAW_DEG
+The Sharpie Fine Point's grip lies in the block's V-groove, yawed PEN_BLOCK_YAW_DEG
 to the paper, held by the stirrup frame at the PAPER end of the block and its
 thumb screw. On the rod top, the adjuster stud + jam nut carry the wire eye.
 
@@ -17,12 +17,13 @@ Two coupled solves fix the layout:
   corner (the stirrup's paper-side corner binds) stands 2 x CLEARANCE off.
 * Balance: the carriage's plan CG (v-block + marker + stirrup + thumb screw +
   rod set screw; the rod, stud and nut sit on the axis) lands on the rod axis.
-  The v-block's pivot-bore station and free-end lightening bore are the knobs
-  (``pn_pen_v_block_spec``); ``plan_cg_residual_mm`` is the analytic check
-  (brass 8.5, AISI 304 8.0, alloy steel 7.7 g/cc; the marker's own mass/CG).
+  The v-block's length is the knob (``pn_pen_v_block_spec.BLOCK_LENGTH``);
+  ``plan_cg_residual_mm`` is the analytic check (brass 8.5, AISI 304 8.0,
+  alloy steel 7.7 g/cc; the marker's published mass at its envelope CG).
 
 Block-local frame (``build_pn_pen_v_block``): x along the length (0 = paper
-end), y up (0 = bottom face), z across the depth (0 = front face). The block's
+end), y up (0 = bottom face), z across the depth (0 = the neck's front face;
+the body runs BODY_Z0..BODY_Z1, both centred on DEPTH_MID_Z). The block's
 local +X points forward-and-east at the yaw: machine (+sin, 0, -cos).
 """
 
@@ -65,7 +66,7 @@ _S = math.sin(math.radians(PEN_BLOCK_YAW_DEG))
 # only: the Euler angles are the assembly's business (_transforms is an
 # assembly helper, and pn_pen_wire_geom -- a leaf part's recipe -- imports this).
 BLOCK_ROWS = [[_S, 0.0, -_C], [0.0, 1.0, 0.0], [_C, 0.0, _S]]
-BORE_LOCAL = (vb.PIVOT_BORE_X, vb.BLOCK_DEPTH / 2.0)  # (x, z) of the rod axis
+BORE_LOCAL = (vb.PIVOT_BORE_X, vb.DEPTH_MID_Z)  # (x, z) of the rod axis
 
 # --- vertical stack -------------------------------------------------------------
 BLOCK_BOTTOM_Y = round(PAPER_MID_Y - vb.MARKER_AXIS_Y, 1)
@@ -111,13 +112,11 @@ MARKER_NIB_LOCAL_X = (
     -(
         (PAPER_FRONT_Z - PEN_PAPER_CLEARANCE_MM - MARKER_NIB_REACH)
         - VBLOCK_POS[2]
-        - (vb.BLOCK_DEPTH / 2.0) * _S
+        - vb.DEPTH_MID_Z * _S
     )
     / _C
 )
-MARKER_POS = block_to_machine(
-    (MARKER_NIB_LOCAL_X, vb.MARKER_AXIS_Y, vb.BLOCK_DEPTH / 2.0)
-)
+MARKER_POS = block_to_machine((MARKER_NIB_LOCAL_X, vb.MARKER_AXIS_Y, vb.DEPTH_MID_Z))
 MARKER_GRIP_LOCAL_X = (
     MARKER_NIB_LOCAL_X + marker.BARREL_START_Y,
     MARKER_NIB_LOCAL_X + marker.BARREL_END_Y,
@@ -134,7 +133,7 @@ FRAME_X_CENTER_LOCAL = FRAME_X0_LOCAL + frame.FRAME_DEPTH / 2.0
 FRAME_ORIGIN_LOCAL = (
     FRAME_X0_LOCAL + frame.FRAME_DEPTH,  # frame z 0 is the face nearer the rod
     vb.BLOCK_HEIGHT + FRAME_TOP_GAP + frame.RAIL_END - frame.OUTER_HEIGHT,
-    vb.BLOCK_DEPTH / 2.0 - frame.OUTER_WIDTH / 2.0,
+    vb.DEPTH_MID_Z - frame.OUTER_WIDTH / 2.0,
 )
 FRAME_POS = block_to_machine(FRAME_ORIGIN_LOCAL)
 FRAME_ROWS = [[_C, 0.0, _S], [0.0, 1.0, 0.0], [-_S, 0.0, _C]]
@@ -153,14 +152,14 @@ THUMB_SCREW_POS = block_to_machine(
     (
         FRAME_X_CENTER_LOCAL,
         MARKER_BOTTOM_LOCAL_Y - THUMB_SCREW_REACH,
-        vb.BLOCK_DEPTH / 2.0,
+        vb.DEPTH_MID_Z,
     )
 )
 
 # --- rod set screw -------------------------------------------------------------
 # Stock local +Y (cup -> socket) points out of the front face (block -Z); the cup
 # sits on the pivot-bore wall.
-ROD_SET_SCREW_CUP_LOCAL_Z = vb.BLOCK_DEPTH / 2.0 - vb.PIVOT_BORE_DIA / 2.0
+ROD_SET_SCREW_CUP_LOCAL_Z = vb.DEPTH_MID_Z - vb.PIVOT_BORE_DIA / 2.0
 ROD_SET_SCREW_ROWS = [
     [BLOCK_ROWS[0][0], BLOCK_ROWS[0][1], BLOCK_ROWS[0][2]],
     [-BLOCK_ROWS[2][0], -BLOCK_ROWS[2][1], -BLOCK_ROWS[2][2]],
@@ -198,11 +197,12 @@ def machine_z(local_x: float, local_z: float) -> float:
 
 def paper_side_points() -> dict[str, float]:
     """Machine z of each carriage feature's paper-most point (the nib excepted)."""
-    frame_z_paper = vb.BLOCK_DEPTH / 2.0 + frame.OUTER_WIDTH / 2.0
+    frame_z_paper = vb.DEPTH_MID_Z + frame.OUTER_WIDTH / 2.0
     points = {
-        "v-block paper-end corner": machine_z(0.0, vb.BLOCK_DEPTH),
+        "v-block neck paper-end corner": machine_z(0.0, vb.NECK_DEPTH),
+        "v-block body paper-side corner": machine_z(vb.RELIEF_X0, vb.BODY_Z1),
         "stirrup paper-side corner": machine_z(FRAME_X0_LOCAL, frame_z_paper),
-        "thumb-screw head rim": machine_z(FRAME_X_CENTER_LOCAL, vb.BLOCK_DEPTH / 2.0)
+        "thumb-screw head rim": machine_z(FRAME_X_CENTER_LOCAL, vb.DEPTH_MID_Z)
         + thumb.HEAD_DIA / 2.0,
     }
     # Marker envelope: a profile station (y, r) reaches its paper-most point on
@@ -211,7 +211,7 @@ def paper_side_points() -> dict[str, float]:
         if y < marker.NIB_LENGTH:
             continue  # the nib itself is placed by the paper solve
         x = MARKER_NIB_LOCAL_X + y
-        points[f"marker at y={y:g}"] = machine_z(x, vb.BLOCK_DEPTH / 2.0) + r * _S
+        points[f"marker at y={y:g}"] = machine_z(x, vb.DEPTH_MID_Z) + r * _S
     return points
 
 
@@ -222,15 +222,13 @@ def _cyl(r: float, h: float) -> float:
 
 def plan_mass_items() -> list[tuple[str, float, float, float]]:
     """(name, mass g, block-local x, block-local z) of every off-axis mass."""
-    L, H, D = vb.BLOCK_LENGTH, vb.BLOCK_HEIGHT, vb.BLOCK_DEPTH
-    zc = D / 2.0
+    L, H, X0 = vb.BLOCK_LENGTH, vb.BLOCK_HEIGHT, vb.RELIEF_X0
+    zc = vb.DEPTH_MID_Z
     tap_r = TAP_DRILL_MM[vb.SET_SCREW_TAP_SPEC.size] / 2.0
-    lighten_r = vb.LIGHTENING_DIA / 2.0
     pivot_r = vb.PIVOT_BORE_DIA / 2.0
     block = [
-        ("stock", L * H * D, L / 2.0, zc),
-        ("paper-end chamfer", -(vb.CHAMFER**2) / 2.0 * D, vb.CHAMFER / 3.0, zc),
-        ("free-end chamfer", -(vb.CHAMFER**2) / 2.0 * D, L - vb.CHAMFER / 3.0, zc),
+        ("neck stock", X0 * H * vb.NECK_DEPTH, X0 / 2.0, zc),
+        ("body stock", (L - X0) * H * vb.BODY_DEPTH, (X0 + L) / 2.0, zc),
         # The V's triangle (90 deg: apex^2) over the seat length.
         (
             "V-groove",
@@ -246,16 +244,10 @@ def plan_mass_items() -> list[tuple[str, float, float, float]]:
         ),
         ("pivot bore", -_cyl(pivot_r, H - vb.RELIEF_HEIGHT), vb.PIVOT_BORE_X, zc),
         (
-            "lightening bore",
-            -_cyl(lighten_r, H - vb.RELIEF_HEIGHT),
-            vb.LIGHTENING_X,
-            zc,
-        ),
-        (
             "set-screw tap",
             -_cyl(tap_r, vb.SET_SCREW_TAP_LENGTH),
             vb.PIVOT_BORE_X,
-            vb.SET_SCREW_TAP_LENGTH / 2.0,
+            vb.BODY_Z0 + vb.SET_SCREW_TAP_LENGTH / 2.0,
         ),
     ]
     items = [(f"v-block {n}", v * BRASS_G_PER_MM3, x, z) for n, v, x, z in block]
@@ -309,8 +301,10 @@ if not (
     raise AssertionError("the marker grip must span the whole V-groove seat")
 if FRAME_ROD_GAP < CLEARANCE:
     raise AssertionError(f"stirrup crowds the rod: gap {FRAME_ROD_GAP:.2f}")
-if frame.WINDOW_WIDTH < vb.BLOCK_DEPTH + 2.0:
-    raise AssertionError("stirrup window must pass the block with 1.0 a side")
+if frame.WINDOW_WIDTH < vb.NECK_DEPTH + 2.0:
+    raise AssertionError("stirrup window must pass the neck with 1.0 a side")
+if FRAME_X0_LOCAL + frame.FRAME_DEPTH + 4.0 * CLEARANCE > vb.RELIEF_X0:
+    raise AssertionError("the stirrup must slide on the neck clear of the body's step")
 if FRAME_WINDOW_BOTTOM_LOCAL_Y > MARKER_BOTTOM_LOCAL_Y - 1.0:
     raise AssertionError("stirrup window leaves the thumb screw under 1.0 of throw")
 if MARKER_BOTTOM_LOCAL_Y - thumb.SHANK_LEN >= FRAME_ORIGIN_LOCAL[1]:

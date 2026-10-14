@@ -1,11 +1,11 @@
 vn-pen-marker:
   title: Pen Marker
   number: MHA-VN-060
-  stock_name: Sharpie Mini Permanent Marker, Fine Point
+  stock_name: Sharpie Permanent Marker, Fine Point
   supplier: Newell Brands (Sharpie)
-  supplier_skus: ["35111"]
+  supplier_skus: ["30051"]
   material: PP Copolymer
-  material_specification: "Polypropylene barrel, Sharpie Mini"
+  material_specification: "Polypropylene barrel, Sharpie Fine Point"
   finish: as supplied
   quantity: 1
   tolerance_class: visual_noncritical

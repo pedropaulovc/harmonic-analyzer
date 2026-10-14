@@ -19,7 +19,7 @@ The one sub-assembly with no original to copy.
 | `pn-pen-v-block` | TODO | TODO | TODO |
 | `pn-pen-rod` | TODO | TODO | TODO |
 | `pn-pen-adjust-screw` | 1 | brass | turned #0-80 eye stud on the rod top; TODO |
-| `vn-pen-marker` | 1 | purchased | Sharpie Mini permanent marker, fine point (Sharpie 35111) |
+| `vn-pen-marker` | 1 | purchased | Sharpie permanent marker, fine point (Sharpie 30051) |
 | `pn-pen-wire` | TODO | TODO | TODO |
 | `pn-pen-hanger` | TODO | TODO | TODO |
 | `vn-pen-set-screw` | TODO | TODO | TODO |

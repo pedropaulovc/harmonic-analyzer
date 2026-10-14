@@ -8,27 +8,30 @@ lives in ``_drawing_common``.  Dimension import and curation live in
 each shows in the view that dimensions it); places and the pivot band are
 authored on the part (``pn_pen_v_block_spec``).
 
-The views follow the part frame (x 0 the paper end, z 0 the front face); every
-feature is located across the depth from the front face:
+The views follow the part frame (x 0 the paper end, z 0 the neck's front
+face); every feature is located across the depth from the body's front face
+(z BODY_Z0), the print's one depth datum:
 
-* front: ``*Back`` looks at the z 0 face the set screw enters, so the paper
-  end is on the RIGHT.  It carries the chamfered outline and the tap's two
-  coordinates, the tap's native callout, and section A-A's cutting line on
-  the pivot-bore axis.
+* front: ``*Back`` looks at the body's front face, where the set screw
+  enters, so the paper end is on the RIGHT; the neck's front face stands back
+  from it at the step.  It carries the height and the tap's two coordinates,
+  the tap's native callout, and section A-A's cutting line on the pivot-bore
+  axis.
 * right (third angle, right of the ``*Back`` face): ``*Left``, the paper end,
-  shows the V in solid lines -- both its mouth edges from the front face,
-  included angle, reference apex height, and the block depth.  Through the V
-  it looks along the open relief slot: the V is cut on past the step
+  shows the neck's end face with the V in solid lines and the body's wider
+  faces beyond it.  Under it, one baseline row from the body's front face:
+  the neck's two faces, the V's two mouth edges and the depth; in it, the
+  V's included angle and reference apex height.  Through the V it looks along
+  the open relief slot: the V is cut on past the step
   (``pn_pen_v_block_spec.V_CUT_LENGTH``), so no brass shows inside it.
 * bottom: ``*Bottom`` turned 180 degrees to keep the front view's X, looking
-  up into the V and the relief; through the relief the roof shows both
-  vertical bores.  It carries the relief's start station and corner radius,
-  the pivot bore (station and reamed, banded diameter) and the lightening
-  bore's two stations with its native callout.
+  up into the V and the relief; through the relief the roof shows the pivot
+  bore.  It carries the overall length, the relief's start station and
+  corner radius, and the pivot bore (station and reamed, banded diameter).
 * section A-A through the pivot-bore axis: bore, tap and relief in one cut,
   looking toward the free end as the paper-end view does (front face on the
-  left in both); it carries both relief walls from the front face and their
-  height, the pivot bore's station from the front face, and the bore's top
+  left in both); it carries both relief walls from the body's front face and
+  their height, the pivot bore's station from that face, and the bore's top
   chamfer.  The tap, cut on its axis, shows its cosmetic thread's major
   diameter as thin solid lines.
 
@@ -85,17 +88,16 @@ from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 from pn_pen_v_block_spec import (
-    BLOCK_DEPTH,
     BLOCK_HEIGHT,
     BLOCK_LENGTH,
-    CHAMFER,
+    BODY_Z0,
+    BODY_Z1,
+    DEPTH_MID_Z,
     DIMENSION_CALLOUTS,
     DIMENSION_CALLOUTS_ABOVE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     ISOMETRIC_VIEW_SCALE,
-    LIGHTENING_DIA,
-    LIGHTENING_X,
     PIVOT_BORE_DIA,
     PIVOT_BORE_TOP_CHAMFER,
     PIVOT_BORE_X,
@@ -107,6 +109,7 @@ from pn_pen_v_block_spec import (
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
     V_APEX_Y,
+    V_MOUTH_Z0,
 )
 
 
@@ -127,62 +130,46 @@ VIEW_SCALE = (4, 1)
 ISO_SCALE = ISOMETRIC_VIEW_SCALE
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
 
-# Sheet layout (meters).  At 4:1 the 36 x 18 x 18 block is 144 x 72 mm in the
-# front and bottom views and 72 x 72 in the end view and the section.  The
-# front (x 0.040..0.184, y 0.156..0.228) stacks over the bottom view (y
-# 0.054..0.126), both left of the title block (x 0.216); the end view
-# (x 0.215..0.287) and section A-A (x 0.324..0.396) share the front's row.
-# The end view sits 31 mm right of the front and 37 mm left of the section
-# (not centred between them): the relief's near-wall station needs the wider
-# gap for its function rows (SECTION_KEEP), the V's mouth station the
-# narrower one (RIGHT_KEEP).
-# The isometric runs 3:2 (pn_pen_v_block_spec): its ink is 1.5x the 38.3 x
-# 34.5 mm the 1:1 view measured on farm 20261014T005925878Z, 57.5 x 51.8,
-# centred 1.8 mm above its ink.  Centred at (0.315, 0.097) it fills x
-# 0.286..0.344, y 0.069..0.121: 9.8 mm right of the reamed diameter's callout
-# (to x 0.2764, y 0.101 up), 4 mm over the title block (top 0.0651), under the
-# end view's depth line (y ~0.1235, to x 0.287) and section A-A's 2.500 (y 0.138
-# up).  Its silhouette slopes down to the right from its top vertex (45%
-# across), so at the caption's left end (x 0.330) its ink tops out ~0.110,
-# 10 mm under the caption (bottom ~0.120 there).  2:1 (77 x 69 mm) fits
-# nowhere between the views, the caption and the title block (65 mm tall at
-# most).
+# Sheet layout (meters).  At 4:1 the 27.3 x 18 block, 22.2 deep across its
+# body, is 109.2 x 72 mm in the front view, 109.2 x 88.8 in the bottom view
+# and 88.8 x 72 in the end view and the section.  The front (x 0.045..0.155,
+# y 0.156..0.228) stacks over the bottom view (y 0.039..0.128), both left of
+# the title block (x 0.216); the end view (x 0.188..0.276) and section A-A
+# (x 0.306..0.394) share the front's row, 33 mm and 30 mm apart.
+# The isometric runs 3:2 (pn_pen_v_block_spec).  At 1:1 an isometric projects
+# a model axis at 0.8165 of its length, so the block's ink is (27.3 + 22.2) x
+# 0.7071 = 35.0 wide and 18 x 0.8165 + 49.5 x 0.4082 = 34.9 tall (the old 36 x
+# 18 x 18 chamfered block computed 38.2 wide against the 38.3 farm
+# 20261014T005925878Z measured); at 3:2, 52.5 x 52.4.  Centred at (0.315,
+# 0.097), its ink centred 1.8 mm under it as measured, it fills x
+# 0.289..0.341, y 0.069..0.121: 42 mm right of the reamed diameter's callout
+# (to x 0.247), 4 mm over the title block (top 0.0651), right of the end
+# view's depth extension line (x 0.276, down to ~0.118).
 # Its scale note (top-left anchor, ~58 mm wide) beside it at mid-height, from
-# x 0.350 (6 mm right of the ink) to ~0.408, 11 mm inside the border (0.4188),
+# x 0.350 (9 mm right of the ink) to ~0.408, 11 mm inside the border (0.4188),
 # under the caption and over the title block.
-FRONT_CENTER = (0.112, 0.192)
-BOTTOM_CENTER = (FRONT_CENTER[0], 0.090)
-RIGHT_CENTER = (0.251, FRONT_CENTER[1])
-SECTION_CENTER = (0.360, FRONT_CENTER[1])
+FRONT_CENTER = (0.100, 0.192)
+BOTTOM_CENTER = (FRONT_CENTER[0], 0.0836)
+RIGHT_CENTER = (0.232, FRONT_CENTER[1])
+SECTION_CENTER = (0.350, FRONT_CENTER[1])
 ISO_CENTER = (0.315, 0.097)
 ISO_NOTE_XY = (0.350, 0.097)
-# The tap's callout rows centre on this point (r11: "TAP 4-40 UNC THRU", 17
-# characters, 42.8 mm wide, x 0.2136..0.2564).  Ending "INTO PIVOT BORE" both
+# The tap's callout rows centre on this point.  Ending "INTO PIVOT BORE" both
 # rows run 28 characters ("DRILL Ø 2.26 INTO PIVOT BORE" from r14), ~71 mm:
-# r13 printed them x ~0.200..0.273 at y ~0.249 / 0.255, 16 mm right of the
-# front view's paper end (x 0.184) and 39 mm left of the pivot chamfer's line
-# (from x ~0.312, SECTION_KEEP).  The leader still runs from the hole across
-# the paper-end chamfer (r13 minor): no clear path exists above the part.
-# From the hole (x 0.134, y 0.204) a leader clears the chamfer's top corner
-# (x 0.160, y 0.228) only at a slope over ~1, so it must still cross Length's
-# extension line at x 0.184 (up to ~0.257) unless its text sits over 0.258,
-# where two rows run into the border (0.267); bent left instead, it crosses
-# section line A's arrow (y ~0.234) and lands on the chamfer callout's rows
-# (x ~0.065..0.115, y ~0.237..0.246).
-TAP_CALLOUT_XY = (0.235, 0.252)
-# Above-left of the bottom view, the lightening bore's near (upper-left) rim
-# 13 mm down-right of the text: one arrow there, no line through the bore
-# (set_near_side_diameter), clear of LighteningZ's extension line at the
-# view's z 0 edge (y 0.126) left of x 0.040, which ends 11 mm below the text.
-LIGHTENING_CALLOUT_XY = (0.060, 0.140)
+# x ~0.165..0.236 at y ~0.249 / 0.255, over the end view (top 0.228), right of
+# section line A's top end and label (x 0.105) and 66 mm left of the pivot
+# chamfer's line (from x ~0.302, SECTION_KEEP).  The leader runs from the
+# hole (x 0.105, y 0.204) up-right across the block's top edge.
+TAP_CALLOUT_XY = (0.200, 0.252)
 # Section A-A's cutting line: the pivot-bore axis (x = PIVOT_BORE_X), 1.5 mm
 # past the bottom and top faces, so the cut closes across the whole block.
 SECTION_LINE_MODEL_MM = (
-    (PIVOT_BORE_X, -1.5, 0.0),
-    (PIVOT_BORE_X, BLOCK_HEIGHT + 1.5, 0.0),
+    (PIVOT_BORE_X, -1.5, BODY_Z0),
+    (PIVOT_BORE_X, BLOCK_HEIGHT + 1.5, BODY_Z0),
 )
 
-_CX, _CY, _CZ = BLOCK_LENGTH / 2.0, BLOCK_HEIGHT / 2.0, BLOCK_DEPTH / 2.0
+# Every view's centre: the body runs BODY_Z0..BODY_Z1 about the mid-depth.
+_CX, _CY, _CZ = BLOCK_LENGTH / 2.0, BLOCK_HEIGHT / 2.0, DEPTH_MID_Z
 _TAP_DRILL_R = TAP_DRILL_MM[SET_SCREW_TAP_SPEC.size] / 2.0
 
 
@@ -197,14 +184,14 @@ def _fy(model_y_mm: float) -> float:
 
 
 def _bz(model_z_mm: float) -> float:
-    """Sheet Y of a model-Z point in the turned bottom view: the front face
-    (z 0) toward the front view above it."""
+    """Sheet Y of a model-Z point in the turned bottom view: the front faces
+    toward the front view above it."""
     return BOTTOM_CENTER[1] - (model_z_mm - _CZ) * _S
 
 
 def _rz(model_z_mm: float) -> float:
-    """Sheet X of a model-Z point in the paper-end view: z 0 on its left, next
-    to the front view."""
+    """Sheet X of a model-Z point in the paper-end view: the front faces on its
+    left, next to the front view."""
     return RIGHT_CENTER[0] + (model_z_mm - _CZ) * _S
 
 
@@ -214,8 +201,8 @@ def _ry(model_y_mm: float) -> float:
 
 def _sz(model_z_mm: float) -> float:
     """Sheet X of a model-Z point in section A-A: it looks toward the free end
-    (+X), as the paper-end view beside it does, so z 0 (the front face, where
-    the tap enters) is on its LEFT in both (``_orient_section``)."""
+    (+X), as the paper-end view beside it does, so the body's front face
+    (where the tap enters) is on its LEFT in both (``_orient_section``)."""
     return SECTION_CENTER[0] + (model_z_mm - _CZ) * _S
 
 
@@ -224,147 +211,127 @@ def _sy(model_y_mm: float) -> float:
 
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position.
-# Front: overall length on top over the free-end chamfer leg, whose wide
-# callout sits right of the leg so the length's end extension line clears it;
-# height left; the tap's coordinates from the paper-end/bottom corner sit right
-# of and below the view, the station clear of section A-A's cutting-line end.
+# position.  Single-row text: its ink ~1.8 mm under to ~1.7 mm over the keep,
+# its dimension line ~3.3 mm under it (r9 / r11 sheets 20261014T011745149Z,
+# 20261014T023836943Z).
+# Front: the height left; the tap's coordinates from the paper-end/bottom
+# corner right of and below the view (the station at y 0.144, ink to ~0.146,
+# its extension lines at x 0.105 / 0.155 down to ~0.139).
 FRONT_KEEP = {
-    "Length": (_fx(_CX), _fy(BLOCK_HEIGHT) + 0.028),
-    "Chamfer2dx": (_fx(BLOCK_LENGTH - CHAMFER) + 0.023, _fy(BLOCK_HEIGHT) + 0.012),
     "Height": (_fx(BLOCK_LENGTH) - 0.014, _fy(_CY)),
     "SetScrewY": (_fx(0.0) + 0.010, _fy(SET_SCREW_Y / 2.0)),
     "SetScrewX": (_fx(PIVOT_BORE_X / 4.0), _fy(0.0) - 0.012),
 }
-# Paper end: a baseline stack under the view from the front face (z 0, the
-# view's left edge, x 0.215), nested shortest-innermost so no extension line
-# crosses a dimension line it does not end on: the V's front mouth edge
-# (x 0.227), its back mouth edge (x 0.275), the depth (x 0.287).  The two V
-# edges are named-exception places, so each carries its function under its
-# value (pn_pen_v_block_spec.DIMENSION_CALLOUTS), the text block centred on
-# its keep point: rows 5.6 mm apart, their mean ~2.3 mm under the keep, a
-# row's ink from ~0.5 mm over its position to ~4 mm over it, the dimension
-# line ~1 mm under the last row (r9 / r11 sheets 20261014T011745149Z,
-# 20261014T023836943Z): line = keep - 2.3 - 2.8 (rows - 1) - 1 mm, top =
-# keep - 2.3 + 2.8 (rows - 1) + 4 mm.
-# * the front edge's 12 mm span would cramp its text, so "3.000" / "CENTRES"
-#   / "GRIP" (~21 mm wide) sits left of the z 0 corner, its right end 3.5 mm
-#   short of the corner's extension line (x 0.215): x ~0.191..0.212, keep
-#   y 0.1475, rows from ~0.1548 (under the front view's SetScrewY extension
-#   line, y 0.156, which ends at x 0.195) down, its line ~0.1386 (x
-#   0.191..0.227), its x 0.227 extension line down to ~0.1376; the front
-#   view's SetScrewX extension line (x 0.184, down to y 0.1402) stays 6.5 mm
-#   left.
-# * the back edge's "15.000" / "CENTRES" / "MARKER GRIP" / "MHA-VN-060"
-#   (~32 mm) centred 1 mm right of the view's axis (x ~0.236..0.268) at
-#   y 0.1427: rows from ~0.1528 (under the V's open mouth; the bottom face
-#   line, y 0.156, stops at the mouth corners) down, 8.5 mm right of the
-#   front edge's x 0.227 extension line and 7 mm left of its own at x 0.275;
-#   its line ~0.131 runs x 0.215..0.275, 6.6 mm under the front edge's, so
-#   the 0.227 extension line ends above it, not through it.
-# * the depth's "18.0" (~12 mm, one row) centred under the view at y 0.1268:
-#   ink ~0.1245..0.1285, 2.5 mm under the back edge's line; its line ~0.1235
-#   runs x 0.215..0.287, 3.5 mm over the reamed diameter's callout
-#   (BOTTOM_KEEP, top ~0.120).
-# * the included angle inside the V on its axis, half way up (y 0.168): its
-#   arc spans the wedge 12 mm under the apex (y 0.180), the "90°" (~9 mm) in
-#   the 24 mm-wide void there, ~13 mm over the back edge's value.
-# * the apex height, a reference "(6.0)", right of the view.
+# Paper end: one baseline row under the view from the body's front face (the
+# view's left edge, x 0.188), nested shortest-innermost 7 mm apart so no
+# extension line crosses a dimension line it does not end on: the neck's
+# front face (x 0.196), the V's front and back mouth edges (x 0.208, 0.256),
+# the neck's back face (x 0.268) and the depth (x 0.276).  Every station
+# stands right of the last, so each outer extension line passes right of
+# every inner span.  The neck's front face's 8.4 mm span would cramp its
+# text, so its value sits left of the datum's extension line, x ~0.174..0.185,
+# right of the front view's SetScrewX text (to x ~0.148).  The lowest line,
+# the depth's, at ~0.119.
+# * the included angle inside the V on its axis, half way up: its arc spans
+#   the wedge 12 mm under the apex (y 0.180), the "90°" (~9 mm) in the 24
+#   mm-wide void there.
+# * the apex height, a reference "(6.0)", right of the view (x ~0.283..0.294),
+#   12 mm clear of section A-A (from x 0.306).
+_END_ROW = 0.007
 RIGHT_KEEP = {
-    "VMouthZ0": (_rz(0.0) - 0.014, _ry(0.0) - 0.0085),
-    "VMouthZ1": (_rz(_CZ) + 0.001, _ry(0.0) - 0.0133),
-    "Depth": (RIGHT_CENTER[0], _ry(0.0) - 0.0292),
+    "NeckZ0": (_rz(BODY_Z0) - 0.008, _ry(0.0) - 0.006),
+    "VMouthZ0": (
+        (_rz(BODY_Z0) + _rz(V_MOUTH_Z0)) / 2.0,
+        _ry(0.0) - 0.006 - _END_ROW,
+    ),
+    "VMouthZ1": (_rz(_CZ), _ry(0.0) - 0.006 - 2 * _END_ROW),
+    "NeckZ1": (_rz(_CZ), _ry(0.0) - 0.006 - 3 * _END_ROW),
+    "Depth": (_rz(_CZ), _ry(0.0) - 0.006 - 4 * _END_ROW),
     "VAngle": (RIGHT_CENTER[0], _ry(V_APEX_Y / 2.0)),
-    "VApexY": (_rz(BLOCK_DEPTH) + 0.012, _ry(V_APEX_Y / 2.0)),
+    "VApexY": (_rz(BODY_Z1) + 0.012, _ry(V_APEX_Y / 2.0)),
 }
-# Bottom: all three stations from the paper end below the view, a baseline
-# stack nested shortest-innermost (relief step x 0.148, pivot axis 0.134,
-# lightening axis 0.092; rows 10 mm apart down to y 0.024, 11 mm above the
-# border) so no extension line crosses a dimension line under it.  That frees
-# the gap above the view for the relief corner's radius: its text sits 45 deg
-# up-right of the front-face corner arc (centre x 0.144, y 0.112), so the
-# radial leader runs out from the arc's midpoint across only the bottom face's
-# land; the text (x ~0.157..0.172) is clear of the front view's SetScrewX line
-# (y 0.142) above and the reamed diameter's callout (from x 0.188) right.  The
-# lightening bore's depth station left of the free end, its extension lines
-# from that end's front-face corner (x 0.040, y 0.126) and from the bore's
-# level on the same edge (y 0.090), whose reference chord (shown here, on the
-# free end's edge) carries on along the centreline to the centre mark.  The
-# reamed diameter's wide callout wholly right of the paper end, its single
-# arrow on the near rim (set_near_side_diameter), so no leader crosses the bore.
-# Its block (r11: 0.108..0.127 at keep y 0.118) sits at keep y 0.111, so
-# ~0.101..0.120: under the end view's depth line (~0.1235) with 3.5 mm to
-# spare, right of the bottom view (x 0.184) and 9.8 mm left of the iso.
+# Bottom (front faces at the top, y 0.128 for the body's, 0.1196 for the
+# neck's):
+# * the overall length above the view, its extension lines rising from the
+#   paper end's and the free end's front corners through the air in front of
+#   the block; its text toward the free end (x ~0.065..0.076) and its line
+#   (~0.132) under the front view's SetScrewX extension lines (ends ~0.139,
+#   x 0.105 / 0.155).
+# * both stations from the paper end below the view, a baseline pair nested
+#   shortest-innermost (relief step, pivot axis; 9 mm apart, the pivot's line
+#   ~5 mm above the border).
+# * the relief corner's radius: its text in the notch in front of the neck
+#   (x ~0.127..0.143, between the neck's front edge at y 0.1196 and the
+#   body's front level at 0.128), up-right of the front-face corner arc
+#   (centre x 0.115, y 0.112), so the radial leader runs out from the arc's
+#   midpoint across only the bottom face's land.
+# * the reamed diameter's wide callout wholly right of the paper end, its
+#   single arrow on the near rim (set_near_side_diameter), so no leader
+#   crosses the bore.  Its block (r11: keep -0.010..+0.009, ~88 mm wide) at
+#   keep (0.203, 0.104) runs x ~0.159..0.247, y ~0.094..0.113: 4 mm right of
+#   the bottom view, 6 mm under the end view's depth line (~0.119) and 42 mm
+#   left of the iso.
 BOTTOM_KEEP = {
-    "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BLOCK_DEPTH) - 0.010),
-    "PivotX": (_fx(PIVOT_BORE_X / 2.0), _bz(BLOCK_DEPTH) - 0.020),
-    "LighteningX": (_fx(LIGHTENING_X / 2.0), _bz(BLOCK_DEPTH) - 0.030),
-    "LighteningZ": (_fx(BLOCK_LENGTH) - 0.012, _bz(_CZ / 2.0)),
+    "Length": (_fx(BLOCK_LENGTH) + 0.025, _bz(BODY_Z0) + 0.0075),
+    "ReliefX0": (_fx(RELIEF_X0 / 2.0), _bz(BODY_Z1) - 0.009),
+    "PivotX": (_fx(PIVOT_BORE_X / 2.0), _bz(BODY_Z1) - 0.018),
     "ReliefCornerR": (
         _fx(RELIEF_X0 + RELIEF_CORNER_R) + 0.020,
-        _bz(RELIEF_Z0 + RELIEF_CORNER_R) + 0.020,
+        _bz(RELIEF_Z0 + RELIEF_CORNER_R) + 0.012,
     ),
-    "PivotDia": (_fx(0.0) + 0.048, _bz(0.0) - 0.015),
+    "PivotDia": (_fx(0.0) + 0.048, _bz(0.0) - 0.016),
 }
-# Section A-A looks the same way as the paper-end view beside it: z 0 at
-# x 0.324 on the LEFT, the bottom face at y 0.156, the top at 0.228.  Its two
-# reference sketches show here (they lie in the cut), every chord on a drawn
-# edge: both relief walls, stubs down the front face and the bore axis from
-# the top face, and the far chamfer face.
+# Section A-A looks the same way as the paper-end view beside it: the body's
+# front face at x 0.306 on the LEFT, the bottom face at y 0.156, the top at
+# 0.228.  Its two reference sketches show here (they lie in the cut), every
+# chord on a drawn edge: a stub up the front face from its foot, both relief
+# walls, stubs down the front face and the bore axis from the top face, and
+# the far chamfer face.
 # * the relief's two walls from the front face, a baseline pair under the
-#   bottom face, their extension lines on the wall feet.  Both are .XXX and
-#   carry their function under the value (pn_pen_v_block_spec), the text
-#   block centred on its keep point, rows 5.6 mm apart, the dimension line
-#   ~1 mm under the last row.  The near wall's 10 mm span is too short for
-#   its text, so "2.500" / "CLEARS" / "MARKER BODY" (~31 mm wide) sits left
-#   of the z 0 foot, x ~0.290..0.322: 3 mm right of the end view's depth
-#   extension line (x 0.287, down to y ~0.1225), 2 mm short of the foot's;
-#   its value's top (~0.1538) 2 mm under the end view's apex-height arrow
-#   and extension line (y 0.156, to x 0.300); its line at ~0.138, its x 0.334
-#   extension line down to ~0.137.  The far wall's "15.500" / "CLEARS
-#   MARKER" / "BODY MHA-VN-060" (~42 mm) centred on the section's axis
-#   (x ~0.339..0.381: 5 mm right of the near wall's extension line, 5 mm
-#   left of its own at x 0.386) one notch lower, its line at ~0.1305 runs x
-#   0.324..0.386, under the near wall's line and the end of its 0.334
-#   extension line, so neither line runs along the other and no extension
-#   line crosses it (r9 printed a chained width's arrows outside its span).
-# * the relief height right of the cut, on the far wall (z 15.5, x 0.386)
-#   from its foot to the roof.
+#   bottom face 7 mm apart, their extension lines on the wall feet: the near
+#   wall's "3.1" centred in its 12.4 mm span (line ~0.144), the far wall's
+#   "19.1" left of the section's axis (line ~0.137), clear of the near wall's
+#   extension line (x 0.318) and its own (x 0.382).
+# * the relief height right of the cut, on the far wall (x 0.382) from its
+#   foot to the roof: "6.5" at x ~0.402..0.410, 9 mm inside the border.
 # * the pivot station 8 mm over the top face (y 0.236), from the front face's
-#   top corner (x 0.324) to the bore axis (x 0.360, a sketched centreline
+#   top corner (x 0.306) to the bore axis (x 0.350, a sketched centreline
 #   from y 0.179 to 0.231); its extension lines top out near y 0.2375.
-# * the chamfer size on the bore's far rim (x 0.368..0.369, the z 11 side; its
-#   extension lines stand at x 0.366..0.371), its text LEFT of that rim so the
+# * the chamfer size on the bore's far rim (x 0.358..0.359; its extension
+#   lines stand at x 0.356..0.361), its text LEFT of that rim so the
 #   dimension line runs left, away from the border (farm 20261014T005925878Z:
 #   text right put the line's end 1 mm off it).  The line runs under the
 #   whole text block, out to the far end of its widest row, the one-row
 #   "CLEARS ROD ... FILLET" above (~72 mm).  Centred 21 mm left of the rim
-#   (x 0.348) the "0.3 min." / "X 45 DEG" rows (~24 mm) end 6 mm short of
-#   the extension lines and the line runs x ~0.312..0.374 at y ~0.2425, 4.8
-#   mm over PivotZ's "9.0" (top 0.2377) and 8 mm over both of its extension
+#   (x 0.338) the "0.3 min." / "X 45 DEG" rows (~24 mm) end 6 mm short of
+#   the extension lines and the line runs x ~0.302..0.364 at y ~0.2425, 4.8
+#   mm over PivotZ's "11.1" (top 0.2377) and 8 mm over both of its extension
 #   lines' tops (0.2345), crossing neither; the block (keep y 0.251, rows
 #   from the line up to ~0.2585) stays 8 mm under the top border (0.2667)
-#   and ~40 mm right of the tap callout (to x ~0.270; TAP_CALLOUT_XY).
+#   and 66 mm right of the tap callout (to x ~0.236; TAP_CALLOUT_XY).
 SECTION_KEEP = {
-    "ReliefZ0": (_sz(0.0) - 0.018, _sy(0.0) - 0.0095),
-    "ReliefZ1": (_sz(_CZ), _sy(0.0) - 0.013),
-    "ReliefHeight": (_sz(BLOCK_DEPTH) + 0.012, _sy(RELIEF_HEIGHT / 2.0)),
-    "PivotZ": (_sz(_CZ / 2.0), _sy(BLOCK_HEIGHT) + 0.008),
+    "ReliefZ0": (
+        (_sz(BODY_Z0) + _sz(RELIEF_Z0)) / 2.0,
+        _sy(0.0) - 0.0085,
+    ),
+    "ReliefZ1": (_sz(_CZ) - 0.006, _sy(0.0) - 0.0155),
+    "ReliefHeight": (_sz(BODY_Z1) + 0.012, _sy(RELIEF_HEIGHT / 2.0)),
+    "PivotZ": (_sz((BODY_Z0 + _CZ) / 2.0), _sy(BLOCK_HEIGHT) + 0.008),
     "PivotChamferSize": (
         _sz(_CZ + PIVOT_BORE_DIA / 2.0 + PIVOT_BORE_TOP_CHAMFER) - 0.021,
         _sy(BLOCK_HEIGHT) + 0.023,
     ),
 }
-# The native SECTION A-A / SCALE caption's top centre, lowered 29 mm under the
-# bottom face (default ~17 mm) so it stands ~3.5 mm under the far wall's line
-# (~0.1305): its rows ~0.1205..0.1268 and ~0.112..0.116, over the iso's note
-# (top 0.097) and 10 mm clear of the iso's sloping top at its left end.
-SECTION_CAPTION_XY = (SECTION_CENTER[0], _sy(0.0) - 0.029)
+# The native SECTION A-A / SCALE caption's top centre, lowered 23 mm under the
+# bottom face (default ~17 mm) so it stands ~4 mm under the far wall's line
+# (~0.137): its rows ~0.127..0.133 and ~0.118..0.122, over the iso's note
+# (top 0.097) and clear of the iso's sloping top at its left end.
+SECTION_CAPTION_XY = (SECTION_CENTER[0], _sy(0.0) - 0.023)
 # Section A-A cuts the set-screw tap on its axis: its cosmetic thread's major
 # diameter prints there as two lines 5.7 mm either side of the axis (y 0.204,
-# so 0.198 / 0.210) from the front face (x 0.324) to the bore wall (x 0.352),
+# so 0.198 / 0.210) from the front face (x 0.306) to the bore wall (x 0.342),
 # inside the section's ink, clear of every dimension (PivotZ's extension lines
-# start at the top face, y 0.228; the bore axis's centreline at x 0.360).
+# start at the top face, y 0.228; the bore axis's centreline at x 0.350).
 # SolidWorks prints a section's thread annotation dashed, as a hidden thread
 # (draw_sm_knife_mount, MHA review 2026-10-09), so it moves onto a visible
 # thin continuous layer of its own.
@@ -568,10 +535,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # axis's centreline is the geometry it lands on.
     _add_pivot_axis_centerline(adapter, section)
 
-    # Native Hole Wizard callouts on each hole's visible rim: the tap's mouth on
-    # the front face, the lightening bore where it breaks through the relief roof.
+    # The native Hole Wizard callout on the tap's mouth, on the body's front face.
     tap_rim = scan_view_edges(front, label="front").circle_at(
-        (PIVOT_BORE_X, SET_SCREW_Y, 0.0),
+        (PIVOT_BORE_X, SET_SCREW_Y, BODY_Z0),
         _TAP_DRILL_R,
         axis=(0.0, 0.0, 1.0),
         label="set-screw tap mouth",
@@ -587,27 +553,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # The title block's THREADS row owns the general thread class (rule 2).
     omit_title_block_thread_class(tap_callout, label="rod set-screw tap")
     # Both rows end where the hole does, in the pivot bore, not through; the
-    # drill row says DRILL as the lightening bore's does (rule 12).
+    # drill row opens with its process word (rule 12).
     _set_tap_callout_text(tap_callout)
-    lightening_rim = scan_view_edges(bottom, label="bottom").circle_at(
-        (LIGHTENING_X, RELIEF_HEIGHT, _CZ),
-        LIGHTENING_DIA / 2.0,
-        axis=(0.0, 1.0, 0.0),
-        label="lightening bore at the relief roof",
-    )
-    lightening_callout = add_native_hole_callout(
-        adapter,
-        bottom,
-        edge=lightening_rim.edge,
-        callout_xy=LIGHTENING_CALLOUT_XY,
-        label="free-end lightening bore",
-        process="DRILL",
-    )
-    # Natively its leader ran through the bore and across its centre mark:
-    # one arrow on the near rim, the leader wholly outside.
-    set_near_side_diameter(
-        lightening_callout.GetAnnotation(), "lightening bore callout"
-    )
     rebuild_drawing(adapter, label="near-side diameter leaders")
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
@@ -634,7 +581,7 @@ async def build(adapter: Any) -> dict[str, str]:
 # ends instead (draw_dt_cone_tip_block's pinch-thread "TO SLOT" recipe): only
 # the extent variable is replaced, the size and thread variables stay live.
 # r13: "Ø 2.26 INTO PIVOT BORE" carried no process word, so the drill row
-# opens with DRILL, as "DRILL Ø 7.94 THRU ALL" does on the same sheet.
+# opens with DRILL (rule 12).
 _TAP_END = "INTO PIVOT BORE"
 _THRU_TOKEN = "<hw-thru>"
 _DRILL_WORD = "DRILL"
@@ -747,7 +694,7 @@ def _section_axes(
 
 def _orient_section(adapter: Any, section: Any) -> None:
     """Look along +X, toward the free end, as the paper-end view does: +z to
-    the sheet's right, +y up, so the front face (z 0) is on the left in both.
+    the sheet's right, +y up, so the body's front face is on the left in both.
 
     SolidWorks cuts A-A looking toward the paper end (farm 20261014T003549Z:
     front face on the right), which mirrors the end view beside it and reads
@@ -905,7 +852,7 @@ def _add_pivot_axis_centerline(adapter: Any, section: Any) -> None:
             f"color={int(segment.Color)}, style={int(segment.Style)}"
         )
     _assert_centreline_placed(adapter, centerline, points)
-    # Against the keep maps' arithmetic (x 0.360): logged, not gated.
+    # Against the keep maps' arithmetic (x 0.350): logged, not gated.
     _telemetry.info(
         f"section A-A pivot axis drawn {ends[0]!r} -> {ends[1]!r} "
         f"(view sketch {points[0]!r} -> {points[1]!r}); "

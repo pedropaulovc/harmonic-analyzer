@@ -65,8 +65,6 @@ def test_drawing_keeps_exactly_the_marked_dimensions() -> None:
 
 def test_build_authors_every_marked_feature_and_dimension_name() -> None:
     strings = _string_constants(_PART_SOURCE)
-    # f-string names (the chamfer legs) are spelled out by the loop's pattern.
-    strings |= {f"Chamfer{corner}{leg}" for corner in (2, 4) for leg in ("dx", "dy")}
     for feature, names in spec.DRAWING_DIMENSIONS.items():
         assert feature in strings, feature
         assert names <= strings, (feature, names - strings)
@@ -81,31 +79,55 @@ def test_build_authors_every_marked_feature_and_dimension_name() -> None:
         "PivotBore",
         "PivotBoreChamfer",
         "SetScrewHole",
-        "LighteningBore",
     ]
-    positions = [_PART_SOURCE.index(f'"{name}"') for name in tree_order]
-    # The reference sketches' helpers sit above build(); their calls come
-    # last, the section's after its cutting plane.
-    positions.append(_PART_SOURCE.index("await _section_plane(adapter)"))
+    # Within build(): the sketch helpers above it name their own sketches.
+    build = _PART_SOURCE[_PART_SOURCE.index("async def build(adapter)") :]
+    positions = [build.index(f'"{name}"') for name in tree_order]
+    # The reference sketches come last, the section's after its cutting plane.
+    positions.append(build.index("await _section_plane(adapter)"))
     positions += [
-        _PART_SOURCE.index(f"drive_jobs += await _{helper}_reference(adapter)")
-        for helper in ("relief", "pivot", "lightening")
+        build.index(f"drive_jobs += await _{helper}_reference(adapter)")
+        for helper in ("relief", "pivot")
     ]
     # The tap is built after the bore, so its through_next stops at the bore.
     assert positions == sorted(positions)
+    # Simplified E: no corner chamfers, no lightening bore (the pivot bore's
+    # top chamfer stays).
+    assert not any(name.startswith(("Chamfer", "Lightening")) for name in strings)
 
 
 def test_every_feature_is_located_from_the_front_face() -> None:
     # drawing-guidelines.md rule 10: no feature across the depth by symmetry.
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert {
+        "NeckZ0",
+        "NeckZ1",
+        "Depth",
         "VMouthZ0",
         "VMouthZ1",
         "ReliefZ0",
         "ReliefZ1",
         "PivotZ",
-        "LighteningZ",
     } <= marked
+    # One datum: the body's front face.  Every depth-wise station the print
+    # states is a baseline from it.
+    assert spec.depth_station(spec.BODY_Z0) == 0.0
+    assert spec.depth_station(0.0) == spec.BODY_SIDE_STEP
+    assert spec.depth_station(spec.BODY_Z1) == spec.BODY_DEPTH
+    # The paper-end view prints the whole depth-wise stack in one row: the V's
+    # sketch carries the neck's and the body's faces as stubs from the datum.
+    assert {"NeckZ0", "NeckZ1", "Depth"} <= spec.DRAWING_DIMENSIONS["VGrooveProfile"]
+    assert spec.DRAWING_DIMENSIONS["OutlineProfile"] == {"Length"}
+    v_groove = _PART_SOURCE[_PART_SOURCE.index("async def _v_groove(") :]
+    v_groove = v_groove[: v_groove.index("\nasync def ")]
+    for needle in (
+        '(0.0, "NeckZ0", \'"NeckFrontZ"\', "VNeckFrontStub")',
+        '(NECK_DEPTH, "NeckZ1", \'"NeckBackZ"\', "VNeckBackStub")',
+        '(BODY_Z1, "Depth", \'"BlockDepth"\', "VBodyBackStub")',
+        "depth_station(z)",
+        '"horizontal_points"',
+    ):
+        assert needle in v_groove, needle
     assert '"VApexZ"' not in _PART_SOURCE
     assert set(spec.REFERENCE_SKETCHES) <= set(spec.DRAWING_DIMENSIONS)
     for feature in spec.REFERENCE_SKETCHES:
@@ -257,27 +279,31 @@ def test_pivot_chamfer_clears_the_rod_fillet_as_a_min_limit() -> None:
         assert not re.search(r"\d\.\d", text)
 
 
-def test_printed_bands_keep_both_relief_walls_and_clear_the_marker_body() -> None:
-    import _config
-    from _printed_tolerance import angular_band_deg, printed_band_mm
+def test_title_block_bands_keep_walls_lands_and_clear_the_marker_body() -> None:
+    import pn_pen_frame_spec as frame
+    from _printed_tolerance import angular_band_deg
 
     places = spec.DRAWING_PRECISION_BY_NAME
-    # Final review (rule 10): every depth-wise edge is a baseline from the
-    # front face, no edge chained from another.  The body's four stations
-    # print .XXX; with nothing chained the far wall holds at the depth's .X.
-    stations = ("VMouthZ0", "VMouthZ1", "ReliefZ0", "ReliefZ1")
+    # Simplified E (2026-10 ruling, no named exception): every depth-wise
+    # station prints the title block's .X as a baseline from the body's front
+    # face; only the neck's two faces take the routine .XX, for the stirrup's
+    # window.  Nothing prints .XXX but the reamed bore's banded diameter.
+    stations = ("VMouthZ0", "VMouthZ1", "ReliefZ0", "ReliefZ1", "Depth")
     for name in stations:
-        assert places[name] == 3, name
-    assert places["Depth"] == 1
+        assert places[name] == 1, name
+    assert places["NeckZ0"] == places["NeckZ1"] == 2
+    assert places["VAngle"] == 0
+    assert {name for name, n in places.items() if n >= 3} == {"PivotDia"}
     assert spec.V_MOUTH_Z0 == 3.0 and spec.V_MOUTH_Z1 == 15.0
-    assert spec.RELIEF_Z0 == 2.5 and spec.RELIEF_Z1 == 15.5
+    assert spec.RELIEF_Z0 == 1.0 and spec.RELIEF_Z1 == 17.0
+    assert spec.NECK_DEPTH == 18.0 and spec.BODY_DEPTH == 22.2
+    station = spec.depth_station
     # Linear bands; the V's angle prints whole degrees on the angular row.
     band = {name: printed_band_mm(n) for name, n in places.items() if name != "VAngle"}
-    assert places["VAngle"] == 0
     body_r = spec.marker.BODY_FRONT_DIA / 2.0
     grip_r = spec.marker.BARREL_DIA / 2.0
 
-    def stack(b: dict[str, float]) -> tuple[float, float, float, float, float]:
+    def stack(b: dict[str, float]) -> dict[str, float]:
         # The seated body's widest chord over the V's printed corners: its
         # angle (the title block's +/-1 deg) and mouth (both edges' bands);
         # the apex height is their reference and carries no band.  The V's
@@ -292,105 +318,95 @@ def test_printed_bands_keep_both_relief_walls_and_clear_the_marker_body() -> Non
                 axis_y = a - grip_r / math.sin(half)
                 chords.append(math.sqrt(body_r**2 - axis_y**2))
         chord = max(chords)
-        centre = (spec.V_MOUTH_Z0 + spec.V_MOUTH_Z1) / 2.0
-        near = (centre - centre_band) - chord - (spec.RELIEF_Z0 + b["ReliefZ0"])
-        far = (spec.RELIEF_Z1 - b["ReliefZ1"]) - (centre + centre_band) - chord
-        near_wall = spec.RELIEF_Z0 - b["ReliefZ0"]
-        far_wall = spec.BLOCK_DEPTH - b["Depth"] - (spec.RELIEF_Z1 + b["ReliefZ1"])
-        return chord, near, far, near_wall, far_wall
+        centre = station((spec.V_MOUTH_Z0 + spec.V_MOUTH_Z1) / 2.0)
+        relief_z0 = station(spec.RELIEF_Z0)
+        relief_z1 = station(spec.RELIEF_Z1)
+        return {
+            "chord": chord,
+            "near": (centre - centre_band) - chord - (relief_z0 + b["ReliefZ0"]),
+            "far": (relief_z1 - b["ReliefZ1"]) - (centre + centre_band) - chord,
+            "near_wall": relief_z0 - b["ReliefZ0"],
+            "far_wall": spec.BODY_DEPTH - b["Depth"] - (relief_z1 + b["ReliefZ1"]),
+            "near_land": (station(spec.V_MOUTH_Z0) - b["VMouthZ0"])
+            - (station(0.0) + b["NeckZ0"]),
+            "far_land": (station(spec.NECK_DEPTH) - b["NeckZ1"])
+            - (station(spec.V_MOUTH_Z1) + b["VMouthZ1"]),
+            "neck": spec.NECK_DEPTH + b["NeckZ0"] + b["NeckZ1"],
+        }
 
-    chord, near, far, near_wall, far_wall = stack(band)
-    assert spec.RELIEF_NEAR_WALL_PRINTED_MIN == pytest.approx(near_wall)
-    assert spec.RELIEF_FAR_WALL_PRINTED_MIN == pytest.approx(far_wall)
-    assert near_wall == pytest.approx(2.37)
-    assert far_wall == pytest.approx(1.57)
-    assert min(near_wall, far_wall) >= 1.5
-    assert spec.BODY_HALF_CHORD_PRINTED_MAX == pytest.approx(chord)
-    assert chord == pytest.approx(6.006, abs=5e-4)
-    assert spec.BODY_NEAR_CLEARANCE_PRINTED_MIN == pytest.approx(near)
-    assert spec.BODY_FAR_CLEARANCE_PRINTED_MIN == pytest.approx(far)
-    assert near == pytest.approx(0.234, abs=5e-4)
-    assert far == pytest.approx(0.234, abs=5e-4)
-    # The depth's .X is no longer load-bearing: no callout, no exception.
-    assert "Depth" not in spec.DIMENSION_CALLOUTS
-    # Review r9 (rules 3/4): each .XXX station states its own function under
-    # its value, with no dimension in its text.  Each is load-bearing: taken
-    # to .XX alone, a relief wall lets the body touch it (the far one also
-    # takes the far wall under the 1.5 floor), a V edge leaves 0.005.
-    for name in stations:
-        loose = dict(band, **{name: printed_band_mm(2)})
-        _, near_loose, far_loose, _, far_wall_loose = stack(loose)
-        if name == "ReliefZ0":
-            assert near_loose == pytest.approx(-0.146, abs=5e-4)
-        elif name == "ReliefZ1":
-            assert far_loose == pytest.approx(-0.146, abs=5e-4)
-            assert far_wall_loose == pytest.approx(1.19)
-        else:
-            assert min(near_loose, far_loose) == pytest.approx(0.005, abs=5e-4)
-        callout = spec.DIMENSION_CALLOUTS[name]
-        assert not re.search(r"\d\.\d", callout), name
-    # All four at the title block's .XX: the clearance the policy row cites.
-    _, near_xx, far_xx, _, far_wall_xx = stack(
-        dict(band, **{name: printed_band_mm(2) for name in stations})
-    )
-    assert near_xx == pytest.approx(-0.598, abs=5e-4)
-    assert far_xx == pytest.approx(-0.598, abs=5e-4)
-    assert far_wall_xx == pytest.approx(1.19)
-    # Review r11: the V's two edges name the grip they centre, the relief's
-    # two the body they clear; the outer one of each pair names the marker.
-    marker_number = _config.parts("vn-pen-marker")["number"]
-    assert spec.DIMENSION_CALLOUTS["VMouthZ0"] == "CENTRES\nGRIP"
-    assert (
-        spec.DIMENSION_CALLOUTS["VMouthZ1"] == f"CENTRES\nMARKER GRIP\n{marker_number}"
-    )
-    assert spec.DIMENSION_CALLOUTS["ReliefZ0"] == "CLEARS\nMARKER BODY"
-    far_callout = spec.DIMENSION_CALLOUTS["ReliefZ1"]
-    assert far_callout.startswith("CLEARS MARKER\nBODY")
-    assert marker_number in far_callout
-    # Row widths (~3 mm a character at the sheet's text height) fit the room
-    # draw_pn_pen_v_block's keeps give them: the front stations beside their
-    # views (~21 / ~31 mm), the back ones between the extension lines either
-    # side (~38 / ~52 mm).
-    room = {"VMouthZ0": 7, "ReliefZ0": 11, "VMouthZ1": 11, "ReliefZ1": 16}
-    for name, chars in room.items():
-        rows = spec.DIMENSION_CALLOUTS[name].split("\n")
-        assert max(len(row) for row in rows) <= chars, name
-    # The two beside-view blocks (centred on their keeps) stay between the
-    # extension lines either side: the end view's depth (x _rz(18)) and the
-    # section's z 0 foot for the near wall; the front view's SetScrewX line
-    # (x 0.184) and the end view's z 0 corner for the V's front edge.
-    half = 0.0315 / 2.0
-    z0_x = drawing.SECTION_KEEP["ReliefZ0"][0]
-    assert z0_x - half > drawing._rz(spec.BLOCK_DEPTH) + 0.002
-    assert z0_x + half < drawing._sz(0.0) - 0.0015
-    half = 0.021 / 2.0
-    mouth_x = drawing.RIGHT_KEEP["VMouthZ0"][0]
-    assert mouth_x - half > 0.184 + 0.005
-    assert mouth_x + half < drawing._rz(0.0) - 0.002
-    # The back stations' blocks (~2.8 mm a character, r9's "BODY MHA-VN-060"
-    # measured ~42 mm) stand between the front station's extension line and
-    # their own, crossing neither.
-    for keep, at, name, z0, z1 in (
-        (drawing.RIGHT_KEEP, drawing._rz, "VMouthZ1", spec.V_MOUTH_Z0, spec.V_MOUTH_Z1),
-        (drawing.SECTION_KEEP, drawing._sz, "ReliefZ1", spec.RELIEF_Z0, spec.RELIEF_Z1),
-    ):
-        chars = max(len(row) for row in spec.DIMENSION_CALLOUTS[name].split("\n"))
-        half = chars * 0.0028 / 2.0
-        assert keep[name][0] - half > at(z0) + 0.003, name
-        assert keep[name][0] + half < at(z1) - 0.003, name
-    # The named-exception row the spec's emitter comments name.
+    worst = stack(band)
+    assert spec.RELIEF_NEAR_WALL_PRINTED_MIN == pytest.approx(worst["near_wall"])
+    assert spec.RELIEF_FAR_WALL_PRINTED_MIN == pytest.approx(worst["far_wall"])
+    assert spec.V_NEAR_LAND_PRINTED_MIN == pytest.approx(worst["near_land"])
+    assert spec.V_FAR_LAND_PRINTED_MIN == pytest.approx(worst["far_land"])
+    assert worst["near_wall"] == pytest.approx(2.3)
+    # The far wall stands at the 1.5 floor exactly (rule: 2.0 target, 1.5
+    # floor at worst case).
+    assert worst["far_wall"] == pytest.approx(1.5)
+    assert worst["near_land"] == pytest.approx(1.69)
+    assert worst["far_land"] == pytest.approx(1.69)
+    for name in ("near_wall", "far_wall", "near_land", "far_land"):
+        assert round(worst[name], 6) >= 1.5, name
+    assert spec.BODY_HALF_CHORD_PRINTED_MAX == pytest.approx(worst["chord"])
+    assert worst["chord"] == pytest.approx(6.116, abs=5e-4)
+    assert spec.BODY_NEAR_CLEARANCE_PRINTED_MIN == pytest.approx(worst["near"])
+    assert spec.BODY_FAR_CLEARANCE_PRINTED_MIN == pytest.approx(worst["far"])
+    assert worst["near"] == pytest.approx(0.284, abs=5e-4)
+    assert worst["far"] == pytest.approx(0.284, abs=5e-4)
+    # The neck slides through the stirrup's window at its printed limits; the
+    # neck faces' .XX is load-bearing: at .X the neck could print 19.6 wide.
+    assert spec.NECK_WIDTH_PRINTED_MAX == pytest.approx(worst["neck"])
+    assert worst["neck"] == pytest.approx(19.02)
+    assert worst["neck"] < frame.WINDOW_WIDTH_PRINTED_MIN
+    loose = stack(dict(band, NeckZ0=printed_band_mm(1), NeckZ1=printed_band_mm(1)))
+    assert loose["neck"] > frame.WINDOW_WIDTH_PRINTED_MIN
+    # No function text and no tolerance exception: the stations print bare.
+    assert set(spec.DIMENSION_CALLOUTS) == {"PivotDia", "PivotChamferSize"}
     policy = (
         Path(__file__).resolve().parents[1] / "docs" / "drawing-simplicity-policy.md"
     ).read_text(encoding="utf-8")
-    assert "| MHA-PN-005 pn-pen-v-block |" in policy
-    assert _SPEC_SOURCE.count("Named exception: MHA-PN-005 pn-pen-v-block") == 2
+    assert "pn-pen-v-block" not in policy
+    assert "Named exception" not in _SPEC_SOURCE
+
+
+def test_end_view_prints_the_depth_stack_in_one_baseline_row() -> None:
+    # Rule 10: one datum (the body's front face, the end view's left edge),
+    # every station a baseline from it, nested shortest-innermost: each
+    # station right of and each row under the last, so an outer extension
+    # line never crosses an inner dimension line.
+    keep = drawing.RIGHT_KEEP
+    order = ("NeckZ0", "VMouthZ0", "VMouthZ1", "NeckZ1", "Depth")
+    stations = (0.0, spec.V_MOUTH_Z0, spec.V_MOUTH_Z1, spec.NECK_DEPTH, spec.BODY_Z1)
+    xs = [drawing._rz(z) for z in stations]
+    assert xs == sorted(xs)
+    rows = [keep[name][1] for name in order]
+    assert rows == sorted(rows, reverse=True)
+    for upper, lower in zip(rows, rows[1:], strict=False):
+        assert upper - lower == pytest.approx(drawing._END_ROW)
+    assert rows[0] < drawing._ry(0.0) - 0.005
+    # ~3 mm a character at the sheet's text height.  The neck front face's
+    # "2.10" stands left of the datum's extension line, right of the front
+    # view's SetScrewX "12.50"; the V's front edge's "5.1" inside its span.
+    datum = drawing._rz(spec.BODY_Z0)
+    neck_text = keep["NeckZ0"][0]
+    assert neck_text + 0.006 < datum - 0.001
+    assert neck_text - 0.006 > drawing.FRONT_KEEP["SetScrewX"][0] + 0.0075 + 0.005
+    mouth_text = keep["VMouthZ0"][0]
+    assert datum + 0.001 < mouth_text - 0.0045
+    assert mouth_text + 0.0045 < drawing._rz(spec.V_MOUTH_Z0) - 0.001
+    # The lowest row's line (~3.3 mm under its text) stays over the reamed
+    # diameter's callout block (keep +0.009 at the top).
+    assert (
+        keep["Depth"][1] - 0.0033 > drawing.BOTTOM_KEEP["PivotDia"][1] + 0.009 + 0.003
+    )
 
 
 def test_section_looks_the_same_way_as_the_paper_end_view() -> None:
     # Review r3 (rule 10 clarity): A-A mirrored the end view, so the V and the
-    # relief read as located from opposite faces.  Both now put z 0 left.
-    assert drawing._rz(0.0) < drawing._rz(spec.BLOCK_DEPTH)
-    assert drawing._sz(0.0) < drawing._sz(spec.BLOCK_DEPTH)
+    # relief read as located from opposite faces.  Both now put the body's
+    # front face left.
+    assert drawing._rz(spec.BODY_Z0) < drawing._rz(spec.BODY_Z1)
+    assert drawing._sz(spec.BODY_Z0) < drawing._sz(spec.BODY_Z1)
     assert drawing._sz(drawing._CZ) == pytest.approx(drawing.SECTION_CENTER[0])
     cut = _DRAWING_SOURCE.index("section = create_section_view(")
     orient = _DRAWING_SOURCE.index("_orient_section(adapter, section)")
@@ -401,61 +417,72 @@ def test_section_looks_the_same_way_as_the_paper_end_view() -> None:
     body = body[: body.index("\ndef ")]
     assert "SetReversedCutDirection(" in body
     assert "GetReversedCutDirection()" in body
-    # Keeps mirror with it: the near-wall text left of the front face, the
-    # height right of the far wall.
+    # Both walls a baseline pair from the front face: the near wall's "3.1"
+    # inside its span, the far wall's "19.1" between the near wall's
+    # extension line and its own, the height right of the far wall.
     keep = drawing.SECTION_KEEP
-    assert keep["ReliefZ0"][0] < drawing._sz(0.0)
-    far_wall_z = spec.RELIEF_Z1
-    assert keep["ReliefHeight"][0] > drawing._sz(spec.BLOCK_DEPTH)
+    front = drawing._sz(spec.BODY_Z0)
+    near_wall = drawing._sz(spec.RELIEF_Z0)
+    far_wall = drawing._sz(spec.RELIEF_Z1)
+    assert front + 0.001 < keep["ReliefZ0"][0] - 0.0045
+    assert keep["ReliefZ0"][0] + 0.0045 < near_wall - 0.001
+    assert near_wall + 0.003 < keep["ReliefZ1"][0] - 0.006
+    assert keep["ReliefZ1"][0] + 0.006 < far_wall - 0.003
+    assert keep["ReliefZ1"][1] < keep["ReliefZ0"][1]
+    assert keep["ReliefHeight"][0] > drawing._sz(spec.BODY_Z1)
+    assert keep["ReliefHeight"][0] + 0.006 < 0.4191 - 0.005
+    assert front < keep["PivotZ"][0] < drawing._sz(drawing._CZ)
     rim = drawing._sz(
         drawing._CZ + spec.PIVOT_BORE_DIA / 2.0 + spec.PIVOT_BORE_TOP_CHAMFER
     )
     # Review r5: with its text right of the far rim the chamfer's line ran
     # under its whole text block to 1 mm off the border.  Text left: the
     # line runs out to the left end of its ~72 mm above-row, clear of the
-    # tap callout (to x 0.2563), over PivotZ's text (top 0.2377) and its
-    # extension lines, the block 5 mm or more under the top border (0.2667).
+    # tap callout (~71 mm centred on TAP_CALLOUT_XY), over PivotZ's text (top
+    # ~1.7 mm over its keep) and its extension lines, the block 5 mm or more
+    # under the top border (0.2667).
     chamfer_x, chamfer_y = keep["PivotChamferSize"]
+    tap_right = drawing.TAP_CALLOUT_XY[0] + 0.0355
     assert chamfer_x + 0.012 < rim
-    assert chamfer_x - 0.036 > 0.2563 + 0.005
-    assert chamfer_y - 0.0084 > 0.2377 + 0.004
+    assert chamfer_x - 0.036 > tap_right + 0.005
+    assert chamfer_y - 0.0084 > keep["PivotZ"][1] + 0.0017 + 0.004
     assert chamfer_y + 0.0075 < 0.2667 - 0.005
     assert chamfer_y > keep["PivotZ"][1] + 0.012
     # The printed ReliefHeight is the far wall's chord in the build; both walls
     # stand from the front face, neither chained from the other.
-    assert '["ReliefZ0", "ReliefNearWall", "ReliefZ1", "ReliefHeight"]' in _PART_SOURCE
+    assert '"ReliefZ0",\n            "ReliefNearWall",\n            "ReliefZ1",' in (
+        _PART_SOURCE
+    )
     assert '"ReliefWidth"' not in _PART_SOURCE
-    assert drawing._sz(far_wall_z) < keep["ReliefHeight"][0]
-    # The caption drops under the far wall's callout rows.
+    # The caption drops under the far wall's line.
     assert "position_section_caption(" in _DRAWING_SOURCE
-    assert drawing.SECTION_CAPTION_XY[1] < keep["ReliefZ1"][1] - 0.015
+    assert drawing.SECTION_CAPTION_XY[1] < keep["ReliefZ1"][1] - 0.0033 - 0.003
 
 
 def test_holes_are_native_wizard_features_with_native_callouts() -> None:
     assert spec.SET_SCREW_TAP_SPEC.kind == "tapped"
     assert spec.SET_SCREW_TAP_SPEC.end == "through_next"
-    assert spec.LIGHTENING_SPEC.end == "through_all"
-    assert _PART_SOURCE.count("wizard_holes(") == 2
+    assert _PART_SOURCE.count("wizard_holes(") == 1
     assert "SET_SCREW_TAP_SPEC,\n" in _PART_SOURCE
-    assert "LIGHTENING_SPEC,\n" in _PART_SOURCE
     # The reamed pivot bore is a sketched cut whose diameter carries the band.
     assert "define_circle(" in _PART_SOURCE
     assert spec.DRAWING_BANDS == {
         ("PivotBoreProfile", "PivotDia"): spec.PIVOT_BORE_BAND
     }
-    assert _DRAWING_SOURCE.count("add_native_hole_callout(") == 2
+    assert _DRAWING_SOURCE.count("add_native_hole_callout(") == 1
     assert 'process="TAP"' in _DRAWING_SOURCE
-    assert 'process="DRILL"' in _DRAWING_SOURCE
-    # The title block owns the thread class (rule 2); the drill's and the
-    # reamed bore's leaders stop on the near rim (rule 14).
+    # The title block owns the thread class (rule 2); the reamed bore's
+    # leader stops on the near rim (rule 14).
     assert (
         'omit_title_block_thread_class(tap_callout, label="rod set-screw tap")'
         in _DRAWING_SOURCE
     )
-    assert "lightening_callout.GetAnnotation()" in _DRAWING_SOURCE
     assert 'set_near_side_diameter(pivot_dia[0], "reamed pivot-bore diameter")' in (
         _DRAWING_SOURCE
     )
+    # The tap's mouth is on the body's front face, the depth datum.
+    assert "(PIVOT_BORE_X, SET_SCREW_Y, BODY_Z0)" in _DRAWING_SOURCE
+    assert "[[PIVOT_BORE_X, SET_SCREW_Y, BODY_Z0]]" in _PART_SOURCE
 
 
 def test_pivot_callout_names_its_mate_and_says_ream() -> None:
@@ -533,7 +560,13 @@ def test_tap_callout_says_drill_and_ends_in_the_pivot_bore() -> None:
         'omit_title_block_thread_class(tap_callout, label="rod set-screw tap")'
     )
     rewrite = _DRAWING_SOURCE.index("_set_tap_callout_text(tap_callout)")
-    assert omit < rewrite < _DRAWING_SOURCE.index("lightening_rim = ")
+    assert (
+        omit
+        < rewrite
+        < _DRAWING_SOURCE.index(
+            'rebuild_drawing(adapter, label="near-side diameter leaders")'
+        )
+    )
     assert _DRAWING_SOURCE.count("_set_tap_callout_text(") == 2  # def + call
 
 
@@ -545,16 +578,23 @@ def test_v_is_its_angle_and_mouth_with_a_reference_apex() -> None:
     # face; the apex height is a driven reference.
     assert spec.V_ANGLE_DEG == 90.0
     assert spec.V_MOUTH_WIDTH == 12.0
-    assert (spec.V_MOUTH_Z0 + spec.V_MOUTH_Z1) / 2.0 == spec.BLOCK_DEPTH / 2.0
-    assert spec.RELIEF_WIDTH == 13.0
-    assert (spec.RELIEF_Z0 + spec.RELIEF_Z1) / 2.0 == spec.BLOCK_DEPTH / 2.0
+    assert (spec.V_MOUTH_Z0 + spec.V_MOUTH_Z1) / 2.0 == spec.DEPTH_MID_Z
+    assert spec.RELIEF_WIDTH == 16.0
+    assert (spec.RELIEF_Z0 + spec.RELIEF_Z1) / 2.0 == spec.DEPTH_MID_Z
+    assert (spec.BODY_Z0 + spec.BODY_Z1) / 2.0 == spec.DEPTH_MID_Z
     assert spec.V_APEX_Y == 6.0
     assert spec.MARKER_AXIS_Y == pytest.approx(6.0 - 5.3 * math.sqrt(2.0))
     assert carriage.BLOCK_BOTTOM_Y == pytest.approx(366.2)
     assert spec.REFERENCE_DIMENSIONS == (("VGrooveProfile", "VApexY"),)
-    assert {"VAngle", "VApexY", "VMouthZ0", "VMouthZ1"} == spec.DRAWING_DIMENSIONS[
-        "VGrooveProfile"
-    ]
+    assert {
+        "VAngle",
+        "VApexY",
+        "VMouthZ0",
+        "VMouthZ1",
+        "NeckZ0",
+        "NeckZ1",
+        "Depth",
+    } == spec.DRAWING_DIMENSIONS["VGrooveProfile"]
     assert spec.DRAWING_DIMENSIONS["ReliefReference"] == {
         "ReliefZ0",
         "ReliefZ1",
@@ -586,12 +626,12 @@ def test_v_is_its_angle_and_mouth_with_a_reference_apex() -> None:
     # The angle's text point (which picks the wedge it measures) lies inside
     # the V: under the apex, over the mouth, between the flanks.
     u, v = part._v_angle_text_point()
-    apex_u = -spec.BLOCK_DEPTH / 2.0
+    apex_u = -spec.DEPTH_MID_Z
     assert 0.0 < v < spec.V_APEX_Y
     half_width = (spec.V_APEX_Y - v) * math.tan(math.radians(spec.V_ANGLE_DEG / 2))
     assert abs(u - apex_u) < half_width
-    # On the sheet the angle sits in the V's void, between the back edge's
-    # value (top ~0.1528) and the apex (y 0.180).
+    # On the sheet the angle sits in the V's void, between the mouth (the
+    # bottom face, y 0.156) and the apex (y 0.180).
     angle_x, angle_y = drawing.RIGHT_KEEP["VAngle"]
     assert angle_x == pytest.approx(drawing._rz(drawing._CZ))
     assert drawing._ry(0.0) + 0.006 < angle_y < drawing._ry(spec.V_APEX_Y) - 0.006
@@ -601,22 +641,14 @@ def test_v_runs_past_the_step_so_no_knife_edge_shows_in_the_end_view() -> None:
     # Review final2: a closed triangle at each V mouth lip in the paper-end
     # view, which hiding tangent edges did not remove.  It was brass: stopped
     # at the step, the V left a sliver under each flank where the corner arc
-    # curves away from the step (0.5 tall at the mouth, thinning to nothing).
-    corner_z = spec.RELIEF_Z0 + spec.RELIEF_CORNER_R
-    assert spec.V_MOUTH_Z0 < corner_z < spec.BLOCK_DEPTH / 2.0
-    sliver_height = corner_z - spec.V_MOUTH_Z0  # the 90 deg flank rises 1:1
-    assert sliver_height == pytest.approx(0.5)
-    arc_x_at_mouth = (
-        spec.RELIEF_X0
-        + spec.RELIEF_CORNER_R
-        - math.sqrt(spec.RELIEF_CORNER_R**2 - sliver_height**2)
-    )
-    assert 0.0 < arc_x_at_mouth - spec.RELIEF_X0 < 0.15
-    # The cut runs to where both corner arcs end, so every sliver goes; R1.0
-    # stays, and past the step the V lies wholly inside the slot.
+    # curved away from the step.  The simplified E's wider slot stands both
+    # corner arcs outside the V's mouth, and the cut still runs on to where
+    # they end: past the step the V lies wholly inside the slot.
+    near_corner_z = spec.RELIEF_Z0 + spec.RELIEF_CORNER_R
+    far_corner_z = spec.RELIEF_Z1 - spec.RELIEF_CORNER_R
+    assert near_corner_z < spec.V_MOUTH_Z0 < spec.V_MOUTH_Z1 < far_corner_z
     assert spec.RELIEF_CORNER_R == 1.0
     assert spec.V_CUT_LENGTH == spec.RELIEF_X0 + spec.RELIEF_CORNER_R
-    assert spec.RELIEF_Z0 < spec.V_MOUTH_Z0 < spec.V_MOUTH_Z1 < spec.RELIEF_Z1
     assert spec.V_APEX_Y < spec.RELIEF_HEIGHT
     assert "ExtrusionParameters(depth=V_CUT_LENGTH)" in _PART_SOURCE
     assert '\'"ReliefX0" + "ReliefCornerR"\'' in _PART_SOURCE
@@ -657,52 +689,19 @@ def test_section_shows_the_tap_thread_on_a_visible_thin_layer() -> None:
     assert drawing.TAPPED_HOLE_NOTE == "#4-40 Tapped Hole"
 
 
-def test_end_view_rows_stack_without_crossing() -> None:
-    # Baselines nested shortest-innermost: the front edge's three rows, the
-    # back edge's four under them, the depth's one value under those, each
-    # block's line under its last row (RIGHT_KEEP's row maths): no extension
-    # line runs through a lower line or block, and the reamed diameter's
-    # callout drops under the depth's line.
-    keep = drawing.RIGHT_KEEP
-    bottom_face = drawing._ry(0.0)
-    row = 0.0056
-
-    def rows(name: str) -> int:
-        callout = spec.DIMENSION_CALLOUTS.get(name)
-        return 1 if callout is None else callout.count("\n") + 2
-
-    def top(name: str) -> float:
-        return keep[name][1] - 0.0023 + (rows(name) - 1) * row / 2.0 + 0.004
-
-    def line(name: str) -> float:
-        return keep[name][1] - 0.0023 - (rows(name) - 1) * row / 2.0 - 0.001
-
-    assert top("VMouthZ0") < bottom_face - 0.0005
-    assert top("VMouthZ1") < bottom_face - 0.0005
-    # Each extension line ends ~1 mm under its own dimension line, over the
-    # next line out.
-    assert line("VMouthZ0") - 0.001 > line("VMouthZ1") + 0.003
-    # The back edge's block stands right of the front edge's x _rz(3)
-    # extension line, so only its line passes under that line's end.
-    assert keep["VMouthZ1"][0] - 0.0165 > drawing._rz(spec.V_MOUTH_Z0) + 0.003
-    assert top("Depth") < line("VMouthZ1") - 0.002
-    pivot_top = drawing.BOTTOM_KEEP["PivotDia"][1] + 0.009
-    assert pivot_top < line("Depth") - 0.003
-    assert drawing.BOTTOM_KEEP["PivotDia"][1] - 0.010 > 0.0651 + 0.03
-
-
 def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     import pn_pen_carriage_geom as carriage
 
-    assert part.V_BLOCK == pytest.approx(11016.0)
+    # The E: the neck 9 x 18, the body 18.3 x 22.2, 18 tall.
+    assert part.V_BLOCK == pytest.approx(10228.68)
     # Cut one corner radius past the step, the V's run there lies in the slot:
-    # the relief removes that much less (the two slivers, 0.005 mm^3, aside).
+    # the relief removes that much less.
     assert part.V_GROOVE == pytest.approx(360.0)
     assert part.V_GROOVE_PAST_STEP == pytest.approx(36.0)
     # The carriage mass model cuts the relief square-cornered and leaves the
     # bore's top chamfer: both under 0.05% of the block.
     assert part.V_RELIEF + part.V_RELIEF_CORNERS + part.V_GROOVE_PAST_STEP == (
-        pytest.approx(2281.5)
+        pytest.approx(1903.2)
     )
     corner_r, relief_h = spec.RELIEF_CORNER_R, spec.RELIEF_HEIGHT
     assert part.V_RELIEF_CORNERS == pytest.approx(
@@ -713,11 +712,13 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     bore_length = spec.BLOCK_HEIGHT - spec.RELIEF_HEIGHT
     assert part.V_PIVOT_BORE == pytest.approx(math.pi * 4.0 * bore_length)
     tap_r = TAP_DRILL_MM[spec.SET_SCREW_TAP_SPEC.size] / 2.0
-    # The exact tap reaches past the bore wall's 7.0 on its axis, never past the bore axis.
+    # The exact tap reaches past the bore wall's 9.1 from the front face on its
+    # axis, never past the bore axis.
+    assert spec.SET_SCREW_TAP_LENGTH == pytest.approx(9.1)
     assert (
         math.pi * tap_r**2 * spec.SET_SCREW_TAP_LENGTH
         < part.V_SET_SCREW_TAP
-        < math.pi * tap_r**2 * spec.BLOCK_DEPTH / 2.0
+        < math.pi * tap_r**2 * (spec.DEPTH_MID_Z - spec.BODY_Z0)
     )
     block_mass = sum(
         mass
@@ -739,16 +740,24 @@ def test_sheet_runs_at_4_to_1_with_3_to_2_isometric() -> None:
     assert _DRAWING_SOURCE.count("scale=VIEW_SCALE") == 4  # three projections + A-A
     assert _DRAWING_SOURCE.count("scale=ISO_SCALE") == 1
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 3:2"
-    # Its ink (1.5x the 38.3 x 34.5 mm measured at 1:1, centred 1.8 mm above
-    # it) clears the ream callout (to x 0.2764), the title block (top
-    # 0.0651) and the caption (from x 0.337, bottom 0.116); the note beside
-    # it stays 5 mm inside the border (0.4188).
-    half_w, half_h = 0.0383 * 1.5 / 2.0, 0.0345 * 1.5 / 2.0
+    # Its ink, estimated from the block's box (the old 36 x 18 x 18 block's
+    # estimate, 38.2 wide, matched the 38.3 measured at 1:1): 35.0 x 34.9 at
+    # 1:1, x1.5, centred 1.8 mm under its centre as measured.  It clears the
+    # ream callout (~44 mm either side of its keep), the end view's depth
+    # extension line, the title block (top 0.0651) and, along its sloping top,
+    # the section caption's left end (x ~0.337, bottom ~0.118); the note
+    # beside it stays 5 mm inside the border (0.4188).
+    half_w, half_h = 0.0350 * 1.5 / 2.0, 0.0349 * 1.5 / 2.0
     ink_cy = drawing.ISO_CENTER[1] - 0.0018
     left, right = drawing.ISO_CENTER[0] - half_w, drawing.ISO_CENTER[0] + half_w
-    assert left > 0.2764 + 0.005
+    assert left > drawing.BOTTOM_KEEP["PivotDia"][0] + 0.044 + 0.005
+    assert left > drawing._rz(spec.BODY_Z1) + 0.005
     assert ink_cy - half_h > 0.0651 + 0.003
-    assert ink_cy + half_h < 0.1235  # the end view's depth line
+    top_vertex_x = left + 0.45 * 2.0 * half_w
+    ink_top_at_caption = (
+        ink_cy + half_h - (0.337 - top_vertex_x) * math.tan(math.radians(30.0))
+    )
+    assert ink_top_at_caption < drawing.SECTION_CAPTION_XY[1] - 0.015 - 0.003
     assert drawing.ISO_NOTE_XY[0] > right + 0.004
     assert drawing.ISO_NOTE_XY[0] + 0.059 < 0.4188 - 0.005
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in _DRAWING_SOURCE

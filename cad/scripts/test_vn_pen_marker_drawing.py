@@ -1,4 +1,4 @@
-"""Sharpie Mini pen marker (MHA-VN-060) contracts, SolidWorks-free."""
+"""Sharpie Fine Point pen marker (MHA-VN-060) contracts, SolidWorks-free."""
 
 from __future__ import annotations
 
@@ -15,15 +15,14 @@ import vn_pen_marker_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 
 STEM = "vn-pen-marker"
-IN = 25.4
 
 
-def test_registry_row_is_the_purchased_sharpie_mini() -> None:
+def test_registry_row_is_the_purchased_sharpie_fine_point() -> None:
     row = _config.parts(STEM)
     assert row["number"] == "MHA-VN-060"
     assert row["process"] == "purchased"
     assert row["supplier"] == spec.SUPPLIER
-    assert row["supplier_skus"] == [spec.SKU] == ["35111"]
+    assert row["supplier_skus"] == [spec.SKU] == ["30051"]
     assert row["material"] == spec.MATERIAL == part.MATERIAL
     assert int(row["quantity"]) == 1
     assert part.STOCK_PROPERTIES == {
@@ -34,13 +33,13 @@ def test_registry_row_is_the_purchased_sharpie_mini() -> None:
 
 
 def test_sourced_lengths_and_seat() -> None:
-    # sharpie.com: 3-1/2 in long, capped and over the key ring.
-    assert spec.CAPPED_LENGTH == pytest.approx(3.5 * IN)
-    # The uncapped marker is shorter than the capped one by the cap's overhang.
-    assert 60.0 < spec.OVERALL_LENGTH < spec.CAPPED_LENGTH
+    # jetpens.com, Sharpie Fine Point 30051: 123 long uncapped, as used.
+    assert spec.OVERALL_LENGTH == 123.0
     # The v-block seat is the regular Sharpie's Ø10.6 grip (jetpens.com).
     assert spec.BARREL_DIA == 10.6
     assert spec.BARREL_START_Y < spec.BARREL_END_Y
+    # The dome carries on from the taper's end to the back end.
+    assert spec.BARREL_END_Y < spec.BODY_TAPER_END_Y < spec.OVERALL_LENGTH
 
 
 def test_profile_runs_nib_to_back_end_on_the_axis() -> None:
@@ -74,9 +73,10 @@ def test_volume_and_centroid_match_a_numeric_revolve() -> None:
             moment += dv * y
     assert spec.VOLUME_MM3 == pytest.approx(volume, rel=1e-6)
     assert spec.CG_Y == pytest.approx(moment / volume, rel=1e-6)
-    assert spec.MASS_G == pytest.approx(spec.VOLUME_MM3 * spec.DENSITY_G_PER_MM3)
-    # A few grams, as a pocket marker is (brief: about 6 g capped).
-    assert 3.0 < spec.MASS_G < 7.0
+    # jetpens.com: the barrel with its ink weighs 7 g; the balance takes it
+    # at the envelope's centroid (uniform density assumed).
+    assert spec.MASS_G == 7.0
+    assert 0.4 * spec.OVERALL_LENGTH < spec.CG_Y < 0.6 * spec.OVERALL_LENGTH
 
 
 def test_build_sketches_radius_over_station() -> None:

@@ -1,4 +1,4 @@
-"""Create the four-view purchased-reference sheet for the Sharpie Mini pen marker (MHA-VN-060).
+"""Create the four-view purchased-reference sheet for the Sharpie Fine Point pen marker (MHA-VN-060).
 
 Identification only: the marker as installed (uncapped), its stock and
 ordering item number, and its fitting note on a leader to the grip band; no
@@ -82,9 +82,9 @@ SOURCE_PROPERTIES = (
 # it and the captions carry no scale. The free field is the border (12.7 mm
 # all round) above the purchased footer (its notes reach y = 73 mm) and the
 # title block (x >= 215.9 mm, y <= 65.1 mm), read from farm run e31912e0's PNG.
-# That leaves 194 mm of height. At 2:1 the FRONT outline (154.0 mm) and the
-# TOP outline (35.8 mm) alone stack to 190 mm, and their two captions add
-# about 18 mm. So 1:1 is the largest project scale that keeps TOP above FRONT.
+# That leaves 194 mm of height. At 2:1 the FRONT outline (257 mm) alone
+# overruns it, so 1:1 is the largest project scale that keeps TOP above FRONT:
+# FRONT's 138 mm cell, TOP's 27.5 mm and their captions stack to 183 mm.
 SHEET_SCALE = (1, 1)
 _MODEL_M = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0  # sheet metres per model mm
 # IView.GetOutline pads the model box by a fixed 5.59 mm a side: at 1:2 the
@@ -95,21 +95,26 @@ _CELL_SLACK = 0.002  # reserved cell beyond the expected outline, each side
 
 # Model box half-extents at the sheet scale. FRONT and RIGHT show the revolved
 # marker's side, MAX_DIA wide and OVERALL_LENGTH tall with the nib at the
-# bottom. TOP looks down the axis at a MAX_DIA circle. The isometric's 1:1 box
-# is the 1:2 audit's 8.69 x 34.17 mm doubled.
+# bottom. TOP looks down the axis at a MAX_DIA circle. The isometric's box:
+# the Mini's 1:2 audit read 8.69 x 34.17 mm doubled at 1:1 for 71.4 long; the
+# axis projects at 0.8165 of its length, so the 123 Fine Point's adds 42.1 mm
+# (estimated, not yet read back on the farm).
 _SIDE_HALF = (MAX_DIA / 2.0 * _MODEL_M, OVERALL_LENGTH / 2.0 * _MODEL_M)
 _END_HALF = (MAX_DIA / 2.0 * _MODEL_M, MAX_DIA / 2.0 * _MODEL_M)
-_ISO_HALF = (0.00869, 0.03417)
+_ISO_HALF = (0.00869, 0.03417 + (OVERALL_LENGTH - 71.4) * 0.8165 / 2.0 * _MODEL_M)
 
 # View centres. GetOutline is centred on the model box, so each view's outline
 # is centred here. TOP shares FRONT's x and RIGHT shares FRONT's y.
-#   FRONT model box x 173.9..186.1, y 109.3..180.7 mm (outline 103.7..186.3).
-#   TOP circle y 208.9..221.1 mm: 28 mm above FRONT, outline gap 17 mm.
+#   FRONT model box x 173.9..186.1, y 94.5..217.5 mm (outline 88.9..223.1;
+#   its caption's box down to 78.2, 5 mm over the footer's notes).
+#   TOP circle y 235.4..247.6 mm: 85.5 above FRONT's centre, outline gap 6.7
+#   mm; its caption's top 264.0, 2.7 mm under the border.
 #   RIGHT model box x 248.9..261.1 mm: 63 mm right of FRONT.
-#   ISOMETRIC x 336.3..353.7, y 135.8..204.2 mm (outline right edge 359.3,
-#   60 mm inside the border; outline bottom 130.3, 65 mm above the title block).
-FRONT_CENTER = (0.180, 0.145)
-TOP_CENTER = (FRONT_CENTER[0], 0.215)
+#   ISOMETRIC x 336.3..353.7, y 114.8..225.2 mm (outline right edge 359.3,
+#   60 mm inside the border; its caption's box down to 98.4, 33 mm above the
+#   title block).
+FRONT_CENTER = (0.180, 0.156)
+TOP_CENTER = (FRONT_CENTER[0], 0.2415)
 RIGHT_CENTER = (0.255, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.170)
 VIEWS = (
@@ -135,8 +140,8 @@ def view_cell(
 
 
 # View captions (3 mm text, top edge at y, centred on the view): FRONT and RIGHT
-# 4.7 mm below their outlines (y 94.7..99.0 mm), the ISOMETRIC caption 4.8 mm
-# below its outline, and TOP 5.4 mm above its outline, 30 mm under the border.
+# 4.7 mm below their outlines (y 78.2..85.2 mm box), the ISOMETRIC caption
+# 4.8 mm below its outline, and TOP 5.4 mm above its outline.
 _SIDE_CAPTION_Y = view_cell(FRONT_CENTER, _SIDE_HALF)[1] - 0.0027
 CAPTIONS = (
     ("FRONT", FRONT_CENTER[0], _SIDE_CAPTION_Y),
@@ -156,7 +161,7 @@ GRIP_TIP = (
 # lines of at most GRIP_NOTE_WIDTH characters, about 77 mm x 14 mm at the
 # repo's widest 2.75 mm per character (pen-hanger audit). So it spans
 # x 60..137 mm, y 136..150 mm, 31 mm clear of FRONT's outline. The leader
-# drops about 42 mm to the tip.
+# drops about 23 mm to the tip (y 112.75).
 GRIP_NOTE_WIDTH = 28
 GRIP_NOTE_XY = (0.060, 0.150)
 GRIP_NOTE_BOX = (0.055, 0.130, 0.160, 0.155)

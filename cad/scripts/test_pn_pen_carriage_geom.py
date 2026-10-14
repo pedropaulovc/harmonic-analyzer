@@ -20,8 +20,9 @@ PAPER_LIMIT_Z = PAPER_FRONT_Z - 2.0 * g.CLEARANCE
 
 def test_carriage_cg_hangs_on_the_rod_axis() -> None:
     # The pen hangs level only if the off-axis carriage balances about the
-    # rod: the pivot-bore station and the lightening bore are the knobs.
-    assert g.plan_cg_residual_mm() <= 0.25
+    # rod: with the lightening bore gone, the block's length is the knob.
+    assert vb.BLOCK_LENGTH == 27.3
+    assert g.plan_cg_residual_mm() <= 0.1
 
 
 def test_every_carriage_point_stands_off_the_paper() -> None:
@@ -31,7 +32,7 @@ def test_every_carriage_point_stands_off_the_paper() -> None:
     # (the top-assembly interference gate caught a 0.03 mm flank overlap).
     sin = math.sin(math.radians(g.PEN_BLOCK_YAW_DEG))
     nib_paper_most = max(
-        g.machine_z(g.MARKER_NIB_LOCAL_X + y, vb.BLOCK_DEPTH / 2.0) + r * sin
+        g.machine_z(g.MARKER_NIB_LOCAL_X + y, vb.DEPTH_MID_Z) + r * sin
         for y, r in g.marker.PROFILE
     )
     assert nib_paper_most == pytest.approx(PAPER_FRONT_Z - g.CLEARANCE)

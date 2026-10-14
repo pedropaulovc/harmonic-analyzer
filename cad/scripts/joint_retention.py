@@ -706,7 +706,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "ms_stick",  # MHA-MS-001 plain 8 x 3 brass bar; the stop's thumbscrew tip pinches it
         "ms_stop_plate",  # MHA-MS-003 brass cover plate: 2 plain clearance holes for the #2-56 screws; no thread
         "fr_nameplate",  # brass plate, #4 clearance holes only
-        "vn_pen_marker",  # purchased Sharpie Mini; plain barrel, the thumb-screw tip bears on it (no thread)
+        "vn_pen_marker",  # purchased Sharpie Fine Point; plain barrel, the thumb-screw tip bears on it (no thread)
         "pn_pen_wire",  # Ø0.80 wire, tied off (tie-off not modelled)
         "dt_pinion_arbor",  # journal + grip head, crossrod bonded, collar spring-pinned
         "dt_pinion_arbor_collar",  # spring-pinned by MHA-VN-033 (arbor-collar-pinned)
