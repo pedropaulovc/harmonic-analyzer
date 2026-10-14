@@ -382,7 +382,7 @@
       "component_focus": [
         "dt_crank_arm",
         "dt_crank_handle",
-        "pd_chain_sprocket",
+        "pd_transgear_removable",
         "crank_pedestal"
       ],
       "status": "aligned",
@@ -493,8 +493,7 @@
       "component_focus": [
         "dt_crank_drive_gear",
         "pd_transgear_removable",
-        "pd_platen_rack",
-        "pd_chain_sprocket"
+        "pd_platen_rack"
       ],
       "status": "aligned",
       "notes": "translational gearing from below-front (az~204 el~-24): knob-shaft T24 disc + chain sprocket + chain, rack-pinion at stub, platen rack above.",

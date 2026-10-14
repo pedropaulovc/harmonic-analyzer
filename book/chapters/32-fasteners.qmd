@@ -19,7 +19,6 @@ The screws, and the small parts that do not belong anywhere else.
 | `vn-guide-lock-screw` | TODO | TODO | TODO |
 | `vn-slotted-screw` | TODO | TODO | TODO |
 | `vn-thumb-screw` | TODO | TODO | TODO |
-| `vn-hex-bolt` | TODO | TODO | TODO |
 | `vn-lag-screw` | TODO | TODO | TODO |
 | `vn-hanger-screw` | TODO | TODO | TODO |
 | `vn-clamp-screw` | TODO | TODO | TODO |

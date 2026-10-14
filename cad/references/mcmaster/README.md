@@ -59,7 +59,7 @@ recipes:
 | 92671A115 | `vn-pen-adjust-nut` (catalogue-only; no vendor model) | Brass Hex Nut |
 | 9414T1 | — (historical MHA-VN-016 until the 2026-10-08 terminal redesign) | Set Screw Shaft Collar for 1/16" Diameter |
 | 94355A213 | `vn-cone-tip-collar` set screw, fitted as supplied | 18-8 Stainless Steel Flat-Tip Set Screw, #2-56 x 5/16" |
-| 92865A585 | `vn-hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
+| 92865A585 | — (diagnostic recipe; former `vn-hex-bolt`, MHA-VN-008 retired) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 92916A250 | `vn-wheel-axle-front-washer` (catalogue-only; no vendor model) | Brass Washer for Number 4 Screw Size |
 | 96659A104 | `vn-knife-hanger-washer` (MHA-VN-060; catalogue-only, no vendor model) | 18-8 Stainless Steel SAE Washer for Number 10 Screw Size |
 | 92916A480 | `vn-wheel-axle-back-washer` (catalogue-only; no vendor model) | Brass Washer for Number 10 Screw Size |

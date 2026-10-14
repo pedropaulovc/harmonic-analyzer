@@ -1,5 +1,0 @@
-pd-chain-sprocket:
-  number: MHA-PD-001
-  material: Plain Carbon Steel
-  tolerance_class: machined_block
-  process: "machined (steel)"

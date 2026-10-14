@@ -151,11 +151,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Low-Strength Zinc-Plated Steel Hex Head Screw",
         "93075A199",
     ),
-    "vn-hex-bolt": _stock(
-        "vn-hex-bolt",
-        "Medium-Strength Grade 5 Steel Hex Head Screw",
-        "92865A585",
-    ),
     "vn-knife-hanger-stud": _stock(
         "vn-knife-hanger-stud",
         "Knife-Hanger Bolt (18-8 Stainless Hex Screw, Cut to Length)",
