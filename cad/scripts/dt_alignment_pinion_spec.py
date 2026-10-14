@@ -17,6 +17,7 @@ from _gear_fit_limits import gear_tip_band_mm
 from _printed_tolerance import printed_deviations
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _inch import inch
 from stock_form_cutter import TOOTH_FORM_NOTE, CutterTemplate, StockFormProfile
 
 
@@ -92,18 +93,20 @@ ENGAGED_CENTER_RADIAL_STACK_MM = float(
 # leave the cut flanks.
 TOOTH_FORM = TOOTH_FORM_NOTE
 
-BORE_DIA = 8.0  # Ø8 arbor through-bore (build_dt_pinion_arbor.py)
-# Slip fit bonded with Loctite 638, not a press: a press over the full 143.2
+BORE_DIA = inch(5, 16)  # Ø5/16 arbor through-bore (build_dt_pinion_arbor.py)
+# Slip fit bonded with Loctite 638, not a press: a press over the full 5-5/8
 # bore is a seizing risk for a novice (U27, U6 precedent).  The band admits a
-# stock 8 mm H7 reamer (8.000-8.015).  The drum sits on MHA-DT-022's bond zone,
-# not its journal lands (U39: Ø8 -0.01/-0.10), so the diametral clearance
+# stock 5/16 in H7 reamer.  The drum sits on MHA-DT-022's bond zone,
+# not its journal lands (U39: Ø5/16 -0.01/-0.10), so the diametral clearance
 # runs from 0.010 (the drum slides on by hand) up to the drum's upper
 # deviation minus the arbor's lower one (0.200), inside the 0.25 mm bond gap
 # the 638 technical data sheet allows.
 ARBOR_BORE_BAND = (0.100, 0.000)  # (upper, lower) deviations
 RETAINING_COMPOUND = "LOCTITE 638"
 RETAINING_COMPOUND_MAX_GAP_MM = 0.25
-FACE_WIDTH = 143.2  # general .X; located from the back end (drawing note)
+# All-inch experiment: 5-5/8, the nearest 1/16, in lockstep with
+# pinion_rig_layout.DRUM_LEN (DtPinionB).
+FACE_WIDTH = inch(45, 8)  # general .X; located from the back end (drawing note)
 # Tips are functional gear surfaces, not routine exterior profiles.  Actual
 # stock-form support, coverage/no-gap, backlash, air and TE must pay both
 # printed tip corners and the retained tangent-span/fit bands independently.

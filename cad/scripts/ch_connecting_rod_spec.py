@@ -16,11 +16,14 @@ import channel_frame_geom
 import ch_rocker_arm_spec
 import dt_cylinder_gear_spec
 from _gtol_cylinder import CylinderFace
+from _inch import inch
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
-# --- Nominal geometry (DIMENSIONS.md "Chapter 13 - Connecting rods"). ---
-# Close the actual phased cam centre to the level rocker's pin. The rocker
-# bank is fixed; raising the drive axis changes this physical rod length.
+# --- Nominal geometry (DIMENSIONS.md "Chapter 13 - Connecting rods"),
+# all-inch experiment. ---
+# Close the actual phased cam centre to the level rocker's pin (a CLOSURE
+# OUTPUT, never a fraction). The rocker bank is fixed; raising the drive axis
+# changes this physical rod length.
 _HOME_PIN_XY = (
     channel_frame_geom.ROCKER_PIVOT_XY[0] - ch_rocker_arm_spec.ROD_HOLE_X,
     channel_frame_geom.ROCKER_PIVOT_XY[1]
@@ -34,19 +37,22 @@ _HOME_CAM_XY = (
     + dt_cylinder_gear_spec.ECCENTRICITY * math.cos(_CAM_PHASE),
 )
 CENTER_DISTANCE = math.dist(_HOME_PIN_XY, _HOME_CAM_XY)
-RING_BORE_DIA = 30.8  # strap bore riding the eccentric cam
+# Strap bore riding the eccentric cam: the cam's diameter plus the existing
+# 0.20 running clearance (a fit size, follows dt_cylinder_gear_spec).
+RING_BORE_CLEARANCE = 0.20
+RING_BORE_DIA = dt_cylinder_gear_spec.CAM_DIA + RING_BORE_CLEARANCE
 RING_BORE_DIA_BAND = (0.10, 0.00)  # running bore; (upper, lower) deviations
-RING_WALL = 5.0  # radial strap wall
-# Ring and shank 2.200 at three places, the title block's +/-.005 in class
+RING_WALL = inch(3, 16)  # radial strap wall (was 5.0)
+# Ring and shank 3/32 (was 2.200; 1/32 grid -- the 1/16 grid's 1/8 grows this
+# sub-1/4 plate 44 %) at three places, the title block's +/-.005 in class
 # (title_block.yaml linear_3pl; #948 ruling R, PR #1292). Both pass between
 # the same two tooth discs of the closed cam slot (cylinder_bank_layout), and
 # a flat rod held by its fork on the arm needs the cam-vs-arm offset inside
-# its float there: 2.200 at three places widens that float over the old
-# 3.00 / 2.50 at two places by geometry, and still leaves a 2.073 section at
-# its thinnest (drawing-guidelines.md rule 17 (walls and webs)).
-RING_THICKNESS = 2.2
+# its float there, and still leaves a 2.254 section at its thinnest
+# (drawing-guidelines.md rule 17 (walls and webs)).
+RING_THICKNESS = inch(3, 32)
 RING_THICKNESS_BAND = (0.127, -0.127)  # (upper, lower) deviations
-SHANK_WIDTH = 8.0
+SHANK_WIDTH = inch(5, 16)  # was 8.0
 SHANK_THICKNESS = RING_THICKNESS  # one plate thickness, ring to shank
 SHANK_THICKNESS_BAND = RING_THICKNESS_BAND
 # Ring and shank symmetric to the fork slot within this (total), so the
@@ -55,32 +61,38 @@ RING_SLOT_SYMMETRY = 0.10
 RULE12_SECTION_MIN = 2.0  # drawing-guidelines.md rule 17 (walls and webs)
 if RING_THICKNESS + RING_THICKNESS_BAND[1] < RULE12_SECTION_MIN:
     raise AssertionError("the rod's thinnest ring/shank section is under drawing-guidelines.md rule 17 (walls and webs)'s 2.0")
-# --- Fork (the U-shaped clevis straddling the 2.500 +/-0.025 rocker strap). ---
+# --- Fork (the U-shaped clevis straddling the 3/32 +/-0.025 rocker strap). ---
 # The rod is flat: ring, shank and fork share one mid-plane (z = 0), the cam
 # plane, which is also the arm plane (rocker_bank_layout.ARM_MID_DZ). Two tines
 # straddle the arm; the bridge joining them sits below the arm's bottom edge;
 # the pin hole runs through both tines on the rod axis at CENTER_DISTANCE.
-# Each inter-arm gap (pitch 7.0565 - arm 2.500) holds one tine of each
+# Each inter-arm gap (pitch 7.0565 - arm 2.381) holds one tine of each
 # neighbouring rod, so the fork's outer thickness and slot carry explicit
-# 3-place bands (Main ruling 2026-10, option b): tine 1.59 MIN, 0.35 MIN to
+# 3-place bands (Main ruling 2026-10, option b): tine 1.50 MIN, 0.35 MIN to
 # the neighbouring fork at the worst case (ch_rod_pivot_pin_spec checks both).
-FORK_WIDTH = 10.0  # across the fork (X), crown radius FORK_WIDTH / 2 on the pin
-FORK_THICKNESS = 6.075  # outer face to outer face (Z)
+FORK_WIDTH = inch(3, 8)  # across the fork (X), crown radius FORK_WIDTH / 2 on the pin
+# Outer face to outer face (Z): .236 in, a 3-place fit size. No 1/16 or 1/32
+# fraction lands in the window the fixed 7.0565 station pitch leaves
+# (5.78 .. 6.18: tine floor vs neighbouring fork), 7/32 and 1/4 both fail.
+FORK_THICKNESS = inch(0.236)
 FORK_THICKNESS_BAND = (0.05, -0.05)  # (upper, lower) deviations
-# Slot nominal = the arm's thickest strap (2.525) + the 0.10 running
-# floor; the band is one-sided so the slot is never narrower than that.
-FORK_SLOT_WIDTH = 2.625
+# Slot nominal = the arm's thickest strap + the 0.10 running floor (a fit
+# size, follows the arm); the band is one-sided so the slot is never
+# narrower than that.
+FORK_SLOT_WIDTH = (
+    ch_rocker_arm_spec.ARM_THICKNESS + ch_rocker_arm_spec.ARM_THICKNESS_BAND[0] + 0.10
+)
 FORK_SLOT_BAND = (0.127, 0.0)  # (upper, lower) deviations
 # Slot centred in the fork: the two tines equal within this (|T_n - T_s|).
 FORK_TINE_MATCH = 0.10
 # The flat slot floor (the crotch) below the pin centre. The arm's curved
 # bottom edge dips into the slot as the arm turns on the pin; the floor clears
 # it by 1.0 MIN at the printed worst case of both parts through the solved
-# swing (ch_rod_pivot_pin_spec.BUDGET: 1.20 worst).
-FORK_CROTCH_BELOW_PIN = 9.75
+# swing (ch_rod_pivot_pin_spec.BUDGET).
+FORK_CROTCH_BELOW_PIN = inch(3, 8)  # was 9.75
 # The fork boss's root step onto the shank. The bridge below the slot floor
 # (ForkBossLength less SlotDepth, both .XX from the crown top) keeps 2.0 MIN.
-FORK_BASE_BELOW_PIN = 13.0
+FORK_BASE_BELOW_PIN = inch(1, 2)  # was 13.0
 # The MHA-CH-010 rod pivot pin presses into this hole through both tines and
 # runs in the arm's #47 rod hole (user ruling 2026-10-09, PR #1292 review F1,
 # press fit as the bar pin; ch_rod_pivot_pin_spec holds the fit budget).

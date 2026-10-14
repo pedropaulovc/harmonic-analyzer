@@ -1,7 +1,7 @@
 
 alignment_pinion:                  # ch25 — engages the cylinder-gear set for zeroing
   teeth: 32
-  disengaged_tip_gap_mm: 2.2425    # PINION_GAP; U28 park-out (was 2.0)
+  disengaged_tip_gap_mm: 1.7907    # PINION_GAP; all-inch closure (U28 2.2425; was 2.0) -- holds the released -76.62 deg cam engage rotation
   engaged_center_extension_mm: 0.35  # chosen extension; actual stock-form backlash qualification pending
   engaged_center_distance_mm: 40.566667  # (120 + 32) * (25.4 / 48) / 2 + 0.35; actual roots are off-centre cutter arcs
   engaged_center_radial_stack_mm: 0.20  # retained fit/placement closing and opening corner
@@ -35,7 +35,10 @@ alignment_pinion:                  # ch25 — engages the cylinder-gear set for 
     Named union coverage is a non-contact-ratio functional measure, not an
     ideal involute CR claim. A pointwise corner sample is not an all-phase
     carrier-aware first-contact/backlash/TE certificate.
-    The U28 2.2425 mm parked tip gap remains the placement input.
+    The all-inch experiment re-solves the U28 parked tip gap (2.2425 mm) as
+    a closure: 1.7907 mm keeps the released -76.62 deg engaged cam rotation
+    on the inch strap, cam and pivot-block geometry (no 1/32 in gap lands
+    in the -85..-75 deg photo band). It remains the placement input.
     Zero is established by the actual cylinder notch UP BY EYE followed
     by the cone lock; the alignment drum has no index. An authored home
     clock is a geometric gauge placement, not accumulated chain/error TE.

@@ -68,7 +68,9 @@ _LEDGE_HEIGHT_FLOOR = (
 _LEDGE_BAND = _LEDGE_HEIGHT_FLOOR - round(
     _LEDGE_HEIGHT_FLOOR + printed_deviations(_LEDGE_HEIGHT_FLOOR, 1)[0], 12
 )
-_LEDGE_HEIGHT = math.ceil(round((_LEDGE_HEIGHT_FLOOR + _LEDGE_BAND) * 10.0, 6)) / 10.0
+# Ceiling onto the 1/16 in grid (all-inch; was the 0.1 mm grid).
+_GRID = 25.4 / 16.0
+_LEDGE_HEIGHT = math.ceil(round((_LEDGE_HEIGHT_FLOOR + _LEDGE_BAND) / _GRID, 6)) * _GRID
 LEDGE_TOP_Y = round(BLOCK_HEIGHT + _LEDGE_HEIGHT, 6)  # 77.7
 PART_PROUD = LEDGE_TOP_Y + sides.FOOT_LEN - PLATE_HEIGHT  # 5.24
 PART_PROUD_WORST = (
@@ -100,8 +102,10 @@ SCREW_HEAD_ECCENTRICITY_MAX = 0.006 * 25.4 / 2.0  # 0.0762
 # The heads only have to stand apart, never bear on each other; 0.3 is the
 # authored daylight margin over contact at the worst printed pitch.
 SCREW_HEAD_GAP_MIN = 0.3
-SCREW_HALF_PITCH = 5.0
-SCREW_BELOW_LEDGE_TOP = 10.5
+# 7/32 (was 5.0), the 1/32 grid: 3/16 closes the head gap below the 0.3
+# daylight floor at the worst printed pitch.
+SCREW_HALF_PITCH = 25.4 * 7.0 / 32.0
+SCREW_BELOW_LEDGE_TOP = 25.4 * 7.0 / 16.0  # 7/16 (was 10.5)
 SCREW_Y = round(LEDGE_TOP_Y - SCREW_BELOW_LEDGE_TOP, 6)  # 67.2
 TAP_X = (CENTRE_X - SCREW_HALF_PITCH, CENTRE_X + SCREW_HALF_PITCH)
 
@@ -122,8 +126,8 @@ TAP_X = (CENTRE_X - SCREW_HALF_PITCH, CENTRE_X + SCREW_HALF_PITCH)
 # wide.
 STUD_DIA = 9.525
 STUD_SPEC = HoleSpec("drilled_letter", "X")
-STUD_HALF_PITCH = 20.0
-STUD_Y = 80.7
+STUD_HALF_PITCH = 25.4 * 13.0 / 16.0  # 13/16 (was 20.0)
+STUD_Y = 25.4 * 3.125  # 3-1/8 (was 80.7; 3-3/16 breaks the upright's top wall)
 STUD_BELOW_PART_TOP = PLATE_HEIGHT + PART_PROUD - STUD_Y
 if not bracket.EAR_T < STUD_BELOW_PART_TOP < sides.FOOT_LEN:
     raise AssertionError("the bridge studs' line is off the foot's free run")

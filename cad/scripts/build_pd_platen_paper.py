@@ -6,9 +6,10 @@ covering most of the platen; without it the CAD platen reads as a bare
 dark board. Consumable media, but modeled for photo fidelity (M6.8
 photo-tuning).
 
-Sized by the ch30-p002 Pose Studio fit to sit between the resized platen
-clips with an 18.2007 mm side margin and 3.0 mm top margin. The front
-face sits 0.5 mm proud of the platen front
+Sized by the ch30-p002 Pose Studio fit (paper_drive_geom; 9-3/16 x 3-3/16 in
+in the all-inch build) to sit between the platen clips with an 18.256 mm
+side margin on the 10-5/8 platen. The front face sits 0.5 mm proud of the
+platen front
 face; the sheet is 0.25 thick so its BACK face keeps the standard 0.25 clear
 of the platen instead of landing coplanar on it — two coincident faces
 z-fight in the offline renders (the ch30 gallery views read as torn white
@@ -41,7 +42,7 @@ from paper_drive_geom import RECORDING_PAPER_HEIGHT_MM, RECORDING_PAPER_WIDTH_MM
 PART_NAME = "pd-platen-paper"
 MATERIAL = "Oak"  # nearest wood-fibre entry in the SW database; colour overridden
 
-PAPER_THICKNESS = 0.25  # front face stays 0.5 proud (assembly plants it at
+PAPER_THICKNESS = 0.25  # render offset, not a size: front face stays 0.5 proud (assembly plants it at
 # PLATE_FRONT_Z - 0.5); the thinner sheet leaves 0.25 air behind so the back
 # face never coincides with the platen front face (render z-fight)
 

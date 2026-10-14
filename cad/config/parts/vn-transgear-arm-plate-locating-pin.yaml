@@ -1,19 +1,19 @@
 vn-transgear-arm-plate-locating-pin:
   title: Transgear Arm Plate Locating Dowel
   number: MHA-VN-056
-  stock_name: Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin
+  stock_name: Alloy Steel Dowel Pin
   supplier: McMaster-Carr
-  supplier_skus: [93600A189]
-  material: 316 stainless steel
-  material_specification: "316 stainless steel dowel pin, ISO 2338-m6, 2 mm +0.008/+0.002 diameter x 6 mm nominal length; McMaster-Carr 93600A189"
-  finish: passivated
-  # https://www.mcmaster.com/93600A189/
-  # Live primary page verified 2026-10-09T00:41:03Z; both ends chamfered.
-  # Published ISO 2338:1997 length limits for nominal 6 mm are 5.75..6.25.
-  # Its end c≈0.35 is reference only, not a supplier maximum.
+  supplier_skus: [98381A434]
+  material: Alloy steel
+  material_specification: "Alloy steel dowel pin, 3/32 x 1/4, Round x Chamfer ends, diameter +0.0001/+0.0003 in; McMaster-Carr 98381A434"
+  finish: plain
+  # https://www.mcmaster.com/98381A434/
+  # Live primary page verified 2026-10-14 (in stock): 3/32 in, 1/4 in long,
+  # +0.0001..+0.0003 in, Rockwell C47 min, Round x Chamfer.
+  # All-inch swap from the metric 2 x 6 ISO 2338-m6 McMaster 93600A189.
   installation_notes: |-
-    McMASTER 93600A189
-    2 x 6 NOMINAL; ISO 2338-m6, BOTH ENDS CHAMFERED
+    McMASTER 98381A434
+    3/32 x 1/4 NOMINAL; ALLOY STEEL, ROUND x CHAMFER
     TWO MATCHED LOCATORS / PRESS ARM; SLIP PLATE
     SCREWS CLAMP ONLY; DO NOT BOTTOM IN ARM
   quantity: 2

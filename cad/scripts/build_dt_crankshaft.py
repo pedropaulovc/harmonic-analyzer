@@ -4,7 +4,7 @@ The cylindrical shaft starts at local y=0, the common outboard plane where
 MHA-DT-006 and through hub MHA-DT-031 finish flush.  Only the shaft's same-diameter
 spherical dome projects outboard (negative Y), so the crank can still withdraw
 through the hub bore after removable taper pin MHA-DT-009 is removed.  The shared
-8-mm face shift preserves the established bearing interfaces.  Behind the
+arm-thickness face shift preserves the established bearing interfaces.  Behind the
 hub, an integral collar's front spigot seats the removable sprocket MHA-PD-009,
 driven by two MHA-VN-044 dowels pressed into blind reamed holes in its face
 (ch. 23; dt_crankshaft_spec owns the seat).  Near
@@ -612,7 +612,7 @@ async def build(adapter) -> dict[str, str]:
         drive_jobs=drive_jobs,
     )
     await volume_check(adapter, "journal relief", v_with_seat, 0.005 * v_with_seat)
-    # The Ø9.0 pinion seat (RULING (b)): the same cut from the seat step to
+    # The 11/32 in pinion seat (RULING (b)): the same cut from the seat step to
     # the far end face.
     v_with_seat -= await _cut_annulus_inboard(
         adapter,

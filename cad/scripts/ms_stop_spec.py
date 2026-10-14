@@ -7,8 +7,10 @@ above Y=0 and their threads extending along -Y. No SolidWorks imports.
 
 User ruling 2026-10-09, option B in stop_roof_options_v1.png: height 14.1
 and a directly dimensioned 2.1 roof replace the original 14 / 2 sketch.
-Routine +/-0.51 on that direct roof dimension leaves 1.59 minimum; no
-drawing-guidelines.md rule 17 (walls and webs) exception or artificially tightened roof tolerance is required.
+All-inch experiment: height 9/16 and a 3/32 roof (1/16 would leave 1.08
+after the routine +/-0.51); routine +/-0.51 on the direct roof dimension
+leaves 1.87 minimum; no drawing-guidelines.md rule 17 (walls and webs)
+exception or artificially tightened roof tolerance is required.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ from __future__ import annotations
 import math
 
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM
+from _inch import inch
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _mcmaster_90114a124 import (
     LENGTH as PLATE_SCREW_LENGTH,
@@ -25,23 +28,27 @@ from _mcmaster_90114a124 import (
 )
 from _mcmaster_91882a221 import SHANK_DIA as THUMB_MAJOR_DIA
 
-BLOCK_LENGTH = 21.0
-BLOCK_HEIGHT = 14.1
-BLOCK_DEPTH = 11.0
-PLATE_THICKNESS = 1.0
+BLOCK_LENGTH = inch(13, 16)  # 20.6375 (was 21.0)
+BLOCK_HEIGHT = inch(9, 16)  # 14.2875 (was 14.1)
+BLOCK_DEPTH = inch(7, 16)  # 11.1125 (was 11.0)
+# 1/16 brass sheet (was 1.0): the 1/32 sheet's longer #2-56 x 1/4 penetration
+# (max 5.91) would overrun the 1/4 full-thread minimum (5.84).
+PLATE_THICKNESS = inch(1, 16)  # 1.5875 (was 1.0)
 PLATE_Z_MAX = 0.0
 PLATE_Z_MIN = PLATE_Z_MAX - PLATE_THICKNESS
 TOTAL_DEPTH = BLOCK_DEPTH + PLATE_THICKNESS
-WINDOW_WIDTH = 8.4
-WINDOW_HEIGHT = 3.4
-ROOF_THICKNESS = 2.1
+# Running fits over the 5/16 x 1/8 stick: the nearest 1/16 (5/16 x 1/8) would
+# equal the bar, so both window sizes use 1/32.
+WINDOW_WIDTH = inch(11, 32)  # 8.73125 (was 8.4)
+WINDOW_HEIGHT = inch(5, 32)  # 3.96875 (was 3.4)
+ROOF_THICKNESS = inch(3, 32)  # 2.38125 (was 2.1); 1/16 fails ROOF_THICKNESS_MIN
 WINDOW_Z_MIN = PLATE_Z_MAX
 WINDOW_Z_MAX = WINDOW_Z_MIN + WINDOW_WIDTH
 WINDOW_Y_MAX = BLOCK_HEIGHT - ROOF_THICKNESS
 WINDOW_Y_MIN = WINDOW_Y_MAX - WINDOW_HEIGHT
 FLOOR_THICKNESS = WINDOW_Y_MIN
 BACK_WALL_THICKNESS = BLOCK_DEPTH - WINDOW_Z_MAX
-ROOF_END_CHAMFER = 1.0
+ROOF_END_CHAMFER = inch(1, 32)  # 0.79375 (was 1.0); 1/16 would be +59 %
 ROOF_CHAMFER_ANGLE = 45.0
 CUT_OVERHANG = 1.0
 
@@ -52,14 +59,16 @@ THUMB_TAP_SPEC = HoleSpec("tapped", "#4-40", end="through_next", thread_class="2
 THUMB_HOLE_POINTS = ((THUMB_AXIS_X, 0.0, THUMB_AXIS_Z),)
 THUMB_HOLE_NORMAL = (0.0, -1.0, 0.0)
 
-PLATE_HOLE_EDGE_OFFSET = 3.5
+# 5/32 (1/32): the 1/8 grid point leaves a 1.32 cover end web (< 1.5).
+PLATE_HOLE_EDGE_OFFSET = inch(5, 32)  # 3.96875 (was 3.5)
 PLATE_HOLE_XS = (PLATE_HOLE_EDGE_OFFSET, BLOCK_LENGTH - PLATE_HOLE_EDGE_OFFSET)
 PLATE_HOLE_PITCH = PLATE_HOLE_XS[1] - PLATE_HOLE_XS[0]
-PLATE_HOLE_Y = 4.0
-PLATE_CLEARANCE_DIA = 2.4
-PLATE_TAP_DRILL_DIA = 1.85  # #49, selected for the brass #2-56 receiver
-PLATE_TAP_THREAD_DEPTH = 6.3
-PLATE_TAP_DRILL_DEPTH = 7.8  # cylindrical depth; the drill point continues past it
+# 1/8 (was 4.0): the nearest 1/16 (3/16) leaves a 0.57 window web minimum.
+PLATE_HOLE_Y = inch(1, 8)  # 3.175
+PLATE_CLEARANCE_DIA = inch(3, 32)  # 2.38125 fractional drill, #2 close fit (was 2.4)
+PLATE_TAP_DRILL_DIA = 1.8542  # #49 = 0.0730 in, for the brass #2-56 receiver (was 1.85)
+PLATE_TAP_THREAD_DEPTH = inch(1, 4)  # 6.35 (was 6.3)
+PLATE_TAP_DRILL_DEPTH = inch(5, 16)  # 7.9375 (was 7.8); cylindrical depth; the drill point continues past it
 PLATE_SCREW_PENETRATION = PLATE_SCREW_LENGTH - PLATE_THICKNESS
 PLATE_TAP_SPEC = HoleSpec(
     "tapped_bottoming", PLATE_SCREW_THREAD, end="blind", depth_mm=PLATE_TAP_DRILL_DEPTH,
@@ -238,7 +247,7 @@ PLATE_CLEARANCE_HEAD_WEB_MIN = BLOCK_HEIGHT - PLATE_PRINTED_BANDS_MM["PlateHeigh
     + (PLATE_CLEARANCE_DIA + DRILL_OVERSIZE_MM) / 2.0
 )
 PLATE_RADIAL_CLEARANCE_MIN = (PLATE_CLEARANCE_DIA - PLATE_SCREW_MAJOR_DIA) / 2.0
-ROOF_OPEN_END_EDGE = ROOF_THICKNESS - ROOF_END_CHAMFER  # 1.1 at the approved end-edge break, not the structural roof
+ROOF_OPEN_END_EDGE = ROOF_THICKNESS - ROOF_END_CHAMFER  # 1/16 (was 1.1) at the approved end-edge break, not the structural roof
 
 assert PLATE_SCREW_PENETRATION_MIN >= 1.5 * PLATE_SCREW_MAJOR_DIA
 assert PLATE_SCREW_PENETRATION_MAX < PLATE_FULL_THREAD_MIN

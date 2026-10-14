@@ -5,27 +5,27 @@ tapered support castings. The FRONT PROFILE is now two concentric arcs of
 DIFFERENT arc length (a tapered curved strap), per the ch.30 back-view
 sketch:
 
-  * Top edge  = concave-up arc, R = 800 mm (= amplitude-bar length, the book's
-    nonlinearity rationale), arc length 11.5" (292.1 mm).
-  * Bottom edge = concentric arc, R = 816 mm (top + 16 mm depth), arc length
-    10.5" (266.7 mm).
+  * Top edge  = concave-up arc, R = 31-1/2 in (~ amplitude-bar length, the
+    book's nonlinearity rationale), arc length 11-1/2 in.
+  * Bottom edge = concentric arc, R = 32-1/8 in (top + 5/8 depth), arc length
+    10-1/2 in.
   * Because the two arcs subtend DIFFERENT angles on their radii, the end faces
     are NOT radial -- they slant inward, so the strap TAPERS toward each tip
     (the "square ends" of the sketch are approximate; a shorter lower edge below
     a longer upper edge is only possible with inward-tapering ends).
-  * Each tip has a 0.22" (5.588 mm) face PERPENDICULAR to the top edge (a radial
+  * Each tip has a 1/4 in face PERPENDICULAR to the top edge (a radial
     segment, the sketch's 90deg right-angle mark), cut into the front profile --
     not a 3D chamfer feature.
 
-The perpendicular top-to-bottom DEPTH stays 16 mm (p.29 end-face callout); the
-plate THICKNESS (Z) stays 2.5 mm (p.27 callout).
+All-inch experiment: the perpendicular top-to-bottom DEPTH is 5/8 (was 16 mm,
+p.29 end-face callout); the plate THICKNESS (Z) 3/32 (was 2.5 mm, p.27).
 
 Mid-pivot SEESAW, symmetric about the pivot. The 11.5" top span was measured
 manually from the ch.30 back view (supersedes the p.29 broadside photo-scaled
 4.5"/9" read and the indirect M6.3 "80 mm bar travel + 8 mm margin" = 88); the
-10.5" bottom arc + 0.22" perpendicular tip face come from the same ch.30 sketch.
-The connecting rod pins at +127.37 on the +X side, just inboard of the rod-side
-tip and LOW in the strap (5.3 above the bottom edge, ch14 fan photo) -- directly
+10.5" bottom arc + perpendicular tip face come from the same ch.30 sketch.
+The connecting rod pins on the +X side, just inboard of the rod-side
+tip and LOW in the strap (11/32 over the pivot axis, ch14 fan photo) -- directly
 above the phased cam lobe, so the rod hangs PLUMB with the arm LEVEL (ch30
 photos + GT rocker-corner triangulation + the ch14 end views' flat 0-crank tip
 row; supersedes M6.3's "1 inch from the pivot", which was tied to the pre-ch30
@@ -40,9 +40,9 @@ Dimensions: cad/DIMENSIONS.md "Chapter 14" - annotated thickness/depth, stated
 curvature, ch.30 back-view arc lengths + perpendicular tip face (med).
 
 Layout: pivot at the origin, arm along X (+X = connecting-rod side), arc center
-816 mm above, extruded mid-plane in Z; holes cut through Z. The pivot hole
-centre sits at local (0, 8) - assembly scripts must offset placements
-accordingly.
+CurveRadius + ArmDepth above, extruded mid-plane in Z; holes cut through Z. The
+pivot hole centre sits at local (0, ArmDepth / 2) - assembly scripts must offset
+placements accordingly.
 
 Run (SolidWorks already open)::
 
@@ -53,8 +53,6 @@ from __future__ import annotations
 
 import math
 import sys
-
-from dt_cone_pivot_post_installation import MECHANISM_X_SHIFT
 
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
@@ -103,34 +101,30 @@ import _config
 PART_NAME = "ch-rocker-arm"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
-CURVE_RADIUS = 800.0  # DIMENSIONS.md ch14: top edge R = amplitude bar length (stated)
-ARM_DEPTH = 16.0  # ch14: p.29 photo callout, perpendicular top-to-bottom depth
-ARM_THICKNESS = 2.5  # ch14: p.27 photo callout (plate thickness, Z)
-TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view, manual)
-BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
-TIP_FACE = 5.588  # 0.22" tip face, PERPENDICULAR to the top edge (ch.30 sketch)
-PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft (DIMENSIONS.md ch14, derived)
+# Nominals are the spec's (all-inch experiment): one source, so the build
+# cannot drift from the closure that solves the rod hole.
+from ch_rocker_arm_spec import (  # noqa: E402
+    ARM_DEPTH,  # 5/8: perpendicular top-to-bottom depth (ch14 p.29)
+    BOT_ARC_LEN,  # 10-1/2 in bottom edge arc length (ch.30 back-view sketch)
+    CURVE_RADIUS,  # R31-1/2 in: top edge ~ amplitude bar length
+    PIVOT_HOLE_DIA,  # rides the 1/4 in pivot shaft
+    ROD_HOLE_X,  # closure: the pin directly above the phased cam lobe
+    ROD_HOLE_Y,  # pivot mid-depth + 11/32
+    TIP_FACE,  # 1/4 tip face, PERPENDICULAR to the top edge (ch.30 sketch)
+    TOP_ARC_LEN,  # 11-1/2 in top edge arc length (ch.30 back view)
+)
+
+ARM_THICKNESS = SPEC_ARM_THICKNESS  # 3/32 plate thickness, Z
 # The hub length IS the station pitch: hub faces of neighbouring arms touch.
 if abs(HUB_LENGTH - _config.machine("channels", "station_pitch_mm")) > 1e-6:
     raise AssertionError("ch_rocker_arm_spec.HUB_LENGTH must equal the channel station pitch")
-HUB_PROUD = (HUB_LENGTH - ARM_THICKNESS) / 2.0  # 2.278 each face
-if ARM_THICKNESS != SPEC_ARM_THICKNESS:
-    raise AssertionError("ch_rocker_arm_spec.ARM_THICKNESS drifted from the build")
-# The rod-pin native drill identity is part-owned by ch_rocker_arm_spec.
-ROD_HOLE_X = 127.3738 - MECHANISM_X_SHIFT
-# bottom-arc end (132.76): solved so the pin sits DIRECTLY ABOVE the phased cam
-# lobe (machine X is DRUM_X + ECC*sin(1.5 deg), lobe UP at the
-# cos-mode home pose) with the pivot at the seesaw mid-span (+72.9) and the arm
-# LEVEL -- the ch30 photos show every connecting rod hanging PLUMB from the arm
-# tip onto its cam, the ch14 end views show the 0-crank tip row dead level, and
-# the GT rocker-corner triangulation puts the rod-side arm end at machine x -60
-# (bottom-arc end predicts -59.9 at the level pose). Supersedes 127.49, the
-# same plumb solve at the pre-ROM-fit lobe-down phase (ring x 54.78), and
-# M6.3's 25.4 ("1 inch from the pivot", pre-ch30 arbor-47.5 layout).
-ROD_HOLE_ABOVE_BOTTOM = 5.53312035905  # preserves the old 15.302534 world/local Y
-# after the X re-anchor moves along the curved bottom edge. This keeps the
-# unchanged-length rod plumb and the neutral arm level.
-THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > thickness
+HUB_PROUD = (HUB_LENGTH - ARM_THICKNESS) / 2.0  # each face
+# ROD_HOLE_X: solved so the pin sits DIRECTLY ABOVE the phased cam lobe
+# (machine X is DRUM_X + ECC*sin(1.5 deg), lobe UP at the cos-mode home pose)
+# with the arm LEVEL -- the ch30 photos show every connecting rod hanging
+# PLUMB from the arm tip onto its cam and the ch14 end views show the 0-crank
+# tip row dead level (ch_rocker_arm_spec holds the closure).
+THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > thickness (a cut extent, not a printed size)
 
 # Arc centre sits ARM_DEPTH above the pivot's bottom edge: bottom edge is an
 # R816 arc, top edge the concentric R800 arc through (0, 16).
@@ -171,8 +165,8 @@ def _mid_y(x: float) -> float:
 
 
 # Rod-pin hole centre: LOW in the strap (ch14 fan photo), not mid-depth like
-# the pivot. Assembly scripts import this (imported-not-copied, like _mid_y).
-ROD_HOLE_Y = _bottom_point(ROD_HOLE_X)[1] + ROD_HOLE_ABOVE_BOTTOM  # 15.303
+# the pivot. ROD_HOLE_Y is the spec's (pivot mid-depth + 11/32); assembly
+# scripts import it from there.
 
 
 def _as_construction(adapter, entity_id: str) -> None:

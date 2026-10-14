@@ -51,16 +51,16 @@ _BANK_COUNT = 20  # the full lever bank (never follows active_count)
 FULCRUM_KEEPER_CENTRE_Z = (
     CHANNEL_Z0 - _STATION_PITCH / 2.0 + _STATION_PITCH * (_BANK_COUNT - 1) / 2.0
 )  # -0.504
-KEEPER_Z_OFF = 74.0  # lug mid-plane off the centre: inner face at 71.0
+KEEPER_Z_OFF = 74.6125  # 2-15/16 in (was 74.0): lug mid-plane off the centre
 
-# --- Nominal geometry (mm). Shaft axis 25.2 above the rail top face
-# (y=1036.2 -> 1061.4, the 2026-08-02 top-frame contract). ---
-LUG_HALF_T = 3.0  # lug half-thickness along X (lug 6.0 thick)
-KEEPER_WIDTH = 14.0  # across Z (machine X when placed); extrudes symmetric
-SHAFT_AXIS_H = 25.2  # shaft bore centre above the seat
-CROWN_DIA = 14.0  # full-round lug top, concentric with the shaft axis
-FOOT_H = 8.0  # foot height; the bracket seats on y=0
-FOOT_L = 10.5  # foot length outboard of the lug's outer face
+# --- Nominal geometry (mm), all-inch experiment. Shaft axis 1 in above the
+# rail top face (y=1035.84375 -> 1061.24375, the all-inch top-frame contract). ---
+LUG_HALF_T = 3.175  # lug half-thickness along X (lug 1/4 thick; was 6.0)
+KEEPER_WIDTH = 14.2875  # 9/16 across Z (machine X when placed; was 14.0); extrudes symmetric
+SHAFT_AXIS_H = 25.4  # 1 in (was 25.2): shaft bore centre above the seat
+CROWN_DIA = 14.2875  # 9/16 (was 14.0): full-round lug top, concentric with the shaft axis
+FOOT_H = 7.9375  # 5/16 (was 8.0): foot height; the bracket seats on y=0
+FOOT_L = 9.525  # 3/8 (was 10.5; 7/16 overran the top frame's printed boss margins): foot length outboard of the lug's outer face
 FOOT_TIP_X = LUG_HALF_T + FOOT_L  # 13.5: outboard end of the foot
 CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_DIA / 2.0  # 32.2: the set-screw tap's entry
 # Plain reamed bore for the plain Ø6.35 (1/4 in ground, SHAFT_H) fulcrum
@@ -168,7 +168,7 @@ KEEPER_FITUP_PLACES = 2
 # rail web under it, its column's socket axis (Main's ruling: a local X
 # datum on the receiving web). Restated here so the spec stays config-free;
 # draw_ch_channel_assembly pins it to the fulcrum line and the column line.
-KEEPER_FITUP_X_FROM_WEB_MM = 2.9
+KEEPER_FITUP_X_FROM_WEB_MM = 3.175  # 1/8: fulcrum x 200.025 - column x 196.85 (was 2.9)
 KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM = tuple(
     FULCRUM_KEEPER_CENTRE_Z + side * (KEEPER_Z_OFF - LUG_HALF_T) - FRAME_FRONT_COLUMN_Z
     for side in (-1.0, 1.0)
@@ -191,7 +191,7 @@ HOLE_DIA_MM = blind_cut_dia_mm(SCREW_CLEARANCE_SPEC)
 # Ø3.8 clears the Ø3.556 stock head (the MHA-VN-050 #2 counterbore); the
 # depth is the exact stock head height (vn_frame_side_screw_spec.HEAD_H,
 # pinned by the part build), so the head is flush.
-CBORE_DIA_MM = 3.8
+CBORE_DIA_MM = 3.96875  # 5/32 drill (was 3.8)
 CBORE_DEPTH_MM = 2.1082
 SCREW_HOLE_SPEC = HoleSpec(
     "counterbore_fillister",
@@ -207,12 +207,12 @@ SCREW_HOLE_SPEC = HoleSpec(
 # FULCRUM_KEEPER_CENTRE_Z +- KEEPER_SCREW_Z_OFF). Thread and drill depths
 # print .X; the worst-case stack is below (FOOT_SCREW_ENGAGEMENT_D and the
 # tap-depth asserts).
-KEEPER_TAP_THREAD_DEPTH_MM = 7.6
+KEEPER_TAP_THREAD_DEPTH_MM = 7.9375  # 5/16 (was 7.6)
 KEEPER_TAP_SPEC = HoleSpec(
     "tapped",
     FOOT_SCREW_THREAD,
     end="blind",
-    depth_mm=11.5,
+    depth_mm=11.90625,  # 15/32 (was 11.5), 1/32 grid: 7/16 leaves no plug-tap lead under the 5/16 thread; 1/2 breaks the top frame's cross-tap wall
     overrides_mm={"ThreadDepth": KEEPER_TAP_THREAD_DEPTH_MM},
 )
 

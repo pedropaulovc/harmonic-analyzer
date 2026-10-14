@@ -3,16 +3,17 @@ r"""Pure-data dimensional contract shared by the pen rod and drawing."""
 from __future__ import annotations
 
 from _hole_spec import HoleSpec, drill_process
+from _inch import inch
 from _gtol_controls import GeometricControl, PartDatum
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
-ROD_SECTION = 5.0  # DIMENSIONS.md ch24: square section (low)
-ROD_LENGTH = 150.0  # ch30 p002 / v4_t00603: the rod runs from the hanger guide
-# down to the v-block at paper mid-height (was 120 with the block grounded)
+ROD_SECTION = inch(3, 16)  # 3/16 square brass bar stock (DIMENSIONS.md ch24: ~5 sq, low)
+ROD_LENGTH = inch(5.875)  # 5-7/8: ch30 p002 / v4_t00603: the rod
+# runs from the hanger guide down to the v-block at paper mid-height
 SECTION_BAND = (0.00, -0.05)
-WIRE_HOLE_Y = 145.0  # wire tie-off near the top (build_pn_pen_assembly imports this)
+WIRE_HOLE_Y = inch(91, 16)  # 5-11/16: wire tie-off near the top (build_pn_pen_assembly imports this)
 WIRE_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 
 # Geometric controls, authored on the model as plain annotations by the part build

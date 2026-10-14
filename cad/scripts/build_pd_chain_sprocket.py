@@ -3,7 +3,7 @@ r"""Reproduction script: drive-chain sprocket (book ch. 23; 2 used).
 The two roller-chain sprockets of the translational gearing (one at the
 platen front, one on the crankshaft) -- modeled identical: 17 teeth
 (counted on `v4_transgear_012` crops), ~3/8" chain pitch (scaled from the
-sprocket OD), 4.5 mm tooth width, plain 3/8" bore.
+sprocket OD), 3/16" tooth width, plain 3/8" bore.
 
 The tooth form is SIMPLIFIED: a flaring trapezoid notch per roller (seat
 width = roller diameter at the seat radius, opening to a pointed-ish tooth
@@ -14,7 +14,7 @@ modeled (flexible element, out of scope).
 Sprocket math (3/8" pitch, roller 0.200"): PD = p / sin(pi/N) = 51.84 mm,
 OD = p (0.6 + cot(pi/N)) = 56.67 mm, seat radius = PD/2 - roller/2.
 
-Layout: axis = Z through the origin, body z = 0..4.5 mm, seed gap on +X.
+Layout: axis = Z through the origin, body z = 0..3/16", seed gap on +X.
 
 Run (SolidWorks already open)::
 
@@ -45,6 +45,7 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _simplified_part import save_simplified_part
 from _gear import volume_check
+from _inch import inch
 
 PART_NAME = "pd-chain-sprocket"
 MATERIAL = "Plain Carbon Steel"  # ch. 23 photos: steel sprockets
@@ -52,12 +53,13 @@ MATERIAL = "Plain Carbon Steel"  # ch. 23 photos: steel sprockets
 TEETH = 17  # DIMENSIONS.md ch23: counted on v4_transgear_012 (low)
 CHAIN_PITCH = 0.375 * IN  # 9.525 -- scaled from sprocket OD (low)
 ROLLER_DIAMETER = 0.200 * IN  # 5.08 -- standard 3/8" roller chain (low)
-FACE_WIDTH = 4.5  # mm -- 3/8" chain inner width budget (low)
+FACE_WIDTH = inch(3, 16)  # 3/8" chain inner width budget (low)
 BORE_DIAMETER = 0.375 * IN  # 9.525 -- crankshaft stock (low)
 
 PITCH_RADIUS = CHAIN_PITCH / (2.0 * math.sin(math.pi / TEETH))  # 25.92
 OUTER_RADIUS = CHAIN_PITCH * (0.6 + 1.0 / math.tan(math.pi / TEETH)) / 2.0  # 28.34
 SEAT_RADIUS = PITCH_RADIUS - ROLLER_DIAMETER / 2.0  # 23.38, notch floor
+# Tooth-gap form (exempt from the inch grid): the notch overshoot and flare.
 NOTCH_OUTER_MARGIN = 1.2  # NOTCH_OUTER opens this far past the OD
 NOTCH_OUTER = OUTER_RADIUS + NOTCH_OUTER_MARGIN  # opens past the OD
 SEAT_HALF_WIDTH = ROLLER_DIAMETER / 2.0  # 2.54 at the floor

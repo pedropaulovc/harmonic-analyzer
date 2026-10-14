@@ -15,13 +15,13 @@ meets a feeler/backlash, then lock the cone-lock-knob. The swing stop screw
 only limits the disengaged swing and plays no part in meshing.
 
 Plan shape is the p.18 wedge, ASYMMETRIC about the shaft line: the east
-side tapers 16 -> 24 half-width, the west side flares 8 -> 37 so the
-run from the swing pivot to the cone-lock-knob is SOLID plate (no lobe
+side tapers 5/8 -> 15/16 in half-width, the west side flares 5/16 -> 1-7/16 in
+so the run from the swing pivot to the cone-lock-knob is SOLID plate (no lobe
 protrusion); the open LOCK NOTCH cuts straight into the west edge. The
 four plan corners are rounded, echoing the hardware each sits beside
 (pivot screw head at the north end, the green column at the south-east,
-the lock-knob head at the south-west). A native close-clearance Ø6.756 pivot
-hole clears the stock Ø6.35 shoulder. A 10.50-wide x 0.25-deep top relief,
+the lock-knob head at the south-west). A native 1/4 in pivot hole, reamed
+H7, runs on the stock Ø6.35 shoulder. A 7/16 in-wide x 0.25-deep top relief,
 round-ended about the pivot and open through the north edge (drawing-guidelines.md rule 17 (walls and webs) W18),
 reduces only the local bearing thickness to 6.10, preserving 0.25 running
 axial clearance without lowering the plate or its mounted hardware.
@@ -62,6 +62,7 @@ from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
+from _inch import inch
 from _session import run_build
 from _sketch import (
     SketchDims,
@@ -242,7 +243,7 @@ async def _add_notch_run_angle(
 
 # The top relief's sketch runs this far past the north edge, so its cut
 # opens the edge cleanly (the plate stops at NORTH_OVERHANG).
-PIVOT_RELIEF_RUNOUT = 3.0
+PIVOT_RELIEF_RUNOUT = inch(1, 8)
 if PIVOT_BEARING_RELIEF_DIAMETER / 2.0 >= NORTH_OVERHANG:
     raise AssertionError("pivot relief no longer runs out through the north edge")
 
@@ -305,7 +306,7 @@ def _north_fillet_relief_overlap(label: str, r: float) -> float:
     """Plan area of a north corner fillet that lies over the open relief.
 
     The fillet is cut after the relief, so where its removed wedge overlaps
-    the 10.50 slot it takes 0.25 less thickness.  A north corner's first edge
+    the relief slot it takes 0.25 less thickness.  A north corner's first edge
     is the north edge (horizontal), so the fillet circle is tangent to it at
     ``x_t`` and the removed wedge above the arc spans ``x_t`` to the corner.
     """
@@ -538,7 +539,7 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += [(relief_depth_dim[0], '"PivotBearingReliefDepth"')]
     # The plan corners are still sharp here, so the relief is exactly a
-    # half disc plus a 10.50 x NORTH_OVERHANG strip, less the pivot hole.
+    # half disc plus a relief-width x NORTH_OVERHANG strip, less the pivot hole.
     relief_r = PIVOT_BEARING_RELIEF_DIAMETER / 2.0
     v_relief = (
         (

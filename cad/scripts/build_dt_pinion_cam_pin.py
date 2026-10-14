@@ -11,9 +11,10 @@ in a tail cross-bore is retired: the photo reads a fatter (~Ø4-5) stud
 at the pivot's height band, and a blind edge seat is the only geometry
 that clears the Ø6.35 pivot bore there.
 
-Layout: axis Z, root (seated) end at the ORIGIN, z 0..15: 4.0 presses
-into the strap's blind edge bore, 13 proud after the v2 linkage closure; domed outer end (sagitta
-0.8, the rod-end crown idiom). Axisymmetric about its local x = 0.  Shank and
+Layout: axis Z, root (seated) end at the ORIGIN, z 0..PIN_LEN (13/16 in):
+SEAT_LEN (3/16) presses into the strap's blind edge bore, 5/8 proud after the
+v2 linkage closure; domed outer end (sagitta 1/32, the rod-end crown idiom).
+Axisymmetric about its local x = 0.  Shank and
 crown are both Right-plane half-profiles (sketch u = -z), so the diameter,
 length and crown radius all import into the *Right side view, where the pin
 lies as it is turned (drawing-guidelines.md rule 11 (turned parts read like the lathe); machinist review of 7f7fc1717).
@@ -80,8 +81,8 @@ _SAVED_DRAWING_PROPERTIES = (
 )
 
 PIN_R = PIN_DIA / 2.0
-CAP_R = (PIN_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 2.9
-V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 5.29
+CAP_R = (PIN_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 2.88
+V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 5.17
 V_PIN = math.pi * PIN_R**2 * PIN_LEN
 
 

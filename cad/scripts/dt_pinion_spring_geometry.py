@@ -22,6 +22,7 @@ import itertools
 import math
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
+from dt_pinion_bracket_geometry import R_END as STRAP_HALF_WIDTH
 from dt_pinion_pivot_block_geometry import BORE_UP
 from dt_pinion_spring_section import (
     PAD_WIDTH,
@@ -33,8 +34,8 @@ from dt_pinion_spring_section import (
 )
 from pinion_rig_park_geometry import STRAP_LEAN_DEG
 
-# The strap the blade bears on (the drive train asserts both in lockstep).
-STRAP_HALF_WIDTH = 7.5
+# STRAP_HALF_WIDTH: the strap the blade bears on, imported from its owner (the
+# drive train asserts the two in lockstep).
 
 # The part owns a convenient local frame; the assembly translates this local
 # pivot onto the live strap pivot.  These are not machine coordinates.

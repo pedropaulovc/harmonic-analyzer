@@ -31,8 +31,9 @@ Geometry (mm), source casting with the corrected top-down hold-down interface
 (model frame: X = extrude/width, Y = height with the wide foot at Y=-88.9,
 Z = wall thickness):
 
-* **Wall** -- trapezoid, wide foot ``Z ±31.75`` at ``Y=-88.9`` tapering to
-  ``Z ±8.4665`` at ``Y=+88.9``; mid-plane extrude 177.8 (``X ±88.9``).
+* **Wall** -- trapezoid, wide foot ``Z ±31.75`` (2-1/2 in) at ``Y=-88.9``
+  tapering to ``Z ±8.73125`` (11/16 in apex) at ``Y=+88.9``; mid-plane extrude
+  177.8 (7 in, ``X ±88.9``).
 * **CavityCut** -- 127 mm cavity square (``±63.5``), Through-All-Both -> the
   central cavity, leaving 6.35 mm shell walls (whole ``CavityProfile``).
 * **WindowCut1 / WindowCut2** -- ONE shared 165.1 mm window square
@@ -49,10 +50,10 @@ Z = wall thickness):
 * **PocketCornerFillet** -- R6.35 on the four corners of each opposed pocket.
 * **FootClearanceHoles** -- a single Hole Wizard (``HoleWzd``) feature, 4x
   5/16 in clearance drills through the 6.35 mm foot from its top seat
-  (Y=-82.55) at ``(X ±60.32, Z ±17.46)``. One feature carries all four
+  (Y=-82.55) at ``(X ±60.325, Z ±17.4625)`` (2-3/8, 11/16 in). One feature carries all four
   placement points; the visible 1/4-20 hex-head screws install from the top
   into blind tapped seats in the harmonic base.
-* **RimChamfer** -- 1.27 mm / 45° on the 12 inner-frame opening edges plus the
+* **RimChamfer** -- 1/16 in (1.5875) / 45° on the 12 inner-frame opening edges plus the
   two slant faces, the two trapezoid (±X) faces, and one fillet face, with
   tangent propagation -- i.e. the whole window rim.
 * **BracketSeats** -- one Hole Wizard feature, 2x #8-32 bottoming-tapped seats
@@ -113,7 +114,13 @@ from fr_rocker_arm_support_section_spec import (
     NARROW,
     WIDE,
 )
-from fr_rocker_arm_support_spec import HOLE_DIA, HOLE_SPEC
+from fr_rocker_arm_support_spec import (
+    HOLD_DOWN_LOCAL_HALF_X,
+    HOLD_DOWN_LOCAL_HALF_Z,
+    HOLE_DIA,
+    HOLE_SPEC,
+)
+from _inch import inch
 from rocker_bracket_seat_layout import SEAT_LOCAL_X, SEAT_SPEC, WEB
 
 PART_NAME = "fr-rocker-arm-support"
@@ -128,23 +135,25 @@ MATERIAL = "Gray Cast Iron"
 # fr_rocker_arm_support_section_spec's (pure data, so the base, frame, drive
 # train and drawing spec read them without importing this COM script). On the
 # Right plane: sketch-x -> model Z (taper), sketch-y -> model Y (height).
-BOSS_DEPTH = 177.8  # mid-plane extrude along X (X ±88.9)
+BOSS_DEPTH = inch(7)  # 177.8: mid-plane extrude along X (X ±88.9)
 
-CAV = 63.5  # 127 mm square half (Cut-Extrude2)
+CAV = inch(2.5)  # 63.5: 5 in (127 mm) square half (Cut-Extrude2)
 # The window is the source's 165.1 square (half BIG), its edges FOOT_THICKNESS
 # inside the foot and top faces. WEB, the window cuts' start offset (the
 # 2*WEB band left as the web), is rocker_bracket_seat_layout's: the seats'
 # thread walls ride on it. The source casting's was SOURCE_WEB.
-SOURCE_WEB = 3.175
+SOURCE_WEB = inch(1, 8)  # 3.175
+# The source casting's apex half-width; NARROW is now the 11/16 in apex's.
+SOURCE_NARROW = 8.4665
 
-FILLET_R = 12.7
+FILLET_R = inch(1, 2)  # 12.7
 FILLET_EDGES = [  # four inner-frame corner edges (run along Z through the web)
     [63.5, 63.5, 0.0],
     [-63.5, 63.5, 0.0],
     [63.5, -63.5, 0.0],
     [-63.5, -63.5, 0.0],
 ]
-POCKET_FILLET_R = 6.35
+POCKET_FILLET_R = inch(1, 4)  # 6.35
 
 
 def _wall_half_z_at(y_mm: float) -> float:
@@ -163,38 +172,71 @@ POCKET_FILLET_EDGES = [
     for face_sign in (-1, 1)
 ]
 
-# Volume targets. The source casting's (square window, 6.35 web) are native
-# SolidWorks measurements; the thicker web's are those plus exact analytic
-# deltas (WEB_GROWTH a face), so the first build re-proves them:
+# Volume targets. The source casting's (square window, 6.35 web, 16.933 apex)
+# are native SolidWorks measurements; the thicker web's and the 11/16 in apex's
+# are those plus exact analytic deltas, so the first build re-proves them.
+# Web (WEB_GROWTH a face):
 # * each window cut leaves the pocket WEB_GROWTH shallower over the window
 #   less the through cavity (the cuts' net area, the same at every depth);
 # * the cavity's four corner edges run through the web, so CornerFillet's
 #   R12.7 spandrels ((1 - pi/4) R^2) grow by 2 * WEB_GROWTH each;
 # * each of the eight pocket-corner edges starts at a web face, so its R6.35
 #   spandrel loses WEB_GROWTH (the web face is square to the edge).
+# Apex (TOP_GROWTH on the top half-width; the wall's half-width is linear in
+# y, so every y-symmetric band's mean half-width grows by TOP_GROWTH / 2):
+# * the wall's trapezoid area grows by 2 * HALF_Y * TOP_GROWTH;
+# * the through cavity removes (2 * CAV)^2 * TOP_GROWTH more;
+# * each window cut removes WINDOW_NET_AREA * TOP_GROWTH / 2 more;
+# * the eight pocket-corner edges (lengths summing to 4 * (WIDE + NARROW) -
+#   8 * WEB) grow by 4 * TOP_GROWTH in all.
+SQUARE_WALL_VOLUME = 1_271_363
+SQUARE_CAVITY_CUT_VOLUME = 622_708
 SQUARE_WINDOW_CUT1_VOLUME = 434_257
 SQUARE_WINDOW_CUT2_VOLUME = 245_806
 SQUARE_CORNER_FILLET_VOLUME = 246_685
 SQUARE_POCKET_FILLET_VOLUME = 247_860
 SQUARE_RIM_CHAMFER_REMOVAL = 3_153
+SOURCE_CHAMFER = 1.27  # the source's rim chamfer leg the removal was measured at
 WEB_GROWTH = WEB - SOURCE_WEB  # 1.5875
 WINDOW_NET_AREA = (2.0 * BIG) ** 2 - (2.0 * CAV) ** 2
 WEB_BAND_VOLUME = WINDOW_NET_AREA * WEB_GROWTH  # left per window cut
 CORNER_FILLET_GROWTH = 4.0 * (1.0 - math.pi / 4.0) * FILLET_R**2 * 2.0 * WEB_GROWTH
 POCKET_FILLET_LOSS = 8.0 * (1.0 - math.pi / 4.0) * POCKET_FILLET_R**2 * WEB_GROWTH
-WINDOW_CUT1_VOLUME = SQUARE_WINDOW_CUT1_VOLUME + WEB_BAND_VOLUME
-WINDOW_CUT2_VOLUME = SQUARE_WINDOW_CUT2_VOLUME + 2.0 * WEB_BAND_VOLUME
-CORNER_FILLET_VOLUME = (
-    SQUARE_CORNER_FILLET_VOLUME + 2.0 * WEB_BAND_VOLUME + CORNER_FILLET_GROWTH
+TOP_GROWTH = NARROW - SOURCE_NARROW  # 0.26475
+WALL_TOP_GROWTH = 2.0 * HALF_Y * BOSS_DEPTH * TOP_GROWTH
+CAVITY_TOP_LOSS = (2.0 * CAV) ** 2 * TOP_GROWTH
+WINDOW_TOP_LOSS = WINDOW_NET_AREA * TOP_GROWTH / 2.0  # per window cut
+POCKET_FILLET_TOP_GROWTH = 4.0 * (1.0 - math.pi / 4.0) * POCKET_FILLET_R**2 * TOP_GROWTH
+WALL_VOLUME = SQUARE_WALL_VOLUME + WALL_TOP_GROWTH
+CAVITY_CUT_VOLUME = SQUARE_CAVITY_CUT_VOLUME + WALL_TOP_GROWTH - CAVITY_TOP_LOSS
+WINDOW_CUT1_VOLUME = (
+    SQUARE_WINDOW_CUT1_VOLUME
+    + WEB_BAND_VOLUME
+    + WALL_TOP_GROWTH
+    - CAVITY_TOP_LOSS
+    - WINDOW_TOP_LOSS
 )
-POCKET_FILLET_VOLUME = (
-    SQUARE_POCKET_FILLET_VOLUME
+WINDOW_CUT2_VOLUME = (
+    SQUARE_WINDOW_CUT2_VOLUME
     + 2.0 * WEB_BAND_VOLUME
-    + CORNER_FILLET_GROWTH
+    + WALL_TOP_GROWTH
+    - CAVITY_TOP_LOSS
+    - 2.0 * WINDOW_TOP_LOSS
+)
+CORNER_FILLET_VOLUME = WINDOW_CUT2_VOLUME + (
+    SQUARE_CORNER_FILLET_VOLUME - SQUARE_WINDOW_CUT2_VOLUME + CORNER_FILLET_GROWTH
+)
+POCKET_FILLET_VOLUME = CORNER_FILLET_VOLUME + (
+    SQUARE_POCKET_FILLET_VOLUME
+    - SQUARE_CORNER_FILLET_VOLUME
     - POCKET_FILLET_LOSS
+    + POCKET_FILLET_TOP_GROWTH
 )
 
-HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
+HOLES = [
+    (x_sign * HOLD_DOWN_LOCAL_HALF_X, z_sign * HOLD_DOWN_LOCAL_HALF_Z)
+    for x_sign, z_sign in ((1, 1), (-1, 1), (1, -1), (-1, -1))
+]
 
 # The manufacturing print's dimension set (draw_fr_rocker_arm_support.py imports
 # exactly these marked dimensions; its keep maps must stay in lockstep).
@@ -214,11 +256,16 @@ FOOT_HOLED_VOLUME = (
     POCKET_FILLET_VOLUME - len(HOLES) * math.pi / 4.0 * HOLE_DIA**2 * FOOT_THICKNESS
 )
 
-CHAMFER = 1.27  # leg, 45°
-# The measured window-rim chamfer removal: none of the chamfered edges changes
-# length with the web (the cavity rim loops lie on the web faces, the window
-# rim on the slant faces), so it carries over unchanged.
-RIM_CHAMFER_VOLUME = FOOT_HOLED_VOLUME - SQUARE_RIM_CHAMFER_REMOVAL
+CHAMFER = inch(1, 16)  # leg, 45° (was 1.27)
+# The window-rim chamfer removal: none of the chamfered edges changes length
+# with the web (the cavity rim loops lie on the web faces, the window rim on
+# the slant faces), and a 45° chamfer's section is leg^2 / 2 on a square edge
+# (leg^2 times a fixed factor on any other dihedral), so the source's measured
+# removal scales by the leg ratio squared. The 11/16 apex lengthens the two
+# ±X faces' top edges by 2 * TOP_GROWTH each (~1.3 mm^3, inside tolerance).
+RIM_CHAMFER_VOLUME = (
+    FOOT_HOLED_VOLUME - SQUARE_RIM_CHAMFER_REMOVAL * (CHAMFER / SOURCE_CHAMFER) ** 2
+)
 # The rocker brackets' two bottoming-tapped seats, down from the top face on
 # the centreline (rocker_bracket_seat_layout owns their stack). Each runs in
 # solid iron for its whole length: the post outboard of the window edge, the
@@ -242,8 +289,8 @@ CHAMFER_EDGES = [  # 12 inner-frame opening edges, both web faces (Z = ±WEB)
     [63.5, 0.0, WEB],
 ]
 CHAMFER_FACES = [  # whole faces whose every edge is chamfered (tangent-propagated)
-    [0.0, -85.0, 31.24],
-    [0.0, -85.0, -31.24],  # ±Z slant window surrounds
+    [0.0, -85.0, _wall_half_z_at(-85.0)],
+    [0.0, -85.0, -_wall_half_z_at(-85.0)],  # ±Z slant window surrounds
     [88.9, 0.0, 0.0],
     [-88.9, 0.0, 0.0],  # front / back trapezoid (±X) faces
     [59.78, -59.78, 0.0],  # one inner fillet face
@@ -430,7 +477,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Wall")
     depth_dim = name_dimensions(adapter, "Wall", ["Depth"])
     drive_jobs += [(depth_dim[0], '"WallWidth"')]
-    await volume_check(adapter, "Wall", 1_271_363, 200)
+    await volume_check(adapter, "Wall", WALL_VOLUME, 200)
 
     # 2-4. Two sketches drive three cuts, exactly as the source tree does (only
     # the names are semantic here, not the source's Sketch11/Cut-ExtrudeN). Both
@@ -487,7 +534,7 @@ async def build(adapter) -> dict[str, str]:
     # CavityCut: cavity -- whole CavityProfile, Through-All-Both.
     _cut_through_all(adapter, "CavityProfile", both=True, reverse_dir=False)
     name_last_feature(adapter, "CavityCut")
-    await volume_check(adapter, "CavityCut", 622_708, 200)
+    await volume_check(adapter, "CavityCut", CAVITY_CUT_VOLUME, 200)
 
     # WindowCut1: one window -- Through-All forward, started WEB off-plane.
     _cut_through_all(
@@ -541,7 +588,7 @@ async def build(adapter) -> dict[str, str]:
     )
     await volume_check(adapter, "FootClearanceHoles", FOOT_HOLED_VOLUME, 200)
 
-    # 8. RimChamfer: 1.27 mm / 45° around the whole window rim -- the 12 inner-
+    # 8. RimChamfer: 1/16 in / 45° around the whole window rim -- the 12 inner-
     #    frame opening edges plus the slant/trapezoid/fillet faces, tangent-
     #    propagated.
     check(

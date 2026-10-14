@@ -1,11 +1,11 @@
 r"""Reproduction script: lever fulcrum shaft (MHA-CH-004; book ch. 17; 1 used).
 
 Plain Ø6.35 (1/4") steel shaft: the top levers' common fulcrum at machine
-(x, y) = (+199.9, 1061.4) (2026-08-02 top-frame rederive: rail top 1036.2 +
-keeper axis rise 25.2). One diameter full length -- no journals, shoulders or
+(x, y) = (+200.025, 1061.24375) (all-inch: rail top 1035.84375 +
+keeper axis rise 1 in). One diameter full length -- no journals, shoulders or
 steps -- through the reamed bores of the two end keepers (MHA-CH-007). Each
-end stands 0.5 past its keeper lug's outer face and finishes in a full
-hemisphere (the bright dome of the ch. 17 p. 40 closeup): 161.35 tip to tip.
+end stands 1/32 past its keeper lug's outer face and finishes in a full
+hemisphere (the bright dome of the ch. 17 p. 40 closeup): 163.5125 (6-7/16) tip to tip.
 One set-screw flat per end, both on +Y, sits under the keeper's crown tap;
 the two #1-72 cup-point set screws (MHA-VN-055) bearing on them are the
 shaft's only axial and rotational location.
@@ -13,7 +13,7 @@ shaft's only axial and rotational location.
 Dimensions: ``ch_fulcrum_shaft_spec`` (derived from ``ch_fulcrum_keeper_spec``);
 cad/DIMENSIONS.md "Channel & top-frame layout".
 
-Layout: shaft axis along Z, centred (tips at z +-80.675); flats face +Y. The
+Layout: shaft axis along Z, centred (tips at z +-81.756); flats face +Y. The
 body is ONE Right-plane half-profile (two quarter-arc domes on a straight
 O.D.) revolved about its on-axis close line (the mg_magnifying_lever capsule
 idiom), so the diameter and tip-to-tip length import into the side view; the

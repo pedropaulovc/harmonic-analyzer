@@ -12,6 +12,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from _inch import inch
+
 import pd_transgear_arm_geometry as ARM
 import pd_transgear_arm_plate_geometry as PLATE
 import pd_transgear_drive_collar_spec as COLLAR
@@ -43,12 +45,12 @@ LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM = 2.0 * reducer_position_diameter_mm()
 LOCATOR_COORDINATE_TRAVEL_MAX_MM = math.floor(
     LOCATOR_GEAR_PLANE_TRAVEL_MAX_MM / math.sqrt(2.0) * 1e4
 ) / 1e4  # inward printed acceptance, not a looser unprinted threshold
-ARM_SEAT_SPAN_MIN_MM = 13.7  # drawn indicator support requirement, not a stock-pin contact span
+ARM_SEAT_SPAN_MIN_MM = inch(9, 16)  # 14.2875 (was 13.7); drawn indicator support requirement, not a stock-pin contact span
 ARM_PLATE_LOADED_NORMAL_CHANGE_MAX_MM = arm_plate_loaded_normal_change_mm()
 ARM_SEAT_NORMAL_WITNESS_XY_MM = (
-    (ARM.PLATE_SCREW_MID_STATION - 13.0, -7.0),
-    (ARM.PLATE_SCREW_MID_STATION + 13.0, -7.0),
-    (ARM.PLATE_SCREW_MID_STATION + 4.0, 7.5),
+    (ARM.PLATE_SCREW_MID_STATION - inch(1, 2), -inch(5, 16)),
+    (ARM.PLATE_SCREW_MID_STATION + inch(1, 2), -inch(5, 16)),
+    (ARM.PLATE_SCREW_MID_STATION + inch(3, 16), inch(5, 16)),
 )
 ARM_SEAT_WITNESS_POSITION_RADIUS_MM = 0.10
 ARM_SEAT_INDICATOR_TIP_DIA_MAX_MM = 1.0
@@ -57,9 +59,14 @@ ARM_SEAT_INDICATOR_TIP_DIA_MAX_MM = 1.0
 # inclusive normal budget, so ordinary indicators may qualify real data.
 ARM_SEAT_NORMAL_UNCERTAINTY_MAX_MM = ARM_PLATE_LOADED_NORMAL_CHANGE_MAX_MM
 # Triangle support width decreases by at most twice the point-location radius.
-ARM_SEAT_WITNESS_MIN_WIDTH_MM = 26.0 * 14.5 / max(
-    math.dist(ARM_SEAT_NORMAL_WITNESS_XY_MM[i], ARM_SEAT_NORMAL_WITNESS_XY_MM[j])
-    for i, j in ((0, 1), (1, 2), (2, 0))
+# Its smallest altitude: twice the triangle's area over its longest side.
+_W = ARM_SEAT_NORMAL_WITNESS_XY_MM
+_WITNESS_TWICE_AREA = abs(
+    (_W[1][0] - _W[0][0]) * (_W[2][1] - _W[0][1])
+    - (_W[2][0] - _W[0][0]) * (_W[1][1] - _W[0][1])
+)
+ARM_SEAT_WITNESS_MIN_WIDTH_MM = _WITNESS_TWICE_AREA / max(
+    math.dist(_W[i], _W[j]) for i, j in ((0, 1), (1, 2), (2, 0))
 ) - 2.0 * ARM_SEAT_WITNESS_POSITION_RADIUS_MM
 if ARM_SEAT_WITNESS_MIN_WIDTH_MM < ARM_SEAT_SPAN_MIN_MM:
     raise AssertionError("actual three-indicator support width is below the charged tilt span")

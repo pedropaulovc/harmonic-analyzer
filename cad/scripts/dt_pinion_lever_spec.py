@@ -46,7 +46,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarrelProfile": {"HubOd", "HubBore"},
     "Barrel": {"BoreDepth"},
     "Wall": {"EndWall"},
-    # The straight grip rod prints its one diameter and its 86.0 height.
+    # The straight grip rod prints its one diameter and its height (RodLen).
     "RodProfile": {"RodTipY", "RodDia"},
     "CapProfile": {"CapR"},
     "PinHoleProfile": {"PinHoleDia"},

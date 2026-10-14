@@ -49,22 +49,25 @@ SHAFT_R = SHAFT_DIA / 2.0
 
 # --- Length: cylindrical to END_PROUD past each keeper lug's outer face, then
 # a full hemisphere (radius = shaft radius). ---
-END_PROUD = 0.5
-CYLINDER_HALF = KEEPER_Z_OFF + LUG_HALF_T + END_PROUD  # 77.5
+# 1/32 (was 0.5): the nearest fraction; 1/16 would triple this sub-1/4 stand-off.
+END_PROUD = 0.03125 * MM_PER_IN
+CYLINDER_HALF = KEEPER_Z_OFF + LUG_HALF_T + END_PROUD  # 78.58125
 DOME_R = SHAFT_R
-SHAFT_LENGTH = 2.0 * (CYLINDER_HALF + DOME_R)  # 161.35 tip to tip
+SHAFT_LENGTH = 2.0 * (CYLINDER_HALF + DOME_R)  # 163.5125 = 6-7/16 tip to tip
 
 # --- Set-screw flats: one per end on +Y, centred on the keeper lug mid-plane
 # (z = +-KEEPER_Z_OFF), so the crown tap's cup point lands mid-flat. The
 # machinist locates the -Z flat's outer edge FLAT_FROM_END off its dome tip
 # and the +Z flat by the like-edge FlatPitch from it (each flat's -Z edge),
 # so neither flat's length enters the other's station. ---
-FLAT_PITCH = 2.0 * KEEPER_Z_OFF  # 148.0 like-edge to like-edge
-FLAT_LENGTH = 3.5
-FLAT_DEPTH = 0.3
-FLAT_FROM_END = SHAFT_LENGTH / 2.0 - FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 4.925
-ACROSS_FLAT = SHAFT_DIA - FLAT_DEPTH  # 6.05: the printed size
-FLAT_HEIGHT = SHAFT_R - FLAT_DEPTH  # 2.875: the set screw's cup seat above the axis
+FLAT_PITCH = 2.0 * KEEPER_Z_OFF  # 149.225 (5-7/8) like-edge to like-edge
+FLAT_LENGTH = 0.125 * MM_PER_IN  # 1/8 (was 3.5)
+# .012 in (was 0.3): a 3-place inch decimal, printed as the .238 across-flat;
+# 1/64 would move this sub-1/4 depth +32%.
+FLAT_DEPTH = 0.012 * MM_PER_IN
+FLAT_FROM_END = SHAFT_LENGTH / 2.0 - FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 5.556 (7/32)
+ACROSS_FLAT = SHAFT_DIA - FLAT_DEPTH  # 6.045 (.238): the printed size
+FLAT_HEIGHT = SHAFT_R - FLAT_DEPTH  # the set screw's cup seat above the axis
 
 # --- Worst case of the printed bands (drawing-guidelines.md rule 17 (walls and webs); DRAWING_PRECISION
 # below). ---

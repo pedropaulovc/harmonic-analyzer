@@ -18,7 +18,7 @@ ribs, with bosses round the sockets and hanging under every blind deck seat.
 
 Finishing (chamfer external, fillet internal; legacy 1/8-1/16 sizes): rounded
 full-height plan corners, C1.59 x 45 breaks on both plates' exposed top rims
-and the underside rim, a C0.79 break on the deck, the R0.50 pad-to-flange
+and the underside rim, a C0.79 break on the deck, the R0.79 (1/32 in) pad-to-flange
 root fillet note 1 caps, and casting fillets on the pocket's reentrant
 junctions (ch06/ch30 photos: every exposed plate edge reads softened).
 
@@ -41,6 +41,8 @@ import sys
 from dataclasses import dataclass, replace
 
 import numpy as np
+
+from _inch import inch
 
 from _appearance import CASTING_GREEN, PANEL_BLACK, apply_color, apply_material
 from _check import check
@@ -236,7 +238,7 @@ MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
 # = 18.1 x 11.0 in (annotated); the length keeps the legacy 18.0 in and the
 # thicknesses come from the legacy HarmonicBase.cs (photo-verify M2 note). The
 # DEPTH deliberately no longer follows the 28 cm callout: fr_harmonic_base_spec
-# widens the pad to 274.5 (slab 287.2, same 0.25 in reveal per side) so the
+# widens the pad to 276.225 (slab 288.925, same 0.25 in reveal per side) so the
 # socket-to-pad-edge land is equal on both axes -- asserted below, because
 # only this module knows the column stations.
 IN = 25.4
@@ -262,12 +264,12 @@ HOLE_XZ = SUPPORT_HOLD_DOWN_XZ
 # vertical plan corners at 1/8 in legs, the exposed top rims and the
 # underside rim at 1/16 in (single-pass mill/file breaks). The one internal
 # wall junction -- the pad side walls meeting the flange top face -- carries a
-# 0.5 root fillet, which is NOT a print requirement: a 0.5 mm internal root
+# 1/32 in root fillet, which is NOT a print requirement: a 0.8 mm internal root
 # cannot be measured with hobby-shop kit (it needs an optical comparator or a
 # radius gauge under magnification), so the sheet carries no radius callout
 # and the deck cutter's own corner defines it (2026-09 review). Every
 # mechanism hole sits >= 26 from every plate edge; the closest seats to a deck
-# edge are the nameplate taps (NAMEPLATE_SCREW_XZ), Ø2.26 about 8 inside the
+# edge are the nameplate taps (NAMEPLATE_SCREW_XZ), Ø2.26 about 9 inside the
 # deck's west edge -- clear of its 0.79 break, so no break touches a seat.
 # Plan corners are ROUNDED, not chamfered (2026-09 photo re-derive): every
 # ch30 plate (p002/p003 front corners, p006 rear) shows the casting's vertical
@@ -277,7 +279,9 @@ HOLE_XZ = SUPPORT_HOLD_DOWN_XZ
 FLANGE_CORNER_R = 0.875 * IN  # 22.225
 PAD_CORNER_R = FLANGE_CORNER_R - (BOTTOM_LENGTH - TOP_LENGTH) / 2.0  # 15.875
 RIM_CHAMFER = 0.0625 * IN  # 1.5875 legs, top rims + underside rim
-PAD_ROOT_R = 0.5  # pad-to-flange root fillet; modelled, never called out
+# 1/32 in: the smallest grid step, and a stock end mill's corner radius -- the
+# cutter that skims the pad sides leaves it (was 0.5).
+PAD_ROOT_R = inch(1, 32)  # 0.79375 pad-to-flange root fillet; modelled, never called out
 
 # Black deck + green land (user ruling 2026-10-09; ch11 p.21, ch13 p.25 and
 # ch30 p002/p003/p006 show a BLACK panel on the green casting top). The raised
@@ -294,15 +298,15 @@ PAD_ROOT_R = 0.5  # pad-to-flange root fillet; modelled, never called out
 # deck's north-west (+X, +Z) corner, SERIAL_INSET in from both deck edges --
 # clear of the nameplate on the deck's west end and of the corner's break.
 SERIAL_TEXT = "2"
-SERIAL_HEIGHT_MM = 3.5  # p.70 macro: a small hand stamp
-SERIAL_DEPTH = 0.3  # a stamp, not an engraving
-SERIAL_INSET = 6.0
-SERIAL_XZ = (DECK_HALF_X - SERIAL_INSET, DECK_HALF_Z - SERIAL_INSET)  # (161.0, 124.25)
+SERIAL_HEIGHT_MM = inch(1, 8)  # 3.175 (was 3.5): a stock 1/8 in hand stamp (p.70 macro)
+SERIAL_DEPTH = 0.3  # a stamp, not an engraving (process depth, not on the inch grid)
+SERIAL_INSET = inch(1, 4)  # 6.35 (was 6.0)
+SERIAL_XZ = (DECK_HALF_X - SERIAL_INSET, DECK_HALF_Z - SERIAL_INSET)  # (160.3375, 123.825)
 SERIAL_MIRROR_Y = (
     False  # flip if the seat's deck-top sketch frame reads the glyph mirrored
 )
 SERIAL_DXF = REFERENCES_DIR / "base-serial.dxf"
-SERIAL_AREA_MM2 = 3.1029  # pinned from gen_base_serial_dxf's summary (net glyph area)
+SERIAL_AREA_MM2 = 2.5534  # pinned from gen_base_serial_dxf's summary (net glyph area; was 3.1029 at 3.5)
 
 # Cone swing hardware, blind from the TOP face. MACHINE-handed part coords.
 # The platform recipe owns the shared lock/stop contact calculation; the base
@@ -386,12 +390,13 @@ PEDESTAL_SCREW_XZ = (
 )
 # drawing-guidelines.md rule 18 (thread engagement) (audit E15), judged at the printed worst case: flange 5.0 +-0.8,
 # screw 19.05 +0/-0.76 (B18.6.3), these depths +-0.8 (.X). The longest screw
-# in the thinnest flange reaches 14.85; 16.0 - 0.8 keeps it 0.35 off the
-# incomplete threads (>= 0.25 tip reserve). The drill keeps two #8-32 pitches
+# in the thinnest flange reaches 14.85; 17.46 - 0.8 keeps it 1.8 off the
+# incomplete threads (>= 0.25 tip reserve; 5/8 = 15.875 would leave 0.23,
+# and a 3/16 in flange would reach 15.09). The drill keeps two #8-32 pitches
 # of bottoming-tap lead beyond the deepest thread at the worst case too:
-# 19.5 - 0.8 >= 16.0 + 0.8 + 1.5875. Minimum engagement 12.49 = 3.0D.
-PEDESTAL_SCREW_HOLE_DEPTH = 16.0
-PEDESTAL_SCREW_DRILL_DEPTH = 19.5
+# 22.23 - 0.8 >= 17.46 + 0.8 + 1.5875 (13/16 = 20.64 misses by 0.01).
+PEDESTAL_SCREW_HOLE_DEPTH = inch(11, 16)  # 17.4625 (was 16.0)
+PEDESTAL_SCREW_DRILL_DEPTH = inch(7, 8)  # 22.225 (was 19.5)
 # A transferred seat lands where the fitted pedestal stands, within the
 # study's +-2 x / +-5 z fit-up bound of nominal; the wall checks book it.
 PEDESTAL_TRANSFER_XZ = (2.0, 5.0)
@@ -410,7 +415,7 @@ if fr_nameplate_spec.MOUNT_NORMAL != (0.0, 1.0, 0.0):
     )
 # The whole plate (its bounding corners, both faces) must lie flat on the
 # raised deck, inside its edge break by >= 1.0, or a corner would overhang the
-# step down to the green land (user ruling 2026-10-09: 4.0 inside the west edge).
+# step down to the green land (user ruling 2026-10-09; now 3/16 in inside the west edge).
 _NAMEPLATE_CORNERS_XZ = tuple(
     (pt[0], pt[2])
     for pt in (
@@ -741,7 +746,7 @@ BLOCK_PAD_LENGTH = (
     - min(x for x, _z in BLOCK_SCREW_XZ)
     + HANGING_BOSS_DIA
 )  # 33.0
-PEDESTAL_PAD_LENGTH = 26.0
+PEDESTAL_PAD_LENGTH = inch(1)  # 25.4 (was 26.0)
 # The cone-lock pad runs from a boss radius past the seat into the mid-wall.
 LOCK_PAD_WALL_Z = -(POCKET_HALF_Z + POCKET_WALL / 2.0)
 # Ribs and lugs end mid-wall, so a +-0.8 shift of the pocket outline never
@@ -870,12 +875,12 @@ STOP_DRILL_BOTTOM_WALL = _HANGING_BY_LABEL["swing stop"].floor_wall
 PEDESTAL_DRILL_BOTTOM_WALL = _HANGING_BY_LABEL["pedestal hold-down"].floor_wall
 
 # The #10-32 cross taps run from the pad's front/rear faces through the
-# socket and on past the Ø41.5 socket boss, so each ends in a lug hung from
+# socket and on past the Ø41.3 socket boss, so each ends in a lug hung from
 # the ceiling to the shallow level: from the tap axis's far side (a boss
 # radius off it) out into the mid-wall, and from the socket centre inward a
-# lug length that keeps 1.5D past the drill tip.
-CROSS_TAP_LUG_WIDTH = 27.0  # x: 189.0 -> 216.0, 5.75 into the 12.0 wall
-CROSS_TAP_LUG_LENGTH = 37.0  # z: 112.0 -> 75.0
+# lug length that keeps 1.5D past the drill tip (1-7/16 leaves 6.7, under it).
+CROSS_TAP_LUG_WIDTH = inch(17, 16)  # 26.9875 (was 27.0): x 188.91 -> 215.90, mid-wall
+CROSS_TAP_LUG_LENGTH = inch(3, 2)  # 38.1 (was 37.0): z 112.71 -> 74.61
 CROSS_TAP_LUG_INNER_X = COLUMN_X - HANGING_BOSS_HALF
 CROSS_TAP_LUG_INNER_Z = abs(FRAME_FRONT_COLUMN_Z) - CROSS_TAP_LUG_LENGTH
 _CROSS_TAP_MAJOR = THREAD_MAJOR_MM[BASE_CROSS_TAP_SPEC.size]
@@ -2182,7 +2187,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "column sockets", after - v_sockets, 0.005 * v_sockets + 10.0
     )
 
-    # Ø9 spot seats on the front/rear pad faces, then bottoming-tapped paths
+    # Ø3/8 spot seats on the front/rear pad faces, then bottoming-tapped paths
     # continue through the near casting, interrupted socket, and far casting.
     v_spot = math.pi * (SCREW_SPOTFACE_DIAMETER / 2.0) ** 2 * BASE_SPOTFACE_DEPTH
     for side, sign, reverse in BASE_SCREW_FACES:
@@ -2421,7 +2426,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Pad root: the one INTERNAL wall junction -- the pad sides meeting the
-    # flange top face -- filleted at the R0.50 note 1 caps (the cutter-corner
+    # flange top face -- filleted at the R0.79 (1/32 in) note 1 caps (the cutter-corner
     # radius that machining the reveal leaves anyway). Reentrant: ADDS
     # material along the pad's rounded base outline.
     check(

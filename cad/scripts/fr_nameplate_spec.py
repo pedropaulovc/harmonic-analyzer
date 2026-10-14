@@ -16,7 +16,7 @@ others:
 
 Mount transform (user ruling 2026-10-09; ch. 26 p.71 and ch. 30 p002/p003/p006):
 the brass plate's outline IS the traced DXF outer edge, uniformly enlarged to
-100 mm wide (height about 45.33 mm). It lies FLAT on the WEST (+X) end of the
+4 in (101.6 mm) wide (height about 46.06 mm). It lies FLAT on the WEST (+X) end of the
 black base deck, decorated side up, read by an operator standing west of it.
 
 The part's decorated face is its FRONT face (+Z local; ``build_fr_nameplate``
@@ -24,13 +24,13 @@ extrudes the body in -Z so the engraving is frontmost and reads with no
 mirror). ``MOUNT_ROWS`` (euler [-90, 90, 0]) lays it flat on the WEST end:
 local +Z (decorated front) -> +Y so the engraving faces up; local +Y (text
 height) -> -X so the text top faces the machine interior and reads upright to
-a west operator; local +X (text length, 100) -> -Z so the line runs
-front-back; the 1.5 body (local -Z) drops onto the deck. The placed point is
-the part origin CORNER (decorated face, x=0/y=0): Y 52.3 lays the decorated
-face on top with the 1.5 body resting on the deck (50.8); Z 50 centres the
-100 mm line at z 0; X 163.0 sets the plate's west edge 4.0 inside the black
-deck's west edge at x 167.0. The plate spans x about 117.67..163.0, clear of
-the rocker-arm-support foot at x 41.15..104.65.
+a west operator; local +X (text length, 4 in) -> -Z so the line runs
+front-back; the 1/16 in body (local -Z) drops onto the deck. The placed point is
+the part origin CORNER (decorated face, x=0/y=0): Y 2-1/16 in lays the decorated
+face on top with the 1/16 in body resting on the deck (2 in); Z 2 in centres the
+4 in line at z 0; X 6-3/8 in sets the plate's west edge 3/16 in inside the black
+deck's west edge at x 6-9/16 in (166.6875). The plate spans x about 115.87..161.93,
+clear of the rocker-arm-support foot.
 
 Row convention (``_transforms.rows_from_euler`` / ``assert_component_placed``):
 ``MOUNT_ROWS[i]`` is the machine image of local axis ``i``, so a plate-local
@@ -40,13 +40,15 @@ asserts the literal rows against ``rows_from_euler(MOUNT_EULER)`` at import.
 
 from __future__ import annotations
 
+from _inch import inch
+
 # --- Photo-traced DXF measurements BEFORE the 2026-10-09 rebake (mm). ---
 # The brief's 39.892 was rounded; preserve the measured outer-loop height and
 # uniformly scale every contour. These data need no DXF/CAD dependency at import.
 DXF_OUTER_ORIGIN = (5.999999999999993, 7.5538435420827525)
 DXF_OUTER_WIDTH = 88.0
 DXF_OUTER_HEIGHT = 39.8923129158345
-DXF_SCALE = 100.0 / DXF_OUTER_WIDTH
+DXF_SCALE = inch(4) / DXF_OUTER_WIDTH  # 4 in wide (was 100 mm)
 DXF_SCREW_XY = (
     (9.566587580494442, 11.120346180985667),
     (90.43341063179248, 11.120530788933703),
@@ -57,7 +59,7 @@ DXF_SCREW_XY = (
 # --- Plate envelope (build_fr_nameplate owns the rest of the plate geometry). ---
 PLATE_WIDTH = DXF_OUTER_WIDTH * DXF_SCALE
 PLATE_HEIGHT = DXF_OUTER_HEIGHT * DXF_SCALE
-PLATE_THICKNESS = 1.5  # thin brass plate; p.71 edge read (low)
+PLATE_THICKNESS = inch(1, 16)  # 1.5875 (was 1.5): stock 0.0625 in brass sheet
 
 # Four slotted screw-head marks in the traced DXF, measured at each mark's
 # combined contour bbox centre. Preserve their slight asymmetry rather than a
@@ -69,7 +71,9 @@ SCREW_XY = tuple(
 )
 
 # --- Mount transform in the machine frame (see the module docstring). ---
-MOUNT_POS = [163.0, 52.3, 50.0]
+# x: 3/16 in inside the deck's 6-9/16 in west edge; y: deck top 2 in + plate;
+# z: half the 4 in plate (centred on z 0).
+MOUNT_POS = [inch(51, 8), inch(2) + PLATE_THICKNESS, inch(2)]  # [161.925, 52.3875, 50.8]
 MOUNT_EULER = [-90.0, 90.0, 0.0]
 MOUNT_ROWS = [[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
 

@@ -19,9 +19,12 @@ from __future__ import annotations
 
 import math
 
-LOOP_R = 2.0  # mean loop radius (O5 eye, photo-scaled, low)
-WIRE_DIA = 1.0  # brass wire (low)
-TAIL_LEN = 4.0  # straight tail from the loop's tangent point to under the screw head
+from _inch import inch
+
+WIRE_DIA = 0.040 * 25.4  # 0.040-in brass wire (low)
+# Mean loop radius: the eye is wound on a 1/8-in mandrel (photo-scaled, low).
+LOOP_R = inch(1, 16) + WIRE_DIA / 2.0
+TAIL_LEN = inch(3, 16)  # straight tail from the loop's tangent point to under the screw head
 # Air the drive train leaves between the tail wire and the arm face, the screw
 # head and the wire, and the tail end and the screw shank.
 ANCHOR_AIR = 0.02

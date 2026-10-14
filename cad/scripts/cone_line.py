@@ -15,6 +15,7 @@ so the values are bit-identical to what the assembly computed.
 
 from __future__ import annotations
 
+from _inch import inch
 import _config
 from cone_stations import (
     CONE_FACE_STATION_REFERENCE as CONE_FACE_STATION_REFERENCE,
@@ -37,6 +38,7 @@ from cone_pitch import (
 )
 from dt_cone_pivot_post_installation import DRUM_X, GEAR_AXIS_SHIFT
 from dt_cone_tip_block_spec import BLOCK_Z as TIP_BLOCK_Z
+from dt_cylinder_gear_spec import FACE_WIDTH as DRUM_FACE
 from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
 
 Y_BASE_TOP = 50.8  # harmonic-base top face
@@ -55,7 +57,8 @@ X_DRUM = DRUM_X
 Z_DRUM0 = _config.machine("channels", "station_z0_mm")
 
 
-DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
+# DRUM_FACE: the cylinder gear's tooth face (gear z = 0..FACE_WIDTH, cam
+# above it), imported from dt_cylinder_gear_spec (1/8 in).
 
 # Mesh anchor: X_PITCH is every cone gear's pitch-section x at the contact
 # azimuth; the edge slack is the T120 set point above the standard centre
@@ -115,12 +118,12 @@ Y_CRANK = Y_BASE_TOP + PLATFORM_THICKNESS_MM + _config.machine("gear_train", "cr
 
 # User ruling 2026-09-29 (eight-views-4.png): the tip block is a straight
 # prism held by one screw in a fixed platform hole under its centre.  Its
-# north face stands TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of the pivot,
-# 0.8125 off the pivot screw's head at nominal -- the gap
-# build_dt_drive_train_assembly proves at print-worst -- and the block grows
-# SOUTH from there (its depth closes the adjuster's embed window), so the
-# centre, and the platform hole under it, follow the depth.
-TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = 5.575
+# north face stands TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET (1/4 in) south of the
+# pivot, 1/16 in off the pivot screw's head (Ø3/8, radius 3/16) at nominal
+# -- the gap build_dt_drive_train_assembly proves at print-worst --
+# and the block grows SOUTH from there (its depth closes the adjuster's embed
+# window), so the centre, and the platform hole under it, follow the depth.
+TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = inch(1, 4)
 TIP_BLOCK_NORTH_FACE = PIVOT_STATION - TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
 TIP_BLOCK_STATION = TIP_BLOCK_NORTH_FACE - TIP_BLOCK_Z / 2.0
 TIP_BLOCK_PIVOT_OFFSET = PIVOT_STATION - TIP_BLOCK_STATION

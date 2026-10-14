@@ -30,6 +30,7 @@ at PRESS_DEPTH inside the arm's end face.
 
 from __future__ import annotations
 
+from _inch import inch
 from _mcmaster_98381a474 import (
     DIA_BAND_IN,
     ENDS,
@@ -56,10 +57,10 @@ LENGTH_GRADE = 0.010 * MM_PER_IN  # 0.254
 # MHA-DT-011 / MHA-VN-044 precedent), so the hole's depth sets its installed length
 # out of the arm's end face (contract 4.1): through the strip plane with the
 # lead end clear past it.
-PROUD = 13.725
+PROUD = inch(9, 16)  # restates pd_transgear_arm_geometry: 7/8 pin less 5/16 hole
 # The pressed end on the hole floor: the length the press fit grips, and the
 # arm's nominal hole depth.
-PRESS_DEPTH = LENGTH - PROUD  # 8.50
+PRESS_DEPTH = LENGTH - PROUD  # 7.9375 (5/16)
 # A press-fit dowel grips at least 1.5 D (the drawing-guidelines.md rule 18 (thread engagement) engagement floor,
 # applied to the press as the contract does), counted over the full
 # diameter only: the chamfer inside the hole carries no interference.

@@ -109,9 +109,11 @@ if PRESS_ZONE_DIA != ROD_DIA:
 # The banded zone starts PRESS_ZONE_LENGTH back from the east dome tip and
 # ends where that dome starts: the straight engagement.
 PRESS_ZONE_END = ROD_LENGTH - R
-if ROD_LENGTH - PRESS_ZONE_X[0] != PRESS_ZONE_LENGTH:
+# abs_tol 1e-9: the inch stations (6-1/2, 6-5/16, 3/16) are not exact binary
+# fractions in mm, so exact float equality fails on representation alone.
+if not math.isclose(ROD_LENGTH - PRESS_ZONE_X[0], PRESS_ZONE_LENGTH, abs_tol=1e-9):
     raise AssertionError("the press zone does not start its length from the tip")
-if PRESS_ZONE_END - PRESS_ZONE_X[0] != COLLAR_ENGAGEMENT:
+if not math.isclose(PRESS_ZONE_END - PRESS_ZONE_X[0], COLLAR_ENGAGEMENT, abs_tol=1e-9):
     raise AssertionError("the press zone witness is not the collar engagement")
 # Where the stock diameter prints: mid-length, under the clamp's travel.
 ROD_DIA_STATION = ROD_LENGTH / 2.0

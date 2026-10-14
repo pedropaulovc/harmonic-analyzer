@@ -1,9 +1,9 @@
 
 amplitude:                         # ch15 — the amplitude bars set the Fourier coefficients
   preset: neutral                  # all amplitude bars at rest (a_j = 0) — matches the neutral-state photos
-  fundamental_station_mm: 80.0     # a_1 bar station; a_j = this / harmonic_n (odd j), 0 (even j)
-  max_travel_mm: 88.0              # ±88 mm amplitude-bar seesaw range (ch.15)
-  stick_division_spacing_mm: 14.2   # measuring-stick engraved scale: pitch of the 11 full ticks the
+  fundamental_station_mm: 79.375  # a_1 bar station = 3-1/8 in (all-inch; was 80.0); a_j = this / harmonic_n (odd j), 0 (even j)
+  max_travel_mm: 87.3125          # ±3-7/16 in amplitude-bar seesaw range (ch.15; all-inch, was ±88)
+  stick_division_spacing_mm: 14.2875 # 9/16 in (all-inch; was 14.2). Measuring-stick engraved scale: pitch of the 11 full ticks the
                                    # operator reads bar stations against (ch16 page001_img02: the 0 and 10
                                    # numerals sit 805 px = 142 mm apart at 5.65 px/mm, half the rocker's
                                    # 292 mm working arc -- the old 80 mm misread the 8 mm width callout)

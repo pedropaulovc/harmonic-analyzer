@@ -5,9 +5,9 @@ screw threads up through its bottom rail to set the pen angle. Nested
 sketch contours (outer + inner rectangle) extrude directly into the ring.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 24" — scaled from the p.64-65
-photos vs the ~5 mm square rod (low). Side rails 4, end rails 5 (the
-window must span the marker + pen rod when the frame lies flat on the
-v-block, long axis along machine X -- see build_pn_pen_assembly.py).
+photos vs the ~5 mm square rod (low), authored in inch fractions. Side
+rails 1/8, end rails 3/16 (the window must pass the v-block section with
+clearance a side -- see build_pn_pen_assembly.py).
 
 Layout: width along +X, height along +Y from the origin corner, depth
 extruded +Z; set-screw hole cut along Y from a Top-plane sketch with a
@@ -45,6 +45,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _holes import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec, wizard_holes
+from _inch import inch
 from pn_pen_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -56,18 +57,19 @@ from pn_pen_frame_spec import (
 PART_NAME = "pn-pen-frame"
 MATERIAL = "Brass"  # see _appearance.apply_material docstring
 
-OUTER_WIDTH = 26.0  # X: the window must pass the 16-deep v-block with 1.0 a side
-# (v4_t00591/t00612 -- the stirrup wraps the block's end section, the block
-# hanging on the rod beside it); was 22 when the ring lay flat on the block
-OUTER_HEIGHT = 40.0  # Y
-RAIL_SIDE = 4.0  # long-side rails (local X): read thinner in the photo; the
-# extra 1 mm of window also clears the marker barrel at the platen side in
-# the M6.4 flat-on-the-v-block layout
-RAIL_END = 5.0  # end rails (local Y); the screw rail keeps thread depth
-TRIM_NEAR = 0.75  # local x = 0 edge pulled back: that rail faces the platen
+OUTER_WIDTH = inch(1)  # X: the window must pass the 5/8-deep v-block with clearance
+# a side (v4_t00591/t00612 -- the stirrup wraps the block's end section, the
+# block hanging on the rod beside it); was 22 when the ring lay flat on the block
+OUTER_HEIGHT = inch(25, 16)  # 1-9/16, Y
+RAIL_SIDE = inch(1, 8)  # long-side rails (local X): read thinner in the photo. The
+# nearest 1/16 (3/16) closes the 1-wide window below the block + 2 x 1.0 the
+# assembly asserts, so the rails drop to 1/8 (a 3/4 window, 1/16 a side).
+RAIL_END = inch(3, 16)  # end rails (local Y); the screw rail keeps thread depth
+TRIM_NEAR = inch(1, 32)  # local x = 0 edge pulled back: that rail faces the platen
 # (machine z = -143 - local x) and must clear the recording paper's front
-# face at -143.25 by the 0.25+ margin (M6.8 platen-paper)
-FRAME_DEPTH = 10.0  # Z
+# face at -143.25 by the 0.25+ margin (M6.8 platen-paper). 1/32: the nearest
+# 1/16 is zero, which would delete the trim.
+FRAME_DEPTH = inch(3, 8)  # Z
 # The set screw threads INTO the bottom rail, so its hole is an exact #4-40
 # tapped Hole Wizard feature drilled up from the bottom face. THROUGH_NEXT
 # (not through-all) stops at the window cavity so the top rail is spared.

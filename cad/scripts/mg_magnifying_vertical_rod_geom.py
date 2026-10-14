@@ -2,5 +2,7 @@
 
 from __future__ import annotations
 
-ROD_LENGTH = 150.0
-ROD_DIA = 5.0
+from _inch import inch
+
+ROD_LENGTH = inch(5 + 7 / 8)  # was 150.0
+ROD_DIA = inch(3, 16)  # 3/16 drill rod (was 5.0)

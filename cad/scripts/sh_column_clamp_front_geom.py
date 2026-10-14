@@ -18,17 +18,18 @@ below; only the arc-envelope constants mirror ``_clamp_arc``.
 from __future__ import annotations
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _inch import inch
 
 # --- Nominal geometry (book ch. 21/22, ch30 p005; layout memory/paper-drive-
 # rework.md E2). ---
-ARC_DEPTH = 17.9  # bar back face to the column-axis plane
-ARC_WIDTH = 48.0  # lateral span, ear tip to ear tip
-ARC_HEIGHT = 16.0  # along the column (2 * _clamp_arc.ARC_HALF_H)
-COLUMN_BORE = 25.6  # half-cylinder relief: slides on the O25.4 column
-EAR_HOLE_Z = 17.5  # ear screw line flanks the column
+ARC_DEPTH = inch(11, 16)  # 17.4625: bar back face to the column-axis plane (was 17.9)
+ARC_WIDTH = inch(15, 8)  # 47.625: lateral span, ear tip to ear tip (was 48.0)
+ARC_HEIGHT = inch(5, 8)  # 15.875: along the column (2 * _clamp_arc.ARC_HALF_H)
+COLUMN_BORE = 25.6  # half-cylinder relief: slides on the O25.4 column (fit, exempt)
+EAR_HOLE_Z = inch(11, 16)  # 17.4625: ear screw line flanks the column (was 17.5)
 EAR_HOLE_SPEC = HoleSpec("clearance", "#8")
 EAR_HOLE_DIA = blind_cut_dia_mm(EAR_HOLE_SPEC)
 
 # Derived spans (equations of the primitives above).
-EAR_SPACING = 2.0 * EAR_HOLE_Z  # 35.0: ear-hole centre to centre
+EAR_SPACING = 2.0 * EAR_HOLE_Z  # 34.925 (1-3/8): ear-hole centre to centre
 BORE_RADIUS = COLUMN_BORE / 2.0  # 12.8

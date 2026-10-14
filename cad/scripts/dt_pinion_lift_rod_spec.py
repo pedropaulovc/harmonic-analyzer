@@ -2,12 +2,15 @@ r"""Pure-data dimensional contract shared by the pinion lift rod and drawing."""
 
 from __future__ import annotations
 
+import math
+
 from _fit_shaft_h import SHAFT_H
 from _gtol_cylinder import CylinderFace
+from _inch import inch
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_rig_layout import LIFT_ROD_LEN
 
-ROD_DIA = 6.35
+ROD_DIA = 6.35  # 1/4 in drill rod
 # Back end flush with the back block, front end the lever hub's seat past the
 # front block; ruling (c) moved that block inboard (pinion_rig_layout),
 # 202 -> 192.0 (Codex #854), then 197.0 so the hub clears the block at the
@@ -18,10 +21,12 @@ ROD_DIA = 6.35
 # 0.45 drum shim, the 6.25 back-collar pin plane and RIG_MARGIN_SPARE past
 # the lever seat (Main, #858), then 198.3 once the back collar went on its
 # leaf F (user ruling P1-1): the lever throw plane's air to the torque shaft's
-# front end now sizes it, not the seat.
+# front end now sizes it, not the seat.  All-inch: the layout rounds it UP to
+# the next 1/16 in (pinion_rig_layout.LIFT_ROD_LEN).
 ROD_LEN = LIFT_ROD_LEN
-CAP_SAG = 1.2
-CAP_R = round((ROD_DIA**2 / 4.0 + CAP_SAG**2) / (2.0 * CAP_SAG), 2)  # 4.80
+# The back-end crown prints its sphere radius (CapR); the sagitta follows.
+CAP_R = inch(3, 16)
+CAP_SAG = CAP_R - math.sqrt(CAP_R**2 - ROD_DIA**2 / 4.0)  # 1.21
 ROD_DIA_BAND = SHAFT_H
 
 LEVER_NUMBER = "MHA-DT-016"

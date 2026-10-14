@@ -9,6 +9,7 @@ view and ch20 page001_img01, top-right close-up.
 from __future__ import annotations
 
 from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
+from _inch import inch
 
 SCREW_SKU = "91794A077"
 SCREW_THREAD = "#2-56"
@@ -18,13 +19,22 @@ SCREW_HEAD_DIA = 3.556
 SCREW_HEAD_HEIGHT = 2.1082
 SCREW_PITCH = 25.4 / 56.0
 
-BRACKET_ORIGIN = (40.0, 979.7, -128.3)
 LEVER_ORIGIN_X = -15.0
 LEVER_FRONT_LOCAL_Z = -76.2
 SEAT_PLANE_Z = -73.11241221957347
+# All-inch: the collar axis sits 2-3/16 east of the summing knife line (was 55)
+# and 2-1/4 in front of the seat plane (was 55.19 from LEVER_ROD_Z -128.3); the
+# 1/4 lever rod then clears the 1 in column (front face z -125.4125) by 1.67.
+BRACKET_ORIGIN = (
+    LEVER_ORIGIN_X + inch(2 + 3 / 16),
+    979.7,
+    SEAT_PLANE_Z - inch(2.25),
+)
 SIDE_PLATE_THICKNESS = 3.175
 SIDE_PLATE_HEIGHT = 12.7
-SIDE_PLATE_MACHINE_X = (-3.0, 45.0)
+# Flange ends 7/16 and 2-3/8 east of the knife line (was 12 / 60): 7/16, not the
+# nearest 1/2, keeps the counterbore end wall over 1.5 at the 5/8 screw.
+SIDE_PLATE_MACHINE_X = (LEVER_ORIGIN_X + inch(7, 16), LEVER_ORIGIN_X + inch(2 + 3 / 8))
 SIDE_PLATE_X = tuple(x - BRACKET_ORIGIN[0] for x in SIDE_PLATE_MACHINE_X)
 SIDE_PLATE_Y = (-SIDE_PLATE_HEIGHT / 2.0, SIDE_PLATE_HEIGHT / 2.0)
 SIDE_PLATE_FRONT_Z = SEAT_PLANE_Z - SIDE_PLATE_THICKNESS
@@ -32,7 +42,8 @@ SIDE_PLATE_Z = (
     SIDE_PLATE_FRONT_Z - BRACKET_ORIGIN[2],
     SEAT_PLANE_Z - BRACKET_ORIGIN[2],
 )
-SCREW_MACHINE_X = (1.0, 14.7)
+# Screw stations 5/8 and 1-3/16 east of the knife line (was 16.0 / 29.7).
+SCREW_MACHINE_X = (LEVER_ORIGIN_X + inch(5, 8), LEVER_ORIGIN_X + inch(1 + 3 / 16))
 SCREW_PITCH_X = SCREW_MACHINE_X[1] - SCREW_MACHINE_X[0]
 BRACKET_HOLE_POINTS = tuple(
     (x - BRACKET_ORIGIN[0], 0.0, SIDE_PLATE_Z[0]) for x in SCREW_MACHINE_X
@@ -42,8 +53,11 @@ LEVER_HOLE_POINTS = tuple(
 )
 # A flush head would put this screw's full thread beyond the 5.08 front rib.
 # The shallow counterbore instead leaves a bearing floor and a visible head.
-COUNTERBORE_DIA = 3.8
-COUNTERBORE_DEPTH = 1.55
+# 5/32 (1/32 step: the nearest 1/8 is under the 0.140 head). Depth .061 in
+# decimal (was 1.55): 1/16 leaves grip 1.49 < 1.5 and 1/32 loses 1.5D thread
+# engagement, so no fraction fits the native-band joint window 1.53..1.575.
+COUNTERBORE_DIA = inch(5, 32)
+COUNTERBORE_DEPTH = inch(0.061)
 CLEARANCE_DIA = blind_cut_dia_mm(HoleSpec("clearance", "#2", fit="normal"))
 CLEARANCE_SPEC = HoleSpec(
     "counterbore_fillister",
@@ -92,8 +106,10 @@ ENGAGEMENT_MIN = (
     ENGAGEMENT - SCREW_LENGTH_MINUS - GRIP_BAND - SCREW_TIP_CHAMFER - EDGE_BREAK
 )
 SCREW_REACH_MAX = ENGAGEMENT + GRIP_BAND
-THREAD_DEPTH = 4.95
-DRILL_DEPTH = 6.05
+# Decimal-inch callout depths (was 4.95 / 6.05): the native-band window is
+# 4.875..4.98 for the thread and >= 6.01 for the drill, no fraction fits.
+THREAD_DEPTH = inch(0.195)
+DRILL_DEPTH = inch(0.238)
 TAP_SPEC = HoleSpec(
     "tapped_bottoming",
     SCREW_THREAD,

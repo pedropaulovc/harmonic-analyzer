@@ -11,7 +11,7 @@ Local frame (the part's origin and axes; the assembly places it by a pure
 rotation about Z and a translation):
 
 * origin on the pivot axis P, on the arm's FRONT face (the face that bears on
-  the MHA-PD-020 spacer; machine z FRONT_FACE_MACHINE_Z, -124.4);
+  the MHA-PD-020 spacer; machine z FRONT_FACE_MACHINE_Z, -124.61875);
 * +X along the arm centreline from P toward the square end (machine U);
 * +Y across the arm toward its upper tangent edge (machine N = U rotated
   +90 deg about +Z), the edge the plate's top edge sits flush with;
@@ -29,18 +29,25 @@ from fractions import Fraction
 
 import pd_rack_pinion_spec as DISC
 import pd_support_bar_spec as BAR
+import sh_column_clamp_front_geom as CLAMP
 import vn_transgear_pivot_screw_spec as PIVOT
 from _fit_close_running import measured_close_running_clearance_mm
 from _gear_quality import reducer_position_diameter_mm
+from _inch import inch
 from _printed_tolerance import angular_band_deg
+from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
 import pd_transgear_pivot_spacer_spec as SPACER
 import vn_transgear_arm_plate_locating_pin_spec as LOCATING_PIN
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 
 MM_PER_IN = 25.4
+# The support bar's back face: the front clamp arc's front face, ARC_DEPTH
+# forward of the front column axis (-130.175 = -5-1/8 in).  The spacer is
+# pressed flush on the bar there and the arm's front face seats on it.
+BAR_BACK_FACE_MACHINE_Z = FRAME_FRONT_COLUMN_Z - CLAMP.ARC_DEPTH
 # The assembly's anchor for the arm: its front face on the spacer.
-FRONT_FACE_MACHINE_Z = -124.4
+FRONT_FACE_MACHINE_Z = BAR_BACK_FACE_MACHINE_Z + SPACER.LENGTH  # -124.61875
 
 # --- Stock: 5/16 x 1 precision-ground flat bar, faces as supplied ------------
 # The arm is cut from McMaster 9517K466 (R9-6, R9-25): its thickness is the
@@ -55,23 +62,22 @@ THICKNESS_BAND = 0.001 * MM_PER_IN  # ±0.0254
 # SOURCE mm; not a whole-crown cap or native IPS physical-unit proof.
 CLAMP_TAP_PROJECTED_HEIGHT_MM = 14.7
 
-# --- Outline: hull of r12.5 about P and r7 about T, cut square through T ----
-PIVOT_END_R = 12.5
-TIP_END_R = 7.0
-# T: the r7 round's centre; the square end face lies on it.  The model
-# carries the printed 128.9 (R9-13); the outline's lean and end width derive
+# --- Outline: hull of R1/2 about P and R1/4 about T, cut square through T ---
+PIVOT_END_R = inch(1, 2)  # 12.7 (was 12.5): the 1 in stock's full width
+TIP_END_R = inch(1, 4)  # 6.35 (was 7.0)
+# T: the tip round's centre; the square end face lies on it.  The model
+# carries the printed station (R9-13); the outline's lean and end width derive
 # from it.  The sheet prints it .XX (R9-23, TIP_STATION_BAND): the latch
 # pin's full diameter must pass the hook's far face, and the hook's fit-up
 # set moves the hook in y/z only, so nothing absorbs the station along the
-# pin axis.  With the 7/8 pin, the flap's bend and the pin's length grade
-# (R9-50, transgear_hanger_joints) the worst is +0.306 at .XX, +0.016 at .X.
-TIP_STATION = 128.9
+# pin axis (R9-50, transgear_hanger_joints.LATCH_PIN_FAR_FACE_MARGIN_WORST).
+TIP_STATION = inch(81, 16)  # 5-1/16 = 128.5875 (was 128.9)
 # The straight edges are tangent to both rounds; each leans in toward the
 # square end by EDGE_LEAN, its outward normal (sin, cos) of that angle.
 EDGE_LEAN = math.asin((PIVOT_END_R - TIP_END_R) / TIP_STATION)
 # Tangent point of the upper edge on the pivot round (the lower is its mirror
 # in y); the square end truncates both edges at the tip station, short of
-# their tangent points on the r7 round.
+# their tangent points on the tip round.
 PIVOT_TANGENT_X = PIVOT_END_R * math.sin(EDGE_LEAN)
 PIVOT_TANGENT_Y = PIVOT_END_R * math.cos(EDGE_LEAN)
 
@@ -93,12 +99,13 @@ END_HALF_WIDTH = edge_half_width(TIP_STATION)
 
 # The spot face seats the MHA-VN-049 curved disc spring's OD rim (Ø10.744) under
 # the MHA-VN-041 head; the spring's float on the shoulder still clears its rim.
-SPOT_FACE_DIA = 11.5
+# 15/32, not 7/16: Ø11.1125 leaves the floating spring's rim 0.013 radial.
+SPOT_FACE_DIA = inch(15, 32)  # 11.90625 (was 11.5)
 SPOT_FACE_DIA_GROWTH = 0.10  # +0.10/0 (drilled row)
 # The floor is dimensioned from the FRONT face so the spring's room never
 # sees the arm's stock thickness (transgear_hanger_joints.SPRING_ROOM_*):
-# 0.70..0.95, inside the spring's catalogue deflection at every corner.
-SPOT_FACE_FLOOR_FROM_FRONT = 6.4
+# 0.69..0.94, inside the spring's catalogue deflection at every corner.
+SPOT_FACE_FLOOR_FROM_FRONT = inch(1, 4)  # 6.35 (was 6.4)
 SPOT_FACE_FLOOR_BAND = 0.05
 SPOT_FACE_DEPTH = THICKNESS - SPOT_FACE_FLOOR_FROM_FRONT
 
@@ -157,12 +164,13 @@ def require_pivot_running_fit(bore_mm: float, measured_shoulder_mm: float) -> fl
     return bore_mm - measured_shoulder_mm
 
 # --- Pin at S: REAM THROUGH, the press for the MHA-PD-023 pin (R9-68) ---------
-# The pin (pd_transgear_pin_spec: Ø3.900 0/-0.008, ground) is pressed in from
-# the rear until its head seats on the rear face, so the hole is reamed
-# square through the ground faces.  The interference (0.010..0.026) is
-# asserted in pd_transgear_arm_spec, which imports both: the pin spec imports
-# this module.
-PIN_STATION = 68.815  # |S - P|, printed .XXX (hole position)
+# The pin (pd_transgear_pin_spec: Ø.1540 0/-0.008, #23 drill rod, ground) is
+# pressed in from the rear until its head seats on the rear face, so the hole
+# is reamed square through the ground faces.  The interference (0.010..0.026)
+# is asserted in pd_transgear_arm_spec, which imports both: the pin spec
+# imports this module, so the rod size lives here.
+PIN_ROD_DIA = inch(154, 1000)  # 3.9116 (was 3.900): standard #23 drill rod
+PIN_STATION = inch(43, 16)  # |S - P| = 2-11/16 = 68.2625 (was 68.815), .XXX
 # Preserve the pivot, latch and pressed stud. The rack setting follows the
 # feed contact law; only the reducer bearing follows its physical axis datum.
 STUD_MACHINE_X = 0.0
@@ -185,13 +193,14 @@ KNOB_BORE_OFFSET = DISC.CENTRE_DISTANCE * (
 
 
 
-PIN_BORE_DIA = 3.874
+# The pin's rod size less the press's 0.026 upper interference.
+PIN_BORE_DIA = round(PIN_ROD_DIA - 0.026, 6)  # 3.8856 (was 3.874)
 PIN_BORE_DIA_BAND = (0.008, 0.0)  # (upper, lower) deviations, reamed
 PIN_BORE_DIA_MAX = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[0], 6)
 PIN_BORE_DIA_MIN = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[1], 6)
 # --- Plate taps: 2 x #8-32 THROUGH; ordinary entry/exit edge breaks ---------
-PLATE_SCREW_PITCH = 15.0
-PLATE_CENTRELINE_OFFSET = -3.375  # 1-1/4 in plate's centreline from its bore
+PLATE_SCREW_PITCH = inch(9, 16)  # 14.2875 (was 15.0)
+PLATE_CENTRELINE_OFFSET = -inch(1, 8)  # screw midpoint from the plate's bore (was -3.375)
 PLATE_SCREW_MID_STATION = KNOB_BORE_STATION + PLATE_CENTRELINE_OFFSET
 PLATE_TAP_STATIONS = (
     PLATE_SCREW_MID_STATION - PLATE_SCREW_PITCH / 2.0,
@@ -199,7 +208,8 @@ PLATE_TAP_STATIONS = (
 )
 
 # Matched locating dowels, independent of the mounting screws' clearance.
-LOCATOR_PAIR_BASELINE_MM = 13.7
+# 1/2, not 9/16 or 17/32: the 3/32 MHA-VN-056 dowel's arm-edge wall needs it.
+LOCATOR_PAIR_BASELINE_MM = inch(1, 2)  # 12.7 (was 13.7)
 LOCATOR_SITES_MM = (
     (PLATE_SCREW_MID_STATION, LOCATOR_PAIR_BASELINE_MM / 2.0),
     (PLATE_SCREW_MID_STATION, -LOCATOR_PAIR_BASELINE_MM / 2.0),
@@ -237,17 +247,17 @@ PIN_HOLE_DIA = 3.175
 # band follows the crank seat drive-pin holes' convention (R9-12).
 PIN_HOLE_DIA_BAND = (0.0, -0.010)
 # The dowel is pressed to the hole's flat floor (R9-12, the MHA-DT-011 / MHA-VN-044
-# precedent), so the depth sets the pin's proud length: 22.225 - 8.50 = 13.725.
-# R9-50: 8.50 (was 6.05 for the 3/4 pin) keeps the full diameter past the
-# latch hook's far face with the flap's bend and the pin's length grade.
-PIN_HOLE_DEPTH = 8.50
+# precedent), so the depth sets the pin's proud length: 7/8 - 5/16 = 9/16.
+# R9-50: the depth keeps the full diameter past the latch hook's far face
+# with the flap's bend and the pin's length grade.
+PIN_HOLE_DEPTH = inch(5, 16)  # 7.9375 (was 8.50)
 # The depth prints .XX: the hanger joints judge the pin's full-diameter grip
 # at the shallowest hole, and the latch hook's grip on the pin over the proud
 # range, both at this band.
 PIN_HOLE_DEPTH_BAND = 0.51
 PIN_HOLE_Z = THICKNESS / 2.0  # mid-thickness, on y = 0
 # The latch pin's axis in the machine frame; the hook's hole is drilled on it.
-PIN_MACHINE_Z = FRONT_FACE_MACHINE_Z + PIN_HOLE_Z  # -120.43125
+PIN_MACHINE_Z = FRONT_FACE_MACHINE_Z + PIN_HOLE_Z  # -120.65
 
 # --- Bands the sheet prints (hard-coded title-block rows, drawing-guidelines.md rule 3 (decimal places carry the tolerance)) ---
 BAND_X = 0.8

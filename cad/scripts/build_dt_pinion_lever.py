@@ -8,22 +8,24 @@ STRAIGHT Ø6 rod reaches up-and-out.  img07 annotates the rod "6 mm"
 beside the hub, and equal-scale crops of its root and tip read the same
 width, so there is no taper (user ruling 2026-09-24; the earlier Ø4-root
 taper put the thinnest section where the grip load bends it hardest).
-The 86 length is re-derived from img07 against that 6 mm.  Standing up =
+The 86 length is re-derived from img07 against that 6 mm; the all-inch
+experiment makes it 1/4 in drill rod, 3-3/8 in long.  Standing up =
 disengaged, folded flat = engaged; the model carries the DISENGAGED
 rest pose.
 
-Layout: hub axis Z centred at the origin (z -5..+5), BLIND bore Ø6.35
-from the +Z face down to z -3 (2 wall behind), domed cap (sagitta 1.5)
-proud of the -Z face -- the lift rod's front end hides inside. Rod: a
-radius-3 cylinder revolved about +Y from y RodY0 (buried in the hub) to
-86. Revolve LAST (nothing later crosses its axis -- the on-axis-revolve
-pitfall's safe case).
+Layout: hub axis Z centred at the origin (z -HubLen/2..+HubLen/2), BLIND
+bore Ø6.35 from the +Z face down to WallT above the -Z face, domed cap
+(sagitta CapSag) proud of the -Z face -- the lift rod's front end hides
+inside. Rod: a RodDia cylinder revolved about +Y from y RodY0 (buried in
+the hub) to RodLen. Revolve LAST (nothing later crosses its axis -- the
+on-axis-revolve pitfall's safe case).
 
 Volume gate (mm^3): annulus + wall disc + cap (spherical-cap formula)
 + rod cylinder - rod/hub-OD overlap (Simpson over circular segments).
 
 U36 (MHA-DT-030): a 1/16 in pin hole crosses the hub along local X -- 3 o'clock
-to the grip -- at mid-engagement (4.0 in from the mouth face B).  It is
+to the grip -- at mid-engagement (half the bore depth in from the mouth face
+B).  It is
 match-drilled at assembly through the hub and the lift rod; the part carries
 it so the print can call it out and the assembly can seat the pin.
 
@@ -111,11 +113,11 @@ _SAVED_DRAWING_PROPERTIES = (
 ROD_R = ROD_DIA / 2.0
 HUB_R = HUB_OD / 2.0
 BORE_R = BORE / 2.0
-CAP_R = (HUB_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 14.83 crown sphere radius
+CAP_R = (HUB_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 14.29 (9/16 in) crown sphere radius
 
 V_ANNULUS = math.pi * (HUB_R**2 - BORE_R**2) * (HUB_LEN - WALL_T)
 V_WALL = math.pi * HUB_R**2 * WALL_T
-V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 101.3
+V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0
 V_ROD = math.pi * ROD_R**2 * (ROD_LEN - ROD_Y0)
 
 

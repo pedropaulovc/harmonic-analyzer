@@ -37,6 +37,7 @@ from __future__ import annotations
 import math
 
 import ch_rocker_arm_spec as parent
+from _inch import inch
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 # --- The setup the stop serves -----------------------------------------------
@@ -106,34 +107,36 @@ SCREW_END_INCOMPLETE = 2.0 * SCREW_PITCH
 
 # --- Geometry (model frame above) -------------------------------------------
 SEAT_X = -BASE_DEPTH
-FINGER_THICK = 5.0
+FINGER_THICK = inch(3, 16)
 FINGER_FRONT_X = NOSE_FACE_X - (NOSE_PIN_LENGTH - FINGER_THICK)
 BACK_X = FINGER_FRONT_X - FINGER_THICK
 # The axial sizes print from the seat face (the face clamped to the base).
-OVERALL_LENGTH = SEAT_X - BACK_X  # 58.6631
-FINGER_FRONT = SEAT_X - FINGER_FRONT_X  # 53.6631
+OVERALL_LENGTH = SEAT_X - BACK_X
+FINGER_FRONT = SEAT_X - FINGER_FRONT_X
 
-# The screw sits on the base's tap; the base stays 0.5 behind the rear jaw's
+# The screw sits on the base's tap; the base stays 1/32 behind the rear jaw's
 # gripping plane (clear of the risers inside the jaws) and below the jaw top.
-SCREW_Y = 0.5 + BASE_SIZE / 2.0  # 20.5
-SCREW_FROM_REAR = 8.5
-SCREW_HEIGHT = 8.5
-ARM_WIDTH = 18.0
-REAR_Y = SCREW_Y + SCREW_FROM_REAR  # 29, the shared rear face
-ARM_INNER_Y = REAR_Y - ARM_WIDTH  # 11
-NOSE_FROM_REAR = REAR_Y - NOSE_Y  # 61
-NOSE_HEIGHT = 29.5  # nose axis above the shared bottom face (the lug's)
+# 1/32 sizes below: the 1/16 neighbours break a drawing-guidelines.md rule 17
+# wall round the floating screw head or the nose hole.
+SCREW_Y = inch(1, 32) + BASE_SIZE / 2.0
+SCREW_FROM_REAR = inch(11, 32)
+SCREW_HEIGHT = inch(11, 32)
+ARM_WIDTH = inch(23, 32)
+REAR_Y = SCREW_Y + SCREW_FROM_REAR  # the shared rear face
+ARM_INNER_Y = REAR_Y - ARM_WIDTH
+NOSE_FROM_REAR = REAR_Y - NOSE_Y
+NOSE_HEIGHT = inch(19, 16)  # nose axis above the shared bottom face (the lug's)
 BOTTOM_Z = NOSE_Z - NOSE_HEIGHT
 SCREW_Z = BOTTOM_Z + SCREW_HEIGHT
-ARM_HEIGHT = 28.5
+ARM_HEIGHT = inch(9, 8)
 ARM_TOP_Z = BOTTOM_Z + ARM_HEIGHT
-FINGER_HEIGHT = 36.5
+FINGER_HEIGHT = inch(47, 32)
 FINGER_TOP_Z = BOTTOM_Z + FINGER_HEIGHT
-FINGER_LENGTH = 68.5
+FINGER_LENGTH = inch(87, 32)
 FINGER_END_Y = REAR_Y - FINGER_LENGTH
 # Beyond the lug a full-width step clears the screw head and the hex key;
 # both its sizes print from the lug's seat and bottom faces.
-NOTCH_HEIGHT = 16.0
+NOTCH_HEIGHT = inch(5, 8)
 NOTCH_TOP_Z = BOTTOM_Z + NOTCH_HEIGHT
 # Seat face to the lug's head-bearing face, printed at three places. With
 # the bought screw's length band, engagement plus tip clearance is fixed at
@@ -160,10 +163,10 @@ DRILLED_BAND = (drilled_oversize_mm(), 0.0)  # (upper, lower)
 # Nose pin fixed with a retaining compound (shop-additions r3 #3 route):
 # a drilled slip hole whose gap stays inside Loctite 638's 0.25 mm fill.
 # The sheet states the installed result, not the method.
-NOSE_HOLE_DIA = 6.10
+NOSE_HOLE_DIA = inch(0.242)  # letter C drill
 BOND_GAP_MAX = 0.25
-# ISO 273 medium clearance for the M6 screw (vendor thread kept).
-SCREW_HOLE_DIA = 6.60
+# Inch drill-chart clearance (17/64) for the vendor's M6 screw.
+SCREW_HOLE_DIA = inch(17, 64)
 
 LINEAR_1PL = printed_band_mm(1)
 LINEAR_3PL = printed_band_mm(3)
@@ -176,7 +179,7 @@ _NOSE_R = (NOSE_HOLE_DIA + DRILLED_BAND[0]) / 2.0
 _SCREW_R = (SCREW_HOLE_DIA + DRILLED_BAND[0]) / 2.0
 # The head is not registered: it may sit off the hole's axis by the screw's
 # float in the largest hole, and the knurled head is up to 10.22.
-SCREW_FLOAT = _SCREW_R - SCREW_MAJOR / 2.0  # 0.35
+SCREW_FLOAT = _SCREW_R - SCREW_MAJOR / 2.0
 _HEAD_R = SCREW_FLOAT + SCREW_HEAD_DIA_MAX / 2.0
 WALLS = {
     "nose to finger top": (FINGER_HEIGHT - LINEAR_1PL) - (NOSE_HEIGHT + LINEAR_1PL) - _NOSE_R,

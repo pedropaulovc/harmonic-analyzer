@@ -5,12 +5,12 @@ closure.  ``build_pd_transgear_drive_collar`` marks and tolerances exactly
 ``DRAWING_DIMENSIONS`` / ``DRAWING_PRECISION`` on the model and
 ``draw_pd_transgear_drive_collar`` keeps exactly the same names.
 
-The actual D-bore slides over the knob shaft's Ø4.850 h6 solid D-core.
+The actual D-bore slides over the knob shaft's Ø3/16 in h6 solid D-core.
 The D-flat carries torque; there is no rear slot or front spring pin.
-The existing Ø17.5 body is supplied long and its REAR FACE is faced at
+The existing Ø11/16 in body is supplied long and its REAR FACE is faced at
 assembly until the removable T24 meets the unchanged chain-plane setting,
 with that rear face seated directly on the integral gear front F.
-The model body length is 6.2 REF, not an independently toleranced length.
+The model body length is 5.87 REF, not an independently toleranced length.
 The thumbnut clamps pilot -> body -> actual gear shoulder; it carries no
 drive torque. The two existing axial MHA-VN-038 dowels still drive the
 removable wheel, and the pilot is faced to retain its .05-.15 float.
@@ -39,6 +39,7 @@ import math
 import textwrap
 
 from _fit_ream_h7 import REAM_H7
+from _inch import inch
 from _printed_tolerance import (
     angular_band_deg,
     drilled_oversize_mm,
@@ -107,21 +108,23 @@ from pd_transgear_thumbnut_spec import TAP_MINOR_2B_MIN as NUT_MINOR_MIN
 WALL_FLOOR = 1.5
 
 # --- Existing body: fitted rear-face reaction, unchanged wheel-seat station --
-SET_NOMINAL = 6.2
+# F - SEAT_FACE_Z at the inch stack: -148.43125 - (-154.3) (restated: the
+# arm registration that sets F imports this module; was 6.2).
+SET_NOMINAL = 5.86875
 SEAT_MIN_FROM_F = 3.870
 SEAT_MAX_FROM_F = 6.900
 LENGTH = SET_NOMINAL  # REF fitted nominal; never title-block +/- .13
 LENGTH_FITTED_MIN = SEAT_MIN_FROM_F
 LENGTH_FITTED_MAX = SEAT_MAX_FROM_F
 LENGTH_PLACES = 2
-BODY_BLANK_LENGTH_MIN = 7.400
-OD = SEAT_SPIGOT_DIA  # 17.5, the crank spigot's seat
+BODY_BLANK_LENGTH_MIN = inch(5, 16)
+OD = SEAT_SPIGOT_DIA  # 11/16 in, the crank spigot's seat
 # The removables swap between shafts: the crank spigot's functional band.
 OD_BAND = SPIGOT_DIA_BAND  # (upper, lower) = (0, -0.10)
 OD_PLACES = 2
 
-# --- Pilot on the front face, through the wheel's Ø10.3 bore (ruling 5) -------
-PILOT_DIA = 10.0
+# --- Pilot on the front face, through the wheel's 13/32 bore (ruling 5) ------
+PILOT_DIA = inch(3, 8)
 PILOT_DIA_BAND = (0.0, -0.10)
 PILOT_DIA_PLACES = 2
 # R9-70 (N-A): the thumbnut's seat.  The fitter faces the pilot so its front
@@ -137,7 +140,7 @@ PILOT_LENGTH_PLACES = 2
 PILOT_LENGTH_FITTED_MIN = THINNEST_PLATE + min(PILOT_PROUD_RANGE)  # 2.75
 PILOT_LENGTH_FITTED_MAX = PLATE + max(PLATE_BAND) + max(PILOT_PROUD_RANGE)  # 2.95
 FACING_ALLOWANCE = 0.10
-PILOT_BLANK_LENGTH_MIN = 3.40
+PILOT_BLANK_LENGTH_MIN = inch(1, 8)
 if PILOT_BLANK_LENGTH_MIN < PILOT_LENGTH_FITTED_MAX + FACING_ALLOWANCE - 1e-9:
     raise AssertionError(
         f"MHA-PD-022 pilot blank {PILOT_BLANK_LENGTH_MIN:.2f} MIN leaves no "
@@ -152,11 +155,13 @@ BORE_DIA = CORE_DIA + 0.010
 BORE_DIA_BAND = REAM_H7
 BORE_DIA_PLACES = 3
 # Actual model midpoint, not a basic flat outside its positive band. Moved in
-# 0.025 with the knob core radius (4.900 -> 4.850, 0.05 tooth-space TIR).
-FLAT_LIMITS = (2.145, 2.160)
+# 0.045 with the knob's core flat (2.125 -> 2.080, the 3/16 in core): the
+# same 0.020..0.035 over the core flat, a 0.27 profile depth for the entry
+# break and 0.040 radial air over the stud's largest thread blank.
+FLAT_LIMITS = (2.100, 2.115)
 FLAT_TO_AXIS = sum(FLAT_LIMITS) / 2.0
 FLAT_BAND = (FLAT_LIMITS[1] - FLAT_TO_AXIS, FLAT_LIMITS[0] - FLAT_TO_AXIS)
-FLAT_TOL_TYPE = 3  # native LIMIT, three-place 2.145..2.160
+FLAT_TOL_TYPE = 3  # native LIMIT, three-place 2.100..2.115
 FLAT_PLACES = 3
 FLAT_CLEARANCE = (
     FLAT_TO_AXIS + min(FLAT_BAND) - (CORE_FLAT_FROM_AXIS + max(CORE_FLAT_BAND)),
@@ -258,7 +263,7 @@ FRONT_BEARING_AREA_MIN = min(
 )
 
 # --- Drive-pin holes: reamed THROUGH for the MHA-VN-038 press (the crank's twin) -
-PIN_CIRCLE_RADIUS = _WHEEL_PIN_CIRCLE_RADIUS  # 7.0, ±Y
+PIN_CIRCLE_RADIUS = _WHEEL_PIN_CIRCLE_RADIUS  # 17/64 in, ±Y
 PIN_HOLE_DIA = DRIVE_PIN_HOLE_DIA  # 2.38
 PIN_HOLE_BAND = DRIVE_PIN_HOLE_BAND  # (0, -0.010)
 PIN_HOLE_PLACES = 3
@@ -310,10 +315,10 @@ def floor_2(value: float) -> float:
 
 
 # --- Walls (contract §8) ---------------------------------------------------------
-_OD_R_MIN = (OD + min(OD_BAND)) / 2.0  # 8.70
+_OD_R_MIN = (OD + min(OD_BAND)) / 2.0  # 8.68
 _PIN_HOLE_R_MAX = (PIN_HOLE_DIA + max(PIN_HOLE_BAND)) / 2.0  # 1.19
-# Drive-pin hole to the Ø17.5 rim: 8.75 - 7.0 - 1.19 = 0.56 nominal;
-# 8.70 - 7.025 - 1.19 = 0.485 worst, printed 0.48.
+# Drive-pin hole to the Ø11/16 rim: 8.731 - 6.747 - 1.19 = 0.794 nominal;
+# 8.681 - 6.772 - 1.19 = 0.719 worst, printed 0.71.
 DRIVE_PIN_COLLAR_RIM = OD / 2.0 - PIN_CIRCLE_RADIUS - PIN_HOLE_DIA / 2.0
 DRIVE_PIN_COLLAR_RIM_WORST = floor_2(
     _OD_R_MIN - PIN_CIRCLE_RADIUS - PIN_OFFSET_TOL - _PIN_HOLE_R_MAX
@@ -366,8 +371,8 @@ BORE_ENTRY_BREAK_GEOMETRY_MAX = min(
     CORE_ACTIVE_LENGTH_MIN / 2.0,
 )
 # The holes run through the body beside the pilot, never into it.
-PIN_HOLE_INNER_R_MIN = PIN_CIRCLE_RADIUS - PIN_OFFSET_TOL - _PIN_HOLE_R_MAX  # 5.785
-PILOT_R_MAX = (PILOT_DIA + max(PILOT_DIA_BAND)) / 2.0  # 5.0
+PIN_HOLE_INNER_R_MIN = PIN_CIRCLE_RADIUS - PIN_OFFSET_TOL - _PIN_HOLE_R_MAX  # 5.532
+PILOT_R_MAX = (PILOT_DIA + max(PILOT_DIA_BAND)) / 2.0  # 4.7625
 
 # --- Fits ------------------------------------------------------------------------
 # Diametral sliding clearance of the curved portion of the true D interface.
@@ -375,14 +380,14 @@ BORE_CORE_CLEARANCE = (
     BORE_DIA + min(BORE_DIA_BAND) - (CORE_DIA + max(CORE_DIA_BAND)),
     BORE_DIA + max(BORE_DIA_BAND) - (CORE_DIA + min(CORE_DIA_BAND)),
 )
-# Radial air round the pilot in the wheel's drilled Ø10.3 bore: 0.15 .. 0.25.
+# Radial air round the pilot in the wheel's drilled letter-W bore: 0.14 .. 0.24.
 PILOT_BORE_CLEARANCE = (
     (WHEEL_BORE_DIA - (PILOT_DIA + max(PILOT_DIA_BAND))) / 2.0,
     (WHEEL_BORE_DIA + drilled_oversize_mm() - (PILOT_DIA + min(PILOT_DIA_BAND))) / 2.0,
 )
 # R9-70 (N-A): the thumbnut seats on the pilot's front face, which stands
 # PILOT_PROUD_RANGE proud of the wheel's front face: the nut's seat bears on the
-# pilot's annulus outside its rear countersink, (9.90 - 6.75) / 2 = 1.575 at
+# pilot's annulus outside its rear countersink, (9.425 - 4.57) / 2 = 2.43 at
 # worst case, its flange covers the pilot all round, and the wheel is free
 # under it by the proud.
 _NUT_FLANGE_LO, _ = printed_deviations(NUT_FLANGE_DIA, NUT_FLANGE_DIA_PLACES)
@@ -503,10 +508,10 @@ STUD_CUT_PHRASE = (
 # collar's rear face on F, seat = the collar length) to SEAT_MAX_FROM_F.  The
 # nut seats on the pilot's faced front face (R9-70), the fitted pilot length
 # in front of the seat.
-_TIP_STATION_MIN = TIP_STATION - printed_band_mm(TIP_STATION_PLACES)  # 23.39
-_PLAIN_CORE_MAX = PLAIN_CORE + printed_band_mm(PLAIN_CORE_PLACES)  # 7.63
+_TIP_STATION_MIN = TIP_STATION - printed_band_mm(TIP_STATION_PLACES)  # 23.30
+_PLAIN_CORE_MAX = PLAIN_CORE + printed_band_mm(PLAIN_CORE_PLACES)  # 8.07
 _CORE_FRONT_MAX = CORE_FRONT_FROM_F + printed_band_mm(CORE_FRONT_FROM_F_PLACES)
-NUT_LENGTH_MIN = NUT_LENGTH + NUT_LENGTH_LO  # 15.3
+NUT_LENGTH_MIN = NUT_LENGTH + NUT_LENGTH_LO  # 15.075
 
 
 def thumbnut_engagement(seat_from_f: float) -> float:
@@ -539,7 +544,7 @@ if THUMBNUT_ENGAGEMENT_WORST < ENGAGEMENT_FLOOR_D * THREAD_MAJOR - 1e-9:
     )
 # At the rearward stop the nut's seat stands in front of the core's step, so
 # its thread runs only on full thread or over the relief, never onto the core
-# or a die run-out: 3.87 + 2.75 - 5.38 = 1.24.
+# or a die run-out: 3.87 + 2.75 - 4.89 = 1.73.
 NUT_CORE_STEP_AIR = LENGTH_FITTED_MIN + PILOT_LENGTH_FITTED_MIN - _CORE_FRONT_MAX
 if NUT_CORE_STEP_AIR <= 0.0:
     raise AssertionError(

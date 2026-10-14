@@ -219,10 +219,11 @@ STRAND_SLACK_PITCHES = 2
 # lowest bead hangs below the outer strand's. Seen from the front, the eye's
 # +X bead is to the right of its -X bead, so the inner strand must pass below
 # and right of the outer one to keep the U's nested.  The drop is the rest
-# height at which the outer halves close on whole pitches: 17.5 keeps the
+# height at which the outer halves close on whole pitches: 16.0 keeps the
 # #1140 loop's 11 + 14 outer beads and 56-bead cut with the ring on the
-# Ø22.25 barrel (as on the Ø20.6 one; on the Ø25.4 one 18.0 closed).
-LINK_DROP = 17.5
+# all-inch Ø23.8125 barrel (16.5..18.0 no longer close; 17.5 did on Ø22.25).
+# A solved closure input, not a dimensioned length: left in mm.
+LINK_DROP = 16.0
 STRAND_GAP = BEAD_DIA + 1.6
 
 

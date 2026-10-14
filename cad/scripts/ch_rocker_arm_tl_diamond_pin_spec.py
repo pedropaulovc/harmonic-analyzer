@@ -16,7 +16,7 @@ Frame (the inventory's fixture frame, rocker-inv rocker-rod-diamond-pin):
 origin on the pin axis at the neck face, +Z DOWN into the plate (axis model
 +Z), +X radial from the rocker pivot to the rod hole. The flats face +-X, so
 the round lands bear tangentially (+-Y). S3/S4 pose this frame at frame-A
-[133.0674, 8.4561, -4.77825], x = [0.997988, 0.063419, 0], z = [0, 0, -1].
+[133.2108, 7.9375, -4.718875], x = [0.998229, 0.059481, 0], z = [0, 0, -1].
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from __future__ import annotations
 import math
 
 import _hole_spec
+from _inch import inch
 from _printed_tolerance import printed_band_mm
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_profile_fixture_spec as plate
@@ -34,9 +35,9 @@ BUILT_UP_PERMISSION_NOTE = "LANDS ARE A BOUGHT GAUGE PIN BONDED INTO THE REAMED 
 LAND_DIA = 1.9868
 LAND_BAND = (0.0005, -0.0005)  # (upper, lower): the gauge pin's certificate
 LAND_PLACES = 4
-FLATS_AF = 1.76  # stoned; .XXX general keeps both flats inside the lands
+FLATS_AF = inch(1, 16)  # stoned; .XXX general keeps both flats inside the lands
 FLATS_PLACES = 3
-PIN_LENGTH = 8.0  # snapped at about 8.5 and squared on the wheel
+PIN_LENGTH = inch(5, 16)  # snapped at about 3/8 and squared on the wheel
 
 # The lands enter the rocker arm's rod-pin hole: the largest land keeps a
 # running clearance in the smallest hole the parent prints (#47 drilled,
@@ -55,33 +56,38 @@ if FLATS_AF + _GENERAL_3PL >= LAND_DIA + LAND_BAND[1]:
     raise AssertionError("diamond-pin flats can vanish inside the general band")
 
 # --- Turned 4140 body: all axial sizes from the neck face. ---
-NECK_DIA = 3.0
+NECK_DIA = inch(1, 8)
 NECK_PLACES = 1
 NECK_BAND = (0.0, -0.2)  # never over the cutter-clearance size; keeps a 0.4 bore wall
-NECK_LENGTH = 4.3  # .X keeps 0.77 of the 1.57 cutter clearance; collar stays below the S4 op 25/27 cutter tip
-COLLAR_DIA = 4.5
-# The collar seats on the plate top. The neck face sits just under the arm's
-# face B so the plate's pads and shimmed hub stand alone set Z: it is a
-# backstop, never a second Z support (FixtureCAD option b).
-COLLAR_END = 10.20
+# 5/32: 1/8 gives up the cutter clearance; 3/16 runs past the bonded pin's
+# shortest inserted length. Collar stays below the S4 op 25/27 cutter tip.
+NECK_LENGTH = inch(5, 32)
+COLLAR_DIA = inch(3, 16)
+# The collar seats on the plate top. The neck face sits flush with the arm's
+# face B at its upper limit, so the plate's pads and shimmed hub stand alone
+# set Z: it is a backstop, never a second Z support (FixtureCAD option b).
+FACE_B_ABOVE_PLATE = plate.PLATE_DROP  # face B is the pad-top plane
+COLLAR_END = FACE_B_ABOVE_PLATE
+# Never above face B; narrow enough for the tip window below (the 3/32 strap's
+# window is 0.376 wide, so 0.20 here plus the land's 0.20 no longer fits).
 COLLAR_END_BAND = (
     0.0,
-    -0.2,
-)  # never above face B; narrow enough for the tip window below
-FACE_B_ABOVE_PLATE = 10.22175  # frame-A Z-4.77825 face B over the plate top Z-15
+    -0.15,
+)
 if COLLAR_END + COLLAR_END_BAND[0] > FACE_B_ABOVE_PLATE:
     raise AssertionError("neck face can lift the arm off the profile-fixture pads")
-SHANK_DIA = 2.97
+# Bonded close slip fit in the plate's 1/8 ream: the ream less 0.03, +-0.02.
+SHANK_DIA = plate.ROD_PIN_HOLE_DIA - 0.03
 SHANK_BAND = (
     0.02,
     -0.02,
-)  # 2.95-2.99: bonded close slip fit in the plate's 3.000-3.010 ream
+)
 if SHANK_DIA + SHANK_BAND[0] >= plate.ROD_PIN_HOLE_DIA + plate.ROD_PIN_HOLE_BAND[1]:
     raise AssertionError("diamond-pin shank no longer slips into the profile-fixture ream")
-OVERALL_LENGTH = COLLAR_END + 4.8  # shank clears the .X 7.0 hole bottom at every limit
+OVERALL_LENGTH = COLLAR_END + inch(3, 16)  # shank clears the .X hole bottom at every limit
 REAM_DIA = 2.0
 REAM_BAND = (0.010, 0.0)  # the shop's rod reamer, 2.000-2.010
-REAM_DEPTH = 8.0
+REAM_DEPTH = inch(5, 16)
 # Pending wall shortfall ruling (#1368):
 # MHA-CH-006-TL-03 neck over the reamed bore is the thinnest wall,
 # stated on the sheet as a MIN, rounded down.
@@ -98,7 +104,7 @@ if NECK_WALL_MIN >= (COLLAR_DIA - _GENERAL_1PL - (REAM_DIA + REAM_BAND[0])) / 2.
 # Lands stand LAND_HEIGHT above the neck face, the tip's direct dimension.
 # The S4 op 10 outline template lies flat on the upper strap face over the rod
 # hole, so the tip must stay under the thinnest strap the parent accepts (it
-# prints STRAP 2.50 at .XX, ch_rocker_arm_notes.DEFAULT_DRAWING_PRECISION,
+# prints STRAP 2.38 at .XX, ch_rocker_arm_notes.DEFAULT_DRAWING_PRECISION,
 # mirrored to keep that prose out of this part's import closure), and the
 # lands must still engage half the thickest strap.  Chain: tip above face B =
 # LAND_HEIGHT - (FACE_B_ABOVE_PLATE - COLLAR_END), every term at its limit.
@@ -106,9 +112,18 @@ STRAP_PLACES = 2
 _STRAP_MIN = rocker.ARM_THICKNESS - printed_band_mm(STRAP_PLACES)
 _STRAP_MAX = rocker.ARM_THICKNESS + printed_band_mm(STRAP_PLACES)
 TIP_UNDER_STRAP_MARGIN = 0.05  # the template's blued face never rides the tip
-LAND_HEIGHT = 1.85
+# The window is narrower than any 1/32 step, so the land height is the
+# closure that centres the tip in it, at its printed places.
 LAND_HEIGHT_PLACES = 2
 LAND_HEIGHT_BAND = (0.10, -0.10)
+_TIP_WINDOW = (_STRAP_MAX / 2.0, _STRAP_MIN - TIP_UNDER_STRAP_MARGIN)
+LAND_HEIGHT = round(
+    sum(_TIP_WINDOW) / 2.0
+    + (FACE_B_ABOVE_PLATE - COLLAR_END)
+    - (COLLAR_END_BAND[0] + COLLAR_END_BAND[1]) / 2.0
+    - (LAND_HEIGHT_BAND[0] + LAND_HEIGHT_BAND[1]) / 2.0,
+    LAND_HEIGHT_PLACES,
+)
 TIP_ABOVE_FACE_B = (
     LAND_HEIGHT
     + LAND_HEIGHT_BAND[1]
@@ -127,7 +142,7 @@ if (
     >= REAM_DEPTH - _GENERAL_1PL
 ):
     raise AssertionError("diamond pin can bottom in the reamed bore")
-# The bonded pin backs the 0.39 neck wall: at the worst-case projection its
+# The bonded pin backs the 0.48 neck wall: at the worst-case projection its
 # shortest inserted length still runs past the deepest neck (.X) with margin.
 PIN_INSERTED_MIN = PIN_LENGTH - _GENERAL_1PL - (LAND_HEIGHT + LAND_HEIGHT_BAND[0])
 if PIN_INSERTED_MIN < NECK_LENGTH + _GENERAL_1PL + 0.1:

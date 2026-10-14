@@ -92,7 +92,7 @@ MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 # FACE_WIDTH (the whole tooth length), SHOULDER_LENGTH, TURNED_DIA and
 # BOSS_LENGTH are in dt_crank_pinion_spec. build_dt_drive_train_assembly checks the
 # installed south face, the T120 clearances and the 64T row overlap.
-BORE_DIAMETER = BORE_DIA  # the crankshaft's Ø9.0 pinion seat (dt_crank_pinion_spec)
+BORE_DIAMETER = BORE_DIA  # the crankshaft's 11/32 in pinion seat (dt_crank_pinion_spec)
 
 # The hub boss as the runtime gate reads it (#906 diag v3, d6ca08eb7): a boss
 # revolve coincident with the gap floors' root arcs vanished on a

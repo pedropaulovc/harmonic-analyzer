@@ -1,7 +1,7 @@
 r"""Reproduction script: frame subassembly (book ch. 6 / eight-views).
 
 Static structure of the machine: the stepped cast base, four polished tube
-columns seated 22.4 into blind base sockets, the rocker-arm support, and
+columns seated 7/8 in into blind base sockets, the rocker-arm support, and
 the top-frame casting. Eight stock 90280A837 cross screws enter from the
 front/rear, clear both tube walls, and engage the far casting wall as well as
 the near wall. The visible frame pose and evidence-locked top station remain
@@ -12,13 +12,13 @@ axes follow the harmonic-base part: X = 46 cm length, Y = up, Z = 28.7 cm
 flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
 "28 cm" callout; see ``fr_harmonic_base_spec.TOP_WIDTH``):
 
-* harmonic-base fixed at the origin, deck at Y=50.8, with four 22.4-deep
-  sockets opening on the green land at Y=47.8.
+* harmonic-base fixed at the origin, deck at Y=50.8, with four 7/8 in deep
+  sockets opening on the green land at Y=47.625 (all-inch experiment).
 * tube-frame x4 inserted at Y=25.4 near the top-plate corners at
-  x +/-197, z +/-112, preserving the prior visible span.
+  x +/-7-3/4 in, z +/-4-7/16 in.
 * rocker-arm-support x1 (the windowed trapezoidal NORTH support,
-  build_fr_rocker_arm_support.py) at (X, Z) = (+72.9, 0), foot seated on the
-  base top. A 177.8 x 177.8 cast plate, 63.5 thick (tapering to 16.94 at the
+  build_fr_rocker_arm_support.py) at (X, Z) = (+73.025, 0), foot seated on the
+  base top. A 177.8 x 177.8 cast plate, 63.5 thick (tapering to 17.46 at the
   apex), with the central rounded window; its apex carries the north pivot ball
   mount (ch-channel.SLDASM, at machine z +116.915) and the rocker-pivot SHAFT runs
   along Z. This REPLACES the rocker-arm-portal casting (north + south unified
@@ -37,14 +37,14 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
   Z -88.9..88.9 at its original location. The north pivot ball
   mount (ch-channel.SLDASM) is recentered to z +84.588, so its narrowed
   O13 footprint remains fully seated inside the wall's rear edge -- no cantilever.
-  Seat Y = base-top 50.8 + 88.9 (half-height) = 139.7. The pivot x = 72.9, the
+  Seat Y = base-top 50.8 + 88.9 (half-height) = 139.7. The pivot x = 73.025 (2-7/8 in), the
   rocker seesaw's mid-span (ch30 GT arm-end triangulation midpoint +72.5; the
   reclosed rod-pin hole 125.890 out reaches the cam centre at -52.990, rods plumb; the old
   "arbor 47.5 + 25.4 rod lever" chain died with the ch30 re-anchor).
   Inserted at its exact authored transform and locked to the fixed base.
-* top-frame x1: the green one-piece casting at mid-plane Y = 1017.95 (side
-  rails 34.2 wide / front-rear rails 38 wide x 36.5 tall, band
-  y 999.7..1036.2; corner bosses Ø45 rise to 1040.7), bored around the
+* top-frame x1: the green one-piece casting at mid-plane Y = 1017.5875
+  (40-1/16 in; ring 1-7/16 in tall, band y 999.33..1035.84; see
+  build_fr_top_frame for the rail and boss sizes), bored around the
   four columns; its east rail (-X) carries the gooseneck hub and its west
   rail top face seats the fulcrum-keeper feet (ch-channel.SLDASM).
 * tube-frame-cap x4: intact stock McMaster 9275K141 push-on caps seated on the
@@ -65,8 +65,8 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
 
 Hold-down: four stock 1/4-20 UNC-2A hex-head screws install from the top,
 through the support foot's 5/16 clearance drills, into blind 1/4-20 UNC-2B
-seats in the base. The foot pattern transforms from local X +/-60.32,
-Z +/-17.46 to machine x 55.44/90.36, z -60.32/+60.32 (the base's shared
+seats in the base. The foot pattern transforms from local X +/-60.325,
+Z +/-17.4625 to machine x 55.5625/90.4875, z -60.325/+60.325 (the base's shared
 SUPPORT_HOLD_DOWN_XZ contract). Each McMaster 92240A540 screw bears on the
 bottom of its exact vendor-modeled 0.277813 mm under-head washer transition,
 crosses the 6.35 mm foot, and engages 12.422187 mm = 1.956D in the base. The
@@ -198,12 +198,14 @@ from vn_tube_frame_cap_spec import (
     TOTAL_HEIGHT as CAP_TOTAL_HEIGHT,
 )
 from fr_tube_frame_spec import COLUMN_LENGTH, OUTER_DIA as COLUMN_OUTER_DIA
+from frame_column_stations import COLUMN_X
+from fr_top_frame_spec import GOOSENECK_X
+from sm_gooseneck_geom import TUBE_DIA as GOOSENECK_POST_DIA
 
 ASM_NAME = "fr-frame"
 FRAME_EXPLODED = "FRAME_EXPLODED"
 
 BASE_TOP_Y = STACK_HEIGHT
-COLUMN_X = 197.0
 FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z
 REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z
 SUPPORT_X = SUPPORT_WORLD_X  # rocker pivot x: the seesaw mid-span (ch30 GT arm-end
@@ -221,9 +223,9 @@ SUPPORT_ROWS = ROT_Y_POS90
 # Rocker-support hold-down: four stock 1/4-20 x 3/4 hex-head screws,
 # coaxial with the support clearance drills and blind base taps via authored
 # transforms; one seed lock mate and a native grid retain that placement.
-# Stations are the foot pattern in the machine frame: local X +/-60.32,
-# Z +/-17.46 turned +90 degrees about Y -> machine x 55.44/90.36 and
-# z SUPPORT_Z +/-60.32. The screw's actual bearing face lies
+# Stations are the foot pattern in the machine frame: local X +/-60.325,
+# Z +/-17.4625 turned +90 degrees about Y -> machine x 55.5625/90.4875 and
+# z SUPPORT_Z +/-60.325. The screw's actual bearing face lies
 # LAG_BEARING_OFFSET below its model origin. Raising that origin by the exact
 # vendor offset seats the washer face on the support without solid overlap;
 # head remains above +Y and shank/tip along -Y.
@@ -304,8 +306,9 @@ if not math.isclose(CAP_MOUTH_Y + CAP_TOTAL_HEIGHT, CAP_TOP_Y, abs_tol=1e-9):
 # the Ø16 post surface at x -205. The under-head face is the tip less the
 # shank, x -224.20: the head stands 6.2 proud of the spot face, so the cup
 # point reaches the post before the head could bottom.
-GOOSENECK_HUB_Z = 3.088  # gooseneck bore centreline (unchanged position)
-SET_SCREW_TIP_X = -205.15  # 0.15 clear (outboard) of the Ø16 post surface -205
+GOOSENECK_HUB_Z = 3.088  # gooseneck bore centreline (SUMMING_Z closure, unchanged)
+# The cup tip stops 0.15 clear (outboard) of the post surface.
+SET_SCREW_TIP_X = GOOSENECK_X - GOOSENECK_POST_DIA / 2.0 - 0.15
 SET_SCREW_UNDER_HEAD_X = SET_SCREW_TIP_X - GOOSENECK_SHANK_LEN
 if not SET_SCREW_UNDER_HEAD_X < TOP_SET_SPOT_FACE_X < SET_SCREW_TIP_X:
     raise AssertionError(

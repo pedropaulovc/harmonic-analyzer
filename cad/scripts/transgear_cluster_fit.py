@@ -104,7 +104,7 @@ F_TERMS: tuple[tuple[str, float, float], ...] = (
         printed_band_mm(KNOB_SHAFT.FACE_WIDTH_PLACES),
     ),
 )
-F_FROM_ARM_REAR = round(sum(value for _, value, _ in F_TERMS), 6)  # 31.6375
+F_FROM_ARM_REAR = round(sum(value for _, value, _ in F_TERMS), 6)  # 31.75
 F_BAND = round(sum(band for _, _, band in F_TERMS), 6)  # 0.31
 
 # --- Hub: faced to the nose (step 0) -------------------------------------------
@@ -117,16 +117,16 @@ HUB_CHAIN_TERMS: tuple[tuple[str, float, float, int], ...] = (
 )
 HUB_CHAIN_NOMINAL = round(
     sum(sign * value for _, value, _, sign in HUB_CHAIN_TERMS), 6
-)  # 13.75
+)  # 12.70
 HUB_CHAIN_BAND = round(sum(band for _, _, band, _ in HUB_CHAIN_TERMS), 6)  # 0.18
 HUB_LENGTH_FITTED_MIN = round(
     HUB_CHAIN_NOMINAL - HUB_CHAIN_BAND - HUB_NOSE_WINDOW[1], 6
-)  # 13.47
+)  # 12.42
 HUB_LENGTH_FITTED_MAX = round(
     HUB_CHAIN_NOMINAL + HUB_CHAIN_BAND - HUB_NOSE_WINDOW[0], 6
-)  # 13.93
+)  # 12.88
 # The model: the window's centre on the nominal chain.
-HUB_LENGTH_MODEL = round(HUB_CHAIN_NOMINAL - HUB_NOSE_WINDOW_CENTRE, 6)  # 13.70
+HUB_LENGTH_MODEL = round(HUB_CHAIN_NOMINAL - HUB_NOSE_WINDOW_CENTRE, 6)  # 12.65
 
 # --- Front bushing: m -------------------------------------------------------------
 # (term, nominal, band, sign): K = sum(sign * nominal); front bushing = K + m
@@ -146,14 +146,14 @@ FRONT_CHAIN_TERMS: tuple[tuple[str, float, float, int], ...] = (
 )
 FRONT_CHAIN_NOMINAL = round(
     sum(sign * value for _, value, _, sign in FRONT_CHAIN_TERMS), 6
-)  # 4.8775
+)  # 6.50875
 FRONT_CHAIN_BAND = round(sum(band for _, _, band, _ in FRONT_CHAIN_TERMS), 6)
 FRONT_BUSHING_FITTED_MIN = round(
     FRONT_CHAIN_NOMINAL - FRONT_CHAIN_BAND + FIT_WINDOW[0] + HUB_NOSE_WINDOW[0], 6
-)  # 4.1767
+)  # 5.80795
 FRONT_BUSHING_FITTED_MAX = round(
     FRONT_CHAIN_NOMINAL + FRONT_CHAIN_BAND + FIT_WINDOW[1] + HUB_NOSE_WINDOW[1], 6
-)  # 5.9783
+)  # 7.60955
 
 # --- Rear bushing: the float ------------------------------------------------------
 REAR_CHAIN_TERMS: tuple[tuple[str, float, float, int], ...] = (
@@ -169,41 +169,41 @@ REAR_CHAIN_TERMS: tuple[tuple[str, float, float, int], ...] = (
 )
 REAR_CHAIN_NOMINAL = round(
     sum(sign * value for _, value, _, sign in REAR_CHAIN_TERMS), 6
-)  # 6.45
+)  # 5.55625
 REAR_CHAIN_BAND = round(sum(band for _, _, band, _ in REAR_CHAIN_TERMS), 6)
 REAR_BUSHING_FITTED_MIN = round(
     REAR_CHAIN_NOMINAL - REAR_CHAIN_BAND - FIT_WINDOW[1] - FLOAT_WINDOW[1], 6
-)  # 5.33
+)  # 4.36085
 REAR_BUSHING_FITTED_MAX = round(
     REAR_CHAIN_NOMINAL + REAR_CHAIN_BAND - FIT_WINDOW[0] - FLOAT_WINDOW[0], 6
-)  # 6.67
+)  # 5.85165
 
 # --- The model: every window at its centre on the nominal chains --------------
 FRONT_BUSHING_MODEL = round(
     FRONT_CHAIN_NOMINAL + FIT_WINDOW_CENTRE + HUB_NOSE_WINDOW_CENTRE, 6
-)  # 5.0775
+)  # 6.70875
 REAR_BUSHING_MODEL = round(
     REAR_CHAIN_NOMINAL - FIT_WINDOW_CENTRE - FLOAT_WINDOW_CENTRE, 6
-)  # 6.0
+)  # 5.10625
 
 # Machine z of the model's faces, cluster REARWARD (the sleeve on the rear
 # bushing, its float open between the front bushing and the ring, the ring
 # on the groove's load wall; hub and disc on the step, the recess open).
 # Machine -Z is forward.
-ARM_REAR_Z = PIN.HEAD_SEAT_MACHINE_Z  # -116.4625
-ARM_FRONT_Z = ARM.FRONT_FACE_MACHINE_Z  # -124.4
+ARM_REAR_Z = PIN.HEAD_SEAT_MACHINE_Z  # -116.68125
+ARM_FRONT_Z = ARM.FRONT_FACE_MACHINE_Z  # -124.61875
 REAR_BUSHING_REAR_Z = ARM_FRONT_Z
-SLEEVE_REAR_Z = round(ARM_FRONT_Z - REAR_BUSHING_MODEL, 6)  # -130.4
-STEP_Z = round(SLEEVE_REAR_Z - SLEEVE.FACE_WIDTH, 6)  # -144.0, the spigot's seat
-DISC_FRONT_Z = round(SLEEVE_REAR_Z - SLEEVE.DISC_FRONT_STATION, 6)  # -147.65
-DISC_REAR_Z = round(DISC_FRONT_Z + DISC.FACE_WIDTH, 6)  # -144.65
-NOSE_Z = round(SLEEVE_REAR_Z - SLEEVE.OVERALL_LENGTH, 6)  # -157.75
-HUB_FRONT_Z = round(STEP_Z - HUB_LENGTH_MODEL, 6)  # -157.70
+SLEEVE_REAR_Z = round(ARM_FRONT_Z - REAR_BUSHING_MODEL, 6)  # -129.725
+STEP_Z = round(SLEEVE_REAR_Z - SLEEVE.FACE_WIDTH, 6)  # -144.0125, the spigot's seat
+DISC_FRONT_Z = round(SLEEVE_REAR_Z - SLEEVE.DISC_FRONT_STATION, 6)  # -147.98125
+DISC_REAR_Z = round(DISC_FRONT_Z + DISC.FACE_WIDTH, 6)  # -144.80625
+NOSE_Z = round(SLEEVE_REAR_Z - SLEEVE.OVERALL_LENGTH, 6)  # -156.7125
+HUB_FRONT_Z = round(STEP_Z - HUB_LENGTH_MODEL, 6)  # -156.6625
 FRONT_BUSHING_REAR_Z = NOSE_Z
-FRONT_BUSHING_FRONT_Z = round(NOSE_Z - FRONT_BUSHING_MODEL, 6)  # -162.8275
-RING_REAR_Z = round(FRONT_BUSHING_FRONT_Z - SLEEVE_FLOAT_WINDOW_CENTRE, 6)  # -163.0775
-RING_FRONT_Z = round(RING_REAR_Z - RING.THICKNESS, 6)  # -163.7125
-F_Z = round(ARM_REAR_Z - F_FROM_ARM_REAR, 6)  # -148.1
+FRONT_BUSHING_FRONT_Z = round(NOSE_Z - FRONT_BUSHING_MODEL, 6)  # -163.42125
+RING_REAR_Z = round(FRONT_BUSHING_FRONT_Z - SLEEVE_FLOAT_WINDOW_CENTRE, 6)  # -163.67125
+RING_FRONT_Z = round(RING_REAR_Z - RING.THICKNESS, 6)  # -164.30625
+F_Z = round(ARM_REAR_Z - F_FROM_ARM_REAR, 6)  # -148.43125
 # m with the cluster, hub and disc forward: the disc comes forward by the
 # sleeve's float and the hub's recess, together the disc's end float.
 MODEL_M = round(
@@ -212,7 +212,7 @@ MODEL_M = round(
 
 # The sleeve's rear face, cluster, hub and disc forward, from the arm's front
 # face: the rear bushing's fitted gap plus the sleeve's float (the rear
-# bushing can follow the sleeve forward), 6.25 .. 6.87 (the 12T over the
+# bushing can follow the sleeve forward), 4.66 .. 6.05 (the 12T over the
 # rack, the bushing to the rack's back face: build_pd_paper_drive_assembly).
 SLEEVE_REAR_FORWARD_FROM_ARM = (
     round(REAR_CHAIN_NOMINAL - REAR_CHAIN_BAND - FIT_WINDOW[1] - HUB_NOSE_WINDOW[1], 6),
@@ -226,10 +226,25 @@ BORE_DIAMETRAL_CLEARANCE = (
     round(BORE_DIA_BAND[0] - PIN.DIA_BAND[1], 3),
 )
 
+# The knob train's F from the arm's own faces (paper_drive_arm_registration's
+# KNOB_F_MACHINE_Z_MM: arm front face plus thickness, less the plate hub face,
+# thrust ring and 12T face width), against F_Z's pin-head-seat datum; and the
+# disc's front face at its fitted station from F: m at the window centre with
+# the disc's end float (sleeve float plus recess) open forward.
+_KNOB_F_Z = round(
+    ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS
+    - (ARM_PLATE.HUB_FACE_TO_MOUNTING + KNOB_RING.LENGTH + KNOB_SHAFT.FACE_WIDTH),
+    6,
+)
+_DISC_FRONT_STATION_Z = round(
+    _KNOB_F_Z + FIT_WINDOW_CENTRE + SLEEVE_FLOAT_WINDOW_CENTRE + HUB_NOSE_WINDOW_CENTRE,
+    6,
+)
+
 for _ok, _what in (
     (
-        math.isclose(DISC_FRONT_Z, -147.65, abs_tol=1e-6),
-        f"the disc's front face {DISC_FRONT_Z} left its station -147.65",
+        math.isclose(DISC_FRONT_Z, _DISC_FRONT_STATION_Z, abs_tol=1e-6),
+        f"the disc's front face {DISC_FRONT_Z} left its station {_DISC_FRONT_STATION_Z}",
     ),
     (
         math.isclose(MODEL_M, FIT_WINDOW_CENTRE, abs_tol=1e-6),
@@ -240,8 +255,8 @@ for _ok, _what in (
         "the model's ring is off the groove's load wall",
     ),
     (
-        math.isclose(F_Z, -148.1, abs_tol=1e-6),
-        f"F {F_Z} is off the knob train's -148.1",
+        math.isclose(F_Z, _KNOB_F_Z, abs_tol=1e-6),
+        f"F {F_Z} is off the knob train's {_KNOB_F_Z}",
     ),
     (
         math.isclose(HUB_FRONT_Z - NOSE_Z, HUB_NOSE_WINDOW_CENTRE, abs_tol=1e-6),

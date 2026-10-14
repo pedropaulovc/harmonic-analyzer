@@ -1,11 +1,11 @@
 r"""Reproduce the v2 cone pivot post and integrated crank pedestal.
 
-The v2 casting supplies the retained diameters, cone-axis, foot and mounting
-datums.  Its original 86 mm height came from the ch30 eight-view; this
-normal-24DP crank variant grows the actual body to ``BLOCK_HEIGHT``
-(dt_cone_pivot_post_spec, from dt_post_mount_stack) and keeps the 26.6 mm
-head so the raised crank boss remains inside the host outline.  The body,
-head and boss proportions otherwise retain the harvested feature geometry.
+The v2 casting supplies the cone-axis, foot and mounting datums.  Its
+original 86 mm height came from the ch30 eight-view; this normal-24DP crank
+variant grows the actual body to ``BLOCK_HEIGHT`` (dt_cone_pivot_post_spec,
+from dt_post_mount_stack) and keeps a ``HEAD_HEIGHT`` head so the raised crank
+boss remains inside the host outline.  The all-inch experiment snaps the body,
+head and boss proportions to inch fractions.
 
 The v2 coordinate frame is also authoritative: the body stands on Top at y=0,
 the crank bore runs straight along +Z, and the cone journal itself is yawed
@@ -175,10 +175,10 @@ def _head_surface_z(x: float) -> float:
 MAIN_BODY_MM3 = math.pi * BLOCK_RADIUS**2 * BLOCK_HEIGHT
 HEAD_SHELL_MM3 = math.pi * (HEAD_RADIUS**2 - BLOCK_RADIUS**2) * HEAD_HEIGHT
 #
-# Crank boss: a Ø21.93 cylinder from the head's tangent plane
-# (z = -CRANK_BOSS_NORTH_FACE) to +50.6591 minus the part of it already inside
-# the head -- at each x the head spans |z| <= s(x), and the boss starts at the
-# station, so the overlap column is s + min(station, s).
+# Crank boss: a CRANK_BOSS_DIA cylinder from the head's tangent plane
+# (z = -CRANK_BOSS_NORTH_FACE) to CRANK_BOSS_END_Z minus the part of it already
+# inside the head -- at each x the head spans |z| <= s(x), and the boss starts
+# at the station, so the overlap column is s + min(station, s).
 CRANK_BOSS_OUTSIDE_HEAD_MM3 = (
     math.pi * CRANK_BOSS_RADIUS** 2 * CRANK_BOSS_LENGTH
     - _disc_column_integral(
@@ -186,11 +186,11 @@ CRANK_BOSS_OUTSIDE_HEAD_MM3 = (
         lambda x: _head_surface_z(x) + min(-CRANK_BOSS_START_Z, _head_surface_z(x)),
     )
 )
-# Crank bore: the full Ø11.438 cylinder from the station through the boss
+# Crank bore: the full CRANK_BORE_DIA cylinder from the station through the boss
 # end; nothing stands proud of the tangent plane inside the boss disc, so
 # everything on that path is solid.
 CRANK_BORE_MM3 = math.pi * CRANK_BORE_RADIUS**2 * CRANK_BOSS_LENGTH
-# Cone pads: a Ø17.2 mid-plane cylinder of total length 42.011 whose axis is
+# Cone pads: a CONE_BOSS_DIA mid-plane cylinder of total length BLOCK_DIA whose axis is
 # yawed about Y and passes through the post axis, so a point at axial t and
 # radial p (in the yaw plane) sits at post radius sqrt(t² + p²) whatever the
 # yaw -- the body clips each column to |t| <= sqrt(R² - p²).
@@ -202,8 +202,8 @@ CONE_PADS_OUTSIDE_BODY_MM3 = (
 )
 CONE_BORE_MM3 = math.pi * BORE_RADIUS**2 * CONE_BOSS_LENGTH
 # Mounting holes: two through drills plus two counterbores; they clear the
-# crank bore (|x| <= 5.72 against a hole edge at 9.87) and, drilled last, are
-# not re-filled by any boss.
+# crank bore (the spec's print-worst webs) and, drilled last, are not
+# re-filled by any boss.
 ATTACHMENT_HOLES_MM3 = 2.0 * (
     math.pi * (ATTACHMENT_THRU_DIA / 2.0) ** 2 * (BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH)
     + math.pi * (ATTACHMENT_CBORE_DIA / 2.0) ** 2 * ATTACHMENT_CBORE_DEPTH
@@ -360,7 +360,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # 1. Main O42.011 body, from the unchanged foot to BLOCK_HEIGHT.
+    # 1. Main BLOCK_DIA body, from the unchanged foot to BLOCK_HEIGHT.
     main = SketchDims()
     check("create sketch MainBodyProfile", await adapter.create_sketch("Top"))
     await define_circle(
@@ -442,7 +442,7 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "CrankInterfacePlane")
     # The offset is authored toward -Z; SOLIDWORKS stores that as a positive
     # distance with the plane reversed, so the positive station drives it.  A
-    # sign slip would move the boss 42.75 mm and fail the final volume gate.
+    # sign slip would move the boss a head diameter and fail the final volume gate.
     drive_jobs.append(("D1@CrankInterfacePlane", '"CrankBossNearZ"'))
     crank_boss = SketchDims()
     check(
@@ -506,7 +506,7 @@ async def build(adapter: Any) -> dict[str, str]:
     volume -= CRANK_BORE_MM3
     await volume_check(adapter, "v2 crank bore", volume, 0.001 * volume)
 
-    # 4. O17.2 flush pads and O12.2808 journal on the inclined v2 axis.  Both
+    # 4. CONE_BOSS_DIA flush pads and BORE_DIA journal on the inclined v2 axis.  Both
     # are mid-plane extrusions from the harvested ConeShaftNormal reference
     # (material on both sides of the plane, so no cut-direction question).
     # Do not substitute an on-axis revolve here: that SolidWorks topology is
@@ -576,7 +576,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # 5. Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the
     # top face, ONE native Hole Wizard feature with two driven placement
     # points.  Drilled LAST, as the real casting is: the crank boss is cast
-    # integral and its Ø21.93 cylinder overlaps both Ø7.14 thru holes; a boss
+    # integral and its CRANK_BOSS_DIA cylinder overlaps both thru holes; a boss
     # extruded after the holes would re-fill a crescent of each and no 1/4
     # screw would pass.  All transverse booleans stop below the top face (the
     # spec guards boss containment), so it remains one +Y planar face for the
@@ -620,7 +620,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_sketch_direct_db(adapter, True)
     # Top-plane sketch X is model +X; sketch Y is model -Z, so the crank boss
-    # (model -21.3753..+50.6591 along +Z) runs from sketch +Y down to -Y.
+    # (model CRANK_BOSS_START_Z..CRANK_BOSS_END_Z along +Z) runs from sketch +Y down to -Y.
     #
     # Every line here is a RAY ROOTED AT THE ORIGIN, which is the post axis:
     # that is how the shop stations these faces, and it is also the only

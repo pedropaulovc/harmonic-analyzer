@@ -8,18 +8,19 @@ both parts.
 
 from __future__ import annotations
 
+from _inch import inch
 from dt_pinion_lever_geometry import HUB_OD, PIN_HOLE_DIA
 
 PIN_DIA = PIN_HOLE_DIA  # 1/16 in drill rod, in its match-drilled hole
 # Codex P1 (#844): cut OVERLENGTH, then trimmed and peened flush at assembly.
-# A pin cut to the hub's 13.0 at .X could be 12.2 in a 13.8 hub -- 0.8 short
-# of each face with nothing left to peen.  Both lengths print at .X (+/-0.8),
-# so the shortest pin still stands PEEN_ALLOWANCE proud of each face of the
-# largest hub.
+# A pin cut to the hub's OD at .X could be 0.8 short of it in a hub 0.8 over --
+# 0.8 short of each face with nothing left to peen.  Both lengths print at .X
+# (+/-0.8), so the shortest pin still stands PEEN_ALLOWANCE proud of each face
+# of the largest hub.
 HUB_OD_BAND = 0.8  # MHA-DT-016 HubOd prints .X
 PIN_LEN_BAND = 0.8  # the cut length prints .X
 PEEN_ALLOWANCE = 0.5  # minimum stock proud of each hub face, per end
-PIN_LEN = 16.0
+PIN_LEN = inch(5, 8)
 if PIN_LEN - PIN_LEN_BAND < HUB_OD + HUB_OD_BAND + 2.0 * PEEN_ALLOWANCE:
     raise AssertionError("shortest pin cannot be peened flush on the largest hub")
 

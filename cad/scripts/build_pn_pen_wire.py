@@ -1,10 +1,10 @@
 r"""Reproduction script: pen wire -- WIRE 2 of the amplification chain (book
 ch. 21/24, pp. 50-53 / 60-61).
 
-The steel wire that leaves the magnifying wheel's 100 mm rim groove and
+The steel wire that leaves the magnifying wheel's 3-15/16 rim groove and
 carries the pen rod (ch. 24: "square brass rod attached to the wire from the
 magnifying wheel"). The pen rod's wire hole sits exactly one wire-centre rim
-radius (RIM_WIRE_R 49.2: the wire seated in the rim groove) east of the wheel
+radius (RIM_WIRE_R 48.825: the wire seated in the rim groove) east of the wheel
 axis, so the hanging run is the vertical tangent off the groove's 3 o'clock
 point down to the hole. Modeled as the STRAIGHT REST-POSE RUN only
 -- the rim wrap over the wheel top and the tie-off knot are NOT modeled (the
@@ -13,11 +13,11 @@ the run's top rides the groove bottom line-to-line (no overlap volume).
 
 Endpoint derivation lives HERE; ``build_pn_pen_assembly`` imports
 ``WIRE_BOTTOM``/``WIRE_LEN`` and asserts them against its own layout anchors
-(pen-rod wire hole at machine y 513, wheel bar y 575.7), so a layout move
+(pen-rod wire hole at machine y 20-3/16, wheel bar y 22-11/16), so a layout move
 fails loud instead of leaving a floating wire.
 
 Dimensions: cad/config/dimensions.yaml ch. 21/24 -- wire dia photo-scaled
-(the book wire is hair-thin; 0.8 keeps it renderable, low confidence).
+(the book wire is hair-thin; .032 music wire keeps it renderable, low confidence).
 
 Layout: wire axis along +Y from the origin (bottom end at the pen-rod wire
 hole level; the assembly places it upright), length ``WIRE_LEN``.

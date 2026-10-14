@@ -23,8 +23,10 @@ PURE DATA, no SolidWorks/COM imports.
 
 from __future__ import annotations
 
+from _inch import inch
+
 # The ring leaves the bench at the 9/16-in rod's own OD and is skimmed to the
-# Ø12.5 grip contour with the MHA-DT-008 shoulder after the epoxy cures (user
+# Ø1/2 grip contour with the MHA-DT-008 shoulder after the epoxy cures (user
 # ruling 2026-10-01, local review of 47cb8a46b: glued on, the ring can sit
 # 0.175 off the reamed bore, so an oak shoulder turned true to the bore could
 # not finish flush with a pre-turned OD).  The default configuration is the
@@ -34,15 +36,17 @@ STOCK_DIA = 0.5625 * 25.4
 # commercial tolerance; not sourced in this repo).
 STOCK_DIA_MIN = round(STOCK_DIA - 0.002 * 25.4, 6)
 OUTER_DIA = STOCK_DIA
-# Ø12.5 x 7 as installed (user ruling 2026-09-30, ch30 eight-views-4: the
+# Ø1/2 x 5/16 in as installed (user ruling 2026-09-30, ch30 eight-views-4: the
 # ring reads ~Ø11-12, not the Ø15 first derived).
-INSTALLED_OUTER_DIA = 12.5
+INSTALLED_OUTER_DIA = inch(1, 2)
 INSTALLED_CONFIG = "INSTALLED"
-# 7.7 (local review of 1f3067ef2): the fitted tenon keeps 1.5 of oak over the
-# reamed pivot bore with 0.10 of eccentricity between them.
-BORE_DIA = 7.7
+# 5/16 in (local review of 1f3067ef2): the fitted tenon keeps 1.5 of oak over
+# the reamed pivot bore with 0.10 of eccentricity between them.
+BORE_DIA = inch(5, 16)
 BORE_DIA_TOL = 0.10
-LENGTH = 7.0
+# 5/16 in: at 1/4 the tenon cannot both keep 3.5 of glue length and stop short
+# of the arm face (dt_crank_handle_spec).
+LENGTH = inch(5, 16)
 
 # Brass wall, on radius, as made: the smallest stock over the largest bore.
 # The skimmed wall, with the ring off-centre, is MHA-DT-008's check.

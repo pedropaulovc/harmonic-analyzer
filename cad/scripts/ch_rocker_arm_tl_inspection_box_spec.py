@@ -16,7 +16,7 @@ the drawing dimensions only the shop's work: two clamp windows through the
 left wall, an access window through the back wall, and two #8-32 taps for the
 C stop bar in the front wall. The core runs vertically, so the base, right
 side and front face stay whole ground faces. Windows are rescaled from the
-inventory's 120 box (left 38/83 above the base -> 40/88; back 80 x 80 centred)
+inventory's 120 box (left 38/83 above the base -> 1-9/16 / 3-7/16; back 3-1/8 square centred)
 keeping their sizes; the clamp windows start just inside the front wall's
 inner face so a clamp jaw reaches it. Squareness after rework is re-checked
 by reversal on the granite (a note: fixtures carry no GD&T).
@@ -33,6 +33,7 @@ from __future__ import annotations
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_c_stop_bar_spec as bar
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _inch import inch
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 INCH = 25.4
@@ -43,13 +44,13 @@ CORE = BOX - 2.0 * WALL
 
 # Clamp windows through the left wall (model Right-plane sketch: u = -Z from
 # the front face, v = +Y from the base).
-WINDOW_W = 32.0  # along the left wall, from the front
-WINDOW_H = 24.0
-WINDOW_FRONT = 16.0  # from the front face: inside the front wall's inner face
-WINDOW_LOW_BASE = 40.0
-WINDOW_UP_BASE = 88.0
+WINDOW_W = inch(5, 4)  # along the left wall, from the front
+WINDOW_H = inch(15, 16)
+WINDOW_FRONT = inch(5, 8)  # from the front face: inside the front wall's inner face
+WINDOW_LOW_BASE = inch(25, 16)
+WINDOW_UP_BASE = inch(55, 16)
 # Access window through the back wall, centred (model Front-plane sketch).
-BACK_WINDOW = 80.0
+BACK_WINDOW = inch(25, 8)
 BACK_WINDOW_X0 = (BOX - BACK_WINDOW) / 2.0
 BACK_WINDOW_Y0 = (BOX - BACK_WINDOW) / 2.0
 
@@ -67,8 +68,8 @@ if BACK_WINDOW_X0 - _X < WALL:
 
 # C stop bar taps in the front wall, at the bar's own screw stations (the bar
 # bottom on the base plane, its left end flush with the left face).
-TAP_SPEC = HoleSpec("tapped", bar.SCREW_THREAD, end="blind", depth_mm=12.0,
-                    overrides_mm={"ThreadDepth": 10.0})
+TAP_SPEC = HoleSpec("tapped", bar.SCREW_THREAD, end="blind", depth_mm=inch(1, 2),
+                    overrides_mm={"ThreadDepth": inch(3, 8)})
 TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 TAP_X = bar.SCREW_X
 TAP_Y = bar.SCREW_Y

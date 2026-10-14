@@ -1,26 +1,27 @@
 r"""Reproduction script: pen hanger (book ch. 24, pp. 60-63).
 
 The black tapered strap bolted to the wheel support bar that hangs the
-pen rod's upper guide: a flat strap (3 thick) tapering 16 -> 10 wide,
+pen rod's upper guide: a flat 1/8 strap tapering 5/8 -> 3/8 wide,
 lying on the bar's front face and descending to a deep guide block with
-a 5.4 square channel the 5-square pen rod slides in -- the rod is
+a 7/32 square channel the 3/16-square pen rod slides in -- the rod is
 VERTICAL, so the channel is cut along Y through the block (an M6.4 fix:
 the first build wrongly tunnelled it along Z). The block reaches
 forward (-Z in the machine) so the pen rod hangs clear of the platen
 paper plane while the strap stays flush on the bar. The M6.10 fastener pass
-adds a #8-32 tap near the strap top (local (-6, 70.7) = machine
-(-3, 575.7): placed IDENTITY at machine x +3, locals map directly)
+adds a #8-32 tap near the strap top (local (HANGER_SCREW_LOCAL_X,
+SCREW_HOLE_XY[1]) = the wheel-bar screw axis: placed IDENTITY at the pen
+rod line, locals map directly)
 for the hanger-screw shank coming through the bar FROM BEHIND (the
-magnifying wheel's rim back face passes 1.0 in front of the strap, so no
+magnifying wheel's rim back face passes just in front of the strap, so no
 front-side head fits).
 
-Layout: origin at the guide block centre (machine (+3, 505, -157));
-block z -4..+18.1 (back face flush with the bar front at machine
-z -138.9), strap in the z = 15.1..18.1 band rising +Y to the bar band.
+Layout: origin at the guide block centre (machine (PEN_ROD_X, 19-7/8 in,
+PEN_Z_MID)); block z BLOCK_Z (back face flush with the wheel-bar front),
+strap in the STRAP_Z band rising +Y to the bar band.
 The part is authored MACHINE-handed and placed
 IDENTITY, so local axes are machine axes (the strap's sideways lean, its
 only x-asymmetric feature, runs toward machine east = local -x).
-Dimensions: cad/DIMENSIONS.md ch. 24 (M6.4, low).
+Dimensions: cad/DIMENSIONS.md ch. 24 (M6.4, low), authored in inch fractions.
 
 Run (SolidWorks already open)::
 
@@ -56,8 +57,10 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _holes import TAP_DRILL_MM, HoleSpec, wizard_holes
+from _inch import inch
 from vn_hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA
 from mg_wheel_bar_geom import (
+    BAR_SIDE as WHEEL_BAR_SIDE,
     HANGER_SCREW_LOCAL_X,
     HANGER_STRAP_TOP_LEFT_X,
 )
@@ -74,22 +77,29 @@ import _telemetry
 PART_NAME = "pn-pen-hanger"
 MATERIAL = "Plain Carbon Steel"  # black hardware
 
-BLOCK_HALF = 6.0  # guide block 12 x 12 (low)
-BLOCK_Z = (-4.0, 18.1)  # deep block: back face on the bar front (derived); the
-# rod line moved 5.5 forward of the bar (build_pn_pen_assembly PEN_Z_MID) so the
-# 45-degree v-block clears the paper, and the block deepens to keep the strap
-# flush on the bar
-GUIDE_HOLE_HALF = 2.7  # 5.4 square: the 5-square pen rod slides (derived)
-STRAP_Z = (15.1, 18.1)  # strap 3 thick, flush with the block back (derived)
-STRAP_TOP_Y = 75.7  # machine 580.7: bar top after the ch30 p002 wheel-bar
-# re-anchor (y 575.7) -- the strap stretches up to the raised bar while the
-# guide block stays put on the pen line (the pen geometry did not move)
-STRAP_TOP_X = (HANGER_STRAP_TOP_LEFT_X, 0.0)  # 16 wide at the bar (low)
-STRAP_BOT_X = (-5.0, 5.0)  # 10 wide at the block (low)
+BLOCK_HALF = inch(1, 4)  # guide block 1/2 x 1/2 (low)
+# Deep block: front face 3/16 ahead of the rod line; back face on the bar front
+# (derived: wheel-bar front z - PEN_Z_MID). The rod line sits forward of the bar
+# (build_pn_pen_assembly PEN_Z_MID) so the 45-degree v-block clears the paper,
+# and the block deepens to keep the strap flush on the bar.
+BLOCK_Z = (-inch(3, 16), 17.4625)  # -139.7 - -157.1625
+# 7/32 square channel the 3/16-square pen rod slides in (1/32: the nearest 1/16,
+# 3/16, is line-to-line on the rod).
+GUIDE_HOLE_HALF = inch(7, 64)
+# 3/32 flat strap: the 1/8 nearest-1/16 strap would eat the whole stock #8-32 x
+# 1/2 shank in the 3/8 wheel bar + strap stack (zero thread protrusion).
+STRAP_T = inch(3, 32)
+STRAP_Z = (round(BLOCK_Z[1] - STRAP_T, 6), BLOCK_Z[1])  # flush with the block back
 # M6.10: the selected hanger screw threads into the strap near its top through
-# an exact #8-32 tapped Hole Wizard feature.
+# an exact #8-32 tapped Hole Wizard feature, on the wheel-bar axis line
+# (derived: WHEEL_BAR_Y - the guide block's machine y, asserted by
+# build_pn_pen_assembly).
 SCREW_TAP_SPEC = HoleSpec("tapped", "#8-32")
-SCREW_HOLE_XY = (HANGER_SCREW_LOCAL_X, 70.7)
+SCREW_HOLE_XY = (HANGER_SCREW_LOCAL_X, 71.4375)
+# The strap runs up to the bar top (the bar is centred on the screw axis).
+STRAP_TOP_Y = round(SCREW_HOLE_XY[1] + WHEEL_BAR_SIDE / 2.0, 6)
+STRAP_TOP_X = (HANGER_STRAP_TOP_LEFT_X, 0.0)  # 5/8 wide at the bar (low)
+STRAP_BOT_X = (-inch(3, 16), inch(3, 16))  # 3/8 wide at the block (low)
 # Exact tapered-land bounds at the tap centre. The clearance bore's bar-end
 # ligament is checked in build_mg_wheel_bar; the receiver uses the thread major
 # diameter here, not the tap-drill diameter.
@@ -144,7 +154,7 @@ async def build(adapter) -> dict[str, str]:
     # batch after the whole model + a rebuild exists (every target must resolve).
     drive_jobs: list[tuple[str, str]] = []
 
-    # 1. Solid guide block: an origin-centred 12 x 12 square -- use
+    # 1. Solid guide block: an origin-centred 1/2 x 1/2 square -- use
     # define_centered_rectangle (width/depth/corner named directly).
     block = SketchDims()
     check("create_sketch block", await adapter.create_sketch("Front"))
@@ -166,8 +176,8 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"block volume {vol:.1f} != {expected:.1f}")
 
     # 1b. Square rod channel cut along Y (the pen rod hangs vertically).
-    # The +-2.7 footprint stays inside the block's z -4..18.1 band (BLOCK_Z) and
-    # well clear of the strap's z 15.1..18.1 band (STRAP_Z), so a through cut
+    # The +-GUIDE_HOLE_HALF footprint stays inside the block's BLOCK_Z band and
+    # well clear of the strap's STRAP_Z band, so a through cut
     # is safe.
     channel = SketchDims()
     check("create_sketch channel", await adapter.create_sketch("Top"))
@@ -242,8 +252,8 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"strap: added {added:.1f}, expected {v_strap:.1f}")
     expected = vol
 
-    # 3. Native #8-32 through tap in the deepened hanger's 3-mm strap.
-    # Drill from local z STRAP_Z[0] (15.1), outward normal -Z; the screw
+    # 3. Native #8-32 through tap in the deepened hanger's 1/8 strap.
+    # Drill from local z STRAP_Z[0], outward normal -Z; the screw
     # enters from behind the bar through the opposite face at STRAP_Z[1].
     screw_dia = TAP_DRILL_MM[SCREW_TAP_SPEC.size]
     screw_cut = wizard_holes(

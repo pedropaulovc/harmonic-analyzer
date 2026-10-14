@@ -11,20 +11,23 @@ same constants so the two can never drift.
 
 from __future__ import annotations
 
+from _inch import inch
 from mg_magnifying_wheel_geom import PEN_WIRE_DIA, RIM_WIRE_R
 
 WIRE_DIA = PEN_WIRE_DIA  # hair-thin in the photos; renderable stand-in (low)
 
 # --- endpoint anchors (machine frame; asserted by build_pn_pen_assembly) --------
-WHEEL_X = 53.0  # magnifying-wheel centre (build_mg_magnifier_assembly.WHEEL_X)
-WHEEL_BAR_Y = 575.7  # wheel axis height = the vertical-tangent point's y
-WHEEL_MID_Z = -146.9  # rim groove mid-plane (wheel mid-plane)
-WIRE_HOLE_Y = 513.0  # pen-rod wire hole: PEN_ROD_POS y 398 + local 115
+WHEEL_X = inch(33, 16)  # 2-1/16: magnifying-wheel centre (build_mg_magnifier_assembly.WHEEL_X)
+WHEEL_BAR_Y = inch(363, 16)  # 22-11/16: wheel axis height = the vertical-tangent point's y
+WHEEL_MID_Z = -147.75375  # rim groove mid-plane (mg_wheel_group.WHEEL_MID_Z, derived)
+# pen-rod wire hole: PEN_ROD_POS y 14-1/2 + rod-local 5-11/16 = 20-3/16 (asserted
+# by build_pn_pen_assembly)
+WIRE_HOLE_Y = inch(323, 16)
 
 # Hanging run: the wire centre rides the rim groove at RIM_WIRE_R; it leaves
 # the groove at the pen-rod-side (3 o'clock from the front) tangent, straight
-# down to the wire-hole level (the wire passes 1.7 clear in front of the
-# rod's z -149 front face -- the tie-off through the hole is implied).
-WIRE_X = round(WHEEL_X - RIM_WIRE_R, 6)  # 3.8
+# down to the wire-hole level (the wire runs behind the rod, clear of its
+# back face -- the tie-off through the hole is implied).
+WIRE_X = round(WHEEL_X - RIM_WIRE_R, 6)  # 3.5625
 WIRE_BOTTOM = (WIRE_X, WIRE_HOLE_Y, WHEEL_MID_Z)
-WIRE_LEN = WHEEL_BAR_Y - WIRE_HOLE_Y  # 62.7
+WIRE_LEN = WHEEL_BAR_Y - WIRE_HOLE_Y  # 63.5 (2-1/2)

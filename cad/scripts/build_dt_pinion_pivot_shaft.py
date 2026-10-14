@@ -7,7 +7,7 @@ the SEPARATE lift rod in the west bores -- build_dt_pinion_lift_rod.py).
 
 Layout: shaft axis Z, z 0..SHAFT_LEN (PR7: ends FLUSH with the pivot blocks'
 outer faces -- pinion_rig_layout -- instead of 2 proud), each end crowned by
-a shallow spherical cap (sagitta 1.2 -- the p.69 close-up's domed end
+a shallow spherical cap (SR 3/16 in, sagitta 1.21 -- the p.69 close-up's domed end
 visible inside the strap bore).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25".
@@ -72,8 +72,8 @@ _SAVED_DRAWING_PROPERTIES = (
 )
 
 SHAFT_R = SHAFT_DIA / 2.0
-CAP_R = (SHAFT_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 4.80 sphere radius
-V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 19.85 each
+CAP_R = (SHAFT_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 4.76 (3/16 in) sphere radius
+V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # each
 V_SHAFT = math.pi * SHAFT_R**2 * SHAFT_LEN
 
 

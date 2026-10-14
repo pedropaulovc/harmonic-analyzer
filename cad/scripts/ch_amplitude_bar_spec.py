@@ -19,10 +19,10 @@ MM_PER_IN = 25.4
 # --- The plates the notches straddle (restated, not imported: the channel and
 # rocker-bank closures import this module, so it reads no other part's spec;
 # test_ch_amplitude_bar_drawing pins each to its source). ---
-LEVER_THICKNESS = 3.0  # ch_channel_lever_spec.LEVER_THICKNESS (the top notch's)
-LEVER_THICKNESS_TOLERANCE = 0.10  # channel-lever note 2: "3.00 +/-0.10 OVERALL"
-STRAP_THICKNESS = 2.5  # ch_rocker_arm_spec.ARM_THICKNESS (the foot notch's)
-STRAP_THICKNESS_TOLERANCE = 0.508  # ch_rocker_arm_spec.LINEAR_2PL: "STRAP 2.50" at .XX
+LEVER_THICKNESS = 0.125 * MM_PER_IN  # ch_channel_lever_spec.LEVER_THICKNESS, 1/8 (the top notch's)
+LEVER_THICKNESS_TOLERANCE = 0.10  # channel-lever note 2: "+/-0.10 OVERALL"
+STRAP_THICKNESS = 0.09375 * MM_PER_IN  # ch_rocker_arm_spec.ARM_THICKNESS, 3/32 (the foot notch's)
+STRAP_THICKNESS_TOLERANCE = 0.508  # ch_rocker_arm_spec.LINEAR_2PL: the strap at .XX
 STRADDLE_RUNNING_FLOOR = 0.10  # rocker_bank_layout.RUNNING_FLOOR, oiled steel faces
 
 
@@ -36,10 +36,10 @@ def _straddle_minimum(plate: float, tolerance: float) -> float:
 
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 15"). ---
-BAR_LENGTH = 32.0 * MM_PER_IN - 4.5  # 808.3: legacy 32" (~80 cm) SHORTENED 4.5
-# at the TOP by the 2026-08-02 top-frame rederive (fulcrum chain -4.5: bar top
-# 1072.25 -> 1067.75, top pin 1065.9 -> 1061.4; the foot/arc contact at the
-# rocker is UNCHANGED, preserving the level d=0 rest pose)
+# 31-13/16 in (all-inch experiment; was 808.3 = legacy 32" less the 2026-08-02
+# top-frame rederive's 4.5): the nearest 1/16 that puts the d = 0 bar top pin
+# back on the snapped fulcrum line (lever level within 0.02 deg).
+BAR_LENGTH = 31.8125 * MM_PER_IN  # 808.0375
 BAR_WIDTH = 0.25 * MM_PER_IN  # 6.35 square section
 BAR_DEPTH = 0.25 * MM_PER_IN  # 6.35
 # Notch widths: interim one-sided bands (user ruling 2026-09-27, #1038). The

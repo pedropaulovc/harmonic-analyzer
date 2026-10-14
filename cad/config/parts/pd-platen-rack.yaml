@@ -14,6 +14,6 @@ pd-platen-rack:
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
-  process: "fabricated from purchased SDP/SI A 1B12-Y324 rack stock, cut to 269.64 mm and soft-soldered to the existing 7.2375 x 6 mm brass backer; backer soft-soldered to the platen"
+  process: "fabricated from purchased SDP/SI A 1B12-Y324 rack stock, cut to 269.875 mm (10-5/8 in) and soft-soldered to the 5.556 x 6.35 mm (7/32 x 1/4 in) brass backer; backer soft-soldered to the platen"
   installation_notes: |-
-    CUT TO 269.6 MM; SOFT-SOLDER TO BACKER; SET MESH AT ASSEMBLY.
+    CUT TO 269.9 MM; SOFT-SOLDER TO BACKER; SET MESH AT ASSEMBLY.

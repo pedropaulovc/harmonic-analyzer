@@ -31,6 +31,7 @@ from typing import NamedTuple
 import _gear_quality as quality
 
 import pd_transgear_feed_pinion_spec as FEED
+from _inch import inch
 from pd_platen_spec import PLATE_WIDTH
 
 MM_PER_IN = FEED.MM_PER_IN
@@ -56,8 +57,11 @@ if DP != PURCHASED_RACK_DP or PA_DEG != PURCHASED_RACK_PA_DEG:
 
 CUT_LENGTH_MM = PLATE_WIDTH
 BAR_LENGTH = CUT_LENGTH_MM  # rack and backer end flush with the platen
-BAR_HEIGHT = 12.0  # accepted exposed band below the guide rail
-BAR_THICKNESS = 6.0  # accepted edge-on photo envelope
+# Accepted exposed band below the guide rail. 13/32 (1/32 grid): the 1/2
+# nearest sixteenth puts the backer's top edge into the bottom guide rail and
+# 7/16 leaves it 0.12 under the rail, inside the seam height's printed .X band.
+BAR_HEIGHT = inch(13, 32)
+BAR_THICKNESS = inch(1, 4)  # accepted edge-on photo envelope (6.0)
 RACK_HEIGHT = PURCHASED_RACK_HEIGHT_IN * MM_PER_IN
 RACK_THICKNESS = PURCHASED_RACK_FACE_WIDTH_IN * MM_PER_IN
 BACKER_HEIGHT = BAR_HEIGHT - RACK_HEIGHT

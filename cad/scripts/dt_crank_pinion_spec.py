@@ -29,9 +29,11 @@ import math
 import _config
 import cone_line
 import dt_cone_pivot_post_installation
+import dt_cone_pivot_post_spec
 import dt_crank_drive_gear_spec
 import dt_crank_hub_geometry
 from _fit_deviations import deviations
+from _inch import inch
 from _gtol_cylinder import CylinderFace
 from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -160,10 +162,12 @@ STOCK_PROFILE_CORNERS = tuple(
     )
 )
 
-# Retain the established 9.0-mm crankshaft step and matching bore. The seat
-# keeps the through shaft's existing size band and fit, while the live boss
-# wall guard checks the standard full-depth root over that bore.
-SEAT_DIA = 9.0
+# The 16T rides an 11/32 in crankshaft step, one step under the 3/8 in shaft,
+# with a matching bore. (All-inch: 1/32, because the nearest 1/16, 3/8 in, is
+# the through shaft itself and would erase the ruled step.) The seat keeps the
+# through shaft's existing size band and fit, while the live boss wall guard
+# checks the standard full-depth root over that bore.
+SEAT_DIA = inch(11, 32)  # 8.731
 
 # The bore over the crankshaft's seat is the part's one critical fit, and the
 # only reason anything here prints a third decimal: a slip fit exists only if
@@ -330,7 +334,8 @@ PIN_STATION_LAYOUT_ALLOWANCE_MM = 0.25
 # are sized to print EXACTLY at their places, so no rounding of a printed
 # nominal can eat the margin (Codex P2 on #892): dt_crankshaft_spec floors the
 # shaft length to SHAFT_LENGTH_PLACES, which leaves the nominal recess between
-# its minimum and one printed unit more, and the boss is sized for the most.
+# its minimum and one printed unit more; the boss starts sized for the most
+# and is then shortened on the actual seat (below).
 OVERALL_LENGTH_PLACES = 1
 SHAFT_LENGTH_PLACES = 1  # dt_crankshaft_spec prints its Depth here
 FACE_WIDTH_PLACES = 1
@@ -359,11 +364,40 @@ _PIN_EDGE_CLOSING_TERMS = (
     + PIN_STATION_LAYOUT_ALLOWANCE_MM
     + _PIN_HOLE_RADIUS_GROWTH
 )
-# The exact shaft recess depends on its one-place floor and installed post
-# station; SHAFT_END_RECESS_MAX is the safe ceiling of that range. The shaft
-# spec independently checks the actual floor and proves that the next shorter
-# printable boss fails it. No tolerance or pin size is tightened for the photo.
+# The boss is the shortest one-place length whose actual W15 stacks hold on
+# the pinion's real seat. The seat is the restored MHA-DT-005 boss's north
+# face plus the feeler, a local station from the crankshaft's dome root at
+# CRANK_FACE_Z (owned here; the drive train imports it and asserts the
+# seat from both sides). The conservative sizing over SHAFT_END_RECESS_MAX is
+# the starting ceiling; each shorter printable boss is tried against the
+# shaft length it floors to, so a moved post can never leave a needlessly
+# long boss. dt_crankshaft_spec re-proves that the next shorter boss fails.
+# No tolerance or pin size is tightened for the photo.
+CRANK_FACE_Z = -183.0  # photo-anchored crank face, a placement anchor
+POST_BOSS_NORTH_LOCAL = (
+    cone_line.cone_station(cone_line.POST_STATION)[2]
+    - CRANK_FACE_Z
+    + dt_cone_pivot_post_spec.CRANK_BOSS_NORTH_FACE
+)
+SEAT_STATION = POST_BOSS_NORTH_LOCAL + SEAT_FEELER_MM
 BOSS_LENGTH_PLACES = OVERALL_LENGTH_PLACES
+_BOSS_STEP = 10.0**-BOSS_LENGTH_PLACES
+
+
+def w15_pin_edge_worst(boss_length: float) -> float:
+    """Print-worst pin edge to the recessed shaft end for a ``boss_length``
+    boss on the actual seat, with the shaft floored to its printed places."""
+    overall = round(FACE_WIDTH + boss_length, OVERALL_LENGTH_PLACES)
+    shaft_length = floor_to_places(
+        SEAT_STATION + overall - SHAFT_END_RECESS_MIN, SHAFT_LENGTH_PLACES
+    )
+    pin_station = FACE_WIDTH + boss_length / 2.0
+    return (
+        shaft_length - (SEAT_STATION + pin_station) - PIN_DIA / 2.0
+        - _PIN_EDGE_CLOSING_TERMS
+    )
+
+
 BOSS_LENGTH = ceil_to_places(
     2.0 * (
         PIN_EDGE_MIN_WORST
@@ -373,6 +407,10 @@ BOSS_LENGTH = ceil_to_places(
     ),
     BOSS_LENGTH_PLACES,
 )
+while w15_pin_edge_worst(round(BOSS_LENGTH - _BOSS_STEP, BOSS_LENGTH_PLACES)) >= PIN_EDGE_MIN_WORST:
+    BOSS_LENGTH = round(BOSS_LENGTH - _BOSS_STEP, BOSS_LENGTH_PLACES)
+if w15_pin_edge_worst(BOSS_LENGTH) < PIN_EDGE_MIN_WORST:
+    raise AssertionError("the W15 boss misses its pin-edge floor on the actual seat")
 OVERALL_LENGTH = round(FACE_WIDTH + BOSS_LENGTH, OVERALL_LENGTH_PLACES)
 for _name, _value, _places in (
     ("FACE_WIDTH", FACE_WIDTH, FACE_WIDTH_PLACES),

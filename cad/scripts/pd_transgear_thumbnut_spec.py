@@ -5,9 +5,9 @@ closure.  The nut runs on the #8-32 stud of the knob shaft (MHA-PD-008) and
 seats on the drive collar's (MHA-PD-022) pilot, faced at assembly to stand
 0.05-0.15 proud of the removable chain wheel's (MHA-PD-009, T24) front face, so
 the wheel floats free under it (R9-70, N-A).  Contract §1.6 (round 10):
-knurled head Ø20.5 × 8.7 with a dished front face (a cone from Ø15 at the
-rim to a flat Ø9 floor 1.0 deep), a Ø11 waist × 2.4 (ruling 5), a Ø12.4
-flange to the seat face, 16.1 long, #8-32 UNC-2B through with an entry
+knurled head Ø13/16 × 5/16 in with a dished front face (a cone from Ø9/16 at
+the rim to a flat Ø3/8 floor 1/16 deep), a Ø7/16 waist × 3/32 (ruling 5), a
+Ø1/2 flange to the seat face, 5/8 long, #8-32 UNC-2B through with an entry
 countersink at each end.  The stud's
 side of the engagement (tip station, tip chamfer, cut-to-fit) is MHA-PD-008's;
 this module owns only the nut's side of it.
@@ -28,33 +28,36 @@ from __future__ import annotations
 import math
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _inch import inch
 from _printed_tolerance import angular_band_deg, printed_deviations
 
 # --- Turned outline (contract §1.6) -------------------------------------------
-HEAD_DIA = 20.5  # knurl crests: the diameter over the knurl
-HEAD_LENGTH = 8.7
-# Straight knurl DIN 82 RAA 1.0 (R9-57): a 90° V at 1.0 pitch, so 64 teeth
-# round the Ø20.5 (pitch 1.006 at the crest) and a 0.5 deep tooth; the
-# sketch's 128-point star puts crests on HEAD_DIA, roots on KNURL_ROOT_DIA.
-KNURL_TEETH = 64
-KNURL_ROOT_DIA = 19.5
-KNURL_DESIGNATION = "DIN 82-RAA 1.0"
-KNURL_PITCH = 1.0
+HEAD_DIA = inch(13, 16)  # knurl crests: the diameter over the knurl
+HEAD_LENGTH = inch(5, 16)
+# Straight knurl 96 DP, ASME B94.6 (R9-57): a 90° V at pi/96 in circular
+# pitch, so 96 x 13/16 = 78 teeth round the Ø13/16 crest and a pitch/2 deep
+# tooth; the sketch's 156-point star puts crests on HEAD_DIA, roots on
+# KNURL_ROOT_DIA.  (DIN 82 RAA 1.0 no longer tracks on the inch head.)
+KNURL_TEETH = 78
+KNURL_PITCH = math.pi * 25.4 / 96.0  # 0.831 circular pitch at the crest
+KNURL_ROOT_DIA = HEAD_DIA - KNURL_PITCH
+KNURL_DESIGNATION = "96 DP ASME B94.6"
 KNURL_FLANK_ANGLE_DEG = 90.0
-WAIST_DIA = 11.0
-WAIST_LENGTH = 2.4
-FLANGE_DIA = 12.4
-OVERALL_LENGTH = 16.1
-FLANGE_LENGTH = OVERALL_LENGTH - HEAD_LENGTH - WAIST_LENGTH  # 5.0, not printed
+WAIST_DIA = inch(7, 16)
+# 3/32 in: 1/8 would move this sub-1/4 in waist 32 % (the 1/32 rule).
+WAIST_LENGTH = inch(3, 32)
+FLANGE_DIA = inch(1, 2)
+OVERALL_LENGTH = inch(5, 8)
+FLANGE_LENGTH = OVERALL_LENGTH - HEAD_LENGTH - WAIST_LENGTH  # 5.56, not printed
 # Dished front face: a conical recess from the rim's Ø down to a flat floor,
 # centred on the axis; the front countersink is cut in that floor.  The
 # machinist review of 6de7230aa found the earlier spherical cap (chord 15,
 # sagitta 1.2 to a point on the axis inside the tap drill) ended on the
 # countersink at no definite Ø: the floor gives the recess a definite inner
 # edge and its depth a real surface.
-DISH_DIA = 15.0  # at the rim
-DISH_FLOOR_DIA = 9.0  # the floor's outer edge, where the cone ends
-DISH_DEPTH = 1.0  # rim to the floor
+DISH_DIA = inch(9, 16)  # at the rim
+DISH_FLOOR_DIA = inch(3, 8)  # the floor's outer edge, where the cone ends
+DISH_DEPTH = inch(1, 16)  # rim to the floor
 
 
 def knurl_tooth_angle_deg(crest_dia: float, root_dia: float, teeth: int) -> float:
@@ -78,7 +81,7 @@ def knurl_tooth_angle_deg(crest_dia: float, root_dia: float, teeth: int) -> floa
 # The modelled knurl is the designated one: its crest pitch within 1 % of
 # the wheel's (the wheel tracks the circumference), its V within 2° of 90°,
 # and an even tooth count so the section plane cuts a crest on both sides.
-KNURL_CREST_PITCH = math.pi * HEAD_DIA / KNURL_TEETH  # 1.006
+KNURL_CREST_PITCH = math.pi * HEAD_DIA / KNURL_TEETH  # 0.831
 KNURL_TOOTH_ANGLE_DEG = knurl_tooth_angle_deg(HEAD_DIA, KNURL_ROOT_DIA, KNURL_TEETH)
 if (
     abs(KNURL_CREST_PITCH - KNURL_PITCH) > 0.01 * KNURL_PITCH
@@ -244,7 +247,7 @@ for _name, _margin in DISH_FLOOR_MARGINS.items():
 REAR_THREAD_LOSS = REAR_CSK_BREAK / math.tan(math.radians(CSK_HALF_ANGLE_MIN))
 FRONT_THREAD_LOSS = DISH_DEPTH + _DISH_DEPTH_HI + REAR_THREAD_LOSS
 
-# The Ø20.5 dimension is the diameter over the knurl; the designation gives
+# The Ø13/16 dimension is the diameter over the knurl; the designation gives
 # the pitch and the 90° tooth, so no tooth count prints (R9-57).  One line:
 # it prints in the dimension's above-callout compartment, and SolidWorks
 # keeps a two-line above callout in the document but prints none of it (run

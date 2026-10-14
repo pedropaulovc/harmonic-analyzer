@@ -16,11 +16,12 @@ the hub-seating face at Z0 and the outer face at +Z.
 from __future__ import annotations
 
 import ch_rocker_arm_spec as rocker
+from _inch import inch
 from _printed_tolerance import printed_deviations
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
-THICKNESS = 4.0
+THICKNESS = inch(3, 16)
 THICKNESS_PLACES = 2
 
 # The rim is the filing line: the button O.D. is the hub O.D. Codex round 3
@@ -30,7 +31,7 @@ THICKNESS_PLACES = 2
 OD = rocker.HUB_DIA
 OD_PLACES = 3
 # A button O.D. of HUB_DIA at the three-place band files the hub to about
-# 10.07-10.33, inside the hub's printed two-place O9.69-10.71.
+# 10.19-10.45, inside the hub's printed two-place O9.81-10.83.
 _OD_MIN, _OD_MAX = [round(OD + deviation, 12) for deviation in printed_deviations(OD, OD_PLACES)]
 _HUB_MIN, _HUB_MAX = [round(rocker.HUB_DIA + deviation, 12) for deviation in printed_deviations(rocker.HUB_DIA, 2)]
 if not (_HUB_MIN <= _OD_MIN and _OD_MAX <= _HUB_MAX):
@@ -69,10 +70,10 @@ SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_
 # The blind reviewer sees only the sheet: each note states a function.
 # Hardness lives in the Finish field.
 # drawing-guidelines.md rule 17 (walls and webs) wall: the rim between the printed O.D. lower limit and the bore.
-RIM_WALL_MIN = 1.78
+RIM_WALL_MIN = 1.84
 if round((_OD_MIN - BORE_DIA) / 2.0, 2) != RIM_WALL_MIN:
     raise AssertionError("filing-button stated rim wall drifted from its geometry")
-# Pending exception ruling: MHA-CH-006-TL-04 rim wall 1.78 MIN (#1369).
+# Pending exception ruling: MHA-CH-006-TL-04 rim wall 1.84 MIN (#1369).
 RIM_WALL_NOTE = f"RIM WALL {RIM_WALL_MIN:.2f} MIN."
 DRAWING_NOTES = (
     "RIM SETS THE FILED DIAMETER OF THE ROCKER ARM HUB; O.D. ROUND AND TRUE TO BORE.\n"

@@ -10,7 +10,7 @@ Layout (part frame of ``pd_transgear_arm_plate_geometry``: origin on K at the
 MOUNTING face, the Front Plane, which seats on the arm's rear face; +X/+Y the
 arm's axes; +Z to the rear):
 
-* ``PlateOutline`` (Front plane): the R12.5 end round about K, each side edge
+* ``PlateOutline`` (Front plane): the R1/2 end round about K, each side edge
   parallel to the long axis down to its kink [INFERENCE] and straight on to
   tangency with the round (symmetric about K), the top edge on the arm's
   upper edge; extruded ``THICKNESS_OVER_ARM`` toward +Z as ``Plate``.
@@ -28,8 +28,8 @@ arm's axes; +Z to the rear):
   printed countersink Ø; the revolved cuts' own profiles lie edge-on to the plan.
 
 Datums (all blanked): ``Axis1`` bore, ``Axis2``/``Axis3`` screw holes (-X,
-+X); planes ``RearFace`` (z = 5), ``HubFace`` (z = -20.5375), ``BossFace``
-(z = 8.5) and ``ScrewHolePlane``; the Front Plane is the mounting face.
++X); planes ``RearFace`` (z = 5.55625), ``HubFace`` (z = -20.6375), ``BossFace``
+(z = 8.73125) and ``ScrewHolePlane``; the Front Plane is the mounting face.
 
 Run (SolidWorks already open)::
 
@@ -927,7 +927,7 @@ async def build(adapter: Any) -> dict[str, str]:
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
     # The sourced H7 running bore and the hub and boss thrust faces, resolved
-    # on its exact native face (HubFace z -20.5375 and BossFace z 8.5 are
+    # on its exact native face (HubFace z -20.6375 and BossFace z 8.73125 are
     # unique).
     author_part_pmi(
         adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS,

@@ -12,13 +12,15 @@ the drawing data.
 
 from __future__ import annotations
 
-# --- block envelope (DIMENSIONS.md ch20, p.48, low) ---------------------------
-BLOCK_WIDTH = 20.0  # X
-BLOCK_HEIGHT = 26.0  # Y
-BLOCK_DEPTH = 12.0  # Z
+from _inch import inch
 
-# --- rod bores (engineered running/slip fits, 0.2 mm clearance over their rods)
-LEVER_BORE_DIA = 6.2  # Ø6 lever + clearance (along Z)
-LEVER_BORE_Y = 19.0  # bore centre height
-ROD_BORE_DIA = 5.2  # Ø5 vertical rod + clearance (along Y)
-ROD_BORE_X = 6.5  # skew offset from the lever-bore axis plane
+# --- block envelope (DIMENSIONS.md ch20, p.48, low; all-inch) ------------------
+BLOCK_WIDTH = inch(13, 16)  # X (was 20.0)
+BLOCK_HEIGHT = inch(1)  # Y (was 26.0)
+BLOCK_DEPTH = inch(1, 2)  # Z (was 12.0)
+
+# --- rod bores (engineered running/slip fits over their rods; drill-chart sizes)
+LEVER_BORE_DIA = inch(0.257)  # letter F drill on the Ø1/4 lever (along Z; was 6.2)
+LEVER_BORE_Y = inch(3, 4)  # bore centre height (was 19.0)
+ROD_BORE_DIA = inch(0.196)  # #9 drill on the Ø3/16 vertical rod (along Y; was 5.2)
+ROD_BORE_X = inch(1, 4)  # skew offset from the lever-bore axis plane (was 6.5)

@@ -3,12 +3,13 @@ r"""Pure-data dimensional contract shared by the pen marker and drawing."""
 from __future__ import annotations
 
 from _gtol_cylinder import CylinderFace
+from _inch import inch
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
-BARREL_DIA = 8.0  # (low)
-BARREL_TOP_Y = 110.0  # ch30 p002/p004 + v4_t00612: ~75 of barrel shows in front
-# of the 36 block plus the 6 nib reach -- a full-length marker, not a 60 stub
-CONE_H = 5.0  # tip nose (low) — the ch24 macro shows a blunt bullet nose
+BARREL_DIA = inch(5, 16)  # 5/16 brass rod stock (low)
+BARREL_TOP_Y = inch(69, 16)  # 4-5/16: ch30 p002/p004 + v4_t00612: ~75 of barrel shows in
+# front of the block plus the nib reach -- a full-length marker, not a 60 stub
+CONE_H = inch(3, 16)  # tip nose (low) — the ch24 macro shows a blunt bullet nose
 # (~0.6x dia), not the needle cone the old 12 gave; keep the same tip origin
 
 SURFACE_FINISHES = (

@@ -30,6 +30,7 @@ import math
 import ch_connecting_rod_spec as _rod
 import ch_rocker_arm_spec as _arm
 from _hole_spec import NUMBER_DRILL_MM
+from _inch import inch
 
 MM_PER_IN = 25.4
 
@@ -44,7 +45,7 @@ PIN_DIA_TOLERANCE = 0.005  # +/-, drill-rod grind
 PIN_INSTALLED_LENGTH = _rod.FORK_THICKNESS  # dressed flush with both tines
 # Cut length of the blank: the fork plus dressing stock at each end. 2-place,
 # printed on the pin sheet with its band (the bar pin's pattern).
-PIN_BLANK_LENGTH = 6.40
+PIN_BLANK_LENGTH = inch(1, 4)  # was 6.40
 PIN_BLANK_LENGTH_BAND = (0.13, -0.13)  # (upper, lower) deviations
 # Dressed ends stand nothing proud of the tine faces (the press-fit ruling).
 PIN_END_PROUD_MAX = 0.0
@@ -69,10 +70,10 @@ NEIGHBOUR_CLEARANCE_MIN = RUNNING_FLOOR + MARGIN_SPARE  # 0.35
 CROTCH_CLEARANCE_MIN = 1.0  # slot floor below the arm's bottom edge, all poses
 BRIDGE_TARGET = 2.0  # fork bridge below the slot floor: the drawing-guidelines.md rule 17 (walls and webs) target
 # Arm tilt less rod tilt, the swing the crotch must clear: the solved loop
-# (channel_kinematics, cam phase 0..360) spans -8.662..+1.061 deg with the
+# (channel_kinematics, cam phase 0..360) spans -7.940..+0.972 deg with the
 # rod closing the raised drive axis to the level rocker, restated here
 # rounded outward (test_ch_rod_pivot_fit pins it to the solved loop).
-RELATIVE_SWING_DEG = (-8.67, 1.07)
+RELATIVE_SWING_DEG = (-7.95, 0.98)
 _SWING_STEPS = 400
 
 

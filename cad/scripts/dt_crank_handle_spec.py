@@ -9,7 +9,7 @@ the pivot screw's slotted head recessed inside it.
 
 User rulings 2026-09-30 (ch30 eight-views-4, the true side view, and the
 approved CadQuery concept v4): the grip leaves the ferrule face flush with its
-OD, flares down to a slim waist, swells in an S-curve to the Ø21 maximum at
+OD, flares down to a slim waist, swells in an S-curve to the Ø13/16-in maximum at
 0.72 of the length, and domes down to an end round turned across the oak AND
 the bonded cup together, so wood and steel read as one rounded butt.  Five
 tangent arcs, in turn:
@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import math
 
+from _inch import inch
 from dt_crank_hub_geometry import EDGE_BREAK_MAX_MM, GENERAL_1PL_TOL_MM
 from dt_crank_handle_butt_cup_spec import (
     BODY_DIA as CUP_BODY_DIA,
@@ -51,18 +52,20 @@ from dt_crank_handle_ferrule_spec import (
     TENON_GLUE_LINE as FERRULE_TENON_GLUE_LINE,
 )
 
-# 2026-09-02 user re-read: overall 58 from the arm face; the ferrule and the
-# cup take its two ends.
-HANDLE_LENGTH = 58.0  # basic: ferrule arm face to cup face
-HANDLE_MAX_DIA = 21.0  # max diameter at the swell
+# 2026-09-02 user re-read: overall 58 from the arm face (all-inch: 2-5/16 in);
+# the ferrule and the cup take its two ends.
+HANDLE_LENGTH = inch(37, 16)  # basic: ferrule arm face to cup face
+HANDLE_MAX_DIA = inch(13, 16)  # max diameter at the swell
 # The turned grip contour's allowance, on diameter, against its arcs: the wood
 # grip is checked by eye and template, not by a profile frame (MHA-DT-008 review,
 # user ruling 2026-09-29).
 CONTOUR_ALLOWANCE_DIA = 0.5
-# Reamed running bore on the MHA-DT-032 Ø4.00 shoulder: limits 4.10-4.15,
-# printed as 4.10 +0.05/0 so the two-place nominal is the limit itself (local
-# review of fbf82ad96: 4.125 at two places printed 4.13 +/-0.025).
-PIVOT_BORE_DIA = 4.10
+# Reamed running bore on the MHA-DT-032 Ø5/32 shoulder: the former 4.10 on a
+# Ø4.00 shoulder, i.e. the shoulder plus 0.10, carried to the 5/32-in shoulder
+# and printed as the limit itself at two places, +0.05/0 (local review of
+# fbf82ad96: 4.125 at two places printed 4.13 +/-0.025).
+_PIVOT_SHOULDER_DIA = inch(5, 32)  # dt_crank_handle_pivot_screw_spec.SHOULDER_DIA (import cycle)
+PIVOT_BORE_DIA = round(_PIVOT_SHOULDER_DIA + 0.10, 2)
 PIVOT_BORE_BAND = (0.05, 0.0)
 
 # The tenon shoulder is where the ferrule seats, FERRULE_LENGTH from the arm
@@ -74,21 +77,22 @@ SHOULDER_R = FERRULE_OUTER_DIA / 2.0
 TENON_GLUE_LINE = FERRULE_TENON_GLUE_LINE
 TENON_DIA = FERRULE_BORE_DIA - sum(TENON_GLUE_LINE) / 2.0
 # Short enough that the longest tenon stops short of the shortest ferrule's
-# arm face, so the oak never bears on the arm.
-TENON_LENGTH = 5.0
+# arm face, so the oak never bears on the arm.  7/32 in: 3/16 leaves under 3.5
+# of glue length, 1/4 reaches the arm face.
+TENON_LENGTH = inch(7, 32)
 TENON_X0 = SHOULDER_X - TENON_LENGTH
 TENON_R = TENON_DIA / 2.0
 
 # Grip stations (x from the arm face) and radii, fitted to eight-views-4.
-WAIST_X = 12.0
-WAIST_R = 9.5 / 2.0
-INFLECTION_X = 20.0
-PEAK_X = 42.0
+WAIST_X = inch(1, 2)
+WAIST_R = inch(3, 8) / 2.0
+INFLECTION_X = inch(13, 16)
+PEAK_X = inch(13, 8)
 PEAK_R = HANDLE_MAX_DIA / 2.0
 # The dome is the circle through the swell (horizontal tangent) and this
 # theoretical point on the cup face plane; the end round replaces it at the
 # butt.
-DOME_THEORETICAL_R = 6.0
+DOME_THEORETICAL_R = inch(1, 4)
 
 # The counterbore is bored to suit the actual MHA-DT-035 body for an epoxy line;
 # the oak ends at its mouth, the end round running out on the cup.

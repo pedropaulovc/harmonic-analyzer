@@ -52,6 +52,8 @@ import sys
 
 import fr_harmonic_base_spec
 import ms_measuring_stick_assembly_spec as ms
+from frame_column_stations import COLUMN_X
+from fr_tube_frame_spec import OUTER_DIA as COLUMN_OUTER_DIA
 from _check import check
 from _custom_properties import apply_custom_properties
 from _paths import OUT_PNG, OUT_SLDASM
@@ -90,11 +92,11 @@ SUBASSEMBLIES = (
 # columns, the stick along Z, GRADUATIONS UP (ms_measuring_stick_assembly_spec:
 # the bar's graduated face bears on the stop's roof, +Y of the stop frame). The
 # user ruling of 2026-10-09 (#1310) took away the raised rim and set a black
-# deck at x -167..167, 3.0 above the land, so the whole stop sits in the land
-# corridor between the deck's east edge and the column east face (x -184.3).
-# The column pair leaves only 198.6 along Z for the 200 bar, so the bar stays
-# east of the column band, clear of the crank column (x >= -150.7) and the front
-# rocker-support band (z <= -118).
+# deck at x -166.69..166.69 (13-1/8 in), 1/8 in above the land, so the whole
+# stop sits in the land corridor between the deck's east edge and the column
+# east face (x -184.15). The column pair leaves only 200.03 along Z for the
+# 200.03 (7-7/8 in) bar, so the bar stays east of the column band, clear of the
+# crank column (x >= -150.7) and the front rocker-support band (z <= -118).
 #
 # The stop frame maps X (along the stick) -> machine +Z, Y (thumbscrew axis,
 # up to the roof) -> machine +Y, Z (cover into the block) -> machine -X; the
@@ -109,7 +111,7 @@ assert all(
 
 LAND_TOP_Y = fr_harmonic_base_spec.GREEN_TOP  # the green land the stop rests on
 STOP_LAND_GAP = 0.25  # thumbscrew head bottom above the land (sliver margin)
-PARK_WEST_LIMIT_X = -184.3  # column east face
+PARK_WEST_LIMIT_X = -(COLUMN_X - COLUMN_OUTER_DIA / 2.0)  # column east face, -184.15
 PARK_EAST_LIMIT_X = -fr_harmonic_base_spec.DECK_HALF_X  # the deck's east edge
 PARK_FRONT_LIMIT_Z = -118.0  # front rocker-support band (z <= -118)
 

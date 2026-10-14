@@ -6,8 +6,8 @@ PURE DATA + math, no SolidWorks/COM and no drawing imports.
 edit that breaks the stack fails the assembly at import.
 
 Axial stations ``d`` run from the wheel bar's FRONT face toward the pen
-(machine z = BAR_FRONT_Z - d): bar -9..0, back washer, wheel hub (spokes'
-mid-plane at d 8), endshake, front washer, nut, locknut, then the pin's thread
+(machine z = BAR_FRONT_Z - d): bar -3/8..0, back washer, wheel hub (spokes'
+mid-plane at d 8.05375), endshake, front washer, nut, locknut, then the pin's thread
 end and domed tip. The pin is pressed to a gauge from the bar's front face,
 its back end about flush with the back face.
 """
@@ -24,7 +24,7 @@ import vn_wheel_axle_back_washer_spec as _back
 import vn_wheel_axle_front_washer_spec as _front
 import vn_wheel_axle_nut_spec as _nut
 
-BAR_FRONT_Z = -138.9  # the wheel bar's front face (build_mg_magnifier_assembly)
+BAR_FRONT_Z = -139.7  # the wheel bar's front face (build_mg_magnifier_assembly; was -138.9)
 
 # --- the endshake: set at assembly with the nut, by feeler ------------------------
 ENDSHAKE = 0.10  # modelled
@@ -34,16 +34,19 @@ ENDSHAKE_MAX = 0.15
 # --- nominal stations (d) ------------------------------------------------------------
 BACK_WASHER_D = 0.0
 HUB_BACK_D = BACK_WASHER_D + _back.MODEL_THICKNESS  # 0.91
-SPOKE_MID_D = HUB_BACK_D + _wheel.HUB_BACK_Z  # 8.0
-HUB_FRONT_D = HUB_BACK_D + _wheel.HUB_LEN  # 20.51
-FRONT_WASHER_D = HUB_FRONT_D + ENDSHAKE  # 20.61
-NUT_D = FRONT_WASHER_D + _front.MODEL_THICKNESS  # 21.25
-LOCKNUT_D = NUT_D + _nut.THICKNESS  # 23.631
-LOCKNUT_FACE_D = LOCKNUT_D + _nut.THICKNESS  # 26.013
-WHEEL_MID_Z = round(BAR_FRONT_Z - SPOKE_MID_D, 6)  # -146.9
-if not math.isclose(SPOKE_MID_D, 8.0):
+SPOKE_MID_D = HUB_BACK_D + _wheel.HUB_BACK_Z  # 8.05375
+HUB_FRONT_D = HUB_BACK_D + _wheel.HUB_LEN  # 21.5475
+FRONT_WASHER_D = HUB_FRONT_D + ENDSHAKE  # 21.6475
+NUT_D = FRONT_WASHER_D + _front.MODEL_THICKNESS  # 22.2875
+LOCKNUT_D = NUT_D + _nut.THICKNESS  # 24.669
+LOCKNUT_FACE_D = LOCKNUT_D + _nut.THICKNESS  # 27.05
+WHEEL_MID_Z = round(BAR_FRONT_Z - SPOKE_MID_D, 6)  # -147.75375
+# The pen line (pn_pen_wire_geom.WHEEL_MID_Z) restates this station: all-inch
+# 0.91 vendor washer + the 9/32 hub back face (was 8.0).
+PEN_LINE_D = 8.05375
+if not math.isclose(SPOKE_MID_D, PEN_LINE_D):
     raise AssertionError(
-        f"spoke mid-plane moved to d {SPOKE_MID_D}; the pen line is at 8"
+        f"spoke mid-plane moved to d {SPOKE_MID_D}; the pen line is at {PEN_LINE_D}"
     )
 
 # --- stack corners (the printed and catalogue bands) -----------------------------------
@@ -137,9 +140,9 @@ if not _nut.ACROSS_CORNERS / 2.0 < _lever.DRUM_DIA / 2.0:
 # PLATE_Y0 + PLATE_HEIGHT - PAPER_HEIGHT - 3.0 to + PAPER_HEIGHT) about the
 # marker tip's rest height (build_pn_pen_assembly.MARKER_POS); the test pins
 # these literals to those modules.
-MARKER_TIP_REST_Y = 363.25
-PAPER_BOTTOM_Y = 324.554
-PAPER_TOP_Y = 405.054
+MARKER_TIP_REST_Y = 364.08125
+PAPER_BOTTOM_Y = 323.85
+PAPER_TOP_Y = 404.8125
 PEN_DOWN_MAX = MARKER_TIP_REST_Y - PAPER_BOTTOM_Y  # 38.696
 PEN_UP_MAX = PAPER_TOP_Y - MARKER_TIP_REST_Y  # 41.804
 # Seen from the front, pen down turns the wheel clockwise (the pen wire leaves

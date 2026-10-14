@@ -7,7 +7,8 @@ stations against, so it belongs with the amplitude subsystem, not in a helper.
 This module is the single configuration read point for ``ms_stick_spec``
 and the offline ``error_budget`` station-to-reading conversion. Neither
 copies the graduation pitch. It has no drawing or SolidWorks dependencies.
-The unchanged scale spans 142 mm at 14.2 mm per full division.
+The scale spans 142.875 mm (5-5/8 in) at the configured 9/16 in (14.2875 mm,
+was 14.2) per full division.
 """
 
 from __future__ import annotations
@@ -23,5 +24,5 @@ DIVISION_COUNT: int = int(
 MINOR_PER_DIVISION: int = int(
     _config.machine("amplitude", "stick_minor_per_division")
 )  # tenths per division
-MINOR_SPACING: float = DIVISION_SPACING / MINOR_PER_DIVISION  # 1.42
-SCALE_SPAN: float = (DIVISION_COUNT - 1) * DIVISION_SPACING  # 0-to-10 span, 142.0
+MINOR_SPACING: float = DIVISION_SPACING / MINOR_PER_DIVISION  # 1.42875
+SCALE_SPAN: float = (DIVISION_COUNT - 1) * DIVISION_SPACING  # 0-to-10 span, 142.875

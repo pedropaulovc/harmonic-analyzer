@@ -11,6 +11,7 @@ from _hole_spec import HoleSpec, THREAD_MAJOR_MM, blind_cut_dia_mm
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
+from _inch import inch
 from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
 
 
@@ -19,26 +20,26 @@ MM_PER_IN = 25.4
 # Black japanned gray-iron bearing post that clamps one end of the
 # stationary cylinder arbor: a low rectangular foot flange, a tapered strap
 # rising to a semicircular dome around the arbor clamp bore, and one #8
-# hold-down hole through the outboard ledge (U34c: ch12 p.18 img09 shows a
-# single slotted fillister centred on a flange about 18 long outboard of the
-# strap root).
-FOOT_WIDTH = 24.0  # X plan width of the foot flange
-FOOT_DEPTH = 28.0  # Z plan depth of the foot flange: 10 strap + 18 ledge
-FOOT_HEIGHT = 5.0  # low flange height under the strap
-STRAP_T = 10.0  # strap depth; far face is coplanar with the foot far face
+# hold-down hole through the outboard ledge (U34c: ch12 p.18 img09
+# shows a single slotted fillister centred on a flange about 3/4 in long
+# outboard of the strap root).
+FOOT_WIDTH = inch(15, 16)  # X plan width of the foot flange
+FOOT_DEPTH = inch(9, 8)  # Z plan depth of the foot flange: 3/8 strap + 3/4 ledge
+FOOT_HEIGHT = inch(3, 16)  # low flange height under the strap
+STRAP_T = inch(3, 8)  # strap depth; far face is coplanar with the foot far face
 # Local Z stations. The part origin sits in the strap band, and the band never
 # moved when U34c grew the foot outboard, so every station hangs off the
 # strap's INNER face -- the one the end disc runs against and the foot's far
 # face is flush with. The drive train anchors each pedestal on that face.
-STRAP_INNER_Z = 8.0  # strap inner face = foot far face (local +Z)
-STRAP_ROOT_Z = STRAP_INNER_Z - STRAP_T  # strap outer face / ledge root, -2
-FOOT_NEAR_Z = STRAP_INNER_Z - FOOT_DEPTH  # outboard end of the ledge, -20
-FOOT_MID_Z = (STRAP_INNER_Z + FOOT_NEAR_Z) / 2.0  # plan centre of the foot, -6
-LEDGE_DEPTH = FOOT_DEPTH - STRAP_T  # exposed hold-down ledge, 18
-# Dome radius = strap half-width at the top. R11, not the photographed R10:
-# the crown carries the MHA-VN-034 apex set screw (#743, below), and only R11
-# leaves it 1.5D of full thread at the printed worst case.
-TOP_RADIUS = 11.0
+STRAP_INNER_Z = inch(5, 16)  # strap inner face = foot far face (local +Z)
+STRAP_ROOT_Z = STRAP_INNER_Z - STRAP_T  # strap outer face / ledge root, -1/16
+FOOT_NEAR_Z = STRAP_INNER_Z - FOOT_DEPTH  # outboard end of the ledge, -13/16
+FOOT_MID_Z = (STRAP_INNER_Z + FOOT_NEAR_Z) / 2.0  # plan centre of the foot
+LEDGE_DEPTH = FOOT_DEPTH - STRAP_T  # exposed hold-down ledge, 3/4
+# Dome radius = strap half-width at the top. R7/16, not the photographed R10:
+# the crown carries the MHA-VN-034 apex set screw (#743, below), and only the
+# larger crown leaves it 1.5D of full thread at the printed worst case.
+TOP_RADIUS = inch(7, 16)
 BORE_DIA = 9.55  # finished running bore for the 3/8 in cylinder-arbor journal
 BORE_DIA_BAND = (0.03, 0.0)  # 9.550–9.580 mm running-bore limits
 BORE_HEIGHT = PLATFORM_THICKNESS_MM + CONE_AXIS_HEIGHT_MM
@@ -60,8 +61,8 @@ TAPER_TANGENT_Y = (
 # bears on a 1.1 annulus.
 SCREW_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
 SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)
-# Hold-down hole centre, local z: centred on the 18 ledge, 9 outboard of the
-# strap root. Shared, because the plan view dimensions the hole from the
+# Hold-down hole centre, local z: centred on the 3/4 ledge, 3/8 outboard of
+# the strap root. Shared, because the plan view dimensions the hole from the
 # strap inner face and must not restate the number.
 SCREW_Z = STRAP_ROOT_Z - LEDGE_DEPTH / 2.0
 
@@ -76,7 +77,7 @@ SCREW_Z = STRAP_ROOT_Z - LEDGE_DEPTH / 2.0
 # (through-next), never into the strap below it.
 SET_SCREW_THREAD = "#4-40"
 SET_SCREW_HOLE_SPEC = HoleSpec("tapped", SET_SCREW_THREAD, end="through_next")
-SET_SCREW_Z = STRAP_INNER_Z - STRAP_T / 2.0  # local z +3: strap mid-depth
+SET_SCREW_Z = STRAP_INNER_Z - STRAP_T / 2.0  # local z +1/8: strap mid-depth
 SET_SCREW_PITCH = 25.4 / 40.0
 SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # drawing-guidelines.md rule 18 (thread engagement): >= 1.5D of full thread
 
@@ -114,7 +115,7 @@ def set_screw_engagement_d(top_radius: float) -> float:
 
 
 # R10 (the photographed crown) leaves 3.45 of full thread = 1.21D and fails;
-# R11 leaves 4.46 = 1.57D.
+# R7/16 leaves about 4.6 = 1.6D.
 SET_SCREW_FULL_THREAD_MM = sum(set_screw_wall_terms(TOP_RADIUS).values())
 SET_SCREW_ENGAGEMENT_D = set_screw_engagement_d(TOP_RADIUS)
 if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:

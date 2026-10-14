@@ -7,24 +7,26 @@ its engagement without importing a COM build script.
 Bar frame (the build's): bar axis along X with the origin at the bar centre;
 height along Y (y = 0 at mid-height); depth along Z with the FRONT face at
 z = -BAR_DEPTH/2 and the BACK face at z = +BAR_DEPTH/2.  The paper-drive
-assembly places it without rotation at machine (0, 303.734, -134.4), so the
-back face is machine z -129.9.
+assembly places it without rotation on the bar centre line, its back face on
+the front clamp arcs (machine z -129.9).
 
 Ch. 23 hanger holes (contract §5), all entering the BACK face:
 
 * the MHA-VN-041 pivot screw's #8-32 blind tap at the arm pivot P, machine
-  (-58, 303.234): a flat-bottomed tap drill (drill + end mill; no drill-point
-  cone) 6.8 +0/-0.4 deep, full thread 5.2 minimum (bottoming tap), entry
-  countersink Ø4.3 max so the shoulder's end ring still bears;
+  x -2-5/16, 1/32 below the bar centre: a flat-bottomed tap drill (drill + end
+  mill; no drill-point cone) 1/4 +0/-0.4 deep, full thread 3/16 minimum
+  (bottoming tap), entry countersink Ø5/32 max so the shoulder's end ring
+  still bears;
 * the latch hook's (MHA-PD-014) two #4-40 THROUGH taps for its base screws
-  (MHA-VN-043) at machine x 65.0 and 72.0 on the same line, countersunk Ø3.1
-  max both faces (their exits on the front face lie under the platen
-  footprint, machine x -33.25..236.39).
+  (MHA-VN-043) at machine x 2-9/16 and 2-13/16 on the same line, countersunk
+  Ø1/8 max both faces (their exits on the front face lie under the platen
+  footprint).
 """
 
 from __future__ import annotations
 
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
+from _inch import inch
 
 # 28 tall (Y), the top edge carrying the hanging platen's top rail at machine
 # y 317.734 and the bottom edge 1.0 above the bottom rail (the paper-drive
@@ -37,37 +39,50 @@ from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 # photo's bright band between the rails at ~25 -- both well over 22. One lock
 # plate size then serves both rails (the user's 2026-10-11 ruling: 1 lip +
 # 5 rail + ~3 bar overlap, top and bottom).
-BAR_HEIGHT = 28.0
+#
+# All-inch experiment: 1-1/8 x 3/8 flat bar (was 28 x 9). The rails' screw
+# rows now stand 1-11/32 apart (pd_platen_spec.GUIDE_HOLE_Y): 1-1/8 bar +
+# 3/16 rail + a 1/32 running clearance over the bottom rail.
+BAR_HEIGHT = inch(1 + 1 / 8)
 # The bar's .XXX height band: the bottom rail's running clearance under the
 # bar spends it (build_pd_paper_drive_assembly._assert_lock_retention).
 # build_pd_support_bar authors it natively on Height@BarProfile.
 BAR_HEIGHT_BAND = 0.13
-BAR_DEPTH = 9.0  # deep (Z) -- front face rubs the platen back (low)
+# 3/8 deep (Z) -- front face rubs the platen back (low). 11/32 would leave
+# the latch-hook bracket screws' tips proud of the front face
+# (vn_latch_hook_bracket_screw_spec.tip_short_worst).
+BAR_DEPTH = inch(3, 8)
 # The pivot floor and the latch-hook-bracket-screw (MHA-VN-043) tips need the bar's
-# thickness at 9.000 ±0.13 (.XXX); at .XX the floor would be 1.69 worst.
+# thickness at 3/8 ±0.13 (.XXX).
 # build_pd_support_bar authors it natively on Depth@Bar.
 BAR_DEPTH_BAND = 0.13
 BAR_BAND_PLACES = 3  # both bands print .XXX
 BACK_FACE_Z = BAR_DEPTH / 2.0
 
-HANGER_TAP_Y = -0.5  # machine y 303.234 on the 303.734 bar centre
+# 1/32 below the bar centre (was 0.5 below; the 1/16 grid would snap the
+# offset to 0, a >25% move of a sub-1/4 feature): 17/32 above the bottom edge.
+HANGER_TAP_Y = -inch(1, 32)
 
 # --- MHA-VN-041 pivot tap -------------------------------------------------------
-PIVOT_TAP_X = -58.0
+PIVOT_TAP_X = -inch(2 + 5 / 16)
 PIVOT_TAP_THREAD = "#8-32"
-PIVOT_TAP_DRILL_DEPTH = 6.8
+PIVOT_TAP_DRILL_DEPTH = inch(1, 4)
 PIVOT_TAP_DRILL_DEPTH_LIMITS = (-0.4, 0.0)
-PIVOT_TAP_FULL_THREAD_MIN = 5.2
-PIVOT_TAP_CSK_DIA = 4.3  # MAX
+# A bottoming tap's ~1.5-pitch lead under the 1/4 drill's shallowest 0.4
+# leaves 3/16 of full thread: exactly the MHA-VN-041 thread length.
+PIVOT_TAP_FULL_THREAD_MIN = inch(3, 16)
+# MAX. 5/32 (1/32 grid): 3/16 would swallow the shoulder's end ring
+# (transgear_hanger_joints).
+PIVOT_TAP_CSK_DIA = inch(5, 32)
 # The Hole Wizard's blind tap always carries a 118-degree drill point, which
 # the flat-bottomed drill forbids, so the build cuts the tap drill as a flat
 # blind cylinder; its thread is this spec's, not a wizard feature's.
 PIVOT_TAP_DRILL_DIA = TAP_DRILL_MM[PIVOT_TAP_THREAD]
 
 # --- Latch-hook base taps (MHA-PD-014's base, MHA-VN-043 screws) -----------------
-BRACKET_TAP_X = (65.0, 72.0)
+BRACKET_TAP_X = (inch(2 + 9 / 16), inch(2 + 13 / 16))
 BRACKET_TAP_SPEC = HoleSpec("tapped", "#4-40")
-BRACKET_TAP_CSK_DIA = 3.1  # MAX, both faces
+BRACKET_TAP_CSK_DIA = inch(1, 8)  # MAX, both faces
 
 TAP_CSK_ANGLE_DEG = 90.0
 

@@ -10,12 +10,12 @@ User rulings 2026-09-30 (ch30 eight-views-4 side view, approved CadQuery
 concept v4): the cup is a plain cup, no flange, seated flush with the oak's
 end; after the epoxy cures the handle's end round is turned on the oak, clear of the
 cup, whose face stays flat (local review of fbf82ad96).  Formerly: turned across the oak and
-the cup together, so wood and steel read as one rounded butt.  The smaller
-MHA-DT-032 head (Ø6) lets the cup shrink to the photographed size, and the pocket
+the cup together, so wood and steel read as one rounded butt.  The small
+MHA-DT-032 head (Ø1/4 in) keeps the cup near the photographed size, and the pocket
 wall is thin -- 0.8 at its worst case -- a named drawing-simplicity-policy
 exception: the wall carries no load (the head bears on the floor, and the oak
-round the bonded body backs it), and a 1.5 wall would push the butt to Ø13.4
-against the photograph's ~Ø10.
+round the bonded body backs it), and a 1.5 wall would push the butt well past
+the photograph's ~Ø10.
 
 The pocket is bored to suit the MHA-DT-032 head; the handle's end play is fitted
 on the screw shoulder at assembly, so no length here is a stack term.  The
@@ -33,27 +33,36 @@ PURE DATA, no SolidWorks/COM imports.
 
 from __future__ import annotations
 
-BODY_DIA = 8.2
+import math
+
+from _inch import inch
+
+# 11/32 in (all-inch experiment): 5/16 leaves the pocket wall round the
+# 1/4-in MHA-DT-032 head under its 0.8.
+BODY_DIA = inch(11, 32)
 BODY_DIA_TOL = 0.10
 # Every axial size reads from the outer face, the one faced end (MHA-DT-035
 # re-review): overall and pocket depth.  The floor is what remains, so the
 # overall carries enough that its .X worst case, over the deepest banded
-# pocket, still leaves 1.5.
-OVERALL_LENGTH = 8.1
+# pocket, still leaves 1.5 (5/16 and 11/32 in do not, over the 1/4-in pocket).
+OVERALL_LENGTH = inch(3, 8)
 # Deep enough that the longest banded MHA-DT-032 head, at the widest fitted end
 # play, still sits below the face (Codex P2 on #1139: at 5.0 .X against a 4.0
-# .X head it could stand 1.6 proud).  User ruling 2026-09-30.
-POCKET_DEPTH = 5.5
+# .X head it could stand 1.6 proud).  User ruling 2026-09-30.  1/4 in: the
+# nearer 3/16 leaves the 3/16-in head proud.
+POCKET_DEPTH = inch(1, 4)
 POCKET_DEPTH_TOL = 0.10
-# Bored to suit the MHA-DT-032 head (reference size); POCKET_CLEARANCE is the
-# diametral clearance the note asks for, and POCKET_DIA_MAX its hard limit
-# (the largest head plus the widest clearance).
-POCKET_DIA = 6.3
+# Bored to suit the MHA-DT-032 head (reference size: the 1/4-in head plus the
+# mid clearance); POCKET_CLEARANCE is the diametral clearance the note asks
+# for, and POCKET_DIA_MAX its hard limit (the largest head, +0.10, plus the
+# widest clearance, rounded up to the place it prints at).
+_HEAD_DIA = inch(1, 4)  # dt_crank_handle_pivot_screw_spec.HEAD_DIA, restated (import cycle)
 POCKET_CLEARANCE = (0.2, 0.4)
-POCKET_DIA_MAX = 6.5
-# The floor hole passes the MHA-DT-032 shoulder: a drilled hole under the title
-# block's DRILLED HOLES band (+0.10/0).
-FLOOR_HOLE_DIA = 4.2
+POCKET_DIA = _HEAD_DIA + sum(POCKET_CLEARANCE) / 2.0
+POCKET_DIA_MAX = math.ceil(round((_HEAD_DIA + 0.10 + POCKET_CLEARANCE[1]) * 10.0, 6)) / 10.0
+# The floor hole passes the MHA-DT-032 shoulder: a #19 drill (0.166 in) under
+# the title block's DRILLED HOLES band (+0.10/0).
+FLOOR_HOLE_DIA = 0.166 * 25.4
 
 FLOOR_THICKNESS = OVERALL_LENGTH - POCKET_DEPTH
 

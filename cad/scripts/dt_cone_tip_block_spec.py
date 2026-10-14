@@ -9,7 +9,11 @@ import _config
 from _fit_deviations import deviations
 from _gtol_planar import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _inch import inch
 from _surface_finish import SEAT_UM, SurfaceFinishControl
+from _mcmaster_94025a164 import CUP_DEPTH as ADJUSTER_CUP_DEPTH, CUP_DIA as ADJUSTER_CUP_DIA
+from cone_shaft_land_bands import TERMINAL_DIA_MM
+from cone_stack_end_play import SHAFT_END_PLAY
 from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM
 
 
@@ -27,31 +31,34 @@ from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM
 # the bands exported here).
 # U24b (2026-09-23): the adjuster thread's side walls keep 2.0 at the printed
 # width (.X) and passage-centre bands.
-# r3 (user ruling, Main option (a), 2026-09-25): 17 wide, the narrowest .X
-# width whose lower limit keeps the 5/8 pinch screw (McMaster 91794A112)
-# PINCH_SCREW_RECESS_MM short of the -X face (asserted with the screw below).
-BLOCK_X = 17.0  # plan width across the shaft
+# r3 (user ruling, Main option (a), 2026-09-25): the width's lower limit keeps
+# the 5/8 pinch screw (McMaster 91794A112) PINCH_SCREW_RECESS_MM short of the
+# -X face (asserted with the screw below).  All-inch: 11/16 in.
+BLOCK_X = inch(11, 16)  # plan width across the shaft
 # Plan depth along the shaft, printed .XXX.  The north face stands the pivot
 # screw's head gap off the pivot (cone_line.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET)
 # and the block grows SOUTH (user ruling 2026-09-29): the depth must hold the
 # adjuster's embed window (below) open over the tip's axial stack, and stay
 # short enough that the MHA-VN-016 stack collar never reaches the south face
-# (build_dt_drive_train_assembly's collar-to-block air).  9.75 sits between the
-# two at print-worst.
-BLOCK_Z = 9.75
+# (build_dt_drive_train_assembly's collar-to-block air).  All-inch: 13/32 in
+# (1/32): 3/8 closes the embed window, and 7/16 pushes the window's deep end
+# past the 3/8 cup screw's length.
+BLOCK_Z = inch(13, 32)
 # The adjuster and cone journal share one height above the platform top.
 # Free material above the slit floor and the pinch screw's rise stay fixed.
 ADJUSTER_AXIS_HEIGHT = CONE_AXIS_HEIGHT_MM
-# User ruling U24b (2026-09-23, W-target): the pinch screw sits 8.85 above the
-# adjuster axis and the top 14.56 above it, so the slit-mouth web between the
-# pinch clearance hole and the adjuster thread root, and the ligament over the
-# pinch hole, both keep 2.0 after edge breaks at the printed limits.
+# User ruling U24b (2026-09-23, W-target): the pinch screw sits PINCH_RISE above
+# the adjuster axis and the top TOP_ABOVE_AXIS above it, so the slit-mouth web
+# between the pinch clearance hole and the adjuster thread root, and the
+# ligament over the pinch hole, both keep 2.0 after edge breaks at the printed
+# limits.  All-inch: top 9/16, rise 5/16 (3/8 with a 9/16 top leaves the
+# ligament over the pinch hole under 2.0).
 # r3 (codex FIX review of 72ab, 2026-09-25): the print locates the pinch hole
 # straight from the foot (PinchHeight, .XX) rather than chaining it off the
 # adjuster axis.  PINCH_RISE stays the design offset; it no longer prints.
-TOP_ABOVE_AXIS = 14.56
+TOP_ABOVE_AXIS = inch(9, 16)
 BLOCK_HEIGHT = ADJUSTER_AXIS_HEIGHT + TOP_ABOVE_AXIS
-PINCH_RISE = 8.85
+PINCH_RISE = inch(5, 16)
 PINCH_HEIGHT = ADJUSTER_AXIS_HEIGHT + PINCH_RISE
 # The printed grade of every dimension a stack reads; DRAWING_PRECISION must
 # carry the same (checked at the end of this module).  Two dimensions carry
@@ -73,30 +80,27 @@ PASSAGE_CENTER_PLACES = 3
 PINCH_DEPTH_PLACES = 1
 SLIT_W_PLACES = 2
 SLIT_DEPTH_PLACES = 1
-SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - 0.65
-SLIT_W = 1.2
+SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - inch(1, 32)
+SLIT_W = inch(1, 16)
 SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
 # drawing-guidelines.md rule 18 (thread engagement) E11/W1 (Main, 2026-09-24): a #10-32 x 3/8 cup set screw (McMaster
 # 94025A164) in a thread tapped THROUGH the block, a 90-degree countersink at
 # both mouths, and no block growth.  A through tap has no floor to break out
 # and no tap lead to deduct; the shaft tip enters through the same thread.
-# ADJUSTER_EMBED is the depth from the north face at which the cup's apex
-# would meet the tip; the tip's flat end seats on the cup wall one seat depth
-# (stub radius / tan 45 deg) short of the apex, so the rim, and the thread
-# engagement, sit that much shallower.  User ruling 2026-09-29: the block is
-# fixed by its hold-down, so the tip's axial scatter lands on that
-# engagement; build_dt_drive_train_assembly sums the stack and asserts it stays
-# inside ADJUSTER_EMBED_WINDOW.  The value centres the engagement there: the
-# Ø1/32 in terminal stub seats 0.397 mm (its radius / tan 45 deg) short of the
-# apex, so 7.77 keeps main's 7.376 mm centred engagement (8.17 with the former
-# Ø1/16 stub's 0.794 mm seat depth).
+# ADJUSTER_EMBED (below the window) is the depth from the north face at which
+# the cup's apex would meet the tip; the tip's flat end seats on the cup wall
+# one seat depth (stub radius / tan of the cup's half-angle) short of the apex,
+# so the rim, and the thread engagement, sit that much shallower.  User ruling
+# 2026-09-29: the block is fixed by its hold-down, so the tip's axial scatter
+# lands on that engagement; build_dt_drive_train_assembly sums the stack and
+# asserts it stays inside ADJUSTER_EMBED_WINDOW.
 ADJUSTER_THREAD = "#10-32"
 ADJUSTER_SCREW_LENGTH = 9.525
-ADJUSTER_EMBED = 7.77
-# 90-degree countersink on each mouth to Ø5.0, just over the 4.826 major, so
-# the first thread starts full rather than on a feather edge (Main,
-# 2026-09-24).  Its depth is the 45-degree break on the tap drill.
-ADJUSTER_CSK_DIA = 5.0
+# 90-degree countersink on each mouth to Ø7/32 (1/32: 3/16 ends inside the
+# 4.826 major), just over the major, so the first thread starts full rather
+# than on a feather edge (Main, 2026-09-24).  Its depth is the 45-degree break
+# on the tap drill.
+ADJUSTER_CSK_DIA = inch(7, 32)
 # ASME B1.1 #10-32 UNF-2B minimum minor diameter (0.1560 in): the tightest
 # envelope the shaft tip passes through.
 ADJUSTER_MINOR_MIN_DIA = 0.1560 * 25.4
@@ -212,8 +216,8 @@ WORST_SLIT_MOUTH_WEB_MM = (
 WORST_SCREW_ENVELOPE_GAP_MM = (
     _worst_rise - _pinch_major_radius - _adjuster_major_radius
 )
-# PinchHeight keeps .XX for this ligament: its 46.95 sits on a .X rounding
-# tie, and printed up to 47.0 the ligament closes at 1.92.
+# PinchHeight keeps .XX for this ligament (U24b: at .X the old 46.95 rounded
+# up to 47.0 closed it at 1.92).
 WORST_TOP_LIGAMENT_MM = (
     _height_limits[0]
     - _pinch_limits[1]
@@ -354,6 +358,17 @@ ADJUSTER_EMBED_WINDOW = (
     ADJUSTER_MIN_ENGAGEMENT_D * THREAD_MAJOR_MM[ADJUSTER_THREAD] + ADJUSTER_CSK,
     _depth_limits[0] - ADJUSTER_CSK,
 )
+# The embed centres the engagement in that window over the set end play
+# (cone_stack_end_play.SHAFT_END_PLAY backs the cup off the tip): a fit-up
+# setting of the cup screw, not a cut length, so it is a closure of the
+# window and the stub's seat depth (its radius over the vendor cup's slope)
+# and stays decimal.  8.054 with the 13/32 block (7.77 with the old 9.75).
+ADJUSTER_SEAT_DEPTH = (TERMINAL_DIA_MM / 2.0) * ADJUSTER_CUP_DEPTH / (ADJUSTER_CUP_DIA / 2.0)
+ADJUSTER_EMBED = (
+    (ADJUSTER_EMBED_WINDOW[0] + ADJUSTER_EMBED_WINDOW[1]) / 2.0
+    + (SHAFT_END_PLAY[0] + SHAFT_END_PLAY[1]) / 2.0
+    + ADJUSTER_SEAT_DEPTH
+)
 if ADJUSTER_MIN_ENGAGEMENT_D != 1.0:
     raise AssertionError(
         "the MHA-VN-017 engagement baseline pending ruling #975 is 1.0D; "
@@ -395,7 +410,7 @@ _HOLDDOWN_PITCH_MM = 25.4 / 40.0
 # (dt_cone_swing_platform_spec.HOLDDOWN_LEDGE_RANGE, asserted equal in
 # build_dt_drive_train_assembly; a copy so this part does not re-key on the
 # platform's print).
-HOLDDOWN_LEDGE_RANGE_MM = (2.21, 3.49)
+HOLDDOWN_LEDGE_RANGE_MM = (2.138125, 3.418125)
 # The block's foot sits on the platform top, so the screw reaches past the
 # ledge straight into the tap.
 WORST_HOLDDOWN_ENGAGEMENT_MM = HOLDDOWN_SCREW_LENGTH_MIN - HOLDDOWN_LEDGE_RANGE_MM[1]
@@ -409,8 +424,8 @@ if WORST_HOLDDOWN_ENGAGEMENT_MM < 1.5 * _HOLDDOWN_MAJOR_MM:
 # the tap's incomplete lead; the tap drill (.X) runs 1.5P past the deepest
 # full thread so a plug tap's lead never eats it.
 FOOT_TAP_MARGIN_MM = 0.25
-FOOT_THREAD_DEPTH = 8.5
-FOOT_DEPTH = 11.1
+FOOT_THREAD_DEPTH = inch(3, 8)
+FOOT_DEPTH = inch(1, 2)
 FOOT_DEPTH_PLACES = 1
 if WORST_HOLDDOWN_REACH_MM > FOOT_THREAD_DEPTH - _GENERAL_1PL_MM - FOOT_TAP_MARGIN_MM:
     raise AssertionError("hold-down screw can reach the foot tap's incomplete threads")
@@ -435,7 +450,7 @@ FOOT_BORE_DIA = blind_cut_dia_mm(FOOT_BORE_SPEC)
 # (dt_cone_swing_platform_spec.HOLDDOWN_LOCAL_X, which says why), so the block
 # body stands centred on the cone line.  Toward -X because the width's band
 # falls on the +X side: there the tap's web is the thinner one.
-FOOT_TAP_OFFSET_X = -1.0
+FOOT_TAP_OFFSET_X = -inch(1, 32)
 FOOT_TAP_X = BLOCK_X / 2.0 + FOOT_TAP_OFFSET_X
 FOOT_TAP_Z = BLOCK_Z / 2.0
 FOOT_TAP_STATION_TOL_MM = 0.10

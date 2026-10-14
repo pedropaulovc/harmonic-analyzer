@@ -23,6 +23,7 @@ import math
 import textwrap
 
 import dt_drive_train_steps
+from _inch import inch
 import pd_transgear_drive_collar_spec as collar
 import pd_transgear_arm_geometry as arm_geometry
 import pd_transgear_feed_pinion_spec as feed_pinion
@@ -192,7 +193,7 @@ PAPER_FEED_REFERENCE_TEXT = (
 # ratio; the fixed-centre loop's slack is solved by _chain from the current
 # knob and crank axes. The title block's .X band holds the height
 # (Main, 2026-10-01).
-BAR_TOP_ABOVE_DECK = 266.934
+BAR_TOP_ABOVE_DECK = inch(10.5)  # 10-1/2
 # The rack's crests below the platen's bottom edge (the builder's PLATE_Y0
 # less RACK_TIP_Y). The hook's pin hole is match-drilled wherever the meshed
 # hanger puts the pin, but a rack set off this band swings the latched hanger

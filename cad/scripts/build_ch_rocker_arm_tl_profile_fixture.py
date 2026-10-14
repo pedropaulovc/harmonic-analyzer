@@ -326,9 +326,20 @@ def _require_rest_tops(adapter) -> None:
 # heights from ISurface.PlaneParams, flat-face extents from their straight
 # edges' vertices and whole circles' CircleParams, hole axes from
 # ISurface.CylinderParams (cross-vendor review of PR 1252: IFace2.GetBox is an
-# approximate, possibly loose box). The schedules round to three places, so
-# the model may differ from a cell by half the finest printed place.
-_SCHEDULE_READBACK_TOL_MM = 0.0005
+# approximate, possibly loose box). The model carries inch fractions, so a
+# cell may differ from it by half its own printed place (a three-place cell
+# by 0.0005, a one-place length by 0.05); the float slack covers a fraction
+# that sits exactly on a half-place.
+_SCHEDULE_READBACK_SLACK_MM = 1e-6
+
+
+def _readback_tol(*cells: str) -> float:
+    """Half the coarsest printed place among ``cells`` (each a schedule cell)."""
+    places = []
+    for cell in cells:
+        number = _cell_number(cell).split()[0]
+        places.append(len(number.split(".")[1]) if "." in number else 0)
+    return 0.5 * 10.0 ** -min(places) + _SCHEDULE_READBACK_SLACK_MM
 
 
 def _flat_face_extent(face) -> tuple[float, ...] | None:
@@ -383,19 +394,21 @@ def _schedule_faces(adapter) -> tuple[list[tuple[float, ...]], list[tuple[float,
     return extents, cylinders
 
 
-def _require_face(extents, label: str, z: float, cx: float, cy: float, length: float, width: float) -> None:
+def _require_face(
+    extents, label: str, z: float, cx: float, cy: float, length: float, width: float, tol: float
+) -> None:
     want = (cx - length / 2.0, cy - width / 2.0, z, cx + length / 2.0, cy + width / 2.0, z)
     if not any(
-        all(abs(a - b) <= _SCHEDULE_READBACK_TOL_MM for a, b in zip(extent, want, strict=True))
+        all(abs(a - b) <= tol for a, b in zip(extent, want, strict=True))
         for extent in extents
     ):
         raise RuntimeError(f"{label}: no flat face {want} in the model, as the schedule prints")
 
 
-def _require_hole(cylinders, label: str, cx: float, cy: float, dia: float) -> None:
+def _require_hole(cylinders, label: str, cx: float, cy: float, dia: float, tol: float) -> None:
     want = (cx, cy, dia / 2.0)
     if not any(
-        all(abs(a - b) <= _SCHEDULE_READBACK_TOL_MM for a, b in zip(cylinder, want, strict=True))
+        all(abs(a - b) <= tol for a, b in zip(cylinder, want, strict=True))
         for cylinder in cylinders
     ):
         raise RuntimeError(f"{label}: no vertical bore {want} in the model, as the schedule prints")
@@ -456,24 +469,33 @@ def _require_schedules(adapter, hole_dias: dict[str, float]) -> None:
     for tag, feature, x, y, length, width, depth in FEATURE_SCHEDULE:
         # Bore L is the origin; a banded coordinate locates at its nominal.
         cx, cy = (0.0 if value == "-" else float(value.split()[0]) for value in (x, y))
+        located = [value for value in (x, y) if value != "-"]
         if not feature.endswith("POCKET"):
-            _require_hole(cylinders, f"{tag} {feature.lower()}", cx, cy, hole_dias[feature])
+            # The hole's diameter is the model's own cut size, not a cell.
+            tol = _readback_tol(*located) if located else _SCHEDULE_READBACK_SLACK_MM
+            _require_hole(cylinders, f"{tag} {feature.lower()}", cx, cy, hole_dias[feature], tol)
             continue
-        pockets[tag] = (cx, cy)
+        tol = _readback_tol(x, y, length, width, depth)
+        pockets[tag] = (cx, cy, tol)
         floor = PLATE_TOP_Z - float(depth)
-        _require_face(extents, f"{tag} pocket floor", floor, cx, cy, float(length), float(width))
+        _require_face(extents, f"{tag} pocket floor", floor, cx, cy, float(length), float(width), tol)
     for tags, part, _stock, length, width, height in PART_SCHEDULE:
         if part == "HUB STAND":
             od = float(_cell_number(length))
+            tol = _readback_tol(length, height)
             for z, end in ((STAND_TOP_Z, "top"), (STAND_TOP_Z - float(height), "foot")):
-                _require_face(extents, f"hub stand {end}", z, 0.0, 0.0, od, od)
-            _require_hole(cylinders, "hub stand bore", 0.0, 0.0, float(_cell_number(width)))
+                _require_face(extents, f"hub stand {end}", z, 0.0, 0.0, od, od, tol)
+            _require_hole(
+                cylinders, "hub stand bore", 0.0, 0.0, float(_cell_number(width)), _readback_tol(width)
+            )
             continue
         top = PAD_TOP_Z if part == "PAD" else REST_TOP_Z
         for tag in tags.split(", "):
+            cx, cy, pocket_tol = pockets[tag]
+            tol = max(pocket_tol, _readback_tol(length, width, height))
             for z, end in ((top, "top"), (top - float(height), "underside")):
                 _require_face(
-                    extents, f"{part.lower()} {tag} {end}", z, *pockets[tag], float(length), float(width)
+                    extents, f"{part.lower()} {tag} {end}", z, cx, cy, float(length), float(width), tol
                 )
 
 

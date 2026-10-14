@@ -14,7 +14,7 @@ line/arc path, so every bend is a smooth cylindrical band.  In plan, the
 spring ends are full half-rounds, the screw rail's corners are rounded
 (large on the outer edge, small at the slit), and each slit ends in a full
 half-round at the bridge, as img03 shows.  The two slotted fillister heads sit
-directly on the flat 0.8 mm sheet (img03: no raised seats); the platen's rear
+directly on the flat .032 in sheet (img03: no raised seats); the platen's rear
 socket bosses take the rest of the stock shank as thread
 (pd_platen_spec.SOCKET_BOSS_H).
 
@@ -59,45 +59,51 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _hole_spec import THREAD_MAJOR_MM
 from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
+from _inch import inch
 from vn_platen_clip_screw_spec import HEAD_DIA, SHANK_DIA, SHANK_LEN, THREAD
 from pd_platen_spec import PLATE_THICKNESS, SOCKET_BOSS_H, SOCKET_THREAD_ENGAGEMENT
 
 PART_NAME = "pd-platen-clip"
 MATERIAL = "Brass"  # see _appearance.apply_material docstring
 
-CLIP_LENGTH = (
-    83.5  # ch22 p.55 rear photo: 86.7 of the 140 mm plate (0.619) x PLATE_HEIGHT 134.82
-)
-CLIP_WIDTH = 8.988  # ch30-p002 Pose Studio: 10 * 0.8988
-SHEET_T = 0.8  # photo-backed brass sheet thickness
+# ch22 p.55 rear photo: 86.7 of the 140 mm plate (0.619) x the 134.82 plate
+# height read 83.5; 3-5/16 in.
+CLIP_LENGTH = inch(3 + 5 / 16)
+# ch30-p002 Pose Studio: 10 * 0.8988 = 8.988. 11/32 (1/32 grid): the slit
+# and two equal rails below must close on sixteenths/thirty-seconds.
+CLIP_WIDTH = inch(11, 32)
+SHEET_T = inch(0.032)  # .032 brass sheet (photo read 0.8)
 CLIP_THICKNESS = SHEET_T  # assembly stand-off: one sheet, not a face stack
 
 # ch22 img03 (one clip, 603 x 68 px of brass): the screw rail and the spring
-# rail are each 32 px wide and the slit between them 4 px.
-SCREW_RAIL_WIDTH = CLIP_WIDTH * 32.0 / 68.0
-NOTCH_WIDTH = CLIP_WIDTH * 4.0 / 68.0
+# rail are each 32 px wide and the slit between them 4 px: two 5/32 rails
+# either side of a 1/32 slit (1/32: the 1/16 grid has no slit under 1/16,
+# triple the 0.53 photo read).
+SCREW_RAIL_WIDTH = inch(5, 32)
+NOTCH_WIDTH = inch(1, 32)
 SPRING_RAIL_WIDTH = CLIP_WIDTH - SCREW_RAIL_WIDTH - NOTCH_WIDTH
 SPRING_RAIL_Y0 = SCREW_RAIL_WIDTH + NOTCH_WIDTH
 # img03: the slits stop 77 px apart on their centreline; with their full
 # half-round ends (radius NOTCH_WIDTH / 2, 2 px) the tangent points sit
-# 81 px apart.  The bridge length is that tangent-point span, which is also
-# the spring rail's flat middle run.
-CENTER_BRIDGE_LENGTH = CLIP_LENGTH * 81.0 / 603.0
+# 81 px apart (11.2 of the photo-read clip): 7/16.  The bridge length is that
+# tangent-point span, which is also the spring rail's flat middle run.
+CENTER_BRIDGE_LENGTH = inch(7, 16)
 SLIT_END_RADIUS = NOTCH_WIDTH / 2.0
 BRIDGE_X0 = (CLIP_LENGTH - CENTER_BRIDGE_LENGTH) / 2.0
 BRIDGE_X1 = BRIDGE_X0 + CENTER_BRIDGE_LENGTH
 # img03 plan corners: the spring rail ends are full half-rounds; the screw
-# rail's outer corners round at ~18 px (2.5 mm) and its slit-side corners at
-# ~6 px (0.75 mm).
+# rail's outer corners round at ~18 px (2.5 mm: R3/32) and its slit-side
+# corners at ~6 px (0.75 mm: R1/32). Both on the 1/32 grid: the 1/16 grid
+# moves each sub-1/4 radius over 25%.
 SPRING_END_RADIUS = SPRING_RAIL_WIDTH / 2.0
-SCREW_RAIL_END_RADIUS = 2.5
-SCREW_RAIL_SLIT_RADIUS = 0.75
-ARCH_RISE = 1.5  # shallow outward bow; editable as ArchRise in Tools > Equations
+SCREW_RAIL_END_RADIUS = inch(3, 32)
+SCREW_RAIL_SLIT_RADIUS = inch(1, 32)
+ARCH_RISE = inch(1, 16)  # shallow outward bow; editable as ArchRise in Tools > Equations
 
 # The brass #2-56 fillister screws (vn-platen-clip-screw; img03's heads read
 # ~2.6-3.0 mm) retain their lengthwise stations in the flat rail, centred
 # across it; each head lies wholly on the rail.
-HOLE_INSET = 7.1904  # ch30-p002 Pose Studio: 8 * 0.8988 from each end
+HOLE_INSET = inch(5, 16)  # ch30-p002 Pose Studio: 8 * 0.8988 = 7.19 from each end
 HOLE_Y = SCREW_RAIL_WIDTH / 2.0
 CLEARANCE_SIZE = THREAD.split("-")[0]  # "#2"
 HOLE_DIA = CLEARANCE_MM[(CLEARANCE_SIZE, "normal")]
@@ -142,7 +148,7 @@ SPRING_RAIL_DRIVES = (
 # gap at the bridge unless the spring rail's start offset follows.
 EQUATION_FLEX = (
     ("SheetT", SHEET_T, 1.0, "sheet_t"),
-    ("NotchW", NOTCH_WIDTH, 0.8, "notch_w"),
+    ("NotchW", NOTCH_WIDTH, inch(1, 16), "notch_w"),
 )
 _CORNER_LOSS = (
     (1.0 - math.pi / 4.0) * 2.0 * (SCREW_RAIL_END_RADIUS**2 + SCREW_RAIL_SLIT_RADIUS**2)

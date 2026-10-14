@@ -10,7 +10,7 @@ Bands, places, worst-case walls and sheet text live in
 ``mg_output_fixture_spec``.
 
 The fixture (book ch. 20 p. 48, the photographed small hex block on the
-vertical rod) is a 3/8 brass hex bar: the Ø5 vertical rod slides through a
+vertical rod) is a 3/8 brass hex bar: the Ø3/16 vertical rod slides through a
 cross bore across the hex corners, a turned spigot on one end carries the
 full-radius groove the lever wire hooks into, and an axial #4-40 tap from
 the spigot face down to the rod bore takes the thumb screw that locks the
@@ -34,6 +34,7 @@ from __future__ import annotations
 import math
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _inch import inch
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 
 # --- Stock: 3/8 hex brass bar --------------------------------------------------
@@ -42,25 +43,29 @@ HEX_AF = 0.375 * 25.4  # 9.525 across the flats
 HEX_CORNER_RADIUS = HEX_AF / math.sqrt(3.0)
 
 # --- Stations along the hex axis (local x; origin on the rod-bore axis) ----------
-ROD_STATION = 5.0  # free end to the rod-bore axis
+ROD_STATION = inch(3, 16)  # was 5.0; free end to the rod-bore axis
 FREE_END_X = -ROD_STATION
-HEX_LENGTH = 11.0  # free end to the shoulder
+# 3/8 (was 11.0): the next fraction down from the nearest 7/16, which put the
+# spigot face 1.6 deeper and broke the plug tap's usable reach (spec).
+HEX_LENGTH = inch(3, 8)  # free end to the shoulder
 SHOULDER_X = FREE_END_X + HEX_LENGTH
 # Long enough that both groove lips hold the 2.0 wall target at the worst
 # case of the printed bands (mg_output_fixture_spec.WALLS).
-SPIGOT_LENGTH = 6.7
+SPIGOT_LENGTH = inch(5, 16)  # was 6.7
 SPIGOT_FACE_X = SHOULDER_X + SPIGOT_LENGTH
 OVERALL_LENGTH = HEX_LENGTH + SPIGOT_LENGTH
 
 # --- Rod bore: across the corners, along local Y, through the hex axis --------
 # Centred between the flats: the sheet states the centring and the wall it
 # must leave (mg_output_fixture_spec), not a location from one flat.
-ROD_BORE_DIA = 5.2  # a slip fit on the Ø5 vertical rod
+ROD_BORE_DIA = inch(0.196)  # #9 drill (was 5.2), a slip fit on the Ø3/16 rod
 
 # --- Spigot and its full-radius wire groove ------------------------------------
-SPIGOT_DIA = 9.0
-GROOVE_RADIUS = 1.2
-GROOVE_ROOT_DIA = 7.0
+# 11/32 (1/32 step): the nearest 3/8 equals the hex flats (no shoulder).
+SPIGOT_DIA = inch(11, 32)  # was 9.0
+GROOVE_RADIUS = inch(1, 16)  # was 1.2
+# 9/32 (1/32 step): the nearest 1/4 left 1.70 < 2.0 under the #4-40 tap.
+GROOVE_ROOT_DIA = inch(9, 32)  # was 7.0
 GROOVE_X = SHOULDER_X + SPIGOT_LENGTH / 2.0  # centred on the spigot
 # The groove arc's centre stands outside the spigot OD, so the arc meets the
 # OD at a definite mouth on each side, GROOVE_HALF_OPENING from GROOVE_X.
@@ -94,14 +99,16 @@ TAP_SPEC = HoleSpec(
 TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 
 # --- Lever wire hook ------------------------------------------------------------
-WIRE_DIA = 0.8
+WIRE_DIA = inch(0.032)  # .032 music wire (was 0.8)
 WIRE_CLEARANCE = 0.25
 HOOK_RADIAL_OFFSET = GROOVE_ROOT_DIA / 2.0 + WIRE_DIA / 2.0 + WIRE_CLEARANCE
 HOOK_LOCAL = (GROOVE_X, 0.0, HOOK_RADIAL_OFFSET)
 
 # --- Installed pose (magnifier frame) -------------------------------------------
-FIXTURE_AXIS_Y = 919.7  # the hex axis's height on the vertical rod
-VROD_Z = -134.8  # the vertical rod's axis
+FIXTURE_AXIS_Y = inch(36 + 3 / 16)  # was 919.7; the hex axis's height on the rod
+# The vertical rod's axis: restated from build_mg_magnifier_assembly (LEVER_ROD_Z
+# - mg_magnifying_clamp_geom.ROD_BORE_X = SEAT_PLANE_Z - 2-1/4 - 1/4); was -134.8.
+VROD_Z = -136.61241221957347
 # The lever wire leaves from the rod's machine-front tangent.
 HOOK_TARGET_Z = VROD_Z - (VROD_DIA / 2.0 + WIRE_DIA / 2.0 + WIRE_CLEARANCE)
 

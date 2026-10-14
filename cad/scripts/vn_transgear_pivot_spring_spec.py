@@ -28,6 +28,8 @@ from __future__ import annotations
 
 import math
 
+from _inch import inch
+
 MM_PER_IN = 25.4
 N_PER_LBF = 4.4482216
 
@@ -43,11 +45,12 @@ WORKING_DEFLECTION = 0.020 * MM_PER_IN  # 0.508
 WORKING_LOAD_N = 9.0 * N_PER_LBF  # 40.03
 # [INFERENCE: linear] The page gives one load point, no rate.
 RATE_N_PER_MM = WORKING_LOAD_N / WORKING_DEFLECTION  # 78.81
-# The installed height at the nominal room under the MHA-VN-041 head (room
-# 0.70..0.9508, inside the catalogue deflection);
-# transgear_hanger_joints.SPRING_ROOM_NOMINAL asserts it.  Load there 31.0 N,
-# (FREE_HEIGHT - INSTALLED_HEIGHT) x RATE [INFERENCE: linear].
-INSTALLED_HEIGHT = 0.80
+# The installed height at the nominal room under the MHA-VN-041 head: shoulder
+# 1/2 less spacer 7/32 less arm spot-face floor 1/4 = 1/32 (room 0.69..0.94,
+# inside the catalogue deflection); transgear_hanger_joints.SPRING_ROOM_NOMINAL
+# asserts it.  Load there 31.5 N, (FREE_HEIGHT - INSTALLED_HEIGHT) x RATE
+# [INFERENCE: linear].
+INSTALLED_HEIGHT = inch(1, 32)
 # The model shows the installed state.
 MODEL_HEIGHT = INSTALLED_HEIGHT
 

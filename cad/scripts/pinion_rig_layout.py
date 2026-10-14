@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import math
 
+from _inch import MM_PER_IN, inch
 from _printed_tolerance import printed_band_mm, printed_deviations
 from dt_cone_pivot_post_installation import MECHANISM_Z_SHIFT
 from cylinder_bank_layout import (
@@ -112,8 +113,8 @@ def leaf_pair(setting: float) -> tuple[float, ...]:
 # contract this module must not import); a lockstep test pins the two.  It is
 # trapped between the straps' inner faces, and at the drilling set-up it sits
 # hard on the back strap, so the back stop sets its station (61.55 from the
-# MHA-DT-022 head shoulder, ruling (c)'s bond station).
-DRUM_LEN = 143.2
+# MHA-DT-022 head shoulder, ruling (c)'s bond station).  All-inch: 5-5/8 in.
+DRUM_LEN = inch(45, 8)
 DRUM_LEN_PLACES = 1  # FaceWidth prints .X (dt_alignment_pinion_spec)
 DRUM_LEN_BAND = printed_band_mm(DRUM_LEN_PLACES)  # 0.8
 
@@ -195,7 +196,7 @@ BLOCK_SEAT_Z = tuple(z0 + BLOCK_DEPTH / 2.0 for z0 in BLOCK_Z0)
 # The span between the blocks' inner faces: both straps, the drum, its end
 # shim and the front-block feeler (Codex #854 P1), the same in the pose and on
 # the machine.
-INNER_SPAN = BACK_BLOCK_Z0 - (FRONT_BLOCK_Z0 + BLOCK_DEPTH)  # 161.90
+INNER_SPAN = BACK_BLOCK_Z0 - (FRONT_BLOCK_Z0 + BLOCK_DEPTH)  # 162.63
 _SOLID_SPAN = 2.0 * STRAP_T + DRUM_LEN + DRUM_END_SHIM + FRONT_BLOCK_FEELER
 if abs(INNER_SPAN - _SOLID_SPAN) > 1e-9:
     raise AssertionError("the block span is not the stack plus shim and feeler")
@@ -211,7 +212,8 @@ if abs(INNER_SPAN - _SOLID_SPAN) > 1e-9:
 # at their front ends and size both lengths.
 
 # Torque shaft and lift rod: back ends flush with the back block's outer face,
-# both printed at .X (title-block +/-0.8, U27) and rounded UP.
+# both printed at .X (title-block +/-0.8, U27).  All-inch: each is cut from
+# 1/4 in stock to the shortest 1/16 in length that still meets its worst stack.
 LENGTH_PLACES = 1
 LENGTH_BAND = printed_band_mm(LENGTH_PLACES)  # 0.8
 
@@ -222,8 +224,13 @@ _DRUM_LEN_UPPER = printed_deviations(DRUM_LEN, DRUM_LEN_PLACES)[1]
 _BLOCK_DEPTH_UPPER = printed_deviations(BLOCK_DEPTH, BLOCK_DEPTH_PLACES)[1]
 
 
-def _up_to_tenth(length: float) -> float:
-    return math.ceil(length * 10.0 - 1e-6) / 10.0
+def _up_to_sixteenth(length: float) -> float:
+    """The shortest 1/16 in length whose printed .X value still reaches
+    ``length`` (every stack below books the length at its printed value)."""
+    sixteenths = math.floor(length / MM_PER_IN * 16.0)
+    while round(inch(sixteenths, 16), LENGTH_PLACES) < length - 1e-9:
+        sixteenths += 1
+    return inch(sixteenths, 16)
 
 
 # The shortest shaft in the longest stack must still bear
@@ -259,7 +266,7 @@ def _stack_text(stack: dict[str, float]) -> str:
 
 
 _FRONT_BEARING_REQUIRED = FRONT_BLOCK_MIN_BEARING + BLOCK_BEARING_MARGIN
-TORQUE_SHAFT_LEN = _up_to_tenth(
+TORQUE_SHAFT_LEN = _up_to_sixteenth(
     _FRONT_BEARING_REQUIRED - sum(torque_shaft_bearing_stack(0.0).values())
 )
 TORQUE_SHAFT_BEARING_STACK = torque_shaft_bearing_stack(TORQUE_SHAFT_LEN)
@@ -335,8 +342,8 @@ if BACK_COLLAR_LEAF_F < smallest_leaf_setting(
 BACK_COLLAR_GAP_MIN = BACK_COLLAR_LEAF_F - FEELER_SET_ERROR  # 0.80
 BACK_COLLAR_GAP_MAX = BACK_COLLAR_LEAF_F + FEELER_SET_ERROR  # 1.00
 _STRAP_T_LOWER = printed_deviations(STRAP_T, STRAP_T_PLACES)[0]
-BACK_CAM_PIN_STATION = CAM_LEN + BACK_COLLAR_LEAF_F - STRAP_T / 2.0  # 5.40
-LEVER_SEAT_MIN = LEVER_BORE_DEPTH + BACK_COLLAR_GAP_MAX + HUB_STOP_MARGIN  # 9.25
+BACK_CAM_PIN_STATION = CAM_LEN + BACK_COLLAR_LEAF_F - STRAP_T / 2.0  # 5.66
+LEVER_SEAT_MIN = LEVER_BORE_DEPTH + BACK_COLLAR_GAP_MAX + HUB_STOP_MARGIN  # 8.39
 
 
 def lift_rod_seat_stack(rod_len: float) -> dict[str, float]:
@@ -430,7 +437,7 @@ def lever_to_shaft_front_worst(rod_len: float) -> float:
 # shaft to 0.14 -- Main, restricted review of #858).
 _LEVER_SEAT_REQUIRED = LEVER_SEAT_MIN + RIG_MARGIN_SPARE
 _LEVER_AIR_REQUIRED = LEVER_THROW_MIN_AIR + RIG_MARGIN_SPARE
-LIFT_ROD_LEN = _up_to_tenth(
+LIFT_ROD_LEN = _up_to_sixteenth(
     max(
         _LEVER_SEAT_REQUIRED - sum(lift_rod_seat_stack(0.0).values()),
         _LEVER_AIR_REQUIRED - lever_to_shaft_front_worst(0.0),
@@ -450,7 +457,7 @@ if sum(LIFT_ROD_SEAT_STACK.values()) < _LEVER_SEAT_REQUIRED - 1e-9:
         f"{_stack_text(LIFT_ROD_SEAT_STACK)} < {_LEVER_SEAT_REQUIRED}"
     )
 # The nominal rod standing proud of the front block, as built.
-LEVER_SEAT_PROUD = LIFT_ROD_LEN - 2.0 * BLOCK_DEPTH - INNER_SPAN  # 15.60
+LEVER_SEAT_PROUD = LIFT_ROD_LEN - 2.0 * BLOCK_DEPTH - INNER_SPAN  # 15.18
 LIFT_ROD_Z0 = BACK_BLOCK_OUTER_Z - LIFT_ROD_LEN
 
 # MHA-DT-024 return spring: the blade rides the back strap's flank, and its foot

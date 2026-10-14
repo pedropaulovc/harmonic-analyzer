@@ -25,13 +25,14 @@ import math
 
 import ch_rocker_arm_spec as rocker
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
+from _inch import inch
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 INCH = 25.4
 # Abrams 102060: O1 precision-ground flat stock 1/2 x 1/2 in.
-BAR_LENGTH = 40.0
-BAR_HEIGHT = 12.7  # the datum-C simulator height above the base
-BAR_WIDTH = 12.7  # as-bought stock, projection in front of the box
+BAR_LENGTH = inch(25, 16)
+BAR_HEIGHT = inch(1, 2)  # the datum-C simulator height above the base
+BAR_WIDTH = inch(1, 2)  # as-bought stock, projection in front of the box
 # Op 50 reads pin-height differences in one set-up (X = H1 - R1, Y = H3 - R3;
 # rocker-plan op 50), so the bar's absolute height cancels; the tilt of its
 # top does not. A tilt t over the bar length turns the op-50 hub-to-rod vector
@@ -61,12 +62,12 @@ SCREW_THREAD = "#8-32"
 SCREW_HEAD_DIA = 0.270 * INCH
 SCREW_HEAD_H = 0.164 * INCH
 SCREW_LENGTH = 0.625 * INCH  # #8-32 x 5/8 SHCS
-SCREW_X = (10.0, 30.0)  # from the bar's left end (= the box left face)
+SCREW_X = (inch(3, 8), inch(19, 16))  # from the bar's left end (= the box left face)
 SCREW_Y = BAR_HEIGHT / 2.0
 # Model and export both use the printed two-place sizes (one fact).
 CLEARANCE_DIA = round(CLEARANCE_MM[("#8", "normal")], 2)
 CBORE_DIA = round(5.0 / 16.0 * INCH, 2)  # standard #8 SHCS counterbore
-CBORE_DEPTH = 4.8
+CBORE_DEPTH = inch(3, 16)
 # Title-block DRILLED HOLES: plus allowance, zero minus (_printed_tolerance).
 DRILLED_BAND = (drilled_oversize_mm(), 0.0)
 # The native counterbore callout prints two places: the .XX general band.

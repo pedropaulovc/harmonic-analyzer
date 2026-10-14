@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import math
 
+from _inch import inch
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SurfaceFinishControl
 from dt_crank_handle_pivot_screw_spec import TAPPED_MOUTH_DIA_MAX as _PIVOT_TAPPED_MOUTH_DIA_MAX
@@ -37,27 +38,28 @@ from dt_crank_hub_geometry import (
     ARM_STOCK_THICKNESS_IN,
     ARM_THICKNESS,
     ARM_WIDTH,
-    AXIAL_PIN_DIA,
-    AXIAL_PIN_LENGTH,
+    AXIAL_PIN_DIA as AXIAL_PIN_DIA,
+    AXIAL_PIN_LENGTH as AXIAL_PIN_LENGTH,
     AXIAL_PIN_RADIUS_FROM_AXIS,
-    FIDUCIAL_MODEL_DEPTH,
-    FIDUCIAL_MODEL_DIA,
+    FIDUCIAL_MODEL_DEPTH as FIDUCIAL_MODEL_DEPTH,
+    FIDUCIAL_MODEL_DIA as FIDUCIAL_MODEL_DIA,
     GENERAL_1PL_TOL_MM,
-    HUB_SEAT_DIA,
+    HUB_SEAT_DIA as HUB_SEAT_DIA,
     MM_PER_IN,
     WALL_TARGET_MM,
 )
 
 
 # --- Nominal geometry -------------------------------------------------------
-ARM_C2C = 75.0
+# The crank radius, hub axis to handle pivot: 2-15/16 in (all-inch experiment;
+# formerly 75.0).
+ARM_C2C = inch(47, 16)
 # User ruling 2026-09-29 (ch11 p.14 photo re-check): the handle end is a full
-# semicircle concentric with the handle pivot, the same R12.7 as the hub end,
-# not the former square end 10.0 past the pivot.  The crank radius stays 75, so
-# the arm grows 2.7 to 87.7 from the hub axis.
+# semicircle concentric with the handle pivot, the same radius as the hub end
+# (half the bar width), not the former square end 10.0 past the pivot.
 END_RADIUS = ARM_WIDTH / 2.0
 # The bar is left at its as-supplied thickness, so that stock must read as the
-# printed 8.0 inside the title block's .X band.
+# printed thickness inside the title block's .X band.
 if abs(ARM_STOCK_THICKNESS - ARM_THICKNESS) > GENERAL_1PL_TOL_MM:
     raise AssertionError(
         f"arm stock {ARM_STOCK_THICKNESS:.3f} is outside the printed {ARM_THICKNESS:.1f}'s .X band"
@@ -76,7 +78,7 @@ if PIVOT_END_WEB_WORST < WALL_TARGET_MM:
 
 # The axial MHA-VN-029 groove is match-drilled in the assembled arm/hub.  Its
 # centre rides the hub-seat interface at six o'clock (toward the hanging handle);
-# the 4-mm length is shared as exactly half the 8-mm arm thickness.
+# its length is shared as exactly half the arm thickness.
 AXIAL_PIN_X = AXIAL_PIN_RADIUS_FROM_AXIS
 AXIAL_PIN_Y = 0.0
 
@@ -92,8 +94,8 @@ FIDUCIAL_Y = _FIDUCIAL_AXIS
 # Tapped THRU the 5/16 bar (drawing-guidelines.md rule 17 (walls and webs), audit W7): a blind 6.5 drill left
 # its point 0.76 from the inboard face nominal and through it at the printed
 # band; through, the screw has 7.94 of thread (2.79D) and nothing to bottom on.
-ANCHOR_SCREW_X = 20.0
-ANCHOR_SCREW_Y = 4.5
+ANCHOR_SCREW_X = inch(13, 16)
+ANCHOR_SCREW_Y = inch(3, 16)
 ANCHOR_HOLE_SPEC = HoleSpec("tapped", "#4-40")
 
 # MHA-DT-031 is a light press in MHA-DT-006 and pinned; nothing runs in this part.
@@ -103,7 +105,7 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 ARM_END_X = ARM_C2C + END_RADIUS
 HALF_WIDTH = ARM_WIDTH / 2.0
 
-# The thickness prints as a reference, (8.0), under the stock line's "AS
+# The thickness prints as a reference, (7.9), under the stock line's "AS
 # SUPPLIED": the bar's mill tolerance governs it, not the title block's .X
 # band, which would accept a 7.2 arm and a 1.02D MHA-DT-032 engagement (Codex
 # #892; the U41 platform precedent).

@@ -1,8 +1,8 @@
 r"""Build the gooseneck post with its brazed, through-tapped end plug.
 
-The polished Ø16 x 2-wall tube anchors the stock counter spring above the
-summing lever. Its vertical leg, R51 quarter bend and horizontal arm form
-one hollow tube. A physical Ø12 x 8 AISI 1018 plug is silver-brazed flush
+The polished 5/8 OD x .083-wall tube anchors the stock counter spring above the
+summing lever. Its vertical leg, R2 in quarter bend and horizontal arm form
+one hollow tube. A physical bore-fit x 8 AISI 1018 plug is silver-brazed flush
 with the arm end, then drilled and tapped #6-32 UNC-2B through. Both tap
 ends have a 0.25 x 45-degree break, leaving 7.50 mm nominal full thread
 (6.99 mm minimum at the printed plug-length band). The made MHA-SM-004
@@ -13,11 +13,12 @@ sets its installed height. The stock counter spring's geometry owns that
 adjustment in ``build_sm_summing_assembly``; the shared gooseneck geometry
 puts the spring eye on its counter-anchor axis.
 
-Layout: origin at the vertical leg's reference mid-height; leg y -330..112.3,
-bend centre (-51, 112.3), arm centreline y 163.3. The straight arm runs
-52.359695 mm west from x -51 to -103.359695; the plug extends east from that
-end face to x -95.359695. The plug's modelling envelope is Ø14, overlapping
-the tube's mid-wall by 1 mm so the union adds only the Ø12 bore fill.
+Layout: origin at the vertical leg's reference mid-height; leg y -330.4125..112.5
+(17-7/16 in straight), bend centre (-50.8, 112.5), arm centreline y 163.3. The
+straight arm runs 52.559695 mm west from x -50.8 to -103.359695; the plug
+extends east from that end face to x -95.359695. The plug's modelling envelope
+is the tube's mid-wall diameter, overlapping the wall by half a wall so the
+union adds only the bore fill.
 That overlap is not the physical plug diameter on the print.
 ``ThreadBore`` is the axial native Hole Wizard tap; ``SpringScrewAxis`` is
 its hidden, equation-driven assembly reference.
@@ -37,6 +38,7 @@ from _check import check
 from _dimensions import drive_dimension, set_global
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
+from _inch import inch
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _bore_axis import name_bore_axis
@@ -90,24 +92,26 @@ from sm_gooseneck_spring_joint import (
 PART_NAME = "sm-gooseneck"
 MATERIAL = "Plain Carbon Steel"
 
-LEG_TOP = round(ARM_Y - BEND_R, 3)  # 112.3: bend start = machine 1322.3
+LEG_TOP = round(ARM_Y - BEND_R, 3)  # 112.5: bend start = machine 1322.5
 # (derived: the arm centreline is the spring hang, see sm_gooseneck_geom.ARM_Y;
-# rounded so the equation-manager literal reads 112.3mm, not float noise)
-LEG_BOTTOM = -330.0  # leg bottom = machine 880: the post passes through a
+# rounded so the equation-manager literal reads 112.5mm, not float noise)
+LEG_LENGTH = inch(17 + 7 / 16)  # 442.9125 straight leg to the bend tangent (was 442.3)
+LEG_BOTTOM = round(LEG_TOP - LEG_LENGTH, 6)  # -330.4125: leg bottom ~ machine 879.6;
+# the post passes through a
 # clearance bore in the east rail (build_fr_top_frame gooseneck bore) and drops
-# ~120 below the rail underside (999.7). Measured from the ch. 7 back-left
+# ~120 below the rail underside (999.33). Measured from the ch. 7 back-left
 # three-quarter view (page001_img17): the post candy-canes, descends through
 # the top frame and ends in a free rounded tip (image y 491), clear of the
 # columns -- machine 880 by the frame-height vertical scale (41 mm / 26 px =
 # 1.58 mm/px), cross-checked by the post's own Ø16 silhouette (10 px). Was
 # -169 (machine 1041, at the rail top), then -250 (a front-view guess while
-# the lower end was occluded by the coincident east column)
+# the lower end was occluded by the coincident east column), then -330.0
 
 TUBE_R = TUBE_DIA / 2.0
-TUBE_IR = TUBE_R - WALL_T  # hollow bore radius (6.0)
+TUBE_IR = TUBE_R - WALL_T  # hollow bore radius (5.8293)
 _RING_AREA = math.pi * (TUBE_R**2 - TUBE_IR**2)  # annular wall cross-section
-PLUG_OVERLAP_DIA = TUBE_DIA - WALL_T  # Ø14 modelling union, not the physical Ø12
-# The 1 mm radial overlap merges into the tube wall; added volume is bore fill.
+PLUG_OVERLAP_DIA = TUBE_DIA - WALL_T  # Ø13.767 modelling union, not the physical plug
+# The half-wall radial overlap merges into the tube wall; added volume is bore fill.
 PLUG_OVERLAP_R = PLUG_OVERLAP_DIA / 2.0
 TAP_DRILL_R = TAP_DRILL_DIA / 2.0
 _BREAK_OVERRUN = 0.5  # each revolved tap-end cutter closes in air
@@ -158,8 +162,8 @@ async def build(adapter) -> dict[str, str]:
 
     # 1. Plug first: the native through-all tap must precede the tube sweep,
     # otherwise its axial ray would also perforate the far curved bend wall.
-    # The Ø14 modelling envelope later overlaps the tube's mid-wall; only the
-    # physical Ø12 bore fill remains additional material after that union.
+    # The Ø13.767 modelling envelope later overlaps the tube's mid-wall; only the
+    # physical Ø11.659 bore fill remains additional material after that union.
     x_plug_in = ARM_END_X + PLUG_LENGTH
     plug_dims = SketchDims()
     check("create_sketch end plug", await adapter.create_sketch("Front"))
@@ -221,7 +225,7 @@ async def build(adapter) -> dict[str, str]:
     vol = await volume_check(adapter, "plug through tap", vol - v_tap, 0.02 * v_tap)
 
     # Both tap ends lose 0.25 mm of full thread. These 45-degree cutters run
-    # radially only inside the Ø12 bore, so their overruns remove no tube wall.
+    # radially only inside the Ø11.659 bore, so their overruns remove no tube wall.
     reach = TAP_DRILL_R + EDGE_BREAK + _BREAK_OVERRUN
     mouth_apex = ARM_END_X + TAP_DRILL_R + EDGE_BREAK
     inner_apex = x_plug_in - TAP_DRILL_R - EDGE_BREAK
@@ -512,7 +516,7 @@ async def build(adapter) -> dict[str, str]:
     # = (pi/2) * BendR * ring area; the straight arm is the same ring extruded.
     v_bend = math.pi / 2.0 * BEND_R * _RING_AREA
     v_arm = _RING_AREA * ARM_RUN
-    # The sweep merges the plug and leg. Subtract the Ø12..Ø14 overlap band:
+    # The sweep merges the plug and leg. Subtract the bore..mid-wall overlap band:
     # the finished plug adds bore fill only, less its native tap and breaks.
     v_overlap = math.pi * (PLUG_OVERLAP_R**2 - (PLUG_DIA / 2.0) ** 2) * PLUG_LENGTH
     expected = expected + v_bend + v_arm - v_overlap

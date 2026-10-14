@@ -12,10 +12,12 @@ side, checked with a micrometer.
 
 from __future__ import annotations
 
+from _inch import inch
 
-WASHER_OD = 25.0
+
+WASHER_OD = inch(1)
 WASHER_BORE = 9.6  # slips on the O9.525 (3/8 in) cylinder arbor
-WASHER_THICK = 1.5
+WASHER_THICK = inch(1, 16)
 WASHER_THICK_TOLERANCE_MM = 0.05
 # Running clearance on the arbor: never under the bore (drilled/reamed class).
 WASHER_BORE_BAND = (0.10, 0.0)  # (upper, lower) deviations

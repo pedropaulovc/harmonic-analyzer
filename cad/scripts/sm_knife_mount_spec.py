@@ -11,7 +11,7 @@ EXACTLY ``DRAWING_DIMENSIONS``.
 
 NOTE on the "knife edge": this hardened-steel BEARING BLOCK (ch18 p.42,
 2026-09-02 user re-read: unpainted heat-treated steel, not brass) carries a
-circular bore CLOSE around the mating hex trunnion (Ø12 over the 8.080 x 10.268
+circular bore CLOSE around the mating hex trunnion (Ø1/2 over the 5/16 x 11/32
 hex), so only the trunnion's TOP VERTEX LINE nears the bore's upper inner wall
 -- the true knife-edge line contact.  The sharp ridge is on the LEVER trunnion
 (``build_sm_summing_lever``), NOT on this part; this part's critical surface is the
@@ -32,17 +32,18 @@ from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from _printed_tolerance import angular_band_deg, drilled_oversize_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 from sm_summing_lever_spec import HEX_H, HEX_W
+from _inch import inch
 
 # --- fixed geometry for the drawing's view math (mirrors build_sm_knife_mount) ----
-R_BORE = 6.0  # Ø12 knife-bearing bore (2026-09-02 ch18 p.42 re-read: close bore)
-# Block half-width, owned here (the build reads it): 25.4 across, the .X
+R_BORE = inch(1, 4)  # Ø1/2 knife-bearing bore (was Ø12; ch18 p.42 close bore)
+# Block half-width, owned here (the build reads it): 1 in across, the
 # width that keeps the -X dowel's far-side web at 2.0 round the 15.264 span
 # (PIN_HOLE_FAR_SIDE_WEB below; 25.319 is the least).
 BLK_HALF_X = 12.7
-SUPPORT_Z_THICK = 14.0  # axial depth straddling the trunnion mid
-BLK_TOP = 14.87  # local block top (clamped to the top-frame casting underside)
-BLK_BOT = -14.75  # local block bottom (BORE_CY - R_BORE - 3.0 wall)
-BORE_CY = -5.75  # bore centre below the ridge origin (TopClear 0.25 - R_BORE)
+SUPPORT_Z_THICK = inch(9, 16)  # 14.2875 axial depth straddling the trunnion mid
+BLK_TOP = 15.265625  # local block top (clamped to the top-frame casting underside)
+BLK_BOT = -15.625  # local block bottom (BORE_CY - R_BORE - 1/8 wall)
+BORE_CY = -6.1  # bore centre below the ridge origin (TopClear 0.25 - R_BORE)
 
 # The knife bore's reamed seat, Ra 1.6; the top seat (datum A), which the
 # screw clamps to the casting underside and the dowels key, Ra 3.2: a static
@@ -63,13 +64,13 @@ _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
 # rock budget takes the smallest bore, the webs the largest.
 BORE_DIA_BAND = (0.03, 0.0)
 BORE_DIA_PLACES = 2
-BORE_R_MIN = R_BORE + min(BORE_DIA_BAND) / 2.0  # 6.000
-BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.015
+BORE_R_MIN = R_BORE + min(BORE_DIA_BAND) / 2.0  # 6.350
+BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.365
 # The block's overall sizes print one place (.X, drawing-guidelines.md rule 17 (walls and webs): every web below
 # holds at that band); the stacks judge the block at those limits.
 BLOCK_SIZE_PLACES = 1
 BLOCK_SIZE_TOL = _X  # 0.8
-BLOCK_HEIGHT_PRINTED = round(BLK_TOP - BLK_BOT, BLOCK_SIZE_PLACES)  # 29.6
+BLOCK_HEIGHT_PRINTED = round(BLK_TOP - BLK_BOT, BLOCK_SIZE_PLACES)  # 30.9
 # Manufacturing GD&T limits consumed by the part's drawing projection.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "knife-bore position": "0.20",
@@ -150,30 +151,32 @@ def free_rock_deg(
 # 2026-10-12), so no bedding term enters: seat form tilts the block, it
 # cannot yaw the bore off the dowel line.
 KNIFE_FREE_ROCK_DEG = free_rock_deg(0.0)
-# The bore crown (its upper inner wall) below the top seat: 14.62.
+# The bore crown (its upper inner wall) below the top seat: 15.015625.
 BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
 # MHA-VN-024, a #10-24 plain hex bolt cut from stock to its under-head length
-# (``vn_knife_hanger_stud_spec``), drops through a washer on the crossbar's
-# spotface and its #10 clearance hole and threads into a bottoming tap on the
-# bore's vertical centreline at mid-depth.  The full thread's shallowest
-# limit, 9.52, must take the bolt's longest reach, 9.4856
+# (``vn_knife_hanger_stud_spec``, 1-25/32 in), drops through a washer on the
+# crossbar's spotface and its #10 clearance hole and threads into a bottoming
+# tap on the bore's vertical centreline at mid-depth.  The full thread's
+# shallowest limit, 9.62, must take the bolt's longest reach, 9.604
 # (``build_sm_summing_assembly.HANGER_TIP_CLEARANCE``), and hold 1.5 D of
-# full thread (below).  It prints 9.65 with an explicit native +/-0.13 on the
-# hole callout: the band the earlier 9.650 took from the title block's .XXX
-# row, held unchanged.  Bare, two places would claim the .XX row's +/-0.51
-# (drawing-guidelines.md rule 3 (decimal places carry the tolerance)), a
-# 9.14 shallowest thread the bolt's tip would bottom in; the band's mate and
-# function are the callout's reason row (rule 4).  The drill runs 1.5 P
-# past that nominal thread (9.65 + 1.5875 = 11.2375, printed 11.24), yet its
-# deepest limit, with the pilot the web charges ground to the sharpest
-# accepted point (below), must still leave the 2.0 crown web: so the drill
-# prints 11.24 with an explicit +/-0.05 band on the sheet's hole callout (the
-# MHA-SM-003 bracket-tap precedent).  Both depths print at two places.
+# full thread (below).  Both tap depths are sized off the vendor bolt's reach
+# (a vendor-fit closure, so they stay decimal, not inch fractions).  It
+# prints 9.75 with an explicit native +/-0.13 on the hole callout: the band
+# the earlier 9.650 took from the title block's .XXX row, held unchanged.
+# Bare, two places would claim the .XX row's +/-0.51 (drawing-guidelines.md
+# rule 3 (decimal places carry the tolerance)), a shallowest thread the
+# bolt's tip would bottom in; the band's mate and function are the callout's
+# reason row (rule 4).  The drill runs 1.5 P past that nominal thread (9.75 +
+# 1.5875 = 11.3375, printed 11.34), yet its deepest limit, with the pilot the
+# web charges ground to the sharpest accepted point (below), must still leave
+# the 2.0 crown web: so the drill prints 11.34 with an explicit +/-0.05 band
+# on the sheet's hole callout (the MHA-SM-003 bracket-tap precedent).  Both
+# depths print at two places.
 STUD_THREAD = "#10-24"
-STUD_TAP_DRILL_DEPTH = 11.24
+STUD_TAP_DRILL_DEPTH = 11.34
 STUD_TAP_DRILL_DEPTH_PLACES = 2
 STUD_TAP_DRILL_DEPTH_BAND = 0.05  # explicit, functional (above)
-STUD_TAP_THREAD_DEPTH = 9.65
+STUD_TAP_THREAD_DEPTH = 9.75
 STUD_TAP_THREAD_DEPTH_PLACES = 2
 STUD_TAP_THREAD_DEPTH_BAND = _XXX  # explicit, native: the 9.650's .XXX, kept
 STUD_TAP_SPEC = HoleSpec(
@@ -243,7 +246,7 @@ if STUD_TAP_RUNOUT < 1.5 * STUD_PITCH:
         f" under 1.5 P ({1.5 * STUD_PITCH:.3f})"
     )
 # At the bands' adverse limits the drill still runs past the deepest full
-# thread by at least one pitch, the bottoming tap's lead: 11.19 - 9.78 = 1.41.
+# thread by at least one pitch, the bottoming tap's lead: 11.29 - 9.88 = 1.41.
 STUD_TAP_RUNOUT_MIN = (STUD_TAP_DRILL_DEPTH - STUD_TAP_DRILL_DEPTH_BAND) - (
     STUD_TAP_THREAD_DEPTH + STUD_TAP_THREAD_DEPTH_BAND
 )
@@ -263,13 +266,13 @@ def drill_point_height(drill_dia: float, point_angle_deg: float) -> float:
 # The metal the tap's drill point leaves over the bore crown, every band at
 # its worst (the drill depth's band, the charged pilot envelope at its
 # sharpest accepted point, the largest reamed bore, the bore's position zone
-# KNIFE_BORE_POSITION_TOL): 14.62 - 0.10 - 0.015 - 11.29 - 1.2032 = 2.0118
-# (2.0078 at the build's unrounded 14.866 top).
+# KNIFE_BORE_POSITION_TOL): 15.0156 - 0.10 - 0.015 - 11.39 - 1.2032 = 2.3074
+# (the block top is the build's derived 15.265625).
 STUD_TAP_WEB_MIN = 2.0
 STUD_TAP_POINT_H = drill_point_height(
     STUD_TAP_DIA_MAX, STUD_TAP_POINT_ANGLE_MIN_DEG
 )  # 1.2032
-STUD_TAP_DRILL_DEPTH_MAX = STUD_TAP_DRILL_DEPTH + STUD_TAP_DRILL_DEPTH_BAND  # 11.29
+STUD_TAP_DRILL_DEPTH_MAX = STUD_TAP_DRILL_DEPTH + STUD_TAP_DRILL_DEPTH_BAND  # 11.39
 BORE_CROWN_DEPTH_MIN = (
     BORE_CROWN_DEPTH - KNIFE_BORE_POSITION_TOL / 2.0 - max(BORE_DIA_BAND) / 2.0
 )
@@ -402,7 +405,7 @@ _PIN_R_MAX = (PIN_HOLE_DIA + max(PIN_HOLE_DIA_BAND)) / 2.0
 PIN_HOLE_SIDE_DISTANCE = BLK_HALF_X - PIN_HOLE_X  # 5.068, prints 5.07
 PIN_HOLE_SIDE_PLACES = 2
 PIN_HOLE_SIDE_TOL = _XX  # 0.51
-HOLE_ROW_FACE_DISTANCE = SUPPORT_Z_THICK / 2.0  # 7.0
+HOLE_ROW_FACE_DISTANCE = SUPPORT_Z_THICK / 2.0  # 7.14375
 HOLE_ROW_FACE_PLACES = 1
 HOLE_ROW_FACE_TOL = _X  # 0.8
 _ANGULAR_TOL_DEG = float(_config.title_block("angular")["value_deg"])  # 1.0

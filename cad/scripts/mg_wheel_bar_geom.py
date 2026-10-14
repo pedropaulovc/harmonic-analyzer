@@ -11,36 +11,47 @@ it imports geometry from, so the drawing contract must NOT live here.
 from __future__ import annotations
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _inch import inch
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 
 # --- bar section + length (DIMENSIONS.md ch21; M6.8 ch30 8-view pass) ----------
-BAR_SIDE = 10.0  # tall (Y)
-BAR_DEPTH = 9.0  # deep (Z) -- support-bar stock; back face seats on the clamp arc
-BAR_LENGTH = 234.0  # clamped end 29 past the west column + free end (photo, med)
+# 13/32 tall (1/32 step, was 10.0): the nearest 3/8 leaves the clamp holes'
+# worst wall 1.82 < 2.0, and 7/16 or 1/2 put the TIE 1 tail into the bar band
+# at full pen travel (mg_wheel_group.TAIL_BAR_CLEARANCE).
+BAR_SIDE = inch(13, 32)  # tall (Y)
+BAR_DEPTH = inch(3, 8)  # deep (Z; was 9.0) -- back face seats on the clamp arc
+# clamped end 29 past the west column + free end (photo, med); 9-3/16 (was 234.0)
+BAR_LENGTH = inch(9 + 3 / 16)
 
 # --- hole stations (local X; the bores run along Z, the front-back axis) --------
-SCREW_HOLE_X = -112.0  # pen-hanger screw hole: 5 mm from the fixed free end
-CLAMP_HOLE_X = (70.5, 105.5)  # clamp-screw holes flanking the column line at +88
+# pen-hanger screw hole: 7/32 from the fixed free end (was 5.0; 1/32 step: the
+# nearest 3/16 leaves the end wall 1.92 < 2.0, and 1/4 moves the sub-1/4
+# station > 25%).
+SCREW_HOLE_X = -BAR_LENGTH / 2.0 + inch(7, 32)
+# clamp-screw holes flanking the column line at local +87.3125 (3-7/16), on the
+# column clamp's +/-11/16 ear lines: 2-3/4 and 4-1/8 (was 70.5 / 105.5)
+CLAMP_HOLE_X = (inch(2.75), inch(4 + 1 / 8))
 # The print reads every station from the left end (the bar is modelled centred).
 LEFT_END_X = -BAR_LENGTH / 2.0
-HANGER_STATION = SCREW_HOLE_X - LEFT_END_X  # 5.0
-CLAMP_STATIONS = tuple(x - LEFT_END_X for x in CLAMP_HOLE_X)  # (187.5, 222.5)
+HANGER_STATION = SCREW_HOLE_X - LEFT_END_X  # 5.55625 (7/32)
+CLAMP_STATIONS = tuple(x - LEFT_END_X for x in CLAMP_HOLE_X)  # (186.53125, 221.45625)
 CLAMP_STATION_PLACES = 1
 
 # Fixed photographic registration, shared by the bar placement and hanger tap.
 # Moving the screw station must not move either the bar or the pen-guide body.
-WHEEL_BAR_X0 = 109.0
-HANGER_ORIGIN_X = 3.0
-HANGER_STRAP_TOP_LEFT_X = -16.0
+WHEEL_BAR_X0 = inch(4 + 5 / 16)  # was 109.0
+# == paper_drive_geom.PEN_ROD_X (1/8; pen assembly asserts the screw station)
+HANGER_ORIGIN_X = inch(1, 8)
+HANGER_STRAP_TOP_LEFT_X = -inch(5, 8)  # OutPN's strap (was -16.0)
 HANGER_SCREW_MACHINE_X = WHEEL_BAR_X0 + SCREW_HOLE_X
 HANGER_SCREW_LOCAL_X = HANGER_SCREW_MACHINE_X - HANGER_ORIGIN_X
 
 # Wheel-axle bore: reamed .1865 through at the wheel station; the 3/16
 # mg-wheel-axle presses in to a gauge from the front face (mg_wheel_axle_spec),
 # its back end near the back face.
-WHEEL_X = 53.0  # magnifying-wheel centre, machine x
-AXLE_BORE_X = WHEEL_X - WHEEL_BAR_X0  # -56
+WHEEL_X = inch(2 + 1 / 16)  # magnifying-wheel centre, machine x (was 53.0)
+AXLE_BORE_X = WHEEL_X - WHEEL_BAR_X0  # -57.15 (-2-1/4)
 AXLE_BORE_DIA = round(0.1865 * 25.4, 6)  # 4.7371
 AXLE_BORE_BAND = (0.010, 0.0)  # (upper, lower) deviations, reamed
 # The height is bright square stock as supplied (cold-drawn h11 is 0/-0.09):
@@ -56,7 +67,7 @@ BAR_DEPTH_BAND = (0.10, -0.10)
 # All four bores share one row at mid-height. No long face seats on a mating
 # part (the back face seats on the clamp arc), so the print reads the row from
 # the bottom face, with an explicit band.
-BORE_ROW_HEIGHT = BAR_SIDE / 2.0  # 5.0
+BORE_ROW_HEIGHT = BAR_SIDE / 2.0  # 5.159375
 BORE_ROW_HEIGHT_TOL = 0.10
 BORE_ROW_HEIGHT_PLACES = 2
 # The bar's faces from the row at their worst: the far face sets the TIE 1
@@ -64,11 +75,11 @@ BORE_ROW_HEIGHT_PLACES = 2
 BORE_ROW_FAR_FACE = (
     max(BORE_ROW_HEIGHT, BAR_SIDE + BAR_SIDE_BAND[0] - BORE_ROW_HEIGHT)
     + BORE_ROW_HEIGHT_TOL
-)  # 5.10
+)  # 5.259
 BORE_ROW_NEAR_FACE = (
     min(BORE_ROW_HEIGHT, BAR_SIDE + BAR_SIDE_BAND[1] - BORE_ROW_HEIGHT)
     - BORE_ROW_HEIGHT_TOL
-)  # 4.60
+)  # 4.859
 
 # Native Hole Wizard clearance contracts shared by build, drawing, and assemblies.
 PEN_HANGER_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
@@ -85,7 +96,7 @@ BORE_ROW_WALLS = {
     "pen-hanger hole": BORE_ROW_NEAR_FACE
     - (PEN_HANGER_HOLE_DIA + DRILLED_HOLE_PLUS) / 2.0,
     "clamp holes": BORE_ROW_NEAR_FACE - (CLAMP_HOLE_DIA + DRILLED_HOLE_PLUS) / 2.0,
-}  # 2.226, 2.264, 2.061
+}  # 2.355, 2.393, 2.320
 for _bore, _wall in BORE_ROW_WALLS.items():
     if _wall < BORE_MIN_WALL:
         raise AssertionError(f"wheel-bar {_bore} wall {_wall:.3f} < {BORE_MIN_WALL}")

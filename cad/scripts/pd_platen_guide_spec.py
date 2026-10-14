@@ -2,7 +2,24 @@
 
 from _gtol_planar import PlanarFace
 from _hole_spec import HoleSpec
+from _inch import inch
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from pd_platen_spec import GUIDE_HOLE_X, PLATE_WIDTH
+
+# The rail section and stations (``build_pd_platen_guide`` builds from these
+# and re-exports them; paper_drive_geom reads them here, COM-free).
+GUIDE_LENGTH = PLATE_WIDTH  # the full platen width, 10-5/8
+GUIDE_HEIGHT = inch(3, 16)
+# 7/16: 1/16 past the 3/8 bar so the lock plates clear it. 13/32 (1/32
+# past) would leave the as-made lock gap under LOCK_GAP_FIT's max at the
+# printed band (build_pd_platen_guide asserts it).
+GUIDE_DEPTH = inch(7, 16)
+# The guide screws' stations: the platen's guide-screw columns.
+SCREW_STATION_X = GUIDE_HOLE_X
+# 3/10 and 7/10 of the width (the 2nd and 4th screw columns); inboard of the
+# east column clamp.
+LOCK_STATION_X = (GUIDE_HOLE_X[1], GUIDE_HOLE_X[3])
+LOCK_SCREW_DX = inch(1, 4)  # 2 screws per lock flank its centre
 
 # R9-64: the guide screws' front receivers are #4-40 tapped THROUGH the rail,
 # as R9-48 made the rear row. A blind tap cannot hold full thread to the
@@ -13,7 +30,7 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 TAPPED_HOLE_SPEC = HoleSpec("tapped", "#4-40")
 
 # The guide-lock screws' rear receivers (R9-48): #4-40 tapped THROUGH the
-# rail, so the full 10.00 depth carries thread and no depth band can starve
+# rail, so the full 7/16 depth carries thread and no depth band can starve
 # the 3/8 in MHA-VN-046 screws (vn_guide_lock_screw_spec.ENGAGEMENT_WORST). The
 # tips stop inside the rail (build_pd_platen_guide asserts the reach).
 LOCK_TAP_SPEC = HoleSpec("tapped", "#4-40")
@@ -22,9 +39,9 @@ LOCK_TAP_SPEC = HoleSpec("tapped", "#4-40")
 # bar's back face the lock plates ride and how close their slotted pan heads
 # come to the hanger arm and its plate. Both sit inside the paper-drive
 # lock-station sweep, so the depth carries an explicit one-sided band, native
-# on Depth@Guide: never deeper than 10 (the heads keep 0.34 to the arm plate
-# at worst), and as loose as the .XX row on the shallow side (the plates keep
-# 0.37 to the bar). It prints at the document's two places.
+# on Depth@Guide: never deeper than nominal (the heads keep their margin to
+# the arm plate at worst), and as loose as the .XX row on the shallow side.
+# It prints at the document's two places.
 GUIDE_DEPTH_BAND = (0.0, -0.50)  # (upper, lower)
 GUIDE_DEPTH_PLACES = 2
 

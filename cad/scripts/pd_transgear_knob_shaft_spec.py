@@ -8,14 +8,14 @@ closure.  ``build_pd_transgear_knob_shaft`` marks and tolerances exactly
 One turned SAE1018 shaft carries a standard-depth 12T48DP PA20 integral
 pinion cut by the finite TTC #8 stock form (10-289-488, Ø44.45 cutter).
 The gear front F and every chain/cup station remain unchanged.  Its front
-Ø4.850 h6 solid D-core drives the matching brass D-collar without a cross
+Ø3/16 in h6 solid D-core drives the matching brass D-collar without a cross
 hole.  The collar's fitted rear face bears directly on F; the #8-32 stud
 and same-outer custom thumbnut clamp it there, while the removable T24
 still floats on the existing pilot and is driven by the two axial dowels.
 The thread relief carries clamp, not torque.
 
-The Ø6 g6 rear journal runs in the plate's Ø6 H7 bore.  The loose Ø6.05-bore
-thrust ring retains its 5.2 length and bears on the actual rear tooth ends.
+The 1/4 in g6 rear journal runs in the plate's 1/4 in H7 bore.  The loose
+1/4-drilled thrust ring, 3/16 long, bears on the actual rear tooth ends.
 True finite disk endcuts run out within that ring, not in the active plate
 bearing.  The rear cup is still set on the existing end-float feeler and
 match-pinned by MHA-VN-048.  No front spring pin or collar slot remains.
@@ -53,8 +53,10 @@ from paper_drive_stock_inspection import GaugeContact, toothspace_gauge_contact_
 from _gtol_controls import GeometricControl, PartDatum
 from _gtol_cylinder import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM
+from _inch import inch
 from _printed_tolerance import printed_band_mm, printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from pd_transgear_arm_plate_geometry import BORE_DIA as PLATE_BORE_DIA
 from pd_transgear_arm_plate_geometry import HUB_TO_BOSS as PLATE_HUB_TO_BOSS
 from pd_transgear_arm_plate_geometry import HUB_TO_BOSS_BAND as PLATE_HUB_TO_BOSS_BAND
 from pd_transgear_knob_thrust_ring_spec import LENGTH as RING_LENGTH
@@ -168,7 +170,7 @@ ROOT_DEPTH_X_MIN = min(
     p.root_point(p.root_half_angle_rad)[0] for p in _PROFILE_CORNERS
 )
 WHOLE_DEPTH = (OUTSIDE_DIA - ROOT_DIA) / 2.0
-FACE_WIDTH = 5.9
+FACE_WIDTH = inch(1, 4)
 FACE_WIDTH_PLACES = 3
 GAP_AZIMUTH_DEG = 180.0 / TEETH
 # The assembly spins the shaft and its whole mounted front stack (collar,
@@ -218,17 +220,20 @@ TIP_CHAMFER_PLACES = 3
 THREAD_CALLOUT = f"{THREAD} UNC"
 CHAMFER_CALLOUT = "X 45 DEG"
 # The tip prints as its station from F (.XX, R9-17), not as a thread length.
-TIP_STATION = 23.9
+TIP_STATION = inch(15, 16)
 TIP_STATION_PLACES = 2
 
 # --- Solid D-core; no gear bore and no transverse torque hole ---------------
-# 4.850, not 4.900: the 0.05 tooth-space TIR (Main ruling 2026-10-10) costs
-# the finite cutter 0.0225 of radial air over the core; 4.850 restores
-# FRONT_CORE_AIR_MIN above its 0.035 floor (0.0385).
-CORE_DIA = 4.850
+# 3/16 in: the shared D nominal with the drive collar's D-bore.  Smaller than
+# the old 4.850, so the finite cutter's radial air over the core only grows.
+CORE_DIA = inch(3, 16)
 CORE_DIA_BAND = (0.0, -0.008)  # ISO h6, over 3 THROUGH 6 mm
 CORE_DIA_PLACES = 3
-CORE_FLAT_FROM_AXIS = 2.125  # moves in with the core radius (4.900 -> 4.850)
+# Moves in with the core radius (4.850 -> 3/16 in), keeping the flat about
+# 0.30 below the O.D. so the collar's rear D-entry break keeps a full profile
+# depth; not an inch fraction (no 1/32 point lies between the stud's
+# thread blank and the core's O.D.).
+CORE_FLAT_FROM_AXIS = 2.080
 CORE_FLAT_BAND = (0.0, -0.015)
 CORE_FLAT_PLACES = 3
 # The drawing's frames print these strings; the turned-shaft grade is the
@@ -275,15 +280,15 @@ TOOTH_SPACE_CALLOUT_POINT_MM = (
     0.0,
 )
 # FRONT STATION from F, not the shortened active D length.
-CORE_FRONT_FROM_F = 5.25
+CORE_FRONT_FROM_F = inch(3, 16)
 CORE_FRONT_FROM_F_PLACES = 3
 
 # Ordinary turned undercut at F: no tiny-radius grade or front disk cut.
-# 3.950, not 4.000: pays the 0.05 tooth-space TIR's extra 0.0225 radius and
-# keeps FRONT_NECK_AIR_MIN above its 0.320 floor (0.3235).
-FRONT_RELIEF_DIA = 3.950
+# 1/8 in: the nearest 1/16 (5/32 would cost the neck corner's cutter air).
+FRONT_RELIEF_DIA = inch(1, 8)
 FRONT_RELIEF_DIA_PLACES = 3
-FRONT_RELIEF_WIDTH = 0.400
+# 1/32 in: 1/16 rounds the 0.400 undercut to nothing.
+FRONT_RELIEF_WIDTH = inch(1, 32)
 FRONT_RELIEF_WIDTH_PLACES = 3
 FRONT_CORNER_RADIUS = 0.050
 FRONT_CORNER_RADIUS_MAX = 0.100
@@ -347,12 +352,13 @@ if FRONT_RELIEF_WIDTH_MIN <= 2.0 * FRONT_CORNER_RADIUS_MAX:
 # die leads]).  The relief's floor stands under the deepest die-cut root,
 # so the lead's incomplete threads lie in air, and the thumbnut at the
 # collar's rearward stop runs only on full thread or over the relief.
-PLAIN_CORE = 7.5
+PLAIN_CORE = inch(5, 16)
 PLAIN_CORE_PLACES = 3
-THREAD_LENGTH_REF = TIP_STATION - PLAIN_CORE  # 16.4 REF
+THREAD_LENGTH_REF = TIP_STATION - PLAIN_CORE  # 5/8 in REF
 DIE_RUNOUT_PITCHES = 1.5
 DIE_RUNOUT_MAX = DIE_RUNOUT_PITCHES * THREAD_PITCH
-RELIEF_DIA = 2.800
+# 3/32 in: 1/8 stands above the deepest #8-32 die root.
+RELIEF_DIA = inch(3, 32)
 RELIEF_DIA_PLACES = 3
 _CORE_FRONT_TOL = printed_band_mm(CORE_FRONT_FROM_F_PLACES)
 _PLAIN_CORE_TOL = printed_band_mm(PLAIN_CORE_PLACES)
@@ -360,7 +366,7 @@ RELIEF_DIA_MAX = RELIEF_DIA + printed_band_mm(RELIEF_DIA_PLACES)
 RELIEF_DIA_MIN = RELIEF_DIA - printed_band_mm(RELIEF_DIA_PLACES)
 RELIEF_WIDTH_MIN = (PLAIN_CORE - _PLAIN_CORE_TOL) - (
     CORE_FRONT_FROM_F + _CORE_FRONT_TOL
-)  # 7.37 - 5.38 = 1.99
+)  # 7.81 - 4.89 = 2.92
 if RELIEF_WIDTH_MIN < DIE_RUNOUT_MAX - 1e-9:
     raise AssertionError(
         f"MHA-PD-008 thread relief / die run-out: the narrowest relief "
@@ -378,8 +384,10 @@ THREAD_STRESS_AREA = math.pi / 4.0 * (THREAD_MAJOR - 0.9743 * THREAD_PITCH) ** 2
 RELIEF_AREA_MIN = math.pi / 4.0 * RELIEF_DIA_MIN**2
 RELIEF_AREA_RATIO_MIN = RELIEF_AREA_MIN / THREAD_STRESS_AREA
 
-# --- Journal: ISO g6 in the arm plate's matching 6 H7 bore ------------------
-JOURNAL_DIA = 6.0
+# --- Journal: ISO g6 in the arm plate's matching 1/4 in H7 bore -------------
+# The shared machined-to-machined nominal is the plate's bore (1/4 in); the
+# g6 band is the existing one.
+JOURNAL_DIA = PLATE_BORE_DIA
 JOURNAL_DIA_BAND = SHAFT_G6_3_TO_6_MM
 JOURNAL_DIA_PLACES = 3
 # The cup's front face, from the 12T's rear face (R9-25): the thrust ring +
@@ -390,23 +398,25 @@ JOURNAL_DIA_PLACES = 3
 # no longer enters it.
 END_FLOAT = 0.2
 END_FLOAT_SET_TOL = 0.05
-CUP_FACE_STATION = RING_LENGTH + PLATE_HUB_TO_BOSS + END_FLOAT  # 34.4375
-if abs(CUP_FACE_STATION - 34.4375) > 1e-9:
+CUP_FACE_STATION = RING_LENGTH + PLATE_HUB_TO_BOSS + END_FLOAT  # 34.33125
+if abs(CUP_FACE_STATION - 34.33125) > 1e-9:
     raise AssertionError(
-        f"cup face station {CUP_FACE_STATION:.4f} is off the contract's 34.4375 "
-        "(ring 5.2 + hub-to-boss 29.0375 + 0.2 float, R9-25)"
+        f"cup face station {CUP_FACE_STATION:.5f} is off the contract's 34.33125 "
+        "(ring 3/16 + hub-to-boss 1-5/32 + 0.2 float, R9-25)"
     )
 # Where the fitter sets the cup on a real stack: the ring's and the hub-to-
 # boss's own bands, and the feeler setting.
 CUP_FACE_STATION_BAND = RING_LENGTH_TOL + PLATE_HUB_TO_BOSS_BAND + END_FLOAT_SET_TOL
 # The journal runs on behind the cup's front face to carry the cup's pin
 # (K-1); 12T rear face to the rear end face, at the title block's .XXX.
-JOURNAL_REAR_EXTENSION = 6.5
-JOURNAL_LENGTH = CUP_FACE_STATION + JOURNAL_REAR_EXTENSION  # 40.9375
+# 5/16 in: 1/4 leaves the match-drilled cup pin under the wall floor from
+# the journal's rear end (MHA-PD-016).
+JOURNAL_REAR_EXTENSION = inch(5, 16)
+JOURNAL_LENGTH = CUP_FACE_STATION + JOURNAL_REAR_EXTENSION  # 42.26875
 JOURNAL_LENGTH_PLACES = 3
 _JOURNAL_LENGTH_BAND = printed_band_mm(JOURNAL_LENGTH_PLACES)
 # The journal behind the cup's front face at the printed worst case:
-# 6.5 - 0.13 - 0.15 = 6.22 .. 6.78.
+# 7.94 - 0.13 - 0.15 = 7.66 .. 8.22.
 JOURNAL_REAR_EXTENSION_MIN = JOURNAL_REAR_EXTENSION - (
     _JOURNAL_LENGTH_BAND + CUP_FACE_STATION_BAND
 )
@@ -422,9 +432,9 @@ CORE_REAR_Z = -FRONT_RELIEF_WIDTH
 CORE_FLAT_CUT_END_Z = -CORE_FLAT_CUT_END_FROM_F
 THREAD_END_Z = -PLAIN_CORE
 PINION_REAR_Z = FACE_WIDTH
-CUP_FACE_Z = PINION_REAR_Z + CUP_FACE_STATION  # 40.3375, at the stack pose
+CUP_FACE_Z = PINION_REAR_Z + CUP_FACE_STATION  # 40.68125, at the stack pose
 REAR_END_Z = FACE_WIDTH + JOURNAL_LENGTH
-OVERALL_LENGTH = REAR_END_Z - TIP_Z  # 70.74 REF
+OVERALL_LENGTH = REAR_END_Z - TIP_Z  # 72.43 REF
 
 FRONT_CORE_AIR_MIN = (
     ROOT_DIA_EXACT_MIN - CORE_DIA - max(CORE_DIA_BAND)
@@ -446,19 +456,19 @@ if not CORE_DIA < JOURNAL_DIA < OUTSIDE_DIA:
     )
 
 # --- Actual finite Ø44.45 stock disk, both axial terminal positions ---------
-FULL_DEPTH = 4.65
+FULL_DEPTH = inch(3, 16)
 FULL_DEPTH_PLACES = 3
-# 10.6, not 10.5: the 0.05 tooth-space TIR raises the worst rear disk chord
-# end to F + 9.589; the printed limit keeps its 1.0 margin over that end and
-# stays 0.32 short of the plate hub bore (F + 10.92 worst).
+# A MAX limit, not a nominal: the 1/4 in journal raises the worst rear disk
+# chord end to F + 10.432 and the plate hub bore lies at F + 10.93 worst; no
+# 1/16 or 1/32 in point lies between, so the limit stays 10.6.
 CUTTER_RUNOUT_MAX = 10.6
 CUTTER_RUNOUT_PLACES = 2
 CUTTER_DIA = 44.45
 CUTTER_ARBOR_BORE = 22.225
 CUTTER_SKU = "10-289-488"
 FULL_DEPTH_BAND = printed_band_mm(FULL_DEPTH_PLACES)
-FULL_DEPTH_MIN = FULL_DEPTH - FULL_DEPTH_BAND  # 4.52
-FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND  # 4.78
+FULL_DEPTH_MIN = FULL_DEPTH - FULL_DEPTH_BAND  # 4.63
+FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND  # 4.89
 # swTolMAX prints the dimension's NOMINAL followed by "MAX", so the witness
 # sits at the limit; its deviations record "anywhere behind the shortest full
 # depth, up to the limit".
@@ -481,16 +491,17 @@ def cutter_runout(cutter_dia: float, rise: float) -> float:
 
 
 # Window (i): full depth covers the disc's worst-corner rear face.  That face
-# is the assembly stack's (contract §13.2): nominal 3.70 from F + arm 0.0254
-# + plate 0.13 + ring 0.05 + 12T face 0.13 + stud 0.05 + disc seat 0.05 +
-# the knob float forward 0.35.
-DISC_REAR_FROM_F_WORST = 4.4854
+# is the assembly stack's (contract §13.2): nominal 3.625 from F
+# (transgear_cluster_fit DISC_REAR_Z - F_Z) + arm 0.0254 + plate 0.13 + ring
+# 0.05 + 12T face 0.13 + stud 0.05 + disc seat 0.05 + the knob float forward
+# 0.35.
+DISC_REAR_FROM_F_WORST = 4.4104
 # Window (ii): the run-out ends in front of the plate hub's running bore.  At
 # the stack pose (12T rear tooth ends -> ring -> hub) the hub face lies the
 # face width plus the ring behind F, nearest at their short limits.
 HUB_BORE_FROM_F_WORST = (FACE_WIDTH - printed_band_mm(FACE_WIDTH_PLACES)) + (
     RING_LENGTH - RING_LENGTH_TOL
-)  # 10.92
+)  # 10.93
 # Use deepest ground X for the rear disk chord, not the polar root radius.
 # Internal toothspace TIR is the only profile/journal axis term here.
 _JOURNAL_R_MAX = (JOURNAL_DIA + max(JOURNAL_DIA_BAND)) / 2.0

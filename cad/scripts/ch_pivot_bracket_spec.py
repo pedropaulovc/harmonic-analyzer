@@ -29,15 +29,20 @@ from __future__ import annotations
 from math import sqrt
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from _inch import inch
 
-FOOT_W = 16.0  # X, across the support apex (16.933 wide; 0.47 margin each side)
-FOOT_H = 6.0
+# All-inch experiment: every independent length an inch fraction.
+# X, across the support apex (was 16.0; apex now 11/16 = 17.4625, 0.40 margin each side). 21/32, the 1/32 grid:
+# 5/8 shrinks the R arch over the bore and drops the #4-40 apex set-screw
+# engagement under the ruled 1.08D floor below.
+FOOT_W = inch(21, 32)
+FOOT_H = inch(1, 4)  # was 6.0
 EAR_W = FOOT_W  # X: the ear's sides run flush with the foot's
-EAR_T = 8.0  # Z; the ear's Z band is the bore's (z -4..+4)
+EAR_T = inch(5, 16)  # Z; the ear's Z band is the bore's (was 8.0)
 FOOT_Z0 = -EAR_T / 2.0  # foot starts at the ear's inboard face
-BORE_H = 25.2  # shaft axis above the seat: the rocker pivot stays at machine
-# y 253.8 on the 228.6 support apex
-BORE_DIA = 6.5  # O6.35 shaft, 0.15 diametral clearance
+BORE_H = inch(1)  # shaft axis above the seat: the rocker pivot at machine
+# y 254.0 (10 in) on the 228.6 (9 in) support apex (was 25.2)
+BORE_DIA = 6.5  # 1/4 in shaft, 0.15 diametral clearance (existing fit)
 EAR_ARCH_R = EAR_W / 2.0  # the ear's top is a half-round about the bore
 EAR_TOP_Y = BORE_H + EAR_ARCH_R  # 33.2
 BORE_LIGAMENT = EAR_ARCH_R - BORE_DIA / 2.0  # 4.75: drawing-guidelines.md rule 17 (walls and webs) web over the bore

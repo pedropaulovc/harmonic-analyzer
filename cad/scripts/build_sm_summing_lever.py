@@ -123,6 +123,7 @@ from sm_summing_lever_spec import (
     HOLE_Z_OFFSET,
     SURFACE_FINISHES,
 )
+import sm_summing_lever_spec
 
 PART_NAME = "sm-summing-lever"
 MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
@@ -147,10 +148,9 @@ ANCHOR_R = 0.375 * IN  # summation anchor outer radius               9.525
 
 # The 20 channel-spring anchors THREAD into the part-owned native tap pattern.
 # The plate is a true coplanar casting -- mid-plane ON the pivot (.cs shape):
-# placed at the knife line y=979.7 it spans 977.16..982.24, so the top registers
-# at machine 982.24 (the whole summing chain dropped 10.3 with the top-frame
-# rederive). The channel springs + magnifying bracket meet it
-# (build_channel_*: PLATE_TOP_Y/PLATE_EYE_Y; build_mg_magnifying_bracket:
+# placed at the knife line y=979.7 (spring-calibrated station, left in mm) it
+# spans 977.16..982.24, so the top registers at machine 982.24. The channel springs + magnifying
+# bracket meet it (spring_mount_geom.PLATE_TOP_Y; build_mg_magnifying_bracket:
 # FLANGE_Y). Consumed at PLACEMENT (the part is pivot-centred), not by any
 # extrude here.
 PLATE_TOP_Y = 982.24
@@ -160,14 +160,15 @@ PLATE_TOP_Y = 982.24
 # the lever's pivot overhangs the body so the knife edges rest on bearing
 # supports standing on the top plate (ch30-p003). Each stub's top vertex line
 # is the knife edge the lever is suspended/rocks on.
-# Knife-edge trunnion cross-section: vertex-up hex, 8.080 wide (X) x 10.268 tall
-# (Y, vertex to vertex) x 21.717 deep (Z protrusion). The top vertex ridge is
-# the knife edge (= the rock axis, above the cylinder centreline).
-HEX_W = 8.080  # across-flats width (X); = sm_summing_lever_spec.HEX_W
-HEX_H = 10.268  # vertex-to-vertex height (Y) -- vertex-up
-HEX_DEPTH = 21.717  # axial length each stub protrudes past the body end
+# Knife-edge trunnion cross-section: vertex-up hex, 5/16 wide (X) x 11/32 tall
+# (Y, vertex to vertex) x 7/8 deep (Z protrusion) -- sm_summing_lever_spec owns
+# the three sizes. The top vertex ridge is the knife edge (= the rock axis,
+# above the cylinder centreline).
+HEX_W = sm_summing_lever_spec.HEX_W  # across-flats width (X), 7.9375
+HEX_H = sm_summing_lever_spec.HEX_H  # vertex-to-vertex height (Y) -- vertex-up, 8.73125
+HEX_DEPTH = sm_summing_lever_spec.HEX_DEPTH  # stub protrusion past the body end, 22.225
 HEX_Z_INNER = PLATE_L / 2.0  # inboard face flush with the body end (76.20)
-HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
+HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (98.425)
 
 # --- derived ---------------------------------------------------------------
 SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20

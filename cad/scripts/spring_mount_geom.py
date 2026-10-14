@@ -26,8 +26,12 @@ import sm_summing_lever_spec
 from _hole_spec import blind_cut_dia_mm
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
+# Left in mm: the summing knife station is the springs' calibration stamp
+# (no spring recalibration in the all-inch experiment).
 KNIFE = (-15.0, 979.7)
 KNIFE_CONTACT_Y = KNIFE[1] + sm_summing_lever_spec.HEX_H / 2.0
+# Gooseneck post station (spring-calibration stamped; decoupled from the
+# 7-3/4 frame column line, snap only after calibrate_spring_seats --write).
 COLUMN_X = -197.0
 MIN_CLEARANCE_MM = 0.25
 PLATE_TOP_Y = KNIFE[1] + sm_summing_lever_spec.PLATE_T / 2.0

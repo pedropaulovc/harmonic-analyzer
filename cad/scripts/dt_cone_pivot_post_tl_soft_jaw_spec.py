@@ -26,25 +26,27 @@ from __future__ import annotations
 import dt_cone_pivot_post_spec as post
 import dt_cone_pivot_post_tl_cap_jaw_button_spec as button
 from _hole_spec import HoleSpec
+from _inch import inch
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 
 MM_PER_IN = 25.4
 
-# Plate: the hardened plate's length (6.247 in read, printed to one place),
-# the jaw height above the vise bed, and the finished thickness after the
-# gripping face is skimmed in place (one place: the vise clamps across it and
+# Plate: the hardened plate's length (6.247 in read, made 6-1/4 in), the jaw
+# height above the vise bed, and the finished thickness after the gripping
+# face is skimmed in place (3/4 in; one place: the vise clamps across it and
 # nothing locates on it).
-PLATE_LENGTH = 158.7
-PLATE_HEIGHT = 63.5
-PLATE_THICK = 19.1
-# Bolt holes: an example reading of the hardened plate's two holes, +-50.8
+PLATE_LENGTH = inch(25, 4)
+PLATE_HEIGHT = inch(5, 2)
+PLATE_THICK = inch(3, 4)
+# Bolt holes: an example reading of the hardened plate's two holes, +-2 in
 # about the plate centre, spotted through it; both stations print from the
 # left end at the two places they were read to.
 # 7/16 drill through, 11/16 end-mill counterbore from the gripping face to the
-# hardened plate's counterbore depth plus 1.25, so the vise's own screws reach
-# the same thread.
+# hardened plate's counterbore depth plus the extra plate thickness, so the
+# vise's own screws reach the same thread (15/32 in deep; 1/32: 7/16 in would
+# pull each screw 0.6 mm out of the vise's thread).
 BOLT_HALF_SPACING = 50.8
-BOLT_HEIGHT = 22.5
+BOLT_HEIGHT = inch(7, 8)
 BOLT_LEFT_X = round(PLATE_LENGTH / 2.0 - BOLT_HALF_SPACING, 2)
 BOLT_RIGHT_X = round(PLATE_LENGTH / 2.0 + BOLT_HALF_SPACING, 2)
 BOLT_XS = (BOLT_LEFT_X, BOLT_RIGHT_X)
@@ -53,7 +55,7 @@ BOLT_XS = (BOLT_LEFT_X, BOLT_RIGHT_X)
 # cuts inside it).
 BOLT_HOLE_DIA = 11.11
 CBORE_DIA = 11.0 / 16.0 * MM_PER_IN
-CBORE_DEPTH = 11.75
+CBORE_DEPTH = inch(15, 32)
 BOLT_HOLE_SPEC = HoleSpec(
     "counterbore_socket",
     "3/8",

@@ -181,7 +181,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # <MOD-DIAM> carries its own leading gap, so no space before it.
 CROSS_HOLE_CALLOUT = (
     "REAM THRU,\n"
-    f"CENTRED ON<MOD-DIAM>{HEAD_DIA:.0f} CYLINDER LENGTH"
+    f"CENTRED ON<MOD-DIAM>{HEAD_DIA:.1f} CYLINDER LENGTH"
 )
 # Notes never carry dimensions (Codex P1 on #814): the drum station is the
 # model's DrumStationFromHeadRear, printed on the profile as "DRUM STATION"
