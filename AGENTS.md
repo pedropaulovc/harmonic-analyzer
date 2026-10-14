@@ -248,6 +248,14 @@ The SolidWorks-free `check:*` gates and the comparison/diff tooling run from thi
 SolidWorks seat — either open on this machine (`--executor local`) or on the build
 farm (`--executor farm`, which is how a seatless machine runs them).
 
+`check:graph` includes the SolidWorks-free part-coverage contract
+(`cad/scripts/test_part_coverage.py`). Every non-tooling part must be reachable
+from the final assembly in `ASSEMBLY_ORDER`; shop fixtures (`*_tl_*`) must never
+appear in assembly references or BOMs (#1239). Every part and assembly needs a
+drawing sourced from its own model kind. The named `PART_DRAWING_EXEMPTIONS`
+mapping exempts only consumable `pd_platen_paper`, and rejects exemptions for
+missing parts or parts that already have drawings.
+
 The `check:recipe` source contracts also cover tooling fixtures. When a builder
 loops over fit bands, register its module-level source expression in
 `test_fit_bands.py::LOCAL_BAND_SOURCES` (`each` for tuples, `values` for mappings).
