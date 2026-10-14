@@ -72,7 +72,13 @@ import sys
 
 from _appearance import apply_material
 from _check import check
-from _dimensions import drive_dimension, set_global
+from _dimensions import drive_dimension, name_dimensions, set_global
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _drawing_precision import apply_drawing_precision
 from _feature_tree import name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -80,6 +86,12 @@ from _paths import REFERENCES_DIR
 from _rebuild import force_rebuild
 from _session import run_build
 from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
+from fr_nameplate_drawing_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    ISOMETRIC_VIEW_NOTE,
+    MANUFACTURING_NOTES,
+)
 from fr_nameplate_spec import (
     PLATE_HEIGHT,
     PLATE_THICKNESS,
@@ -192,6 +204,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "PlateSlab")
+    name_dimensions(adapter, "PlateSlab", ["PlateThick"])
     await bbox_extent_check(adapter, "plate width (traced outline)", "x", PLATE_WIDTH)
     await bbox_extent_check(adapter, "plate height (traced outline)", "y", PLATE_HEIGHT)
     await volume_check(
@@ -334,8 +347,25 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven nameplate (equations neutral)", final_volume, 1e-3 * final_volume
     )
 
+    # Manufacturing drawing support (#628): every printed model dimension's
+    # places live on the part (fr_nameplate_drawing_spec), then the print's
+    # dimensions are marked and the title-block properties stamped. No model
+    # band: each prints the title block's grade for its places.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": MANUFACTURING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

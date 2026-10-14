@@ -1166,7 +1166,8 @@ def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> Non
     ]
     assert not unassigned  # every callout is kept, so every one is checked
     assert callout_names == placed == {
-        "block_callout", "pedestal_callout", "spring_callout", "tap_callout"
+        "block_callout", "pedestal_callout", "spring_callout", "nameplate_callout",
+        "tap_callout",
     }
     assert {ast.unparse(value) for value in keywords["views"].values} == {
         "hole_top", "hole_side", "section"
@@ -1744,7 +1745,7 @@ def test_underside_round_boss_diameters_name_their_level_and_holes() -> None:
     )
     callouts = sheet.UNDERSIDE_BOTTOM_CALLOUTS
     assert callouts["HangingBossDia"] == "5X BOSSES UNDER\nE1-E4, MHA-DT-024\nTO DEEP LEVEL"
-    assert callouts["ShallowBoss4Dia"] == "6X BOSSES UNDER\nB1, D1, F1-F4\nTO SHALLOW LEVEL"
+    assert callouts["ShallowBoss4Dia"] == "6X BOSSES UNDER\nB1, D1, MHA-FR-004\nTO SHALLOW LEVEL"
     assert sheet.UNDERSIDE_SECTION_CALLOUTS == {
         "DeepBossBottom": "DEEP\nLEVEL",
         "ShallowBossBottom": "SHALLOW\nLEVEL",
@@ -2157,67 +2158,64 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
                 )
 
 
-def test_nameplate_tags_read_clear_of_section_a_and_of_every_other_tag() -> None:
-    # ec323b4eb leaf: F3's and F4's leaders crossed section line A and each
-    # other; ab1f78504 leaf: the tags stacked in one column within a row pitch
-    # of each other and of E4 (enforced merged-blocks). The west tags read in
-    # the four-tap quad, the east tags between the deck's east edge and
-    # section line A; any two tags whose columns overlap stand a row pitch
-    # (1.543 text heights, 5.4 mm at 3.5 mm) apart.
+def test_nameplate_seats_are_transferred_through_the_plate() -> None:
+    # #628 (Main ruling, option A): the four #4-40 taps are spotted through
+    # the finished MHA-FR-004 plate at assembly, so they leave the hole table
+    # (the former F rows) and their one callout names the plate.
     import draw_fr_harmonic_base as sheet
 
-    spec = fr_harmonic_base_spec
-    half_h = sheet._HOLE_TAG_HALF_HEIGHT_M
-    tag_w = 2 * _DIM_CHAR_M
-    row_pitch = 5.556 / 3.5 * 2 * half_h
-    section_x = sheet._plan_xy(spec.COLUMN_X, 0.0, center=sheet.HOLE_TOP_CENTER)[0]
-    deck_east = sheet._plan_xy(part.DECK_HALF_X, 0.0, center=sheet.HOLE_TOP_CENTER)[0]
-    centre_x = sum(x for x, _ in part.NAMEPLATE_SCREW_XZ) / len(part.NAMEPLATE_SCREW_XZ)
-    taps = [
-        sheet._plan_xy(x, z, center=sheet.HOLE_TOP_CENTER) for x, z in part.NAMEPLATE_SCREW_XZ
-    ]
-    tags = []
-    for (x, z), tap in zip(part.NAMEPLATE_SCREW_XZ, taps, strict=True):
-        table = (x + spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_REAR_Z - z)
-        left, top = sheet._nameplate_tag_position(table)
-        box = (left, top - 2 * half_h, left + tag_w, top)
-        if x > centre_x:
-            assert deck_east + 0.001 < box[0] and box[2] < section_x - 0.001
-        else:
-            assert tap[0] < box[0] and box[2] < deck_east - 0.001
-        # The leader leaves the box's west side and ends on its tap; judged
-        # to 1 mm short of the centre, where the arrowhead lands on the tap.
-        start = (box[0], top - half_h)
-        length = math.dist(start, tap)
-        end = tuple(s + (t - s) * (length - 0.001) / length for s, t in zip(start, tap))
-        tags.append((box, (start, end)))
-    assert sheet._nameplate_tag_position((0.0, 0.0)) is None
-    others = [
-        (x, y - 2 * half_h, x + tag_w, y) for x, y in sheet.HOLE_TAG_POSITIONS.values()
-    ]
-    radius = part.NAMEPLATE_SCREW_HOLE_DIA * sheet.VIEW_SCALE / 2000.0
-    boxes = [box for box, _ in tags] + others
-    for other in others:
-        for hole in taps:
-            assert _box_gap(other, (hole[0], hole[1], hole[0], hole[1])) > radius + 0.0008, other
-    for i, (box, leader) in enumerate(tags):
-        for hole in taps:
-            assert _box_gap(box, (hole[0], hole[1], hole[0], hole[1])) > radius + 0.0008
-        for j, other in enumerate(boxes):
-            if j == i:
-                continue
-            assert _segment_box_gap(leader, other) > 0.0003, (i, other)
-            if min(box[2], other[2]) > max(box[0], other[0]):  # one column
-                gap = max(box[1] - other[3], other[1] - box[3])
-                assert gap > row_pitch + 0.0003, (i, other, gap)
-        for _other_box, other_leader in tags[i + 1 :]:
-            (ax, ay), (bx, by) = leader
-            (cx, cy), (dx, dy) = other_leader
-            cross = lambda px, py, qx, qy, rx, ry: (qx - px) * (ry - py) - (qy - py) * (rx - px)  # noqa: E731
-            assert not (
-                cross(ax, ay, bx, by, cx, cy) * cross(ax, ay, bx, by, dx, dy) < 0
-                and cross(cx, cy, dx, dy, ax, ay) * cross(cx, cy, dx, dy, bx, by) < 0
-            )
+    seats = {(x, z, part.NAMEPLATE_SCREW_HOLE_DIA) for x, z in part.NAMEPLATE_SCREW_XZ}
+    assert set(sheet.TRANSFER_NAMEPLATE_HOLES) == seats
+    assert seats <= set(sheet.TRANSFER_HOLES)
+    assert not seats & set(sheet.TABLE_HOLES)
+    assert sheet.TRANSFER_NAMEPLATE_CALLOUT == "TRANSFER FROM MHA-FR-004\nAT ASSEMBLY;"
+    assert not any(tag.startswith("F") for tag in sheet.HOLE_TAG_POSITIONS)
+    # The leader lands on the plan's right, upper (rear-east) tap.
+    taps = [sheet._plan_xy(x, z, center=sheet.HOLE_TOP_CENTER) for x, z, _ in seats]
+    leader_tap = sheet._plan_xy(
+        *sheet.TRANSFER_NAMEPLATE_LEADER_HOLE[:2], center=sheet.HOLE_TOP_CENTER
+    )
+    assert leader_tap[0] == pytest.approx(max(x for x, _ in taps), abs=1e-5)
+    assert leader_tap[1] == pytest.approx(max(y for _, y in taps), abs=1e-5)
+
+
+def test_nameplate_callout_reads_in_the_top_band_its_leader_clear_of_the_tags() -> None:
+    # Box from the hb-callout-cal display data of a three-row "TRANSFER FROM
+    # ... / AT ASSEMBLY; 4-40 UNC - 2B" block (E0E287C83's spring callout):
+    # 80.3 mm by 14.7 mm, centred 1 mm under its anchor. Its leader leaves the
+    # near (left) shoulder end, the box's lower-left corner.
+    import draw_fr_harmonic_base as sheet
+
+    spring = sheet.callout_text_box(
+        *E0E287C83_CALLOUTS["MHA-DT-024 spring transfer"], "spring"
+    )
+    half_w = (spring[2] - spring[0]) / 2.0
+    half_h = (spring[3] - spring[1]) / 2.0
+    x, y = sheet.NAMEPLATE_CALLOUT_XY
+    box = (x - half_w, y - 0.001 - half_h, x + half_w, y - 0.001 + half_h)
+    assert box[3] < _BORDER_INNER_M[3] - 0.003
+    assert box[2] < _BORDER_INNER_M[2] - 0.005
+    # Its top row level with the four-row block callout's beside it, 10 mm
+    # or more clear of that block's widest row, "TRANSFER FROM MHA-DT-018".
+    block_half_w = len("TRANSFER FROM MHA-DT-018") * _DIM_CHAR_M * 1.08 / 2.0
+    assert box[0] - (sheet.BLOCK_CALLOUT_XY[0] + block_half_w) > 0.010
+    block_top = sheet.BLOCK_CALLOUT_XY[1] - 0.001 + 2 * half_h * 4 / 3 / 2.0
+    assert abs(box[3] - block_top) < 0.0015
+    tap = sheet._plan_xy(
+        *sheet.TRANSFER_NAMEPLATE_LEADER_HOLE[:2], center=sheet.HOLE_TOP_CENTER
+    )
+    leader = ((box[0], box[1]), tap)
+    tag_boxes = {
+        tag: (tx, ty - _DIM_TEXT_H_M, tx + 2 * _DIM_CHAR_M, ty)
+        for tag, (tx, ty) in sheet.HOLE_TAG_POSITIONS.items()
+    }
+    for tag, tag_box in tag_boxes.items():
+        assert _segment_box_gap(leader, tag_box) > 0.0015, tag
+    # West of section line A, which rises over the plan to its arrow.
+    section_x = sheet._plan_xy(
+        fr_harmonic_base_spec.COLUMN_X, 0.0, center=sheet.HOLE_TOP_CENTER
+    )[0]
+    assert max(leader[0][0], leader[1][0]) < section_x - 0.004
 
 
 def test_rig_callouts_name_the_rig_set_note() -> None:
