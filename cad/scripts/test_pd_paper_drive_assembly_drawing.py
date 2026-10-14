@@ -65,6 +65,7 @@ UNCHANGED_FAMILIES = {
     "vn-guide-lock-screw",  # R9-31: the eight lock screws leave MHA-VN-006
     "vn-chain-inner-link",
     "vn-chain-outer-link",
+    "vn-chain-connecting-link",  # MHA-VN-068 closes the loop as its last outer link
     "pd-transgear-removable",
 }
 CONTRACT_TRANSGEAR_QUANTITIES = {
@@ -1278,8 +1279,15 @@ def test_the_chain_is_closed_and_run_after_the_collar_is_accepted() -> None:
     )
     assert drawing.CHAIN_QUANTITIES == {
         "vn-chain-inner-link": chain.LINK_COUNT // 2,
-        "vn-chain-outer-link": chain.LINK_COUNT // 2,
+        "vn-chain-outer-link": chain.LINK_COUNT // 2 - 1,
+        "vn-chain-connecting-link": 1,
     }
+    assert sum(drawing.CHAIN_QUANTITIES.values()) == chain.LINK_COUNT
+    assert (
+        f"{chain.LINK_COUNT // 2} {_number('vn-chain-inner-link')} INNER AND "
+        f"{chain.LINK_COUNT // 2 - 1} {_number('vn-chain-outer-link')} OUTER LINKS"
+    ) in closed
+    assert f"THE {_number('vn-chain-connecting-link')} #25 CONNECTING LINK" in closed
     for stem in drawing.CHAIN_QUANTITIES:
         assert "ANSI #25" in drawing.BOM_DESCRIPTIONS[stem]
     assert "CONNECTING LINK" in closed and "CLOSED END LEADING" in closed

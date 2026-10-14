@@ -5,7 +5,9 @@ the pin stations -- the outer half of the drive chain. Each pin floats through
 the neighbouring inner link's bushing bore (0.35 clearance) at the shared
 joints; the outer links alternate with the inner links
 (build_vn_chain_inner_link.py) along the centreline loop via the two-group
-Connected-Linkage chain component pattern in build_pd_paper_drive_assembly.py.
+Connected-Linkage chain component pattern in build_pd_paper_drive_assembly.py;
+the loop's closing outer link is the separate connecting link
+(build_vn_chain_connecting_link.py).
 Geometry and clearances: _chain.py / _chain_link.py.
 
 Run (SolidWorks already open)::

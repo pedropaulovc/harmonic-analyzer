@@ -126,7 +126,7 @@ _INSERTED_SOURCES = {
     "pn_pen": "vn_hanger_screw pn_pen_adjust_screw vn_pen_adjust_nut pn_pen_frame pn_pen_hanger "
     "vn_pen_hanger_jam_nut vn_pen_hanger_nut vn_pen_marker "
     "pn_pen_rod vn_pen_rod_set_screw vn_pen_set_screw pn_pen_v_block vn_pen_wire",
-    "pd_paper_drive": "vn_chain_inner_link vn_chain_outer_link vn_clamp_screw "
+    "pd_paper_drive": "vn_chain_connecting_link vn_chain_inner_link vn_chain_outer_link vn_clamp_screw "
     "sh_column_clamp_back sh_column_clamp_front vn_fillister_screw pd_guide_lock vn_guide_lock_screw pd_latch_hook "
     "vn_latch_hook_bracket_screw vn_platen_clip_screw "
     "pd_platen pd_platen_clip pd_platen_guide pd_platen_paper pd_platen_rack pd_rack_pinion pd_support_bar "

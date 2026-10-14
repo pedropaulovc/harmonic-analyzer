@@ -17,7 +17,7 @@ recipes:
 |---|---|---|
 | 3606T118 | `vn-keeper-chain` (catalogue-only; no vendor model) | Bead Chain, Unfinished Brass, Trade Size 3 |
 | 3606T811 | `vn-keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
-| 6261K108 | `vn-chain-outer-link` (the loop's one connecting link; catalogue-only, vendor model not downloaded) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
+| 6261K108 | `vn-chain-connecting-link` (the loop's one connecting link; catalogue-only, vendor model not downloaded) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
 | 6261K171 | `vn-chain-inner-link`, `vn-chain-outer-link` (cut to length; catalogue-only, vendor model not downloaded) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
 | 6793K4 | `pd-transgear-removable` T12 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 12 Teeth |
 | 6793K11 | `pd-transgear-removable` T18 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 18 Teeth |
@@ -941,15 +941,16 @@ Catalog specifications checked on September 10, 2026:
 
 - [6261K171](https://www.mcmaster.com/6261K171/) (`vn-chain-inner-link`,
   MHA-VN-002, and `vn-chain-outer-link`, MHA-VN-003) and
-  [6261K108](https://www.mcmaster.com/6261K108/) (`vn-chain-outer-link`) are
+  [6261K108](https://www.mcmaster.com/6261K108/) (`vn-chain-connecting-link`,
+  MHA-VN-068) are
   the paper-drive chain between the T12 and T24 MHA-PD-009 sprockets. Both
   product pages were read on October 14, 2026. Each states steel, single
   strand, ANSI 25, 1/4 in pitch, 0.130 in roller diameter, 1/8 in roller width
   and 140 lb working load; neither states a grade, plate size or coating.
   6261K171 is sold by the foot. The selected 68-pitch loop (17 in) is cut from
   2 ft with an inner link at each end. This gives 34 inner and 33 outer links;
-  6261K108, the connecting link, is the 34th outer link. The cut is the only
-  modification, so both identities stay VN
+  6261K108, the connecting link, closes the loop as its last outer link. The
+  cut is the only modification, so all three identities stay VN
   (`cad/docs/subsystem-identities.md`). The modelled links are the clearance
   stand-ins in `_chain.py`, not vendor replicas. McMaster offers CAD for both
   items, but none was downloaded and no replica equivalence is claimed. Evidence:

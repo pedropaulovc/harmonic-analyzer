@@ -570,3 +570,25 @@ def test_soundness_interference_gates_get_the_chain_mounts(monkeypatch, tmp_path
         asyncio.run(verify._verify_static_one(adapter, name, report))
         report.gates[f"{name}:interference-free"]()
         assert seen.pop("mounts") == expected
+
+
+def test_the_connecting_link_is_held_to_zero_contact(observations) -> None:
+    """It closes the loop on the straight taut run, where both its joints are
+    concentric; unlike the patterned links it may touch nothing."""
+    connecting = _link("vn-chain-connecting-link-1")
+    assert not connecting.Name2.startswith(_assembly._CHAIN_LINK_PREFIXES)
+    for other in (_link("vn-chain-inner-link-1"), _wheel("knob")):
+        with pytest.raises(RuntimeError, match="interference"):
+            _check(_Adapter(_Interference([connecting, other])))
+
+
+def test_the_closing_links_sit_on_the_taut_run() -> None:
+    """Stations LINK_COUNT-2 and -1 (the cut chain's closing inner link and the
+    connecting link) span the straight run: no wrap, so no sprocket mesh."""
+    taut_start = _chain.CENTRELINE_LEN - _chain.TAUT_LEN
+    assert (_chain.LINK_COUNT - 2) * _chain.LINK_PITCH > taut_start
+    angles = {
+        round(_chain.loop_point_tangent(station * _chain.LINK_PITCH)[2], 9)
+        for station in (_chain.LINK_COUNT - 2, _chain.LINK_COUNT - 1, _chain.LINK_COUNT)
+    }
+    assert len(angles) == 1
