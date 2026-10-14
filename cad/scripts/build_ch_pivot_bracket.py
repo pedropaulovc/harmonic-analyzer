@@ -32,6 +32,12 @@ through the arch apex (EAR_TOP_Y) on x = 0, z = 0 into the bore
 free run (``ch_pivot_bracket_sides`` places it), its station
 (``HoleStation``) dimensioned from the ear's inboard face at FOOT_Z0.
 
+Drawing contract (``ch_pivot_bracket_drawing_spec``): three blanked
+reference-line sketches carry the bore's and the hold-down hole's lateral
+locations off the west side face and the apex tap's station off the inboard
+face; the build marks the drawing dimensions, owns their decimal places and
+bands, and authors the foot seat's finish.
+
 Volume (``V_TOTAL``): foot FOOT_W * FOOT_H * FOOT_LEN, plus the ear block
 EAR_W * (BORE_H - FOOT_H) * EAR_T and the arch half-disc pi R^2 / 2 * EAR_T,
 less the bore, the apex tap's drill from the arch down to the bore
@@ -49,7 +55,7 @@ import sys
 
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -60,15 +66,35 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    blank_sketch,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
-from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
+from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
+from _part_pmi import author_part_pmi
+import _telemetry
+from ch_pivot_bracket_drawing_spec import (
+    BORE_DIA_BAND,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    REFERENCE_SKETCHES,
+    SURFACE_FINISHES,
+)
 from ch_pivot_bracket_sides import FOOT_LEN, FOOT_Z1, HOLE_STATION, HOLE_Z
 from ch_pivot_bracket_spec import (
     BORE_DIA,
@@ -84,6 +110,7 @@ from ch_pivot_bracket_spec import (
     FOOT_Z0,
     HOLE_DIA,
     SET_SCREW_HOLE_SPEC,
+    SET_SCREW_STATION_BAND,
     STATION_BAND,
 )
 
@@ -114,6 +141,53 @@ if EAR_W > FOOT_W:
 if abs(BORE_H + EAR_ARCH_R - EAR_TOP_Y) > 1e-9:
     raise AssertionError("the arch apex must be the ear top the tap starts on")
 
+# The drawing-reference lines (ch_pivot_bracket_drawing_spec.REFERENCE_SKETCHES):
+# (sketch, plane, dimension, start, end, orientation, value, drives). Points
+# are sketch coordinates -- the Top plane's sketch y is model -Z, the Front
+# plane's is model +Y. Every line lies on the part outline, so the view that
+# shows its sketch prints no extra line, and each starts on a FEATURE
+# (drawing-guidelines.md rule 10): the west side face for the lateral
+# locations, the ear's inboard face for the tap station. ``drives`` binds, in
+# creation order, the value dimension and then the start point's origin
+# anchors (x then y for a general point, one for a point on a sketch axis) to
+# the part's globals, so a global edit moves the line with the geometry.
+REFERENCE_LINES = (
+    (
+        "BoreLateralReference",
+        "Front",
+        "BoreLateral",
+        (-FOOT_W / 2.0, 0.0),
+        (0.0, 0.0),
+        "horizontal",
+        FOOT_W / 2.0,
+        ('"FootW" / 2', '"FootW" / 2'),
+    ),
+    (
+        # Along the foot's free end edge, west side to the hole's x = 0.
+        "HoleLateralReference",
+        "Top",
+        "HoleLateral",
+        (-FOOT_W / 2.0, -FOOT_Z1),
+        (0.0, -FOOT_Z1),
+        "horizontal",
+        FOOT_W / 2.0,
+        ('"FootW" / 2', '"FootW" / 2', '"FootZ1"'),
+    ),
+    (
+        # Along the east side face, inboard face to the tap's z = 0.
+        "SetScrewReference",
+        "Top",
+        "SetScrewLocation",
+        (FOOT_W / 2.0, -FOOT_Z0),
+        (FOOT_W / 2.0, 0.0),
+        "vertical",
+        -FOOT_Z0,
+        ('"EarT" / 2', '"FootW" / 2', '"EarT" / 2'),
+    ),
+)
+if tuple(row[0] for row in REFERENCE_LINES) != REFERENCE_SKETCHES:
+    raise AssertionError("REFERENCE_LINES and REFERENCE_SKETCHES disagree")
+
 
 def _as_construction(adapter, entity_id: str) -> None:
     """Flag a registered sketch line as construction geometry.
@@ -125,6 +199,63 @@ def _as_construction(adapter, entity_id: str) -> None:
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
         raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+async def _reference_line(
+    adapter, sketch, plane, dimension, start, end, orientation, value, drives
+) -> list[tuple[str, str]]:
+    """One hidden-reference sketch: a construction line whose driving
+    dimension IS ``value``; returns its deferred drive jobs
+    (build_dt_arbor_pedestal's idiom)."""
+    check(f"create_sketch {sketch}", await adapter.create_sketch(plane))
+    # Direct-to-DB: the line lies on an outline edge and runs along a sketch
+    # axis direction, so creation-time inference would snap in the relations
+    # added below and over-define the sketch.
+    set_sketch_direct_db(adapter, True)
+    line = check(f"{sketch} line", await adapter.add_line(*start, *end))
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, line)
+    check(
+        f"{sketch} {orientation}",
+        await adapter.add_sketch_constraint(line, None, orientation),
+    )
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        f"{orientation}_distance",
+        value,
+        sketch,
+    )
+    await anchor_point_to_origin(adapter, f"{line}.start", *start, sketch)
+    await ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    name_last_feature(adapter, sketch)
+    names = [dimension, *(f"{dimension}Anchor{i}" for i in range(1, len(drives)))]
+    full = name_dimensions(adapter, sketch, names)
+    dimension_value = _early_bound(
+        adapter.currentModel.Parameter(full[0]), "IDimension"
+    ).SystemValue
+    measured = float(dimension_value) * 1000.0
+    if abs(measured - value) > 1e-6:
+        raise RuntimeError(f"{full[0]} measures {measured:g} mm, expected {value:g} mm")
+    return list(zip(full, drives, strict=True))
+
+
+@_telemetry.traced("appearance.hide_reference_sketches")
+def _hide_reference_sketches(adapter) -> None:
+    """Blank the drawing-reference sketches and prove each one reads hidden."""
+    for name in REFERENCE_SKETCHES:
+        blank_sketch(adapter, name)
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    shown = {
+        name: visible
+        for name in REFERENCE_SKETCHES
+        # swVisibilityState_e: 1 hidden
+        if (visible := int(_read_member(part.FeatureByName(name), "Visible"))) != 1
+    }
+    if shown:
+        raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -174,7 +305,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=FOOT_H)),
     )
     name_last_feature(adapter, "Foot")
-    drive_jobs.append(("D1@Foot", '"FootH"'))
+    foot_ht_dim = name_dimensions(adapter, "Foot", ["FootHt"])
+    drive_jobs.append((foot_ht_dim[0], '"FootH"'))
     expected = V_FOOT
     await volume_check(adapter, "foot", expected, 0.005 * expected)
 
@@ -218,13 +350,15 @@ async def build(adapter) -> dict[str, str]:
     # Ear arch: a full O EAR_W boss on the bore axis, the block's own width,
     # merged over the block's top -- its lower half lies inside the block, its
     # upper half is the arch (the arbor-pedestal crown idiom). On-axis in X,
-    # so define_circle records the rise + diameter.
+    # so define_circle records the rise + size. The size is the RADIUS the
+    # print gives the arch (a sheet must never flip a model diameter radial).
     arch = SketchDims()
     check("create_sketch arch", await adapter.create_sketch("Front"))
     await define_circle(
         adapter, 0.0, BORE_H, EAR_ARCH_R, "ear arch",
-        dims=arch, names=("ArchCx", "ArchCz", "ArchDia"),
-        drives=(None, '"BoreH"', '"EarW"'),
+        dims=arch, names=("ArchCx", "ArchCz", "ArchRadius"),
+        drives=(None, '"BoreH"', '"EarW" / 2'),
+        size_dimension="radius",
     )
     await ensure_fully_defined(adapter, "arch sketch")
     check("exit_sketch arch", await adapter.exit_sketch())
@@ -348,6 +482,9 @@ async def build(adapter) -> dict[str, str]:
     expected -= V_HOLE
     await volume_check(adapter, "hold-down hole", expected, 0.02 * V_HOLE)
 
+    for row in REFERENCE_LINES:
+        drive_jobs += await _reference_line(adapter, *row)
+
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
@@ -355,21 +492,41 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven bracket (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
     )
+    _hide_reference_sketches(adapter)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
 
-    # The three lengths along the foot carry +/-0.10 natively
+    # Decimal places are the tolerance statement, so the PART carries them
+    # (drawing-simplicity-policy.md `How the repository implements the
+    # guidelines`); the drawing reads them back instead of rewriting them.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    # The four lengths along the foot carry +/-0.10 natively
     # (ch_pivot_bracket_spec: the foot's short run cannot take title-block
-    # .XX): the foot length and the hold-down station, both from the ear's
-    # inboard face -- the face fit-up sets and the S4 hold touches Z0 on --
-    # and the ear thickness. No in-repo sheet prints this part, so a fixture
-    # plan or later drawing inherits the bands from the saved model.
+    # .XX): the foot length, the hold-down station and the apex tap's
+    # station, all from the ear's inboard face -- the face fit-up sets and
+    # the S4 hold touches Z0 on -- and the ear thickness. The reamed bore
+    # holds the drilled-hole row's +0.10/0 its set-screw thread is counted at.
     set_dimension_symmetric_tolerance(adapter, "FootProfile", "FootLen", FOOT_LEN_BAND)
     set_dimension_symmetric_tolerance(adapter, "Ear", "EarThick", EAR_T_BAND)
     set_dimension_symmetric_tolerance(adapter, "HoleProfile", "HoleStation", STATION_BAND)
+    set_dimension_symmetric_tolerance(
+        adapter, "SetScrewReference", "SetScrewLocation", SET_SCREW_STATION_BAND
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "ShaftBoreProfile",
+        "ShaftBoreDia",
+        *deviations(BORE_DIA_BAND),
+        places=2,
+    )
 
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 if __name__ == "__main__":

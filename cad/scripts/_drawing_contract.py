@@ -95,6 +95,7 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_dt_cone_pivot_post_tl_bond_cradle.py",
         "draw_ch_pivot_bracket_tl_ledge.py",
         "draw_ch_pivot_bracket_tl_angle_plate.py",
+        "draw_ch_pivot_bracket.py",
         "draw_dt_cone_pivot_post_tl_saw_cradle.py",
         "draw_ch_rocker_arm_tl_filing_button.py",
         "draw_ch_rocker_arm_tl_trammel_pivot_block.py",
