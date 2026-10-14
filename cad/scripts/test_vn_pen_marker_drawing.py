@@ -171,6 +171,15 @@ def test_grip_note_is_the_part_note_on_a_leader_to_the_grip_band() -> None:
     box = drawing.GRIP_NOTE_BOX
     assert box[0] < drawing.GRIP_NOTE_XY[0] and drawing.GRIP_NOTE_XY[1] <= box[3]
     assert box[2] < tip[0]
+    # GetExtent spans the leader too (farm r14): the native extent box is the
+    # text box run out just past the tip, and it holds r14's readback.
+    extent = drawing.GRIP_NOTE_EXTENT
+    r14 = (0.05958551, 0.12778579, 0.17443854, 0.15018451)
+    assert extent[0] <= r14[0] and extent[1] <= r14[1]
+    assert r14[2] <= extent[2] and r14[3] <= extent[3]
+    assert extent[2] - tip[0] == pytest.approx(0.001)
+    assert tip[1] - extent[1] == pytest.approx(0.001)
+    assert extent[3] == box[3] and extent[0] == box[0]
     # The note prints only on the leader: no general installation note.
     names = drawing.build.__code__.co_names
     assert names.count("add_leader_note") == 1

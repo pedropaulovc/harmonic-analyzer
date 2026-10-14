@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import iter_views, place_view
 
 import _telemetry
@@ -159,6 +160,41 @@ GRIP_TIP = (
 GRIP_NOTE_WIDTH = 28
 GRIP_NOTE_XY = (0.060, 0.150)
 GRIP_NOTE_BOX = (0.055, 0.130, 0.160, 0.155)
+# INote.GetExtent spans the note's leader too: farm r14 read (59.6, 127.8,
+# 174.4, 150.2) mm, the text block plus the leader down to the tip. The native
+# check holds that extent to the text box grown 1 mm past the tip. It checks
+# the text anchor and the leader tip separately (_assert_grip_leader).
+_TIP_REACH = 0.001
+GRIP_NOTE_EXTENT = (
+    min(GRIP_NOTE_BOX[0], GRIP_TIP[0] - _TIP_REACH),
+    min(GRIP_NOTE_BOX[1], GRIP_TIP[1] - _TIP_REACH),
+    max(GRIP_NOTE_BOX[2], GRIP_TIP[0] + _TIP_REACH),
+    max(GRIP_NOTE_BOX[3], GRIP_TIP[1] + _TIP_REACH),
+)
+
+
+def _assert_grip_leader(note: Any) -> None:
+    """After the final rebuild: the text sits in its box, the leader on the grip."""
+    annotation = _sw_type_info.early_bound_or_flag(
+        note.GetAnnotation(), "IAnnotation", "GetPosition", "GetLeaderPointsAtIndex"
+    )
+    anchor = tuple(float(value) for value in (annotation.GetPosition() or ()))[:2]
+    if len(anchor) != 2 or not _inside((*anchor, *anchor), GRIP_NOTE_BOX):
+        raise RuntimeError(f"grip note text left its box {GRIP_NOTE_BOX}: {anchor!r}")
+    points = [float(value) for value in (annotation.GetLeaderPointsAtIndex(0) or ())]
+    if len(points) < 6:
+        raise RuntimeError(f"grip note leader is unreadable ({len(points)} values)")
+    # The API does not pin which end it lists first; accept either order,
+    # but one end must be in the text box and the other on the grip.
+    ends = ((points[0], points[1]), (points[-3], points[-2]))
+    for start, tip in (ends, ends[::-1]):
+        if _inside((*start, *start), GRIP_NOTE_BOX) and (
+            math.dist(tip, GRIP_TIP) <= _TIP_REACH
+        ):
+            return
+    raise RuntimeError(
+        f"grip note leader must run from its text box to the grip {GRIP_TIP!r}: {ends!r}"
+    )
 
 
 def grip_note(manufacturing_notes: str) -> str:
@@ -282,7 +318,8 @@ async def build(adapter: Any) -> dict[str, str]:
             label="marker grip in the v-block groove",
             view=views["*Front"],
         )
-        notes.append((_early_bound(note, "INote"), grip_text, grip_text, GRIP_NOTE_BOX))
+        grip = _early_bound(note, "INote")
+        notes.append((grip, grip_text, grip_text, GRIP_NOTE_EXTENT))
 
     with _telemetry.span("drawing.marker_native_contract"):
         _rebuild(draw, phase="marker notes and final layout")
@@ -334,6 +371,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 raise RuntimeError(
                     f"marker note leaves its reserved space/border: {linked_text!r}: {box!r}"
                 )
+        _assert_grip_leader(grip)
 
     paths = SPEC.outputs
     return await finalize_drawing(
