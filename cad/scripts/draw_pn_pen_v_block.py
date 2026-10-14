@@ -20,8 +20,9 @@ face); every feature is located across the depth from the body's front face
 * right (third angle, right of the ``*Back`` face): ``*Left``, the paper end,
   shows the neck's end face with the V in solid lines and the body's wider
   faces beyond it.  Under it, one baseline row from the body's front face:
-  the neck's two faces, the V's two mouth edges and the depth; in it, the
-  V's included angle and reference apex height.  Through the V it looks along
+  the neck's two faces, the V's two mouth edges and the depth; under the V's
+  mouth, its included angle; over the view, its apex flat's width; right of
+  it, the flat's reference height.  Through the V it looks along
   the open relief slot: the V is cut on past the step
   (``pn_pen_v_block_spec.V_CUT_LENGTH``), so no brass shows inside it.
 * bottom: ``*Bottom`` turned 180 degrees to keep the front view's X, looking
@@ -108,7 +109,7 @@ from pn_pen_v_block_spec import (
     SECTION_REFERENCE_SKETCHES,
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
-    V_APEX_Y,
+    V_FLAT_Y,
     V_MOUTH_Z0,
 )
 
@@ -232,11 +233,18 @@ FRONT_KEEP = {
 # text, so its value sits left of the datum's extension line, x ~0.174..0.185,
 # right of the front view's SetScrewX text (to x ~0.148).  The lowest line,
 # the depth's, at ~0.119.
-# * the included angle inside the V on its axis, half way up: its arc spans
-#   the wedge 12 mm under the apex (y 0.180), the "90°" (~9 mm) in the 24
-#   mm-wide void there.
-# * the apex height, a reference "(6.0)", right of the view (x ~0.283..0.294),
-#   12 mm clear of section A-A (from x 0.306).
+# * the included angle under the V's mouth on its axis, outside the part
+#   (rule 14): its arc, 30 mm (7.5 model) under the theoretical apex (y
+#   0.180), ends on the flanks 2.8 mm over the mouth corners, so it meets no
+#   row's extension line (the mouth edges', x 0.208 / 0.256); the "90°" (~9
+#   mm, y ~0.148..0.152) sits between them, right of the neck's front-face
+#   row (to x 0.196) and 3 mm over the mouth edges' row text (~0.145).
+# * the apex flat's width over the view (its line ~6 mm over the top face,
+#   y ~0.234; text ~0.2355..0.239), its extension lines rising from the
+#   flat's ends (x 0.228 / 0.236) across the end face: 8 mm under the tap's
+#   callout (from y ~0.247).
+# * the flat's height, a reference "(5.0)", right of the view (x
+#   ~0.283..0.294), 12 mm clear of section A-A (from x 0.306).
 _END_ROW = 0.007
 RIGHT_KEEP = {
     "NeckZ0": (_rz(BODY_Z0) - 0.008, _ry(0.0) - 0.006),
@@ -247,8 +255,9 @@ RIGHT_KEEP = {
     "VMouthZ1": (_rz(_CZ), _ry(0.0) - 0.006 - 2 * _END_ROW),
     "NeckZ1": (_rz(_CZ), _ry(0.0) - 0.006 - 3 * _END_ROW),
     "Depth": (_rz(_CZ), _ry(0.0) - 0.006 - 4 * _END_ROW),
-    "VAngle": (RIGHT_CENTER[0], _ry(V_APEX_Y / 2.0)),
-    "VApexY": (_rz(BODY_Z1) + 0.012, _ry(V_APEX_Y / 2.0)),
+    "VAngle": (RIGHT_CENTER[0], _ry(0.0) - 0.006),
+    "VFlatWidth": (RIGHT_CENTER[0], _ry(BLOCK_HEIGHT) + 0.0093),
+    "VFlatY": (_rz(BODY_Z1) + 0.012, _ry(V_FLAT_Y / 2.0)),
 }
 # Bottom (front faces at the top, y 0.128 for the body's, 0.1196 for the
 # neck's):

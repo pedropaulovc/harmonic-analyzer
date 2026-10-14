@@ -76,7 +76,11 @@ def depth_station(z: float) -> float:
 # The print defines the V by what seats the grip: its included angle and both
 # mouth edges on the bottom face, each a baseline station from the body's
 # front face (all three driving in VGrooveProfile).  The mouth width and the
-# apex height follow from them; the apex height prints as a reference.
+# theoretical apex height follow from them.  The apex is not cut sharp
+# (drawing-guidelines.md rule 16): a flat across it, V_FLAT_WIDTH wide
+# (driving, .X), is the tip a 90 deg chamfer mill or a small end mill leaves.
+# The flat's height is what the angle, the mouth and the width leave; it
+# prints as a reference.
 V_ANGLE_DEG = 90.0
 V_MOUTH_Z0 = 3.0  # front mouth edge (part frame; prints 5.1 from the datum)
 V_MOUTH_Z1 = 15.0  # back mouth edge (part frame; prints 17.1)
@@ -89,6 +93,12 @@ V_APEX_Y = round(
 # contact lines r*sin(half-angle) below it.
 MARKER_AXIS_Y = V_APEX_Y - (marker.BARREL_DIA / 2.0) / math.sin(_HALF)
 V_CONTACT_Y = V_APEX_Y - (marker.BARREL_DIA / 2.0) * math.sin(_HALF)
+V_FLAT_WIDTH = 2.0
+V_FLAT_Y = round(V_APEX_Y - (V_FLAT_WIDTH / 2.0) / math.tan(_HALF), 6)  # 5.0
+# The groove's section: the V's triangle less the tip the flat leaves standing.
+V_GROOVE_AREA = (
+    V_APEX_Y * V_MOUTH_WIDTH / 2.0 - V_FLAT_WIDTH * (V_APEX_Y - V_FLAT_Y) / 2.0
+)  # 35.0
 
 # --- Relief slot (body clearance), x RELIEF_X0..BLOCK_LENGTH ---
 # The step stands far enough toward the paper end that the reamed pivot bore
@@ -151,8 +161,8 @@ for _name, _z0, _z1 in (
         raise AssertionError(f"the {_name} must centre on the block's mid-depth")
 if min(V_MOUTH_Z0, NECK_DEPTH - V_MOUTH_Z1) < 2.0:
     raise AssertionError("V-groove leaves under 2.0 lands on the bottom face")
-if not 1.0 <= V_CONTACT_Y < V_APEX_Y:
-    raise AssertionError("grip contact lines must lie inside the V flanks")
+if not 1.0 <= V_CONTACT_Y < V_FLAT_Y:
+    raise AssertionError("grip contact lines must lie on the V flanks, under the flat")
 if min(RELIEF_Z0 - BODY_Z0, BODY_Z1 - RELIEF_Z1) < 2.0:
     raise AssertionError("relief slot legs under the rule 17 2.0 target")
 _BODY_R = marker.BODY_FRONT_DIA / 2.0
@@ -242,7 +252,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Block": {"Height"},
     "VGrooveProfile": {
         "VAngle",
-        "VApexY",
+        "VFlatWidth",
+        "VFlatY",
         "VMouthZ0",
         "VMouthZ1",
         "NeckZ0",
@@ -259,9 +270,9 @@ REFERENCE_SKETCHES = ("ReliefReference", "PivotReference")
 SECTION_REFERENCE_SKETCHES = REFERENCE_SKETCHES
 # Places carry the title block's tolerance (drawing-guidelines.md rule 3),
 # .X by default.  The V prints as its included angle (whole degrees, the
-# title block's +/-1) and its two mouth edges; the apex height they leave is
-# a reference, (6.0), driven in the sketch.  .XX, the title block's routine
-# location row, where a mate needs it:
+# title block's +/-1), its two mouth edges and its apex flat's width; the
+# flat's height they leave is a reference, (5.0), driven in the sketch.  .XX,
+# the title block's routine location row, where a mate needs it:
 # * the tap's and the pivot bore's station from the paper end (SetScrewX,
 #   PivotX): the tap must meet the bore it locks, and the bore must drop
 #   wholly past the step (guard below);
@@ -276,7 +287,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Block": {"Height": 1},
     "VGrooveProfile": {
         "VAngle": 0,
-        "VApexY": 1,
+        "VFlatWidth": 1,
+        "VFlatY": 1,
         "VMouthZ0": 1,
         "VMouthZ1": 1,
         "NeckZ0": 2,
@@ -290,11 +302,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SetScrewHole": {"SetScrewX": 2, "SetScrewY": 1},
 }
 # The one driven sketch dimension the print shows, parenthesised as a
-# reference (no tolerance): the V's apex height, which its angle and mouth
-# edges fix.
-REFERENCE_DIMENSIONS: tuple[tuple[str, str], ...] = (("VGrooveProfile", "VApexY"),)
-if round(V_APEX_Y, DRAWING_PRECISION["VGrooveProfile"]["VApexY"]) != V_APEX_Y:
-    raise AssertionError("the V's reference apex height must print exactly")
+# reference (no tolerance): the apex flat's height, which the V's angle, mouth
+# edges and flat width fix.
+REFERENCE_DIMENSIONS: tuple[tuple[str, str], ...] = (("VGrooveProfile", "VFlatY"),)
+if round(V_FLAT_Y, DRAWING_PRECISION["VGrooveProfile"]["VFlatY"]) != V_FLAT_Y:
+    raise AssertionError("the V flat's reference height must print exactly")
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
@@ -371,7 +383,7 @@ def _body_half_chord_at_bottom(angle_deg: float, mouth: float) -> float:
 # independent (a bound: one edge cannot both widen the mouth and pull the
 # centre toward the wall it does not move), the widest body chord at the
 # bottom face is over the printed angle (the title block's +/-1 deg) and that
-# mouth band: 6.116 at 89 deg and the widest mouth, 5.965 nominal.  The apex
+# mouth band: 6.116 at 89 deg and the widest mouth, 5.965 nominal.  The flat's
 # height is their reference and adds no band of its own.
 V_CENTRE_BAND = (_band("VMouthZ0") + _band("VMouthZ1")) / 2.0
 V_MOUTH_BAND = _band("VMouthZ0") + _band("VMouthZ1")
@@ -393,6 +405,27 @@ BODY_FAR_CLEARANCE_PRINTED_MIN = (
 )  # 0.28
 if min(BODY_NEAR_CLEARANCE_PRINTED_MIN, BODY_FAR_CLEARANCE_PRINTED_MIN) <= 0.0:
     raise AssertionError("a printed relief wall may touch the marker body")
+
+
+def _flat_grip_clearance(angle_deg: float, flat_width: float) -> float:
+    """The flat's height over the seated grip's top: both hang from the V's
+    theoretical apex, so the mouth does not enter."""
+    half = math.radians(angle_deg / 2.0)
+    grip_top_under_apex = _GRIP_R / math.sin(half) - _GRIP_R
+    return grip_top_under_apex - (flat_width / 2.0) / math.tan(half)
+
+
+# The grip seats on the flanks, never on the flat: at the widest flat and
+# either printed angle it stays 0.75 under it (1.20 nominal); at the
+# narrowest the flat is still 1.2 wide.
+V_FLAT_GRIP_CLEARANCE_PRINTED_MIN = min(
+    _flat_grip_clearance(V_ANGLE_DEG + angle, V_FLAT_WIDTH + _band("VFlatWidth"))
+    for angle in (-angular_band_deg(), angular_band_deg())
+)  # 0.75
+if V_FLAT_GRIP_CLEARANCE_PRINTED_MIN < 0.25:
+    raise AssertionError("at its printed limits the apex flat may touch the grip")
+if V_FLAT_WIDTH - _band("VFlatWidth") <= 0.0:
+    raise AssertionError("at its printed limits the apex flat vanishes")
 # (feature, dimension) -> (upper, lower) native band.
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
     ("PivotBoreProfile", "PivotDia"): PIVOT_BORE_BAND,

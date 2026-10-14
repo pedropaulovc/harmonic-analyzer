@@ -22,8 +22,9 @@ Features, in tree order:
 * ``OutlineProfile`` (Top plane, sketch (u, v) = model (X, -Z)) -> ``Block``:
   the plan outline, neck and body, extruded +Y by the height.
 * ``VGrooveProfile`` (Right plane, sketch (u, v) = model (-Z, Y)) ->
-  ``VGroove``: the V triangle, its included angle and both mouth edges (each
-  from the body's front face) driving and its apex height a driven reference,
+  ``VGroove``: the V, its included angle, both mouth edges (each from the
+  body's front face) and its apex flat's width driving and the flat's height
+  a driven reference,
   cut +X from the paper end to ``V_CUT_LENGTH``, one corner radius past the
   relief's step.
 * ``ReliefProfile`` (Top plane) -> ``Relief``: the slot from ``RELIEF_X0`` to
@@ -118,9 +119,10 @@ from pn_pen_v_block_spec import (
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
     V_ANGLE_DEG,
-    V_APEX_Y,
     V_CUT_LENGTH,
-    V_MOUTH_WIDTH,
+    V_FLAT_WIDTH,
+    V_FLAT_Y,
+    V_GROOVE_AREA,
     V_MOUTH_Z0,
     V_MOUTH_Z1,
     depth_station,
@@ -146,12 +148,12 @@ _STUB = 1.0
 V_BLOCK = (
     RELIEF_X0 * NECK_DEPTH + (BLOCK_LENGTH - RELIEF_X0) * BODY_DEPTH
 ) * BLOCK_HEIGHT
-V_GROOVE = V_APEX_Y * V_MOUTH_WIDTH / 2.0 * V_CUT_LENGTH
+V_GROOVE = V_GROOVE_AREA * V_CUT_LENGTH
 # Each step corner leaves its R x R square less the quarter disc standing.
 V_RELIEF_CORNERS = 2.0 * (1.0 - math.pi / 4.0) * RELIEF_CORNER_R**2 * RELIEF_HEIGHT
 # The V's run past the step lies inside the slot (the corner arcs stand
 # outside its mouth), already void when the relief is cut.
-V_GROOVE_PAST_STEP = V_APEX_Y * V_MOUTH_WIDTH / 2.0 * (V_CUT_LENGTH - RELIEF_X0)
+V_GROOVE_PAST_STEP = V_GROOVE_AREA * (V_CUT_LENGTH - RELIEF_X0)
 V_RELIEF = (
     RELIEF_WIDTH * RELIEF_HEIGHT * (BLOCK_LENGTH - RELIEF_X0)
     - V_RELIEF_CORNERS
@@ -281,11 +283,11 @@ async def _outline(adapter, dims: SketchDims) -> None:
         dims.record(name, drive)
 
 
-# Sketch (u, v) of a point inside the V's wedge, under the apex on its axis:
+# Sketch (u, v) of a point inside the V's wedge, under the flat on its axis:
 # where the included angle's text goes, which picks the wedge the angle is
 # measured in (AddSpecificDimension takes the region holding its text point).
 def _v_angle_text_point() -> tuple[float, float]:
-    return (-_Z_MID, V_APEX_Y / 2.0)
+    return (-_Z_MID, V_FLAT_Y / 2.0)
 
 
 def _add_driving_v_angle(adapter, flank_a: str, flank_b: str) -> None:
@@ -345,26 +347,27 @@ def _make_driven(adapter, dimension_id: str, label: str) -> None:
 
 
 async def _v_groove(adapter, dims: SketchDims) -> None:
-    """The V triangle on the Right plane, sketch (u, v) = model (-Z, Y).
+    """The V on the Right plane, sketch (u, v) = model (-Z, Y).
 
     Construction stubs stand on the depth-wise faces from their feet on the
     bottom face: on the body's front face (the depth datum, beyond the neck
     in the paper-end view; its foot from the origin and its length,
     unprinted), and on the neck's front and back faces and the body's back
     face, each foot level with the datum's and printed from it (NeckZ0,
-    NeckZ1, Depth).  LA runs front mouth -> apex, LB apex -> back mouth, LC
-    back mouth -> front mouth along the bottom face.  Relations: each stub's
-    foot on the origin's level and the stub vertical, LC horizontal, its front
-    mouth on the origin's level, LA = LB (the V symmetric about the apex).
-    Driving dims: both mouth edges from the datum's foot (real edges on the
-    bottom face, baselines from the face the print locates everything from,
-    so neither is chained from the other and the V is not placed by the
-    depth's symmetry) and the included angle -- 4 x 4 + 6 DOF less 11
-    relations + 11 dims = 0.  The mouth width is their difference and the
-    apex height what they leave: a DRIVEN dimension the print shows as a
+    NeckZ1, Depth).  The V is a trapezoid: LA runs front mouth -> the flat's
+    front end, LF along the apex flat, LB the flat's back end -> back mouth,
+    LC back mouth -> front mouth along the bottom face.  Relations: each
+    stub's foot on the origin's level and the stub vertical, LC and LF
+    horizontal, the front mouth on the origin's level, LA = LB (the V
+    symmetric about its axis).  Driving dims: both mouth edges from the
+    datum's foot (real edges on the bottom face, baselines from the face the
+    print locates everything from, so neither is chained from the other and
+    the V is not placed by the depth's symmetry), the flat's width and the
+    included angle -- 4 x 4 + 8 DOF less 12 relations + 12 dims = 0.  The
+    flat's height is what they leave: a DRIVEN dimension the print shows as a
     reference.  It is made driven before the angle exists, so the sketch is
     never over-defined.  The stubs are construction geometry: the cut takes
-    only the triangle.
+    only the trapezoid.
     """
     datum = await _construction_chord(
         adapter, "VGrooveProfile", (_DATUM_U, 0.0), (_DATUM_U, _STUB)
@@ -422,11 +425,21 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
             f"V {name} stub",
         )
         dims.record(stub_name)
-    points = [(-V_MOUTH_Z0, 0.0), (-_Z_MID, V_APEX_Y), (-V_MOUTH_Z1, 0.0)]
-    flank_a, flank_b, mouth = await add_line_chain(adapter, points)
+    flat_half = V_FLAT_WIDTH / 2.0
+    points = [
+        (-V_MOUTH_Z0, 0.0),
+        (-(_Z_MID - flat_half), V_FLAT_Y),
+        (-(_Z_MID + flat_half), V_FLAT_Y),
+        (-V_MOUTH_Z1, 0.0),
+    ]
+    flank_a, flat, flank_b, mouth = await add_line_chain(adapter, points)
     check(
         "V mouth horizontal",
         await adapter.add_sketch_constraint(mouth, None, "horizontal"),
+    )
+    check(
+        "V apex flat horizontal",
+        await adapter.add_sketch_constraint(flat, None, "horizontal"),
     )
     check(
         "V mouth on the bottom face",
@@ -446,16 +459,16 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
         "V front mouth edge from the front face",
     )
     dims.record("VMouthZ0", '"VMouthFrontZ"')
-    apex = await dimension_between(
+    flat_height = await dimension_between(
         adapter,
-        f"{flank_a}.end",
+        f"{flat}.end",
         "origin",
         "vertical_distance",
-        V_APEX_Y,
-        "V apex height",
+        V_FLAT_Y,
+        "V apex flat height",
     )
-    _make_driven(adapter, apex, "V apex height")
-    dims.record("VApexY")
+    _make_driven(adapter, flat_height, "V apex flat height")
+    dims.record("VFlatY")
     await dimension_between(
         adapter,
         f"{datum}.start",
@@ -465,6 +478,15 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
         "V back mouth edge from the front face",
     )
     dims.record("VMouthZ1", '"VMouthBackZ"')
+    await dimension_between(
+        adapter,
+        f"{flat}.start",
+        f"{flat}.end",
+        "horizontal_distance",
+        V_FLAT_WIDTH,
+        "V apex flat width",
+    )
+    dims.record("VFlatWidth", '"VFlatWidth"')
     _add_driving_v_angle(adapter, flank_a, flank_b)
     dims.record("VAngle", '"VAngle"')
 
@@ -803,7 +825,7 @@ def _pivot_chamfer_min_limit(adapter) -> None:
 
 
 def _author_reference_dimensions(adapter) -> None:
-    """Show each driven dimension as a reference: no tolerance, "(6.0)"
+    """Show each driven dimension as a reference: no tolerance, "(5.0)"
     (build_ms_stop_block._author_plate_location_references' recipe)."""
     for feature_name, dimension_name in REFERENCE_DIMENSIONS:
         display, dimension = _named_dimension(adapter, feature_name, dimension_name)
@@ -842,6 +864,7 @@ async def build(adapter) -> dict[str, str]:
         ("NeckBackZ", depth_station(NECK_DEPTH)),
         ("VMouthFrontZ", depth_station(V_MOUTH_Z0)),
         ("VMouthBackZ", depth_station(V_MOUTH_Z1)),
+        ("VFlatWidth", V_FLAT_WIDTH),
         ("ReliefX0", RELIEF_X0),
         ("ReliefFrontZ", depth_station(RELIEF_Z0)),
         ("ReliefBackZ", depth_station(RELIEF_Z1)),

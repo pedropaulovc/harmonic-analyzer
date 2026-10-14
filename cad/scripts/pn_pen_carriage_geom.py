@@ -229,10 +229,11 @@ def plan_mass_items() -> list[tuple[str, float, float, float]]:
     block = [
         ("neck stock", X0 * H * vb.NECK_DEPTH, X0 / 2.0, zc),
         ("body stock", (L - X0) * H * vb.BODY_DEPTH, (X0 + L) / 2.0, zc),
-        # The V's triangle (90 deg: apex^2) over the seat length.
+        # The V's section (its triangle less the tip the apex flat leaves)
+        # over the seat length.
         (
             "V-groove",
-            -vb.V_APEX_Y * vb.V_MOUTH_WIDTH / 2.0 * vb.RELIEF_X0,
+            -vb.V_GROOVE_AREA * vb.RELIEF_X0,
             vb.RELIEF_X0 / 2.0,
             zc,
         ),

@@ -306,7 +306,7 @@ def test_title_block_bands_keep_walls_lands_and_clear_the_marker_body() -> None:
     def stack(b: dict[str, float]) -> dict[str, float]:
         # The seated body's widest chord over the V's printed corners: its
         # angle (the title block's +/-1 deg) and mouth (both edges' bands);
-        # the apex height is their reference and carries no band.  The V's
+        # the flat's height is their reference and carries no band.  The V's
         # centre moves by the mean of its two edges' bands.
         mouth_band = b["VMouthZ0"] + b["VMouthZ1"]
         centre_band = mouth_band / 2.0
@@ -570,25 +570,32 @@ def test_tap_callout_says_drill_and_ends_in_the_pivot_bore() -> None:
     assert _DRAWING_SOURCE.count("_set_tap_callout_text(") == 2  # def + call
 
 
-def test_v_is_its_angle_and_mouth_with_a_reference_apex() -> None:
+def test_v_is_its_angle_mouth_and_apex_flat_with_a_reference_height() -> None:
     import pn_pen_carriage_geom as carriage
+    from _printed_tolerance import angular_band_deg
 
     # Review r11 (rules 3/10): the V prints its included angle (driving, the
     # title block's +/-1 deg); final review: both mouth edges from the front
-    # face; the apex height is a driven reference.
+    # face.  Blind review (rule 16): the apex is a flat a cutter leaves, its
+    # width driving at .X and its height a driven reference.
     assert spec.V_ANGLE_DEG == 90.0
     assert spec.V_MOUTH_WIDTH == 12.0
     assert (spec.V_MOUTH_Z0 + spec.V_MOUTH_Z1) / 2.0 == spec.DEPTH_MID_Z
     assert spec.RELIEF_WIDTH == 16.0
     assert (spec.RELIEF_Z0 + spec.RELIEF_Z1) / 2.0 == spec.DEPTH_MID_Z
     assert (spec.BODY_Z0 + spec.BODY_Z1) / 2.0 == spec.DEPTH_MID_Z
+    # The theoretical apex still seats the grip; the flat stands 1.0 under it.
     assert spec.V_APEX_Y == 6.0
     assert spec.MARKER_AXIS_Y == pytest.approx(6.0 - 5.3 * math.sqrt(2.0))
+    assert spec.V_FLAT_WIDTH == 2.0
+    assert spec.V_FLAT_Y == 5.0
+    assert spec.V_GROOVE_AREA == pytest.approx(35.0)
     assert carriage.BLOCK_BOTTOM_Y == pytest.approx(366.2)
-    assert spec.REFERENCE_DIMENSIONS == (("VGrooveProfile", "VApexY"),)
+    assert spec.REFERENCE_DIMENSIONS == (("VGrooveProfile", "VFlatY"),)
     assert {
         "VAngle",
-        "VApexY",
+        "VFlatWidth",
+        "VFlatY",
         "VMouthZ0",
         "VMouthZ1",
         "NeckZ0",
@@ -600,23 +607,39 @@ def test_v_is_its_angle_and_mouth_with_a_reference_apex() -> None:
         "ReliefZ1",
         "ReliefHeight",
     }
-    assert spec.DRAWING_PRECISION["VGrooveProfile"]["VApexY"] == 1
-    # The build: the apex is made driven before the angle drives, so the
-    # sketch is never over-defined; the angle follows a "VAngle" global in
-    # degrees; the reference display (parentheses, no tolerance) is read back.
+    assert spec.DRAWING_PRECISION["VGrooveProfile"]["VFlatY"] == 1
+    assert spec.DRAWING_PRECISION["VGrooveProfile"]["VFlatWidth"] == 1
+    # The grip seats on the flanks: at the widest printed flat and either
+    # printed angle the flat stays clear over the grip's top, and at the
+    # narrowest it is still a flat.
+    grip_r = spec.marker.BARREL_DIA / 2.0
+    widest = spec.V_FLAT_WIDTH + printed_band_mm(1)
+    for angle in (-angular_band_deg(), angular_band_deg()):
+        half = math.radians(spec.V_ANGLE_DEG + angle) / 2.0
+        gap = grip_r / math.sin(half) - grip_r - (widest / 2.0) / math.tan(half)
+        assert gap >= spec.V_FLAT_GRIP_CLEARANCE_PRINTED_MIN - 1e-9
+    assert spec.V_FLAT_GRIP_CLEARANCE_PRINTED_MIN == pytest.approx(0.754, abs=1e-3)
+    assert spec.V_FLAT_WIDTH - printed_band_mm(1) == pytest.approx(1.2)
+    assert spec.V_CONTACT_Y < spec.V_FLAT_Y
+    # The build: the flat's height is made driven before the angle drives, so
+    # the sketch is never over-defined; the width and the angle follow
+    # globals; the reference display (parentheses, no tolerance) is read back.
     body = _PART_SOURCE[_PART_SOURCE.index("async def _v_groove(") :]
     body = body[: body.index("\nasync def ")]
-    driven = body.index('_make_driven(adapter, apex, "V apex height")')
+    assert "flank_a, flat, flank_b, mouth = await add_line_chain" in body
+    assert 'add_sketch_constraint(flat, None, "horizontal")' in body
+    driven = body.index('_make_driven(adapter, flat_height, "V apex flat height")')
     angle = body.index("_add_driving_v_angle(adapter, flank_a, flank_b)")
-    assert driven < angle
-    assert 'dims.record("VApexY")\n' in body
+    assert driven < body.index('dims.record("VFlatWidth", \'"VFlatWidth"\')') < angle
+    assert 'dims.record("VFlatY")\n' in body
     assert 'dims.record("VAngle", \'"VAngle"\')' in body
     assert 'dims.record("VMouthZ0", \'"VMouthFrontZ"\')' in body
     assert 'dims.record("VMouthZ1", \'"VMouthBackZ"\')' in body
     assert '"VMouth"' not in _PART_SOURCE
     assert '"vertical_distance"' in body and '"horizontal_distance"' in body
     assert 'set_global(adapter, "VAngle", f"{V_ANGLE_DEG}deg")' in _PART_SOURCE
-    assert '("VApexY", V_APEX_Y)' not in _PART_SOURCE
+    assert '("VFlatWidth", V_FLAT_WIDTH)' in _PART_SOURCE
+    assert '("VFlatY", V_FLAT_Y)' not in _PART_SOURCE
     assert "dimension.DrivenState = 2" in _PART_SOURCE
     assert "dimension.DrivenState = 1" in _PART_SOURCE
     assert "_author_reference_dimensions(adapter)\n" in _PART_SOURCE
@@ -624,17 +647,45 @@ def test_v_is_its_angle_and_mouth_with_a_reference_apex() -> None:
         _PART_SOURCE.index("clear_dimensions_for_drawing(adapter)")
     )
     # The angle's text point (which picks the wedge it measures) lies inside
-    # the V: under the apex, over the mouth, between the flanks.
+    # the V: under the flat, over the mouth, between the flanks.
     u, v = part._v_angle_text_point()
     apex_u = -spec.DEPTH_MID_Z
-    assert 0.0 < v < spec.V_APEX_Y
+    assert 0.0 < v < spec.V_FLAT_Y
     half_width = (spec.V_APEX_Y - v) * math.tan(math.radians(spec.V_ANGLE_DEG / 2))
     assert abs(u - apex_u) < half_width
-    # On the sheet the angle sits in the V's void, between the mouth (the
-    # bottom face, y 0.156) and the apex (y 0.180).
-    angle_x, angle_y = drawing.RIGHT_KEEP["VAngle"]
+
+
+def test_v_dimension_text_stays_off_the_part_in_the_end_view() -> None:
+    # Blind review (rule 14): the angle's text sat in the V.  It now sits on
+    # the V's axis under the bottom face (y 0.156), its arc wholly inside the
+    # wedge's mouth so it meets neither mouth edge's extension line; the
+    # flat's width prints over the top face and its height right of the body.
+    keep = drawing.RIGHT_KEEP
+    angle_x, angle_y = keep["VAngle"]
     assert angle_x == pytest.approx(drawing._rz(drawing._CZ))
-    assert drawing._ry(0.0) + 0.006 < angle_y < drawing._ry(spec.V_APEX_Y) - 0.006
+    bottom = drawing._ry(0.0)
+    assert angle_y + 0.0017 < bottom - 0.003
+    # The arc runs through the text, about the theoretical apex: it ends on
+    # the flanks over the mouth corners, and under the flat.
+    radius_mm = (drawing._ry(spec.V_APEX_Y) - angle_y) / drawing._S
+    flank_end_y = spec.V_APEX_Y - radius_mm * math.cos(math.radians(45.0))
+    assert 0.5 < flank_end_y < spec.V_FLAT_Y
+    # Its text clears the rows: the neck's front-face row ends at x 0.196,
+    # the mouth edges' row text sits 4.5 mm under it.
+    assert angle_x - 0.0045 > drawing._rz(0.0) + 0.02
+    assert keep["VMouthZ0"][1] + 0.0017 < angle_y - 0.0018 - 0.002
+    # The flat's width: its line over the top face, its text under the tap's
+    # callout rows (~0.249 / 0.255, from ~0.247).
+    width_x, width_y = keep["VFlatWidth"]
+    assert width_x == pytest.approx(drawing._rz(drawing._CZ))
+    assert width_y - 0.0033 > drawing._ry(spec.BLOCK_HEIGHT) + 0.004
+    assert width_y + 0.0017 < drawing.TAP_CALLOUT_XY[1] - 0.003 - 0.005
+    # The flat's height: right of the body's back face, inside the gap to
+    # section A-A.
+    height_x, height_y = keep["VFlatY"]
+    assert height_x > drawing._rz(spec.BODY_Z1) + 0.008
+    assert height_x + 0.006 < drawing._sz(spec.BODY_Z0) - 0.008
+    assert drawing._ry(0.0) < height_y < drawing._ry(spec.V_FLAT_Y)
 
 
 def test_v_runs_past_the_step_so_no_knife_edge_shows_in_the_end_view() -> None:
@@ -695,9 +746,10 @@ def test_analytic_volumes_match_the_carriage_mass_model() -> None:
     # The E: the neck 9 x 18, the body 18.3 x 22.2, 18 tall.
     assert part.V_BLOCK == pytest.approx(10228.68)
     # Cut one corner radius past the step, the V's run there lies in the slot:
-    # the relief removes that much less.
-    assert part.V_GROOVE == pytest.approx(360.0)
-    assert part.V_GROOVE_PAST_STEP == pytest.approx(36.0)
+    # the relief removes that much less.  The apex flat leaves its 2 x 1 tip
+    # standing: 35 of the sharp V's 36 mm^2.
+    assert part.V_GROOVE == pytest.approx(350.0)
+    assert part.V_GROOVE_PAST_STEP == pytest.approx(35.0)
     # The carriage mass model cuts the relief square-cornered and leaves the
     # bore's top chamfer: both under 0.05% of the block.
     assert part.V_RELIEF + part.V_RELIEF_CORNERS + part.V_GROOVE_PAST_STEP == (
