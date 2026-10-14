@@ -30,7 +30,7 @@ bore's upper inner wall lands on the ridge (with a TOP_CLEAR sliver margin). The
 block rises from below the bore up to the top-frame casting's faced underside
 (999.7), its top seat clamped flush to it: the #10-24 bolt threads into a
 9.65 +/-0.13 full-thread bottoming tap (drill 11.24) on the bore's vertical
-centreline, whose charged pilot (Ø3.927, past the accepted Ø3.797-3.897) at
+centreline, whose charged pilot (Ø3.927, past the accepted Ø3.7973-3.8973) at
 its sharpest accepted point leaves 2.0 of metal over the bore crown at worst
 case; the two dowels' blind flat-bottom reamed holes sit 7.632 either side of
 the tap axis along X, in a block 25.4 across.
@@ -148,7 +148,7 @@ if abs(BLK_TOP - sm_knife_mount_spec.BLK_TOP) > 0.005:
 BORE_CENTRE_DEPTH = BLK_TOP - BORE_CY
 # The spec judges the tap's web at its rounded mirror; the derived top is
 # 0.004 lower, so re-judge it here (2.0078: the charged pilot envelope,
-# Ø3.927, not the accepted Ø3.897, at the sharpest accepted point, 117 deg).
+# Ø3.927, not the accepted Ø3.8973, at the sharpest accepted point, 117 deg).
 _TAP_WEB_WORST = sm_knife_mount_spec.tap_web_worst(
     BLK_TOP,
     sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH,

@@ -315,11 +315,28 @@ INK_CLEARANCE = 0.002
 ROUND_OUT = 0.0001
 # The native arrowhead is 0.762 mm across (b49e1 dump, IDisplayData arrows).
 ARROW_HALF_WIDTH = 0.000381
-# Q7 preserves underside-entry through drilling and top-entry spotfacing.
-# Diameter values stay Hole Wizard variables; the native model grip in F-F
-# replaces a depth from the as-cast top.
-HANGER_DRILL_CALLOUT = "DRILL FROM UNDERSIDE;\nSPOTFACE FROM TOP:\n"
-HANGER_CENTER_FRAME_XY = (0.267, 0.231)
+# The native callout names the spotface's side as geometry (TOP SPOTFACE),
+# not a drilling method; diameter values stay Hole Wizard variables, and the
+# native model grip in F-F replaces a depth from the as-cast top.
+HANGER_SPOTFACE_SIDE = "TOP SPOTFACE "
+# Sheet 3's top band, right of the 182.0 extension line and above the top
+# rail.  R4 printed the four-row callout's +0.130 stack on the 266.7
+# border and the position frame over the upper-right boss.  Two rows now
+# centre lower, clear of the boss; the frame (top-left corner here) stands
+# above them, its 5.5 mm box and one qualifier row ending about 11 mm under
+# frame_xy.  Its leader drops near-vertically to the front hole, left of the
+# callout, steeper than the callout's own leader, so they cannot cross.
+HANGER_CALLOUT_XY = (0.262, 0.238)
+HANGER_CENTER_FRAME_XY = (0.200, 0.264)
+# The linear (non-diameter) zone is two planes about D's median: X only.
+# The axes are drawn ON D, an implied BASIC zero (ASME Y14.5-2018); no
+# zero-length dimension exists to box, so the qualifier states it, with the
+# hardware the holes pass.  Z stays the plain toleranced socket stations.
+HANGER_CENTER_QUALIFIER = "2X HANGER AXES BASIC ZERO ON D, FOR MHA-VN-024"
+# The 182.0 locates D itself -- the crossbar's median, the native centreline
+# between its two side faces -- from the upper-left socket axis under the
+# general .X band; it no longer reaches a hole.
+CROSSBAR_MEDIAN_SUFFIX = "CROSSBAR\nCENTRE, D"
 CROSSBAR_MEDIAN_DATUM_XY = (0.142, 0.095)
 # Transfer fit-up owns these locations; the nominal model holes and their
 # sheet coordinates are references, not independent inspection requirements.
@@ -1058,11 +1075,54 @@ def _exact_linear_entities(
     return [edges.exact_line_through(point, label=label).edge for point in points]
 
 
+def _insert_crossbar_median(adapter: Any, view: Any, sides: tuple[Any, Any]) -> None:
+    """Insert D's trace: the native centreline between the crossbar's sides.
+
+    ``InsertCenterLine2`` on two parallel model edges (draw_dt_crank_arm's and
+    draw_pn_pen_marker's pattern, selected here by entity) bisects those
+    edges, so it stays on their median when the faces move.  Fail unless both
+    sides were selected, the view gained exactly one centreline (the crank
+    arm's ``IView.GetCenterLineCount`` proof) and its annotation is live
+    (``IAnnotation.IsDangling`` false).
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the crossbar median view")
+    native_view = _early_bound(view, "IView")
+    before = int(native_view.GetCenterLineCount())
+    draw.ClearSelection2(True)
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    for index, side in enumerate(sides):
+        selection_data = manager.CreateSelectData()
+        selection_data.View = view
+        if not _early_bound(side, "IEntity").Select4(index > 0, selection_data):
+            raise RuntimeError(f"failed to select crossbar side {index} for its median")
+    count = int(manager.GetSelectedObjectCount2(-1))
+    if count != 2:
+        raise RuntimeError(f"crossbar median selection holds {count} entities, not 2")
+    centerline = ddoc.InsertCenterLine2()
+    draw.ClearSelection2(True)
+    if centerline is None:
+        raise RuntimeError("failed to insert the crossbar median centreline")
+    after = int(native_view.GetCenterLineCount())
+    if after != before + 1:
+        raise RuntimeError(
+            f"crossbar median insert left the view with {after} centrelines, "
+            f"expected {before + 1}"
+        )
+    annotation = _early_bound(
+        _early_bound(centerline, "ICenterLine").GetAnnotation(), "IAnnotation"
+    )
+    if bool(annotation.IsDangling()):
+        raise RuntimeError("crossbar median centreline is dangling")
+
+
 _HANGER_SPOT_DEPTH = re.compile(r"\s*<HOLE-DEPTH>\s*<hw-cbdepth>")
 
 
 def _hanger_spotface_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Keep native diameters/extent; replace the cast-top depth with SPOTFACE.
+    """Keep native diameters/extent; replace the cast-top depth with TOP SPOTFACE.
 
     Tokens are from the installed R2026x ANSI-inch calloutformat.txt. The
     floor's axial location is the model's toleranced HangerGrip, imported in F-F.
@@ -1077,7 +1137,7 @@ def _hanger_spotface_callout_definitions(definitions: dict[int, str]) -> dict[in
     ):
         raise RuntimeError(f"unexpected native hanger spotface callout: {definitions!r}")
     return {
-        part: _HANGER_SPOT_DEPTH.sub("", text).replace("<HOLE-SPOT>", "SPOTFACE ")
+        part: _HANGER_SPOT_DEPTH.sub("", text).replace("<HOLE-SPOT>", HANGER_SPOTFACE_SIDE)
         for part, text in definitions.items()
     }
 
@@ -1818,26 +1878,6 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         ),
     )
     edges = scan_view_edges(view, label="F-F knife-hanger section")
-    # The spotface floor has two lands either side of the clearance hole;
-    # the +X one takes the finish leader.
-    seat_edge, seat_point = _cut_face_edge(
-        edges, fixed={1: HANGER_SPOTFACE_FLOOR_Y, 2: z},
-        near=(0, HANGER_X+(HANGER_SPOTFACE_DIA+HANGER_CLEARANCE_DIA)/4.0, 0.5),
-        label="knife-hanger washer spotface finish land",
-    )
-    spot_tip = model_point_in_view(
-        adapter, view, tuple(value/1000.0 for value in seat_point),
-        label="washer spotface finish landing",
-    )
-    add_surface_finish(
-        adapter, view,
-        symbol_xy=(0.155, 0.097),
-        control=surface_finish_by_key(SURFACE_FINISHES, "hanger_spotface_rear"),
-        label="washer spotface seat finish",
-        entity=seat_edge,
-        leader_attach_xy=spot_tip,
-        char_height=0.0025,
-    )
     _checked_dimension(
         adapter, view,
         p0=(HANGER_X, -HALF_H-2.0, z), p1=(PIN_HOLE_X, -HALF_H-2.0, z),
@@ -2780,19 +2820,17 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail_top,
         edge_xy=stud_edge,
-        # Right of the 182.0 hanger-X row's end, so the leader reaches the
-        # hole past that row instead of across it (codex round 5).  Two rows
-        # centred here printed 262.6..253.4 mm (762a8de5); four need it 3.5
-        # mm lower to keep under the frame's 266.7 top (70ac591e: 264.6).
-        callout_xy=(0.262, 0.2545),
+        # Right of the 182.0 row's end, so the leader reaches the hole past
+        # that row instead of across it (codex round 5).
+        callout_xy=HANGER_CALLOUT_XY,
         label="2X #10 loose hanger washer spotfaces",
-        process=HANGER_DRILL_CALLOUT,
     )
     _set_hanger_spotface_callout(hanger_callout)
     # Linear position to D centres each bolt axis within +/-0.05 of the
-    # TWO-side-face median plane (implicit BASIC zero). No diameter prefix:
-    # this controls X only; the existing Z socket stations remain unchanged.
-    hanger_hole_edge = scan_view_edges(detail_top, label="hanger axis centring").circle_at(
+    # TWO-side-face median plane, the axes BASIC zero on D. No diameter
+    # prefix: this controls X only; the Z socket stations stay toleranced.
+    detail_top_edges = scan_view_edges(detail_top, label="hanger axis centring")
+    hanger_hole_edge = detail_top_edges.circle_at(
         (HANGER_X, HANGER_SPOTFACE_FLOOR_Y, STUD_Z_FRONT), HANGER_CLEARANCE_DIA / 2.0,
         axis=(0.0, 1.0, 0.0), label="front hanger clearance at spotfloor",
     ).edge
@@ -2801,8 +2839,32 @@ async def build(adapter: Any) -> dict[str, str]:
         frame_xy=HANGER_CENTER_FRAME_XY,
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"],
-        datums=("D",), quantity="2X HANGER AXES ON D",
+        datums=("D",), quantity=HANGER_CENTER_QUALIFIER,
         label="hanger axes on crossbar median plane",
+    )
+    # D's own station: the crossbar median from the upper-left socket axis,
+    # the plain .X band the seat-footprint stack charges.  The median is the
+    # native centreline between the two side-face edges (sheet 2's flange
+    # width picks), so it follows the faces.  The dimension picks it by the
+    # documented CENTERLINE select type at its mid-bar point, clear of both
+    # holes; the socket end re-anchors to its arc centre.
+    crossbar_median_x = (BAR_X0 + BAR_X1) / 2.0
+    _insert_crossbar_median(
+        adapter, detail_top,
+        tuple(_exact_linear_entities(
+            detail_top_edges,
+            ((BAR_X0, HALF_H-EDGE_CHAMFER, 0.0), (BAR_X1, HALF_H-EDGE_CHAMFER, 0.0)),
+            label="crossbar sides for median D",
+        )),
+    )
+    upper_left_rim = (-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
+    _checked_dimension(
+        adapter, detail_top,
+        p0=upper_left_rim, p1=(crossbar_median_x, HALF_H, 0.0),
+        text_xy=(0.162, 0.240), label="hanger x from left sockets",
+        expected_mm=COLUMN_X + crossbar_median_x, orientation="horizontal",
+        center=True, entity_types=("EDGE", "CENTERLINE"),
+        suffix=CROSSBAR_MEDIAN_SUFFIX,
     )
     # #946: RD4 reads off the rear keeper tap, from the rail's outer side.
     rear_keeper = (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_REAR)
@@ -2866,14 +2928,10 @@ async def build(adapter: Any) -> dict[str, str]:
         *keeper_facing_note_xy(keeper_callout_xy),
         char_height=FACING_NOTE_HEIGHT,
     )
-    upper_left_rim = (-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
     upper_right_rim = (COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
     hanger_x = HANGER_X
     keeper_drill_r = TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0
     for p0, p1, expected, xy, orientation, label, suffix, reference in (
-        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + HANGER_SPOTFACE_DIA/2),
-         COLUMN_X + hanger_x, (0.162, 0.240), "horizontal",
-         "hanger x from left sockets", "2X HANGER X", False),
         (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + HANGER_SPOTFACE_DIA/2),
          STUD_Z_FRONT - FRONT_COLUMN_Z, (0.062, 0.209), "vertical",
          "front hanger z from upper sockets", "FRONT HANGER Z", False),

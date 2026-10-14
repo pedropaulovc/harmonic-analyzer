@@ -29,7 +29,6 @@ from _surface_finish import SEAT_UM, SurfaceFinishControl
 from dt_cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
-    SUMMING_Z,
 )
 from fr_frame_attachment_spec import CAP_RECESS_DEPTH, COLUMN_SOCKET_DIAMETER
 from ch_fulcrum_keeper_spec import KEEPER_SEAT_FLATNESS_BUDGET_MM
@@ -113,7 +112,11 @@ HANGER_CLEARANCE_DIA_MAX = HANGER_CLEARANCE_DIA + max(HANGER_CLEARANCE_DIA_BAND)
 HANGER_GRIP = 35.50
 HANGER_GRIP_PLACES = 2
 HANGER_GRIP_TOL = 0.05
-HANGER_GRIP_CALLOUT = "2X SPOTFACE FLOOR\nFROM FINISHED UNDERSIDE"
+# The band sets the bolt's reach into the knife mount's tap
+# (build_sm_summing_assembly HANGER_REACH_MIN/MAX), so the callout names it.
+HANGER_GRIP_CALLOUT = (
+    "2X SPOTFACE FLOOR FROM\nFINISHED UNDERSIDE;\nSETS MHA-VN-024\nTHREAD ENGAGEMENT"
+)
 HANGER_GRIP_SKETCH = "HangerGripReference"
 # Hidden model sketches whose driving dimensions the sheet imports per view.
 REFERENCE_SKETCHES = (HANGER_GRIP_SKETCH,)
@@ -276,7 +279,7 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
 
 # --- Machining-required surfaces ---------------------------------------------
 #
-# These eight faces own native finish controls. The right (west) rail top
+# These six faces own native finish controls. The right (west) rail top
 # between its bosses, which seats both MHA-CH-007 keepers, and the underside
 # plane between the bosses, which seats both MHA-SM-002 knife mounts, carry
 # SEAT_UM in the linked facing notes below: each is one plane, so its note
@@ -292,14 +295,13 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
 #   is pinched by the set screw against it.
 # * The set-screw boss's spot face is the machined face the set tap starts
 #   square from, so the cup point bears on the post along the tap axis.
-# * Both top washer spotfloors are functional SEAT 3.2 lands; the existing
-#   MASK SEATS coating instruction therefore keeps them bare and lightly oiled.
+# * The two top washer spotfloors carry no finish: each MHA-VN-060 washer
+#   clamps there, a face that neither runs nor locates.
 #
 # SEAT grade throughout: nothing runs on these surfaces continuously, so the
 # commercial machine finish is what the fit needs. Each controlled face has
 # a native model symbol; each drawing family appears once with a target label.
 SOCKET_BORE_TARGET = "TUBE SOCKET BORES, 4X"
-HANGER_SPOTFACE_TARGET = "WASHER SPOTFACES, 2X"
 SURFACE_FINISHES = tuple(
     SurfaceFinishControl(
         f"socket_{rail}_{end}",
@@ -320,19 +322,6 @@ SURFACE_FINISHES = tuple(
         SEAT_UM,
         PlanarFace((-1.0, 0.0, 0.0), HUB_SET_SPOT_FROM_AXIS - GOOSENECK_X),
     ),
-) + tuple(
-    SurfaceFinishControl(
-        f"hanger_spotface_{end}",
-        SEAT_UM,
-        PlanarFace(
-            (0.0, 1.0, 0.0),
-            HANGER_SPOTFACE_FLOOR_Y,
-            contains_x_mm=-15.0,
-            contains_z_mm=z,
-        ),
-        production_method=HANGER_SPOTFACE_TARGET,
-    )
-    for end, z in (("front", SUMMING_Z - 87.06), ("rear", SUMMING_Z + 87.06))
 )
 
 
@@ -478,7 +467,9 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "socket horizontal pitch": 2,
     "socket vertical pitch": 2,
     # Hole stations baseline from socket axes (X from the left pair, Z from
-    # the upper pair). Hangers are drilled under the general band; keeper
+    # the upper pair). Hanger Z stations are drilled under the general band;
+    # "hanger x" locates datum D (the crossbar median) under the same band,
+    # and the position frame holds the hanger axes BASIC zero on D; keeper
     # coordinates are reference-only guides to assembly-transferred taps.
     "hanger x from left sockets": 1,
     "front hanger z from upper sockets": 1,

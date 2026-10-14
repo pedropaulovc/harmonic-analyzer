@@ -756,6 +756,7 @@ def _knife_seat_footprint(station_z: float, z_label: str) -> list[tuple[float, f
         PRINTED_LINEAR_BAND_MM[
             DRAWING_REFERENCE_PRECISION["hanger x from left sockets"]
         ]
+        + HANGER_CROSSBAR_CENTER_TOL
         + HANGER_PIN_X_TOL
         + slip
     )
@@ -2303,7 +2304,6 @@ def _qualify_machined_faces(adapter) -> None:
     _paint_machined_faces_black precedent). Expectations are the full analytic
     wall/annulus areas; the 5% band absorbs the cross-screw and set-screw tap
     windows that break into the bores (~1% each) and the C1 bore-top breaks.
-    The spotface expectations are each full washer-bearing annulus.
     """
     faces = resolve_faces(
         adapter.currentModel,
@@ -2316,14 +2316,11 @@ def _qualify_machined_faces(adapter) -> None:
     spot_face = (
         math.pi / 4.0 * (HUB_SET_SPOT_DIA**2 - TAP_DRILL_MM[SET_SCREW_THREAD] ** 2)
     )
-    hanger_spotface = math.pi / 4.0 * (HANGER_SPOTFACE_DIA**2 - HANGER_CLEARANCE_DIA**2)
     for key, face in faces.items():
         if key == "hub_bore":
             expected = hub_wall
         elif key == "hub_set_spot_face":
             expected = spot_face
-        elif key.startswith("hanger_spotface_"):
-            expected = hanger_spotface
         else:
             expected = socket_wall
         area = float(face.GetArea()) * 1e6

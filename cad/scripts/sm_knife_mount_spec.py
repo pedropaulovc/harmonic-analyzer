@@ -74,7 +74,7 @@ BLOCK_HEIGHT_PRINTED = round(BLK_TOP - BLK_BOT, BLOCK_SIZE_PLACES)  # 29.6
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "knife-bore position": "0.20",
     "knife-bore perpendicularity": "0.05",
-    "knife-hanger tap position": "0.10",
+    "knife-hanger tap position": "0.15",
     "dowel hole pattern position": "0.13",
 }
 # The bore (drawing-guidelines.md rule 5 (avoid excessive GD&T), knife-edge system): ⌖Ø0.20 locates it to the top
@@ -89,11 +89,15 @@ KNIFE_BORE_ORIENTATION_TOL = float(
 )
 # The #10-24 tap's position to the top seat and the dowel pattern (A|B): the
 # bolt axis the crossbar's #10 clearance hole must float round
-# (``build_sm_summing_assembly``'s knife-hanger stack).  Its 0.05 zone radius
-# is one term of HANGER_SCREW_MISMATCH (hypot(0.291, 0.239) = 0.377) inside
-# the hole's 0.6095 radial float with the drill drift's 0.195, 0.038 spare.
-# Plain face dimensions instead, even at .XXX (+/-0.13 each way, not 0.05),
-# give hypot(0.371, 0.319) = 0.489 and -0.075: the frame is functional.
+# (``build_sm_summing_assembly``'s knife-hanger stack).  Its 0.075 zone radius
+# is one term of HANGER_SCREW_MISMATCH (hypot(0.316, 0.264) = 0.412) inside
+# the hole's 0.6095 radial float with the drill drift's 0.195, 0.0024 spare.
+# A screw through a clearance hole needs no tighter zone than that float
+# admits (drawing-guidelines.md rule 5), and Ø0.15 is the largest two-place
+# zone it admits: the float closes at Ø0.1534; Ø0.16 leaves -0.0046 and
+# Ø0.25 -0.068.  Plain face dimensions instead, even at .XXX (+/-0.13 each
+# way, not 0.075), give hypot(0.371, 0.319) = 0.489 and -0.075: the frame is
+# functional.
 STUD_TAP_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"])
 
 
@@ -158,8 +162,8 @@ BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
 # hole callout: the band the earlier 9.650 took from the title block's .XXX
 # row, held unchanged.  Bare, two places would claim the .XX row's +/-0.51
 # (drawing-guidelines.md rule 3 (decimal places carry the tolerance)), a
-# 9.14 shallowest thread the bolt's tip would bottom in; the band's mate is
-# the bolt the callout's process row names (rule 4).  The drill runs 1.5 P
+# 9.14 shallowest thread the bolt's tip would bottom in; the band's mate and
+# function are the callout's reason row (rule 4).  The drill runs 1.5 P
 # past that nominal thread (9.65 + 1.5875 = 11.2375, printed 11.24), yet its
 # deepest limit, with the pilot the web charges ground to the sharpest
 # accepted point (below), must still leave the 2.0 crown web: so the drill
@@ -180,28 +184,38 @@ STUD_TAP_SPEC = HoleSpec(
     overrides_mm={"ThreadDepth": STUD_TAP_THREAD_DEPTH},
 )
 STUD_TAP_DIA = TAP_DRILL_MM[STUD_THREAD]  # #25 drill, 3.797
-# The pilot the shop may drill.  The native callout prints the #25 drill at
-# three places, Ø3.797, with no band of its own: a drilled hole with no band
-# is toleranced by the title block's DRILLED HOLES row, +0.10/0
-# (drawing-guidelines.md rule 3 (decimal places carry the tolerance); rule 2
-# (the title block is the general specification): no callout restates it).
-# This constant is that row, indexed for the limits, not printed.  The pilot
-# accepted is Ø3.797-3.897, the band the native +0.10/0 printed before.  (At
-# two places, Ø3.80 under the row would reject the #25 drill.)
-STUD_TAP_DIA_PLACES = 3
+# The callout names the pilot by its drill, #25 (0.1495 in, the #10-24 tap
+# drill the Hole Wizard cuts), not by a printed Ø: at three places Ø3.797
+# claims a precision the drill does not hold, and at two places Ø3.80 under
+# the DRILLED HOLES row would reject the #25 drill itself.  The drawing reads
+# the Hole Wizard's native drill Ø back against the #25 before it writes the
+# designation in its place (draw_sm_knife_mount._prove_tap_drill).
+STUD_TAP_DRILL = "#25"
+STUD_TAP_DRILL_IN = 0.1495
+if round(STUD_TAP_DRILL_IN * DOWEL.MM_PER_IN, 3) != STUD_TAP_DIA:
+    raise AssertionError(
+        f"the {STUD_TAP_DRILL} drill is not the {STUD_THREAD} tap drill Ø{STUD_TAP_DIA}"
+    )
+# The pilot the shop may drill.  A named drill with no band of its own is
+# toleranced by the title block's DRILLED HOLES row, +0.10/0, on the drill's
+# size (drawing-guidelines.md rule 3 (decimal places carry the tolerance);
+# rule 2 (the title block is the general specification): no callout restates
+# it).  This constant is that row, indexed for the limits, not printed.  The
+# row reads on the #25's true size, 0.1495 in = 3.7973, not the rounded
+# 3.797 the wizard table carries: the pilot accepted is Ø3.7973-3.8973.
+STUD_TAP_DRILL_DIA = STUD_TAP_DRILL_IN * DOWEL.MM_PER_IN  # 3.7973
 STUD_TAP_DIA_BAND = (drilled_oversize_mm(), 0.0)  # (upper, lower), title block
-_STUD_TAP_DIA_PRINTED = round(STUD_TAP_DIA, STUD_TAP_DIA_PLACES)
 STUD_TAP_DIA_ACCEPTED = (
-    _STUD_TAP_DIA_PRINTED + min(STUD_TAP_DIA_BAND),
-    _STUD_TAP_DIA_PRINTED + max(STUD_TAP_DIA_BAND),
-)  # (3.797, 3.897)
+    STUD_TAP_DRILL_DIA + min(STUD_TAP_DIA_BAND),
+    STUD_TAP_DRILL_DIA + max(STUD_TAP_DIA_BAND),
+)  # (3.7973, 3.8973)
 # CHARGED, NOT ACCEPTED: the crown web below charges a wider pilot than the
-# sheet accepts, Ø3.927 -- the printed Ø3.797 plus the larger of the DRILLED
-# HOLES plus and the general .XXX (+/-0.13), the reading three places would
-# claim were the row not read -- a conservative envelope 0.03 over the
-# accepted Ø3.897 that keeps the web and every stack built on it where they
-# stood.  No pilot is drilled, inspected or passed to it.
-STUD_TAP_DIA_MAX = _STUD_TAP_DIA_PRINTED + max(max(STUD_TAP_DIA_BAND), _XXX)  # 3.927
+# sheet accepts, Ø3.927 -- the wizard's Ø3.797 plus the larger of the
+# DRILLED HOLES plus and the general .XXX (+/-0.13) -- a conservative
+# envelope 0.0297 over the accepted Ø3.8973 that keeps the web and every
+# stack built on it where they stood.  No pilot is drilled, inspected or
+# passed to it.
+STUD_TAP_DIA_MAX = STUD_TAP_DIA + max(max(STUD_TAP_DIA_BAND), _XXX)  # 3.927
 if STUD_TAP_DIA_MAX < max(STUD_TAP_DIA_ACCEPTED):
     raise AssertionError(
         f"knife-mount crown web charges Ø{STUD_TAP_DIA_MAX:.3f}, under the"
@@ -311,18 +325,18 @@ if STUD_TAP_THREAD_DEPTH_MIN < STUD_TAP_ENGAGEMENT_MIN_D * STUD_THREAD_MAJOR:
         f" is under {STUD_TAP_ENGAGEMENT_MIN_D:g} D"
         f" ({STUD_TAP_ENGAGEMENT_MIN_D * STUD_THREAD_MAJOR:.3f})"
     )
-# The full thread holds the bolt, so the tap's callout names its mate
-# (drawing-guidelines.md rule 4 (tighten only for function, and name the
-# mate)) on its process row, the row draw_sm_knife_mount writes into the
-# native callout's prefix ahead of the thread: the mate of the full thread's
-# explicit +/-0.13.  The 1.41 mm adverse runout is under a plug tap's
-# chamfered lead, so the process is a bottoming tap; the thread row's depth
-# is its full thread (ASME Y14.6), so no row restates it.  Folding the mate
-# there keeps the callout inside the layout audit's four-row limit (tall-block,
-# farm build 20261013T225639.450330Z: five rows with the mate on its own).
-# The trailing break puts the native thread on its own row.
+# The full thread holds the bolt, so the tap's callout says why its explicit
+# +/-0.13 is there and names the mate (drawing-guidelines.md rule 4 (tighten
+# only for function, and name the mate)) on one reason row under the native
+# thread row: the bolt's tip clearance.  The callout names no tap tool (rule
+# 7: the thread row's depth is its full thread, ASME Y14.6, and the shop
+# picks the tap that reaches it).  The drill row names the #25 drill in the
+# native size token's place.  Three rows -- drill, thread, reason -- keep the
+# callout inside the layout audit's four-row limit (tall-block, farm build
+# 20261013T225639.450330Z: five rows failed it).
 BOLT_NUMBER = "MHA-VN-024"
-TAP_CALLOUT_PROCESS = f"BOTTOMING TAP FOR {BOLT_NUMBER}\n"
+TAP_DRILL_CALLOUT = f"{STUD_TAP_DRILL} DRILL"
+TAP_CALLOUT_REASON = f"SETS {BOLT_NUMBER} TIP CLEARANCE"
 
 # MHA-VN-051 dowels: two blind flat-bottom reamed holes in the top seat at
 # DOWEL.HANGER_OFFSET either side of the tap axis along local X, at mid-depth.
@@ -337,7 +351,9 @@ PIN_HOLE_COUNT = len(PIN_HOLE_XS)
 if PIN_HOLE_COUNT != DOWEL.PER_MOUNT:
     raise AssertionError("the knife mount reams one hole per MHA-VN-051 dowel")
 # The pair's 2X ream carries ⌖Ø0.13 to the top seat (datum A) and names the
-# pattern datum B (the datum feature symbol on that frame; drawing-guidelines.md rule 5 (avoid excessive GD&T)); the sheet
+# pattern datum B (the datum feature symbol on that frame; drawing-guidelines.md rule 5 (avoid excessive GD&T)); the
+# frame itself prints 2X under it too, so B is plainly the two-hole pattern,
+# not one hole.  The sheet
 # prints its span BASIC between the two hole axes, centred on the block, and
 # positions the tap and the bore to A|B.  Each hole's station from the
 # pattern centre varies by the zone's radius, and from the tap axis by that
@@ -347,7 +363,7 @@ PIN_HOLE_SPAN = DOWEL.SPAN  # 15.264 BASIC
 PIN_HOLE_SPAN_PLACES = DOWEL.SPAN_PLACES
 PIN_HOLE_SPAN_TOL = PIN_HOLE_POSITION_TOL  # 0.13: the span's worst variation
 PIN_HOLE_HALF_SPAN_TOL = PIN_HOLE_SPAN_TOL / 2.0  # 0.065
-PIN_HOLE_X_TOL = PIN_HOLE_HALF_SPAN_TOL + STUD_TAP_POSITION_TOL / 2.0  # 0.115
+PIN_HOLE_X_TOL = PIN_HOLE_HALF_SPAN_TOL + STUD_TAP_POSITION_TOL / 2.0  # 0.14
 PIN_HOLE_DIA = DOWEL.DIA  # 3.175
 PIN_HOLE_DIA_BAND = (0.0, -0.010)
 PIN_HOLE_DIA_PLACES = 3
@@ -403,9 +419,9 @@ PIN_HOLE_FAR_SIDE_WEB = (
 # thinnest .X depth, the row skewed by the angular tolerance.  The +X hole
 # stands a full pattern variation and the longest span's skew off it, 0.13 +
 # 15.394 tan 1 deg = 0.399; the tap the half-span band, its zone radius and
-# half that skew, 0.249.  Back (the binding side) 13.2 - 7.8 = 5.4 from the
-# -X axis: dowel 5.4 - 0.399 - 1.5875 = 3.41, tap thread 5.4 - 0.249 -
-# 2.413 = 2.74.
+# half that skew, 0.274.  Back (the binding side) 13.2 - 7.8 = 5.4 from the
+# -X axis: dowel 5.4 - 0.399 - 1.5875 = 3.41, tap thread 5.4 - 0.274 -
+# 2.413 = 2.71.
 _ROW_Z_MIN = min(
     HOLE_ROW_FACE_DISTANCE - HOLE_ROW_FACE_TOL,
     (2.0 * HOLE_ROW_FACE_DISTANCE - BLOCK_SIZE_TOL)
@@ -438,7 +454,7 @@ BORE_BOTTOM_WALL = (
     - KNIFE_BORE_POSITION_TOL / 2.0
     - BORE_R_MAX
 )
-# To the tap's thread major: 7.517 - 1.5875 - 2.413 = 3.5165.
+# To the tap's thread major: 7.492 - 1.5875 - 2.413 = 3.4915.
 PIN_HOLE_TAP_WEB = (PIN_HOLE_X - PIN_HOLE_X_TOL) - _PIN_R_MAX - STUD_THREAD_MAJOR / 2.0
 # The hole floor's inner corner to the bore, the floor at its deepest and the
 # bore at its largest, highest position, its axis also off the pattern

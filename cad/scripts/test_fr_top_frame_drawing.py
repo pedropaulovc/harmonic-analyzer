@@ -423,8 +423,8 @@ def test_crossbar_t_keeps_the_hanger_holes_in_the_full_depth_junctions() -> None
 
 def test_knife_seat_footprints_cover_every_printed_extreme() -> None:
     # Each print-worst hull holds the nominal block and reaches at least the
-    # unskewed stack: the station at its .X band and half the slip, the
-    # worse .X row-to-face reach.
+    # unskewed stack: D's .X location band, the hanger's centring zone, half
+    # the dowel slip and the worse .X row-to-face reach.
     import sm_knife_mount_spec as mount
 
     reach = max(
@@ -452,6 +452,24 @@ def test_knife_seat_footprints_cover_every_printed_extreme() -> None:
         zs = [abs(z) for _x, z in hull]
         assert min(zs) <= abs(station) - band - slip - reach
         assert max(zs) >= abs(station) + band + slip + reach
+
+
+def test_knife_seat_footprint_charges_axis_centring_from_d(monkeypatch) -> None:
+    original = part._knife_seat_footprint(
+        part.STUD_Z_FRONT, "front hanger z from upper sockets"
+    )
+    monkeypatch.setattr(
+        part, "HANGER_CROSSBAR_CENTER_TOL", spec.HANGER_CROSSBAR_CENTER_TOL + 0.01
+    )
+    expanded = part._knife_seat_footprint(
+        part.STUD_Z_FRONT, "front hanger z from upper sockets"
+    )
+    assert min(x for x, _z in expanded) == pytest.approx(
+        min(x for x, _z in original) - 0.01
+    )
+    assert max(x for x, _z in expanded) == pytest.approx(
+        max(x for x, _z in original) + 0.01
+    )
 
 
 def test_c2_breaks_stay_clear_of_both_print_worst_knife_seats() -> None:
@@ -1946,13 +1964,130 @@ def test_crossbar_median_control_cancels_the_socket_station_chain() -> None:
     assert "_crossbar_median_datum(adapter, geometry_top, crossbar_width)" in source
     assert 'kinds != (14,)' in source
     assert "attached_dimension.FullName" in source and "adapter.swApp.IsSame(attached, display)" in source
-    assert 'datums=("D",), quantity="2X HANGER AXES ON D"' in source
+    assert 'datums=("D",), quantity=HANGER_CENTER_QUALIFIER' in source
     assert 'tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"]' in source
     assert "characteristic=\"position\"" in source
     # The native zone is linear, no diameter prefix; X only, Z unchanged.
     frame = source[source.index('hanger_hole_edge ='):source.index('# #946:', source.index('hanger_hole_edge ='))]
     assert "diameter=True" not in frame
     assert "HANGER_CLEARANCE_DIA / 2.0" in frame and "HANGER_SPOTFACE_FLOOR_Y" in frame
+    # The axes' BASIC zero on D is stated by the frame's own qualifier, with
+    # the hardware it serves; no numeric note or zero-length dimension.
+    assert "BASIC ZERO ON D" in drawing.HANGER_CENTER_QUALIFIER
+    assert "MHA-VN-024" in drawing.HANGER_CENTER_QUALIFIER
+    assert "set_basic_dimension" not in frame
+
+
+def test_hanger_x_locates_datum_d_not_a_hole() -> None:
+    """182.0 runs from the upper-left socket axis to D's trace -- the native
+    centreline between the crossbar's two side-face edges -- a plain .X
+    locator; no competing hole-axis X dimension survives."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    block = source[source.index("# D's own station"):source.index("# #946:")]
+    assert "crossbar_median_x = (BAR_X0 + BAR_X1) / 2.0" in block
+    assert "_insert_crossbar_median(" in block and "_add_view_centerlines(" not in block
+    # Sheet 2's proven flange-width picks: the two side faces' top edges.
+    assert (
+        "((BAR_X0, HALF_H-EDGE_CHAMFER, 0.0), (BAR_X1, HALF_H-EDGE_CHAMFER, 0.0))"
+        in block
+    )
+    assert 'label="hanger x from left sockets"' in block
+    assert "expected_mm=COLUMN_X + crossbar_median_x" in block
+    # Typed coordinate pick (the documented CENTERLINE select type) at the
+    # mid-bar point, clear of both holes; no entity re-key of the helper.
+    assert 'entity_types=("EDGE", "CENTERLINE")' in block
+    assert "p1=(crossbar_median_x, HALF_H, 0.0)" in block
+    assert "entities=" not in block[block.index("_checked_dimension("):]
+    assert part.STUD_Z_FRONT + spec.HANGER_SPOTFACE_DIA < 0.0 < part.STUD_Z_REAR - spec.HANGER_SPOTFACE_DIA
+    assert "center=True" in block
+    assert "reference=" not in block and "set_basic_dimension" not in block
+    assert drawing.CROSSBAR_MEDIAN_SUFFIX.endswith(", D")
+    assert (part.BAR_X0 + part.BAR_X1) / 2.0 == pytest.approx(part.HANGER_X)
+    # The general .X band the seat-footprint stack charges.
+    assert spec.DRAWING_REFERENCE_PRECISION["hanger x from left sockets"] == 1
+
+
+def test_crossbar_median_is_the_native_centreline_of_both_sides(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda entity, _kind: entity)
+    monkeypatch.setattr(drawing, "view_name", lambda *_args: "DETAIL TOP")
+    state: dict = {}
+    calls: list = []
+
+    def side(name):
+        def select4(append, data):
+            calls.append(("Select4", name, append, data.View))
+            state["count"] += state["per_pick"]
+            return state["selected"]
+
+        return SimpleNamespace(Select4=select4)
+
+    sides = (side("left"), side("right"))
+    annotation = SimpleNamespace(IsDangling=lambda: state["dangling"])
+    centerline = SimpleNamespace(GetAnnotation=lambda: annotation)
+
+    def insert():
+        calls.append("InsertCenterLine2")
+        state["centrelines"] += state["added"]
+        return state["centerline"]
+
+    model = SimpleNamespace(
+        ActivateView=lambda _name: True,
+        ClearSelection2=lambda _all: None,
+        InsertCenterLine2=insert,
+        SelectionManager=SimpleNamespace(
+            CreateSelectData=lambda: SimpleNamespace(),
+            GetSelectedObjectCount2=lambda _mark: state["count"],
+        ),
+    )
+    adapter = SimpleNamespace(currentModel=model)
+    view = SimpleNamespace(GetCenterLineCount=lambda: state["centrelines"])
+
+    def reset(**changes) -> None:
+        state.update(
+            count=0, per_pick=1, selected=True, centrelines=3, added=1,
+            centerline=centerline, dangling=False,
+        )
+        state.update(changes)
+        calls.clear()
+
+    reset()
+    assert drawing._insert_crossbar_median(adapter, view, sides) is None
+    assert calls == [
+        ("Select4", "left", False, view),
+        ("Select4", "right", True, view),
+        "InsertCenterLine2",
+    ]
+    assert state["centrelines"] == 4
+    for changes, message in (
+        ({"selected": False}, "failed to select crossbar side 0"),
+        ({"per_pick": 2}, "holds 4 entities, not 2"),
+        ({"centerline": None}, "failed to insert"),
+        ({"added": 0}, "with 3 centrelines, expected 4"),
+        ({"added": 2}, "with 5 centrelines, expected 4"),
+        ({"dangling": True}, "centreline is dangling"),
+    ):
+        reset(**changes)
+        with pytest.raises(RuntimeError, match=message):
+            drawing._insert_crossbar_median(adapter, view, sides)
+
+
+def test_hanger_callout_and_frame_clear_the_border_and_each_other() -> None:
+    """R4: the callout's +0.130 stack struck the 266.7 border and the frame
+    sat on the upper-right boss.  Both now stand in the top band right of
+    the 182.0 extension line, the frame's top under the border."""
+    frame_x, frame_y = drawing.HANGER_CENTER_FRAME_XY
+    callout_x, callout_y = drawing.HANGER_CALLOUT_XY
+    assert frame_y < drawing.SHEET_FRAME[3] - 0.002
+    # Frame box (5.5 mm) and qualifier row stand above the callout block.
+    assert frame_y - 0.011 > callout_y + 0.009
+    # The frame's leader leaves from its left end, left of the callout.
+    assert frame_x < callout_x - 0.031 - 0.005
+    # Right of the 182.0 (x 162 mm text) row's end at the hanger axis.
+    assert frame_x > 0.190
+    # The qualifier stays on the sheet (about 2.75 mm per glyph).
+    assert frame_x + 0.00275 * len(drawing.HANGER_CENTER_QUALIFIER) < drawing.SHEET_FRAME[2]
 
 
 def test_crossbar_datum_requires_the_exact_native_width_attachment(monkeypatch) -> None:
@@ -2600,7 +2735,7 @@ def test_spotface_support_and_floor_webs_charge_all_printed_limits() -> None:
     assert (spec.HANGER_SPOTFACE_DIA_MIN, spec.HANGER_SPOTFACE_DIA_MAX) == (16.49, 17.51)
     assert part.HANGER_SPOTFACE_BAR_WALL == pytest.approx(3.0996958719073833)
     assert part.HANGER_SPOTFACE_POCKET_ROOF_WEB == pytest.approx(5.35)
-    assert part.HANGER_SEAT_BOLT_MISMATCH == pytest.approx(0.3765726036237899)
+    assert part.HANGER_SEAT_BOLT_MISMATCH == pytest.approx(0.4117704770864468)
     assert spec.HANGER_WASHER_FLOAT_MAX == pytest.approx(
         (spec.HANGER_WASHER.ID_MAX-spec.HANGER_SCREW.SHANK_DIA_MIN)/2,
     )
@@ -2608,9 +2743,9 @@ def test_spotface_support_and_floor_webs_charge_all_printed_limits() -> None:
     assert spec.HANGER_WASHER_FLOAT_MAX > (
         spec.HANGER_WASHER.ID_MAX-spec.HANGER_SCREW.SHANK_DIA
     )/2
-    assert part.HANGER_SPOTFACE_WASHER_OFFSET_MAX == pytest.approx(1.4761167317164047)
-    assert part.HANGER_SPOTFACE_WASHER_SUPPORT_MIN == pytest.approx(0.2283832682835948)
-    assert part.HANGER_WASHER_BEARING_MIN == pytest.approx(1.722883268283595)
+    assert part.HANGER_SPOTFACE_WASHER_OFFSET_MAX == pytest.approx(1.5113146051790616)
+    assert part.HANGER_SPOTFACE_WASHER_SUPPORT_MIN == pytest.approx(0.1931853948209379)
+    assert part.HANGER_WASHER_BEARING_MIN == pytest.approx(1.6876853948209381)
     assert part.HANGER_WASHER_BEARING_MIN > 0
     assert part.HANGER_SPOTFACE_OUTER_END_WALL == pytest.approx(30.19210809148086)
     # The largest spot fits; the smallest supports the eccentric largest washer.
@@ -3114,6 +3249,19 @@ def test_slip_hole_callout_states_process_and_purpose_briefly() -> None:
     assert drawing.HANGER_SECTION_CALLOUTS["HangerPinHoleDia"] == text
 
 
+def test_spotfloor_grip_band_names_its_function_and_mate() -> None:
+    """Rule 4 (tighten only for function, and name the mate): the 35.50
+    +/-0.05 grip sets the MHA-VN-024 bolt's reach into the knife mount's
+    tap; the callout says so at the dimension, in four short rows."""
+    text = spec.HANGER_GRIP_CALLOUT
+    assert (spec.HANGER_GRIP, spec.HANGER_GRIP_TOL) == (35.50, 0.05)
+    assert "MHA-VN-024" in text and "THREAD ENGAGEMENT" in text
+    assert "FINISHED UNDERSIDE" in text and text.startswith("2X SPOTFACE FLOOR")
+    assert len(text.splitlines()) <= 4
+    assert max(len(line) for line in text.splitlines()) <= 23
+    assert drawing.HANGER_SECTION_CALLOUTS["HangerGrip"] == text
+
+
 def test_hanger_section_cuts_the_crossbar_from_window_to_window() -> None:
     """F-F cuts the rear station across the crossbar and its gussets only:
     both ends stand in open window, past the gussets' reach at that z and
@@ -3242,30 +3390,26 @@ def test_build_places_the_hanger_section_on_the_underside_sheet() -> None:
     assert "imported_annotations += hanger_dimensions" in underside
 
 
-def test_hanger_drill_callout_states_both_entries() -> None:
-    """Q7: underside-entry #10 drill and top-entry SPOTFACE, followed by
-    two native variable-driven diameter/extent rows; no cast-top depth.
-    The process qualifier stays within drawing-guidelines.md rule 7
-    (notes: few, flagged, never a method)'s four-line budget."""
+def test_hanger_callout_names_the_spotface_side_without_a_method() -> None:
+    """The native callout keeps its variable-driven diameter/extent rows,
+    names the spotface side as geometry (TOP SPOTFACE) and carries no
+    drilling method (drawing-guidelines.md rule 7 (notes: few, flagged,
+    never a method)) and no cast-top depth."""
     import ast
-
-    import _drawing_hole_callout
 
     native = (
         "<MOD-DIAM> <hw-thruholedia> <hw-thru>\n"
         "<HOLE-SPOT><MOD-DIAM> <hw-cbdia> <HOLE-DEPTH> <hw-cbdepth>"
     )
-    prefixed = _drawing_hole_callout.compose_hole_callout_prefix(
-        drawing.HANGER_DRILL_CALLOUT, native
-    )
-    assert prefixed == "DRILL FROM UNDERSIDE;\nSPOTFACE FROM TOP:\n" + native
-    definitions = {5: prefixed, 6: "", 7: "", 8: ""}
+    definitions = {5: native, 6: "", 7: "", 8: ""}
     rewritten = drawing._hanger_spotface_callout_definitions(definitions)
-    assert len(rewritten[5].splitlines()) <= 4
-    assert "<hw-cbdepth>" not in rewritten[5]
-    assert "<hw-thruholedia>" in rewritten[5] and "<hw-cbdia>" in rewritten[5]
-    assert "SPOTFACE <MOD-DIAM> <hw-cbdia>" in rewritten[5]
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    assert rewritten[5] == (
+        "<MOD-DIAM> <hw-thruholedia> <hw-thru>\nTOP SPOTFACE <MOD-DIAM> <hw-cbdia>"
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "DRILL FROM UNDERSIDE" not in source
+    assert not hasattr(drawing, "HANGER_DRILL_CALLOUT")
+    tree = ast.parse(source)
     (callout,) = [
         node
         for node in ast.walk(tree)
@@ -3279,8 +3423,10 @@ def test_hanger_drill_callout_states_both_entries() -> None:
             for keyword in node.keywords
         )
     ]
-    process = next(k.value for k in callout.keywords if k.arg == "process")
-    assert isinstance(process, ast.Name) and process.id == "HANGER_DRILL_CALLOUT"
+    keywords = {k.arg: k.value for k in callout.keywords}
+    assert "process" not in keywords
+    assert isinstance(keywords["callout_xy"], ast.Name)
+    assert keywords["callout_xy"].id == "HANGER_CALLOUT_XY"
 
 
 def test_keeper_transfer_prefix_preserves_the_native_hole_definition() -> None:
@@ -3387,7 +3533,9 @@ def test_keeper_locations_are_reference_but_hanger_locations_remain_manufacturin
         compile(ast.Module(body=loops, type_ignores=[]), "<station-contract>", "exec"),
         environment,
     )
-    assert len(captured) == 6
+    # Hanger X is D's own station (test_hanger_x_locates_datum_d_not_a_hole).
+    assert len(captured) == 5
+    assert "hanger x from left sockets" not in {entry["label"] for entry in captured}
     by_label = {entry["label"]: entry for entry in captured}
     for label in (
         "keeper x from left sockets",
@@ -3398,12 +3546,6 @@ def test_keeper_locations_are_reference_but_hanger_locations_remain_manufacturin
         assert by_label[label]["center"] is True
         assert label in spec.DRAWING_REFERENCE_PRECISION
     hanger_expectations = (
-        (
-            "hanger x from left sockets",
-            "2X HANGER X",
-            (0.162, 0.240),
-            part.COLUMN_X + environment["hanger_x"],
-        ),
         (
             "front hanger z from upper sockets",
             "FRONT HANGER Z",
@@ -3538,7 +3680,8 @@ def test_transfer_plan_and_station_fields_remain_inside_the_hole_sheet() -> None
         < frame[3] - drawing.INK_CLEARANCE
     )
     stations = _hole_sheet_stations()
-    assert len(stations) == 6
+    # Hanger X is D's own station, outside the loop.
+    assert len(stations) == 5
     _callout, callout_box = _keeper_callout_placed()
     left, _down, right, _up = drawing.KEEPER_CALLOUT_EXTENT
     # Estimated field allowances, not measured render ink: 2 mm per qualifier
@@ -3783,13 +3926,16 @@ def test_keeper_feet_stay_on_the_faced_rail_top_and_keep_their_ligaments() -> No
     assert margin == pytest.approx(3.58)
     # Faced in place: the rail-top plane stays put.
     assert part.HALF_H - part.FLANGE_BOT_Y == pytest.approx(spec.FLANGE_THICKNESS_MM)
-    # Native socket, hub-bore/set-screw spotface and 2X hanger-seat finishes.
-    # The faced rail top's SEAT_UM rides on linked note B; the cap-recess
-    # floors carry none because caps
-    # seat on the tube ends, clear of the floors.
+    # Native socket and hub-bore/set-screw spotface finishes. The faced rail
+    # top's SEAT_UM rides on linked note B; the cap-recess floors carry none
+    # because caps seat on the tube ends, clear of the floors; the washer
+    # spotfloors carry none because a clamp face neither runs nor locates.
     assert [c.key for c in spec.SURFACE_FINISHES] == [
         f"socket_{rail}_{end}" for rail in ("east", "west") for end in ("front", "rear")
-    ] + ["hub_bore", "hub_set_spot_face", "hanger_spotface_front", "hanger_spotface_rear"]
+    ] + ["hub_bore", "hub_set_spot_face"]
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "washer spotface seat finish" not in source
+    assert not hasattr(spec, "HANGER_SPOTFACE_TARGET")
 
 
 def test_top_frame_drawing_is_six_sheets() -> None:

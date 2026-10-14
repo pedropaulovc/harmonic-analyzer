@@ -156,13 +156,13 @@ KNIFE_DOWEL_X_OFFSETS = knife_mount.PIN_HOLE_XS
 # worst case (drawing-guidelines.md rule 19 (absorb stacks)) when
 # every station sits at its limit.  Along the dowel line (X): the crossbar's
 # round-hole station (.XXX, 0.13), the knife mount's half-span band (0.065),
-# its tap's position zone radius (0.05) and the round-hole pin across its
+# its tap's position zone radius (0.075) and the round-hole pin across its
 # loosest slip (0.046).  Across it (Z): the crossbar's implied-zero offset of
 # the round hole from the screw hole (.XXX, 0.13), the tap zone radius
-# (0.05), and the pair's mid-point between the round-hole pin and the slot
+# (0.075), and the pair's mid-point between the round-hole pin and the slot
 # pin, each across its loosest slip and the slot's centre plane off by its
-# zone radius, (0.046 + 0.046 + 0.025) / 2 = 0.059.  hypot(0.291, 0.239) =
-# 0.376.
+# zone radius, (0.046 + 0.046 + 0.025) / 2 = 0.059.  hypot(0.31623, 0.26373)
+# = 0.41177048.
 _KNIFE_DOWEL_SLIP_MAX = top_frame.HANGER_PIN_SLIP_CLEARANCE_MAX
 _KNIFE_DOWEL_PAIR_SHIFT = (
     _KNIFE_DOWEL_SLIP_MAX / 2.0
@@ -175,17 +175,17 @@ HANGER_SCREW_MISMATCH_X = (
     + knife_mount.PIN_HOLE_HALF_SPAN_TOL
     + knife_mount.STUD_TAP_POSITION_TOL / 2.0
     + _KNIFE_DOWEL_SLIP_MAX / 2.0
-)  # 0.291
+)  # 0.31623
 HANGER_SCREW_MISMATCH_Z = (
     top_frame.HANGER_PIN_X_TOL
     + knife_mount.STUD_TAP_POSITION_TOL / 2.0
     + _KNIFE_DOWEL_PAIR_SHIFT / 2.0
-)  # 0.239
+)  # 0.26373
 HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATCH_Z)
 # The hole is drilled from the finished underside. Prove drift over the FULL
 # crossbar body through its as-cast top, not only to the shallow spotface:
 # tan(0.3 deg) * (36.5 + 0.8) = 0.19530413. The #10 loose hole's 0.6095
-# radial float covers this plus the station mismatch, with 0.03762327 spare.
+# radial float covers this plus the station mismatch, with 0.00242539 spare.
 HANGER_SCREW_DRIFT = top_frame.DRILL_DRIFT_PER_MM * (
     top_frame.RING_HEIGHT + top_frame.PRINTED_LINEAR_BAND_MM[1]
 )

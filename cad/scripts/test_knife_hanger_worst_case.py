@@ -35,7 +35,9 @@ def test_the_tap_point_leaves_the_web_over_the_bore_crown() -> None:
     # deliberately charges more diameter than the native accepted maximum.
     assert knife_mount.STUD_TAP_DIA == pytest.approx(3.797)
     assert knife_mount.STUD_TAP_DIA_BAND == pytest.approx((0.10, 0.0))
-    assert knife_mount.STUD_TAP_DIA_ACCEPTED == pytest.approx((3.797, 3.897))
+    assert knife_mount.STUD_TAP_DIA_ACCEPTED == pytest.approx(
+        (0.1495 * 25.4, 0.1495 * 25.4 + 0.10), abs=1e-12
+    )
     assert knife_mount.STUD_TAP_DIA_OVERSIZE == pytest.approx(
         max(knife_mount._XXX, drilled_oversize_mm())
     )
@@ -226,24 +228,50 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
         (top_frame.HANGER_CLEARANCE_DIA_MIN - screw.SHANK_DIA) / 2.0
     )
     assert top_frame.HANGER_SCREW_FLOAT == pytest.approx(0.6095)
-    # Along X: 0.13 crossbar station + 0.065 half-span + 0.05 tap zone
-    # +0.04623 slip; across: 0.13 +0.05 +(0.04623+0.04623+0.025)/2.
-    assert knife_mount.STUD_TAP_POSITION_TOL == 0.10
-    assert asm.HANGER_SCREW_MISMATCH_X == pytest.approx(0.29123)
-    assert asm.HANGER_SCREW_MISMATCH_Z == pytest.approx(0.238730)
-    assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.3766, abs=5e-4)
+    # Along X: 0.13 crossbar station + 0.065 half-span + 0.075 tap zone
+    # +0.04623 slip; across: 0.13 +0.075 +(0.04623+0.04623+0.025)/2.
+    assert knife_mount.STUD_TAP_POSITION_TOL == 0.15
+    assert asm.HANGER_SCREW_MISMATCH_X == pytest.approx(0.31623)
+    assert asm.HANGER_SCREW_MISMATCH_Z == pytest.approx(0.26373)
+    assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.4117704770864468, abs=1e-12)
     # Drift reaches the full as-cast top, at the longest .X body thickness;
     # using the shorter machined grip would miss the hole's top endpoint.
     assert asm.HANGER_SCREW_DRIFT == pytest.approx(
         math.tan(math.radians(top_frame.KEEPER_TAP_DRILL_WANDER_DEG))
         * (top_frame.RING_HEIGHT + top_frame.PRINTED_LINEAR_BAND_MM[1])
     )
-    assert asm.HANGER_SCREW_DRIFT == pytest.approx(0.1953041281)
-    assert asm.HANGER_SCREW_FLOAT_SPARE == pytest.approx(0.0376232683)
+    assert asm.HANGER_SCREW_DRIFT == pytest.approx(0.19530412809261474, abs=1e-12)
+    assert asm.HANGER_SCREW_FLOAT_SPARE == pytest.approx(
+        0.0024253948209385645, abs=1e-12
+    )
     assert (
         asm.HANGER_SCREW_MISMATCH + asm.HANGER_SCREW_DRIFT
         < top_frame.HANGER_SCREW_FLOAT
     )
+
+    # The tap zone is the largest two-place zone the float admits (R4 asked
+    # Ø0.25): the stack, each mismatch carrying the zone's radius, closes at
+    # Ø0.1534; Ø0.16 and Ø0.25 overrun the float.
+    def spare_at(zone: float) -> float:
+        shift = (zone - knife_mount.STUD_TAP_POSITION_TOL) / 2.0
+        mismatch = math.hypot(
+            asm.HANGER_SCREW_MISMATCH_X + shift, asm.HANGER_SCREW_MISMATCH_Z + shift
+        )
+        return top_frame.HANGER_SCREW_FLOAT - mismatch - asm.HANGER_SCREW_DRIFT
+
+    assert spare_at(0.15) == pytest.approx(asm.HANGER_SCREW_FLOAT_SPARE, abs=1e-12)
+    assert spare_at(0.16) == pytest.approx(-0.004617363079285064, abs=1e-12)
+    assert spare_at(0.25) == pytest.approx(-0.06803947084550743, abs=1e-12)
+    assert spare_at(0.16) < 0.0 and spare_at(0.25) < 0.0
+    x0 = asm.HANGER_SCREW_MISMATCH_X - knife_mount.STUD_TAP_POSITION_TOL / 2.0
+    z0 = asm.HANGER_SCREW_MISMATCH_Z - knife_mount.STUD_TAP_POSITION_TOL / 2.0
+    reach = top_frame.HANGER_SCREW_FLOAT - asm.HANGER_SCREW_DRIFT
+    half_zone_max = (
+        -(x0 + z0) + math.sqrt((x0 + z0) ** 2 - 2.0 * (x0**2 + z0**2 - reach**2))
+    ) / 2.0
+    assert 2.0 * half_zone_max == pytest.approx(0.1534439686274326, abs=1e-12)
+    assert spare_at(2.0 * half_zone_max) == pytest.approx(0.0, abs=1e-12)
+    assert 0.15 <= 2.0 * half_zone_max < 0.16
     # Negative control: inheriting the general symmetric .XXX hole band
     # would allow an undersize hole that fails the very same float proof.
     undersize_float = (
@@ -343,7 +371,7 @@ def test_the_dowel_pattern_frame_is_the_zone_the_stacks_were_derived_on() -> Non
     assert knife_mount.PIN_HOLE_POSITION_TOL == 0.13
     assert knife_mount.PIN_HOLE_SPAN_TOL == dowel.SPAN_TOL == float(zone)
     assert knife_mount.PIN_HOLE_HALF_SPAN_TOL == pytest.approx(0.065)
-    assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.3766, abs=5e-5)
+    assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.41177, abs=5e-5)
     assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(6.392778, abs=5e-6)
     assert top_frame.HANGER_SLOT_LENGTH_REQUIRED == pytest.approx(3.795, abs=5e-4)
     # Enlarging the pattern zone to Ø0.23 would consume more screw float
@@ -352,7 +380,7 @@ def test_the_dowel_pattern_frame_is_the_zone_the_stacks_were_derived_on() -> Non
         asm.HANGER_SCREW_MISMATCH_X - knife_mount.PIN_HOLE_HALF_SPAN_TOL + 0.23 / 2.0
     )
     assert math.hypot(x_at_023, asm.HANGER_SCREW_MISMATCH_Z) == pytest.approx(
-        0.4164, abs=5e-4
+        0.4513, abs=5e-4
     )
     normal_float = (CLEARANCE_MM[("#10", "normal")] - screw.SHANK_DIA) / 2.0
     assert math.hypot(x_at_023, asm.HANGER_SCREW_MISMATCH_Z) > normal_float
@@ -361,7 +389,7 @@ def test_the_dowel_pattern_frame_is_the_zone_the_stacks_were_derived_on() -> Non
 def test_the_knife_mount_webs_hold_round_both_dowel_holes() -> None:
     assert knife_mount.PIN_HOLE_SPAN == pytest.approx(15.264)
     assert knife_mount.PIN_HOLE_SPAN_TOL == 0.13
-    assert knife_mount.PIN_HOLE_X_TOL == pytest.approx(0.115)
+    assert knife_mount.PIN_HOLE_X_TOL == pytest.approx(0.14)
     # Same face-location scheme, minimally widened to 25.4 at functional .X;
     # the +X hole stands 5.068 .XX from its face, the row 7.0 .X from front.
     assert knife_mount.BLK_HALF_X == 12.7
@@ -376,10 +404,10 @@ def test_the_knife_mount_webs_hold_round_both_dowel_holes() -> None:
         "dowel hole to +X face": (knife_mount.PIN_HOLE_SIDE_WEB, 2.9705),
         "dowel hole to -X face": (knife_mount.PIN_HOLE_FAR_SIDE_WEB, 2.0405),
         "dowel hole to Z faces": (knife_mount.PIN_HOLE_Z_WEB, 3.413797),
-        "tap to Z faces": (knife_mount.STUD_TAP_Z_WALL, 2.737648),
+        "tap to Z faces": (knife_mount.STUD_TAP_Z_WALL, 2.712648),
         "bore to side faces": (knife_mount.BORE_SIDE_WEB, 5.21),
         "bore to bottom face": (knife_mount.BORE_BOTTOM_WALL, 2.065),
-        "dowel hole to tap": (knife_mount.PIN_HOLE_TAP_WEB, 3.5165),
+        "dowel hole to tap": (knife_mount.PIN_HOLE_TAP_WEB, 3.4915),
         "dowel hole to bore": (knife_mount.PIN_HOLE_BORE_WEB, 5.775544),
     }
     for label, (web, expected) in webs.items():

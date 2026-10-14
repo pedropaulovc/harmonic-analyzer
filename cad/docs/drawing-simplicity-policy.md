@@ -85,7 +85,7 @@ frames and no datums.
 - **Knife-edge system.** The knife-mount 2X dowel-hole pattern (one position
   frame under its 2X Ø, Ø0.13 to the top seat, datum A, at the BASIC 15.264
   span, datum feature B on that frame), its bore (⌖Ø0.20 to A|B with ⊥Ø0.05
-  to B stacked under it) and its #10-24 hanger tap (Ø0.10 to A|B, so the
+  to B stacked under it) and its #10-24 hanger tap (Ø0.15 to A|B, so the
   crossbar's Ø6.045 clearance hole still floats round the bolt); the top
   frame's two knife-hanger dowel slots (⌖0.05 to the round dowel hole at
   their own station, BASIC 15.264 from it, datum B front / C rear, B|C▷ and
