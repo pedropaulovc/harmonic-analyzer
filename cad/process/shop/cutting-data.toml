@@ -1,54 +1,154 @@
-# Copied from https://github.com/pedropaulovc/prechips/blob/0dd7614/examples/cutting-data.toml
-# Inventory verification flags and author-choice process proposals are unchanged.
-# Versioned reference table. No Handbook page was available to transcribe.
-# PLAN.md's 90 sfm / 0.05 mm example is a layout sketch, not source evidence.
-# Every dependent speed/feed and physics value therefore remains unknown.
+# Shop cutting data: starting speeds and feeds for the routes the shop's plans use.
+# Only material/tool/operation combinations a plan uses have rows. Every row cites a
+# public table and row; sfm is the LOW end of the cited range (light bench mill, cutting
+# oil brushed on). Chip loads in mm/tooth = cited in/tooth x 25.4; a drill's chip load
+# is its cited feed per revolution / 2 flutes, a reamer's is its feed per rev / 6 flutes.
+#
+# Sources:
+#   LMS  = LittleMachineShop "Cutting Speeds", https://littlemachineshop.com/pages/cutting-speeds
+#          (Milling table and Drilling & Reaming table, row "Plain carbon steels
+#          1006 ... 1018 ... 1026, 1513, 1514")
+#   UF   = University of Florida MAE Design & Manufacturing Lab "Speeds and Feeds",
+#          https://web.mae.ufl.edu/designlab/Advanced%20Manufacturing/Speeds%20and%20Feeds/Speeds%20and%20Feeds.htm
+#          (Table "Recommended Feed Rates for 2 Flute HSS & Carbide Drills",
+#          Table "Recommended Feed Rates for HSS and Carbide Endmills" row "Mild steel
+#          (.2-.3 C)", and Example 1B reamer rule: twice the drill's feed per rev)
 revision = 1
 
 [aliases]
-"1018 CRS" = "low_carbon_steel"
-"1018 low-carbon steel" = "low_carbon_steel"
-"AISI 1018 cold-finished steel bar, Ø10" = "low_carbon_steel"
-"Plain Carbon Steel" = "low_carbon_steel"
+"1018 cold-rolled steel" = "low_carbon_steel"
 
+# --- End mills, HSS ----------------------------------------------------------------------
+# Facing with the 3/4 in four-flute (12.7-25.4 mm cutters).
 [[cut]]
 material_class = "low_carbon_steel"
 tool_material = "HSS"
 operation = "face"
-diameter_range = "unknown"
-sfm = "unknown"
-chip_load_mm_per_tooth = "unknown"
-cite = "unknown"
+diameter_range = [12.7, 25.4]
+sfm = 65.0
+chip_load_mm_per_tooth = 0.0508
+cite = [
+  "LMS Milling table, row Plain carbon steels (1018): 65-110 ft/min; low end used",
+  "UF endmill feed table, row Mild steel (.2-.3 C): 0.002-0.008 in/tooth (cutters 1/2 to 1-1/2 in); low end 0.002 in = 0.0508 mm",
+]
 
+# Facing with the 3/8 in four-flute (below the UF table's 1/2 in range): half the low end,
+# the same basis as the small-cutter profile row below.
+[[cut]]
+material_class = "low_carbon_steel"
+tool_material = "HSS"
+operation = "face"
+diameter_range = [3.0, 12.69]
+sfm = 65.0
+chip_load_mm_per_tooth = 0.0254
+cite = [
+  "LMS Milling table, row Plain carbon steels (1018): 65-110 ft/min; low end used",
+  "UF endmill feed table, row Mild steel (.2-.3 C): 0.002-0.008 in/tooth, stated for 1/2 to 1-1/2 in cutters",
+  "AUTHOR'S CHOICE: below 1/2 in, half the UF low end, 0.001 in = 0.0254 mm/tooth",
+]
+
+# Side milling / profiling at and above 1/2 in (the 3/4 in cutter on the rotary table).
 [[cut]]
 material_class = "low_carbon_steel"
 tool_material = "HSS"
 operation = "profile"
-diameter_range = "unknown"
-sfm = "unknown"
-chip_load_mm_per_tooth = "unknown"
-cite = "unknown"
+diameter_range = [12.7, 25.4]
+sfm = 65.0
+chip_load_mm_per_tooth = 0.0508
+cite = [
+  "LMS Milling table, row Plain carbon steels (1018): 65-110 ft/min; low end used",
+  "UF endmill feed table, row Mild steel (.2-.3 C): 0.002-0.008 in/tooth (cutters 1/2 to 1-1/2 in); low end 0.002 in = 0.0508 mm",
+]
+
+# Small cutters (below the UF table's 1/2 in range): half the table's low end.
+[[cut]]
+material_class = "low_carbon_steel"
+tool_material = "HSS"
+operation = "profile"
+diameter_range = [3.0, 12.69]
+sfm = 65.0
+chip_load_mm_per_tooth = 0.0254
+cite = [
+  "LMS Milling table, row Plain carbon steels (1018): 65-110 ft/min; low end used",
+  "UF endmill feed table, row Mild steel (.2-.3 C): 0.002-0.008 in/tooth, stated for 1/2 to 1-1/2 in cutters",
+  "AUTHOR'S CHOICE: below 1/2 in, half the UF low end, 0.001 in = 0.0254 mm/tooth",
+]
+
+# Chain drilling (S3 ops 20 and 30, #33 and #29 drills): prechips looks a rough_profile
+# chain_drill up under operation "profile", i.e. the end-mill rows (prechips#185). The two
+# drills therefore carry their own cited drilling data as the inventory member's `chart`
+# (inventory tools.drill-index-115 members "#33" and "#29"), which the rule reads before any
+# row; no row here carries drill numbers under an end-mill operation.
+
+# --- Drills, HSS ----------------------------------------------------------------------
+[[cut]]
+material_class = "low_carbon_steel"
+tool_material = "HSS"
+operation = "drill"
+diameter_range = [0.5, 3.17]
+sfm = 60.0
+chip_load_mm_per_tooth = 0.0127
+cite = [
+  "LMS Drilling & Reaming table, row Plain carbon steels (1018): drilling 60-100 ft/min; low end used",
+  "UF drill feed table, row Under 1/8 in: up to 0.002 in/rev; AUTHOR'S CHOICE 0.001 in/rev = 0.0254 mm/rev, / 2 flutes = 0.0127 mm/tooth",
+]
 
 [[cut]]
 material_class = "low_carbon_steel"
 tool_material = "HSS"
 operation = "drill"
-diameter_range = "unknown"
-sfm = "unknown"
-chip_load_mm_per_tooth = "unknown"
-cite = "unknown"
+diameter_range = [3.175, 6.35]
+sfm = 60.0
+chip_load_mm_per_tooth = 0.0254
+cite = [
+  "LMS Drilling & Reaming table, row Plain carbon steels (1018): drilling 60-100 ft/min; low end used",
+  "UF drill feed table, row 1/8 to 1/4 in: 0.002-0.004 in/rev; low end 0.002 in/rev = 0.0508 mm/rev, / 2 flutes = 0.0254 mm/tooth",
+]
 
+# --- Combined drill and countersink (centre drill) used to spot holes, M42 -----------------
+[[cut]]
+material_class = "low_carbon_steel"
+tool_material = "M42"
+operation = "spot"
+diameter_range = [0.5, 3.17]
+sfm = 60.0
+chip_load_mm_per_tooth = 0.0127
+cite = [
+  "LMS Drilling & Reaming table, row Plain carbon steels (1018): drilling 60-100 ft/min; low end used",
+  "UF drill feed table, row Under 1/8 in (the #2 centre drill's 1.98 mm pilot): up to 0.002 in/rev; AUTHOR'S CHOICE 0.001 in/rev, / 2 flutes = 0.0127 mm/tooth",
+]
+
+# --- Machine reamer, HSS ----------------------------------------------------------------
 [[cut]]
 material_class = "low_carbon_steel"
 tool_material = "HSS"
 operation = "ream"
-diameter_range = "unknown"
-sfm = "unknown"
-chip_load_mm_per_tooth = "unknown"
-cite = "unknown"
+diameter_range = [6.35, 12.7]
+sfm = 40.0
+chip_load_mm_per_tooth = 0.0339
+cite = [
+  "LMS Drilling & Reaming table, row Plain carbon steels (1018): reaming 40-65 ft/min; low end used",
+  "UF Example 1B reamer rule: twice the drill's feed per rev; UF drill feed table row 1/4 to 1/2 in low end 0.004 in/rev, x2 = 0.008 in/rev = 0.2032 mm/rev, / 6 flutes = 0.0339 mm/tooth",
+]
 
-[[material]]
+# --- Plunge feeds for centre-cutting HSS end mills ---------------------------------------
+[[plunge]]
 material_class = "low_carbon_steel"
-kc_n_per_mm2 = "unknown"
-e_gpa = "unknown"
-cite = "unknown"
+tool_material = "HSS"
+diameter_range = [3.175, 6.35]
+feed_mm_rev = 0.0254
+cite = ["UF drill feed table, row 1/8 to 1/4 in: 0.002-0.004 in/rev; AUTHOR'S CHOICE half the low end for an end mill fed down its axis, 0.001 in/rev = 0.0254 mm/rev"]
+
+[[plunge]]
+material_class = "low_carbon_steel"
+tool_material = "HSS"
+diameter_range = [6.36, 12.69]
+feed_mm_rev = 0.0508
+cite = ["UF drill feed table, row 1/4 to 1/2 in: 0.004-0.008 in/rev; AUTHOR'S CHOICE half the low end for an end mill fed down its axis, 0.002 in/rev = 0.0508 mm/rev"]
+
+[[plunge]]
+material_class = "low_carbon_steel"
+tool_material = "HSS"
+diameter_range = [12.7, 25.4]
+feed_mm_rev = 0.1016
+cite = ["UF drill feed table, row 1/2 to 1 in: 0.008-0.016 in/rev; AUTHOR'S CHOICE half the low end for an end mill fed down its axis, 0.004 in/rev = 0.1016 mm/rev"]
