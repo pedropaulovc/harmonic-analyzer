@@ -1,6 +1,6 @@
 r"""Build the rocker arm hub filing stud (MHA-CH-006-TL-05; shop fixture).
 
-A headed O1 stud turned in one chucking: the lapped body locates in the
+A headed 4140 stud turned in one chucking: the lapped body locates in the
 rocker arm's reamed pivot bore and carries the two filing buttons, the
 head's seat takes the lower button, the thread takes the clamping nut and the
 tail goes in the bench vise (``ch_rocker_arm_tl_filing_stud_spec``).
@@ -59,7 +59,7 @@ from ch_rocker_arm_tl_filing_stud_spec import (
 )
 
 PART_NAME = "ch-rocker-arm-tl-filing-stud"
-MATERIAL = "Alloy Steel"  # the registry row names the annealed O1 drill rod
+MATERIAL = "Alloy Steel"  # the registry row names the 4140 HT rod
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
     "Material Specification",

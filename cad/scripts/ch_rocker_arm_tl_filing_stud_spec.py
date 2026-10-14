@@ -7,8 +7,8 @@ body locates in the arm's reamed pivot bore (datum A) and carries both
 filing buttons (MHA-CH-006-TL-04). The lower button seats on the integral
 head, the arm's hub sits between the buttons, the upper button rides the
 body, and a bought #10-24 coupling nut (McMaster 90264A425) on the thread
-clamps the stack. Turned in one chucking from the buttons' O1 drill rod and
-left annealed (inventory ``hub-filing-buttons``): nothing files on it.
+clamps the stack. Turned in one chucking from 4140 at HRC 32 and left
+unhardened (shop stock: "headed stud (ruling 1)"): nothing files on it.
 
 Frame: the stud axis is model +X with the head's seat face at X0, the body
 and thread toward +X and the head and vise tail toward -X. Every axial size
@@ -247,7 +247,7 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 # stud's size come from their TL specs, the nut from its catalogue page.
 _SEAT_Z = round(-(rocker.HUB_LENGTH + button.THICKNESS), 6)
 _O1_BUTTON = "O1 drill rod, hardened and tempered; bore, faces and O.D. lapped"
-_O1_STUD = "O1 drill rod, annealed"
+_STUD_ROD = "4140 rod, HRC 32, left unhardened"
 PRECHIPS_SOLIDS: list[dict] = [
     {
         "name": "upper button",
@@ -298,7 +298,7 @@ PRECHIPS_SOLIDS: list[dict] = [
         "axis": [0.0, 0.0, -1.0],
         "dia_mm": HEAD_DIA,
         "length_mm": HEAD_LENGTH,
-        "note": _O1_STUD,
+        "note": _STUD_ROD,
     },
     {
         "name": "stud pin",
@@ -309,7 +309,7 @@ PRECHIPS_SOLIDS: list[dict] = [
         "length_mm": BODY_LENGTH,
         "locates": "pivot bore (datum A)",
         "bears": "bore",
-        "note": _O1_STUD,
+        "note": _STUD_ROD,
     },
     {
         "name": "stud thread",
@@ -319,7 +319,7 @@ PRECHIPS_SOLIDS: list[dict] = [
         "dia_mm": THREAD_MODEL_DIA,
         "length_mm": THREAD_START,
         "fastener": THREAD,
-        "note": _O1_STUD,
+        "note": _STUD_ROD,
     },
     {
         "name": "stud tail",
@@ -328,7 +328,7 @@ PRECHIPS_SOLIDS: list[dict] = [
         "axis": [0.0, 0.0, -1.0],
         "dia_mm": TAIL_DIA,
         "length_mm": TAIL_END - HEAD_LENGTH,
-        "note": _O1_STUD,
+        "note": _STUD_ROD,
     },
     {
         "name": "nut",

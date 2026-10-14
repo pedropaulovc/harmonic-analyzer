@@ -263,7 +263,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Arm Hub Filing Stud Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker arm hub filing stud; turned O1, annealed; MHA-CH-006-TL-05",
+            3: "rocker arm hub filing stud; turned 4140; MHA-CH-006-TL-05",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
