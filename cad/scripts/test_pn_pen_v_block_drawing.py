@@ -217,6 +217,7 @@ def test_relief_corners_carry_the_largest_radius_the_grip_allows() -> None:
     assert spec.RELIEF_CORNER_R == 1.0
     assert spec._GRIP_GAP_AT_BOTTOM - spec.RELIEF_CORNER_R >= 0.25
     assert spec.DIMENSION_PREFIXES == {
+        ("VGrooveProfile", "VFlankAngle"): "2X ",
         ("VApexFillets", "VApexFilletR"): "2X R",
         ("ReliefProfile", "ReliefCornerR"): "2X R",
     }
@@ -291,9 +292,88 @@ def test_pivot_chamfer_clears_the_rod_fillet_as_a_min_limit() -> None:
         assert not re.search(r"\d\.\d", text)
 
 
+def _seat_by_bisector(
+    z0: float, z1: float, front_deg: float, back_deg: float, width: float, r: float
+) -> dict[str, float]:
+    """The grip seated in one V, by another route than the spec's: its axis on
+    the flanks' bisector, R / sin(half the included angle) under the apex;
+    each round's centre on its corner's bisector, its arc sampled."""
+
+    def unit(v: tuple[float, float]) -> tuple[float, float]:
+        length = math.hypot(*v)
+        return (v[0] / length, v[1] / length)
+
+    grip_r = spec.marker.BARREL_DIA / 2.0
+    t0, t1 = math.tan(math.radians(front_deg)), math.tan(math.radians(back_deg))
+    apex = ((t0 * z0 + t1 * z1) / (t0 + t1), 0.0)
+    apex = (apex[0], t0 * (apex[0] - z0))
+    down = (unit((z0 - apex[0], -apex[1])), unit((z1 - apex[0], -apex[1])))
+    bisector = unit((down[0][0] + down[1][0], down[0][1] + down[1][1]))
+    half = (math.pi - math.radians(front_deg) - math.radians(back_deg)) / 2.0
+    reach = grip_r / math.sin(half)
+    axis = (apex[0] + bisector[0] * reach, apex[1] + bisector[1] * reach)
+    drop = width / (1.0 / t0 + 1.0 / t1)
+    flat_y = apex[1] - drop
+    corners = ((apex[0] - drop / t0, flat_y), (apex[0] + drop / t1, flat_y))
+    nearest, flat_tangents, contacts, flank_tops = [], [], [], []
+    for corner, flank, inward in zip(corners, down, (1.0, -1.0)):
+        split = unit((inward + flank[0], flank[1]))
+        interior = math.acos(inward * flank[0])
+        reach_r = r / math.sin(interior / 2.0)
+        centre = (corner[0] + split[0] * reach_r, corner[1] + split[1] * reach_r)
+        along = (centre[0] - corner[0]) * flank[0] + (centre[1] - corner[1]) * flank[1]
+        on_flank = (corner[0] + along * flank[0], corner[1] + along * flank[1])
+        on_flat = (centre[0], flat_y)
+        start, end = (
+            math.atan2(p[1] - centre[1], p[0] - centre[0]) for p in (on_flat, on_flank)
+        )
+        nearest.append(
+            min(
+                math.hypot(
+                    centre[0] + r * math.cos(start + (end - start) * k / 400) - axis[0],
+                    centre[1] + r * math.sin(start + (end - start) * k / 400) - axis[1],
+                )
+                for k in range(401)
+            )
+        )
+        flat_tangents.append(on_flat[0])
+        flank_tops.append(on_flank[1])
+        # The grip's contact line: the axis's foot on the flank.
+        foot = (axis[0] - corner[0]) * flank[0] + (axis[1] - corner[1]) * flank[1]
+        contacts.append(corner[1] + foot * flank[1])
+    body_r = spec.marker.BODY_FRONT_DIA / 2.0
+    return {
+        "axis_z": axis[0],
+        "axis_y": axis[1],
+        "chord": math.sqrt(body_r**2 - axis[1] ** 2),
+        "flat": flat_y - (axis[1] + grip_r),
+        "round": min(nearest) - grip_r,
+        "contact": min(
+            min(contacts), *(top - y for top, y in zip(flank_tops, contacts))
+        ),
+        "straight": flat_tangents[1] - flat_tangents[0],
+    }
+
+
+def _printed_seats(mouth_band: float, flat_band: float) -> list[dict[str, float]]:
+    from _printed_tolerance import angular_band_deg
+
+    angles = (
+        spec.V_FLANK_ANGLE_DEG - angular_band_deg(),
+        spec.V_FLANK_ANGLE_DEG + angular_band_deg(),
+    )
+    return [
+        _seat_by_bisector(z0, z1, front, back, width, spec.V_APEX_FILLET_R)
+        for z0 in (spec.V_MOUTH_Z0 - mouth_band, spec.V_MOUTH_Z0 + mouth_band)
+        for z1 in (spec.V_MOUTH_Z1 - mouth_band, spec.V_MOUTH_Z1 + mouth_band)
+        for front in angles
+        for back in angles
+        for width in (spec.V_FLAT_WIDTH - flat_band, spec.V_FLAT_WIDTH + flat_band)
+    ]
+
+
 def test_title_block_bands_keep_walls_lands_and_clear_the_marker_body() -> None:
     import pn_pen_frame_spec as frame
-    from _printed_tolerance import angular_band_deg
 
     places = spec.DRAWING_PRECISION_BY_NAME
     # Simplified E (2026-10 ruling, no named exception): every depth-wise
@@ -304,39 +384,38 @@ def test_title_block_bands_keep_walls_lands_and_clear_the_marker_body() -> None:
     for name in stations:
         assert places[name] == 1, name
     assert places["NeckZ0"] == places["NeckZ1"] == 2
-    assert places["VAngle"] == 0
+    assert places["VFlankAngle"] == 0
     assert {name for name, n in places.items() if n >= 3} == {"PivotDia"}
     assert spec.V_MOUTH_Z0 == 3.0 and spec.V_MOUTH_Z1 == 15.0
     assert spec.RELIEF_Z0 == 1.0 and spec.RELIEF_Z1 == 17.0
     assert spec.NECK_DEPTH == 18.0 and spec.BODY_DEPTH == 22.2
     station = spec.depth_station
-    # Linear bands; the V's angle prints whole degrees on the angular row.
-    band = {name: printed_band_mm(n) for name, n in places.items() if name != "VAngle"}
-    body_r = spec.marker.BODY_FRONT_DIA / 2.0
-    grip_r = spec.marker.BARREL_DIA / 2.0
+    # Linear bands; the flanks' angle prints whole degrees on the angular row.
+    band = {
+        name: printed_band_mm(n) for name, n in places.items() if name != "VFlankAngle"
+    }
 
     def stack(b: dict[str, float]) -> dict[str, float]:
-        # The seated body's widest chord over the V's printed corners: its
-        # angle (the title block's +/-1 deg) and mouth (both edges' bands);
-        # the flat's height is their reference and carries no band.  The V's
-        # centre moves by the mean of its two edges' bands.
-        mouth_band = b["VMouthZ0"] + b["VMouthZ1"]
-        centre_band = mouth_band / 2.0
-        chords = []
-        for angle in (-angular_band_deg(), angular_band_deg()):
-            for mouth in (-mouth_band, mouth_band):
-                half = math.radians(spec.V_ANGLE_DEG + angle) / 2.0
-                a = ((spec.V_MOUTH_WIDTH + mouth) / 2.0) / math.tan(half)
-                axis_y = a - grip_r / math.sin(half)
-                chords.append(math.sqrt(body_r**2 - axis_y**2))
-        chord = max(chords)
-        centre = station((spec.V_MOUTH_Z0 + spec.V_MOUTH_Z1) / 2.0)
+        # The seated body over the V's printed corners: each mouth edge at its
+        # band and each flank at the title block's +/-1 deg on its own, so the
+        # V may lean and its axis shift toward either wall; the flat's height
+        # is their reference and carries no band.
+        assert b["VMouthZ0"] == b["VMouthZ1"]
+        seats = _printed_seats(b["VMouthZ0"], b["VFlatWidth"])
         relief_z0 = station(spec.RELIEF_Z0)
         relief_z1 = station(spec.RELIEF_Z1)
+        # The axis is no printed station: shift it unrounded.
+        axes = [seat["axis_z"] - spec.BODY_Z0 for seat in seats]
         return {
-            "chord": chord,
-            "near": (centre - centre_band) - chord - (relief_z0 + b["ReliefZ0"]),
-            "far": (relief_z1 - b["ReliefZ1"]) - (centre + centre_band) - chord,
+            "chord": max(seat["chord"] for seat in seats),
+            "near": min(
+                axis - seat["chord"] - (relief_z0 + b["ReliefZ0"])
+                for axis, seat in zip(axes, seats, strict=True)
+            ),
+            "far": min(
+                (relief_z1 - b["ReliefZ1"]) - axis - seat["chord"]
+                for axis, seat in zip(axes, seats, strict=True)
+            ),
             "near_wall": relief_z0 - b["ReliefZ0"],
             "far_wall": spec.BODY_DEPTH - b["Depth"] - (relief_z1 + b["ReliefZ1"]),
             "near_land": (station(spec.V_MOUTH_Z0) - b["VMouthZ0"])
@@ -359,12 +438,12 @@ def test_title_block_bands_keep_walls_lands_and_clear_the_marker_body() -> None:
     assert worst["far_land"] == pytest.approx(1.69)
     for name in ("near_wall", "far_wall", "near_land", "far_land"):
         assert round(worst[name], 6) >= 1.5, name
-    assert spec.BODY_HALF_CHORD_PRINTED_MAX == pytest.approx(worst["chord"])
-    assert worst["chord"] == pytest.approx(6.116, abs=5e-4)
+    # The widest body chord: both flanks at 44 deg, the mouth at its widest.
+    assert worst["chord"] == pytest.approx(6.122, abs=5e-4)
     assert spec.BODY_NEAR_CLEARANCE_PRINTED_MIN == pytest.approx(worst["near"])
     assert spec.BODY_FAR_CLEARANCE_PRINTED_MIN == pytest.approx(worst["far"])
-    assert worst["near"] == pytest.approx(0.284, abs=5e-4)
-    assert worst["far"] == pytest.approx(0.284, abs=5e-4)
+    assert worst["near"] == pytest.approx(0.357, abs=5e-4)
+    assert worst["far"] == pytest.approx(0.357, abs=5e-4)
     # The neck slides through the stirrup's window at its printed limits; the
     # neck faces' .XX is load-bearing: at .X the neck could print 19.6 wide.
     assert spec.NECK_WIDTH_PRINTED_MAX == pytest.approx(worst["neck"])
@@ -582,14 +661,16 @@ def test_tap_callout_says_drill_and_ends_in_the_pivot_bore() -> None:
     assert _DRAWING_SOURCE.count("_set_tap_callout_text(") == 2  # def + call
 
 
-def test_v_is_its_angle_mouth_and_apex_flat_with_a_reference_height() -> None:
+def test_v_is_its_flank_angles_mouth_and_apex_flat_with_a_reference_height() -> None:
     import pn_pen_carriage_geom as carriage
-    from _printed_tolerance import angular_band_deg
 
-    # Review r11 (rules 3/10): the V prints its included angle (driving, the
-    # title block's +/-1 deg); final review: both mouth edges from the front
-    # face.  Blind review (rule 16): the apex is a flat a cutter leaves, its
-    # width driving at .X and its height a driven reference.
+    # Review r11 (rules 3/10): the V's angle prints driving at the title
+    # block's +/-1 deg; final review: both mouth edges from the front face.
+    # Blind review (rule 16): the apex is a flat a cutter leaves, its width
+    # driving at .X and its height a driven reference.  Blind review (rule
+    # 1): an included angle left both flanks free to tilt together, so each
+    # flank prints its own angle to the bottom face, "2X 45°".
+    assert spec.V_FLANK_ANGLE_DEG == 45.0
     assert spec.V_ANGLE_DEG == 90.0
     assert spec.V_MOUTH_WIDTH == 12.0
     assert (spec.V_MOUTH_Z0 + spec.V_MOUTH_Z1) / 2.0 == spec.DEPTH_MID_Z
@@ -605,7 +686,7 @@ def test_v_is_its_angle_mouth_and_apex_flat_with_a_reference_height() -> None:
     assert carriage.BLOCK_BOTTOM_Y == pytest.approx(366.2)
     assert spec.REFERENCE_DIMENSIONS == (("VGrooveProfile", "VFlatY"),)
     assert {
-        "VAngle",
+        "VFlankAngle",
         "VFlatWidth",
         "VFlatY",
         "VMouthZ0",
@@ -621,35 +702,66 @@ def test_v_is_its_angle_mouth_and_apex_flat_with_a_reference_height() -> None:
     }
     assert spec.DRAWING_PRECISION["VGrooveProfile"]["VFlatY"] == 1
     assert spec.DRAWING_PRECISION["VGrooveProfile"]["VFlatWidth"] == 1
-    # The grip seats on the flanks: at the widest printed flat and either
-    # printed angle the flat stays clear over the grip's top, and at the
-    # narrowest it is still a flat.
-    grip_r = spec.marker.BARREL_DIA / 2.0
-    widest = spec.V_FLAT_WIDTH + printed_band_mm(1)
-    for angle in (-angular_band_deg(), angular_band_deg()):
-        half = math.radians(spec.V_ANGLE_DEG + angle) / 2.0
-        gap = grip_r / math.sin(half) - grip_r - (widest / 2.0) / math.tan(half)
-        assert gap >= spec.V_FLAT_GRIP_CLEARANCE_PRINTED_MIN - 1e-9
-    assert spec.V_FLAT_GRIP_CLEARANCE_PRINTED_MIN == pytest.approx(0.754, abs=1e-3)
-    assert spec.V_FLAT_WIDTH - printed_band_mm(1) == pytest.approx(1.2)
+    # The grip seats on both flanks: each flank at its own printed limit,
+    # each mouth edge at its .X and the flat at its .X, it stays 0.72 under
+    # the flat (1.20 nominal), each contact line at least 1.38 up its flank
+    # and inside its straight run.
+    seats = _printed_seats(printed_band_mm(1), printed_band_mm(1))
+    assert len(seats) == 32
+    flat = min(seat["flat"] for seat in seats)
+    assert spec.V_FLAT_GRIP_CLEARANCE_PRINTED_MIN == pytest.approx(flat)
+    assert flat == pytest.approx(0.716, abs=1e-3)
+    contact = min(seat["contact"] for seat in seats)
+    assert spec.V_CONTACT_MARGIN_PRINTED_MIN == pytest.approx(contact)
+    assert contact == pytest.approx(1.384, abs=1e-3)
+    nominal = _seat_by_bisector(
+        spec.V_MOUTH_Z0,
+        spec.V_MOUTH_Z1,
+        spec.V_FLANK_ANGLE_DEG,
+        spec.V_FLANK_ANGLE_DEG,
+        spec.V_FLAT_WIDTH,
+        spec.V_APEX_FILLET_R,
+    )
+    assert nominal["axis_y"] == pytest.approx(spec.MARKER_AXIS_Y)
+    assert nominal["flat"] == pytest.approx(1.195, abs=1e-3)
     assert spec.V_CONTACT_Y < spec.V_FLAT_Y
-    # The build: the flat's height is made driven before the angle drives, so
-    # the sketch is never over-defined; the width and the angle follow
-    # globals; the reference display (parentheses, no tolerance) is read back.
+    # The spec's seat agrees with this one at every printed corner.
+    for mine, theirs in zip(seats, spec.V_PRINTED_CORNERS, strict=True):
+        assert (mine["axis_z"], mine["axis_y"]) == pytest.approx(theirs.axis)
+        assert mine["flat"] == pytest.approx(theirs.flat_clearance)
+        assert mine["round"] == pytest.approx(theirs.round_clearance, abs=1e-6)
+        assert mine["contact"] == pytest.approx(theirs.contact_margin)
+        assert mine["straight"] == pytest.approx(theirs.flat_straight)
+    # The build: the flat's height is made driven before the angles drive, so
+    # the sketch is never over-defined (no equal-flanks relation: each flank
+    # has its own angle); the width and both angles follow globals; the
+    # reference display (parentheses, no tolerance) is read back.
     body = _PART_SOURCE[_PART_SOURCE.index("async def _v_groove(") :]
     body = body[: body.index("\nasync def ")]
     assert "flank_a, flat, flank_b, mouth = await add_line_chain" in body
     assert 'add_sketch_constraint(flat, None, "horizontal")' in body
+    assert '"equal"' not in body
     driven = body.index('_make_driven(adapter, flat_height, "V apex flat height")')
-    angle = body.index("_add_driving_v_angle(adapter, flank_a, flank_b)")
-    assert driven < body.index('dims.record("VFlatWidth", \'"VFlatWidth"\')') < angle
+    front = body.index("_add_driving_flank_angle(\n        adapter, flank_a, mouth,")
+    back = body.index("_add_driving_flank_angle(\n        adapter, flank_b, mouth,")
+    width = body.index('dims.record("VFlatWidth", \'"VFlatWidth"\')')
+    assert driven < width < front < back
+    other = body.index('dims.record("OtherVFlankAngle", \'"VFlankAngle"\')')
+    assert (
+        front
+        < other
+        < back
+        < body.index('dims.record("VFlankAngle", \'"VFlankAngle"\')')
+    )
     assert 'dims.record("VFlatY")\n' in body
-    assert 'dims.record("VAngle", \'"VAngle"\')' in body
     assert 'dims.record("VMouthZ0", \'"VMouthFrontZ"\')' in body
     assert 'dims.record("VMouthZ1", \'"VMouthBackZ"\')' in body
     assert '"VMouth"' not in _PART_SOURCE
+    assert '"VAngle"' not in _PART_SOURCE
     assert '"vertical_distance"' in body and '"horizontal_distance"' in body
-    assert 'set_global(adapter, "VAngle", f"{V_ANGLE_DEG}deg")' in _PART_SOURCE
+    assert (
+        'set_global(adapter, "VFlankAngle", f"{V_FLANK_ANGLE_DEG}deg")' in _PART_SOURCE
+    )
     assert '("VFlatWidth", V_FLAT_WIDTH)' in _PART_SOURCE
     assert '("VFlatY", V_FLAT_Y)' not in _PART_SOURCE
     assert "dimension.DrivenState = 2" in _PART_SOURCE
@@ -658,13 +770,17 @@ def test_v_is_its_angle_mouth_and_apex_flat_with_a_reference_height() -> None:
     assert _PART_SOURCE.index("_author_reference_dimensions(adapter)\n") < (
         _PART_SOURCE.index("clear_dimensions_for_drawing(adapter)")
     )
-    # The angle's text point (which picks the wedge it measures) lies inside
-    # the V: under the flat, over the mouth, between the flanks.
-    u, v = part._v_angle_text_point()
-    apex_u = -spec.DEPTH_MID_Z
-    assert 0.0 < v < spec.V_FLAT_Y
-    half_width = (spec.V_APEX_Y - v) * math.tan(math.radians(spec.V_ANGLE_DEG / 2))
-    assert abs(u - apex_u) < half_width
+    # Each angle's text point (which picks the wedge it measures) lies in the
+    # groove just over its mouth corner, between the bottom face and its
+    # flank: so each measures the flank's 45 deg, not its 135.
+    for (u, v), mouth_z, sign in zip(
+        part._flank_angle_text_points(),
+        (spec.V_MOUTH_Z0, spec.V_MOUTH_Z1),
+        (1.0, -1.0),
+        strict=True,
+    ):
+        run = sign * (-u - mouth_z)
+        assert 0.0 < v < run * math.tan(math.radians(spec.V_FLANK_ANGLE_DEG))
 
 
 def test_apex_flat_corners_are_rounds_at_a_max_limit_clear_of_the_grip() -> None:
@@ -672,8 +788,6 @@ def test_apex_flat_corners_are_rounds_at_a_max_limit_clear_of_the_grip() -> None
     # corners.  Each takes any chamfer-mill tip or end-mill corner up to
     # R0.5, printed "2X R0.5 MAX": swTolMAX prints the nominal, so the model
     # carries the limit and its band runs from sharp to it.
-    from _printed_tolerance import angular_band_deg
-
     assert spec.V_APEX_FILLET_R == 0.5
     assert spec.V_APEX_FILLET_BAND == (0.0, -spec.V_APEX_FILLET_R)
     assert spec.V_APEX_FILLET_TOL_TYPE == 6  # swTolMAX
@@ -691,35 +805,18 @@ def test_apex_flat_corners_are_rounds_at_a_max_limit_clear_of_the_grip() -> None
     assert "await adapter.add_fillet(\n            V_APEX_FILLET_R," in _PART_SOURCE
     assert '("VApexFilletR", V_APEX_FILLET_R)' in _PART_SOURCE
     assert "(fillet_dim[0], '\"VApexFilletR\"')" in _PART_SOURCE
-    # Worst case: the rounds at R0.5, the flat and the angle at either printed
-    # limit.  The grip clears them by 0.81 (the flat by 0.75), and the
-    # narrowest flat (1.2) still runs straight between the two tangent points.
+    # Worst case: the rounds at R0.5, each flank's angle, each mouth edge and
+    # the flat at their printed limits.  The grip clears the rounds by 0.78
+    # (the flat by 0.72), and the narrowest flat (1.2) still runs straight
+    # between the two tangent points.
+    seats = _printed_seats(printed_band_mm(1), printed_band_mm(1))
     clearance = spec.V_APEX_FILLET_GRIP_CLEARANCE_PRINTED_MIN
-    assert clearance == pytest.approx(0.810, abs=1e-3)
+    assert clearance == pytest.approx(0.775, abs=1e-3)
+    assert clearance == pytest.approx(min(seat["round"] for seat in seats), abs=1e-6)
     assert min(clearance, spec.V_FLAT_GRIP_CLEARANCE_PRINTED_MIN) >= 0.25
-    grip_r = spec.marker.BARREL_DIA / 2.0
-    for angle in (-angular_band_deg(), angular_band_deg()):
-        for width in (-printed_band_mm(1), printed_band_mm(1)):
-            half = math.radians(spec.V_ANGLE_DEG + angle) / 2.0
-            flat = spec.V_FLAT_WIDTH + width
-            # Sampled along the arc, its centre r under the flat and r off
-            # the flank, from the flank's normal (half) up to the flat's.
-            tangent = spec.V_APEX_FILLET_R * math.tan(math.pi / 4.0 - half / 2.0)
-            assert 2.0 * tangent < flat
-            centre = (
-                flat / 2.0 - tangent,
-                -(flat / 2.0) / math.tan(half) - spec.V_APEX_FILLET_R,
-            )
-            axis_y = -grip_r / math.sin(half)
-            nearest = min(
-                math.hypot(
-                    centre[0] + spec.V_APEX_FILLET_R * math.cos(bearing),
-                    centre[1] + spec.V_APEX_FILLET_R * math.sin(bearing) - axis_y,
-                )
-                for step in range(201)
-                for bearing in [half + (math.pi / 2.0 - half) * step / 200]
-            )
-            assert nearest - grip_r >= clearance - 1e-9
+    straight = spec.V_FLAT_STRAIGHT_PRINTED_MIN
+    assert straight == pytest.approx(min(seat["straight"] for seat in seats))
+    assert straight == pytest.approx(0.776, abs=1e-3)
     # The rounds' section and the groove's finished section feed the volumes.
     assert spec.V_APEX_FILLET_AREA == pytest.approx(
         2.0 * 0.25 * (math.tan(math.pi / 8.0) - math.pi / 8.0)
@@ -753,24 +850,29 @@ def test_apex_round_radius_text_stays_off_the_part_in_the_end_view() -> None:
 
 
 def test_v_dimension_text_stays_off_the_part_in_the_end_view() -> None:
-    # Blind review (rule 14): the angle's text sat in the V.  It now sits on
-    # the V's axis under the bottom face (y 0.156), its arc wholly inside the
-    # wedge's mouth so it meets neither mouth edge's extension line; the
-    # flat's width prints over the top face and its height right of the body.
+    # Blind review (rule 14): the angle's text sat in the V.  The flanks'
+    # "2X 45°" now measures the back flank at its mouth corner in the wedge
+    # opposite the groove's (between the bottom face's line and the flank's,
+    # both run on), under the bottom face and right of the body; the flat's
+    # width prints over the top face and its height right of the body.
     keep = drawing.RIGHT_KEEP
-    angle_x, angle_y = keep["VAngle"]
-    assert angle_x == pytest.approx(drawing._rz(drawing._CZ))
-    bottom = drawing._ry(0.0)
-    assert angle_y + 0.0017 < bottom - 0.003
-    # The arc runs through the text, about the theoretical apex: it ends on
-    # the flanks over the mouth corners, and under the flat.
-    radius_mm = (drawing._ry(spec.V_APEX_Y) - angle_y) / drawing._S
-    flank_end_y = spec.V_APEX_Y - radius_mm * math.cos(math.radians(45.0))
-    assert 0.5 < flank_end_y < spec.V_FLAT_Y
-    # Its text clears the rows: the neck's front-face row ends at x 0.196,
-    # the mouth edges' row text sits 4.5 mm under it.
-    assert angle_x - 0.0045 > drawing._rz(0.0) + 0.02
-    assert keep["VMouthZ0"][1] + 0.0017 < angle_y - 0.0018 - 0.002
+    angle_x, angle_y = keep["VFlankAngle"]
+    corner = (drawing._rz(spec.V_MOUTH_Z1), drawing._ry(0.0))
+    bearing = math.degrees(math.atan2(angle_y - corner[1], angle_x - corner[0]))
+    assert -spec.V_FLANK_ANGLE_DEG < bearing < 0.0
+    half_text = 0.0075  # "2X 45°", 6 characters at ~2.5 mm
+    assert angle_y + 0.0017 < drawing._ry(0.0) - 0.003
+    assert angle_x - half_text > drawing._rz(spec.BODY_Z1) + 0.001
+    assert angle_x + half_text < drawing._sz(spec.BODY_Z0) - 0.003
+    # Over the iso (top ~0.121) and right of the rows' lines, which end at
+    # the body's back face (the depth's) or left of it.
+    assert angle_y - 0.0018 > 0.121 + 0.01
+    # The arc, about the corner through the text, runs clear right of the
+    # depth's extension line (the body's back face) from the bottom face's
+    # line down to the flank's.
+    run = math.hypot(angle_x - corner[0], angle_y - corner[1])
+    flank_end_x = corner[0] + run * math.cos(math.radians(spec.V_FLANK_ANGLE_DEG))
+    assert flank_end_x > drawing._rz(spec.BODY_Z1) + 0.005
     # The flat's width: its line over the top face, its text under the tap's
     # callout rows (~0.249 / 0.255, from ~0.247).
     width_x, width_y = keep["VFlatWidth"]

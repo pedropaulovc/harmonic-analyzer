@@ -46,6 +46,7 @@ no general note.
 from __future__ import annotations
 
 import math
+from typing import NamedTuple
 
 import _config
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
@@ -73,15 +74,18 @@ def depth_station(z: float) -> float:
 
 
 # --- V-groove (grip seat), x 0..RELIEF_X0 ---
-# The print defines the V by what seats the grip: its included angle and both
-# mouth edges on the bottom face, each a baseline station from the body's
-# front face (all three driving in VGrooveProfile).  The mouth width and the
-# theoretical apex height follow from them.  The apex is not cut sharp
+# The print defines the V by what seats the grip: each flank's angle to the
+# bottom face and both mouth edges on that face, each a baseline station from
+# the body's front face (all four driving in VGrooveProfile), so each flank
+# is fixed on its own (blind review: an included angle left them free to
+# tilt together).  The mouth width and the theoretical apex height follow
+# from them.  The apex is not cut sharp
 # (drawing-guidelines.md rule 16): a flat across it, V_FLAT_WIDTH wide
 # (driving, .X), is the tip a 90 deg chamfer mill or a small end mill leaves.
-# The flat's height is what the angle, the mouth and the width leave; it
-# prints as a reference.
-V_ANGLE_DEG = 90.0
+# The flat's height is what the flanks and the width leave; it prints as a
+# reference.
+V_FLANK_ANGLE_DEG = 45.0  # each flank to the bottom face; prints "2X 45" deg
+V_ANGLE_DEG = 180.0 - 2.0 * V_FLANK_ANGLE_DEG  # the included angle, 90
 V_MOUTH_Z0 = 3.0  # front mouth edge (part frame; prints 5.1 from the datum)
 V_MOUTH_Z1 = 15.0  # back mouth edge (part frame; prints 17.1)
 V_MOUTH_WIDTH = V_MOUTH_Z1 - V_MOUTH_Z0
@@ -268,7 +272,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OutlineProfile": {"Length"},
     "Block": {"Height"},
     "VGrooveProfile": {
-        "VAngle",
+        "VFlankAngle",
         "VFlatWidth",
         "VFlatY",
         "VMouthZ0",
@@ -287,10 +291,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 REFERENCE_SKETCHES = ("ReliefReference", "PivotReference")
 SECTION_REFERENCE_SKETCHES = REFERENCE_SKETCHES
 # Places carry the title block's tolerance (drawing-guidelines.md rule 3),
-# .X by default.  The V prints as its included angle (whole degrees, the
-# title block's +/-1), its two mouth edges and its apex flat's width; the
-# flat's height they leave is a reference, (5.0), driven in the sketch.  The
-# flat's two rounds print their single limit, R0.5 MAX.  .XX,
+# .X by default.  The V prints each flank's angle to the bottom face (one
+# "2X 45°" for both, whole degrees, the title block's +/-1), its two mouth
+# edges and its apex flat's width; the flat's height they leave is a
+# reference, (5.0), driven in the sketch.  The flat's two rounds print their
+# single limit, R0.5 MAX.  .XX,
 # the title block's routine location row, where a mate needs it:
 # * the tap's and the pivot bore's station from the paper end (SetScrewX,
 #   PivotX): the tap must meet the bore it locks, and the bore must drop
@@ -305,7 +310,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutlineProfile": {"Length": 1},
     "Block": {"Height": 1},
     "VGrooveProfile": {
-        "VAngle": 0,
+        "VFlankAngle": 0,
         "VFlatWidth": 1,
         "VFlatY": 1,
         "VMouthZ0": 1,
@@ -322,8 +327,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SetScrewHole": {"SetScrewX": 2, "SetScrewY": 1},
 }
 # The one driven sketch dimension the print shows, parenthesised as a
-# reference (no tolerance): the apex flat's height, which the V's angle, mouth
-# edges and flat width fix.
+# reference (no tolerance): the apex flat's height, which the flanks' angles,
+# mouth edges and flat width fix.
 REFERENCE_DIMENSIONS: tuple[tuple[str, str], ...] = (("VGrooveProfile", "VFlatY"),)
 if round(V_FLAT_Y, DRAWING_PRECISION["VGrooveProfile"]["VFlatY"]) != V_FLAT_Y:
     raise AssertionError("the V flat's reference height must print exactly")
@@ -389,103 +394,161 @@ if PIVOT_BORE_STEP_CLEARANCE_PRINTED_MIN < 0.0:
     raise AssertionError("at its printed limits the pivot bore breaks the step wall")
 
 
-def _body_half_chord_at_bottom(angle_deg: float, mouth: float) -> float:
-    """The marker body's half-width at the bottom face, its grip seated in a
-    V of this included angle and mouth (both flanks touching the grip)."""
-    half = math.radians(angle_deg / 2.0)
-    apex_y = (mouth / 2.0) / math.tan(half)
-    axis_y = apex_y - (marker.BARREL_DIA / 2.0) / math.sin(half)
-    return math.sqrt(_BODY_R**2 - axis_y**2)
+class SeatedV(NamedTuple):
+    """The grip seated against both flanks of one V (part frame z, y)."""
+
+    axis: tuple[float, float]  # the grip's (and the body's) axis
+    flat_clearance: float  # the flat over the grip
+    round_clearance: float  # the nearer apex round to the grip
+    contact_margin: float  # each contact line inside its flank's straight run
+    flat_straight: float  # the flat's straight run between its rounds
+    body_half_chord: float  # the body's half-width at the bottom face
 
 
-# The V's centre (the body's) is the mean of its two edge stations, +/- the
-# mean of their bands; its mouth is their difference, +/- the sum.  Taken as
-# independent (a bound: one edge cannot both widen the mouth and pull the
-# centre toward the wall it does not move), the widest body chord at the
-# bottom face is over the printed angle (the title block's +/-1 deg) and that
-# mouth band: 6.116 at 89 deg and the widest mouth, 5.965 nominal.  The flat's
-# height is their reference and adds no band of its own.
-V_CENTRE_BAND = (_band("VMouthZ0") + _band("VMouthZ1")) / 2.0
-V_MOUTH_BAND = _band("VMouthZ0") + _band("VMouthZ1")
-BODY_HALF_CHORD_PRINTED_MAX = max(
-    _body_half_chord_at_bottom(V_ANGLE_DEG + angle, V_MOUTH_WIDTH + mouth)
-    for angle in (-angular_band_deg(), angular_band_deg())
-    for mouth in (-V_MOUTH_BAND, V_MOUTH_BAND)
-)
-_V_CENTRE_STATION = depth_station((V_MOUTH_Z0 + V_MOUTH_Z1) / 2.0)
-BODY_NEAR_CLEARANCE_PRINTED_MIN = (
-    (_V_CENTRE_STATION - V_CENTRE_BAND)
-    - BODY_HALF_CHORD_PRINTED_MAX
-    - (depth_station(RELIEF_Z0) + _band("ReliefZ0"))
-)  # 0.28
-BODY_FAR_CLEARANCE_PRINTED_MIN = (
-    (depth_station(RELIEF_Z1) - _band("ReliefZ1"))
-    - (_V_CENTRE_STATION + V_CENTRE_BAND)
-    - BODY_HALF_CHORD_PRINTED_MAX
-)  # 0.28
+def _arc_distance(
+    point: tuple[float, float],
+    centre: tuple[float, float],
+    radius: float,
+    span: tuple[float, float],
+) -> float:
+    """Distance from ``point`` to the arc of ``radius`` about ``centre`` that
+    runs between the two bearings in ``span`` (radians, the shorter way)."""
+    lo, hi = sorted(span)
+    bearing = math.atan2(point[1] - centre[1], point[0] - centre[0])
+    ends = [
+        math.hypot(
+            point[0] - centre[0] - radius * math.cos(angle),
+            point[1] - centre[1] - radius * math.sin(angle),
+        )
+        for angle in (lo, hi)
+    ]
+    if lo <= bearing <= hi:
+        ends.append(math.hypot(point[0] - centre[0], point[1] - centre[1]) - radius)
+    return min(ends)
+
+
+def seated_v(
+    mouth_z0: float,
+    mouth_z1: float,
+    front_deg: float,
+    back_deg: float,
+    flat_width: float,
+    round_r: float,
+) -> SeatedV:
+    """The grip seated in a V cut to these sizes.  Each flank stands on its
+    own mouth edge at its own angle to the bottom face, so the two tilt
+    independently and the V may lean."""
+    a0, a1 = math.radians(front_deg), math.radians(back_deg)
+    s0, c0, s1, c1 = math.sin(a0), math.cos(a0), math.sin(a1), math.cos(a1)
+    t0, t1 = s0 / c0, s1 / c1
+    apex_z = (t0 * mouth_z0 + t1 * mouth_z1) / (t0 + t1)
+    apex_y = t0 * (apex_z - mouth_z0)
+    # The axis lies _GRIP_R inside each flank: n . (p - mouth) = _GRIP_R with
+    # n the flank's normal into the groove, (s0, -c0) front and (-s1, -c1)
+    # back.
+    det = -(s0 * c1 + c0 * s1)
+    front_rhs, back_rhs = _GRIP_R + s0 * mouth_z0, _GRIP_R - s1 * mouth_z1
+    axis = (
+        (c0 * back_rhs - c1 * front_rhs) / det,
+        (s0 * back_rhs + s1 * front_rhs) / det,
+    )
+    contacts = (axis[1] + _GRIP_R * c0, axis[1] + _GRIP_R * c1)
+    flat_y = apex_y - flat_width / (1.0 / t0 + 1.0 / t1)
+    flat_ends = (
+        apex_z - (apex_y - flat_y) / t0,
+        apex_z + (apex_y - flat_y) / t1,
+    )
+    # Each round turns through its flank's angle: it meets the flat and the
+    # flank r tan(angle / 2) from the corner; its arc runs from the flat's
+    # normal (up) to the flank's, both into the brass.
+    tangents = (round_r * math.tan(a0 / 2.0), round_r * math.tan(a1 / 2.0))
+    rounds = (
+        (
+            (flat_ends[0] + tangents[0], flat_y - round_r),
+            (math.pi / 2.0, math.pi / 2.0 + a0),
+        ),
+        (
+            (flat_ends[1] - tangents[1], flat_y - round_r),
+            (math.pi / 2.0 - a1, math.pi / 2.0),
+        ),
+    )
+    flank_straight_tops = (
+        flat_y - tangents[0] * s0,
+        flat_y - tangents[1] * s1,
+    )
+    return SeatedV(
+        axis=axis,
+        flat_clearance=flat_y - (axis[1] + _GRIP_R),
+        round_clearance=min(
+            _arc_distance(axis, centre, round_r, span) for centre, span in rounds
+        )
+        - _GRIP_R,
+        contact_margin=min(
+            min(contacts),
+            min(top - y for top, y in zip(flank_straight_tops, contacts)),
+        ),
+        flat_straight=flat_width - sum(tangents),
+        body_half_chord=(
+            math.sqrt(_BODY_R**2 - axis[1] ** 2) if axis[1] < 0.0 else _BODY_R
+        ),
+    )
+
+
+# Every printed corner of the V at once: each mouth edge at its .X, each flank
+# at the title block's +/-1 deg on its own, the flat at its .X, the rounds at
+# their MAX (a smaller round only moves brass away from the grip).
+V_PRINTED_CORNERS = [
+    seated_v(z0, z1, front, back, width, V_APEX_FILLET_R)
+    for z0 in (V_MOUTH_Z0 - _band("VMouthZ0"), V_MOUTH_Z0 + _band("VMouthZ0"))
+    for z1 in (V_MOUTH_Z1 - _band("VMouthZ1"), V_MOUTH_Z1 + _band("VMouthZ1"))
+    for front in (
+        V_FLANK_ANGLE_DEG - angular_band_deg(),
+        V_FLANK_ANGLE_DEG + angular_band_deg(),
+    )
+    for back in (
+        V_FLANK_ANGLE_DEG - angular_band_deg(),
+        V_FLANK_ANGLE_DEG + angular_band_deg(),
+    )
+    for width in (
+        V_FLAT_WIDTH - _band("VFlatWidth"),
+        V_FLAT_WIDTH + _band("VFlatWidth"),
+    )
+]
+# The body, coaxial with the grip, clears both relief walls at their limits:
+# 0.36 each side (the V leaning toward that wall, its mouth shifted there).
+BODY_NEAR_CLEARANCE_PRINTED_MIN = min(
+    seat.axis[0] - seat.body_half_chord - (RELIEF_Z0 + _band("ReliefZ0"))
+    for seat in V_PRINTED_CORNERS
+)  # 0.36
+BODY_FAR_CLEARANCE_PRINTED_MIN = min(
+    (RELIEF_Z1 - _band("ReliefZ1")) - (seat.axis[0] + seat.body_half_chord)
+    for seat in V_PRINTED_CORNERS
+)  # 0.36
 if min(BODY_NEAR_CLEARANCE_PRINTED_MIN, BODY_FAR_CLEARANCE_PRINTED_MIN) <= 0.0:
     raise AssertionError("a printed relief wall may touch the marker body")
-
-
-def _flat_grip_clearance(angle_deg: float, flat_width: float) -> float:
-    """The flat's height over the seated grip's top: both hang from the V's
-    theoretical apex, so the mouth does not enter."""
-    half = math.radians(angle_deg / 2.0)
-    grip_top_under_apex = _GRIP_R / math.sin(half) - _GRIP_R
-    return grip_top_under_apex - (flat_width / 2.0) / math.tan(half)
-
-
-# The grip seats on the flanks, never on the flat: at the widest flat and
-# either printed angle it stays 0.75 under it (1.20 nominal); at the
-# narrowest the flat is still 1.2 wide.
+# The grip seats on both flanks, never on the flat or its rounds: it stays
+# 0.72 under the flat and 0.78 off the rounds (1.20 / 1.15 nominal), each
+# contact line at least 1.38 up its flank and 2.06 under the round's tangent
+# line, and the narrowest flat still runs 0.78 straight between its rounds.
 V_FLAT_GRIP_CLEARANCE_PRINTED_MIN = min(
-    _flat_grip_clearance(V_ANGLE_DEG + angle, V_FLAT_WIDTH + _band("VFlatWidth"))
-    for angle in (-angular_band_deg(), angular_band_deg())
-)  # 0.75
+    seat.flat_clearance for seat in V_PRINTED_CORNERS
+)  # 0.72
+V_APEX_FILLET_GRIP_CLEARANCE_PRINTED_MIN = min(
+    seat.round_clearance for seat in V_PRINTED_CORNERS
+)  # 0.78
+V_CONTACT_MARGIN_PRINTED_MIN = min(
+    seat.contact_margin for seat in V_PRINTED_CORNERS
+)  # 1.38
+V_FLAT_STRAIGHT_PRINTED_MIN = min(
+    seat.flat_straight for seat in V_PRINTED_CORNERS
+)  # 0.78
 if V_FLAT_GRIP_CLEARANCE_PRINTED_MIN < 0.25:
     raise AssertionError("at its printed limits the apex flat may touch the grip")
-if V_FLAT_WIDTH - _band("VFlatWidth") <= 0.0:
-    raise AssertionError("at its printed limits the apex flat vanishes")
-
-
-def _apex_fillet_grip_clearance(
-    angle_deg: float, flat_width: float, radius: float
-) -> float:
-    """The seated grip's clearance to one flat/flank round.  The round's arc
-    faces its corner, away from the grip's axis below it, so its nearest point
-    is a tangent point: on the flat or on the flank.  Frame: the theoretical
-    apex at the origin, the V's axis along y."""
-    half = math.radians(angle_deg / 2.0)
-    tangent = radius * math.tan((math.pi / 2.0 - half) / 2.0)
-    corner = (flat_width / 2.0, -(flat_width / 2.0) / math.tan(half))
-    axis_y = -_GRIP_R / math.sin(half)
-    on_flat = (corner[0] - tangent, corner[1])
-    on_flank = (
-        corner[0] + tangent * math.sin(half),
-        corner[1] - tangent * math.cos(half),
-    )
-    return min(math.hypot(x, y - axis_y) for x, y in (on_flat, on_flank)) - _GRIP_R
-
-
-# The rounds at their MAX, at either printed flat width and angle: the grip
-# clears them by 0.81 (the widest flat, the widest angle), and the narrowest
-# flat still runs straight between them.
-_APEX_FILLET_LIMITS = [
-    (V_ANGLE_DEG + angle, V_FLAT_WIDTH + width)
-    for angle in (-angular_band_deg(), angular_band_deg())
-    for width in (-_band("VFlatWidth"), _band("VFlatWidth"))
-]
-V_APEX_FILLET_GRIP_CLEARANCE_PRINTED_MIN = min(
-    _apex_fillet_grip_clearance(angle, width, V_APEX_FILLET_R)
-    for angle, width in _APEX_FILLET_LIMITS
-)  # 0.81
 if V_APEX_FILLET_GRIP_CLEARANCE_PRINTED_MIN < 0.25:
     raise AssertionError("at its printed limits an apex round may touch the grip")
-if any(
-    2.0 * V_APEX_FILLET_R * math.tan((math.pi / 2.0 - math.radians(angle / 2.0)) / 2.0)
-    >= width
-    for angle, width in _APEX_FILLET_LIMITS
-):
+if V_CONTACT_MARGIN_PRINTED_MIN <= 0.0:
+    raise AssertionError("at its printed limits a grip contact leaves its flank")
+if V_FLAT_STRAIGHT_PRINTED_MIN <= 0.0:
     raise AssertionError("at its printed limits the apex rounds meet across the flat")
 # (feature, dimension) -> (upper, lower) native band.
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
@@ -508,10 +571,12 @@ DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
 }
 if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE.values()):
     raise AssertionError("an above-callout line break would not print")
-# Both relief corners are one radius, and both apex rounds one; the printed
-# one stands for the pair.  A custom prefix replaces SolidWorks' own radius
-# "R", so it carries it (pn_pen_hanger_spec's slot corners).
+# Both relief corners are one radius, both apex rounds one, and both flanks
+# one angle to the bottom face; the printed one stands for the pair.  A
+# custom radius prefix replaces SolidWorks' own "R", so it carries it
+# (pn_pen_hanger_spec's slot corners).
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
+    ("VGrooveProfile", "VFlankAngle"): "2X ",
     ("VApexFillets", "VApexFilletR"): "2X R",
     ("ReliefProfile", "ReliefCornerR"): "2X R",
 }

@@ -22,9 +22,9 @@ Features, in tree order:
 * ``OutlineProfile`` (Top plane, sketch (u, v) = model (X, -Z)) -> ``Block``:
   the plan outline, neck and body, extruded +Y by the height.
 * ``VGrooveProfile`` (Right plane, sketch (u, v) = model (-Z, Y)) ->
-  ``VGroove``: the V, its included angle, both mouth edges (each from the
-  body's front face) and its apex flat's width driving and the flat's height
-  a driven reference,
+  ``VGroove``: the V, each flank's angle to the bottom face, both mouth edges
+  (each from the body's front face) and its apex flat's width driving and the
+  flat's height a driven reference,
   cut +X from the paper end to ``V_CUT_LENGTH``, one corner radius past the
   relief's step.
 * ``VApexFillets``: the rounds where the apex flat meets the flanks, at the
@@ -120,7 +120,7 @@ from pn_pen_v_block_spec import (
     RELIEF_Z1,
     SET_SCREW_TAP_SPEC,
     SET_SCREW_Y,
-    V_ANGLE_DEG,
+    V_FLANK_ANGLE_DEG,
     V_APEX_FILLET_AREA,
     V_APEX_FILLET_BAND,
     V_APEX_FILLET_R,
@@ -298,18 +298,22 @@ async def _outline(adapter, dims: SketchDims) -> None:
         dims.record(name, drive)
 
 
-# Sketch (u, v) of a point inside the V's wedge, under the flat on its axis:
-# where the included angle's text goes, which picks the wedge the angle is
-# measured in (AddSpecificDimension takes the region holding its text point).
-def _v_angle_text_point() -> tuple[float, float]:
-    return (-_Z_MID, V_FLAT_Y / 2.0)
+# Sketch (u, v) of a point inside the groove just over each mouth corner,
+# front then back: where that flank's angle to the bottom face goes, which
+# picks the wedge it is measured in (AddSpecificDimension takes the region
+# holding its text point).
+def _flank_angle_text_points() -> tuple[tuple[float, float], tuple[float, float]]:
+    return ((-(V_MOUTH_Z0 + 1.5), 0.5), (-(V_MOUTH_Z1 - 1.5), 0.5))
 
 
-def _add_driving_v_angle(adapter, flank_a: str, flank_b: str) -> None:
-    """The V's included angle between its two flanks, as a DRIVING dimension.
+def _add_driving_flank_angle(
+    adapter, flank: str, mouth: str, text_point: tuple[float, float], label: str
+) -> None:
+    """One flank's angle to the mouth line (the bottom face), as a DRIVING
+    dimension.
 
     ``build_dt_cone_pivot_post._add_driving_plan_incline``'s recipe: both
-    flanks selected as segments (the adapter's "angular" route selects one
+    lines selected as segments (the adapter's "angular" route selects one
     segment and its vertex and left the farm's first native run, c0b95549c,
     over-defined), the text point inside the wedge, passed as sketch (u, v)
     in the x / y slots and as the model point (Z = -u) in the z slot, so it
@@ -320,11 +324,10 @@ def _add_driving_v_angle(adapter, flank_a: str, flank_b: str) -> None:
     from solidworks_mcp.adapters import sw_type_info as _sw_type_info
     from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
 
-    label = "V included angle"
-    u, v = (value / 1000.0 for value in _v_angle_text_point())
+    u, v = (value / 1000.0 for value in text_point)
     model = adapter.currentModel
     model.ClearSelection2(True)
-    _select_sketch_entities(adapter, [flank_a, flank_b], 0)
+    _select_sketch_entities(adapter, [flank, mouth], 0)
     extension = _sw_type_info.early_bound_or_flag(
         model.Extension, "IModelDocExtension", "AddSpecificDimension"
     )
@@ -341,15 +344,15 @@ def _add_driving_v_angle(adapter, flank_a: str, flank_b: str) -> None:
     display = _early_bound(display, "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     actual_rad = abs(float(dimension.SystemValue))
-    if abs(actual_rad - math.radians(V_ANGLE_DEG)) > 1e-8:
+    if abs(actual_rad - math.radians(V_FLANK_ANGLE_DEG)) > 1e-8:
         raise RuntimeError(
             f"{label}: measured {math.degrees(actual_rad):.6f} deg, "
-            f"expected {V_ANGLE_DEG:.6f} deg"
+            f"expected {V_FLANK_ANGLE_DEG:.6f} deg"
         )
     dimension.DrivenState = 2  # swDimensionDrivenState_e.swDimensionDriving
     if int(dimension.DrivenState) != 2:
         raise RuntimeError(f"{label}: angular dimension did not become driving")
-    _telemetry.success(f"driving {label}: {V_ANGLE_DEG:g} deg")
+    _telemetry.success(f"driving {label}: {V_FLANK_ANGLE_DEG:g} deg")
 
 
 def _make_driven(adapter, dimension_id: str, label: str) -> None:
@@ -373,16 +376,16 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
     front end, LF along the apex flat, LB the flat's back end -> back mouth,
     LC back mouth -> front mouth along the bottom face.  Relations: each
     stub's foot on the origin's level and the stub vertical, LC and LF
-    horizontal, the front mouth on the origin's level, LA = LB (the V
-    symmetric about its axis).  Driving dims: both mouth edges from the
-    datum's foot (real edges on the bottom face, baselines from the face the
-    print locates everything from, so neither is chained from the other and
-    the V is not placed by the depth's symmetry), the flat's width and the
-    included angle -- 4 x 4 + 8 DOF less 12 relations + 12 dims = 0.  The
-    flat's height is what they leave: a DRIVEN dimension the print shows as a
-    reference.  It is made driven before the angle exists, so the sketch is
-    never over-defined.  The stubs are construction geometry: the cut takes
-    only the trapezoid.
+    horizontal, the front mouth on the origin's level.  Driving dims: both
+    mouth edges from the datum's foot (real edges on the bottom face,
+    baselines from the face the print locates everything from, so neither is
+    chained from the other and the V is not placed by the depth's symmetry),
+    the flat's width and each flank's angle to LC (the bottom face), so each
+    flank is fixed on its own -- 4 x 4 + 8 DOF less 11 relations + 13 dims =
+    0.  The flat's height is what they leave: a DRIVEN dimension the print
+    shows as a reference.  It is made driven before the angles exist, so the
+    sketch is never over-defined.  The stubs are construction geometry: the
+    cut takes only the trapezoid.
     """
     datum = await _construction_chord(
         adapter, "VGrooveProfile", (_DATUM_U, 0.0), (_DATUM_U, _STUB)
@@ -462,9 +465,6 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
             f"{flank_a}.start", "origin", "horizontal_points"
         ),
     )
-    check(
-        "V flanks equal", await adapter.add_sketch_constraint(flank_a, flank_b, "equal")
-    )
     await dimension_between(
         adapter,
         f"{datum}.start",
@@ -502,8 +502,15 @@ async def _v_groove(adapter, dims: SketchDims) -> None:
         "V apex flat width",
     )
     dims.record("VFlatWidth", '"VFlatWidth"')
-    _add_driving_v_angle(adapter, flank_a, flank_b)
-    dims.record("VAngle", '"VAngle"')
+    front_text, back_text = _flank_angle_text_points()
+    _add_driving_flank_angle(
+        adapter, flank_a, mouth, front_text, "V front flank to the bottom face"
+    )
+    dims.record("OtherVFlankAngle", '"VFlankAngle"')
+    _add_driving_flank_angle(
+        adapter, flank_b, mouth, back_text, "V back flank to the bottom face"
+    )
+    dims.record("VFlankAngle", '"VFlankAngle"')
 
 
 async def _construction_chord(
@@ -924,8 +931,8 @@ async def build(adapter) -> dict[str, str]:
         ("SetScrewY", SET_SCREW_Y),
     ):
         await set_global(adapter, name, f"{value}mm")
-    # The V's included angle drives its sketch (degrees, not mm).
-    await set_global(adapter, "VAngle", f"{V_ANGLE_DEG}deg")
+    # Both flanks' angle to the bottom face drives its sketch (degrees, not mm).
+    await set_global(adapter, "VFlankAngle", f"{V_FLANK_ANGLE_DEG}deg")
 
     # Each sketch records its dim names + drive equations in emission order;
     # the equations are applied in one deferred batch once the model exists.
