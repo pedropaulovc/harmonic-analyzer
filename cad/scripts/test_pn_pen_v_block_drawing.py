@@ -17,6 +17,7 @@ from _hole_spec import TAP_DRILL_MM
 
 _PART_SOURCE = Path(part.__file__).read_text(encoding="utf-8")
 _DRAWING_SOURCE = Path(drawing.__file__).read_text(encoding="utf-8")
+_SPEC_SOURCE = Path(spec.__file__).read_text(encoding="utf-8")
 _VIEW_KEEPS = (
     drawing.FRONT_KEEP,
     drawing.RIGHT_KEEP,
@@ -259,14 +260,59 @@ def test_printed_bands_keep_both_relief_walls_and_clear_the_marker_body() -> Non
     assert spec.BODY_NEAR_CLEARANCE_PRINTED_MIN == pytest.approx(near)
     assert spec.BODY_FAR_CLEARANCE_PRINTED_MIN == pytest.approx(far)
     assert min(near, far) > 0.0
-    # One functional callout on the governing width, naming the mate; no
-    # dimension in its text.
-    callout = spec.DIMENSION_CALLOUTS["ReliefWidth"]
-    assert callout.startswith("CLEARS MARKER BODY")
-    assert _config.parts("vn-pen-marker")["number"] in callout
-    assert not re.search(r"\d\.\d", callout)
-    for name in ("ReliefZ0", "VMouthZ", "VMouth"):
-        assert name not in spec.DIMENSION_CALLOUTS
+    # Review r9 (rules 3/4): each .XXX station states its own function under
+    # its value, with no dimension in its text; the width names the mate.
+    # Each is load-bearing: taken to .XX alone, it lets a printed relief wall
+    # touch the body.
+    for name in ("ReliefZ0", "ReliefWidth", "VMouthZ", "VMouth"):
+        loose = dict(band, **{name: printed_band_mm(2)})
+        near_loose = (
+            (mouth_z - loose["VMouthZ"])
+            + (spec.V_MOUTH_WIDTH - loose["VMouth"]) / 2.0
+            - chord
+            - (z0 + loose["ReliefZ0"])
+        )
+        far_loose = (
+            (z0 - loose["ReliefZ0"])
+            + (spec.RELIEF_WIDTH - loose["ReliefWidth"])
+            - (mouth_z + loose["VMouthZ"])
+            - (spec.V_MOUTH_WIDTH + loose["VMouth"]) / 2.0
+            - chord
+        )
+        assert min(near_loose, far_loose) <= 0.0, name
+        callout = spec.DIMENSION_CALLOUTS[name]
+        assert not re.search(r"\d\.\d", callout), name
+    assert spec.DIMENSION_CALLOUTS["ReliefZ0"] == "CLEARS\nMARKER BODY"
+    assert spec.DIMENSION_CALLOUTS["VMouthZ"] == "CENTRES\nMARKER"
+    assert spec.DIMENSION_CALLOUTS["VMouth"] == "CENTRES MARKER"
+    width = spec.DIMENSION_CALLOUTS["ReliefWidth"]
+    assert width.startswith("CLEARS MARKER\nBODY")
+    assert _config.parts("vn-pen-marker")["number"] in width
+    # Row widths (~3 mm a character at the sheet's text height) fit the room
+    # draw_pn_pen_v_block's keeps give them: the two stations beside their
+    # views ~31 mm, the mouth 48 mm between its extension lines, the width 52.
+    room = {"ReliefZ0": 11, "VMouthZ": 11, "VMouth": 15, "ReliefWidth": 16}
+    for name, chars in room.items():
+        rows = spec.DIMENSION_CALLOUTS[name].split("\n")
+        assert max(len(row) for row in rows) <= chars, name
+    # The two beside-view blocks (centred on their keeps) stay between the
+    # extension lines either side: the end view's depth (x _rz(18)) and the
+    # section's z 0 foot for the near wall; the front view's SetScrewX line
+    # (x 0.184) and the end view's z 0 corner for the mouth edge.
+    half = 0.0315 / 2.0
+    z0_x = drawing.SECTION_KEEP["ReliefZ0"][0]
+    assert z0_x - half > drawing._rz(spec.BLOCK_DEPTH) + 0.002
+    assert z0_x + half < drawing._sz(0.0) - 0.0015
+    half = 0.021 / 2.0
+    mouth_x = drawing.RIGHT_KEEP["VMouthZ"][0]
+    assert mouth_x - half > 0.184 + 0.005
+    assert mouth_x + half < drawing._rz(0.0) - 0.002
+    # The named-exception row the spec's emitter comments name.
+    policy = (
+        Path(__file__).resolve().parents[1] / "docs" / "drawing-simplicity-policy.md"
+    ).read_text(encoding="utf-8")
+    assert "| MHA-PN-005 pn-pen-v-block |" in policy
+    assert _SPEC_SOURCE.count("Named exception: MHA-PN-005 pn-pen-v-block") == 2
 
 
 def test_section_looks_the_same_way_as_the_paper_end_view() -> None:

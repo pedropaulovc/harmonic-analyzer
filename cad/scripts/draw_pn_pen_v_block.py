@@ -126,23 +126,28 @@ _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0  # sheet metres per model mm
 # front and bottom views and 72 x 72 in the end view and the section.  The
 # front (x 0.040..0.184, y 0.156..0.228) stacks over the bottom view (y
 # 0.054..0.126), both left of the title block (x 0.216); the end view
-# (x 0.219..0.291) and section A-A (x 0.324..0.396) share the front's row.
+# (x 0.215..0.287) and section A-A (x 0.324..0.396) share the front's row.
+# The end view sits 31 mm right of the front and 37 mm left of the section
+# (not centred between them): the relief's near-wall station needs the wider
+# gap for its function rows (SECTION_KEEP), the V's mouth station the
+# narrower one (RIGHT_KEEP).
 # The isometric runs 3:2 (pn_pen_v_block_spec): its ink is 1.5x the 38.3 x
 # 34.5 mm the 1:1 view measured on farm 20261014T005925878Z, 57.5 x 51.8,
 # centred 1.8 mm above its ink.  Centred at (0.315, 0.097) it fills x
 # 0.286..0.344, y 0.069..0.121: 9.8 mm right of the reamed diameter's callout
 # (to x 0.2764, y 0.100 up), 4 mm over the title block (top 0.0651), under the
-# end view's depth row (y 0.132, to x 0.291) and section A-A's 2.500 (y 0.145
+# end view's depth row (y 0.132, to x 0.287) and section A-A's 2.500 (y 0.138
 # up).  Its silhouette slopes down to the right from its top vertex (45%
-# across), so at the caption's left end (x 0.337) its ink tops out ~0.105,
-# 11 mm under the caption (bottom 0.116).  2:1 (77 x 69 mm) fits nowhere
-# between the views, the caption and the title block (65 mm tall at most).
+# across), so at the caption's left end (x 0.330) its ink tops out ~0.110,
+# 10 mm under the caption (bottom ~0.120 there).  2:1 (77 x 69 mm) fits
+# nowhere between the views, the caption and the title block (65 mm tall at
+# most).
 # Its scale note (top-left anchor, ~58 mm wide) beside it at mid-height, from
 # x 0.350 (6 mm right of the ink) to ~0.408, 11 mm inside the border (0.4188),
 # under the caption and over the title block.
 FRONT_CENTER = (0.112, 0.192)
 BOTTOM_CENTER = (FRONT_CENTER[0], 0.090)
-RIGHT_CENTER = (0.255, FRONT_CENTER[1])
+RIGHT_CENTER = (0.251, FRONT_CENTER[1])
 SECTION_CENTER = (0.360, FRONT_CENTER[1])
 ISO_CENTER = (0.315, 0.097)
 ISO_NOTE_XY = (0.350, 0.097)
@@ -215,15 +220,27 @@ FRONT_KEEP = {
 }
 # Paper end: the depth under the view; one row above it the V's front mouth
 # edge from the front face (z 0, the view's left edge) chained with the mouth
-# width.  The 3.000's 12 mm span would cramp its text (~13 mm) between the
-# arrows, so it sits 10 mm left of the z 0 corner (x ~0.203..0.215), in the
-# gap to the front view (whose right edge is at x 0.184; its SetScrewY text is
-# at y 0.180, above), 4 mm clear of the corner's extension line.  The apex
-# height right of the view.
+# width.  Both are .XXX, so each carries its function under its value
+# (pn_pen_v_block_spec.DIMENSION_CALLOUTS), the text block centred on its
+# keep point, rows 5.6 mm apart, the dimension line ~1 mm under the last row
+# (r9 sheet 20261014T011745149Z).
+# * the mouth's "12.000" / "CENTRES MARKER" (~40 mm) centred between its
+#   extension lines (x 0.227 / 0.275, 48 mm apart) at y 0.149: value row in
+#   the V's mouth, the function row ~0.1445..0.148, its line ~0.1435, 6 mm
+#   over the depth's "18.00" (top 0.1377).
+# * the mouth edge's 12 mm span would cramp its text, so "3.000" /
+#   "CENTRES" / "MARKER" (~21 mm wide) sits left of the z 0 corner, its right
+#   end 3.5 mm short of the corner's extension line (x 0.215): x ~0.191..0.212,
+#   rows from ~0.1538 (1 mm under the front view's SetScrewY extension line,
+#   y 0.156, which ends at x 0.195) down to ~0.139, its line at ~0.138, 6 mm
+#   over the depth's line (0.132) and 10 mm over the reamed diameter's
+#   callout (top 0.128); the front view's SetScrewX extension line (x 0.184)
+#   stays 6.5 mm left.
+# The apex height right of the view.
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], _ry(0.0) - 0.020),
     "VMouth": (RIGHT_CENTER[0], _ry(0.0) - 0.007),
-    "VMouthZ": (_rz(0.0) - 0.010, _ry(0.0) - 0.007),
+    "VMouthZ": (_rz(0.0) - 0.014, _ry(0.0) - 0.0095),
     "VApexY": (_rz(BLOCK_DEPTH) + 0.012, _ry(V_APEX_Y / 2.0)),
 }
 # Bottom: all three stations from the paper end below the view, a baseline
@@ -257,13 +274,20 @@ BOTTOM_KEEP = {
 # reference sketches show here (they lie in the cut), every chord on a drawn
 # edge: both relief walls, stubs down the front face and the bore axis from
 # the top face, and the far chamfer face.
-# * the relief's near wall from the front face and its width, one chain 7 mm
-#   under the bottom face, their extension lines on the wall feet; the
-#   2.500's 10 mm span is too short for its text (~13 mm), which sits left of
-#   the z 0 foot (x ~0.309..0.321, y 0.149), clear of the end view's apex
-#   height (x 0.303, y 0.156 up).  The width's two-row function callout
-#   (~46 mm wide, centred under 13.000) stays between the wall feet's
-#   extension lines (x 0.334 / 0.386) and ends ~0.136.
+# * the relief's near wall from the front face and its width, a chain under
+#   the bottom face, their extension lines on the wall feet.  Both are .XXX
+#   and carry their function under the value (pn_pen_v_block_spec), the text
+#   block centred on its keep point, rows 5.6 mm apart, the dimension line
+#   ~1 mm under the last row.  The 2.500's 10 mm span is too short for its
+#   text, so "2.500" / "CLEARS" / "MARKER BODY" (~31 mm wide) sits left of
+#   the z 0 foot, x ~0.290..0.322: 3 mm right of the end view's depth
+#   extension line (x 0.287, down to y 0.132), 2 mm short of the foot's; its
+#   value's top (~0.1538) 2 mm under the end view's apex-height arrow and
+#   extension line (y 0.156, to x 0.300); its line at ~0.138.  The width's
+#   "13.000" / "CLEARS MARKER" / "BODY MHA-VN-060" (~42 mm) centred between
+#   the wall feet's extension lines (x 0.334 / 0.386, 5 mm a side) one notch
+#   lower, its line at ~0.1346: 3.5 mm under the 2.500's, so neither line
+#   runs along the other (r9 printed the width's arrows outside its span).
 # * the relief height right of the cut, on the far wall (z 15.5, x 0.386)
 #   from its foot to the roof.
 # * the pivot station 8 mm over the top face (y 0.236), from the front face's
@@ -282,8 +306,8 @@ BOTTOM_KEEP = {
 #   from the line up to ~0.2585) stays 8 mm under the top border (0.2667)
 #   and ~56 mm right of the tap callout (to x 0.2563).
 SECTION_KEEP = {
-    "ReliefZ0": (_sz(0.0) - 0.009, _sy(0.0) - 0.007),
-    "ReliefWidth": (_sz(_CZ), _sy(0.0) - 0.007),
+    "ReliefZ0": (_sz(0.0) - 0.018, _sy(0.0) - 0.0095),
+    "ReliefWidth": (_sz(_CZ), _sy(0.0) - 0.013),
     "ReliefHeight": (_sz(BLOCK_DEPTH) + 0.012, _sy(RELIEF_HEIGHT / 2.0)),
     "PivotZ": (_sz(_CZ / 2.0), _sy(BLOCK_HEIGHT) + 0.008),
     "PivotChamferSize": (
@@ -291,9 +315,11 @@ SECTION_KEEP = {
         _sy(BLOCK_HEIGHT) + 0.023,
     ),
 }
-# The native SECTION A-A / SCALE caption's top centre, lowered 25 mm under the
-# bottom face (default ~17 mm) so the width's callout rows clear it.
-SECTION_CAPTION_XY = (SECTION_CENTER[0], _sy(0.0) - 0.025)
+# The native SECTION A-A / SCALE caption's top centre, lowered 29 mm under the
+# bottom face (default ~17 mm) so it stands ~8 mm under the width's line
+# (~0.1346): its rows ~0.1205..0.1268 and ~0.112..0.116, over the iso's note
+# (top 0.097) and 10 mm clear of the iso's sloping top at its left end.
+SECTION_CAPTION_XY = (SECTION_CENTER[0], _sy(0.0) - 0.029)
 
 
 async def build(adapter: Any) -> dict[str, str]:

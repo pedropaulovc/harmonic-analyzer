@@ -233,6 +233,8 @@ SECTION_REFERENCE_SKETCHES = ("ReliefReference", "PivotReference")
 # wall, left over from Depth - ReliefZ0 - ReliefWidth, falls under rule 17's
 # 1.5 (guarded below); the depth is fixed by the frame window the block passes
 # and the slot by the body, so geometry cannot buy the wall.
+# Named exception: MHA-PN-005 pn-pen-v-block, the four .XXX depth stations
+# (drawing-simplicity-policy.md, Named exceptions).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutlineProfile": {"Length": 1, "Height": 1, "Chamfer2dx": 1},
     "Block": {"Depth": 2},
@@ -319,13 +321,22 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 # clear of the extension lines below (draw_pn_pen_v_block's SECTION_KEEP).
 PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
 MARKER_NUMBER = _config.parts("vn-pen-marker")["number"]
-# The relief's four .XXX stations share one function, stated once on the
-# slot's width; two short rows stay between its extension lines.
+# Named exception: MHA-PN-005 pn-pen-v-block, the four .XXX depth stations
+# (drawing-simplicity-policy.md, Named exceptions).  Each states its own
+# function under its value: taken to .XX alone, each one lets a printed relief
+# wall touch the marker body (the body clearance stack above); the near wall
+# and the width also carry the far wall.  The V's two stations seat the
+# marker's centre, the relief's two put both walls clear of its body.  Rows
+# stay short enough to sit between their own extension lines or in the gap
+# beside the view (draw_pn_pen_v_block's RIGHT_KEEP / SECTION_KEEP).
 DIMENSION_CALLOUTS: dict[str, str] = {
     "PivotDia": f"REAM THRU\nSLIP FIT ON PEN ROD PIVOT {PEN_ROD_NUMBER}",
     "Chamfer2dx": "X 45 DEG, 2 PLACES",
     "PivotChamferSize": "X 45 DEG",
-    "ReliefWidth": f"CLEARS MARKER BODY\n{MARKER_NUMBER}",
+    "VMouthZ": "CENTRES\nMARKER",
+    "VMouth": "CENTRES MARKER",
+    "ReliefZ0": "CLEARS\nMARKER BODY",
+    "ReliefWidth": f"CLEARS MARKER\nBODY {MARKER_NUMBER}",
 }
 # One row: SolidWorks stores a line break in the above compartment but prints
 # nothing of it, while the dimension line still runs under the unprinted text
