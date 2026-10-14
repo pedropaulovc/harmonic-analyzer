@@ -9,8 +9,9 @@ Layout (the spec's model frame, +Y up): the plate is a Top-plane rectangle
 are Top-plane circles cut through; the 5/64 pilot is a circle on a plane at
 the seat face, cut blind down into the plate. The seat cone and the two
 countersinks are revolved cuts sketched on a plane through the hole axes
-(model Z = -HOLE_Y), each a triangle from the face to its cone's apex, so the
-face-to-flank angle is a native dimension at the mouth vertex.
+(model Z = -HOLE_Y), each a triangle from the face to its cone's apex. The
+cone depth drives the flank; the face-to-flank angle is a driven reference
+dimension at the mouth vertex.
 
 Run (SolidWorks already open)::
 
@@ -42,7 +43,10 @@ from _sketch import (
 )
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
-from _drawing_dimension_insert import add_diametric_linear_dimension
+from _drawing_dimension_insert import (
+    add_angular_reference_dimension,
+    add_diametric_linear_dimension,
+)
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
@@ -183,20 +187,25 @@ async def _cone_cut(
     x: float,
     mouth_r: float,
     flank_deg: float,
-    names: tuple[str, str, str, str, str],
-    drives: tuple[str | None, str | None, str | None, str | None, str | None],
+    names: tuple[str, str, str, str, str, str],
+    drives: tuple[str, str, str],
     label: str,
 ) -> list[tuple[str, str]]:
     """Revolve-cut one cone on HoleAxisPlane: mouth on the seat face at model
     X = ``x``, apex on the axis ``mouth_r * tan(flank)`` below it.
 
-    Profile: axis-top P0 (on the face) -> mouth P1 -> apex P2 -> P0. The face
-    line P0-P1 and the flank P1-P2 share the mouth vertex, so the printed
-    face-to-flank angle is one native angular dimension whose interior angle
-    is the flank angle itself (no supplement to misread). The revolve axis is
-    a centerline from P0 up past the face (build_pd_transgear_arm_plate's
-    countersinks). ``names``/``drives`` follow creation order: station, face
-    height, mouth diameter, flank angle, axis length.
+    Profile: axis-top P0 (on the face) -> mouth P1 -> apex P2 -> P0, with
+    explicit junction coincidences (build_ch_rocker_arm_tl_trammel_setting_bar's
+    seat, farm-proven). The revolve axis is a centerline from P0 up past the
+    face (build_pd_transgear_arm_plate's countersinks). The cone's depth from
+    the mouth to the apex fixes the flank, driven from the mouth diameter and
+    the half-angle: the adapter's driving angular dimension leaves the profile
+    under-defined on the farm (this plate's seat, round 1; the setting bar's
+    seat; the magnifying wheel's tie 2). The printed face-to-flank angle is a
+    driven reference at the shared mouth vertex, so its interior angle is the
+    flank angle itself. ``names`` follow creation order: station, face height,
+    mouth diameter, cone depth, flank angle, axis length; ``drives`` are the
+    station, face height and mouth diameter expressions.
     """
     from solidworks_mcp.adapters.base import RevolveParameters
 
@@ -219,8 +228,16 @@ async def _cone_cut(
             *profile[0], *to_sketch((x, PLATE_HEIGHT + AXIS_OVERRUN, -HOLE_Y))
         ),
     )
-    face, flank, axis_side = await add_line_chain(adapter, profile)
+    lines = await add_line_chain(adapter, profile)
     set_sketch_direct_db(adapter, False)
+    face, flank, axis_side = lines
+    for i in range(len(lines)):
+        check(
+            f"{label} junction {i}",
+            await adapter.add_sketch_constraint(
+                f"{lines[i]}.end", f"{lines[(i + 1) % len(lines)]}.start", "coincident"
+            ),
+        )
     for first, second, relation in (
         (face, None, "horizontal"),
         (axis_side, None, "vertical"),
@@ -231,8 +248,8 @@ async def _cone_cut(
             f"{label} {relation} {first}",
             await adapter.add_sketch_constraint(first, second, relation),
         )
-    station, face_height, dia, angle, axis_length = names
-    d_station, d_face, d_dia, d_angle, d_axis = drives
+    station, face_height, dia, depth, angle, axis_length = names
+    d_station, d_face, d_dia = drives
     await dimension_between(
         adapter,
         "origin",
@@ -259,16 +276,38 @@ async def _cone_cut(
         f"{label} mouth diameter",
     )
     dims.record(dia, d_dia)
-    check(
-        f"{label} face-to-flank angle",
-        await adapter.add_sketch_dimension(face, flank, "angular", flank_deg),
+    await dimension_between(
+        adapter,
+        f"{flank}.start",
+        f"{flank}.end",
+        "vertical_distance",
+        drop,
+        f"{label} cone depth",
     )
-    dims.record(angle, d_angle)
+    dims.record(depth, f"{d_dia} / 2 / tan({90.0 - flank_deg:g})")
+    # Text on the wedge's bisector at the mouth vertex, inside the profile.
+    bisector = math.radians(180.0 + flank_deg / 2.0)
+    reach = 0.5 * mouth_r
+    await add_angular_reference_dimension(
+        adapter,
+        face,
+        flank,
+        to_sketch(
+            (
+                x + mouth_r + reach * math.cos(bisector),
+                PLATE_HEIGHT + reach * math.sin(bisector),
+                -HOLE_Y,
+            )
+        ),
+        f"{label} face-to-flank angle",
+        expected_degrees=flank_deg,
+    )
+    dims.record(angle)
     check(
         f"{label} axis length",
         await adapter.add_sketch_dimension(axis, None, "linear", AXIS_OVERRUN),
     )
-    dims.record(axis_length, d_axis)
+    dims.record(axis_length)
     await ensure_fully_defined(adapter, f"{label} profile")
     check(f"exit_sketch {label}", await adapter.exit_sketch())
     name_last_feature(adapter, sketch_name)
@@ -447,10 +486,11 @@ async def build(adapter) -> dict[str, str]:
             "SeatStation",
             "SeatFace",
             "SeatDia",
+            "SeatConeDepth",
             "SeatFlankAngle",
             "SeatAxisLength",
         ),
-        drives=('"SeatX"', '"PlateHeight"', '"SeatDia"', None, None),
+        drives=('"SeatX"', '"PlateHeight"', '"SeatDia"'),
         label="seat cone",
     )
     volume = await volume_check(
@@ -473,10 +513,11 @@ async def build(adapter) -> dict[str, str]:
                 f"Csk{index}X",
                 f"Csk{index}Face",
                 f"CskDia{suffix}",
+                f"Csk{index}ConeDepth",
                 f"CskFlankAngle{suffix}",
                 f"Csk{index}AxisLength",
             ),
-            drives=(x_drive, '"PlateHeight"', '"CskDia"', None, None),
+            drives=(x_drive, '"PlateHeight"', '"CskDia"'),
             label=f"countersink {index}",
         )
         volume = await volume_check(

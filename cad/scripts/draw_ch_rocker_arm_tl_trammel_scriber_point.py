@@ -92,6 +92,10 @@ PROFILE_KEEP = {
     "TipHalfAngle": (APEX_X + 0.020, PROFILE_CENTER[1] + 0.002),
 }
 TIP_ANGLE_TEXT_XY = (APEX_X + 0.035, PROFILE_CENTER[1] + 0.040)
+# The axis pick sits on the shank face just off the axis, clear of the
+# hardened-zone reference line the profile view shows on the axis (the
+# pivot screw's pick).
+CENTERLINE_PICK = (PROFILE_CENTER[0], PROFILE_CENTER[1] + 0.003)
 
 
 _AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
@@ -279,7 +283,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="below")
     _place_tip_angle(adapter, annotations)
     add_view_centerline(
-        adapter, profile, face_xy=PROFILE_CENTER, label="scriber point axis"
+        adapter, profile, face_xy=CENTERLINE_PICK, label="scriber point axis"
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)

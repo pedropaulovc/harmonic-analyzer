@@ -31,7 +31,12 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
-from _trammel_block_drawing import TrammelBlockSheet, circle_edge, hide_thread_labels
+from _trammel_block_drawing import (
+    TrammelBlockSheet,
+    circle_edge,
+    hide_thread_labels,
+    set_blind_extent_text,
+)
 import _telemetry
 import ch_rocker_arm_tl_trammel_pivot_block_spec as part_spec
 from _feature_requirements import part_metadata, requirement
@@ -361,12 +366,20 @@ for _index, _x in enumerate(part_spec.PINCH_X, start=1):
             ),
             "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
             "dia": (
-                limits(part_spec.PINCH_CLEARANCE_DIA, 2, part_spec.DRILLED_BAND),
-                ("PINCH_CLEARANCE_DIA", "DRILLED_BAND", "PINCH_CLEARANCE_SPEC"),
+                limits(
+                    part_spec.PINCH_CLEARANCE_PRINTED_DIA, 2, part_spec.DRILLED_BAND
+                ),
+                ("PINCH_CLEARANCE_PRINTED_DIA", "DRILLED_BAND", "PINCH_CLEARANCE_SPEC"),
             ),
-            "dia_nominal": (part_spec.PINCH_CLEARANCE_DIA, ("PINCH_CLEARANCE_DIA",)),
+            "dia_nominal": (
+                part_spec.PINCH_CLEARANCE_PRINTED_DIA,
+                ("PINCH_CLEARANCE_PRINTED_DIA",),
+            ),
             # Drilled from edge B up to the slit.
-            "note": (part_spec.PINCH_CLEARANCE_PROCESS, ("PINCH_CLEARANCE_PROCESS",)),
+            "note": (
+                f"{part_spec.PINCH_CLEARANCE_PROCESS} {part_spec.PINCH_CLEARANCE_EXTENT_TEXT}",
+                ("PINCH_CLEARANCE_PROCESS", "PINCH_CLEARANCE_EXTENT_TEXT"),
+            ),
         },
         precision={"dia": 2},
     )
@@ -480,7 +493,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         process=part_spec.PINCH_TAP_PROCESS,
     )
-    add_native_hole_callout(
+    pinch_clearance_callout = add_native_hole_callout(
         adapter,
         front,
         callout_xy=PINCH_CLEARANCE_CALLOUT_XY,
@@ -489,6 +502,11 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, front, part_spec.PINCH_CLEARANCE_DIA, "edge B pinch clearance"
         ),
         process=part_spec.PINCH_CLEARANCE_PROCESS,
+    )
+    set_blind_extent_text(
+        pinch_clearance_callout,
+        part_spec.PINCH_CLEARANCE_EXTENT_TEXT,
+        part_spec.PINCH_CLEARANCE_DIA,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)

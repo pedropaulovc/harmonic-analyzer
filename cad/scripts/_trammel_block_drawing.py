@@ -14,6 +14,7 @@ X running left) beyond.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -132,3 +133,55 @@ def hide_thread_labels(adapter: Any, view: Any) -> int:
         hidden += 1
     rebuild_drawing(adapter, label="hide trammel block thread labels")
     return hidden
+
+
+# draw_dt_cone_tip_block's r3 recipe: a jaw drilled full diameter until it
+# opens into the slit states that extent in place of the native blind depth
+# ("<HOLE-DEPTH> <hw-depth>"); the diameter stays the Hole Wizard variable.
+_BLIND_DEPTH_TOKENS = re.compile(r"<HOLE-DEPTH>\s*<hw-depth>")
+
+
+def blind_extent_definitions(
+    definitions: dict[int, str], extent_text: str
+) -> dict[int, str]:
+    """Swap the one native blind-depth pair for ``extent_text``, loudly."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected blind callout parts: {definitions!r}")
+    hits = {
+        part: len(_BLIND_DEPTH_TOKENS.findall(text))
+        for part, text in definitions.items()
+    }
+    if sorted(hits.values()) != [0, 0, 0, 1]:
+        raise RuntimeError(
+            f"blind callout has no single blind depth to replace: {definitions!r}"
+        )
+    updated = {
+        part: _BLIND_DEPTH_TOKENS.sub(extent_text, text)
+        for part, text in definitions.items()
+    }
+    rewritten = "\n".join(updated.values())
+    if "<hw-depth>" in rewritten or "<HOLE-DEPTH>" in rewritten:
+        raise RuntimeError(f"blind callout rewrite left a depth: {updated!r}")
+    return updated
+
+
+def set_blind_extent_text(display: Any, extent_text: str, diameter_mm: float) -> None:
+    """State ``extent_text`` without severing the diameter's Hole Wizard
+    variable (draw_dt_cone_tip_block's ``_set_pinch_clearance_callout_text``)."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = blind_extent_definitions(definitions, extent_text)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            display.SetText(writable_part, updated[definition_part])
+    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved = "\n".join(str(display.GetText(part) or "") for part in (1, 2, 3, 4))
+    if (
+        persisted != updated
+        or resolved.count(extent_text) != 1
+        or "<HOLE-DEPTH>" in resolved
+        or f"{diameter_mm:.2f}" not in resolved
+    ):
+        raise RuntimeError(
+            f"blind callout extent {extent_text!r} did not persist: "
+            f"definitions={persisted!r}, resolved={resolved!r}"
+        )

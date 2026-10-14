@@ -23,6 +23,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _appearance import apply_material
 from _check import check
 from _com import _early_bound
@@ -108,28 +109,42 @@ def _face_count(adapter, *, label: str) -> int:
 
 
 def _set_tip_flat_max_limit(adapter) -> None:
-    """Print the tip flat as a single MAX limit (drawing-guidelines rule 16)."""
-    label = "TipFlatDia@TipFlatProfile"
+    """The tip flat as the single limit "MAX" (swTolMAX; drawing-guidelines
+    rule 16): SolidWorks prints the nominal then the limit word, so the
+    nominal is the limit; the deviations stay on the native tolerance as the
+    model's record of the band. Copied from the knob shaft's run-out limit.
+
+    The nominal check holds to 1 um, not 1 pm: the equation manager stores the
+    "TipFlatDia" global in inches to eight places (0.1 mm reads back as
+    0.00393701 in, 0.100000054 mm), so the driven value is never bit-exact.
+    """
     lower, upper = deviations(TIP_FLAT_DIA_BAND)
     _, dimension = _named_dimension(adapter, "TipFlatProfile", "TipFlatDia")
-    if not math.isclose(
-        float(dimension.SystemValue), TIP_FLAT_DIA_MAX / 1000.0, abs_tol=1e-12
-    ):
-        raise RuntimeError(f"{label}: model value is not the printed maximum")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    label = "TipFlatDia@TipFlatProfile"
+    value_m = float(dimension.SystemValue)
+    if not math.isclose(value_m, TIP_FLAT_DIA_MAX / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value_m * 1000.0:.9f} mm is not the printed "
+            f"maximum {TIP_FLAT_DIA_MAX:g} mm"
+        )
+    raw_tolerance = dimension.Tolerance
+    if raw_tolerance is None:
+        raise RuntimeError(f"{label}: native dimension has no tolerance")
+    tolerance = _early_bound(raw_tolerance, "IDimensionTolerance")
     tolerance.Type = TIP_FLAT_DIA_TOL_TYPE
-    if not bool(tolerance.SetValues(lower / 1000.0, upper / 1000.0)):
-        raise RuntimeError(f"{label}: tolerance values were rejected")
-    got = (
-        int(tolerance.Type),
-        float(tolerance.GetMinValue()) * 1000.0,
-        float(tolerance.GetMaxValue()) * 1000.0,
-    )
-    if got[0] != TIP_FLAT_DIA_TOL_TYPE or not all(
-        math.isclose(actual, wanted, abs_tol=1e-9)
-        for actual, wanted in zip(got[1:], (lower, upper), strict=True)
+    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != TIP_FLAT_DIA_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
     ):
-        raise RuntimeError(f"{label}: MAX limit did not persist: {got!r}")
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {TIP_FLAT_DIA_MAX:g} MAX")
 
 
 async def build(adapter) -> dict[str, str]:

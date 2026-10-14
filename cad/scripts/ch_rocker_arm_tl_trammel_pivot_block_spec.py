@@ -38,7 +38,13 @@ from __future__ import annotations
 import math
 
 import ch_rocker_arm_tl_trammel_spec as kit
-from _hole_spec import CLEARANCE_MM, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
+from _hole_spec import (
+    CLEARANCE_MM,
+    TAP_DRILL_MM,
+    THREAD_MAJOR_MM,
+    HoleSpec,
+    blind_cut_dia_mm,
+)
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 INCH = kit.INCH
@@ -146,17 +152,30 @@ PINCH_MAJOR = THREAD_MAJOR_MM[PINCH_THREAD]
 # #8 clearance up to the slit (draw/build of dt_cone_tip_block's pinch).
 PINCH_TAP_SPEC = HoleSpec("tapped", PINCH_THREAD)
 PINCH_TAP_DRILL = TAP_DRILL_MM[PINCH_THREAD]
-PINCH_CLEARANCE_DIA = round(CLEARANCE_MM[("#8", "close")], 2)  # printed size, one fact
+EDGE_B_JAW = BLOCK_WIDTH - SLIT_Z1  # the clearance length, nominal
+# Blind to the slit face, as dt_cone_tip_block's pinch clearance: a
+# through_next end ran on through the slot-side jaw to edge A (farm round 1),
+# stripping the thread. The drill point lies in the slit (_trammel_block
+# asserts it cuts nothing past the jaw). No diameter override: the blind path
+# cuts the pinned close-fit diameter directly.
 PINCH_CLEARANCE_SPEC = HoleSpec(
     "clearance",
     "#8",
-    end="through_next",
+    end="blind",
+    depth_mm=EDGE_B_JAW,
     fit="close",
-    overrides_mm={"HoleDiameter": PINCH_CLEARANCE_DIA},
 )
+# The model cuts the pinned #8 close diameter; the callout prints it at two
+# places, and the requirement band and the walls use that printed size.
+PINCH_CLEARANCE_DIA = blind_cut_dia_mm(PINCH_CLEARANCE_SPEC)
+if abs(PINCH_CLEARANCE_DIA - CLEARANCE_MM[("#8", "close")]) > 1e-9:
+    raise AssertionError("pinch clearance is not the #8 close fit")
+PINCH_CLEARANCE_PRINTED_DIA = round(PINCH_CLEARANCE_DIA, 2)
 # Title-block DRILLED HOLES: plus allowance, zero minus (_printed_tolerance).
 DRILLED_BAND = (drilled_oversize_mm(), 0.0)
-PINCH_CLEARANCE_R_MAX = (PINCH_CLEARANCE_DIA + DRILLED_BAND[0]) / 2.0
+PINCH_CLEARANCE_R_MAX = (PINCH_CLEARANCE_PRINTED_DIA + DRILLED_BAND[0]) / 2.0
+if PINCH_CLEARANCE_DIA > 2.0 * PINCH_CLEARANCE_R_MAX:
+    raise AssertionError("the modelled pinch clearance lies outside its printed band")
 # Below the top face, printed at two places. Chosen to balance the tap's wall
 # under the slot floor against the clearance's wall over the block bottom.
 PINCH_DEPTH = 14.15
@@ -165,11 +184,13 @@ PINCH_X = (12.0 - HOLE_FROM_END,)  # L12, between the end face and the point
 # ASME B18.3 #8 SHCS head 0.270 in; #8-32 x 1 in SHCS.
 PINCH_HEAD_DIA = 0.270 * INCH
 PINCH_SCREW_LENGTH = 1.0 * INCH
-EDGE_B_JAW = BLOCK_WIDTH - SLIT_Z1  # the clearance length, nominal
 # The shop's drill index sizes (tools.drill-index-115), said on the callouts.
 SET_SCREW_PROCESS = "#25 DRILL, THEN TAP"
 PINCH_TAP_PROCESS = "#29 DRILL, THEN TAP"
-PINCH_CLEARANCE_PROCESS = "#15 DRILL TO THE SLIT"
+PINCH_CLEARANCE_PROCESS = "#15 DRILL"
+# Replaces the native blind depth on the callout (dt_cone_tip_block's r3 rule):
+# the depth is "up to the slit", not a printed length.
+PINCH_CLEARANCE_EXTENT_TEXT = "TO THE SLIT"
 
 # --- Worst cases (rules 17, 18) at the printed bands ----------------------------
 _BAND_BY_PLACES = {1: _X, 2: _XX, 3: _XXX}

@@ -39,7 +39,7 @@ from _drawing_precision import apply_drawing_precision
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import name_last_feature
 from _fit_deviations import deviations
-from _holes import SharedCoordinate, wizard_holes
+from _holes import DRILL_POINT_H, SharedCoordinate, wizard_holes
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -90,6 +90,19 @@ _SAVED_DRAWING_PROPERTIES = (
     "Manufacturing Notes",
     "Isometric View Note",
 )
+
+# The blind pinch clearance stops at the slit face; its drill point runs on
+# through the slit's air. Past the slit's far face its radius must stay
+# inside the tap drill, so the point cuts no slot-side-jaw thread.
+_CLEARANCE_POINT_H = PINCH_CLEARANCE_DIA / 2.0 * DRILL_POINT_H
+if (
+    PINCH_CLEARANCE_DIA
+    / 2.0
+    * max(0.0, _CLEARANCE_POINT_H - SLIT_WIDTH)
+    / _CLEARANCE_POINT_H
+    >= PINCH_TAP_DRILL / 2.0
+):
+    raise AssertionError("pinch clearance drill point cuts the slot-side jaw")
 
 
 def _require_one_solid_body(adapter, *, label: str) -> None:
@@ -383,7 +396,8 @@ async def build_block(adapter, part: ModuleType, part_name: str) -> dict[str, st
     volume = await volume_check(adapter, "set-screw taps", volume - v_set, 0.03 * v_set)
 
     # Pinch screws: #8-32 tapped through both jaws from edge B (outward
-    # normal +Z), then the edge-B jaw opened to the close clearance up to the slit.
+    # normal +Z), then the edge-B jaw opened, blind to the slit face, to the
+    # close clearance (dt_cone_tip_block's blind near-jaw clearance).
     pinch_points = [[x, -PINCH_DEPTH, BLOCK_WIDTH] for x in part.PINCH_X]
     pinch_taps = wizard_holes(
         adapter,
@@ -416,6 +430,8 @@ async def build_block(adapter, part: ModuleType, part_name: str) -> dict[str, st
             _station_names("ClearanceX", len(part.PINCH_X)), "ClearanceDepth"
         ),
     )
+    # The point lies in the slit and inside the tap drill: only the annulus
+    # over the edge-B jaw is removed.
     v_clearance = (
         len(part.PINCH_X)
         * math.pi
