@@ -4595,7 +4595,7 @@ cad = "ch_rocker_arm_tl_strap_shim_stack"
 # Stack: buttons 4.00 + hub 7.0565-7.1065 = 15.06-15.11 above the stud head; the pin body
 # runs 14.80 to the M5 thread shoulder, so the nut seats on the upper button first. Head
 # Ø9.5 and nut (8 A/F, 9.2 across corners) stay inside the button OD, so a file riding a
-# button rim never touches them. Tail Ø6.49 x 30: 25 in the vise jaws, 5 bare below the head.
+# button rim never touches them. Tail Ø8.0 x 30: 25 in the vise jaws, 5 bare below the head.
 # Make: buttons from O1 7/16 in drill rod, turned to OD 10.20 and reamed 6.5 on the lathe,
 # torch-hardened, oil-quenched, tempered, then OD polished to 10.15-10.25 on a 6.49
 # mandrel (canola-oil quench). Stud from the same rod, left annealed.
@@ -4874,11 +4874,11 @@ note = "AUTHOR'S CHOICE: illustrative fitter's bench beside the surface plate wi
 cite = ["AUTHOR'S CHOICE: illustrative fitting station"]
 
 # A 4 in bench vise closed on the ground stud of a filing-button kit. Local frame: the
-# stud axis is Z, the jaw tops are Z0 and the jaws close along X on a 6.49 mm stud.
+# stud axis is Z, the jaw tops are Z0 and the jaws close along X on an 8.0 mm stud tail.
 [fixtures.bench-vise-4in]
 name = "4 in bench vise"
 kind = "custom"
-note = "illustrative example item: 4 in machinist's bench vise bolted to the fitting bench, smooth hardened jaw plates closed on the 6.49 mm ground stud of a filing-button kit; the work never touches the jaws"
+note = "illustrative example item: 4 in machinist's bench vise bolted to the fitting bench, smooth hardened jaw plates closed on the 8.0 mm turned tail of a filing-button stud; the work never touches the jaws"
 # Basis: fixtures.bench-vise-4in.length_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2224 (fixtures.bench-vise-4in.length_mm) authored custom geometry baseline 160 mm, offset +0 mm = 160 mm. Obstruction/stack dimensions are not reduced below their source baseline; catalogue conversions are not fabricated physical readings.
 length_mm = { value = 160.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "steel rule" } }
 # Basis: fixtures.bench-vise-4in.width_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2225 (fixtures.bench-vise-4in.width_mm) authored custom geometry baseline 100 mm, offset +0 mm = 100 mm. Obstruction/stack dimensions are not reduced below their source baseline; catalogue conversions are not fabricated physical readings.
@@ -4886,10 +4886,10 @@ width_mm = { value = 100.0, measured = { status = "measured", by = "placeholder 
 # Basis: fixtures.bench-vise-4in.height_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2226 (fixtures.bench-vise-4in.height_mm) authored custom geometry baseline 85 mm, offset +0 mm = 85 mm. Obstruction/stack dimensions are not reduced below their source baseline; catalogue conversions are not fabricated physical readings.
 height_mm = { value = 85.0, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "height gauge, bench to jaw tops" } }
 solids = [
-  # Basis: fixtures.bench-vise-4in.solids.fixed-jaw: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2228 (fixtures.bench-vise-4in.solids.fixed-jaw) filing-button stud tail; authored physical-size model {"size_mm":[25.0,100.0,25.0]} mm, offsets zero. at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
-  { name = "fixed-jaw", supply = "existing", shape = "box", at_mm = [-28.245, -50.0, -25.0], size_mm = [25.0, 100.0, 25.0], locates = "filing-button stud tail", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
-  # Basis: fixtures.bench-vise-4in.solids.moving-jaw: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2229 (fixtures.bench-vise-4in.solids.moving-jaw) filing-button stud tail; authored physical-size model {"size_mm":[25.0,100.0,25.0]} mm, offsets zero. at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
-  { name = "moving-jaw", supply = "existing", shape = "box", at_mm = [3.245, -50.0, -25.0], size_mm = [25.0, 100.0, 25.0], locates = "filing-button stud tail", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
+  # Basis: fixtures.bench-vise-4in.solids.fixed-jaw: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2228 (fixtures.bench-vise-4in.solids.fixed-jaw) filing-button stud tail; authored physical-size model {"size_mm":[25.0,100.0,25.0]} mm, offsets zero. at_mm x re-posed to close on the Ø8.0 filing-stud tail (Main's round-3 ruling, PR #1447); the rest of at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
+  { name = "fixed-jaw", supply = "existing", shape = "box", at_mm = [-29.0, -50.0, -25.0], size_mm = [25.0, 100.0, 25.0], locates = "filing-button stud tail", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
+  # Basis: fixtures.bench-vise-4in.solids.moving-jaw: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2229 (fixtures.bench-vise-4in.solids.moving-jaw) filing-button stud tail; authored physical-size model {"size_mm":[25.0,100.0,25.0]} mm, offsets zero. at_mm x re-posed to close on the Ø8.0 filing-stud tail (Main's round-3 ruling, PR #1447); the rest of at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
+  { name = "moving-jaw", supply = "existing", shape = "box", at_mm = [4.0, -50.0, -25.0], size_mm = [25.0, 100.0, 25.0], locates = "filing-button stud tail", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
   # Basis: fixtures.bench-vise-4in.solids.body: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:2230 (fixtures.bench-vise-4in.solids.body) authored box envelope; authored physical-size model {"size_mm":[120.0,100.0,60.0]} mm, offsets zero. at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
   { name = "body", supply = "existing", shape = "box", at_mm = [-60.0, -50.0, -85.0], size_mm = [120.0, 100.0, 60.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
 ]
