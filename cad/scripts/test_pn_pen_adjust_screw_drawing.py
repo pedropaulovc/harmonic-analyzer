@@ -131,7 +131,6 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
             "OverallLength",
         },
         "EyeStationReference": {"EyeFromHeadEnd"},
-        "ThreadLimitReference": {"ShankDia"},
     }
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.SIDE_KEEP) == marked
@@ -145,54 +144,49 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "HeadHeight": 1,
         "OverallLength": 1,
         "EyeFromHeadEnd": 1,
-        "ShankDia": 2,
     }
 
 
 def test_plain_shank_diameter_prints_as_a_reference() -> None:
-    """The plain shank's Ø is the thread blank: a native diametric model
-    dimension driven by ThreadDia, printed parenthesised with no band."""
-    assert spec.REFERENCE_DIMENSIONS == frozenset({"ShankDia"})
-    assert spec.REFERENCE_DIMENSIONS <= spec.DRAWING_DIMENSIONS["ThreadLimitReference"]
-    source = _source(part)
-    assert 'dims.record("ShankDia", \'"ThreadDia"\')' in source
-    # The proven diametric recipe (StudProfile, butt cup): the centerline
-    # spans the witness along the axis, the pick stands beyond the witness at
-    # its mid-height. A centerline ending short of the line made a plain
-    # linear dimension on the farm (run 20261014T002650255Z).
-    calls = [
-        call
-        for call in _calls(part, "add_diametric_linear_dimension")
-        if ast.literal_eval(call.args[-1]) == "ShankDia"
-    ]
-    (shank_dia,) = calls
-    assert [ast.unparse(arg) for arg in shank_dia.args[1:4]] == [
-        "shank_axis",
-        "witness",
-        "(THREAD_R + 3.0, witness_y + _SHANK_WITNESS_LEN / 2.0)",
-    ]
-    (shank_axis,) = (
-        call
-        for call in _calls(part, "add_centerline")
-        if [ast.unparse(arg) for arg in call.args]
-        == ["0.0", "FULL_THREAD_LENGTH", "0.0", "SHANK_LENGTH"]
-    )
-    witness_lo = spec.FULL_THREAD_LENGTH + part._SHANK_WITNESS_GAP
-    witness_hi = witness_lo + part._SHANK_WITNESS_LEN
-    assert spec.FULL_THREAD_LENGTH < witness_lo < witness_hi < spec.SHANK_LENGTH
-    drives = {
-        call.args[0].value: call.args[1].value
-        for call in _calls(part, "record")
-        if all(isinstance(arg, ast.Constant) for arg in call.args[:2])
-        and call.args[0].value
-    }
-    assert drives["PlainShankAxis"] == (
-        '"OverallLength" - "HeadHeight" - "FullThreadLength"'
-    )
-    draw_source = _source(drawing)
-    assert "for name in sorted(REFERENCE_DIMENSIONS):" in draw_source
-    assert "diameter=True" in draw_source
+    """The plain shank's Ø is the thread blank: a drawing-added dimension
+    between the plain shank's two flank silhouettes, proved attached and
+    measuring THREAD_MAJOR, printed parenthesised with no band. Two model
+    diametric attempts in the thread-limit sketch came back non-diametric on
+    the farm, so the build carries no ShankDia."""
+    assert spec.DRAWING_REFERENCE_PRECISION == 2
+    assert not hasattr(spec, "REFERENCE_DIMENSIONS")
+    assert "ShankDia" not in _source(part)
     assert not model_toleranced_dimensions(part)
+    (face,) = _calls(drawing, "CylinderFace")
+    assert ast.unparse(face) == "CylinderFace(THREAD_MAJOR, contains_y_mm=station_mm)"
+    # The station lies on the plain shank, off the threaded face's span.
+    station = spec.FULL_THREAD_LENGTH + spec.PLAIN_SHANK / 2.0
+    assert spec.FULL_THREAD_LENGTH + 0.05 < station < spec.SHANK_LENGTH - 0.05
+    assert len(_calls(drawing, "face_silhouettes_through")) == 1
+    (dimension,) = _calls(drawing, "add_edge_dimension")
+    assert ast.literal_eval(_keyword(dimension, "orientation")) == "vertical"
+    assert ast.unparse(_keyword(dimension, "entity_types")) == "kinds"
+    assert ast.unparse(_keyword(dimension, "entities")) == "picks"
+    (measured,) = _calls(drawing, "assert_dimension_measures")
+    assert ast.unparse(_keyword(measured, "expected_mm")) == "THREAD_MAJOR"
+    assert ast.unparse(_keyword(measured, "entities")) == "picks"
+    assert ast.unparse(_keyword(measured, "entity_types")) == "kinds"
+    draw_source = _source(drawing)
+    assert 'kinds = ("SILHOUETTE", "SILHOUETTE")' in draw_source
+    (reference,) = _calls(drawing, "set_reference_dimension")
+    assert ast.unparse(reference.args[1]) == "display.GetAnnotation()"
+    assert ast.literal_eval(_keyword(reference, "diameter")) is True
+    assert (
+        "display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)" in draw_source
+    )
+    # Added after HLR and the curated imports, before the eye's center mark.
+    build_body = draw_source[draw_source.index("async def build(") :]
+    assert (
+        build_body.index("set_hidden_lines_removed(")
+        < build_body.index("set_dimension_callouts(")
+        < build_body.index("_plain_shank_reference(adapter, side, spt(*SHANK_DIA_XY))")
+        < build_body.index("auto_center_marks(")
+    )
 
 
 def test_every_marked_dimension_is_created_and_named_by_the_build() -> None:
@@ -275,11 +269,7 @@ def test_a_split_line_rings_the_shank_at_the_thread_limit() -> None:
     assert part._THREAD_FACE_AREA == pytest.approx(
         math.pi * spec.THREAD_MAJOR * spec.FULL_THREAD_LENGTH
     )
-    # The ShankDia witness lies wholly on the plain shank.
-    assert part._SHANK_WITNESS_GAP > 0.0 and part._SHANK_WITNESS_LEN > 0.0
-    assert 2.0 * part._SHANK_WITNESS_GAP + part._SHANK_WITNESS_LEN == pytest.approx(
-        spec.PLAIN_SHANK
-    )
+    assert not hasattr(part, "_SHANK_WITNESS_LEN")
     assert '"thread-limit split cuts nothing", stud_volume' in source
 
 
@@ -370,7 +360,12 @@ def test_no_gdt_no_pmi_no_roughness() -> None:
             "author_part_pmi",
             "PART_DATUMS",
             "GEOMETRIC_CONTROLS",
-            "_gtol",
+            # GD&T authoring; _gtol_cylinder's CylinderFace is only the face
+            # identity the plain shank's reference picks its silhouettes by.
+            "_gtol_frame",
+            "_gtol_controls",
+            "_gtol_symbols",
+            "from _gtol_face import",
             "add_datum_feature(",
             "add_feature_control_frame(",
             "set_basic_dimension",
@@ -483,7 +478,7 @@ def test_side_view_layout_reads_like_the_lathe() -> None:
     # The plain shank's reference Ø: above the plain shank (below it the
     # FULL THREAD extension line drops to row 1), over the head's top
     # silhouette, under the eye callout's text row.
-    shank_x, shank_y = keep["ShankDia"]
+    shank_x, shank_y = drawing.SHANK_DIA_XY
     assert drawing.FULL_THREAD_X < shank_x < drawing.SHOULDER_X
     assert head_top < shank_y < drawing.EYE_CALLOUT_XY[1] - 0.008
     # The eye callout: text right end left of the eye's centre (the station

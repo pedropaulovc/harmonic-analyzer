@@ -142,14 +142,31 @@ def test_front_view_looks_at_the_plates_and_keeps_the_taper_outside() -> None:
         assert draw.FRONT_KEEP[name][0] < draw._fx(draw._X[1]), name
 
 
-def test_section_cuts_the_upper_plate_and_spans_its_silhouette() -> None:
-    lower, upper = spec.GUIDE_PLATE_YS[1], spec.GUIDE_PLATE_YS[1] + spec.GUIDE_PLATE_T
+def test_section_looks_down_onto_the_upper_plate_and_spans_its_silhouette() -> None:
+    top = spec.GUIDE_PLATE_YS[1] + spec.GUIDE_PLATE_T
     start, end = draw.SECTION_LINE_MODEL_MM
     assert start[1] == end[1] == draw.SECTION_Y
-    assert lower < draw.SECTION_Y < upper
+    # Just above the plate: the 1:1 cutting line clears its top edge, and the
+    # strap edge it cuts still reads the plate's overhang to the printed place.
+    assert top + 0.5 <= draw.SECTION_Y < top + 1.0
+    places = spec.DRAWING_REFERENCE_PRECISION
+    assert round(draw._OVERHANG_AT_CUT, places) == 1.2
+    assert round(spec.UPPER_PLATE_OVERHANG, places) == 1.2
+    source = inspect.getsource(draw._create_section)
+    assert "SetDisplayOnlySurfaceCut(False)" in source
     strap = draw._strap_x_at(draw.SECTION_Y)
     assert end[0] < min(strap[0], -spec.GUIDE_PLATE_WIDTH / 2.0)
     assert start[0] > max(strap[1], spec.GUIDE_PLATE_WIDTH / 2.0)
+    # Each arrow's letter (5.5 mm wide, 14.6-20.1 mm under the line on the
+    # 20261014T002650255Z sheet) clears the slanted strap edges by 1 mm, and on
+    # the -x side the StrapTaperDx extension line too.
+    half_letter = 0.00275
+    letter_ys = (draw.SECTION_Y - 20.1, draw.SECTION_Y - 14.6)
+    plus_edge = max(draw._strap_x_at(y)[1] for y in letter_ys)
+    minus_edge = min(draw._strap_x_at(y)[0] for y in letter_ys)
+    assert draw._fx(start[0]) + half_letter < draw._fx(plus_edge) - 0.001
+    assert draw._fx(end[0]) - half_letter > draw._fx(minus_edge) + 0.001
+    assert draw._fx(end[0]) + half_letter < draw._fx(spec.STRAP_TOP_X[0]) - 0.001
     # Looking down: model +x left, the strap back face above the plate front.
     assert draw._ax(1.0) < draw._ax(0.0)
     assert draw._az(spec.STRAP_Z[1]) > draw._az(spec.PLATE_FRONT_Z)
@@ -186,23 +203,42 @@ def test_slot_width_text_is_parked_clear_of_every_extension_line() -> None:
     )
 
 
+def test_overhang_reference_spans_the_strap_cut_and_the_plate_edge() -> None:
+    strap_x = draw._ax(draw._STRAP_CUT_X[1])
+    plate_x = draw._ax(draw._HALF_PLATE)
+    # Model +x prints left: the plate edge stands left of the strap's cut.
+    assert strap_x - plate_x == pytest.approx(draw._OVERHANG_AT_CUT * 0.002)
+    # Picks inside the strap's thickness and on the plate's reach, between
+    # the plate-back and slot-bottom extension lines.
+    assert spec.STRAP_Z[0] < draw.OVERHANG_PICK_Z[0] < spec.STRAP_Z[1]
+    assert spec.SLOT_BOTTOM_Z < draw.OVERHANG_PICK_Z[1] < spec.STRAP_Z[0]
+    # Its row above the strap back face, its value left of the plate edge,
+    # above the slot bottom's value.
+    text_x, text_y = draw.OVERHANG_TEXT_XY
+    assert text_y > draw._az(spec.STRAP_Z[1]) + 0.006
+    assert text_x + 0.0045 < plate_x
+    assert draw.SECTION_KEEP["SlotBottom"][1] < draw._az(spec.STRAP_Z[1])
+    assert "_add_overhang_reference(adapter, section)" in inspect.getsource(draw.build)
+    source = inspect.getsource(draw._add_overhang_reference)
+    assert "set_reference_dimension(" in source
+    assert 'orientation="horizontal"' in source
+
+
 def test_upper_plate_location_callout_stays_off_lines() -> None:
     assert not re.search(r"\d", spec.UPPER_PLATE_LOCATION_CALLOUT)
+    tip_x, tip_y = draw.UPPER_PLATE_NOTE_TIP
     text_x, text_y = draw.UPPER_PLATE_NOTE_XY
-    tip = (draw._fx(-draw._HALF_PLATE / 2.0), draw._fy(draw._UPPER_TOP_Y))
-    taper_extension_x = draw._fx(spec.STRAP_TOP_X[0])
-    assert text_x > taper_extension_x
-    # The tip is on the plate's top edge inside the strap's silhouette.
-    left, right = draw._strap_x_at(draw._UPPER_TOP_Y)
-    assert draw._fx(right) < tip[0] < draw._fx(left)
-    # The straight leader passes above the cutting line's right end.
-    line_y = draw._fy(draw.SECTION_Y)
-    line_end_x = draw._fx(draw.SECTION_LINE_MODEL_MM[1][0])
-    lowest_start_y = text_y - 0.010  # the bottom of the two-line block
-    t = (line_end_x - tip[0]) / (text_x - tip[0])
-    assert tip[1] + t * (lowest_start_y - tip[1]) > line_y + 0.002
-    # Above the general notes.
-    assert lowest_start_y > draw.NOTES_XY[1]
+    # The tip on the plate's -x edge, between the slot bottom and plate front.
+    assert tip_x == pytest.approx(draw._ax(-draw._HALF_PLATE))
+    assert draw._az(spec.PLATE_FRONT_Z) < tip_y < draw._az(spec.SLOT_BOTTOM_Z)
+    # The text right of the section's rightmost ink (the strap end), between
+    # the corner radius's text above and the slot width's block below (the
+    # note's two lines stand about 8.5 mm tall from its top-left).
+    assert text_x > draw._ax(draw._SECTION_X[0])
+    assert text_y < draw.SECTION_KEEP["SlotCornerR"][1] - 0.006
+    assert text_y - 0.0085 > draw.SLOT_WIDTH_TEXT_XY[1] + 0.0075 + 0.005
+    assert abs(text_y - tip_y) < text_x - tip_x
+    assert "view=section" in inspect.getsource(draw.build)
 
 
 def test_tap_callout_omits_the_title_block_thread_class() -> None:

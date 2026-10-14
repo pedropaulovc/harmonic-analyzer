@@ -124,15 +124,22 @@ def test_shoulder_layout_stays_clear() -> None:
     assert centre[0] + radius < title_block_left
     # The label (~32 mm wide, anchored top centre) stands left of the fence.
     assert drawing.DETAIL_LABEL_XY[0] + 0.016 < centre[0] - radius
-    # The R MAX block (~57 x 17 mm) stands up-right of the right shoulder
-    # corner, its bottom above the 10.5's upper extension line (the shoulder)
-    # and its right end left of the bottom view's note.
+    # The R MAX block stands up-right of the right shoulder corner, its
+    # shoulder (the line under the text) above the 10.5's dimension line,
+    # and its right end left of the bottom view's note.  Sizes are the farm
+    # audit's (leaf 20261014T003619Z): 54.6 mm wide, shoulder 8.35 mm under
+    # the anchor; the 10.5's line ran up to its outside arrow at y 0.1056 on
+    # x 0.0885, and the shoulder crossed it at y 0.1029.
     corner = (drawing._fx(spec.PIVOT_DIA / 2.0), drawing._fy(0.0))
     text_x, text_y = drawing.FRONT_KEEP["ShoulderRadius"]
-    half_w, half_h = 0.0285, 0.0085
+    half_w, shoulder_drop = 0.0273, 0.00835
+    pivot_length_x, pivot_length_line_top = drawing.FRONT_KEEP["PivotLength"][0], 0.1056
     assert text_x - half_w > drawing._fx(spec.ROD_SECTION / 2.0) + 0.005
-    assert text_y - half_h > corner[1] + 0.003
+    assert text_y - shoulder_drop > pivot_length_line_top + 0.003
+    assert text_x - half_w < pivot_length_x  # hence the clearance above
     assert text_x + half_w < drawing.BOTTOM_NOTE_XY[0] - 0.015
+    # Under the end views (bottom view square from y 0.130).
+    assert text_y + shoulder_drop < drawing.BOTTOM_CENTER[1] - drawing._END_HALF_M
     # The fence letter sits between the 10.5's extension lines, clear of its
     # text and under the R MAX leader.
     letter_x, letter_y = drawing.DETAIL_LETTER_XY

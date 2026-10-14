@@ -6,11 +6,12 @@ cross hole seen end-on as a circle with its center mark and native #54 DRILL
 callout. Every marked dimension (pn_pen_adjust_screw_spec.DRAWING_DIMENSIONS)
 lives in a Right-plane sketch and imports here: the thread's major diameter
 (printed as its #0-80 UNF designation), its usable full-thread length to the
-thread-limit split edge, the plain shank's diameter as a parenthesised
-reference, the head's diameter and height, the overall length, and the eye's
-station from the head's faced end (the hidden EyeStationReference sketch,
-shown in this view only). A shaded isometric at the sheet scale completes the
-package (rule 8).
+thread-limit split edge, the head's diameter and height, the overall length,
+and the eye's station from the head's faced end (the hidden
+EyeStationReference sketch, shown in this view only). The plain shank's
+diameter is not a model dimension: the sheet adds it between the plain
+shank's flank silhouettes as a parenthesised reference. A shaded isometric
+at the sheet scale completes the package (rule 8).
 No datums, frames or roughness symbols: the stud is not on the GD&T allowlist
 (rule 5) and nothing on it runs or locates (rule 6). No general note: the
 title block says all the stud needs.
@@ -25,7 +26,6 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
-    dimension_name,
     place_view,
 )
 
@@ -46,11 +46,14 @@ from _drawing_dimensions import (
     set_dimension_text,
     set_reference_dimension,
 )
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_edges import face_silhouettes_through
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _gtol_cylinder import CylinderFace
 from _hole_spec import drill_process
 from _paths import CAD_ROOT
 from _session import run_build
@@ -60,6 +63,7 @@ from pn_pen_adjust_screw_spec import (
     DIMENSION_TEXT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     EYE_DIA,
     EYE_SPEC,
     EYE_Y,
@@ -67,7 +71,6 @@ from pn_pen_adjust_screw_spec import (
     HEAD_DIA,
     OVERALL_LENGTH,
     PLAIN_SHANK,
-    REFERENCE_DIMENSIONS,
     SHANK_LENGTH,
     THREAD_CALLOUT,
     THREAD_MAJOR,
@@ -134,25 +137,26 @@ PLAIN_MID_X = sheet_x(FULL_THREAD_LENGTH + PLAIN_SHANK / 2.0)
 # the faced end. The thread's Ø line (printed as the thread designation)
 # stands below the thread, short of row 1; the head's Ø right of the faced
 # end, between its extension lines.
-# The plain shank's reference Ø stands ABOVE the plain shank, on its
-# mid-station (the ThreadLimitReference witness spans it, so the dimension
-# line rises from the shank with no extension line): below it, the
-# FullThreadLength extension line drops from the split edge to row 1 and
-# would strike its text. 26 mm over the axis puts the text 8 mm above the
-# head's top silhouette (AXIS_Y + 18 mm), left of the head (shoulder at
-# PLAIN_MID_X + 9 mm) and 12 mm under the eye callout's text row; the eye
-# leader leaves that text at EYE_X - 20 mm, 13 mm right of this line.
+# The plain shank's reference Ø, (Ø1.52), is added on the sheet between the
+# plain shank's two flank silhouettes (_plain_shank_reference). Its text
+# stands ABOVE the plain shank on its mid-station, so the vertical dimension
+# line rises from the flanks with zero-length extension lines: below the
+# shank, the FullThreadLength extension line drops from the split edge to
+# row 1 and would strike its text. 26 mm over the axis puts the text 8 mm
+# above the head's top silhouette (AXIS_Y + 18 mm), left of the head
+# (shoulder at PLAIN_MID_X + 9 mm) and 12 mm under the eye callout's text
+# row; the eye leader leaves that text at EYE_X - 20 mm, 13 mm right of this
+# line.
 _ROW_1_Y = AXIS_Y - 0.032
 _ROW_2_Y = AXIS_Y - 0.050
 _ROW_ABOVE_Y = AXIS_Y + 0.035
-_SHANK_DIA_Y = AXIS_Y + 0.026
+SHANK_DIA_XY = (PLAIN_MID_X, AXIS_Y + 0.026)
 SIDE_KEEP = {
     "FullThreadLength": ((THREAD_END_X + FULL_THREAD_X) / 2.0, _ROW_1_Y),
     "HeadHeight": ((SHOULDER_X + TOP_X) / 2.0, _ROW_1_Y),
     "OverallLength": ((THREAD_END_X + TOP_X) / 2.0, _ROW_2_Y),
     "EyeFromHeadEnd": ((EYE_X + TOP_X) / 2.0, _ROW_ABOVE_Y),
     "ThreadDia": (sheet_x(6.0), AXIS_Y - 0.016),
-    "ShankDia": (PLAIN_MID_X, _SHANK_DIA_Y),
     "HeadDia": (TOP_X + 0.021, AXIS_Y),
 }
 # The eye callout stands up and LEFT of the eye, above the bare thread (the
@@ -182,6 +186,83 @@ def _shift(
     points: dict[str, tuple[float, float]], dx: float, dy: float
 ) -> dict[str, tuple[float, float]]:
     return {name: (x + dx, y + dy) for name, (x, y) in points.items()}
+
+
+@_telemetry.traced("drawing.pen_adjust_screw.plain_shank_reference")
+def _plain_shank_reference(
+    adapter: Any, side: Any, text_xy: tuple[float, float]
+) -> None:
+    """(Ø1.52): the plain shank between its two flank silhouettes.
+
+    The plain shank is the thread blank (its Ø is the thread's basic major),
+    so it prints once as a reference with no band (rule 10). It is not a model
+    dimension: two diametric dimensions in the thread-limit sketch came back
+    non-diametric on the farm (build_pn_pen_adjust_screw._add_thread_limit).
+    A revolved flank is a silhouette, not a model edge, so both picks resolve
+    by the plain shank's own face (the split leaves it its own cylinder, so
+    the threaded face cannot match) through a point projected onto each flank
+    at the plain shank's mid-station; the dimension is proved attached to that
+    face's silhouettes and measuring THREAD_MAJOR before it is parenthesised.
+    """
+    label = "MHA-PN-007 plain shank diameter reference"
+    station_mm = FULL_THREAD_LENGTH + PLAIN_SHANK / 2.0
+    face = CylinderFace(THREAD_MAJOR, contains_y_mm=station_mm)
+    # Right-plane profile: sketch u -> model -Z, so the flanks sit at z = +-r
+    # (model metres).
+    flank_xy = {
+        key: model_point_in_view(
+            adapter,
+            side,
+            (0.0, station_mm / 1000.0, sign * THREAD_MAJOR / 2000.0),
+            label=f"{label} {key} flank",
+        )
+        for key, sign in (("near", 1.0), ("far", -1.0))
+    }
+    silhouettes = face_silhouettes_through(
+        adapter,
+        side,
+        {key: (face, xy) for key, xy in flank_xy.items()},
+        label=label,
+    )
+    picks = (silhouettes["near"], silhouettes["far"])
+    kinds = ("SILHOUETTE", "SILHOUETTE")
+    display = add_edge_dimension(
+        adapter,
+        side,
+        # Documentation only: both picks are by entity.
+        p0=flank_xy["near"],
+        p1=flank_xy["far"],
+        text_xy=text_xy,
+        label=label,
+        # The stud lies along the sheet X, so its Ø spans the sheet Y.
+        orientation="vertical",
+        entity_types=kinds,
+        entities=picks,
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    dimension_type = int(display.Type2)
+    # swLinearDimension, swVertLinearDimension
+    if dimension_type not in (2, 12):
+        raise RuntimeError(
+            f"{label}: expected a linear dimension, got type {dimension_type}"
+        )
+    # Both flanks belong to the one face, so the attachment check matches each
+    # by face; the value tells the two flanks from one flank twice.
+    assert_dimension_measures(
+        adapter,
+        display,
+        expected_mm=THREAD_MAJOR,
+        label=label,
+        entities=picks,
+        entity_types=kinds,
+        tolerance_mm=1e-3,
+    )
+    set_reference_dimension(
+        adapter, display.GetAnnotation(), label=label, diameter=True
+    )
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+        raise RuntimeError(f"{label} precision did not persist")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -254,13 +335,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # says what it bounds.
     set_dimension_text(adapter, annotations, DIMENSION_TEXT)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="below")
-    # The plain shank is the thread blank: its Ø prints once, parenthesised
-    # as a reference with no band.
-    by_name = {dimension_name(adapter, a): a for a in annotations}
-    for name in sorted(REFERENCE_DIMENSIONS):
-        set_reference_dimension(
-            adapter, by_name[name], label=f"MHA-PN-007 {name}", diameter=True
-        )
+    # After HLR (the silhouette sweep reads the view as displayed).
+    _plain_shank_reference(adapter, side, spt(*SHANK_DIA_XY))
     if not auto_center_marks(adapter, side, holes=True, size=0.0025):
         raise RuntimeError("failed to add the ASME center mark to the eye")
     add_view_centerline(

@@ -170,19 +170,24 @@ DETAIL_LETTER_XY = (_fx(_HALF + 5.0), _fy(-PIVOT_LENGTH / 2.0))
 # right so neither extension line runs through the toleranced text.  The
 # pivot length's text stands 16 mm right of the square's side (x 0.0885,
 # ~0.085..0.092) to leave the detail letter room between it and the pivot.
-# The shoulder root's R MAX (R0.2 MAX / SEATS ON PEN V-BLOCK / MHA-PN-005,
-# ~57 x 17 mm) stands up-right of the right shoulder: centred at
-# (0.110, 0.11125) it spans x 0.0815..0.1385, y 0.103..0.120 -- 3.5 mm above
-# the 10.5's upper extension line (y 0.0993), 9 mm right of the square, 19 mm
-# left of the bottom view's note (x >= 0.1575).  Its leader leaves the text's
-# left end at ~52 deg down to the corner (0.0722, 0.0990), crossing only the
-# fence it shares the corner with, never the 10.5's lines (it stays above
-# y 0.0993 until x 0.0724, left of where that extension line starts).
+# The shoulder root's R MAX (R0.2 MAX / SEATS ON PEN V-BLOCK / MHA-PN-005)
+# stands up-right of the right shoulder.  Farm leaf 20261014T003619Z measured
+# the block centred on (0.110, 0.11125) as x 0.0819..0.1365 with its shoulder
+# (the line under the text) at y 0.1029, half height 8.35 mm -- and that
+# shoulder crossed the 10.5's dimension line, which runs past the shoulder
+# face (y 0.0992) to its outside arrow at y 0.1056 on x 0.0885.  Raised 7 mm
+# to (0.110, 0.11825): shoulder at y ~0.1099, 4.3 mm above that arrow, top
+# ~0.1266; nothing else lives in x 0.082..0.137, y 0.110..0.127 (the square
+# ends at x 0.0725, the bottom view's note starts right of x ~0.157, the end
+# views at y >= 0.130 lie right of x 0.190).  Its leader leaves the text's
+# left end (~0.0819, 0.1099) at ~48 deg down to the corner (0.0722, 0.0990),
+# left of x 0.082 throughout, so it never meets the 10.5's lines; it reaches
+# y 0.0993 at x ~0.0724, left of where that extension line starts.
 FRONT_KEEP = {
     "Length": (_fx(-_HALF) - 0.012, _fy(SQUARE_LENGTH / 2.0)),
     "PivotLength": (_fx(_HALF) + 0.016, _fy(-PIVOT_LENGTH / 2.0)),
     "Section": (_fx(0.0) + 0.040, _fy(SQUARE_LENGTH) + 0.010),
-    "ShoulderRadius": (_fx(_HALF) + 0.0375, _fy(12.0)),
+    "ShoulderRadius": (_fx(_HALF) + 0.0375, _fy(19.0)),
 }
 # The (122.5) end-to-end reference stands OUTSIDE the 112.0 (dimension line
 # x 0.0555): its line at x 0.0415, about 20 mm of text centred there

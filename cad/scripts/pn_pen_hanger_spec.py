@@ -170,9 +170,9 @@ if HANGER_THREAD_STRAP_WALL <= 0.0:
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  Front view (looking at the plates): the strap outline, the tap
 # station, the upper plate's drop and the (alike) lower plate's thickness.
-# Section A-A through the upper plate: its U outline, the slot-corner radius
-# and the strap stock thickness (the lower plate is identical and flush with
-# the strap bottom end -- notes). ---
+# Section A-A just above the upper plate, looking down onto it: its U
+# outline, the slot-corner radius and the strap stock thickness (the lower
+# plate is identical and flush with the strap bottom end -- notes). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StrapProfile": {"StrapTopRun", "StrapTaperDx", "StrapRise", "StrapBotWidth"},
     "Strap": {"StrapThick"},
@@ -225,6 +225,8 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 # Every tight band names its mate on the dimension it governs.
 DIMENSION_CALLOUTS: dict[str, str] = {
     "SlotWidth": f"2X SLIDING FIT ON\nPEN ROD {PEN_ROD_NUMBER}",
+    # "2X" counts the two corners of one slot, not the two plates.
+    "SlotCornerR": "EACH SLOT",
 }
 # (feature, dimension) -> native prefix.  A custom radius prefix replaces
 # SolidWorks' own "R", so it carries it: the section's two slot corners.
@@ -241,10 +243,21 @@ DRAWING_NOTES = "\n".join(
         "   THROUGH BOTH UNDER ITS OWN WEIGHT.",
     )
 )
-# Leadered on the upper plate in the front view: its lateral station is the
+# Leadered on the upper plate in section A-A: its lateral station is the
 # lower plate's (both centred on the rod line), which the strap's foot
-# corners fix (note 1).  A dimension instead would need a long extension
-# line beside the tapered edge or a reference value off that taper.
+# corners fix (note 1).
 UPPER_PLATE_LOCATION_CALLOUT = "IN LINE WITH\nLOWER PLATE"
+# What that station leaves the reader to work out (rule 10): the upper
+# plate's +x edge stands past the tapered strap's edge at the plate's top
+# face.  Section A-A prints it as a reference, measured on the sheet.
+UPPER_PLATE_OVERHANG = GUIDE_PLATE_WIDTH / 2.0 - (
+    STRAP_TOP_X[1]
+    + (STRAP_BOT_X[1] - STRAP_TOP_X[1])
+    * (GUIDE_PLATE_YS[1] + GUIDE_PLATE_T)
+    / STRAP_BOT_Y
+)
+DRAWING_REFERENCE_PRECISION = 1
+if UPPER_PLATE_OVERHANG <= 0.0:
+    raise AssertionError("the upper guide plate no longer overhangs the strap edge")
 FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:1"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

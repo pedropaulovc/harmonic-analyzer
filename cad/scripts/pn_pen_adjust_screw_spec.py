@@ -27,8 +27,9 @@ marked dimension lives in a Right-plane sketch, so all of them import into
 the *Right side view, where the eye is seen end-on. The eye's station rides
 a hidden reference sketch (``EyeStationReference``): the Hole Wizard's
 cylindrical placement sketch carries no printable dimension. The plain
-shank's diameter rides the thread-limit split sketch
-(``ThreadLimitReference``).
+shank's diameter is not a model dimension: the drawing adds it between the
+plain shank's two flank silhouettes and parenthesises it, its places from
+``DRAWING_REFERENCE_PRECISION``.
 """
 
 from __future__ import annotations
@@ -107,7 +108,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "OverallLength",
     },
     "EyeStationReference": {"EyeFromHeadEnd"},
-    "ThreadLimitReference": {"ShankDia"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StudProfile": {
@@ -118,8 +118,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "OverallLength": 1,
     },
     "EyeStationReference": {"EyeFromHeadEnd": 1},
-    # A reference size carries no band; two places read the basic 1.524.
-    "ThreadLimitReference": {"ShankDia": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -130,8 +128,9 @@ if {
     feature: set(names) for feature, names in DRAWING_PRECISION.items()
 } != DRAWING_DIMENSIONS:
     raise AssertionError("every marked adjuster dimension needs authored places")
-# The plain shank is turned with the thread blank: its Ø prints parenthesised.
-REFERENCE_DIMENSIONS = frozenset({"ShankDia"})
+# The plain shank is turned with the thread blank: the sheet adds its Ø
+# between the plain shank's flanks as a reference, (Ø1.52), no band.
+DRAWING_REFERENCE_PRECISION = 2
 
 # The thread's major-diameter dimension prints as its designation (the
 # title block's THREADS row owns the class), so the print never states the

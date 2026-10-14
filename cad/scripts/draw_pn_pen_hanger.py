@@ -11,9 +11,10 @@ tall) with two open U guide plates brazed across its front face; the pen rod
 hangs in both slots.  The front view (1:1, ``*Back``: looking at the strap's
 front face and the plates from the machine front, as note 1 names it) carries
 the strap outline, the tap station, the upper plate's drop and the plates'
-thickness; section A-A (2:1) cuts across the upper plate and looks down on its
-U, carrying the slot, its corner radius and the strap stock; the shaded
-isometric sits right.
+thickness; section A-A (2:1) cuts the strap just above the upper plate and
+looks down onto its U, carrying the slot, its corner radius, the strap stock,
+the plate's overhang past the strap (a reference) and its in-line callout;
+the shaded isometric sits right.
 
 Run with SolidWorks open::
 
@@ -49,7 +50,9 @@ from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
     set_dimension_callouts,
+    set_reference_dimension,
 )
+from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
@@ -67,6 +70,7 @@ from pn_pen_hanger_spec import (
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     GUIDE_PLATE_T,
     GUIDE_PLATE_WIDTH,
     GUIDE_PLATE_YS,
@@ -79,6 +83,7 @@ from pn_pen_hanger_spec import (
     STRAP_TOP_X,
     STRAP_Z,
     UPPER_PLATE_LOCATION_CALLOUT,
+    UPPER_PLATE_OVERHANG,
 )
 
 
@@ -118,19 +123,37 @@ def _strap_x_at(y_mm: float) -> tuple[float, float]:
     )
 
 
-# Section A-A: a horizontal cutting plane through the upper plate's
-# mid-thickness, looking down (-y) on its U.  Shown cut faces only, its ink is
-# the strap's section there plus the plate's U; the cutting line overruns
-# that silhouette by SECTION_LINE_OVERRUN each side so the cut closes.
-SECTION_Y = GUIDE_PLATE_YS[1] + GUIDE_PLATE_T / 2.0
-_SECTION_X = (
-    min(_strap_x_at(SECTION_Y)[0], -_HALF_PLATE),
-    max(_strap_x_at(SECTION_Y)[1], _HALF_PLATE),
-)
+_UPPER_TOP_Y = GUIDE_PLATE_YS[1] + GUIDE_PLATE_T
+
+# Section A-A: a horizontal cutting plane just above the upper plate, looking
+# down (-y) onto it: the strap's cut is hatched and the plate's U prints
+# below it as visible outline (the lower plate, alike and in line, hides
+# behind it).  The plane clears the plate's top face by SECTION_ABOVE_PLATE,
+# so the heavy cutting line does not overprint the 1.5 plate on the 1:1
+# front view, yet stays close enough that the strap edge it cuts reads the
+# plate's overhang at the plate to the printed place (guarded below).
+SECTION_ABOVE_PLATE = 0.8
+SECTION_Y = _UPPER_TOP_Y + SECTION_ABOVE_PLATE
+_STRAP_CUT_X = _strap_x_at(SECTION_Y)
+_SECTION_X = (min(_STRAP_CUT_X[0], -_HALF_PLATE), max(_STRAP_CUT_X[1], _HALF_PLATE))
 _SECTION_Z = (PLATE_FRONT_Z, STRAP_Z[1])
 _SX = (_SECTION_X[0] + _SECTION_X[1]) / 2.0
 _SZ = (_SECTION_Z[0] + _SECTION_Z[1]) / 2.0
-SECTION_LINE_OVERRUN = 1.5
+# The plate's +x edge past the strap's cut edge, which the section prints as
+# a reference: the same .X value as the overhang at the plate's top face.
+_OVERHANG_AT_CUT = _HALF_PLATE - _STRAP_CUT_X[1]
+if round(_OVERHANG_AT_CUT, DRAWING_REFERENCE_PRECISION) != round(
+    UPPER_PLATE_OVERHANG, DRAWING_REFERENCE_PRECISION
+):
+    raise AssertionError(
+        "section A-A sits too far above the plate to read its overhang"
+    )
+# The cutting line overruns that silhouette so each arrow's letter (5.5 mm
+# wide, 15-20 mm under the line on the 20261014T002650255Z sheet) stands
+# clear of the slanted strap edge below it: about 1.9 mm on the +x side,
+# and on the -x side 2.2 mm from the strap edge and 1.5 mm from the
+# StrapTaperDx extension line (sheet x 0.0855) beyond it.
+SECTION_LINE_OVERRUN = 4.0
 SECTION_LINE_MODEL_MM = (
     (_SECTION_X[1] + SECTION_LINE_OVERRUN, SECTION_Y, 0.0),
     (_SECTION_X[0] - SECTION_LINE_OVERRUN, SECTION_Y, 0.0),
@@ -154,12 +177,6 @@ NOTES_XY = (0.110, 0.094)
 CALLOUT_XY = (0.137, 0.215)
 # Under the front view's StrapTaperDx row (its text at y 0.045).
 FRONT_NOTE_XY = (0.030, 0.034)
-# The upper plate's "in line" callout (rule 10): its text top-left right of
-# the StrapTaperDx extension line (sheet x 0.0855), its straight leader
-# dropping left onto the plate's top edge, passing over the A-A cutting
-# line's right end (y 0.1058 at x 0.0786) about 5 mm clear, under the tap
-# callout and above the notes.
-UPPER_PLATE_NOTE_XY = (0.090, 0.124)
 
 
 def _fx(model_x_mm: float) -> float:
@@ -182,13 +199,11 @@ def _az(model_z_mm: float) -> float:
     return SECTION_CENTER[1] + (model_z_mm - _SZ) * _SECTION_M_PER_MM
 
 
-_UPPER_TOP_Y = GUIDE_PLATE_YS[1] + GUIDE_PLATE_T
-
 # Front view: the tap station and the strap's top run stacked above it (the
 # station's value left of the origin corner, outside the run's extension
 # lines); the tap height, the upper plate's drop and the strap's rise stacked
 # left, shortest nearest; the lower plate's thickness at the bottom left, its
-# value under the plate, far from section A-A's cutting line through the
+# value under the plate, far from section A-A's cutting line just above the
 # upper plate; the strap's bottom width and its taper under the view, so the
 # taper's long extension line drops from the top outer corner outside the
 # tapered edge instead of running down through the strap.
@@ -262,10 +277,27 @@ SLOT_WIDTH_TEXT_XY = (
 # The native SECTION A-A / SCALE 2 : 1 caption's top centre, under the plate
 # width row.
 SECTION_CAPTION_XY = (SECTION_CENTER[0], SECTION_ROW_Y["PlateWidth"] - 0.012)
+# The overhang reference (rule 10): picked on the strap's cut edge at mid
+# thickness and on the plate's +x edge 7 mm ahead of its back, clear of the
+# plate-back and slot-bottom extension lines.  Its row 6 mm above the strap
+# back face; its value left of the plate edge's extension line (the 2.5 mm
+# span holds no text), as the arm width's sits.  The plate edge's extension
+# line rises past the strap foot and crosses only the slot bottom's
+# extension line (rule 14: conventional).
+OVERHANG_PICK_Z = ((STRAP_Z[0] + STRAP_Z[1]) / 2.0, STRAP_Z[0] - 7.0)
+_OVERHANG_ROW_Y = _az(STRAP_Z[1]) + 0.006
+OVERHANG_TEXT_XY = (_ax(_HALF_PLATE) - 0.0085, _OVERHANG_ROW_Y + _VALUE_ABOVE_LINE)
+# The in-line callout (rule 10) on section A-A, where the plate shows in
+# plan: the leader tip on the plate's -x edge midway between the slot bottom
+# and the plate front; the text top-left 13 mm right of that edge, between
+# the corner radius's text above and the slot width's block below, so the
+# leader runs nearly level and crosses nothing.
+UPPER_PLATE_NOTE_TIP = (_ax(-_HALF_PLATE), _az((SLOT_BOTTOM_Z + PLATE_FRONT_Z) / 2.0))
+UPPER_PLATE_NOTE_XY = (UPPER_PLATE_NOTE_TIP[0] + 0.013, UPPER_PLATE_NOTE_TIP[1] + 0.006)
 
 
 def _create_section(adapter: Any, front: Any) -> Any:
-    """Section A-A across the upper plate, cut faces only, looking down."""
+    """Section A-A just above the upper plate, looking down onto it."""
     line = [
         model_point_in_view(
             adapter,
@@ -287,12 +319,14 @@ def _create_section(adapter: Any, front: Any) -> Any:
     )
     native = _early_bound(section, "IView")
     cut = _early_bound(native.GetSection(), "IDrSection")
-    # Nothing below the plate (the lower plate, the strap's foot) prints over
-    # the U.  R2026x declares the setter void; only the getter is tested.
-    cut.SetDisplayOnlySurfaceCut(True)
-    rebuild_drawing(adapter, label="hanger section cut faces only")
-    if not bool(cut.GetDisplayOnlySurfaceCut()):
-        raise RuntimeError("hanger section A-A retained geometry beyond the cut")
+    # The plate lies below the cut: it must print as visible outline beyond
+    # it, so the section may not be a surface cut only.  R2026x declares the
+    # setter void; only the getter is tested.
+    if bool(cut.GetDisplayOnlySurfaceCut()):
+        cut.SetDisplayOnlySurfaceCut(False)
+        rebuild_drawing(adapter, label="hanger section shows the plate below")
+        if bool(cut.GetDisplayOnlySurfaceCut()):
+            raise RuntimeError("hanger section A-A hides the plate beyond the cut")
     ratio = tuple(float(value) for value in native.ScaleRatio)
     if not math.isclose(ratio[0] / ratio[1], SECTION_SCALE[0] / SECTION_SCALE[1]):
         raise RuntimeError(f"hanger section A-A scale did not persist: {ratio}")
@@ -391,6 +425,49 @@ def _centre_section(adapter: Any, native: Any) -> None:
     )
 
 
+def _add_overhang_reference(adapter: Any, section: Any) -> None:
+    """The upper plate's +x edge past the strap's cut edge, as a reference.
+
+    Both ends are real edges of section A-A (the strap's hatched cut and the
+    plate's outline below it); the value is read back before it is
+    parenthesized, so a pick that resolved to a neighbouring line fails the
+    build instead of printing a wrong number.
+    """
+    label = "upper plate overhang reference"
+    strap_edge, plate_edge = model_points_in_view(
+        adapter,
+        section,
+        (
+            (_STRAP_CUT_X[1] / 1000.0, SECTION_Y / 1000.0, OVERHANG_PICK_Z[0] / 1000.0),
+            (_HALF_PLATE / 1000.0, _UPPER_TOP_Y / 1000.0, OVERHANG_PICK_Z[1] / 1000.0),
+        ),
+        label=label,
+        names=("strap cut edge", "plate +x edge"),
+    )
+    display = _early_bound(
+        add_edge_dimension(
+            adapter,
+            section,
+            p0=strap_edge,
+            p1=plate_edge,
+            text_xy=OVERHANG_TEXT_XY,
+            label=label,
+            orientation="horizontal",
+        ),
+        "IDisplayDimension",
+    )
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue)) * 1000.0
+    if abs(measured_mm - _OVERHANG_AT_CUT) > 1e-4:
+        raise RuntimeError(
+            f"{label} measured {measured_mm:g}, expected {_OVERHANG_AT_CUT:g}"
+        )
+    set_reference_dimension(adapter, display.GetAnnotation(), label=label)
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+        raise RuntimeError(f"{label} precision did not persist")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -472,6 +549,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _add_overhang_reference(adapter, section)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the hanger-screw hole")
 
@@ -495,16 +573,15 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Front View Note", *FRONT_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    # Rule 10: the upper plate's lateral station is the lower plate's.  The
-    # leader tip sits on the plate's top edge, on its -x half inside the
-    # strap, clear of the A-A cutting line 0.75 mm below that edge.
+    # Rule 10: the upper plate's lateral station is the lower plate's, said
+    # on section A-A where the plate shows in plan beside its overhang.
     add_leader_note(
         adapter,
         UPPER_PLATE_LOCATION_CALLOUT,
         text_xy=UPPER_PLATE_NOTE_XY,
-        attach_xy=(_fx(-_HALF_PLATE / 2.0), _fy(_UPPER_TOP_Y)),
+        attach_xy=UPPER_PLATE_NOTE_TIP,
         label="upper guide plate in line with the lower",
-        view=front,
+        view=section,
     )
 
     # Materialize the iso's cosmetic thread before the strict final note cleanup;
