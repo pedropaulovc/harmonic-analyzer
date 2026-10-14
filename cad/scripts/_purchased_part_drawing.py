@@ -30,8 +30,14 @@ _PART_VIEW_CELLS = (
 )
 
 
-async def build_purchased_part_drawing(adapter: Any, spec: DrawingSpec) -> dict[str, str]:
-    """Front/Top/Right plus Isometric of a purchased part, its note as the install line."""
+async def build_purchased_part_drawing(
+    adapter: Any, spec: DrawingSpec, *, hidden_lines_removed: bool = False
+) -> dict[str, str]:
+    """Front/Top/Right plus Isometric of a purchased part, its note as the install line.
+
+    ``hidden_lines_removed`` drops the dashed edges from Front/Top/Right too,
+    as for a purchased fastener, where they only clutter an undimensioned view.
+    """
     source = spec.source
     if spec.source_kind != "part" or not source.is_file():
         raise FileNotFoundError(f"source purchased part is missing: {source}")
@@ -49,4 +55,5 @@ async def build_purchased_part_drawing(adapter: Any, spec: DrawingSpec) -> dict[
         material_property="Material Specification",
         installation_notes=properties["Manufacturing Notes"],
         cells=_PART_VIEW_CELLS,
+        hidden_lines_removed=hidden_lines_removed,
     )

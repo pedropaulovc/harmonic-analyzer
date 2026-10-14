@@ -27,14 +27,14 @@ def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
     assert spec.layout is DrawingLayout.LANDSCAPE
     calls = []
 
-    async def fake(adapter, drawn):
-        calls.append((adapter, drawn))
+    async def fake(adapter, drawn, *, hidden_lines_removed=False):
+        calls.append((adapter, drawn, hidden_lines_removed))
         return {"pdf": "x"}
 
     monkeypatch.setattr(draw, "build_purchased_part_drawing", fake)
     adapter = object()
     assert asyncio.run(draw.build(adapter)) == {"pdf": "x"}
-    assert calls == [(adapter, spec)]
+    assert calls == [(adapter, spec, True)]
 
 
 def test_registry_row_is_the_bought_chain_not_a_machined_part() -> None:
@@ -73,7 +73,10 @@ def test_note_is_one_short_line_that_closes_the_loop_count() -> None:
     assert " MM" not in note
     quantity = int(ROW["quantity"])
     # All but one come in the cut chain; the connecting link is the last.
-    assert f"{quantity} PER LOOP: {quantity - 1} IN THE CUT CHAIN, 1 IS " in note
+    assert (
+        f"{quantity} PER LOOP: {quantity - 1} IN THE CUT {_chain_link.CHAIN_SKU} "
+        f"+ 1 {_chain_link.CONNECTING_LINK_SKU} CONNECTING LINK" in note
+    )
     assert _chain_link.CONNECTING_LINK_SKU == ROW["supplier_skus"][1]
-    assert _chain_link.CONNECTING_LINK_SKU in note
-    assert "CLOSED END LEADING" in note
+    # Clip orientation is assembly information, kept on the A-sheet step.
+    assert "LEADING" not in note

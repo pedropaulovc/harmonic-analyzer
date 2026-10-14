@@ -64,15 +64,17 @@ if _ROWS["vn-chain-inner-link"]["supplier_skus"] != [CHAIN_SKU]:
 LINKS_PER_KIND = LINK_COUNT // 2
 # The chain is sold by the foot; the loop is LINK_COUNT whole pitches of it.
 CHAIN_ORDER_FEET = math.ceil(LINK_COUNT * LINK_PITCH / 304.8)
-# One line each: the purchased sheet reserves ~0.21 m for the note.
+# One line each: the purchased sheet reserves ~0.21 m for the note. The
+# connecting link's clip orientation is an assembly fact (MHA-PD-000 step).
 DRAWING_NOTES = {
     "vn-chain-inner-link": (
-        f"CUT {CHAIN_ORDER_FEET} FT OF {CHAIN_SKU} TO {LINK_COUNT} PITCHES, "
-        f"INNER LINK AT EACH END: {LINKS_PER_KIND} PER LOOP."
+        f"BREAK {CHAIN_ORDER_FEET} FT OF {CHAIN_SKU} TO {LINKS_PER_KIND} INNER + "
+        f"{LINKS_PER_KIND - 1} OUTER LINKS; {CONNECTING_LINK_SKU} CLOSES "
+        f"{LINK_COUNT} PITCHES."
     ),
     "vn-chain-outer-link": (
-        f"{LINKS_PER_KIND} PER LOOP: {LINKS_PER_KIND - 1} IN THE CUT CHAIN, "
-        f"1 IS {CONNECTING_LINK_SKU} (CLIP CLOSED END LEADING)."
+        f"{LINKS_PER_KIND} PER LOOP: {LINKS_PER_KIND - 1} IN THE CUT {CHAIN_SKU} "
+        f"+ 1 {CONNECTING_LINK_SKU} CONNECTING LINK."
     ),
 }
 # Everything the purchased-part sheet reads from the saved part.

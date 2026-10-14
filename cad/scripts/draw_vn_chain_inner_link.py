@@ -21,7 +21,8 @@ PART_STEM = SPEC.artifact_stem
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_part_drawing(adapter, SPEC)
+    # Undimensioned reference views: dashed bores and pins inform nothing.
+    return await build_purchased_part_drawing(adapter, SPEC, hidden_lines_removed=True)
 
 
 def _parse_args() -> argparse.Namespace:
