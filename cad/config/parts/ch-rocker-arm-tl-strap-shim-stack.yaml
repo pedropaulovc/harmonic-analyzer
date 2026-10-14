@@ -2,7 +2,7 @@ ch-rocker-arm-tl-strap-shim-stack:
   title: Rocker Strap Shim Stack
   # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
   number: MHA-CH-006-TL-11
-  material: precision ground flat stock (AISI O1) on steel shim stock
+  material: AISI O1 ground flat on steel shim
   material_specification: "AISI O1 precision ground flat stock, 3/32 x 3/4 in (Abrams Industries), as supplied (annealed); steel shim stock 0.001-0.031 in assortment (Precision Brand, MSC 86798816)"
   finish: protect with ISO VG 32 machine-oil film
   quantity: 4

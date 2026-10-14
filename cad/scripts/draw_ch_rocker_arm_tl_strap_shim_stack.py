@@ -63,10 +63,12 @@ FACE_KEEP = {
 }
 # Neither thickness fits its text between its extension lines: the piece's
 # text sits above the view's top extension line (callout above, so the
-# dimension line meets the value first), the pack's below the bottom one.
+# dimension line meets the value first), the pack's below the bottom one,
+# in line with it. Both sit right of the view: outside text runs away from the
+# view along its shelf, and on the left the pack's callout left the sheet.
 EDGE_KEEP = {
     "StripThick": (0.200, 0.122),
-    "ShimThick": (0.075, 0.088),
+    "ShimThick": (0.200, 0.088),
 }
 CALLOUTS_ABOVE = {"StripThick": "FLAT STOCK AS SUPPLIED"}
 CALLOUTS_BELOW = {
