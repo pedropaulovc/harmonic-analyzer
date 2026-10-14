@@ -92,8 +92,11 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
         "every marked strap shim stack dimension needs authored places"
     )
 # The stock thickness and the shim pack print as references: the pack is
-# built to each blank's gap, so neither carries an acceptance band.
+# built to each blank's gap, so neither carries a band. The pack's acceptance
+# is fit-up instead (Main's ruling 2026-10-14): a feeler of this size must not
+# enter between the stack and the blank's strap face.
 REFERENCE_DIMENSIONS = ("StripThick", "ShimThick")
+FIT_UP_FEELER_NO_GO = 0.05
 
 DRAWING_NOTES = "BOTH FLAT FACES BEAR: KEEP THEM FREE OF BURRS AND NICKS."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 4:1"

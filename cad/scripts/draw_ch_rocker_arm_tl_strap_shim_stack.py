@@ -73,9 +73,12 @@ EDGE_KEEP = {
 CALLOUTS_ABOVE = {"StripThick": "FLAT STOCK AS SUPPLIED"}
 CALLOUTS_BELOW = {
     "StackWidth": "UNDER THE ARM STRAP",
-    # The acceptance and the mate (codex): the pack is built per blank until
+    # The mate and the fit-up acceptance: the pack is chosen at setup until
     # the stack bears on the rocker blank's strap face.
-    "ShimThick": "SHIM TO BEAR ON MHA-CH-006 STRAP FACE",
+    "ShimThick": (
+        "SHIM AT SETUP TO BEAR ON MHA-CH-006 STRAP FACE: "
+        f"{part_spec.FIT_UP_FEELER_NO_GO:.2f} FEELER NO-GO"
+    ),
 }
 
 
