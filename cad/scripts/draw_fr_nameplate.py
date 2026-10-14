@@ -52,7 +52,7 @@ from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
@@ -187,9 +187,34 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {"PlateThick": (RIGHT_CENTER[0], _TOP + 0.012)}
 HOLE_CALLOUT_XY = (_LEFT + 0.045, _TOP + 0.021)
-# The callout's rim pick: up-right, towards its text, clear of the head
-# mark's slot, whose edges cross the rim (the offline test proves 0.15 air).
-HOLE_CALLOUT_RIM_DEGREES = 75.0
+
+
+def _hole_rim_edge(edges: ViewEdges, hole: tuple[float, float]) -> Any:
+    """The visible rim circle of ``hole`` in the face view, picked by entity.
+
+    A coordinate pick on the rim took a head-mark slot edge instead (r1 leaf,
+    worker 10, 2026-10-14: AddHoleCallout2 refused the EngravingCut line), so
+    the callout's edge is the scanned circle of the hole's own radius and
+    centre; of its face and back rims, the decorated-face one (highest z).
+    """
+    rims = [
+        item
+        for item in edges.circles
+        if abs(item.circle[6] - HOLE_R) < 0.01
+        and math.dist(item.circle[:2], hole) < 0.02
+    ]
+    if not rims:
+        raise RuntimeError(
+            f"no visible r={HOLE_R:g} rim at {hole} in the {edges.label!r} scan; "
+            f"{len(edges.circles)} circles: "
+            + "; ".join(
+                f"({item.circle[0]:.3f}, {item.circle[1]:.3f}, "
+                f"{item.circle[2]:.3f}) r={item.circle[6]:.3f}"
+                for item in edges.circles
+            )
+        )
+    return max(rims, key=lambda item: item.circle[2]).edge
+
 
 # Section A-A: a removed cut across the left border into the sunk field at
 # SECTION_Y (plate-local), from just outside the left edge to SECTION_X_END.
@@ -551,12 +576,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         front,
-        edge_xy=model_point_in_view(
-            adapter,
-            front,
-            _mm_to_m(_rim(TOP_LEFT, HOLE_CALLOUT_RIM_DEGREES)),
-            label="hole callout rim",
-        ),
+        edge=_hole_rim_edge(scan_view_edges(front, label="front"), TOP_LEFT),
         callout_xy=HOLE_CALLOUT_XY,
         label="nameplate screw holes",
         process=HOLE_CALLOUT_PROCESS,

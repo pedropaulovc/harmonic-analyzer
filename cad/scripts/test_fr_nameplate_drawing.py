@@ -86,12 +86,11 @@ def test_each_hole_prints_one_station_value_per_edge_pair() -> None:
         assert len(rounded) == 1, label
 
 
-def test_rim_picks_land_on_each_hole_and_off_the_head_mark() -> None:
+def test_station_rim_picks_land_on_each_hole_and_off_the_head_mark() -> None:
     # The pick sits on the rim; the nearest engraved edge stands off it, so
     # the coordinate pick cannot take the head mark instead of the hole.
     engraving = _rings(part.ENGRAVING_DXF)
     picks = [
-        drawing._rim(drawing.TOP_LEFT, drawing.HOLE_CALLOUT_RIM_DEGREES),
         drawing.FRONT_PICKS["right hole station"]["p1"],
         drawing.FRONT_PICKS["top hole station"]["p1"],
     ]
