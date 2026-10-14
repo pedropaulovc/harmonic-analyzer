@@ -7,6 +7,7 @@ tail goes in the bench vise (``ch_rocker_arm_tl_filing_stud_spec``).
 
 Layout: four Right-plane circles, each extruded from the seat face (X0) to
 its step: body and thread toward +X, head and tail reversed toward -X. A
+thread-relief annulus is then cut from a plane at the body shoulder. A
 hidden station sketch carries the print's axial baseline from the faced tip.
 
 Run (SolidWorks already open)::
@@ -36,6 +37,7 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
+from _visibility import blank_reference_geometry
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
@@ -52,6 +54,8 @@ from ch_rocker_arm_tl_filing_stud_spec import (
     HEAD_DIA,
     HEAD_LENGTH,
     ISOMETRIC_VIEW_NOTE,
+    RELIEF_DIA,
+    RELIEF_WIDTH,
     TAIL_DIA,
     TAIL_END,
     THREAD_END,
@@ -74,11 +78,13 @@ def _area(dia: float) -> float:
     return math.pi * (dia / 2.0) ** 2
 
 
+V_RELIEF = (_area(THREAD_MODEL_DIA) - _area(RELIEF_DIA)) * RELIEF_WIDTH
 V_TOTAL = (
     _area(BODY_DIA) * BODY_LENGTH
     + _area(THREAD_MODEL_DIA) * (THREAD_END - BODY_LENGTH)
     + _area(HEAD_DIA) * HEAD_LENGTH
     + _area(TAIL_DIA) * (TAIL_END - HEAD_LENGTH)
+    - V_RELIEF
 )
 
 # (profile, feature, diameter knob, length knob, dia, length, reversed);
@@ -110,7 +116,7 @@ def _require_one_solid_body(adapter, *, label: str) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -119,6 +125,8 @@ async def build(adapter) -> dict[str, str]:
     for _profile, _feature, dia_knob, length_knob, dia, length, _rev in _STEPS:
         await set_global(adapter, dia_knob, f"{dia}mm")
         await set_global(adapter, length_knob, f"{length}mm")
+    await set_global(adapter, "ReliefDia", f"{RELIEF_DIA}mm")
+    await set_global(adapter, "ReliefWidth", f"{RELIEF_WIDTH}mm")
 
     drive_jobs: list[tuple[str, str]] = []
     for profile, feature, dia_knob, length_knob, dia, length, reverse in _STEPS:
@@ -148,6 +156,56 @@ async def build(adapter) -> dict[str, str]:
         drive_jobs.append(
             (name_dimensions(adapter, feature, [length_knob])[0], f'"{length_knob}"')
         )
+
+    # Thread relief: the thread annulus down to the relief floor, from a plane
+    # at the body shoulder toward the tip (build_dt_crankshaft's
+    # _cut_annulus_inboard: running away from the base plane takes
+    # reverse_direction; the volume gate fails loud on the wrong side).
+    check(
+        "create_plane ReliefStartPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Right Plane", offset=BODY_LENGTH
+            )
+        ),
+    )
+    name_last_feature(adapter, "ReliefStartPlane")
+    relief_start = name_dimensions(adapter, "ReliefStartPlane", ["ReliefStart"])[0]
+    drive_jobs.append((relief_start, '"BodyLength"'))
+    relief = SketchDims()
+    check("create_sketch Relief", await adapter.create_sketch("ReliefStartPlane"))
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        RELIEF_DIA / 2.0,
+        "relief floor circle",
+        dims=relief,
+        names=("ReliefCx", "ReliefCy", "ReliefDia"),
+        drives=(None, None, '"ReliefDia"'),
+    )
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        THREAD_MODEL_DIA / 2.0 + 1.0,
+        "relief clearance circle",
+        dims=relief,
+        names=("ReliefOuterCx", "ReliefOuterCy", "ReliefOuterDia"),
+    )
+    await ensure_fully_defined(adapter, "Relief sketch")
+    check("exit_sketch Relief", await adapter.exit_sketch())
+    name_last_feature(adapter, "ReliefProfile")
+    drive_jobs += relief.apply(adapter, "ReliefProfile")
+    check(
+        "cut Relief",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=RELIEF_WIDTH, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "Relief")
+    relief_width = name_dimensions(adapter, "Relief", ["ReliefWidth"])[0]
+    drive_jobs.append((relief_width, '"ReliefWidth"'))
     await volume_check(adapter, "stud", V_TOTAL, 0.005 * V_TOTAL)
     _require_one_solid_body(adapter, label="stud")
 
@@ -163,9 +221,15 @@ async def build(adapter) -> dict[str, str]:
     rows = (
         ("head seat", 0.0, "SeatStation", '"ThreadEnd"'),
         (
-            "thread start",
+            "relief end",
+            BODY_LENGTH + RELIEF_WIDTH,
+            "ReliefEndStation",
+            '"ThreadEnd" - "BodyLength" - "ReliefWidth"',
+        ),
+        (
+            "body shoulder",
             BODY_LENGTH,
-            "ThreadStartStation",
+            "ShoulderStation",
             '"ThreadEnd" - "BodyLength"',
         ),
         (
@@ -244,6 +308,7 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     blank_sketch(adapter, "StationReference")
+    blank_reference_geometry(adapter, (("ReliefStartPlane", "PLANE"),))
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

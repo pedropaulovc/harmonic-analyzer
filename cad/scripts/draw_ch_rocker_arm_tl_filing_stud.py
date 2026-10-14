@@ -26,6 +26,7 @@ from _drawing_common import (
 from _drawing_dimensions import (
     assert_imported_precision,
     move_model_dimension,
+    set_dimension_callouts,
     set_dimension_text,
     set_reference_dimension,
 )
@@ -52,6 +53,8 @@ from ch_rocker_arm_tl_filing_stud_spec import (
     HEAD_LENGTH,
     REFERENCE_CALLOUTS,
     REFERENCE_DIMENSIONS,
+    RELIEF_WIDTH,
+    STACK_CALLOUT,
     SURFACE_FINISHES,
     TAIL_END,
     THREAD_END,
@@ -80,7 +83,9 @@ ISO_CENTER = (0.355, 0.195)  # clear of the two-line fit callout
 ISO_NOTE_XY = (0.295, 0.240)
 NOTES_XY = (0.020, 0.075)
 _TIP_X = SEAT_X + THREAD_END * _S
-_ROW = 0.012
+# Rows 15 mm apart: the seat row's stack callout stands between its value
+# and its dimension line.
+_ROW = 0.015
 
 
 def _row(station_x_mm: float, row: int) -> tuple[float, float]:
@@ -91,12 +96,16 @@ def _row(station_x_mm: float, row: int) -> tuple[float, float]:
     )
 
 
-# Shortest span lowest so no extension line crosses another row's text.
+# Shortest span lowest so no extension line crosses another row's text. The
+# seat's value and stack callout sit a little left of their span's middle:
+# the callout is wider than the value, and the tip's extension line rises
+# past it to the upper rows.
 PROFILE_KEEP = {
-    "ThreadStartStation": _row(BODY_LENGTH, 0),
-    "SeatStation": _row(0.0, 1),
-    "HeadBackStation": _row(-HEAD_LENGTH, 2),
-    "TailEndStation": _row(-TAIL_END, 3),
+    "ReliefEndStation": _row(BODY_LENGTH + RELIEF_WIDTH, 0),
+    "ShoulderStation": _row(BODY_LENGTH, 1),
+    "SeatStation": (_row(0.0, 2)[0] - 0.002, _row(0.0, 2)[1]),
+    "HeadBackStation": _row(-HEAD_LENGTH, 3),
+    "TailEndStation": _row(-TAIL_END, 4),
 }
 
 
@@ -152,8 +161,28 @@ requirement("head_back_face",
     precision={"station": part_spec.STOCK_PLACES},
 )
 
-# The thread runs from the faced tip to the printed thread start, where
-# the locating journal begins.
+requirement("body_shoulder",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), part_spec.BODY_LENGTH),),
+    requirements=("station",),
+    fields={
+        "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
+        "plane": (
+            {"frame": "model", "axis": "x", "value": part_spec.BODY_LENGTH},
+            ("BODY_LENGTH",),
+        ),
+        "station": (
+            limits(part_spec.SHOULDER_STATION, part_spec.STATION_PLACES),
+            ("SHOULDER_STATION", ("ch_rocker_arm_spec", "HUB_LENGTH")),
+        ),
+        "station_nominal": (part_spec.SHOULDER_STATION, ("SHOULDER_STATION",)),
+        "height_from": _FROM_TIP,
+    },
+    precision={"station": part_spec.STATION_PLACES},
+)
+
+# The full thread runs from the faced tip to the printed relief end; the
+# relief takes the die's incomplete threads against the body shoulder.
 requirement("thread",
     kind="boss",
     faces=(CylinderFace(part_spec.THREAD_MODEL_DIA),),
@@ -162,30 +191,58 @@ requirement("thread",
         "axis": _AXIS,
         "thread": (part_spec.THREAD, ("THREAD",)),
         "length": (
-            limits(part_spec.THREAD_START, part_spec.STATION_PLACES),
-            ("THREAD_START", ("ch_rocker_arm_spec", "HUB_LENGTH")),
+            limits(part_spec.RELIEF_END_STATION, part_spec.STOCK_PLACES),
+            ("RELIEF_END_STATION",),
         ),
-        "length_nominal": (part_spec.THREAD_START, ("THREAD_START",)),
+        "length_nominal": (part_spec.RELIEF_END_STATION, ("RELIEF_END_STATION",)),
         "height_from": _FROM_TIP,
     },
-    precision={"length": part_spec.STATION_PLACES},
+    precision={"length": part_spec.STOCK_PLACES},
+)
+
+requirement("thread_relief",
+    kind="boss",
+    faces=(
+        CylinderFace(
+            part_spec.RELIEF_DIA,
+            contains_x_mm=part_spec.BODY_LENGTH + part_spec.RELIEF_WIDTH / 2.0,
+        ),
+    ),
+    requirements=("dia",),
+    fields={
+        "axis": _AXIS,
+        "dia": (limits(part_spec.RELIEF_DIA, part_spec.RELIEF_PLACES), ("RELIEF_DIA",)),
+        "dia_nominal": (part_spec.RELIEF_DIA, ("RELIEF_DIA",)),
+    },
+    precision={"dia": part_spec.RELIEF_PLACES},
 )
 
 DONOR_KEEP = {
     "TailDia": (0.300, 0.060),
     "HeadDia": (0.360, 0.060),
+    "ReliefDia": (0.330, 0.060),
     "BodyDia": (0.300, 0.140),
     "ThreadDia": (0.360, 0.140),
 }
 PROFILE_DIAMETER_XY = {
-    "TailDia": (SEAT_X - 0.060, PROFILE_CENTER[1] + 0.022),
+    # Below the middle of the tail, clear of the vise-end extension line.
+    "TailDia": (
+        SEAT_X - (HEAD_LENGTH + TAIL_END) / 2.0 * _S,
+        PROFILE_CENTER[1] - 0.030,
+    ),
     "HeadDia": (SEAT_X - 0.020, PROFILE_CENTER[1] + 0.024),
     # Each diameter's dimension line stands inside its own step (codex round
-    # 15): the fit callout on the journal (seat to thread start), the thread on the
-    # threaded tip (thread start to the tip), both below so no leader crosses a row.
+    # 15): the fit callout on the journal (seat to shoulder), the relief floor
+    # in its groove and the thread on the threaded tip (relief end to the
+    # tip), all below so no leader crosses a row. The relief's value sits
+    # under the thread's so its dimension line passes left of that text.
     "BodyDia": (SEAT_X + BODY_LENGTH / 2.0 * _S, PROFILE_CENTER[1] - 0.065),
+    "ReliefDia": (
+        SEAT_X + (BODY_LENGTH + RELIEF_WIDTH / 2.0) * _S,
+        PROFILE_CENTER[1] - 0.045,
+    ),
     "ThreadDia": (
-        SEAT_X + (BODY_LENGTH + THREAD_END) / 2.0 * _S,
+        SEAT_X + (BODY_LENGTH + RELIEF_WIDTH + THREAD_END) / 2.0 * _S,
         PROFILE_CENTER[1] - 0.030,
     ),
 }
@@ -216,7 +273,6 @@ requirement("locating_body",
 
 requirement("vise_tail",
     kind="boss",
-    # The tail shares the body's size; the station picks the vise end.
     faces=(
         CylinderFace(
             part_spec.TAIL_DIA,
@@ -311,6 +367,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_text(adapter, annotations, DIMENSION_TEXT)
+    # drawing-guidelines.md rule 4: the seat station's stack reason rides it.
+    set_dimension_callouts(
+        adapter, annotations, {"SeatStation": STACK_CALLOUT}, location="below"
+    )
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [a for a in annotations if dimension_name(adapter, a) == name]
         if len(matches) != 1:

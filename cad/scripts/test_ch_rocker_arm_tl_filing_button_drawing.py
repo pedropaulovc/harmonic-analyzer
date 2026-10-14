@@ -105,11 +105,13 @@ PRINTED_OWNERS = {
         stud,
         {
             "SeatStation": ("button_seat", "station"),
-            "ThreadStartStation": ("thread", "length"),
+            "ShoulderStation": ("body_shoulder", "station"),
+            "ReliefEndStation": ("thread", "length"),
             "HeadBackStation": ("head_back_face", "station"),
             "TailEndStation": ("vise_tail", "station"),
             "HeadDia": ("button_seat", "dia"),
             "TailDia": ("vise_tail", "dia"),
+            "ReliefDia": ("thread_relief", "dia"),
         },
         {"BodyDia", "ThreadDia"},
     ),
@@ -148,7 +150,7 @@ def test_body_carries_the_hub_and_both_buttons_inside_the_stack() -> None:
     button (body short of the stack top)."""
     stud = _features(STUD)
     seat_low, seat_high = stud["button_seat"]["station"]
-    start_low, start_high = stud["thread"]["length"]
+    start_low, start_high = stud["body_shoulder"]["station"]
     body_low, body_high = seat_low - start_high, seat_high - start_low
     thick_low, thick_high = _features(BUTTON)["hub_seat_face"]["thickness"]
     hub_high = rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
@@ -201,8 +203,11 @@ def test_kit_solids_validate_and_follow_the_specs() -> None:
     assert span("upper button") == pytest.approx((0.0, button.THICKNESS))
     assert span("lower button") == pytest.approx((seat, -rocker.HUB_LENGTH))
     assert span("stud pin") == pytest.approx((seat, seat + stud.BODY_LENGTH))
+    assert span("stud relief") == pytest.approx(
+        (seat + stud.BODY_LENGTH, seat + stud.BODY_LENGTH + stud.RELIEF_WIDTH)
+    )
     assert span("stud thread") == pytest.approx(
-        (seat + stud.BODY_LENGTH, seat + stud.THREAD_END)
+        (seat + stud.BODY_LENGTH + stud.RELIEF_WIDTH, seat + stud.THREAD_END)
     )
     assert span("stud head") == pytest.approx((seat - stud.HEAD_LENGTH, seat))
     assert span("stud tail") == pytest.approx(
@@ -210,6 +215,7 @@ def test_kit_solids_validate_and_follow_the_specs() -> None:
     )
     assert span("nut")[0] == pytest.approx(button.THICKNESS)
     assert span("stud pin")[1] < span("nut")[0] < span("stud thread")[1]
+    assert stud.RELIEF_DIA < stud.THREAD_MODEL_DIA - 1.299038 * 25.4 / 24.0
     rim_low, rim_high = _features(BUTTON)["rim"]["dia"]
     for name in ("upper button", "lower button"):
         assert rim_low <= solids[name]["dia_mm"] <= rim_high

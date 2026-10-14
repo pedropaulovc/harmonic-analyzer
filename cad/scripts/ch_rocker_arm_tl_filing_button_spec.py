@@ -79,12 +79,15 @@ if round((_OD_MIN - BORE_DIA) / 2.0, 2) != RIM_WALL_MIN:
     raise AssertionError("filing-button stated rim wall drifted from its geometry")
 # Pending exception ruling: MHA-CH-006-TL-04 rim wall 1.78 MIN (#1369).
 RIM_WALL_NOTE = f"RIM WALL {RIM_WALL_MIN:.2f} MIN."
-DRAWING_NOTES = (
-    "RIM SETS THE FILED DIAMETER OF THE ROCKER ARM HUB; O.D. ROUND AND TRUE TO BORE.\n"
-    "THICKNESS STACKS THE ROCKER ARM HUB BETWEEN BUTTONS ON THE FILING STUD.\n"
-    "KEEP RIM CORNERS SHARP; STONE BURRS ONLY.\n"
-    f"{RIM_WALL_NOTE}"
-)
+# drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
+# each three-place size names its mate on its own dimension (callout below).
+OD_CALLOUT = "SETS FILED MHA-CH-006 HUB"
+THICKNESS_CALLOUT = "STACKS MHA-CH-006 HUB"
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the
+# title block's edge break does not apply to the rim; a leadered note on the
+# rim edge says so.
+RIM_CORNER_NOTE = "BOTH RIM CORNERS SHARP"
+DRAWING_NOTES = f"O.D. ROUND AND TRUE TO BORE.\n{RIM_WALL_NOTE}"
 REFERENCE_DIMENSIONS = frozenset({"BoreDia"})
 REFERENCE_CALLOUTS = {"BoreDia": BORE_FIT_CALLOUT}
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

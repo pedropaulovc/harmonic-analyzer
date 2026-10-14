@@ -60,30 +60,51 @@ if not (
     )
 
 # Axial sizes print as one baseline from the faced tip (the thread end): the
-# thread start, the head seat, the head's back face and the vise end. The
-# model keeps the seat at X0 (the stack datum). The body carries the lower
-# button, the whole hub and the upper button at every printed button
-# thickness and hub length, and stops short of the stack top so the nut
-# bears on the upper button. Both buttons therefore centre on the lapped
-# body, never on the thread crests (the hub coaxiality budget below). The
-# stack-bearing stations print to three places; the body length is their
+# relief end, the body shoulder, the head seat, the head's back face and the
+# vise end. The model keeps the seat at X0 (the stack datum). The body
+# carries the lower button, the whole hub and the upper button at every
+# printed button thickness and hub length, and stops short of the stack top
+# so the nut bears on the upper button. Both buttons therefore centre on the
+# lapped body, never on the thread crests (the hub coaxiality budget below).
+# The stack-bearing stations print to three places; the body length is their
 # difference, checked at worst case below.
-STATION_PLACES = 3  # thread start and head seat: the stack reads from them
-STOCK_PLACES = 1  # head back face and vise end: stock only
-BODY_LENGTH = 13.9  # model: seat face to the thread start (derived on print)
-THREAD_END = 25.0  # seat face to the faced tip; printed tip to seat
-THREAD_START = round(THREAD_END - BODY_LENGTH, 6)  # printed: tip to the thread start
+STATION_PLACES = 3  # body shoulder and head seat: the stack reads from them
+STOCK_PLACES = 1  # relief end, head back face and vise end: title block
+BODY_LENGTH = 13.9  # model: seat face to the body shoulder (derived on print)
+THREAD_END = 26.0  # seat face to the faced tip; printed tip to seat
+SHOULDER_STATION = round(THREAD_END - BODY_LENGTH, 6)  # printed: tip to the shoulder
 TAIL_END = 35.0  # seat face to the vise end: head plus a thirty-millimetre vise tail
 HEAD_BACK = THREAD_END + HEAD_LENGTH  # printed: tip to the head's back face
 OVERALL_LENGTH = TAIL_END + THREAD_END  # printed: tip to the vise end
-# The record's tail: the body size, so the bench vise jaws posed for the kit
-# (inventory bench-vise-4in) close on it; stock only.
-TAIL_DIA = 6.49
-TAIL_PLACES = 2
+# The tail is only held in the bench vise (traveler S6: 25 in the jaws, 5
+# bare below the head); nothing passes over it, so it is plain stock at the
+# title-block band, stout in the jaws and clear of the body and head sizes.
+TAIL_DIA = 8.0
+TAIL_PLACES = 1
 # HA fastener policy (memory/fastener-policy-us-customary.md): the
-# inventory's M5 maps to #10-24 UNC; an external thread is class 2A.
+# inventory's M5 maps to #10-24 UNC. The title block states the 2A class, so
+# the callout prints the size and series only.
 THREAD = "#10-24 UNC-2A"
+THREAD_CALLOUT = "#10-24 UNC"
 THREAD_MODEL_DIA = 4.826
+_THREAD_PITCH = 25.4 / 24.0
+# drawing-guidelines.md rule 16 (design for the cutter): a relief groove at
+# the body shoulder takes the die's incomplete threads, so the full thread
+# starts at the relief end. Its floor sits under the thread's basic minor
+# diameter at the .XX band's top, and its width (shoulder station less the
+# relief-end station) is at least one pitch at the worst case.
+RELIEF_DIA = 2.9
+RELIEF_PLACES = 2
+RELIEF_END_STATION = 10.0  # printed: tip to the relief end, .X
+RELIEF_WIDTH = round(SHOULDER_STATION - RELIEF_END_STATION, 6)  # model: 2.1
+_THREAD_MINOR = THREAD_MODEL_DIA - 1.299038 * _THREAD_PITCH
+if (
+    round(RELIEF_DIA + printed_deviations(RELIEF_DIA, RELIEF_PLACES)[1], 12)
+    >= _THREAD_MINOR
+):
+    raise AssertionError(
+        "filing-stud relief floor is not under the thread minor diameter"
+    )
 
 _BUTTON_MIN, _BUTTON_MAX = [
     round(button.THICKNESS + deviation, 12)
@@ -93,7 +114,14 @@ _STACK_MIN = 2.0 * _BUTTON_MIN + rocker.HUB_LENGTH
 _STACK_MAX = 2.0 * _BUTTON_MAX + rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
 _HUB_TOP_MAX = _BUTTON_MAX + rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
 _SEAT_MIN, _SEAT_MAX = [round(THREAD_END + deviation, 12) for deviation in printed_deviations(THREAD_END, STATION_PLACES)]
-_START_MIN, _START_MAX = [round(THREAD_START + deviation, 12) for deviation in printed_deviations(THREAD_START, STATION_PLACES)]
+_START_MIN, _START_MAX = [round(SHOULDER_STATION + deviation, 12) for deviation in printed_deviations(SHOULDER_STATION, STATION_PLACES)]
+_RELIEF_END_MIN, _RELIEF_END_MAX = [
+    round(RELIEF_END_STATION + deviation, 12)
+    for deviation in printed_deviations(RELIEF_END_STATION, STOCK_PLACES)
+]
+RELIEF_WIDTH_MIN = round(_START_MIN - _RELIEF_END_MAX, 12)
+if RELIEF_WIDTH_MIN < _THREAD_PITCH:
+    raise AssertionError("filing-stud thread relief is shorter than one pitch")
 _BODY_LEN_MIN, _BODY_LEN_MAX = _SEAT_MIN - _START_MAX, _SEAT_MAX - _START_MIN
 if _BODY_LEN_MAX >= _STACK_MIN:
     raise AssertionError("filing-stud body can stand proud of the button stack")
@@ -112,37 +140,32 @@ if UPPER_BUTTON_SUPPORT_MIN < _BUTTON_MIN / 2.0:
 # pitch of incomplete thread. drawing-guidelines.md rule 18 (thread engagement): at the worst case of the printed
 # stack and stations the INSTALLED full-thread engagement in the nut is at
 # least one and a half diameters. Engagement starts above the stack top
-# past the nut's entry chamfer, or past the die's runout (one and a half
-# pitches beyond the thread start), whichever is higher; it ends one pitch
-# short of the faced tip (the tip chamfer) or at the nut's far chamfer.
+# past the nut's entry chamfer, or at the relief end (the die's runout lies
+# in the relief), whichever is higher; it ends one pitch short of the faced
+# tip (the tip chamfer) or at the nut's far chamfer.
 NUT_SKU = "90264A425"
 NUT_LENGTH = 3.0 / 4.0 * 25.4
 NUT_ACROSS_FLATS = 5.0 / 16.0 * 25.4
 NUT_CORNER_DIA = NUT_ACROSS_FLATS / math.cos(math.radians(30.0))
 if NUT_CORNER_DIA >= _BUTTON_OD_MIN:
     raise AssertionError("filing-stud nut corners stand outside the button rim")
-_THREAD_PITCH = 25.4 / 24.0
 _NUT_CHAMFER = _THREAD_PITCH
-_DIE_RUNOUT = 1.5 * _THREAD_PITCH
 _TIP_CHAMFER = _THREAD_PITCH
-# The nut seats on the stack before its first full thread meets the die's
-# runout: at the shortest stack its full thread starts at or above the stud's.
-if _STACK_MIN + _NUT_CHAMFER < _BODY_LEN_MAX + _DIE_RUNOUT:
-    raise AssertionError("filing-stud nut meets the die runout before it seats")
 
 
-def installed_engagement(stack: float, seat_to_tip: float, body: float) -> float:
-    """Full-thread engagement in the coupling nut seated on the stack top."""
-    start = max(stack + _NUT_CHAMFER, body + _DIE_RUNOUT)
+def installed_engagement(stack: float, seat_to_tip: float, relief_end: float) -> float:
+    """Full-thread engagement in the coupling nut seated on the stack top;
+    ``relief_end`` is the seat-to-relief-end length."""
+    start = max(stack + _NUT_CHAMFER, relief_end)
     end = min(seat_to_tip - _TIP_CHAMFER, stack + NUT_LENGTH - _NUT_CHAMFER)
     return end - start
 
 
 ENGAGEMENT_MIN = min(
-    installed_engagement(stack, seat_to_tip, body)
+    installed_engagement(stack, seat_to_tip, seat_to_tip - relief_station)
     for stack in (_STACK_MIN, _STACK_MAX)
     for seat_to_tip in (_SEAT_MIN, _SEAT_MAX)
-    for body in (_BODY_LEN_MIN, _BODY_LEN_MAX)
+    for relief_station in (_RELIEF_END_MIN, _RELIEF_END_MAX)
 )
 if ENGAGEMENT_MIN < 1.5 * THREAD_MODEL_DIA:
     raise AssertionError("filing-stud nut engagement is under one and a half diameters")
@@ -181,8 +204,9 @@ if not (_HUB_MIN <= FILED_HUB_DIA[0] and FILED_HUB_DIA[1] <= _HUB_MAX):
     raise AssertionError("filing kit files the hub outside its printed O.D. band")
 
 _STATIONS = {
-    "ThreadStartStation": STATION_PLACES,
+    "ShoulderStation": STATION_PLACES,
     "SeatStation": STATION_PLACES,
+    "ReliefEndStation": STOCK_PLACES,
     "HeadBackStation": STOCK_PLACES,
     "TailEndStation": STOCK_PLACES,
 }
@@ -191,6 +215,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "TailProfile": {"TailDia"},
     "BodyProfile": {"BodyDia"},
     "ThreadProfile": {"ThreadDia"},
+    "ReliefProfile": {"ReliefDia"},
     "StationReference": set(_STATIONS),
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -198,6 +223,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "TailProfile": {"TailDia": TAIL_PLACES},
     "BodyProfile": {"BodyDia": BODY_PLACES},
     "ThreadProfile": {"ThreadDia": 2},
+    "ReliefProfile": {"ReliefDia": RELIEF_PLACES},
     "StationReference": dict(_STATIONS),
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -220,7 +246,7 @@ BODY_FIT_NOTE = " ".join(part for part in BODY_FIT_CALLOUT if part)
 REFERENCE_DIMENSIONS = frozenset({"BodyDia"})
 REFERENCE_CALLOUTS = {"BodyDia": BODY_FIT_CALLOUT}
 # The thread size prints as its designation, not as a plain diameter.
-DIMENSION_TEXT = {"ThreadDia": THREAD}
+DIMENSION_TEXT = {"ThreadDia": THREAD_CALLOUT}
 
 # The sliding journal is a required machined surface at the project grade;
 # the fit callout governs its size.
@@ -233,9 +259,12 @@ SURFACE_FINISHES = (
 )
 # The three-place tip stations are functional: the journal between them must
 # carry the whole hub and the upper button yet stop below the stack top so
-# the nut clamps.
+# the nut clamps. The seat's reason rides its dimension as a callout; the
+# shoulder row has no lane (the tip's extension line rises past it to the
+# upper rows), so its reason stays a note.
+STACK_CALLOUT = "HOLDS BUTTON STACK"
 DRAWING_NOTES = (
-    "SEAT AND THREAD START HOLD THE BUTTON STACK: UPPER BUTTON RIDES THE BODY, NUT CLAMPS IT.\n"
+    "SHOULDER KEEPS THE BODY UNDER THE STACK TOP: UPPER BUTTON RIDES THE BODY, NUT CLAMPS IT.\n"
     "VISE TAIL IS HELD ONLY."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
@@ -312,12 +341,21 @@ PRECHIPS_SOLIDS: list[dict] = [
         "note": _STUD_ROD,
     },
     {
-        "name": "stud thread",
+        "name": "stud relief",
         "shape": "cylinder",
         "at_mm": [0.0, 0.0, round(_SEAT_Z + BODY_LENGTH, 6)],
         "axis": [0.0, 0.0, 1.0],
+        "dia_mm": RELIEF_DIA,
+        "length_mm": RELIEF_WIDTH,
+        "note": _STUD_ROD,
+    },
+    {
+        "name": "stud thread",
+        "shape": "cylinder",
+        "at_mm": [0.0, 0.0, round(_SEAT_Z + BODY_LENGTH + RELIEF_WIDTH, 6)],
+        "axis": [0.0, 0.0, 1.0],
         "dia_mm": THREAD_MODEL_DIA,
-        "length_mm": THREAD_START,
+        "length_mm": RELIEF_END_STATION,
         "fastener": THREAD,
         "note": _STUD_ROD,
     },

@@ -7,4 +7,4 @@ ch-rocker-arm-tl-filing-stud:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "turn head seat, body and thread in one chucking; ring-lap body; die-cut thread; part off"
+  process: "turn head seat, body, thread relief and thread in one chucking; ring-lap body; die-cut thread; part off"

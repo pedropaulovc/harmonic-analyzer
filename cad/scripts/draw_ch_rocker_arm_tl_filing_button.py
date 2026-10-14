@@ -24,8 +24,10 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     move_model_dimension,
+    set_dimension_callouts,
     set_reference_dimension,
 )
+from _drawing_leader_notes import add_attached_note
 from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -42,9 +44,12 @@ from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_filing_button_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    OD_CALLOUT,
     REFERENCE_CALLOUTS,
     REFERENCE_DIMENSIONS,
+    RIM_CORNER_NOTE,
     SURFACE_FINISHES,
+    THICKNESS_CALLOUT,
 )
 
 
@@ -75,7 +80,13 @@ FACE_KEEP = {
     # border (codex: at x 0.060 its opening words left the sheet).
     "BoreDia": (0.115, 0.240),
 }
-EDGE_XY = {"DiscDia": (0.165, 0.180)}
+# Right of the edge view: the O.D.'s mate callout is wider than the gap
+# between the two views, and the isometric stands clear further right.
+EDGE_XY = {"DiscDia": (0.245, 0.180)}
+# The rim note leads to the face view's outer circle at lower left, clear of
+# the bore leader (upper left) and the bore finish symbol (lower right).
+RIM_PICK = (FACE_CENTER[0] - 0.0144, FACE_CENTER[1] - 0.0144)
+RIM_NOTE_XY = (0.025, 0.145)
 
 
 _AXIS = ([0.0, 0.0, 1.0], ("__frame__",))
@@ -114,8 +125,9 @@ requirement("bore",
     precision={"finish_ra": 1},
 )
 
+# Above the bore's fit callout so the thickness's mate callout clears it.
 EDGE_KEEP = {
-    "DiscThick": (0.200, 0.235),
+    "DiscThick": (0.200, 0.250),
 }
 
 
@@ -240,6 +252,20 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    set_dimension_callouts(
+        adapter,
+        annotations,
+        {"DiscDia": OD_CALLOUT, "DiscThick": THICKNESS_CALLOUT},
+        location="below",
+    )
+    add_attached_note(
+        adapter,
+        face,
+        text=RIM_CORNER_NOTE,
+        entity_xy=RIM_PICK,
+        note_xy=RIM_NOTE_XY,
+        label="filing button rim corner note",
+    )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
