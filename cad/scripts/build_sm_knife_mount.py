@@ -29,7 +29,7 @@ axis, +Y up, +X across. The bore centre sits ``R_BORE`` below the origin so the
 bore's upper inner wall lands on the ridge (with a TOP_CLEAR sliver margin). The
 block rises from below the bore up to the top-frame casting's faced underside
 (999.7), its top seat clamped flush to it: the #10-24 bolt threads into a
-9.650 full-thread bottoming tap (drill 11.24) on the bore's vertical
+9.65 +/-0.13 full-thread bottoming tap (drill 11.24) on the bore's vertical
 centreline, whose charged pilot (Ø3.927, past the accepted Ø3.797-3.897) at
 its sharpest accepted point leaves 2.0 of metal over the bore crown at worst
 case; the two dowels' blind flat-bottom reamed holes sit 7.632 either side of

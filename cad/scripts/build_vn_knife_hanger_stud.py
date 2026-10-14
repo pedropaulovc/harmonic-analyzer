@@ -25,10 +25,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_tolerances import (
-    set_dimension_symmetric_angular_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _fastener_catalog import fastener
 from _feature_tree import _feature_by_name, name_last_feature
 from _rebuild import force_rebuild
@@ -52,7 +49,6 @@ from vn_knife_hanger_stud_spec import (
     CHAMFER_WIDTH_TOLERANCE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    ISOMETRIC_VIEW_NOTE,
     LENGTH,
     LENGTH_BAND,
     SHANK_DIA,
@@ -304,12 +300,24 @@ def _manufacturing_controls(adapter) -> None:
     set_dimension_symmetric_tolerance(
         adapter, "StockTrimProfile", "CutLength", LENGTH_BAND[0]
     )
+    # The leg's band holds the chamfer inside the charged incomplete pitch.
     set_dimension_symmetric_tolerance(
         adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE
     )
-    set_dimension_symmetric_angular_tolerance(
-        adapter, "StockDeburrProfile", "ChamferAngle", CHAMFER_ANGLE_TOLERANCE
-    )
+    # The driving 45-degree angle keeps its title-block band natively;
+    # swTolGeneral prints no band and leaves the title block's row in force.
+    feature, name = "StockDeburrProfile", "ChamferAngle"
+    band = math.radians(CHAMFER_ANGLE_TOLERANCE)
+    _, dimension = _named_dimension(adapter, feature, name)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 11  # swTolType_e.swTolGeneral
+    if (
+        not tolerance.SetValues(-band, band)
+        or int(tolerance.Type) != 11
+        or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
+        or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
+    ):
+        raise RuntimeError(f"{name}@{feature}: cannot retain general tolerance")
     feature, name = "ThreadTailAcceptance", "ThreadLengthMin"
     _, dimension = _named_dimension(adapter, feature, name)
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
@@ -323,9 +331,7 @@ def _manufacturing_controls(adapter) -> None:
         adapter,
         PART_NAME,
         {
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-            "Machining Route": str(row["machining_notes"]),
-            "Modified-Part Inspection": str(row["inspection_notes"]),
+            "Purchased Screw Note": str(row["purchased_note"]),
         },
     )
 

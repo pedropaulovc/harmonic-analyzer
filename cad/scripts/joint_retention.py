@@ -605,7 +605,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_hanger_screw",  # #8-32 UNC x 1/2 hex head (McMaster 93075A194), member into the pen-hanger strap tap
         "fr_harmonic_base",  # receiver: #10-32 cross taps, 1/4-20 hold-down seats, #4-40 nameplate seats, and the drive_train screws' seats (top-level rows)
         "vn_knife_hanger_stud",  # #10-24 UNC cut plain hex bolt (McMaster 92314A253 x 2), member into the knife-mount top tap
-        "sm_knife_mount",  # #10-24 UNC-2B bottoming tap (9.650 full thread, 11.24 drill) in the top seat, receiver of the knife-hanger bolt; two plain reamed dowel holes
+        "sm_knife_mount",  # #10-24 UNC-2B bottoming tap (9.65 full thread, 11.24 drill) in the top seat, receiver of the knife-hanger bolt; two plain reamed dowel holes
         "vn_lag_screw",  # 1/4-20 UNC-2A x 3/4 hex head (92240A540), member: through rocker_arm_support foot into harmonic_base
         "vn_latch_hook_bracket_screw",  # #4-40 narrow fillister (McMaster 90280A108, MHA-VN-043), member: 2 into the support_bar's #4-40 through taps
         "vn_magnifying_bracket_screw",  # #2-56 fillister, member: two in bracket counterbores into summing_lever (top-level row)
@@ -1429,7 +1429,7 @@ JOINTS: tuple[Joint, ...] = (
             "plain hex head (92314A253, cut to 45.70 +/-0.15 under the head) seated on a new "
             "18-8 SAE washer (96659A104), whose lower bearing face seats on the crossbar spotface "
             "35.50 +/-0.05 above the finished underside; the bolt passes the O6.045 clearance "
-            "hole and reaches 8.9173 nominal (8.349..9.4856 worst case) into the 9.650 +/-0.13 "
+            "hole and reaches 8.9173 nominal (8.349..9.4856 worst case) into the 9.65 +/-0.13 "
             "full thread of the #10-24 bottoming tap, drawing the block up against the casting. "
             "The independently inspected full-form cut tail covers the longest reach with "
             "0.0760667 spare; one incomplete tip pitch leaves 7.2906667 full engagement, "

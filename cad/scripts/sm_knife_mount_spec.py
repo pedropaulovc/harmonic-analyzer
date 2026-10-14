@@ -89,7 +89,11 @@ KNIFE_BORE_ORIENTATION_TOL = float(
 )
 # The #10-24 tap's position to the top seat and the dowel pattern (A|B): the
 # bolt axis the crossbar's #10 clearance hole must float round
-# (``build_sm_summing_assembly``'s knife-hanger stack).
+# (``build_sm_summing_assembly``'s knife-hanger stack).  Its 0.05 zone radius
+# is one term of HANGER_SCREW_MISMATCH (hypot(0.291, 0.239) = 0.377) inside
+# the hole's 0.6095 radial float with the drill drift's 0.195, 0.038 spare.
+# Plain face dimensions instead, even at .XXX (+/-0.13 each way, not 0.05),
+# give hypot(0.371, 0.319) = 0.489 and -0.075: the frame is functional.
 STUD_TAP_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"])
 
 
@@ -147,23 +151,27 @@ BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
 # MHA-VN-024, a #10-24 plain hex bolt cut from stock to its under-head length
 # (``vn_knife_hanger_stud_spec``), drops through a washer on the crossbar's
 # spotface and its #10 clearance hole and threads into a bottoming tap on the
-# bore's vertical centreline at mid-depth.  The full thread prints 9.650 at
-# the title block's .XXX (+/-0.13): its shallowest, 9.52, still takes the
-# bolt's longest reach, 9.4856 (``build_sm_summing_assembly.HANGER_TIP_CLEARANCE``),
-# and holds 1.5 D of full thread (below).  The drill runs 1.5 P past that
-# nominal thread (9.650 + 1.5875 = 11.2375, printed 11.24), yet its deepest
-# limit, with the pilot the web charges ground to the sharpest accepted
-# point (below), must still leave the 2.0 crown web: so the drill prints
-# 11.24 with an explicit +/-0.05 band on the sheet's hole callout (the
-# MHA-SM-003 bracket-tap precedent).  The callout prints the full thread at
-# three places and the drill depth at two.
+# bore's vertical centreline at mid-depth.  The full thread's shallowest
+# limit, 9.52, must take the bolt's longest reach, 9.4856
+# (``build_sm_summing_assembly.HANGER_TIP_CLEARANCE``), and hold 1.5 D of
+# full thread (below).  It prints 9.65 with an explicit native +/-0.13 on the
+# hole callout: the band the earlier 9.650 took from the title block's .XXX
+# row, held unchanged.  Bare, two places would claim the .XX row's +/-0.51
+# (drawing-guidelines.md rule 3 (decimal places carry the tolerance)), a
+# 9.14 shallowest thread the bolt's tip would bottom in; the band's mate is
+# the bolt the callout's process row names (rule 4).  The drill runs 1.5 P
+# past that nominal thread (9.65 + 1.5875 = 11.2375, printed 11.24), yet its
+# deepest limit, with the pilot the web charges ground to the sharpest
+# accepted point (below), must still leave the 2.0 crown web: so the drill
+# prints 11.24 with an explicit +/-0.05 band on the sheet's hole callout (the
+# MHA-SM-003 bracket-tap precedent).  Both depths print at two places.
 STUD_THREAD = "#10-24"
 STUD_TAP_DRILL_DEPTH = 11.24
 STUD_TAP_DRILL_DEPTH_PLACES = 2
 STUD_TAP_DRILL_DEPTH_BAND = 0.05  # explicit, functional (above)
 STUD_TAP_THREAD_DEPTH = 9.65
-STUD_TAP_THREAD_DEPTH_PLACES = 3
-STUD_TAP_THREAD_DEPTH_BAND = _XXX  # general, the title block's .XXX
+STUD_TAP_THREAD_DEPTH_PLACES = 2
+STUD_TAP_THREAD_DEPTH_BAND = _XXX  # explicit, native: the 9.650's .XXX, kept
 STUD_TAP_SPEC = HoleSpec(
     "tapped_bottoming",
     STUD_THREAD,
@@ -173,26 +181,32 @@ STUD_TAP_SPEC = HoleSpec(
 )
 STUD_TAP_DIA = TAP_DRILL_MM[STUD_THREAD]  # #25 drill, 3.797
 # The pilot the shop may drill.  The native callout prints the #25 drill at
-# three places, Ø3.797, so it carries its own native band, +0.10/0
-# (draw_sm_knife_mount writes and reads it back): three places on a drilled
-# hole with no band would claim the general .XXX (drawing-guidelines.md
-# rule 3 (decimal places carry the tolerance)), and the band is the title
-# block's DRILLED HOLES grade, not a tighter one.  The pilot accepted is
-# Ø3.797-3.897.  (At two places, Ø3.80 +0.10/0 would reject the #25 drill.)
+# three places, Ø3.797, with no band of its own: a drilled hole with no band
+# is toleranced by the title block's DRILLED HOLES row, +0.10/0
+# (drawing-guidelines.md rule 3 (decimal places carry the tolerance); rule 2
+# (the title block is the general specification): no callout restates it).
+# This constant is that row, indexed for the limits, not printed.  The pilot
+# accepted is Ø3.797-3.897, the band the native +0.10/0 printed before.  (At
+# two places, Ø3.80 under the row would reject the #25 drill.)
 STUD_TAP_DIA_PLACES = 3
-STUD_TAP_DIA_BAND = (drilled_oversize_mm(), 0.0)  # (upper, lower), native
+STUD_TAP_DIA_BAND = (drilled_oversize_mm(), 0.0)  # (upper, lower), title block
 _STUD_TAP_DIA_PRINTED = round(STUD_TAP_DIA, STUD_TAP_DIA_PLACES)
 STUD_TAP_DIA_ACCEPTED = (
     _STUD_TAP_DIA_PRINTED + min(STUD_TAP_DIA_BAND),
     _STUD_TAP_DIA_PRINTED + max(STUD_TAP_DIA_BAND),
 )  # (3.797, 3.897)
 # CHARGED, NOT ACCEPTED: the crown web below charges a wider pilot than the
-# sheet accepts, Ø3.927 -- the printed Ø3.797 plus the larger of the band
-# and the general .XXX (+/-0.13), the reading three unbanded places would
-# claim -- a conservative envelope 0.03 over the accepted Ø3.897 that keeps
-# the web and every stack built on it where they stood.  No pilot is
-# drilled, inspected or passed to it.
+# sheet accepts, Ø3.927 -- the printed Ø3.797 plus the larger of the DRILLED
+# HOLES plus and the general .XXX (+/-0.13), the reading three places would
+# claim were the row not read -- a conservative envelope 0.03 over the
+# accepted Ø3.897 that keeps the web and every stack built on it where they
+# stood.  No pilot is drilled, inspected or passed to it.
 STUD_TAP_DIA_MAX = _STUD_TAP_DIA_PRINTED + max(max(STUD_TAP_DIA_BAND), _XXX)  # 3.927
+if STUD_TAP_DIA_MAX < max(STUD_TAP_DIA_ACCEPTED):
+    raise AssertionError(
+        f"knife-mount crown web charges Ø{STUD_TAP_DIA_MAX:.3f}, under the"
+        f" accepted pilot Ø{max(STUD_TAP_DIA_ACCEPTED):.3f}"
+    )
 STUD_TAP_DIA_OVERSIZE = STUD_TAP_DIA_MAX - STUD_TAP_DIA  # 0.13, charged
 # The drill's point.  The Hole Wizard cuts a 118 deg point (``_holes``' blind
 # drill angle, 2.0594885 rad), but a ground twist-drill point is not exact
@@ -300,13 +314,13 @@ if STUD_TAP_THREAD_DEPTH_MIN < STUD_TAP_ENGAGEMENT_MIN_D * STUD_THREAD_MAJOR:
 # The full thread holds the bolt, so the tap's callout names its mate
 # (drawing-guidelines.md rule 4 (tighten only for function, and name the
 # mate)) on its process row, the row draw_sm_knife_mount writes into the
-# native callout's prefix ahead of the thread.  The 1.41 mm adverse runout is
-# under a plug tap's chamfered lead, so the process is a bottoming tap; the
-# thread row's depth is its full thread (ASME Y14.6), so no row restates it.
-# Folding the mate there keeps the callout at four printed rows with the
-# pilot's stacked band (layout audit tall-block, farm build
-# 20261013T225639.450330Z: five rows with the mate on its own).  The trailing
-# break puts the native thread on its own row.
+# native callout's prefix ahead of the thread: the mate of the full thread's
+# explicit +/-0.13.  The 1.41 mm adverse runout is under a plug tap's
+# chamfered lead, so the process is a bottoming tap; the thread row's depth
+# is its full thread (ASME Y14.6), so no row restates it.  Folding the mate
+# there keeps the callout inside the layout audit's four-row limit (tall-block,
+# farm build 20261013T225639.450330Z: five rows with the mate on its own).
+# The trailing break puts the native thread on its own row.
 BOLT_NUMBER = "MHA-VN-024"
 TAP_CALLOUT_PROCESS = f"BOTTOMING TAP FOR {BOLT_NUMBER}\n"
 

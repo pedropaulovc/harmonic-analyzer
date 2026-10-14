@@ -299,7 +299,7 @@ def test_the_knife_hanger_is_a_threadlocked_clamp_keyed_by_its_two_dowels() -> N
     assert "spotface" in row.axial_capture
     assert "45.70 +/-0.15" in row.axial_capture
     assert "8.9173 nominal (8.349..9.4856 worst case)" in row.axial_capture
-    assert "9.650 +/-0.13" in row.axial_capture
+    assert "9.65 +/-0.13" in row.axial_capture
     assert "0.0760667 spare" in row.axial_capture
     assert "7.2906667 full engagement" in row.axial_capture
     assert "0.0344 minimum tip air" in row.axial_capture

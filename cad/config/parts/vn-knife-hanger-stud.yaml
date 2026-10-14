@@ -4,15 +4,10 @@ vn-knife-hanger-stud:
   stock_name: Knife-Hanger Bolt (18-8 Stainless Hex Screw, Cut to Length)
   supplier: McMaster-Carr
   supplier_skus: [92314A253]
-  material: AISI 304
+  material: 18-8 STAINLESS (AS SUPPLIED)
   material_specification: "18-8 stainless steel, McMaster-Carr 92314A253"
   finish: AS SUPPLIED; DEBURR CUT END
-  machining_notes: |-
-    PURCHASED HEX HEAD UNMODIFIED.
-    CUT END AND UNDER-HEAD LENGTH AS DRAWN.
-  inspection_notes: |-
-    NATIVE MIN THREAD TAIL IS FINISHED-PART ACCEPTANCE, NOT A SUPPLIER GRADE.
-    ALL TAIL AFTER INCOMPLETE END THREAD MUST BE FULL FORM.
+  purchased_note: PURCHASED SCREW McMASTER 92314A253; HEAD UNMODIFIED
   installation_notes: |-
     INSTALLATION - MHA-FR-002 CROSSBAR SPOTFACE
     ONE MHA-VN-060 FLAT WASHER BETWEEN HEX HEAD AND SPOTFACE FLOOR.

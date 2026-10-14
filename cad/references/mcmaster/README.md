@@ -545,7 +545,7 @@ Catalog specifications checked on September 10, 2026:
   above the faced crossbar underside**. With the cut bolt, nominal tip
   reach is 8.9173 mm, bounded by 8.349–9.4856 mm. Subtracting one #10-24
   pitch gives minimum full-form engagement 7.290667 mm, above 1.5D =
-  7.239 mm. Full-thread depth **9.650 ±0.13 mm** (MIN 9.52) leaves
+  7.239 mm. Full-thread depth **9.65 ±0.13 mm** (MIN 9.52) leaves
   0.0344 mm tip air at maximum reach; the inspected full-form tail leaves
   9.561667 − 9.4856 = 0.076066667 mm coverage beyond maximum reach.
   These are the stated stack margins, not extra tolerance reserves.
@@ -557,7 +557,9 @@ Catalog specifications checked on September 10, 2026:
   PDF fetching succeeded after direct HTTP 403 failures. The drawings state
   that dimensions are for reference only and add no screw tolerance.
   No vendor CAD download, hash, or measured vendor geometry is claimed.
-  The joint's native COM geometry and drawing behavior remain unverified.
+  R3 proved the prior native joint geometry and assembly soundness; the
+  revised datum and machinist-driven sheet edits require a fresh scoped
+  native proof and sheet review before they are reported verified.
 - [91255A106](https://www.mcmaster.com/91255A106/) (`vn-guide-lock-screw`,
   MHA-VN-046, eight) holds the four guide locks to the platen guides per ruling
   R9-31 (September 30, 2026): these screws ride the platen, and the MHA-VN-006

@@ -130,7 +130,7 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`sm-summing-lever`** | modeled **Gray Cast Iron casting**; organic first-class lever ~120×28×196 | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× hex knife trunnions (edges = top-vertex ridges) protruding 21.717 each end; 20× #6-32 tapped anchor seats through the 5.08 plate @ 7.0565 pitch (web ~5.06, Ø2.705 tap drill); one #10-24 tap through the Ø19.05×19.05 summation-anchor boss — both purchased spring anchors thread straight in, no nuts | knife-edge ridge **delicate** (the precision line); trunnion slender cantilever → **chatter**; organic 3-pt-arc leaf/rib profiles hard to mill; turning Ø25.4 with cantilevered plates; 20 small through-taps in a 5.08 web → **tap breakage**, use a tapping head | **4–5 from bar** (2 sketch planes + turn) | **CAST or fabricate**, don't hog; knife edge → hardened insert (§6) |
-| **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.797 +0.10/0 cylindrical drill depth 11.24 ±0.05, full thread 9.650 ±0.13; fully charged drill-point crown web 2.0077656525, no break-in (conservative proof envelope Ø3.927, above accepted MAX Ø3.897; point MIN 117°); 2× Ø3.175 reamed dowel press holes ×9.5 at ±7.632 from the tap axis (span 15.264 BASIC, pair ⌖Ø0.13 to top seat datum A, datum pattern B; row 7.0 from front face; tap ⌖Ø0.10 to A and B); bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or manual. Modified #10-24 hex-head Bolt MHA-VN-024 (92314A253, cut under head to 45.70 ±0.15) and new 18-8 SAE washer MHA-VN-060 (96659A104) clamp the block to the top-frame's integral crossbar through Ø6.045 #10 loose clearance. Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat SPOTFACE Ø17.0 ±0.51 with floor 35.50 ±0.05 above faced underside. Nominal reach 8.9173, range 8.349–9.4856; full-form engagement MIN 7.290667 ≥7.239, tip air MIN 0.0344. Retain removable medium-strength threadlocker. Unchanged MHA-VN-051 dowels (98381A473, 1/8 ×3/4) enter Ø3.24 ±0.03 ×12.0 blind round hole and 3.24 ±0.03 wide ×3.95 ±0.13 long ×12.0 blind slot, BASIC 15.264 from and ⌖0.05 to round hole. One native linear pattern position control ⌖0.10 to the bar's two-face width median datum D limits X shift to ±0.05, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
+| **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.797 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth 11.24 ±0.05, full thread 9.65 ±0.13; fully charged drill-point crown web 2.0077656525, no break-in (conservative proof envelope Ø3.927, above accepted MAX Ø3.897; point MIN 117°); 2× Ø3.175 reamed dowel press holes ×9.5 at ±7.632 from the tap axis (span 15.264 BASIC, pair ⌖Ø0.13 to top seat datum A, datum pattern B; row 7.0 from front face; tap ⌖Ø0.10 to A and B); bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or manual. Modified #10-24 hex-head Bolt MHA-VN-024 (92314A253, cut under head to 45.70 ±0.15) and new 18-8 SAE washer MHA-VN-060 (96659A104) clamp the block to the top-frame's integral crossbar through Ø6.045 #10 loose clearance. Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat SPOTFACE Ø17.0 ±0.51 with floor 35.50 ±0.05 above faced underside. Nominal reach 8.9173, range 8.349–9.4856; full-form engagement MIN 7.290667 ≥7.239, tip air MIN 0.0344. Retain removable medium-strength threadlocker. Unchanged MHA-VN-051 dowels (98381A473, 1/8 ×3/4) enter Ø3.24 ±0.03 ×12.0 blind round hole and 3.24 ±0.03 wide ×3.95 ±0.13 long ×12.0 blind slot, BASIC 15.264 from and ⌖0.05 to round hole. One native linear pattern position control ⌖0.10 to the bar's two-face width median datum D limits X shift to ±0.05, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
 
 The Ø6.045 hanger clearance hole carries a **native explicit +0.13/0
 diameter band** (MIN 6.045, MAX 6.175), not the symmetric general ±0.13
@@ -151,22 +151,24 @@ The earlier 2.020267 mm crown-web proof was undercharged: it used the
 nominal Ø3.797 pilot and an exact 118° point, omitting physical drill
 oversize and point-angle variation. The correction is a tap-depth and
 finished-bolt acceptance change, not new material, a bore change or a pose
-change. The native Hole Wizard drill row prints **Ø3.797 +0.10/0**:
-the explicit native diameter band (`STUD_TAP_DIA_BAND`) is written through
-`ICalloutVariable` and read back, accepting **Ø3.797–3.897 mm**
-(`STUD_TAP_DIA_ACCEPTED`). The crown proof instead charges the conservative
+change. The native Hole Wizard drill row prints **Ø3.797** without repeating
+the title block's **DRILLED HOLES +0.10/0** band. The indexed row
+(`STUD_TAP_DIA_BAND`) still accepts **Ø3.797–3.897 mm**
+(`STUD_TAP_DIA_ACCEPTED`); native callout variables clear the duplicate band
+and verify the readback. The crown proof instead charges the conservative
 envelope **MAX Ø3.927 mm** (`STUD_TAP_DIA_MAX`), the maximum of the
 drilled-hole +0.10 and .XXX ±0.13 readings, 0.03 mm above the accepted
 maximum. That envelope is charged, not accepted: nothing is drilled,
 inspected or passed to Ø3.927. The row also dimensions the physical point
 using the native drill-angle variable (`<hw-drlang>`,
 `swCalloutVariable_Drill_Angle`):
-**Ø3.797 +0.10/0 ▽ 11.24 ±0.05 ×118°**. The mate identifier is folded into
-the native process row **BOTTOMING TAP FOR MHA-VN-024**, rather than a
-separate fifth row. The thread row still controls full-thread depth; the
-native drill angle and diameter/depth bands are unchanged. Its placement
-is derived to clear the logged block-height stroke; the final native layout
-audit remains active and must prove the rebuilt sheet.
+**Ø3.797 ▽ 11.24 ±0.05 ×118°**. The mate identifier is folded into
+the native process row **BOTTOMING TAP FOR MHA-VN-024**. With no duplicate
+diameter band, the callout has three rows and remains inside the four-row
+limit. The title block supplies default class 2B; the thread row prints
+**#10-24 UNC ▽ 9.65 ±0.13**. The native point and physical acceptance limits
+are unchanged. Its placement clears the logged block-height stroke; the
+final native layout audit remains active and must prove the rebuilt sheet.
 The now-dimensioned point takes the title block's **angular ±1°**, giving
 117°–119°; the proof charges **MIN 117°**. This is not a claim that an
 undimensioned tool point was already governed by the general angular grade.
@@ -174,8 +176,11 @@ The resulting point height is 1.2032343475 mm. With drill depth MAX
 11.29 mm, the built top at 14.866
 leaves **2.0077656525 mm** over the worst-case bore crown; the spec mirror's
 rounded top at 14.87 gives 2.0117656525 mm, not the built guarantee.
-Full thread 9.650 ±0.13 mm gives MIN 9.52 mm. Drill-minus-full-thread
-runout is 1.59 mm nominal and 1.41 mm at the adverse depth limits.
+Full thread **9.65 ±0.13 mm** gives MIN 9.52 mm. Two printed places do
+not loosen it to the general .XX ±0.51 band: that would give MIN 9.14 mm,
+below MAX 9.4856 mm bolt reach. The explicit band preserves 0.0344 mm tip
+air. Drill-minus-full-thread runout is 1.59 mm nominal and 1.41 mm at the
+adverse depth limits.
 
 **Modified hanger-bolt shop route (MHA-VN-024, two).** Source McMaster
 92314A253, 18-8 stainless plain external-hex #10-24 UNC-2A ×2 in stock;

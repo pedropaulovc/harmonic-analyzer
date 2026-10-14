@@ -295,8 +295,8 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "minimum/maximum and written to both model and callout tolerances"
     ),
     ("sm_knife_mount_spec", "STUD_TAP_DIA_BAND"): (
-        "the native +0.10/0 tap-pilot diameter: indexed into accepted limits "
-        "and written through ICalloutVariable with native readback"
+        "the title-block DRILLED HOLES +0.10/0 tap-pilot diameter: indexed into "
+        "accepted limits, without a redundant explicit callout band"
     ),
     ("vn_knife_hanger_stud_spec", "LENGTH_BAND"): (
         "the finished cut-to-length hex bolt's inspection band: indexed into "

@@ -120,9 +120,9 @@ def test_previous_drill_depth_fails_when_pilot_and_point_limits_are_charged() ->
 
 
 def test_the_tap_drill_runs_a_pitch_past_the_full_thread() -> None:
-    # Full thread at .XXX general band; the drill has its explicit functional
-    # band. Nominal runout 1.59 >=1.5P; worst runout 1.41 >=1P.
-    assert knife_mount.STUD_TAP_THREAD_DEPTH == 9.650
+    # Full thread keeps its explicit functional ±0.13 at two printed places;
+    # the drill has its explicit depth band. Nominal runout 1.59 >=1.5P.
+    assert knife_mount.STUD_TAP_THREAD_DEPTH == 9.65
     assert knife_mount.STUD_TAP_THREAD_DEPTH_BAND == knife_mount._XXX == 0.13
     assert knife_mount.STUD_TAP_THREAD_DEPTH_MIN == pytest.approx(9.52)
     assert knife_mount.STUD_TAP_DRILL_DEPTH == 11.24

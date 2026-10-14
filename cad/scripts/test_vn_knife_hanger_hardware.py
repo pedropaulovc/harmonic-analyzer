@@ -18,6 +18,7 @@ import pytest
 import _config
 import _mcmaster_92314a253 as bolt_catalogue
 import _stock_trim_drawing as trim_drawing
+import build_sm_summing_assembly as asm
 import build_vn_knife_hanger_stud as bolt_part
 import build_vn_knife_hanger_washer as washer_part
 import draw_vn_knife_hanger_stud as bolt_drawing
@@ -30,6 +31,7 @@ from _fastener_catalog import FASTENERS
 from _hole_spec import TAP_DRILL_MM
 from _mcmaster_92314a253 import DIMS as BOLT_DIMS
 from _mcmaster_96659a104 import DIMS as WASHER_DIMS
+from _printed_tolerance import angular_band_deg, printed_band_mm
 from _stock_recipe import recipe_declaration
 from diagnostics import diag_build_92314A253 as bolt_recipe
 from diagnostics import diag_build_96659A104 as washer_recipe
@@ -65,6 +67,8 @@ def test_modified_bolt_nominals_and_inspection_are_separate() -> None:
     assert bolt.LENGTH_MIN == pytest.approx(45.55)
     assert bolt.LENGTH_MAX == pytest.approx(45.85)
     assert bolt.THREAD == "#10-24" and bolt.THREAD_FIT == "UNC-2A"
+    # The stock stays class 2A; the title block's thread row prints the class.
+    assert bolt.PRINTED_THREAD == "#10-24 UNC"
     assert bolt.SHANK_DIA == BOLT_DIMS.major_dia == pytest.approx(4.826)
     assert (
         bolt.SHANK_DIA_MIN == bolt_catalogue.THREAD_MAJOR_MIN == pytest.approx(4.61772)
@@ -93,14 +97,37 @@ def test_modified_bolt_nominals_and_inspection_are_separate() -> None:
     assert bolt.ENGAGEMENT_MIN_D == 1.5
 
 
-def test_end_preparation_is_real_and_fits_inside_one_pitch() -> None:
-    low = bolt.CHAMFER_WIDTH - bolt.CHAMFER_WIDTH_TOLERANCE
-    high = bolt.CHAMFER_WIDTH + bolt.CHAMFER_WIDTH_TOLERANCE
-    assert bolt.SHANK_DIA - 2 * low < TAP_DRILL_MM[bolt.THREAD]
-    worst_axial = high / math.tan(
-        math.radians(bolt.CHAMFER_ANGLE - bolt.CHAMFER_ANGLE_TOLERANCE)
+def test_chamfer_band_is_needed_for_full_thread_engagement() -> None:
+    # Native radial leg 0.60 +/-0.05 at the title-block 45 +/-1 degrees.
+    assert (bolt.CHAMFER_WIDTH_MIN, bolt.CHAMFER_WIDTH_MAX) == pytest.approx(
+        (0.55, 0.65)
     )
-    assert 0 < worst_axial < bolt.INCOMPLETE_TIP_LEN_MAX
+    assert bolt.CHAMFER_ANGLE_TOLERANCE == angular_band_deg() == 1.0
+    steepest = math.radians(bolt.CHAMFER_ANGLE + bolt.CHAMFER_ANGLE_TOLERANCE)
+    assert bolt.CHAMFER_AXIAL_MAX == pytest.approx(0.65 * math.tan(steepest))
+    assert bolt.CHAMFER_AXIAL_MAX == pytest.approx(0.67309, abs=5e-6)
+    # Inside the one incomplete pitch the worst engagement already charges:
+    # reach MIN 8.349 - 1 P = 7.2907 >= 1.5D = 7.239.
+    assert bolt.CHAMFER_AXIAL_MAX <= bolt.INCOMPLETE_TIP_LEN_MAX == bolt.PITCH
+    floor = bolt.ENGAGEMENT_MIN_D * bolt.SHANK_DIA
+    assert floor == pytest.approx(7.239)
+    tip_loss = max(bolt.CHAMFER_AXIAL_MAX, bolt.INCOMPLETE_TIP_LEN_MAX)
+    assert asm.HANGER_REACH_MIN - tip_loss >= floor
+    # The smallest leg still takes the cut thread start inside the mount's
+    # #25 tap drill (tip flat 3.726 < 3.797).
+    tap_drill = TAP_DRILL_MM[bolt.THREAD]
+    assert bolt.SHANK_DIA - 2 * bolt.CHAMFER_WIDTH_MIN < tap_drill
+    # Left to the title block's two-place row (0.60 +/-0.51) the same leg
+    # fails both: 1.149 axial exceeds the charged pitch, leaving 7.200 < 7.239,
+    # and the 0.09 leg leaves the feather start outside the tap drill.
+    assert bolt.CHAMFER_WIDTH_TITLE_BLOCK_BAND == printed_band_mm(2) == 0.51
+    assert bolt.CHAMFER_AXIAL_MAX_AT_TITLE_BLOCK == pytest.approx(
+        1.11 * math.tan(steepest)
+    )
+    assert bolt.CHAMFER_AXIAL_MAX_AT_TITLE_BLOCK > bolt.INCOMPLETE_TIP_LEN_MAX
+    assert asm.HANGER_REACH_MIN - bolt.CHAMFER_AXIAL_MAX_AT_TITLE_BLOCK < floor
+    loose_low = bolt.CHAMFER_WIDTH - bolt.CHAMFER_WIDTH_TITLE_BLOCK_BAND
+    assert bolt.SHANK_DIA - 2 * loose_low > tap_drill
     assert bolt.CATALOG_LENGTH - bolt.LENGTH > bolt.PITCH
 
 
@@ -123,21 +150,38 @@ def test_washer_conforming_bounds_and_y_frame() -> None:
 
 
 @pytest.mark.parametrize(
-    ("part", "spec", "recipe", "number", "threaded"),
+    ("part", "spec", "recipe", "number", "threaded", "title_material"),
     [
-        (bolt_part, bolt, bolt_recipe.build_92314A253, "MHA-VN-024", True),
-        (washer_part, washer, washer_recipe.build_96659A104, "MHA-VN-060", False),
+        (
+            bolt_part,
+            bolt,
+            bolt_recipe.build_92314A253,
+            "MHA-VN-024",
+            True,
+            "18-8 STAINLESS (AS SUPPLIED)",
+        ),
+        (
+            washer_part,
+            washer,
+            washer_recipe.build_96659A104,
+            "MHA-VN-060",
+            False,
+            "AISI 304",
+        ),
     ],
 )
 def test_stock_identity_recipe_and_normalized_frame(
-    monkeypatch, part, spec, recipe, number, threaded
+    monkeypatch, part, spec, recipe, number, threaded, title_material
 ) -> None:
     stock = FASTENERS[part.PART_NAME]
     row = _config.parts(part.PART_NAME)
     assert stock is part.SPEC
     assert stock.skus == tuple(row["supplier_skus"]) == (spec.SKU,)
     assert stock.stock_name == row["stock_name"]
-    assert stock.material == row["material"] == part.MATERIAL == "AISI 304"
+    # The catalogue material is the native library stand-in for mass and
+    # rendering; the title block prints the config row.
+    assert stock.material == part.MATERIAL == "AISI 304"
+    assert row["material"] == title_material
     assert row["number"] == number and row["process"] == "purchased"
     assert int(row["quantity"]) == 2
     seen = {}
@@ -230,14 +274,24 @@ def test_native_controls_are_owned_and_printed_without_precision_rewrites() -> N
             "ThreadLengthMin",
         }
     )
+    # The driving 45-degree ChamferAngle prints natively, whole degrees, with
+    # its title-block band retained under swTolGeneral (no printed band).
+    assert bolt.DIMENSION_TOLERANCE_TYPES["ChamferAngle"] == 11
+    assert bolt.DIMENSION_PRECISION["ChamferAngle"] == 0
+    assert bolt_drawing.EXPECTED_CONTROLS["ChamferAngle"] == pytest.approx(
+        (math.radians(45.0), -math.radians(1.0), math.radians(1.0))
+    )
+    assert "ChamferAngle" not in bolt.DIMENSION_CALLOUTS
     assert set(bolt.DRAWING_DIMENSIONS) == {
         "StockTrimProfile",
         "StockDeburrProfile",
         "ThreadTailAcceptance",
     }
-    assert set(bolt_drawing.FRONT_KEEP) == {"CutLength", "ThreadLengthMin"}
-    assert set(bolt_drawing.DETAIL_KEEP) == {"ChamferWidth", "ChamferAngle"}
-    assert bolt_drawing.SHEET.cut_end_y_mm == bolt.TIP_Y
+    assert set(bolt_drawing.FRONT_KEEP) == set(bolt_drawing.EXPECTED_CONTROLS)
+    assert bolt_drawing.EXPECTED_CONTROLS["ChamferWidth"] == pytest.approx(
+        (0.00060, -0.00005, 0.00005)
+    )
+    assert bolt.DIMENSION_TOLERANCE_TYPES["ChamferWidth"] == 4
     assert bolt_drawing.EXPECTED_CONTROLS["CutLength"] == pytest.approx(
         (0.04570, -0.00015, 0.00015)
     )
@@ -252,10 +306,26 @@ def test_native_controls_are_owned_and_printed_without_precision_rewrites() -> N
     assert "FULL FORM" in bolt.DIMENSION_CALLOUTS["ThreadLengthMin"]
     assert "\n" in bolt.DIMENSION_CALLOUTS["ThreadLengthMin"]
     assert all("\\n" not in text for text in bolt.DIMENSION_CALLOUTS.values())
+    # The title block's thread row gives class 2A; the callout does not.
+    assert bolt.DIMENSION_CALLOUTS["ThreadLengthMin"].startswith("#10-24 UNC ")
+    assert all("2A" not in text for text in bolt.DIMENSION_CALLOUTS.values())
+    chamfer_callout = bolt.DIMENSION_CALLOUTS["ChamferWidth"]
+    # No literal angle: the 45 degrees is the native ChamferAngle's own text.
+    reason = chamfer_callout.replace("MHA-SM-002", "")
+    assert not any(character.isdigit() for character in reason)
+    assert "DEG" not in chamfer_callout and "°" not in chamfer_callout
+    assert "SETS FULL-THREAD ENGAGEMENT" in chamfer_callout
+    assert "MHA-SM-002" in chamfer_callout
     source = (SCRIPTS / "draw_vn_knife_hanger_stud.py").read_text(encoding="utf-8")
     assert "build_purchased_fastener_drawing" not in source
     assert "_stock_trim_drawing" in source
     assert "SetPrecision3" not in source and "set_dimension_precision" not in source
+    # The chamfer prints on the main view: no detail, hidden lines or
+    # per-view scale label.
+    for retired in ("end_detail", "CreateDetailViewAt", "set_hidden_lines_visible"):
+        assert retired not in source
+    assert "Isometric View Note" not in source
+    assert bolt_drawing.ISO_SCALE == bolt_drawing.SHEET_SCALE
     assert washer_drawing.SPEC is DRAWINGS_BY_NAME["vn_knife_hanger_washer"]
     assert "build_purchased_fastener_drawing" in washer_drawing.build.__code__.co_names
     for sheet, stem in (
@@ -333,21 +403,14 @@ def test_sheet_readback_refuses_lost_cut_or_inspection_control(
 def test_modified_stock_route_is_complete_not_the_old_socket_recipe() -> None:
     row = _config.parts(bolt_part.PART_NAME)
     assert row["title"] == "Knife-Hanger Bolt"
-    machining = row["machining_notes"]
-    inspection = row["inspection_notes"]
-    assert "PURCHASED HEX HEAD UNMODIFIED" in machining
-    assert "CUT END AND UNDER-HEAD LENGTH AS DRAWN" in machining
-    assert "NATIVE MIN THREAD TAIL IS FINISHED-PART ACCEPTANCE" in inspection
-    assert "NOT A SUPPLIER GRADE" in inspection
-    assert "ALL TAIL AFTER INCOMPLETE END THREAD MUST BE FULL FORM" in inspection
-    assert not any(
-        method in machining + inspection
-        for method in ("TRIM ", "RESTORE ", "DEBURR ", "GAUGE ")
-    )
-    assert len(machining.splitlines()) + len(inspection.splitlines()) == 4
-    assert "\n" in machining and "\n" in inspection
-    assert "\\n" not in machining and "\\n" not in inspection
-    assert not any(character.isdigit() for character in machining + inspection)
+    note = row["purchased_note"]
+    assert note == f"PURCHASED SCREW McMASTER {bolt.SKU}; HEAD UNMODIFIED"
+    assert "machining_notes" not in row and "inspection_notes" not in row
+    # One line that restates neither the title block nor a native number.
+    assert "\n" not in note
+    assert not any(character.isdigit() for character in note.replace(bolt.SKU, ""))
+    for restated in ("STAINLESS", "AS SUPPLIED", "MIN THREAD TAIL", "2A"):
+        assert restated not in note
     assert "MHA-VN-060" in row["installation_notes"]
     assert "COUNTERBORE" not in row["installation_notes"]
     for module in ("build_vn_knife_hanger_stud", "draw_vn_knife_hanger_stud"):
@@ -359,11 +422,10 @@ def test_modified_stock_route_is_complete_not_the_old_socket_recipe() -> None:
     assert FASTENERS["vn-cone-tip-block-screw"].skus == ("91251A108",)
 
 
-def test_route_and_inspection_notes_are_consumed_native_part_properties(monkeypatch):
+def test_purchased_note_is_a_consumed_native_part_property(monkeypatch):
     stamped = {}
     linear = []
-    angular = []
-    native_min = []
+    tolerances = {}
     for name in (
         "clear_dimensions_for_drawing",
         "apply_drawing_precision",
@@ -375,16 +437,23 @@ def test_route_and_inspection_notes_are_consumed_native_part_properties(monkeypa
         "set_dimension_symmetric_tolerance",
         lambda _adapter, feature, name, band: linear.append((feature, name, band)),
     )
-    monkeypatch.setattr(
-        bolt_part,
-        "set_dimension_symmetric_angular_tolerance",
-        lambda _adapter, feature, name, band: angular.append((feature, name, band)),
-    )
+    assert not hasattr(bolt_part, "set_dimension_symmetric_angular_tolerance")
     monkeypatch.setattr(bolt_part, "_early_bound", lambda value, _kind: value)
-    tolerance = SimpleNamespace(Type=0, SetValues=lambda *_args: True)
 
     def named_dimension(_adapter, feature, name):
-        native_min.append((feature, name))
+        values = [0.0, 0.0]
+
+        def set_values(lower, upper):
+            values[:] = [lower, upper]
+            return True
+
+        tolerance = SimpleNamespace(
+            Type=0,
+            SetValues=set_values,
+            GetMinValue=lambda: values[0],
+            GetMaxValue=lambda: values[1],
+        )
+        tolerances[(feature, name)] = tolerance
         return None, SimpleNamespace(Tolerance=tolerance)
 
     monkeypatch.setattr(bolt_part, "_named_dimension", named_dimension)
@@ -395,16 +464,20 @@ def test_route_and_inspection_notes_are_consumed_native_part_properties(monkeypa
     )
     bolt_part._manufacturing_controls(None)
     row = _config.parts(bolt_part.PART_NAME)
-    assert stamped["Machining Route"] == row["machining_notes"]
-    assert stamped["Modified-Part Inspection"] == row["inspection_notes"]
-    assert "Manufacturing Notes" not in stamped
-    assert tolerance.Type == 5
-    assert native_min == [("ThreadTailAcceptance", "ThreadLengthMin")]
+    assert stamped == {"Purchased Screw Note": row["purchased_note"]}
+    assert list(tolerances) == [
+        ("StockDeburrProfile", "ChamferAngle"),
+        ("ThreadTailAcceptance", "ThreadLengthMin"),
+    ]
+    angle = tolerances[("StockDeburrProfile", "ChamferAngle")]
+    assert angle.Type == 11
+    band = math.radians(angular_band_deg())
+    assert (angle.GetMinValue(), angle.GetMaxValue()) == pytest.approx((-band, band))
+    assert tolerances[("ThreadTailAcceptance", "ThreadLengthMin")].Type == 5
     assert linear == [
         ("StockTrimProfile", "CutLength", 0.15),
         ("StockDeburrProfile", "ChamferWidth", 0.05),
     ]
-    assert angular == [("StockDeburrProfile", "ChamferAngle", 1.0)]
 
 
 @pytest.mark.parametrize(
@@ -765,19 +838,19 @@ def test_production_cut_positions_complete_stock_at_finished_head_pose(monkeypat
 
 
 @pytest.mark.parametrize("fault", [None, "callout", "link", "text"])
-def test_sheet_prints_consumed_route_and_inspection_with_native_text_readback(
+def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     monkeypatch, tmp_path, fault
 ):
     source = tmp_path / "vn-knife-hanger-stud.SLDPRT"
     source.touch()
     row = _config.parts(bolt_part.PART_NAME)
-    properties = {
-        "Machining Route": row["machining_notes"],
-        "Modified-Part Inspection": row["inspection_notes"],
-    }
+    properties = {"Purchased Screw Note": row["purchased_note"]}
     printed = []
     required = []
     views = []
+    curated = []
+    offsets = []
+    projected = []
 
     async def open_model(_path):
         pass
@@ -786,8 +859,8 @@ def test_sheet_prints_consumed_route_and_inspection_with_native_text_readback(
         return {"drawing": "recorded"}
 
     def place_view(_adapter, _source, orientation, *_args, **_kwargs):
-        views.append(orientation)
-        return object()
+        views.append((orientation, _kwargs["scale"]))
+        return orientation
 
     def read_properties(_model, names, *, required: tuple[str, ...]):
         properties.update({name: properties.get(name, name) for name in names})
@@ -797,7 +870,8 @@ def test_sheet_prints_consumed_route_and_inspection_with_native_text_readback(
         required.extend(kwargs["required"])
         return read_properties(model, names, **kwargs)
 
-    def annotations(_adapter, _view, *, keep, **_kwargs):
+    def annotations(_adapter, view, *, keep, **_kwargs):
+        curated.append((view, keep))
         result = []
         for name in keep:
             display = SimpleNamespace(
@@ -814,13 +888,17 @@ def test_sheet_prints_consumed_route_and_inspection_with_native_text_readback(
             )
         return result
 
-    def note(_adapter, name, x, y, **_kwargs):
-        printed.append((name, x, y))
-        text = properties[name].replace("\n", "\r\n")
-        link = bolt_drawing.property_link(name)
-        if fault == "link" and name == "Modified-Part Inspection":
+    def project(_adapter, view, xyz, *, label):
+        projected.append((view, xyz, label))
+        return (0.1, 0.2)
+
+    def callout(_adapter, view, *, property_name, edge_xy, note_xy):
+        printed.append((view, property_name, edge_xy, note_xy))
+        text = properties[property_name].replace("\n", "\r\n")
+        link = bolt_drawing.property_link(property_name)
+        if fault == "link":
             link = bolt_drawing.property_link("Wrong Property")
-        if fault == "text" and name == "Machining Route":
+        if fault == "text":
             text += " WRONG"
         return SimpleNamespace(PropertyLinkedText=link, GetText=lambda: text)
 
@@ -828,11 +906,8 @@ def test_sheet_prints_consumed_route_and_inspection_with_native_text_readback(
         "check",
         "stamp_drawing_summary",
         "set_hidden_lines_removed",
-        "set_hidden_lines_visible",
         "verify_machining_controls",
         "set_dimension_callouts",
-        "position_detail_label",
-        "position_parent_detail_letter",
     ):
         monkeypatch.setattr(bolt_drawing, name, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(bolt_drawing, "SOURCE", source)
@@ -847,13 +922,14 @@ def test_sheet_prints_consumed_route_and_inspection_with_native_text_readback(
         lambda *_args, **_kwargs: (object(), object()),
     )
     monkeypatch.setattr(bolt_drawing, "place_view", place_view)
+    monkeypatch.setattr(bolt_drawing, "curate_view_dimensions", annotations)
     monkeypatch.setattr(
         bolt_drawing,
-        "end_detail",
-        lambda *_args: SimpleNamespace(UpdateViewDisplayGeometry=lambda: None),
+        "offset_dimension_text",
+        lambda _adapter, _annotations, positions: offsets.append(positions),
     )
-    monkeypatch.setattr(bolt_drawing, "curate_view_dimensions", annotations)
-    monkeypatch.setattr(bolt_drawing, "add_property_linked_note", note)
+    monkeypatch.setattr(bolt_drawing, "model_point_in_view", project)
+    monkeypatch.setattr(bolt_drawing, "add_property_linked_callout", callout)
     monkeypatch.setattr(bolt_drawing, "finalize_drawing", finalize)
     adapter = SimpleNamespace(currentModel=object(), open_model=open_model)
     if fault is not None:
@@ -861,17 +937,71 @@ def test_sheet_prints_consumed_route_and_inspection_with_native_text_readback(
             asyncio.run(bolt_drawing.build(adapter))
         return
     assert asyncio.run(bolt_drawing.build(adapter)) == {"drawing": "recorded"}
-    assert "Machining Route" in required and "Modified-Part Inspection" in required
-    assert "Manufacturing Notes" not in required
-    assert views == ["*Front", "*Isometric"]
-    assert [name for name, _x, _y in printed] == [
-        "Supplier",
-        "Supplier SKUs",
-        "Stock Name",
+    assert "Purchased Screw Note" in required
+    for retired in (
         "Machining Route",
         "Modified-Part Inspection",
         "Isometric View Note",
+        "Supplier",
+        "Stock Name",
+    ):
+        assert retired not in required
+    # One scale: both views at the sheet's 2:1.
+    assert views == [
+        ("*Front", bolt_drawing.SHEET_SCALE),
+        ("*Isometric", bolt_drawing.SHEET_SCALE),
     ]
+    # Every control on the main view; the chamfer text leaves on a leader.
+    assert curated == [("*Front", bolt_drawing.FRONT_KEEP)]
+    assert offsets == [{"ChamferWidth": bolt_drawing.CHAMFER_TEXT_XY}]
+    (head,) = projected
+    assert head[0] == "*Front"
+    assert head[1] == pytest.approx((bolt.HEAD_AF / 4000, bolt.HEAD_TOP_Y / 1000, 0.0))
+    assert printed == [
+        ("*Front", "Purchased Screw Note", (0.1, 0.2), bolt_drawing.PURCHASED_NOTE_XY)
+    ]
+
+
+def test_layout_keeps_text_off_the_part_border_and_title_block() -> None:
+    """Offline placement relations; the native PDF proof owns text bounds."""
+    scale = bolt_drawing._SHEET_PER_MODEL_MM
+    center_x, center_y = bolt_drawing.FRONT_CENTER
+    tip_y = bolt_drawing.TIP_SHEET_Y
+    assert tip_y == pytest.approx(center_y - bolt.HEAD_TOP_Y / 2 * scale)
+    head_left = center_x - bolt.HEAD_AF / 2 * scale
+    shank_right = center_x + bolt.SHANK_DIA / 2 * scale
+    keep = bolt_drawing.FRONT_KEEP
+    # R3 measured ~2.57 mm per character of dimension text and ~5.75 mm per
+    # line. The widest cut-length line (28 characters, ~72 mm) stays inside
+    # the 12.7 mm border and 10 mm clear of the hex head.
+    cut_half_width = 0.036
+    assert keep["CutLength"][0] - cut_half_width > 0.0127
+    assert keep["CutLength"][0] + cut_half_width < head_left - 0.010
+    assert tip_y < keep["CutLength"][1] < tip_y + bolt.LENGTH * scale
+    # The tail text (four lines, ~23 mm) sits wholly above the tail's top
+    # extension line, right of the shank.
+    tail_top = tip_y + bolt.THREAD_LENGTH_MIN * scale
+    assert keep["ThreadLengthMin"][1] - 0.0115 > tail_top + 0.005
+    assert keep["ThreadLengthMin"][0] > shank_right + 0.040
+    # The chamfer dimension line under the tip, its text right and below.
+    assert keep["ChamferWidth"][1] < tip_y
+    text_x, text_y = bolt_drawing.CHAMFER_TEXT_XY
+    assert text_x > shank_right + 0.035 and text_y < keep["ChamferWidth"][1]
+    # The native 45 degrees sits in the open wedge right of the tip: on the
+    # bisector from the chamfer vertex, clear of the tip-face extension line,
+    # below the tail's top extension line and left of its dimension line.
+    angle_x, angle_y = keep["ChamferAngle"]
+    vertex_x = center_x + (bolt.SHANK_DIA / 2 - bolt.CHAMFER_WIDTH) * scale
+    bisector = math.atan2(angle_y - tip_y, angle_x - vertex_x)
+    assert bisector == pytest.approx(math.radians(bolt.CHAMFER_ANGLE / 2))
+    assert angle_x > shank_right + 0.008
+    assert tip_y + 0.004 < angle_y < tail_top - 0.004
+    assert angle_x + 0.006 < keep["ThreadLengthMin"][0]
+    # The purchased note above the head; nothing reaches the title block.
+    head_top = tip_y + bolt.HEAD_TOP_Y * scale
+    assert bolt_drawing.PURCHASED_NOTE_XY[1] > head_top + 0.015
+    assert bolt_drawing.PURCHASED_NOTE_XY[1] < 0.2667 - 0.010
+    assert text_y - 0.035 > 0.0127
 
 
 @pytest.mark.parametrize(
