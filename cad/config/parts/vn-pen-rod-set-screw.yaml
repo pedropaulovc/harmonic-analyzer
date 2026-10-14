@@ -1,16 +1,15 @@
 vn-pen-rod-set-screw:
-  title: Thread-Locking Alloy Steel Cup-Tip Set Screw
+  title: Pen Rod Set Screw
   number: MHA-VN-061
-  stock_name: Thread-Locking Alloy Steel Cup-Tip Set Screw
+  stock_name: Alloy Steel Cup-Tip Set Screw
   supplier: McMaster-Carr
-  supplier_skus: [91385A105]
+  supplier_skus: [91375A105]
   material: Alloy Steel
-  material_specification: "Alloy steel, black oxide, Rockwell C45, pre-applied nylon-patch threadlocker; McMaster-Carr 91385A105"
+  material_specification: "Alloy steel, black oxide, Rockwell C45; McMaster-Carr 91375A105"
   finish: black oxide
   installation_notes: |-
     INSTALLATION - IN THE MHA-PN-005 V-BLOCK TAP, CUP ON THE
     MHA-PN-004 PEN-ROD PIVOT END. TIGHTEN AFTER SETTING THE NIB.
-    ITS NYLON PATCH LOCKS THE THREAD; ADD NO THREADLOCKER.
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance

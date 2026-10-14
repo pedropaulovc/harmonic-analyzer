@@ -1,10 +1,9 @@
-r"""Purchased pen-rod set screw: McMaster 91385A105, black (MHA-VN-061).
+r"""Purchased pen-rod set screw: McMaster 91375A105, black (MHA-VN-061).
 
-A thread-locking #4-40 x 3/16 in hex socket cup-point set screw in the pen
-v-block's tap, bearing on the pen rod's turned pivot end and locking it in the
-block; its pre-applied nylon patch (not modelled) locks the thread.
+A #4-40 x 3/16 in hex socket cup-point set screw in the pen v-block's tap,
+bearing on the pen rod's turned pivot end and locking it in the block.
 
-The body is the catalogue-only recipe (diagnostics/diag_build_91385A105),
+The body is the catalogue-only recipe (diagnostics/diag_build_91375A105),
 lifted so the cup end sits on the Top plane at y = 0 and the socket face at
 y = LENGTH; the pen assembly places it cup-down on the rod.
 
@@ -22,7 +21,7 @@ from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from _simplified_part import save_simplified_part
-from diagnostics.diag_build_91385A105 import HALF, LENGTH, build_91385A105
+from diagnostics.diag_build_91375A105 import HALF, LENGTH, build_91375A105
 from vn_pen_rod_set_screw_spec import SKU
 
 PART_NAME = "vn-pen-rod-set-screw"
@@ -39,7 +38,7 @@ async def build(adapter) -> dict[str, str]:
         components=(
             StockComponent(
                 sku=SKU,
-                author=build_91385A105,
+                author=build_91375A105,
                 transform=RigidTransform(translation_mm=(0.0, HALF, 0.0)),
             ),
         ),

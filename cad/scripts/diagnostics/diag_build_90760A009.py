@@ -1,13 +1,13 @@
-r"""McMaster 90631A009 -- zinc-plated steel nylon-insert locknut, #8-32.
+r"""McMaster 90760A009 -- zinc-plated steel small-pattern hex nut, #8-32.
 
-Used as vn-pen-hanger-locknut (MHA-VN-063), the locknut on the pen-hanger
-screw at the strap's front face.  The catalogue facts are
-``_mcmaster_90631a009``'s.  The model is the 92671A115 recipe at this size:
+Used as vn-pen-hanger-jam-nut (MHA-VN-064), the thin nut jammed against the
+MHA-VN-063 nut on the pen-hanger screw.  The catalogue facts are
+``_mcmaster_90760a009``'s.  The model is the 92671A115 recipe at this size:
 one Top-plane profile -- the hexagon (flats normal to the sketch X) with the
 bore circle inside it -- extruded blind THICKNESS along +Y from the y = 0
-face.  Neither the thread nor the nylon insert is modelled: the bore
-is the #8-32 basic major diameter.  The production build turns the body so
-the recipe's +Y is the part frame's +Z.
+face.  The thread is not modelled: the bore is the #8-32 basic major
+diameter.  The production build turns the body so the recipe's +Y is the
+part frame's +Z.
 
 No vendor solid was harvested, so there is no replica gate: the standalone
 run is catalog-only, building the recipe, checking the solid and saving it
@@ -15,7 +15,7 @@ under cad/out/reference.
 
 Run standalone (SolidWorks open)::
 
-    uv run python cad\scripts\diagnostics\diag_build_90631A009.py
+    uv run python cad\scripts\diagnostics\diag_build_90760A009.py
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ else:
     import _script_paths  # noqa: F401
 from _check import check  # noqa: E402
 from _feature_tree import name_last_feature  # noqa: E402
-from _mcmaster_90631a009 import (  # noqa: E402
+from _mcmaster_90760a009 import (  # noqa: E402
     ACROSS_CORNERS,
     BORE_DIA,
     SKU,
@@ -58,8 +58,8 @@ def hex_profile_mm() -> list[tuple[float, float]]:
     ]
 
 
-@stock_recipe("90631A009", threaded=False)
-async def build_90631A009(adapter, truth=None):
+@stock_recipe("90760A009", threaded=False)
+async def build_90760A009(adapter, truth=None):
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_sketch nut profile", await adapter.create_sketch("Top"))
@@ -91,7 +91,7 @@ async def build_catalog(adapter) -> dict[str, str]:
     with _telemetry.span("catalog.build", label=PART_NO):
         check(f"create_part {PART_NO}", await adapter.create_part())
         assert_seat_sketch_baseline(adapter, PART_NO)
-        await build_90631A009(adapter)
+        await build_90760A009(adapter)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
             raise RuntimeError(f"{PART_NO} catalog build has no solid volume")

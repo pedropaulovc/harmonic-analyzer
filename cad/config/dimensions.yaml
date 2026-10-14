@@ -1916,7 +1916,7 @@ sections:
         - scaled
         - low
       - - Rod set screw (MHA-VN-061, purchased)
-        - '#4-40 × 3/16 thread-locking (nylon-patch) cup point (McMaster 91385A105) in the v-block front-face tap, cup on the rod''s pivot end'
+        - '#4-40 × 3/16 cup point (McMaster 91375A105) in the v-block front-face tap, cup on the rod''s pivot end'
         - —
         - 'p.60 (side set screw pins the block to the rod); tap length 7.0, screw recessed 2.24 below the face'
         - catalog + derived
@@ -1933,10 +1933,10 @@ sections:
         - p.60–63; engineerguy 4/4 9:15–10:34
         - scaled + derived
         - low
-      - - Hanger screw ×1 and locknut ×1 (M6.10)
-        - 'McMaster 93075A199 hex-head #8-32 × 1 screw, driven from behind the wheel bar through the pen-hanger strap''s Ø4.572 #8 close-clearance hole into a McMaster 90631A009 #8-32 nylon-insert locknut (MHA-VN-063) bearing on the strap front; 6.8 of full thread stands past the nut (≥ 2 pitches, tip chamfer excluded) and the tip stops 3.2 short of the magnifying-wheel rim. Hole station: wheel-bar local x −112, machine (x, y) = (−3, 575.7), 5.0 below the strap top. The bar''s Ø4.572 close-clearance hole is centred 5.0 from the fixed free end (machine x −8), leaving 2.714 nominal end wall.'
+      - - Hanger screw ×1, nut ×1 and jam nut ×1 (M6.10)
+        - 'McMaster 93075A199 hex-head #8-32 × 1 screw, driven from behind the wheel bar through the pen-hanger strap''s Ø4.572 #8 close-clearance hole into a McMaster 90480A009 zinc-plated steel #8-32 hex nut (MHA-VN-063, 11/32 AF × 1/8) bearing on the strap front, locked by a McMaster 90760A009 zinc-plated steel #8-32 small-pattern nut (MHA-VN-064, 1/4 AF × 3/32) jammed against it; 7.2 of full thread stands past the jam nut (≥ 2 pitches, tip chamfer excluded; a 3/4 screw would leave 0.8), the tip stops 3.2 short of the magnifying-wheel rim, and the nut''s corners clear the rim radially by 0.96. Hole station: wheel-bar local x −112, machine (x, y) = (−3, 575.7), 5.0 below the strap top. The bar''s Ø4.572 close-clearance hole is centred 5.0 from the fixed free end (machine x −8), leaving 2.714 nominal end wall.'
         - —
-        - 'p.60–63 (the strap is bolted to the bar); stock wrappers `cad/scripts/build_vn_hanger_screw.py` / `cad/scripts/build_vn_pen_hanger_locknut.py`; station and end wall from `cad/scripts/build_mg_wheel_bar.py` / `cad/scripts/mg_wheel_bar_geom.py`; clearance hole from `cad/scripts/build_pn_pen_hanger.py`; stack from `cad/scripts/build_pn_pen_assembly.py`'
+        - 'p.60–63 (the strap is bolted to the bar); stock wrappers `cad/scripts/build_vn_hanger_screw.py` / `cad/scripts/build_vn_pen_hanger_nut.py` / `cad/scripts/build_vn_pen_hanger_jam_nut.py`; station and end wall from `cad/scripts/build_mg_wheel_bar.py` / `cad/scripts/mg_wheel_bar_geom.py`; clearance hole from `cad/scripts/build_pn_pen_hanger.py`; stack from `cad/scripts/build_pn_pen_assembly.py`'
         - scaled + derived
         - low
       - - Pen marker (MHA-VN-060, purchased)

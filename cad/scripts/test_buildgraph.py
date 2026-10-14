@@ -124,7 +124,7 @@ _INSERTED_SOURCES = {
     "mg_magnifying_wheel mg_output_fixture vn_thumb_screw mg_wheel_axle mg_wheel_axle_spacer vn_wheel_axle_back_washer "
     "vn_wheel_axle_front_washer vn_wheel_axle_nut mg_wheel_bar mg_wheel_drum",
     "pn_pen": "vn_hanger_screw pn_pen_adjust_screw vn_pen_adjust_nut pn_pen_frame pn_pen_hanger "
-    "vn_pen_hanger_locknut vn_pen_marker "
+    "vn_pen_hanger_jam_nut vn_pen_hanger_nut vn_pen_marker "
     "pn_pen_rod vn_pen_rod_set_screw vn_pen_set_screw pn_pen_v_block pn_pen_wire",
     "pd_paper_drive": "vn_chain_inner_link vn_chain_outer_link vn_clamp_screw "
     "sh_column_clamp_back sh_column_clamp_front vn_fillister_screw pd_guide_lock vn_guide_lock_screw pd_latch_hook "

@@ -1,4 +1,4 @@
-"""Create the purchased reference drawing for the pen-rod set screw (MHA-VN-061, McMaster 91385A105)."""
+"""Create the purchased reference drawing for the pen-rod set screw (MHA-VN-061, McMaster 91375A105)."""
 
 from __future__ import annotations
 

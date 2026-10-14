@@ -31,9 +31,10 @@ the curve. Everything below the guides rides the rod:
   mid-plane), locked to the rod so it rides the pen travel. The rim wrap and
   tie-off are not modeled; the kinematic coupling stays a Motion-study mate
   (cad/docs/motion-policy.md).
-* vn-hanger-screw + vn-pen-hanger-locknut -- fasten the pen-hanger: the screw
-  from behind the wheel bar through the strap's clearance hole, the
-  nylon-insert locknut on the strap front locking it.
+* vn-hanger-screw + vn-pen-hanger-nut + vn-pen-hanger-jam-nut -- fasten the
+  pen-hanger: the screw from behind the wheel bar through the strap's
+  clearance hole, the nut on the strap front and the thin jam nut jammed
+  against it, locking it.
 
 The carriage layout and its plan balance live in ``pn_pen_carriage_geom``
 (pure): the rod line PEN_Z_MID and the v-block's pivot-bore station put the
@@ -90,10 +91,12 @@ from _interference_contracts import allowed_interference_pairs
 from vn_hanger_screw_spec import SHANK_LEN as HANGER_SHANK_LEN
 from vn_hanger_screw_spec import THREAD_PITCH as HANGER_THREAD_PITCH
 from vn_hanger_screw_spec import TIP_CHAMFER as HANGER_TIP_CHAMFER
-from vn_pen_hanger_locknut_spec import THICKNESS as HANGER_LOCKNUT_T
-from vn_pen_hanger_locknut_spec import (
-    THREAD_PAST_MIN_PITCHES as HANGER_LOCKNUT_PAST_PITCHES,
+from vn_pen_hanger_jam_nut_spec import (
+    THREAD_PAST_MIN_PITCHES as HANGER_THREAD_PAST_PITCHES,
 )
+from vn_pen_hanger_jam_nut_spec import THICKNESS as HANGER_JAM_NUT_T
+from vn_pen_hanger_nut_spec import ACROSS_CORNERS as HANGER_NUT_ACROSS_CORNERS
+from vn_pen_hanger_nut_spec import THICKNESS as HANGER_NUT_T
 from mg_magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
 from mg_magnifying_wheel_geom import RIM_OUTER_DIA as WHEEL_RIM_OUTER_DIA
 from mg_wheel_bar_geom import BAR_DEPTH as WHEEL_BAR_DEPTH
@@ -160,8 +163,8 @@ if STUD_HEAD_TOP_Y[1] > _RIM_LOW_Y_AT_WIRE - 2.0:
 # --- M6.10 fastener ----------------------------------------------------------
 # Pen-hanger screw from BEHIND the bar. Its under-head frame follows the shared
 # wheel-bar back face; the exact stock shank passes through the 9 mm bar, the
-# 3 mm strap's clearance hole and the locknut on the strap front, then stands
-# clear of the magnifying-wheel rim.
+# 3 mm strap's clearance hole, the nut on the strap front and the jam nut on
+# that, then stands clear of the magnifying-wheel rim.
 BAR_BACK_Z = HANGER_POS[2] + max(HANGER_STRAP_Z) + WHEEL_BAR_DEPTH
 HANGER_SCREW_POS = (
     HANGER_POS[0] + HANGER_HOLE_XY[0],
@@ -172,23 +175,38 @@ assert math.isclose(HANGER_SCREW_POS[0], HANGER_SCREW_MACHINE_X, abs_tol=1e-9)
 assert math.isclose(HANGER_SCREW_POS[1], WHEEL_BAR_Y, abs_tol=1e-9)
 HANGER_SCREW_TIP_Z = HANGER_SCREW_POS[2] - HANGER_SHANK_LEN
 HANGER_STRAP_FRONT_Z = HANGER_POS[2] + min(HANGER_STRAP_Z)
-# The locknut's frame spans local z 0..T (vn_pen_hanger_locknut_spec): placed
-# un-rotated at the strap front less T, its z = T face bears on the strap.
-HANGER_LOCKNUT_POS = (
+# Both nuts' frames span local z 0..T (vn_pen_hanger_nut_spec,
+# vn_pen_hanger_jam_nut_spec): the nut placed un-rotated at the strap front
+# less its T bears on the strap with its z = T face; the jam nut, placed at
+# the nut's z = 0 face less its own T, bears on the nut the same way.
+HANGER_NUT_POS = (
     HANGER_SCREW_POS[0],
     HANGER_SCREW_POS[1],
-    HANGER_STRAP_FRONT_Z - HANGER_LOCKNUT_T,
+    HANGER_STRAP_FRONT_Z - HANGER_NUT_T,
+)
+HANGER_JAM_NUT_POS = (
+    HANGER_SCREW_POS[0],
+    HANGER_SCREW_POS[1],
+    HANGER_NUT_POS[2] - HANGER_JAM_NUT_T,
 )
 WHEEL_RIM_BACK_Z = WHEEL_MID_Z + WHEEL_RIM_AXIAL / 2.0
-# Full thread standing past the nut's insert end, the tip chamfer excluded.
-HANGER_THREAD_PAST_NUT = HANGER_LOCKNUT_POS[2] - HANGER_SCREW_TIP_Z - HANGER_TIP_CHAMFER
+# Full thread standing past the jam nut's outer face, the tip chamfer excluded.
+HANGER_THREAD_PAST_NUT = HANGER_JAM_NUT_POS[2] - HANGER_SCREW_TIP_Z - HANGER_TIP_CHAMFER
 HANGER_TIP_TO_RIM = HANGER_SCREW_TIP_Z - WHEEL_RIM_BACK_Z
-if HANGER_THREAD_PAST_NUT < HANGER_LOCKNUT_PAST_PITCHES * HANGER_THREAD_PITCH:
+# The wider nut's corners against the rim, radially from the wheel axis.
+HANGER_NUT_RIM_RADIAL = (
+    math.hypot(HANGER_SCREW_POS[0] - WHEEL_X, HANGER_SCREW_POS[1] - WHEEL_BAR_Y)
+    - HANGER_NUT_ACROSS_CORNERS / 2.0
+    - _RIM_R
+)
+if HANGER_THREAD_PAST_NUT < HANGER_THREAD_PAST_PITCHES * HANGER_THREAD_PITCH:
     raise AssertionError(
-        "stock hanger screw stands under two full pitches past the locknut"
+        "stock hanger screw stands under two full pitches past the jam nut"
     )
 if HANGER_TIP_TO_RIM <= 0.0:
     raise AssertionError("stock hanger screw tip reaches the magnifying-wheel rim")
+if HANGER_NUT_RIM_RADIAL <= 0.0:
+    raise AssertionError("hanger nut corners reach the magnifying-wheel rim")
 
 # Every part that rides the rod: (stem, position, rows). Each is placed at its
 # exact pose and LOCKED to the rod (a Lock mate freezes the full relative
@@ -329,24 +347,28 @@ async def build(adapter) -> dict[str, str]:
     )
     assert_component_placed(adapter, hanger_screw, list(HANGER_SCREW_POS), IDENTITY)
 
-    # The locknut on the strap front: placed on the screw axis at its exact
-    # pose and locked to the fixed hanger -- one Lock mate, like the riders;
-    # a coaxial mate on top would only over-constrain the solve.
-    hanger_locknut = await place_component(
-        adapter,
-        "vn-pen-hanger-locknut",
-        list(HANGER_LOCKNUT_POS),
-        [0.0, 0.0, 0.0],
-        IDENTITY,
-        ground=False,
-    )
-    await lock_mate(
-        adapter,
-        named_ref(f"Front Plane@{hanger_locknut}", "PLANE"),
-        named_ref(f"Front Plane@{hanger}", "PLANE"),
-        label="hanger locknut locked to hanger",
-    )
-    assert_component_placed(adapter, hanger_locknut, list(HANGER_LOCKNUT_POS), IDENTITY)
+    # The nut on the strap front and the jam nut on the nut: each placed on
+    # the screw axis at its exact pose and locked to the fixed hanger -- one
+    # Lock mate, like the riders; a coaxial mate on top would only
+    # over-constrain the solve.
+    for stem, pos, label in (
+        ("vn-pen-hanger-nut", HANGER_NUT_POS, "hanger nut locked to hanger"),
+        (
+            "vn-pen-hanger-jam-nut",
+            HANGER_JAM_NUT_POS,
+            "hanger jam nut locked to hanger",
+        ),
+    ):
+        nut = await place_component(
+            adapter, stem, list(pos), [0.0, 0.0, 0.0], IDENTITY, ground=False
+        )
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{nut}", "PLANE"),
+            named_ref(f"Front Plane@{hanger}", "PLANE"),
+            label=label,
+        )
+        assert_component_placed(adapter, nut, list(pos), IDENTITY)
 
     # Certify the AS-BUILT model. Necessity only: the freed pen travel is
     # genuinely free; the lock-mated riders MUST read under-constrained WITH

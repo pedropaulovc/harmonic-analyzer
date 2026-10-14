@@ -1,11 +1,10 @@
-r"""Purchased MHA-VN-063 pen-hanger locknut: McMaster 90631A009.
+r"""Purchased MHA-VN-063 pen-hanger nut: McMaster 90480A009.
 
-A zinc-plated steel #8-32 nylon-insert locknut
-(``vn_pen_hanger_locknut_spec``) on the pen-hanger screw at the strap's front
-face; its insert's prevailing torque locks the screw.  The stock recipe
-``diagnostics/diag_build_90631A009.py`` models the hex with a plain bore at
-the thread major; no vendor model was fetched, so its standalone run is
-catalog-only.
+A zinc-plated steel #8-32 hex nut (``vn_pen_hanger_nut_spec``) on the
+pen-hanger screw, bearing on the strap's front face; the MHA-VN-064 jam nut
+is jammed against it.  The stock recipe ``diagnostics/diag_build_90480A009.py``
+models the hex with a plain bore at the thread major; no vendor model was
+fetched, so its standalone run is catalog-only.
 
 Frame: the recipe is built about +Y and turned so its axis is +Z, the solid
 spanning z = 0 (the Front Plane) to z = THICKNESS.  The axis is published as
@@ -13,7 +12,7 @@ spanning z = 0 (the Front Plane) to z = THICKNESS.  The axis is published as
 
 Run (SolidWorks already open)::
 
-    uv run python cad\scripts\build_vn_pen_hanger_locknut.py
+    uv run python cad\scripts\build_vn_pen_hanger_nut.py
 """
 
 from __future__ import annotations
@@ -24,10 +23,10 @@ import sys
 from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
-from diagnostics.diag_build_90631A009 import build_90631A009
-from vn_pen_hanger_locknut_spec import SKU
+from diagnostics.diag_build_90480A009 import build_90480A009
+from vn_pen_hanger_nut_spec import SKU
 
-PART_NAME = "vn-pen-hanger-locknut"
+PART_NAME = "vn-pen-hanger-nut"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
@@ -41,7 +40,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         part_name=PART_NAME,
         components=(
-            StockComponent(sku=SKU, author=build_90631A009, transform=TRANSFORM),
+            StockComponent(sku=SKU, author=build_90480A009, transform=TRANSFORM),
         ),
         material=MATERIAL,
         screw_axis_planes=("Top Plane", "Right Plane"),

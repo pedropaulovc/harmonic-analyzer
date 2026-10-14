@@ -23,9 +23,10 @@ The one sub-assembly with no original to copy.
 | `pn-pen-wire` | TODO | TODO | TODO |
 | `pn-pen-hanger` | TODO | TODO | TODO |
 | `vn-pen-set-screw` | TODO | TODO | TODO |
-| `vn-pen-rod-set-screw` | 1 | alloy steel, black oxide | #4-40 × 4.76 mm (3/16") thread-locking (nylon-patch) cup-point set screw (McMaster 91385A105) |
+| `vn-pen-rod-set-screw` | 1 | alloy steel, black oxide | #4-40 × 4.76 mm (3/16") cup-point set screw (McMaster 91375A105) |
 | `vn-pen-adjust-nut` | 1 | brass | #0-80 hex nut (McMaster 92671A115) |
-| `vn-pen-hanger-locknut` | 1 | steel, zinc plated | #8-32 nylon-insert locknut (McMaster 90631A009) |
+| `vn-pen-hanger-nut` | 1 | steel, zinc plated | #8-32 hex nut (McMaster 90480A009) |
+| `vn-pen-hanger-jam-nut` | 1 | steel, zinc plated | #8-32 thin hex jam nut (McMaster 90760A009) |
 | `mg-output-fixture` | 1 | C36000 brass | 9.525 mm (3/8 in) hex bar (`mg_output_fixture_geom.HEX_AF`); TODO(cut it first) |
 
 : {tbl-colwidths="[40,10,25,25]"}

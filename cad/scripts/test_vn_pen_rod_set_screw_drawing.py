@@ -1,4 +1,4 @@
-"""Offline contracts for the MHA-VN-061 pen-rod set screw (McMaster 91385A105)."""
+"""Offline contracts for the MHA-VN-061 pen-rod set screw (McMaster 91375A105)."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from _fastener_catalog import FASTENERS
 from _hole_spec import THREAD_MAJOR_MM
 from _stock_fastener import RigidTransform
 from _stock_recipe import recipe_declaration
-from diagnostics import diag_build_91385A105 as recipe
+from diagnostics import diag_build_91375A105 as recipe
 from diagnostics import diag_build_91375A106 as family
 
 IN = 25.4
@@ -24,10 +24,10 @@ STEM = "vn-pen-rod-set-screw"
 
 
 def test_stock_build_uses_its_registered_recipe() -> None:
-    metadata = recipe_declaration(spec.SKU, recipe.build_91385A105)
-    assert spec.SKU == "91385A105"
+    metadata = recipe_declaration(spec.SKU, recipe.build_91375A105)
+    assert spec.SKU == "91375A105"
     assert metadata.module == recipe.__name__
-    assert metadata.callable_name == recipe.build_91385A105.__name__
+    assert metadata.callable_name == recipe.build_91375A105.__name__
     assert metadata.threaded
     assert part.SPEC is FASTENERS[STEM]
     assert part.SPEC.skus == (spec.SKU,)
@@ -47,9 +47,9 @@ def test_part_frame_is_the_arbor_set_screws() -> None:
 def test_config_row_is_the_catalog_identity() -> None:
     row = _config.parts(STEM)
     assert row["number"] == "MHA-VN-061"
-    assert row["title"] == "Thread-Locking Alloy Steel Cup-Tip Set Screw"
+    assert row["title"] == "Pen Rod Set Screw"
     assert row["stock_name"] == FASTENERS[STEM].stock_name
-    assert row["stock_name"] == "Thread-Locking Alloy Steel Cup-Tip Set Screw"
+    assert row["stock_name"] == "Alloy Steel Cup-Tip Set Screw"
     assert row["supplier_skus"] == [spec.SKU]
     assert spec.SKU in row["material_specification"]
     assert row["finish"] == "black oxide"
@@ -58,7 +58,7 @@ def test_config_row_is_the_catalog_identity() -> None:
 
 
 def test_spec_carries_the_live_catalogue_facts() -> None:
-    """mcmaster.com/91385A105, read live 2026-10-13."""
+    """mcmaster.com/91375A105, read live 2026-10-13."""
     assert spec.THREAD == "#4-40"
     assert spec.MAJOR_DIA == pytest.approx(THREAD_MAJOR_MM[spec.THREAD], abs=5e-4)
     assert spec.PITCH == recipe.PITCH == IN / 40.0

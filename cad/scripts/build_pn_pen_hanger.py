@@ -11,7 +11,7 @@ lateral guide, and the slot's two milled bottom corners carry a radius.  The
 lower plate is flush with the strap's bottom end.  A #8 close-clearance
 hole near the strap top passes the hanger screw coming through the bar FROM
 BEHIND (the magnifying wheel's rim passes in front of the strap, so no
-front-side head fits) into a nylon-insert locknut on the strap front.
+front-side head fits) into a hex nut and jam nut on the strap front.
 
 Layout: origin at the strap's top-right BACK corner -- on the bar's front
 face, level with the bar top, on the rod line's x (machine ``HANGER_POS``;
@@ -257,7 +257,7 @@ async def build(adapter) -> dict[str, str]:
 
     # 3. Native #8 close-clearance hole through the strap, drilled from its
     # front face (outward normal -Z); the screw enters from behind the bar
-    # through the back face and takes the locknut on the front.
+    # through the back face and takes the nuts on the front.
     screw_dia = SCREW_HOLE_DIA
     screw_cut = wizard_holes(
         adapter,

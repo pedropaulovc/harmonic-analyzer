@@ -34,14 +34,14 @@ def test_hanger_screw_hole_lands_on_the_bar_screw_axis() -> None:
         magnifier.WHEEL_BAR_Y + bar.BAR_SIDE / 2.0
     )
     # The 3.0 strap carries no thread: the screw passes its #8 clearance hole
-    # into the locknut, which leaves at least two full pitches beyond it.
+    # into the nut and jam nut, which leave at least two full pitches beyond.
     assert spec.STRAP_Z[1] - spec.STRAP_Z[0] == pytest.approx(3.0)
     assert spec.SCREW_HOLE_SPEC.kind == "clearance"
     assert spec.SCREW_HOLE_DIA > spec.HANGER_SCREW_DIA
     assert pen.HANGER_THREAD_PAST_NUT >= 2.0 * pen.HANGER_THREAD_PITCH
 
 
-def test_screw_hole_and_locknut_fit_all_four_tapered_strap_edges() -> None:
+def test_screw_hole_and_nut_fit_all_four_tapered_strap_edges() -> None:
     point = spec.SCREW_HOLE_XY
     vertices = spec.STRAP_OUTLINE
     # Signed point-to-edge distances in the CCW outline measure the complete
@@ -56,7 +56,7 @@ def test_screw_hole_and_locknut_fit_all_four_tapered_strap_edges() -> None:
     # The top edge governs, 5.0 above the axis.
     assert min(distances) == pytest.approx(5.0)
     assert min(distances) == pytest.approx(spec.SCREW_HOLE_EDGE_DISTANCE)
-    assert spec.LOCKNUT_ACROSS_FLATS / 2.0 < min(distances)
+    assert spec.NUT_ACROSS_FLATS / 2.0 < min(distances)
     # Rule 17 at the printed worst case: the .X station band and the drilled
     # hole's upper limit (title block +0.10).
     assert spec.SCREW_HOLE_WALL_MIN == pytest.approx(5.0 - 0.8 - (4.572 + 0.10) / 2.0)

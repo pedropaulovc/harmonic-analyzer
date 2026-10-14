@@ -379,6 +379,35 @@ def test_the_gooseneck_set_screw_is_waived_only_by_its_ruling() -> None:
     assert joint_id in unlocked(without)
 
 
+def test_the_pen_rod_set_screw_is_waived_only_by_its_ruling() -> None:
+    """PR #1436: the MHA-VN-061 cup point is the v-block's only retention on
+    the rod, an oscillating joint with no room for a jam screw. The user
+    waived drawing-guidelines.md rule 23 for it (2026-10-14): an operator
+    adjustment and light clamp, period-faithful and plain."""
+    joint_id = "pn-pen/rod-set-screw-in-v-block"
+    (row,) = [j for j in jr.JOINTS if j.id == joint_id]
+    assert row.exposure is Exposure.OSCILLATING
+    assert row.lock is Lock.NONE
+    assert "91375A105" in row.evidence
+    assert jr._config.parts("vn-pen-rod-set-screw")["supplier_skus"] == ["91375A105"]
+    ruling = jr.RULINGS[row.exception]
+    assert ruling.joint == joint_id
+    assert "2026-10-14" in ruling.granted and "PR #1436" in ruling.granted
+    assert joint_id not in {f.subject for f in jr.audit_table()}
+    without = {k: v for k, v in jr.RULINGS.items() if k != row.exception}
+    findings = jr.audit(
+        jr.JOINTS,
+        jr.build_inventory(),
+        threaded=jr.THREADED_PARTS,
+        unthreaded=jr.UNTHREADED_PARTS,
+        purchased=jr.purchased_parts(),
+        unthreaded_stock=jr.UNTHREADED_STOCK,
+        required=jr.REQUIRED_JOINTS,
+        rulings=without,
+    )
+    assert (joint_id, Kind.UNLOCKED) in {(f.subject, f.kind) for f in findings}
+
+
 def test_a_static_clamp_must_say_why_no_operating_torque_reaches_it() -> None:
     unreasoned = dataclasses.replace(SCREW, exposure_reason="  ")
     assert _kinds(_audit((STUD, CAP, unreasoned, NUT))) == {

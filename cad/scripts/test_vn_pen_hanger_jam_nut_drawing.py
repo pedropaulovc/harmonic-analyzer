@@ -1,4 +1,4 @@
-"""Offline contracts for the MHA-VN-063 pen-hanger locknut (McMaster 90631A009)."""
+"""Offline contracts for the MHA-VN-064 pen-hanger jam nut (McMaster 90760A009)."""
 
 from __future__ import annotations
 
@@ -11,18 +11,18 @@ from pathlib import Path
 import pytest
 
 import _config
-import build_vn_pen_hanger_locknut as part
-import vn_pen_hanger_locknut_spec as spec
+import build_vn_pen_hanger_jam_nut as part
+import vn_pen_hanger_jam_nut_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _test_stock_recipes import discovered_recipes
-from diagnostics import diag_build_90631A009 as recipe
+from diagnostics import diag_build_90760A009 as recipe
 
-STEM = "vn-pen-hanger-locknut"
-SHEET = "vn_pen_hanger_locknut"
-NUMBER = "MHA-VN-063"
-STOCK_NAME = "Low-Strength Steel Nylon-Insert Locknut"
-BUILD = "build_90631A009"
+STEM = "vn-pen-hanger-jam-nut"
+SHEET = "vn_pen_hanger_jam_nut"
+NUMBER = "MHA-VN-064"
+STOCK_NAME = "Zinc-Plated Steel Narrow-Profile Hex Nut"
+BUILD = "build_90760A009"
 IN = 25.4
 
 
@@ -30,7 +30,7 @@ def test_catalogue_row_is_the_registered_mcmaster_part() -> None:
     row = _config.parts(STEM)
     stock = FASTENERS[STEM]
     assert part.SPEC is stock
-    assert stock.skus == tuple(row["supplier_skus"]) == (spec.SKU,) == ("90631A009",)
+    assert stock.skus == tuple(row["supplier_skus"]) == (spec.SKU,) == ("90760A009",)
     assert stock.supplier == row["supplier"] == "McMaster-Carr"
     assert stock.stock_name == row["stock_name"] == STOCK_NAME
     assert stock.material == row["material"] == part.MATERIAL == "Plain Carbon Steel"
@@ -45,10 +45,10 @@ def test_catalogue_row_is_the_registered_mcmaster_part() -> None:
 
 
 def test_spec_carries_the_live_catalogue_facts() -> None:
-    """mcmaster.com/90631A009, read live 2026-10-14."""
+    """McMaster 8-32 narrow-profile hex-nut listing (90760A009 row), read live 2026-10-14."""
     assert spec.THREAD == "#8-32"
-    assert spec.ACROSS_FLATS == pytest.approx(11.0 / 32.0 * IN)
-    assert spec.THICKNESS == pytest.approx(15.0 / 64.0 * IN)
+    assert spec.ACROSS_FLATS == pytest.approx(1.0 / 4.0 * IN)
+    assert spec.THICKNESS == pytest.approx(3.0 / 32.0 * IN)
     # The thread is not modelled: the bore is the #8-32 basic major.
     assert spec.BORE_DIA == pytest.approx(0.164 * IN, abs=0.001)
     assert spec.ACROSS_CORNERS == pytest.approx(
@@ -205,7 +205,7 @@ def test_no_vendor_model_is_tracked() -> None:
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:
-    import draw_vn_pen_hanger_locknut as drawing
+    import draw_vn_pen_hanger_jam_nut as drawing
 
     sheet = DRAWINGS_BY_NAME[SHEET]
     assert drawing.SPEC is sheet
@@ -228,19 +228,29 @@ def test_installation_note_fits_the_sheet(stem: str) -> None:
     assert not re.search(r"\d+\.\d|\+/-|±|Ø|MAX|MIN| MM\b", notes)
 
 
-def test_hanger_screw_runs_through_the_nut_past_the_insert() -> None:
-    """Rule 23: the insert locks only on full thread standing past the nut."""
+def test_jam_nut_bears_on_the_nut_outboard() -> None:
+    """Rule 23: the thin nut is jammed against the full nut's outer face."""
+    import build_pn_pen_assembly as pen
+    import vn_pen_hanger_nut_spec as nut
+
+    assert pen.HANGER_JAM_NUT_POS[2] == pytest.approx(
+        pen.HANGER_NUT_POS[2] - spec.THICKNESS
+    )
+    assert pen.HANGER_JAM_NUT_POS[:2] == pen.HANGER_SCREW_POS[:2]
+    # Thinner and narrower than the nut it jams: its face lies on that nut's.
+    assert spec.THICKNESS < nut.THICKNESS
+    assert spec.ACROSS_CORNERS < nut.ACROSS_FLATS
+
+
+def test_hanger_screw_runs_through_both_nuts() -> None:
+    """Two full pitches stand past the jam nut, the tip chamfer excluded."""
     import build_pn_pen_assembly as pen
     import vn_hanger_screw_spec as screw
 
-    assert pen.HANGER_LOCKNUT_POS[2] == pytest.approx(
-        pen.HANGER_STRAP_FRONT_Z - spec.THICKNESS
-    )
-    assert pen.HANGER_LOCKNUT_POS[:2] == pen.HANGER_SCREW_POS[:2]
-    # Two full pitches past the insert end, the screw's tip chamfer excluded.
     assert spec.THREAD_PAST_MIN_PITCHES == 2
-    past = pen.HANGER_LOCKNUT_POS[2] - pen.HANGER_SCREW_TIP_Z - screw.TIP_CHAMFER
+    past = pen.HANGER_JAM_NUT_POS[2] - pen.HANGER_SCREW_TIP_Z - screw.TIP_CHAMFER
     assert pen.HANGER_THREAD_PAST_NUT == pytest.approx(past)
     assert past >= 2 * screw.THREAD_PITCH
-    # The nut's flats fit the strap face: 5.0 under its top edge.
-    assert spec.ACROSS_FLATS / 2.0 < 5.0
+    # A 3/4 screw, the next family length down, leaves under two pitches.
+    assert past - (screw.SHANK_LEN - 0.75 * IN) < 2 * screw.THREAD_PITCH
+    assert pen.HANGER_TIP_TO_RIM > 0.0

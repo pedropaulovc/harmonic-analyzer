@@ -1,4 +1,4 @@
-"""Create the purchased reference drawing for the pen-hanger locknut (MHA-VN-063, McMaster 90631A009)."""
+"""Create the purchased reference drawing for the pen-hanger nut (MHA-VN-063, McMaster 90480A009)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
-SPEC = DRAWINGS_BY_NAME["vn_pen_hanger_locknut"]
+SPEC = DRAWINGS_BY_NAME["vn_pen_hanger_nut"]
 
 
 async def build(adapter: Any) -> dict[str, str]:

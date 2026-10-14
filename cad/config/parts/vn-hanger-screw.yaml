@@ -9,7 +9,8 @@ vn-hanger-screw:
   finish: zinc plated
   installation_notes: |-
     INSTALLATION - FROM BEHIND THE MHA-MG-008 WHEEL BAR, THROUGH THE
-    MHA-PN-002 PEN-HANGER STRAP INTO THE MHA-VN-063 LOCKNUT.
+    MHA-PN-002 PEN-HANGER STRAP INTO THE MHA-VN-063 NUT, LOCKED BY
+    THE MHA-VN-064 JAM NUT.
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance

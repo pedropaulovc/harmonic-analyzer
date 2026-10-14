@@ -100,12 +100,13 @@ expect("pn-pen", "pn-pen-rod-1", list(p.PEN_ROD_POS), IDENTITY, "pn-pen-rod")
 for _stem, _pos, _rows in p.RIDERS:
     expect("pn-pen", f"{_stem}-1", list(_pos), _rows, _stem)
 expect("pn-pen", "vn-hanger-screw-1", list(p.HANGER_SCREW_POS), IDENTITY, "vn-hanger-screw")
+expect("pn-pen", "vn-pen-hanger-nut-1", list(p.HANGER_NUT_POS), IDENTITY, "vn-pen-hanger-nut")
 expect(
     "pn-pen",
-    "vn-pen-hanger-locknut-1",
-    list(p.HANGER_LOCKNUT_POS),
+    "vn-pen-hanger-jam-nut-1",
+    list(p.HANGER_JAM_NUT_POS),
     IDENTITY,
-    "vn-pen-hanger-locknut",
+    "vn-pen-hanger-jam-nut",
 )
 
 # Each rider's placement euler (derived in the assembly) must reproduce its rows.

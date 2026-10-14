@@ -27,7 +27,7 @@ from paper_drive_geom import PEN_ROD_X, PEN_Z_MID, PLATEN_BOTTOM_Y
 from pd_platen_spec import PLATE_HEIGHT as PLATEN_HEIGHT
 from pn_pen_rod_spec import ROD_SECTION, SECTION_BAND as ROD_SECTION_BAND
 from vn_hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA
-from vn_pen_hanger_locknut_spec import ACROSS_FLATS as LOCKNUT_ACROSS_FLATS
+from vn_pen_hanger_nut_spec import ACROSS_FLATS as NUT_ACROSS_FLATS
 
 
 PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
@@ -146,9 +146,9 @@ if GUIDE_ARM_COVER_MIN <= 0.0:
 
 # --- M6.10: the selected hanger screw passes through a #8 close-clearance
 # Hole Wizard hole near the strap top, on the bar's screw axis, into the
-# MHA-VN-063 nylon-insert locknut on the strap front (rule 23: the insert locks
-# the joint the pen rod's reversing friction loads; rule 18: the nut, not the
-# 3.0 strap, carries the thread). ---
+# MHA-VN-063 hex nut on the strap front, the MHA-VN-064 jam nut jammed against
+# it (rule 23: the jam nut locks the joint the pen rod's reversing friction
+# loads; rule 18: the nuts, not the 3.0 strap, carry the thread). ---
 SCREW_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
 SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)
 if SCREW_HOLE_DIA <= HANGER_SCREW_DIA:
@@ -169,15 +169,15 @@ def _edge_distance(start: tuple[float, float], end: tuple[float, float]) -> floa
 
 
 # Perpendicular distances to all four straight strap edges (the top edge
-# governs, 5.0 above the axis): the hole and the locknut's flats must both sit
-# inside the whole tapered outline.  The wall is judged at the printed worst
-# case below, once the station's places are authored.
+# governs, 5.0 above the axis): the hole and the bearing nut's flats must
+# both sit inside the whole tapered outline.  The wall is judged at the printed
+# worst case below, once the station's places are authored.
 SCREW_HOLE_EDGE_DISTANCE = min(
     _edge_distance(a, b)
     for a, b in zip(STRAP_OUTLINE, STRAP_OUTLINE[1:] + STRAP_OUTLINE[:1])
 )
-if LOCKNUT_ACROSS_FLATS / 2.0 >= SCREW_HOLE_EDGE_DISTANCE:
-    raise AssertionError("hanger locknut flats overhang the strap edge")
+if NUT_ACROSS_FLATS / 2.0 >= SCREW_HOLE_EDGE_DISTANCE:
+    raise AssertionError("hanger nut flats overhang the strap edge")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  Front view (looking at the plates): the strap outline, the
