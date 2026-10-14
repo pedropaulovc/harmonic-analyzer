@@ -54,18 +54,21 @@ OUTPUTS = DrawingOutputs(
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 # A 50 x 38.1 x 19.05 plate: 2:1 keeps the Ø1.98 pilot and the seat cone
-# legible. The top view carries the plan sizes and every station; section A-A
+# legible. The top view carries the plan sizes, every station (one baseline
+# stack below the view) and the hole sizes (leaders above it); section A-A
 # along the hole centre line shows the seat cone, the pilot depth and the
-# countersinks; the shaded isometric sits above the title block.
+# countersinks. The section draws the seat face DOWN, so its callouts sit
+# below the view: the countersink's at its own cone, the seat's out under the
+# second countersink, which carries none. The caption and the shaded
+# isometric stack below that, right of centre and clear of the title block.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 ISO_SCALE = (1, 1)
 TOP_CENTER = (0.115, 0.195)
-SECTION_CENTER = (0.305, 0.200)
-ISO_CENTER = (0.335, 0.112)
-ISO_NOTE_XY = (0.290, 0.152)
+SECTION_CENTER = (0.305, 0.215)
+ISO_CENTER = (0.370, 0.105)
+ISO_NOTE_XY = (0.338, 0.147)
 CAPTION_XY = (0.305, 0.163)
-NOTES_XY = (0.020, 0.090)
 # The cutting line runs the plate's length on the hole centre line, past
 # both ends (model mm).
 CUT_X = (-4.0, PLATE_LENGTH + 4.0)
@@ -76,25 +79,32 @@ CUT_X = (-4.0, PLATE_LENGTH + 4.0)
 _H = PLATE_HEIGHT
 _W = PLATE_WIDTH
 TOP_KEEP: dict[str, tuple[float, float, float]] = {
-    "PlateLength": (25.0, _H, -_W - 7.0),
-    "PlateWidth": (-14.0, _H, -_W / 2.0),
-    "HoleY": (-6.0, _H, -9.5),
-    # The stations baseline from the left end, shortest nearest the part.
+    # The stations and the length baseline from the left end, shortest
+    # nearest the part, all below the view.
     "HoleLeftX": (5.0, _H, 5.0),
     "PilotX": (12.5, _H, 10.0),
     "HoleRightX": (20.0, _H, 15.0),
-    # Between the left countersink and the seat, clear of both.
-    "PilotY": (18.5, _H, -9.5),
-    "HoleDia": (2.0, _H, -_W - 3.0),
-    "PilotDia": (33.0, _H, -_W - 3.0),
+    "PlateLength": (30.0, _H, 20.0),
+    # The width right of the view, the row location left of it, both clear
+    # of the section arrows on the centre line.
+    "PlateWidth": (58.0, _H, -0.75 * _W),
+    "HoleY": (-14.0, _H, -9.5),
+    # The hole sizes on leaders above the view, their process lane clear of
+    # the outline.
+    "HoleDia": (-2.0, _H, -_W - 8.0),
+    "PilotDia": (33.0, _H, -_W - 8.0),
 }
+# Model +Y (beyond the seat face) prints below the section view.
 SECTION_KEEP: dict[str, tuple[float, float, float]] = {
     "PlateHeight": (-8.0, _H / 2.0, -HOLE_Y),
     "PilotDepth": (57.0, _H - 3.0, -HOLE_Y),
-    "SeatDia": (25.0, _H + 5.0, -HOLE_Y),
-    "SeatFlankAngle": (32.0, _H + 9.0, -HOLE_Y),
-    "CskDia": (10.0, _H + 5.0, -HOLE_Y),
-    "CskFlankAngle": (2.0, _H + 9.0, -HOLE_Y),
+    "CskDia": (10.0, _H + 6.0, -HOLE_Y),
+    # Each angle reads in the vertical-angle wedge outside its mouth vertex
+    # (face line extended outward, flank extended out of the part), on that
+    # wedge's bisector.
+    "CskFlankAngle": (19.9, _H + 2.1, -HOLE_Y),
+    "SeatFlankAngle": (30.9, _H + 2.25, -HOLE_Y),
+    "SeatDia": (37.5, _H + 8.0, -HOLE_Y),
 }
 
 _UP = [0.0, 1.0, 0.0]
@@ -285,7 +295,6 @@ async def build(adapter: Any) -> dict[str, str]:
         "Material Specification",
         "Finish",
         "Quantity",
-        "Manufacturing Notes",
         "Isometric View Note",
     )
     read_required_properties(
@@ -348,7 +357,6 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add center marks to the pivot plate holes")
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(

@@ -164,7 +164,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateLength", "PlateWidth"},
     "Plate": {"PlateHeight"},
     "ScrewHoleProfile": {"HoleLeftX", "HoleRightX", "HoleY", "HoleDia"},
-    "PilotProfile": {"PilotX", "PilotY", "PilotDia"},
+    # The pilot shares the screw holes' row: HoleY prints once for all three.
+    "PilotProfile": {"PilotX", "PilotDia"},
     "Pilot": {"PilotDepth"},
     "SeatProfile": {"SeatDia", "SeatFlankAngle"},
     "CountersinkProfile1": {"CskDia", "CskFlankAngle"},
@@ -173,7 +174,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {"PlateLength": 1, "PlateWidth": 1},
     "Plate": {"PlateHeight": 2},
     "ScrewHoleProfile": {"HoleLeftX": 1, "HoleRightX": 1, "HoleY": 2, "HoleDia": 2},
-    "PilotProfile": {"PilotX": 1, "PilotY": 2, "PilotDia": 2},
+    "PilotProfile": {"PilotX": 1, "PilotDia": 2},
     "Pilot": {"PilotDepth": 1},
     "SeatProfile": {"SeatDia": 2, "SeatFlankAngle": 0},
     "CountersinkProfile1": {"CskDia": 2, "CskFlankAngle": 0},
@@ -195,7 +196,6 @@ for _name, _value in (
     ("HoleY", HOLE_Y),
     ("HoleDia", HOLE_DIA),
     ("PilotX", SEAT_X),
-    ("PilotY", HOLE_Y),
     ("PilotDia", PILOT_DIA),
     ("PilotDepth", PILOT_DEPTH),
     ("SeatDia", SEAT_DIA),
@@ -214,16 +214,23 @@ DRILLED_DIMENSIONS: tuple[tuple[str, str], ...] = (
 
 # Sheet callouts (the draw imports them; tolerance text never lives there).
 PIVOT_POINT_NUMBER = "MHA-CH-006-TL-18"
-# HoleY locates both screw holes (the right one is driven equal).
-CALLOUTS_ABOVE = {"HoleY": "2X", "HoleDia": "2X", "CskDia": "2X", "CskFlankAngle": "2X"}
+# HoleY locates the whole row: both screw holes (the right one is driven
+# equal) and the seat pilot (driven from the same global).
+CALLOUTS_ABOVE = {"HoleY": "3X", "HoleDia": "2X", "CskDia": "2X"}
+# Hole callouts name their process (drawing-guidelines.md rule 12); the
+# pilot's blind depth prints in section A-A. The plate thickness is the bar's
+# as-bought 3/4 in, never machined, so it prints as stock.
 CALLOUTS_BELOW = {
-    "HoleDia": "THRU",
-    "CskDia": f"FOR {SCREW_SIZE} FLAT HEAD WOOD SCREW",
-    "SeatDia": f"SEAT FOR {PIVOT_POINT_NUMBER} PIVOT POINT",
+    "HoleDia": "DRILL THRU",
+    "PilotDia": "DRILL",
+    "PlateHeight": "STOCK",
+    "CskFlankAngle": "2X",
+    "SeatDia": f"SEAT FOR PIVOT POINT\n{PIVOT_POINT_NUMBER}",
 }
 
 SURFACE_FINISHES = ()
-DRAWING_NOTES = "PIVOT POINT SEAT: NO BURR AT THE MOUTH."
+# The title block's burr and edge-break line covers the seat mouth.
+DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
 

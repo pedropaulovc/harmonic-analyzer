@@ -29,6 +29,24 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     assert set(drawing.CALLOUTS_ABOVE) | set(drawing.CALLOUTS_BELOW) <= marked
 
 
+def test_pinch_tap_leader_starts_at_edge_a_rightmost_tap() -> None:
+    """Farm r2: the leader from the L25 tap crossed the set-screw callout's
+    text, whose right end sat at sheet x 390.2 mm; the pivot block's tap at
+    391 mm cleared it. The pinned outer tap stands beyond both."""
+    import draw_ch_rocker_arm_tl_trammel_pivot_block as pivot_drawing
+
+    def sheet_x(sheet, x: float) -> float:
+        return sheet.back(x, -block.PINCH_DEPTH)[0]
+
+    leader_x = sheet_x(drawing.SHEET, drawing.PINCH_TAP_LEADER_X)
+    assert drawing.PINCH_TAP_LEADER_X in spec.PINCH_X
+    assert leader_x == max(sheet_x(drawing.SHEET, x) for x in spec.PINCH_X)
+    assert leader_x > sheet_x(pivot_drawing.SHEET, block.PINCH_X[0]) > 0.3902
+    assert drawing.PINCH_TAP_CALLOUT_XY == pivot_drawing.PINCH_TAP_CALLOUT_XY
+    assert drawing.SET_SCREW_CALLOUT_XY == pivot_drawing.SET_SCREW_CALLOUT_XY
+    assert "center_x_mm=PINCH_TAP_LEADER_X" in inspect.getsource(drawing.build)
+
+
 def test_shares_the_pivot_block_section() -> None:
     """Only the holes, slit end and screw stations differ from the pivot block."""
     for feature in (
@@ -42,10 +60,38 @@ def test_shares_the_pivot_block_section() -> None:
         assert spec.DRAWING_PRECISION[feature] == block.DRAWING_PRECISION[feature]
 
 
-def test_every_view_including_the_isometric_hides_its_hidden_lines() -> None:
-    assert "for view in (top, front, right, back, iso):" in inspect.getsource(
+def test_every_view_including_the_section_and_isometric_hides_hidden_lines() -> None:
+    assert "for view in (top, front, right, back, section, iso):" in inspect.getsource(
         drawing.build
     )
+
+
+def test_section_cuts_the_near_end_pinch_screw_axis() -> None:
+    source = inspect.getsource(drawing.build)
+    assert "create_pinch_section(" in source
+    assert "part_spec.PINCH_X[0]," in source
+    assert spec.BLOCK_X0 < spec.PINCH_X[0] < spec.HOLE_X[0]
+
+
+def test_above_lane_callouts_are_single_lines() -> None:
+    for text in drawing.CALLOUTS_ABOVE.values():
+        assert "\n" not in text
+    assert drawing.CALLOUTS_ABOVE == {"SlotWidth": block.SLOT_WIDTH_CALLOUT}
+    assert "SlotDepth" not in drawing.CALLOUTS_BELOW
+    for text in (*drawing.CALLOUTS_ABOVE.values(), *drawing.CALLOUTS_BELOW.values()):
+        assert all(len(line) <= 33 for line in text.splitlines()), text
+
+
+def test_tap_callouts_drop_the_title_block_thread_class() -> None:
+    assert inspect.getsource(drawing.build).count("strip_thread_class(") == 2
+
+
+def test_bar_contact_faces_carry_the_pivot_block_finishes() -> None:
+    assert spec.SURFACE_FINISHES == block.SURFACE_FINISHES
+    source = inspect.getsource(drawing.build)
+    for finish in spec.SURFACE_FINISHES:
+        assert f'surface_finish_by_key(SURFACE_FINISHES, "{finish.key}")' in source
+    assert "text=block.SLOT_CORNER_CALLOUT," in source
 
 
 def test_point_holes_are_the_reamed_fit_named_on_the_scriber_points() -> None:

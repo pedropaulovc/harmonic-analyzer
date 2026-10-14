@@ -108,10 +108,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked scriber block dimension needs authored places")
 
-SURFACE_FINISHES = ()
-DRAWING_NOTES = (
-    "SLIDES ON THE TRAMMEL BAR.\n"
-    "THE PINCH SCREWS CLOSE THE SLIT ON BOTH SCRIBER POINTS.\n"
-    "NO BURRS IN THE SLOT OR THE POINT HOLES."
-)
+# The same slot, so the same bar-contact faces and Ra (the pivot block's rows).
+SURFACE_FINISHES = block.SURFACE_FINISHES
+DRAWING_NOTES = "THE PINCH SCREWS CLOSE THE SLIT ON BOTH SCRIBER POINTS."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

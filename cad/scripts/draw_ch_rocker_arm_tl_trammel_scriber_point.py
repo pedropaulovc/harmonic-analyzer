@@ -64,7 +64,9 @@ _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
 # One turned profile (axis horizontal, tip left) carries every size: the
 # lengths as one baseline from the theoretical apex below the axis, the
 # diameters and the cone angle above it.
-PROFILE_CENTER = (0.170, 0.175)
+# Centred 20 mm right of the sheet's half-width so the tip-flat callout,
+# whose text stands left of its dimension line, clears the left border.
+PROFILE_CENTER = (0.190, 0.175)
 # The view centres on the model box (apex to back face).
 APEX_X = PROFILE_CENTER[0] - POINT_LENGTH / 2.0 * _S
 ISO_CENTER = (0.355, 0.200)
@@ -86,7 +88,8 @@ PROFILE_KEEP = {
         APEX_X + (CONE_LENGTH + POINT_LENGTH) / 2.0 * _S,
         PROFILE_CENTER[1] + 0.050,
     ),
-    "TipFlatDia": (APEX_X - 0.020, PROFILE_CENTER[1] + 0.035),
+    # The text stands left of its dimension line, just ahead of the apex.
+    "TipFlatDia": (APEX_X - 0.010, PROFILE_CENTER[1] + 0.035),
     # The arc stays inside the narrow cone/axis wedge near the apex; only its
     # text moves outboard (TIP_ANGLE_TEXT_XY).
     "TipHalfAngle": (APEX_X + 0.020, PROFILE_CENTER[1] + 0.002),

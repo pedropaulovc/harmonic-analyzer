@@ -45,7 +45,9 @@ from _hole_spec import (
     HoleSpec,
     blind_cut_dia_mm,
 )
+from _gtol_planar import PlanarFace
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 INCH = kit.INCH
 _X = printed_band_mm(1)
@@ -60,7 +62,11 @@ BLOCK_LENGTH = kit.BLOCK_LENGTH
 BLOCK_WIDTH = kit.BLOCK_WIDTH
 BLOCK_HEIGHT = kit.BLOCK_HEIGHT
 # The block height prints at two places: the pinch screw's walls below the
-# slot floor are budgeted against its +/-0.51 band.
+# slot floor are budgeted against its +/-0.51 band (rule 17: worst_walls'
+# pinch-clearance-to-bottom web is 1.545 at .XX and would fall under the
+# 1.5 floor at the one-place +/-0.8). 1018 cold-rolled stays for the same
+# reason: drawn flat holds its 3/4 in thickness well inside that .XX band as
+# supplied, so the budgeted walls need no machining of the broad faces.
 BLOCK_HEIGHT_PLACES = 2
 HOLE_FROM_END = kit.PIVOT_HOLE_L  # 25.0: the end face to the point-hole axis
 BLOCK_X0 = -HOLE_FROM_END
@@ -85,12 +91,11 @@ SLOT_CLEARANCE_MIN = SLOT_WIDTH_MIN - kit.BAR_SIDE
 SLOT_CLEARANCE_MAX = SLOT_WIDTH_MAX - kit.BAR_SIDE_MIN
 if SLOT_CLEARANCE_MIN <= 0.0:
     raise AssertionError("the trammel bar does not enter the smallest slot")
-# drawing-guidelines.md rule 4 (matched fits): the tight slot names its mate.
-# The bar is bought stock with no part Number, so it is named by its stock.
-SLOT_WIDTH_CALLOUT = (
-    f"({SLOT_CLEARANCE_MIN:.3f}-{SLOT_CLEARANCE_MAX:.3f} CLEARANCE\n"
-    "ON BOUGHT 1/4 IN SQUARE TRAMMEL BAR)"
-)
+# drawing-guidelines.md rule 4 (matched fits): the tight slot names its mate
+# and its fit. The bar is bought stock with no part Number, so it is named by
+# its stock. One line: the dimension's above-lane prints one line only, and
+# the SLOT_CLEARANCE_MIN/MAX asserts above carry the fit's numbers.
+SLOT_WIDTH_CALLOUT = "SLIDING FIT ON TRAMMEL BAR"
 SLOT_CORNER_CALLOUT = f"FLOOR CORNERS R{SLOT_CORNER_R_MAX:.1f} MAX"
 
 # --- Point hole ----------------------------------------------------------------
@@ -113,11 +118,15 @@ POINT_MATE_NUMBER = "MHA-CH-006-TL-18"
 
 
 def point_hole_callout(count: int, mate_number: str) -> str:
-    """The reamed hole's rule-4 matched-fit callout, naming the point."""
+    """The reamed hole's rule-4 matched-fit callout, naming the point.
+
+    Three short rows (<= 25 characters) so the stacked block stays inside the
+    sheet beside the top view.
+    """
     prefix = f"{count}X " if count > 1 else ""
     return (
-        f"{prefix}REAM THRU\n({POINT_CLEARANCE_MIN:.3f}-{POINT_CLEARANCE_MAX:.3f} "
-        f"DIAMETRAL CLEARANCE\nON {mate_number})"
+        f"{prefix}REAM THRU ({POINT_CLEARANCE_MIN:.3f}-{POINT_CLEARANCE_MAX:.3f}\n"
+        f"DIAMETRAL CLEARANCE ON\n{mate_number})"
     )
 
 
@@ -370,10 +379,18 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked pivot block dimension needs authored places")
 
-SURFACE_FINISHES = ()
-DRAWING_NOTES = (
-    "SLIDES ON THE TRAMMEL BAR.\n"
-    "THE PINCH SCREW CLOSES THE SLIT ON THE PIVOT POINT.\n"
-    "NO BURRS IN THE SLOT OR THE POINT HOLE."
+# drawing-guidelines.md rule 6: Ra only where a surface slides or locates.
+# The bar slides on the slot floor and is pushed against the edge-B wall,
+# so the bar's two contact faces carry the machined Ra.
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "slot_floor", MACHINED_UM, PlanarFace((0.0, 1.0, 0.0), -SLOT_DEPTH)
+    ),
+    SurfaceFinishControl(
+        "slot_datum_wall", MACHINED_UM, PlanarFace((0.0, 0.0, -1.0), -SLOT_Z1)
+    ),
 )
+# The bar's sliding fit is on the slot callout and the deburring is the title
+# block's; only the pinch's function needs saying.
+DRAWING_NOTES = "THE PINCH SCREW CLOSES THE SLIT ON THE PIVOT POINT."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

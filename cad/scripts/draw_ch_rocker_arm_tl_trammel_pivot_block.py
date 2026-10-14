@@ -1,10 +1,13 @@
 r"""Create the drawing for the rocker template trammel's pivot block (MHA-CH-006-TL-14).
 
-Four orthographic views at 2:1 and a 1:1 shaded isometric: the top face
-(length, width, the reamed point hole and the slit), edge B below it (the
-height and the pinch screw's clearance), the end view to its right (the bar
-slot) and edge A beyond (the set-screw taps and the pinch taps' exits). Every
-station along the block is dimensioned from the point-hole axis.
+Four orthographic views at 2:1, section A-A and a 1:1 shaded isometric: the
+top face (length, width, the reamed point hole, the slit and the bar-contact
+finishes), edge B below it (the height and the pinch screw's clearance), the
+end view to its right (the bar slot), edge A beyond (the set-screw taps and
+the pinch taps' exits) and the section through the pinch screw's axis (the
+clearance, the slit and the tapped jaw together, and the slot floor's
+corners). Every station along the block is dimensioned from the point-hole
+axis.
 """
 
 from __future__ import annotations
@@ -25,17 +28,25 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
+from _surface_finish import surface_finish_by_key
 from _trammel_block_drawing import (
     TrammelBlockSheet,
     circle_edge,
+    create_pinch_section,
     hide_thread_labels,
+    mm_in_view,
+    near,
     set_blind_extent_text,
+    straight_edge,
+    strip_thread_class,
 )
 import _telemetry
 import ch_rocker_arm_tl_trammel_pivot_block_spec as part_spec
@@ -46,6 +57,7 @@ from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_trammel_pivot_block_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    SURFACE_FINISHES,
 )
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_trammel_pivot_block"]
@@ -61,25 +73,35 @@ SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 ISO_SCALE = (1, 1)
 SHEET = TrammelBlockSheet(part_spec.BLOCK_X0, part_spec.BLOCK_X1)
-ISO_CENTER = (0.300, 0.210)
-ISO_NOTE_XY = (0.270, 0.250)
+# Upper right, from the top view out: the reamed hole's callout, section A-A
+# (caption below it, clear of edge A's callouts) and the isometric.
+SECTION_CENTER = (0.285, 0.192)
+SECTION_CAPTION_XY = (0.285, 0.168)
+ISO_CENTER = (0.375, 0.225)
+ISO_NOTE_XY = (0.345, 0.262)
 NOTES_XY = (0.020, 0.060)
 
 # Top face (edge A at the view's top, edge B toward the edge-B view below).
+# The distances from edge A stand left of the view, the two 28.0s on their
+# own lines with their values at different heights (two sketches, two
+# features: the slit's and the reamed hole's); the right side keeps only the
+# slit width, so the reamed hole's leader rises up and right to its callout
+# beside the top view, clear of the 50.0 and inside the border.
 TOP_KEEP = {
     "BlockLength": SHEET.top(0.5 * (part_spec.BLOCK_X0 + part_spec.BLOCK_X1), -10.0),
     "HoleFromEnd": SHEET.top(0.5 * part_spec.BLOCK_X0, -4.5),
-    "BlockWidth": SHEET.top(part_spec.BLOCK_X0 - 10.0, 19.0),
-    "PointFromEdgeA": SHEET.top(part_spec.BLOCK_X1 + 6.0, 11.0),
-    "SlitFromEdgeA": SHEET.top(part_spec.BLOCK_X1 + 12.0, 11.0),
+    "BlockWidth": SHEET.top(part_spec.BLOCK_X0 - 17.0, 19.0),
+    "PointFromEdgeA": SHEET.top(part_spec.BLOCK_X0 - 11.0, 8.0),
+    "SlitFromEdgeA": SHEET.top(part_spec.BLOCK_X0 - 5.0, 17.0),
     "SlitWidth": SHEET.top(part_spec.BLOCK_X1 + 6.0, 31.0),
     "SlitEnd": SHEET.top(0.5 * part_spec.SLIT_END_X, 44.0),
-    "PointHoleDia": SHEET.top(part_spec.BLOCK_X1 - 5.0, -12.0),
+    "PointHoleDia": SHEET.top(part_spec.BLOCK_X1 + 26.0, -5.5),
 }
-# Edge B (pinch screw head side): the height and the pinch station.
+# Edge B (pinch screw head side): the height and the pinch station, the
+# station's row low enough to clear section A-A's lower letter.
 FRONT_KEEP = {
     "BlockHeight": SHEET.front(part_spec.BLOCK_X0 - 10.0, -9.5),
-    "PinchX": SHEET.front(0.5 * part_spec.PINCH_X[0], -24.5),
+    "PinchX": SHEET.front(0.5 * part_spec.PINCH_X[0], -29.0),
     "PinchDepth": SHEET.front(part_spec.BLOCK_X1 + 6.0, -7.0),
 }
 # The end view: the bar slot from edge A (edge A on the view's right).
@@ -94,15 +116,31 @@ BACK_KEEP = {
     "SetScrewX2": SHEET.back(0.5 * part_spec.SET_SCREW_X[1], -24.5),
     "SetScrewDepth": SHEET.back(part_spec.BLOCK_X1 + 7.0, -2.5),
 }
+# One line above the slot width (a multi-line above-lane callout does not
+# print); the stacked callouts hang below their values.
 CALLOUTS_ABOVE = {"SlotWidth": part_spec.SLOT_WIDTH_CALLOUT}
 CALLOUTS_BELOW = {
     "PointHoleDia": part_spec.POINT_HOLE_CALLOUT,
-    "SlotDepth": part_spec.SLOT_CORNER_CALLOUT,
     "SlitWidth": part_spec.SLIT_CALLOUT,
 }
+# The set-screw leader runs from the callout's left end to the near tap; the
+# pinch-tap callout stands right so its leader slants past the far set
+# screw's circle to the pinch tap's exit.
 SET_SCREW_CALLOUT_XY = (0.345, 0.140)
-PINCH_TAP_CALLOUT_XY = (0.345, 0.160)
-PINCH_CLEARANCE_CALLOUT_XY = (0.030, 0.140)
+SET_SCREW_LEADER_X = max(part_spec.SET_SCREW_X)
+PINCH_TAP_CALLOUT_XY = (0.3665, 0.160)
+# Two rows ("#15 DRILL" over the size and extent) inside the left border.
+PINCH_CLEARANCE_CALLOUT_XY = (0.042, 0.074)
+# The bar-contact finishes: right of the top view, under the reamed hole's
+# leader. The wall lands on its top edge 2.5 short of the far end, the floor
+# on its end edge.
+WALL_FINISH_XY = (0.170, 0.195)
+FLOOR_FINISH_XY = (0.172, 0.208)
+WALL_FINISH_X = part_spec.BLOCK_X1 - 2.5
+# The floor-corner note: above-left of section A-A, its leader down through
+# the slot opening to the floor beside the edge-B wall.
+SLOT_CORNER_NOTE_XY = (0.205, 0.229)
+SLOT_CORNER_PICK_Z = part_spec.SLOT_Z1 - 0.7
 
 
 _KIT = "ch_rocker_arm_tl_trammel_spec"
@@ -117,6 +155,7 @@ part_metadata(
     precision_sources=(
         "DRAWING_PRECISION_BY_NAME",
         ("_drawing_hole_callout", "add_native_hole_callout"),
+        ("_surface_finish", "ra"),
     )
 )
 
@@ -428,7 +467,15 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # finalize_drawing shades the pictorial isometric with edges.
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (top, front, right, back, iso):
+    section = create_pinch_section(
+        adapter,
+        front,
+        part_spec.PINCH_X[0],
+        view_xy=SECTION_CENTER,
+        caption_xy=SECTION_CAPTION_XY,
+        scale=VIEW_SCALE,
+    )
+    for view in (top, front, right, back, section, iso):
         set_hidden_lines_removed(adapter, view)
 
     annotations = [
@@ -473,47 +520,136 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add center marks to the pivot block {label}")
-    add_native_hole_callout(
+    set_screw_callout = add_native_hole_callout(
         adapter,
         back,
         callout_xy=SET_SCREW_CALLOUT_XY,
         label="trammel bar set-screw taps",
         edge=circle_edge(
-            adapter, back, part_spec.SET_SCREW_TAP_DRILL, "edge A set-screw tap"
+            adapter,
+            back,
+            part_spec.SET_SCREW_TAP_DRILL,
+            "edge A set-screw tap",
+            center_x_mm=SET_SCREW_LEADER_X,
         ),
         process=part_spec.SET_SCREW_PROCESS,
     )
-    add_native_hole_callout(
+    strip_thread_class(set_screw_callout, label="set-screw tap callout")
+    pinch_tap_callout = add_native_hole_callout(
         adapter,
         back,
         callout_xy=PINCH_TAP_CALLOUT_XY,
         label="pinch screw tap",
         edge=circle_edge(
-            adapter, back, part_spec.PINCH_TAP_DRILL, "edge A pinch tap exit"
+            adapter,
+            back,
+            part_spec.PINCH_TAP_DRILL,
+            "edge A pinch tap exit",
+            center_x_mm=part_spec.PINCH_X[0],
         ),
         process=part_spec.PINCH_TAP_PROCESS,
     )
+    strip_thread_class(pinch_tap_callout, label="pinch tap callout")
     pinch_clearance_callout = add_native_hole_callout(
         adapter,
         front,
         callout_xy=PINCH_CLEARANCE_CALLOUT_XY,
         label="pinch screw clearance",
         edge=circle_edge(
-            adapter, front, part_spec.PINCH_CLEARANCE_DIA, "edge B pinch clearance"
+            adapter,
+            front,
+            part_spec.PINCH_CLEARANCE_DIA,
+            "edge B pinch clearance",
+            center_x_mm=part_spec.PINCH_X[0],
         ),
-        process=part_spec.PINCH_CLEARANCE_PROCESS,
+        process=part_spec.PINCH_CLEARANCE_PROCESS + "\n",
     )
     set_blind_extent_text(
         pinch_clearance_callout,
         part_spec.PINCH_CLEARANCE_EXTENT_TEXT,
         part_spec.PINCH_CLEARANCE_DIA,
     )
+    # The bar's contact faces (rule 6), on the top view: the edge-B wall at
+    # its top edge, the floor at its end edge.
+    add_surface_finish(
+        adapter,
+        top,
+        symbol_xy=WALL_FINISH_XY,
+        control=surface_finish_by_key(SURFACE_FINISHES, "slot_datum_wall"),
+        label="bar slot datum-wall finish",
+        char_height=0.0025,
+        entity=straight_edge(
+            top,
+            "slot datum wall's top edge",
+            lambda a, b: (
+                near(a[1], 0.0)
+                and near(b[1], 0.0)
+                and near(a[2], part_spec.SLOT_Z1)
+                and near(b[2], part_spec.SLOT_Z1)
+            ),
+        ),
+        leader_attach_xy=mm_in_view(
+            adapter,
+            top,
+            (WALL_FINISH_X, 0.0, part_spec.SLOT_Z1),
+            label="datum wall finish landing",
+        ),
+    )
+    add_surface_finish(
+        adapter,
+        top,
+        symbol_xy=FLOOR_FINISH_XY,
+        control=surface_finish_by_key(SURFACE_FINISHES, "slot_floor"),
+        label="bar slot floor finish",
+        char_height=0.0025,
+        entity=straight_edge(
+            top,
+            "slot floor's far end edge",
+            lambda a, b: (
+                near(a[0], part_spec.BLOCK_X1)
+                and near(b[0], part_spec.BLOCK_X1)
+                and near(a[1], -part_spec.SLOT_DEPTH)
+                and near(b[1], -part_spec.SLOT_DEPTH)
+            ),
+        ),
+        leader_attach_xy=mm_in_view(
+            adapter,
+            top,
+            (part_spec.BLOCK_X1, -part_spec.SLOT_DEPTH, part_spec.SLOT_FROM_EDGE_A),
+            label="slot floor finish landing",
+        ),
+    )
+    # Rule 16's corner cap, off the views: down through the slot's opening in
+    # section A-A to the floor beside the edge-B wall.
+    add_attached_note(
+        adapter,
+        section,
+        text=part_spec.SLOT_CORNER_CALLOUT,
+        entity_xy=mm_in_view(
+            adapter,
+            section,
+            (part_spec.PINCH_X[0], -part_spec.SLOT_DEPTH, SLOT_CORNER_PICK_Z),
+            label="slot floor corner pick",
+        ),
+        note_xy=SLOT_CORNER_NOTE_XY,
+        label="slot floor corners",
+        attached_to=straight_edge(
+            section,
+            "slot floor in section A-A",
+            lambda a, b: (
+                near(a[1], -part_spec.SLOT_DEPTH)
+                and near(b[1], -part_spec.SLOT_DEPTH)
+                and near(a[2], part_spec.SLOT_Z0)
+                and near(b[2], part_spec.SLOT_Z1)
+            ),
+        ),
+    )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     # Precise shaded isometrics need the taps' cosmetic threads imported
     # (draw_pn_pen_hanger); the hole callouts already state every thread.
     import_cosmetic_threads(adapter, iso)
-    for view in (back, front, iso):
+    for view in (back, front, section, iso):
         hide_thread_labels(adapter, view)
 
     return await finalize_drawing(

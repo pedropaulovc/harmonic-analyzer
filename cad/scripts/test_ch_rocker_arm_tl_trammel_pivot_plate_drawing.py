@@ -42,7 +42,7 @@ def test_seat_matches_the_pivot_point_and_the_centre_drill() -> None:
     assert seat["angle_deg"] == 60.0
     assert seat["angle_tol_deg"] == 2.0
     assert math.isclose(90.0 - spec.SEAT_ANGLE / 2.0, spec.SEAT_FLANK_ANGLE)
-    assert spec.CALLOUTS_BELOW["SeatDia"].endswith("MHA-CH-006-TL-18 PIVOT POINT")
+    assert spec.CALLOUTS_BELOW["SeatDia"].endswith("\nMHA-CH-006-TL-18")
     pilot = _features()["seat_pilot"]
     assert pilot["dia"] == [1.98, 2.08]
     assert abs(pilot["dia_nominal"] - kit.CENTER_DRILL_PILOT_DIA) < 0.005
@@ -85,11 +85,13 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     assert number == "MHA-CH-006-TL-19"
 
 
-def test_notes_follow_the_simplicity_policy() -> None:
-    lines = spec.DRAWING_NOTES.splitlines()
-    assert 1 <= len(lines) <= 4
-    assert not re.search(r"\d", spec.DRAWING_NOTES)
-    assert not re.search(r"DRILL|COUNTERSINK|SAW|MILL|REAM", spec.DRAWING_NOTES.upper())
+def test_sheet_carries_no_notes_and_callouts_name_processes() -> None:
+    # The title block's burr line covers the seat mouth (rule 2).
+    assert spec.DRAWING_NOTES == ""
+    assert spec.CALLOUTS_BELOW["HoleDia"] == "DRILL THRU"
+    assert spec.CALLOUTS_BELOW["PilotDia"] == "DRILL"
+    for text in (*spec.CALLOUTS_ABOVE.values(), *spec.CALLOUTS_BELOW.values()):
+        assert all(len(line) <= 30 for line in text.splitlines()), text
 
 
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:

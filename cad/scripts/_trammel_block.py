@@ -41,6 +41,7 @@ from _feature_tree import name_last_feature
 from _fit_deviations import deviations
 from _holes import DRILL_POINT_H, SharedCoordinate, wizard_holes
 from _part_checks import report_mass_properties, volume_check
+from _part_pmi import author_part_pmi
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
@@ -469,6 +470,9 @@ async def build_block(adapter, part: ModuleType, part_name: str) -> dict[str, st
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in part.DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # The bar's sliding/locating faces carry their Ra on the part (the
+    # drawing's symbols are validated against these faces).
+    author_part_pmi(adapter, surface_finishes=part.SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         part_name,

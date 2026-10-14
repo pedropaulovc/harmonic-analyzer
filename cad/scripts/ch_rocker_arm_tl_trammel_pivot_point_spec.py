@@ -149,9 +149,16 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # The O.D. is the drill rod as supplied (stock stays stock): a reference
 # with the function that rides on it, naming the mate by Number.
 REFERENCE_DIMENSIONS = frozenset({"RodDia"})
-ROD_CALLOUT = "DRILL ROD AS SUPPLIED\nSLIDES IN MHA-CH-006-TL-14 POINT HOLE"
+# Callouts ride the below lane only, one short line each (about 30
+# characters at most): SolidWorks does not wrap callout text.
+ROD_CALLOUT = "DRILL ROD AS SUPPLIED\nSLIDES IN MHA-CH-006-TL-14\nPOINT HOLE"
 ROD_NOTE = " ".join(ROD_CALLOUT.splitlines())
-TIP_ANGLE_CALLOUT = "EACH SIDE OF AXIS"
+# Drawing-guidelines rule 4: the half-angle's band serves the seats, so the
+# angle callout names them by Number: the pivot plate's and the setting bar's
+# centre-drilled cones.
+TIP_ANGLE_CALLOUT = (
+    "EACH SIDE OF AXIS\nSEATS IN MHA-CH-006-TL-19\nAND MHA-CH-006-TL-17 CONES"
+)
 HARDENED_CALLOUT = "HARDENED ZONE"
 TIP_FLAT_CALLOUT = "TIP FLAT"
 DIMENSION_CALLOUTS = {
@@ -163,9 +170,5 @@ DIMENSION_CALLOUTS = {
 
 # The blind reviewer sees only the sheet: each note states a function.
 # Hardness lives in the Finish field.
-DRAWING_NOTES = (
-    "TRAMMEL PIVOT: SEATS IN THE CONE OF THE PIVOT PLATE AND OF THE SETTING BAR.\n"
-    "TIP CONE TRUE TO THE ROD AXIS; TIP FLAT CENTRED ON IT.\n"
-    "ONLY THE HARDENED ZONE TAKES THE FINISH HARDNESS."
-)
+DRAWING_NOTES = "TIP CONE TRUE TO THE ROD AXIS; TIP FLAT CENTRED ON IT."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

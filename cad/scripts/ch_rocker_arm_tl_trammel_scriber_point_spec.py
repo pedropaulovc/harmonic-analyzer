@@ -119,7 +119,9 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # The O.D. is the drill rod as supplied (stock stays stock): a reference
 # with the function that rides on it, naming the mate by Number.
 REFERENCE_DIMENSIONS = frozenset({"RodDia"})
-ROD_CALLOUT = "DRILL ROD AS SUPPLIED\nSLIDES IN MHA-CH-006-TL-15 POINT HOLES"
+# Callouts ride the below lane only, one short line each (about 30
+# characters at most): SolidWorks does not wrap callout text.
+ROD_CALLOUT = "DRILL ROD AS SUPPLIED\nSLIDES IN MHA-CH-006-TL-15\nPOINT HOLES"
 ROD_NOTE = " ".join(ROD_CALLOUT.splitlines())
 TIP_ANGLE_CALLOUT = "EACH SIDE OF AXIS"
 HARDENED_CALLOUT = "HARDENED ZONE"
@@ -134,8 +136,7 @@ DIMENSION_CALLOUTS = {
 # The blind reviewer sees only the sheet: each note states a function.
 # Hardness lives in the Finish field.
 DRAWING_NOTES = (
-    "SCRIBES THE ROCKER TEMPLATE ARCS FROM THE SCRIBER BLOCK.\n"
-    "TIP CONE TRUE TO THE ROD AXIS; TIP FLAT CENTRED ON IT.\n"
-    "ONLY THE HARDENED ZONE TAKES THE FINISH HARDNESS."
+    "SCRIBES THE ROCKER TEMPLATE ARCS.\n"
+    "TIP CONE TRUE TO THE ROD AXIS; TIP FLAT CENTRED ON IT."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

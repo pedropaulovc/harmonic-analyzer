@@ -6,6 +6,8 @@ import inspect
 import re
 
 import _config
+import _trammel_block
+import _trammel_block_drawing
 import ch_rocker_arm_tl_trammel_pivot_block_spec as spec
 import ch_rocker_arm_tl_trammel_spec as kit
 import draw_ch_rocker_arm_tl_trammel_pivot_block as drawing
@@ -28,10 +30,64 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     assert set(drawing.CALLOUTS_ABOVE) | set(drawing.CALLOUTS_BELOW) <= marked
 
 
-def test_every_view_including_the_isometric_hides_its_hidden_lines() -> None:
-    assert "for view in (top, front, right, back, iso):" in inspect.getsource(
+def test_every_view_including_the_section_and_isometric_hides_hidden_lines() -> None:
+    assert "for view in (top, front, right, back, section, iso):" in inspect.getsource(
         drawing.build
     )
+
+
+def test_section_cuts_the_pinch_screw_axis() -> None:
+    """Review r1: the clearance, the slit and the tapped jaw read together."""
+    source = inspect.getsource(drawing.build)
+    assert "create_pinch_section(" in source
+    assert "part_spec.PINCH_X[0]," in source
+    assert spec.BLOCK_X0 < spec.PINCH_X[0] < spec.BLOCK_X1
+
+
+def test_above_lane_callouts_are_single_lines_and_slot_names_its_bar() -> None:
+    for text in drawing.CALLOUTS_ABOVE.values():
+        assert "\n" not in text
+    assert drawing.CALLOUTS_ABOVE == {"SlotWidth": spec.SLOT_WIDTH_CALLOUT}
+    assert "SlotDepth" not in drawing.CALLOUTS_BELOW
+    for text in (*drawing.CALLOUTS_ABOVE.values(), *drawing.CALLOUTS_BELOW.values()):
+        assert all(len(line) <= 33 for line in text.splitlines()), text
+
+
+def test_tap_callouts_drop_the_title_block_thread_class() -> None:
+    source = inspect.getsource(drawing.build)
+    assert source.count("strip_thread_class(") == 2
+
+
+def test_bar_contact_faces_carry_the_part_owned_finish() -> None:
+    keys = {finish.key for finish in spec.SURFACE_FINISHES}
+    assert keys == {"slot_floor", "slot_datum_wall"}
+    source = inspect.getsource(drawing.build)
+    for key in keys:
+        assert f'surface_finish_by_key(SURFACE_FINISHES, "{key}")' in source
+    assert (
+        "author_part_pmi(adapter, surface_finishes=part.SURFACE_FINISHES)"
+        in inspect.getsource(_trammel_block)
+    )
+
+
+def test_floor_corner_cap_rides_a_leader_on_the_section() -> None:
+    source = inspect.getsource(drawing.build)
+    assert "text=part_spec.SLOT_CORNER_CALLOUT," in source
+    assert "attached_to=straight_edge(" in source
+
+
+def test_thread_class_strip_keeps_every_hole_wizard_variable() -> None:
+    native = {
+        5: "",
+        6: "<MOD-DIAM><hw-diameter> THRU",
+        7: "#25 DRILL, THEN TAP <hw-thread> - <hw-threadclass> THRU",
+        8: "",
+    }
+    updated = _trammel_block_drawing.thread_class_free_definitions(native)
+    assert updated[7] == "#25 DRILL, THEN TAP <hw-thread> THRU"
+    assert {part: updated[part] for part in (5, 6, 8)} == {
+        part: native[part] for part in (5, 6, 8)
+    }
 
 
 def test_point_hole_is_the_reamed_fit_named_on_the_pivot_point() -> None:

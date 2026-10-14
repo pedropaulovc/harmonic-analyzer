@@ -108,11 +108,37 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     assert _config.parts(DASHED)["quantity"] == 1
 
 
+def test_finish_fits_one_title_block_line() -> None:
+    finish = _config.parts(DASHED)["finish"]
+    assert "\n" not in finish and len(finish) <= 40, finish
+
+
+def test_callouts_are_short_below_lane_lines() -> None:
+    """Callout text does not wrap, so every line stays short; the drawing
+    puts every callout in the below lane."""
+    for name, text in spec.DIMENSION_CALLOUTS.items():
+        for line in text.splitlines():
+            assert len(line) <= 30, (name, line)
+    source = inspect.getsource(drawing)
+    assert 'location="above"' not in source
+    assert 'DIMENSION_CALLOUTS, location="below"' in source
+
+
 def test_notes_follow_the_simplicity_policy() -> None:
     notes = spec.DRAWING_NOTES
     assert 1 <= len(notes.splitlines()) <= 4
     assert not re.search(r"\d", notes)
     assert "GROUND" not in notes and "GRIND" not in notes
+    # The Finish field carries the hardness; the seats ride the angle callout.
+    assert "HARD" not in notes and "SEAT" not in notes
+
+
+def test_tightened_cone_names_its_seats_on_its_callout() -> None:
+    """Rule 4: the half-angle band names the pivot plate's and the setting
+    bar's cones by Number on the angle callout itself."""
+    callout = spec.DIMENSION_CALLOUTS["TipHalfAngle"]
+    assert "MHA-CH-006-TL-19" in callout and "MHA-CH-006-TL-17" in callout
+    assert spec.TIP_ANGLE_TOL_DEG == spec.TIP_HALF_ANGLE_TOL_DEG * 2.0
 
 
 def test_drawing_script_meets_the_drawing_contract() -> None:
