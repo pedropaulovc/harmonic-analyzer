@@ -1,7 +1,8 @@
 r"""Pure-data contract for the rocker arm hub filing button (MHA-CH-006-TL-04).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). In the
-rocker arm's hub filing hold (prechips S3F) two buttons ride the headed filing
+rocker arm's hub filing hold (traveler setup S6, inventory fixture
+``hub-filing-buttons``) two buttons ride the headed filing
 stud (MHA-CH-006-TL-05) that locates in the arm's reamed pivot bore: one seats
 on each hub face, the stud's nut clamps the arm between them, and the hub is
 filed down until the file rides on both hardened rims all round. The rim is
@@ -21,7 +22,7 @@ from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 THICKNESS = 4.0
-THICKNESS_PLACES = 2
+THICKNESS_PLACES = 3  # lapped faces: the stack the stud's stations hold
 
 # The rim is the filing line: the button O.D. is the hub O.D. Codex round 3
 # found the shop-additions 0.010 lapped band unsupported: the hub prints at
@@ -35,6 +36,10 @@ _OD_MIN, _OD_MAX = [round(OD + deviation, 12) for deviation in printed_deviation
 _HUB_MIN, _HUB_MAX = [round(rocker.HUB_DIA + deviation, 12) for deviation in printed_deviations(rocker.HUB_DIA, 2)]
 if not (_HUB_MIN <= _OD_MIN and _OD_MAX <= _HUB_MAX):
     raise AssertionError("filing-button rim band leaves the hub's printed O.D. band")
+# "O.D. round and true to bore": the inventory's receipt limit for the rim's
+# runout to its bore (hub-filing-buttons button_runout_mm). The stud's hub
+# coaxiality budget spends it.
+OD_RUNOUT_TIR = 0.02
 
 # The bore prints as a reference and its fit to the stud governs (callout).
 # BORE_BAND is the design intent of that fit for the stud's stack checks

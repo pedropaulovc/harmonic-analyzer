@@ -65,7 +65,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A seventy-millimetre stud: 2:1 keeps the four steps legible on one turned profile.
+# A sixty-millimetre stud: 2:1 keeps the four steps legible on one turned profile.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
@@ -126,13 +126,13 @@ requirement("button_seat",
     fields={
         "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
         "plane": ({"frame": "model", "axis": "x", "value": 0.0}, ("__frame__",)),
-        "dia": (limits(part_spec.HEAD_DIA, 1), ("HEAD_DIA",)),
+        "dia": (limits(part_spec.HEAD_DIA, part_spec.HEAD_PLACES), ("HEAD_DIA",)),
         "dia_nominal": (part_spec.HEAD_DIA, ("HEAD_DIA",)),
         "station": (limits(part_spec.THREAD_END, part_spec.STATION_PLACES), ("THREAD_END",)),
         "station_nominal": (part_spec.THREAD_END, ("THREAD_END",)),
         "height_from": _FROM_TIP,
     },
-    precision={"dia": 1, "station": part_spec.STATION_PLACES},
+    precision={"dia": part_spec.HEAD_PLACES, "station": part_spec.STATION_PLACES},
 )
 
 requirement("head_back_face",
@@ -181,7 +181,7 @@ PROFILE_DIAMETER_XY = {
     "TailDia": (SEAT_X - 0.060, PROFILE_CENTER[1] + 0.022),
     "HeadDia": (SEAT_X - 0.020, PROFILE_CENTER[1] + 0.024),
     # Each diameter's dimension line stands inside its own step (codex round
-    # 15): the fit callout on the journal (seat to 12.5), the thread on the
+    # 15): the fit callout on the journal (seat to thread start), the thread on the
     # threaded tip (thread start to the tip), both below so no leader crosses a row.
     "BodyDia": (SEAT_X + BODY_LENGTH / 2.0 * _S, PROFILE_CENTER[1] - 0.065),
     "ThreadDia": (
@@ -193,7 +193,9 @@ PROFILE_DIAMETER_XY = {
 
 requirement("locating_body",
     kind="boss",
-    faces=(CylinderFace(part_spec.BODY_DIA),),
+    faces=(
+        CylinderFace(part_spec.BODY_DIA, contains_x_mm=part_spec.BODY_LENGTH / 2.0),
+    ),
     requirements=("note", "finish_ra"),
     fields={
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
@@ -214,17 +216,23 @@ requirement("locating_body",
 
 requirement("vise_tail",
     kind="boss",
-    faces=(CylinderFace(part_spec.TAIL_DIA),),
+    # The tail shares the body's size; the station picks the vise end.
+    faces=(
+        CylinderFace(
+            part_spec.TAIL_DIA,
+            contains_x_mm=-(part_spec.HEAD_LENGTH + part_spec.TAIL_END) / 2.0,
+        ),
+    ),
     requirements=("dia", "station"),
     fields={
         "axis": _AXIS,
-        "dia": (limits(part_spec.TAIL_DIA, 1), ("TAIL_DIA",)),
+        "dia": (limits(part_spec.TAIL_DIA, part_spec.TAIL_PLACES), ("TAIL_DIA",)),
         "dia_nominal": (part_spec.TAIL_DIA, ("TAIL_DIA",)),
         "station": (limits(part_spec.OVERALL_LENGTH, part_spec.STOCK_PLACES), ("OVERALL_LENGTH",)),
         "station_nominal": (part_spec.OVERALL_LENGTH, ("OVERALL_LENGTH",)),
         "height_from": _FROM_TIP,
     },
-    precision={"dia": 1, "station": part_spec.STOCK_PLACES},
+    precision={"dia": part_spec.TAIL_PLACES, "station": part_spec.STOCK_PLACES},
 )
 
 
@@ -255,7 +263,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Arm Hub Filing Stud Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker arm hub filing stud; turned 4140; MHA-CH-006-TL-05",
+            3: "rocker arm hub filing stud; turned O1, annealed; MHA-CH-006-TL-05",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -265,8 +273,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Front", *PROFILE_CENTER, scale=VIEW_SCALE
     )
     # finalize_drawing shades the pictorial isometric with edges.
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    for view in (donor, profile):
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
+    for view in (donor, profile, iso):
         set_hidden_lines_removed(adapter, view)
 
     donor_annotations = curate_view_dimensions(

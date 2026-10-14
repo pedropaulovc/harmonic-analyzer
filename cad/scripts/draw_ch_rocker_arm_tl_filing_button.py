@@ -183,8 +183,8 @@ async def build(adapter: Any) -> dict[str, str]:
     face = place_view(adapter, str(SOURCE), "*Front", *FACE_CENTER, scale=VIEW_SCALE)
     edge = place_view(adapter, str(SOURCE), "*Right", *EDGE_CENTER, scale=VIEW_SCALE)
     # finalize_drawing shades the pictorial isometric with edges.
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    for view in (face, edge):
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
+    for view in (face, edge, iso):
         set_hidden_lines_removed(adapter, view)
 
     annotations = []

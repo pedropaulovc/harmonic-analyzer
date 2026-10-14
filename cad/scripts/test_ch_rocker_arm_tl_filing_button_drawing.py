@@ -141,11 +141,11 @@ def test_every_printed_band_has_a_requirement_owner(stem: str) -> None:
         assert owner["finish_ra"] == control.roughness_um, control.key
 
 
-def test_body_carries_the_hub_and_stays_inside_the_stack() -> None:
-    """At every printed button thickness and hub length the whole hub sits on
-    the lapped body (its length the worst case of the two printed tip
-    stations), and the nut lands on the upper button (body short of the
-    stack top)."""
+def test_body_carries_the_hub_and_both_buttons_inside_the_stack() -> None:
+    """At every printed button thickness and hub length the whole hub and at
+    least half the upper button sit on the lapped body (its length the worst
+    case of the two printed tip stations), and the nut lands on the upper
+    button (body short of the stack top)."""
     stud = _features(STUD)
     seat_low, seat_high = stud["button_seat"]["station"]
     start_low, start_high = stud["thread"]["length"]
@@ -153,13 +153,85 @@ def test_body_carries_the_hub_and_stays_inside_the_stack() -> None:
     thick_low, thick_high = _features(BUTTON)["hub_seat_face"]["thickness"]
     hub_high = rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
     assert body_high < 2 * thick_low + rocker.HUB_LENGTH
-    assert body_low > thick_high + hub_high
+    assert body_low - (thick_high + hub_high) >= thick_low / 2
 
 
-def test_head_seat_lands_on_the_button_face_outside_its_bore() -> None:
-    head = stud.HEAD_DIA
-    bore_high = button.BORE_DIA + button.BORE_BAND[0]
-    assert bore_high < head < _features(BUTTON)["rim"]["dia"][0]
+def test_kit_holds_the_hub_coaxiality_and_filed_band() -> None:
+    """The manual-arc centre shift (pin in the pivot bore, button bore on the
+    pin, rim runout to its bore) keeps the filed hub inside the arm's printed
+    coaxiality and O.D. band."""
+    body_min = stud.BODY_DIA + stud.BODY_BAND[1]
+    shift = (
+        (rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[0] - body_min) / 2
+        + (button.BORE_DIA + button.BORE_BAND[0] - body_min) / 2
+        + button.OD_RUNOUT_TIR / 2
+    )
+    assert shift == pytest.approx(stud.HUB_CENTRE_SHIFT_MAX)
+    assert 2 * shift <= rocker.HUB_COAXIALITY_DIA
+    rim_low, rim_high = _features(BUTTON)["rim"]["dia"]
+    hub_low, hub_high = limits(rocker.HUB_DIA, 2)
+    assert hub_low <= rim_low - 2 * shift and rim_high + 2 * shift <= hub_high
+
+
+def test_head_and_nut_stay_inside_the_rim_outside_the_bore() -> None:
+    """A file laid on either rim clears the head and the nut corners at the
+    worst case of every printed band."""
+    rim_low = _features(BUTTON)["rim"]["dia"][0]
+    head_low, head_high = _features(STUD)["button_seat"]["dia"]
+    assert button.BORE_DIA + button.BORE_BAND[0] < head_low
+    assert head_high < rim_low
+    assert stud.NUT_CORNER_DIA < rim_low
+
+
+def test_kit_solids_validate_and_follow_the_specs() -> None:
+    from prechips.model import FixtureSolid
+
+    for solid in stud.PRECHIPS_SOLIDS:
+        FixtureSolid.model_validate(solid)
+    solids = {solid["name"]: solid for solid in stud.PRECHIPS_SOLIDS}
+    assert len(solids) == len(stud.PRECHIPS_SOLIDS)
+
+    def span(name: str) -> tuple[float, float]:
+        solid = solids[name]
+        z, length = solid["at_mm"][2], solid["length_mm"]
+        end = z + length * solid["axis"][2]
+        return min(z, end), max(z, end)
+
+    seat = -(rocker.HUB_LENGTH + button.THICKNESS)
+    assert span("upper button") == pytest.approx((0.0, button.THICKNESS))
+    assert span("lower button") == pytest.approx((seat, -rocker.HUB_LENGTH))
+    assert span("stud pin") == pytest.approx((seat, seat + stud.BODY_LENGTH))
+    assert span("stud thread") == pytest.approx(
+        (seat + stud.BODY_LENGTH, seat + stud.THREAD_END)
+    )
+    assert span("stud head") == pytest.approx((seat - stud.HEAD_LENGTH, seat))
+    assert span("stud tail") == pytest.approx(
+        (seat - stud.TAIL_END, seat - stud.HEAD_LENGTH)
+    )
+    assert span("nut")[0] == pytest.approx(button.THICKNESS)
+    assert span("stud pin")[1] < span("nut")[0] < span("stud thread")[1]
+    rim_low, rim_high = _features(BUTTON)["rim"]["dia"]
+    for name in ("upper button", "lower button"):
+        assert rim_low <= solids[name]["dia_mm"] <= rim_high
+    for name in ("upper button bore", "lower button bore"):
+        assert solids[name]["void"] and solids[name]["dia_mm"] == button.BORE_DIA
+    assert solids["stud pin"]["dia_mm"] == stud.BODY_DIA
+    assert solids["stud tail"]["dia_mm"] == stud.TAIL_DIA
+    assert (
+        solids["nut"]["supply"] == "bought"
+        and stud.NUT_SKU in solids["nut"]["fastener"]
+    )
+
+
+def test_inventory_kit_binds_its_solids_from_the_stud_spec(tmp_path) -> None:
+    import tomllib
+
+    import _process_plans as plans
+
+    assert "ch_rocker_arm_tl_filing_stud_spec" in plans.shop_spec_modules()
+    inventory, _, _ = plans.bind_shop(tmp_path)
+    kit = tomllib.loads(inventory.read_text(encoding="utf-8"))["fixtures"]
+    assert kit["hub-filing-buttons"]["solids"] == stud.PRECHIPS_SOLIDS
 
 
 @pytest.mark.parametrize(
