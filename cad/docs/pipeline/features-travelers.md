@@ -51,8 +51,10 @@ swDetailingDiameterDimension)`. The effective value must match
 `PIVOT_BORE.precision["dia"]`; missing or unreadable values fail closed.
 The guard does not change the sheet-wide units-decimal setting. The other
 three dimensions (`TopAbovePivot`, `HubLength`, `StrapThickness`) retain the
-strict explicit part-owned precision assertion; none of these guards rewrites
-the imported dimension. Other return values may remain inspection-only;
+strict explicit part-owned precision assertion. The front annotations are returned
+by the outline helper that imports them and combined with the detail and right
+annotations; they are not re-imported for these checks. None of these guards
+rewrites the imported dimension. Other return values may remain inspection-only;
 colocation alone is not a printed-callout drift check.
 `faces` contains the existing geometry selectors;
 `requirements` preserves the ordered acceptance-field names, including explicit

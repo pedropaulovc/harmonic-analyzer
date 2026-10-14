@@ -1704,6 +1704,23 @@ def test_build_keeps_pivot_out_of_strict_part_precision() -> None:
         "HubLength",
         "StrapThickness",
     }
+    front_import = next(
+        node for node in build.body
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == "_add_rocker_outline_dimensions"
+    )
+    assert isinstance(front_import.targets[0], ast.Tuple)
+    assert front_import.targets[0].elts[0].id == "front_annotations"
+    imported = next(
+        node.value for node in build.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "imported_annotations" for target in node.targets)
+    )
+    assert [item.value.id for item in imported.elts] == [
+        "front_annotations", "hub_annotations", "end_annotations", "right_annotations",
+    ]
 
 
 def test_datum_a_attached_to_the_bore_passes(bound: None) -> None:
@@ -2533,7 +2550,7 @@ def test_land_locator_final_rebuild_readback_and_exact_front_census(
 ):
     case = native_front
     front, other = object(), object()
-    _taper, _taper_entities, display, entities = drawing._add_rocker_outline_dimensions(case.adapter, front)
+    _front_annotations, _taper, _taper_entities, display, entities = drawing._add_rocker_outline_dimensions(case.adapter, front)
     annotations = {front: [display.annotation], other: []}
     monkeypatch.setattr(drawing, "_bound_view_annotations", lambda view, **_k: annotations[view])
     if defect in {"wrong", "missing-value", "nan", "inf"}:
@@ -2593,7 +2610,7 @@ def test_land_locator_expected_value_is_sourced_and_rejects_stale_native_geometr
         assert len(checks) == 1
         assert next(ast.unparse(k.value) for k in checks[0].keywords if k.arg == "expected_mm") == "ROD_TIP_X"
     front = object()
-    _taper, _taper_entities, display, entities = drawing._add_rocker_outline_dimensions(native_front.adapter, front)
+    _front_annotations, _taper, _taper_entities, display, entities = drawing._add_rocker_outline_dimensions(native_front.adapter, front)
     monkeypatch.setattr(drawing, "_bound_view_annotations", lambda *_a, **_k: [display.annotation])
     monkeypatch.setattr(drawing, "ROD_TIP_X", ch_rocker_arm_spec.ROD_TIP_X + 0.1)
     with pytest.raises(RuntimeError):
@@ -8071,7 +8088,8 @@ def test_r24_dot_actual_printed_arm_and_taper_route_are_not_inferred_from_reques
 
 def test_r24_caps_taper_and_land_locator_but_preserves_uncapped_overall(native_front):
     case = native_front
-    display, entities, land, land_entities = drawing._add_rocker_outline_dimensions(case.adapter, object())
+    front_annotations, display, entities, land, land_entities = drawing._add_rocker_outline_dimensions(case.adapter, object())
+    assert front_annotations is case.basic_calls[0]
     assert display is case.displays["taper intersection X"]
     assert display.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH == 0.008
     assert display.annotation.GetAttachedEntities3() == entities
@@ -8229,7 +8247,7 @@ def test_r26_actual_inside_r800_tail_and_strap_extension_refuse_restored_legacy_
 @pytest.fixture
 def r24_taper(native_front, bound, monkeypatch):
     case = native_front
-    taper, entities, _land_dimension, _land_entities = drawing._add_rocker_outline_dimensions(case.adapter, object())
+    _front_annotations, taper, entities, _land_dimension, _land_entities = drawing._add_rocker_outline_dimensions(case.adapter, object())
     data = _ClearanceDisplayData(
         [_r24_text("132.76", (0.2118882, 0.132), width=0.0142236),
          _r24_text("R816/TAPER", (0.2059139, 0.1264437), width=0.0261722)],

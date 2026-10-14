@@ -1896,8 +1896,8 @@ def _dress_detail_dimensions(
 
 def _add_rocker_outline_dimensions(
     adapter: Any, front: Any,
-) -> tuple[Any, tuple[Any, Any], Any, tuple[Any, Any]]:
-    """Import profile nominals and measure the remaining actual CAD outline."""
+) -> tuple[list[Any], Any, tuple[Any, Any], Any, tuple[Any, Any]]:
+    """Import profile nominals and return their annotations with the outline."""
     annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
@@ -1981,7 +1981,7 @@ def _add_rocker_outline_dimensions(
     if (not _native_finite_scalar(land_dimension.MaxWitnessLineLength)
             or abs(land_dimension.MaxWitnessLineLength - TAPER_WITNESS_LENGTH) > 1e-9):
         raise RuntimeError("datum C land X location retained full-height witnesses")
-    return taper_dimension, (pivot, taper), land_dimension, land_entities
+    return annotations, taper_dimension, (pivot, taper), land_dimension, land_entities
 
 
 def _add_pin_coordinates(adapter: Any, front: Any) -> None:
@@ -3097,7 +3097,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Import the source radii and top height too: these are the BASIC nominal
     # geometry of the profile zone, not independent radius/height bands.
-    taper_dimension, taper_entities, land_dimension, land_entities = _add_rocker_outline_dimensions(adapter, front)
+    front_annotations, taper_dimension, taper_entities, land_dimension, land_entities = _add_rocker_outline_dimensions(adapter, front)
     try:
         notes = add_property_linked_note(
             adapter, "Manufacturing Notes", NOTES_LEFT, NOTES_CEILING
