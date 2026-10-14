@@ -109,8 +109,11 @@ def test_every_feature_is_located_from_the_front_face() -> None:
     assert "segment.ConstructionGeometry = True" in _PART_SOURCE
     # PivotZ's extension line lands on the section's bore-axis centreline.
     # Farm 2229cc4db: InsertCenterLine2 on a picked bore face returned None in
-    # this section, so the axis is sketched between projected model points
-    # (dt_cone_pivot_post's section recipe), black, CENTER font, read back.
+    # this section, so the axis is sketched between projected model points.
+    # r13: sheet-owned after EditSheet it passed its colour readback and never
+    # printed, so it is view-owned (draw_fr_top_frame's recipe): the section
+    # active, the points mapped into its sketch, straight to the database (no
+    # snapping), endpoints read back, black, CENTER font.
     assert "add_view_centerline" not in _DRAWING_SOURCE
     assert "_add_pivot_axis_centerline(adapter, section)" in _DRAWING_SOURCE
     body = _DRAWING_SOURCE[_DRAWING_SOURCE.index("def _add_pivot_axis_centerline(") :]
@@ -119,12 +122,19 @@ def test_every_feature_is_located_from_the_front_face() -> None:
         "model_point_in_view(",
         "PIVOT_BORE_X / 1000.0",
         "_CZ / 1000.0",
-        "drawing.EditSheet()",
+        "drawing.ActivateView(view_name(adapter, section))",
+        "sketch.ModelToSketchTransform",
+        "manager.AddToDB = True",
         "CreateCenterLine(",
+        "_assert_centreline_placed(adapter, centerline, points)",
         "segment.Style = _SW_LINE_CENTER",
         "GetOutline()",
     ):
         assert needle in body, needle
+    assert "EditSheet()" not in body
+    # The database flag is restored whatever CreateCenterLine does.
+    assert body.index("manager.AddToDB = True") < body.index("finally:")
+    assert "manager.AddToDB = previous_add_to_db" in body
     # 3 mm past each end on paper.
     assert drawing._CENTERLINE_OVERSHOOT_MM * drawing._S == pytest.approx(0.003)
     # Drawn after the section is cut and curated.
@@ -415,38 +425,73 @@ def test_pivot_callout_names_its_mate_and_says_ream() -> None:
     assert not re.search(r"\d\.\d", callout)
 
 
-def test_tap_callout_ends_in_the_pivot_bore() -> None:
+def test_tap_callout_says_drill_and_ends_in_the_pivot_bore() -> None:
     # Review r11 (rule 12): "TAP 4-40 UNC THRU" read as drilled through the
-    # block.  Both native rows end INTO PIVOT BORE; only the extent variable
-    # changes, so size and thread stay associative.
+    # block, so both native rows end INTO PIVOT BORE; r13: "Ø 2.26 ..." had no
+    # process word, so the drill row opens DRILL.  Only text around the
+    # variables changes, so size and thread stay associative.
     original = {
         5: "TAP <hw-threaddesc> <hw-thru>",
         6: "",
         7: "<MOD-DIAM><hw-tapdrldia> <hw-thru>",
         8: "",
     }
-    rewritten = drawing._tap_into_bore_definitions(original)
+    rewritten = drawing._tap_callout_definitions(original)
     assert rewritten == {
         5: "TAP <hw-threaddesc> INTO PIVOT BORE",
         6: "",
-        7: "<MOD-DIAM><hw-tapdrldia> INTO PIVOT BORE",
+        7: "DRILL <MOD-DIAM><hw-tapdrldia> INTO PIVOT BORE",
         8: "",
     }
+    # Both rows in one part: the drill row alone takes the word.
+    joined = drawing._tap_callout_definitions(
+        {
+            5: "TAP <hw-threaddesc> <hw-thru>",
+            6: "",
+            7: "",
+            8: "<MOD-DIAM><hw-thrutapdrldia> <hw-thru>\nCOAXIAL",
+        }
+    )
+    assert joined[8] == "DRILL <MOD-DIAM><hw-thrutapdrldia> INTO PIVOT BORE\nCOAXIAL"
     for bad in (
         {5: "TAP <hw-threaddesc> <hw-thru>", 6: "", 7: "", 8: ""},
         {5: "<hw-thru>", 6: "", 7: "<hw-thru>", 8: ""},
         {5: "TAP <hw-threaddesc> <hw-thru>", 7: "<hw-thru>"},
+        # No drill row, or one already worded, or sharing the thread's row.
+        {5: "TAP <hw-threaddesc> <hw-thru>", 6: "", 7: "<hw-thru>", 8: ""},
+        {
+            5: "TAP <hw-threaddesc> <hw-thru>",
+            6: "",
+            7: "DRILL <MOD-DIAM><hw-tapdrldia> <hw-thru>",
+            8: "",
+        },
+        {
+            5: "TAP <hw-tapdrldia> <hw-threaddesc> <hw-thru> <hw-thru>",
+            6: "",
+            7: "",
+            8: "",
+        },
     ):
         with pytest.raises(RuntimeError):
-            drawing._tap_into_bore_definitions(bad)
-    assert not re.search(r"\d", drawing._TAP_END)
+            drawing._tap_callout_definitions(bad)
+    assert not re.search(r"\d", drawing._TAP_END + drawing._DRILL_WORD)
+    # The readback, on resolved text as the sheet prints it.
+    assert drawing._tap_callout_resolved(
+        "TAP 4-40 UNC INTO PIVOT BORE\n\nDRILL Ø2.26 INTO PIVOT BORE\n"
+    )
+    for printed in (
+        "TAP 4-40 UNC INTO PIVOT BORE\n\nØ2.26 INTO PIVOT BORE\n",
+        "DRILL TAP 4-40 UNC INTO PIVOT BORE\n\nØ2.26 INTO PIVOT BORE\n",
+        "TAP 4-40 UNC THRU\n\nDRILL Ø2.26 INTO PIVOT BORE\n",
+    ):
+        assert not drawing._tap_callout_resolved(printed), printed
     # After the thread class leaves, on the tap's callout only.
     omit = _DRAWING_SOURCE.index(
         'omit_title_block_thread_class(tap_callout, label="rod set-screw tap")'
     )
-    rewrite = _DRAWING_SOURCE.index("_set_tap_into_bore_text(tap_callout)")
+    rewrite = _DRAWING_SOURCE.index("_set_tap_callout_text(tap_callout)")
     assert omit < rewrite < _DRAWING_SOURCE.index("lightening_rim = ")
-    assert _DRAWING_SOURCE.count("_set_tap_into_bore_text(") == 2  # def + call
+    assert _DRAWING_SOURCE.count("_set_tap_callout_text(") == 2  # def + call
 
 
 def test_v_is_its_angle_and_mouth_with_a_reference_apex() -> None:

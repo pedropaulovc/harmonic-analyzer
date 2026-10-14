@@ -51,6 +51,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
@@ -154,10 +155,18 @@ SECTION_CENTER = (0.360, FRONT_CENTER[1])
 ISO_CENTER = (0.315, 0.097)
 ISO_NOTE_XY = (0.350, 0.097)
 # The tap's callout rows centre on this point (r11: "TAP 4-40 UNC THRU", 17
-# characters, 42.8 mm wide, x 0.2136..0.2564).  Ending "INTO PIVOT BORE" the
-# thread row runs 28 characters, ~71 mm: x ~0.200..0.270 at y ~0.246, 16 mm
-# right of the front view's paper end (x 0.184) and 42 mm left of the pivot
-# chamfer's line (from x ~0.312, SECTION_KEEP).
+# characters, 42.8 mm wide, x 0.2136..0.2564).  Ending "INTO PIVOT BORE" both
+# rows run 28 characters ("DRILL Ø 2.26 INTO PIVOT BORE" from r14), ~71 mm:
+# r13 printed them x ~0.200..0.273 at y ~0.249 / 0.255, 16 mm right of the
+# front view's paper end (x 0.184) and 39 mm left of the pivot chamfer's line
+# (from x ~0.312, SECTION_KEEP).  The leader still runs from the hole across
+# the paper-end chamfer (r13 minor): no clear path exists above the part.
+# From the hole (x 0.134, y 0.204) a leader clears the chamfer's top corner
+# (x 0.160, y 0.228) only at a slope over ~1, so it must still cross Length's
+# extension line at x 0.184 (up to ~0.257) unless its text sits over 0.258,
+# where two rows run into the border (0.267); bent left instead, it crosses
+# section line A's arrow (y ~0.234) and lands on the chamfer callout's rows
+# (x ~0.065..0.115, y ~0.237..0.246).
 TAP_CALLOUT_XY = (0.235, 0.252)
 # Above-left of the bottom view, the lightening bore's near (upper-left) rim
 # 13 mm down-right of the text: one arrow there, no line through the bore
@@ -508,8 +517,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The title block's THREADS row owns the general thread class (rule 2).
     omit_title_block_thread_class(tap_callout, label="rod set-screw tap")
-    # Both rows end where the hole does: in the pivot bore, not through.
-    _set_tap_into_bore_text(tap_callout)
+    # Both rows end where the hole does, in the pivot bore, not through; the
+    # drill row says DRILL as the lightening bore's does (rule 12).
+    _set_tap_callout_text(tap_callout)
     lightening_rim = scan_view_edges(bottom, label="bottom").circle_at(
         (LIGHTENING_X, RELIEF_HEIGHT, _CZ),
         LIGHTENING_DIA / 2.0,
@@ -554,35 +564,70 @@ async def build(adapter: Any) -> dict[str, str]:
 # prefix).  The block is not drilled through, so both rows name where the hole
 # ends instead (draw_dt_cone_tip_block's pinch-thread "TO SLOT" recipe): only
 # the extent variable is replaced, the size and thread variables stay live.
+# r13: "Ø 2.26 INTO PIVOT BORE" carried no process word, so the drill row
+# opens with DRILL, as "DRILL Ø 7.94 THRU ALL" does on the same sheet.
 _TAP_END = "INTO PIVOT BORE"
 _THRU_TOKEN = "<hw-thru>"
+_DRILL_WORD = "DRILL"
+# The drill row's size variable: <hw-tapdrldia> (or <hw-thrutapdrldia> for a
+# through tap); the thread row carries <hw-threaddesc>.
+_TAP_DRILL_TOKEN = "tapdrldia>"
 # swDimensionTextParts_e: each definition part and the part SetText writes.
 _DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
 
 
-def _tap_into_bore_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Replace the native THRU extent on both rows with ``_TAP_END``."""
+def _tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Replace the native THRU extent on both rows with ``_TAP_END`` and open
+    the drill row with ``_DRILL_WORD``; every native variable stays."""
     if set(definitions) != set(_DEFINITION_TO_WRITABLE):
         raise RuntimeError(f"unexpected tap callout definition parts: {definitions!r}")
     original = "\n".join(definitions.values())
     if original.count(_THRU_TOKEN) != 2 or "<hw-threaddesc>" not in original:
         raise RuntimeError(f"unexpected native tap callout definition: {definitions!r}")
-    updated = {
-        part: text.replace(_THRU_TOKEN, _TAP_END) for part, text in definitions.items()
-    }
+    updated = {}
+    drill_rows = 0
+    for part, text in definitions.items():
+        rows = text.replace(_THRU_TOKEN, _TAP_END).split("\n")
+        for index, row in enumerate(rows):
+            if _TAP_DRILL_TOKEN not in row:
+                continue
+            if "<hw-threaddesc>" in row or "TAP" in row or _DRILL_WORD in row:
+                raise RuntimeError(f"tap drill row shares its text: {definitions!r}")
+            body = row.lstrip()
+            rows[index] = f"{row[: len(row) - len(body)]}{_DRILL_WORD} {body}"
+            drill_rows += 1
+        updated[part] = "\n".join(rows)
     rewritten = "\n".join(updated.values())
-    if rewritten.count(_TAP_END) != 2 or "<hw-threaddesc>" not in rewritten:
+    if (
+        drill_rows != 1
+        or rewritten.count(_TAP_END) != 2
+        or "<hw-threaddesc>" not in rewritten
+    ):
         raise RuntimeError(f"tap callout rewrite lost its rows: {updated!r}")
     return updated
 
 
-def _set_tap_into_bore_text(display: Any) -> None:
-    """Write the into-bore extent on the native callout and read it back."""
+def _tap_callout_resolved(resolved: str) -> bool:
+    """Both rows end in the bore; exactly one row, the drill's, opens DRILL."""
+    drill = [row for row in resolved.split("\n") if _DRILL_WORD in row]
+    return (
+        resolved.count(_TAP_END) == 2
+        and "THRU" not in resolved
+        and len(drill) == 1
+        and drill[0].lstrip().startswith(f"{_DRILL_WORD} ")
+        and _TAP_END in drill[0]
+        and "UNC" not in drill[0]
+    )
+
+
+def _set_tap_callout_text(display: Any) -> None:
+    """Write the drill word and into-bore extent on the native callout and
+    read both back."""
     native = _early_bound(display, "IDisplayDimension")
     definitions = {
         part: str(native.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
     }
-    updated = _tap_into_bore_definitions(definitions)
+    updated = _tap_callout_definitions(definitions)
     for definition_part, writable_part in _DEFINITION_TO_WRITABLE.items():
         if updated[definition_part] != definitions[definition_part]:
             native.SetText(writable_part, updated[definition_part])  # void return
@@ -592,9 +637,9 @@ def _set_tap_into_bore_text(display: Any) -> None:
     resolved = "\n".join(
         str(native.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE.values()
     )
-    if persisted != updated or resolved.count(_TAP_END) != 2 or "THRU" in resolved:
+    if persisted != updated or not _tap_callout_resolved(resolved):
         raise RuntimeError(
-            "tap callout into-bore extent did not persist: "
+            "tap callout drill word / into-bore extent did not persist: "
             f"definitions={persisted!r}, resolved={resolved!r}"
         )
 
@@ -711,12 +756,18 @@ def _add_pivot_axis_centerline(adapter: Any, section: Any) -> None:
     Farm 2229cc4db: ``InsertCenterLine2`` on the bore face picked at (z 10,
     y 15) returned None; in this cut the bore wall is split by the tap on the
     near side and trimmed by the chamfer on top, so neither a face nor a
-    wall-edge pair is a dependable handle.  dt_cone_pivot_post's section
-    recipe instead: the model axis projected through the section's own
-    transform into sheet space, a sheet-owned centreline between the ends,
-    black in the CENTER font, read back.
+    wall-edge pair is a dependable handle.  The model axis is projected
+    through the section's own transform instead.  r13 (98ffd38a8) drew it
+    sheet-owned after ``EditSheet`` (dt_cone_pivot_post's recipe) and passed
+    its colour readback, yet no axis printed: the reviewer saw PivotZ's 9.0
+    end in mid-air.  So this is draw_fr_top_frame's view-owned recipe, which
+    reads the line back where it was authored: the section activated, each
+    sheet point mapped through the view sketch's ModelToSketchTransform, the
+    line added straight to the database (an inferred endpoint snaps onto
+    nearby ink), its endpoints read back, black in the CENTER font.
     """
-    _early_bound(section, "IView").UpdateViewDisplayGeometry()
+    native = _early_bound(section, "IView")
+    native.UpdateViewDisplayGeometry()
     ends = [
         model_point_in_view(
             adapter,
@@ -737,38 +788,80 @@ def _add_pivot_axis_centerline(adapter: Any, section: Any) -> None:
     ):
         raise RuntimeError(f"section A-A pivot axis projects as {ends!r}")
     middle = ((ends[0][0] + ends[1][0]) / 2.0, (ends[0][1] + ends[1][1]) / 2.0)
-    outline = tuple(float(v) for v in _early_bound(section, "IView").GetOutline())
+    outline = tuple(float(v) for v in native.GetOutline())
     if not (
         outline[0] < middle[0] < outline[2] and outline[1] < middle[1] < outline[3]
     ):
         raise RuntimeError(
             f"section A-A pivot axis {middle!r} falls outside the section {outline!r}"
         )
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    # EditSheet makes the line sheet-owned; the ends are already in sheet space.
-    drawing.EditSheet()
-    sketch_manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
-    centerline = sketch_manager.CreateCenterLine(
-        ends[0][0], ends[0][1], 0.0, ends[1][0], ends[1][1], 0.0
-    )
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, section)):
+        raise RuntimeError("failed to activate section A-A for the pivot axis")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = [
+        tuple(
+            _early_bound(
+                _early_bound(
+                    utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+                ).MultiplyTransform(transform),
+                "IMathPoint",
+            ).ArrayData
+        )
+        for x, y in ends
+    ]
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        centerline = manager.CreateCenterLine(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
     if centerline is None:
         raise RuntimeError("failed to create the pivot-bore centreline in section A-A")
-    # A sheet sketch line otherwise prints in the under-defined sketch blue.
+    _assert_centreline_placed(adapter, centerline, points)
+    # A view sketch line otherwise prints in the under-defined sketch blue.
     segment = _early_bound(centerline, "ISketchSegment")
     segment.Color = 0  # COLORREF black
     segment.Style = _SW_LINE_CENTER
-    adapter.currentModel.ClearSelection2(True)
+    draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="section A-A pivot axis")
     if int(segment.Color) != 0 or int(segment.Style) != _SW_LINE_CENTER:
         raise RuntimeError(
             "pivot-bore centreline did not keep black centreline font: "
             f"color={int(segment.Color)}, style={int(segment.Style)}"
         )
+    _assert_centreline_placed(adapter, centerline, points)
     # Against the keep maps' arithmetic (x 0.360): logged, not gated.
     _telemetry.info(
-        f"section A-A pivot axis drawn {ends[0]!r} -> {ends[1]!r}; "
+        f"section A-A pivot axis drawn {ends[0]!r} -> {ends[1]!r} "
+        f"(view sketch {points[0]!r} -> {points[1]!r}); "
         f"keep-map axis x {_sz(_CZ):.4f}, off by {middle[0] - _sz(_CZ):+.5f} m"
     )
+
+
+def _assert_centreline_placed(
+    adapter: Any, segment: Any, points: list[tuple[float, ...]]
+) -> None:
+    """Fail when the axis's endpoints are not where they were authored
+    (draw_fr_top_frame ``_assert_centreline_placed``)."""
+    line = _early_bound(segment, "ISketchLine")
+    for expected, accessor in zip(points, ("GetStartPoint2", "GetEndPoint2")):
+        point = _early_bound(adapter._get_attr_or_call(line, accessor), "ISketchPoint")
+        actual = [
+            float(adapter._get_attr_or_call(point, axis)) for axis in ("X", "Y", "Z")
+        ]
+        drift = max(abs(a - b) for a, b in zip(actual, expected))
+        if drift > 1e-9:
+            raise RuntimeError(
+                f"section A-A pivot axis {accessor[3:-6].lower()} point sits "
+                f"{drift * 1000.0:.4g} mm from where it was authored "
+                f"({actual} instead of {list(expected)})"
+            )
 
 
 def _orient_bottom_view(adapter: Any, view: Any) -> None:

@@ -99,10 +99,83 @@ def test_drawing_is_the_purchased_reference_sheet() -> None:
     assert drawing.SPEC is sheet
     assert sheet.artifact_stem == part.PART_NAME == STEM
     assert sheet.source_kind == "part"
-    assert drawing.build.__code__.co_names.count("build_purchased_part_drawing") == 1
     # The sheet note carries no numbers; the model and the SKU carry them.
     assert not re.search(r"\d", spec.DRAWING_NOTES)
-    assert len(spec.DRAWING_NOTES) <= 70
+
+
+def _overlaps(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+# ASME B landscape: the border 12.7 mm in, the title block and the purchased
+# footer's notes in the lower corners (farm run e31912e0's PNG).
+BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
+TITLE_BLOCK = (0.2159, 0.0127, 0.4191, 0.0651)
+FOOTER = (0.0127, 0.0127, 0.2600, 0.0730)
+
+
+def _cells() -> dict[str, tuple[float, float, float, float]]:
+    return {
+        name: drawing.view_cell(center, half) for name, center, half in drawing.VIEWS
+    }
+
+
+def test_views_are_one_sheet_scale_in_third_angle_alignment() -> None:
+    assert drawing.SHEET_SCALE == (1, 1)
+    centers = {name: center for name, center, _ in drawing.VIEWS}
+    assert set(centers) == {"*Front", "*Top", "*Right", "*Isometric"}
+    front, top, right = centers["*Front"], centers["*Top"], centers["*Right"]
+    assert top[0] == front[0] and top[1] > front[1]
+    assert right[1] == front[1] and right[0] > front[0]
+    # The side views are the marker at full size: nib to back end, Ø over the shoulder.
+    assert drawing._SIDE_HALF == pytest.approx(
+        (spec.MAX_DIA / 2000.0, spec.OVERALL_LENGTH / 2000.0)
+    )
+
+
+def test_view_cells_and_notes_clear_each_other_and_the_sheet_furniture() -> None:
+    boxes = dict(_cells())
+    for label, x, y in drawing.CAPTIONS:
+        half = drawing._CAPTION_HALF_WIDTH
+        boxes[f"caption {label}"] = (x - half, y - 0.006, x + half, y + 0.001)
+    boxes["grip note"] = drawing.GRIP_NOTE_BOX
+    names = sorted(boxes)
+    for i, a in enumerate(names):
+        box = boxes[a]
+        assert BORDER[0] <= box[0] and box[2] <= BORDER[2], a
+        assert BORDER[1] <= box[1] and box[3] <= BORDER[3], a
+        assert not _overlaps(box, TITLE_BLOCK), a
+        assert not _overlaps(box, FOOTER), a
+        for b in names[i + 1 :]:
+            assert not _overlaps(box, boxes[b]), (a, b)
+
+
+def test_grip_note_is_the_part_note_on_a_leader_to_the_grip_band() -> None:
+    text = drawing.grip_note(spec.DRAWING_NOTES)
+    # Every word of the part's note, printed once, on short lines.
+    assert " ".join(text.split("\n")) == spec.DRAWING_NOTES
+    lines = text.split("\n")
+    assert len(lines) == 3
+    assert all(len(line) <= drawing.GRIP_NOTE_WIDTH for line in lines)
+    # The tip sits on the grip's silhouette in FRONT, inside the band.
+    front, half = drawing.FRONT_CENTER, drawing._SIDE_HALF
+    nib_y = front[1] - half[1]
+    tip = drawing.GRIP_TIP
+    assert tip[0] == pytest.approx(front[0] - spec.BARREL_DIA / 2000.0)
+    assert (
+        nib_y + spec.BARREL_START_Y / 1000.0
+        < tip[1]
+        < nib_y + spec.BARREL_END_Y / 1000.0
+    )
+    # The text box (top-left at GRIP_NOTE_XY) reaches toward the tip from its left.
+    box = drawing.GRIP_NOTE_BOX
+    assert box[0] < drawing.GRIP_NOTE_XY[0] and drawing.GRIP_NOTE_XY[1] <= box[3]
+    assert box[2] < tip[0]
+    # The note prints only on the leader: no general installation note.
+    names = drawing.build.__code__.co_names
+    assert names.count("add_leader_note") == 1
+    assert "build_purchased_part_drawing" not in names
+    assert "Installation Notes" not in drawing.build.__code__.co_consts
 
 
 def test_retired_turned_marker_is_gone() -> None:
