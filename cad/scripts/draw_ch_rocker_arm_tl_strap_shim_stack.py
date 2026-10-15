@@ -22,6 +22,7 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -73,17 +74,31 @@ EDGE_KEEP = {
 CALLOUTS_ABOVE = {"StripThick": "FLAT STOCK AS SUPPLIED"}
 CALLOUTS_BELOW = {
     "StackWidth": "UNDER THE ARM STRAP",
-    # The mate and the fit-up acceptance as a GO/NO-GO pair: the pack is
-    # chosen at setup until the stack bears on the rocker blank's strap face,
-    # but no higher: with the strap snug the raw blank ends still bear on the
-    # riser blocks, so an over-height pack cannot bow the span.
+    # The mate and the lower fit-up bound: the pack is chosen at setup until
+    # the stack bears on the rocker blank's strap face. One line, so the
+    # callout hangs under its shelf, clear of the dimension's vertical line.
     "ShimThick": (
         "SHIM AT SETUP TO BEAR ON MHA-CH-006 STRAP FACE: "
-        f"{part_spec.FIT_UP_FEELER_NO_GO:.2f} FEELER NO-GO\n"
-        "BLANK ENDS ON MHA-CH-006-TL-10: "
         f"{part_spec.FIT_UP_FEELER_NO_GO:.2f} FEELER NO-GO"
     ),
 }
+# The upper fit-up bound (Codex #1448 P1): an over-height pack would lift the
+# blank off the riser blocks and bow the span, so the stack's underside, the
+# face that seats on MHA-CH-006-TL-10, must still bear with the strap snug.
+RISER_SEAT_NOTE = (
+    "BLANK FLAT ON ALL MHA-CH-006-TL-10 SEATS: "
+    f"{part_spec.FIT_UP_FEELER_NO_GO:.2f} FEELER NO-GO"
+)
+# The *Bottom edge view shows the model's +Z up, so the riser seat (Z0) is the
+# view's bottom edge, under the shim layer. The tip sits on it left of centre;
+# the note sits below-left of the view, above the manufacturing note and left
+# of the ShimThick callout.
+RISER_SEAT_TIP = (
+    EDGE_CENTER[0] - 0.020,
+    EDGE_CENTER[1]
+    - part_spec.STACK_HEIGHT / 2.0 * VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0,
+)
+RISER_SEAT_NOTE_XY = (0.020, 0.086)
 
 
 part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
@@ -191,6 +206,14 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW, location="below")
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
+    add_leader_note(
+        adapter,
+        RISER_SEAT_NOTE,
+        text_xy=RISER_SEAT_NOTE_XY,
+        attach_xy=RISER_SEAT_TIP,
+        label="strap shim stack riser-seat fit-up",
+        view=edge,
+    )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
