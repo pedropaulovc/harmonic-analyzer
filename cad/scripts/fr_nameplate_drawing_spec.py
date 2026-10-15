@@ -62,12 +62,17 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "top hole station": 1,
     "sunk field depth": 3,
     "engraving depth": 3,
+    "floor under engraving": 3,
 }
 
 # Section A-A's depths from the decorated face: the sunk field, then every
 # engraved groove (border pinstripe and field lettering alike) to one floor.
+# The floor left under the engraving prints as a reference (user ruling
+# 2026-10-14): its printed worst case, ENGRAVING_FLOOR_MIN, sits under rule
+# 17's 1.5 floor as a decorative exception, not a structural wall.
 FIELD_DEPTH = 0.4
 ENGRAVING_FLOOR_DEPTH = 0.7
+FLOOR_UNDER_ENGRAVING = PLATE_THICKNESS - ENGRAVING_FLOOR_DEPTH
 ENGRAVING_FLOOR_MIN = (
     PLATE_THICKNESS
     + printed_deviations(PLATE_THICKNESS, DRAWING_PRECISION["PlateSlab"]["PlateThick"])[
@@ -120,10 +125,11 @@ HOLE_STATION_SHIFT_MAX = max(
 )
 
 DIMENSION_PREFIXES = {"S0X": "2X ", "S0Z": "2X "}
-DIMENSION_CALLOUTS = {"PlateThick": "SETS ENGRAVING FLOOR"}
+DIMENSION_CALLOUTS = {"PlateThick": "SETS FLOOR UNDER ENGRAVING"}
 STATION_PREFIX = "2X "
 FIELD_DEPTH_CALLOUT = "SUNK FIELD"
 ENGRAVING_DEPTH_CALLOUT = "ALL ENGRAVING"
+FLOOR_UNDER_ENGRAVING_CALLOUT = "FLOOR UNDER ENGRAVING"
 HOLE_CALLOUT_PROCESS = "DRILL"
 
 # The three vendored contours the build imports (cad/references), named on the

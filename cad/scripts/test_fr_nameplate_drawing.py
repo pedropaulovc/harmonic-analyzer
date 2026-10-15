@@ -116,7 +116,28 @@ def _segment_distance(
     return math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy)
 
 
-def test_section_a_stations_cut_border_field_and_a_letter() -> None:
+def test_section_a_crosses_the_plate_between_the_lettering_rows() -> None:
+    # Both ends stand off the outline, so the arrows and letters print off
+    # the plate (r2 review C3).
+    outline = _rings(part.OUTLINE_DXF)[0]
+    y = drawing.SECTION_Y
+    assert drawing.SECTION_X_START < 0.0 < spec.PLATE_WIDTH < drawing.SECTION_X_END
+    for x in (drawing.SECTION_X_START, drawing.SECTION_X_END):
+        assert not dxf.point_in_ring(outline, (x, y))
+    # The only engraved rings the line meets are the border's (pinstripe and
+    # field edges, which span the plate); every letter and the ornament
+    # stand at least a millimetre clear of it.
+    for ring in _rings(part.ENGRAVING_DXF):
+        xs = [x for x, _ in ring]
+        ys = [y_ for _, y_ in ring]
+        if min(ys) <= y <= max(ys):
+            assert min(xs) < drawing.SECTION_FIELD_X, ring[0]
+            assert max(xs) > spec.PLATE_WIDTH - drawing.SECTION_FIELD_X, ring[0]
+        else:
+            assert min(abs(min(ys) - y), abs(max(ys) - y)) >= 1.0, ring[0]
+
+
+def test_section_a_crop_holds_the_border_the_groove_and_the_field() -> None:
     # The engraving DXF's closed rings nest: the pinstripe's outer edge, the
     # field ring (its inner edge), each letter and each letter's counter. A
     # point is cut to the engraving floor where an odd number of them holds it.
@@ -124,23 +145,83 @@ def test_section_a_stations_cut_border_field_and_a_letter() -> None:
     field = _rings(part.FIELD_DXF)[0]
     engraving = _rings(part.ENGRAVING_DXF)
     assert field in engraving
+    y = drawing.SECTION_Y
 
     def engraved(x: float) -> bool:
-        point = (x, drawing.SECTION_Y)
-        return sum(dxf.point_in_ring(ring, point) for ring in engraving) % 2 == 1
+        return sum(dxf.point_in_ring(ring, (x, y)) for ring in engraving) % 2 == 1
 
-    y = drawing.SECTION_Y
-    assert not dxf.point_in_ring(outline, (drawing.SECTION_X_START, y))
-    border = (drawing.SECTION_BORDER_X, y)
-    assert dxf.point_in_ring(outline, border) and not dxf.point_in_ring(field, border)
-    assert not engraved(drawing.SECTION_BORDER_X)
+    face = (drawing.SECTION_FACE_X, y)
+    assert dxf.point_in_ring(outline, face) and not dxf.point_in_ring(field, face)
+    assert not engraved(drawing.SECTION_FACE_X)
+    groove = (drawing.SECTION_GROOVE_X, y)
+    assert not dxf.point_in_ring(field, groove) and engraved(drawing.SECTION_GROOVE_X)
     floor = (drawing.SECTION_FIELD_X, y)
     assert dxf.point_in_ring(field, floor) and not engraved(drawing.SECTION_FIELD_X)
-    letter = (drawing.SECTION_LETTER_X, y)
-    assert dxf.point_in_ring(field, letter) and engraved(drawing.SECTION_LETTER_X)
-    # The removed section ends on the field floor, not mid-groove.
-    end = (drawing.SECTION_X_END, y)
-    assert dxf.point_in_ring(field, end) and not engraved(drawing.SECTION_X_END)
+    # The crop holds the plate's left edge and the whole thickness, and ends
+    # on the field floor, not mid-groove.
+    (x0, z0), (x1, z1) = drawing.SECTION_CROP
+    assert x0 < 0.0 and z0 > 0.0 and z1 < -spec.PLATE_THICKNESS
+    assert x1 > drawing.SECTION_FIELD_X
+    end = (x1, y)
+    assert dxf.point_in_ring(field, end) and not engraved(x1)
+
+
+def test_section_a_dimensions_each_depth_on_its_own_line() -> None:
+    # r2 review C2: the two depths shared one face arrow; each now stands on
+    # its own station, both from the decorated face (z = 0).
+    picks = drawing.SECTION_PICKS
+    field, groove = picks["sunk field depth"], picks["engraving depth"]
+    assert field["from"][1] == groove["from"][1] == 0.0
+    assert field["to"][0] != groove["to"][0]
+    assert field["text_xy"][0] != groove["text_xy"][0]
+    for pick in picks.values():
+        (_, z0), (_, z1) = pick["from"], pick["to"]
+        assert math.isclose(z0 - z1, pick["expected_mm"])
+        assert not pick["reference"] or pick is picks["floor under engraving"]
+    # B3: the floor under the engraving chains below the engraving depth as
+    # a reference, plate thickness less the engraving floor depth.
+    floor = picks["floor under engraving"]
+    assert floor["reference"] and floor["from"] == groove["to"]
+    assert math.isclose(
+        floor["expected_mm"], spec.PLATE_THICKNESS - print_spec.ENGRAVING_FLOOR_DEPTH
+    )
+    assert floor["callout"] == "FLOOR UNDER ENGRAVING"
+
+
+def test_section_a_texts_and_caption_clear_each_other() -> None:
+    # Measured r2 text blocks (8:1): a two-row value and callout is about
+    # 8 mm tall and its callout row about 2.85 mm a character wide. Each
+    # block is boxed both left-aligned on its dimension line (as r2 printed)
+    # and centred on it, so neither SOLIDWORKS placement can collide.
+    def boxes(pick: dict) -> list[tuple[float, float, float, float]]:
+        x, y = pick["text_xy"]
+        width = 0.00285 * len(pick["callout"])
+        return [
+            (x, y - 0.004, x + width, y + 0.004),
+            (x - width / 2.0, y - 0.004, x + width / 2.0, y + 0.004),
+        ]
+
+    def overlaps(a: tuple, b: tuple) -> bool:
+        return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+    caption_x, caption_top = drawing.SECTION_CAPTION_XY
+    caption = (caption_x - 0.023, caption_top - 0.016, caption_x + 0.023, caption_top)
+    crop_low = drawing._section_xy(*drawing.SECTION_CROP[1])
+    crop_high = drawing._section_xy(*drawing.SECTION_CROP[0])
+    crop = (crop_high[0], crop_low[1], crop_low[0], crop_high[1])
+    placed = {name: boxes(pick) for name, pick in drawing.SECTION_PICKS.items()}
+    for name, candidates in placed.items():
+        for box in candidates:
+            assert box[2] < _BORDER[2] - 0.003, name
+            assert not overlaps(box, caption), name
+            assert not overlaps(box, crop), name
+        for other, others in placed.items():
+            clash = any(overlaps(a, b) for a in candidates for b in others)
+            assert other == name or not clash, (name, other)
+    assert not overlaps(caption, crop)
+    assert caption[1] > _TITLE_BLOCK[1] + 0.003
+    # Below the edge view, whose bottom is the face's bottom edge.
+    assert caption[3] < drawing._BOTTOM - 0.005
 
 
 def test_heads_stay_on_the_border_at_the_worst_printed_station() -> None:
@@ -180,6 +261,7 @@ def test_notes_and_callouts_carry_no_numbers_and_stay_short() -> None:
         *notes,
         print_spec.FIELD_DEPTH_CALLOUT,
         print_spec.ENGRAVING_DEPTH_CALLOUT,
+        print_spec.FLOOR_UNDER_ENGRAVING_CALLOUT,
         *print_spec.DIMENSION_CALLOUTS.values(),
     ]
     assert not any(re.search(r"\d", text) for text in texts), texts
@@ -198,6 +280,7 @@ def test_texts_stand_inside_the_border_and_off_the_title_block() -> None:
         drawing.NOTES_XY,
         drawing.ISO_NOTE_XY,
         drawing.SECTION_CENTER,
+        drawing.SECTION_CAPTION_XY,
         drawing.ISO_CENTER,
     ]
     for x, y in points:
@@ -215,6 +298,14 @@ def test_texts_stand_inside_the_border_and_off_the_title_block() -> None:
         assert not (
             left - 0.003 < x < right + 0.003 and bottom - 0.003 < y < top + 0.003
         )
+    # r2 audit: the plate height's dimension line crossed both "2X 4.1"
+    # station texts, which print 1.5..14.6 mm left of their own lines.
+    height_line_x = drawing.FRONT_PICKS["plate height"]["text_xy"][0]
+    for station_x, _ in (
+        drawing.FRONT_KEEP["S0Z"],
+        drawing.FRONT_PICKS["top hole station"]["text_xy"],
+    ):
+        assert height_line_x < station_x - 0.0146 - 0.002
 
 
 def test_part_registry_row_carries_the_title_block_facts() -> None:
