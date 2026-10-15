@@ -58,11 +58,11 @@ KEEPER_Z_OFF = 74.0  # lug mid-plane off the centre: inner face at 71.0
 LUG_HALF_T = 3.0  # lug half-thickness along X (lug 6.0 thick)
 KEEPER_WIDTH = 14.0  # across Z (machine X when placed); extrudes symmetric
 SHAFT_AXIS_H = 25.2  # shaft bore centre above the seat
-CROWN_DIA = 14.0  # full-round lug top, concentric with the shaft axis
+CROWN_R = 7.0  # full-round lug top about the shaft axis (CROWN_R_TOL_TYPE)
 FOOT_H = 8.0  # foot height; the bracket seats on y=0
 FOOT_L = 10.5  # foot length outboard of the lug's outer face
 FOOT_TIP_X = LUG_HALF_T + FOOT_L  # 13.5: outboard end of the foot
-CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_DIA / 2.0  # 32.2: the set-screw tap's entry
+CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_R  # 32.2: the set-screw tap's entry
 # Plain reamed bore for the plain Ø6.35 (1/4 in ground, SHAFT_H) fulcrum
 # shaft: the shaft slides through both lugs at assembly and the set screw
 # then pulls it onto the bore wall, so the fit only has to locate it, not run
@@ -159,7 +159,11 @@ BORE_PAIR_CALLOUT = (
     "INSTALLED SPACING; THE MHA-CH-004\n"
     "SHAFT SLIDES THROUGH BOTH"
 )
-CROWN_ABOUT_BORE_CALLOUT = "ROUND ABOUT THE BORE AFTER REAMING"
+# The crown round meets both side faces whatever its radius above the MIN, so
+# a bore off the width's centre (BoreFromSide's band) leaves no step (MR-fleet
+# r5: with only "(7.0)" across the width the builder could not tell what
+# lateral error the blend allows).
+CROWN_ABOUT_BORE_CALLOUT = "ROUND ABOUT THE BORE AFTER\nREAMING, MEETING BOTH SIDES"
 
 # --- Fit-up on the top frame (MHA-CH-000): the pair goes on with the shaft
 # through both bores and is set by DRO, the lug centres on the fulcrum line
@@ -191,6 +195,7 @@ FOOT_SCREW_LENGTH_MM = 11.1125  # 7/16 under the head (vn_frame_side_screw_spec)
 SCREW_X = LUG_HALF_T + FOOT_L / 2.0  # 8.25: foot centre
 SCREW_FROM_TIP = FOOT_TIP_X - SCREW_X  # 5.25: printed off the foot tip
 SCREW_FROM_SIDE = KEEPER_WIDTH / 2.0  # 7.0: printed off a side face
+BORE_FROM_SIDE = KEEPER_WIDTH / 2.0  # 7.0: the bore printed off the same side face
 KEEPER_SCREW_Z_OFF = KEEPER_Z_OFF + SCREW_X  # 82.25: screw off the centre
 SCREW_CLEARANCE_SPEC = HoleSpec("clearance", "#2", fit="close")
 HOLE_DIA_MM = blind_cut_dia_mm(SCREW_CLEARANCE_SPEC)
@@ -242,13 +247,25 @@ def _sag(radius: float) -> float:
     return radius - sqrt(radius**2 - _THREAD_HALF_MAJOR**2)
 
 
-def set_screw_wall_terms(crown_dia: float) -> dict[str, float]:
+# The crown is a 180 deg end arc, so it prints a radius (MR-fleet r5: "Ø14.0"
+# on the half round read as a boss or hole), as the single limit "R7.0 MIN"
+# (Main ruling (a), 2026-10-15): at the title block's .X a radius could drop
+# to 6.2, under this tap's 1.5D and ch_fulcrum_shaft's set-screw proud
+# ruling. Larger only moves where the round meets the sides; the supplied
+# blank's height (SUPPLY_HEIGHT_MIN) bounds it. swTolMIN prints the nominal,
+# so nominal = limit (the CORNER_R_MAX recipe).
+CROWN_R_PLACES = 1
+CROWN_R_MIN = CROWN_R
+CROWN_R_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "R7.0 MIN"
+
+
+def set_screw_wall_terms(crown_r_min: float) -> dict[str, float]:
     """Named terms of the crown tap's worst-case full-thread length (mm): the
     crown at its least radius, less the metal the thread cannot use (the
     dt_arbor_pedestal_spec.set_screw_wall_terms precedent)."""
-    least_crown = (crown_dia - _BAND_BY_PLACES[1]) / 2.0  # CrownDia prints .X
+    least_crown = crown_r_min  # CrownRadius prints its single limit MIN
     return {
-        "crown radius at .X minimum": least_crown,
+        "crown radius at its MIN limit": least_crown,
         "bore radius at its maximum": -_BORE_MAX_RADIUS,
         "crown sag across the thread": -_sag(least_crown),
         "bore sag across the thread": -_sag(_BORE_MAX_RADIUS),
@@ -256,7 +273,7 @@ def set_screw_wall_terms(crown_dia: float) -> dict[str, float]:
     }
 
 
-SET_SCREW_FULL_THREAD_MM = sum(set_screw_wall_terms(CROWN_DIA).values())
+SET_SCREW_FULL_THREAD_MM = sum(set_screw_wall_terms(CROWN_R_MIN).values())
 SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MM / THREAD_MAJOR_MM[SET_SCREW_THREAD]
 if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
     raise AssertionError(
@@ -348,15 +365,15 @@ if KEEPER_TAP_SPEC.depth_mm - _BAND_BY_PLACES[1] < (
 # stations off the foot tip and a side face are manufacturing dimensions no
 # feature measures (both holes are placed by point), so a one-line
 # construction sketch carries each. Four more: the bore's place across the
-# width (a REFERENCE_DIMENSIONS entry: the pair-ream setup puts it there),
-# the finished height seat to crown top and the overall length lug face to
-# foot tip (references: the bore height and crown, and the lug thickness and
-# foot length, chain them) and the supplied blank's height
-# (SUPPLY_HEIGHT_MIN), printed beside the finished one (MR-fleet r4: the
-# supply size alone left its extension line in empty space above the top).
-# The part saves them blanked; the drawing shows the tap's and the foot
-# screw's stations in the plan, the heights and length in the front view and
-# the bore's place in the end view.
+# width (BORE_FROM_SIDE, toleranced at .X: MR-fleet r5 asked what lateral
+# error the pair-ream layout may take), the finished height seat to crown top
+# and the overall length lug face to foot tip (references: the bore height
+# and crown, and the lug thickness and foot length, chain them) and the
+# supplied blank's height (SUPPLY_HEIGHT_MIN), printed beside the finished
+# one (MR-fleet r4: the supply size alone left its extension line in empty
+# space above the top). The part saves them blanked; the drawing shows the
+# tap's and the foot screw's stations in the plan, the heights and length in
+# the front view and the bore's place in the end view.
 REFERENCE_SKETCHES = (
     "SetScrewReference",
     "FootScrewReference",
@@ -366,7 +383,7 @@ REFERENCE_SKETCHES = (
     "SupplyHeightReference",
     "OverallLengthReference",
 )
-REFERENCE_DIMENSIONS = ("BoreFromSide", "OverallHeight", "OverallLength")
+REFERENCE_DIMENSIONS = ("OverallHeight", "OverallLength")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. The wizard screw hole and the crown tap ship as native hole
@@ -376,7 +393,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LugBody": {"LugThickness"},
     "FootProfile": {"FootLength", "FootRise"},
     "Foot": {"Depth"},
-    "LugCrownProfile": {"CrownDia"},
+    "LugCrownProfile": {"CrownRadius"},
     "ShaftBoreProfile": {"BoreDia"},
     "SetScrewReference": {"SetScrewLocation"},
     "FootScrewReference": {"ScrewFromTip"},
@@ -389,7 +406,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL
 # owns them. One place is the general grade: the crown thread is sized at
-# the .X worst case (SET_SCREW_ENGAGEMENT_D). The shaft-axis height takes
+# the crown radius's single limit MIN (SET_SCREW_ENGAGEMENT_D) and the bore's
+# side walls at the .X lateral station and width (BORE_SIDE_WALL_MM). The shaft-axis height takes
 # two (it sets the fulcrum height; the pair reaming lines the two bores
 # up); the reamed bore carries its own BORE_DIA_BAND; the foot screw's
 # station off the tip takes two (FOOT_TIP_WALL_MM). Three places each carry
@@ -399,14 +417,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # outer web (SET_SCREW_WEB_MM), and the side station centres the transferred
 # MHA-FR-002 tap in its rail web (KEEPER_SCREW_TRANSVERSE_BAND_MM,
 # build_fr_top_frame). The references print one place; the corner round
-# prints its single limit at CORNER_R_PLACES, the supplied height its own at
-# SUPPLY_HEIGHT_PLACES.
+# prints its single limit at CORNER_R_PLACES, the crown round its own at
+# CROWN_R_PLACES and the supplied height its own at SUPPLY_HEIGHT_PLACES.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LugProfile": {"LugRise": 2},
     "LugBody": {"LugThickness": 3},
     "FootProfile": {"FootLength": 1, "FootRise": 1},
     "Foot": {"Depth": 1},
-    "LugCrownProfile": {"CrownDia": 1},
+    "LugCrownProfile": {"CrownRadius": CROWN_R_PLACES},
     "ShaftBoreProfile": {"BoreDia": 3},
     "SetScrewReference": {"SetScrewLocation": 3},
     "FootScrewReference": {"ScrewFromTip": 2},
@@ -437,8 +455,21 @@ if DRAWING_PRECISION["Foot"]["Depth"] != 1 or (
     )
 if DRAWING_PRECISION["FootProfile"]["FootRise"] != 1:
     raise AssertionError("the foot screw's engagement is sized at the .X foot height")
-if DRAWING_PRECISION["LugCrownProfile"]["CrownDia"] != 1:
-    raise AssertionError("the crown thread is sized at the .X crown diameter")
+if DRAWING_PRECISION["LugCrownProfile"]["CrownRadius"] != CROWN_R_PLACES:
+    raise AssertionError("the crown thread is sized at the crown radius's MIN limit")
+# Walls from the reamed bore to each side face (drawing-guidelines.md rule 17
+# (walls and webs)): the bore is placed off the -Z side face and the width
+# prints separately, so the far wall loses both bands.
+_BORE_SIDE_BAND = _BAND_BY_PLACES[DRAWING_PRECISION["BoreSideReference"]["BoreFromSide"]]
+_WIDTH_BAND = _BAND_BY_PLACES[DRAWING_PRECISION["Foot"]["Depth"]]
+BORE_SIDE_WALL_MM = min(
+    BORE_FROM_SIDE - _BORE_SIDE_BAND - _BORE_MAX_RADIUS,
+    (KEEPER_WIDTH - _WIDTH_BAND)
+    - (BORE_FROM_SIDE + _BORE_SIDE_BAND)
+    - _BORE_MAX_RADIUS,
+)  # 2.2
+if BORE_SIDE_WALL_MM < 2.0:
+    raise AssertionError(f"keeper bore side wall {BORE_SIDE_WALL_MM:.2f} < 2.0")
 # The foot hole's (and so the transferred frame tap's) transverse place off
 # the keeper's centre line, for build_fr_top_frame's tap-ligament stack.
 KEEPER_SCREW_TRANSVERSE_BAND_MM = _BAND_BY_PLACES[
@@ -455,7 +486,7 @@ SUPPLY_HEIGHT_PLACES = DRAWING_PRECISION["SupplyHeightReference"]["SupplyHeight"
 _SUPPLY_STEP = 10.0**-SUPPLY_HEIGHT_PLACES
 SUPPLY_HEIGHT_MIN = round(
     ceil(
-        (SHAFT_AXIS_H + _BAND_BY_PLACES[DRAWING_PRECISION["LugProfile"]["LugRise"]] + CROWN_DIA / 2.0)
+        (SHAFT_AXIS_H + _BAND_BY_PLACES[DRAWING_PRECISION["LugProfile"]["LugRise"]] + CROWN_R_MIN)
         / _SUPPLY_STEP
         - 1e-9
     )

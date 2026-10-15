@@ -24,8 +24,9 @@ MM_PER_IN = 25.4
 
 # 5/32 chosen over 1/8 for drawing-guidelines.md rule 18 (thread engagement) installed engagement: >= 1.52D worst (1/8
 # gave 1.40D). The socket face sits 0.156 below the keeper crown apex at
-# nominal. At the worst case (CrownDia .X min + shallowest flat) it stands up
-# to 0.374 proud, in free air above the crown (Main ruling A, 2026-10-10).
+# nominal. At the worst case (the crown at its R7.0 MIN + shallowest flat) it
+# stays 0.044 below; the ruling allows up to 0.4 proud, in free air above the
+# crown (Main ruling A, 2026-10-10).
 SKU = "91375A942"
 THREAD = SET_SCREW_THREAD  # #1-72 UNF
 MAJOR_DIA = THREAD_MAJOR_MM[THREAD]  # 0.073 in

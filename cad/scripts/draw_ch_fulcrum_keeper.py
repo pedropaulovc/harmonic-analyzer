@@ -31,6 +31,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
@@ -60,12 +61,16 @@ from ch_fulcrum_keeper_spec import (
     CORNER_R_MAX,
     CORNER_R_TOL_TYPE,
     CROWN_ABOUT_BORE_CALLOUT,
+    CROWN_R_MIN,
+    CROWN_R_TOL_TYPE,
+    CROWN_TOP_Y,
     DRAWING_DIMENSIONS,
     FOOT_SCREW_SIDE_CALLOUT,
     FOOT_TIP_X,
     KEEPER_WIDTH,
     LUG_HALF_T,
     LUG_THICKNESS_CALLOUT,
+    OVERALL_LENGTH,
     REFERENCE_DIMENSIONS,
     SCREW_X,
     SET_SCREW_HOLE_SPEC,
@@ -159,7 +164,7 @@ _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
 _PAIR_REAM_STEP = steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)
 DIMENSION_CALLOUTS = {
     "BoreDia": f"{BORE_PAIR_CALLOUT},\nPER {_PAIR_REAM_STEP}",
-    "CrownDia": f"{CROWN_ABOUT_BORE_CALLOUT},\nPER {_PAIR_REAM_STEP}",
+    "CrownRadius": f"{CROWN_ABOUT_BORE_CALLOUT},\nPER {_PAIR_REAM_STEP}",
 }
 # Each three-place size states the function that holds it there (rule 4,
 # machinist review baseline: 6.000 / 3.000 / 7.000 printed with neither a
@@ -198,8 +203,7 @@ TOP_CALLOUTS = {
 # foot tip (above the plan) and off the -Z side face, the latter's text and
 # function under its extension lines right of the foot tip, clear of the
 # foot-hole callout.  The end view carries the width plus the shaft-axis /
-# crown stack, the reamed bore and the bore's place off a side face (a
-# reference) above it.
+# crown stack, the reamed bore and the bore's place off a side face above it.
 FRONT_KEEP = {
     "LugThickness": (0.066, 0.086),
     "FootLength": (_front_x(SCREW_X), 0.086),
@@ -217,9 +221,10 @@ TOP_KEEP = {
     "ScrewFromTip": (_front_x((FOOT_TIP_X + SCREW_X) / 2.0), 0.252),
     "ScrewFromSide": (0.178, 0.214),
 }
-# The end view's diameters take the near-side leader style (one arrow on the
-# rim facing the text, no chord through the bore) and stand in clear paper on
-# either side of the view; the width moves under it.  Machinist review r13
+# The end view's bore diameter takes the near-side leader style (one arrow on
+# the rim facing the text, no chord through the bore); it and the crown
+# radius stand in clear paper on either side of the view; the width moves
+# under it.  Machinist review r13
 # (and its layout audit): with the width dimension above the crown, the crown
 # callout over it and the bore callout right of the crown, the three texts
 # overlapped one another and the crown/bore outline, and the Ø14 chord ran
@@ -228,16 +233,17 @@ TOP_KEEP = {
 # 32.0 deg, both exactly the bend-to-centre bearing), so:
 # - Depth: below the foot; its extension lines leave the bottom corners (r13
 #   drew them up from y 98.8) and stop ~7 mm under the view.
-# - CrownDia: above-left, between the front view's crown stack (x <= 112)
-#   and the end view; the leader lands on the crown arc at ~124 deg, clear of
-#   every other line, the block ~9 mm under the foot-hole callout.
+# - CrownRadius: above-left, between the front view's crown stack (x <= 112)
+#   and the end view; the leader lands on the crown arc at ~127 deg, clear of
+#   every other line, the block ~6 mm under the foot-hole callout (MR-fleet
+#   r5: the 180 deg end round prints a radius, its arrow outside the arc).
 # - BoreDia: below-right, under the isometric note (>= 4 mm air; MR-fleet r1's
 #   supply-condition row made it a row taller, so it sits 1.5 mm lower); the
 #   leader leaves the bore at ~-55 deg and crosses only the lug's right edge.
 RIGHT_KEEP = {
     "Depth": (0.225, 0.090),
     "LugRise": (0.196, 0.126),
-    "CrownDia": (0.168, 0.180),
+    "CrownRadius": (0.168, 0.180),
     "BoreDia": (0.304, 0.1225),
     # Above the crown, between the bore axis and the sheet-right side face
     # (the Right plane's +u): clear of the crown leader, which leaves the
@@ -247,7 +253,24 @@ RIGHT_KEEP = {
         0.172,
     ),
 }
-NEAR_SIDE_DIAMETERS = ("CrownDia", "BoreDia")
+NEAR_SIDE_DIAMETERS = ("BoreDia",)
+_ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+# The front view's reference sketches lay their construction lines ON the
+# outline (the heights up the inner lug face, the length along the seat) and
+# the curate leaves each sketch shown so its dimension prints, so they drew
+# their grey dash-dot over the black edges: MR-fleet r5 (9517eb1) read the
+# upright's left edge as overprinted by reference lines.  Drawn in the
+# outline's black they ARE the edges (draw_dt_pinion_arbor.
+# _blacken_reference_witnesses' recipe): sketch name -> its one construction
+# line's length (mm).
+REFERENCE_WITNESS_COLOR = 0  # COLORREF black, the outline's colour.
+FRONT_REFERENCE_WITNESSES = {
+    "OverallHeightReference": CROWN_TOP_Y,
+    "SupplyHeightReference": SUPPLY_HEIGHT_MIN,
+    "OverallLengthReference": OVERALL_LENGTH,
+}
+SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
+REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the lines are fully defined sketch lengths
 
 
 def _one(adapter: Any, annotations: list[Any], name: str) -> Any:
@@ -292,6 +315,99 @@ def _dress_corner_radius(adapter: Any, annotations: list[Any]) -> None:
     display.ArcExtensionLineOrOppositeSide = False
     if bool(display.ArcExtensionLineOrOppositeSide):
         raise RuntimeError("CornerRadius leader still runs to the opposite side")
+
+
+@_telemetry.traced("drawing.fulcrum_keeper.crown_radius")
+def _dress_crown_radius(adapter: Any, annotations: list[Any]) -> None:
+    """Prove the end view's CrownRadius prints the part's "R7.0 MIN" as a
+    radius and stop its leader at the arc (draw_dt_arbor_pedestal.
+    _show_crown_radius).
+
+    The part dimensions the crown as a radius (define_circle
+    ``size_dimension="radius"``); a sheet must never flip a model diameter.
+    Arrow outside, the leader runs from the text to the arc and stops there
+    instead of on through the bore.
+    """
+    display = _require_single_limit(
+        adapter, annotations, "CrownRadius", CROWN_R_TOL_TYPE, CROWN_R_MIN
+    )
+    if bool(display.Diametric):
+        raise RuntimeError("the imported crown dimension is not radial")
+    display.ArcExtensionLineOrOppositeSide = False
+    display.ArrowSide = _ARROWS_OUTSIDE
+    if (
+        bool(display.Diametric)
+        or bool(display.ArcExtensionLineOrOppositeSide)
+        or int(display.ArrowSide) != _ARROWS_OUTSIDE
+    ):
+        raise RuntimeError("crown radius display did not persist")
+
+
+def _reference_line_in_view(view: Any, sketch_name: str, length_mm: float) -> Any:
+    """The drawing-view instance of one reference sketch's construction line,
+    chosen on the model (the sketch's one construction segment of that
+    length) and mapped into ``view`` -- a point pick on the outline would
+    resolve to the edge under it."""
+    native = _early_bound(view, "IView")
+    model = native.ReferencedDocument
+    if model is None:
+        raise RuntimeError(f"{sketch_name}: the front view references no model")
+    feature = _early_bound(model, "IPartDoc").FeatureByName(sketch_name)
+    if feature is None:
+        raise RuntimeError(f"{sketch_name}: no such feature in the keeper model")
+    sketch = _early_bound(
+        _early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch"
+    )
+    matches = []
+    for raw in sketch.GetSketchSegments() or ():
+        segment = _early_bound(raw, "ISketchSegment")
+        length = float(segment.GetLength()) * 1000.0
+        if (
+            bool(segment.ConstructionGeometry)
+            and abs(length - length_mm) <= REFERENCE_WITNESS_LEN_TOL
+        ):
+            matches.append(segment)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{sketch_name}: {len(matches)} construction segments are "
+            f"{length_mm:.3f} mm long; the reference line must be exactly one"
+        )
+    in_view = native.GetCorresponding(matches[0])
+    if in_view is None:
+        raise RuntimeError(f"{sketch_name}: its line has no instance in the front view")
+    return _early_bound(in_view, "ISketchSegment")
+
+
+@_telemetry.traced("drawing.fulcrum_keeper.blacken_reference_lines")
+def _blacken_reference_lines(adapter: Any, view: Any) -> None:
+    """Draw each FRONT_REFERENCE_WITNESSES line in the outline's black."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the keeper front view for its references")
+    for sketch_name, expected in FRONT_REFERENCE_WITNESSES.items():
+        line = _reference_line_in_view(view, sketch_name, expected)
+        draw.ClearSelection2(True)
+        selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        selection_data = selection.CreateSelectData()
+        selection_data.View = view
+        if not line.Select4(False, selection_data):
+            raise RuntimeError(f"failed to select the {sketch_name} line")
+        kind = int(selection.GetSelectedObjectType3(1, -1))
+        if kind != SW_SEL_EXT_SKETCH_SEGS:
+            raise RuntimeError(f"{sketch_name} line pick resolved to type {kind}")
+        segment = _early_bound(selection.GetSelectedObject6(1, -1), "ISketchSegment")
+        length = float(segment.GetLength()) * 1000.0
+        construction = bool(segment.ConstructionGeometry)
+        if abs(length - expected) > REFERENCE_WITNESS_LEN_TOL or not construction:
+            raise RuntimeError(
+                f"{sketch_name} line pick resolved to {segment.GetName()} "
+                f"({length:.3f} mm, want {expected:.3f}; construction={construction})"
+            )
+        drawing.SetLineColor(REFERENCE_WITNESS_COLOR)
+        draw.ClearSelection2(True)
+        _telemetry.info(f"fulcrum-keeper: {sketch_name} line drawn black")
+    draw.EditRebuild3()
 
 
 def set_screw_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
@@ -424,6 +540,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for name in NEAR_SIDE_DIAMETERS:
         set_near_side_diameter(_one(adapter, right_annotations, name), f"keeper {name}")
+    _dress_crown_radius(adapter, right_annotations)
     set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
     _dress_corner_radius(adapter, front_annotations)
@@ -440,6 +557,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_reference_dimension(
             adapter, _one(adapter, kept, name), label=f"keeper {name}"
         )
+    _blacken_reference_lines(adapter, front)
 
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")

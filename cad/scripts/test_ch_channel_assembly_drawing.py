@@ -269,7 +269,7 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     assert keeper_drawing.DIMENSION_CALLOUTS["BoreDia"].endswith(
         f"PER {steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)}"
     )
-    assert keeper_drawing.DIMENSION_CALLOUTS["CrownDia"].endswith(
+    assert keeper_drawing.DIMENSION_CALLOUTS["CrownRadius"].endswith(
         f"PER {steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)}"
     )
     staking = steps.step_ref(steps.SET_SCREWS_STAKED_KEY)

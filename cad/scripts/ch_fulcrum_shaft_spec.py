@@ -26,7 +26,8 @@ from ch_fulcrum_keeper_spec import (
     BORE_DIA_BAND,
     BORE_RUNNING_MIN_CLEARANCE_MM,
     BORE_SEAT_ALLOWANCE_MM,
-    CROWN_DIA,
+    CROWN_R,
+    CROWN_R_MIN,
     KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_Z_OFF,
     LUG_HALF_T,
@@ -105,7 +106,7 @@ def _sag(radius: float) -> float:
     return radius - sqrt(radius**2 - _SCREW_HALF_MAJOR**2)
 
 
-_CROWN_LEAST_R = (CROWN_DIA - _BAND_BY_PLACES[1]) / 2.0
+_CROWN_LEAST_R = CROWN_R_MIN  # the keeper prints its crown "R7.0 MIN"
 _BORE_R_MAX = (BORE_DIA + BORE_DIA_BAND[0]) / 2.0
 _BORE_R_MIN = (BORE_DIA + BORE_DIA_BAND[1]) / 2.0
 _TAP_FULL_TOP = _CROWN_LEAST_R - _sag(_CROWN_LEAST_R) - SET_SCREW_PITCH
@@ -123,9 +124,10 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
         f"installed set screw engages {SET_SCREW_ENGAGEMENT_D:.2f}D of full "
         f"thread at the worst case (< {SET_SCREW_MIN_ENGAGEMENT_D}D)"
     )
-# Socket face above the crown apex: below it at nominal, proud in free air at
-# the worst case (Main ruling A, 2026-10-10; vn_fulcrum_set_screw_spec).
-SET_SCREW_PROUD_NOMINAL = FLAT_HEIGHT + SET_SCREW_LENGTH - CROWN_DIA / 2.0
+# Socket face above the crown apex: below it at nominal; the ruling lets it
+# stand up to 0.4 proud in free air at the worst case (Main ruling A,
+# 2026-10-10; vn_fulcrum_set_screw_spec).
+SET_SCREW_PROUD_NOMINAL = FLAT_HEIGHT + SET_SCREW_LENGTH - CROWN_R
 SET_SCREW_PROUD_WORST = _SEAT_HIGH + SET_SCREW_LENGTH - _CROWN_LEAST_R
 if SET_SCREW_PROUD_NOMINAL >= 0.0 or SET_SCREW_PROUD_WORST > 0.4:
     raise AssertionError("set screw stands proud of the keeper crown past the ruling")

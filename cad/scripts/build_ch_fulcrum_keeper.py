@@ -69,12 +69,14 @@ from vn_frame_side_screw_spec import THREAD as FRAME_SIDE_THREAD
 from ch_fulcrum_keeper_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
+    BORE_FROM_SIDE,
     CBORE_DEPTH_MM,
     CBORE_DIA_MM,
     CORNER_R_BAND,
     CORNER_R_MAX,
     CORNER_R_TOL_TYPE,
-    CROWN_DIA,
+    CROWN_R,
+    CROWN_R_TOL_TYPE,
     CROWN_TOP_Y,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -179,10 +181,10 @@ REFERENCE_LINES = (
         "BoreSideReference",
         "Right",
         "BoreFromSide",
-        (KEEPER_WIDTH / 2.0, SHAFT_AXIS_H),
+        (BORE_FROM_SIDE, SHAFT_AXIS_H),
         (0.0, SHAFT_AXIS_H),
         "horizontal",
-        KEEPER_WIDTH / 2.0,
+        BORE_FROM_SIDE,
         ('"KeeperWidth" / 2', '"KeeperWidth" / 2', '"ShaftAxisH"'),
     ),
     (
@@ -193,7 +195,7 @@ REFERENCE_LINES = (
         (-LUG_HALF_T, CROWN_TOP_Y),
         "vertical",
         CROWN_TOP_Y,
-        ('"ShaftAxisH" + "CrownDia" / 2', '"LugT" / 2'),
+        ('"ShaftAxisH" + "CrownR"', '"LugT" / 2'),
     ),
     (
         "SupplyHeightReference",
@@ -337,7 +339,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "KeeperWidth", f"{KEEPER_WIDTH}mm")
     await set_global(adapter, "LugT", f"{LUG_T}mm")
     await set_global(adapter, "ShaftAxisH", f"{SHAFT_AXIS_H}mm")
-    await set_global(adapter, "CrownDia", f"{CROWN_DIA}mm")
+    await set_global(adapter, "CrownR", f"{CROWN_R}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "CornerR", f"{CORNER_R_MAX}mm")
     await set_global(adapter, "SupplyH", f"{SUPPLY_HEIGHT_MIN}mm")
@@ -442,11 +444,12 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         0.0,
         SHAFT_AXIS_H,
-        CROWN_DIA / 2.0,
+        CROWN_R,
         "lug crown",
         dims=crown,
-        names=("CrownCz", "ShaftAxisH", "CrownDia"),
-        drives=(None, '"ShaftAxisH"', '"CrownDia"'),
+        names=("CrownCz", "ShaftAxisH", "CrownRadius"),
+        drives=(None, '"ShaftAxisH"', '"CrownR"'),
+        size_dimension="radius",
     )
     await ensure_fully_defined(adapter, "lug crown sketch")
     check("exit_sketch crown", await adapter.exit_sketch())
@@ -461,7 +464,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "LugCrown")
     crown_depth = name_dimensions(adapter, "LugCrown", ["Depth"])
     drive_jobs += [(crown_depth[0], '"LugT"')]
-    r_c = CROWN_DIA / 2.0
+    r_c = CROWN_R
     # The crown circle's lower half merges into the lug rectangle (its centre
     # sits ON the lug top edge and its bottom, y 18.2, is inside the lug), so
     # only the upper half adds metal.
@@ -537,7 +540,7 @@ async def build(adapter) -> dict[str, str]:
     # is a full cylinder across it).
     tap_dia = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC)
     v_tap = (
-        cross_hole_volume_mm3(tap_dia, CROWN_DIA)
+        cross_hole_volume_mm3(tap_dia, 2.0 * CROWN_R)
         - cross_hole_volume_mm3(tap_dia, BORE_DIA)
     ) / 2.0
     volume = await volume_check(
@@ -576,6 +579,16 @@ async def build(adapter) -> dict[str, str]:
         "SupplyHeight",
         SUPPLY_HEIGHT_MIN,
         SUPPLY_HEIGHT_TOL_TYPE,
+        0.0,
+        0.0,
+    )
+    # Any larger crown just meets the sides further down: no deviation.
+    _single_limit(
+        adapter,
+        "LugCrownProfile",
+        "CrownRadius",
+        CROWN_R,
+        CROWN_R_TOL_TYPE,
         0.0,
         0.0,
     )
