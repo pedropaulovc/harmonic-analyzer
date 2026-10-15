@@ -116,7 +116,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import _named_dimension
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _fit_deviations import deviations
 import _telemetry
 from _hole_spec import blind_cut_dia_mm
@@ -268,6 +268,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PocketFloorFillet": {"PocketFloorRadius"},
     "RimChamfer": {"RimChamferSize"},
     "SeatStationReference": {"SeatEastStation", "SeatWestStation"},
+}
+
+# Decimal places the PART owns (drawing-simplicity-policy.md: the model owns
+# tolerance and precision; the drawing imports the dimension verbatim and only
+# reads its places back). The R0.8 MAX single limit prints at one place.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "PocketFloorFillet": {"PocketFloorRadius": POCKET_FLOOR_R_PLACES},
 }
 
 # The seats' REF stations (r7 machinist review: the seats print with no
@@ -749,6 +756,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven part (equations neutral)", BRACKET_SEATS_VOLUME, 200
     )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     _pocket_floor_radius_max_limit(adapter)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
