@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import pytest
 
@@ -139,3 +140,71 @@ def test_notes_follow_the_simplicity_policy() -> None:
     assert 1 <= len(lines) <= 4
     assert not re.search(r"\d", spec.DRAWING_NOTES)
     assert "GROUND" not in spec.DRAWING_NOTES.upper()
+
+
+_TAP_VARIABLES = {
+    "<hw-threaddesc>": "10-24 UNC",
+    "<hw-threadclass>": spec.TAP_SPEC.thread_class,
+    "<hw-thru>": "THRU ALL",
+}
+
+
+class _TapCallout:
+    """A native tap callout: part 5 is the thread row's definition, part 1
+    its resolved text; ``SetText(1, ...)`` rewrites the definition."""
+
+    def __init__(
+        self, definition: str, *, accepts: bool = True, stuck: str = ""
+    ) -> None:
+        self.definition = definition
+        self.accepts = accepts
+        self.stuck = stuck
+
+    def IsHoleCallout(self) -> bool:
+        return True
+
+    def SetText(self, part: int, text: str) -> None:
+        assert part == 1
+        if self.accepts:
+            self.definition = text
+
+    def GetText(self, part: int) -> str:
+        if part == 5:
+            return self.definition
+        if part != 1:
+            return ""
+        if self.stuck:
+            return self.stuck
+        resolved = self.definition
+        for token, value in _TAP_VARIABLES.items():
+            resolved = resolved.replace(token, value)
+        return resolved
+
+
+def test_tap_callout_drops_the_title_block_thread_class() -> None:
+    """Machinist review over_spec: '10-24 UNC - 2B' repeated the title
+    block's THREADS UNC/UNF CLASS 2A/2B. Only the class variable and its dash
+    leave; the thread and extent stay live."""
+    callout = _TapCallout("<hw-threaddesc> - <hw-threadclass> <hw-thru>")
+    drawing._omit_tap_thread_class(callout)
+    assert callout.definition == "<hw-threaddesc> <hw-thru>"
+    assert callout.GetText(1) == "10-24 UNC THRU ALL"
+    for refused in (
+        _TapCallout("<hw-threaddesc> - <hw-threadclass> <hw-thru>", accepts=False),
+        _TapCallout("<hw-threaddesc> <hw-thru>"),
+        _TapCallout(
+            "<hw-threaddesc> - <hw-threadclass> <hw-thru>",
+            stuck="10-24 UNC - 2B THRU ALL",
+        ),
+    ):
+        with pytest.raises(RuntimeError):
+            drawing._omit_tap_thread_class(refused)
+
+
+def test_tap_callout_class_is_omitted_right_after_it_is_inserted() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    insert = source.index("tap_callout = add_native_hole_callout(")
+    omit = source.index("_omit_tap_thread_class(tap_callout)")
+    stud = source.index("stud_callout = add_native_hole_callout(")
+    assert insert < omit < stud
+    assert 'omit_title_block_thread_class(display, label="ledge screw taps")' in source

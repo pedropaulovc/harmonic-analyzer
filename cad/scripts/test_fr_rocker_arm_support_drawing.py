@@ -43,7 +43,7 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
         "PocketRadius": "8X",
         "CavityRadius": "4X",
         "CavWidth": "SQ CAVITY THRU",
-        "RimChamferSize": " X 45 DEG\n2 FACES",
+        "RimChamferSize": RIM_CHAMFER_CALLOUT,
     }
     assert drawing.DIMENSION_PRECISION == {
         **dict.fromkeys(expected - {"PocketRadius", "RimChamferSize"}, 1),
@@ -617,12 +617,62 @@ def _boxes_clear(a: tuple[float, ...], b: tuple[float, ...], gap: float) -> bool
     )
 
 
-def test_rim_chamfer_callout_stays_right_of_the_front_view() -> None:
-    # Rendered as three lines: the value, then the callout's two.
-    assert drawing.DIMENSION_CALLOUTS["RimChamferSize"] == " X 45 DEG\n2 FACES"
-    chamfer = _text_box("1.27\nX 45 DEG\n2 FACES", drawing.RIGHT_KEEP["RimChamferSize"])
-    front_right = drawing.FRONT_CENTER[0] + support.HALF_Y * drawing.VIEW_SCALE / 1000
+# One chamfer feature (RimChamfer) breaks every outside edge, both pocket rims
+# and the cavity rims on both web faces, so the size's caption names them all:
+# outside chamfers drawn with no size contradict the title block's 0.25 MAX
+# edge break (machinist review, MHA-FR-005 blocker).
+RIM_CHAMFER_CALLOUT = " X 45 DEG\nALL OUTSIDE\nEDGES AND\nPOCKET AND\nCAVITY RIMS"
+RIM_CHAMFER_TEXT = "1.27\n" + RIM_CHAMFER_CALLOUT.strip()
+
+
+def _rim_chamfer_box() -> tuple[float, ...]:
+    """The chamfer's text box, which hangs LEFT of its anchor: the layout audit
+    of farm run 20261015T015928596Z measured the old block at 144.5..164.8 mm
+    for an anchor at x 165 mm, centred on the anchor's y."""
+    anchor = drawing.RIGHT_KEEP["RimChamferSize"]
+    centred = _text_box(RIM_CHAMFER_TEXT, anchor)
+    width = centred[2] - centred[0]
+    return (anchor[0] - width, centred[1], anchor[0], centred[3])
+
+
+def test_rim_chamfer_callout_names_every_edge_the_feature_breaks() -> None:
+    assert drawing.DIMENSION_CALLOUTS["RimChamferSize"] == RIM_CHAMFER_CALLOUT
+    # The rows under the size's angle name the edges, digit-free.
+    caption = RIM_CHAMFER_CALLOUT.split("\n", 1)[1]
+    assert "OUTSIDE" in caption and "POCKET" in caption and "CAVITY" in caption
+    assert not any(char.isdigit() for char in caption)
+    # The faces whose every edge the feature breaks: both slant faces (the
+    # pocket rims and the outside edges they share) and both end faces.
+    assert len(support.CHAMFER_FACES) == 5
+    assert {face[0] for face in support.CHAMFER_FACES[2:4]} == {
+        support.BOSS_DEPTH / 2.0,
+        -support.BOSS_DEPTH / 2.0,
+    }
+    assert {abs(edge[2]) for edge in support.CHAMFER_EDGES} == {support.WEB}
+
+
+def test_rim_chamfer_callout_sits_between_the_front_view_and_the_section() -> None:
+    scale = drawing.VIEW_SCALE / 1000
+    chamfer = _rim_chamfer_box()
+    front_right = drawing.FRONT_CENTER[0] + support.BOSS_DEPTH / 2 * scale
     assert chamfer[0] > front_right + 0.003
+    # The dimension line drops at the anchor's x to the cavity rim at the web
+    # and its arrow tail runs on (to y 146.3 mm on the audited render): it
+    # stays outside the section's slant wall over that whole run...
+    rim_y = drawing.RIGHT_CENTER[1] - support.CAV * scale
+    tail_y = rim_y - 0.0064
+    lowest_local_y = (tail_y - drawing.RIGHT_CENTER[1]) / scale
+    wall_x = drawing.RIGHT_CENTER[0] - support._wall_half_z_at(lowest_local_y) * scale
+    assert chamfer[2] < wall_x - 0.002
+    # ...and the caption's own rows stay clear of the wall too.
+    top_local_y = (chamfer[3] - drawing.RIGHT_CENTER[1]) / scale
+    top_wall_x = drawing.RIGHT_CENTER[0] - support._wall_half_z_at(top_local_y) * scale
+    assert chamfer[2] < top_wall_x - 0.002
+    assert chamfer[1] > rim_y + 0.020
+    # The line misses the foot's 6.35 text, which sits over that tail and,
+    # like this caption, hangs left of its anchor (audited at 168.4..180.0 mm
+    # for an anchor at x 180 mm).
+    assert chamfer[2] > drawing.FOOT_TEXT_XY[0] + 0.003
 
 
 def test_web_thickness_text_clears_the_wall_and_the_height_dimension() -> None:
@@ -718,7 +768,7 @@ def test_cavity_radius_callout_sits_on_its_corner_bisector_outside_the_view() ->
     assert label[0] > front_right + 0.003
     for other in (
         _text_box("16.9", drawing.RIGHT_KEEP["TopSpan"]),
-        _text_box("1.27\nX 45 DEG\n2 FACES", drawing.RIGHT_KEEP["RimChamferSize"]),
+        _rim_chamfer_box(),
         _text_box("177.8", drawing.FRONT_KEEP["Depth"]),
     ):
         assert _boxes_clear(label, other, 0.003)

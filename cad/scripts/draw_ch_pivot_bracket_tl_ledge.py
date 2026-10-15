@@ -55,6 +55,7 @@ from ch_pivot_bracket_tl_ledge_spec import (
     HOLE_Y,
     LEDGE_HEIGHT,
     LEDGE_WIDTH,
+    SPOT_TAPS_LINES,
 )
 
 SPEC = DRAWINGS_BY_NAME["ch_pivot_bracket_tl_ledge"]
@@ -75,7 +76,6 @@ FRONT_CENTER = (0.135, 0.165)
 RIGHT_CENTER = (0.290, 0.165)
 ISO_CENTER = (0.370, 0.205)
 ISO_NOTE_XY = (0.340, 0.250)
-NOTES_XY = (0.020, 0.070)
 
 
 def _sheet_x(model_x_mm: float) -> float:
@@ -156,16 +156,18 @@ requirement("upright_seat",
 DIMENSION_PREFIXES = {"Hole1Y": "2X "}
 # Centred text (~63 mm at 4:1) in the gap between the face's right edge
 # (0.180) and the edge view (0.278): at x 0.200 it began inside the face and
-# the outline ran through DRILL (PR #1317 machinist review).
+# the outline ran through DRILL (PR #1317 machinist review). The spot-taps
+# transfer rows stand above the drill row (no wider than it), naming the
+# angle plate by part number; the block centres on this point.
 HOLE_CALLOUT_XY = (0.230, 0.200)
-HOLE_CALLOUT_PROCESS = drill_process(CLEARANCE_SPEC)
+HOLE_CALLOUT_PROCESS = "\n".join((*SPOT_TAPS_LINES, drill_process(CLEARANCE_SPEC)))
 
 
 for _side, _x in (("left", part_spec.HOLE_X[0]), ("right", part_spec.HOLE_X[1])):
     requirement(f"screw_hole_{_side}",
         kind="hole",
         faces=(CylinderFace(part_spec.HOLE_DIA, contains_x_mm=_x),),
-        requirements=("dia", "station", "height"),
+        requirements=("dia", "station", "height", "note"),
         fields={
             "at": ([_x, part_spec.HOLE_Y, part_spec.LEDGE_THICK], ("HOLE_X", "HOLE_Y", "LEDGE_THICK")),
             "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
@@ -187,6 +189,10 @@ for _side, _x in (("left", part_spec.HOLE_X[0]), ("right", part_spec.HOLE_X[1]))
             ),
             "height_nominal": (part_spec.HOLE_Y, ("HOLE_Y",)),
             "height_from": ("block_face", (("draw_ch_pivot_bracket_tl_ledge", "build"),)),
+            "note": (
+                part_spec.SPOT_TAPS_NOTE,
+                ("SPOT_TAPS_NOTE", "ANGLE_PLATE_NUMBER"),
+            ),
         },
         precision={"dia": 2, "station": part_spec.HOLE_X_PLACES, "height": part_spec.HOLE_Y_PLACES},
     )
@@ -221,7 +227,6 @@ async def build(adapter: Any) -> dict[str, str]:
         "Material Specification",
         "Finish",
         "Quantity",
-        "Manufacturing Notes",
         "Isometric View Note",
     )
     read_required_properties(
@@ -284,7 +289,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="ledge screw holes",
         process=HOLE_CALLOUT_PROCESS,
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
