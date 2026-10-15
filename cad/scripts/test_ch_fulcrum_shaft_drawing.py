@@ -149,7 +149,7 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
     from_end_x, _ = keep["FlatFromEnd"]
     # Outboard of the left tip, clear of the end view.
     assert from_end_x + len("5.45") * char / 2.0 <= left_tip - 0.001
-    end_view_right = drawing.FRONT_CENTER[0] + drawing._sheet(
+    end_view_right = drawing.FRONT_CENTER[0] + drawing._on_sheet(
         ch_fulcrum_shaft_spec.SHAFT_DIA / 2.0
     )
     assert from_end_x - len("5.45") * char / 2.0 >= end_view_right + 0.005

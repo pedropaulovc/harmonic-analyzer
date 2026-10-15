@@ -70,7 +70,7 @@ ISO_CENTER = (0.318, 0.122)
 ISO_SCALE = (1, 1)
 
 
-def _sheet(mm: float) -> float:
+def _on_sheet(mm: float) -> float:
     """A model length in mm as sheet metres at the view scale."""
     return mm * VIEW_SCALE / 1000.0
 
@@ -81,9 +81,9 @@ def _sheet(mm: float) -> float:
 # stations run from the sheet-LEFT dome tip, the flat length and the
 # across-flat witness ride the sheet-right flat, the dome radius the left
 # dome.
-_LEFT_TIP_X = RIGHT_CENTER[0] - _sheet(SHAFT_LENGTH / 2.0)
-_RIGHT_TIP_X = RIGHT_CENTER[0] + _sheet(SHAFT_LENGTH / 2.0)
-_RIGHT_FLAT_INNER_X = _RIGHT_TIP_X - _sheet(FLAT_FROM_END + FLAT_LENGTH)
+_LEFT_TIP_X = RIGHT_CENTER[0] - _on_sheet(SHAFT_LENGTH / 2.0)
+_RIGHT_TIP_X = RIGHT_CENTER[0] + _on_sheet(SHAFT_LENGTH / 2.0)
+_RIGHT_FLAT_INNER_X = _RIGHT_TIP_X - _on_sheet(FLAT_FROM_END + FLAT_LENGTH)
 # Rows above the shaft, nearest first; every text stands where no other
 # dimension's extension line runs: 5.45 outboard left of the left tip, the
 # flat length left of its flat's inner edge, and the overall length (the
@@ -199,7 +199,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The bearing O.D.'s roughness: picked on the end circle's lower-right
     # point (the flat is on top), the symbol well below so its leader runs
     # down clear of the side view's left-end dimensions.
-    end_radius = _sheet(SHAFT_DIA / 2.0)
+    end_radius = _on_sheet(SHAFT_DIA / 2.0)
     add_surface_finish(
         adapter,
         front,
