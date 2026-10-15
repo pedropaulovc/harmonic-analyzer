@@ -2,7 +2,7 @@ ch-fulcrum-keeper:
   number: MHA-CH-007
   material: LOW-CARBON STEEL, E.G. 1018 CF
   material_specification: AISI 1018 cold-finished steel bar
-  finish: black oxide + oil; oil the bore and crown left bare by the pair-ream
+  finish: black oxide + oil; oil the bore and crown and the crown tap, all cut after the pair-ream
   quantity: 2
   tolerance_class: machined_block
   process: "machined (steel)"

@@ -253,8 +253,12 @@ def test_print_carries_no_datums_or_frames_and_cites_the_fitup_steps() -> None:
     pair_ream = steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].endswith(f"PER {pair_ream}")
     assert drawing.DIMENSION_CALLOUTS["CrownDia"].endswith(f"PER {pair_ream}")
-    assert "STAKE MOUTH 2 PLACES" in " ".join(drawing.SET_SCREW_PROCESS.split())
+    process = " ".join(drawing.SET_SCREW_PROCESS.split())
+    assert "STAKE MOUTH 2 PLACES" in process
     assert steps.step_ref(steps.SET_SCREWS_STAKED_KEY) in drawing.SET_SCREW_PROCESS
+    # MR-fleet r2: supplied undrilled, the crown tap that stops at the bore is
+    # cut after the pair-ream, on the bore's axis.
+    assert process.startswith("ON BORE AXIS, AFTER THE PAIR-REAM: TAP TO BORE;")
 
 
 def test_screw_hole_seats_the_frame_side_screw() -> None:
@@ -638,9 +642,10 @@ def test_parts_registry_row() -> None:
     # The MATERIAL cell names the family (rule 2): a staked tap mouth wants a
     # ductile low-carbon steel; 1018 CF is an example, not a requirement.
     assert config["material"] == "LOW-CARBON STEEL, E.G. 1018 CF"
-    # Rule 2: the Finish field also protects the metal the pair-ream leaves
-    # bare after finishing (baseline review blocker).
+    # Rule 2: the Finish field also protects the metal the pair-ream and the
+    # crown tap after it leave bare after finishing (baseline review blocker,
+    # MR-fleet r2).
     finish = str(config["finish"])
     assert "black oxide" in finish
-    assert "oil the bore and crown" in finish
+    assert "oil the bore and crown and the crown tap" in finish
     assert int(config["quantity"]) == 2

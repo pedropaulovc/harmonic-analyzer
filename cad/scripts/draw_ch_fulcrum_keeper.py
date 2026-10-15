@@ -121,22 +121,30 @@ TAP_R_SHEET = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) * SHEET_SCALE[0] / 2000.0
 # end, x 126, keeps clear of the ScrewFromSide extension at y 228 above and
 # of the front view's crown stack (x <= 108) and foot below.
 FOOT_HOLE_CALLOUT_XY = (0.126, 0.202)
-# The tap is cut at the bench; its mouth is staked over the seated set screw
-# at the channel assembly (drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)'s lock, joint_retention), so the
-# callout says so ahead of the native size row.  Machinist review r13: as two
-# 86 mm rows centred at x 50 the block ran 5.7 mm past the left inner border
-# (x 12.7).  Three rows of at most 24 characters (~61 mm printed, 2.56 mm a
-# character in r13) centred at x 58 start at x ~27, ~14 mm in from it, and end
-# ~4 mm left of the plan's inner face (x 93.5), in the band between the front
-# view and the plan.  The tap's station prints above the plan (MR-fleet r1,
-# 991a56e: in the front view its text sat 1 mm under this block's shoulder
-# and the two read as one), so nothing else stands in that band.
+# The keeper is supplied undrilled (BORE_PAIR_CALLOUT), so the crown tap,
+# which stops at the bore, is cut after the pair-ream, on the bore's axis
+# (MR-fleet r2, 0eca37c: "TAP TO BORE" with no bore yet left the stage
+# open, and the 7.000 off the side face read as locating it); its mouth is
+# staked over the seated set screw at the channel assembly
+# (drawing-guidelines.md rule 23 (lock threaded joints exposed to operating
+# loads)'s lock, joint_retention), so the callout says both ahead of the
+# native size row.  Machinist review r13: as two 86 mm rows centred at x 50
+# the block ran 5.7 mm past the left inner border (x 12.7).  Rows of at most
+# 24 characters (~61 mm printed, 2.56 mm a character in r13) centred at x 54
+# start at x ~20, ~8 mm in from it, and end ~6 mm left of the plan's inner
+# face (x 93.5), in the band between the front view and the plan (seven rows,
+# y ~174..210, over the front view's crown top at y 162).  The tap's station
+# prints above the plan (MR-fleet r1, 991a56e: in the front view its text
+# sat 1 mm under this block's shoulder and the two read as one), so nothing
+# else stands in that band.
 SET_SCREW_PROCESS = (
-    "TAP TO BORE; STAKE MOUTH\n"
-    "2 PLACES AT ASSEMBLY PER\n"
+    "ON BORE AXIS, AFTER THE\n"
+    "PAIR-REAM: TAP TO BORE;\n"
+    "STAKE MOUTH 2 PLACES AT\n"
+    "ASSEMBLY PER\n"
     f"{steps.step_ref(steps.SET_SCREWS_STAKED_KEY)}\n"
 )
-SET_SCREW_CALLOUT_XY = (0.058, 0.196)
+SET_SCREW_CALLOUT_XY = (0.054, 0.192)
 # The two keepers' bores are drilled and reamed through in one pass at their
 # installed spacing (one straight line whatever LugRise prints) and each crown
 # is then rounded about its own bore: bench instructions of the pair-ream
