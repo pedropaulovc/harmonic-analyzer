@@ -105,6 +105,7 @@ from build_fr_harmonic_base import (
     PEDESTAL_SCREW_XZ,
     PIVOT_SCREW_HOLE_DIA,
     PIVOT_SCREW_XZ,
+    POCKET_FILLET_COUNT,
     SERIAL_HEIGHT_MM,
     SERIAL_TEXT,
     SERIAL_XZ,
@@ -948,7 +949,7 @@ if _SHALLOW_ROUND_BOSSES != len(SHALLOW_BOSS_CENTRES):
 UNDERSIDE_BOTTOM_CALLOUTS = {
     "PocketLen": "POCKET",
     "SocketBossDia": f"{len(SOCKET_BOSS_SHAPES)}X SOCKET\nBOSSES",
-    "PocketFilletRadius": f"{2 * len(SOCKET_BOSS_SHAPES)}X BOSS\nTO WALL",
+    "PocketFilletRadius": f"{POCKET_FILLET_COUNT}X POCKET\nCORNERS",
     "LongRibThickness": "RIB",
     "CrossRibThickness": "RIB",
     "HangingBossDia": (
