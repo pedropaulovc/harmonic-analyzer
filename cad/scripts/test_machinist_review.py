@@ -996,6 +996,46 @@ def test_declared_exceptions_load_and_validate(tmp_path: Path) -> None:
             machinist_exceptions.load_exceptions(tmp_path, "dt_crank_hub", "part")
 
 
+def test_assembly_declarations_load_from_the_assemblys_contract(tmp_path: Path) -> None:
+    """The review names an assembly package by its drawing, ``<stem>_assembly``
+    (BUILDING.md keeps the suffix); its declarations live at top level in the
+    assembly's contract, ``assemblies/<stem>.yaml``, beside the build keys."""
+    import yaml
+
+    import machinist_exceptions
+
+    entry = {
+        "id": "RV-01",
+        "where": "fit-up step 4, the set-screw engagement",
+        "finding": "short thread engagement (rule 18)",
+        "reason": "the arch is all the thread there is (owner-ruled shortfall)",
+        "kind": "minor",
+    }
+    directory = tmp_path / "assemblies"
+    directory.mkdir()
+    (directory / "xx-bank.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "number": "MHA-XX-000",
+                "flip_invert": [],
+                "allowed_free_stems": [],
+                "required_free_stems": [],
+                "free_dof": 0,
+                "machinist_exceptions": [entry],
+            }
+        ),
+        encoding="utf-8",
+    )
+    load = machinist_exceptions.load_exceptions
+    (loaded,) = load(tmp_path, "xx_bank_assembly", "assembly")
+    assert (loaded.id, loaded.kind, loaded.where) == ("RV-01", "minor", entry["where"])
+    # Parts are unchanged: their own key in parts/<name>.yaml, the name never
+    # stripped, so an "-assembly" part name finds no file.
+    _write_exceptions_config(tmp_path, "xx_bank", [dict(entry, id="RV-09")])
+    assert [e.id for e in load(tmp_path, "xx_bank", "part")] == ["RV-09"]
+    assert load(tmp_path, "xx_bank_assembly", "part") == ()
+
+
 def test_review_prompt_injects_declared_exceptions(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
