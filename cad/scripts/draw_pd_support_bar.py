@@ -176,7 +176,7 @@ BACK_KEEP = {
     "ClampStation3": (RIGHT_END - 0.150, BACK_BOTTOM - 0.026),
     "ClampStation4": (RIGHT_END - 0.170, BACK_BOTTOM - 0.034),
     "Height": (RIGHT_END + 0.016, BACK_TOP + 0.016),
-    "ClampRowHeight": (LEFT_END - 0.016, BACK_BOTTOM - 0.008),
+    "ClampRowHeight": (LEFT_END - 0.020, BACK_BOTTOM - 0.008),
 }
 # The counterbores' callout stands wholly right of the hole it points at, so
 # its leader slants right, off the clamp row height's extension line.

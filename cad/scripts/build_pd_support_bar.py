@@ -73,8 +73,6 @@ from pd_support_bar_spec import (
     BAR_DEPTH,
     BAR_HEIGHT,
     BAR_BAND_PLACES,
-    BAR_DEPTH_BAND,
-    BAR_HEIGHT_BAND,
     BRACKET_TAP_CSK_DIA,
     BRACKET_TAP_SPEC,
     BRACKET_TAP_X,
@@ -561,14 +559,14 @@ async def build(adapter) -> dict[str, str]:
 
     # The bottom rail's running clearance under the bar spends the height's
     # .XXX band, and the pivot floor and bracket-screw tips the thickness's
-    # (pd_support_bar_spec.BAR_HEIGHT_BAND, BAR_DEPTH_BAND), so both live on
-    # the model dimensions, read back by the helper, not only in the spec.
+    # (pd_support_bar_spec.BAR_HEIGHT_BAND, BAR_DEPTH_BAND). Both equal the
+    # title block's .XXX row, so the model dimensions carry them as their
+    # three places alone: an explicit ±0.13 would restate the title block
+    # (drawing-guidelines rule 2; r4 machinist review).
     apply_drawing_precision(
         adapter,
         {"BarProfile": {"Height": BAR_BAND_PLACES}, "Bar": {"Depth": BAR_BAND_PLACES}},
     )
-    set_dimension_symmetric_tolerance(adapter, "BarProfile", "Height", BAR_HEIGHT_BAND)
-    set_dimension_symmetric_tolerance(adapter, "Bar", "Depth", BAR_DEPTH_BAND)
 
     # The rest of the print's places, then its bands and limits: the hanger
     # holes' row and stations carry the pivot and hook positions'

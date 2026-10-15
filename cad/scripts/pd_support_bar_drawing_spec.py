@@ -95,8 +95,10 @@ _HOOK_TAPS = "MHA-PD-014 HOOK TAPS"
 DIMENSION_CALLOUTS = {
     "Height": "MHA-PD-011\nHANGS ON IT",
     "Depth": "PIVOT TAP FLOOR AND\nMHA-VN-043 SCREW TIPS",
-    # Both rows print on one line at 1:2; the third line parts them.
-    "HangerRowHeight": f"MHA-VN-041 PIVOT AND\n{_HOOK_TAPS},\nBELOW THE CLAMP ROW",
+    # The two rows print on one line at 1:2 though they are separate rows
+    # (the hanger row from the machine layout, the clamp row at mid-height).
+    "HangerRowHeight": f"MHA-VN-041 PIVOT AND\n{_HOOK_TAPS},\nNOT ON THE CLAMP ROW",
+    "ClampRowHeight": "BAR MID-HEIGHT",
     "PivotTapStation": "MHA-VN-041 PIVOT",
     "BracketTapStation1": _HOOK_TAPS,
     "BracketTapStation2": _HOOK_TAPS,
