@@ -48,13 +48,15 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
-from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_edges import face_silhouettes_through
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _gtol_cylinder import CylinderFace
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -66,10 +68,12 @@ from ch_connecting_rod_spec import (
     FORK_SLOT_WIDTH,
     FORK_THICKNESS,
     FORK_TOP_Y,
+    FORK_WIDTH,
     GEOMETRIC_TOLERANCES_MM,
     PIN_HOLE_DIA,
     RING_BORE_DIA,
     RING_BOTTOM_Y,
+    RING_OUTER_RADIUS,
     SHANK_WIDTH,
     STRAP_DIAMETRAL_CLEARANCE,
     SURFACE_FINISHES,
@@ -177,11 +181,19 @@ LEFT_KEEP = {
 LEFT_CALLOUTS = {
     "RingThick": f"RING AND SHANK; RUNS IN\nCAM SLOT OF {CAM_NUMBER}",
 }
-# The overall length, ring bottom to crown top, as a reference (two
-# silhouettes of the side view: the ring's bottom and the far tine's top),
-# right of the side view, clear of the detail circle's letter on its left.
-OVERALL_BOTTOM_XY = _left_xy(0.0, RING_BOTTOM_Y)
-OVERALL_TOP_XY = _left_xy((FORK_THICKNESS + FORK_SLOT_WIDTH) / 4.0, FORK_TOP_Y)
+# The overall length, ring bottom to crown top, as a reference: the side
+# view's ring-bottom silhouette and the far tine's crown-top silhouette,
+# named by their faces and projected model points (a coordinate hit-test on
+# the 2 mm ring bottom missed on the farm, r2), right of the side view, clear
+# of the detail circle's letter on its left. Model points in mm.
+OVERALL_LENGTH = FORK_TOP_Y - RING_BOTTOM_Y
+OVERALL_BOTTOM_MM = (0.0, RING_BOTTOM_Y, 0.0)
+OVERALL_TOP_MM = (0.0, FORK_TOP_Y, (FORK_THICKNESS + FORK_SLOT_WIDTH) / 4.0)
+OVERALL_FACES = {
+    "ring bottom": CylinderFace(2.0 * RING_OUTER_RADIUS),
+    # The slot splits the crown's full round into one face per tine.
+    "crown top": CylinderFace(FORK_WIDTH, contains_z_mm=OVERALL_TOP_MM[2]),
+}
 OVERALL_TEXT_XY = (0.100, 0.175)
 
 # DETAIL C: the fork's side profile at 3:1. At 1:1 the tines, slot and ring
@@ -450,17 +462,47 @@ async def build(adapter: Any) -> dict[str, str]:
     # Overall length, ring bottom to crown top: the side view's two
     # horizontal silhouettes, so the dimension is their plain distance (two
     # circle picks in the front view would dimension centre to centre).
+    picks = model_points_in_view(
+        adapter,
+        left,
+        [
+            tuple(v / 1000.0 for v in point)
+            for point in (OVERALL_BOTTOM_MM, OVERALL_TOP_MM)
+        ],
+        label="overall length picks",
+        names=tuple(OVERALL_FACES),
+    )
+    silhouettes = face_silhouettes_through(
+        adapter,
+        left,
+        {
+            key: (face, xy)
+            for (key, face), xy in zip(OVERALL_FACES.items(), picks, strict=True)
+        },
+        label="overall length",
+    )
+    ends = tuple(silhouettes[key] for key in OVERALL_FACES)
     overall = add_edge_dimension(
         adapter,
         left,
-        p0=OVERALL_BOTTOM_XY,
-        p1=OVERALL_TOP_XY,
+        p0=picks[0],
+        p1=picks[1],
         text_xy=OVERALL_TEXT_XY,
         label="overall length",
         orientation="vertical",
         entity_type="SILHOUETTE",
+        entities=ends,
     )
-    set_reference_dimension(adapter, overall, label="overall length")
+    assert_dimension_measures(
+        adapter,
+        overall,
+        expected_mm=OVERALL_LENGTH,
+        label="overall length",
+        entities=ends,
+        entity_types=("SILHOUETTE", "SILHOUETTE"),
+    )
+    overall = _early_bound(overall, "IDisplayDimension")
+    set_reference_dimension(adapter, overall.GetAnnotation(), label="overall length")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

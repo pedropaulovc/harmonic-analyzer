@@ -374,20 +374,33 @@ def test_inside_corners_are_one_modelled_radius_printed_max() -> None:
 
 def test_overall_length_is_a_side_view_reference() -> None:
     """#982 review r1: no overall length. The side view's ring-bottom and
-    tine-top silhouettes give it as a plain distance, printed reference."""
+    tine-top silhouettes give it as a plain distance, printed reference.
+    Farm r2: a coordinate hit-test on the 2 mm ring bottom missed, so each
+    end is named by its face and a projected model point."""
     spec = ch_connecting_rod_spec
     d = drawing
-    assert d.OVERALL_BOTTOM_XY == d._left_xy(0.0, spec.RING_BOTTOM_Y)
-    # The top pick lands on the far tine, between the slot and the outer face.
-    tine_inner = d._left_xy(spec.FORK_SLOT_WIDTH / 2.0, 0.0)[0]
-    tine_outer = d._left_xy(spec.FORK_THICKNESS / 2.0, 0.0)[0]
-    assert tine_inner < d.OVERALL_TOP_XY[0] < tine_outer
-    assert d.OVERALL_TOP_XY[1] == pytest.approx(d._left_xy(0.0, spec.FORK_TOP_Y)[1])
+    assert d.OVERALL_LENGTH == pytest.approx(183.769, abs=1e-3)
+    assert d.OVERALL_BOTTOM_MM == (0.0, -spec.RING_OUTER_RADIUS, 0.0)
+    assert spec.RING_BOTTOM_Y == -spec.RING_OUTER_RADIUS
+    # The top pick lands on the far tine's crown, between the slot and the
+    # outer face; the crown is the fork's full round.
+    x, y, z = d.OVERALL_TOP_MM
+    assert (x, y) == (0.0, spec.FORK_TOP_Y)
+    assert spec.FORK_SLOT_WIDTH / 2.0 < z < spec.FORK_THICKNESS / 2.0
+    assert spec.FORK_TOP_Y == pytest.approx(spec.CENTER_DISTANCE + spec.FORK_WIDTH / 2.0)
+    ring, crown = d.OVERALL_FACES.values()
+    assert ring.diameter_mm == 2.0 * spec.RING_OUTER_RADIUS
+    assert (crown.diameter_mm, crown.contains_z_mm) == (spec.FORK_WIDTH, z)
     # Right of the side view, left of the centre distance's text.
+    tine_outer = d._left_xy(spec.FORK_THICKNESS / 2.0, 0.0)[0]
     assert tine_outer + 0.010 < d.OVERALL_TEXT_XY[0] < 0.125 - 0.015
     source = Path(d.__file__).read_text(encoding="utf-8")
-    assert 'set_reference_dimension(adapter, overall, label="overall length")' in source
-    assert source.count('entity_type="SILHOUETTE"') == 1
+    assert "face_silhouettes_through(" in source
+    assert "entities=ends," in source
+    assert (
+        'set_reference_dimension(adapter, overall.GetAnnotation(), label="overall length")'
+        in source
+    )
 
 
 def test_datum_a_tag_stands_clear_of_the_centre_distance_witness() -> None:
