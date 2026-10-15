@@ -3,13 +3,19 @@ r"""Create the drawing for the rocker trammel setting bar (MHA-CH-006-TL-17)."""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_name,
+    place_view,
+    view_name,
+)
 
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -25,6 +31,7 @@ from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _layout_audit import arc_segments
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -55,7 +62,13 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (1.0, 4.0)
 VIEW_SCALE = (1, 4)
 SECTION_SCALE = (4, 1)
-ISO_SCALE = (1, 10)
+# The PDF carries a shaded view as a fixed ~120 dpi bitmap (every sheet of
+# run 20261015T092257793Z), its edges as vectors over it. At 1:10 the bar's
+# 6.35 mm side face is a 2-3 px band, so its raster steps show between the
+# edge lines as a sawtooth; 1:5 doubles the band. The view stays in the
+# empty lower-left, its outline clear of the title block and the notes'
+# lines clear of the bar.
+ISO_SCALE = (1, 5)
 # The broad (seat) face, the edge view under it (third angle) carrying the
 # cutting line through H0, the section to the right, the isometric below.
 # x 0.160 leaves the pivot seat's callout clear of the border and the H0
@@ -63,7 +76,7 @@ ISO_SCALE = (1, 10)
 TOP_CENTER = (0.160, 0.215)
 FRONT_CENTER = (0.160, 0.165)
 SECTION_CENTER = (0.330, 0.150)
-ISO_CENTER = (0.150, 0.105)
+ISO_CENTER = (0.140, 0.112)
 ISO_NOTE_XY = (0.020, 0.118)
 NOTES_XY = (0.020, 0.090)
 # Top-view text offsets (sheet m) from H0's centre.
@@ -71,24 +84,38 @@ TOP_OFFSETS = {
     "BarLength": (0.102, -0.017),
     # Above the bar, clear of both extension lines.
     "BarWidth": (0.252, 0.012),
-    # Outside the end's extension line: the H0 station chains on from it.
-    "H0FromEnd": (-0.022, 0.011),
+    # Outside the end's extension line: the H0 station chains on from it. Its
+    # line shares H800X's row, which clears the 3X 12.7 arrow's tail.
+    "H0FromEnd": (-0.022, 0.0168),
     # Left of the bar's end and under it, clear of both extension lines.
     "H0FromSide": (-0.020, -0.010),
-    "H800X": (0.102, 0.011),
-    "H816X": (0.102, 0.030),
+    # The first row 8 mm above the bar's edge (the saw cradle's _GAP), the
+    # second at the old 19 mm pitch: a value's dimension line sits 7.3 mm
+    # under its text position, the PIVOT SEAT one's 5.6 mm.
+    "H800X": (0.102, 0.0185),
+    "H816X": (0.102, 0.0375),
 }
 # Cutting line through H0 on the edge view: past both faces.
 CUT_OVERRUN = 0.008
 # Section text offsets (sheet m) from H0's axis on the seat face; ``side`` is
-# +1 where the flank-angle vertex lands right of the axis. The angle sits in
-# the quadrant above the face and outboard of the flank, which reads the same
-# 60 deg as the one inside the seat; the diameters go to the other side.
+# +1 where the flank-angle vertex lands right of the axis. The angle imports
+# measuring the wedge inside the seat, so its arc ran through the pilot and
+# the 1.98 dimension line; flipped to the vertically opposite wedge (above
+# the face, outboard of the flank, the same 60 deg) its arc stays clear of
+# both diameters. Its text sits about 20 mm out from the vertex, so the arc
+# keeps both arrows inside beside it; the diameters go to the other side.
 SECTION_OFFSETS = {
-    "SeatFlankAngle": (0.020, 0.010),
+    "SeatFlankAngle": (0.025, 0.010),
     "PilotDia": (-0.035, 0.010),
     "SeatDia": (-0.035, 0.029),
 }
+# swDimArrowsInside: the 1.98 dimension's outside arrow tail ran out past
+# the flank's extension line.
+ARROWS_INSIDE = 0
+INSIDE_ARROW_DIMENSIONS = ("PilotDia", "SeatFlankAngle")
+# A drawn flank-angle arc may overrun its wedge's legs by this (sheet m), as
+# cone gear's flat clock does.
+ANGLE_ARC_OVERRUN = 0.0003
 THICKNESS_TEXT_GAP = 0.010
 
 # Functional acceptance sits on the dimension it governs, not in the notes;
@@ -233,6 +260,119 @@ def _set_cut_face_only(adapter: Any, section: Any) -> None:
         )
 
 
+def _section_display(adapter: Any, annotations: list[Any], name: str) -> Any:
+    matches = [
+        _early_bound(a, "IAnnotation")
+        for a in annotations
+        if dimension_name(adapter, _early_bound(a, "IAnnotation")) == name
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"section A-A: expected one {name}, found {len(matches)}")
+    return matches[0], _early_bound(
+        matches[0].GetSpecificAnnotation(), "IDisplayDimension"
+    )
+
+
+def _flank_angle_strays(
+    display: Any, vertex: tuple[float, float], side: float
+) -> list[tuple[float, float]]:
+    """Drawn flank-angle arc points outside the wedge above the face and
+    outboard of the flank's extension (0..60 deg from the face, outboard)."""
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    points = []
+    for index in range(int(data.GetArcCount())):
+        raw = tuple(float(value) for value in (data.GetArcAtIndex2(index) or ()))
+        segments = arc_segments(raw)
+        points += [(s.x0, s.y0) for s in segments] + [(s.x1, s.y1) for s in segments]
+    if not points:
+        raise RuntimeError("section A-A: the flank angle draws no arc")
+    flank = math.radians(part_spec.SEAT_FLANK_ANGLE_DEG)
+    strays = []
+    for x, y in points:
+        u, v = side * (x - vertex[0]), y - vertex[1]
+        if (
+            v < -ANGLE_ARC_OVERRUN
+            or v * math.cos(flank) - u * math.sin(flank) > ANGLE_ARC_OVERRUN
+        ):
+            strays.append((x, y))
+    return strays
+
+
+def _flip_flank_angle_above_face(
+    adapter: Any,
+    section: Any,
+    annotations: list[Any],
+    vertex: tuple[float, float],
+    side: float,
+    text_xy: tuple[float, float],
+) -> Any:
+    """Flip the imported flank angle into the wedge above the face, as cone
+    gear flips its flat clock: select it alone in its view, flip, re-seat the
+    text, and read the drawn arc and the value back."""
+    annotation, display = _section_display(adapter, annotations, "SeatFlankAngle")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    selection_name = str(display.GetNameForSelection() or "")
+    if not selection_name:
+        raise RuntimeError("section A-A: the flank angle has no selection name")
+    model = adapter.currentModel
+    drawing = _early_bound(model, "IDrawingDoc")
+    imported = float(_read_member(dimension, "SystemValue"))
+    flips: list[str] = []
+    for flip in ("", "VerticallyOppositeAngle"):
+        if flip:
+            if not drawing.ActivateView(view_name(adapter, section)):
+                raise RuntimeError("section A-A: failed to activate the view")
+            model.ClearSelection2(True)
+            if not model.Extension.SelectByID2(
+                selection_name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+            ):
+                raise RuntimeError(
+                    f"section A-A: failed to select the flank angle {selection_name!r}"
+                )
+            flipped = getattr(display, flip)()
+            model.ClearSelection2(True)
+            if not flipped:
+                raise RuntimeError(f"section A-A: {flip} refused on the flank angle")
+            flips.append(flip)
+            if not annotation.SetPosition2(*text_xy, 0.0):
+                raise RuntimeError("section A-A: failed to re-seat the flank angle")
+            rebuild_drawing(adapter, label=f"setting bar flank angle {flip}")
+        measured = float(_read_member(dimension, "SystemValue"))
+        if abs(measured - imported) > 1e-9:
+            raise RuntimeError(
+                f"section A-A: {flips} changed the flank angle from "
+                f"{math.degrees(imported):.4f} to {math.degrees(measured):.4f} deg"
+            )
+        strays = _flank_angle_strays(display, vertex, side)
+        _telemetry.info(
+            f"setting bar flank angle after {flips or ['import']}: "
+            f"{len(strays)} arc point(s) outside the wedge above the face",
+            flank_angle_flips=len(flips),
+            flank_angle_stray_points=len(strays),
+        )
+        if not strays:
+            return display
+    raise RuntimeError(
+        f"section A-A: flank angle arc still leaves the wedge above the face after "
+        f"{flips}; first stray points "
+        f"{[tuple(round(v * 1000, 1) for v in p) for p in strays[:3]]} mm"
+    )
+
+
+def _assert_settled_flank_angle(
+    display: Any, vertex: tuple[float, float], side: float
+) -> None:
+    """After finalize's settling rebuild the arc still stays above the face
+    (cone gear's clock was drawn as outside stubs after it, run
+    20261010T073917031Z)."""
+    strays = _flank_angle_strays(display, vertex, side)
+    if strays or int(display.ArrowSide) != ARROWS_INSIDE:
+        raise RuntimeError(
+            f"section A-A: settled flank angle has {len(strays)} arc point(s) "
+            f"outside its wedge, arrow side {int(display.ArrowSide)}"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -336,6 +476,20 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
+    for name in INSIDE_ARROW_DIMENSIONS:
+        _annotation, display = _section_display(adapter, annotations, name)
+        display.ArrowSide = ARROWS_INSIDE
+        if int(display.ArrowSide) != ARROWS_INSIDE:
+            raise RuntimeError(f"section A-A: {name} did not keep its arrows inside")
+    flank_vertex = (vertex[0], vertex[1])
+    flank_angle = _flip_flank_angle_above_face(
+        adapter,
+        section,
+        annotations,
+        flank_vertex,
+        side,
+        section_keep["SeatFlankAngle"],
+    )
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
@@ -350,6 +504,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rocker Trammel Setting Bar Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _assert_settled_flank_angle(flank_angle, flank_vertex, side),
+        ),
     )
 
 

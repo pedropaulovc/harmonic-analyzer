@@ -10,6 +10,7 @@ from prechips.model import FixtureSolid
 import _config
 import ch_rocker_arm_tl_trammel_setting_bar_spec as spec
 import draw_ch_rocker_arm_tl_trammel_setting_bar as drawing
+from _drawing_registry import DRAWING_TEMPLATES
 import export_features
 
 STEM = "ch_rocker_arm_tl_trammel_setting_bar"
@@ -90,6 +91,61 @@ def test_notes_follow_the_simplicity_policy() -> None:
     for callout in (*drawing.CALLOUTS_ABOVE.values(), *drawing.CALLOUTS_BELOW.values()):
         bare = re.sub(r"MHA-CH-006-TL-\d\d\b", "", callout)
         assert not re.search(r"\d(?!X\b)", bare), callout
+
+
+# Measured on run 20261015T092257793Z (layout audit, sheet m): a value's
+# dimension line sits this far under its text position, and the 3X 12.7
+# arrow's outside tail ends this far above H0's centre line.
+_LINE_BELOW_TEXT = {"H0FromEnd": 0.0056, "H800X": 0.0073, "H816X": 0.0073}
+_HOLE_HEIGHT_TAIL = 0.0063
+# The 1:10 isometric's ink half-extents and GetOutline's padding on that run.
+_ISO_INK_HALF_AT_1_10 = (0.0331, 0.0193)
+_ISO_PADDING = 0.006
+
+
+def test_top_view_rows_clear_the_bar_and_the_hole_height_tail() -> None:
+    scale = drawing.VIEW_SCALE[0] / drawing.VIEW_SCALE[1]
+    edge = spec.BAR_WIDTH / 2.0 * scale / 1000.0
+    line = {
+        name: drawing.TOP_OFFSETS[name][1] - below
+        for name, below in _LINE_BELOW_TEXT.items()
+    }
+    # The first row has 8 mm of air over the bar (round-5 review: 800.00 sat
+    # on the edge); 816.00 keeps its pitch above it.
+    assert line["H800X"] - edge >= 0.008 - 1e-9
+    assert abs(line["H816X"] - line["H800X"] - 0.019) < 1e-9
+    # 49.2 chains into 800.00's row, clear above the 12.7 tail it crossed.
+    assert abs(line["H0FromEnd"] - line["H800X"]) < 1e-4
+    assert line["H0FromEnd"] - _HOLE_HEIGHT_TAIL >= 0.004
+
+
+def test_flank_angle_text_sits_in_the_wedge_above_the_face() -> None:
+    scale = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1]
+    vertex = spec.SEAT_DIA / 2.0 * scale / 1000.0
+    dx, dy = drawing.SECTION_OFFSETS["SeatFlankAngle"]
+    u = dx - vertex
+    assert 0.0 < math.degrees(math.atan2(dy, u)) < spec.SEAT_FLANK_ANGLE_DEG
+    assert math.hypot(u, dy) >= 0.018
+    assert all(
+        drawing.SECTION_OFFSETS[name][0] < 0.0 for name in ("PilotDia", "SeatDia")
+    )
+    assert set(drawing.INSIDE_ARROW_DIMENSIONS) <= set(drawing.SECTION_OFFSETS)
+
+
+def test_isometric_note_and_outline_follow_its_scale() -> None:
+    num, den = drawing.ISO_SCALE
+    assert spec.ISOMETRIC_VIEW_NOTE == f"ISOMETRIC VIEW SCALE {num}:{den}"
+    grow = (num / den) / (1 / 10)
+    half_w, half_h = (ink * grow + _ISO_PADDING for ink in _ISO_INK_HALF_AT_1_10)
+    cx, cy = drawing.ISO_CENTER
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    assert (
+        cx + half_w < template.title_block_left_m
+        or cy - half_h > template.title_block_top_m
+    )
+    # Below the edge view's outline (run 20261015T092257793Z: y 158.6 mm).
+    assert cy + half_h < 0.1586
+    assert cx - half_w > 0.0127
 
 
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:

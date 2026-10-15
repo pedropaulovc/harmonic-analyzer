@@ -128,7 +128,7 @@ REFERENCE_SKETCHES = ("H800Reference", "H816Reference")
 
 SURFACE_FINISHES = ()
 DRAWING_NOTES = "NO NICKS OR BURRS AT THE SEATS."
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:10"
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:5"
 
 # prechips fixture solids (prechips.model.FixtureSolid), model frame: the bar
 # and each seat's through pilot (the cone is a #2 centre-drill mouth on it).
