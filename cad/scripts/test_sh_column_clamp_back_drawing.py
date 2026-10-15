@@ -193,17 +193,18 @@ def test_screw_line_shortfall_is_the_owner_ruled_one() -> None:
     # Independent oracle from literals: the printed Ø4.98 front hole at its
     # least on the #8 screw major 4.1656, against the printed station/height
     # mismatch hypot(0.2, 0.2) plus 0.3 deg of wander down both through holes
-    # (front 17.9 + 0.51, back 15.0 + 0.51), in any direction.
+    # (front 17.4 + 0.51, back 15.0 + 0.51), in any direction.
     float_ = (4.98 - 4.1656) / 2.0  # 0.407
     drift = math.tan(math.radians(0.3))
-    demand = math.hypot(0.2, 0.2) + (18.41 + 15.51) * drift  # 0.460
+    demand = math.hypot(0.2, 0.2) + (17.91 + 15.51) * drift  # 0.458
     assert math.isclose(fit.SCREW_FLOAT, float_)
     assert math.isclose(fit.SCREW_LINE_DEMAND, demand)
-    assert math.isclose(fit.SCREW_LINE_SHORTFALL, demand - float_)  # 0.0532
-    # Owner-ruled (sh-column-clamp-front RV-02) as 0.053 at three places;
-    # the printed bands alone still leave the screw float.
+    assert math.isclose(fit.SCREW_LINE_SHORTFALL, demand - float_)  # 0.0506
+    # Owner-ruled (sh-column-clamp-front RV-02) as up to 0.053 at three
+    # places (ruled on the 17.9 arc); the 17.4 arc's shorter hole wanders
+    # less. The printed bands alone still leave the screw float.
     assert fit.SCREW_LINE_SHORTFALL_RULED == 0.053
-    assert round(demand - float_, 3) == 0.053
+    assert round(demand - float_, 3) == 0.051
     assert math.hypot(0.2, 0.2) < float_
 
 

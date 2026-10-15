@@ -156,11 +156,13 @@ if min(WALLS_WORST.values()) < WALL_FLOOR:
         f"clamp-front walls {WALLS_WORST} under the {WALL_FLOOR} floor"
     )
 # drawing-guidelines.md rule 20: walls between the floor and the target.  The
-# ear-to-bore web, 1.850 on the largest A513 column with drill wander, is the
-# only one and the part's least wall: it would need a column of at most 25.23
-# -- under its own nominal -- to reach 2.0.  Owner-ruled shortfall, declared
-# as sh-column-clamp-front RV-01 (cad/config/parts/sh-column-clamp-front.yaml)
-# and stated by EAR_WALL_NOTE; any other wall falling short needs its own.
+# ear-to-bore web on the largest A513 column with drill wander, ruled at 1.850
+# on the 17.9 arc and 1.853 on the 17.4 arc (whose shorter hole wanders
+# less), is the only one and the part's least wall: it would need a column of
+# at most 25.23 -- under its own nominal -- to reach 2.0.  Owner-ruled
+# shortfall, declared as sh-column-clamp-front RV-01
+# (cad/config/parts/sh-column-clamp-front.yaml) and stated by EAR_WALL_NOTE;
+# any other wall falling short needs its own.
 _SHORT_WALLS = {name for name, wall in WALLS_WORST.items() if wall < WALL_TARGET}
 if _SHORT_WALLS != {"ear to bore"} or WALLS_WORST["ear to bore"] != min(
     WALLS_WORST.values()
