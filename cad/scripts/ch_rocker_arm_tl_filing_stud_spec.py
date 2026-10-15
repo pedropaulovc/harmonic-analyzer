@@ -161,8 +161,8 @@ if TAIL_ROOT_RADIUS >= (HEAD_DIA - TAIL_DIA) / 2.0:
 # line rho + z = Rs + r from the shoulder corner and the chamfered button's
 # material beyond rho + z = Rb + leg, so leg + (Rb - Rs) >= r clears it. It
 # is checked at the smallest bore, largest body and the shorter leg the
-# chamfer's MIN size leaves at the title block's angular band.
-_SEAT_CHAMFER_LEG_MIN = button.BORE_CHAMFER * math.tan(
+# chamfer band's MIN leaves at the title block's angular band.
+_SEAT_CHAMFER_LEG_MIN = button.BORE_CHAMFER_MIN * math.tan(
     math.radians(button.BORE_CHAMFER_ANGLE_DEG - angular_band_deg())
 )
 SEAT_FILLET_CLEARANCE_MIN = (

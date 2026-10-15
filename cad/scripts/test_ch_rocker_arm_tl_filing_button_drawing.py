@@ -317,21 +317,47 @@ def test_bore_chamfer_clears_the_seat_fillet_at_the_tightest_fit() -> None:
     bore entry clears the stud's MAX seat fillet. The fillet lies under the
     line rho + z = Rs + r from the shoulder corner; the chamfer's material
     lies beyond rho + z = Rb + leg. So leg + (Rb - Rs) >= r clears it, at the
-    smallest bore, largest body and shortest leg the angle band allows."""
+    smallest bore, largest body and shortest leg the band's MIN and the angle
+    band allow."""
     import math
 
     from _printed_tolerance import angular_band_deg
 
     bore_min = button.BORE_DIA + button.BORE_BAND[1]
     body_max = stud.BODY_DIA + stud.BODY_BAND[0]
-    leg_min = button.BORE_CHAMFER * math.tan(
+    leg_min = button.BORE_CHAMFER_MIN * math.tan(
         math.radians(button.BORE_CHAMFER_ANGLE_DEG - angular_band_deg())
     )
     margin = leg_min + (bore_min - body_max) / 2.0 - stud.SEAT_FILLET_RADIUS
     assert margin > 0
     assert stud.SEAT_FILLET_CLEARANCE_MIN == pytest.approx(margin)
-    assert button.BORE_FIT_CALLOUT[0] == "0.3 MIN X 45\u00b0 BOTH ENDS"
+    assert button.BORE_FIT_CALLOUT[0] == "0.24-0.26 X 45\u00b0 BOTH ENDS"
     assert _features(BUTTON)["bore"]["note"].startswith(button.BORE_FIT_CALLOUT[0])
+
+
+def test_bore_chamfer_band_keeps_the_rule_17_rim_wall() -> None:
+    """Codex 4282149107: the chamfer eats the rim wall at both faces. At the
+    smallest printed O.D., largest bore and the longest radial leg the band's
+    MAX and the angle band allow, the wall holds rule 17's 1.5 floor, and the
+    sheet's stated rim wall is that worst case rounded down."""
+    import math
+
+    from _printed_tolerance import angular_band_deg
+
+    low, high = button.BORE_CHAMFER_MIN, button.BORE_CHAMFER_MAX
+    assert high - low >= 0.02 - 1e-9
+    assert button.BORE_CHAMFER == pytest.approx((low + high) / 2.0)
+    leg_max = high * math.tan(
+        math.radians(button.BORE_CHAMFER_ANGLE_DEG + angular_band_deg())
+    )
+    od_min = limits(button.OD, button.OD_PLACES)[0]
+    bore_max = button.BORE_DIA + button.BORE_BAND[0]
+    wall = (od_min - bore_max) / 2.0 - leg_max
+    assert wall >= rocker.RULE12_WALL_FLOOR
+    assert button.RIM_WALL_WORST == pytest.approx(wall)
+    assert button.RIM_WALL_MIN == math.floor(wall * 100.0 + 1e-9) / 100.0
+    assert button.RIM_WALL_NOTE == f"RIM WALL {button.RIM_WALL_MIN:.2f} MIN."
+    assert button.RIM_WALL_NOTE == "RIM WALL 1.50 MIN."
 
 
 def test_rim_runout_is_the_hub_coaxiality_remainder() -> None:

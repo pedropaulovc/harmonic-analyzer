@@ -16,8 +16,10 @@ the hub-seating face at Z0 and the outer face at +Z.
 
 from __future__ import annotations
 
+import math
+
 import ch_rocker_arm_spec as rocker
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import angular_band_deg, printed_deviations
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -55,17 +57,27 @@ BORE_BAND = (0.005, -0.005)
 BORE_PLACES = 3
 # Both bore ends carry a 45 degree entry chamfer (the button is reversible):
 # the stud's MAX seat fillet would otherwise hold the lower button off the
-# head face at the tightest fit (codex 4280374810). Printed as a MIN leg on
-# the bore callout, as draw_dt_cone_tip_block names its bore's two
-# countersinks; the stud spec asserts the worst-case clearance.
-BORE_CHAMFER = 0.3
-BORE_CHAMFER_PLACES = 1
+# head face at the tightest fit (codex 4280374810), and the chamfer eats the
+# rim wall at both faces (codex 4282149107). So it prints as a band on the
+# bore callout: the stud spec asserts its MIN clears the fillet, and the rim
+# wall below holds rule 17's floor at its MAX. Each leg is taken at the
+# title block's angular band (shorter leg at the MIN, longer at the MAX).
+BORE_CHAMFER_MIN = 0.24
+BORE_CHAMFER_MAX = 0.26
+BORE_CHAMFER = round((BORE_CHAMFER_MIN + BORE_CHAMFER_MAX) / 2.0, 12)  # modelled
+BORE_CHAMFER_PLACES = 2
 BORE_CHAMFER_ANGLE_DEG = 45.0
-if round(BORE_CHAMFER, BORE_CHAMFER_PLACES) != BORE_CHAMFER:
+if any(
+    round(size, BORE_CHAMFER_PLACES) != size
+    for size in (BORE_CHAMFER_MIN, BORE_CHAMFER_MAX)
+):
     raise AssertionError(
-        "filing-button bore chamfer MIN does not print as its model value"
+        "filing-button bore chamfer band does not print as its model limits"
     )
-BORE_CHAMFER_CALLOUT = f"{BORE_CHAMFER:.{BORE_CHAMFER_PLACES}f} MIN X {BORE_CHAMFER_ANGLE_DEG:.0f}\u00b0 BOTH ENDS"
+BORE_CHAMFER_CALLOUT = (
+    f"{BORE_CHAMFER_MIN:.{BORE_CHAMFER_PLACES}f}-{BORE_CHAMFER_MAX:.{BORE_CHAMFER_PLACES}f}"
+    f" X {BORE_CHAMFER_ANGLE_DEG:.0f}\u00b0 BOTH ENDS"
+)
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit sits on the bore's callout, naming
 # the mate by Number with its acceptance (callout above, callout below).
 BORE_FIT_CALLOUT = (
@@ -95,11 +107,22 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),)
 # The blind reviewer sees only the sheet: each note states a function.
 # Hardness lives in the Finish field.
-# drawing-guidelines.md rule 17 (walls and webs) wall: the rim between the printed O.D. lower limit and the bore.
-RIM_WALL_MIN = 1.78
-if round((_OD_MIN - BORE_DIA) / 2.0, 2) != RIM_WALL_MIN:
-    raise AssertionError("filing-button stated rim wall drifted from its geometry")
-# Pending exception ruling: MHA-CH-006-TL-04 rim wall 1.78 MIN (#1369).
+# drawing-guidelines.md rule 17 (walls and webs) wall: the rim between the
+# printed O.D. lower limit and the largest bore, less the longest radial leg
+# the chamfer band's MAX leaves at the angular band.
+_BORE_MAX = BORE_DIA + BORE_BAND[0]
+_CHAMFER_RADIAL_LEG_MAX = BORE_CHAMFER_MAX * math.tan(
+    math.radians(BORE_CHAMFER_ANGLE_DEG + angular_band_deg())
+)
+RIM_WALL_WORST = (_OD_MIN - _BORE_MAX) / 2.0 - _CHAMFER_RADIAL_LEG_MAX
+if RIM_WALL_WORST < rocker.RULE12_WALL_FLOOR:
+    raise AssertionError(
+        f"filing-button bore chamfer leaves a {RIM_WALL_WORST:.4f} rim wall,"
+        f" under the {rocker.RULE12_WALL_FLOOR} floor"
+    )
+# Round DOWN at two places; never overstate the minimum.
+RIM_WALL_MIN = math.floor(RIM_WALL_WORST * 100.0 + 1e-9) / 100.0
+# Pending exception ruling: MHA-CH-006-TL-04 rim wall under the 2.0 target (#1369).
 RIM_WALL_NOTE = f"RIM WALL {RIM_WALL_MIN:.2f} MIN."
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
 # each three-place size names its mate on its own dimension (callout below);
