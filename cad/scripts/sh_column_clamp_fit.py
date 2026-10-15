@@ -149,7 +149,7 @@ COLUMN_OD_MAX = COLUMN_DIA + COLUMN_OD_PLUS_IN * MM_PER_IN  # 25.527
 BORE_RADIUS_MAX = (COLUMN_OD_MAX + BORE_DIAMETRAL_CLEARANCE[1]) / 2.0  # 12.9135
 
 # drawing-guidelines.md rule 17 (walls and webs): realistic drill wander on
-# the 15-18.4 deep ear holes, the repository's 0.3 deg angular allowance
+# the 15-17.9 deep ear holes, the repository's 0.3 deg angular allowance
 # (fr_top_frame_spec.KEEPER_TAP_DRILL_WANDER_DEG), charged over each hole's
 # full printed depth in every direction: the shop may enter from either face.
 EAR_DRILL_WANDER_DEG = 0.3
@@ -158,20 +158,21 @@ EAR_DRILL_DRIFT_PER_MM = math.tan(math.radians(EAR_DRILL_WANDER_DEG))  # 0.00524
 # arc's deepest printed Depth, the back's tap over the block's.
 FRONT_EAR_WANDER = EAR_DRILL_DRIFT_PER_MM * (
     ARC_DEPTH + printed_deviations(ARC_DEPTH, DEPTH_PLACES)[1]
-)  # 0.096
+)  # 0.094
 BACK_EAR_WANDER = EAR_DRILL_DRIFT_PER_MM * (
     BLOCK_DEPTH + printed_deviations(BLOCK_DEPTH, DEPTH_PLACES)[1]
 )  # 0.081
 
 # The screw line at its worst: the printed ear mismatch plus both holes'
 # wander, in any direction, against the front hole's float.  Owner-ruled
-# short (above, sh-column-clamp-front RV-02): 0.283 + 0.096 + 0.081 = 0.460
-# against 0.407, i.e. 0.053 at the ruling's three places; the front sheet
-# states it as 0.06 at its own two (rounded up).  The floor still holds --
-# the printed bands alone never bind the screw (EAR_SCREW_MISMATCH_MAX <
+# short (above, sh-column-clamp-front RV-02) at up to 0.053: ruled on the
+# 17.9 arc as 0.283 + 0.096 + 0.081 = 0.460 against 0.407; the 17.4 arc gives
+# 0.283 + 0.094 + 0.081 = 0.458, i.e. 0.051.  The front sheet states it as
+# 0.06 at its own two places (rounded up).  The floor still holds -- the
+# printed bands alone never bind the screw (EAR_SCREW_MISMATCH_MAX <
 # SCREW_FLOAT above) -- and the shortfall may not grow past the ruled value.
 SCREW_LINE_DEMAND = EAR_SCREW_MISMATCH_MAX + FRONT_EAR_WANDER + BACK_EAR_WANDER
-SCREW_LINE_SHORTFALL = SCREW_LINE_DEMAND - SCREW_FLOAT  # 0.0532
+SCREW_LINE_SHORTFALL = SCREW_LINE_DEMAND - SCREW_FLOAT  # 0.0506
 SCREW_LINE_SHORTFALL_RULED = 0.053
 if not 0.0 < round(SCREW_LINE_SHORTFALL, 3) <= SCREW_LINE_SHORTFALL_RULED:
     raise AssertionError(
