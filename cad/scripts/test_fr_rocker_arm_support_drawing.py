@@ -799,7 +799,7 @@ def test_seat_stations_print_as_ref_from_the_real_end_faces() -> None:
         name: f"{abs(end - seat):.{drawing.PART_PRECISION[name]}f}"
         for name, (end, seat) in lines.items()
     }
-    assert printed == {"SeatEastStation": "4.95", "SeatWestStation": "6.56"}
+    assert printed == {"SeatEastStation": "5.39", "SeatWestStation": "7.00"}
     assert support.REFERENCE_SKETCHES[0] == "SeatStationReference"
     assert support.DRAWING_DIMENSIONS["SeatStationReference"] == set(lines)
     assert set(drawing.VIEW_B_KEEP) == set(lines)
@@ -896,9 +896,9 @@ def test_seat_station_drives_end_on_the_seats_for_any_wall_width_or_seat_edit(
             # The line runs inboard from its end face and ends on its seat.
             assert side * (anchor - station) == pytest.approx(seat_on[side])
     # The finding's case: the REF tracks the 2.0 longer wall.
-    values = {"WallWidth": 180.8, **nominal}
+    values = {"WallWidth": support.BOSS_DEPTH + 2.0, **nominal}
     assert f"{_evaluate_equation(jobs[f'SeatEastStation@{sketch}'], values):.2f}" == (
-        "5.95"
+        "6.39"
     )
 
 
