@@ -48,21 +48,24 @@ if SHAFT_DIA != BORE_DIA:
 SHAFT_R = SHAFT_DIA / 2.0
 
 # --- Length: cylindrical to END_PROUD past each keeper lug's outer face, then
-# a full hemisphere (radius = shaft radius). ---
-END_PROUD = 0.5
-CYLINDER_HALF = KEEPER_Z_OFF + LUG_HALF_T + END_PROUD  # 77.5
+# a full hemisphere (radius = shaft radius). END_PROUD is what lets the
+# tip-to-tip length print at .X and still keep both domes clear of the bores
+# (FLAT_STATION_WINDOW_MM below). ---
+END_PROUD = 1.025
+CYLINDER_HALF = KEEPER_Z_OFF + LUG_HALF_T + END_PROUD  # 78.025
 DOME_R = SHAFT_R
-SHAFT_LENGTH = 2.0 * (CYLINDER_HALF + DOME_R)  # 161.35 tip to tip
+SHAFT_LENGTH = 2.0 * (CYLINDER_HALF + DOME_R)  # 162.4 tip to tip
 
 # --- Set-screw flats: one per end on +Y, centred on the keeper lug mid-plane
-# (z = +-KEEPER_Z_OFF), so the crown tap's cup point lands mid-flat. The
-# machinist locates the -Z flat's outer edge FLAT_FROM_END off its dome tip
-# and the +Z flat by the like-edge FlatPitch from it (each flat's -Z edge),
-# so neither flat's length enters the other's station. ---
-FLAT_PITCH = 2.0 * KEEPER_Z_OFF  # 148.0 like-edge to like-edge
+# (z = +-KEEPER_Z_OFF), so the crown tap's cup point lands mid-flat. Both
+# stations are baseline dimensions from the -Z dome tip (sheet left): the -Z
+# flat's outer edge FLAT_FROM_END off it and the +Z flat's inner edge
+# FLAT_BASELINE off it, so no station chains through another. ---
+FLAT_PITCH = 2.0 * KEEPER_Z_OFF  # 148.0 centre to centre (assembly only)
 FLAT_LENGTH = 3.5
 FLAT_DEPTH = 0.3
-FLAT_FROM_END = SHAFT_LENGTH / 2.0 - FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 4.925
+FLAT_FROM_END = SHAFT_LENGTH / 2.0 - FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 5.45
+FLAT_BASELINE = SHAFT_LENGTH / 2.0 + FLAT_PITCH / 2.0 - FLAT_LENGTH / 2.0  # 153.45
 ACROSS_FLAT = SHAFT_DIA - FLAT_DEPTH  # 6.05: the printed size
 FLAT_HEIGHT = SHAFT_R - FLAT_DEPTH  # 2.875: the set screw's cup seat above the axis
 
@@ -132,23 +135,36 @@ SURFACE_FINISHES = (
 )
 
 # One revolved half-profile carries the diameter and the tip-to-tip length;
-# the flats' cut sketch carries their length, the -Z flat's station off its
-# dome tip (a construction line from the origin to the tip), their like-edge
-# pitch and the across-flat size (a construction line from the flat to the
-# far O.D.).
+# the flats' cut sketch carries their length, both stations off the -Z dome
+# tip (a construction line from the origin to the tip), the across-flat size
+# (a construction line from the flat to the far O.D.) and the dome radius (a
+# construction arc on the -Z dome, printed as a reference).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDia", "OverallLength"},
-    "FlatProfile": {"FlatLength", "FlatFromEnd", "FlatPitch", "AcrossFlat"},
+    "FlatProfile": {
+        "FlatLength",
+        "FlatFromEnd",
+        "FlatBaseline",
+        "AcrossFlat",
+        "DomeRadius",
+    },
 }
 # Decimal places are the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`); the model owns
 # them. ShaftDia carries its SHAFT_H band natively; AcrossFlat at .XXX holds
-# FLAT_CHORD_MIN above the set screw's major. OverallLength at .XX and
-# FlatFromEnd and FlatPitch at .XXX hold FLAT_STATION_WINDOW_MM (0.14) open;
-# one place looser on any one of them closes it (.X OverallLength -0.15,
-# .XX FlatFromEnd -0.24, .XX FlatPitch -0.13; machinist review r8).
+# FLAT_CHORD_MIN above the set screw's major and its >= 1.5D engagement and
+# proud ruling. FlatFromEnd and FlatBaseline at .XX with OverallLength at .X
+# hold FLAT_STATION_WINDOW_MM open (test_ch_fulcrum_shaft_drawing pins which
+# ones cannot drop a place). DomeRadius is a reference: the full hemisphere
+# follows from the diameter.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "ShaftProfile": {"ShaftDia": 3, "OverallLength": 2},
-    "FlatProfile": {"FlatLength": 1, "FlatFromEnd": 3, "FlatPitch": 3, "AcrossFlat": 3},
+    "ShaftProfile": {"ShaftDia": 3, "OverallLength": 1},
+    "FlatProfile": {
+        "FlatLength": 2,
+        "FlatFromEnd": 2,
+        "FlatBaseline": 2,
+        "AcrossFlat": 3,
+        "DomeRadius": 2,
+    },
 }
 if {
     feature: set(names) for feature, names in DRAWING_PRECISION.items()
@@ -157,7 +173,8 @@ if {
         "DRAWING_PRECISION and DRAWING_DIMENSIONS must name the same dims"
     )
 # One flat length and one across-flat size govern both flats (the cut sketch
-# carries one of each), so each prints "2X".
+# carries one of each), so each prints "2X". DomeRadius gets its "2X (SR" in
+# the drawing, which keeps the native radius symbol.
 DIMENSION_PREFIXES = {
     ("FlatProfile", "FlatLength"): "2X ",
     ("FlatProfile", "AcrossFlat"): "2X ",
@@ -189,7 +206,7 @@ _STATION_BANDS = {
     "flat_from_end": _band(DRAWING_PRECISION, "FlatProfile", "FlatFromEnd"),
     "front_flat": _band(DRAWING_PRECISION, "FlatProfile", "FlatLength"),
     "rear_flat": _band(DRAWING_PRECISION, "FlatProfile", "FlatLength"),
-    "flat_pitch": _band(DRAWING_PRECISION, "FlatProfile", "FlatPitch"),
+    "flat_baseline": _band(DRAWING_PRECISION, "FlatProfile", "FlatBaseline"),
     "length": _band(DRAWING_PRECISION, "ShaftProfile", "OverallLength"),
 }
 
@@ -224,20 +241,20 @@ _tap_rear = _sum((1, _outer_rear), (-1, _lin(LUG_HALF_T, rear_tap=1.0)))
 _from_end = _lin(FLAT_FROM_END, flat_from_end=1.0)
 _front_len = _lin(FLAT_LENGTH, front_flat=1.0)
 _rear_len = _lin(FLAT_LENGTH, rear_flat=1.0)
-_pitch = _lin(FLAT_PITCH, flat_pitch=1.0)
+_baseline = _lin(FLAT_BASELINE, flat_baseline=1.0)
 _length = _lin(SHAFT_LENGTH, length=1.0)
 _cup = _lin(SET_SCREW_CUP_DIA / 2.0)
 _dome = _lin(DOME_R)
-# Bounds on t: front flat [t + S, t + S + FLf]; rear flat [t + S + P, t + S +
-# P + FLr]; rear tip t + L.
+# Bounds on t: front flat [t + S, t + S + FLf]; rear flat [t + B, t + B +
+# FLr]; rear tip t + L.
 _T_LOW = {
     "front cup on its flat's inner end": _sum(
         (1, _tap_front), (1, _cup), (-1, _from_end), (-1, _front_len)
     ),
     "rear cup on its flat's outer end": _sum(
-        (1, _tap_rear), (1, _cup), (-1, _from_end), (-1, _pitch), (-1, _rear_len)
+        (1, _tap_rear), (1, _cup), (-1, _baseline), (-1, _rear_len)
     ),
-    "rear flat inside its lug": _sum((1, _inner_rear), (-1, _from_end), (-1, _pitch)),
+    "rear flat inside its lug": _sum((1, _inner_rear), (-1, _baseline)),
     "rear cylinder past its lug": _sum((1, _outer_rear), (1, _dome), (-1, _length)),
 }
 _T_HIGH = {
@@ -245,7 +262,7 @@ _T_HIGH = {
         (1, _tap_front), (-1, _cup), (-1, _from_end)
     ),
     "rear cup on its flat's inner end": _sum(
-        (1, _tap_rear), (-1, _cup), (-1, _from_end), (-1, _pitch)
+        (1, _tap_rear), (-1, _cup), (-1, _baseline)
     ),
     "front flat inside its lug": _sum(
         (1, _inner_front), (-1, _from_end), (-1, _front_len)
@@ -285,16 +302,29 @@ if PAIRED_MIN_CLEARANCE_MM < BORE_RUNNING_MIN_CLEARANCE_MM:
         f"(< {BORE_RUNNING_MIN_CLEARANCE_MM})"
     )
 
-DRAWING_NOTES = "\n".join(
+# The shaft is the first-made part of the keeper fit (rule 4: the band lives
+# here, the bore's .XXX is the mate's), and the levers run on the same O.D.
+SHAFT_FIT_CLEARANCE_MM = (
+    BORE_DIA_BAND[1] - SHAFT_DIA_BAND[0],
+    BORE_DIA_BAND[0] - SHAFT_DIA_BAND[1],
+)  # (0.035, 0.070)
+SHAFT_DIA_CALLOUT = "\n".join(
     (
-        "BOTH ENDS FULL HEMISPHERE (R = SHAFT RADIUS).",
-        "CENTRE MARKS 1.0 DEEP MAX.",
-        "FLATS SEAT MHA-VN-055 SET SCREWS IN MHA-CH-007 KEEPERS.",
+        "SLIDING FIT IN MHA-CH-007 BORES,",
+        f"{SHAFT_FIT_CLEARANCE_MM[0]:.3f}-{SHAFT_FIT_CLEARANCE_MM[1]:.3f} "
+        "DIAMETRAL CLEARANCE;",
+        "MHA-CH-002 LEVERS RUN ON IT",
     )
 )
-END_VIEW_NOTE = "END VIEW SCALE 2:1"
-# The isometric renders at ISO_SCALE (1, 2) while the sheet/title block reads
-# 1:1, so without this the pictorial is silently half scale -- the sheet's own
-# title block would misstate it. Mirrors cylinder-gear-shaft, whose identical
-# 1:2 iso carries the same note (codex #334).
-ISO_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
+# AcrossFlat's .XXX is the set screw's seat height: it sets both the >= 1.5D
+# engagement and the proud limit above (a .XX band breaks both).
+ACROSS_FLAT_CALLOUT = "SETS MHA-VN-055\nENGAGEMENT"
+DRAWING_NOTES = "\n".join(
+    (
+        "1/4 IN GROUND STOCK OK.",
+        "CENTRE MARKS 1.0 DEEP MAX.",
+    )
+)
+# The isometric renders at ISO_SCALE (1, 1) while the sheet/title block reads
+# 2:1, so without this the pictorial is silently half scale.
+ISO_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
