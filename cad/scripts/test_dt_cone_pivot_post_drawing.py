@@ -20,6 +20,7 @@ from _assembly import _seed_flip, activate_assembly_contract
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED_UM, SEAT_UM, surface_finish_by_key
+from machinist_exceptions import load_exceptions
 
 
 def test_required_drawing_paths() -> None:
@@ -557,7 +558,7 @@ def test_machined_faces_are_called_out_on_the_casting() -> None:
 
 
 def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
-    """#906 (USER RULING 2026-09-26, option ii): drawing-simplicity-policy.md `GD&T allowlist (rule 5)`'s crank-mesh entry.
+    """#906 (USER RULING 2026-09-26, option ii): the package's RV-01 machinist exception.
 
     One diametral angularity frame on the crank bore to datum A, the cone
     journal bore, clocked by datum B, the foot seat; its value is the spec
@@ -586,10 +587,9 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
     assert round(spec.CRANK_BORE_ANGLE_LIMIT_DEG, 4) == 0.0795
     assert part.PART_DATUMS is spec.PART_DATUMS
     assert part.GEOMETRIC_CONTROLS is spec.GEOMETRIC_CONTROLS
-    policy = (
-        Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
-    ).read_text(encoding="utf-8")
-    assert "**Crank mesh.** MHA-DT-005's crank bore" in policy
+    (exception,) = load_exceptions(_config.CONFIG_DIR, "dt_cone_pivot_post", "part")
+    assert exception.kind == "accept"
+    assert "crank-bore diametral angularity frame" in exception.where
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "datums=PART_DATUMS" in source
     assert "controls=GEOMETRIC_CONTROLS" in source
