@@ -279,6 +279,17 @@ ROCKER_NUMBER = "MHA-CH-006"
 STATION_CALLOUT = f"{PROFILE_CALLOUT}, {ROCKER_NUMBER}"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:4"
 
+# The #1413 placeholder provenance every solid carries: ``by`` is
+# _process_plans.PLACEHOLDER_BY verbatim (test_process_shop pins the spelling)
+# and bind_shop refuses a solid without a measured status (#1462).
+_MEASURED = {
+    "status": "measured",
+    "by": "placeholder (realistic, remeasure: #1413)",
+    "date": "2026-10-12",
+    "instrument": (
+        "digital calipers, height gauge and indicator; physical component sizes/fit only"
+    ),
+}
 # prechips models a fixture as boxes and cylinders only, so the bound shop
 # inventory carries the plate's envelope (its outline's extents by the plate
 # thickness) with the pivot hole as a void, in this module's frame.
@@ -294,6 +305,7 @@ PRECHIPS_SOLIDS: list[dict[str, object]] = [
             THICK,
         ],
         "note": "outline envelope; the arcs, tip lands and tapered ends are inside it",
+        "measured": dict(_MEASURED),
     },
     {
         "name": "pivot-hole",
@@ -304,5 +316,6 @@ PRECHIPS_SOLIDS: list[dict[str, object]] = [
         "dia_mm": PIVOT_HOLE_DIA,
         "length_mm": THICK,
         "locates": "pin gauge in the rocker's pivot bore",
+        "measured": dict(_MEASURED),
     },
 ]

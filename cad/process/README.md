@@ -49,7 +49,11 @@ marks each unmeasured fact as a realistic placeholder,
 these are test inputs, not shop metrology, and must be remeasured before shop use.
 Spell the `by` exactly as `_process_plans.PLACEHOLDER_BY`, in the inventory and in
 TL specs' `PRECHIPS_SOLIDS`: it keeps `status = "measured"` so travelers exercise
-every check, and it is the one marker binding counts. Binding counts every bound
+every check, and it is the one marker binding counts. Every `PRECHIPS_SOLIDS`
+entry carries `measured` with an explicit `status`, and `bind_shop` refuses one
+without it, naming the spec and solid (#1462): prechips trusts a solid with no
+record as installed nominal geometry, and an omitted status reads as `assumed`.
+Binding counts every bound
 occurrence: `measured.by` values (spliced spec solids included), prose, and the
 comment-declared placeholders that schema-limited facts carry in the tracked
 files; `bind_shop` warns with the count. A traveler built on any placeholder is
@@ -60,7 +64,8 @@ still produce and verify it. Release preflight and traveler staging refuse while
 any placeholder is bound to an enrolled stem, naming every one.
 `cad/scripts/test_process_shop.py` (in `check:recipe`) validates the three
 files under the pinned prechips models and through `bind_shop`, requires a `by`
-on every `measured` record and the shared placeholder spelling, enumerates every
+on every `measured` record, an explicit `measured.status` on every bound solid
+and the shared placeholder spelling (spec solids included), enumerates every
 `shop_made` record, and rejects any other inventory table whose id or name names
 a registered part (stem or drawing number from `cad/config/parts`).
 

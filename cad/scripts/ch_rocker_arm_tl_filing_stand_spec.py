@@ -134,6 +134,17 @@ BENCH_SIZE = (500.0, 160.0, 30.0)
 # Prechips fixture solids in the inventory's fixture frame (Z0 = end-block
 # tops), from the same constants the SolidWorks part is built from.
 _FIXTURE_Z = -BLOCK_HEIGHT
+# The #1413 placeholder provenance every solid carries: ``by`` is
+# _process_plans.PLACEHOLDER_BY verbatim (test_process_shop pins the spelling)
+# and bind_shop refuses a solid without a measured status (#1462).
+_MEASURED = {
+    "status": "measured",
+    "by": "placeholder (realistic, remeasure: #1413)",
+    "date": "2026-10-12",
+    "instrument": (
+        "digital calipers, height gauge and indicator; physical component sizes/fit only"
+    ),
+}
 PRECHIPS_SOLIDS: list[dict[str, object]] = [
     {
         "name": "bench top",
@@ -146,6 +157,7 @@ PRECHIPS_SOLIDS: list[dict[str, object]] = [
         ],
         "size_mm": list(BENCH_SIZE),
         "note": "fitting bench top, drawn for clearance",
+        "measured": dict(_MEASURED),
     },
     *(
         {
@@ -156,6 +168,7 @@ PRECHIPS_SOLIDS: list[dict[str, object]] = [
             "label": "end blocks",
             "locates": f"raw blank underside, {side} end",
             "note": "low-carbon steel offcut",
+            "measured": dict(_MEASURED),
         }
         for side, west_x in zip(("left", "right"), BLOCK_WEST_X, strict=True)
     ),
@@ -168,5 +181,6 @@ PRECHIPS_SOLIDS: list[dict[str, object]] = [
         "length_mm": PEDESTAL_LENGTH,
         "locates": "lower hub face (P01)",
         "note": f"low-carbon steel round, its top {STEP:.2f} above the end blocks",
+        "measured": dict(_MEASURED),
     },
 ]

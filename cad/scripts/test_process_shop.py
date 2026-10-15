@@ -118,14 +118,41 @@ def test_every_measured_record_names_who_measured(name):
     assert not missing, missing
 
 
+def _spec_solids() -> Iterator[tuple[str, dict[str, Any]]]:
+    """Every solid a cad-tagged inventory table splices from its TL spec."""
+    for module in plans.shop_spec_modules():
+        for index, solid in enumerate(importlib.import_module(module).PRECHIPS_SOLIDS):
+            yield f"{module}.PRECHIPS_SOLIDS[{index}]", solid
+
+
+def _solids(node: Any, path: str = "") -> Iterator[tuple[str, Any]]:
+    """Every entry of every ``solids`` list, wherever its table nests."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            here = f"{path}.{key}" if path else key
+            if key == "solids" and isinstance(value, list):
+                for index, solid in enumerate(value):
+                    yield f"{here}[{index}]", solid
+            else:
+                yield from _solids(value, here)
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            yield from _solids(value, f"{path}[{index}]")
+
+
 def test_placeholder_marker_is_the_shared_constant():
     marker = plans.PLACEHOLDER_BY
     assert plans.PLACEHOLDER_ISSUE in marker
-    # No variant spelling escapes the count: every #1413 `by` is the constant.
+    # No variant spelling escapes the count: every #1413 `by` is the constant,
+    # in the tracked files and in the TL specs' PRECHIPS_SOLIDS alike.
+    measurements = [
+        measured for name in MODELS for _, measured in _measurements(_shop(name))
+    ] + [
+        measured for _, solid in _spec_solids() for _, measured in _measurements(solid)
+    ]
     variants = {
         str(measured["by"])
-        for name in MODELS
-        for _, measured in _measurements(_shop(name))
+        for measured in measurements
         if isinstance(measured, dict)
         and plans.PLACEHOLDER_ISSUE in str(measured.get("by", ""))
     } - {marker}
@@ -141,6 +168,37 @@ def test_placeholder_marker_is_the_shared_constant():
         for module in plans.shop_spec_modules()
     )
     assert len(plans.shop_placeholders()) == tracked + spliced > 0
+
+
+def test_spec_solid_placeholders_are_counted_where_they_bind():
+    expected = {
+        f"inventory.toml:{qualified}.solids[{index}].measured.by"
+        for qualified, _, record in _records()
+        if "cad" in record
+        for index, solid in enumerate(
+            importlib.import_module(f"{record['cad']}_spec").PRECHIPS_SOLIDS
+        )
+        if solid["measured"]["by"] == plans.PLACEHOLDER_BY
+    }
+    assert expected
+    assert expected <= set(plans.shop_placeholders())
+
+
+def test_every_bound_solid_states_its_measured_status(tmp_path):
+    """#1462: prechips trusts a solid with no measured record as installed
+    nominal geometry, and an omitted status reads as assumed."""
+    inventory, _, _ = plans.bind_shop(directory=tmp_path)
+    bound = list(_solids(tomllib.loads(inventory.read_text(encoding="utf-8"))))
+    tracked = list(_solids(_shop("inventory.toml")))
+    assert len(bound) == len(tracked) + len(list(_spec_solids()))
+    missing = [
+        path
+        for path, solid in bound
+        if not (
+            isinstance(solid.get("measured"), dict) and "status" in solid["measured"]
+        )
+    ]
+    assert not missing, missing
 
 
 def _nested(

@@ -354,6 +354,27 @@ def _toml_value(value: Any) -> str:
     raise PlanBindError(f"cannot serialize fixture value {value!r}")
 
 
+def _require_measured_status(module_name: str, solid: dict[str, Any]) -> None:
+    """Refuse a spec solid without an explicit ``measured.status`` (#1462).
+
+    prechips trusts a solid with no ``measured`` as installed nominal geometry
+    and records no debt, and an omitted status silently becomes ``assumed``, so
+    either would drop a fixture's provenance (the #1413 placeholder) unseen.
+    """
+    where = f"{module_name}.PRECHIPS_SOLIDS solid {solid.get('name', '<unnamed>')!r}"
+    measured = solid.get("measured")
+    if not isinstance(measured, dict):
+        raise PlanBindError(
+            f"{where}: no measured record; state its provenance, e.g. "
+            f'measured = {{ status = "measured", by = {PLACEHOLDER_BY!r}, … }} (#1462)'
+        )
+    if "status" not in measured:
+        raise PlanBindError(
+            f"{where}: measured has no status; an omitted status binds as "
+            "'assumed' (#1462)"
+        )
+
+
 def _shop_contents() -> tuple[bytes, bytes, bytes]:
     """Regenerate current tracked shop inputs without touching generated outputs."""
     from prechips.model import FixtureSolid
@@ -378,6 +399,7 @@ def _shop_contents() -> tuple[bytes, bytes, bytes]:
                     f"{module_name}.PRECHIPS_SOLIDS must be a list of dicts"
                 )
             for solid in solids:
+                _require_measured_status(module_name, solid)
                 FixtureSolid.model_validate(solid)
             table["solids"] = solids
             del table["cad"]

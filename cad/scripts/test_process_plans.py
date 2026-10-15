@@ -154,7 +154,13 @@ def _spec(monkeypatch, solids=True):
     module = ModuleType("ch_rocker_arm_tl_test_spec")
     if solids:
         module.PRECHIPS_SOLIDS = [
-            {"shape": "box", "at_mm": [0.0, 0.0, 0.0], "size_mm": [2.0, 3.0, 4.0]}
+            {
+                "name": "block",
+                "shape": "box",
+                "at_mm": [0.0, 0.0, 0.0],
+                "size_mm": [2.0, 3.0, 4.0],
+                "measured": _measurement("P. Vicente"),
+            }
         ]
     monkeypatch.setitem(sys.modules, module.__name__, module)
     return module
@@ -216,6 +222,34 @@ def test_shop_binding_fails_closed(synthetic, monkeypatch, failure):
     (shop / "inventory.toml").write_text(text)
     with pytest.raises(plans.PlanBindError):
         plans.bind_shop(out)
+
+
+@pytest.mark.parametrize(
+    ("gap", "reason"),
+    [("measured", "no measured record"), ("status", "measured has no status")],
+)
+def test_shop_binding_refuses_a_solid_without_measured_status(
+    synthetic, monkeypatch, gap, reason
+):
+    """#1462: prechips trusts a solid with no measured record as installed
+    nominal geometry, and an omitted status reads as assumed, so binding
+    refuses both, naming the spec and the solid, before writing anything."""
+    _, out, _, shop = synthetic
+    module = _spec(monkeypatch)
+    solid = module.PRECHIPS_SOLIDS[0]
+    if gap == "measured":
+        del solid["measured"]
+    else:
+        del solid["measured"]["status"]
+    (shop / "inventory.toml").write_text(
+        '[fixtures.test]\ncad = "ch_rocker_arm_tl_test"\n'
+    )
+    where = r"ch_rocker_arm_tl_test_spec\.PRECHIPS_SOLIDS solid 'block': "
+    with pytest.raises(plans.PlanBindError, match=where + reason):
+        plans.bind_shop(out)
+    with pytest.raises(plans.PlanBindError, match=where + reason):
+        plans.shop_placeholders()
+    assert not (out / "travelers" / "_shop").exists()
 
 
 def _complete(synthetic):

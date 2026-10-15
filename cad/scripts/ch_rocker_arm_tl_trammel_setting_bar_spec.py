@@ -130,6 +130,17 @@ SURFACE_FINISHES = ()
 DRAWING_NOTES = "NO NICKS OR BURRS AT THE SEATS."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:5"
 
+# The #1413 placeholder provenance every solid carries: ``by`` is
+# _process_plans.PLACEHOLDER_BY verbatim (test_process_shop pins the spelling)
+# and bind_shop refuses a solid without a measured status (#1462).
+_MEASURED = {
+    "status": "measured",
+    "by": "placeholder (realistic, remeasure: #1413)",
+    "date": "2026-10-12",
+    "instrument": (
+        "digital calipers, height gauge and indicator; physical component sizes/fit only"
+    ),
+}
 # prechips fixture solids (prechips.model.FixtureSolid), model frame: the bar
 # and each seat's through pilot (the cone is a #2 centre-drill mouth on it).
 PRECHIPS_SOLIDS: list[dict] = [
@@ -139,6 +150,7 @@ PRECHIPS_SOLIDS: list[dict] = [
         "note": "1018 CF 1/4 x 1 flat, supply length; seats on the top face",
         "at_mm": [-H0_FROM_END, -BAR_THICKNESS, -BAR_WIDTH / 2.0],
         "size_mm": [BAR_LENGTH, BAR_THICKNESS, BAR_WIDTH],
+        "measured": dict(_MEASURED),
     },
     *(
         {
@@ -151,6 +163,7 @@ PRECHIPS_SOLIDS: list[dict] = [
             "dia_mm": PILOT_DIA,
             "length_mm": BAR_THICKNESS,
             "void": True,
+            "measured": dict(_MEASURED),
         }
         for label, x in SEAT_STATIONS.items()
     ),
