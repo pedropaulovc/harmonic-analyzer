@@ -1185,8 +1185,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "clips-fitted": (
             f"SCREW THE {_N['pd-platen-clip']} CLIPS TO THE PLATEN FRONT WITH "
-            f"{CLIP_SCREWS} {_N['vn-platen-clip-screw']} SCREWS; SLIP THE "
-            f"{_N['pd-platen-paper']} PAPER UNDER THEIR SPRING RAILS."
+            f"{CLIP_SCREWS} {_N['vn-platen-clip-screw']} SCREWS, SPRING RAILS "
+            f"INBOARD; LAY THE {_N['pd-platen-paper']} PAPER BETWEEN THEM."
         ),
         "platen-hung": (
             "TRIAL-HANG THE PLATEN ON THE BAR, THE TOP GUIDE ON THE BAR TOP. FIT THE "
