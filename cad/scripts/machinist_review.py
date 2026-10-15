@@ -84,6 +84,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME, CAD_ROOT  # noqa: E402
+from machinist_exceptions import load_exceptions as _load_exceptions  # noqa: E402
 from machinist_review_sheets_mcp import (  # noqa: E402
     PDFIUM_LOCK as _PDFIUM_LOCK,
     SheetStore,
@@ -316,6 +317,22 @@ def _review_prompt(
             "images.\n"
             f"{layers}\n"
         )
+    if package.sources:
+        exceptions = _load_exceptions(CAD_ROOT / "config", package.name, package.kind)
+        if exceptions:
+            prompt += (
+                "\nOWNER-DECLARED MACHINIST EXCEPTIONS\n"
+                "The project owner has accepted these known departures. A "
+                "would-be finding that matches one is not a finding: do not "
+                'file it (kind "accept"), or file it at most under minor '
+                '(kind "minor"), and never let it affect the verdict. Name '
+                "the exception id in the summary when you apply one.\n"
+            )
+            for exception in exceptions:
+                prompt += (
+                    f"- {exception.id} [{exception.kind}] at {exception.where}: "
+                    f"{exception.finding} — {exception.reason}\n"
+                )
     return prompt + "Return one verdict for the package as a whole.\n"
 
 
@@ -1733,6 +1750,16 @@ def review_package(
         "crop_calls": evidence["crop_calls"],
         "crops": evidence["crops"],
         "neutral_calls": evidence["neutral_calls"],
+        "exceptions": [
+            {
+                "id": exception.id,
+                "where": exception.where,
+                "finding": exception.finding,
+                "reason": exception.reason,
+                "kind": exception.kind,
+            }
+            for exception in _load_exceptions(CAD_ROOT / "config", package.name, package.kind)
+        ],
         "context_errors": context_errors,
         "usage": _usage(
             events, reviewer, success_events=success_events,

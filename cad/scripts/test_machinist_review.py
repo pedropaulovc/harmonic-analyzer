@@ -987,6 +987,87 @@ def test_sheet_text_is_authorized_but_never_proves_inspection() -> None:
         assert not evidence["inspection_proven"]
 
 
+# --- owner-declared machinist exceptions -------------------------------------
+
+
+def _write_exceptions_config(root: Path, name: str, section: Any) -> Path:
+    dashed = name.replace("_", "-")
+    directory = root / "parts"
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{dashed}.yaml"
+    import yaml
+
+    path.write_text(
+        yaml.safe_dump({dashed: {"number": "MHA-XX-000", "machinist_exceptions": section}}),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_declared_exceptions_load_and_validate(tmp_path: Path) -> None:
+    import machinist_exceptions
+
+    section = [
+        {
+            "id": "RV-001",
+            "where": "sheet 1, front view, 25.20 overall length",
+            "finding": "tight clearance band with no named mate (rule 4)",
+            "reason": "CLEARS callout names the mate; owner accepts it",
+            "kind": "accept",
+        }
+    ]
+    _write_exceptions_config(tmp_path, "dt_crank_hub", section)
+    entries = machinist_exceptions.load_exceptions(tmp_path, "dt_crank_hub", "part")
+    assert [entry.id for entry in entries] == ["RV-001"]
+    assert entries[0].kind == "accept"
+    # A package that declares nothing (or has no config file) gets nothing.
+    assert machinist_exceptions.load_exceptions(tmp_path, "ms_stick", "part") == ()
+    assert machinist_exceptions.load_exceptions(tmp_path, "pn_pen_assembly", "assembly") == ()
+    # Malformed declarations fail loud: a typo must never silently widen
+    # or narrow what the reviewer ignores.
+    for bad in (
+        [dict(section[0], kind="ignore")],
+        [dict(section[0], reason="")],
+        [dict(section[0], extra="x")],
+        [section[0], section[0]],
+    ):
+        _write_exceptions_config(tmp_path, "dt_crank_hub", bad)
+        with pytest.raises(ValueError):
+            machinist_exceptions.load_exceptions(tmp_path, "dt_crank_hub", "part")
+
+
+def test_review_prompt_injects_declared_exceptions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _text_pdf(tmp_path / "sheet.pdf", [(100, 400, "FRONT 5:1")])
+    config_root = tmp_path / "config"
+    _write_exceptions_config(
+        config_root,
+        "crank_arm",
+        [
+            {
+                "id": "RV-007",
+                "where": "sheet 1, bore",
+                "finding": "REAM callout with no named mate (rule 4)",
+                "reason": "mate named in the gear data block; accepted",
+                "kind": "minor",
+            }
+        ],
+    )
+    monkeypatch.setattr(mr, "CAD_ROOT", tmp_path)
+    package = mr.ReviewPackage("crank_arm", "part", (source,))
+    prompt = mr._review_prompt(package, 1)
+    assert "OWNER-DECLARED MACHINIST EXCEPTIONS" in prompt
+    assert "RV-007 [minor] at sheet 1, bore" in prompt
+    assert "the exception id in the summary" in prompt
+    lines = prompt.splitlines()
+    assert lines[-1] == "Return one verdict for the package as a whole."
+    # Packages without sources never see config-derived exceptions, so the
+    # static tail contract holds regardless of what configs declare.
+    bare = mr.ReviewPackage("crank_arm", "part", ())
+    assert "OWNER-DECLARED MACHINIST EXCEPTIONS" not in mr._review_prompt(bare, 1)
+
+
 # --- blind evidence ----------------------------------------------------------
 
 
