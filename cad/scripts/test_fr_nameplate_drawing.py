@@ -16,6 +16,7 @@ import fr_nameplate_spec as spec
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _printed_tolerance import printed_band_mm
+from _release_artwork import bundle_path
 from vn_fillister_screw_spec import HEAD_DIA
 
 # Sheet B landscape inner border and the title block's top-left corner (m).
@@ -172,7 +173,9 @@ def test_hole_ligaments_and_engraving_floor_at_the_printed_worst_case() -> None:
 
 def test_notes_and_callouts_carry_no_numbers_and_stay_short() -> None:
     notes = print_spec.MANUFACTURING_NOTES.splitlines()
+    # The note block's rows fit the left half above the title band.
     assert 1 <= len(notes) <= 4
+    assert all(len(note) <= 60 for note in notes), notes
     texts = [
         *notes,
         print_spec.FIELD_DEPTH_CALLOUT,
@@ -180,8 +183,9 @@ def test_notes_and_callouts_carry_no_numbers_and_stay_short() -> None:
         *print_spec.DIMENSION_CALLOUTS.values(),
     ]
     assert not any(re.search(r"\d", text) for text in texts), texts
+    # Each vendored contour by the exact path cut_release stages it at.
     for name in (part.OUTLINE_DXF, part.FIELD_DXF, part.ENGRAVING_DXF):
-        assert name.name.upper() in print_spec.MANUFACTURING_NOTES
+        assert f" PER {bundle_path(name.name)}" in print_spec.MANUFACTURING_NOTES
 
 
 def test_texts_stand_inside_the_border_and_off_the_title_block() -> None:

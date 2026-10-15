@@ -647,6 +647,7 @@ def feature_release(
     monkeypatch.setattr(cut_release, "RELEASE_DIR", out / "release")
     monkeypatch.setattr(cut_release, "SCENE_JSON", scene)
     monkeypatch.setattr(cut_release, "DRAWING_OUTPUTS", {})
+    monkeypatch.setattr(cut_release, "drawing_note_texts", set)
     monkeypatch.setattr(cut_release, "load_native_package", lambda: package)
     monkeypatch.setattr(cut_release, "stage_comparisons", lambda _stage: {})
     monkeypatch.setattr(cut_release, "stage_readout_procedure", lambda *_args: [])
