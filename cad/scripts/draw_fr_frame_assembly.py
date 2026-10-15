@@ -33,6 +33,8 @@ from _drawing_balloons import (
     BalloonLanding,
     _balloon_item_number,
     _spread_balloons,
+    _stems_matching,
+    _view_component_leaves,
     add_component_bom_balloons,
     assert_balloon_landings,
     drawing_viewport_pixel_size,
@@ -672,14 +674,29 @@ def _visible_z_line_at_x(
     adapter: Any, view: Any, *, component_stem: str, x_mm: float, label: str
 ) -> Any:
     """The highest visible straight edge of ``component_stem`` running along
-    machine Z at machine x = ``x_mm``: the one a plan view prints there."""
+    machine Z at machine x = ``x_mm``: the one a plan view prints there.
+
+    The instances come from the view's drawing-component tree, not
+    ``IView::GetVisibleComponents``: on assembly section B-B that call returned
+    no component at all (r4, run 20261015T024651004Z) while the sheet printed
+    the plate and the deck. The tree lists every instance with its shown
+    state, and ``GetVisibleEntities2`` takes the tree's component directly,
+    as the balloon anchors do.
+    """
     candidates = []
-    families = _frame_visible_components(view)
+    leaves = _view_component_leaves(adapter, view, label=label)
+    matching = [
+        leaf
+        for leaf in leaves
+        if leaf.visible
+        and leaf.component is not None
+        and _stems_matching(leaf.identities, frozenset({component_stem}))
+    ]
     seen: list[tuple[float, ...]] = []
     edge_count = 0
-    for component, full in families.get(component_stem, ()):
+    for leaf in matching:
         transform = None
-        for edge in visible_component_entities(view, component, 1):
+        for edge in visible_component_entities(view, leaf.component, 1) or ():
             edge_count += 1
             curve = _early_bound(_early_bound(edge, "IEdge").GetCurve(), "ICurve")
             if curve is None or not curve.IsLine():
@@ -688,7 +705,7 @@ def _visible_z_line_at_x(
             if key is None:
                 continue
             if transform is None:
-                transform = _component_transform(full)
+                transform = _component_transform(leaf.component)
             start = _transform_point(transform, key[:3])
             end = _transform_point(transform, key[3:6])
             seen.append(tuple(round(v * 1000.0, 3) for v in (*start, *end)))
@@ -702,11 +719,19 @@ def _visible_z_line_at_x(
     if not candidates:
         # The nearest lines by x, so a miss names what the view did offer.
         nearest = sorted(seen, key=lambda row: abs(row[0] - x_mm) + abs(row[3] - x_mm))
+        shown = sorted(
+            {
+                identity
+                for leaf in leaves
+                if leaf.visible
+                for identity in leaf.identities
+            }
+        )
         raise RuntimeError(
             f"{label}: no visible {component_stem!r} edge along Z at x {x_mm:g} mm; "
-            f"{len(families.get(component_stem, ()))} component(s), {edge_count} "
-            f"visible edge(s), {len(seen)} line(s), nearest (machine mm) "
-            f"{nearest[:8]}; visible stems {sorted(families)}"
+            f"{len(leaves)} leaf component(s), {len(matching)} shown {component_stem!r}, "
+            f"{edge_count} visible edge(s), {len(seen)} line(s), nearest (machine mm) "
+            f"{nearest[:8]}; shown identities {shown[:24]}"
         )
     return max(candidates, key=lambda row: row[0])[1]
 
