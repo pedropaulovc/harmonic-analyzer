@@ -76,12 +76,12 @@ HOLES row.
 - Three places mean "hold it", two mean "routine", one means "near enough".
   Three places on a drilled hole is a defect, and so are two places on a reamed
   bearing bore with no band. Two places is the ordinary spelling of a drilled
-  hole (`Ø5.95 DRILL THRU`), a tap or tap-drill depth and a routine location;
+  hole (`Øn.nn DRILL THRU`), a tap or tap-drill depth and a routine location;
   it is never over-specification by itself.
 - Noncritical overall sizes generally need one place (`.X`). Chamfers, edge
   breaks and clearance holes never need extra places.
-- A dimension that carries its own band (`Ø9.55 +0.03/0`, or stacked limits
-  such as `15.65` over `0.0/-0.5`) is toleranced by that band. Its decimal
+- A dimension that carries its own band (`Øn.nn +0.03/0`, or stacked limits
+  such as `n.nn` over `0.0/-0.5`) is toleranced by that band. Its decimal
   places are only the number's spelling: never ask it to grow or drop a place,
   and never round it, which moves its limits.
 - A three-place size with no band and no stated function is
@@ -123,7 +123,7 @@ a chamfer gets the loosest title-block band that serves it.
   still apply and must produce the required fit; matching does not waive them.
   Interchangeable parts need their essential limits.
 - **Stock that is good enough stays stock.** Where bar stock already meets the
-  need, say so (`16 STOCK OK`, `.50 (STOCK)`) or give a minimum cleanup size
+  need, say so (`n STOCK OK`, `.nn (STOCK)`) or give a minimum cleanup size
   rather than a turned band.
 - **Read a band as its total width.** `+0.005 / 0` is 5 µm wide, the same as
   ±0.0025. Keep the original nominal and the asymmetric limits when checking a
@@ -195,7 +195,7 @@ note says slides or bears does run.
 ### Rule 7 — Notes: few, flagged, never a method
 
 At most four short lines of part-specific facts the views cannot carry: drill
-versus ream, stock allowance (`16 STOCK OK`, `SUPPLY 4.30 MIN THICK`),
+versus ream, stock allowance (`n STOCK OK`, `SUPPLY n.nn MIN THICK`),
 `CENTRES OK`, match-drill at assembly, a matched-fit statement with its mate
 and acceptance, a loose-supplied set screw, a stated shortfall (rule 20), a
 gear data block. A gear data block may carry REF values (module, transverse
@@ -208,7 +208,7 @@ are gear data, not narration.
   mate is always allowed.
 - **Say why when it is not obvious.** A short functional reason is welcome
   where a tight band, a roughness symbol or a hardness would otherwise look
-  arbitrary: `WHEEL BEARING SURFACE`, `KNIFE-EDGE SEAT`, `SETS MESH BACKLASH`.
+  arbitrary: `BEARING SURFACE`, `KNIFE-EDGE SEAT`, `SETS MESH BACKLASH`.
   Put it on the callout it explains; naming the mate (rule 4) is the commonest
   form. A reason says what the feature does, never how to make it, and it is
   never a defect in itself. What a note must not do is prescribe the process.
@@ -287,8 +287,8 @@ Hidden lines appear only where they inform (ASME Y14.3).
 
 ### Rule 12 — Hole and slot callouts say what to do
 
-- A hole callout gives the decimal Ø and the process: `Ø9.525 REAM THRU`,
-  `Ø5.95 DRILL THRU`. A clearance hole gives its size, not "FOR 1/4-20 SHCS".
+- A hole callout gives the decimal Ø and the process: `Øn.nn REAM THRU`,
+  `Øn.nn DRILL THRU`. A clearance hole gives its size, not "FOR 1/4-20 SHCS".
 - A through tap can stay simple. A blind tap gives its required full-thread
   depth and, when it governs the operation, the separately deeper tap-drill
   depth. Those are not interchangeable; never let a modelled minor-diameter
@@ -398,15 +398,15 @@ worst-case range: a slot, shim, feeler-set gap, cut-to-fit length or
 match-drilled hole, named in the assembly step. A stack that silently depends
 on tight part bands is a defect; the fix is an adjustment, not a tighter part.
 A part that states a supply size and a set-at-assembly size for the same
-feature (`SUPPLY 3.40 MIN`, `2.90 SET AT ASSEMBLY 2.75–2.95`) is describing
+feature (`SUPPLY n.nn MIN`, `n.nn SET AT ASSEMBLY n.nn–n.nn`) is describing
 this adjustment, not contradicting itself.
 
 ### Rule 20 — State a known shortfall as a plain fact
 
 Where a part knowingly falls short of rules 17–18 or another numeric rule, its
 sheet (or the assembly step that sets it) states the shortfall and its value as
-a manufacturing fact, for example `ENGAGEMENT 5.72 MIN (0.90D)` or
-`WALL 1.64 MIN`. The sheet never argues for it: no rule numbers and no words
+a manufacturing fact, for example `ENGAGEMENT n.nn MIN (n.nnD)` or
+`WALL n.nn MIN`. The sheet never argues for it: no rule numbers and no words
 such as EXCEPTION, ACCEPTED, RULING, POLICY or BOOK FIDELITY. Stating a
 shortfall makes it visible; it does not approve it. Approval belongs to the
 project owner and lives outside the drawing.
@@ -505,8 +505,8 @@ obeyed. That includes:
 
 Statements that can both be obeyed are not a contradiction: a tighter local
 band inside the title-block band, a material picked from the title block's
-listed alternatives, the same size spelled with different places (`Ø12.0` and
-`Ø12.00`), a supply size and a set-at-assembly size (rule 19), or a view-scale
+listed alternatives, the same size spelled with different places (`Øn.n` and
+`Øn.nn`), a supply size and a set-at-assembly size (rule 19), or a view-scale
 label differing from the title-block scale on a DO NOT SCALE sheet. Judge
 those under rules 2, 3 or 7 at their own severity.
 
