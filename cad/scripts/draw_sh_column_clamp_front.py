@@ -102,6 +102,10 @@ FACE_CENTER = (0.095, 0.175)
 FACE_VIEW_ANGLE = -math.pi / 2.0
 ISO_CENTER = (0.355, 0.205)
 ISO_NOTE_XY = (0.330, 0.168)
+# Ear-height text centre off the face view's centre (sheet m): the bottom-face
+# witness stands ARC_HEIGHT / 2 at 2:1 = 0.016 off it, the widest callout
+# line is ~0.040 wide, so 0.040 leaves ~4 mm between text and witness.
+EAR_HEIGHT_TEXT_OFFSET = 0.040
 
 
 def _face_xy(y_mm: float, z_mm: float) -> tuple[float, float]:
@@ -121,8 +125,13 @@ def _face_xy(y_mm: float, z_mm: float) -> tuple[float, float]:
 # ear-hole station from the bore centerline left of it, its mate callout under
 # the value; under the view, the ears' shared height off the bottom face
 # (EarHoleHeight, from the part's hidden EarHeightReference sketch: its
-# witnesses leave the bottom face and ear 1's centre) with its mate callout
-# under the value, and the height below that callout.
+# witnesses leave the bottom face and ear 1's centre), and the height below
+# it.  The ears' height spans only 16 mm of sheet between its witnesses, far
+# short of its ~40 mm callout block, so that block stands OUTSIDE them, past
+# the bottom-face witness (which the height shares) and off the part, its
+# dimension line run out under it: no witness, ear centreline or part edge
+# crosses the text (farm round 20261015T1724 audit and machinist review,
+# rule 14).
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0], 0.248),
     "Width": (0.262, TOP_CENTER[1]),
@@ -132,7 +141,7 @@ TOP_KEEP = {
 FACE_KEEP = {
     "Height": (FACE_CENTER[0], 0.090),
     "EarHole1Z": (0.055, 0.1575),
-    "EarHoleHeight": (FACE_CENTER[0] - 0.008, 0.113),
+    "EarHoleHeight": (FACE_CENTER[0] - EAR_HEIGHT_TEXT_OFFSET, 0.113),
 }
 
 # Both ear holes stand on the one station and the one height the part prints
