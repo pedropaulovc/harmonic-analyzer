@@ -71,11 +71,12 @@ FULL_FORM_TAIL_MIN = THREAD_LENGTH_MIN - INCOMPLETE_TIP_LEN_MAX
 # The 2A minor diameter's MAX (ASME B1.1 #8-32 UNC-2A, 0.1302 in): the cut-end
 # chamfer's least leg must reach under it so no feather edge is left.
 THREAD_MINOR_MAX = 0.1302 * 25.4
-# Radial leg from the native ChamferWidth, measured on the tip face.
-CHAMFER_WIDTH = 0.50
-CHAMFER_WIDTH_TOLERANCE = 0.05
-CHAMFER_WIDTH_MIN = CHAMFER_WIDTH - CHAMFER_WIDTH_TOLERANCE
-CHAMFER_WIDTH_MAX = CHAMFER_WIDTH + CHAMFER_WIDTH_TOLERANCE
+# Radial leg from the native ChamferWidth, measured on the tip face: a MAX
+# (swTolMAX prints the nominal and "max."), so the model stands at the printed
+# maximum. Its callout asks for the chamfer past the thread root, which leaves
+# no feather edge; the thread tail's 1-pitch note bounds the rest.
+CHAMFER_WIDTH = 0.60
+CHAMFER_WIDTH_MAX = CHAMFER_WIDTH
 CHAMFER_ANGLE = 45.0  # Native driving angle between tip face and chamfer.
 # Printed natively without a band: the title block's angular row governs it.
 CHAMFER_ANGLE_TOLERANCE = angular_band_deg()
@@ -86,8 +87,8 @@ CHAMFER_AXIAL_MAX = CHAMFER_WIDTH_MAX * math.tan(
 )
 if not 0.0 < CHAMFER_AXIAL_MAX <= INCOMPLETE_TIP_LEN_MAX:
     raise AssertionError("cut-end chamfer exceeds the charged incomplete pitch")
-if not THREAD_MAJOR / 2.0 - CHAMFER_WIDTH_MIN < THREAD_MINOR_MAX / 2.0:
-    raise AssertionError("the least cut-end chamfer leaves a feather edge")
+if not THREAD_MAJOR / 2.0 - CHAMFER_WIDTH_MAX < THREAD_MINOR_MAX / 2.0:
+    raise AssertionError("a chamfer past the thread root exceeds its maximum")
 # The faced length is shorter than every catalogue stock length's nominal and
 # its full thread clears the neck.
 if not FULL_THREAD_START + THREAD_LENGTH_MIN < FITTED_THREAD_LEN < THREAD_LEN:
@@ -100,7 +101,7 @@ DRAWING_DIMENSIONS = {
 }
 DRAWING_PRECISION = {
     "StockTrimProfile": {"CutLength": 2},
-    "StockDeburrProfile": {"ChamferWidth": 2, "ChamferAngle": 0},
+    "StockDeburrProfile": {"ChamferWidth": 1, "ChamferAngle": 0},
     "ThreadTailAcceptance": {"ThreadLengthMin": 2},
 }
 DIMENSION_PRECISION = {
@@ -112,7 +113,7 @@ DIMENSION_PRECISION = {
 REFERENCE_DIMENSIONS = (("StockTrimProfile", "CutLength"),)
 DIMENSION_TOLERANCE_TYPES = {
     "CutLength": 0,
-    "ChamferWidth": 4,
+    "ChamferWidth": 6,  # swTolMAX
     "ChamferAngle": 11,  # swTolGeneral: native band, title-block print.
     "ThreadLengthMin": 5,
 }
@@ -123,9 +124,8 @@ DIMENSION_CALLOUTS = {
         f"TIP {TIP_RECESS[0]:.2f}-{TIP_RECESS[1]:.2f} BELOW MHA-PD-007\n"
         "FRONT FACE AS FITTED"
     ),
-    # The band on the leg is the engagement reason; the native ChamferAngle
-    # prints its own 45 degrees.
-    "ChamferWidth": "CUT-END CHAMFER\nSETS FULL-THREAD ENGAGEMENT\nIN MHA-PD-007 BAR",
+    # The native ChamferAngle prints its own 45 degrees.
+    "ChamferWidth": "CUT-END CHAMFER\nPAST THE THREAD ROOT",
     "ThreadLengthMin": (
         f"{PRINTED_THREAD} CONTINUOUS TAIL FROM TIP\n"
         "INCOMPLETE CUT-END THREAD 1 PITCH MAX\n"
