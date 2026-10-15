@@ -44,7 +44,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
-from _drawing_dimensions import set_dimension_callouts, set_dimension_precision
+from _drawing_dimensions import (
+    offset_dimension_text,
+    set_dimension_callouts,
+    set_dimension_precision,
+)
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout
@@ -53,7 +57,7 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_tables import create_view_theoretical_datum, insert_hole_table
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_view_display import set_hidden_lines_removed
 from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
 from _hole_spec import blind_cut_dia_mm
@@ -131,7 +135,9 @@ CAVITY_RADIUS_CORNER = (1, 1)
 DIMENSION_CALLOUTS = {
     "PocketRadius": "8X",
     "CavityRadius": "4X",
-    "WinWidth": "SQ POCKET",
+    # One SQ size covers both opposed pockets; the front view shows only the
+    # near one (r6 machinist review).
+    "WinWidth": "SQ POCKET BOTH SIDES",
     "CavWidth": "SQ CAVITY THRU",
     "RimChamferSize": " X 45 DEG\nALL OUTSIDE\nEDGES AND\nPOCKET AND\nCAVITY RIMS",
 }
@@ -144,7 +150,9 @@ DIMENSION_PRECISION = {
     "WallHeight": 1,
     "FootSpan": 1,
     "TopSpan": 1,
-    "RimChamferSize": 2,
+    # A chamfer never needs extra places (drawing-guidelines.md rule 3): no
+    # stack reads RimChamferSize, so 1.27 prints as 1.3 on the .X band.
+    "RimChamferSize": 1,
     # A held thickness, 9.525 at the routine ±0.51: the seats' thread-wall
     # stack reads the same places (rocker_bracket_seat_layout).
     "WebThickness": WEB_PLACES,
@@ -206,9 +214,11 @@ VIEW_B_ARROW = (
     (FRONT_CENTER[0] - 0.020, FRONT_CENTER[1] + HALF_Y * VIEW_SCALE / 1000.0),
 )
 # The web thickness text sits right of the section, clear of the slanted
-# wall (x ~0.2187 at y 0.157) and of the 177.8 dimension line at x 0.240;
-# at x 0.221 it printed across the wall line (fix3 render).
-WEB_TEXT_XY = (RIGHT_CENTER[0] + 0.026, RIGHT_CENTER[1] - 0.028)
+# wall and of the 177.8 dimension line at x 0.240; at x 0.221 it printed
+# across the wall line (fix3 render). Its dimension line (about 2.8 mm under
+# the text) runs above the cavity rim's chamfer dimension and the chamfer
+# leader: at y 0.157 it crossed both beside the web (r6 render).
+WEB_TEXT_XY = (RIGHT_CENTER[0] + 0.026, RIGHT_CENTER[1] - 0.0122)
 # The foot's 6.35 spans only 3.2 mm of sheet, too little for its text: at
 # y 0.142 the text sat between the extension lines with its own dimension
 # line through it (fix4 render). It prints just above the foot's top
@@ -218,21 +228,25 @@ FOOT_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] - 0.0365)
 # The section cuts the window rim in profile, and it is the one view where a
 # targeted import of RimChamfer delivers RimChamferSize (r743-diag-c, leaf
 # 20260926T100550Z-1-829fb125). The front view only ever got it as a side
-# effect of the entire-model import, which the #743 rail took away. The callout
-# keeps the lane between the front view and the section, beside the section's
-# chamfered outside edges. Its text box hangs LEFT of this point (a display
-# dimension anchors where its leader meets the box: the layout audit of farm
-# run 20261015T015928596Z measured the old block at 144.5..164.8 mm for an
-# anchor at 165), so the anchor sits near the section's slant wall and the
-# widened caption still clears the front view's right edge (149.7 mm). The
-# dimension line drops from here to the cavity rim at the web, left of the
-# wall and right of the 6.35's text.
+# effect of the entire-model import, which the #743 rail took away. The import
+# binds the size to the cavity rim on the web's left face, inside the
+# section, so the dimension line stands just left of that face (short
+# extension lines across the pocket void, not from the web out past the slant
+# wall: r4 machinist review, rule 14) and the text rides an OffsetText leader
+# out to the lane between the front view and the section, beside the
+# section's chamfered outside edges. With OffsetText the text centres on its
+# point.
+RIM_CHAMFER_LINE_GAP = 0.0025
 RIGHT_KEEP = {
     "WallHeight": (0.240, 0.185),
     "FootSpan": (0.205, 0.133),
     "TopSpan": (0.205, 0.238),
-    "RimChamferSize": (0.187, 0.200),
+    "RimChamferSize": (
+        RIGHT_CENTER[0] - WEB * VIEW_SCALE / 1000.0 - RIM_CHAMFER_LINE_GAP,
+        RIGHT_CENTER[1] - (CAV + CHAMFER / 2.0) * VIEW_SCALE / 1000.0,
+    ),
 }
+RIM_CHAMFER_TEXT_XY = (0.1717, 0.200)
 
 # Top-left anchor; the native four-row table grows down and right while
 # remaining clear of the isometric and title block.
@@ -620,10 +634,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (front, bottom):
-        set_hidden_lines_visible(adapter, view)
-    set_hidden_lines_removed(adapter, right)
-    set_hidden_lines_removed(adapter, iso)
+    # Every view hides its hidden edges: Section A-A shows the pockets, web
+    # and cavity, and View B the seats, so dashed lines in the front and the
+    # hole-table view only buried the A1-A4 holes (r4 machinist review).
+    for view in (front, right, bottom, iso):
+        set_hidden_lines_removed(adapter, view)
 
     front_dimensions = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -638,6 +653,9 @@ async def build(adapter: Any) -> dict[str, str]:
     dimensions = [*front_dimensions, *right_dimensions]
     set_dimension_callouts(adapter, dimensions, DIMENSION_CALLOUTS)
     set_dimension_precision(adapter, dimensions, imported_precision())
+    offset_dimension_text(
+        adapter, right_dimensions, {"RimChamferSize": RIM_CHAMFER_TEXT_XY}
+    )
     _create_view_centerline(
         adapter,
         front,
@@ -758,9 +776,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rocker-arm-support",
     )
     _mirror_right_end_hole_tags(bottom)
-    # The drawing-sketch datum and hole table leave the bottom view's HLV edge
-    # set stale, so restore its complete projected edge set before export.
-    set_hidden_lines_visible(adapter, bottom)
+    # The drawing-sketch datum and hole table leave the bottom view's edge set
+    # stale, so regenerate it before export.
+    set_hidden_lines_removed(adapter, bottom)
     _telemetry.info(
         f"bottom view outline (uncropped 1:2 control): "
         f"{tuple(_early_bound(bottom, 'IView').GetOutline())!r}"
