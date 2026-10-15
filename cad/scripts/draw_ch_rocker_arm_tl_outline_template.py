@@ -142,19 +142,20 @@ requirement(
             limits(
                 part_spec.TOP_ABOVE_PIVOT,
                 _PRECISION["TopAbovePivot"],
-                part_spec.APEX_BAND,
+                part_spec.LOW_POINT_BAND,
             ),
-            ("TOP_ABOVE_PIVOT", "APEX_BAND", ("ch_rocker_arm_spec", "TOP_EDGE_BAND")),
+            (
+                "TOP_ABOVE_PIVOT",
+                "LOW_POINT_BAND",
+                ("ch_rocker_arm_spec", "TOP_EDGE_BAND"),
+            ),
         ),
         "height_nominal": (part_spec.TOP_ABOVE_PIVOT, ("TOP_ABOVE_PIVOT",)),
         "height_from": (
             "pivot_hole",
             (("draw_ch_rocker_arm_tl_outline_template", "build"),),
         ),
-        "radius": (
-            limits(part_spec.R_TOP, _PRECISION["TopRadius"], part_spec.APEX_BAND),
-            ("R_TOP", "APEX_BAND"),
-        ),
+        "radius": (limits(part_spec.R_TOP, _PRECISION["TopRadius"]), ("R_TOP",)),
         "radius_nominal": (part_spec.R_TOP, ("R_TOP",)),
         "arc_centre": ([0.0, part_spec.CENTER_Y, 0.0], ("CENTER_Y",)),
         "station": (
@@ -189,11 +190,11 @@ requirement(
             limits(
                 part_spec.BOTTOM_BELOW_PIVOT,
                 _PRECISION["BottomBelowPivot"],
-                part_spec.APEX_BAND,
+                part_spec.LOW_POINT_BAND,
             ),
             (
                 "BOTTOM_BELOW_PIVOT",
-                "APEX_BAND",
+                "LOW_POINT_BAND",
                 ("ch_rocker_arm_spec", "TOP_EDGE_BAND"),
             ),
         ),
@@ -202,8 +203,8 @@ requirement(
             (("draw_ch_rocker_arm_tl_outline_template", "build"),),
         ),
         "radius": (
-            limits(part_spec.R_BOTTOM, _PRECISION["BottomRadius"], part_spec.APEX_BAND),
-            ("R_BOTTOM", "APEX_BAND"),
+            limits(part_spec.R_BOTTOM, _PRECISION["BottomRadius"]),
+            ("R_BOTTOM",),
         ),
         "radius_nominal": (part_spec.R_BOTTOM, ("R_BOTTOM",)),
         "arc_centre": ([0.0, part_spec.CENTER_Y, 0.0], ("CENTER_Y",)),

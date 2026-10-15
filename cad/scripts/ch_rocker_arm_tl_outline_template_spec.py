@@ -25,7 +25,7 @@ from __future__ import annotations
 import math
 
 import ch_rocker_arm_spec as rocker
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import printed_band_mm, printed_deviations
 
 R_TOP = rocker.R_TOP
 R_BOTTOM = rocker.R_BOTTOM
@@ -61,23 +61,26 @@ if (
     )
 
 # Shop acceptance (inventory gauges.arm-outline-template, Pedro 2026-10-11):
-# DTI stations within +/-0.03 of nominal about the pivot. On the sheet it is
-# the band on both apex heights, measured from the pin gauge in the hole, and
-# on both radii: their centre sits on the pivot centreline, so each radius
-# band is the zone between two arcs +/-0.03 about the nominal one, at every
-# station.
-APEX_BAND = (0.03, -0.03)
+# DTI stations within +/-0.03 of nominal about the pivot.
+DTI_ACCEPTANCE = 0.03
+# The sheet fixes each arc by its low point on the mirror line, measured from
+# the pin gauge in the hole, and prints its radius at the title block's .XX
+# band. The centre sits on the pivot centreline, so the low point and the
+# radius pin the whole arc; the end stations below check that the radius
+# band, carried out to the arc ends, stays inside DTI_ACCEPTANCE.
+LOW_POINT_BAND = (0.02, -0.02)
 APEX_PLACES = 2
+RADIUS_PLACES = 2
 for _low, _high, _nominal in (
     (_ROCKER_TOP_LOW, _ROCKER_TOP_HIGH, TOP_ABOVE_PIVOT),
     (_ROCKER_BOTTOM_LOW, _ROCKER_BOTTOM_HIGH, BOTTOM_BELOW_PIVOT),
 ):
-    if not _low < _nominal + APEX_BAND[1] < _nominal + APEX_BAND[0] < _high:
-        raise AssertionError("template apex band leaves the rocker's arc zone")
+    if not _low < _nominal + LOW_POINT_BAND[1] < _nominal + LOW_POINT_BAND[0] < _high:
+        raise AssertionError("template low-point band leaves the rocker's arc zone")
     # The gauge spends at most a quarter of the zone it sets.
-    if APEX_BAND[0] - APEX_BAND[1] > 0.25 * (_high - _low) + 1e-9:
+    if LOW_POINT_BAND[0] - LOW_POINT_BAND[1] > 0.25 * (_high - _low) + 1e-9:
         raise AssertionError(
-            "template apex band spends more than a quarter of the rocker zone"
+            "template low-point band spends more than a quarter of the rocker zone"
         )
 
 # The arcs end where the rocker's do: its 11.5 in / 10.5 in arc lengths
@@ -96,6 +99,22 @@ ALPHA_TOP = math.asin(TOP_END_X / R_TOP)
 ALPHA_BOT = math.asin(BOT_END_X / R_BOTTOM)
 TOP_END_Y = CENTER_Y - R_TOP * math.cos(ALPHA_TOP)  # 21.545
 BOT_END_Y = CENTER_Y - R_BOTTOM * math.cos(ALPHA_BOT)  # 3.122
+# With the centre on the pivot centreline and the low point held, a radius
+# error dR moves the edge at station x by dR x^2 / (2 R^2): at the end
+# stations that drift plus the low-point band stays inside the DTI acceptance.
+END_STATION_DRIFT: dict[str, float] = {}
+for _name, _radius, _station in (
+    ("top", R_TOP, TOP_END_X),
+    ("bottom", R_BOTTOM, BOT_END_X),
+):
+    _lower, _upper = printed_deviations(_radius, RADIUS_PLACES)
+    END_STATION_DRIFT[_name] = (
+        max(-_lower, _upper) * _station**2 / (2.0 * _radius**2)
+    )  # top 0.0084, bottom 0.0068
+    if END_STATION_DRIFT[_name] + LOW_POINT_BAND[0] > DTI_ACCEPTANCE + 1e-9:
+        raise AssertionError(
+            f"title-block {_name} radius band carries the arc end outside the DTI acceptance"
+        )
 # Each tip land is radial (square to the top arc), TIP_FACE long, outward
 # from the top arc's end; the tapered end runs from its foot to the bottom
 # arc's end.
@@ -135,11 +154,12 @@ if PIN_GAUGE_MAX >= PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]:
     raise AssertionError("pin gauge does not enter the template hole")
 if PIN_GAUGE_MAX >= _ROCKER_BORE_LOW:
     raise AssertionError("pin gauge does not enter the rocker's pivot bore")
-# Two budgets. APEX_BAND is the template's own edge acceptance about its hole
-# (what the DTI record checks). Laid on the arm, the pin's worst-case play in
-# both bores (each at its largest, the pin at its smallest) moves the edges
-# further: edge band plus that registration stays inside the quarter of the
-# rocker's arc zone the gauge may spend, centred on the aim.
+# Two budgets. The low-point band holds the template's own edges about its
+# hole (the DTI record checks them against DTI_ACCEPTANCE). Laid on the arm,
+# the pin's worst-case play in both bores (each at its largest, the pin at its
+# smallest) moves the edges further: low-point band plus that registration
+# stays inside the quarter of the rocker's arc zone the gauge may spend,
+# centred on the aim (0.02 + 0.0262 = 0.0462 <= 0.0625).
 LOCATOR_REGISTRATION_MAX = (
     math.ceil(
         1e4
@@ -151,9 +171,9 @@ LOCATOR_REGISTRATION_MAX = (
     / 1e4
 )  # 0.0262 = 0.0094 template + 0.0169 rocker, rounded up
 _ROCKER_ZONE = rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
-if APEX_BAND[0] + LOCATOR_REGISTRATION_MAX > 0.25 * _ROCKER_ZONE / 2.0 + 1e-9:
+if LOW_POINT_BAND[0] + LOCATOR_REGISTRATION_MAX > 0.25 * _ROCKER_ZONE / 2.0 + 1e-9:
     raise AssertionError(
-        "pin-gauge play in both bores plus the apex band spends more than a"
+        "pin-gauge play in both bores plus the low-point band spends more than a"
         " quarter of the rocker zone"
     )
 
@@ -163,7 +183,10 @@ THICK_PLACES = 3
 THICK_CALLOUT = "GROUND FLAT STOCK"
 # drawing-guidelines.md rule 17 (walls and webs): the thinnest web, between the hole and the bottom arc.
 WEB_MIN = round(
-    BOTTOM_BELOW_PIVOT + APEX_BAND[1] - (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) / 2.0, 4
+    BOTTOM_BELOW_PIVOT
+    + LOW_POINT_BAND[1]
+    - (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) / 2.0,
+    4,
 )
 if min(WEB_MIN, THICK - printed_band_mm(THICK_PLACES)) < 1.5 - 1e-9:
     raise AssertionError(
@@ -213,8 +236,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutlineProfile": {
-        "TopRadius": 2,
-        "BottomRadius": 2,
+        "TopRadius": RADIUS_PLACES,
+        "BottomRadius": RADIUS_PLACES,
         "TopTailX": END_PLACES,
         "TopRodX": END_PLACES,
         "BottomTailX": END_PLACES,
@@ -237,10 +260,8 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     )
 # Bands other than the title block's, keyed (feature, dimension).
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
-    ("OutlineProfile", "TopRadius"): APEX_BAND,
-    ("OutlineProfile", "BottomRadius"): APEX_BAND,
-    ("ApexReference", "TopAbovePivot"): APEX_BAND,
-    ("ApexReference", "BottomBelowPivot"): APEX_BAND,
+    ("ApexReference", "TopAbovePivot"): LOW_POINT_BAND,
+    ("ApexReference", "BottomBelowPivot"): LOW_POINT_BAND,
     ("PivotHoleProfile", "PivotDia"): PIVOT_HOLE_BAND,
 }
 

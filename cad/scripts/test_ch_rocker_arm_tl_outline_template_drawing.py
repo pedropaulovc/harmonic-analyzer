@@ -14,6 +14,7 @@ import ch_rocker_arm_tl_outline_template_spec as spec
 import draw_ch_rocker_arm_tl_outline_template as drawing
 import export_features
 from _paths import CAD_ROOT
+from _printed_tolerance import printed_deviations
 
 STEM = "ch_rocker_arm_tl_outline_template"
 # The template frame is the rocker build frame moved down to the pivot and
@@ -56,8 +57,8 @@ def test_apex_bands_sit_mid_zone_inside_the_rocker_arc_zone() -> None:
     features = _features()
     top = features["top_edge"]["height_above_pivot"]
     bottom = features["bottom_edge"]["depth"]
-    assert top == [8.22, 8.28]
-    assert bottom == [7.72, 7.78]
+    assert top == [8.23, 8.27]
+    assert bottom == [7.73, 7.77]
     zone_top = (
         rocker.TOP_EDGE_ABOVE_PIVOT,
         rocker.TOP_EDGE_ABOVE_PIVOT + rocker.TOP_EDGE_BAND[0],
@@ -126,7 +127,7 @@ def test_locator_play_and_edge_band_fit_a_quarter_of_the_rocker_zone() -> None:
         rocker_bore[1] - spec.PIN_GAUGE_MIN
     ) / 2.0
     zone = rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
-    assert spec.APEX_BAND[0] + registration <= 0.25 * zone / 2.0 + 1e-9
+    assert spec.LOW_POINT_BAND[0] + registration <= 0.25 * zone / 2.0 + 1e-9
     assert spec.LOCATOR_REGISTRATION_MAX >= registration
 
 
@@ -179,10 +180,8 @@ def test_inventory_record_binds_this_part_without_hand_solids() -> None:
     assert "solids" not in records[0]
 
 
-def test_sheet_prints_the_inventory_profile_acceptance_on_both_arcs() -> None:
-    """inventory accepts the template on profile, DTI stations within the
-    acceptance about the pivot: the sheet holds both apex heights and both
-    radii (arc centre on the pivot centreline) to that same band."""
+def _dti_acceptance() -> float:
+    """The inventory record's profile acceptance, DTI stations about the pivot."""
     inventory = tomllib.loads(
         (CAD_ROOT / "process" / "shop" / "inventory.toml").read_text(encoding="utf-8")
     )
@@ -191,20 +190,30 @@ def test_sheet_prints_the_inventory_profile_acceptance_on_both_arcs() -> None:
         r"DTI within \+/-(\d+\.\d+) of nominal about the pivot at (\d+) stations", note
     )
     assert match, note
-    acceptance = float(match.group(1))
-    assert spec.APEX_BAND == (acceptance, -acceptance)
+    return float(match.group(1))
+
+
+def test_end_stations_hold_the_dti_acceptance_under_the_title_block_radii() -> None:
+    """The arcs' centre sits on the pivot centreline and each low point is
+    held by its band, so a radius error dR at the title block's band moves
+    the edge at station x by dR x^2 / (2 R^2): at the end stations that drift
+    plus the low-point band stays inside the inventory's DTI acceptance."""
+    acceptance = _dti_acceptance()
     features = _features()
-    for feature, field, nominal in (
-        ("top_edge", "height_above_pivot", spec.TOP_ABOVE_PIVOT),
-        ("top_edge", "radius", spec.R_TOP),
-        ("bottom_edge", "depth", spec.BOTTOM_BELOW_PIVOT),
-        ("bottom_edge", "radius", spec.R_BOTTOM),
+    for feature, low_point, radius_name in (
+        ("top_edge", "height_above_pivot", "TopRadius"),
+        ("bottom_edge", "depth", "BottomRadius"),
     ):
-        assert features[feature][field] == pytest.approx(
-            [nominal - acceptance, nominal + acceptance], abs=1e-9
-        ), (feature, field)
-    for name in ("TopRadius", "BottomRadius"):
-        assert spec.DRAWING_BANDS[("OutlineProfile", name)] == spec.APEX_BAND
+        edge = features[feature]
+        radius = edge["radius_nominal"]
+        lower, upper = printed_deviations(
+            radius, spec.DRAWING_PRECISION_BY_NAME[radius_name]
+        )
+        drift = max(-lower, upper) * edge["station_nominal"] ** 2 / (2.0 * radius**2)
+        low, high = edge[low_point]
+        assert drift + (high - low) / 2.0 <= acceptance + 1e-9, (feature, drift)
+        assert edge["radius"] == pytest.approx([radius + lower, radius + upper])
+    assert spec.DTI_ACCEPTANCE == acceptance
 
 
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:
