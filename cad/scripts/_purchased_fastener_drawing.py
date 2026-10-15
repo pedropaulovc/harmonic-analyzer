@@ -445,13 +445,19 @@ def add_purchased_footer(
 
 
 async def build_purchased_fastener_drawing(
-    adapter: Any, spec: DrawingSpec, *, item: str, cut_to_suit: bool = False
+    adapter: Any,
+    spec: DrawingSpec,
+    *,
+    item: str | None = None,
+    cut_to_suit: bool = False,
 ) -> dict[str, str]:
     """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
 
     ``item`` is the catalogue designation printed on the ITEM row, e.g.
-    ``#4-40 x 1/4 SOCKET SET SCREW, CUP POINT``.  ``cut_to_suit`` marks a
-    fastener its registry installation note cuts at assembly.
+    ``#4-40 x 1/4 SOCKET SET SCREW, CUP POINT``; without one the row prints
+    the registry stock name (vn_transgear_pivot_screw, reworked in PR #1477).
+    ``cut_to_suit`` marks a fastener its registry installation note cuts at
+    assembly.
     """
     stock = fastener(spec.artifact_stem)
     source = spec.source
@@ -493,7 +499,7 @@ async def build_purchased_fastener_drawing(
         spec,
         properties=properties,
         finish=finish,
-        item=item,
+        item=item if item is not None else stock.stock_name.upper(),
         notes=str(registry.get("installation_notes", "")),
         cut_to_suit=cut_to_suit,
         document_title=str(registry["title"]),

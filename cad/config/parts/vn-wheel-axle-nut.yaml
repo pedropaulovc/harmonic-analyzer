@@ -8,9 +8,9 @@ vn-wheel-axle-nut:
   material_specification: "Brass hex nut, #4-40, 1/4 AF x 3/32; McMaster-Carr 92671A005"
   finish: plain; no coating
   installation_notes: |-
-    INSTALLATION - ON THE MG-WHEEL-AXLE #4-40 END, OUTSIDE MHA-VN-058.
-    RUN THE FIRST NUT DOWN TO THE ENDSHAKE ON MHA-MG-000 (WHEEL
-    ENDSHAKE), THEN LOCK WITH THE SECOND NUT.
+    INSTALLATION - TWO ON THE MG-WHEEL-AXLE #4-40 END, OUTSIDE MHA-VN-058.
+    THE INNER NUT SETS THE WHEEL ENDSHAKE ON MHA-MG-000; THE OUTER NUT
+    LOCKS IT.
   quantity: 2
   tolerance_class: machined_block
   process: purchased

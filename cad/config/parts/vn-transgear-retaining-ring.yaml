@@ -8,8 +8,8 @@ vn-transgear-retaining-ring:
   material_specification: "Carbon steel, phosphate coated, Rockwell C47 min, E-style for 5/32 shaft; McMaster-Carr 97431A260"
   finish: phosphate
   installation_notes: |-
-    INSTALLATION - TRANSGEAR PIN MHA-PD-023 GROOVE, FRONT OF MHA-PD-025
-    PUSH ON SIDEWAYS INTO THE GROOVE; SEATS ON ITS FRONT WALL.
+    INSTALLATION - TRANSGEAR PIN MHA-PD-023 GROOVE, FRONT OF MHA-PD-025;
+    SEATED ON THE GROOVE'S FRONT WALL.
   quantity: 1
   tolerance_class: machined_block
   process: purchased

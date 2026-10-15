@@ -8,8 +8,8 @@ vn-pen-hanger-jam-nut:
   material_specification: "Zinc-plated steel narrow-profile hex nut, #8-32, 1/4 AF x 3/32; McMaster-Carr 90760A009"
   finish: zinc plated
   installation_notes: |-
-    INSTALLATION - ON THE MHA-VN-007 HANGER SCREW, OUTBOARD OF THE
-    MHA-VN-063 NUT. HOLD THAT NUT STILL AND JAM THIS NUT AGAINST IT.
+    INSTALLATION - ON THE MHA-VN-007 HANGER SCREW, JAMMED AGAINST THE
+    OUTBOARD FACE OF THE MHA-VN-063 NUT.
   quantity: 1
   tolerance_class: machined_block
   process: purchased
