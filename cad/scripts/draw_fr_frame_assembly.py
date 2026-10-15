@@ -63,7 +63,7 @@ from _drawing_view_configuration import (
     assert_full_detail_view,
     set_view_exploded_state,
 )
-from _drawing_view_display import set_hidden_lines_visible
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _fr_frame_balloon_anchors import FRAME_BALLOON_ANCHORS
 from _session import run_build
 from _simplified_names import simplified_name
@@ -75,7 +75,7 @@ from fr_frame_attachment_spec import (
     TOP_SCREW_Y,
     TUBE_CROSS_HOLE_DIAMETER,
 )
-from fr_harmonic_base_spec import DECK_HALF_X
+from fr_harmonic_base_spec import BOTTOM_WIDTH, DECK_HALF_X
 from fr_nameplate_spec import MOUNT_POS as NAMEPLATE_MOUNT_POS
 from vn_frame_cross_screw_spec import (
     HEAD_DIA as CROSS_SCREW_HEAD_DIA,
@@ -103,19 +103,22 @@ PNG = OUTPUTS.png
 # B-B looks down on both edges and dimensions the inset between them; step 9
 # points to that dimension instead of repeating its value.
 NAMEPLATE_END_INSET = DECK_HALF_X - NAMEPLATE_MOUNT_POS[0]
-# Machine z of the inset dimension line: on the plate's lower edge, clear of
-# its corner screw heads (z +/-42) and the deck's centre hidden lines (z +/-5).
-NAMEPLATE_INSET_LINE_Z_M = 0.025
-# Machine z stations each inset pick tries in turn, the dimension line first;
-# every one is on both edges and clear of the same screw heads and hidden lines.
-NAMEPLATE_INSET_PICK_Z_M = (NAMEPLATE_INSET_LINE_Z_M, 0.020, 0.030, 0.015, 0.035)
+# Machine z stations each inset pick tries in turn: on both edges, clear of
+# the plate's corner screw heads (z +/-42) and the deck's centre line (z 0).
+NAMEPLATE_INSET_PICK_Z_M = (0.025, 0.020, 0.030, 0.015, 0.035)
 # How far (model mm) a picked edge's ends may lie from the target machine x.
 # r6 (run 20261015T051440407Z) dimensioned a line 1.334 mm off its target.
 NAMEPLATE_INSET_PICK_TOLERANCE_MM = 0.05
 # swSelectType_e.swSelEDGES
 _SW_SEL_EDGES = 1
-# Sheet distance of the inset text beyond the deck end, short of the top
-# frame's hatched west rail (~10 mm beyond it at 1:3).
+# Machine z of the inset text, which carries the dimension line with it: past
+# the base's outer edge (BOTTOM_WIDTH / 2), so the text sits below the plan
+# view off the part and the line clears the plate's lettering. 17 mm is ~5.7
+# mm on the 1:3 sheet: the 3.5 mm text and the line ~1 mm below it clear the
+# base outline, above the title block.
+NAMEPLATE_INSET_TEXT_Z_M = (BOTTOM_WIDTH / 2.0 + 17.0) / 1000.0
+# Sheet distance of the inset text beyond the deck end, along the dimension
+# line: the 1:3 gap is too narrow to hold it between the edges.
 NAMEPLATE_INSET_TEXT_OFFSET_M = 0.005
 
 # The controlling setup height names itself on its own native dimension, not
@@ -671,7 +674,9 @@ def _create_joint_sections(adapter: Any, front: Any) -> tuple[Any, Any]:
             scale=JOINT_SECTION_SCALE,
             label=label,
         )
-        set_hidden_lines_visible(adapter, section)
+        # A section shows its cut in solid lines only; the working front
+        # view keeps its hidden lines.
+        set_hidden_lines_removed(adapter, section)
         apply_view_configuration(adapter, section, label=f"joint section {cut_y:.3f}")
         sections.append(section)
     return sections[0], sections[1]
@@ -775,19 +780,26 @@ def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
         ("nameplate lower edge", NAMEPLATE_MOUNT_POS[0]),
         ("deck end", DECK_HALF_X),
     )
+    y_m = NAMEPLATE_MOUNT_POS[1] / 1000.0
     projected = model_points_in_view(
         adapter,
         section,
         [
-            (x_mm / 1000.0, NAMEPLATE_MOUNT_POS[1] / 1000.0, z_m)
-            for _, x_mm in targets
-            for z_m in NAMEPLATE_INSET_PICK_Z_M
+            *(
+                (x_mm / 1000.0, y_m, z_m)
+                for _, x_mm in targets
+                for z_m in NAMEPLATE_INSET_PICK_Z_M
+            ),
+            *((x_mm / 1000.0, y_m, NAMEPLATE_INSET_TEXT_Z_M) for _, x_mm in targets),
         ],
         label="nameplate inset stations",
         names=[
-            f"{name} z {z_m * 1000.0:g}"
-            for name, _ in targets
-            for z_m in NAMEPLATE_INSET_PICK_Z_M
+            *(
+                f"{name} z {z_m * 1000.0:g}"
+                for name, _ in targets
+                for z_m in NAMEPLATE_INSET_PICK_Z_M
+            ),
+            *(f"{name} text line" for name, _ in targets),
         ],
     )
     count = len(NAMEPLATE_INSET_PICK_Z_M)
@@ -795,9 +807,9 @@ def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
         list(zip(NAMEPLATE_INSET_PICK_Z_M, projected[i * count : (i + 1) * count]))
         for i in range(len(targets))
     ]
-    # The first station of each edge is on the dimension line.
     plate_xy, deck_xy = (rows[0][1] for rows in station_rows)
-    gap = math.hypot(deck_xy[0] - plate_xy[0], deck_xy[1] - plate_xy[1])
+    plate_line, deck_line = projected[len(targets) * count :]
+    gap = math.hypot(deck_line[0] - plate_line[0], deck_line[1] - plate_line[1])
     if gap <= 0.0:
         raise RuntimeError("nameplate inset edges coincide on the sheet")
     edges = tuple(
@@ -806,11 +818,9 @@ def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
         )
         for (name, target_mm), rows in zip(targets, station_rows)
     )
-    # Text beyond the deck end, on the dimension line: the 1:3 gap is too
-    # narrow to hold it between the edges.
     text_xy = tuple(
         deck + (deck - plate) / gap * NAMEPLATE_INSET_TEXT_OFFSET_M
-        for plate, deck in zip(plate_xy, deck_xy)
+        for plate, deck in zip(plate_line, deck_line)
     )
     display = add_edge_dimension(
         adapter,
