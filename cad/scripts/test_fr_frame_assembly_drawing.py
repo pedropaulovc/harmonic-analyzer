@@ -702,9 +702,8 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
     assert drawing._add_nameplate_inset_dimension(None, "B-B") == "display"
 
     count = len(drawing.NAMEPLATE_INSET_PICK_Z_M)
-    assert drawing.NAMEPLATE_INSET_PICK_Z_M[0] == drawing.NAMEPLATE_INSET_LINE_Z_M
     assert len(set(drawing.NAMEPLATE_INSET_PICK_Z_M)) == count
-    assert len(stations["points"]) == len(stations["names"]) == 2 * count
+    assert len(stations["points"]) == len(stations["names"]) == 2 * count + 2
     plate_x = drawing.NAMEPLATE_MOUNT_POS[0]
     deck_x = plate_x + drawing.NAMEPLATE_END_INSET
     for label, target, offset in (
@@ -721,16 +720,27 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
     assert added["view"] == "B-B"
     # The dimension spans exactly the read-back edges; the value check stays.
     assert added["entities"] == ("edge nameplate lower edge", "edge deck end")
+    first_z = drawing.NAMEPLATE_INSET_PICK_Z_M[0]
     assert added["p0"] == pytest.approx(
-        (0.300 + plate_x / 3000.0, 0.180 - drawing.NAMEPLATE_INSET_LINE_Z_M / 3.0)
+        (0.300 + plate_x / 3000.0, 0.180 - first_z / 3.0)
     )
     assert added["p1"] == pytest.approx(
-        (0.300 + deck_x / 3000.0, 0.180 - drawing.NAMEPLATE_INSET_LINE_Z_M / 3.0)
+        (0.300 + deck_x / 3000.0, 0.180 - first_z / 3.0)
     )
-    # The text sits on the dimension line, past the deck end, away from the plate.
-    deck_sheet = added["p1"]
+    # The text, and the dimension line with it, sit past the base's outer edge:
+    # below the plan view, clear of the plate and its lettering, beyond the
+    # deck end and away from the plate.
+    text_z = drawing.NAMEPLATE_INSET_TEXT_Z_M
+    assert text_z * 1000.0 > drawing.BOTTOM_WIDTH / 2.0
+    assert stations["points"][-2:] == [
+        pytest.approx((plate_x / 1000.0, stations["points"][0][1], text_z)),
+        pytest.approx((deck_x / 1000.0, stations["points"][0][1], text_z)),
+    ]
     assert added["text_xy"] == pytest.approx(
-        (deck_sheet[0] + drawing.NAMEPLATE_INSET_TEXT_OFFSET_M, deck_sheet[1])
+        (
+            0.300 + deck_x / 3000.0 + drawing.NAMEPLATE_INSET_TEXT_OFFSET_M,
+            0.180 - text_z / 3.0,
+        )
     )
     assert checked == {"display": "display", "expected_mm": drawing.NAMEPLATE_END_INSET}
 
