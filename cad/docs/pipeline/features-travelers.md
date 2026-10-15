@@ -237,7 +237,7 @@ missing spec file or correct the inventory's `cad` stem before retrying.
 `_process_plans.TRAVELER_STEMS` is the enrollment authority for the
 `prechips:<stem>` task family. It is **empty** in this infrastructure change.
 The legacy rocker, shaft and cone plans remain tracked but are stale against
-prechips 0.1; they are neither run nor shipped. A stem enrolls only after its
+the pinned prechips; they are neither run nor shipped. A stem enrolls only after its
 migrated plan reaches exit 0 on real exported geometry. See
 [`cad/process/README.md`](../../process/README.md) for authoring and enrollment.
 
@@ -253,7 +253,7 @@ files, CAD-tagged fixture spec modules, the locked consumer and executed wrapper
 closure. It runs locally on the submitter without a SolidWorks seat, including
 under the farm executor, and needs FreeCAD 1.1 (see
 [`DEVELOPING.md`](../../../DEVELOPING.md#process-traveler-prerequisites)).
-The consumer is pinned to PyPI `prechips==0.1`; no upstream examples are run by
+The consumer is pinned to PyPI `prechips==0.1.1`; no upstream examples are run by
 this task family.
 
 | prechips exit | build/release gate | interpretation |
@@ -274,7 +274,7 @@ record matching SHA-256 hashes for every render under `inputs["render:…"]`,
 declare `expected_exit == 0`, and match the manifest's `step_sha256`.
 Its `hash` must equal `prechips.report.report_hash(report)`, so editing report
 metadata without regenerating its canonical content hash also invalidates it.
-prechips 0.1 does not record an HTML digest itself. After a successful default
+prechips 0.1.1 does not record an HTML digest itself. After a successful default
 run, the wrapper adds `inputs["traveler:html"]` with the exact HTML path,
 SHA-256 and original `source_report_hash`, then recomputes the report's canonical
 hash. The HTML's `prechips-report` meta tag keeps that original upstream hash,
