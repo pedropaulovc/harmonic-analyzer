@@ -42,10 +42,15 @@ from collections.abc import Callable
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    dimension_name,
+    place_view,
+    view_name,
+)
 
 from _check import check
-from _com import _early_bound, _read_member
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -224,13 +229,23 @@ CAPTION_SETTLE_M = 0.0006
 # face-on at the outer slot at 2:1, left of the view's caption and the title
 # block: the counterbore's width left of it, the slot's right (its callout
 # saying why it is a slot), the slot's travel below and the counterbore's
-# above; its label right of the slot's width, its letter over the bar.
+# above; its label right of the slot's width, its letter over the bar. It is
+# a cropped *Back model view, dimensioned uncropped then cropped (the
+# draw_ch_amplitude_bar notch details): a model view has no native label or
+# parent circle, so its label is a note in the native label's words and its
+# mark a black circle and letter on the front-face view.
 DETAIL_SLOT_X = max(CLAMP_SLOT_X)
+DETAIL_FOCUS = (DETAIL_SLOT_X, 0.0, -BAR_DEPTH / 2.0)  # model mm
 DETAIL_CENTER = (0.120, 0.040)
 DETAIL_SCALE = (2, 1)
+DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0  # sheet metres per mm
 DETAIL_RADIUS_MM = 7.5
+DETAIL_LABEL = f"DETAIL C\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
 DETAIL_LABEL_XY = (0.190, 0.034)  # top centre
-DETAIL_LETTER_RISE = 0.010
+DETAIL_LETTER = "C"
+DETAIL_LETTER_RISE = 0.005  # the letter's top over the bar's top edge
+DETAIL_POSITION_TOL_M = 1e-4
+CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_KEEP = {
     "ClampSlotCboreWidth": (DETAIL_CENTER[0] - 0.030, DETAIL_CENTER[1]),
     "ClampSlotWidth": (DETAIL_CENTER[0] + 0.035, DETAIL_CENTER[1]),
@@ -389,22 +404,28 @@ def _hole_rims(face: Any, back: Any) -> tuple[Any, Any]:
     return tap, cbore
 
 
-def _slot_detail(adapter: Any, back: Any) -> Any:
-    """Native detail C: a fence round the outer west slot in the front-face
-    view, the 2:1 detail centred on DETAIL_CENTER, its label at
-    DETAIL_LABEL_XY and its parent letter over the bar
-    (draw_dt_pinion_lift_rod._front_end_detail, draw_ms_stick's letter)."""
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    parent = _early_bound(back, "IView")
-    if not drawing.ActivateView(view_name(adapter, back)):
-        raise RuntimeError("failed to activate the slot detail's parent")
-    draw.ClearSelection2(True)
-    center = _sheet(
-        adapter, back, (DETAIL_SLOT_X, 0.0, -BAR_DEPTH / 2.0), "slot detail centre"
-    )
-    radius = DETAIL_RADIUS_MM * _S
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
+def _activate(adapter: Any, view: Any, *, label: str) -> None:
+    """Make ``view`` the active view (sketch entities and notes land in it)."""
+    name = view_name(adapter, view)
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate the {label} {name!r}")
+    adapter.currentModel.ClearSelection2(True)
+
+
+def _sketch_circle(
+    adapter: Any,
+    view: Any,
+    center: tuple[float, float],
+    radius: float,
+    *,
+    label: str,
+    add_to_db: bool,
+) -> Any:
+    """A circle in the ACTIVE ``view``'s own sketch from sheet points, through
+    the view sketch's ModelToSketchTransform. Without ``add_to_db`` the circle
+    is left SELECTED, which is what Crop2 consumes
+    (draw_ch_amplitude_bar._sketch_circle)."""
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     points = []
@@ -414,64 +435,157 @@ def _slot_detail(adapter: Any, back: Any) -> Any:
         )
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
-        raise RuntimeError("failed to create the slot detail's fence")
-    detail = drawing.CreateDetailViewAt4(
-        *DETAIL_CENTER,
-        0.0,
-        0,  # swDetViewSTANDARD
-        *DETAIL_SCALE,
-        "C",
-        1,  # swDetCircleCIRCLE
-        True,
-        False,
-        False,
-        5,
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = add_to_db
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if circle is None:
+        raise RuntimeError(f"failed to sketch the {label} circle")
+    return circle
+
+
+def _slot_detail(adapter: Any) -> Any:
+    """Detail C, uncropped: a standalone 2:1 *Back model view moved so the
+    outer slot's centre lands on DETAIL_CENTER (checked to
+    DETAIL_POSITION_TOL_M). Not a native detail: the r3 farm leaf's native
+    detail of the front-face view imported none of the slot profiles'
+    dimensions (available=[]), the refusal draw_ch_amplitude_bar and
+    draw_vn_post_mount_screw measured, while the same part's projected views
+    import their consumed profiles' dimensions (PivotTapProfile's in the
+    back-face view)."""
+    draw = adapter.currentModel
+    view = _early_bound(
+        place_view(adapter, str(SOURCE), "*Back", *DETAIL_CENTER, scale=DETAIL_SCALE),
+        "IView",
     )
-    if detail is None:
-        raise RuntimeError("failed to create the slot detail")
-    detail = _early_bound(detail, "IView")
-    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    ratio = tuple(float(value) for value in view.ScaleRatio)
+    if ratio != tuple(float(value) for value in DETAIL_SCALE):
+        raise RuntimeError(f"slot detail C scale {ratio!r}, expected {DETAIL_SCALE!r}")
+    label = "slot detail C centre"
+    center = _sheet(adapter, view, DETAIL_FOCUS, label)
+    position = tuple(float(value) for value in view.Position)
+    target = [position[axis] + DETAIL_CENTER[axis] - center[axis] for axis in range(2)]
+    if not view.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to move slot detail C onto its spot")
+    draw.EditRebuild3()
+    center = _sheet(adapter, view, DETAIL_FOCUS, label)
+    if math.dist(center, DETAIL_CENTER) > DETAIL_POSITION_TOL_M:
+        raise RuntimeError(
+            f"slot detail C centre sits at {center!r}, not {DETAIL_CENTER!r}"
+        )
+    return view
+
+
+def _crop_slot_detail(adapter: Any, view: Any) -> None:
+    """Crop ``view`` to its circle round DETAIL_CENTER: activate it, sketch
+    the circle in its own sketch and Crop2 while the circle is still selected.
+    Crop status, IsCropped, the outline and its style are read back and raise
+    (draw_ch_amplitude_bar._crop_detail_view)."""
+    draw = adapter.currentModel
+    view = _early_bound(view, "IView")
+    uncropped = tuple(float(value) for value in view.GetOutline())
+    _activate(adapter, view, label="slot detail C")
+    _sketch_circle(
+        adapter,
+        view,
+        DETAIL_CENTER,
+        DETAIL_RADIUS_MM * DETAIL_MM,
+        label="slot detail C crop",
+        add_to_db=False,
+    )
+    status = int(view.Crop2(False, False, 1))
     draw.ClearSelection2(True)
     draw.EditRebuild3()
-    outline = tuple(float(value) for value in detail.GetOutline())
-    position = tuple(float(value) for value in detail.Position)
-    if len(outline) != 4 or len(position) != 2:
-        raise RuntimeError("the slot detail has invalid bounds")
-    target = [
-        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
-        for axis in range(2)
-    ]
-    if not detail.SetViewPosition(double_array(target), False):
-        raise RuntimeError("failed to position the slot detail")
-    draw.EditRebuild3()
-    notes = tuple(_read_member(detail, "GetNotes") or ())
-    if len(notes) != 1:
-        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
-    note = _early_bound(notes[0], "INote")
-    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    label_xyz = (*DETAIL_LABEL_XY, 0.0)
-    if not annotation.SetPosition2(*label_xyz):
-        raise RuntimeError("failed to position the slot detail's label")
-    draw.EditRebuild3()
-    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
-    if math.dist(actual, label_xyz) > 1e-8:
-        raise RuntimeError(f"the slot detail's label did not persist: {actual}")
-    circles = [
-        _early_bound(circle, "IDetailCircle")
-        for circle in parent.GetDetailCircles() or ()
-    ]
-    matching = [circle for circle in circles if circle.GetLabel() == "C"]
-    if len(matching) != 1:
-        raise RuntimeError("the slot detail: expected one parent circle C")
-    letter_xy = (center[0], center[1] + DETAIL_LETTER_RISE)
-    matching[0].SetLabelPosition(*letter_xy)
-    rebuild_drawing(adapter, label="place the slot detail's parent letter")
-    actual = tuple(float(value) for value in matching[0].GetLabelPosition())
-    if len(actual) != 2 or math.dist(actual, letter_xy) > 1e-8:
-        raise RuntimeError(f"the slot detail's letter placement rejected: {actual}")
-    return detail
+    view.UpdateViewDisplayGeometry()
+    cropped = bool(view.IsCropped())
+    outline = tuple(float(value) for value in view.GetOutline())
+    _telemetry.info(
+        f"slot detail C Crop2 status {status}, IsCropped {cropped}, outline "
+        f"{tuple(round(value * 1000, 1) for value in outline)} mm"
+    )
+    if status != CROP_NO_ERROR or not cropped:
+        raise RuntimeError(
+            f"slot detail C is not cropped: Crop2 status {status}, IsCropped {cropped}"
+        )
+    # Uncropped, the 2:1 view spans the whole 452 mm bar (~0.9 m on the
+    # sheet); the crop is one 30 mm circle.
+    if (
+        len(outline) != 4
+        or len(uncropped) != 4
+        or outline[2] - outline[0] > (uncropped[2] - uncropped[0]) / 2.0
+    ):
+        raise RuntimeError(
+            f"slot detail C crop did not take: outline {outline!r}, "
+            f"before {uncropped!r}"
+        )
+    boundary = (bool(view.CropViewJaggedOutline), bool(view.CropViewNoOutline))
+    if boundary != (False, False):
+        raise RuntimeError(
+            "slot detail C's crop boundary is not its plain circle: jagged, "
+            f"no-outline {boundary!r}"
+        )
+
+
+def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
+    """The model-dimension names ``view`` holds, sorted."""
+    return sorted(
+        name
+        for name in (
+            dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+            for annotation in (_early_bound(view, "IView").GetAnnotations() or ())
+        )
+        if name
+    )
+
+
+def _dimension_then_crop(adapter: Any, view: Any) -> list[Any]:
+    """Import and curate detail C's dimensions while it is uncropped, then
+    crop it; a kept dimension the crop drops raises."""
+    annotations = hidden_sketches.curate_view_dimensions(
+        adapter,
+        view,
+        keep=DETAIL_KEEP,
+        view_label="slot detail C",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    before = _view_dimension_names(adapter, view)
+    _crop_slot_detail(adapter, view)
+    after = _view_dimension_names(adapter, view)
+    _telemetry.info(f"slot detail C dimensions before crop {before}, after {after}")
+    lost = sorted(set(DETAIL_KEEP) - set(after))
+    if lost:
+        raise RuntimeError(
+            f"slot detail C lost {lost} to its crop; before {before}, after {after}"
+        )
+    return annotations
+
+
+def _label_slot_detail(adapter: Any, detail: Any, back: Any) -> None:
+    """Detail C's label under its crop circle, owned by the detail, and its
+    mark on the front-face view: a black circle round the outer slot and the
+    letter over the bar. The back view is left active."""
+    _activate(adapter, detail, label="slot detail C")
+    _place_caption(adapter, DETAIL_LABEL, DETAIL_LABEL_XY)
+    _activate(adapter, back, label="front face view")
+    mark = _sheet(adapter, back, DETAIL_FOCUS, "slot detail C mark")
+    circle = _sketch_circle(
+        adapter,
+        back,
+        mark,
+        DETAIL_RADIUS_MM * _S,
+        label="slot detail C mark",
+        add_to_db=True,
+    )
+    segment = _early_bound(circle, "ISketchSegment")
+    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+    if int(segment.Color) != 0:
+        raise RuntimeError("slot detail C mark circle colour did not persist")
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
+    _place_caption(adapter, DETAIL_LETTER, (mark[0], BACK_TOP + DETAIL_LETTER_RISE))
 
 
 def _slot_section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, float]]:
@@ -676,17 +790,12 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
 
-    # The west slots: detail C face-on at the outer one, section B-B across
-    # the inner one for the counterbore's depth.
-    detail = _slot_detail(adapter, back)
+    # The west slots: detail C face-on at the outer one (a cropped model
+    # view, dimensioned before its crop), section B-B across the inner one
+    # for the counterbore's depth.
+    detail = _slot_detail(adapter)
     set_hidden_lines_removed(adapter, detail)
-    detail_annotations = hidden_sketches.curate_view_dimensions(
-        adapter,
-        detail,
-        keep=DETAIL_KEEP,
-        view_label="slot detail C",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
+    detail_annotations = _dimension_then_crop(adapter, detail)
     slot_section = create_section_view(
         adapter,
         back,
@@ -732,6 +841,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's band or limit) are authored on the part;
     # the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # Detail C's label and mark go on once every import is done, so nothing of
+    # the front-face view's own sketch is near an import.
+    _label_slot_detail(adapter, detail, back)
     tap_edge, cbore_edge = _hole_rims(face, back)
     _drop_thread_class(
         adapter,

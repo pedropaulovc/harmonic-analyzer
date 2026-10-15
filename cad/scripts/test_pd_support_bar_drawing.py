@@ -7,6 +7,7 @@ import asyncio
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -689,6 +690,89 @@ def test_slot_views_frame_the_slots() -> None:
     assert drawing.SLOT_SECTION_CAPTION_XY[1] < bottom
     # The depth's callout stands above it, off the cut bar.
     assert drawing.CALLOUTS_ABOVE == tuple(drawing.SLOT_SECTION_KEEP_NAMES)
+
+
+class _DetailView:
+    """A placed model view: its Position moves by SetViewPosition, and a model
+    point projects ``offset`` from it."""
+
+    def __init__(self, position, scale, offset):
+        self.Position = position
+        self.ScaleRatio = scale
+        self.offset = offset
+
+    def SetViewPosition(self, xy, _redraw):  # noqa: N802
+        self.Position = tuple(float(value) for value in xy)
+        return True
+
+
+def test_slot_detail_is_a_model_view_centred_on_the_outer_slot(monkeypatch) -> None:
+    """Farm r3 (leaf 20261015T223907.571157Z, drawing:pd_support_bar): a
+    native detail of the front-face view imported none of the slot profiles'
+    dimensions (available=[]). Detail C is a 2:1 *Back model view moved so
+    the outer slot lands on its centre; nothing creates a native detail."""
+    placed = []
+
+    def place(_adapter, source, orientation, x, y, *, scale):
+        placed.append((source, orientation, scale))
+        return _DetailView((x, y), tuple(float(v) for v in scale), (-0.31, 0.0))
+
+    def sheet(_adapter, view, xyz, _label):
+        assert xyz == (max(part.CLAMP_SLOT_X), 0.0, -spec.BAR_DEPTH / 2.0)
+        return (
+            view.Position[0] + view.offset[0],
+            view.Position[1] + view.offset[1],
+        )
+
+    def native_detail(*_args):
+        raise AssertionError("detail C must not be a native detail view")
+
+    model = SimpleNamespace(
+        EditRebuild3=lambda: True, CreateDetailViewAt4=native_detail
+    )
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "_sheet", sheet)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    view = drawing._slot_detail(SimpleNamespace(currentModel=model))
+    assert placed == [(str(drawing.SOURCE), "*Back", drawing.DETAIL_SCALE)]
+    assert sheet(None, view, drawing.DETAIL_FOCUS, "") == pytest.approx(
+        drawing.DETAIL_CENTER
+    )
+    assert drawing.DETAIL_LABEL == "DETAIL C\nSCALE 2 : 1"
+
+
+@pytest.mark.parametrize("dropped", [(), ("ClampSlotTravel",)])
+def test_slot_detail_is_dimensioned_before_its_crop(monkeypatch, dropped) -> None:
+    """The dimensions import into the uncropped view; a kept one the crop
+    drops fails the sheet."""
+    calls = []
+    names = {"cropped": False}
+
+    def curate(_adapter, _view, *, keep, view_label, dimensions_by_feature):
+        calls.append("curate")
+        assert keep is drawing.DETAIL_KEEP
+        assert dimensions_by_feature is sheet_spec.DRAWING_DIMENSIONS
+        return ["kept"]
+
+    def crop(_adapter, _view):
+        calls.append("crop")
+        names["cropped"] = True
+
+    def held(_adapter, _view):
+        kept = sorted(drawing.DETAIL_KEEP)
+        if names["cropped"]:
+            return [name for name in kept if name not in dropped]
+        return kept
+
+    monkeypatch.setattr(drawing.hidden_sketches, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "_crop_slot_detail", crop)
+    monkeypatch.setattr(drawing, "_view_dimension_names", held)
+    if dropped:
+        with pytest.raises(RuntimeError, match="lost"):
+            drawing._dimension_then_crop(None, object())
+    else:
+        assert drawing._dimension_then_crop(None, object()) == ["kept"]
+    assert calls == ["curate", "crop"]
 
 
 def test_round_counterbore_callout_stands_over_the_east_pair() -> None:
