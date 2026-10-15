@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import math
-import os
 import re
 from pathlib import Path
 
@@ -158,10 +157,7 @@ def test_bom_catalog_numbers_match_the_parts_registry() -> None:
         if not skus:
             assert not printed, stem
             continue
-        # A select-fit row (several sizes of one series) prints the series.
-        series = skus[0] if len(skus) == 1 else os.path.commonprefix(list(skus))
-        assert series, stem
-        assert printed == [series], stem
+        assert printed == [skus[0]], stem
 
 
 def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
@@ -174,7 +170,7 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
         drawing.FIT_PLACEHOLDER,
-        drawing.CRANK_SHIM_FIT_NOTES,
+        drawing.CRANK_END_FIT_NOTES,
         *drawing.BOM_DESCRIPTIONS.values(),
     )
     cited = set(re.findall(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", "\n".join(texts)))

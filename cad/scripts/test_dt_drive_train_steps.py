@@ -177,33 +177,37 @@ def test_full_turn_checks_use_the_spec_ratio_and_clear_the_unrelieved_platform()
     )
 
 
-def test_crank_shim_fit_retains_the_live_recess_and_feeler_window() -> None:
+def test_crank_end_fit_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -> None:
+    # Owner ruling D1 (2026-10-15): no crank-seat washer.  The collar bears on
+    # the boss, the feeler is the end play, and the shaft end is left proud.
     import dt_crank_pinion_spec as pinion
-    import dt_crank_seat_gap as gap
-    import vn_crank_seat_shim_spec as shim
+    import dt_crankshaft_spec as crankshaft
 
-    fitup = " ".join(drawing.CRANK_SHIM_FIT_NOTES.split())
-    middle = (pinion.SHAFT_END_RECESS_MIN + pinion.SHAFT_END_RECESS_MAX) / 2.0
-    assert f"{middle:.2f} BELOW MHA-DT-010 NORTH FACE" in fitup
-    assert f"({gap.GAP_MIN:.2f}-{gap.GAP_MAX:.2f})" in fitup
-    assert (
-        f"{pinion.SHAFT_END_RECESS_MIN:.2f}-{pinion.SHAFT_END_RECESS_MAX:.2f} BELOW"
-        in fitup
+    fitup = " ".join(drawing.CRANK_END_FIT_NOTES.split())
+    least, most = crankshaft.SHAFT_END_PROUD_RANGE
+    assert least >= 0.0
+    order = (
+        "MHA-DT-011 COLLAR REAR FACE HARD ON THE MHA-DT-005 BOSS SOUTH FACE",
+        f"MHA-DT-010 ON THE {pinion.SEAT_FEELER_MM:.2f} FEELER OFF THE BOSS NORTH FACE",
+        "MATCH-DRILL/REAM MHA-DT-029 AT BOSS MID-LENGTH",
+        "END PLAY = THE FEELER",
+        f"END STANDS {least:.2f}-{most:.2f} PROUD OF MHA-DT-010 NORTH FACE",
+        "DO NOT FACE",
     )
-    assert (
-        f"END PLAY {pinion.SEAT_FEELER_MM:.2f}-"
-        f"{pinion.SEAT_FEELER_MM + shim.FIT_RESIDUAL_MAX:.2f}" in fitup
-    )
-    # The stack rule: at most the catalogue's four shims, of the six sizes
-    # bought, mic'd to within the fit residual under the measured gap.
-    assert f"STACK 1-{shim.STACK_MAX} MHA-VN-071 SHIMS (0.1/0.2/0.5/1/1.5/2)" in fitup
-    assert f"MIC 0.00-{shim.FIT_RESIDUAL_MAX:.2f} UNDER THAT GAP" in fitup
-    assert (
-        fitup.index("WITHDRAW BOTH")
-        < fitup.index("STACK 1-")
-        < fitup.index("FROM THE REAR")
-        < fitup.index("REFIT")
-    )
+    positions = [fitup.index(phrase) for phrase in order]
+    assert positions == sorted(positions)
+    assert f"(STEP {steps.step_number('crank-mesh-checked')})" in fitup
+    assert "SHIM" not in fitup and "MHA-VN-071" not in fitup
+
+
+def test_step_four_holds_the_collar_before_the_feeler_and_the_pin() -> None:
+    body = _step_body("crank-mesh-checked")
+    positions = [
+        body.index("HOLD THE MHA-DT-011 COLLAR HARD ON THE BOSS SOUTH FACE"),
+        body.index("OFF THE MHA-DT-005 BOSS NORTH FACE WITH A FEELER"),
+        body.index("MATCH-DRILL/REAM"),
+    ]
+    assert positions == sorted(positions)
 
 
 def test_a_cite_to_the_wrong_step_is_caught() -> None:

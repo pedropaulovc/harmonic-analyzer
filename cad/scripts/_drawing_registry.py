@@ -1048,13 +1048,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="vn_crank_seat_shim",
-        part="vn_crank_seat_shim",
-        artifact_stem="vn-crank-seat-shim",
-        script_name="draw_vn_crank_seat_shim.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="pd_transgear_knob_shaft",
         part="pd_transgear_knob_shaft",
         artifact_stem="pd-transgear-knob-shaft",

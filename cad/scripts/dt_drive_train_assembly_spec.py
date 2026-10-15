@@ -68,7 +68,6 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "dt-crank-handle-pivot-screw",
         "dt-crank-hub",
         "vn-crank-hub-pin",
-        "vn-crank-seat-shim",
         "vn-crank-seat-drive-pin",
     ),
     "pinion-rig": (
@@ -252,9 +251,7 @@ STATIONARY_STEMS = frozenset(
         "dt-cone-pivot-post",
 
         "dt-crankshaft",
-        # Pressed into / trapped behind the crankshaft's collar: they stay
-        # with it (the shim pack cannot pass the collar forward).
-        "vn-crank-seat-shim",
+        # Pressed into the crankshaft's collar: they stay with it.
         "vn-crank-seat-drive-pin",
         "dt-crank-pinion",
         "dt-crank-pinion-pin",

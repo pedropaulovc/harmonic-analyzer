@@ -89,17 +89,9 @@ from dt_crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
 import dt_crank_pinion_spec as pinion
 from dt_crank_pinion_spec import (
     SEAT_FEELER_MM as PINION_SEAT_FEELER,
-    SHAFT_END_RECESS_MAX as PINION_RECESS_MAX,
-    SHAFT_END_RECESS_MIN as PINION_RECESS_MIN,
     T120_FITUP_ASSEMBLY_CHECK,
 )
-from dt_crank_seat_gap import (
-    END_PLAY_MAX as CRANK_END_PLAY_MAX,
-    END_PLAY_MIN as CRANK_END_PLAY_MIN,
-    GAP_MAX as SHIM_GAP_MAX,
-    GAP_MIN as SHIM_GAP_MIN,
-)
-import vn_crank_seat_shim_spec as seat_shim
+from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
 from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
 import dt_cylinder_gear_spec as drum
 from dt_drive_train_assembly_spec import (
@@ -438,7 +430,6 @@ BOM_PART_NUMBERS = {
     "dt-crank-handle-pivot-screw": "MHA-DT-032",
     "dt-crank-hub": "MHA-DT-031",
     "vn-crank-hub-pin": "MHA-VN-029",
-    "vn-crank-seat-shim": "MHA-VN-071",
     "vn-crank-seat-drive-pin": "MHA-VN-044",
     "dt-alignment-pinion": "MHA-DT-001",
     "dt-pinion-bracket": "MHA-DT-014",
@@ -495,7 +486,6 @@ BOM_DESCRIPTIONS = {
     "dt-crank-handle-pivot-screw": "CRANK HANDLE PIVOT SCREW",
     "dt-crank-hub": "CRANK HUB",
     "vn-crank-hub-pin": "CRANK HUB AXIAL PIN",
-    "vn-crank-seat-shim": "12 X 18 SHIMS AS REQ'D, MCMASTER 3088A",
     "vn-crank-seat-drive-pin": "3/32 X 1/4 DOWEL PIN, MCMASTER 98381A434",
     "dt-alignment-pinion": "ALIGNMENT PINION",
     "dt-pinion-bracket": "PINION BRACKET STRAP",
@@ -682,11 +672,11 @@ CONE_CRANK_STEPS = _note_text(
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         # CONTRACT-crank: MHA-VN-044 press to the blind-hole floor (their proud
-        # length is the result).  MHA-VN-071 is a pack of purchased shims
-        # selected at assembly; it goes on from the rear end before the
-        # journal enters the bore, and MHA-DT-010's pin is match-drilled, so
-        # the gap is taken in a trial fit before either (CRANK_SHIM_FIT_NOTES,
-        # on the continuation sheet).
+        # length is the result).  Owner ruling D1 (2026-10-15): no crank-seat
+        # washer -- the collar is held hard on the boss's south face, the 16T
+        # set on its feeler off the north face, and only then is its pin
+        # match-drilled, so the end play is the feeler and the shaft end is
+        # left proud (CRANK_END_FIT_NOTES, on the continuation sheet).
         # User ruling 2026-09-30 (#1154): the 16T's shoulder and turned band
         # are feeler-checked against T120 before the pin is drilled.  The
         # pair may rub on T120 until that check closes, so the seat and the
@@ -695,7 +685,7 @@ CONE_CRANK_STEPS = _note_text(
         # short; the step carries on after it.
         "4. PRESS 2X MHA-VN-044 TO THE MHA-DT-011 COLLAR HOLE FLOORS. FIT MHA-DT-011 IN",
         "   THE MHA-DT-005 CRANK BORE; SLIDE MHA-DT-010 ON UNPINNED, TOOTH IN GAP",
-        f"   WITH MHA-DT-007. FIT MHA-VN-071 PER SHEET {CONTINUATION_SHEET}. WITH MHA-VN-071 SEATED,",
+        "   WITH MHA-DT-007. HOLD THE MHA-DT-011 COLLAR HARD ON THE BOSS SOUTH FACE;",
         f"   SET MHA-DT-010 {PINION_SEAT_FEELER:.2f} OFF THE MHA-DT-005 BOSS NORTH FACE WITH A FEELER.",
         T120_FITUP_ASSEMBLY_CHECK + " THEN",
         "   TURN MHA-DT-007 ONE FULL REVOLUTION; IT MUST NEVER BIND (ELSE CHECK",
@@ -1045,34 +1035,21 @@ FIT_PLACEHOLDER = _note_text(
     heading=False,
 )
 
-# MHA-VN-071 goes on from the rear before MHA-DT-011 enters the bore and
-# MHA-DT-010's pin is match-drilled, so the gap is measured in a trial fit
-# without either, at the pinion's feeler and the shaft end's mid-window recess;
-# the fitter stacks at most STACK_MAX catalogue shims to within FIT_RESIDUAL_MAX
-# under it (dt_crank_seat_gap proves every accepted gap takes such a pack), slides
-# them on and refits the parts.  Seated, the pack leaves the feeler plus that
-# residual as the end play, and the recess lands in the window the 16T boss was
-# sized for.
-_RECESS_MID = (PINION_RECESS_MIN + PINION_RECESS_MAX) / 2.0
-_SHIM_SIZES = "/".join(
-    f"{thickness:g}" for thickness in sorted(seat_shim.THICKNESS_NOMINAL.values())
-)
-CRANK_SHIM_FIT_NOTES = _note_text(
+# Owner ruling D1 (2026-10-15): the collar bears on the boss with no washer,
+# the 16T's feeler is the end play, and the shaft end stands proud of the
+# 16T by dt_crankshaft_spec.SHAFT_END_PROUD_RANGE at every accepted part set;
+# it is left as it comes, not faced.
+CRANK_END_FIT_NOTES = _note_text(
     (
-        f"MHA-VN-071 SHIM PACK FIT (STEP {steps.step_number('crank-mesh-checked')})",
-        "A. TRIAL FIT WITHOUT MHA-VN-071, MHA-DT-010 UNPINNED ON THE "
-        f"{PINION_SEAT_FEELER:.2f} FEELER,",
-        f"   MHA-DT-011 END {_RECESS_MID:.2f} BELOW MHA-DT-010 NORTH FACE: MEASURE MHA-DT-011 "
-        "COLLAR",
-        "   REAR FACE TO MHA-DT-005 BOSS SOUTH FACE "
-        f"({SHIM_GAP_MIN:.2f}-{SHIM_GAP_MAX:.2f}).",
-        f"B. WITHDRAW BOTH. STACK 1-{seat_shim.STACK_MAX} MHA-VN-071 SHIMS ({_SHIM_SIZES}), "
-        f"FEWEST FIRST, MIC 0.00-{seat_shim.FIT_RESIDUAL_MAX:.2f} UNDER THAT GAP;",
-        "   SLIDE THEM ONTO MHA-DT-011 FROM THE REAR, FLAT ON THE COLLAR. REFIT",
-        "   MHA-DT-011 AND MHA-DT-010.",
-        "C. MHA-VN-071 ON THE COLLAR AND MHA-DT-010 ON THE FEELER: MHA-DT-011 END",
-        f"   {PINION_RECESS_MIN:.2f}-{PINION_RECESS_MAX:.2f} BELOW MHA-DT-010 NORTH FACE, "
-        f"END PLAY {CRANK_END_PLAY_MIN:.2f}-{CRANK_END_PLAY_MAX:.2f}.",
+        f"MHA-DT-011 CRANK END FIT (STEP {steps.step_number('crank-mesh-checked')})",
+        "A. MHA-DT-011 COLLAR REAR FACE HARD ON THE MHA-DT-005 BOSS SOUTH FACE;",
+        "   NO WASHER.",
+        f"B. MHA-DT-010 ON THE {PINION_SEAT_FEELER:.2f} FEELER OFF THE BOSS NORTH FACE, "
+        "THEN",
+        "   MATCH-DRILL/REAM MHA-DT-029 AT BOSS MID-LENGTH. END PLAY = THE FEELER.",
+        f"C. MHA-DT-011 END STANDS {max(CRANK_END_PROUD_RANGE[0], 0.0):.2f}-"
+        f"{CRANK_END_PROUD_RANGE[1]:.2f} PROUD OF MHA-DT-010 NORTH FACE;",
+        "   LEAVE IT PROUD, DO NOT FACE.",
     )
 )
 
@@ -1538,7 +1515,7 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             (
                 ("cone station table", station_table_text(facts.cone_rows())),
                 ("fit placeholder", FIT_PLACEHOLDER),
-                ("crank fit pointer", f"MHA-VN-071 SHIM PACK FIT: SHEET {CONTINUATION_SHEET}."),
+                ("crank fit pointer", f"MHA-DT-011 CRANK END FIT: SHEET {CONTINUATION_SHEET}."),
             ),
         ),
         NoteField(
@@ -1576,7 +1553,7 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             CONTINUATION_SHEET,
             f"sheet {CONTINUATION_SHEET} right note field",
             ISO_RIGHT_FIELD,
-            (("crank shim fit", CRANK_SHIM_FIT_NOTES),),
+            (("crank end fit", CRANK_END_FIT_NOTES),),
         ),
     )
 

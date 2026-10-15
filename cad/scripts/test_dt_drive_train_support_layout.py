@@ -702,51 +702,66 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
     assert base.DECK_HALF_Z - RIG.BACK_BLOCK_OUTER_Z >= 25.0
 
 
-def test_crank_seat_stack_keeps_its_air_and_fits_the_shim_pack(monkeypatch) -> None:
+def test_crank_collar_bears_on_the_boss_and_the_end_stands_proud(monkeypatch) -> None:
     """Worst case over the collar's functional bands: the T12 plate, seated on
-    the collar, keeps air to the hub rear face.  Behind it, the MHA-VN-071 shim
-    pack is selected at assembly to within its fit residual under the
-    collar-to-boss gap: the layout carries the nominal gap with the pack chosen
-    for it, bearing on the collar and short of the boss by at most the
-    residual, so the shaft's end play is the 16T's feeler gap plus at most
-    that residual."""
+    the collar, keeps air to the hub rear face.  Behind it (owner ruling D1,
+    2026-10-15: no washer) the collar's rear face bears on the post boss's
+    south face, within its two-place print; the shaft's end play is the 16T's
+    feeler gap to the boss's north face, and the shaft end stands proud of the
+    16T by the spec's stack, clear of the inclined cone stack."""
     import dt_crank_pinion_spec as pinion
-    import dt_crank_seat_gap as gap
     import dt_crankshaft_spec as cs
     import pd_transgear_removable_spec as removable
-    import vn_crank_seat_shim_spec as shim
 
     seat_face_fwd = drive.CRANKSHAFT_Z0 + cs.SEAT_COLLAR + min(cs.SEAT_COLLAR_BAND)
     assert removable.SEAT_FACE_Z - removable.PLATE - drive.CRANK_HUB_REAR_Z == (
         pytest.approx(0.7)
     )
     assert seat_face_fwd - removable.PLATE - drive.CRANK_HUB_REAR_Z > 0.0
-    # (1) The nominal gap, filled by the pack selected for it.
-    assert drive._POST_BOSS_SOUTH - drive.CRANK_SEAT_SHIM_Z0 == pytest.approx(
-        gap.GAP_NOMINAL
-    )
-    assert drive.CRANK_SEAT_SHIM_REAR_Z - drive.CRANK_SEAT_SHIM_Z0 == pytest.approx(
-        shim.THICKNESS
-    )
-    assert 0.0 <= drive.CRANK_SEAT_SHIM_FLOAT <= shim.FIT_RESIDUAL_MAX
-    assert drive.CRANK_SEAT_SHIM_FLOAT == pytest.approx(gap.FLOAT_NOMINAL)
-    # (2) The end play is the feeler plus the pack's residual.
+    # (1) The collar's rear face sits on the boss's south face.
+    assert drive.CRANK_COLLAR_REAR_Z == drive.CRANK_COLLAR_Z1
+    assert drive.CRANK_COLLAR_REAR_Z == pytest.approx(drive.CRANKSHAFT_Z0 + cs.COLLAR_REAR)
+    assert 0.0 <= drive._POST_BOSS_SOUTH - drive.CRANK_COLLAR_REAR_Z < 0.01
+    assert drive.CRANK_COLLAR_BOSS_AIR == pytest.approx(cs.COLLAR_BOSS_AIR)
+    # (2) The end play is the 16T's feeler gap to the boss's north face.
     assert (
-        pinion.SEAT_FEELER_MM
+        pinion.SEAT_FEELER_MM - 1e-6
         <= drive.CRANK_SHAFT_END_PLAY
-        <= pinion.SEAT_FEELER_MM + shim.FIT_RESIDUAL_MAX
+        < pinion.SEAT_GAP_MAX_MM
     )
-    # Negative control: a layout off the nominal gap is refused.
-    with pytest.raises(AssertionError, match="nominal crank-seat gap"):
-        _drive_with(monkeypatch, gap, "GAP_NOMINAL", gap.GAP_NOMINAL + 0.5)
+    # (3) The modelled end stands proud of the 16T inside the spec's range,
+    # the stack's nominal less the collar's model air.
+    least, most = cs.SHAFT_END_PROUD_RANGE
+    assert 0.0 <= least <= drive.CRANK_SHAFT_END_PROUD_NOMINAL_MODEL <= most
+    assert drive.CRANK_SHAFT_END_PROUD_NOMINAL_MODEL == pytest.approx(
+        cs.SHAFT_END_PROUD_NOMINAL
+        - drive.CRANK_COLLAR_BOSS_AIR
+        - (drive.CRANK_SHAFT_END_PLAY - pinion.SEAT_FEELER_MM),
+        abs=1e-6,
+    )
+    assert drive._PINION_NORTH == pytest.approx(
+        drive.PINION_Z0 + drive.PINION_OVERALL_LENGTH
+    )
+    # (4) The proud end's print-worst top keeps the radial floor to every
+    # stacked cone gear; T120 and T114 pass nearest.
+    assert drive.CRANK_SHAFT_END_Z_MAX >= drive.CRANKSHAFT_Z0 + cs.SHAFT_LENGTH - 1e-9
+    assert {"T120", "T114"} <= set(drive.CRANK_SHAFT_END_CONE_NEAREST)
+    nearest = min(drive.CRANK_SHAFT_END_CONE_NEAREST.values())
+    assert drive.CRANK_SHAFT_END_NORTH_NEIGHBOUR.startswith("inclined cone gear T")
+    air = drive.CRANK_SHAFT_END_NORTH_AIR_WORST
+    assert air == pytest.approx(
+        nearest - drive.T120_POSE_RADIAL - drive.CRANK_SHAFT_END_RADIUS_MAX
+    )
+    assert air >= drive.T120_TURNED_BAND_RADIAL_FLOOR
+    # Negative control: a collar standing off the boss is refused.
+    with pytest.raises(AssertionError, match="off the post boss in the layout"):
+        _drive_with(monkeypatch, cs, "COLLAR_BOSS_AIR", cs.COLLAR_BOSS_AIR + 0.5)
     monkeypatch.undo()
-    # Negative control: a modelled pack 0.2 thinner leaves more than the residual.
-    with pytest.raises(AssertionError, match="fit residual"):
-        _drive_with(monkeypatch, shim, "THICKNESS", shim.THICKNESS - 0.2)
-    monkeypatch.undo()
-    # Negative control: a modelled pack thicker than the gap is refused too.
-    with pytest.raises(AssertionError, match="fit residual"):
-        _drive_with(monkeypatch, shim, "THICKNESS", shim.THICKNESS + 0.1)
+    # Negative control: a model off the spec's proud stack is refused.
+    with pytest.raises(AssertionError, match="off the spec's proud stack"):
+        _drive_with(
+            monkeypatch, cs, "SHAFT_END_PROUD_NOMINAL", cs.SHAFT_END_PROUD_NOMINAL + 0.5
+        )
 
 
 def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
@@ -768,10 +783,13 @@ def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
     assert knob_seat == pytest.approx(crank_seat)
     assert paper.KNOB_SHAFT_Z0 - collar.SET_NOMINAL == pytest.approx(knob_seat)
     assert paper.CHAIN_MID_Z == pytest.approx(crank_seat - removable.PLATE / 2.0)
-    # The spigot stays put (-154.3..-148.5); the body ends at -144.5 (0.5 came
-    # off its rear when the seat washer had a 0.5 floor).
+    # The spigot stays put (-154.3..-148.5); the body runs on to the boss's
+    # south face (owner ruling D1: no washer).
     assert drive.CRANK_SPIGOT_FRONT_Z == pytest.approx(-148.5)
-    assert drive.CRANK_SEAT_SHIM_Z0 == pytest.approx(-144.5)
+    assert drive.CRANK_COLLAR_Z1 == pytest.approx(drive._POST_BOSS_SOUTH, abs=0.01)
+    assert drive.CRANK_COLLAR_Z1 == pytest.approx(-141.67)
+    body = next(band for band in drive.CRANK_COLUMN_BANDS if band[3] == "crank collar body")
+    assert body[:3] == (drive.CRANK_SPIGOT_FRONT_Z, drive.CRANK_COLLAR_Z1, cs.COLLAR_DIA)
     assert drive.CRANK_HUB_REAR_Z == pytest.approx(-157.8)
     # Stack C grew by the 1.8: 5.8 - 0.05 - 3.5865.
     assert drive.CHAIN_SPIGOT_AXIAL_AIR_WORST == pytest.approx(2.1635)

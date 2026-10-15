@@ -61,9 +61,8 @@ allowed_free_stems:
   - dt-crank-pin-ring
   - dt-crank-pinion
   - dt-crank-pinion-pin
-  # MHA-VN-044/071: closed on the crankshaft, they turn with the freed crank spin.
+  # MHA-VN-044: closed on the crankshaft, they turn with the freed crank spin.
   - vn-crank-seat-drive-pin
-  - vn-crank-seat-shim
   - dt-crankshaft
   - dt-cylinder-gear
   - vn-fillister-screw

@@ -96,12 +96,21 @@ def test_notes_stay_within_rule_six() -> None:
 
 
 def test_shaft_prints_exactly_and_reaches_the_restored_post_boss() -> None:
-    # W15: the boss recess survives the printed limits, while the shaft
-    # datum independently lands on the post's restored north face.
+    # W15 under ruling D1: the shortest one-place shaft whose end stands proud
+    # of the 16T at every accepted part set, while the shaft datum
+    # independently lands on the post's restored north face.
     pinion = spec.dt_crank_pinion_spec
     assert spec.SHAFT_LENGTH == round(spec.SHAFT_LENGTH, pinion.SHAFT_LENGTH_PLACES)
     assert spec.DRAWING_PRECISION["Shaft"]["Depth"] == pinion.SHAFT_LENGTH_PLACES
-    assert pinion.SHAFT_END_RECESS_MIN <= spec.SHAFT_END_RECESS <= pinion.SHAFT_END_RECESS_MAX
+    assert spec.SHAFT_LENGTH == pytest.approx(136.3)
+    least, most = spec.SHAFT_END_PROUD_RANGE
+    assert spec.shaft_end_proud_range(spec.SHAFT_LENGTH) == (least, most)
+    assert least >= 0.0
+    assert most - least == pytest.approx(3.4)
+    assert least <= spec.SHAFT_END_PROUD_NOMINAL <= most
+    # One print step shorter and the end can sit inside the 16T.
+    step = 10.0**-pinion.SHAFT_LENGTH_PLACES
+    assert spec.shaft_end_proud_range(spec.SHAFT_LENGTH - step)[0] < 0.0
     import cone_line
     import dt_cone_pivot_post_spec as post
 
@@ -109,31 +118,33 @@ def test_shaft_prints_exactly_and_reaches_the_restored_post_boss() -> None:
     assert -183.0 + spec.POST_BORE_END == pytest.approx(post_boss_north)
 
 
-def test_seat_collar_lands_the_wheel_seat_and_leaves_the_shim_pack_its_fit() -> None:
+def test_seat_collar_lands_the_wheel_seat_and_bears_on_the_post_boss() -> None:
     # The collar's front is the Ø17.5 seat spigot, whose face is the removable
     # sprocket's seat on the shared plane, stepping up to the Ø20.6 body; its
-    # rear face stands off the post boss by the gap the MHA-VN-071 shim pack
-    # fills, and stays short of the outboard journal land.
+    # rear face bears on the post boss's south face (owner ruling D1: no
+    # washer), and stays short of the outboard journal land.
     import build_dt_drive_train_assembly as bdt
     import dt_cone_pivot_post_spec as post
-    import dt_crank_seat_gap as gap
     import pd_transgear_removable_spec as removable
-    import vn_crank_seat_shim_spec as shim
 
     assert bdt.CRANKSHAFT_Z0 + spec.SEAT_COLLAR == pytest.approx(removable.SEAT_FACE_Z)
     assert spec.SPIGOT_DIA == removable.SEAT_SPIGOT_DIA < spec.COLLAR_DIA
-    # Ruling 2026-09-30: spigot -154.3..-148.5; body -148.5..-144.5.
+    # Ruling 2026-09-30: spigot -154.3..-148.5; the body runs on to the boss.
     assert bdt.CRANKSHAFT_Z0 + spec.SPIGOT_END == pytest.approx(-148.5)
     # The blind drive-pin holes end in the spigot, short of its step.
     assert spec.SEAT_COLLAR < spec.DRIVE_PIN_FLOOR < spec.SPIGOT_END
-    assert bdt.CRANKSHAFT_Z0 + spec.COLLAR_REAR == pytest.approx(-144.5)
-    # The gap from the post's own boss face, not the gap module's chain.
+    # The rear face from the post's own boss face, floored to its .XX print.
     boss_south = spec.POST_BORE_END - post.CRANK_BOSS_LENGTH
-    assert boss_south - spec.COLLAR_REAR == pytest.approx(gap.GAP_NOMINAL)
-    # Every accepted gap takes a pack of at most four catalogue shims.
-    assert shim.worst_residual(gap.GAP_MIN, gap.GAP_MAX) <= shim.FIT_RESIDUAL_MAX + 1e-9
-    # The pack's bore passes the outboard journal land on the way on.
-    assert shim.ID_MIN > spec.JOURNAL_DIA + max(spec.JOURNAL_DIA_BAND)
+    assert spec.POST_BOSS_SOUTH == pytest.approx(boss_south)
+    places = spec.COLLAR_STATION_PLACES
+    assert spec.COLLAR_LENGTH == round(spec.COLLAR_LENGTH, places)
+    assert spec.COLLAR_LENGTH == pytest.approx(12.63)
+    assert 0.0 <= boss_south - spec.COLLAR_REAR < 10.0**-places
+    assert spec.COLLAR_BOSS_AIR == pytest.approx(boss_south - spec.COLLAR_REAR)
+    assert bdt.CRANKSHAFT_Z0 + spec.COLLAR_REAR == pytest.approx(
+        bdt.CRANKSHAFT_Z0 + boss_south, abs=10.0**-places
+    )
+    assert bdt.CRANKSHAFT_Z0 + spec.COLLAR_REAR == pytest.approx(-141.67)
     # The body keeps length at print-worst: both stations and the spigot.
     body_worst = (
         spec.COLLAR_LENGTH
@@ -143,6 +154,15 @@ def test_seat_collar_lands_the_wheel_seat_and_leaves_the_shim_pack_its_fit() -> 
     )
     assert body_worst > 0.0
     assert spec.COLLAR_REAR + spec.COLLAR_STATION_TOL < spec.JOURNAL_START
+    # The bare land behind the collar spans the bore mouth's edge break at
+    # print-worst, so the rear face seats flat on the boss.
+    assert (
+        spec.JOURNAL_START - spec.STATION_ROW - (spec.COLLAR_REAR + spec.COLLAR_STATION_TOL)
+        >= spec.BORE_MOUTH_BREAK_MAX - 1e-9
+    )
+    assert spec.BORE_MOUTH_BREAK_MAX == 0.25
+    assert spec.SHAFT_LENGTH - spec.JOURNAL_START == pytest.approx(93.8)
+    assert spec.JOURNAL_START == pytest.approx(42.5)
     # Bottomed dowels stand proud by the drive-train's pin length budget.
     assert (
         bdt.CRANKSHAFT_Z0 + spec.DRIVE_PIN_FLOOR - spec.vn_crank_seat_drive_pin_spec.LENGTH
@@ -462,8 +482,8 @@ def test_view_scales_and_linked_notes_are_explicit() -> None:
 def test_seat_step_never_pushes_the_pinion_past_its_seat_gap() -> None:
     # The pinion is set on its feeler and pinned; the step never locates it.
     # A step printed at its north limit plus a corner up to the title block's
-    # R0.25 stands the bore edge off, which the seat gap's north range (the
-    # range the W15 pin-wall and recess stacks carry) must hold.
+    # R0.25 stands the bore edge off, which the seat gap's north range must
+    # hold.
     import _config
 
     pinion = spec.dt_crank_pinion_spec
@@ -541,8 +561,9 @@ def test_leader_tip_is_the_point_nearest_the_hole_and_must_land_on_it() -> None:
 
 
 def test_shaft_length_is_unilateral_and_printed_from_the_model() -> None:
-    # W15 band (a): a long shaft would stand proud of the 16T boss, so the
-    # length only comes out short, and the model's Depth carries the band.
+    # The dome-side Depth band carries the hub-air stack through the seat
+    # collar's station, so the length only comes out short, and the model's
+    # Depth carries the band.
     assert spec.SHAFT_LENGTH_BAND == (0.00, -0.40)
     build = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Shaft", "Depth", *deviations(SHAFT_LENGTH_BAND)' in build
@@ -550,28 +571,29 @@ def test_shaft_length_is_unilateral_and_printed_from_the_model() -> None:
     assert "Depth" not in spec.REFERENCE_DIMENSIONS
 
 
-def test_shaft_band_ruling_holds_because_the_general_tolerance_fails_both_stacks(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_shaft_band_ruling_holds_because_the_general_tolerance_closes_the_hub_air() -> None:
     # RULING W15-SHAFT-BAND (machinist review of f0c105531 flagged the band as
-    # over-specified): the unilateral +0/-0.4 is functional. With the shaft at
-    # the title block's .X +/-0.8 instead, both W15 stacks fail.
+    # over-specified): the unilateral +0/-0.4 is functional.  The seat face
+    # prints from the far end, so the shaft's band moves it against the hub
+    # set flush with the dome root; at the title block's .X +/-0.8 the 0.7
+    # hub-to-sprocket air closes.
     import build_dt_drive_train_assembly as bdt
 
-    assert spec.SHAFT_LENGTH_BAND == (0.0, -0.4)
-    shaft, pinion = spec.SHAFT_LENGTH, bdt.PINION_OVERALL_LENGTH
-    edge_nominal, recess_nominal = bdt.PINION_PIN_EDGE_NOMINAL_ACTUAL, bdt.PINION_RECESS_NOMINAL
-    assert sum(bdt.pinion_pin_edge_stack(edge_nominal, shaft, pinion).values()) >= (
-        bdt.PINION_PIN_EDGE_MIN_WORST
+    assert spec.SHAFT_LENGTH_BAND == (0.0, -spec.SHAFT_LENGTH_SHORT_MM) == (0.0, -0.4)
+    assert spec.SEAT_COLLAR_BAND == pytest.approx(
+        (
+            spec.SHAFT_LENGTH_BAND[0] + spec.COLLAR_STATION_TOL,
+            spec.SHAFT_LENGTH_BAND[1] - spec.COLLAR_STATION_TOL,
+        )
     )
-    assert sum(bdt.pinion_recess_stack(recess_nominal, shaft, pinion).values()) >= (
-        bdt.PINION_RECESS_MIN_WORST
+    assert bdt.CRANK_HUB_SPROCKET_AIR == pytest.approx(0.7)
+    assert bdt.CRANK_HUB_SPROCKET_AIR_WORST == pytest.approx(
+        bdt.CRANK_HUB_SPROCKET_AIR + min(spec.SEAT_COLLAR_BAND)
     )
-    monkeypatch.setattr(bdt, "_SHAFT_LENGTH_LIMITS", (-0.8, 0.8))
-    edge = sum(bdt.pinion_pin_edge_stack(edge_nominal, shaft, pinion).values())
-    recess = sum(bdt.pinion_recess_stack(recess_nominal, shaft, pinion).values())
-    assert edge < bdt.PINION_PIN_EDGE_MIN_WORST
-    assert recess < bdt.PINION_RECESS_MIN_WORST
+    assert bdt.CRANK_HUB_SPROCKET_AIR_WORST > 0.0
+    general = spec.dt_crank_pinion_spec.printed_band_mm(spec.dt_crank_pinion_spec.SHAFT_LENGTH_PLACES)
+    assert general == pytest.approx(0.8)
+    assert bdt.CRANK_HUB_SPROCKET_AIR - general - spec.COLLAR_STATION_TOL < 0.0
 
 
 

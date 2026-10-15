@@ -146,10 +146,16 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
         pd_transgear_removable_spec.BAND_FRONT_Z - drive.CRANK_HUB_REAR_Z
         == pytest.approx(0.7)
     )
-    # The restored shaft ends inside the pinion boss, rather than exposing a tip.
+    # Owner ruling D1 (2026-10-15): the shaft end stands proud of the pinion's
+    # north face by the spec's stack, past the match-drilled pin.
+    import dt_crank_pinion_spec
+    import dt_crankshaft_spec
+
     shaft_end = drive.CRANKSHAFT_Z0 + drive.CRANKSHAFT_LENGTH
-    assert shaft_end < drive.PINION_Z0 + drive.PINION_OVERALL_LENGTH
-    assert shaft_end > drive.PINION_PIN_Z + drive.PINION_PIN_DIA / 2.0
+    proud = shaft_end - (drive.PINION_Z0 + drive.PINION_OVERALL_LENGTH)
+    least, most = dt_crankshaft_spec.SHAFT_END_PROUD_RANGE
+    assert 0.0 <= least <= proud <= most
+    assert shaft_end > drive.PINION_PIN_Z + dt_crank_pinion_spec.PIN_DIA / 2.0
 
 
 def test_stock_anchor_still_clamps_eye_without_bottoming() -> None:

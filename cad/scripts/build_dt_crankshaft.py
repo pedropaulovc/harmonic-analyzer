@@ -114,14 +114,15 @@ PART_NAME = "dt-crankshaft"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
 # Dimensions live in dt_crankshaft_spec / dt_crank_hub_geometry. The crank face,
-# collar seat and restored post bore stay fixed while the shaft's north end
-# follows the shortest W15-compliant pinion boss; MHA-DT-009 still crosses the
-# separate hub behind the arm.
+# collar seat and restored post bore stay fixed; the collar runs back to the
+# post boss's south face and the shaft's north end stands proud of the 16T
+# (owner ruling D1, dt_crankshaft_spec.SHAFT_END_PROUD_RANGE); MHA-DT-009 still
+# crosses the separate hub behind the arm.
 # The pinion's retention-pin cross-hole station: the pinion's own PIN_STATION
 # (from its toothed south face) measured from the SeatPinion datum that face
-# sits on. Machine z = CRANKSHAFT_Z0 + this. The recess of the shaft end inside
-# the pinion's boss (build_dt_drive_train_assembly asserts it) is
-# SEAT_PINION + OVERALL_LENGTH - SHAFT_LENGTH.
+# sits on. Machine z = CRANKSHAFT_Z0 + this. The shaft end's stand past the
+# pinion's north face (build_dt_drive_train_assembly asserts it) is
+# SHAFT_LENGTH - SEAT_PINION - OVERALL_LENGTH.
 
 DOME_R = SHAFT_DIA / 2.0
 DOME_SPHERE_R = (DOME_R**2 + SHAFT_DOME_HEIGHT**2) / (2.0 * SHAFT_DOME_HEIGHT)
@@ -729,7 +730,7 @@ async def build(adapter) -> dict[str, str]:
     # two sections: the seat spigot, whose face on the SeatCollar datum is the
     # removable sprocket's seat and which the #25 plates wrapping the T12 pass
     # over, then the body from the spigot's step (the SpigotEnd datum) to the
-    # CollarRear face the MHA-DT-036 washer rides.  The step is sharp: the title
+    # CollarRear face that bears on the post boss.  The step is sharp: the title
     # block's general edge break covers its corners.
     v_final += await _collar_section(
         adapter,
@@ -980,8 +981,8 @@ async def build(adapter) -> dict[str, str]:
         "PinionSeatDiaDim",
         *deviations(PINION_SEAT_DIA_BAND),
     )
-    # W15: the length is unilateral (dt_crankshaft_spec.SHAFT_LENGTH_BAND); it
-    # prints from the model on the far-end-to-dome-root Depth.
+    # The length is unilateral (dt_crankshaft_spec.SHAFT_LENGTH_BAND, the hub
+    # air); it prints from the model on the far-end-to-dome-root Depth.
     set_dimension_bilateral_tolerance(
         adapter, "Shaft", "Depth", *deviations(SHAFT_LENGTH_BAND)
     )

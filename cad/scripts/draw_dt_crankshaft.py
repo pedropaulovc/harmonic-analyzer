@@ -247,7 +247,7 @@ DIAMETER_POSITIONS = {
     "CollarDiaDim": (SPIGOT_END_X + 0.002, _DIAMETER_ROW_Y[0]),
 }
 # The Ø9.525 callout counts every bare core land (SHAFT_CORE_LANDS: the
-# dome-side shank, the washer's land behind the collar and the land before
+# dome-side shank, the land behind the collar and the land before
 # the Ø9 seat step); machinist review of 8b5e1f354 found the 2X it carried
 # named two of the three.  The 2X Ø11.388 names both bearing lands on either
 # side of the relief; the displayed arrow picks the outboard land, and the
@@ -262,7 +262,7 @@ CALLOUTS_BELOW = {
 # Both running lands carry separate part-owned finish symbols. The outboard
 # symbol sits right of the Ø11.388 dimension line, its leader landing on the
 # land just short of the relief shoulder; the inboard symbol retains its
-# clear spot above the relief.  The collar's rear (washer) face takes its
+# clear spot above the relief.  The collar's rear (boss) face takes its
 # own symbol on that face's edge-on line ABOVE the axis, the symbol in the
 # pocket over the outboard land under the collar's Ø20.6 text: under the axis
 # every way to that face crosses a station's extension line.
@@ -921,7 +921,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=COLLAR_REAR_FINISH[0],
         symbol_xy=COLLAR_REAR_FINISH[1],
         control=surface_finish_by_key(SURFACE_FINISHES, "collar_rear_face"),
-        label="crankshaft collar rear (thrust washer) face finish",
+        label="crankshaft collar rear (post boss) face finish",
         char_height=0.0025,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)

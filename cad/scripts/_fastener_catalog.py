@@ -90,18 +90,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "98381A434",
         material="Alloy Steel",
     ),
-    # One pack of 1-4 ring shims selected at assembly; the model is the pack
-    # for the nominal gap (vn_crank_seat_shim_spec.PACK).
-    "vn-crank-seat-shim": _stock(
-        "vn-crank-seat-shim",
-        "Carbon Steel Ring Shims, 12 mm ID x 18 mm OD",
-        "3088A006",
-        "3088A026",
-        "3088A066",
-        "3088A086",
-        "3088A106",
-        "3088A207",
-    ),
     "vn-fillister-screw": _stock(
         "vn-fillister-screw",
         "Brass Fillister Head Slotted Screw",

@@ -495,8 +495,6 @@ from dt_crank_arm_spec import (  # noqa: E402
 from _fit_deviations import deviations  # noqa: E402
 import _chain  # noqa: E402
 import vn_crank_seat_drive_pin_spec as SEAT_PIN  # noqa: E402
-import dt_crank_seat_gap as SEAT_GAP  # noqa: E402
-import vn_crank_seat_shim_spec as SEAT_SHIM  # noqa: E402
 import pd_transgear_removable_spec as REMOVABLE  # noqa: E402
 from dt_crankshaft_spec import (  # noqa: E402
     COLLAR_DIA,
@@ -507,7 +505,6 @@ from dt_crankshaft_spec import (  # noqa: E402
     SEAT_COLLAR,
     SEAT_COLLAR_BAND,
     SHAFT_LENGTH as CRANKSHAFT_LENGTH,
-    SHAFT_LENGTH_BAND as CRANKSHAFT_LENGTH_BAND,
     SPIGOT_DIA,
     SPIGOT_DIA_BAND,
     SPIGOT_END,
@@ -563,11 +560,9 @@ if CRANK_HUB_SPROCKET_AIR_WORST <= 0.0:
         "crank hub rear/sprocket air closes at the SeatCollar band: "
         f"{CRANK_HUB_SPROCKET_AIR_WORST:.3f}"
     )
-# Behind the seat: the integral collar, then the MHA-VN-071 shim pack flat on
-# the collar's rear face (its y = 0 face), selected to fill the gap to the post
-# boss to within its fit residual.
-CRANK_SEAT_SHIM_Z0 = CRANKSHAFT_Z0 + COLLAR_REAR
-CRANK_SEAT_SHIM_REAR_Z = CRANK_SEAT_SHIM_Z0 + SEAT_SHIM.THICKNESS
+# Behind the seat: the integral collar, its rear face on the post boss's
+# south face (owner ruling D1, 2026-10-15: no crank-seat washer).
+CRANK_COLLAR_Z1 = CRANKSHAFT_Z0 + COLLAR_REAR
 # The seat is a Ø17.5 spigot (SEAT_FACE_Z..SPIGOT_END) ahead of the Ø20.6
 # body; the hub's rear Ø16.5 relief runs from its barrel's rear shoulder to
 # the hub rear face.  Both let the #25 plates wrapping the crank sprocket pass inside
@@ -824,6 +819,11 @@ from build_dt_crankshaft import (  # noqa: E402
     SEAT_PINION as CS_SEAT_PINION,
     SHAFT_LENGTH as CS_SHAFT_LENGTH,
 )
+from dt_crankshaft_spec import (  # noqa: E402
+    COLLAR_BOSS_AIR as CS_COLLAR_BOSS_AIR,
+    SHAFT_END_PROUD_NOMINAL as CS_SHAFT_END_PROUD_NOMINAL,
+    SHAFT_END_PROUD_RANGE as CS_SHAFT_END_PROUD_RANGE,
+)
 
 # Crank taper pin + keeper ring (ch11 p.14): pin axis along machine X through
 # MHA-DT-031's rear barrel and the crankshaft at station 12, behind the arm.
@@ -932,18 +932,12 @@ from dt_crank_pinion_spec import (  # noqa: E402
     BOSS_DIA as PINION_BOSS_DIA,
     FACE_WIDTH as PINION_SPEC_FACE,
     OVERALL_LENGTH as PINION_OVERALL_LENGTH,
-    PIN_DIA as PINION_PIN_DIA,
     PIN_LENGTH as PINION_PIN_LENGTH,
     FACE_WIDTH_PLACES as PINION_FACE_WIDTH_PLACES,
     FACE_WIDTH_LIMITS as PINION_FACE_LIMITS,
-    W15_FACE_ALLOWANCE_MM as PINION_W15_FACE_ALLOWANCE,
     OVERALL_LENGTH_PLACES as PINION_OVERALL_LENGTH_PLACES,
-    SHAFT_LENGTH_PLACES as PINION_SHAFT_LENGTH_PLACES,
-    PIN_EDGE_MIN_WORST as PINION_PIN_EDGE_MIN_WORST,
     PIN_STATION as PINION_PIN_STATION,
-    PIN_STATION_LAYOUT_ALLOWANCE_MM as PINION_PIN_LAYOUT_ALLOWANCE,
     SEAT_GAP_MAX_MM as PINION_SEAT_GAP_MAX,
-    SHAFT_END_RECESS_MIN_WORST as PINION_RECESS_MIN_WORST,
 )
 from build_dt_crankshaft import PINION_PIN_STATION_Y as CS_PINION_PIN_STATION  # noqa: E402
 
@@ -974,12 +968,6 @@ if abs((CRANKSHAFT_Z0 + CS_PINION_PIN_STATION) - PINION_PIN_Z) > 1e-6:
 if abs(PINION_PIN_LENGTH - PINION_BOSS_DIA) > 1e-9:
     raise AssertionError("pinion pin is not flush with the boss")
 _SHAFT_NORTH_END = CRANKSHAFT_Z0 + CS_SHAFT_LENGTH
-# Nominal recess of the shaft end inside the boss and the pin's wall to that
-# end; their worst cases are asserted once the seat gap is known (below).
-PINION_RECESS_NOMINAL = (PINION_Z0 + PINION_OVERALL_LENGTH) - _SHAFT_NORTH_END
-PINION_PIN_EDGE_NOMINAL_ACTUAL = _SHAFT_NORTH_END - (
-    PINION_PIN_Z + PINION_PIN_DIA / 2.0
-)
 
 # The whole cone set rides the SWING PLATFORM (ch.12 p.18: the dark wedge
 # plate labelled "pivot" at its tip end). The green pivot post (big-end
@@ -1697,44 +1685,30 @@ if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
     raise AssertionError("column CRANK_BORE_Y != Y_CRANK - Y_BASE_TOP - PLAT_T")
 # Axial closure around the v2 boss after the casting's exact Ry(180).  The turn
 # reverses local Z, so the harvested asymmetric boss now runs from
-# post.z - (start + length) to post.z - start.  South of it the crank seat
-# stack closes the gap to the chain wheel's seat face: the integral collar,
-# then the MHA-VN-071 shim pack, flat on its rear face and selected at assembly
-# to within its fit residual under the gap to the cast south face.  The shaft's
-# end play is the 16T's feeler gap to the boss's north face plus that residual.
+# post.z - (start + length) to post.z - start.  Owner ruling D1 (2026-10-15):
+# no crank-seat washer -- the crankshaft's integral collar is pulled hard onto
+# the cast south face, the 16T is set on its feeler off the north face and
+# only then is its pin match-drilled (MHA-DT-000 step 4), so the shaft's end
+# play is the 16T's gap to the north face.
 # The 16T follows the translated 64T contact row to the boss's north.
 _POST_BOSS_SOUTH = _PPOST[2] - (POST_CRANK_BOSS_START_Z + POST_CRANK_BOSS_LENGTH)
 _PINION_SOUTH = PINION_TOOTH_Z - PINION_FACE / 2.0
-CRANK_SEAT_SHIM_GAP = _POST_BOSS_SOUTH - CRANK_SEAT_SHIM_Z0
-CRANK_SEAT_SHIM_FLOAT = _POST_BOSS_SOUTH - CRANK_SEAT_SHIM_REAR_Z
+CRANK_COLLAR_REAR_Z = CRANKSHAFT_Z0 + COLLAR_REAR
+CRANK_COLLAR_BOSS_AIR = _POST_BOSS_SOUTH - CRANK_COLLAR_REAR_Z
 _BOSS_NORTH_GAP = _PINION_SOUTH - _POST_BOSS_NORTH
 # The feeler sets the south face directly off the restored boss (MHA-DT-000).
 PINION_BOSS_NORTH_GAP_RANGE = (PINION_SEAT_FEELER, PINION_SEAT_GAP_MAX)
 _GAP_LO, _GAP_HI = PINION_BOSS_NORTH_GAP_RANGE
-# (1) The modelled gap is the nominal crank-seat gap, and the modelled pack (the
-# one selected for it) bears on the collar with at most the fit residual to the
-# boss.  dt_crank_seat_gap proves every accepted gap takes such a pack.
-if abs(CRANK_SEAT_SHIM_GAP - SEAT_GAP.GAP_NOMINAL) > 1e-6:
+# (1) The modelled collar bears on the cast south face: the spec floors its
+# length to the two-place print, so the model stands under 0.01 off it.
+if abs(CRANK_COLLAR_BOSS_AIR - CS_COLLAR_BOSS_AIR) > 1e-6:
     raise AssertionError(
-        f"MHA-VN-071 gap {CRANK_SEAT_SHIM_GAP:.4f} in the layout is not the "
-        f"nominal crank-seat gap {SEAT_GAP.GAP_NOMINAL:.4f}"
+        f"crank collar rear face {CRANK_COLLAR_BOSS_AIR:.4f} off the post boss in the "
+        f"layout; the crankshaft spec closes it to {CS_COLLAR_BOSS_AIR:.4f}"
     )
-if not -1e-9 <= CRANK_SEAT_SHIM_FLOAT <= SEAT_SHIM.FIT_RESIDUAL_MAX + 1e-9:
-    raise AssertionError(
-        f"MHA-VN-071 leaves {CRANK_SEAT_SHIM_FLOAT:.4f} to the boss, outside its "
-        f"0-{SEAT_SHIM.FIT_RESIDUAL_MAX} fit residual"
-    )
-# (2) The shaft's end play is the 16T's feeler gap plus the pack's residual.
-CRANK_SHAFT_END_PLAY = _BOSS_NORTH_GAP + CRANK_SEAT_SHIM_FLOAT
-if not (
-    SEAT_GAP.END_PLAY_MIN - 1e-6
-    <= CRANK_SHAFT_END_PLAY
-    <= SEAT_GAP.END_PLAY_MAX + 1e-6
-):
-    raise AssertionError(
-        f"crankshaft end play {CRANK_SHAFT_END_PLAY:.4f} is outside the "
-        f"{SEAT_GAP.END_PLAY_MIN}-{SEAT_GAP.END_PLAY_MAX:.2f} feeler-plus-residual band"
-    )
+# (2) The shaft's end play is the 16T's gap to the boss's north face (the
+# collar's model air is under a print step and is pulled out at fit-up).
+CRANK_SHAFT_END_PLAY = _BOSS_NORTH_GAP
 if not (
     _GAP_LO - 1e-6
     <= _BOSS_NORTH_GAP
@@ -1763,57 +1737,6 @@ assert GEAR64_POST_CLEARANCES and min(GEAR64_POST_CLEARANCES.values()) >= crank_
 # nominal (the model rounded to its printed places) under the band that sheet
 # prints for it -- the title block's metric row, or the dimension's own band --
 # never the inch grade behind the row (Codex P2 on #892).
-_SHAFT_LENGTH_LIMITS = deviations(CRANKSHAFT_LENGTH_BAND)  # (lower, upper)
-
-
-def pinion_pin_edge_stack(
-    edge_nominal: float, shaft_length: float, pinion_overall_length: float
-) -> dict[str, float]:
-    """W15's worst-case wall from the 16T pin hole to the shaft's north end.
-
-    Each term comes from the source that owns it: the shaft printed at its
-    lower limit (dt_crankshaft_spec), the seat gap opening from its nominal to the
-    range's ceiling (the pinion, and its pin, move north), the boss mid-length
-    the pin is laid out at moving north with a long face (W15's .X allowance,
-    which the face's printed band sits inside) and a long overall length (its
-    printed row), the laid-out station's allowance
-    (dt_crank_pinion_spec), and the title block's drilled-hole oversize on the
-    pin's radius.
-    """
-    shaft_lower, _ = printed_deviations(
-        shaft_length, PINION_SHAFT_LENGTH_PLACES, _SHAFT_LENGTH_LIMITS
-    )
-    face_upper = PINION_W15_FACE_ALLOWANCE
-    _, overall_upper = printed_deviations(pinion_overall_length, PINION_OVERALL_LENGTH_PLACES)
-    return {
-        "nominal": edge_nominal,
-        "shaft length": shaft_lower,
-        "seat gap": -(_GAP_HI - _BOSS_NORTH_GAP),
-        "boss mid-length": -(face_upper + overall_upper) / 2.0,
-        "pin layout": -PINION_PIN_LAYOUT_ALLOWANCE,
-        "drill oversize": -float(_config.title_block("drilled_hole")["plus_mm"]) / 2.0,
-    }
-
-
-def pinion_recess_stack(
-    recess_nominal: float, shaft_length: float, pinion_overall_length: float
-) -> dict[str, float]:
-    """W15's worst-case recess of the shaft end inside the 16T boss.
-
-    A pinion at its printed lower limit, a seat gap closing from its nominal to
-    the range's floor, and a shaft at its printed upper limit each bring the
-    shaft end out toward the boss face.
-    """
-    overall_lower, _ = printed_deviations(pinion_overall_length, PINION_OVERALL_LENGTH_PLACES)
-    _, shaft_upper = printed_deviations(
-        shaft_length, PINION_SHAFT_LENGTH_PLACES, _SHAFT_LENGTH_LIMITS
-    )
-    return {
-        "nominal": recess_nominal,
-        "pinion overall length": overall_lower,
-        "seat gap": -(_BOSS_NORTH_GAP - _GAP_LO),
-        "shaft length": -shaft_upper,
-    }
 
 
 def _stack_text(stack: dict[str, float]) -> str:
@@ -1821,21 +1744,35 @@ def _stack_text(stack: dict[str, float]) -> str:
     return f"{terms} = {sum(stack.values()):.3f}"
 
 
-PINION_PIN_EDGE_STACK = pinion_pin_edge_stack(
-    PINION_PIN_EDGE_NOMINAL_ACTUAL, CS_SHAFT_LENGTH, PINION_OVERALL_LENGTH
-)
-if sum(PINION_PIN_EDGE_STACK.values()) < PINION_PIN_EDGE_MIN_WORST:
-    raise AssertionError(
-        f"16T pin wall to the shaft end, worst case: "
-        f"{_stack_text(PINION_PIN_EDGE_STACK)} < {PINION_PIN_EDGE_MIN_WORST}"
+# --- The crankshaft end proud of the 16T (owner ruling D1, 2026-10-15) ------
+# Collar on the boss, 16T on its feeler: the shaft end stands past the 16T's
+# north face by the printed CollarRearStation less the boss, the feeler and
+# the 16T's overall length (dt_crankshaft_spec.SHAFT_END_PROUD_LINKS), never
+# inside it, so the match-drilled pin always has the 16T's own wall of shaft
+# beyond it, and it is left proud (not faced at assembly).
+_PINION_NORTH = PINION_Z0 + PINION_OVERALL_LENGTH
+CRANK_SHAFT_END_PROUD_NOMINAL_MODEL = _SHAFT_NORTH_END - _PINION_NORTH
+# The model sits the 16T on its feeler and the collar within a print step of
+# the boss, so its proud length is the stack's nominal less the collar air.
+if (
+    abs(
+        CRANK_SHAFT_END_PROUD_NOMINAL_MODEL
+        - (CS_SHAFT_END_PROUD_NOMINAL - CRANK_COLLAR_BOSS_AIR - (_BOSS_NORTH_GAP - PINION_SEAT_FEELER))
     )
-PINION_RECESS_STACK = pinion_recess_stack(
-    PINION_RECESS_NOMINAL, CS_SHAFT_LENGTH, PINION_OVERALL_LENGTH
-)
-if sum(PINION_RECESS_STACK.values()) < PINION_RECESS_MIN_WORST:
+    > 1e-6
+):
     raise AssertionError(
-        f"crankshaft end recess inside the 16T boss, worst case: "
-        f"{_stack_text(PINION_RECESS_STACK)} < {PINION_RECESS_MIN_WORST}"
+        f"crankshaft end stands {CRANK_SHAFT_END_PROUD_NOMINAL_MODEL:.4f} past the 16T in "
+        f"the layout, off the spec's proud stack {CS_SHAFT_END_PROUD_NOMINAL:.4f}"
+    )
+if not (
+    -1e-9
+    <= CS_SHAFT_END_PROUD_RANGE[0]
+    <= CRANK_SHAFT_END_PROUD_NOMINAL_MODEL
+    <= CS_SHAFT_END_PROUD_RANGE[1] + 1e-9
+):
+    raise AssertionError(
+        f"crankshaft end proud range {CS_SHAFT_END_PROUD_RANGE} misses the 16T or the model"
     )
 
 # --- The 16T's north end under the inclined T120 (user ruling c'' variant B,
@@ -2143,11 +2080,12 @@ def _t120_lowest(south: np.ndarray, dy: np.ndarray, reach: float) -> np.ndarray:
 
 
 def _t120_nearest(
-    south: np.ndarray, dy: np.ndarray, z_low: float, z_high: float
+    south: np.ndarray, dy: np.ndarray, z_low: float, z_high: float, tip: float = _TIP120
 ) -> np.ndarray:
     """T120's least distance from the crank axis between machine z ``z_low``
     and ``z_high``, per corner (``south`` and ``dy`` as _t120_lowest); inf
-    where T120 has no point between them."""
+    where T120 has no point between them.  ``tip`` reads a stacked cone gear
+    of that tip radius in T120's place, ``south`` then being its south face."""
     north = south + CONE_FACE + _T120_NORTH_BAND[0]
     above = np.abs(Y_CRANK + dy - Y_DRIVE)
     w_low, w_high = z_low - _T120_ORIGIN[2], z_high - _T120_ORIGIN[2]
@@ -2171,10 +2109,10 @@ def _t120_nearest(
         return low - high
 
     def in_tip(p: np.ndarray) -> np.ndarray:
-        return offset(p) - _TIP120
+        return offset(p) - tip
 
     def distance(p: np.ndarray) -> np.ndarray:
-        q = np.sqrt(np.maximum(_TIP120**2 - offset(p) ** 2, 0.0))
+        q = np.sqrt(np.maximum(tip**2 - offset(p) ** 2, 0.0))
         return np.hypot(p - _T120_CRANK_P, np.maximum(above - q, 0.0))
 
     centre = np.full_like(south, _T120_CRANK_P)
@@ -2285,6 +2223,73 @@ if PINION_T120_CONCENTRIC["turned band radial"] < T120_TURNED_BAND_RADIAL_FLOOR:
         f"16T turned band passes {PINION_T120_CONCENTRIC['turned band radial']:.3f} mm "
         "inside the T120 rim on its nominal axis, below the "
         f"{T120_TURNED_BAND_RADIAL_FLOOR:.2f}-mm radial floor"
+    )
+
+# Owner ruling D1 (2026-10-15): the crankshaft end is left proud of the 16T's
+# north face.  Its highest is the collar hard on the boss (the crank's end
+# play only runs it south), the boss's north face high, and the boss and the
+# CollarRearStation at their print limits (dt_crankshaft_spec.
+# SHAFT_END_PROUD_LINKS).  The inclined cone stack is what reaches toward the
+# crank axis north of the 16T: T120's lowest point never comes over the axis
+# (the shoulder air above is unbounded), but T120 and the gears stacked north
+# of it (T114 nearest, one SEAT_PITCH on) pass beside the proud end.  So the
+# proud Ø9 seat, at its largest, must keep the turned band's radial floor to
+# every stacked gear over every z it can occupy past the 16T's shortest north
+# face, at every printed corner of the cone stack, its float and the crank
+# height, the poses closing.  Each gear past T120 carries one more face band
+# of the stack, widening the shaft's window by it both ways.
+from dt_crankshaft_spec import (  # noqa: E402
+    PINION_SEAT_DIA as CS_PINION_SEAT_DIA,
+    PINION_SEAT_DIA_BAND as CS_PINION_SEAT_DIA_BAND,
+    SHAFT_END_PROUD_LINKS as CS_SHAFT_END_PROUD_LINKS,
+)
+
+CRANK_SHAFT_END_Z_MAX = (
+    _POST_BOSS_NORTH
+    + max(_BOSS_NORTH_BAND)
+    + sum(
+        nominal + upper
+        for name, (nominal, _lower, upper) in CS_SHAFT_END_PROUD_LINKS.items()
+        if name in ("MHA-DT-011 CollarRearStation", "MHA-DT-005 crank boss length")
+    )
+)
+if CRANK_SHAFT_END_Z_MAX < _SHAFT_NORTH_END - 1e-9:
+    raise AssertionError("the crankshaft end's print-worst top falls below its model")
+_PINION_NORTH_Z_MIN = (
+    _POST_BOSS_NORTH
+    + min(_BOSS_NORTH_BAND)
+    + PINION_SEAT_FEELER
+    + min(PINION_END_PLAY)
+    + PINION_OVERALL_LENGTH
+    + min(printed_deviations(PINION_OVERALL_LENGTH, PINION_OVERALL_LENGTH_PLACES))
+)
+CRANK_SHAFT_END_RADIUS_MAX = (CS_PINION_SEAT_DIA + max(CS_PINION_SEAT_DIA_BAND)) / 2.0
+_END_SHIFT, _END_DY = _cone_corners(_CONE_FLOATS, _CRANK_HEIGHT_BAND)
+_CONE_FACE_BAND_MAX = max(abs(d) for d in CONE_GEAR_FACE_WIDTH_BAND)
+CRANK_SHAFT_END_CONE_NEAREST = {}
+for _j in range(20):
+    _teeth = 120 - 6 * _j
+    _widen = _j * _CONE_FACE_BAND_MAX
+    CRANK_SHAFT_END_CONE_NEAREST[f"T{_teeth:03d}"] = float(
+        _t120_nearest(
+            _T120_SOUTH_FACE_STATION + _j * SEAT_PITCH + _END_SHIFT,
+            _END_DY,
+            _PINION_NORTH_Z_MIN - T120_POSE_AXIAL - _widen,
+            CRANK_SHAFT_END_Z_MAX + T120_POSE_AXIAL + _widen,
+            tip=_cone_tip_radius_max(_teeth),
+        ).min()
+    )
+_END_NEAREST_GEAR = min(CRANK_SHAFT_END_CONE_NEAREST, key=CRANK_SHAFT_END_CONE_NEAREST.get)
+_END_T120_NEAREST = CRANK_SHAFT_END_CONE_NEAREST[_END_NEAREST_GEAR]
+CRANK_SHAFT_END_NORTH_NEIGHBOUR = f"inclined cone gear {_END_NEAREST_GEAR}"
+CRANK_SHAFT_END_NORTH_AIR_WORST = (
+    _END_T120_NEAREST - T120_POSE_RADIAL - CRANK_SHAFT_END_RADIUS_MAX
+)
+if CRANK_SHAFT_END_NORTH_AIR_WORST < T120_TURNED_BAND_RADIAL_FLOOR:
+    raise AssertionError(
+        f"the proud crankshaft end (top z {CRANK_SHAFT_END_Z_MAX:.3f}) passes "
+        f"{CRANK_SHAFT_END_NORTH_AIR_WORST:.3f} mm from the {CRANK_SHAFT_END_NORTH_NEIGHBOUR} "
+        f"at print-worst, below the {T120_TURNED_BAND_RADIAL_FLOOR:.2f}-mm radial floor"
     )
 # This envelope follows the configured cone family. The nominal floors above
 # and the fit-up/service and engagement guards below remain independent of
@@ -3633,7 +3638,7 @@ _SWING_RIG_BANDS = (
 )
 # The crank column behind the hub, each body a solid of revolution about the
 # crank axis (z band, diameter): the selected crank sprocket paper-drive seats on it, the
-# collar's seat spigot and body, and the MHA-VN-071 shim pack on the body's rear.
+# collar's seat spigot and body, the body's rear face on the post boss.
 CRANK_SPROCKET_TIP_DIA = REMOVABLE.outside_dia(REMOVABLE.CRANK_TEETH)
 CRANK_COLUMN_BANDS = (
     (
@@ -3643,13 +3648,7 @@ CRANK_COLUMN_BANDS = (
         "crank chain wheel",
     ),
     (REMOVABLE.SEAT_FACE_Z, CRANK_SPIGOT_FRONT_Z, SPIGOT_DIA, "crank seat spigot"),
-    (CRANK_SPIGOT_FRONT_Z, CRANK_SEAT_SHIM_Z0, COLLAR_DIA, "crank collar body"),
-    (
-        CRANK_SEAT_SHIM_Z0,
-        CRANK_SEAT_SHIM_REAR_Z,
-        SEAT_SHIM.OD_MAX,
-        "crank seat shim",
-    ),
+    (CRANK_SPIGOT_FRONT_Z, CRANK_COLLAR_Z1, COLLAR_DIA, "crank collar body"),
 )
 _CRANK_TO_GRIP_AXIS = math.hypot(X_CRANK - APINION_X, Y_CRANK - APINION_Y)
 for _lo, _hi, _what in (
@@ -4564,15 +4563,14 @@ async def build(adapter) -> dict[str, str]:
         f"(axis poses +/-{CRANK_ROW_POSE_AXIAL:.4f}, cone stack floated {CONE_FLOAT_NORTH:.2f}) "
         f">= {CRANK_ROW_ENGAGEMENT_FLOOR:.0%}"
     )
-    # #893: the W15 stacks are import-time asserts, so a passing build would
-    # otherwise leave no record of their sums or margins in the leaf log.
+    # #893: the proud stack is an import-time assert, so a passing build would
+    # otherwise leave no record of its range in the leaf log.
     _telemetry.info(
-        "16T pin wall to the shaft end, worst case: "
-        f"{_stack_text(PINION_PIN_EDGE_STACK)} >= {PINION_PIN_EDGE_MIN_WORST}"
-    )
-    _telemetry.info(
-        "crankshaft end recess inside the 16T boss, worst case: "
-        f"{_stack_text(PINION_RECESS_STACK)} >= {PINION_RECESS_MIN_WORST}"
+        "crankshaft end proud of the 16T north face (owner ruling D1): "
+        f"{CS_SHAFT_END_PROUD_RANGE[0]:.3f}..{CS_SHAFT_END_PROUD_RANGE[1]:.3f} "
+        f"(nominal {CS_SHAFT_END_PROUD_NOMINAL:.3f}); top of the end at "
+        f"z <= {CRANK_SHAFT_END_Z_MAX:.3f}, {CRANK_SHAFT_END_NORTH_AIR_WORST:.3f} "
+        f"under the {CRANK_SHAFT_END_NORTH_NEIGHBOUR}"
     )
     # The rig's worst-case margin table (asserted at import), in the task log at
     # info: the farm leaf log runs at info, and a debug line never reached it
@@ -5148,20 +5146,10 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="MHA-VN-029 six-o'clock axial seam pin",
     )
-    # The crank seat behind the chain wheel: MHA-VN-071 flat on the collar's rear
-    # face (local +Y -> machine +Z, rearward), and the two MHA-VN-044 drive pins
-    # standing in the collar's blind holes, pressed end on DrivePinFloor and
-    # rounded lead end forward (local +Y -> machine -Z).  DrivePinAxis1 lies
-    # on the shaft's local +Z (machine -Y), DrivePinAxis2 opposite.
-    seat_shim = await place_component(
-        adapter,
-        "vn-crank-seat-shim",
-        [X_CRANK, Y_CRANK, CRANK_SEAT_SHIM_Z0],
-        [90.0, 0.0, 0.0],
-        ROT_X_POS90,
-        ground=False,
-        label="MHA-VN-071 on the crank collar's rear face",
-    )
+    # The two MHA-VN-044 drive pins stand in the collar's blind holes, pressed
+    # end on DrivePinFloor and rounded lead end forward (local +Y -> machine
+    # -Z).  DrivePinAxis1 lies on the shaft's local +Z (machine -Y),
+    # DrivePinAxis2 opposite.
     seat_pins = [
         await place_component(
             adapter,
@@ -5179,7 +5167,7 @@ async def build(adapter) -> dict[str, str]:
     # single crank chain wheel lives in paper-drive (codex #189 :605). Placing it
     # here too made two coincident T12 wheels at the crank centre once both
     # subassemblies are inserted at the top level -> interference. Drive-train
-    # keeps the shaft, its seat shim pack and drive pins, hub, arm, handle, both
+    # keeps the shaft, its drive pins, hub, arm, handle, both
     # crank pins and 16T pinion; the crank spin DOF remains keyed through the arm.
     # Crank rest pose: the arm hangs straight DOWN (ch30 eight-views -- the
     # handle reads "down" in all eight roll angles, which only a -Y arm does,
@@ -5513,32 +5501,6 @@ async def build(adapter) -> dict[str, str]:
         verify=(seam_pin, seam_o),
     )
 
-    # MHA-VN-071 rides the shaft flat against CollarRear; its rear face stops
-    # short of the boss's south face by the pack's fit residual, so the collar
-    # mate places it.  A revolved pack's spin is immaterial: the parallel
-    # closes it like MHA-VN-029's.
-    shim_o = _org(adapter, seat_shim)
-    await coincident_mate(
-        adapter,
-        named_ref(f"ScrewAxis@{seat_shim}", "AXIS"),
-        crank_axis,
-        label="MHA-VN-071 coaxial on crankshaft",
-        verify=(seat_shim, shim_o),
-    )
-    await coincident_mate(
-        adapter,
-        named_ref(f"Top Plane@{seat_shim}", "PLANE"),
-        named_ref(f"CollarRear@{crankshaft}", "PLANE"),
-        label="MHA-VN-071 flat on the collar rear face",
-        verify=(seat_shim, shim_o),
-    )
-    await parallel_mate(
-        adapter,
-        named_ref(f"Right Plane@{seat_shim}", "PLANE"),
-        cs_right,
-        label="MHA-VN-071 rotational closure",
-        verify=(seat_shim, shim_o),
-    )
     # Each MHA-VN-044 is pressed to the hole floor; its axis is the collar's
     # drilled pin axis, and the parallel closes the revolved pin's spin.
     for k, seat_pin in enumerate(seat_pins, start=1):

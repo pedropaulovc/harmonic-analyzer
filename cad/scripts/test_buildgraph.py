@@ -107,7 +107,7 @@ _INSERTED_SOURCES = {
     "vn_cone_tip_adjuster dt_cone_tip_block vn_cone_tip_block_screw vn_cone_tip_collar vn_cone_tip_pinch_screw "
     "dt_crank_arm dt_crank_drive_gear dt_crank_handle dt_crank_handle_butt_cup dt_crank_handle_ferrule "
     "dt_crank_handle_pivot_screw dt_crank_hub vn_crank_hub_pin dt_crank_pin "
-    "dt_crank_pin_eye dt_crank_pin_ring vn_crank_seat_drive_pin vn_crank_seat_shim "
+    "dt_crank_pin_eye dt_crank_pin_ring vn_crank_seat_drive_pin "
     "dt_crank_pinion dt_crank_pinion_pin dt_crankshaft dt_cylinder_end_disc dt_cylinder_gear "
     "vn_cylinder_bank_spring dt_cylinder_gear_shaft "
     "vn_fillister_screw vn_foot_screw vn_keeper_chain vn_keeper_chain_link vn_pedestal_hold_down_screw dt_pinion_arbor dt_pinion_arbor_collar dt_pinion_bracket dt_pinion_cam "

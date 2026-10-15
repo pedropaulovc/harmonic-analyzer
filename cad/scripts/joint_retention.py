@@ -673,7 +673,6 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_crank_pin",  # 1:48 taper pin, light drive
         "dt_crank_pin_eye",  # formed brass eye, clamped under fillister_screw (no thread of its own)
         "vn_crank_seat_drive_pin",  # MHA-VN-044 dowel pressed into match-drilled holes, no thread
-        "vn_crank_seat_shim",  # MHA-VN-071 3088A ring shims loose on the crankshaft, plain bore, no thread
         "dt_crank_pin_ring",  # brass wire keeper ring
         "dt_crank_pinion",  # pinned by crank_pinion_pin
         "dt_crank_pinion_pin",  # plain 1/8 drill-rod drive pin
@@ -757,7 +756,6 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_chain_connecting_link": "clip-retained roller-chain link; pins only, no thread",
     "vn_keeper_chain": "chain; its end links hang on screws and eyes, carrying no thread",
     "vn_crank_seat_drive_pin": "dowel pin pressed into a plain hole",
-    "vn_crank_seat_shim": "plain-bore shim pack loose on the crankshaft; no thread",
     "vn_keeper_chain_link": "plain chain link",
     "vn_knife_mount_dowel": "dowel pin pressed into a reamed hole",
     "vn_knife_hanger_washer": "plain SAE washer under the knife-hanger hex head; no thread",
