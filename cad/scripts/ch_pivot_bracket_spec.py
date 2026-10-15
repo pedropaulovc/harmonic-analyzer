@@ -8,17 +8,18 @@ Part frame: seat face at y = 0, origin under the bore on the seat plane. The
 foot runs FOOT_Z0 along +Z (the ear end at -EAR_T/2, the free end outboard
 once placed, toward the support's end face); the ear is EAR_W wide (X) by
 EAR_T thick (Z), centred on the origin, rising from the foot top and ARCHED
-with radius EAR_W/2 over the O BORE_DIA cross-bore, its apex APEX_ABOVE_BORE
-over the bore axis (the arch's centre ARCH_LIFT above it). The ear is as wide
-as the foot, so their sides are one flat each side. Each ear's inner face
-bears on a MHA-CH-009 thrust washer: hub 19's at the north ear (the bank's
-datum), the preload spring's at the south one (``rocker_bank_layout``).
+with radius EAR_W/2 over the O BORE_DIA cross-bore, its apex EAR_TOP_Y over
+the seat (the arch's centre ARCH_LIFT above the bore axis). The ear is as
+wide as the foot, so their sides are one flat each side. Each ear's inner
+face bears on a MHA-CH-009 thrust washer: hub 19's at the north ear (the
+bank's datum), the preload spring's at the south one (``rocker_bank_layout``).
 
 One MHA-VN-034 #4-40 cup-point set screw drops through the arch apex, on the
 ear's mid-plane, into the bore and onto the pivot shaft's flat (user,
 2026-10-10). EAR_T is 8.0 (was 6.0) so the tap keeps its walls to both ear
-faces; the apex stands 9.30 over the bore (was the R8 half-round's 8.00) so
-the tap keeps 1.5D of full thread (#1371).
+faces; the apex stands 35.00 over the seat, 9.80 over the bore (was the R8
+half-round's 8.00), so the tap keeps 1.5D of full thread with both heights
+at the title block's band (#1371).
 
 The foot's end and its one hold-down hole must suit both ends of the support,
 so ``ch_pivot_bracket_sides`` derives them from the bank layout (which
@@ -41,16 +42,18 @@ BORE_H = 25.2  # shaft axis above the seat: the rocker pivot stays at machine
 # y 253.8 on the 228.6 support apex
 BORE_DIA = 6.5  # O6.35 shaft, 0.15 diametral clearance
 EAR_ARCH_R = EAR_W / 2.0  # the ear's top is a half-round, tangent to its sides
-# The apex over the bore axis (a .XX length off the bore, the arch radius's
-# setup): the R8 half-round about the bore left the apex tap 1.08D of full
-# thread; lifting the arch's centre 1.30 over the bore gives it 1.5D (#1371,
-# owner policy: geometry, not a ruling). The arch stays the ear's own
-# half-round, its sides run 1.30 further up.
-APEX_ABOVE_BORE = 9.3
-APEX_BAND = 0.508  # title-block .XX
-ARCH_LIFT = APEX_ABOVE_BORE - EAR_ARCH_R  # 1.30: the arch centre over the bore
-EAR_TOP_Y = BORE_H + APEX_ABOVE_BORE  # 34.5
-BORE_LIGAMENT = APEX_ABOVE_BORE - BORE_DIA / 2.0  # 6.05: drawing-guidelines.md rule 17 (walls and webs) web over the bore
+# Every height runs from the seat (drawing-guidelines.md rule 10, #1371 r1
+# review): the bore axis and the arch apex, each at the title block's .XX.
+# The apex tap's wall over the bore is their difference, so it loses both
+# bands; the R8 half-round about the bore left the tap 1.08D of full thread,
+# and lifting the arch's centre 1.80 over the bore gives it 1.5D at that
+# worst case (owner policy: geometry, not a ruling). The arch stays the ear's
+# own half-round, its sides run 1.80 further up.
+EAR_TOP_Y = 35.0  # the overall height, seat to apex
+HEIGHT_BAND = 0.508  # title-block .XX: the overall and the bore heights
+APEX_ABOVE_BORE = EAR_TOP_Y - BORE_H  # 9.80
+ARCH_LIFT = APEX_ABOVE_BORE - EAR_ARCH_R  # 1.80: the arch centre over the bore
+BORE_LIGAMENT = APEX_ABOVE_BORE - BORE_DIA / 2.0  # 6.55: drawing-guidelines.md rule 17 (walls and webs) web over the bore
 # The MHA-VN-032 hold-down passes here: #8 close clearance, the hole MHA-DT-002
 # gives the same screw. The old #19 (0.025 radial over the thread major)
 # caught the screw's under-head junction fillet on its mouth (r743-3C).
@@ -115,8 +118,8 @@ def head_to_ear_face_min(hole_z: float, head_dia: float) -> float:
 if BORE_LIGAMENT < LIGAMENT_TARGET:
     raise AssertionError("ear arch leaves less than the 2.0 web over the bore")
 
-# The arch's radius and the apex's height over the bore ride the title block's
-# .XX; the bore grows by the drilled hole's +0.10/0.
+# The arch's radius rides the title block's .XX (the two heights' band is
+# HEIGHT_BAND); the bore grows by the drilled hole's +0.10/0.
 ARCH_R_BAND = 0.508
 BORE_RADIUS_MAX = (BORE_DIA + DRILL_GROWTH) / 2.0
 
@@ -162,17 +165,18 @@ def _sag(radius: float) -> float:
 # Full thread in the arch wall at the worst case (dt_arbor_pedestal_spec's
 # terms): the thread is full only where its major circle lies wholly in
 # metal, so the arch's and the bore's sags across the hole are lost, and so
-# is the one-pitch entry chamfer. The apex sits at its lowest, the arch at its
-# smallest radius (its largest sag).
+# is the one-pitch entry chamfer. The apex sits at its lowest over the bore
+# (the overall height low, the bore high), the arch at its smallest radius
+# (its largest sag).
 SET_SCREW_WALL_TERMS = {
-    "apex over the bore at its minimum": APEX_ABOVE_BORE - APEX_BAND,
+    "apex over the bore at its minimum": APEX_ABOVE_BORE - 2.0 * HEIGHT_BAND,
     "bore radius at its maximum": -BORE_RADIUS_MAX,
     "arch sag across the thread": -_sag(EAR_ARCH_R - ARCH_R_BAND),
     "bore sag across the thread": -_sag(BORE_RADIUS_MAX),
     "one-pitch entry chamfer": -SET_SCREW_PITCH,
 }
-SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_WALL_TERMS.values())  # 4.40
-SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.546D
+SET_SCREW_FULL_THREAD_MIN = sum(SET_SCREW_WALL_TERMS.values())  # 4.39
+SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MIN / SET_SCREW_MAJOR_DIA  # 1.543D
 SET_SCREW_ENGAGEMENT_PRINTED = int(SET_SCREW_ENGAGEMENT_D * 100.0) / 100.0
 SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # drawing-guidelines.md rule 18 (thread engagement)
 if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:

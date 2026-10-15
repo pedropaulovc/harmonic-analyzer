@@ -456,7 +456,7 @@ if abs(SUPPORT_APEX_Y + _bracket_spec.BORE_H - PIVOT[1]) > 1e-9:
 # installed cup sits this far below the modelled one.
 SET_SCREW_SHAFT_DROP = (_bracket_spec.BORE_DIA - _PIVOT_SHAFT_DIA) / 2.0
 # Each socket's height over its ear's arch apex (modelled; installed less the
-# drop): negative since #1371 lifted the apex 1.30, so the socket sits 0.67
+# drop): negative since #1371 lifted the apex 1.80, so the socket sits 1.17
 # down the tap. Axially the screw lies inside its ear, the tap's worst-case
 # walls to both faces (ch_pivot_bracket_spec.SET_SCREW_WALLS_MIN) being
 # positive, so the ch0 / ch19 amplitude bars, which stay outside the ears' z

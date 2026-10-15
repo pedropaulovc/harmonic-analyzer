@@ -6,9 +6,9 @@ the green rocker-arm support (ch14 page002_img01/img02, page002_img07
 at one END of the foot, and the foot is only as wide as the support's apex.
 #743 PR2 (Reading 1, user Q4): the bright dome on the ear is the pivot
 shaft's own domed end, not a brazed-on ball, so the ear is a plain plate
-arched EAR_W/2 over the O6.5 cross-bore, its apex APEX_ABOVE_BORE over the
-bore axis (#1371: the arch's centre stands ARCH_LIFT over the bore so the
-apex tap keeps 1.5D of full thread). The north ear's inner face is the
+arched EAR_W/2 over the O6.5 cross-bore, its apex EAR_TOP_Y over the seat
+(#1371: the arch's centre stands ARCH_LIFT over the bore so the apex tap
+keeps 1.5D of full thread). The north ear's inner face is the
 rocker bank's axial datum (the north thrust washer behind hub 19 bears on
 it); the south one is set off the MHA-VN-053 preload spring
 (``rocker_bank_layout``). One MHA-VN-034 #4-40 set screw
@@ -38,7 +38,7 @@ foot-to-ear inside corner filleted at its MAX radius (``CornerFillet``).
 Drawing contract (``ch_pivot_bracket_drawing_spec``): four blanked
 reference-line sketches carry the bore's and the hold-down hole's lateral
 locations off the west side face, the apex tap's station off the inboard
-face and the apex's height over the bore; the build marks the drawing
+face and the overall height off the seat; the build marks the drawing
 dimensions, owns their decimal places and bands, and authors the foot seat's
 finish.
 
@@ -105,7 +105,6 @@ from ch_pivot_bracket_drawing_spec import (
 )
 from ch_pivot_bracket_sides import FOOT_LEN, FOOT_Z1, HOLE_STATION, HOLE_Z
 from ch_pivot_bracket_spec import (
-    APEX_ABOVE_BORE,
     ARCH_LIFT,
     BORE_DIA,
     BORE_H,
@@ -163,8 +162,8 @@ if not 0.0 < ARCH_LIFT < BORE_DIA / 2.0:
 # plane's is model +Y. The lateral and station lines lie on the part outline,
 # so the view that shows their sketch prints no extra line, and each starts
 # on a FEATURE (drawing-guidelines.md rule 10): the west side face for the
-# lateral locations, the ear's inboard face for the tap station, the bore's
-# axis for the apex height (its line runs up the tap's axis, inside the tap).
+# lateral locations, the ear's inboard face for the tap station, the seat
+# for the overall height (its line runs up the tap's axis to the apex).
 # ``drives`` binds, in creation order, the value dimension and then the start
 # point's origin anchors (x then y for a general point, one for a point on a
 # sketch axis) to the part's globals, so a global edit moves the line with the
@@ -203,15 +202,15 @@ REFERENCE_LINES = (
         ('"EarT" / 2', '"FootW" / 2', '"EarT" / 2'),
     ),
     (
-        # Up the tap's axis, the bore's axis to the arch apex.
-        "ApexReference",
+        # Up the tap's axis, the seat to the arch apex.
+        "HeightReference",
         "Front",
-        "ApexAboveBore",
-        (0.0, BORE_H),
+        "OverallHeight",
+        (0.0, 0.0),
         (0.0, EAR_TOP_Y),
         "vertical",
-        APEX_ABOVE_BORE,
-        ('"ApexH"', '"BoreH"'),
+        EAR_TOP_Y,
+        ('"TopH"',),
     ),
 )
 if tuple(row[0] for row in REFERENCE_LINES) != REFERENCE_SKETCHES:
@@ -328,7 +327,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "EarW", f"{EAR_W}mm")
     await set_global(adapter, "EarT", f"{EAR_T}mm")
     await set_global(adapter, "BoreH", f"{BORE_H}mm")
-    await set_global(adapter, "ApexH", f"{APEX_ABOVE_BORE}mm")
+    await set_global(adapter, "TopH", f"{EAR_TOP_Y}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
     await set_global(adapter, "CornerR", f"{CORNER_R_MAX}mm")
@@ -389,7 +388,7 @@ async def build(adapter) -> dict[str, str]:
         names=["EarW", "EarRise", "EarAnchorX", "EarAnchorZ"],
         drives=[
             '"EarW"',
-            '"BoreH" + "ApexH" - "EarW" / 2 - "FootH"',
+            '"TopH" - "EarW" / 2 - "FootH"',
             '"EarW" / 2',
             '"FootH"',
         ],
@@ -423,7 +422,7 @@ async def build(adapter) -> dict[str, str]:
     await define_circle(
         adapter, 0.0, ARCH_CENTER_Y, EAR_ARCH_R, "ear arch",
         dims=arch, names=("ArchCx", "ArchCz", "ArchRadius"),
-        drives=(None, '"BoreH" + "ApexH" - "EarW" / 2', '"EarW" / 2'),
+        drives=(None, '"TopH" - "EarW" / 2', '"EarW" / 2'),
         size_dimension="radius",
     )
     await ensure_fully_defined(adapter, "arch sketch")

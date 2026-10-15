@@ -21,7 +21,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
-    view_name,
 )
 
 import _config
@@ -36,9 +35,7 @@ from _drawing_common import (
 )
 from _drawing_dimensions import (
     assert_imported_precision,
-    set_arc_endpoints_to_max,
     set_dimension_callouts,
-    set_reference_dimension,
 )
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
@@ -57,15 +54,11 @@ from ch_pivot_bracket_drawing_spec import (
     CORNER_R_TOL_TYPE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    DRAWING_REFERENCE_PRECISION,
     SURFACE_FINISHES,
 )
 from ch_pivot_bracket_sides import FOOT_Z1, HOLE_STATION, HOLE_Z
 from ch_pivot_bracket_spec import (
-    ARCH_LIFT,
-    BORE_DIA,
     BORE_H,
-    EAR_ARCH_R,
     EAR_T,
     EAR_TOP_Y,
     FOOT_H,
@@ -89,7 +82,7 @@ PNG = OUTPUTS.png
 PIVOT_SHAFT_NUMBER = str(_config.parts("ch-pivot-shaft")["number"])
 THRUST_WASHER_NUMBER = str(_config.parts("ch-rocker-thrust-washer")["number"])
 
-# 34.5 mm tall: 2:1 keeps the bore and the tap legible and lets the right view
+# 35 mm tall: 2:1 keeps the bore and the tap legible and lets the right view
 # stand at the sheet scale, level with the elevation, clear of the title block
 # (#1371 machinist review: a 2:1 right view under a 3:1 sheet broke the
 # projection).
@@ -157,15 +150,15 @@ CORNER_MODEL_MM = (0.0, FOOT_H, EAR_T / 2.0)
 CORNER_TEXT_OFFSET = (0.022, 0.020)
 _CORNER_FRAME_TOL_M = 2.5e-4
 
-# The elevation carries the heights off the seat -- the one face a machinist
-# clamps to -- in nested left lanes: the foot, the bore axis chained to the
-# arch apex (the apex height over the bore is what holds the set-screw tap's
-# thread), the overall reference; the bore's lateral location off the west
-# side face below the seat, and the arch radius up and right of the arch.
+# The elevation carries every height off the seat -- the one face a machinist
+# clamps to -- in nested left lanes (rule 10, #1371 r1 review): the foot, the
+# bore axis, the overall height to the arch apex (both the apex tap's thread
+# is counted against); the bore's lateral location off the west side face
+# below the seat, and the arch radius up and right of the arch.
 FRONT_KEEP = {
     "FootHt": (_WEST_X - 0.012, _front_y(FOOT_H / 2.0)),
     "BoreCz": (_WEST_X - 0.028, _front_y(BORE_H / 2.0)),
-    "ApexAboveBore": (_WEST_X - 0.028, _front_y((BORE_H + EAR_TOP_Y) / 2.0)),
+    "OverallHeight": (_WEST_X - 0.044, _front_y(EAR_TOP_Y / 2.0)),
     # Right of the elevation's right edge by a clear 7 mm: the callout's
     # widest line, its mate's part number, ~58 mm long, centres on the text.
     "ShaftBoreDia": (FRONT_CENTER[0] + 0.052, _front_y(BORE_H) - 0.016),
@@ -178,13 +171,15 @@ FRONT_KEEP = {
 # length step out on the right, each text in its own column (the foot length's
 # extension lines leave the EAST corners, so on the left they would run the
 # whole top edge the tap's leader must cross). The tap station's text sits
-# just above its short span, left of the ear thickness's so its witness at the
-# bore plane passes under neither text. Both laterals start on the west side
-# face, below the plan, where the foot width nests outside them. Above the
-# plan's left half only the apex tap callout stands.
+# above its short span, high enough that the ear thickness's outside arrow
+# (which runs up past the plan's top edge) stops below it (r1 render: the
+# arrow struck "SHAFT"), its text starting at its own dimension line, east
+# of the tap callout. Both laterals start on the west side face, below the
+# plan, where the foot width nests outside them. Above the plan's left half
+# only the apex tap callout stands.
 TOP_KEEP = {
     "HoleStation": (_WEST_X - 0.010, _top_y(FOOT_Z0 + HOLE_STATION / 2.0)),
-    "SetScrewLocation": (_EAST_X + 0.030, _top_y(FOOT_Z0) + 0.009),
+    "SetScrewLocation": (_EAST_X + 0.030, _top_y(FOOT_Z0) + 0.017),
     "EarThick": (_EAST_X + 0.075, _top_y(0.0)),
     "FootLen": (_EAST_X + 0.119, _top_y(FOOT_Z1) + 0.012),
     "HoleDia": (FRONT_CENTER[0] + 0.045, _top_y(HOLE_Z) - 0.001),
@@ -193,16 +188,16 @@ TOP_KEEP = {
 }
 # REAM marks a fit bore, so the callout names its mate (drawing-guidelines.md
 # rule 4); the drilled hold-down hole says drill and through. The two lengths
-# that carry their own band say what the band holds: the ear's faces bear on
-# the bank's thrust washers, and the tap's station from the inboard face puts
-# the apex screw's cup on the pivot shaft's flat (ch_pivot_bracket_spec,
-# rocker_bank_layout). The foot length and the hold-down station ride the
-# title block.
+# that carry their own band say what the band holds, naming the mate: the
+# ear's faces bear on the bank's thrust washers, and the tap's station from
+# the inboard face puts the apex screw's cup on the pivot shaft's flat
+# (ch_pivot_bracket_spec, rocker_bank_layout). The foot length and the
+# hold-down station ride the title block.
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": f"REAM THRU\nSLIP FIT ON\nPIVOT SHAFT {PIVOT_SHAFT_NUMBER}",
     "HoleDia": "DRILL THRU",
     "EarThick": f"THRUST FACES ON {THRUST_WASHER_NUMBER}",
-    "SetScrewLocation": "SET SCREW ON SHAFT FLAT",
+    "SetScrewLocation": f"SET SCREW ON FLAT OF\nPIVOT SHAFT {PIVOT_SHAFT_NUMBER}",
 }
 # The right view prints the one dimension it exists for.
 RIGHT_KEEP_NAMES = ("CornerRadius",)
@@ -218,8 +213,6 @@ SET_SCREW_EXTENT = "TO BORE"
 # the plan's centre) and west of the right lanes' (which start at its east
 # edge).
 SET_SCREW_CALLOUT_XY = (FRONT_CENTER[0] - 0.018, _top_y(FOOT_Z0) + 0.026)
-# The overall height's lane, outside the bore-height lane.
-OVERALL_HEIGHT_XY = (_WEST_X - 0.046, FRONT_CENTER[1])
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 _LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
@@ -271,38 +264,12 @@ def _set_tap_callout_text(display: Any) -> None:
     _telemetry.info(f"apex tap callout: {resolved!r}")
 
 
-def _set_reference_precision(display: Any, label: str) -> None:
-    """Give the SHEET-derived overall height its spec-owned decimal places.
-
-    Every imported dimension's places are the part's and are read back by
-    ``assert_imported_precision``; the parenthesised overall height is a
-    band-free restatement with no model dimension behind it, so its places
-    come from the spec's ``DRAWING_REFERENCE_PRECISION``, never a literal.
-    """
-    places = DRAWING_REFERENCE_PRECISION[label]
-    display = _early_bound(display, "IDisplayDimension")
-    # -1: do-not-change for the dual and both tolerance places.
-    display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
-    applied = int(display.GetPrimaryPrecision2())
-    if applied != places:
-        raise RuntimeError(
-            f"{label}: sheet dimension prints {applied} decimal places, not {places}"
-        )
-
-
 @_telemetry.traced("drawing.pivot_bracket.front_entity_scan")
-def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
-    """Return the seat edge, the cross-bore edge and the arch edge."""
+def _seat_edge(view: Any) -> Any:
+    """Return the elevation's seat edge, the foot's full width on y = 0."""
     seat_candidates: list[tuple[float, Any]] = []
-    circles: list[tuple[float, float, Any]] = []
     for raw_edge in visible_view_entities(view, 1, label="pivot bracket front edges"):
         edge = _early_bound(raw_edge, "IEdge")
-        curve = edge.GetCurve()
-        if curve is not None:
-            curve = _early_bound(curve, "ICurve")
-            if curve.IsCircle():
-                params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
-                circles.append((params[6], params[1], edge))
         start = edge.GetStartVertex()
         end = edge.GetEndVertex()
         if start is None or end is None:
@@ -316,23 +283,7 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
     seat_span, seat_edge = max(seat_candidates, key=lambda item: item[0])
     if seat_span < FOOT_W - 0.1:
         raise RuntimeError(f"seat edge span is only {seat_span:.3f} mm")
-
-    def _circle(radius: float, centre_y: float, label: str) -> Any:
-        if not circles:
-            raise RuntimeError("front view has no circular model edges")
-        found_r, found_y, edge = min(
-            circles, key=lambda item: abs(item[0] - radius) + abs(item[1] - centre_y)
-        )
-        if abs(found_r - radius) > 0.01 or abs(found_y - centre_y) > 0.01:
-            raise RuntimeError(f"front view has no {label} edge at {centre_y:.2f} mm")
-        return edge
-
-    return (
-        seat_edge,
-        _circle(BORE_DIA / 2.0, BORE_H, "cross-bore"),
-        # The arch's centre stands ARCH_LIFT over the bore's (#1371).
-        _circle(EAR_ARCH_R, BORE_H + ARCH_LIFT, "arch"),
-    )
+    return seat_edge
 
 
 @_telemetry.traced("drawing.arch_radius")
@@ -488,34 +439,6 @@ def _dress_corner_radius(adapter: Any, annotations: list[Any]) -> None:
     _telemetry.info(f"corner radius: text {display.GetText(1)!r}, MAX type")
 
 
-@_telemetry.traced("drawing.overall_height")
-def _add_overall_height(adapter: Any, view: Any, seat: Any, arch: Any) -> Any:
-    """The seat-to-apex height as a sheet reference dimension."""
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate the elevation for the overall height")
-    draw.ClearSelection2(True)
-    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    for append, raw_entity in ((False, seat), (True, arch)):
-        selection_data = selection_manager.CreateSelectData()
-        selection_data.View = view
-        if not _early_bound(raw_entity, "IEntity").Select4(append, selection_data):
-            raise RuntimeError("failed to select an overall-height entity")
-    display = draw.AddVerticalDimension2(*OVERALL_HEIGHT_XY, 0.0)
-    draw.ClearSelection2(True)
-    if display is None:
-        raise RuntimeError("failed to create the overall height dimension")
-    set_arc_endpoints_to_max(adapter, display, label="overall height")
-    set_reference_dimension(
-        adapter,
-        _early_bound(display, "IDisplayDimension").GetAnnotation(),
-        label="overall height",
-    )
-    _set_reference_precision(display, "overall height")
-    return display
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -604,7 +527,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
-    seat_entity, _bore_entity, arch_entity = _front_entities(adapter, front)
+    seat_entity = _seat_edge(front)
     # Below and right of the seat, clear of the bore-lateral lane on its left
     # half: the leader lands on the seat's right quarter.
     add_surface_finish(
@@ -617,7 +540,6 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=seat_entity,
         leader_attach_xy=(FRONT_CENTER[0] + FOOT_W * _S / 4.0, _front_y(0.0)),
     )
-    _add_overall_height(adapter, front, seat_entity, arch_entity)
     _show_arch_radius(adapter, front_annotations)
     adapter.currentModel.GraphicsRedraw2()
 

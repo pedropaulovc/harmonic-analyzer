@@ -830,8 +830,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # MHA-CH-010: the same pin pressed into its rod's Ø1.968 fork ream through
     # both tines (6.075 fork less the 2.675 slot); channel j's pin with
     # channel j's bar or rod only. MHA-VN-034: each #4-40 apex set screw's
-    # thread in its MHA-CH-008 ear's tap, over the 9.30 apex (R8 arch lifted
-    # 1.30, #1371) less the Ø6.5 bore's height at the Ø2.845 envelope's edge;
+    # thread in its MHA-CH-008 ear's tap, over the 9.80 apex (R8 arch lifted
+    # 1.80, #1371) less the Ø6.5 bore's height at the Ø2.845 envelope's edge;
     # screw n in bracket n.
     # MHA-VN-055: each #1-72 x 5/32 keeper set screw in its own keeper's
     # crown tap (#53 drill).
@@ -854,7 +854,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 frozenset(
                     (f"vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")
                 ): _annulus_limit(
-                    2.845, 2.261, 9.3 - math.sqrt(3.25**2 - (2.845 / 2.0) ** 2)
+                    2.845, 2.261, 9.8 - math.sqrt(3.25**2 - (2.845 / 2.0) ** 2)
                 )
                 for n in (1, 2)
             },

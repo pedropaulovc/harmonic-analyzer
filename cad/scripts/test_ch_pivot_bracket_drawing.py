@@ -52,17 +52,17 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert set().union(*keeps) == marked
     assert sum(len(names) for names in keeps) == len(marked)
     # Every manufactured feature is sized and located: foot (width, length,
-    # height), ear (thickness; its width is the foot's), arch (radius, apex
-    # over the bore), bore (size, height, lateral), hold-down hole (size,
-    # station, lateral), the apex tap (native callout + station) and the
-    # foot-to-ear corner's MAX radius.
+    # height), ear (thickness; its width is the foot's), arch (radius, the
+    # overall height to its apex), bore (size, height, lateral), hold-down
+    # hole (size, station, lateral), the apex tap (native callout + station)
+    # and the foot-to-ear corner's MAX radius.
     assert marked == {
         "FootW",
         "FootLen",
         "FootHt",
         "EarThick",
         "ArchRadius",
-        "ApexAboveBore",
+        "OverallHeight",
         "BoreCz",
         "ShaftBoreDia",
         "BoreLateral",
@@ -83,10 +83,11 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
     assert drawing.DRAWING_PRECISION_BY_NAME is drawing_spec.DRAWING_PRECISION_BY_NAME
     assert part.DRAWING_PRECISION is drawing_spec.DRAWING_PRECISION
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
-    labels = set(
-        re.findall(r'_set_reference_precision\([^,]+,\s*"([^"]+)"\)', _drawing_source())
-    )
-    assert labels == set(drawing_spec.DRAWING_REFERENCE_PRECISION) == {"overall height"}
+    # Every height is a model dimension now (#1371 r1: the overall height runs
+    # from the seat), so the sheet derives none.
+    assert not hasattr(drawing_spec, "DRAWING_REFERENCE_PRECISION")
+    assert "_set_reference_precision" not in _drawing_source()
+    assert "AddVerticalDimension2" not in _drawing_source()
 
 
 def test_model_bands_come_from_named_spec_constants() -> None:
@@ -97,8 +98,9 @@ def test_model_bands_come_from_named_spec_constants() -> None:
     }
     assert part.EAR_T_BAND == part.SET_SCREW_STATION_BAND == 0.10
     # The hold-down station rides the title block's .XX too (#1371 review: a
-    # band on a clearance hole's station holds nothing).
-    assert spec.STATION_BAND == spec.APEX_BAND == 0.508
+    # band on a clearance hole's station holds nothing), as do the overall
+    # and the bore heights the tap's thread is counted against.
+    assert spec.STATION_BAND == spec.HEIGHT_BAND == 0.508
     assert "HoleStation" not in drawing.DIMENSION_CALLOUTS
     assert round(HOLE_STATION, 1) == pytest.approx(HOLE_STATION)
     # The foot length rides the title block's .XX (its wall to the hold-down
@@ -120,7 +122,7 @@ def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
         "FootW": spec.FOOT_W,
         "FootZ1": FOOT_Z1,
         "EarT": spec.EAR_T,
-        "ApexH": spec.APEX_ABOVE_BORE,
+        "TopH": spec.EAR_TOP_Y,
         "BoreH": spec.BORE_H,
     }
 
@@ -134,8 +136,8 @@ def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
         # The tap sits at z = 0, the bore axis plane; the station runs from
         # the ear's inboard face, the face every plan length starts on.
         "SetScrewLocation": 0.0 - spec.FOOT_Z0,
-        # The bore's axis up to the arch apex: the tap's thread length.
-        "ApexAboveBore": spec.EAR_TOP_Y - spec.BORE_H,
+        # The seat up the tap's axis to the arch apex: the overall height.
+        "OverallHeight": spec.EAR_TOP_Y,
     }
     assert (
         tuple(row[0] for row in part.REFERENCE_LINES) == drawing_spec.REFERENCE_SKETCHES
@@ -156,12 +158,14 @@ def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
         assert end[1 - axis] == start[1 - axis]
         anchors = [abs(c) for c in start if abs(c) > 1e-9]
         assert [evaluate(d) for d in drives] == pytest.approx([value, *anchors]), sketch
-        assert plane == ("Front" if name in {"BoreLateral", "ApexAboveBore"} else "Top")
+        assert plane == ("Front" if name in {"BoreLateral", "OverallHeight"} else "Top")
     starts = {row[2]: row[3] for row in part.REFERENCE_LINES}
     # Laterals start on the west side face, the tap station on the inboard
     # face (Top-plane sketch y is model -Z).
     assert starts["BoreLateral"][0] == starts["HoleLateral"][0] == -spec.FOOT_W / 2.0
     assert -starts["SetScrewLocation"][1] == spec.FOOT_Z0
+    # The overall height starts on the seat.
+    assert starts["OverallHeight"] == (0.0, 0.0)
     # The hold-down station is the hole's z off that same face.
     assert abs(HOLE_STATION - (HOLE_Z - spec.FOOT_Z0)) < 1e-9
     assert abs(FOOT_LEN - (FOOT_Z1 - spec.FOOT_Z0)) < 1e-9
@@ -180,15 +184,19 @@ def test_bore_callout_names_the_mating_pivot_shaft() -> None:
 
 
 def test_every_banded_length_says_what_its_band_holds() -> None:
-    """A band tighter than the title block names its reason at the dimension,
-    one reason per dimension (#1371 review: the set-screw note belongs to the
-    tap's station, not the ear thickness)."""
+    """A band tighter than the title block names its reason, and its mate's
+    part number, at the dimension, one reason per dimension (#1371 review:
+    the set-screw note belongs to the tap's station, not the ear thickness,
+    and names the shaft)."""
     banded = {name for _feature, name in model_toleranced_dimensions(part)}
     assert banded <= set(drawing.DIMENSION_CALLOUTS)
     washer = _config.parts("ch-rocker-thrust-washer")["number"]
     assert washer == "MHA-CH-009"
     assert drawing.DIMENSION_CALLOUTS["EarThick"] == f"THRUST FACES ON {washer}"
-    assert drawing.DIMENSION_CALLOUTS["SetScrewLocation"] == "SET SCREW ON SHAFT FLAT"
+    shaft = _config.parts("ch-pivot-shaft")["number"]
+    assert drawing.DIMENSION_CALLOUTS["SetScrewLocation"] == (
+        f"SET SCREW ON FLAT OF\nPIVOT SHAFT {shaft}"
+    )
     assert sum("SET SCREW" in text for text in drawing.DIMENSION_CALLOUTS.values()) == 1
 
 
@@ -301,7 +309,6 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
         "plan view": drawing.TOP_CENTER,
         "isometric view": drawing.ISO_CENTER,
         "set-screw callout": drawing.SET_SCREW_CALLOUT_XY,
-        "overall height": drawing.OVERALL_HEIGHT_XY,
         "right view": drawing.RIGHT_CENTER,
         "corner radius (planned frame)": _planned_corner_text(),
     }
