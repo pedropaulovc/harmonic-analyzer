@@ -22,7 +22,11 @@ Pass 1 — detection. Find every candidate item; classify nothing yet.
 1. Read the title block first: assembly name, number, revision, scale, units,
    sheet count. Anything it says is not missing (rule 2). Read the SHEET TEXT
    LAYER for exact values, quantities, steps and note text; never estimate a
-   number from pixels. Use crops to judge what text cannot tell you:
+   number from pixels. It is a transcription aid, not proof of print: any
+   finding that depends on text being PRINTED on the sheet must be confirmed
+   on the sheet image or a crop. A sheet without a section in the layer has no
+   extractable text — that absence is not missing drawing information; read
+   the sheet image. Use crops to judge what text cannot tell you:
    crossings, leader landings, balloons, symbols, line quality, layout.
 2. Inspect the whole package: every sheet, view, balloon, list row, step, note
    and title block. Never accept a sheet in isolation.
@@ -62,7 +66,7 @@ a lower category because it feels minor — the type decides.
 |---|---|---|
 | contradiction | BOM rows against balloons, setup sequences across sheets, a table or step against the views, or two views or notes that disagree (rule 25) | blockers |
 | missing | what stops assembly or setup: no exploded view or order; no parts list or balloons; a visible part with no identification (rule 22); an assembly fit or adjustment with no mate, acceptance criterion or procedure; missing essential interchangeability requirements; an ambiguous parked or engaged state; missing or ineffective retention of a threaded joint exposed to operating loads, or no step that engages it — including a pivot screw listed only as an external interface and a joint whose engagement is not verifiable (rule 23); full-thread engagement under 1.5D or an adjustment range that does not cover the worst-case stack, unless the package states the shortfall (rules 18–20) | blockers |
-| unbuildable | functionally essential precision with a substantiated setting or verification conflict (rule 4) | blockers |
+| unbuildable | incompatible controlled fit ranges; functionally essential precision with a substantiated setting or verification conflict (rule 4) | blockers |
 | over_specification | anything the assembly job does not need: repeated part tolerances, materials or finishes (rule 24), assembly-level GD&T without cause (rule 5), unneeded precision on an assembly check (rule 4), notes restating the title block | over_specification |
 | presentation | what makes you stop and re-read: content touching or outside the border (rule 13); text inside the silhouette without cause, or crossing balloons or leaders (rule 14); broken ASME alignment, a view group bunched against one edge, the wrong orientation or a crowded sheet (rule 15; say which view, BOM or step list should move to its own sheet); views too small to identify parts; a missing or noncompliant isometric (rule 8); a step order that is hard to follow; an exploded view that does not read; an otherwise identifiable matched-fit mate missing its name or number (rule 4) | clarity |
 | shortfall | any shortfall the package states as a plain fact (rule 20), each quoted with its stated value; engagement not verifiable from the package | minor |

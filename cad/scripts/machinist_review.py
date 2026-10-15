@@ -264,7 +264,7 @@ def _validate_package(package: ReviewPackage) -> int:
 
 def _text_layers(package: ReviewPackage) -> str:
     """Exact sheet text for the package prompt; empty without PDF text."""
-    if not package.sources:
+    if not package.sources or os.environ.get("MACHINIST_REVIEW_TEXT_LAYER") == "off":
         return ""
     documents = []
     with SheetStore(package.sources) as store:
@@ -287,18 +287,33 @@ def _review_prompt(
         "\n\nPACKAGE INPUT\n"
         f"Sheet count: {sheet_count}.\n"
         f"Call view_sheet for sheets 1..{sheet_count} in order before judging.\n"
-        "Use only view_sheet and crop.\n"
+        "Use only view_sheet, crop and sheet_text.\n"
     )
     if sheet_count > 1:
         prompt += (
             "Compare every sheet against every other sheet before accepting SHIP.\n"
         )
     layers = _text_layers(package)
+    if (
+        not layers
+        and package.sources
+        and os.environ.get("MACHINIST_REVIEW_TEXT_LAYER") == "off"
+    ):
+        prompt += (
+            "\nSHEET TEXT LAYER\n"
+            "Not pre-injected for this run: fetch it with the sheet_text tool "
+            "(rect in view_sheet pixels; use the size view_sheet reports for a "
+            "whole sheet). It comes organized by sheet then view.\n"
+        )
     if layers:
         prompt += (
             "\nSHEET TEXT LAYER\n"
-            "Exact text of every sheet, organized by sheet then view; rects are "
-            "view_sheet pixels. It is this prompt's content, not a tool.\n"
+            "Extracted sheet text, organized by sheet then view; rects are "
+            "view_sheet pixels. It is this prompt's content, not a tool, and a "
+            "transcription aid rather than proof of print: confirm printed-"
+            "evidence claims on the sheet image or a crop. Sheets without a "
+            "section here have no extractable text and must be read from the "
+            "images.\n"
             f"{layers}\n"
         )
     return prompt + "Return one verdict for the package as a whole.\n"
@@ -347,7 +362,7 @@ def build_claude_command(
         "--tools",
         "",
         "--allowedTools",
-        "mcp__sheets__view_sheet,mcp__sheets__crop",
+        "mcp__sheets__view_sheet,mcp__sheets__crop,mcp__sheets__sheet_text",
         "--restricted",
         "--setting-sources",
         "",
@@ -617,10 +632,10 @@ def _codex_sheet_call(payload: dict[str, Any]) -> dict[str, Any] | None:
     if payload.get("type") != "function_call":
         return None
     name, namespace = payload.get("name"), payload.get("namespace")
-    if namespace == "mcp__sheets" and name in {"view_sheet", "crop"}:
+    if namespace == "mcp__sheets" and name in {"view_sheet", "crop", "sheet_text"}:
         tool = name
     elif namespace in {None, "functions"} and name in {
-        "mcp__sheets__view_sheet", "mcp__sheets__crop"
+        "mcp__sheets__view_sheet", "mcp__sheets__crop", "mcp__sheets__sheet_text"
     }:
         tool = str(name).removeprefix("mcp__sheets__")
     else:
@@ -1013,6 +1028,25 @@ def codex_rollout_evidence(
                         else:
                             normalized.append(event)
                     else:
+                        # Native completions prove call identity and
+                        # provenance only: strip image payloads so inspection
+                        # can never be established from server-side records
+                        # the model itself never saw.
+                        if isinstance(item.get("result"), dict):
+                            native_result = item["result"]
+                            content = native_result.get("content")
+                            if isinstance(content, list):
+                                item = {
+                                    **item,
+                                    "result": {
+                                        **native_result,
+                                        "content": [
+                                            part for part in content
+                                            if not (isinstance(part, dict)
+                                                    and part.get("type") == "image")
+                                        ],
+                                    },
+                                }
                         normalized.append({"type": "item.completed", "item": item})
             elif any(marker in str(payload.get("type", "")).lower()
                      for marker in ("tool_call", "command", "shell", "patch", "web_search")):
@@ -1143,7 +1177,7 @@ def evaluate_sheet_evidence(
                 name = node.get("name")
                 if name == "StructuredOutput":
                     continue
-                if name in {"mcp__sheets__view_sheet", "mcp__sheets__crop"}:
+                if name in {"mcp__sheets__view_sheet", "mcp__sheets__crop", "mcp__sheets__sheet_text"}:
                     tool = str(name).removeprefix("mcp__sheets__")
                     arguments = node.get("input")
                     successful = (attempt, str(node.get("id", ""))) in image_results
@@ -1151,7 +1185,7 @@ def evaluate_sheet_evidence(
                 reviewer == "codex"
                 and kind == "mcp_tool_call"
                 and node.get("server") == "sheets"
-                and node.get("tool") in {"view_sheet", "crop"}
+                and node.get("tool") in {"view_sheet", "crop", "sheet_text"}
             ):
                 tool = node["tool"]
                 arguments = node.get("arguments")
@@ -1467,7 +1501,18 @@ def review_package(
     if reviewer not in REVIEWERS:
         raise ValueError(f"unknown reviewer {reviewer!r}; choose one of {REVIEWERS}")
     sheet_count = _validate_package(package)
-    mcp_catalog = _sheet_resource_manifest(package.sources)
+    # Snapshot the sources once: the injected text layer, the recorded hashes
+    # and every attempt's sheet images must come from the same bytes, even if a
+    # concurrent build rewrites the originals mid-review.
+    snapshot_dir = report_dir / f"{package.name}.sources"
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_sources = []
+    for source in package.sources:
+        target = snapshot_dir / source.name
+        shutil.copyfile(source, target)
+        snapshot_sources.append(target)
+    snapshot = ReviewPackage(package.name, package.kind, tuple(snapshot_sources))
+    mcp_catalog = _sheet_resource_manifest(snapshot.sources)
     neutral_resources = reviewer == "codex" and _resource_neutrality_permitted(mcp_catalog)
     model = model or DEFAULT_MODELS[reviewer]
     effort = effort or DEFAULT_EFFORTS[reviewer]
@@ -1475,10 +1520,10 @@ def review_package(
     if not executable:
         raise RuntimeError(f"{reviewer} CLI not found on PATH")
     prompt = _review_prompt(
-        package, sheet_count, reviewer=reviewer, prompt_text=prompt_text
+        snapshot, sheet_count, reviewer=reviewer, prompt_text=prompt_text
     )
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
-    source_sha = [_sha256(source) for source in package.sources]
+    source_sha = [_sha256(source) for source in snapshot.sources]
     schema_bytes = SCHEMA_FILE.read_bytes()
     report_dir.mkdir(parents=True, exist_ok=True)
     events_path = report_dir / f"{package.name}.events.jsonl"
@@ -1514,7 +1559,7 @@ def review_package(
             "cwd": str(cwd),
             "attempt_dir": str(attempt_dir),
             "codex_home": str(CODEX_HOME) if reviewer == "codex" else None,
-            "sources": [str(source.resolve()) for source in package.sources],
+            "sources": [str(source.resolve()) for source in snapshot.sources],
             "retained_dir": None,
             "retained_argv": None,
             "retention_warning": None,
@@ -1568,7 +1613,7 @@ def review_package(
                     "mcpServers": {
                         "sheets": {
                             "command": sys.executable,
-                            "args": [str(SHEETS_SERVER), *(str(p.resolve()) for p in package.sources)],
+                            "args": [str(SHEETS_SERVER), *(str(p.resolve()) for p in snapshot.sources)],
                         },
                     },
                 }), encoding="utf-8")
@@ -1582,7 +1627,7 @@ def review_package(
                     model=model, codex=executable,
                 )
                 cmd = build_codex_command(
-                    workdir=cwd, attempt_dir=attempt_dir, sources=package.sources,
+                    workdir=cwd, attempt_dir=attempt_dir, sources=snapshot.sources,
                     schema=schema, output=output, model=model, effort=effort,
                     codex=executable,
                 )

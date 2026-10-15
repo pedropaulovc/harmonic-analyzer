@@ -18,9 +18,14 @@ HOW TO REVIEW — TWO PASSES
 Pass 1 — detection. Find every candidate item; classify nothing yet.
 1. Read each title block first. Anything it covers is not missing (rule 2).
 2. Read the SHEET TEXT LAYER for exact dimension values, tolerances, callout
-   and note text; never estimate a number from pixels. Use crops to judge
-   what text cannot tell you: crossings, overprints, leader landings,
-   symbols, hidden-vs-solid lines, line quality, layout.
+   and note text; never estimate a number from pixels. It is a transcription
+   aid, not proof of print: any finding that depends on text being PRINTED on
+   the sheet (a named mate, a stated shortfall, a callout) must be confirmed
+   on the sheet image or a crop. A sheet without a section in the layer has no
+   extractable text — that absence is not missing drawing information; read
+   the sheet image. Use crops to judge what text cannot tell you: crossings,
+   overprints, leader landings, symbols, hidden-vs-solid lines, line quality,
+   layout.
 3. Inspect every whole sheet: trace each complete inner border, then every
    view, dimension, extension line, callout, note, table and the isometric.
    Reconcile all sheets as one part (rule 25) before deciding whether the
@@ -62,13 +67,18 @@ a lower category because it feels minor — the type decides.
 
 Rule 4 evidence standard — when is a mate "named"? The package must PRINT the
 mating part's name, drawing number or part number, or name the mating feature
-unambiguously, somewhere on its sheets: at the callout, in a note or in a data
-block. A guessed or inferred mate ("likely referenced elsewhere", an unnamed
-seat, a mating assembly you cannot see) is NOT a named mate. Named at the
-callout: no finding. Named elsewhere in the package: `presentation`. Named
-nowhere: `missing`. Whatever fix you prefer, a tight band with no named mate
-is `missing` only — never also over_specification. A border breach, a wording
-gap or a mate named elsewhere in the package is never a blocker.
+unambiguously, somewhere on its sheets: at the callout (a flagged note
+attached to the callout counts as at the callout, rule 7), in a note or in a
+data block. A guessed or inferred mate ("likely referenced elsewhere", an
+unnamed seat, a generic noun such as COLLAR or SEAT, a mating assembly you
+cannot see) is NOT a named mate. Named at the callout: no finding. Named
+elsewhere in the package: `presentation`. Named nowhere: `missing`. Separately,
+a matched or selectively fitted pair (rule 4) must identify its mate by BOTH
+name AND assigned drawing or part number: an otherwise identifiable matched
+mate missing its assigned number is `presentation`, whatever else is named.
+Whatever fix you prefer, a tight band with no named mate is `missing` only —
+never also over_specification. A border breach, a wording gap or a mate named
+elsewhere in the package is never a blocker.
 
 JUDGING THE PART AS DRAWN
 - Do not invent a requirement because the part might need it in a mating

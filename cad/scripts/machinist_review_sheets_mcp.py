@@ -17,6 +17,7 @@ import os
 import re
 import sys
 import threading
+from ctypes import byref, c_long
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
@@ -263,33 +264,94 @@ def _span_height(span: dict[str, Any]) -> float:
     return max(span["y2"] - span["y1"], 1.0)
 
 
+ZONE_FURNITURE_RE = re.compile(r"^[A-Z0-9]$")
+WATERMARK_FRAGMENT_RE = re.compile(r"maker|personal|solidworks|(?:^|\s)ake$", re.IGNORECASE)
+# PDF text rendering modes that produce no ink (3 = invisible, 7 = clip only).
+INVISIBLE_RENDER_MODES = (3, 7)
+
+
+def _char_visibility(textpage: Any) -> list[tuple[tuple[float, float, float, float], bool]]:
+    """Per-character (page-space box, is_printing) flags, keyed by render mode."""
+    import pypdfium2.raw as raw
+
+    flags: list[tuple[tuple[float, float, float, float], bool]] = []
+    for index in range(textpage.count_chars()):
+        box = textpage.get_charbox(index)
+        if box is None:
+            continue
+        obj = textpage.get_textobj(index)
+        printing = (
+            obj is not None
+            and raw.FPDFTextObj_GetTextRenderMode(obj.raw) not in INVISIBLE_RENDER_MODES
+        )
+        left, bottom, right, top = box
+        flags.append(
+            (
+                (min(left, right), min(bottom, top), max(left, right), max(bottom, top)),
+                printing,
+            )
+        )
+    return flags
+
+
 def _text_spans(
-    page: Any, height: float, scale: float, view_size: tuple[int, int]
+    page: Any, view_size: tuple[int, int]
 ) -> list[dict[str, Any]]:
-    """Extract page text as spans in view_sheet pixels, minus border furniture."""
-    textpage = page.get_textpage()
+    """Extract page text as spans in view_sheet pixels.
+
+    Rectangles are transformed through PDFium's own page-to-device mapping, so
+    text positions match the rendered view under page rotation and nonzero
+    crop-box origins exactly as view_sheet/crop draw them. Non-rendering text
+    (render mode 3 or 7) is excluded: it is not printed evidence. Border
+    furniture is dropped narrowly — zone labels and the licence watermark
+    only — so annotation text near an edge is preserved for rule 13 findings.
+    """
+    import pypdfium2.raw as raw
+
     spans: list[dict[str, Any]] = []
+
+    def to_device(x: float, y: float) -> tuple[int, int]:
+        out_x, out_y = c_long(), c_long()
+        raw.FPDF_PageToDevice(
+            page.raw, 0, 0, view_size[0], view_size[1], 0, x, y,
+            byref(out_x), byref(out_y),
+        )
+        return out_x.value, out_y.value
+
+    textpage = page.get_textpage()
     try:
+        visibility = _char_visibility(textpage)
         textpage.count_rects()  # required before get_rect (pypdfium2 contract)
         for index in range(textpage.count_rects()):
             left, bottom, right, top = textpage.get_rect(index)
             text = re.sub(
                 r"\s+", " ", (textpage.get_text_bounded(left, bottom, right, top) or "").strip()
             )
-            if not text or WATERMARK_RE.search(text):
+            if not text:
                 continue
-            x1, y1 = left * scale, (height - top) * scale
-            x2, y2 = right * scale, (height - bottom) * scale
-            # Zone letters/numbers and the licence watermark live in the
-            # sheet strips outside the inner border.
-            if (
-                x1 < 70
-                or x2 > view_size[0] - 70
-                or y1 < 75
-                or y2 > view_size[1] - 45
-            ):
+            in_span = [
+                printing
+                for box, printing in visibility
+                if (box[0] + box[2]) / 2 >= left
+                and (box[0] + box[2]) / 2 <= right
+                and (box[1] + box[3]) / 2 >= bottom
+                and (box[1] + box[3]) / 2 <= top
+            ]
+            if in_span and not any(in_span):
                 continue
-            spans.append({"x1": x1, "y1": y1, "x2": x2, "y2": y2, "text": text})
+            corners = [
+                to_device(x, y)
+                for x, y in ((left, bottom), (right, bottom), (left, top), (right, top))
+            ]
+            x1 = min(p[0] for p in corners)
+            y1 = min(p[1] for p in corners)
+            x2 = max(p[0] for p in corners)
+            y2 = max(p[1] for p in corners)
+            if WATERMARK_RE.search(text) or WATERMARK_FRAGMENT_RE.search(text):
+                continue
+            if ZONE_FURNITURE_RE.match(text):
+                continue
+            spans.append({"x1": float(x1), "y1": float(y1), "x2": float(x2), "y2": float(y2), "text": text})
     finally:
         textpage.close()
     return spans
@@ -348,25 +410,49 @@ def _fold_operators(spans: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return spans
 
 
+STACK_LIMIT_RE = re.compile(r"^[+±\-]?\d[\d.]*$")
+
+
 def _stack_pairs(spans: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Join vertically stacked short tokens as 'upper/lower' (stacked limits)."""
+    """Join a positively identified tolerance stack as 'upper/lower'.
+
+    Only two spans ever join: the upper token carries an explicit +/± limit
+    sign, or the lower token is negative, and both are plain limit values of
+    similar size. Ordinary aligned rows (table cells, note lines, adjacent
+    dimensions) are never synthesized into a single value, and a joined pair
+    absorbs nothing further.
+    """
     ordered = [dict(s) for s in sorted(spans, key=lambda s: (s["y1"], s["x1"]))]
     merged: list[dict[str, Any]] = []
+    joined: set[int] = set()
     for span in ordered:
         target = None
         for candidate in merged:
-            if " " in span["text"] or " " in candidate["text"]:
+            if id(candidate) in joined:
                 continue
-            if len(span["text"]) > 14 or len(candidate["text"]) > 14:
+            if not (
+                STACK_LIMIT_RE.match(span["text"])
+                and STACK_LIMIT_RE.match(candidate["text"])
+            ):
                 continue
-            height = min(_span_height(span), _span_height(candidate))
+            upper, lower = (
+                (candidate, span) if candidate["y1"] <= span["y1"] else (span, candidate)
+            )
+            if not (
+                upper["text"].startswith(("+", "±"))
+                or lower["text"].startswith("-")
+            ):
+                continue
+            heights = (_span_height(span), _span_height(candidate))
+            if max(heights) > 2 * min(heights):
+                continue
             xoverlap = min(span["x2"], candidate["x2"]) - max(
                 span["x1"], candidate["x1"]
             )
             dy = max(0.0, span["y1"] - candidate["y2"], candidate["y1"] - span["y2"])
             if (
                 xoverlap > 0.5 * min(span["x2"] - span["x1"], candidate["x2"] - candidate["x1"])
-                and dy <= 0.8 * height
+                and dy <= 0.8 * min(heights)
             ):
                 target = candidate
                 break
@@ -377,6 +463,7 @@ def _stack_pairs(spans: list[dict[str, Any]]) -> list[dict[str, Any]]:
             target["y1"] = min(target["y1"], span["y1"])
             target["x2"] = max(target["x2"], span["x2"])
             target["y2"] = max(target["y2"], span["y2"])
+            joined.add(id(target))
         else:
             merged.append(span)
     return merged
@@ -446,23 +533,23 @@ def _chain_groups(
 
 
 def sheet_text_document(
-    page: Any,
+    spans: list[dict[str, Any]],
     *,
     sheet: int,
     sheet_count: int,
     view_size: tuple[int, int],
-    page_size: tuple[float, float],
 ) -> str:
     """One sheet's exact text, organized by view, in view_sheet pixels.
 
     A view label names only its own spatial group; unlabeled groups keep
-    honest bbox names rather than guessed view ownership. The title block is
+    honest bbox names rather than guessed view ownership, and a cluster
+    carrying more than one view label stays unlabeled. The title block is
     the bottom-right region; border furniture and the licence watermark are
-    excluded.
+    excluded. A sheet without extractable text yields an empty document.
     """
-    width, height = page_size
-    scale = min(VIEW_BOX[0] / width, VIEW_BOX[1] / height)
-    lines = _text_lines(_text_spans(page, height, scale, view_size))
+    if not spans:
+        return ""
+    lines = _text_lines(spans)
     view_w, view_h = view_size
     title = [
         line
@@ -481,22 +568,20 @@ def sheet_text_document(
 
     groups: list[tuple[str, list[dict[str, Any]]]] = []
     for block in _chain_groups(rest, gap=90):
-        label = next(
-            (
-                line["text"].strip()
-                for line in block
-                if VIEW_LABEL_RE.match(line["text"].strip())
-            ),
-            None,
-        )
-        if label is not None:
-            groups.append((label, block))
+        labels = [
+            line["text"].strip()
+            for line in block
+            if VIEW_LABEL_RE.match(line["text"].strip())
+        ]
+        if len(labels) == 1:
+            groups.append((labels[0], block))
             continue
         x1 = min(line["x1"] for line in block)
         y1 = min(line["y1"] for line in block)
         x2 = max(line["x2"] for line in block)
         y2 = max(line["y2"] for line in block)
-        groups.append((f"(unlabeled) @ ({x1:.0f},{y1:.0f})-({x2:.0f},{y2:.0f})", block))
+        kind = "unlabeled" if not labels else "multi-view"
+        groups.append((f"({kind}) @ ({x1:.0f},{y1:.0f})-({x2:.0f},{y2:.0f})", block))
 
     out = [
         f"Sheet text layer — sheet {sheet} of {sheet_count}.",
@@ -552,6 +637,7 @@ class SheetStore:
         self._views: dict[int, tuple[bytes, str]] = {}
         self._crops: dict[tuple[int, int, int, int, int], tuple[bytes, str]] = {}
         self._texts: dict[int, str] = {}
+        self._spans: dict[int, list[dict[str, Any]]] = {}
         self._crop_calls = 0
         try:
             with PDFIUM_LOCK:
@@ -614,6 +700,7 @@ class SheetStore:
                 self._views.clear()
                 self._crops.clear()
                 self._texts.clear()
+                self._spans.clear()
 
     def _ensure_open(self) -> None:
         if self._closed:
@@ -670,39 +757,75 @@ class SheetStore:
             return self._crops[key]
 
     def text_layer(self, sheet: int) -> str:
-        """One sheet's exact text organized by view; empty for a PNG source."""
+        """One sheet's exact text organized by view; empty without extractable text."""
         with self._lock:
             entry = self._sheet(sheet)
             if sheet in self._texts:
                 return self._texts[sheet]
+            spans = self._text_spans(sheet, entry)
+        # Grouping is pure Python on copied spans; keep it off the global lock.
+        document = sheet_text_document(
+            spans,
+            sheet=sheet,
+            sheet_count=self.sheet_count,
+            view_size=entry.view_size,
+        )
+        with self._lock:
+            self._texts[sheet] = document
+        return document
+
+    def sheet_text_region(
+        self, sheet: int, x1: int, y1: int, x2: int, y2: int
+    ) -> str:
+        """The sheet's text inside a view_sheet rect, organized by view.
+
+        Text queries never consume the crop budget: extraction is
+        deterministic and cheap next to rendering.
+        """
+        with self._lock:
+            entry = self._sheet(sheet)
+            rect = (x1, y1, x2, y2)
+            _validate_rect(rect, entry.view_size)
+            spans = self._text_spans(sheet, entry)
+        selected = [
+            span
+            for span in spans
+            if span["x1"] < x2 and x1 < span["x2"] and span["y1"] < y2 and y1 < span["y2"]
+        ]
+        return sheet_text_document(
+            selected,
+            sheet=sheet,
+            sheet_count=self.sheet_count,
+            view_size=entry.view_size,
+        )
+
+    def _text_spans(self, sheet: int, entry: _Sheet) -> list[dict[str, Any]]:
+        """Memoized per-sheet spans; native extraction stays under the lock."""
+        with self._lock:
+            if sheet in self._spans:
+                return self._spans[sheet]
             if entry.page_index is None:
-                self._texts[sheet] = ""
-                return ""
+                self._spans[sheet] = []
+                return []
             with PDFIUM_LOCK:
                 page = entry.source[entry.page_index]
                 try:
-                    width, height = page.get_size()
-                    document = sheet_text_document(
-                        page,
-                        sheet=sheet,
-                        sheet_count=self.sheet_count,
-                        view_size=entry.view_size,
-                        page_size=(width, height),
-                    )
+                    spans = _text_spans(page, entry.view_size)
                 finally:
                     page.close()
-            self._texts[sheet] = document
-            return document
+            self._spans[sheet] = spans
+            return spans
 
 
 def create_server(store: SheetStore) -> FastMCP:
-    """Register only static-schema view_sheet/crop tools; SDK reports tool errors."""
+    """Register only static-schema view_sheet/crop/sheet_text tools; SDK reports tool errors."""
 
     class SheetsServer(FastMCP):
         async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
             expected = {
                 "view_sheet": {"sheet"},
                 "crop": {"sheet", "x1", "y1", "x2", "y2"},
+                "sheet_text": {"sheet", "x1", "y1", "x2", "y2"},
             }.get(name)
             if expected is not None and (
                 not isinstance(arguments, dict)
@@ -757,6 +880,22 @@ def create_server(store: SheetStore) -> FastMCP:
     def crop(sheet: int, x1: int, y1: int, x2: int, y2: int) -> list[ImageContent | TextContent]:
         png, text = store.crop(sheet, x1, y1, x2, y2)
         return [Image(data=png, format="png").to_image_content(), TextContent(type="text", text=text)]
+
+    @server.tool(
+        description=(
+            "Exact sheet text inside an integer top-left-origin view_sheet rect, "
+            "organized by sheet then view; rects in the output are view_sheet "
+            "pixels. Use it for exact dimension values, tolerances and callout "
+            "text; judge crossings and layout from crops. It never consumes the "
+            "crop budget. Absence of text in the output is not absence of drawing "
+            "information: textless sheets must be read from the images."
+        ),
+        annotations=annotations,
+        structured_output=False,
+    )
+    def sheet_text(sheet: int, x1: int, y1: int, x2: int, y2: int) -> list[TextContent]:
+        text = store.sheet_text_region(sheet, x1, y1, x2, y2)
+        return [TextContent(type="text", text=text or "(no extractable text in this rect)")]
 
     return server
 
