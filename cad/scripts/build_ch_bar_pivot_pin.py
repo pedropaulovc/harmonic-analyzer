@@ -14,6 +14,13 @@ The pin is a Front-plane half-profile revolved about that axis (the
 ``build_dt_pinion_lever_pin`` idiom), so its diameter and length both import
 into the *Front side view (drawing-guidelines.md rule 11 (turned parts read like the lathe), turned parts).
 
+``BlankReference`` (blanked, on the Front plane, on the pin axis): the blank's
+cut length, a construction line centred on the Right Plane whose one
+dimension carries the 2-place band (drawing-simplicity-policy.md `How the
+repository implements the guidelines`: the model, not a note, owns it); the
+side view prints it below the installed length (the ``build_ch_rod_pivot_pin``
+pattern).
+
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_ch_bar_pivot_pin.py
@@ -36,6 +43,7 @@ from _session import run_build
 from _sketch import (
     SketchDims,
     add_line_chain,
+    blank_reference_sketches,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
@@ -48,11 +56,12 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
-from ch_bar_pivot_pin_notes import DRAWING_NOTES
+from ch_bar_pivot_pin_notes import DRAWING_DIMENSIONS, DRAWING_NOTES, DRAWING_PRECISION
 from ch_bar_pivot_pin_spec import (
-    DRAWING_DIMENSIONS,
-    DRAWING_PRECISION,
+    PIN_BLANK_LENGTH,
+    PIN_BLANK_LENGTH_BAND,
     PIN_DIA,
     PIN_DIA_TOLERANCE,
     PIN_INSTALLED_LENGTH,
@@ -82,6 +91,7 @@ async def build(adapter) -> dict[str, str]:
     # document; the equation manager reads bare numbers in document units).
     await set_global(adapter, "PinDia", f"{PIN_DIA}mm")
     await set_global(adapter, "PinLen", f"{PIN_INSTALLED_LENGTH}mm")
+    await set_global(adapter, "BlankLen", f"{PIN_BLANK_LENGTH}mm")
 
     # Half-profile on the Front Plane (sketch x -> model X, y -> model Y): the
     # axis centerline along X through the origin and the rectangle above it,
@@ -150,6 +160,41 @@ async def build(adapter) -> dict[str, str]:
     if com is None or any(abs(c) > 1e-6 for c in com):
         raise RuntimeError(f"bar pivot pin is not centred on its origin (COM {com})")
 
+    # REFERENCE sketch: the blank's cut length, a construction line on the pin
+    # axis centred on the Right Plane (the model is the installed pin, so no
+    # model edge spans the blank). The side view imports its one dimension.
+    blank = SketchDims()
+    check("create_sketch blank reference", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    blank_line = check(
+        "blank centerline",
+        await adapter.add_centerline(
+            -PIN_BLANK_LENGTH / 2.0, 0.0, PIN_BLANK_LENGTH / 2.0, 0.0
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "blank centerline horizontal",
+        await adapter.add_sketch_constraint(blank_line, None, "horizontal"),
+    )
+    check(
+        "blank centerline midpoint -> origin",
+        await adapter.add_sketch_constraint("origin", blank_line, "midpoint"),
+    )
+    await dimension_between(
+        adapter,
+        f"{blank_line}.start",
+        f"{blank_line}.end",
+        "horizontal_distance",
+        PIN_BLANK_LENGTH,
+        "pin BlankLen",
+    )
+    blank.record("BlankLen", '"BlankLen"')
+    await ensure_fully_defined(adapter, "blank reference sketch")
+    check("exit_sketch blank reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "BlankReference")
+    drive_jobs += blank.apply(adapter, "BlankReference")
+
     # Named pin axis (Axis1, along X): coaxial with the bar's top pin bore and
     # the lever's bar-pin hole in the assembly.
     await name_bore_axis(adapter, "Top Plane", 0.0, "Front Plane", 0.0, "pin axis")
@@ -164,9 +209,18 @@ async def build(adapter) -> dict[str, str]:
 
     # The diameter carries the drill rod's grind band natively (drawing-guidelines.md rule 3 (decimal places carry the tolerance)); the
     # installed length is the bar's width, parenthesized as REFERENCE on the
-    # sheet.
+    # sheet; the blank's cut length carries its own band (the dressing stock,
+    # ch_bar_pivot_pin_spec.joint_budget blank_excess_min/max).
     set_dimension_symmetric_tolerance(
         adapter, "PinProfile", "PinDia", PIN_DIA_TOLERANCE
+    )
+    blank_lower, blank_upper = deviations(PIN_BLANK_LENGTH_BAND)
+    if blank_lower != -blank_upper:
+        raise AssertionError(
+            "ch_bar_pivot_pin_spec.PIN_BLANK_LENGTH_BAND must be symmetric"
+        )
+    set_dimension_symmetric_tolerance(
+        adapter, "BlankReference", "BlankLen", blank_upper
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -176,6 +230,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
+    blank_reference_sketches(adapter, ("BlankReference",))
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

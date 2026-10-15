@@ -31,6 +31,13 @@ def test_restated_floors_are_their_sources() -> None:
     assert pin.BAR_HOLE_BAND is bar.TOP_PIN_HOLE_BAND
     # ANSI B4.1 FN2, 0-0.12 in: 0.85 thousandths of an inch at most.
     assert pin.PRESS_INTERFERENCE_MAX == pytest.approx(0.02159, abs=1e-6)
+    # The hole's offset prints at three places on the bar sheet: .XXX.
+    from _printed_tolerance import printed_band_mm
+    import ch_amplitude_bar_notes as bar_notes
+
+    places = bar_notes.DRAWING_PRECISION["TopPinProfile"]["TopPinX"]
+    assert pin.HOLE_LOCATION_TOLERANCE == printed_band_mm(places) == 0.13
+    assert pin.BAR_STOCK_UNDERSIZE is bar.BAR_STOCK_UNDERSIZE
 
 
 def test_the_pin_is_flush_with_the_bar_and_runs_in_the_lever() -> None:
@@ -54,7 +61,8 @@ def test_worst_case_joint_budget() -> None:
     # Flush ends leave the #1038 top-notch gap untouched.
     assert b["neighbour_clearance_min"] == pytest.approx(0.1065, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.RUNNING_FLOOR
-    assert b["hole_face_wall_min"] == pytest.approx(2.1606, abs=1e-6)
+    # The far face, the offset at its long limit on the narrowest stock.
+    assert b["hole_face_wall_min"] == pytest.approx(2.0052, abs=1e-6)
     assert b["hole_face_wall_min"] >= pin.RULE12_WALL_TARGET
     assert b["blank_excess_min"] == pytest.approx(0.12, abs=1e-6)
     assert b["blank_excess_max"] == pytest.approx(0.4308, abs=1e-6)

@@ -1,8 +1,8 @@
 ch-amplitude-bar:
   number: MHA-CH-001
-  material: Plain Carbon Steel
+  material: "AISI 1018 cold-finished, 1/4 in sq"
   material_specification: AISI 1018 cold-rolled steel, 6.35 sq
-  finish: bright chrome plated
+  finish: "bright chrome plated; dims after plating; mask pin hole"
   quantity: 20
   tolerance_class: machined_block
   fit_class: sliding_amplitude_bar_on_rocker

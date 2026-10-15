@@ -1,9 +1,9 @@
 """Offline contracts for the bar pivot pin (MHA-CH-011) part and drawing.
 
-The installed pressed pin under ``cad/docs/drawing-guidelines.md``: two
-native model dimensions whose places (and the diameter's grind band) the PART
-owns, the installed length as REFERENCE, no GD&T, no roughness symbol, and at
-most four note lines: the blank, the press, the flush ends, the running fit.
+The installed pressed pin under ``cad/docs/drawing-guidelines.md``: three
+native model dimensions whose places (and the diameter's and blank's bands)
+the PART owns, the installed length as REFERENCE, the mates and the stock
+named at the diameter, no GD&T, no roughness symbol, and one note line.
 """
 
 from __future__ import annotations
@@ -62,16 +62,35 @@ def test_pin_axis_and_mid_plane_contract() -> None:
     assert "create_configuration" not in build  # one INSTALLED configuration
 
 
-def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
-    assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.FRONT_KEEP) == marked == {"PinDia", "PinLen"}
-    assert spec.REFERENCE_DIMENSIONS == {"PinLen"}
+def test_notes_module_is_the_single_source_of_the_marked_dimension_set() -> None:
+    """The drawing contract lives in ch_bar_pivot_pin_notes, out of the spec
+    the channel assembly and the fit test import."""
+    assert part.DRAWING_DIMENSIONS is notes.DRAWING_DIMENSIONS
+    assert part.DRAWING_PRECISION is notes.DRAWING_PRECISION
+    assert drawing.DRAWING_DIMENSIONS is notes.DRAWING_DIMENSIONS
+    for name in ("DRAWING_DIMENSIONS", "DRAWING_PRECISION", "REFERENCE_DIMENSIONS"):
+        assert not hasattr(spec, name), name
+    marked = set().union(*notes.DRAWING_DIMENSIONS.values())
+    assert set(drawing.FRONT_KEEP) == marked == {"PinDia", "PinLen", "BlankLen"}
+    assert notes.REFERENCE_DIMENSIONS == {"PinLen"}
     assert not hasattr(drawing, "RIGHT_KEEP")
 
 
+def test_blank_length_is_a_banded_model_dimension_on_a_hidden_sketch() -> None:
+    """Machinist round 1 (#1305): the blank length sat in a note. It prints
+    from the part's blanked BlankReference sketch (the rod-pin pattern)."""
+    build = _build_source()
+    assert notes.DRAWING_DIMENSIONS["BlankReference"] == {"BlankLen"}
+    assert 'set_global(adapter, "BlankLen", f"{PIN_BLANK_LENGTH}mm")' in build
+    assert 'blank.record("BlankLen", \'"BlankLen"\')' in build
+    assert 'blank_reference_sketches(adapter, ("BlankReference",))' in build
+    assert "hidden_sketches.curate_view_dimensions(" in _source()
+    assert spec.PIN_BLANK_LENGTH_BAND == (0.13, -0.13)
+    assert drawing.FRONT_KEEP["BlankLen"][1] < drawing.FRONT_KEEP["PinLen"][1] - 0.015
+
+
 def test_precision_and_band_are_authored_on_the_part() -> None:
-    assert spec.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 2}
+    assert notes.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 2, "BlankLen": 2}
     assert "draw_ch_bar_pivot_pin.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source
@@ -80,10 +99,11 @@ def test_precision_and_band_are_authored_on_the_part() -> None:
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
     assert model_toleranced_dimensions(part) == {
         ("PinProfile", "PinDia"): "PIN_DIA_TOLERANCE",
+        ("BlankReference", "BlankLen"): "blank_upper",
     }
 
 
-def test_print_carries_no_gdt_roughness_or_callouts() -> None:
+def test_print_carries_no_gdt_or_roughness() -> None:
     source = _source()
     for helper in (
         "add_datum_feature(",
@@ -92,7 +112,6 @@ def test_print_carries_no_gdt_roughness_or_callouts() -> None:
         "project_part_pmi(",
         "add_surface_finish(",
         "add_native_hole_callout(",
-        "set_dimension_callouts(",
     ):
         assert helper not in source, helper
     assert "author_part_pmi" not in _build_source()
@@ -102,24 +121,34 @@ def test_print_carries_no_gdt_roughness_or_callouts() -> None:
     assert "add_view_centerline(" in source
 
 
-def test_notes_state_blank_press_flush_ends_and_running_fit() -> None:
-    lines = notes.DRAWING_NOTES.splitlines()
-    assert len(lines) <= 4  # drawing-guidelines.md rule 7 (notes: few, flagged, never a method)
-    assert lines == [
-        "1. CUT BLANK 6.60 \u00b10.13 LONG; INSTALLED STATE SHOWN.",
-        "2. PRESS IN; REMOVABLE WITH PUNCH.",
-        "3. PRESSED IN THE MHA-CH-001 REAMED TOP PIN HOLE;"
-        " DRESS BOTH ENDS FLUSH, NEVER PROUD.",
-        "4. RUNS FREE IN THE MHA-CH-002 #47 BAR-PIN HOLE.",
+def test_one_note_and_the_mates_at_their_dimensions() -> None:
+    """Machinist round 1 (#1305): the press/punch line was a method, the
+    flush dressing assembly wording, and the mates sat away from the Ø they
+    govern; the drill-rod stock explains the tight grind band. Each now rides
+    its dimension; one note says what the views show."""
+    assert notes.DRAWING_NOTES.splitlines() == [
+        "1. VIEWS SHOW THE INSTALLED PIN; CUT THE BLANK SHOWN."
     ]
-    assert "DRILL ROD" not in notes.DRAWING_NOTES  # the title block owns the stock
+    assert "PUNCH" not in notes.DRAWING_NOTES and "DRESS" not in notes.DRAWING_NOTES
+    assert notes.DIMENSION_CALLOUTS_ABOVE == {
+        "PinDia": "5/64 DRILL ROD, AS SUPPLIED\n"
+        "PRESS FIT IN MHA-CH-001\n"
+        "RUNS IN MHA-CH-002 #47 HOLE"
+    }
+    assert notes.DIMENSION_CALLOUTS_BELOW == {
+        "PinLen": "INSTALLED, FLUSH WITH MHA-CH-001",
+        "BlankLen": "BLANK",
+    }
+    source = _source()
+    assert 'location="above"' in source
+    assert source.count("set_dimension_callouts(") == 2
     assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
 
 
-def test_mating_part_numbers_in_the_notes_are_live() -> None:
-    assert _config.parts("ch-amplitude-bar")["number"] == "MHA-CH-001"
-    assert _config.parts("ch-channel-lever")["number"] == "MHA-CH-002"
+def test_mating_part_numbers_in_the_callouts_are_live() -> None:
+    assert _config.parts("ch-amplitude-bar")["number"] == notes.BAR_NUMBER
+    assert _config.parts("ch-channel-lever")["number"] == notes.LEVER_NUMBER
     assert str(lever.BAR_PIN_HOLE_SPEC.size).lstrip("#") == "47"
 
 

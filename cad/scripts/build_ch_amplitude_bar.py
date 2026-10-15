@@ -20,7 +20,10 @@ end faces. Extruded by the bar depth (+Z, 0..6.35). The top pin hole -- a
 through the top-slot cheeks at 6.35 below the bar top, mid-depth
 (Z = 3.175): a Right-plane sketch maps local +X -> global -Z, so the circle
 centre sits at sketch_x = -BarDepth/2 to land inside the body, and the
-removed volume is asserted against analytic so a wrong side fails loud.
+removed volume is asserted against analytic so a wrong side fails loud. The
+same sketch carries a construction line along the bar's top edge: the hole
+is dimensioned from it, and its length is the square section, so the print's
+right side view of the top end reads all three from the model.
 
 Run (SolidWorks already open)::
 
@@ -42,8 +45,15 @@ from _part_save import save_part_and_images
 from _paths import IN
 from _rebuild import force_rebuild
 from _session import run_build
-from _sketch import SketchDims, add_line_chain, ensure_fully_defined
-from _sketch_circle import define_circle
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    anchor_point_to_point,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
@@ -52,13 +62,11 @@ from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from ch_amplitude_bar_drawing_spec import SURFACE_FINISHES
-from ch_amplitude_bar_notes import DRAWING_NOTES, END_VIEW_NOTE, ISOMETRIC_VIEW_NOTE
+from ch_amplitude_bar_notes import DRAWING_DIMENSIONS, DRAWING_NOTES, DRAWING_PRECISION
 from ch_amplitude_bar_spec import (
     BOTTOM_NOTCH_DEPTH_BAND,
     BOTTOM_NOTCH_OFFSET,
     BOTTOM_NOTCH_WIDTH,
-    DRAWING_DIMENSIONS,
-    DRAWING_PRECISION,
     NOTCH_OFFSET_TOLERANCE_MM,
     NOTCH_WIDTH_BAND,
     TOP_NOTCH_OFFSET,
@@ -211,18 +219,59 @@ async def build(adapter) -> dict[str, str]:
     expected_removed = (
         math.pi * (TOP_PIN_HOLE_DIA / 2.0) ** 2 * (BAR_WIDTH - TOP_NOTCH_WIDTH)
     )
+    # The hole's sketch on the Right plane (the bar's x = 0 face; sketch x =
+    # model -Z, y = model Y). A construction line runs along the bar's top
+    # edge from the back face (z = 0) to the front: the hole is located from
+    # its back end -- across the depth and down from the top, both inside the
+    # top end's 4:1 right side view -- and its length is the square section.
+    # Both entities go in direct to the sketch DB (no inference relation onto
+    # the bar's own edges); every relation below is explicit.
     pin_hole = SketchDims()
     check("create_sketch top pin hole", await adapter.create_sketch("Right"))
-    await define_circle(
-        adapter,
-        -BAR_DEPTH / 2.0,
-        pin_y,
-        TOP_PIN_HOLE_DIA / 2.0,
-        "top pin hole",
-        dims=pin_hole,
-        names=("TopPinX", "TopPinY", "TopPinDia"),
-        drives=('"BarDepth" / 2', '"BarLength" - "TopPinDrop"', '"TopPinDia"'),
+    set_sketch_direct_db(adapter, True)
+    try:
+        top_edge = check(
+            "top edge construction line",
+            await adapter.add_centerline(0.0, BAR_LENGTH, -BAR_DEPTH, BAR_LENGTH),
+        )
+        circle = check(
+            "add_circle top pin hole",
+            await adapter.add_circle(-BAR_DEPTH / 2.0, pin_y, TOP_PIN_HOLE_DIA / 2.0),
+        )
+    finally:
+        set_sketch_direct_db(adapter, False)
+    check(
+        "top edge horizontal",
+        await adapter.add_sketch_constraint(top_edge, None, "horizontal"),
     )
+    await anchor_point_to_origin(
+        adapter, f"{top_edge}.start", 0.0, BAR_LENGTH, "top edge back end"
+    )
+    pin_hole.record("TopEdgeY", '"BarLength"')
+    await dimension_between(
+        adapter,
+        f"{top_edge}.start",
+        f"{top_edge}.end",
+        "horizontal_distance",
+        BAR_DEPTH,
+        "bar section",
+    )
+    pin_hole.record("BarSection", '"BarDepth"')
+    await anchor_point_to_point(
+        adapter,
+        f"{top_edge}.start",
+        f"{circle}.center",
+        -BAR_DEPTH / 2.0,
+        -TOP_PIN_DROP,
+        "top pin hole centre",
+    )
+    pin_hole.record("TopPinX", '"BarDepth" / 2')
+    pin_hole.record("TopPinDrop", '"TopPinDrop"')
+    check(
+        "dimension top pin hole diameter",
+        await adapter.add_sketch_dimension(circle, None, "diameter", TOP_PIN_HOLE_DIA),
+    )
+    pin_hole.record("TopPinDia", '"TopPinDia"')
     await ensure_fully_defined(adapter, "top pin hole sketch")
     check("exit_sketch top pin hole", await adapter.exit_sketch())
     name_last_feature(adapter, "TopPinProfile")
@@ -351,8 +400,8 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "BarProfile", "TopRightLedge", NOTCH_OFFSET_TOLERANCE_MM
     )
-    # The reamed press hole's band rides natively on its diameter; the sheet
-    # states it in note 3 (the hole is dimensioned in the notes).
+    # The reamed press hole's band rides natively on its diameter, printed in
+    # the top end's right side view.
     set_dimension_bilateral_tolerance(
         adapter, "TopPinProfile", "TopPinDia", *deviations(TOP_PIN_HOLE_BAND)
     )
@@ -363,21 +412,12 @@ async def build(adapter) -> dict[str, str]:
     # The foot notch floor's roughness lives on the MODEL as a plain annotation.
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-            "End View Note": END_VIEW_NOTE,
-        },
+        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
-        (
-            "Number", "Material Specification", "Finish", "Quantity",
-            "Manufacturing Notes", "Isometric View Note", "End View Note",
-        ),
+        ("Number", "Material Specification", "Finish", "Quantity", "Manufacturing Notes"),
     )
     return artefacts
 

@@ -6,10 +6,11 @@ sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
 The bar is ~808 mm long but only 6.35 mm square, so the print shows a 1:4
-full-length front view (overall length only), a 4:1 top end view for the square
-section, a small 1:8 isometric, and a 4:1 native detail of each end notch that
-carries its centring ledge, width and depth (and, at the foot, the floor's Ra
-symbol); the top pin hole is dimensioned in the notes.  The sheet runs at 1:4.
+full-length front view (overall length only) and enlarged cropped model views
+of its two ends: a 4:1 detail of each end notch (centring ledge, width and
+depth, and at the foot the floor's Ra symbol), the 4:1 right side of the top
+end's detail (the reamed pin hole, located from the bar's top edge, and the
+square stock), and a 3:1 isometric of each end.  The sheet runs at 1:4.
 
 Run with SolidWorks open::
 
@@ -42,7 +43,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
@@ -54,6 +59,12 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from ch_amplitude_bar_drawing_spec import SURFACE_FINISHES
+from ch_amplitude_bar_notes import (
+    DIMENSION_CALLOUTS,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    REFERENCE_DIMENSIONS,
+)
 from ch_amplitude_bar_spec import (
     BAR_DEPTH,
     BAR_LENGTH,
@@ -61,9 +72,8 @@ from ch_amplitude_bar_spec import (
     BOTTOM_NOTCH_HEIGHT,
     BOTTOM_NOTCH_OFFSET,
     BOTTOM_NOTCH_WIDTH,
-    DRAWING_DIMENSIONS,
-    DRAWING_PRECISION,
     TOP_NOTCH_HEIGHT,
+    TOP_PIN_DROP,
 )
 
 
@@ -80,49 +90,56 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 4.0)  # 1:4
-FRONT_CENTER = (0.110, 0.140)
-TOP_CENTER = (0.220, 0.150)  # square-section end view (4:1)
-ISO_CENTER = (0.330, 0.140)
-
-
+FRONT_CENTER = (0.065, 0.140)
 FRONT_KEEP = {
-    "BarLength": (0.075, FRONT_CENTER[1]),
+    "BarLength": (FRONT_CENTER[0] - 0.035, FRONT_CENTER[1]),
 }
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-TOP_KEEP: dict[str, tuple[float, float]] = {}
-
-DRAWING_PRECISION_BY_NAME = {
-    name: digits
-    for names in DRAWING_PRECISION.values()
-    for name, digits in names.items()
-}
+# Top-left of the property-linked note: right of the top end's side view,
+# under the diameter callout and the top isometric's label.
+NOTES_XY = (0.300, 0.150)
 
 
 @dataclass(frozen=True)
-class NotchDetail:
-    """A detail of one end notch: a cropped 4:1 *Front model view.
+class CroppedView:
+    """A cropped model view of one end of the bar, at its own scale.
 
-    ``fence_mm`` is the crop circle's centre in part (x, y) -- the Front-plane
-    profile frame the front view shows unrotated, bar width along x from the
-    origin corner, length along y -- and ``centre`` where that point lands on
-    the sheet.
+    ``fence_mm`` is the crop circle's centre in part (x, y, z) -- bar width
+    along x from the origin corner, length along y, depth along z -- and
+    ``centre`` where that point lands on the sheet. A view with a ``letter``
+    is a detail: its region is circled and lettered on the 1:4 front view.
     """
 
-    label: str
+    name: str
+    title: str
+    orientation: str
     scale: tuple[int, int]
-    fence_mm: tuple[float, float]
+    fence_mm: tuple[float, float, float]
     radius_mm: float
     centre: tuple[float, float]
+    letter: str | None = None
 
     @property
     def mm(self) -> float:
-        """Sheet metres per part millimetre in the detail."""
+        """Sheet metres per part millimetre in the view."""
         return self.scale[0] / self.scale[1] / 1000.0
 
-    def sheet_xy(self, x_mm: float, y_mm: float) -> tuple[float, float]:
+    def sheet_xy(
+        self, x_mm: float, y_mm: float, z_mm: float = 0.0
+    ) -> tuple[float, float]:
+        """Where part point (x, y, z) lands on the sheet in a *Front or a
+        *Right view (the latter looks along -X, so +Z runs to the left)."""
+        fx, fy, fz = self.fence_mm
+        if self.orientation == "*Front":
+            across = x_mm - fx
+        elif self.orientation == "*Right":
+            across = fz - z_mm
+        else:
+            raise ValueError(
+                f"{self.name}: no planar sheet mapping for {self.orientation}"
+            )
         return (
-            self.centre[0] + (x_mm - self.fence_mm[0]) * self.mm,
-            self.centre[1] + (y_mm - self.fence_mm[1]) * self.mm,
+            self.centre[0] + across * self.mm,
+            self.centre[1] + (y_mm - fy) * self.mm,
         )
 
     @property
@@ -135,8 +152,8 @@ class NotchDetail:
 
     @property
     def label_text(self) -> str:
-        """The native detail label's words."""
-        return f"DETAIL {self.label}\nSCALE {self.scale[0]} : {self.scale[1]}"
+        """The view label's words, in the native detail label's form."""
+        return f"{self.title}\nSCALE {self.scale[0]} : {self.scale[1]}"
 
     @property
     def crop_radius(self) -> float:
@@ -149,10 +166,10 @@ class NotchDetail:
         return self.radius_mm * SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
 
 
-# A model view has no native label the API can show, so each detail's label
+# A model view has no native label the API can show, so each view's label
 # is a note the view owns, in the native label's words, its top edge this far
-# under the crop circle; the front view carries the crop circle and the letter,
-# east of the bar.
+# under the crop circle; the front view carries each detail's crop circle and
+# letter, east of the bar.
 DETAIL_LABEL_DROP = 0.007
 PARENT_LETTER_GAP = 0.005
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
@@ -160,49 +177,102 @@ DETAIL_POSITION_TOL_M = 1e-4
 NOTE_CENTRING_TOL_M = 0.001
 NOTE_CENTRING_PASSES = 2
 
-# At 1:4 an end notch is under a millimetre on the sheet, so each end's
-# centring ledge, width and depth -- the foot notch's depth with its one-sided
-# band (Codex #936 PRRT_kwDOPHDy386mWF0L) -- print in a 4:1 detail (Main
-# ruling 2026-09-27). Each is a cropped *Front model view, dimensioned while
-# uncropped and cropped after: r743-6 (d92938949, leaf
-# 20260927T020523Z-1-e3f9f1f7) showed a native detail of the front view
-# refusing the targeted import (available=[]), the MHA-VN-031 / MHA-DT-022 / MHA-DT-024
-# pattern (the pc-r15 kink detail, d6b8ed93f). DETAIL A (the foot) sits under
-# the end view, left of the title block, its circle centred on the bar's end,
-# right of the notch, to take the width row and the floor's Ra symbol;
-# DETAIL B (the 12.7-deep top notch) right of the notes, left of and above the
-# isometric. A crop drops any dimension whose reference lies outside it, so
-# every printed edge's ends stay inside the circle
-# (test_notch_details_frame_their_ends...).
-DETAIL_A = NotchDetail("A", (4, 1), (BAR_WIDTH / 2.0 + 2.0, 0.0), 7.5, (0.170, 0.100))
-DETAIL_B = NotchDetail(
-    "B", (4, 1), (BAR_WIDTH / 2.0, BAR_LENGTH - 6.0), 8.0, (0.300, 0.205)
+# At 1:4 an end is under two millimetres wide on the sheet, so each end's
+# notch prints in a 4:1 detail (Main ruling 2026-09-27). Each is a cropped
+# *Front model view, dimensioned while uncropped and cropped after: r743-6
+# (d92938949, leaf 20260927T020523Z-1-e3f9f1f7) showed a native detail of the
+# front view refusing the targeted import (available=[]), the MHA-VN-031 /
+# MHA-DT-022 / MHA-DT-024 pattern (the pc-r15 kink detail, d6b8ed93f). A crop
+# drops any dimension whose reference lies outside it, so every printed
+# edge's ends stay inside the circle (test_cropped_views_frame_their_ends...).
+# The foot's views run along the bottom of the sheet, the top end's along the
+# top: DETAIL A and the foot isometric; DETAIL B, its right side and the top
+# isometric.
+DETAIL_A = CroppedView(
+    "A",
+    "DETAIL A",
+    "*Front",
+    (4, 1),
+    (BAR_WIDTH / 2.0 + 2.0, 0.0, 0.0),
+    7.5,
+    (0.150, 0.100),
+    letter="A",
 )
+DETAIL_B = CroppedView(
+    "B",
+    "DETAIL B",
+    "*Front",
+    (4, 1),
+    (BAR_WIDTH / 2.0, BAR_LENGTH - 6.0, 0.0),
+    8.0,
+    (0.150, 0.200),
+    letter="B",
+)
+# DETAIL B's right side, projected on its row (third angle): the reamed pin
+# hole, located from the back end of the bar's top edge, and that edge's
+# length -- the square stock. Machinist round 1 (#1293): the hole was a note.
+TOP_SIDE = CroppedView(
+    "B right side",
+    "RIGHT SIDE OF DETAIL B",
+    "*Right",
+    (4, 1),
+    (BAR_WIDTH, BAR_LENGTH - 6.0, BAR_DEPTH / 2.0),
+    8.0,
+    (0.255, DETAIL_B.centre[1]),
+)
+# The pictorials: each end at 3:1 (machinist round 1, #1293: the full bar at
+# 1:8 was an unreadable sliver). The finalizer shades every *Isometric.
+TOP_ISO = CroppedView(
+    "top isometric",
+    "ISOMETRIC, TOP END",
+    "*Isometric",
+    (3, 1),
+    (BAR_WIDTH / 2.0, BAR_LENGTH - 7.0, BAR_DEPTH / 2.0),
+    10.0,
+    (0.365, 0.205),
+)
+FOOT_ISO = CroppedView(
+    "foot isometric",
+    "ISOMETRIC, FOOT END",
+    "*Isometric",
+    (3, 1),
+    (BAR_WIDTH / 2.0, 2.5, BAR_DEPTH / 2.0),
+    7.0,
+    (0.245, 0.112),
+)
+CROPPED_VIEWS = (DETAIL_A, DETAIL_B, TOP_SIDE, TOP_ISO, FOOT_ISO)
+
 # A callout's text stands this far outside the bar's edge, or outside
-# DETAIL A's fence; a width/ledge row this far outside the bar's end.
+# DETAIL A's fence; a ledge row this far outside the bar's end.
 DETAIL_TEXT_GAP = 0.010
 DETAIL_A_FENCE_TEXT_GAP = 0.014
 DETAIL_ROW_GAP = 0.012
-DETAIL_A_WIDTH_ROW_GAP = 0.020
+# DETAIL A's width row hangs under its ledge row and the ledge's one-line
+# callout.
+DETAIL_A_WIDTH_ROW_GAP = 0.028
 # A width with its +0.3/0.0 stack prints ~20 mm wide, wider than the 12.4 mm
 # mouth at 4:1: centred on the mouth it straddled both extension lines, and in
 # DETAIL A the Ra leader ran through it (r743-6b, 64fedd3cc). So each width's
 # text stands west of the bar, its centre this far out from the bar's edge,
 # and the dimension line runs out to it.
 WIDTH_TEXT_OFFSET = 0.014
+# A depth's ROOTS callout (~36 mm) hangs centred under its value; the top
+# notch's depth stands this far east of the bar so the callout clears it.
+DETAIL_B_DEPTH_TEXT_GAP = 0.022
 _DETAIL_A_TEXT_X = (
     DETAIL_A.centre[0] - DETAIL_A.radius_mm * DETAIL_A.mm - DETAIL_A_FENCE_TEXT_GAP
 )
 _DETAIL_A_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_ROW_GAP
 _DETAIL_A_WIDTH_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_A_WIDTH_ROW_GAP
 DETAIL_A_KEEP = {
-    # Left of the fence, level with the notch: the depth and its band.
+    # Left of the fence, level with the notch: the depth and its band, the
+    # ROOTS callout above it.
     "BottomNotchHeight": (
         _DETAIL_A_TEXT_X,
         DETAIL_A.sheet_xy(0.0, BOTTOM_NOTCH_HEIGHT / 2.0)[1],
     ),
     # One row under the open end: the centring ledge, its text left of the
-    # fence. The width a row lower, its witnesses running down the walls
+    # fence. The width two rows lower, its witnesses running down the walls
     # through the notch's air and its text west of the bar, so its dimension
     # line runs west and leaves the air under the right cheek to the Ra symbol.
     "BottomLeftLedge": (_DETAIL_A_TEXT_X, _DETAIL_A_ROW_Y),
@@ -215,17 +285,46 @@ _DETAIL_B_TEXT_X = DETAIL_B.sheet_xy(BAR_WIDTH, 0.0)[0] + DETAIL_TEXT_GAP
 _DETAIL_B_ROW_Y = DETAIL_B.sheet_xy(0.0, BAR_LENGTH)[1] + DETAIL_ROW_GAP
 DETAIL_B_KEEP = {
     "TopNotchHeight": (
-        _DETAIL_B_TEXT_X,
+        DETAIL_B.sheet_xy(BAR_WIDTH, 0.0)[0] + DETAIL_B_DEPTH_TEXT_GAP,
         DETAIL_B.sheet_xy(0.0, BAR_LENGTH - TOP_NOTCH_HEIGHT / 2.0)[1],
     ),
     # One row over the open end, chained on the ledge's inner witness: the
-    # width's text west of the bar, the ledge's east of it.
+    # width's text west of the bar, the ledge's east of it, each callout over
+    # its value.
     "TopNotchWidth": (
         DETAIL_B.sheet_xy(0.0, 0.0)[0] - WIDTH_TEXT_OFFSET,
         _DETAIL_B_ROW_Y,
     ),
     "TopRightLedge": (_DETAIL_B_TEXT_X, _DETAIL_B_ROW_Y),
 }
+# The top end's right side: the hole's offset from the back face one row over
+# the end, the section a row higher with its STOCK callout over it, the drop
+# east of the bar, and the diameter's leader out to the south-east with its
+# THRU / PRESS FIT callout under the value.
+_TOP_SIDE_END_Y = TOP_SIDE.sheet_xy(0.0, BAR_LENGTH, 0.0)[1]
+_TOP_SIDE_BACK_X = TOP_SIDE.sheet_xy(0.0, 0.0, 0.0)[0]
+TOP_SIDE_KEEP = {
+    "TopPinX": (
+        TOP_SIDE.sheet_xy(0.0, 0.0, BAR_DEPTH / 4.0)[0],
+        _TOP_SIDE_END_Y + DETAIL_ROW_GAP - 0.002,
+    ),
+    "BarSection": (
+        TOP_SIDE.sheet_xy(0.0, 0.0, BAR_DEPTH / 2.0)[0],
+        _TOP_SIDE_END_Y + 0.022,
+    ),
+    "TopPinDrop": (
+        _TOP_SIDE_BACK_X + DETAIL_ROW_GAP,
+        TOP_SIDE.sheet_xy(0.0, BAR_LENGTH - TOP_PIN_DROP / 2.0, 0.0)[1],
+    ),
+    "TopPinDia": (
+        _TOP_SIDE_BACK_X + 0.032,
+        TOP_SIDE.sheet_xy(0.0, BAR_LENGTH - TOP_PIN_DROP, 0.0)[1] - 0.017,
+    ),
+}
+# Callouts that stack over their value; the rest hang under it.
+CALLOUTS_ABOVE = frozenset(
+    {"BottomNotchHeight", "TopNotchWidth", "TopRightLedge", "BarSection"}
+)
 
 # The foot notch floor's Ra (Main ruling B, 2026-09-27). The symbol is ~17 mm
 # wide at the fleet's 2.5 mm height, wider than the 12.7 mm mouth, so it
@@ -245,7 +344,7 @@ FINISH_CHAR_HEIGHT = 0.0025
 FINISH_SHOULDER = 0.0063
 
 
-# The cropped-detail helpers below are copied from draw_pinion_spring's pc-r15
+# The cropped-view helpers below are copied from draw_pinion_spring's pc-r15
 # kink detail (d6b8ed93f); a shared crop module is #1036, after the release.
 
 
@@ -295,49 +394,47 @@ def _sketch_circle(
     return circle
 
 
-def _placed_detail_view(adapter: Any, detail: NotchDetail) -> Any:
-    """``detail``, uncropped: a standalone *Front model view at its scale,
-    moved so the circle's centre lands on ``detail.centre`` (checked to
-    DETAIL_POSITION_TOL_M)."""
+def _placed_cropped_view(adapter: Any, spec: CroppedView) -> Any:
+    """``spec``'s view, uncropped: a standalone model view in its orientation
+    and at its scale, moved so the fence point lands on ``spec.centre``
+    (checked to DETAIL_POSITION_TOL_M)."""
     draw = adapter.currentModel
     view = _early_bound(
-        place_view(adapter, str(SOURCE), "*Front", *detail.centre, scale=detail.scale),
+        place_view(
+            adapter, str(SOURCE), spec.orientation, *spec.centre, scale=spec.scale
+        ),
         "IView",
     )
     ratio = tuple(float(value) for value in view.ScaleRatio)
-    if ratio != tuple(float(value) for value in detail.scale):
-        raise RuntimeError(
-            f"detail {detail.label} scale {ratio!r}, expected {detail.scale!r}"
-        )
-    focus = (detail.fence_mm[0] / 1000.0, detail.fence_mm[1] / 1000.0, 0.0)
-    label = f"detail {detail.label} centre"
+    if ratio != tuple(float(value) for value in spec.scale):
+        raise RuntimeError(f"{spec.name} scale {ratio!r}, expected {spec.scale!r}")
+    focus = tuple(value / 1000.0 for value in spec.fence_mm)
+    label = f"{spec.name} centre"
     center = model_point_in_view(adapter, view, focus, label=label)
     position = tuple(float(value) for value in view.Position)
-    target = [position[axis] + detail.centre[axis] - center[axis] for axis in range(2)]
+    target = [position[axis] + spec.centre[axis] - center[axis] for axis in range(2)]
     if not view.SetViewPosition(double_array(target), False):
-        raise RuntimeError(f"failed to move detail {detail.label} onto its spot")
+        raise RuntimeError(f"failed to move {spec.name} onto its spot")
     draw.EditRebuild3()
     center = model_point_in_view(adapter, view, focus, label=label)
-    if math.dist(center, detail.centre) > DETAIL_POSITION_TOL_M:
+    if math.dist(center, spec.centre) > DETAIL_POSITION_TOL_M:
         raise RuntimeError(
-            f"detail {detail.label} centre sits at {center!r}, not {detail.centre!r}"
+            f"{spec.name} centre sits at {center!r}, not {spec.centre!r}"
         )
     return view
 
 
-def _crop_detail_view(adapter: Any, view: Any, detail: NotchDetail) -> None:
-    """Crop ``view`` to its circle round ``detail.centre``: activate it,
+def _crop_view(adapter: Any, view: Any, spec: CroppedView) -> None:
+    """Crop ``view`` to its circle round ``spec.centre``: activate it,
     sketch the circle in its own sketch and Crop2 while the circle is still
     selected. Crop status, IsCropped, the outline and its style are read back
     and raise."""
     draw = adapter.currentModel
     view = _early_bound(view, "IView")
     uncropped = tuple(float(value) for value in view.GetOutline())
-    label = f"detail {detail.label}"
+    label = spec.name
     name = _activate_view(adapter, view, label=label)
-    _sketch_circle(
-        adapter, view, detail.centre, detail.crop_radius, label=f"{label} crop"
-    )
+    _sketch_circle(adapter, view, spec.centre, spec.crop_radius, label=f"{label} crop")
     status = int(view.Crop2(False, False, 1))
     draw.ClearSelection2(True)
     draw.EditRebuild3()
@@ -354,8 +451,8 @@ def _crop_detail_view(adapter: Any, view: Any, detail: NotchDetail) -> None:
         raise RuntimeError(
             f"{label} is not cropped: Crop2 status {status}, IsCropped {cropped}"
         )
-    # Uncropped, the 4:1 view spans the whole 808 mm bar (~3.2 m on the
-    # sheet); the crop is one ~60 mm circle.
+    # Uncropped, each view spans the whole 808 mm bar (2-3 m on the sheet);
+    # the crop is one ~40-64 mm circle.
     if (
         len(outline) != 4
         or len(uncropped) != 4
@@ -385,43 +482,41 @@ def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
 
 
 def _dimension_then_crop(
-    adapter: Any, view: Any, detail: NotchDetail, keep: dict[str, tuple[float, float]]
+    adapter: Any, view: Any, spec: CroppedView, keep: dict[str, tuple[float, float]]
 ) -> list[Any]:
-    """Import and curate ``detail``'s dimensions while it is uncropped, then
+    """Import and curate ``spec``'s dimensions while it is uncropped, then
     crop it. The names read back before and after the crop ride one
     ``notch_detail.crop`` event; any kept dimension missing after raises."""
     annotations = curate_view_dimensions(
         adapter,
         view,
         keep=keep,
-        view_label=f"detail {detail.label}",
+        view_label=spec.name,
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     before = _view_dimension_names(adapter, view)
-    _crop_detail_view(adapter, view, detail)
+    _crop_view(adapter, view, spec)
     after = _view_dimension_names(adapter, view)
     lost = sorted(set(keep) - set(after))
     _telemetry.event(
         "notch_detail.crop",
-        detail=detail.label,
+        detail=spec.name,
         dimensions_before=",".join(before),
         dimensions_after=",".join(after),
         lost=",".join(lost),
     )
     _telemetry.info(
-        f"amplitude-bar: detail {detail.label} dimensions before crop {before}, "
-        f"after {after}"
+        f"amplitude-bar: {spec.name} dimensions before crop {before}, after {after}"
     )
     if lost:
         raise RuntimeError(
-            f"detail {detail.label} lost {lost} to its crop; before {before}, "
-            f"after {after}"
+            f"{spec.name} lost {lost} to its crop; before {before}, after {after}"
         )
     return annotations
 
 
 def _mark_detail_on_front(
-    adapter: Any, front: Any, detail: NotchDetail
+    adapter: Any, front: Any, detail: CroppedView
 ) -> tuple[float, float]:
     """Circle ``detail``'s region on the 1:4 front view; returns its sheet
     centre. A plain view-sketch circle, drawn direct to the database in the
@@ -431,20 +526,20 @@ def _mark_detail_on_front(
         adapter,
         front,
         (detail.fence_mm[0] / 1000.0, detail.fence_mm[1] / 1000.0, 0.0),
-        label=f"detail {detail.label} mark centre",
+        label=f"detail {detail.name} mark centre",
     )
     circle = _sketch_circle(
         adapter,
         front,
         center,
         detail.mark_radius,
-        label=f"detail {detail.label} mark",
+        label=f"detail {detail.name} mark",
         add_to_db=True,
     )
     segment = _early_bound(circle, "ISketchSegment")
     segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
     if int(segment.Color) != 0:
-        raise RuntimeError(f"detail {detail.label} mark circle colour did not persist")
+        raise RuntimeError(f"detail {detail.name} mark circle colour did not persist")
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
     return center
@@ -541,26 +636,29 @@ def _centred_view_note(
     return box
 
 
-def _label_detail(
-    adapter: Any, view: Any, front: Any, detail: NotchDetail, mark: tuple[float, float]
-) -> None:
-    """Label ``detail`` under its crop circle and letter its mark on the front,
-    east of the bar."""
+def _label_view(adapter: Any, view: Any, spec: CroppedView) -> None:
+    """Label ``spec``'s view under its crop circle."""
     _centred_view_note(
         adapter,
         view,
-        detail.label_text,
-        center_x=detail.label_xy[0],
-        top=detail.label_xy[1],
-        label=f"detail {detail.label} label",
+        spec.label_text,
+        center_x=spec.label_xy[0],
+        top=spec.label_xy[1],
+        label=f"{spec.name} label",
     )
+
+
+def _letter_detail(
+    adapter: Any, front: Any, detail: CroppedView, mark: tuple[float, float]
+) -> None:
+    """Letter ``detail``'s mark on the front view, east of the bar."""
     _centred_view_note(
         adapter,
         front,
-        detail.label,
+        str(detail.letter),
         center_x=mark[0] + detail.mark_radius + PARENT_LETTER_GAP,
         center_y=mark[1],
-        label=f"detail {detail.label} letter",
+        label=f"detail {detail.name} letter",
     )
 
 
@@ -609,8 +707,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Isometric View Note",
-            "End View Note",
         ),
         required=(
             "Number",
@@ -618,8 +714,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Isometric View Note",
-            "End View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -637,25 +731,35 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
+    # The front view goes on first: the first view is the title block's
+    # property view.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 4))
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(4, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 8))
-    for view in (top, iso):
-        set_hidden_lines_removed(adapter, view)
 
-    # The details are placed and dimensioned FIRST, one at a time, each while
-    # it is uncropped, then cropped. The profile owns every printed dimension,
-    # so a targeted import of it delivers the whole set; a dimension already on
-    # the sheet is never imported again, while a deleted one is. Detail A keeps
-    # the foot's three and deletes the rest, detail B takes the top's three
-    # back, and the front view's import then brings only the length (r743-6:
-    # front first, its deletions and a native detail left detail A nothing).
+    # The cropped views are placed and dimensioned before the front view's
+    # import, one at a time, each while it is uncropped, then cropped. The
+    # profile owns every notch dimension, so a targeted import of it delivers
+    # the whole set; a dimension already on the sheet is never imported again,
+    # while a deleted one is. Detail A keeps the foot's three and deletes the
+    # rest, detail B takes the top's three back, the right side takes the pin
+    # hole's sketch, and the front view's import then brings only the length
+    # (r743-6: front first, its deletions and a native detail left detail A
+    # nothing). The isometrics carry no dimensions.
     annotations: list[Any] = []
-    details = {}
-    for detail, keep in ((DETAIL_A, DETAIL_A_KEEP), (DETAIL_B, DETAIL_B_KEEP)):
-        view = _placed_detail_view(adapter, detail)
-        annotations += _dimension_then_crop(adapter, view, detail, keep)
-        details[detail.label] = view
+    views = {}
+    keeps = {
+        DETAIL_A.name: DETAIL_A_KEEP,
+        DETAIL_B.name: DETAIL_B_KEEP,
+        TOP_SIDE.name: TOP_SIDE_KEEP,
+    }
+    for spec in CROPPED_VIEWS:
+        view = _placed_cropped_view(adapter, spec)
+        if spec.orientation == "*Right":
+            set_hidden_lines_removed(adapter, view)
+        if spec.name in keeps:
+            annotations += _dimension_then_crop(adapter, view, spec, keeps[spec.name])
+        else:
+            _crop_view(adapter, view, spec)
+        views[spec.name] = view
     annotations += curate_view_dimensions(
         adapter,
         front,
@@ -663,16 +767,34 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    curate_view_dimensions(
-        adapter,
-        top,
-        keep=TOP_KEEP,
-        view_label="top",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
     # Decimal places (and so the band each dimension claims) are authored on
     # the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # Each mating feature names its mate where it is dimensioned (rule 4).
+    set_dimension_callouts(
+        adapter,
+        annotations,
+        {
+            name: text
+            for name, text in DIMENSION_CALLOUTS.items()
+            if name in CALLOUTS_ABOVE
+        },
+        location="above",
+    )
+    set_dimension_callouts(
+        adapter,
+        annotations,
+        {
+            name: text
+            for name, text in DIMENSION_CALLOUTS.items()
+            if name not in CALLOUTS_ABOVE
+        },
+        location="below",
+    )
+    for annotation in annotations:
+        name = dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+        if name in REFERENCE_DIMENSIONS:
+            set_reference_dimension(adapter, annotation, label=f"{name} reference")
 
     # The circles and labels go on once every import is done, so nothing of
     # the front view's own sketch is near its import.
@@ -680,15 +802,17 @@ async def build(adapter: Any) -> dict[str, str]:
         _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
     )
     if not sheet.SetScale(*SHEET_SCALE, False, False):
-        raise RuntimeError("failed to pin sheet scale before labelling the details")
-    for detail in (DETAIL_A, DETAIL_B):
-        mark = _mark_detail_on_front(adapter, front, detail)
-        _label_detail(adapter, details[detail.label], front, detail, mark)
+        raise RuntimeError("failed to pin sheet scale before labelling the views")
+    for spec in CROPPED_VIEWS:
+        _label_view(adapter, views[spec.name], spec)
+        if spec.letter is not None:
+            mark = _mark_detail_on_front(adapter, front, spec)
+            _letter_detail(adapter, front, spec, mark)
 
     add_surface_finish(
         adapter,
-        details[DETAIL_A.label],
-        edge_entity=_notch_floor_edge(details[DETAIL_A.label]),
+        views[DETAIL_A.name],
+        edge_entity=_notch_floor_edge(views[DETAIL_A.name]),
         symbol_xy=FLOOR_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "bottom_notch_floor"),
         label="bottom notch floor finish",
@@ -696,18 +820,7 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=FINISH_CHAR_HEIGHT,
     )
 
-    # The projected end outline is not a selectable topological EDGE after the
-    # end notches are overlaid. The manufacturing note owns the explicit 6.35
-    # square section; this enlarged end view confirms its shape without a
-    # duplicate, topology-fragile dimension.
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.150, 0.230)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.070)
-    # The end view runs 16x the sheet scale -- label it or "do not scale
-    # drawing" leaves its size unreadable.
-    # Below the 4:1 end view -- the manufacturing-notes block above descends
-    # to ~y=0.175 and owns the old 0.180 spot (layout audit).
-    add_property_linked_note(adapter, "End View Note", 0.205, 0.120)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
         adapter,

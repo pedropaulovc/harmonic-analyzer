@@ -22,20 +22,28 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["ch_amplitude_bar"].script == Path(drawing.__file__).resolve()
 
 
-def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
-    assert bar.DRAWING_DIMENSIONS is ch_amplitude_bar_spec.DRAWING_DIMENSIONS
-    marked = set().union(*ch_amplitude_bar_spec.DRAWING_DIMENSIONS.values())
+def test_notes_module_is_the_single_source_of_the_marked_dimension_set() -> None:
+    """The drawing contract lives in ch_amplitude_bar_notes, out of the spec's
+    import closure (the channel kinematics, rocker arm and both pins import
+    the spec), so a sheet edit re-keys only the bar."""
+    notes = ch_amplitude_bar_notes
+    assert bar.DRAWING_DIMENSIONS is notes.DRAWING_DIMENSIONS
+    assert bar.DRAWING_PRECISION is notes.DRAWING_PRECISION
+    assert drawing.DRAWING_DIMENSIONS is notes.DRAWING_DIMENSIONS
+    assert drawing.DRAWING_PRECISION_BY_NAME is notes.DRAWING_PRECISION_BY_NAME
+    for name in ("DRAWING_DIMENSIONS", "DRAWING_PRECISION", "DRAWING_NOTES"):
+        assert not hasattr(ch_amplitude_bar_spec, name), name
+    marked = set().union(*notes.DRAWING_DIMENSIONS.values())
     keeps = (
         drawing.FRONT_KEEP,
-        drawing.RIGHT_KEEP,
-        drawing.TOP_KEEP,
         drawing.DETAIL_A_KEEP,
         drawing.DETAIL_B_KEEP,
+        drawing.TOP_SIDE_KEEP,
     )
     kept = set().union(*keeps)
     assert kept == marked
     assert sum(len(keep) for keep in keeps) == len(marked)  # one view each
-    assert set(drawing.DRAWING_PRECISION_BY_NAME) == marked
+    assert set(notes.DRAWING_PRECISION_BY_NAME) == marked
 
 
 def test_part_geometry_matches_the_spec() -> None:
@@ -43,44 +51,142 @@ def test_part_geometry_matches_the_spec() -> None:
     assert ch_amplitude_bar_spec.BAR_WIDTH == bar.BAR_WIDTH
     assert bar.TOP_PIN_HOLE_DIA is ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA
     assert bar.TOP_PIN_HOLE_BAND is ch_amplitude_bar_spec.TOP_PIN_HOLE_BAND
+    assert bar.BAR_DEPTH == ch_amplitude_bar_spec.BAR_DEPTH
 
 
 def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     """User ruling 2026-10: the MHA-CH-011 pin is pressed into both top-notch
     cheeks (ch_bar_pivot_pin_spec holds the fit), so the hole is reamed to a
-    band of its own, native on TopPinDia, not a #47 drill."""
+    band of its own, native on TopPinDia. Machinist round 1 (#1293): the hole
+    was only words in a note; it now prints in the top end's right side view,
+    its THRU / REAM / PRESS FIT callout at the diameter."""
     from _drawing_contract import model_toleranced_dimensions
 
+    notes = ch_amplitude_bar_notes
     assert ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA == 1.968
     assert ch_amplitude_bar_spec.TOP_PIN_HOLE_BAND == (0.010, 0.0)
     assert model_toleranced_dimensions(bar)[("TopPinProfile", "TopPinDia")] == (
         "*deviations(TOP_PIN_HOLE_BAND)"
     )
-    assert ch_amplitude_bar_notes.TOP_PIN_NUMBER == parts("ch-bar-pivot-pin")["number"]
+    assert notes.TOP_PIN_NUMBER == parts("ch-bar-pivot-pin")["number"]
+    assert notes.DRAWING_DIMENSIONS["TopPinProfile"] == {
+        "BarSection",
+        "TopPinX",
+        "TopPinDrop",
+        "TopPinDia",
+    }
+    assert set(drawing.TOP_SIDE_KEEP) == notes.DRAWING_DIMENSIONS["TopPinProfile"]
+    assert notes.DIMENSION_CALLOUTS["TopPinDia"] == "THRU, REAM\nPRESS FIT MHA-CH-011"
+    precision = notes.DRAWING_PRECISION["TopPinProfile"]
+    assert precision == {"BarSection": 2, "TopPinX": 3, "TopPinDrop": 2, "TopPinDia": 3}
 
 
-def test_sheet_runs_at_1_to_4_with_1_to_8_isometric() -> None:
+def test_pin_hole_is_a_native_sketch_located_from_the_top_edge() -> None:
+    """The hole's sketch carries a construction line along the bar's top edge:
+    the hole is located from its back end, and its length is the section, all
+    model dimensions (rule 21)."""
+    source = Path(bar.__file__).read_text(encoding="utf-8")
+    assert "define_circle" not in source
+    for record in (
+        "pin_hole.record(\"TopEdgeY\", '\"BarLength\"')",
+        "pin_hole.record(\"BarSection\", '\"BarDepth\"')",
+        "pin_hole.record(\"TopPinX\", '\"BarDepth\" / 2')",
+        "pin_hole.record(\"TopPinDrop\", '\"TopPinDrop\"')",
+        "pin_hole.record(\"TopPinDia\", '\"TopPinDia\"')",
+    ):
+        assert record in source, record
+    assert 'drive_jobs += pin_hole.apply(adapter, "TopPinProfile")' in source
+    assert "TopEdgeY" not in ch_amplitude_bar_notes.DRAWING_PRECISION_BY_NAME
+
+
+def test_square_section_prints_as_stock_reference() -> None:
+    """Machinist round 1 (#1293): the 6.35 square lived only in a note. It
+    prints in the top end's right side view as the stock's reference size."""
+    notes = ch_amplitude_bar_notes
+    assert notes.REFERENCE_DIMENSIONS == frozenset({"BarSection"})
+    assert notes.DIMENSION_CALLOUTS["BarSection"] == "1/4 SQ STOCK"
+    assert ch_amplitude_bar_spec.BAR_DEPTH == ch_amplitude_bar_spec.BAR_WIDTH == 6.35
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_reference_dimension(" in source
+    config = parts("ch-amplitude-bar")
+    assert "1/4 in sq" in config["material"]
+    assert len(str(config["material"])) <= 36
+
+
+def test_views_are_the_full_length_and_enlarged_cropped_ends() -> None:
+    """Machinist round 1 (#1293): the 1:8 isometric was an unreadable sliver
+    labelled far away, and the 4:1 end view repeated the section. The sheet
+    runs at 1:4; each end prints enlarged in cropped model views, each owning
+    its label."""
     assert drawing.SHEET_SCALE == (1.0, 4.0)
+    views = {view.name: view for view in drawing.CROPPED_VIEWS}
+    assert {(v.orientation, v.scale) for v in views.values()} == {
+        ("*Front", (4, 1)),
+        ("*Right", (4, 1)),
+        ("*Isometric", (3, 1)),
+    }
+    assert [v.letter for v in drawing.CROPPED_VIEWS if v.letter] == ["A", "B"]
+    assert drawing.TOP_SIDE.centre[1] == drawing.DETAIL_B.centre[1]  # its row
+    assert drawing.TOP_SIDE.fence_mm[1] == drawing.DETAIL_B.fence_mm[1]
+    for view in drawing.CROPPED_VIEWS:
+        assert view.label_text == (
+            f"{view.title}\nSCALE {view.scale[0]} : {view.scale[1]}"
+        )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 8)" in source  # the isometric override
-    assert "scale=(4, 1)" in source  # the top end-view section override
-    assert ch_amplitude_bar_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:8"
-    assert ch_amplitude_bar_notes.END_VIEW_NOTE == "END VIEW SCALE 4:1"
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "End View Note"' in source
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+    assert '"*Top"' not in source
+    assert "View Note" not in source
+    assert "View Note" not in Path(bar.__file__).read_text(encoding="utf-8")
+    assert not hasattr(ch_amplitude_bar_notes, "ISOMETRIC_VIEW_NOTE")
+    assert not hasattr(ch_amplitude_bar_notes, "END_VIEW_NOTE")
 
 
-def test_linked_notes_carry_the_notches_and_hole() -> None:
-    notes = ch_amplitude_bar_notes.DRAWING_NOTES
-    assert "END NOTCHES (DETAILS A, B)" in notes
-    assert "\u00d81.968 +0.010/0 REAM" in notes
-    assert "PRESS FIT PIN MHA-CH-011" in notes
-    assert "LINEAR +/-" not in notes
-    assert "STEEL" not in notes
-    assert "CHROME" not in notes
+def test_callouts_name_each_mate_at_its_dimension() -> None:
+    """Rule 4: each mating feature names its mate where it is dimensioned."""
+    notes = ch_amplitude_bar_notes
+    assert notes.LEVER_NUMBER == parts("ch-channel-lever")["number"]
+    assert notes.ROCKER_ARM_NUMBER == parts("ch-rocker-arm")["number"]
+    callouts = notes.DIMENSION_CALLOUTS
+    assert callouts["TopNotchWidth"].startswith("STRADDLES MHA-CH-002\n")
+    assert callouts["BottomNotchWidth"].startswith("RIDES MHA-CH-006\n")
+    assert callouts["TopRightLedge"] == "CENTRES ON LEVER"
+    assert callouts["BottomLeftLedge"] == "CENTRES ON ROCKER"
+    assert callouts["TopNotchHeight"] == callouts["BottomNotchHeight"] == (
+        "ROOTS R0.40 MAX"
+    )
+    assert drawing.CALLOUTS_ABOVE <= set(callouts)
+    for text in callouts.values():
+        assert all(len(line) <= 20 for line in text.splitlines()), text
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert source.count("set_dimension_callouts(") == 2
+
+
+def test_cheek_walls_state_their_worst_case_at_each_width() -> None:
+    """Rule 20 (#1038): the cheek opposite each printed ledge, on the
+    narrowest stock beside the widest notch and ledge, falls short of the 2.0
+    target. The shortfall prints at the notch's width."""
+    spec = ch_amplitude_bar_spec
+    notes = ch_amplitude_bar_notes
+    assert spec.BAR_STOCK_UNDERSIZE == pytest.approx(0.0508)
+    upper, _lower = spec.NOTCH_WIDTH_BAND
+    for width, ledge, printed, name in (
+        (spec.TOP_NOTCH_WIDTH, spec.TOP_NOTCH_OFFSET, notes.TOP_CHEEK_WALL_MIN, "TopNotchWidth"),
+        (
+            spec.BOTTOM_NOTCH_WIDTH,
+            spec.BOTTOM_NOTCH_OFFSET,
+            notes.BOTTOM_CHEEK_WALL_MIN,
+            "BottomNotchWidth",
+        ),
+    ):
+        wall = (
+            spec.BAR_WIDTH
+            - spec.BAR_STOCK_UNDERSIZE
+            - (ledge + spec.NOTCH_OFFSET_TOLERANCE_MM)
+            - (width + upper)
+        )
+        assert printed <= wall < printed + 0.01
+        assert printed < 2.0
+        assert notes.DIMENSION_CALLOUTS[name].endswith(f"CHEEK WALL {printed:.2f} MIN")
+    assert (notes.TOP_CHEEK_WALL_MIN, notes.BOTTOM_CHEEK_WALL_MIN) == (1.17, 1.21)
 
 
 def test_bottom_notch_depth_band_is_native_on_its_dimension() -> None:
@@ -107,45 +213,61 @@ def test_bottom_notch_depth_band_is_native_on_its_dimension() -> None:
     assert bar.DRAWING_NOTES is ch_amplitude_bar_notes.DRAWING_NOTES
 
 
-# Each printed profile dimension's two sketch endpoints (part x, y mm): a
-# detail drops any dimension whose reference lies outside its fence.
+# Each printed dimension's two sketch references, in the part (x, y, z) mm: a
+# crop drops any dimension whose reference lies outside its fence.
 _W = ch_amplitude_bar_spec.BAR_WIDTH
+_D = ch_amplitude_bar_spec.BAR_DEPTH
 _O = (_W - ch_amplitude_bar_spec.BOTTOM_NOTCH_WIDTH) / 2.0  # bottom ledge
 _OT = (_W - ch_amplitude_bar_spec.TOP_NOTCH_WIDTH) / 2.0  # top ledge
 _L = ch_amplitude_bar_spec.BAR_LENGTH
-_DETAIL_DIMENSION_ENDS = {
-    "BottomLeftLedge": ((0.0, 0.0), (_O, 0.0)),
-    "BottomNotchHeight": ((_O, 0.0), (_O, ch_amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT)),
-    "BottomNotchWidth": (
-        (_O, ch_amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT),
-        (_W - _O, ch_amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT),
+_PIN = (_W, _L - ch_amplitude_bar_spec.TOP_PIN_DROP, _D / 2.0)  # on the x = W face
+_HOLE_R = ch_amplitude_bar_spec.TOP_PIN_HOLE_DIA / 2.0
+_DIMENSION_ENDS = {
+    "BottomLeftLedge": ((0.0, 0.0, 0.0), (_O, 0.0, 0.0)),
+    "BottomNotchHeight": (
+        (_O, 0.0, 0.0),
+        (_O, ch_amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT, 0.0),
     ),
-    "TopRightLedge": ((_W, _L), (_W - _OT, _L)),
+    "BottomNotchWidth": (
+        (_O, ch_amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT, 0.0),
+        (_W - _O, ch_amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT, 0.0),
+    ),
+    "TopRightLedge": ((_W, _L, 0.0), (_W - _OT, _L, 0.0)),
     "TopNotchHeight": (
-        (_W - _OT, _L),
-        (_W - _OT, _L - ch_amplitude_bar_spec.TOP_NOTCH_HEIGHT),
+        (_W - _OT, _L, 0.0),
+        (_W - _OT, _L - ch_amplitude_bar_spec.TOP_NOTCH_HEIGHT, 0.0),
     ),
     "TopNotchWidth": (
-        (_W - _OT, _L - ch_amplitude_bar_spec.TOP_NOTCH_HEIGHT),
-        (_OT, _L - ch_amplitude_bar_spec.TOP_NOTCH_HEIGHT),
+        (_W - _OT, _L - ch_amplitude_bar_spec.TOP_NOTCH_HEIGHT, 0.0),
+        (_OT, _L - ch_amplitude_bar_spec.TOP_NOTCH_HEIGHT, 0.0),
+    ),
+    "BarSection": ((_W, _L, 0.0), (_W, _L, _D)),
+    "TopPinX": ((_W, _L, 0.0), _PIN),
+    "TopPinDrop": ((_W, _L, 0.0), _PIN),
+    "TopPinDia": (
+        (_W, _PIN[1] + _HOLE_R, _PIN[2]),
+        (_W, _PIN[1] - _HOLE_R, _PIN[2]),
     ),
 }
+_KEEPS = (
+    (drawing.DETAIL_A, drawing.DETAIL_A_KEEP),
+    (drawing.DETAIL_B, drawing.DETAIL_B_KEEP),
+    (drawing.TOP_SIDE, drawing.TOP_SIDE_KEEP),
+)
 
 
-def test_notch_details_frame_their_ends_and_place_text_outside_the_bar() -> None:
-    """Both details run 4:1 (Main ruling 2026-09-27). DETAIL A takes in the
-    foot notch and the open end; DETAIL B the 12.7 top notch. Every printed
-    dimension's ends lie inside its fence; each depth's text stands outside
-    the bar's side and each ledge/width row outside its open end, where the
-    witnesses run through air."""
+def test_cropped_views_frame_their_ends_and_place_text_outside_the_bar() -> None:
+    """Every printed dimension's references lie inside its view's fence; each
+    depth's text stands outside the bar's side and each ledge/width row
+    outside its open end, where the witnesses run through air."""
     spec = ch_amplitude_bar_spec
-    a, b = drawing.DETAIL_A, drawing.DETAIL_B
-    assert a.scale == b.scale == (4, 1)
-    for detail, keep in ((a, drawing.DETAIL_A_KEEP), (b, drawing.DETAIL_B_KEEP)):
-        fx, fy = detail.fence_mm
+    a, b, side = drawing.DETAIL_A, drawing.DETAIL_B, drawing.TOP_SIDE
+    for view, keep in _KEEPS:
+        fx, fy, fz = view.fence_mm
         for name in keep:
-            for x, y in _DETAIL_DIMENSION_ENDS[name]:
-                assert math.hypot(x - fx, y - fy) < detail.radius_mm - 0.5, name
+            for x, y, z in _DIMENSION_ENDS[name]:
+                across = x - fx if view.orientation == "*Front" else z - fz
+                assert math.hypot(across, y - fy) < view.radius_mm - 0.5, name
     depth_x, depth_y = drawing.DETAIL_A_KEEP["BottomNotchHeight"]
     assert depth_x < a.centre[0] - a.radius_mm * a.mm  # left of the fence
     assert (
@@ -153,15 +275,19 @@ def test_notch_details_frame_their_ends_and_place_text_outside_the_bar() -> None
     )
     # r743-6b (64fedd3cc): a width with its +0.3/0.0 stack prints ~20 mm
     # wide; centred on the ~12.4 mm mouth it straddled both extension lines.
-    # Each width's text now stands west of the bar, clear of it.
+    # Each width's text stands west of the bar, clear of it.
     ledge_x, ledge_y = drawing.DETAIL_A_KEEP["BottomLeftLedge"]
     width_x, width_y = drawing.DETAIL_A_KEEP["BottomNotchWidth"]
     assert width_y < ledge_y < a.sheet_xy(0.0, 0.0)[1]
-    assert ledge_y - width_y >= 0.007  # the stack's half-height plus a line
+    # The ledge's stack half-height, its one-line callout under it, and the
+    # width stack's half-height.
+    assert ledge_y - width_y >= 0.014
     assert ledge_x < a.sheet_xy(0.0, 0.0)[0]
     assert width_x + 0.010 < a.sheet_xy(0.0, 0.0)[0]
+    # The top depth's ~36 mm ROOTS callout hangs clear of the bar.
     assert (
-        drawing.DETAIL_B_KEEP["TopNotchHeight"][0] > b.sheet_xy(spec.BAR_WIDTH, 0.0)[0]
+        drawing.DETAIL_B_KEEP["TopNotchHeight"][0] - 0.019
+        > b.sheet_xy(spec.BAR_WIDTH, 0.0)[0]
     )
     top_row = {drawing.DETAIL_B_KEEP[n][1] for n in ("TopRightLedge", "TopNotchWidth")}
     (row_y,) = top_row
@@ -170,17 +296,111 @@ def test_notch_details_frame_their_ends_and_place_text_outside_the_bar() -> None
     assert (
         drawing.DETAIL_B_KEEP["TopRightLedge"][0] > b.sheet_xy(spec.BAR_WIDTH, 0.0)[0]
     )
-    # Both details and their labels stay on the sheet, clear of the title
-    # block (x >= 0.218 below y 0.065), the notes block (right edge ~0.237),
-    # the end-view note (from x 0.205) and the isometric (x 0.330, top 0.181).
-    for detail in (a, b):
-        radius = detail.radius_mm * detail.mm
-        assert detail.label_xy[1] - 0.010 > 0.0127
-        assert detail.centre[1] + radius < 0.2667
-    assert drawing._DETAIL_B_ROW_Y + 0.004 < 0.2667
-    assert a.centre[0] + a.radius_mm * a.mm < 0.205
-    assert b.centre[0] - b.radius_mm * b.mm > 0.240
-    assert b.label_xy[0] + 0.022 < drawing.ISO_CENTER[0] - 0.002
+    # The side view: +Z runs left, so the back face (z = 0) is its right edge.
+    back_x = side.sheet_xy(0.0, 0.0, 0.0)[0]
+    front_x = side.sheet_xy(0.0, 0.0, _D)[0]
+    end_y = side.sheet_xy(0.0, _L, 0.0)[1]
+    assert front_x < back_x
+    pin_x, pin_y = side.sheet_xy(0.0, _PIN[1], _PIN[2])
+    assert pin_x == pytest.approx(side.centre[0] + (side.fence_mm[2] - _PIN[2]) * side.mm)
+    keep = drawing.TOP_SIDE_KEEP
+    assert pin_x < keep["TopPinX"][0] < back_x  # between its witnesses
+    assert end_y < keep["TopPinX"][1] < keep["BarSection"][1] - 0.007
+    assert keep["TopPinDrop"][0] > back_x and pin_y < keep["TopPinDrop"][1] < end_y
+    assert keep["TopPinDia"][0] > back_x and keep["TopPinDia"][1] < pin_y
+
+
+def _box(
+    centre: tuple[float, float], half_w: float, top: float, bottom: float
+) -> tuple[float, float, float, float]:
+    return (centre[0] - half_w, bottom, centre[0] + half_w, top)
+
+
+def _overlap(p: tuple[float, ...], q: tuple[float, ...]) -> bool:
+    return p[0] < q[2] and q[0] < p[2] and p[1] < q[3] and q[1] < p[3]
+
+
+# 2.4 mm a character and 4.5 mm a line at the sheet's text height, measured on
+# the base render (808.30 ~14 mm; a notes line ~2.4 mm a character).
+_CHAR = 0.0024
+_LINE = 0.0045
+
+
+def test_views_labels_and_notes_stay_on_the_sheet_and_apart() -> None:
+    """Each crop circle with its label, and the notes block, stand on the
+    sheet (border 0.0127..0.419 x 0.0127..0.2667), clear of the title block
+    (x >= 0.216 below y 0.065) and of one another."""
+    boxes = {}
+    for view in drawing.CROPPED_VIEWS:
+        r = view.crop_radius
+        label_w = max(len(line) for line in view.label_text.splitlines()) * _CHAR
+        label_bottom = view.label_xy[1] - 2 * _LINE
+        boxes[view.name] = (
+            min(view.centre[0] - r, view.centre[0] - label_w / 2),
+            label_bottom,
+            max(view.centre[0] + r, view.centre[0] + label_w / 2),
+            view.centre[1] + r,
+        )
+    lines = ch_amplitude_bar_notes.DRAWING_NOTES.splitlines()
+    nx, ny = drawing.NOTES_XY
+    boxes["notes"] = (
+        nx,
+        ny - len(lines) * _LINE,
+        nx + max(map(len, lines)) * _CHAR,
+        ny,
+    )
+    title_block = (0.216, 0.0, 0.419, 0.065)
+    for name, box in boxes.items():
+        assert 0.0127 < box[0] and box[2] < 0.419, name
+        assert 0.0127 < box[1] and box[3] < 0.2667, name
+        assert not _overlap(box, title_block), name
+    names = sorted(boxes)
+    for i, p in enumerate(names):
+        for q in names[i + 1 :]:
+            assert not _overlap(boxes[p], boxes[q]), (p, q)
+    # The front view's length text stands left of the bar, on the sheet.
+    assert 0.0127 + 0.008 < drawing.FRONT_KEEP["BarLength"][0] < drawing.FRONT_CENTER[0]
+
+
+def test_callouts_clear_the_bar_and_the_neighbouring_views() -> None:
+    """Each callout block (value plus callout lines, centred on the value)
+    stays off the bar in its view and off the other views' circles."""
+    spec = ch_amplitude_bar_spec
+    b, side = drawing.DETAIL_B, drawing.TOP_SIDE
+    callouts = ch_amplitude_bar_notes.DIMENSION_CALLOUTS
+    bar_b = (
+        b.sheet_xy(0.0, 0.0)[0],
+        b.sheet_xy(0.0, spec.BAR_LENGTH - 8.0)[1],
+        b.sheet_xy(spec.BAR_WIDTH, 0.0)[0],
+        b.sheet_xy(0.0, spec.BAR_LENGTH)[1],
+    )
+    blocks = {}
+    for view, keep in _KEEPS:
+        for name, (x, y) in keep.items():
+            text = callouts.get(name, "")
+            lines = text.splitlines()
+            half_w = max([len(line) for line in lines] + [8]) * _CHAR / 2
+            extra = len(lines) * _LINE
+            if name in drawing.CALLOUTS_ABOVE:
+                blocks[name] = _box((x, y), half_w, y + _LINE / 2 + extra, y - _LINE / 2)
+            else:
+                blocks[name] = _box((x, y), half_w, y + _LINE / 2, y - _LINE / 2 - extra)
+    for name in ("TopNotchWidth", "TopRightLedge", "TopNotchHeight"):
+        assert not _overlap(blocks[name], bar_b), name
+    assert not _overlap(blocks["TopNotchWidth"], blocks["TopRightLedge"])
+    names = sorted(blocks)
+    for i, p in enumerate(names):
+        for q in names[i + 1 :]:
+            assert not _overlap(blocks[p], blocks[q]), (p, q)
+    for name, block in blocks.items():
+        assert block[3] < 0.2667 and block[0] > 0.0127, name
+        for view in (drawing.TOP_ISO, drawing.FOOT_ISO):
+            r = view.crop_radius
+            circle = (view.centre[0] - r, view.centre[1] - r, view.centre[0] + r, view.centre[1] + r)
+            assert not _overlap(block, circle), (name, view.name)
+    side_r = side.crop_radius
+    for name in ("TopNotchHeight", "TopRightLedge"):
+        assert blocks[name][2] < side.centre[0] - side_r, name
 
 
 def test_notch_centring_bands_ride_each_details_ledge_not_a_note() -> None:
@@ -199,39 +419,34 @@ def test_notch_centring_bands_ride_each_details_ledge_not_a_note() -> None:
     ):
         assert bands[("BarProfile", name)] == "NOTCH_OFFSET_TOLERANCE_MM"
         assert name in keep
-        assert ch_amplitude_bar_spec.DRAWING_PRECISION["BarProfile"][name] == 2
+        assert ch_amplitude_bar_notes.DRAWING_PRECISION["BarProfile"][name] == 2
     notes = " ".join(
         line.strip() for line in ch_amplitude_bar_notes.DRAWING_NOTES.splitlines()
     )
     assert "CENTRED" not in notes and "WITHIN" not in notes
 
 
-def test_notes_keep_only_the_ruled_prose() -> None:
-    """Note 2 keeps its orientation prose and the Main-ruled R0.40 MAX
-    exception word for word; the Ra note is gone and PLATING renumbers."""
+def test_notes_keep_only_what_no_view_states() -> None:
+    """Machinist round 1 (#1293): the section, the hole, the roots and the
+    plating left the notes for their dimensions and the FINISH field. What
+    remains is the one fact no single view states."""
     assert ch_amplitude_bar_notes.DRAWING_NOTES.splitlines() == [
-        "1. BAR SECTION 6.35 SQUARE.",
-        "2. END NOTCHES (DETAILS A, B):",
-        "   BOTH THRU THE FULL DEPTH, OPEN TO",
-        "   OPPOSITE ENDS, IN ONE COMMON PLANE;",
-        "   ROOTS R0.40 MAX.",
-        "3. TOP PIN HOLE \u00d81.968 +0.010/0 REAM",
-        "   THRU BOTH TOP-NOTCH CHEEKS AT",
-        "   MID-DEPTH, 6.35 BELOW THE BAR TOP;",
-        "   PRESS FIT PIN MHA-CH-011.",
-        "4. DIMS APPLY AFTER PLATING.",
+        "1. BOTH END NOTCHES THRU THE FULL DEPTH,",
+        "    IN ONE COMMON PLANE.",
     ]
 
 
 def test_functional_notch_finish_is_a_native_symbol_on_the_floor() -> None:
-    """Main ruling B 2026-09-27: the foot notch floor's Ra 0.8 is a native
-    finish symbol on the floor in DETAIL A, authored on the part, not a note."""
+    """Main ruling B 2026-09-27: the foot notch floor's finish is a native
+    symbol on the floor in DETAIL A, authored on the part, not a note.
+    Machinist round 1 (#1293) and drawing-simplicity-policy.md rule 6: the
+    amplitude-bar slide grades machined 1.6, not ground 0.8."""
     import ch_amplitude_bar_drawing_spec as finish_spec
     from _gtol_planar import PlanarFace
-    from _surface_finish import GROUND, surface_finish_by_key
+    from _surface_finish import MACHINED, surface_finish_by_key
 
     control = surface_finish_by_key(finish_spec.SURFACE_FINISHES, "bottom_notch_floor")
-    assert control.roughness_ra == GROUND == "0.8"
+    assert control.roughness_ra == MACHINED == "1.6"
     assert control.face == PlanarFace(
         (0, -1, 0), -ch_amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT
     )
@@ -296,6 +511,8 @@ def test_floor_finish_leader_runs_through_the_mouth_crossing_only_a_witness() ->
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
+    """Machinist round 1 (#1293): the plating's effect on size and the masked
+    reamed hole belong in the FINISH field, not a note."""
     source = Path(bar.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
     assert "clear_dimensions_for_drawing" in source
@@ -303,8 +520,9 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
     spec = _config.parts("ch-amplitude-bar")
     assert spec["material_specification"] == "AISI 1018 cold-rolled steel, 6.35 sq"
-    assert spec["finish"] == "bright chrome plated"
+    assert spec["finish"] == "bright chrome plated; dims after plating; mask pin hole"
     assert int(spec["quantity"]) == 20
+    assert "PLATING" not in ch_amplitude_bar_notes.DRAWING_NOTES
 
 
 def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
@@ -348,7 +566,7 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     bands = model_toleranced_dimensions(bar)
     for name in ("BottomNotchWidth", "TopNotchWidth"):
         assert bands[("BarProfile", name)] == "*deviations(NOTCH_WIDTH_BAND)"
-        assert spec.DRAWING_PRECISION["BarProfile"][name] == 2
+        assert ch_amplitude_bar_notes.DRAWING_PRECISION["BarProfile"][name] == 2
 
 
 @pytest.mark.xfail(
@@ -374,12 +592,12 @@ def test_neighbouring_bars_keep_a_running_gap_at_the_printed_worst_case() -> Non
         assert gap - float_max >= bank.RUNNING_FLOOR
 
 
-def test_details_are_cropped_model_views_dimensioned_before_the_crop() -> None:
+def test_cropped_views_are_model_views_dimensioned_before_the_crop() -> None:
     """r743-6 (d92938949, leaf 20260927T020523Z-1-e3f9f1f7): the front view's
     import took the notch dimensions and deleted them, then a native detail of
-    it imported nothing (available=[]). Each detail is now a 4:1 *Front model
-    view, dimensioned uncropped, then cropped (the pc-r15 kink-detail pattern,
-    d6b8ed93f), and both details import before the front view."""
+    it imported nothing (available=[]). Each enlarged view is a model view,
+    dimensioned uncropped, then cropped (the pc-r15 kink-detail pattern,
+    d6b8ed93f), and every one imports before the front view."""
     import ast
     import inspect
 
@@ -402,16 +620,15 @@ def test_details_are_cropped_model_views_dimensioned_before_the_crop() -> None:
         return [name for _line, _col, name in sorted(found)]
 
     order = calls("_dimension_then_crop")
-    assert order.index("curate_view_dimensions") < order.index("_crop_detail_view")
+    assert order.index("curate_view_dimensions") < order.index("_crop_view")
     assert order.count("_view_dimension_names") == 2
     build = calls("build")
-    assert build.index("_placed_detail_view") < build.index("_dimension_then_crop")
+    assert build.index("place_view") < build.index("_placed_cropped_view")
+    assert build.index("_placed_cropped_view") < build.index("_dimension_then_crop")
     assert build.index("_dimension_then_crop") < build.index("curate_view_dimensions")
     assert build.index("curate_view_dimensions") < build.index("_mark_detail_on_front")
-    assert "Crop2" in inspect.getsource(drawing._crop_detail_view)
-    for detail in (drawing.DETAIL_A, drawing.DETAIL_B):
-        assert detail.label_text == f"DETAIL {detail.label}\nSCALE 4 : 1"
-        assert detail.crop_radius == pytest.approx(detail.radius_mm * 4 / 1000)
-        assert detail.mark_radius == pytest.approx(detail.radius_mm / 4 / 1000)
-        # The label note's two lines stay on the sheet.
-        assert detail.label_xy[1] - 0.012 > 0.0127
+    assert "Crop2" in inspect.getsource(drawing._crop_view)
+    for view in drawing.CROPPED_VIEWS:
+        scale = view.scale[0] / view.scale[1]
+        assert view.crop_radius == pytest.approx(view.radius_mm * scale / 1000)
+        assert view.mark_radius == pytest.approx(view.radius_mm / 4 / 1000)

@@ -248,8 +248,9 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "dressing stock"
     ),
     ("ch_bar_pivot_pin_spec", "PIN_BLANK_LENGTH_BAND"): (
-        "the drill-rod blank's cut-length deviations: indexed into the blank "
-        "note and the dressing-stock stack (blank_excess_min/max)"
+        "the drill-rod blank's cut-length deviations: the BlankLen model "
+        "dimension's symmetric band and the dressing-stock stack "
+        "(blank_excess_min/max)"
     ),
     ("dt_cylinder_gear_spec", "WHOLE_DEPTH_BAND"): (
         "indexed into the cylinder gear-data whole-depth limits"
