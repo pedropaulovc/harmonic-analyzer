@@ -15,7 +15,10 @@ SPEC = DRAWINGS_BY_NAME["vn_crank_seat_shim"]
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_fastener_drawing(adapter, SPEC)
+    # Plain bore: the edge views' dashed bore adds nothing to the solid top view.
+    return await build_purchased_fastener_drawing(
+        adapter, SPEC, hidden_lines_removed=True
+    )
 
 
 if __name__ == "__main__":
