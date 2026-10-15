@@ -143,7 +143,7 @@ def _plane_frame(adapter, name: str) -> tuple[tuple[float, ...], tuple[float, ..
 
 
 async def _cbore_section_plane(adapter) -> None:
-    """Section A-A's cutting plane: the Right plane carried +X to the bottom row's
+    """Section A-A's cutting plane: the Right plane carried +X to the top row's
     middle guide hole.  Read back against the Right plane: the same rotation
     (so a sketch on it keeps the Right plane's (u, v) = model (-Z, Y)) and an
     origin shifted by exactly CBORE_SECTION_X along +X."""
@@ -343,7 +343,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Drawing-only counterbore-floor reference (the user-accepted rule-17
     # exception, pd_platen_spec.CBORE_FLOOR): one construction line across the
-    # floor, mid-annulus above the bottom row's middle guide hole, from the back
+    # floor, mid-annulus below the top row's middle guide hole, from the back
     # face to the counterbore's bottom.  It sits on section A-A's cutting
     # plane because the drawing's section through that hole prints it (a
     # reference sketch a derived view imports lies in its cut;

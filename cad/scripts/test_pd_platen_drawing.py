@@ -47,8 +47,7 @@ def _view_boxes() -> dict[str, tuple[float, float, float, float]]:
         ),
         "section A-A": (
             draw.SECTION_CENTER[0] - spec.PLATE_THICKNESS * draw._SECTION_S / 2.0,
-            draw.SECTION_CENTER[1]
-            - (spec.CBORE_SECTION_HOLE_Y + draw.SECTION_OVERRUN) * draw._SECTION_S,
+            draw.SECTION_CENTER[1] - draw.SECTION_SPAN * draw._SECTION_S,
             draw.SECTION_CENTER[0] + spec.PLATE_THICKNESS * draw._SECTION_S / 2.0,
             draw.SECTION_CENTER[1] + draw.SECTION_SPAN * draw._SECTION_S,
         ),
@@ -107,26 +106,35 @@ def test_counterbore_floor_holds_the_user_accepted_worst_case():
     assert worst >= 0.67
     assert spec.CBORE_FLOOR == pytest.approx(spec.PLATE_THICKNESS - spec.CBORE_DEPTH)
     # The reference line crosses the floor's annulus, clear of the through hole
-    # and inside the counterbore, so it measures metal; it stands above the
-    # hole so the value's extension lines rise clear of the cut (r5).
-    offset = spec.CBORE_FLOOR_REFERENCE_Y - spec.CBORE_SECTION_HOLE_Y
+    # and inside the counterbore, so it measures metal.
+    offset = spec.CBORE_SECTION_HOLE_Y - spec.CBORE_FLOOR_REFERENCE_Y
     assert spec.GUIDE_HOLE_DIA / 2.0 < offset < spec.CBORE_DIA / 2.0
-    assert spec.CBORE_SECTION_HOLE_Y == min(spec.GUIDE_HOLE_Y)
     assert (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y) in spec.GUIDE_HOLE_XY
     assert spec.DRAWING_DIMENSIONS["CboreFloorReference"] == {draw.REFERENCE_DIMENSION}
     # Section A-A draws the counterbore (r4: not hidden lines in the right
-    # view); its partial cut spans the whole counterbore and its cutting plane
-    # crosses the plate's lower edge (r5: not a stub at one hole).
+    # view), and its partial cut spans the whole counterbore.
     assert draw.SECTION_KEEP_NAMES == {draw.REFERENCE_DIMENSION}
     assert draw.REFERENCE_DIMENSION not in draw.RIGHT_KEEP
     assert draw.SECTION_SPAN > spec.CBORE_DIA / 2.0
-    assert draw.SECTION_OVERRUN > 0.0
     assert {point[:2] for point in draw.SECTION_LINE_MODEL_MM} == {
-        (spec.CBORE_SECTION_X, -draw.SECTION_OVERRUN),
+        (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y - draw.SECTION_SPAN),
         (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y + draw.SECTION_SPAN),
     }
-    text_y = draw.SECTION_TEXT_MODEL_MM[draw.REFERENCE_DIMENSION][1]
-    assert text_y > spec.CBORE_SECTION_HOLE_Y + draw.SECTION_SPAN
+    # The value hangs below the cut, wholly left of both extension lines (r5:
+    # centred on them, they struck its text).
+    _, text_y, text_z = draw.SECTION_TEXT_MODEL_MM[draw.REFERENCE_DIMENSION]
+    assert text_y < spec.CBORE_SECTION_HOLE_Y - draw.SECTION_SPAN
+    text_right = (
+        draw.SECTION_CENTER[0]
+        + (text_z - spec.PLATE_THICKNESS / 2.0) * draw._SECTION_S
+        + draw._SECTION_TEXT_HALF_WIDTH
+    )
+    assert text_right == pytest.approx(draw.SECTION_TEXT_RIGHT)
+    near_extension = (
+        draw.SECTION_CENTER[0]
+        + (spec.CBORE_DEPTH - spec.PLATE_THICKNESS / 2.0) * draw._SECTION_S
+    )
+    assert near_extension - text_right >= 0.002
     assert "HIDDEN" not in spec.RIGHT_VIEW_NOTE
     assert draw.REFERENCE_DIMENSION in draw.DIMENSION_CALLOUTS_BELOW
     # The sheet states the accepted shortfall at the floor, from the same
@@ -231,15 +239,21 @@ def test_views_and_annotations_stay_in_the_field():
         draw.GUIDE_CALLOUT_XY,
         draw.SOCKET_CALLOUT_XY,
         draw.SECTION_CAPTION_XY,
-        # The floor value above the cut's upper end (+Y up, centred).
-        (
-            draw.SECTION_CENTER[0],
-            draw.SECTION_CENTER[1]
-            + (
-                draw.SECTION_TEXT_MODEL_MM[draw.REFERENCE_DIMENSION][1]
-                - spec.CBORE_SECTION_HOLE_Y
+        # The floor value's text, both ends, below the cut.
+        *(
+            (
+                x,
+                draw.SECTION_CENTER[1]
+                + (
+                    draw.SECTION_TEXT_MODEL_MM[draw.REFERENCE_DIMENSION][1]
+                    - spec.CBORE_SECTION_HOLE_Y
+                )
+                * draw._SECTION_S,
             )
-            * draw._SECTION_S,
+            for x in (
+                draw.SECTION_TEXT_RIGHT - 2.0 * draw._SECTION_TEXT_HALF_WIDTH,
+                draw.SECTION_TEXT_RIGHT,
+            )
         ),
     ]
     for xy in points:
