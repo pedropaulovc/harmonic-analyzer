@@ -72,9 +72,9 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
 )
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
-from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import insert_bom_table
 from _drawing_view_configuration import (
@@ -85,8 +85,9 @@ from _drawing_view_configuration import (
     set_view_exploded_state,
     view_configuration,
 )
-from _drawing_view_display import set_hidden_lines_visible
+from _drawing_view_display import set_hidden_lines_removed
 from _pd_paper_drive_explode import exploded_view_name
+from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 import pd_latch_hook_geometry as hook_geometry
@@ -230,20 +231,41 @@ SHEET_TWO_RING_LIMITS = (0.185, 0.090, 0.415, 0.262)
 BALLOON_RING_REACH = BALLOON_MARGIN + 0.005
 SHEET_TWO_RING_GAP = 0.004
 INNER_CAPTION_GAP = 0.002
-# The hanger pivot (step 13, rule 23) in sheet 2's empty left field, clear of
-# the inner view's ring (SHEET_TWO_RING_LIMITS[0]): the *Top view, cropped to
-# a circle on the MHA-VN-041 axis, showing only the pivot stack, hidden lines
-# shown so the screw's thread and faced tip read inside the bar. A *Top view
-# puts machine -Z (the bar's front face) up the sheet; the stake note sits
-# above the circle and the caption below it. Points are in the screw's part
-# frame (mm): the head's underside at y 0, the shoulder down -Y seated on the
-# bar's back face, so the bar's front face is SHOULDER_LEN + BAR_DEPTH down.
+# The hanger pivot (step 13, rules 9 and 22) in sheet 2's empty left field,
+# clear of the inner view's ring (SHEET_TWO_RING_LIMITS[0]). A 1:1 *Top
+# locator, cropped to a circle on the MHA-VN-041 axis and showing only the
+# pivot stack, carries cutting line A-A along that axis. SECTION A-A at 2:1
+# shows every part of the stack cut (the shim and spring under the head and
+# arm too, so no hidden lines are needed) and balloons each part. It is cropped
+# to a circle in the same way. A *Top view puts machine -Z (the bar's front face) down
+# the sheet, so the cutting line runs vertically through the circle's centre.
+# Points are in the screw's part frame (mm): the head's underside at y 0, the
+# shoulder down -Y seated on the bar's back face, so the bar's front face is
+# SHOULDER_LEN + BAR_DEPTH down.
 PIVOT_VIEW_ORIENTATION = "*Top"
-PIVOT_VIEW_SCALE = (3.0, 1.0)
-PIVOT_VIEW_CENTER = (0.100, 0.180)
-PIVOT_VIEW_RADIUS_MM = 15.0
-PIVOT_VIEW_RADIUS = (
-    PIVOT_VIEW_RADIUS_MM * PIVOT_VIEW_SCALE[0] / PIVOT_VIEW_SCALE[1] / 1000.0
+# Model mm about the stack's midpoint that frame the head to the front face.
+PIVOT_FRAME_RADIUS_MM = 15.0
+PIVOT_LOCATOR_SCALE = (1.0, 1.0)
+PIVOT_LOCATOR_CENTER = (0.150, 0.228)
+PIVOT_LOCATOR_RADIUS = (
+    (PIVOT_FRAME_RADIUS_MM + 1.0) * PIVOT_LOCATOR_SCALE[0] / PIVOT_LOCATOR_SCALE[1]
+) / 1000.0
+# The cutting line's half-length on the sheet: at least 1 mm past the stack
+# each way along the axis (a full section's line must span the parts it cuts),
+# inside the locator's circle.
+PIVOT_CUT_HALF = (
+    PIVOT_FRAME_RADIUS_MM * PIVOT_LOCATOR_SCALE[0] / PIVOT_LOCATOR_SCALE[1] / 1000.0
+)
+PIVOT_SECTION_LABEL = "A"
+PIVOT_SECTION_SCALE = (2, 1)
+PIVOT_SECTION_CENTER = (0.095, 0.120)
+PIVOT_SECTION_RADIUS = (
+    PIVOT_FRAME_RADIUS_MM * PIVOT_SECTION_SCALE[0] / PIVOT_SECTION_SCALE[1] / 1000.0
+)
+# The native "SECTION A-A" caption goes under the section's balloon ring.
+PIVOT_SECTION_CAPTION_XY = (
+    PIVOT_SECTION_CENTER[0],
+    PIVOT_SECTION_CENTER[1] - PIVOT_SECTION_RADIUS - BALLOON_RING_REACH - 0.010,
 )
 PIVOT_SCREW_INSTANCE = "vn-transgear-pivot-screw-1"
 PIVOT_VIEW_INSTANCES = frozenset(
@@ -258,22 +280,18 @@ PIVOT_VIEW_INSTANCES = frozenset(
 )
 PIVOT_FRONT_FACE_Y = -(pivot_screw.SHOULDER_LEN + support_bar.BAR_DEPTH)
 PIVOT_VIEW_CENTRE_MM = (0.0, (pivot_screw.HEAD_H + PIVOT_FRONT_FACE_Y) / 2.0, 0.0)
-# The stake's leader lands on the front face's edge at the tap mouth's rim.
-PIVOT_MOUTH_MM = (support_bar.PIVOT_TAP_CSK_DIA / 2.0, PIVOT_FRONT_FACE_Y, 0.0)
-if (pivot_screw.HEAD_H - PIVOT_FRONT_FACE_Y) / 2.0 + 1.0 > PIVOT_VIEW_RADIUS_MM:
-    raise AssertionError("the pivot view's circle must frame head to front face")
-PIVOT_VIEW_REF = f"PIVOT VIEW, SHEET {SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}"
-PIVOT_STAKE_NOTE = "STAKE THE TAP MOUTH ONTO\nTHE SCREW TIP AT 2 POINTS"
-# A *Top view of this assembly shows the bar's front face below the axis
-# (run pc-lock-r1), so the stake's note stands under the circle and the
-# caption over it.
-PIVOT_STAKE_NOTE_XY = (0.030, PIVOT_VIEW_CENTER[1] - PIVOT_VIEW_RADIUS - 0.006)
-PIVOT_CAPTION = (
-    f"PIVOT VIEW {PIVOT_VIEW_SCALE[0]:g}:{PIVOT_VIEW_SCALE[1]:g} FROM ABOVE, "
-    "HIDDEN\nLINES SHOWN: THE HANGER PIVOT AS FITTED\nIN STEP "
-    f"{steps.step_number('hanger-pivoted')}"
+if (pivot_screw.HEAD_H - PIVOT_FRONT_FACE_Y) / 2.0 + 1.0 > PIVOT_FRAME_RADIUS_MM:
+    raise AssertionError("the pivot circles must frame head to front face")
+PIVOT_VIEW_REF = (
+    f"SECTION {PIVOT_SECTION_LABEL}-{PIVOT_SECTION_LABEL}, "
+    f"SHEET {SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}"
 )
-PIVOT_CAPTION_XY = (PIVOT_VIEW_CENTER[0] - PIVOT_VIEW_RADIUS, 0.255)
+PIVOT_CAPTION = (
+    "THE HANGER PIVOT AS FITTED IN\n"
+    f"STEP {steps.step_number('hanger-pivoted')}: STAKE THE TAP MOUTH\n"
+    "ONTO THE SCREW TIP AT 2 POINTS"
+)
+PIVOT_CAPTION_XY = (0.022, 0.255)
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 
 # --- sheet 3: the platen-and-support steps, the ballooned exploded view -----
@@ -1499,7 +1517,6 @@ def sheet_texts(notes: StepNotes) -> tuple[str, ...]:
         FITUP_REFERENCE_CAPTION,
         BOM_REFERENCE_CAPTION,
         PIVOT_CAPTION,
-        PIVOT_STAKE_NOTE,
     )
 
 
@@ -2161,23 +2178,12 @@ def _place_bom_sheet(
     return landings, table, items, pieces
 
 
-def _place_pivot_view(adapter: Any) -> None:
-    """Sheet 2's pivot view: the step-13 stack from above, cropped to a
-    circle on the screw's axis, with the stake's pointer at the tap mouth."""
-    label = "hanger pivot view"
-    _activate_sheet(adapter, SHEET_NAMES[1])
-    view = _early_bound(
-        place_view(
-            adapter,
-            str(SOURCE),
-            PIVOT_VIEW_ORIENTATION,
-            *PIVOT_VIEW_CENTER,
-            scale=PIVOT_VIEW_SCALE,
-        ),
-        "IView",
-    )
-    apply_view_configuration(adapter, view, label=label)
-    _isolate_instances(adapter, view, PIVOT_VIEW_INSTANCES, label=label)
+def _centre_pivot_view(
+    adapter: Any, view: Any, target: tuple[float, float], *, label: str
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Shift ``view`` until the pivot stack's midpoint sits on ``target``;
+    return the sheet points of the screw's head top and the bar's front
+    face on its axis, read after the shift."""
     leaf = _shown_instances(
         _view_component_leaves(adapter, view, label=label),
         "vn-transgear-pivot-screw",
@@ -2185,8 +2191,8 @@ def _place_pivot_view(adapter: Any) -> None:
         label=label,
     )[0]
 
-    def project() -> tuple[tuple[float, float], tuple[float, float]]:
-        centre, mouth = model_points_in_view(
+    def project() -> list[tuple[float, float]]:
+        return model_points_in_view(
             adapter,
             view,
             _anchor_model_points(
@@ -2194,7 +2200,11 @@ def _place_pivot_view(adapter: Any) -> None:
                 leaf,
                 tuple(
                     tuple(value / 1000.0 for value in point)
-                    for point in (PIVOT_VIEW_CENTRE_MM, PIVOT_MOUTH_MM)
+                    for point in (
+                        PIVOT_VIEW_CENTRE_MM,
+                        (0.0, pivot_screw.HEAD_H, 0.0),
+                        (0.0, PIVOT_FRONT_FACE_Y, 0.0),
+                    )
                 ),
                 _view_explode_offsets(adapter, view, label=label),
                 stem="vn-transgear-pivot-screw",
@@ -2202,41 +2212,99 @@ def _place_pivot_view(adapter: Any) -> None:
             ),
             label=label,
         )
-        return centre, mouth
 
     centre = project()[0]
     _shift_view(
         adapter,
         view,
-        (PIVOT_VIEW_CENTER[0] - centre[0], PIVOT_VIEW_CENTER[1] - centre[1]),
+        (target[0] - centre[0], target[1] - centre[1]),
         label=f"{label} centre",
     )
-    centre, mouth = project()
-    if math.dist(centre, PIVOT_VIEW_CENTER) > 1e-4:
-        raise RuntimeError(
-            f"{label}: centre sits at {centre!r}, not {PIVOT_VIEW_CENTER!r}"
-        )
-    # The stake's note under the circle relies on the front face projecting
-    # below the axis.
-    if mouth[1] >= centre[1]:
-        raise RuntimeError(f"{label}: the bar's front face projects above the axis")
-    _crop_to_circle(adapter, view, PIVOT_VIEW_CENTER, PIVOT_VIEW_RADIUS, label=label)
-    set_hidden_lines_visible(adapter, view)
-    add_leader_note(
-        adapter,
-        PIVOT_STAKE_NOTE,
-        text_xy=PIVOT_STAKE_NOTE_XY,
-        attach_xy=mouth,
-        label=f"{label} stake",
-        view=view,
+    centre, head, front = project()
+    if math.dist(centre, target) > 1e-4:
+        raise RuntimeError(f"{label}: centre sits at {centre!r}, not {target!r}")
+    return head, front
+
+
+def _place_pivot_view(
+    adapter: Any, table: Any, items: dict[str, str]
+) -> list[BalloonLanding]:
+    """Sheet 2's hanger pivot: a 1:1 locator of the step-13 stack from above,
+    cut along the screw's axis into SECTION A-A at 2:1, both cropped to
+    circles on the stack, the section ballooned part by part."""
+    label = "hanger pivot locator"
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    locator = _early_bound(
+        place_view(
+            adapter,
+            str(SOURCE),
+            PIVOT_VIEW_ORIENTATION,
+            *PIVOT_LOCATOR_CENTER,
+            scale=PIVOT_LOCATOR_SCALE,
+        ),
+        "IView",
     )
+    apply_view_configuration(adapter, locator, label=label)
+    _isolate_instances(adapter, locator, PIVOT_VIEW_INSTANCES, label=label)
+    head, front = _centre_pivot_view(
+        adapter, locator, PIVOT_LOCATOR_CENTER, label=label
+    )
+    # The cutting line is drawn vertically through the circle's centre: the
+    # *Top locator must lay the screw's axis down the sheet, head up.
+    if abs(head[0] - front[0]) > 1e-5 or head[1] <= front[1]:
+        raise RuntimeError(
+            f"{label}: the screw's axis runs {head!r} -> {front!r}, not down the sheet"
+        )
+    _crop_to_circle(
+        adapter, locator, PIVOT_LOCATOR_CENTER, PIVOT_LOCATOR_RADIUS, label=label
+    )
+    set_hidden_lines_removed(adapter, locator)
+    section_label = "hanger pivot section"
+    section = create_section_view(
+        adapter,
+        locator,
+        line_start=(PIVOT_LOCATOR_CENTER[0], PIVOT_LOCATOR_CENTER[1] + PIVOT_CUT_HALF),
+        line_end=(PIVOT_LOCATOR_CENTER[0], PIVOT_LOCATOR_CENTER[1] - PIVOT_CUT_HALF),
+        view_xy=PIVOT_SECTION_CENTER,
+        section_label=PIVOT_SECTION_LABEL,
+        scale=PIVOT_SECTION_SCALE,
+        label=section_label,
+    )
+    _isolate_instances(adapter, section, PIVOT_VIEW_INSTANCES, label=section_label)
+    _centre_pivot_view(adapter, section, PIVOT_SECTION_CENTER, label=section_label)
+    _crop_to_circle(
+        adapter,
+        section,
+        PIVOT_SECTION_CENTER,
+        PIVOT_SECTION_RADIUS,
+        label=section_label,
+    )
+    set_hidden_lines_removed(adapter, section)
+    position_section_caption(
+        adapter, section, PIVOT_SECTION_CAPTION_XY, label=section_label
+    )
+    _link_view_to_bom(section, table, label=section_label)
+    balloons_label = "paper-drive hanger pivot BOM coverage"
+    stems = {name.rsplit("-", 1)[0] for name in PIVOT_VIEW_INSTANCES}
+    landings = add_component_bom_balloons(
+        adapter,
+        section,
+        items=tuple(
+            sorted(((stem, items[stem]) for stem in stems), key=lambda p: int(p[1]))
+        ),
+        anchors={stem: BalloonAnchor() for stem in stems},
+        label=balloons_label,
+        margin=BALLOON_MARGIN,
+    )
+    _uncross_ring(adapter, landings, label=balloons_label)
     _place_sheet_note(
         adapter,
         SHEET_NAMES[1],
         PIVOT_CAPTION,
         PIVOT_CAPTION_XY,
-        label=f"{label} caption",
+        label="hanger pivot caption",
     )
+    return landings
 
 
 def _crop_to_circle(
@@ -2405,7 +2473,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _create_sheets(adapter)
     iso = _place_assembled_sheet(adapter)
     landings, table, items, pieces = _place_bom_sheet(adapter, counts)
-    _place_pivot_view(adapter)
+    landings += _place_pivot_view(adapter, table, items)
     landings += _balloon_assembled_sheet(adapter, iso, table, items)
     landings += _place_exploded_sheet(adapter, table, items, notes)
     _place_fitup_sheets(adapter, notes)
