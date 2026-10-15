@@ -72,12 +72,6 @@ APEX_X = PROFILE_CENTER[0] - POINT_LENGTH / 2.0 * _S
 ISO_CENTER = (0.355, 0.200)
 ISO_SCALE = (1, 1)
 ISO_NOTE_XY = (0.325, 0.245)
-# The tip half-angle's arc radius about the apex: its midpoint (on the
-# bisector, where SOLIDWORKS lands the leader) clears the rod outline.
-TIP_ARC_CLEAR = 0.003
-TIP_ARC_R = (part_spec.ROD_R * _S + TIP_ARC_CLEAR) / math.sin(
-    math.radians(part_spec.TIP_HALF_ANGLE / 2.0)
-)
 
 
 def _below(station_mm: float, row: int) -> tuple[float, float]:
@@ -89,28 +83,23 @@ PROFILE_KEEP = {
     # Shortest span nearest the part so no extension line crosses a row.
     "HardenedLength": _below(HARDENED_LENGTH, 0),
     "PointLength": _below(POINT_LENGTH, 1),
-    # Well right of the cone-to-back midpoint: the tip-angle callout block
-    # now stands over the shoulder (TIP_ANGLE_TEXT_XY), so this block starts
-    # clear of it.
+    # Ten millimetres right of the cone-to-back midpoint: its block shares
+    # rows with the four-line tip-angle callout, whose last line and shelf
+    # end at ~145 mm, so this block starts clear of them rather than 1.4 mm
+    # above them.
     "RodDia": (
-        APEX_X + (CONE_LENGTH + POINT_LENGTH) / 2.0 * _S + 0.080,
+        APEX_X + (CONE_LENGTH + POINT_LENGTH) / 2.0 * _S + 0.010,
         PROFILE_CENTER[1] + 0.050,
     ),
     # The text stands left of its dimension line, just ahead of the apex.
     "TipFlatDia": (APEX_X - 0.010, PROFILE_CENTER[1] + 0.035),
-    # The arc runs out past the shoulder so its midpoint, where the leader
-    # lands, stands TIP_ARC_CLEAR above the rod outline: the leader stays off
-    # the part and never crosses the arc (machinist review, 2026-10-15).
-    "TipHalfAngle": (
-        APEX_X + TIP_ARC_R * math.cos(math.radians(part_spec.TIP_HALF_ANGLE / 2.0)),
-        PROFILE_CENTER[1]
-        + TIP_ARC_R * math.sin(math.radians(part_spec.TIP_HALF_ANGLE / 2.0)),
-    ),
+    # The arc stays inside the narrow cone/axis wedge near the apex; only its
+    # text moves outboard (TIP_ANGLE_TEXT_XY).
+    "TipHalfAngle": (APEX_X + 0.012, PROFILE_CENTER[1] + 0.003),
 }
-# Four callout lines (value, side, the two seats by Number): its left end
-# stands right of the arc midpoint, so the leader runs down-left to the arc
-# clear of the cone's extension line past the shoulder.
-TIP_ANGLE_TEXT_XY = (PROFILE_KEEP["TipHalfAngle"][0] + 0.041, PROFILE_CENTER[1] + 0.045)
+# Four callout lines (value, side, the two seats by Number): higher and
+# further right so the block clears the cone and the tip-flat callout.
+TIP_ANGLE_TEXT_XY = (APEX_X + 0.040, PROFILE_CENTER[1] + 0.045)
 # The axis pick sits on the shank face just off the axis, clear of the
 # hardened-zone reference line the profile view shows on the axis (the
 # pivot screw's pick).

@@ -132,20 +132,17 @@ def test_sheet_carries_no_notes() -> None:
     assert '"Manufacturing Notes"' not in source
 
 
-def test_tip_angle_leader_lands_off_the_part() -> None:
-    """Rule 14: the leader lands at the arc midpoint (the half-angle's
-    bisector), which stands clear above the rod outline, and the callout's
-    left end stands right of it so the leader runs away from the arc."""
+def test_tip_angle_arc_stays_in_the_cone_wedge() -> None:
+    """The arc sits inside the cone/axis wedge short of the shoulder, the
+    placement that renders the native arc; only the text moves outboard."""
     arc_x, arc_y = drawing.PROFILE_KEEP["TipHalfAngle"]
-    rod_top = drawing.PROFILE_CENTER[1] + spec.ROD_R * drawing._S
-    assert arc_y >= rod_top + drawing.TIP_ARC_CLEAR - 1e-9
-    radius = math.dist((arc_x, arc_y), (drawing.APEX_X, drawing.PROFILE_CENTER[1]))
-    assert math.isclose(radius, drawing.TIP_ARC_R)
-    bearing = math.degrees(
-        math.atan2(arc_y - drawing.PROFILE_CENTER[1], arc_x - drawing.APEX_X)
+    dx, dy = arc_x - drawing.APEX_X, arc_y - drawing.PROFILE_CENTER[1]
+    assert 0.0 < math.degrees(math.atan2(dy, dx)) < spec.TIP_HALF_ANGLE
+    assert math.hypot(dx, dy) < spec.CONE_LENGTH * drawing._S
+    assert (
+        drawing.TIP_ANGLE_TEXT_XY[1]
+        > drawing.PROFILE_CENTER[1] + spec.ROD_R * drawing._S
     )
-    assert math.isclose(bearing, spec.TIP_HALF_ANGLE / 2.0)
-    assert drawing.TIP_ANGLE_TEXT_XY[0] > arc_x and drawing.TIP_ANGLE_TEXT_XY[1] > arc_y
 
 
 def test_tightened_cone_names_its_seats_on_its_callout() -> None:
