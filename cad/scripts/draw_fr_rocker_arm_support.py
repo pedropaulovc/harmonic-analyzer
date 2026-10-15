@@ -162,6 +162,9 @@ DIMENSION_CALLOUTS = {
     # One fillet loop per pocket floor (r7 review: the corner was unstated).
     "PocketFloorRadius": "POCKET FLOOR\nCORNERS",
 }
+# The sheet's own places. RimChamferSize's, PocketFloorRadius's and the seat
+# REF stations' are the PART's (build_fr_rocker_arm_support.DRAWING_PRECISION):
+# read back (PART_PRECISION), never set here.
 DIMENSION_PRECISION = {
     "Depth": 1,
     "WinWidth": 1,
@@ -171,15 +174,6 @@ DIMENSION_PRECISION = {
     "WallHeight": 1,
     "FootSpan": 1,
     "TopSpan": 1,
-    # A chamfer never needs extra places (drawing-guidelines.md rule 3): no
-    # stack reads RimChamferSize, so 1.27 prints as 1.3 on the .X band.
-    "RimChamferSize": 1,
-    # PocketFloorRadius's R0.8 MAX places are the PART's
-    # (build_fr_rocker_arm_support.DRAWING_PRECISION): read back, not set.
-    # The seats' REF stations off the end faces, at the seat stack's places
-    # (rocker_bracket_seat_layout's 4.95 / 6.56 end walls).
-    "SeatEastStation": 2,
-    "SeatWestStation": 2,
     # A held thickness, 9.525 at the routine ±0.51: the seats' thread-wall
     # stack reads the same places (rocker_bracket_seat_layout).
     "WebThickness": WEB_PLACES,
@@ -197,12 +191,23 @@ def imported_precision(kept: Any) -> dict[str, int]:
     }
 
 
-def _assert_part_precision(adapter: Any, annotations: list[Any]) -> None:
-    """Read back the places the part build authored (PocketFloorRadius's R0.8
-    MAX, drawing-simplicity-policy.md): the sheet never rewrites them, and an
-    import that lost them fails here instead of printing the sheet default."""
+# The part-authored places by dimension name (each name is unique on the part).
+PART_PRECISION = {
+    name: digits
+    for dimensions in DRAWING_PRECISION.values()
+    for name, digits in dimensions.items()
+}
+
+
+def _assert_part_precision(adapter: Any, annotations: list[Any], kept: Any) -> None:
+    """Read back the places the part build authored for the dimensions one
+    curate pass ``kept`` (drawing-simplicity-policy.md): the sheet never
+    rewrites them, and an import that lost them fails here instead of
+    printing the sheet default."""
     assert_imported_precision(
-        adapter, annotations, DRAWING_PRECISION["PocketFloorFillet"]
+        adapter,
+        annotations,
+        {name: digits for name, digits in PART_PRECISION.items() if name in kept},
     )
 
 
@@ -740,7 +745,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(
         adapter, dimensions, imported_precision(set(FRONT_KEEP) | set(RIGHT_KEEP))
     )
-    _assert_part_precision(adapter, right_dimensions)
+    _assert_part_precision(adapter, dimensions, set(FRONT_KEEP) | set(RIGHT_KEEP))
     offset_dimension_text(
         adapter, front_dimensions, {"RimChamferSize": RIM_CHAMFER_TEXT_XY}
     )
@@ -886,7 +891,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="VIEW B",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    set_dimension_precision(adapter, view_b_dimensions, imported_precision(VIEW_B_KEEP))
+    _assert_part_precision(adapter, view_b_dimensions, VIEW_B_KEEP)
     for annotation in view_b_dimensions:
         set_reference_dimension(adapter, annotation, label="VIEW B seat station")
     if add_note(adapter, VIEW_B_CAPTION, *VIEW_B_CAPTION_XY) is None:

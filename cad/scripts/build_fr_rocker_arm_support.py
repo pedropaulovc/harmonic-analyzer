@@ -275,8 +275,19 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal places the PART owns (drawing-simplicity-policy.md: the model owns
 # tolerance and precision; the drawing imports the dimension verbatim and only
 # reads its places back). The R0.8 MAX single limit prints at one place.
+# A chamfer never needs extra places (drawing-guidelines.md rule 3): no stack
+# reads RimChamferSize, so 1.27 prints as 1.3 on the .X band.
+RIM_CHAMFER_PLACES = 1
+# The seats' REF stations off the end faces print at the seat stack's places
+# (rocker_bracket_seat_layout's 4.95 / 6.56 end walls).
+SEAT_STATION_PLACES = 2
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PocketFloorFillet": {"PocketFloorRadius": POCKET_FLOOR_R_PLACES},
+    "RimChamfer": {"RimChamferSize": RIM_CHAMFER_PLACES},
+    "SeatStationReference": {
+        "SeatEastStation": SEAT_STATION_PLACES,
+        "SeatWestStation": SEAT_STATION_PLACES,
+    },
 }
 
 # The seats' REF stations (r7 machinist review: the seats print with no
