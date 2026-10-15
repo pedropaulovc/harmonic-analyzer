@@ -53,15 +53,19 @@ HOLE_DIA = blind_cut_dia_mm(HOLD_DOWN_HOLE_SPEC)
 # face), so the hole lands on the support's transferred seat without the foot
 # length's band (user, 2026-10-10, option ii). Worst case is each term at its
 # OWN band (Codex #936 PRRT_kwDOPHDy386mV3AN). Along the foot its short free
-# run leaves no room for title-block .XX, so three lengths
-# carry +/-0.10 (Codex P2 on 2026-10-09's flip, user option A): the foot
-# length and the hole station, both from the inboard ear face, and the ear
-# thickness. Across the foot its sides stay at .XX (the band
+# run leaves no room for title-block .XX on the two lengths that place the
+# hole against the ear and the support's seat, so they carry +/-0.10 (Codex
+# P2 on 2026-10-09's flip, user option A): the hole station from the inboard
+# ear face, and the ear thickness. The foot length rides the title block's
+# .XX: the foot is long enough to keep the 2.0 wall to its end at that band
+# (user ruling 2026-10-14, #954 machinist review: fix the wall with geometry,
+# not a band; ``ch_pivot_bracket_sides`` sizes the support, and so the foot,
+# for it). Across the foot its sides stay at .XX (the band
 # rocker_bracket_seat_layout carries this foot at) and the hole's centring on
 # x = 0 at .XX; a drilled hole grows by the title block's +0.10/0.
 # build_ch_pivot_bracket carries the +/-0.10 bands on the model's own
 # dimensions.
-FOOT_LEN_BAND = 0.10
+FOOT_LEN_BAND = 0.508  # title-block .XX
 EAR_T_BAND = 0.10
 STATION_BAND = 0.10
 EDGE_BAND = 0.508  # title-block .XX: the foot's sides

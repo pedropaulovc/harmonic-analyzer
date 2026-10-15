@@ -46,8 +46,11 @@ from _hole_spec import (
     HoleSpec,
 )
 from ch_pivot_bracket_sides import HOLE_MACHINE_Z, SIDES
-from fr_rocker_arm_support_section_spec import HALF_Y
-from fr_rocker_arm_support_spec import SUPPORT_WORLD_X, SUPPORT_WORLD_Z
+from fr_rocker_arm_support_spec import (
+    SUPPORT_HALF_MACHINE_Z,
+    SUPPORT_WORLD_X,
+    SUPPORT_WORLD_Z,
+)
 
 LINEAR_1PL = 0.8  # title-block .X band
 LINEAR_2PL = 0.508  # title-block .XX band
@@ -104,10 +107,15 @@ WEB_WALL_MIN = WEB - LINEAR_2PL / 2.0 - SCREW_MAJOR_DIA / 2.0
 # From the thread to the support's end face on its side, at the worst
 # transferred position: the end face moves by half the support length's .X
 # band, the hole by the bracket's station band from the fit-up-set ear face.
+# The end faces lie SUPPORT_HALF_MACHINE_Z off the casting's centre along
+# local X (its length; the height is a different 177.8).
 END_WALL_MIN = tuple(
-    (HALF_Y - abs(x)) - SCREW_MAJOR_DIA / 2.0 - _bracket.STATION_BAND - LINEAR_1PL / 2.0
+    (SUPPORT_HALF_MACHINE_Z - abs(x))
+    - SCREW_MAJOR_DIA / 2.0
+    - _bracket.STATION_BAND
+    - LINEAR_1PL / 2.0
     for x in SEAT_LOCAL_X
-)  # S 2.11, N 3.72
+)  # S 2.36, N 3.97
 
 if ENGAGEMENT_MIN < 1.5 * SCREW_MAJOR_DIA:
     raise AssertionError(
@@ -125,7 +133,10 @@ if WEB_WALL_MIN < RULE12_WEB_TARGET:
         f"bracket seat thread leaves {WEB_WALL_MIN:.2f} to the web faces at worst"
         f" case, under the {RULE12_WEB_TARGET} web"
     )
-if max(abs(x) for x in SEAT_LOCAL_X) + SEAT_DRILL_DIA / 2.0 > HALF_Y - EDGE_BREAK:
+if (
+    max(abs(x) for x in SEAT_LOCAL_X) + SEAT_DRILL_DIA / 2.0
+    > SUPPORT_HALF_MACHINE_Z - EDGE_BREAK
+):
     raise AssertionError("a bracket seat runs off the end of the support")
 if min(END_WALL_MIN) < RULE12_WEB_TARGET:
     raise AssertionError(

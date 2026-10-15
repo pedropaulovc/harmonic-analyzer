@@ -792,7 +792,7 @@ if END_DISC_SOUTH_Z0 - ARBOR_STRAP_SOUTH_Z < 0.25:
 if abs(ARBOR_STRAP_NORTH_Z - (END_DISC_NORTH_Z0 + END_DISC_THICK)) > 1e-9:
     raise AssertionError("north thrust washer does not bear on the datum strap")
 # Plan overlap, not z alone, against the rocker-arm-support foot (x 41.15..
-# 104.65 about SUPPORT_WORLD_X, z +-88.9): the north foot shares its z band but
+# 104.65 about SUPPORT_WORLD_X, z +-89.4): the north foot shares its z band but
 # stands ~89.5 away in x (study rev 3 section 6; the z-only test fired falsely).
 from build_dt_arbor_pedestal import FOOT_WIDTH as _PED_FOOT_WIDTH  # noqa: E402
 from fr_rocker_arm_support_section_spec import WIDE as _SUPPORT_FOOT_HALF_X  # noqa: E402
@@ -4056,7 +4056,7 @@ _SPRING_Z_BAND = (
 )
 _PIVOT_BLOCK_X = (PIVOT_X - BLOCK_EAST, PIVOT_X - BLOCK_EAST + BLOCK_WIDTH)
 SWING_FOOTPRINTS: dict[str, tuple[Plan, ...]] = {
-    # The support's trapezoid is widest at its foot (x +-WIDE, z +-88.9).
+    # The support's trapezoid is widest at its foot (x +-WIDE, z +-89.4).
     "rocker-arm support": _plan_box(
         _SUPPORT_X - _SUPPORT_FOOT_HALF_X,
         _SUPPORT_X + _SUPPORT_FOOT_HALF_X,

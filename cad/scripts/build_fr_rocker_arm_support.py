@@ -32,7 +32,9 @@ Geometry (mm), source casting with the corrected top-down hold-down interface
 Z = wall thickness):
 
 * **Wall** -- trapezoid, wide foot ``Z ±31.75`` at ``Y=-88.9`` tapering to
-  ``Z ±8.4665`` at ``Y=+88.9``; mid-plane extrude 177.8 (``X ±88.9``).
+  ``Z ±8.4665`` at ``Y=+88.9``; mid-plane extrude 178.8 (``X ±89.4``): the
+  source's 177.8, widened 0.5 an end for the pivot brackets' feet
+  (``fr_rocker_arm_support_spec.SUPPORT_HALF_MACHINE_Z``).
 * **CavityCut** -- 127 mm cavity square (``±63.5``), Through-All-Both -> the
   central cavity, leaving 6.35 mm shell walls (whole ``CavityProfile``).
 * **WindowCut1 / WindowCut2** -- ONE shared 165.1 mm window square
@@ -113,7 +115,7 @@ from fr_rocker_arm_support_section_spec import (
     NARROW,
     WIDE,
 )
-from fr_rocker_arm_support_spec import HOLE_DIA, HOLE_SPEC
+from fr_rocker_arm_support_spec import HOLE_DIA, HOLE_SPEC, SUPPORT_HALF_MACHINE_Z
 from rocker_bracket_seat_layout import SEAT_LOCAL_X, SEAT_SPEC, WEB
 
 PART_NAME = "fr-rocker-arm-support"
@@ -128,7 +130,15 @@ MATERIAL = "Gray Cast Iron"
 # fr_rocker_arm_support_section_spec's (pure data, so the base, frame, drive
 # train and drawing spec read them without importing this COM script). On the
 # Right plane: sketch-x -> model Z (taper), sketch-y -> model Y (height).
-BOSS_DEPTH = 177.8  # mid-plane extrude along X (X ±88.9)
+BOSS_DEPTH = 2.0 * SUPPORT_HALF_MACHINE_Z  # mid-plane extrude along X (178.8)
+# The source casting's length. The window and the cavity cut through the
+# wall's thickness inside the side posts, so the longer wall only thickens
+# both posts: every stage's measured volume gains the trapezoid's area times
+# the added length, and no cut or edge treatment changes.
+SOURCE_BOSS_DEPTH = 177.8
+WALL_GROWTH_VOLUME = (WIDE + NARROW) * 2.0 * HALF_Y * (BOSS_DEPTH - SOURCE_BOSS_DEPTH)
+SOURCE_WALL_VOLUME = 1_271_363
+SOURCE_CAVITY_CUT_VOLUME = 622_708
 
 CAV = 63.5  # 127 mm square half (Cut-Extrude2)
 # The window is the source's 165.1 square (half BIG), its edges FOOT_THICKNESS
@@ -182,16 +192,22 @@ WINDOW_NET_AREA = (2.0 * BIG) ** 2 - (2.0 * CAV) ** 2
 WEB_BAND_VOLUME = WINDOW_NET_AREA * WEB_GROWTH  # left per window cut
 CORNER_FILLET_GROWTH = 4.0 * (1.0 - math.pi / 4.0) * FILLET_R**2 * 2.0 * WEB_GROWTH
 POCKET_FILLET_LOSS = 8.0 * (1.0 - math.pi / 4.0) * POCKET_FILLET_R**2 * WEB_GROWTH
-WINDOW_CUT1_VOLUME = SQUARE_WINDOW_CUT1_VOLUME + WEB_BAND_VOLUME
-WINDOW_CUT2_VOLUME = SQUARE_WINDOW_CUT2_VOLUME + 2.0 * WEB_BAND_VOLUME
+WINDOW_CUT1_VOLUME = SQUARE_WINDOW_CUT1_VOLUME + WEB_BAND_VOLUME + WALL_GROWTH_VOLUME
+WINDOW_CUT2_VOLUME = (
+    SQUARE_WINDOW_CUT2_VOLUME + 2.0 * WEB_BAND_VOLUME + WALL_GROWTH_VOLUME
+)
 CORNER_FILLET_VOLUME = (
-    SQUARE_CORNER_FILLET_VOLUME + 2.0 * WEB_BAND_VOLUME + CORNER_FILLET_GROWTH
+    SQUARE_CORNER_FILLET_VOLUME
+    + 2.0 * WEB_BAND_VOLUME
+    + CORNER_FILLET_GROWTH
+    + WALL_GROWTH_VOLUME
 )
 POCKET_FILLET_VOLUME = (
     SQUARE_POCKET_FILLET_VOLUME
     + 2.0 * WEB_BAND_VOLUME
     + CORNER_FILLET_GROWTH
     - POCKET_FILLET_LOSS
+    + WALL_GROWTH_VOLUME
 )
 
 HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
@@ -244,8 +260,8 @@ CHAMFER_EDGES = [  # 12 inner-frame opening edges, both web faces (Z = ±WEB)
 CHAMFER_FACES = [  # whole faces whose every edge is chamfered (tangent-propagated)
     [0.0, -85.0, 31.24],
     [0.0, -85.0, -31.24],  # ±Z slant window surrounds
-    [88.9, 0.0, 0.0],
-    [-88.9, 0.0, 0.0],  # front / back trapezoid (±X) faces
+    [BOSS_DEPTH / 2.0, 0.0, 0.0],
+    [-BOSS_DEPTH / 2.0, 0.0, 0.0],  # front / back trapezoid (±X) faces
     [59.78, -59.78, 0.0],  # one inner fillet face
 ]
 
@@ -386,7 +402,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # 1. Boss: trapezoid on the Right plane (sketch-x -> model Z, sketch-y ->
-    #    model Y, so the wide foot sits at Y=-88.9), mid-plane extruded 177.8
+    #    model Y, so the wide foot sits at Y=-88.9), mid-plane extruded 178.8
     #    along X. A polygon chain (two slanted sides) anchored at the foot's
     #    -Z corner; the six dims drive off FootHalf/TopHalf/HalfHeight.
     trap = SketchDims()
@@ -430,7 +446,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Wall")
     depth_dim = name_dimensions(adapter, "Wall", ["Depth"])
     drive_jobs += [(depth_dim[0], '"WallWidth"')]
-    await volume_check(adapter, "Wall", 1_271_363, 200)
+    await volume_check(adapter, "Wall", SOURCE_WALL_VOLUME + WALL_GROWTH_VOLUME, 200)
 
     # 2-4. Two sketches drive three cuts, exactly as the source tree does (only
     # the names are semantic here, not the source's Sketch11/Cut-ExtrudeN). Both
@@ -487,7 +503,9 @@ async def build(adapter) -> dict[str, str]:
     # CavityCut: cavity -- whole CavityProfile, Through-All-Both.
     _cut_through_all(adapter, "CavityProfile", both=True, reverse_dir=False)
     name_last_feature(adapter, "CavityCut")
-    await volume_check(adapter, "CavityCut", 622_708, 200)
+    await volume_check(
+        adapter, "CavityCut", SOURCE_CAVITY_CUT_VOLUME + WALL_GROWTH_VOLUME, 200
+    )
 
     # WindowCut1: one window -- Through-All forward, started WEB off-plane.
     _cut_through_all(
