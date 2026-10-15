@@ -161,7 +161,7 @@ HEAD_RAIL_MARGIN = min(HOLE_Y, SCREW_RAIL_WIDTH - HOLE_Y) - HEAD_DIA / 2.0
 # Worst case of the printed sheet (drawing-guidelines.md rule 17): the hole
 # stations and the hole row print at .XXX, the screw-rail width at .XX, the
 # holes are DRILLED at the size their callout prints (HOLE_CALLOUT_PRECISION).
-POSITION_PLACES = 3
+POSITION_PLACES = 3  # pd-platen-clip RV-01
 _POSITION_BAND = printed_band_mm(POSITION_PLACES)
 HOLE_CALLOUT_PRECISION = {"hw-diam": 2}
 HOLE_DIA_PRINTED = round(HOLE_DIA, HOLE_CALLOUT_PRECISION["hw-diam"])

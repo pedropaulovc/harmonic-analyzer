@@ -233,7 +233,7 @@ SECTION_KEEP_NAMES = frozenset(SECTION_TEXT_MODEL_MM)
 DISC_NUMBER = "MHA-PD-006"
 DIMENSION_CALLOUTS_ABOVE = {"Depth": f"SETS AIR TO {DISC_NUMBER} DISC"}
 DIMENSION_CALLOUTS_BELOW = {
-    "CboreFloor": CBORE_FLOOR_CALLOUT,
+    "CboreFloor": CBORE_FLOOR_CALLOUT,  # pd-platen RV-02
     "Boss2Dia": "BOSS",
     "BossH": "TAP BOSS",
 }
@@ -282,7 +282,7 @@ SOCKET_EDGE_XY = (
     _front_y(_SOCKET_HIGH_Y) + SOCKET_DRILL_R_SHEET * _DIAG,
 )
 SOCKET_CALLOUT_XY = (0.215, 0.252)
-SOCKET_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-003\nTAP"
+SOCKET_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-003\nTAP"  # pd-platen RV-01
 # The template centre-marks every hole as the view is placed (an explicit
 # AutoInsertCenterMarks2 printed all 28 marks twice in r1); the front view
 # proves exactly one mark per hole.
