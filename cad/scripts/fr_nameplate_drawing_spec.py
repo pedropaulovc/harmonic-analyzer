@@ -2,10 +2,10 @@ r"""Pure-data print contract for the nameplate's manufacturing drawing (#628).
 
 PURE DATA, no SolidWorks/COM imports. ``build_fr_nameplate`` marks and gives
 places to exactly ``DRAWING_DIMENSIONS``; ``draw_fr_nameplate`` keeps exactly
-those model dimensions and adds the sheet-derived ones whose places live in
-``DRAWING_REFERENCE_PRECISION``. Kept apart from ``fr_nameplate_spec`` on
-purpose: that module feeds the base and the frame assembly, so a print-only
-edit here must not rebuild them.
+those model dimensions and adds one sheet-derived reference, the floor under
+the engraving, whose places live in ``DRAWING_REFERENCE_PRECISION``. Kept
+apart from ``fr_nameplate_spec`` on purpose: that module feeds the base and
+the frame assembly, so a print-only edit here must not rebuild them.
 
 Fit (Main ruling, 2026-10-14): the base's four #4-40 seats are spotted through
 the finished plate at assembly (drawing-guidelines.md rule 19 (absorb stacks
@@ -26,20 +26,41 @@ from fr_nameplate_spec import PLATE_HEIGHT, PLATE_THICKNESS, PLATE_WIDTH, SCREW_
 # --- Model dimensions the print shows: feature -> parametric names. The slab's
 # extrude depth is the plate thickness; the Hole Wizard placement sketch
 # carries each station from the part origin, the plate's lower-left corner
-# (S0X is the left column, S0Z the bottom row). ---
+# (S0X is the left column, S0Z the bottom row). The outline is an imported
+# contour and the field and engraving cuts are mid-plane (their one depth is
+# twice the depth below the face), so no feature dimension carries the plate's
+# width or height, a far-edge hole station or a depth below the decorated
+# face: each is the one driving dimension the build gives it in a hidden
+# reference sketch (drawing-simplicity-policy.md, "The model owns tolerance
+# and precision"). FaceReference lies on the decorated face (the Front plane);
+# SectionReference on SECTION_PLANE, section A-A's cutting plane. ---
+FACE_REFERENCE = "FaceReference"
+SECTION_REFERENCE = "SectionReference"
+REFERENCE_SKETCHES = (FACE_REFERENCE, SECTION_REFERENCE)
+SECTION_PLANE = "SectionAPlane"
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateSlab": {"PlateThick"},
     "ScrewHoles": {"S0X", "S0Z"},
+    FACE_REFERENCE: {"PlateWidth", "PlateHeight", "RightHoleStation", "TopHoleStation"},
+    SECTION_REFERENCE: {"FieldDepth", "EngravingDepth"},
 }
 
 # Places. The engraving is incised 0.300 below the 0.400 sunk field, so the
-# thinnest floor left under it is the thickness less 0.700: the thickness
-# prints .XXX so that floor is a measured number, not a .X guess (Main ruling
-# 2026-10-14; the shortfall under rule 17's 1.5 floor is reported, not hidden).
-# The hole stations print .X: the base is spotted through the plate.
+# thinnest floor left under it is the thickness less 0.700: the thickness and
+# both depths print .XXX so that floor is a measured number, not a .X guess
+# (Main ruling 2026-10-14; the shortfall under rule 17's 1.5 floor is
+# reported, not hidden). The outline and the hole stations print .X: the base
+# is spotted through the plate.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateSlab": {"PlateThick": 3},
     "ScrewHoles": {"S0X": 1, "S0Z": 1},
+    FACE_REFERENCE: {
+        "PlateWidth": 1,
+        "PlateHeight": 1,
+        "RightHoleStation": 1,
+        "TopHoleStation": 1,
+    },
+    SECTION_REFERENCE: {"FieldDepth": 3, "EngravingDepth": 3},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -52,18 +73,10 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
 ):
     raise AssertionError("every marked nameplate dimension needs authored places")
 
-# Sheet-derived dimensions (no model parameter of their own: the outline is an
-# imported contour, and the far-edge hole stations are its edges' distances
-# to the right and top hole centres). Keyed by the sheet's label.
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {
-    "plate width": 1,
-    "plate height": 1,
-    "right hole station": 1,
-    "top hole station": 1,
-    "sunk field depth": 3,
-    "engraving depth": 3,
-    "floor under engraving": 3,
-}
+# The one sheet-derived dimension: the floor left under the engraving, a
+# parenthesised reference (thickness less the engraving depth) with no band
+# and no model dimension to import. Keyed by the sheet's label.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"floor under engraving": 3}
 
 # Section A-A's depths from the decorated face: the sunk field, then every
 # engraved groove (border pinstripe and field lettering alike) to one floor.
@@ -73,6 +86,25 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
 FIELD_DEPTH = 0.4
 ENGRAVING_FLOOR_DEPTH = 0.7
 FLOOR_UNDER_ENGRAVING = PLATE_THICKNESS - ENGRAVING_FLOOR_DEPTH
+
+# Section A-A cuts the whole plate at SECTION_Y (plate-local), in the gap
+# between the CHICAGO row and the scroll ornament. Along the cut (plate x):
+# the raised border's top (the decorated face) up to 3.15, the border
+# pinstripe groove (the engraving floor) 3.16..3.60, then the sunk field. The
+# offline test proves each station against the DXFs.
+SECTION_Y = 14.85
+SECTION_FACE_X = 2.6
+SECTION_GROOVE_X = 3.38
+SECTION_FIELD_X = 5.5
+# SectionReference's construction chords (plate x0, x1, z), each lying on a
+# cut-face line the section shows: the decorated face ending at its station,
+# the groove floor and the field floor each starting at theirs. A depth's
+# dimension spans the face chord's end to its floor chord's start.
+SECTION_REFERENCE_CHORDS: dict[str, tuple[float, float, float]] = {
+    "face": (SECTION_FACE_X - 1.0, SECTION_FACE_X, 0.0),
+    "groove": (SECTION_GROOVE_X, SECTION_GROOVE_X + 0.1, -ENGRAVING_FLOOR_DEPTH),
+    "field": (SECTION_FIELD_X, SECTION_FIELD_X + 1.0, -FIELD_DEPTH),
+}
 ENGRAVING_FLOOR_MIN = (
     PLATE_THICKNESS
     + printed_deviations(PLATE_THICKNESS, DRAWING_PRECISION["PlateSlab"]["PlateThick"])[
@@ -81,7 +113,8 @@ ENGRAVING_FLOOR_MIN = (
     - (
         ENGRAVING_FLOOR_DEPTH
         + printed_deviations(
-            ENGRAVING_FLOOR_DEPTH, DRAWING_REFERENCE_PRECISION["engraving depth"]
+            ENGRAVING_FLOOR_DEPTH,
+            DRAWING_PRECISION[SECTION_REFERENCE]["EngravingDepth"],
         )[1]
     )
 )
@@ -100,9 +133,9 @@ HOLE_EDGE_STATIONS: dict[str, float] = {
 }
 _STATION_PLACES = {
     "left": DRAWING_PRECISION["ScrewHoles"]["S0X"],
-    "right": DRAWING_REFERENCE_PRECISION["right hole station"],
+    "right": DRAWING_PRECISION[FACE_REFERENCE]["RightHoleStation"],
     "bottom": DRAWING_PRECISION["ScrewHoles"]["S0Z"],
-    "top": DRAWING_REFERENCE_PRECISION["top hole station"],
+    "top": DRAWING_PRECISION[FACE_REFERENCE]["TopHoleStation"],
 }
 
 # Edge ligaments at the printed worst case: the largest drilled hole at the
@@ -124,11 +157,19 @@ HOLE_STATION_SHIFT_MAX = max(
     for edge, station in HOLE_EDGE_STATIONS.items()
 )
 
-DIMENSION_PREFIXES = {"S0X": "2X ", "S0Z": "2X "}
+DIMENSION_PREFIXES = {
+    "S0X": "2X ",
+    "S0Z": "2X ",
+    "RightHoleStation": "2X ",
+    "TopHoleStation": "2X ",
+}
 DIMENSION_CALLOUTS = {"PlateThick": "SETS FLOOR UNDER ENGRAVING"}
-STATION_PREFIX = "2X "
 FIELD_DEPTH_CALLOUT = "SUNK FIELD"
 ENGRAVING_DEPTH_CALLOUT = "ALL ENGRAVING"
+SECTION_CALLOUTS = {
+    "FieldDepth": FIELD_DEPTH_CALLOUT,
+    "EngravingDepth": ENGRAVING_DEPTH_CALLOUT,
+}
 FLOOR_UNDER_ENGRAVING_CALLOUT = "FLOOR UNDER ENGRAVING"
 HOLE_CALLOUT_PROCESS = "DRILL"
 

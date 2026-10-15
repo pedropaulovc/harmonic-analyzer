@@ -60,6 +60,14 @@ artwork, drawn to read from +Z, then reads correctly on the face you actually
 see, with no mirror. (build_pd_platen is untextured and extrudes +Z; only this
 engraved plate needs the decorated face frontmost.)
 
+Drawing references (``fr_nameplate_drawing_spec``): the outline is an
+imported contour and the field and engraving cuts are mid-plane, so no feature
+dimension carries the plate's width or height, a far-edge hole station or a
+depth below the decorated face. Two construction-only sketches, saved hidden,
+carry them as driving dimensions the drawing imports: ``FaceReference`` on the
+Front plane (the decorated face) and ``SectionReference`` on
+``SectionAPlane``, section A-A's cutting plane (hidden).
+
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_fr_nameplate.py
@@ -72,6 +80,7 @@ import sys
 
 from _appearance import apply_material
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _drawing_marks import (
     apply_drawing_properties,
@@ -79,18 +88,33 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
-from _feature_tree import name_last_feature
+from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _paths import REFERENCES_DIR
 from _rebuild import force_rebuild
 from _session import run_build
+from _sketch import (
+    SketchDims,
+    anchor_point_to_origin,
+    blank_reference_sketches,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
+from _visibility import blank_reference_geometry
 from fr_nameplate_drawing_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    FACE_REFERENCE,
     ISOMETRIC_VIEW_NOTE,
     MANUFACTURING_NOTES,
+    REFERENCE_SKETCHES,
+    SECTION_PLANE,
+    SECTION_REFERENCE,
+    SECTION_REFERENCE_CHORDS,
+    SECTION_Y,
 )
 from fr_nameplate_spec import (
     PLATE_HEIGHT,
@@ -144,6 +168,266 @@ ENGRAVING_POSITION = (0.0, 0.0)  # placement was baked; never re-centre the head
 # nominal / Ø2.845 major would not pass a Ø2.591 hole.
 SCREW_HOLE_SPEC = HoleSpec("clearance", "#4", fit="close")
 SCREW_HOLE_DIA = CLEARANCE_MM[(SCREW_HOLE_SPEC.size, SCREW_HOLE_SPEC.fit)]  # 3.048
+
+# FaceReference's construction chords. Each is REFERENCE_CHORD long (an
+# unprinted length): on a plate edge it starts FACE_EDGE_STATION from the
+# corner, on the edge's straight run (the traced corners round off within
+# 4.02 of each corner), so the width's and the height's extension lines rise
+# from the flats; from a hole centre it stays inside the hole along its centre
+# mark. The right column's station is the bottom-right hole's, the top row's
+# the top-left hole's (SCREW_XY runs bottom-left, bottom-right, top-left,
+# top-right).
+REFERENCE_CHORD = 1.0
+FACE_EDGE_STATION = 5.0
+RIGHT_HOLE = SCREW_XY[1]
+TOP_HOLE = SCREW_XY[2]
+
+
+async def _construction_chord(
+    adapter, feature: str, start: tuple[float, float], end: tuple[float, float]
+) -> str:
+    """One construction line, placed with inference off (ms_stop_geom recipe)."""
+    set_sketch_direct_db(adapter, True)
+    line = check(feature, await adapter.add_line(*start, *end))
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not segment.ConstructionGeometry:
+        raise RuntimeError(f"{feature}: construction flag rejected")
+    return line
+
+
+async def _square_chord(
+    adapter,
+    feature: str,
+    line: str,
+    relation: str,
+    length: float,
+    dims: SketchDims,
+    name: str,
+) -> None:
+    """Hold ``line`` horizontal or vertical at ``length``."""
+    check(feature, await adapter.add_sketch_constraint(line, None, relation))
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        f"{relation}_distance",
+        length,
+        f"{feature} {name}",
+    )
+    dims.record(name)
+
+
+async def _face_reference(adapter) -> None:
+    """The outline's width and height and the far-edge hole stations.
+
+    On the Front plane (the decorated face), sketch (u, v) = model (X, Y),
+    construction only and hidden. A shown reference sketch prints, so each
+    chord lies on what the face view draws: up the left and right edges and
+    along the bottom and top edges, each from FACE_EDGE_STATION; from the
+    right column's hole centre toward the right edge and from the top row's
+    toward the top edge. The width spans the side chords' starts, the height
+    the bottom and top chords' starts, and each station a hole centre to its
+    edge chord's start. 6 x 4 DOF less: the left and bottom starts on the
+    origin's axes (2), the right and top starts level with them (2), six
+    square relations and fourteen dims = 0.
+    """
+    feature = FACE_REFERENCE
+    dims = SketchDims()
+    station, chord = FACE_EDGE_STATION, REFERENCE_CHORD
+    check(f"create sketch {feature}", await adapter.create_sketch("Front"))
+    left = await _construction_chord(
+        adapter, feature, (0.0, station), (0.0, station + chord)
+    )
+    await anchor_point_to_origin(
+        adapter, f"{left}.start", 0.0, station, f"{feature} left edge chord"
+    )
+    dims.record("LeftEdgeStation")
+    await _square_chord(adapter, feature, left, "vertical", chord, dims, "LeftChord")
+    right = await _construction_chord(
+        adapter, feature, (PLATE_WIDTH, station), (PLATE_WIDTH, station + chord)
+    )
+    check(
+        feature,
+        await adapter.add_sketch_constraint(
+            f"{right}.start", f"{left}.start", "horizontal_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{left}.start",
+        f"{right}.start",
+        "horizontal_distance",
+        PLATE_WIDTH,
+        f"{feature} plate width",
+    )
+    dims.record("PlateWidth")
+    await _square_chord(adapter, feature, right, "vertical", chord, dims, "RightChord")
+    bottom = await _construction_chord(
+        adapter, feature, (station, 0.0), (station + chord, 0.0)
+    )
+    await anchor_point_to_origin(
+        adapter, f"{bottom}.start", station, 0.0, f"{feature} bottom edge chord"
+    )
+    dims.record("BottomEdgeStation")
+    await _square_chord(
+        adapter, feature, bottom, "horizontal", chord, dims, "BottomChord"
+    )
+    top = await _construction_chord(
+        adapter, feature, (station, PLATE_HEIGHT), (station + chord, PLATE_HEIGHT)
+    )
+    check(
+        feature,
+        await adapter.add_sketch_constraint(
+            f"{top}.start", f"{bottom}.start", "vertical_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{bottom}.start",
+        f"{top}.start",
+        "vertical_distance",
+        PLATE_HEIGHT,
+        f"{feature} plate height",
+    )
+    dims.record("PlateHeight")
+    await _square_chord(adapter, feature, top, "horizontal", chord, dims, "TopChord")
+    right_x, right_y = RIGHT_HOLE
+    right_hole = await _construction_chord(
+        adapter, feature, (right_x, right_y), (right_x + chord, right_y)
+    )
+    await dimension_between(
+        adapter,
+        f"{right_hole}.start",
+        f"{right}.start",
+        "horizontal_distance",
+        PLATE_WIDTH - right_x,
+        f"{feature} right hole station",
+    )
+    dims.record("RightHoleStation")
+    await dimension_between(
+        adapter,
+        f"{bottom}.start",
+        f"{right_hole}.start",
+        "vertical_distance",
+        right_y,
+        f"{feature} right hole height",
+    )
+    dims.record("RightHoleY")
+    await _square_chord(
+        adapter, feature, right_hole, "horizontal", chord, dims, "RightHoleChord"
+    )
+    top_x, top_y = TOP_HOLE
+    top_hole = await _construction_chord(
+        adapter, feature, (top_x, top_y), (top_x, top_y + chord)
+    )
+    await dimension_between(
+        adapter,
+        f"{top_hole}.start",
+        f"{top}.start",
+        "vertical_distance",
+        PLATE_HEIGHT - top_y,
+        f"{feature} top hole station",
+    )
+    dims.record("TopHoleStation")
+    await dimension_between(
+        adapter,
+        f"{left}.start",
+        f"{top_hole}.start",
+        "horizontal_distance",
+        top_x,
+        f"{feature} top hole across",
+    )
+    dims.record("TopHoleX")
+    await _square_chord(
+        adapter, feature, top_hole, "vertical", chord, dims, "TopHoleChord"
+    )
+    await ensure_fully_defined(adapter, feature)
+    check(f"exit sketch {feature}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    dims.apply(adapter, feature)
+
+
+async def _section_plane(adapter) -> None:
+    """Section A-A's cutting plane: the Top plane carried SECTION_Y along +Y,
+    so a sketch on it keeps the Top plane's (u, v) = model (X, -Z)."""
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    check(
+        f"create plane {SECTION_PLANE}",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Top Plane", offset=SECTION_Y
+            )
+        ),
+    )
+    name_last_feature(adapter, SECTION_PLANE)
+
+
+def _require_on_section_plane(adapter, sketch: str) -> None:
+    """create_sketch falls back to a standard plane when a named one fails to
+    select; the sketch's parents must name SECTION_PLANE."""
+    feature = _early_bound(_feature_by_name(adapter, sketch), "IFeature")
+    parents = [
+        str(_early_bound(parent, "IFeature").Name)
+        for parent in (feature.GetParents() or ())
+    ]
+    if SECTION_PLANE not in parents:
+        raise RuntimeError(f"{sketch} is not on {SECTION_PLANE}: parents {parents}")
+
+
+async def _section_reference(adapter) -> None:
+    """The sunk field's and the engraving floor's depths below the face.
+
+    On SECTION_PLANE, sketch (u, v) = model (X, -Z), construction only and
+    hidden. Each SECTION_REFERENCE_CHORDS chord lies on a cut-face line
+    section A-A draws: the decorated face, the groove's floor and the field's
+    floor. Each depth spans the face chord's end to its floor chord's start.
+    3 x 4 DOF less: the face chord's start on the origin's axis (1), three
+    horizontal relations and eight dims = 0.
+    """
+    feature = SECTION_REFERENCE
+    dims = SketchDims()
+    check(f"create sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
+    face_x0, face_x1, _ = SECTION_REFERENCE_CHORDS["face"]
+    face = await _construction_chord(adapter, feature, (face_x0, 0.0), (face_x1, 0.0))
+    await anchor_point_to_origin(
+        adapter, f"{face}.start", face_x0, 0.0, f"{feature} face chord"
+    )
+    dims.record("FaceChordStation")
+    await _square_chord(
+        adapter, feature, face, "horizontal", face_x1 - face_x0, dims, "FaceChord"
+    )
+    for chord, depth in (("field", "FieldDepth"), ("groove", "EngravingDepth")):
+        x0, x1, z = SECTION_REFERENCE_CHORDS[chord]
+        line = await _construction_chord(adapter, feature, (x0, -z), (x1, -z))
+        await dimension_between(
+            adapter,
+            f"{face}.end",
+            f"{line}.start",
+            "vertical_distance",
+            -z,
+            f"{feature} {depth}",
+        )
+        dims.record(depth)
+        await dimension_between(
+            adapter,
+            f"{face}.end",
+            f"{line}.start",
+            "horizontal_distance",
+            x0 - face_x1,
+            f"{feature} {chord} chord station",
+        )
+        dims.record(f"{chord.title()}ChordStation")
+        await _square_chord(
+            adapter, feature, line, "horizontal", x1 - x0, dims, f"{chord.title()}Chord"
+        )
+    await ensure_fully_defined(adapter, feature)
+    check(f"exit sketch {feature}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    _require_on_section_plane(adapter, feature)
+    dims.apply(adapter, feature)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -333,6 +617,11 @@ async def build(adapter) -> dict[str, str]:
             f"(> half the {slab_volume:.1f} mm^3 slab); check import scale/position"
         )
 
+    # The hidden references the sheet prints (no solid change).
+    await _face_reference(adapter)
+    await _section_plane(adapter)
+    await _section_reference(adapter)
+
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so geometry must not move. This part has no single analytic-total
@@ -355,6 +644,10 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # Saved hidden: the drawing shows each sketch in the view that dimensions
+    # it (_drawing_hidden_sketches).
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
+    blank_reference_geometry(adapter, ((SECTION_PLANE, "PLANE"),))
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
+import _drawing_edge_dimensions
 import _dxf_text as dxf
 import build_fr_nameplate as part
 import draw_fr_nameplate as drawing
 import fr_nameplate_drawing_spec as print_spec
 import fr_nameplate_spec as spec
-from _drawing_contract import model_toleranced_dimensions
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _printed_tolerance import printed_band_mm
 from _release_artwork import bundle_path
@@ -38,15 +42,231 @@ def test_registry_row_names_this_script_and_stem() -> None:
 
 def test_marked_set_is_exactly_what_the_sheet_keeps() -> None:
     # The build marks and gives places to DRAWING_DIMENSIONS; the sheet keeps
-    # exactly their union, and every sheet-derived dimension has spec places.
+    # exactly their union, and its one sheet-derived reference has spec places.
     assert part.DRAWING_DIMENSIONS is print_spec.DRAWING_DIMENSIONS
+    assert part.DRAWING_PRECISION is print_spec.DRAWING_PRECISION
     marked = set().union(*print_spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) == marked
+    kept = [*drawing.FRONT_KEEP, *drawing.RIGHT_KEEP, *drawing.SECTION_KEEP]
+    assert len(kept) == len(set(kept)) and set(kept) == marked
     assert set(print_spec.DRAWING_PRECISION_BY_NAME) == marked
-    derived = set(drawing.FRONT_PICKS) | set(drawing.SECTION_PICKS)
-    assert derived == set(print_spec.DRAWING_REFERENCE_PRECISION)
+    assert print_spec.DRAWING_REFERENCE_PRECISION == {drawing.FLOOR_REFERENCE_LABEL: 3}
     assert set(print_spec.DIMENSION_PREFIXES) <= marked
     assert set(print_spec.DIMENSION_CALLOUTS) <= marked
+    assert set(print_spec.SECTION_CALLOUTS) == set(drawing.SECTION_KEEP)
+    # The reference sketches carry exactly the marked names they own.
+    for sketch in print_spec.REFERENCE_SKETCHES:
+        assert sketch in print_spec.DRAWING_DIMENSIONS
+
+
+def test_places_are_the_parts_and_the_sheet_sets_only_the_reference() -> None:
+    # Every manufacturing dimension's places are authored on the part and read
+    # back on the sheet; SetPrecision3 is reserved for the one reference, and
+    # takes its places from the spec's DRAWING_REFERENCE_PRECISION.
+    assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    calls = re.findall(r"SetPrecision3\(([^)]*)\)", source)
+    assert calls == ["DRAWING_REFERENCE_PRECISION[label], -1, -1, -1"]
+    assert "set_dimension_precision" not in source
+    assert (
+        "assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)"
+        in source
+    )
+    build = Path(part.__file__).read_text(encoding="utf-8")
+    order = [
+        build.index("    await _face_reference(adapter)\n"),
+        build.index("    await _section_reference(adapter)\n"),
+        build.index("    apply_drawing_precision(adapter, DRAWING_PRECISION)\n"),
+        build.index("    blank_reference_sketches(adapter, REFERENCE_SKETCHES)\n"),
+        build.index("    return await save_part_and_images(adapter, PART_NAME)\n"),
+    ]
+    assert order == sorted(order)
+
+
+class _FakeSegment:
+    ConstructionGeometry = False
+
+
+class _ReferenceSketchAdapter:
+    """Records what the build's reference-sketch recipes ask SOLIDWORKS for."""
+
+    def __init__(self) -> None:
+        self.lines: dict[str, tuple[tuple[float, float], tuple[float, float]]] = {}
+        self.relations: list[tuple[str, str | None, str]] = []
+        self._sketch_entities: dict[str, _FakeSegment] = {}
+        self.planes: list[Any] = []
+        self.sketch_planes: list[str] = []
+
+    @staticmethod
+    def _ok(data: Any = None) -> SimpleNamespace:
+        return SimpleNamespace(is_success=True, data=data, error=None)
+
+    async def create_sketch(self, plane: str) -> SimpleNamespace:
+        self.sketch_planes.append(plane)
+        return self._ok()
+
+    async def add_line(self, x0: float, y0: float, x1: float, y1: float) -> Any:
+        line = f"Line{len(self.lines) + 1}"
+        self.lines[line] = ((x0, y0), (x1, y1))
+        self._sketch_entities[line] = _FakeSegment()
+        return self._ok(line)
+
+    async def add_sketch_constraint(
+        self, ref1: str, ref2: str | None, relation: str
+    ) -> SimpleNamespace:
+        self.relations.append((ref1, ref2, relation))
+        return self._ok()
+
+    async def exit_sketch(self) -> SimpleNamespace:
+        return self._ok()
+
+    async def create_plane(self, parameters: Any) -> SimpleNamespace:
+        self.planes.append(parameters)
+        return self._ok()
+
+    def point(self, ref: str) -> tuple[float, float]:
+        line, end = ref.split(".")
+        return self.lines[line][0 if end == "start" else 1]
+
+
+def _run_reference_sketch(
+    monkeypatch: pytest.MonkeyPatch, recipe: Any
+) -> tuple[_ReferenceSketchAdapter, dict[str, float]]:
+    """Run one reference-sketch recipe offline; prove each relation and dim
+    holds on the drawn geometry and the sketch is exactly defined, and return
+    the recorded dimension name -> value."""
+    adapter = _ReferenceSketchAdapter()
+    values: list[float] = []
+    anchors: list[str] = []
+    applied: list[list[str]] = []
+
+    async def dimension_between(
+        _adapter: Any, ref1: str, ref2: str, kind: str, value: float, label: str
+    ) -> str:
+        (x0, y0), (x1, y1) = adapter.point(ref1), adapter.point(ref2)
+        span = abs(x1 - x0) if kind == "horizontal_distance" else abs(y1 - y0)
+        assert kind in {"horizontal_distance", "vertical_distance"}, label
+        assert span == pytest.approx(value, abs=1e-9), label
+        values.append(value)
+        return label
+
+    async def anchor_point_to_origin(
+        _adapter: Any, ref: str, x: float, y: float, label: str
+    ) -> None:
+        assert adapter.point(ref) == pytest.approx((x, y)), label
+        assert (x == 0.0) != (y == 0.0), label  # one relation + one dim
+        anchors.append(ref)
+        values.append(x or y)
+
+    async def ensure_fully_defined(_adapter: Any, _label: str) -> None:
+        return None
+
+    class Dims(part.SketchDims):
+        def apply(self, _adapter: Any, _feature: str) -> list[tuple[str, str]]:
+            applied.append([name for name, _drive in self._rows])
+            return []
+
+    monkeypatch.setattr(part, "dimension_between", dimension_between)
+    monkeypatch.setattr(part, "anchor_point_to_origin", anchor_point_to_origin)
+    monkeypatch.setattr(part, "ensure_fully_defined", ensure_fully_defined)
+    monkeypatch.setattr(part, "SketchDims", Dims)
+    monkeypatch.setattr(part, "set_sketch_direct_db", lambda _adapter, _on: None)
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(part, "name_last_feature", lambda _adapter, _name: None)
+    monkeypatch.setattr(part, "_require_on_section_plane", lambda *_args: None)
+    asyncio.run(recipe(adapter))
+
+    (names,) = applied
+    assert len(names) == len(values) == len(set(names))
+    for segment in adapter._sketch_entities.values():
+        assert segment.ConstructionGeometry
+    for ref1, ref2, relation in adapter.relations:
+        if relation in {"horizontal", "vertical"}:
+            (x0, y0), (x1, y1) = adapter.lines[ref1]
+            assert (y0 == y1) if relation == "horizontal" else (x0 == x1), ref1
+        else:
+            (x0, y0), (x1, y1) = adapter.point(ref1), adapter.point(ref2)
+            assert relation in {"horizontal_points", "vertical_points"}
+            assert (y0 == y1) if relation == "horizontal_points" else (x0 == x1)
+    # Exactly defined: four DOF a line, one relation per anchor, every dim.
+    assert 4 * len(adapter.lines) == len(adapter.relations) + len(anchors) + len(values)
+    return adapter, dict(zip(names, values, strict=True))
+
+
+def test_face_reference_carries_the_outline_and_far_stations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter, dims = _run_reference_sketch(monkeypatch, part._face_reference)
+    assert adapter.sketch_planes == ["Front"]
+    assert print_spec.DRAWING_DIMENSIONS[print_spec.FACE_REFERENCE] <= set(dims)
+    assert dims["PlateWidth"] == spec.PLATE_WIDTH
+    assert dims["PlateHeight"] == spec.PLATE_HEIGHT
+    # Each far station is measured on a hole the spec's ligament check judges
+    # (to the 0.0002 the traced stations differ by).
+    for name, edge in (("RightHoleStation", "right"), ("TopHoleStation", "top")):
+        assert dims[name] == pytest.approx(
+            print_spec.HOLE_EDGE_STATIONS[edge], abs=1e-3
+        )
+    # Every chord lies on what the face view draws: an edge chord on the
+    # outline's straight run, a hole chord inside its hole from the centre.
+    outline = _rings(part.OUTLINE_DXF)[0]
+    holes = 0
+    for start, end in adapter.lines.values():
+        if tuple(start) in {tuple(xy) for xy in spec.SCREW_XY}:
+            holes += 1
+            assert math.dist(start, end) < drawing.HOLE_R
+            continue
+        for point in (start, ((start[0] + end[0]) / 2, (start[1] + end[1]) / 2), end):
+            gap = min(
+                _segment_distance(point, outline[i], outline[(i + 1) % len(outline)])
+                for i in range(len(outline))
+            )
+            assert gap < 1e-6, (start, end, point, gap)
+    assert holes == 2
+
+
+def test_section_reference_carries_both_depths_on_the_cut_plane(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter, dims = _run_reference_sketch(monkeypatch, part._section_reference)
+    assert adapter.sketch_planes == [print_spec.SECTION_PLANE]
+    assert print_spec.DRAWING_DIMENSIONS[print_spec.SECTION_REFERENCE] <= set(dims)
+    assert dims["FieldDepth"] == print_spec.FIELD_DEPTH == part.RECESS_DEPTH
+    assert dims["EngravingDepth"] == print_spec.ENGRAVING_FLOOR_DEPTH
+    # Each chord lies on the cut-face line A-A draws at its height: the
+    # decorated face, the groove's floor, the field's floor (sketch v = -z).
+    field = _rings(part.FIELD_DXF)[0]
+    engraving = _rings(part.ENGRAVING_DXF)
+    y = print_spec.SECTION_Y
+
+    def engraved(x: float) -> bool:
+        return sum(dxf.point_in_ring(ring, (x, y)) for ring in engraving) % 2 == 1
+
+    expected = {
+        0.0: (False, False),
+        print_spec.ENGRAVING_FLOOR_DEPTH: (False, True),
+        print_spec.FIELD_DEPTH: (True, False),
+    }
+    for (x0, v0), (x1, v1) in adapter.lines.values():
+        assert v0 == v1 and x0 < x1
+        for x in (x0, (x0 + x1) / 2.0, x1):
+            assert (dxf.point_in_ring(field, (x, y)), engraved(x)) == expected[v0], x
+        assert drawing.SECTION_CROP[0][0] < x0 and x1 < drawing.SECTION_CROP[1][0]
+
+
+def test_section_plane_is_the_top_plane_carried_to_the_cut(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The +Y offset keeps the Top plane's (u, v) = model (X, -Z), the frame
+    # SectionReference's chords are drawn in.
+    adapter = _ReferenceSketchAdapter()
+    monkeypatch.setattr(part, "name_last_feature", lambda _adapter, _name: None)
+    asyncio.run(part._section_plane(adapter))
+    (plane,) = adapter.planes
+    assert (plane.mode, plane.base_plane, plane.offset) == (
+        "offset",
+        "Top Plane",
+        print_spec.SECTION_Y,
+    )
 
 
 def test_no_model_band_every_dimension_prints_the_title_block_grade() -> None:
@@ -63,47 +283,19 @@ def test_print_contract_matches_the_built_geometry() -> None:
     assert print_spec.SCREW_HOLE_DIA == part.SCREW_HOLE_DIA
     assert print_spec.FIELD_DEPTH == part.RECESS_DEPTH
     assert print_spec.ENGRAVING_FLOOR_DEPTH == part.RECESS_DEPTH + part.ENGRAVE_DEPTH
-    # The sheet measures each far-edge station on the hole the spec's
-    # ligament check judges (to the 0.0002 the traced stations differ by).
-    for name, edge in (("right hole station", "right"), ("top hole station", "top")):
-        expected = drawing.FRONT_PICKS[name]["expected_mm"]
-        assert expected == pytest.approx(print_spec.HOLE_EDGE_STATIONS[edge], abs=1e-3)
-    assert drawing.FRONT_PICKS["plate width"]["expected_mm"] == spec.PLATE_WIDTH
-    assert drawing.FRONT_PICKS["plate height"]["expected_mm"] == spec.PLATE_HEIGHT
 
 
 def test_each_hole_prints_one_station_value_per_edge_pair() -> None:
     # "2X" stands for two holes whose stations print the same number.
-    places = print_spec.DRAWING_PRECISION["ScrewHoles"]
+    places = print_spec.DRAWING_PRECISION_BY_NAME
     bottom_left, bottom_right, top_left, top_right = spec.SCREW_XY
     assert round(bottom_left[0], places["S0X"]) == round(top_left[0], places["S0X"])
     assert round(bottom_left[1], places["S0Z"]) == round(bottom_right[1], places["S0Z"])
     right = [spec.PLATE_WIDTH - x for x in (bottom_right[0], top_right[0])]
     top = [spec.PLATE_HEIGHT - y for y in (top_left[1], top_right[1])]
-    for values, label in ((right, "right hole station"), (top, "top hole station")):
-        rounded = {
-            round(v, print_spec.DRAWING_REFERENCE_PRECISION[label]) for v in values
-        }
-        assert len(rounded) == 1, label
-
-
-def test_station_rim_picks_land_on_each_hole_and_off_the_head_mark() -> None:
-    # The pick sits on the rim; the nearest engraved edge stands off it, so
-    # the coordinate pick cannot take the head mark instead of the hole.
-    engraving = _rings(part.ENGRAVING_DXF)
-    picks = [
-        drawing.FRONT_PICKS["right hole station"]["p1"],
-        drawing.FRONT_PICKS["top hole station"]["p1"],
-    ]
-    for point in picks:
-        nearest_hole = min(spec.SCREW_XY, key=lambda xy: math.dist(xy, point[:2]))
-        assert math.isclose(math.dist(nearest_hole, point[:2]), drawing.HOLE_R)
-        clearance = min(
-            _segment_distance(point[:2], ring[i], ring[(i + 1) % len(ring)])
-            for ring in engraving
-            for i in range(len(ring))
-        )
-        assert clearance > 0.15, (point, clearance)
+    for values, name in ((right, "RightHoleStation"), (top, "TopHoleStation")):
+        assert len({round(v, places[name]) for v in values}) == 1, name
+    assert (part.RIGHT_HOLE, part.TOP_HOLE) == (bottom_right, top_left)
 
 
 def _segment_distance(
@@ -150,9 +342,9 @@ def test_section_a_crop_holds_the_border_the_groove_and_the_field() -> None:
     def engraved(x: float) -> bool:
         return sum(dxf.point_in_ring(ring, (x, y)) for ring in engraving) % 2 == 1
 
-    face = (drawing.SECTION_FACE_X, y)
+    face = (print_spec.SECTION_FACE_X, y)
     assert dxf.point_in_ring(outline, face) and not dxf.point_in_ring(field, face)
-    assert not engraved(drawing.SECTION_FACE_X)
+    assert not engraved(print_spec.SECTION_FACE_X)
     groove = (drawing.SECTION_GROOVE_X, y)
     assert not dxf.point_in_ring(field, groove) and engraved(drawing.SECTION_GROOVE_X)
     floor = (drawing.SECTION_FIELD_X, y)
@@ -195,24 +387,102 @@ def test_section_a_break_line_closes_the_crops_open_end() -> None:
 
 def test_section_a_dimensions_each_depth_on_its_own_line() -> None:
     # r2 review C2: the two depths shared one face arrow; each now stands on
-    # its own station, both from the decorated face (z = 0).
-    picks = drawing.SECTION_PICKS
-    field, groove = picks["sunk field depth"], picks["engraving depth"]
-    assert field["from"][1] == groove["from"][1] == 0.0
-    assert field["to"][0] != groove["to"][0]
-    assert field["text_xy"][0] != groove["text_xy"][0]
-    for pick in picks.values():
-        (_, z0), (_, z1) = pick["from"], pick["to"]
-        assert math.isclose(z0 - z1, pick["expected_mm"])
-        assert not pick["reference"] or pick is picks["floor under engraving"]
+    # its own station, both from the decorated face chord's end (z = 0).
+    chords = print_spec.SECTION_REFERENCE_CHORDS
+    face, field, groove = chords["face"], chords["field"], chords["groove"]
+    assert face[2] == 0.0 and field[0] != groove[0]
+    assert -field[2] == print_spec.FIELD_DEPTH
+    assert -groove[2] == print_spec.ENGRAVING_FLOOR_DEPTH
+    keep = drawing.SECTION_KEEP
+    assert keep["FieldDepth"][0] != keep["EngravingDepth"][0]
     # B3: the floor under the engraving chains below the engraving depth as
     # a reference, plate thickness less the engraving floor depth.
-    floor = picks["floor under engraving"]
-    assert floor["reference"] and floor["from"] == groove["to"]
+    floor = drawing.FLOOR_REFERENCE
+    assert floor["from"] == (groove[0], groove[2])
+    (_, z0), (_, z1) = floor["from"], floor["to"]
+    assert math.isclose(z0 - z1, floor["expected_mm"])
     assert math.isclose(
         floor["expected_mm"], spec.PLATE_THICKNESS - print_spec.ENGRAVING_FLOOR_DEPTH
     )
     assert floor["callout"] == "FLOOR UNDER ENGRAVING"
+
+
+class _FakeDisplay:
+    def __init__(self) -> None:
+        self.precision: tuple[int, ...] | None = None
+
+    def SetPrecision3(self, *places: int) -> None:  # noqa: N802 -- COM name
+        self.precision = places
+
+    def GetPrimaryPrecision2(self) -> int:  # noqa: N802 -- COM name
+        assert self.precision is not None
+        return self.precision[0]
+
+    def GetAnnotation(self) -> _FakeDisplay:  # noqa: N802 -- COM name
+        return self
+
+
+def test_floor_reference_measures_through_the_shared_helper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The sheet measures its one derived dimension with the shared
+    # assert_dimension_measures (attachments checked, 1e-3 mm), not a copy,
+    # and gives it the spec's reference places.
+    assert (
+        drawing.assert_dimension_measures
+        is _drawing_edge_dimensions.assert_dimension_measures
+    )
+    display = _FakeDisplay()
+    calls: dict[str, Any] = {}
+
+    def cut_face_line(_edges: Any, *, x_mm: float, z_mm: float, label: str) -> Any:
+        return f"edge@{z_mm}", (x_mm, print_spec.SECTION_Y, z_mm)
+
+    def measures(_adapter: Any, dimension: Any, **kwargs: Any) -> float:
+        calls["measures"] = (dimension, kwargs)
+        return kwargs["expected_mm"]
+
+    def add_edge_dimension(_adapter: Any, _view: Any, **kwargs: Any) -> Any:
+        calls["add"] = kwargs
+        return display
+
+    monkeypatch.setattr(drawing, "scan_view_edges", lambda _view, label: label)
+    monkeypatch.setattr(drawing, "_cut_face_line", cut_face_line)
+    monkeypatch.setattr(
+        drawing, "model_points_in_view", lambda _a, _v, points, label: points
+    )
+    monkeypatch.setattr(drawing, "add_edge_dimension", add_edge_dimension)
+    monkeypatch.setattr(drawing, "assert_dimension_measures", measures)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(
+        drawing,
+        "set_reference_dimension",
+        lambda _a, annotation, label: calls.setdefault("reference", label),
+    )
+    monkeypatch.setattr(
+        drawing,
+        "set_dimension_callouts",
+        lambda _a, _annotations, callouts: calls.setdefault("callouts", callouts),
+    )
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, _annotation: "RD1")
+    drawing._floor_reference(object(), object())
+
+    floor = drawing.FLOOR_REFERENCE
+    entities = (f"edge@{floor['from'][1]}", f"edge@{floor['to'][1]}")
+    assert calls["add"]["entities"] == entities
+    assert calls["measures"] == (
+        display,
+        {
+            "expected_mm": floor["expected_mm"],
+            "label": drawing.FLOOR_REFERENCE_LABEL,
+            "entities": entities,
+            "tolerance_mm": 1e-3,
+        },
+    )
+    places = print_spec.DRAWING_REFERENCE_PRECISION[drawing.FLOOR_REFERENCE_LABEL]
+    assert display.precision == (places, -1, -1, -1)
+    assert calls["reference"] == drawing.FLOOR_REFERENCE_LABEL
+    assert calls["callouts"] == {"RD1": print_spec.FLOOR_UNDER_ENGRAVING_CALLOUT}
 
 
 def test_section_a_texts_and_caption_clear_each_other() -> None:
@@ -238,7 +508,14 @@ def test_section_a_texts_and_caption_clear_each_other() -> None:
     crop_low = drawing._section_xy(*drawing.SECTION_CROP[1])
     crop_high = drawing._section_xy(*drawing.SECTION_CROP[0])
     crop = (crop_high[0], crop_low[1], crop_low[0], crop_high[1])
-    placed = {name: boxes(pick) for name, pick in drawing.SECTION_PICKS.items()}
+    texts = {
+        **{
+            name: {"text_xy": xy, "callout": print_spec.SECTION_CALLOUTS[name]}
+            for name, xy in drawing.SECTION_KEEP.items()
+        },
+        drawing.FLOOR_REFERENCE_LABEL: drawing.FLOOR_REFERENCE,
+    }
+    placed = {name: boxes(pick) for name, pick in texts.items()}
     for name, candidates in placed.items():
         for box in candidates:
             assert box[2] < _BORDER[2] - 0.003, name
@@ -304,8 +581,8 @@ def test_texts_stand_inside_the_border_and_off_the_title_block() -> None:
     points = [
         *drawing.FRONT_KEEP.values(),
         *drawing.RIGHT_KEEP.values(),
-        *(pick["text_xy"] for pick in drawing.FRONT_PICKS.values()),
-        *(pick["text_xy"] for pick in drawing.SECTION_PICKS.values()),
+        *drawing.SECTION_KEEP.values(),
+        drawing.FLOOR_REFERENCE["text_xy"],
         drawing.HOLE_CALLOUT_XY,
         drawing.NOTES_XY,
         drawing.SCREW_HEAD_NOTE_XY,
@@ -323,7 +600,6 @@ def test_texts_stand_inside_the_border_and_off_the_title_block() -> None:
     right, top = drawing._front_xy(spec.PLATE_WIDTH, spec.PLATE_HEIGHT)
     for x, y in [
         *drawing.FRONT_KEEP.values(),
-        *(pick["text_xy"] for pick in drawing.FRONT_PICKS.values()),
         drawing.HOLE_CALLOUT_XY,
     ]:
         assert not (
@@ -331,10 +607,10 @@ def test_texts_stand_inside_the_border_and_off_the_title_block() -> None:
         )
     # r2 audit: the plate height's dimension line crossed both "2X 4.1"
     # station texts, which print 1.5..14.6 mm left of their own lines.
-    height_line_x = drawing.FRONT_PICKS["plate height"]["text_xy"][0]
+    height_line_x = drawing.FRONT_KEEP["PlateHeight"][0]
     for station_x, _ in (
         drawing.FRONT_KEEP["S0Z"],
-        drawing.FRONT_PICKS["top hole station"]["text_xy"],
+        drawing.FRONT_KEEP["TopHoleStation"],
     ):
         assert height_line_x < station_x - 0.0146 - 0.002
 
