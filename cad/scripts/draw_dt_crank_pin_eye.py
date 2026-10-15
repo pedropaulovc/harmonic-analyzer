@@ -14,7 +14,7 @@ complete the sheet. No datums, no frames, no roughness symbol: the part is
 The decimal places are the PART's (``dt_crank_pin_eye_notes``, applied
 natively by ``build_dt_crank_pin_eye``); this script only reads them back.
 
-Drawn 10:1 -- a 5 x 6.5 eye of Ø1 wire is a speck on a B sheet at less.
+Drawn 10:1 -- a 5.3 x 6.65 eye of Ø1 wire is a speck on a B sheet at less.
 """
 
 from __future__ import annotations
@@ -100,7 +100,7 @@ def _side_xy(model_z_mm: float, model_y_mm: float) -> tuple[float, float]:
 
 LOOP_CENTER_XY = _side_xy(-LOOP_R, 0.0)
 TAIL_END_XY = _side_xy(0.0, TAIL_LEN)
-HALF_OD = (LOOP_R + WIRE_DIA / 2.0) * _S  # 0.025
+HALF_OD = (LOOP_R + WIRE_DIA / 2.0) * _S  # 0.0265
 
 # Side view: the loop's inside diameter labelled down and right of the loop,
 # its chain callout in the open field under it; the tail's length on the
@@ -122,6 +122,7 @@ TOP_KEEP = {
 }
 
 
+@_telemetry.traced("drawing.crank_pin_eye.top_view_projection")
 def _turn_top_view(adapter: Any, drawing_model: Any, side: Any, top: Any) -> None:
     """Turn the top view into projection over the side view, and prove it."""
     native = _early_bound(top, "IView")

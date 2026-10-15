@@ -48,7 +48,7 @@ import math
 
 from dt_crank_arm_spec import ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ARM_THICKNESS, HALF_WIDTH
 from dt_crank_hub_geometry import HUB_BARREL_DIA, HUB_LENGTH, SERVICE_PIN_STATION
-from dt_crank_pin_eye_spec import ANCHOR_AIR, LOOP_INNER_R, LOOP_R
+from dt_crank_pin_eye_spec import ANCHOR_AIR, LOOP_ID_MIN, LOOP_INNER_R, LOOP_R
 from dt_crank_pin_eye_spec import TAIL_LEN as EYE_TAIL_LEN
 from dt_crank_pin_eye_spec import WIRE_DIA as EYE_WIRE_DIA
 from dt_crank_pin_ring_spec import MEAN_R, PIN_PROUD, RING_BOTTOM_X, RING_CENTRE_X
@@ -94,6 +94,16 @@ LINK_SLOT_WIDTH = LINK_TIP_HOLE
 LINK_BEAD_SPACING = 2.0 * LINK_END_BEAD_X  # the joint's gap between end beads
 
 AIR = 0.02  # minimum air the solve leaves between parts that must not touch
+# The cut chain is threaded through the anchor eye before the link closes it,
+# so a bead must pass the loop at the loop's smallest printed inside diameter.
+EYE_BEAD_PASS_AIR = 0.05  # least radial air round a bead passing the loop
+EYE_BEAD_AIR_MIN = (LOOP_ID_MIN - BEAD_DIA) / 2.0
+if EYE_BEAD_AIR_MIN < EYE_BEAD_PASS_AIR - 1e-9:
+    raise AssertionError(
+        f"the anchor eye's smallest printed loop (Ø{LOOP_ID_MIN}) leaves "
+        f"{EYE_BEAD_AIR_MIN:.3f} radial air round the Ø{BEAD_DIA:.3f} bead, "
+        f"under {EYE_BEAD_PASS_AIR}"
+    )
 
 # --- pose inputs from the part specs (crank frame) ----------------------------
 HUB_R = HUB_BARREL_DIA / 2.0
