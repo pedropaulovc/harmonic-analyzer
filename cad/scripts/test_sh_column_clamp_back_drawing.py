@@ -31,13 +31,12 @@ def test_required_drawing_paths() -> None:
 
 def test_marked_dimensions_are_exactly_the_kept_set() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.TOP_KEEP) | set(drawing.FRONT_KEEP) | set(drawing.LEFT_KEEP)
+    kept = set(drawing.TOP_KEEP) | set(drawing.FACE_KEEP)
     assert kept == marked
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     assert part.DRAWING_PRECISION is spec.DRAWING_PRECISION
     annotated = (
         set(drawing.DIMENSION_CALLOUTS)
-        | set(drawing.ABOVE_CALLOUTS)
         | set(drawing.DIMENSION_PREFIXES)
         | set(drawing.REFERENCE_DIMENSIONS)
     )
@@ -80,8 +79,9 @@ def test_tight_bands_name_their_mate() -> None:
     assert "DIAMETRAL" in bore and "MHA-FR-003" in bore
     assert f"{fit.BORE_DIAMETRAL_CLEARANCE[0]:.2f}" in bore
     assert "MHA-SH-001" in drawing.DIMENSION_CALLOUTS["GripOffset"]
-    assert "MHA-SH-001" in drawing.ABOVE_CALLOUTS["EarHole1Z"]
-    assert "\n" not in drawing.ABOVE_CALLOUTS["EarHole1Z"]
+    assert "MHA-SH-001" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
+    # The grip offset says what it locates: the bore axis, off the split face.
+    assert "BORE AXIS" in drawing.DIMENSION_CALLOUTS["GripOffset"]
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "GRIP_OFFSET_BAND" in source and "EAR_STATION_BAND" in source
 
@@ -100,7 +100,17 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 1)" in source
-    assert "for view in (front, top, left, iso):" in source
+    assert "for view in (top, face, iso):" in source
+
+
+def test_split_face_view_projects_beside_the_plan() -> None:
+    # Third-angle right-side projection of the plan: level with it, to its
+    # right (the split face is the plan's right edge), the 48 running up both.
+    assert drawing.FACE_CENTER[1] == drawing.TOP_CENTER[1]
+    assert drawing.FACE_CENTER[0] > drawing.TOP_CENTER[0]
+    ear_1 = drawing._face_xy(0.0, spec.EAR_HOLE_Z)
+    assert ear_1[0] == drawing.FACE_CENTER[0]
+    assert ear_1[1] < drawing.FACE_CENTER[1]  # +Z runs down, as in the plan
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
 
 
