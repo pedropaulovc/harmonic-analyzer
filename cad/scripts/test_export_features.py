@@ -398,10 +398,13 @@ def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -
     assert features["profile_outer"]["bottom_radius"] == rocker.R_BOTTOM
     assert features["top_edge"]["arc_len"] == rocker.TOP_ARC_LEN
     assert features["profile_outer"]["bottom_arc_len"] == rocker.BOT_ARC_LEN
-    for name, outside in (("top_edge", rocker.TOP_EDGE_BAND[0]), ("profile_outer", rocker.TOP_EDGE_BAND[1])):
+    for name, outside, suffix in (
+        ("top_edge", rocker.TOP_EDGE_BAND[0], ""),
+        ("profile_outer", rocker.TOP_EDGE_BAND[1], ", BETWEEN J AND K"),
+    ):
         assert features[name]["dimension_type"] == "basic"
         assert "unknown" in features[name]["requirements"]
-        assert features[name]["note"] == f"SURFACE PROFILE {rocker.TOP_EDGE_BAND[0]:g} U{outside:g} TO A|B|C"
+        assert features[name]["note"] == f"SURFACE PROFILE {rocker.TOP_EDGE_BAND[0]:g} U{outside:g} TO A|B|C{suffix}"
         assert set(exporter._cite(rocker, "TOP_EDGE_BAND")) <= set(features[name]["cite"]["note"])
     assert "depth_ref" not in features["profile_outer"]["requirements"]
     assert "centre_from_pivot_ref" not in features["top_edge"]["requirements"]
@@ -431,11 +434,15 @@ def test_shaft_flats_are_coplanar_faces_named_by_their_stations() -> None:
         assert _owners("ch_pivot_shaft", face) == [name]
 
 
-def test_rocker_datum_domains_are_only_the_drawing_bore_broad_face_and_positive_tip() -> None:
+def test_rocker_datum_domains_are_only_the_drawing_bore_broad_face_and_rod_pin_hole() -> None:
     manifest = exporter.requirement_manifest("ch_rocker_arm")
     assert manifest["datums"]["A"]["feature"] == "pivot_bore"
     assert manifest["datums"]["B"]["feature"] == "strap_datum_b"
-    assert manifest["datums"]["C"]["feature"] == "tip_land_pos_x"
+    # Option 4: C is the rod-pin hole; the lands sit in the J↔K profile zone.
+    assert manifest["datums"]["C"]["feature"] == "rod_hole"
+    assert manifest["features"]["rod_hole"]["datum"] == "C"
+    assert manifest["features"]["rod_hole"]["position_datums"] == ["A", "B"]
+    assert manifest["features"]["profile_outer"]["note"].endswith(", BETWEEN J AND K")
     assert _owners("ch_rocker_arm", _plane((0, 0, 1), (0, 0, rocker.ARM_THICKNESS / 2))) == ["strap_datum_b"]
     assert _owners("ch_rocker_arm", _plane((0, 0, -1), (0, 0, -rocker.ARM_THICKNESS / 2))) == ["strap_faces"]
     # The authored land is radial from the top arc's endpoint. Its surface
@@ -452,6 +459,7 @@ def test_rocker_datum_domains_are_only_the_drawing_bore_broad_face_and_positive_
     assert "datum" not in manifest["features"]["profile_outer"]
     assert "datum" not in manifest["features"]["strap_faces"]
     assert "datum" not in manifest["features"]["tip_land_neg_x"]
+    assert "datum" not in manifest["features"]["tip_land_pos_x"]
 
 
 def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
@@ -646,7 +654,7 @@ def test_raw_step_face_sets_and_values_satisfy_installed_consumer_schema(tmp_pat
         pivot_faces = expected_faces("HAF_PIVOT_BORE__P01")
         assert len(pivot_faces) == 2
         assert loaded.features["pivot_bore"].faces == pivot_faces
-        for datum, label in (("B", "HAF_STRAP_DATUM_B__P01"), ("C", "HAF_TIP_LAND_POS_X__P01")):
+        for datum, label in (("B", "HAF_STRAP_DATUM_B__P01"), ("C", "HAF_ROD_HOLE__P01")):
             datum_faces = expected_faces(label)
             assert len(datum_faces) == 1
             assert loaded.features[loaded.datums[datum].feature].faces == datum_faces

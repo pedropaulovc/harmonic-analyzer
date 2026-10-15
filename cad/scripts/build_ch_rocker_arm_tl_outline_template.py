@@ -1,8 +1,8 @@
 r"""Build the rocker arm's outline template (MHA-CH-006-TL-13; shop gauge).
 
 An annealed O1 plate cut to the rocker arm's finished outline about its pivot
-hole, aimed at the middle of the rocker's arc zone
-(``ch_rocker_arm_tl_outline_template_spec``).
+hole, aimed at the middle of the rocker's arc zone, with a radial slot at the
+arm's rod-pin hole that clocks it (``ch_rocker_arm_tl_outline_template_spec``).
 
 Layout (the spec's frame): the pivot hole on the origin, the arcs' common
 centre straight up the Y axis, the outline sketched on the Front plane and
@@ -44,10 +44,14 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import (
+    set_dimension_basic_tolerance,
+    set_dimension_bilateral_tolerance,
+)
 from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from ch_rocker_arm_tl_outline_template_spec import (
+    BASIC_DIMENSIONS,
     BOT_END_X,
     BOT_END_Y,
     BOTTOM_BELOW_PIVOT,
@@ -59,6 +63,11 @@ from ch_rocker_arm_tl_outline_template_spec import (
     ISOMETRIC_VIEW_NOTE,
     PIVOT_HOLE_DIA,
     PLATE_VOLUME,
+    ROD_SLOT_AREA,
+    ROD_SLOT_FLAT,
+    ROD_SLOT_WIDTH,
+    ROD_SLOT_X,
+    ROD_SLOT_Y,
     R_BOTTOM,
     R_TOP,
     THICK,
@@ -69,6 +78,7 @@ from ch_rocker_arm_tl_outline_template_spec import (
     TOP_END_X,
     TOP_END_Y,
     outline_area,
+    rod_slot_points,
 )
 
 PART_NAME = "ch-rocker-arm-tl-outline-template"
@@ -121,6 +131,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "TipFaceLen", f"{TIP_FACE}mm")
     await set_global(adapter, "PivotHoleDia", f"{PIVOT_HOLE_DIA}mm")
     await set_global(adapter, "PlateThickness", f"{THICK}mm")
+    await set_global(adapter, "RodSlotX", f"{ROD_SLOT_X}mm")
+    await set_global(adapter, "RodSlotY", f"{ROD_SLOT_Y}mm")
+    await set_global(adapter, "RodSlotWidth", f"{ROD_SLOT_WIDTH}mm")
+    await set_global(adapter, "RodSlotFlat", f"{ROD_SLOT_FLAT}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -236,10 +250,127 @@ async def build(adapter) -> dict[str, str]:
     v_hole = math.pi * (PIVOT_HOLE_DIA / 2.0) ** 2 * THICK
     if 0.002 * v_plate >= 0.5 * v_hole:
         raise AssertionError("the volume gate can no longer see the pivot hole")
+    v_slot = ROD_SLOT_AREA * THICK
     v_measured = await volume_check(
-        adapter, "plate less pivot hole", PLATE_VOLUME, 0.002 * v_plate
+        adapter, "plate less pivot hole", PLATE_VOLUME + v_slot, 0.002 * v_plate
     )
     _require_one_solid_body(adapter, label="plate")
+
+    # Rod-pin slot: a radial stadium at the rocker's rod-pin hole station,
+    # one closed contour (build_fr_top_frame's dowel-slot recipe, turned to
+    # the radial). A construction ray from the pivot to the slot's centre
+    # holds the station; the slot's construction axis has that point as its
+    # midpoint and runs parallel to the ray, so the slot is radial. The
+    # printed BASIC station lives in RodSlotReference, below.
+    slot = SketchDims()
+    check("create_sketch rod slot", await adapter.create_sketch("Front"))
+    p1, p2, p3, p4, outer, inner = rod_slot_points()
+    set_sketch_direct_db(adapter, True)
+    ray = check(
+        "rod slot ray", await adapter.add_line(0.0, 0.0, ROD_SLOT_X, ROD_SLOT_Y)
+    )
+    axis = check("rod slot axis", await adapter.add_line(*inner, *outer))
+    side_a = check("rod slot side a", await adapter.add_line(*p1, *p2))
+    outer_end = check("rod slot outer end", await adapter.add_arc(*outer, *p2, *p3))
+    side_b = check("rod slot side b", await adapter.add_line(*p3, *p4))
+    inner_end = check("rod slot inner end", await adapter.add_arc(*inner, *p4, *p1))
+    set_sketch_direct_db(adapter, False)
+    for line in (ray, axis):
+        _as_construction(adapter, line)
+    for join, a, b in (
+        ("side a - outer end", f"{side_a}.end", f"{outer_end}.start"),
+        ("outer end - side b", f"{outer_end}.end", f"{side_b}.start"),
+        ("side b - inner end", f"{side_b}.end", f"{inner_end}.start"),
+        ("inner end - side a", f"{inner_end}.end", f"{side_a}.start"),
+        ("outer centre on the axis", f"{outer_end}.center", f"{axis}.end"),
+        ("inner centre on the axis", f"{inner_end}.center", f"{axis}.start"),
+    ):
+        check(
+            f"rod slot {join}",
+            await adapter.add_sketch_constraint(a, b, "coincident"),
+        )
+    # Tangency closes the shape; parallel sides make both ends one radius.
+    for a, b in (
+        (side_a, outer_end),
+        (outer_end, side_b),
+        (side_b, inner_end),
+        (inner_end, side_a),
+    ):
+        check(
+            f"rod slot {a} tangent {b}",
+            await adapter.add_sketch_constraint(a, b, "tangent"),
+        )
+    check(
+        "rod slot sides parallel",
+        await adapter.add_sketch_constraint(side_a, side_b, "parallel"),
+    )
+    check(
+        "rod slot centre at the axis midpoint",
+        await adapter.add_sketch_constraint(f"{ray}.end", axis, "midpoint"),
+    )
+    check(
+        "rod slot radial",
+        await adapter.add_sketch_constraint(axis, ray, "parallel"),
+    )
+    # Emission order: the station (x, y), the width across the outer end's
+    # tangent points (its witness lines run outboard, clear of the slot),
+    # then side a's straight run.
+    await anchor_point_to_origin(adapter, f"{ray}.start", 0.0, 0.0, "rod slot ray foot")
+    await dimension_between(
+        adapter,
+        f"{ray}.start",
+        f"{ray}.end",
+        "horizontal_distance",
+        ROD_SLOT_X,
+        "rod slot station x",
+    )
+    slot.record("RodSlotCentreX", '"RodSlotX"')
+    await dimension_between(
+        adapter,
+        f"{ray}.start",
+        f"{ray}.end",
+        "vertical_distance",
+        ROD_SLOT_Y,
+        "rod slot station y",
+    )
+    slot.record("RodSlotCentreY", '"RodSlotY"')
+    await dimension_between(
+        adapter,
+        f"{side_a}.end",
+        f"{side_b}.start",
+        "distance",
+        ROD_SLOT_WIDTH,
+        "rod slot width",
+    )
+    slot.record("RodSlotWidth", '"RodSlotWidth"')
+    await dimension_between(
+        adapter,
+        f"{side_a}.start",
+        f"{side_a}.end",
+        "distance",
+        ROD_SLOT_FLAT,
+        "rod slot run",
+    )
+    slot.record("RodSlotFlat", '"RodSlotFlat"')
+    await ensure_fully_defined(adapter, "rod slot sketch")
+    check("exit_sketch rod slot", await adapter.exit_sketch())
+    name_last_feature(adapter, "RodSlotProfile")
+    drive_jobs += slot.apply(adapter, "RodSlotProfile")
+    check(
+        "cut rod slot",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "RodSlot")
+    # The slot (~15 mm^3) is under the plate gate's tolerance, so it is
+    # checked against the measured plate with a tolerance it can fail.
+    v_measured = await volume_check(
+        adapter, "plate less rod slot", v_measured - v_slot, 0.05 * v_slot
+    )
+    if abs(v_measured - PLATE_VOLUME) > 0.002 * v_plate:
+        raise RuntimeError("plate less pivot hole and rod slot left PLATE_VOLUME")
+    _require_one_solid_body(adapter, label="plate with rod slot")
 
     # REFERENCE sketch: the print gives each arc's height on the mirror line
     # from the pivot hole, yet no outline dimension carries it (the arcs hang
@@ -289,6 +420,39 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "ApexReference")
     drive_jobs += apex.apply(adapter, "ApexReference")
 
+    # REFERENCE sketch for the rod slot's BASIC station, the same form: one
+    # construction ray from the pivot centre to the slot's centre, its x and
+    # y the printed values, driven by the globals the slot itself reads.
+    slot_station = SketchDims()
+    check("create_sketch rod slot reference", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    station_ray = check(
+        "rod slot station ray",
+        await adapter.add_line(0.0, 0.0, ROD_SLOT_X, ROD_SLOT_Y),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, station_ray)
+    await anchor_point_to_origin(
+        adapter, f"{station_ray}.start", 0.0, 0.0, "rod slot station foot"
+    )
+    for name, kind, value in (
+        ("RodSlotX", "horizontal_distance", ROD_SLOT_X),
+        ("RodSlotY", "vertical_distance", ROD_SLOT_Y),
+    ):
+        await dimension_between(
+            adapter,
+            f"{station_ray}.start",
+            f"{station_ray}.end",
+            kind,
+            value,
+            f"rod slot BASIC {name}",
+        )
+        slot_station.record(name, f'"{name}"')
+    await ensure_fully_defined(adapter, "rod slot reference sketch")
+    check("exit_sketch rod slot reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "RodSlotReference")
+    drive_jobs += slot_station.apply(adapter, "RodSlotReference")
+
     # Apply the deferred drive equations after the whole model exists; each
     # evaluates to the value just built, so the geometry must not move.
     await force_rebuild(adapter)
@@ -309,6 +473,8 @@ async def build(adapter) -> dict[str, str]:
         set_dimension_bilateral_tolerance(
             adapter, feature_name, dimension_name, *deviations(band)
         )
+    for feature_name, dimension_name in BASIC_DIMENSIONS:
+        set_dimension_basic_tolerance(adapter, feature_name, dimension_name)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -321,10 +487,11 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    # The reference sketch owns printed dimensions but no geometry: hide it
-    # so no assembly renders it; the drawing shows it in the view that
-    # imports its dimensions (_drawing_hidden_sketches).
+    # The reference sketches own printed dimensions but no geometry: hide
+    # them so no assembly renders them; the drawing shows each in the view
+    # that imports its dimensions (_drawing_hidden_sketches).
     blank_sketch(adapter, "ApexReference")
+    blank_sketch(adapter, "RodSlotReference")
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

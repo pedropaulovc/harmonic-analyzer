@@ -133,9 +133,10 @@ drill rows; place the **whole** HubLength value/stack to the left, outside both
 witnesses and clear of the drill and arrow tail. A rightward move is not a
 clearance proof: an above-callout row can reflow the lower tolerance into E's
 full circle. R23's numeric angular BASIC box still crossed its witness and
-arc. Pedro's superseding R27 ruling removes that angular dimension entirely:
-Manufacturing Note 1 carries **AT 10.46° BASIC TO DATUM C**, and note 5 refers
-to that datum-defined mirror plane. Do not replace the removed dimension
+arc. Pedro's superseding R27 ruling removes that angular dimension entirely
+(option 4 later moved datum C from the +X tip land to the rod-pin hole: note 1
+now says the mirror plane is clocked by C, note 2 makes the tip lands radial
+to the arc centre, and the old note 5 is gone). Do not replace the removed dimension
 with another offset, seed or route mechanism. Retain R23's R800/R816 positions;
 their C1/C2 clarity findings remain open. Remove automatic
 centre-mark reinsertion on front/D/E while strictly retaining the native
@@ -224,9 +225,9 @@ gap passed both witness routes, with upper/lower crop-visible portions
 The parent taper witness must miss E's source circle without changing its value
 or endpoints. Note 2 states
 explicitly that the top basic is **ABOVE A** and the common arc centre is
-above A. The approved B2-1 reference clarification defines the mirror plane
-through datum axis A, perpendicular to datum B and at the source-derived
-10.46° BASIC angle to datum C; note 5 refers to that datum-defined plane.
+above A. The B2-1 reference clarification, as revised by option 4, defines
+the mirror plane through datum axis A, perpendicular to datum B and clocked by
+datum C, the rod-pin hole, whose BASIC pin coordinates fix the angle.
 The familiar pin coordinates and arc basics remain unchanged and are thereby
 chained to A|B|C. None of these presentation/reference controls changes a
 datum feature, geometry, zone or manufacturing tolerance.

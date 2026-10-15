@@ -118,11 +118,11 @@ def test_sheet_runs_at_1_to_2() -> None:
 def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
     notes = ch_rocker_arm_notes.DRAWING_NOTES
     # One common nominal centre on the plane, explicitly above physical A.
-    assert "COMMON ARC CENTRE ABOVE A ON THE PLANE." in notes
+    assert "COMMON ARC CENTRE ABOVE A ON THE PLANE;" in notes
     assert "R800" not in notes
     assert "R816" not in notes
     # Processes and through conditions belong to the native size callouts.
-    assert "(1X)" in notes
+    assert "ROD-PIN HOLE, 1X" in notes
     assert "#47" not in notes
     assert "PIVOT HOLE: REAM" not in notes
     assert "16.00 REF" not in notes
@@ -133,39 +133,23 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "HUB LENGTH SETS THE PITCH" in " ".join(notes.split())
     assert "ARC LENGTHS" not in notes
     assert "EACH END:" not in notes
-    assert re.findall(r"^(\d+)\.", notes, re.MULTILINE) == ["1", "2", "3", "4", "5"]
+    assert re.findall(r"^(\d+)\.", notes, re.MULTILINE) == ["1", "2", "3", "4"]
     assert "UPPER BAR CONTACT; LOWER STRAP ENVELOPE" in notes
     assert "ROD-PIN SETS CONNECTING-ROD GEOMETRY." not in notes
-    assert "5. DATUM C: STRAP END LAND IN DETAIL E." in notes
-    assert "   MIRROR PLANE IS DEFINED BY NOTE 1." in notes
+    # Option 4: datum C is the rod-pin hole; the old note 5 (C on the land) is gone.
+    assert "STRAP END LAND" not in notes and "DEFINED BY NOTE 1" not in notes
     assert (
-        f"1. MIRROR PLANE: THROUGH DATUM AXIS A, PERPENDICULAR TO DATUM B, AT "
-        f"{math.degrees(ch_rocker_arm_spec._ALPHA_TOP):.2f}° BASIC TO DATUM C."
+        "1. MIRROR PLANE: THROUGH DATUM AXIS A, PERPENDICULAR TO DATUM B, "
+        "CLOCKED BY DATUM C (ROD-PIN HOLE, 1X, END SHOWN)."
         in " ".join(notes.split())
     )
+    # The lands' 10.46° is derived (radial to the arc centre), never a note number.
+    assert "2. COMMON ARC CENTRE ABOVE A ON THE PLANE; TIP LANDS RADIAL TO IT." in " ".join(notes.split())
+    assert "°" not in notes
     assert "NORMAL TO LENGTH" not in notes and "NOMINAL MIRROR PLANE" not in notes
     assert f"{ch_rocker_arm_notes.HUB_WALL_NOTE}." in notes
     assert max(map(len, notes.splitlines())) <= 42
-    assert len(notes.splitlines()) == 13
-    notes_tree = ast.parse(Path(ch_rocker_arm_notes.__file__).read_text(encoding="utf-8"))
-    angle_note = next(
-        node for node in ast.walk(notes_tree)
-        if isinstance(node, ast.JoinedStr)
-        and isinstance(node.values[0], ast.Constant)
-        and node.values[0].value == "   "
-    )
-    assert ast.dump(angle_note.values[1].value) == ast.dump(
-        ast.parse("math.degrees(_ALPHA_TOP)", mode="eval").body
-    )
-    assert angle_note.values[1].format_spec.values[0].value == (
-        f".{ch_rocker_arm_notes.DEFAULT_DRAWING_PRECISION}f"
-    )
-    assert any(
-        isinstance(node, ast.ImportFrom)
-        and node.module == "ch_rocker_arm_spec"
-        and any(alias.name == "_ALPHA_TOP" for alias in node.names)
-        for node in notes_tree.body
-    )
+    assert len(notes.splitlines()) == 11
     assert (
         f"HUB OD COAXIAL WITH PIVOT BORE WITHIN Ø{ch_rocker_arm_spec.HUB_COAXIALITY_DIA:.2f}."
         in " ".join(line.strip() for line in notes.splitlines())
@@ -197,9 +181,12 @@ def test_native_gdt_and_finish_present() -> None:
         ("_drawing_hole_callout", "add_native_hole_callout"),
     )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # A = pivot bore axis, B = broad face (right end view), C = rod-side tip
-    # face; the rod-pin position frame references all three.
-    assert source.count("add_datum_feature(") == 3
+    # A = pivot bore axis, B = broad face (right end view): edge tags. C is
+    # the rod-pin hole, tagged on its own position frame (option 4), which
+    # references only A|B.
+    assert source.count("add_datum_feature(") == 2
+    assert source.count("add_frame_datum_feature(\n            adapter, end, rod_position_gtol,") == 1
+    assert drawing.ROD_HOLE.fields["datum"][0] == "C"
     # Datum A's leader runs oblique, 45 deg off both centre-mark axes.
     assert math.degrees(drawing.PIVOT_DATUM_ANGLE) % 90.0 == pytest.approx(45.0)
     assert 'label="pivot bore cylindrical datum feature"' in source
@@ -225,7 +212,7 @@ def test_native_gdt_and_finish_present() -> None:
         compile(ast.Expression(keywords["datums"]), drawing.__file__, "eval"),
         vars(drawing),
     )
-    assert printed_datums == ("A", "B", "C")
+    assert printed_datums == ("A", "B")
     printed_tolerance = eval(
         compile(ast.Expression(keywords["tolerance"]), drawing.__file__, "eval"),
         vars(drawing),
@@ -506,9 +493,24 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         return native_frames[("TopRadius", "BottomRadius")[len(frames) - 1]]
 
     monkeypatch.setattr(drawing, "add_feature_control_frame", add_frame)
+    between, letters = [], []
+    monkeypatch.setattr(drawing, "_set_profile_between", lambda a, gtol: between.append((a, gtol)))
+    monkeypatch.setattr(
+        drawing, "add_leader_note",
+        lambda a, text, **kwargs: letters.append((a, text, kwargs)) or text,
+    )
     assert drawing._add_arc_profiles(adapter, front) == native_frames
     assert picks == [1600.0, 1632.0]
     assert len(frames) == 2
+    # Only the lower (Ⓤ0) frame carries J↔K: its zone runs over both lands.
+    assert between == [(adapter, native_frames["BottomRadius"])]
+    assert [text for _a, text, _kw in letters] == ["J", "K"]
+    for (_a, letter, kwargs), sign in zip(letters, (-1.0, 1.0)):
+        assert kwargs["view"] is front
+        assert kwargs["attach_xy"] == pytest.approx(_front_xy(sign * drawing.TOP_END_X, drawing.TOP_END_Y))
+        dx, dy = drawing.BETWEEN_POINT_OFFSET[letter]
+        assert kwargs["text_xy"] == pytest.approx((kwargs["attach_xy"][0] + dx, kwargs["attach_xy"][1] + dy))
+        assert math.copysign(1.0, dx) == sign  # each letter sits outboard of its corner
     scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
     for (args, kwargs), name, radius, model_x, frame_xy, outside in zip(
         frames,
@@ -535,6 +537,40 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         assert x == pytest.approx(model_x)
         assert y < ch_rocker_arm_spec.CENTER_Y
         assert math.hypot(x, y - ch_rocker_arm_spec.CENTER_Y) == pytest.approx(radius)
+
+
+class _BetweenGtol:
+    def __init__(self, stored: tuple[bool, str, str] | None = None) -> None:
+        self.calls: list[tuple[bool, str, str]] = []
+        self.stored = stored
+
+    def SetBetweenTwoPoints(self, between: bool, text_from: str, text_to: str) -> None:
+        self.calls.append((between, text_from, text_to))
+
+    def _state(self) -> tuple[bool, str, str]:
+        return self.stored if self.stored is not None else self.calls[-1]
+
+    def GetBetweenTwoPoints(self) -> bool:
+        return self._state()[0]
+
+    def GetBetweenTwoPointsText(self, index: int) -> str:
+        return self._state()[1 + index]
+
+
+@pytest.mark.parametrize("stored", [None, (False, "", ""), (True, "K", "J"), (True, "J", "")])
+def test_profile_between_symbol_is_set_and_read_back(
+    monkeypatch: pytest.MonkeyPatch, stored: tuple[bool, str, str] | None,
+) -> None:
+    gtol, rebuilds = _BetweenGtol(stored), []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda _a, **kw: rebuilds.append(kw["label"]))
+    if stored is None:
+        drawing._set_profile_between(object(), gtol)
+    else:
+        with pytest.raises(RuntimeError, match="lower profile between symbol read back"):
+            drawing._set_profile_between(object(), gtol)
+    assert gtol.calls == [(True, "J", "K")]
+    assert rebuilds == ["lower profile between symbol"]
 
 
 _REAM_ROW = Box(0.1040, 0.1444, 0.1561, 0.1480)
@@ -2442,8 +2478,7 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
     )
 
     def project(_adapter, _view, points, *, label):
-        mapper = _end_xy if label.startswith("datum C") else _front_xy
-        return [mapper(x * 1000.0, y * 1000.0) for x, y, _z in points]
+        return [_front_xy(x * 1000.0, y * 1000.0) for x, y, _z in points]
 
     def create(_adapter, _front, **kwargs):
         state.calls.append(kwargs)
@@ -2451,7 +2486,7 @@ def native_front(monkeypatch: pytest.MonkeyPatch):
         entities = kwargs["entities"]
         if label == "rocker overall width":
             value_mm = abs(vertex_points[entities[1]][0] - vertex_points[entities[0]][0])
-        elif label in {"taper intersection X", "datum C land X location"}:
+        elif label in {"taper intersection X", "tip land X location"}:
             value_mm = abs(vertex_points[entities[1]][0])
         else:
             pytest.fail(f"unowned native dimension {label}")
@@ -2508,7 +2543,7 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
     expected = {
         "rocker overall width": 2.0 * ch_rocker_arm_spec.ROD_TIP_X / 1000.0,
         "taper intersection X": ch_rocker_arm_spec.BOT_END_X / 1000.0,
-        "datum C land X location": ch_rocker_arm_spec.ROD_TIP_X / 1000.0,
+        "tip land X location": ch_rocker_arm_spec.ROD_TIP_X / 1000.0,
     }
     assert {
         label: display.model.SystemValue for label, display in state.displays.items()
@@ -2523,13 +2558,13 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
     assert land["entity_types"] == ("EDGE", "VERTEX")
     assert land["entities"] == (taper["entities"][0], width["entities"][1])
     assert land["p0"] == taper["p0"] and land["p1"] == width["p1"]
-    locator = state.displays["datum C land X location"]
+    locator = state.displays["tip land X location"]
     assert locator.arc_conditions[1] == 1
     assert locator.model.GetToleranceType() == 1
     assert locator.ShowDimensionValue is True
     assert locator.text[1] == locator.text[2] == ""
-    assert locator.text[4] == "DATUM C LAND"
-    assert locator.writes[-2:] == [(4, ""), (4, "DATUM C LAND")]
+    assert locator.text[4] == drawing.LAND_LABEL == "LAND"
+    assert locator.writes[-2:] == [(4, ""), (4, "LAND")]
     assert locator.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH
     width_display = state.displays["rocker overall width"]
     assert (width_display.text[1], width_display.text[2]) == ("(", ")")
@@ -2538,7 +2573,7 @@ def test_outline_dimensions_measure_real_endpoints_and_choose_exact_positive_z_l
 
 
 @pytest.mark.parametrize("label", [
-    "rocker overall width", "taper intersection X", "datum C land X location",
+    "rocker overall width", "taper intersection X", "tip land X location",
 ])
 @pytest.mark.parametrize("defect", ["creation", "wrong", "missing", "nan", "inf", "attachment"])
 def test_each_new_outline_measurement_fails_closed(native_front, label, defect) -> None:
@@ -2550,7 +2585,7 @@ def test_each_new_outline_measurement_fails_closed(native_front, label, defect) 
 
 @pytest.mark.parametrize("defect", ["uncentred", "basic", "text", "cap"])
 def test_land_locator_rejects_ignored_native_setters(native_front, defect):
-    native_front.defect_label = "datum C land X location"
+    native_front.defect_label = "tip land X location"
     native_front.defect = defect
     with pytest.raises(RuntimeError):
         drawing._add_rocker_outline_dimensions(native_front.adapter, object())
@@ -2621,7 +2656,7 @@ def test_land_locator_expected_value_is_sourced_and_rejects_stale_native_geometr
             node for node in ast.walk(function) if isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name) and node.func.id == "assert_dimension_measures"
             and any(k.arg == "label" and isinstance(k.value, ast.Constant)
-                    and k.value.value == "datum C land X location" for k in node.keywords)
+                    and k.value.value == "tip land X location" for k in node.keywords)
         ]
         assert len(checks) == 1
         assert next(ast.unparse(k.value) for k in checks[0].keywords if k.arg == "expected_mm") == "ROD_TIP_X"
@@ -2661,58 +2696,33 @@ def test_source_geometry_change_invalidates_stale_front_measurements(
     monkeypatch.setattr(drawing, source, getattr(drawing, source) + 0.1)
     with pytest.raises(RuntimeError):
         if source == "TIP_FACE":
-            drawing._add_land_datum(native_front.adapter, object(), native_front.land)
+            drawing._dress_detail_dimensions(native_front.adapter, [display.GetAnnotation() for display in native_front.imported.values()], keep=drawing.END_KEEP)
         elif source == "HUB_DIA":
             drawing._dress_detail_dimensions(native_front.adapter, [display.GetAnnotation() for display in native_front.imported.values()], keep=drawing.HUB_KEEP)
         else:
             drawing._add_rocker_outline_dimensions(native_front.adapter, object())
 
 
-def test_datum_c_owns_the_named_positive_z_land_and_midpoint_landing(
-    native_front, monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    calls = []
-    tag = object()
-
-    def insert(_adapter, _front, **kwargs):
-        calls.append(kwargs)
-        return tag
-
-    monkeypatch.setattr(drawing, "add_datum_feature", insert)
-    assert drawing._add_land_datum(
-        native_front.adapter, object(), native_front.land,
-    ) is tag
-    (call,) = calls
-    assert call["datum"] == "C"
-    assert call["edge_entity"] is native_front.land.edge
-    assert "edge_xy" not in call and "expected_entity" not in call
-    a, b = native_front.land.line
-    expected = _end_xy((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
-    assert call["leader_attach_xy"] == pytest.approx(expected)
-    assert math.dist(call["symbol_xy"], expected) == pytest.approx(drawing.LAND_DATUM_STANDOFF)
-    assert call["symbol_xy"][0] > expected[0]
-
-
-@pytest.mark.parametrize("defect", ["rear_face", "wrong_length", "not_a_line"])
-def test_datum_c_refuses_a_nonland_owner_before_insertion(
-    native_front, monkeypatch: pytest.MonkeyPatch, defect: str,
-) -> None:
-    from dataclasses import replace
-
-    a, b = native_front.land.line
-    if defect == "rear_face":
-        line = ((a[0], a[1], -a[2]), (b[0], b[1], -b[2]))
-    elif defect == "wrong_length":
-        line = (a, (b[0] + 1.0, b[1], b[2]))
-    else:
-        line = None
-    monkeypatch.setattr(
-        drawing, "add_datum_feature", lambda *_a, **_k: pytest.fail("invalid C owner inserted"),
-    )
-    with pytest.raises(RuntimeError):
-        drawing._add_land_datum(
-            native_front.adapter, object(), replace(native_front.land, line=line),
-        )
+def test_datum_c_hangs_under_the_rod_pin_frame_after_its_dot_is_configured() -> None:
+    # Y14.5: a feature of size's datum feature symbol sits on its frame.
+    frame_left, frame_top = drawing.FCF_XY
+    width, height = drawing.ROD_FRAME_SIZE
+    x, y = drawing.ROD_DATUM_C_XY
+    assert x == pytest.approx(frame_left + width / 2.0)
+    assert y == pytest.approx(frame_top - height - 0.005 - drawing.DATUM_TAG_BOX)
+    assert width == pytest.approx(0.0351)  # ⌖|Ø0.20|A|B cells on v43, C removed
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
+    (tag,) = [node for node in calls if node.func.id == "add_frame_datum_feature"]
+    (dot,) = [node for node in calls if node.func.id == "_configure_rod_position_dot"]
+    assert dot.lineno < tag.lineno
+    assert [ast.unparse(arg) for arg in tag.args] == ["adapter", "end", "rod_position_gtol"]
+    keywords = {k.arg: ast.unparse(k.value) for k in tag.keywords}
+    assert keywords["datum"] == "ROD_HOLE.fields['datum'][0]"
+    assert keywords["symbol_xy"] == "ROD_DATUM_C_XY"
+    assert not any(node.func.id == "_add_land_datum" for node in calls)
+    assert not hasattr(drawing, "_add_land_datum") and not hasattr(drawing, "LAND_DATUM_STANDOFF")
 
 
 @pytest.fixture
@@ -5618,7 +5628,7 @@ def test_source_height_normalization_then_quantized_native_caption_seating_keeps
 
 
 _POST_CAPTION_PHASES = (
-    "rebuild", "dimension census", "datum C land location", "REAM clearance", "front-detail air",
+    "rebuild", "dimension census", "tip land location", "REAM clearance", "front-detail air",
     "radius exterior", "arc profile clearance",
     "R24 detail layout", "R24 DOT state", "R24 DOT route",
     "shared layout", "finalize",
@@ -7932,7 +7942,7 @@ def r24_dot(bound, monkeypatch):
     )
     ann = _R24DotAnnotation(data, edge, landing)
     state = SimpleNamespace(annotation=ann, data=data, edge=edge, landing=landing, events=[], xml=None)
-    state.xml = gtol_frame_xml("position", "0.20", datums=("A", "B", "C"), diameter=True)
+    state.xml = gtol_frame_xml("position", "0.20", datums=("A", "B"), diameter=True)
     frame = _native("IGtolFrame", GetSymbolXml=lambda: state.xml)
     def get_frame(index):
         assert index == 1  # IGtol frames, unlike arrow heads, are one-based.
@@ -7965,7 +7975,7 @@ def test_r24_dot_official_order_int_status_style_entity_frame_arm_and_taper_read
         ("SetArrowHeadStyleAtIndex", 0, 3),
     ]
     assert case.events == ["redraw", "rebuild"]
-    assert signature.datums == ("A", "B", "C") and signature.tolerance == "0.2"
+    assert signature.datums == ("A", "B") and signature.tolerance == "0.2"
     assert case.annotation.attached == (case.edge,)
     assert case.annotation.position[:2] == drawing.FCF_XY
     with pytest.raises(RuntimeError, match="owner mismatch"):
@@ -8082,9 +8092,9 @@ def test_r24_dot_does_not_waive_entity_frame_display_or_landing_failures(r24_dot
     elif defect == "display-landing":
         case.data.primitives["arrows"][0][0] += 0.001
     elif defect == "frame-datum-order":
-        case.xml = gtol_frame_xml("position", "0.20", datums=("A", "C", "B"), diameter=True)
+        case.xml = gtol_frame_xml("position", "0.20", datums=("B", "A"), diameter=True)
     elif defect == "frame-zone":
-        case.xml = gtol_frame_xml("position", "0.20", datums=("A", "B", "C"), diameter=False)
+        case.xml = gtol_frame_xml("position", "0.20", datums=("A", "B"), diameter=False)
     elif defect == "frame-position":
         ann.position = (0.265, 0.1, 0)
     elif defect == "no-annotation":
@@ -8122,7 +8132,7 @@ def test_r24_caps_taper_and_land_locator_but_preserves_uncapped_overall(native_f
     assert display is case.displays["taper intersection X"]
     assert display.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH == 0.008
     assert display.annotation.GetAttachedEntities3() == entities
-    assert land is case.displays["datum C land X location"]
+    assert land is case.displays["tip land X location"]
     assert land.MaxWitnessLineLength == drawing.TAPER_WITNESS_LENGTH
     assert land.annotation.GetAttachedEntities3() == land_entities
     assert not hasattr(case.displays["rocker overall width"], "MaxWitnessLineLength")
@@ -8151,7 +8161,7 @@ def test_r24_production_wires_all_native_local_guards_without_banned_fcf_setter_
         "_r24_arc_sweep", "_r24_arc_contains", "_r24_arc_intersections",
         "_r24_no_arc_crossings", "_r24_terminals",
     }.isdisjoint(definitions)
-    assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 13
+    assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 11
     assert "COMMON ARC CENTRE ABOVE A" in ch_rocker_arm_notes.DRAWING_NOTES
     assert ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT == 8.0
     assert drawing.ARC_PROFILE_PICK_X_MM == {"TopRadius": -130.0, "BottomRadius": -110.0}
@@ -8344,7 +8354,7 @@ def test_r24_raw_text_metrics_are_unrounded_and_zero_table_width_remains_an_esti
 
 @pytest.fixture
 def r24_final_layout(r24_tip, r24_taper, monkeypatch):
-    """Reprove only the remaining native 5.59/C, strap and taper contracts."""
+    """Reprove only the remaining native 5.59, datum C, strap and taper contracts."""
     tip, taper = r24_tip, r24_taper
     # native_front (via r24_taper) installs a front-view projection. Bind the
     # combined fixture's actual E projection/crop BEFORE its initial witness
@@ -8352,11 +8362,14 @@ def r24_final_layout(r24_tip, r24_taper, monkeypatch):
     monkeypatch.setattr(drawing, "_project", lambda _a, _v, points, **_k: [_end_xy(x * 1000, y * 1000) for x, y, _z in points])
     monkeypatch.setattr(drawing, "_detail_crop", lambda *_a, **_k: tip.crop)
     rod_tip_attached = tip.invoke()
-    datum = _R24Annotation("C", (0.355, 0.126, 0),
-                           _ClearanceDisplayData([_r24_text("C", (0.356, 0.122), width=0.0035)],
-                                                 [_native_line(0.3425, 0.1229, 0.356, 0.1255)]), kind=2)
+    # Option 4: E's one datum tag is C, hung under the rod-pin frame.
+    tag_x, tag_y = drawing.ROD_DATUM_C_XY
+    datum = _R24Annotation("C", (tag_x, tag_y, 0),
+                           _ClearanceDisplayData([_r24_text("C", (tag_x - 0.0017, tag_y + 0.0007), width=0.0035)],
+                                                 [_native_line(tag_x, tag_y + 0.007, tag_x, tag_y + 0.012)]), kind=2)
+    datum.display = _native("IDatumTag", GetLabel=lambda: "C")
     state = SimpleNamespace(adapter=taper.adapter, tip=tip, taper=taper,
-                            rod_tip_attached=rod_tip_attached)
+                            rod_tip_attached=rod_tip_attached, datum=datum)
     # Actual R23 2.500 text metrics; no fictitious 18 mm thickness neighbour.
     thickness = _R24Annotation("StrapThickness", (0.317, 0.175, 0.1461546),
                                _ClearanceDisplayData(
@@ -8392,7 +8405,7 @@ def test_r24_final_native_layout_accepts_legitimate_effective_gap_regeneration(r
 
 @pytest.mark.parametrize("defect", [
     "attachment", "nominal", "missing-c", "missing-tip", "missing-thickness",
-    "witness-gap-mismatch",
+    "witness-gap-mismatch", "wrong-letter", "second-tag",
 ])
 def test_r24_final_native_regeneration_cannot_bypass_approved_local_guards(r24_final_layout, defect):
     case = r24_final_layout
@@ -8404,6 +8417,10 @@ def test_r24_final_native_regeneration_cannot_bypass_approved_local_guards(r24_f
         case.right_annotations.clear()
     elif defect == "missing-c":
         case.end_annotations[:] = [ann for ann in case.end_annotations if ann.GetType() != 2]
+    elif defect == "wrong-letter":
+        case.datum.display = _native("IDatumTag", GetLabel=lambda: "D")
+    elif defect == "second-tag":
+        case.end_annotations.append(case.datum)
     elif defect == "missing-tip":
         case.end_annotations.remove(case.tip.annotation)
     elif defect == "witness-gap-mismatch":
@@ -8423,23 +8440,21 @@ def test_r24_raw_native_text_metric_scalar_types_refuse_before_using_the_dump(r2
         drawing._r24_record(r24_tip.adapter, r24_tip.annotation, label="native text metrics")
 
 
-def test_r27_note_one_is_the_only_source_angle_carrier_and_preserves_wall_and_thirteen_lines():
+def test_option_four_notes_carry_no_angle_and_name_datum_c_as_the_rod_pin_hole():
     notes = ch_rocker_arm_notes.DRAWING_NOTES
-    derived = (
-        f"{math.degrees(ch_rocker_arm_spec._ALPHA_TOP):.{ch_rocker_arm_notes.DEFAULT_DRAWING_PRECISION}f}"
-        "° BASIC"
+    flat = " ".join(notes.split())
+    # The 10.46° land angle is derived (lands radial to the arc centre), so no
+    # note carries a number for it; C clocks the plane from the rod-pin hole.
+    assert "°" not in notes and "BASIC TO DATUM" not in notes
+    assert flat.startswith(
+        "1. MIRROR PLANE: THROUGH DATUM AXIS A, PERPENDICULAR TO DATUM B, "
+        "CLOCKED BY DATUM C (ROD-PIN HOLE, 1X, END SHOWN)."
     )
-    assert notes.count(derived) == 1
-    assert " ".join(notes.split()).startswith(
-        f"1. MIRROR PLANE: THROUGH DATUM AXIS A, PERPENDICULAR TO DATUM B, AT {derived} TO DATUM C."
-    )
-    assert "ROD-PIN HOLE (1X) AT THE END SHOWN." in notes
-    assert "2. COMMON ARC CENTRE ABOVE A ON THE PLANE." in notes
+    assert "2. COMMON ARC CENTRE ABOVE A ON THE PLANE; TIP LANDS RADIAL TO IT." in flat
     assert "BASIC 8.00: TOP ARC ABOVE A." in notes
-    assert "5. DATUM C: STRAP END LAND IN DETAIL E." in notes
-    assert "   MIRROR PLANE IS DEFINED BY NOTE 1." in notes
+    assert "5." not in re.findall(r"^\d+\.", notes, re.MULTILINE)
     assert notes.count(ch_rocker_arm_notes.HUB_WALL_NOTE) == 1
-    assert len(notes.splitlines()) == 13
+    assert len(notes.splitlines()) == 11
     assert max(map(len, notes.splitlines())) <= 42
 
 

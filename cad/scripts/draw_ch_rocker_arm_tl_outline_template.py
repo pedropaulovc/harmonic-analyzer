@@ -2,8 +2,10 @@ r"""Create the drawing for the rocker arm's outline template (MHA-CH-006-TL-13).
 
 The face view (``*Front``, 1:1) carries the whole outline from the pivot
 hole: both apex heights on the mirror line, both radii, the arc-end stations
-and the tip lands; the right-side edge view carries the plate thickness; a
-shaded isometric at 1:4 sits above.
+and the tip lands, plus the rod slot's BASIC station; a native 5:1 detail of
+the face view carries the rod slot's width (a matched fit on its pin gauge)
+and run; the right-side edge view carries the plate thickness; a shaded
+isometric at 1:4 sits above.
 """
 
 from __future__ import annotations
@@ -13,14 +15,16 @@ import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -29,12 +33,17 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 
-# The part saves ApexReference hidden: this form shows it in the view that
-# imports its dimensions.
+# The part saves ApexReference and RodSlotReference hidden: this form shows
+# each in the view that imports its dimensions.
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
@@ -46,10 +55,14 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_outline_template_spec import (
     ARC_CENTER_CALLOUT,
+    DETAIL_SCALE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIVOT_CALLOUT,
     PROFILE_CALLOUT,
+    REFERENCE_DIMENSIONS,
+    ROD_SLOT_CALLOUT,
+    ROD_SLOT_STATION_CALLOUT,
     SHARP_EDGE_CALLOUT,
     STATION_CALLOUT,
     THICK_CALLOUT,
@@ -74,6 +87,13 @@ RIGHT_CENTER = (0.400, 0.165)
 NOTES_XY = (0.020, 0.088)
 ISO_CENTER = (0.330, 0.240)
 ISO_NOTE_XY = (0.250, 0.258)
+# The rod slot's 5:1 detail sits in the open field under the notes, left of
+# the title block. Its fence takes DETAIL_RADIUS_MM of the face view about
+# the slot's centre: the whole slot and nothing else.
+DETAIL_CENTER = (0.075, 0.040)
+DETAIL_RADIUS_MM = 3.0
+# The label anchors at its top centre: right of the fence, under the width.
+DETAIL_LABEL_XY = (0.112, 0.050)
 # Radius text stays outside both circles (below the outline) and each radius
 # keeps its arrow outside the arc with no solid leader, so its leader runs
 # from the text to its arc and stops: never on to the off-sheet centre.  The
@@ -92,6 +112,18 @@ FRONT_KEEP = {
     "TopRodX": (0.272, 0.207),
     "TailTipLen": (0.033, 0.197),
     "RodTipLen": (0.367, 0.197),
+    # The slot's BASIC station: x in its own lane under the 132.757 lane, y
+    # just outboard of the slot with its value below the arrows, clear of the
+    # R816.00 block and the edge view's thickness.
+    "RodSlotX": (0.267, 0.097),
+    "RodSlotY": (0.352, 0.152),
+}
+# The width's dimension line stands just outboard of the slot's round end
+# with its value and fit callout above the fence; the run's value sits left
+# of its witness lines (the 3.75 mm span is narrower than the text).
+DETAIL_KEEP = {
+    "RodSlotWidth": (DETAIL_CENTER[0] + 0.013, DETAIL_CENTER[1] + 0.028),
+    "RodSlotFlat": (DETAIL_CENTER[0] - 0.024, DETAIL_CENTER[1] - 0.011),
 }
 # Below the edge view and left of its extension lines (the text is far wider
 # than the 3.175 span), clear of the front view's rod tip and the isometric.
@@ -117,6 +149,10 @@ CALLOUTS_BELOW = {
     # value; its end-face direction rides above.
     "TailTipLen": PROFILE_CALLOUT,
     "RodTipLen": PROFILE_CALLOUT,
+    "RodSlotX": ROD_SLOT_STATION_CALLOUT,
+    # drawing-guidelines.md rule 4: the slot's width is a matched fit, so the
+    # print gives its reference nominal and the clearance on the named pin.
+    "RodSlotWidth": ROD_SLOT_CALLOUT,
 }
 # The top stations take their profile flag above the value: below, it would
 # land on the apex block.
@@ -252,6 +288,49 @@ requirement(
     precision={"dia": _PRECISION["PivotDia"]},
 )
 
+# The radial slot that clocks the template on the rocker's rod-pin hole: its
+# outboard round end names it (the inboard end shares its diameter, a quarter
+# width outboard of the end's centre is inside this end alone). Its station
+# is BASIC (the rocker's datum C) and ``end`` is that outboard end's centre,
+# on the radial from the pivot; its width is a matched fit on the pin, its
+# length the end-centre run.
+_ROD_SLOT_OUTER = part_spec.rod_slot_points()[4]
+requirement(
+    "rod_slot",
+    kind="slot",
+    faces=(
+        CylinderFace(
+            part_spec.ROD_SLOT_WIDTH,
+            contains_x_mm=_ROD_SLOT_OUTER[0] + part_spec.ROD_SLOT_WIDTH / 4.0,
+        ),
+    ),
+    requirements=("note", "length", "thru"),
+    fields={
+        "at": (
+            [part_spec.ROD_SLOT_X, part_spec.ROD_SLOT_Y, 0.0],
+            ("ROD_SLOT_X", "ROD_SLOT_Y"),
+        ),
+        "axis": (_Z, ("__frame__",)),
+        "end": (
+            [_ROD_SLOT_OUTER[0], _ROD_SLOT_OUTER[1], 0.0],
+            ("ROD_SLOT_AXIS", "ROD_SLOT_FLAT"),
+        ),
+        "dimension_type": ("basic", ("BASIC_DIMENSIONS",)),
+        "width_nominal": (part_spec.ROD_SLOT_WIDTH, ("ROD_SLOT_WIDTH",)),
+        "length": (
+            limits(part_spec.ROD_SLOT_FLAT, _PRECISION["RodSlotFlat"]),
+            ("ROD_SLOT_FLAT", "ROD_SLOT_PLACES"),
+        ),
+        "length_nominal": (part_spec.ROD_SLOT_FLAT, ("ROD_SLOT_FLAT",)),
+        "note": (
+            " ".join(part_spec.ROD_SLOT_CALLOUT.splitlines()),
+            ("ROD_SLOT_CALLOUT",),
+        ),
+        "thru": (True, (("draw_ch_rocker_arm_tl_outline_template", "build"),)),
+    },
+    precision={"length": _PRECISION["RodSlotFlat"]},
+)
+
 for _side, _sign in (("rod", 1.0), ("tail", -1.0)):
     # A radial land: its plane holds the arcs' centre, its outward normal is
     # the top arc's tangent at that end.
@@ -360,14 +439,31 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
+    detail = _rod_slot_detail(adapter, front)
+    set_hidden_lines_removed(adapter, detail)
+    annotations += curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="rod slot detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+    for name in sorted(REFERENCE_DIMENSIONS):
+        matches = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one outline-template {name} on the sheet")
+        set_reference_dimension(adapter, matches[0], label=f"outline template {name}")
     _radius_leaders_to_arc(adapter, annotations)
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add the center mark to the template pivot hole")
+    # One mark on each of the slot's round ends.
+    if not auto_center_marks(adapter, detail, holes=False, slots=True, size=0.0025):
+        raise RuntimeError("failed to add the center marks to the template rod slot")
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
@@ -378,6 +474,79 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )
+
+
+def _rod_slot_detail(adapter: Any, front: Any) -> Any:
+    """A native 5:1 detail of the face view about the rod slot's centre
+    (``draw_dt_pinion_lift_rod``'s front-end detail form)."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(front, "IView")
+    if not drawing.ActivateView(view_name(adapter, front)):
+        raise RuntimeError("failed to activate the rod slot detail's parent")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(
+        adapter,
+        front,
+        (part_spec.ROD_SLOT_X / 1000.0, part_spec.ROD_SLOT_Y / 1000.0, 0.0),
+        label="rod slot detail centre",
+    )
+    radius = DETAIL_RADIUS_MM * VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create the rod slot detail fence")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *DETAIL_SCALE,
+        "A",
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create the rod slot detail")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("rod slot detail has invalid bounds")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position the rod slot detail")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position the rod slot detail label")
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"rod slot detail label did not persist: {actual}")
+    return detail
 
 
 def _radius_leaders_to_arc(adapter: Any, annotations: list[Any]) -> None:
