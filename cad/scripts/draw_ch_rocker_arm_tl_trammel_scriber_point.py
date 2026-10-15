@@ -94,6 +94,10 @@ PROFILE_KEEP = {
     # text moves outboard (TIP_ANGLE_TEXT_XY).
     "TipHalfAngle": (APEX_X + 0.020, PROFILE_CENTER[1] + 0.002),
 }
+# Three callout lines centred here (r3 sheet: the text centres on x and its
+# middle on y). The widest, the setting-bar line, spans about 75-136 mm: some
+# 15 mm clear of the tip-flat text (ends near 60 mm) and of the rod callout
+# (starts near 151 mm), and its bottom (about 207 mm) stays well above the cone.
 TIP_ANGLE_TEXT_XY = (APEX_X + 0.035, PROFILE_CENTER[1] + 0.040)
 # The axis pick sits on the shank face just off the axis, clear of the
 # hardened-zone reference line the profile view shows on the axis (the

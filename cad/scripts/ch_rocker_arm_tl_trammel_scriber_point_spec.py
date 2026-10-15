@@ -123,7 +123,10 @@ REFERENCE_DIMENSIONS = frozenset({"RodDia"})
 # characters at most): SolidWorks does not wrap callout text.
 ROD_CALLOUT = "DRILL ROD AS SUPPLIED\nSLIDES IN MHA-CH-006-TL-15\nPOINT HOLES"
 ROD_NOTE = " ".join(ROD_CALLOUT.splitlines())
-TIP_ANGLE_CALLOUT = "EACH SIDE OF AXIS"
+# Drawing-guidelines rule 4: the half-angle's band serves the setting bar's
+# centre-drilled seats, which centre the scriber on the pilot rim, so the angle
+# callout names that mate by Number.
+TIP_ANGLE_CALLOUT = "EACH SIDE OF AXIS\nSEATS IN MHA-CH-006-TL-17"
 HARDENED_CALLOUT = "HARDENED ZONE"
 TIP_FLAT_CALLOUT = "TIP FLAT"
 DIMENSION_CALLOUTS = {

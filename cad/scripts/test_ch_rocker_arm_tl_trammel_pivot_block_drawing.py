@@ -73,7 +73,7 @@ def test_bar_contact_faces_carry_the_part_owned_finish() -> None:
 def test_floor_corner_cap_rides_a_leader_on_the_section() -> None:
     source = inspect.getsource(drawing.build)
     assert "text=part_spec.SLOT_CORNER_CALLOUT," in source
-    assert "attached_to=straight_edge(" in source
+    assert "entity=straight_edge(" in source
 
 
 def test_thread_class_strip_keeps_every_hole_wizard_variable() -> None:

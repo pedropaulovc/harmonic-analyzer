@@ -36,10 +36,13 @@ INCH = kit.INCH
 _X = printed_band_mm(1)
 _XX = printed_band_mm(2)
 # Title-block DRILLED HOLES: plus allowance, zero minus (_printed_tolerance).
+# The drilled holes print DRILL with no band of their own: this row is theirs
+# (drawing-guidelines.md rule 2), and the worst cases below read it.
 DRILLED_BAND = (drilled_oversize_mm(), 0.0)
-# The cones print their face-to-flank angle at the title block's general
-# angular band; each flank moving by it moves the included angle twice as much.
-INCLUDED_ANGLE_TOL_DEG = 2.0 * angular_band_deg()
+# Both cones print their included angle as callout text on their native mouth
+# diameter (the tools' own angles), so the title block's general angular band
+# is the included angle's.
+INCLUDED_ANGLE_TOL_DEG = angular_band_deg()
 
 # --- Plate: the blocks' bar offcut (stock width and height as bought) --------
 PLATE_LENGTH = kit.BLOCK_LENGTH  # 50.0, sawn and faced
@@ -54,11 +57,10 @@ PILOT_DIA = round(kit.CENTER_DRILL_PILOT_DIA, 2)  # 1.98, a 5/64 in drill
 PILOT_DEPTH = 6.0  # full-diameter depth below the seat face
 SEAT_DIA = 4.0  # the cone's mouth on the seat face
 SEAT_ANGLE = kit.CENTER_DRILL_ANGLE  # 60 degrees included
-# Printed as the angle from the seat face to the cone flank (the sketch's
-# mouth-line-to-flank dimension): 90 - 30 = 60, which equals the included
-# angle. The setting bar's H0 seat prints the same dimension.
+# The build's sketch drives the cone from the face-to-flank angle:
+# 90 - 30 = 60. The sheet prints the included angle on the mouth callout.
 SEAT_FLANK_ANGLE = 90.0 - SEAT_ANGLE / 2.0
-# The sharpest printed cone: each flank at its band edge.
+# The sharpest printed cone: the included angle at its band's low edge.
 _SEAT_HALF_MIN = math.radians((SEAT_ANGLE - INCLUDED_ANGLE_TOL_DEG) / 2.0)
 _SEAT_R_MIN = (SEAT_DIA - _XX) / 2.0
 _SEAT_R_MAX = (SEAT_DIA + _XX) / 2.0
@@ -90,7 +92,7 @@ HOLE_DIA = 4.5  # #16 drill (0.1770 in): #8 body clearance
 # The shop's countersinks are 90 degree (inventory tools.countersinks); under
 # the 82 degree head the head bears at its root, on the hole edge's cone.
 CSK_ANGLE = 90.0
-CSK_FLANK_ANGLE = 90.0 - CSK_ANGLE / 2.0  # face to flank, printed
+CSK_FLANK_ANGLE = 90.0 - CSK_ANGLE / 2.0  # face to flank, the sketch's
 CSK_DIA = 9.6
 _CSK_HALF = math.radians(CSK_ANGLE / 2.0)
 _CSK_R_MIN = (CSK_DIA - _XX) / 2.0
@@ -167,8 +169,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # The pilot shares the screw holes' row: HoleY prints once for all three.
     "PilotProfile": {"PilotX", "PilotDia"},
     "Pilot": {"PilotDepth"},
-    "SeatProfile": {"SeatDia", "SeatFlankAngle"},
-    "CountersinkProfile1": {"CskDia", "CskFlankAngle"},
+    "SeatProfile": {"SeatDia"},
+    "CountersinkProfile1": {"CskDia"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {"PlateLength": 1, "PlateWidth": 1},
@@ -176,8 +178,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewHoleProfile": {"HoleLeftX": 1, "HoleRightX": 1, "HoleY": 2, "HoleDia": 2},
     "PilotProfile": {"PilotX": 1, "PilotDia": 2},
     "Pilot": {"PilotDepth": 1},
-    "SeatProfile": {"SeatDia": 2, "SeatFlankAngle": 0},
-    "CountersinkProfile1": {"CskDia": 2, "CskFlankAngle": 0},
+    "SeatProfile": {"SeatDia": 2},
+    "CountersinkProfile1": {"CskDia": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -199,33 +201,32 @@ for _name, _value in (
     ("PilotDia", PILOT_DIA),
     ("PilotDepth", PILOT_DEPTH),
     ("SeatDia", SEAT_DIA),
-    ("SeatFlankAngle", SEAT_FLANK_ANGLE),
     ("CskDia", CSK_DIA),
-    ("CskFlankAngle", CSK_FLANK_ANGLE),
 ):
     if abs(_value - round(_value, DRAWING_PRECISION_BY_NAME[_name])) > 1e-9:
         raise AssertionError(f"pivot plate {_name} {_value} does not print as modelled")
-# (feature, dimension) native bands; every other size is the title block's
-# general band for its places.
-DRILLED_DIMENSIONS: tuple[tuple[str, str], ...] = (
-    ("ScrewHoleProfile", "HoleDia"),
-    ("PilotProfile", "PilotDia"),
-)
 
 # Sheet callouts (the draw imports them; tolerance text never lives there).
-PIVOT_POINT_NUMBER = "MHA-CH-006-TL-18"
 # HoleY locates the whole row: both screw holes (the right one is driven
 # equal) and the seat pilot (driven from the same global).
 CALLOUTS_ABOVE = {"HoleY": "3X", "HoleDia": "2X", "CskDia": "2X"}
 # Hole callouts name their process (drawing-guidelines.md rule 12); the
-# pilot's blind depth prints in section A-A. The plate thickness is the bar's
-# as-bought 3/4 in, never machined, so it prints as stock.
+# pilot's blind depth prints in section A-A. The plate's width and thickness
+# are the bar's as-bought 1-1/2 x 3/4 in, never machined, so they print as
+# stock. Every added text is one line.
 CALLOUTS_BELOW = {
     "HoleDia": "DRILL THRU",
     "PilotDia": "DRILL",
+    "PlateWidth": "STOCK",
     "PlateHeight": "STOCK",
-    "CskFlankAngle": "2X",
-    "SeatDia": f"SEAT FOR PIVOT POINT\n{PIVOT_POINT_NUMBER}",
+    "SeatDia": "PIVOT POINT SEAT",
+}
+# Each cone's included angle follows its native mouth diameter (the size
+# stays associative): the 90 degree countersink and the centre drill's own
+# 60 degree seat for the pivot point's 60 degree tip.
+CALLOUT_SUFFIXES = {
+    "CskDia": f" X {CSK_ANGLE:.0f}\u00b0 CSK",
+    "SeatDia": f" X {SEAT_ANGLE:.0f}\u00b0",
 }
 
 SURFACE_FINISHES = ()

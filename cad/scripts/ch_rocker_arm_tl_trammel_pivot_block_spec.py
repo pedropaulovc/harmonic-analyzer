@@ -64,9 +64,11 @@ BLOCK_HEIGHT = kit.BLOCK_HEIGHT
 # The block height prints at two places: the pinch screw's walls below the
 # slot floor are budgeted against its +/-0.51 band (rule 17: worst_walls'
 # pinch-clearance-to-bottom web is 1.545 at .XX and would fall under the
-# 1.5 floor at the one-place +/-0.8). 1018 cold-rolled stays for the same
-# reason: drawn flat holds its 3/4 in thickness well inside that .XX band as
-# supplied, so the budgeted walls need no machining of the broad faces.
+# 1.5 floor at the one-place +/-0.8). The title block's material is any
+# LOW-CARBON STEEL FLAT; the stock named in material_specification stays
+# 1018 cold-rolled for the same reason: drawn flat holds its 3/4 in thickness
+# well inside that .XX band as supplied, so the budgeted walls need no
+# machining of the broad faces.
 BLOCK_HEIGHT_PLACES = 2
 HOLE_FROM_END = kit.PIVOT_HOLE_L  # 25.0: the end face to the point-hole axis
 BLOCK_X0 = -HOLE_FROM_END

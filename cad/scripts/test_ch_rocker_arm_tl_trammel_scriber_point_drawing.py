@@ -133,6 +133,14 @@ def test_notes_follow_the_simplicity_policy() -> None:
     assert "HARD" not in notes
 
 
+def test_tightened_cone_names_its_seat_on_its_callout() -> None:
+    """Rule 4: the half-angle band names the setting bar's seats by Number on
+    the angle callout itself."""
+    callout = spec.DIMENSION_CALLOUTS["TipHalfAngle"]
+    assert "SEATS IN MHA-CH-006-TL-17" in callout.splitlines()
+    assert spec.TIP_ANGLE_TOL_DEG == spec.TIP_HALF_ANGLE_TOL_DEG * 2.0
+
+
 def test_drawing_script_meets_the_drawing_contract() -> None:
     filename = f"draw_{STEM}.py"
     assert filename in _drawing_contract.PRECISION_MIGRATED_DRAWINGS

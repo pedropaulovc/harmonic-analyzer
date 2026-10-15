@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 from _check import check
 from _com import _early_bound
@@ -35,6 +35,7 @@ from _gtol_cone import ConeFace
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_trammel_pivot_plate_spec import (
+    CALLOUT_SUFFIXES,
     CALLOUTS_ABOVE,
     CALLOUTS_BELOW,
     DRAWING_DIMENSIONS,
@@ -57,9 +58,10 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # legible. The top view carries the plan sizes, every station (one baseline
 # stack below the view) and the hole sizes (leaders above it); section A-A
 # along the hole centre line shows the seat cone, the pilot depth and the
-# countersinks. The section draws the seat face DOWN, so its callouts sit
-# below the view: the countersink's at its own cone, the seat's out under the
-# second countersink, which carries none. The caption and the shaded
+# countersinks, each cone's angle on its mouth callout. The section draws the
+# seat face DOWN, so its callouts sit below the view, each outside its own
+# extension lines: the countersink's left of its cone, the seat's out over
+# the second countersink, which carries none. The caption and the shaded
 # isometric stack below that, right of centre and clear of the title block.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
@@ -98,13 +100,11 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
 SECTION_KEEP: dict[str, tuple[float, float, float]] = {
     "PlateHeight": (-8.0, _H / 2.0, -HOLE_Y),
     "PilotDepth": (57.0, _H - 3.0, -HOLE_Y),
-    "CskDia": (10.0, _H + 6.0, -HOLE_Y),
-    # Each angle reads in the vertical-angle wedge outside its mouth vertex
-    # (face line extended outward, flank extended out of the part), on that
-    # wedge's bisector.
-    "CskFlankAngle": (19.9, _H + 2.1, -HOLE_Y),
-    "SeatFlankAngle": (30.9, _H + 2.25, -HOLE_Y),
-    "SeatDia": (37.5, _H + 8.0, -HOLE_Y),
+    # Left of the first countersink's extension lines (the one-line value
+    # is wider than the cone), under the seat face's line.
+    "CskDia": (-5.5, _H + 5.5, -HOLE_Y),
+    # Right of the seat's extension lines, over the second countersink.
+    "SeatDia": (39.0, _H + 6.0, -HOLE_Y),
 }
 
 _UP = [0.0, 1.0, 0.0]
@@ -194,13 +194,13 @@ requirement(
         ),
         "dia": (limits(part_spec.SEAT_DIA, 2), ("SEAT_DIA", "SEAT_FLANK_MIN")),
         "dia_nominal": (part_spec.SEAT_DIA, ("SEAT_DIA",)),
-        # The included cone angle; the sheet prints the face-to-flank angle
-        # (90 - half the included), whose general band moves each flank.
+        # The included cone angle, printed on the mouth callout at the title
+        # block's general angular band.
         "angle_deg": (
             part_spec.SEAT_ANGLE,
             (
                 "SEAT_ANGLE",
-                "SEAT_FLANK_ANGLE",
+                "CALLOUT_SUFFIXES",
                 ("ch_rocker_arm_tl_trammel_spec", "CENTER_DRILL_ANGLE"),
                 _PIVOT_POINT,
             ),
@@ -209,10 +209,7 @@ requirement(
             part_spec.INCLUDED_ANGLE_TOL_DEG,
             ("INCLUDED_ANGLE_TOL_DEG",),
         ),
-        "note": (
-            part_spec.CALLOUTS_BELOW["SeatDia"],
-            ("CALLOUTS_BELOW", "PIVOT_POINT_NUMBER"),
-        ),
+        "note": (part_spec.CALLOUTS_BELOW["SeatDia"], ("CALLOUTS_BELOW",)),
     },
     precision={"dia": 2, "angle_deg": 0},
 )
@@ -257,7 +254,7 @@ for side, x in zip(("left", "right"), part_spec.SCREW_X, strict=True):
                 ("CSK_DIA", "HEAD_TOP_DEPTH_MIN", "SCREW_HEAD_DIA_MAX"),
             ),
             "dia_nominal": (part_spec.CSK_DIA, ("CSK_DIA",)),
-            "angle_deg": (part_spec.CSK_ANGLE, ("CSK_ANGLE", "CSK_FLANK_ANGLE")),
+            "angle_deg": (part_spec.CSK_ANGLE, ("CSK_ANGLE", "CALLOUT_SUFFIXES")),
             "angle_tol_deg": (
                 part_spec.INCLUDED_ANGLE_TOL_DEG,
                 ("INCLUDED_ANGLE_TOL_DEG",),
@@ -283,6 +280,26 @@ def _view_mapper(adapter: Any, view: Any):
         return float(data[0]), float(data[1])
 
     return to_sheet
+
+
+def _set_callout_suffixes(
+    adapter: Any, annotations: list[Any], suffixes: dict[str, str]
+) -> None:
+    """Write each named dimension's native suffix (after its value) and read
+    it back; the value stays the model's dimension (the setter is void)."""
+    remaining = dict(suffixes)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        text = remaining.pop(dimension_name(adapter, annotation), None)
+        if text is None:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(2, text)  # swDimensionTextSuffix
+        got = str(display.GetText(2) or "")
+        if got != text:
+            raise RuntimeError(f"dimension suffix {text!r} did not persist: {got!r}")
+    if remaining:
+        raise RuntimeError(f"dimension suffixes not applied: {sorted(remaining)}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -352,11 +369,13 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
+    _set_callout_suffixes(adapter, annotations, CALLOUT_SUFFIXES)
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
-        raise RuntimeError("failed to add center marks to the pivot plate holes")
+    # The template centre-marks the top view's holes as it is placed; an
+    # explicit auto_center_marks printed a second, identical mark over each
+    # (r3 native audit; #913).
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(

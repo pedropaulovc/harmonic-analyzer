@@ -12,7 +12,7 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 from _check import check
 from _drawing_common import (
@@ -96,17 +96,20 @@ TOP_KEEP = {
     "ScriberSpacing": SHEET.top(0.5 * part_spec.SCRIBER_SPACING, 46.05),
     "PointHoleDia": SHEET.top(part_spec.BLOCK_X1 + 26.0, -5.5),
 }
-# Edge B (pinch screw head side): the height and the pinch stations, the
-# stations' row low enough to clear section A-A's lower letter.
+# Edge B (pinch screw head side): the pinch stations below, their row low
+# enough to clear section A-A's lower letter; the pinch depth and, outside
+# it, the height right of the view (the pivot block's: farm r2's height left
+# of the view ran its extension lines across the clearance callout's leader).
 FRONT_KEEP = {
-    "BlockHeight": SHEET.front(part_spec.BLOCK_X0 - 10.0, -9.5),
+    "BlockHeight": SHEET.front(part_spec.BLOCK_X1 + 10.0, -16.5),
     "PinchX1": SHEET.front(0.5 * part_spec.PINCH_X[0], -29.0),
     "PinchX2": SHEET.front(0.5 * part_spec.PINCH_X[1], -29.0),
-    "PinchDepth": SHEET.front(part_spec.BLOCK_X1 + 6.0, -7.0),
+    "PinchDepth": SHEET.front(part_spec.BLOCK_X1 + 5.5, -7.0),
 }
-# The end view: the bar slot from edge A (edge A on the view's right).
+# The end view: the bar slot from edge A (edge A on the view's right), the
+# slot width's value left of its extension lines (the pivot block's).
 RIGHT_KEEP = {
-    "SlotWidth": SHEET.right(block.SLOT_FROM_EDGE_A, 6.0),
+    "SlotWidth": SHEET.right(block.SLOT_FROM_EDGE_A + 13.0, 6.0),
     "SlotFromEdgeA": SHEET.right(0.5 * block.SLOT_FROM_EDGE_A, -24.5),
     "SlotDepth": SHEET.right(-7.0, -5.0),
 }
@@ -125,8 +128,10 @@ CALLOUTS_BELOW = {
     "SlitWidth": block.SLIT_CALLOUT,
 }
 SET_SCREW_CALLOUT_XY = (0.345, 0.140)
-# The set-screw leader runs from the callout's left end to the near tap.
-SET_SCREW_LEADER_X = max(part_spec.SET_SCREW_X)
+# The set-screw leader runs from the callout's right end down to the tap
+# right in the view, clear of the set-screw depth's extension lines (the
+# pivot block's, farm r2).
+SET_SCREW_LEADER_X = min(part_spec.SET_SCREW_X)
 PINCH_TAP_CALLOUT_XY = (0.3665, 0.160)
 # The pinch-tap leader drops from the callout's right end. Farm r2: from the
 # L25 tap (sheet x 365) it crossed the set-screw text; from the L8 tap, edge
@@ -139,7 +144,6 @@ WALL_FINISH_XY = (0.170, 0.195)
 FLOOR_FINISH_XY = (0.172, 0.208)
 WALL_FINISH_X = part_spec.BLOCK_X1 - 2.5
 SLOT_CORNER_NOTE_XY = (0.205, 0.229)
-SLOT_CORNER_PICK_Z = block.SLOT_Z1 - 0.7
 
 
 _KIT = "ch_rocker_arm_tl_trammel_spec"
@@ -570,15 +574,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    for view, label in (
-        (top, "point holes"),
-        (front, "pinch clearances"),
-        (back, "edge-A taps"),
-    ):
-        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
-            raise RuntimeError(
-                f"failed to add center marks to the scriber block {label}"
-            )
+    # No explicit centre marks: the template marks every hole as each view is
+    # placed, and AutoInsertCenterMarks2 printed a second, identical mark
+    # (farm r2 duplicate-annotation; draw_mg_wheel_drum, #913).
     set_screw_callout = add_native_hole_callout(
         adapter,
         back,
@@ -684,19 +682,19 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         section,
         text=block.SLOT_CORNER_CALLOUT,
-        entity_xy=mm_in_view(
-            adapter,
-            section,
-            (part_spec.PINCH_X[0], -block.SLOT_DEPTH, SLOT_CORNER_PICK_Z),
-            label="slot floor corner pick",
-        ),
         note_xy=SLOT_CORNER_NOTE_XY,
         label="slot floor corners",
-        attached_to=straight_edge(
+        # Selected directly (draw_dt_crankshaft, and the swing platform's
+        # section finishes): r3's sheet pick plus attached_to read
+        # same_entity=False on section A-A. Pinned to the cut plane so a
+        # coincident edge behind it cannot stand in for the cut floor.
+        entity=straight_edge(
             section,
             "slot floor in section A-A",
             lambda a, b: (
-                near(a[1], -block.SLOT_DEPTH)
+                near(a[0], part_spec.PINCH_X[0])
+                and near(b[0], part_spec.PINCH_X[0])
+                and near(a[1], -block.SLOT_DEPTH)
                 and near(b[1], -block.SLOT_DEPTH)
                 and near(a[2], block.SLOT_Z0)
                 and near(b[2], block.SLOT_Z1)

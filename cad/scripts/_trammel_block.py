@@ -81,7 +81,8 @@ from ch_rocker_arm_tl_trammel_pivot_block_spec import (
     SLOT_Z1,
 )
 
-# The registry rows name the 1018 cold-rolled flat bar.
+# The parts config prints LOW-CARBON STEEL FLAT; its material_specification
+# names the 1018 cold-rolled flat bar the shop stocks.
 MATERIAL = "Plain Carbon Steel"
 _SAVED_DRAWING_PROPERTIES = (
     "Number",

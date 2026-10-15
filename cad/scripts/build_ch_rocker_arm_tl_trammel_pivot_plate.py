@@ -10,8 +10,8 @@ are Top-plane circles cut through; the 5/64 pilot is a circle on a plane at
 the seat face, cut blind down into the plate. The seat cone and the two
 countersinks are revolved cuts sketched on a plane through the hole axes
 (model Z = -HOLE_Y), each a triangle from the face to its cone's apex. The
-cone depth drives the flank; the face-to-flank angle is a driven reference
-dimension at the mouth vertex.
+cone depth drives the flank; a driven reference angle at the mouth vertex
+proves it (the sheet prints the included angle as mouth-callout text).
 
 Run (SolidWorks already open)::
 
@@ -53,8 +53,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_bilateral_tolerance
-from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from ch_rocker_arm_tl_trammel_pivot_plate_spec import (
@@ -62,8 +60,6 @@ from ch_rocker_arm_tl_trammel_pivot_plate_spec import (
     CSK_FLANK_ANGLE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    DRILLED_BAND,
-    DRILLED_DIMENSIONS,
     HOLE_DIA,
     HOLE_Y,
     ISOMETRIC_VIEW_NOTE,
@@ -79,7 +75,8 @@ from ch_rocker_arm_tl_trammel_pivot_plate_spec import (
 )
 
 PART_NAME = "ch-rocker-arm-tl-trammel-pivot-plate"
-MATERIAL = "Plain Carbon Steel"  # the registry row names the 1018 bar offcut
+# The registry row prints LOW-CARBON STEEL FLAT; the stock is the 1018 bar offcut.
+MATERIAL = "Plain Carbon Steel"
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
     "Material Specification",
@@ -199,9 +196,9 @@ async def _cone_cut(
     the mouth to the apex fixes the flank, driven from the mouth diameter and
     the half-angle: the adapter's driving angular dimension leaves the profile
     under-defined on the farm (this plate's seat, round 1; the setting bar's
-    seat; the magnifying wheel's tie 2). The printed face-to-flank angle is a
-    driven reference at the shared mouth vertex, so its interior angle is the
-    flank angle itself. ``names`` follow creation order: station, face height,
+    seat; the magnifying wheel's tie 2). A driven face-to-flank reference at
+    the shared mouth vertex proves the flank (``expected_degrees``); it is not
+    marked for the drawing. ``names`` follow creation order: station, face height,
     mouth diameter, cone depth, flank angle, axis length; ``drives`` are the
     station, face height and mouth diameter expressions.
     """
@@ -534,10 +531,8 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    for feature_name, dimension_name in DRILLED_DIMENSIONS:
-        set_dimension_bilateral_tolerance(
-            adapter, feature_name, dimension_name, *deviations(DRILLED_BAND)
-        )
+    # No model band: the holes print DRILL, so the title block's DRILLED
+    # HOLES row governs them (spec DRILLED_BAND).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

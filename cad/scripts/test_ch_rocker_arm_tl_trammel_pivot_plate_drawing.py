@@ -6,10 +6,13 @@ import math
 import re
 
 import _config
+import build_ch_rocker_arm_tl_trammel_pivot_plate as part
 import ch_rocker_arm_tl_trammel_pivot_plate_spec as spec
 import ch_rocker_arm_tl_trammel_spec as kit
 import draw_ch_rocker_arm_tl_trammel_pivot_plate as drawing
 import export_features
+from _drawing_contract import model_toleranced_dimensions
+from _printed_tolerance import angular_band_deg
 
 STEM = "ch_rocker_arm_tl_trammel_pivot_plate"
 
@@ -23,8 +26,15 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     assert set(drawing.TOP_KEEP) | set(drawing.SECTION_KEEP) == marked
     assert not set(drawing.TOP_KEEP) & set(drawing.SECTION_KEEP)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert {name for _feature, name in spec.DRILLED_DIMENSIONS} <= marked
+    assert set(spec.CALLOUT_SUFFIXES) <= marked
     assert set(spec.CALLOUTS_ABOVE) | set(spec.CALLOUTS_BELOW) <= marked
+
+
+def test_drilled_holes_carry_the_title_block_band_only() -> None:
+    """The holes print DRILL, so the title block's DRILLED HOLES row is their
+    band; a model +0.1/0 restated it (drawing-guidelines.md rule 2)."""
+    assert model_toleranced_dimensions(part) == {}
+    assert _features()["screw_hole_left"]["dia"] == [4.5, 4.6]
 
 
 def test_plate_is_the_block_bar_offcut() -> None:
@@ -38,11 +48,12 @@ def test_plate_is_the_block_bar_offcut() -> None:
 def test_seat_matches_the_pivot_point_and_the_centre_drill() -> None:
     seat = _features()["pivot_seat"]
     assert spec.SEAT_ANGLE == kit.CENTER_DRILL_ANGLE == kit.PIVOT_TIP_ANGLE
-    # The sheet prints the face-to-flank angle: 90 - half the included.
+    # The sheet prints the included angle on the Ø4.00 mouth callout.
     assert seat["angle_deg"] == 60.0
-    assert seat["angle_tol_deg"] == 2.0
+    assert seat["angle_tol_deg"] == angular_band_deg()
     assert math.isclose(90.0 - spec.SEAT_ANGLE / 2.0, spec.SEAT_FLANK_ANGLE)
-    assert spec.CALLOUTS_BELOW["SeatDia"].endswith("\nMHA-CH-006-TL-18")
+    assert spec.CALLOUT_SUFFIXES == {"CskDia": " X 90° CSK", "SeatDia": " X 60°"}
+    assert spec.CALLOUTS_BELOW["SeatDia"] == "PIVOT POINT SEAT"
     pilot = _features()["seat_pilot"]
     assert pilot["dia"] == [1.98, 2.08]
     assert abs(pilot["dia_nominal"] - kit.CENTER_DRILL_PILOT_DIA) < 0.005
@@ -90,8 +101,15 @@ def test_sheet_carries_no_notes_and_callouts_name_processes() -> None:
     assert spec.DRAWING_NOTES == ""
     assert spec.CALLOUTS_BELOW["HoleDia"] == "DRILL THRU"
     assert spec.CALLOUTS_BELOW["PilotDia"] == "DRILL"
-    for text in (*spec.CALLOUTS_ABOVE.values(), *spec.CALLOUTS_BELOW.values()):
-        assert all(len(line) <= 30 for line in text.splitlines()), text
+    assert spec.CALLOUTS_BELOW["PlateWidth"] == spec.CALLOUTS_BELOW["PlateHeight"]
+    assert spec.CALLOUTS_BELOW["PlateHeight"] == "STOCK"
+    # Every added text is one short line (multi-line callouts rendered wide).
+    for text in (
+        *spec.CALLOUTS_ABOVE.values(),
+        *spec.CALLOUTS_BELOW.values(),
+        *spec.CALLOUT_SUFFIXES.values(),
+    ):
+        assert "\n" not in text and len(text) <= 20, text
 
 
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:
