@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -96,6 +97,7 @@ def _launcher_fixture(tmp_path: Path, *, submodules: bool = False) -> dict[str, 
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import time
@@ -104,6 +106,13 @@ from pathlib import Path
 # legacy Python pipe encoding.
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
+
+
+def wait_for_release(variable):
+    port = os.environ.get(variable)
+    if port:
+        with socket.create_connection(("127.0.0.1", int(port)), timeout=300) as gate:
+            assert gate.recv(1) == b"x", f"{variable} closed without release"
 
 
 farm = next((i for i, arg in enumerate(sys.argv) if arg.endswith("farm.py")), None)
@@ -224,7 +233,7 @@ if sys.argv[1] == "sync":
             )
             + "\\n"
         )
-    time.sleep(float(os.environ.get("UV_STUB_SYNC_DELAY", "0")))
+    wait_for_release("UV_STUB_SYNC_GATE")
     (Path(os.environ["VIRTUAL_ENV"]) / "synced.txt").write_text(
         str(os.getpid()), encoding="utf-8"
     )
@@ -274,6 +283,7 @@ def record(**late):
 
 
 record()
+wait_for_release("UV_STUB_BUILD_GATE")
 reports = Path("cad") / "out" / "reports"
 reports.mkdir(parents=True, exist_ok=True)
 (reports / "stub-output.txt").write_text("built\\n", encoding="utf-8")
@@ -1049,18 +1059,33 @@ def test_launches_share_one_environment_synced_once(tmp_path: Path) -> None:
     assert invocation["environment_synced"] is True
 
 
+@pytest.mark.parametrize("ordering", ["both-sync", "reuse-published"])
 def test_concurrent_launches_publish_one_environment_and_both_build(
     tmp_path: Path,
+    ordering: str,
 ) -> None:
-    """Two launchers creating the same environment each sync privately; one
-    publishes, the other adopts it, and neither touches the other's sync."""
+    """Both arrivals during sync and arrival after publication are legitimate.
+
+    Gate the stub at sync or build, not for a guessed number of seconds: both
+    private syncs must start before either publishes in the first ordering;
+    the first environment must be published before the second starts in the
+    other. Either way, exactly one launcher publishes and both builds use it.
+    """
     fixture = _launcher_fixture(tmp_path)
     processes = []
     invocations = []
+    gates = []
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(2)
+    listener.settimeout(HANG_GUARD_S)
     try:
         for index in range(2):
             environment = dict(fixture["environment"])
-            environment["UV_STUB_SYNC_DELAY"] = "3"
+            gate_variable = (
+                "UV_STUB_SYNC_GATE" if ordering == "both-sync" else "UV_STUB_BUILD_GATE"
+            )
+            environment[gate_variable] = str(listener.getsockname()[1])
             invocations.append(tmp_path / f"uv invocation {index}.json")
             environment["UV_STUB_INVOCATION"] = str(invocations[-1])
             processes.append(
@@ -1072,8 +1097,17 @@ def test_concurrent_launches_publish_one_environment_and_both_build(
                     text=True,
                 )
             )
+            # Accept proves this racer reached the selected phase. Keep its
+            # connection blocked until the other racer reaches the same phase.
+            gate, _ = listener.accept()
+            gates.append(gate)
+        for gate in gates:
+            gate.sendall(b"x")
         results = [process.communicate(timeout=HANG_GUARD_S) for process in processes]
     finally:
+        for gate in gates:
+            gate.close()
+        listener.close()
         # Only these Popen handles are owned here; never scan or kill by name.
         # Stop both before reaping either so a failed communicate cannot leave
         # the other launcher running. Descendants may still hold pipe handles.
@@ -1092,8 +1126,19 @@ def test_concurrent_launches_publish_one_environment_and_both_build(
     finished = [json.loads(stdout.splitlines()[-1]) for stdout, _ in results]
     assert finished[0]["environment"] == finished[1]["environment"]
     assert sorted(f["environment_reused"] for f in finished) == [False, True]
-    syncs = Path(fixture["syncs"]).read_text(encoding="utf-8").splitlines()
-    assert len({json.loads(line)["VIRTUAL_ENV"] for line in syncs}) == 2, syncs
+    syncs = [
+        json.loads(line)
+        for line in Path(fixture["syncs"]).read_text(encoding="utf-8").splitlines()
+    ]
+    expected_syncs = 2 if ordering == "both-sync" else 1
+    assert len(syncs) == expected_syncs, syncs
+    staged = {Path(sync["VIRTUAL_ENV"]) for sync in syncs}
+    assert len(staged) == expected_syncs, syncs
+    published = Path(finished[0]["environment"])
+    for path in staged:
+        assert path.parent == published.parent
+        assert path.name.startswith(published.name + ".staging-")
+        assert not path.exists()
     for invocation in invocations:
         built = json.loads(invocation.read_text(encoding="utf-8"))
         assert Path(built["environment"]["VIRTUAL_ENV"]) == Path(
