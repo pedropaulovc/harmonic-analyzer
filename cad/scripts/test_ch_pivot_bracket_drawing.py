@@ -75,14 +75,17 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
 
 def test_model_bands_come_from_named_spec_constants() -> None:
     assert model_toleranced_dimensions(part) == {
-        ("FootProfile", "FootLen"): "FOOT_LEN_BAND",
         ("Ear", "EarThick"): "EAR_T_BAND",
         ("HoleProfile", "HoleStation"): "STATION_BAND",
         ("SetScrewReference", "SetScrewLocation"): "SET_SCREW_STATION_BAND",
         ("ShaftBoreProfile", "ShaftBoreDia"): "*deviations(BORE_DIA_BAND)",
     }
-    assert part.FOOT_LEN_BAND == part.EAR_T_BAND == part.STATION_BAND == 0.10
+    assert part.EAR_T_BAND == part.STATION_BAND == 0.10
     assert part.SET_SCREW_STATION_BAND == 0.10
+    # The foot length rides the title block's .XX (its wall to the hold-down
+    # hole is sized for it), so its sheet value carries no band of its own.
+    assert spec.FOOT_LEN_BAND == spec.EDGE_BAND == 0.508
+    assert "FootLen" not in drawing.DIMENSION_CALLOUTS
     # The reamed bore holds the drilled-hole growth its set-screw thread
     # count assumes: largest bore = nominal + DRILL_GROWTH.
     upper, lower = drawing_spec.BORE_DIA_BAND
@@ -156,8 +159,12 @@ def test_every_banded_length_says_what_its_band_holds() -> None:
     assert banded <= set(drawing.DIMENSION_CALLOUTS)
     support = _config.parts("fr-rocker-arm-support")["number"]
     assert drawing.DIMENSION_CALLOUTS["HoleStation"] == f"ON {support} SEAT"
-    for name in ("FootLen", "EarThick", "SetScrewLocation"):
-        assert not re.search(r"\d", drawing.DIMENSION_CALLOUTS[name]), name
+    washer = _config.parts("ch-rocker-thrust-washer")["number"]
+    assert washer == "MHA-CH-009"
+    assert drawing.DIMENSION_CALLOUTS["EarThick"].startswith(
+        f"THRUST FACES ON {washer}\n"
+    )
+    assert not re.search(r"\d", drawing.DIMENSION_CALLOUTS["SetScrewLocation"])
 
 
 # The native definitions of a through-next 4-40 Hole Wizard tap, as the
