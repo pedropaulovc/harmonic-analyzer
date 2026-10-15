@@ -9,8 +9,8 @@ Sheet/template and export behaviour lives in ``_drawing_common``.
 
 The lever is a long thin third-class lever (185.8 mm over the hub, 9.5 mm
 tall, 3.0 mm thick).  The sheet runs at 1:1: the front view carries the
-profile, bore, hub and both arms from the fulcrum bore; the top view the plate
-thickness, the hub length and the overall length; a 1:2 isometric.
+profile, bore, hub, both arms from the fulcrum bore and the overall length;
+the top view the plate thickness and the hub length; a 1:2 isometric.
 
 Run with SolidWorks open::
 
@@ -38,10 +38,11 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
+    set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_reference_dimension,
 )
-from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
@@ -89,7 +90,7 @@ _SPRING_HOLE_DIA = blind_cut_dia_mm(SPRING_EYE_HOLE_SPEC)
 _BAR_PIN_DIA = blind_cut_dia_mm(BAR_PIN_HOLE_SPEC)
 
 FRONT_CENTER = (0.150, 0.155)
-TOP_CENTER = (0.150, 0.205)  # above the profile: plate thickness, hub length
+TOP_CENTER = (0.150, 0.220)  # above the profile: plate thickness, hub length
 ISO_CENTER = (0.345, 0.215)
 ISO_NOTE_XY = (0.300, 0.172)
 
@@ -111,7 +112,7 @@ FRONT_CALLOUTS = {
         f"REAM; RUNS ON SHAFT\n{SHAFT_NUMBER},"
         f" {_CLEARANCE_LEAST:.2f}-{_CLEARANCE_MOST:.2f}\nDIAMETRAL CLEARANCE"
     ),
-    "BarHeight": "FULL R TIP",
+    "BarHeight": "FULL R AT TIP",
     "BarPinCx": "SETS LEVER RATIO",
     "SpringCx": "SETS LEVER RATIO",
 }
@@ -121,20 +122,20 @@ TOP_CALLOUTS = {
 }
 
 FRONT_KEEP = {
-    "HubDia": (0.030, 0.178),
-    "FulcrumDia": (0.088, 0.190),
+    "HubDia": (0.030, 0.135),
+    "FulcrumDia": (0.040, 0.190),
     "BarHeight": (0.262, FRONT_CENTER[1]),
-    "BarPinCx": (_sheet_x(BAR_PIN_X / 2.0), 0.133),
-    "SpringCx": (_sheet_x(LEVER_SPRING_X / 2.0 + 25.0), 0.113),
+    "BarPinCx": (_sheet_x(BAR_PIN_X / 2.0), 0.128),
+    "SpringCx": (_sheet_x(LEVER_SPRING_X / 2.0 + 25.0), 0.115),
 }
 TOP_KEEP = {
     "LeverThick": (0.264, TOP_CENTER[1] + 0.006),
     "HubLength": (0.036, TOP_CENTER[1] + 0.006),
 }
-OVERALL_TEXT_XY = (FRONT_CENTER[0], TOP_CENTER[1] + 0.022)
+OVERALL_TEXT_XY = (FRONT_CENTER[0], 0.102)
 BAR_PIN_CALLOUT_XY = (0.170, 0.188)
 SPRING_CALLOUT_XY = (0.240, 0.188)
-BORE_FINISH_SYMBOL = (0.036, 0.142)
+BORE_FINISH_SYMBOL = (0.082, 0.140)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -221,22 +222,28 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Overall length over the hub and the full-round tip, for the stock cut:
     # a reference (the hub, the spring-hole location and the bar's full round
-    # set it).  Both ends are silhouettes of round faces in the top view.
-    hub_end = model_point_in_view(
-        adapter, top, (-_HUB_R / 1000.0, 0.0, 0.0025), label="hub end silhouette"
-    )
-    tip_end = model_point_in_view(
-        adapter, top, (TIP_END_X / 1000.0, 0.0, 0.0), label="tip end silhouette"
+    # set it).  Both ends are arcs in the front view, each picked on its
+    # extreme and re-anchored to it (a horizontal arc pick resolves to the
+    # centre by default and would read the 175.05 spring arm).
+    hub_end, tip_end = (
+        model_point_in_view(adapter, front, (x / 1000.0, 0.0, 0.0), label=label)
+        for x, label in ((-_HUB_R, "hub extreme"), (TIP_END_X, "tip extreme"))
     )
     overall = add_edge_dimension(
         adapter,
-        top,
+        front,
         p0=hub_end,
         p1=tip_end,
         text_xy=OVERALL_TEXT_XY,
         label="overall length",
         orientation="horizontal",
-        entity_type="SILHOUETTE",
+    )
+    set_arc_endpoints_to_max(adapter, overall, label="overall length")
+    # Value-only: both picks are arcs the recipe locates by coordinate, and
+    # the far-extreme sum is the one value either centre-anchored mistake
+    # (175.05, 181.05, 179.80) cannot produce.
+    assert_dimension_measures(
+        adapter, overall, expected_mm=_HUB_R + TIP_END_X, label="overall length"
     )
     overall = _sw_type_info.early_bound_or_flag(
         overall, "IDisplayDimension", "GetAnnotation"
@@ -278,11 +285,11 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to front view")
 
     # The reamed fulcrum bore is the one running surface (rule 6): Ra on its
-    # lower-left rim, the symbol standing off below the hub.
+    # lower-right rim, the symbol standing off below the bar.
     bore_rim = model_point_in_view(
         adapter,
         front,
-        (-PIVOT_HOLE_DIA / 2000.0 * 0.7071, -PIVOT_HOLE_DIA / 2000.0 * 0.7071, 0.0),
+        (PIVOT_HOLE_DIA / 2000.0 * 0.7071, -PIVOT_HOLE_DIA / 2000.0 * 0.7071, 0.0),
         label="fulcrum bore rim",
     )
     add_surface_finish(
