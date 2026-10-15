@@ -14,7 +14,7 @@ import re
 import tomllib
 from datetime import date, datetime, time
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterable, Iterator
 
 from filelock import FileLock
 
@@ -29,6 +29,15 @@ _REF = re.compile(
     r"#[1-9]\d*/ADVANCED_FACE\[[1-9]\d*\]/(?P<label>HAF_[A-Z0-9_]+__P\d{2})"
 )
 _TL_STEM = re.compile(r"[a-z][a-z0-9_]*_tl_[a-z0-9_]+")
+# Pedro's #1413 convention for a realistic value that is not yet a shop
+# measurement. It keeps ``status = "measured"`` so travelers exercise every
+# check; this one marker is what binding counts, stamps PROVISIONAL and refuses
+# to release. Shop data and TL specs must spell it exactly this way.
+PLACEHOLDER_BY = "placeholder (realistic, remeasure: #1413)"
+PLACEHOLDER_ISSUE = "#1413"
+# HA's traveler stamp inside report.json, outside the prechips-generated report.
+PROVISIONAL_KEY = "ha_provisional"
+_BANNER = b'<div class="banner">'
 
 
 class PlanBindError(ValueError):
@@ -43,6 +52,10 @@ class PlanBindError(ValueError):
 
 class TravelerIncomplete(ValueError):
     """A traveler does not certify its full plan-derived output inventory."""
+
+
+class PlaceholderRelease(TravelerIncomplete):
+    """A release would ship travelers bound to #1413 placeholder values."""
 
 
 def plan_path(stem: str) -> Path:
@@ -389,8 +402,20 @@ def _shop_contents() -> tuple[bytes, bytes, bytes]:
 def bind_shop(
     out: Path = CAD_OUT, *, directory: Path | None = None
 ) -> tuple[Path, Path, Path]:
-    """Generate shop inputs, sourcing every cad-tagged solid from its TL spec."""
+    """Generate shop inputs, sourcing every cad-tagged solid from its TL spec.
+
+    Counts the bound #1413 placeholder facts: any makes the traveler PROVISIONAL.
+    """
+    import _telemetry
+
     contents = _shop_contents()
+    placeholders = _placeholders(contents)
+    if placeholders:
+        _telemetry.warn(
+            f"bound shop: {len(placeholders)} placeholder values "
+            f"(remeasure: {PLACEHOLDER_ISSUE}); travelers are PROVISIONAL and "
+            "cannot be released"
+        )
     directory = (
         Path(out) / "travelers" / "_shop" if directory is None else Path(directory)
     )
@@ -407,6 +432,95 @@ def bind_shop(
     except OSError as exc:
         raise PlanBindError(f"cannot write bound shop: {exc}") from exc
     return targets
+
+
+def _marked_values(node: Any, path: str) -> Iterator[str]:
+    if isinstance(node, str):
+        if PLACEHOLDER_BY in node:
+            yield path
+    elif isinstance(node, dict):
+        for key, value in node.items():
+            yield from _marked_values(value, f"{path}.{key}" if path else key)
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            yield from _marked_values(value, f"{path}[{index}]")
+
+
+# A table header line, never an inline array element such as ``[0.1, 0.2],``.
+_TABLE = re.compile(r"\[\[?\s*([\w.\"' -]+?)\s*\]\]?\s*(?:#.*)?")
+
+
+def _marked_comments(text: str) -> Iterator[str]:
+    table = ""
+    for number, line in enumerate(text.splitlines(), start=1):
+        stripped = line.strip()
+        header = _TABLE.fullmatch(stripped)
+        if header is not None:
+            table = header.group(1)
+        elif stripped.startswith("#") and PLACEHOLDER_BY in stripped:
+            yield f"{table} line {number} (comment)"
+
+
+def _placeholders(bound: Iterable[bytes]) -> tuple[str, ...]:
+    """Every #1413 placeholder in a bound shop, as ``<file>:<where>``.
+
+    A bound value carrying the marker (a ``measured.by``, including solids
+    spliced from a TL spec's ``PRECHIPS_SOLIDS``, or prose) counts, and so does
+    a comment-declared placeholder in the tracked source: binding drops the
+    comment, but the value it qualifies still reaches prechips.
+    """
+    try:
+        return tuple(
+            f"{name}:{where}"
+            for name, content, source in zip(
+                SHOP_FILES, bound, shop_paths(), strict=True
+            )
+            for where in (
+                *_marked_values(tomllib.loads(content.decode("utf-8")), ""),
+                *_marked_comments(source.read_bytes().decode("utf-8")),
+            )
+        )
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
+        raise PlanBindError(f"cannot count shop placeholders: {exc}") from exc
+
+
+def shop_placeholders() -> tuple[str, ...]:
+    """The #1413 placeholders the current tracked shop binds."""
+    return _placeholders(_shop_contents())
+
+
+def provisional_stamp(placeholders: tuple[str, ...]) -> dict[str, Any]:
+    """HA's report stamp: a traveler bound to any placeholder is PROVISIONAL."""
+    return {
+        "provisional": bool(placeholders),
+        "placeholders": len(placeholders),
+        "remeasure": PLACEHOLDER_ISSUE,
+    }
+
+
+def provisional_banner(count: int) -> str:
+    """The header text a provisional traveler prints on every sheet."""
+    return (
+        f"PROVISIONAL — {count} placeholder values, remeasure: {PLACEHOLDER_ISSUE} · "
+    )
+
+
+def require_measured_release() -> None:
+    """Refuse a release while any #1413 placeholder is bound to an enrolled stem.
+
+    Every enrolled stem binds the same shop, so one placeholder binds to all of
+    them. Builds and farm runs still produce (PROVISIONAL) travelers.
+    """
+    if not TRAVELER_STEMS:
+        return
+    placeholders = shop_placeholders()
+    if placeholders:
+        raise PlaceholderRelease(
+            f"release refused: {len(placeholders)} placeholder values "
+            f"(by = {PLACEHOLDER_BY!r}) are bound to enrolled travelers "
+            f"{', '.join(TRAVELER_STEMS)}; remeasure them per {PLACEHOLDER_ISSUE} "
+            "first:\n" + "\n".join(placeholders)
+        )
 
 
 def _required_names(plan: dict[str, Any]) -> tuple[str, ...]:
@@ -454,6 +568,21 @@ def bind_traveler_html(stem: str, out: Path = CAD_OUT) -> None:
             raise TravelerIncomplete(
                 f"{stem}: traveler.html does not identify its source report"
             )
+        # Bound below the source marker: the visible PROVISIONAL header is HA's,
+        # stamped into every sheet banner prechips renders.
+        shop = Path(out) / "travelers" / "_shop"
+        stamp = provisional_stamp(
+            _placeholders((shop / name).read_bytes() for name in SHOP_FILES)
+        )
+        if stamp["provisional"]:
+            if _BANNER not in html_bytes:
+                raise TravelerIncomplete(
+                    f"{stem}: traveler.html has no sheet banner to stamp PROVISIONAL"
+                )
+            banner = provisional_banner(stamp["placeholders"]).encode()
+            html_bytes = html_bytes.replace(_BANNER, _BANNER + banner)
+            (directory / "traveler.html").write_bytes(html_bytes)
+        report[PROVISIONAL_KEY] = stamp
         records["traveler:html"] = {
             "path": "traveler.html",
             "sha256": hashlib.sha256(html_bytes).hexdigest(),
@@ -569,8 +698,22 @@ def _verified_traveler_bytes(
             raise TravelerIncomplete(
                 f"{stem}: traveler.html record missing or sha256 differs"
             )
+        stamp = provisional_stamp(
+            _placeholders(shop_bytes[name] for name in SHOP_FILES)
+        )
+        if report.get(PROVISIONAL_KEY) != stamp:
+            raise TravelerIncomplete(
+                f"{stem}: report provisional stamp differs from bound shop placeholders"
+            )
+        if (
+            stamp["provisional"]
+            and provisional_banner(stamp["placeholders"]).encode() not in html_bytes
+        ):
+            raise TravelerIncomplete(
+                f"{stem}: traveler.html lacks its PROVISIONAL header"
+            )
         source_report = {
-            **report,
+            **{key: value for key, value in report.items() if key != PROVISIONAL_KEY},
             "inputs": {
                 key: value for key, value in records.items() if key != "traveler:html"
             },
@@ -611,6 +754,7 @@ def stage_travelers(out: Path, stage: Path) -> list[Path]:
     import _telemetry
 
     with _telemetry.span("release.travelers_stage", stems=len(TRAVELER_STEMS)):
+        require_measured_release()
         pending: dict[Path, bytes] = {}
         for stem in TRAVELER_STEMS:
             snapshots = _verified_traveler_bytes(

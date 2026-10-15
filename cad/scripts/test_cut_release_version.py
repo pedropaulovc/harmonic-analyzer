@@ -159,6 +159,61 @@ def test_release_revision_mismatch_fails_before_staging_or_publication(
     assert calls == [(stem, cad / "out", "v22") for stem in stems]
 
 
+def test_release_refuses_placeholder_measurements_before_side_effects(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Preflight names every bound #1413 placeholder; a dry run refuses too."""
+    plans = cut_release._process_plans
+    measured = (
+        '{ status = "measured", by = "' + plans.PLACEHOLDER_BY + '", '
+        'date = "2026-10-12", instrument = "height gauge" }'
+    )
+    shop = tmp_path / "process" / "shop"
+    shop.mkdir(parents=True)
+    for name in plans.SHOP_FILES:
+        (shop / name).write_text("version = 1\n", encoding="utf-8")
+    (shop / "inventory.toml").write_text(
+        f"[fixtures.test]\nheight_mm = {{ value = 18.5, measured = {measured} }}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(plans, "PROCESS_ROOT", shop.parent)
+    monkeypatch.setattr(cut_release, "CAD_ROOT", tmp_path / "cad")
+    monkeypatch.setattr(cut_release, "RELEASE_DIR", tmp_path / "release")
+    monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    monkeypatch.setattr(plans, "TRAVELER_STEMS", ("ch_rocker_arm",))
+    monkeypatch.setattr(plans, "check_plan_revision", lambda *_a, **_k: None)
+
+    def forbidden(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("placeholder measurements reached release side effects")
+
+    monkeypatch.setattr(
+        cut_release,
+        "_start_release_log",
+        lambda _version: (tmp_path / "release.log", lambda: None),
+    )
+    for name in (
+        "_git",
+        "_gh",
+        "previous_tag",
+        "bundle",
+        "publish",
+        "prepare_configured_revision_advance",
+        "report_no_publish",
+    ):
+        monkeypatch.setattr(cut_release, name, forbidden)
+    monkeypatch.setattr(trim_renders, "regenerate_readme_images", forbidden)
+    monkeypatch.setattr(sys, "argv", ["cut_release.py", "v22", "--no-publish"])
+
+    with pytest.raises(SystemExit) as failure:
+        cut_release.main()
+
+    message = str(failure.value)
+    assert message.startswith("!!  release refused: 1 placeholder values")
+    assert plans.PLACEHOLDER_ISSUE in message
+    assert message.endswith("\ninventory.toml:fixtures.test.height_mm.measured.by")
+
+
 @pytest.fixture
 def enrolled_revision_plans(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -776,6 +831,8 @@ def prepared_readme_release(
         cut_release._process_plans, "check_plan_revision",
         lambda _stem, _out, *, revision: None,
     )
+    # A fully remeasured shop; the placeholder refusal has its own regression.
+    monkeypatch.setattr(cut_release._process_plans, "shop_placeholders", lambda: ())
     monkeypatch.setattr(trim_renders, "DOCS_IMAGES", images)
     monkeypatch.setattr(cut_release, "bundle", lambda *_args: (zip_path, facts))
     monkeypatch.setattr(cut_release, "_git", lambda *_args, **_kwargs: "")

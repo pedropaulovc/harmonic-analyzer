@@ -22,6 +22,12 @@ def wrapper_stubs(tmp_path, monkeypatch):
     directory = out / "travelers" / "ch_rocker_arm"
     bound = directory / "plan.toml"
     shop = tuple(out / "travelers" / "_shop" / name for name in plans.SHOP_FILES)
+    # A synthetic tracked shop: the HTML stamp counts its placeholders.
+    tracked = tmp_path / "process" / "shop"
+    tracked.mkdir(parents=True)
+    for name in plans.SHOP_FILES:
+        (tracked / name).write_text("version = 1\n", encoding="utf-8")
+    monkeypatch.setattr(plans, "PROCESS_ROOT", tracked.parent)
     calls = {
         "cli": [],
         "capture": [],
@@ -49,11 +55,13 @@ def wrapper_stubs(tmp_path, monkeypatch):
 
     def bind_shop(output, *, directory=None):
         calls["bind_shop"].append((output, directory))
-        return (
-            tuple(directory / name for name in plans.SHOP_FILES)
-            if directory is not None
-            else shop
-        )
+        if directory is not None:
+            return tuple(directory / name for name in plans.SHOP_FILES)
+        # Like the real binder, install the shared shop the HTML stamp counts.
+        shop[0].parent.mkdir(parents=True, exist_ok=True)
+        for path in shop:
+            path.write_text("version = 1\n", encoding="utf-8")
+        return shop
 
     @contextmanager
     def span(name, **attributes):

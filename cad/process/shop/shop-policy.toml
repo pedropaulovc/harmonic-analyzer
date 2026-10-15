@@ -1,31 +1,76 @@
-# Copied from https://github.com/pedropaulovc/prechips/blob/0dd7614/examples/shop-policy.toml
-# Inventory verification flags and author-choice process proposals are unchanged.
-# Shop-owned policy; a process plan cannot waive required findings.
-# PLAN.md rev 6 §3.4 ships these first seven rules on every subject.
-revision = 6
+# Harmonic-analyzer shop policy for prechips travelers (docs/policy.md).
+#
+# Authored from scratch for the rocker-arm trial (2026-10-11). Every rule a
+# traveler must clear before the shop cuts metal is listed here. A required
+# rule's warn/unknown/unsupported blocks the gate (exit 4), so a traveler that
+# passes has had every listed check resolved. joint_fit, joint_assembly,
+# manual_arc, centre_support, prepared_blank and purchased_tooling are always
+# required by prechips and are not repeated here.
+
+revision = 1
 
 [required]
+# Declared-input resolution: every tool, holder, fixture and gauge the plan names
+# must resolve to the shop inventory, and every hole must have a sized tool.
 tool_resolves = "*"
-sizing = "*"
+sizing = "holes"
+consistency = "*"
+hold_fields = "setups"
+
+# Route integrity: ops chain stock to finished feature, blind depths are reachable,
+# ops run in a valid order, and every datum the drawing uses is established
+# before it is consumed.
 op_chain = "*"
-blind_depth = "*"
-inspection = "*"
+order = "*"
+blind_depth = "holes"
+datum_consistency = "*"
+
+# Manual-machine coordinates: every position is a DRO number from a declared
+# zero, and every zero is checked before cutting.
 coordinates = "*"
-zero_check = "*"
+zero_check = "setups"
+
+# Cutting physics on a hobby-size machine.
+speeds_feeds = "*"
+engagement = "*"
+headroom = "setups"
+
+# Measured mill feasibility (M5): the setup must fit the machine's envelope and
+# axis travels.
+envelope = "setups"
+travel = "setups"
+
+# Geometry (FreeCAD kernel): tools reach and clear, vise and fixtures hold
+# without collision, and every face is cut.
+accessibility = "*"
+reach = "*"
+internal_corner_radius = "*"
+coverage = "*"
+finish_coverage = "*"
+vise = "setups"
+fixture_interference = "setups"
+thin_wall_under_clamp = "setups"
+
+# Every toleranced feature has a named inspection with a gauge that resolves.
+inspection = "toleranced_features"
+finish_route = "*"
 
 [numbers]
-refixture_budget_mm = "unknown"
-thin_wall_floor_mm = "unknown"
-stickout_ld_max = "unknown"
+# Values approved by Pedro 2026-10-11 from researched candidates; each cite
+# says whether the number is published or a shop decision.
+max_filing_stock_mm = 2.0
+refixture_budget_mm = 0.05
+stickout_ld_max = 3.0
+thin_wall_floor_mm = 3.0
 
-# No logbook measurements or authoritative threshold citations were supplied.
-# Separate metadata tables avoid pretending the layout-sketch values are measured.
 [numbers_cite]
-refixture_budget_mm = "unknown"
-thin_wall_floor_mm = "unknown"
-stickout_ld_max = "unknown"
+max_filing_stock_mm = "Gopalan College of Engineering and Management, Workshop Practice Lab manual, PDF p.25, fitting step 7: 'Removing small amount (1 mm to 2mm) of material Files can be used.' Upper endpoint adopted as the shop cap (Pedro, 2026-10-11). https://www.gopalancolleges.com/gcem/course-material/mechanical/lab-manual/sem-II/workshop-manual-15wsl24.pdf"
+refixture_budget_mm = "SHOP DECISION (Pedro, 2026-10-11), planning threshold, not a measured capability: two 0.001 in indicator alignments (US Army lathe guide, 'A dial indicator can then be used to finish aligning the workpiece to within 0.001 inch.') rounded to 0.05 mm. https://www.americanmachinetools.com/how_to_use_a_lathe.htm"
+stickout_ld_max = "US Army lathe guide, Turning Work in Chucks: 'If the work extends more than three times the diameter of the workpiece from the chuck or collet, additional support must be used such as a steady rest or a tailstock center support.' https://www.americanmachinetools.com/how_to_use_a_lathe.htm"
+thin_wall_floor_mm = "SHOP DECISION (Pedro, 2026-10-11), cautious protective-holding trigger; no published numeric floor. Carr Lane, Work Supports: 'This support is well suited for parts with thin cross sections where excessive pressure can distort the part.' https://www.carrlane.com/engineering-resources/technical-information/manual-workholding/locating-devices/work-supports"
 
 [numbers_verify]
-refixture_budget_mm = true
-thin_wall_floor_mm = true
-stickout_ld_max = true
+max_filing_stock_mm = false
+refixture_budget_mm = false
+stickout_ld_max = false
+thin_wall_floor_mm = false

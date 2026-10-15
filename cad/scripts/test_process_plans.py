@@ -264,7 +264,8 @@ def _complete(synthetic):
     _write_report(directory, report)
     (directory / "traveler.html").write_text(
         '<html><head><meta name="prechips-report" '
-        f'content="{report["hash"]}"></head>synthetic traveler</html>',
+        f'content="{report["hash"]}"></head>'
+        '<div class="banner">PLANNED — NOT APPROVED</div>synthetic traveler</html>',
         encoding="utf-8",
     )
     plans.bind_traveler_html(STEM, out)
@@ -450,6 +451,116 @@ def test_manifest_override_and_staging_prove_staged_digest(synthetic, tmp_path):
         plans.verify_traveler(STEM, out, manifest=staged_manifest)
     with pytest.raises(plans.TravelerIncomplete):
         plans.stage_travelers(out, stage)
+
+
+def _measurement(by):
+    return {
+        "status": "measured",
+        "by": by,
+        "date": "2026-10-12",
+        "instrument": "height gauge on surface plate",
+    }
+
+
+def _measured_shop(shop, by):
+    measured = plans._toml_value(_measurement(by))
+    (shop / "inventory.toml").write_text(
+        f"[fixtures.test]\nheight_mm = {{ value = 18.5, measured = {measured} }}\n",
+        encoding="utf-8",
+    )
+
+
+def _stage(manifest, tmp_path):
+    stage = tmp_path / "stage"
+    staged_manifest, _ = plans.bundle_paths(STEM, stage)
+    staged_manifest.parent.mkdir(parents=True)
+    staged_manifest.write_bytes(manifest.read_bytes())
+    step_name = tomllib.loads(manifest.read_text())["step"]
+    (staged_manifest.parent / step_name).write_bytes(
+        (manifest.parent / step_name).read_bytes()
+    )
+    return stage
+
+
+def test_placeholder_traveler_is_provisional_and_cannot_release(synthetic, tmp_path):
+    *_, shop = synthetic
+    _measured_shop(shop, plans.PLACEHOLDER_BY)
+    out, manifest, bound, report = _complete(synthetic)
+    assert report[plans.PROVISIONAL_KEY] == {
+        "provisional": True,
+        "placeholders": 1,
+        "remeasure": plans.PLACEHOLDER_ISSUE,
+    }
+    html = (bound.parent / "traveler.html").read_text(encoding="utf-8")
+    assert f'<div class="banner">{plans.provisional_banner(1)}PLANNED' in html
+    # Ordinary builds and farm runs still certify the (provisional) traveler.
+    plans.verify_traveler(STEM, out)
+    stage = _stage(manifest, tmp_path)
+    with pytest.raises(plans.PlaceholderRelease) as refusal:
+        plans.stage_travelers(out, stage)
+    assert plans.PLACEHOLDER_ISSUE in str(refusal.value)
+    assert str(refusal.value).endswith(
+        "\ninventory.toml:fixtures.test.height_mm.measured.by"
+    )
+    assert not (stage / "travelers").exists()
+    with pytest.raises(plans.PlaceholderRelease):
+        plans.require_measured_release()
+
+
+def test_measured_fixture_traveler_is_not_provisional(synthetic, tmp_path):
+    *_, shop = synthetic
+    _measured_shop(shop, "P. Vicente")
+    out, manifest, bound, report = _complete(synthetic)
+    assert report[plans.PROVISIONAL_KEY] == plans.provisional_stamp(())
+    assert not report[plans.PROVISIONAL_KEY]["provisional"]
+    assert "PROVISIONAL" not in (bound.parent / "traveler.html").read_text(
+        encoding="utf-8"
+    )
+    plans.require_measured_release()
+    assert plans.stage_travelers(out, _stage(manifest, tmp_path)) == [
+        tmp_path / "stage" / "travelers" / STEM
+    ]
+
+
+def test_every_bound_placeholder_is_counted(synthetic, monkeypatch):
+    _, out, _, shop = synthetic
+    module = _spec(monkeypatch)
+    module.PRECHIPS_SOLIDS[0]["measured"] = _measurement(plans.PLACEHOLDER_BY)
+    (shop / "inventory.toml").write_text(
+        '[fixtures.test]\ncad = "ch_rocker_arm_tl_test"\n'
+        "[gauges.radius]\n"
+        f"# Identity: by = {plans.PLACEHOLDER_BY!r}; schema has no measured.\n"
+        "range_mm = [\n  [1.0, 7.0],\n]\n"
+        f"note = {plans._toml_value('provenance: by = ' + plans.PLACEHOLDER_BY)}\n",
+        encoding="utf-8",
+    )
+    assert plans.shop_placeholders() == (
+        "inventory.toml:fixtures.test.solids[0].measured.by",
+        "inventory.toml:gauges.radius.note",
+        "inventory.toml:gauges.radius line 4 (comment)",
+    )
+    bound = plans.bind_shop(out)
+    assert plans._placeholders(path.read_bytes() for path in bound) == (
+        plans.shop_placeholders()
+    )
+
+
+@pytest.mark.parametrize("tamper", ["stamp", "header"])
+def test_verification_requires_the_provisional_stamp(synthetic, tamper):
+    *_, shop = synthetic
+    _measured_shop(shop, plans.PLACEHOLDER_BY)
+    out, _, bound, report = _complete(synthetic)
+    if tamper == "stamp":
+        report[plans.PROVISIONAL_KEY] = plans.provisional_stamp(())
+    else:
+        html = bound.parent / "traveler.html"
+        content = html.read_bytes().replace(plans.provisional_banner(1).encode(), b"")
+        html.write_bytes(content)
+        digest = hashlib.sha256(content).hexdigest()
+        report["inputs"]["traveler:html"]["sha256"] = digest
+    _write_report(bound.parent, report)
+    with pytest.raises(plans.TravelerIncomplete, match="(?i)provisional"):
+        plans.verify_traveler(STEM, out)
 
 
 def test_enrolled_plan_revisions_match_configured_release():
