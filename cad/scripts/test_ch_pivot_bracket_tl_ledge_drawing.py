@@ -18,15 +18,17 @@ from _hole_spec import THREAD_MAJOR_MM
 # follow-on 67237b9, examples/inventory/pedro-shop.toml [fixtures.angle-plate]
 # and examples/pivot-bracket/plan.toml [setups.hold]), in Setup frame TC: Z0
 # is the bracket's faced outer face (in the plane of the ear's inboard face,
-# the hold-down station's datum), 5.24 proud of the plate top. The 2026-10-10
+# the hold-down station's datum), 5.64 proud of the plate top. The 2026-10-10
 # 8-thick ears and two thrust washers moved the ledge rows, and the
 # worst-case 4 mm floor (CodeRabbit on 3d649fd90) raised the ledge and
-# lowered the studs; the prechips plan follows these.
-PRECHIPS_PART_PROUD = 5.24
-PRECHIPS_TABLE_Z = -94.14  # base box bottom
-PRECHIPS_LEDGE_Z = (-43.34, -16.44)  # bolted foot-end ledge box, 26.9 high
-PRECHIPS_SCREW_Z = -26.94  # ledge screws, clearance and tapped holes
-PRECHIPS_STUD_Z = -13.44  # bridge stud holes (the bridge's Setup Z)
+# lowered the studs; the 2026-10-14 longer foot at its title-block band
+# (user ruling, #954) lowered the ledge and its screw row 0.1. The prechips
+# plan follows these.
+PRECHIPS_PART_PROUD = 5.64
+PRECHIPS_TABLE_Z = -94.54  # base box bottom
+PRECHIPS_LEDGE_Z = (-43.74, -16.94)  # bolted foot-end ledge box, 26.8 high
+PRECHIPS_SCREW_Z = -27.44  # ledge screws, clearance and tapped holes
+PRECHIPS_STUD_Z = -13.84  # bridge stud holes (the bridge's Setup Z)
 
 
 def _features() -> dict:
@@ -35,7 +37,7 @@ def _features() -> dict:
 
 def test_ledge_and_plate_stations_are_the_prechips_s4_stack() -> None:
     """BR-B1 (#1262): the part stands at least 4 mm proud at the stack's worst
-    case, so the ledge is 26.9 high with its holes 16.4 off its bottom, and the plate's taps and studs sit at
+    case, so the ledge is 26.8 high with its holes 16.3 off its bottom, and the plate's taps and studs sit at
     the prechips hold's Z rows. Each printed value is held here, independently
     of the specs, and checked with its one-place band."""
     assert round(plate.PART_PROUD, 2) == PRECHIPS_PART_PROUD
@@ -47,7 +49,7 @@ def test_ledge_and_plate_stations_are_the_prechips_s4_stack() -> None:
     hole_y = round(PRECHIPS_SCREW_Z - PRECHIPS_LEDGE_Z[0], 1)
     tap_y = round(PRECHIPS_SCREW_Z - PRECHIPS_TABLE_Z, 1)
     stud_y = round(PRECHIPS_STUD_Z - PRECHIPS_TABLE_Z, 1)
-    assert (height, hole_y, tap_y, stud_y) == (26.9, 16.4, 67.2, 80.7)
+    assert (height, hole_y, tap_y, stud_y) == (26.8, 16.3, 67.1, 80.7)
     rest = ledge["foot_rest"]
     assert (rest["height_nominal"], rest["height"]) == (height, limits(height, 1))
     for side in ("left", "right"):
