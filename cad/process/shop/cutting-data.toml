@@ -13,6 +13,13 @@
 #          (Table "Recommended Feed Rates for 2 Flute HSS & Carbide Drills",
 #          Table "Recommended Feed Rates for HSS and Carbide Endmills" row "Mild steel
 #          (.2-.3 C)", and Example 1B reamer rule: twice the drill's feed per rev)
+#
+# Diameter ranges: prechips matches lo <= d <= hi, and a diameter inside two rows is
+# unresolved. Rows of one material/tool/operation tile their span as half-open
+# [lo, hi): a row below its neighbour ends on the float just under the neighbour's lo
+# (12.699999999999998 = the double before 12.7), so a measured cutter such as a
+# 12.695 mm "1/2 in" end mill falls in exactly one row and a nominal boundary belongs
+# to the upper row (test_process_shop checks the tiling).
 revision = 1
 
 [aliases]
@@ -38,7 +45,7 @@ cite = [
 material_class = "low_carbon_steel"
 tool_material = "HSS"
 operation = "face"
-diameter_range = [3.0, 12.69]
+diameter_range = [3.0, 12.699999999999998]
 sfm = 65.0
 chip_load_mm_per_tooth = 0.0254
 cite = [
@@ -65,7 +72,7 @@ cite = [
 material_class = "low_carbon_steel"
 tool_material = "HSS"
 operation = "profile"
-diameter_range = [3.0, 12.69]
+diameter_range = [3.0, 12.699999999999998]
 sfm = 65.0
 chip_load_mm_per_tooth = 0.0254
 cite = [
@@ -85,7 +92,7 @@ cite = [
 material_class = "low_carbon_steel"
 tool_material = "HSS"
 operation = "drill"
-diameter_range = [0.5, 3.17]
+diameter_range = [0.5, 3.1749999999999994]
 sfm = 60.0
 chip_load_mm_per_tooth = 0.0127
 cite = [
@@ -135,14 +142,14 @@ cite = [
 [[plunge]]
 material_class = "low_carbon_steel"
 tool_material = "HSS"
-diameter_range = [3.175, 6.35]
+diameter_range = [3.175, 6.349999999999999]
 feed_mm_rev = 0.0254
 cite = ["UF drill feed table, row 1/8 to 1/4 in: 0.002-0.004 in/rev; AUTHOR'S CHOICE half the low end for an end mill fed down its axis, 0.001 in/rev = 0.0254 mm/rev"]
 
 [[plunge]]
 material_class = "low_carbon_steel"
 tool_material = "HSS"
-diameter_range = [6.36, 12.69]
+diameter_range = [6.35, 12.699999999999998]
 feed_mm_rev = 0.0508
 cite = ["UF drill feed table, row 1/4 to 1/2 in: 0.004-0.008 in/rev; AUTHOR'S CHOICE half the low end for an end mill fed down its axis, 0.002 in/rev = 0.0508 mm/rev"]
 
