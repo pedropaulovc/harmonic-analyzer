@@ -90,8 +90,9 @@ def test_every_exported_nominal_lies_inside_its_band(stem: str) -> None:
 
 
 # Each printed toleranced dimension -> the exported feature and requirement
-# that owns its band. Reference sizes governed by a matched-fit callout and
-# the thread designation own no band.
+# that owns its band. Reference sizes governed by a matched-fit callout, the
+# thread designation and the corner radii (tool-form sizes read with a radius
+# gauge, as vn_cone_tip_collar's shoulder root) own no band.
 PRINTED_OWNERS = {
     BUTTON: (
         button,
@@ -105,13 +106,15 @@ PRINTED_OWNERS = {
         stud,
         {
             "SeatStation": ("button_seat", "station"),
-            "ThreadStartStation": ("thread", "length"),
+            "ShoulderStation": ("body_shoulder", "station"),
+            "ReliefEndStation": ("thread", "length"),
             "HeadBackStation": ("head_back_face", "station"),
             "TailEndStation": ("vise_tail", "station"),
             "HeadDia": ("button_seat", "dia"),
             "TailDia": ("vise_tail", "dia"),
+            "ReliefDia": ("thread_relief", "dia"),
         },
-        {"BodyDia", "ThreadDia"},
+        {"BodyDia", "ThreadDia", "SeatFilletR", "ReliefRootR", "TailRootR"},
     ),
 }
 
@@ -141,25 +144,126 @@ def test_every_printed_band_has_a_requirement_owner(stem: str) -> None:
         assert owner["finish_ra"] == control.roughness_um, control.key
 
 
-def test_body_carries_the_hub_and_stays_inside_the_stack() -> None:
-    """At every printed button thickness and hub length the whole hub sits on
-    the lapped body (its length the worst case of the two printed tip
-    stations), and the nut lands on the upper button (body short of the
-    stack top)."""
+def test_body_carries_the_hub_and_both_buttons_inside_the_stack() -> None:
+    """At every printed button thickness and hub length the whole hub and at
+    least half the upper button sit on the lapped body (its length the worst
+    case of the two printed tip stations), and the nut lands on the upper
+    button (body short of the stack top)."""
     stud = _features(STUD)
     seat_low, seat_high = stud["button_seat"]["station"]
-    start_low, start_high = stud["thread"]["length"]
+    start_low, start_high = stud["body_shoulder"]["station"]
     body_low, body_high = seat_low - start_high, seat_high - start_low
     thick_low, thick_high = _features(BUTTON)["hub_seat_face"]["thickness"]
     hub_high = rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
     assert body_high < 2 * thick_low + rocker.HUB_LENGTH
-    assert body_low > thick_high + hub_high
+    assert body_low - (thick_high + hub_high) >= thick_low / 2
 
 
-def test_head_seat_lands_on_the_button_face_outside_its_bore() -> None:
-    head = stud.HEAD_DIA
-    bore_high = button.BORE_DIA + button.BORE_BAND[0]
-    assert bore_high < head < _features(BUTTON)["rim"]["dia"][0]
+def test_kit_holds_the_hub_coaxiality_and_filed_band() -> None:
+    """The manual-arc centre shift (pin in the pivot bore, button bore on the
+    pin, rim runout to its bore) keeps the filed hub inside the arm's printed
+    coaxiality and O.D. band."""
+    body_min = stud.BODY_DIA + stud.BODY_BAND[1]
+    shift = (
+        (rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[0] - body_min) / 2
+        + (button.BORE_DIA + button.BORE_BAND[0] - body_min) / 2
+        + button.OD_RUNOUT_TIR / 2
+    )
+    assert shift == pytest.approx(stud.HUB_CENTRE_SHIFT_MAX)
+    # The rim runout spends the whole budget, so the shift meets it exactly.
+    assert 2 * shift <= rocker.HUB_COAXIALITY_DIA + 1e-9
+    rim_low, rim_high = _features(BUTTON)["rim"]["dia"]
+    hub_low, hub_high = limits(rocker.HUB_DIA, 2)
+    assert hub_low <= rim_low - 2 * shift and rim_high + 2 * shift <= hub_high
+
+
+def test_head_and_nut_stay_inside_the_rim_outside_the_bore() -> None:
+    """A file laid on either rim clears the head and the nut corners at the
+    worst case of every printed band."""
+    rim_low = _features(BUTTON)["rim"]["dia"][0]
+    head_low, head_high = _features(STUD)["button_seat"]["dia"]
+    assert button.BORE_DIA + button.BORE_BAND[0] < head_low
+    assert head_high < rim_low
+    assert stud.NUT_CORNER_DIA < rim_low
+
+
+def test_kit_solids_validate_and_follow_the_specs() -> None:
+    from prechips.model import FixtureSolid
+
+    for solid in stud.PRECHIPS_SOLIDS:
+        FixtureSolid.model_validate(solid)
+    solids = {solid["name"]: solid for solid in stud.PRECHIPS_SOLIDS}
+    assert len(solids) == len(stud.PRECHIPS_SOLIDS)
+
+    def span(name: str) -> tuple[float, float]:
+        solid = solids[name]
+        z, length = solid["at_mm"][2], solid["length_mm"]
+        end = z + length * solid["axis"][2]
+        return min(z, end), max(z, end)
+
+    seat = -(rocker.HUB_LENGTH + button.THICKNESS)
+    assert span("upper button") == pytest.approx((0.0, button.THICKNESS))
+    assert span("lower button") == pytest.approx((seat, -rocker.HUB_LENGTH))
+    assert span("stud pin") == pytest.approx((seat, seat + stud.BODY_LENGTH))
+    assert span("stud relief") == pytest.approx(
+        (seat + stud.BODY_LENGTH, seat + stud.BODY_LENGTH + stud.RELIEF_WIDTH)
+    )
+    assert span("stud thread") == pytest.approx(
+        (seat + stud.BODY_LENGTH + stud.RELIEF_WIDTH, seat + stud.THREAD_END)
+    )
+    assert span("stud head") == pytest.approx((seat - stud.HEAD_LENGTH, seat))
+    assert span("stud tail") == pytest.approx(
+        (seat - stud.TAIL_END, seat - stud.HEAD_LENGTH)
+    )
+    assert span("nut")[0] == pytest.approx(button.THICKNESS)
+    assert span("stud pin")[1] < span("nut")[0] < span("stud thread")[1]
+    assert stud.RELIEF_DIA < stud.THREAD_MODEL_DIA - 1.299038 * 25.4 / 24.0
+    rim_low, rim_high = _features(BUTTON)["rim"]["dia"]
+    for name in ("upper button", "lower button"):
+        assert rim_low <= solids[name]["dia_mm"] <= rim_high
+    for name in ("upper button bore", "lower button bore"):
+        assert solids[name]["void"] and solids[name]["dia_mm"] == button.BORE_DIA
+    assert solids["stud pin"]["dia_mm"] == stud.BODY_DIA
+    assert solids["stud tail"]["dia_mm"] == stud.TAIL_DIA
+    assert (
+        solids["nut"]["supply"] == "bought"
+        and stud.NUT_SKU in solids["nut"]["fastener"]
+    )
+
+
+def test_inventory_kit_binds_its_solids_from_the_stud_spec(tmp_path) -> None:
+    import tomllib
+
+    import _process_plans as plans
+
+    assert "ch_rocker_arm_tl_filing_stud_spec" in plans.shop_spec_modules()
+    inventory, _, _ = plans.bind_shop(tmp_path)
+    kit = tomllib.loads(inventory.read_text(encoding="utf-8"))["fixtures"]
+    assert kit["hub-filing-buttons"]["solids"] == stud.PRECHIPS_SOLIDS
+
+
+def test_inventory_kit_limit_facts_lie_inside_the_cad_bands() -> None:
+    """The kit's #1413 placeholder limits are what prechips proves the filed
+    radius from; each must be a stack the TL parts' bands accept."""
+    import tomllib
+
+    import _process_plans as plans
+
+    path = plans.PROCESS_ROOT / "shop" / "inventory.toml"
+    kit = tomllib.loads(path.read_text(encoding="utf-8"))["fixtures"][
+        "hub-filing-buttons"
+    ]
+    bands = {
+        "button_dia_limits_mm": limits(button.OD, button.OD_PLACES),
+        "button_bore_limits_mm": limits(
+            button.BORE_DIA, button.BORE_PLACES, button.BORE_BAND
+        ),
+        "pin_dia_limits_mm": limits(stud.BODY_DIA, stud.BODY_PLACES, stud.BODY_BAND),
+    }
+    for field, (low, high) in bands.items():
+        least, greatest = kit[field]["value"]
+        assert low - 1e-9 <= least <= greatest <= high + 1e-9, (field, low, high)
+    assert 0 <= kit["button_runout_mm"]["value"] <= button.OD_RUNOUT_TIR
 
 
 @pytest.mark.parametrize(
@@ -178,3 +282,89 @@ def test_notes_follow_the_simplicity_policy(notes: str) -> None:
     # The only figure a note may carry is a named exception's stated shortfall.
     assert not re.search(r"\d", notes.replace(button.RIM_WALL_NOTE, ""))
     assert "GROUND" not in notes and "GRIND" not in notes
+
+
+def test_corner_radii_fit_their_corners_and_clear_the_button() -> None:
+    """Main's round-6 ruling: every internal corner prints a MAX radius on its
+    model value; the roots fit the relief and leave a head step face, and the
+    seat corner stays inside the title block's edge break on the button bore."""
+    assert stud.RADIUS_TOL_TYPE == 6
+    assert stud.ROOT_RADIUS < (stud.THREAD_MODEL_DIA - stud.RELIEF_DIA) / 2
+    assert 2 * stud.ROOT_RADIUS < stud.RELIEF_WIDTH_MIN
+    assert stud.TAIL_ROOT_RADIUS < (stud.HEAD_DIA - stud.TAIL_DIA) / 2
+    edge_break = float(_config.title_block("edge_break")["chamfer_max_mm"])
+    assert stud.SEAT_FILLET_RADIUS < edge_break
+    for name in ("SeatFilletR", "ReliefRootR", "TailRootR"):
+        assert stud.DRAWING_PRECISION_BY_NAME[name] == stud.RADIUS_PLACES == 1
+    assert stud_drawing.PROFILE_KEEP.keys() >= {
+        "SeatFilletR",
+        "ReliefRootR",
+        "TailRootR",
+    }
+
+
+def test_shoulder_station_keeps_three_places_for_its_stack() -> None:
+    """At the title block's .X band the relief would narrow under one pitch,
+    so the shoulder keeps three places and its callout says why."""
+    assert stud.DRAWING_PRECISION_BY_NAME["ShoulderStation"] == 3
+    band_x = limits(stud.SHOULDER_STATION, 1)
+    assert band_x[0] - (stud.RELIEF_END_STATION + 0.8) < stud._THREAD_PITCH
+    assert stud.SHOULDER_CALLOUT == "BODY UNDER STACK TOP"
+
+
+def test_bore_chamfer_clears_the_seat_fillet_at_the_tightest_fit() -> None:
+    """Codex 4280374810: the lower button seats on the head face only if its
+    bore entry clears the stud's MAX seat fillet. The fillet lies under the
+    line rho + z = Rs + r from the shoulder corner; the chamfer's material
+    lies beyond rho + z = Rb + leg. So leg + (Rb - Rs) >= r clears it, at the
+    smallest bore, largest body and shortest leg the band's MIN and the angle
+    band allow."""
+    import math
+
+    from _printed_tolerance import angular_band_deg
+
+    bore_min = button.BORE_DIA + button.BORE_BAND[1]
+    body_max = stud.BODY_DIA + stud.BODY_BAND[0]
+    leg_min = button.BORE_CHAMFER_MIN * math.tan(
+        math.radians(button.BORE_CHAMFER_ANGLE_DEG - angular_band_deg())
+    )
+    margin = leg_min + (bore_min - body_max) / 2.0 - stud.SEAT_FILLET_RADIUS
+    assert margin > 0
+    assert stud.SEAT_FILLET_CLEARANCE_MIN == pytest.approx(margin)
+    assert button.BORE_CHAMFER_MIN == 0.20
+    assert button.BORE_FIT_CALLOUT[0] == "0.20-0.26 X 45\u00b0 BOTH ENDS"
+    assert _features(BUTTON)["bore"]["note"].startswith(button.BORE_FIT_CALLOUT[0])
+
+
+def test_bore_chamfer_band_keeps_the_rule_17_rim_wall() -> None:
+    """Codex 4282149107: the chamfer eats the rim wall at both faces. At the
+    smallest printed O.D., largest bore and the longest radial leg the band's
+    MAX and the angle band allow, the wall holds rule 17's 1.5 floor, and the
+    sheet's stated rim wall is that worst case rounded down."""
+    import math
+
+    from _printed_tolerance import angular_band_deg
+
+    low, high = button.BORE_CHAMFER_MIN, button.BORE_CHAMFER_MAX
+    assert (low, high) == (0.20, 0.26)
+    assert button.BORE_CHAMFER == pytest.approx((low + high) / 2.0) == 0.23
+    leg_max = high * math.tan(
+        math.radians(button.BORE_CHAMFER_ANGLE_DEG + angular_band_deg())
+    )
+    od_min = limits(button.OD, button.OD_PLACES)[0]
+    bore_max = button.BORE_DIA + button.BORE_BAND[0]
+    wall = (od_min - bore_max) / 2.0 - leg_max
+    assert wall >= rocker.RULE12_WALL_FLOOR
+    assert button.RIM_WALL_WORST == pytest.approx(wall)
+    assert button.RIM_WALL_MIN == math.floor(wall * 100.0 + 1e-9) / 100.0
+    assert button.RIM_WALL_NOTE == f"RIM WALL {button.RIM_WALL_MIN:.2f} MIN."
+    assert button.RIM_WALL_NOTE == "RIM WALL 1.50 MIN."
+
+
+def test_rim_runout_is_the_hub_coaxiality_remainder() -> None:
+    assert button.OD_RUNOUT_TIR <= stud.RIM_RUNOUT_BUDGET_TIR + 1e-9
+    assert button.OD_RUNOUT_TIR + 0.001 > stud.RIM_RUNOUT_BUDGET_TIR + 1e-9
+    assert button.OD_RUNOUT_CALLOUT == "RUNOUT 0.025 TIR TO BORE"
+    assert "HUB COAXIALITY" in button.OD_CALLOUT
+    assert "\n" not in button.OD_RUNOUT_CALLOUT
+    assert "TRUE TO BORE" not in button.DRAWING_NOTES

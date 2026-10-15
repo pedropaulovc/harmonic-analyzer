@@ -7,12 +7,12 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     dimension_name,
     place_view,
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -24,8 +24,10 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     move_model_dimension,
+    set_dimension_callouts,
     set_reference_dimension,
 )
+from _drawing_leader_notes import add_attached_note
 from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -42,9 +44,13 @@ from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_filing_button_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    OD_CALLOUT,
+    OD_RUNOUT_CALLOUT,
     REFERENCE_CALLOUTS,
     REFERENCE_DIMENSIONS,
+    RIM_CORNER_NOTE,
     SURFACE_FINISHES,
+    THICKNESS_CALLOUT,
 )
 
 
@@ -75,7 +81,28 @@ FACE_KEEP = {
     # border (codex: at x 0.060 its opening words left the sheet).
     "BoreDia": (0.115, 0.240),
 }
-EDGE_XY = {"DiscDia": (0.165, 0.180)}
+# Right of the edge view: the O.D.'s mate callout is wider than the gap
+# between the two views, and the isometric stands clear further right.
+EDGE_XY = {"DiscDia": (0.245, 0.180)}
+# The rim note leads to the face view's outer circle at lower left, clear of
+# the bore leader (upper left) and the bore finish symbol (lower right).
+RIM_PICK = (FACE_CENTER[0] - 0.0144, FACE_CENTER[1] - 0.0144)
+RIM_NOTE_XY = (0.025, 0.145)
+
+# The template centre-marks the bore as the face view is placed, so the
+# explicit AutoInsertCenterMarks2 printed a second, identical mark over it
+# (round-4 layout audit: DetailItem347/349 at one point; round 6: the view
+# arrived marked; draw_sm_knife_mount #913). The sheet adds none; it proves
+# the one.
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+
+
+def _prove_one_bore_mark(view: Any) -> None:
+    marks = (
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
+    if len(marks) != 1:
+        raise RuntimeError(f"expected one button-bore centre mark, found {len(marks)}")
 
 
 _AXIS = ([0.0, 0.0, 1.0], ("__frame__",))
@@ -114,8 +141,12 @@ requirement("bore",
     precision={"finish_ra": 1},
 )
 
+# Close above the edge view, under the bore's fit callout: the thickness's
+# mate callout stands above its value, so the dimension line runs under the
+# value and clear of the callout (Claude review: below the value, the line
+# struck the callout).
 EDGE_KEEP = {
-    "DiscThick": (0.200, 0.235),
+    "DiscThick": (0.200, 0.218),
 }
 
 
@@ -183,8 +214,8 @@ async def build(adapter: Any) -> dict[str, str]:
     face = place_view(adapter, str(SOURCE), "*Front", *FACE_CENTER, scale=VIEW_SCALE)
     edge = place_view(adapter, str(SOURCE), "*Right", *EDGE_CENTER, scale=VIEW_SCALE)
     # finalize_drawing shades the pictorial isometric with edges.
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    for view in (face, edge):
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
+    for view in (face, edge, iso):
         set_hidden_lines_removed(adapter, view)
 
     annotations = []
@@ -208,8 +239,10 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="edge view",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Lower right on the bore circle, clear of the bore dimension's leader.
-    bore_pick = (FACE_CENTER[0] + 0.0092, FACE_CENTER[1] - 0.0092)
+    # Lower right on the bore circle, past the end of the bore dimension's
+    # diameter line (Claude review: at 45 degrees the two arrows met there)
+    # and clear of the vertical centre mark.
+    bore_pick = (FACE_CENTER[0] + 0.00445, FACE_CENTER[1] - 0.01223)
     add_surface_finish(
         adapter,
         face,
@@ -219,8 +252,7 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
         label="filing button bore finish",
     )
-    if not auto_center_marks(adapter, face, holes=True, size=0.0025):
-        raise RuntimeError("failed to add the center mark to the button face view")
+    _prove_one_bore_mark(face)
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [a for a in annotations if dimension_name(adapter, a) == name]
         if len(matches) != 1:
@@ -240,6 +272,23 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    set_dimension_callouts(
+        adapter, annotations, {"DiscDia": OD_CALLOUT}, location="below"
+    )
+    set_dimension_callouts(
+        adapter,
+        annotations,
+        {"DiscDia": OD_RUNOUT_CALLOUT, "DiscThick": THICKNESS_CALLOUT},
+        location="above",
+    )
+    add_attached_note(
+        adapter,
+        face,
+        text=RIM_CORNER_NOTE,
+        entity_xy=RIM_PICK,
+        note_xy=RIM_NOTE_XY,
+        label="filing button rim corner note",
+    )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 

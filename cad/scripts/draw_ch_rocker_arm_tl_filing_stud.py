@@ -15,6 +15,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -26,6 +27,7 @@ from _drawing_common import (
 from _drawing_dimensions import (
     assert_imported_precision,
     move_model_dimension,
+    set_dimension_callouts,
     set_dimension_text,
     set_reference_dimension,
 )
@@ -52,6 +54,10 @@ from ch_rocker_arm_tl_filing_stud_spec import (
     HEAD_LENGTH,
     REFERENCE_CALLOUTS,
     REFERENCE_DIMENSIONS,
+    RELIEF_ROOTS_CALLOUT,
+    RELIEF_WIDTH,
+    SHOULDER_CALLOUT,
+    STACK_CALLOUT,
     SURFACE_FINISHES,
     TAIL_END,
     THREAD_END,
@@ -65,7 +71,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A seventy-millimetre stud: 2:1 keeps the four steps legible on one turned profile.
+# A sixty-millimetre stud: 2:1 keeps the four steps legible on one turned profile.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
@@ -80,7 +86,9 @@ ISO_CENTER = (0.355, 0.195)  # clear of the two-line fit callout
 ISO_NOTE_XY = (0.295, 0.240)
 NOTES_XY = (0.020, 0.075)
 _TIP_X = SEAT_X + THREAD_END * _S
-_ROW = 0.012
+# Rows 15 mm apart: the seat row's stack callout stands between its value
+# and its dimension line.
+_ROW = 0.015
 
 
 def _row(station_x_mm: float, row: int) -> tuple[float, float]:
@@ -91,13 +99,43 @@ def _row(station_x_mm: float, row: int) -> tuple[float, float]:
     )
 
 
-# Shortest span lowest so no extension line crosses another row's text.
+# Shortest span lowest so no extension line crosses another row's text. The
+# seat's value and stack callout sit in the middle of their span, the
+# callout's ends clear of the seat's and the tip's extension lines (Claude
+# review: 2 mm left, the seat's line ran into "HOLDS"). The shoulder's value
+# and its function callout are wider than its span: they stand right of the
+# tip's extension line, clear of the profile.
+_SHOULDER_TEXT_X = _TIP_X + 0.031
 PROFILE_KEEP = {
-    "ThreadStartStation": _row(BODY_LENGTH, 0),
-    "SeatStation": _row(0.0, 1),
-    "HeadBackStation": _row(-HEAD_LENGTH, 2),
-    "TailEndStation": _row(-TAIL_END, 3),
+    "ReliefEndStation": _row(BODY_LENGTH + RELIEF_WIDTH, 0),
+    "ShoulderStation": (_SHOULDER_TEXT_X, _row(BODY_LENGTH, 1)[1]),
+    "SeatStation": _row(0.0, 2),
+    "HeadBackStation": _row(-HEAD_LENGTH, 3),
+    "TailEndStation": _row(-TAIL_END, 4),
+    # Corner radii, each a MAX. The seat's stands just up and right of its
+    # corner and the relief roots' "2X" pair a full text gap above it, so
+    # each reads as its own block (round-4 layout audit: 2.66 mm read as
+    # one); both sit between the seat's and the shoulder's extension lines,
+    # below the shoulder row. The tail root's text stands below and left of
+    # its lower step corner, under the tail and clear of the head diameter's
+    # text (round 4: led from above, its leader crossed that text).
+    "SeatFilletR": (SEAT_X + 0.014, PROFILE_CENTER[1] + 0.0135),
+    "ReliefRootR": (SEAT_X + 0.015, PROFILE_CENTER[1] + 0.026),
+    "TailRootR": (SEAT_X - 0.021, PROFILE_CENTER[1] - 0.023),
 }
+# The diameter sketches sit on the seat plane (X0), so the tail's and the
+# thread's extension lines ran from the seat through the head and the body
+# and read as phantom steps (Claude review). Capped from their dimension
+# lines (draw_dt_pinion_cam's _limit_witness_lines), each stays on its own
+# step's silhouette: the tail's from its mid-length, the thread's within its
+# ten-millimetre run (sheet metres).
+WITNESS_CAPS = {"TailDia": 0.008, "ThreadDia": 0.006}
+# swDimensionArrowsSide_e.swDimArrowsInside on the two shortest rows: left to
+# the document's arrows outside, the relief end's dimension line ran left
+# across the shoulder's extension line (round-3 layout audit) and the
+# shoulder row's ran toward the relief roots' text.
+ARROWS_INSIDE = 0
+INSIDE_ARROW_ROWS = ("ReliefEndStation", "ShoulderStation")
 
 
 _AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
@@ -126,13 +164,13 @@ requirement("button_seat",
     fields={
         "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
         "plane": ({"frame": "model", "axis": "x", "value": 0.0}, ("__frame__",)),
-        "dia": (limits(part_spec.HEAD_DIA, 1), ("HEAD_DIA",)),
+        "dia": (limits(part_spec.HEAD_DIA, part_spec.HEAD_PLACES), ("HEAD_DIA",)),
         "dia_nominal": (part_spec.HEAD_DIA, ("HEAD_DIA",)),
         "station": (limits(part_spec.THREAD_END, part_spec.STATION_PLACES), ("THREAD_END",)),
         "station_nominal": (part_spec.THREAD_END, ("THREAD_END",)),
         "height_from": _FROM_TIP,
     },
-    precision={"dia": 1, "station": part_spec.STATION_PLACES},
+    precision={"dia": part_spec.HEAD_PLACES, "station": part_spec.STATION_PLACES},
 )
 
 requirement("head_back_face",
@@ -152,8 +190,28 @@ requirement("head_back_face",
     precision={"station": part_spec.STOCK_PLACES},
 )
 
-# The thread runs from the faced tip to the printed thread start, where
-# the locating journal begins.
+requirement("body_shoulder",
+    kind="face",
+    faces=(PlanarFace((1.0, 0.0, 0.0), part_spec.BODY_LENGTH),),
+    requirements=("station",),
+    fields={
+        "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
+        "plane": (
+            {"frame": "model", "axis": "x", "value": part_spec.BODY_LENGTH},
+            ("BODY_LENGTH",),
+        ),
+        "station": (
+            limits(part_spec.SHOULDER_STATION, part_spec.STATION_PLACES),
+            ("SHOULDER_STATION", ("ch_rocker_arm_spec", "HUB_LENGTH")),
+        ),
+        "station_nominal": (part_spec.SHOULDER_STATION, ("SHOULDER_STATION",)),
+        "height_from": _FROM_TIP,
+    },
+    precision={"station": part_spec.STATION_PLACES},
+)
+
+# The full thread runs from the faced tip to the printed relief end; the
+# relief takes the die's incomplete threads against the body shoulder.
 requirement("thread",
     kind="boss",
     faces=(CylinderFace(part_spec.THREAD_MODEL_DIA),),
@@ -162,30 +220,60 @@ requirement("thread",
         "axis": _AXIS,
         "thread": (part_spec.THREAD, ("THREAD",)),
         "length": (
-            limits(part_spec.THREAD_START, part_spec.STATION_PLACES),
-            ("THREAD_START", ("ch_rocker_arm_spec", "HUB_LENGTH")),
+            limits(part_spec.RELIEF_END_STATION, part_spec.STOCK_PLACES),
+            ("RELIEF_END_STATION",),
         ),
-        "length_nominal": (part_spec.THREAD_START, ("THREAD_START",)),
+        "length_nominal": (part_spec.RELIEF_END_STATION, ("RELIEF_END_STATION",)),
         "height_from": _FROM_TIP,
     },
-    precision={"length": part_spec.STATION_PLACES},
+    precision={"length": part_spec.STOCK_PLACES},
+)
+
+requirement("thread_relief",
+    kind="boss",
+    faces=(
+        CylinderFace(
+            part_spec.RELIEF_DIA,
+            contains_x_mm=part_spec.BODY_LENGTH + part_spec.RELIEF_WIDTH / 2.0,
+        ),
+    ),
+    requirements=("dia",),
+    fields={
+        "axis": _AXIS,
+        "dia": (limits(part_spec.RELIEF_DIA, part_spec.RELIEF_PLACES), ("RELIEF_DIA",)),
+        "dia_nominal": (part_spec.RELIEF_DIA, ("RELIEF_DIA",)),
+    },
+    precision={"dia": part_spec.RELIEF_PLACES},
 )
 
 DONOR_KEEP = {
     "TailDia": (0.300, 0.060),
     "HeadDia": (0.360, 0.060),
+    "ReliefDia": (0.330, 0.060),
     "BodyDia": (0.300, 0.140),
     "ThreadDia": (0.360, 0.140),
 }
 PROFILE_DIAMETER_XY = {
-    "TailDia": (SEAT_X - 0.060, PROFILE_CENTER[1] + 0.022),
+    # Below the middle of the tail, clear of the vise-end extension line.
+    "TailDia": (
+        SEAT_X - (HEAD_LENGTH + TAIL_END) / 2.0 * _S,
+        PROFILE_CENTER[1] - 0.030,
+    ),
     "HeadDia": (SEAT_X - 0.020, PROFILE_CENTER[1] + 0.024),
     # Each diameter's dimension line stands inside its own step (codex round
-    # 15): the fit callout on the journal (seat to 12.5), the thread on the
-    # threaded tip (thread start to the tip), both below so no leader crosses a row.
-    "BodyDia": (SEAT_X + BODY_LENGTH / 2.0 * _S, PROFILE_CENTER[1] - 0.065),
+    # 15): the fit callout on the journal (seat to shoulder), the relief floor
+    # in its groove and the thread on the threaded tip (relief end to the
+    # tip), all below so no leader crosses a row. The relief's value sits
+    # under the thread's so its dimension line passes left of that text. The
+    # journal's line stands near the shoulder: the finish symbol hangs under
+    # the journal's seat end (the corner radii took the space above it).
+    "BodyDia": (SEAT_X + (BODY_LENGTH - 2.5) * _S, PROFILE_CENTER[1] - 0.065),
+    "ReliefDia": (
+        SEAT_X + (BODY_LENGTH + RELIEF_WIDTH / 2.0) * _S,
+        PROFILE_CENTER[1] - 0.045,
+    ),
     "ThreadDia": (
-        SEAT_X + (BODY_LENGTH + THREAD_END) / 2.0 * _S,
+        SEAT_X + (BODY_LENGTH + RELIEF_WIDTH + THREAD_END) / 2.0 * _S,
         PROFILE_CENTER[1] - 0.030,
     ),
 }
@@ -193,7 +281,9 @@ PROFILE_DIAMETER_XY = {
 
 requirement("locating_body",
     kind="boss",
-    faces=(CylinderFace(part_spec.BODY_DIA),),
+    faces=(
+        CylinderFace(part_spec.BODY_DIA, contains_x_mm=part_spec.BODY_LENGTH / 2.0),
+    ),
     requirements=("note", "finish_ra"),
     fields={
         "at": ([0.0, 0.0, 0.0], ("__frame__",)),
@@ -214,17 +304,22 @@ requirement("locating_body",
 
 requirement("vise_tail",
     kind="boss",
-    faces=(CylinderFace(part_spec.TAIL_DIA),),
+    faces=(
+        CylinderFace(
+            part_spec.TAIL_DIA,
+            contains_x_mm=-(part_spec.HEAD_LENGTH + part_spec.TAIL_END) / 2.0,
+        ),
+    ),
     requirements=("dia", "station"),
     fields={
         "axis": _AXIS,
-        "dia": (limits(part_spec.TAIL_DIA, 1), ("TAIL_DIA",)),
+        "dia": (limits(part_spec.TAIL_DIA, part_spec.TAIL_PLACES), ("TAIL_DIA",)),
         "dia_nominal": (part_spec.TAIL_DIA, ("TAIL_DIA",)),
         "station": (limits(part_spec.OVERALL_LENGTH, part_spec.STOCK_PLACES), ("OVERALL_LENGTH",)),
         "station_nominal": (part_spec.OVERALL_LENGTH, ("OVERALL_LENGTH",)),
         "height_from": _FROM_TIP,
     },
-    precision={"dia": 1, "station": part_spec.STOCK_PLACES},
+    precision={"dia": part_spec.TAIL_PLACES, "station": part_spec.STOCK_PLACES},
 )
 
 
@@ -265,8 +360,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Front", *PROFILE_CENTER, scale=VIEW_SCALE
     )
     # finalize_drawing shades the pictorial isometric with edges.
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    for view in (donor, profile):
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
+    for view in (donor, profile, iso):
         set_hidden_lines_removed(adapter, view)
 
     donor_annotations = curate_view_dimensions(
@@ -303,6 +398,36 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_text(adapter, annotations, DIMENSION_TEXT)
+    # drawing-guidelines.md rule 4: the seat station's stack reason rides it.
+    set_dimension_callouts(
+        adapter,
+        annotations,
+        {"SeatStation": STACK_CALLOUT, "ShoulderStation": SHOULDER_CALLOUT},
+        location="below",
+    )
+    set_dimension_callouts(
+        adapter, annotations, {"ReliefRootR": RELIEF_ROOTS_CALLOUT}, location="above"
+    )
+    for name, length in WITNESS_CAPS.items():
+        matches = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one filing-stud {name} diameter dimension")
+        display = _early_bound(
+            _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        display.MaxWitnessLineLength = length
+        if abs(float(display.MaxWitnessLineLength) - length) > 1e-9:
+            raise RuntimeError(f"filing stud {name}: witness-line cap did not persist")
+    for name in INSIDE_ARROW_ROWS:
+        matches = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one filing-stud {name} station dimension")
+        annotation = _early_bound(matches[0], "IAnnotation")
+        row = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        row.ArrowSide = ARROWS_INSIDE
+        if int(row.ArrowSide) != ARROWS_INSIDE:
+            raise RuntimeError(f"filing stud {name} did not keep its arrows inside")
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [a for a in annotations if dimension_name(adapter, a) == name]
         if len(matches) != 1:
@@ -323,14 +448,15 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, profile, face_xy=PROFILE_CENTER, label="stud turning axis"
     )
     # The sliding journal is a required machined surface (codex round 14):
-    # on its upper silhouette, symbol between the seat and thread-start lines.
-    body_pick = (SEAT_X + 0.006, PROFILE_CENTER[1] + BODY_DIA / 2.0 * _S)
+    # on its lower silhouette near the seat, symbol hanging below it, left of
+    # the journal's fit-callout line (the corner radii stand above).
+    body_pick = (SEAT_X + 0.006, PROFILE_CENTER[1] - BODY_DIA / 2.0 * _S)
     add_surface_finish(
         adapter,
         profile,
         edge_xy=body_pick,
         entity_type="SILHOUETTE",
-        symbol_xy=(SEAT_X + 0.008, PROFILE_CENTER[1] + 0.012),
+        symbol_xy=(SEAT_X + 0.004, PROFILE_CENTER[1] - 0.022),
         leader_attach_xy=body_pick,
         control=surface_finish_by_key(SURFACE_FINISHES, "locating_body"),
         label="filing stud locating diameter finish",

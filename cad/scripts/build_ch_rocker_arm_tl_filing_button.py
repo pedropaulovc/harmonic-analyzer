@@ -5,7 +5,8 @@ face of the rocker arm; its rim is the filing line for the hub O.D.
 (``ch_rocker_arm_tl_filing_button_spec``). Two are made.
 
 Layout: Front-plane annulus at the origin (O.D., bore) extruded +Z by the
-thickness, like the rocker thrust washer.
+thickness, like the rocker thrust washer; both bore edges then take one 45
+deg entry chamfer.
 
 Run (SolidWorks already open)::
 
@@ -35,6 +36,7 @@ from _drawing_marks import (
 )
 from _saved_part_guard import require_saved_drawing_properties
 from ch_rocker_arm_tl_filing_button_spec import (
+    BORE_CHAMFER,
     BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -56,6 +58,9 @@ _SAVED_DRAWING_PROPERTIES = (
 )
 
 V_DISC = math.pi * ((OD / 2.0) ** 2 - (BORE_DIA / 2.0) ** 2) * THICKNESS
+# One 45 deg ring per bore end: the leg-square triangle about its centroid.
+V_CHAMFER = 2.0 * math.pi * BORE_CHAMFER**2 * (BORE_DIA / 2.0 + BORE_CHAMFER / 3.0)
+V_TOTAL = V_DISC - V_CHAMFER
 
 
 async def build(adapter) -> dict[str, str]:
@@ -68,6 +73,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "DiscDia", f"{OD}mm")
     await set_global(adapter, "DiscThick", f"{THICKNESS}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    await set_global(adapter, "BoreChamferSize", f"{BORE_CHAMFER}mm")
 
     ring = SketchDims()
     check("create_sketch ring", await adapter.create_sketch("Front"))
@@ -103,14 +109,37 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append(
         (name_dimensions(adapter, "Disc", ["DiscThick"])[0], '"DiscThick"')
     )
-    await volume_check(adapter, "button", V_DISC, 0.005 * V_DISC)
+    volume = await volume_check(adapter, "button", V_DISC, 0.005 * V_DISC)
+
+    # Both bore entries (the button is reversible): one native 45 deg chamfer
+    # on the two bore edges, as the transgear front bushing breaks its O.D.
+    bore_r = BORE_DIA / 2.0
+    check(
+        "chamfer both bore entries",
+        await adapter.add_chamfer(
+            BORE_CHAMFER, [[bore_r, 0.0, 0.0], [bore_r, 0.0, THICKNESS]]
+        ),
+    )
+    name_last_feature(adapter, "BoreChamfer")
+    drive_jobs.append(
+        (
+            name_dimensions(adapter, "BoreChamfer", ["BoreChamferSize"])[0],
+            '"BoreChamferSize"',
+        )
+    )
+    await volume_check(
+        adapter, "chamfered button", volume - V_CHAMFER, 0.02 * V_CHAMFER + 0.05
+    )
 
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
         await drive_dimension(adapter, dimension_name, expression)
     await force_rebuild(adapter)
     await volume_check(
-        adapter, "driven button (equations neutral)", V_DISC, 0.005 * V_DISC
+        adapter,
+        "driven button (equations neutral)",
+        V_TOTAL,
+        0.02 * V_CHAMFER + 0.05,
     )
 
     await apply_material(adapter, MATERIAL)
