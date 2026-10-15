@@ -120,9 +120,33 @@ def test_chamfer_max_keeps_the_tip_inside_the_charged_pitch() -> None:
     steepest = math.radians(screw.CHAMFER_ANGLE + screw.CHAMFER_ANGLE_TOLERANCE)
     assert screw.CHAMFER_AXIAL_MAX == pytest.approx(0.60 * math.tan(steepest))
     assert screw.CHAMFER_AXIAL_MAX <= screw.INCOMPLETE_TIP_LEN_MAX == screw.PITCH
-    # "Past the thread root" fits under the maximum.
-    assert screw.THREAD_MAJOR / 2 - screw.CHAMFER_WIDTH_MAX < screw.THREAD_MINOR_MAX / 2
+    # "Past the thread root" fits under the maximum: tip Ø 4.1656 - 1.20 =
+    # 2.9656 clears the deepest estimated 2A root Ø3.038.
+    screw.require_chamfer_past_root(0.60)
     assert "THREAD ROOT" in screw.DIMENSION_CALLOUTS["ChamferWidth"]
+
+
+def test_minor_diameter_is_the_external_2a_root() -> None:
+    """#8-32 UNC-2A (Kennametal UN tables): UNR minor max 0.1248 in; the
+    deepest root estimate is 0.649519 P under the 0.1399 in PD minimum."""
+    # 0.1631 - 1.226869/32 = 0.12476 in, tabled as 0.1248 in.
+    assert screw.THREAD_MINOR_UNR_2A_MAX == pytest.approx(3.1689, abs=1e-4)
+    assert screw.THREAD_MINOR_2A_MIN_EST == pytest.approx(3.0379, abs=1e-4)
+    assert screw.THREAD_MINOR_2A_MIN_EST < screw.THREAD_MINOR_UNR_2A_MAX
+
+
+@pytest.mark.parametrize(
+    "chamfer_width_max",
+    [
+        0.45,  # tip Ø 3.2656: above even the shallowest root, Ø3.170.
+        0.55,  # tip Ø 3.0656: under the shallowest root, above the deepest.
+    ],
+)
+def test_chamfer_that_misses_the_deepest_root_is_refused(
+    chamfer_width_max: float,
+) -> None:
+    with pytest.raises(AssertionError, match="thread root"):
+        screw.require_chamfer_past_root(chamfer_width_max)
 
 
 class _Recorder:
