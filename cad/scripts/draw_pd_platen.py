@@ -3,11 +3,11 @@ r"""Create the curated machinist drawing for the platen plate (MHA-PD-002).
 The platen is a 269.64 x 134.82 brass plate, 3.85 thick, with four Ø7 bosses
 standing proud of its back face round the #2-56 clip-screw through taps and
 ten counterbored #4 loose through holes for the guide screws.  The sheet runs
-at 1:2: the front view carries the outline, the boss Ø and every hole
-coordinate from the plate's bottom-left corner, a back view the counterbored
-face, an enlarged 1:1 right view (hidden lines shown) the thickness, the boss
-height and the user-accepted counterbore floor as a reference dimension, and a
-1:4 isometric the form.
+at 1:2: the front view carries the outline, the bosses and every hole
+coordinate from the plate's bottom-left corner, an enlarged 1:1 right view
+(hidden lines shown) the thickness, the boss height and the user-accepted
+counterbore floor as a reference dimension with its worst case, and a 1:4
+isometric the form.  The counterbores' far side is named in their callout.
 
 Every printed dimension is an associative model dimension whose places the
 part authors (``pd_platen_spec.DRAWING_PRECISION``); the hole sizes ship as
@@ -25,7 +25,11 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_name,
+    place_view,
+    visible_component_entities,
+)
 
 from _check import check
 from _com import _early_bound
@@ -52,6 +56,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from pd_platen_spec import (
+    CBORE_FLOOR_CALLOUT,
     CBORE_FLOOR_REFERENCE_Y,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -90,16 +95,13 @@ _RIGHT_S = 1.0 / 1000.0  # enlarged right view, 1:1
 
 # Sheet layout (meters; the B-size field is x 0.0127..0.4191, y 0.0127..0.2667
 # and the title block holds x >= 0.216, y <= 0.066).  The front view's hole
-# coordinates stack below it (smallest nearest) and at its sides; the back
-# view sits below that stack, left of the title block; the enlarged right view
-# and the isometric stand right of the front view.
+# coordinates stack below it (smallest nearest) and at its sides; the enlarged
+# right view and the isometric stand right of the front view.
 FRONT_CENTER = (0.140, 0.190)
-BACK_CENTER = (0.140, 0.056)
 RIGHT_CENTER = (0.300, 0.175)
 ISO_CENTER = (0.370, 0.190)
 ISO_NOTE_XY = (0.338, 0.150)
 RIGHT_NOTE_XY = (0.262, 0.100)
-BACK_NOTE_XY = (0.020, 0.062)
 # The right view's bbox spans the plate and the bosses behind it (model Z).
 _DEPTH_SPAN = PLATE_THICKNESS + SOCKET_BOSS_H
 
@@ -112,16 +114,6 @@ def _front_x(model_x_mm: float) -> float:
 def _front_y(model_y_mm: float) -> float:
     """Sheet Y of a model-Y point in the front view (bbox-centred)."""
     return FRONT_CENTER[1] + (model_y_mm - PLATE_HEIGHT / 2.0) * _S
-
-
-def _back_x(model_x_mm: float) -> float:
-    """Sheet X of a model-X point in the back view (seen from -Z: mirrored)."""
-    return BACK_CENTER[0] - (model_x_mm - PLATE_WIDTH / 2.0) * _S
-
-
-def _back_y(model_y_mm: float) -> float:
-    """Sheet Y of a model-Y point in the back view."""
-    return BACK_CENTER[1] + (model_y_mm - PLATE_HEIGHT / 2.0) * _S
 
 
 def _right_x(model_z_mm: float) -> float:
@@ -175,12 +167,17 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (_right_x(PLATE_THICKNESS / 2.0), 0.251),
     "BossH": (0.284, _right_y(_SOCKET_LOW_Y)),
-    "CboreFloor": (0.284, _right_y(CBORE_FLOOR_REFERENCE_Y)),
+    "CboreFloor": (0.270, _right_y(CBORE_FLOOR_REFERENCE_Y)),
 }
 # The thickness states what its .XXX is spent on; the floor is a reference
-# dimension (the user-accepted exception) and says what it is.
+# dimension (the user-accepted exception) that also states its printed worst
+# case (pd_platen_spec.CBORE_FLOOR_CALLOUT); the bosses say what they are.
 DIMENSION_CALLOUTS_ABOVE = {"Depth": "SETS DISC-TO-PLATEN AIR"}
-DIMENSION_CALLOUTS_BELOW = {"CboreFloor": "C'BORE FLOOR"}
+DIMENSION_CALLOUTS_BELOW = {
+    "CboreFloor": CBORE_FLOOR_CALLOUT,
+    "Boss2Dia": "BOSS",
+    "BossH": "TAP BOSS",
+}
 REFERENCE_DIMENSION = "CboreFloor"
 # One printed coordinate stands for every hole on its station: 5X per guide
 # row and column pair, 2X per socket station.  A custom prefix replaces
@@ -200,31 +197,33 @@ DIMENSION_PREFIXES = {
     "Boss2Dia": "4X Ø",
 }
 
-# The guide-hole callout rides the top row's first hole, its leader up-right
-# to text above the plate's left half; the socket callout rides the upper
-# right socket, its leader up to text above the plate's right end.  Each pick
-# lies on the hole's own visible rim (through Ø, tap drill Ø) on the side the
-# leader leaves.  Both name the part whose pattern their .XXX coordinates
-# match; the counterbores open on the far (paper) face the back view shows,
-# deep enough to sink the heads.
+# The guide-hole callout rides the top row's first hole, its leader up to
+# text above the plate's left half, right of the upper left boss; the socket
+# callout rides the upper right socket's tap drill, its leader up to text above
+# the plate's right end.  Both name the part whose pattern their .XXX
+# coordinates match; the counterbores open on the far (paper) face, deep
+# enough to sink the named guide screw's heads.
 _GUIDE_PICK_HOLE = (GUIDE_HOLE_X[0], GUIDE_HOLE_Y[1])
 _DIAG = math.sqrt(0.5)
 GUIDE_EDGE_XY = (
     _front_x(_GUIDE_PICK_HOLE[0]) + GUIDE_HOLE_DIA / 2.0 * _S * _DIAG,
     _front_y(_GUIDE_PICK_HOLE[1]) + GUIDE_HOLE_DIA / 2.0 * _S * _DIAG,
 )
-GUIDE_CALLOUT_XY = (0.110, 0.248)
-GUIDE_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-011\nC'BORE FAR SIDE, HEADS SUB-FLUSH\n"
-SOCKET_DRILL_R_SHEET = blind_cut_dia_mm(SOCKET_SPEC) / 2.0 * _S
+GUIDE_CALLOUT_XY = (0.128, 0.248)
+GUIDE_CALLOUT_PROCESS = (
+    "PATTERN MATCHES MHA-PD-011\nC'BORE FAR SIDE\nMHA-VN-006 HEADS SUB-FLUSH\n"
+)
+SOCKET_DRILL_DIA = blind_cut_dia_mm(SOCKET_SPEC)
+SOCKET_DRILL_R_SHEET = SOCKET_DRILL_DIA / 2.0 * _S
 SOCKET_EDGE_XY = (
     _front_x(_SOCKET_RIGHT_X) + SOCKET_DRILL_R_SHEET * _DIAG,
     _front_y(_SOCKET_HIGH_Y) + SOCKET_DRILL_R_SHEET * _DIAG,
 )
 SOCKET_CALLOUT_XY = (0.215, 0.252)
 SOCKET_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-003\nTAP"
-# The template centre-marks every hole as each view is placed (an explicit
-# AutoInsertCenterMarks2 printed all 28 marks twice in r1); the front and back
-# views each prove exactly one mark per hole.
+# The template centre-marks every hole as the view is placed (an explicit
+# AutoInsertCenterMarks2 printed all 28 marks twice in r1); the front view
+# proves exactly one mark per hole.
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 CENTER_MARKS_PER_VIEW = len(SOCKET_XY) + len(GUIDE_HOLE_XY)
 # The socket's native callout drops one automatic "Tapped Hole" note.
@@ -253,6 +252,32 @@ def _set_dimension_prefixes(
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
 
 
+def _socket_tap_edge(adapter: Any, view: Any) -> Any:
+    """The upper right socket's tap-drill rim, found by its radius.
+
+    A pick at SOCKET_EDGE_XY alone selected the Ø7 boss's rim at 1:2 (r2), so
+    the callout printed the boss as a Ø7.00 x 1.70 "tap".  Of the front view's
+    visible circles of the tap-drill radius, the one furthest up and right
+    (*Front: model +X right, +Y up) is the upper right socket's.
+    """
+    radius_m = SOCKET_DRILL_DIA / 2000.0
+    rims: list[tuple[float, Any]] = []
+    for component in (
+        adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    ):
+        for raw in visible_component_entities(view, component, 1) or ():
+            edge = _early_bound(raw, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsCircle():
+                continue
+            params = tuple(float(value) for value in curve.CircleParams)
+            if abs(params[6] - radius_m) <= 1e-6:
+                rims.append((params[0] + params[1], edge))
+    if not rims:
+        raise RuntimeError("platen front view shows no clip-screw tap-drill rim")
+    return max(rims, key=lambda rim: rim[0])[1]
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -269,7 +294,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Isometric View Note",
             "Right View Note",
-            "Back View Note",
         ),
         required=(
             "Number",
@@ -278,7 +302,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Isometric View Note",
             "Right View Note",
-            "Back View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -298,13 +321,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
-    back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=RIGHT_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     # The holes are fully defined by their callouts; only the enlarged right
     # view shows hidden lines, so the counterbore profile its floor reference
     # dimension measures reads behind the plate's edge.
-    for view in (front, back, iso):
+    for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, right)
 
@@ -342,16 +364,14 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS_BELOW)
 
-    for view, label in ((front, "front"), (back, "back")):
-        marks = (
-            _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION)
-            or ()
+    marks = (
+        _early_bound(front, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
+    if len(marks) != CENTER_MARKS_PER_VIEW:
+        raise RuntimeError(
+            f"expected {CENTER_MARKS_PER_VIEW} centre marks in the front view, "
+            f"found {len(marks)}"
         )
-        if len(marks) != CENTER_MARKS_PER_VIEW:
-            raise RuntimeError(
-                f"expected {CENTER_MARKS_PER_VIEW} centre marks in the {label} view, "
-                f"found {len(marks)}"
-            )
 
     guide_callout = add_native_hole_callout(
         adapter,
@@ -368,13 +388,13 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=SOCKET_EDGE_XY,
+        edge=_socket_tap_edge(adapter, front),
         callout_xy=SOCKET_CALLOUT_XY,
         label="clip-screw through taps",
         process=SOCKET_CALLOUT_PROCESS,
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     add_property_linked_note(adapter, "Right View Note", *RIGHT_NOTE_XY)
-    add_property_linked_note(adapter, "Back View Note", *BACK_NOTE_XY)
     _telemetry.info("platen sheet: views, dimensions and callouts placed")
 
     return await finalize_drawing(

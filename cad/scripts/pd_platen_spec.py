@@ -163,6 +163,9 @@ if CBORE_FLOOR_MIN < CBORE_FLOOR_ACCEPTED_MIN:
         f"counterbore floor {CBORE_FLOOR_MIN:.3f} is thinner than the user-accepted "
         f"{CBORE_FLOOR_ACCEPTED_MIN}"
     )
+# The floor's reference dimension states that worst case as plain fact at the
+# callout (Main's ruling, option A).
+CBORE_FLOOR_CALLOUT = f"C'BORE FLOOR\n{CBORE_FLOOR_MIN:.2f} MIN WORST CASE"
 # The smallest printed boss round the #2-56 major, concentric with its tap.
 SOCKET_BOSS_WALL_MIN = (
     SOCKET_BOSS_DIA - printed_band_mm(DRAWING_PRECISION_BY_NAME["Boss2Dia"])
@@ -173,5 +176,6 @@ if SOCKET_BOSS_WALL_MIN < 2.0:
     )
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
-RIGHT_VIEW_NOTE = "ENLARGED RIGHT VIEW SCALE 1:1"
-BACK_VIEW_NOTE = "BACK VIEW"
+# The right view keeps its hidden lines for one reason, which the note states
+# (r2 rule 9): they draw the counterbore the floor reference measures.
+RIGHT_VIEW_NOTE = "ENLARGED RIGHT VIEW SCALE 1:1\nHIDDEN LINES SHOW C'BORE FLOOR"

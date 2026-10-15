@@ -6,6 +6,7 @@ import math
 
 import pytest
 
+import _config
 import build_pd_platen as build
 import draw_pd_platen as draw
 import pd_platen_spec as spec
@@ -37,12 +38,6 @@ def _view_boxes() -> dict[str, tuple[float, float, float, float]]:
             draw.FRONT_CENTER[1] - h,
             draw.FRONT_CENTER[0] + w,
             draw.FRONT_CENTER[1] + h,
-        ),
-        "back": (
-            draw.BACK_CENTER[0] - w,
-            draw.BACK_CENTER[1] - h,
-            draw.BACK_CENTER[0] + w,
-            draw.BACK_CENTER[1] + h,
         ),
         "right": (
             draw.RIGHT_CENTER[0] - depth,
@@ -111,6 +106,15 @@ def test_counterbore_floor_holds_the_user_accepted_worst_case():
     assert spec.DRAWING_DIMENSIONS["CboreFloorReference"] == {draw.REFERENCE_DIMENSION}
     assert draw.REFERENCE_DIMENSION in draw.RIGHT_KEEP
     assert draw.REFERENCE_DIMENSION in draw.DIMENSION_CALLOUTS_BELOW
+    # The sheet states the accepted shortfall at the floor, from the same
+    # constant this test pins.
+    assert draw.DIMENSION_CALLOUTS_BELOW[draw.REFERENCE_DIMENSION] == (
+        spec.CBORE_FLOOR_CALLOUT
+    )
+    assert spec.CBORE_FLOOR_CALLOUT == (
+        f"C'BORE FLOOR\n{spec.CBORE_FLOOR_MIN:.2f} MIN WORST CASE"
+    )
+    assert f"{spec.CBORE_FLOOR_MIN:.2f}" == "0.67"
 
 
 def test_one_centre_mark_per_hole_per_plan_view():
@@ -120,6 +124,8 @@ def test_one_centre_mark_per_hole_per_plan_view():
 def test_hole_callouts_name_their_mating_patterns():
     assert "MHA-PD-011" in draw.GUIDE_CALLOUT_PROCESS
     assert "MHA-PD-003" in draw.SOCKET_CALLOUT_PROCESS
+    # The counterbore depth's .XXX sinks a named screw's head.
+    assert _config.parts("vn-fillister-screw")["number"] in draw.GUIDE_CALLOUT_PROCESS
     # The through hole is DRILLED at .XX; the depth keeps .XXX to sink the head.
     assert spec.GUIDE_CALLOUT_PRECISION["hw-thruholedia"] == 2
     assert spec.HEAD_RECESS_MIN > 0.0
@@ -197,7 +203,6 @@ def test_views_and_annotations_stay_in_the_field():
         draw.ISO_CENTER,
         draw.ISO_NOTE_XY,
         draw.RIGHT_NOTE_XY,
-        draw.BACK_NOTE_XY,
         draw.GUIDE_CALLOUT_XY,
         draw.SOCKET_CALLOUT_XY,
     ]
@@ -218,8 +223,6 @@ def test_x_stations_stack_smallest_nearest_below_the_front_view():
     assert heights == sorted(heights, reverse=True)
     assert heights[0] < draw.BOTTOM_EDGE_Y - TEXT_HALF_H
     assert all(a - b >= 0.006 for a, b in zip(heights, heights[1:]))
-    # Every row clears the back view below the stack.
-    assert heights[-1] - TEXT_HALF_H > _view_boxes()["back"][3]
 
 
 def test_callout_picks_lie_on_their_hole_rims():

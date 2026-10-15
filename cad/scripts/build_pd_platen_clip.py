@@ -297,12 +297,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "FlatFinger",
     },
 }
-# Places.  The hole stations (their pattern matches the platen's taps) and the
-# screw rail's width (the slit-side hole ligament) print .XXX
-# (POSITION_PLACES); the bow tangent stations on the hole stations are
-# references spelled as those are, the rest as the bridge ends they meet.  The
-# overall width and the slit print .XX; the outline, the bridge, the rise and
-# the radii only shape the spring.
+# Places.  The hole stations (their pattern matches the platen's taps), the
+# hole row's height and the screw rail's width (between them they keep the
+# hole's walls to the edge and to the slit) print .XXX (POSITION_PLACES); the
+# bow tangent stations on the hole stations are references spelled as those
+# are, the rest as the bridge ends they meet.  The overall width and the slit
+# print .XX; the outline, the bridge, the rise and the radii only shape the
+# spring.
 _TANGENT_PLACES = {"TangentX1": POSITION_PLACES, "TangentX8": POSITION_PLACES}
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FlatSheetProfile": {

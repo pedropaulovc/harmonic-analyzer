@@ -62,7 +62,6 @@ from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _holes import HoleSpec, SharedCoordinate, blind_cut_dia_mm, wizard_holes
 from pd_platen_spec import (
-    BACK_VIEW_NOTE,
     CBORE_DEPTH,
     CBORE_DIA,
     CBORE_FLOOR,
@@ -370,7 +369,6 @@ async def build(adapter) -> dict[str, str]:
         {
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Right View Note": RIGHT_VIEW_NOTE,
-            "Back View Note": BACK_VIEW_NOTE,
         },
     )
     # The floor reference is construction-only: saved hidden so no assembly
