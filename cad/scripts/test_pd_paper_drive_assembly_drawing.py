@@ -931,6 +931,86 @@ def test_the_pivot_section_and_its_locator_keep_to_sheet_two_left_field() -> Non
     }
 
 
+def test_each_pivot_section_balloon_points_into_its_own_cut_face() -> None:
+    tips = {stem: (side, y, r) for stem, side, y, r in drawing.PIVOT_BALLOON_TIPS}
+    assert set(tips) == {
+        name.rsplit("-", 1)[0] for name in drawing.PIVOT_VIEW_INSTANCES
+    }
+    shim, spring, spacer = joints.SHIM, joints.SPRING, joints.SPACER
+    arm_geometry = joints.ARM
+    floor = -(shim.THICKNESS + spring.MODEL_HEIGHT)
+    arm_front = -(pivot_screw.SHOULDER_LEN - spacer.LENGTH)
+    # (y span along the axis, r span off it) of each part's cut face, in the
+    # screw's frame, head underside y 0.
+    faces = {
+        "vn-transgear-pivot-screw": (
+            (0.0, pivot_screw.HEAD_H),
+            (pivot_screw.SOCKET_AF / math.sqrt(3.0), pivot_screw.HEAD_DIA / 2.0),
+        ),
+        "vn-transgear-pivot-shim": ((-shim.THICKNESS, 0.0), (shim.ID / 2, shim.OD / 2)),
+        "vn-transgear-pivot-spring": (
+            (floor, -shim.THICKNESS),
+            (spring.ID / 2, spring.OD / 2),
+        ),
+        "pd-transgear-arm": (
+            (arm_front, floor),
+            (arm_geometry.PIVOT_BORE_DIA / 2, arm_geometry.SPOT_FACE_DIA / 2),
+        ),
+        "pd-transgear-pivot-spacer": (
+            (-pivot_screw.SHOULDER_LEN, arm_front),
+            (spacer.BORE_DIA / 2, spacer.OD / 2),
+        ),
+        "pd-support-bar": (
+            (drawing.PIVOT_FRONT_FACE_Y, -pivot_screw.SHOULDER_LEN),
+            (assembly.BAR.PIVOT_TAP_CSK_DIA / 2, drawing.PIVOT_FRAME_RADIUS_MM),
+        ),
+    }
+    centre_y = drawing.PIVOT_VIEW_CENTRE_MM[1]
+    for stem, (side, y, r) in tips.items():
+        (y0, y1), (r0, r1) = faces[stem]
+        assert y0 < y < y1, stem
+        assert r0 < r < r1, stem
+        # Inside the crop circle.
+        assert math.hypot(r, y - centre_y) < drawing.PIVOT_FRAME_RADIUS_MM, stem
+    # The spring's tip is on its cone's diagonal, inside its thin wall.
+    _side, y, r = tips["vn-transgear-pivot-spring"]
+    assert y == pytest.approx((floor - shim.THICKNESS) / 2.0)
+    assert r == pytest.approx((spring.ID + spring.OD) / 4.0)
+    # Down the stack the tips alternate sides.
+    order = sorted(tips.values(), key=lambda tip: -tip[1])
+    assert [side for side, _y, _r in order] == ["right", "left"] * 3
+
+
+def test_pivot_section_balloon_columns_keep_order_and_pitch() -> None:
+    pitch = drawing.PIVOT_BALLOON_PITCH
+    assert drawing.spread_balloon_column([0.05, 0.0, -0.05], pitch) == [
+        pytest.approx(v) for v in (0.05, 0.0, -0.05)
+    ]
+    spread = drawing.spread_balloon_column([0.010, 0.008, 0.007], pitch)
+    assert all(a - b >= pitch - 1e-12 for a, b in zip(spread, spread[1:]))
+    assert sum(spread) == pytest.approx(0.025)
+    with pytest.raises(ValueError):
+        drawing.spread_balloon_column([0.0, 0.01], pitch)
+    # Every balloon of either column stays inside the section's ring reach.
+    scale = drawing.PIVOT_SECTION_SCALE[0] / drawing.PIVOT_SECTION_SCALE[1] / 1000.0
+    sx, sy = drawing.PIVOT_SECTION_CENTER
+    centre_y = drawing.PIVOT_VIEW_CENTRE_MM[1]
+    reach = drawing.PIVOT_SECTION_RADIUS + drawing.BALLOON_RING_REACH
+    assert drawing.PIVOT_SECTION_RADIUS + drawing.PIVOT_BALLOON_GAP < reach
+    for flip in (1.0, -1.0):
+        for column in ("left", "right"):
+            ys = sorted(
+                (
+                    sy + flip * (y - centre_y) * scale
+                    for _stem, side, y, _r in drawing.PIVOT_BALLOON_TIPS
+                    if side == column
+                ),
+                reverse=True,
+            )
+            for balloon_y in drawing.spread_balloon_column(ys, pitch):
+                assert abs(balloon_y - sy) < reach - 0.005
+
+
 def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installation() -> None:
     """A static F-to-disc setting cannot certify all loaded overlapping patches."""
     assert _step_body("platen-hung").startswith("TRIAL-HANG")
