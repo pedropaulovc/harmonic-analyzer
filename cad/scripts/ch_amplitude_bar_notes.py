@@ -74,11 +74,13 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     raise AssertionError("every marked bar dimension needs authored places")
 
 
-def _far_cheek_min(notch_width: float, ledge: float) -> float:
+def _far_cheek_min(
+    notch_width: float, band: tuple[float, float], ledge: float
+) -> float:
     """The cheek opposite a notch's printed ledge at the worst case: the
     narrowest stock less the widest notch beside the widest ledge, floored to
     the two places it prints at."""
-    upper, _lower = bar.NOTCH_WIDTH_BAND
+    upper, _lower = band
     wall = (
         (bar.BAR_WIDTH - bar.BAR_STOCK_UNDERSIZE)
         - (ledge + bar.NOTCH_OFFSET_TOLERANCE_MM)
@@ -91,9 +93,20 @@ def _far_cheek_min(notch_width: float, ledge: float) -> float:
 # target and the 1.5 floor (#1038; the book's 6.35 bar straddling its 2.5
 # rocker arm leaves cheeks under 1.93 nominal). The shortfall is stated at
 # each notch's width.
-# Pending exception ruling: MHA-CH-001 cheek wall 1.17 MIN (#1293/#1038).
-TOP_CHEEK_WALL_MIN = _far_cheek_min(bar.TOP_NOTCH_WIDTH, bar.TOP_NOTCH_OFFSET)
-BOTTOM_CHEEK_WALL_MIN = _far_cheek_min(bar.BOTTOM_NOTCH_WIDTH, bar.BOTTOM_NOTCH_OFFSET)
+# Owner ruling 2026-10-15 (#1293/#1038): the stated cheek walls are approved
+# exceptions at or above 1.17 (top) and 1.21 (foot) MIN.
+TOP_CHEEK_WALL_MIN = _far_cheek_min(
+    bar.TOP_NOTCH_WIDTH, bar.TOP_NOTCH_WIDTH_BAND, bar.TOP_NOTCH_OFFSET
+)
+BOTTOM_CHEEK_WALL_MIN = _far_cheek_min(
+    bar.BOTTOM_NOTCH_WIDTH, bar.BOTTOM_NOTCH_WIDTH_BAND, bar.BOTTOM_NOTCH_OFFSET
+)
+CHEEK_WALL_APPROVED_MIN = {"top": 1.17, "bottom": 1.21}
+if (
+    TOP_CHEEK_WALL_MIN < CHEEK_WALL_APPROVED_MIN["top"]
+    or BOTTOM_CHEEK_WALL_MIN < CHEEK_WALL_APPROVED_MIN["bottom"]
+):
+    raise AssertionError("a notch cheek fell under its approved minimum")
 
 
 def _pin_hole_wall_min() -> float:

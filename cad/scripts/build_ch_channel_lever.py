@@ -5,9 +5,11 @@ pivot at one end (Ø6.5 hole riding the common Ø6.35 fulcrum shaft - the
 p.40 ball clevis is the shaft's END mount, mirroring the rocker-pivot
 design), channel-spring pull from its rounded end (Ø4 hook hole at
 175.05), driven in between by its amplitude bar pinned Ø2 at 127
-(5"). Section 9.5 tall x 3.0 thick: 20 levers at the 7.0565 channel
+(5"). Section 11.0 tall x 3.0 thick: 20 levers at the 7.0565 channel
 pitch cap the thickness (the M2 12.5 "width" violated the pitch), and
-3.0 lets the bar's 3.2 top slot straddle the lever at the pin.
+3.0 lets the bar's 3.15 top slot straddle the lever at the pin. The
+height was 9.5; the owner ruled the lever gray cast iron and its arm
+deepened in-plane while staying under the O12 hub (2026-10-15).
 
 The earlier 254 (10", "clean 2:1") length is REFUTED by the calibrated
 ch. 30 front view: the lever bank ends at x ~ -30 (not +54), the
@@ -20,9 +22,10 @@ solver frame's mirror of this paragraph's photo signs), so c2c = 175.05
 from the |x| 199.9 fulcrum (motion ratio 175.05/127 = 1.378). The
 photo-read 7" (177.8) left the spring 2.75 mm off plumb at neutral.
 The p.39 close-up also shows the bar pin only ~4-5 bar-heights from the
-tip (50.8/9.5 = 5.3 fits; 127/9.5 = 13 does not). The p.39 close-up also
+tip (50.8/9.5 = 5.3 fits; 127/9.5 = 13 does not; the read predates the
+deepened 11.0 arm). The p.39 close-up also
 shows the bar running full height to its rounded end with the hook hole in
-it: the 9.5 bar ends in a full round about the spring hole (the former 6.0
+it: the bar ends in a full round about the spring hole (the former 6.0
 stepped tab left 0.98 of wall beside the hole).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 17" - lengths/section derived in
@@ -319,10 +322,10 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "lever outline", expected, 0.005 * expected)
 
     # Integral fulcrum hub (2026-09-02, ch17 p.40): O12 boss on the origin,
-    # HUB_LENGTH long mid-plane (= the station pitch). r 6 > the 4.75 half-bar,
+    # HUB_LENGTH long mid-plane (= the station pitch). r 6 > the 5.50 half-bar,
     # so the boss also stands proud of the bar's edges in-plane: the added
-    # volume is the full cylinder minus its overlap with the body (the r 4.75
-    # nose half-disc on x < 0, the strip |y| < 4.75 clipped by the circle on
+    # volume is the full cylinder minus its overlap with the body (the r 5.50
+    # nose half-disc on x < 0, the strip |y| < 5.50 clipped by the circle on
     # x >= 0).
     await set_global(adapter, "HubDia", f"{HUB_DIA}mm")
     await set_global(adapter, "HubLength", f"{HUB_LENGTH}mm")

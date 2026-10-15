@@ -928,21 +928,21 @@ sections:
         - legacy
         - med
       - - Top notch width
-        - 3.2 mm
-        - '0.125'
-        - legacy TopNotchWidth
-        - legacy
+        - 3.15 +0.20/0 mm
+        - '0.124'
+        - 'legacy TopNotchWidth 1/8"; the 3.00 ±0.05 lever plus the 0.10 running floor (owner ruling 2026-10-15, #1038 option 2)'
+        - derived
         - med
       - - Top notch height
-        - 12.7 mm
-        - '0.5'
-        - legacy TopNotchHeight
-        - legacy
+        - 14.0 mm
+        - '0.551'
+        - 'legacy TopNotchHeight 1/2"; deepened so the roof clears the 11.0 lever turned 10.3° on its pin at the printed bands (ch_bar_pivot_pin_spec notch_roof_clearance_min)'
+        - derived
         - med
       - - Top pin hole
         - Ø2 through the top-notch cheeks, 6.35 below the top end
         - —
-        - 'M6.3: p.39 shows the bar pinned to its top lever; the 3.2 top slot straddles the 3.0-thick lever with a Ø2 cross pin (matches the lever''s bar-pin hole at 127 from its fulcrum, ch. 17)'
+        - 'M6.3: p.39 shows the bar pinned to its top lever; the 3.15 top slot straddles the 3.0-thick lever with a Ø2 cross pin (matches the lever''s bar-pin hole at 127 from its fulcrum, ch. 17)'
         - derived
         - low
       - - Bar count
@@ -1095,9 +1095,9 @@ sections:
         - derived
         - med
       - - Lever bar section
-        - 9.5 tall × 3.0 thick
-        - 0.37 × 0.118
-        - 'M6.3: 20 levers at the 7.06 channel pitch on a common shaft cap the thickness (the M2 12.5 "width" violated the pitch); 3.0 lets the bar''s 3.2 top slot straddle the lever'
+        - 11.0 tall × 3.00 ±0.05 thick
+        - 0.433 × 0.118
+        - 'M6.3: 20 levers at the 7.06 channel pitch on a common shaft cap the thickness (the M2 12.5 "width" violated the pitch); 3.0 lets the bar''s 3.15 top slot straddle the lever. Owner ruling 2026-10-15: gray cast iron, the arm deepened from 9.5 under the Ø12 hub'
         - derived
         - med
       - - Lever fulcrum
@@ -1106,7 +1106,7 @@ sections:
         - 'p.40 bottom-left clevis = the shaft END mount; rail top = 1061.4 − 25.2 = 1036.2; ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive); keeper/shaft/set-screw geometry from `cad/scripts/ch_fulcrum_keeper_spec.py` and `cad/scripts/ch_fulcrum_shaft_spec.py` (2026-10-10 outward-foot rederive); tap from ch_fulcrum_keeper_spec KEEPER_TAP_SPEC'
         - measured
         - med
-      - raw: '| Lever tip | the 9.5 bar runs full height to a full-round R4.75 tip concentric with the Ø4 spring-hook hole at 175.05 (end 179.80; 2.73 wall all round, ≥2.0 worst case), as the p.39 close-up shows (ch17_images/page001_img01: rounded full-height end, hook hole in it); replaces the 6.0-tall stepped tab (0.98 wall beside the hole, 2026-10 machinist review); fork/clip fittings deferred (photogrammetry 195527397) | — | p.39, p.40; the Ø3 photo read is infeasible — the spring''s r 2.75 Ø1-wire eye threading the 3.0 plate needs eye-drop margins |√(ρ²−1.5²)−D| ≤ hole_r − 0.1 at ρ = 2.25/3.25, best ~0.05 through Ø3, ~0.3 through Ø4 (M6.3 toroid solve) | scaled→derived | med |'
+      - raw: '| Lever tip | the 11.0 bar runs full height to a full-round R5.50 tip concentric with the Ø4 spring-hook hole at 175.05 (end 180.55; 3.48 wall all round, ≥2.0 worst case), as the p.39 close-up shows (ch17_images/page001_img01: rounded full-height end, hook hole in it); replaces the 6.0-tall stepped tab (0.98 wall beside the hole, 2026-10 machinist review); fork/clip fittings deferred (photogrammetry 195527397) | — | p.39, p.40; the Ø3 photo read is infeasible — the spring''s r 2.75 Ø1-wire eye threading the 3.0 plate needs eye-drop margins |√(ρ²−1.5²)−D| ≤ hole_r − 0.1 at ρ = 2.25/3.25, best ~0.05 through Ø3, ~0.3 through Ø4 (M6.3 toroid solve) | scaled→derived | med |'
   - prose: |2
 
       Notes: each third-class lever pivots at its end (fulcrum), is driven by its

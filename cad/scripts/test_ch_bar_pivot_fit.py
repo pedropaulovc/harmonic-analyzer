@@ -38,6 +38,15 @@ def test_restated_floors_are_their_sources() -> None:
     places = bar_notes.DRAWING_PRECISION["TopPinProfile"]["TopPinX"]
     assert pin.HOLE_LOCATION_TOLERANCE == printed_band_mm(places) == 0.13
     assert pin.BAR_STOCK_UNDERSIZE is bar.BAR_STOCK_UNDERSIZE
+    # The roof budget's bands: the lever's height at one place, the notch's
+    # depth and the pin's drop at two.
+    import ch_channel_lever_notes as lever_notes
+
+    assert lever_notes.DRAWING_PRECISION["LeverOutline"]["BarHeight"] == 1
+    assert pin.LINEAR_1PL == printed_band_mm(1)
+    assert bar_notes.DRAWING_PRECISION["BarProfile"]["TopNotchHeight"] == 2
+    assert bar_notes.DRAWING_PRECISION["TopPinProfile"]["TopPinDrop"] == 2
+    assert pin.LINEAR_2PL == printed_band_mm(2)
 
 
 def test_the_pin_is_flush_with_the_bar_and_runs_in_the_lever() -> None:
@@ -61,6 +70,9 @@ def test_worst_case_joint_budget() -> None:
     # Flush ends leave the #1038 top-notch gap untouched.
     assert b["neighbour_clearance_min"] == pytest.approx(0.1065, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.RUNNING_FLOOR
+    # The 14.0 roof under the 11.0 lever turned the full relative swing.
+    assert b["notch_roof_clearance_min"] == pytest.approx(0.2001, abs=1e-4)
+    assert b["notch_roof_clearance_min"] >= pin.RUNNING_FLOOR
     # The far face, the offset at its long limit on the narrowest stock.
     assert b["hole_face_wall_min"] == pytest.approx(2.0052, abs=1e-6)
     assert b["hole_face_wall_min"] >= pin.RULE12_WALL_TARGET
@@ -69,26 +81,79 @@ def test_worst_case_joint_budget() -> None:
     assert b["blank_excess_max"] == pytest.approx(1.2108, abs=1e-6)
 
 
-def test_the_cheeks_the_pin_presses_into_are_the_1038_shortfall_unchanged() -> None:
+def test_the_cheeks_the_pin_presses_into_hold_the_approved_exception() -> None:
     """The printed ledge cheek holds the drawing-guidelines.md rule 17 (walls and webs) floor; the far cheek, derived
-    from the widest notch on the narrowest stock, is the pre-existing #1038
-    shortfall. The pin fills the hole it presses into and changes neither."""
+    from the widest notch on the narrowest stock, is the #1038 shortfall the
+    owner approved at 1.17 MIN (2026-10-15). The pin fills the hole it presses
+    into and changes neither."""
+    import ch_amplitude_bar_notes as bar_notes
+
     b = pin.BUDGET
-    assert b["tine_min_printed"] == pytest.approx(1.525, abs=1e-6)
+    assert b["tine_min_printed"] == pytest.approx(1.55, abs=1e-6)
     assert b["tine_min_printed"] >= pin.RULE12_WALL_FLOOR
-    assert b["tine_min_derived"] == pytest.approx(1.1742, abs=1e-6)
+    assert b["tine_min_derived"] == pytest.approx(1.2992, abs=1e-6)
     assert b["tine_min_derived"] < pin.RULE12_WALL_FLOOR  # #1038, not this pin
+    assert b["tine_min_derived"] >= bar_notes.CHEEK_WALL_APPROVED_MIN["top"]
 
 
 def test_neighbour_stack_closes_the_inter_bar_gap_exactly() -> None:
     """The gap (pitch less the widest bar) holds the bar's float on its lever,
-    both dressed pin ends and the neighbour clearance: nothing left out."""
+    both ledges' and both plate offsets' bands, both dressed pin ends and the
+    neighbour clearance: nothing left out (#1038 option 2)."""
     b = pin.BUDGET
-    notch_max = bar.TOP_NOTCH_WIDTH + bar.NOTCH_WIDTH_BAND[0]
-    lever_min = lever.LEVER_THICKNESS - bar.LEVER_THICKNESS_TOLERANCE
+    notch_max = bar.TOP_NOTCH_WIDTH + bar.TOP_NOTCH_WIDTH_BAND[0]
+    lever_min = lever.LEVER_THICKNESS - lever.LEVER_THICKNESS_TOLERANCE
     assert bank.PITCH - (
-        bar.BAR_WIDTH + (notch_max - lever_min) + 2.0 * pin.PIN_END_PROUD_MAX
+        bar.BAR_WIDTH
+        + (notch_max - lever_min)
+        + 2.0 * bar.NOTCH_OFFSET_TOLERANCE_MM
+        + 2.0 * lever.PLATE_OFFSET_TOLERANCE
+        + 2.0 * pin.PIN_END_PROUD_MAX
     ) == pytest.approx(b["neighbour_clearance_min"])
+    # 7.0565 - 6.35 - (3.35 - 2.95) - 0.10 - 0.10.
+    assert (notch_max, lever_min) == pytest.approx((3.35, 2.95))
+
+
+def _lever_bar_swing_deg() -> float:
+    """|lever tilt - bar tilt| over one cam turn at bar stations 0..80 mm,
+    the rocker's solved swing applied to its R800 arc in either sense."""
+    import ch_connecting_rod_spec as rod
+    import channel_frame_geom as frame
+    import channel_kinematics as ck
+    import dt_cylinder_gear_spec as gear
+
+    ox, oy = frame.ROCKER_PIVOT_XY
+    arm, c2c = ck._ARM_ROD_LEVER, rod.CENTER_DISTANCE
+    tilts = []
+    for k in range(0, 360, 2):
+        phase = math.radians(k)
+        cx = frame.CAM_SHAFT_XY[0] + gear.ECCENTRICITY * math.sin(phase)
+        cy = frame.CAM_SHAFT_XY[1] + gear.ECCENTRICITY * math.cos(phase)
+        dx, dy = cx - ox, cy - oy
+        d = math.hypot(dx, dy)
+        a = (arm**2 - c2c**2 + d * d) / (2.0 * d)
+        h = math.sqrt(arm**2 - a * a)
+        px, py = ox + a * dx / d + h * dy / d, oy + a * dy / d - h * dx / d
+        tilts.append(math.degrees(math.atan2(py - oy, ox - px)) - ck._ARM_LEVER_BETA_DEG)
+    acx0, acy0 = ck.ARC["acx"], ck.ARC["acy"]
+    worst = 0.0
+    try:
+        for delta in {min(tilts), max(tilts), -min(tilts), -max(tilts), 0.0}:
+            t = math.radians(delta)
+            rx, ry = acx0 - ox, acy0 - oy
+            ck.ARC["acx"] = ox + rx * math.cos(t) - ry * math.sin(t)
+            ck.ARC["acy"] = oy + rx * math.sin(t) + ry * math.cos(t)
+            for station in range(0, 81, 10):
+                state = ck.solve_state(float(station))
+                worst = max(worst, abs(state["lever_tilt"] - state["bar_tilt"]))
+    finally:
+        ck.ARC["acx"], ck.ARC["acy"] = acx0, acy0
+    return worst
+
+
+def test_restated_lever_bar_swing_brackets_the_solved_loop() -> None:
+    worst = _lever_bar_swing_deg()
+    assert worst <= pin.LEVER_BAR_SWING_DEG <= worst + 0.05
 
 
 def test_the_assembly_press_allowance_is_this_joint() -> None:

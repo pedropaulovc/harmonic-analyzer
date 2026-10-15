@@ -83,7 +83,7 @@ def test_walls_clear_the_floor_at_worst_case() -> None:
         assert value >= spec.WALL_FLOOR, wall
     # The concentric full round leaves the same nominal wall to the tip.
     nominal = spec.TIP_RADIUS - blind_cut_dia_mm(spec.SPRING_EYE_HOLE_SPEC) / 2.0
-    assert nominal == pytest.approx(2.73, abs=0.01)
+    assert nominal == pytest.approx(3.48, abs=0.01)
 
 
 def test_twenty_long_hubs_still_float_between_the_keepers() -> None:
@@ -111,7 +111,7 @@ def test_plate_is_located_from_one_hub_face() -> None:
 def test_draw_view_math_matches_the_spec() -> None:
     assert drawing._BAR_PIN_DIA == blind_cut_dia_mm(spec.BAR_PIN_HOLE_SPEC)
     assert drawing._SPRING_HOLE_DIA == blind_cut_dia_mm(spec.SPRING_EYE_HOLE_SPEC)
-    assert spec.TIP_END_X == pytest.approx(179.80)
+    assert spec.TIP_END_X == pytest.approx(180.55)
 
 
 def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
@@ -147,9 +147,13 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     part = _config.parts("ch-channel-lever")
-    assert part["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
-    assert part["material"] == "LOW-CARBON STEEL OR GRAY IRON"
+    # Owner ruling 2026-10-15: gray cast iron is the material, and its
+    # build-up-free conversion coat is the cast-iron class of black oxide.
+    assert part["material_specification"] == "GRAY CAST IRON, ASTM A48 CLASS 30"
+    assert part["material"] == "GRAY CAST IRON"
+    assert "material_family" not in part
+    assert lever.MATERIAL == "Gray Cast Iron"
     # A conversion coat, not paint: the hub faces, plate faces and bores
     # keep their bands with nothing masked (as the rocker arms, MHA-CH-006).
-    assert part["finish"] == "matte black oxide"
+    assert part["finish"] == "matte black oxide per MIL-DTL-13924 Class 1, oil sealed"
     assert int(part["quantity"]) == 20

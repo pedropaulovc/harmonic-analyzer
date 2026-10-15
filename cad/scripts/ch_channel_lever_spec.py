@@ -26,39 +26,49 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 # below the +/-0.10 hook-arm allocation (error_budget.yaml), hence the flat
 # nominal.  Was 177.8 (7"), which left the spring leaning 2.75 mm off plumb.
 LEVER_SPRING_X = 175.05  # fulcrum -> spring-hole c2c, plumb over the anchor
-BAR_TALL = 9.5  # bar height, full length: the end carries the spring hole
+# Bar height, full length; the end carries the spring hole. The lever is
+# gray cast iron (owner ruling 2026-10-15: "device levers are clearly cast
+# iron"), so the arm is deepened in its own plane from 9.5 for strength while
+# staying under the O12.0 hub. Its lower edge clears the bar's top-notch roof
+# (ch_bar_pivot_pin_spec notch_roof_clearance_min) and the spring's coil
+# under the full-round tip (build_ch_channel_assembly._assert_spring_mount).
+BAR_TALL = 11.0
 LEVER_THICKNESS = 3.0
 PIVOT_HOLE_DIA = 6.5  # fulcrum bore riding the 6.35 fulcrum shaft
 BAR_PIN_X = 127.0  # fulcrum -> bar-pin c2c, 5"
 BAR_PIN_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 SPRING_EYE_HOLE_SPEC = HoleSpec("drilled_number", "#21")
 
-# The end is the full 9.5 bar with a full-round tip about the spring hole
+# The end is the full-height bar with a full-round tip about the spring hole
 # (ch17 p.39 close-up, page001_img01: the bar runs full height to a rounded
 # end with the hook hole in it).  The former 6.0-tall stepped tab left
 # (6.0 - 4.04) / 2 = 0.98 of wall beside the #21 hole (baseline machinist
 # review, drawing-guidelines.md rule 17); concentric with the full round the
 # wall is BAR_TALL / 2 - r all the way round.
 TIP_ARC_CX = LEVER_SPRING_X
-TIP_RADIUS = BAR_TALL / 2.0  # 4.75: full round, tangent to both bar edges
+TIP_RADIUS = BAR_TALL / 2.0  # 5.50: full round, tangent to both bar edges
 
 # --- Derived spans. ---
-NOSE_RADIUS = BAR_TALL / 2.0  # 4.75 fulcrum nose (inside the hub)
-TIP_END_X = TIP_ARC_CX + TIP_RADIUS  # 179.80 tip from the fulcrum axis
+NOSE_RADIUS = BAR_TALL / 2.0  # 5.50 fulcrum nose (inside the hub)
+TIP_END_X = TIP_ARC_CX + TIP_RADIUS  # 180.55 tip from the fulcrum axis
 
 # Integral fulcrum hub (2026-09-02 photo re-derive, ch17 p.40 page002_img03):
 # the levers stack hub-to-hub on the fulcrum shaft at the station pitch; the
 # 19 `lever-bushing` spacers are retired. OD = the old bushing's O12.
 HUB_DIA = 12.0
 HUB_LENGTH = 7.0565  # == machine channels.station_pitch_mm (asserted by the build)
+if not BAR_TALL < HUB_DIA:
+    raise AssertionError("the arm must stay under the hub")
 
 # --- Bands (upper, lower), native on the model dimensions. ---
 # The fulcrum bore is reamed: it runs on the h-band 6.35 fulcrum shaft
 # (MHA-CH-004), the same O6.5 +0.03/0 pivot the rocker arm runs on its shaft.
 PIVOT_HOLE_BAND = (0.03, 0.0)
-# The plate is straddled by the amplitude bar's top notch, whose 3.20 minimum
-# is this band's maximum plus the running floor (ch_amplitude_bar_spec).
-LEVER_THICKNESS_TOLERANCE = 0.10
+# The plate is straddled by the amplitude bar's top notch, whose 3.15 minimum
+# is this band's maximum plus the running floor (ch_amplitude_bar_spec). The
+# band is +/-0.05 so the bar's float, with both ledges and both plate offsets,
+# leaves the bar-to-bar running gap (owner ruling 2026-10-15, #1038 option 2).
+LEVER_THICKNESS_TOLERANCE = 0.05
 # Both transfer arms carry the error budget's +/-0.10 gain allocation
 # (error_budget.yaml lever_bar_pin_arm / lever_spring_hook_arm), measured from
 # the fulcrum bore that the lever turns about.

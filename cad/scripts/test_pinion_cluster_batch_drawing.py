@@ -826,7 +826,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     assert 111.2 < crank_allowed[hub_pair] < 111.8
     assert 55.1 < crank_allowed[shaft_pair] < 55.6
     # MHA-CH-011: each 5/64 bar pivot pin pressed into its bar's Ø1.968 ream
-    # through both top-notch cheeks (6.35 bar less the 3.20 notch), and
+    # through both top-notch cheeks (6.35 bar less the 3.15 notch), and
     # MHA-CH-010: the same pin pressed into its rod's Ø1.968 fork ream through
     # both tines (6.075 fork less the 2.675 slot); channel j's pin with
     # channel j's bar or rod only. MHA-VN-034: each #4-40 apex set screw's
@@ -840,7 +840,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             **{
                 frozenset(
                     (f"ch-bar-pivot-pin-{n}", f"ch-amplitude-bar-{n}")
-                ): _annulus_limit(1.984375, 1.968, 3.15)
+                ): _annulus_limit(1.984375, 1.968, 3.20)
                 for n in range(1, 21)
             },
             **{

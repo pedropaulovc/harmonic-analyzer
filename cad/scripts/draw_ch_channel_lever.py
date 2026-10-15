@@ -7,7 +7,7 @@ placement of those dimensions, the function each tight band serves, the hole
 callouts, the bore's roughness and one reference overall length.
 Sheet/template and export behaviour lives in ``_drawing_common``.
 
-The lever is a long thin third-class lever (185.8 mm over the hub, 9.5 mm
+The lever is a long thin third-class lever (186.6 mm over the hub, 11.0 mm
 tall, 3.0 mm thick).  The sheet runs at 1:1: the front view carries the
 profile, bore, hub, both arms from the fulcrum bore and the overall length;
 the top view the plate thickness and the hub length; a 1:2 isometric.
@@ -200,7 +200,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    # The integral Ø12 x 7.06 fulcrum hub hides the whole 3 x 9.5 plate section
+    # The integral Ø12 x 7.06 fulcrum hub hides the whole 3 x 11 plate section
     # in an end view, so the plate thickness and the hub length read here.
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
@@ -274,7 +274,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_arc_endpoints_to_max(adapter, overall, label="overall length")
     # Value-only: both picks are arcs the recipe locates by coordinate, and
     # the far-extreme sum is the one value either centre-anchored mistake
-    # (175.05, 181.05, 179.80) cannot produce.
+    # (175.05, 181.05, 180.55) cannot produce.
     assert_dimension_measures(
         adapter, overall, expected_mm=_HUB_R + TIP_END_X, label="overall length"
     )
