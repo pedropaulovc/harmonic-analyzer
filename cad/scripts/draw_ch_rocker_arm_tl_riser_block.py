@@ -54,7 +54,6 @@ from ch_rocker_arm_tl_riser_block_spec import (
     DRAWING_PRECISION_BY_NAME,
     LENGTHS,
     QUANTITIES,
-    SET_EQUALITY,
     configuration_number,
 )
 
@@ -86,9 +85,9 @@ FRONT_KEEP = {
 RIGHT_KEEP = {"BlockWidth": (RIGHT_CENTER[0], RIGHT_CENTER[1] + _HALF_HEIGHT + 0.0145)}
 # The height governs all six blocks of both lengths; the set requirement
 # rides on it as the result, not the method. The width is the bar's own.
-CALLOUTS_ABOVE = {"BlockHeight": "MATCHED SET OF SIX"}
+CALLOUTS_ABOVE = {"BlockHeight": part_spec.SET_CALLOUT[0]}
 CALLOUTS_BELOW = {
-    "BlockHeight": f"EQUAL WITHIN {SET_EQUALITY:.2f}",
+    "BlockHeight": part_spec.SET_CALLOUT[1],
     "BlockWidth": "STOCK",
 }
 
@@ -126,7 +125,7 @@ requirement(
     "support_top",
     kind="face",
     faces=(PlanarFace((0.0, 1.0, 0.0), part_spec.BLOCK_HEIGHT),),
-    requirements=("height", "width"),
+    requirements=("height", "width", "note"),
     fields={
         "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
         "plane": (
@@ -137,6 +136,7 @@ requirement(
         "height_nominal": (part_spec.BLOCK_HEIGHT, ("BLOCK_HEIGHT",)),
         "width": (limits(part_spec.BLOCK_WIDTH, 1), ("BLOCK_WIDTH",)),
         "width_nominal": (part_spec.BLOCK_WIDTH, ("BLOCK_WIDTH",)),
+        "note": (part_spec.SET_NOTE, ("SET_NOTE", "SET_CALLOUT", "SET_EQUALITY")),
     },
     precision={"height": 2, "width": 1},
 )
@@ -145,11 +145,12 @@ requirement(
     "table_seat",
     kind="face",
     faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
-    requirements=("height",),
+    requirements=("height", "note"),
     fields={
         "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
         "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
         "height": (limits(part_spec.BLOCK_HEIGHT, 2), ("BLOCK_HEIGHT", "BAR_THICK")),
+        "note": (part_spec.SET_NOTE, ("SET_NOTE", "SET_CALLOUT", "SET_EQUALITY")),
     },
     precision={"height": 2},
 )

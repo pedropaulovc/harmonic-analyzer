@@ -38,6 +38,17 @@ QUANTITIES = {name: qty for name, _length, qty in CONFIGS}
 DEFAULT_CONFIG = CONFIGS[0][0]  # the part saves on L036; the main views draw it
 BLOCK_LENGTH = LENGTHS[DEFAULT_CONFIG]
 QUANTITY = sum(QUANTITIES.values())
+# The feature bundle and neutral STEP carry one STEP per configuration
+# (export_features.step_configurations reads this literal statically).
+FEATURE_STEP_CONFIGURATIONS = ("L036", "L045")
+if FEATURE_STEP_CONFIGURATIONS != tuple(LENGTHS):
+    raise AssertionError("feature STEP configurations drift from CONFIGS")
+# The height's set requirement, printed in two callout lines and exported as
+# one requirement note: every block of both lengths matches the others.
+SET_CALLOUT = ("MATCHED SET OF SIX", f"EQUAL WITHIN {SET_EQUALITY:.2f}")
+if QUANTITY != 6:
+    raise AssertionError("the set callout counts six blocks")
+SET_NOTE = ", ".join(SET_CALLOUT)
 
 _X = printed_band_mm(1)
 _XX = printed_band_mm(2)

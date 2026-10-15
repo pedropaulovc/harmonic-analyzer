@@ -115,3 +115,15 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
                 assert band[0] <= nominal <= band[1], (name, requirement, nominal, band)
             checked += 1
     assert checked
+
+
+def test_exported_height_features_carry_the_matched_set_requirement() -> None:
+    """The six-block matched set the sheet prints is exported, not just the band."""
+    features = _features()
+    printed = ", ".join(
+        (drawing.CALLOUTS_ABOVE["BlockHeight"], drawing.CALLOUTS_BELOW["BlockHeight"])
+    )
+    assert printed == f"MATCHED SET OF SIX, EQUAL WITHIN {spec.SET_EQUALITY:.2f}"
+    for name in ("support_top", "table_seat"):
+        assert "note" in features[name]["requirements"]
+        assert features[name]["note"] == printed

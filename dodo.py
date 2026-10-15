@@ -2091,9 +2091,12 @@ def _feature_export_file_deps(stem: str) -> list[str]:
 
 
 def _feature_export_outputs(stem: str) -> list[Path]:
-    from export_features import bundle_paths
+    from export_features import bundle_paths, configuration_step_paths
 
-    return [path.resolve() for path in bundle_paths(stem, CAD_OUT)]
+    return [
+        path.resolve()
+        for path in (*bundle_paths(stem, CAD_OUT), *configuration_step_paths(stem, CAD_OUT).values())
+    ]
 
 
 def _feature_bundle_outputs() -> list[Path]:

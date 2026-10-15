@@ -47,8 +47,10 @@ export above can run on a SolidWorks farm worker that has no renderer:
 ``--features <stem> ...`` is the separate feature-bundle producer
 (the doit ``package:features:<stem>`` leaves, aggregated by ``package:features``).
 For each supported part it writes ONLY ``cad/out/features/<stem>/<dashed>.STEP``
-(the named, default-configuration ``SaveAs3`` export full export consumes) and an
-adjacent ``features.toml`` bound to those raw STEP bytes by ``export_features.write_manifest``.
+(the named, default-configuration ``SaveAs3`` export full export consumes), one
+``<dashed>-<configuration>.STEP`` per configuration a multi-configuration part
+declares in its spec's ``FEATURE_STEP_CONFIGURATIONS``, and an adjacent
+``features.toml`` bound to the default STEP's raw bytes by ``export_features.write_manifest``.
 It never touches the global STEP/STL/PNG, colour, source-digest or release-neutral files:
 
     uv run python cad\\scripts\\export_models.py --features ch_rocker_arm ch_pivot_shaft
@@ -103,7 +105,7 @@ OUT_BOXES = CAD_ROOT / "out" / "boxes"
 OUT_SLDPRT = CAD_ROOT / "out" / "sldprt"
 OUT_SLDASM = CAD_ROOT / "out" / "sldasm"
 OUT_PNG = CAD_ROOT / "out" / "png"
-# ``--features`` owns features/<underscore-stem>/{<dashed>.STEP, features.toml}.
+# ``--features`` owns features/<underscore-stem>/{<dashed>[-<cfg>].STEP, features.toml}.
 OUT_FEATURES = CAD_ROOT / "out" / "features"
 COLORS = OUT_STL / "colors.json"
 # Per-output source-recipe digests: ``mesh|dashed-assembly -> digest`` recorded at
@@ -611,9 +613,15 @@ def _release_inventory(
 ) -> dict[str, Path]:
     """Exact bundle-relative neutral inventory and its cache-owned source files."""
     files: dict[str, Path] = {}
+    feature_stems = set(_feature_stems())
     for stem in parts:
         dashed = stem.replace("_", "-")
         files[f"step/{dashed}.STEP"] = OUT_STEP / f"{dashed}.STEP"
+        if stem.replace("-", "_") in feature_stems:
+            from export_features import configuration_step_paths  # noqa: PLC0415
+
+            for scoped in configuration_step_paths(stem).values():
+                files[f"step/{scoped.name}"] = OUT_STEP / scoped.name
         files[f"stl/{dashed}.STL"] = OUT_STL / f"{dashed}.STL"
         files[f"png/{dashed}/{dashed}_isometric.png"] = (
             OUT_PNG / dashed / f"{dashed}_isometric.png"
@@ -869,14 +877,15 @@ def _feature_stems() -> tuple[str, ...]:
     return tuple(SUPPORTED_PARTS)
 
 
-def _save_feature_step(doc: Any, stem: str, out: Path) -> None:
+def _save_feature_step(doc: Any, stem: str, out: Path, *, reuse_names: bool = False) -> None:
     """The named STEP producer used only by ``--features``.
 
     Name ``stem``'s feature faces on the open part, ``SaveAs3`` under
     :data:`EXPORT_PREFERENCES`, and read the labels back. Names are transient:
     the caller closes the part unsaved and checks the native's SHA-256.
+    ``reuse_names`` exports a later configuration of the already-named part.
     """
-    names = name_feature_faces(doc, stem)
+    names = name_feature_faces(doc, stem, reuse=reuse_names)
     _save_as(doc, out)
     faces = step_face_sets(out.read_text(encoding="latin-1"), names)
     if stem == "ch_rocker_arm" and len(faces["pivot_bore"]) != 2:
@@ -884,6 +893,33 @@ def _save_feature_step(doc: Any, stem: str, out: Path) -> None:
             f"{stem}.pivot_bore: expected exactly 2 STEP patches, "
             f"found {len(faces['pivot_bore'])}"
         )
+
+
+def _active_configuration(doc: Any) -> str:
+    try:
+        cm = _read_member(doc, "ConfigurationManager")
+        ac = _read_member(cm, "ActiveConfiguration") if cm is not None else None
+        return str(_read_member(ac, "Name") or "") if ac is not None else ""
+    except Exception:
+        return ""
+
+
+def _switch_configuration(adapter: Any, doc: Any, stem: str, cfg: str) -> bool:
+    """Show ``cfg`` and rebuild; False when it is already active."""
+    if not cfg or _active_configuration(doc).casefold() == cfg.casefold():
+        return False
+    ok_cfg = doc.ShowConfiguration2(cfg)
+    if not ok_cfg and _active_configuration(doc).casefold() != cfg.casefold():
+        try:
+            names = list(doc.GetConfigurationNames() or [])
+        except Exception:
+            names = None
+        raise RuntimeError(
+            f"{stem}: ShowConfiguration2({cfg!r}) failed (has {names})"
+        )
+    adapter._attempt(lambda: doc.ForceRebuild3(False), default=None)
+    adapter._attempt(lambda: doc.EditRebuild3(), default=None)
+    return True
 
 
 def _require_native_unchanged(native: Path, before: str) -> None:
@@ -1478,9 +1514,16 @@ def export_feature_bundles(stems: list[str]) -> int:
 
     Each part opens once, exports its authoritative named STEP, closes unsaved,
     and must leave its native byte-identical before the manifest reads and
-    binds the just-written STEP. No global export output is touched.
+    binds the just-written STEP. A part that declares
+    ``FEATURE_STEP_CONFIGURATIONS`` also exports each listed configuration,
+    shown in turn, as its own named STEP in the bundle. No global export
+    output is touched.
     """
-    from export_features import bundle_paths, write_manifest  # noqa: PLC0415
+    from export_features import (  # noqa: PLC0415
+        bundle_paths,
+        configuration_step_paths,
+        write_manifest,
+    )
 
     natives = {stem: OUT_SLDPRT / f"{stem.replace('_', '-')}.SLDPRT" for stem in stems}
     missing = sorted(path.name for path in natives.values() if not path.is_file())
@@ -1498,8 +1541,13 @@ def export_feature_bundles(stems: list[str]) -> int:
                 manifest.unlink(missing_ok=True)
                 native_sha = _file_sha256(native)
                 check(f"open {native.name}", await adapter.open_model(str(native)))
-                _save_feature_step(adapter.currentModel, stem, step)
+                doc = adapter.currentModel
+                _save_feature_step(doc, stem, step)
                 log(f"saved {step.name} ({step.stat().st_size / 1e6:.1f} MB)")
+                for cfg, cfg_step in configuration_step_paths(stem, OUT_FEATURES.parent).items():
+                    _switch_configuration(adapter, doc, stem, cfg)
+                    _save_feature_step(doc, stem, cfg_step, reuse_names=True)
+                    log(f"saved {cfg_step.name} ({cfg_step.stat().st_size / 1e6:.1f} MB)")
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
                 _require_native_unchanged(native, native_sha)
                 write_manifest(stem, step, revision=_config.release_revision())
@@ -1682,30 +1730,6 @@ def main() -> int:
         enforce_preferences(adapter, EXPORT_PREFERENCES)
         done: dict[str, str] = {}
 
-        def active_cfg(doc: Any) -> str:
-            try:
-                cm = _read_member(doc, "ConfigurationManager")
-                ac = _read_member(cm, "ActiveConfiguration") if cm is not None else None
-                return str(_read_member(ac, "Name") or "") if ac is not None else ""
-            except Exception:
-                return ""
-
-        def switch_configuration(doc: Any, stem: str, cfg: str) -> bool:
-            if not cfg or active_cfg(doc).casefold() == cfg.casefold():
-                return False
-            ok_cfg = doc.ShowConfiguration2(cfg)
-            if not ok_cfg and active_cfg(doc).casefold() != cfg.casefold():
-                try:
-                    names = list(doc.GetConfigurationNames() or [])
-                except Exception:
-                    names = None
-                raise RuntimeError(
-                    f"{stem}: ShowConfiguration2({cfg!r}) failed (has {names})"
-                )
-            adapter._attempt(lambda: doc.ForceRebuild3(False), default=None)
-            adapter._attempt(lambda: doc.EditRebuild3(), default=None)
-            return True
-
         def scene_stems(data: dict[str, Any]) -> set[tuple[str, str, str]]:
             return {
                 (str(comp["part"]), str(comp.get("cfg") or ""), str(comp["mesh"]))
@@ -1779,7 +1803,7 @@ def main() -> int:
                 src = OUT_SLDPRT / f"{stem}.SLDPRT"
                 check(f"open {src.name}", await adapter.open_model(str(src)))
                 doc = adapter.currentModel
-                render_cfg = active_cfg(doc)
+                render_cfg = _active_configuration(doc)
                 if stem in default_stale:
                     for out in (OUT_STL / f"{stem}.STL", OUT_STEP / f"{stem}.STEP"):
                         if out.resolve() not in feature_steps:
@@ -1790,7 +1814,7 @@ def main() -> int:
                 entries = all_by_stem.get(stem, []) if stem in scene_stale else []
                 crc_by_mesh: dict[str, int] = {}
                 for cfg, mesh in entries:
-                    switch_configuration(doc, stem, cfg)
+                    _switch_configuration(adapter, doc, stem, cfg)
                     out = OUT_STL / f"{mesh}.STL"
                     if not (mesh == stem and stem in default_stale):
                         _save_as(doc, out)
@@ -1800,7 +1824,7 @@ def main() -> int:
                         f"rgb={colors[mesh]}")
                 assert_configs_distinct(stem, crc_by_mesh)
                 if stem in missing_part_png:
-                    switch_configuration(doc, stem, render_cfg)
+                    _switch_configuration(adapter, doc, stem, render_cfg)
                     await export_build_png(adapter, stem)
 
                 d = src_digest(src) if record else None
