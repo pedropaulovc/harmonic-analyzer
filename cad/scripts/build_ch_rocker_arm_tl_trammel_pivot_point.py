@@ -54,7 +54,6 @@ from _sketch import (
 from ch_rocker_arm_tl_trammel_pivot_point_spec import (
     CONE_LENGTH,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     HARDENED_LENGTH,
     ISOMETRIC_VIEW_NOTE,
@@ -77,7 +76,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Material Specification",
     "Finish",
     "Quantity",
-    "Manufacturing Notes",
     "Isometric View Note",
 )
 
@@ -380,12 +378,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
     blank_sketch(adapter, "HardenedZoneReference")
     artefacts = await save_part_and_images(adapter, PART_NAME)

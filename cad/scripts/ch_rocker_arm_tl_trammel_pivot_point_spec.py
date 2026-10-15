@@ -168,7 +168,8 @@ DIMENSION_CALLOUTS = {
     "TipFlatDia": TIP_FLAT_CALLOUT,
 }
 
-# The blind reviewer sees only the sheet: each note states a function.
-# Hardness lives in the Finish field.
-DRAWING_NOTES = "TIP CONE TRUE TO THE ROD AXIS; TIP FLAT CENTRED ON IT."
+# The blind reviewer sees only the sheet. Hardness lives in the Finish field;
+# the cone is turned in one chucking with the rod O.D., so a coaxiality note
+# would set no checkable acceptance (machinist review, 2026-10-15).
+DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

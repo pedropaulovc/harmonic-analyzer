@@ -124,13 +124,28 @@ def test_callouts_are_short_below_lane_lines() -> None:
     assert 'DIMENSION_CALLOUTS, location="below"' in source
 
 
-def test_notes_follow_the_simplicity_policy() -> None:
-    notes = spec.DRAWING_NOTES
-    assert 1 <= len(notes.splitlines()) <= 4
-    assert not re.search(r"\d", notes)
-    assert "GROUND" not in notes and "GRIND" not in notes
-    # The Finish field carries the hardness; the seats ride the angle callout.
-    assert "HARD" not in notes and "SEAT" not in notes
+def test_sheet_carries_no_notes() -> None:
+    # The Finish field carries the hardness, the seats ride the angle
+    # callout, and a coaxiality note had no checkable acceptance.
+    assert spec.DRAWING_NOTES == ""
+    source = inspect.getsource(drawing)
+    assert '"Manufacturing Notes"' not in source
+
+
+def test_tip_angle_leader_lands_off_the_part() -> None:
+    """Rule 14: the leader lands at the arc midpoint (the half-angle's
+    bisector), which stands clear above the rod outline, and the callout's
+    left end stands right of it so the leader runs away from the arc."""
+    arc_x, arc_y = drawing.PROFILE_KEEP["TipHalfAngle"]
+    rod_top = drawing.PROFILE_CENTER[1] + spec.ROD_R * drawing._S
+    assert arc_y >= rod_top + drawing.TIP_ARC_CLEAR - 1e-9
+    radius = math.dist((arc_x, arc_y), (drawing.APEX_X, drawing.PROFILE_CENTER[1]))
+    assert math.isclose(radius, drawing.TIP_ARC_R)
+    bearing = math.degrees(
+        math.atan2(arc_y - drawing.PROFILE_CENTER[1], arc_x - drawing.APEX_X)
+    )
+    assert math.isclose(bearing, spec.TIP_HALF_ANGLE / 2.0)
+    assert drawing.TIP_ANGLE_TEXT_XY[0] > arc_x and drawing.TIP_ANGLE_TEXT_XY[1] > arc_y
 
 
 def test_tightened_cone_names_its_seats_on_its_callout() -> None:
