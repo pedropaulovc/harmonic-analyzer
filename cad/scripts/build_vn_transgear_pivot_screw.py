@@ -34,7 +34,6 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _fastener_catalog import fastener
 from _feature_tree import _feature_by_name, name_last_feature
 from _rebuild import force_rebuild
@@ -54,7 +53,6 @@ from vn_transgear_pivot_screw_spec import (
     CHAMFER_ANGLE,
     CHAMFER_ANGLE_TOLERANCE,
     CHAMFER_WIDTH,
-    CHAMFER_WIDTH_TOLERANCE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FITTED_THREAD_LEN,
@@ -342,10 +340,13 @@ def _manufacturing_controls(adapter) -> None:
     clear_dimensions_for_drawing(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _reference_length(adapter)
-    # The leg's band holds the chamfer inside the charged incomplete pitch.
-    set_dimension_symmetric_tolerance(
-        adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE
-    )
+    # The leg prints as a MAX: past the thread root, inside the charged pitch.
+    feature, name = "StockDeburrProfile", "ChamferWidth"
+    _, dimension = _named_dimension(adapter, feature, name)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 6  # swTolMAX: nominal is the maximum acceptance size.
+    if not tolerance.SetValues(0.0, 0.0) or int(tolerance.Type) != 6:
+        raise RuntimeError(f"{name}@{feature}: cannot retain MAX acceptance")
     # The driving 45-degree angle keeps its title-block band natively;
     # swTolGeneral prints no band and leaves the title block's row in force.
     feature, name = "StockDeburrProfile", "ChamferAngle"

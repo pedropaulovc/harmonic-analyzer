@@ -113,15 +113,16 @@ def test_engagement_charges_one_pitch_and_the_neck() -> None:
     )
 
 
-def test_chamfer_band_keeps_the_tip_inside_the_charged_pitch() -> None:
-    assert (screw.CHAMFER_WIDTH_MIN, screw.CHAMFER_WIDTH_MAX) == pytest.approx(
-        (0.45, 0.55)
-    )
+def test_chamfer_max_keeps_the_tip_inside_the_charged_pitch() -> None:
+    # The model stands at the printed maximum (swTolMAX prints the nominal).
+    assert screw.CHAMFER_WIDTH == screw.CHAMFER_WIDTH_MAX == pytest.approx(0.60)
     assert screw.CHAMFER_ANGLE_TOLERANCE == angular_band_deg() == 1.0
     steepest = math.radians(screw.CHAMFER_ANGLE + screw.CHAMFER_ANGLE_TOLERANCE)
-    assert screw.CHAMFER_AXIAL_MAX == pytest.approx(0.55 * math.tan(steepest))
+    assert screw.CHAMFER_AXIAL_MAX == pytest.approx(0.60 * math.tan(steepest))
     assert screw.CHAMFER_AXIAL_MAX <= screw.INCOMPLETE_TIP_LEN_MAX == screw.PITCH
-    assert screw.THREAD_MAJOR / 2 - screw.CHAMFER_WIDTH_MIN < screw.THREAD_MINOR_MAX / 2
+    # "Past the thread root" fits under the maximum.
+    assert screw.THREAD_MAJOR / 2 - screw.CHAMFER_WIDTH_MAX < screw.THREAD_MINOR_MAX / 2
+    assert "THREAD ROOT" in screw.DIMENSION_CALLOUTS["ChamferWidth"]
 
 
 class _Recorder:
@@ -379,14 +380,14 @@ def test_native_controls_are_owned_and_the_length_prints_as_reference() -> None:
     assert set(screw.DIMENSION_PRECISION) == {"CutLength", *drawing.EXPECTED_CONTROLS}
     assert set(drawing.FRONT_KEEP) == set(screw.DIMENSION_PRECISION)
     assert drawing.EXPECTED_CONTROLS["ChamferWidth"] == pytest.approx(
-        (0.00050, -0.00005, 0.00005)
+        (0.00060, 0.0, 0.0)
     )
     assert drawing.EXPECTED_CONTROLS["ChamferAngle"] == pytest.approx(
         (math.radians(45.0), -math.radians(1.0), math.radians(1.0))
     )
     assert screw.DIMENSION_TOLERANCE_TYPES == {
         "CutLength": 0,
-        "ChamferWidth": 4,
+        "ChamferWidth": 6,
         "ChamferAngle": 11,
         "ThreadLengthMin": 5,
     }
@@ -430,7 +431,8 @@ def test_isometric_view_is_in_the_hidden_lines_removed_loop() -> None:
 def test_registry_row_is_the_faced_stock_without_sheet_instructions() -> None:
     row = _config.parts(part.PART_NAME)
     assert row["title"] == "Transgear Pivot Screw"
-    assert row["finish"] == "AS SUPPLIED; DEBURR FACED END"
+    # The title block's break-edge row covers the faced end's deburr.
+    assert row["finish"] == "AS SUPPLIED"
     note = row["purchased_note"]
     assert note.startswith(f"PURCHASED SCREW McMASTER {screw.SKU}")
     assert "\n" not in note

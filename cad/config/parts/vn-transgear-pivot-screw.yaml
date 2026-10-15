@@ -6,7 +6,7 @@ vn-transgear-pivot-screw:
   supplier_skus: [90325A174]
   material: 18-8 STAINLESS (AS SUPPLIED)
   material_specification: "18-8 stainless steel, McMaster-Carr 90325A174"
-  finish: AS SUPPLIED; DEBURR FACED END
+  finish: AS SUPPLIED
   purchased_note: PURCHASED SCREW McMASTER 90325A174; HEAD AND SHOULDER UNMODIFIED
   quantity: 1
   tolerance_class: machined_block

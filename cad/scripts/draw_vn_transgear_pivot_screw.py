@@ -32,7 +32,6 @@ from vn_transgear_pivot_screw_spec import (
     CHAMFER_ANGLE,
     CHAMFER_ANGLE_TOLERANCE,
     CHAMFER_WIDTH,
-    CHAMFER_WIDTH_TOLERANCE,
     DIMENSION_CALLOUTS,
     DIMENSION_PRECISION,
     DIMENSION_TOLERANCE_TYPES,
@@ -50,12 +49,12 @@ from vn_transgear_pivot_screw_spec import (
 SPEC = DRAWINGS_BY_NAME["vn_transgear_pivot_screw"]
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
-SHEET_SCALE = (2.0, 1.0)
+SHEET_SCALE = (4.0, 1.0)
 ISO_SCALE = SHEET_SCALE  # One-scale sheet: no per-view scale label.
 _SHEET_PER_MODEL_MM = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000
 # Sheet metres. The Front view centres the part's Y box (faced tip to head
 # top), so the tip lands half the scaled part height below it.
-FRONT_CENTER = (0.110, 0.170)
+FRONT_CENTER = (0.140, 0.150)
 TIP_SHEET_Y = FRONT_CENTER[1] - (HEAD_H - TIP_Y) / 2 * _SHEET_PER_MODEL_MM
 SHOULDER_END_SHEET_Y = TIP_SHEET_Y + FITTED_THREAD_LEN * _SHEET_PER_MODEL_MM
 # The chamfer meets the tip face one leg inside the thread major radius.
@@ -67,12 +66,16 @@ _ANGLE_TEXT_RADIUS = 0.016
 # The B-size inner border is 12.7 mm in from the sheet edge; the title block
 # spans x >= 0.216 below y = 0.065.
 FRONT_KEEP = {
-    # The reference length's dimension line and three-line callout stand left
-    # of the thread, level with the span from the shoulder end to the tip.
-    "CutLength": (0.055, (TIP_SHEET_Y + SHOULDER_END_SHEET_Y) / 2),
+    # The reference length's dimension line stands left of the thread, level
+    # with the span from the shoulder end to the tip; its text leaves on a
+    # leader (CUT_LENGTH_TEXT_XY).
+    "CutLength": (0.115, (TIP_SHEET_Y + SHOULDER_END_SHEET_Y) / 2),
     # The tail's text stands right of the shank, above its top extension
     # line, so neither extension line crosses the text or its lines.
-    "ThreadLengthMin": (0.170, TIP_SHEET_Y + 0.030),
+    "ThreadLengthMin": (
+        0.180,
+        TIP_SHEET_Y + THREAD_LENGTH_MIN * _SHEET_PER_MODEL_MM + 0.016,
+    ),
     # Dimension line 6 mm under the chamfer leg; its text leaves on a leader.
     "ChamferWidth": (
         FRONT_CENTER[0] + (THREAD_MAJOR - CHAMFER_WIDTH) / 2 * _SHEET_PER_MODEL_MM,
@@ -89,22 +92,21 @@ FRONT_KEEP = {
 }
 # The chamfer callout stands below-right of the tip, under the tail's lower
 # extension line and right of the leg's own extension lines.
-CHAMFER_TEXT_XY = (0.157, TIP_SHEET_Y - 0.014)
+CHAMFER_TEXT_XY = (0.185, TIP_SHEET_Y - 0.018)
+# The reference length's four lines stand wholly left of its dimension line
+# (73 mm wide), so neither its arrows nor its extension lines strike them.
+CUT_LENGTH_TEXT_XY = (0.062, (TIP_SHEET_Y + SHOULDER_END_SHEET_Y) / 2)
 # The purchased-screw note flags the unmodified head and shoulder: its leader
 # lands on the head-top edge, the note stands up and right in the open field.
 HEAD_PICK_MM = (HEAD_DIA / 4, HEAD_H, 0.0)
-PURCHASED_NOTE_XY = (0.130, 0.240)
-# Every view and the sheet are 2:1, so the title-block SCALE is the view
+PURCHASED_NOTE_XY = (0.150, 0.245)
+# Every view and the sheet are 4:1, so the title-block SCALE is the view
 # scale and the isometric carries no scale label.
-ISO_CENTER = (0.340, 0.135)
+ISO_CENTER = (0.360, 0.165)
 # The cutting controls verify_machining_controls re-reads. CutLength, the
 # fit-up length, still drives the facing cut but prints as a reference.
 EXPECTED_CONTROLS = {
-    "ChamferWidth": (
-        CHAMFER_WIDTH / 1000,
-        -CHAMFER_WIDTH_TOLERANCE / 1000,
-        CHAMFER_WIDTH_TOLERANCE / 1000,
-    ),
+    "ChamferWidth": (CHAMFER_WIDTH / 1000, 0.0, 0.0),
     "ChamferAngle": (
         math.radians(CHAMFER_ANGLE),
         -math.radians(CHAMFER_ANGLE_TOLERANCE),
@@ -200,7 +202,11 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(
                 f"{name}: modified-part acceptance callout did not persist"
             )
-    offset_dimension_text(adapter, annotations, {"ChamferWidth": CHAMFER_TEXT_XY})
+    offset_dimension_text(
+        adapter,
+        annotations,
+        {"ChamferWidth": CHAMFER_TEXT_XY, "CutLength": CUT_LENGTH_TEXT_XY},
+    )
     head_edge = model_point_in_view(
         adapter,
         front,
