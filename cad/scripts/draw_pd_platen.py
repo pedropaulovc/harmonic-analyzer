@@ -5,7 +5,7 @@ standing proud of its back face round the #2-56 clip-screw through taps and
 ten counterbored #4 loose through holes for the guide screws.  The sheet runs
 at 1:2: the front view carries the outline, the bosses and every hole
 coordinate from the plate's bottom-left corner, an enlarged 1:1 right view the
-thickness and the boss height, a 4:1 partial section A-A through one
+thickness and the boss height, a 3:1 partial section A-A through one
 counterbore the user-accepted counterbore floor as a reference dimension with
 its worst case, and a 1:4 isometric the form.  The counterbores' far side is
 named in their callout.
@@ -110,31 +110,39 @@ _RIGHT_S = 1.0 / 1000.0  # enlarged right view, 1:1
 # below it, its caption between it and the isometric's note.
 FRONT_CENTER = (0.140, 0.190)
 RIGHT_CENTER = (0.300, 0.175)
-ISO_CENTER = (0.370, 0.202)
-ISO_NOTE_XY = (0.338, 0.168)
+ISO_CENTER = (0.370, 0.214)
+ISO_NOTE_XY = (0.338, 0.180)
 RIGHT_NOTE_XY = (0.262, 0.100)
-# Section A-A: a partial cut down the top row's middle guide hole (x =
+# Section A-A: a partial cut down the bottom row's middle guide hole (x =
 # CBORE_SECTION_X, its cutting plane the part's CBORE_SECTION_PLANE) from
-# SECTION_SPAN below the hole's centre to as far above, past the 6.5
-# counterbore's rim, at 4:1 (36 mm tall), +Y up.  The floor reference stands
-# mid-annulus below the hole (pd_platen_spec), so its value hangs below the
-# cut's lower end; the native caption's top centre stands above the cut.
-SECTION_SCALE = (4, 1)
+# SECTION_OVERRUN below the plate's lower edge, so the cutting plane crosses
+# the outline (r5: a stub at one hole read poorly), to SECTION_SPAN above the
+# hole's centre, past the 6.5 counterbore's rim, at 3:1 (61.5 mm tall), +Y up.
+# The floor reference stands mid-annulus above the hole (pd_platen_spec), so
+# its value stands above the cut with the dimension line under the text and
+# the extension lines clear of it (r5: placed below, they ran up through it);
+# the native caption's top centre stands under the cut.
+SECTION_SCALE = (3, 1)
 _SECTION_S = SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
 SECTION_SPAN = 4.5
-SECTION_CENTER = (0.380, 0.114)
-SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.157)
+SECTION_OVERRUN = 3.0
+SECTION_CENTER = (0.385, 0.138)
+SECTION_CAPTION_XY = (
+    SECTION_CENTER[0],
+    SECTION_CENTER[1] - (CBORE_SECTION_HOLE_Y + SECTION_OVERRUN) * _SECTION_S - 0.004,
+)
 # Model mm, in the cutting plane: the cut's ends, its centre (the hole's axis
-# at mid-thickness) and the floor value's text, 2.5 below the cut.
+# at mid-thickness) and the floor value's text, 4 above the cut (its dimension
+# line hangs about 9 mm of sheet under the text's anchor).
 SECTION_LINE_MODEL_MM = (
-    (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y - SECTION_SPAN, 0.0),
+    (CBORE_SECTION_X, -SECTION_OVERRUN, 0.0),
     (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y + SECTION_SPAN, 0.0),
 )
 _SECTION_ANCHOR_MM = (CBORE_SECTION_X, CBORE_SECTION_HOLE_Y, PLATE_THICKNESS / 2.0)
 SECTION_TEXT_MODEL_MM = {
     "CboreFloor": (
         CBORE_SECTION_X,
-        CBORE_SECTION_HOLE_Y - SECTION_SPAN - 2.5,
+        CBORE_SECTION_HOLE_Y + SECTION_SPAN + 4.0,
         (PLATE_THICKNESS + CBORE_DEPTH) / 2.0,
     ),
 }
@@ -247,9 +255,11 @@ GUIDE_EDGE_XY = (
     _front_y(_GUIDE_PICK_HOLE[1]) + GUIDE_HOLE_DIA / 2.0 * _S * _DIAG,
 )
 GUIDE_CALLOUT_XY = (0.128, 0.248)
-# Four rows at most (r4 tall-block): the far-side counterbore and the screw
-# whose heads it sinks share one.
-GUIDE_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-011\nC'BORE FAR SIDE FOR MHA-VN-006\n"
+# Four rows at most (r4 tall-block): the drill, the far-side counterbore and
+# the screw whose heads it sinks share one (r5 asked for the process word).
+GUIDE_CALLOUT_PROCESS = (
+    "PATTERN MATCHES MHA-PD-011\nDRILL, C'BORE FAR SIDE FOR MHA-VN-006\n"
+)
 SOCKET_DRILL_DIA = blind_cut_dia_mm(SOCKET_SPEC)
 SOCKET_DRILL_R_SHEET = SOCKET_DRILL_DIA / 2.0 * _S
 SOCKET_EDGE_XY = (

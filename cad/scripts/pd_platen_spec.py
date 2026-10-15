@@ -77,17 +77,19 @@ CBORE_DEPTH = FILLISTER_HEAD_H + HEAD_RECESS
 # guide screws are hand-tight: the floor's shear ring under the head
 # (pi x 3.658 x 0.67, about 7.7 mm^2) carries only that clamp.  The sheet prints
 # the floor as a reference dimension in section A-A, a partial section through
-# the top row's middle hole (r4 asked for a cut, not hidden lines): the hidden
+# the bottom row's middle hole from below the plate's lower edge (r4 asked for
+# a cut, not hidden lines; r5 for a cutting plane past the outline): the hidden
 # CboreFloorReference sketch lies in the cutting plane (CBORE_SECTION_PLANE,
-# x = CBORE_SECTION_X), mid-annulus below that hole.  test_pd_platen_drawing
+# x = CBORE_SECTION_X), mid-annulus above that hole, so the value's extension
+# lines rise clear of the cut.  test_pd_platen_drawing
 # pins the worst case at or above the accepted value, so no later change can
 # thin it further.
 CBORE_FLOOR = PLATE_THICKNESS - CBORE_DEPTH
 CBORE_FLOOR_ACCEPTED_MIN = 0.67
 CBORE_SECTION_X = GUIDE_HOLE_X[2]
-CBORE_SECTION_HOLE_Y = GUIDE_HOLE_Y[1]
+CBORE_SECTION_HOLE_Y = GUIDE_HOLE_Y[0]
 CBORE_SECTION_PLANE = "CboreSectionPlane"
-CBORE_FLOOR_REFERENCE_Y = CBORE_SECTION_HOLE_Y - (GUIDE_HOLE_DIA + CBORE_DIA) / 4.0
+CBORE_FLOOR_REFERENCE_Y = CBORE_SECTION_HOLE_Y + (GUIDE_HOLE_DIA + CBORE_DIA) / 4.0
 
 # --- Drawing contract.  ``build_pd_platen`` marks exactly these dimensions and
 # authors their places; ``draw_pd_platen`` keeps exactly their union across its
