@@ -59,7 +59,7 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     assert f"(NOTE {spec.QUANTITY_NOTE}) AT INSTALLED SPACING" in pair_ream
     assert "AT INSTALLED SPACING; THE MHA-CH-004 SHAFT SLIDES THROUGH BOTH" in pair_ream
     assert " ".join(spec.CROWN_ABOUT_BORE_CALLOUT.split()) == (
-        "ROUND ABOUT THE BORE AFTER REAMING, MEETING BOTH SIDES"
+        "ROUND ABOUT THE BORE AFTER REAMING, BLENDED INTO BOTH SIDES"
     )
     notes = spec.DRAWING_NOTES.splitlines()
     quantity = [line for line in notes if "2 REQUIRED" in line]
@@ -531,7 +531,7 @@ def test_end_view_callouts_stand_clear_of_the_part_and_each_other() -> None:
     neighbours = {
         "iso note": Box(0.3098, 0.1459, 0.3694, 0.1502),
         "iso view": Box(0.3136, 0.165, 0.3464, 0.215),
-        "foot-hole callout": Box(0.1035, 0.1964, 0.1620, 0.2055),  # r13 + "DRILL "
+        "foot-hole callout": Box(0.1035, 0.1945, 0.1469, 0.2095),  # r13 + DRILL row
         "25.20": Box(0.1889, 0.1232, 0.2031, 0.1267),
         "title block": Box(0.216, 0.0, 0.4318, 0.066),
     }
@@ -636,9 +636,9 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
         ["R7.0 MIN", *drawing.DIMENSION_CALLOUTS["CrownRadius"].splitlines()],
     )
     notes_top = drawing.NOTES_TOP
-    notes = Box(0.020, notes_top - 7 * _PITCH, 0.200, notes_top)
+    notes = Box(0.020, notes_top - 5 * _PITCH, 0.182, notes_top)
     overall_length = _text_block(drawing.FRONT_KEEP["OverallLength"], ["(16.5)"])
-    foot_hole = Box(0.1035, 0.1964, 0.1620, 0.2055)  # r13 printed + "DRILL "
+    foot_hole = Box(0.1035, 0.1945, 0.1469, 0.2095)  # r13 printed + DRILL row
     tap = _text_block(drawing.SET_SCREW_CALLOUT_XY, _tap_rows())
     keeps = {**drawing.FRONT_KEEP, **drawing.TOP_KEEP}
     callouts = {**drawing.FRONT_CALLOUTS, **drawing.TOP_CALLOUTS}
@@ -739,7 +739,7 @@ def test_tap_callout_stands_inside_the_border_clear_of_the_plan() -> None:
     set_screw_location = _value_block(
         drawing.TOP_KEEP[station], "3.000", drawing.TOP_CALLOUTS[station]
     )
-    foot_hole = Box(0.1035, 0.1964, 0.1620, 0.2055)  # r13 printed + "DRILL "
+    foot_hole = Box(0.1035, 0.1945, 0.1469, 0.2095)  # r13 printed + DRILL row
     for other in (plan, set_screw_location, foot_hole):
         assert _box_gap(block, other) >= _AIR, other
     bend = (block.xmax + _SHOULDER_RUN, block.ymin)
@@ -760,10 +760,23 @@ def test_the_auto_tapped_hole_note_is_removed() -> None:
     assert "tapped hole" not in ch_fulcrum_keeper_spec.DRAWING_NOTES.lower()
 
 
-def test_foot_hole_callout_says_drill() -> None:
+def test_foot_hole_callout_says_drill_above_its_through_row() -> None:
     # MR-fleet r6 (rule 12): "Ø2.39 THRU ALL" left drill against ream unsaid.
-    source = " ".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
-    assert 'label="keeper foot screw hole", process="DRILL", )' in source
+    # r7 (cc1a81a): the Prefix part is the counterbore row, so DRILL printed
+    # ahead of the counterbore; it belongs on its own row over the THRU part.
+    native = {
+        5: "<HOLE-SPOT><MOD-DIAM><hw-cbdiam> <HOLE-DEPTH><hw-cbdepth>",
+        6: "",
+        7: "<MOD-DIAM><hw-diam> <hw-thru>",
+        8: "",
+    }
+    updated = drawing.foot_hole_callout_definitions(native)
+    assert updated == {**native, 7: "DRILL\n<MOD-DIAM><hw-diam> <hw-thru>"}
+    with pytest.raises(RuntimeError, match="THRU row"):
+        drawing.foot_hole_callout_definitions({**native, 5: native[7]})
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_set_foot_hole_process(foot_callout)" in source
+    assert 'label="keeper foot screw hole",\n    )' in source
 
 
 def test_notes_cover_the_tap_the_screw_and_the_quantity() -> None:
@@ -779,17 +792,9 @@ def test_notes_cover_the_tap_the_screw_and_the_quantity() -> None:
     assert "MHA-VN-055" in notes
     assert "MHA-VN-022 #2-56 FILLISTER" in notes
     assert "2 REQUIRED" in notes
-    assert len(notes.splitlines()) <= 6
-    # MR-fleet r6 (rule 10): why the plan's two holes run from different ends.
-    datum = [
-        line
-        for line in notes.splitlines()
-        if line.startswith(f"{ch_fulcrum_keeper_spec.DATUM_REASON_NOTE}. ")
-    ]
-    assert datum == [
-        "3. CROWN TAP LOCATED FROM THE INNER LUG FACE (SET AT FIT-UP);"
-    ]
-    assert "FOOT HOLE FROM THE FOOT TIP" in notes
+    assert len(notes.splitlines()) <= 4
+    # MR-fleet r7: a datum-reason note drew three findings of its own.
+    assert "INNER LUG FACE" not in notes and "3. " not in notes
 
 
 def test_keeper_is_one_body_with_no_ball() -> None:

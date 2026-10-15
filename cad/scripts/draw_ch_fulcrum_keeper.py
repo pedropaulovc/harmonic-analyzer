@@ -45,7 +45,7 @@ from _drawing_common import (
 )
 from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, compose_hole_callout_prefix
 from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -128,8 +128,10 @@ TAP_R_SHEET = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) * SHEET_SCALE[0] / 2000.0
 # end-on circle, where it crossed the tap callout's leader at (99.7, 229.3)
 # mm (leader-crosses-leader, farm run r8, HEAD c126e34b). The block's left
 # end, x 126, keeps clear of the ScrewFromSide extension at y 228 above and
-# of the front view's crown stack (x <= 108) and foot below.
-FOOT_HOLE_CALLOUT_XY = (0.126, 0.202)
+# of the front view's crown stack (x <= 108) and foot below. Its y rose 1 mm
+# for the DRILL row (FOOT_HOLE_PROCESS, MR-fleet r7), which grows the block
+# both ways, keeping it clear of the plan above and the crown radius below.
+FOOT_HOLE_CALLOUT_XY = (0.126, 0.203)
 # The keeper is supplied undrilled (BORE_PAIR_CALLOUT), so the crown tap,
 # which stops at the bore, is cut after the pair-ream, on the bore's axis
 # (MR-fleet r2, 0eca37c: "TAP TO BORE" with no bore yet left the stage
@@ -157,6 +159,8 @@ SET_SCREW_QUALIFIER = (
 )
 SET_SCREW_CALLOUT_XY = (0.058, 0.196)
 _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
+# The foot hole's process, on its own row above the native through row.
+FOOT_HOLE_PROCESS = "DRILL\n"
 # The two keepers' bores are drilled and reamed through in one pass at their
 # installed spacing (one straight line whatever LugRise prints) and each crown
 # is then rounded about its own bore: bench instructions of the pair-ream
@@ -468,6 +472,48 @@ def _set_tap_callout_text(display: Any) -> None:
     _telemetry.info(f"crown tap callout: {resolved!r}")
 
 
+def foot_hole_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Put FOOT_HOLE_PROCESS on its own row above the native THRU row.
+
+    A counterbored callout prints its through row from the CalloutAbove
+    part (7) and the counterbore row from the Prefix part (5), so
+    ``add_native_hole_callout(process=...)``, which writes the Prefix, put
+    DRILL ahead of the counterbore (MR-fleet r7, cc1a81a: "DRILL ⌴Ø3.80",
+    and a leader-through-own-text on the widened row). On its own row the
+    word stays narrower than the counterbore row the leader lands on.
+    """
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected foot-hole callout parts: {definitions!r}")
+    thru_parts = [part for part, text in definitions.items() if "THRU" in text.upper()]
+    if len(thru_parts) != 1:
+        raise RuntimeError(f"foot-hole THRU row is not in one part: {definitions!r}")
+    part = thru_parts[0]
+    return {
+        **definitions,
+        part: compose_hole_callout_prefix(FOOT_HOLE_PROCESS, definitions[part]),
+    }
+
+
+@_telemetry.traced("drawing.fulcrum_keeper.foot_hole_process")
+def _set_foot_hole_process(display: Any) -> None:
+    """Write the foot hole's process row and prove it persisted first."""
+    native = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = foot_hole_callout_definitions(definitions)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            native.SetText(writable_part, updated[definition_part])
+    persisted = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved = {part: str(native.GetText(part) or "") for part in (1, 2, 3, 4)}
+    first = resolved[3] or resolved[1]
+    if persisted != updated or not first.startswith(FOOT_HOLE_PROCESS):
+        raise RuntimeError(
+            "foot-hole process row did not persist first: "
+            f"definitions={persisted!r}, resolved={resolved!r}"
+        )
+    _telemetry.info(f"foot-hole callout: {resolved!r}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -569,14 +615,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # Counterbored screw hole ships as the native wizard callout on the plan
     # view, where it projects as its true circles; DRILL says it is not reamed
     # (MR-fleet r6, rule 12: "Ø2.39 THRU ALL" named no process).
-    add_native_hole_callout(
+    foot_callout = add_native_hole_callout(
         adapter,
         top,
         edge_xy=(HOLE_X_SHEET, TOP_CENTER[1] + CBORE_R_SHEET),
         callout_xy=FOOT_HOLE_CALLOUT_XY,
         label="keeper foot screw hole",
-        process="DRILL",
     )
+    _set_foot_hole_process(foot_callout)
     # Crown set-screw tap: the plan sees it end-on at the crown top on the
     # lug mid-plane; its callout sits in the band between the front view
     # and the plan, left of both.

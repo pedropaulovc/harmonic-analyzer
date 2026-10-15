@@ -162,8 +162,10 @@ BORE_PAIR_CALLOUT = (
 # The crown round meets both side faces whatever its radius above the MIN, so
 # a bore off the width's centre (BoreFromSide's band) leaves no step (MR-fleet
 # r5: with only "(7.0)" across the width the builder could not tell what
-# lateral error the blend allows).
-CROWN_ABOUT_BORE_CALLOUT = "ROUND ABOUT THE BORE AFTER\nREAMING, MEETING BOTH SIDES"
+# lateral error the blend allows). r7 (cc1a81a): an R7.0 MIN about a bore up
+# to 0.8 off centre cannot meet both sides tangentially, so the callout's
+# acceptance is a blend into them, not a meeting.
+CROWN_ABOUT_BORE_CALLOUT = "ROUND ABOUT THE BORE AFTER\nREAMING, BLENDED INTO BOTH SIDES"
 
 # --- Fit-up on the top frame (MHA-CH-000): the pair goes on with the shaft
 # through both bores and is set by DRO, the lug centres on the fulcrum line
@@ -504,19 +506,16 @@ OVERALL_LENGTH = 2.0 * LUG_HALF_T + FOOT_L  # 16.5
 # True free-text instructions only (native dims and callouts carry the rest;
 # the bore's pair reaming is its callout, BORE_PAIR_CALLOUT). The material
 # and finish are the title block's. Brackets carry no frames and no datums
-# (policy). MR-fleet r6 (e4ef909) asked why the plan locates the crown tap
-# and the foot hole from different ends (rule 10): the tap's station is the
-# fit-up face's (KEEPERS_SET_KEY sets the inner faces), the foot hole's only
-# its walls' (the frame tap is transferred through it), so note 3 says so.
-DATUM_REASON_NOTE = 3
+# (policy). The plan's foot hole stays located off the foot tip: from the
+# 3.000's lug face (11.25 at .XX) the tip wall would fall to 1.86 mm with the
+# 6.000 and .X foot length in the stack (FOOT_TIP_WALL_MM). A note saying so
+# (MR-fleet r7, cc1a81a) drew three findings of its own, so none is printed.
 DRAWING_NOTES = "\n".join(
     (
         "1. CROWN TAP FOR THE MHA-VN-055 CUP-POINT SET SCREW; FOOT HOLE",
         "   FOR THE MHA-VN-022 #2-56 FILLISTER, HEAD FLUSH.",
         f"{QUANTITY_NOTE}. 2 REQUIRED, ONE PER MHA-CH-004 FULCRUM-SHAFT END (SECOND",
         "   IS THIS PART FLIPPED 180 DEG ABOUT VERTICAL).",
-        f"{DATUM_REASON_NOTE}. CROWN TAP LOCATED FROM THE INNER LUG FACE (SET AT FIT-UP);",
-        "   FOOT HOLE FROM THE FOOT TIP (THE FRAME TAP IS TRANSFERRED THROUGH IT).",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
