@@ -4576,10 +4576,7 @@ kind = "custom"
 shop_made = true
 purchase = "O1 precision ground flat stock 3/32 x 3/4 x 18 in (cut into 20 mm pieces, one per stack) and a 0.001-0.031 in steel shim stock assortment (purchase approved by Pedro 2026-10-11)"
 source = "Abrams Industries O1 3/32 x 3/4 x 18 reg, $12.05 (https://us.abrams-industries.com/buy/precision-ground-flat-stock); Precision Brand 15-piece 0.001-0.031 in steel shim sheet assortment 6 x 12 in, MSC 86798816, $136.56 web price (https://www.mscdirect.com/product/details/86798816); prices read 2026-10-11"
-solids = [
-  # Basis: fixtures.strap-shim-stack.solids.stack: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1959 (fixtures.strap-shim-stack.solids.stack); retained item source Abrams Industries O1 3/32 x 3/4 x 18 reg, $12.05 (https://us.abrams-industries.com/buy/precision-ground-flat-stock); Precision Brand 15-piece 0.001-0.031 in steel shim sheet assortment 6 x 12 in, MSC 86798816, $136.56 web price (https://www.mscdirect.com/product/details/86798816); prices read 2026-10-11 work underside (S1 raw lower face; S4 S3-faced strap face, datum B); authored physical-size model {"size_mm":[20.0,12.0,2.71875]} mm, offsets zero. at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
-  { name = "stack", shape = "box", supply = "bought", shim = true, at_mm = [-10.0, -6.0, 0.0], size_mm = [20.0, 12.0, 2.71875], locates = "work underside (S1 raw lower face; S4 S3-faced strap face, datum B)", bears = "face", note = "3/32 in ground flat + shim to the measured gap M - 5.219; 2.71875 is the nominal for a 7.9375 blank (ASSUMED placeholder, checklist A1)", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
-]
+cad = "ch_rocker_arm_tl_strap_shim_stack"
 
 # Hub filing buttons for MHA-CH-006 (Pedro 2026-10-11: the rotary table cannot swing the
 # 336 mm blank, so the hub OD is stair-milled and filed to buttons). Two hardened O1 buttons
