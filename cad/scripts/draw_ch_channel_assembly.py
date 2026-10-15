@@ -197,7 +197,8 @@ def _fitup_notes() -> tuple[str, str]:
         "set-screws-driven": (
             f"NORTH END FLUSH, FLATS UP: RUN ONE {pivot_set_screw} DOWN EACH APEX "
             "TAP ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG. "
-            # Pending exception ruling: MHA-CH-008 set-screw engagement (#1371).
+            # Owner-ruled shortfall, declared as ch-channel RV-01 (the
+            # bracket's own: ch-pivot-bracket RV-01, #1371).
             f"{SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}"
         ),
         "preload-accepted": (
