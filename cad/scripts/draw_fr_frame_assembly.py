@@ -22,6 +22,7 @@ from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     place_view,
+    view_name,
     visible_component_entities,
 )
 
@@ -50,7 +51,7 @@ from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import _edge_endpoint_key
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
-from _drawing_scan import _zoomed_on
+from _drawing_scan import _HIT_ZOOM_HALF, _zoomed_on
 from _drawing_sections import create_section_view
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_tables import insert_bom_table
@@ -105,6 +106,14 @@ NAMEPLATE_END_INSET = DECK_HALF_X - NAMEPLATE_MOUNT_POS[0]
 # Machine z of the inset dimension line: on the plate's lower edge, clear of
 # its corner screw heads (z +/-42) and the deck's centre hidden lines (z +/-5).
 NAMEPLATE_INSET_LINE_Z_M = 0.025
+# Machine z stations each inset pick tries in turn, the dimension line first;
+# every one is on both edges and clear of the same screw heads and hidden lines.
+NAMEPLATE_INSET_PICK_Z_M = (NAMEPLATE_INSET_LINE_Z_M, 0.020, 0.030, 0.015, 0.035)
+# How far (model mm) a picked edge's ends may lie from the target machine x.
+# r6 (run 20261015T051440407Z) dimensioned a line 1.334 mm off its target.
+NAMEPLATE_INSET_PICK_TOLERANCE_MM = 0.05
+# swSelectType_e.swSelEDGES
+_SW_SEL_EDGES = 1
 # Sheet distance of the inset text beyond the deck end, short of the top
 # frame's hatched west rail (~10 mm beyond it at 1:3).
 NAMEPLATE_INSET_TEXT_OFFSET_M = 0.005
@@ -668,30 +677,135 @@ def _create_joint_sections(adapter: Any, front: Any) -> tuple[Any, Any]:
     return sections[0], sections[1]
 
 
+def _read_inset_pick(
+    adapter: Any, view: Any, sheet_xy: Sequence[float]
+) -> tuple[Any, str, tuple[float, float] | None]:
+    """Pick the edge drawn at ``sheet_xy`` and read back where it lies.
+
+    Returns the edge, its owner (or why there is none) and its two ends'
+    machine x in mm; edge and x are ``None`` when the pick is not a readable
+    component edge. The pick runs zoomed onto the station (``_HIT_ZOOM_HALF``),
+    so its aperture is hundredths of a millimetre instead of the fit zoom's
+    few sheet millimetres, which span both edges' neighbours at 1:3.
+    """
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    if not _early_bound(draw, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate drawing view {name!r}")
+    draw.ClearSelection2(True)
+    with _zoomed_on(adapter, sheet_xy, _HIT_ZOOM_HALF):
+        selected = draw.Extension.SelectByID2(
+            "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, null_callout(), 0
+        )
+    if not selected:
+        return None, "no edge", None
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    index = int(manager.GetSelectedObjectCount2(-1))
+    kind = int(manager.GetSelectedObjectType3(index, -1))
+    edge = manager.GetSelectedObject6(index, -1)
+    draw.ClearSelection2(True)
+    if kind != _SW_SEL_EDGES or edge is None:
+        return None, f"selection type {kind}", None
+    component = adapter._attempt(
+        lambda: _early_bound(edge, "IEntity").GetComponent(), default=None
+    )
+    if component is None:
+        return None, "edge without a component", None
+    owner = str(_early_bound(component, "IComponent2").Name2)
+    key = _edge_endpoint_key(adapter, edge)
+    if key is None:
+        return None, f"{owner} edge without curve params", None
+    transform = _component_transform(component)
+    start, end = (_transform_point(transform, key[i : i + 3]) for i in (0, 3))
+    return edge, owner, (start[0] * 1000.0, end[0] * 1000.0)
+
+
+def _pick_inset_edge(
+    adapter: Any,
+    view: Any,
+    *,
+    label: str,
+    target_mm: float,
+    stations: Sequence[tuple[float, Sequence[float]]],
+) -> Any:
+    """Return ``label``'s edge from the first ``(z, sheet_xy)`` station on target.
+
+    Every pick is read back and logged with the machine x it found, hit or
+    miss, so a wrong line explains itself; a miss moves the pick along z to
+    the next station. Fails naming every reading when none lies within
+    ``NAMEPLATE_INSET_PICK_TOLERANCE_MM`` of ``target_mm`` at both ends.
+    """
+    readings = []
+    for z_m, sheet_xy in stations:
+        edge, owner, xs = _read_inset_pick(adapter, view, sheet_xy)
+        hit = xs is not None and all(
+            abs(x - target_mm) <= NAMEPLATE_INSET_PICK_TOLERANCE_MM for x in xs
+        )
+        reading = (
+            f"z {z_m * 1000.0:g} mm sheet ({sheet_xy[0]:.5f}, {sheet_xy[1]:.5f}): "
+            f"{owner}"
+            + ("" if xs is None else f" at machine x {xs[0]:.3f}/{xs[1]:.3f} mm")
+        )
+        _telemetry.info(
+            f"nameplate inset pick {label} {reading} "
+            f"(target x {target_mm:g} mm) -> {'hit' if hit else 'miss'}"
+        )
+        if hit:
+            return edge
+        readings.append(reading)
+    raise RuntimeError(
+        f"nameplate inset {label}: no pick lies at machine x {target_mm:g} mm; "
+        f"read {'; '.join(readings)}"
+    )
+
+
 def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
     """Dimension step 9's nameplate inset from the deck end in plan section B-B.
 
-    Both edges are picked at their projected sheet stations, not as entities:
-    on this assembly section the API lists nothing. ``IView::GetVisibleComponents``
-    returned no component (r4, run 20261015T024651004Z), and
-    ``GetVisibleEntities2`` gave no edge for the drawing-component tree's shown
-    plate (r5, run 20261015T042140629Z), while the sheet prints both edges.
-    The measured value is checked against ``NAMEPLATE_END_INSET``, so a pick
-    that lands on any other line fails the sheet.
+    Both edges are picked at their projected sheet stations: on this assembly
+    section the API lists nothing. ``IView::GetVisibleComponents`` returned no
+    component (r4, run 20261015T024651004Z), and ``GetVisibleEntities2`` gave
+    no edge for the drawing-component tree's shown plate (r5, run
+    20261015T042140629Z), while the sheet prints both edges. Each pick is read
+    back to its machine x (:func:`_pick_inset_edge`) and the dimension is made
+    between the verified edges; the measured value is still checked against
+    ``NAMEPLATE_END_INSET``.
     """
-    plate_xy, deck_xy = model_points_in_view(
+    targets = (
+        ("nameplate lower edge", NAMEPLATE_MOUNT_POS[0]),
+        ("deck end", DECK_HALF_X),
+    )
+    projected = model_points_in_view(
         adapter,
         section,
         [
-            (x_mm / 1000.0, NAMEPLATE_MOUNT_POS[1] / 1000.0, NAMEPLATE_INSET_LINE_Z_M)
-            for x_mm in (NAMEPLATE_MOUNT_POS[0], DECK_HALF_X)
+            (x_mm / 1000.0, NAMEPLATE_MOUNT_POS[1] / 1000.0, z_m)
+            for _, x_mm in targets
+            for z_m in NAMEPLATE_INSET_PICK_Z_M
         ],
         label="nameplate inset stations",
-        names=("nameplate lower edge", "deck end"),
+        names=[
+            f"{name} z {z_m * 1000.0:g}"
+            for name, _ in targets
+            for z_m in NAMEPLATE_INSET_PICK_Z_M
+        ],
     )
+    count = len(NAMEPLATE_INSET_PICK_Z_M)
+    station_rows = [
+        list(zip(NAMEPLATE_INSET_PICK_Z_M, projected[i * count : (i + 1) * count]))
+        for i in range(len(targets))
+    ]
+    # The first station of each edge is on the dimension line.
+    plate_xy, deck_xy = (rows[0][1] for rows in station_rows)
     gap = math.hypot(deck_xy[0] - plate_xy[0], deck_xy[1] - plate_xy[1])
     if gap <= 0.0:
         raise RuntimeError("nameplate inset edges coincide on the sheet")
+    edges = tuple(
+        _pick_inset_edge(
+            adapter, section, label=name, target_mm=target_mm, stations=rows
+        )
+        for (name, target_mm), rows in zip(targets, station_rows)
+    )
     # Text beyond the deck end, on the dimension line: the 1:3 gap is too
     # narrow to hold it between the edges.
     text_xy = tuple(
@@ -705,6 +819,7 @@ def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
         p1=deck_xy,
         text_xy=(text_xy[0], text_xy[1]),
         label="nameplate end inset",
+        entities=edges,
     )
     return _checked_linear_dimension(
         adapter, display, expected_mm=NAMEPLATE_END_INSET, label="nameplate end inset"
