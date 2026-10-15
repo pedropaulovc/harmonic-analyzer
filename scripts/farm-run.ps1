@@ -675,12 +675,68 @@ function Select-RunRecordPath {
     return $newest.Path
 }
 
+# WMI faults that say nothing about the process queried: winmgmt cancelled the
+# call under load, is restarting, or its RPC transport dropped. On amet a
+# `Call cancelled` -Status succeeded when run again at once (2026-10-15).
+# Keyed by the HRESULT a CimException carries in ErrorData.error_Code (and
+# FullyQualifiedErrorId), named as wbemcli.h/winerror.h name them.
+$script:TransientCimFaults = @{
+    0x80041032u = 'WBEM_E_CALL_CANCELLED'
+    0x80041033u = 'WBEM_E_SHUTTING_DOWN'
+    0x80041015u = 'WBEM_E_TRANSPORT_FAILURE'
+    0x8004106Cu = 'WBEM_E_QUOTA_VIOLATION'
+    0x80043001u = 'WBEM_E_RETRY_LATER'
+    0x800706BAu = 'RPC_S_SERVER_UNAVAILABLE'
+    0x800706BEu = 'RPC_S_CALL_FAILED'
+}
+# Attempts per query, and the first pause between them (doubled each time):
+# about 4 s in all before the last fault is thrown.
+$script:CimAttempts = 5
+$script:CimRetryMilliseconds = 250
+
+function Get-Win32Process {
+    param(
+        [string]$Filter,
+        [string[]]$Property
+    )
+
+    # Every Win32_Process query goes through here. A query that fails is never
+    # an empty result: read as one, it turns a live launcher into a dead one
+    # (exit 21) or hides a run's processes from -Cancel. A transient fault is
+    # retried; anything else, or the last transient one, is thrown as is.
+    $arguments = @{ ClassName = 'Win32_Process'; ErrorAction = 'Stop' }
+    if ($Filter) {
+        $arguments['Filter'] = $Filter
+    }
+    if ($Property) {
+        $arguments['Property'] = $Property
+    }
+    for ($attempt = 1; ; $attempt++) {
+        try {
+            return @(Get-CimInstance @arguments)
+        }
+        catch [Microsoft.Management.Infrastructure.CimException] {
+            $code = $_.Exception.ErrorData.CimInstanceProperties['error_Code'].Value
+            $fault = if ($null -ne $code) { $script:TransientCimFaults[[uint32]$code] } else { $null }
+            if ($null -eq $fault -or $attempt -ge $script:CimAttempts) {
+                throw
+            }
+            $delay = $script:CimRetryMilliseconds * [math]::Pow(2, $attempt - 1)
+            Write-Warning (
+                "Win32_Process query failed with $fault ($($_.Exception.Message.Trim())); " +
+                "retry $attempt of $($script:CimAttempts - 1) in $delay ms"
+            )
+            Start-Sleep -Milliseconds $delay
+        }
+    }
+}
+
 function Test-LauncherAlive {
     param([Parameter(Mandatory)]$Record)
 
     # CIM reports CreationDate even for a protected process, where
     # Process.StartTime throws; Get-RunProcessTree reads the same field.
-    $holder = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId=$([int]$Record['pid'])" -ErrorAction SilentlyContinue
+    $holder = Get-Win32Process -Filter "ProcessId=$([int]$Record['pid'])"
     if ($null -eq $holder -or $null -eq $holder.CreationDate) {
         # Gone, or its identity cannot be read: not confirmed as the launcher.
         return $false
@@ -1001,7 +1057,7 @@ function Get-RunProcessTree {
     $startedAt = ConvertTo-UtcTimestamp -Value $Record['started_at']
     # A process CIM cannot date (a protected one) can be proven neither the
     # launcher nor the run's, and every check below compares creation times.
-    $all = @(Get-CimInstance -ClassName Win32_Process -Property ProcessId, ParentProcessId, CreationDate, CommandLine |
+    $all = @(Get-Win32Process -Property ProcessId, ParentProcessId, CreationDate, CommandLine |
             Where-Object { $null -ne $_.CreationDate })
     # With the launcher gone, its PID says nothing about who a process belongs
     # to: a direct child must also name this run on its command line -- the
@@ -1716,18 +1772,29 @@ if ($PSCmdlet.ParameterSetName -ne 'Launch') {
         }
         $listTag = if ($PSBoundParameters.ContainsKey('Tag')) { $Tag } else { $null }
         # Each operation streams its lines to stdout and sets TrackExitCode.
+        # Status and List print JSON and Watch its events, all of it parsed:
+        # a warning (a retried CIM query) goes to stderr, not into stdout.
         $script:TrackExitCode = 2
-        switch ($PSCmdlet.ParameterSetName) {
-            'List' {
-                Invoke-RunList -Directory $trackedDirectory -Tag $listTag -State $State -MaxAgeHours $MaxAgeHours
-            }
-            default {
-                $selected = Select-RunRecordPath -Directory $trackedDirectory -RunId $RunId -Tag $listTag
-                switch ($PSCmdlet.ParameterSetName) {
-                    'Status' { Invoke-RunStatus -RecordPath $selected }
-                    'Watch' { Invoke-RunWatch -RecordPath $selected -PollSeconds $PollSeconds }
-                    'Cancel' { Invoke-RunCancel -RecordPath $selected -Why $Why -BindingWaitSeconds $BindingWaitSeconds }
+        & {
+            switch ($PSCmdlet.ParameterSetName) {
+                'List' {
+                    Invoke-RunList -Directory $trackedDirectory -Tag $listTag -State $State -MaxAgeHours $MaxAgeHours
                 }
+                default {
+                    $selected = Select-RunRecordPath -Directory $trackedDirectory -RunId $RunId -Tag $listTag
+                    switch ($PSCmdlet.ParameterSetName) {
+                        'Status' { Invoke-RunStatus -RecordPath $selected }
+                        'Watch' { Invoke-RunWatch -RecordPath $selected -PollSeconds $PollSeconds }
+                        'Cancel' { Invoke-RunCancel -RecordPath $selected -Why $Why -BindingWaitSeconds $BindingWaitSeconds }
+                    }
+                }
+            }
+        } 3>&1 | ForEach-Object {
+            if ($_ -is [System.Management.Automation.WarningRecord]) {
+                [System.Console]::Error.WriteLine("WARNING: $($_.Message)")
+            }
+            else {
+                $_
             }
         }
     }
