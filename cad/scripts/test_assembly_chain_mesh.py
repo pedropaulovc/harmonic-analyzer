@@ -572,9 +572,9 @@ def test_soundness_interference_gates_get_the_chain_mounts(monkeypatch, tmp_path
         assert seen.pop("mounts") == expected
 
 
-def test_the_connecting_link_is_held_to_zero_contact(observations) -> None:
-    """It closes the loop on the straight taut run, where both its joints are
-    concentric; unlike the patterned links it may touch nothing."""
+def test_the_connecting_link_has_no_generic_chain_exemption(observations) -> None:
+    """It is not a gate chain-link family: its one T24 mesh is a bounded exact
+    pair (test_pd_paper_drive_interference_contracts); any other touch fails."""
     connecting = _link("vn-chain-connecting-link-1")
     assert not connecting.Name2.startswith(_assembly._CHAIN_LINK_PREFIXES)
     for other in (_link("vn-chain-inner-link-1"), _wheel("knob")):
@@ -584,7 +584,7 @@ def test_the_connecting_link_is_held_to_zero_contact(observations) -> None:
 
 def test_the_closing_links_sit_on_the_taut_run() -> None:
     """Stations LINK_COUNT-2 and -1 (the cut chain's closing inner link and the
-    connecting link) span the straight run: no wrap, so no sprocket mesh."""
+    connecting link) span the straight run up to the T24 tangent at pin 0."""
     taut_start = _chain.CENTRELINE_LEN - _chain.TAUT_LEN
     assert (_chain.LINK_COUNT - 2) * _chain.LINK_PITCH > taut_start
     angles = {

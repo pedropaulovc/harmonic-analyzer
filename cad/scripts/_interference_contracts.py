@@ -638,6 +638,17 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
             _SEAT_PIN_DIA, _SEAT_PIN_HOLE_DIA, _KNOB_SEAT_PIN_DEPTH
         ),
     ),
+    # Chain-mesh contact at the closing station: the MHA-VN-068 connecting
+    # link closes the chain at station 67, whose forward pin is pin 0 on the
+    # T24's pitch circle, the same seated-chain mesh the gate allows every
+    # MHA-VN-002/003 link on a mounted removable. Its family is deliberately
+    # not in _paths._CHAIN_LINK_PREFIXES, which would re-key all 373 leaves;
+    # follow-up harmonic-analyzer#1457 moves it there and deletes this row.
+    # Two bodies, 3.512 + 2.105 = 5.617 mm^3 on run 20261015T010201208Z
+    # (assembly:pd_paper_drive); the reading plus ten percent, so a deeper
+    # seat or a clash with any other part still fails.
+    frozenset(("pd-transgear-removable-1", "vn-chain-connecting-link-1")): 1.10
+    * 5.61663709,
 }
 
 # The cone-platform pivot screw now carries its full McMaster #10-24 thread
