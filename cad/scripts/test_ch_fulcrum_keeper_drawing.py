@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import math
+import re
 from pathlib import Path
+
+import pytest
 
 import build_ch_fulcrum_keeper as part
 import ch_channel_assembly_steps as steps
@@ -114,7 +117,8 @@ def test_three_place_sizes_state_their_function() -> None:
         if value == 3
     } - {"BoreDia"}  # the reamed bore carries its own band
     callouts = {**drawing.FRONT_CALLOUTS, **drawing.TOP_CALLOUTS}
-    assert set(callouts) == three_place
+    # The supplied height's callout names what it is, not a function.
+    assert set(callouts) - {"SupplyHeight"} == three_place
     assert " ".join(drawing.FRONT_CALLOUTS["LugThickness"].split()) == (
         "HOLDS CROWN TAP OUTER WALL"
     )
@@ -172,13 +176,38 @@ def test_corner_round_prints_its_max_limit_in_the_open_corner() -> None:
         assert _box_gap(block, other) >= _AIR, other
 
 
-def test_overall_height_and_bore_station_print_as_references() -> None:
+def test_overall_length_and_bore_station_print_as_references() -> None:
     spec = ch_fulcrum_keeper_spec
-    assert spec.REFERENCE_DIMENSIONS == ("BoreFromSide", "OverallHeight")
+    assert spec.REFERENCE_DIMENSIONS == ("BoreFromSide", "OverallLength")
     assert spec.DRAWING_PRECISION["BoreSideReference"] == {"BoreFromSide": 1}
-    assert spec.DRAWING_PRECISION["OverallHeightReference"] == {"OverallHeight": 1}
+    assert spec.DRAWING_PRECISION["OverallLengthReference"] == {"OverallLength": 1}
+    assert spec.OVERALL_LENGTH == 2.0 * spec.LUG_HALF_T + spec.FOOT_L == 16.5
     assert "BoreFromSide" in drawing.RIGHT_KEEP
-    assert "OverallHeight" in drawing.FRONT_KEEP
+    assert "OverallLength" in drawing.FRONT_KEEP
+
+
+def test_supply_height_prints_the_blank_minimum() -> None:
+    # MR-fleet r3: supplied undrilled and square-topped, the blank's height
+    # was printed nowhere. It must reach the crown apex of a bore at the top
+    # of the .XX LugRise band; the part models it AT that limit.
+    spec = ch_fulcrum_keeper_spec
+    assert spec.DRAWING_DIMENSIONS["SupplyHeightReference"] == {"SupplyHeight"}
+    assert spec.SUPPLY_HEIGHT_PLACES == 1
+    assert spec.SUPPLY_HEIGHT_TOL_TYPE == 5  # swTolMIN
+    assert spec.DRAWING_PRECISION["LugProfile"]["LugRise"] == 2
+    apex = spec.SHAFT_AXIS_H + 0.51 + spec.CROWN_DIA / 2.0
+    assert apex <= spec.SUPPLY_HEIGHT_MIN < apex + 0.1
+    assert spec.SUPPLY_HEIGHT_MIN == 32.8
+    assert "SupplyHeight" not in spec.REFERENCE_DIMENSIONS
+    assert drawing.FRONT_CALLOUTS["SupplyHeight"] == spec.SUPPLY_HEIGHT_CALLOUT
+    # The builder sets the MIN type on the line's own dimension (no upper
+    # deviation: any taller blank rounds down to the crown).
+    source = " ".join(Path(part.__file__).read_text(encoding="utf-8").split())
+    assert re.search(
+        r'_single_limit\( adapter, "SupplyHeightReference", "SupplyHeight", '
+        r"SUPPLY_HEIGHT_MIN, SUPPLY_HEIGHT_TOL_TYPE, 0\.0, 0\.0, \)",
+        source,
+    )
 
 
 def test_tap_and_foot_hole_station_reference_sketches() -> None:
@@ -189,7 +218,8 @@ def test_tap_and_foot_hole_station_reference_sketches() -> None:
         "FootScrewReference",
         "FootScrewSideReference",
         "BoreSideReference",
-        "OverallHeightReference",
+        "SupplyHeightReference",
+        "OverallLengthReference",
     ]
     rows = {row[0]: row for row in part.REFERENCE_LINES}
     _, plane, dimension, start, end, _, value, _ = rows["SetScrewReference"]
@@ -215,11 +245,16 @@ def test_tap_and_foot_hole_station_reference_sketches() -> None:
     assert (plane, dimension) == ("Right", "BoreFromSide")
     assert start == (spec.KEEPER_WIDTH / 2.0, spec.SHAFT_AXIS_H)
     assert end == (0.0, spec.SHAFT_AXIS_H)
-    _, plane, dimension, start, end, _, value, _ = rows["OverallHeightReference"]
-    assert (plane, dimension) == ("Front", "OverallHeight")
+    _, plane, dimension, start, end, _, value, _ = rows["SupplyHeightReference"]
+    assert (plane, dimension) == ("Front", "SupplyHeight")
     assert start == (-spec.LUG_HALF_T, 0.0)
-    assert end == (-spec.LUG_HALF_T, spec.CROWN_TOP_Y)
-    assert value == spec.CROWN_TOP_Y
+    assert end == (-spec.LUG_HALF_T, spec.SUPPLY_HEIGHT_MIN)
+    assert value == spec.SUPPLY_HEIGHT_MIN
+    _, plane, dimension, start, end, _, value, _ = rows["OverallLengthReference"]
+    assert (plane, dimension) == ("Front", "OverallLength")
+    assert start == (-spec.LUG_HALF_T, 0.0)
+    assert end == (spec.FOOT_TIP_X, 0.0)
+    assert value == spec.OVERALL_LENGTH
 
 
 def test_keeper_tap_spec_for_the_frame() -> None:
@@ -253,12 +288,30 @@ def test_print_carries_no_datums_or_frames_and_cites_the_fitup_steps() -> None:
     pair_ream = steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].endswith(f"PER {pair_ream}")
     assert drawing.DIMENSION_CALLOUTS["CrownDia"].endswith(f"PER {pair_ream}")
-    process = " ".join(drawing.SET_SCREW_PROCESS.split())
-    assert "STAKE MOUTH 2 PLACES" in process
-    assert steps.step_ref(steps.SET_SCREWS_STAKED_KEY) in drawing.SET_SCREW_PROCESS
-    # MR-fleet r2: supplied undrilled, the crown tap that stops at the bore is
-    # cut after the pair-ream, on the bore's axis.
-    assert process.startswith("ON BORE AXIS, AFTER THE PAIR-REAM: TAP TO BORE;")
+    assert steps.step_ref(steps.SET_SCREWS_STAKED_KEY) in drawing.SET_SCREW_QUALIFIER
+    # MR-fleet r2/r3: supplied undrilled, the crown tap that stops at the bore
+    # is cut after the pair-ream, on the bore's axis; the native sizes lead.
+    assert drawing.SET_SCREW_EXTENT == "TO BORE"
+    assert drawing.SET_SCREW_QUALIFIER.splitlines()[0] == "ON BORE AXIS AFTER REAM;"
+    assert "STAKE AT ASSEMBLY PER" in drawing.SET_SCREW_QUALIFIER
+
+
+_NATIVE_TAP = {
+    5: "<hw-threaddesc> - <hw-threadclass> <hw-thru>",
+    6: "",
+    7: "<MOD-DIAM><hw-thrutapdrldia> <hw-thru>",
+    8: "",
+}
+
+
+def test_tap_callout_says_to_bore_and_closes_with_place_and_staking() -> None:
+    updated = drawing.set_screw_callout_definitions(dict(_NATIVE_TAP))
+    assert updated[7] == "<MOD-DIAM><hw-thrutapdrldia> TO BORE"
+    assert updated[5] == f"<hw-threaddesc> TO BORE\n{drawing.SET_SCREW_QUALIFIER}"
+    assert updated[6] == updated[8] == ""
+    blind = {**_NATIVE_TAP, 7: "<MOD-DIAM><hw-thrutapdrldia> <hw-deep>"}
+    with pytest.raises(RuntimeError, match="two native extents"):
+        drawing.set_screw_callout_definitions(blind)
 
 
 def test_screw_hole_seats_the_frame_side_screw() -> None:
@@ -472,12 +525,23 @@ def _value_block(xy, value, callout):
     )
 
 
+def _tap_rows() -> list[str]:
+    """The crown-tap callout as printed: native drill and thread rows (TO
+    BORE, no class), then the place, stage and staking rows."""
+    extent = drawing.SET_SCREW_EXTENT
+    return [
+        f"Ø 1.51 {extent}",
+        f"1-72 UNF {extent}",
+        *drawing.SET_SCREW_QUALIFIER.splitlines(),
+    ]
+
+
 def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
     # The three-place sizes' function rows: 3.000 above the plan out to the
     # left (MR-fleet r1), 6.000 left of the seat over the notes, 7.000 under
-    # its extension lines right of the plan. None may touch a view, a
-    # neighbour, its own extension lines, the overall height's lines or the
-    # border.
+    # its extension lines right of the plan; the supplied height's MIN left
+    # of the lug (MR-fleet r3). None may touch a view, a neighbour, its own
+    # extension lines, the supplied height's lines or the border.
     from _layout_geometry import Box, Segment, segment_box_distance
 
     spec = ch_fulcrum_keeper_spec
@@ -504,16 +568,14 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
     )
     notes = Box(0.020, 0.062 - 5 * _PITCH, 0.182, 0.062)
     foot_hole = Box(0.1035, 0.1964, 0.1469, 0.2055)  # r13 printed
-    tap = _text_block(
-        drawing.SET_SCREW_CALLOUT_XY,
-        ["Ø 1.51 THRU", *drawing.SET_SCREW_PROCESS.splitlines(), "1-72 UNF - 2B THRU"],
-    )
+    tap = _text_block(drawing.SET_SCREW_CALLOUT_XY, _tap_rows())
     keeps = {**drawing.FRONT_KEEP, **drawing.TOP_KEEP}
     callouts = {**drawing.FRONT_CALLOUTS, **drawing.TOP_CALLOUTS}
     values = {
         "SetScrewLocation": "3.000",
         "LugThickness": "6.000",
         "ScrewFromSide": "7.000",
+        "SupplyHeight": "32.8 MIN",
     }
     blocks = {
         name: _value_block(keeps[name], value, callouts[name])
@@ -527,7 +589,7 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
         "notes": notes,
         "foot-hole callout": foot_hole,
         "tap callout": tap,
-        "overall height": _text_block(drawing.FRONT_KEEP["OverallHeight"], ["(32.2)"]),
+        "overall length": _text_block(drawing.FRONT_KEEP["OverallLength"], ["(16.5)"]),
         "foot length": _text_block(drawing.FRONT_KEEP["FootLength"], ["10.5"]),
         "screw from tip": _text_block(drawing.TOP_KEEP["ScrewFromTip"], ["5.25"]),
         "corner radius": _text_block(drawing.FRONT_KEEP["CornerRadius"], ["R1.0 MAX"]),
@@ -548,17 +610,26 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
     assert blocks["LugThickness"].xmax <= lug.xmin - _AIR
     assert blocks["ScrewFromSide"].ymax <= cy - _AIR
     assert blocks["ScrewFromSide"].xmin >= plan.xmax + _AIR
-    # The (32.2) reference's dimension line and its seat and crown-top
-    # extension lines (1 mm overshoot) run between the lug and the blocks.
-    height_x = drawing.FRONT_KEEP["OverallHeight"][0]
+    assert blocks["SupplyHeight"].xmax <= lug.xmin - 0.008
+    # The supplied height's dimension line and its seat and blank-top
+    # extension lines (1 mm overshoot) run from the lug out to its block; the
+    # overall length's extension lines drop from the seat to its value.
+    height_x = drawing.FRONT_KEEP["SupplyHeight"][0]
+    supply_top = seat + spec.SUPPLY_HEIGHT_MIN * scale
     height_lines = (
-        Segment(height_x, lug.ymin, height_x, lug.ymax),
         Segment(height_x - 0.001, lug.ymin, lug.xmin - 0.001, lug.ymin),
-        Segment(height_x - 0.001, lug.ymax, lug.xmin - 0.001, lug.ymax),
+        Segment(height_x - 0.001, supply_top, lug.xmin - 0.001, supply_top),
     )
     for line in height_lines:
         for name in ("SetScrewLocation", "LugThickness"):
             assert segment_box_distance(line, blocks[name]) >= 0.003, (name, line)
+        assert segment_box_distance(line, tap) >= 0.003, line
+    length_y = drawing.FRONT_KEEP["OverallLength"][1]
+    for x in (lug.xmin, foot.xmax):
+        line = Segment(x, seat, x, length_y - 0.003)
+        for name in ("LugThickness",):
+            assert segment_box_distance(line, blocks[name]) >= 0.003, (name, line)
+        assert segment_box_distance(line, notes) >= 0.003, line
 
 
 def test_tap_callout_stands_inside_the_border_clear_of_the_plan() -> None:
@@ -570,7 +641,7 @@ def test_tap_callout_stands_inside_the_border_clear_of_the_plan() -> None:
     from _layout_geometry import Box, Segment, point_segment_distance
 
     spec = ch_fulcrum_keeper_spec
-    rows = ["Ø 1.51 THRU", *drawing.SET_SCREW_PROCESS.splitlines(), "1-72 UNF - 2B THRU"]
+    rows = _tap_rows()
     assert max(map(len, rows)) <= 24
     block = _text_block(drawing.SET_SCREW_CALLOUT_XY, rows)
     assert block.xmin >= 0.0127 + _AIR

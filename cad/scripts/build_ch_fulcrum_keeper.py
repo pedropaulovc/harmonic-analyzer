@@ -87,6 +87,7 @@ from ch_fulcrum_keeper_spec import (
     ISOMETRIC_VIEW_NOTE,
     KEEPER_WIDTH,
     LUG_HALF_T,
+    OVERALL_LENGTH,
     REFERENCE_SKETCHES,
     SCREW_FROM_SIDE,
     SCREW_FROM_TIP,
@@ -94,6 +95,8 @@ from ch_fulcrum_keeper_spec import (
     SCREW_HOLE_SPEC,
     SET_SCREW_HOLE_SPEC,
     SHAFT_AXIS_H,
+    SUPPLY_HEIGHT_MIN,
+    SUPPLY_HEIGHT_TOL_TYPE,
 )
 
 PART_NAME = "ch-fulcrum-keeper"
@@ -134,11 +137,12 @@ V_CORNER = (1.0 - math.pi / 4.0) * CORNER_R_MAX**2 * KEEPER_WIDTH
 # edge; the foot screw's two run on the seat from the foot-tip/-Z
 # side corner along the side face to the screw station and down the tip
 # face to the screw axis, so their extension lines leave the plan's outline
-# without crossing; the bore's runs on the Right plane (the end view's
-# frame) from a side face to the bore axis; the overall height's runs up
-# the lug's inner face from the seat to the crown top. ``drives`` binds the
-# value dimension, then the start point's origin anchors, to the part's
-# globals.
+# without crossing; the bore's runs on the Right plane
+# (the end view's frame) from a side face to the bore axis; the supplied
+# height's runs up the lug's inner face from the seat to the blank's least
+# top; the overall length's along the seat from the inner lug face to the
+# foot tip. ``drives`` binds the value dimension, then the start point's
+# origin anchors, to the part's globals.
 REFERENCE_LINES = (
     (
         "SetScrewReference",
@@ -181,14 +185,24 @@ REFERENCE_LINES = (
         ('"KeeperWidth" / 2', '"KeeperWidth" / 2', '"ShaftAxisH"'),
     ),
     (
-        "OverallHeightReference",
+        "SupplyHeightReference",
         "Front",
-        "OverallHeight",
+        "SupplyHeight",
         (-LUG_HALF_T, 0.0),
-        (-LUG_HALF_T, CROWN_TOP_Y),
+        (-LUG_HALF_T, SUPPLY_HEIGHT_MIN),
         "vertical",
-        CROWN_TOP_Y,
-        ('"ShaftAxisH" + "CrownDia" / 2', '"LugT" / 2'),
+        SUPPLY_HEIGHT_MIN,
+        ('"SupplyH"', '"LugT" / 2'),
+    ),
+    (
+        "OverallLengthReference",
+        "Front",
+        "OverallLength",
+        (-LUG_HALF_T, 0.0),
+        (FOOT_TIP_X, 0.0),
+        "horizontal",
+        OVERALL_LENGTH,
+        ('"LugT" + "FootL"', '"LugT" / 2'),
     ),
 )
 if tuple(row[0] for row in REFERENCE_LINES) != REFERENCE_SKETCHES:
@@ -263,23 +277,32 @@ def _hide_reference_sketches(adapter) -> None:
         raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
 
 
-def _corner_radius_max_limit(adapter) -> None:
-    """CornerRadius as the single limit "R1.0 MAX" carrying the band's
-    deviations (build_ch_pivot_bracket._corner_radius_max_limit's recipe)."""
-    lower, upper = deviations(CORNER_R_BAND)
-    _, dimension = _named_dimension(adapter, "CornerFillet", "CornerRadius")
-    label = "CornerRadius@CornerFillet"
+def _single_limit(
+    adapter,
+    feature: str,
+    name: str,
+    limit: float,
+    tol_type: int,
+    lower: float,
+    upper: float,
+) -> None:
+    """``name@feature`` as a single limit: its nominal IS the printed limit
+    (swTolMAX / swTolMIN print the nominal plus MAX / MIN), carrying the
+    deviations ``lower`` / ``upper`` mm (build_ch_pivot_bracket.
+    _corner_radius_max_limit's recipe)."""
+    _, dimension = _named_dimension(adapter, feature, name)
+    label = f"{name}@{feature}"
     value = float(dimension.SystemValue)
-    if not math.isclose(value, CORNER_R_MAX / 1000.0, abs_tol=1e-9):
+    if not math.isclose(value, limit / 1000.0, abs_tol=1e-9):
         raise RuntimeError(
-            f"{label}: nominal {value * 1000.0:.7f} is not the band's max {CORNER_R_MAX}"
+            f"{label}: nominal {value * 1000.0:.7f} is not the limit {limit}"
         )
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = CORNER_R_TOL_TYPE
+    tolerance.Type = tol_type
     if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
         raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
     if (
-        int(tolerance.Type) != CORNER_R_TOL_TYPE
+        int(tolerance.Type) != tol_type
         or not math.isclose(
             float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
         )
@@ -287,8 +310,8 @@ def _corner_radius_max_limit(adapter) -> None:
             float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
         )
     ):
-        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {CORNER_R_MAX:g} MAX")
+        raise RuntimeError(f"{label}: single-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {limit:g} (type {tol_type})")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -306,6 +329,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "CrownDia", f"{CROWN_DIA}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "CornerR", f"{CORNER_R_MAX}mm")
+    await set_global(adapter, "SupplyH", f"{SUPPLY_HEIGHT_MIN}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -526,7 +550,24 @@ async def build(adapter) -> dict[str, str]:
     # Decimal places are the tolerance statement, so the PART carries them;
     # the reamed bore's running band (BORE_DIA_BAND) is a native model tolerance.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    _corner_radius_max_limit(adapter)
+    _single_limit(
+        adapter,
+        "CornerFillet",
+        "CornerRadius",
+        CORNER_R_MAX,
+        CORNER_R_TOL_TYPE,
+        *deviations(CORNER_R_BAND),
+    )
+    # Any taller blank rounds down to the crown: no deviation either way.
+    _single_limit(
+        adapter,
+        "SupplyHeightReference",
+        "SupplyHeight",
+        SUPPLY_HEIGHT_MIN,
+        SUPPLY_HEIGHT_TOL_TYPE,
+        0.0,
+        0.0,
+    )
     set_dimension_bilateral_tolerance(
         adapter, "ShaftBoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )

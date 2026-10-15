@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 from typing import Any
 
@@ -69,6 +70,9 @@ from ch_fulcrum_keeper_spec import (
     SCREW_X,
     SET_SCREW_HOLE_SPEC,
     SET_SCREW_STATION_CALLOUT,
+    SUPPLY_HEIGHT_CALLOUT,
+    SUPPLY_HEIGHT_MIN,
+    SUPPLY_HEIGHT_TOL_TYPE,
 )
 
 
@@ -127,24 +131,27 @@ FOOT_HOLE_CALLOUT_XY = (0.126, 0.202)
 # open, and the 7.000 off the side face read as locating it); its mouth is
 # staked over the seated set screw at the channel assembly
 # (drawing-guidelines.md rule 23 (lock threaded joints exposed to operating
-# loads)'s lock, joint_retention), so the callout says both ahead of the
-# native size row.  Machinist review r13: as two 86 mm rows centred at x 50
-# the block ran 5.7 mm past the left inner border (x 12.7).  Rows of at most
-# 24 characters (~61 mm printed, 2.56 mm a character in r13) centred at x 54
-# start at x ~20, ~8 mm in from it, and end ~6 mm left of the plan's inner
-# face (x 93.5), in the band between the front view and the plan (seven rows,
-# y ~174..210, over the front view's crown top at y 162).  The tap's station
-# prints above the plan (MR-fleet r1, 991a56e: in the front view its text
-# sat 1 mm under this block's shoulder and the two read as one), so nothing
-# else stands in that band.
-SET_SCREW_PROCESS = (
-    "ON BORE AXIS, AFTER THE\n"
-    "PAIR-REAM: TAP TO BORE;\n"
-    "STAKE MOUTH 2 PLACES AT\n"
-    "ASSEMBLY PER\n"
-    f"{steps.step_ref(steps.SET_SCREWS_STAKED_KEY)}\n"
+# loads)'s lock, joint_retention).  The native sizes lead and say where they
+# stop (both "<hw-thru>" extents read TO BORE; the thread class is the title
+# block's), and the place, stage and staking step close the thread's own
+# part (draw_ch_pivot_bracket's apex tap; MR-fleet r3, cb6e11e: seven rows
+# mixing sequence, staking and size buried the thread on the last row).
+# Machinist review r13: as two 86 mm rows centred at x 50 the block ran
+# 5.7 mm past the left inner border (x 12.7).  Five rows of at most 24
+# characters (~61 mm printed, 2.56 mm a character in r13) centred at x 58
+# start at x ~27, ~14 mm in from it, and end ~4 mm left of the plan's inner
+# face (x 93.5), in the band between the front view and the plan.  The tap's
+# station prints above the plan (MR-fleet r1, 991a56e: in the front view its
+# text sat 1 mm under this block's shoulder and the two read as one), so
+# nothing else stands in that band.
+SET_SCREW_EXTENT = "TO BORE"
+SET_SCREW_QUALIFIER = (
+    "ON BORE AXIS AFTER REAM;\n"
+    "STAKE AT ASSEMBLY PER\n"
+    f"{steps.step_ref(steps.SET_SCREWS_STAKED_KEY)}"
 )
-SET_SCREW_CALLOUT_XY = (0.054, 0.192)
+SET_SCREW_CALLOUT_XY = (0.058, 0.196)
+_THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
 # The two keepers' bores are drilled and reamed through in one pass at their
 # installed spacing (one straight line whatever LugRise prints) and each crown
 # is then rounded about its own bore: bench instructions of the pair-ream
@@ -160,7 +167,12 @@ DIMENSION_CALLOUTS = {
 # the set screw on its shaft flat; the lug thickness holds the tap's outer
 # web (MR-fleet r1: chained with the station it read as doing no work); the
 # foot hole's side station centres the transferred frame tap in its web.
-FRONT_CALLOUTS = {"LugThickness": LUG_THICKNESS_CALLOUT}
+# The supplied blank's least height states what it is (MR-fleet r3: the
+# square-topped blank's height was printed nowhere).
+FRONT_CALLOUTS = {
+    "LugThickness": LUG_THICKNESS_CALLOUT,
+    "SupplyHeight": SUPPLY_HEIGHT_CALLOUT,
+}
 TOP_CALLOUTS = {
     "SetScrewLocation": SET_SCREW_STATION_CALLOUT,
     "ScrewFromSide": FOOT_SCREW_SIDE_CALLOUT,
@@ -169,10 +181,13 @@ TOP_CALLOUTS = {
 # Per-view survivors of the marked-dimension import: parametric name ->
 # sheet position.  The front view carries the lug thickness chained left of
 # the foot length below the seat, its text and function out to the left
-# over the notes; the overall height (a reference) left of the lug; the foot
-# height right of the foot tip; the foot-to-lug corner's R MAX up in the open
-# corner, ~16 mm along the foot and up the lug (the ch_pivot_bracket
-# placement), so its leader runs through the round's centre onto the arc.
+# over the notes, and under both the overall length (a reference, MR-fleet
+# r3: the chain printed no overall), ~8 mm above the notes; the supplied
+# height (single limit MIN) left of the lug, its block ~10 mm off the lug's
+# inner face; the foot height right of the foot tip; the foot-to-lug
+# corner's R MAX up in the open corner, ~16 mm along the foot and up the lug
+# (the ch_pivot_bracket placement), so its leader runs through the round's
+# centre onto the arc.
 # The plan carries the crown tap's station off the inner lug face above the
 # plan, its text and function out to the left under the sheet border
 # (MR-fleet r1: in the front view its extension line off the tap axis ended
@@ -185,8 +200,9 @@ TOP_CALLOUTS = {
 FRONT_KEEP = {
     "LugThickness": (0.066, 0.086),
     "FootLength": (_front_x(SCREW_X), 0.086),
+    "OverallLength": (FRONT_CENTER[0], 0.075),
     "FootRise": (0.140, 0.106),
-    "OverallHeight": (0.080, FRONT_CENTER[1]),
+    "SupplyHeight": (0.064, FRONT_CENTER[1]),
     "CornerRadius": (0.122, 0.130),
 }
 TOP_KEEP = {
@@ -234,31 +250,95 @@ def _one(adapter: Any, annotations: list[Any], name: str) -> Any:
     return matches[0]
 
 
+def _require_single_limit(
+    adapter: Any, annotations: list[Any], name: str, tol_type: int, limit_mm: float
+) -> Any:
+    """Prove ``name`` prints the part's single limit: measuring ``limit_mm``
+    and carrying the native swTolMAX / swTolMIN type the part set."""
+    annotation = _early_bound(_one(adapter, annotations, name), "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(tolerance.Type) != tol_type:
+        raise RuntimeError(
+            f"{name} lost its native single-limit type {tol_type}: {int(tolerance.Type)}"
+        )
+    if not math.isclose(float(dimension.SystemValue), limit_mm / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(f"{name} does not measure its {limit_mm:g} mm limit")
+    _telemetry.info(
+        f"{name}: text {display.GetText(1)!r}, single-limit type {tol_type}"
+    )
+    return display
+
+
 @_telemetry.traced("drawing.fulcrum_keeper.corner_radius")
 def _dress_corner_radius(adapter: Any, annotations: list[Any]) -> None:
     """Prove the front view's CornerRadius prints the part's R MAX and stop
     its leader at the arc (draw_ch_pivot_bracket's corner radius).
 
-    Read back: measuring CORNER_R_MAX, the native swTolMAX the part set.
     ``ArcExtensionLineOrOppositeSide`` False keeps the leader from running on
     through the arc into the part.
     """
-    annotation = _early_bound(_one(adapter, annotations, "CornerRadius"), "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    if int(tolerance.Type) != CORNER_R_TOL_TYPE:
-        raise RuntimeError(
-            f"CornerRadius lost its native MAX type: {int(tolerance.Type)}"
-        )
-    if not math.isclose(
-        float(dimension.SystemValue), CORNER_R_MAX / 1000.0, abs_tol=1e-9
-    ):
-        raise RuntimeError("CornerRadius does not measure the corner fillet")
+    display = _require_single_limit(
+        adapter, annotations, "CornerRadius", CORNER_R_TOL_TYPE, CORNER_R_MAX
+    )
     display.ArcExtensionLineOrOppositeSide = False
     if bool(display.ArcExtensionLineOrOppositeSide):
         raise RuntimeError("CornerRadius leader still runs to the opposite side")
-    _telemetry.info(f"corner radius: text {display.GetText(1)!r}, MAX type")
+
+
+def set_screw_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Rewrite the native crown-tap callout's definition parts (5..8).
+
+    Both ``<hw-thru>`` extents become TO BORE, the thread class goes (the
+    title block states it), and the place, stage and staking step close the
+    thread's own part, which prints last (draw_ch_pivot_bracket's
+    set_screw_callout_definitions). Every Hole Wizard size variable stays.
+    """
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected tap callout parts: {definitions!r}")
+    if "\n".join(definitions.values()).count("<hw-thru>") != 2:
+        raise RuntimeError(f"tap callout lacks its two native extents: {definitions!r}")
+    updated = {
+        part: text.replace("<hw-thru>", SET_SCREW_EXTENT)
+        for part, text in definitions.items()
+    }
+    thread_parts = [
+        part for part, text in updated.items() if "<hw-threadclass>" in text.lower()
+    ]
+    if len(thread_parts) != 1:
+        raise RuntimeError(f"tap thread line is not in one callout part: {updated!r}")
+    part = thread_parts[0]
+    without_class = re.sub(r" {2,}", " ", _THREAD_CLASS.sub(" ", updated[part]))
+    updated[part] = f"{without_class.rstrip()}\n{SET_SCREW_QUALIFIER}"
+    return updated
+
+
+@_telemetry.traced("drawing.fulcrum_keeper.tap_callout_text")
+def _set_tap_callout_text(display: Any) -> None:
+    """Write the rewritten definitions and prove they persisted."""
+    native = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = set_screw_callout_definitions(definitions)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            native.SetText(writable_part, updated[definition_part])
+    persisted = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved = {part: str(native.GetText(part) or "") for part in (1, 2, 3, 4)}
+    joined = "\n".join(resolved.values())
+    if (
+        persisted != updated
+        or joined.count(SET_SCREW_EXTENT) != 2
+        or "2B" in joined
+        or not any(
+            text.rstrip().endswith(SET_SCREW_QUALIFIER) for text in resolved.values()
+        )
+    ):
+        raise RuntimeError(
+            "crown tap callout text did not persist: "
+            f"definitions={persisted!r}, resolved={resolved!r}"
+        )
+    _telemetry.info(f"crown tap callout: {resolved!r}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -340,6 +420,13 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
     _dress_corner_radius(adapter, front_annotations)
+    _require_single_limit(
+        adapter,
+        front_annotations,
+        "SupplyHeight",
+        SUPPLY_HEIGHT_TOL_TYPE,
+        SUPPLY_HEIGHT_MIN,
+    )
     set_dimension_callouts(adapter, top_annotations, TOP_CALLOUTS)
     kept = [*front_annotations, *right_annotations]
     for name in REFERENCE_DIMENSIONS:
@@ -362,14 +449,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # Crown set-screw tap: the plan sees it end-on at the crown top on the
     # lug mid-plane; its callout sits in the band between the front view
     # and the plan, left of both.
-    add_native_hole_callout(
+    tap_callout = add_native_hole_callout(
         adapter,
         top,
         edge_xy=(TAP_X_SHEET - TAP_R_SHEET, TOP_CENTER[1]),
         callout_xy=SET_SCREW_CALLOUT_XY,
         label="crown set-screw tap",
-        process=SET_SCREW_PROCESS,
     )
+    _set_tap_callout_text(tap_callout)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)
     add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.150)
 

@@ -273,7 +273,7 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
         f"PER {steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)}"
     )
     staking = steps.step_ref(steps.SET_SCREWS_STAKED_KEY)
-    assert staking in keeper_drawing.SET_SCREW_PROCESS
+    assert staking in keeper_drawing.SET_SCREW_QUALIFIER
 
 
 def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:

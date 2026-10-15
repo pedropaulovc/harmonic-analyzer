@@ -31,7 +31,7 @@ underside x -3..+13.5 is the flat seat.
 
 from __future__ import annotations
 
-from math import hypot, sqrt
+from math import ceil, hypot, sqrt
 
 from _fit_shaft_h import SHAFT_H
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
@@ -347,19 +347,22 @@ if KEEPER_TAP_SPEC.depth_mm - _BAND_BY_PLACES[1] < (
 # the set-screw tap's station off the inner lug face and the foot screw's
 # stations off the foot tip and a side face are manufacturing dimensions no
 # feature measures (both holes are placed by point), so a one-line
-# construction sketch carries each. Two more carry REFERENCE_DIMENSIONS: the
-# bore's place across the width (the pair-ream setup puts it there) and the
-# overall height (shaft axis plus crown radius). The part saves them
-# blanked; the drawing shows the tap's and the foot screw's stations in the
-# plan, the height in the front view and the bore's place in the end view.
+# construction sketch carries each. Three more: the bore's place across the
+# width (a REFERENCE_DIMENSIONS entry: the pair-ream setup puts it there),
+# the overall length lug face to foot tip (a reference: the lug thickness and
+# foot length chain it) and the supplied blank's height (SUPPLY_HEIGHT_MIN).
+# The part saves them blanked; the drawing shows the tap's and the foot
+# screw's stations in the plan, the length and height in the front view and
+# the bore's place in the end view.
 REFERENCE_SKETCHES = (
     "SetScrewReference",
     "FootScrewReference",
     "FootScrewSideReference",
     "BoreSideReference",
-    "OverallHeightReference",
+    "SupplyHeightReference",
+    "OverallLengthReference",
 )
-REFERENCE_DIMENSIONS = ("BoreFromSide", "OverallHeight")
+REFERENCE_DIMENSIONS = ("BoreFromSide", "OverallLength")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. The wizard screw hole and the crown tap ship as native hole
@@ -375,7 +378,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootScrewReference": {"ScrewFromTip"},
     "FootScrewSideReference": {"ScrewFromSide"},
     "BoreSideReference": {"BoreFromSide"},
-    "OverallHeightReference": {"OverallHeight"},
+    "SupplyHeightReference": {"SupplyHeight"},
+    "OverallLengthReference": {"OverallLength"},
     "CornerFillet": {"CornerRadius"},
 }
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL
@@ -390,7 +394,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # outer web (SET_SCREW_WEB_MM), and the side station centres the transferred
 # MHA-FR-002 tap in its rail web (KEEPER_SCREW_TRANSVERSE_BAND_MM,
 # build_fr_top_frame). The references print one place; the corner round
-# prints its single limit at CORNER_R_PLACES.
+# prints its single limit at CORNER_R_PLACES, the supplied height its own at
+# SUPPLY_HEIGHT_PLACES.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LugProfile": {"LugRise": 2},
     "LugBody": {"LugThickness": 3},
@@ -402,7 +407,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FootScrewReference": {"ScrewFromTip": 2},
     "FootScrewSideReference": {"ScrewFromSide": 3},
     "BoreSideReference": {"BoreFromSide": 1},
-    "OverallHeightReference": {"OverallHeight": 1},
+    "SupplyHeightReference": {"SupplyHeight": 1},
+    "OverallLengthReference": {"OverallLength": 1},
     "CornerFillet": {"CornerRadius": CORNER_R_PLACES},
 }
 # The function each three-place size serves, printed under it.
@@ -432,6 +438,31 @@ if DRAWING_PRECISION["LugCrownProfile"]["CrownDia"] != 1:
 KEEPER_SCREW_TRANSVERSE_BAND_MM = _BAND_BY_PLACES[
     DRAWING_PRECISION["FootScrewSideReference"]["ScrewFromSide"]
 ]
+# The keeper is supplied square-topped (BORE_PAIR_CALLOUT: undrilled) and
+# the pair-ream step rounds each crown about its own bore (MR-fleet r3,
+# cb6e11e: the blank's height was printed nowhere). The blank must reach the
+# crown apex of a bore at the top of its printed LugRise band; taller, the
+# round cuts the rest away. The SupplyHeightReference line runs up the inner
+# lug face AT the limit and prints the single limit "32.8 MIN" (swTolMIN
+# prints the nominal, so nominal = limit).
+SUPPLY_HEIGHT_PLACES = DRAWING_PRECISION["SupplyHeightReference"]["SupplyHeight"]
+_SUPPLY_STEP = 10.0**-SUPPLY_HEIGHT_PLACES
+SUPPLY_HEIGHT_MIN = round(
+    ceil(
+        (SHAFT_AXIS_H + _BAND_BY_PLACES[DRAWING_PRECISION["LugProfile"]["LugRise"]] + CROWN_DIA / 2.0)
+        / _SUPPLY_STEP
+        - 1e-9
+    )
+    * _SUPPLY_STEP,
+    SUPPLY_HEIGHT_PLACES,
+)  # 32.8
+SUPPLY_HEIGHT_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "32.8 MIN"
+SUPPLY_HEIGHT_CALLOUT = "SUPPLY HEIGHT,\nSQUARE TOP"
+if not CROWN_TOP_Y < SUPPLY_HEIGHT_MIN:
+    raise AssertionError("the supplied blank does not reach the crown apex")
+# Overall length, inner lug face to foot tip (MR-fleet r3: only the chained
+# lug thickness and foot length printed it).
+OVERALL_LENGTH = 2.0 * LUG_HALF_T + FOOT_L  # 16.5
 
 # True free-text instructions only (native dims and callouts carry the rest;
 # the bore's pair reaming is its callout, BORE_PAIR_CALLOUT). The material
