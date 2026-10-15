@@ -45,6 +45,12 @@ def _view_boxes() -> dict[str, tuple[float, float, float, float]]:
             draw.RIGHT_CENTER[0] + depth,
             draw.RIGHT_CENTER[1] + right_h,
         ),
+        "section A-A": (
+            draw.SECTION_CENTER[0] - spec.PLATE_THICKNESS * draw._SECTION_S / 2.0,
+            draw.SECTION_CENTER[1] - draw.SECTION_SPAN * draw._SECTION_S,
+            draw.SECTION_CENTER[0] + spec.PLATE_THICKNESS * draw._SECTION_S / 2.0,
+            draw.SECTION_CENTER[1] + draw.SECTION_SPAN * draw._SECTION_S,
+        ),
     }
 
 
@@ -59,7 +65,7 @@ def test_registry_row_names_the_platen_sheet():
 
 
 def test_views_keep_exactly_the_marked_dimensions_once():
-    keeps = (draw.FRONT_KEEP, draw.RIGHT_KEEP)
+    keeps = (draw.FRONT_KEEP, draw.RIGHT_KEEP, draw.SECTION_KEEP_NAMES)
     names = [name for keep in keeps for name in keep]
     assert len(names) == len(set(names))
     assert set(names) == set().union(*spec.DRAWING_DIMENSIONS.values())
@@ -101,10 +107,20 @@ def test_counterbore_floor_holds_the_user_accepted_worst_case():
     assert spec.CBORE_FLOOR == pytest.approx(spec.PLATE_THICKNESS - spec.CBORE_DEPTH)
     # The reference line crosses the floor's annulus, clear of the through hole
     # and inside the counterbore, so it measures metal.
-    offset = spec.CBORE_FLOOR_REFERENCE_Y - spec.GUIDE_HOLE_Y[0]
+    offset = spec.CBORE_SECTION_HOLE_Y - spec.CBORE_FLOOR_REFERENCE_Y
     assert spec.GUIDE_HOLE_DIA / 2.0 < offset < spec.CBORE_DIA / 2.0
+    assert (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y) in spec.GUIDE_HOLE_XY
     assert spec.DRAWING_DIMENSIONS["CboreFloorReference"] == {draw.REFERENCE_DIMENSION}
-    assert draw.REFERENCE_DIMENSION in draw.RIGHT_KEEP
+    # Section A-A draws the counterbore (r4: not hidden lines in the right
+    # view), and its partial cut spans the whole counterbore.
+    assert draw.SECTION_KEEP_NAMES == {draw.REFERENCE_DIMENSION}
+    assert draw.REFERENCE_DIMENSION not in draw.RIGHT_KEEP
+    assert draw.SECTION_SPAN > spec.CBORE_DIA / 2.0
+    assert {point[:2] for point in draw.SECTION_LINE_MODEL_MM} == {
+        (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y - draw.SECTION_SPAN),
+        (spec.CBORE_SECTION_X, spec.CBORE_SECTION_HOLE_Y + draw.SECTION_SPAN),
+    }
+    assert "HIDDEN" not in spec.RIGHT_VIEW_NOTE
     assert draw.REFERENCE_DIMENSION in draw.DIMENSION_CALLOUTS_BELOW
     # The sheet states the accepted shortfall at the floor, from the same
     # constant this test pins.
@@ -123,6 +139,8 @@ def test_one_centre_mark_per_hole_per_plan_view():
 
 def test_hole_callouts_name_their_mating_patterns():
     assert "MHA-PD-011" in draw.GUIDE_CALLOUT_PROCESS
+    # Four callout rows at most: the Ø line, two process rows, the C'BORE row.
+    assert draw.GUIDE_CALLOUT_PROCESS.count("\n") == 2
     assert "MHA-PD-003" in draw.SOCKET_CALLOUT_PROCESS
     # The counterbore depth's .XXX sinks a named screw's head.
     assert _config.parts("vn-fillister-screw")["number"] in draw.GUIDE_CALLOUT_PROCESS
@@ -205,6 +223,12 @@ def test_views_and_annotations_stay_in_the_field():
         draw.RIGHT_NOTE_XY,
         draw.GUIDE_CALLOUT_XY,
         draw.SOCKET_CALLOUT_XY,
+        draw.SECTION_CAPTION_XY,
+        # The floor value 2.5 under the cut's lower end (+Y up, centred).
+        (
+            draw.SECTION_CENTER[0],
+            draw.SECTION_CENTER[1] - (draw.SECTION_SPAN + 2.5) * draw._SECTION_S,
+        ),
     ]
     for xy in points:
         assert _inside(xy, BORDER), xy

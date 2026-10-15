@@ -7,8 +7,9 @@ bows.  The sheet runs at 3:1: the plan (front view) carries the blank (the
 length, the bridge's two ends from the near end, the hole row, the screw
 rail's and the overall width from the outer edge, the slit, the corner radii,
 the hole stations), the profile (top view) above it the bows' rise and, as
-references, their eight tangent stations from the near end, their radius, the
-developed finger and the sheet stock; a 2:1 isometric shows the form.
+references, the four stations where the bows leave and rejoin the flat, their
+radius, the developed finger and the sheet stock; a 2:1 isometric shows the
+form.
 
 Every printed dimension is an associative model dimension whose places the
 part authors (``build_pd_platen_clip.DRAWING_PRECISION``); the overall width,
@@ -63,6 +64,7 @@ from build_pd_platen_clip import (
     CLIP_LENGTH,
     CLIP_WIDTH,
     DRAWING_DIMENSIONS,
+    DRAWN_TANGENT_STATIONS,
     DRAWING_PRECISION_BY_NAME,
     FAR_CREST_X,
     FLAT_FINGER_LENGTH,
@@ -75,7 +77,6 @@ from build_pd_platen_clip import (
     SCREW_RAIL_WIDTH,
     SHEET_T,
     SPRING_RAIL_Y0,
-    TANGENT_STATIONS,
 )
 
 
@@ -99,9 +100,9 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0  # sheet m per model mm, 3:1
 # Sheet layout (meters; the B-size field is x 0.0127..0.4191, y 0.0127..0.2667
 # and the title block holds x >= 0.216, y <= 0.066).  The plan (250.5 x 34.1
 # at 3:1) sits mid-sheet with its hole stations below and its bridge and
-# length above; the profile, third-angle above it, hangs its eight tangent
-# stations between the two and carries the developed finger and the bend
-# radius above itself; the 2:1 isometric runs down-right in the free field
+# length above; the profile, third-angle above it, hangs its four bow stations
+# between the two and carries the developed finger and the bend radius above
+# itself; the 2:1 isometric runs down-right in the free field
 # bottom-centre, clear of the title block and of the plan's left-side texts,
 # its note in the empty corner above it.
 FRONT_CENTER = (0.200, 0.140)
@@ -145,15 +146,18 @@ HOLE_FAR_X = CLIP_LENGTH - HOLE_INSET
 # (smallest nearest), the spring rail's width in a column of its own beside
 # its span.  Each of those texts stands past its own span's end, so no
 # dimension or extension line runs through it: the hole row's below the
-# plan, the screw rail's below that and left of the hole row's text, the
-# spring rail's and the overall width's above the plan.  The outer and the
-# slit-side corner radii stand off the right end.
+# plan, the screw rail's below that, the spring rail's and the overall
+# width's above the plan.  A vertical dimension's text ends at its own
+# dimension line (r4), so each column is its text's right end: the hole
+# row's text stands right of the screw rail's line, the spring rail's right
+# of the overall width's text, and the overall width's inside the border.
+# The outer and the slit-side corner radii stand off the right end.
 _BELOW_PLAN_ROWS = (0.116, 0.110)
 _ABOVE_PLAN_ROWS = (0.172, 0.178, 0.184)
-_HOLE_ROW_COLUMN = 0.0585
-_RAIL_COLUMN = 0.042
-_SPRING_RAIL_COLUMN = 0.050
-_OVERALL_COLUMN = 0.024
+_HOLE_ROW_COLUMN = 0.0715
+_RAIL_COLUMN = 0.051
+_SPRING_RAIL_COLUMN = 0.066
+_OVERALL_COLUMN = 0.030
 FRONT_KEEP = {
     "LeftX": (_plan_x(HOLE_INSET / 2.0), _BELOW_PLAN_ROWS[0]),
     "RightX": (_plan_x(HOLE_FAR_X / 2.0), _BELOW_PLAN_ROWS[1]),
@@ -161,7 +165,7 @@ FRONT_KEEP = {
     "BridgeX1": (_plan_x(BRIDGE_X1 / 2.0), _ABOVE_PLAN_ROWS[1]),
     "Length": (FRONT_CENTER[0], _ABOVE_PLAN_ROWS[2]),
     "LeftZ": (_HOLE_ROW_COLUMN, 0.1120),
-    "RailWidth": (_RAIL_COLUMN, 0.0930),
+    "RailWidth": (_RAIL_COLUMN, 0.0900),
     "SpringRailWidth": (_SPRING_RAIL_COLUMN, 0.1652),
     "OverallWidth": (_OVERALL_COLUMN, 0.1625),
     # The slit's dimension line stands inside the slit just short of its
@@ -173,21 +177,33 @@ FRONT_KEEP = {
     "EndR1": (0.345, 0.112),
     "SlitCornerR1": (0.355, 0.158),
 }
-# Profile: the eight tangent stations stack below it from the near end,
-# smallest nearest, so no station's extension line crosses another's
-# dimension line; each value stands just short of its own station, where no
-# other station's extension line and no neighbour's value reaches.  The
-# developed finger stands above it, the bend radius above the far crown (its
-# leader stops on the crown), the rise off the far end and the sheet off the
-# near end.
-_STATION_TEXT_INSET = 0.009
+# Profile: the four bow stations (where the bows leave and rejoin the flat)
+# stack below it from the near end, smallest nearest, so no station's
+# extension line crosses another's dimension line; each value stands just
+# short of its own station, its arrows outside, clear of the previous
+# station's outside arrow.  The developed finger stands above it, the bend
+# radius above the far crown (its leader stops on the crown), the rise off the
+# far end and the sheet off the near end.
+_STATION_ROW_PITCH = 0.008
 _STATION_ROWS = tuple(
-    PROFILE_BOTTOM_Y - 0.0075 - 0.0052 * index for index in range(len(TANGENT_STATIONS))
+    PROFILE_BOTTOM_Y - 0.0075 - _STATION_ROW_PITCH * index
+    for index in range(len(DRAWN_TANGENT_STATIONS))
 )
+# A reference station's printed width ("(76.310)": 16.4 mm, r4's audit) and
+# the air between its right end and its own station.
+_STATION_CHAR_WIDTH = 0.00205
+_STATION_TEXT_GAP = 0.001
+
+
+def _station_text_x(name: str, x: float) -> float:
+    text = f"({x:.{DRAWING_PRECISION_BY_NAME[name]}f})"
+    return _plan_x(x) - _STATION_TEXT_GAP - len(text) * _STATION_CHAR_WIDTH / 2.0
+
+
 TOP_KEEP = {
     **{
-        name: (_plan_x(x) - _STATION_TEXT_INSET, row)
-        for (name, x, _drive), row in zip(TANGENT_STATIONS, _STATION_ROWS)
+        name: (_station_text_x(name, x), row)
+        for (name, x, _drive), row in zip(DRAWN_TANGENT_STATIONS, _STATION_ROWS)
     },
     "CrestRise": (RIGHT_EDGE_X + 0.008, _profile_y(ARCH_RISE / 2.0)),
     "FlatFinger": (_plan_x(BRIDGE_X0 - FLAT_FINGER_LENGTH / 2.0), 0.2555),
@@ -224,15 +240,15 @@ DIMENSION_AFFIXES = {
     )
     for name in sorted({*_COUNTS, *REFERENCE_DIMENSIONS})
 }
-# What each callout-bearing size is for: the hole row's and the screw rail's
-# .XXX keep the hole's walls to the edge and to the slit; the sheet is the
-# stock's; the slit and the spring rail end in full rounds; the developed
-# finger is measured along the bows from the bridge to the tip, not across
-# the formed profile (r2 read it as a span); the rise is each bow's crest
-# height.
+# What each callout-bearing size is for: the screw rail's .XXX width (edge to
+# slit) holds the wall between the hole and the slit, which .XX would thin
+# under the 1.5 floor (r4); the hole row's prints bare, since a label beside
+# a centre-to-edge line read as a wall size (r4).  The sheet is the stock's;
+# the slit and the spring rail end in full rounds; the developed finger is
+# measured along the bows from the bridge to the tip, not across the formed
+# profile (r2 read it as a span); the rise is each bow's crest height.
 DIMENSION_CALLOUTS = {
-    "LeftZ": "HOLE WALL\nTO EDGE",
-    "RailWidth": "HOLE WALL\nTO SLIT",
+    "RailWidth": "SCREW RAIL\nSETS SLIT\nWALL AT HOLE",
     "SheetDepth": "SHEET STOCK",
     "SpringRailWidth": "FULL R ENDS",
     "SlitWidth": "SLIT, FULL R END",
@@ -255,7 +271,7 @@ HOLE_EDGE_XY = (
     _plan_x(HOLE_FAR_X) + HOLE_R_SHEET * _DIAG,
     _plan_y(HOLE_Y) - HOLE_R_SHEET * _DIAG,
 )
-HOLE_CALLOUT_XY = (0.345, 0.098)
+HOLE_CALLOUT_XY = (0.360, 0.098)
 HOLE_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-002\nDRILL"
 # Where the slit-side corner radius lands (its leader target), for the layout
 # tests: the screw rail's top-right corner.

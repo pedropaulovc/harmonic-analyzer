@@ -35,7 +35,7 @@ import sys
 from _appearance import apply_material, apply_color, PANEL_BLACK
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _drawing_marks import (
     apply_drawing_properties,
@@ -44,7 +44,7 @@ from _drawing_marks import (
 )
 from _drawing_precision import apply_drawing_precision
 from _extrude import extrude_at_offset
-from _feature_tree import name_last_feature
+from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -61,11 +61,14 @@ from _sketch import (
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _holes import HoleSpec, SharedCoordinate, blind_cut_dia_mm, wizard_holes
+from _visibility import blank_reference_geometry
 from pd_platen_spec import (
     CBORE_DEPTH,
     CBORE_DIA,
     CBORE_FLOOR,
     CBORE_FLOOR_REFERENCE_Y,
+    CBORE_SECTION_PLANE,
+    CBORE_SECTION_X,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     GUIDE_HOLE_DIA,
@@ -126,6 +129,60 @@ GUIDE_PLACEMENT = [
 ]
 if [(x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X] != list(GUIDE_HOLE_XY):
     raise AssertionError("guide-hole placement assumes the y-major GUIDE_HOLE_XY order")
+
+
+def _plane_frame(adapter, name: str) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """(rotation, origin mm) of a reference plane, read back from
+    ``IRefPlane::Transform`` (build_pn_pen_v_block._plane_frame)."""
+    feature = _early_bound(_feature_by_name(adapter, name), "IFeature")
+    plane = _early_bound(feature.GetSpecificFeature2(), "IRefPlane")
+    data = [
+        float(v) for v in _read_member(_read_member(plane, "Transform"), "ArrayData")
+    ]
+    return tuple(data[0:9]), tuple(v * 1000.0 for v in data[9:12])
+
+
+async def _cbore_section_plane(adapter) -> None:
+    """Section A-A's cutting plane: the Right plane carried +X to the top row's
+    middle guide hole.  Read back against the Right plane: the same rotation
+    (so a sketch on it keeps the Right plane's (u, v) = model (-Z, Y)) and an
+    origin shifted by exactly CBORE_SECTION_X along +X."""
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    check(
+        f"create plane {CBORE_SECTION_PLANE}",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Right Plane", offset=CBORE_SECTION_X
+            )
+        ),
+    )
+    name_last_feature(adapter, CBORE_SECTION_PLANE)
+    right_rotation, right_origin = _plane_frame(adapter, "Right Plane")
+    rotation, origin = _plane_frame(adapter, CBORE_SECTION_PLANE)
+    shift = tuple(o - r for o, r in zip(origin, right_origin))
+    if any(abs(a - b) > 1e-9 for a, b in zip(rotation, right_rotation)) or any(
+        abs(s - e) > 1e-6 for s, e in zip(shift, (CBORE_SECTION_X, 0.0, 0.0))
+    ):
+        raise RuntimeError(
+            f"{CBORE_SECTION_PLANE}: rotation {rotation} / origin shift {shift} mm, "
+            f"expected the Right plane's {right_rotation} shifted "
+            f"({CBORE_SECTION_X}, 0, 0)"
+        )
+
+
+def _require_on_section_plane(adapter, sketch: str) -> None:
+    """create_sketch falls back to a standard plane when a named one fails to
+    select; the sketch's parents must name CBORE_SECTION_PLANE."""
+    feature = _early_bound(_feature_by_name(adapter, sketch), "IFeature")
+    parents = [
+        str(_early_bound(parent, "IFeature").Name)
+        for parent in (feature.GetParents() or ())
+    ]
+    if CBORE_SECTION_PLANE not in parents:
+        raise RuntimeError(
+            f"{sketch} is not on {CBORE_SECTION_PLANE}: parents {parents}"
+        )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -286,12 +343,17 @@ async def build(adapter) -> dict[str, str]:
 
     # Drawing-only counterbore-floor reference (the user-accepted rule-17
     # exception, pd_platen_spec.CBORE_FLOOR): one construction line across the
-    # floor, mid-annulus over the bottom guide row, from the back face to the
-    # counterbore's bottom.  It sits on the Right plane because the *Right view
-    # prints it (every reference sketch that imports natively sits on the plane
-    # of its view; build_dt_crank_hub).  Right (u, v) -> (-Z, Y).
+    # floor, mid-annulus below the top row's middle guide hole, from the back
+    # face to the counterbore's bottom.  It sits on section A-A's cutting
+    # plane because the drawing's section through that hole prints it (a
+    # reference sketch a derived view imports lies in its cut;
+    # build_pn_pen_v_block).  Section plane (u, v) -> (-Z, Y), as Right.
+    await _cbore_section_plane(adapter)
     floor = SketchDims()
-    check("create_sketch counterbore floor", await adapter.create_sketch("Right"))
+    check(
+        "create_sketch counterbore floor",
+        await adapter.create_sketch(CBORE_SECTION_PLANE),
+    )
     set_sketch_direct_db(adapter, True)
     floor_line = check(
         "counterbore floor reference line",
@@ -332,6 +394,7 @@ async def build(adapter) -> dict[str, str]:
     await ensure_fully_defined(adapter, "counterbore floor reference sketch")
     check("exit_sketch counterbore floor", await adapter.exit_sketch())
     name_last_feature(adapter, "CboreFloorReference")
+    _require_on_section_plane(adapter, "CboreFloorReference")
     drive_jobs += floor.apply(adapter, "CboreFloorReference")
 
     # Apply the deferred drive equations after the whole model + a rebuild
@@ -372,9 +435,11 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     # The floor reference is construction-only: saved hidden so no assembly
-    # renders it; the drawing shows it in its view through
-    # _drawing_hidden_sketches to import the floor dimension.
+    # renders it; the drawing shows it in section A-A through
+    # _drawing_hidden_sketches to import the floor dimension.  Its cutting
+    # plane is hidden too.
     blank_sketch(adapter, "CboreFloorReference")
+    blank_reference_geometry(adapter, ((CBORE_SECTION_PLANE, "PLANE"),))
     return await save_part_and_images(adapter, PART_NAME)
 
 
