@@ -128,6 +128,10 @@ def test_shim_fit_up_is_a_go_no_go_pair() -> None:
     # The leader lands on the riser seat: the edge view's bottom edge (Z0).
     bottom = drawing.EDGE_CENTER[1] - spec.STACK_HEIGHT / 2.0 * 4.0 / 1000.0
     assert abs(drawing.RISER_SEAT_TIP[1] - bottom) < 1e-9
+    # ...just inside its right end, so the leader leaves the note's right side
+    # and rises clear of its own text (layout audit: leader-through-own-text).
+    right_end = drawing.EDGE_CENTER[0] + spec.STACK_LENGTH / 2.0 * 4.0 / 1000.0
+    assert right_end - 0.004 <= drawing.RISER_SEAT_TIP[0] < right_end
 
 
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:

@@ -90,11 +90,12 @@ RISER_SEAT_NOTE = (
     f"{part_spec.FIT_UP_FEELER_NO_GO:.2f} FEELER NO-GO"
 )
 # The *Bottom edge view shows the model's +Z up, so the riser seat (Z0) is the
-# view's bottom edge, under the shim layer. The tip sits on it left of centre;
-# the note sits below-left of the view, above the manufacturing note and left
-# of the ShimThick callout.
+# view's bottom edge, under the shim layer. The tip sits on it just inside the
+# right end, past the note's right end, so the leader leaves the text's right
+# side and rises clear of it; the note sits below-left of the view, above the
+# manufacturing note and left of the ShimThick callout.
 RISER_SEAT_TIP = (
-    EDGE_CENTER[0] - 0.020,
+    EDGE_CENTER[0] + 0.038,
     EDGE_CENTER[1]
     - part_spec.STACK_HEIGHT / 2.0 * VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0,
 )
