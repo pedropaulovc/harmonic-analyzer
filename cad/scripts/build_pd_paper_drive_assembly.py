@@ -297,12 +297,14 @@ import paper_drive_geom as PAPER_GEOMETRY  # noqa: E402
 PLATE_X0_PHOTO = -inch(21, 16)  # -1-5/16 (photo fit -33.213, snapped)
 # ch30-p002 Pose Studio refit (2026-07-23): the platen's top-left reference
 # corner was hand-aligned at (-33.213, 408.054) in the current assembly. The
-# width is 300 * 0.8988 and the user-confirmed H:W ratio is 1:2, so preserving
-# that top edge puts the resized plate bottom here. The fit's z delta remains
-# ignored: a near-front view does not constrain depth. The placed PLATE_X0 is
-# this photo x snapped to the rack's mesh phasing (below, after the stud).
+# width is 300 * 0.8988 and the user-confirmed H:W ratio is 1:2. All-inch: the
+# plate hangs from the bar by its guide-hole rows, which put its top at
+# 409.575 (1.52 above the fit) so its bottom edge clears the 12T's tips. The
+# fit's z delta remains ignored: a near-front view does not constrain depth.
+# The placed PLATE_X0 is this photo x snapped to the rack's mesh phasing
+# (below, after the stud).
 PLATE_Y0 = PAPER_GEOMETRY.PLATEN_BOTTOM_Y
-PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.75
+PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.875
 
 # The platen hangs: the bar's top edge carries the top guide's underside.
 # The bar top stands 10-1/2 above the base deck (the fit-up value,
@@ -747,6 +749,48 @@ if BUSHING_RACK_AIR_WORST < 0.0:
     raise AssertionError(
         "MHA-PD-024 rear bushing enters the MHA-PD-005 rack at the printed worst case: "
         f"air {BUSHING_RACK_AIR_WORST:.4f} (R9-68)"
+    )
+
+# The 12T's toothed face runs forward from the sleeve's rear face through the
+# platen's own thickness (the teeth pass under the platen's bottom edge to the
+# disc in front of it), so its tip circle must stay under that edge. The rack
+# is soldered with its crests RACK_CREST_DROP (+-RACK_CREST_TOL) below the
+# edge; the feed sets the sleeve's axis at the rack datum's least distance
+# from the crests' pitch line; the sleeve's tips are at their largest and
+# ride up by its bore clearance and its tilt on the pin.
+from pd_paper_drive_assembly_steps import (  # noqa: E402
+    RACK_CREST_DROP,
+    RACK_CREST_TOL,
+    RACK_DATUM_MODEL_AXIS_DISTANCE_RANGE,
+)
+
+if abs(RACK_CREST_DROP - (PLATE_Y0 - RACK_TIP_Y)) > 1e-9:
+    raise AssertionError("the soldered rack's crest drop is off the placed platen")
+FEED_TIP_PLATEN_AIR_MIN = 0.1
+FEED_TIP_PLATEN_AIR_NOMINAL = PLATE_Y0 - (STUD_XY[1] + FEED.OUTSIDE_DIA / 2.0)
+FEED_TIP_PLATEN_AIR_WORST = (
+    RACK_CREST_DROP
+    - RACK_CREST_TOL
+    - (
+        (FEED.OUTSIDE_DIA + max(FEED.OUTSIDE_DIA_BAND)) / 2.0
+        - (min(RACK_DATUM_MODEL_AXIS_DISTANCE_RANGE) - FEED.MODULE_MM)
+    )
+    - CLUSTER.BORE_DIAMETRAL_CLEARANCE[1] / 2.0
+    - CLUSTER_TILT_AT_FEED_TIPS
+)
+_FEED_TEETH_Z = (
+    FEED_Z0 - FEED.FACE_WIDTH - HANGER_TILT_AT_FEED_TIPS,
+    FEED_Z0 + HANGER_TILT_AT_FEED_TIPS,
+)
+if (
+    _FEED_TEETH_Z[0] < BAR_FRONT_Z
+    and PLATE_FRONT_Z < _FEED_TEETH_Z[1]
+    and FEED_TIP_PLATEN_AIR_WORST < FEED_TIP_PLATEN_AIR_MIN
+):
+    raise AssertionError(
+        "MHA-PD-010 12T tips reach the MHA-PD-002 platen's bottom edge at the "
+        f"printed worst case: air {FEED_TIP_PLATEN_AIR_WORST:.4f} < "
+        f"{FEED_TIP_PLATEN_AIR_MIN} (nominal {FEED_TIP_PLATEN_AIR_NOMINAL:.4f})"
     )
 
 # Stack D: a bought #25 chain floated REARMOST on the thinnest knob-wheel plate
@@ -2614,9 +2658,11 @@ async def build(adapter) -> dict[str, str]:
     # edge clips, with the fitted side/top margins. The 0.25-thick sheet leaves 0.25 air
     # behind it (build_pd_platen_paper) so no face lands coplanar on the platen.
     paper_side_margin = (PLATE_WIDTH - PAPER_GEOMETRY.RECORDING_PAPER_WIDTH_MM) / 2.0
-    paper_top_margin = (
-        inch(1, 8)  # ch30-p002: the sheet's top edge sits just under the plate top
-    )
+    # ch30-p002: the sheet's top edge sits just under the plate top. 3/16, not
+    # 1/8: the platen stands 1/16 higher on its rails (pd_platen_spec
+    # GUIDE_HOLE_Y) and the sheet stays where the pen expects it
+    # (mg_wheel_group.PAPER_BOTTOM_Y / PAPER_TOP_Y).
+    paper_top_margin = inch(3, 16)
     paper = await place_component(
         adapter,
         "pd-platen-paper",

@@ -60,7 +60,12 @@ GUIDE_HOLE_X = (
 # Bottom / top rail centrelines. 1-11/32 apart: the 1-1/8 support bar
 # (pd_support_bar_spec.BAR_HEIGHT) + one 3/16 rail + a 1/32 running
 # clearance over the bottom rail (the paper-drive assembly closes the stack).
-GUIDE_HOLE_Y = (inch(1, 2), inch(1 + 27 / 32))
+# The rows sit 7/16 / 1-25/32 up from the bottom edge (not 1/2 / 1-27/32): the
+# hung platen then stands 1/16 higher on the rails, so its bottom edge clears
+# the 12T feed pinion's tips, whose toothed face runs forward through the
+# platen's thickness under that edge (build_pd_paper_drive_assembly
+# FEED_TIP_PLATEN_AIR_WORST).
+GUIDE_HOLE_Y = (inch(7, 16), inch(1 + 25 / 32))
 GUIDE_HOLE_XY = tuple((x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X)
 
 # Front-face counterbores recess the stock 4.6482 x 2.7178 fillister heads

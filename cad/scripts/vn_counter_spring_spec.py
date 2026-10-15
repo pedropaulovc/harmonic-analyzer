@@ -1,7 +1,8 @@
 """Purchased-data contract for McMaster-Carr 1330K524.
 
 Catalogue geometry comes from the verified supplier-geometry module.  The
-illustrated installed length is the actual reference mount pose.  Every length
+illustrated installed length is the calibrated reference mount pose (pinned for
+the all-inch experiment; see INSTALLED_LENGTH_MM).  Every length
 is the catalogue inside-loop measurement; the supplier display model's coil
 count is never used to infer force or spring rate.
 """
@@ -13,13 +14,19 @@ from spring_mount_geom import (
     COUNTER_INITIAL_TENSION_N,
     COUNTER_MAXIMUM_LOAD_N,
     COUNTER_RATE_N_PER_MM,
-    COUNTER_REFERENCE_POSE,
 )
 
 
 FREE_LENGTH_MM = stock.FREE_LENGTH_MM
 MAX_LENGTH_MM = stock.MAX_LENGTH_MM
-INSTALLED_LENGTH_MM = stock.validate_length_mm(COUNTER_REFERENCE_POSE.length_mm)
+# All-inch experiment: spring-calibration stamped. The analytic reference pose
+# (COUNTER_REFERENCE_POSE) re-balances to 349.4296 after the channel-lever inch
+# snap lowered the channel spring anchors 0.045, but the summing assembly still
+# places the spring at its calibrated seat (settled_spring_seats.counter_seat,
+# length 349.6944). A part built 0.265 short then overlaps the MHA-SM-004 screw
+# (farm sm-summing interference 0.0742 mm^3). Keep the pre-conversion length
+# until diagnostics/calibrate_spring_seats.py --write re-seats the bank.
+INSTALLED_LENGTH_MM = stock.validate_length_mm(349.6944335598102)
 SPRING_RATE_N_PER_MM = COUNTER_RATE_N_PER_MM
 INITIAL_TENSION_N = COUNTER_INITIAL_TENSION_N
 MAXIMUM_LOAD_N = COUNTER_MAXIMUM_LOAD_N
