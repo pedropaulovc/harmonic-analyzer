@@ -28,6 +28,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -109,8 +110,17 @@ RIGHT_CENTER = (0.276, 0.170)
 ISO_CENTER = (0.366, 0.222)
 ISO_NOTE_XY = (0.330, 0.183)
 NOTES_XY = (0.030, 0.085)
+# r4 review: the engraving DXF draws a whole slotted screw head round each
+# hole, and the drilled hole removes its centre. Stated once, under the DXF
+# rows (whose fourth row ends near y 0.064), as a fact of the part, not a
+# method: the hole wins where the two meet.
+SCREW_HEAD_NOTE = "SCREW HOLES CUT THROUGH THE ENGRAVED SCREW HEADS"
+SCREW_HEAD_NOTE_XY = (0.030, 0.061)
 SECTION_CENTER = (0.350, 0.115)
-SECTION_CAPTION_XY = (0.288, 0.100)  # the native caption's top centre
+# The native caption's top centre. r4 printed the floor reference's text
+# right-aligned on its dimension line, its "(0.800)" row 0.88 mm into a
+# caption whose top stood at 0.100; the caption now hangs 11 mm lower.
+SECTION_CAPTION_XY = (0.288, 0.089)
 
 
 def _front_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
@@ -251,6 +261,22 @@ _SECTION_CROP_CENTER = (
     (SECTION_CROP[0][1] + SECTION_CROP[1][1]) / 2.0,
 )
 _SECTION_M_PER_MM = SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
+# r4 review: the fragment's open right end read as no end at all. A long-break
+# line (thin, one Z) stands on the crop's right edge across the cut there,
+# the field's floor down to the back face, overrunning both by
+# _SECTION_BREAK_OVERRUN; the Z sits mid-thickness, one tip each side of the
+# edge (plate x, z in mm).
+_SECTION_BREAK_X = SECTION_CROP[1][0]
+_SECTION_BREAK_OVERRUN = 0.35
+_SECTION_BREAK_MID = -(FIELD_DEPTH + PLATE_THICKNESS) / 2.0
+SECTION_BREAK = (
+    (_SECTION_BREAK_X, -FIELD_DEPTH + _SECTION_BREAK_OVERRUN),
+    (_SECTION_BREAK_X, _SECTION_BREAK_MID + 0.3),
+    (_SECTION_BREAK_X + 0.25, _SECTION_BREAK_MID + 0.15),
+    (_SECTION_BREAK_X - 0.25, _SECTION_BREAK_MID - 0.15),
+    (_SECTION_BREAK_X, _SECTION_BREAK_MID - 0.3),
+    (_SECTION_BREAK_X, -PLATE_THICKNESS - _SECTION_BREAK_OVERRUN),
+)
 
 
 def _section_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
@@ -502,6 +528,49 @@ def _crop_section(adapter: Any, view: Any) -> None:
         )
 
 
+def _sketch_section_break(adapter: Any, view: Any) -> None:
+    """Draw SECTION_BREAK into A-A's own sketch as thin lines.
+
+    Projected like the crop fence (model point -> sheet -> the view sketch's
+    ModelToSketchTransform). AddToDB keeps sketch inference from snapping the
+    short Z segments onto the cut face's edges.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    view = _early_bound(view, "IView")
+    sheet_points = model_points_in_view(
+        adapter,
+        view,
+        [_mm_to_m((x, SECTION_Y, z)) for x, z in SECTION_BREAK],
+        label="section A-A break line",
+    )
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate section A-A for its break line")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in sheet_points:
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
+            "IMathPoint",
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        for index in range(len(points) - 1):
+            if sketch_manager.CreateLine(*points[index], *points[index + 1]) is None:
+                raise RuntimeError(f"section A-A break line segment {index} failed")
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="section A-A break line")
+
+
 def _place_crop_on_center(adapter: Any, view: Any) -> None:
     """Move A-A so the crop's centre (a cut-plane point) lands on SECTION_CENTER.
 
@@ -558,6 +627,7 @@ def _section(adapter: Any, front: Any) -> Any:
         raise RuntimeError(f"section A-A must keep its own {SECTION_SCALE} scale")
     _crop_section(adapter, view)
     _place_crop_on_center(adapter, view)
+    _sketch_section_break(adapter, view)
     position_section_caption(
         adapter, view, SECTION_CAPTION_XY, label="nameplate section A-A"
     )
@@ -708,6 +778,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _section_dimensions(adapter, section)
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    if add_note(adapter, SCREW_HEAD_NOTE, *SCREW_HEAD_NOTE_XY) is None:
+        raise RuntimeError("failed to place the screw-head engraving note")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     _telemetry.info("nameplate drawing views, dimensions and notes placed")
 
