@@ -242,6 +242,30 @@ def test_inventory_kit_binds_its_solids_from_the_stud_spec(tmp_path) -> None:
     assert kit["hub-filing-buttons"]["solids"] == stud.PRECHIPS_SOLIDS
 
 
+def test_inventory_kit_limit_facts_lie_inside_the_cad_bands() -> None:
+    """The kit's #1413 placeholder limits are what prechips proves the filed
+    radius from; each must be a stack the TL parts' bands accept."""
+    import tomllib
+
+    import _process_plans as plans
+
+    path = plans.PROCESS_ROOT / "shop" / "inventory.toml"
+    kit = tomllib.loads(path.read_text(encoding="utf-8"))["fixtures"][
+        "hub-filing-buttons"
+    ]
+    bands = {
+        "button_dia_limits_mm": limits(button.OD, button.OD_PLACES),
+        "button_bore_limits_mm": limits(
+            button.BORE_DIA, button.BORE_PLACES, button.BORE_BAND
+        ),
+        "pin_dia_limits_mm": limits(stud.BODY_DIA, stud.BODY_PLACES, stud.BODY_BAND),
+    }
+    for field, (low, high) in bands.items():
+        least, greatest = kit[field]["value"]
+        assert low - 1e-9 <= least <= greatest <= high + 1e-9, (field, low, high)
+    assert 0 <= kit["button_runout_mm"]["value"] <= button.OD_RUNOUT_TIR
+
+
 @pytest.mark.parametrize(
     "dashed", ["ch-rocker-arm-tl-filing-button", "ch-rocker-arm-tl-filing-stud"]
 )
