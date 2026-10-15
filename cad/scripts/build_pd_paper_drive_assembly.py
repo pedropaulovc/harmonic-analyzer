@@ -2065,8 +2065,10 @@ async def _insert_roller_chain(adapter) -> None:
     connecting link (MHA-VN-068), so the loop holds one outer link fewer than
     inner links. The pattern takes one count per inner/outer PAIR and cannot
     skip an instance, so it stops one pair short; the cut chain's last inner
-    link and the connecting link are seated at the two closing stations on the
-    straight taut run, the same way as the seeds.
+    link and the connecting link are seated at the two closing stations, the
+    same way as the seeds. The connecting link's forward pin is the seed's
+    pin 0 on the T24, so it meshes there like the outer link it replaces; the
+    gate bounds that one pair in _interference_contracts.
 
     The path MUST be one connected segment: SolidWorks never treats the 3-arc +
     taut-line contour as connected (the segments share coordinates but carry no
@@ -2171,7 +2173,7 @@ async def _insert_roller_chain(adapter) -> None:
     reledger_to_solved(adapter, outer)
 
     # The cut chain's closing inner link and the connecting link that joins
-    # it to the seed inner link, on the straight taut run.
+    # it to the seed inner link, its forward pin on the T24 at pin 0.
     await _place_chain_seed(adapter, "vn-chain-inner-link", LINK_COUNT - 2)
     await _place_chain_seed(adapter, "vn-chain-connecting-link", LINK_COUNT - 1)
 

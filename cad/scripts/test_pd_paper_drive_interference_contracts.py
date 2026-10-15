@@ -13,6 +13,7 @@ import math
 
 import pytest
 
+import _chain
 import _holes
 import _interference_contracts
 import vn_latch_hook_bracket_screw_spec as bracket_screw
@@ -203,6 +204,20 @@ def test_drive_pins_press_into_the_collar_not_the_shaft() -> None:
         assert _pair(pin, "pd-transgear-knob-shaft-1") not in allowed
 
 
+def test_connecting_link_row_is_the_closing_link_mesh_on_the_t24() -> None:
+    """MHA-VN-068 closes the loop at the last station, whose forward pin is
+    pin 0 on the knob T24's pitch circle: one bounded mesh row with the
+    removable, and no row with any chain link (link joints are clear)."""
+    x, y, _ = _chain.loop_point_tangent(_chain.LINK_COUNT * _chain.LINK_PITCH)
+    assert math.hypot(x, y) == pytest.approx(_chain.KNOB_PITCH_R, abs=1e-6)
+    rows = {
+        pair: v for pair, v in _allowed().items() if any("vn-chain" in n for n in pair)
+    }
+    pair = _pair("pd-transgear-removable-1", "vn-chain-connecting-link-1")
+    assert set(rows) == {pair}
+    assert rows[pair] == pytest.approx(1.10 * (3.51208627 + 2.10455082))
+
+
 def test_locating_dowels_press_into_the_arm_and_slip_in_the_plate() -> None:
     """MHA-VN-056 presses into the arm's blind reams over its insertion
     (length less proud), short of the floor, and slips in the plate."""
@@ -218,7 +233,6 @@ def test_locating_dowels_press_into_the_arm_and_slip_in_the_plate() -> None:
         pin = f"vn-transgear-arm-plate-locating-pin-{n}"
         assert allowed[_pair(pin, "pd-transgear-arm-1")] == pytest.approx(limit)
         assert _pair(pin, "pd-transgear-arm-plate-1") not in allowed
-
 
 
 def test_pressed_and_slip_joints_without_a_row_do_not_overlap() -> None:
