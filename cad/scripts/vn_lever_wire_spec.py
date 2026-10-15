@@ -17,8 +17,9 @@ its Ø0.8 design nominal inside the catalogue band), cut from the coil: a ~353
 long thin silhouette with no flat face, no end-face big enough to pick and no
 selectable silhouette edge, so NOTHING is a marked dimension; the SKU and the
 straight rest-run length ride the notes.  The rest-run length is COMPUTED between
-the two solved endpoints, but it is NOT a cut length: the hook and drum wrap are
-formed, and the wire trimmed, at assembly, so no developed length is needed.
+the two solved endpoints, but it is NOT a developed cut length: the source model
+deliberately omits both end terminations and the drum wrap, so their development
+allowance is unknown and the sheet stays DO NOT RELEASE until they are specified.
 """
 
 from __future__ import annotations
@@ -35,9 +36,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {}
 # computed straight-run line, then the drawing displays only the $PRPSHEET link.
 DRAWING_NOTES = "\n".join(
     (
-        f"PURCHASED WIRE: McMASTER-CARR {SKU}, Ø0.031 IN, CUT FROM COIL.",
-        "THIS SHEET SHOWS THE STRAIGHT REST RUN ONLY.",
-        "CUT OVERLENGTH; HOOK, DRUM WRAP AND TRIM AT ASSEMBLY.",
+        f"PURCHASED WIRE: McMASTER-CARR {SKU}, Ø0.031 IN.",
+        "THIS SHEET DEFINES THE STRAIGHT REST RUN ONLY.",
+        "FORMED HOOK, DRUM WRAP, AND DEVELOPED CUT LENGTH ARE NOT DEFINED BY",
+        "THE SOURCE MODEL. DO NOT RELEASE UNTIL THOSE DETAILS ARE SPECIFIED.",
     )
 )
 FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:5"

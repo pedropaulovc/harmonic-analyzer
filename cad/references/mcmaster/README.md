@@ -902,8 +902,9 @@ Catalog specifications checked on September 10, 2026:
   and `diag_build_90760A009.py` extrude the hexagon with a plain bore at the
   #8-32 basic major, so both are catalogue-only.
 - [9666K56](https://www.mcmaster.com/9666K56/) supplies both amplification
-  wires, `vn-lever-wire` (MHA-VN-066) and `vn-pen-wire` (MHA-VN-067), each
-  cut overlength from one coil, then formed and trimmed at assembly. Read live
+  wires, `vn-lever-wire` (MHA-VN-066) and `vn-pen-wire` (MHA-VN-067), both
+  cut from one coil. Their end terminations, wraps and developed cut lengths
+  are not yet modelled, so both sheets stay DO NOT RELEASE. Read live
   on October 14, 2026: lubricated 1080 spring steel music wire, ASTM A228,
   cold drawn, spring temper, phosphate coated, 261,000 psi tensile, diameter
   0.031 in with -0.001/+0.001 in tolerance, 110 ft in a 1/4 lb coil;

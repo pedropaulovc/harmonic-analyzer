@@ -50,7 +50,8 @@ def test_notes_do_not_misrepresent_the_rest_run_as_a_cut_length() -> None:
     assert "ASTM A228" not in notes
     assert "X.XX" not in notes and "X.XXX" not in notes
     # The endpoint chord is computed in the build and labelled only as the
-    # straight rest-run length; the hook/wrap are formed and trimmed at assembly.
+    # straight rest-run length; the unmodelled hook/wrap keep the sheet unreleased.
+    assert "DO NOT RELEASE" in notes
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "STRAIGHT REST-RUN LENGTH {WIRE_LEN" in part_source
     assert "NOT A CUT LENGTH" in part_source

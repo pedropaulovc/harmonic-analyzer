@@ -30,6 +30,8 @@ def test_notes_name_the_registry_sku() -> None:
     notes = vn_pen_wire_spec.DRAWING_NOTES
     (sku,) = _config.parts("vn-pen-wire")["supplier_skus"]
     assert sku in notes
+    assert "NOT A CUT" in notes
+    assert "DO NOT RELEASE" in notes
     assert "ASTM" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")

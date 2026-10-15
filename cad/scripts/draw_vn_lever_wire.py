@@ -4,8 +4,8 @@ The lever wire is a purchased Ø0.8 (0.031 in) music-wire run ~353 long -- a hai
 silhouette with no flat face, no pickable end and no selectable silhouette edge,
 so the print is note-based: nothing is a marked dimension, and the diameter +
 straight rest-run length ride the notes (the build stamps the computed length).
-That chord is not a cut length: the wire is cut overlength from the coil and
-hooked, wrapped and trimmed at assembly.
+That chord is not represented as a developed cut length because the source model
+does not define the formed hook or drum-wrap allowance.
 The wire axis is local +Y, so the FRONT view is the straight run reduced to fit
 (1:5) and the isometric confirms it is a plain straight rod.
 

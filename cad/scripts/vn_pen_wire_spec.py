@@ -22,11 +22,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # title block (x >= 0.264 m); it grows DOWNWARD from its anchor.
 DRAWING_NOTES = "\n".join(
     (
-        f"1. PURCHASED WIRE: McMASTER-CARR {SKU},",
-        "   <MOD-DIAM>0.031 IN, CUT FROM COIL.",
+        f"1. PURCHASED WIRE: McMASTER-CARR {SKU}, <MOD-DIAM>0.031 IN.",
         "2. LENGTH SHOWN IS THE STRAIGHT REST RUN, NOT A CUT",
-        "   LENGTH. CUT OVERLENGTH; RIM WRAP, EYE TIE-OFF AND",
-        "   TRIM AT ASSEMBLY.",
+        "   LENGTH.",
+        "3. RIM WRAP, EYE TIE-OFF, AND DEVELOPED CUT LENGTH ARE",
+        "   NOT DEFINED BY THE SOURCE MODEL. DO NOT RELEASE",
+        "   UNTIL THOSE DETAILS ARE SPECIFIED.",
     )
 )
 ELEVATION_VIEW_NOTE = "ELEVATION SCALE 2:1"
