@@ -217,8 +217,13 @@ if CLAMP_POSITION_BAND <= 0.0:
 # (draw_fr_harmonic_base), so at the bar the pitch may stand one .XX band
 # off, or two. The round holes' along-bar float takes up neither, so the west
 # pair (+X) are slots along the bar and the east pair (END A, -X) stay round
-# and locate it. The fit-up this relies on: all four screws enter loose, the
-# bar settles on the east pair at its height, then all four tighten.
+# and locate it. Rule 19 makes slots and fit-up a last resort; the owner chose
+# them after seeing that no loose-band geometry closes the span: a looser
+# round Ø5.41 holds the ±0.51 top-frame pitch by only 0.141 and fails the
+# ±1.02 base-socket pitch, and transfer-drilling the bar off its columns
+# makes each bar fit only its own frame. The fit-up this relies on: all four
+# screws enter loose, the bar settles on the east pair at its height, then all
+# four tighten.
 COLUMN_PITCH_PLACES = 2
 COLUMN_PITCH_DEVIATIONS = {
     "top frame socket pitch": printed_band_mm(COLUMN_PITCH_PLACES),
