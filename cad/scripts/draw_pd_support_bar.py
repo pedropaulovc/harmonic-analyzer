@@ -3,7 +3,8 @@ r"""Create the curated machinist drawing for the platen support bar (MHA-PD-007)
 A 452 x 28 x 9 steel bar clamped across the frame columns. Its BACK face
 carries the transgear pivot's flat-bottomed #8-32 tap and the latch hook's two
 #4-40 through taps on one row; its FRONT face, which the platen slides on,
-carries the four counterbored clamp-screw holes.
+carries the four clamp screws: two counterbored holes on the east column and
+two counterbored slots on the west one (owner ruling 2026-10-15, option A).
 
 * The upper view looks on the back face (model +Z, ``*Front``): the length,
   the hanger row's banded stations from the left end, each naming its mate,
@@ -13,10 +14,13 @@ carries the four counterbored clamp-screw holes.
   class left to the title block) and the top face's slide roughness.
 * The lower view looks on the front face (``*Back``, so the left end is on
   the sheet's right): the banded height, the clamp row's banded stations
-  from the same end and its banded height (ClampRowReference), the
+  from the same end and its banded height (ClampRowReference), the round
   counterbores' native callout (depth at .XX) naming the back-arc taps the
   row locates to, and the front face's slide roughness. Each
   roughness symbol has its reason beside it; the sheet has no general note.
+* Detail C looks face-on at the outer slot: the slot's and its
+  counterbore's widths and travels, the slot's width naming why it is one.
+  Section B-B cuts the inner slot across the bar for the counterbore's depth.
 * Each face view carries its caption; section A-A cuts the pivot tap across
   the bar: the banded thickness, the drill's depth limits and the full
   thread's MIN (PivotThreadReference, in the cutting plane).
@@ -34,12 +38,14 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from collections.abc import Callable
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
 
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -67,8 +73,10 @@ import _telemetry
 from _surface_finish import surface_finish_by_key
 from build_pd_support_bar import (
     BAR_LENGTH,
+    CLAMP_CBORE_DEPTH,
     CLAMP_CBORE_DIA,
-    CLAMP_ROW_X,
+    CLAMP_ROUND_X,
+    CLAMP_SLOT_X,
 )
 from pd_support_bar_spec import (
     BACK_FACE_Z,
@@ -175,7 +183,8 @@ BRACKET_CALLOUT_XY = (_face_x(BRACKET_TAP_X[1]) + 0.056, FACE_TOP + 0.031)
 TOP_FINISH_MODEL_X = -178.0
 TOP_FINISH_SYMBOL_XY = (LEFT_END + 0.030, FACE_TOP + 0.014)
 TOP_REASON_TOP = (TOP_FINISH_SYMBOL_XY[0] + 0.003, FACE_TOP + 0.032)
-FACE_CAPTION_TOP = (0.200, FACE_BOTTOM - 4.0 * ROW_STEP - 0.008)
+# Under the length line, left of the round counterbores' callout.
+FACE_CAPTION_TOP = (0.150, FACE_BOTTOM - 4.0 * ROW_STEP - 0.008)
 
 # The clamp stations from the same left (x = -226) end, on the sheet's right
 # here, shortest nearest the bar. The first two spans (5.75 and 23.25 mm on
@@ -194,21 +203,52 @@ BACK_KEEP = {
     "Height": (RIGHT_END + 0.022, BACK_TOP + 0.016),
     "ClampRowHeight": (LEFT_END - 0.010, BACK_BOTTOM - 0.008),
 }
-# The counterbores' callout stands wholly right of the hole it points at, so
-# its leader slants right, off the clamp row height's extension line. Its
-# text block centres 2.8 mm under this point, so its four lines (the mate's
-# under the size) run from ~156 down to ~136 mm: under the face view's
-# length line (160.2 mm, r7 audit text-on-line at +0.0216) and over the bar.
-CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROW_X)) + 0.047, BACK_TOP + 0.017)
+# The round counterbores' callout stands over the east pair, its leader
+# dropping to the inner one, between the face view's caption and the bar
+# height's text. Its text block centres 2.8 mm under this point, so its four
+# lines (the mate's under the size) run from ~156 down to ~136 mm: under the
+# face view's length line (160.2 mm, r7 audit text-on-line at +0.0216) and
+# over the bar.
+CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROUND_X)) - 0.005, BACK_TOP + 0.017)
 # The front face's slide roughness, seen face-on: a leader to a point clear
-# of the holes, the symbol above the view.
-FRONT_FINISH_MODEL_XY = (-150.0, 6.0)
-FRONT_FINISH_SYMBOL_XY = (0.252, BACK_TOP + 0.014)
+# of the holes, the symbol above the view, left of the counterbores' callout.
+FRONT_FINISH_MODEL_XY = (-40.0, 6.0)
+FRONT_FINISH_SYMBOL_XY = (0.192, BACK_TOP + 0.014)
 # Its reason stands left of it, under the face view's caption.
-FRONT_REASON_TOP = (0.2175, BACK_TOP + 0.013)
+FRONT_REASON_TOP = (0.1575, BACK_TOP + 0.013)
 BACK_CAPTION_TOP = (BACK_CENTER[0], BACK_BOTTOM - 0.042)
 FINISH_CHAR_HEIGHT = 0.0025
 CAPTION_SETTLE_M = 0.0006
+
+# The west slots in the clear field under the front-face view. Detail C looks
+# face-on at the outer slot at 2:1, left of the view's caption and the title
+# block: the counterbore's width left of it, the slot's right (its callout
+# saying why it is a slot), the slot's travel below and the counterbore's
+# above; its label right of the slot's width, its letter over the bar.
+DETAIL_SLOT_X = max(CLAMP_SLOT_X)
+DETAIL_CENTER = (0.120, 0.040)
+DETAIL_SCALE = (2, 1)
+DETAIL_RADIUS_MM = 7.5
+DETAIL_LABEL_XY = (0.190, 0.034)  # top centre
+DETAIL_LETTER_RISE = 0.010
+DETAIL_KEEP = {
+    "ClampSlotCboreWidth": (DETAIL_CENTER[0] - 0.030, DETAIL_CENTER[1]),
+    "ClampSlotWidth": (DETAIL_CENTER[0] + 0.035, DETAIL_CENTER[1]),
+    "ClampSlotTravel": (DETAIL_CENTER[0] + 0.015, DETAIL_CENTER[1] - 0.020),
+    "ClampSlotCboreTravel": (DETAIL_CENTER[0] + 0.015, DETAIL_CENTER[1] + 0.021),
+}
+# Section B-B cuts the inner slot across the bar, at 1:1 in the sheet's
+# lower-left corner: the counterbore's depth over it, its text outside the
+# front face and its callout above it (below would cross the cut bar), the
+# caption under it.
+SLOT_SECTION_X = min(CLAMP_SLOT_X)
+SLOT_SECTION_CENTER = (0.040, 0.045)
+SLOT_SECTION_SCALE = (1, 1)
+SLOT_SECTION_CAPTION_XY = (SLOT_SECTION_CENTER[0], 0.028)  # top centre
+SLOT_SECTION_KEEP_NAMES = ("ClampSlotCboreDepth",)
+SLOT_DEPTH_RISE = 0.005
+SLOT_DEPTH_TEXT_SIDE = 0.006
+CALLOUTS_ABOVE = ("ClampSlotCboreDepth",)
 
 # Section A-A: the thickness up-left of the cut bar, the full thread and the
 # drill depth below it (shorter nearer). Each text stands outside its
@@ -284,9 +324,11 @@ def _section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, float]]:
     }
 
 
-def _lower_caption(adapter: Any, view: Any, drop: float) -> None:
-    """Move a section's native caption down the sheet by ``drop`` metres,
-    keeping its linked fields
+def _move_caption(
+    adapter: Any, view: Any, place: Callable[[float, float], tuple[float, float]]
+) -> None:
+    """Move a section's native caption from where it stands, ``(x, y)``, to
+    ``place(x, y)``, keeping its linked fields
     (draw_dt_cone_pivot_post_tl_bond_cradle._lower_caption)."""
     view = _early_bound(view, "IView")
     captions = []
@@ -304,10 +346,10 @@ def _lower_caption(adapter: Any, view: Any, drop: float) -> None:
     note, linked_text = captions[0]
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     x, y = (float(value) for value in tuple(annotation.GetPosition())[:2])
-    target = (x, y - drop)
+    target = place(x, y)
     if not annotation.SetPosition2(*target, 0.0):
         raise RuntimeError("failed to position native view caption")
-    rebuild_drawing(adapter, label="lower section caption")
+    rebuild_drawing(adapter, label="move section caption")
     position = tuple(float(value) for value in annotation.GetPosition())
     if math.dist(position[:2], target) > 1e-6:
         raise RuntimeError("native view caption position did not persist")
@@ -317,8 +359,9 @@ def _lower_caption(adapter: Any, view: Any, drop: float) -> None:
 
 def _hole_rims(face: Any, back: Any) -> tuple[Any, Any]:
     """The first latch-hook tap's drill edge under its back-face countersink
-    (a Hole Wizard tap edge, so its callout is native) and the first clamp
-    counterbore's rim on the front face."""
+    (a Hole Wizard tap edge, so its callout is native) and the inner east
+    clamp counterbore's rim on the front face (the round pair's Hole Wizard
+    feature; the west pair are slots)."""
     tap_dia = blind_cut_dia_mm(BRACKET_TAP_SPEC)
     tap_csk_depth = (BRACKET_TAP_CSK_DIA - tap_dia) / 2.0
     tap = (
@@ -335,7 +378,7 @@ def _hole_rims(face: Any, back: Any) -> tuple[Any, Any]:
     cbore = (
         scan_view_edges(back, label="support-bar front face")
         .circle_at(
-            (max(CLAMP_ROW_X), 0.0, -BAR_DEPTH / 2.0),
+            (max(CLAMP_ROUND_X), 0.0, -BAR_DEPTH / 2.0),
             CLAMP_CBORE_DIA / 2.0,
             axis=(0.0, 0.0, 1.0),
             label="clamp counterbore rim",
@@ -344,6 +387,110 @@ def _hole_rims(face: Any, back: Any) -> tuple[Any, Any]:
         .edge
     )
     return tap, cbore
+
+
+def _slot_detail(adapter: Any, back: Any) -> Any:
+    """Native detail C: a fence round the outer west slot in the front-face
+    view, the 2:1 detail centred on DETAIL_CENTER, its label at
+    DETAIL_LABEL_XY and its parent letter over the bar
+    (draw_dt_pinion_lift_rod._front_end_detail, draw_ms_stick's letter)."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(back, "IView")
+    if not drawing.ActivateView(view_name(adapter, back)):
+        raise RuntimeError("failed to activate the slot detail's parent")
+    draw.ClearSelection2(True)
+    center = _sheet(
+        adapter, back, (DETAIL_SLOT_X, 0.0, -BAR_DEPTH / 2.0), "slot detail centre"
+    )
+    radius = DETAIL_RADIUS_MM * _S
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create the slot detail's fence")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *DETAIL_SCALE,
+        "C",
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create the slot detail")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("the slot detail has invalid bounds")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position the slot detail")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position the slot detail's label")
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"the slot detail's label did not persist: {actual}")
+    circles = [
+        _early_bound(circle, "IDetailCircle")
+        for circle in parent.GetDetailCircles() or ()
+    ]
+    matching = [circle for circle in circles if circle.GetLabel() == "C"]
+    if len(matching) != 1:
+        raise RuntimeError("the slot detail: expected one parent circle C")
+    letter_xy = (center[0], center[1] + DETAIL_LETTER_RISE)
+    matching[0].SetLabelPosition(*letter_xy)
+    rebuild_drawing(adapter, label="place the slot detail's parent letter")
+    actual = tuple(float(value) for value in matching[0].GetLabelPosition())
+    if len(actual) != 2 or math.dist(actual, letter_xy) > 1e-8:
+        raise RuntimeError(f"the slot detail's letter placement rejected: {actual}")
+    return detail
+
+
+def _slot_section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, float]]:
+    """Section B-B's depth text from its own projection, whichever way the cut
+    looks: over the bar, outside the front face the counterbore enters."""
+
+    def point(z: float, y: float = 0.0) -> tuple[float, float]:
+        return _sheet(adapter, section, (SLOT_SECTION_X, y, z), "section B-B")
+
+    top = point(0.0, BAR_HEIGHT / 2.0)[1]
+    front = point(-BAR_DEPTH / 2.0)[0]
+    floor = point(-BAR_DEPTH / 2.0 + CLAMP_CBORE_DEPTH)[0]
+    away = math.copysign(1.0, front - floor)
+    return {
+        "ClampSlotCboreDepth": (
+            front + away * SLOT_DEPTH_TEXT_SIDE,
+            top + SLOT_DEPTH_RISE,
+        )
+    }
 
 
 _THREAD_CLASS_TOKEN = " <hw-threadclass>"
@@ -529,8 +676,59 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
 
-    annotations = [*face_annotations, *back_annotations, *section_annotations]
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    # The west slots: detail C face-on at the outer one, section B-B across
+    # the inner one for the counterbore's depth.
+    detail = _slot_detail(adapter, back)
+    set_hidden_lines_removed(adapter, detail)
+    detail_annotations = hidden_sketches.curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="slot detail C",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    slot_section = create_section_view(
+        adapter,
+        back,
+        line_start=_sheet(adapter, back, (SLOT_SECTION_X, reach, 0.0), "B cut top"),
+        line_end=_sheet(adapter, back, (SLOT_SECTION_X, -reach, 0.0), "B cut foot"),
+        view_xy=SLOT_SECTION_CENTER,
+        section_label="B",
+        scale=SLOT_SECTION_SCALE,
+        label="section B-B",
+    )
+    _turn_y_up(adapter, slot_section, label="section B-B")
+    set_hidden_lines_removed(adapter, slot_section)
+    slot_section_annotations = hidden_sketches.curate_view_dimensions(
+        adapter,
+        slot_section,
+        keep=_slot_section_keep(adapter, slot_section),
+        view_label="section B-B",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+
+    annotations = [
+        *face_annotations,
+        *back_annotations,
+        *section_annotations,
+        *detail_annotations,
+        *slot_section_annotations,
+    ]
+    set_dimension_callouts(
+        adapter,
+        annotations,
+        {
+            name: text
+            for name, text in DIMENSION_CALLOUTS.items()
+            if name not in CALLOUTS_ABOVE
+        },
+    )
+    set_dimension_callouts(
+        adapter,
+        annotations,
+        {name: DIMENSION_CALLOUTS[name] for name in CALLOUTS_ABOVE},
+        location="above",
+    )
     # Places (and so each dimension's band or limit) are authored on the part;
     # the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
@@ -557,7 +755,8 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     )
     _add_slide_finishes(adapter, face, back)
-    _lower_caption(adapter, section, CAPTION_DROP)
+    _move_caption(adapter, section, lambda x, y: (x, y - CAPTION_DROP))
+    _move_caption(adapter, slot_section, lambda _x, _y: SLOT_SECTION_CAPTION_XY)
     _place_caption(adapter, FACE_VIEW_CAPTION, FACE_CAPTION_TOP)
     _place_caption(adapter, BACK_VIEW_CAPTION, BACK_CAPTION_TOP)
     _place_caption(adapter, TOP_FINISH_REASON, TOP_REASON_TOP)

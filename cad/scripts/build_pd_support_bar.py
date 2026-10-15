@@ -10,9 +10,12 @@ Cross-section 28 tall x 9 deep (it fills the platen's guide channel to a
 photo chain); 452 long so the ends run ~29 past each column (ch30 p002).
 
 Holes (all along local Z, the machine front-back axis):
-* 4x clamp-screw counterbores flanking each column (x +-197 -+ 17.5):
-  the screw heads sit sub-flush in the BAR's front face so the refitted platen
-  can slide across the east clamp, and thread into the back clamp arc.
+* 4x clamp screws flanking each column (x +-197 -+ 17.5): round counterbores
+  on the east column (END A, -X), which locate the bar, and counterbored
+  slots along the bar on the west one, which take up the column pitch (owner
+  ruling 2026-10-15, option A). The screw heads sit sub-flush in the BAR's
+  front face so the refitted platen can slide across the east clamp, and
+  thread into the back clamp arc.
 * the hanger's #8-32 blind pivot tap and the latch hook's two #4-40 base-screw
   through taps, all entering the back face (``pd_support_bar_spec``).
 
@@ -67,10 +70,13 @@ from _sketch_rectangle import define_centered_rectangle
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _holes import wizard_holes
 from _visibility import blank_reference_geometry
+from _drawing_prefix import set_dimension_prefix
 import _telemetry
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
+from sh_column_clamp_fit import BORE_DIAMETRAL_CLEARANCE
 from sh_column_clamp_fit import EAR_HEIGHT_BAND as BACK_ARC_TAP_HEIGHT_BAND
 from sh_column_clamp_fit import EAR_STATION_BAND as BACK_ARC_TAP_STATION_BAND
+from vn_clamp_screw_spec import HEAD_DIA as CLAMP_HEAD_DIA
 from vn_clamp_screw_spec import HEAD_H as CLAMP_HEAD_H
 from vn_clamp_screw_spec import SHANK_DIA as CLAMP_SCREW_MAJOR
 from pd_support_bar_spec import (
@@ -91,8 +97,12 @@ from pd_support_bar_spec import (
     PIVOT_TAP_X,
 )
 from pd_support_bar_drawing_spec import (
+    CLAMP_HOLE_CALLOUT_PLACES,
     CLAMP_POSITION_PLACES,
+    CLAMP_SLOT_PLACES,
+    CLAMP_SLOT_WIDTH_PLACES,
     CLAMP_STATION_NAMES,
+    DIMENSION_PREFIXES,
     DRAWING_DIMENSIONS,
     HANGER_STATION_NAMES,
     ISOMETRIC_VIEW_NOTE,
@@ -200,6 +210,135 @@ if CLAMP_POSITION_BAND <= 0.0:
         f".XX clamp-hole position band fits the {CLAMP_HOLE_FLOAT:.4f} float"
     )
 
+# --- West clamp slots: owner ruling 2026-10-15, option A (PR #1471 r3) -------
+# The bar spans the two columns, whose pitch is not the bar's: the top frame
+# prints its socket pitch at .XX (fr_top_frame_spec "socket horizontal
+# pitch") and the harmonic base's hole table each socket's X at .XX
+# (draw_fr_harmonic_base), so at the bar the pitch may stand one .XX band
+# off, or two. The round holes' along-bar float takes up neither, so the west
+# pair (+X) are slots along the bar and the east pair (END A, -X) stay round
+# and locate it. The fit-up this relies on: all four screws enter loose, the
+# bar settles on the east pair at its height, then all four tighten.
+COLUMN_PITCH_PLACES = 2
+COLUMN_PITCH_DEVIATIONS = {
+    "top frame socket pitch": printed_band_mm(COLUMN_PITCH_PLACES),
+    "base socket coordinates": 2.0 * printed_band_mm(COLUMN_PITCH_PLACES),
+}
+CLAMP_ROUND_X = tuple(x for x in CLAMP_HOLE_X if x < 0.0)
+CLAMP_SLOT_X = tuple(x for x in CLAMP_HOLE_X if x > 0.0)
+# Each slot is the round hole's width run CLAMP_SLOT_TRAVEL each way along the
+# bar, inside the round counterbore's width run as far and as deep: the east
+# pair's screw, head seat and floor.
+CLAMP_SLOT_TRAVEL = 1.5
+CLAMP_SLOT_RUN = 2.0 * CLAMP_SLOT_TRAVEL  # straight sides, end centre to end centre
+CLAMP_SLOT_WIDTH = CLAMP_HOLE_DIA
+CLAMP_SLOT_CBORE_WIDTH = CLAMP_CBORE_DIA
+CLAMP_SLOT_CBORE_RUN = CLAMP_SLOT_RUN
+# The round holes print under the title block's DRILLED HOLES row; the milled
+# slot carries the same limits on its own width.
+DRILLED_HOLE_LIMITS = (0.0, drilled_oversize_mm())
+CLAMP_SLOT_WIDTH_LIMITS = DRILLED_HOLE_LIMITS
+# Each column clamp may stand off its column by half the bore's widest
+# diametral clearance (sh_column_clamp_fit), the two clamps independently.
+COLUMN_CLAMP_SHIFT = BORE_DIAMETRAL_CLEARANCE[1] / 2.0
+
+
+def _printed_limits(
+    value: float, places: int, limits: tuple[float, float] | None = None
+) -> tuple[float, float]:
+    lower, upper = printed_deviations(value, places, limits)
+    return value + lower, value + upper
+
+
+def clamp_shank_slack_along() -> float:
+    """How far a clamp shank may stand along the bar off a round hole's
+    centre (or a slot end's) at the worst height: the least hole's radial
+    float less the height misalignment (the bar row's band plus the tap's)."""
+    radial = CLAMP_HOLE_FLOAT / 2.0
+    height = CLAMP_POSITION_BAND + BACK_ARC_TAP_HEIGHT_BAND
+    return math.sqrt(radial**2 - height**2)
+
+
+def clamp_east_pair_margin() -> float:
+    """Along-bar slack left between the two round (east) holes: both screws
+    stand in one clamp, so only the two bar stations' bands and the two taps'
+    station bands open their spacing."""
+    demand = 2.0 * (CLAMP_POSITION_BAND + BACK_ARC_TAP_STATION_BAND)
+    return 2.0 * clamp_shank_slack_along() - demand
+
+
+def clamp_slot_closure_margin(pitch_deviation: float) -> float:
+    """Along-bar slack left between an east (round) and a west (slotted)
+    screw when the columns stand ``pitch_deviation`` off the bar's pitch: the
+    shortest slot's travel each way plus both shanks' slack, less the pitch
+    error and every band between the two screws (both bar stations, both
+    clamps' tap stations, both clamps' shift on their columns). The two west
+    screws share the slots, so they close whenever each east-west pair does."""
+    shortest_run, _ = _printed_limits(CLAMP_SLOT_RUN, CLAMP_SLOT_PLACES)
+    capacity = shortest_run / 2.0 + 2.0 * clamp_shank_slack_along()
+    demand = pitch_deviation + 2.0 * (
+        CLAMP_POSITION_BAND + BACK_ARC_TAP_STATION_BAND + COLUMN_CLAMP_SHIFT
+    )
+    return capacity - demand
+
+
+def clamp_head_bearing(widest_hole: float) -> float:
+    """Least overlap of a clamp-screw head past the edge of a hole (or slot
+    side) ``widest_hole`` across onto its counterbore floor: the shank pushed
+    its full float across the hole, the head's far edge left nearest the
+    hole's edge."""
+    float_across = (widest_hole - CLAMP_SCREW_MAJOR) / 2.0
+    return CLAMP_HEAD_DIA / 2.0 - widest_hole / 2.0 - float_across
+
+
+def clamp_slot_head_clearance() -> float:
+    """Least gap from a clamp-screw head to its slot counterbore's wall: the
+    head centred anywhere the shank reaches in the widest, longest slot,
+    against the narrowest, shortest counterbore. The slot and its counterbore
+    are milled about the same centre; this gap is what their co-location
+    error may spend."""
+    _, widest = _printed_limits(
+        CLAMP_SLOT_WIDTH, CLAMP_SLOT_WIDTH_PLACES, CLAMP_SLOT_WIDTH_LIMITS
+    )
+    _, longest_run = _printed_limits(CLAMP_SLOT_RUN, CLAMP_SLOT_PLACES)
+    shortest_cbore_run, _ = _printed_limits(CLAMP_SLOT_CBORE_RUN, CLAMP_SLOT_PLACES)
+    narrowest_cbore, _ = _printed_limits(CLAMP_SLOT_CBORE_WIDTH, CLAMP_SLOT_PLACES)
+    float_across = (widest - CLAMP_SCREW_MAJOR) / 2.0
+    overrun = max(0.0, (longest_run - shortest_cbore_run) / 2.0)
+    return narrowest_cbore / 2.0 - (CLAMP_HEAD_DIA / 2.0 + float_across + overrun)
+
+
+# The head's least bearing beside a slot is held to the round counterbores'
+# own worst case (the same screw over the same DRILLED HOLES #8 clearance).
+CLAMP_HEAD_BEARING_MIN = clamp_head_bearing(
+    _printed_limits(CLAMP_HOLE_DIA, CLAMP_HOLE_CALLOUT_PLACES, DRILLED_HOLE_LIMITS)[1]
+)
+if clamp_east_pair_margin() < 0.0:
+    raise AssertionError(
+        "MHA-VN-021 screws in one MHA-SH-002 clamp: the round east holes' "
+        f"spacing over-runs their float by {-clamp_east_pair_margin():.3f}"
+    )
+if clamp_slot_closure_margin(max(COLUMN_PITCH_DEVIATIONS.values())) < 0.0:
+    raise AssertionError(
+        "MHA-VN-021 screws in the two MHA-SH-002 clamps: the west slots do not "
+        "take up the worst column pitch "
+        f"({max(COLUMN_PITCH_DEVIATIONS.values()):.2f})"
+    )
+if (
+    clamp_head_bearing(
+        _printed_limits(
+            CLAMP_SLOT_WIDTH, CLAMP_SLOT_WIDTH_PLACES, CLAMP_SLOT_WIDTH_LIMITS
+        )[1]
+    )
+    < CLAMP_HEAD_BEARING_MIN
+):
+    raise AssertionError("MHA-VN-021 heads bear less beside a slot than a round hole")
+if clamp_slot_head_clearance() < 0.0:
+    raise AssertionError(
+        "MHA-VN-021 heads reach past the slot counterbores' walls by "
+        f"{-clamp_slot_head_clearance():.3f}"
+    )
+
 # The pivot tap's full-thread minimum, drawn along the tap axis in its section
 # plane from the back face.
 PIVOT_SECTION_PLANE = "PivotSectionPlane"
@@ -273,6 +412,162 @@ def _as_construction(adapter, entity_id: str, label: str) -> None:
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
         raise RuntimeError(f"{label} did not take the construction flag")
+
+
+# The bar's front face as a plane, for the west clamp slots' sketches.
+FRONT_FACE_PLANE = "FrontFace"
+
+
+def _sketch_uvw(
+    adapter, model_mm: tuple[float, float, float]
+) -> tuple[float, float, float]:
+    """``model_mm`` in the active sketch's own ``(u, v, w)`` mm, ``w`` off its
+    plane (``ModelToSketchTransform``, as ``_model_to_sketch`` reads it)."""
+    from solidworks_mcp.adapters.com_variant import double_array
+
+    sketch = _early_bound(adapter.currentModel.SketchManager.ActiveSketch, "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    point = _early_bound(
+        utility.CreatePoint(double_array([v / 1000.0 for v in model_mm])), "IMathPoint"
+    )
+    moved = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+    u, v, w = (float(c) * 1000.0 for c in moved.ArrayData)
+    return u, v, w
+
+
+def stadium_area(width: float, run: float) -> float:
+    """A slot's area: ``width`` across, its straight sides ``run`` long."""
+    return width * run + math.pi * (width / 2.0) ** 2
+
+
+def _stadium_points(
+    centre: tuple[float, float], *, along_u: bool, half_run: float, half_width: float
+) -> tuple[tuple[float, float], ...]:
+    """One slot's stadium in sketch ``(u, v)``, counter-clockwise, as
+    build_fr_top_frame.slot_stadium_points draws it (copied: importing that
+    build would key this part on the top frame's recipe). Returns ``(p1, p2,
+    p3, p4, centre_b, centre_a)``: side a runs p1 -> p2, end b arcs about
+    centre_b from p2 to p3, side b runs p3 -> p4 and end a arcs about
+    centre_a from p4 back to p1. The slot runs along sketch u when
+    ``along_u``, else along v."""
+    u0, v0 = centre
+
+    def at(du: float, dv: float) -> tuple[float, float]:
+        return (u0 + du, v0 + dv) if along_u else (u0 - dv, v0 + du)
+
+    return (
+        at(-half_run, -half_width),
+        at(half_run, -half_width),
+        at(half_run, half_width),
+        at(-half_run, half_width),
+        at(half_run, 0.0),
+        at(-half_run, 0.0),
+    )
+
+
+async def _author_clamp_slot_profile(
+    adapter, feature: str, base: str, width: float, run: float
+) -> tuple[list[tuple[str, str]], bool]:
+    """One closed stadium per west clamp slot on the front face
+    (``FRONT_FACE_PLANE``): ``width`` across, its straight sides ``run`` long
+    along the bar, centred on the slot's station at mid-height. The outer
+    slot's (the detail's) width and run are ``{base}Width`` and
+    ``{base}Travel``; the inner slot's carry the same names numbered 1. An
+    offset plane's sketch axes are SOLIDWORKS' choice, so the centres map
+    through ``_sketch_uvw``. Returns the sketch's drive jobs and whether its
+    normal points out of the front face (-Z): a cut runs opposite the sketch
+    normal unless reversed (build_fr_top_frame's slip holes and slots)."""
+    front_z = -BAR_DEPTH / 2.0
+    check(f"create_sketch {feature}", await adapter.create_sketch(FRONT_FACE_PLANE))
+    outer = max(CLAMP_SLOT_X)
+    u0, v0, w0 = _sketch_uvw(adapter, (outer, 0.0, front_z))
+    u1, v1, _ = _sketch_uvw(adapter, (outer + 1.0, 0.0, front_z))
+    du, dv = u1 - u0, v1 - v0
+    if abs(abs(du) - 1.0) < 1e-4 and abs(dv) < 1e-4:
+        u_is_x = True
+    elif abs(abs(dv) - 1.0) < 1e-4 and abs(du) < 1e-4:
+        u_is_x = False
+    else:
+        raise RuntimeError(f"{feature}: sketch axes are not along X/Y ({du:g}, {dv:g})")
+    w_out = _sketch_uvw(adapter, (outer, 0.0, front_z - 1.0))[2] - w0
+    if abs(abs(w_out) - 1.0) > 1e-4:
+        raise RuntimeError(f"{feature}: sketch normal is not along Z (w {w_out:g})")
+    dims = SketchDims()
+    for index, x in enumerate(sorted(CLAMP_SLOT_X, reverse=True)):
+        tag = str(index) if index else ""
+        where = f"{feature} at x {x:g}"
+        u, v, w = _sketch_uvw(adapter, (x, 0.0, front_z))
+        if abs(w) > 1e-4:
+            raise RuntimeError(f"{where} lies {w:g} mm off the sketch plane")
+        p1, p2, p3, p4, c_end_b, c_end_a = _stadium_points(
+            (u, v), along_u=u_is_x, half_run=run / 2.0, half_width=width / 2.0
+        )
+        set_sketch_direct_db(adapter, True)
+        side_a = check(f"{where} side a", await adapter.add_line(*p1, *p2))
+        end_b = check(f"{where} end b", await adapter.add_arc(*c_end_b, *p2, *p3))
+        side_b = check(f"{where} side b", await adapter.add_line(*p3, *p4))
+        end_a = check(f"{where} end a", await adapter.add_arc(*c_end_a, *p4, *p1))
+        set_sketch_direct_db(adapter, False)
+        for join, a, b in (
+            ("side a - end b", f"{side_a}.end", f"{end_b}.start"),
+            ("end b - side b", f"{end_b}.end", f"{side_b}.start"),
+            ("side b - end a", f"{side_b}.end", f"{end_a}.start"),
+            ("end a - side a", f"{end_a}.end", f"{side_a}.start"),
+        ):
+            check(
+                f"{where} {join}",
+                await adapter.add_sketch_constraint(a, b, "coincident"),
+            )
+        along = "horizontal" if u_is_x else "vertical"
+        for side in (side_a, side_b):
+            check(
+                f"{where} {side} {along}",
+                await adapter.add_sketch_constraint(side, None, along),
+            )
+        # Tangency closes the shape: both ends' radii follow from the sides'
+        # spacing, the far side's length from the near side's.
+        for a, b in (
+            (side_a, end_b),
+            (end_b, side_b),
+            (side_b, end_a),
+            (end_a, side_a),
+        ):
+            check(
+                f"{where} {a} tangent {b}",
+                await adapter.add_sketch_constraint(a, b, "tangent"),
+            )
+        # Emission order: the width across the sides, the near side's
+        # straight run, then end a's centre anchors (one dimension per
+        # off-axis coordinate, anchor_point_to_origin).
+        await dimension_between(
+            adapter,
+            f"{side_a}.start",
+            f"{side_b}.end",
+            "vertical_distance" if u_is_x else "horizontal_distance",
+            width,
+            f"{where} width",
+        )
+        dims.record(f"{base}Width{tag}")
+        await dimension_between(
+            adapter,
+            f"{side_a}.start",
+            f"{side_a}.end",
+            "horizontal_distance" if u_is_x else "vertical_distance",
+            run,
+            f"{where} run",
+        )
+        dims.record(f"{base}Travel{tag}")
+        await anchor_point_to_origin(
+            adapter, f"{end_a}.center", *c_end_a, f"{where} end a"
+        )
+        for axis, coordinate in zip("UV", c_end_a):
+            if abs(coordinate) >= 1e-9:
+                dims.record(f"{base}End{axis}{tag}")
+    await ensure_fully_defined(adapter, f"{feature} sketch")
+    check(f"exit_sketch {feature}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    return dims.apply(adapter, feature), w_out > 0.0
 
 
 async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
@@ -476,15 +771,16 @@ async def build(adapter) -> dict[str, str]:
     # Clamp-screw holes, through along Z at the bar's mid-height, drilled from
     # the bar FRONT face (local z = -BAR_DEPTH/2, where the clamp-screw heads
     # sit -- ch30 p002), while the bar is still a plain prism: one native Hole
-    # Wizard feature, 4 clamp-screw #8 COUNTERBORES flanking the columns.
+    # Wizard feature, the east column's 2 clamp-screw #8 COUNTERBORES, which
+    # locate the bar (the west pair are slots, below).
     front_z = -BAR_DEPTH / 2.0
     clamp_dia = CLAMP_HOLE_DIA
     wizard_holes(
         adapter, CLAMP_HOLE_SPEC,
-        [[x, 0.0, front_z] for x in CLAMP_HOLE_X],
+        [[x, 0.0, front_z] for x in CLAMP_ROUND_X],
         (0.0, 0.0, -1.0), "clamp-screw counterbores (#8)", name="ClampHoles",
     )
-    v_holes = len(CLAMP_HOLE_X) * (
+    v_holes = len(CLAMP_ROUND_X) * (
         math.pi * (clamp_dia / 2.0) ** 2 * BAR_DEPTH
         + math.pi
         * ((CLAMP_CBORE_DIA / 2.0) ** 2 - (clamp_dia / 2.0) ** 2)
@@ -492,6 +788,66 @@ async def build(adapter) -> dict[str, str]:
     )
     expected -= v_holes
     await volume_check(adapter, "bar with clamp holes", expected, 0.02 * v_holes)
+
+    # The west column's clamp screws pass counterbored slots along the bar,
+    # which take up the column pitch (owner ruling 2026-10-15, option A; see
+    # CLAMP_SLOT_TRAVEL): the round hole's width through, then the round
+    # counterbore's width as deep, each run CLAMP_SLOT_RUN along the bar.
+    check(
+        f"create_plane {FRONT_FACE_PLANE} (Front Plane, {front_z})",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Front Plane", offset=front_z
+            )
+        ),
+    )
+    name_last_feature(adapter, FRONT_FACE_PLANE)
+    slot_jobs, _ = await _author_clamp_slot_profile(
+        adapter, "ClampSlotProfile", "ClampSlot", CLAMP_SLOT_WIDTH, CLAMP_SLOT_RUN
+    )
+    drive_jobs += slot_jobs
+    # Mid-plane, so either sketch normal cuts: half the total depth each way
+    # from the front face, a millimetre past the back face.
+    check(
+        "cut clamp slots (through)",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * (BAR_DEPTH + 1.0), both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "ClampSlots")
+    slot_area = stadium_area(CLAMP_SLOT_WIDTH, CLAMP_SLOT_RUN)
+    v_slots = len(CLAMP_SLOT_X) * slot_area * BAR_DEPTH
+    expected -= v_slots
+    # A cut the wrong way leaves the solid untouched and fails here.
+    await volume_check(adapter, "bar with clamp slots", expected, 0.01 * v_slots)
+    cbore_jobs, normal_out = await _author_clamp_slot_profile(
+        adapter,
+        "ClampSlotCboreProfile",
+        "ClampSlotCbore",
+        CLAMP_SLOT_CBORE_WIDTH,
+        CLAMP_SLOT_CBORE_RUN,
+    )
+    drive_jobs += cbore_jobs
+    check(
+        "cut clamp slot counterbores",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(
+                depth=CLAMP_CBORE_DEPTH, reverse_direction=not normal_out
+            )
+        ),
+    )
+    name_last_feature(adapter, "ClampSlotCounterbores")
+    name_dimensions(adapter, "ClampSlotCounterbores", ["ClampSlotCboreDepth"])
+    v_slot_cbores = (
+        len(CLAMP_SLOT_X)
+        * (stadium_area(CLAMP_SLOT_CBORE_WIDTH, CLAMP_SLOT_CBORE_RUN) - slot_area)
+        * CLAMP_CBORE_DEPTH
+    )
+    expected -= v_slot_cbores
+    await volume_check(
+        adapter, "bar with clamp slot counterbores", expected, 0.01 * v_slot_cbores
+    )
+    blank_reference_geometry(adapter, ((FRONT_FACE_PLANE, "PLANE"),))
 
     # Latch hook's base screws: two #4-40 taps THROUGH from the back face (their
     # exits on the front face lie under the platen footprint), then a
@@ -680,6 +1036,18 @@ async def build(adapter) -> dict[str, str]:
     _single_limit(
         adapter, "CountersinkReference", "BracketCskDia", BRACKET_TAP_CSK_DIA, TOL_MAX
     )
+    # The milled west slots' width carries the drilled holes' limits (it is
+    # their float the closure and head checks above spend); both slots share
+    # one detail, so their widths print their count.
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "ClampSlotProfile",
+        "ClampSlotWidth",
+        *CLAMP_SLOT_WIDTH_LIMITS,
+        places=CLAMP_SLOT_WIDTH_PLACES,
+    )
+    for (feature_name, dimension_name), prefix in DIMENSION_PREFIXES.items():
+        set_dimension_prefix(adapter, feature_name, dimension_name, prefix)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
