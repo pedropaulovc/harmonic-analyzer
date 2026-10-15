@@ -131,7 +131,9 @@ DIMENSION_CALLOUTS = {
     "PivotTapDrillDia": f"TAP {PIVOT_TAP_THREAD} UNC THRU",
     # At most 24 characters a line: the latch-hook taps' callout leader
     # passes just right of this text (layout audit: leader-through-text).
-    "PivotCskDia": f"2X {_CSK} BOTH FACES,\nMHA-VN-041 BEARS OUTSIDE",
+    # One hole countersunk on both faces: no "2X", which on the hook taps'
+    # callout counts holes (r6 machinist review, rule 12).
+    "PivotCskDia": f"{_CSK} BOTH FACES,\nMHA-VN-041 BEARS OUTSIDE",
     "BracketCskDia": f"2X {_CSK}\nBOTH FACES, {BRACKET_TAP_SPEC.size} TAPS",
     # The west slots: why they are slots, and the screws whose heads their
     # counterbores sink, as the round counterbores' callout says.
