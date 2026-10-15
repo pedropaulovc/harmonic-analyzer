@@ -962,7 +962,7 @@ def test_only_notes_that_reach_the_final_sheet_are_obstacles() -> None:
     assert "if not note_reaches_final_sheet(text):" in source
 
 
-# The fake sheet's C1 pivot seat note, clear of its table, view and callout.
+# The fake sheet's D1 pivot seat note, clear of its table, view and callout.
 _FAKE_PIVOT_SEAT_BOX = (0.150, 0.020, 0.180, 0.040)
 
 
@@ -972,7 +972,7 @@ def _drive_hole_sheet_callout_check(
     pivot_seat_box: tuple[float, float, float, float] | None = _FAKE_PIVOT_SEAT_BOX,
 ) -> None:
     """Run _check_hole_sheet_callouts on fakes: one callout, one sheet note at
-    ``note_box``, the C1 pivot seat note at ``pivot_seat_box`` (None: absent)
+    ``note_box``, the D1 pivot seat note at ``pivot_seat_box`` (None: absent)
     and a display dimension, which _iter_view_annotations yields as
     ``(None, annotation)`` since #902 (a5563c7a0)."""
     from types import SimpleNamespace
@@ -1037,7 +1037,7 @@ def test_hole_sheet_callout_check_still_measures_notes_beside_dimensions(
 def test_hole_sheet_callout_check_measures_the_pivot_seat_note_against_obstacles(
     monkeypatch,
 ) -> None:
-    """Fail-first: the C1 pivot seat note is measured like a callout, so the
+    """Fail-first: the D1 pivot seat note is measured like a callout, so the
     note landing on the hole table fails the build -- a plain note obstacle is
     never compared with the table -- and a sheet without it fails too."""
     clear = (0.200, 0.200, 0.220, 0.210)
@@ -2393,8 +2393,9 @@ def test_pivot_seat_note_locates_it_from_the_near_pedestal_seat() -> None:
     """The pivot seat is held +-0.05 to the MHA-DT-002 seats, in one setup with
     them (cone_set_stack); the note's offsets are the model's, measured from
     the nearer seat in table axes (X right, Y = -z). plate-r1 review: the note
-    names C1 and says its table location is reference, so the two cannot read
-    as competing. Its box heads the notes column clear of the table, views and
+    names its table tag, D1 (r4), and says its table location is reference,
+    so the two cannot read as competing. Its box heads the notes column clear
+    of the table, views and
     callouts; fail-first, the same box collides once moved onto the table. The
     build measures the note's read-back ink against every callout and
     obstacle the same way."""
@@ -2414,8 +2415,15 @@ def test_pivot_seat_note_locates_it_from_the_near_pedestal_seat() -> None:
     assert "ONE SETUP" in sheet.PIVOT_SEAT_STEP
     assert "MHA-DT-002" in sheet.PIVOT_SEAT_STEP
     lines = sheet.PIVOT_SEAT_STEP.split("\n")
-    assert lines[0].startswith("C1 PIVOT SEAT:")
-    assert lines[-1] == "THIS GOVERNS C1; ITS TABLE X/Y ARE REFERENCE."
+    assert sheet.PIVOT_SEAT_TAG == "D1"
+    assert lines[0].startswith("D1 PIVOT SEAT:")
+    assert lines[-1] == "THIS GOVERNS D1; ITS TABLE X/Y ARE REFERENCE."
+    # r4 review: the plate-r1 note named C1, the lock seat's 1/4-20 row. D1 is
+    # the table's one 10-24 row, the only tabled hole of the pivot's size, and
+    # one of the two tabled holes the shallow-boss callout names.
+    pivot_size = [h for h in sheet.TABLE_HOLES if h[2] == sheet.PIVOT_SCREW_HOLE_DIA]
+    assert pivot_size == [(*sheet.PIVOT_SCREW_XZ, sheet.PIVOT_SCREW_HOLE_DIA)]
+    assert "B1, D1," in sheet.UNDERSIDE_BOTTOM_CALLOUTS["ShallowBoss4Dia"]
     obstacles = dict(E0E287C83_OBSTACLES)
     obstacles.update((f"callout {name}", b) for name, b in HB_RENDER_4_BOXES.items())
 
@@ -2446,3 +2454,48 @@ def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
     assert source.count(blank) == 1
     assert part.REFERENCE_SKETCHES == ("HeightReference", "CrossTapReference", "PlanReference")
     assert hasattr(_sketch.blank_reference_sketches, "__wrapped__")
+
+
+def test_pedestal_pad_row_keeps_its_arrows_inside_clear_of_the_title_block(
+    monkeypatch,
+) -> None:
+    """r4 review: the 2X 16.0 pedestal-pad row's outside arrow ran into the
+    title block's MATERIAL cell. Its arrows stand inside, read back; a
+    display that drops the setting, or a missing dimension, fails the build."""
+    from types import SimpleNamespace
+
+    import draw_fr_harmonic_base as sheet
+
+    class Display:
+        def __init__(self, keeps: bool) -> None:
+            self.keeps = keeps
+            self._side = 2  # swDimArrowsSmart
+
+        @property
+        def ArrowSide(self) -> int:  # noqa: N802 - the COM member name
+            return self._side
+
+        @ArrowSide.setter
+        def ArrowSide(self, value: int) -> None:  # noqa: N802 - the COM member name
+            if self.keeps:
+                self._side = value
+
+    def annotation(name: str, display: Display) -> SimpleNamespace:
+        return SimpleNamespace(name=name, GetSpecificAnnotation=lambda: display)
+
+    monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(sheet, "dimension_name", lambda adapter, a: a.name)
+    assert sheet.PADS_ARROWS_INSIDE == ("PedestalPad0Width",)
+    pedestal, lock = Display(keeps=True), Display(keeps=True)
+    sheet._set_pads_arrows_inside(
+        object(),
+        [annotation("LockPadWidth", lock), annotation("PedestalPad0Width", pedestal)],
+    )
+    assert pedestal.ArrowSide == 0  # swDimArrowsInside
+    assert lock.ArrowSide == 2
+    with pytest.raises(RuntimeError, match="did not keep its arrows inside"):
+        sheet._set_pads_arrows_inside(
+            object(), [annotation("PedestalPad0Width", Display(keeps=False))]
+        )
+    with pytest.raises(RuntimeError, match="no dimension to set arrows inside"):
+        sheet._set_pads_arrows_inside(object(), [annotation("LockPadWidth", lock)])

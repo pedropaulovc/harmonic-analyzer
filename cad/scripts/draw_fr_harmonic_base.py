@@ -768,31 +768,35 @@ TRANSFER_NAMEPLATE_LEADER_HOLE = max(
 # seats, +-0.05, in one setup with them (Main ruling 2026-10-10, critical
 # interface), not from the table's corner datum: its table row stays the
 # nominal, the offsets below govern, and the note says so in words and names
-# C1, so the two locations cannot read as competing (plate-r1 review). The note
-# heads the sheet-2 notes column, under the hole table and short of the 38.1
-# cross-screw-axis callout, with no leader: one would cross the table. The
-# sheet-2 callout check measures its read-back ink like a callout's: against
-# every callout AND every other obstacle (the table, the views, the frame), so
-# the note cannot land on the table or a view any more than a callout can
-# (pc-p1 eye pass).
+# the seat's table tag, so the two locations cannot read as competing
+# (plate-r1 review). The tag is D1, the 10-24 row at X 142.05 Y 39.81 (r4
+# render; C1 is the lock seat's 1/4-20 row, which the plate-r1 note named and
+# the r4 review caught: its offsets from the near pedestal seat land on D1).
+# The note heads the sheet-2 notes column, under the hole table and short of
+# the 38.1 cross-screw-axis callout, with no leader: one would cross the
+# table. The sheet-2 callout check measures its read-back ink like a
+# callout's: against every callout AND every other obstacle (the table, the
+# views, the frame), so the note cannot land on the table or a view any more
+# than a callout can (pc-p1 eye pass).
 _PIVOT_NEAR_PEDESTAL_XZ = min(
     PEDESTAL_SCREW_XZ, key=lambda xz: math.dist(xz, PIVOT_SCREW_XZ)
 )
+PIVOT_SEAT_TAG = "D1"
 PIVOT_SEAT_STEP = (
-    "C1 PIVOT SEAT: DRILL AND TAP AT ASSEMBLY, AFTER\n"
+    f"{PIVOT_SEAT_TAG} PIVOT SEAT: DRILL AND TAP AT ASSEMBLY, AFTER\n"
     "THE MHA-DT-002 SEATS, IN ONE SETUP WITH THEM;\n"
     f"X {PIVOT_SCREW_XZ[0] - _PIVOT_NEAR_PEDESTAL_XZ[0]:.2f}, "
     f"Y {_PIVOT_NEAR_PEDESTAL_XZ[1] - PIVOT_SCREW_XZ[1]:.2f} "
     f"<MOD-PM>{PIVOT_SEAT_POSITION_BAND_MM:.2f} "
     "FROM THE NEAR ONE.\n"
-    "THIS GOVERNS C1; ITS TABLE X/Y ARE REFERENCE."
+    f"THIS GOVERNS {PIVOT_SEAT_TAG}; ITS TABLE X/Y ARE REFERENCE."
 )
 PIVOT_SEAT_NOTE_XY = (0.020, 0.108)
 PIVOT_SEAT_NOTE_LABEL = "pivot seat note"
 
 
 def is_pivot_seat_note(text: str) -> bool:
-    """Whether a note read back off the sheet is the C1 pivot seat note (INote
+    """Whether a note read back off the sheet is the D1 pivot seat note (INote
     text reads back with CRLF line breaks)."""
     return text.replace("\r\n", "\n").strip() == PIVOT_SEAT_STEP.strip()
 
@@ -1088,6 +1092,30 @@ PADS_SIZE_BELOW_MM = {
     "LockPadWidth": (_LOCK_PAD[1] - 28.5, BOTTOM_FRONT_Z - 21.6),
     "PedestalPad0Width": (_LOCK_PAD[1] - 28.5, BOTTOM_FRONT_Z - 59.6),
 }
+# The pedestal pad's row stands beside the title block, which starts barely
+# below the flange's front edge, so an outside arrow past its east extension
+# line ran into the MATERIAL cell (r4 machinist review). Its arrows stand
+# inside the 8 mm span instead; its line runs west to the text as before.
+PADS_ARROWS_INSIDE = ("PedestalPad0Width",)
+_DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+
+
+def _set_pads_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
+    """Stand each PADS_ARROWS_INSIDE dimension's arrows inside its extension
+    lines, as draw_mg_magnifying_wheel's _set_arrows_inside."""
+    remaining = set(PADS_ARROWS_INSIDE)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        remaining.discard(name)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArrowSide = _DIM_ARROWS_INSIDE
+        if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
+            raise RuntimeError(f"{name} did not keep its arrows inside")
+    if remaining:
+        raise RuntimeError(f"no dimension to set arrows inside: {sorted(remaining)}")
 
 
 def _cast_level(shapes: tuple, *, deep: bool) -> str:
@@ -2412,6 +2440,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_callouts(adapter, pads_dimensions, PADS_CALLOUTS)
+    _set_pads_arrows_inside(adapter, pads_dimensions)
     add_note(adapter, PADS_NOTE, *PADS_NOTE_XY)
     # Pointer notes owned by the view (add_leader_note), after the sheet's
     # own note so that one stays sheet-owned.
