@@ -64,7 +64,7 @@ def test_both_ears_located_by_one_model_owned_height() -> None:
     feature = _clamp_arc.EAR_HEIGHT_REFERENCE
     name = _clamp_arc.EAR_HEIGHT_DIMENSION
     assert spec.DRAWING_DIMENSIONS[feature] == {name}
-    assert spec.DRAWING_PRECISION[feature] == {name: 2}
+    assert spec.DRAWING_PRECISION[feature] == {name: 1}
     assert drawing.DRAWING_PRECISION_BY_NAME is spec.DRAWING_PRECISION_BY_NAME
     assert not hasattr(spec, "EAR_HOLE_HEIGHT_PLACES")
     assert name in drawing.FACE_KEEP
@@ -130,6 +130,7 @@ def test_bore_prints_the_grip_budget_on_the_column() -> None:
     assert f"{spec.BORE_DIAMETRAL_CLEARANCE[1]:.2f}" in bore
     assert spec.BORE_DIAMETRAL_CLEARANCE[1] <= 0.30
     assert "MHA-SH-002" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
+    assert "MHA-SH-002" in drawing.DIMENSION_CALLOUTS["EarHoleHeight"]
     # The two-place depth says what it sets; the bore says where its axis is.
     assert spec.DRAWING_PRECISION["BlockProfile"]["Depth"] == 2
     assert "MHA-SH-002" in drawing.DIMENSION_CALLOUTS["Depth"]
@@ -156,6 +157,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert "apply_drawing_properties" in source
     assert "clear_dimensions_for_drawing" in source
     assert "EAR_STATION_BAND" in source
+    assert "EAR_HEIGHT_BAND" in source
     import _config
 
     row = _config.parts("sh-column-clamp-front")

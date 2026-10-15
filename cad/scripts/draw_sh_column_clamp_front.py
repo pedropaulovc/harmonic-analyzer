@@ -118,11 +118,11 @@ def _face_xy(y_mm: float, z_mm: float) -> tuple[float, float]:
 # side face on a dimension line left of the split face with its value on that
 # line, and the bore's reference Ø leadered in through the upper half of the
 # open mouth from above left, clear of that dimension.  Split-face view: the
-# height under the view, the ear-hole station from the bore centerline
-# left of it, its mate callout under the value, and the ears' shared height
-# off the bottom face just under the view (EarHoleHeight, from the part's
-# hidden EarHeightReference sketch: its witnesses leave the bottom face and
-# ear 1's centre).
+# ear-hole station from the bore centerline left of it, its mate callout under
+# the value; under the view, the ears' shared height off the bottom face
+# (EarHoleHeight, from the part's hidden EarHeightReference sketch: its
+# witnesses leave the bottom face and ear 1's centre) with its mate callout
+# under the value, and the height below that callout.
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0], 0.248),
     "Width": (0.262, TOP_CENTER[1]),
@@ -130,7 +130,7 @@ TOP_KEEP = {
     "BoreDia": (0.155, 0.212),
 }
 FACE_KEEP = {
-    "Height": (FACE_CENTER[0], 0.098),
+    "Height": (FACE_CENTER[0], 0.090),
     "EarHole1Z": (0.055, 0.1575),
     "EarHoleHeight": (FACE_CENTER[0] - 0.008, 0.113),
 }
@@ -143,7 +143,7 @@ REFERENCE_DIMENSIONS = ("BoreDia",)
 # (drawing-guidelines.md rule 4): the bore is matched to the purchased column
 # (sh_column_clamp_fit's grip budget), the depth at two places sets the clamp
 # screws' engagement in the back arc's taps (sh_column_clamp_front_spec), and
-# the ear stations line up with those taps.  The bore callout also says where
+# the ear stations and height line up with those taps.  The bore callout also says where
 # the axis lies (on the split face; round-3 review).  All under the value: SOLIDWORKS prints nothing of an
 # above-callout holding a line break
 # (draw_dt_cone_gear_shaft._printable_above_callouts).
@@ -154,6 +154,7 @@ DIMENSION_CALLOUTS = {
     ),
     "Depth": f"SETS SCREW ENGAGEMENT\nIN {BACK_ARC_MATE}",
     "EarHole1Z": f"ALIGNS WITH\n{BACK_ARC_MATE} TAPS",
+    "EarHoleHeight": f"ALIGNS WITH\n{BACK_ARC_MATE} TAPS",
 }
 
 # Model points (mm) the sheet picks project from, on the split face (X = 0).

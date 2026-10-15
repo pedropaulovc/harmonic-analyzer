@@ -25,6 +25,7 @@ from sh_column_clamp_fit import (  # noqa: F401
     BORE_DIAMETRAL_CLEARANCE,
     BORE_RADIUS_MAX,
     COLUMN_MATE,
+    EAR_HEIGHT_BAND,
     EAR_STATION_BAND,
     GRIP_GAP_MIN,
     GRIP_OFFSET_BAND,
@@ -68,14 +69,15 @@ EAR_STATION_DIMENSIONS = ("EarHole1Z", "EarHole2Z")
 # * BoreDia prints (Ø25.6) as a reference nominal under its matched
 #   diametral-clearance acceptance on the column.
 # * Width, AnchorZ and Height are outside sizes at .X.
-# * EarHoleHeight .XX: the taps line up with the front arc's clearance holes
-#   across the bar's height too; the walls below take its printed band.
+# * EarHoleHeight 8.0 +/-0.1 (EAR_HEIGHT_BAND): the taps line up with the
+#   front arc's clearance holes across the bar's height too
+#   (sh_column_clamp_fit.EAR_SCREW_MISMATCH_MAX); the walls below take it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"Depth": 2, "Width": 1, "GripOffset": 1, "AnchorZ": 1},
     "Block": {"Height": 1},
     "BoreProfile": {"BoreDia": 1},
     "EarHoles": {"EarHole1Z": 1},
-    "EarHeightReference": {"EarHoleHeight": 2},
+    "EarHeightReference": {"EarHoleHeight": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -106,11 +108,9 @@ _HEIGHT_MIN = (
     ARC_HEIGHT + printed_deviations(ARC_HEIGHT, DRAWING_PRECISION["Block"]["Height"])[0]
 )
 # The ear holes sit at mid-height, located from the bottom face by the
-# model's EarHoleHeight at its authored places.
+# model's EarHoleHeight at its band.
 EAR_HOLE_HEIGHT = ARC_HEIGHT / 2.0
-_EAR_HEIGHT_DEV = printed_deviations(
-    EAR_HOLE_HEIGHT, DRAWING_PRECISION["EarHeightReference"]["EarHoleHeight"]
-)
+_EAR_HEIGHT_DEV = (-EAR_HEIGHT_BAND, EAR_HEIGHT_BAND)
 # The tapped ear's thread major envelope, the one rule 17 judges.
 THREAD_MAJOR_DIA = THREAD_MAJOR_MM[HOLE_SPEC.size]
 _EAR_IN = EAR_HOLE_Z - EAR_STATION_BAND

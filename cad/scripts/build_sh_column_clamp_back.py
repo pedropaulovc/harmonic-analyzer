@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import sys
 
-from _clamp_arc import build_arc
+from _clamp_arc import EAR_HEIGHT_DIMENSION, EAR_HEIGHT_REFERENCE, build_arc
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -32,6 +32,7 @@ from sh_column_clamp_back_spec import (
     DEPTH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    EAR_HEIGHT_BAND,
     EAR_STATION_BAND,
     EAR_STATION_DIMENSIONS,
     GRIP_OFFSET,
@@ -54,9 +55,9 @@ async def build(adapter) -> dict[str, str]:
     )
     # Manufacturing drawing support, applied to the unsaved model the shared
     # builder leaves behind and saved ONCE below: the explicit bands (the grip
-    # offset and the ear stations, sh_column_clamp_fit) and every printed
-    # dimension's places live on the model, then mark exactly the print's
-    # dimensions and stamp the make-critical title-block properties.
+    # offset, the ear stations and the ears' height, sh_column_clamp_fit) and
+    # every printed dimension's places live on the model, then mark exactly
+    # the print's dimensions and stamp the make-critical title-block properties.
     set_dimension_symmetric_tolerance(
         adapter, "BlockProfile", "GripOffset", GRIP_OFFSET_BAND
     )
@@ -64,6 +65,9 @@ async def build(adapter) -> dict[str, str]:
         set_dimension_symmetric_tolerance(
             adapter, "EarHoles", dimension_name, EAR_STATION_BAND
         )
+    set_dimension_symmetric_tolerance(
+        adapter, EAR_HEIGHT_REFERENCE, EAR_HEIGHT_DIMENSION, EAR_HEIGHT_BAND
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
