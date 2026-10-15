@@ -214,6 +214,23 @@ def test_rows_stack_shortest_nearest_the_bar() -> None:
     ] == [True, True, False, False]
 
 
+def test_clamp_callout_stands_between_the_bar_and_the_length_line() -> None:
+    """r7 audit: the 4-line counterbore callout's first line sat on the face
+    view's 452.0 length line. Native callout metrics measured on the farm
+    (r6/r7 layout audits): the text block centres 2.8 mm under the anchor,
+    lines 5.6 mm apart, each line's box 0.9..4.5 mm above its position; the
+    length line runs 2.8 mm under its text anchor."""
+    pitch, below_anchor = 0.0056, 0.0028
+    # The native size and DRILL, C'BORE lines, then the mate lines.
+    lines = 2 + len(sheet_spec.CLAMP_CBORE_CALLOUT.splitlines())
+    centre = drawing.CLAMP_CALLOUT_XY[1] - below_anchor
+    first = centre + (lines - 1) * pitch / 2.0
+    last = centre - (lines - 1) * pitch / 2.0
+    length_line = drawing.FRONT_KEEP["Length"][1] - 0.0028  # 160.2 mm
+    assert first + 0.0045 <= length_line - 0.003
+    assert last + 0.0009 >= drawing.BACK_TOP + 0.005
+
+
 def test_sheet_texts_carry_no_dimensions_and_stay_short() -> None:
     # No general note: each slide grade's reason sits by its symbol.
     assert not hasattr(sheet_spec, "DRAWING_NOTES")
