@@ -16,7 +16,10 @@ height along Y with y = 0 at mid-height, and its depth along Z with the FRONT
   rail: the pivot and the latch hook's base place the platen's arm and hook
   relative to it.
 * The clamp row's stations run from the same end (x = -226, the sheet's right
-  in the front-face view) and its height from the top face.
+  in the front-face view) and its height from the top face. The east pair
+  (that end's, -X) are round counterbored holes; the west pair (+X) are
+  counterbored slots along the bar that take up the column pitch (owner
+  ruling 2026-10-15, option A).
 * The platen hangs on the top face and slides across the front face: both
   carry the slide roughness (``SURFACE_FINISHES``, drawing-guidelines rule 6).
 
@@ -52,6 +55,17 @@ CLAMP_POSITION_PLACES = 2
 # depth still sinks the clamp-screw head below the front face the platen
 # slides across (build_pd_support_bar.CLAMP_HEAD_RECESS).
 CLAMP_CBORE_DEPTH_PLACES = 2
+# The round counterbores' native callout prints its Ø at the document's two
+# places, under the title block's DRILLED HOLES row.
+CLAMP_HOLE_CALLOUT_PLACES = 2
+# The west clamp slots (build_pd_support_bar, owner ruling 2026-10-15 option
+# A): the width is the round hole's, carrying its drilled +0.10/-0 at .XX;
+# the travel and the counterbore's width and travel print .XXX, the places
+# whose title-block band still closes the slots' worst-case column span and
+# keeps the screw head inside the counterbore
+# (build_pd_support_bar.clamp_slot_closure_margin, clamp_slot_head_clearance).
+CLAMP_SLOT_WIDTH_PLACES = 2
+CLAMP_SLOT_PLACES = 3
 HANGER_STATION_NAMES = ("PivotTapStation", "BracketTapStation1", "BracketTapStation2")
 CLAMP_STATION_NAMES = (
     "ClampStation1",
@@ -69,6 +83,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PivotTap": {"DrillDepth"},
     "PivotThreadReference": {"ThreadMin"},
     "CountersinkReference": {"PivotCskDia", "BracketCskDia"},
+    "ClampSlotProfile": {"ClampSlotWidth", "ClampSlotTravel"},
+    "ClampSlotCboreProfile": {"ClampSlotCboreWidth", "ClampSlotCboreTravel"},
+    "ClampSlotCounterbores": {"ClampSlotCboreDepth"},
 }
 
 # The bar's two .XXX bands are authored first, by the build's own literal
@@ -88,6 +105,14 @@ SHEET_PRECISION: dict[str, dict[str, int]] = {
     "PivotTap": {"DrillDepth": 1},
     "PivotThreadReference": {"ThreadMin": 1},
     "CountersinkReference": {"PivotCskDia": 1, "BracketCskDia": 1},
+    "ClampSlotProfile": {
+        "ClampSlotWidth": CLAMP_SLOT_WIDTH_PLACES,
+        "ClampSlotTravel": CLAMP_SLOT_PLACES,
+    },
+    "ClampSlotCboreProfile": dict.fromkeys(
+        ("ClampSlotCboreWidth", "ClampSlotCboreTravel"), CLAMP_SLOT_PLACES
+    ),
+    "ClampSlotCounterbores": {"ClampSlotCboreDepth": CLAMP_CBORE_DEPTH_PLACES},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     **SHEET_PRECISION,
@@ -116,9 +141,19 @@ DIMENSION_CALLOUTS = {
     "ThreadMin": f"FULL THREAD ({PIVOT_TAP_FULL_THREAD_MIN / THREAD_MAJOR_MM[PIVOT_TAP_THREAD]:.2f}D)",
     "PivotCskDia": f"{_CSK}, MHA-VN-041\nSHOULDER BEARS OUTSIDE",
     "BracketCskDia": f"2X {_CSK}\nBOTH FACES, {BRACKET_TAP_SPEC.size} TAPS",
+    # The west slots: why they are slots, and the screws whose heads their
+    # counterbores sink, as the round counterbores' callout says.
+    "ClampSlotWidth": "THRU\nSLOTS TAKE UP\nCOLUMN PITCH",
+    "ClampSlotCboreWidth": "C'BORE",
+    "ClampSlotCboreDepth": "MHA-VN-021 HEADS\nBELOW SLIDE FACE",
 }
-# Under the counterbores' native callout: the taps the holes' banded row
-# height and stations locate to (rule 4: the tight band names its mate, as
+# The slot widths' count: both west slots share one detail.
+DIMENSION_PREFIXES = {
+    ("ClampSlotProfile", "ClampSlotWidth"): "2X ",
+    ("ClampSlotCboreProfile", "ClampSlotCboreWidth"): "2X ",
+}
+# Under the round counterbores' native callout: the taps the holes' banded
+# row height and stations locate to (rule 4: the tight band names its mate, as
 # the latch hook's SCREW_HOLE_MATE does), then the screws whose heads they
 # sink, and why the depth has a floor (the heads' worst case stays sub-flush).
 CLAMP_TAP_MATE = "LOCATE TO MHA-SH-002 TAPS"

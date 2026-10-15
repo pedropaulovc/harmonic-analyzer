@@ -40,7 +40,13 @@ def test_registry_identity_and_paths() -> None:
 def test_marked_dimensions_are_the_kept_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is sheet_spec.DRAWING_DIMENSIONS
     marked = set().union(*sheet_spec.DRAWING_DIMENSIONS.values())
-    kept = [*drawing.FRONT_KEEP, *drawing.BACK_KEEP, *drawing.SECTION_KEEP_NAMES]
+    kept = [
+        *drawing.FRONT_KEEP,
+        *drawing.BACK_KEEP,
+        *drawing.SECTION_KEEP_NAMES,
+        *drawing.DETAIL_KEEP,
+        *drawing.SLOT_SECTION_KEEP_NAMES,
+    ]
     assert len(kept) == len(set(kept))
     assert set(kept) == marked
     assert set(drawing.DRAWING_PRECISION_BY_NAME) == marked
@@ -52,6 +58,7 @@ def test_printed_bands_are_the_spec_bands() -> None:
         ("HangerRowReference", "name"): "HOLE_POSITION_BAND",
         ("ClampRowReference", "name"): "CLAMP_POSITION_BAND",
         ("PivotTap", "DrillDepth"): "*PIVOT_TAP_DRILL_DEPTH_LIMITS",
+        ("ClampSlotProfile", "ClampSlotWidth"): "*CLAMP_SLOT_WIDTH_LIMITS",
     }
     assert part.HANGER_STATION_NAMES == sheet_spec.HANGER_STATION_NAMES
     assert part.CLAMP_STATION_NAMES == sheet_spec.CLAMP_STATION_NAMES
@@ -81,6 +88,23 @@ def test_printed_bands_are_the_spec_bands() -> None:
         == spec.BAR_DEPTH_BAND
     )
     assert places["PivotTap"]["DrillDepth"] == 1
+    # The slots' width at the round holes' .XX under their drilled limits;
+    # travels and the counterbore's width at .XXX; its depth as the round
+    # counterbores' (test_west_slots_take_up_the_column_pitch and
+    # test_slot_heads_bear_and_stay_inside_their_counterbores say why).
+    import _config
+
+    drilled = _config.title_block("drilled_hole")
+    assert (float(drilled["minus_mm"]), float(drilled["plus_mm"])) == (0.0, 0.1)
+    assert part.CLAMP_SLOT_WIDTH_LIMITS == (0.0, 0.1)
+    assert places["ClampSlotProfile"] == {"ClampSlotWidth": 2, "ClampSlotTravel": 3}
+    assert places["ClampSlotCboreProfile"] == {
+        "ClampSlotCboreWidth": 3,
+        "ClampSlotCboreTravel": 3,
+    }
+    assert places["ClampSlotCounterbores"] == {
+        "ClampSlotCboreDepth": sheet_spec.CLAMP_CBORE_DEPTH_PLACES
+    }
 
 
 def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
@@ -171,6 +195,11 @@ def test_row_nominals_are_the_built_holes() -> None:
     assert part.CLAMP_ROW_X == (-214.5, -179.5, 179.5, 214.5)
     assert sorted(part.CLAMP_ROW_X) == sorted(part.CLAMP_HOLE_X)
     assert part.CLAMP_STATIONS == (11.5, 46.5, 405.5, 440.5)
+    # END A's (east, -X) pair are round and locate the bar; the west pair are
+    # the slots (owner ruling 2026-10-15, option A).
+    assert sorted(part.CLAMP_ROUND_X) == [-214.5, -179.5]
+    assert sorted(part.CLAMP_SLOT_X) == [179.5, 214.5]
+    assert sorted((*part.CLAMP_ROUND_X, *part.CLAMP_SLOT_X)) == list(part.CLAMP_ROW_X)
     assert part.CLAMP_ROW_HEIGHT == spec.BAR_HEIGHT / 2.0
 
 
@@ -475,7 +504,7 @@ def test_hole_callouts_pick_the_tap_and_counterbore_edges(monkeypatch) -> None:
             (0.0, 0.0, 1.0),
         ),
         (
-            (max(part.CLAMP_ROW_X), 0.0, -spec.BAR_DEPTH / 2.0),
+            (max(part.CLAMP_ROUND_X), 0.0, -spec.BAR_DEPTH / 2.0),
             part.CLAMP_CBORE_DIA / 2.0,
             (0.0, 0.0, 1.0),
         ),
@@ -529,3 +558,287 @@ def test_clamp_screws_engage_the_back_arc_and_stop_inside_it() -> None:
     # The tip never leaves the back arc's tapped block, so nothing behind it
     # is reached.
     assert most < back_block
+
+
+def test_west_slots_take_up_the_column_pitch() -> None:
+    """Owner ruling 2026-10-15, option A (PR #1471 round-3 review, finding 1):
+    the column pitch is not the bar's, and the round holes' float did not take
+    it up. Recomputed here from the mates' bands, not the builder's helpers:
+    the east pair stay round and locate the bar; each west slot's least travel
+    each way plus both shanks' slack along the bar must cover the pitch error
+    and every band between an east and a west screw."""
+    import fr_top_frame_spec
+    from _printed_tolerance import printed_band_mm
+    from sh_column_clamp_fit import (
+        BORE_DIAMETRAL_CLEARANCE,
+        EAR_HEIGHT_BAND,
+        EAR_STATION_BAND,
+    )
+    from vn_clamp_screw_spec import SHANK_DIA
+
+    # The pitch's sources: the top frame dimensions its socket pitch at .XX;
+    # the base's hole table prints each socket's X at .XX, two bands apart.
+    assert fr_top_frame_spec.DRAWING_REFERENCE_PRECISION["socket horizontal pitch"] == 2
+    assert part.COLUMN_PITCH_PLACES == 2
+    top, base = printed_band_mm(2), 2.0 * printed_band_mm(2)
+    assert (top, base) == pytest.approx((0.51, 1.02))
+    assert sorted(part.COLUMN_PITCH_DEVIATIONS.values()) == pytest.approx([top, base])
+    # A shank's slack along the bar in the least #8 hole (the model's 4.978,
+    # under the printed 4.98) at the worst height misalignment.
+    radial = (4.978 - SHANK_DIA) / 2.0
+    height = 0.18 + EAR_HEIGHT_BAND
+    assert part.CLAMP_POSITION_BAND == 0.18
+    slack = math.sqrt(radial**2 - height**2)
+    assert slack == pytest.approx(0.2943, abs=1e-4)
+    # Each slot's least travel each way: its 3.000 run at .XXX.
+    assert part.CLAMP_SLOT_RUN == 2.0 * part.CLAMP_SLOT_TRAVEL == 3.0
+    assert part.CLAMP_SLOT_WIDTH == part.CLAMP_HOLE_DIA == pytest.approx(4.978)
+    travel = (3.0 - printed_band_mm(3)) / 2.0
+    # Between an east and a west screw: both bar stations, both clamps' tap
+    # stations and both clamps' shift on their columns.
+    between = 2.0 * (0.18 + EAR_STATION_BAND + BORE_DIAMETRAL_CLEARANCE[1] / 2.0)
+    assert between == pytest.approx(0.86)
+    for pitch, margin in ((top, 0.6536), (base, 0.1436)):
+        left = travel + 2.0 * slack - (pitch + between)
+        assert left == pytest.approx(margin, abs=5e-4)
+        assert part.clamp_slot_closure_margin(pitch) == pytest.approx(left)
+    # Round west holes would not close even the top frame's pitch, and the
+    # travel's .XXX matters: at .XX the base's pitch would not close.
+    assert 2.0 * slack - (top + between) < 0.0
+    assert (3.0 - printed_band_mm(2)) / 2.0 + 2.0 * slack - (base + between) < 0.0
+    # The east pair share one clamp: only their stations and taps open it.
+    east = 2.0 * slack - 2.0 * (0.18 + EAR_STATION_BAND)
+    assert east == pytest.approx(0.0286, abs=1e-4)
+    assert part.clamp_east_pair_margin() == pytest.approx(east)
+    # The sheet says why they are slots, with no numbers.
+    why = sheet_spec.DIMENSION_CALLOUTS["ClampSlotWidth"]
+    assert "SLOTS TAKE UP\nCOLUMN PITCH" in why
+    assert re.search(r"\d", why) is None
+
+
+def test_slot_heads_bear_and_stay_inside_their_counterbores() -> None:
+    """The stock MHA-VN-021 head over a slot: at the shank's full float across
+    the widest slot it still overlaps the counterbore floor by the round
+    holes' own least (the same Ø4.98 +0.10/-0), and anywhere the shank reaches
+    in the longest slot it stays inside the narrowest, shortest counterbore."""
+    from _printed_tolerance import printed_band_mm
+    from vn_clamp_screw_spec import HEAD_DIA, SHANK_DIA
+
+    head_r = HEAD_DIA / 2.0
+    widest = 4.98 + 0.10
+    shift = (widest - SHANK_DIA) / 2.0
+    bearing = head_r - widest / 2.0 - shift
+    assert bearing == pytest.approx(0.4318, abs=1e-4)
+    assert part.CLAMP_HEAD_BEARING_MIN == pytest.approx(bearing)
+    assert part.clamp_head_bearing(widest) == pytest.approx(bearing)
+    band = printed_band_mm(3)
+    overrun = ((3.0 + band) - (3.0 - band)) / 2.0
+    reach = head_r + shift + overrun
+    room = (8.5 - band) / 2.0
+    assert room - reach == pytest.approx(0.1688, abs=1e-4)
+    assert part.clamp_slot_head_clearance() == pytest.approx(room - reach)
+    # At .XX the counterbore's width would not hold the head.
+    assert (8.5 - printed_band_mm(2)) / 2.0 < reach
+    # The slot counterbore is the round one's width, cut as deep.
+    assert part.CLAMP_SLOT_CBORE_WIDTH == part.CLAMP_CBORE_DIA == 8.5
+    assert part.CLAMP_SLOT_CBORE_RUN == part.CLAMP_SLOT_RUN
+
+
+def test_slot_counterbores_leave_rule_17_walls() -> None:
+    """Worst-case walls round the west counterbores: to the bar's west end
+    (the .X length short, the outer station long), between the pair's
+    counterbores, and to the top and bottom faces."""
+    from _printed_tolerance import printed_band_mm
+
+    assert sheet_spec.SHEET_PRECISION["BarProfile"]["Length"] == 1
+    band = printed_band_mm(3)
+    cbore_reach = (3.0 + band) / 2.0 + (8.5 + band) / 2.0
+    end_wall = (452.0 - printed_band_mm(1)) - (440.5 + 0.18) - cbore_reach
+    assert end_wall == pytest.approx(4.64, abs=5e-3)
+    web = (440.5 - 405.5) - 2.0 * 0.18 - 2.0 * cbore_reach
+    assert web == pytest.approx(22.88, abs=5e-3)
+    side = (spec.BAR_HEIGHT - spec.BAR_HEIGHT_BAND) / 2.0 - 0.18 - (8.5 + band) / 2.0
+    assert side == pytest.approx(9.44, abs=5e-3)
+    for wall in (end_wall, web, side):
+        assert wall >= 2.0
+    # Nominally 5.75 to the end, 23.5 between.
+    reach = part.CLAMP_SLOT_RUN / 2.0 + part.CLAMP_SLOT_CBORE_WIDTH / 2.0
+    assert part.BAR_LENGTH / 2.0 - max(part.CLAMP_SLOT_X) - reach == 5.75
+    assert max(part.CLAMP_SLOT_X) - min(part.CLAMP_SLOT_X) - 2.0 * reach == 23.5
+
+
+def test_slot_widths_print_their_count() -> None:
+    count = f"{len(part.CLAMP_SLOT_X)}X "
+    assert sheet_spec.DIMENSION_PREFIXES == {
+        ("ClampSlotProfile", "ClampSlotWidth"): count,
+        ("ClampSlotCboreProfile", "ClampSlotCboreWidth"): count,
+    }
+    for feature, name in sheet_spec.DIMENSION_PREFIXES:
+        assert name in sheet_spec.DRAWING_DIMENSIONS[feature]
+
+
+def test_slot_views_frame_the_slots() -> None:
+    # Detail C fences the outer slot's whole counterbore inside the bar's
+    # height; section B-B cuts the inner slot, its caption under it.
+    assert drawing.DETAIL_SLOT_X == max(part.CLAMP_SLOT_X)
+    reach = part.CLAMP_SLOT_CBORE_RUN / 2.0 + part.CLAMP_SLOT_CBORE_WIDTH / 2.0
+    assert reach < drawing.DETAIL_RADIUS_MM < spec.BAR_HEIGHT / 2.0
+    assert drawing.SLOT_SECTION_X == min(part.CLAMP_SLOT_X)
+    scale = drawing.SLOT_SECTION_SCALE[0] / drawing.SLOT_SECTION_SCALE[1]
+    bottom = drawing.SLOT_SECTION_CENTER[1] - spec.BAR_HEIGHT * scale / 2000.0
+    assert drawing.SLOT_SECTION_CAPTION_XY[1] < bottom
+    # The depth's callout stands above it, off the cut bar.
+    assert drawing.CALLOUTS_ABOVE == tuple(drawing.SLOT_SECTION_KEEP_NAMES)
+
+
+def test_round_counterbore_callout_stands_over_the_east_pair() -> None:
+    """The native counterbore callout points at a round (east) hole; its
+    widest line (2.3 mm a character, measured) stands right of the front
+    finish symbol and left of the bar height's text."""
+    half = (
+        max(len(line) for line in sheet_spec.CLAMP_CBORE_CALLOUT.splitlines())
+        * 0.0023
+        / 2.0
+    )
+    x = drawing.CLAMP_CALLOUT_XY[0]
+    assert drawing.FRONT_FINISH_SYMBOL_XY[0] + 0.006 < x - half
+    assert x + half < drawing.BACK_KEEP["Height"][0] - 0.002
+    hole = drawing._back_x(max(part.CLAMP_ROUND_X))
+    assert x - half < hole < x + half
+
+
+_FRONT_Z = -spec.BAR_DEPTH / 2.0
+# Sketch frames SOLIDWORKS may hand the front-face plane's sketch: model mm
+# to (u, v, w), sketch (u, v) back to model (x, y), and whether the normal
+# points out of the front face.
+_FRAMES = {
+    "u along +X, normal into the bar": (
+        lambda p: (p[0], p[1], p[2] - _FRONT_Z),
+        lambda u, v: (u, v),
+        False,
+    ),
+    "u along -X, normal out": (
+        lambda p: (-p[0], p[1], _FRONT_Z - p[2]),
+        lambda u, v: (-u, v),
+        True,
+    ),
+    "u along Y, normal out": (
+        lambda p: (p[1], p[0], _FRONT_Z - p[2]),
+        lambda u, v: (v, u),
+        True,
+    ),
+}
+
+
+@pytest.mark.parametrize("frame", list(_FRAMES))
+@pytest.mark.parametrize(
+    ("feature", "base", "width"),
+    [
+        ("ClampSlotProfile", "ClampSlot", part.CLAMP_SLOT_WIDTH),
+        ("ClampSlotCboreProfile", "ClampSlotCbore", part.CLAMP_SLOT_CBORE_WIDTH),
+    ],
+)
+def test_slot_profiles_run_along_the_bar_in_any_sketch_frame(
+    monkeypatch, frame, feature, base, width
+) -> None:
+    """Whatever axes the front-face sketch gets, each west slot's stadium runs
+    along the bar on its station at mid-height, its width and run carry the
+    print's names (the outer slot's bare, the inner's numbered), and the cut
+    direction follows the sketch normal."""
+    import _sketch
+
+    to_sketch, to_model, normal_out = _FRAMES[frame]
+    run = part.CLAMP_SLOT_RUN
+    values: list[float] = []
+    names: list[str] = []
+    lines: dict[str, tuple[float, float, float, float]] = {}
+    arcs: dict[str, tuple[float, float]] = {}
+    anchors: list[tuple[float, float]] = []
+
+    class _Adapter:
+        async def create_sketch(self, plane):
+            assert plane == part.FRONT_FACE_PLANE
+            return plane
+
+        async def add_line(self, *points):
+            key = f"line{len(lines)}"
+            lines[key] = points
+            return key
+
+        async def add_arc(self, cu, cv, *_ends):
+            key = f"arc{len(arcs)}"
+            arcs[key] = (cu, cv)
+            return key
+
+        async def add_sketch_constraint(self, *args):
+            return args
+
+        async def exit_sketch(self):
+            return None
+
+    async def anchor(_adapter, _point, u, v, _label):
+        anchors.append((u, v))
+        values.extend(abs(c) for c in (u, v) if c != 0.0)
+
+    async def dimension(_adapter, _a, _b, _kind, value, _label):
+        values.append(value)
+
+    async def defined(_adapter, _label):
+        return None
+
+    monkeypatch.setattr(part, "_sketch_uvw", lambda _adapter, p: to_sketch(p))
+    monkeypatch.setattr(part, "check", lambda _label, result: result)
+    monkeypatch.setattr(part, "set_sketch_direct_db", lambda *_args: None)
+    monkeypatch.setattr(part, "anchor_point_to_origin", anchor)
+    monkeypatch.setattr(part, "dimension_between", dimension)
+    monkeypatch.setattr(part, "ensure_fully_defined", defined)
+    monkeypatch.setattr(part, "name_last_feature", lambda *_args: None)
+    monkeypatch.setattr(_sketch, "_feature_by_name", lambda _adapter, name: name)
+    monkeypatch.setattr(_sketch, "_display_dimensions", lambda _f, _n: list(values))
+    monkeypatch.setattr(
+        _sketch,
+        "_rename_dimensions",
+        lambda _dims, _f, recorded: names.extend(recorded),
+    )
+    jobs, out = asyncio.run(
+        part._author_clamp_slot_profile(_Adapter(), feature, base, width, run)
+    )
+    assert jobs == []
+    assert out is normal_out
+    end_axis = "V" if frame.startswith("u along Y") else "U"
+    assert names == [
+        f"{base}Width",
+        f"{base}Travel",
+        f"{base}End{end_axis}",
+        f"{base}Width1",
+        f"{base}Travel1",
+        f"{base}End{end_axis}1",
+    ]
+    slots = sorted(part.CLAMP_SLOT_X, reverse=True)
+    ends = [to_model(*anchor) for anchor in anchors]
+    assert len(ends) == len(slots)
+    # Each slot's width, its run, then its end's one off-axis station.
+    assert values == pytest.approx(
+        [value for x, _y in ends for value in (width, run, abs(x))]
+    )
+    # Two sides and two ends a slot, the outer slot first.
+    assert len(lines) == len(arcs) == 2 * len(slots)
+    for index, slot_x in enumerate(slots):
+        sides = list(lines.values())[2 * index : 2 * index + 2]
+        for u0, v0, u1, v1 in sides:
+            (x0, y0), (x1, y1) = to_model(u0, v0), to_model(u1, v1)
+            assert y0 == pytest.approx(y1)
+            assert abs(y0) == pytest.approx(width / 2.0)
+            assert sorted((x0, x1)) == pytest.approx(
+                [slot_x - run / 2.0, slot_x + run / 2.0]
+            )
+        centres = sorted(
+            to_model(*centre)
+            for centre in list(arcs.values())[2 * index : 2 * index + 2]
+        )
+        assert centres == [
+            pytest.approx((slot_x - run / 2.0, 0.0)),
+            pytest.approx((slot_x + run / 2.0, 0.0)),
+        ]
+        assert ends[index][1] == pytest.approx(0.0)
+        assert abs(ends[index][0] - slot_x) == pytest.approx(run / 2.0)
