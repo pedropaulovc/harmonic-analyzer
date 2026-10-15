@@ -312,6 +312,28 @@ def test_shoulder_station_keeps_three_places_for_its_stack() -> None:
     assert stud.SHOULDER_CALLOUT == "BODY UNDER STACK TOP"
 
 
+def test_bore_chamfer_clears_the_seat_fillet_at_the_tightest_fit() -> None:
+    """Codex 4280374810: the lower button seats on the head face only if its
+    bore entry clears the stud's MAX seat fillet. The fillet lies under the
+    line rho + z = Rs + r from the shoulder corner; the chamfer's material
+    lies beyond rho + z = Rb + leg. So leg + (Rb - Rs) >= r clears it, at the
+    smallest bore, largest body and shortest leg the angle band allows."""
+    import math
+
+    from _printed_tolerance import angular_band_deg
+
+    bore_min = button.BORE_DIA + button.BORE_BAND[1]
+    body_max = stud.BODY_DIA + stud.BODY_BAND[0]
+    leg_min = button.BORE_CHAMFER * math.tan(
+        math.radians(button.BORE_CHAMFER_ANGLE_DEG - angular_band_deg())
+    )
+    margin = leg_min + (bore_min - body_max) / 2.0 - stud.SEAT_FILLET_RADIUS
+    assert margin > 0
+    assert stud.SEAT_FILLET_CLEARANCE_MIN == pytest.approx(margin)
+    assert button.BORE_FIT_CALLOUT[0] == "0.3 MIN X 45\u00b0 BOTH ENDS"
+    assert _features(BUTTON)["bore"]["note"].startswith(button.BORE_FIT_CALLOUT[0])
+
+
 def test_rim_runout_is_the_hub_coaxiality_remainder() -> None:
     assert button.OD_RUNOUT_TIR <= stud.RIM_RUNOUT_BUDGET_TIR + 1e-9
     assert button.OD_RUNOUT_TIR + 0.001 > stud.RIM_RUNOUT_BUDGET_TIR + 1e-9

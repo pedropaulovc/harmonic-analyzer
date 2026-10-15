@@ -53,9 +53,25 @@ if round(OD_RUNOUT_TIR, OD_RUNOUT_PLACES) != OD_RUNOUT_TIR:
 BORE_DIA = 6.51
 BORE_BAND = (0.005, -0.005)
 BORE_PLACES = 3
+# Both bore ends carry a 45 degree entry chamfer (the button is reversible):
+# the stud's MAX seat fillet would otherwise hold the lower button off the
+# head face at the tightest fit (codex 4280374810). Printed as a MIN leg on
+# the bore callout, as draw_dt_cone_tip_block names its bore's two
+# countersinks; the stud spec asserts the worst-case clearance.
+BORE_CHAMFER = 0.3
+BORE_CHAMFER_PLACES = 1
+BORE_CHAMFER_ANGLE_DEG = 45.0
+if round(BORE_CHAMFER, BORE_CHAMFER_PLACES) != BORE_CHAMFER:
+    raise AssertionError(
+        "filing-button bore chamfer MIN does not print as its model value"
+    )
+BORE_CHAMFER_CALLOUT = f"{BORE_CHAMFER:.{BORE_CHAMFER_PLACES}f} MIN X {BORE_CHAMFER_ANGLE_DEG:.0f}\u00b0 BOTH ENDS"
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit sits on the bore's callout, naming
 # the mate by Number with its acceptance (callout above, callout below).
-BORE_FIT_CALLOUT = ("", "SLIDES ON MHA-CH-006-TL-05 STUD BY HAND WITHOUT SHAKE")
+BORE_FIT_CALLOUT = (
+    BORE_CHAMFER_CALLOUT,
+    "SLIDES ON MHA-CH-006-TL-05 STUD BY HAND WITHOUT SHAKE",
+)
 BORE_FIT_NOTE = " ".join(part for part in BORE_FIT_CALLOUT if part)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

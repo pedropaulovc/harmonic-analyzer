@@ -23,7 +23,7 @@ import math
 
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_filing_button_spec as button
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import angular_band_deg, printed_deviations
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -139,9 +139,8 @@ if UPPER_BUTTON_SUPPORT_MIN < _BUTTON_MIN / 2.0:
 # model value), so the model carries the worst-case corner. The relief's two
 # roots stay inside the relief depth under the thread and do not meet at the
 # worst-case relief width; the held-only tail's step root leaves a flat on
-# the head's back face; the button seat corner stays under the title block's
-# 0.25 edge break on the lower button's bore (the kit test reads the row), so
-# the button bears on the head face.
+# the head's back face; the button seat corner clears the button's MIN bore
+# entry chamfer (below), so the button bears on the head face.
 RADIUS_PLACES = 1
 RADIUS_TOL_TYPE = 6  # swTolType_e.swTolMAX
 ROOT_RADIUS = 0.3
@@ -156,6 +155,25 @@ if 2.0 * ROOT_RADIUS >= RELIEF_WIDTH_MIN:
     raise AssertionError("filing-stud relief roots meet at the narrowest relief")
 if TAIL_ROOT_RADIUS >= (HEAD_DIA - TAIL_DIA) / 2.0:
     raise AssertionError("filing-stud tail root radius leaves no head step face")
+# Codex 4280374810: the title block's 0.25 edge break is a MAX, not a
+# guaranteed break, and at the tightest fit the bore clears the body by only
+# 0.0075 a side. Conservative sufficient condition: the fillet lies under the
+# line rho + z = Rs + r from the shoulder corner and the chamfered button's
+# material beyond rho + z = Rb + leg, so leg + (Rb - Rs) >= r clears it. It
+# is checked at the smallest bore, largest body and the shorter leg the
+# chamfer's MIN size leaves at the title block's angular band.
+_SEAT_CHAMFER_LEG_MIN = button.BORE_CHAMFER * math.tan(
+    math.radians(button.BORE_CHAMFER_ANGLE_DEG - angular_band_deg())
+)
+SEAT_FILLET_CLEARANCE_MIN = (
+    _SEAT_CHAMFER_LEG_MIN
+    + (button.BORE_DIA + button.BORE_BAND[1] - _BODY_MAX) / 2.0
+    - SEAT_FILLET_RADIUS
+)
+if SEAT_FILLET_CLEARANCE_MIN <= 0.0:
+    raise AssertionError(
+        "filing-button bore chamfer does not clear the stud seat fillet"
+    )
 RELIEF_ROOTS_CALLOUT = "2X"
 # The shoulder station stays at three places: at the title block's .X band
 # the relief would narrow under one pitch and the body could stand proud of
