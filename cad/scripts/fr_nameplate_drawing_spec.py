@@ -55,9 +55,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Places. The engraving is incised 0.300 below the 0.400 sunk field, so the
 # thinnest floor left under it is the thickness less 0.700: the thickness and
 # both depths print .XXX so that floor is a measured number, not a .X guess
-# (Main ruling 2026-10-14; the shortfall under rule 17's 1.5 floor is
-# reported, not hidden). The outline and the hole stations print .X: the base
-# is spotted through the plate.
+# (Main ruling 2026-10-14; the floor's shortfall under rule 17's 1.5 floor is
+# stated on the sheet, MINIMUM_NOTES). The outline and the hole stations
+# print .X: the base is spotted through the plate.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateSlab": {"PlateThick": 3},
     "ScrewHoles": {"S0X": 1, "S0Z": 1},
@@ -87,9 +87,11 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {"floor under engraving": 3}
 
 # Section A-A's depths from the decorated face: the sunk field, then every
 # engraved groove (border pinstripe and field lettering alike) to one floor.
-# The floor left under the engraving prints as a reference (user ruling
-# 2026-10-14): its printed worst case, ENGRAVING_FLOOR_MIN, sits under rule
-# 17's 1.5 floor as a decorative exception, not a structural wall.
+# The floor left under the engraving prints as a reference at its nominal
+# (0.800); its worst case at the printed bands, ENGRAVING_FLOOR_MIN (0.540),
+# sits under rule 17's 1.5 floor as a decorative exception, not a structural
+# wall (user ruling 2026-10-14; declared as fr-nameplate machinist exception
+# RV-02), and the sheet states it as a minimum in MINIMUM_NOTES.
 FIELD_DEPTH = 0.4
 ENGRAVING_FLOOR_DEPTH = 0.7
 FLOOR_UNDER_ENGRAVING = PLATE_THICKNESS - ENGRAVING_FLOOR_DEPTH
@@ -140,7 +142,8 @@ if ENGRAVING_FLOOR_MIN <= 0.0:
 # its .XX minimum) runs past the 4.98 deepest reach, so the screw, not the
 # seat, is the limit: 3.736 (1.31D) against 4.267.
 # Owner ruling 2026-10-15: accepted under rule 20, unloaded cosmetic plate
-# (option C: keep the 1/4 screw). The shortfall may not grow past the
+# (option C: keep the 1/4 screw; declared as fr-nameplate machinist exception
+# RV-03, stated in MINIMUM_NOTES). The shortfall may not grow past the
 # accepted value, and a joint that reaches 1.5D no longer needs the ruling.
 SCREW_LENGTH_SHORT_ALLOWANCE = 0.02 * 25.4
 SCREW_TIP_INCOMPLETE = 0.75 * SCREW_PITCH
@@ -284,6 +287,24 @@ SECTION_CALLOUTS = {
 FLOOR_UNDER_ENGRAVING_CALLOUT = "FLOOR UNDER ENGRAVING"
 HOLE_CALLOUT_PROCESS = "DRILL"
 
+
+def _stated_minimum(value: float) -> str:
+    """A worst-case minimum at two places, rounded DOWN: never overstated."""
+    return f"{math.floor(value * 100.0 + 1e-9) / 100.0:.2f}"
+
+
+# The two stated shortfalls, plain facts below the screw-head note:
+# fr-nameplate machinist exceptions RV-02 (the floor) and RV-03 (the screws'
+# full thread in the base), each formatted from its worst-case value above.
+FLOOR_MINIMUM_NOTE = f"FLOOR UNDER ENGRAVING {_stated_minimum(ENGRAVING_FLOOR_MIN)} MIN"
+SCREW_ENGAGEMENT_NOTE = (
+    f"SCREWS ENGAGE {_stated_minimum(SCREW_FULL_THREAD_MIN)} MIN FULL THREAD"
+)
+MINIMUM_NOTES = "\n".join((FLOOR_MINIMUM_NOTE, SCREW_ENGAGEMENT_NOTE))
+
+# The DXF rows: fr-nameplate machinist exception RV-01 (the outline, the sunk
+# field and the engraving are the release bundle's DXF artwork, not
+# dimensioned on the sheet).
 MANUFACTURING_NOTES = "\n".join(
     (
         f"OUTLINE AND CORNERS PER {bundle_path(OUTLINE_DXF_NAME)}",

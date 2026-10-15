@@ -77,6 +77,7 @@ from fr_nameplate_drawing_spec import (
     FLOOR_UNDER_ENGRAVING,
     FLOOR_UNDER_ENGRAVING_CALLOUT,
     HOLE_CALLOUT_PROCESS,
+    MINIMUM_NOTES,
     SCREW_HOLE_DIA,
     SECTION_CALLOUTS,
     SECTION_FIELD_X,
@@ -120,6 +121,9 @@ NOTES_XY = (0.030, 0.085)
 # method: the hole wins where the two meet.
 SCREW_HEAD_NOTE = "SCREW HOLES CUT THROUGH THE ENGRAVED SCREW HEADS"
 SCREW_HEAD_NOTE_XY = (0.030, 0.061)
+# The stated worst-case minimums (fr-nameplate machinist exceptions RV-02 and
+# RV-03), two rows a line below the screw-head note, in the empty bottom-left.
+MINIMUM_NOTES_XY = (0.030, 0.050)
 SECTION_CENTER = (0.350, 0.115)
 # The native caption's top centre. r4 printed the floor reference's text
 # right-aligned on its dimension line, its "(0.800)" row 0.88 mm into a
@@ -696,6 +700,9 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     if add_note(adapter, SCREW_HEAD_NOTE, *SCREW_HEAD_NOTE_XY) is None:
         raise RuntimeError("failed to place the screw-head engraving note")
+    # Named exceptions: fr-nameplate RV-02 (floor) and RV-03 (screw thread).
+    if add_note(adapter, MINIMUM_NOTES, *MINIMUM_NOTES_XY) is None:
+        raise RuntimeError("failed to place the stated-minimum notes")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     _telemetry.info("nameplate drawing views, dimensions and notes placed")
 
