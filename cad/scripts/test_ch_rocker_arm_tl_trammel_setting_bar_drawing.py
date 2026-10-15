@@ -60,6 +60,13 @@ def test_bar_is_the_supply_stock_with_h0_and_h816_equally_in_from_the_ends() -> 
     )
 
 
+def test_supply_dimensions_read_as_stock_not_machined() -> None:
+    """The bar is used at its supply length and thickness; only the seat
+    stations are machined, so neither stock size takes the title-block band."""
+    for name in ("BarLength", "BarThickness"):
+        assert drawing.CALLOUTS_BELOW[name] == "STOCK"
+
+
 def test_prechips_solids_are_valid_fixture_solids() -> None:
     for solid in spec.PRECHIPS_SOLIDS:
         FixtureSolid.model_validate(solid)

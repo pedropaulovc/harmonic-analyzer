@@ -103,8 +103,13 @@ CALLOUTS_ABOVE = {
     "SeatDia": "3X",
     "PilotDia": "3X",
 }
-# The thickness is the supply stock's, read at its exact 1/4 in size.
-CALLOUTS_BELOW = {"PilotDia": "DRILL THRU", "BarThickness": "STOCK"}
+# The length and thickness are the supply stock's (the bar is used at its
+# 36 in supply length), read at their exact sizes; only the stations are cut.
+CALLOUTS_BELOW = {
+    "PilotDia": "DRILL THRU",
+    "BarLength": "STOCK",
+    "BarThickness": "STOCK",
+}
 
 _DOWN = [0.0, -1.0, 0.0]
 
