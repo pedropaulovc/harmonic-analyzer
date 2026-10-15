@@ -102,6 +102,11 @@ FACE_CENTER = (0.095, 0.175)
 FACE_VIEW_ANGLE = -math.pi / 2.0
 ISO_CENTER = (0.355, 0.205)
 ISO_NOTE_XY = (0.330, 0.168)
+# The stated shortfalls (sh_column_clamp_front_spec.DRAWING_NOTES) stand in
+# the open lower-left field, under the split-face view's height callout
+# (0.090) and left of the title block (x 0.216, up to y 0.070), where the
+# fleet's notes stand.
+NOTES_XY = (0.020, 0.070)
 # Ear-height text centre off the face view's centre (sheet m): the bottom-face
 # witness stands ARC_HEIGHT / 2 at 2:1 = 0.016 off it, the widest callout
 # line is ~0.040 wide, so 0.040 leaves ~4 mm between text and witness.
@@ -257,6 +262,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "Material Specification",
         "Finish",
         "Quantity",
+        "Manufacturing Notes",
         "Isometric View Note",
     )
     read_required_properties(
@@ -334,6 +340,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="ear holes",
         process=HOLE_CALLOUT_PROCESS,
     )
+    # sh-column-clamp-front RV-01 (EAR_WALL_NOTE) and RV-02 (SCREW_LINE_NOTE).
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(

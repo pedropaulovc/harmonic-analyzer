@@ -31,8 +31,10 @@ from sh_column_clamp_fit import (  # noqa: F401
     EAR_STATION_BAND,
     GRIP_GAP_MIN,
     GRIP_OFFSET_BAND,
+    NOTE_PLACES,
     WALL_FLOOR,
     WALL_TARGET,
+    stated_min,
 )
 from sh_column_clamp_front_geom import (  # noqa: F401
     ARC_HEIGHT,
@@ -147,20 +149,23 @@ WALLS_WORST: dict[str, float] = {
 }
 if min(WALLS_WORST.values()) < WALL_FLOOR:
     raise AssertionError(f"clamp-back walls {WALLS_WORST} under the {WALL_FLOOR} floor")
-# drawing-guidelines.md rule 20: walls between the floor and the target.
-# Accepted, owner ruling 2026-10-15 (PR #1467 round-3 review; recorded in
-# sh_column_clamp_fit): the back wall, 1.9765 on the largest A513 column.  It
-# would need a column of at most 25.48 to reach 2.0.  Any other wall falling
-# short is a new shortfall.
-RULE_20_ACCEPTED = frozenset({"back wall"})
-RULE_20_SHORTFALLS = {
-    name: wall for name, wall in WALLS_WORST.items() if wall < WALL_TARGET
-}
-if not set(RULE_20_SHORTFALLS) <= RULE_20_ACCEPTED:
+# drawing-guidelines.md rule 20: walls between the floor and the target.  The
+# back wall, 1.9765 on the largest A513 column, is the only one and the part's
+# least wall: it would need a column of at most 25.48 to reach 2.0.
+# Owner-ruled shortfall, declared as sh-column-clamp-back RV-01
+# (cad/config/parts/sh-column-clamp-back.yaml) and stated by BACK_WALL_NOTE;
+# any other wall falling short needs its own.
+_SHORT_WALLS = {name for name, wall in WALLS_WORST.items() if wall < WALL_TARGET}
+if _SHORT_WALLS != {"back wall"} or WALLS_WORST["back wall"] != min(
+    WALLS_WORST.values()
+):
     raise AssertionError(
-        f"clamp-back walls {sorted(set(RULE_20_SHORTFALLS) - RULE_20_ACCEPTED)} "
-        f"under {WALL_TARGET} without a ruling"
+        f"clamp-back walls under {WALL_TARGET}: {sorted(_SHORT_WALLS)}; only the "
+        "back wall is declared (sh-column-clamp-back RV-01)"
     )
-BACK_WALL_MIN = WALLS_WORST["back wall"]
+BACK_WALL_MIN = stated_min(WALLS_WORST["back wall"])  # 1.97
+# sh-column-clamp-back RV-01
+BACK_WALL_NOTE = f"MIN BACK WALL {BACK_WALL_MIN:.{NOTE_PLACES}f}"
+DRAWING_NOTES = f"1. {BACK_WALL_NOTE}."
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
