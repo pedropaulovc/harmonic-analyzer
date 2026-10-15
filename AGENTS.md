@@ -353,6 +353,13 @@ such build:
 | `cache_status` | **no** | no (diagnostic) | no |
 | `build` (default), `build_bare`, `release` | meta | — | no (`release` publishes) |
 
+The `check:*` pytest subprocesses disable `cacheprovider` at their shared command
+definition in `dodo.py`; these gates do not use `--lf`/`--ff`. Under parallel
+`doit -n N`, pytest's root-level `pytest-cache-files-*` atomic rename can race
+another gate's Windows collection `lstat`, even with an explicit test-file path.
+Keep this policy on the gate commands, not global pytest configuration, so local
+interactive pytest retains its cache and unrelated CAD recipes do not re-key.
+
 `package:features:<stem>` exports each part whose `draw_<stem>.py` has module-level
 `_feature_requirements.requirement(...)` declarations beside its printed drawing
 requirements. `export_features.SUPPORTED_PARTS` is derived by import-free AST
