@@ -24,7 +24,11 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
 
 import _config
 from _check import check
@@ -33,6 +37,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 # The plate offset is owned by a reference sketch the part saves hidden.
@@ -46,6 +51,7 @@ from _drawing_dimensions import (
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -127,9 +133,9 @@ TOP_CALLOUTS = {
 }
 
 FRONT_KEEP = {
-    # Left of the hub, just above its axis: the leader clears the overall
-    # length's extension line below the hub and crosses the bore at an angle
-    # well away from the REAM leader's.
+    # Left of the hub, just above its axis: the near-side leader stops on the
+    # left rim, clear of the overall length's extension line below the hub
+    # and of the REAM leader, which lands from the upper right.
     "HubDia": (0.033, 0.165),
     "FulcrumDia": (0.050, 0.190),
     # Above the bar, so neither dimension line runs into the text.
@@ -237,6 +243,13 @@ async def build(adapter: Any) -> dict[str, str]:
             **DRAWING_PRECISION["PlateOffsetReference"],
         },
     )
+    # Native, the Ø12.0 line runs rim to rim through the hub centre and
+    # crosses the REAM leader there (review r3): one arrow on the near rim.
+    hub_dia = [a for a in front_annotations if dimension_name(adapter, a) == "HubDia"]
+    if len(hub_dia) != 1:
+        raise RuntimeError(f"expected one HubDia dimension, found {len(hub_dia)}")
+    set_near_side_diameter(hub_dia[0], "hub diameter")
+    rebuild_drawing(adapter, label="hub diameter near-side leader")
     set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
     set_dimension_callouts(adapter, top_annotations, TOP_CALLOUTS)
 

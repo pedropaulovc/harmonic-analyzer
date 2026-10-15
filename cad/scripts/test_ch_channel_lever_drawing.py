@@ -132,6 +132,14 @@ def test_sheet_carries_no_gdt_and_drill_callouts() -> None:
     assert source.count("process=drill_process(") == 2
 
 
+def test_hub_diameter_lands_on_its_near_rim() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'set_near_side_diameter(hub_dia[0], "hub diameter")' in source
+    assert source.index("set_near_side_diameter(") < source.index(
+        "set_dimension_callouts(adapter, front_annotations"
+    )
+
+
 def test_part_stamps_make_critical_drawing_properties() -> None:
     source = Path(lever.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
