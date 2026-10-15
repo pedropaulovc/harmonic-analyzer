@@ -58,7 +58,7 @@ KEEPER_Z_OFF = 74.0  # lug mid-plane off the centre: inner face at 71.0
 LUG_HALF_T = 3.0  # lug half-thickness along X (lug 6.0 thick)
 KEEPER_WIDTH = 14.0  # across Z (machine X when placed); extrudes symmetric
 SHAFT_AXIS_H = 25.2  # shaft bore centre above the seat
-CROWN_R = 7.0  # full-round lug top about the shaft axis (CROWN_R_TOL_TYPE)
+CROWN_R = 7.0  # full-round lug top about the shaft axis: KEEPER_WIDTH / 2
 FOOT_H = 8.0  # foot height; the bracket seats on y=0
 FOOT_L = 10.5  # foot length outboard of the lug's outer face
 FOOT_TIP_X = LUG_HALF_T + FOOT_L  # 13.5: outboard end of the foot
@@ -159,13 +159,11 @@ BORE_PAIR_CALLOUT = (
     "INSTALLED SPACING; THE MHA-CH-004\n"
     "SHAFT SLIDES THROUGH BOTH"
 )
-# The crown round meets both side faces whatever its radius above the MIN, so
-# a bore off the width's centre (BoreFromSide's band) leaves no step (MR-fleet
-# r5: with only "(7.0)" across the width the builder could not tell what
-# lateral error the blend allows). r7 (cc1a81a): an R7.0 MIN about a bore up
-# to 0.8 off centre cannot meet both sides tangentially, so the callout's
-# acceptance is a blend into them, not a meeting.
-CROWN_ABOUT_BORE_CALLOUT = "ROUND ABOUT THE BORE AFTER\nREAMING, BLENDED INTO BOTH SIDES"
+# The crown is a full round tangent to both side faces (Main ruling B+,
+# 2026-10-15, after MR-fleet r8 (7b21790) read "R7.0 MIN" as ambiguous):
+# its radius is the width's half, so the print gives it as a reference and
+# the width's band governs it (CROWN_LEAST_R below).
+CROWN_ABOUT_BORE_CALLOUT = "FULL ROUND ABOUT THE REAMED\nBORE, TANGENT TO BOTH SIDES"
 
 # --- Fit-up on the top frame (MHA-CH-000): the pair goes on with the shaft
 # through both bores and is set by DRO, the lug centres on the fulcrum line
@@ -250,24 +248,27 @@ def _sag(radius: float) -> float:
 
 
 # The crown is a 180 deg end arc, so it prints a radius (MR-fleet r5: "Ø14.0"
-# on the half round read as a boss or hole), as the single limit "R7.0 MIN"
-# (Main ruling (a), 2026-10-15): at the title block's .X a radius could drop
-# to 6.2, under this tap's 1.5D and ch_fulcrum_shaft's set-screw proud
-# ruling. Larger only moves where the round meets the sides; the supplied
-# blank's height (SUPPLY_HEIGHT_MIN) bounds it. swTolMIN prints the nominal,
-# so nominal = limit (the CORNER_R_MAX recipe).
-CROWN_R_PLACES = 1
-CROWN_R_MIN = CROWN_R
-CROWN_R_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "R7.0 MIN"
+# on the half round read as a boss or hole). A full round tangent to both
+# side faces carries no band of its own (Main ruling B+, 2026-10-15): it
+# prints as the radial reference "(R7.0)" and follows the width's .X band,
+# so it runs CROWN_LEAST_R..CROWN_MOST_R (6.6..7.4) -- not the 6.2 an
+# independent .X radius could drop to, under this tap's 1.5D.
+KEEPER_WIDTH_PLACES = 1
+CROWN_R_PLACES = KEEPER_WIDTH_PLACES
+if CROWN_R != KEEPER_WIDTH / 2.0:
+    raise AssertionError("the crown is not a full round across the keeper width")
+_CROWN_R_HALF_BAND = _BAND_BY_PLACES[KEEPER_WIDTH_PLACES] / 2.0
+CROWN_LEAST_R = CROWN_R - _CROWN_R_HALF_BAND  # 6.6
+CROWN_MOST_R = CROWN_R + _CROWN_R_HALF_BAND  # 7.4
 
 
-def set_screw_wall_terms(crown_r_min: float) -> dict[str, float]:
+def set_screw_wall_terms(crown_least_r: float) -> dict[str, float]:
     """Named terms of the crown tap's worst-case full-thread length (mm): the
     crown at its least radius, less the metal the thread cannot use (the
     dt_arbor_pedestal_spec.set_screw_wall_terms precedent)."""
-    least_crown = crown_r_min  # CrownRadius prints its single limit MIN
+    least_crown = crown_least_r  # half the width at its .X minimum
     return {
-        "crown radius at its MIN limit": least_crown,
+        "crown radius at the width's least half": least_crown,
         "bore radius at its maximum": -_BORE_MAX_RADIUS,
         "crown sag across the thread": -_sag(least_crown),
         "bore sag across the thread": -_sag(_BORE_MAX_RADIUS),
@@ -275,7 +276,7 @@ def set_screw_wall_terms(crown_r_min: float) -> dict[str, float]:
     }
 
 
-SET_SCREW_FULL_THREAD_MM = sum(set_screw_wall_terms(CROWN_R_MIN).values())
+SET_SCREW_FULL_THREAD_MM = sum(set_screw_wall_terms(CROWN_LEAST_R).values())
 SET_SCREW_ENGAGEMENT_D = SET_SCREW_FULL_THREAD_MM / THREAD_MAJOR_MM[SET_SCREW_THREAD]
 if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
     raise AssertionError(
@@ -408,7 +409,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL
 # owns them. One place is the general grade: the crown thread is sized at
-# the crown radius's single limit MIN (SET_SCREW_ENGAGEMENT_D) and the bore's
+# the full round's least radius, half the .X width's least (SET_SCREW_ENGAGEMENT_D), and the bore's
 # side walls at the .X lateral station and width (BORE_SIDE_WALL_MM). The shaft-axis height takes
 # two (it sets the fulcrum height; the pair reaming lines the two bores
 # up); the reamed bore carries its own BORE_DIA_BAND; the foot screw's
@@ -419,13 +420,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # outer web (SET_SCREW_WEB_MM), and the side station centres the transferred
 # MHA-FR-002 tap in its rail web (KEEPER_SCREW_TRANSVERSE_BAND_MM,
 # build_fr_top_frame). The references print one place; the corner round
-# prints its single limit at CORNER_R_PLACES, the crown round its own at
-# CROWN_R_PLACES and the supplied height its own at SUPPLY_HEIGHT_PLACES.
+# prints its single limit at CORNER_R_PLACES, the crown's radial reference
+# the width's CROWN_R_PLACES and the supplied height its own at
+# SUPPLY_HEIGHT_PLACES.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LugProfile": {"LugRise": 2},
     "LugBody": {"LugThickness": 3},
     "FootProfile": {"FootLength": 1, "FootRise": 1},
-    "Foot": {"Depth": 1},
+    "Foot": {"Depth": KEEPER_WIDTH_PLACES},
     "LugCrownProfile": {"CrownRadius": CROWN_R_PLACES},
     "ShaftBoreProfile": {"BoreDia": 3},
     "SetScrewReference": {"SetScrewLocation": 3},
@@ -457,8 +459,8 @@ if DRAWING_PRECISION["Foot"]["Depth"] != 1 or (
     )
 if DRAWING_PRECISION["FootProfile"]["FootRise"] != 1:
     raise AssertionError("the foot screw's engagement is sized at the .X foot height")
-if DRAWING_PRECISION["LugCrownProfile"]["CrownRadius"] != CROWN_R_PLACES:
-    raise AssertionError("the crown thread is sized at the crown radius's MIN limit")
+if DRAWING_PRECISION["Foot"]["Depth"] != KEEPER_WIDTH_PLACES:
+    raise AssertionError("the crown thread is sized at half the width's .X least")
 # Walls from the reamed bore to each side face (drawing-guidelines.md rule 17
 # (walls and webs)): the bore is placed off the -Z side face and the width
 # prints separately, so the far wall loses both bands.
@@ -480,22 +482,24 @@ KEEPER_SCREW_TRANSVERSE_BAND_MM = _BAND_BY_PLACES[
 # The keeper is supplied square-topped (BORE_PAIR_CALLOUT: undrilled) and
 # the pair-ream step rounds each crown about its own bore (MR-fleet r3,
 # cb6e11e: the blank's height was printed nowhere). The blank must reach the
-# crown apex of a bore at the top of its printed LugRise band; taller, the
-# round cuts the rest away. The SupplyHeightReference line runs up the inner
-# lug face AT the limit and prints the single limit "32.8 MIN" (swTolMIN
-# prints the nominal, so nominal = limit).
+# crown apex of a bore at the top of its printed LugRise band under the
+# largest full round the width allows (CROWN_MOST_R); taller, the round cuts
+# the rest away. The SupplyHeightReference line runs up the inner lug face AT
+# the limit, its square top drawn across the lug (MR-fleet r8: the extension
+# line ended in air), and prints the single limit "33.2 MIN" (swTolMIN prints
+# the nominal, so nominal = limit).
 SUPPLY_HEIGHT_PLACES = DRAWING_PRECISION["SupplyHeightReference"]["SupplyHeight"]
 _SUPPLY_STEP = 10.0**-SUPPLY_HEIGHT_PLACES
 SUPPLY_HEIGHT_MIN = round(
     ceil(
-        (SHAFT_AXIS_H + _BAND_BY_PLACES[DRAWING_PRECISION["LugProfile"]["LugRise"]] + CROWN_R_MIN)
+        (SHAFT_AXIS_H + _BAND_BY_PLACES[DRAWING_PRECISION["LugProfile"]["LugRise"]] + CROWN_MOST_R)
         / _SUPPLY_STEP
         - 1e-9
     )
     * _SUPPLY_STEP,
     SUPPLY_HEIGHT_PLACES,
-)  # 32.8
-SUPPLY_HEIGHT_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "32.8 MIN"
+)  # 33.2
+SUPPLY_HEIGHT_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "33.2 MIN"
 SUPPLY_HEIGHT_CALLOUT = "SUPPLY HEIGHT,\nSQUARE TOP"
 if not CROWN_TOP_Y < SUPPLY_HEIGHT_MIN:
     raise AssertionError("the supplied blank does not reach the crown apex")

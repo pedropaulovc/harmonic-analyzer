@@ -59,7 +59,7 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     assert f"(NOTE {spec.QUANTITY_NOTE}) AT INSTALLED SPACING" in pair_ream
     assert "AT INSTALLED SPACING; THE MHA-CH-004 SHAFT SLIDES THROUGH BOTH" in pair_ream
     assert " ".join(spec.CROWN_ABOUT_BORE_CALLOUT.split()) == (
-        "ROUND ABOUT THE BORE AFTER REAMING, BLENDED INTO BOTH SIDES"
+        "FULL ROUND ABOUT THE REAMED BORE, TANGENT TO BOTH SIDES"
     )
     notes = spec.DRAWING_NOTES.splitlines()
     quantity = [line for line in notes if "2 REQUIRED" in line]
@@ -171,7 +171,7 @@ def test_corner_round_prints_its_max_limit_in_the_open_corner() -> None:
     foot = Box(corner[0], seat, drawing._front_x(spec.FOOT_TIP_X), corner[1])
     crown_block = _text_block(
         drawing.RIGHT_KEEP["CrownRadius"],
-        ["R7.0 MIN", *drawing.DIMENSION_CALLOUTS["CrownRadius"].splitlines()],
+        ["(R7.0)", *drawing.DIMENSION_CALLOUTS["CrownRadius"].splitlines()],
     )
     for other in (
         lug,
@@ -206,15 +206,16 @@ def test_overall_sizes_print_as_references_and_the_bore_station_banded() -> None
 def test_supply_height_prints_the_blank_minimum() -> None:
     # MR-fleet r3: supplied undrilled and square-topped, the blank's height
     # was printed nowhere. It must reach the crown apex of a bore at the top
-    # of the .XX LugRise band; the part models it AT that limit.
+    # of the .XX LugRise band under the largest full round the .X width
+    # allows; the part models it AT that limit.
     spec = ch_fulcrum_keeper_spec
     assert spec.DRAWING_DIMENSIONS["SupplyHeightReference"] == {"SupplyHeight"}
     assert spec.SUPPLY_HEIGHT_PLACES == 1
     assert spec.SUPPLY_HEIGHT_TOL_TYPE == 5  # swTolMIN
     assert spec.DRAWING_PRECISION["LugProfile"]["LugRise"] == 2
-    apex = spec.SHAFT_AXIS_H + 0.51 + spec.CROWN_R_MIN
+    apex = spec.SHAFT_AXIS_H + 0.51 + (spec.KEEPER_WIDTH + 0.8) / 2.0
     assert apex <= spec.SUPPLY_HEIGHT_MIN < apex + 0.1
-    assert spec.SUPPLY_HEIGHT_MIN == 32.8
+    assert spec.SUPPLY_HEIGHT_MIN == 33.2
     assert "SupplyHeight" not in spec.REFERENCE_DIMENSIONS
     assert drawing.FRONT_CALLOUTS["SupplyHeight"] == spec.SUPPLY_HEIGHT_CALLOUT
     # The builder sets the MIN type on the line's own dimension (no upper
@@ -225,35 +226,45 @@ def test_supply_height_prints_the_blank_minimum() -> None:
         r"SUPPLY_HEIGHT_MIN, SUPPLY_HEIGHT_TOL_TYPE, 0\.0, 0\.0, \)",
         source,
     )
+    # MR-fleet r8: its extension line ended in air above the crown; the
+    # sketch draws the blank's square top across the lug from the line's top.
+    assert part.SUPPLY_TOP_SKETCH == "SupplyHeightReference"
+    assert "await _supply_square_top(adapter, sketch, line, end)" in source
+    assert (
+        "await adapter.add_line(*corner, corner[0] + LUG_T, corner[1])" in source
+    )
+    assert '"coincident"' in source
 
 
-def test_crown_prints_its_radius_as_a_min_limit() -> None:
-    # MR-fleet r5: "Ø14.0" on the 180 deg end round read as a boss or hole.
-    # The part dimensions the crown as a radius and prints the single limit
-    # "R7.0 MIN" (Main ruling (a), 2026-10-15): at .X the radius could drop
-    # to 6.2, under the crown tap's 1.5D.
+def test_crown_prints_a_full_round_reference_radius() -> None:
+    # MR-fleet r5: "Ø14.0" on the 180 deg end round read as a boss or hole;
+    # r8: "R7.0 MIN" was ambiguous. The crown is a full round tangent to both
+    # sides (Main ruling B+, 2026-10-15): the radius follows the .X width,
+    # 6.6..7.4, and prints as the radial reference "(R7.0)" -- an
+    # independent .X radius could drop to 6.2, under the crown tap's 1.5D.
     spec = ch_fulcrum_keeper_spec
     assert spec.DRAWING_DIMENSIONS["LugCrownProfile"] == {"CrownRadius"}
     assert spec.DRAWING_PRECISION["LugCrownProfile"] == {"CrownRadius": 1}
-    assert spec.CROWN_R_MIN == spec.CROWN_R == 7.0
-    assert spec.CROWN_R_TOL_TYPE == 5  # swTolMIN
+    assert spec.DRAWING_PRECISION["Foot"] == {"Depth": 1}
+    assert spec.CROWN_R == spec.KEEPER_WIDTH / 2.0 == 7.0
+    assert spec.CROWN_LEAST_R == pytest.approx(6.6)
+    assert spec.CROWN_MOST_R == pytest.approx(7.4)
     at_x_band = sum(spec.set_screw_wall_terms(spec.CROWN_R - 0.8).values())
     assert at_x_band / 1.8542 < 1.5
-    assert round(spec.SET_SCREW_ENGAGEMENT_D, 2) == 1.75
+    assert round(spec.SET_SCREW_ENGAGEMENT_D, 2) == 1.53
+    assert not hasattr(spec, "CROWN_R_MIN")
     source = " ".join(Path(part.__file__).read_text(encoding="utf-8").split())
     assert 'names=("CrownCz", "ShaftAxisH", "CrownRadius")' in source
     assert 'size_dimension="radius"' in source
-    assert re.search(
-        r'_single_limit\( adapter, "LugCrownProfile", "CrownRadius", '
-        r"CROWN_R, CROWN_R_TOL_TYPE, 0\.0, 0\.0, \)",
-        source,
-    )
+    assert '"LugCrownProfile", "CrownRadius",' not in source
     # The sheet keeps it radial: no near-side diameter style, arrow outside,
     # no solid leader on through the bore to the centre (MR-fleet r6 eye pass).
     assert "CrownRadius" not in drawing.NEAR_SIDE_DIAMETERS
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "_dress_crown_radius(adapter, right_annotations)" in sheet
+    assert 'prefix = "(" + existing' in sheet
     assert "display.SolidLeader = False" in sheet
+    assert "CrownRadius" not in spec.REFERENCE_DIMENSIONS
 
 
 def test_front_reference_lines_draw_in_the_outline_black() -> None:
@@ -513,7 +524,7 @@ def test_end_view_callouts_stand_clear_of_the_part_and_each_other() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
     blocks = {
         "CrownRadius": _text_block(
-            keep["CrownRadius"], ["R7.0 MIN", *callouts["CrownRadius"].splitlines()]
+            keep["CrownRadius"], ["(R7.0)", *callouts["CrownRadius"].splitlines()]
         ),
         "BoreDia": _text_block(
             keep["BoreDia"], ["Ø6.350 +0.035", *callouts["BoreDia"].splitlines()], stack=True
@@ -633,7 +644,7 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
     )
     crown_block = _text_block(
         drawing.RIGHT_KEEP["CrownRadius"],
-        ["R7.0 MIN", *drawing.DIMENSION_CALLOUTS["CrownRadius"].splitlines()],
+        ["(R7.0)", *drawing.DIMENSION_CALLOUTS["CrownRadius"].splitlines()],
     )
     notes_top = drawing.NOTES_TOP
     notes = Box(0.020, notes_top - 5 * _PITCH, 0.182, notes_top)
@@ -646,7 +657,7 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
         "SetScrewLocation": "3.000",
         "LugThickness": "6.000",
         "ScrewFromSide": "7.000",
-        "SupplyHeight": "32.8 MIN",
+        "SupplyHeight": "33.2 MIN",
     }
     blocks = {
         name: _value_block(keeps[name], value, callouts[name])
@@ -701,6 +712,12 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
         for name in ("SetScrewLocation", "LugThickness"):
             assert segment_box_distance(line, blocks[name]) >= 0.003, (name, line)
         assert segment_box_distance(line, tap) >= 0.003, line
+    # MR-fleet r8: the blank's square top runs across the lug at the limit,
+    # clear of every text and of the plan above.
+    square_top = Segment(lug.xmin, supply_top, lug.xmax, supply_top)
+    for name, box in {**neighbours, **blocks}.items():
+        if name != "lug":
+            assert segment_box_distance(square_top, box) >= 0.003, name
     # r4: SolidWorks drew the (16.5)'s line ~2.7 mm off its text, onto the
     # 6.000's arrows under that block's last row; either side, it stays clear
     # of the 6.000's line and of the notes.

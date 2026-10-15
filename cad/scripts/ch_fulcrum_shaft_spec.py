@@ -26,8 +26,8 @@ from ch_fulcrum_keeper_spec import (
     BORE_DIA_BAND,
     BORE_RUNNING_MIN_CLEARANCE_MM,
     BORE_SEAT_ALLOWANCE_MM,
+    CROWN_LEAST_R,
     CROWN_R,
-    CROWN_R_MIN,
     KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_Z_OFF,
     LUG_HALF_T,
@@ -106,7 +106,7 @@ def _sag(radius: float) -> float:
     return radius - sqrt(radius**2 - _SCREW_HALF_MAJOR**2)
 
 
-_CROWN_LEAST_R = CROWN_R_MIN  # the keeper prints its crown "R7.0 MIN"
+_CROWN_LEAST_R = CROWN_LEAST_R  # the full round at half the least width
 _BORE_R_MAX = (BORE_DIA + BORE_DIA_BAND[0]) / 2.0
 _BORE_R_MIN = (BORE_DIA + BORE_DIA_BAND[1]) / 2.0
 _TAP_FULL_TOP = _CROWN_LEAST_R - _sag(_CROWN_LEAST_R) - SET_SCREW_PITCH

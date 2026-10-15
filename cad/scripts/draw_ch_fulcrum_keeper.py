@@ -61,8 +61,7 @@ from ch_fulcrum_keeper_spec import (
     CORNER_R_MAX,
     CORNER_R_TOL_TYPE,
     CROWN_ABOUT_BORE_CALLOUT,
-    CROWN_R_MIN,
-    CROWN_R_TOL_TYPE,
+    CROWN_R,
     CROWN_TOP_Y,
     DRAWING_DIMENSIONS,
     FOOT_SCREW_SIDE_CALLOUT,
@@ -323,22 +322,41 @@ def _dress_corner_radius(adapter: Any, annotations: list[Any]) -> None:
 
 @_telemetry.traced("drawing.fulcrum_keeper.crown_radius")
 def _dress_crown_radius(adapter: Any, annotations: list[Any]) -> None:
-    """Prove the end view's CrownRadius prints the part's "R7.0 MIN" as a
-    radius and stop its leader at the arc (draw_dt_arbor_pedestal.
-    _show_crown_radius).
+    """Print the end view's CrownRadius as the radial reference "(R7.0)" and
+    stop its leader at the arc (draw_dt_arbor_pedestal._show_crown_radius).
 
-    The part dimensions the crown as a radius (define_circle
-    ``size_dimension="radius"``); a sheet must never flip a model diameter.
-    Arrow outside with no solid leader (draw_pd_platen_clip /
-    draw_ch_rocker_arm), the leader runs from the text to the arc and stops
-    there: MR-fleet r6 (443b118) eye pass, with only the arrow outside the
-    line still ran on from the arc through the bore to the centre.
+    The crown is a full round tangent to both sides (Main ruling B+,
+    2026-10-15): the width's band governs it, so it carries no band of its
+    own and reads as a reference. The part dimensions it as a radius
+    (define_circle ``size_dimension="radius"``); a sheet must never flip a
+    model diameter. The bare "(" prefix of set_reference_dimension would
+    replace SolidWorks' own radius glyph, so whatever prefix the display
+    carries stays behind the "(" (draw_mg_magnifying_lever.
+    _set_radial_reference). Arrow outside with no solid leader
+    (draw_pd_platen_clip / draw_ch_rocker_arm), the leader runs from the text
+    to the arc and stops there: MR-fleet r6 (443b118) eye pass, with only the
+    arrow outside the line still ran on from the arc through the bore to the
+    centre.
     """
-    display = _require_single_limit(
-        adapter, annotations, "CrownRadius", CROWN_R_TOL_TYPE, CROWN_R_MIN
-    )
+    annotation = _early_bound(_one(adapter, annotations, "CrownRadius"), "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    if not math.isclose(float(dimension.SystemValue), CROWN_R / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(f"CrownRadius does not measure the {CROWN_R:g} mm full round")
     if bool(display.Diametric):
         raise RuntimeError("the imported crown dimension is not radial")
+    existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+    prefix = "(" + existing
+    display.SetText(1, prefix)
+    display.SetText(2, ")")  # swDimensionTextSuffix
+    applied = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    _telemetry.info(
+        f"CrownRadius: radial reference prefix {existing!r} -> {applied[0]!r}, "
+        f"suffix {applied[1]!r}, tolerance type {int(tolerance.Type)}"
+    )
+    if applied != (prefix, ")"):
+        raise RuntimeError(f"failed to mark CrownRadius as a radial reference: {applied}")
     display.ArcExtensionLineOrOppositeSide = False
     display.ArrowSide = _ARROWS_OUTSIDE
     display.SolidLeader = False

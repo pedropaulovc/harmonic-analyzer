@@ -76,7 +76,6 @@ from ch_fulcrum_keeper_spec import (
     CORNER_R_MAX,
     CORNER_R_TOL_TYPE,
     CROWN_R,
-    CROWN_R_TOL_TYPE,
     CROWN_TOP_Y,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -220,6 +219,14 @@ REFERENCE_LINES = (
 )
 if tuple(row[0] for row in REFERENCE_LINES) != REFERENCE_SKETCHES:
     raise AssertionError("REFERENCE_LINES and REFERENCE_SKETCHES disagree")
+# The supplied blank's square top (MR-fleet r8, 7b21790: the supply height's
+# extension line ended in air above the crown): a second construction line in
+# the supply height's sketch, across the lug thickness from the height line's
+# top, so the dimension lands on drawn geometry, the blank's phantom outline.
+SUPPLY_TOP_SKETCH = "SupplyHeightReference"
+SUPPLY_TOP_DIMENSION = "SupplyTopWidth"
+if SUPPLY_TOP_SKETCH not in REFERENCE_SKETCHES:
+    raise AssertionError("the supply top's sketch is not a reference sketch")
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -229,6 +236,31 @@ def _as_construction(adapter, entity_id: str) -> None:
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
         raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+async def _supply_square_top(adapter, sketch: str, height_line: str, corner) -> None:
+    """The blank's square top: a horizontal construction line LUG_T long from
+    the supply height line's top corner, sized by its own dimension."""
+    set_sketch_direct_db(adapter, True)
+    top = check(
+        f"{sketch} square top",
+        await adapter.add_line(*corner, corner[0] + LUG_T, corner[1]),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, top)
+    check(
+        f"{sketch} square top horizontal",
+        await adapter.add_sketch_constraint(top, None, "horizontal"),
+    )
+    check(
+        f"{sketch} square top starts on the height line",
+        await adapter.add_sketch_constraint(
+            f"{height_line}.end", f"{top}.start", "coincident"
+        ),
+    )
+    await dimension_between(
+        adapter, f"{top}.start", f"{top}.end", "horizontal_distance", LUG_T, sketch
+    )
 
 
 async def _reference_line(
@@ -256,10 +288,14 @@ async def _reference_line(
         sketch,
     )
     await anchor_point_to_origin(adapter, f"{line}.start", *start, sketch)
+    names = [dimension, *(f"{dimension}Anchor{i}" for i in range(1, len(drives)))]
+    if sketch == SUPPLY_TOP_SKETCH:
+        await _supply_square_top(adapter, sketch, line, end)
+        names.append(SUPPLY_TOP_DIMENSION)
+        drives = (*drives, '"LugT"')
     await ensure_fully_defined(adapter, f"{sketch} sketch")
     check(f"exit_sketch {sketch}", await adapter.exit_sketch())
     name_last_feature(adapter, sketch)
-    names = [dimension, *(f"{dimension}Anchor{i}" for i in range(1, len(drives)))]
     full = name_dimensions(adapter, sketch, names)
     measured = (
         float(
@@ -582,16 +618,8 @@ async def build(adapter) -> dict[str, str]:
         0.0,
         0.0,
     )
-    # Any larger crown just meets the sides further down: no deviation.
-    _single_limit(
-        adapter,
-        "LugCrownProfile",
-        "CrownRadius",
-        CROWN_R,
-        CROWN_R_TOL_TYPE,
-        0.0,
-        0.0,
-    )
+    # The crown is a full round tangent to both sides: no band of its own
+    # (the width's governs it); the sheet prints it as a radial reference.
     set_dimension_bilateral_tolerance(
         adapter, "ShaftBoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )
