@@ -49,15 +49,17 @@ from __future__ import annotations
 
 import math
 
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from dt_crank_arm_spec import ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ARM_C2C
 from dt_crank_arm_spec import ARM_THICKNESS, HALF_WIDTH
 from dt_crank_hub_geometry import HUB_BARREL_DIA, HUB_LENGTH, SERVICE_PIN_STATION
+from dt_crank_hub_spec import DRAWING_PRECISION_BY_NAME as HUB_PRECISION
 from dt_crank_pin_eye_spec import ANCHOR_AIR, LOOP_ID_MIN, LOOP_INNER_R, LOOP_R
 from dt_crank_pin_eye_spec import TAIL_LEN as EYE_TAIL_LEN
 from dt_crank_pin_eye_spec import WIRE_DIA as EYE_WIRE_DIA
-from dt_crank_pin_ring_spec import ARC_SAGITTA, MEAN_R, PIN_BAND
+from dt_crank_pin_ring_spec import ARC_SAGITTA, MEAN_R, PIN_BAND, PIN_DIA_AT_HOLE_MAX
 from dt_crank_pin_ring_spec import PIN_DIA_AT_HOLE, PIN_PROUD
-from dt_crank_pin_ring_spec import RING_CENTRE_X, RING_FAR_X, RING_ID_MAX
+from dt_crank_pin_ring_spec import RING_CENTRE_X, RING_FAR_X, RING_ID_MAX, RING_ID_MIN
 from dt_crank_pin_ring_spec import WIRE_DIA as RING_WIRE_DIA
 from dt_crank_pin_spec import BIG_END_DIA, PIN_LENGTH, RING_HOLE_DIA
 from dt_crank_pin_spec import RING_HOLE_X, SMALL_END_DIA
@@ -117,6 +119,12 @@ HUB_R = HUB_BARREL_DIA / 2.0
 ARM_Z = (0.0, ARM_THICKNESS)
 HUB_Z = (ARM_THICKNESS, HUB_LENGTH)
 PIN_Z = SERVICE_PIN_STATION
+# The hub prints the pin's station from its arm shoulder, which is the arm's
+# inboard face (ARM_Z[1]), at ServicePinFromShoulder's places. At the band's
+# arm-side limit the pin, and the ring hanging from it, sit that much nearer
+# the arm.
+PIN_Z_BAND = printed_band_mm(HUB_PRECISION["ServicePinFromShoulder"])
+PIN_Z_ARMWARD = PIN_Z - PIN_Z_BAND
 PIN_X0 = -HUB_R - PIN_PROUD  # the pin's big end
 RING_X = PIN_X0 + RING_HOLE_X  # the ring's through leg and plane
 SCREW_XY = (-ANCHOR_SCREW_Y, -ANCHOR_SCREW_X)
@@ -129,11 +137,13 @@ EYE_ROOT: Vec = (
 EYE_LOOP_CENTRE: Vec = (EYE_ROOT[0], EYE_ROOT[1], EYE_ROOT[2] - LOOP_R)
 EYE_LOOP_Z = EYE_LOOP_CENTRE[2]
 # The ring swings freely about the cross-hole axis (machine z). Owner ruling
-# 2026-10-15 A1: it is posed flat in the pin's axial plane, hanging outboard
-# along RING_HANG past the pin's big end and clear of the arm's -X edge; hung
-# toward -Y along the arm (the Ø12 ring, option A) its low arc dipped 0.9
-# into the arm's inboard face. The chain drapes over its outboard wire, in
-# the pin axis's z plane.
+# 2026-10-15 A1: it is modelled flat in the pin's axial plane, hanging
+# outboard along RING_HANG past the pin's big end and clear of the arm's -X
+# edge; hung toward -Y along the arm (the Ø12 ring, option A) its low arc
+# dipped 0.9 into the arm's inboard face. The chain drapes over its outboard
+# wire, in the pin axis's z plane. In service the arm is the ring's swing stop
+# (RING_STOP_SWING_DEG); what holds at the printed limits is asserted with
+# ring_arm_air below.
 RING_HANG: Vec = (-1.0, 0.0, 0.0)
 RING_CENTRE: Vec = (RING_X - RING_CENTRE_X, 0.0, PIN_Z)
 RING_OUT_X = RING_X - RING_FAR_X  # the wire centreline's outboard extreme
@@ -190,14 +200,14 @@ def _dist(a: Vec, b: Vec) -> float:
     return _norm(_sub(a, b))
 
 
-# Owner ruling 2026-10-15 A1, worst case: the smallest printed ring on the
-# pin's fattest printed section pinches the hole's outboard edge in this plane
-# (-0.057 centred in the hole, -0.010 at its best slide), so it comes to rest
-# swung about the hole axis, zero air from ~25 degrees off the plane. Its
-# threading air (dt_crank_pin_ring_spec.HOLE_AIR_WORST) is in the hole's own
-# section and holds at every swing; the arm must clear it over that range.
+# Owner ruling 2026-10-15 A1, at the printed limits: the smallest printed ring
+# on the pin's fattest printed section pinches the hole's outboard edge in the
+# modelled plane (-0.057 centred in the hole, -0.010 at its best slide), so it
+# sits swung about the hole axis, zero air from ~RING_REST_SWING_DEG off the
+# plane. Its threading air (dt_crank_pin_ring_spec.HOLE_AIR_WORST) is in the
+# hole's own section and holds at every swing.
 RING_REST_SWING_DEG = 25.0
-RING_ARM_AIR = 0.1  # least air between the ring and the arm over the swing
+RING_ARM_AIR = 0.1  # least air between the modelled (nominal, A1) ring and the arm
 
 
 def _arm_gap(p: Vec) -> float:
@@ -210,17 +220,23 @@ def _arm_gap(p: Vec) -> float:
 
 
 def ring_arm_air(
-    swing_deg: float, mean_r: float, crown: float, hole_x: float, samples: int = 360
+    swing_deg: float,
+    mean_r: float,
+    crown: float,
+    hole_x: float,
+    pin_z: float,
+    samples: int = 360,
 ) -> float:
     """Air between a keeper ring's wire and the arm.
 
     The ring's plane holds the hole axis, swung ``swing_deg`` from RING_HANG
     toward -Y; its wire centreline (radius ``mean_r``) crowns ``crown`` hub-side
-    of a hole at machine x ``hole_x``.
+    of a hole at machine x ``hole_x`` in a pin whose axis is at machine z
+    ``pin_z``.
     """
     a = math.radians(swing_deg)
     hang = (RING_HANG[0] * math.cos(a), -math.sin(a), 0.0)
-    centre = _add((hole_x, 0.0, PIN_Z), _scale(hang, mean_r - crown))
+    centre = _add((hole_x, 0.0, pin_z), _scale(hang, mean_r - crown))
     return (
         min(
             _arm_gap(
@@ -238,23 +254,108 @@ def ring_arm_air(
     )
 
 
-# The worst printed reach: the largest ring the title block accepts, its crown
-# against the hole's hub-side wall, the hole at its station's hub-side limit.
-# The arm's hub end cannot grow past the as-supplied bar's half-width.
-RING_ARM_AIR_NOMINAL = ring_arm_air(0.0, MEAN_R, ARC_SAGITTA / 2.0, RING_X)
-RING_ARM_AIR_WORST = min(
-    ring_arm_air(
-        float(swing),
-        (RING_ID_MAX + RING_WIRE_DIA) / 2.0,
-        _HOLE_R - RING_WIRE_DIA / 2.0,
-        RING_X + PIN_BAND,
-    )
-    for swing in range(-int(RING_REST_SWING_DEG), int(RING_REST_SWING_DEG) + 1)
-)
-if RING_ARM_AIR_WORST < RING_ARM_AIR:
+# The modelled ring: nominal, in the A1 plane, at the nominal pin station.
+RING_ARM_AIR_NOMINAL = ring_arm_air(0.0, MEAN_R, ARC_SAGITTA / 2.0, RING_X, PIN_Z)
+if RING_ARM_AIR_NOMINAL < RING_ARM_AIR:
     raise AssertionError(
-        f"the largest printed keeper ring (Ø{RING_ID_MAX}) comes within "
-        f"{RING_ARM_AIR_WORST:.3f} of the crank arm, under {RING_ARM_AIR}"
+        f"the modelled keeper ring comes within {RING_ARM_AIR_NOMINAL:.3f} of the "
+        f"crank arm, under {RING_ARM_AIR}"
+    )
+
+# The arm is the ring's swing stop, not a clearance it keeps. With the arm
+# hanging down, the nominal ring swings under its own weight toward -Y until
+# its low arc lands on the arm's -X edge, RING_STOP_SWING_DEG off the A1
+# plane and short of plumb; as the crank turns it falls onto the arm's other
+# side. It touches the arm in service at every printing, so the printed limits
+# must keep that contact harmless, not absent:
+# * The pin is reamed into the hub, which is pressed and pinned into the arm:
+#   the crank carries ring and arm together, only the ring's own swing moves
+#   against the arm, and the chain wraps the ring's far (outboard) wire.
+# * Withdrawal: no point of any printed ring reaches x = 0 (RING_REACH_X_MAX,
+#   the oversize hole's hub-side wall at its station's hub-side limit). The
+#   arm is symmetric about x = 0, so wherever the ring meets it the arm's
+#   outward normal points -X or along its face: drawing the pin out (-X) lifts
+#   or slides the ring off the arm, never into it.
+# * No clamp: at the adverse printed corner every ring the title block accepts
+#   has a pose clear of the arm (ring_clear_pose_air), so the arm is a
+#   one-sided stop the ring can always leave and the pin seats with the ring
+#   held clear. The corner: the pin at ServicePinFromShoulder's arm-side limit
+#   (PIN_Z_ARMWARD), the hole at its station's hub-side limit, the pin's
+#   fattest printed section through it, and the hole drilled to size (the
+#   least room to slide in). The arm's hub end cannot grow past the
+#   as-supplied bar's half-width. Crowned against the hole's hub-side wall
+#   there, the largest ring touches the arm even in the A1 plane; slid
+#   outboard as far as the hole's edges let it, it clears.
+
+
+def _ring_stop_swing() -> float:
+    """Swing toward -Y at which the modelled ring meets the arm."""
+    clear, plumb = 0.0, 90.0
+    for _ in range(30):
+        mid = (clear + plumb) / 2.0
+        if ring_arm_air(mid, MEAN_R, ARC_SAGITTA / 2.0, RING_X, PIN_Z) > 0.0:
+            clear = mid
+        else:
+            plumb = mid
+    return clear
+
+
+if ring_arm_air(90.0, MEAN_R, ARC_SAGITTA / 2.0, RING_X, PIN_Z) >= 0.0:
+    raise AssertionError(
+        "the nominal keeper ring hangs plumb clear of the crank arm: the arm is "
+        "no longer its rest, so the contact case below no longer covers it"
+    )
+RING_STOP_SWING_DEG = _ring_stop_swing()
+
+_HOLE_R_MAX = (RING_HOLE_DIA + drilled_oversize_mm()) / 2.0
+_HOLE_X_HUBWARD = RING_X + PIN_BAND
+RING_REACH_X_MAX = _HOLE_X_HUBWARD + _HOLE_R_MAX
+if RING_REACH_X_MAX >= 0.0:
+    raise AssertionError(
+        f"a printed keeper ring reaches x = {RING_REACH_X_MAX:.3f}, past the arm's "
+        "mid-plane: drawing the pin out could drive it into the arm"
+    )
+
+_PIN_R_AT_HOLE_MAX = PIN_DIA_AT_HOLE_MAX / 2.0
+
+
+def a1_crown_min(mean_r: float, pin_r: float) -> float:
+    """Least crown at which a ring of wire-centreline radius ``mean_r`` in the
+    A1 plane keeps a drilled-to-size hole's outboard edges, on a pin section of
+    radius ``pin_r``, a wire radius inside its arc (A1_HOLE_AIR's edge term at
+    zero air)."""
+    return mean_r - _HOLE_R - math.sqrt((mean_r - RING_WIRE_DIA / 2.0) ** 2 - pin_r**2)
+
+
+def ring_clear_pose_air(mean_r: float) -> float:
+    """Arm air in one pose a printed ring of radius ``mean_r`` can take at the
+    adverse corner: a witness, other poses may clear more.
+
+    Where the hole admits the ring in the A1 plane, that plane with its crown
+    slid outboard to a1_crown_min. Otherwise (the smallest rings, which pinch
+    there) RING_REST_SWING_DEG either way, crowned against the oversize hole's
+    hub-side wall, the worst crown.
+    """
+    crown = a1_crown_min(mean_r, _PIN_R_AT_HOLE_MAX)
+    if crown <= _HOLE_R - RING_WIRE_DIA / 2.0:
+        return ring_arm_air(0.0, mean_r, crown, _HOLE_X_HUBWARD, PIN_Z_ARMWARD)
+    hub_wall = _HOLE_R_MAX - RING_WIRE_DIA / 2.0
+    return min(
+        ring_arm_air(swing, mean_r, hub_wall, _HOLE_X_HUBWARD, PIN_Z_ARMWARD)
+        for swing in (-RING_REST_SWING_DEG, RING_REST_SWING_DEG)
+    )
+
+
+_RING_R_MIN = (RING_ID_MIN + RING_WIRE_DIA) / 2.0
+_RING_R_MAX = (RING_ID_MAX + RING_WIRE_DIA) / 2.0
+RING_FREE_AIR_WORST = min(
+    ring_clear_pose_air(_RING_R_MIN + (_RING_R_MAX - _RING_R_MIN) * k / 32.0)
+    for k in range(33)
+)
+if RING_FREE_AIR_WORST < 0.0:
+    raise AssertionError(
+        f"a printed keeper ring at the adverse corner finds no pose clear of the "
+        f"crank arm ({RING_FREE_AIR_WORST:.3f}): the arm would clamp it"
     )
 
 
