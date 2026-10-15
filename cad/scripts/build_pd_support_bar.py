@@ -67,7 +67,10 @@ from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _holes import wizard_holes
 from _visibility import blank_reference_geometry
 import _telemetry
+from _printed_tolerance import printed_deviations
+from sh_column_clamp_fit import EAR_STATION_BAND as BACK_ARC_TAP_BAND
 from vn_clamp_screw_spec import HEAD_H as CLAMP_HEAD_H
+from vn_clamp_screw_spec import SHANK_DIA as CLAMP_SCREW_MAJOR
 from pd_support_bar_spec import (
     BACK_FACE_Z,
     BAR_DEPTH,
@@ -86,6 +89,7 @@ from pd_support_bar_spec import (
     PIVOT_TAP_X,
 )
 from pd_support_bar_drawing_spec import (
+    CLAMP_POSITION_PLACES,
     CLAMP_STATION_NAMES,
     DRAWING_DIMENSIONS,
     HANGER_STATION_NAMES,
@@ -143,6 +147,55 @@ CLAMP_ROW_START_X = LEFT_END_X
 CLAMP_ROW_HEIGHT = BAR_HEIGHT / 2.0
 CLAMP_ROW_X = tuple(sorted(CLAMP_HOLE_X))
 CLAMP_STATIONS = tuple(x - CLAMP_ROW_START_X for x in CLAMP_ROW_X)
+
+# The clamp holes' position band: a fixed-fastener stack, as the latch hook's
+# on this bar's own taps. Each #8-32 screw stands in its MHA-SH-002 back-arc
+# tap, whose station the clamp pair holds to ±BACK_ARC_TAP_BAND
+# (sh_column_clamp_fit; taken on both axes), and passes the bar's #8
+# clearance hole, whose least size (DRILLED HOLES minus 0) clears the basic
+# major by CLAMP_HOLE_FLOAT. A coordinate ±band is a diametral zone of
+# 2·√2·band (the rounding to the printed places included), and the bar's
+# zone plus the tap's must stay inside the float. The row height and
+# stations, at .XX, take the widest band that does: ±0.18 (0.509 + 0.283 =
+# 0.792 of 0.812; ±0.19 needs 0.820; the title block's .X ±0.8 needed 2.546).
+CLAMP_HOLE_FLOAT = CLAMP_HOLE_DIA - CLAMP_SCREW_MAJOR
+BACK_ARC_TAP_ZONE = 2.0 * math.hypot(BACK_ARC_TAP_BAND, BACK_ARC_TAP_BAND)
+
+
+def clamp_position_zone(band: float) -> float:
+    """Diametral zone a ±``band`` print of the clamp row gives a hole centre:
+    twice its farthest printed corner off the model, over every station."""
+
+    def reach(value: float) -> float:
+        deviations = printed_deviations(value, CLAMP_POSITION_PLACES, (-band, band))
+        return max(abs(d) for d in deviations)
+
+    return 2.0 * max(
+        math.hypot(reach(station), reach(CLAMP_ROW_HEIGHT))
+        for station in CLAMP_STATIONS
+    )
+
+
+_CLAMP_POSITION_STEP = 10.0**-CLAMP_POSITION_PLACES
+CLAMP_POSITION_BAND = round(
+    _CLAMP_POSITION_STEP
+    * max(
+        (
+            k
+            for k in range(1, math.ceil(CLAMP_HOLE_FLOAT / _CLAMP_POSITION_STEP))
+            if clamp_position_zone(k * _CLAMP_POSITION_STEP) + BACK_ARC_TAP_ZONE
+            <= CLAMP_HOLE_FLOAT + 1e-9
+        ),
+        default=0,
+    ),
+    CLAMP_POSITION_PLACES,
+)
+if CLAMP_POSITION_BAND <= 0.0:
+    raise AssertionError(
+        "MHA-VN-021 screws in the MHA-SH-002 taps through the support bar: no "
+        f".XX clamp-hole position band fits the {CLAMP_HOLE_FLOAT:.4f} float"
+    )
+
 # The pivot tap's full-thread minimum, drawn along the tap axis in its section
 # plane from the back face.
 PIVOT_SECTION_PLANE = "PivotSectionPlane"
@@ -571,13 +624,18 @@ async def build(adapter) -> dict[str, str]:
 
     # The rest of the print's places, then its bands and limits: the hanger
     # holes' row and stations carry the pivot and hook positions'
-    # HOLE_POSITION_BAND (paper_drive_geom, transgear_hanger_joints); the
-    # pivot drill's depth its spec limits; the full thread and countersinks
-    # their single limits.
+    # HOLE_POSITION_BAND (paper_drive_geom, transgear_hanger_joints), the
+    # clamp holes' row and stations the MHA-SH-002 taps' CLAMP_POSITION_BAND;
+    # the pivot drill's depth its spec limits; the full thread and
+    # countersinks their single limits.
     apply_drawing_precision(adapter, SHEET_PRECISION)
     for name in ("HangerRowHeight", *HANGER_STATION_NAMES):
         set_dimension_symmetric_tolerance(
             adapter, "HangerRowReference", name, HOLE_POSITION_BAND
+        )
+    for name in ("ClampRowHeight", *CLAMP_STATION_NAMES):
+        set_dimension_symmetric_tolerance(
+            adapter, "ClampRowReference", name, CLAMP_POSITION_BAND
         )
     set_dimension_bilateral_tolerance(
         adapter, "PivotTap", "DrillDepth", *PIVOT_TAP_DRILL_DEPTH_LIMITS, places=1

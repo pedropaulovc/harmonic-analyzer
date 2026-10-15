@@ -44,6 +44,10 @@ from pd_support_bar_spec import (
 TOL_MIN = 5  # swTolMIN
 TOL_MAX = 6  # swTolMAX
 HOLE_POSITION_PLACES = 3  # the hanger holes' ±0.065 prints .XXX
+# The clamp holes' row height and stations print .XX: their position band
+# (build_pd_support_bar.CLAMP_POSITION_BAND) is the MHA-SH-002 back-arc taps'
+# fixed-fastener stack, so the title block's .X ±0.8 would miss the taps.
+CLAMP_POSITION_PLACES = 2
 # The clamp counterbores' depth prints .XX: under its band the shallowest
 # depth still sinks the clamp-screw head below the front face the platen
 # slides across (build_pd_support_bar.CLAMP_HEAD_RECESS).
@@ -77,8 +81,8 @@ SHEET_PRECISION: dict[str, dict[str, int]] = {
         **dict.fromkeys(HANGER_STATION_NAMES, HOLE_POSITION_PLACES),
     },
     "ClampRowReference": {
-        "ClampRowHeight": 1,
-        **dict.fromkeys(CLAMP_STATION_NAMES, 1),
+        "ClampRowHeight": CLAMP_POSITION_PLACES,
+        **dict.fromkeys(CLAMP_STATION_NAMES, CLAMP_POSITION_PLACES),
     },
     "PivotTapProfile": {"PivotTapDrillDia": 2},
     "PivotTap": {"DrillDepth": 1},
@@ -113,9 +117,12 @@ DIMENSION_CALLOUTS = {
     "PivotCskDia": f"{_CSK}, MHA-VN-041\nSHOULDER BEARS OUTSIDE",
     "BracketCskDia": f"2X {_CSK}\nBOTH FACES, {BRACKET_TAP_SPEC.size} TAPS",
 }
-# Under the counterbores' native callout: the screws whose heads they sink,
-# and why the depth has a floor (the heads' worst case stays sub-flush).
-CLAMP_CBORE_CALLOUT = "MHA-VN-021 HEADS BELOW SLIDE FACE"
+# Under the counterbores' native callout: the taps the holes' banded row
+# height and stations locate to (rule 4: the tight band names its mate, as
+# the latch hook's SCREW_HOLE_MATE does), then the screws whose heads they
+# sink, and why the depth has a floor (the heads' worst case stays sub-flush).
+CLAMP_TAP_MATE = "LOCATE TO MHA-SH-002 TAPS"
+CLAMP_CBORE_CALLOUT = f"{CLAMP_TAP_MATE}\nMHA-VN-021 HEADS BELOW SLIDE FACE"
 
 # The platen hangs by its top rail's underside on the top face and slides
 # across the front face (build_pd_support_bar; pd_platen_guide_spec's own
