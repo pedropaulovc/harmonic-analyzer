@@ -18,6 +18,7 @@ import pd_platen_rack_spec as rack
 import build_pd_support_bar as support
 import vn_fillister_screw_spec as fillister
 import vn_platen_clip_screw_spec as clip_screw
+from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm, printed_deviations
 
 
@@ -258,6 +259,53 @@ def test_wider_platen_clip_stays_on_the_platen_and_off_the_recording_paper() -> 
     assert math.isclose(
         platen.PLATE_WIDTH - max(x for x, _ in platen.SOCKET_XY), socket_x
     )
+
+
+def _clip_paper_gap(socket_x: float) -> float:
+    """Nominal gap from the left clip's inboard edge to the recording paper."""
+    inboard = socket_x - clip.HOLE_Y + clip.CLIP_WIDTH
+    return paper_geometry.RECORDING_PAPER_LEFT_INSET_MM - inboard
+
+
+def test_clip_socket_station_is_the_largest_grid_value_holding_the_paper_gap() -> None:
+    # The photographed station no longer holds the 2.0 nominal gap beside the
+    # 6.6 clip screw rail and the 14.6 paper inset; the station is the largest
+    # 0.1-grid value that does, on both sides.
+    assert _clip_paper_gap(5.3928) < 2.0
+    assert _clip_paper_gap(platen.SOCKET_X) > 2.0
+    assert _clip_paper_gap(platen.SOCKET_X + 0.1) <= 2.0
+    assert math.isclose(platen.SOCKET_X * 10.0, round(platen.SOCKET_X * 10.0))
+    assert {x for x, _ in platen.SOCKET_XY} == {
+        platen.SOCKET_X,
+        platen.PLATE_WIDTH - platen.SOCKET_X,
+    }
+
+
+def test_outboard_clip_sockets_hold_their_edges_at_the_printed_worst_case() -> None:
+    # Coordinates print from the bottom-left corner: the left edge is the
+    # datum, the right edge spends the printed overall width's band too.
+    places = platen.DRAWING_PRECISION_BY_NAME
+    station = printed_band_mm(places["Socket3X"])
+    assert places["Socket1X"] == places["Socket3X"]
+    width = printed_band_mm(places["Width"])
+    edge_in = {
+        "left": platen.SOCKET_X - station,
+        "right": platen.SOCKET_X - station - width,
+    }
+    tap_r = THREAD_MAJOR_MM["#2-56"] / 2.0
+    clip_hole_y_max = clip.HOLE_Y + printed_band_mm(clip.POSITION_PLACES)
+    for side, distance in edge_in.items():
+        # Rule 17: the tap keeps its edge ligament (and the boss, should the
+        # edge flat it, its 2.0 wall round the tap).
+        assert distance - tap_r >= 2.0, side
+        # The clip's outer edge stays on the plate.
+        assert distance - clip_hole_y_max > 0.0, side
+    # The station moves nothing along the screw: the engagement is the plate
+    # and boss, at least 1.5D at the worst case.
+    assert (
+        platen.SOCKET_THREAD_ENGAGEMENT == platen.PLATE_THICKNESS + platen.SOCKET_BOSS_H
+    )
+    assert clip.CLIP_SCREW_ENGAGEMENT_MIN >= 1.5 * THREAD_MAJOR_MM["#2-56"]
 
 
 def test_platen_guide_holes_float_over_the_fixed_guide_screws() -> None:
