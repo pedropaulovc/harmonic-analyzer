@@ -505,9 +505,11 @@ DRILL_DRIFT_PER_MM = tan(radians(KEEPER_TAP_DRILL_WANDER_DEG))  # 0.00524
 # base rim break's one place, 1.6) overrides the title block's 0.25 max break
 # on the convex casting edges the model chamfers; hole, bore, counterbore, tap
 # and slot mouths keep the title-block break (the counterbore and tap walls are
-# proved without a chamfer).  The edges too close to a feature or under a knife
-# seat for it (build_fr_top_frame._external_edge_breaks) are the "UNLESS
-# NOTED": the hub side view's note names the hub rib's inner bottom and the
+# proved without a chamfer).  The edges too close to a feature, too short or
+# on too narrow a flange shelf at the print's limits, or under a knife seat,
+# for it (build_fr_top_frame._external_edge_breaks) are the "UNLESS NOTED":
+# E-E's note names the crossbar flange's underside, the hub side view's the
+# hub rib's inner bottom, its outer bottom beside the set-screw boss and the
 # V-gussets, the underside locator's the bar and gusset bottoms at the knife
 # seats; they keep the title block break.  drawing-guidelines.md rule 7 (notes: few, flagged, never a method) caps this block at four lines of at most 70
 # characters.

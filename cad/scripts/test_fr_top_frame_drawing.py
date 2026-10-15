@@ -291,10 +291,10 @@ def test_complete_keeper_foot_clears_boss_at_every_printed_fitup_corner(
         assert margins == pytest.approx(part.KEEPER_FOOT_PRINTED_BOSS_MARGINS)
 
 
-def _in_corner_crop(dx: float, dz: float) -> bool:
-    """Whether the plan offset (dx, dz) outward from a boss axis lies inside
-    the sketched flange corner crop triangle."""
-    (x0, z0), (x1, z1), (x2, z2) = part.CORNER_CROP_TRIANGLE
+def _in_corner_crop(dx: float, dz: float, triangle=part.CORNER_CROP_TRIANGLE) -> bool:
+    """Whether the plan point (dx, dz) lies inside ``triangle``: by default
+    the sketched flange corner crop, as offsets outward from a boss axis."""
+    (x0, z0), (x1, z1), (x2, z2) = triangle
 
     def side(ax: float, az: float, bx: float, bz: float) -> float:
         return (bx - ax) * (dz - az) - (bz - az) * (dx - ax)
@@ -338,7 +338,7 @@ def test_boss_additions_match_an_independent_t_section_area_integral() -> None:
     actual_upper, actual_lower = part._boss_add_volumes()
     assert actual_upper == pytest.approx(upper, abs=10.0)
     assert actual_lower == pytest.approx(lower, abs=10.0)
-    assert actual_upper == pytest.approx(18898.122327621306)
+    assert actual_upper == pytest.approx(18921.470677653993)
     assert actual_lower == pytest.approx(28519.255654222216)
 
 
@@ -422,7 +422,8 @@ def test_flange_corner_crops_remove_all_four_nibs_outside_the_barrels() -> None:
     side_cross = (a, side_leg[1] + (a - side_leg[0]) * slope)
     fr_cross = (side_leg[0] + (b - side_leg[1]) / slope, b)
     # ... inside the barrel, so the union leaves no flange outside it and the
-    # cut never nicks the barrel; the triangle stays off the web ring.
+    # cut never nicks the barrel; the triangle stays off the web ring. (A
+    # printed-limit test below holds it inside the smallest printed barrel.)
     assert math.hypot(*side_cross) < radius and math.hypot(*fr_cross) < radius
     assert min(min(point) for point in part.CORNER_CROP_TRIANGLE) > part.WEB_T / 2.0
     # Exact areas against a 0.01 mm grid over the corner: the flange the cut
@@ -454,7 +455,7 @@ def test_flange_corner_crops_remove_all_four_nibs_outside_the_barrels() -> None:
     assert nib == pytest.approx(part.CORNER_NIB_AREA, abs=0.02)
     assert refilled == pytest.approx(part.CORNER_CROP_IN_BOSS, abs=0.02)
     assert part.CORNER_NIB_AREA == pytest.approx(9.935, abs=1e-3)
-    assert part.CORNER_CROP_AREA == pytest.approx(13.528, abs=1e-3)
+    assert part.CORNER_CROP_AREA == pytest.approx(16.447, abs=1e-3)
     # The casting model is empty in all four nibs at mid-flange, solid on the
     # barrels and on the flange beside them.
     y = (part.FLANGE_BOT_Y + part.HALF_H) / 2.0
@@ -493,6 +494,148 @@ def test_flange_corner_crops_remove_all_four_nibs_outside_the_barrels() -> None:
         < body.index('name_last_feature(adapter, "CornerCrop")')
         < body.index("v_boss_up, v_boss_down = _boss_add_volumes()")
     )
+
+
+def _flange_left_outside_barrel(
+    triangle,
+    axis: tuple[float, float],
+    sign: tuple[float, float],
+    radius: float,
+    side: float,
+    front_rear: float,
+) -> int:
+    """Sampled plan points of one corner's flange, its outer faces ``side``
+    and ``front_rear`` off the boss ``axis`` toward ``sign``, that stand
+    outside a ``radius`` barrel and outside the plan ``triangle``."""
+    step = 0.05
+    left = 0
+    for i in range(math.ceil(side / step)):
+        dx = (i + 0.5) * step
+        if dx >= side:
+            continue
+        j0 = int(math.sqrt(max(radius**2 - dx**2, 0.0)) / step)
+        for j in range(j0, math.ceil(front_rear / step)):
+            dz = (j + 0.5) * step
+            if dz >= front_rear or math.hypot(dx, dz) <= radius + 1e-6:
+                continue
+            point = (axis[0] + sign[0] * dx, axis[1] + sign[1] * dz)
+            left += not _in_corner_crop(*point, triangle)
+    return left
+
+
+def _t_flange_overhang(width: float, width_label: str, web_label: str) -> float:
+    """A T flange's least printed overhang past its centred web, each side:
+    the narrowest printed flange less the thickest printed web, halved."""
+    band = spec.PRINTED_LINEAR_BAND_MM
+    reference = spec.DRAWING_REFERENCE_PRECISION
+    width_places, web_places = reference[width_label], reference[web_label]
+    return (
+        round(width, width_places)
+        - band[width_places]
+        - round(part.WEB_T, web_places)
+        - band[web_places]
+    ) / 2.0
+
+
+def test_flange_corner_crop_chord_holds_at_every_printed_limit() -> None:
+    # A conforming part may pair the smallest or largest .X barrel with each
+    # outer face anywhere in its printed band: half the .X flange extent less
+    # half the .XX socket pitch, both centred on the socket pattern (a wider
+    # band than the local flange width's). At all four corners the crop
+    # leaves no flange outside the barrel and stays clear of the printed web.
+    band = spec.PRINTED_LINEAR_BAND_MM
+    outer = spec.DRAWING_PRECISION["OuterProfile"]
+    reference = spec.DRAWING_REFERENCE_PRECISION
+
+    def face_band(
+        extent: float, extent_places: int, pitch: float, pitch_places: int
+    ) -> tuple[float, float]:
+        offset = (round(extent, extent_places) - round(pitch, pitch_places)) / 2.0
+        half = (band[extent_places] + band[pitch_places]) / 2.0
+        return offset - half, offset + half
+
+    z_col = abs(part.FRONT_COLUMN_Z)
+    side = face_band(
+        2.0 * part.OUTER_X,
+        outer["Width"],
+        2.0 * part.COLUMN_X,
+        reference["socket horizontal pitch"],
+    )
+    front_rear = face_band(
+        2.0 * part.OUTER_Z,
+        outer["Depth"],
+        2.0 * z_col,
+        reference["socket vertical pitch"],
+    )
+    assert side == pytest.approx((16.445, 17.755))
+    assert front_rear == pytest.approx((18.345, 19.655))
+    assert part.CORNER_CROP_FACE_OFFSETS["side"] == pytest.approx(side)
+    assert part.CORNER_CROP_FACE_OFFSETS["front/rear"] == pytest.approx(front_rear)
+    for (low, high), width, label in (
+        (side, part.RAIL_W_SIDE, "side flange width"),
+        (front_rear, part.RAIL_W_FR, "front rear flange width"),
+    ):
+        half_band = band[reference[label]] / 2.0
+        assert low < width / 2.0 - half_band and width / 2.0 + half_band < high
+    boss_places = spec.DRAWING_PRECISION["BossUpProfile"]["C0Dia"]
+    radii = tuple(
+        (round(part.BOSS_DIA, boss_places) + sign * band[boss_places]) / 2.0
+        for sign in (-1.0, 1.0)
+    )
+    assert radii == pytest.approx((22.1, 22.9))
+    assert part.CORNER_CROP_BOSS_R_MIN == pytest.approx(radii[0])
+    apex, side_leg, fr_leg = part.CORNER_CROP_TRIANGLE
+    # No sketch edge lies on any printed outer face.
+    assert apex[0] > side[1] and apex[1] > front_rear[1]
+    assert side_leg[0] > side[1] and fr_leg[1] > front_rear[1]
+    for sx, sz in ((1.0, 1.0), (1.0, -1.0), (-1.0, -1.0), (-1.0, 1.0)):
+        axis = (sx * part.COLUMN_X, sz * z_col)
+        triangle = [
+            (sx * (part.COLUMN_X + px), sz * (z_col + pz))
+            for px, pz in part.CORNER_CROP_TRIANGLE
+        ]
+        for radius in radii:
+            for a in side:
+                for b in front_rear:
+                    left = _flange_left_outside_barrel(
+                        triangle, axis, (sx, sz), radius, a, b
+                    )
+                    assert left == 0, (sx, sz, radius, a, b)
+    # Each web prints centred under its flange: its outer face stands at
+    # most 7.955 off the axis, short of every triangle vertex.
+    side_overhang = _t_flange_overhang(
+        part.RAIL_W_SIDE, "side flange width", "side rail web thickness"
+    )
+    fr_overhang = _t_flange_overhang(
+        part.RAIL_W_FR, "front rear flange width", "rail web thickness"
+    )
+    web_faces = [side[1] - side_overhang, front_rear[1] - fr_overhang]
+    assert web_faces == pytest.approx([7.955, 7.955])
+    assert part.CORNER_CROP_WEB_FACE_MAX == pytest.approx(max(web_faces))
+    assert min(min(point) for point in part.CORNER_CROP_TRIANGLE) > max(web_faces)
+    # The former chord, 0.5 inside each nominal barrel crossing, ended at
+    # R22.178 and R22.236: it held on the nominal part but left flange
+    # outside the smallest barrel with the farthest faces.
+    a, b = part.RAIL_W_SIDE / 2.0, part.RAIL_W_FR / 2.0
+    inset_side = (a, part.CORNER_SIDE_CUT - 0.5)
+    inset_fr = (part.CORNER_FR_CUT - 0.5, b)
+    assert math.hypot(*inset_side) == pytest.approx(22.178, abs=1e-3)
+    assert math.hypot(*inset_fr) == pytest.approx(22.236, abs=1e-3)
+    slope = (inset_fr[1] - inset_side[1]) / (inset_side[0] - inset_fr[0])
+    inset_triangle = (
+        (a + 1.0, b + 1.0),
+        (a + 1.0, inset_side[1] - slope),
+        (inset_fr[0] - 1.0 / slope, b + 1.0),
+    )
+    origin, outward = (0.0, 0.0), (1.0, 1.0)
+    nominal_left = _flange_left_outside_barrel(
+        inset_triangle, origin, outward, part.BOSS_DIA / 2.0, a, b
+    )
+    printed_left = _flange_left_outside_barrel(
+        inset_triangle, origin, outward, radii[0], side[1], front_rear[1]
+    )
+    assert nominal_left == 0
+    assert printed_left > 0
 
 
 def test_flange_corner_guard_requires_every_diagonal_to_end_on_its_barrel() -> None:
@@ -544,9 +687,6 @@ def test_crossbar_t_keeps_the_hanger_holes_in_the_full_depth_junctions() -> None
     assert part.BAR_WEB_X1 - part.BAR_WEB_X0 == part.WEB_T
     assert part.BAR_X0 < part.BAR_WEB_X0 - part.ROOT_FILLET_R
     assert part.BAR_WEB_X1 + part.ROOT_FILLET_R < part.BAR_X1
-    # The flange underside's breaks keep a flat outboard of each R3 root.
-    assert part.CROSSBAR_FLANGE_UNDERSIDE_LAND == pytest.approx(0.6)
-    assert part.CROSSBAR_FLANGE_UNDERSIDE_LAND >= part.EDGE_BREAK_SLIVER_MIN
     band = spec.PRINTED_LINEAR_BAND_MM[1]
     pocket_end = part.BAR_POCKET_Z + 2.0 * band
     for station in (part.STUD_Z_FRONT, part.STUD_Z_REAR):
@@ -554,6 +694,91 @@ def test_crossbar_t_keeps_the_hanger_holes_in_the_full_depth_junctions() -> None
         wall = abs(station) - band - largest_hole_r - pocket_end
         assert wall >= 2.0
     assert min(part.BAR_POCKET_HOLE_WALLS.values()) >= 2.0
+
+
+def _t_flange_shelf(width: float, width_label: str, web_label: str) -> float:
+    """A T flange underside's flat at the printed limits: its least printed
+    overhang less the largest printed root radius."""
+    band = spec.PRINTED_LINEAR_BAND_MM
+    root_places = spec.DRAWING_REFERENCE_PRECISION["T rail root radius"]
+    root_max = round(part.ROOT_FILLET_R, root_places) + band[root_places]
+    return _t_flange_overhang(width, width_label, web_label) - root_max
+
+
+def test_t_flange_underside_breaks_need_a_printed_shelf() -> None:
+    # Each web prints centred under its flange. The rails' printed flats
+    # hold the printed worst leg and the sliver land; the 25-wide crossbar's
+    # 1.4, (24.2 - 13.8) / 2 - 3.8, does not hold a 2.4 break, so its
+    # underside edges stay sharp, as E-E notes.
+    expected = {
+        "side rail": _t_flange_shelf(
+            part.RAIL_W_SIDE, "side flange width", "side rail web thickness"
+        ),
+        "front/rear rail": _t_flange_shelf(
+            part.RAIL_W_FR, "front rear flange width", "rail web thickness"
+        ),
+        "crossbar": _t_flange_shelf(
+            part.BAR_X1 - part.BAR_X0,
+            "crossbar flange width",
+            "crossbar web thickness",
+        ),
+    }
+    assert expected == pytest.approx(
+        {"side rail": 6.0, "front/rear rail": 7.9, "crossbar": 1.4}
+    )
+    assert part.T_FLANGE_SHELF_PRINTED_MIN == pytest.approx(expected)
+    needed = part.EDGE_BREAK_PRINTED_MAX + part.EDGE_BREAK_SLIVER_MIN
+    assert expected["crossbar"] < needed
+    assert needed <= min(expected["side rail"], expected["front/rear rail"])
+    points = _external_break_points()
+    for x_bar in (part.BAR_X0, part.BAR_X1):
+        assert [x_bar, part.FLANGE_BOT_Y, 0.0] not in points
+    # Every rail flange underside keeps its break: the west outer and window
+    # runs, both front/rear outer runs, and the hub side's runs either side
+    # of the rib.
+    rib_lo = part.GOOSENECK_Z - part.HUB_RIB_W / 2.0
+    z_col = abs(part.FRONT_COLUMN_Z)
+    for point in (
+        [part.OUTER_X, part.FLANGE_BOT_Y, 0.0],
+        [part.INNER_X, part.FLANGE_BOT_Y, 0.0],
+        [0.0, part.FLANGE_BOT_Y, part.OUTER_Z],
+        [0.0, part.FLANGE_BOT_Y, -part.OUTER_Z],
+        [
+            -part.OUTER_X,
+            part.FLANGE_BOT_Y,
+            (-(z_col - part.CORNER_SIDE_CUT) + rib_lo) / 2.0,
+        ],
+        [-part.INNER_X, part.FLANGE_BOT_Y, (-part.INNER_Z + rib_lo) / 2.0],
+    ):
+        assert point in points
+
+
+def test_a_crossbar_shelf_that_holds_the_break_takes_it(monkeypatch) -> None:
+    # A 30-wide crossbar flange would print a 3.9 flat: its two underside
+    # edges return to the crossbar's chain, each meeting both pocket ends'
+    # vertical corners, and every other chain is unchanged.
+    wider = _t_flange_shelf(30.0, "crossbar flange width", "crossbar web thickness")
+    assert wider == pytest.approx(3.9)
+    monkeypatch.setattr(
+        part,
+        "T_FLANGE_SHELF_PRINTED_MIN",
+        {**part.T_FLANGE_SHELF_PRINTED_MIN, "crossbar": wider},
+    )
+    groups, _clearance = part._external_edge_breaks()
+    picks, removal, shared = groups["CrossbarBreaks"]
+    base_picks, base_removal, base_shared = part.EXTERNAL_EDGE_BREAKS["CrossbarBreaks"]
+    for x_bar in (part.BAR_X0, part.BAR_X1):
+        assert [x_bar, part.FLANGE_BOT_Y, 0.0] in picks
+    assert [point for point in picks if point[1] != part.FLANGE_BOT_Y] == base_picks
+    assert len(picks) == len(base_picks) + 2
+    assert removal == pytest.approx(
+        base_removal + 2.0 * 0.5 * part.EDGE_CHAMFER**2 * 2.0 * part.BAR_POCKET_Z
+    )
+    assert shared == base_shared + 4
+    assert list(groups) == list(part.EXTERNAL_EDGE_BREAKS)
+    for name, chain in part.EXTERNAL_EDGE_BREAKS.items():
+        if name != "CrossbarBreaks":
+            assert groups[name] == chain, name
 
 
 def test_knife_seat_footprints_cover_every_printed_extreme() -> None:
@@ -676,13 +901,15 @@ def _external_break_points() -> list[list[float]]:
 def test_edge_breaks_split_into_connected_chains_in_build_order() -> None:
     groups, _clearance = part._external_edge_breaks()
     assert groups == part.EXTERNAL_EDGE_BREAKS
-    # The set-screw boss joins the hub rail's chain through the rib's outer
-    # bottom either side of it.
+    # Derived from the eligible breaks: the crossbar T flange's underside and
+    # the hub rib's outer bottom either side of the set-screw boss stay sharp
+    # at the printed limits, so the boss's breaks are a chain of their own.
     expected = {
         "RailRunBreaks": (7, 2517.9136949365184, 0),
-        "CrossbarBreaks": (14, 884.5748437500002, 16),
+        "CrossbarBreaks": (12, 536.7932812499998, 12),
         "WestWindowBreaks": (11, 1140.0162198910798, 12),
-        "HubRailBreaks": (36, 1900.5878147090089, 42),
+        "HubRailBreaks": (26, 1746.1022365840088, 24),
+        "HubSetBossBreaks": (8, 141.884796875, 12),
         "BossRimBreaks": (9, 1506.1681883564097, 0),
     }
     assert list(groups) == list(expected)
@@ -700,11 +927,75 @@ def test_edge_breaks_split_into_connected_chains_in_build_order() -> None:
     rib_hi = part.GOOSENECK_Z + part.HUB_RIB_W / 2.0
     for z_rib in (rib_lo, rib_hi):
         assert [(-part.OUTER_X - part.WEB_OUT_X) / 2.0, -part.HALF_H, z_rib] in hub
-    # The rib's outer bottom stubs either side of the set-screw boss.
+    # The crossbar: two web bottoms, four pocket-end bottoms, four full-depth
+    # vertical corners and two rear side bottoms, meeting at the pocket ends'
+    # bottom corners.
+    half_c2 = 0.5 * part.EDGE_CHAMFER**2
+    full_depth = part.HALF_H + part.FLANGE_BOT_Y
+    bar_lengths = (
+        2.0 * 2.0 * part.BAR_POCKET_Z
+        + 2.0 * (part.BAR_WEB_X0 - part.BAR_X0 + part.BAR_X1 - part.BAR_WEB_X1)
+        + 4.0 * full_depth
+        + 2.0 * (part.INNER_Z - part.GUSSET - part.BAR_POCKET_Z)
+    )
+    assert groups["CrossbarBreaks"][1] == pytest.approx(half_c2 * bar_lengths)
+    # The set-screw boss: two vertical corners, two face runs and four side
+    # runs back to the rib, three meeting at each face corner.
+    boss_lengths = (
+        2.0 * full_depth
+        + 2.0 * part.HUB_SET_BOSS_W
+        + 4.0 * (-part.OUTER_X - part.SET_BOSS_FACE_X)
+    )
+    assert groups["HubSetBossBreaks"][1] == pytest.approx(half_c2 * boss_lengths)
+    assert all(x <= -part.OUTER_X for x, _y, _z in groups["HubSetBossBreaks"][0])
+
+
+def test_hub_rib_stubs_beside_the_set_boss_stay_sharp(monkeypatch) -> None:
+    # Either side of the set-screw boss the rib's outer bottom runs 5.0
+    # nominal but 4.2 at the printed limits (the narrowest .X rib less the
+    # widest .X boss, halved): under the 4.8 that printed worst legs at both
+    # its ends take, so it stays sharp. The rib's breaks keep 1.8 of it as a
+    # land on the rib's outer face.
+    band = spec.PRINTED_LINEAR_BAND_MM
+    rib_places = spec.DRAWING_PRECISION["RibProfile"]["RibWidth"]
+    boss_places = spec.DRAWING_PRECISION["SetBossProfile"]["SetBossWidth"]
+    stub = (
+        round(part.HUB_RIB_W, rib_places)
+        - band[rib_places]
+        - round(part.HUB_SET_BOSS_W, boss_places)
+        - band[boss_places]
+    ) / 2.0
+    nominal = (part.HUB_RIB_W - part.HUB_SET_BOSS_W) / 2.0
+    assert (nominal, stub) == pytest.approx((5.0, 4.2))
+    assert part.HUB_RIB_STUB_PRINTED_MIN == pytest.approx(stub)
+    assert nominal > 2.0 * part.EDGE_BREAK_PRINTED_MAX > stub
+    assert part.HUB_RIB_STUB_LAND_MIN == pytest.approx(1.8)
+    assert part.HUB_RIB_STUB_LAND_MIN >= part.EDGE_BREAK_SLIVER_MIN
+    # Judged on the nominal 5.0 instead, the stubs would join the rib's
+    # breaks to the boss's in one chain, each meeting the rib's corner and
+    # side bottom at one end and the boss's side bottom at the other.
+    monkeypatch.setattr(part, "HUB_RIB_STUB_PRINTED_MIN", nominal)
+    groups, _clearance = part._external_edge_breaks()
+    base = part.EXTERNAL_EDGE_BREAKS
+    assert list(groups) == [name for name in base if name != "HubSetBossBreaks"]
+    for name in groups:
+        if name != "HubRailBreaks":
+            assert groups[name] == base[name], name
+    rib_lo = part.GOOSENECK_Z - part.HUB_RIB_W / 2.0
+    rib_hi = part.GOOSENECK_Z + part.HUB_RIB_W / 2.0
     boss_lo = part.GOOSENECK_Z - part.HUB_SET_BOSS_W / 2.0
     boss_hi = part.GOOSENECK_Z + part.HUB_SET_BOSS_W / 2.0
-    assert [-part.OUTER_X, -part.HALF_H, (rib_lo + boss_lo) / 2.0] in hub
-    assert [-part.OUTER_X, -part.HALF_H, (boss_hi + rib_hi) / 2.0] in hub
+    stubs = [
+        [-part.OUTER_X, -part.HALF_H, (rib_lo + boss_lo) / 2.0],
+        [-part.OUTER_X, -part.HALF_H, (boss_hi + rib_hi) / 2.0],
+    ]
+    hub, removal, shared = groups["HubRailBreaks"]
+    assert hub == base["HubRailBreaks"][0] + stubs + base["HubSetBossBreaks"][0]
+    stubs_removal = 0.5 * part.EDGE_CHAMFER**2 * 2.0 * nominal
+    assert removal == pytest.approx(
+        base["HubRailBreaks"][1] + stubs_removal + base["HubSetBossBreaks"][1]
+    )
+    assert shared == base["HubRailBreaks"][2] + base["HubSetBossBreaks"][2] + 6
 
 
 def test_edge_break_chains_leave_no_sliver_between_features(monkeypatch) -> None:
@@ -713,16 +1004,19 @@ def test_edge_break_chains_leave_no_sliver_between_features(monkeypatch) -> None
         pytest.approx(math.sqrt(2.0))
     )
     assert part._segment_gap((0, 0, 0), (1, 0, 0), (3, 0, 0), (4, 0, 0)) == 2.0
-    # The nearest two breaks that do not meet stand 4.9 apart, two printed
-    # worst legs and exactly the 0.1 land: the hub rib's outer bottom stub and
-    # the set-screw boss face's vertical corner (the hub rail's flange
-    # underside run and the boss's stand 5.0 apart, the pocket ends 6.0 on
-    # the 25-wide crossbar); demanding a wider land trips the guard there.
+    # The nearest two breaks that do not meet stand 5.0 apart, two printed
+    # worst legs and a 0.2 land: the hub rail's outer flange underside run
+    # and the set-screw boss's top side run beside it (the boss's bottom side
+    # runs stand as far off the rib's corners and side bottoms across the
+    # sharp outer-bottom stubs, the pocket ends 6.0 on the 25-wide crossbar);
+    # demanding a land over 0.2 trips the guard there.
     assert 2.0 * part.EDGE_BREAK_PRINTED_MAX + part.EDGE_BREAK_SLIVER_MIN == (
         pytest.approx(4.9)
     )
-    monkeypatch.setattr(part, "EDGE_BREAK_SLIVER_MIN", 0.11)
-    with pytest.raises(AssertionError, match=r"stop 4\.900 mm apart.*sliver"):
+    monkeypatch.setattr(part, "EDGE_BREAK_SLIVER_MIN", 0.2)
+    part._external_edge_breaks()
+    monkeypatch.setattr(part, "EDGE_BREAK_SLIVER_MIN", 0.21)
+    with pytest.raises(AssertionError, match=r"stop 5\.000 mm apart.*sliver"):
         part._external_edge_breaks()
 
 
@@ -739,7 +1033,7 @@ def test_hub_boss_chord_stays_inside_the_web_at_the_rib_sides() -> None:
 
 def test_external_edge_breaks_select_distinct_edges_and_skip_the_noted_ones() -> None:
     points = _external_break_points()
-    assert len(points) == 77
+    assert len(points) == 73
     assert len({tuple(round(value, 6) for value in point) for point in points}) == len(
         points
     )
@@ -747,22 +1041,28 @@ def test_external_edge_breaks_select_distinct_edges_and_skip_the_noted_ones() ->
     for i, a in enumerate(points):
         for b in points[i + 1 :]:
             assert math.dist(a, b) > 0.5
-    # Picked: the crossbar flange's underside edges and the rear full-depth
-    # bar-side bottoms.
+    # Picked: the rear full-depth bar-side bottoms.
     for x_bar in (part.BAR_X0, part.BAR_X1):
-        assert [x_bar, part.FLANGE_BOT_Y, 0.0] in points
         assert [
             x_bar, -part.HALF_H, (part.BAR_POCKET_Z + part.INNER_Z - part.GUSSET) / 2.0
         ] in points
-    # Sharp: the front bar-side bottoms, every gusset hypotenuse bottom
-    # beyond the pockets and the hub rib's inner bottom edge: none is picked.
+    # Sharp: the crossbar T flange's underside edges on their 1.4 printed
+    # shelf, the front bar-side bottoms, every gusset hypotenuse bottom beyond
+    # the pockets and the hub rib's inner and outer bottom edges (the outer
+    # one 4.2 either side of the set-screw boss at the printed limits): none
+    # is picked.
+    rib_lo = part.GOOSENECK_Z - part.HUB_RIB_W / 2.0
+    rib_hi = part.GOOSENECK_Z + part.HUB_RIB_W / 2.0
     for x, y, z in points:
         assert not (
+            y == part.FLANGE_BOT_Y
+            and part.BAR_X0 <= x <= part.BAR_X1
+            and abs(z) < part.INNER_Z
+        )
+        assert not (
             y == -part.HALF_H
-            and x == -part.INNER_X
-            and part.GOOSENECK_Z - part.HUB_RIB_W / 2.0
-            < z
-            < part.GOOSENECK_Z + part.HUB_RIB_W / 2.0
+            and x in (-part.OUTER_X, -part.INNER_X)
+            and rib_lo < z < rib_hi
         )
         if y == -part.HALF_H and part.BAR_POCKET_Z < abs(z) < part.INNER_Z:
             if z > 0.0 and x in (part.BAR_X0, part.BAR_X1):

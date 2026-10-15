@@ -148,6 +148,18 @@ The whole top except the four corner bosses is finished Ra 3.2 µm. The right
 (west) rail alone remains flat within 0.04 so both MHA-CH-007 keeper bores
 align. The finished underside and knife-mount pose remain unchanged.
 
+The casting's flange corner crops and convex edge breaks are judged at the
+print's limits, not on the nominal model. Each corner's crop chord ends on
+the smallest printed corner-boss barrel at the farthest printed rail faces
+(`CORNER_CROP_BOSS_R_MIN`, `CORNER_CROP_FACE_OFFSETS`), so no conforming
+casting keeps a flange nib outside a barrel. The 1/16 in × 45° break goes
+only on edges that hold its print-worst leg and sliver land at those limits.
+The crossbar flange underside (`T_FLANGE_SHELF_PRINTED_MIN`) and the hub
+rib's outer bottom beside the set-screw boss (`HUB_RIB_STUB_PRINTED_MIN`)
+do not, so they stay sharp. The rib's inner bottom, the V-gussets and the
+knife-seat bottoms also stay sharp, as the sheet notes say. No band is
+tightened to recover a break.
+
 The grip callout identifies its function: it sets **MHA-VN-024 thread
 engagement**. The crossbar median datum D controls the hanger axes in X only:
 their BASIC X location is on D.

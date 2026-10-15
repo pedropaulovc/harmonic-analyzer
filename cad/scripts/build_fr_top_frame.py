@@ -74,10 +74,14 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   only. The R22.5 bosses bulge 5.4 beyond the side rails and 3.5 beyond
   the front/rear rails, but do not reach the rectangular flange's plan
   corners (25.56 from their centres), so each corner is cropped back to its
-  boss barrel (user ruling 2026-10-14): window corners remain square and
-  the outer rim runs die into the barrels. Edges too close to a feature
-  or under a knife-mount seat for the printed worst break stay sharp (listed in
-  _external_edge_breaks); hole and bore low ends stay sharp.
+  boss barrel (user ruling 2026-10-14), with the crop's chord inside the
+  smallest printed barrel at the farthest printed faces: window corners
+  remain square and the outer rim runs die into the barrels. Edge breaks
+  are judged at the print's limits, since a conforming casting may carry
+  any printed size: edges too close to a feature, too short or on too
+  narrow a flange shelf there, or under a knife-mount seat, for the printed
+  worst break stay sharp (listed in _external_edge_breaks); hole and bore
+  low ends stay sharp.
 
 Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 (rails y -18.25..+18.25 local). Sketches on the Top plane use the
@@ -93,7 +97,7 @@ bore -> wizard holes (#10 loose hanger clearance holes) -> dowel slip holes -> w
 holes (side-screw taps, set-screw tap, keeper taps) -> internal T-root
 fillets (R3) -> external top-rim breaks (1/16 in) -> C1 bore top lead-ins ->
 remaining external edge breaks (1/16 in, one feature per connected chain: rail
-runs, crossbar, west window, hub rail, boss rims).
+runs, crossbar, west window, hub rail, hub set-screw boss, boss rims).
 Wizard holes come after the face cuts so every seat face is final; the
 edge breaks follow the solid features.
 Analytic volume checks after every feature; boss additions and top-rim
@@ -472,43 +476,126 @@ BAR_POCKET_Z = 69.0  # pocket length 138.0, centred on the crossbar
 # which left a flange nib outside every barrel -- bounded by the two outer
 # faces from their barrel intersections to the corner and by the barrel arc
 # between them. Each corner is cropped by one triangle cut through the band
-# before the bosses: its chord ends CORNER_CROP_INSET inside each outer
-# face's barrel intersection, so the whole chord lies inside the barrel, and
-# its apex and legs overrun the plan corner by CORNER_CROP_OVERRUN, so no
-# sketch edge lies on a face. The boss union then restores the barrel
-# segment inside the chord: no flange stays outside a barrel, and the
-# barrels, counterbores and bores are unchanged.
+# before the bosses. The print, not the nominal barrel, places its chord: a
+# conforming part may pair the smallest .X barrel with both outer faces at
+# their farthest printed offsets, so the chord's ends stand on that barrel
+# where those faces cross it, and the chord lies inside every printed barrel
+# across every printed face (a chord inside the nominal barrel alone left
+# flange outside an R22.1 one). Its apex and legs overrun the farthest faces
+# by CORNER_CROP_OVERRUN, so no sketch edge lies on a face. The boss union
+# then restores the barrel segment inside the chord: no flange stays outside
+# a barrel, and the barrels, counterbores and bores are unchanged.
 _BOSS_R = BOSS_DIA / 2.0
 CORNER_SIDE_CUT = math.sqrt(_BOSS_R**2 - (RAIL_W_SIDE / 2.0) ** 2)  # 14.623
 CORNER_FR_CUT = math.sqrt(_BOSS_R**2 - (RAIL_W_FR / 2.0) ** 2)  # 12.052
-CORNER_CROP_INSET = 0.5
 CORNER_CROP_OVERRUN = 1.0
-# The chord's ends, as plan offsets (x, z) from the boss axis outward: on the
-# side-rail face below its barrel intersection, on the front/rear face
-# inboard of its own.
-_CROP_SIDE_END = (RAIL_W_SIDE / 2.0, CORNER_SIDE_CUT - CORNER_CROP_INSET)
-_CROP_FR_END = (CORNER_FR_CUT - CORNER_CROP_INSET, RAIL_W_FR / 2.0)
+
+
+def _printed_limit(value: float, places: int, sign: float) -> float:
+    """``value`` as the sheet prints it at ``places``, ``sign`` bands out."""
+    return round(value, places) + sign * PRINTED_LINEAR_BAND_MM[places]
+
+
+def _t_flange_overhang_printed_min(
+    width: float, width_label: str, web_label: str
+) -> float:
+    """Least printed overhang of a T flange past its web, each side.
+
+    The web prints centred under its flange, so each side keeps half the
+    narrowest flange less the thickest web.
+    """
+    return (
+        _printed_limit(width, DRAWING_REFERENCE_PRECISION[width_label], -1.0)
+        - _printed_limit(WEB_T, DRAWING_REFERENCE_PRECISION[web_label], 1.0)
+    ) / 2.0
+
+
+CORNER_CROP_BOSS_R_MIN = (
+    _printed_limit(BOSS_DIA, DRAWING_PRECISION["BossUpProfile"]["C0Dia"], -1.0) / 2.0
+)  # 22.1
+
+
+def _printed_face_offsets(
+    extent: float, extent_places: int, pitch: float, pitch_places: int
+) -> tuple[float, float]:
+    """Least and greatest printed offset of an outer face from its boss axis.
+
+    The plan centres the rail flange extents on the socket pattern, so each
+    outer face stands half the extent less half the socket pitch off its
+    socket's (and boss's) axis, within half of each printed band.
+    """
+    offset = (round(extent, extent_places) - round(pitch, pitch_places)) / 2.0
+    band = (
+        PRINTED_LINEAR_BAND_MM[extent_places] + PRINTED_LINEAR_BAND_MM[pitch_places]
+    ) / 2.0
+    return offset - band, offset + band
+
+
+CORNER_CROP_FACE_OFFSETS = {
+    "side": _printed_face_offsets(
+        2.0 * OUTER_X,
+        DRAWING_PRECISION["OuterProfile"]["Width"],
+        2.0 * COLUMN_X,
+        DRAWING_REFERENCE_PRECISION["socket horizontal pitch"],
+    ),  # 16.445 .. 17.755
+    "front/rear": _printed_face_offsets(
+        2.0 * OUTER_Z,
+        DRAWING_PRECISION["OuterProfile"]["Depth"],
+        2.0 * abs(FRONT_COLUMN_Z),
+        DRAWING_REFERENCE_PRECISION["socket vertical pitch"],
+    ),  # 18.345 .. 19.655
+}
+_CROP_SIDE_FACE_MAX = CORNER_CROP_FACE_OFFSETS["side"][1]
+_CROP_FR_FACE_MAX = CORNER_CROP_FACE_OFFSETS["front/rear"][1]
+# The chord's ends, as plan offsets (x, z) from the boss axis outward: where
+# the farthest side-rail and front/rear faces cross the smallest barrel.
+_CROP_SIDE_END = (
+    _CROP_SIDE_FACE_MAX,
+    math.sqrt(CORNER_CROP_BOSS_R_MIN**2 - _CROP_SIDE_FACE_MAX**2),
+)  # (17.755, 13.159)
+_CROP_FR_END = (
+    math.sqrt(CORNER_CROP_BOSS_R_MIN**2 - _CROP_FR_FACE_MAX**2),
+    _CROP_FR_FACE_MAX,
+)  # (10.104, 19.655)
 _CROP_SLOPE = (_CROP_FR_END[1] - _CROP_SIDE_END[1]) / (
     _CROP_SIDE_END[0] - _CROP_FR_END[0]
 )
-# The sketched triangle: apex past the plan corner, then the chord carried
-# past the side and front/rear faces.
+
+
+def _crop_chord_z(x: float) -> float:
+    """The chord's offset from the boss axis along z where it crosses x."""
+    return _CROP_SIDE_END[1] - (x - _CROP_SIDE_END[0]) * _CROP_SLOPE
+
+
+def _crop_chord_x(z: float) -> float:
+    """The chord's offset from the boss axis along x where it crosses z."""
+    return _CROP_FR_END[0] - (z - _CROP_FR_END[1]) / _CROP_SLOPE
+
+
+# The sketched triangle: apex past the farthest plan corner, then the chord
+# carried past the farthest side and front/rear faces.
 CORNER_CROP_TRIANGLE = (
-    (RAIL_W_SIDE / 2.0 + CORNER_CROP_OVERRUN, RAIL_W_FR / 2.0 + CORNER_CROP_OVERRUN),
     (
-        RAIL_W_SIDE / 2.0 + CORNER_CROP_OVERRUN,
-        _CROP_SIDE_END[1] - CORNER_CROP_OVERRUN * _CROP_SLOPE,
+        _CROP_SIDE_FACE_MAX + CORNER_CROP_OVERRUN,
+        _CROP_FR_FACE_MAX + CORNER_CROP_OVERRUN,
     ),
     (
-        _CROP_FR_END[0] - CORNER_CROP_OVERRUN / _CROP_SLOPE,
-        RAIL_W_FR / 2.0 + CORNER_CROP_OVERRUN,
+        _CROP_SIDE_FACE_MAX + CORNER_CROP_OVERRUN,
+        _crop_chord_z(_CROP_SIDE_FACE_MAX + CORNER_CROP_OVERRUN),
+    ),
+    (
+        _crop_chord_x(_CROP_FR_FACE_MAX + CORNER_CROP_OVERRUN),
+        _CROP_FR_FACE_MAX + CORNER_CROP_OVERRUN,
     ),
 )
-# Flange the triangle removes (its part inside the plan rectangle), the nib
-# outside the barrel, and the difference the boss union restores.
+# Flange the triangle removes from the model (its part inside the nominal
+# plan rectangle), the nib outside the nominal barrel, and the difference
+# the boss union restores.
 CORNER_CROP_AREA = (
-    (RAIL_W_FR / 2.0 - _CROP_SIDE_END[1]) * (RAIL_W_SIDE / 2.0 - _CROP_FR_END[0]) / 2.0
-)  # 13.528
+    (RAIL_W_FR / 2.0 - _crop_chord_z(RAIL_W_SIDE / 2.0))
+    * (RAIL_W_SIDE / 2.0 - _crop_chord_x(RAIL_W_FR / 2.0))
+    / 2.0
+)  # 16.447
 _NIB_CHORD = math.hypot(
     RAIL_W_SIDE / 2.0 - CORNER_FR_CUT, RAIL_W_FR / 2.0 - CORNER_SIDE_CUT
 )
@@ -516,16 +603,33 @@ _NIB_ANGLE = 2.0 * math.asin(_NIB_CHORD / BOSS_DIA)
 CORNER_NIB_AREA = (RAIL_W_FR / 2.0 - CORNER_SIDE_CUT) * (
     RAIL_W_SIDE / 2.0 - CORNER_FR_CUT
 ) / 2.0 - _BOSS_R**2 / 2.0 * (_NIB_ANGLE - math.sin(_NIB_ANGLE))  # 9.935
-CORNER_CROP_IN_BOSS = CORNER_CROP_AREA - CORNER_NIB_AREA  # 3.593
+CORNER_CROP_IN_BOSS = CORNER_CROP_AREA - CORNER_NIB_AREA  # 6.512
+# The printed web stays clear of the triangle: its outer face stands at most
+# the farthest outer face less the flange's least printed overhang.
+CORNER_CROP_WEB_FACE_MAX = max(
+    _CROP_SIDE_FACE_MAX
+    - _t_flange_overhang_printed_min(
+        RAIL_W_SIDE, "side flange width", "side rail web thickness"
+    ),
+    _CROP_FR_FACE_MAX
+    - _t_flange_overhang_printed_min(
+        RAIL_W_FR, "front rear flange width", "rail web thickness"
+    ),
+)  # 7.955
 if not (
     math.hypot(RAIL_W_SIDE / 2.0, RAIL_W_FR / 2.0) > _BOSS_R
-    and math.hypot(*_CROP_SIDE_END) < _BOSS_R
-    and math.hypot(*_CROP_FR_END) < _BOSS_R
-    and min(min(point) for point in CORNER_CROP_TRIANGLE) > WEB_T / 2.0
+    and all(
+        math.hypot(side, _crop_chord_z(side)) <= CORNER_CROP_BOSS_R_MIN + 1e-9
+        and math.hypot(_crop_chord_x(fr), fr) <= CORNER_CROP_BOSS_R_MIN + 1e-9
+        for side in CORNER_CROP_FACE_OFFSETS["side"]
+        for fr in CORNER_CROP_FACE_OFFSETS["front/rear"]
+    )
+    and min(min(point) for point in CORNER_CROP_TRIANGLE) > CORNER_CROP_WEB_FACE_MAX
 ):
     raise AssertionError(
         "flange corner crop needs a plan corner outside the barrel, its chord"
-        " inside it and the triangle clear of the web ring"
+        " inside the smallest printed barrel at every printed outer face and"
+        " the triangle clear of the printed web"
     )
 
 THROUGH_CUT_DEPTH = 110.0  # mid-plane total; > boss stack (47.3)
@@ -577,17 +681,50 @@ for _label, _land in SET_SPOT_LAND_MIN.items():
             f"set-screw spot face breaks into the boss edge break {_label}: "
             f"land {_land:.3f}"
         )
-# The crossbar T flange's underside breaks stop short of the R3 web roots:
-# the 3.0 flat outboard of each root less the printed worst leg, on the
-# nominal section like the sliver rule (a native-modelling guard: on a real
-# casting the cast bands only move where the hand break blends).
-CROSSBAR_FLANGE_UNDERSIDE_LAND = (
-    BAR_WEB_X0 - ROOT_FILLET_R - BAR_X0 - EDGE_BREAK_PRINTED_MAX
-)  # 0.6
-if CROSSBAR_FLANGE_UNDERSIDE_LAND < EDGE_BREAK_SLIVER_MIN:
+# Edge-break eligibility is judged at the print's limits, not on the nominal
+# model: a conforming casting may carry any printed size, so an edge stays
+# sharp wherever some printed extreme leaves it too short, or its face too
+# narrow, for the printed worst break (_external_edge_breaks).
+# A T flange's underside break needs that leg and the sliver land on the
+# flat between the flange's outer face and its R3 web root: the least
+# printed overhang less the largest printed root. The rails keep 6.0 and
+# 7.9; the 25-wide crossbar keeps 1.4, so its flange underside stays sharp
+# (E-E's note).
+_ROOT_R_PRINTED_MAX = _printed_limit(
+    ROOT_FILLET_R, DRAWING_REFERENCE_PRECISION["T rail root radius"], 1.0
+)  # 3.8
+T_FLANGE_SHELF_PRINTED_MIN = {
+    "side rail": _t_flange_overhang_printed_min(
+        RAIL_W_SIDE, "side flange width", "side rail web thickness"
+    )
+    - _ROOT_R_PRINTED_MAX,  # 6.0
+    "front/rear rail": _t_flange_overhang_printed_min(
+        RAIL_W_FR, "front rear flange width", "rail web thickness"
+    )
+    - _ROOT_R_PRINTED_MAX,  # 7.9
+    "crossbar": _t_flange_overhang_printed_min(
+        BAR_X1 - BAR_X0, "crossbar flange width", "crossbar web thickness"
+    )
+    - _ROOT_R_PRINTED_MAX,  # 1.4
+}
+# The hub rib's outer bottom either side of the set-screw boss runs 5.0
+# nominal, but the narrowest .X rib (centred on the bore) less the widest
+# .X boss (centred on the tap, on the bore axis), halved, is 4.2: under the
+# printed worst legs of the breaks at both its ends (the rib's corner and
+# side bottom, the boss's side bottom), so it stays sharp. Those breaks
+# keep the rest of it as a land on the rib's outer face; the boss's own
+# side breaks bevel into the boss, clear of the rib.
+HUB_RIB_STUB_PRINTED_MIN = (
+    _printed_limit(HUB_RIB_W, DRAWING_PRECISION["RibProfile"]["RibWidth"], -1.0)
+    - _printed_limit(
+        HUB_SET_BOSS_W, DRAWING_PRECISION["SetBossProfile"]["SetBossWidth"], 1.0
+    )
+) / 2.0  # 4.2
+HUB_RIB_STUB_LAND_MIN = HUB_RIB_STUB_PRINTED_MIN - EDGE_BREAK_PRINTED_MAX  # 1.8
+if HUB_RIB_STUB_LAND_MIN < EDGE_BREAK_SLIVER_MIN:
     raise AssertionError(
-        "crossbar flange underside break runs into the web root: land "
-        f"{CROSSBAR_FLANGE_UNDERSIDE_LAND:.3f}"
+        "hub rib corner break runs into the set-screw boss's side: land "
+        f"{HUB_RIB_STUB_LAND_MIN:.3f}"
     )
 
 if abs(FRONT_COLUMN_Z + REAR_COLUMN_Z) > 1e-12 or abs(FRAME_CENTER_Z) > 1e-12:
@@ -1671,14 +1808,13 @@ def _external_edge_breaks() -> tuple[
     shared vertices), and each knife seat's least clearance to them.
 
     Every external convex edge the top-rim and bore-top breaks left, once
-    the T-section crossbar exists: the flange undersides (outer, window and
-    the crossbar T's; the corner crops leave no outer-corner runs or vertical
-    corners, every outer run dying into a boss barrel at both ends), the web
-    bottoms, the junction lands' free edges, the crossbar web bottoms,
-    pocket-end bottoms and outer corners, the rear full-depth bar-side
-    bottoms, the hub rib's free corners, side bottoms and outer bottoms
-    either side of the set-screw boss, the boss's edges, and the corner/hub
-    boss rims.
+    the T-section crossbar exists: the outer and window flange undersides
+    (the corner crops leave no outer-corner runs or vertical corners, every
+    outer run dying into a boss barrel at both ends), the web bottoms, the
+    junction lands' free edges, the crossbar web bottoms, pocket-end bottoms
+    and outer corners, the rear full-depth bar-side bottoms, the hub rib's
+    free corners and side bottoms, the set-screw boss's edges, and the
+    corner/hub boss rims.
     Straight edges remove ``c^2 sin(angle) / 2`` per mm over their run to the
     face that ends them; outer rims remove ``pi c^2 (R - c/3)`` (c the
     model's EDGE_CHAMFER). Corner patches and the ends dying into boss
@@ -1693,6 +1829,13 @@ def _external_edge_breaks() -> tuple[
     ``2 EDGE_BREAK_PRINTED_MAX``, or the module fails to import. ``shared``
     counts the pairs of a group's breaks that meet at a vertex.
 
+    Eligibility is judged at the print's limits, since a conforming casting
+    may carry any printed size: an edge whose printed worst length
+    (``printed_length``) cannot hold the printed worst legs at both its
+    ends, or whose flange shelf at its printed worst
+    (``T_FLANGE_SHELF_PRINTED_MIN``) cannot hold one leg and the sliver
+    land, stays sharp instead of being picked.
+
     Every pick must be the convex edge it claims: its solid angle, measured
     on ``_casting_occupies``, is below 180 degrees and equals the angle its
     removal uses, or the module fails to import. Every break reaching the
@@ -1701,14 +1844,18 @@ def _external_edge_breaks() -> tuple[
     ``KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE`` off both print-worst knife-seat
     hulls; the returned dict is each seat's least clearance.
 
-    Not broken, each at the printed worst leg: the crossbar's front
-    full-depth side bottoms from the pocket end to the gusset leg and all
-    four gusset hypotenuse bottoms (a knife-mount seat sits over each: 0.0
-    clearance), the hub rib's inner bottom edge (2.1 to the Ø30 hub boss
-    barrel, so a 2.4 leg runs 0.3 into it), the tapered hub V-gusset edges
-    (they feather into the underside), and every hole, bore, counterbore,
-    spot-face, tap and slot edge. The vertical junctions of the bar sides with
-    the gusset hypotenuses are re-entrant (225 degrees), not edges to break.
+    Not broken, each at the printed worst leg: the crossbar T flange's
+    underside edges (a 1.4 printed shelf beside the web roots), the
+    crossbar's front full-depth side bottoms from the pocket end to the
+    gusset leg and all four gusset hypotenuse bottoms (a knife-mount seat
+    sits over each: 0.0 clearance), the hub rib's outer bottom either side
+    of the set-screw boss (4.2 at the printed limits,
+    ``HUB_RIB_STUB_PRINTED_MIN``) and its inner bottom edge (2.1 to the Ø30
+    hub boss barrel, so a 2.4 leg runs 0.3 into it), the tapered hub
+    V-gusset edges (they feather into the underside), and every hole, bore,
+    counterbore, spot-face, tap and slot edge. The vertical junctions of the
+    bar sides with the gusset hypotenuses are re-entrant (225 degrees), not
+    edges to break.
     """
     c = EDGE_CHAMFER
     z_col = abs(FRONT_COLUMN_Z)
@@ -1720,6 +1867,10 @@ def _external_edge_breaks() -> tuple[
     rib_hi = GOOSENECK_Z + HUB_RIB_W / 2.0
     y_under = FLANGE_BOT_Y
     y_bottom = -HALF_H
+    # Each flange underside's printed worst shelf, by T family.
+    side_shelf = T_FLANGE_SHELF_PRINTED_MIN["side rail"]
+    fr_shelf = T_FLANGE_SHELF_PRINTED_MIN["front/rear rail"]
+    bar_shelf = T_FLANGE_SHELF_PRINTED_MIN["crossbar"]
     # feature name -> (picks, analytic removal, shared vertices), build order
     groups: dict[str, tuple[list[list[float]], float, int]] = {}
     segments: list[tuple[str, tuple[float, ...], tuple[float, ...]]] = []
@@ -1749,7 +1900,21 @@ def _external_edge_breaks() -> tuple[
         length: float,
         angle: float,
         axis: tuple[float, float, float],
-    ) -> None:
+        *,
+        printed_length: float | None = None,
+        printed_shelf: float | None = None,
+    ) -> bool:
+        # At the print's limits an edge too short for the printed worst legs
+        # at both its ends, or on a flange shelf too narrow for one leg and
+        # the sliver land, stays sharp: no pick.
+        if (
+            printed_length is not None
+            and printed_length <= 2.0 * EDGE_BREAK_PRINTED_MAX
+        ) or (
+            printed_shelf is not None
+            and printed_shelf < EDGE_BREAK_PRINTED_MAX + EDGE_BREAK_SLIVER_MIN
+        ):
+            return False
         if length <= 2.0 * EDGE_BREAK_PRINTED_MAX:
             raise AssertionError(
                 f"edge at {point} is too short for a {EDGE_BREAK_PRINTED_MAX:g}"
@@ -1806,41 +1971,63 @@ def _external_edge_breaks() -> tuple[
                     ],
                 )
             )
+        return True
 
-    def along_x(z: float, y: float, x0: float, x1: float, angle: float = 90.0) -> None:
+    def along_x(
+        z: float, y: float, x0: float, x1: float, angle: float = 90.0, **printed: float
+    ) -> bool:
         lo, hi = sorted((x0, x1))
-        edge(((lo + hi) / 2.0, y, z), hi - lo, angle, (1.0, 0.0, 0.0))
+        point = ((lo + hi) / 2.0, y, z)
+        return edge(point, hi - lo, angle, (1.0, 0.0, 0.0), **printed)
 
-    def along_y(x: float, z: float, y0: float, y1: float, angle: float = 90.0) -> None:
+    def along_y(
+        x: float, z: float, y0: float, y1: float, angle: float = 90.0, **printed: float
+    ) -> bool:
         lo, hi = sorted((y0, y1))
-        edge((x, (lo + hi) / 2.0, z), hi - lo, angle, (0.0, 1.0, 0.0))
+        point = (x, (lo + hi) / 2.0, z)
+        return edge(point, hi - lo, angle, (0.0, 1.0, 0.0), **printed)
 
-    def along_z(x: float, y: float, z0: float, z1: float, angle: float = 90.0) -> None:
+    def along_z(
+        x: float, y: float, z0: float, z1: float, angle: float = 90.0, **printed: float
+    ) -> bool:
         lo, hi = sorted((z0, z1))
-        edge((x, y, (lo + hi) / 2.0), hi - lo, angle, (0.0, 0.0, 1.0))
+        point = (x, y, (lo + hi) / 2.0)
+        return edge(point, hi - lo, angle, (0.0, 0.0, 1.0), **printed)
 
     start("RailRunBreaks")
     # Long single runs whose both ends die into corner-boss barrels: the
     # west and front/rear outer flange undersides, the west web bottoms and
     # the front/rear outer web bottoms.
-    along_z(OUTER_X, y_under, -(z_col - side_cut), z_col - side_cut)
+    along_z(
+        OUTER_X,
+        y_under,
+        -(z_col - side_cut),
+        z_col - side_cut,
+        printed_shelf=side_shelf,
+    )
     for sz in (-1.0, 1.0):
-        along_x(sz * OUTER_Z, y_under, -(COLUMN_X - fr_cut), COLUMN_X - fr_cut)
+        along_x(
+            sz * OUTER_Z,
+            y_under,
+            -(COLUMN_X - fr_cut),
+            COLUMN_X - fr_cut,
+            printed_shelf=fr_shelf,
+        )
     for x_web in (WEB_OUT_X, WEB_IN_X):
         along_z(x_web, y_bottom, -(z_col - web_cut), z_col - web_cut)
     for sz in (-1.0, 1.0):
         along_x(sz * WEB_OUT_Z, y_bottom, -(COLUMN_X - web_cut), COLUMN_X - web_cut)
     start("CrossbarBreaks")
-    # Crossbar: web bottoms; the T flange's underside edges, 3.0 wide
-    # outboard of the R3 web roots (CROSSBAR_FLANGE_UNDERSIDE_LAND); per
-    # pocket end its bottom and its outer vertical corner; the rear
-    # full-depth side bottoms from the pocket ends to the gusset legs.  The
+    # Crossbar: web bottoms; per pocket end its bottom and its outer
+    # vertical corner; the rear full-depth side bottoms from the pocket ends
+    # to the gusset legs. The T flange's underside edges are picked only on
+    # a printed shelf that holds a break (T_FLANGE_SHELF_PRINTED_MIN). The
     # knife-mount seats sit over the front side bottoms and every gusset
     # hypotenuse, whose bottoms stay sharp.
     for x_web in (BAR_WEB_X0, BAR_WEB_X1):
         along_z(x_web, y_bottom, -BAR_POCKET_Z, BAR_POCKET_Z)
     for x_bar in (BAR_X0, BAR_X1):
-        along_z(x_bar, y_under, -BAR_POCKET_Z, BAR_POCKET_Z)
+        along_z(x_bar, y_under, -BAR_POCKET_Z, BAR_POCKET_Z, printed_shelf=bar_shelf)
         along_z(x_bar, y_bottom, BAR_POCKET_Z, INNER_Z - GUSSET)
     for sz in (-1.0, 1.0):
         along_x(sz * BAR_POCKET_Z, y_bottom, BAR_X0, BAR_WEB_X0)
@@ -1853,9 +2040,9 @@ def _external_edge_breaks() -> tuple[
     # corners, end bottoms and short window-face bottoms (to the sharp
     # gusset hypotenuse), and the front/rear window web bottoms the land
     # ends meet.
-    along_z(INNER_X, y_under, -INNER_Z, INNER_Z)
+    along_z(INNER_X, y_under, -INNER_Z, INNER_Z, printed_shelf=side_shelf)
     for sz in (-1.0, 1.0):
-        along_x(sz * INNER_Z, y_under, LAND_X1, INNER_X)
+        along_x(sz * INNER_Z, y_under, LAND_X1, INNER_X, printed_shelf=fr_shelf)
         along_y(LAND_X1, sz * INNER_Z, y_bottom, y_under)
         along_z(LAND_X1, y_bottom, sz * INNER_Z, sz * WEB_IN_Z)
         along_x(sz * INNER_Z, y_bottom, BAR_X1 + GUSSET, LAND_X1)
@@ -1865,13 +2052,12 @@ def _external_edge_breaks() -> tuple[
     # undersides split by the hub rib, the rib's four free vertical
     # corners, its side bottoms out to the web faces (each meeting its web
     # bottom at one vertex: the boss chord stays inside the web), the east
-    # web bottoms, the east window's front/rear runs, land edges and
-    # window web bottoms as on the west, and the set-screw boss proud of the
-    # rib's outer face.
-    along_z(-OUTER_X, y_under, -(z_col - side_cut), rib_lo)
-    along_z(-OUTER_X, y_under, rib_hi, z_col - side_cut)
-    along_z(-INNER_X, y_under, -INNER_Z, rib_lo)
-    along_z(-INNER_X, y_under, rib_hi, INNER_Z)
+    # web bottoms, and the east window's front/rear runs, land edges and
+    # window web bottoms as on the west.
+    along_z(-OUTER_X, y_under, -(z_col - side_cut), rib_lo, printed_shelf=side_shelf)
+    along_z(-OUTER_X, y_under, rib_hi, z_col - side_cut, printed_shelf=side_shelf)
+    along_z(-INNER_X, y_under, -INNER_Z, rib_lo, printed_shelf=side_shelf)
+    along_z(-INNER_X, y_under, rib_hi, INNER_Z, printed_shelf=side_shelf)
     for z_rib in (rib_lo, rib_hi):
         for x_face in (-OUTER_X, -INNER_X):
             along_y(x_face, z_rib, y_bottom, y_under)
@@ -1881,19 +2067,30 @@ def _external_edge_breaks() -> tuple[
         along_z(-x_web, y_bottom, -(z_col - web_cut), rib_lo)
         along_z(-x_web, y_bottom, rib_hi, z_col - web_cut)
     for sz in (-1.0, 1.0):
-        along_x(sz * INNER_Z, y_under, -INNER_X, LAND_X0)
+        along_x(sz * INNER_Z, y_under, -INNER_X, LAND_X0, printed_shelf=fr_shelf)
         along_y(LAND_X0, sz * INNER_Z, y_bottom, y_under)
         along_z(LAND_X0, y_bottom, sz * INNER_Z, sz * WEB_IN_Z)
         along_x(sz * INNER_Z, y_bottom, LAND_X0, BAR_X0 - GUSSET)
         along_x(sz * WEB_IN_Z, y_bottom, -(COLUMN_X - web_cut), LAND_X0)
-    # The set-screw boss: the rib's outer bottom either side of it, which
-    # joins the boss's breaks to the rib's, the four edges of its cast face
-    # and its four runs back to the rib, meeting at the face's corners. The
-    # breaks leave the Ø10 spot face SET_SPOT_LAND_MIN (print-worst).
+    # The set-screw boss proud of the rib's outer face: the four edges of its
+    # cast face and its four runs back to the rib, meeting at the face's
+    # corners. The breaks leave the Ø10 spot face SET_SPOT_LAND_MIN
+    # (print-worst). The rib's outer bottom either side of it would join the
+    # boss's breaks to the rib's, but stays sharp at its printed worst length
+    # (HUB_RIB_STUB_PRINTED_MIN), leaving the boss's breaks a chain of their
+    # own.
     boss_lo = GOOSENECK_Z - HUB_SET_BOSS_W / 2.0
     boss_hi = GOOSENECK_Z + HUB_SET_BOSS_W / 2.0
-    along_z(-OUTER_X, y_bottom, rib_lo, boss_lo)
-    along_z(-OUTER_X, y_bottom, boss_hi, rib_hi)
+    stubs = (
+        along_z(
+            -OUTER_X, y_bottom, rib_lo, boss_lo, printed_length=HUB_RIB_STUB_PRINTED_MIN
+        ),
+        along_z(
+            -OUTER_X, y_bottom, boss_hi, rib_hi, printed_length=HUB_RIB_STUB_PRINTED_MIN
+        ),
+    )
+    if not any(stubs):
+        start("HubSetBossBreaks")
     for z_side in (boss_lo, boss_hi):
         along_y(SET_BOSS_FACE_X, z_side, y_bottom, y_under)
     for y_side in (y_bottom, y_under):
@@ -2529,7 +2726,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "CornerCrop")
-    v_crops = 4.0 * CORNER_CROP_AREA * FLANGE  # 432.9
+    v_crops = 4.0 * CORNER_CROP_AREA * FLANGE  # 526.3
     volume = await volume_check(adapter, "flange corner crops", volume - v_crops, 1.0)
 
     # 6. Corner bosses: one circle set extruded UP to the boss top, a second
@@ -3282,7 +3479,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "bore top breaks", volume - v_breaks, 0.02 * v_breaks + 10.0
     )
 
-    # 18b. EDGE_CHAMFER x 45 on every remaining external convex edge (68 edges and 9
+    # 18b. EDGE_CHAMFER x 45 on every remaining external convex edge (64 edges and 9
     #      boss rims), one chamfer feature per connected chain so a native
     #      failure names its chain and each chain's volume is proved on its
     #      own (see _external_edge_breaks for the chains and the edges left

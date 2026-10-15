@@ -813,11 +813,11 @@ SIDE_SECTION_CENTER = (0.3183, 0.106)
 SIDE_SECTION_SCALE = (1, 4)
 SIDE_SECTION_CAPTION_XY = (0.3183, 0.0915)
 # The E-E note's last line keeps 2.1 mm of air over the side web's 13.0 (its
-# top at 124.5 mm); its third line, the crossbar web's centring, lifts the
-# first to 139.8, 4.6 under B-B's note.  The web text sits 8 mm left so its
-# 37.5 mm qualifier row ends at 345.8 mm, 4.1 short of the crossbar flange's
-# 8.0 dimension line at 349.9 (farm 30394c1da: the row ran 3.8 mm past that
-# line, text-on-line).
+# top at 124.5 mm); its third line, the crossbar web's centring and the sharp
+# crossbar flange underside, lifts the first to 139.8, 4.6 under B-B's note.
+# The web text sits 8 mm left so its 37.5 mm qualifier row ends at 345.8 mm,
+# 4.1 short of the crossbar flange's 8.0 dimension line at 349.9 (farm
+# 30394c1da: the row ran 3.8 mm past that line, text-on-line).
 SIDE_SECTION_NOTE_XY = (0.290, 0.1398)
 SIDE_WEB_TEXT_XY = (0.327, 0.120)
 # Where each removed section prints the rail centreline it cuts, sheet x:
@@ -2832,9 +2832,9 @@ async def build(adapter: Any) -> dict[str, str]:
         suffix="2X SIDE RAIL WEB", edges=side_section_edges,
     )
     # The crossbar T: its web below the flange's R3 roots and above the
-    # bottom break, its flange from the top face to the 1.4125 underside flat
-    # between the flange underside's break and the root.
-    flange_flat_x = (BAR_X0 + EDGE_CHAMFER + BAR_WEB_X0 - ROOT_FILLET_R) / 2.0
+    # bottom break, its flange from the top face to the sharp underside's
+    # 3.0 flat outboard of the root.
+    flange_flat_x = (BAR_X0 + BAR_WEB_X0 - ROOT_FILLET_R) / 2.0
     for p0, p1, expected, xy, offset, orientation, label, qualifier in (
         ((BAR_WEB_X0, 0.0, SIDE_SECTION_Z), (BAR_WEB_X1, 0.0, SIDE_SECTION_Z),
          WEB_T, CROSSBAR_WEB_LINE_XY, CROSSBAR_WEB_TEXT_XY, "horizontal",
@@ -2864,8 +2864,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _position_view_caption(adapter, side_section, SIDE_SECTION_CAPTION_XY)
     if add_note(
         adapter,
-        "E-E: LEFT SIDE RAIL AND CROSSBAR T\nRIGHT RAIL IDENTICAL\n"
-        "T WEB CENTRED UNDER FLANGE",
+        "E-E: LEFT SIDE RAIL AND CROSSBAR T\nRIGHT RAIL IDENTICAL; T WEB CENTRED\n"
+        "UNDER FLANGE; CROSSBAR FLANGE UNDERSIDE SHARP",
         *SIDE_SECTION_NOTE_XY,
     ) is None:
         raise RuntimeError("failed to identify the cut side rail and crossbar T")
@@ -3596,7 +3596,9 @@ async def build(adapter: Any) -> dict[str, str]:
     _gusset_ramp_angle(adapter, detail_left, detail_left_edges)
     set_hidden_lines_removed(adapter, detail_left)
     left_note = add_note(
-        adapter, "HUB SIDE / REMOVED VIEW SCALE 1:2\nINNER RIB BOTTOM, GUSSETS SHARP",
+        adapter,
+        "HUB SIDE / REMOVED VIEW SCALE 1:2\nINNER RIB BOTTOM, GUSSETS SHARP\n"
+        "OUTER RIB BOTTOM BESIDE BOSS SHARP",
         *HUB_LEFT_NOTE_XY,
     )
     if (
