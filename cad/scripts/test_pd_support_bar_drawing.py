@@ -47,8 +47,6 @@ def test_marked_dimensions_are_the_kept_dimensions() -> None:
 
 def test_printed_bands_are_the_spec_bands() -> None:
     assert model_toleranced_dimensions(part) == {
-        ("BarProfile", "Height"): "BAR_HEIGHT_BAND",
-        ("Bar", "Depth"): "BAR_DEPTH_BAND",
         ("HangerRowReference", "name"): "HOLE_POSITION_BAND",
         ("PivotTap", "DrillDepth"): "*PIVOT_TAP_DRILL_DEPTH_LIMITS",
     }
@@ -57,12 +55,21 @@ def test_printed_bands_are_the_spec_bands() -> None:
     assert 'for name in ("HangerRowHeight", *HANGER_STATION_NAMES):' in source
     assert spec.HOLE_POSITION_BAND == 0.065
     assert spec.PIVOT_TAP_DRILL_DEPTH_LIMITS == (-0.4, 0.0)
-    # The band's places print it whole: .XXX for ±0.065 and the bar bands.
+    # The band's places print it whole: .XXX for ±0.065. The bar bands ARE
+    # the title block's .XXX row, so their three places alone carry them.
+    from _printed_tolerance import printed_band_mm
+
     places = sheet_spec.DRAWING_PRECISION
     assert places["HangerRowReference"] == dict.fromkeys(
         ("HangerRowHeight", *sheet_spec.HANGER_STATION_NAMES), 3
     )
     assert places["BarProfile"]["Height"] == places["Bar"]["Depth"] == 3
+    assert spec.BAR_BAND_PLACES == 3
+    assert (
+        printed_band_mm(spec.BAR_BAND_PLACES)
+        == spec.BAR_HEIGHT_BAND
+        == spec.BAR_DEPTH_BAND
+    )
     assert places["PivotTap"]["DrillDepth"] == 1
 
 
