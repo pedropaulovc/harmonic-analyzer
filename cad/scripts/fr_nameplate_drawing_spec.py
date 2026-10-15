@@ -23,9 +23,12 @@ import math
 from _dxf_text import read_lwpolylines
 from _hole_spec import CLEARANCE_MM
 from _paths import REFERENCES_DIR
+from _mcmaster_90114a511 import BF_PITCH as SCREW_PITCH
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from _release_artwork import bundle_path
 from fr_nameplate_spec import PLATE_HEIGHT, PLATE_THICKNESS, PLATE_WIDTH, SCREW_XY
+from vn_fillister_screw_spec import SHANK_DIA as SCREW_MAJOR_DIA
+from vn_fillister_screw_spec import SHANK_LEN as SCREW_LEN
 
 # --- Model dimensions the print shows: feature -> parametric names. The slab's
 # extrude depth is the plate thickness; the Hole Wizard placement sketch
@@ -125,6 +128,45 @@ ENGRAVING_FLOOR_MIN = (
 if ENGRAVING_FLOOR_MIN <= 0.0:
     raise AssertionError(
         f"engraving can reach through the plate: {ENGRAVING_FLOOR_MIN}"
+    )
+
+# drawing-guidelines.md rule 18 (1.5D of full thread) for the four McMaster
+# 90114A511 #4-40 x 1/4 brass fillisters that hold the plate to the base's
+# blind seats (PR #1468 r3 review). The shortest stock screw (ASME B18.6.3
+# allows #4 machine screws 1/8..1/2 long 0.02 in short) through the thickest
+# accepted plate, less the tip's incomplete 0.75 pitch. Thread starts within
+# two pitches (1.27) of the head, inside even the thinnest plate, so all the
+# thread below the plate is full form; the base thread (6.00 deep, 5.49 at
+# its .XX minimum) runs past the 4.98 deepest reach, so the screw, not the
+# seat, is the limit: 3.736 (1.31D) against 4.267.
+# Owner ruling 2026-10-15: accepted under rule 20, unloaded cosmetic plate
+# (option C: keep the 1/4 screw). The shortfall may not grow past the
+# accepted value, and a joint that reaches 1.5D no longer needs the ruling.
+SCREW_LENGTH_SHORT_ALLOWANCE = 0.02 * 25.4
+SCREW_TIP_INCOMPLETE = 0.75 * SCREW_PITCH
+SCREW_ENGAGEMENT_TARGET = 1.5 * SCREW_MAJOR_DIA
+SCREW_FULL_THREAD_MIN = (
+    SCREW_LEN
+    - SCREW_LENGTH_SHORT_ALLOWANCE
+    - (
+        PLATE_THICKNESS
+        + printed_deviations(
+            PLATE_THICKNESS, DRAWING_PRECISION["PlateSlab"]["PlateThick"]
+        )[1]
+    )
+    - SCREW_TIP_INCOMPLETE
+)
+SCREW_FULL_THREAD_ACCEPTED = 3.736
+if not (
+    0.0
+    < SCREW_FULL_THREAD_ACCEPTED
+    <= round(SCREW_FULL_THREAD_MIN, 3)
+    < SCREW_ENGAGEMENT_TARGET
+):
+    raise AssertionError(
+        f"nameplate screw full thread {SCREW_FULL_THREAD_MIN:.3f} is not the "
+        f"accepted rule-20 shortfall [{SCREW_FULL_THREAD_ACCEPTED}, "
+        f"{SCREW_ENGAGEMENT_TARGET:.3f})"
     )
 
 # The three vendored contours the build imports (cad/references), named on the
