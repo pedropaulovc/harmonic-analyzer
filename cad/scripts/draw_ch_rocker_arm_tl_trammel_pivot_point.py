@@ -84,8 +84,12 @@ PROFILE_KEEP = {
     # Shortest span nearest the part so no extension line crosses a row.
     "HardenedLength": _below(HARDENED_LENGTH, 0),
     "PointLength": _below(POINT_LENGTH, 1),
+    # Ten millimetres right of the cone-to-back midpoint: its block shares
+    # rows with the four-line tip-angle callout, whose last line and shelf
+    # end at ~145 mm, so this block starts clear of them rather than 1.4 mm
+    # above them.
     "RodDia": (
-        APEX_X + (CONE_LENGTH + POINT_LENGTH) / 2.0 * _S,
+        APEX_X + (CONE_LENGTH + POINT_LENGTH) / 2.0 * _S + 0.010,
         PROFILE_CENTER[1] + 0.050,
     ),
     # The text stands left of its dimension line, just ahead of the apex.
