@@ -6,6 +6,8 @@ import math
 from pathlib import Path
 
 import _clamp_arc
+import _column_clamp_drawing
+import _drawing_hidden_sketches
 import _config
 import build_sh_column_clamp_back as part
 import draw_sh_column_clamp_back as drawing
@@ -42,6 +44,50 @@ def test_marked_dimensions_are_exactly_the_kept_set() -> None:
     )
     assert annotated <= kept
     assert set(spec.EAR_STATION_DIMENSIONS) >= set(spec.DRAWING_DIMENSIONS["EarHoles"])
+
+
+def test_both_ears_located_by_one_model_owned_height() -> None:
+    # Both ear centres hold the bar's centre plane: each placement y is zero,
+    # which wizard_holes ties to the origin by a relation, not a dimension.
+    assert _clamp_arc.EAR_HOLE_Y == 0.0
+    assert [y for _, y in _clamp_arc.EAR_PLACEMENT] == [(None, None)] * 2
+    # The hidden reference line runs from the midplane block's bottom face up
+    # to that shared height under ear 1 (Right-plane x is model -z), so its
+    # one printed length is the height of both ears.
+    (bottom_x, bottom_y), (top_x, top_y) = _clamp_arc.EAR_HEIGHT_LINE
+    assert bottom_x == top_x == -spec.EAR_HOLE_Z
+    assert bottom_y == -spec.ARC_HEIGHT / 2.0
+    assert top_y == _clamp_arc.EAR_HOLE_Y
+    assert top_y - bottom_y == spec.EAR_HOLE_HEIGHT
+    # The part marks it and authors its places; the sheet imports it in the
+    # split-face view (showing the hidden sketch there), reads those places
+    # back and prefixes it for the pair -- no sheet-side edge dimension.
+    feature = _clamp_arc.EAR_HEIGHT_REFERENCE
+    name = _clamp_arc.EAR_HEIGHT_DIMENSION
+    assert spec.DRAWING_DIMENSIONS[feature] == {name}
+    assert spec.DRAWING_PRECISION[feature] == {name: 2}
+    assert drawing.DRAWING_PRECISION_BY_NAME is spec.DRAWING_PRECISION_BY_NAME
+    assert not hasattr(spec, "EAR_HOLE_HEIGHT_PLACES")
+    assert name in drawing.FACE_KEEP
+    assert drawing.DIMENSION_PREFIXES[name] == "2X "
+    assert (
+        drawing.curate_view_dimensions
+        is _drawing_hidden_sketches.curate_view_dimensions
+    )
+    assert not hasattr(drawing, "add_edge_dimension")
+    assert part.build_arc is _clamp_arc.build_arc
+
+
+def test_split_face_helpers_are_shared_with_the_front_arc() -> None:
+    assert (
+        drawing.set_dimension_prefixes is _column_clamp_drawing.set_dimension_prefixes
+    )
+    assert (
+        drawing.add_bore_axis_centerline
+        is _column_clamp_drawing.add_bore_axis_centerline
+    )
+    assert not hasattr(drawing, "_set_dimension_prefixes")
+    assert not hasattr(drawing, "_add_bore_axis_centerline")
 
 
 def test_geometry_mirrors_the_shared_builder() -> None:
