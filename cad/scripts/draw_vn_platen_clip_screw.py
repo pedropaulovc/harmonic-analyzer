@@ -1,4 +1,4 @@
-"""Create the purchased reference drawing for the platen-clip screw (MHA-VN-059, McMaster 90114A124)."""
+"""Create the purchased reference drawing for the platen-clip screw (MHA-VN-059, McMaster 92446A077)."""
 
 from __future__ import annotations
 

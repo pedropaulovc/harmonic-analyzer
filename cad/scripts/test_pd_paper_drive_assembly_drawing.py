@@ -1408,7 +1408,7 @@ def test_the_explode_moves_only_the_platen_group_and_keeps_the_platen() -> None:
         explode.SHOWN_STEMS - explode.STATIONARY_STEMS
     )
     # The guide screws leave with the guides' step, the clip screws with the
-    # clips': the two fillister families never share a step.
+    # clips': the two screw families never share a step.
     for _step, names in plan:
         assert not {"vn-fillister-screw-1", "vn-platen-clip-screw-1"} <= set(names)
 

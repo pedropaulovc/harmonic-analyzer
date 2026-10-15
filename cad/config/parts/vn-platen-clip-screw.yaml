@@ -1,11 +1,11 @@
 vn-platen-clip-screw:
-  title: Brass Fillister Head Slotted Screw
+  title: Brass Pan Head Slotted Screw
   number: MHA-VN-059
-  stock_name: Brass Fillister Head Slotted Screw
+  stock_name: Brass Pan Head Slotted Screw
   supplier: McMaster-Carr
-  supplier_skus: [90114A124]
+  supplier_skus: [92446A077]
   material: Brass
-  material_specification: Brass, McMaster-Carr 90114A124
+  material_specification: "Brass, slotted pan head, ASME B18.6.3; McMaster-Carr 92446A077"
   finish: plain
   quantity: 4
   tolerance_class: machined_block

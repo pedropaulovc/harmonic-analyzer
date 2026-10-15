@@ -21,7 +21,7 @@ PLATE_HEIGHT = PLATE_WIDTH / 2.0  # user-confirmed front-face H:W = 1:2
 # the front face moves 0.15 rearward to open the disc-to-platen air.
 PLATE_THICKNESS = 3.85
 
-# Clip-screw receivers: the stock 90114A124 brass #2-56 fillister head
+# Clip-screw receivers: the stock 92446A077 brass #2-56 slotted pan head
 # (vn-platen-clip-screw) sits directly on the clip's flat 0.8 brass sheet
 # (ch22 img03: no raised seat, small heads), and its shank reaches through a
 # #2-56 tap through the plate and a Ø7 boss standing SOCKET_BOSS_H proud of the
