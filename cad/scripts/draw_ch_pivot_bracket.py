@@ -194,7 +194,7 @@ SIDE_KEEP_NAMES = ("CornerRadius",)
 # ("<hw-thru>", the drill's and the thread's) say so in words; the thread
 # class is the title block's; the thread's full-thread shortfall (a plain
 # fact, rule 20) closes the callout of the hole it describes.
-# Pending exception ruling: MHA-CH-008 set-screw engagement (#1371).
+# Owner-ruled shortfall, declared as ch-pivot-bracket RV-01 (#1371).
 SET_SCREW_PROCESS = "TAP"
 SET_SCREW_EXTENT = "TO BORE"
 SET_SCREW_QUALIFIER = SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
