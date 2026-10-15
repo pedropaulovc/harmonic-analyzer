@@ -123,19 +123,22 @@ TOP_CALLOUTS = {
 
 FRONT_KEEP = {
     "HubDia": (0.030, 0.135),
-    "FulcrumDia": (0.040, 0.190),
+    "FulcrumDia": (0.050, 0.190),
     "BarHeight": (0.262, FRONT_CENTER[1]),
     "BarPinCx": (_sheet_x(BAR_PIN_X / 2.0), 0.128),
     "SpringCx": (_sheet_x(LEVER_SPRING_X / 2.0 + 25.0), 0.115),
 }
 TOP_KEEP = {
     "LeverThick": (0.264, TOP_CENTER[1] + 0.006),
-    "HubLength": (0.036, TOP_CENTER[1] + 0.006),
+    # Above the hub: a vertical dimension's text sits left of its line, and
+    # left of the hub there is no room inside the border.
+    "HubLength": (0.045, TOP_CENTER[1] + 0.020),
 }
 OVERALL_TEXT_XY = (FRONT_CENTER[0], 0.102)
 BAR_PIN_CALLOUT_XY = (0.170, 0.188)
 SPRING_CALLOUT_XY = (0.240, 0.188)
-BORE_FINISH_SYMBOL = (0.082, 0.140)
+BORE_FINISH_SYMBOL = (0.030, 0.112)
+FINISH_CHAR_HEIGHT = 0.0025
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -285,11 +288,11 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to front view")
 
     # The reamed fulcrum bore is the one running surface (rule 6): Ra on its
-    # lower-right rim, the symbol standing off below the bar.
+    # lower-left rim, the symbol below-left of the hub, clear of the bar.
     bore_rim = model_point_in_view(
         adapter,
         front,
-        (PIVOT_HOLE_DIA / 2000.0 * 0.7071, -PIVOT_HOLE_DIA / 2000.0 * 0.7071, 0.0),
+        (-PIVOT_HOLE_DIA / 2000.0 * 0.7071, -PIVOT_HOLE_DIA / 2000.0 * 0.7071, 0.0),
         label="fulcrum bore rim",
     )
     add_surface_finish(
@@ -299,6 +302,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=BORE_FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "fulcrum_bore"),
         label="fulcrum bore finish",
+        char_height=FINISH_CHAR_HEIGHT,
     )
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
