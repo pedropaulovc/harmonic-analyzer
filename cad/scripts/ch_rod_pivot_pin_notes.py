@@ -15,9 +15,9 @@ guidelines`: the model dimension, never note text, owns it). The journal's two
 fits are flagged at its Ø callout, where they apply (rules 4 and 7): stock
 size, pressed in the fork's reamed hole (user ruling 2026-10-09, PR #1292
 review F1), running in the arm's #47 hole. The note keeps what no callout
-carries: the views show the installed pin, its ends dressed flush (the
-inter-arm gap's neighbour clearance), and the press is removable. The title
-block owns the drill rod (MATERIAL) and its finish.
+carries: the views show the installed pin, its ends dressed flush at
+assembly (the inter-arm gap's neighbour clearance). The title block owns the
+drill rod (MATERIAL) and its finish.
 """
 
 from __future__ import annotations
@@ -71,5 +71,5 @@ PIN_DIA_CALLOUT = "\n".join(
 
 DRAWING_NOTES = (
     "1. INSTALLED STATE SHOWN: BOTH ENDS DRESSED FLUSH WITH THE MHA-CH-003"
-    " FORK FACES, NEVER PROUD; REMOVABLE WITH PUNCH."
+    " FORK FACES AT ASSEMBLY, NEVER PROUD."
 )

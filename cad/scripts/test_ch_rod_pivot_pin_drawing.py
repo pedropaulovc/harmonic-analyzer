@@ -138,8 +138,9 @@ def test_print_carries_no_gdt_roughness_or_callouts() -> None:
     ):
         assert helper not in source, helper
     # The dimension callouts are descriptive words below native values: the
-    # journal's stock and fits, the blank's word. Nothing rides ABOVE: a line
-    # break there is stored but never printed (ch_rod_pivot_pin r1 render).
+    # journal's stock and fits, the installed reference's and the blank's
+    # words. Nothing rides ABOVE: a line break there is stored but never
+    # printed (ch_rod_pivot_pin r1 render).
     assert source.count("set_dimension_callouts(") == 1
     assert 'location="above"' not in source
     assert "author_part_pmi" not in _build_source()
@@ -160,15 +161,18 @@ def test_journal_callout_names_both_mates_and_stock() -> None:
     # The press and the running fit hold at the drill rod's own grind band.
     assert spec.BUDGET["interference_min"] > 0.0
     assert spec.BUDGET["running_clearance_min"] > 0.0
-    assert '{"PinDia": PIN_DIA_CALLOUT, "BlankLen": "BLANK"}' in _source()
+    assert (
+        '{"PinDia": PIN_DIA_CALLOUT, "PinLen": "INSTALLED", "BlankLen": "BLANK"}'
+        in _source()
+    )
 
 
-def test_note_states_installed_state_flush_ends_and_removal() -> None:
+def test_note_states_installed_state_and_flush_ends() -> None:
     lines = notes.DRAWING_NOTES.splitlines()
     assert len(lines) <= 4  # drawing-guidelines.md rule 7 (notes: few, flagged, never a method)
     assert lines == [
         "1. INSTALLED STATE SHOWN: BOTH ENDS DRESSED FLUSH WITH THE MHA-CH-003"
-        " FORK FACES, NEVER PROUD; REMOVABLE WITH PUNCH.",
+        " FORK FACES AT ASSEMBLY, NEVER PROUD.",
     ]
     text = notes.DRAWING_NOTES
     # drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (PR #1292 review N1): the blank's size and limit are the
