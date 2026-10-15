@@ -885,33 +885,44 @@ def test_the_fitup_acceptance_prints_the_contract_bands() -> None:
     assert "HEAD PLAY" not in body
 
 
-def test_the_pivot_view_and_its_notes_keep_to_sheet_two_left_field() -> None:
-    cx, cy = drawing.PIVOT_VIEW_CENTER
-    r = drawing.PIVOT_VIEW_RADIUS
+def test_the_pivot_section_and_its_locator_keep_to_sheet_two_left_field() -> None:
     ring_left, _bottom, _right, ring_top = drawing.SHEET_TWO_RING_LIMITS
-    assert cx + r < ring_left - drawing.SHEET_TWO_RING_GAP
-    assert cx - r > 0.018
-    stake_lines = drawing.PIVOT_STAKE_NOTE.splitlines()
+    field_right = ring_left - drawing.SHEET_TWO_RING_GAP
+    # The section's balloon ring stays in the field.
+    sx, sy = drawing.PIVOT_SECTION_CENTER
+    reach = drawing.PIVOT_SECTION_RADIUS + drawing.BALLOON_RING_REACH
+    assert sx - reach > 0.018
+    assert sx + reach < field_right
+    # The locator's circle sits above the ring, its cutting line inside the
+    # circle and at least 1 mm past the stack each way along the axis.
+    lx, ly = drawing.PIVOT_LOCATOR_CENTER
+    lr = drawing.PIVOT_LOCATOR_RADIUS
+    assert lx + lr < field_right
+    assert ly + lr < ring_top
+    assert sy + reach < ly - lr - 0.006
+    scale = drawing.PIVOT_LOCATOR_SCALE[0] / drawing.PIVOT_LOCATOR_SCALE[1]
+    stack_half = (pivot_screw.HEAD_H - drawing.PIVOT_FRONT_FACE_Y) / 2.0
+    assert (stack_half + 1.0) * scale / 1000.0 <= drawing.PIVOT_CUT_HALF < lr
+    # The caption over the ring, left of the locator's section arrows.
     caption_lines = drawing.PIVOT_CAPTION.splitlines()
-    for text, (x, _y) in (
-        (drawing.PIVOT_STAKE_NOTE, drawing.PIVOT_STAKE_NOTE_XY),
-        (drawing.PIVOT_CAPTION, drawing.PIVOT_CAPTION_XY),
-    ):
-        assert x > 0.018
-        assert x + max(map(len, text.splitlines())) * NOTE_CHAR_WIDTH < ring_left
-    # The front face projects below the axis: the stake's note under the
-    # circle, the caption over it.
-    caption_top = drawing.PIVOT_CAPTION_XY[1]
-    assert caption_top <= ring_top
-    assert caption_top - len(caption_lines) * NOTE_LINE_PITCH > cy + r
-    stake_top = drawing.PIVOT_STAKE_NOTE_XY[1]
-    assert stake_top < cy - r
-    assert stake_top - len(stake_lines) * NOTE_LINE_PITCH > (
-        drawing.SHEET_INNER_BORDER_BOTTOM
-    )
-    # The circle frames the screw from its head to the bar's front face.
+    cx, cy = drawing.PIVOT_CAPTION_XY
+    assert cx > 0.018
+    assert cx + max(map(len, caption_lines)) * NOTE_CHAR_WIDTH < lx - lr - 0.008
+    assert cy <= ring_top
+    assert cy - len(caption_lines) * NOTE_LINE_PITCH > sy + reach
+    # The native section caption under the ring, above the border.
+    caption_y = drawing.PIVOT_SECTION_CAPTION_XY[1]
+    assert caption_y < sy - reach
+    assert caption_y - 2 * NOTE_LINE_PITCH > drawing.SHEET_INNER_BORDER_BOTTOM
+    # Both circles frame the screw from its head to the bar's front face.
     assert drawing.PIVOT_FRONT_FACE_Y == pytest.approx(
         -(pivot_screw.SHOULDER_LEN + assembly.BAR.BAR_DEPTH)
+    )
+    assert drawing.PIVOT_SECTION_RADIUS == pytest.approx(
+        drawing.PIVOT_FRAME_RADIUS_MM
+        * drawing.PIVOT_SECTION_SCALE[0]
+        / drawing.PIVOT_SECTION_SCALE[1]
+        / 1000.0
     )
     assert drawing.PIVOT_VIEW_INSTANCES >= {
         "pd-support-bar-1",
