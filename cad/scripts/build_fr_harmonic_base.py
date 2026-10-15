@@ -65,7 +65,7 @@ from _sketch import (
 )
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _drawing_prefix import set_dimension_prefix
@@ -84,7 +84,6 @@ from fr_harmonic_base_spec import (
     BOTTOM_LENGTH,
     BOTTOM_THICKNESS,
     BOTTOM_WIDTH,
-    CASTING_FILLET_R,
     COLUMN_SOCKET_XZ,
     COLUMN_X,
     DECK_CORNER_R,
@@ -101,6 +100,8 @@ from fr_harmonic_base_spec import (
     HANGING_BOSS_MIN_DIA,
     PART_SURFACE_FINISHES,
     POCKET_CEILING_Y,
+    POCKET_CORNER_FILLET_R,
+    POCKET_FILLET_TOL_TYPE,
     POCKET_HALF_X,
     POCKET_HALF_Z,
     POCKET_WALL,
@@ -1205,10 +1206,101 @@ def _pocket_fillet_areas() -> list[float]:
     """The eight boss-to-wall fillets: each socket boss meets one end wall
     and one side wall."""
     return [
-        _boss_wall_fillet_area(SOCKET_BOSS_DIA / 2.0, inset, CASTING_FILLET_R)
+        _boss_wall_fillet_area(SOCKET_BOSS_DIA / 2.0, inset, POCKET_CORNER_FILLET_R)
         for x, z in COLUMN_SOCKET_XZ
         for inset in (POCKET_HALF_X - abs(x), POCKET_HALF_Z - abs(z))
     ]
+
+
+def _disc_rect_corners(
+    centre: tuple[float, float], radius: float, rect: PocketShape
+) -> list[tuple[float, float, float]]:
+    """Where a round boss's cylinder crosses a rect feature's faces inside
+    the pocket: (x, z, inset) per crossing, the inset being the boss centre's
+    signed distance to that face, positive on the face's air side (the
+    convention _boss_wall_fillet_area takes)."""
+    cx, cz = centre
+    _kind, x0, x1, z0, z1 = rect
+    found = []
+    for along_x, value, side, lo, hi in (
+        (False, x0, -1.0, z0, z1),
+        (False, x1, 1.0, z0, z1),
+        (True, z0, -1.0, x0, x1),
+        (True, z1, 1.0, x0, x1),
+    ):
+        across, along = (cz, cx) if along_x else (cx, cz)
+        inset = side * (across - value)
+        if abs(inset) >= radius:
+            continue
+        half = math.sqrt(radius**2 - inset**2)
+        for t in (along - half, along + half):
+            x, z = (t, value) if along_x else (value, t)
+            if lo < t < hi and abs(x) < POCKET_HALF_X and abs(z) < POCKET_HALF_Z:
+                found.append((x, z, inset))
+    return found
+
+
+def _pocket_corner_fillets(fillet_r: float) -> list[tuple[list[float], float, float]]:
+    """(pick, edge length, plan section) for each vertical reentrant pocket
+    edge PocketFillets leaves sharp: each rib to the wall and to the other
+    rib, the cone-lock pad to the front wall, the pinion-block pads to the
+    cross rib, each lug to its end wall and its socket boss, the swing-stop
+    boss to the long rib and the spring-foot boss to its block pad. Each pick
+    sits mid-height on its edge. test_fr_harmonic_base_pocket_fillets_drawing
+    enumerates the same edges from the plan shapes and proves the radius
+    against every seat, socket and cross tap at the worst case."""
+    square = _fillet_section_area(fillet_r)
+    half_rib = RIB_THICKNESS / 2.0
+    corners: list[tuple[float, float, float, float]] = []  # x, z, bottom, area
+    for sa in (-1.0, 1.0):
+        for sb in (-1.0, 1.0):
+            corners += [
+                (sa * POCKET_HALF_X, sb * half_rib, RIB_RELIEF, square),
+                (sa * half_rib, sb * POCKET_HALF_Z, RIB_RELIEF, square),
+                (sa * half_rib, sb * half_rib, RIB_RELIEF, square),
+            ]
+    _kind, lock_x0, lock_x1, _z0, _z1 = LOCK_PAD_SHAPE
+    lock_wall_z = math.copysign(POCKET_HALF_Z, LOCK_PAD_WALL_Z)
+    corners += [
+        (x, lock_wall_z, DEEP_BOSS_BOTTOM_Y, square) for x in (lock_x0, lock_x1)
+    ]
+    for _kind, x0, x1, z0, z1 in BLOCK_PAD_SHAPES:
+        for rib_x in (-half_rib, half_rib):
+            if x0 < rib_x < x1:
+                corners += [(rib_x, z, SHALLOW_BOSS_BOTTOM_Y, square) for z in (z0, z1)]
+    for (x, z), lug in zip(COLUMN_SOCKET_XZ, CROSS_TAP_LUG_SHAPES, strict=True):
+        lug_z = z - math.copysign(CROSS_TAP_LUG_LENGTH, z)
+        corners.append(
+            (math.copysign(POCKET_HALF_X, x), lug_z, SHALLOW_BOSS_BOTTOM_Y, square)
+        )
+        for cx, cz, inset in _disc_rect_corners((x, z), SOCKET_BOSS_DIA / 2.0, lug):
+            area = _boss_wall_fillet_area(SOCKET_BOSS_DIA / 2.0, inset, fillet_r)
+            corners.append((cx, cz, SHALLOW_BOSS_BOTTOM_Y, area))
+    for centre, rect in (
+        (STOP_SCREW_XZ, LONG_RIB_SHAPE),
+        *((foot, pad) for foot in FOOT_SCREW_XZ for pad in BLOCK_PAD_SHAPES),
+    ):
+        for cx, cz, inset in _disc_rect_corners(centre, HANGING_BOSS_HALF, rect):
+            area = _boss_wall_fillet_area(HANGING_BOSS_HALF, inset, fillet_r)
+            corners.append((cx, cz, SHALLOW_BOSS_BOTTOM_Y, area))
+    return [
+        ([x, (bottom + POCKET_CEILING_Y) / 2.0, z], POCKET_CEILING_Y - bottom, area)
+        for x, z, bottom, area in corners
+    ]
+
+
+def _pocket_corner_fillet_volume(fillet_r: float) -> float:
+    """Metal the PocketCornerFillets feature adds: section x edge length."""
+    return sum(
+        length * area for _pick, length, area in _pocket_corner_fillets(fillet_r)
+    )
+
+
+# Every vertical reentrant pocket corner, both fillet features: the count the
+# one "R MAX" dimension prints.
+POCKET_FILLET_COUNT = len(_pocket_fillet_areas()) + len(
+    _pocket_corner_fillets(POCKET_CORNER_FILLET_R)
+)
 
 
 def _span_overlap(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -2041,7 +2133,7 @@ async def build(adapter) -> dict[str, str]:
         fillet_heights += [SHALLOW_BOSS_BOTTOM_Y, POCKET_CEILING_Y]
     check(
         "fillet pocket boss junctions",
-        await adapter.add_fillet(CASTING_FILLET_R, fillet_picks, propagate=False),
+        await adapter.add_fillet(POCKET_CORNER_FILLET_R, fillet_picks, propagate=False),
     )
     name_last_feature(adapter, "PocketFillets")
     name_dimensions(adapter, "PocketFillets", ["PocketFilletRadius"])
@@ -2051,6 +2143,31 @@ async def build(adapter) -> dict[str, str]:
     )
     after = await volume_check(
         adapter, "pocket fillets", after + v_fillets, 0.05 * v_fillets + 5.0
+    )
+
+    # The same radius on every other vertical reentrant pocket edge (rib,
+    # pad, lug and boss corners), so the one "R MAX" dimension on
+    # PocketFillets covers all of them (machinist review rule 16). No two of
+    # these edges share a vertex and each ends at sharp horizontal edges, so
+    # nothing propagates.
+    corner_fillets = _pocket_corner_fillets(POCKET_CORNER_FILLET_R)
+    check(
+        "fillet pocket rib, pad, lug and boss corners",
+        await adapter.add_fillet(
+            POCKET_CORNER_FILLET_R,
+            [pick for pick, _length, _area in corner_fillets],
+            propagate=False,
+        ),
+    )
+    name_last_feature(adapter, "PocketCornerFillets")
+    v_corner_fillets = _pocket_corner_fillet_volume(POCKET_CORNER_FILLET_R)
+    # 2 % + 5 (about 106 mm^3 at R6): a dropped rib corner (about 277 mm^3)
+    # fails the step; check() on add_fillet guards the shallower corners.
+    after = await volume_check(
+        adapter,
+        "pocket corner fillets",
+        after + v_corner_fillets,
+        0.02 * v_corner_fillets + 5.0,
     )
 
     # Four blind native 1/4-20 UNC-2B seats from the support deck. The screws
@@ -2779,6 +2896,17 @@ async def build(adapter) -> dict[str, str]:
         "SpotFaceDepth",
         *deviations(SPOTFACE_DEPTH_BAND_MM),
     )
+    # Every pocket corner fillet prints as one single limit, "R6.0 MAX":
+    # swTolMAX prints the nominal then MAX, so the modelled radius IS the max.
+    _display, fillet_radius = _named_dimension(
+        adapter, "PocketFillets", "PocketFilletRadius"
+    )
+    tolerance = _early_bound(fillet_radius.Tolerance, "IDimensionTolerance")
+    tolerance.Type = POCKET_FILLET_TOL_TYPE
+    if int(tolerance.Type) != POCKET_FILLET_TOL_TYPE:
+        raise RuntimeError(
+            "PocketFilletRadius@PocketFillets: MAX limit did not persist"
+        )
     # A pair's shared size or coordinate prints once, as "2X": the count is
     # specification, so the part owns it like the places.
     for (feature_name, dimension_name), prefix in UNDERSIDE_PAD_PREFIXES.items():

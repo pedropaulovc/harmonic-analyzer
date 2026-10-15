@@ -1,0 +1,901 @@
+"""Offline proof for the harmonic base's underside-pocket corner fillets.
+
+COORD ruling (a) on the fr_harmonic_base machinist review (clarity 4, rule 16
+(design for the cutter)): every pocket corner still drawn sharp in the bottom
+views gets a modelled fillet of ONE radius, printed "nX Rr MAX", the largest
+standard radius up to the existing R6 boss-to-wall fillets that keeps rule 17
+(walls and webs) at the worst case.
+
+Scope: the VERTICAL concave edges -- the plan corners the bottom views show
+and the finding lists (rib to wall, rib to rib, pad and lug to wall or rib or
+boss). The pocket's own four plan corners are not among them: each lies
+inside a socket boss, whose eight junctions PocketFillets already rounds.
+The horizontal concave edges (every hanging feature's root at the ceiling,
+the ceiling-to-wall line, a shorter feature's bottom against a taller one's
+side) are left to the process: they set no cutter diameter, and filleting
+them would add over a hundred edges and outline every pad twice in the
+bottom views.
+
+Everything here is derived from the build's own plan shapes: the corner set,
+each fillet's tangent points and plan section, the worst-case wall from every
+deck seat, column socket and cross tap to every new fillet, and the pick
+point the native feature selects each edge by. The build's own
+_pocket_corner_fillets (PocketCornerFillets' picks, edge lengths and the
+closed-form sections its volume check sums) must match this enumeration.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+from functools import cache
+
+import numpy as np
+import pytest
+
+import _config
+import build_fr_harmonic_base as base
+
+# Standard casting-fillet radii, largest first, capped at the R6 the
+# socket-boss junctions already carry.
+STANDARD_RADII = (6.0, 5.0, 4.0, 3.0, 2.5, 2.0)
+LIGAMENT_FLOOR = 1.5  # rule 17 (walls and webs): hard floor
+
+_BAND = base._general_band_mm()  # .X: bounds every location term (0.8)
+# A cast outline moves by its location band plus half its size band (the
+# convention require_hanging_boss applies to the boss walls).
+_CAST_SHIFT = _BAND + _BAND / 2.0
+# Two cast features can each run that far toward one another.
+_RELATIVE_CAST_SHIFT = 2.0 * _CAST_SHIFT
+_DRILL_OVERSIZE_R = float(_config.title_block("drilled_hole")["plus_mm"]) / 2.0
+_HOLE_SHIFT = math.hypot(_BAND, _BAND)  # both table coordinates against it
+_CEILING = base.POCKET_CEILING_Y
+_ARC_SAMPLES = 96
+_PICK_TOLERANCE = 0.5  # _select_edges_geometric's default hit radius (mm)
+_FACE_LOOKAHEAD = 20.0  # face run scanned past each tangent point (mm)
+
+Point = tuple[float, float]
+
+
+# --- Plan features: what hangs from the ceiling, and the wall around it. ---
+
+
+@dataclass(frozen=True)
+class Feature:
+    """One plan shape standing from ``bottom_y`` up to the pocket ceiling.
+
+    The pocket wall is the rect's complement: metal OUTSIDE the outline.
+    """
+
+    kind: str
+    name: str
+    shape: tuple
+    bottom_y: float
+    wall: bool = False
+
+    def contains(self, x, z, eps: float = 1e-6):
+        """True where (x, z) lies strictly inside this feature's metal
+        (scalars or arrays)."""
+        if self.wall:
+            _k, x0, x1, z0, z1 = self.shape
+            inside = (x >= x0 - eps) & (x <= x1 + eps) & (z >= z0 - eps)
+            return np.logical_not(inside & (z <= z1 + eps))
+        if self.shape[0] == "disc":
+            _k, cx, cz, r = self.shape
+            return np.hypot(x - cx, z - cz) < r - eps
+        _k, x0, x1, z0, z1 = self.shape
+        return (x > x0 + eps) & (x < x1 - eps) & (z > z0 + eps) & (z < z1 - eps)
+
+    def clearance(self, pts: np.ndarray) -> np.ndarray:
+        """Plan distance from each point to this feature's metal (0 inside)."""
+        x, z = pts[:, 0], pts[:, 1]
+        if self.wall:
+            _k, x0, x1, z0, z1 = self.shape
+            return np.maximum(0.0, np.minimum.reduce([x - x0, x1 - x, z - z0, z1 - z]))
+        if self.shape[0] == "disc":
+            _k, cx, cz, r = self.shape
+            return np.maximum(0.0, np.hypot(x - cx, z - cz) - r)
+        _k, x0, x1, z0, z1 = self.shape
+        dx = np.maximum.reduce([x0 - x, np.zeros_like(x), x - x1])
+        dz = np.maximum.reduce([z0 - z, np.zeros_like(z), z - z1])
+        return np.hypot(dx, dz)
+
+
+def _at(xz: tuple[float, float]) -> str:
+    return f"({xz[0]:+.1f}, {xz[1]:+.1f})"
+
+
+def _same(a: Point, b: Point) -> bool:
+    return math.dist(a, b) < 1e-9
+
+
+def _hanging_kind(shape: tuple) -> str:
+    if shape == base.LOCK_PAD_SHAPE:
+        return "cone-lock pad"
+    for kind, shapes in (
+        ("pedestal pad", base.PEDESTAL_PAD_SHAPES),
+        ("pinion-block pad", base.BLOCK_PAD_SHAPES),
+        ("cross-tap lug", base.CROSS_TAP_LUG_SHAPES),
+    ):
+        if shape in shapes:
+            return kind
+    if shape[0] == "disc":
+        for kind, stations in (
+            ("rocker-support boss", base.HOLE_XZ),
+            ("spring-foot boss", base.FOOT_SCREW_XZ),
+            ("cone-pivot boss", (base.PIVOT_SCREW_XZ,)),
+            ("swing-stop boss", (base.STOP_SCREW_XZ,)),
+            ("nameplate boss", base.NAMEPLATE_SCREW_XZ),
+        ):
+            if any(_same(shape[1:3], xz) for xz in stations):
+                return kind
+    raise AssertionError(f"unnamed pocket shape {shape}")
+
+
+def _shape_label(shape: tuple) -> str:
+    if shape[0] == "disc":
+        return _at(shape[1:3])
+    _k, x0, x1, z0, z1 = shape
+    return _at(((x0 + x1) / 2.0, (z0 + z1) / 2.0))
+
+
+@cache
+def pocket_features() -> tuple[Feature, ...]:
+    """The wall, the socket bosses, the ribs, both boss levels and the lugs."""
+    pocket = ("rect", -base.POCKET_HALF_X, base.POCKET_HALF_X)
+    pocket += (-base.POCKET_HALF_Z, base.POCKET_HALF_Z)
+    features = [Feature("pocket wall", "pocket wall", pocket, 0.0, wall=True)]
+    features += [
+        Feature("socket boss", f"socket boss {_shape_label(s)}", s, 0.0)
+        for s in base.SOCKET_BOSS_SHAPES
+    ]
+    features += [
+        Feature("long rib", "long rib", base.LONG_RIB_SHAPE, base.RIB_RELIEF),
+        Feature("cross rib", "cross rib", base.CROSS_RIB_SHAPE, base.RIB_RELIEF),
+    ]
+    for shapes, bottom_y in (
+        (base.DEEP_BOSS_SHAPES, base.DEEP_BOSS_BOTTOM_Y),
+        (base.SHALLOW_BOSS_SHAPES, base.SHALLOW_BOSS_BOTTOM_Y),
+        (base.CROSS_TAP_LUG_SHAPES, base.SHALLOW_BOSS_BOTTOM_Y),
+    ):
+        for shape in shapes:
+            kind = _hanging_kind(shape)
+            features.append(
+                Feature(kind, f"{kind} {_shape_label(shape)}", shape, bottom_y)
+            )
+    names = [f.name for f in features]
+    if len(set(names)) != len(names):
+        raise AssertionError(f"pocket feature names collide: {names}")
+    return tuple(features)
+
+
+# --- Boundary primitives and their crossings. ---
+
+
+@dataclass(frozen=True)
+class Line:
+    """A straight plan face; ``normal`` points into the pocket's air."""
+
+    feature: Feature
+    start: Point
+    end: Point
+    normal: Point
+
+    @property
+    def length(self) -> float:
+        return math.dist(self.start, self.end)
+
+    @property
+    def direction(self) -> np.ndarray:
+        return (np.array(self.end) - np.array(self.start)) / self.length
+
+    def param(self, p) -> float:
+        return float(np.dot(np.array(p) - np.array(self.start), self.direction))
+
+
+@dataclass(frozen=True)
+class Circle:
+    """A round boss's cylinder; the air lies outside it."""
+
+    feature: Feature
+    centre: Point
+    radius: float
+
+
+def _primitives(feature: Feature) -> tuple[Line | Circle, ...]:
+    if feature.shape[0] == "disc":
+        _k, cx, cz, r = feature.shape
+        return (Circle(feature, (cx, cz), r),)
+    _k, x0, x1, z0, z1 = feature.shape
+    sign = -1.0 if feature.wall else 1.0
+    return (
+        Line(feature, (x0, z0), (x1, z0), (0.0, -sign)),
+        Line(feature, (x1, z0), (x1, z1), (sign, 0.0)),
+        Line(feature, (x1, z1), (x0, z1), (0.0, sign)),
+        Line(feature, (x0, z1), (x0, z0), (-sign, 0.0)),
+    )
+
+
+def _on_segments(p, *lines: Line, eps: float = 1e-9) -> bool:
+    """True when p lies on every segment; a crossing exactly at a segment's
+    end (a face ending on another) is a contact this proof does not model."""
+    params = [(line, line.param(p)) for line in lines]
+    if not all(-eps <= t <= line.length + eps for line, t in params):
+        return False
+    for line, t in params:
+        if min(abs(t), abs(t - line.length)) < 1e-6:
+            raise AssertionError(
+                f"{line.feature.name}: a face ends exactly on another at {_at(p)}"
+            )
+    return True
+
+
+def _crossings(a: Line | Circle, b: Line | Circle) -> list[Point]:
+    """Plan points where two features' faces cross."""
+    if isinstance(a, Circle) and isinstance(b, Line):
+        a, b = b, a
+    if isinstance(a, Line) and isinstance(b, Line):
+        da, db = a.direction, b.direction
+        det = da[0] * -db[1] + db[0] * da[1]
+        if abs(det) < 1e-12:
+            offset = np.array(b.start) - np.array(a.start)
+            if abs(float(np.dot(offset, a.normal))) < 1e-6 and (
+                max(a.param(b.start), a.param(b.end)) > 1e-6
+                and min(a.param(b.start), a.param(b.end)) < a.length - 1e-6
+            ):
+                raise AssertionError(
+                    f"{a.feature.name} and {b.feature.name} share a face"
+                )
+            return []
+        rhs = np.array(b.start) - np.array(a.start)
+        s = (rhs[0] * -db[1] + db[0] * rhs[1]) / det
+        p = tuple(np.array(a.start) + s * da)
+        return [p] if _on_segments(p, a, b) else []
+    if isinstance(a, Line):
+        f = np.array(a.start) - np.array(b.centre)
+        half_b = float(np.dot(f, a.direction))
+        disc = half_b * half_b - (float(np.dot(f, f)) - b.radius**2)
+        if disc <= 1e-12:
+            return []
+        points = []
+        for t in (-half_b - math.sqrt(disc), -half_b + math.sqrt(disc)):
+            p = tuple(np.array(a.start) + t * a.direction)
+            if _on_segments(p, a):
+                points.append(p)
+        return points
+    gap = math.dist(a.centre, b.centre)
+    if gap < a.radius + b.radius:
+        raise AssertionError(f"{a.feature.name} crosses {b.feature.name}")
+    return []
+
+
+# --- The corner set. ---
+
+
+@dataclass(frozen=True)
+class Corner:
+    """One vertical reentrant edge: two features' faces crossing in plan."""
+
+    face_a: Line | Circle
+    face_b: Line | Circle
+    point: Point
+    y_lo: float
+    y_hi: float
+
+    @property
+    def features(self) -> tuple[Feature, Feature]:
+        return self.face_a.feature, self.face_b.feature
+
+    @property
+    def kind(self) -> tuple[str, str]:
+        return tuple(sorted(f.kind for f in self.features))
+
+    @property
+    def name(self) -> str:
+        a, b = self.features
+        return f"{a.name} / {b.name} at {_at(self.point)}"
+
+    @property
+    def length(self) -> float:
+        return self.y_hi - self.y_lo
+
+    @property
+    def existing(self) -> bool:
+        """One of the eight socket-boss junctions PocketFillets rounds."""
+        return self.kind == ("pocket wall", "socket boss")
+
+    @property
+    def pick(self) -> list[float]:
+        """Mid-height point on the edge, for add_fillet's edge selection."""
+        return [self.point[0], (self.y_lo + self.y_hi) / 2.0, self.point[1]]
+
+
+@cache
+def pocket_corners() -> tuple[Corner, ...]:
+    """Every vertical concave edge in the pocket, with its exposed height.
+
+    Two convex shapes whose faces cross make a reentrant corner on their
+    union. It runs from the higher of the two bottoms up to the ceiling,
+    less any height where a third feature (or the wall) swallows it.
+    """
+    features = pocket_features()
+    corners = []
+    for i, a in enumerate(features):
+        for b in features[i + 1 :]:
+            for face_a in _primitives(a):
+                for face_b in _primitives(b):
+                    for p in _crossings(face_a, face_b):
+                        y_lo = max(a.bottom_y, b.bottom_y)
+                        y_hi = min(
+                            [_CEILING]
+                            + [
+                                c.bottom_y
+                                for c in features
+                                if c not in (a, b) and c.contains(*p)
+                            ]
+                        )
+                        if y_hi - y_lo > 1e-6:
+                            corners.append(Corner(face_a, face_b, p, y_lo, y_hi))
+    return tuple(corners)
+
+
+def new_corners() -> tuple[Corner, ...]:
+    return tuple(c for c in pocket_corners() if not c.existing)
+
+
+def existing_corners() -> tuple[Corner, ...]:
+    return tuple(c for c in pocket_corners() if c.existing)
+
+
+# --- One fillet's geometry. ---
+
+
+def _arc_points(centre, radius: float, p0, p1, n: int = _ARC_SAMPLES) -> np.ndarray:
+    c = np.array(centre)
+    a0 = math.atan2(p0[1] - c[1], p0[0] - c[0])
+    a1 = math.atan2(p1[1] - c[1], p1[0] - c[0])
+    sweep = (a1 - a0 + math.pi) % (2.0 * math.pi) - math.pi
+    angles = a0 + sweep * np.linspace(0.0, 1.0, n)
+    return c + radius * np.column_stack([np.cos(angles), np.sin(angles)])
+
+
+def _tangent(face: Line | Circle, centre: np.ndarray, r: float) -> np.ndarray:
+    if isinstance(face, Line):
+        return centre - r * np.array(face.normal)
+    c = np.array(face.centre)
+    return c + face.radius * (centre - c) / np.linalg.norm(centre - c)
+
+
+def _air_side(face: Line | Circle, p: Point, q: np.ndarray) -> bool:
+    """True when q lies in the air beside ``face`` (strictly)."""
+    if isinstance(face, Line):
+        return float(np.dot(q - np.array(p), face.normal)) > 1e-9
+    return math.dist(q, face.centre) > face.radius + 1e-9
+
+
+def _centres(a: Line | Circle, b: Line | Circle, r: float) -> list[np.ndarray]:
+    """Points r clear of both faces on their air sides (offset crossings)."""
+    if isinstance(a, Circle) and isinstance(b, Line):
+        a, b = b, a
+    if isinstance(a, Line) and isinstance(b, Line):
+        normals = np.array([a.normal, b.normal])
+        rhs = np.array(
+            [
+                np.dot(a.normal, a.start) + r,
+                np.dot(b.normal, b.start) + r,
+            ]
+        )
+        return [np.linalg.solve(normals, rhs)]
+    if isinstance(a, Line):
+        start = np.array(a.start) + r * np.array(a.normal)
+        f = start - np.array(b.centre)
+        half_b = float(np.dot(f, a.direction))
+        disc = half_b * half_b - (float(np.dot(f, f)) - (b.radius + r) ** 2)
+        if disc < 0.0:
+            return []
+        return [
+            start + t * a.direction
+            for t in (-half_b - math.sqrt(disc), -half_b + math.sqrt(disc))
+        ]
+    raise AssertionError(f"{a.feature.name} / {b.feature.name}: boss-to-boss corner")
+
+
+@dataclass(frozen=True)
+class Fillet:
+    corner: Corner
+    radius: float
+    centre: np.ndarray
+    tangent_a: np.ndarray
+    tangent_b: np.ndarray
+
+    @property
+    def zone(self) -> np.ndarray:
+        """The fillet's plan section as a closed polygon: corner, along face
+        a to its tangent point, round the fillet arc, back along face b."""
+        p = np.array(self.corner.point)
+        legs = []
+        for face, tangent in (
+            (self.corner.face_a, self.tangent_a),
+            (self.corner.face_b, self.tangent_b),
+        ):
+            if isinstance(face, Line):
+                legs.append(np.array([p, tangent]))
+            else:
+                legs.append(_arc_points(face.centre, face.radius, p, tangent))
+        arc = _arc_points(self.centre, self.radius, self.tangent_a, self.tangent_b)
+        return np.vstack([legs[0], arc[1:], legs[1][::-1][1:]])
+
+    @property
+    def area(self) -> float:
+        x, z = self.zone[:, 0], self.zone[:, 1]
+        return 0.5 * abs(float(np.dot(x, np.roll(z, -1)) - np.dot(z, np.roll(x, -1))))
+
+    def face_slack(self) -> list[tuple[float, str]]:
+        """For each face: how far it runs on past the fillet's tangent point
+        before it ends at a convex corner or a third feature takes it over.
+        A fillet that ran off its face would eat a printed pad or lug size."""
+        p = np.array(self.corner.point)
+        others = [c for c in pocket_features() if c not in self.corner.features]
+        slacks = []
+        for face, tangent in (
+            (self.corner.face_a, self.tangent_a),
+            (self.corner.face_b, self.tangent_b),
+        ):
+            if isinstance(face, Line):
+                step = (tangent - p) / np.linalg.norm(tangent - p)
+                need = float(np.linalg.norm(tangent - p))
+                run = np.arange(0.05, need + _FACE_LOOKAHEAD, 0.05)
+                pts = p + np.outer(run, step)
+                t = (pts - np.array(face.start)) @ face.direction
+                off_face = (t < -1e-9) | (t > face.length + 1e-9)
+            else:
+                c = np.array(face.centre)
+                a0 = math.atan2(*(p - c)[::-1])
+                a1 = math.atan2(*(tangent - c)[::-1])
+                sweep = (a1 - a0 + math.pi) % (2.0 * math.pi) - math.pi
+                need = abs(sweep) * face.radius
+                run = np.arange(0.05, need + _FACE_LOOKAHEAD, 0.05)
+                angles = a0 + math.copysign(1.0, sweep) * run / face.radius
+                pts = c + face.radius * np.column_stack(
+                    [np.cos(angles), np.sin(angles)]
+                )
+                off_face = np.zeros(len(pts), dtype=bool)
+            first = len(pts)
+            why = f"{face.feature.name} face runs on"
+            if off_face.any():
+                first = int(np.argmax(off_face))
+                why = f"{face.feature.name} face ends"
+            for other in others:
+                hit = other.contains(pts[:first, 0], pts[:first, 1])
+                if hit.any():
+                    first = int(np.argmax(hit))
+                    why = f"{face.feature.name} face meets {other.name}"
+            slack = float(run[first]) - need if first < len(pts) else _FACE_LOOKAHEAD
+            slacks.append((slack, why))
+        return slacks
+
+
+def fillet(corner: Corner, r: float) -> Fillet:
+    p = np.array(corner.point)
+    a, b = corner.face_a, corner.face_b
+    valid = []
+    for centre in _centres(a, b, r):
+        ta, tb = _tangent(a, centre, r), _tangent(b, centre, r)
+        if _air_side(b, corner.point, ta) and _air_side(a, corner.point, tb):
+            valid.append((float(np.linalg.norm(centre - p)), centre, ta, tb))
+    if not valid:
+        raise AssertionError(f"no R{r:g} fillet fits {corner.name}")
+    _d, centre, ta, tb = min(valid, key=lambda v: v[0])
+    return Fillet(corner, r, centre, ta, tb)
+
+
+# --- Holes and their worst-case walls to a fillet. ---
+
+
+@dataclass(frozen=True)
+class VerticalHole:
+    label: str
+    centre: Point
+    radius: float  # worst case: thread major, or drill + DRILLED HOLES band
+    y_lo: float
+    y_hi: float
+    shift: float  # worst-case plan location error
+    depth_band: float
+
+
+@dataclass(frozen=True)
+class CrossTap:
+    label: str
+    x: float
+    y: float
+    z_span: tuple[float, float]
+    radius: float
+    shift: float
+    depth_band: float
+
+
+def _seat_radius(size: str, drill_dia: float) -> float:
+    return max(base.THREAD_MAJOR_MM[size] / 2.0, drill_dia / 2.0 + _DRILL_OVERSIZE_R)
+
+
+@cache
+def pocket_holes() -> tuple[VerticalHole | CrossTap, ...]:
+    """Every hole that reaches the pocket's height: the deck seats (each
+    HangingSeat group), the column sockets and the four cross taps."""
+    holes: list[VerticalHole | CrossTap] = []
+    for seat in base.HANGING_SEATS:
+        for xz in seat.stations:
+            holes.append(
+                VerticalHole(
+                    f"{seat.label} seat {_at(xz)}",
+                    xz,
+                    _seat_radius(seat.seat.size, seat.drill_dia),
+                    seat.tip_y,
+                    base.STACK_HEIGHT,
+                    _HOLE_SHIFT + math.hypot(*seat.envelope),
+                    base.SEAT_DEPTH_BAND,
+                )
+            )
+    for xz in base.COLUMN_SOCKET_XZ:
+        holes.append(
+            VerticalHole(
+                f"column socket {_at(xz)}",
+                xz,
+                base.COLUMN_SOCKET_MATCH_BORE_MAX / 2.0,
+                base.GREEN_TOP - base.COLUMN_SOCKET_DEPTH,
+                base.GREEN_TOP,
+                _HOLE_SHIFT,
+                _BAND,
+            )
+        )
+    tap_radius = _seat_radius(
+        base.BASE_CROSS_TAP_SPEC.size, base.BASE_CROSS_TAP_DRILL_DIA
+    )
+    for x, z in base.COLUMN_SOCKET_XZ:
+        sign = math.copysign(1.0, z)
+        span = sorted((sign * base.BASE_SCREW_SEAT_Z, sign * base.CROSS_TAP_TIP_Z))
+        holes.append(
+            CrossTap(
+                f"cross tap {_at((x, z))}",
+                x,
+                base.BASE_SCREW_Y,
+                tuple(span),
+                tap_radius,
+                _HOLE_SHIFT,
+                _BAND,
+            )
+        )
+    return tuple(holes)
+
+
+def _inside(poly: np.ndarray, pts) -> np.ndarray:
+    """Even-odd test of each point (rows of ``pts``) against ``poly``."""
+    pts = np.atleast_2d(np.asarray(pts, dtype=float))
+    x0, z0 = poly[:, 0], poly[:, 1]
+    x1, z1 = np.roll(x0, -1), np.roll(z0, -1)
+    x, z = pts[:, :1], pts[:, 1:]
+    straddle = (z0 > z) != (z1 > z)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        x_cross = x0 + (z - z0) * (x1 - x0) / (z1 - z0)
+    return ((straddle & (x < x_cross)).sum(axis=1) % 2).astype(bool)
+
+
+def _point_polygon_distance(poly: np.ndarray, pts: np.ndarray) -> np.ndarray:
+    a = poly
+    b = np.roll(poly, -1, axis=0)
+    ab = b - a
+    ap = pts[:, None, :] - a[None, :, :]
+    t = np.clip(
+        np.einsum("ijk,jk->ij", ap, ab)
+        / np.maximum(np.einsum("jk,jk->j", ab, ab), 1e-18),
+        0.0,
+        1.0,
+    )
+    nearest = a[None, :, :] + t[:, :, None] * ab[None, :, :]
+    return np.linalg.norm(pts[:, None, :] - nearest, axis=2).min(axis=1)
+
+
+def _worst(plan: float, rise: float) -> float:
+    """Worst-case wall from a plan gap and a vertical gap (each already
+    reduced by its bands): the 3D distance where both are open."""
+    if rise <= 0.0:
+        return plan
+    if plan <= 0.0:
+        return rise
+    return math.hypot(plan, rise)
+
+
+def hole_ligament(hole: VerticalHole | CrossTap, f: Fillet) -> float:
+    """Worst-case metal between a hole and a fillet's whole plan section
+    (corner to arc), so a smaller-than-max fillet is covered too."""
+    zone = f.zone
+    y_lo, y_hi = f.corner.y_lo, f.corner.y_hi
+    if isinstance(hole, VerticalHole):
+        if _inside(zone, hole.centre)[0]:
+            return -math.inf
+        plan = float(_point_polygon_distance(zone, np.array([hole.centre]))[0])
+        plan -= hole.radius + hole.shift + _CAST_SHIFT
+        rise = max(0.0, y_lo - hole.y_hi, hole.y_lo - y_hi)
+        return _worst(plan, rise - hole.depth_band - _BAND)
+    dense = np.vstack(
+        [
+            np.linspace(p0, p1, 16)
+            for p0, p1 in zip(zone, np.roll(zone, -1, axis=0), strict=True)
+        ]
+    )
+    dx = np.abs(dense[:, 0] - hole.x)
+    z0, z1 = hole.z_span
+    dz = np.maximum.reduce([dense[:, 1] - z1, np.zeros(len(dense)), z0 - dense[:, 1]])
+    dz = np.maximum(0.0, dz - hole.depth_band)
+    dy = abs(min(max(hole.y, y_lo), y_hi) - hole.y)
+    gap = np.sqrt(dx**2 + dy**2 + dz**2) - hole.radius - hole.shift - _CAST_SHIFT
+    return float(gap.min())
+
+
+# --- The radius proof. ---
+
+
+def _zone_gap(f: Fillet, g: Fillet) -> float:
+    za, zb = f.zone, g.zone
+    if _inside(zb, za).any() or _inside(za, zb).any():
+        return -math.inf
+    return float(
+        min(
+            _point_polygon_distance(zb, za).min(),
+            _point_polygon_distance(za, zb).min(),
+        )
+    )
+
+
+def _heights_overlap(a: Corner, b: Corner) -> bool:
+    return min(a.y_hi, b.y_hi) - max(a.y_lo, b.y_lo) > 1e-6
+
+
+@dataclass(frozen=True)
+class Margin:
+    value: float
+    what: str
+
+
+def radius_margins(r: float) -> dict[str, Margin]:
+    """The tightest worst-case margin of each kind at radius r.
+
+    - "ligament": hole wall to a new fillet's section, against the 1.5 floor;
+    - "face run": face left past a tangent point before the face ends (a
+      convex corner) or another feature takes it, against the relative cast
+      shift -- a fillet that ran off its face would eat a printed pad size;
+    - "feature gap": air between a new fillet and any third feature;
+    - "fillet gap": air between two fillets (new or existing R6) that share
+      height, so no fillet bridges into another at the worst case.
+    """
+    features = pocket_features()
+    existing = [fillet(c, base.POCKET_CORNER_FILLET_R) for c in existing_corners()]
+    new = [fillet(c, r) for c in new_corners()]
+    margins: dict[str, Margin] = {}
+
+    def keep(kind: str, value: float, what: str) -> None:
+        if kind not in margins or value < margins[kind].value:
+            margins[kind] = Margin(value, what)
+
+    for f in new:
+        others = [c for c in features if c not in f.corner.features]
+        for slack, why in f.face_slack():
+            keep(
+                "face run",
+                slack - _RELATIVE_CAST_SHIFT,
+                f"{f.corner.name}: {why} {slack:.2f} past the tangent",
+            )
+        zone = f.zone
+        for c in others:
+            gap = float(c.clearance(zone).min()) - _RELATIVE_CAST_SHIFT
+            keep("feature gap", gap, f"{f.corner.name} to {c.name}")
+        for g in (*existing, *new):
+            if g is f or not _heights_overlap(f.corner, g.corner):
+                continue
+            gap = _zone_gap(f, g) - _RELATIVE_CAST_SHIFT
+            keep("fillet gap", gap, f"{f.corner.name} to {g.corner.name}")
+        for hole in pocket_holes():
+            keep("ligament", hole_ligament(hole, f), f"{hole.label} to {f.corner.name}")
+    return margins
+
+
+def radius_violations(r: float) -> list[str]:
+    floors = {
+        "ligament": LIGAMENT_FLOOR,
+        "face run": 0.0,
+        "feature gap": 0.0,
+        "fillet gap": 0.0,
+    }
+    try:
+        margins = radius_margins(r)
+    except AssertionError as exc:
+        return [str(exc)]
+    return [
+        f"R{r:g} {kind}: {m.value:.2f} < {floors[kind]:.2f} ({m.what})"
+        for kind, m in margins.items()
+        if m.value < floors[kind] - 1e-9
+    ]
+
+
+@cache
+def chosen_radius() -> float:
+    for r in STANDARD_RADII:
+        if not radius_violations(r):
+            return r
+    raise AssertionError(
+        "no standard radius >= R2 clears the pocket corners: "
+        + "; ".join(radius_violations(STANDARD_RADII[-1]))
+    )
+
+
+# --- Tests. ---
+
+_RIB_H = base.POCKET_CEILING_Y - base.RIB_RELIEF
+_DEEP_H = base.POCKET_CEILING_Y - base.DEEP_BOSS_BOTTOM_Y
+_SHALLOW_H = base.POCKET_CEILING_Y - base.SHALLOW_BOSS_BOTTOM_Y
+# (kind pair) -> (count, edge length). A change to the pocket that adds,
+# drops or re-heights a corner must revisit the build's _pocket_corner_fillets.
+EXPECTED_NEW_CORNERS = {
+    ("long rib", "pocket wall"): (4, _RIB_H),
+    ("cross rib", "pocket wall"): (4, _RIB_H),
+    ("cross rib", "long rib"): (4, _RIB_H),
+    ("cone-lock pad", "pocket wall"): (2, _DEEP_H),
+    ("cross rib", "pinion-block pad"): (4, _SHALLOW_H),
+    ("cross-tap lug", "pocket wall"): (4, _SHALLOW_H),
+    ("long rib", "swing-stop boss"): (2, _SHALLOW_H),
+    ("cross-tap lug", "socket boss"): (4, _SHALLOW_H),
+    ("pinion-block pad", "spring-foot boss"): (2, _SHALLOW_H),
+}
+
+
+def test_corner_set_is_the_expected_thirty_plus_the_existing_eight() -> None:
+    found: dict[tuple[str, str], list[Corner]] = {}
+    for corner in new_corners():
+        found.setdefault(corner.kind, []).append(corner)
+    assert set(found) == set(EXPECTED_NEW_CORNERS), sorted(found)
+    for kind, (count, length) in EXPECTED_NEW_CORNERS.items():
+        corners = found[kind]
+        assert len(corners) == count, (kind, [c.name for c in corners])
+        for corner in corners:
+            assert corner.length == pytest.approx(length), corner.name
+            assert corner.y_hi == pytest.approx(_CEILING), corner.name
+    assert len(new_corners()) == 30
+
+
+def test_existing_corners_are_pocket_fillets_eight_junctions() -> None:
+    corners = existing_corners()
+    assert len(corners) == 8
+    # End-wall junctions stop under the lug; side-wall ones run full depth.
+    heights = sorted(c.y_hi for c in corners)
+    assert heights == pytest.approx(
+        [base.SHALLOW_BOSS_BOTTOM_Y] * 4 + [base.POCKET_CEILING_Y] * 4
+    )
+    assert all(c.y_lo == 0.0 for c in corners)
+    areas = sorted(fillet(c, base.POCKET_CORNER_FILLET_R).area for c in corners)
+    assert areas == pytest.approx(sorted(base._pocket_fillet_areas()), rel=2e-3)
+
+
+def test_pocket_plan_corners_lie_inside_the_socket_bosses() -> None:
+    bosses = [f for f in pocket_features() if f.kind == "socket boss"]
+    for sx in (-1.0, 1.0):
+        for sz in (-1.0, 1.0):
+            corner = (sx * base.POCKET_HALF_X, sz * base.POCKET_HALF_Z)
+            assert any(b.contains(*corner) for b in bosses), (
+                f"pocket plan corner {_at(corner)} is exposed and needs a fillet"
+            )
+
+
+def test_chosen_radius_is_the_largest_standard_one_that_clears() -> None:
+    r = chosen_radius()
+    assert r == base.POCKET_CORNER_FILLET_R, radius_violations(r)
+    larger = [c for c in STANDARD_RADII if c > r]
+    if larger:
+        assert radius_violations(min(larger)), f"R{min(larger):g} also clears"
+    else:
+        assert r == max(STANDARD_RADII)
+
+
+def test_every_hole_keeps_the_ligament_floor_to_every_new_fillet() -> None:
+    fillets = [fillet(c, base.POCKET_CORNER_FILLET_R) for c in new_corners()]
+    worst = min(
+        (hole_ligament(h, f), h.label, f.corner.name)
+        for h in pocket_holes()
+        for f in fillets
+    )
+    assert worst[0] >= LIGAMENT_FLOOR, (
+        f"{worst[1]} keeps {worst[0]:.2f} to the R{base.POCKET_CORNER_FILLET_R:g} "
+        f"fillet at {worst[2]} at the worst case, under {LIGAMENT_FLOOR}"
+    )
+
+
+def test_holes_cover_every_seat_group_socket_and_cross_tap() -> None:
+    holes = pocket_holes()
+    seats = sum(len(s.stations) for s in base.HANGING_SEATS)
+    assert len(holes) == seats + 2 * len(base.COLUMN_SOCKET_XZ)
+    assert {s.label for s in base.HANGING_SEATS} == {
+        "rocker support",
+        "cone pivot",
+        "cone lock",
+        "swing stop",
+        "pinion block",
+        "spring foot",
+        "pedestal hold-down",
+        "nameplate",
+    }
+
+
+def test_no_seat_breaks_out_into_the_pocket() -> None:
+    """A seat drilled below the ceiling ends inside the feature it hangs in,
+    so no drill breakout can land on a fillet. (Nominal containment; the
+    build's require_hanging_boss proves the boss walls at the worst case.)"""
+    features = pocket_features()
+    for hole in pocket_holes():
+        if not isinstance(hole, VerticalHole) or hole.y_lo >= _CEILING:
+            continue
+        reach = hole.radius
+        holders = [
+            f
+            for f in features
+            if not f.wall
+            and f.bottom_y < hole.y_lo - hole.depth_band
+            and float(
+                f.clearance(
+                    np.array(hole.centre)
+                    + reach
+                    * np.column_stack(
+                        [
+                            np.cos(np.linspace(0, 2 * np.pi, 72)),
+                            np.sin(np.linspace(0, 2 * np.pi, 72)),
+                        ]
+                    )
+                ).max()
+            )
+            == 0.0
+        ]
+        assert holders, f"{hole.label} breaks out below the ceiling"
+
+
+@pytest.mark.parametrize("r", STANDARD_RADII)
+def test_build_fillets_match_the_enumerated_corners(r: float) -> None:
+    """PocketCornerFillets' picks, edge lengths and closed-form sections (the
+    volume check's terms) are exactly the enumerated corners and their
+    numerically integrated fillet sections."""
+    built = {
+        (round(pick[0], 6), round(pick[1], 6), round(pick[2], 6)): (length, area)
+        for pick, length, area in base._pocket_corner_fillets(r)
+    }
+    assert len(built) == len(base._pocket_corner_fillets(r)), "duplicate picks"
+    numeric = 0.0
+    for corner in new_corners():
+        key = tuple(round(v, 6) for v in corner.pick)
+        assert key in built, f"build has no pick for {corner.name}"
+        length, area = built.pop(key)
+        section = fillet(corner, r).area
+        assert length == pytest.approx(corner.length), corner.name
+        assert area == pytest.approx(section, rel=2e-3), corner.name
+        numeric += section * corner.length
+    assert not built, f"build picks with no reentrant corner: {sorted(built)}"
+    assert base._pocket_corner_fillet_volume(r) == pytest.approx(numeric, rel=2e-3)
+
+
+def test_one_printed_count_covers_every_vertical_pocket_corner() -> None:
+    assert base.POCKET_FILLET_COUNT == len(pocket_corners()) == 38
+    assert base.POCKET_FILLET_TOL_TYPE == 6  # swTolType_e.swTolMAX
+
+
+def test_each_pick_selects_exactly_its_own_edge() -> None:
+    """add_fillet resolves each point to the body edge within 0.5 mm, so a
+    pick must sit farther than that from every other edge it could hit: the
+    other vertical corners (existing ones too) and its own edge's ends."""
+    corners = pocket_corners()
+    for corner in new_corners():
+        x, y, z = corner.pick
+        assert corner.length / 2.0 > 2.0 * _PICK_TOLERANCE, corner.name
+        for other in corners:
+            if other is corner:
+                continue
+            plan = math.dist((x, z), other.point)
+            rise = max(0.0, other.y_lo - y, y - other.y_hi)
+            assert math.hypot(plan, rise) > 2.0 * _PICK_TOLERANCE, (
+                f"pick for {corner.name} is ambiguous with {other.name}"
+            )

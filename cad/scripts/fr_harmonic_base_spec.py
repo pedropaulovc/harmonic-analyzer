@@ -87,7 +87,16 @@ HANGING_BOSS_MIN_DIA = 16.0  # max(this, 2.5 x tap drill) per seat
 # tip stands 32.96 up and needs 1.5D (6.25) under it: 26.71 at most.
 DEEP_BOSS_BOTTOM_Y = 12.0
 SHALLOW_BOSS_BOTTOM_Y = 26.5
-CASTING_FILLET_R = 6.0
+# ONE radius for every vertical reentrant pocket corner: the socket-boss
+# junctions (PocketFillets) and the rib, pad, lug and boss corners
+# (PocketCornerFillets) print as one "R6.0 MAX" (machinist review rule 16).
+# R6 is the largest standard value that keeps rule 17's 1.5 wall from every
+# seat, socket and cross tap at the worst case
+# (test_fr_harmonic_base_pocket_fillets_drawing).
+POCKET_CORNER_FILLET_R = 6.0
+# swTolMAX prints the nominal then "MAX", so the model sits at the max: any
+# smaller fillet, down to sharp, keeps every wall the proof checked.
+POCKET_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX
 
 if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
     raise AssertionError("base plates are not centred")
