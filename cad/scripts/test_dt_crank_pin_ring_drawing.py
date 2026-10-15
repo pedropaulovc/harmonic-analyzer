@@ -18,6 +18,7 @@ import _config
 import build_dt_crank_pin_ring as part
 import dt_crank_pin_ring_notes as notes
 import dt_crank_pin_ring_spec as spec
+import dt_crank_pin_spec as pin
 import draw_dt_crank_pin_ring as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -43,9 +44,33 @@ def test_required_drawing_paths() -> None:
 
 def test_printed_sizes_derive_from_the_ring_spec() -> None:
     assert notes.RING_ID == pytest.approx(2.0 * spec.MEAN_R - spec.WIRE_DIA)
-    assert notes.RING_ID == pytest.approx(9.0)
+    assert notes.RING_ID == pytest.approx(11.0)
     # The bead is bigger than the wire it joins, so it reads on the sheet.
     assert spec.JOINT_DIA > spec.WIRE_DIA
+
+
+def _band(places: int) -> float:
+    return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+
+
+def test_smallest_printed_ring_threads_the_fattest_printed_pin_section() -> None:
+    # The ring closes through the taper pin's straight cross-hole, its wire
+    # bowing along its own arc. The governing case is the ring at its printed
+    # lower limit (tightest arc) through the pin at its .XX upper limits (the
+    # big end oversize, the hole's station toward the big end), the drilled
+    # hole at nominal (it only cuts oversize).
+    places = notes.DRAWING_PRECISION_BY_NAME["RingID"]
+    ring_min = round(notes.RING_ID, places) - _band(places)
+    assert spec.RING_ID_MIN == pytest.approx(ring_min)
+    taper = (pin.BIG_END_DIA - pin.SMALL_END_DIA) / pin.PIN_LENGTH
+    xx = _band(2)
+    pin_max = pin.BIG_END_DIA + xx - taper * (pin.RING_HOLE_X - xx)
+    assert spec.PIN_DIA_AT_HOLE_MAX == pytest.approx(pin_max)
+    radius = (ring_min + spec.WIRE_DIA) / 2.0
+    sagitta = radius - math.sqrt(radius**2 - (pin_max / 2.0) ** 2)
+    air = pin.RING_HOLE_DIA / 2.0 - spec.WIRE_DIA / 2.0 - sagitta / 2.0
+    assert air >= spec.RING_HOLE_AIR
+    assert spec.HOLE_AIR_WORST == pytest.approx(air)
 
 
 def test_marked_dimension_set_lives_in_the_notes_module() -> None:
@@ -119,7 +144,16 @@ def test_notes_are_few_and_carry_no_values() -> None:
     for number, line in enumerate(lines, start=1):
         assert line.startswith(f"{number}. "), line
     text = notes.DRAWING_NOTES
-    for value in ("\u00b1", "+/-", "\u00d8", "MM", "1.0", "1.3", "9.0", "10"):
+    for value in (
+        "\u00b1",
+        "+/-",
+        "\u00d8",
+        "MM",
+        f"{spec.WIRE_DIA:.1f}",
+        f"{spec.JOINT_DIA:.1f}",
+        f"{notes.RING_ID:.1f}",
+        f"{2.0 * spec.MEAN_R:g}",
+    ):
         assert value not in text, value
     assert "SILVER-SOLDERED" in text
     assert "MHA-DT-009" in text and "CROSS-HOLE" in text

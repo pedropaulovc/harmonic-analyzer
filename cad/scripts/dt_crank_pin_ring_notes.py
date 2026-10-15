@@ -26,8 +26,10 @@ from __future__ import annotations
 
 import dt_crank_pin_ring_spec as ring
 
-# The ring's inside diameter, on the wire's inner edge.
-RING_ID = 2.0 * ring.MEAN_R - ring.WIRE_DIA
+# The ring's inside diameter, on the wire's inner edge, and its places: the
+# spec owns both, because it asserts the smallest printed ring still threads
+# the taper pin's cross-hole.
+RING_ID = ring.RING_ID
 
 # --- Drawing contract (drawing-simplicity-policy.md `How the repository implements the guidelines`: the PART owns places and bands). ---
 # ``WireProfile`` (Front plane) is the revolve's wire circle: the front view,
@@ -41,7 +43,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "WireProfile": {"WireDia": 1},
-    "RingReference": {"RingID": 1},
+    "RingReference": {"RingID": ring.RING_ID_PLACES},
     "JointProfile": {"JointDia": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
