@@ -2101,14 +2101,20 @@ def _place_bom_sheet(
     shift = inner_view_shift(iso_outline, _view_outline(inner))
     _shift_view(adapter, inner, shift, label=f"{inner_label} ring fit")
     iso_items, inner_items = transgear_balloon_items(items)
+    iso_label = "paper-drive transgear BOM coverage"
     landings = add_component_bom_balloons(
         adapter,
         view,
         items=iso_items,
         anchors=TRANSGEAR_BALLOON_ANCHORS,
-        label="paper-drive transgear BOM coverage",
+        label=iso_label,
         margin=BALLOON_MARGIN,
     )
+    # Farm run 20261015T082822796Z: the isometric's angular ring order still
+    # crossed items 14 and 16, whose attachments sit at different depths
+    # inside the ring; the inner ring's slot swap uncrosses
+    # it the same way.
+    _uncross_ring(adapter, landings, label=iso_label)
     # The collar balloons after the batch, so its balloon cannot cover a
     # point the batch hit-tests; then all of the view's balloons re-ring.
     balloons_label = "paper-drive transgear inner BOM coverage"
