@@ -1,0 +1,10 @@
+ch-rocker-arm-tl-trammel-pivot-point:
+  title: Rocker Template Trammel Pivot Point
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-18
+  material: O1 tool steel
+  material_specification: O1 drill rod, 1/4 in, precision ground +/-0.0005 in, annealed (Abrams Industries O1 drill rod 1/4 x 36 in)
+  finish: 58-62 HRC hardened zone; rest annealed
+  quantity: 1
+  tolerance_class: machined_block
+  process: "cut off and face to length; turn the tip cone in one chucking with the compound at 30 degrees and face the tip flat; torch-harden the tip zone (tools.map-torch-kit), canola-oil quench, temper to light straw; file-check the tip; polish scale off the shank so it slides in the reamed point hole; stone the tip flat (rocker-template-route.md §2.1-2.4)"
