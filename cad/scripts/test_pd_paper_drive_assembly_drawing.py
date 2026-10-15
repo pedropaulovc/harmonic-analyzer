@@ -871,12 +871,14 @@ def test_the_pivot_view_and_its_notes_keep_to_sheet_two_left_field() -> None:
     ):
         assert x > 0.018
         assert x + max(map(len, text.splitlines())) * NOTE_CHAR_WIDTH < ring_left
-    stake_top = drawing.PIVOT_STAKE_NOTE_XY[1]
-    assert stake_top <= ring_top
-    assert stake_top - len(stake_lines) * NOTE_LINE_PITCH > cy + r
+    # The front face projects below the axis: the stake's note under the
+    # circle, the caption over it.
     caption_top = drawing.PIVOT_CAPTION_XY[1]
-    assert caption_top < cy - r
-    assert caption_top - len(caption_lines) * NOTE_LINE_PITCH > (
+    assert caption_top <= ring_top
+    assert caption_top - len(caption_lines) * NOTE_LINE_PITCH > cy + r
+    stake_top = drawing.PIVOT_STAKE_NOTE_XY[1]
+    assert stake_top < cy - r
+    assert stake_top - len(stake_lines) * NOTE_LINE_PITCH > (
         drawing.SHEET_INNER_BORDER_BOTTOM
     )
     # The circle frames the screw from its head to the bar's front face.

@@ -264,16 +264,16 @@ if (pivot_screw.HEAD_H - PIVOT_FRONT_FACE_Y) / 2.0 + 1.0 > PIVOT_VIEW_RADIUS_MM:
     raise AssertionError("the pivot view's circle must frame head to front face")
 PIVOT_VIEW_REF = f"PIVOT VIEW, SHEET {SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}"
 PIVOT_STAKE_NOTE = "STAKE THE TAP MOUTH ONTO\nTHE SCREW TIP AT 2 POINTS"
-PIVOT_STAKE_NOTE_XY = (0.030, 0.255)
+# A *Top view of this assembly shows the bar's front face below the axis
+# (run pc-lock-r1), so the stake's note stands under the circle and the
+# caption over it.
+PIVOT_STAKE_NOTE_XY = (0.030, PIVOT_VIEW_CENTER[1] - PIVOT_VIEW_RADIUS - 0.006)
 PIVOT_CAPTION = (
     f"PIVOT VIEW {PIVOT_VIEW_SCALE[0]:g}:{PIVOT_VIEW_SCALE[1]:g} FROM ABOVE, "
     "HIDDEN\nLINES SHOWN: THE HANGER PIVOT AS FITTED\nIN STEP "
     f"{steps.step_number('hanger-pivoted')}"
 )
-PIVOT_CAPTION_XY = (
-    PIVOT_VIEW_CENTER[0] - PIVOT_VIEW_RADIUS,
-    PIVOT_VIEW_CENTER[1] - PIVOT_VIEW_RADIUS - 0.006,
-)
+PIVOT_CAPTION_XY = (PIVOT_VIEW_CENTER[0] - PIVOT_VIEW_RADIUS, 0.255)
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 
 # --- sheet 3: the platen-and-support steps, the ballooned exploded view -----
@@ -2210,9 +2210,10 @@ def _place_pivot_view(adapter: Any) -> None:
         raise RuntimeError(
             f"{label}: centre sits at {centre!r}, not {PIVOT_VIEW_CENTER!r}"
         )
-    # A *Top view shows the front face up the sheet; the note above relies on it.
-    if mouth[1] <= centre[1]:
-        raise RuntimeError(f"{label}: the bar's front face projects below the axis")
+    # The stake's note under the circle relies on the front face projecting
+    # below the axis.
+    if mouth[1] >= centre[1]:
+        raise RuntimeError(f"{label}: the bar's front face projects above the axis")
     _crop_to_circle(adapter, view, PIVOT_VIEW_CENTER, PIVOT_VIEW_RADIUS, label=label)
     set_hidden_lines_visible(adapter, view)
     add_leader_note(

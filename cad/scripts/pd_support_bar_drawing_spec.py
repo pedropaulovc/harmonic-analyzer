@@ -129,7 +129,9 @@ DIMENSION_CALLOUTS = {
     "BracketTapStation2": _HOOK_TAPS,
     # The thread class is the title block's (rule 2).
     "PivotTapDrillDia": f"TAP {PIVOT_TAP_THREAD} UNC THRU",
-    "PivotCskDia": f"2X {_CSK} BOTH FACES,\nMHA-VN-041 SHOULDER BEARS OUTSIDE",
+    # At most 24 characters a line: the latch-hook taps' callout leader
+    # passes just right of this text (layout audit: leader-through-text).
+    "PivotCskDia": f"2X {_CSK} BOTH FACES,\nMHA-VN-041 BEARS OUTSIDE",
     "BracketCskDia": f"2X {_CSK}\nBOTH FACES, {BRACKET_TAP_SPEC.size} TAPS",
     # The west slots: why they are slots, and the screws whose heads their
     # counterbores sink, as the round counterbores' callout says.
