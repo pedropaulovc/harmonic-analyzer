@@ -371,7 +371,8 @@ def add_purchased_footer(
         # Finish: never forced into title-block cells.
         text = "\n".join(lines)
         apply_custom_properties(adapter, {"Installation Notes": text}, model=draw)
-        link = property_link("Installation Notes")
+        # $PRP (this drawing), not $PRPSHEET (the model in view).
+        link = '$PRP:"Installation Notes"'
         top = footer_top(text, label=label)
         note = _literal_note(adapter, link, _NOTE_X, top)
         placed.append(
