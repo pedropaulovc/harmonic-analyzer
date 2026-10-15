@@ -102,6 +102,27 @@ ISO_CENTER = (0.345, 0.215)
 ISO_NOTE_XY = (0.315, 0.185)  # left end: centres the label under the iso
 
 
+def _name_hole_mate(display: Any, *, label: str) -> None:
+    """Add the hole's mate under its native callout.
+
+    swDimensionTextCalloutBelowDefinition (8) pairs with the writable
+    swDimensionTextCalloutBelow (4); the prefix, size and depth definitions
+    stay untouched, so the Hole Wizard variables stay associative
+    (draw_ch_rocker_arm_tl_profile_fixture._locate_pivot_tap_depths)."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    below = definitions[8].rstrip()
+    mate = HOLE_MATES[label]
+    updated = f"{below}\n{mate}" if below else mate
+    display.SetText(4, updated)
+    if str(display.GetText(8) or "").replace("\r", "") != updated or any(
+        str(display.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
+    ):
+        raise RuntimeError(
+            f"{label}: hole callout mate or native definitions did not persist: "
+            f"{[str(display.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
+        )
+
+
 def _sheet_x(mx: float) -> float:
     """Sheet x of a model x in either 1:1 view (both are bbox-centred)."""
     return FRONT_CENTER[0] + (mx - _BBOX_CX) / 1000.0
@@ -123,8 +144,14 @@ FRONT_CALLOUTS = {
         f" {_CLEARANCE_LEAST:.2f}-{_CLEARANCE_MOST:.2f}\nDIAMETRAL CLEARANCE"
     ),
     "BarHeight": "FULL R AT TIP",
-    "BarPinCx": f"SETS LEVER RATIO;\nRUNS ON PIN {PIN_NUMBER}",
-    "SpringCx": f"SETS LEVER RATIO;\nHOOKS SPRING {SPRING_NUMBER}",
+    "BarPinCx": "SETS LEVER RATIO",
+    "SpringCx": "SETS LEVER RATIO",
+}
+# What engages each drilled hole rides its own hole callout (machinist r5:
+# on the arm's location it did not say the hole is a running bore).
+HOLE_MATES = {
+    "bar-pin hole": f"RUNS ON PIN\n{PIN_NUMBER}",
+    "spring-eye hole": f"HOOKS SPRING\n{SPRING_NUMBER}",
 }
 TOP_CALLOUTS = {
     "LeverThick": f"SLIDING FIT IN NOTCH\nOF {BAR_NUMBER}",
@@ -150,7 +177,7 @@ TOP_KEEP = {
     # is no room inside the border).  Each text runs right from its own line
     # (r2 render), so the outer (right) line carries the lower text and
     # neither line runs through the other's text.
-    "HubLength": (0.075, TOP_CENTER[1] + 0.034),
+    "HubLength": (0.075, TOP_CENTER[1] + 0.032),
     "PlateOffset": (0.095, TOP_CENTER[1] + 0.014),
 }
 OVERALL_TEXT_XY = (FRONT_CENTER[0], 0.082)
@@ -297,7 +324,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ((LEVER_SPRING_X - _SPRING_HOLE_DIA / 2.0) / 1000.0, 0.0, 0.0),
         label="spring-eye hole rim",
     )
-    add_native_hole_callout(
+    bar_pin_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=bar_pin_edge,
@@ -305,7 +332,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="bar-pin hole",
         process=drill_process(BAR_PIN_HOLE_SPEC) + "\n",
     )
-    add_native_hole_callout(
+    _name_hole_mate(bar_pin_callout, label="bar-pin hole")
+    spring_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=spring_edge,
@@ -313,6 +341,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-eye hole",
         process=drill_process(SPRING_EYE_HOLE_SPEC) + "\n",
     )
+    _name_hole_mate(spring_callout, label="spring-eye hole")
+    rebuild_drawing(adapter, label="hole callout mates")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

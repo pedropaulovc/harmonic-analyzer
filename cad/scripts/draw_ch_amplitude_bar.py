@@ -201,15 +201,16 @@ DETAIL_A = CroppedView(
 )
 # DETAIL B and its right side frame the top end down to the 14.0 notch roof
 # (#1038 option 2 deepened it from 12.7); the bar's top edge stays where it
-# printed on the sheet before.
+# printed on the sheet before, and the label stays clear of DETAIL A's
+# four-line depth stack.
 DETAIL_B = CroppedView(
     "B",
     "DETAIL B",
     "*Front",
     (4, 1),
-    (BAR_WIDTH / 2.0, BAR_LENGTH - 7.5, 0.0),
-    9.0,
-    (0.150, 0.194),
+    (BAR_WIDTH / 2.0, BAR_LENGTH - 7.0, 0.0),
+    8.5,
+    (0.150, 0.196),
     letter="B",
 )
 # DETAIL B's right side, projected on its row (third angle): the reamed pin
@@ -220,8 +221,8 @@ TOP_SIDE = CroppedView(
     "RIGHT SIDE OF DETAIL B",
     "*Right",
     (4, 1),
-    (BAR_WIDTH, BAR_LENGTH - 7.5, BAR_DEPTH / 2.0),
-    9.0,
+    (BAR_WIDTH, BAR_LENGTH - 7.0, BAR_DEPTH / 2.0),
+    8.5,
     (0.255, DETAIL_B.centre[1]),
 )
 # The pictorials: each end at 3:1 (machinist round 1, #1293: the full bar at
@@ -278,7 +279,7 @@ _DETAIL_A_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_ROW_GAP
 _DETAIL_A_WIDTH_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_A_WIDTH_ROW_GAP
 DETAIL_A_KEEP = {
     # Left of the fence, over the notch floor: the depth and its band, the
-    # ROOTS callout above it, hanging west of the dimension line.
+    # mate callout above it, hanging west of the dimension line.
     "BottomNotchHeight": (
         _DETAIL_A_FENCE_X - DETAIL_A_DEPTH_LINE_GAP,
         DETAIL_A.sheet_xy(0.0, BOTTOM_NOTCH_HEIGHT)[1] + DETAIL_A_DEPTH_TEXT_RISE,

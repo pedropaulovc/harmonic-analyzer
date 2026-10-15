@@ -161,9 +161,10 @@ def test_callouts_name_each_mate_at_its_dimension() -> None:
     assert callouts["BottomNotchWidth"].startswith("RIDES MHA-CH-006\n")
     assert callouts["TopRightLedge"] == "CENTRES ON LEVER"
     assert callouts["BottomLeftLedge"] == "CENTRES ON ROCKER"
-    assert callouts["TopNotchHeight"] == callouts["BottomNotchHeight"] == (
-        "ROOTS R0.40 MAX"
-    )
+    assert callouts["TopNotchHeight"] == "ROOTS R0.40 MAX"
+    # Machinist r5: the foot depth's shallow-only band names its mate.
+    assert callouts["BottomNotchHeight"] == "SITS ON MHA-CH-006"
+    assert callouts["BottomNotchWidth"].endswith("\nROOTS R0.40 MAX")
     assert drawing.CALLOUTS_ABOVE <= set(callouts)
     for text in callouts.values():
         assert all(len(line) <= 20 for line in text.splitlines()), text
@@ -206,7 +207,7 @@ def test_cheek_walls_state_their_worst_case_at_each_width() -> None:
         )
         assert printed <= wall < printed + 0.01
         assert printed < 2.0
-        assert notes.DIMENSION_CALLOUTS[name].endswith(f"CHEEK WALL {printed:.2f} MIN")
+        assert f"CHEEK WALL {printed:.2f} MIN" in notes.DIMENSION_CALLOUTS[name].splitlines()
     assert (notes.TOP_CHEEK_WALL_MIN, notes.BOTTOM_CHEEK_WALL_MIN) == (1.29, 1.21)
     # Owner ruling 2026-10-15: approved exceptions at 1.17 (top), 1.21 (foot).
     assert notes.CHEEK_WALL_APPROVED_MIN == {"top": 1.17, "bottom": 1.21}
@@ -291,7 +292,7 @@ def test_cropped_views_frame_their_ends_and_place_text_outside_the_bar() -> None
     # on that witness with the text inside it.
     floor_y = a.sheet_xy(0.0, spec.BOTTOM_NOTCH_HEIGHT)[1]
     assert depth_y - 1.5 * _LINE > floor_y
-    # Its stack (band, value, ROOTS line) stays under DETAIL B's label.
+    # Its stack (band, value, mate line) stays under DETAIL B's label.
     assert depth_y + 3.0 * _LINE < b.label_xy[1] - 2 * _LINE - 0.004
     # r743-6b (64fedd3cc): a width with its +0.3/0.0 stack prints ~20 mm
     # wide; centred on the ~12.4 mm mouth it straddled both extension lines.

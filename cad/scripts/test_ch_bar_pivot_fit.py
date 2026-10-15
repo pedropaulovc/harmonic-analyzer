@@ -76,9 +76,9 @@ def test_worst_case_joint_budget() -> None:
     # The far face, the offset at its long limit on the narrowest stock.
     assert b["hole_face_wall_min"] == pytest.approx(2.0052, abs=1e-6)
     assert b["hole_face_wall_min"] >= pin.RULE12_WALL_TARGET
-    # The 7.00 blank under the title block's .XX band.
-    assert b["blank_excess_min"] == pytest.approx(0.14, abs=1e-6)
-    assert b["blank_excess_max"] == pytest.approx(1.2108, abs=1e-6)
+    # The 7.5 blank under the title block's .X band.
+    assert b["blank_excess_min"] == pytest.approx(0.35, abs=1e-6)
+    assert b["blank_excess_max"] == pytest.approx(2.0008, abs=1e-6)
 
 
 def test_the_cheeks_the_pin_presses_into_hold_the_approved_exception() -> None:

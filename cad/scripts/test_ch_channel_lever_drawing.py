@@ -70,8 +70,15 @@ def test_every_tight_band_names_its_mate_or_function() -> None:
     assert "REAM" in callouts["FulcrumDia"]
     assert drawing.BAR_NUMBER in callouts["LeverThick"]
     assert drawing.BAR_NUMBER in callouts["PlateOffset"]
-    assert drawing.PIN_NUMBER in callouts["BarPinCx"]
-    assert drawing.SPRING_NUMBER in callouts["SpringCx"]
+    # Machinist r5: each hole's mate rides its own hole callout.
+    assert callouts["BarPinCx"] == callouts["SpringCx"] == "SETS LEVER RATIO"
+    assert drawing.HOLE_MATES == {
+        "bar-pin hole": f"RUNS ON PIN\n{drawing.PIN_NUMBER}",
+        "spring-eye hole": f"HOOKS SPRING\n{drawing.SPRING_NUMBER}",
+    }
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for label in drawing.HOLE_MATES:
+        assert f'_callout, label="{label}")' in source
     assert drawing._CLEARANCE_LEAST == pytest.approx(0.15)
     assert drawing._CLEARANCE_MOST == pytest.approx(0.20)
 

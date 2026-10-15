@@ -139,11 +139,16 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     ),
     "BottomNotchWidth": (
         f"RIDES {ROCKER_ARM_NUMBER}\nCHEEK WALL {BOTTOM_CHEEK_WALL_MIN:.2f} MIN"
+        f"\n{ROOT_CALLOUT}"
     ),
     "TopRightLedge": "CENTRES ON LEVER",
     "BottomLeftLedge": "CENTRES ON ROCKER",
     "TopNotchHeight": ROOT_CALLOUT,
-    "BottomNotchHeight": ROOT_CALLOUT,
+    # The foot notch's roof seats the bar on the rocker's top edge; its
+    # shallow-only band keeps the cheeks off the rocker hub (machinist r5).
+    # One line over its value (a two-line callout above printed nothing, r1),
+    # so the foot's ROOTS limit rides the width below.
+    "BottomNotchHeight": f"SITS ON {ROCKER_ARM_NUMBER}",
     "TopPinDia": f"THRU, REAM\nPRESS FIT {TOP_PIN_NUMBER}",
     "TopPinX": f"HOLE WALL {PIN_HOLE_WALL_MIN:.1f} MIN",
     "BarSection": "1/4 SQ STOCK",
