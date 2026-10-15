@@ -64,12 +64,24 @@ cannot ask for what the authors were told to leave out.
   title-block keep-out; the machinist review judges containment, balance and
   fit of every visible element. An eye pass never substitutes for it (merge
   gate 3 in the root `AGENTS.md`).
+- **Fit-up at assembly (rule 19) is a last resort.** Slots, shims, cut-to-fit
+  and match-drilling open space for sloppy work, so avoid them as much as
+  possible: prefer geometry whose loose bands hold the stack at the worst
+  case. A stated fit-up adjustment is the escape hatch when the stack cannot
+  be held otherwise — never the design default.
 - **Thread engagement (rule 18)** is owned by the CAD: the build's seat-fit
   and stack asserts (for example `require_blind_seat_fit`) enforce it. Today
   they check only ≥ 1D; raising them to 1.5D at the worst case is follow-up
-  work.
-- **Retention (rule 23).** `cad/scripts/joint_retention.py` lists every
-  threaded joint and audits the rule (`check:joint_retention`).
+  work. The 1.5D engagement minimum and the rule-17 wall targets (2.0 mm
+  target, 1.5 mm floor) exist to be forgiving to a first-time hobby machinist:
+  they are design margins for the shop class the guidelines describe, not
+  capability limits.
+- **Retention (rule 23).** Mechanical locks are the default, in preference
+  order: dowels, set screws, jam nuts, cross-pins, keys or flats with axial
+  capture, pinch clamps — then a brazed joint — then peening. Threadlocker is
+  an option, never the default; on its own it locks nothing (rule 23).
+  `cad/scripts/joint_retention.py` lists every threaded joint and audits the
+  rule (`check:joint_retention`).
 - **Legacy assembly sheets.** Three-view sheets from
   `drawing_recipe_assembly.md` are orientation placeholders and are expected
   to fail review until they are built out to rule 22.
