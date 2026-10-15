@@ -290,10 +290,13 @@ DATUM_A_SYMBOL = _sheet_xy(
 # above the shank width's dimension line (its text stands right of the shank).
 DATUM_B_EDGE = _sheet_xy(-SHANK_WIDTH / 2.0, 100.0)
 DATUM_B_SYMBOL = (DATUM_B_EDGE[0] - 0.016, FRONT_KEEP["ShankWidthDim"][1] + 0.0045)
-# The 4.00 BASIC (datum B to the pin axis) runs between the pin and the fork
+# The 4.00 BASIC (datum B to the pin axis) runs on the shank below the fork
 # root, its text out to the left: over the pin its line lay on the position
-# FCF's level leader and under the ream leader (baseline review).
-PIN_OFFSET_TEXT_XY = (0.150, _sheet_xy(0.0, (CENTER_DISTANCE + FORK_BASE_Y) / 2.0)[1])
+# FCF's level leader and under the ream leader (baseline review); inside the
+# head it crowded the hole and the ream callout's leader crossed it (#982
+# review r3). On the shank its arrow lands on the flank itself, datum B's
+# visible edge, left of the ream leader's run down-right from the hole.
+PIN_OFFSET_TEXT_XY = (0.150, _sheet_xy(0.0, FORK_BASE_Y - 6.0)[1])
 
 
 def _fork_detail(adapter: Any, left: Any) -> Any:
@@ -554,8 +557,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_basic_dimension(adapter, centre_distance, label="rod centre distance")
 
-    # Datum A on the strap bore axis (picked at 5:30, the tag inside the
-    # bore), Ra on the bore at 3 o'clock, and a position FCF tying the rocker
+    # Datum A on the strap bore axis (picked at 5 o'clock, the tag below the
+    # ring), Ra on the bore at 3 o'clock, and a position FCF tying the rocker
     # pin hole to A.
     add_datum_feature(
         adapter,

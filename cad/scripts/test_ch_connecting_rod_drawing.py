@@ -435,6 +435,23 @@ def test_datum_a_tag_stands_clear_of_the_centre_distance_witness() -> None:
     assert symbol_x + half_box < 0.216
 
 
+def test_pin_offset_basic_runs_on_the_shank_below_the_fork_head() -> None:
+    """#982 review r3: inside the head the 4.00 BASIC crowded the hole and
+    the ream callout's leader crossed it. Below the root its line meets the
+    flank (datum B) inside the flank's run, left of the pin axis, where the
+    leader (pin rim to the callout, down-right) has already moved right."""
+    spec = ch_connecting_rod_spec
+    text_x, text_y = drawing.PIN_OFFSET_TEXT_XY
+    root_y = drawing._sheet_xy(0.0, spec.FORK_BASE_Y)[1]
+    assert root_y - 0.010 < text_y < root_y - 0.003
+    assert text_y > drawing.DATUM_B_EDGE[1]
+    assert text_y > drawing.FRONT_KEEP["ShankWidthDim"][1] + 0.040
+    pin_x, pin_y = drawing._sheet_xy(0.0, spec.CENTER_DISTANCE)
+    callout_x, callout_y = drawing.FRONT_KEEP["PinHoleDia"]
+    assert callout_x > pin_x and callout_y < text_y < pin_y
+    assert text_x < drawing.DATUM_B_EDGE[0] - 0.015
+
+
 def test_ring_diameters_keep_one_arrow_on_the_near_rim() -> None:
     """#982 review r2: both diameters ran rim to rim through the bore's
     centre and crossed there."""
