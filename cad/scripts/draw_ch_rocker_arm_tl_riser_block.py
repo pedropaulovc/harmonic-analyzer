@@ -84,28 +84,34 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {"BlockWidth": (RIGHT_CENTER[0], RIGHT_CENTER[1] + _HALF_HEIGHT + 0.0145)}
 # The height governs all six blocks of both lengths; the set requirement
-# rides on it as the result, not the method. The width is the bar's own.
+# rides on it as the result, not the method. The width is the bar's own,
+# the same on both lengths: its one dimension says so.
 CALLOUTS_ABOVE = {"BlockHeight": part_spec.SET_CALLOUT[0]}
 CALLOUTS_BELOW = {
     "BlockHeight": part_spec.SET_CALLOUT[1],
-    "BlockWidth": "STOCK",
+    "BlockWidth": "STOCK, BOTH LENGTHS",
 }
 
 CONFIGURATION_VIEW_CENTERS = {
     DEFAULT_CONFIG: FRONT_CENTER,
     "L045": (0.130, 0.115),
 }
-# Above each configuration view, its length; below it, its label.
+# Above each configuration view, its length; below it, its label. Each other
+# configuration view also repeats the height as a reference, left of it.
 CONFIGURATION_DIMENSION_RISE = 0.0145
 CONFIGURATION_LABEL_DROP = 0.010
+CONFIGURATION_HEIGHT_CALLOUT = "MATCHED SET"
 if set(CONFIGURATION_VIEW_CENTERS) != set(LENGTHS):
     raise AssertionError("every riser block configuration needs its own view")
 
 
 def configuration_keep(configuration: str) -> dict[str, tuple[float, float]]:
-    """The one dimension a configuration view keeps, and where it prints."""
+    """The dimensions a configuration view keeps, and where they print."""
     x, y = CONFIGURATION_VIEW_CENTERS[configuration]
-    return {"BlockLength": (x, y + _HALF_HEIGHT + CONFIGURATION_DIMENSION_RISE)}
+    keep = {"BlockLength": (x, y + _HALF_HEIGHT + CONFIGURATION_DIMENSION_RISE)}
+    if configuration != DEFAULT_CONFIG:
+        keep["BlockHeight"] = (FRONT_KEEP["BlockHeight"][0], y)
+    return keep
 
 
 def configuration_label(number: str, configuration: str) -> str:
@@ -264,6 +270,27 @@ def _assert_length(adapter: Any, annotations: list[Any], configuration: str) -> 
     _telemetry.success(f"{configuration}: sheet length {measured_mm:.{places}f} mm")
 
 
+def _reference_height(adapter: Any, annotations: list[Any], configuration: str) -> None:
+    """Parenthesize a configuration view's repeated height: (18.50), a reference.
+
+    The L036 front view's height carries the band and the set requirement;
+    the repeat only tells the reader the other length shares it. A linear
+    dimension takes ``ShowParenthesis`` (draw_dt_cylinder_gear's cam thickness).
+    """
+    found = [a for a in annotations if dimension_name(adapter, a) == "BlockHeight"]
+    if len(found) != 1:
+        raise RuntimeError(
+            f"{configuration}: expected one BlockHeight on its view, found {len(found)}"
+        )
+    display = _early_bound(
+        _early_bound(found[0], "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
+    )
+    display.ShowParenthesis = True
+    if not bool(display.ShowParenthesis):
+        raise RuntimeError(f"{configuration}: repeated height was not shown as reference")
+
+
 def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
     """Make ``view`` the active view (a note lands in the active view)."""
     name = view_name(adapter, view)
@@ -363,7 +390,8 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     _label_configuration_view(adapter, front, number, DEFAULT_CONFIG)
     # The L036 front view imports first, so its import keeps eliminating
-    # duplicates; each other configuration view prints the length again.
+    # duplicates; each other configuration view prints its length again and
+    # the height as a reference.
     for configuration, view in configuration_views.items():
         curated = _curate_repeated_dimensions(
             adapter,
@@ -372,6 +400,10 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} front",
         )
         _assert_length(adapter, curated, configuration)
+        _reference_height(adapter, curated, configuration)
+        set_dimension_callouts(
+            adapter, curated, {"BlockHeight": CONFIGURATION_HEIGHT_CALLOUT}
+        )
         annotations += curated
         _label_configuration_view(adapter, view, number, configuration)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")

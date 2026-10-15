@@ -47,6 +47,23 @@ def test_every_configuration_gets_a_labelled_view_with_its_quantity() -> None:
     assert drawing.configuration_label(number, "L045") == "MHA-CH-006-TL-10-L045  QTY 2"
 
 
+def test_every_other_length_reads_its_depth_and_height_on_the_sheet() -> None:
+    """L045's view shows only its length; the shared sizes must still reach it."""
+    # The one 38.1 width dimension states that it is both lengths' depth.
+    assert drawing.CALLOUTS_BELOW["BlockWidth"] == "STOCK, BOTH LENGTHS"
+    for configuration in set(spec.LENGTHS) - {spec.DEFAULT_CONFIG}:
+        x, y = drawing.CONFIGURATION_VIEW_CENTERS[configuration]
+        keep = drawing.configuration_keep(configuration)
+        # Its height repeats as a native reference, left of its own view.
+        assert set(keep) == {"BlockLength", "BlockHeight"}
+        assert keep["BlockHeight"] == (drawing.FRONT_KEEP["BlockHeight"][0], y)
+        half_length = spec.LENGTHS[configuration] * drawing._S / 2000.0
+        assert keep["BlockHeight"][0] < x - half_length
+    assert drawing.CONFIGURATION_HEIGHT_CALLOUT == "MATCHED SET"
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_reference_height(adapter, curated, configuration)" in source
+
+
 def test_inventory_record_takes_its_solids_from_this_spec() -> None:
     record = _record()
     assert record["cad"] == STEM
