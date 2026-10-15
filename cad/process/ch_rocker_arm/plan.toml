@@ -668,13 +668,13 @@ guide = { template = "arm-outline-template" }
 op = 30
 do = "deburr"
 feature = "profile_outer"
-note = "Break out the webs between the S3 op 20 chain-drill holes under the profile_outer arc: chisel along the hole centres from the scrap side, never toward the scribed line, until the scrap below the arc is free of the arm. This leaves stock for the file at op 80; do not file yet."
+note = "Break out the webs between the S3 op 20 chain-drill holes under the profile_outer arc: drive tools.cold-chisel-1-2in with tools.ball-peen-hammer-16oz along the hole centres from the scrap side, never toward the scribed line, until the scrap below the arc is free of the arm. This leaves stock for the file at op 80; do not file yet."
 
 [[setups.ops]]
 op = 40
 do = "deburr"
 feature = "top_edge"
-note = "Break out the webs between the S3 op 30 chain-drill holes above the top_edge line the same way, from the scrap side, until the scrap above the line is free of the arm. This leaves stock for the file at op 70; do not file yet."
+note = "Break out the webs between the S3 op 30 chain-drill holes above the top_edge line the same way with tools.cold-chisel-1-2in and tools.ball-peen-hammer-16oz, from the scrap side, until the scrap above the line is free of the arm. This leaves stock for the file at op 70; do not file yet."
 
 [[setups.ops]]
 op = 50
