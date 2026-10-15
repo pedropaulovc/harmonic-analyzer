@@ -48,6 +48,7 @@ from _drawing_tolerances import (
     set_dimension_symmetric_tolerance,
 )
 from _feature_tree import name_last_feature
+from _part_pmi import author_part_pmi
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -93,6 +94,7 @@ from pd_support_bar_drawing_spec import (
     HANGER_STATION_NAMES,
     ISOMETRIC_VIEW_NOTE,
     SHEET_PRECISION,
+    SURFACE_FINISHES,
     TOL_MAX,
     TOL_MIN,
 )
@@ -136,12 +138,13 @@ CLAMP_HOLE_X = tuple(
 LEFT_END_X = -BAR_LENGTH / 2.0
 HANGER_ROW_HEIGHT = BAR_HEIGHT / 2.0 - HANGER_TAP_Y
 HANGER_STATIONS = tuple(x - LEFT_END_X for x in (PIVOT_TAP_X, *BRACKET_TAP_X))
-# The clamp holes on the front face, which the front-face view shows mirrored:
-# stations from the +X end (the sheet's left there), height from the top face.
-CLAMP_ROW_START_X = BAR_LENGTH / 2.0
+# The clamp holes on the front face: stations from the same (left, x = -226)
+# end as the hanger row, so one end is the datum on both faces, and the
+# height from the top face, its rise on the +X end.
+CLAMP_ROW_START_X = LEFT_END_X
 CLAMP_ROW_HEIGHT = BAR_HEIGHT / 2.0
-CLAMP_ROW_X = tuple(sorted(CLAMP_HOLE_X, reverse=True))
-CLAMP_STATIONS = tuple(CLAMP_ROW_START_X - x for x in CLAMP_ROW_X)
+CLAMP_ROW_X = tuple(sorted(CLAMP_HOLE_X))
+CLAMP_STATIONS = tuple(x - CLAMP_ROW_START_X for x in CLAMP_ROW_X)
 # The pivot tap's full-thread minimum, drawn along the tap axis in its section
 # plane from the back face.
 PIVOT_SECTION_PLANE = "PivotSectionPlane"
@@ -538,7 +541,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += await _author_row(
         adapter,
         "ClampRowReference",
-        rise_x=-BAR_LENGTH / 2.0,
+        rise_x=BAR_LENGTH / 2.0,
         row_y=0.0,
         start_x=CLAMP_ROW_START_X,
         holes=tuple(zip(CLAMP_STATION_NAMES, CLAMP_ROW_X, CLAMP_STATIONS, strict=True)),
@@ -594,6 +597,9 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
+    # The platen's slide faces (top edge, front face) carry their roughness
+    # on the MODEL as plain annotations; the drawing points at them.
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

@@ -101,7 +101,9 @@ def test_row_nominals_are_the_built_holes() -> None:
         tuple(x - left for x in (spec.PIVOT_TAP_X, *spec.BRACKET_TAP_X))
     )
     assert part.HANGER_STATIONS == (168.0, 291.0, 298.0)
-    assert part.CLAMP_ROW_X == (214.5, 179.5, -179.5, -214.5)
+    # Both rows read from the same (left, x = -226) end.
+    assert part.CLAMP_ROW_START_X == left
+    assert part.CLAMP_ROW_X == (-214.5, -179.5, 179.5, 214.5)
     assert sorted(part.CLAMP_ROW_X) == sorted(part.CLAMP_HOLE_X)
     assert part.CLAMP_STATIONS == (11.5, 46.5, 405.5, 440.5)
     assert part.CLAMP_ROW_HEIGHT == spec.BAR_HEIGHT / 2.0
@@ -126,6 +128,18 @@ def test_rows_stack_shortest_nearest_the_bar() -> None:
     ):
         x = drawing.FRONT_KEEP[name][0]
         assert drawing.LEFT_END < x < drawing.LEFT_END + span * drawing._S
+    # In the front-face view that end is on the sheet's right: the long clamp
+    # rows' texts stand between it and their holes; the first row's, too
+    # short a span, stands between the first two holes.
+    for name, hole_x in zip(sheet_spec.CLAMP_STATION_NAMES[1:], part.CLAMP_ROW_X[1:]):
+        x = drawing.BACK_KEEP[name][0]
+        assert drawing._back_x(hole_x) < x < drawing.RIGHT_END, name
+    first = drawing.BACK_KEEP[sheet_spec.CLAMP_STATION_NAMES[0]][0]
+    assert (
+        drawing._back_x(part.CLAMP_ROW_X[1])
+        < first
+        < drawing._back_x(part.CLAMP_ROW_X[0])
+    )
 
 
 def test_notes_carry_no_dimensions_and_stay_short() -> None:
@@ -149,12 +163,42 @@ def test_callouts_name_the_mates() -> None:
     assert "MHA-VN-043" in callouts["Depth"]
     assert "MHA-VN-041" in callouts["HangerRowHeight"]
     assert "MHA-PD-014" in callouts["HangerRowHeight"]
+    # Each tight hanger station names the part it places.
+    assert "MHA-VN-041" in callouts["PivotTapStation"]
+    assert "MHA-PD-014" in callouts["BracketTapStation1"]
+    assert "MHA-PD-014" in callouts["BracketTapStation2"]
     assert callouts["PivotTapDrillDia"] == "TAP #8-32 UNC-2B"
     assert callouts["DrillDepth"] == "FLAT BOTTOM"
     assert callouts["ThreadMin"] == "FULL THREAD"
     assert callouts["BracketCskDia"].startswith("2X 90\u00b0 CSK")
     for text in callouts.values():
         assert len(text.splitlines()) <= 2
+    assert "MHA-VN-021" in sheet_spec.CLAMP_CBORE_CALLOUT
+    for caption in (sheet_spec.FACE_VIEW_CAPTION, sheet_spec.BACK_VIEW_CAPTION):
+        assert re.search(r"\d", caption) is None
+
+
+def test_slide_faces_carry_the_slide_grade() -> None:
+    from _surface_finish import MACHINED_UM
+
+    controls = {control.key: control for control in sheet_spec.SURFACE_FINISHES}
+    assert set(controls) == {"top_slide", "front_slide"}
+    assert {control.roughness_um for control in controls.values()} == {MACHINED_UM}
+    top, front = controls["top_slide"].face, controls["front_slide"].face
+    assert (top.normal, top.offset_mm) == ((0, 1, 0), spec.BAR_HEIGHT / 2.0)
+    assert (front.normal, front.offset_mm) == ((0, 0, -1), spec.BAR_DEPTH / 2.0)
+    # The front-face leader lands on the face, clear of every hole.
+    x, y = drawing.FRONT_FINISH_MODEL_XY
+    assert abs(y) < spec.BAR_HEIGHT / 2.0
+    assert all(
+        abs(x - hole) > part.CLAMP_CBORE_DIA
+        for hole in (*part.CLAMP_HOLE_X, *spec.BRACKET_TAP_X)
+    )
+    assert (
+        drawing.LEFT_END
+        < drawing._face_x(drawing.TOP_FINISH_MODEL_X)
+        < drawing._face_x(spec.PIVOT_TAP_X)
+    )
 
 
 def test_build_authors_marks_properties_and_hides_references() -> None:
@@ -164,8 +208,8 @@ def test_build_authors_marks_properties_and_hides_references() -> None:
         "apply_drawing_precision(adapter, SHEET_PRECISION)",
         "clear_dimensions_for_drawing(adapter)",
         "blank_reference_sketches(adapter, REFERENCE_SKETCHES)",
-        '"Manufacturing Notes": DRAWING_NOTES',
         '"Isometric View Note": ISOMETRIC_VIEW_NOTE',
+        "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)",
     ):
         assert source.count(needle) == 1, needle
     hidden = {
@@ -206,7 +250,7 @@ def test_hole_callouts_pick_the_tap_and_counterbore_edges(monkeypatch) -> None:
             (0.0, 0.0, 1.0),
         ),
         (
-            (part.CLAMP_ROW_X[0], 0.0, -spec.BAR_DEPTH / 2.0),
+            (max(part.CLAMP_ROW_X), 0.0, -spec.BAR_DEPTH / 2.0),
             part.CLAMP_CBORE_DIA / 2.0,
             (0.0, 0.0, 1.0),
         ),
