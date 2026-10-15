@@ -325,8 +325,10 @@ def _dress_crown_radius(adapter: Any, annotations: list[Any]) -> None:
 
     The part dimensions the crown as a radius (define_circle
     ``size_dimension="radius"``); a sheet must never flip a model diameter.
-    Arrow outside, the leader runs from the text to the arc and stops there
-    instead of on through the bore.
+    Arrow outside with no solid leader (draw_pd_platen_clip /
+    draw_ch_rocker_arm), the leader runs from the text to the arc and stops
+    there: MR-fleet r6 (443b118) eye pass, with only the arrow outside the
+    line still ran on from the arc through the bore to the centre.
     """
     display = _require_single_limit(
         adapter, annotations, "CrownRadius", CROWN_R_TOL_TYPE, CROWN_R_MIN
@@ -335,12 +337,14 @@ def _dress_crown_radius(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError("the imported crown dimension is not radial")
     display.ArcExtensionLineOrOppositeSide = False
     display.ArrowSide = _ARROWS_OUTSIDE
+    display.SolidLeader = False
     if (
         bool(display.Diametric)
         or bool(display.ArcExtensionLineOrOppositeSide)
         or int(display.ArrowSide) != _ARROWS_OUTSIDE
+        or bool(display.SolidLeader)
     ):
-        raise RuntimeError("crown radius display did not persist")
+        raise RuntimeError("crown radius kept its leader to the arc's centre")
 
 
 def _reference_line_in_view(view: Any, sketch_name: str, length_mm: float) -> Any:

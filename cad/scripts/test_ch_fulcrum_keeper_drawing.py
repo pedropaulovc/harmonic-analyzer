@@ -248,10 +248,12 @@ def test_crown_prints_its_radius_as_a_min_limit() -> None:
         r"CROWN_R, CROWN_R_TOL_TYPE, 0\.0, 0\.0, \)",
         source,
     )
-    # The sheet keeps it radial: no near-side diameter style, arrow outside.
+    # The sheet keeps it radial: no near-side diameter style, arrow outside,
+    # no solid leader on through the bore to the centre (MR-fleet r6 eye pass).
     assert "CrownRadius" not in drawing.NEAR_SIDE_DIAMETERS
     sheet = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "_dress_crown_radius(adapter, right_annotations)" in sheet
+    assert "display.SolidLeader = False" in sheet
 
 
 def test_front_reference_lines_draw_in_the_outline_black() -> None:
