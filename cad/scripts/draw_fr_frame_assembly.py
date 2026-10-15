@@ -100,6 +100,11 @@ PNG = OUTPUTS.png
 # MOUNT_POS[0], parallel to the deck's MHA-FR-004 end at DECK_HALF_X.
 NAMEPLATE_END_INSET = DECK_HALF_X - NAMEPLATE_MOUNT_POS[0]
 
+# The controlling setup height names itself on its own native dimension, not
+# in a free note the reader must pair with it.
+TOP_AXIS_HEIGHT_SUFFIX = " TOP CROSS-BORE AXIS HEIGHT FROM BASE UNDERSIDE"
+_DIMENSION_TEXT_SUFFIX = 2  # swDimensionTextParts_e.swDimensionTextSuffix
+
 
 SHEET_NAMES = (
     "ASSEMBLED + JOINT SECTIONS",
@@ -242,7 +247,7 @@ ASSEMBLY_STEPS = "\n".join(
         "   SKIRT. AFTER MATCH MARKS ALIGN AND MHA-VN-027 HEADS SEAT, PUSH EACH",
         "   CAP OVER THE CHAMFERED OPEN END UNTIL THE TUBE REACHES THE CAP'S",
         "   INSIDE SEAT.",
-        "8. SEAT MHA-FR-005 ON DECK, WINDOWS TOWARD LONG SIDES; INSTALL FOUR",
+        "8. SEAT MHA-FR-005 ON DECK, WINDOWS FACING THE SHORT ENDS; INSTALL FOUR",
         "   MHA-VN-009 TOP-DOWN AND DRAW DOWN EVENLY UNTIL ALL HEADS SEAT.",
         "9. SET MHA-FR-004 DECORATED FACE UP, CENTRED FRONT TO REAR, ITS LOWER",
         f"   EDGE AS LETTERED {NAMEPLATE_END_INSET:.1f} INSIDE THE DECK'S "
@@ -261,8 +266,7 @@ ASSEMBLY_CHECKS = "\n".join(
         "   CLEARS BOTH TUBE WALLS AND HAS POSITIVE THREAD ENGAGEMENT IN BOTH",
         "   NEAR AND FAR CASTING THREAD SEGMENTS.",
         "3. ALL FOUR MHA-VN-028 CAPS REACH THEIR INSIDE SEATS; SKIRTS CLEAR THE",
-        "   MHA-FR-002 RECESSES, TOPS ARE EVEN, AND TUBE ENDS ARE NOT",
-        "   DISTORTED.",
+        "   MHA-FR-002 RECESSES AND TUBE ENDS ARE NOT DISTORTED.",
         "4. MHA-FR-005 AND MHA-FR-004 LIE FLAT; ALL EIGHT OF THEIR SCREW HEADS",
         "   BEAR.",
         "5. GOOSENECK BORE IS UNOBSTRUCTED WITH MHA-VN-023 BACKED CLEAR.",
@@ -332,7 +336,7 @@ def _configure_view(
     return configuration
 
 
-def _checked_height_dimension(
+def _checked_linear_dimension(
     adapter: Any, display: Any, *, expected_mm: float, label: str
 ) -> Any:
     display = _early_bound(display, "IDisplayDimension")
@@ -346,6 +350,21 @@ def _checked_height_dimension(
         raise RuntimeError(f"failed to set {label} precision")
     if int(display.GetPrimaryPrecision2()) != 1:
         raise RuntimeError(f"{label} did not retain one-place precision")
+    adapter.currentModel.EditRebuild3()
+    return display
+
+
+def _set_dimension_suffix(
+    adapter: Any, display: Any, suffix: str, *, label: str
+) -> Any:
+    """Write ``suffix`` after a dimension's value and read the native text back."""
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(_DIMENSION_TEXT_SUFFIX, suffix)
+    actual = str(display.GetText(_DIMENSION_TEXT_SUFFIX) or "")
+    if actual != suffix:
+        raise RuntimeError(
+            f"{label}: suffix {suffix!r} did not persist, read {actual!r}"
+        )
     adapter.currentModel.EditRebuild3()
     return display
 
@@ -509,7 +528,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         text_xy=(0.092, 0.244),
         label="finished frame overall height",
     )
-    overall = _checked_height_dimension(
+    overall = _checked_linear_dimension(
         adapter,
         overall,
         expected_mm=CAP_TOP_Y,
@@ -540,10 +559,16 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
     screw_axis = set_arc_endpoints_to_center(
         adapter, screw_axis, label="installed top cross-screw axis height"
     )
-    screw_axis = _checked_height_dimension(
+    screw_axis = _checked_linear_dimension(
         adapter,
         screw_axis,
         expected_mm=TOP_SCREW_Y,
+        label="installed top cross-screw axis height",
+    )
+    screw_axis = _set_dimension_suffix(
+        adapter,
+        screw_axis,
+        TOP_AXIS_HEIGHT_SUFFIX,
         label="installed top cross-screw axis height",
     )
 
@@ -1480,12 +1505,6 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     _configure_view(adapter, front, exploded=False, label="working front")
     _add_frame_height_dimensions(adapter, front)
     _create_joint_sections(adapter, front)
-    _add_note_block(
-        adapter,
-        "TOP CROSS-BORE AXIS HEIGHT",
-        (0.119, 0.254),
-        label="controlling height identity",
-    )
 
     _add_note_block(
         adapter,
@@ -1563,8 +1582,8 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     _add_note_block(adapter, ASSEMBLY_STEPS, (0.018, 0.263), label="assembly sequence")
     # Reflowed canonical references occupy 37 sequence rows. The existing
     # ~4.7 mm pitch estimates the last sequence row's anchor near y=94 mm,
-    # overlapping checks at y=95. At y=80, the 12th checks row's anchor is
-    # near y=28 mm, not its full text bottom; native extents prove clearance.
+    # overlapping checks at y=95. At y=80, the 11th checks row's anchor is
+    # near y=33 mm, not its full text bottom; native extents prove clearance.
     _add_note_block(adapter, ASSEMBLY_CHECKS, (0.018, 0.080), label="assembly checks")
     _add_note_block(
         adapter,
