@@ -33,9 +33,11 @@ STOCK_THICKNESS_IN = Fraction(1, 32)
 STOCK_THICKNESS = float(STOCK_THICKNESS_IN) * MM_PER_IN  # 0.79375
 # The model carries the stock at the print's two places.
 THICKNESS = round(STOCK_THICKNESS, 2)  # 0.79
-# Thickness band of the stock as supplied: A366/1008 cold-rolled sheet either
-# side of 1/32 in holds +/-0.003 in (OnlineMetals cold-roll steel tolerances,
-# sheet table, gauges 21 and 22; fetched 2026-10-10).
+# Thickness band of the stock as supplied: low-carbon cold-rolled sheet
+# either side of 1/32 in holds +/-0.003 in (OnlineMetals cold-roll steel
+# tolerances, sheet table, gauges 21 and 22; fetched 2026-10-10). Steel shim
+# stock, the title block's alternative, rolls tighter, so the sheet's band is
+# the one every stack reads.
 STOCK_THICKNESS_TOL_IN = 0.003
 STOCK_THICKNESS_RANGE = (
     STOCK_THICKNESS - STOCK_THICKNESS_TOL_IN * MM_PER_IN,
@@ -48,13 +50,14 @@ STOCK_TEXT_PREFIX = f"{_STOCK_FRACTION} ("
 STOCK_TEXT_SUFFIX = ") STOCK"
 # The registry row carries this text verbatim (test_ch_rocker_thrust_washer_drawing).
 MATERIAL_SPECIFICATION = (
-    f"1008 cold-rolled steel sheet, {_STOCK_FRACTION} in, ASTM A1008 CS"
+    f"low-carbon cold-rolled steel sheet or steel shim stock, {_STOCK_FRACTION} in"
 )
-# The title block's MATERIAL cell prints the registry row's ``material``: the
-# ruled sheet, short enough for the cell (r743-4 eye pass: it printed the
-# SolidWorks library name "Plain Carbon Steel", which only feeds the mass
-# model). The thickness prints on the view ("1/32 (0.79) STOCK").
-MATERIAL_TITLE = "1008 CR sheet, ASTM A1008 CS"
+# The title block's MATERIAL cell prints the registry row's ``material``.
+# drawing-guidelines.md rule 2 (the title block is the general specification): a thrust washer between
+# oiled steel faces needs no one grade, so the cell names the acceptable
+# families as alternatives (Opus #1022 baseline over-specification: it named
+# 1008 to ASTM A1008 CS). The thickness prints on the view ("1/32 (0.79) STOCK").
+MATERIAL_TITLE = "LOW-CARBON STEEL SHEET OR SHIM STOCK"
 
 BORE_DIA = _BRACKET_BORE_DIA  # slips on the O6.35 pivot shaft
 # Running clearance on the shaft: never under the bore. The sheet calls it
@@ -74,6 +77,19 @@ if OD < OD_MIN:
     raise AssertionError(
         f"washer O{OD:.2f} is under its drawing-guidelines.md rule 17 (walls and webs) wall floor O{OD_MIN:.2f}"
     )
+
+# The worst-case wall the sheet states (drawing-guidelines.md rule 20 (state a known shortfall as a plain fact)): the
+# OD at the bottom of its printed .XX band less the DRILLED HOLES top, rounded
+# DOWN. Rule 17 (walls and webs)'s 2.0 target needs a nominal OD of about
+# 11.11, past the amplitude-bar foot cheeks' ceiling that holds the shared
+# hub/washer O10.20 (test_rocker_bank_layout), so the washer states 1.54.
+# Pending exception ruling: MHA-CH-009 wall 1.54 MIN (#1022).
+_PRINTED_2PL = round(LINEAR_2PL, 2)  # the title block prints the .XX class as +/-0.51
+_WALL_WORST = (round(OD, 2) - _PRINTED_2PL - (round(BORE_DIA, 2) + BORE_BAND[0])) / 2.0
+WALL_MIN = math.floor(_WALL_WORST * 100.0 + 1e-9) / 100.0
+WALL_NOTE = f"WALL {WALL_MIN:.2f} MIN"
+# Manufacturing Notes (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): only the stated shortfall.
+DRAWING_NOTES = WALL_NOTE
 
 # Marked model dimensions and the places the model authors on them
 # (drawing-simplicity-policy.md `How the repository implements the guidelines`): the bore banded, the thickness printed

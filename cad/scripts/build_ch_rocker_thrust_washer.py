@@ -38,6 +38,7 @@ from _drawing_marks import (
 
 from ch_rocker_thrust_washer_spec import (
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION,
     OD,
     THICKNESS,
@@ -45,7 +46,7 @@ from ch_rocker_thrust_washer_spec import (
 from ch_rocker_thrust_washer_spec import BORE_DIA as BORE_DIA
 
 PART_NAME = "ch-rocker-thrust-washer"
-MATERIAL = "Plain Carbon Steel"  # 1008 cold-rolled sheet (spec MATERIAL_SPECIFICATION)
+MATERIAL = "Plain Carbon Steel"  # mass model only; the title block prints spec MATERIAL_TITLE
 
 DISC_DIA = OD
 DISC_THICK = THICKNESS
@@ -124,7 +125,9 @@ async def build(adapter) -> dict[str, str]:
     # No face finish (Main 2026-09-26): the faces are the sheet's as
     # supplied, so a roughness callout could only force the facing the stock
     # ruling avoids.
-    apply_drawing_properties(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

@@ -101,11 +101,13 @@ def test_registry_row_is_two_of_the_one_thirty_second_stock() -> None:
     assert "1/32 in" in str(row["process"])
 
 
-def test_title_block_material_prints_the_ruled_sheet() -> None:
-    """Main (r743-4 eye pass): the MATERIAL cell printed the SolidWorks
-    library name "Plain Carbon Steel". The cell reads the part's "Material"
-    property, which part_properties takes from the registry row's material;
-    that is now the ruled 1008 CR sheet, short enough for the cell."""
+def test_title_block_material_names_the_acceptable_families() -> None:
+    """Opus #1022 baseline over-specification: the MATERIAL cell named one
+    grade to one spec (1008 CR sheet, ASTM A1008 CS) that nothing on the
+    sheet needs. drawing-guidelines.md rule 2 (the title block is the general
+    specification): name the acceptable families as alternatives. The cell
+    reads the part's "Material" property, which part_properties takes from
+    the registry row's material; never the SolidWorks library name (r743-4)."""
     import _part_properties
 
     row = _config.parts("ch-rocker-thrust-washer")
@@ -113,9 +115,59 @@ def test_title_block_material_prints_the_ruled_sheet() -> None:
     assert dict(_part_properties.part_properties(part.PART_NAME))["Material"] == (
         spec.MATERIAL_TITLE
     )
-    assert "1008" in spec.MATERIAL_TITLE and "A1008" in spec.MATERIAL_TITLE
+    assert spec.MATERIAL_TITLE == "LOW-CARBON STEEL SHEET OR SHIM STOCK"
+    assert " OR " in spec.MATERIAL_TITLE
+    assert "1008" not in spec.MATERIAL_TITLE and "ASTM" not in spec.MATERIAL_TITLE
     assert "Plain Carbon Steel" not in spec.MATERIAL_TITLE
-    assert len(spec.MATERIAL_TITLE) <= 30
+    # The thickness prints on the view ("1/32 (0.79) STOCK"), not in the cell;
+    # registry cells of 50 characters print in this cell.
+    assert "1/32" not in spec.MATERIAL_TITLE
+    assert len(spec.MATERIAL_TITLE) <= 40
+
+
+def test_sheet_states_the_worst_case_wall() -> None:
+    """drawing-guidelines.md rule 20 (state a known shortfall as a plain
+    fact): the OD is held to the hub's O10.20 by the amplitude-bar foot cheeks
+    (test_rocker_bank_layout), so the washer falls short of rule 17's 2.0
+    target and says so, in the part's only manufacturing note."""
+    from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+
+    worst = (spec.OD - printed_band_mm(2) - (spec.BORE_DIA + drilled_oversize_mm())) / 2.0
+    assert worst == pytest.approx(1.545)
+    assert spec.WALL_MIN == 1.54 <= worst
+    assert ch_rocker_arm_spec.RULE12_WALL_FLOOR <= spec.WALL_MIN < 2.0
+    assert spec.DRAWING_NOTES == spec.WALL_NOTE == "WALL 1.54 MIN"
+    assert "Pending exception ruling: MHA-CH-009 wall 1.54 MIN (#1022)." in Path(
+        spec.__file__
+    ).read_text(encoding="utf-8")
+    assert part.DRAWING_NOTES is spec.DRAWING_NOTES
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)' in source
+
+
+def test_face_view_diameters_take_their_near_rims() -> None:
+    """Opus #1022 baseline clarity, drawing-guidelines.md rule 14 (keep text
+    off the part): both diameter lines ran through the centre and crossed.
+    Each is restyled to one arrow on its near rim, and the build proves the
+    ink lands on its own rim, stays out of the centre and crosses nothing."""
+    assert drawing.NEAR_SIDE_DIAMETERS == ("DiscDia", "BoreDia")
+    assert set(drawing.NEAR_SIDE_DIAMETERS) == set(drawing.FRONT_KEEP)
+    assert drawing.OD_SHEET_RADIUS == pytest.approx(0.0204)
+    assert drawing.BORE_SHEET_RADIUS == pytest.approx(0.013)
+    od_low, od_high = drawing.LEADER_LANDING["DiscDia"]
+    bore_low, bore_high = drawing.LEADER_LANDING["BoreDia"]
+    # The bands cannot mistake one rim for the other.
+    assert bore_high < od_low
+    assert drawing.LEADER_KEEP_OUT["DiscDia"] <= od_low
+    assert drawing.LEADER_KEEP_OUT["BoreDia"] < bore_low
+    # The OD text stands left of the centre and the bore's right of it, both
+    # above the view, so the near rims face away from each other.
+    centre_x, centre_y = drawing.FRONT_CENTER
+    assert drawing.FRONT_KEEP["DiscDia"][0] < centre_x < drawing.FRONT_KEEP["BoreDia"][0]
+    assert min(y for _x, y in drawing.FRONT_KEEP.values()) > centre_y + drawing.OD_SHEET_RADIUS
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_near_side_diameters_clear(adapter, front, annotations)" in source
+    assert 'set_near_side_diameter(annotation, f"washer {name}")' in source
 
 
 def test_od_is_the_hub_od_over_its_own_wall_floor() -> None:
@@ -170,7 +222,11 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     build_calls = _calls(part.__file__)
     stamp = build_calls.get("apply_drawing_properties")
     if stamp is not None:
-        assert [ast.unparse(a) for a in stamp.args] == ["adapter", "PART_NAME"]
+        assert [ast.unparse(a) for a in stamp.args] == [
+            "adapter",
+            "PART_NAME",
+            "{'Manufacturing Notes': DRAWING_NOTES}",
+        ]
         assert stamp.lineno < build_calls["save_part_and_images"].lineno
         stamped = {}
         monkeypatch.setattr(
@@ -178,7 +234,9 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
             "apply_custom_properties",
             lambda _adapter, props: stamped.update(props),
         )
-        _drawing_marks.apply_drawing_properties(None, part.PART_NAME)
+        _drawing_marks.apply_drawing_properties(
+            None, part.PART_NAME, {"Manufacturing Notes": part.DRAWING_NOTES}
+        )
         carried.update(stamped)
     missing = [name for name in required if not str(carried.get(name) or "").strip()]
     assert missing == []

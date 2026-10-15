@@ -2,9 +2,9 @@ ch-rocker-thrust-washer:
   number: MHA-CH-009
   title: Rocker Bank Thrust Washer
   # ch_rocker_thrust_washer_spec.MATERIAL_TITLE: the title block's MATERIAL cell.
-  material: "1008 CR sheet, ASTM A1008 CS"
+  material: "LOW-CARBON STEEL SHEET OR SHIM STOCK"
   # ch_rocker_thrust_washer_spec.MATERIAL_SPECIFICATION verbatim (its drawing test pins it).
-  material_specification: "1008 cold-rolled steel sheet, 1/32 in, ASTM A1008 CS"
+  material_specification: "low-carbon cold-rolled steel sheet or steel shim stock, 1/32 in"
   finish: oiled
   tolerance_class: machined_block
   quantity: 2
