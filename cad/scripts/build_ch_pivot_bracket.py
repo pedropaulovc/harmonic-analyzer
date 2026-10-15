@@ -30,7 +30,8 @@ only proven primitives); O BORE_DIA cross-bore along Z; one #4-40 tap down
 through the arch apex (EAR_TOP_Y) on x = 0, z = 0 into the bore
 (``SetScrewTap``); one hold-down hole through the foot on x = 0 in the foot's
 free run (``ch_pivot_bracket_sides`` places it), its station
-(``HoleStation``) dimensioned from the ear's inboard face at FOOT_Z0.
+(``HoleStation``) dimensioned from the ear's inboard face at FOOT_Z0; the
+foot-to-ear inside corner filleted at its MAX radius (``CornerFillet``).
 
 Drawing contract (``ch_pivot_bracket_drawing_spec``): three blanked
 reference-line sketches carry the bore's and the hold-down hole's lateral
@@ -41,7 +42,8 @@ bands, and authors the foot seat's finish.
 Volume (``V_TOTAL``): foot FOOT_W * FOOT_H * FOOT_LEN, plus the ear block
 EAR_W * (BORE_H - FOOT_H) * EAR_T and the arch half-disc pi R^2 / 2 * EAR_T,
 less the bore, the apex tap's drill from the arch down to the bore
-(``V_TAP``) and the hold-down hole.
+(``V_TAP``) and the hold-down hole, plus the corner fillet's spandrel
+(``V_CORNER``).
 
 Run (SolidWorks already open)::
 
@@ -78,7 +80,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
@@ -90,6 +92,9 @@ from _part_pmi import author_part_pmi
 import _telemetry
 from ch_pivot_bracket_drawing_spec import (
     BORE_DIA_BAND,
+    CORNER_R_BAND,
+    CORNER_R_MAX,
+    CORNER_R_TOL_TYPE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     REFERENCE_SKETCHES,
@@ -132,7 +137,10 @@ V_TAP = (
     cross_hole_volume_mm3(TAP_DRILL_DIA, 2.0 * EAR_ARCH_R)
     - cross_hole_volume_mm3(TAP_DRILL_DIA, BORE_DIA)
 ) / 2.0
-V_TOTAL = V_FOOT + V_BLOCK + V_ARCH - V_BORE - V_TAP - V_HOLE
+# The foot-to-ear inside corner's fillet adds its spandrel, (1 - pi/4) R^2,
+# along the ear's width.
+V_CORNER = (1.0 - math.pi / 4.0) * CORNER_R_MAX**2 * EAR_W
+V_TOTAL = V_FOOT + V_BLOCK + V_ARCH - V_BORE - V_TAP - V_HOLE + V_CORNER
 if EAR_ARCH_R != EAR_W / 2.0 or BORE_H - EAR_ARCH_R <= FOOT_H:
     raise AssertionError("the ear boss must be the block's width and clear the foot")
 if EAR_W > FOOT_W:
@@ -257,6 +265,34 @@ def _hide_reference_sketches(adapter) -> None:
         raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
 
 
+def _corner_radius_max_limit(adapter) -> None:
+    """CornerRadius as the single limit "R0.3 MAX" carrying the band's
+    deviations (build_pn_pen_rod._shoulder_fillet_max_limit's recipe)."""
+    lower, upper = deviations(CORNER_R_BAND)
+    _, dimension = _named_dimension(adapter, "CornerFillet", "CornerRadius")
+    label = "CornerRadius@CornerFillet"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, CORNER_R_MAX / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max {CORNER_R_MAX}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = CORNER_R_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != CORNER_R_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {CORNER_R_MAX:g} MAX")
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -272,6 +308,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BoreH", f"{BORE_H}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
+    await set_global(adapter, "CornerR", f"{CORNER_R_MAX}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -481,6 +518,22 @@ async def build(adapter) -> dict[str, str]:
     expected -= V_HOLE
     await volume_check(adapter, "hold-down hole", expected, 0.02 * V_HOLE)
 
+    # Foot-to-ear inside corner (drawing-guidelines.md rule 16): the edge where
+    # the foot top meets the ear's outboard face, filleted AT the largest
+    # radius the hold-down screw's head clears (CORNER_R_MAX), the radius the
+    # print gives as a single MAX limit.
+    check(
+        "fillet foot-to-ear corner",
+        await adapter.add_fillet(
+            CORNER_R_MAX, [[0.0, FOOT_H, EAR_T / 2.0]], propagate=False
+        ),
+    )
+    name_last_feature(adapter, "CornerFillet")
+    corner_dim = name_dimensions(adapter, "CornerFillet", ["CornerRadius"])
+    drive_jobs.append((corner_dim[0], '"CornerR"'))
+    expected += V_CORNER
+    await volume_check(adapter, "foot-to-ear corner fillet", expected, 0.1 * V_CORNER)
+
     for row in REFERENCE_LINES:
         drive_jobs += await _reference_line(adapter, *row)
 
@@ -500,6 +553,7 @@ async def build(adapter) -> dict[str, str]:
     # (drawing-simplicity-policy.md `How the repository implements the
     # guidelines`); the drawing reads them back instead of rewriting them.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _corner_radius_max_limit(adapter)
     # Three lengths carry +/-0.10 natively (ch_pivot_bracket_spec: the
     # foot's short run cannot take title-block .XX on them): the hold-down
     # station and the apex tap's station, both from the ear's inboard face --

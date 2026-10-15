@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 
@@ -13,7 +14,13 @@ import draw_ch_pivot_bracket as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
-from ch_pivot_bracket_sides import FOOT_LEN, FOOT_Z1, HOLE_STATION, HOLE_Z
+from ch_pivot_bracket_sides import (
+    FOOT_LEN,
+    FOOT_Z1,
+    HEAD_TO_EAR_FACE_MIN,
+    HOLE_STATION,
+    HOLE_Z,
+)
 
 _FRAME_M = 0.0127
 
@@ -37,12 +44,18 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     marked = set().union(*drawing_spec.DRAWING_DIMENSIONS.values())
     # Every marked dimension is placed by exactly one view; an unplaced import
     # is deleted silently, a kept name the part never marks never prints.
-    assert set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) == marked
-    assert not set(drawing.FRONT_KEEP) & set(drawing.TOP_KEEP)
+    keeps = (
+        set(drawing.FRONT_KEEP),
+        set(drawing.TOP_KEEP),
+        set(drawing.RIGHT_KEEP_NAMES),
+    )
+    assert set().union(*keeps) == marked
+    assert sum(len(names) for names in keeps) == len(marked)
     # Every manufactured feature is sized and located: foot (width, length,
     # height), ear (thickness; its width is the foot's), arch radius, bore
-    # (size, height, lateral), hold-down hole (size, station, lateral), and
-    # the apex tap (native callout + station).
+    # (size, height, lateral), hold-down hole (size, station, lateral), the
+    # apex tap (native callout + station) and the foot-to-ear corner's MAX
+    # radius.
     assert marked == {
         "FootW",
         "FootLen",
@@ -56,13 +69,15 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "HoleDia",
         "HoleLateral",
         "SetScrewLocation",
+        "CornerRadius",
     }
     assert spec.EAR_W == spec.FOOT_W
 
 
 def test_the_part_owns_every_printed_decimal_place() -> None:
     assert drawing_spec.DRAWING_PRECISION_BY_NAME == {
-        name: 2 for name in set().union(*drawing_spec.DRAWING_DIMENSIONS.values())
+        **{name: 2 for name in set().union(*drawing_spec.DRAWING_DIMENSIONS.values())},
+        "CornerRadius": 1,
     }
     assert drawing.DRAWING_PRECISION_BY_NAME is drawing_spec.DRAWING_PRECISION_BY_NAME
     assert part.DRAWING_PRECISION is drawing_spec.DRAWING_PRECISION
@@ -226,6 +241,15 @@ def test_projected_views_stay_aligned_and_ordered() -> None:
     assert plan_bottom > lanes[0] > lanes[1] > apex + 0.010
 
 
+def _planned_corner_text() -> tuple[float, float]:
+    """The R MAX text in the planned right-view frame (*Right: +Z left)."""
+    dz, dy = drawing.CORNER_TEXT_OFFSET
+    return (
+        drawing._right_x(spec.EAR_T / 2.0) - dz,
+        drawing._right_y(spec.FOOT_H) + dy,
+    )
+
+
 def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
     template = DRAWING_TEMPLATES[DRAWINGS_BY_NAME["ch_pivot_bracket"].layout]
     anchors = {
@@ -236,6 +260,9 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
         "isometric view": drawing.ISO_CENTER,
         "set-screw callout": drawing.SET_SCREW_CALLOUT_XY,
         "overall height": drawing.OVERALL_HEIGHT_XY,
+        "right view": drawing.RIGHT_CENTER,
+        "right view caption": drawing.RIGHT_CAPTION_XY,
+        "corner radius (planned frame)": _planned_corner_text(),
     }
     for label, (x, y) in anchors.items():
         assert _FRAME_M < x < template.width_m - _FRAME_M, label
@@ -288,3 +315,85 @@ def test_registry_row_carries_the_title_block_material_specification() -> None:
     assert config["number"] == "MHA-CH-008"
     assert config["material_specification"]
     assert int(config["quantity"]) == 2
+
+
+def test_corner_radius_is_the_largest_the_screw_head_clears() -> None:
+    """Rule 16: the foot-to-ear inside corner carries the largest radius the
+    hold-down screw's head clears at the worst case, at one place, modelled
+    at that limit and printed as a single MAX limit."""
+    assert drawing_spec.CORNER_R_PLACES == 1
+    assert drawing_spec.CORNER_R_MAX == pytest.approx(0.3)
+    assert drawing_spec.CORNER_R_MAX <= HEAD_TO_EAR_FACE_MIN
+    step = 10.0**-drawing_spec.CORNER_R_PLACES
+    assert drawing_spec.CORNER_R_MAX + step > HEAD_TO_EAR_FACE_MIN
+    assert drawing_spec.CORNER_R_BAND == (0.0, -drawing_spec.CORNER_R_MAX)
+    assert drawing_spec.CORNER_R_TOL_TYPE == 6  # swTolMAX
+    assert drawing_spec.DRAWING_DIMENSIONS["CornerFillet"] == {"CornerRadius"}
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert (
+        "add_fillet(\n            CORNER_R_MAX, [[0.0, FOOT_H, EAR_T / 2.0]], propagate=False"
+        in source
+    )
+    assert 'name_dimensions(adapter, "CornerFillet", ["CornerRadius"])' in source
+    assert "drive_jobs.append((corner_dim[0], '\"CornerR\"'))" in source
+    assert source.index("apply_drawing_precision(adapter, DRAWING_PRECISION)") < (
+        source.index("_corner_radius_max_limit(adapter)\n")
+    )
+    # The spandrel the fillet adds, along the ear's width, is in the target.
+    assert part.V_CORNER == pytest.approx((1.0 - math.pi / 4.0) * 0.3**2 * spec.EAR_W)
+    assert part.V_TOTAL == pytest.approx(
+        part.V_FOOT
+        + part.V_BLOCK
+        + part.V_ARCH
+        - part.V_BORE
+        - part.V_TAP
+        - part.V_HOLE
+        + part.V_CORNER
+    )
+
+
+def test_right_view_shows_the_corner_radius_clear_of_its_neighbours() -> None:
+    template = DRAWING_TEMPLATES[DRAWINGS_BY_NAME["ch_pivot_bracket"].layout]
+    assert drawing.RIGHT_SCALE == (2, 1)
+    assert drawing.RIGHT_CAPTION == "RIGHT VIEW\nSCALE 2:1"
+    assert drawing.RIGHT_KEEP_NAMES == ("CornerRadius",)
+    left = drawing._right_x(FOOT_Z1)
+    right = drawing._right_x(spec.FOOT_Z0)
+    bottom = drawing._right_y(0.0)
+    top = drawing._right_y(spec.EAR_TOP_Y)
+    assert abs((left + right) / 2.0 - drawing.RIGHT_CENTER[0]) < 1e-12
+    assert abs((bottom + top) / 2.0 - drawing.RIGHT_CENTER[1]) < 1e-12
+    # Above the title block with room for its two-line caption.
+    assert drawing.RIGHT_CAPTION_XY[1] - 0.010 > template.title_block_top_m
+    assert drawing.RIGHT_CAPTION_XY[1] < bottom
+    # Under the foot length's extension line, left of the isometric (whose
+    # outline starts ~0.036 left of its centre), right of the bore callout.
+    assert top + 0.010 < drawing._top_y(FOOT_Z1)
+    assert right + 0.015 < drawing.ISO_CENTER[0] - 0.036
+    bore_text_right = drawing.FRONT_KEEP["ShaftBoreDia"][0] + 0.029
+    text_x, text_y = _planned_corner_text()
+    assert bore_text_right + 0.008 < text_x - 0.011
+    # The R MAX text stands over the open corner, above the foot top.
+    assert text_y > drawing._right_y(spec.FOOT_H) + 0.015
+    assert left - 0.011 < text_x < drawing._right_x(spec.EAR_T / 2.0)
+    source = _drawing_source()
+    assert source.count("for view in (front, top, iso, right):") == 2
+    assert source.index("set_dimension_callouts(adapter, imported_annotations") < (
+        source.index("_dress_corner_radius(adapter, right_annotations)")
+    )
+
+
+def test_bore_callout_clears_the_elevation() -> None:
+    """The REAM block's widest line (its mate's part number, ~58 mm centred on
+    the text) starts clear of the elevation's right edge."""
+    x, _y = drawing.FRONT_KEEP["ShaftBoreDia"]
+    assert x - 0.029 > drawing._EAST_X + 0.005
+
+
+def test_drill_callout_hides_its_dimension_leader_lines() -> None:
+    assert drawing._LEADER_LINE_NONE == 3
+    call = (
+        "_hide_diameter_leader_lines(\n"
+        '        adapter, top_annotations, dimension="HoleDia", label="hold-down hole"'
+    )
+    assert call in _drawing_source()
