@@ -12,9 +12,10 @@ carries the four counterbored clamp-screw holes.
   (CountersinkReference), the latch-hook taps' native callout (its thread
   class left to the title block) and the top face's slide roughness.
 * The lower view looks on the front face (``*Back``, so the left end is on
-  the sheet's right): the banded height, the clamp row's stations from the
-  same end and its height (ClampRowReference), the counterbores' native
-  callout (depth at .XX) and the front face's slide roughness. Each
+  the sheet's right): the banded height, the clamp row's banded stations
+  from the same end and its banded height (ClampRowReference), the
+  counterbores' native callout (depth at .XX) naming the back-arc taps the
+  row locates to, and the front face's slide roughness. Each
   roughness symbol has its reason beside it; the sheet has no general note.
 * Each face view carries its caption; section A-A cuts the pivot tap across
   the bar: the banded thickness, the drill's depth limits and the full
@@ -177,23 +178,26 @@ TOP_REASON_TOP = (TOP_FINISH_SYMBOL_XY[0] + 0.003, FACE_TOP + 0.032)
 FACE_CAPTION_TOP = (0.200, FACE_BOTTOM - 4.0 * ROW_STEP - 0.008)
 
 # The clamp stations from the same left (x = -226) end, on the sheet's right
-# here, shortest nearest the bar; the first's 5.75 mm span is too short for
-# its text, which stands left of its hole between it and the second's. The
-# bar height reads off that end too (the BarProfile dimension's model edge),
-# the clamp row's height off the other end, where its rise is: its text
-# stands left of its dimension line, so the line hugs the bar to keep the
-# text inside the border (r5 audit: outside-border).
+# here, shortest nearest the bar. The first two spans (5.75 and 23.25 mm on
+# the sheet) are too short for their banded texts, which stand right of the
+# end's extension line, under END A and left of the isometric view; the long
+# rows' texts stand between their holes and the end. The bar height reads off
+# that end too (the BarProfile dimension's model edge), the clamp row's height
+# off the other end, where its rise is: its text stands left of its dimension
+# line, so the line hugs the bar to keep the text inside the border (r5
+# audit: outside-border).
 BACK_KEEP = {
-    "ClampStation1": (RIGHT_END - 0.015, BACK_BOTTOM - 0.010),
-    "ClampStation2": (RIGHT_END - 0.012, BACK_BOTTOM - 0.018),
+    "ClampStation1": (RIGHT_END + 0.019, BACK_BOTTOM - 0.010),
+    "ClampStation2": (RIGHT_END + 0.019, BACK_BOTTOM - 0.018),
     "ClampStation3": (RIGHT_END - 0.150, BACK_BOTTOM - 0.026),
     "ClampStation4": (RIGHT_END - 0.170, BACK_BOTTOM - 0.034),
     "Height": (RIGHT_END + 0.022, BACK_TOP + 0.016),
     "ClampRowHeight": (LEFT_END - 0.010, BACK_BOTTOM - 0.008),
 }
 # The counterbores' callout stands wholly right of the hole it points at, so
-# its leader slants right, off the clamp row height's extension line.
-CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROW_X)) + 0.047, BACK_TOP + 0.016)
+# its leader slants right, off the clamp row height's extension line; its
+# four lines (the mate's first under the size) end where its three did.
+CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROW_X)) + 0.047, BACK_TOP + 0.0216)
 # The front face's slide roughness, seen face-on: a leader to a point clear
 # of the holes, the symbol above the view.
 FRONT_FINISH_MODEL_XY = (-150.0, 6.0)
@@ -363,8 +367,9 @@ def _drop_thread_class(adapter: Any, display: Any) -> None:
 
 
 def _name_clamp_screws(display: Any) -> None:
-    """Hang the screws' part number under the counterbores' native callout,
-    and print its depth at the .XX its head clearance takes."""
+    """Hang the back-arc taps the holes locate to and the screws' part number
+    under the counterbores' native callout, and print its depth at the .XX
+    its head clearance takes."""
     set_hole_callout_precision(
         display,
         {"hw-cbdepth": CLAMP_CBORE_DEPTH_PLACES},
@@ -372,8 +377,12 @@ def _name_clamp_screws(display: Any) -> None:
     )
     display = _early_bound(display, "IDisplayDimension")
     display.SetText(4, CLAMP_CBORE_CALLOUT)  # swDimensionTextCalloutBelow
-    if str(display.GetText(4) or "") != CLAMP_CBORE_CALLOUT:
-        raise RuntimeError("clamp counterbore callout's mate line did not persist")
+    # Multi-line text may read back with CR LF; draw_dt_crank_hub strips it too.
+    applied = str(display.GetText(4) or "").replace("\r", "")
+    if applied != CLAMP_CBORE_CALLOUT:
+        raise RuntimeError(
+            f"clamp counterbore callout's mate lines did not persist: {applied!r}"
+        )
 
 
 def _place_caption(adapter: Any, text: str, top_centre: tuple[float, float]) -> None:

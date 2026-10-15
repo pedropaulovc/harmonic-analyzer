@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import math
 import re
 from pathlib import Path
 
@@ -48,21 +49,29 @@ def test_marked_dimensions_are_the_kept_dimensions() -> None:
 def test_printed_bands_are_the_spec_bands() -> None:
     assert model_toleranced_dimensions(part) == {
         ("HangerRowReference", "name"): "HOLE_POSITION_BAND",
+        ("ClampRowReference", "name"): "CLAMP_POSITION_BAND",
         ("PivotTap", "DrillDepth"): "*PIVOT_TAP_DRILL_DEPTH_LIMITS",
     }
     assert part.HANGER_STATION_NAMES == sheet_spec.HANGER_STATION_NAMES
+    assert part.CLAMP_STATION_NAMES == sheet_spec.CLAMP_STATION_NAMES
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'for name in ("HangerRowHeight", *HANGER_STATION_NAMES):' in source
+    assert 'for name in ("ClampRowHeight", *CLAMP_STATION_NAMES):' in source
     assert spec.HOLE_POSITION_BAND == 0.065
     assert spec.PIVOT_TAP_DRILL_DEPTH_LIMITS == (-0.4, 0.0)
-    # The band's places print it whole: .XXX for ±0.065. The bar bands ARE
-    # the title block's .XXX row, so their three places alone carry them.
+    # The band's places print it whole: .XXX for ±0.065, .XX for the clamp
+    # row's ±0.18. The bar bands ARE the title block's .XXX row, so their
+    # three places alone carry them.
     from _printed_tolerance import printed_band_mm
 
     places = sheet_spec.DRAWING_PRECISION
     assert places["HangerRowReference"] == dict.fromkeys(
         ("HangerRowHeight", *sheet_spec.HANGER_STATION_NAMES), 3
     )
+    assert places["ClampRowReference"] == dict.fromkeys(
+        ("ClampRowHeight", *sheet_spec.CLAMP_STATION_NAMES), 2
+    )
+    assert round(part.CLAMP_POSITION_BAND, 2) == part.CLAMP_POSITION_BAND
     assert places["BarProfile"]["Height"] == places["Bar"]["Depth"] == 3
     assert spec.BAR_BAND_PLACES == 3
     assert (
@@ -71,6 +80,53 @@ def test_printed_bands_are_the_spec_bands() -> None:
         == spec.BAR_DEPTH_BAND
     )
     assert places["PivotTap"]["DrillDepth"] == 1
+
+
+def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
+    """Review of PR #1471: the clamp row printed .X (±0.8), whose 2.263
+    position zone over-runs the 0.812 the #8 clearance holes float on the
+    #8-32 shanks. Fixed fastener: each screw threads into an MHA-SH-002
+    back-arc tap held ±0.1 (sh_column_clamp_fit), so the bar's zone
+    (2·√2·band) plus the tap's must stay inside the least hole's float; the
+    band is the widest .XX that does. A drift in the band, the hole, the
+    shank or the taps' band breaks one of these."""
+    import _config
+    from _hole_spec import HoleSpec, blind_cut_dia_mm
+    from _printed_tolerance import printed_band_mm
+    from sh_column_clamp_back_geom import HOLE_SPEC as BACK_ARC_TAP
+    from sh_column_clamp_fit import EAR_STATION_BAND
+    from vn_clamp_screw_spec import SHANK_DIA
+
+    # The mate: #8-32 taps in the back arc, located ±0.1 from its bore axis.
+    assert (BACK_ARC_TAP.kind, BACK_ARC_TAP.size) == ("tapped", "#8-32")
+    assert _config.parts("sh-column-clamp-back")["number"] == "MHA-SH-002"
+    assert EAR_STATION_BAND == 0.1
+    # The float: the least drilled #8 clearance hole over the basic major.
+    assert part.CLAMP_THROUGH_HOLE_SPEC == HoleSpec("clearance", "#8")
+    assert _config.title_block("drilled_hole")["minus_mm"] == 0.0
+    hole_min = blind_cut_dia_mm(part.CLAMP_THROUGH_HOLE_SPEC)
+    assert (hole_min, SHANK_DIA) == pytest.approx((4.978, 4.1656))
+    hole_float = hole_min - SHANK_DIA
+    assert part.CLAMP_HOLE_FLOAT == pytest.approx(hole_float)
+
+    def zone(band: float) -> float:
+        return 2.0 * math.sqrt(2.0) * band
+
+    # The printed nominals are exact at .XX, so the zone is the band's alone.
+    for value in (*part.CLAMP_STATIONS, part.CLAMP_ROW_HEIGHT):
+        assert round(value, 2) == value
+    band = part.CLAMP_POSITION_BAND
+    assert band == pytest.approx(0.18)
+    assert part.clamp_position_zone(band) == pytest.approx(zone(band))
+    assert part.BACK_ARC_TAP_ZONE == pytest.approx(zone(EAR_STATION_BAND))
+    assert zone(band) + zone(EAR_STATION_BAND) <= hole_float  # 0.792 <= 0.812
+    assert zone(band + 0.01) + zone(EAR_STATION_BAND) > hole_float
+    # The title block's .X row (the finding) would not close; the band is
+    # tighter than the .XX row, so the callout names the taps (rule 4).
+    assert zone(printed_band_mm(1)) + zone(EAR_STATION_BAND) > hole_float
+    assert band < printed_band_mm(2)
+    assert "MHA-SH-002" in sheet_spec.CLAMP_TAP_MATE
+    assert sheet_spec.CLAMP_CBORE_CALLOUT.startswith(sheet_spec.CLAMP_TAP_MATE)
 
 
 def test_single_limits_are_the_spec_limits() -> None:
@@ -136,17 +192,25 @@ def test_rows_stack_shortest_nearest_the_bar() -> None:
         x = drawing.FRONT_KEEP[name][0]
         assert drawing.LEFT_END < x < drawing.LEFT_END + span * drawing._S
     # In the front-face view that end is on the sheet's right: the long clamp
-    # rows' texts stand between it and their holes; the first row's, too
-    # short a span, stands between the first two holes.
-    for name, hole_x in zip(sheet_spec.CLAMP_STATION_NAMES[1:], part.CLAMP_ROW_X[1:]):
+    # rows' texts stand between it and their holes. The first two rows'
+    # banded texts are wider than their spans, so they stand right of the
+    # end's extension line and left of the isometric view (its r6 outline's
+    # left edge), at a conservative 2.76 mm a character (2.3 measured).
+    iso_left = 0.3216
+    for name, station, hole_x in zip(
+        sheet_spec.CLAMP_STATION_NAMES, part.CLAMP_STATIONS, part.CLAMP_ROW_X
+    ):
         x = drawing.BACK_KEEP[name][0]
-        assert drawing._back_x(hole_x) < x < drawing.RIGHT_END, name
-    first = drawing.BACK_KEEP[sheet_spec.CLAMP_STATION_NAMES[0]][0]
-    assert (
-        drawing._back_x(part.CLAMP_ROW_X[1])
-        < first
-        < drawing._back_x(part.CLAMP_ROW_X[0])
-    )
+        text = f"{station:.2f} \u00b1{part.CLAMP_POSITION_BAND:.2f}"
+        half = len(text) * 0.00276 / 2.0
+        if (drawing.RIGHT_END - drawing._back_x(hole_x)) > 2.0 * half:
+            assert drawing._back_x(hole_x) < x - half < x + half < drawing.RIGHT_END
+        else:
+            assert drawing.RIGHT_END < x - half < x + half < iso_left, name
+    assert [
+        drawing.BACK_KEEP[name][0] > drawing.RIGHT_END
+        for name in sheet_spec.CLAMP_STATION_NAMES
+    ] == [True, True, False, False]
 
 
 def test_sheet_texts_carry_no_dimensions_and_stay_short() -> None:
@@ -197,8 +261,12 @@ def test_callouts_name_the_mates() -> None:
     assert callouts["BracketCskDia"].startswith("2X 90\u00b0 CSK")
     for text in callouts.values():
         assert len(text.splitlines()) <= 3
-    assert "MHA-VN-021" in sheet_spec.CLAMP_CBORE_CALLOUT
-    assert "SLIDE FACE" in sheet_spec.CLAMP_CBORE_CALLOUT
+    # The banded clamp row names the back-arc taps it locates to, then the
+    # screws whose heads the counterbores sink.
+    assert sheet_spec.CLAMP_CBORE_CALLOUT.splitlines() == [
+        "LOCATE TO MHA-SH-002 TAPS",
+        "MHA-VN-021 HEADS BELOW SLIDE FACE",
+    ]
 
 
 def test_slide_faces_carry_the_slide_grade() -> None:
