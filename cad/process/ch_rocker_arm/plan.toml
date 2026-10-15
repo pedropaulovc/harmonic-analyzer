@@ -148,6 +148,8 @@ check_jog_mm = 10.0
 
 [setups.zero.z]
 face = "top"
+# The drills touch off on this same spot (tool_touches below), so they share the end mill's Z.
+edge = "raw top over the X+60 shim stack"
 # Catalogue-valued placeholder (realistic, remeasure: #1413), status="measured", date="2026-10-13", instrument="0-25 mm micrometer, 0.001 mm" (original authorization 2026-10-11; see
 # local://rocker-measurement-checklist.md A1): raw bar thickness = 7.9375 (nominal 5/16 in,
 # Online Metals pid 12035), so the raw top stands at stock_state.top_z. Mike the bar before
@@ -436,6 +438,8 @@ check_jog_mm = 10.0
 
 [setups.zero.z]
 face = "top"
+# The drills touch off on this same spot (tool_touches below), so they share the end mill's Z.
+edge = "raw top of the right blank end at X+158"
 # Catalogue-valued placeholder (realistic, remeasure: #1413): status="measured", date="2026-10-13", instrument="0-25 mm micrometer, 0.001 mm"; raw thickness 7.9375 mm exactly from Online Metals pid 12035, 5/16 in (checklist A1); see S1 zero.z.
 method = "paper"
 tool = "endmills-lms-6784/3-8in-4fl"
