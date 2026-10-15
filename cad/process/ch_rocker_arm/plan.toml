@@ -259,7 +259,12 @@ do = "drill"
 feature = "pivot_bore"
 tool = "drill-index-115/D"
 holder = "drill-chuck-r8"
-exit_mm = 0.6                     # author's choice: full Ø 0.6 past the raw underside, point clear of the shim-stack air gap
+# Author's choice: full Ø 0.4 past the raw underside (the #47's breakout), tip at -2.276. With
+# Z zero on the raw top, bar thickness (+/-0.004 in, width-governed, Online Metals 1018 CF
+# rectangle tolerances) moves the underside and, with the S4 stacks built to M - 5.219, the
+# block seat too: >= 0.298 full-Ø breakout on a thick bar and >= 0.23 point clearance above
+# the block on a thin bar (blocks equal within 0.01). At 0.6 that clearance was 0.03.
+exit_mm = 0.4
 approach_mm = 3.0
 
 [[setups.ops]]
