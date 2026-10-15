@@ -147,15 +147,17 @@ HOLE_FAR_X = CLIP_LENGTH - HOLE_INSET
 # its span.  Each of those texts stands past its own span's end, so no
 # dimension or extension line runs through it: the hole row's below the
 # plan, the screw rail's below that, the spring rail's and the overall
-# width's above the plan.  A vertical dimension's text ends at its own
-# dimension line (r4), so each column is its text's right end: the hole
-# row's text stands right of the screw rail's line, the spring rail's right
-# of the overall width's text, and the overall width's inside the border.
-# The outer and the slit-side corner radii stand off the right end.
+# width's above the plan.  A vertical dimension's text stands left of its own
+# dimension line on a shoulder that runs from the line to the text's far end
+# (r5: the hole row's "2X 3.300" spans 21 mm), so each column is its text's
+# right end: the hole row's shoulder ends right of the screw rail's line, the
+# spring rail's right of the overall width's text, and the overall width's
+# inside the border.  The outer and the slit-side corner radii stand off the
+# right end.
 _BELOW_PLAN_ROWS = (0.116, 0.110)
 _ABOVE_PLAN_ROWS = (0.172, 0.178, 0.184)
-_HOLE_ROW_COLUMN = 0.0715
-_RAIL_COLUMN = 0.051
+_HOLE_ROW_COLUMN = 0.0725
+_RAIL_COLUMN = 0.0475
 _SPRING_RAIL_COLUMN = 0.066
 _OVERALL_COLUMN = 0.030
 FRONT_KEEP = {
