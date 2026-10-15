@@ -83,6 +83,18 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     assert _config.parts("ch-rocker-arm-tl-strap-shim-stack")["quantity"] == 4
 
 
+def test_material_names_an_alternative_to_o1() -> None:
+    # Annealed static support: no hardness or wear function needs O1 (rule 2).
+    part = _config.parts("ch-rocker-arm-tl-strap-shim-stack")
+    assert " or " in part["material"]
+    assert " or " in part["material_specification"].split(";")[0]
+
+
+def test_notes_do_not_repeat_the_title_block_burr_note() -> None:
+    # The shared title block already says REMOVE BURRS AND BREAK SHARP EDGES.
+    assert "BURR" not in spec.DRAWING_NOTES.upper()
+
+
 def test_notes_follow_the_simplicity_policy() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     assert 1 <= len(lines) <= 4
