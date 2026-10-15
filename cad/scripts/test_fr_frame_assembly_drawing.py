@@ -588,18 +588,18 @@ def test_step_9_sets_the_nameplate_then_spots_its_base_seats_through_it() -> Non
     # spots, drills and taps through it before the screws go in.
     import build_fr_harmonic_base as base
 
-    steps = drawing.ASSEMBLY_STEPS.splitlines()
-    start = next(i for i, line in enumerate(steps) if line.startswith("9. "))
-    end = next(i for i, line in enumerate(steps) if line.startswith("10. "))
-    step = " ".join(line.strip() for line in steps[start:end])
+    step = _step(9)
     assert drawing.NAMEPLATE_END_INSET == pytest.approx(base.NAMEPLATE_DECK_CLEARANCE)
-    assert (
-        f"{base.NAMEPLATE_DECK_CLEARANCE:.1f} INSIDE THE DECK'S MHA-FR-004 END" in step
+    # The inset is section B-B's native dimension, never a number in the note.
+    assert "INSET FROM THE NEAR DECK END PER SECTION B-B" in step
+    assert not re.search(r"\d\.\d", step)
+    place = step.index(
+        "SET MHA-FR-004 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL"
     )
     spot = step.index("SPOT MHA-FR-001 THROUGH ITS FOUR HOLES")
-    assert step.index("CLAMP.") < spot < step.index("TRANSFER CALLOUT")
+    assert place < step.index("CLAMP.") < spot < step.index("TRANSFER CALLOUT")
     assert step.index("TRANSFER CALLOUT") < step.index("SEAT ALL FOUR MHA-VN-006 HEADS")
-    assert max(map(len, steps)) <= 72
+    assert len(_step_lines(9)) <= 4
 
 
 def test_check_3_accepts_the_caps_by_their_seats_alone() -> None:
@@ -666,3 +666,91 @@ def test_a_suffix_that_does_not_persist_fails_the_sheet() -> None:
             label="top axis",
         )
     assert model.count == 0
+
+
+def test_plan_pick_takes_the_nameplates_top_lower_edge_along_z(monkeypatch) -> None:
+    # The plate's real mount transform: local y -> machine -x, local z -> +y.
+    from fr_nameplate_spec import MOUNT_POS, MOUNT_ROWS, PLATE_HEIGHT, PLATE_THICKNESS
+
+    mount = (
+        *(value for row in MOUNT_ROWS for value in row),
+        *(value / 1000.0 for value in MOUNT_POS),
+        1.0,
+        0,
+        0,
+        0,
+    )
+    lower_back = _Edge(
+        (0.004, 0.0, -PLATE_THICKNESS / 1000.0, 0.096, 0.0, -PLATE_THICKNESS / 1000.0)
+    )
+    lower_front = _Edge((0.004, 0.0, 0.0, 0.096, 0.0, 0.0))
+    upper_front = _Edge(
+        (0.004, PLATE_HEIGHT / 1000.0, 0.0, 0.096, PLATE_HEIGHT / 1000.0, 0.0)
+    )
+    side = _Edge((0.0, 0.004, 0.0, 0.0, 0.041, 0.0))  # along machine x
+    corner = _Edge((0.004, 0.0, 0.0, 0.0, 0.004, 0.0), line=False)
+    entities = [corner, side, lower_back, upper_front, lower_front, _Edge(None)]
+    plate = SimpleNamespace(stem="fr-nameplate")
+    monkeypatch.setattr(
+        drawing,
+        "_frame_visible_components",
+        lambda _view: {"fr-nameplate": [(plate, _Full(mount))]},
+    )
+    monkeypatch.setattr(
+        drawing, "visible_component_entities", lambda _view, _component, _kind: entities
+    )
+    monkeypatch.setattr(drawing, "_edge_endpoint_key", lambda _adapter, edge: edge.key)
+
+    pick = drawing._visible_z_line_at_x(
+        None, None, component_stem="fr-nameplate", x_mm=MOUNT_POS[0], label="plate"
+    )
+
+    assert pick is lower_front
+    with pytest.raises(RuntimeError, match="no visible 'fr-harmonic-base' edge"):
+        drawing._visible_z_line_at_x(
+            None, None, component_stem="fr-harmonic-base", x_mm=167.0, label="deck"
+        )
+
+
+def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
+    monkeypatch,
+) -> None:
+    edges = {"fr-nameplate": object(), "fr-harmonic-base": object()}
+    stations = {}
+    added = {}
+    checked = {}
+    monkeypatch.setattr(
+        drawing,
+        "_visible_z_line_at_x",
+        lambda _adapter, _view, *, component_stem, x_mm, label: edges[component_stem],
+    )
+
+    def project(_adapter, _view, points, *, label, names):
+        stations["points"] = points
+        # 1:3 plan view, machine x to the sheet's right.
+        return [(0.300 + point[0] / 3.0, 0.180 - point[2] / 3.0) for point in points]
+
+    def add(_adapter, view, **kwargs):
+        added.update(kwargs, view=view)
+        return "display"
+
+    def check(_adapter, display, *, expected_mm, label):
+        checked.update(display=display, expected_mm=expected_mm)
+        return display
+
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(drawing, "add_edge_dimension", add)
+    monkeypatch.setattr(drawing, "_checked_linear_dimension", check)
+
+    assert drawing._add_nameplate_inset_dimension(None, "B-B") == "display"
+
+    plate_x, deck_x = (point[0] * 1000.0 for point in stations["points"])
+    assert deck_x - plate_x == pytest.approx(drawing.NAMEPLATE_END_INSET)
+    assert added["view"] == "B-B"
+    assert added["entities"] == (edges["fr-nameplate"], edges["fr-harmonic-base"])
+    # The text sits on the dimension line, past the deck end, away from the plate.
+    deck_sheet = added["p1"]
+    assert added["text_xy"] == pytest.approx(
+        (deck_sheet[0] + drawing.NAMEPLATE_INSET_TEXT_OFFSET_M, deck_sheet[1])
+    )
+    assert checked == {"display": "display", "expected_mm": drawing.NAMEPLATE_END_INSET}
