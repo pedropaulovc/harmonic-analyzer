@@ -20,7 +20,7 @@ def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
 
 def test_every_marked_model_dimension_is_shown() -> None:
     marked = set().union(*ch_fulcrum_shaft_spec.DRAWING_DIMENSIONS.values())
-    displayed = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    displayed = set(drawing.RIGHT_KEEP)
     assert displayed == marked
 
 
@@ -147,25 +147,42 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
     char = 0.0021
     left_tip, right_tip = drawing._LEFT_TIP_X, drawing._RIGHT_TIP_X
     from_end_x, _ = keep["FlatFromEnd"]
-    # Outboard of the left tip, clear of the end view.
+    # Outboard of the left tip, inside the left zone margin.
     assert from_end_x + len("5.45") * char / 2.0 <= left_tip - 0.001
-    end_view_right = drawing.FRONT_CENTER[0] + drawing._on_sheet(
-        ch_fulcrum_shaft_spec.SHAFT_DIA / 2.0
-    )
-    assert from_end_x - len("5.45") * char / 2.0 >= end_view_right + 0.005
+    assert from_end_x - len("5.45") * char / 2.0 >= 0.0127 + 0.003
     # Left of the right flat's inner edge, whose extension line rises to the
     # baseline row; the right tip's only extension line rises past it.
     flat_x, flat_y = keep["FlatLength"]
     assert flat_x + len("2X 3.50") * char / 2.0 <= drawing._RIGHT_FLAT_INNER_X - 0.001
     rows = [keep[name][1] for name in ("FlatLength", "FlatBaseline", "OverallLength")]
     assert rows == sorted(rows) and flat_y == keep["FlatFromEnd"][1]
-    # The across-flat callout stays inside the right zone margin.
-    across_x, _ = keep["AcrossFlat"]
+    # Machinist review r1: the across-flat value and callout sat between its
+    # own extension lines, which struck them. They now hang below the shaft,
+    # right of the dome tip, inside the right zone margin.
+    across_x, across_y = keep["AcrossFlat"]
     widest = max(
         len(line) for line in ch_fulcrum_shaft_spec.ACROSS_FLAT_CALLOUT.splitlines()
     )
-    assert across_x - len("2X 6.050") * char / 2.0 > right_tip
+    assert across_y + 0.004 <= drawing._SHAFT_BOTTOM_Y - 0.010
+    assert across_x - widest * char / 2.0 > right_tip - 0.005
     assert across_x + widest * char / 2.0 <= 0.4318 - 0.0127 - 0.003
+    # Machinist review r1: the Ø callout block (hanging left of its line,
+    # ~36 characters) printed over the dome radius, and its upper limit
+    # (~7 mm over the anchor) inside the outline.
+    dia_x, dia_y = keep["ShaftDia"]
+    dia_widest = max(
+        len(line) for line in ch_fulcrum_shaft_spec.SHAFT_DIA_CALLOUT.splitlines()
+    )
+    dome_x, _ = keep["DomeRadius"]
+    assert dome_x + len("2X (SR3.18)") * char / 2.0 + 0.005 <= dia_x - dia_widest * char
+    assert dia_y + 0.007 + 0.003 <= drawing._SHAFT_BOTTOM_Y
+    # The Ra symbol (~35 x 15 mm right-up of its vertex) stands right of the
+    # Ø line and left of the across-flat callout.
+    finish_x, finish_y = drawing.FINISH_SYMBOL
+    assert finish_x > dia_x + 0.005
+    assert finish_x + 0.035 < across_x - widest * char / 2.0
+    assert finish_y + 0.015 < drawing._SHAFT_BOTTOM_Y
+    assert math.isclose(drawing.FINISH_EDGE[1], drawing._SHAFT_BOTTOM_Y)
 
 
 def test_three_place_sizes_name_their_mates() -> None:

@@ -6,11 +6,7 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    dimension_name,
-    place_view,
-)
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 from _check import check
 from _com import _early_bound
@@ -55,13 +51,12 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# 2:1 for every orthographic view: the 0.3 flats and their stations read at
-# that size, the side view spans most of the sheet width and the end view
-# needs no scale note of its own.
+# One side view at 2:1: the 0.3 flats and their stations read at that size
+# and it spans most of the sheet width. No end view: from the end the dome
+# hides the flats, so it showed a bare circle (machinist review r1).
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 AXIS_Y = 0.212
-FRONT_CENTER = (0.026, AXIS_Y)
 RIGHT_CENTER = (0.216, AXIS_Y)
 # The isometric fills the free band over the title block at 1:1 (half the
 # sheet scale, hence its note): the shaft runs lower-left to upper-right
@@ -91,19 +86,29 @@ _RIGHT_FLAT_INNER_X = _RIGHT_TIP_X - _on_sheet(FLAT_FROM_END + FLAT_LENGTH)
 _ROW_1 = AXIS_Y + 0.014
 _ROW_2 = AXIS_Y + 0.026
 _ROW_3 = AXIS_Y + 0.038
-FRONT_KEEP: dict[str, tuple[float, float]] = {}
+_SHAFT_BOTTOM_Y = AXIS_Y - _on_sheet(SHAFT_DIA / 2.0)
+# The bearing O.D.'s roughness rides the side view's lower silhouette right
+# of centre, its symbol below the shaft, clear of the Ø callout block (which
+# hangs left of mid-length) and of the across-flat callout at the right tip.
+FINISH_EDGE = (RIGHT_CENTER[0] + 0.060, _SHAFT_BOTTOM_Y)
+FINISH_SYMBOL = (RIGHT_CENTER[0] + 0.075, AXIS_Y - 0.030)
 RIGHT_KEEP = {
     "FlatFromEnd": (_LEFT_TIP_X - 0.0065, _ROW_1),
     "FlatLength": (_RIGHT_FLAT_INNER_X - 0.0105, _ROW_1),
     "FlatBaseline": (RIGHT_CENTER[0] - 0.020, _ROW_2),
     "OverallLength": (RIGHT_CENTER[0], _ROW_3),
-    # Under the shaft: the limit Ø with its fit callout, left of centre (its
-    # value block ~3 mm clear of the lower silhouette), and the dome's
-    # reference radius under the left dome, right of the end view's Ra.
-    "ShaftDia": (RIGHT_CENTER[0] - 0.050, AXIS_Y - 0.015),
+    # Under the shaft: the limit Ø with its fit callout at mid-length (the
+    # callout block hangs left of its dimension line, ~75 mm wide; r1 had it
+    # over the dome radius). Its stacked limits reach ~7 mm above the
+    # anchor, so 0.022 keeps the upper limit ~3 mm below the silhouette (r1
+    # printed it inside the outline). The dome's reference radius sits
+    # under the left dome.
+    "ShaftDia": (RIGHT_CENTER[0], AXIS_Y - 0.022),
     "DomeRadius": (_LEFT_TIP_X + 0.030, AXIS_Y - 0.018),
-    # Right of the right tip, its two-line callout under it.
-    "AcrossFlat": (_RIGHT_TIP_X + 0.018, AXIS_Y),
+    # Below and right of the right tip, outside its extension lines, so the
+    # dimension line stops at the value instead of running through the
+    # two-line callout under it (r1).
+    "AcrossFlat": (_RIGHT_TIP_X + 0.012, AXIS_Y - 0.022),
 }
 
 
@@ -168,14 +173,11 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (front, right, iso):
+    for view in (right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # The end view carries no dimension: it shows the flat's chord on the
-    # round, and every size is in the side view.
     curated = curate_view_dimensions(
         adapter,
         right,
@@ -190,24 +192,16 @@ async def build(adapter: Any) -> dict[str, str]:
         {"ShaftDia": SHAFT_DIA_CALLOUT, "AcrossFlat": ACROSS_FLAT_CALLOUT},
     )
     _set_dome_reference(adapter, curated)
-    # SolidWorks classifies a solid circular end silhouette under the same
-    # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
-    # makes the API a guaranteed no-op even though the end view is circular.
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to shaft end view")
 
-    # The bearing O.D.'s roughness: picked on the end circle's lower-right
-    # point (the flat is on top), the symbol well below so its leader runs
-    # down clear of the side view's left-end dimensions.
-    end_radius = _on_sheet(SHAFT_DIA / 2.0)
+    # The bearing O.D.'s roughness, on the cylinder's own silhouette line
+    # (a revolve's flank is a SILHOUETTE edge), not on an end-view circle
+    # that is the dome and the cylinder at once (machinist review r1).
     add_surface_finish(
         adapter,
-        front,
-        edge_xy=(
-            FRONT_CENTER[0] + end_radius * 0.7071,
-            FRONT_CENTER[1] - end_radius * 0.7071,
-        ),
-        symbol_xy=(FRONT_CENTER[0] - 0.004, AXIS_Y - 0.040),
+        right,
+        edge_xy=FINISH_EDGE,
+        entity_type="SILHOUETTE",
+        symbol_xy=FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="fulcrum bearing finish",
     )
