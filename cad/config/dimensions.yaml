@@ -1591,7 +1591,7 @@ sections:
         - scaled
         - low
       - - Paper holder springs (×2)
-        - 'ONE formed brass sheet per holder, 83.5 × 8.988 × 0.8: a 4.2296-wide flat screw rail carries the two #2 clearance holes; opposed open-ended slits, 0.5287 wide with full half-round ends, stop at an 11.2164 intact centre bridge (tangent-point span) and free the adjacent 4.2296-wide spring rail; each centre-to-end half lies flat from its end out to the screw station, then lifts 1.5 away from the platen in one smooth bow (three tangent R35.30 bends, no creases) and lies flat again over the bridge; spring ends full half-rounds, screw-rail corners R2.5 outer / R0.75 slit side'
+        - 'ONE formed brass sheet per holder, 83.5 × 11.39 × 0.8 (formed; the blank''s fingers are longer by their developed bows): a 7.0-wide flat screw rail carries the two #2 loose holes on a row 3.3 from its outer edge (user rulings 2026-10-14 and 2026-10-15, default D adjusted per rule 21); opposed open-ended slits, 1.04 wide with full half-round ends, stop at an 11.2164 intact centre bridge (tangent-point span) and free the adjacent 3.35-wide spring rail (photographed 4.2296); each centre-to-end half lies flat from its end out to the screw station, then lifts 1.5 away from the platen in one smooth bow (three tangent R35.30 bends, no creases) and lies flat again over the bridge; spring ends full half-rounds, screw-rail corners R2.5 outer / R0.75 slit side'
         - —
         - 'ch22 p.54 page001_img02/03: one slotted sheet with the middle left intact; img03 pixel read (603 × 68 px clip) gives 32/4/32 px rail/slit/rail, the 77-px slit-centreline bridge and the corner rounds; user topology clarification 2026-09-03; hole stations retain the ch30-p002 scale fit'
         - scaled + derived
@@ -1609,13 +1609,13 @@ sections:
         - derived
         - med
       - - Paper holder positions (rework E4)
-        - 'two handed vertical holders from y 324.554..408.054: left origin (−30.3861523, 408.054), Rz −90°, envelope x −30.3861523..−21.3981523; right origin (+232.6978948, 324.554), Rz +90°, envelope x +223.7098948..+232.6978948. The flat rails seat at z −143.55..−142.75 against the platen; each local +Y spring rail points inward over the paper and bows to z −145.05 at peak'
+        - 'two handed vertical holders from y 324.554..408.054: left origin (−32.4641288, 408.054), Rz −90°, envelope x −32.4641288..−21.0741288; right origin (+234.7758712, 324.554), Rz +90°, envelope x +223.3858712..+234.7758712. The flat rails seat at z −143.55..−142.75 against the platen; each local +Y spring rail points inward over the paper and bows to z −145.05 at peak'
         - —
         - 'ch22 front photo: bright holders hug opposite platen edges with their spring lanes inward; #2 holes remain on the platen socket rows, while opposite handed rotations preserve the asymmetric one-sheet topology'
         - scaled + derived
         - med
       - - Clip screws ×4 + platen sockets
-        - stock 92446A077 #2-56 × 1/4 brass slotted pan head `vn-platen-clip-screw` (MHA-VN-059; Ø4.2418 × 1.3462 head, Ø3.937 least (ASME B18.6.3), 6.35 shank; user ruling 2026-10-15 — the 90114A124 fillister's least head left 0.05 bearing land over the clip's largest drilled #2 loose hole, the pan head 0.44; the head lies wholly on the 6.6 screw rail) through each clip's #2 clearance end holes (machine x −28.2713288/+230.5830712, y 331.7444/400.8636) into #2-56 taps through the 3.85 platen and its Ø7 × 1.70 rear bosses (5.55 engaged, 2.54D; tips flush with the boss rear faces); under-head faces directly on the flat clip sheet (z −143.55, no seat boss — ch22 img03); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
+        - stock 92446A077 #2-56 × 1/4 brass slotted pan head `vn-platen-clip-screw` (MHA-VN-059; Ø4.2418 × 1.3462 head, Ø3.937 least (ASME B18.6.3), 6.35 shank; user ruling 2026-10-15 — the 90114A124 fillister's least head left 0.05 bearing land over the clip's largest drilled #2 loose hole, the pan head 0.44; the head lies wholly on the 7.0 screw rail, its hole row 3.3 from the rail's outer edge (owner ruling 2026-10-15, default D adjusted per rule 21)) through each clip's #2 clearance end holes (machine x −28.2713288/+230.5830712, y 331.7444/400.8636) into #2-56 taps through the 3.85 platen and its Ø7 × 1.70 rear bosses (5.55 engaged, 2.54D; tips flush with the boss rear faces); under-head faces directly on the flat clip sheet (z −143.55, no seat boss — ch22 img03); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
         - —
         - p.55 front photo (clip end screws); McMaster 92446A077 product page and technical drawing read live 2026-10-15; head band Olander 2C25SPMBP (B18.6.3), read 2026-10-15
         - scaled + derived

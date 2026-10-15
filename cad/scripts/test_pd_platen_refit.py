@@ -89,11 +89,17 @@ def test_platen_clip_is_one_center_bridged_sheet() -> None:
     )
     # ch22 img03: a 32-px spring rail beside a 4-px slit, of the photographed
     # width.  The screw rail is widened for its holes' ligaments (user ruling
-    # 2026-10-14) and the overall width held; the slit's .XX worst case keeps
-    # the photographed gap, and the spring rail gives that widening up.
-    assert math.isclose(
-        clip.CLIP_WIDTH,
-        clip.SCREW_RAIL_WIDTH + clip.PHOTO_CLIP_WIDTH * 36.0 / 68.0,
+    # 2026-10-14; owner ruling 2026-10-15, default D adjusted per rule 21) and
+    # the overall width is the widest 0.01 step holding the 2.0 paper gap;
+    # the slit's .XX worst case keeps the photographed gap, and the spring
+    # rail is what is left.
+    assert clip.CLIP_WIDTH == pytest.approx(11.39)
+    assert clip.SCREW_RAIL_WIDTH == pytest.approx(7.0)
+    assert _clip_paper_gap(platen.SOCKET_X) > 2.0
+    assert (
+        paper_geometry.RECORDING_PAPER_LEFT_INSET_MM
+        - (platen.SOCKET_X - clip.HOLE_Y + clip.CLIP_WIDTH + 0.01)
+        <= 2.0
     )
     assert clip.NOTCH_WIDTH == 1.04
     assert clip.NOTCH_WIDTH - 0.51 >= clip.PHOTO_CLIP_WIDTH * 4.0 / 68.0
@@ -187,7 +193,8 @@ def test_platen_clip_screws_seat_on_the_flat_sheet_with_full_engagement() -> Non
 
 
 def test_platen_clip_holes_and_handed_assembly_placements_follow_flat_rail() -> None:
-    assert clip.HOLE_Y == clip.SCREW_RAIL_WIDTH / 2.0
+    assert clip.HOLE_Y == pytest.approx(3.3)
+    assert clip.HOLE_Y < clip.SCREW_RAIL_WIDTH / 2.0
     assert clip.HOLE_Y - clip.HOLE_DIA / 2.0 > 0.0
     assert clip.HOLE_Y + clip.HOLE_DIA / 2.0 < clip.SCREW_RAIL_WIDTH
     assert tuple(row[3] for row in assembly.CLIP_PLACEMENTS) == (90.0, -90.0)
@@ -220,22 +227,28 @@ def test_platen_clip_holes_and_handed_assembly_placements_follow_flat_rail() -> 
 
 
 def test_platen_clip_hole_ligaments_float_and_head_land_hold_at_worst_case() -> None:
-    # Rule 17 at the printed worst case: the .XXX hole station and rail width,
-    # the DRILLED hole's largest size.
+    # Rule 17 at the printed worst case: the .XXX hole station, the .XX rail
+    # width, the DRILLED hole's largest size.
     band = printed_band_mm(clip.POSITION_PLACES)
+    rail_band = printed_band_mm(clip.RAIL_WIDTH_PLACES)
+    assert clip.RAIL_WIDTH_PLACES == 2
     hole_r = clip.HOLE_DIA_MAX / 2.0
     assert clip.EDGE_LIGAMENT_MIN == pytest.approx(clip.HOLE_Y - band - hole_r)
     assert clip.SLIT_LIGAMENT_MIN == pytest.approx(
-        clip.SCREW_RAIL_WIDTH - clip.HOLE_Y - 2.0 * band - hole_r
+        clip.SCREW_RAIL_WIDTH - rail_band - clip.HOLE_Y - band - hole_r
     )
     assert min(clip.EDGE_LIGAMENT_MIN, clip.SLIT_LIGAMENT_MIN) >= 1.5
     assert clip.END_LIGAMENT_MIN >= 1.5
     # The photographed 4.23 rail cannot hold the floor on both sides.
     photo_rail = clip.PHOTO_CLIP_WIDTH * 32.0 / 68.0
     assert photo_rail - photo_rail / 2.0 - 2.0 * band - hole_r < 1.5
-    # Fixed fasteners: the hole floats over the shank by both patterns' zones.
+    # Fixed fasteners: the hole floats over the shank by both patterns'
+    # zones, which holds only with the hole row at .XXX too.
     zone = 2.0 * math.sqrt(2.0) * band
     assert clip.HOLE_DIA - clip_screw.SHANK_DIA >= 2.0 * zone
+    assert clip.HOLE_DIA - clip_screw.SHANK_DIA < 2.0 * (
+        2.0 * math.hypot(band, printed_band_mm(2))
+    )
     # The least head never pulls through the largest hole, with land to bear on.
     assert clip_screw.HEAD_DIA_MIN - clip.HOLE_DIA_MAX >= 0.8
 
@@ -272,7 +285,7 @@ def _clip_paper_gap(socket_x: float) -> float:
 
 def test_clip_socket_station_is_the_largest_grid_value_holding_the_paper_gap() -> None:
     # The photographed station no longer holds the 2.0 nominal gap beside the
-    # 6.6 clip screw rail and the 14.6 paper inset; the station is the largest
+    # 7.0 clip screw rail and the 14.6 paper inset; the station is the largest
     # 0.1-grid value that does, on both sides.
     assert _clip_paper_gap(5.3928) < 2.0
     assert _clip_paper_gap(platen.SOCKET_X) > 2.0

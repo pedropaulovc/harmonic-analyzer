@@ -152,16 +152,21 @@ HOLE_FAR_X = CLIP_LENGTH - HOLE_INSET
 # width's above the plan.  A vertical dimension's text stands left of its own
 # dimension line on a shoulder that runs from the line to the text's far end
 # (r5: the hole row's "2X 3.300" spans 21 mm), so each column is its text's
-# right end: the hole row's shoulder ends right of the screw rail's line, the
-# hole row's text stands under the near hole station's outside-arrow line (r7
-# audit: at 0.112 that line, y ~0.1132, ran 2.7 mm into it), the
-# spring rail's right of the overall width's text, and the overall width's
+# right end: the hole row's widest line ("MHA-PD-002", ~23 mm) ends right of
+# the screw rail's line, the hole row's three-line block stands under the
+# near hole station's outside-arrow line (r7 audit: at 0.112 that line,
+# y ~0.1132, ran 2.7 mm into it), the spring rail's right of the overall
+# width's text, and the overall width's
 # inside the border.  The outer and the slit-side corner radii stand off the
 # right end.
 _BELOW_PLAN_ROWS = (0.116, 0.110)
-_ABOVE_PLAN_ROWS = (0.172, 0.178, 0.184)
+# The length's text block carries the FORMED line above its value, so its
+# dimension line runs a line lower than its centre (r8a audit: at 0.184 that
+# line, y 0.1784, ran through the bridge end's text); its row stands that
+# much higher.
+_ABOVE_PLAN_ROWS = (0.172, 0.178, 0.189)
 _HOLE_ROW_COLUMN = 0.0725
-_RAIL_COLUMN = 0.0475
+_RAIL_COLUMN = 0.042
 _SPRING_RAIL_COLUMN = 0.066
 _OVERALL_COLUMN = 0.030
 FRONT_KEEP = {
@@ -170,7 +175,7 @@ FRONT_KEEP = {
     "BridgeX0": (_plan_x(BRIDGE_X0 / 2.0), _ABOVE_PLAN_ROWS[0]),
     "BridgeX1": (_plan_x(BRIDGE_X1 / 2.0), _ABOVE_PLAN_ROWS[1]),
     "Length": (FRONT_CENTER[0], _ABOVE_PLAN_ROWS[2]),
-    "LeftZ": (_HOLE_ROW_COLUMN, 0.1095),
+    "LeftZ": (_HOLE_ROW_COLUMN, 0.1025),
     "RailWidth": (_RAIL_COLUMN, 0.0900),
     "SpringRailWidth": (_SPRING_RAIL_COLUMN, 0.1652),
     "OverallWidth": (_OVERALL_COLUMN, 0.1625),
@@ -246,15 +251,16 @@ DIMENSION_AFFIXES = {
     )
     for name in sorted({*_COUNTS, *REFERENCE_DIMENSIONS})
 }
-# What each callout-bearing size is for: the screw rail's .XXX width (edge to
-# slit) holds the wall between the hole and the slit, which .XX would thin
-# under the 1.5 floor (r4); the hole row's prints bare, since a label beside
-# a centre-to-edge line read as a wall size (r4).  The sheet is the stock's;
+# What each callout-bearing size is for: the hole row's .XXX height, with the
+# hole stations, matches the platen's tap pattern (the holes float over the
+# shanks by both patterns' zones only at .XXX; the r7 review read a bare .XXX
+# row as over-spec).  The sheet is the stock's;
 # the slit and the spring rail end in full rounds; the developed finger is
 # measured along the bows from the bridge to the tip, not across the formed
 # profile (r2 read it as a span); the rise is each bow's crest height.
 DIMENSION_CALLOUTS = {
-    "RailWidth": "SCREW RAIL\nSETS SLIT\nWALL AT HOLE",
+    "LeftZ": "MATCHES\nMHA-PD-002",
+    "RailWidth": "SCREW RAIL",
     "SheetDepth": "SHEET STOCK",
     "SpringRailWidth": "FULL R ENDS",
     "SlitWidth": "SLIT, FULL R END",

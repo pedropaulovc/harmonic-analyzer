@@ -92,11 +92,10 @@ def test_pan_head_bears_holds_and_clears_on_the_clip_at_the_worst_case() -> None
     assert reach == pytest.approx(
         pd_platen_spec.PLATE_THICKNESS + pd_platen_spec.SOCKET_BOSS_H
     )
-    # Rail clearance: the largest head stays on the 6.6 screw rail and clear
-    # of the slit, its edge inside the rail's ends.
-    assert clip.HEAD_RAIL_MARGIN == pytest.approx(
-        (clip.SCREW_RAIL_WIDTH - spec.HEAD_DIA) / 2.0
-    )
+    # Rail clearance: the largest head stays on the 7.0 screw rail, nearer
+    # its outer edge than the slit, its edge inside the rail's ends.
+    assert clip.HEAD_RAIL_MARGIN == pytest.approx(clip.HOLE_Y - spec.HEAD_DIA / 2.0)
+    assert clip.SCREW_RAIL_WIDTH - clip.HOLE_Y > clip.HOLE_Y
     assert clip.HEAD_RAIL_MARGIN == pytest.approx(1.1791, abs=1e-4)
     assert clip.HEAD_TO_SPRING_RAIL == pytest.approx(
         clip.SPRING_RAIL_Y0 - clip.HOLE_Y - spec.HEAD_DIA / 2.0
