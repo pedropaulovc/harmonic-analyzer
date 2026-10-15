@@ -2080,6 +2080,93 @@ def test_a_pid_reused_after_the_record_is_not_the_launcher(tmp_path: Path) -> No
     assert survived
 
 
+def _ps_quote(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _tracking_with_cim_faults(
+    fixture: dict[str, object], faults: int, *args: str
+) -> list[str]:
+    """A tracking command whose first `faults` Win32_Process queries fail as
+    one did on amet (2026-10-15): a non-terminating `Call cancelled`
+    CimException, HRESULT 0x80041032. Later queries reach CIM."""
+    arguments = " ".join(
+        arg if arg.startswith("-") else _ps_quote(arg)
+        for arg in [*args, "-LogDirectory", str(fixture["log_directory"])]
+    )
+    script = f"""
+$global:CimFaults = {faults}
+function global:Get-CimInstance {{
+    [CmdletBinding()]
+    param([string]$ClassName, [string]$Filter, [string[]]$Property)
+    if ($global:CimFaults -gt 0) {{
+        $global:CimFaults--
+        $data = New-CimInstance -ClientOnly -Namespace root/cimv2 -ClassName MSFT_ExtendedStatus -Property @{{
+            CIMStatusCode = [uint32]1; Message = 'Call cancelled '; MessageID = 'HRESULT 0x80041032'
+            error_Code = 0x80041032u; error_Type = 'HRESULT'
+        }}
+        $PSCmdlet.WriteError([System.Management.Automation.ErrorRecord]::new(
+            [Microsoft.Management.Infrastructure.CimException]::new($data),
+            'HRESULT 0x80041032,Microsoft.Management.Infrastructure.CimCmdlets.GetCimInstanceCommand',
+            [System.Management.Automation.ErrorCategory]::InvalidOperation, $ClassName))
+        return
+    }}
+    CimCmdlets\\Get-CimInstance @PSBoundParameters
+}}
+& {_ps_quote(str(LAUNCHER))} {arguments}
+exit $LASTEXITCODE
+"""
+    return [str(fixture["pwsh"]), "-NoProfile", "-NonInteractive", "-Command", script]
+
+
+def test_status_retries_a_transient_cim_fault_and_reports_the_run_running(
+    tmp_path: Path,
+) -> None:
+    """amet 2026-10-15: one `Call cancelled` from the launcher's CIM query
+    ended -Status and -Watch, although the run was healthy and the same
+    query succeeded at once when run again."""
+    fixture = _launcher_fixture(tmp_path)
+    _write_run_record(
+        fixture, pid=os.getpid(), tag="flaky", workflow=None, argv=[], hexdigit="c"
+    )
+
+    status = _run_launcher(
+        fixture,
+        _tracking_with_cim_faults(fixture, 2, "-Status", "-Tag", "flaky"),
+        fixture["environment"],
+    )
+
+    assert status.returncode == 0, status.stderr
+    report = json.loads(status.stdout)
+    assert report["state"] == "running"
+    assert report["launcher"]["alive"] is True
+    assert status.stderr.count("WBEM_E_CALL_CANCELLED") == 2, status.stderr
+
+
+@pytest.mark.parametrize("operation", [["-Status"], ["-Watch", "-PollSeconds", "1"]])
+def test_a_persistent_cim_fault_is_an_error_never_launcher_died(
+    tmp_path: Path, operation: list[str]
+) -> None:
+    """A query that keeps failing proves nothing about the launcher: the
+    command fails (exit 2) with the CIM error after bounded retries, rather
+    than reporting launcher-died (exit 21) for a run that may be healthy."""
+    fixture = _launcher_fixture(tmp_path)
+    _write_run_record(
+        fixture, pid=os.getpid(), tag="broken", workflow=None, argv=[], hexdigit="d"
+    )
+
+    result = _run_launcher(
+        fixture,
+        _tracking_with_cim_faults(fixture, 1000, *operation, "-Tag", "broken"),
+        fixture["environment"],
+    )
+
+    assert result.returncode == 2, (result.stdout, result.stderr)
+    assert "launcher-died" not in result.stdout
+    assert "Call cancelled" in result.stderr
+    assert result.stderr.count("WBEM_E_CALL_CANCELLED") == 4, result.stderr
+
+
 def test_a_pre_registration_dead_run_breaks_neither_status_nor_cancel(
     tmp_path: Path,
 ) -> None:

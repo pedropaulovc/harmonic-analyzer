@@ -643,7 +643,13 @@ The run's state is derived, never trusted from one file: `.done`'s `state` when
 it exists (`succeeded`, `failed` or `cancelled`), otherwise `running` while the
 recorded `pid` is alive (a PID reused by a process that started after the run is
 not the launcher), otherwise **`launcher-died`** — the launcher is gone and wrote
-no `.done`.
+no `.done`. Liveness comes from a `Win32_Process` CIM query, and a failed query
+is never read as a dead launcher. A transient WMI fault (`Call cancelled`,
+shutting down, transport or RPC failure, quota violation, retry later) is
+retried up to four times over about 4 s, each retry a `WARNING:` line on
+stderr. A fault that persists, or any other one, ends `-Status`, `-Watch`,
+`-List` or `-Cancel` with exit 2 and the CIM error. It is not an outcome:
+run the same command again.
 
 If the final run-record refresh fails, the launcher still writes `.done` with
 the actual build outcome and reports the refresh error in `cleanup_errors`.
