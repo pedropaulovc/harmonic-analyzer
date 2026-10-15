@@ -22,7 +22,7 @@ import math
 from _gtol_cylinder import CylinderFace
 from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
-import mg_lever_wire_geom as _lever
+import vn_lever_wire_geom as _lever
 from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     BORE_DIA,
     CAST_ROUND_R,

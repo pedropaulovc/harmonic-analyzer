@@ -9,7 +9,7 @@ import _config
 
 MAGNIFIER_SPECS = {
     "sm-knife-mount": "sm_knife_mount_spec",
-    "mg-lever-wire": "mg_lever_wire_spec",
+    "vn-lever-wire": "vn_lever_wire_spec",
     "mg-magnifying-bracket": "mg_magnifying_bracket_spec",
     "mg-magnifying-clamp": "mg_magnifying_clamp_spec",
     "mg-magnifying-lever": "mg_magnifying_lever_spec",

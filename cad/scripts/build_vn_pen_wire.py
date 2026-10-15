@@ -12,20 +12,21 @@ wrap over the wheel top and the tie-off through the eye are NOT modeled (the
 kinematic coupling stays a Motion-study scotch-yoke -- cad/docs/motion-policy.md);
 the run's top rides the groove bottom line-to-line (no overlap volume).
 
-Endpoint derivation lives in ``pn_pen_wire_geom`` (bottom = the stud's eye-head
+Endpoint derivation lives in ``vn_pen_wire_geom`` (bottom = the stud's eye-head
 top at rest, ``pn_pen_carriage_geom.STUD_HEAD_TOP_REST_Y``; top = the wheel
 axis height), which ``build_pn_pen_assembly`` also places from, so a layout
 move re-derives the wire instead of leaving it floating.
 
-Dimensions: cad/config/dimensions.yaml ch. 21/24 -- wire dia photo-scaled
-(the book wire is hair-thin; 0.8 keeps it renderable, low confidence).
+Stock: purchased McMaster-Carr 9666K56 music wire (0.031 in, ASTM A228), cut
+from the coil (MHA-VN-067); modelled at the Ø0.8 design nominal, which lies in
+the catalogue band (``vn_pen_wire_geom``).
 
 Layout: wire axis along +Y from the origin (bottom end at the stud's eye
 head; the assembly places it upright), length ``WIRE_LEN``.
 
 Run (SolidWorks already open)::
 
-    uv run python cad\scripts\build_pn_pen_wire.py
+    uv run python cad\scripts\build_vn_pen_wire.py
 """
 
 from __future__ import annotations
@@ -48,21 +49,21 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from pn_pen_wire_spec import (
+from vn_pen_wire_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ELEVATION_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
 )
 
-PART_NAME = "pn-pen-wire"
+PART_NAME = "vn-pen-wire"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
-# Geometry nominals (wire dia, run length) live in pn_pen_wire_geom -- the
+# Geometry nominals (wire dia, run length) live in vn_pen_wire_geom -- the
 # prose-free module build_pn_pen_assembly imports (with the endpoint anchors
 # WIRE_X 3.8 / WIRE_BOTTOM) -- and are re-imported here so the build and the
 # assembly can never drift.
-from pn_pen_wire_geom import WIRE_DIA, WIRE_LEN  # noqa: E402
+from vn_pen_wire_geom import WIRE_DIA, WIRE_LEN  # noqa: E402
 
 
 async def build(adapter) -> dict[str, str]:

@@ -53,7 +53,7 @@ import dt_cylinder_gear_spec
 import dt_cone_gear_spec
 import cone_shaft_land_bands
 import gear_seat_fit
-import mg_lever_wire_geom
+import vn_lever_wire_geom
 import mg_magnifying_clamp_geom
 import mg_magnifying_lever_geom
 import mg_output_fixture_geom
@@ -170,7 +170,7 @@ def nominal() -> Nominal:
     )
 
 
-# The knife axis in the machine frame mg_lever_wire_geom solves wire 1 in: the
+# The knife axis in the machine frame vn_lever_wire_geom solves wire 1 in: the
 # magnifying lever's KnifeAxis lands on the summing chain's knife line
 # (build_mg_magnifier_assembly asserts it), the axis spring_force_model takes
 # its torques about, so a clamp at knife radius R sits at machine x KNIFE + R.
@@ -186,11 +186,11 @@ def wire_rest_run(nom: Nominal, lever_r: float) -> tuple[np.ndarray, np.ndarray]
     hook = np.array(
         [
             KNIFE_AXIS_XY[0] + lever_r + nom.hook_offset_x,
-            mg_lever_wire_geom.HOOK_Y,
-            mg_lever_wire_geom.HOOK_Z,
+            vn_lever_wire_geom.HOOK_Y,
+            vn_lever_wire_geom.HOOK_Z,
         ]
     )
-    end = np.array(mg_lever_wire_geom.tangent_end(float(hook[0]), float(hook[1])))
+    end = np.array(vn_lever_wire_geom.tangent_end(float(hook[0]), float(hook[1])))
     return hook, end
 
 
@@ -1341,8 +1341,8 @@ def _minimum_pose_wire_estimate(nom: Nominal) -> dict[str, float]:
     in error_budget.yaml is an informed one; the proof is a seat build of the
     magnifier at that pose (#748)."""
     hook, end = wire_rest_run(nom, nom.lever_r_min)
-    gaps = mg_lever_wire_geom.run_gaps(hook, end)
-    cx, cy = mg_lever_wire_geom.WHEEL_X, mg_lever_wire_geom.WHEEL_BAR_Y
+    gaps = vn_lever_wire_geom.run_gaps(hook, end)
+    cx, cy = vn_lever_wire_geom.WHEEL_X, vn_lever_wire_geom.WHEEL_BAR_Y
     ts = np.linspace(0.0, 1.0, 2001)
     pts = hook[None, :] + ts[:, None] * (end - hook)[None, :]
     radial = np.hypot(pts[:, 0] - cx, pts[:, 1] - cy)

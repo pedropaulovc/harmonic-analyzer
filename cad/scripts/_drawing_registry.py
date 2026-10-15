@@ -341,10 +341,10 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="mg_lever_wire",
-        part="mg_lever_wire",
-        artifact_stem="mg-lever-wire",
-        script_name="draw_mg_lever_wire.py",
+        name="vn_lever_wire",
+        part="vn_lever_wire",
+        artifact_stem="vn-lever-wire",
+        script_name="draw_vn_lever_wire.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -544,10 +544,10 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="pn_pen_wire",
-        part="pn_pen_wire",
-        artifact_stem="pn-pen-wire",
-        script_name="draw_pn_pen_wire.py",
+        name="vn_pen_wire",
+        part="vn_pen_wire",
+        artifact_stem="vn-pen-wire",
+        script_name="draw_vn_pen_wire.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

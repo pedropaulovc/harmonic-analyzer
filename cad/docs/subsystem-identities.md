@@ -16,12 +16,12 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | `ch` / `CH` | Channel | 11 |
 | `dt` / `DT` | Drive train | 36 |
 | `fr` / `FR` | Frame | 5 |
-| `mg` / `MG` | Magnifier | 11 |
+| `mg` / `MG` | Magnifier | 10 |
 | `pd` / `PD` | Paper drive | 24 |
-| `pn` / `PN` | Pen | 6 |
+| `pn` / `PN` | Pen | 5 |
 | `ms` / `MS` | Measuring stick | 3 |
 | `sm` / `SM` | Summing | 4 |
-| `vn` / `VN` | Vendor parts | 62 |
+| `vn` / `VN` | Vendor parts | 64 |
 | `sh` / `SH` | Shared fabricated parts | 2 |
 
 Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. The retained orphan chain sprocket belongs to PD by its translational-gearing and platen-chain evidence; the retained orphan hex bolt belongs to VN by catalog evidence. Wheel axle nut is VN by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
@@ -273,6 +273,8 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | `vn-pen-adjust-nut` | — | MHA-VN-062 |
 | part | — | `vn-pen-hanger-nut` | — | MHA-VN-063 |
 | part | — | `vn-pen-hanger-jam-nut` | — | MHA-VN-064 |
+| part | — | `vn-lever-wire` | — | MHA-VN-066 |
+| part | — | `vn-pen-wire` | — | MHA-VN-067 |
 | part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
 | part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
 | assembly | `frame` | `fr-frame` | MHA-A04 | MHA-FR-000 |
@@ -312,3 +314,7 @@ next free Number in its category and has no old stem or old Number.
 | added | `pn-pen-adjust-screw` | MHA-PN-007 | turned brass #0-80 eye stud in the MHA-PN-004 pen rod's top, locked by the MHA-VN-062 jam nut; the MHA-PN-006 pen wire ties through its eye |
 | added | `vn-pen-hanger-nut` | MHA-VN-063 | zinc-plated steel #8-32 hex nut on the strap front; holds the MHA-PN-002 pen hanger on the MHA-VN-007 hanger screw through the strap's clearance hole |
 | added | `vn-pen-hanger-jam-nut` | MHA-VN-064 | thin zinc-plated steel #8-32 hex nut jammed against the MHA-VN-063 nut, locking the MHA-VN-007 hanger screw |
+| retired | `mg-lever-wire` | MHA-MG-009 | replaced by the purchased MHA-VN-066 lever wire |
+| retired | `pn-pen-wire` | MHA-PN-006 | replaced by the purchased MHA-VN-067 pen wire |
+| added | `vn-lever-wire` | MHA-VN-066 | ASTM A228 music wire, 0.031 in, cut from McMaster-Carr 9666K56 coil; hooks on the MHA-MG-006 output fixture and wraps the MHA-MG-010 drum |
+| added | `vn-pen-wire` | MHA-VN-067 | ASTM A228 music wire, 0.031 in, cut from the same McMaster-Carr 9666K56 coil; runs from the MHA-MG-005 wheel rim groove to the MHA-PN-007 adjuster stud's eye |

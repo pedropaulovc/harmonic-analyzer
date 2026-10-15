@@ -26,7 +26,7 @@ the groove root with its running clearance.
 
 Installed pose: ``Ry(180 deg + FIXTURE_YAW_DEG)`` about the vertical rod, so
 local +X runs back through the spigot toward the bracket and the hook lands
-on the lever wire's start (``mg_lever_wire_geom.WIRE_START``).
+on the lever wire's start (``vn_lever_wire_geom.WIRE_START``).
 """
 
 from __future__ import annotations

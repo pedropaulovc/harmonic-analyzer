@@ -7,7 +7,7 @@ from HERE -- not from ``build_lever_wire`` -- so the lever-wire DRAWING notes
 (``lever_wire_spec``, imported only by the build script) stay out of the wheel
 part recipe and the magnifier assembly helper closure. A sheet-note edit
 therefore rebuilds only the lever-wire part + its drawing, never the wheel or
-the assembly (codex #360: the old ``from build_mg_lever_wire import ...`` edges
+the assembly (codex #360: the old ``from build_vn_lever_wire import ...`` edges
 pulled the spec into both closures).
 
 The derivation: the wire runs from the output fixture's hook to the XY-tangent
@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import math
 
+from _mcmaster_9666k56 import DIA_MAX as _STOCK_DIA_MAX, DIA_MIN as _STOCK_DIA_MIN
 from mg_magnifying_wheel_geom import (
     DRUM_MID_Z as _DRUM_MID_LOCAL_Z,
     HUB_DIA as _BOSS_DIA,
@@ -43,6 +44,10 @@ from paper_drive_geom import PEN_Z_MID
 assert math.isclose(WIRE_DIA, LEVER_WIRE_DIA, abs_tol=1e-12), (
     "fixture groove and wheel drum must carry the same lever wire diameter"
 )
+
+# Ø0.8 design nominal: inside the purchased 9666K56 0.031 +/-0.001 in band.
+if not _STOCK_DIA_MIN <= WIRE_DIA <= _STOCK_DIA_MAX:
+    raise AssertionError("lever wire Ø must lie in the 9666K56 catalogue band")
 
 # --- endpoint anchors (magnifier frame; asserted by build_mg_magnifier_assembly)
 #

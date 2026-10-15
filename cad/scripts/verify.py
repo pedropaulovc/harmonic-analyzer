@@ -1426,7 +1426,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     """
     import build_mg_magnifier_assembly as _mag
     from mg_output_fixture_geom import HOOK_LOCAL
-    import mg_lever_wire_geom as _wire
+    import vn_lever_wire_geom as _wire
 
     name = "mg-magnifier"
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
@@ -1469,7 +1469,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
 
     def _wire_state() -> tuple[float, float, list[float]]:
         """(centreline-to-axis distance, hook ball residual, hub-end pos)."""
-        rows, pos = _xform("mg-lever-wire-1")
+        rows, pos = _xform("vn-lever-wire-1")
         u = rows[1]  # wire axis (+Y local = hub -> hook)
         # line-line distance to the wheel axis (direction Z at axis_xy)
         n = [u[1], -u[0], 0.0]  # u x z-hat

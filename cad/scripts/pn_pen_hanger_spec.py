@@ -21,7 +21,7 @@ import math
 import _config
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
-from mg_lever_wire_geom import WHEEL_BAR_Y
+from vn_lever_wire_geom import WHEEL_BAR_Y
 from mg_wheel_bar_geom import BAR_FRONT_Z, BAR_SIDE, HANGER_SCREW_MACHINE_X
 from paper_drive_geom import PEN_ROD_X, PEN_Z_MID, PLATEN_BOTTOM_Y
 from pd_platen_spec import PLATE_HEIGHT as PLATEN_HEIGHT

@@ -12,7 +12,7 @@ import pn_pen_frame_spec
 import pn_pen_hanger_spec
 import pn_pen_rod_spec
 import pn_pen_v_block_spec
-import pn_pen_wire_spec
+import vn_pen_wire_spec
 
 
 SHEETS = (
@@ -25,7 +25,7 @@ SHEETS = (
     ("pn-pen-rod", pn_pen_rod_spec),
     ("pn-pen-v-block", pn_pen_v_block_spec),
     ("pn-pen-adjust-screw", pn_pen_adjust_screw_spec),
-    ("pn-pen-wire", pn_pen_wire_spec),
+    ("vn-pen-wire", vn_pen_wire_spec),
 )
 
 TITLE_BLOCK_OWNED_NOTE_TEXT = (

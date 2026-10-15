@@ -20,7 +20,7 @@ The one sub-assembly with no original to copy.
 | `pn-pen-rod` | TODO | TODO | TODO |
 | `pn-pen-adjust-screw` | 1 | brass | turned #0-80 eye stud on the rod top; TODO |
 | `vn-pen-marker` | 1 | purchased | Sharpie permanent marker, fine point (Sharpie 30051) |
-| `pn-pen-wire` | TODO | TODO | TODO |
+| `vn-pen-wire` | 1 | purchased | 0.031" (0.79 mm) ASTM A228 music wire (McMaster 9666K56), cut from the coil |
 | `pn-pen-hanger` | TODO | TODO | TODO |
 | `vn-pen-set-screw` | TODO | TODO | TODO |
 | `vn-pen-rod-set-screw` | 1 | alloy steel, black oxide | #4-40 × 4.76 mm (3/16") cup-point set screw (McMaster 91375A105) |

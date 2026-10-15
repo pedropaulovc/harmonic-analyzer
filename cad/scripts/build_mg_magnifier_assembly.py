@@ -183,7 +183,7 @@ LEVER_ROD_Y = 979.7
 # front column surface -124.7 by 0.25 (axis <= -127.95); the retained -128.3
 # axis gives a 0.6 surface gap. Keep the accepted lever, vertical-rod and hook
 # datums while the current drum route proves its own rim/spoke/boss clearance
-# through mg_lever_wire_geom.RUN_GAPS; the old hub-lane rim-depth cap no longer
+# through vn_lever_wire_geom.RUN_GAPS; the old hub-lane rim-depth cap no longer
 # describes that route. VROD_Z = -134.8 (clamp's 6.5 skew bore); hook -137.95;
 # the bracket arm reaches back to the unchanged plate flange.
 LEVER_ROD_Z = -128.3
@@ -315,10 +315,10 @@ assert (stack_spec.AXLE_X, stack_spec.AXLE_Y, stack_spec.BAR_FRONT_Z) == (
     BAR_FRONT_Z,
 ), "mg_magnifier_assembly_spec's axle line drifted from the placed axle"
 # --- amplification wire 1 (fixture -> drum) ----------------------------------
-# Endpoints + length live in build_mg_lever_wire.py (the part's length IS the run);
+# Endpoints + length live in build_vn_lever_wire.py (the part's length IS the run);
 # re-derive the anchors from THIS script's layout and fail loud on drift, so a
 # layout move can never leave a floating wire.
-from mg_lever_wire_geom import (  # noqa: E402
+from vn_lever_wire_geom import (  # noqa: E402
     CLEARANCE as WIRE_CLEARANCE,
     DRUM_DIA,
     RUN_GAPS,
@@ -354,7 +354,7 @@ assert math.isclose(
 ), "lever-wire end is not tangent to the drum"
 # ... inside the drum's axial span (boss front face .. spigot front end, wire
 # r inside each), and the slanted run clears the rim, spokes and boss pen-side
-# faces it passes (RUN_GAPS, asserted >= CLEARANCE in mg_lever_wire_geom).
+# faces it passes (RUN_GAPS, asserted >= CLEARANCE in vn_lever_wire_geom).
 assert (
     WHEEL_MID_Z + HUB_STEP_Z - HUB_WIRE_DIA / 2.0
     > HUB_WIRE_END[2]
@@ -893,7 +893,7 @@ async def build(adapter) -> dict[str, str]:
     # origin = the DRUM end, +Y toward the hook.
     hw = await place_component(
         adapter,
-        "mg-lever-wire",
+        "vn-lever-wire",
         list(HUB_WIRE_END),
         euler_from_rows(_HW_ROWS),
         _HW_ROWS,
@@ -960,7 +960,7 @@ async def build(adapter) -> dict[str, str]:
     # the lever-wire's YokePlane (perpendicular to the wire axis). The wheel's
     # spin -- its one remaining DOF -- is thereby tied to the lever group's
     # travel along the wire: the linearized inextensible-wire constraint, sign
-    # and ratio from geometry (build_mg_lever_wire docstring). With every freed
+    # and ratio from geometry (build_vn_lever_wire docstring). With every freed
     # DOF genuinely free, dragging the lever turns the wheel. The mate is
     # residual-free at the rest pose, so the wheel must NOT move when it
     # solves -- asserted right after.
@@ -989,7 +989,7 @@ async def build(adapter) -> dict[str, str]:
         required_stems=(
             "mg-magnifying-lever",
             "mg-magnifying-wheel",
-            "mg-lever-wire",
+            "vn-lever-wire",
             "mg-magnifying-bracket",
         ),
     )

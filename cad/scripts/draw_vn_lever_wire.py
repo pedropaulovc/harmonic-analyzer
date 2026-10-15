@@ -1,17 +1,17 @@
-r"""Create the curated machinist drawing for the pen amplification wire.
+r"""Create the curated machinist drawing for the lever wire (WIRE 1).
 
-The SLDPRT remains authoritative.  This recipe supplies only the wire's
-elevation view, its run-length dimension, and the amplification notes;
-sheet/template and export behavior lives in ``_drawing_common``.
-Dimension import and curation live in ``_drawing_dimension_import``.
-
-The wire is a hair-thin Ø0.8 steel run (WIRE 2 of the amplification chain),
-modelled as the straight rest-pose length only.  The sheet magnifies to 2:1 so
-the run is legible; the isometric matches.
+The lever wire is a purchased Ø0.8 (0.031 in) music-wire run ~353 long -- a hair-thin
+silhouette with no flat face, no pickable end and no selectable silhouette edge,
+so the print is note-based: nothing is a marked dimension, and the diameter +
+straight rest-run length ride the notes (the build stamps the computed length).
+That chord is not represented as a developed cut length because the source model
+does not define the formed hook or drum-wrap allowance.
+The wire axis is local +Y, so the FRONT view is the straight run reduced to fit
+(1:5) and the isometric confirms it is a plain straight rod.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pn_pen_wire.py pn-pen-wire
+    uv run python cad\scripts\draw_vn_lever_wire.py vn-lever-wire
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ from _session import run_build
 import _telemetry
 
 
-SPEC = DRAWINGS_BY_NAME["pn_pen_wire"]
+SPEC = DRAWINGS_BY_NAME["vn_lever_wire"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
 OUTPUTS = DrawingOutputs(
@@ -51,26 +51,22 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (2.0, 1.0)  # 2:1 whole sheet (hair-thin ~60 mm wire)
+SHEET_SCALE = (1.0, 1.0)
+WIRE_SCALE = (1, 5)  # ~353 long reduced to ~71 mm on the sheet
+FRONT_CENTER = (0.135, 0.150)
+ISO_CENTER = (0.320, 0.160)
 
-# Sheet layout (meters).  The elevation (front) is the sole ortho view -- the
-# vertical wire -- with the run length to its left; the isometric sits mid-right;
-# the notes fill the lower-left.
-FRONT_CENTER = (0.110, 0.155)
-ISO_CENTER = (0.300, 0.170)
-
-# Per-view survivor of the marked-dimension import: the run length only (the
-# Ø0.8 diameter is a note -- a 0.8 mm circle is below the view's ink width).
-FRONT_KEEP = {
-    "Depth": (0.078, 0.155),
-}
+# Note-based: the wire carries no marked model dimension, so every view keeps
+# nothing (the front view is curated with an empty keep to delete any stray
+# auto-import; the offline test asserts union(marks) == union(keeps) == {}).
+FRONT_KEEP: dict[str, tuple[float, float]] = {}
 
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pen-wire source", await adapter.open_model(str(SOURCE)))
+    check("open lever-wire source", await adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -81,7 +77,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Elevation View Note",
+            "Front View Note",
             "Isometric View Note",
         ),
         required=(
@@ -90,7 +86,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Elevation View Note",
+            "Front View Note",
             "Isometric View Note",
         ),
     )
@@ -101,28 +97,29 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         drawing_model,
         {
-            0: "Pen Wire Manufacturing Drawing",
+            0: "Lever Wire (WIRE 1) Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pen wire; amplification wire 2; straight steel run",
+            3: "lever wire; purchased music wire; amplification chain",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
+
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=WIRE_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=WIRE_SCALE)
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.086)
-    add_property_linked_note(adapter, "Elevation View Note", 0.040, 0.036)
-    add_property_linked_note(adapter, "Isometric View Note", 0.270, 0.100)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
+    add_property_linked_note(adapter, "Front View Note", 0.100, 0.100)
+    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.100)
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Pen Wire Manufacturing Drawing",
+        pdf_title="Lever Wire (WIRE 1) Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )

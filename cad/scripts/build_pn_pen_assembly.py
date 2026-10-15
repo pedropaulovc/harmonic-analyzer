@@ -26,7 +26,7 @@ the curve. Everything below the guides rides the rod:
 * pn-pen-adjust-screw + vn-pen-adjust-nut -- the height adjuster on the rod
   top: the stud threads into the rod's #0-80 tap, the jam nut locks it, and
   the pen wire ties through its eye.
-* pn-pen-wire -- WIRE 2's straight rest-pose run hanging PLUMB from the wheel
+* vn-pen-wire -- WIRE 2's straight rest-pose run hanging PLUMB from the wheel
   rim's 3 o'clock tangent onto the stud's eye head (the rod line is the rim's
   mid-plane), locked to the rod so it rides the pen travel. The rim wrap and
   tie-off are not modeled; the kinematic coupling stays a Motion-study mate
@@ -109,7 +109,7 @@ from pn_pen_hanger_spec import (
     SCREW_HOLE_XY as HANGER_HOLE_XY,
     STRAP_Z as HANGER_STRAP_Z,
 )
-from pn_pen_wire_geom import (
+from vn_pen_wire_geom import (
     WHEEL_BAR_Y,
     WHEEL_MID_Z,
     WIRE_BOTTOM as PEN_WIRE_BOTTOM,
@@ -222,7 +222,7 @@ RIDERS = (
     ("vn-pen-rod-set-screw", ROD_SET_SCREW_POS, ROD_SET_SCREW_ROWS),
     ("pn-pen-adjust-screw", STUD_POS, IDENTITY),
     ("vn-pen-adjust-nut", NUT_POS, NUT_ROWS),
-    ("pn-pen-wire", PEN_WIRE_BOTTOM, IDENTITY),
+    ("vn-pen-wire", PEN_WIRE_BOTTOM, IDENTITY),
 )
 
 

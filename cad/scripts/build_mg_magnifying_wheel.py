@@ -120,10 +120,10 @@ MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
 # wire radius) at the lever-wire's tangency azimuth, in the wheel mid-plane. The
 # magnifier assembly holds it COINCIDENT to the lever-wire's YokePlane, tying the
 # wheel's spin to the lever group's travel along the wire (the linearized
-# inextensible-wire constraint -- see build_mg_lever_wire's docstring). The azimuth
-# is layout-derived, so it is imported from mg_lever_wire_geom: a layout move
+# inextensible-wire constraint -- see build_vn_lever_wire's docstring). The azimuth
+# is layout-derived, so it is imported from vn_lever_wire_geom: a layout move
 # re-tangents the wire AND re-stamps this point in one rebuild.
-from mg_lever_wire_geom import (  # noqa: E402
+from vn_lever_wire_geom import (  # noqa: E402
     WHEEL_BAR_Y as _YOKE_WHEEL_Y,
     WHEEL_X as _YOKE_WHEEL_X,
     YOKE_POINT as _YOKE_POINT,

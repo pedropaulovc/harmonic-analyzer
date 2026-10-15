@@ -11,10 +11,10 @@ spigot-groove front tangent to the XY-tangent point on the drum. The
 fixture/drum wraps, the tie-off and the wire's compliance are NOT modeled (the kinematic
 coupling stays a Motion-study gear mate -- cad/docs/motion-policy.md); every
 surface stands >= 0.25 off its neighbour so the interference gate reads zero
-(mg_lever_wire_geom.RUN_GAPS: the run vs the rim, spoke and boss pen-side
+(vn_lever_wire_geom.RUN_GAPS: the run vs the rim, spoke and boss pen-side
 faces, and the drum-end z inside the drum's span).
 
-Endpoint derivation lives in the drawing-free ``mg_lever_wire_geom`` module (the
+Endpoint derivation lives in the drawing-free ``vn_lever_wire_geom`` module (the
 part's length is the distance between them); ``build_mg_magnifier_assembly``
 imports ``WIRE_START``/``WIRE_END``/``WIRE_LEN`` from THERE and asserts them
 against its own layout anchors, so a layout move fails loud instead of
@@ -33,8 +33,9 @@ linearized inextensible-wire constraint, sign and ratio straight from the
 geometry. Exact at the rest pose; a linearization away from it (same
 convention as the Motion study's WIRE 2 yoke).
 
-Dimensions: cad/config/dimensions.yaml ch. 20-21 -- wire dia photo-scaled
-(the book wire is hair-thin; 0.8 keeps it renderable, low confidence).
+Stock: purchased McMaster-Carr 9666K56 music wire (0.031 in, ASTM A228), cut
+from the coil (MHA-VN-066); modelled at the Ø0.8 design nominal, which lies in
+the catalogue band (``vn_lever_wire_geom``).
 
 Layout: wire axis along +Y from the origin (the assembly turns it onto the
 DRUM->HOOK direction -- the part ORIGIN is the DRUM end, so the Top plane and
@@ -42,7 +43,7 @@ its YokePlane offset sit at the drum-end tangency), length ``WIRE_LEN``.
 
 Run (SolidWorks already open)::
 
-    uv run python cad\scripts\build_mg_lever_wire.py
+    uv run python cad\scripts\build_vn_lever_wire.py
 """
 
 from __future__ import annotations
@@ -67,21 +68,21 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _visibility import blank_reference_geometry
-from mg_lever_wire_spec import (
+from vn_lever_wire_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
 )
 
-PART_NAME = "mg-lever-wire"
+PART_NAME = "vn-lever-wire"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
-# The endpoint/yoke SOLVER lives in the drawing-free ``mg_lever_wire_geom`` module
+# The endpoint/yoke SOLVER lives in the drawing-free ``vn_lever_wire_geom`` module
 # (codex #360): the wheel + assembly import the anchors from THERE, so this
-# build script's drawing-contract imports (``mg_lever_wire_spec``) never enter
+# build script's drawing-contract imports (``vn_lever_wire_spec``) never enter
 # their recipe closures. Re-exported here unchanged for this build's own use.
-from mg_lever_wire_geom import (  # noqa: E402
+from vn_lever_wire_geom import (  # noqa: E402
     WIRE_DIA,
     WIRE_LEN,
     YOKE_PLANE_OFFSET,

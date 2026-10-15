@@ -7,7 +7,7 @@ import math
 import pytest
 
 import build_mg_magnifier_assembly as assembly
-import mg_lever_wire_geom as wire
+import vn_lever_wire_geom as wire
 import mg_output_fixture_geom as fixture
 from _mcmaster_91882a221 import HEAD_STACK_LEN, SHANK_LEN, THUMB_SPEC
 from mg_magnifying_vertical_rod_geom import ROD_DIA
