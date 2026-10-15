@@ -19,7 +19,7 @@ import fr_nameplate_drawing_spec as print_spec
 import fr_nameplate_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _release_artwork import bundle_path
 from vn_fillister_screw_spec import HEAD_DIA
 
@@ -547,8 +547,66 @@ def test_heads_stay_on_the_border_at_the_worst_printed_station() -> None:
             assert not dxf.point_in_ring(field, point), (hx, hy, point)
 
 
-def test_hole_ligaments_and_engraving_floor_at_the_printed_worst_case() -> None:
-    assert min(print_spec.HOLE_LIGAMENTS_WORST.values()) >= print_spec.LIGAMENT_FLOOR
+def _corner_worst_centres(
+    stations: tuple[tuple[float, float], ...],
+) -> list[tuple[float, float]]:
+    # Each hole driven to the least printed station from BOTH of its corner's
+    # edges at once: the sheet prints one .X value per edge pair (2X), the
+    # smallest of the pair's stations rounded, and accepts that value - 0.8.
+    width, height = spec.PLATE_WIDTH, spec.PLATE_HEIGHT
+    left = min(x for x, _ in stations if x < width / 2.0)
+    right = min(width - x for x, _ in stations if x > width / 2.0)
+    bottom = min(y for _, y in stations if y < height / 2.0)
+    top = min(height - y for _, y in stations if y > height / 2.0)
+    least = {
+        name: round(value, 1) - printed_band_mm(1)
+        for name, value in (
+            ("left", left),
+            ("right", right),
+            ("bottom", bottom),
+            ("top", top),
+        )
+    }
+    return [
+        (
+            least["left"] if x < width / 2.0 else width - least["right"],
+            least["bottom"] if y < height / 2.0 else height - least["top"],
+        )
+        for x, y in stations
+    ]
+
+
+def _ring_of_ligament_holds(centre: tuple[float, float], radius: float) -> bool:
+    outline = _rings(part.OUTLINE_DXF)[0]
+    return all(
+        dxf.point_in_ring(
+            outline,
+            (
+                centre[0] + radius * math.cos(math.radians(degrees / 4.0)),
+                centre[1] + radius * math.sin(math.radians(degrees / 4.0)),
+            ),
+        )
+        for degrees in range(4 * 360)
+    )
+
+
+def test_hole_ligament_holds_with_each_hole_driven_into_its_rounded_corner() -> None:
+    # PR #1468 r3: the corner arcs, not the straight edges, are nearest. A
+    # drilled hole at 3.05 printed + 0.10 plus the 1.5 floor must stay inside
+    # the outline with every hole pushed toward its corner in X and Y at once.
+    radius = (round(part.SCREW_HOLE_DIA, 2) + drilled_oversize_mm()) / 2.0 + 1.5
+    for centre in _corner_worst_centres(spec.SCREW_XY):
+        assert _ring_of_ligament_holds(centre, radius), centre
+    # At the traced head marks (4.05 from each edge, printing 4.1) the same
+    # hole breaks the floor at the corner: the inset is what clears it.
+    assert not any(
+        _ring_of_ligament_holds(centre, radius)
+        for centre in _corner_worst_centres(spec.HEAD_MARK_XY)
+    )
+    assert print_spec.HOLE_LIGAMENT_WORST >= print_spec.LIGAMENT_FLOOR
+
+
+def test_engraving_floor_at_the_printed_worst_case() -> None:
     floor = (
         spec.PLATE_THICKNESS
         - printed_band_mm(3)

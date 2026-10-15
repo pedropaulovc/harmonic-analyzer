@@ -40,6 +40,8 @@ asserts the literal rows against ``rows_from_euler(MOUNT_EULER)`` at import.
 
 from __future__ import annotations
 
+import math
+
 # --- Photo-traced DXF measurements BEFORE the 2026-10-09 rebake (mm). ---
 # The brief's 39.892 was rounded; preserve the measured outer-loop height and
 # uniformly scale every contour. These data need no DXF/CAD dependency at import.
@@ -61,11 +63,31 @@ PLATE_THICKNESS = 1.5  # thin brass plate; p.71 edge read (low)
 
 # Four slotted screw-head marks in the traced DXF, measured at each mark's
 # combined contour bbox centre. Preserve their slight asymmetry rather than a
-# single nominal inset: each #4 CLOSE hole coincides with its traced head mark.
-# The raised border's notches keep the heads off the recessed field.
-SCREW_XY = tuple(
+# single nominal inset. The raised border's notches keep the heads off the
+# recessed field.
+HEAD_MARK_XY = tuple(
     ((x - DXF_OUTER_ORIGIN[0]) * DXF_SCALE, (y - DXF_OUTER_ORIGIN[1]) * DXF_SCALE)
     for x, y in DXF_SCREW_XY
+)
+# Owner ruling 2026-10-15: nameplate holes and frame taps moved inward for
+# corner ligament (PR #1468 r3 review). Each hole sits concentric with the
+# outline's rounded corner, so at the head marks a hole drilled at both
+# printed .X station minima (4.1 - 0.8 = 3.3 from each edge) leaves only
+# 1.41 to the corner arc (rule 17's floor is 1.5). Moving each hole
+# SCREW_INSET toward the plate centre in x and y lifts every station past
+# 4.15, so it prints 4.2 and its minimum is 3.4: 1.56 to the arc
+# (fr_nameplate_drawing_spec.HOLE_LIGAMENT_WORST measures it on the DXF).
+# 0.0972 is the least inset that does it; 0.1 keeps the stations off the .X
+# rounding knife-edge without a band. The heads (R2.32) still cover the
+# engraved marks (R2.16 + 0.14 offset). The base's blind seats derive from
+# these stations through MOUNT_HOLE_XZ, so they move with them.
+SCREW_INSET = 0.1
+SCREW_XY = tuple(
+    (
+        x + math.copysign(SCREW_INSET, PLATE_WIDTH / 2.0 - x),
+        y + math.copysign(SCREW_INSET, PLATE_HEIGHT / 2.0 - y),
+    )
+    for x, y in HEAD_MARK_XY
 )
 
 # --- Mount transform in the machine frame (see the module docstring). ---
@@ -90,7 +112,7 @@ MOUNT_NORMAL = tuple(MOUNT_ROWS[2])
 # plate lies horizontal (MOUNT_NORMAL is +Y).
 MOUNT_FRONT_Y = MOUNT_POS[1]
 MOUNT_BACK_Y = mount_point((0.0, 0.0, -PLATE_THICKNESS))[1]  # 50.8
-# The four screw axes in the machine frame -- the plate-local DXF marks mapped
+# The four screw axes in the machine frame -- the plate-local stations mapped
 # through the mount rows (x = MOUNT_POS[0] - y_local, z = MOUNT_POS[2] - x_local).
 # These are the base's tapped-seat stations; each axis runs along -Y into the deck.
 MOUNT_HOLE_XZ = tuple(

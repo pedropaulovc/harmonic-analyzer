@@ -4,7 +4,7 @@ The 2026-10-09 ruling makes the original outer ribbon's OUTER edge the plate
 outline, uniformly scaled to 100 mm wide. That edge is imported for the slab;
 the ribbon itself is omitted from the engraving so it cannot nick the plate.
 The recessed field follows the notched pinstripe INNER edge, copied into its
-own single-loop DXF. Screw holes must coincide with the traced head marks and
+own single-loop DXF. Screw holes sit just inside the traced head marks and
 the whole head must bear on the raised border, not the sunken field.
 
 Reuse the repo's ASCII DXF/polygon helpers: no ezdxf or CAD kernel is needed.
@@ -126,22 +126,31 @@ def test_field_is_exactly_the_pinstripe_inner_edge_and_has_pinned_area():
     assert all(dxf.point_in_ring(outline, point) for point in field)
 
 
-def test_screw_stations_coincide_with_the_dxf_head_marks():
+def test_screw_stations_sit_the_inset_off_the_dxf_head_marks():
+    # Owner ruling 2026-10-15: each hole moved SCREW_INSET toward the plate
+    # centre in x and y from its traced head mark, and the head still covers
+    # the engraved mark.
     rings = _rings(part.ENGRAVING_DXF)
-    assert len(spec.SCREW_XY) == 4
-    for station in spec.SCREW_XY:
+    assert len(spec.SCREW_XY) == len(spec.HEAD_MARK_XY) == 4
+    for (sx, sy), mark_xy in zip(spec.SCREW_XY, spec.HEAD_MARK_XY, strict=True):
         # Each slotted head is two ribbon halves, each with an inner counter.
         # Identify by geometry, not DXF ordering/handles, to tolerate a re-export.
         mark = []
         for ring in rings:
             x0, y0, x1, y1 = dxf.bbox([ring])
             centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
-            if x1 - x0 < 5.0 and y1 - y0 < 5.0 and math.dist(centre, station) < 1.0:
+            if x1 - x0 < 5.0 and y1 - y0 < 5.0 and math.dist(centre, mark_xy) < 1.0:
                 mark.append(ring)
-        assert len(mark) == 4, (station, len(mark))
+        assert len(mark) == 4, (mark_xy, len(mark))
         x0, y0, x1, y1 = dxf.bbox(mark)
         centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
-        assert math.dist(centre, station) < 0.01, (station, centre)
+        assert math.dist(centre, mark_xy) < 0.01, (mark_xy, centre)
+        toward_centre_x = math.copysign(1.0, spec.PLATE_WIDTH / 2.0 - centre[0])
+        toward_centre_y = math.copysign(1.0, spec.PLATE_HEIGHT / 2.0 - centre[1])
+        assert sx - centre[0] == pytest.approx(toward_centre_x * 0.1, abs=0.01)
+        assert sy - centre[1] == pytest.approx(toward_centre_y * 0.1, abs=0.01)
+        reach = max(math.dist((sx, sy), point) for ring in mark for point in ring)
+        assert reach < HEAD_DIA / 2.0, (sx, sy, reach)
 
 
 def test_screw_holes_and_heads_stay_on_the_raised_plate_border():

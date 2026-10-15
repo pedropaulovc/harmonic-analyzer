@@ -41,7 +41,7 @@ DXFs, so every import uses scale=1, position=(0,0). The remaining engraving
 cuts both directions to reach the field floor: lettering incises the sunk
 field and the pinstripe incises the raised border. The SolidWorks-free
 ``test_fr_nameplate_geometry`` guards the files, field/outline areas, and
-the coincidence of the clearance stations with the traced screw-head marks.
+each clearance station's SCREW_INSET offset from its traced screw-head mark.
 
 Mounting (2026-09-02 re-derive off ch26 p.71 ``page001_img01``): FOUR brass
 slotted round-head screws, one per corner, heads riding the pinstripe corners

@@ -2014,10 +2014,12 @@ def test_underside_pads_sheet_prints_each_pad_and_lug_from_x0_y0() -> None:
         "LockPadY": 247.3,
         "FootBossX": 195.4,
         "FootBossY": 67.2,
-        "NameplateBoss2X": 350.3,
-        "NameplateBoss2Y": 97.7,
-        "NameplateBoss0X": 387.5,
-        "NameplateBoss3Y": 189.5,
+        # Each 0.1 toward the plate centre (owner ruling 2026-10-15: nameplate
+        # holes and frame taps moved inward for corner ligament).
+        "NameplateBoss2X": 350.4,
+        "NameplateBoss2Y": 97.8,
+        "NameplateBoss0X": 387.4,
+        "NameplateBoss3Y": 189.4,
         "LockPadWidth": 16.0,
         "PedestalPadLength": 26.0,
         "PedestalPad0Width": 16.0,

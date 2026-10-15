@@ -18,7 +18,11 @@ the sheet rather than redrawn as dimensions.
 
 from __future__ import annotations
 
+import math
+
+from _dxf_text import read_lwpolylines
 from _hole_spec import CLEARANCE_MM
+from _paths import REFERENCES_DIR
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from _release_artwork import bundle_path
 from fr_nameplate_spec import PLATE_HEIGHT, PLATE_THICKNESS, PLATE_WIDTH, SCREW_XY
@@ -123,6 +127,14 @@ if ENGRAVING_FLOOR_MIN <= 0.0:
         f"engraving can reach through the plate: {ENGRAVING_FLOOR_MIN}"
     )
 
+# The three vendored contours the build imports (cad/references), named on the
+# sheet by the path cut_release stages each at in the release bundle, spelled
+# exactly as the file is (lower case: the path must open as printed). No
+# digits, no method: the shop cuts them however it engraves.
+OUTLINE_DXF_NAME = "fr-nameplate-outline.dxf"
+FIELD_DXF_NAME = "fr-nameplate-field.dxf"
+ENGRAVING_DXF_NAME = "fr-nameplate-engraving.dxf"
+
 # Each hole's station from its adjacent edges, as the sheet prints it.
 SCREW_HOLE_DIA = CLEARANCE_MM[("#4", "close")]
 HOLE_EDGE_STATIONS: dict[str, float] = {
@@ -138,17 +150,74 @@ _STATION_PLACES = {
     "top": DRAWING_PRECISION[FACE_REFERENCE]["TopHoleStation"],
 }
 
-# Edge ligaments at the printed worst case: the largest drilled hole at the
-# station's least accepted value (drawing-guidelines.md rule 17's 1.5 floor).
+# Edge ligaments at the printed worst case (drawing-guidelines.md rule 17's
+# 1.5 floor), measured to the vendored outline itself: each hole is concentric
+# with a rounded corner, so the corner arc, not a straight edge, is nearest
+# when the shop drills both stations at their minima (PR #1468 r3 review).
+# Each hole locates from its corner's two edges, so its accepted centres are
+# the rectangle of the two printed station limits in that corner's DXF frame.
+# The outline is convex (asserted), and distance to a convex boundary is
+# concave inside it, so the least distance over a rectangle lies at one of its
+# four vertices. The largest hole is the callout's printed .XX diameter (never
+# under the model's) plus the DRILLED HOLES allowance.
 LIGAMENT_FLOOR = 1.5
-_HOLE_R_MAX = (SCREW_HOLE_DIA + drilled_oversize_mm()) / 2.0
-HOLE_LIGAMENTS_WORST: dict[str, float] = {
-    edge: station + printed_deviations(station, _STATION_PLACES[edge])[0] - _HOLE_R_MAX
-    for edge, station in HOLE_EDGE_STATIONS.items()
-}
-if min(HOLE_LIGAMENTS_WORST.values()) < LIGAMENT_FLOOR:
+_HOLE_R_MAX = (
+    max(SCREW_HOLE_DIA, round(SCREW_HOLE_DIA, 2)) + drilled_oversize_mm()
+) / 2.0
+_OUTLINE_TEXT = (REFERENCES_DIR / OUTLINE_DXF_NAME).read_text(encoding="ascii")
+_OUTLINE = read_lwpolylines(_OUTLINE_TEXT[_OUTLINE_TEXT.find("\nENTITIES\n") :])[0][0]
+_TURNS = [
+    (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0])
+    for a, b, c in zip(
+        _OUTLINE, _OUTLINE[1:] + _OUTLINE[:1], _OUTLINE[2:] + _OUTLINE[:2]
+    )
+]
+if min(_TURNS) < 0.0 < max(_TURNS):
+    raise AssertionError("the nameplate outline is no longer convex")
+
+
+def _outline_distance(point: tuple[float, float]) -> float:
+    """Least distance from ``point`` to the outline's polyline."""
+    best = math.inf
+    for (ax, ay), (bx, by) in zip(_OUTLINE, _OUTLINE[1:] + _OUTLINE[:1]):
+        dx, dy = bx - ax, by - ay
+        length2 = dx * dx + dy * dy
+        t = 0.0
+        if length2 > 0.0:
+            t = min(
+                1.0, max(0.0, ((point[0] - ax) * dx + (point[1] - ay) * dy) / length2)
+            )
+        best = min(best, math.hypot(point[0] - ax - t * dx, point[1] - ay - t * dy))
+    return best
+
+
+def _station_limits(edge: str) -> tuple[float, float]:
+    station = HOLE_EDGE_STATIONS[edge]
+    lower, upper = printed_deviations(station, _STATION_PLACES[edge])
+    return station + lower, station + upper
+
+
+def _accepted_centres(x: float, y: float) -> list[tuple[float, float]]:
+    """The four extreme accepted centres of the hole nearest (x, y)'s corner."""
+    if x < PLATE_WIDTH / 2.0:
+        xs = _station_limits("left")
+    else:
+        xs = tuple(PLATE_WIDTH - limit for limit in _station_limits("right"))
+    if y < PLATE_HEIGHT / 2.0:
+        ys = _station_limits("bottom")
+    else:
+        ys = tuple(PLATE_HEIGHT - limit for limit in _station_limits("top"))
+    return [(cx, cy) for cx in xs for cy in ys]
+
+
+HOLE_LIGAMENT_WORST = min(
+    _outline_distance(centre) - _HOLE_R_MAX
+    for x, y in SCREW_XY
+    for centre in _accepted_centres(x, y)
+)
+if HOLE_LIGAMENT_WORST < LIGAMENT_FLOOR:
     raise AssertionError(
-        f"nameplate screw-hole ligaments {HOLE_LIGAMENTS_WORST} under {LIGAMENT_FLOOR}"
+        f"nameplate screw-hole ligament {HOLE_LIGAMENT_WORST:.3f} under {LIGAMENT_FLOOR}"
     )
 # The largest station shift any accepted plate may show, for the head-on-border
 # check the offline test runs against the vendored field contour.
@@ -173,13 +242,6 @@ SECTION_CALLOUTS = {
 FLOOR_UNDER_ENGRAVING_CALLOUT = "FLOOR UNDER ENGRAVING"
 HOLE_CALLOUT_PROCESS = "DRILL"
 
-# The three vendored contours the build imports (cad/references), named on the
-# sheet by the path cut_release stages each at in the release bundle, spelled
-# exactly as the file is (lower case: the path must open as printed). No
-# digits, no method: the shop cuts them however it engraves.
-OUTLINE_DXF_NAME = "fr-nameplate-outline.dxf"
-FIELD_DXF_NAME = "fr-nameplate-field.dxf"
-ENGRAVING_DXF_NAME = "fr-nameplate-engraving.dxf"
 MANUFACTURING_NOTES = "\n".join(
     (
         f"OUTLINE AND CORNERS PER {bundle_path(OUTLINE_DXF_NAME)}",
