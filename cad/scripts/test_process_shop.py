@@ -141,12 +141,22 @@ def test_placeholder_marker_is_the_shared_constant():
     assert len(plans.shop_placeholders()) == tracked + spliced > 0
 
 
+def _nested(
+    qualified: str, item: str, record: dict[str, Any]
+) -> Iterator[tuple[str, str, dict[str, Any]]]:
+    yield qualified, item, record
+    for key, value in record.items():
+        if isinstance(value, dict):
+            yield from _nested(f"{qualified}.{key}", key, value)
+
+
 def _records() -> Iterator[tuple[str, str, dict[str, Any]]]:
+    """Every inventory record, including nested ones such as a kit's members."""
     for category, items in _shop("inventory.toml").items():
         if isinstance(items, dict):
             for item, record in items.items():
                 if isinstance(record, dict):
-                    yield f"{category}.{item}", item, record
+                    yield from _nested(f"{category}.{item}", item, record)
 
 
 def test_shop_made_records_are_enumerated():
