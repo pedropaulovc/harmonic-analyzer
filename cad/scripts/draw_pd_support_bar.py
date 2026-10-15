@@ -14,7 +14,7 @@ carries the four counterbored clamp-screw holes.
 * The lower view looks on the front face (``*Back``, so the left end is on
   the sheet's right): the banded height, the clamp row's stations from the
   same end and its height (ClampRowReference), the counterbores' native
-  callout (depth at .XXX) and the front face's slide roughness. Each
+  callout (depth at .XX) and the front face's slide roughness. Each
   roughness symbol has its reason beside it; the sheet has no general note.
 * Each face view carries its caption; section A-A cuts the pivot tap across
   the bar: the banded thickness, the drill's depth limits and the full
@@ -345,7 +345,7 @@ def _drop_thread_class(adapter: Any, display: Any) -> None:
 
 def _name_clamp_screws(display: Any) -> None:
     """Hang the screws' part number under the counterbores' native callout,
-    and print its depth at the .XXX its head clearance needs."""
+    and print its depth at the .XX its head clearance takes."""
     set_hole_callout_precision(
         display,
         {"hw-cbdepth": CLAMP_CBORE_DEPTH_PLACES},

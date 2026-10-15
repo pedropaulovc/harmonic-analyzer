@@ -42,10 +42,10 @@ from pd_support_bar_spec import (
 TOL_MIN = 5  # swTolMIN
 TOL_MAX = 6  # swTolMAX
 HOLE_POSITION_PLACES = 3  # the hanger holes' ±0.065 prints .XXX
-# The clamp counterbores' depth prints .XXX: under its band the shallowest
+# The clamp counterbores' depth prints .XX: under its band the shallowest
 # depth still sinks the clamp-screw head below the front face the platen
 # slides across (build_pd_support_bar.CLAMP_HEAD_RECESS).
-CLAMP_CBORE_DEPTH_PLACES = 3
+CLAMP_CBORE_DEPTH_PLACES = 2
 HANGER_STATION_NAMES = ("PivotTapStation", "BracketTapStation1", "BracketTapStation2")
 CLAMP_STATION_NAMES = (
     "ClampStation1",
