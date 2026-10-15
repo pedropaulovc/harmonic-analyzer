@@ -6,6 +6,9 @@ import math
 
 import pytest
 
+import _config
+import dt_crank_pin_ring_spec as ring
+import dt_crank_pin_spec as pin
 import vn_keeper_chain_spec as chain
 
 
@@ -27,6 +30,45 @@ def test_each_strand_reaches_the_withdrawn_pin() -> None:
     assert chain.OUTER_LENGTH >= chain.OUTER_REACH + chain.PITCH
     # The pin comes all the way out of the hub, not just loose in it.
     assert chain.PIN_X0 + chain.PIN_LENGTH - chain.PIN_WITHDRAWAL < -chain.HUB_R
+
+
+def _band(places: int) -> float:
+    return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+
+
+def test_ring_swung_outboard_clears_the_arm_at_its_worst_printed_reach() -> None:
+    # Owner ruling 2026-10-15 A1: the ring reaches outboard (-X) past the
+    # pin's big end. Hung toward -Y along the arm, as first placed, the
+    # nominal ring's low arc ran into the arm's inboard face.
+    nominal_crown = ring.ARC_SAGITTA / 2.0
+    assert chain.RING_HANG == (-1.0, 0.0, 0.0)
+    assert chain.ring_arm_air(90.0, ring.MEAN_R, nominal_crown, chain.RING_X) < 0.0
+    assert chain.RING_ARM_AIR_NOMINAL == pytest.approx(
+        chain.ring_arm_air(0.0, ring.MEAN_R, nominal_crown, chain.RING_X)
+    )
+    # The largest ring the title block accepts, crowned against the hole's
+    # hub-side wall with the hole at its .XX station's hub-side limit, clears
+    # the arm across the swing a worst-printed ring rests in.
+    ring_id_max = round(ring.RING_ID, ring.RING_ID_PLACES) + _band(ring.RING_ID_PLACES)
+    assert ring.RING_ID_MAX == pytest.approx(ring_id_max)
+    worst = min(
+        chain.ring_arm_air(
+            float(swing),
+            (ring_id_max + ring.WIRE_DIA) / 2.0,
+            (pin.RING_HOLE_DIA - ring.WIRE_DIA) / 2.0,
+            chain.RING_X + _band(2),
+        )
+        for swing in range(-25, 26)
+    )
+    assert worst == pytest.approx(chain.RING_ARM_AIR_WORST)
+    assert worst >= chain.RING_ARM_AIR > 0.0
+    assert worst < chain.RING_ARM_AIR_NOMINAL
+
+
+def test_nominal_ring_threads_the_hole_edges_in_its_posed_plane() -> None:
+    # In the pin's axial plane the wire leaves the hole along the pin's top
+    # line, so the hole's edges are tighter than its wall.
+    assert 0.0 < chain.A1_HOLE_AIR < ring.HOLE_AIR
 
 
 def test_one_closed_loop_through_both_wires() -> None:
@@ -88,8 +130,6 @@ def test_chain_edges_fit_the_balloon_walk() -> None:
 
 
 def test_purchased_parts_name_their_skus() -> None:
-    import _config
-
     assert _config.parts("vn-keeper-chain")["supplier_skus"] == [chain.CHAIN_SKU]
     assert _config.parts("vn-keeper-chain-link")["supplier_skus"] == [chain.LINK_SKU]
     assert int(_config.parts("vn-keeper-chain-link")["quantity"]) == 1

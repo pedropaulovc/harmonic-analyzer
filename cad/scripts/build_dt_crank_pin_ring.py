@@ -4,11 +4,12 @@ The round brass wire ring hanging from the crank taper pin's head
 (page002_img01), threaded through the pin's cross-hole. A torus of MEAN_R on
 the wire centreline, with a small bead at its silver-soldered joint; the
 cross-hole is sized for its arc (see
-``dt_crank_pin_ring_spec``), and the keeper chain (MHA-VN-035) loops its bottom.
+``dt_crank_pin_ring_spec``), and the keeper chain (MHA-VN-035) loops its far side.
 
 Layout: the origin is on the cross-hole axis (local Z) and the ring lies in
 the local XZ plane, its centre RING_CENTRE_X along local +X. The drive train
-maps local +X to machine -Y, so the ring hangs below the pin.
+maps local +X to machine -X, so the ring reaches outboard past the pin's big
+end, clear of the crank arm (owner ruling 2026-10-15 A1).
 
 ``RingReference`` (blanked, on the Top plane, the ring's own plane): a circle
 on the ring's inside edge whose one diameter carries the ring's controlling
