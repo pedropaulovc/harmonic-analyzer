@@ -1776,6 +1776,7 @@ def test_underside_round_boss_diameters_name_their_level_and_holes() -> None:
     assert sheet.UNDERSIDE_SECTION_CALLOUTS == {
         "DeepBossBottom": "DEEP\nLEVEL",
         "ShallowBossBottom": "SHALLOW\nLEVEL",
+        "RibRelief": "BOTH\nRIBS",
     }
     # The leaders land on E1's boss and the rear-west nameplate tap's, both
     # in the view's top-right quarter (+Z up), so they drop from the texts.
@@ -2499,3 +2500,19 @@ def test_pedestal_pad_row_keeps_its_arrows_inside_clear_of_the_title_block(
         )
     with pytest.raises(RuntimeError, match="no dimension to set arrows inside"):
         sheet._set_pads_arrows_inside(object(), [annotation("LockPadWidth", lock)])
+
+
+def test_section_rib_relief_names_both_ribs() -> None:
+    # plate-r5 review: B-B cuts only the long rib, so the cross rib's level
+    # was in no view. Both ribs' reliefs are driven by "RibRelief", so the
+    # one printed height says it governs both.
+    import inspect
+
+    import draw_fr_harmonic_base as sheet
+
+    assert sheet.UNDERSIDE_SECTION_CALLOUTS["RibRelief"] == "BOTH\nRIBS"
+    # One loop builds both ribs: each relief is equated to "RibRelief".
+    source = inspect.getsource(part)
+    assert "(rib_dims[1], '\"RibRelief\"')" in source
+    extrude = "extrude_at_offset(adapter, POCKET_CEILING_Y - RIB_RELIEF, RIB_RELIEF)"
+    assert source.count(extrude) == 1
