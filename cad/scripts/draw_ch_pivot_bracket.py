@@ -10,11 +10,11 @@ dimension the part build marks, places and bands
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -80,6 +80,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 PIVOT_SHAFT_NUMBER = str(_config.parts("ch-pivot-shaft")["number"])
+SUPPORT_NUMBER = str(_config.parts("fr-rocker-arm-support")["number"])
 
 SHEET_SCALE = (3.0, 1.0)  # 33.2 mm tall: 3:1 keeps the bore and the tap legible
 _S = SHEET_SCALE[0] / 1000.0  # sheet metres per model mm
@@ -89,12 +90,15 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet metres per model mm
 # face, the plan's TOP edge: a *Top view projects +Z downward) to FOOT_Z1 (the
 # free end, its bottom edge). Sheet bands, bottom up: bore-lateral lane 0.030,
 # elevation 0.040..0.140, foot-width lane 0.153, hole-lateral lane 0.164,
-# plan 0.172..0.222, apex tap callout ~0.236..0.248 under the zone frame.
+# plan 0.172..0.222, apex tap callout ~0.232..0.248 under the zone frame. The
+# views stand right of the sheet's left edge so the plan's left lane and the
+# elevation's height lanes have room; the plan's right lanes run out to the
+# isometric.
 _PART_MID_Y = EAR_TOP_Y / 2.0
 _FOOT_MID_Z = (FOOT_Z0 + FOOT_Z1) / 2.0
-FRONT_CENTER = (0.115, 0.090)
+FRONT_CENTER = (0.160, 0.090)
 TOP_CENTER = (FRONT_CENTER[0], 0.197)
-ISO_CENTER = (0.320, 0.170)
+ISO_CENTER = (0.365, 0.170)
 _WEST_X = FRONT_CENTER[0] - FOOT_W / 2.0 * _S
 _EAST_X = FRONT_CENTER[0] + FOOT_W / 2.0 * _S
 
@@ -122,41 +126,108 @@ FRONT_KEEP = {
     "BoreLateral": (FRONT_CENTER[0] - FOOT_W / 4.0 * _S, _front_y(0.0) - 0.010),
 }
 # Every plan length along the foot runs from the ear's INBOARD face (the plan's
-# top edge): the face fit-up sets and the fixtures hold Z0 on. The hole
-# station and foot length nest on the left; the tap station and the ear
-# thickness on the right, so each horizontal value text has its own column.
-# Both laterals start on the west side face, below the plan, where the foot
-# width nests outside them. Above the plan only the apex tap callout stands.
+# top edge): the face fit-up sets and the fixtures hold Z0 on. Only the hole
+# station stands on the left; the tap station, the ear thickness and the foot
+# length step out on the right, each text in its own column (the foot length's
+# extension lines leave the EAST corners, so on the left they would run the
+# whole top edge the tap's leader must cross). The tap station's text sits
+# just above its short span. Both laterals start on the west side face, below
+# the plan, where the foot width nests outside them. Above the plan's left
+# half only the apex tap callout stands.
 TOP_KEEP = {
-    "HoleStation": (_WEST_X - 0.018, _top_y((FOOT_Z0 + HOLE_Z) / 2.0)),
-    "FootLen": (_WEST_X - 0.051, _top_y(_FOOT_MID_Z)),
-    "SetScrewLocation": (_EAST_X + 0.016, _top_y(FOOT_Z0 / 2.0)),
-    "EarThick": (_EAST_X + 0.051, _top_y(0.0)),
-    "HoleDia": (FRONT_CENTER[0] + 0.050, _top_y(HOLE_Z) - 0.004),
+    "HoleStation": (_WEST_X - 0.031, _top_y(FOOT_Z0) - 0.0105),
+    "SetScrewLocation": (_EAST_X + 0.021, _top_y(FOOT_Z0) + 0.009),
+    "EarThick": (_EAST_X + 0.061, _top_y(0.0)),
+    "FootLen": (_EAST_X + 0.106, _top_y(FOOT_Z1) + 0.012),
+    "HoleDia": (FRONT_CENTER[0] + 0.045, _top_y(HOLE_Z)),
     "HoleLateral": (FRONT_CENTER[0] - FOOT_W / 4.0 * _S, _top_y(FOOT_Z1) - 0.008),
     "FootW": (FRONT_CENTER[0], _top_y(FOOT_Z1) - 0.019),
 }
 # REAM marks a fit bore, so the callout names its mate (drawing-guidelines.md
-# rule 4); the drilled hold-down hole says drill and through.
+# rule 4); the drilled hold-down hole says drill and through. The four
+# lengths that carry their own band say what the band holds: the hold-down
+# hole lands on the support's tapped seat and keeps its wall to the foot end,
+# the ear's faces are the bank's thrust faces, and the apex screw's cup must
+# land on the pivot shaft's flat (ch_pivot_bracket_spec, rocker_bank_layout).
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": f"REAM THRU\nSLIP FIT ON\nPIVOT SHAFT {PIVOT_SHAFT_NUMBER}",
     "HoleDia": "DRILL THRU",
+    "HoleStation": f"ON {SUPPORT_NUMBER} SEAT",
+    "FootLen": "HOLE END WALL",
+    "EarThick": "THRUST FACES",
+    "SetScrewLocation": "ON SHAFT FLAT",
 }
-# The apex tap runs down into the bore and stops there; the callout says
-# where the thread ends and nothing more (digit-free, rule 7).
-SET_SCREW_PROCESS = "TAP TO BORE"
-# Centre of the native tap callout's text, above the plan's top-left corner:
-# its leader drops from the shoulder's right end through the plan's top edge
-# to the tap, east of every left-lane extension line.
-SET_SCREW_CALLOUT_XY = (FRONT_CENTER[0] - 0.035, _top_y(FOOT_Z0) + 0.020)
+# The apex tap runs down into the bore and stops there. Both native extents
+# ("<hw-thru>", the drill's and the thread's) say so in words; the thread
+# class is the title block's; the thread's full-thread shortfall (a plain
+# fact, rule 20) closes the callout of the hole it describes.
+# Pending exception ruling: MHA-CH-008 set-screw engagement (#1371).
+SET_SCREW_PROCESS = "TAP"
+SET_SCREW_EXTENT = "TO BORE"
+SET_SCREW_QUALIFIER = SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
+# Centre of the native tap callout's text, above the plan's left half: its
+# leader drops from the block's right end through the plan's top edge to the
+# tap's east rim, east of the hole station's extension line (which ends at
+# the plan's centre) and west of the right lanes' (which start at its east
+# edge).
+SET_SCREW_CALLOUT_XY = (FRONT_CENTER[0] - 0.030, _top_y(FOOT_Z0) + 0.021)
 # The overall height's lane, outside the bore-height lane.
 OVERALL_HEIGHT_XY = (_WEST_X - 0.046, FRONT_CENTER[1])
-# The apex thread's full-thread shortfall, stated as a plain fact (rule 20)
-# in the free band over the title block, under the isometric.
-# Pending exception ruling: MHA-CH-008 set-screw engagement (#1371).
-ENGAGEMENT_NOTE = SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
-ENGAGEMENT_NOTE_XY = (0.225, 0.088)
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+_THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
+
+
+def set_screw_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Rewrite the native tap callout's definition parts (5..8).
+
+    Both ``<hw-thru>`` extents become TO BORE, the thread class goes (the
+    title block states it), and the engagement fact closes the thread's own
+    part, which prints last. Every Hole Wizard size variable stays.
+    """
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected tap callout parts: {definitions!r}")
+    if "\n".join(definitions.values()).count("<hw-thru>") != 2:
+        raise RuntimeError(f"tap callout lacks its two native extents: {definitions!r}")
+    updated = {
+        part: text.replace("<hw-thru>", SET_SCREW_EXTENT)
+        for part, text in definitions.items()
+    }
+    thread_parts = [
+        part for part, text in updated.items() if "<hw-threadclass>" in text.lower()
+    ]
+    if len(thread_parts) != 1:
+        raise RuntimeError(f"tap thread line is not in one callout part: {updated!r}")
+    part = thread_parts[0]
+    without_class = re.sub(r" {2,}", " ", _THREAD_CLASS.sub(" ", updated[part]))
+    updated[part] = f"{without_class.rstrip()}\n{SET_SCREW_QUALIFIER}"
+    return updated
+
+
+@_telemetry.traced("drawing.pivot_bracket.tap_callout_text")
+def _set_tap_callout_text(display: Any) -> None:
+    """Write the rewritten definitions and prove they persisted."""
+    native = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = set_screw_callout_definitions(definitions)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            native.SetText(writable_part, updated[definition_part])
+    persisted = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved = {part: str(native.GetText(part) or "") for part in (1, 2, 3, 4)}
+    joined = "\n".join(resolved.values())
+    if (
+        persisted != updated
+        or joined.count(SET_SCREW_EXTENT) != 2
+        or "2B" in joined
+        or not any(
+            text.rstrip().endswith(SET_SCREW_QUALIFIER) for text in resolved.values()
+        )
+    ):
+        raise RuntimeError(
+            "apex tap callout text did not persist: "
+            f"definitions={persisted!r}, resolved={resolved!r}"
+        )
+    _telemetry.info(f"apex tap callout: {resolved!r}")
 
 
 def _set_reference_precision(display: Any, label: str) -> None:
@@ -386,18 +457,18 @@ async def build(adapter: Any) -> dict[str, str]:
     _show_arch_radius(adapter, front_annotations)
     adapter.currentModel.GraphicsRedraw2()
 
-    # Apex set-screw tap: the plan sees it end-on at the arch apex.
+    # Apex set-screw tap: the plan sees it end-on at the arch apex. Picked on
+    # its EAST rim so the leader leaves it eastward of the plan's centreline.
     tap_r = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) / 2.0 * _S
-    add_native_hole_callout(
+    tap_callout = add_native_hole_callout(
         adapter,
         top,
-        edge_xy=(TOP_CENTER[0] - tap_r, _top_y(0.0)),
+        edge_xy=(TOP_CENTER[0] + tap_r, _top_y(0.0)),
         callout_xy=SET_SCREW_CALLOUT_XY,
         label="apex set-screw tap",
         process=SET_SCREW_PROCESS,
     )
-    if add_note(adapter, ENGAGEMENT_NOTE, *ENGAGEMENT_NOTE_XY) is None:
-        raise RuntimeError("failed to add the apex thread engagement note")
+    _set_tap_callout_text(tap_callout)
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
     # unregenerated, and only a real mode change rebuilds it.
