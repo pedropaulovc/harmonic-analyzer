@@ -25,8 +25,10 @@ from __future__ import annotations
 
 import dt_crank_pin_eye_spec as eye
 
-# The loop's inside diameter, on the wire's inner edge.
-LOOP_ID = 2.0 * eye.LOOP_INNER_R
+# The loop's inside diameter, on the wire's inner edge, and its places: the
+# spec owns both, because the keeper chain asserts its bead passes the loop's
+# smallest printed size.
+LOOP_ID = eye.LOOP_ID
 
 # --- Drawing contract (drawing-simplicity-policy.md `How the repository implements the guidelines`: the PART owns places and bands). ---
 # ``WireProfile`` (Top plane) is the loop's wire circle, at the origin where
@@ -38,7 +40,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "WireProfile": {"WireDia": 1},
-    "EyeReference": {"LoopID": 1, "TailLen": 1},
+    "EyeReference": {"LoopID": eye.LOOP_ID_PLACES, "TailLen": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: decimals
