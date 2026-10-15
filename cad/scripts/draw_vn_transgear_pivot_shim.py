@@ -12,10 +12,12 @@ from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _session import run_build
 
 SPEC = DRAWINGS_BY_NAME["vn_transgear_pivot_shim"]
+# The footer's ITEM row: the catalogue designation in plain text.
+ITEM = "DIN 988 SHIM RING, ID 5 x OD 10 x 0.5 THK"
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_fastener_drawing(adapter, SPEC)
+    return await build_purchased_fastener_drawing(adapter, SPEC, item=ITEM)
 
 
 if __name__ == "__main__":
