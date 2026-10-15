@@ -195,9 +195,11 @@ BACK_KEEP = {
     "ClampRowHeight": (LEFT_END - 0.010, BACK_BOTTOM - 0.008),
 }
 # The counterbores' callout stands wholly right of the hole it points at, so
-# its leader slants right, off the clamp row height's extension line; its
-# four lines (the mate's first under the size) end where its three did.
-CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROW_X)) + 0.047, BACK_TOP + 0.0216)
+# its leader slants right, off the clamp row height's extension line. Its
+# text block centres 2.8 mm under this point, so its four lines (the mate's
+# under the size) run from ~156 down to ~136 mm: under the face view's
+# length line (160.2 mm, r7 audit text-on-line at +0.0216) and over the bar.
+CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROW_X)) + 0.047, BACK_TOP + 0.017)
 # The front face's slide roughness, seen face-on: a leader to a point clear
 # of the holes, the symbol above the view.
 FRONT_FINISH_MODEL_XY = (-150.0, 6.0)
