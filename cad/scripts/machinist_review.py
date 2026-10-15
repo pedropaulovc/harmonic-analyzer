@@ -265,7 +265,7 @@ def _validate_package(package: ReviewPackage) -> int:
 
 def _text_layers(package: ReviewPackage) -> str:
     """Exact sheet text for the package prompt; empty without PDF text."""
-    if not package.sources or os.environ.get("MACHINIST_REVIEW_TEXT_LAYER") == "off":
+    if not package.sources:
         return ""
     documents = []
     with SheetStore(package.sources) as store:
@@ -288,24 +288,13 @@ def _review_prompt(
         "\n\nPACKAGE INPUT\n"
         f"Sheet count: {sheet_count}.\n"
         f"Call view_sheet for sheets 1..{sheet_count} in order before judging.\n"
-        "Use only view_sheet, crop and sheet_text.\n"
+        "Use only view_sheet and crop.\n"
     )
     if sheet_count > 1:
         prompt += (
             "Compare every sheet against every other sheet before accepting SHIP.\n"
         )
     layers = _text_layers(package)
-    if (
-        not layers
-        and package.sources
-        and os.environ.get("MACHINIST_REVIEW_TEXT_LAYER") == "off"
-    ):
-        prompt += (
-            "\nSHEET TEXT LAYER\n"
-            "Not pre-injected for this run: fetch it with the sheet_text tool "
-            "(rect in view_sheet pixels; use the size view_sheet reports for a "
-            "whole sheet). It comes organized by sheet then view.\n"
-        )
     if layers:
         prompt += (
             "\nSHEET TEXT LAYER\n"
@@ -379,7 +368,7 @@ def build_claude_command(
         "--tools",
         "",
         "--allowedTools",
-        "mcp__sheets__view_sheet,mcp__sheets__crop,mcp__sheets__sheet_text",
+        "mcp__sheets__view_sheet,mcp__sheets__crop",
         "--restricted",
         "--setting-sources",
         "",
@@ -649,10 +638,10 @@ def _codex_sheet_call(payload: dict[str, Any]) -> dict[str, Any] | None:
     if payload.get("type") != "function_call":
         return None
     name, namespace = payload.get("name"), payload.get("namespace")
-    if namespace == "mcp__sheets" and name in {"view_sheet", "crop", "sheet_text"}:
+    if namespace == "mcp__sheets" and name in {"view_sheet", "crop"}:
         tool = name
     elif namespace in {None, "functions"} and name in {
-        "mcp__sheets__view_sheet", "mcp__sheets__crop", "mcp__sheets__sheet_text"
+        "mcp__sheets__view_sheet", "mcp__sheets__crop"
     }:
         tool = str(name).removeprefix("mcp__sheets__")
     else:
@@ -1194,7 +1183,7 @@ def evaluate_sheet_evidence(
                 name = node.get("name")
                 if name == "StructuredOutput":
                     continue
-                if name in {"mcp__sheets__view_sheet", "mcp__sheets__crop", "mcp__sheets__sheet_text"}:
+                if name in {"mcp__sheets__view_sheet", "mcp__sheets__crop"}:
                     tool = str(name).removeprefix("mcp__sheets__")
                     arguments = node.get("input")
                     successful = (attempt, str(node.get("id", ""))) in image_results
@@ -1202,7 +1191,7 @@ def evaluate_sheet_evidence(
                 reviewer == "codex"
                 and kind == "mcp_tool_call"
                 and node.get("server") == "sheets"
-                and node.get("tool") in {"view_sheet", "crop", "sheet_text"}
+                and node.get("tool") in {"view_sheet", "crop"}
             ):
                 tool = node["tool"]
                 arguments = node.get("arguments")

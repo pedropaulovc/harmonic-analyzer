@@ -25,7 +25,7 @@ from PIL import Image, ImageDraw
 import machinist_review as mr
 import machinist_review_sheets_mcp as sheets
 
-SHEET_TOOLS = {"mcp__sheets__view_sheet", "mcp__sheets__crop", "mcp__sheets__sheet_text"}
+SHEET_TOOLS = {"mcp__sheets__view_sheet", "mcp__sheets__crop"}
 
 
 def _clean_verdict(verdict: str = "SHIP") -> dict[str, Any]:
@@ -872,9 +872,9 @@ def test_prompts_share_the_static_load_prompt_prefix_for_every_package() -> None
             assert f"view_sheet for sheets 1..{sheet_count}" in tail
             # Codex's resource helpers are neutral; the prompt still names the tools.
             lines = tail.splitlines()
-            assert lines.count("Use only view_sheet, crop and sheet_text.") == 1
+            assert lines.count("Use only view_sheet and crop.") == 1
             view_line = next(i for i, line in enumerate(lines) if "view_sheet for sheets" in line)
-            assert lines[view_line + 1] == "Use only view_sheet, crop and sheet_text."
+            assert lines[view_line + 1] == "Use only view_sheet and crop."
             assert lines[-1] == "Return one verdict for the package as a whole."
             assert package.name not in tail
             tails.setdefault(package.kind, set()).add(tail)
@@ -945,46 +945,6 @@ def test_prompts_define_the_classification_contract() -> None:
         assert "FIX if and only if blockers" in prompt
         assert 'never invent a hybrid category such as "minor clarity"' in prompt
         assert "the first that applies in this precedence" in prompt
-
-
-def test_sheet_text_region_filters_rect_and_skips_the_crop_budget(
-    tmp_path: Path,
-) -> None:
-    source = _text_pdf(
-        tmp_path / "sheet.pdf",
-        [(100, 700, "UPPERLEFT"), (300, 200, "LOWERRIGHT")],
-    )
-    with sheets.SheetStore([source]) as store:
-        width, height = store.view_size(1)
-        region = store.sheet_text_region(1, 0, 0, width // 2, height // 2)
-        assert "UPPERLEFT" in region and "LOWERRIGHT" not in region
-        whole = store.sheet_text_region(1, 0, 0, width, height)
-        assert "UPPERLEFT" in whole and "LOWERRIGHT" in whole
-        with pytest.raises(ValueError):
-            store.sheet_text_region(1, 0, 0, width + 1, height)
-        server = sheets.create_server(store)
-        for _ in range(sheets.CROP_BUDGET + 5):
-            _call(
-                server,
-                "sheet_text",
-                {"sheet": 1, "x1": 0, "y1": 0, "x2": width, "y2": height},
-            )
-        # Text queries never consume the crop budget.
-        _image_and_text(_call(server, "crop", {"sheet": 1, "x1": 0, "y1": 0, "x2": 8, "y2": 8}))
-        _image_and_text(_call(server, "view_sheet", {"sheet": 1}))
-
-
-def test_sheet_text_is_authorized_but_never_proves_inspection() -> None:
-    for reviewer in mr.REVIEWERS:
-        events = [
-            *_call_events(
-                reviewer, "sheet_text", {"sheet": 1, "x1": 0, "y1": 0, "x2": 9, "y2": 9}, "txt"
-            ),
-        ]
-        evidence = mr.evaluate_sheet_evidence(events, reviewer=reviewer, sheet_count=1)
-        assert evidence["tool_events"] == 0
-        assert evidence["sheets_viewed"] == []
-        assert not evidence["inspection_proven"]
 
 
 # --- owner-declared machinist exceptions -------------------------------------
@@ -3298,12 +3258,8 @@ def test_tool_list_and_schemas_are_static_across_servers(tmp_path: Path) -> None
     for leaked in ("gearbox", "crank", tmp_path.name, "maximum"):
         assert leaked not in text
     tools = {tool["name"]: tool for tool in dumps[0]}
-    assert set(tools) == {"view_sheet", "crop", "sheet_text"}
-    expected_arguments = {
-        "view_sheet": {"sheet"},
-        "crop": {"sheet", "x1", "y1", "x2", "y2"},
-        "sheet_text": {"sheet", "x1", "y1", "x2", "y2"},
-    }
+    assert set(tools) == {"view_sheet", "crop"}
+    expected_arguments = {"view_sheet": {"sheet"}, "crop": {"sheet", "x1", "y1", "x2", "y2"}}
     for name, tool in tools.items():
         schema = tool["inputSchema"]
         assert set(schema["properties"]) == expected_arguments[name]

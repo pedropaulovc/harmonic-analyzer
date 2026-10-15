@@ -7,3 +7,9 @@ ch-connecting-rod:
   tolerance_class: machined_block
   fit_class: cam_follower_contact
   process: "machined from 1018 steel plate"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "accept"
+      where: "the one position control carried on this sheet"
+      finding: "position frame over-specified on a channel part (rule 5)"
+      reason: "a coordinate plus/minus would let the 20 channels scatter; at most one control per channel part (owner-accepted channel-consistency class)"

@@ -774,31 +774,6 @@ class SheetStore:
             self._texts[sheet] = document
         return document
 
-    def sheet_text_region(
-        self, sheet: int, x1: int, y1: int, x2: int, y2: int
-    ) -> str:
-        """The sheet's text inside a view_sheet rect, organized by view.
-
-        Text queries never consume the crop budget: extraction is
-        deterministic and cheap next to rendering.
-        """
-        with self._lock:
-            entry = self._sheet(sheet)
-            rect = (x1, y1, x2, y2)
-            _validate_rect(rect, entry.view_size)
-            spans = self._text_spans(sheet, entry)
-        selected = [
-            span
-            for span in spans
-            if span["x1"] < x2 and x1 < span["x2"] and span["y1"] < y2 and y1 < span["y2"]
-        ]
-        return sheet_text_document(
-            selected,
-            sheet=sheet,
-            sheet_count=self.sheet_count,
-            view_size=entry.view_size,
-        )
-
     def _text_spans(self, sheet: int, entry: _Sheet) -> list[dict[str, Any]]:
         """Memoized per-sheet spans; native extraction stays under the lock."""
         with self._lock:
@@ -818,14 +793,13 @@ class SheetStore:
 
 
 def create_server(store: SheetStore) -> FastMCP:
-    """Register only static-schema view_sheet/crop/sheet_text tools; SDK reports tool errors."""
+    """Register only static-schema view_sheet/crop tools; SDK reports tool errors."""
 
     class SheetsServer(FastMCP):
         async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
             expected = {
                 "view_sheet": {"sheet"},
                 "crop": {"sheet", "x1", "y1", "x2", "y2"},
-                "sheet_text": {"sheet", "x1", "y1", "x2", "y2"},
             }.get(name)
             if expected is not None and (
                 not isinstance(arguments, dict)
@@ -880,22 +854,6 @@ def create_server(store: SheetStore) -> FastMCP:
     def crop(sheet: int, x1: int, y1: int, x2: int, y2: int) -> list[ImageContent | TextContent]:
         png, text = store.crop(sheet, x1, y1, x2, y2)
         return [Image(data=png, format="png").to_image_content(), TextContent(type="text", text=text)]
-
-    @server.tool(
-        description=(
-            "Exact sheet text inside an integer top-left-origin view_sheet rect, "
-            "organized by sheet then view; rects in the output are view_sheet "
-            "pixels. Use it for exact dimension values, tolerances and callout "
-            "text; judge crossings and layout from crops. It never consumes the "
-            "crop budget. Absence of text in the output is not absence of drawing "
-            "information: textless sheets must be read from the images."
-        ),
-        annotations=annotations,
-        structured_output=False,
-    )
-    def sheet_text(sheet: int, x1: int, y1: int, x2: int, y2: int) -> list[TextContent]:
-        text = store.sheet_text_region(sheet, x1, y1, x2, y2)
-        return [TextContent(type="text", text=text or "(no extractable text in this rect)")]
 
     return server
 
