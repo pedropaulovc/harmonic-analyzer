@@ -334,8 +334,11 @@ def test_cropped_views_frame_their_ends_and_place_text_outside_the_bar() -> None
     assert row_y > b.sheet_xy(0.0, spec.BAR_LENGTH)[1]
     half = max(map(len, callouts["TopNotchWidth"].splitlines())) * _CHAR / 2
     assert drawing.DETAIL_B_KEEP["TopNotchWidth"][0] + half + 0.002 < b.sheet_xy(0.0, 0.0)[0]
+    # r6: the ledge's value and callout clear the bar's right-face witness.
+    ledge_half = len(callouts["TopRightLedge"]) * _CHAR / 2
     assert (
-        drawing.DETAIL_B_KEEP["TopRightLedge"][0] > b.sheet_xy(spec.BAR_WIDTH, 0.0)[0]
+        drawing.DETAIL_B_KEEP["TopRightLedge"][0] - ledge_half
+        > b.sheet_xy(spec.BAR_WIDTH, 0.0)[0] + 0.0015
     )
     # The side view: +Z runs left, so the back face (z = 0) is its right edge.
     back_x = side.sheet_xy(0.0, 0.0, 0.0)[0]

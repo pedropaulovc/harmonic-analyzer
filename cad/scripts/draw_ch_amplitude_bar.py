@@ -247,9 +247,8 @@ FOOT_ISO = CroppedView(
 )
 CROPPED_VIEWS = (DETAIL_A, DETAIL_B, TOP_SIDE, TOP_ISO, FOOT_ISO)
 
-# A callout's text stands this far outside the bar's edge, or outside
-# DETAIL A's fence; a ledge row this far outside the bar's end.
-DETAIL_TEXT_GAP = 0.010
+# A callout's text stands this far outside DETAIL A's fence; a ledge row this
+# far outside the bar's end.
 DETAIL_A_FENCE_TEXT_GAP = 0.020
 DETAIL_ROW_GAP = 0.012
 # DETAIL A's width row hangs under its ledge row and the ledge's one-line
@@ -294,7 +293,14 @@ DETAIL_A_KEEP = {
         _DETAIL_A_WIDTH_ROW_Y,
     ),
 }
-_DETAIL_B_TEXT_X = DETAIL_B.sheet_xy(BAR_WIDTH, 0.0)[0] + DETAIL_TEXT_GAP
+# The ledge's text and its callout stand wholly east of the bar's right-face
+# witness (r6, c8fafeb80: centred 10 mm out, that witness struck the leading
+# '1' of 1.60): the callout's half-width plus a 2 mm gap.
+_DETAIL_B_TEXT_X = (
+    DETAIL_B.sheet_xy(BAR_WIDTH, 0.0)[0]
+    + len(DIMENSION_CALLOUTS["TopRightLedge"]) * 0.0026 / 2.0
+    + 0.002
+)
 _DETAIL_B_ROW_Y = DETAIL_B.sheet_xy(0.0, BAR_LENGTH)[1] + DETAIL_ROW_GAP
 DETAIL_B_KEEP = {
     "TopNotchHeight": (
