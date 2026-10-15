@@ -981,18 +981,21 @@ UNDERSIDE_SECTION_CALLOUTS = {
 }
 
 # Sheet 4, the underside pads (Codex P2 on #1310). The rect pads, the
-# cross-tap lugs, the ribs and the MHA-DT-024 foot boss stand under seats the
-# hole table does not locate, or under none, so their sizes and their places
-# are model dims, placed from the table's own X0 Y0 -- the flange's rear-west
-# theoretical corner, top left in a bottom view (drawing-guidelines.md rule 10 (dimension from a real feature): one feature origin
+# cross-tap lugs, the ribs, the MHA-DT-024 foot boss and the four MHA-FR-004
+# nameplate bosses stand under seats the hole table does not locate, or under
+# none, so their sizes and their places are model dims, placed from the
+# table's own X0 Y0 -- the flange's rear-west theoretical corner, top left in
+# a bottom view (drawing-guidelines.md rule 10 (dimension from a real feature): one feature origin
 # per view; baselines, never chains). One *Bottom view at 1:2: the X
 # baselines stack in rows above it and the Y baselines in columns left of it,
 # shortest innermost, so no extension line crosses a dimension line.
 PADS_SCALE = (1.0, 2.0)
 _PADS_M_PER_MM = PADS_SCALE[0] / PADS_SCALE[1] / 1000.0
-# The view's 228.6 x 143.6 mm sit right of the nine Y columns and under the
-# seven X rows, its bottom edge 9.7 mm above the title block.
-PADS_CENTER = (0.2253, 0.1475)
+# The view's 228.6 x 143.6 mm sit right of the eleven Y columns and under the
+# nine X rows, its bottom edge 2.3 mm above the title block. The front
+# pedestal pad's east witness line, which drops past the view to its width
+# below it, runs 2.7 mm left of the title block.
+PADS_CENTER = (0.2395, 0.1401)
 
 
 def _pads_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
@@ -1004,15 +1007,18 @@ def _pads_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
 
 
 PADS_DATUM = _pads_xy(-BOTTOM_LENGTH / 2.0, BOTTOM_REAR_Z)
-# Baseline pitch: a 3.5 mm text row and its air; the first 8 mm off the view.
-PADS_BASELINE_FIRST_M = 0.008
-PADS_BASELINE_ROW_M = 0.0058
+# Baseline pitch: a 3.5 mm text row and its air; the first 5.2 mm off the
+# view, so the ninth row's text stays under the border.
+PADS_BASELINE_FIRST_M = 0.0052
+PADS_BASELINE_ROW_M = 0.0057
 _LOCK_PAD = LOCK_PAD_SHAPE
 _FRONT_PEDESTAL_PAD = PEDESTAL_PAD_SHAPES[0]
 _FRONT_BLOCK_PAD = BLOCK_PAD_SHAPES[0]
 # X rows, innermost first: (name, machine X of the text's centre). The lugs'
 # 39.6 is shorter than its "2X" text, which reads just past its witness line.
 # The foot boss's extension line rises 1.75 mm west of the rear block pad's.
+# The nameplate bosses (plate-r1 review: no location anywhere) take the west
+# pair's X and the east pair's, each from its rear boss's centre.
 PADS_X_ROWS = (
     ("Lug1X", -166.5),
     ("LockPadX", -168.6),
@@ -1020,26 +1026,32 @@ PADS_X_ROWS = (
     ("FootBossX", -110.0),
     ("BlockPad1X", -129.8),
     ("CrossRibX", -90.0),
+    ("NameplateBoss2X", -60.0),
+    ("NameplateBoss0X", -40.0),
     ("Lug3X", -19.8),
 )
 # Y columns, innermost first: (name, column offset left of X0, text depth
 # below X0; sheet mm). Each pitch clears the wider neighbouring text from the
-# next dimension line by 2.5 mm; the depths step down column by column, so
+# next dimension line by 1.5 mm; the depths step down column by column, so
 # neighbouring texts never share a row, each inside its own span and clear of
-# every longer column's extension line (stations 19.3, 24.1, 33.6, 34.3, 69.3,
-# then 109.3 on). The foot boss's extension line runs 0.7 mm over the rear
-# lugs' (their fronts stand 1.4 mm in front of the boss centre), its arrow on
-# its own line above theirs.
+# every longer column's extension line. The foot boss's extension line runs
+# 0.7 mm over the rear lugs' (their fronts stand 1.4 mm in front of the boss
+# centre), its arrow on its own line above theirs. The nameplate bosses' rear
+# pair reads between the rear lugs and the long rib, the front pair outside
+# the rib (its 10 mm pitch is enough since its text sits below the rib's
+# station); both from the west bosses' centres.
 PADS_Y_COLUMNS = (
     ("PedestalPad1Y", 8.0, 6.0),
     ("BlockPad1Y", 15.5, 14.0),
     ("FootBossY", 23.0, 21.0),
     ("Lug1Y", 34.25, 28.0),
-    ("LongRibY", 45.5, 36.0),
-    ("Lug0Y", 58.0, 45.0),
-    ("PedestalPad0Y", 70.5, 55.0),
-    ("BlockPad0Y", 79.25, 65.0),
-    ("LockPadY", 88.0, 75.0),
+    ("NameplateBoss2Y", 44.5, 40.0),
+    ("LongRibY", 54.75, 52.0),
+    ("NameplateBoss3Y", 64.75, 80.0),
+    ("Lug0Y", 76.25, 86.0),
+    ("PedestalPad0Y", 87.75, 93.0),
+    ("BlockPad0Y", 95.5, 100.0),
+    ("LockPadY", 103.25, 108.0),
 )
 # Sizes, machine (X, Z) of each text. In the pocket's open air: the pedestal
 # pad's length rises from its west side and the block pad's width rises from
@@ -1051,14 +1063,16 @@ PADS_Y_COLUMNS = (
 # of its dimension line, which runs at the keep X (13f1ca261 render): the
 # pedestal length's line hugs its pad so its "2X 26.0" ends clear of the
 # lock pad's X extension line (at the gap's midpoint it ran through "2X").
+# Both texts sit 4 mm nearer the pads than before, so the block pad's width
+# clears the front nameplate bosses' Y extension line over it.
 PADS_SIZE_TEXT_MM = {
     "PedestalPadLength": (
         _FRONT_PEDESTAL_PAD[1] - 1.6,
-        _FRONT_PEDESTAL_PAD[4] + 16.0,
+        _FRONT_PEDESTAL_PAD[4] + 12.0,
     ),
     "BlockPad0Width": (
         (_FRONT_PEDESTAL_PAD[2] + _FRONT_BLOCK_PAD[1]) / 2.0,
-        _FRONT_PEDESTAL_PAD[4] + 28.0,
+        _FRONT_PEDESTAL_PAD[4] + 24.0,
     ),
 }
 # The lock and front pedestal pads' widths read below the view (machine X, Z
@@ -1066,10 +1080,12 @@ PADS_SIZE_TEXT_MM = {
 # and of the title block. A dimension with a callout runs its line under the
 # callout's last row, so each text block stands over its own dimension line:
 # the lock pad's first, the pedestal pad's under it, below the lock pad's
-# extension lines.
+# extension lines. SolidWorks centres the three-row block on its keep (plate-r1
+# render: the lock pad's "16.0" sat on the flange's front outline), so each
+# keep sits a row below where the block's value would otherwise read.
 PADS_SIZE_BELOW_MM = {
-    "LockPadWidth": (_LOCK_PAD[1] - 28.5, BOTTOM_FRONT_Z - 10.6),
-    "PedestalPad0Width": (_LOCK_PAD[1] - 28.5, BOTTOM_FRONT_Z - 50.2),
+    "LockPadWidth": (_LOCK_PAD[1] - 28.5, BOTTOM_FRONT_Z - 21.6),
+    "PedestalPad0Width": (_LOCK_PAD[1] - 28.5, BOTTOM_FRONT_Z - 59.6),
 }
 
 
@@ -1086,10 +1102,12 @@ def _cast_level(shapes: tuple, *, deep: bool) -> str:
 # callouts named no pad), worded as section B-B captions its 12.0 and 28.0.
 # The pad sizes below the view carry it as callouts; the block pads and the
 # lugs, whose sizes read inside the view or are not printed, take pointer
-# notes below the view -- the block pads' in the band over the title block,
-# its arrow ON the front pad's front edge, east of the corner where the
-# 2X 16.0's extension line leaves it (bp5: through the edge, it read as
-# crossing that line).
+# notes. The lugs' reads below the view, left of the pad sizes. Nine X rows
+# leave no band under the view, so the block pads' reads right of it, its
+# leader running west across the pocket (over the east-front lug, across the
+# cross rib) to its arrow ON the front pad's front edge, east of the corner
+# where the 2X 16.0's extension line leaves it (bp5: through the edge, it read
+# as crossing that line).
 # The builder hangs the lugs to the shallow level (CrossTapLugs' LugBottom
 # is driven by "ShallowBossBottom"; CROSS_TAP_LUG_WALLS reckons from it).
 PADS_CALLOUTS = {
@@ -1099,9 +1117,9 @@ PADS_CALLOUTS = {
 # label -> (text, top-left sheet xy, leader tip machine (X, Z)).
 PADS_LEVEL_NOTES = {
     "pinion-block pads level": (
-        f"{len(BLOCK_PAD_SHAPES)}X PADS TO {_cast_level(BLOCK_PAD_SHAPES, deep=False)}",
-        (0.222, 0.0735),
-        (-20.0, _FRONT_BLOCK_PAD[3]),
+        f"{len(BLOCK_PAD_SHAPES)}X PADS TO\n{_cast_level(BLOCK_PAD_SHAPES, deep=False)}",
+        (0.3565, 0.1110),
+        (-10.0, _FRONT_BLOCK_PAD[3]),
     ),
     "cross-tap lugs level": (
         f"{len(CROSS_TAP_LUG_SHAPES)}X LUGS TO\nSHALLOW LEVEL",
@@ -1131,11 +1149,14 @@ UNDERSIDE_PADS_KEEP = {
 }
 # Below the Y columns, left of the title block: the view's scale, the
 # baselines' origin, named as sheet 2 names it, and where the levels print.
+# Every place on this view is a dimension from that origin; the old "FROM
+# HOLE TABLE" read as if the table located the bosses, and the nameplate
+# bosses are not in it (plate-r1 review).
 PADS_NOTE = (
     "BOTTOM VIEW SCALE 1:2\n"
-    "PAD, LUG, RIB AND FOOT-BOSS\n"
-    "LOCATIONS FROM HOLE TABLE\n"
-    "X0 Y0: FLANGE OUTER SHARP CORNER\n"
+    "PAD, LUG, RIB AND BOSS LOCATIONS\n"
+    "FROM X0 Y0 (HOLE TABLE ORIGIN):\n"
+    "FLANGE OUTER SHARP CORNER\n"
     "LEVELS: SECTION B-B, SHEET 3"
 )
 PADS_NOTE_XY = (0.020, 0.052)
@@ -2374,7 +2395,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_note(adapter, "BOTTOM VIEW SCALE 1:4", *UNDERSIDE_BOTTOM_NOTE_XY)
 
     # Sheet 4, the underside pads: the same bottom view at 1:2, carrying only
-    # the pads', lugs', ribs' and foot boss's sizes and places from X0 Y0.
+    # the pads', lugs', ribs' and bosses' sizes and places from X0 Y0.
     # Hidden lines removed like sheet 3's, so each dimensioned edge draws as
     # the visible edge it is; the "2X" prefixes come with the part's dims.
     if not ddoc.ActivateSheet(SHEET_NAMES[3]):

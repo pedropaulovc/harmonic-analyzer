@@ -1950,6 +1950,13 @@ def _pads_vertices() -> dict[str, tuple[float, float]]:
         "LockPadY": (lock[1], lock[4]),
         "FootBossX": foot,
         "FootBossY": foot,
+        # The west pair's X and the rear one's Y from the rear-west boss, the
+        # east pair's X from the rear-east boss, the front pair's Y from the
+        # front-west boss (each boss centre is its tap's).
+        "NameplateBoss2X": part.NAMEPLATE_SCREW_XZ[2],
+        "NameplateBoss2Y": part.NAMEPLATE_SCREW_XZ[2],
+        "NameplateBoss0X": part.NAMEPLATE_SCREW_XZ[0],
+        "NameplateBoss3Y": part.NAMEPLATE_SCREW_XZ[3],
     }
 
 
@@ -2006,6 +2013,10 @@ def test_underside_pads_sheet_prints_each_pad_and_lug_from_x0_y0() -> None:
         "LockPadY": 247.3,
         "FootBossX": 195.4,
         "FootBossY": 67.2,
+        "NameplateBoss2X": 350.3,
+        "NameplateBoss2Y": 97.7,
+        "NameplateBoss0X": 387.5,
+        "NameplateBoss3Y": 189.5,
         "LockPadWidth": 16.0,
         "PedestalPadLength": 26.0,
         "PedestalPad0Width": 16.0,
@@ -2018,6 +2029,31 @@ def test_underside_pads_sheet_prints_each_pad_and_lug_from_x0_y0() -> None:
     for baselines in (sheet.PADS_X_ROWS, sheet.PADS_Y_COLUMNS):
         values = [printed[name] for name, *_ in baselines]
         assert values == sorted(values)
+
+
+def test_underside_pads_sheet_locates_the_nameplate_bosses_from_x0_y0() -> None:
+    # plate-r1 review (blocker): the four MHA-FR-004 bosses had no location
+    # anywhere -- their taps are transferred, so the hole table holds none.
+    # Two Xs and two Ys pin the rectangle: k2 is rear-west, k0 rear-east and
+    # k3 front-west, and the four taps square up.
+    import draw_fr_harmonic_base as sheet
+
+    spec = fr_harmonic_base_spec
+    names = set(spec.NAMEPLATE_BOSS_LOCATION_DIMENSIONS)
+    assert names == {"NameplateBoss2X", "NameplateBoss2Y", "NameplateBoss0X", "NameplateBoss3Y"}
+    assert names <= set(sheet.UNDERSIDE_PADS_KEEP)
+    k0, k1, k2, k3 = part.NAMEPLATE_SCREW_XZ
+    xs = sorted({round(x, 3) for x, _z in part.NAMEPLATE_SCREW_XZ})
+    zs = sorted({round(z, 3) for _x, z in part.NAMEPLATE_SCREW_XZ})
+    assert len(xs) == len(zs) == 2
+    assert (round(k2[0], 3), round(k2[1], 3)) == (xs[0], zs[1])
+    assert (round(k0[0], 3), round(k0[1], 3)) == (xs[1], zs[1])
+    assert (round(k3[0], 3), round(k3[1], 3)) == (xs[0], zs[0])
+    assert (round(k1[0], 3), round(k1[1], 3)) == (xs[1], zs[0])
+    # The rear pair's Y column reads inside the long rib's; the front pair's
+    # outside it.
+    columns = [name for name, *_ in sheet.PADS_Y_COLUMNS]
+    assert columns.index("NameplateBoss2Y") < columns.index("LongRibY") < columns.index("NameplateBoss3Y")
 
 
 def test_underside_pads_sheet_names_each_pad_and_lug_level() -> None:
@@ -2043,7 +2079,7 @@ def test_underside_pads_sheet_names_each_pad_and_lug_level() -> None:
     assert set(sheet.PADS_CALLOUTS) <= set(sheet.PADS_SIZE_BELOW_MM)
     texts = {label: text for label, (text, _xy, _tip) in sheet.PADS_LEVEL_NOTES.items()}
     assert texts == {
-        "pinion-block pads level": "2X PADS TO SHALLOW LEVEL",
+        "pinion-block pads level": "2X PADS TO\nSHALLOW LEVEL",
         "cross-tap lugs level": "4X LUGS TO\nSHALLOW LEVEL",
     }
     # Each leader tip lands on its group's front pad or lug: the block pad's
