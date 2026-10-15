@@ -45,12 +45,16 @@ FRONT_ARC_MATE = "MHA-SH-001"
 # axis (GripOffset), the block depth from the mating face (Depth), the overall
 # width and the bore axis to one side face (AnchorZ); the ear holes' station
 # from the bore axis prints once for both (EarHole1Z, "2X"; EarHole2Z shares
-# its drive); their size and thread ship as a native hole callout. ---
+# its drive); their size and thread ship as a native hole callout; their
+# shared height off the bottom face prints once for both from the hidden
+# EarHeightReference sketch (_clamp_arc.EAR_HEIGHT_LINE: both ear centres hold
+# the centre plane its top end shares). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"Depth", "Width", "GripOffset", "AnchorZ"},
     "Block": {"Height"},
     "BoreProfile": {"BoreDia"},
     "EarHoles": {"EarHole1Z"},
+    "EarHeightReference": {"EarHoleHeight"},
 }
 EAR_STATION_DIMENSIONS = ("EarHole1Z", "EarHole2Z")
 
@@ -64,11 +68,14 @@ EAR_STATION_DIMENSIONS = ("EarHole1Z", "EarHole2Z")
 # * BoreDia prints (Ø25.6) as a reference nominal under its matched
 #   diametral-clearance acceptance on the column.
 # * Width, AnchorZ and Height are outside sizes at .X.
+# * EarHoleHeight .XX: the taps line up with the front arc's clearance holes
+#   across the bar's height too; the walls below take its printed band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"Depth": 2, "Width": 1, "GripOffset": 1, "AnchorZ": 1},
     "Block": {"Height": 1},
     "BoreProfile": {"BoreDia": 1},
     "EarHoles": {"EarHole1Z": 1},
+    "EarHeightReference": {"EarHoleHeight": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -98,12 +105,12 @@ _ANCHOR_DEV = printed_deviations(
 _HEIGHT_MIN = (
     ARC_HEIGHT + printed_deviations(ARC_HEIGHT, DRAWING_PRECISION["Block"]["Height"])[0]
 )
-# The ear holes sit at mid-height. The sheet locates them from the bottom face
-# with a drawing dimension at the sheet's default two places (the placement
-# sketch ties them to the bar's centre plane, which carries no dimension).
+# The ear holes sit at mid-height, located from the bottom face by the
+# model's EarHoleHeight at its authored places.
 EAR_HOLE_HEIGHT = ARC_HEIGHT / 2.0
-EAR_HOLE_HEIGHT_PLACES = 2
-_EAR_HEIGHT_DEV = printed_deviations(EAR_HOLE_HEIGHT, EAR_HOLE_HEIGHT_PLACES)
+_EAR_HEIGHT_DEV = printed_deviations(
+    EAR_HOLE_HEIGHT, DRAWING_PRECISION["EarHeightReference"]["EarHoleHeight"]
+)
 # The tapped ear's thread major envelope, the one rule 17 judges.
 THREAD_MAJOR_DIA = THREAD_MAJOR_MM[HOLE_SPEC.size]
 _EAR_IN = EAR_HOLE_Z - EAR_STATION_BAND

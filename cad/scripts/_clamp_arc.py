@@ -31,7 +31,15 @@ from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _rebuild import force_rebuild
-from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    blank_reference_sketches,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
@@ -41,6 +49,27 @@ ARC_HALF_H = 8.0  # 16 tall along the column, like the old one-piece collar
 COLUMN_BORE = 25.6  # half-cylinder relief: slides on the Ø25.4 column
 EAR_HOLE_Z = 17.5  # ear screw line flanks the column (ch30 p002 heads)
 MATERIAL = "Gray Cast Iron"  # black casting (ch30 p005)
+
+# Ear-hole placement contract, per ear ((x name, drive), (y name, drive)) in
+# placement-sketch coordinates (x along model z, y along model y).  Both ears
+# sit on the bar's centre plane (EAR_HOLE_Y = 0): wizard_holes ties a zero
+# coordinate to the origin by a relation, never a dimension, so the two
+# centres share ONE height, the one the ear-height reference below measures.
+EAR_HOLE_Y = 0.0
+EAR_PLACEMENT = (
+    (("EarHole1Z", '"EarHoleZ"'), (None, None)),
+    (("EarHole2Z", '"EarHoleZ"'), (None, None)),
+)
+# The prints locate both ears' height from the bottom face, which no feature
+# dimension carries (see build_arc).  A hidden reference sketch on the Right
+# plane (parallel to the split face both prints view it in; a Right-plane
+# sketch maps (x, y) -> model (-z, y)) holds one construction centerline from
+# the bottom face (the midplane block's -ArcHalfH) up to ear 1's centre: its
+# length is the printed height, its station keeps the print's witness lines on
+# that ear.
+EAR_HEIGHT_REFERENCE = "EarHeightReference"
+EAR_HEIGHT_DIMENSION = "EarHoleHeight"
+EAR_HEIGHT_LINE = ((-EAR_HOLE_Z, -ARC_HALF_H), (-EAR_HOLE_Z, EAR_HOLE_Y))
 
 
 async def build_arc(
@@ -58,8 +87,10 @@ async def build_arc(
     back arc's ears are tapped for the clamp screw, the front arc's are
     clearance). ``grip_offset`` is the back arc's alone (the front's mating face
     stays on the column-axis plane), and it must be positive there. Both arcs
-    name their height (``Height@Block``) and ear-hole stations from the bore
-    axis (``EarHole1Z``/``EarHole2Z@EarHoles``) for their prints. It leaves the
+    name their height (``Height@Block``), ear-hole stations from the bore
+    axis (``EarHole1Z``/``EarHole2Z@EarHoles``) and the ears' shared height
+    from the bottom face (``EarHoleHeight@EarHeightReference``, a hidden
+    reference sketch) for their prints. It leaves the
     part unsaved: each caller applies its drawing support (bands, places, marks,
     title-block properties) and then saves ONCE, like every other part builder."""
     if front and grip_offset != 0.0:
@@ -178,26 +209,70 @@ async def build_arc(
     # runs along model z and its y along model y (build_fr_top_frame's
     # GooseneckTap on -X, build_dt_cone_tip_block's PinchBore on +X), so each
     # ear's station from the bore axis is a named sketch-x dimension; the
-    # height stays the origin relation (the bar's centre plane).
+    # height stays the origin relation (the bar's centre plane), shared by
+    # both ears (EAR_PLACEMENT).
     ear_normal = (1.0, 0.0, 0.0) if front else (-1.0, 0.0, 0.0)
     ear_face_x = depth if front else -depth
-    ear_placement = [
-        (("EarHole1Z", '"EarHoleZ"'), (None, None)),
-        (("EarHole2Z", '"EarHoleZ"'), (None, None)),
-    ]
     ears = wizard_holes(
         adapter,
         hole_spec,
-        [[ear_face_x, 0.0, EAR_HOLE_Z], [ear_face_x, 0.0, -EAR_HOLE_Z]],
+        [
+            [ear_face_x, EAR_HOLE_Y, EAR_HOLE_Z],
+            [ear_face_x, EAR_HOLE_Y, -EAR_HOLE_Z],
+        ],
         ear_normal,
         f"clamp ear holes ({hole_spec.size} {hole_spec.kind})",
         name="EarHoles",
-        placement_dims=ear_placement,
+        placement_dims=list(EAR_PLACEMENT),
     )
     drive_jobs += ears.placement_drive_jobs
     ear_dia = blind_cut_dia_mm(hole_spec)
     expected -= 2.0 * math.pi * (ear_dia / 2.0) ** 2 * (x1 - x0)
     await volume_check(adapter, "ear holes", expected, 0.01 * expected)
+
+    # REFERENCE sketch (drawing-simplicity-policy.md `How the repository
+    # implements the guidelines`): both prints locate the ears' height from
+    # the bottom face, yet no feature dimension carries it -- the placement
+    # sketch holds both centres on the centre plane by an origin relation and
+    # the midplane block puts the bottom face ArcHalfH below it.  One
+    # construction centerline (EAR_HEIGHT_LINE) runs from the bottom face up
+    # to ear 1's centre; its top end shares the origin's height, which both
+    # ear centres hold, so its length is the height of both.  The station
+    # dimension only keeps it under ear 1 (not printed).  Direct-to-DB keeps
+    # creation-time inference from adding relations the explicit ones repeat.
+    (bottom_x, bottom_y), (top_x, top_y) = EAR_HEIGHT_LINE
+    height_ref = SketchDims()
+    check("create_sketch ear height reference", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    height_line = check(
+        "ear height reference line",
+        await adapter.add_centerline(bottom_x, bottom_y, top_x, top_y),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "ear height reference vertical",
+        await adapter.add_sketch_constraint(height_line, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{height_line}.end", top_x, top_y, "ear 1 centre height"
+    )
+    height_ref.record("EarHeightStation", '"EarHoleZ"')
+    await dimension_between(
+        adapter,
+        f"{height_line}.start",
+        f"{height_line}.end",
+        "vertical_distance",
+        top_y - bottom_y,
+        "ear hole height",
+    )
+    height_ref.record(EAR_HEIGHT_DIMENSION, '"ArcHalfH"')
+    await ensure_fully_defined(adapter, "ear height reference sketch")
+    check("exit_sketch ear height reference", await adapter.exit_sketch())
+    name_last_feature(adapter, EAR_HEIGHT_REFERENCE)
+    drive_jobs += height_ref.apply(adapter, EAR_HEIGHT_REFERENCE)
+    # Saved hidden so no part image or assembly renders it (#880); each print
+    # shows it in its split-face view only (_drawing_hidden_sketches).
+    blank_reference_sketches(adapter, (EAR_HEIGHT_REFERENCE,))
 
     # Deferred drive equations, then re-check neutrality (each evaluates to
     # the as-built value, so the geometry must not move).
