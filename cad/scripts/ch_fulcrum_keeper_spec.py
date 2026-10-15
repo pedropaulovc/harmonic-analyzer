@@ -147,11 +147,13 @@ if BORE_DIA_BAND[1] - SHAFT_H[0] < (
     raise AssertionError("the keeper bore band does not cover the rail-seat budget")
 # The pair-ream instruction on the bore callout, short enough to stand in one
 # clear block beside the end view (machinist review r13: four 75-97 mm rows
-# overprinted the crown, the bore and the width dimension).
+# overprinted the crown, the bore and the width dimension). The mate is the
+# OTHER keeper of the pair, which the quantity note (QUANTITY_NOTE) states.
+QUANTITY_NOTE = 2
 BORE_PAIR_CALLOUT = (
-    "PAIR-REAM WITH THE MATING MHA-CH-007\n"
-    "AT INSTALLED SPACING; THE MHA-CH-004\n"
-    "SHAFT SLIDES THROUGH BOTH"
+    "PAIR-REAM WITH THE OTHER MHA-CH-007\n"
+    f"(NOTE {QUANTITY_NOTE}) AT INSTALLED SPACING; THE\n"
+    "MHA-CH-004 SHAFT SLIDES THROUGH BOTH"
 )
 CROWN_ABOUT_BORE_CALLOUT = "ROUND ABOUT THE REAMED BORE"
 
@@ -183,7 +185,7 @@ KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM = tuple(
 FOOT_SCREW_THREAD = "#2-56"
 FOOT_SCREW_LENGTH_MM = 11.1125  # 7/16 under the head (vn_frame_side_screw_spec)
 SCREW_X = LUG_HALF_T + FOOT_L / 2.0  # 8.25: foot centre
-SCREW_FROM_LUG_FACE = SCREW_X - LUG_HALF_T  # 5.25: printed off the outer lug face
+SCREW_FROM_TIP = FOOT_TIP_X - SCREW_X  # 5.25: printed off the foot tip
 SCREW_FROM_SIDE = KEEPER_WIDTH / 2.0  # 7.0: printed off a side face
 KEEPER_SCREW_Z_OFF = KEEPER_Z_OFF + SCREW_X  # 82.25: screw off the centre
 SCREW_CLEARANCE_SPEC = HoleSpec("clearance", "#2", fit="close")
@@ -271,20 +273,24 @@ SET_SCREW_WEB_MM = min(
 )
 if SET_SCREW_WEB_MM < 1.5:
     raise AssertionError(f"crown tap web {SET_SCREW_WEB_MM:.2f} < 1.5 floor")
-# Counterbore walls. The hole prints 5.25 off the outer lug face and 7.0 off
-# a side face, both at .XXX (FootScrewReference / FootScrewSideReference:
-# the side station is also the frame tap's transverse place, transferred at
-# fit-up); the foot length and width print .X and the counterbore is a
-# drilled diameter. The lug side is no wall: the foot runs on under the lug
-# to x = -3.
+# Counterbore walls. The hole prints 5.25 off the foot tip at .XX and 7.000
+# off a side face at .XXX (FootScrewReference / FootScrewSideReference: the
+# side station is the frame tap's transverse place, transferred at fit-up);
+# the foot length and width print .X and the counterbore is a drilled
+# diameter. Located off the tip, the tip wall takes only the station's band.
+# The lug side is no wall: the foot runs on under the lug to x = -3, so
+# there the counterbore need only stay off the lug's outer face.
 _CBORE_MAX_RADIUS = (CBORE_DIA_MM + _DRILLED_PLUS) / 2.0
-FOOT_TIP_WALL_MM = (
+FOOT_TIP_WALL_MM = SCREW_FROM_TIP - _BAND_BY_PLACES[2] - _CBORE_MAX_RADIUS
+if FOOT_TIP_WALL_MM < 2.0:
+    raise AssertionError(f"keeper counterbore tip wall {FOOT_TIP_WALL_MM:.2f} < 2.0")
+FOOT_CBORE_LUG_CLEARANCE_MM = (
     (FOOT_L - _BAND_BY_PLACES[1])
-    - (SCREW_FROM_LUG_FACE + _BAND_BY_PLACES[3])
+    - (SCREW_FROM_TIP + _BAND_BY_PLACES[2])
     - _CBORE_MAX_RADIUS
 )
-if FOOT_TIP_WALL_MM < 1.5:
-    raise AssertionError(f"keeper counterbore tip wall {FOOT_TIP_WALL_MM:.2f} < 1.5")
+if FOOT_CBORE_LUG_CLEARANCE_MM <= 0.0:
+    raise AssertionError("the keeper counterbore runs into the lug's outer face")
 FOOT_SIDE_WALL_MM = min(
     SCREW_FROM_SIDE - _BAND_BY_PLACES[3] - _CBORE_MAX_RADIUS,
     (KEEPER_WIDTH - _BAND_BY_PLACES[1])
@@ -320,16 +326,21 @@ if KEEPER_TAP_SPEC.depth_mm - _BAND_BY_PLACES[1] < (
 
 # Hidden reference sketches (drawing-simplicity-policy.md `How the repository implements the guidelines`, the dt_arbor_pedestal pattern):
 # the set-screw tap's station off the outer lug face and the foot screw's
-# stations off the outer lug face and a side face are manufacturing
-# dimensions no feature measures (both holes are placed by point), so a
-# one-line construction sketch carries each. The part saves them blanked;
-# the drawing shows the tap's in the front view and the foot screw's in the
-# plan.
+# stations off the foot tip and a side face are manufacturing dimensions no
+# feature measures (both holes are placed by point), so a one-line
+# construction sketch carries each. Two more carry REFERENCE_DIMENSIONS: the
+# bore's place across the width (the pair-ream setup puts it there) and the
+# overall height (shaft axis plus crown radius). The part saves them
+# blanked; the drawing shows the tap's station and the height in the front
+# view, the foot screw's in the plan and the bore's in the end view.
 REFERENCE_SKETCHES = (
     "SetScrewReference",
     "FootScrewReference",
     "FootScrewSideReference",
+    "BoreSideReference",
+    "OverallHeightReference",
 )
+REFERENCE_DIMENSIONS = ("BoreFromSide", "OverallHeight")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. The wizard screw hole and the crown tap ship as native hole
@@ -342,18 +353,23 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LugCrownProfile": {"CrownDia"},
     "ShaftBoreProfile": {"BoreDia"},
     "SetScrewReference": {"SetScrewLocation"},
-    "FootScrewReference": {"ScrewFromLug"},
+    "FootScrewReference": {"ScrewFromTip"},
     "FootScrewSideReference": {"ScrewFromSide"},
+    "BoreSideReference": {"BoreFromSide"},
+    "OverallHeightReference": {"OverallHeight"},
 }
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL
 # owns them. One place is the general grade: the crown thread is sized at
 # the .X worst case (SET_SCREW_ENGAGEMENT_D). The shaft-axis height takes
 # two (it sets the fulcrum height; the pair reaming lines the two bores
-# up); the reamed bore carries its own BORE_DIA_BAND; the lug thickness
-# and the tap station take three, the web's worst case (SET_SCREW_WEB_MM),
-# and so do the foot screw's stations: off the lug for the tip wall
-# (FOOT_TIP_WALL_MM), off the side for the frame tap's ligament
-# (KEEPER_SCREW_TRANSVERSE_BAND_MM, build_fr_top_frame).
+# up); the reamed bore carries its own BORE_DIA_BAND; the foot screw's
+# station off the tip takes two (FOOT_TIP_WALL_MM). Three places each carry
+# a stated function (rule 4): the lug thickness and the tap station put the
+# set screw on its MHA-CH-004 flat (ch_fulcrum_shaft_spec
+# FLAT_STATION_WINDOW_MM, from the DRO-set inner faces), and the side
+# station centres the transferred MHA-FR-002 tap in its rail web
+# (KEEPER_SCREW_TRANSVERSE_BAND_MM, build_fr_top_frame). The references
+# print one place.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LugProfile": {"LugRise": 2},
     "LugBody": {"LugThickness": 3},
@@ -362,19 +378,22 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LugCrownProfile": {"CrownDia": 1},
     "ShaftBoreProfile": {"BoreDia": 3},
     "SetScrewReference": {"SetScrewLocation": 3},
-    "FootScrewReference": {"ScrewFromLug": 3},
+    "FootScrewReference": {"ScrewFromTip": 2},
     "FootScrewSideReference": {"ScrewFromSide": 3},
+    "BoreSideReference": {"BoreFromSide": 1},
+    "OverallHeightReference": {"OverallHeight": 1},
 }
+# The function each three-place size serves, printed under it.
+SET_SCREW_STATION_CALLOUT = "SETS SCREW ON\nMHA-CH-004 FLAT"
+FOOT_SCREW_SIDE_CALLOUT = "CENTERS MHA-FR-002\nTAP IN RAIL WEB"
 if {f: set(names) for f, names in DRAWING_PRECISION.items()} != DRAWING_DIMENSIONS:
     raise AssertionError("DRAWING_PRECISION and DRAWING_DIMENSIONS disagree")
 if DRAWING_PRECISION["LugBody"]["LugThickness"] != 3 or (
     DRAWING_PRECISION["SetScrewReference"]["SetScrewLocation"] != 3
 ):
     raise AssertionError("the crown-tap web is sized at .XXX lug and tap station")
-if DRAWING_PRECISION["FootProfile"]["FootLength"] != 1 or (
-    DRAWING_PRECISION["FootScrewReference"]["ScrewFromLug"] != 3
-):
-    raise AssertionError("the counterbore tip wall is sized at .X foot, .XXX station")
+if DRAWING_PRECISION["FootScrewReference"]["ScrewFromTip"] != 2:
+    raise AssertionError("the counterbore tip wall is sized at the .XX tip station")
 if DRAWING_PRECISION["Foot"]["Depth"] != 1 or (
     DRAWING_PRECISION["FootScrewSideReference"]["ScrewFromSide"] != 3
 ):
@@ -392,14 +411,14 @@ KEEPER_SCREW_TRANSVERSE_BAND_MM = _BAND_BY_PLACES[
 ]
 
 # True free-text instructions only (native dims and callouts carry the rest;
-# the bore's pair reaming is its callout, BORE_PAIR_CALLOUT). Brackets carry
-# no frames and no datums (policy).
+# the bore's pair reaming is its callout, BORE_PAIR_CALLOUT). The material
+# and finish are the title block's. Brackets carry no frames and no datums
+# (policy).
 DRAWING_NOTES = "\n".join(
     (
-        "1. MATERIAL: AISI 1018 COLD-FINISHED STEEL BAR.",
-        "2. CROWN TAP FOR THE MHA-VN-055 CUP-POINT SET SCREW; FOOT HOLE",
+        "1. CROWN TAP FOR THE MHA-VN-055 CUP-POINT SET SCREW; FOOT HOLE",
         "   FOR THE MHA-VN-022 #2-56 FILLISTER, HEAD FLUSH.",
-        "3. 2 REQUIRED, ONE PER MHA-CH-004 FULCRUM-SHAFT END (SECOND",
+        f"{QUANTITY_NOTE}. 2 REQUIRED, ONE PER MHA-CH-004 FULCRUM-SHAFT END (SECOND",
         "   IS THIS PART FLIPPED 180 DEG ABOUT VERTICAL).",
     )
 )

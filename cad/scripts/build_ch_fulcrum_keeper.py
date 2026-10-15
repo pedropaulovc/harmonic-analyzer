@@ -84,8 +84,8 @@ from ch_fulcrum_keeper_spec import (
     KEEPER_WIDTH,
     LUG_HALF_T,
     REFERENCE_SKETCHES,
-    SCREW_FROM_LUG_FACE,
     SCREW_FROM_SIDE,
+    SCREW_FROM_TIP,
     SCREW_X,
     SCREW_HOLE_SPEC,
     SET_SCREW_HOLE_SPEC,
@@ -121,10 +121,14 @@ if blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) >= LUG_T:
 # (sketch, plane, dimension, start, end, orientation, value, drives), the
 # dt_arbor_pedestal pattern. Each line starts on the feature it is measured
 # from (drawing-guidelines.md rule 10 (dimension from a real feature)): the set-screw tap's runs along the crown-top outline
-# from the outer lug face to the tap axis; the foot screw's run on the seat
-# (Top plane: sketch u = model X, v = -model Z) from the outer lug face to the
-# screw axis and from the screw axis to the -Z side face. ``drives`` binds
-# the value dimension, then the start point's origin anchors, to the part's
+# from the outer lug face to the tap axis; the foot screw's two run on the
+# seat (Top plane: sketch u = model X, v = -model Z) from the foot-tip/-Z
+# side corner along the side face to the screw station and down the tip
+# face to the screw axis, so their extension lines leave the plan's outline
+# without crossing; the bore's runs on the Right plane (the end view's
+# frame) from a side face to the bore axis; the overall height's runs up
+# the lug's inner face from the seat to the crown top. ``drives`` binds the
+# value dimension, then the start point's origin anchors, to the part's
 # globals.
 REFERENCE_LINES = (
     (
@@ -140,22 +144,42 @@ REFERENCE_LINES = (
     (
         "FootScrewReference",
         "Top",
-        "ScrewFromLug",
-        (LUG_HALF_T, 0.0),
-        (SCREW_X, 0.0),
+        "ScrewFromTip",
+        (FOOT_TIP_X, SCREW_FROM_SIDE),
+        (SCREW_X, SCREW_FROM_SIDE),
         "horizontal",
-        SCREW_FROM_LUG_FACE,
-        ('"FootL" / 2', '"LugT" / 2'),
+        SCREW_FROM_TIP,
+        ('"FootL" / 2', '"LugT" / 2 + "FootL"', '"KeeperWidth" / 2'),
     ),
     (
         "FootScrewSideReference",
         "Top",
         "ScrewFromSide",
-        (SCREW_X, 0.0),
-        (SCREW_X, SCREW_FROM_SIDE),
+        (FOOT_TIP_X, SCREW_FROM_SIDE),
+        (FOOT_TIP_X, 0.0),
         "vertical",
         SCREW_FROM_SIDE,
-        ('"KeeperWidth" / 2', '"LugT" / 2 + "FootL" / 2'),
+        ('"KeeperWidth" / 2', '"LugT" / 2 + "FootL"', '"KeeperWidth" / 2'),
+    ),
+    (
+        "BoreSideReference",
+        "Right",
+        "BoreFromSide",
+        (KEEPER_WIDTH / 2.0, SHAFT_AXIS_H),
+        (0.0, SHAFT_AXIS_H),
+        "horizontal",
+        KEEPER_WIDTH / 2.0,
+        ('"KeeperWidth" / 2', '"KeeperWidth" / 2', '"ShaftAxisH"'),
+    ),
+    (
+        "OverallHeightReference",
+        "Front",
+        "OverallHeight",
+        (-LUG_HALF_T, 0.0),
+        (-LUG_HALF_T, CROWN_TOP_Y),
+        "vertical",
+        CROWN_TOP_Y,
+        ('"ShaftAxisH" + "CrownDia" / 2', '"LugT" / 2'),
     ),
 )
 if tuple(row[0] for row in REFERENCE_LINES) != REFERENCE_SKETCHES:

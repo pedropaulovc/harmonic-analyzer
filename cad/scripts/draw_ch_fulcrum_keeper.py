@@ -39,7 +39,7 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import set_dimension_callouts
+from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leaders import set_near_side_diameter
@@ -56,11 +56,14 @@ from ch_fulcrum_keeper_spec import (
     CBORE_DIA_MM,
     CROWN_ABOUT_BORE_CALLOUT,
     DRAWING_DIMENSIONS,
+    FOOT_SCREW_SIDE_CALLOUT,
     FOOT_TIP_X,
+    KEEPER_WIDTH,
     LUG_HALF_T,
-    SCREW_FROM_SIDE,
+    REFERENCE_DIMENSIONS,
     SCREW_X,
     SET_SCREW_HOLE_SPEC,
+    SET_SCREW_STATION_CALLOUT,
 )
 
 
@@ -119,9 +122,10 @@ FOOT_HOLE_CALLOUT_XY = (0.126, 0.202)
 # 86 mm rows centred at x 50 the block ran 5.7 mm past the left inner border
 # (x 12.7).  Three rows of at most 24 characters (~61 mm printed, 2.56 mm a
 # character in r13) centred at x 58 start at x ~27, ~15 mm in from it, and end
-# left of the plan's lower-left corner (93.5, 214) and of LugThickness's
-# "6.000" (x >= 92.4, top 178.7); the leader still rises from the shoulder's
-# right end to the tap's lower rim, ~10 mm left of the foot-hole shoulder.
+# left of the plan's lower-left corner (93.5, 214) and above the 3.000 tap
+# station and its function rows (top ~177); the leader still rises from the
+# shoulder's right end to the tap's lower rim, ~10 mm left of the foot-hole
+# shoulder.
 SET_SCREW_PROCESS = (
     "TAP TO BORE; STAKE MOUTH\n"
     "2 PLACES AT ASSEMBLY PER\n"
@@ -137,28 +141,41 @@ DIMENSION_CALLOUTS = {
     "BoreDia": f"{BORE_PAIR_CALLOUT},\nPER {_PAIR_REAM_STEP}",
     "CrownDia": f"{CROWN_ABOUT_BORE_CALLOUT},\nPER {_PAIR_REAM_STEP}",
 }
+# Each three-place size states the function that holds it there (rule 4,
+# machinist review baseline: 6.000 / 3.000 / 7.000 printed with neither a
+# band nor a reason): the lug thickness and the tap's station off the outer
+# lug face put the set screw on its shaft flat from the DRO-set inner face;
+# the foot hole's side station centres the transferred frame tap in its web.
+FRONT_CALLOUTS = {
+    "SetScrewLocation": SET_SCREW_STATION_CALLOUT,
+    "LugThickness": SET_SCREW_STATION_CALLOUT,
+}
+TOP_CALLOUTS = {"ScrewFromSide": FOOT_SCREW_SIDE_CALLOUT}
 
 # Per-view survivors of the marked-dimension import: parametric name ->
-# sheet position.  The front view carries the lug thickness and the crown
-# tap's station off the outer lug face (both stacked above the crown), the
-# foot length below the seat and the foot height right of the foot tip; the
-# plan carries the foot screw's station off the outer lug face (above the
-# plan) and off the -Z side face (right of the foot tip); the end view
-# carries the width plus the shaft-axis / crown stack and the reamed bore.
+# sheet position.  The front view carries the crown tap's station off the
+# outer lug face above the crown, its text and function out to the left
+# under the tap callout (baseline review: centred in its 6 mm span, the
+# 3.000 text was struck by both extension lines; right of the lug its rows
+# would meet the end view's crown callout); the lug thickness chained left
+# of the foot length below the seat, its text and function out to the left
+# over the notes; the overall height (a reference) between the two, left of
+# the lug; the foot height right of the foot tip.  The plan carries the foot
+# screw's station off the foot tip (above the plan) and off the -Z side
+# face, the latter's text and function under its extension lines right of
+# the foot tip, clear of the foot-hole callout.  The end view carries the
+# width plus the shaft-axis / crown stack, the reamed bore and the bore's
+# place off a side face (a reference) above it.
 FRONT_KEEP = {
-    "SetScrewLocation": (_front_x(1.5), 0.170),
-    "LugThickness": (_front_x(0.0), 0.178),
+    "SetScrewLocation": (0.054, 0.1745),
+    "LugThickness": (0.066, 0.086),
     "FootLength": (_front_x(SCREW_X), 0.086),
     "FootRise": (0.140, 0.106),
+    "OverallHeight": (0.080, FRONT_CENTER[1]),
 }
-# The plan projects model -Z to sheet UP, so the -Z side face is the
-# plan's top edge, SCREW_FROM_SIDE above the screw axis.
 TOP_KEEP = {
-    "ScrewFromLug": (_front_x((LUG_HALF_T + SCREW_X) / 2.0), 0.252),
-    "ScrewFromSide": (
-        _front_x(FOOT_TIP_X) + 0.014,
-        TOP_CENTER[1] + SCREW_FROM_SIDE * SHEET_SCALE[0] / 2000.0,
-    ),
+    "ScrewFromTip": (_front_x((FOOT_TIP_X + SCREW_X) / 2.0), 0.252),
+    "ScrewFromSide": (0.178, 0.214),
 }
 # The end view's diameters take the near-side leader style (one arrow on the
 # rim facing the text, no chord through the bore) and stand in clear paper on
@@ -181,8 +198,22 @@ RIGHT_KEEP = {
     "LugRise": (0.196, 0.126),
     "CrownDia": (0.168, 0.180),
     "BoreDia": (0.304, 0.124),
+    # Above the crown, between the bore axis and the sheet-right side face
+    # (the Right plane's +u): clear of the crown leader, which leaves the
+    # arc up-left.
+    "BoreFromSide": (
+        RIGHT_CENTER[0] + KEEPER_WIDTH * SHEET_SCALE[0] / 4000.0,
+        0.172,
+    ),
 }
 NEAR_SIDE_DIAMETERS = ("CrownDia", "BoreDia")
+
+
+def _one(adapter: Any, annotations: list[Any], name: str) -> Any:
+    matches = [a for a in annotations if dimension_name(adapter, a) == name]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+    return matches[0]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -234,17 +265,18 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, top, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # The tap and foot-screw stations are owned by reference sketches the
-    # part saves blanked (ch_fulcrum_keeper_spec.REFERENCE_SKETCHES); the
-    # hidden-owner curate shows each in the view that dimensions it.
-    curate_view_dimensions(
+    # The tap and foot-screw stations and the two references are owned by
+    # reference sketches the part saves blanked
+    # (ch_fulcrum_keeper_spec.REFERENCE_SKETCHES); the hidden-owner curate
+    # shows each in the view that dimensions it.
+    front_annotations = curate_view_dimensions(
         adapter,
         front,
         keep=FRONT_KEEP,
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    curate_view_dimensions(
+    top_annotations = curate_view_dimensions(
         adapter,
         top,
         keep=TOP_KEEP,
@@ -259,11 +291,15 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     for name in NEAR_SIDE_DIAMETERS:
-        matches = [a for a in right_annotations if dimension_name(adapter, a) == name]
-        if len(matches) != 1:
-            raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
-        set_near_side_diameter(matches[0], f"keeper {name}")
+        set_near_side_diameter(_one(adapter, right_annotations, name), f"keeper {name}")
     set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
+    set_dimension_callouts(adapter, top_annotations, TOP_CALLOUTS)
+    kept = [*front_annotations, *right_annotations]
+    for name in REFERENCE_DIMENSIONS:
+        set_reference_dimension(
+            adapter, _one(adapter, kept, name), label=f"keeper {name}"
+        )
 
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
