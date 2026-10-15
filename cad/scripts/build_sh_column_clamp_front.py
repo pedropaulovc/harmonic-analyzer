@@ -51,11 +51,11 @@ async def build(adapter) -> dict[str, str]:
         front=True,
         hole_spec=EAR_HOLE_SPEC,
     )
-    # Manufacturing drawing support, applied AFTER the shared builder's gated
-    # save (as build_sh_column_clamp_back does): the ear stations' band
-    # (sh_column_clamp_fit) and every printed dimension's places live on the
-    # model, then mark exactly the print's dimensions, stamp the make-critical
-    # title-block properties, and re-save so the shipped SLDPRT carries them.
+    # Manufacturing drawing support, applied to the unsaved model the shared
+    # builder leaves behind and saved ONCE below (as build_sh_column_clamp_back
+    # does): the ear stations' band (sh_column_clamp_fit) and every printed
+    # dimension's places live on the model, then mark exactly the print's
+    # dimensions and stamp the make-critical title-block properties.
     for dimension_name in EAR_STATION_DIMENSIONS:
         set_dimension_symmetric_tolerance(
             adapter, "EarHoles", dimension_name, EAR_STATION_BAND

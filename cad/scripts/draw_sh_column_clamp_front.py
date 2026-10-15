@@ -128,7 +128,9 @@ DIMENSION_CALLOUTS = {
         f"DIAMETRAL\nCLEARANCE ON\n{COLUMN_MATE}"
     ),
 }
-ABOVE_CALLOUTS = {"EarHole1Z": f"ALIGNS WITH\n{BACK_ARC_MATE} TAPS"}
+# One line: SOLIDWORKS stores a line break in the above compartment but prints
+# none of that callout (draw_dt_cone_gear_shaft._printable_above_callouts).
+ABOVE_CALLOUTS = {"EarHole1Z": f"ALIGNS WITH {BACK_ARC_MATE} TAPS"}
 
 # Ear-hole height: the placement sketch ties both holes to the bar's centre
 # plane, which carries no dimension, so the sheet locates them from the bottom

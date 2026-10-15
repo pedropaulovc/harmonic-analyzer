@@ -102,16 +102,18 @@ def _left_x(model_z_mm: float) -> float:
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Top view (the block and bore sketches lie on the Top plane): the
 # depth above the view, the grip offset just under it (bore axis to the mating
-# face, text outboard right), the width left of the view, the bore axis to
-# the near side face right of it, the bore's reference Ø leadered off the
-# relief arc through the open mouth, its matched-fit callout under the value.
+# face, text outboard right), the width left of the view, the bore's reference
+# Ø leadered off the relief arc through the open mouth with its matched-fit
+# callout under the value, and the bore axis to the near side face outboard of
+# that callout (inboard, its dimension line crossed the callout's text: round-1
+# layout audit).
 # Front view: the collar height right of the profile.  Left view (the back
 # face): the ear-hole station from the bore axis above the view.
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0], 0.257),
     "GripOffset": (0.236, 0.248),
     "Width": (0.165, TOP_CENTER[1]),
-    "AnchorZ": (0.240, 0.214),
+    "AnchorZ": (0.292, 0.166),
     "BoreDia": (0.252, 0.172),
 }
 FRONT_KEEP = {"Height": (0.232, FRONT_CENTER[1])}
@@ -132,7 +134,9 @@ DIMENSION_CALLOUTS = {
     ),
     "GripOffset": f"GRIP GAP TO\n{FRONT_ARC_MATE}",
 }
-ABOVE_CALLOUTS = {"EarHole1Z": f"ALIGNS WITH\n{FRONT_ARC_MATE} EARS"}
+# One line: SOLIDWORKS stores a line break in the above compartment but prints
+# none of that callout (draw_dt_cone_gear_shaft._printable_above_callouts).
+ABOVE_CALLOUTS = {"EarHole1Z": f"ALIGNS WITH {FRONT_ARC_MATE} EARS"}
 
 # Ear-hole height: the placement sketch ties both holes to the bar's centre
 # plane, which carries no dimension, so the sheet locates them from the bottom
@@ -142,7 +146,9 @@ _EAR_2 = (_left_x(-EAR_HOLE_Z), LEFT_CENTER[1])
 _EAR_1 = (_left_x(EAR_HOLE_Z), LEFT_CENTER[1])
 _BOTTOM_EDGE = (_left_x(-EAR_HOLE_Z / 2.0), LEFT_CENTER[1] - ARC_HEIGHT / 2.0 * _M)
 EAR_HEIGHT_TEXT_XY = (0.026, LEFT_CENTER[1] - 0.004)
-HOLE_CALLOUT_XY = (0.120, 0.064)
+# Below and right of ear 1, so its leader leaves the text's near (left) end
+# instead of running back through it (round-1 layout audit).
+HOLE_CALLOUT_XY = (0.155, 0.066)
 
 
 def _set_dimension_prefixes(
