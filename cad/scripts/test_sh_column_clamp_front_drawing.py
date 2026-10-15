@@ -166,11 +166,12 @@ def test_walls_at_the_largest_column_and_drill_wander() -> None:
     assert math.isclose(spec.WALLS_WORST["ear to far side"], 47.2 - 24.8 - 17.6 - reach)
     assert min(spec.WALLS_WORST.values()) >= 1.5
     # The web reaches the 2.0 target only on a column under its own Ø25.4
-    # nominal, so no column acceptance can lift it: a rule-20 shortfall
-    # pending an owner ruling on geometry.
+    # nominal, so no column acceptance can lift it: a rule-20 shortfall,
+    # accepted (owner, 2026-10-15).
     column_at_target = 2.0 * (17.4 - reach - 2.0) - 0.30
     assert column_at_target < 25.4
     assert set(spec.RULE_20_SHORTFALLS) == {"ear to bore"}
+    assert spec.RULE_20_ACCEPTED == {"ear to bore"}
 
 
 def test_sheet_has_no_gdt_notes_or_drawing_precision() -> None:

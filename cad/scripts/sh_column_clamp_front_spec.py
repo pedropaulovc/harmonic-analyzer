@@ -35,7 +35,9 @@ from sh_column_clamp_fit import (  # noqa: F401
     BORE_DIAMETRAL_CLEARANCE,
     BORE_RADIUS_MAX,
     COLUMN_MATE,
-    EAR_DRILL_DRIFT_PER_MM,
+    DEPTH_PLACES,
+    EAR_HOLE_CALLOUT_PLACES,
+    FRONT_EAR_WANDER,
     EAR_HEIGHT_BAND,
     EAR_STATION_BAND,
     WALL_FLOOR,
@@ -78,7 +80,7 @@ EAR_STATION_DIMENSIONS = ("EarHole1Z", "EarHole2Z")
 #   with the back arc's taps across the bar's height too
 #   (sh_column_clamp_fit.EAR_SCREW_MISMATCH_MAX); the walls below take it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "BlockProfile": {"Depth": 2, "Width": 1, "AnchorZ": 1},
+    "BlockProfile": {"Depth": DEPTH_PLACES, "Width": 1, "AnchorZ": 1},
     "Block": {"Height": 1},
     "BoreProfile": {"BoreDia": 1},
     "EarHoles": {"EarHole1Z": 1},
@@ -117,20 +119,15 @@ EAR_HOLE_HEIGHT = ARC_HEIGHT / 2.0
 _EAR_HEIGHT_DEV = (-EAR_HEIGHT_BAND, EAR_HEIGHT_BAND)
 # The largest accepted clearance hole: the Hole Wizard callout prints its
 # diameter at two places (Ø4.98), checked on the DRILLED HOLES row (+0.10/-0).
-EAR_HOLE_CALLOUT_PLACES = 2
 _EAR_HOLE_R_MAX = (
     EAR_HOLE_DIA
     + printed_deviations(
         EAR_HOLE_DIA, EAR_HOLE_CALLOUT_PLACES, (0.0, drilled_oversize_mm())
     )[1]
 ) / 2.0
-# Each through hole wanders over the arc's deepest printed depth.
-_EAR_WANDER = EAR_DRILL_DRIFT_PER_MM * (
-    ARC_DEPTH
-    + printed_deviations(ARC_DEPTH, DRAWING_PRECISION["BlockProfile"]["Depth"])[1]
-)
-# The hole's reach: its largest radius off a wandered axis.
-_EAR_REACH = _EAR_HOLE_R_MAX + _EAR_WANDER
+# The hole's reach: its largest radius off its wandered axis (the through
+# hole wanders over the arc's deepest printed Depth, sh_column_clamp_fit).
+_EAR_REACH = _EAR_HOLE_R_MAX + FRONT_EAR_WANDER
 _EAR_IN = EAR_HOLE_Z - EAR_STATION_BAND
 _EAR_OUT = EAR_HOLE_Z + EAR_STATION_BAND
 WALLS_WORST: dict[str, float] = {
@@ -155,11 +152,18 @@ if min(WALLS_WORST.values()) < WALL_FLOOR:
         f"clamp-front walls {WALLS_WORST} under the {WALL_FLOOR} floor"
     )
 # drawing-guidelines.md rule 20: walls between the floor and the target.
-# Pending owner ruling (PR #1467 round-3 review): the ear-to-bore web, 1.85
-# on the largest A513 column with drill wander, needs the column at most
-# 25.23 to reach 2.0 -- under its own nominal -- so only geometry can lift it.
+# Accepted, owner ruling 2026-10-15 (PR #1467 round-3 review; recorded in
+# sh_column_clamp_fit): the ear-to-bore web, 1.850 on the largest A513 column
+# with drill wander.  It would need a column of at most 25.23 -- under its own
+# nominal -- to reach 2.0.  Any other wall falling short is a new shortfall.
+RULE_20_ACCEPTED = frozenset({"ear to bore"})
 RULE_20_SHORTFALLS = {
     name: wall for name, wall in WALLS_WORST.items() if wall < WALL_TARGET
 }
+if not set(RULE_20_SHORTFALLS) <= RULE_20_ACCEPTED:
+    raise AssertionError(
+        f"clamp-front walls {sorted(set(RULE_20_SHORTFALLS) - RULE_20_ACCEPTED)} "
+        f"under {WALL_TARGET} without a ruling"
+    )
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
