@@ -505,6 +505,39 @@ def test_transferred_pedestal_and_spring_seats_print_no_station() -> None:
     assert not any(tag.startswith("G") for tag in sheet.HOLE_TAG_POSITIONS)
 
 
+def test_nameplate_transfer_is_the_declared_fit_up() -> None:
+    # Owner ruling 2026-10-15 (#1468): the nameplate taps are spotted through
+    # the actual MHA-FR-004 plate at assembly, declared as RV-01. Its `where`
+    # must quote the callout the sheet prints, and the taps must stay out of
+    # the hole table (a printed station would reopen the stack).
+    import draw_fr_harmonic_base as sheet
+    from _paths import CAD_ROOT
+    from machinist_exceptions import load_exceptions
+
+    declared = {
+        entry.id: entry
+        for entry in load_exceptions(CAD_ROOT / "config", "fr_harmonic_base", "part")
+    }
+    fit_up = declared["RV-01"]
+    assert fit_up.kind == "accept"
+    assert fit_up.finding == "fit-up at assembly (rule 19)"
+    assert fit_up.reason.endswith("(owner-accepted)")
+    assert " ".join(sheet.TRANSFER_NAMEPLATE_CALLOUT.split()) in fit_up.where
+    assert sheet.TRANSFER_NAMEPLATE_CALLOUT.startswith("TRANSFER FROM MHA-FR-004\n")
+    nameplate_seats = {
+        (x, z, part.NAMEPLATE_SCREW_HOLE_DIA) for x, z in part.NAMEPLATE_SCREW_XZ
+    }
+    assert set(sheet.TRANSFER_NAMEPLATE_HOLES) == nameplate_seats
+    assert not nameplate_seats & set(sheet.TABLE_HOLES)
+    # The reason's numbers, from literals: #4 close hole 0.120 in over the
+    # #4-40 basic major 0.112 in; .X and .XX title-block rows +-0.8, +-0.51.
+    float_diametral = (0.120 - 0.112) * 25.4
+    demand = 2.0 * math.sqrt(2.0) * (0.8 + 0.51)
+    assert f"{float_diametral:.3f}" == "0.203"
+    assert f"{demand:.1f}" == "3.7"
+    assert "0.203" in fit_up.reason and "3.7" in fit_up.reason
+
+
 def _deck_seat_features_in_build() -> dict[str, object]:
     """Each deck Hole Wizard seat feature build_harmonic_base cuts, name ->
     its stations: the named SupportHoldDownSeats call plus every row of the

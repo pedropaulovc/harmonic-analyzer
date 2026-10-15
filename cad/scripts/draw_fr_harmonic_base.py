@@ -750,7 +750,8 @@ _TRANSFER_AFTER_RIG_SET = f"AFTER {step_ref('rig-set')};\n"
 TRANSFER_BLOCK_CALLOUT = f"TRANSFER FROM MHA-DT-018\n{_TRANSFER_AFTER_RIG_SET}"
 TRANSFER_SPRING_CALLOUT = f"TRANSFER FROM MHA-DT-024\n{_TRANSFER_AFTER_RIG_SET}"
 TRANSFER_PEDESTAL_CALLOUT = "TRANSFER FROM MHA-DT-002\nAT ASSEMBLY;\n"
-# #628 (Main ruling, option A): the base's #4-40 nameplate taps are spotted
+# #628 (owner-ratified 2026-10-15, fr-harmonic-base machinist exception
+# RV-01, a rule-19 fit-up): the base's #4-40 nameplate taps are spotted
 # through the finished MHA-FR-004 plate's corner holes, its frame-assembly
 # step setting the plate first. Like the spring callout, the instruction joins
 # the thread line, so the callout stays three rows in the band above the plan.
