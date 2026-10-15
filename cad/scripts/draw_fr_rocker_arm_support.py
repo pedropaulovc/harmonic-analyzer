@@ -122,12 +122,18 @@ FRONT_KEEP = {
 }
 # The cavity corner CornerFillet's dimension attaches to, as sheet signs.
 CAVITY_RADIUS_CORNER = (1, 1)
+# RimChamfer is ONE model feature: 1.27 x 45 on every edge of the two slant
+# faces and the two end faces (all twelve outside edges plus both pocket
+# rims) and on the cavity rims on both web faces. The import attaches its
+# size to one cavity rim, so the caption names everything it governs; drawn
+# outside chamfers with no size read as breaks past the title block's 0.25
+# MAX (machinist review, MHA-FR-005).
 DIMENSION_CALLOUTS = {
     "PocketRadius": "8X",
     "CavityRadius": "4X",
     "WinWidth": "SQ POCKET",
     "CavWidth": "SQ CAVITY THRU",
-    "RimChamferSize": " X 45 DEG\n2 FACES",
+    "RimChamferSize": " X 45 DEG\nALL OUTSIDE\nEDGES AND\nPOCKET AND\nCAVITY RIMS",
 }
 DIMENSION_PRECISION = {
     "Depth": 1,
@@ -213,12 +219,19 @@ FOOT_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] - 0.0365)
 # targeted import of RimChamfer delivers RimChamferSize (r743-diag-c, leaf
 # 20260926T100550Z-1-829fb125). The front view only ever got it as a side
 # effect of the entire-model import, which the #743 rail took away. The callout
-# keeps the lane between the front view and the section.
+# keeps the lane between the front view and the section, beside the section's
+# chamfered outside edges. Its text box hangs LEFT of this point (a display
+# dimension anchors where its leader meets the box: the layout audit of farm
+# run 20261015T015928596Z measured the old block at 144.5..164.8 mm for an
+# anchor at 165), so the anchor sits near the section's slant wall and the
+# widened caption still clears the front view's right edge (149.7 mm). The
+# dimension line drops from here to the cavity rim at the web, left of the
+# wall and right of the 6.35's text.
 RIGHT_KEEP = {
     "WallHeight": (0.240, 0.185),
     "FootSpan": (0.205, 0.133),
     "TopSpan": (0.205, 0.238),
-    "RimChamferSize": (0.165, 0.200),
+    "RimChamferSize": (0.187, 0.200),
 }
 
 # Top-left anchor; the native four-row table grows down and right while

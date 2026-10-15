@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import _config
 import ch_pivot_bracket_sides as sides
@@ -122,8 +123,33 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
 
 
-def test_notes_follow_the_simplicity_policy() -> None:
-    lines = spec.DRAWING_NOTES.splitlines()
-    assert 1 <= len(lines) <= 4
-    assert not re.search(r"\d", spec.DRAWING_NOTES)
-    assert "GROUND" not in spec.DRAWING_NOTES.upper()
+def test_spot_transfer_rides_the_hole_callout_and_names_the_angle_plate() -> None:
+    """Machinist review: the floating 'SPOT THE ANGLE PLATE TAPS THROUGH
+    THESE HOLES.' named its mate only as 'the angle plate' and pointed at
+    nothing. The words ride the 2X #5 callout now, naming the plate by part
+    number, and the sheet carries no general note."""
+    angle_plate = _config.parts("ch-pivot-bracket-tl-angle-plate")["number"]
+    assert spec.ANGLE_PLATE_NUMBER == angle_plate == "MHA-CH-008-TL-02"
+    assert spec.SPOT_TAPS_LINES == (
+        "SPOT TAPS IN ANGLE PLATE",
+        "MHA-CH-008-TL-02 THROUGH",
+        "THESE HOLES AT ASSEMBLY;",
+    )
+    assert drawing.HOLE_CALLOUT_PROCESS == (
+        "SPOT TAPS IN ANGLE PLATE\nMHA-CH-008-TL-02 THROUGH\n"
+        "THESE HOLES AT ASSEMBLY;\n#5 DRILL"
+    )
+    # Digit-free apart from the mate's part number; never a method beyond the
+    # transfer, and no wider than the native drill row under it.
+    words = spec.SPOT_TAPS_NOTE.replace(angle_plate, "")
+    assert not re.search(r"\d", words)
+    assert "GROUND" not in words.upper()
+    assert max(map(len, spec.SPOT_TAPS_LINES)) <= len("#5 DRILL 2X Ø5.22 THRU ALL")
+    assert spec.DRAWING_NOTES == ""
+    for side in ("left", "right"):
+        assert _features()[f"screw_hole_{side}"]["note"] == spec.SPOT_TAPS_NOTE
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    build = Path(drawing.__file__).with_name("build_ch_pivot_bracket_tl_ledge.py")
+    assert "Manufacturing Notes" not in source
+    assert "Manufacturing Notes" not in build.read_text(encoding="utf-8")
+    assert "NOTES_XY" not in source

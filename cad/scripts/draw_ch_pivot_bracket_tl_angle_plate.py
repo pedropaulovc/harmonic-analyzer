@@ -44,6 +44,7 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _hole_callout_thread_class import omit_title_block_thread_class
 from _hole_spec import blind_cut_dia_mm, drill_process
 from _paths import CAD_ROOT
 from _session import run_build
@@ -265,6 +266,20 @@ def _set_dimension_text(
         raise RuntimeError(f"dimension texts not applied: {sorted(remaining)}")
 
 
+def _omit_tap_thread_class(display: Any) -> None:
+    """The title block's THREADS row owns the class (rule 2): the tap row
+    reads ``10-24 UNC THRU ALL``, not ``10-24 UNC - 2B THRU ALL`` (machinist
+    review). The shared helper proves the definition lost its variable; the
+    resolved rows prove the class no longer prints."""
+    omit_title_block_thread_class(display, label="ledge screw taps")
+    native = _early_bound(display, "IDisplayDimension")
+    resolved = [str(native.GetText(part) or "") for part in (1, 2, 3, 4)]
+    if any(TAP_SPEC.thread_class in text for text in resolved):
+        raise RuntimeError(
+            f"ledge screw taps: callout still prints its class: {resolved!r}"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -331,7 +346,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the upright face")
-    add_native_hole_callout(
+    tap_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=(
@@ -341,6 +356,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=TAP_CALLOUT_XY,
         label="ledge screw taps",
     )
+    _omit_tap_thread_class(tap_callout)
     stud_callout = add_native_hole_callout(
         adapter,
         front,
