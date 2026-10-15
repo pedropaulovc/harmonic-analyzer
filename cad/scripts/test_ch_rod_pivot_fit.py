@@ -91,10 +91,10 @@ def test_worst_case_joint_budget() -> None:
     assert b["running_clearance_min"] == pytest.approx(0.004625, abs=1e-6)
     assert b["running_clearance_max"] == pytest.approx(0.114625, abs=1e-6)
     assert b["side_clearance_min"] == pytest.approx(0.100, abs=1e-6)
-    assert b["side_clearance_max"] == pytest.approx(0.277, abs=1e-6)
-    assert b["neighbour_clearance_min"] == pytest.approx(0.4545, abs=1e-6)
+    assert b["side_clearance_max"] == pytest.approx(0.250, abs=1e-6)
+    assert b["neighbour_clearance_min"] == pytest.approx(0.4815, abs=1e-6)
     assert b["neighbour_clearance_min"] >= pin.NEIGHBOUR_CLEARANCE_MIN
-    assert b["tine_min"] == pytest.approx(1.5865, abs=1e-6)
+    assert b["tine_min"] == pytest.approx(1.65, abs=1e-6)
     assert b["tine_bearing_land_min"] == b["tine_min"]
     assert b["tine_bearing_land_min"] >= pin.RULE12_WALL_FLOOR
     assert b["crown_wall_min"] >= pin.RULE12_WALL_TARGET
@@ -107,20 +107,19 @@ def test_worst_case_joint_budget() -> None:
     assert b["bridge_min"] == pytest.approx(2.234, abs=1e-6)
     assert b["bridge_min"] >= pin.BRIDGE_TARGET
     # Dressing stock: the shortest blank still covers the thickest fork.
-    assert b["blank_excess_min"] == pytest.approx(0.145, abs=1e-6)
-    assert b["blank_excess_max"] == pytest.approx(0.505, abs=1e-6)
+    assert b["blank_excess_min"] == pytest.approx(0.045, abs=1e-6)
+    assert b["blank_excess_max"] == pytest.approx(0.605, abs=1e-6)
     assert not any(key.startswith(("upset", "retention")) for key in b)
 
 
 def test_the_pin_bears_on_the_whole_tine() -> None:
     """PR #1292 review F1: the land the pin bears on in each tine is the
-    thinnest tine itself, built here from the fork's printed bands, and it
-    holds drawing-guidelines.md rule 17 (walls and webs)'s 1.5 floor. Positive control: the withdrawn 90-degree
-    Ø3.2 countersink sunk into each tine mouth, on the #47's largest drill,
-    left under that floor."""
-    w_min = rod.FORK_THICKNESS + rod.FORK_THICKNESS_BAND[1]
-    s_max = rod.FORK_SLOT_WIDTH + rod.FORK_SLOT_BAND[0]
-    tine = (w_min - s_max) / 2.0 - rod.FORK_TINE_MATCH / 2.0
+    thinnest tine itself, the tine's own printed band (#982), and it holds
+    drawing-guidelines.md rule 17 (walls and webs)'s 1.5 floor. Positive
+    control: the withdrawn 90-degree Ø3.2 countersink sunk into each tine
+    mouth, on the #47's largest drill, left under that floor."""
+    tine = rod.TINE_THICKNESS + rod.TINE_BAND[1]
+    assert tine == rod.TINE_MIN
     assert pin.BUDGET["tine_bearing_land_min"] == pytest.approx(tine, abs=1e-12)
     assert tine >= pin.RULE12_WALL_FLOOR
     withdrawn_leg = (3.2 - NUMBER_DRILL_MM["#47"]) / 2.0
@@ -129,15 +128,21 @@ def test_the_pin_bears_on_the_whole_tine() -> None:
 
 def test_neighbour_stack_fills_the_inter_arm_gap_exactly() -> None:
     """The gap (pitch less the thickest arm) holds both side clearances,
-    both outer tines' slot offsets, the two straps' offsets from their hubs
+    the thickest fork over its tines, the two straps' offsets from their hubs
     and the neighbour clearance: the stack closes with nothing left out. The
     dressed ends are flush, so no pin end stands in it."""
     b = pin.BUDGET
     w_max = rod.FORK_THICKNESS + rod.FORK_THICKNESS_BAND[0]
-    off = rod.FORK_TINE_MATCH / 2.0
+    # The fork over the tines is a reference: its limits are the tines' and
+    # the slot's.
+    assert w_max == pytest.approx(
+        2.0 * (rod.TINE_THICKNESS + rod.TINE_BAND[0])
+        + rod.FORK_SLOT_WIDTH
+        + rod.FORK_SLOT_BAND[0]
+    )
     float_total = b["side_clearance_max"]
     assert bank.PITCH - (
-        w_max + float_total + 2.0 * off + arm.STRAP_HUB_SYMMETRY
+        w_max + float_total + arm.STRAP_HUB_SYMMETRY
     ) == pytest.approx(b["neighbour_clearance_min"])
 
 
@@ -147,24 +152,22 @@ def _corner_gap(proud: float, strap_offsets: tuple[float, ...]) -> float:
     printed to, built as positions: hub j's mid-plane at 0 and hub j + 1's
     half the two hub lengths north; each strap's mid-plane off its hub's
     by one of ``strap_offsets``; each fork's slot anywhere it still clears
-    its strap; each fork's mid-plane off its slot's by half the tine match;
-    each dressed pin end ``proud`` of its fork face."""
+    its strap; each fork's outer face a tine past its slot's wall; each
+    dressed pin end ``proud`` of its fork face."""
     t_band = [arm.ARM_THICKNESS + d for d in arm.ARM_THICKNESS_BAND]
-    w_band = [rod.FORK_THICKNESS + d for d in rod.FORK_THICKNESS_BAND]
+    tine_band = [rod.TINE_THICKNESS + d for d in rod.TINE_BAND]
     s_band = [rod.FORK_SLOT_WIDTH + d for d in rod.FORK_SLOT_BAND]
     hubs = [arm.HUB_LENGTH + d for d in arm.HUB_LENGTH_BAND]
-    match = (-rod.FORK_TINE_MATCH / 2.0, rod.FORK_TINE_MATCH / 2.0)
 
     def reach(sign: int) -> list[float]:
         """Offsets of a rod's outer face (pin end included) from its own
         hub's mid-plane, toward the neighbour (+1 north, -1 south)."""
         out = []
-        for e, t, w, s, m, side in itertools.product(
-            strap_offsets, t_band, w_band, s_band, match, (-1.0, 1.0)
+        for e, t, tine, s, side in itertools.product(
+            strap_offsets, t_band, tine_band, s_band, (-1.0, 1.0)
         ):
             slot_centre = e + side * (s - t) / 2.0
-            fork_centre = slot_centre + m
-            out.append(sign * (fork_centre + sign * (w / 2.0 + proud)))
+            out.append(sign * (slot_centre + sign * (s / 2.0 + tine + proud)))
         return out
 
     north_j = max(reach(+1))  # rod j's north-most point
@@ -181,7 +184,7 @@ def test_opposed_neighbour_forks_clear_at_every_band_corner() -> None:
     half_zone = arm.STRAP_HUB_SYMMETRY / 2.0
     gap = _corner_gap(pin.PIN_END_PROUD_MAX, (-half_zone, half_zone))
     assert gap == pytest.approx(pin.BUDGET["neighbour_clearance_min"], abs=1e-9)
-    assert gap == pytest.approx(0.4545, abs=1e-9)
+    assert gap == pytest.approx(0.4815, abs=1e-9)
     assert gap >= pin.NEIGHBOUR_CLEARANCE_MIN
     # Positive controls: the strap symmetry is in the corner (centred straps
     # gain its whole zone), and the withdrawn peened pin (0.10 proud each

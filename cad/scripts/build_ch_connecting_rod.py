@@ -14,9 +14,10 @@ lobe UP); the rod length closes that link without moving the rocker bank.
 The rod is FLAT: ring, shank and fork share one mid-plane, which is the cam
 plane and the arm plane (rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ), so the
 arm runs centred in the fork slot. The fork is 10 wide with a full-round
-crown on the pin, 6.075 +/-0.05 over the tines with a 2.625 +0.127/0 slot
+crown on the pin; its two 1.700 +/-0.05 tines straddle a 2.675 +/-0.05 slot
 (Main ruling 2026-10, option b): each inter-arm gap holds one tine of each
-neighbouring rod, so both are 3-place model bands. The pin is pressed into a
+neighbouring rod, so tines, slot and the ring/shank faces are model bands
+located from one finished fork face (#982). The pin is pressed into a
 hole reamed through both tines and dressed flush (user ruling 2026-10-09, PR
 #1292 review F1, reversing the #746 reconstruction choice of peening it into
 countersinks): the photos show two rod cheeks round each rocker, not the
@@ -82,19 +83,22 @@ from ch_connecting_rod_spec import (
     FORK_SLOT_BAND,
     FORK_SLOT_WIDTH,
     FORK_THICKNESS,
-    FORK_THICKNESS_BAND,
     FORK_TOP_Y,
     FORK_WIDTH,
     PIN_HOLE_BAND,
     PIN_HOLE_DIA,
     RING_BORE_DIA,
     RING_BORE_DIA_BAND,
+    RING_FACE_BAND,
+    RING_FACE_NEAR,
     RING_OUTER_RADIUS,
     RING_THICKNESS,
     RING_WALL,
     SHANK_THICKNESS,
     SHANK_WIDTH,
     SURFACE_FINISHES,
+    TINE_BAND,
+    TINE_THICKNESS,
 )
 
 PART_NAME = "ch-connecting-rod"
@@ -120,6 +124,9 @@ MATERIAL = "Plain Carbon Steel"
 # the slot cut runs out SLOT_RUNOUT above the crown so the crown alone shapes
 # the tine tops.
 SLOT_RUNOUT = 1.0  # unprinted
+# The ring/shank face references run this far down the shank from the fork
+# root, so the face ordinates print below the fork in its side detail.
+RING_FACE_REF_RUN = 2.0  # unprinted
 # The rocker pivot pin hole is a reamed press hole; its size and band live in
 # ch_connecting_rod_spec.
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness or width
@@ -221,8 +228,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ShankWidth", f"{SHANK_WIDTH}mm")
     await set_global(adapter, "ShankThickness", f"{SHANK_THICKNESS}mm")
     await set_global(adapter, "ForkWidth", f"{FORK_WIDTH}mm")
-    await set_global(adapter, "ForkThickness", f"{FORK_THICKNESS}mm")
+    await set_global(adapter, "ForkTine", f"{TINE_THICKNESS}mm")
     await set_global(adapter, "ForkSlotWidth", f"{FORK_SLOT_WIDTH}mm")
+    await set_global(adapter, "ForkThickness", '2 * "ForkTine" + "ForkSlotWidth"')
     await set_global(adapter, "ForkCrotchBelowPin", f"{FORK_CROTCH_BELOW_PIN}mm")
     await set_global(adapter, "ForkBaseBelowPin", f"{FORK_BASE_BELOW_PIN}mm")
     await set_global(adapter, "SlotRunout", f"{SLOT_RUNOUT}mm")
@@ -230,6 +238,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "RingOuterRadius", '"RingBoreDia" / 2 + "RingWall"')
     await set_global(adapter, "ShankStartY", '"RingBoreDia" / 2 - 0.5mm')
     await set_global(adapter, "ForkBaseY", '"CenterDistance" - "ForkBaseBelowPin"')
+    await set_global(
+        adapter, "RingFaceNear", '("ForkThickness" - "RingThickness") / 2'
+    )
 
     # Each sketch records its dim names + drive equations into a per-sketch
     # SketchDims in helper emission order; the drives are collected and applied in
@@ -371,31 +382,37 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "ForkBoss")
-    # The fork thickness prints natively at three places (FORK_THICKNESS_BAND):
-    # named so the band, the precision and the drawing select it by name.
+    # The fork thickness prints as a reference at three places (two tines and
+    # the slot own its limits): named so the precision and the drawing select
+    # it by name.
     fork_thickness_dim = name_dimensions(adapter, "ForkBoss", ["ForkThick"])
     drive_jobs.append((fork_thickness_dim[0], '"ForkThickness"'))
     v_expected = boss_volume()
     await volume_check(adapter, "ring, shank and fork bosses", v_expected, 0.002 * v_expected)
 
-    # Fork slot: a Right-plane rectangle (sketch x = model Z) centred on the rod
-    # mid-plane, from the crotch up past the crown, cut through the fork's
-    # width. A construction centreline from the fork's root step to its crown
-    # top carries the two lengths the side view prints from the crown top --
-    # the slot depth (to the crotch) and the boss length (to the root step) --
-    # so the print measures from the visible tine tops, never from the origin.
-    # The boss length is a driving dimension of that reference line, driven by
-    # the same knobs as the fork outline, so it always equals the modelled
-    # step. Dim EMISSION ORDER: reference start height (on-axis anchor, ONE
-    # dim), boss length, slot width, cut height, slot corner x, slot depth.
-    # 12 DOF = reference vertical + on-axis alignment + 2 dims, rectangle's four
-    # relations + 4 dims.
+    # Fork slot: a Right-plane rectangle (sketch x = model -Z) centred on the
+    # rod mid-plane, from the crotch up past the crown, cut through the fork's
+    # width. Every side-view location runs from ONE finished face, the fork's
+    # outer face at sketch +x (model -Z; the left face in the side view): a
+    # construction line on that face, from the fork's root step to its crown
+    # top, carries the boss length and the slot depth from the crown top, the
+    # near tine (face to slot wall) and the ring/shank faces' ordinates. Two
+    # short construction lines on the ring/shank faces run down the shank from
+    # the root step, so those ordinates print below the fork. Every reference
+    # is driven by the same knobs as the solid features, so it always lies on
+    # the modelled face. Dim EMISSION ORDER: face x and root height (general
+    # anchor, TWO dims), boss length, slot width, cut height, near tine, slot
+    # depth, then per ring face its ordinate and its run.
+    # 20 DOF = face line: vertical + 2 anchor dims + boss length; rectangle:
+    # four relations + 4 dims; each ring-face line: vertical + level with the
+    # face line's root end + ordinate + run.
     slot_sd = SketchDims()
     check("create_sketch fork slot", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    boss_ref = check(
-        "fork boss reference",
-        await adapter.add_centerline(0.0, FORK_BASE_Y, 0.0, FORK_TOP_Y),
+    face_x = FORK_THICKNESS / 2.0
+    face_ref = check(
+        "fork face reference",
+        await adapter.add_centerline(face_x, FORK_BASE_Y, face_x, FORK_TOP_Y),
     )
     sh = FORK_SLOT_WIDTH / 2.0
     slot_rect = [
@@ -405,19 +422,30 @@ async def build(adapter) -> dict[str, str]:
         (-sh, FORK_CROTCH_Y + SLOT_CUT_HEIGHT),
     ]
     slot = await add_line_chain(adapter, slot_rect)
+    ring_faces = []
+    for x in (RING_THICKNESS / 2.0, -RING_THICKNESS / 2.0):
+        ring_faces.append(
+            check(
+                "ring face reference",
+                await adapter.add_centerline(
+                    x, FORK_BASE_Y, x, FORK_BASE_Y - RING_FACE_REF_RUN
+                ),
+            )
+        )
     set_sketch_direct_db(adapter, False)
     check(
-        "fork boss reference vertical",
-        await adapter.add_sketch_constraint(boss_ref, None, "vertical"),
+        "fork face reference vertical",
+        await adapter.add_sketch_constraint(face_ref, None, "vertical"),
     )
     await anchor_point_to_origin(
-        adapter, f"{boss_ref}.start", 0.0, FORK_BASE_Y, "fork boss reference"
+        adapter, f"{face_ref}.start", face_x, FORK_BASE_Y, "fork face reference"
     )
+    slot_sd.record("ForkFaceX", '"ForkThickness" / 2')
     slot_sd.record("ForkRootY", '"ForkBaseY"')
     await dimension_between(
         adapter,
-        f"{boss_ref}.start",
-        f"{boss_ref}.end",
+        f"{face_ref}.start",
+        f"{face_ref}.end",
         "vertical_distance",
         FORK_BOSS_LENGTH,
         "fork boss length",
@@ -443,17 +471,46 @@ async def build(adapter) -> dict[str, str]:
     slot_sd.record(
         "SlotCutHeight", '"ForkWidth" / 2 + "ForkCrotchBelowPin" + "SlotRunout"'
     )
-    # Centred: the tines come out equal (the notes' tine-match requirement).
+    # The near tine: the datum face to the slot's near wall, at the tine top.
     await dimension_between(
-        adapter, f"{slot[0]}.start", "origin", "horizontal_distance", sh,
-        "slot corner x",
+        adapter, f"{face_ref}.end", f"{slot[0]}.end", "horizontal_distance",
+        TINE_THICKNESS, "near tine",
     )
-    slot_sd.record("SlotHalfWidth", '"ForkSlotWidth" / 2')
+    slot_sd.record("TineNear", '"ForkTine"')
     await dimension_between(
-        adapter, f"{slot[0]}.start", f"{boss_ref}.end", "vertical_distance",
+        adapter, f"{slot[0]}.start", f"{face_ref}.end", "vertical_distance",
         SLOT_DEPTH, "slot depth",
     )
     slot_sd.record("SlotDepth", '"ForkWidth" / 2 + "ForkCrotchBelowPin"')
+    for line, ordinate, name, drive in (
+        (ring_faces[0], RING_FACE_NEAR, "RingFaceNear", '"RingFaceNear"'),
+        (
+            ring_faces[1],
+            RING_FACE_NEAR + RING_THICKNESS,
+            "RingFaceFar",
+            '"RingFaceNear" + "RingThickness"',
+        ),
+    ):
+        check(
+            f"{name} reference vertical",
+            await adapter.add_sketch_constraint(line, None, "vertical"),
+        )
+        check(
+            f"{name} reference level with the fork root",
+            await adapter.add_sketch_constraint(
+                f"{line}.start", f"{face_ref}.start", "horizontal_points"
+            ),
+        )
+        await dimension_between(
+            adapter, f"{face_ref}.start", f"{line}.end", "horizontal_distance",
+            ordinate, name,
+        )
+        slot_sd.record(name, drive)
+        await dimension_between(
+            adapter, f"{line}.start", f"{line}.end", "vertical_distance",
+            RING_FACE_REF_RUN, f"{name} reference run",
+        )
+        slot_sd.record(f"{name}Run")
     await ensure_fully_defined(adapter, "fork slot sketch")
     check("exit_sketch fork slot", await adapter.exit_sketch())
     name_last_feature(adapter, "ForkSlotProfile")
@@ -554,16 +611,24 @@ async def build(adapter) -> dict[str, str]:
         "StrapBoreDia",
         *deviations(RING_BORE_DIA_BAND),
     )
-    # The fork straddles the rocker strap inside one station pitch, so its
-    # outer thickness and slot print natively at three places (Main ruling
-    # 2026-10, option b). The fork is centred (mid-plane extrude) and its band
-    # symmetric, so it prints +/-; the slot may only come out wide.
-    fork_lower, fork_upper = deviations(FORK_THICKNESS_BAND)
-    if fork_lower != -fork_upper:
-        raise AssertionError("ch_connecting_rod_spec.FORK_THICKNESS_BAND must be symmetric")
-    set_dimension_symmetric_tolerance(adapter, "ForkBoss", "ForkThick", fork_upper)
-    set_dimension_bilateral_tolerance(
-        adapter, "ForkSlotProfile", "SlotWidth", *deviations(FORK_SLOT_BAND)
+    # The fork straddles the rocker strap inside one station pitch (Main
+    # ruling 2026-10, option b), and the ring must ride its cam slot while the
+    # fork rides the arm (test_channel_axial_budget): the near tine, the slot
+    # and both ring/shank faces print natively, located from the fork's datum
+    # face, each band symmetric so it prints +/-. The fork over the tines is a
+    # reference (two tines and the slot set it).
+    tine_lower, tine_upper = deviations(TINE_BAND)
+    slot_lower, slot_upper = deviations(FORK_SLOT_BAND)
+    face_lower, face_upper = deviations(RING_FACE_BAND)
+    if (tine_lower, slot_lower, face_lower) != (-tine_upper, -slot_upper, -face_upper):
+        raise AssertionError("the fork side-view bands must be symmetric")
+    set_dimension_symmetric_tolerance(adapter, "ForkSlotProfile", "TineNear", tine_upper)
+    set_dimension_symmetric_tolerance(adapter, "ForkSlotProfile", "SlotWidth", slot_upper)
+    set_dimension_symmetric_tolerance(
+        adapter, "ForkSlotProfile", "RingFaceNear", face_upper
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "ForkSlotProfile", "RingFaceFar", face_upper
     )
     # The reamed press hole's band rides natively on its diameter, which the
     # front view imports at three places (DRAWING_PRECISION); its band prints

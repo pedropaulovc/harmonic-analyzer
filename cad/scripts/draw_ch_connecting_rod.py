@@ -6,7 +6,9 @@ sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
 The rod is a tall thin lollipop (~190 mm ring-bottom to fork crown), so the
-sheet runs at 1:1 with a 1:2 isometric.
+sheet runs at 1:1 with a 1:2 isometric; the fork's side profile (tines, slot
+and the ring/shank faces located from one fork face) prints in a 4:1 detail
+of the side view.
 
 Run with SolidWorks open::
 
@@ -16,15 +18,21 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
+    view_name,
 )
 
+import _config
 from _check import check
+from _com import _early_bound, _read_member
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -37,13 +45,15 @@ from _drawing_dimensions import (
     assert_imported_precision,
     set_basic_dimension,
     set_dimension_callouts,
+    set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -52,15 +62,16 @@ from ch_connecting_rod_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
     FORK_BASE_Y,
-    FORK_CROTCH_Y,
     FORK_THICKNESS,
     FORK_TOP_Y,
     GEOMETRIC_TOLERANCES_MM,
     PIN_HOLE_DIA,
     RING_BORE_DIA,
     RING_BOTTOM_Y,
+    STRAP_DIAMETRAL_CLEARANCE,
     SURFACE_FINISHES,
 )
+from ch_rod_pivot_pin_spec import BUDGET as PIN_JOINT_BUDGET
 
 
 SPEC = DRAWINGS_BY_NAME["ch_connecting_rod"]
@@ -83,13 +94,18 @@ SHEET_SCALE = (1.0, 1.0)  # 1:1
 _BBOX_CY = (RING_BOTTOM_Y + FORK_TOP_Y) / 2.0
 
 FRONT_CENTER = (0.180, 0.135)
-# Third-angle left view, aligned with the front view so the fork's thickness
-# and slot dimensions stand in the clear band above its crown.
+# Third-angle left view, aligned with the front view: it shows the stepped
+# thickness and carries the fork detail's circle.
 LEFT_CENTER = (0.080, FRONT_CENTER[1])
-ISO_CENTER = (0.385, 0.140)
-# The notes column sits between the front view's pin annotations and the
-# isometric view (the left view now runs down the old bottom-left column).
-NOTES_XY = (0.258, 0.185)
+ISO_CENTER = (0.398, 0.212)
+ISO_NOTE_XY = (0.355, 0.168)
+# The one-line note stands right of the detail's lower dimensions.
+NOTES_XY = (0.360, 0.097)
+
+# The mates the tight bands name (drawing-guidelines.md rule 7).
+CAM_NUMBER = str(_config.parts("dt-cylinder-gear")["number"])
+ARM_NUMBER = str(_config.parts("ch-rocker-arm")["number"])
+PIN_NUMBER = str(_config.parts("ch-rod-pivot-pin")["number"])
 
 
 def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
@@ -110,79 +126,185 @@ def _left_xy(offset: float, my: float) -> tuple[float, float]:
 
 
 FRONT_KEEP = {
-    "RingOuterDia": (0.185, 0.070),
-    "StrapBoreDia": (0.190, 0.052),
-    "ShankWidthDim": (0.180, 0.150),
+    # Both ring diameters stand outside the ring, down-left, their leaders
+    # meeting the rims (inside the ring the texts sat on the ring's ink).
+    "RingOuterDia": (0.135, 0.098),
+    "StrapBoreDia": (0.130, 0.040),
+    # Right of the shank, so the flanks never strike the value.
+    "ShankWidthDim": (0.198, 0.150),
     "ForkWidthDim": _sheet_xy(0.0, FORK_TOP_Y + 8.0),
-    # The reamed pin hole's Ø and band leave the hole for the lane above the
-    # crown, right of the fork; the position FCF attaches at the 3-o'clock rim
-    # with a level leader below that lane, so the two leaders cannot cross.
-    "PinHoleDia": (0.240, 0.243),
+    # The reamed pin hole's value stands right of the fork, below the position
+    # FCF's level leader, so the two leaders cannot cross.
+    "PinHoleDia": (0.218, 0.196),
 }
-# Descriptive text beneath each native value/band: the strap bore; the fork's
-# crown, a full round on the pin tangent to its sides; the reamed press hole
-# (drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the decimal Ø and the process).
+# Descriptive text beneath each native value/band: the strap bore and its
+# cam; the fork's crown, a full round on the pin tangent to its sides; the
+# reamed press hole and its pin (drawing-guidelines.md rule 12 (hole and slot
+# callouts say what to do): the decimal Ø and the process).
+_CLEARANCE_LEAST, _CLEARANCE_MOST = STRAP_DIAMETRAL_CLEARANCE
+_PRESS_LEAST = PIN_JOINT_BUDGET["interference_min"]
+_PRESS_MOST = PIN_JOINT_BUDGET["interference_max"]
 FRONT_CALLOUTS = {
-    "StrapBoreDia": "BORE",
+    "StrapBoreDia": (
+        f"BORE; RUNS ON CAM OF\n{CAM_NUMBER},"
+        f" {_CLEARANCE_LEAST:.2f}-{_CLEARANCE_MOST:.2f}\nDIAMETRAL CLEARANCE"
+    ),
     "ForkWidthDim": "FULL R",
-    "PinHoleDia": "THRU - REAM",
-}
-# Side-view ink, read off the farm render of 1b1f2f7fd (run
-# 20261009T190048955Z; mm at 1:1, from each dimension's keep point).  A
-# horizontal dimension's text centres on its keep x.  The thickness's one
-# line ("6.075 ±0.05", 23.9 wide) centres on its keep y and stands on its
-# dimension line FORK_THICK_LINE_DROP_MM under it.  The slot's stacked band
-# ("2.625 +0.127/0.000", 26.9 wide) rises over the value: its frame tops out
-# SLOT_WIDTH_TEXT_RISE_MM over the keep y, its line SLOT_WIDTH_LINE_DROP_MM
-# under it.  Smart arrows stand outside these short spans, their tails
-# DIM_ARROW_REACH_MM past the extension line (the 14.75 and 18.00 top tails
-# rise that far over the tine tops); an arrowhead is ARROW_HALF_WIDTH_MM
-# either side of its line.
-FORK_THICK_TEXT_HALF_WIDTH_MM = 12.0
-FORK_THICK_LINE_DROP_MM = 2.8
-SLOT_WIDTH_TEXT_HALF_WIDTH_MM = 13.5
-SLOT_WIDTH_TEXT_RISE_MM = 4.4
-SLOT_WIDTH_LINE_DROP_MM = 4.5
-VERTICAL_TEXT_HALF_WIDTH_MM = 5.4  # "14.75", "18.00"
-DIM_ARROW_REACH_MM = 6.4
-ARROW_HALF_WIDTH_MM = 0.3
-# Air between side-view text and any other dimension's ink.
-SIDE_TEXT_CLEARANCE_MM = 2.5
-# The slot's 2.625 span is narrower than its value: centred over the slot, the
-# thickness's dimension line cut the top of its band, the thickness's right
-# extension line and the 14.75's top arrow tail ran through its "0.000"
-# (farm render of 1b1f2f7fd).  So the slot's text stands LEFT of the fork,
-# clear of the thickness's left extension line, on its own dimension line
-# run out just above the tine tops; the thickness stands centred over the
-# fork, its line and arrows clear above the slot's band.  The slot depth and
-# the boss length run from the tine tops down the right-hand side, their
-# values a clear gap apart.
-SLOT_WIDTH_TEXT_DX_MM = -(
-    FORK_THICKNESS / 2.0 + SIDE_TEXT_CLEARANCE_MM + SLOT_WIDTH_TEXT_HALF_WIDTH_MM
-)
-SLOT_WIDTH_RISE_MM = 6.0
-FORK_THICK_RISE_MM = 16.5
-SLOT_DEPTH_DX_MM = 12.0
-FORK_BOSS_LENGTH_DX_MM = 28.0
-LEFT_KEEP = {
-    "SlotWidth": _left_xy(SLOT_WIDTH_TEXT_DX_MM, FORK_TOP_Y + SLOT_WIDTH_RISE_MM),
-    "ForkThick": _left_xy(0.0, FORK_TOP_Y + FORK_THICK_RISE_MM),
-    "SlotDepth": _left_xy(SLOT_DEPTH_DX_MM, (FORK_TOP_Y + FORK_CROTCH_Y) / 2.0),
-    "ForkBossLength": _left_xy(
-        FORK_BOSS_LENGTH_DX_MM, (FORK_TOP_Y + FORK_BASE_Y) / 2.0
+    "PinHoleDia": (
+        f"THRU - REAM; PRESS\nFIT ON PIN {PIN_NUMBER},\n"
+        f"{_PRESS_LEAST:.3f}-{_PRESS_MOST:.3f} INTERFERENCE"
     ),
 }
-TOP_KEEP: dict[str, tuple[float, float]] = {}
+
+# DETAIL C: the fork's side profile at 4:1. At 1:1 the tines, slot and ring
+# faces are 1.7-2.7 mm features and their dimensions crowded the side view
+# (baseline review). The fence centres on the rod axis midway between the
+# crown top and the ring-face references' lower ends and takes in both.
+DETAIL_SCALE = (4, 1)
+DETAIL_RADIUS_MM = 11.0
+DETAIL_FENCE_Y_MM = (FORK_TOP_Y + FORK_BASE_Y - 2.0) / 2.0
+DETAIL_CENTER = (0.312, 0.150)
+_DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+_DETAIL_FENCE_R = DETAIL_RADIUS_MM * _DETAIL_MM
+if DETAIL_RADIUS_MM <= math.hypot(FORK_THICKNESS / 2.0, FORK_TOP_Y - DETAIL_FENCE_Y_MM):
+    raise AssertionError("DETAIL C's fence must take in the whole crown top")
+# The label stands right of the fence, under the isometric's note.
+DETAIL_LABEL_XY = (0.375, 0.130)
+# The fence's letter on the side view, up-left of its circle.
+DETAIL_LETTER_XY = (
+    LEFT_CENTER[0] - DETAIL_RADIUS_MM / 1000.0 - 0.006,
+    LEFT_CENTER[1] + (DETAIL_FENCE_Y_MM - _BBOX_CY + DETAIL_RADIUS_MM) / 1000.0,
+)
+
+
+def _detail_xy(z_mm: float, y_mm: float) -> tuple[float, float]:
+    """Sheet (x, y) of side-view point (model z, model y) in DETAIL C: the
+    *Left view runs model +Z to the right, so the datum fork face (model -Z,
+    the build's sketch +x) stands on the LEFT."""
+    return (
+        DETAIL_CENTER[0] + z_mm * _DETAIL_MM,
+        DETAIL_CENTER[1] + (y_mm - DETAIL_FENCE_Y_MM) * _DETAIL_MM,
+    )
+
+
+_FACE_X = _detail_xy(-FORK_THICKNESS / 2.0, FORK_TOP_Y)[0]
+_FAR_X = _detail_xy(FORK_THICKNESS / 2.0, FORK_TOP_Y)[0]
+_TINE_TOP_Y = _detail_xy(0.0, FORK_TOP_Y)[1]
+_ROOT_Y = _detail_xy(0.0, FORK_BASE_Y)[1]
+DETAIL_KEEP = {
+    # Over the tines, nearest first: the near tine (text wholly left of the
+    # datum face's witness), the slot (text right of the far face), the
+    # reference thickness centred over the fork.
+    "TineNear": (_FACE_X - 0.028, _TINE_TOP_Y + 0.014),
+    "SlotWidth": (_FAR_X + 0.024, _TINE_TOP_Y + 0.028),
+    "ForkThick": (DETAIL_CENTER[0], _TINE_TOP_Y + 0.042),
+    # Down the right-hand side from the crown top: the slot depth inside, the
+    # boss length outside.
+    "SlotDepth": (_FAR_X + 0.018, (_TINE_TOP_Y + _ROOT_Y) / 2.0 + 0.006),
+    "ForkBossLength": (_FAR_X + 0.044, (_TINE_TOP_Y + _ROOT_Y) / 2.0),
+    # Under the fork, from the datum face: the ring's near face (text left of
+    # the datum face), its far face (text right of the ring).
+    "RingFaceNear": (_FACE_X - 0.028, _ROOT_Y - 0.026),
+    "RingFaceFar": (_FAR_X + 0.024, _ROOT_Y - 0.040),
+}
+_RING_FACE_CALLOUT = f"RING FACE; RUNS IN\nCAM SLOT OF {CAM_NUMBER}"
+DETAIL_CALLOUTS = {
+    "TineNear": f"2X TINE; CLEARS THE\nNEXT ROD ON {ARM_NUMBER}",
+    "SlotWidth": f"RUNS ON ARM\n{ARM_NUMBER}",
+    "RingFaceNear": _RING_FACE_CALLOUT,
+    "RingFaceFar": _RING_FACE_CALLOUT,
+}
 
 BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
 BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.025, BORE_FINISH_EDGE[1] + 0.015)
 # Datum B on the shank's left flank. The tag's edge attachment re-solves
-# square to the flank, so its leader runs level at the tag's height; the tag
-# stands 4.5 mm above the ShankWidthDim keep, whose 3.5 mm text reads
-# 148.2..151.7 at y 150, leaving the leader 2.8 mm over the text (it rode 1.3
-# mm lower, through the text, once the fork's crown raised the bbox centre).
+# square to the flank, so its leader runs level at the tag's height, 4.5 mm
+# above the shank width's dimension line (its text stands right of the shank).
 DATUM_B_EDGE = _sheet_xy(-4.0, 100.0)
 DATUM_B_SYMBOL = (DATUM_B_EDGE[0] - 0.016, FRONT_KEEP["ShankWidthDim"][1] + 0.0045)
+# The 4.00 BASIC (datum B to the pin axis) runs between the pin and the fork
+# root, its text out to the left: over the pin its line lay on the position
+# FCF's level leader and under the ream leader (baseline review).
+PIN_OFFSET_TEXT_XY = (0.150, _sheet_xy(0.0, (CENTER_DISTANCE + FORK_BASE_Y) / 2.0)[1])
+
+
+def _fork_detail(adapter: Any, left: Any) -> Any:
+    """DETAIL C: a native 4:1 detail of the side view's fork."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(left, "IView")
+    if not drawing.ActivateView(view_name(adapter, left)):
+        raise RuntimeError("failed to activate the fork detail's parent")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(
+        adapter,
+        left,
+        (0.0, DETAIL_FENCE_Y_MM / 1000.0, 0.0),
+        label="fork detail centre",
+    )
+    radius = DETAIL_RADIUS_MM * SHEET_SCALE[0] / 1000.0
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create the fork detail fence")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *DETAIL_SCALE,
+        "C",
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create the fork detail")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("the fork detail has invalid bounds")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position the fork detail")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position the fork detail label")
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"the fork detail label did not persist: {actual}")
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(f"expected one detail circle on the side view, found {len(circles)}")
+    circle = _early_bound(circles[0], "IDetailCircle")
+    circle.SetLabelPosition(*DETAIL_LETTER_XY)
+    draw.EditRebuild3()
+    letter = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, DETAIL_LETTER_XY) > 1e-8:
+        raise RuntimeError(f"the detail circle's letter did not persist: {letter}")
+    return detail
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -228,16 +350,14 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     # The 1:1 left view (third angle: placed LEFT of the front) shows the
-    # stepped thickness -- one 2.200 plate for ring and shank (note 2), and the
-    # 6.075 fork split by its slot into two tines -- and carries the fork's
-    # thickness, slot width, slot depth and boss length.  The right-hand
-    # column belongs to the title block,
-    # so the side view lives on the left.
+    # stepped thickness -- one 2.175 plate for ring and shank, and the 6.075
+    # fork split by its slot into two tines -- and carries DETAIL C's circle.
+    # The right-hand column belongs to the title block, so the side view lives
+    # on the left.
     left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (left, iso):
+    for view in (front, left, iso):
         set_hidden_lines_removed(adapter, view)
-    set_hidden_lines_visible(adapter, front)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -246,20 +366,37 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    curate_view_dimensions(
+    detail = _fork_detail(adapter, left)
+    set_hidden_lines_removed(adapter, detail)
+    detail_annotations = curate_view_dimensions(
         adapter,
-        left,
-        keep=LEFT_KEEP,
-        view_label="left",
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="fork detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # The strap-bore and reamed pin-hole bands import with their named model
-    # dimensions, at the part's places; the drawing owns only the callout
-    # text beneath them.
+    # The bands import with their named model dimensions, at the part's
+    # places; the drawing owns only the callout text beneath them.
     assert_imported_precision(
         adapter, front_annotations, DRAWING_PRECISION["PinHoleProfile"]
     )
+    assert_imported_precision(
+        adapter,
+        detail_annotations,
+        {**DRAWING_PRECISION["ForkBoss"], **DRAWING_PRECISION["ForkSlotProfile"]},
+    )
     set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
+    set_dimension_callouts(adapter, detail_annotations, DETAIL_CALLOUTS)
+    # Two tines and the slot set the fork over the tines: it prints as a
+    # reference.
+    fork_thick = [
+        annotation
+        for annotation in detail_annotations
+        if dimension_name(adapter, annotation) == "ForkThick"
+    ]
+    if len(fork_thick) != 1:
+        raise RuntimeError("fork detail does not carry exactly one fork thickness")
+    set_reference_dimension(adapter, fork_thick[0], label="fork over the tines")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -310,7 +447,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         p0=DATUM_B_EDGE,
         p1=pin_rim,
-        text_xy=(0.152, 0.224),
+        text_xy=PIN_OFFSET_TEXT_XY,
         label="pin C/L from shank flank",
         orientation="horizontal",
     )
@@ -324,7 +461,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="strap bore finish",
     )
     # The position FCF attaches at the reamed pin hole's 3-o'clock rim with a
-    # level leader, below the Ø callout's lane.
+    # level leader, above the Ø callout's lane.
     pin_fcf_rim = _sheet_xy(_PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
     add_feature_control_frame(
         adapter,
@@ -339,7 +476,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
-    add_property_linked_note(adapter, "Isometric View Note", 0.350, 0.205)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,
