@@ -629,6 +629,39 @@ def test_screw_full_thread_is_the_accepted_rule_20_shortfall() -> None:
     assert worst / 2.8448 == pytest.approx(1.31, abs=5e-3)
 
 
+def test_declared_exceptions_name_the_printed_minimums() -> None:
+    # Each owner-ruled shortfall is declared for this package, names the
+    # sheet text that states it, and that text prints the spec's worst case
+    # rounded down to two places.
+    from _paths import CAD_ROOT
+    from machinist_exceptions import load_exceptions
+
+    declared = {
+        entry.id: entry
+        for entry in load_exceptions(CAD_ROOT / "config", "fr_nameplate", "part")
+    }
+    assert {name: entry.kind for name, entry in declared.items()} == {
+        "RV-01": "accept",
+        "RV-02": "minor",
+        "RV-03": "minor",
+    }
+    for entry in declared.values():
+        assert entry.reason.endswith(("(owner-accepted)", "(owner-ruled shortfall)"))
+    floor, screws = print_spec.MINIMUM_NOTES.splitlines()
+    assert floor == "FLOOR UNDER ENGRAVING 0.54 MIN"
+    assert screws == "SCREWS ENGAGE 3.73 MIN FULL THREAD"
+    assert floor in declared["RV-02"].where
+    assert screws in declared["RV-03"].where
+    # 1.500 - 0.13 - (0.700 + 0.13) = 0.540; 3.73575 rounds down to 3.73.
+    assert float(floor.split()[-2]) == pytest.approx(print_spec.ENGRAVING_FLOOR_MIN)
+    assert (
+        float(screws.split()[2])
+        == math.floor(print_spec.SCREW_FULL_THREAD_MIN * 100.0) / 100.0
+    )
+    for note in print_spec.MANUFACTURING_NOTES.splitlines()[:3]:
+        assert note in declared["RV-01"].where
+
+
 def test_notes_and_callouts_carry_no_numbers_and_stay_short() -> None:
     notes = print_spec.MANUFACTURING_NOTES.splitlines()
     # The note block's rows fit the left half above the title band.
@@ -657,6 +690,7 @@ def test_texts_stand_inside_the_border_and_off_the_title_block() -> None:
         drawing.HOLE_CALLOUT_XY,
         drawing.NOTES_XY,
         drawing.SCREW_HEAD_NOTE_XY,
+        drawing.MINIMUM_NOTES_XY,
         drawing.ISO_NOTE_XY,
         drawing.SECTION_CENTER,
         drawing.SECTION_CAPTION_XY,
