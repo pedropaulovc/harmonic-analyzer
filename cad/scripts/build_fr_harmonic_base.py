@@ -1631,9 +1631,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "socket bosses", after + v_hang, 0.005 * v_hang + 10.0
     )
 
-    # The rect pads, the lugs, the ribs and the spring-foot boss stand under
-    # seats the hole table does not locate (transfer seats, cross taps) or
-    # under none, so the drawing places them from the table's own X0 Y0: the
+    # The rect pads, the lugs, the ribs, the spring-foot boss and the
+    # nameplate bosses stand under seats the hole table does not locate
+    # (transfer seats, cross taps, the MHA-FR-004 taps) or under none, so the
+    # drawing places them from the table's own X0 Y0: the
     # flange's rear-west theoretical sharp corner, one datum per view (drawing
     # drawing-guidelines.md rule 10 (dimension from a real feature)). Each sketch carries that corner as a point, and every
     # such feature is dimensioned FROM it, so the printed locations are these
@@ -1665,6 +1666,42 @@ async def build(adapter) -> dict[str, str]:
     def _from_origin(x: float, sketch_y: float) -> tuple[float, float]:
         """Hole-table (X, Y) of a Top-plane sketch point (sketch y = -z)."""
         return x + BOTTOM_LENGTH / 2.0, sketch_y + BOTTOM_WIDTH / 2.0
+
+    async def _boss_from_origin(
+        dims: SketchDims,
+        origin: str,
+        x: float,
+        z: float,
+        label: str,
+        names: tuple[str, str, str],
+    ) -> None:
+        """Sketch a hanging boss whose centre the table does not hold: the
+        centre placed from X0 Y0 (``names[0]``, ``names[1]``), as
+        define_circle would place it from the origin, then its diameter."""
+        manager = adapter.currentSketchManager
+        previous = bool(manager.AddToDB)
+        manager.AddToDB = True
+        try:
+            circle = await adapter.add_circle(x, -z, HANGING_BOSS_HALF)
+            check(f"add_circle {label}", circle)
+        finally:
+            manager.AddToDB = previous
+        await anchor_point_to_point(
+            adapter,
+            origin,
+            f"{circle.data}.center",
+            *_from_origin(x, -z),
+            f"{label} from X0 Y0",
+        )
+        dims.record(names[0])
+        dims.record(names[1])
+        check(
+            f"dimension {label} diameter",
+            await adapter.add_sketch_dimension(
+                circle.data, None, "diameter", 2.0 * HANGING_BOSS_HALF
+            ),
+        )
+        dims.record(names[2], '"HangingBossDia"')
 
     async def _pad(
         dims: SketchDims,
@@ -1837,31 +1874,10 @@ async def build(adapter) -> dict[str, str]:
                 continue
             # Under the transferred MHA-DT-024 foot hole, which the table does
             # not hold: the boss's own centre is placed from X0 Y0 (FootBossX,
-            # FootBossY), as define_circle would place it from the origin.
-            manager = adapter.currentSketchManager
-            previous = bool(manager.AddToDB)
-            manager.AddToDB = True
-            try:
-                circle = await adapter.add_circle(x, -z, HANGING_BOSS_HALF)
-                check(f"add_circle {label}", circle)
-            finally:
-                manager.AddToDB = previous
-            await anchor_point_to_point(
-                adapter,
-                origin,
-                f"{circle.data}.center",
-                *_from_origin(x, -z),
-                f"{label} from X0 Y0",
+            # FootBossY).
+            await _boss_from_origin(
+                sketch, origin, x, z, label, ("FootBossX", "FootBossY", name_size)
             )
-            sketch.record("FootBossX")
-            sketch.record("FootBossY")
-            check(
-                f"dimension {label} diameter",
-                await adapter.add_sketch_dimension(
-                    circle.data, None, "diameter", 2.0 * HANGING_BOSS_HALF
-                ),
-            )
-            sketch.record(name_size, '"HangingBossDia"')
         await _pad(
             sketch,
             LOCK_PAD_SHAPE,
@@ -1904,15 +1920,33 @@ async def build(adapter) -> dict[str, str]:
     async def _shallow_sketch(sketch: SketchDims) -> None:
         origin = await _table_origin(sketch, "ShallowBoss")
         for i, (x, z) in enumerate(SHALLOW_BOSS_CENTRES):
-            await define_circle(
-                adapter,
+            label = f"shallow boss ({x:+.1f}, {z:+.1f})"
+            name_size = f"ShallowBoss{i}Dia"
+            if (x, z) not in NAMEPLATE_SCREW_XZ:
+                # Concentric with a tabled hole (B1, D1): the table locates it.
+                await define_circle(
+                    adapter,
+                    x,
+                    -z,
+                    HANGING_BOSS_HALF,
+                    label,
+                    dims=sketch,
+                    names=(f"ShallowBoss{i}X", f"ShallowBoss{i}Z", name_size),
+                    drives=(None, None, '"HangingBossDia"'),
+                )
+                continue
+            # Under an MHA-FR-004 nameplate tap, which the table no longer
+            # holds: the boss's centre is placed from X0 Y0, named in
+            # NAMEPLATE_SCREW_XZ order (fr_harmonic_base_spec marks one
+            # diagonal pair, each value printed 2X).
+            k = NAMEPLATE_SCREW_XZ.index((x, z))
+            await _boss_from_origin(
+                sketch,
+                origin,
                 x,
-                -z,
-                HANGING_BOSS_HALF,
-                f"shallow boss ({x:+.1f}, {z:+.1f})",
-                dims=sketch,
-                names=(f"ShallowBoss{i}X", f"ShallowBoss{i}Z", f"ShallowBoss{i}Dia"),
-                drives=(None, None, '"HangingBossDia"'),
+                z,
+                label,
+                (f"NameplateBoss{k}X", f"NameplateBoss{k}Y", name_size),
             )
         for i, shape in enumerate(BLOCK_PAD_SHAPES):
             await _pad(
