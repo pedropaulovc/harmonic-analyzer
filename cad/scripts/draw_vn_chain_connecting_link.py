@@ -13,7 +13,7 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_part_drawing import build_purchased_part_drawing
+from _purchased_part_drawing import HiddenLineDisplay, build_purchased_part_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["vn_chain_connecting_link"]
@@ -22,7 +22,9 @@ PART_STEM = SPEC.artifact_stem
 
 async def build(adapter: Any) -> dict[str, str]:
     # Undimensioned reference views: dashed bores and pins inform nothing.
-    return await build_purchased_part_drawing(adapter, SPEC, hidden_lines_removed=True)
+    return await build_purchased_part_drawing(
+        adapter, SPEC, hidden_lines=HiddenLineDisplay.REMOVED
+    )
 
 
 def _parse_args() -> argparse.Namespace:
