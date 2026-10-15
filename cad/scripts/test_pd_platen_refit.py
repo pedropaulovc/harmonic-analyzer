@@ -88,10 +88,16 @@ def test_platen_clip_is_one_center_bridged_sheet() -> None:
         clip.CLIP_WIDTH,
     )
     # ch22 img03: a 32-px spring rail beside a 4-px slit, of the photographed
-    # width; the screw rail is widened for its holes' ligaments (user ruling
-    # 2026-10-14).
-    assert math.isclose(clip.SPRING_RAIL_WIDTH, clip.PHOTO_CLIP_WIDTH * 32.0 / 68.0)
-    assert math.isclose(clip.NOTCH_WIDTH, clip.PHOTO_CLIP_WIDTH * 4.0 / 68.0)
+    # width.  The screw rail is widened for its holes' ligaments (user ruling
+    # 2026-10-14) and the overall width held; the slit's .XX worst case keeps
+    # the photographed gap, and the spring rail gives that widening up.
+    assert math.isclose(
+        clip.CLIP_WIDTH,
+        clip.SCREW_RAIL_WIDTH + clip.PHOTO_CLIP_WIDTH * 36.0 / 68.0,
+    )
+    assert clip.NOTCH_WIDTH == 1.04
+    assert clip.NOTCH_WIDTH - 0.51 >= clip.PHOTO_CLIP_WIDTH * 4.0 / 68.0
+    assert clip.SPRING_RAIL_WIDTH < clip.PHOTO_CLIP_WIDTH * 32.0 / 68.0
     assert clip.SCREW_RAIL_WIDTH > clip.SPRING_RAIL_WIDTH
     assert math.isclose(
         clip.BRIDGE_X0 + clip.CENTER_BRIDGE_LENGTH + clip.BRIDGE_X0, clip.CLIP_LENGTH
@@ -235,20 +241,16 @@ def test_platen_clip_hole_ligaments_float_and_head_land_hold_at_worst_case() -> 
 
 def test_wider_platen_clip_stays_on_the_platen_and_off_the_recording_paper() -> None:
     # Local y = 0 (the screw rail's outer edge) lies toward the platen's edge;
-    # the spring rail's inboard edge toward the paper.  Each clip-width lane
-    # and both hole stations at their printed bands.
+    # the spring rail's inboard edge toward the paper.  The sheet locates the
+    # inboard edge from the hole row through the .XXX hole row height and the
+    # .XX overall width (the spring rail is a reference), the platen's socket
+    # station at .XXX.
     band3, band2 = printed_band_mm(3), printed_band_mm(2)
     socket_x = min(x for x, _ in platen.SOCKET_XY)
     outer_edge_min = socket_x - band3 - (clip.HOLE_Y + band3)
     assert outer_edge_min > 0.0
     inboard_edge_max = (
-        socket_x
-        + band3
-        + (clip.SCREW_RAIL_WIDTH - clip.HOLE_Y + 2.0 * band3)
-        + clip.NOTCH_WIDTH
-        + band3
-        + clip.SPRING_RAIL_WIDTH
-        + band2
+        socket_x + band3 - (clip.HOLE_Y - band3) + clip.CLIP_WIDTH + band2
     )
     paper_inset_min = paper_geometry.recording_paper_sweep_bands_mm()[
         "paper_left_inset_band_mm"

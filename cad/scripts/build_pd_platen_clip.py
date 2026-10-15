@@ -58,6 +58,7 @@ from _session import run_build
 from _sketch import (
     SketchDims,
     anchor_point_to_origin,
+    blank_sketch,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
@@ -82,22 +83,38 @@ CLIP_THICKNESS = SHEET_T  # assembly stand-off: one sheet, not a face stack
 
 # ch22 img03 (one clip, 603 x 68 px of brass): the spring rail is 32 px wide
 # and the slit beside it 4 px, of the photographed width.
-NOTCH_WIDTH = PHOTO_CLIP_WIDTH * 4.0 / 68.0
-SPRING_RAIL_WIDTH = PHOTO_CLIP_WIDTH * 32.0 / 68.0
+PHOTO_SLIT_WIDTH = PHOTO_CLIP_WIDTH * 4.0 / 68.0
+PHOTO_SPRING_RAIL_WIDTH = PHOTO_CLIP_WIDTH * 32.0 / 68.0
 # The photographed 32-px (4.23) screw rail cannot hold a #2 clearance hole
 # with the rule-17 1.5 mm ligament on both sides (user ruling 2026-10-14,
-# option A: widen the screw rail, keep the spring rail and slit).  With the
+# option A: widen the screw rail).  With the
 # hole centred at half the rail, its station and the rail width each printed
 # at .XXX and the hole DRILLED, the slit side is the binding ligament:
 # W - band - (W/2 + band) - r_max >= 1.5, so W >= 2 * (1.5 + r_max + 2 * band),
-# 6.566 for the #2 loose hole; 6.6 holds it.
+# 6.570 for the #2 loose hole drilled at its printed Ø2.95; 6.6 holds it.
 SCREW_RAIL_WIDTH = 6.6
-CLIP_WIDTH = SCREW_RAIL_WIDTH + NOTCH_WIDTH + SPRING_RAIL_WIDTH
+# The overall width beside the widened rail is the photographed slit and
+# spring rail's: the platen's clip-socket station holds the clip-to-paper gap
+# against it (pd_platen_spec.SOCKET_X), so neither lane may grow it.
+CLIP_WIDTH = SCREW_RAIL_WIDTH + PHOTO_SLIT_WIDTH + PHOTO_SPRING_RAIL_WIDTH
+# The slit frees the spring rail to flex out of the sheet on its own while the
+# screw rail stays clamped; the book's clip does that through the photographed
+# 0.53 slit, so the print's narrowest slit keeps at least that open.  It
+# prints .XX (the title block's general band, +/-0.51): the nominal is the
+# floor plus the band, rounded up to the 0.01 grid, 1.04.  The spring rail
+# gives the widening up (3.72), the overall width stays.
+SLIT_PLACES = 2
+SLIT_GAP_FLOOR = PHOTO_SLIT_WIDTH
+NOTCH_WIDTH = (
+    math.ceil(round((SLIT_GAP_FLOOR + printed_band_mm(SLIT_PLACES)) * 100.0, 9)) / 100.0
+)
+SPRING_RAIL_WIDTH = CLIP_WIDTH - SCREW_RAIL_WIDTH - NOTCH_WIDTH
 SPRING_RAIL_Y0 = SCREW_RAIL_WIDTH + NOTCH_WIDTH
 # img03: the slits stop 77 px apart on their centreline; with their full
-# half-round ends (radius NOTCH_WIDTH / 2, 2 px) the tangent points sit
-# 81 px apart.  The bridge length is that tangent-point span, which is also
-# the spring rail's flat middle run.
+# half-round ends (2 px radius) the tangent points sit 81 px apart.  The
+# bridge length is that tangent-point span, which is also the spring rail's
+# flat middle run; the wider slit's full round (radius NOTCH_WIDTH / 2) ends
+# at the same tangent points.
 CENTER_BRIDGE_LENGTH = CLIP_LENGTH * 81.0 / 603.0
 SLIT_END_RADIUS = NOTCH_WIDTH / 2.0
 BRIDGE_X0 = (CLIP_LENGTH - CENTER_BRIDGE_LENGTH) / 2.0
@@ -126,10 +143,13 @@ HEAD_TO_SPRING_RAIL = SPRING_RAIL_Y0 - (HOLE_Y + HEAD_DIA / 2.0)
 HEAD_RAIL_MARGIN = (SCREW_RAIL_WIDTH - HEAD_DIA) / 2.0
 
 # Worst case of the printed sheet (drawing-guidelines.md rule 17): the hole
-# stations and the screw-rail width print at .XXX, the holes are DRILLED.
+# stations and the screw-rail width print at .XXX, the holes are DRILLED at
+# the size their callout prints (HOLE_CALLOUT_PRECISION).
 POSITION_PLACES = 3
 _POSITION_BAND = printed_band_mm(POSITION_PLACES)
-HOLE_DIA_MAX = HOLE_DIA + drilled_oversize_mm()
+HOLE_CALLOUT_PRECISION = {"hw-diam": 2}
+HOLE_DIA_PRINTED = round(HOLE_DIA, HOLE_CALLOUT_PRECISION["hw-diam"])
+HOLE_DIA_MAX = HOLE_DIA_PRINTED + drilled_oversize_mm()
 LIGAMENT_FLOOR = 1.5
 EDGE_LIGAMENT_MIN = HOLE_Y - _POSITION_BAND - HOLE_DIA_MAX / 2.0
 SLIT_LIGAMENT_MIN = (
@@ -155,18 +175,22 @@ HOLE_FLOAT_MIN = HOLE_DIA - SHANK_DIA
 HEAD_BEARING_LAND_MIN = (HEAD_DIA - HOLE_DIA_MAX) / 2.0
 # Clip-joint thread engagement at the worst case (drawing-guidelines.md rule
 # 18): the shortest catalogue screw (ASME B18.6.3, to 1 in: +0/-0.03 in) under
-# the thickest printed sheet reaches the least into the platen's through tap,
+# the thickest stock sheet reaches the least into the platen's through tap,
 # less one pitch of incomplete lead and the tap mouth's title-block edge break.
 SCREW_LENGTH_MINUS = 0.03 * 25.4
 TAP_MOUTH_BREAK = 0.25
-SHEET_PLACES = 3
+# The sheet is the stock's (the print gives it as a reference over SHEET
+# STOCK): 0.032 in C26000 strip, whose thickness ASTM B248 (Table 1, 0.026 to
+# 0.037 in, to 8 in wide) holds to +/-0.002 in.
+STOCK_THICKNESS_IN = 0.032
+STOCK_THICKNESS_TOL_IN = 0.002
+SHEET_T_MAX = (STOCK_THICKNESS_IN + STOCK_THICKNESS_TOL_IN) * 25.4
 CLIP_SCREW_ENGAGEMENT_MIN = (
-    SHANK_LEN
-    - SCREW_LENGTH_MINUS
-    - (SHEET_T + printed_band_mm(SHEET_PLACES))
-    - PITCH
-    - TAP_MOUTH_BREAK
+    SHANK_LEN - SCREW_LENGTH_MINUS - SHEET_T_MAX - PITCH - TAP_MOUTH_BREAK
 )
+# The overall width prints .XX from the outer edge, as the slit (SLIT_PLACES)
+# does: the spring rail is what they leave beside the screw rail (a reference).
+WIDTH_PLACES = 2
 
 # Spring rail section (local X, Z) as its sheet MID-SURFACE: the free tip lies
 # flat from its end-round centre out to the screw station, then each free half
@@ -182,6 +206,26 @@ TIP_FLAT_LENGTH = HOLE_INSET - SPRING_END_RADIUS
 MID_SURFACE_LENGTH = (
     2.0 * TIP_FLAT_LENGTH + CENTER_BRIDGE_LENGTH + 2.0 * 4.0 * BEND_RADIUS * BEND_ANGLE
 )
+# Each formed finger's flat length in the blank, from the bridge to its tip
+# (the mid-surface's developed bow and tip flat, and the end round): the
+# blank's fingers stand this far past the bridge, longer than the formed
+# ones, so forming draws each tip back flush with its rail end.
+FLAT_FINGER_LENGTH = HOLE_INSET + 4.0 * BEND_RADIUS * BEND_ANGLE
+# The tangent stations of the two bows' four arcs each, from the near end
+# (the mid-surface's joins): each bow starts and ends flat, and its lift and
+# return arcs meet the crown a quarter of the run in (R sin(a) = run / 4).
+TANGENT_STATIONS = (
+    ("TangentX1", HOLE_INSET, '"HoleInset"'),
+    ("TangentX2", HOLE_INSET + BOW_RUN / 4.0, '"HoleInset" + "BowRun" / 4'),
+    ("TangentX3", HOLE_INSET + 3.0 * BOW_RUN / 4.0, '"HoleInset" + 3 * "BowRun" / 4'),
+    ("TangentX4", BRIDGE_X0, '"BridgeX0"'),
+    ("TangentX5", BRIDGE_X1, '"BridgeX0" + "CenterBridgeL"'),
+    ("TangentX6", BRIDGE_X1 + BOW_RUN / 4.0, '"HoleFarX" - 3 * "BowRun" / 4'),
+    ("TangentX7", BRIDGE_X1 + 3.0 * BOW_RUN / 4.0, '"HoleFarX" - "BowRun" / 4'),
+    ("TangentX8", CLIP_LENGTH - HOLE_INSET, '"HoleFarX"'),
+)
+# The far bow's crest station, where the drawing's rise reference stands.
+FAR_CREST_X = BRIDGE_X1 + BOW_RUN / 2.0
 
 MODEL_FEATURES = (
     "FlatSheet",
@@ -206,7 +250,7 @@ SPRING_RAIL_DRIVES = (
 # gap at the bridge unless the spring rail's start offset follows.
 EQUATION_FLEX = (
     ("SheetT", SHEET_T, 1.0, "sheet_t"),
-    ("NotchW", NOTCH_WIDTH, 0.8, "notch_w"),
+    ("NotchW", NOTCH_WIDTH, 0.6, "notch_w"),
 )
 _CORNER_LOSS = (
     (1.0 - math.pi / 4.0) * 2.0 * (SCREW_RAIL_END_RADIUS**2 + SCREW_RAIL_SLIT_RADIUS**2)
@@ -215,42 +259,63 @@ _CORNER_LOSS = (
 # --- Drawing contract: feature -> the parametric dimension NAMES the print
 # shows.  The build marks exactly these and authors their places;
 # ``draw_pd_platen_clip`` keeps exactly their union across its views.  The plan
-# carries the blank: the overall length, the screw rail's width, the spring
-# rail's start and width from the same outer edge (the slit is what lies
-# between), the bridge, the corner radii and the hole stations; the formed
-# profile carries the sheet, the bow stations and the bend radius.  The hole
-# size ships as a native Hole Wizard callout. ---
+# carries the blank: the overall length, the bridge's two ends (the slits'
+# rounded ends) from the near end, the hole row, the screw rail's width and
+# the overall width from the outer edge, the slit, the corner radii and the
+# hole stations; the spring rail's width is what they leave, a reference.  The
+# formed profile carries the bows' rise and, as references, their eight tangent
+# stations from the near end, their radius, the developed finger and the sheet
+# stock.  Hidden reference sketches own the overall width, the rise, the
+# stations and the developed finger.  The hole size ships as a native Hole
+# Wizard callout. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FlatSheetProfile": {
         "Length",
         "RailWidth",
+        "SlitWidth",
         "BridgeX0",
-        "BridgeLength",
+        "BridgeX1",
         "EndR1",
         "SlitCornerR1",
     },
     "FlatSheet": {"SheetDepth"},
-    "SpringRail": {"SpringRailWidth", "StartOffset"},
-    "SpringRailPath": {"BowStartX", "FarBowEndX", "BendR1"},
+    "SpringRail": {"SpringRailWidth"},
+    "SpringRailPath": {"BendR5"},
     "ScrewHoles": {"LeftX", "RightX", "LeftZ"},
+    "PlanReference": {"OverallWidth"},
+    "ProfileReference": {
+        *(name for name, _x, _drive in TANGENT_STATIONS),
+        "CrestRise",
+        "FlatFinger",
+    },
 }
-# Places.  The hole stations and the rail widths that hold the hole's
-# ligaments and the slit print .XXX (POSITION_PLACES), as does the sheet the
-# screw's engagement spends (SHEET_PLACES); the spring rail's own width .XX;
-# the outline, the bridge, the bows and the radii only shape the spring.
+# Places.  The hole stations (their pattern matches the platen's taps) and the
+# screw rail's width (the slit-side hole ligament) print .XXX
+# (POSITION_PLACES); the bow tangent stations on the hole stations are
+# references spelled as those are, the rest as the bridge ends they meet.  The
+# overall width and the slit print .XX; the outline, the bridge, the rise and
+# the radii only shape the spring.
+_TANGENT_PLACES = {"TangentX1": POSITION_PLACES, "TangentX8": POSITION_PLACES}
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FlatSheetProfile": {
         "Length": LENGTH_PLACES,
         "RailWidth": POSITION_PLACES,
+        "SlitWidth": SLIT_PLACES,
         "BridgeX0": 1,
-        "BridgeLength": 1,
+        "BridgeX1": 1,
         "EndR1": 1,
         "SlitCornerR1": 2,
     },
-    "FlatSheet": {"SheetDepth": SHEET_PLACES},
-    "SpringRail": {"SpringRailWidth": 2, "StartOffset": POSITION_PLACES},
-    "SpringRailPath": {"BowStartX": 1, "FarBowEndX": 1, "BendR1": 1},
+    "FlatSheet": {"SheetDepth": 1},
+    "SpringRail": {"SpringRailWidth": 2},
+    "SpringRailPath": {"BendR5": 1},
     "ScrewHoles": {name: POSITION_PLACES for name in ("LeftX", "RightX", "LeftZ")},
+    "PlanReference": {"OverallWidth": WIDTH_PLACES},
+    "ProfileReference": {
+        **{name: _TANGENT_PLACES.get(name, 1) for name, _x, _d in TANGENT_STATIONS},
+        "CrestRise": 1,
+        "FlatFinger": 1,
+    },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -262,10 +327,23 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
     for feature, names in DRAWING_DIMENSIONS.items()
 ):
     raise AssertionError("every marked platen-clip dimension needs authored places")
-# The clearance hole's native Ø variable prints the #2 loose size the
-# ligaments and the float above are taken off.
-HOLE_CALLOUT_PRECISION = {"hw-diam": 3}
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+# Printed as references (parenthesised): the sheet stock, the spring rail's
+# width (what the overall width, the screw rail and the slit leave), the bows'
+# tangent stations and radius (the rise and the plan's hole and bridge
+# stations fix them), and the developed finger.
+REFERENCE_DIMENSIONS = frozenset(
+    {
+        "SheetDepth",
+        "SpringRailWidth",
+        "BendR5",
+        "FlatFinger",
+        *(name for name, _x, _drive in TANGENT_STATIONS),
+    }
+)
+# Construction-only reference sketches the part saves hidden; the drawing
+# shows each in the view that dimensions it.
+REFERENCE_SKETCHES = ("PlanReference", "ProfileReference")
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
 
 def clip_volumes(
@@ -351,12 +429,12 @@ if (
         f"{END_LIGAMENT_MIN:.3f}, far end {FAR_END_LIGAMENT_MIN:.3f}) under the "
         f"{LIGAMENT_FLOOR} floor (drawing-guidelines.md rule 17)"
     )
-# The slit is what the screw rail's and the spring rail's printed widths from
-# the outer edge leave between them; it stays open at their worst case.
-SLIT_WIDTH_MIN = (SPRING_RAIL_Y0 - _POSITION_BAND) - (SCREW_RAIL_WIDTH + _POSITION_BAND)
-if SLIT_WIDTH_MIN <= 0.0:
+# The slit prints its own .XX width; its worst case keeps the floor open.
+SLIT_WIDTH_MIN = NOTCH_WIDTH - printed_band_mm(SLIT_PLACES)
+if SLIT_WIDTH_MIN < SLIT_GAP_FLOOR - 1e-9:
     raise AssertionError(
-        f"platen clip slit closes at the printed worst case: {SLIT_WIDTH_MIN}"
+        f"platen clip slit narrows to {SLIT_WIDTH_MIN:.3f} at the printed worst "
+        f"case, under the photographed {SLIT_GAP_FLOOR:.3f} it must keep open"
     )
 if CLIP_SCREW_ENGAGEMENT_MIN < 1.5 * THREAD_MAJOR_MM[THREAD]:
     raise AssertionError(
@@ -384,6 +462,23 @@ def _bow_points(x0: float, s0: float) -> dict[str, tuple[float, float]]:
         "p2": (x1 - r * math.sin(a), lift),
         "c3": (x1, s0 + r),
     }
+
+
+_BOW_JOINS = [
+    x
+    for x0 in (HOLE_INSET, BRIDGE_X1)
+    for x in (
+        x0,
+        _bow_points(x0, 0.0)["p1"][0],
+        _bow_points(x0, 0.0)["p2"][0],
+        x0 + BOW_RUN,
+    )
+]
+if len(_BOW_JOINS) != len(TANGENT_STATIONS) or any(
+    not math.isclose(x, join, abs_tol=1e-9)
+    for (_name, x, _drive), join in zip(TANGENT_STATIONS, _BOW_JOINS)
+):
+    raise AssertionError("platen clip tangent stations must be the bows' arc joins")
 
 
 async def _flat_sheet_outline(adapter) -> SketchDims:
@@ -489,15 +584,17 @@ async def _flat_sheet_outline(adapter) -> SketchDims:
         "screw rail width",
     )
     dims.record("RailWidth", '"ScrewRailW"')
+    # The slit's own width, across its rounded end at the near bridge end.
     await dimension_between(
         adapter,
-        f"{top_r}.end",
-        f"{bridge}.start",
+        f"{top_l}.start",
+        f"{bridge}.end",
         "vertical_distance",
         NOTCH_WIDTH,
         "slit width",
     )
     dims.record("SlitWidth", '"NotchW"')
+    # The bridge's two ends (the slits' rounded ends) from the near end.
     await dimension_between(
         adapter,
         "origin",
@@ -507,13 +604,15 @@ async def _flat_sheet_outline(adapter) -> SketchDims:
         "bridge start",
     )
     dims.record("BridgeX0", '"BridgeX0"')
-    check(
-        "bridge length",
-        await adapter.add_sketch_dimension(
-            bridge, None, "linear", CENTER_BRIDGE_LENGTH
-        ),
+    await dimension_between(
+        adapter,
+        "origin",
+        f"{bridge}.start",
+        "horizontal_distance",
+        BRIDGE_X1,
+        "bridge end",
     )
-    dims.record("BridgeLength", '"CenterBridgeL"')
+    dims.record("BridgeX1", '"BridgeX0" + "CenterBridgeL"')
     return dims
 
 
@@ -616,6 +715,149 @@ async def _spring_mid_surface(adapter) -> SketchDims:
         await adapter.add_sketch_dimension(tip_r, None, "linear", TIP_FLAT_LENGTH),
     )
     dims.record("TipFlatL2", '"HoleInset" - "SpringEndR"')
+    return dims
+
+
+def _construction(adapter, segment: str, label: str) -> None:
+    """Flag one sketch segment as construction geometry, read back."""
+    entity = _early_bound(adapter._sketch_entities[segment], "ISketchSegment")
+    entity.ConstructionGeometry = True
+    if not bool(entity.ConstructionGeometry):
+        raise RuntimeError(f"{label} did not take the construction flag")
+
+
+async def _plan_reference(adapter) -> SketchDims:
+    """Drawing-only overall width in the open Front sketch, fully defined.
+
+    One construction line up the near end's line, from the outer edge's
+    level (the origin) to the spring rail's outer edge: the plan prints the
+    overall width from the outer edge, where the profile sketches leave it
+    only as the sum of the screw rail, the slit and the spring rail.
+    """
+    dims = SketchDims()
+    set_sketch_direct_db(adapter, True)
+    line = check(
+        "overall width reference line",
+        await adapter.add_line(0.0, 0.0, 0.0, CLIP_WIDTH),
+    )
+    set_sketch_direct_db(adapter, False)
+    _construction(adapter, line, "overall width reference")
+    check(
+        "overall width reference vertical",
+        await adapter.add_sketch_constraint(line, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{line}.start", 0.0, 0.0, "overall width at the outer edge"
+    )
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "vertical_distance",
+        CLIP_WIDTH,
+        "overall width",
+    )
+    dims.record("OverallWidth", '"ClipWidth"')
+    return dims
+
+
+async def _profile_reference(adapter) -> SketchDims:
+    """Drawing-only bow references in the open Top sketch, fully defined.
+
+    Top-plane (x, s) is part (X, -Z), as in ``_spring_mid_surface``: the flat
+    sheet spans s = -SHEET_T..0 and the bows rise toward +s, so the face the
+    bows rise from is s = 0 and their crest on it s = ARCH_RISE.  All
+    construction: a chain along the sheet's back face (s = -SHEET_T) whose
+    joins stand at the eight tangent stations, each dimensioned from the near
+    end; a riser up from the far end's face, whose span is the rise, and a
+    level from its top back to the far bow's crest (outside the part, as the
+    rise's extension lines would run); and a line along the near finger's face
+    from the bridge end, as long as the finger's developed (flat) length.
+    """
+    dims = SketchDims()
+    t = SHEET_T
+    set_sketch_direct_db(adapter, True)
+    chain: list[str] = []
+    x_prev = 0.0
+    for name, x, _drive in TANGENT_STATIONS:
+        chain.append(
+            check(f"{name} station line", await adapter.add_line(x_prev, -t, x, -t))
+        )
+        x_prev = x
+    riser = check(
+        "crest rise line",
+        await adapter.add_line(CLIP_LENGTH, 0.0, CLIP_LENGTH, ARCH_RISE),
+    )
+    level = check(
+        "crest level line",
+        await adapter.add_line(CLIP_LENGTH, ARCH_RISE, FAR_CREST_X, ARCH_RISE),
+    )
+    finger = check(
+        "developed finger line",
+        await adapter.add_line(BRIDGE_X0, 0.0, BRIDGE_X0 - FLAT_FINGER_LENGTH, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for segment in (*chain, riser, level, finger):
+        _construction(adapter, segment, "bow reference")
+    for segment, relation in (
+        *((segment, "horizontal") for segment in chain),
+        (riser, "vertical"),
+        (level, "horizontal"),
+        (finger, "horizontal"),
+    ):
+        check(
+            f"bow reference {relation}",
+            await adapter.add_sketch_constraint(segment, None, relation),
+        )
+
+    await anchor_point_to_origin(
+        adapter, f"{chain[0]}.start", 0.0, -t, "stations on the back face"
+    )
+    dims.record(None, '"SheetT"')
+    for (name, x, drive), segment in zip(TANGENT_STATIONS, chain):
+        await dimension_between(
+            adapter,
+            f"{chain[0]}.start",
+            f"{segment}.end",
+            "horizontal_distance",
+            x,
+            name,
+        )
+        dims.record(name, drive)
+
+    await anchor_point_to_origin(
+        adapter, f"{riser}.start", CLIP_LENGTH, 0.0, "rise at the far end"
+    )
+    dims.record(None, '"ClipLength"')
+    await dimension_between(
+        adapter, "origin", f"{level}.end", "horizontal_distance", FAR_CREST_X, "crest"
+    )
+    dims.record(None, '"HoleFarX" - "BowRun" / 2')
+    await dimension_between(
+        adapter,
+        f"{riser}.start",
+        f"{riser}.end",
+        "vertical_distance",
+        ARCH_RISE,
+        "crest rise",
+    )
+    dims.record("CrestRise", '"ArchRise"')
+
+    await anchor_point_to_origin(
+        adapter, f"{finger}.start", BRIDGE_X0, 0.0, "finger from the bridge"
+    )
+    dims.record(None, '"BridgeX0"')
+    # Developed length: no trig in the equation manager (build_ch_rocker_arm),
+    # so it is the as-built value, re-derived from the knobs on every build.
+    await dimension_between(
+        adapter,
+        f"{finger}.start",
+        f"{finger}.end",
+        "horizontal_distance",
+        FLAT_FINGER_LENGTH,
+        "developed finger",
+    )
+    dims.record("FlatFinger")
     return dims
 
 
@@ -868,6 +1110,20 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += hole_cut.placement_drive_jobs
     await volume_check(adapter, "one-piece clip", V_FINAL, 0.005 * V_FINAL)
 
+    # Drawing-only reference sketches (construction geometry, childless, saved
+    # hidden below): each sits on the plane of the view that prints it, the
+    # plan's on Front and the profile's on Top (build_pd_platen's floor).
+    for plane, feature, define in (
+        ("Front", "PlanReference", _plan_reference),
+        ("Top", "ProfileReference", _profile_reference),
+    ):
+        check(f"create_sketch {feature}", await adapter.create_sketch(plane))
+        reference = await define(adapter)
+        await ensure_fully_defined(adapter, f"{feature} sketch")
+        check(f"exit_sketch {feature}", await adapter.exit_sketch())
+        name_last_feature(adapter, feature)
+        drive_jobs += reference.apply(adapter, feature)
+
     # Apply deferred equations after every target exists.  Their initial values
     # are neutral, so the second volume check also catches a mis-bound knob.
     await force_rebuild(adapter)
@@ -907,6 +1163,10 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
+    # Hidden, so no assembly renders them; the drawing shows each in its view
+    # through _drawing_hidden_sketches to import its dimensions.
+    for sketch in REFERENCE_SKETCHES:
+        blank_sketch(adapter, sketch)
     return await save_part_and_images(adapter, PART_NAME)
 
 

@@ -3,14 +3,18 @@ r"""Create the curated machinist drawing for the platen clip (MHA-PD-003).
 The clip is one 0.8 brass sheet, 83.5 long: a flat screw rail carrying the two
 #2 loose screw holes, an open-ended slit from each end, and a spring rail
 joined to the screw rail only at the centre bridge, formed into two shallow
-bows that press the paper.  The sheet runs at 3:1: the plan (front view)
-carries the blank (length, rail widths from the outer edge, bridge, corner
-radii, hole stations), the profile (top view) above it the sheet and the bows'
-stations and bend radius, and a 1:1 isometric the form.
+bows.  The sheet runs at 3:1: the plan (front view) carries the blank (the
+length, the bridge's two ends from the near end, the hole row, the screw
+rail's and the overall width from the outer edge, the slit, the corner radii,
+the hole stations), the profile (top view) above it the bows' rise and, as
+references, their eight tangent stations from the near end, their radius, the
+developed finger and the sheet stock; a 2:1 isometric shows the form.
 
 Every printed dimension is an associative model dimension whose places the
-part authors (``build_pd_platen_clip.DRAWING_PRECISION``); the hole size ships
-as a native Hole Wizard callout.
+part authors (``build_pd_platen_clip.DRAWING_PRECISION``); the overall width,
+the rise, the stations and the developed finger live in hidden reference
+sketches the views show to import them (``_drawing_hidden_sketches``).  The
+hole size ships as a native Hole Wizard callout.
 
 Run (SolidWorks already open)::
 
@@ -39,8 +43,12 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+)
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -49,20 +57,26 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from build_pd_platen_clip import (
+    ARCH_RISE,
     BRIDGE_X0,
-    CENTER_BRIDGE_LENGTH,
+    BRIDGE_X1,
     CLIP_LENGTH,
     CLIP_WIDTH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    FAR_CREST_X,
+    FLAT_FINGER_LENGTH,
     HOLE_CALLOUT_PRECISION,
     HOLE_DIA,
     HOLE_INSET,
     HOLE_Y,
+    REFERENCE_DIMENSIONS,
     SCREW_RAIL_SLIT_RADIUS,
     SCREW_RAIL_WIDTH,
+    SHEET_T,
     SPRING_RAIL_WIDTH,
     SPRING_RAIL_Y0,
+    TANGENT_STATIONS,
 )
 
 
@@ -80,18 +94,23 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
-ISO_SCALE = (1, 1)
+ISO_SCALE = (2, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0  # sheet m per model mm, 3:1
 
 # Sheet layout (meters; the B-size field is x 0.0127..0.4191, y 0.0127..0.2667
 # and the title block holds x >= 0.216, y <= 0.066).  The plan (250.5 x 34.1
 # at 3:1) sits mid-sheet with its hole stations below and its bridge and
-# length above; the profile, third-angle above it, carries its bow stations
-# between the two; the isometric sits bottom-left, clear of the title block.
-FRONT_CENTER = (0.200, 0.150)
-TOP_CENTER = (0.200, 0.215)
-ISO_CENTER = (0.090, 0.062)
-ISO_NOTE_XY = (0.020, 0.032)
+# length above; the profile, third-angle above it, hangs its eight tangent
+# stations between the two and carries the developed finger and the bend
+# radius above itself; the 2:1 isometric runs down-right in the free field
+# bottom-left, clear of the title block, its note in the empty corner above it.
+FRONT_CENTER = (0.200, 0.140)
+TOP_CENTER = (0.200, 0.2405)
+ISO_CENTER = (0.090, 0.058)
+ISO_NOTE_XY = (0.125, 0.092)
+# The profile's sheet-normal span (Top-plane s = -Z): the sheet's back face
+# at s = -SHEET_T up to the bows' crests at s = ARCH_RISE.
+_PROFILE_S_MID = (ARCH_RISE - SHEET_T) / 2.0
 
 
 def _plan_x(model_x_mm: float) -> float:
@@ -104,60 +123,125 @@ def _plan_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - CLIP_WIDTH / 2.0) * _S
 
 
+def _profile_y(s_mm: float) -> float:
+    """Sheet Y of a Top-plane s (= -Z) point in the profile (bbox-centred)."""
+    return TOP_CENTER[1] + (s_mm - _PROFILE_S_MID) * _S
+
+
 LEFT_EDGE_X = _plan_x(0.0)
 RIGHT_EDGE_X = _plan_x(CLIP_LENGTH)
 BOTTOM_EDGE_Y = _plan_y(0.0)
 TOP_EDGE_Y = _plan_y(CLIP_WIDTH)
+PROFILE_BOTTOM_Y = _profile_y(-SHEET_T)
+PROFILE_TOP_Y = _profile_y(ARCH_RISE)
 HOLE_FAR_X = CLIP_LENGTH - HOLE_INSET
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position.  Plan: the two hole stations stack below it from the near end, the
-# bridge's start and length chain above it with the overall length outermost;
-# left of it the hole row's height, the screw rail's width and the spring
-# rail's start stand in their own columns from the outer edge (smallest
-# nearest), the spring rail's width beside its own span; the outer and the
-# slit-side corner radii off the right end.  Profile: the near bow's start and
-# the far bow's end stack between it and the plan, the bend radius above the
-# near bow, the sheet off the near end.
+# position.  Plan: the two hole stations stack below it from the near end;
+# above it the bridge's two ends and the overall length stack from the near
+# end (smallest nearest), the slit's text offset beneath them.  Left of it,
+# from the outer edge, the hole row's height, the screw rail's width and the
+# overall width stand in their own columns (smallest nearest), the spring
+# rail's width in the screw rail's column beside its own span; the outer and
+# the slit-side corner radii off the right end.
+_BELOW_PLAN_ROWS = (0.116, 0.110)
+_ABOVE_PLAN_ROWS = (0.172, 0.178, 0.184)
+_HOLE_ROW_COLUMN = 0.062
+_RAIL_COLUMN = 0.046
+_OVERALL_COLUMN = 0.024
 FRONT_KEEP = {
-    "LeftX": (_plan_x(HOLE_INSET / 2.0), 0.125),
-    "RightX": (_plan_x(HOLE_FAR_X / 2.0), 0.118),
-    "BridgeX0": (_plan_x(BRIDGE_X0 / 2.0), 0.175),
-    "BridgeLength": (_plan_x(BRIDGE_X0 + CENTER_BRIDGE_LENGTH / 2.0), 0.175),
-    "Length": (FRONT_CENTER[0], 0.183),
-    "LeftZ": (0.062, _plan_y(HOLE_Y / 2.0)),
-    "RailWidth": (0.050, _plan_y(SCREW_RAIL_WIDTH * 0.75)),
-    "StartOffset": (0.038, _plan_y(SPRING_RAIL_Y0 * 0.35)),
-    "SpringRailWidth": (0.062, _plan_y(SPRING_RAIL_Y0 + SPRING_RAIL_WIDTH / 2.0)),
-    "EndR1": (0.345, 0.122),
-    "SlitCornerR1": (0.352, 0.164),
+    "LeftX": (_plan_x(HOLE_INSET / 2.0), _BELOW_PLAN_ROWS[0]),
+    "RightX": (_plan_x(HOLE_FAR_X / 2.0), _BELOW_PLAN_ROWS[1]),
+    "BridgeX0": (_plan_x(BRIDGE_X0 / 2.0), _ABOVE_PLAN_ROWS[0]),
+    "BridgeX1": (_plan_x(BRIDGE_X1 / 2.0), _ABOVE_PLAN_ROWS[1]),
+    "Length": (FRONT_CENTER[0], _ABOVE_PLAN_ROWS[2]),
+    "LeftZ": (_HOLE_ROW_COLUMN, _plan_y(HOLE_Y / 2.0)),
+    "RailWidth": (_RAIL_COLUMN, _plan_y(SCREW_RAIL_WIDTH * 0.75)),
+    "SpringRailWidth": (
+        _RAIL_COLUMN,
+        _plan_y(SPRING_RAIL_Y0 + SPRING_RAIL_WIDTH / 2.0),
+    ),
+    "OverallWidth": (_OVERALL_COLUMN, _plan_y(CLIP_WIDTH * 0.85)),
+    # The slit's dimension line stands inside the slit just short of its
+    # rounded end at the bridge; its text is offset above the plan.
+    "SlitWidth": (
+        _plan_x(BRIDGE_X0) - 0.003,
+        _plan_y(SCREW_RAIL_WIDTH + (SPRING_RAIL_Y0 - SCREW_RAIL_WIDTH) / 2.0),
+    ),
+    "EndR1": (0.345, 0.112),
+    "SlitCornerR1": (0.352, 0.153),
 }
+# Profile: the eight tangent stations stack below it from the near end,
+# smallest nearest, so no station's extension line crosses another's
+# dimension line; the developed finger stands above it, the bend radius above
+# the far crown, the rise off the far end and the sheet off the near end.
+_STATION_ROWS = tuple(
+    PROFILE_BOTTOM_Y - 0.0075 - 0.0052 * index for index in range(len(TANGENT_STATIONS))
+)
 TOP_KEEP = {
-    "BowStartX": (_plan_x(HOLE_INSET / 2.0), 0.204),
-    "FarBowEndX": (_plan_x(HOLE_FAR_X / 2.0), 0.197),
-    "BendR1": (0.100, 0.232),
-    "SheetDepth": (0.060, 0.2125),
+    **{
+        name: (_plan_x(x / 2.0), row)
+        for (name, x, _drive), row in zip(TANGENT_STATIONS, _STATION_ROWS)
+    },
+    "CrestRise": (RIGHT_EDGE_X + 0.008, _profile_y(ARCH_RISE / 2.0)),
+    "FlatFinger": (_plan_x(BRIDGE_X0 - FLAT_FINGER_LENGTH / 2.0), 0.251),
+    "BendR5": (_plan_x(FAR_CREST_X), 0.256),
+    "SheetDepth": (LEFT_EDGE_X - 0.008, _profile_y(-SHEET_T / 2.0)),
 }
-# The hole row's height stands for both holes; each printed radius for its
-# equal set.  A custom prefix replaces SolidWorks' own radius "R", so it
-# carries it.
-DIMENSION_PREFIXES = {
+# Narrow linear dimensions whose text would sit between their own arrows:
+# each moves off its line on a leader to clear field.
+OFFSET_TEXT = {
+    "SlitWidth": (0.150, 0.1645),
+    "CrestRise": (RIGHT_EDGE_X + 0.024, 0.2515),
+    "SheetDepth": (0.040, 0.2515),
+}
+# Native prefix and suffix per imported dimension: one printed size stands
+# for its equal set ("2X", "6X") and the references print parenthesised, the
+# count outside the parentheses.  A custom prefix replaces SolidWorks' own
+# radius "R", so a radius's prefix carries it.
+_COUNTS = {
     "LeftZ": "2X ",
-    "EndR1": "2X R",
-    "SlitCornerR1": "2X R",
-    "BendR1": "6X R",
+    "SlitWidth": "2X ",
+    "EndR1": "2X ",
+    "SlitCornerR1": "2X ",
+    "CrestRise": "2X ",
+    "FlatFinger": "2X ",
+    "BendR5": "6X ",
+}
+_RADII = frozenset({"EndR1", "SlitCornerR1", "BendR5"})
+DIMENSION_AFFIXES = {
+    name: (
+        _COUNTS.get(name, "")
+        + ("(" if name in REFERENCE_DIMENSIONS else "")
+        + ("R" if name in _RADII else ""),
+        ")" if name in REFERENCE_DIMENSIONS else "",
+    )
+    for name in sorted({*_COUNTS, *REFERENCE_DIMENSIONS})
+}
+# What each callout-bearing size is for: the screw rail's .XXX holds the
+# slit-side hole ligament; the sheet is the stock's; the slit and the spring
+# rail end in full rounds; the developed finger is the blank's, which forming
+# draws back flush with the rail end; the rise is each bow's crest height.
+DIMENSION_CALLOUTS = {
+    "RailWidth": "HOLE LIGAMENT",
+    "SheetDepth": "SHEET STOCK",
+    "SpringRailWidth": "FULL R ENDS",
+    "SlitWidth": "SLIT, FULL R END",
+    "FlatFinger": "FINGER BLANK; FORMED TIP FLUSH WITH END",
+    "CrestRise": "BOW RISE",
 }
 
 # The callout rides the far hole, its leader leaving the rim up-right over
-# the clip's right end to text clear of the corner radii.
+# the clip's right end to text clear of the corner radii; it names the
+# platen whose taps the .XXX hole pattern matches.
 _DIAG = math.sqrt(0.5)
 HOLE_R_SHEET = HOLE_DIA / 2.0 * _S
 HOLE_EDGE_XY = (
     _plan_x(HOLE_FAR_X) + HOLE_R_SHEET * _DIAG,
     _plan_y(HOLE_Y) + HOLE_R_SHEET * _DIAG,
 )
-HOLE_CALLOUT_XY = (0.370, 0.142)
-HOLE_CALLOUT_PROCESS = "DRILL"
+HOLE_CALLOUT_XY = (0.370, 0.132)
+HOLE_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-002\nDRILL"
 # Where the slit-side corner radius lands (its leader target), for the layout
 # tests: the screw rail's top-right corner.
 SLIT_CORNER_XY = (
@@ -172,22 +256,25 @@ if set().union(*_VIEW_KEEPS.values()) != set().union(*DRAWING_DIMENSIONS.values(
     )
 
 
-def _set_dimension_prefixes(
-    adapter: Any, annotations: list[Any], prefixes: dict[str, str]
+def _set_dimension_affixes(
+    adapter: Any, annotations: list[Any], affixes: dict[str, tuple[str, str]]
 ) -> None:
-    """Write a native prefix on named imported dimensions and read it back."""
-    remaining = dict(prefixes)
+    """Write a native prefix and suffix on named imported dimensions, read back."""
+    remaining = dict(affixes)
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
-        prefix = remaining.pop(dimension_name(adapter, annotation), None)
-        if prefix is None:
+        affix = remaining.pop(dimension_name(adapter, annotation), None)
+        if affix is None:
             continue
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        prefix, suffix = affix
         display.SetText(1, prefix)  # swDimensionTextPrefix
-        if str(display.GetText(1) or "") != prefix:
-            raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
+        display.SetText(2, suffix)  # swDimensionTextSuffix
+        written = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+        if written != affix:
+            raise RuntimeError(f"dimension affixes {affix!r} read back {written!r}")
     if remaining:
-        raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
+        raise RuntimeError(f"dimension affixes not applied: {sorted(remaining)}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -238,6 +325,9 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, top, iso):
         set_hidden_lines_removed(adapter, view)
 
+    # The overall width's and the profile references' owner sketches are
+    # saved hidden (build_pd_platen_clip); each view shows its own to import
+    # the dimensions.
     annotations = [
         *curate_view_dimensions(
             adapter,
@@ -255,7 +345,9 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     ]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
+    _set_dimension_affixes(adapter, annotations, DIMENSION_AFFIXES)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    offset_dimension_text(adapter, annotations, OFFSET_TEXT)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -272,6 +364,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callout, HOLE_CALLOUT_PRECISION, label="platen-clip screw holes"
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    _telemetry.info("platen-clip sheet: views, dimensions and callouts placed")
 
     return await finalize_drawing(
         adapter,
