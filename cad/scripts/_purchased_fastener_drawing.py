@@ -631,12 +631,17 @@ async def _build_reference_sheet(
 
     placed = []
     with _telemetry.span("drawing.purchased_annotations"):
-        for name, center, cell in cells:
+        for view, (name, center, cell) in zip(views, cells, strict=True):
             view_scale = scales[name]
             caption = f"{name[1:].upper()}  {view_scale[0]}:{view_scale[1]}"
             if spring and name == "*Front":
                 caption += "  (SHOWN AT INSTALLED LENGTH)"
-            caption_at = cell[1] - _CAPTION_TO_CELL
+            # Under the view itself, not the cell's floor: a short view in a
+            # tall cell (the counter spring's TOP) left its caption stranded
+            # mid-field (r4 review, rule 15). The fit keeps outlines in cells,
+            # so this only ever lifts a caption toward its own view.
+            outline = _box(view.GetOutline(), label=name)
+            caption_at = max(outline[1], cell[1]) - _CAPTION_TO_CELL
             note = _literal_note(adapter, caption, center[0], caption_at)
             bounds = _box(note.GetExtent(), label=caption, kind="note")
             annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
