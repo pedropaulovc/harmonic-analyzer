@@ -57,15 +57,17 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 
 # The journal's fits, flagged at its Ø callout (drawing-guidelines.md rule 4
 # (tighten only for function, and name the mate); machinist review
-# 2026-10-15, #1522): each mate named with the fit it needs above the value,
-# and the drill rod's grind, which already holds the band, as stock below it.
-PIN_DIA_FIT_CALLOUT = "\n".join(
+# 2026-10-15, #1522): below the value, the drill rod's grind, which already
+# holds the band, as stock, then each mate named with the fit it needs. All
+# below: SOLIDWORKS stores a line break in the ABOVE compartment but never
+# prints it (draw_pd_transgear_pin._printable_above_callouts).
+PIN_DIA_CALLOUT = "\n".join(
     (
+        "STOCK OK",
         "PRESS FIT IN MHA-CH-003 FORK HOLE",
         "RUNNING FIT IN MHA-CH-006 #47 HOLE",
     )
 )
-PIN_DIA_STOCK_CALLOUT = "STOCK OK"
 
 DRAWING_NOTES = (
     "1. INSTALLED STATE SHOWN: BOTH ENDS DRESSED FLUSH WITH THE MHA-CH-003"

@@ -5,8 +5,8 @@ drill-rod cylinder pressed into the connecting rod's reamed fork pin hole and
 dressed flush with both tines (user ruling 2026-10-09, PR #1292 review F1) --
 on three native model dimensions, all on the side view where a turned part's
 diameter sits beside its length (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the Ø with the drill rod's own
-grind band, its two fits named above it and STOCK OK below (rules 4 and 7:
-the mates are flagged where they apply), the installed length as REFERENCE
+grind band, STOCK OK and its two fits named below it (rules 4 and 7: the
+mates are flagged where they apply), the installed length as REFERENCE
 (the fork's thickness; the MHA-CH-003 print owns it), and the blank's cut
 length as a single MIN limit from the part's blanked ``BlankReference``
 sketch. An axis centerline, a bare end view with its center mark, the
@@ -55,8 +55,7 @@ import _telemetry
 from ch_rod_pivot_pin_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    PIN_DIA_FIT_CALLOUT,
-    PIN_DIA_STOCK_CALLOUT,
+    PIN_DIA_CALLOUT,
     REFERENCE_DIMENSIONS,
 )
 from ch_rod_pivot_pin_spec import PIN_DIA, PIN_INSTALLED_LENGTH
@@ -87,11 +86,11 @@ HALF_LEN = PIN_INSTALLED_LENGTH * VIEW_SCALE[0] / 2000.0  # 0.0304
 
 # Side view: the diameter above the view, its text left of centre so the
 # axis-centerline pick at the view's middle lands on bare face, high enough
-# that its STOCK OK line below stays clear of the pin's top edge (its two fit
-# lines sit above it); the installed length below, and the blank's cut length
+# that its three callout lines below (stock, then the two fits) stay clear of
+# the pin's top edge; the installed length below, and the blank's cut length
 # below that.
 RIGHT_KEEP = {
-    "PinDia": (RIGHT_CENTER[0] - 0.020, RIGHT_CENTER[1] + HALF_DIA + 0.022),
+    "PinDia": (RIGHT_CENTER[0] - 0.020, RIGHT_CENTER[1] + HALF_DIA + 0.034),
     "PinLen": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_DIA - 0.016),
     "BlankLen": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_DIA - 0.032),
 }
@@ -157,15 +156,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     assert_imported_precision(adapter, right_annotations, DRAWING_PRECISION_BY_NAME)
     # Descriptive text only; the values, bands and MIN limit are the model's.
-    # The journal flags its two fits above its value and the stock below it
+    # The journal flags the stock and its two fits below its value
     # (drawing-guidelines.md rules 4 and 7: name the mate where it applies).
     set_dimension_callouts(
-        adapter,
-        right_annotations,
-        {"PinDia": PIN_DIA_STOCK_CALLOUT, "BlankLen": "BLANK"},
-    )
-    set_dimension_callouts(
-        adapter, right_annotations, {"PinDia": PIN_DIA_FIT_CALLOUT}, location="above"
+        adapter, right_annotations, {"PinDia": PIN_DIA_CALLOUT, "BlankLen": "BLANK"}
     )
     # The installed length is the fork's thickness: a LINEAR reference. The
     # plural set_reference_dimensions forces a diameter glyph, printing

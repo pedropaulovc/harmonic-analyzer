@@ -137,9 +137,11 @@ def test_print_carries_no_gdt_roughness_or_callouts() -> None:
         "add_native_hole_callout(",
     ):
         assert helper not in source, helper
-    # The dimension callouts are descriptive words beside native values: the
-    # journal's fits above it and STOCK OK below, the blank's word below.
-    assert source.count("set_dimension_callouts(") == 2
+    # The dimension callouts are descriptive words below native values: the
+    # journal's stock and fits, the blank's word. Nothing rides ABOVE: a line
+    # break there is stored but never printed (ch_rod_pivot_pin r1 render).
+    assert source.count("set_dimension_callouts(") == 1
+    assert 'location="above"' not in source
     assert "author_part_pmi" not in _build_source()
     assert (
         "for view in (front, right, iso):\n        set_hidden_lines_removed" in source
@@ -150,17 +152,15 @@ def test_print_carries_no_gdt_roughness_or_callouts() -> None:
 def test_journal_callout_names_both_mates_and_stock() -> None:
     """Machinist review #1522 (rules 4 and 7): the Ø band's two mates and fits
     are flagged at the callout, and the drill rod as supplied meets it."""
-    assert notes.PIN_DIA_FIT_CALLOUT.splitlines() == [
+    assert notes.PIN_DIA_CALLOUT.splitlines() == [
+        "STOCK OK",
         "PRESS FIT IN MHA-CH-003 FORK HOLE",
         "RUNNING FIT IN MHA-CH-006 #47 HOLE",
     ]
-    assert notes.PIN_DIA_STOCK_CALLOUT == "STOCK OK"
     # The press and the running fit hold at the drill rod's own grind band.
     assert spec.BUDGET["interference_min"] > 0.0
     assert spec.BUDGET["running_clearance_min"] > 0.0
-    source = _source()
-    assert '{"PinDia": PIN_DIA_STOCK_CALLOUT, "BlankLen": "BLANK"}' in source
-    assert '{"PinDia": PIN_DIA_FIT_CALLOUT}, location="above"' in source
+    assert '{"PinDia": PIN_DIA_CALLOUT, "BlankLen": "BLANK"}' in _source()
 
 
 def test_note_states_installed_state_flush_ends_and_removal() -> None:
