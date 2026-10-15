@@ -44,6 +44,7 @@ from types import SimpleNamespace  # noqa: E402
 import pytest  # noqa: E402
 
 import _drawing_projection  # noqa: E402
+from _drawing_balloons import _ComponentLeaf  # noqa: E402
 import _telemetry  # noqa: E402
 
 GET_MATH_UTILITY = (132, 0, 1, (9, 0), ())
@@ -690,14 +691,31 @@ def test_plan_pick_takes_the_nameplates_top_lower_edge_along_z(monkeypatch) -> N
     side = _Edge((0.0, 0.004, 0.0, 0.0, 0.041, 0.0))  # along machine x
     corner = _Edge((0.004, 0.0, 0.0, 0.0, 0.004, 0.0), line=False)
     entities = [corner, side, lower_back, upper_front, lower_front, _Edge(None)]
-    plate = SimpleNamespace(stem="fr-nameplate")
+    hidden_edge = _Edge((0.004, 0.0, 0.0, 0.096, 0.0, 0.0))
+    plate = _Full(mount)
+    hidden_plate = _Full(mount)
+    leaves = (
+        _ComponentLeaf("fr-harmonic-base-1", _Full(), frozenset({"fr-harmonic-base"})),
+        _ComponentLeaf(
+            "fr-nameplate-2", hidden_plate, frozenset({"fr-nameplate"}), visible=False
+        ),
+        _ComponentLeaf("fr-nameplate-1", plate, frozenset({"fr-nameplate"})),
+    )
+    # The B-B section's GetVisibleComponents returned nothing (r4); the
+    # instances come from the view's drawing-component tree instead.
     monkeypatch.setattr(
-        drawing,
-        "_frame_visible_components",
-        lambda _view: {"fr-nameplate": [(plate, _Full(mount))]},
+        drawing, "_view_component_leaves", lambda _adapter, _view, *, label: leaves
     )
     monkeypatch.setattr(
-        drawing, "visible_component_entities", lambda _view, _component, _kind: entities
+        drawing,
+        "visible_component_entities",
+        lambda _view, component, _kind: (
+            entities
+            if component is plate
+            else [hidden_edge]
+            if component is hidden_plate
+            else []
+        ),
     )
     monkeypatch.setattr(drawing, "_edge_endpoint_key", lambda _adapter, edge: edge.key)
 
@@ -706,7 +724,11 @@ def test_plan_pick_takes_the_nameplates_top_lower_edge_along_z(monkeypatch) -> N
     )
 
     assert pick is lower_front
-    with pytest.raises(RuntimeError, match="no visible 'fr-harmonic-base' edge"):
+    with pytest.raises(
+        RuntimeError,
+        match=r"no visible 'fr-harmonic-base' edge.*3 leaf component\(s\), "
+        r"1 shown 'fr-harmonic-base', 0 visible edge",
+    ):
         drawing._visible_z_line_at_x(
             None, None, component_stem="fr-harmonic-base", x_mm=167.0, label="deck"
         )
