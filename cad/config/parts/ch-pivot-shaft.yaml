@@ -6,4 +6,4 @@ ch-pivot-shaft:
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "plain rod cut from Ø1/4 in cold-finished shafting (steel); north end domed on the lathe; two set-screw flats milled in line, one side; plain end cut and domed to fit"
+  process: "plain rod cut from Ø1/4 in cold-finished shafting (steel); both ends faced to length and domed on the lathe; two set-screw flats milled in line, one side"

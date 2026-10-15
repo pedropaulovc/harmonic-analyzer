@@ -53,8 +53,8 @@ from channel_frame_geom import LEVER_FULCRUM_XY
 from frame_column_stations import COLUMN_X
 from rocker_bank_layout import (
     COUNT,
-    PLAIN_END_CUT_BAND,
     ROCKER_SPRING_SET,
+    SHAFT_TIP_SET_BAND,
     STACK_L20_ACCEPT,
 )
 
@@ -133,14 +133,11 @@ def _fitup_notes() -> tuple[str, str]:
     last = COUNT - 1
     stack_low, stack_high = STACK_L20_ACCEPT
     set_step = steps.step_number("south-bracket-spring-set")
-    north_step = steps.step_number("north-ear-datum")
-    # The pivot shaft is supplied long, its plain end uncut (pivot_shaft_spec):
-    # the cylinder ends PLAIN_END_CUT_BAND past the south ear's outer face and
-    # the dome stands DOME_HEIGHT beyond that, so the saw cut sits that far
-    # past a scribe on the ear face. The arms are held at their stations by
-    # their pinned rods, so the plain rod goes in and comes out only through
-    # the set north ear, uncut end first.
-    cut_low, cut_high = (DOME_HEIGHT + band for band in reversed(PLAIN_END_CUT_BAND))
+    # The pivot shaft comes finished, domed both ends to its overall length
+    # (ch_pivot_shaft_spec): its north tip set DOME_HEIGHT proud of the north
+    # ear, within SHAFT_TIP_SET_BAND, puts both flats under their screws
+    # (rocker_bank_layout checks the worst case).
+    tip_low, tip_high = DOME_HEIGHT - SHAFT_TIP_SET_BAND, DOME_HEIGHT + SHAFT_TIP_SET_BAND
     # Each keeper lug is set off the top-frame rail web under it (its column's
     # socket axis) in X and off the frame's hole-station origin, the upper-left
     # socket, in Z (Main's ruling): the lug centre on the fulcrum line, its
@@ -172,9 +169,8 @@ def _fitup_notes() -> tuple[str, str]:
         ),
         "north-ear-datum": (
             f"NORTH {bracket} SET AT {steps.NORTH_BRACKET_SET_REF}: SWING "
-            f"EACH ARM UP ON ITS ROD; PUSH THE {shaft} SHAFT, UNCUT END "
-            f"FIRST, FLATS UP, SOUTH THROUGH THE EAR, ITS MICED {washer} AND "
-            f"HUBS {last} TO 0."
+            f"EACH ARM UP ON ITS ROD; PUSH THE {shaft} SHAFT, FLATS UP, "
+            f"SOUTH THROUGH THE EAR, ITS MICED {washer} AND HUBS {last} TO 0."
         ),
         "south-washer-fitted": f"SLIP THE OTHER {washer} ON AGAINST HUB 0.",
         "south-bracket-spring-set": (
@@ -184,19 +180,15 @@ def _fitup_notes() -> tuple[str, str]:
             f"CLAMP, TRANSFER ITS SEAT INTO THE {support} RAIL, SCREW DOWN, "
             "PULL THE BLADE."
         ),
-        "shaft-cut-to-fit": (
-            f"NORTH END FLUSH WITH ITS EAR, SCRIBE THE {shaft} AT THE SOUTH "
-            "EAR'S OUTER FACE. DRAW IT OUT NORTH, EACH ARM LEFT HANGING ON "
-            "ITS ROD; CATCH WASHERS AND SPRING. CUT THE PLAIN END "
-            f"{cut_low:.1f} TO {cut_high:.1f} PAST THE SCRIBE AND DOME IT "
-            f"{DOME_HEIGHT:.1f}. REFIT AS STEP {north_step}, WASHERS AND SPRING "
-            f"IN PLACE; SOUTH EAR AT ITS STEP {set_step} SETTING."
+        "shaft-set": (
+            f"SLIDE THE {shaft} SHAFT UNTIL ITS NORTH TIP STANDS "
+            f"{tip_low:.2f} TO {tip_high:.2f} PROUD OF THE NORTH EAR'S OUTER FACE."
         ),
         # drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads) waived for this joint only (joint_retention RULINGS
         # "U-MHA-VN-034-channel-threadlocker", user 2026-10-10).
         "set-screws-driven": (
-            f"NORTH END FLUSH, FLATS UP: RUN ONE {pivot_set_screw} DOWN EACH APEX "
-            "TAP ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG. "
+            f"SHAFT HELD AS SET, FLATS UP: RUN ONE {pivot_set_screw} DOWN EACH "
+            "APEX TAP ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG. "
             # Owner-ruled shortfall, declared as ch-channel RV-01 (the
             # bracket's own: ch-pivot-bracket RV-01, #1371).
             f"{SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}"

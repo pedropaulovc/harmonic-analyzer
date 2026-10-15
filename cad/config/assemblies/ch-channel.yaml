@@ -91,6 +91,6 @@ free_dof_per_active_channel: 3
 machinist_exceptions:
   - id: "RV-01"
     kind: "minor"
-    where: "the ROCKER BANK FIT-UP step NORTH END FLUSH, FLATS UP: RUN ONE MHA-VN-034 DOWN EACH APEX TAP ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG. #4-40 ENGAGEMENT 3.10 MIN (1.08D)."
+    where: "the ROCKER BANK FIT-UP step SHAFT HELD AS SET, FLATS UP: RUN ONE MHA-VN-034 DOWN EACH APEX TAP ONTO ITS FLAT, NORTH FIRST, WITH LOCTITE 222; SNUG. #4-40 ENGAGEMENT 3.10 MIN (1.08D)."
     finding: "MHA-CH-008 apex #4-40 set-screw full thread below 1.5D at the worst case (rule 18, thread engagement: 1.5D of full thread)"
     reason: "the same shortfall as ch-pivot-bracket RV-01, stated in the step that drives the screws: 3.10 MIN (3.098, 1.089D; 1.29D nominal) in the R8 arch wall over the bore, which is all the thread the ear has; the cup-point set screw bears on the pivot shaft's flat and carries no axial working load (owner-ruled shortfall)"

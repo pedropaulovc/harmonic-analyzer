@@ -132,7 +132,7 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     assert "MIC ONE MHA-CH-009, W" in north
     north_ear = _step_body("north-ear-datum")
     washer = _config.parts("ch-rocker-thrust-washer")["number"]
-    assert "UNCUT END FIRST" in north_ear and "SOUTH THROUGH THE EAR" in north_ear
+    assert "FLATS UP" in north_ear and "SOUTH THROUGH THE EAR" in north_ear
     assert f"ITS MICED {washer}" in north_ear
     # Positive control: the step before it is the bank's end play, not the ear.
     assert f"NORTH {bracket}" not in sheets[fitup_number]["9F"]
@@ -310,59 +310,45 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
 
 
 
-def test_the_shaft_supplied_long_is_cut_to_fit_before_the_preload_is_accepted() -> None:
-    """Codex #936 (PRRT_kwDOPHDy386mSteE): MHA-CH-005 is supplied long with its
-    plain end uncut, and its print defers the length to the assembly, but no
-    step cut it. A step between the south bracket's setting and the preload
-    acceptance must scribe the shaft at the ear, take it out, and cut and dome
-    it to the layout's band."""
+def test_the_finished_shaft_is_set_by_its_north_tip_before_the_screws() -> None:
+    """Machinist review (fleet pass): MHA-CH-005 comes finished, domed both
+    ends to its overall length, so nothing is cut at assembly. Between the
+    south bracket's setting and the set screws one step sets the shaft's
+    north tip DOME_HEIGHT proud of the north ear, within the layout's band."""
     import ch_pivot_shaft_spec as shaft
 
-    # The part's promise this sheet has to keep.
-    assert "PLAIN END UNCUT" in shaft.DRAWING_NOTES
-    assert shaft.LENGTH_CALLOUT.startswith("CUT TO FIT")
-    cut_steps = [key for key in steps.SEQUENCE if "PLAIN END" in _step_body(key)]
-    assert len(cut_steps) == 1
-    (key,) = cut_steps
+    assert "UNCUT" not in shaft.DRAWING_NOTES and "SUPPLY" not in shaft.DRAWING_NOTES
+    assert not hasattr(shaft, "LENGTH_CALLOUT")
+    for key in steps.SEQUENCE:
+        body = _step_body(key)
+        assert "CUT THE" not in body and "SCRIBE" not in body and "UNCUT" not in body
+    key = "shaft-set"
     number = steps.step_number(key)
     assert steps.step_number("south-bracket-spring-set") < number
-    assert number < steps.step_number("preload-accepted")
-    body = _step_body(key)
-    upper, lower = bank.PLAIN_END_CUT_BAND
-    cut = f"{shaft.DOME_HEIGHT + lower:.1f} TO {shaft.DOME_HEIGHT + upper:.1f}"
-    assert f"CUT THE PLAIN END {cut} PAST THE SCRIBE" in body
-    assert f"DOME IT {shaft.DOME_HEIGHT:.1f}" in body
-    assert "SCRIBE" in body.split("CUT")[0] and "SOUTH EAR'S OUTER FACE" in body
-    # The pinned rods hold the arms at their stations: the plain shaft comes
-    # out northward through the set north ear and goes back by the threading
-    # of the north-ear step, the south bracket staying down at its spring
-    # setting.
-    assert "NORTH END FLUSH WITH ITS EAR" in body.split("SCRIBE")[0]
-    assert "DRAW IT OUT NORTH" in body and "UNSCREW THE NORTH" not in body
-    assert "EACH ARM LEFT HANGING ON ITS ROD" in body
-    # The refit re-threads the washers and spring the draw-out caught.
+    assert number < steps.step_number("set-screws-driven")
+    low = shaft.DOME_HEIGHT - bank.SHAFT_TIP_SET_BAND
+    high = shaft.DOME_HEIGHT + bank.SHAFT_TIP_SET_BAND
     assert (
-        f"REFIT AS STEP {steps.step_number('north-ear-datum')}, WASHERS AND SPRING"
-        " IN PLACE;"
-    ) in body
-    assert f"SOUTH EAR AT ITS STEP {steps.step_number('south-bracket-spring-set')} SETTING" in body
-    assert "CATCH WASHERS AND SPRING" in body
-    assert "UNSCREW THE SOUTH" not in body
-    # Positive control: no other step mentions the cut.
-    assert "SCRIBE" not in _step_body("south-bracket-spring-set")
+        f"NORTH TIP STANDS {low:.2f} TO {high:.2f} PROUD OF THE NORTH EAR'S OUTER FACE"
+        in _step_body(key)
+    )
+    # Positive control: no other step sets the tip.
+    for other in steps.SEQUENCE:
+        if other != key:
+            assert "NORTH TIP" not in _step_body(other)
 
 
-def test_the_set_screws_go_in_after_the_cut_and_print_the_engagement_fact() -> None:
+def test_the_set_screws_go_in_after_the_shaft_is_set_and_print_the_engagement_fact() -> None:
     """User, 2026-10-10: one MHA-VN-034 down each ear's apex tap onto the
-    plain shaft's flat, once the shaft is cut and refitted, before the preload
-    is accepted. The step prints the bracket spec's engagement fact, the
-    named exception, from the spec, never typed."""
+    plain shaft's flat, once the shaft is set, before the preload is
+    accepted. The step prints the bracket spec's engagement fact, the named
+    exception, from the spec, never typed."""
     import ch_pivot_bracket_spec as bracket_spec
 
     set_screw = _config.parts("vn-arbor-set-screw")["number"]
     key = "set-screws-driven"
     number = steps.step_number(key)
-    assert steps.step_number("shaft-cut-to-fit") < number
+    assert steps.step_number("shaft-set") < number
     assert number < steps.step_number("preload-accepted")
     body = _step_body(key)
     assert f"RUN ONE {set_screw} DOWN EACH APEX TAP ONTO ITS FLAT" in body

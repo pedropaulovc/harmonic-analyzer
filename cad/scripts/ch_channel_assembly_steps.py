@@ -41,7 +41,7 @@ SEQUENCE: tuple[str, ...] = (
     "north-ear-datum",
     "south-washer-fitted",
     "south-bracket-spring-set",
-    "shaft-cut-to-fit",
+    "shaft-set",
     "set-screws-driven",
     "preload-accepted",
     KEEPERS_PAIR_REAMED_KEY,
