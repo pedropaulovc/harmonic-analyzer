@@ -110,6 +110,7 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_ch_rocker_arm_tl_strap_shim_stack.py",
         "draw_ch_rocker_arm_tl_filing_stand.py",
         "draw_fr_top_frame.py",
+        "draw_fr_nameplate.py",
         "draw_pd_transgear_removable.py",
         "draw_pd_transgear_knob_cup.py",
         "draw_pd_transgear_knob_thrust_ring.py",
