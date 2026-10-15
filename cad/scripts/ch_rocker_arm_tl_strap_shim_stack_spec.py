@@ -94,7 +94,8 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # The stock thickness and the shim pack print as references: the pack is
 # built to each blank's gap, so neither carries a band. The pack's acceptance
 # is fit-up instead (Main's ruling 2026-10-14): a feeler of this size must not
-# enter between the stack and the blank's strap face.
+# enter between the stack and the blank's strap face, nor (Codex #1448 P1, the
+# upper bound) under the raw blank ends on the riser blocks with the strap snug.
 REFERENCE_DIMENSIONS = ("StripThick", "ShimThick")
 FIT_UP_FEELER_NO_GO = 0.05
 

@@ -73,10 +73,14 @@ EDGE_KEEP = {
 CALLOUTS_ABOVE = {"StripThick": "FLAT STOCK AS SUPPLIED"}
 CALLOUTS_BELOW = {
     "StackWidth": "UNDER THE ARM STRAP",
-    # The mate and the fit-up acceptance: the pack is chosen at setup until
-    # the stack bears on the rocker blank's strap face.
+    # The mate and the fit-up acceptance as a GO/NO-GO pair: the pack is
+    # chosen at setup until the stack bears on the rocker blank's strap face,
+    # but no higher: with the strap snug the raw blank ends still bear on the
+    # riser blocks, so an over-height pack cannot bow the span.
     "ShimThick": (
         "SHIM AT SETUP TO BEAR ON MHA-CH-006 STRAP FACE: "
+        f"{part_spec.FIT_UP_FEELER_NO_GO:.2f} FEELER NO-GO\n"
+        "BLANK ENDS ON MHA-CH-006-TL-10: "
         f"{part_spec.FIT_UP_FEELER_NO_GO:.2f} FEELER NO-GO"
     ),
 }

@@ -100,13 +100,24 @@ def test_notes_follow_the_simplicity_policy() -> None:
     assert 1 <= len(lines) <= 4
     assert not re.search(r"\d", spec.DRAWING_NOTES)
     assert not re.search(r"GROUND|LAPP|GRIND|MILL|SAW", spec.DRAWING_NOTES.upper())
-    # Callouts may name a mating part's Number and the pack's authored fit-up
+    # Callouts may name a part's Number and the pack's authored fit-up
     # feeler, never another value.
     feeler = f"{spec.FIT_UP_FEELER_NO_GO:.2f} FEELER NO-GO"
-    assert drawing.CALLOUTS_BELOW["ShimThick"].endswith(feeler)
     for text in [*drawing.CALLOUTS_ABOVE.values(), *drawing.CALLOUTS_BELOW.values()]:
-        bare = re.sub(r"MHA-[A-Z]+-\d{3}", "", text.replace(feeler, ""))
+        bare = re.sub(r"MHA-[A-Z]+-\d{3}(-TL-\d+)?", "", text.replace(feeler, ""))
         assert not re.search(r"\d", bare), text
+
+
+def test_shim_fit_up_is_a_go_no_go_pair() -> None:
+    # Codex #1448 P1: the strap-face feeler alone passes an over-height pack,
+    # which lifts the raw blank ends off the riser blocks and bows the span.
+    # One line per check: the pack bears on the strap face, and the blank
+    # still bears on every riser block (MHA-CH-006-TL-10).
+    feeler = f"{spec.FIT_UP_FEELER_NO_GO:.2f} FEELER NO-GO"
+    strap, risers = drawing.CALLOUTS_BELOW["ShimThick"].split("\n")
+    assert "MHA-CH-006 STRAP FACE" in strap and strap.endswith(feeler)
+    assert "MHA-CH-006-TL-10" in risers and risers.endswith(feeler)
+    assert max(len(strap), len(risers)) <= 66
 
 
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:
