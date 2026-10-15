@@ -567,13 +567,15 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to top view")
 
     # Counterbored screw hole ships as the native wizard callout on the plan
-    # view, where it projects as its true circles.
+    # view, where it projects as its true circles; DRILL says it is not reamed
+    # (MR-fleet r6, rule 12: "Ø2.39 THRU ALL" named no process).
     add_native_hole_callout(
         adapter,
         top,
         edge_xy=(HOLE_X_SHEET, TOP_CENTER[1] + CBORE_R_SHEET),
         callout_xy=FOOT_HOLE_CALLOUT_XY,
         label="keeper foot screw hole",
+        process="DRILL",
     )
     # Crown set-screw tap: the plan sees it end-on at the crown top on the
     # lug mid-plane; its callout sits in the band between the front view

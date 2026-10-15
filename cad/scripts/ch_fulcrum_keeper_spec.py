@@ -504,13 +504,19 @@ OVERALL_LENGTH = 2.0 * LUG_HALF_T + FOOT_L  # 16.5
 # True free-text instructions only (native dims and callouts carry the rest;
 # the bore's pair reaming is its callout, BORE_PAIR_CALLOUT). The material
 # and finish are the title block's. Brackets carry no frames and no datums
-# (policy).
+# (policy). MR-fleet r6 (e4ef909) asked why the plan locates the crown tap
+# and the foot hole from different ends (rule 10): the tap's station is the
+# fit-up face's (KEEPERS_SET_KEY sets the inner faces), the foot hole's only
+# its walls' (the frame tap is transferred through it), so note 3 says so.
+DATUM_REASON_NOTE = 3
 DRAWING_NOTES = "\n".join(
     (
         "1. CROWN TAP FOR THE MHA-VN-055 CUP-POINT SET SCREW; FOOT HOLE",
         "   FOR THE MHA-VN-022 #2-56 FILLISTER, HEAD FLUSH.",
         f"{QUANTITY_NOTE}. 2 REQUIRED, ONE PER MHA-CH-004 FULCRUM-SHAFT END (SECOND",
         "   IS THIS PART FLIPPED 180 DEG ABOUT VERTICAL).",
+        f"{DATUM_REASON_NOTE}. CROWN TAP LOCATED FROM THE INNER LUG FACE (SET AT FIT-UP);",
+        "   FOOT HOLE FROM THE FOOT TIP (THE FRAME TAP IS TRANSFERRED THROUGH IT).",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

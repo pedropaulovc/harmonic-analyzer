@@ -531,7 +531,7 @@ def test_end_view_callouts_stand_clear_of_the_part_and_each_other() -> None:
     neighbours = {
         "iso note": Box(0.3098, 0.1459, 0.3694, 0.1502),
         "iso view": Box(0.3136, 0.165, 0.3464, 0.215),
-        "foot-hole callout": Box(0.1035, 0.1964, 0.1469, 0.2055),
+        "foot-hole callout": Box(0.1035, 0.1964, 0.1620, 0.2055),  # r13 + "DRILL "
         "25.20": Box(0.1889, 0.1232, 0.2031, 0.1267),
         "title block": Box(0.216, 0.0, 0.4318, 0.066),
     }
@@ -636,9 +636,9 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
         ["R7.0 MIN", *drawing.DIMENSION_CALLOUTS["CrownRadius"].splitlines()],
     )
     notes_top = drawing.NOTES_TOP
-    notes = Box(0.020, notes_top - 5 * _PITCH, 0.182, notes_top)
+    notes = Box(0.020, notes_top - 7 * _PITCH, 0.200, notes_top)
     overall_length = _text_block(drawing.FRONT_KEEP["OverallLength"], ["(16.5)"])
-    foot_hole = Box(0.1035, 0.1964, 0.1469, 0.2055)  # r13 printed
+    foot_hole = Box(0.1035, 0.1964, 0.1620, 0.2055)  # r13 printed + "DRILL "
     tap = _text_block(drawing.SET_SCREW_CALLOUT_XY, _tap_rows())
     keeps = {**drawing.FRONT_KEEP, **drawing.TOP_KEEP}
     callouts = {**drawing.FRONT_CALLOUTS, **drawing.TOP_CALLOUTS}
@@ -652,6 +652,11 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
         name: _value_block(keeps[name], value, callouts[name])
         for name, value in values.items()
     }
+    # The 7.000 block prints with its LEFT edge at the requested x, not its
+    # centre (MR-fleet r6b, e4ef909: printed x 177.9-225.6 mm for a 178 keep).
+    side = blocks["ScrewFromSide"]
+    shift = keeps["ScrewFromSide"][0] - side.xmin
+    blocks["ScrewFromSide"] = Box(side.xmin + shift, side.ymin, side.xmax + shift, side.ymax)
     neighbours = {
         "lug": lug,
         "foot": foot,
@@ -734,7 +739,7 @@ def test_tap_callout_stands_inside_the_border_clear_of_the_plan() -> None:
     set_screw_location = _value_block(
         drawing.TOP_KEEP[station], "3.000", drawing.TOP_CALLOUTS[station]
     )
-    foot_hole = Box(0.1035, 0.1964, 0.1469, 0.2055)  # r13 printed
+    foot_hole = Box(0.1035, 0.1964, 0.1620, 0.2055)  # r13 printed + "DRILL "
     for other in (plan, set_screw_location, foot_hole):
         assert _box_gap(block, other) >= _AIR, other
     bend = (block.xmax + _SHOULDER_RUN, block.ymin)
@@ -755,6 +760,12 @@ def test_the_auto_tapped_hole_note_is_removed() -> None:
     assert "tapped hole" not in ch_fulcrum_keeper_spec.DRAWING_NOTES.lower()
 
 
+def test_foot_hole_callout_says_drill() -> None:
+    # MR-fleet r6 (rule 12): "Ø2.39 THRU ALL" left drill against ream unsaid.
+    source = " ".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
+    assert 'label="keeper foot screw hole", process="DRILL", )' in source
+
+
 def test_notes_cover_the_tap_the_screw_and_the_quantity() -> None:
     notes = ch_fulcrum_keeper_spec.DRAWING_NOTES
     # The material is the title block's MATERIAL cell (rule 2; baseline
@@ -769,6 +780,16 @@ def test_notes_cover_the_tap_the_screw_and_the_quantity() -> None:
     assert "MHA-VN-022 #2-56 FILLISTER" in notes
     assert "2 REQUIRED" in notes
     assert len(notes.splitlines()) <= 6
+    # MR-fleet r6 (rule 10): why the plan's two holes run from different ends.
+    datum = [
+        line
+        for line in notes.splitlines()
+        if line.startswith(f"{ch_fulcrum_keeper_spec.DATUM_REASON_NOTE}. ")
+    ]
+    assert datum == [
+        "3. CROWN TAP LOCATED FROM THE INNER LUG FACE (SET AT FIT-UP);"
+    ]
+    assert "FOOT HOLE FROM THE FOOT TIP" in notes
 
 
 def test_keeper_is_one_body_with_no_ball() -> None:
