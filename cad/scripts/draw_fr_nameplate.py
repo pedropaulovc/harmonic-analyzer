@@ -6,9 +6,10 @@ behaviour lives in ``_drawing_common``.
 
 One B sheet at 2:1: the decorated face (front) carries the outline's width
 and height and each screw hole's station from its two adjacent edges; the
-edge view (right) carries the plate thickness; removed section A-A, cut
-through the left border and into the sunk field, carries the field's depth
-and the engraving floor below the decorated face.  The outline's corners, the
+edge view (right) carries the plate thickness; section A-A, cut across the
+whole plate and cropped to its left border and sunk field, carries the
+field's depth, the engraving floor below the decorated face and, as a
+reference, the floor left under the engraving.  The outline's corners, the
 sunk field's notched edge and the engraving are the vendored DXF contours the
 build imports (``fr_nameplate_drawing_spec.MANUFACTURING_NOTES`` names them).
 The base's seats are spotted through this plate at assembly, so no datums.
@@ -30,6 +31,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
@@ -47,6 +49,7 @@ from _drawing_dimensions import (
     assert_imported_precision,
     set_arc_endpoints_to_center,
     set_dimension_callouts,
+    set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import ViewEdges, scan_view_edges
@@ -57,6 +60,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
+from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 from fr_nameplate_drawing_spec import (
@@ -69,11 +73,13 @@ from fr_nameplate_drawing_spec import (
     ENGRAVING_FLOOR_DEPTH,
     FIELD_DEPTH,
     FIELD_DEPTH_CALLOUT,
+    FLOOR_UNDER_ENGRAVING,
+    FLOOR_UNDER_ENGRAVING_CALLOUT,
     HOLE_CALLOUT_PROCESS,
     SCREW_HOLE_DIA,
     STATION_PREFIX,
 )
-from fr_nameplate_spec import PLATE_HEIGHT, PLATE_WIDTH, SCREW_XY
+from fr_nameplate_spec import PLATE_HEIGHT, PLATE_THICKNESS, PLATE_WIDTH, SCREW_XY
 
 
 SPEC = DRAWINGS_BY_NAME["fr_nameplate"]
@@ -95,13 +101,16 @@ _M_PER_MM = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
 # Sheet layout (metres).  At 2:1 the face is 200 x 90.7 mm, x 0.050..0.250,
 # y 0.125..0.215.  Third angle: the 1.5 edge view stands right of it, the
 # isometric top-right, removed section A-A bottom-right above the title
-# block, the notes bottom-left below the face's dimensions.
+# block (its crop centred on SECTION_CENTER, its caption hung below-left of
+# it, clear of the floor reference's text below the cut), the notes
+# bottom-left below the face's dimensions.
 FRONT_CENTER = (0.150, 0.170)
 RIGHT_CENTER = (0.276, 0.170)
 ISO_CENTER = (0.366, 0.222)
 ISO_NOTE_XY = (0.330, 0.183)
 NOTES_XY = (0.030, 0.085)
-SECTION_CENTER = (0.335, 0.115)
+SECTION_CENTER = (0.350, 0.115)
+SECTION_CAPTION_XY = (0.288, 0.100)  # the native caption's top centre
 
 
 def _front_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
@@ -156,7 +165,9 @@ FRONT_PICKS: dict[str, dict[str, Any]] = {
         "p1": (PLATE_WIDTH / 2.0, PLATE_HEIGHT, 0.0),
         "expected_mm": PLATE_HEIGHT,
         "orientation": "vertical",
-        "text_xy": (_LEFT - 0.022, FRONT_CENTER[1]),
+        # r2 audit: at _LEFT - 0.022 its line crossed both "2X 4.1" station
+        # texts, which print 1.5..14.6 mm left of their own dimension lines.
+        "text_xy": (_LEFT - 0.029, FRONT_CENTER[1]),
         "center": False,
     },
     "right hole station": {
@@ -216,33 +227,64 @@ def _hole_rim_edge(edges: ViewEdges, hole: tuple[float, float]) -> Any:
     return max(rims, key=lambda item: item.circle[2]).edge
 
 
-# Section A-A: a removed cut across the left border into the sunk field at
-# SECTION_Y (plate-local), from just outside the left edge to SECTION_X_END.
-# At that height the cut crosses the raised border (x 0..3.16), the border
-# pinstripe groove, the sunk field from x 3.61, a letter groove at x
-# 7.65..8.11 and ends on that letter's counter, at field level (the offline
-# test proves each station against the DXFs).  Both depths stand right of
-# the profile, one above and one below it, each from the decorated face (the
-# raised border top).
-SECTION_Y = 35.0
-SECTION_X_START = -1.5
-SECTION_X_END = 8.6
-SECTION_BORDER_X = 1.5
+# Section A-A: a cut across the whole plate at SECTION_Y (plate-local), in
+# the gap between the CHICAGO row and the scroll ornament, so the line meets
+# no engraving but the border pinstripe on each side.  It starts and ends
+# SECTION_OVERRUN outside the outline, so both arrows and both letters print
+# off the plate (r2 review C3).  The removed section is cropped to its left
+# end, SECTION_CROP (plate x, z corners): the raised border (x 0..3.15), the
+# pinstripe groove (x 3.15..3.60, the engraving floor) and the sunk field.
+# The offline test proves each station against the DXFs.  Each depth is
+# dimensioned in place on its own dimension line from the decorated face
+# (the raised border top), its text above the cut; the floor left under the
+# groove chains below the engraving depth as a reference, its text below.
+SECTION_Y = 14.85
+SECTION_OVERRUN = 3.0
+SECTION_X_START = -SECTION_OVERRUN
+SECTION_X_END = PLATE_WIDTH + SECTION_OVERRUN
+SECTION_FACE_X = 2.6
+SECTION_GROOVE_X = 3.38
 SECTION_FIELD_X = 5.5
-SECTION_LETTER_X = 7.87
-SECTION_TEXT_X = SECTION_CENTER[0] + 0.058
+SECTION_CROP = ((-0.6, 0.6), (8.0, -(PLATE_THICKNESS + 0.6)))
+_SECTION_CROP_CENTER = (
+    (SECTION_CROP[0][0] + SECTION_CROP[1][0]) / 2.0,
+    (SECTION_CROP[0][1] + SECTION_CROP[1][1]) / 2.0,
+)
+_SECTION_M_PER_MM = SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
+
+
+def _section_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
+    """Sheet point of a cut-plane point (plate x, z) in section A-A."""
+    return (
+        SECTION_CENTER[0] + (x_mm - _SECTION_CROP_CENTER[0]) * _SECTION_M_PER_MM,
+        SECTION_CENTER[1] + (z_mm - _SECTION_CROP_CENTER[1]) * _SECTION_M_PER_MM,
+    )
+
+
 SECTION_PICKS: dict[str, dict[str, Any]] = {
     "sunk field depth": {
-        "floor": (SECTION_FIELD_X, -FIELD_DEPTH),
+        "from": (SECTION_FACE_X, 0.0),
+        "to": (SECTION_FIELD_X, -FIELD_DEPTH),
         "expected_mm": FIELD_DEPTH,
-        "text_xy": (SECTION_TEXT_X, SECTION_CENTER[1] + 0.013),
+        "text_xy": _section_xy(SECTION_FIELD_X, 1.4),
         "callout": FIELD_DEPTH_CALLOUT,
+        "reference": False,
     },
     "engraving depth": {
-        "floor": (SECTION_LETTER_X, -ENGRAVING_FLOOR_DEPTH),
+        "from": (SECTION_FACE_X, 0.0),
+        "to": (SECTION_GROOVE_X, -ENGRAVING_FLOOR_DEPTH),
         "expected_mm": ENGRAVING_FLOOR_DEPTH,
-        "text_xy": (SECTION_TEXT_X, SECTION_CENTER[1] - 0.015),
+        "text_xy": _section_xy(SECTION_GROOVE_X, 2.8),
         "callout": ENGRAVING_DEPTH_CALLOUT,
+        "reference": False,
+    },
+    "floor under engraving": {
+        "from": (SECTION_GROOVE_X, -ENGRAVING_FLOOR_DEPTH),
+        "to": (SECTION_GROOVE_X, -PLATE_THICKNESS),
+        "expected_mm": FLOOR_UNDER_ENGRAVING,
+        "text_xy": _section_xy(SECTION_GROOVE_X, -2.9),
+        "callout": FLOOR_UNDER_ENGRAVING_CALLOUT,
+        "reference": True,
     },
 }
 
@@ -392,24 +434,97 @@ def _orient_section(adapter: Any, view: Any) -> None:
         )
 
 
-def _center_on_outline(adapter: Any, view: Any, target: tuple[float, float]) -> None:
-    """Move ``view`` so its outline (its ink) is centred on ``target``."""
+def _crop_section(adapter: Any, view: Any) -> None:
+    """Crop A-A to SECTION_CROP: the border, the groove and the field's start.
+
+    The full cut is the plate's whole width (848 mm at 8:1); the fence is a
+    rectangle sketched in the section's own sketch round the projected crop
+    corners (``draw_fr_rocker_arm_support._crop_view_b_to_rail``'s sequence),
+    with no crop outline, so the cut face simply stops on the field.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
     view = _early_bound(view, "IView")
+    rebuild_drawing(adapter, label="section A-A before crop")
+    sheet_corners = model_points_in_view(
+        adapter,
+        view,
+        [_mm_to_m((x, SECTION_Y, z)) for x, z in SECTION_CROP],
+        label="section A-A crop corners",
+    )
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate section A-A for its crop")
+    draw.ClearSelection2(True)
+    before = tuple(float(value) for value in view.GetOutline())
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    corners = []
+    for x, y in sheet_corners:
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
+            "IMathPoint",
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        corners.append(tuple(float(value) for value in projected.ArrayData))
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    segments = tuple(
+        sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]) or ()
+    )
+    if len(segments) != 4:
+        raise RuntimeError(f"section A-A crop fence has {len(segments)} segments")
+    for segment in segments:
+        if not _early_bound(segment, "ISketchSegment").Select4(True, None):
+            raise RuntimeError("failed to select the section A-A crop fence")
+    # Crop2(jagged, no outline, intensity) returns swCropViewErrors_e; 1 is
+    # NoError.
+    status = int(view.Crop2(False, True, 0))
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="section A-A crop")
+    view.UpdateViewDisplayGeometry()
+    outline = tuple(float(value) for value in view.GetOutline())
+    _telemetry.info(
+        f"section A-A Crop2 status {status}: outline {before!r} -> {outline!r}, "
+        f"fence corners {sheet_corners!r}"
+    )
+    width = (SECTION_CROP[1][0] - SECTION_CROP[0][0]) * _SECTION_M_PER_MM
+    if (
+        status != 1
+        or not bool(view.IsCropped())
+        or outline[2] - outline[0] > width + 0.005
+    ):
+        raise RuntimeError(
+            f"section A-A did not crop to {width * 1000.0:.1f} mm: status {status}, "
+            f"outline {before!r} -> {outline!r}"
+        )
+
+
+def _place_crop_on_center(adapter: Any, view: Any) -> None:
+    """Move A-A so the crop's centre (a cut-plane point) lands on SECTION_CENTER.
+
+    Placed by a projected model point, not the outline, so every text
+    position ``_section_xy`` derives holds whatever margin the outline adds.
+    """
+    view = _early_bound(view, "IView")
+    point = _mm_to_m((_SECTION_CROP_CENTER[0], SECTION_Y, _SECTION_CROP_CENTER[1]))
     for _attempt in range(3):
-        outline = tuple(float(value) for value in view.GetOutline())
-        center = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
-        if math.dist(center, target) < 0.0002:
+        (center,) = model_points_in_view(
+            adapter, view, [point], label="section A-A crop centre"
+        )
+        if math.dist(center, SECTION_CENTER) < 1e-5:
             return
         position = tuple(float(value) for value in view.Position)
-        moved = [position[axis] + target[axis] - center[axis] for axis in range(2)]
+        moved = [
+            position[axis] + SECTION_CENTER[axis] - center[axis] for axis in range(2)
+        ]
         if not view.SetViewPosition(double_array(moved), False):
             raise RuntimeError("failed to position section A-A")
-        rebuild_drawing(adapter, label="center section A-A")
-    raise RuntimeError(f"section A-A outline did not settle on {target!r}")
+        rebuild_drawing(adapter, label="place section A-A")
+    raise RuntimeError(f"section A-A crop centre did not settle on {SECTION_CENTER!r}")
 
 
 def _section(adapter: Any, front: Any) -> Any:
-    """Removed section A-A through the left border into the sunk field."""
+    """Section A-A across the plate, cropped to the left border and field."""
     line = model_points_in_view(
         adapter,
         front,
@@ -438,7 +553,11 @@ def _section(adapter: Any, front: Any) -> Any:
     ratio = tuple(float(value) for value in view.ScaleRatio)
     if bool(view.UseParentScale) or ratio != tuple(float(v) for v in SECTION_SCALE):
         raise RuntimeError(f"section A-A must keep its own {SECTION_SCALE} scale")
-    _center_on_outline(adapter, view, SECTION_CENTER)
+    _crop_section(adapter, view)
+    _place_crop_on_center(adapter, view)
+    position_section_caption(
+        adapter, view, SECTION_CAPTION_XY, label="nameplate section A-A"
+    )
     return view
 
 
@@ -470,17 +589,15 @@ def _cut_face_line(
 
 
 def _section_dimensions(adapter: Any, section: Any) -> None:
-    """The sunk field's and the engraving floor's depths from the decorated face."""
+    """Each depth on its own dimension line; the floor under it as a reference."""
     edges = scan_view_edges(section, label="section A-A")
-    face_edge, face_point = _cut_face_line(
-        edges, x_mm=SECTION_BORDER_X, z_mm=0.0, label="decorated face"
-    )
     for label, pick in SECTION_PICKS.items():
-        floor_edge, floor_point = _cut_face_line(
-            edges, x_mm=pick["floor"][0], z_mm=pick["floor"][1], label=label
+        (from_edge, from_point), (to_edge, to_point) = (
+            _cut_face_line(edges, x_mm=x, z_mm=z, label=f"{label} {end}")
+            for end, (x, z) in (("from", pick["from"]), ("to", pick["to"]))
         )
         points = model_points_in_view(
-            adapter, section, [_mm_to_m(face_point), _mm_to_m(floor_point)], label=label
+            adapter, section, [_mm_to_m(from_point), _mm_to_m(to_point)], label=label
         )
         native = _checked_dimension(
             adapter,
@@ -490,9 +607,11 @@ def _section_dimensions(adapter: Any, section: Any) -> None:
             text_xy=pick["text_xy"],
             expected_mm=pick["expected_mm"],
             orientation="vertical",
-            entities=(face_edge, floor_edge),
+            entities=(from_edge, to_edge),
         )
         annotation = _early_bound(native.GetAnnotation(), "IAnnotation")
+        if pick["reference"]:
+            set_reference_dimension(adapter, annotation, label=label)
         set_dimension_callouts(
             adapter,
             [annotation],
