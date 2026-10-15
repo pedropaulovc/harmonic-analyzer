@@ -3,9 +3,11 @@ r"""Create the curated machinist drawing for the platen plate (MHA-PD-002).
 The platen is a 269.64 x 134.82 brass plate, 3.85 thick, with four Ø7 bosses
 standing proud of its back face round the #2-56 clip-screw through taps and
 ten counterbored #4 loose through holes for the guide screws.  The sheet runs
-at 1:2: the front view carries the outline and every hole coordinate from the
-plate's bottom-left corner, a back view the bosses, an enlarged 1:1 right view
-the thickness and the boss height, and a 1:4 isometric the form.
+at 1:2: the front view carries the outline, the boss Ø and every hole
+coordinate from the plate's bottom-left corner, a back view the counterbored
+face, an enlarged 1:1 right view (hidden lines shown) the thickness, the boss
+height and the user-accepted counterbore floor as a reference dimension, and a
+1:4 isometric the form.
 
 Every printed dimension is an associative model dimension whose places the
 part authors (``pd_platen_spec.DRAWING_PRECISION``); the hole sizes ship as
@@ -23,11 +25,7 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    dimension_name,
-    place_view,
-)
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 from _check import check
 from _com import _early_bound
@@ -39,21 +37,28 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+import _drawing_hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_view_display import set_hidden_lines_removed
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _hole_spec import blind_cut_dia_mm
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from pd_platen_spec import (
-    CBORE_DIA,
+    CBORE_FLOOR_REFERENCE_Y,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     GUIDE_CALLOUT_PRECISION,
+    GUIDE_HOLE_DIA,
     GUIDE_HOLE_X,
+    GUIDE_HOLE_XY,
     GUIDE_HOLE_Y,
     PLATE_HEIGHT,
     PLATE_THICKNESS,
@@ -89,12 +94,12 @@ _RIGHT_S = 1.0 / 1000.0  # enlarged right view, 1:1
 # view sits below that stack, left of the title block; the enlarged right view
 # and the isometric stand right of the front view.
 FRONT_CENTER = (0.140, 0.190)
-BACK_CENTER = (0.140, 0.058)
+BACK_CENTER = (0.140, 0.056)
 RIGHT_CENTER = (0.300, 0.175)
 ISO_CENTER = (0.370, 0.190)
 ISO_NOTE_XY = (0.338, 0.150)
 RIGHT_NOTE_XY = (0.262, 0.100)
-BACK_NOTE_XY = (0.020, 0.064)
+BACK_NOTE_XY = (0.020, 0.062)
 # The right view's bbox spans the plate and the bosses behind it (model Z).
 _DEPTH_SPAN = PLATE_THICKNESS + SOCKET_BOSS_H
 
@@ -138,33 +143,45 @@ _SOCKET_LOW_Y, _SOCKET_HIGH_Y = sorted({y for _, y in SOCKET_XY})
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Below the front view the X coordinates stack from the corner,
-# smallest nearest: the left sockets' 5.393 and the first guide hole's 26.964
-# print outboard of the plate's left edge (their spans are narrower than the
-# text), the rest mid-span, the overall width outermost.  The guide rows' Y
-# coordinates stand left of the plate, each value on its own line clear of the
-# other's; the sockets' Y coordinates and the height stand right of it.  The
-# enlarged right view carries the plate's thickness above it and the boss
-# height beside the upper boss; the back view the boss Ø.
+# smallest nearest, 7.5 mm apart: the left sockets' 5.393 and the first guide
+# hole's 26.964 print outboard of the plate's left edge (their spans are
+# narrower than the text), left of the bottom guide row's Y dimension so its
+# outside arrow strikes neither; the rest mid-span, the overall width
+# outermost.  The guide rows' Y coordinates stand left of the plate, each value
+# on its own line clear of the other's; the sockets' Y coordinates and the
+# height stand right of it.  The upper left boss carries the bosses' Ø up-left
+# over the plate's corner.  The enlarged right view carries the plate's
+# thickness above it, the boss height beside the lower boss (the dimension
+# attaches there, so its extension lines stay on the boss), and the counterbore
+# floor beside the bottom guide row.
+_ROW_Y = (0.1485, 0.141, 0.1335, 0.126, 0.1185, 0.111, 0.1035, 0.096)
+_OUTBOARD_X = 0.040
 FRONT_KEEP = {
-    "Socket3X": (0.058, 0.150),
-    "Guide1X": (0.058, 0.143),
-    "Guide2X": (_front_x(GUIDE_HOLE_X[1] / 2.0), 0.136),
-    "Guide3X": (_front_x(GUIDE_HOLE_X[2] / 2.0), 0.129),
-    "Guide4X": (_front_x(GUIDE_HOLE_X[3] / 2.0), 0.122),
-    "Guide5X": (_front_x(GUIDE_HOLE_X[4] / 2.0), 0.115),
-    "Socket1X": (_front_x(_SOCKET_RIGHT_X / 2.0), 0.108),
-    "Width": (FRONT_CENTER[0], 0.101),
+    "Socket3X": (_OUTBOARD_X, _ROW_Y[0]),
+    "Guide1X": (_OUTBOARD_X, _ROW_Y[1]),
+    "Guide2X": (_front_x(GUIDE_HOLE_X[1] / 2.0), _ROW_Y[2]),
+    "Guide3X": (_front_x(GUIDE_HOLE_X[2] / 2.0), _ROW_Y[3]),
+    "Guide4X": (_front_x(GUIDE_HOLE_X[3] / 2.0), _ROW_Y[4]),
+    "Guide5X": (_front_x(GUIDE_HOLE_X[4] / 2.0), _ROW_Y[5]),
+    "Socket1X": (_front_x(_SOCKET_RIGHT_X / 2.0), _ROW_Y[6]),
+    "Width": (FRONT_CENTER[0], _ROW_Y[7]),
     "Guide1Y": (0.058, _front_y(GUIDE_HOLE_Y[0] / 2.0)),
     "Guide6Y": (0.030, _front_y(GUIDE_HOLE_Y[1] / 2.0)),
     "Socket1Y": (0.222, _front_y(_SOCKET_LOW_Y / 2.0)),
     "Socket2Y": (0.250, _front_y(_SOCKET_HIGH_Y * 0.68)),
     "Height": (0.272, FRONT_CENTER[1]),
+    "Boss2Dia": (0.035, 0.238),
 }
 RIGHT_KEEP = {
     "Depth": (_right_x(PLATE_THICKNESS / 2.0), 0.251),
-    "BossH": (0.284, _right_y(_SOCKET_HIGH_Y)),
+    "BossH": (0.284, _right_y(_SOCKET_LOW_Y)),
+    "CboreFloor": (0.284, _right_y(CBORE_FLOOR_REFERENCE_Y)),
 }
-BACK_KEEP = {"Boss1Dia": (0.240, 0.082)}
+# The thickness states what its .XXX is spent on; the floor is a reference
+# dimension (the user-accepted exception) and says what it is.
+DIMENSION_CALLOUTS_ABOVE = {"Depth": "SETS DISC-TO-PLATEN AIR"}
+DIMENSION_CALLOUTS_BELOW = {"CboreFloor": "C'BORE FLOOR"}
+REFERENCE_DIMENSION = "CboreFloor"
 # One printed coordinate stands for every hole on its station: 5X per guide
 # row and column pair, 2X per socket station.  A custom prefix replaces
 # SolidWorks' own diameter symbol, so the boss's carries it.
@@ -180,31 +197,40 @@ DIMENSION_PREFIXES = {
     "Guide5X": "2X ",
     "Guide1Y": "5X ",
     "Guide6Y": "5X ",
-    "Boss1Dia": "4X Ø",
+    "Boss2Dia": "4X Ø",
 }
 
-# The guide-hole callout rides the top row's first hole, its leader up-left
-# over the plate's left edge to text above the plate's top-left corner; the
-# socket callout rides the upper right socket, its leader up-right to text
-# above the plate's top-right corner.  Each pick lies on the hole's own rim
-# (counterbore Ø, tap drill Ø) on the side the leader leaves.
+# The guide-hole callout rides the top row's first hole, its leader up-right
+# to text above the plate's left half; the socket callout rides the upper
+# right socket, its leader up to text above the plate's right end.  Each pick
+# lies on the hole's own visible rim (through Ø, tap drill Ø) on the side the
+# leader leaves.  Both name the part whose pattern their .XXX coordinates
+# match; the counterbores open on the far (paper) face the back view shows,
+# deep enough to sink the heads.
 _GUIDE_PICK_HOLE = (GUIDE_HOLE_X[0], GUIDE_HOLE_Y[1])
 _DIAG = math.sqrt(0.5)
 GUIDE_EDGE_XY = (
-    _front_x(_GUIDE_PICK_HOLE[0]) - CBORE_DIA / 2.0 * _S * _DIAG,
-    _front_y(_GUIDE_PICK_HOLE[1]) + CBORE_DIA / 2.0 * _S * _DIAG,
+    _front_x(_GUIDE_PICK_HOLE[0]) + GUIDE_HOLE_DIA / 2.0 * _S * _DIAG,
+    _front_y(_GUIDE_PICK_HOLE[1]) + GUIDE_HOLE_DIA / 2.0 * _S * _DIAG,
 )
-GUIDE_CALLOUT_XY = (0.060, 0.245)
-GUIDE_CALLOUT_PROCESS = "DRILL"
+GUIDE_CALLOUT_XY = (0.110, 0.248)
+GUIDE_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-011\nC'BORE FAR SIDE, HEADS SUB-FLUSH\n"
 SOCKET_DRILL_R_SHEET = blind_cut_dia_mm(SOCKET_SPEC) / 2.0 * _S
 SOCKET_EDGE_XY = (
     _front_x(_SOCKET_RIGHT_X) + SOCKET_DRILL_R_SHEET * _DIAG,
     _front_y(_SOCKET_HIGH_Y) + SOCKET_DRILL_R_SHEET * _DIAG,
 )
-SOCKET_CALLOUT_XY = (0.250, 0.252)
-SOCKET_CALLOUT_PROCESS = "TAP"
+SOCKET_CALLOUT_XY = (0.215, 0.252)
+SOCKET_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-003\nTAP"
+# The template centre-marks every hole as each view is placed (an explicit
+# AutoInsertCenterMarks2 printed all 28 marks twice in r1); the front and back
+# views each prove exactly one mark per hole.
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+CENTER_MARKS_PER_VIEW = len(SOCKET_XY) + len(GUIDE_HOLE_XY)
+# The socket's native callout drops one automatic "Tapped Hole" note.
+REDUNDANT_NOTE = "Tapped Hole"
 
-_VIEW_KEEPS = {"front": FRONT_KEEP, "right": RIGHT_KEEP, "back": BACK_KEEP}
+_VIEW_KEEPS = {"front": FRONT_KEEP, "right": RIGHT_KEEP}
 if set().union(*_VIEW_KEEPS.values()) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("the platen views must keep exactly the marked dimensions")
 
@@ -275,39 +301,57 @@ async def build(adapter: Any) -> dict[str, str]:
     back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=RIGHT_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    # The holes are fully defined by their callouts; no view needs hidden lines.
-    for view in (front, back, right, iso):
+    # The holes are fully defined by their callouts; only the enlarged right
+    # view shows hidden lines, so the counterbore profile its floor reference
+    # dimension measures reads behind the plate's edge.
+    for view in (front, back, iso):
         set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_visible(adapter, right)
 
-    annotations = [
-        *curate_view_dimensions(
-            adapter,
-            front,
-            keep=FRONT_KEEP,
-            view_label="front",
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        ),
-        *curate_view_dimensions(
-            adapter,
-            right,
-            keep=RIGHT_KEEP,
-            view_label="right",
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        ),
-        *curate_view_dimensions(
-            adapter,
-            back,
-            keep=BACK_KEEP,
-            view_label="back",
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        ),
-    ]
+    front_annotations = curate_view_dimensions(
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    # The floor's owner sketch is saved hidden (build_pd_platen); this view
+    # shows it to import the dimension.
+    right_annotations = _drawing_hidden_sketches.curate_view_dimensions(
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="right",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    annotations = [*front_annotations, *right_annotations]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
+    floor = [
+        a
+        for a in right_annotations
+        if dimension_name(adapter, a) == REFERENCE_DIMENSION
+    ]
+    if len(floor) != 1:
+        raise RuntimeError(
+            f"expected one {REFERENCE_DIMENSION} dimension, found {len(floor)}"
+        )
+    set_reference_dimension(adapter, floor[0], label="counterbore floor")
+    set_dimension_callouts(
+        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
+    )
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS_BELOW)
 
     for view, label in ((front, "front"), (back, "back")):
-        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
-            raise RuntimeError(f"failed to add ASME center marks to {label} view")
+        marks = (
+            _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION)
+            or ()
+        )
+        if len(marks) != CENTER_MARKS_PER_VIEW:
+            raise RuntimeError(
+                f"expected {CENTER_MARKS_PER_VIEW} centre marks in the {label} view, "
+                f"found {len(marks)}"
+            )
 
     guide_callout = add_native_hole_callout(
         adapter,
@@ -339,6 +383,8 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Platen Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        redundant_note_substrings=(REDUNDANT_NOTE,),
+        expected_redundant_notes=1,
     )
 
 

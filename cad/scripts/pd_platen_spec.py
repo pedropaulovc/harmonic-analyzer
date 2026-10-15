@@ -10,7 +10,7 @@ keys (#880).
 
 from __future__ import annotations
 
-from _hole_spec import CLEARANCE_MM, HoleSpec
+from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _printed_tolerance import printed_band_mm
 from vn_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 
@@ -31,7 +31,7 @@ PLATE_THICKNESS = 3.85
 # without bottoming. The bosses stand above the top guide rail's band, where
 # nothing but the clip-screw tips rides the back.
 SOCKET_SPEC = HoleSpec("tapped", "#2-56")
-SOCKET_BOSS_DIA = 7.0  # 2.41 wall around the #2-56 major (drawing-guidelines.md rule 17 (walls and webs): 2.0)
+SOCKET_BOSS_DIA = 7.0  # wall round the #2-56 major (drawing-guidelines.md rule 17 (walls and webs): 2.0)
 # 6.35 shank - 0.8 clip sheet - 3.85 plate: 5.55 engaged (2.54D), tip flush.
 # build_pd_platen_clip asserts the closure against the live screw and sheet.
 SOCKET_BOSS_H = 1.70
@@ -71,6 +71,18 @@ HEAD_RECESS = 0.2
 CBORE_DIA = 6.5
 CBORE_DEPTH = FILLISTER_HEAD_H + HEAD_RECESS
 
+# Counterbore floor: the plate left under each guide-screw head.  USER-ACCEPTED
+# rule-17 exception (2026-10-14): 0.93 nominal and CBORE_FLOOR_MIN (0.67) at
+# the printed worst case, under the 1.5 floor.  The plate is brass and the #4
+# guide screws are hand-tight: the floor's shear ring under the head
+# (pi x 3.658 x 0.67, about 7.7 mm^2) carries only that clamp.  The sheet prints
+# the floor as a reference dimension (the hidden CboreFloorReference sketch,
+# mid-annulus on the bottom row), and test_pd_platen_drawing pins the worst case
+# at or above the accepted value, so no later change can thin it further.
+CBORE_FLOOR = PLATE_THICKNESS - CBORE_DEPTH
+CBORE_FLOOR_ACCEPTED_MIN = 0.67
+CBORE_FLOOR_REFERENCE_Y = GUIDE_HOLE_Y[0] + (GUIDE_HOLE_DIA + CBORE_DIA) / 4.0
+
 # --- Drawing contract.  ``build_pd_platen`` marks exactly these dimensions and
 # authors their places; ``draw_pd_platen`` keeps exactly their union across its
 # views.  Hole sizes ship as native Hole Wizard callouts.  The socket and the
@@ -80,7 +92,7 @@ CBORE_DEPTH = FILLISTER_HEAD_H + HEAD_RECESS
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"Width", "Height"},
     "Plate": {"Depth"},
-    "SocketBossProfile": {"Boss1Dia"},
+    "SocketBossProfile": {"Boss2Dia"},
     "SocketBosses": {"BossH"},
     "Sockets": {"Socket1X", "Socket1Y", "Socket2Y", "Socket3X"},
     "GuideHoles": {
@@ -92,20 +104,26 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "Guide1Y",
         "Guide6Y",
     },
+    "CboreFloorReference": {"CboreFloor"},
 }
 # Places.  The outline prints .X: the clips and guides locate from the holes,
-# not the edges.  The thickness and boss height are the clip-screw thread
-# stack (SOCKET_THREAD_ENGAGEMENT), the boss Ø its wall round the tap, and
-# every hole coordinate is spent by the fixed-screw float over the clip's and
-# the guides' patterns (test_pd_platen_refit): all .XXX.
+# not the edges.  The thickness prints .XXX: it is spent by the paper-drive
+# assembly's disc-to-platen air budget (the back face rides the bar, so the
+# thickness sets the front face).  The boss Ø and height print .X: the boss
+# keeps its wall round the tap (SOCKET_BOSS_WALL_MIN) and the clip-screw
+# engagement through plate and boss stays far above 1.5D at that band.  Every
+# hole coordinate is spent by the fixed-screw float over the clip's and the
+# guides' patterns (test_pd_platen_refit): all .XXX.  The counterbore floor is
+# a reference dimension.
 POSITION_PLACES = 3
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {"Width": 1, "Height": 1},
     "Plate": {"Depth": 3},
-    "SocketBossProfile": {"Boss1Dia": 3},
-    "SocketBosses": {"BossH": 3},
+    "SocketBossProfile": {"Boss2Dia": 1},
+    "SocketBosses": {"BossH": 1},
     "Sockets": {name: POSITION_PLACES for name in DRAWING_DIMENSIONS["Sockets"]},
     "GuideHoles": {name: POSITION_PLACES for name in DRAWING_DIMENSIONS["GuideHoles"]},
+    "CboreFloorReference": {"CboreFloor": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -119,9 +137,10 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
     raise AssertionError("every marked platen dimension needs authored places")
 
 # The counterbored guide-hole callout's native variables: the loose through
-# hole and the head-recess depth at .XXX, the counterbore Ø at .X (the head
-# clears it by more than the .X band).
-GUIDE_CALLOUT_PRECISION = {"hw-thruholedia": 3, "hw-cbdia": 1, "hw-cbdepth": 3}
+# hole DRILLED at .XX, the head-recess depth at .XXX (the head sits sub-flush
+# below the paper face), the counterbore Ø at .X (the head clears it by more
+# than the .X band).
+GUIDE_CALLOUT_PRECISION = {"hw-thruholedia": 2, "hw-cbdia": 1, "hw-cbdepth": 3}
 # The shallowest printed counterbore still sinks the stock fillister head.
 HEAD_RECESS_MIN = (
     round(CBORE_DEPTH, GUIDE_CALLOUT_PRECISION["hw-cbdepth"])
@@ -131,6 +150,26 @@ HEAD_RECESS_MIN = (
 if HEAD_RECESS_MIN <= 0.0:
     raise AssertionError(
         f"guide-screw heads stand proud at the shallowest counterbore: {HEAD_RECESS_MIN}"
+    )
+# The thinnest printed plate under the deepest printed counterbore.
+CBORE_FLOOR_MIN = (
+    round(PLATE_THICKNESS, DRAWING_PRECISION_BY_NAME["Depth"])
+    - printed_band_mm(DRAWING_PRECISION_BY_NAME["Depth"])
+    - round(CBORE_DEPTH, GUIDE_CALLOUT_PRECISION["hw-cbdepth"])
+    - printed_band_mm(GUIDE_CALLOUT_PRECISION["hw-cbdepth"])
+)
+if CBORE_FLOOR_MIN < CBORE_FLOOR_ACCEPTED_MIN:
+    raise AssertionError(
+        f"counterbore floor {CBORE_FLOOR_MIN:.3f} is thinner than the user-accepted "
+        f"{CBORE_FLOOR_ACCEPTED_MIN}"
+    )
+# The smallest printed boss round the #2-56 major, concentric with its tap.
+SOCKET_BOSS_WALL_MIN = (
+    SOCKET_BOSS_DIA - printed_band_mm(DRAWING_PRECISION_BY_NAME["Boss2Dia"])
+) / 2.0 - THREAD_MAJOR_MM[SOCKET_SPEC.size] / 2.0
+if SOCKET_BOSS_WALL_MIN < 2.0:
+    raise AssertionError(
+        f"socket boss wall {SOCKET_BOSS_WALL_MIN:.3f} under the rule-17 2.0 target"
     )
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

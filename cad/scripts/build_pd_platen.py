@@ -35,6 +35,7 @@ import sys
 from _appearance import apply_material, apply_color, PANEL_BLACK
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _drawing_marks import (
     apply_drawing_properties,
@@ -48,7 +49,15 @@ from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
-from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _holes import HoleSpec, SharedCoordinate, blind_cut_dia_mm, wizard_holes
@@ -56,6 +65,8 @@ from pd_platen_spec import (
     BACK_VIEW_NOTE,
     CBORE_DEPTH,
     CBORE_DIA,
+    CBORE_FLOOR,
+    CBORE_FLOOR_REFERENCE_Y,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     GUIDE_HOLE_DIA,
@@ -135,6 +146,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PlateThickness", f"{PLATE_THICKNESS}mm")
     await set_global(adapter, "SocketBossDia", f"{SOCKET_BOSS_DIA}mm")
     await set_global(adapter, "SocketBossH", f"{SOCKET_BOSS_H}mm")
+    # The counterbore depth the guide Hole Wizard override cuts; only the
+    # drawing's floor reference reads it.
+    await set_global(adapter, "CounterBoreDepth", f"{CBORE_DEPTH}mm")
     # The printed hole stations (SOCKET_PLACEMENT / GUIDE_PLACEMENT).
     for index, value in enumerate(sorted({x for x, _ in SOCKET_XY}), start=1):
         await set_global(adapter, f"SocketX{index}", f"{value}mm")
@@ -271,6 +285,56 @@ async def build(adapter) -> dict[str, str]:
     if abs(removed - v_guide) > 0.02 * v_guide:
         raise RuntimeError(f"guide holes removed {removed:.1f}, expected {v_guide:.1f}")
 
+    # Drawing-only counterbore-floor reference (the user-accepted rule-17
+    # exception, pd_platen_spec.CBORE_FLOOR): one construction line across the
+    # floor, mid-annulus over the bottom guide row, from the back face to the
+    # counterbore's bottom.  It sits on the Right plane because the *Right view
+    # prints it (every reference sketch that imports natively sits on the plane
+    # of its view; build_dt_crank_hub).  Right (u, v) -> (-Z, Y).
+    floor = SketchDims()
+    check("create_sketch counterbore floor", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    floor_line = check(
+        "counterbore floor reference line",
+        await adapter.add_line(
+            -PLATE_THICKNESS,
+            CBORE_FLOOR_REFERENCE_Y,
+            -CBORE_DEPTH,
+            CBORE_FLOOR_REFERENCE_Y,
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[floor_line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("counterbore floor reference did not take construction flag")
+    check(
+        "counterbore floor reference horizontal",
+        await adapter.add_sketch_constraint(floor_line, None, "horizontal"),
+    )
+    await anchor_point_to_origin(
+        adapter,
+        f"{floor_line}.start",
+        -PLATE_THICKNESS,
+        CBORE_FLOOR_REFERENCE_Y,
+        "counterbore floor reference at the back face",
+    )
+    floor.record("CboreFloorZ", '"PlateThickness"')
+    floor.record("CboreFloorY", None)
+    await dimension_between(
+        adapter,
+        f"{floor_line}.start",
+        f"{floor_line}.end",
+        "horizontal_distance",
+        CBORE_FLOOR,
+        "counterbore floor",
+    )
+    floor.record("CboreFloor", '"PlateThickness" - "CounterBoreDepth"')
+    await ensure_fully_defined(adapter, "counterbore floor reference sketch")
+    check("exit_sketch counterbore floor", await adapter.exit_sketch())
+    name_last_feature(adapter, "CboreFloorReference")
+    drive_jobs += floor.apply(adapter, "CboreFloorReference")
+
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
     # value, so the geometry must not move).
@@ -309,6 +373,10 @@ async def build(adapter) -> dict[str, str]:
             "Back View Note": BACK_VIEW_NOTE,
         },
     )
+    # The floor reference is construction-only: saved hidden so no assembly
+    # renders it; the drawing shows it in its view through
+    # _drawing_hidden_sketches to import the floor dimension.
+    blank_sketch(adapter, "CboreFloorReference")
     return await save_part_and_images(adapter, PART_NAME)
 
 
