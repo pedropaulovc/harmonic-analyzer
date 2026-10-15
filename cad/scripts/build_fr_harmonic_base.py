@@ -1396,7 +1396,7 @@ async def _paint_machined_faces_black(adapter) -> None:
         _telemetry.info(f"{key} face painted black ({area * 1e6:.0f} mm^2)")
 
 
-REFERENCE_SKETCHES = ("HeightReference", "CrossTapReference")
+REFERENCE_SKETCHES = ("HeightReference", "CrossTapReference", "PlanReference")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -2509,8 +2509,9 @@ async def build(adapter) -> dict[str, str]:
     # (the first build failed with "geometry top view is missing model
     # dimensions: ['RimWidth']"), so draw_fr_harmonic_base imports them through
     # _drawing_hidden_sketches.curate_view_dimensions, which shows each owner
-    # sketch in its own view only. The pocket wall needs no such sketch: the
-    # sheet prints the pocket's own PocketLen/PocketWid in the bottom view.
+    # sketch in its own view only. The pocket's size needs no such sketch (the
+    # sheet prints its own PocketLen/PocketWid in the bottom view); its place
+    # from X0 Y0 does, with the pad's and the deck's: PlanReference below.
 
     # On the left silhouette (x = -BOTTOM_LENGTH/2), where the front view's
     # flange-to-deck dimension has always drawn its witness lines.
@@ -2549,12 +2550,11 @@ async def build(adapter) -> dict[str, str]:
     name_dimensions(adapter, "HeightReference", ["FlangeToDeck"])
     _verify_named_dimension(adapter, "FlangeToDeck@HeightReference", TOP_THICKNESS)
 
-    # The cross-tap X stations, chained from the flange's west face (the hole
-    # table's X0) to the first tap and on to the second, along the tap axis.
+    # The cross-tap X stations, each a baseline from the flange's west face
+    # (the hole table's X0) along the tap axis, both from one start point.
     # The taps share their X with the A1-A4 bores, but the table locates only
     # the bores, and "ON A1-A4 X CENTRES" in the tap callout was a location
-    # in a note (hb-render-4 eye pass). Chained, not baselined: the front
-    # view has one free dimension row beneath it.
+    # in a note (hb-render-4 eye pass).
     check("create_sketch cross-tap reference", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     tap_edge_ref = check(
@@ -2563,21 +2563,23 @@ async def build(adapter) -> dict[str, str]:
             -BOTTOM_LENGTH / 2.0, BASE_SCREW_Y, -COLUMN_X, BASE_SCREW_Y
         ),
     )
-    tap_pitch_ref = check(
-        "cross-tap pitch reference line",
-        await adapter.add_line(-COLUMN_X, BASE_SCREW_Y, COLUMN_X, BASE_SCREW_Y),
+    tap_far_ref = check(
+        "cross-tap far reference line",
+        await adapter.add_line(
+            -BOTTOM_LENGTH / 2.0, BASE_SCREW_Y, COLUMN_X, BASE_SCREW_Y
+        ),
     )
     set_sketch_direct_db(adapter, False)
-    for line in (tap_edge_ref, tap_pitch_ref):
+    for line in (tap_edge_ref, tap_far_ref):
         _as_construction(adapter, line)
         check(
             f"cross-tap reference {line} horizontal",
             await adapter.add_sketch_constraint(line, None, "horizontal"),
         )
     check(
-        "cross-tap reference chain",
+        "cross-tap reference baseline",
         await adapter.add_sketch_constraint(
-            f"{tap_edge_ref}.end", f"{tap_pitch_ref}.start", "coincident"
+            f"{tap_edge_ref}.start", f"{tap_far_ref}.start", "coincident"
         ),
     )
     await dimension_between(
@@ -2590,11 +2592,11 @@ async def build(adapter) -> dict[str, str]:
     )
     await dimension_between(
         adapter,
-        f"{tap_pitch_ref}.start",
-        f"{tap_pitch_ref}.end",
+        f"{tap_far_ref}.start",
+        f"{tap_far_ref}.end",
         "horizontal_distance",
-        2.0 * COLUMN_X,
-        "cross-tap pitch",
+        BOTTOM_LENGTH / 2.0 + COLUMN_X,
+        "cross-tap far X from flange edge",
     )
     await anchor_point_to_origin(
         adapter,
@@ -2606,11 +2608,116 @@ async def build(adapter) -> dict[str, str]:
     await ensure_fully_defined(adapter, "cross-tap reference sketch")
     check("exit_sketch cross-tap reference", await adapter.exit_sketch())
     name_last_feature(adapter, "CrossTapReference")
-    name_dimensions(adapter, "CrossTapReference", ["CrossTapX", "CrossTapPitch"])
+    name_dimensions(adapter, "CrossTapReference", ["CrossTapX", "CrossTapFarX"])
     _verify_named_dimension(
         adapter, "CrossTapX@CrossTapReference", BOTTOM_LENGTH / 2.0 - COLUMN_X
     )
-    _verify_named_dimension(adapter, "CrossTapPitch@CrossTapReference", 2.0 * COLUMN_X)
+    _verify_named_dimension(
+        adapter, "CrossTapFarX@CrossTapReference", BOTTOM_LENGTH / 2.0 + COLUMN_X
+    )
+
+    # The plan stations of the pad, the deck and the underside pocket from
+    # the hole table's X0 Y0 (the flange's rear-west theoretical sharp
+    # corner). The plates are centred, so their own Len/Wid dims fix only
+    # their sizes; these baselines, each from the one X0 Y0 point along the
+    # flange's rear edge (X) or west edge (Y), place them from the datum
+    # every other plan location is measured from. Driven by the plate
+    # globals, so a footprint edit moves the printed stations with it.
+    # Top-plane sketch y is machine -Z: the rear edge lies at y = -width/2.
+    plan = SketchDims()
+    plan_x0, plan_y0 = -BOTTOM_LENGTH / 2.0, -BOTTOM_WIDTH / 2.0
+    plan_rows = (
+        (
+            "PadX",
+            "horizontal",
+            (BOTTOM_LENGTH - TOP_LENGTH) / 2.0,
+            '("BottomLength" - "TopLength") / 2',
+        ),
+        (
+            "PadY",
+            "vertical",
+            (BOTTOM_WIDTH - TOP_WIDTH) / 2.0,
+            '("BottomWidth" - "TopWidth") / 2',
+        ),
+        (
+            "DeckX",
+            "horizontal",
+            BOTTOM_LENGTH / 2.0 - DECK_HALF_X,
+            '("BottomLength" - "DeckLength") / 2',
+        ),
+        (
+            "DeckY",
+            "vertical",
+            BOTTOM_WIDTH / 2.0 - DECK_HALF_Z,
+            '("BottomWidth" - "DeckWidth") / 2',
+        ),
+        (
+            "PocketX",
+            "horizontal",
+            BOTTOM_LENGTH / 2.0 - POCKET_HALF_X,
+            '("BottomLength" - "TopLength") / 2 + "PocketWall"',
+        ),
+        (
+            "PocketY",
+            "vertical",
+            BOTTOM_WIDTH / 2.0 - POCKET_HALF_Z,
+            '("BottomWidth" - "TopWidth") / 2 + "PocketWall"',
+        ),
+    )
+    check("create_sketch plan reference", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    plan_lines = []
+    for name, direction, value, _drive in plan_rows:
+        end_x = plan_x0 + (value if direction == "horizontal" else 0.0)
+        end_y = plan_y0 + (value if direction == "vertical" else 0.0)
+        plan_lines.append(
+            check(
+                f"plan reference {name} line",
+                await adapter.add_line(plan_x0, plan_y0, end_x, end_y),
+            )
+        )
+    set_sketch_direct_db(adapter, False)
+    for line, (name, direction, _value, _drive) in zip(
+        plan_lines, plan_rows, strict=True
+    ):
+        _as_construction(adapter, line)
+        check(
+            f"plan reference {name} {direction}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    for line in plan_lines[1:]:
+        check(
+            f"plan reference {line} from X0 Y0",
+            await adapter.add_sketch_constraint(
+                f"{line}.start", f"{plan_lines[0]}.start", "coincident"
+            ),
+        )
+    await anchor_point_to_origin(
+        adapter, f"{plan_lines[0]}.start", plan_x0, plan_y0, "plan reference X0 Y0"
+    )
+    plan.record("PlanOriginX", '"BottomLength" / 2')
+    plan.record("PlanOriginY", '"BottomWidth" / 2')
+    for line, (name, direction, value, drive) in zip(
+        plan_lines, plan_rows, strict=True
+    ):
+        await dimension_between(
+            adapter,
+            f"{line}.start",
+            f"{line}.end",
+            f"{direction}_distance",
+            value,
+            f"plan reference {name}",
+        )
+        plan.record(name, drive)
+    await ensure_fully_defined(adapter, "plan reference sketch")
+    check("exit_sketch plan reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "PlanReference")
+    # The main drive batch ran before the reference sketches existed.
+    for dim_name, expr in plan.apply(adapter, "PlanReference"):
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    for name, _direction, value, _drive in plan_rows:
+        _verify_named_dimension(adapter, f"{name}@PlanReference", value)
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
     await apply_material(adapter, MATERIAL)

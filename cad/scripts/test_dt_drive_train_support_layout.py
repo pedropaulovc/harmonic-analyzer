@@ -1675,6 +1675,7 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
     # User rulings P1-1 / P1-2 and the spring pad: every setting is one leaf,
     # or D's pair, of the one purchased gage, and each print states its step.
     import draw_fr_harmonic_base as base_sheet
+    import dt_drive_train_steps
     import dt_pinion_cam_spec
 
     for name, leaf in FITUP.SINGLE_LEAF_SETTINGS.items():
@@ -1689,8 +1690,11 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
         "NORTH MHA-DT-012 BACK FACE, BANK PUSHED NORTH;\n"
         "MHA-DT-024 PAD 0.65 LEAF OFF MHA-DT-018."
     )
+    # The base's rig callouts cite this step on MHA-DT-000 by key (plate-r1
+    # review: the procedure is the assembly's, not the base's).
+    rig_set_ref = dt_drive_train_steps.step_ref("rig-set")
     for callout in (base_sheet.TRANSFER_BLOCK_CALLOUT, base_sheet.TRANSFER_SPRING_CALLOUT):
-        assert FITUP.TRANSFER_AFTER_RIG_SET in callout
+        assert f"AFTER {rig_set_ref};" in callout
     # The collars' set is an assembly step: nothing is cut, so MHA-DT-023's own
     # print stays free of it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method), as MHA-DT-018 keeps its feeler).
     assert "LEAF" not in dt_pinion_cam_spec.DRAWING_NOTES
