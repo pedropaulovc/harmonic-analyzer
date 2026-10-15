@@ -13,7 +13,7 @@ creases: the spring rail is a mid-plane thin extrusion of one tangent
 line/arc path, so every bend is a smooth cylindrical band.  In plan, the
 spring ends are full half-rounds, the screw rail's corners are rounded
 (large on the outer edge, small at the slit), and each slit ends in a full
-half-round at the bridge, as img03 shows.  The two slotted fillister heads sit
+half-round at the bridge, as img03 shows.  The two slotted pan heads sit
 directly on the flat 0.8 mm sheet (img03: no raised seats); the platen's rear
 socket bosses take the rest of the stock shank as thread
 (pd_platen_spec.SOCKET_BOSS_H).
@@ -67,7 +67,14 @@ from _sketch_circle import define_circle
 from _hole_spec import THREAD_MAJOR_MM
 from _holes import CLEARANCE_MM, HoleSpec, SharedCoordinate, wizard_holes
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
-from vn_platen_clip_screw_spec import HEAD_DIA, PITCH, SHANK_DIA, SHANK_LEN, THREAD
+from vn_platen_clip_screw_spec import (
+    HEAD_DIA,
+    HEAD_DIA_MIN,
+    PITCH,
+    SHANK_DIA,
+    SHANK_LEN,
+    THREAD,
+)
 from pd_platen_spec import PLATE_THICKNESS, SOCKET_BOSS_H, SOCKET_THREAD_ENGAGEMENT
 
 PART_NAME = "pd-platen-clip"
@@ -127,9 +134,10 @@ SCREW_RAIL_END_RADIUS = 2.5
 SCREW_RAIL_SLIT_RADIUS = 0.75
 ARCH_RISE = 1.5  # shallow outward bow; editable as ArchRise in Tools > Equations
 
-# The brass #2-56 fillister screws (vn-platen-clip-screw; img03's heads read
-# ~2.6-3.0 mm) retain their lengthwise stations in the flat rail, centred
-# across it; each head lies wholly on the rail.
+# The brass #2-56 slotted pan-head screws (vn-platen-clip-screw; img03's heads
+# read ~2.6-3.0 mm, user ruling 2026-10-15 for the pan head's bearing land)
+# retain their lengthwise stations in the flat rail, centred across it; each
+# head lies wholly on the rail.
 HOLE_INSET = 7.1904  # ch30-p002 Pose Studio: 8 * 0.8988 from each end
 HOLE_Y = SCREW_RAIL_WIDTH / 2.0
 CLEARANCE_SIZE = THREAD.split("-")[0]  # "#2"
@@ -170,9 +178,9 @@ FAR_END_LIGAMENT_MIN = (
 # tap share the smallest hole's clearance over the shank.
 PATTERN_POSITION_ZONE = 2.0 * math.sqrt(2.0) * _POSITION_BAND
 HOLE_FLOAT_MIN = HOLE_DIA - SHANK_DIA
-# The catalogue head over the largest drilled hole, concentric: the least
-# bearing land (an offset head only uncovers less of the hole).
-HEAD_BEARING_LAND_MIN = (HEAD_DIA - HOLE_DIA_MAX) / 2.0
+# The least catalogue head (ASME B18.6.3) over the largest drilled hole,
+# concentric: the least bearing land (an offset head only uncovers less hole).
+HEAD_BEARING_LAND_MIN = (HEAD_DIA_MIN - HOLE_DIA_MAX) / 2.0
 # Clip-joint thread engagement at the worst case (drawing-guidelines.md rule
 # 18): the shortest catalogue screw (ASME B18.6.3, to 1 in: +0/-0.03 in) under
 # the thickest stock sheet reaches the least into the platen's through tap,
@@ -418,7 +426,7 @@ if SOCKET_THREAD_ENGAGEMENT + 1e-9 < 1.5 * THREAD_MAJOR_MM[THREAD]:
         f"clip {THREAD} engagement {SOCKET_THREAD_ENGAGEMENT:.4f} < 1.5D (drawing-guidelines.md rule 18 (thread engagement))"
     )
 if HOLE_DIA < SHANK_DIA:
-    raise AssertionError("stock fillister shank does not clear the clip")
+    raise AssertionError("stock clip-screw shank does not clear the clip")
 if (
     min(EDGE_LIGAMENT_MIN, SLIT_LIGAMENT_MIN, END_LIGAMENT_MIN, FAR_END_LIGAMENT_MIN)
     < LIGAMENT_FLOOR

@@ -172,9 +172,10 @@ def test_platen_clip_free_halves_bow_smoothly_and_return_to_sheet_plane() -> Non
 
 
 def test_platen_clip_screws_seat_on_the_flat_sheet_with_full_engagement() -> None:
-    # The user's #2-56 brass fillister (90114A124): its head lies wholly on the
-    # screw rail, and the platen's through tap is the same thread.
-    assert clip_screw.SKU == "90114A124" and clip_screw.THREAD == "#2-56"
+    # The #2-56 brass slotted pan head (92446A077, user ruling 2026-10-15):
+    # its head lies wholly on the screw rail, and the platen's through tap is
+    # the same thread.
+    assert clip_screw.SKU == "92446A077" and clip_screw.THREAD == "#2-56"
     assert (platen.SOCKET_SPEC.kind, platen.SOCKET_SPEC.size) == ("tapped", "#2-56")
     assert clip.HOLE_DIA == clip.CLEARANCE_MM[("#2", "loose")]
     assert clip_screw.HEAD_DIA < clip.SCREW_RAIL_WIDTH
@@ -235,8 +236,8 @@ def test_platen_clip_hole_ligaments_float_and_head_land_hold_at_worst_case() -> 
     # Fixed fasteners: the hole floats over the shank by both patterns' zones.
     zone = 2.0 * math.sqrt(2.0) * band
     assert clip.HOLE_DIA - clip_screw.SHANK_DIA >= 2.0 * zone
-    # The head never pulls through the largest hole, with land to bear on.
-    assert clip_screw.HEAD_DIA - clip.HOLE_DIA_MAX >= 0.5
+    # The least head never pulls through the largest hole, with land to bear on.
+    assert clip_screw.HEAD_DIA_MIN - clip.HOLE_DIA_MAX >= 0.8
 
 
 def test_wider_platen_clip_stays_on_the_platen_and_off_the_recording_paper() -> None:

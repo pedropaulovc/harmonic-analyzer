@@ -568,7 +568,7 @@ BOM_DESCRIPTIONS = {
     "pd-platen-paper": "PLATEN PAPER",
     "vn-fillister-screw": f"BRASS FILLISTER SCREW, MCMASTER {_SKU['vn-fillister-screw']}",
     "vn-platen-clip-screw": (
-        f"BRASS FILLISTER SCREW, MCMASTER {_SKU['vn-platen-clip-screw']}"
+        f"BRASS PAN HEAD SCREW, MCMASTER {_SKU['vn-platen-clip-screw']}"
     ),
     "vn-guide-lock-screw": f"PAN HEAD SCREW, MCMASTER {_SKU['vn-guide-lock-screw']}",
     "vn-chain-inner-link": f"ANSI #25 INNER LINK, MCMASTER {_SKU['vn-chain-inner-link']}",

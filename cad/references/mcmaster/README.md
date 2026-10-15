@@ -22,7 +22,7 @@ recipes:
 | 6793K4 | `pd-transgear-removable` T12 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 12 Teeth |
 | 6793K11 | `pd-transgear-removable` T18 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 18 Teeth |
 | 6793K17 | `pd-transgear-removable` T24 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 24 Teeth |
-| 90114A124 | `vn-ms-stop-plate-screw`, `vn-platen-clip-screw` (catalogue-only; no vendor model) | Brass Fillister Head Slotted Screw |
+| 90114A124 | `vn-ms-stop-plate-screw`; `vn-platen-clip-screw` until 2026-10-15 (catalogue-only; no vendor model) | Brass Fillister Head Slotted Screw |
 | 90114A511 | `vn-fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `vn-foot-screw`, `vn-swing-stop-screw`, `vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -54,6 +54,7 @@ recipes:
 | 92240A540 | `vn-lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A560 | `vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 92314A253 | `vn-knife-hanger-stud` (modified stock; catalogue-only, no vendor model) | 18-8 Stainless Steel Hex Head Screw, #10-24 × 2 in, cut to length |
+| 92446A077 | `vn-platen-clip-screw` (catalogue-only; no vendor model) | Brass Pan Head Slotted Screw |
 | 91882A221 | `vn-thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | — (diagnostic recipe; `vn-cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `vn-tube-frame-cap` | Metal Round Cap |
@@ -135,6 +136,34 @@ Live catalog verification on October 11, 2026:
   recipe; its derived slot, dome, thread/runout and vendor-frame mapping are
   family assumptions, not verified vendor geometry. No vendor model is
   harvested.
+
+  Replaced on October 15, 2026 by 92446A077 (below) for the clip screws: the
+  ASME B18.6.3 fillister head's least Ø0.124 in leaves 0.05 mm of bearing land
+  over the clip's largest drilled #2 loose hole (Ø2.95 +0.10). 90114A124 stays
+  selected for the MHA-VN-054 stop-plate screws.
+- [92446A077](https://www.mcmaster.com/92446A077/) (`vn-platen-clip-screw`,
+  MHA-VN-059, four) replaces 90114A124 on October 15, 2026 (user ruling: a
+  pan head for the bearing land). The live page, titled “Brass Pan Head
+  Slotted Screws, 2-56 Thread Size, 1/4" Long”, and its
+  [technical drawing](https://www.mcmaster.com/mvC/Library/CAD2/20260610/72386355/92446A077_Brass%20Pan%20Head%20Slotted%20ScrewsX.GIF)
+  were read on October 15, 2026 (a plain headless browser met the login
+  wall; a Firecrawl scrape through its enhanced proxy returned the page):
+  brass, Rockwell B40, 50,000 psi tensile strength, #2-56 UNC class 2A,
+  fully threaded, flat tip, ASME B18.6.3, standard-profile slotted pan head
+  0.167 in (4.2418 mm) across and 0.053 in (1.3462 mm) high, 0.25 in
+  (6.35 mm) under the head, screw size decimal 0.086 in. The drawing states
+  no tolerances; Olander's 2C25SPMBP, cross-referenced to 92446A077 (read
+  October 15, 2026), gives the B18.6.3 head band Ø0.167 in max, 0.155 in
+  min, and `_mcmaster_92446a077.py` holds the least head. Over the clip's
+  largest drilled hole the least head leaves 0.44 mm of land (0.25 mm on a
+  bearing circle of 90 % of it); the Ø4.24 head stays 1.18 mm inside the
+  6.6 mm screw rail. Length and thread are 90114A124's, so the engagement
+  (5.55 mm nominal, 4.02 mm worst case, at least 1.5D) and the flush tip are
+  unchanged. The drawing shows a domed pan crown but sizes no crown, slot or
+  tip, so `diag_build_92446A077.py` builds it on the shared slotted-head laws
+  of `diag_mcmaster_fillister.py`, as 91792A108 does [INFERENCE]. It is
+  catalogue-only: the SLDPRT download is not harvested, so it has no replica
+  gate.
 
 Live catalogue verification on October 9, 2026:
 

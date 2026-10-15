@@ -1615,9 +1615,9 @@ sections:
         - scaled + derived
         - med
       - - Clip screws ×4 + platen sockets
-        - stock 90114A124 #2-56 × 1/4 brass fillister `vn-platen-clip-screw` (MHA-VN-059; Ø3.556 × 2.1082 head, 6.35 shank; user ruling 2026-10-11 — img03's heads read ~2.6–3.0, and the Ø3.556 head lies wholly on the 4.23 screw rail) through each clip's #2 clearance end holes (machine x −28.2713288/+230.5830712, y 331.7444/400.8636) into #2-56 taps through the 3.85 platen and its Ø7 × 1.70 rear bosses (5.55 engaged, 2.54D; tips flush with the boss rear faces); under-head faces directly on the flat clip sheet (z −143.55, no seat boss — ch22 img03); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
+        - stock 92446A077 #2-56 × 1/4 brass slotted pan head `vn-platen-clip-screw` (MHA-VN-059; Ø4.2418 × 1.3462 head, Ø3.937 least (ASME B18.6.3), 6.35 shank; user ruling 2026-10-15 — the 90114A124 fillister's least head left 0.05 bearing land over the clip's largest drilled #2 loose hole, the pan head 0.44; the head lies wholly on the 6.6 screw rail) through each clip's #2 clearance end holes (machine x −28.2713288/+230.5830712, y 331.7444/400.8636) into #2-56 taps through the 3.85 platen and its Ø7 × 1.70 rear bosses (5.55 engaged, 2.54D; tips flush with the boss rear faces); under-head faces directly on the flat clip sheet (z −143.55, no seat boss — ch22 img03); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
         - —
-        - p.55 front photo (clip end screws); McMaster 90114A124 product page and technical drawing read live 2026-10-11
+        - p.55 front photo (clip end screws); McMaster 92446A077 product page and technical drawing read live 2026-10-15; head band Olander 2C25SPMBP (B18.6.3), read 2026-10-15
         - scaled + derived
         - low
   - prose: |2
