@@ -352,11 +352,11 @@ if abs(BAR_PIN_LENGTH - BAR_WIDTH) > 1e-9:
 # (ch_channel_lever_spec is what error_budget.nominal() reads).
 from ch_channel_lever_spec import (  # noqa: E402
     BAR_PIN_X as LEVER_BAR_PIN_X,  # 127.0, fulcrum -> bar-pin c2c, 5"
+    TIP_RADIUS as LEVER_END_HALF,  # spring hole in the full-height rounded end
 )
 
 # the lever bank ends at x ~ -30 in the ch. 30 front view and the 32 mm
 # springs must reach the summing plate at x ~ -22..-27)
-LEVER_TAB_HALF = 3.0  # spring hole sits in the lever's 6.0-tall end tab
 LEVER_THICKNESS = 3.0
 
 # --- supports / mounts ------------------------------------------------------
@@ -878,7 +878,7 @@ def _assert_spring_mount(
     under_lever = (
         (drop + edge_height) * along_normal
         - wire_r * abs(across_normal)
-        - LEVER_TAB_HALF
+        - LEVER_END_HALF
     )
     if (state == "catalog_seed" and abs(bore_margin) > 1e-6) or under_lever < 0.1:
         raise RuntimeError(

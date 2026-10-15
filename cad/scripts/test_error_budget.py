@@ -1578,13 +1578,20 @@ def test_drawing_limits_agree_with_the_budget(budget):
     for feature, spec_module, key in (
         ("summing_hook_arm", sm_summing_lever_spec, "spring-hole pattern position"),
         ("rocker_rod_pin_radius", ch_rocker_arm_spec, "rod-pin hole position"),
-        ("lever_bar_pin_arm", ch_channel_lever_spec, "bar-pin hole position"),
-        ("lever_spring_hook_arm", ch_channel_lever_spec, "spring-eye hole position"),
     ):
         zone = float(spec_module.GEOMETRIC_TOLERANCES_MM[key])
         assert zone == pytest.approx(2.0 * feats[feature]["tolerance"]), (
             f"{spec_module.__name__} {key!r} zone {zone} is not twice the budget's "
             f"+/-{feats[feature]['tolerance']} on {feature}"
+        )
+    # the channel lever prints its two arms as +/- locations from the fulcrum bore
+    for feature, tolerance in (
+        ("lever_bar_pin_arm", ch_channel_lever_spec.BAR_PIN_X_TOLERANCE),
+        ("lever_spring_hook_arm", ch_channel_lever_spec.LEVER_SPRING_X_TOLERANCE),
+    ):
+        assert tolerance == pytest.approx(feats[feature]["tolerance"]), (
+            f"channel lever {feature} prints +/-{tolerance}, the budget allocates "
+            f"+/-{feats[feature]['tolerance']}"
         )
     backlash_lo, backlash_hi = eb._config.fit("gear_mesh", "backlash_mm")
     pitch_r = (

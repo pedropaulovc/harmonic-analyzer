@@ -3,7 +3,7 @@ r"""Reproduction script: channel (top) lever (book ch. 17, pp. 38-41).
 One of the 20 cast third-class levers at the top of the machine: fulcrum
 pivot at one end (Ø6.5 hole riding the common Ø6.35 fulcrum shaft - the
 p.40 ball clevis is the shaft's END mount, mirroring the rocker-pivot
-design), channel-spring pull from a narrow end tab (Ø4 hook hole at
+design), channel-spring pull from its rounded end (Ø4 hook hole at
 175.05), driven in between by its amplitude bar pinned Ø2 at 127
 (5"). Section 9.5 tall x 3.0 thick: 20 levers at the 7.0565 channel
 pitch cap the thickness (the M2 12.5 "width" violated the pitch), and
@@ -20,9 +20,10 @@ solver frame's mirror of this paragraph's photo signs), so c2c = 175.05
 from the |x| 199.9 fulcrum (motion ratio 175.05/127 = 1.378). The
 photo-read 7" (177.8) left the spring 2.75 mm off plumb at neutral.
 The p.39 close-up also shows the bar pin only ~4-5 bar-heights from the
-tip (50.8/9.5 = 5.3 fits; 127/9.5 = 13 does not). The tab itself is the
-narrow stepped end visible on p.39/p.41: bar height 9.5 steps to a 6.0
-centred tab carrying the spring hole, rounded tip.
+tip (50.8/9.5 = 5.3 fits; 127/9.5 = 13 does not). The p.39 close-up also
+shows the bar running full height to its rounded end with the hook hole in
+it: the 9.5 bar ends in a full round about the spring hole (the former 6.0
+stepped tab left 0.98 of wall beside the hole).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 17" - lengths/section derived in
 M6.3/M6.4 (med), hole diameters low.
@@ -46,7 +47,7 @@ import sys
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _dimensions import drive_dimension, set_global
+from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -63,29 +64,43 @@ from _sketch import (
 from _sketch_circle import define_circle
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
+from _com import _early_bound
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
+from _fit_deviations import deviations
+from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
+import _telemetry
+from ch_channel_lever_notes import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    ISOMETRIC_VIEW_NOTE,
+)
 from ch_channel_lever_spec import (
     BAR_PIN_HOLE_SPEC,
     BAR_PIN_X,
+    BAR_PIN_X_TOLERANCE,
     BAR_TALL,
-    DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
-    ISOMETRIC_VIEW_NOTE,
     HUB_DIA,
     HUB_LENGTH,
+    HUB_LENGTH_BAND,
     LEVER_SPRING_X,
+    LEVER_SPRING_X_TOLERANCE,
     LEVER_THICKNESS,
+    LEVER_THICKNESS_TOLERANCE,
+    PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
     SPRING_EYE_HOLE_SPEC,
-    TAB_HALF,
-    TAB_START_X,
+    SURFACE_FINISHES,
     TIP_ARC_CX,
-    TIP_RADIUS,
 )
 
 PART_NAME = "ch-channel-lever"
@@ -101,6 +116,33 @@ HUB_PROUD = (HUB_LENGTH - LEVER_THICKNESS) / 2.0  # 2.028 each face
 
 HALF_BAR = BAR_TALL / 2.0
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > extrude width
+if TIP_ARC_CX != LEVER_SPRING_X:
+    raise AssertionError("the full-round tip must be concentric with the spring hole")
+
+
+def tolerance_at_value_places(adapter, feature_name: str, dimension_name: str) -> int:
+    """Print one dimension's band at the dimension's own decimal places.
+
+    The shared setters print a band at the fewest places that hold it, so a
+    two-place 127.00 would read "127.00 +/-0.1".  The places come from
+    DRAWING_PRECISION, the entry that sets the value's places, and are set on
+    the model so the drawing imports them verbatim (as
+    build_ch_connecting_rod does for its pin hole)."""
+    places = DRAWING_PRECISION[feature_name][dimension_name]
+    display, _dimension = _named_dimension(adapter, feature_name, dimension_name)
+    display = _early_bound(display, "IDisplayDimension")
+    do_not_change = -1  # swDimensionPrecisionSettings_e
+    display.SetPrecision3(do_not_change, do_not_change, places, do_not_change)
+    applied = int(display.GetPrimaryTolPrecision2())
+    if applied != places:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: tolerance places did not persist: "
+            f"requested {places}, dimension reports {applied}"
+        )
+    _telemetry.success(
+        f"tolerance places {dimension_name}@{feature_name}: {places} decimals"
+    )
+    return places
 
 
 async def build(adapter) -> dict[str, str]:
@@ -112,8 +154,8 @@ async def build(adapter) -> dict[str, str]:
     # fine-tune edits THESE globals -- never an auto "D1@Sketch1". The mm suffix
     # is load-bearing: this is an INCH document and the equation manager reads
     # BARE numbers in document units (an unsuffixed 175.05 = 175.05 in, blowing
-    # the part up 25.4x). Derived globals (TipArcCx) reference others as equation
-    # strings so the tip stays a fixed overhang past the spring hole.
+    # the part up 25.4x). The tip centre is driven by "LeverSpringX" itself, so
+    # the full-round end stays concentric with the spring hole.
     await set_global(adapter, "LeverSpringX", f"{LEVER_SPRING_X}mm")
     await set_global(adapter, "BarTall", f"{BAR_TALL}mm")
     await set_global(adapter, "LeverThickness", f"{LEVER_THICKNESS}mm")
@@ -122,10 +164,6 @@ async def build(adapter) -> dict[str, str]:
     # (The old BarPinHoleDia/SpringHoleDia/BarPinX knobs are gone: the bar-pin and
     # spring holes are now native Hole Wizard features whose diameters come from
     # the #47/#21 drill standard, not equation-driven sketch dims.)
-    await set_global(adapter, "TabStartX", f"{TAB_START_X}mm")
-    await set_global(adapter, "TabHalf", f"{TAB_HALF}mm")
-    await set_global(adapter, "TipRadius", f"{TIP_RADIUS}mm")
-    await set_global(adapter, "TipArcCx", '"LeverSpringX" + 5mm')
 
     # Each sketch records its dim names + drive equations into a per-sketch
     # SketchDims as the dims are created; the drives are collected here and
@@ -133,8 +171,8 @@ async def build(adapter) -> dict[str, str]:
     # resolve against the finished model + a rebuild).
     drive_jobs: list[tuple[str, str]] = []
 
-    # Side profile: round fulcrum nose, flat bar, stepped end tab with a
-    # rounded tip (two arcs + 6-line chain). The manual constraints/dims below
+    # Side profile: round fulcrum nose, full-height bar, full-round tip about
+    # the spring hole (two arcs + two lines). The manual constraints/dims below
     # define the sketch; each driving dim is record()ed into ``outline`` in the
     # exact order it is added so naming/driving land structurally.
     outline = SketchDims()
@@ -144,80 +182,51 @@ async def build(adapter) -> dict[str, str]:
         "add_arc fulcrum nose",
         await adapter.add_arc(0.0, 0.0, 0.0, HALF_BAR, 0.0, -HALF_BAR),
     )
-    lower = await add_line_chain(
-        adapter,
-        [
-            (0.0, -HALF_BAR),
-            (TAB_START_X, -HALF_BAR),
-            (TAB_START_X, -TAB_HALF),
-            (TIP_ARC_CX, -TAB_HALF),
-        ],
-        close=False,
+    (lower_bar,) = await add_line_chain(
+        adapter, [(0.0, -HALF_BAR), (TIP_ARC_CX, -HALF_BAR)], close=False
     )
     tip = check(
-        "add_arc tab tip",
+        "add_arc full-round tip",
         await adapter.add_arc(
-            TIP_ARC_CX, 0.0, TIP_ARC_CX, -TAB_HALF, TIP_ARC_CX, TAB_HALF
+            TIP_ARC_CX, 0.0, TIP_ARC_CX, -HALF_BAR, TIP_ARC_CX, HALF_BAR
         ),
     )
-    upper = await add_line_chain(
-        adapter,
-        [
-            (TIP_ARC_CX, TAB_HALF),
-            (TAB_START_X, TAB_HALF),
-            (TAB_START_X, HALF_BAR),
-            (0.0, HALF_BAR),
-        ],
-        close=False,
-    )
+    await add_line_chain(adapter, [(TIP_ARC_CX, HALF_BAR), (0.0, HALF_BAR)], close=False)
     set_sketch_direct_db(adapter, False)
-    # Semantic scheme: bar/tab edges horizontal, steps vertical; the nose
-    # semicircle is pinned by centre-at-origin + radius + both ends on the
-    # Y axis; the tip arc by its centre on the X axis at TIP_ARC_CX +
-    # radius + both ends vertically aligned with its centre. One alignment
-    # ties the lower step to the upper, one dim carries the bar length.
-    lower_bar, lower_step, tab_bottom = lower
-    tab_top, upper_step, upper_bar = upper
-    for edge in (lower_bar, tab_bottom, tab_top, upper_bar):
-        check(f"horizontal {edge}", await adapter.add_sketch_constraint(edge, None, "horizontal"))
-    for edge in (lower_step, upper_step):
-        check(f"vertical {edge}", await adapter.add_sketch_constraint(edge, None, "vertical"))
+    # Semantic scheme: the nose semicircle is pinned by its centre at the
+    # origin and both ends on the Y axis; the tip arc by its centre on the X
+    # axis at TIP_ARC_CX and both ends plumb with that centre, so it is a full
+    # round tangent to the bar edges. The lower edge is horizontal; the upper
+    # one follows from the two arcs (a relation there would be redundant). The
+    # bar height spans the tip's ends.
+    check(
+        f"horizontal {lower_bar}",
+        await adapter.add_sketch_constraint(lower_bar, None, "horizontal"),
+    )
     check(
         "nose centre -> origin",
         await adapter.add_sketch_constraint(f"{nose}.center", "origin", "coincident"),
     )
-    # Dim 1 (emission order): nose radius = HALF_BAR = BarTall / 2.
-    check("nose radius", await adapter.add_sketch_dimension(nose, None, "radial", HALF_BAR))
-    outline.record("NoseRadius", '"BarTall" / 2')
     for point in (f"{nose}.start", f"{nose}.end"):
         check(
             f"{point} on Y axis",
             await adapter.add_sketch_constraint(point, "origin", "vertical_points"),
         )
-    # Dim 2: tip-centre X (on the X axis, +TIP_ARC_CX, so an unsigned distance
-    # that already evaluates positive -- no negation needed).
+    # Dim 1 (emission order): tip-centre X (on the X axis, +TIP_ARC_CX, so an
+    # unsigned distance that already evaluates positive). Driven by the spring
+    # hole's own global: the tip stays concentric with the hole.
     await anchor_point_to_origin(adapter, f"{tip}.center", TIP_ARC_CX, 0.0, "tip centre")
-    outline.record("TipCentreX", '"TipArcCx"')
-    # Dim 3: tip radius.
-    check("tip radius", await adapter.add_sketch_dimension(tip, None, "radial", TIP_RADIUS))
-    outline.record("TipRadius", '"TipRadius"')
+    outline.record("TipCentreX", '"LeverSpringX"')
     for point in (f"{tip}.start", f"{tip}.end"):
         check(
             f"{point} above/below tip centre",
             await adapter.add_sketch_constraint(point, f"{tip}.center", "vertical_points"),
         )
-    check(
-        "tab steps aligned",
-        await adapter.add_sketch_constraint(
-            f"{lower_step}.start", f"{upper_step}.start", "vertical_points"
-        ),
-    )
-    # Dim 4: bar length (TAB_START_X).
+    # Dim 2: bar height, across the tip's two ends.
     await dimension_between(
-        adapter, f"{lower_bar}.start", f"{lower_bar}.end",
-        "horizontal_distance", TAB_START_X, "bar length",
+        adapter, f"{tip}.start", f"{tip}.end", "vertical_distance", BAR_TALL, "bar height"
     )
-    outline.record("BarLength", '"TabStartX"')
+    outline.record("BarHeight", '"BarTall"')
     await ensure_fully_defined(adapter, "lever outline")
     check("exit_sketch outline", await adapter.exit_sketch())
     name_last_feature(adapter, "LeverOutline")
@@ -229,12 +238,10 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "LeverBody")
-    area = (
-        TAB_START_X * BAR_TALL
-        + math.pi * HALF_BAR**2 / 2.0
-        + (TIP_ARC_CX - TAB_START_X) * 2.0 * TAB_HALF
-        + math.pi * TIP_RADIUS**2 / 2.0
-    )
+    (lever_thick_dim,) = name_dimensions(adapter, "LeverBody", ["LeverThick"])
+    drive_jobs.append((lever_thick_dim, '"LeverThickness"'))
+    # Bar plus the two half-discs: the nose and the full-round tip.
+    area = TIP_ARC_CX * BAR_TALL + math.pi * HALF_BAR**2
     expected = area * LEVER_THICKNESS
     await volume_check(adapter, "lever outline", expected, 0.005 * expected)
 
@@ -264,7 +271,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Hub")
-    drive_jobs.append(("D1@Hub", '"HubLength"'))
+    (hub_length_dim,) = name_dimensions(adapter, "Hub", ["HubLength"])
+    drive_jobs.append((hub_length_dim, '"HubLength"'))
     _r, _h = HUB_DIA / 2.0, HALF_BAR
     _half_strip = _h * math.sqrt(_r**2 - _h**2) + _r**2 * math.asin(_h / _r)
     _overlap = _half_strip + math.pi * _h**2 / 2.0
@@ -351,6 +359,33 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven channel lever (equations neutral)", expected, 0.005 * expected)
 
+    # Bands ride natively on the model dimensions the print imports
+    # (drawing-simplicity-policy.md): the reamed fulcrum bore, the plate the
+    # bar's top notch straddles, the hub faces that set the station pitch, and
+    # the two gain arms from the fulcrum bore.
+    set_dimension_bilateral_tolerance(
+        adapter, "FulcrumProfile", "FulcrumDia", *deviations(PIVOT_HOLE_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "Hub", "HubLength", *deviations(HUB_LENGTH_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "LeverBody", "LeverThick", LEVER_THICKNESS_TOLERANCE
+    )
+    set_dimension_symmetric_tolerance(adapter, "BarPinHole", "BarPinCx", BAR_PIN_X_TOLERANCE)
+    set_dimension_symmetric_tolerance(
+        adapter, "SpringHole", "SpringCx", LEVER_SPRING_X_TOLERANCE
+    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    for feature_name, dimension_name in (
+        ("FulcrumProfile", "FulcrumDia"),
+        ("Hub", "HubLength"),
+        ("LeverBody", "LeverThick"),
+        ("BarPinHole", "BarPinCx"),
+        ("SpringHole", "SpringCx"),
+    ):
+        tolerance_at_value_places(adapter, feature_name, dimension_name)
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
@@ -359,21 +394,14 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
-        (
-            "Number", "Material Specification", "Finish", "Quantity",
-            "Manufacturing Notes", "Isometric View Note",
-        ),
+        ("Number", "Material Specification", "Finish", "Quantity", "Isometric View Note"),
     )
     return artefacts
 

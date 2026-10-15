@@ -568,10 +568,7 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     spec = ch_amplitude_bar_spec
     # The restated plate constants are their sources'.
     assert spec.LEVER_THICKNESS == lever.LEVER_THICKNESS
-    lever_print = (
-        f"{lever.LEVER_THICKNESS:.2f} +/-{spec.LEVER_THICKNESS_TOLERANCE:.2f} OVERALL"
-    )
-    assert lever_print in lever.DRAWING_NOTES
+    assert spec.LEVER_THICKNESS_TOLERANCE == lever.LEVER_THICKNESS_TOLERANCE
     assert spec.STRAP_THICKNESS == rocker.ARM_THICKNESS
     # The rocker strap now prints 2.500 +/-0.025 natively (Main ruling
     # 2026-10, option b); the bar keeps the former .XX band, which covers it,
