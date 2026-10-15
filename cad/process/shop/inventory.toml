@@ -61,6 +61,7 @@ resolution_mm = { value = 0.005, measured = { status = "measured", by = "placeho
 # A manual mill moves one handwheel at a time: arcs are cut by the manual-arc methods
 # (stairs or chain drill then filing, chords, rotary table; docs/plan.md "Manual arcs").
 note = "Manual mill with DRO; envelope and travel below are illustrative example values (vendor numbers relabelled)."
+cite = ["PM-30MV manual v3 2020-10 p.5 (https://macclab.com/wp-content/uploads/2022/01/PM-30MV-v3-2020-10.pdf): 2 HP (1.5 kW) brushless DC motor, spindle 50-1500 rpm low range and 1400-3000 rpm high range, R8"]
 
 [machines.PM-30MV.envelope]
 # Basis: machines.PM-30MV.envelope.spindle_to_table_max_in: catalogue-valued placeholder; source nominal 17 in, offset +0 in = 17 in. Source b757b5a76 cad/process/shop/inventory.toml:36 (machines.PM-30MV.envelope.spindle_to_table_max_in); retained item source https://www.precisionmatthews.com/products/pm-30mv. No invented catalogue deviation or actual installed-machine/gauge metrology is claimed.
@@ -97,6 +98,7 @@ drill = 1.25
 end_mill = 0.75
 face_mill = 3.5
 
+# The shop's installed lathe (Pedro 2026-10-15; it replaced the JET BD-920N).
 [machines.PM-1127VF-LB]
 kind = "lathe"
 make = "Precision Matthews"
@@ -109,7 +111,7 @@ compound_travel_in = 3
 weight_lb = 575
 standard_accessories = ["chuck-3jaw-6-d1-4", "chuck-4jaw-6-d1-4", "faceplate-d1-4", "steady_rest", "follow_rest", "thread_dial", "dead_centre_headstock", "dead_centre_tailstock_mt3"]
 # --- pivot-shaft additions ---
-control = "manual; illustrative example item (plausible, not on hand): Electronica EL400 two-axis lathe DRO, X scale on the cross slide, Z scale on the bed"
+control = "manual; Electronica EL400 two-axis lathe DRO, X scale on the cross slide, Z scale on the bed (DRO identity is a #1413 placeholder: confirm the fitted readout)"
 # The DRO grid the sheet prints and the kernel checks (docs/rules-coordinates.md), one step
 # for both axes. With 5 um scales the EL400 shows Z in 0.005 steps but X in diameter mode
 # in 0.01 steps (each cross-slide count is doubled), so the grid is the coarser 0.01: every
@@ -182,6 +184,7 @@ kind = "dividing_head"
 make = "Precision Matthews"
 sku = "DIVIDINGHEAD-BS-0"
 source = "https://www.precisionmatthews.com/products/dividinghead-bs-0"
+note = "installed and usable on the PM-30MV: delivered and commissioned (https://github.com/pedropaulovc/harmonic-analyzer/issues/465)"
 worm_ratio = 40
 centre_height_in = 3.9375
 swing_in = 7.875
