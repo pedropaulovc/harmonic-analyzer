@@ -276,7 +276,7 @@ def _fit_views(draw: Any, views: list[Any], cells: tuple) -> dict[str, tuple[int
 
 
 @_telemetry.traced("drawing.purchased_center_marks")
-def _center_marks_without_lines(views: list[Any], cells: tuple) -> int:
+def _center_marks_without_lines(views: list[Any], cells: tuple) -> dict[str, int]:
     """Drop the extension lines of every template-inserted centre mark.
 
     The template auto-inserts a centre mark on each view of a circle, its arms
@@ -284,10 +284,13 @@ def _center_marks_without_lines(views: list[Any], cells: tuple) -> int:
     view outline the cells fit). Captions sit on the view's vertical axis, so
     those arms struck the FRONT caption and the TOP caption above it (r3
     review, rule 14). The centre cross stays; the reference views need no
-    more. Returns the number of marks changed.
+    more. Even the cross is scaled (8:1 pins: ~20 mm arms), so the count of
+    marks per view tells the caption pass which views to leave at the cell
+    floor.
     """
-    count = 0
+    counts: dict[str, int] = {}
     for view, (name, _, _) in zip(views, cells, strict=True):
+        counts[name] = 0
         mark = view.GetFirstCenterMark2()
         while mark is not None:
             mark = _early_bound(mark, "ICenterMark")
@@ -297,9 +300,9 @@ def _center_marks_without_lines(views: list[Any], cells: tuple) -> int:
                 raise RuntimeError(
                     f"{name}: centre mark still shows its extension lines"
                 )
-            count += 1
+            counts[name] += 1
             mark = mark.GetNext()
-    return count
+    return counts
 
 
 @_telemetry.traced("drawing.purchased_note")
@@ -586,7 +589,7 @@ async def _build_reference_sheet(
             view.UseSheetScale = 0
             view.ScaleRatio = double_array([1.0, 1.0])
     scales = _fit_views(draw, views, cells)
-    _center_marks_without_lines(views, cells)
+    center_marks = _center_marks_without_lines(views, cells)
     scale = scales["*Front"]
 
     with _telemetry.span("drawing.purchased_property_link"):
@@ -639,9 +642,14 @@ async def _build_reference_sheet(
             # Under the view itself, not the cell's floor: a short view in a
             # tall cell (the counter spring's TOP) left its caption stranded
             # mid-field (r4 review, rule 15). The fit keeps outlines in cells,
-            # so this only ever lifts a caption toward its own view.
-            outline = _box(view.GetOutline(), label=name)
-            caption_at = max(outline[1], cell[1]) - _CAPTION_TO_CELL
+            # so this only ever lifts a caption toward its own view. A view
+            # with a centre mark keeps the cell floor: the mark's scaled cross
+            # reaches past the outline and struck lifted captions (r5, 8:1
+            # pins, rule 14).
+            floor = cell[1]
+            if not center_marks[name]:
+                floor = max(_box(view.GetOutline(), label=name)[1], floor)
+            caption_at = floor - _CAPTION_TO_CELL
             note = _literal_note(adapter, caption, center[0], caption_at)
             bounds = _box(note.GetExtent(), label=caption, kind="note")
             annotation = _early_bound(note.GetAnnotation(), "IAnnotation")

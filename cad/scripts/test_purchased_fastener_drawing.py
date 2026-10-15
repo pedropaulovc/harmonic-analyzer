@@ -371,7 +371,12 @@ def test_center_marks_lose_their_extension_lines(monkeypatch):
     first = Mark(second)
     cells = purchased.fastener_view_cells(0.073)
     views = [MarkedView(first), MarkedView(None), MarkedView(None), MarkedView(None)]
-    assert purchased._center_marks_without_lines(views, cells) == 2
+    assert purchased._center_marks_without_lines(views, cells) == {
+        "*Front": 2,
+        "*Top": 0,
+        "*Right": 0,
+        "*Isometric": 0,
+    }
     assert not any(m.ShowLines or m.UseDocDisplaySettings for m in (first, second))
 
     class StuckMark(Mark):
