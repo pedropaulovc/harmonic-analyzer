@@ -307,19 +307,23 @@ def test_clamp_heads_stay_under_the_front_face_at_the_printed_worst_case() -> No
 
 
 def test_clamp_screws_engage_the_back_arc_and_stop_inside_it() -> None:
-    # Head seat -> rest of the bar -> front arc -> threads into the back
-    # arc's through tap (build_pd_paper_drive_assembly's clamp stack), over
-    # the printed depth and thickness bands; the arcs at their nominals.
-    from build_sh_column_clamp_back import DEPTH as back_arc
+    # Head seat -> rest of the bar -> front arc -> the open grip gap (the back
+    # arc's mating face stops GRIP_OFFSET short of the column axis) ->
+    # threads into the back arc's through tap (build_pd_paper_drive_assembly's
+    # clamp stack), over the printed depth and thickness bands; the arcs at
+    # their nominals.
+    from sh_column_clamp_back_geom import BLOCK_DEPTH as back_block
+    from sh_column_clamp_back_geom import GRIP_OFFSET as grip_gap
     from sh_column_clamp_front_geom import ARC_DEPTH as front_arc
     from vn_clamp_screw_spec import SHANK_DIA, SHANK_LEN
 
     shallowest, deepest = _printed_cbore_depth_limits()
     thick = spec.BAR_DEPTH + spec.BAR_DEPTH_BAND
     thin = spec.BAR_DEPTH - spec.BAR_DEPTH_BAND
-    least = SHANK_LEN - (thick - shallowest + front_arc)
-    most = SHANK_LEN - (thin - deepest + front_arc)
+    least = SHANK_LEN - (thick - shallowest + front_arc + grip_gap)
+    most = SHANK_LEN - (thin - deepest + front_arc + grip_gap)
     # Rule 18: 1.5D of thread at the least engagement.
     assert least >= 1.5 * SHANK_DIA
-    # The tip never leaves the back arc, so nothing behind it is reached.
-    assert most < back_arc
+    # The tip never leaves the back arc's tapped block, so nothing behind it
+    # is reached.
+    assert most < back_block
