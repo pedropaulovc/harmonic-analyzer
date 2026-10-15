@@ -55,7 +55,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from ch_channel_lever_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
+from ch_channel_lever_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION, ROOT_CALLOUT
 from ch_channel_lever_spec import (
     BAR_PIN_HOLE_SPEC,
     BAR_PIN_X,
@@ -93,7 +93,7 @@ _BAR_PIN_DIA = blind_cut_dia_mm(BAR_PIN_HOLE_SPEC)
 FRONT_CENTER = (0.150, 0.155)
 TOP_CENTER = (0.150, 0.220)  # above the profile: plate thickness, hub length
 ISO_CENTER = (0.345, 0.215)
-ISO_NOTE_XY = (0.300, 0.172)
+ISO_NOTE_XY = (0.315, 0.185)  # left end: centres the label under the iso
 
 
 def _sheet_x(mx: float) -> float:
@@ -111,6 +111,7 @@ _CLEARANCE_LEAST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]) - (SHAFT_DIA + SHAFT_DI
 _CLEARANCE_MOST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) - (SHAFT_DIA + SHAFT_DIA_BAND[1])
 
 FRONT_CALLOUTS = {
+    "HubDia": ROOT_CALLOUT,
     "FulcrumDia": (
         f"REAM; RUNS ON SHAFT\n{SHAFT_NUMBER},"
         f" {_CLEARANCE_LEAST:.2f}-{_CLEARANCE_MOST:.2f}\nDIAMETRAL CLEARANCE"
@@ -126,25 +127,30 @@ TOP_CALLOUTS = {
 }
 
 FRONT_KEEP = {
-    "HubDia": (0.030, 0.135),
+    # Left of the hub, just above its axis: the leader clears the overall
+    # length's extension line below the hub and crosses the bore at an angle
+    # well away from the REAM leader's.
+    "HubDia": (0.033, 0.165),
     "FulcrumDia": (0.050, 0.190),
-    "BarHeight": (0.262, FRONT_CENTER[1]),
+    # Above the bar, so neither dimension line runs into the text.
+    "BarHeight": (0.262, 0.171),
     "BarPinCx": (_sheet_x(BAR_PIN_X / 2.0), 0.126),
     "SpringCx": (_sheet_x(LEVER_SPRING_X / 2.0 + 25.0), 0.104),
 }
 TOP_KEEP = {
-    "LeverThick": (0.264, TOP_CENTER[1] + 0.006),
-    # Both above the hub, their lines just right of it: a vertical
-    # dimension's text sits left of its line, and left of the hub there is no
-    # room inside the border.  The plate offset is the inner, lower one, so
-    # neither dimension line runs through the other's text.
-    "PlateOffset": (0.075, TOP_CENTER[1] + 0.014),
-    "HubLength": (0.095, TOP_CENTER[1] + 0.034),
+    # Above the plate: its arrows come in from outside the 3.00 span.
+    "LeverThick": (0.264, TOP_CENTER[1] + 0.032),
+    # Both above the hub, their lines just right of it (left of the hub there
+    # is no room inside the border).  Each text runs right from its own line
+    # (r2 render), so the outer (right) line carries the lower text and
+    # neither line runs through the other's text.
+    "HubLength": (0.075, TOP_CENTER[1] + 0.034),
+    "PlateOffset": (0.095, TOP_CENTER[1] + 0.014),
 }
 OVERALL_TEXT_XY = (FRONT_CENTER[0], 0.082)
 BAR_PIN_CALLOUT_XY = (0.170, 0.188)
 SPRING_CALLOUT_XY = (0.240, 0.188)
-BORE_FINISH_SYMBOL = (0.070, 0.134)
+BORE_FINISH_SYMBOL = (0.080, 0.140)
 FINISH_CHAR_HEIGHT = 0.0025
 
 
@@ -299,12 +305,13 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to front view")
 
     # The reamed fulcrum bore is the one running surface (rule 6): Ra on its
-    # lower-right rim, the symbol below the hub, right of the arms' extension
-    # line and clear of the hub's own leader.
+    # rim at 300 degrees, the symbol below-right of the hub: between the REAM
+    # leader (about 240 degrees through the bore) and the hub's (about 345),
+    # right of the arms' extension line.
     bore_rim = model_point_in_view(
         adapter,
         front,
-        (PIVOT_HOLE_DIA / 2000.0 * 0.7071, -PIVOT_HOLE_DIA / 2000.0 * 0.7071, 0.0),
+        (PIVOT_HOLE_DIA / 2000.0 * 0.5, -PIVOT_HOLE_DIA / 2000.0 * 0.8660, 0.0),
         label="fulcrum bore rim",
     )
     add_surface_finish(

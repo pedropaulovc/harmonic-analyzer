@@ -141,8 +141,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     part = _config.parts("ch-channel-lever")
     assert part["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
     assert part["material"] == "LOW-CARBON STEEL OR GRAY IRON"
-    assert part["finish"] == (
-        "RAL 6005 alkyd enamel, SSPC-SP3, 40-60 um DFT; mask all bores;"
-        " oil masked bores after coating"
-    )
+    # A conversion coat, not paint: the hub faces, plate faces and bores
+    # keep their bands with nothing masked (as the rocker arms, MHA-CH-006).
+    assert part["finish"] == "matte black oxide"
     assert int(part["quantity"]) == 20
