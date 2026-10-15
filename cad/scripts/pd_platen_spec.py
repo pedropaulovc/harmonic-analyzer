@@ -36,6 +36,16 @@ SOCKET_BOSS_DIA = 7.0  # wall round the #2-56 major (drawing-guidelines.md rule 
 # build_pd_platen_clip asserts the closure against the live screw and sheet.
 SOCKET_BOSS_H = 1.70
 SOCKET_THREAD_ENGAGEMENT = PLATE_THICKNESS + SOCKET_BOSS_H
+# Each boss meets the back face in a root round up to the tool-nose radius
+# the print allows (r7 review: a bare corner left the root unstated).  It
+# prints as the single limit "4X R0.5 MAX"; swTolMAX prints the nominal, so
+# the model carries the limit (pn_pen_rod_spec's shoulder root).  The round
+# stands 0.5 out from the boss on the back face, where nothing rides
+# (build_pd_paper_drive_assembly's lock-station sweep grows each boss by it).
+SOCKET_BOSS_FILLET_R = 0.5
+# (upper, lower) deviations: the nominal IS the limit, down to sharp.
+SOCKET_BOSS_FILLET_BAND = (0.0, -SOCKET_BOSS_FILLET_R)
+SOCKET_BOSS_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "4X R0.5 MAX"
 # Each socket's distance in from its side edge, on both sides.  The 6.6 clip
 # screw rail (user ruling 2026-10-14) puts the clip's inboard edge at
 # SOCKET_X - HOLE_Y + CLIP_WIDTH; with the recording paper's 14.6 left inset
@@ -50,6 +60,10 @@ SOCKET_XY = (
     (PLATE_WIDTH - SOCKET_X, 58.5104),
     (PLATE_WIDTH - SOCKET_X, 127.6296),
 )
+# The one printed root round: the upper boss nearest the right view's eye
+# (+X), whose root silhouette that view shows; the other three are a second
+# feature on the same global.
+SOCKET_BOSS_FILLET_PRINTED_XY = SOCKET_XY[3]
 
 # Guide-screw through-holes: 2 rows of 5 (heads on the front face, shanks
 # into the guide rails on the back). ONE counterbored #4 fillister Hole
@@ -102,6 +116,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Plate": {"Depth"},
     "SocketBossProfile": {"Boss2Dia"},
     "SocketBosses": {"BossH"},
+    "SocketBossFillet": {"BossFilletR"},
     "Sockets": {"Socket1X", "Socket1Y", "Socket2Y", "Socket3X"},
     "GuideHoles": {
         "Guide1X",
@@ -119,7 +134,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # assembly's disc-to-platen air budget (the back face rides the bar, so the
 # thickness sets the front face).  The boss Ø and height print .X: the boss
 # keeps its wall round the tap (SOCKET_BOSS_WALL_MIN) and the clip-screw
-# engagement through plate and boss stays far above 1.5D at that band.  Every
+# engagement through plate and boss stays far above 1.5D at that band; the
+# root round prints its single limit (no band to spend) at .X.  Every
 # hole coordinate is spent by the fixed-screw float over the clip's and the
 # guides' patterns (test_pd_platen_refit): all .XXX.  The counterbore floor is
 # a reference dimension.
@@ -129,6 +145,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Plate": {"Depth": 3},
     "SocketBossProfile": {"Boss2Dia": 1},
     "SocketBosses": {"BossH": 1},
+    "SocketBossFillet": {"BossFilletR": 1},
     "Sockets": {name: POSITION_PLACES for name in DRAWING_DIMENSIONS["Sockets"]},
     "GuideHoles": {name: POSITION_PLACES for name in DRAWING_DIMENSIONS["GuideHoles"]},
     "CboreFloorReference": {"CboreFloor": 2},

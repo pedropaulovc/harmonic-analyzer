@@ -9,7 +9,8 @@ build_pd_platen_guide.py). Fastener holes:
 * four clip-screw #2-56 through receivers at the resized plate's extreme
   left/right edges (x 4.5/265.14), matching the resized clips'
   7.1904-inset end holes at local y 29.6604/127.6296, each tapped on
-  through a Ø7 x 1.70 boss on the back face for >= 1.5D engagement;
+  through a Ø7 x 1.70 boss on the back face for >= 1.5D engagement, each
+  boss rounded into the face at its R0.5 MAX root;
 * ten #4 loose (Ø3.658) counterbored guide-screw through-holes in two rows
   of 5 (ch22 front photo) at the guide rail centrelines: bottom row y 13,
   top row y 47 (machine 318 / 352 with the plate at y 305).
@@ -42,9 +43,10 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _extrude import extrude_at_offset
 from _feature_tree import _feature_by_name, name_last_feature
+from _fit_deviations import deviations
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -82,6 +84,10 @@ from pd_platen_spec import (
     PLATE_WIDTH,
     RIGHT_VIEW_NOTE,
     SOCKET_BOSS_DIA,
+    SOCKET_BOSS_FILLET_BAND,
+    SOCKET_BOSS_FILLET_PRINTED_XY,
+    SOCKET_BOSS_FILLET_R,
+    SOCKET_BOSS_FILLET_TOL_TYPE,
     SOCKET_BOSS_H,
     SOCKET_SPEC,
     SOCKET_THREAD_ENGAGEMENT,
@@ -129,6 +135,36 @@ GUIDE_PLACEMENT = [
 ]
 if [(x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X] != list(GUIDE_HOLE_XY):
     raise AssertionError("guide-hole placement assumes the y-major GUIDE_HOLE_XY order")
+
+
+def _boss_fillet_max_limit(adapter) -> None:
+    """BossFilletR as a MAX single limit carrying the band's deviations
+    (build_pn_pen_rod._shoulder_fillet_max_limit's recipe): the native type
+    prints the nominal, so the nominal is the limit."""
+    lower, upper = deviations(SOCKET_BOSS_FILLET_BAND)
+    _, dimension = _named_dimension(adapter, "SocketBossFillet", "BossFilletR")
+    label = "BossFilletR@SocketBossFillet"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, SOCKET_BOSS_FILLET_R / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
+            f"{SOCKET_BOSS_FILLET_R}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = SOCKET_BOSS_FILLET_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != SOCKET_BOSS_FILLET_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {SOCKET_BOSS_FILLET_R:g} MAX")
 
 
 def _plane_frame(adapter, name: str) -> tuple[tuple[float, ...], tuple[float, ...]]:
@@ -202,6 +238,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PlateThickness", f"{PLATE_THICKNESS}mm")
     await set_global(adapter, "SocketBossDia", f"{SOCKET_BOSS_DIA}mm")
     await set_global(adapter, "SocketBossH", f"{SOCKET_BOSS_H}mm")
+    await set_global(adapter, "SocketBossFilletR", f"{SOCKET_BOSS_FILLET_R}mm")
     # The counterbore depth the guide Hole Wizard override cuts; only the
     # drawing's floor reference reads it.
     await set_global(adapter, "CounterBoreDepth", f"{CBORE_DEPTH}mm")
@@ -283,6 +320,44 @@ async def build(adapter) -> dict[str, str]:
     v_bosses = len(SOCKET_XY) * math.pi * (SOCKET_BOSS_DIA / 2.0) ** 2 * SOCKET_BOSS_H
     await volume_check(
         adapter, "plate with socket bosses", v_plate + v_bosses, 0.05 * v_bosses
+    )
+
+    # Boss roots: each boss rounds into the back face at the R MAX limit the
+    # print allows, picked on its root circle at +X (the only edge through
+    # that point).  The printed one is its own feature, the boss whose root
+    # silhouette the right view shows (pd_platen_spec); the other three share
+    # the global.
+    others = [xy for xy in SOCKET_XY if xy != SOCKET_BOSS_FILLET_PRINTED_XY]
+    if len(others) != len(SOCKET_XY) - 1:
+        raise AssertionError("the printed boss root must be one of the bosses")
+    fillet_jobs = []
+    for feature, dimension, stations in (
+        ("SocketBossFillet", "BossFilletR", [SOCKET_BOSS_FILLET_PRINTED_XY]),
+        ("SocketBossFillets", "BossFilletsR", others),
+    ):
+        check(
+            f"fillet {feature}",
+            await adapter.add_fillet(
+                SOCKET_BOSS_FILLET_R,
+                [[x + SOCKET_BOSS_DIA / 2.0, y, PLATE_THICKNESS] for x, y in stations],
+            ),
+        )
+        name_last_feature(adapter, feature)
+        fillet_dim = name_dimensions(adapter, feature, [dimension])
+        fillet_jobs += [(fillet_dim[0], '"SocketBossFilletR"')]
+    drive_jobs += fillet_jobs
+    # Pappus: the corner spandrel r^2 (1 - pi/4), its centroid r (10 - 3 pi) /
+    # (3 (4 - pi)) out from the boss surface, revolved about each boss axis.
+    spandrel = SOCKET_BOSS_FILLET_R**2 * (1.0 - math.pi / 4.0)
+    spandrel_r = SOCKET_BOSS_DIA / 2.0 + SOCKET_BOSS_FILLET_R * (
+        10.0 - 3.0 * math.pi
+    ) / (3.0 * (4.0 - math.pi))
+    v_fillets = len(SOCKET_XY) * 2.0 * math.pi * spandrel_r * spandrel
+    await volume_check(
+        adapter,
+        "socket boss root fillets",
+        v_plate + v_bosses + v_fillets,
+        0.25 * v_fillets,
     )
 
     # Clip-screw receivers: ONE native Hole Wizard #2-56 through-tapped
@@ -400,7 +475,7 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
     # value, so the geometry must not move).
-    v_final = v_plate + v_bosses - v_sockets - v_guide
+    v_final = v_plate + v_bosses + v_fillets - v_sockets - v_guide
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
@@ -421,6 +496,7 @@ async def build(adapter) -> dict[str, str]:
     # the guidelines`), then mark exactly the print's dimensions (the drawing
     # imports the marked set and must find every one) and stamp the view notes.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _boss_fillet_max_limit(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

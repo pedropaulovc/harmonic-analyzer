@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import pytest
 
@@ -20,6 +21,7 @@ from vn_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 # ASME B landscape field and title block (sheet metres).
 BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 TITLE_BLOCK = (0.216, 0.0127, 0.4191, 0.066)
+CAD_SCRIPTS = Path(__file__).resolve().parent
 # Half extent of one printed dimension value (about 2.5 mm a character).
 TEXT_HALF_H = 0.002
 
@@ -80,15 +82,61 @@ def test_places_follow_what_each_dimension_holds():
         spec.DRAWING_DIMENSIONS["Sockets"] | spec.DRAWING_DIMENSIONS["GuideHoles"]
     )
     assert {places[name] for name in stations} == {3}
-    # The thickness is spent by the disc-to-platen air and says so on the sheet.
+    # The thickness is spent by the disc-to-platen air and says so on the
+    # sheet, naming the reducer disc by its registry number (r7 review).
     assert places["Depth"] == 3
-    assert "Depth" in draw.DIMENSION_CALLOUTS_ABOVE
+    depth_callout = draw.DIMENSION_CALLOUTS_ABOVE["Depth"]
+    assert draw.DISC_NUMBER == _config.parts("pd-rack-pinion")["number"]
+    assert draw.DISC_NUMBER in depth_callout
+    # An above-callout line break would not print.
+    assert "\n" not in depth_callout
     # The boss prints .X and still keeps its wall round the tap at that band.
     assert places["BossH"] == places["Boss2Dia"] == 1
     assert spec.SOCKET_BOSS_WALL_MIN == pytest.approx(
         (spec.SOCKET_BOSS_DIA - printed_band_mm(1)) / 2.0 - 2.184 / 2.0
     )
     assert spec.SOCKET_BOSS_WALL_MIN >= 2.0
+
+
+def test_boss_roots_print_a_single_max_limit_on_the_right_view():
+    # r7 review: the 4X tap bosses' root corner was unstated.  Each takes the
+    # tool-nose round up to R0.5, printed "4X R0.5 MAX": swTolMAX prints the
+    # nominal, so the model carries the limit and its band runs down to sharp.
+    assert spec.SOCKET_BOSS_FILLET_R == 0.5
+    assert spec.SOCKET_BOSS_FILLET_BAND == (0.0, -spec.SOCKET_BOSS_FILLET_R)
+    assert spec.SOCKET_BOSS_FILLET_TOL_TYPE == 6  # swTolMAX
+    assert spec.DRAWING_DIMENSIONS["SocketBossFillet"] == {"BossFilletR"}
+    places = spec.DRAWING_PRECISION_BY_NAME["BossFilletR"]
+    assert round(spec.SOCKET_BOSS_FILLET_R, places) == spec.SOCKET_BOSS_FILLET_R
+    assert draw.DIMENSION_PREFIXES["BossFilletR"] == "4X R"
+    assert "BossFilletR" in draw.RIGHT_KEEP
+    # The printed round is the upper boss nearest the right view's eye (+X);
+    # the build rounds it alone and the other three in a second feature, both
+    # on one global, each picked on its root circle at the back face.
+    assert spec.SOCKET_BOSS_FILLET_PRINTED_XY == (
+        max(x for x, _ in spec.SOCKET_XY),
+        max(y for _, y in spec.SOCKET_XY),
+    )
+    source = (CAD_SCRIPTS / "build_pd_platen.py").read_text(encoding="utf-8")
+    assert '("SocketBossFillet", "BossFilletR", [SOCKET_BOSS_FILLET_PRINTED_XY])' in (
+        source
+    )
+    assert "_boss_fillet_max_limit(adapter)" in source
+    assert '"SocketBossFilletR", f"{SOCKET_BOSS_FILLET_R}mm"' in source
+    # The text stands up-left of the upper boss's root, left of its end face
+    # (half of ~28 mm of text) and under the thickness's outside arrow.
+    x, y = draw.RIGHT_KEEP["BossFilletR"]
+    boss_end_x = draw._right_x(spec.PLATE_THICKNESS + spec.SOCKET_BOSS_H)
+    assert x + 0.014 < boss_end_x - 0.002
+    root_y = draw._right_y(max(y for _, y in spec.SOCKET_XY) + spec.SOCKET_BOSS_DIA / 2)
+    assert abs(y - root_y) < 0.003
+    assert y + TEXT_HALF_H < 0.2458 - 0.002
+    # Nothing rides the back face there: the assembly's boss sweep grows each
+    # boss by the round's foot.
+    assembly_source = (CAD_SCRIPTS / "build_pd_paper_drive_assembly.py").read_text(
+        encoding="utf-8"
+    )
+    assert "PLATEN_SOCKET_BOSS_DIA / 2.0 + PLATEN_BOSS_FILLET_R" in assembly_source
 
 
 def test_counterbore_floor_holds_the_user_accepted_worst_case():
