@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 import _config
 import build_ch_pivot_bracket as part
 import ch_pivot_bracket_drawing_spec as drawing_spec
@@ -147,14 +149,52 @@ def test_bore_callout_names_the_mating_pivot_shaft() -> None:
     )
 
 
-def test_the_only_note_is_the_spec_owned_engagement_fact() -> None:
-    assert drawing.ENGAGEMENT_NOTE == spec.SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT
-    # It restates the spec's own full-thread minimum, at two places.
-    assert f"{spec.SET_SCREW_FULL_THREAD_MIN:.2f} MIN" in drawing.ENGAGEMENT_NOTE
+def test_every_banded_length_says_what_its_band_holds() -> None:
+    """A band tighter than the title block names its reason at the dimension;
+    the hold-down station names the support it lands on."""
+    banded = {name for _feature, name in model_toleranced_dimensions(part)}
+    assert banded <= set(drawing.DIMENSION_CALLOUTS)
+    support = _config.parts("fr-rocker-arm-support")["number"]
+    assert drawing.DIMENSION_CALLOUTS["HoleStation"] == f"ON {support} SEAT"
+    for name in ("FootLen", "EarThick", "SetScrewLocation"):
+        assert not re.search(r"\d", drawing.DIMENSION_CALLOUTS[name]), name
+
+
+# The native definitions of a through-next 4-40 Hole Wizard tap, as the
+# fleet's TAP-prefixed callouts carry them (part 5 the thread, part 7 the
+# tap drill).
+_NATIVE_TAP = {
+    5: "TAP <hw-threaddesc> - <hw-threadclass> <hw-thru>",
+    6: "",
+    7: "<MOD-DIAM><hw-thrutapdrldia> <hw-thru>",
+    8: "",
+}
+
+
+def test_tap_callout_says_to_bore_and_states_its_engagement() -> None:
+    updated = drawing.set_screw_callout_definitions(dict(_NATIVE_TAP))
+    assert updated[7] == "<MOD-DIAM><hw-thrutapdrldia> TO BORE"
+    assert updated[5] == (
+        f"TAP <hw-threaddesc> TO BORE\n{spec.SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}"
+    )
+    joined = "\n".join(updated.values())
+    # Every Hole Wizard size variable survives; the class and THRU are gone.
+    assert "<hw-threaddesc>" in joined and "<hw-thrutapdrldia>" in joined
+    assert "<hw-threadclass>" not in joined and "<hw-thru>" not in joined
+    # The engagement is the spec's own full-thread minimum, a plain fact.
+    fact = drawing.SET_SCREW_QUALIFIER
+    assert f"{spec.SET_SCREW_FULL_THREAD_MIN:.2f} MIN" in fact
     for word in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY"):
-        assert word not in drawing.ENGAGEMENT_NOTE
-    assert drawing.SET_SCREW_PROCESS == "TAP TO BORE"
-    assert not re.search(r"\d", drawing.SET_SCREW_PROCESS)
+        assert word not in fact
+
+
+def test_tap_callout_rewrite_refuses_an_unexpected_native_format() -> None:
+    blind = {**_NATIVE_TAP, 5: "TAP <hw-threaddesc> <hw-threadclass> <hw-depth>"}
+    with pytest.raises(RuntimeError, match="two native extents"):
+        drawing.set_screw_callout_definitions(blind)
+    no_class = {**_NATIVE_TAP, 5: "TAP <hw-threaddesc> <hw-thru>"}
+    with pytest.raises(RuntimeError, match="not in one callout part"):
+        drawing.set_screw_callout_definitions(no_class)
 
 
 def test_foot_seat_is_the_one_finish_controlled_face() -> None:
@@ -189,7 +229,6 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
         "isometric view": drawing.ISO_CENTER,
         "set-screw callout": drawing.SET_SCREW_CALLOUT_XY,
         "overall height": drawing.OVERALL_HEIGHT_XY,
-        "engagement note": drawing.ENGAGEMENT_NOTE_XY,
     }
     for label, (x, y) in anchors.items():
         assert _FRAME_M < x < template.width_m - _FRAME_M, label
@@ -199,16 +238,18 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
         ), f"{label} is inside the title block"
 
 
-def test_apex_tap_callout_fits_above_the_plan() -> None:
+def test_apex_tap_callout_fits_above_the_plan_between_the_lanes() -> None:
     from _drawing_annotation_extent import CLEAR_GAP_M
     from _layout_geometry import estimate_text_box
 
     # The native callout font as MHA-DT-002 printed it (cap 3.5 mm,
     # 109.7 mm per 42 glyphs, lines 16.8 pt apart).
-    drill = f"Ø{blind_cut_dia_mm(spec.SET_SCREW_HOLE_SPEC):.2f} THRU"
-    thread = f"{drawing.SET_SCREW_PROCESS} 4-40 UNC - 2B THRU"
+    drill = (
+        f"Ø{blind_cut_dia_mm(spec.SET_SCREW_HOLE_SPEC):.2f} {drawing.SET_SCREW_EXTENT}"
+    )
+    thread = f"{drawing.SET_SCREW_PROCESS} 4-40 UNC {drawing.SET_SCREW_EXTENT}"
     box = estimate_text_box(
-        f"{drill}\n{thread}",
+        f"{drill}\n{thread}\n{drawing.SET_SCREW_QUALIFIER}",
         anchor=drawing.SET_SCREW_CALLOUT_XY,
         height=0.0035,
         reference=2,  # swCENTER
@@ -218,9 +259,15 @@ def test_apex_tap_callout_fits_above_the_plan() -> None:
     template = DRAWING_TEMPLATES[DRAWINGS_BY_NAME["ch_pivot_bracket"].layout]
     assert box.xmin >= _FRAME_M + CLEAR_GAP_M
     assert box.ymax <= template.height_m - _FRAME_M - CLEAR_GAP_M
-    # Wholly above the plan's top edge and the left lanes' extension lines
-    # drawn off it.
+    # Wholly above the plan's top edge and every extension line drawn off it.
     assert box.ymin >= drawing._top_y(spec.FOOT_Z0) + CLEAR_GAP_M
+    # Its leader drops from the block's east end to the tap's east rim: east
+    # of the plan centre (where the hole station's witness ends) and west of
+    # the east edge (where the right lanes' witnesses start).
+    assert drawing.TOP_CENTER[0] < box.xmax < drawing._EAST_X
+    # Clear of the tap station's text above its span.
+    set_screw_text_x = drawing.TOP_KEEP["SetScrewLocation"][0]
+    assert box.xmax + 0.015 < set_screw_text_x
 
 
 def test_tap_note_solidworks_adds_is_removed() -> None:
