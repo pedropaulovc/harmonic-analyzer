@@ -13,7 +13,7 @@ to the bore (datum A) over the face the arm seats on: the sheet carries
 those two frames.
 
 Local frame: lathe axis +Z, origin on the axis at the face that bears on the
-bar (the FRONT face, machine z -129.9); the rear face (on the arm) at
+bar (the FRONT face, machine z -129.4); the rear face (on the arm) at
 z = LENGTH.  Front Plane (z = 0) and the RearFace plane (z = LENGTH) are the
 mating planes, Axis1 the bore axis.
 """
@@ -37,8 +37,11 @@ BORE_DIA_BAND = (0.008, 0.0)  # (upper, lower) deviations, reamed
 BORE_DIA_MAX = round(BORE_DIA + BORE_DIA_BAND[0], 6)
 BORE_DIA_MIN = round(BORE_DIA + BORE_DIA_BAND[1], 6)
 BORE_CALLOUT = "REAM THRU"
-LENGTH = 5.5
-LENGTH_BAND = 0.05  # spring room 0.70..0.95 with the floor and shoulder
+# 5.0: the bar grew 0.5 rearward under the arm (user ruling 2026-10-15), so
+# the ring gives it up and the hanger stays put; the MHA-VN-069 shim under the
+# screw head restores the spring room (transgear_hanger_joints).
+LENGTH = 5.0
+LENGTH_BAND = 0.05  # spring room 0.70..1.00 with the floor, shoulder and shim
 # (loosest, tightest): the smallest shoulder in the largest ream, and the
 # reverse.
 _SHOULDER_DIA_MIN = SCREW.SHOULDER_DIA + SCREW.SHOULDER_DIA_LIMITS[0]

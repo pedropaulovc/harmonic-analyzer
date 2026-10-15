@@ -600,8 +600,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 3.454,
                 7.9375,
             ),
+            # MHA-VN-041 through the bar's through tap: the fitted 9.15 thread
+            # less the 1.1938 neck flat.
             frozenset(("vn-transgear-pivot-screw-1", "pd-support-bar-1")): _annulus_limit(
-                4.1656, 3.454, 3.5687
+                4.1656, 3.454, 7.9562
             ),
             **_expected_numbered_pairs(
                 "vn-latch-hook-bracket-screw",
@@ -625,9 +627,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 6.0 - 1.70,
             ),
             # R9-71: MHA-PD-020's Ø4.727 ream pressed on MHA-VN-041's Ø4.7625
-            # shoulder over its 5.5 length.
+            # shoulder over its 5.0 length.
             frozenset(("pd-transgear-pivot-spacer-1", "vn-transgear-pivot-screw-1")): (
-                _annulus_limit(4.7625, 4.727, 5.5)
+                _annulus_limit(4.7625, 4.727, 5.0)
             ),
             # MHA-VN-047's three prong arcs, atan(3/4) of the turn each, at the
             # Ø2.8956 free diameter inside the MHA-PD-023 Ø2.9464 groove floor.

@@ -1,16 +1,13 @@
 vn-transgear-pivot-screw:
   title: Transgear Pivot Screw
   number: MHA-VN-041
-  stock_name: Slotted 18-8 Stainless Steel Precision Shoulder Screw
+  stock_name: Transgear Pivot Screw (18-8 Stainless Socket Shoulder Screw, Faced to Fit)
   supplier: McMaster-Carr
-  supplier_skus: [91829A205]
-  material: 18-8 stainless steel
-  material_specification: "18-8 stainless steel, passivated, slotted precision shoulder screw; McMaster-Carr 91829A205"
-  finish: passivated
-  installation_notes: |-
-    INSTALLATION - THROUGH MHA-PD-020 AND MHA-PD-018 INTO THE MHA-PD-007 BLIND TAP.
-    #8-32 THREAD ENGAGEMENT 0.72D NOMINAL, 0.52D MIN.
-    USE LOW-STRENGTH THREADLOCKER.
+  supplier_skus: [90325A174]
+  material: 18-8 STAINLESS (AS SUPPLIED)
+  material_specification: "18-8 stainless steel, McMaster-Carr 90325A174"
+  finish: AS SUPPLIED; DEBURR FACED END
+  purchased_note: PURCHASED SCREW McMASTER 90325A174; HEAD AND SHOULDER UNMODIFIED
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance

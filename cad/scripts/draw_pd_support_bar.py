@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the platen support bar (MHA-PD-007).
 
 A 452 x 28 x 9 steel bar clamped across the frame columns. Its BACK face
-carries the transgear pivot's flat-bottomed #8-32 tap and the latch hook's two
+carries the transgear pivot's #8-32 through tap and the latch hook's two
 #4-40 through taps on one row; its FRONT face, which the platen slides on,
 carries the four clamp screws: two counterbored holes on the east column and
 two counterbored slots on the west one (owner ruling 2026-10-15, option A).
@@ -22,8 +22,8 @@ two counterbored slots on the west one (owner ruling 2026-10-15, option A).
   counterbore's widths and travels, the slot's width naming why it is one.
   Section B-B cuts the inner slot across the bar for the counterbore's depth.
 * Each face view carries its caption; section A-A cuts the pivot tap across
-  the bar: the banded thickness, the drill's depth limits and the full
-  thread's MIN (PivotThreadReference, in the cutting plane).
+  the bar: the banded thickness and the tap's countersunk mouths on both
+  faces.
 
 Every value and band is a native model dimension authored by
 ``build_pd_support_bar``; the sheet only places and curates them.
@@ -265,18 +265,12 @@ SLOT_DEPTH_RISE = 0.005
 SLOT_DEPTH_TEXT_SIDE = 0.006
 CALLOUTS_ABOVE = ("ClampSlotCboreDepth",)
 
-# Section A-A: the thickness up-left of the cut bar, the full thread and the
-# drill depth below it (shorter nearer). Each text stands outside its
-# extension lines, beyond the tap's mouth, since the 2:1 spans are narrower
-# than the texts. The caption drops under them.
-SECTION_KEEP_NAMES = ("Depth", "ThreadMin", "DrillDepth")
+# Section A-A: the thickness up-left of the cut bar, its text outside the
+# extension lines since the 2:1 span is narrower than it. The caption drops
+# under the section.
+SECTION_KEEP_NAMES = ("Depth",)
 SECTION_DEPTH_RISE = 0.010
 SECTION_DEPTH_SIDE = 0.028
-SECTION_DEPTH_TEXT_SIDE = 0.016
-# The full thread's text states its 1.5D shortfall, so it stands further out.
-SECTION_THREAD_TEXT_SIDE = 0.026
-SECTION_THREAD_DROP = 0.010
-SECTION_DRILL_DROP = 0.027
 CAPTION_DROP = 0.035
 SECTION_OVERRUN = 3.0  # mm the cutting line runs past each long edge
 
@@ -316,26 +310,17 @@ def _turn_y_up(adapter: Any, view: Any, *, label: str) -> None:
 
 
 def _section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, float]]:
-    """Section A-A's text positions from its own projection, whichever way the
-    cut looks: the thickness left of the bar's left face, the depths beyond
-    the tap's mouth."""
+    """Section A-A's text position from its own projection, whichever way the
+    cut looks: the thickness left of the bar's left face."""
 
     def point(z: float, y: float = HANGER_TAP_Y) -> tuple[float, float]:
         return _sheet(adapter, section, (PIVOT_TAP_X, y, z), "section A-A")
 
     top = point(0.0, BAR_HEIGHT / 2.0)[1]
-    bottom = point(0.0, -BAR_HEIGHT / 2.0)[1]
     mouth = point(BACK_FACE_Z)[0]
     front = point(-BACK_FACE_Z)[0]
-    away = math.copysign(1.0, mouth - front)
-    outside = mouth + away * SECTION_DEPTH_TEXT_SIDE
     return {
         "Depth": (min(mouth, front) - SECTION_DEPTH_SIDE, top + SECTION_DEPTH_RISE),
-        "ThreadMin": (
-            mouth + away * SECTION_THREAD_TEXT_SIDE,
-            bottom - SECTION_THREAD_DROP,
-        ),
-        "DrillDepth": (outside, bottom - SECTION_DRILL_DROP),
     }
 
 
@@ -760,35 +745,27 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
 
-    # Section A-A cuts down the pivot axis across the whole height; its
-    # full-thread line lies in the cutting plane and is shown while it is cut.
-    with hidden_sketches.part_sketches_shown(
+    # Section A-A cuts down the pivot axis across the whole height.
+    reach = BAR_HEIGHT / 2.0 + SECTION_OVERRUN
+    section = create_section_view(
         adapter,
-        source_model,
-        ("PivotThreadReference",),
-        label="pivot section",
-        base_view=face,
-    ):
-        reach = BAR_HEIGHT / 2.0 + SECTION_OVERRUN
-        section = create_section_view(
-            adapter,
-            face,
-            line_start=_sheet(adapter, face, (PIVOT_TAP_X, reach, 0.0), "cut top"),
-            line_end=_sheet(adapter, face, (PIVOT_TAP_X, -reach, 0.0), "cut foot"),
-            view_xy=SECTION_CENTER,
-            section_label="A",
-            scale=SECTION_SCALE,
-            label="section A-A",
-        )
-        _turn_y_up(adapter, section, label="section A-A")
-        set_hidden_lines_removed(adapter, section)
-        section_annotations = hidden_sketches.curate_view_dimensions(
-            adapter,
-            section,
-            keep=_section_keep(adapter, section),
-            view_label="section A-A",
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        )
+        face,
+        line_start=_sheet(adapter, face, (PIVOT_TAP_X, reach, 0.0), "cut top"),
+        line_end=_sheet(adapter, face, (PIVOT_TAP_X, -reach, 0.0), "cut foot"),
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=SECTION_SCALE,
+        label="section A-A",
+    )
+    _turn_y_up(adapter, section, label="section A-A")
+    set_hidden_lines_removed(adapter, section)
+    section_annotations = hidden_sketches.curate_view_dimensions(
+        adapter,
+        section,
+        keep=_section_keep(adapter, section),
+        view_label="section A-A",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
 
     # The west slots: detail C face-on at the outer one (a cropped model
     # view, dimensioned before its crop), section B-B across the inner one

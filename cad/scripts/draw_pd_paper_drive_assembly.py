@@ -72,6 +72,7 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
 )
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
@@ -84,6 +85,7 @@ from _drawing_view_configuration import (
     set_view_exploded_state,
     view_configuration,
 )
+from _drawing_view_display import set_hidden_lines_visible
 from _pd_paper_drive_explode import exploded_view_name
 from _session import run_build
 import _telemetry
@@ -92,6 +94,7 @@ import pd_paper_drive_assembly_steps as steps
 import pd_paper_drive_explode_spec as explode
 import pd_platen_guide_spec as platen_guide
 import pd_platen_spec as platen
+import pd_support_bar_spec as support_bar
 import pd_transgear_arm_geometry as arm_geometry
 import pd_transgear_disc_hub_geometry as hub_geometry
 import pd_transgear_disc_hub_spec as hub
@@ -227,6 +230,51 @@ SHEET_TWO_RING_LIMITS = (0.185, 0.090, 0.415, 0.262)
 BALLOON_RING_REACH = BALLOON_MARGIN + 0.005
 SHEET_TWO_RING_GAP = 0.004
 INNER_CAPTION_GAP = 0.002
+# The hanger pivot (step 13, rule 23) in sheet 2's empty left field, clear of
+# the inner view's ring (SHEET_TWO_RING_LIMITS[0]): the *Top view, cropped to
+# a circle on the MHA-VN-041 axis, showing only the pivot stack, hidden lines
+# shown so the screw's thread and faced tip read inside the bar. A *Top view
+# puts machine -Z (the bar's front face) up the sheet; the stake note sits
+# above the circle and the caption below it. Points are in the screw's part
+# frame (mm): the head's underside at y 0, the shoulder down -Y seated on the
+# bar's back face, so the bar's front face is SHOULDER_LEN + BAR_DEPTH down.
+PIVOT_VIEW_ORIENTATION = "*Top"
+PIVOT_VIEW_SCALE = (3.0, 1.0)
+PIVOT_VIEW_CENTER = (0.100, 0.180)
+PIVOT_VIEW_RADIUS_MM = 15.0
+PIVOT_VIEW_RADIUS = (
+    PIVOT_VIEW_RADIUS_MM * PIVOT_VIEW_SCALE[0] / PIVOT_VIEW_SCALE[1] / 1000.0
+)
+PIVOT_SCREW_INSTANCE = "vn-transgear-pivot-screw-1"
+PIVOT_VIEW_INSTANCES = frozenset(
+    {
+        "pd-support-bar-1",
+        PIVOT_SCREW_INSTANCE,
+        "vn-transgear-pivot-shim-1",
+        "vn-transgear-pivot-spring-1",
+        "pd-transgear-pivot-spacer-1",
+        "pd-transgear-arm-1",
+    }
+)
+PIVOT_FRONT_FACE_Y = -(pivot_screw.SHOULDER_LEN + support_bar.BAR_DEPTH)
+PIVOT_VIEW_CENTRE_MM = (0.0, (pivot_screw.HEAD_H + PIVOT_FRONT_FACE_Y) / 2.0, 0.0)
+# The stake's leader lands on the front face's edge at the tap mouth's rim.
+PIVOT_MOUTH_MM = (support_bar.PIVOT_TAP_CSK_DIA / 2.0, PIVOT_FRONT_FACE_Y, 0.0)
+if (pivot_screw.HEAD_H - PIVOT_FRONT_FACE_Y) / 2.0 + 1.0 > PIVOT_VIEW_RADIUS_MM:
+    raise AssertionError("the pivot view's circle must frame head to front face")
+PIVOT_VIEW_REF = f"PIVOT VIEW, SHEET {SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}"
+PIVOT_STAKE_NOTE = "STAKE THE TAP MOUTH ONTO\nTHE SCREW TIP AT 2 POINTS"
+PIVOT_STAKE_NOTE_XY = (0.030, 0.255)
+PIVOT_CAPTION = (
+    f"PIVOT VIEW {PIVOT_VIEW_SCALE[0]:g}:{PIVOT_VIEW_SCALE[1]:g} FROM ABOVE, "
+    "HIDDEN\nLINES SHOWN: THE HANGER PIVOT AS FITTED\nIN STEP "
+    f"{steps.step_number('hanger-pivoted')}"
+)
+PIVOT_CAPTION_XY = (
+    PIVOT_VIEW_CENTER[0] - PIVOT_VIEW_RADIUS,
+    PIVOT_VIEW_CENTER[1] - PIVOT_VIEW_RADIUS - 0.006,
+)
+CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 
 # --- sheet 3: the platen-and-support steps, the ballooned exploded view -----
 # The builder's PAPER_DRIVE_EXPLODED shows only these families here. No run
@@ -305,6 +353,7 @@ BOM_PART_NUMBERS = {
     "pd-transgear-pivot-spacer": _config.parts("pd-transgear-pivot-spacer")["number"],
     "vn-transgear-pivot-screw": _config.parts("vn-transgear-pivot-screw")["number"],
     "vn-transgear-pivot-spring": _config.parts("vn-transgear-pivot-spring")["number"],
+    "vn-transgear-pivot-shim": _config.parts("vn-transgear-pivot-shim")["number"],
     "vn-transgear-latch-pin": _config.parts("vn-transgear-latch-pin")["number"],
     "vn-latch-hook-bracket-screw": _config.parts("vn-latch-hook-bracket-screw")["number"],
     "pd-latch-hook": _config.parts("pd-latch-hook")["number"],
@@ -345,6 +394,9 @@ _SKU = {
     "vn-transgear-pivot-spring": _config.parts("vn-transgear-pivot-spring")["supplier_skus"][
         0
     ],
+    "vn-transgear-pivot-shim": _config.parts("vn-transgear-pivot-shim")[
+        "supplier_skus"
+    ][0],
     "vn-transgear-latch-pin": _config.parts("vn-transgear-latch-pin")["supplier_skus"][0],
     "vn-latch-hook-bracket-screw": _config.parts("vn-latch-hook-bracket-screw")[
         "supplier_skus"
@@ -404,6 +456,7 @@ BOM_DESCRIPTIONS = {
     "vn-transgear-pivot-spring": (
         f"CURVED DISC SPRING, MCMASTER {_SKU['vn-transgear-pivot-spring']}"
     ),
+    "vn-transgear-pivot-shim": f"SHIM WASHER, MCMASTER {_SKU['vn-transgear-pivot-shim']}",
     "vn-transgear-latch-pin": f"DOWEL PIN, MCMASTER {_SKU['vn-transgear-latch-pin']}",
     "vn-latch-hook-bracket-screw": (
         f"FILLISTER SCREW, MCMASTER {_SKU['vn-latch-hook-bracket-screw']}"
@@ -468,6 +521,7 @@ TRANSGEAR_QUANTITIES = {
     "pd-transgear-pivot-spacer": 1,
     "vn-transgear-pivot-screw": 1,
     "vn-transgear-pivot-spring": spring.COUNT,
+    "vn-transgear-pivot-shim": 1,
     "vn-transgear-latch-pin": 1,
     "vn-latch-hook-bracket-screw": len(hook_geometry.SCREW_X),
     "pd-latch-hook": 1,
@@ -1018,10 +1072,12 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "PAIR, THEN THE SLOTTED PAIR."
         ),
         "rack-soldered": (
-            f"SOFT-SOLDER THE {_N['pd-platen-rack']} RACK TO THE {_N['pd-platen']} "
-            "PLATEN'S BACK, TEETH DOWN, ENDS FLUSH WITH THE PLATEN'S, CRESTS "
-            f"{steps.RACK_CREST_TEXT} BELOW "
-            "ITS BOTTOM EDGE. SIGHT ALONG IT: TEETH STRAIGHT, NO SOLDER IN THE GAPS."
+            f"SOFT-SOLDER (60/40 TIN-LEAD, ROSIN FLUX) THE {_N['pd-platen-rack']} RACK "
+            f"TO THE {_N['pd-platen']} PLATEN'S BACK, TEETH DOWN, ENDS FLUSH WITH THE "
+            f"PLATEN'S, CRESTS {steps.RACK_CREST_TEXT} BELOW ITS BOTTOM EDGE: THIS "
+            f"HOLDS THE {_N['vn-transgear-latch-pin']} PIN ON THE "
+            f"{_N['pd-latch-hook']} HOOK'S STRAIGHT RUN. SIGHT ALONG IT: TEETH "
+            "STRAIGHT, NO SOLDER IN THE GAPS."
         ),
         "guides-screwed": (
             f"SCREW THE {len(platen.GUIDE_HOLE_Y)} {_N['pd-platen-guide']} GUIDES TO "
@@ -1082,15 +1138,22 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "REFIT THE SAME SCREWS IN THE SAME HOLES BEFORE PIVOTING THE HANGER."
         ),
         # R9-71: the spacer is pressed on the shoulder, so its faces' tilt is
-        # fixed in the bar; the MHA-VN-049 spring holds the arm on it.
+        # fixed in the bar; the MHA-VN-049 spring holds the arm on it. The
+        # screw's tip is faced below the bar's front face, where the platen
+        # slides, and staked there (rule 23); MHA-VN-069 restores the spring
+        # room the 9.5 bar took (transgear_hanger_joints).
         "hanger-pivoted": (
-            f"{_N['vn-transgear-pivot-spring']} SPRING, THEN ARM, ON THE "
-            f"{_N['vn-transgear-pivot-screw']} SHOULDER SCREW FROM THE REAR; PRESS "
-            f"THE {_N['pd-transgear-pivot-spacer']} SPACER, AS MADE, ON THE SHOULDER, "
-            "FLUSH WITH ITS END ON A FLAT. SEAT IT IN THE "
-            f"{_N['pd-support-bar']} BAR'S BLIND TAP WITH LOW-STRENGTH THREADLOCKER; "
-            "THE ARM FALLS FREELY. THE ARM'S PIVOT BORE IS REAMED TO THIS SCREW: "
-            "KEEP THEM TOGETHER."
+            f"ON THE {_N['vn-transgear-pivot-screw']} SHOULDER SCREW FROM THE REAR: "
+            f"{_N['vn-transgear-pivot-shim']} SHIM, {_N['vn-transgear-pivot-spring']} "
+            f"SPRING, THEN ARM; PRESS THE {_N['pd-transgear-pivot-spacer']} SPACER, AS "
+            "MADE, ON THE SHOULDER, FLUSH WITH ITS END ON A FLAT. FACE THE SCREW'S "
+            f"TIP SO THAT, SEATED IN THE {_N['pd-support-bar']} BAR'S THROUGH TAP, IT "
+            f"STANDS {pivot_screw.TIP_RECESS[0]:.2f} TO {pivot_screw.TIP_RECESS[1]:.2f} "
+            "BELOW THE BAR'S FRONT FACE; IF ITS UNFACED TIP STANDS DEEPER, USE "
+            "ANOTHER SCREW. SEAT IT, THREADLOCKER OPTIONAL (LOW STRENGTH ONLY); THE "
+            "ARM FALLS FREELY. PLATEN SLID CLEAR, STAKE THE FRONT TAP MOUTH ONTO THE "
+            f"TIP AT 2 POINTS, NOTHING PROUD OF THE FACE ({PIVOT_VIEW_REF}). THE "
+            "ARM'S PIVOT BORE IS REAMED TO THIS SCREW: KEEP THEM TOGETHER."
         ),
         "disc-cluster-assembled": (
             f"FIT THE {_N['pd-rack-pinion']} DISC ON THE {_N['pd-transgear-disc-hub']} "
@@ -1126,7 +1189,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "DEBURR THE BORE."
         ),
         "disc-cluster-hung": (
-            "OIL THE PIN; CLUSTER ON, PINION REARWARD; A "
+            "OIL THE PIN (LIGHT MACHINE OIL); CLUSTER ON, PINION REARWARD; A "
             f"{_N['pd-transgear-front-bushing']} BUSHING BLANK ON THE NOSE TRAPS HUB "
             f"AND DISC; {_N['vn-transgear-retaining-ring']} RING SIDEWAYS IN THE PIN "
             "GROOVE. NO REAR BUSHING YET: CLUSTER FORWARD ON THE RING."
@@ -1148,7 +1211,9 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"JOURNAL ON A {knob_shaft.END_FLOAT:.1f} FEELER AT THE BOSS; "
             f"MATCH-DRILL {cup_pin.HOLE_TEXT} THROUGH BOTH "
             f"{knob_cup.PIN_HOLE_FROM_FRONT:.1f} FROM THE CUP FRONT; PRESS THE PIN "
-            "IN, CENTRED. COLLAR ON THE CORE UNPINNED, PINS FORWARD."
+            "IN, CENTRED. COLLAR ON THE CORE UNPINNED, PINS FORWARD. THIS SHAFT IS "
+            "THE KNOB; ITS GRIP IS THE COLLAR: HOLD OR TURN THE KNOB BY IT TILL "
+            f"STEP {steps.step_number('chain-closed')}, THEN TURN THE CRANK."
         ),
         "latch-hook-fitted": (
             f"SCREW THE {_N['pd-latch-hook']} HOOK'S BASE TO THE BAR'S BACK FACE "
@@ -1162,7 +1227,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "DIRECTLY BELOW A RACK SPACE CENTRE. KNOB HELD, SET "
             f"{steps.RACK_DATUM_BACKLASH_TEXT} PLATEN SHAKE AT THAT DATUM "
             "(DIAL ALONG THE RACK); CLAMP THE ARM TO THE BAR. "
-            f"{operating_domain.operating_window_text} {OPERATING_DIRECTION_TEXT}. "
+            f"{operating_domain.operating_window_text} {OPERATING_DIRECTION_TEXT}; "
+            f"THE FEED STUD IS THE {_N['pd-transgear-pin']} PIN. "
             "RUN THAT WINDOW: NO TIGHT SPOT, SHAKE AT EVERY TOOTH. "
             "STOP BEFORE EITHER END LIMIT; RESET ONLY WITH FEED DISENGAGED."
         ),
@@ -1175,9 +1241,11 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"HOLDING THAT MESH, MARK THE {_N['vn-transgear-latch-pin']} PIN'S "
             f"AXIS WHERE ITS END BEARS ON THE {_N['pd-latch-hook']} HOOK'S "
             "STRAIGHT RUN. REMOVE THE HOOK; DRILL ITS PIN HOLE AT THE MARK PER "
-            f"{_N['pd-latch-hook']}; HARDEN AND TEMPER BLUE. REFIT, ITS HOLE'S "
-            f"LOWER EDGE ON THE {_N['vn-transgear-latch-pin']} PIN, THEN TIGHTEN "
-            "THE SCREWS. UNCLAMP, LATCH, RE-RUN THE DEFINED ENGAGED-FEED WINDOW."
+            f"{_N['pd-latch-hook']}; HARDEN AND TEMPER PER {_N['pd-latch-hook']}. "
+            f"REFIT, ITS HOLE'S LOWER EDGE ON THE {_N['vn-transgear-latch-pin']} PIN, "
+            "THEN TIGHTEN THE SCREWS. UNCLAMP, LATCH, RE-RUN THE DEFINED "
+            f"ENGAGED-FEED WINDOW; RE-CHECK {steps.RACK_DATUM_BACKLASH_TEXT} SHAKE AT "
+            "THE DATUM."
         ),
         "loaded-rack-geometry-checked": (
             "HANGER LATCHED, PAPER LOADED. TRAVEL: TURN THE KNOB TO RUN THE "
@@ -1198,7 +1266,9 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "TURN THE KNOB: NO TIGHT SPOT, SHAKE AT EVERY TOOTH."
         ),
         "front-bushing-faced-to-fit": (
-            f"CLUSTER, HUB AND DISC FORWARD, FEEL m ({teeth} TO DISC). FACE THE "
+            "CLUSTER, HUB AND DISC FORWARD, FEEL m, THE AXIAL GAP FROM THE "
+            f"{_N['pd-transgear-knob-shaft']} {teeth} TO THE {_N['pd-rack-pinion']} "
+            "DISC. FACE THE "
             f"{_N['pd-transgear-front-bushing']} BUSHING'S REAR TILL m IS "
             f"{cluster_fit.FIT_WINDOW_TEXT}; ELSE REPORT."
         ),
@@ -1218,23 +1288,27 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"OF THE {sprocket.CRANK_CONFIG} FRONT FACE. START LONG; STRIP AND FACE "
             "THE REAR TO MOVE THE WHEEL REARWARD, REFITTING WITH THE REAR FACE SEATED. "
             f"FINISHED BODY WITHIN {_N['pd-transgear-drive-collar']}'S FITTED LIMITS; "
-            f"ELSE REPORT. STEP {steps.step_number('fitup-accepted')} RE-CHECKS."
+            f"ELSE REPORT. STEP {steps.step_number('fitup-accepted')} RE-CHECKS. "
+            "THE SETTING LEAVES ROOM FOR END FLOAT AND THE WHEEL'S FLOAT UNDER THE "
+            f"NUT: IN SERVICE THE WHEELS RUN WITHIN {collar.CHAIN_OFFSET_LIMIT:.1f} "
+            "OF IN LINE, THE #25 CHAIN'S LIMIT."
         ),
         "collar-shoulder-seated": (
             f"SEAT THE {_N['pd-transgear-drive-collar']} D-BORE ON THE SHAFT D-FLAT, "
             f"ITS REAR FACE BEARING ON THE {_N['pd-transgear-knob-shaft']} 12T FRONT FACE. "
-            f"{sprocket.KNOB_CONFIG} ON THE DRIVE DOWELS, NUT TIGHT ON THE PILOT."
+            f"{sprocket.KNOB_CONFIG} ON THE DRIVE DOWELS, NUT TIGHT ON THE PILOT. "
+            "THUMBNUT IS A CLAMP ONLY; NEVER TURNED TO DRIVE."
         ),
         "stud-end-cut": (
             f"IF THE {_N['pd-transgear-knob-shaft']} STUD END STANDS PROUD OF THE "
             f"THUMBNUT RIM, {collar.STUD_CUT_PHRASE}."
         ),
         "collar-disc-air-inspected": (
-            "CHAIN OFF. REMOVE THE TRIAL PLATEN, KEEPING THE ARM HELD IN ITS "
+            f"CHAIN OFF. REMOVE THE {_N['pd-platen']} PLATEN, KEEPING THE ARM HELD IN ITS "
             "OPERATING LATCH POSE. "
             f"{collar.COLLAR_DISC_AIR_PHRASE}; "
             f"ONE DISC TURN = {disc.TEETH / KNOB_TEETH:g} KNOB TURNS. "
-            "REFIT THE PLATEN AND LOCK THE ASSEMBLY; RE-CHECK THE OVERLAP AIR "
+            "REFIT THE PLATEN AND LATCH THE HANGER; RE-CHECK THE OVERLAP AIR "
             "AND RACK MESH. ELSE REPORT."
         ),
         "fitup-accepted": (
@@ -1247,7 +1321,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"PASSES); KNOB END FLOAT {knob_lo:.2f} TO {knob_hi:.2f}; "
             f"{sprocket.KNOB_CONFIG} FREE "
             "UNDER THE NUT; THE HANGER FREE; RE-CHECK ACTUAL COLLAR TO DISC AIR "
-            f"{steps.COLLAR_DISC_AIR_TEXT} AT OVERLAP AFTER REFITTING AND LOCKING. "
+            f"{steps.COLLAR_DISC_AIR_TEXT} AT OVERLAP AFTER REFITTING AND LATCHING. "
             "ELSE REPORT."
         ),
         "chain-closed": (
@@ -1424,6 +1498,8 @@ def sheet_texts(notes: StepNotes) -> tuple[str, ...]:
         *INNER_CAPTIONS.values(),
         FITUP_REFERENCE_CAPTION,
         BOM_REFERENCE_CAPTION,
+        PIVOT_CAPTION,
+        PIVOT_STAKE_NOTE,
     )
 
 
@@ -2079,6 +2155,125 @@ def _place_bom_sheet(
     return landings, table, items, pieces
 
 
+def _place_pivot_view(adapter: Any) -> None:
+    """Sheet 2's pivot view: the step-13 stack from above, cropped to a
+    circle on the screw's axis, with the stake's pointer at the tap mouth."""
+    label = "hanger pivot view"
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    view = _early_bound(
+        place_view(
+            adapter,
+            str(SOURCE),
+            PIVOT_VIEW_ORIENTATION,
+            *PIVOT_VIEW_CENTER,
+            scale=PIVOT_VIEW_SCALE,
+        ),
+        "IView",
+    )
+    apply_view_configuration(adapter, view, label=label)
+    _isolate_instances(adapter, view, PIVOT_VIEW_INSTANCES, label=label)
+    leaf = _shown_instances(
+        _view_component_leaves(adapter, view, label=label),
+        "vn-transgear-pivot-screw",
+        BalloonAnchor(instance=PIVOT_SCREW_INSTANCE),
+        label=label,
+    )[0]
+
+    def project() -> tuple[tuple[float, float], tuple[float, float]]:
+        centre, mouth = model_points_in_view(
+            adapter,
+            view,
+            _anchor_model_points(
+                adapter,
+                leaf,
+                tuple(
+                    tuple(value / 1000.0 for value in point)
+                    for point in (PIVOT_VIEW_CENTRE_MM, PIVOT_MOUTH_MM)
+                ),
+                _view_explode_offsets(adapter, view, label=label),
+                stem="vn-transgear-pivot-screw",
+                label=label,
+            ),
+            label=label,
+        )
+        return centre, mouth
+
+    centre = project()[0]
+    _shift_view(
+        adapter,
+        view,
+        (PIVOT_VIEW_CENTER[0] - centre[0], PIVOT_VIEW_CENTER[1] - centre[1]),
+        label=f"{label} centre",
+    )
+    centre, mouth = project()
+    if math.dist(centre, PIVOT_VIEW_CENTER) > 1e-4:
+        raise RuntimeError(
+            f"{label}: centre sits at {centre!r}, not {PIVOT_VIEW_CENTER!r}"
+        )
+    # A *Top view shows the front face up the sheet; the note above relies on it.
+    if mouth[1] <= centre[1]:
+        raise RuntimeError(f"{label}: the bar's front face projects below the axis")
+    _crop_to_circle(adapter, view, PIVOT_VIEW_CENTER, PIVOT_VIEW_RADIUS, label=label)
+    set_hidden_lines_visible(adapter, view)
+    add_leader_note(
+        adapter,
+        PIVOT_STAKE_NOTE,
+        text_xy=PIVOT_STAKE_NOTE_XY,
+        attach_xy=mouth,
+        label=f"{label} stake",
+        view=view,
+    )
+    _place_sheet_note(
+        adapter,
+        SHEET_NAMES[1],
+        PIVOT_CAPTION,
+        PIVOT_CAPTION_XY,
+        label=f"{label} caption",
+    )
+
+
+def _crop_to_circle(
+    adapter: Any, view: Any, centre: tuple[float, float], radius: float, *, label: str
+) -> None:
+    """Crop ``view`` to a sheet circle: sketch it in the active view's own
+    sketch and Crop2 while it is still selected (draw_mg_magnifier_assembly's
+    detail crop)."""
+    view = _early_bound(view, "IView")
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(
+        view_name(adapter, view)
+    ):
+        raise RuntimeError(f"{label}: failed to activate the view to crop")
+    adapter.currentModel.ClearSelection2(True)
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (centre, (centre[0] + radius, centre[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = False
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous
+    if circle is None:
+        raise RuntimeError(f"{label}: failed to sketch the crop circle")
+    status = int(view.Crop2(False, False, 1))
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
+    view.UpdateViewDisplayGeometry()
+    cropped = bool(view.IsCropped())
+    if status != CROP_NO_ERROR or not cropped:
+        raise RuntimeError(
+            f"{label}: not cropped: Crop2 status {status}, IsCropped {cropped}"
+        )
+
+
 def _balloon_assembled_sheet(
     adapter: Any, iso: Any, table: Any, items: dict[str, str]
 ) -> list[Any]:
@@ -2203,6 +2398,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _create_sheets(adapter)
     iso = _place_assembled_sheet(adapter)
     landings, table, items, pieces = _place_bom_sheet(adapter, counts)
+    _place_pivot_view(adapter)
     landings += _balloon_assembled_sheet(adapter, iso, table, items)
     landings += _place_exploded_sheet(adapter, table, items, notes)
     _place_fitup_sheets(adapter, notes)

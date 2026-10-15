@@ -1,53 +1,40 @@
-r"""McMaster 91829A205 -- slotted 18-8 stainless precision shoulder screw,
-shoulder Ø3/16 x 1/2, 8-32 x 3/16 (MHA-VN-041, the transgear pivot screw).
+r"""McMaster 90325A174 -- 18-8 stainless precision shoulder screw, hex socket,
+shoulder Ø3/16 x 1/2, 8-32 x 3/8 (MHA-VN-041, the transgear pivot screw).
 
-Catalogue: the live page (``transgear-evidence/mcmaster-skus.md``, R1,
-re-verified 2026-09-30).  Laws: the vendor model
-``cad/references/mcmaster/91829A205.SLDPRT`` (SHA-256
-bb7a805e75e4e656242ff71cc97cf7e34a7f97c4a90fd66f4b05cb3ebe24601c, harvested
-on amet 2026-09-30; read-only dump
-``cad/out/reports/mcmaster-91829A205-dump.json``; coordinator ruling R9-7).
-The vendor file is local-only (© McMaster, gitignored, never committed; see
-cad/references/mcmaster/README.md).  Vendor truth: volume 451.9447 mm^3,
-area 485.1899 mm^2, 20 faces.  Every number is imported from
-``transgear_pivot_screw_spec``; none is typed here.
+Catalogue-only: the live page (read 2026-10-14) gives the shoulder, thread,
+head envelope and 3/32 hex drive; its CAD download was refused, so there is
+no vendor model and no replica gate.  ASME B18.3-2012 Table 13 (hexagon
+socket head shoulder screws, 3/16 row) bounds what the page omits: the
+socket's key engagement, the head-rim chamfer and the thread neck.  Every
+number is imported from ``_mcmaster_90325a174``; none is typed
+here.
 
-The vendor tree is the 91829A560 family's (``diag_build_91829A560.py``, the
-replica-gated original), reproduced feature for feature at this size:
+The construction is the retired 91829A205 recipe's (the 91829A560 family's
+replica-gated feature order) with the slot replaced by a hex socket:
 
-1.  Base solid (their Revolve1): head HEAD_DIA x HEAD_H up from the
-    under-head shoulder face (y = 0); shoulder SHOULDER_DIA x SHOULDER_LEN and
-    thread shank THREAD_MAJOR x THREAD_LEN down from it.  Stacked extrudes
-    make the same solid.
-2.  Thread neck (their Cut-Revolve1 / Sketch5): under the shoulder's END face
-    a R NECK_FILLET_R quarter-fillet (radial at the end face, tangent to the
-    land) into a Ø NECK_DIA land, flat to NECK_FLAT_END below the end face,
-    then a 45 deg flank back to the major, reached FULL_THREAD_START below it.
-3.  Driver slot (their Cut-Extrude2 / Sketch8) SLOT_WIDTH x SLOT_DEPTH across
-    the full head.
-4.  Helix (their Helix/Spiral2): seeded on the tip plane, ascending, pitch
-    PITCH x THREAD_LEN / PITCH revs (6).
-5.  Chamfers, 45 deg (their Chamfer1/2): head rim HEAD_CHAMFER (the slot has
-    already split the rim into two edges) and thread start TIP_CHAMFER.
-6.  Split (their Split2 at Plane1) at the neck's land bottom, so the thread
-    sweep is scoped to the tail and cannot touch the shoulder or the fillet.
-7.  Thread groove (their Cut-Sweep1 / Sketch10): the UN 60 deg V truncated to
-    a P/8 root flat at r = major - 0.75 H and capped at a 15P/16 top width,
-    placed 7P/16 past the tip in air, swept along the helix, tail-scoped,
-    start/end tangency none.
-8.  Combine (their Combine1) unions the bodies back.
+1.  Base solid: head HEAD_DIA x HEAD_H up from the under-head shoulder face
+    (y = 0); shoulder SHOULDER_DIA x SHOULDER_LEN and thread shank
+    THREAD_MAJOR x THREAD_LEN down from it.
+2.  Thread neck under the shoulder's END face: a R NECK_FILLET_R
+    quarter-fillet into a Ø NECK_DIA land, flat to NECK_FLAT_END below the end
+    face, then a 45 deg flank back to the major, reached FULL_THREAD_START
+    below it.
+3.  Hex socket SOCKET_AF across flats, SOCKET_DEPTH deep, cut down from the
+    head top.
+4.  Helix: seeded on the tip plane, ascending, pitch PITCH over THREAD_LEN.
+5.  Chamfers, 45 deg: the head rim HEAD_CHAMFER and the thread start
+    TIP_CHAMFER.
+6.  Split at the neck's land bottom, so the thread sweep is scoped to the
+    tail and cannot touch the shoulder or the fillet.
+7.  Thread groove: the UN 60 deg V truncated to a P/8 root flat at
+    r = major - 0.75 H and capped at a 15P/16 top width, placed 7P/16 past the
+    tip in air, swept along the helix, tail-scoped.
+8.  Combine unions the bodies back.
 
 Class 2A and the shoulder's tolerances are not modelled (nominal sizes,
-nominal UN cutter), as on the vendor model.
+nominal UN cutter).
 
 Frame: axis +Y, head up, the under-head shoulder face at y = 0 (Top Plane).
-The vendor origin sits mid-overall (axis z, head +z), so their under-head
-face is at z = (HEAD_H + SHOULDER_LEN + THREAD_LEN) / 2 - HEAD_H.
-
-Run standalone (SolidWorks open, vendor file and dump local); it is the
-replica gate::
-
-    uv run python cad\scripts\diagnostics\diag_build_91829A205.py
 """
 
 from __future__ import annotations
@@ -61,6 +48,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from _stock_recipe import stock_recipe  # noqa: E402
 
 import _telemetry  # noqa: E402
+
 if __package__:
     from . import _script_paths  # noqa: F401
 else:
@@ -71,22 +59,16 @@ from _feature_tree import name_last_feature  # noqa: E402
 from _part_checks import volume_check  # noqa: E402
 from _sketch import add_line_chain  # noqa: E402
 from _sketch_circle import define_circle  # noqa: E402
-from _sketch_rectangle import define_centered_rectangle  # noqa: E402
-from _shoulder_screw_geometry import (  # noqa: E402
-    _slot_strip_area,
-    _slotted_rim_chamfer_volume,
-    _undercut_volume,
-)
+from _shoulder_screw_geometry import _undercut_volume  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     combine_union,
     insert_helix,
     no_sketch_inference,
     offset_plane,
-    replica_main,
     split_at_plane,
     thread_sweep_cut,
 )
-from vn_transgear_pivot_screw_spec import (  # noqa: E402
+from _mcmaster_90325a174 import (  # noqa: E402
     FULL_THREAD_START,
     HEAD_CHAMFER,
     HEAD_DIA,
@@ -98,8 +80,8 @@ from vn_transgear_pivot_screw_spec import (  # noqa: E402
     SHOULDER_DIA,
     SHOULDER_LEN,
     SKU,
-    SLOT_DEPTH,
-    SLOT_WIDTH,
+    SOCKET_AF,
+    SOCKET_DEPTH,
     THREAD_LEN,
     THREAD_MAJOR,
     TIP_CHAMFER,
@@ -113,13 +95,16 @@ SHOULDER_R = SHOULDER_DIA / 2.0
 NECK_R = NECK_DIA / 2.0
 NECK_LAND = NECK_FLAT_END - NECK_FILLET_R
 REVS = THREAD_LEN / PITCH  # tip to the shoulder's end face
+# A regular hexagon's corner stands AF / sqrt(3) from its centre.
+SOCKET_CORNER_R = SOCKET_AF / math.sqrt(3.0)
+SOCKET_VOLUME = math.sqrt(3.0) / 2.0 * SOCKET_AF**2 * SOCKET_DEPTH
 
 # Neck heights in the part frame.
 Y_SHOULDER_END = -SHOULDER_LEN
 Y_LAND_TOP = Y_SHOULDER_END - NECK_FILLET_R
-Y_LAND_BOT = Y_SHOULDER_END - NECK_FLAT_END  # also the split plane (Plane1)
+Y_LAND_BOT = Y_SHOULDER_END - NECK_FLAT_END  # also the split plane
 
-# The UN thread cutter (vendor Sketch10).
+# The UN thread cutter.
 H_SHARP = PITCH * math.sqrt(3.0) / 2.0
 ROOT_R = MAJOR_R - 0.75 * H_SHARP
 ROOT_FLAT = PITCH / 8.0
@@ -127,15 +112,14 @@ CUT_TOP_W = 15.0 * PITCH / 16.0
 CUT_TOP_R = ROOT_R + (CUT_TOP_W - ROOT_FLAT) / 2.0 * math.sqrt(3.0)
 CUT_CENTRE_Y = -UNDERHEAD_LEN - 7.0 * PITCH / 16.0  # past the tip, in air
 
-# The vendor origin is mid-overall, head +z.
-VENDOR_UNDERHEAD_Z = (HEAD_H + UNDERHEAD_LEN) / 2.0 - HEAD_H
-
-if not SLOT_DEPTH < HEAD_H:
-    raise ValueError(f"{PART_NO}: the driver slot falls through the head")
+if not SOCKET_DEPTH < HEAD_H:
+    raise ValueError(f"{PART_NO}: the hex socket falls through the head")
+if not SOCKET_CORNER_R < HEAD_DIA / 2.0 - HEAD_CHAMFER:
+    raise ValueError(f"{PART_NO}: the hex socket breaks into the head-rim chamfer")
 if not CUT_TOP_R > MAJOR_R:
     raise ValueError(f"{PART_NO}: the thread cutter does not clear the major")
-# The vendor fillet runs radially off the end face and lands tangent on the
-# neck, so its radius IS the major-to-land rise; _undercut_volume assumes it.
+# The fillet runs radially off the end face and lands tangent on the neck,
+# so its radius IS the major-to-land rise; _undercut_volume assumes it.
 if not math.isclose(NECK_FILLET_R, MAJOR_R - NECK_R, abs_tol=1e-6):
     raise ValueError(f"{PART_NO}: neck fillet R != major-to-land rise")
 if not (0.0 < NECK_LAND and FULL_THREAD_START < THREAD_LEN - TIP_CHAMFER):
@@ -152,11 +136,11 @@ def _tail_body(boxes: list[dict]) -> str:
     return below[0]
 
 
-@stock_recipe("91829A205", threaded=True)
-async def build_91829A205(adapter, truth=None):
+@stock_recipe("90325A174", threaded=True)
+async def build_90325A174(adapter, truth=None):
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
-    # --- base solid (vendor Revolve1) -----------------------------------------
+    # --- base solid -----------------------------------------------------------
     check("create_sketch head", await adapter.create_sketch("Top"))
     await define_circle(adapter, 0.0, 0.0, HEAD_DIA / 2.0, "head")
     check("exit_sketch head", await adapter.exit_sketch())
@@ -184,7 +168,7 @@ async def build_91829A205(adapter, truth=None):
     v = math.pi * MAJOR_R**2 * THREAD_LEN
     volume = await volume_check(adapter, "thread shank", volume + v, 0.005 * v)
 
-    # --- thread neck (vendor Cut-Revolve1: fillet + land + 45 deg flank) ------
+    # --- thread neck (fillet + land + 45 deg flank) -----------------------------
     check("create_sketch neck", await adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
@@ -234,25 +218,37 @@ async def build_91829A205(adapter, truth=None):
     v = _undercut_volume(MAJOR_R, NECK_R, NECK_LAND)
     volume = await volume_check(adapter, "thread neck", volume - v, 0.01 * v)
 
-    # --- driver slot (vendor Cut-Extrude2) ------------------------------------
+    # --- hex socket, blind down from the head top --------------------------------
     offset_plane(adapter, "HeadTop", HEAD_H)
-    check("create_sketch slot", await adapter.create_sketch("HeadTop"))
-    await define_centered_rectangle(
-        adapter, HEAD_DIA / 2.0 + 1.0, SLOT_WIDTH / 2.0, "slot"
-    )
-    check("exit_sketch slot", await adapter.exit_sketch())
-    name_last_feature(adapter, "SlotProfile")
+    check("create_sketch socket", await adapter.create_sketch("HeadTop"))
+    flat = SOCKET_AF / 2.0
+    corner = SOCKET_CORNER_R
+    with no_sketch_inference(adapter):
+        await add_line_chain(
+            adapter,
+            [
+                (0.0, corner),
+                (-flat, corner / 2.0),
+                (-flat, -corner / 2.0),
+                (0.0, -corner),
+                (flat, -corner / 2.0),
+                (flat, corner / 2.0),
+            ],
+        )
+    check("exit_sketch socket", await adapter.exit_sketch())
+    name_last_feature(adapter, "SocketProfile")
     check(
-        "cut slot",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=SLOT_DEPTH)),
+        "cut hex socket",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=SOCKET_DEPTH)),
     )
-    name_last_feature(adapter, "DriverSlot")
-    v = _slot_strip_area(HEAD_DIA / 2.0, SLOT_WIDTH) * SLOT_DEPTH
-    volume = await volume_check(adapter, "driver slot", volume - v, 0.02 * v)
+    name_last_feature(adapter, "HexSocket")
+    volume = await volume_check(
+        adapter, "hex socket", volume - SOCKET_VOLUME, 0.02 * SOCKET_VOLUME
+    )
 
-    # --- helix (vendor Helix/Spiral2: tip-seeded, ascending) ------------------
-    # 91829A560's proven flags in this frame: Clockwised=False is the vendor's
-    # right-hand thread, start azimuth +X on the Front plane's cutter.
+    # --- helix (tip-seeded, ascending) -------------------------------------------
+    # 91829A560's proven flags in this frame: Clockwised=False is a right-hand
+    # thread, start azimuth +X on the Front plane's cutter.
     offset_plane(adapter, "TipPlane", -UNDERHEAD_LEN)
     check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
     with no_sketch_inference(adapter):
@@ -271,16 +267,14 @@ async def build_91829A205(adapter, truth=None):
         feature_name="ThreadHelix",
     )
 
-    # --- chamfers (vendor order: after the helix, before the thread cut) ------
+    # --- chamfers (after the helix, before the thread cut) -----------------------
     head_r = HEAD_DIA / 2.0
     check(
         "chamfer head rim",
-        await adapter.add_chamfer(
-            HEAD_CHAMFER, [[0.0, HEAD_H, head_r], [0.0, HEAD_H, -head_r]]
-        ),
+        await adapter.add_chamfer(HEAD_CHAMFER, [[0.0, HEAD_H, head_r]]),
     )
     name_last_feature(adapter, "HeadChamfer")
-    v = _slotted_rim_chamfer_volume(head_r, HEAD_CHAMFER, SLOT_WIDTH)
+    v = math.pi * HEAD_CHAMFER**2 * (head_r - HEAD_CHAMFER / 3.0)
     volume = await volume_check(adapter, "head chamfer", volume - v, 0.03 * v)
 
     check(
@@ -291,12 +285,12 @@ async def build_91829A205(adapter, truth=None):
     v = math.pi * TIP_CHAMFER**2 * (MAJOR_R - TIP_CHAMFER / 3.0)
     await volume_check(adapter, "tip chamfer", volume - v, 0.02 * v)
 
-    # --- split at the land bottom (vendor Split2 @ Plane1) --------------------
+    # --- split at the land bottom -------------------------------------------------
     offset_plane(adapter, "SplitPlane", Y_LAND_BOT)
     tail = _tail_body(split_at_plane(adapter, "SplitPlane", "TailSplit"))
     _telemetry.info(f"tail body: {tail}")
 
-    # --- thread groove (vendor Cut-Sweep1) ------------------------------------
+    # --- thread groove --------------------------------------------------------------
     check("create_sketch cutter", await adapter.create_sketch("Front"))
     await add_line_chain(
         adapter,
@@ -313,12 +307,5 @@ async def build_91829A205(adapter, truth=None):
         adapter, "ThreadCutter", "ThreadHelix", tail, "ThreadGroove", tangency=(0, 0)
     )
 
-    # --- combine (vendor Combine1) --------------------------------------------
+    # --- combine ----------------------------------------------------------------------
     combine_union(adapter, "ThreadedUnion")
-
-    # Vendor frame: axis z, head +z, origin mid-overall.
-    adapter._mcm_com_map = lambda v: [v[0], v[2] - VENDOR_UNDERHEAD_Z, v[1]]
-
-
-if __name__ == "__main__":
-    sys.exit(replica_main(PART_NO, build_91829A205))

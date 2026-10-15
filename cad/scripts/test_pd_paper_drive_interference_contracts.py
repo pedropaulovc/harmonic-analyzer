@@ -32,6 +32,7 @@ import vn_transgear_knob_drive_pin_spec as drive_pin
 import pd_transgear_knob_shaft_spec as shaft
 import vn_transgear_latch_pin_spec as latch_pin
 import vn_transgear_pivot_screw_spec as pivot_screw
+from _mcmaster_90325a174 import NECK_FLAT_END
 import pd_transgear_pivot_spacer_spec as spacer
 import pd_transgear_removable_spec as removable
 import pd_transgear_pin_spec as pin
@@ -69,12 +70,13 @@ def test_hanger_screw_rows_follow_the_arm_plate_and_bar() -> None:
         pair = _pair(f"vn-transgear-arm-plate-screw-{n}", "pd-transgear-arm-1")
         assert allowed[pair] == pytest.approx(plate_limit)
 
-    # The shoulder screw's thread past its neck flat, in the bar's blind tap.
+    # The shoulder screw's fitted thread past its neck flat, in the bar's
+    # through tap.
     assert allowed[_pair("vn-transgear-pivot-screw-1", "pd-support-bar-1")] == pytest.approx(
         _annulus(
             pivot_screw.THREAD_MAJOR,
             bar.PIVOT_TAP_DRILL_DIA,
-            pivot_screw.THREAD_LEN - pivot_screw.NECK_FLAT_END,
+            pivot_screw.FITTED_THREAD_LEN - NECK_FLAT_END,
         )
     )
     # R9-71: the spacer's reamed bore pressed on the shoulder, whole length.

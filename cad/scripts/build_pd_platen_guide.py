@@ -71,7 +71,11 @@ MATERIAL = "Plain Carbon Steel"
 
 GUIDE_LENGTH = 269.64  # = resized platen width (ch30-p002 Pose Studio)
 GUIDE_HEIGHT = 5.0
-GUIDE_DEPTH = 10.0  # 1.0 past the 9-deep bar so the lock plates clear it
+# 0.7 past the bar's back face so the lock plates clear it: the 9.5 bar grew
+# rearward under the fixed hanger (user ruling 2026-10-15), so the rail's
+# relief shrank from 1.0 to keep the lock-screw heads off the arm plate
+# (pd_platen_guide_spec.GUIDE_DEPTH_BAND).
+GUIDE_DEPTH = BAR_DEPTH + 0.7
 LOCK_STATION_X = (80.892, 188.748)  # 30% / 70%; inboard of the east column clamp
 LOCK_SCREW_DX = 7.0  # 2 screws per lock flank its centre
 

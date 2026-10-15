@@ -1,25 +1,27 @@
 r"""The hanger's screwed joints, pivot spring and tilt, at the printed bands.
 
-PURE DATA, no SolidWorks/COM imports.  The two purchased screws' catalog
+PURE DATA, no SolidWorks/COM imports.  The purchased screws' catalogue
 modules stay free of their mates (their stock builds rebuild only when the
-catalog changes); this module reads both sides of each joint and holds the
-sheet text the MHA-VN-041 purchased sheet prints.  The paper-drive assembly
-may import it; no part build does.
+catalogue changes); this module reads both sides of each joint.  The
+paper-drive assembly may import it; no part build does.
 
-* MHA-VN-041 pivot screw (91829A205) in the MHA-PD-007 bar's blind #8-32 tap:
-  the 3/16 stock thread is in the tap, but the vendor's thread neck under
-  the shoulder's end face leaves full thread only below FULL_THREAD_START;
-  worst = that - one pitch (first thread).  The tap's entry countersink lies
-  inside the neck zone and costs nothing more (contract §7, ruling R9-7).
-  Below 1.5 D, pending exception ruling #1385.
+* MHA-VN-041 pivot screw (90325A174, faced to fit) in the MHA-PD-007 bar's
+  THROUGH #8-32 tap (user rulings 2026-10-15): the tip is faced at fit-up to
+  stand TIP_RECESS below the bar's front face and staked at the tap's front
+  mouth (rule 23, staked end).  Engagement runs from the vendor neck's full
+  thread start to the faced tip less one pitch (the repo's charge at a faced
+  tip); the thinnest bar at the deepest recess is the worst, >= 1.5 D.  The
+  back countersink lies inside the neck zone (R9-63); the front one lies
+  beyond the tip's charged pitch.
 * MHA-VN-040 OVAL plate screws (verified1in stock, pre-cut OFF MECHANISM)
   use published ASME head, eccentricity, fillet and thread-length bounds.
   Critical gear-centre/seat controls remain separate; nominal CAD pose is
   not a stock-pin whole-body or positive-load retention certificate.
 * The MHA-PD-020 spacer pressed on the MHA-VN-041 shoulder, and the MHA-VN-049
   spring's room under the head: shoulder - spacer - spot-face floor (from
-  the arm's front face).  The spring holds the arm on the spacer, so the
-  hanger's tilt is the spacer's face squareness, fixed in the bar's frame.
+  the arm's front face) - the MHA-VN-069 shim under the head.  The spring
+  holds the arm on the spacer, so the hanger's tilt is the spacer's face
+  squareness, fixed in the bar's frame.
 * The MHA-VN-042 latch pin pressed to the floor of the arm's blind end-face
   hole (R9-12): the hole's reamed band keeps the press, its depth band and
   the dowel's length grade set the proud range, the shallowest hole still
@@ -47,49 +49,59 @@ import vn_transgear_pivot_screw_spec as PIVOT
 import vn_transgear_latch_pin_spec as LATCH_PIN
 import pd_transgear_pivot_spacer_spec as SPACER
 import vn_transgear_pivot_spring_spec as SPRING
+import vn_transgear_pivot_shim_spec as SHIM
 
 ENGAGEMENT_TARGET_D = 1.5
-
-
-def _floor2(value: float) -> float:
-    """A MIN never rounds up: floor to two places."""
-    return math.floor(value * 100.0 + 1e-9) / 100.0
 
 
 # --- MHA-VN-041 pivot screw in the bar -----------------------------------------
 if PIVOT.THREAD != BAR.PIVOT_TAP_THREAD:
     raise AssertionError("the pivot screw's thread is not the bar's pivot tap")
-if BAR.PIVOT_TAP_FULL_THREAD_MIN < PIVOT.THREAD_LEN:
-    raise AssertionError("the bar's pivot tap is shorter than the screw's thread")
-# The bar tap's 45° entry countersink stays inside the neck zone; its loss
-# runs to where the leg meets the tap drill (R9-63).
+# The printed REFERENCE length is the nominal bar less the recess window's
+# middle.
+_RECESS_MID = sum(PIVOT.TIP_RECESS) / 2.0
+if not math.isclose(PIVOT.FITTED_THREAD_LEN, BAR.BAR_DEPTH - _RECESS_MID, abs_tol=1e-9):
+    raise AssertionError("the pivot screw's reference length is off the bar")
+# Each countersink's loss runs to where its leg meets the tap drill (R9-63):
+# the back one stays inside the neck zone, the front one beyond the tip's
+# charged pitch at the shallowest recess.
 _PIVOT_TAP_CSK_DEPTH = (BAR.PIVOT_TAP_CSK_DIA - BAR.PIVOT_TAP_DRILL_DIA) / 2.0
 if _PIVOT_TAP_CSK_DEPTH > PIVOT.FULL_THREAD_START:
     raise AssertionError(
         "the bar tap's countersink reaches the pivot screw's full thread"
     )
-PIVOT_ENGAGEMENT_NOMINAL = PIVOT.THREAD_LEN - PIVOT.FULL_THREAD_START
-PIVOT_ENGAGEMENT_WORST = PIVOT_ENGAGEMENT_NOMINAL - PIVOT.FIRST_THREAD_LOSS
+if _PIVOT_TAP_CSK_DEPTH > PIVOT.TIP_RECESS[0] + PIVOT.INCOMPLETE_TIP_LEN_MAX:
+    raise AssertionError("the bar's front countersink reaches the screw's full thread")
+_BAR_THIN = BAR.BAR_DEPTH - BAR.BAR_DEPTH_BAND
+_BAR_THICK = BAR.BAR_DEPTH + BAR.BAR_DEPTH_BAND
+# Fitted thread lengths (shoulder end to faced tip) over the bar band and the
+# recess window.
+PIVOT_FITTED_LEN_MIN = _BAR_THIN - PIVOT.TIP_RECESS[1]
+PIVOT_FITTED_LEN_MAX = _BAR_THICK - PIVOT.TIP_RECESS[0]
+PIVOT_ENGAGEMENT_NOMINAL = (
+    PIVOT.FITTED_THREAD_LEN - PIVOT.INCOMPLETE_TIP_LEN_MAX - PIVOT.FULL_THREAD_START
+)
+PIVOT_ENGAGEMENT_WORST = (
+    PIVOT_FITTED_LEN_MIN - PIVOT.INCOMPLETE_TIP_LEN_MAX - PIVOT.FULL_THREAD_START
+)
 PIVOT_ENGAGEMENT_NOMINAL_D = PIVOT_ENGAGEMENT_NOMINAL / PIVOT.THREAD_MAJOR
 PIVOT_ENGAGEMENT_WORST_D = PIVOT_ENGAGEMENT_WORST / PIVOT.THREAD_MAJOR
-PIVOT_ENGAGEMENT_WORST_PRINTED = _floor2(PIVOT_ENGAGEMENT_WORST_D)
-# Ruling R9-7 approved the vendor neck's worst (2.203 = 0.529 D, stated
-# there rounded as 0.53 D; a MIN prints floored, 0.52 D): the joint carries
-# only the shoulder's seating preload, the arm load runs on the shoulder.
-# Any further loss re-opens the ruling.
-PIVOT_ENGAGEMENT_APPROVED_MIN_D = 0.52
-_PIVOT_PRINTED = PIVOT_ENGAGEMENT_WORST_PRINTED
-if not PIVOT_ENGAGEMENT_APPROVED_MIN_D <= _PIVOT_PRINTED < ENGAGEMENT_TARGET_D:
+if PIVOT_ENGAGEMENT_WORST_D < ENGAGEMENT_TARGET_D:
     raise AssertionError(
-        f"MHA-VN-041 worst engagement {PIVOT_ENGAGEMENT_WORST_D:.3f}D left the "
-        "approved shortfall"
+        f"MHA-VN-041 worst engagement {PIVOT_ENGAGEMENT_WORST_D:.3f}D < 1.5D"
     )
-# The tip stands clear of the shallowest flat drill bottom.
-PIVOT_TIP_TO_DRILL_BOTTOM = (
-    BAR.PIVOT_TAP_DRILL_DEPTH + BAR.PIVOT_TAP_DRILL_DEPTH_LIMITS[0] - PIVOT.THREAD_LEN
+# The gauged full-form tail reaches the neck's full thread at the shortest fit.
+if PIVOT_FITTED_LEN_MIN - PIVOT.FULL_THREAD_START < PIVOT.THREAD_LENGTH_MIN:
+    raise AssertionError("the shortest fit leaves the gauged tail inside the neck")
+# Every stock length reaches the thinnest bar's recess window, so facing
+# (never adding) fits it there. At the thickest bar the ASME-short stock
+# (-0.020 in) can stop this far deeper than the deepest recess: the fit-up
+# sets such a screw aside (assembly step "hanger-pivoted").
+if PIVOT.STOCK_THREAD_LEN_MIN < _BAR_THIN - PIVOT.TIP_RECESS[1]:
+    raise AssertionError("the shortest stock cannot reach the thinnest bar's recess")
+PIVOT_STOCK_SHORTFALL_AT_THICKEST_BAR = max(
+    0.0, _BAR_THICK - PIVOT.TIP_RECESS[1] - PIVOT.STOCK_THREAD_LEN_MIN
 )
-if PIVOT_TIP_TO_DRILL_BOTTOM <= 0.0:
-    raise AssertionError("the pivot screw bottoms in the bar's tap")
 # The shoulder's end ring bears on the bar outside the tap's countersink.
 if not BAR.PIVOT_TAP_CSK_DIA < PIVOT.SHOULDER_DIA + PIVOT.SHOULDER_DIA_LIMITS[0]:
     raise AssertionError("the bar tap's countersink swallows the shoulder end")
@@ -103,26 +115,28 @@ if not BAR.PIVOT_TAP_CSK_DIA < PIVOT.SHOULDER_DIA + PIVOT.SHOULDER_DIA_LIMITS[0]
 _SHOULDER_MIN = PIVOT.SHOULDER_DIA + min(PIVOT.SHOULDER_DIA_LIMITS)
 _SHOULDER_MAX = PIVOT.SHOULDER_DIA + max(PIVOT.SHOULDER_DIA_LIMITS)
 
-# --- MHA-VN-049 spring room: shoulder - spacer - spot-face floor ----------------
+# --- MHA-VN-049 spring room: shoulder - spacer - floor - shim -------------------
 # The spring holds the arm's front face on the spacer's rear face, so the
-# hanger has no end play; the room between the spot-face floor and the head
-# must stay between the spring's catalogue working height and its free
-# height at every printed corner.
+# hanger has no end play; the room between the spot-face floor and the shim
+# under the head must stay between the spring's catalogue working height and
+# its free height at every printed corner.
 SPRING_ROOM_NOMINAL = (
-    PIVOT.SHOULDER_LEN - SPACER.LENGTH - ARM.SPOT_FACE_FLOOR_FROM_FRONT
+    PIVOT.SHOULDER_LEN - SPACER.LENGTH - ARM.SPOT_FACE_FLOOR_FROM_FRONT - SHIM.THICKNESS
 )
 SPRING_ROOM_MIN = (
     PIVOT.SHOULDER_LEN
     + PIVOT.SHOULDER_LEN_LIMITS[0]
     - (SPACER.LENGTH + SPACER.LENGTH_BAND)
     - (ARM.SPOT_FACE_FLOOR_FROM_FRONT + ARM.SPOT_FACE_FLOOR_BAND)
+    - SHIM.THICKNESS_MAX
 )  # 0.70
 SPRING_ROOM_MAX = (
     PIVOT.SHOULDER_LEN
     + PIVOT.SHOULDER_LEN_LIMITS[1]
     - (SPACER.LENGTH - SPACER.LENGTH_BAND)
     - (ARM.SPOT_FACE_FLOOR_FROM_FRONT - ARM.SPOT_FACE_FLOOR_BAND)
-)  # 0.9508
+    - SHIM.THICKNESS_MIN
+)  # 1.0008
 if not SPRING.WORKING_HEIGHT <= SPRING_ROOM_MIN < SPRING_ROOM_MAX < SPRING.FREE_HEIGHT:
     raise AssertionError(
         f"MHA-VN-049 room {SPRING_ROOM_MIN:.4f}..{SPRING_ROOM_MAX:.4f} leaves the "
@@ -134,7 +148,7 @@ if abs(SPRING.MODEL_HEIGHT - SPRING_ROOM_NOMINAL) > 1e-9:
 SPRING_PRELOAD_N = (
     SPRING.RATE_N_PER_MM * (SPRING.FREE_HEIGHT - SPRING_ROOM_MAX),
     SPRING.RATE_N_PER_MM * (SPRING.FREE_HEIGHT - SPRING_ROOM_MIN),
-)  # 19.2 .. 38.9
+)  # 15.2 .. 38.9
 
 # --- Seated spacer face-grade enclosure --------------------------------------
 # These are the spacer's geometric grades, conditional on staying seated.
@@ -156,6 +170,14 @@ SPRING_RIM_CLEARANCE = (
 ) / 2.0  # 0.21
 if min(HEAD_RADIAL_CLEARANCE, SHOULDER_RADIAL_CLEARANCE, SPRING_RIM_CLEARANCE) <= 0.0:
     raise AssertionError("the pivot screw or its spring binds in the arm")
+# The MHA-VN-069 shim slides on the shoulder and, floated to one side on it,
+# stays inside the spot face.
+SHIM_BORE_CLEARANCE = (SHIM.ID_MIN - _SHOULDER_MAX) / 2.0
+SHIM_RIM_CLEARANCE = (
+    ARM.SPOT_FACE_DIA - SHIM.OD_MAX - (SHIM.ID_MAX - _SHOULDER_MIN)
+) / 2.0
+if min(SHIM_BORE_CLEARANCE, SHIM_RIM_CLEARANCE) <= 0.0:
+    raise AssertionError("the pivot shim binds on the shoulder or in the spot face")
 
 # --- MHA-VN-040 plate screws in the arm ------------------------------------------
 if PLATE_SCREW.THREAD != ARM.PLATE_TAP_SPEC.size:
@@ -522,15 +544,3 @@ def latch_pinion_drop(slack_along: float) -> float:
     same line, falls PIN_STATION * cos per radian."""
     turn = slack_along / HOOK.HOLE_STATION
     return turn * ARM.PIN_STATION * math.cos(_LATCH_THETA)
-
-
-# --- The MHA-VN-041 sheet's installation line ------------------------------------
-# The purchased sheet prints the registry's ``installation_notes``; the
-# drawing test holds that field equal to this text.
-# Pending exception ruling: MHA-VN-041 engagement (#1385).
-PIVOT_SCREW_INSTALLATION_NOTES = (
-    "INSTALLATION - THROUGH MHA-PD-020 AND MHA-PD-018 INTO THE MHA-PD-007 BLIND TAP.\n"
-    f"{PIVOT.THREAD} THREAD ENGAGEMENT {PIVOT_ENGAGEMENT_NOMINAL_D:.2f}D NOMINAL, "
-    f"{PIVOT_ENGAGEMENT_WORST_PRINTED:.2f}D MIN.\n"
-    "USE LOW-STRENGTH THREADLOCKER."
-)

@@ -58,7 +58,6 @@ def test_printed_bands_are_the_spec_bands() -> None:
     assert model_toleranced_dimensions(part) == {
         ("HangerRowReference", "name"): "HOLE_POSITION_BAND",
         ("ClampRowReference", "name"): "CLAMP_POSITION_BAND",
-        ("PivotTap", "DrillDepth"): "*PIVOT_TAP_DRILL_DEPTH_LIMITS",
         ("ClampSlotProfile", "ClampSlotWidth"): "*CLAMP_SLOT_WIDTH_LIMITS",
     }
     assert part.HANGER_STATION_NAMES == sheet_spec.HANGER_STATION_NAMES
@@ -67,7 +66,6 @@ def test_printed_bands_are_the_spec_bands() -> None:
     assert 'for name in ("HangerRowHeight", *HANGER_STATION_NAMES):' in source
     assert 'for name in ("ClampRowHeight", *CLAMP_STATION_NAMES):' in source
     assert spec.HOLE_POSITION_BAND == 0.065
-    assert spec.PIVOT_TAP_DRILL_DEPTH_LIMITS == (-0.4, 0.0)
     # The band's places print it whole: .XXX for ±0.065, .XX for the clamp
     # row's ±0.18. The bar bands ARE the title block's .XXX row, so their
     # three places alone carry them.
@@ -88,7 +86,6 @@ def test_printed_bands_are_the_spec_bands() -> None:
         == spec.BAR_HEIGHT_BAND
         == spec.BAR_DEPTH_BAND
     )
-    assert places["PivotTap"]["DrillDepth"] == 1
     # The slots' width at the round holes' .XX under their drilled limits;
     # travels and the counterbore's width at .XXX; its depth as the round
     # counterbores' (test_west_slots_take_up_the_column_pitch and
@@ -165,12 +162,6 @@ def test_single_limits_are_the_spec_limits() -> None:
         and getattr(node.func, "id", None) == "_single_limit"
     }
     assert calls == {
-        (
-            "'PivotThreadReference'",
-            "'ThreadMin'",
-            "PIVOT_TAP_FULL_THREAD_MIN",
-            "TOL_MIN",
-        ),
         ("'CountersinkReference'", "'PivotCskDia'", "PIVOT_TAP_CSK_DIA", "TOL_MAX"),
         (
             "'CountersinkReference'",
@@ -180,8 +171,21 @@ def test_single_limits_are_the_spec_limits() -> None:
         ),
     }
     assert (sheet_spec.TOL_MIN, sheet_spec.TOL_MAX) == (5, 6)
-    assert spec.PIVOT_TAP_FULL_THREAD_MIN == 5.2
     assert (spec.PIVOT_TAP_CSK_DIA, spec.BRACKET_TAP_CSK_DIA) == (4.3, 3.1)
+
+
+def test_pivot_tap_runs_through_countersunk_on_both_faces() -> None:
+    """User ruling 2026-10-15: the MHA-VN-041 tap runs THROUGH the bar so the
+    screw's faced tip sits below the front face and is staked at its mouth."""
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "ExtrusionParameters(depth=2.0 * BAR_DEPTH, both_directions=True)" in source
+    assert "for z_face in (-BACK_FACE_Z, BACK_FACE_Z)" in source
+    assert source.count("v_pivot_csk = 2 * math.pi") == 1
+    for retired in ("PIVOT_TAP_DRILL_DEPTH", "PIVOT_TAP_FULL_THREAD_MIN"):
+        assert not hasattr(spec, retired), retired
+    assert "PivotThreadReference" not in source
+    assert "PivotThreadReference" not in sheet_spec.DRAWING_DIMENSIONS
+    assert "PivotTap" not in sheet_spec.DRAWING_DIMENSIONS
 
 
 def test_row_nominals_are_the_built_holes() -> None:
@@ -407,6 +411,7 @@ def test_callouts_name_the_mates() -> None:
     for name in ("Height", "Depth", "HangerRowHeight", "PivotCskDia"):
         assert any(mate in callouts[name] for mate in _MATES), name
     assert "MHA-PD-011" in callouts["Height"]
+    assert "MHA-VN-041" in callouts["Depth"]
     assert "MHA-VN-043" in callouts["Depth"]
     assert "MHA-VN-041" in callouts["HangerRowHeight"]
     assert "MHA-PD-014" in callouts["HangerRowHeight"]
@@ -415,13 +420,10 @@ def test_callouts_name_the_mates() -> None:
     assert "MHA-PD-014" in callouts["BracketTapStation1"]
     assert "MHA-PD-014" in callouts["BracketTapStation2"]
     # The thread class is the title block's (rule 2), native callout too.
-    assert callouts["PivotTapDrillDia"] == "TAP #8-32 UNC"
+    assert callouts["PivotTapDrillDia"] == "TAP #8-32 UNC THRU"
     assert "2B" not in "".join(callouts.values())
     assert drawing._THREAD_CLASS_TOKEN == " <hw-threadclass>"
-    assert callouts["DrillDepth"] == "FLAT BOTTOM"
-    # Rule 20: the blind thread's shortfall against 1.5D, stated as a fact.
-    assert callouts["ThreadMin"] == "FULL THREAD (1.25D)"
-    assert spec.PIVOT_TAP_FULL_THREAD_MIN < 1.5 * spec.THREAD_MAJOR_MM["#8-32"]
+    assert callouts["PivotCskDia"].startswith("2X 90\u00b0 CSK BOTH FACES")
     assert callouts["BracketCskDia"].startswith("2X 90\u00b0 CSK")
     for text in callouts.values():
         assert len(text.splitlines()) <= 3
@@ -459,7 +461,7 @@ def test_slide_faces_carry_the_slide_grade() -> None:
 def test_build_authors_marks_properties_and_hides_references() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     for needle in (
-        'name_dimensions(adapter, "PivotTap", ["DrillDepth"])',
+        '"cut pivot tap drill (through)"',
         "apply_drawing_precision(adapter, SHEET_PRECISION)",
         "clear_dimensions_for_drawing(adapter)",
         "blank_reference_sketches(adapter, REFERENCE_SKETCHES)",

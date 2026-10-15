@@ -7,7 +7,7 @@ lives in ``_drawing_common``.  Dimension import and curation live in
 
 The sheet runs at 2:1 (the arc is 48 mm ear tip to ear tip); the isometric
 carries an explicit 1:1 override so it stays clear of the title block.  Two
-views in third-angle projection: the top view (the 17.9 x 48 plan carrying
+views in third-angle projection: the top view (the 17.4 x 48 plan carrying
 the column-relief arc, the bore axis centre-marked on the split face) and,
 projected to its left, the split face (the 48 x 16 face the relief opens
 into, turned so its 48 runs up the sheet beside the plan's, with the bore
@@ -89,9 +89,9 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (2.0, 1.0)
 _M = SHEET_SCALE[0] / 1000.0  # model mm -> sheet meters
 
-# Sheet layout (meters).  The model bbox runs 0..17.9 in X (split face, on
+# Sheet layout (meters).  The model bbox runs 0..17.4 in X (split face, on
 # the bore axis, to bar face), +/-8 in Y (height) and +/-24 in Z (width); each
-# view centres on that bbox.  At 2:1 the top view is 35.8 x 96 mm with +X
+# view centres on that bbox.  At 2:1 the top view is 34.8 x 96 mm with +X
 # right and +Z down, so the split face and the bore axis lie on its left edge,
 # level with the view centre.  The split-face view is the *Left view (looking
 # +X) turned a quarter turn clockwise: +Z runs down the sheet as in the top

@@ -2,8 +2,7 @@
 
 ``transgear_hanger_joints`` judges each joint at the worst case of the printed
 bands and refuses to import when one fails. These tests show that each check
-still fires when a mating number drifts, and that the MHA-VN-041 sheet line
-states the worst case it computes.
+still fires when a mating number drifts.
 """
 
 from __future__ import annotations
@@ -20,6 +19,7 @@ import transgear_hanger_joints as joints
 import paper_drive_arm_registration as registration
 import vn_transgear_latch_pin_spec as latch_pin
 import vn_transgear_pivot_screw_spec as pivot
+import vn_transgear_pivot_shim_spec as shim
 import pd_transgear_pivot_spacer_spec as spacer
 import vn_transgear_pivot_spring_spec as spring
 
@@ -33,15 +33,23 @@ def _reload_joints():
     return fresh
 
 
-def test_pivot_screw_refuses_a_tap_drill_it_can_bottom_in(monkeypatch) -> None:
-    assert joints.PIVOT_TIP_TO_DRILL_BOTTOM > 0.0
-    # The shallowest drill (depth minus its minus limit) now ends at the tip.
-    monkeypatch.setattr(
-        bar,
-        "PIVOT_TAP_DRILL_DEPTH",
-        pivot.THREAD_LEN - bar.PIVOT_TAP_DRILL_DEPTH_LIMITS[0],
+def test_pivot_screw_refuses_a_bar_too_thin_for_one_and_a_half_d(monkeypatch) -> None:
+    # Thinnest bar, deepest recess, one pitch charged at the faced tip and the
+    # vendor neck: (9.37 - 0.50) - 0.794 - 1.7653 = 6.311 = 1.515 D.
+    assert joints.PIVOT_ENGAGEMENT_WORST == pytest.approx(
+        bar.BAR_DEPTH
+        - bar.BAR_DEPTH_BAND
+        - pivot.TIP_RECESS[1]
+        - pivot.INCOMPLETE_TIP_LEN_MAX
+        - pivot.FULL_THREAD_START
     )
-    with pytest.raises(AssertionError, match="bottoms"):
+    assert joints.PIVOT_ENGAGEMENT_WORST_D == pytest.approx(1.515, abs=1e-3)
+    assert joints.PIVOT_STOCK_SHORTFALL_AT_THICKEST_BAR == pytest.approx(
+        0.113, abs=1e-3
+    )
+    # A .X depth band (+/-0.25) on the bar leaves 6.19 = 1.49 D: refused.
+    monkeypatch.setattr(bar, "BAR_DEPTH_BAND", 0.25)
+    with pytest.raises(AssertionError, match="worst engagement"):
         _reload_joints()
 
 
@@ -64,14 +72,37 @@ def test_the_spring_room_stays_inside_the_springs_catalogue_travel(
     corner, never pressed past its catalogue working height.  The old floor
     (7.00, the free pivot's 0.10..0.35 head play) leaves the spring loose."""
     assert joints.SPRING_ROOM_MIN == pytest.approx(0.70, abs=1e-9)
-    assert joints.SPRING_ROOM_MAX == pytest.approx(0.9508, abs=1e-9)
+    assert joints.SPRING_ROOM_MAX == pytest.approx(1.0008, abs=1e-9)
     assert spring.WORKING_HEIGHT <= joints.SPRING_ROOM_MIN
     assert joints.SPRING_ROOM_MAX < spring.FREE_HEIGHT
-    assert joints.SPRING_PRELOAD_N == pytest.approx((19.15, 38.91), abs=0.01)
+    assert joints.SPRING_PRELOAD_N == pytest.approx((15.21, 38.91), abs=0.01)
     for floor in (7.0, 6.5):
         monkeypatch.setattr(arm, "SPOT_FACE_FLOOR_FROM_FRONT", floor)
         with pytest.raises(AssertionError, match="leaves the spring"):
             _reload_joints()
+
+
+def test_the_shim_restores_the_spring_room_the_rearward_bar_took(monkeypatch) -> None:
+    """Ruling B (2026-10-15): the 9.5 bar grew 0.5 rearward and the spacer
+    gave it up (5.5 -> 5.0); the MHA-VN-069 shim under the head takes the 0.5
+    back, so the room keeps its 0.80 nominal and the spring its preload."""
+    assert spacer.LENGTH + shim.THICKNESS == pytest.approx(5.5)
+    assert joints.SPRING_ROOM_NOMINAL == pytest.approx(spring.MODEL_HEIGHT)
+    # The shim rides the shoulder and stays inside the arm's spot face.
+    assert shim.ID_MIN > pivot.SHOULDER_DIA + max(pivot.SHOULDER_DIA_LIMITS)
+    assert shim.OD_MAX < arm.SPOT_FACE_DIA
+    assert min(joints.SHIM_BORE_CLEARANCE, joints.SHIM_RIM_CLEARANCE) > 0.0
+    # The shim's catalogue minus limit is in the room's floor: a shim
+    # 0.10 thicker leaves the spring pressed past its working height.
+    monkeypatch.setattr(shim, "THICKNESS_MAX", shim.THICKNESS + 0.10)
+    with pytest.raises(AssertionError, match="leaves the"):
+        _reload_joints()
+
+
+def test_a_shim_that_cannot_pass_the_shoulder_is_refused(monkeypatch) -> None:
+    monkeypatch.setattr(shim, "ID_MIN", pivot.SHOULDER_DIA)
+    with pytest.raises(AssertionError, match="pivot shim binds"):
+        _reload_joints()
 
 
 def test_seated_hanger_enclosure_uses_actual_spacer_face_grades() -> None:
@@ -213,13 +244,6 @@ def test_plate_notch_face_clears_the_arm_edge_at_every_limit(monkeypatch) -> Non
         _reload_joints()
 
 
-def test_pivot_sheet_line_prints_a_worst_engagement_it_never_overstates() -> None:
-    printed = joints.PIVOT_ENGAGEMENT_WORST_PRINTED
-    assert printed <= joints.PIVOT_ENGAGEMENT_WORST_D < printed + 0.01
-    assert f"{printed:.2f}D MIN" in joints.PIVOT_SCREW_INSTALLATION_NOTES
-    assert "MHA-PD-007 BLIND TAP" in joints.PIVOT_SCREW_INSTALLATION_NOTES
-
-
 def test_pivot_engagement_starts_below_the_vendor_thread_neck(monkeypatch) -> None:
     # Every 0.02 the full thread starts lower costs 0.02 of engagement...
     monkeypatch.setattr(pivot, "FULL_THREAD_START", pivot.FULL_THREAD_START + 0.02)
@@ -231,9 +255,9 @@ def test_pivot_engagement_starts_below_the_vendor_thread_neck(monkeypatch) -> No
     assert math.isclose(
         joints.PIVOT_ENGAGEMENT_WORST - fresh.PIVOT_ENGAGEMENT_WORST, 0.02, abs_tol=1e-9
     )
-    # ...and past the approved shortfall the joint is refused.
+    # ...and below 1.5 D the joint is refused.
     monkeypatch.setattr(pivot, "FULL_THREAD_START", pivot.FULL_THREAD_START + 0.3)
-    with pytest.raises(AssertionError, match="approved shortfall"):
+    with pytest.raises(AssertionError, match="worst engagement"):
         _reload_joints()
 
 

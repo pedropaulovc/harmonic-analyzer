@@ -12,13 +12,15 @@ from __future__ import annotations
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from sh_column_clamp_front_geom import BAR_DEPTH as BAR_DEPTH
 
 
 # --- bar section + length (DIMENSIONS.md ch21; M6.8 ch30 8-view pass) ----------
 BAR_SIDE = 10.0  # tall (Y)
-BAR_DEPTH = 9.0  # deep (Z) -- support-bar stock; back face seats on the clamp arc
+# BAR_DEPTH (deep, Z) is the support-bar stock's (sh_column_clamp_front_geom);
+# the back face seats on the clamp arc.
 # The front face in the machine frame: the front clamp arc's front face
-# (-129.9) less BAR_DEPTH, the plane the platen's back face shares
+# (-129.4) less BAR_DEPTH, the plane the platen's back face shares
 # (build_mg_magnifier_assembly asserts it against the clamp chain). The wheel
 # axle's press gauge and the axial stack on it read from here (mg_wheel_group).
 BAR_FRONT_Z = -138.9

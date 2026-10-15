@@ -9,7 +9,7 @@ and tempered blue.  It replaces the old edgewise strip, its riveted L
 bracket and the two rivets:
 
 * the BASE lies flat on the MHA-PD-007 support bar's back face (machine z
-  -129.9) in the bar's lock-free band (y 299.2..307.2) and takes the two
+  -129.4) in the bar's lock-free band (y 299.2..307.2) and takes the two
   MHA-VN-043 #4-40 screws into the bar's through taps (x 65.0 / 72.0,
   y 303.234);
 * at the base's +X end a 90 deg bend (inside R1.2) raises the EAR rearward
@@ -47,7 +47,7 @@ Part frame (axes parallel to the machine's; the assembly places the part by
 translation only, ``PART_ORIGIN_MACHINE``):
 
 * origin = the ear's outer (+X) face, the base's underside (on the bar)
-  and the base's low-Y edge (machine (X_B, 299.2, -129.9));
+  and the base's low-Y edge (machine (X_B, 299.2, -129.4));
 * Right plane (x = 0) = the ear's outer face, the bend's outer tangent and
   the datum for the screw holes, drilled after bending;
 * Front plane (z = 0) = the base's underside on the bar's back face;
@@ -61,7 +61,9 @@ from __future__ import annotations
 
 import math
 
+from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
 from pd_support_bar_spec import BRACKET_TAP_X, HANGER_TAP_Y, PIVOT_TAP_X
+from sh_column_clamp_front_geom import ARC_DEPTH
 from pd_transgear_arm_geometry import ARM_ANGLE_DEG, PIN_MACHINE_Z
 from vn_transgear_latch_pin_spec import DIA_MAX as PIN_DIA_MAX
 
@@ -72,11 +74,11 @@ SHEET_T_MINUS = 0.03  # stock band: the thinnest
 HALF_T = SHEET_T / 2.0
 
 # --- Machine anchors -------------------------------------------------------------
-# The support bar sits unrotated at machine (0, BAR_CENTRE_Y, -134.4) with its
-# back face at z -129.9 (pd_support_bar_spec's frame), so a bar-frame X is a
-# machine X and a bar-frame Y is BAR_CENTRE_Y above.
+# The support bar sits unrotated with its back face on the front clamp arcs
+# (z -129.4, pd_support_bar_spec's frame), so a bar-frame X is a machine X and
+# a bar-frame Y is BAR_CENTRE_Y above.
 BAR_CENTRE_Y = 303.734
-BAR_BACK_FACE_Z = -129.9
+BAR_BACK_FACE_Z = FRAME_FRONT_COLUMN_Z - ARC_DEPTH
 # The hanger's pivot P and its latched direction U (the arm geometry's
 # ARM_ANGLE_DEG, set by the pressed stud's station); N = U turned +90 deg.
 PIVOT_XY = (PIVOT_TAP_X, BAR_CENTRE_Y + HANGER_TAP_Y)  # (-58, 303.234)

@@ -280,8 +280,9 @@ def test_wheel_pin_press_pair_pins_the_pin_and_bar_bore() -> None:
 
     pairs = interference.allowed_interference_pairs("mg-magnifier")
     limit = pairs[frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1"))]
+    # The pin stands in the bore over its nominal 8.9 (back end 0.60 inside
+    # the 9.5 bar), inside the contract's 9.0.
+    assert -pin.BACK_Y <= 9.0 < bar.BAR_DEPTH
     assert limit == pytest.approx(
-        interference._smooth_annulus_limit_mm3(
-            pin.PIN_DIA, bar.AXLE_BORE_DIA, bar.BAR_DEPTH
-        )
+        interference._smooth_annulus_limit_mm3(pin.PIN_DIA, bar.AXLE_BORE_DIA, 9.0)
     )

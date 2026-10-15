@@ -38,6 +38,7 @@ import pd_transgear_removable_spec as sprocket
 import transgear_cluster_fit as cluster_fit
 import transgear_hanger_joints as joints
 import vn_transgear_knob_cup_pin_spec as cup_pin
+import vn_transgear_pivot_screw_spec as pivot_screw
 
 STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
 # Default-format note text, measured on r743-rocker-fix3's render (leaf
@@ -76,6 +77,7 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-transgear-pivot-spacer": 1,
     "vn-transgear-pivot-screw": 1,
     "vn-transgear-pivot-spring": 1,
+    "vn-transgear-pivot-shim": 1,
     "vn-transgear-latch-pin": 1,
     "vn-latch-hook-bracket-screw": 2,
     "pd-latch-hook": 1,
@@ -810,12 +812,23 @@ def test_the_knob_stack_prints_front_to_rear() -> None:
     assert body.index("REAR BOSS") < body.index(_number("pd-transgear-knob-cup"))
 
 
-def test_the_pivot_screw_is_threadlocked_and_the_spacer_pressed_as_made() -> None:
-    """R9-7 adds threadlocker to MHA-VN-041; R9-6 never faces MHA-PD-020.  R9-71:
-    the spacer is pressed on the shoulder flush with its end, and the MHA-VN-049
-    spring under the head holds the arm on it."""
+def test_the_pivot_screw_is_staked_and_the_spacer_pressed_as_made() -> None:
+    """Rule 23: MHA-VN-041 runs through the bar, its tip faced below the
+    front face and staked there, shown in the pivot view; threadlocker is
+    optional. R9-6 never faces MHA-PD-020.  R9-71: the spacer is pressed on
+    the shoulder flush with its end, and the MHA-VN-049 spring under the
+    MHA-VN-069 shim holds the arm on it."""
     body = _step_body("hanger-pivoted")
-    assert "LOW-STRENGTH THREADLOCKER" in body
+    low, high = pivot_screw.TIP_RECESS
+    assert "THREADLOCKER OPTIONAL" in body
+    assert "BLIND" not in body
+    assert "THROUGH TAP" in body
+    assert f"{low:.2f} TO {high:.2f} BELOW THE BAR'S FRONT FACE" in body
+    assert "STAKE THE FRONT TAP MOUTH ONTO THE TIP" in body
+    assert drawing.PIVOT_VIEW_REF in body
+    assert body.index(_number("vn-transgear-pivot-shim")) < body.index(
+        _number("vn-transgear-pivot-spring")
+    )
     assert _number("vn-transgear-pivot-screw") in body
     assert _number("pd-transgear-pivot-spacer") in body
     assert _number("vn-transgear-pivot-spring") in body
@@ -844,20 +857,54 @@ def test_the_fitup_acceptance_prints_the_contract_bands() -> None:
     assert "HEAD PLAY" not in body
 
 
+def test_the_pivot_view_and_its_notes_keep_to_sheet_two_left_field() -> None:
+    cx, cy = drawing.PIVOT_VIEW_CENTER
+    r = drawing.PIVOT_VIEW_RADIUS
+    ring_left, _bottom, _right, ring_top = drawing.SHEET_TWO_RING_LIMITS
+    assert cx + r < ring_left - drawing.SHEET_TWO_RING_GAP
+    assert cx - r > 0.018
+    stake_lines = drawing.PIVOT_STAKE_NOTE.splitlines()
+    caption_lines = drawing.PIVOT_CAPTION.splitlines()
+    for text, (x, _y) in (
+        (drawing.PIVOT_STAKE_NOTE, drawing.PIVOT_STAKE_NOTE_XY),
+        (drawing.PIVOT_CAPTION, drawing.PIVOT_CAPTION_XY),
+    ):
+        assert x > 0.018
+        assert x + max(map(len, text.splitlines())) * NOTE_CHAR_WIDTH < ring_left
+    stake_top = drawing.PIVOT_STAKE_NOTE_XY[1]
+    assert stake_top <= ring_top
+    assert stake_top - len(stake_lines) * NOTE_LINE_PITCH > cy + r
+    caption_top = drawing.PIVOT_CAPTION_XY[1]
+    assert caption_top < cy - r
+    assert caption_top - len(caption_lines) * NOTE_LINE_PITCH > (
+        drawing.SHEET_INNER_BORDER_BOTTOM
+    )
+    # The circle frames the screw from its head to the bar's front face.
+    assert drawing.PIVOT_FRONT_FACE_Y == pytest.approx(
+        -(pivot_screw.SHOULDER_LEN + assembly.BAR.BAR_DEPTH)
+    )
+    assert drawing.PIVOT_VIEW_INSTANCES >= {
+        "pd-support-bar-1",
+        "vn-transgear-pivot-screw-1",
+        "vn-transgear-pivot-shim-1",
+    }
+
+
 def test_the_actual_collar_disc_overlap_is_checked_before_final_platen_installation() -> None:
     """A static F-to-disc setting cannot certify all loaded overlapping patches."""
     assert _step_body("platen-hung").startswith("TRIAL-HANG")
     inspected = _step_body("collar-disc-air-inspected")
     assert "CHAIN OFF" in inspected
-    assert "REMOVE THE TRIAL PLATEN" in inspected
+    assert f"REMOVE THE {_number('pd-platen')} PLATEN" in inspected
+    assert "TRIAL PLATEN" not in inspected
     assert "ARM HELD IN ITS OPERATING LATCH POSE" in inspected
     assert " ".join(collar.COLLAR_DISC_AIR_PHRASE.split()) in inspected
     assert f"ONE DISC TURN = {disc.TEETH / knob_shaft.TEETH:g} KNOB TURNS" in inspected
-    assert "REFIT THE PLATEN AND LOCK THE ASSEMBLY" in inspected
+    assert "REFIT THE PLATEN AND LATCH THE HANGER" in inspected
     assert "RE-CHECK THE OVERLAP AIR AND RACK MESH" in inspected
     assert "BIASED" not in inspected
     assert steps.COLLAR_DISC_AIR_MIN == collar.COLLAR_DISC_AIR_MIN
-    assert "AT OVERLAP AFTER REFITTING AND LOCKING" in _step_body("fitup-accepted")
+    assert "AT OVERLAP AFTER REFITTING AND LATCHING" in _step_body("fitup-accepted")
     keys = (
         "hook-pin-hole-match-drilled",
         "collar-shoulder-seated",
@@ -893,7 +940,27 @@ def test_the_rear_cup_is_pinned_and_the_nut_seats_on_the_faced_pilot() -> None:
     assert seq.index("pilot-faced-to-fit") < seq.index("knob-stack-fitted")
     assert seq.index("pilot-faced-to-fit") < seq.index("collar-shoulder-seated")
     assert f"{collar.PILOT_PROUD_TEXT} PROUD" in _step_body("pilot-faced-to-fit")
-    assert _step_body("collar-shoulder-seated").endswith("NUT TIGHT ON THE PILOT.")
+    seated = _step_body("collar-shoulder-seated")
+    assert "NUT TIGHT ON THE PILOT." in seated
+    # The nut is a static clamp (the D-flat and dowels drive): rule 23's
+    # U-MHA-PD-013-no-lock holds only while nobody turns it to drive.
+    assert seated.endswith("THUMBNUT IS A CLAMP ONLY; NEVER TURNED TO DRIVE.")
+
+
+def test_the_knob_and_its_grip_are_defined_and_service_turns_the_crank() -> None:
+    knob = _step_body("knob-stack-fitted")
+    chain_step = steps.step_number("chain-closed")
+    assert knob.endswith(
+        "THIS SHAFT IS THE KNOB; ITS GRIP IS THE COLLAR: HOLD OR TURN THE KNOB BY "
+        f"IT TILL STEP {chain_step}, THEN TURN THE CRANK."
+    )
+    assert "KNOB HELD" in _step_body("hanger-meshed")
+    assert steps.SEQUENCE.index("knob-stack-fitted") < steps.SEQUENCE.index(
+        "hanger-meshed"
+    )
+    assert _step_body("chain-run-accepted").startswith("TURN THE CRANK")
+    for key in steps.SEQUENCE[chain_step - 1 :]:
+        assert "TURN THE KNOB" not in _step_body(key), key
 
 
 def test_the_fitted_collar_rear_face_reacts_on_the_actual_gear_shoulder() -> None:
@@ -1469,8 +1536,15 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     # The one-piece hook's pin hole is drilled from the pin at the set mesh,
     # then the part is hardened: no fitter-measured set position remains.
     assert "DRAWN PLACE" not in hook
-    assert "HARDEN AND TEMPER BLUE" in hook
-    assert hook.endswith("UNCLAMP, LATCH, RE-RUN THE DEFINED ENGAGED-FEED WINDOW.")
+    # Rule 24: the heat treatment is the hook drawing's; the re-run re-checks
+    # step 24's datum shake (rule 4: the drilled hole must keep that band).
+    hook_number = drawing._N["pd-latch-hook"]
+    assert f"HARDEN AND TEMPER PER {hook_number}." in hook
+    assert "BLUE" not in hook
+    assert hook.endswith(
+        "UNCLAMP, LATCH, RE-RUN THE DEFINED ENGAGED-FEED WINDOW; RE-CHECK "
+        f"{steps.RACK_DATUM_BACKLASH_TEXT} SHAKE AT THE DATUM."
+    )
 
 
 def test_the_loaded_rack_check_is_one_dial_run_over_the_engaged_window() -> None:

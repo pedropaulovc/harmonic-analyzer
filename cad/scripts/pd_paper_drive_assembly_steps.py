@@ -175,8 +175,9 @@ def matched_locator_notes(
 # --- Values the procedure owns (CONTRACT-paper-drive.md §13.2) --------------
 # A reference operating quantity, not a second gear-data block. The current
 # travel law uses the reference pitch circle. A finite cutter's setting
-# changes the tooth boundary, not the feed per revolution.
-PAPER_FEED_REFERENCE_PLACES = 6
+# changes the tooth boundary, not the feed per revolution. A reference value
+# prints to three places (machinist review: six read as a demanded precision).
+PAPER_FEED_REFERENCE_PLACES = 3
 PAPER_TRAVEL_PER_CRANK_TEXT = format(
     paper_geometry.NET_RACK_TRAVEL_PER_CRANK_REV,
     f".{PAPER_FEED_REFERENCE_PLACES}f",

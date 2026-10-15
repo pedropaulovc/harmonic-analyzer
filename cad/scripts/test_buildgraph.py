@@ -134,7 +134,7 @@ _INSERTED_SOURCES = {
     "pd_transgear_disc_hub vn_transgear_disc_screw pd_transgear_drive_collar pd_transgear_feed_pinion "
     "pd_transgear_knob_cup vn_transgear_knob_cup_pin vn_transgear_knob_drive_pin "
     "pd_transgear_knob_shaft pd_transgear_knob_thrust_ring vn_transgear_latch_pin vn_transgear_pivot_screw "
-    "pd_transgear_pin pd_transgear_pivot_spacer vn_transgear_pivot_spring pd_transgear_rear_bushing "
+    "pd_transgear_pin pd_transgear_pivot_spacer vn_transgear_pivot_spring vn_transgear_pivot_shim pd_transgear_rear_bushing "
     "pd_transgear_front_bushing "
     "pd_transgear_removable vn_transgear_retaining_ring "
     "pd_transgear_thumbnut",
