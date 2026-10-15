@@ -30,7 +30,6 @@ from _check import check
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
-from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _sketch import SketchDims, add_line_chain, ensure_fully_defined
 from _sketch_chains import define_rectilinear_chain
@@ -52,7 +51,7 @@ async def build_arc(
     front: bool,
     hole_spec: HoleSpec,
     grip_offset: float = 0.0,
-) -> dict[str, str]:
+) -> None:
     """Build one semi-arc shell: ``front=True`` spans local x 0..depth (relief
     cut opening -X toward the column), ``front=False`` spans x
     -depth..-grip_offset. Each caller passes its own ear-hole ``HoleSpec`` (the
@@ -60,7 +59,9 @@ async def build_arc(
     clearance). ``grip_offset`` is the back arc's alone (the front's mating face
     stays on the column-axis plane), and it must be positive there. Both arcs
     name their height (``Height@Block``) and ear-hole stations from the bore
-    axis (``EarHole1Z``/``EarHole2Z@EarHoles``) for their prints."""
+    axis (``EarHole1Z``/``EarHole2Z@EarHoles``) for their prints. It leaves the
+    part unsaved: each caller applies its drawing support (bands, places, marks,
+    title-block properties) and then saves ONCE, like every other part builder."""
     if front and grip_offset != 0.0:
         raise ValueError("only the back arc's mating face is offset from the axis")
     if not front and not 0.0 < grip_offset < COLUMN_BORE / 2.0:
@@ -211,4 +212,3 @@ async def build_arc(
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, part_name)

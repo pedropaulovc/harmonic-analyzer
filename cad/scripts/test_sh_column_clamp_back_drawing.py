@@ -81,6 +81,7 @@ def test_tight_bands_name_their_mate() -> None:
     assert f"{fit.BORE_DIAMETRAL_CLEARANCE[0]:.2f}" in bore
     assert "MHA-SH-001" in drawing.DIMENSION_CALLOUTS["GripOffset"]
     assert "MHA-SH-001" in drawing.ABOVE_CALLOUTS["EarHole1Z"]
+    assert "\n" not in drawing.ABOVE_CALLOUTS["EarHole1Z"]
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "GRIP_OFFSET_BAND" in source and "EAR_STATION_BAND" in source
 

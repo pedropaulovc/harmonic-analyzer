@@ -75,6 +75,7 @@ def test_bore_prints_the_grip_budget_on_the_column() -> None:
     assert f"{spec.BORE_DIAMETRAL_CLEARANCE[1]:.2f}" in bore
     assert spec.BORE_DIAMETRAL_CLEARANCE[1] <= 0.30
     assert "MHA-SH-002" in drawing.ABOVE_CALLOUTS["EarHole1Z"]
+    assert "\n" not in drawing.ABOVE_CALLOUTS["EarHole1Z"]
     assert min(spec.WALLS_WORST.values()) >= spec.WALL_TARGET
 
 

@@ -52,12 +52,11 @@ async def build(adapter) -> dict[str, str]:
         hole_spec=HOLE_SPEC,
         grip_offset=GRIP_OFFSET,
     )
-    # Manufacturing drawing support, applied AFTER the shared builder's gated
-    # save (as build_sh_column_clamp_front does): the explicit bands (the grip
+    # Manufacturing drawing support, applied to the unsaved model the shared
+    # builder leaves behind and saved ONCE below: the explicit bands (the grip
     # offset and the ear stations, sh_column_clamp_fit) and every printed
     # dimension's places live on the model, then mark exactly the print's
-    # dimensions and stamp the make-critical title-block properties, and
-    # re-save so the shipped SLDPRT carries them.
+    # dimensions and stamp the make-critical title-block properties.
     set_dimension_symmetric_tolerance(
         adapter, "BlockProfile", "GripOffset", GRIP_OFFSET_BAND
     )
