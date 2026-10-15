@@ -123,10 +123,34 @@ def test_fit_budget_closes_at_the_printed_limits() -> None:
     assert fit.EAR_SCREW_MISMATCH_MAX < fit.SCREW_FLOAT
 
 
-def test_walls_hold_the_rule_17_target_at_the_printed_worst_case() -> None:
-    assert min(spec.WALLS_WORST.values()) >= spec.WALL_TARGET
-    # The back wall the deepened arc buys (user ruling 2026-10-14).
-    assert math.isclose(spec.BACK_WALL_MIN, 0.4 + 14.49 - 12.85)
+def test_column_limit_is_the_a513_dom_table_row() -> None:
+    # The cited table applies only while MHA-FR-003 is bought as A513 Type 5
+    # (DOM) 1 x .120 in tube: OD 0.500-1.699 in carries +0.005 / -0.000 in.
+    tube = _config.parts("fr-tube-frame")
+    assert tube["number"] == "MHA-FR-003"
+    assert tube["material_specification"].startswith("ASTM A513 T5 ")
+    assert "DOM 1x.120in" in tube["material_specification"]
+    assert math.isclose(fit.COLUMN_OD_MAX, 25.4 + 0.127)
+    assert math.isclose(fit.BORE_RADIUS_MAX, (25.527 + 0.30) / 2.0)
+
+
+def test_walls_at_the_largest_column_and_drill_wander() -> None:
+    # Independent oracle from literals: the largest A513 column (25.527) at the
+    # loosest 0.30 clearance, the printed .XX/.X limits, and 0.3 deg of drill
+    # wander over the through tap's deepest printed length (15.0 + 0.51).
+    r_bore = (25.527 + 0.30) / 2.0
+    wander = 15.51 * math.tan(math.radians(0.3))
+    reach = 4.166 / 2.0 + wander
+    assert math.isclose(spec.BACK_WALL_MIN, 0.4 + 14.49 - r_bore)  # 1.9765
+    assert math.isclose(spec.WALLS_WORST["ear to bore"], 17.4 - reach - r_bore)
+    assert math.isclose(spec.WALLS_WORST["ear to far side"], 47.2 - 24.8 - 17.6 - reach)
+    assert min(spec.WALLS_WORST.values()) >= 1.5
+    # The back wall reaches the 2.0 target only on a column of at most 25.48;
+    # A513 admits 25.527, so it is a rule-20 shortfall pending an owner ruling.
+    column_at_target = 2.0 * (0.4 + 14.49 - 2.0) - 0.30
+    assert math.isclose(column_at_target, 25.48)
+    assert column_at_target < fit.COLUMN_OD_MAX
+    assert set(spec.RULE_20_SHORTFALLS) == {"back wall"}
 
 
 def test_tight_bands_name_their_mate() -> None:

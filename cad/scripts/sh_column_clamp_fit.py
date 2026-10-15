@@ -19,11 +19,13 @@ at the printed worst case, and each sheet prints its share:
   and height together, must stay inside that hole's radial float on the
   screw's major diameter.
 
-The column is purchased 1 in DOM tube with no band in the repository
-(``fr_tube_frame_spec.OUTER_DIA``), so the bores are MATCHED to the column
-they clamp: each sheet prints its bore as a reference nominal with this
-diametral-clearance acceptance on MHA-FR-003, never a free-standing size band
-(drawing-guidelines.md rule 4, matched pairs).
+The column is purchased 1 x .120 in ASTM A513 Type 5 (DOM) tube
+(``fr_tube_frame_spec.OUTER_DIA``; MHA-FR-003 prints its OD as a reference
+only), so the bores are MATCHED to the column they clamp: each sheet prints
+its bore as a reference nominal with this diametral-clearance acceptance on
+MHA-FR-003, never a free-standing size band (drawing-guidelines.md rule 4,
+matched pairs).  The walls are judged on the largest bore that acceptance
+admits on the largest tube A513 admits (``COLUMN_OD_MAX``).
 """
 
 from __future__ import annotations
@@ -31,7 +33,7 @@ from __future__ import annotations
 import math
 
 from _hole_spec import blind_cut_dia_mm
-from fr_tube_frame_spec import OUTER_DIA as COLUMN_DIA
+from fr_tube_frame_spec import MM_PER_IN, OUTER_DIA as COLUMN_DIA
 from sh_column_clamp_back_geom import GRIP_OFFSET
 from sh_column_clamp_front_geom import COLUMN_BORE, EAR_HOLE_SPEC
 from vn_clamp_screw_spec import SHANK_DIA as CLAMP_SCREW_MAJOR
@@ -71,7 +73,9 @@ if GRIP_GAP_MIN <= 0.0:
 # Radial float of the screw major in the front ear's clearance hole (least
 # hole: the DRILLED HOLES row's minus is 0), and what the two printed ear
 # stations spend of it at worst (one arc's +band against the other's -band).
-# The remainder is left for drill wander down the 15-17.9 deep ear holes.
+# The remainder (0.12 after the height mismatch below) is under the 0.18 the
+# two ear holes' full-depth EAR_DRILL_WANDER_DEG can add: pending owner ruling
+# with the walls (PR #1467 round-3 review).
 SCREW_FLOAT = (blind_cut_dia_mm(EAR_HOLE_SPEC) - CLAMP_SCREW_MAJOR) / 2.0
 EAR_STATION_MISMATCH_MAX = 2.0 * EAR_STATION_BAND
 if EAR_STATION_MISMATCH_MAX >= SCREW_FLOAT:
@@ -93,6 +97,26 @@ if EAR_SCREW_MISMATCH_MAX >= SCREW_FLOAT:
         f"{SCREW_FLOAT:.3f} screw float"
     )
 
-# Largest seated bore radius on a nominal column (the column's own size is the
-# purchased tube's, matched by both bores).
-BORE_RADIUS_MAX = (COLUMN_DIA + BORE_DIAMETRAL_CLEARANCE[1]) / 2.0
+# The largest incoming column: ASTM A513 round tubing, Types 5/6 (DOM), OD
+# 0.500-1.699 in: +0.005 / -0.000 in.  At a .120 wall (12 % of OD, over the
+# table's 3 % threshold) the ovality lies inside that band, so no diameter of
+# the tube exceeds it.  Read 2026-10-15 from the A513 table as republished by
+# Boyer Steel (https://www.boyersteel.com/resource-astm-specifications/a513-t-5-d-o-m/)
+# and Amardeep Steel (https://www.amardeepsteel.com/a513-dom-tubing.html);
+# the material row is cad/config/parts/fr-tube-frame.yaml.
+COLUMN_OD_PLUS_IN = 0.005
+COLUMN_OD_MAX = COLUMN_DIA + COLUMN_OD_PLUS_IN * MM_PER_IN  # 25.527
+# Largest seated bore radius: the largest column's bore at the loosest
+# accepted clearance.
+BORE_RADIUS_MAX = (COLUMN_OD_MAX + BORE_DIAMETRAL_CLEARANCE[1]) / 2.0  # 12.9135
+
+# drawing-guidelines.md rule 17 (walls and webs): realistic drill wander on
+# the 15-18.4 deep ear holes, the repository's 0.3 deg angular allowance
+# (fr_top_frame_spec.KEEPER_TAP_DRILL_WANDER_DEG), charged over each hole's
+# full printed depth in every direction: the shop may enter from either face.
+EAR_DRILL_WANDER_DEG = 0.3
+EAR_DRILL_DRIFT_PER_MM = math.tan(math.radians(EAR_DRILL_WANDER_DEG))  # 0.00524
+
+# drawing-guidelines.md rule 17: wall target and hard floor.
+WALL_TARGET = 2.0
+WALL_FLOOR = 1.5
