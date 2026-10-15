@@ -30,7 +30,10 @@ wires:
 
 * eye, plane z = EYE_LOOP_Z: the chain crosses the eye along X, its rod
   bearing on the inside of the loop's bottom wire with a bead either side.
-* ring, plane z = RING_PLANE_Z: the same wrap on the ring's lowest point.
+* ring, plane z = RING_PLANE_Z: the ring lies flat in the pin's axial plane,
+  hanging outboard (-X) past the pin's big end (owner ruling 2026-10-15 A1),
+  and the chain drapes over its outboard wire, rod across the wire's top
+  and a bead either side.
 * two strands join the wraps round the arm's -X edge, nested so they never
   cross. The inner strand runs from the eye's +X bead to the ring's hub-side
   bead, beside the edge at INNER_SIDE_X. The outer strand runs from the eye's
@@ -46,14 +49,18 @@ from __future__ import annotations
 
 import math
 
-from dt_crank_arm_spec import ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ARM_THICKNESS, HALF_WIDTH
+from dt_crank_arm_spec import ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ARM_C2C
+from dt_crank_arm_spec import ARM_THICKNESS, HALF_WIDTH
 from dt_crank_hub_geometry import HUB_BARREL_DIA, HUB_LENGTH, SERVICE_PIN_STATION
 from dt_crank_pin_eye_spec import ANCHOR_AIR, LOOP_ID_MIN, LOOP_INNER_R, LOOP_R
 from dt_crank_pin_eye_spec import TAIL_LEN as EYE_TAIL_LEN
 from dt_crank_pin_eye_spec import WIRE_DIA as EYE_WIRE_DIA
-from dt_crank_pin_ring_spec import MEAN_R, PIN_PROUD, RING_BOTTOM_X, RING_CENTRE_X
+from dt_crank_pin_ring_spec import ARC_SAGITTA, MEAN_R, PIN_BAND
+from dt_crank_pin_ring_spec import PIN_DIA_AT_HOLE, PIN_PROUD
+from dt_crank_pin_ring_spec import RING_CENTRE_X, RING_FAR_X, RING_ID_MAX
 from dt_crank_pin_ring_spec import WIRE_DIA as RING_WIRE_DIA
-from dt_crank_pin_spec import BIG_END_DIA, PIN_LENGTH, RING_HOLE_X, SMALL_END_DIA
+from dt_crank_pin_spec import BIG_END_DIA, PIN_LENGTH, RING_HOLE_DIA
+from dt_crank_pin_spec import RING_HOLE_X, SMALL_END_DIA
 from vn_fillister_screw_spec import HEAD_DIA as SCREW_HEAD_DIA
 from vn_fillister_screw_spec import HEAD_H as SCREW_HEAD_H
 from vn_fillister_screw_spec import SHANK_DIA as SCREW_SHANK_DIA
@@ -121,8 +128,36 @@ EYE_ROOT: Vec = (
 )
 EYE_LOOP_CENTRE: Vec = (EYE_ROOT[0], EYE_ROOT[1], EYE_ROOT[2] - LOOP_R)
 EYE_LOOP_Z = EYE_LOOP_CENTRE[2]
-# The chain wraps the ring's lowest point, in the pin axis's z plane.
+# The ring swings freely about the cross-hole axis (machine z). Owner ruling
+# 2026-10-15 A1: it is posed flat in the pin's axial plane, hanging outboard
+# along RING_HANG past the pin's big end and clear of the arm's -X edge; hung
+# toward -Y along the arm (the Ø12 ring, option A) its low arc dipped 0.9
+# into the arm's inboard face. The chain drapes over its outboard wire, in
+# the pin axis's z plane.
+RING_HANG: Vec = (-1.0, 0.0, 0.0)
+RING_CENTRE: Vec = (RING_X - RING_CENTRE_X, 0.0, PIN_Z)
+RING_OUT_X = RING_X - RING_FAR_X  # the wire centreline's outboard extreme
 RING_PLANE_Z = PIN_Z
+
+# In the A1 plane the wire leaves the cross-hole along the pin's straight top
+# and bottom lines, so the hole's edges, not its wall, are the tight points:
+# the outboard edge sits inside the arc, the hub-side edge outside it, and the
+# crown rides ARC_SAGITTA / 2 hub-side of the axis.
+_HOLE_R = RING_HOLE_DIA / 2.0
+_PIN_R_AT_HOLE = PIN_DIA_AT_HOLE / 2.0
+A1_HOLE_AIR = (
+    min(
+        MEAN_R - math.hypot(RING_CENTRE_X - _HOLE_R, _PIN_R_AT_HOLE),
+        math.hypot(RING_CENTRE_X + _HOLE_R, _PIN_R_AT_HOLE) - MEAN_R,
+        _HOLE_R - ARC_SAGITTA / 2.0,
+    )
+    - RING_WIRE_DIA / 2.0
+)
+if A1_HOLE_AIR <= 0.0:
+    raise AssertionError(
+        f"the nominal keeper ring posed in the pin's axial plane leaves "
+        f"{A1_HOLE_AIR:.3f} air at the cross-hole's edges"
+    )
 
 # The pin comes out along -X until its small end clears the hub barrel, plus
 # a finger's grip of margin.
@@ -153,6 +188,74 @@ def _norm(a: Vec) -> float:
 
 def _dist(a: Vec, b: Vec) -> float:
     return _norm(_sub(a, b))
+
+
+# Owner ruling 2026-10-15 A1, worst case: the smallest printed ring on the
+# pin's fattest printed section pinches the hole's outboard edge in this plane
+# (-0.057 centred in the hole, -0.010 at its best slide), so it comes to rest
+# swung about the hole axis, zero air from ~25 degrees off the plane. Its
+# threading air (dt_crank_pin_ring_spec.HOLE_AIR_WORST) is in the hole's own
+# section and holds at every swing; the arm must clear it over that range.
+RING_REST_SWING_DEG = 25.0
+RING_ARM_AIR = 0.1  # least air between the ring and the arm over the swing
+
+
+def _arm_gap(p: Vec) -> float:
+    """Distance from p to the arm: the R HALF_WIDTH stadium from the crank
+    axis down to the handle pivot, z 0..ARM_THICKNESS (0 inside)."""
+    x, y, z = p
+    radial = max(0.0, math.hypot(x, y - min(0.0, max(-ARM_C2C, y))) - HALF_WIDTH)
+    axial = max(0.0, ARM_Z[0] - z, z - ARM_Z[1])
+    return math.hypot(radial, axial)
+
+
+def ring_arm_air(
+    swing_deg: float, mean_r: float, crown: float, hole_x: float, samples: int = 360
+) -> float:
+    """Air between a keeper ring's wire and the arm.
+
+    The ring's plane holds the hole axis, swung ``swing_deg`` from RING_HANG
+    toward -Y; its wire centreline (radius ``mean_r``) crowns ``crown`` hub-side
+    of a hole at machine x ``hole_x``.
+    """
+    a = math.radians(swing_deg)
+    hang = (RING_HANG[0] * math.cos(a), -math.sin(a), 0.0)
+    centre = _add((hole_x, 0.0, PIN_Z), _scale(hang, mean_r - crown))
+    return (
+        min(
+            _arm_gap(
+                _add(
+                    centre,
+                    _add(
+                        _scale(hang, mean_r * math.cos(2.0 * math.pi * k / samples)),
+                        (0.0, 0.0, mean_r * math.sin(2.0 * math.pi * k / samples)),
+                    ),
+                )
+            )
+            for k in range(samples)
+        )
+        - RING_WIRE_DIA / 2.0
+    )
+
+
+# The worst printed reach: the largest ring the title block accepts, its crown
+# against the hole's hub-side wall, the hole at its station's hub-side limit.
+# The arm's hub end cannot grow past the as-supplied bar's half-width.
+RING_ARM_AIR_NOMINAL = ring_arm_air(0.0, MEAN_R, ARC_SAGITTA / 2.0, RING_X)
+RING_ARM_AIR_WORST = min(
+    ring_arm_air(
+        float(swing),
+        (RING_ID_MAX + RING_WIRE_DIA) / 2.0,
+        _HOLE_R - RING_WIRE_DIA / 2.0,
+        RING_X + PIN_BAND,
+    )
+    for swing in range(-int(RING_REST_SWING_DEG), int(RING_REST_SWING_DEG) + 1)
+)
+if RING_ARM_AIR_WORST < RING_ARM_AIR:
+    raise AssertionError(
+        f"the largest printed keeper ring (Ø{RING_ID_MAX}) comes within "
+        f"{RING_ARM_AIR_WORST:.3f} of the crank arm, under {RING_ARM_AIR}"
+    )
 
 
 def _catmull_rom(points: list[Vec], samples: int = 40) -> list[Vec]:
@@ -213,13 +316,13 @@ def _chord_walk(curve: list[Vec], steps: int) -> list[Vec]:
 
 # --- the two wraps ---------------------------------------------------------------
 EYE_ROD_Y = EYE_LOOP_CENTRE[1] - LOOP_INNER_R + ROD_R + AIR
-RING_ROD_Y = -RING_BOTTOM_X + RING_WIRE_DIA / 2.0 + ROD_R + AIR
+RING_ROD_Y = RING_WIRE_DIA / 2.0 + ROD_R + AIR
 _HALF = PITCH / 2.0
 _UP: Vec = (0.0, PITCH, 0.0)
 EYE_OUTER: Vec = (EYE_ROOT[0] - _HALF, EYE_ROD_Y, EYE_LOOP_Z)
 EYE_INNER: Vec = (EYE_ROOT[0] + _HALF, EYE_ROD_Y, EYE_LOOP_Z)
-RING_OUTER: Vec = (RING_X - _HALF, RING_ROD_Y, RING_PLANE_Z)
-RING_INNER: Vec = (RING_X + _HALF, RING_ROD_Y, RING_PLANE_Z)
+RING_OUTER: Vec = (RING_OUT_X - _HALF, RING_ROD_Y, RING_PLANE_Z)
+RING_INNER: Vec = (RING_OUT_X + _HALF, RING_ROD_Y, RING_PLANE_Z)
 
 # The strands drape outboard of the arm's -X edge at these x.
 INNER_SIDE_X = -(HALF_WIDTH + BEAD_R + 1.6)
@@ -230,10 +333,10 @@ STRAND_SLACK_PITCHES = 2
 # +X bead is to the right of its -X bead, so the inner strand must pass below
 # and right of the outer one to keep the U's nested.  The drop is the rest
 # height at which the outer halves close on whole pitches. Owner ruling
-# 2026-10-15, option A, 58 beads: the Ø12 keeper ring (dt_crank_pin_ring_spec)
-# hangs ~2.1 lower than the Ø10 one, the 17.5 drop no longer closes, and 20.0
-# closes on a 58-bead cut (16.5 would close on 54).
-LINK_DROP = 20.0
+# 2026-10-15 A1: with the Ø12 keeper ring swung outboard its wrap sits at the
+# pin's height, 11.6 out past the hole, and 14.0 closes on the same 58-bead
+# cut as option A (8.0 would close on 50, 18.0 on 62).
+LINK_DROP = 14.0
 STRAND_GAP = BEAD_DIA + 1.6
 
 
@@ -399,16 +502,25 @@ def _eye_tail() -> list[Vec]:
     return [EYE_ROOT, _add(EYE_ROOT, (0.0, EYE_TAIL_LEN, 0.0))]
 
 
-def _ring_centreline() -> list[Vec]:
-    """The round ring's wire centreline in the plane x = RING_X."""
+def _ring_circle(mean_r: float, centre: Vec, samples: int = 144) -> list[Vec]:
+    """A ring's wire centreline: radius ``mean_r`` about ``centre`` in the
+    plane of RING_HANG and machine z."""
     return [
-        (
-            RING_X,
-            -RING_CENTRE_X + MEAN_R * math.cos(2.0 * math.pi * k / 144),
-            PIN_Z + MEAN_R * math.sin(2.0 * math.pi * k / 144),
+        _add(
+            centre,
+            (
+                RING_HANG[0] * mean_r * math.cos(2.0 * math.pi * k / samples),
+                RING_HANG[1] * mean_r * math.cos(2.0 * math.pi * k / samples),
+                mean_r * math.sin(2.0 * math.pi * k / samples),
+            ),
         )
-        for k in range(145)
+        for k in range(samples + 1)
     ]
+
+
+def _ring_centreline() -> list[Vec]:
+    """The nominal ring's wire centreline."""
+    return _ring_circle(MEAN_R, RING_CENTRE)
 
 
 def _pin_radius_at(x: float) -> float:

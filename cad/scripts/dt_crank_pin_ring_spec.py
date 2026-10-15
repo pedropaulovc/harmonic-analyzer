@@ -9,8 +9,10 @@ taper pin's cross-hole (ch11 p.14 page002_img01). A round ring's wire follows
 its own arc through the straight hole, so the hole is sized for that arc: across
 the pin's section the arc bows ARC_SAGITTA off its chord, and the hole takes half
 of that either side of the wire plus RING_HOLE_AIR (asserted below, at the
-worst printed limits of both parts). The ring hangs ~11.6 below the pin, where
-the keeper chain loops it and its hub-side beads clear the Ø25.4 hub barrel.
+worst printed limits of both parts). The ring lies in the pin's axial plane
+and reaches ~11.6 outboard of the hole, past the pin's big end and the crank
+arm's edge, where the keeper chain loops it (owner ruling 2026-10-15 A1;
+``vn_keeper_chain_spec`` owns the pose and its arm clearance).
 
 Part frame: the origin is on the cross-hole axis at the pin's centre, the hole
 axis is local Z, and the ring lies in the local XZ plane hanging toward local
@@ -45,7 +47,7 @@ ARC_SAGITTA = MEAN_R - math.sqrt(MEAN_R**2 - (PIN_DIA_AT_HOLE / 2.0) ** 2)
 # The arc is centred in the hole: its crown sits half the sagitta above the
 # hole axis, and its ends at the pin surface half the sagitta below.
 RING_CENTRE_X = MEAN_R - ARC_SAGITTA / 2.0
-RING_BOTTOM_X = RING_CENTRE_X + MEAN_R  # the wire centreline's lowest point
+RING_FAR_X = RING_CENTRE_X + MEAN_R  # the wire centreline's far point along +X
 V_RING = 2.0 * math.pi**2 * MEAN_R * (WIRE_DIA / 2.0) ** 2
 # The silver-soldered butt joint, on the ring's side away from the arm: a
 # JOINT_DIA bead centred on the wire centreline. It also gives the drawings a
@@ -70,12 +72,13 @@ if HOLE_AIR < RING_HOLE_AIR - 1e-9:
 # at its station's big-end limit and drilled to its nominal size.
 RING_ID = 2.0 * MEAN_R - WIRE_DIA
 RING_ID_PLACES = 1
-RING_ID_MIN = round(RING_ID + printed_deviations(RING_ID, RING_ID_PLACES)[0], 12)
-_PIN_BAND = printed_band_mm(2)
-_TAPER_PER_MM = (BIG_END_DIA - SMALL_END_DIA) / PIN_LENGTH
-PIN_DIA_AT_HOLE_MAX = (
-    BIG_END_DIA + _PIN_BAND - _TAPER_PER_MM * (RING_HOLE_X - _PIN_BAND)
+RING_ID_MIN, RING_ID_MAX = (
+    round(RING_ID + d, 12) for d in printed_deviations(RING_ID, RING_ID_PLACES)
 )
+# The pin's end diameters and the hole's station print at two places.
+PIN_BAND = printed_band_mm(2)
+_TAPER_PER_MM = (BIG_END_DIA - SMALL_END_DIA) / PIN_LENGTH
+PIN_DIA_AT_HOLE_MAX = BIG_END_DIA + PIN_BAND - _TAPER_PER_MM * (RING_HOLE_X - PIN_BAND)
 _MEAN_R_MIN = (RING_ID_MIN + WIRE_DIA) / 2.0
 _HALF_CHORD = PIN_DIA_AT_HOLE_MAX / 2.0
 ARC_SAGITTA_WORST = _MEAN_R_MIN - math.sqrt(_MEAN_R_MIN**2 - _HALF_CHORD**2)

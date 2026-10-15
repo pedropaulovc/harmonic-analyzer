@@ -847,9 +847,13 @@ import vn_keeper_chain_spec  # noqa: E402
 
 CRANK_PIN_Z = CRANK_FACE_Z + PIN_HOLE_HEIGHT  # -169.4: behind the 8-mm arm
 CRANK_PIN_X0 = X_CRANK - HUB_BARREL_DIA / 2.0 - PIN_PROUD
-# The ring lies in machine YZ. Its straight local-Z leg is concentric with the
-# pin's machine-Z cross-hole; its bends and return hang toward machine -Y.
+# The ring lies in the pin's axial plane (machine XZ). Its straight local-Z leg
+# is concentric with the pin's machine-Z cross-hole; its bends and return reach
+# outboard toward machine -X, past the pin's big end and clear of the arm (owner
+# ruling 2026-10-15 A1; hung toward -Y it dipped into the arm). The rows turn
+# local +X onto the keeper-chain spec's RING_HANG, checked below.
 CRANK_RING_Y = Y_CRANK
+CRANK_RING_ROWS = [[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]]
 if (PIN_RING_HOLE_DIA - CRANK_RING_WIRE_DIA) / 2.0 < 0.1:
     raise AssertionError("keeper-ring wire does not clear the crank-pin cross-hole")
 if abs((CRANKSHAFT_Z0 + PIN_HOLE_HEIGHT) - CRANK_PIN_Z) > 1e-6:
@@ -891,6 +895,11 @@ for _got, _want, _what in (
     _placed = tuple(g + o for g, o in zip(_got, CRANK_FRAME_ORIGIN))
     if max(abs(p - w) for p, w in zip(_placed, _want)) > 1e-9:
         raise AssertionError(f"vn_keeper_chain_spec {_what} {_placed} != placed {_want}")
+if tuple(CRANK_RING_ROWS[0]) != vn_keeper_chain_spec.RING_HANG:
+    raise AssertionError(
+        f"keeper ring placed hanging along {CRANK_RING_ROWS[0]}, "
+        f"vn_keeper_chain_spec hangs it along {vn_keeper_chain_spec.RING_HANG}"
+    )
 if min(vn_keeper_chain_spec.clearance_report().values()) < 0.0:
     raise AssertionError("keeper chain touches a part it must clear")
 ANCHOR_THREAD_ENGAGEMENT = ANCHOR_HEAD_Z + ANCHOR_SCREW_SHANK_LEN - CRANK_ARM_Z0
@@ -5215,8 +5224,8 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         "dt-crank-pin-ring",
         [CRANK_PIN_X0 + PIN_RING_HOLE_X, CRANK_RING_Y, CRANK_PIN_Z],
-        [0.0, 0.0, -90.0],
-        rot_z_rows(-90.0),
+        [0.0, 0.0, 180.0],
+        CRANK_RING_ROWS,
         ground=False,
         label="crank pin keeper ring",
     )
