@@ -673,7 +673,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_crank_pin",  # 1:48 taper pin, light drive
         "dt_crank_pin_eye",  # formed brass eye, clamped under fillister_screw (no thread of its own)
         "vn_crank_seat_drive_pin",  # MHA-VN-044 dowel pressed into match-drilled holes, no thread
-        "dt_crank_seat_washer",  # MHA-DT-036 turned steel washer, plain bore, no thread
+        "vn_crank_seat_shim",  # MHA-VN-071 3088A ring shims loose on the crankshaft, plain bore, no thread
         "dt_crank_pin_ring",  # brass wire keeper ring
         "dt_crank_pinion",  # pinned by crank_pinion_pin
         "dt_crank_pinion_pin",  # plain 1/8 drill-rod drive pin
@@ -718,7 +718,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_platen_rack",  # soft-soldered to the platen back (A06 rack-soldered); no holes, no thread
         "ch_rocker_arm",  # reamed pivot hub bore + #47 rod-pin hole
         "ch_rod_pivot_pin",  # MHA-CH-010 5/64 drill-rod pin, pressed into the fork's reamed tines, ends dressed flush (rod-forks-pinned); no thread
-        "ch_rocker_thrust_washer",  # 1/32 sheet washer, plain bore (north and south)
+        "vn_rocker_thrust_washer",  # MHA-VN-070 carbon-steel ring shim (McMaster 3088A429) loose on the MHA-CH-005 shaft, north and south; no thread
         "pd_transgear_arm_plate",  # MHA-PD-019: reamed knob-shaft bore + 2 countersunk clearance screw holes; no thread
         "vn_transgear_knob_cup_pin",  # MHA-VN-048 1/16 slotted spring pin through the knob cup and the shaft's journal
         "pd_transgear_disc_hub",  # MHA-PD-017 brass hub: D-bore on the sleeve's D-flat, plain flange clearance holes for the disc screws; trapped between the seat shoulder and the front bushing, no thread
@@ -757,6 +757,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_chain_connecting_link": "clip-retained roller-chain link; pins only, no thread",
     "vn_keeper_chain": "chain; its end links hang on screws and eyes, carrying no thread",
     "vn_crank_seat_drive_pin": "dowel pin pressed into a plain hole",
+    "vn_crank_seat_shim": "plain-bore shim pack loose on the crankshaft; no thread",
     "vn_keeper_chain_link": "plain chain link",
     "vn_knife_mount_dowel": "dowel pin pressed into a reamed hole",
     "vn_knife_hanger_washer": "plain SAE washer under the knife-hanger hex head; no thread",
@@ -770,6 +771,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_transgear_pivot_shim": "shim ring on the pivot shoulder under the head; no thread",
     "vn_cylinder_bank_spring": "wave disc spring loose on the arbor; no thread",
     "vn_rocker_bank_spring": "wave disc spring loose on the pivot shaft; no thread",
+    "vn_rocker_thrust_washer": "ring shim loose on the pivot shaft; no thread",
     "vn_tube_frame_cap": "push-on round cap over the column end",
     "vn_wheel_axle_back_washer": "plain washer loose on the wheel-axle pin; no thread",
     "vn_wheel_axle_front_washer": "plain washer loose on the wheel-axle's threaded end; no thread",

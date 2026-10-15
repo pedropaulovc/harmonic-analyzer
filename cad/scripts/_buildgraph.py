@@ -2338,8 +2338,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "dt_crank_pinion_spec",
         # Drilled-hole row bounds the rocker's #47 hole the rod-slot pin enters.
         "ch_rocker_arm_tl_outline_template_spec",
-        # Drilled-hole row sets the bore band and worst journal-pass clearance.
-        "dt_crank_seat_washer_spec",
         "dt_crankshaft_spec",
         "error_budget",
         "export_features",

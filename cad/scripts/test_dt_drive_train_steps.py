@@ -177,21 +177,30 @@ def test_full_turn_checks_use_the_spec_ratio_and_clear_the_unrelieved_platform()
     )
 
 
-def test_crank_washer_fit_retains_the_live_recess_and_feeler_window() -> None:
+def test_crank_shim_fit_retains_the_live_recess_and_feeler_window() -> None:
     import dt_crank_pinion_spec as pinion
-    import dt_crank_seat_washer_spec as washer
+    import dt_crank_seat_gap as gap
+    import vn_crank_seat_shim_spec as shim
 
-    fitup = " ".join(drawing.CRANK_WASHER_FIT_NOTES.split())
+    fitup = " ".join(drawing.CRANK_SHIM_FIT_NOTES.split())
     middle = (pinion.SHAFT_END_RECESS_MIN + pinion.SHAFT_END_RECESS_MAX) / 2.0
     assert f"{middle:.2f} BELOW MHA-DT-010 NORTH FACE" in fitup
-    assert f"({washer.GAP_MIN:.2f}-{washer.GAP_MAX:.2f})" in fitup
+    assert f"({gap.GAP_MIN:.2f}-{gap.GAP_MAX:.2f})" in fitup
     assert (
         f"{pinion.SHAFT_END_RECESS_MIN:.2f}-{pinion.SHAFT_END_RECESS_MAX:.2f} BELOW"
         in fitup
     )
-    assert f"END PLAY {pinion.SEAT_FEELER_MM:.2f}" in fitup
+    assert (
+        f"END PLAY {pinion.SEAT_FEELER_MM:.2f}-"
+        f"{pinion.SEAT_FEELER_MM + shim.FIT_RESIDUAL_MAX:.2f}" in fitup
+    )
+    # The stack rule: at most the catalogue's four shims, of the six sizes
+    # bought, mic'd to within the fit residual under the measured gap.
+    assert f"STACK 1-{shim.STACK_MAX} MHA-VN-071 SHIMS (0.1/0.2/0.5/1/1.5/2)" in fitup
+    assert f"MIC 0.00-{shim.FIT_RESIDUAL_MAX:.2f} UNDER THAT GAP" in fitup
     assert (
         fitup.index("WITHDRAW BOTH")
+        < fitup.index("STACK 1-")
         < fitup.index("FROM THE REAR")
         < fitup.index("REFIT")
     )

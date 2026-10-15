@@ -495,7 +495,8 @@ from dt_crank_arm_spec import (  # noqa: E402
 from _fit_deviations import deviations  # noqa: E402
 import _chain  # noqa: E402
 import vn_crank_seat_drive_pin_spec as SEAT_PIN  # noqa: E402
-import dt_crank_seat_washer_spec as SEAT_WASHER  # noqa: E402
+import dt_crank_seat_gap as SEAT_GAP  # noqa: E402
+import vn_crank_seat_shim_spec as SEAT_SHIM  # noqa: E402
 import pd_transgear_removable_spec as REMOVABLE  # noqa: E402
 from dt_crankshaft_spec import (  # noqa: E402
     COLLAR_DIA,
@@ -562,10 +563,11 @@ if CRANK_HUB_SPROCKET_AIR_WORST <= 0.0:
         "crank hub rear/sprocket air closes at the SeatCollar band: "
         f"{CRANK_HUB_SPROCKET_AIR_WORST:.3f}"
     )
-# Behind the seat: the integral collar, then the turned MHA-DT-036 thrust washer
-# flat on the collar's rear face (its y = 0 face), faced to fit the post boss.
-CRANK_SEAT_WASHER_Z0 = CRANKSHAFT_Z0 + COLLAR_REAR
-CRANK_SEAT_WASHER_REAR_Z = CRANK_SEAT_WASHER_Z0 + SEAT_WASHER.THICKNESS
+# Behind the seat: the integral collar, then the MHA-VN-071 shim pack flat on
+# the collar's rear face (its y = 0 face), selected to fill the gap to the post
+# boss to within its fit residual.
+CRANK_SEAT_SHIM_Z0 = CRANKSHAFT_Z0 + COLLAR_REAR
+CRANK_SEAT_SHIM_REAR_Z = CRANK_SEAT_SHIM_Z0 + SEAT_SHIM.THICKNESS
 # The seat is a Ø17.5 spigot (SEAT_FACE_Z..SPIGOT_END) ahead of the Ø20.6
 # body; the hub's rear Ø16.5 relief runs from its barrel's rear shoulder to
 # the hub rear face.  Both let the #25 plates wrapping the crank sprocket pass inside
@@ -1697,48 +1699,41 @@ if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
 # reverses local Z, so the harvested asymmetric boss now runs from
 # post.z - (start + length) to post.z - start.  South of it the crank seat
 # stack closes the gap to the chain wheel's seat face: the integral collar,
-# then MHA-DT-036, flat on its rear face and faced at assembly to fill the gap to
-# the cast south face.  The shaft's only end play is the 16T's feeler gap to
-# the boss's north face.
+# then the MHA-VN-071 shim pack, flat on its rear face and selected at assembly
+# to within its fit residual under the gap to the cast south face.  The shaft's
+# end play is the 16T's feeler gap to the boss's north face plus that residual.
 # The 16T follows the translated 64T contact row to the boss's north.
 _POST_BOSS_SOUTH = _PPOST[2] - (POST_CRANK_BOSS_START_Z + POST_CRANK_BOSS_LENGTH)
 _PINION_SOUTH = PINION_TOOTH_Z - PINION_FACE / 2.0
-CRANK_SEAT_WASHER_GAP = _POST_BOSS_SOUTH - CRANK_SEAT_WASHER_Z0
-CRANK_SEAT_WASHER_FLOAT = _POST_BOSS_SOUTH - CRANK_SEAT_WASHER_REAR_Z
+CRANK_SEAT_SHIM_GAP = _POST_BOSS_SOUTH - CRANK_SEAT_SHIM_Z0
+CRANK_SEAT_SHIM_FLOAT = _POST_BOSS_SOUTH - CRANK_SEAT_SHIM_REAR_Z
 _BOSS_NORTH_GAP = _PINION_SOUTH - _POST_BOSS_NORTH
 # The feeler sets the south face directly off the restored boss (MHA-DT-000).
 PINION_BOSS_NORTH_GAP_RANGE = (PINION_SEAT_FEELER, PINION_SEAT_GAP_MAX)
 _GAP_LO, _GAP_HI = PINION_BOSS_NORTH_GAP_RANGE
-# (1) The modelled gap is the washer spec's nominal fit, and the washer, at
-# that thickness, is seated on both faces.
-if abs(CRANK_SEAT_WASHER_GAP - SEAT_WASHER.GAP_NOMINAL) > 1e-6:
+# (1) The modelled gap is the nominal crank-seat gap, and the modelled pack (the
+# one selected for it) bears on the collar with at most the fit residual to the
+# boss.  dt_crank_seat_gap proves every accepted gap takes such a pack.
+if abs(CRANK_SEAT_SHIM_GAP - SEAT_GAP.GAP_NOMINAL) > 1e-6:
     raise AssertionError(
-        f"MHA-DT-036 gap {CRANK_SEAT_WASHER_GAP:.4f} in the layout is not the washer "
-        f"spec's nominal fit {SEAT_WASHER.GAP_NOMINAL:.4f}"
+        f"MHA-VN-071 gap {CRANK_SEAT_SHIM_GAP:.4f} in the layout is not the "
+        f"nominal crank-seat gap {SEAT_GAP.GAP_NOMINAL:.4f}"
     )
-if abs(CRANK_SEAT_WASHER_FLOAT) > 1e-6:
+if not -1e-9 <= CRANK_SEAT_SHIM_FLOAT <= SEAT_SHIM.FIT_RESIDUAL_MAX + 1e-9:
     raise AssertionError(
-        f"MHA-DT-036 is not seated on both faces: {CRANK_SEAT_WASHER_FLOAT:.4f} float"
+        f"MHA-VN-071 leaves {CRANK_SEAT_SHIM_FLOAT:.4f} to the boss, outside its "
+        f"0-{SEAT_SHIM.FIT_RESIDUAL_MAX} fit residual"
     )
-# (2) Every accepted set of parts is fitted from the blank without going under
-# the floor.
-_BLANK_FACEABLE = SEAT_WASHER.BLANK_THICKNESS_MIN - SEAT_WASHER.FACING_ALLOWANCE
+# (2) The shaft's end play is the 16T's feeler gap plus the pack's residual.
+CRANK_SHAFT_END_PLAY = _BOSS_NORTH_GAP + CRANK_SEAT_SHIM_FLOAT
 if not (
-    SEAT_WASHER.THICKNESS_FLOOR - 1e-9
-    <= SEAT_WASHER.GAP_MIN
-    <= SEAT_WASHER.GAP_MAX
-    <= _BLANK_FACEABLE + 1e-9
+    SEAT_GAP.END_PLAY_MIN - 1e-6
+    <= CRANK_SHAFT_END_PLAY
+    <= SEAT_GAP.END_PLAY_MAX + 1e-6
 ):
     raise AssertionError(
-        f"MHA-DT-036 fit range {SEAT_WASHER.GAP_MIN:.3f}-{SEAT_WASHER.GAP_MAX:.3f} "
-        f"is outside {SEAT_WASHER.THICKNESS_FLOOR}-{_BLANK_FACEABLE:.3f}"
-    )
-# (3) With the washer seated, the shaft's end play is the 16T's feeler gap.
-CRANK_SHAFT_END_PLAY = _BOSS_NORTH_GAP + CRANK_SEAT_WASHER_FLOAT
-if abs(CRANK_SHAFT_END_PLAY - PINION_SEAT_FEELER) > 1e-6:
-    raise AssertionError(
-        f"crankshaft end play {CRANK_SHAFT_END_PLAY:.4f} is not the "
-        f"{PINION_SEAT_FEELER} 16T feeler gap"
+        f"crankshaft end play {CRANK_SHAFT_END_PLAY:.4f} is outside the "
+        f"{SEAT_GAP.END_PLAY_MIN}-{SEAT_GAP.END_PLAY_MAX:.2f} feeler-plus-residual band"
     )
 if not (
     _GAP_LO - 1e-6
@@ -3638,7 +3633,7 @@ _SWING_RIG_BANDS = (
 )
 # The crank column behind the hub, each body a solid of revolution about the
 # crank axis (z band, diameter): the selected crank sprocket paper-drive seats on it, the
-# collar's seat spigot and body, and the MHA-DT-036 washer on the body's rear.
+# collar's seat spigot and body, and the MHA-VN-071 shim pack on the body's rear.
 CRANK_SPROCKET_TIP_DIA = REMOVABLE.outside_dia(REMOVABLE.CRANK_TEETH)
 CRANK_COLUMN_BANDS = (
     (
@@ -3648,12 +3643,12 @@ CRANK_COLUMN_BANDS = (
         "crank chain wheel",
     ),
     (REMOVABLE.SEAT_FACE_Z, CRANK_SPIGOT_FRONT_Z, SPIGOT_DIA, "crank seat spigot"),
-    (CRANK_SPIGOT_FRONT_Z, CRANK_SEAT_WASHER_Z0, COLLAR_DIA, "crank collar body"),
+    (CRANK_SPIGOT_FRONT_Z, CRANK_SEAT_SHIM_Z0, COLLAR_DIA, "crank collar body"),
     (
-        CRANK_SEAT_WASHER_Z0,
-        CRANK_SEAT_WASHER_REAR_Z,
-        SEAT_WASHER.OD,
-        "crank seat washer",
+        CRANK_SEAT_SHIM_Z0,
+        CRANK_SEAT_SHIM_REAR_Z,
+        SEAT_SHIM.OD_MAX,
+        "crank seat shim",
     ),
 )
 _CRANK_TO_GRIP_AXIS = math.hypot(X_CRANK - APINION_X, Y_CRANK - APINION_Y)
@@ -5153,19 +5148,19 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="MHA-VN-029 six-o'clock axial seam pin",
     )
-    # The crank seat behind the chain wheel: MHA-DT-036 flat on the collar's rear
+    # The crank seat behind the chain wheel: MHA-VN-071 flat on the collar's rear
     # face (local +Y -> machine +Z, rearward), and the two MHA-VN-044 drive pins
     # standing in the collar's blind holes, pressed end on DrivePinFloor and
     # rounded lead end forward (local +Y -> machine -Z).  DrivePinAxis1 lies
     # on the shaft's local +Z (machine -Y), DrivePinAxis2 opposite.
-    seat_washer = await place_component(
+    seat_shim = await place_component(
         adapter,
-        "dt-crank-seat-washer",
-        [X_CRANK, Y_CRANK, CRANK_SEAT_WASHER_Z0],
+        "vn-crank-seat-shim",
+        [X_CRANK, Y_CRANK, CRANK_SEAT_SHIM_Z0],
         [90.0, 0.0, 0.0],
         ROT_X_POS90,
         ground=False,
-        label="MHA-DT-036 on the crank collar's rear face",
+        label="MHA-VN-071 on the crank collar's rear face",
     )
     seat_pins = [
         await place_component(
@@ -5184,7 +5179,7 @@ async def build(adapter) -> dict[str, str]:
     # single crank chain wheel lives in paper-drive (codex #189 :605). Placing it
     # here too made two coincident T12 wheels at the crank centre once both
     # subassemblies are inserted at the top level -> interference. Drive-train
-    # keeps the shaft, its seat washer and drive pins, hub, arm, handle, both
+    # keeps the shaft, its seat shim pack and drive pins, hub, arm, handle, both
     # crank pins and 16T pinion; the crank spin DOF remains keyed through the arm.
     # Crank rest pose: the arm hangs straight DOWN (ch30 eight-views -- the
     # handle reads "down" in all eight roll angles, which only a -Y arm does,
@@ -5518,31 +5513,31 @@ async def build(adapter) -> dict[str, str]:
         verify=(seam_pin, seam_o),
     )
 
-    # MHA-DT-036 rides the shaft flat against CollarRear; faced to fit, its rear
-    # face lands on the boss's south face with no float, so the collar mate
-    # places it.  A revolved washer's spin is immaterial: the parallel closes
-    # it like MHA-VN-029's.
-    washer_o = _org(adapter, seat_washer)
+    # MHA-VN-071 rides the shaft flat against CollarRear; its rear face stops
+    # short of the boss's south face by the pack's fit residual, so the collar
+    # mate places it.  A revolved pack's spin is immaterial: the parallel
+    # closes it like MHA-VN-029's.
+    shim_o = _org(adapter, seat_shim)
     await coincident_mate(
         adapter,
-        named_ref(f"Axis1@{seat_washer}", "AXIS"),
+        named_ref(f"ScrewAxis@{seat_shim}", "AXIS"),
         crank_axis,
-        label="MHA-DT-036 coaxial on crankshaft",
-        verify=(seat_washer, washer_o),
+        label="MHA-VN-071 coaxial on crankshaft",
+        verify=(seat_shim, shim_o),
     )
     await coincident_mate(
         adapter,
-        named_ref(f"Top Plane@{seat_washer}", "PLANE"),
+        named_ref(f"Top Plane@{seat_shim}", "PLANE"),
         named_ref(f"CollarRear@{crankshaft}", "PLANE"),
-        label="MHA-DT-036 flat on the collar rear face",
-        verify=(seat_washer, washer_o),
+        label="MHA-VN-071 flat on the collar rear face",
+        verify=(seat_shim, shim_o),
     )
     await parallel_mate(
         adapter,
-        named_ref(f"Right Plane@{seat_washer}", "PLANE"),
+        named_ref(f"Right Plane@{seat_shim}", "PLANE"),
         cs_right,
-        label="MHA-DT-036 rotational closure",
-        verify=(seat_washer, washer_o),
+        label="MHA-VN-071 rotational closure",
+        verify=(seat_shim, shim_o),
     )
     # Each MHA-VN-044 is pressed to the hole floor; its axis is the collar's
     # drilled pin axis, and the parallel closes the revolved pin's spin.

@@ -11,7 +11,7 @@ EAR_T thick (Z), centred on the origin, rising from the foot top and ARCHED
 with radius EAR_W/2 over the O BORE_DIA cross-bore, its apex EAR_TOP_Y over
 the seat (the arch's centre ARCH_LIFT above the bore axis). The ear is as
 wide as the foot, so their sides are one flat each side. Each ear's inner
-face bears on a MHA-CH-009 thrust washer: hub 19's at the north ear (the
+face bears on a MHA-VN-070 thrust washer: hub 19's at the north ear (the
 bank's datum), the preload spring's at the south one (``rocker_bank_layout``).
 
 One MHA-VN-034 #4-40 cup-point set screw drops through the arch apex, on the

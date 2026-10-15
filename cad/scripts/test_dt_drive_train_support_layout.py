@@ -702,40 +702,51 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
     assert base.DECK_HALF_Z - RIG.BACK_BLOCK_OUTER_Z >= 25.0
 
 
-def test_crank_seat_stack_keeps_its_air_and_fits_the_washer(monkeypatch) -> None:
+def test_crank_seat_stack_keeps_its_air_and_fits_the_shim_pack(monkeypatch) -> None:
     """Worst case over the collar's functional bands: the T12 plate, seated on
-    the collar, keeps air to the hub rear face.  Behind it, MHA-DT-036 is faced at
-    assembly to fill the collar-to-boss gap (user ruling 2026-09-30, floor 0.5):
-    the layout seats it on both faces at the spec's nominal fit, every accepted
-    part set is faced from the blank above the floor, and the shaft's only end
-    play is the 16T's feeler gap."""
+    the collar, keeps air to the hub rear face.  Behind it, the MHA-VN-071 shim
+    pack is selected at assembly to within its fit residual under the
+    collar-to-boss gap: the layout carries the nominal gap with the pack chosen
+    for it, bearing on the collar and short of the boss by at most the
+    residual, so the shaft's end play is the 16T's feeler gap plus at most
+    that residual."""
     import dt_crank_pinion_spec as pinion
-    import dt_crank_seat_washer_spec as washer
+    import dt_crank_seat_gap as gap
     import dt_crankshaft_spec as cs
     import pd_transgear_removable_spec as removable
+    import vn_crank_seat_shim_spec as shim
 
     seat_face_fwd = drive.CRANKSHAFT_Z0 + cs.SEAT_COLLAR + min(cs.SEAT_COLLAR_BAND)
     assert removable.SEAT_FACE_Z - removable.PLATE - drive.CRANK_HUB_REAR_Z == (
         pytest.approx(0.7)
     )
     assert seat_face_fwd - removable.PLATE - drive.CRANK_HUB_REAR_Z > 0.0
-    # (1) Seated on both faces at the nominal fit.
-    assert drive._POST_BOSS_SOUTH - drive.CRANK_SEAT_WASHER_Z0 == pytest.approx(
-        washer.GAP_NOMINAL
+    # (1) The nominal gap, filled by the pack selected for it.
+    assert drive._POST_BOSS_SOUTH - drive.CRANK_SEAT_SHIM_Z0 == pytest.approx(
+        gap.GAP_NOMINAL
     )
-    assert drive.CRANK_SEAT_WASHER_REAR_Z == pytest.approx(drive._POST_BOSS_SOUTH)
-    # (2) Faced from the blank, never under the floor.
-    assert washer.THICKNESS_FLOOR - 1e-9 <= washer.GAP_MIN
-    assert washer.GAP_MAX <= washer.BLANK_THICKNESS_MIN - washer.FACING_ALLOWANCE + 1e-9
-    # (3) The end play is the feeler.
-    assert drive.CRANK_SHAFT_END_PLAY == pytest.approx(pinion.SEAT_FEELER_MM)
-    # Negative control: a layout off the washer's nominal fit is refused.
-    with pytest.raises(AssertionError, match="nominal fit"):
-        _drive_with(monkeypatch, washer, "GAP_NOMINAL", washer.GAP_NOMINAL + 0.5)
+    assert drive.CRANK_SEAT_SHIM_REAR_Z - drive.CRANK_SEAT_SHIM_Z0 == pytest.approx(
+        shim.THICKNESS
+    )
+    assert 0.0 <= drive.CRANK_SEAT_SHIM_FLOAT <= shim.FIT_RESIDUAL_MAX
+    assert drive.CRANK_SEAT_SHIM_FLOAT == pytest.approx(gap.FLOAT_NOMINAL)
+    # (2) The end play is the feeler plus the pack's residual.
+    assert (
+        pinion.SEAT_FEELER_MM
+        <= drive.CRANK_SHAFT_END_PLAY
+        <= pinion.SEAT_FEELER_MM + shim.FIT_RESIDUAL_MAX
+    )
+    # Negative control: a layout off the nominal gap is refused.
+    with pytest.raises(AssertionError, match="nominal crank-seat gap"):
+        _drive_with(monkeypatch, gap, "GAP_NOMINAL", gap.GAP_NOMINAL + 0.5)
     monkeypatch.undo()
-    # Negative control: a blank too thin to face to the widest gap is refused.
-    with pytest.raises(AssertionError, match="fit range"):
-        _drive_with(monkeypatch, washer, "BLANK_THICKNESS_MIN", washer.GAP_MAX)
+    # Negative control: a modelled pack 0.2 thinner leaves more than the residual.
+    with pytest.raises(AssertionError, match="fit residual"):
+        _drive_with(monkeypatch, shim, "THICKNESS", shim.THICKNESS - 0.2)
+    monkeypatch.undo()
+    # Negative control: a modelled pack thicker than the gap is refused too.
+    with pytest.raises(AssertionError, match="fit residual"):
+        _drive_with(monkeypatch, shim, "THICKNESS", shim.THICKNESS + 0.1)
 
 
 def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
@@ -757,10 +768,10 @@ def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
     assert knob_seat == pytest.approx(crank_seat)
     assert paper.KNOB_SHAFT_Z0 - collar.SET_NOMINAL == pytest.approx(knob_seat)
     assert paper.CHAIN_MID_Z == pytest.approx(crank_seat - removable.PLATE / 2.0)
-    # The spigot stays put (-154.3..-148.5); the body ends at -144.5 (MHA-DT-036
-    # floor 0.5 took 0.5 off its rear).
+    # The spigot stays put (-154.3..-148.5); the body ends at -144.5 (0.5 came
+    # off its rear when the seat washer had a 0.5 floor).
     assert drive.CRANK_SPIGOT_FRONT_Z == pytest.approx(-148.5)
-    assert drive.CRANK_SEAT_WASHER_Z0 == pytest.approx(-144.5)
+    assert drive.CRANK_SEAT_SHIM_Z0 == pytest.approx(-144.5)
     assert drive.CRANK_HUB_REAR_Z == pytest.approx(-157.8)
     # Stack C grew by the 1.8: 5.8 - 0.05 - 3.5865.
     assert drive.CHAIN_SPIGOT_AXIAL_AIR_WORST == pytest.approx(2.1635)

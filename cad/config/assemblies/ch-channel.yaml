@@ -43,12 +43,13 @@ flip_invert:
   - vn bracket hold down screw datum x
   - vn bracket hold down screw datum y
   - vn bracket hold down screw datum z
-  # #743 PR2: the MHA-CH-009 thrust washers (north and south, user
-  # 2026-10-10), datum-located IDENTITY like the pivot brackets (r743-4D
-  # flip-seed MISS on its x); both share the one canonical signature.
-  - ch rocker thrust washer datum x
-  - ch rocker thrust washer datum y
-  - ch rocker thrust washer datum z
+  # #743 PR2: the thrust washers (north and south, user 2026-10-10; MHA-VN-070
+  # since the owner's 2026-10-15 purchased-washer ruling), datum-located
+  # IDENTITY like the pivot brackets (r743-4D flip-seed MISS on its x); both
+  # share the one canonical signature.
+  - vn rocker thrust washer datum x
+  - vn rocker thrust washer datum y
+  - vn rocker thrust washer datum z
   # #948 ruling R: the MHA-VN-053 rocker bank spring, datum-located IDENTITY
   # beside the washer [INFERENCE: same learned side; confirm on the farm build].
   - vn rocker bank spring datum x

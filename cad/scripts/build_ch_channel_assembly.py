@@ -13,7 +13,8 @@ the M6.8 mirror layer is gone).
 * pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z; a plain rod whose
   cylinder spans both ears' outer faces, each end domed, held axially and in
   rotation by two set screws on flats milled at the ears -- rocker_bank_layout)
-* rocker-thrust-washer x2 (MHA-CH-009: north, between rocker 19's hub and the
+* vn-rocker-thrust-washer x2 (MHA-VN-070, McMaster 3088A429: north, between
+  rocker 19's hub and the
   north ear, the bank's datum; south, on rocker 0's hub) +
   vn-rocker-bank-spring x1 (MHA-VN-053, the wave disc spring between the
   south washer and the south ear that preloads the bank north; #948 ruling R)
@@ -364,7 +365,7 @@ SUPPORT_APEX_Y = 228.6
 CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
 # Rocker pivot brackets, shaft, washers, spring and set screws (#948 ruling R,
 # PR #1292; user, 2026-10-10): the rocker bank's retention stack, from
-# rocker_bank_layout. Hub 19 bears on the north MHA-CH-009 washer, which bears
+# rocker_bank_layout. Hub 19 bears on the north MHA-VN-070 washer, which bears
 # on the north ear's inner face, the bank's datum; the MHA-VN-053 spring
 # between the south ear and the south washer on hub 0 preloads the bank north
 # onto it. The plain shaft is held by one MHA-VN-034 set screw per ear on a
@@ -406,17 +407,17 @@ if any(
     for station, ear_z in zip(PIVOT_SHAFT_FLAT_STATIONS, PIVOT_BRACKET_Z, strict=True)
 ):
     raise AssertionError("a pivot shaft flat is not under its ear's set screw")
-# The datum-located washers: the part runs z 0..THICKNESS from its origin (a
-# Front-plane annulus extruded +Z), so IDENTITY at each washer's z0 puts the
-# south one's north face on hub 0's south face, and the north one between hub
-# 19's north face and the north ear's inner face.
+# The datum-located washers: the purchased part runs z 0..THICKNESS from its
+# origin (the stock recipe's annulus turned axis +Z), so IDENTITY at each
+# washer's z0 puts the south one's north face on hub 0's south face, and the
+# north one between hub 19's north face and the north ear's inner face.
 from ch_rocker_arm_spec import HUB_LENGTH as _ROCKER_HUB_LENGTH  # noqa: E402
-from ch_rocker_thrust_washer_spec import THICKNESS as _WASHER_THICK  # noqa: E402
+from vn_rocker_thrust_washer_spec import THICKNESS as _WASHER_THICK  # noqa: E402
 
 for _washer_z in (SOUTH_WASHER_Z, NORTH_WASHER_Z):
     if abs(_washer_z[1] - _washer_z[0] - _WASHER_THICK) > 1e-9:
         raise AssertionError(
-            "a thrust washer is not ch_rocker_thrust_washer_spec's thickness"
+            "a thrust washer is not vn_rocker_thrust_washer_spec's thickness"
         )
 if abs(SOUTH_WASHER_Z[1] - (hub_mid_z(0) - _ROCKER_HUB_LENGTH / 2.0)) > 1e-9:
     raise AssertionError(
@@ -1107,13 +1108,13 @@ async def build(adapter) -> dict[str, str]:
             label=f"pivot-bracket set screw {name} z{screw_z:+.1f}",
         )
         await _locate_to_datum(adapter, set_screw)
-    # Thrust washers (MHA-CH-009): south on the shaft against rocker 0's hub,
+    # Thrust washers (MHA-VN-070): south on the shaft against rocker 0's hub,
     # north between rocker 19's hub and the north ear. Free-space structure
     # here, datum-located like the brackets.
     for washer_z, side in ((SOUTH_WASHER_Z, "south"), (NORTH_WASHER_Z, "north")):
         washer = await place_component(
             adapter,
-            "ch-rocker-thrust-washer",
+            "vn-rocker-thrust-washer",
             [PIVOT[0], PIVOT[1], washer_z[0]],
             [0.0, 0.0, 0.0],
             IDENTITY,

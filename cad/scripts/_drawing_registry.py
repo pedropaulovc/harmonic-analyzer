@@ -740,13 +740,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="ch_rocker_thrust_washer",
-        part="ch_rocker_thrust_washer",
-        artifact_stem="ch-rocker-thrust-washer",
-        script_name="draw_ch_rocker_thrust_washer.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="dt_cone_pivot_post_tl_cap_jaw_button",
         part="dt_cone_pivot_post_tl_cap_jaw_button",
         artifact_stem="dt-cone-pivot-post-tl-cap-jaw-button",
@@ -891,13 +884,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="dt_crankshaft",
         artifact_stem="dt-crankshaft",
         script_name="draw_dt_crankshaft.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="dt_crank_seat_washer",
-        part="dt_crank_seat_washer",
-        artifact_stem="dt-crank-seat-washer",
-        script_name="draw_dt_crank_seat_washer.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -1062,6 +1048,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_crank_seat_shim",
+        part="vn_crank_seat_shim",
+        artifact_stem="vn-crank-seat-shim",
+        script_name="draw_vn_crank_seat_shim.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pd_transgear_knob_shaft",
         part="pd_transgear_knob_shaft",
         artifact_stem="pd-transgear-knob-shaft",
@@ -1206,6 +1199,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="vn_rocker_bank_spring",
         artifact_stem="vn-rocker-bank-spring",
         script_name="draw_vn_rocker_bank_spring.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="vn_rocker_thrust_washer",
+        part="vn_rocker_thrust_washer",
+        artifact_stem="vn-rocker-thrust-washer",
+        script_name="draw_vn_rocker_thrust_washer.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

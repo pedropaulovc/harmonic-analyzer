@@ -109,28 +109,31 @@ def test_shaft_prints_exactly_and_reaches_the_restored_post_boss() -> None:
     assert -183.0 + spec.POST_BORE_END == pytest.approx(post_boss_north)
 
 
-def test_seat_collar_lands_the_wheel_seat_and_leaves_the_washer_its_fit() -> None:
+def test_seat_collar_lands_the_wheel_seat_and_leaves_the_shim_pack_its_fit() -> None:
     # The collar's front is the Ø17.5 seat spigot, whose face is the removable
     # sprocket's seat on the shared plane, stepping up to the Ø20.6 body; its
-    # rear face stands off the post boss by the gap MHA-DT-036 is faced to fill,
-    # and stays short of the outboard journal land.
+    # rear face stands off the post boss by the gap the MHA-VN-071 shim pack
+    # fills, and stays short of the outboard journal land.
     import build_dt_drive_train_assembly as bdt
     import dt_cone_pivot_post_spec as post
-    import dt_crank_seat_washer_spec as washer
+    import dt_crank_seat_gap as gap
     import pd_transgear_removable_spec as removable
+    import vn_crank_seat_shim_spec as shim
 
     assert bdt.CRANKSHAFT_Z0 + spec.SEAT_COLLAR == pytest.approx(removable.SEAT_FACE_Z)
     assert spec.SPIGOT_DIA == removable.SEAT_SPIGOT_DIA < spec.COLLAR_DIA
-    # Ruling 2026-09-30: spigot -154.3..-148.5; MHA-DT-036 floor 0.5: body
-    # -148.5..-144.5.
+    # Ruling 2026-09-30: spigot -154.3..-148.5; body -148.5..-144.5.
     assert bdt.CRANKSHAFT_Z0 + spec.SPIGOT_END == pytest.approx(-148.5)
     # The blind drive-pin holes end in the spigot, short of its step.
     assert spec.SEAT_COLLAR < spec.DRIVE_PIN_FLOOR < spec.SPIGOT_END
     assert bdt.CRANKSHAFT_Z0 + spec.COLLAR_REAR == pytest.approx(-144.5)
-    # The gap from the post's own boss face, not the washer spec's chain.
+    # The gap from the post's own boss face, not the gap module's chain.
     boss_south = spec.POST_BORE_END - post.CRANK_BOSS_LENGTH
-    assert boss_south - spec.COLLAR_REAR == pytest.approx(washer.GAP_NOMINAL)
-    assert washer.GAP_MIN >= washer.THICKNESS_FLOOR - 1e-9
+    assert boss_south - spec.COLLAR_REAR == pytest.approx(gap.GAP_NOMINAL)
+    # Every accepted gap takes a pack of at most four catalogue shims.
+    assert shim.worst_residual(gap.GAP_MIN, gap.GAP_MAX) <= shim.FIT_RESIDUAL_MAX + 1e-9
+    # The pack's bore passes the outboard journal land on the way on.
+    assert shim.ID_MIN > spec.JOURNAL_DIA + max(spec.JOURNAL_DIA_BAND)
     # The body keeps length at print-worst: both stations and the spigot.
     body_worst = (
         spec.COLLAR_LENGTH

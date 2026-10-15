@@ -1,7 +1,7 @@
 r"""Purchased MHA-VN-053 rocker bank spring: McMaster 9714K24.
 
 A wave disc spring (``vn_rocker_bank_spring_spec``); on the MHA-CH-005
-pivot shaft between the MHA-CH-009 washer and the south MHA-CH-008 ear, it
+pivot shaft between the MHA-VN-070 washer and the south MHA-CH-008 ear, it
 holds the 20-hub stack north on its datum (#948 ruling R).  The stock recipe
 ``diagnostics/diag_build_9714K24.py`` models the installed envelope; no
 vendor model was fetched, so its standalone run is catalog-only.

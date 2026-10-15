@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import math
+import os
 import re
 from pathlib import Path
 
@@ -27,8 +28,8 @@ BUILDER = SCRIPTS / "build_dt_drive_train_assembly.py"
 RIG_STEPS = drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4)
 # Installation interfaces the package may cite without owning a BOM row.
 # Step 10 sets the channel's north MHA-CH-008 on the frame's MHA-FR-005 (#936 P1 b),
-# offset by the miced north MHA-CH-009 washer (user, 2026-10-10).
-EXTERNAL_NUMBERS = frozenset({"MHA-FR-001", "MHA-FR-005", "MHA-CH-008", "MHA-CH-009"})
+# offset by the miced north MHA-VN-070 washer (user, 2026-10-10).
+EXTERNAL_NUMBERS = frozenset({"MHA-FR-001", "MHA-FR-005", "MHA-CH-008", "MHA-VN-070"})
 # Named installation assemblies are external interfaces, not drive-train BOM rows.
 EXTERNAL_NUMBERS |= frozenset(
     assembly_contract(stem).number
@@ -157,7 +158,10 @@ def test_bom_catalog_numbers_match_the_parts_registry() -> None:
         if not skus:
             assert not printed, stem
             continue
-        assert printed == [skus[0]], stem
+        # A select-fit row (several sizes of one series) prints the series.
+        series = skus[0] if len(skus) == 1 else os.path.commonprefix(list(skus))
+        assert series, stem
+        assert printed == [series], stem
 
 
 def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
@@ -170,7 +174,7 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
         drawing.FIT_PLACEHOLDER,
-        drawing.CRANK_WASHER_FIT_NOTES,
+        drawing.CRANK_SHIM_FIT_NOTES,
         *drawing.BOM_DESCRIPTIONS.values(),
     )
     cited = set(re.findall(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", "\n".join(texts)))
@@ -1169,7 +1173,7 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     rounded inward so a part inside the print is inside the model band."""
     import math
 
-    import ch_rocker_thrust_washer_spec as rocker_washer
+    import vn_rocker_thrust_washer_spec as rocker_washer
     import cylinder_bank_layout as bank
     import fr_harmonic_base_spec as base
     import rocker_bank_layout as rockers
@@ -1207,7 +1211,7 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     )
     assert steps.index("MIC ONE MHA-DT-026, W") < steps.index("FACE TO Y")
     # Step 10: the north MHA-CH-008 ear inner face on the same DRO zero, its
-    # target offset north by the miced north MHA-CH-009 washer's excess; the
+    # target offset north by the miced north MHA-VN-070 washer's excess; the
     # plain shaft threads through the set ear, so the bracket stays down.
     ear_y = base.BOTTOM_REAR_Z - rockers.NORTH_EAR_INNER_Z
     ear_band = rockers.NORTH_EAR_LOCATE_BAND
@@ -1216,7 +1220,7 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
         f"EAR INNER FACE TO Y {limits(ear_y - ear_band, ear_y + ear_band, 2)} "
         f"LESS (W - {rocker_washer_thick})" in steps
     )
-    assert steps.index("MIC ONE MHA-CH-009, W") < steps.index("EAR INNER FACE")
+    assert steps.index("MIC ONE MHA-VN-070, W") < steps.index("EAR INNER FACE")
     assert "LIFT IT OFF" not in steps
     assert "SHOULDER" not in steps
     # The front strap is set one spring-set blade off the front washer, the

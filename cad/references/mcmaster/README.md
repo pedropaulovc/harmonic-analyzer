@@ -15,6 +15,13 @@ recipes:
 
 | part number | production part stem(s) | stock item |
 |---|---|---|
+| 3088A006 | `vn-crank-seat-shim` (MHA-VN-071 pack, 0.1 size; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 12 mm ID x 18 mm OD, 0.1 mm Thick |
+| 3088A026 | `vn-crank-seat-shim` (MHA-VN-071 pack, 0.2 size; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 12 mm ID x 18 mm OD, 0.2 mm Thick |
+| 3088A066 | `vn-crank-seat-shim` (MHA-VN-071 pack, 0.5 size; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 12 mm ID x 18 mm OD, 0.5 mm Thick |
+| 3088A086 | `vn-crank-seat-shim` (MHA-VN-071 pack, 1 size; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 12 mm ID x 18 mm OD, 1 mm Thick |
+| 3088A106 | `vn-crank-seat-shim` (MHA-VN-071 pack, 1.5 size; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 12 mm ID x 18 mm OD, 1.5 mm Thick |
+| 3088A207 | `vn-crank-seat-shim` (MHA-VN-071 pack, 2 size; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 12 mm ID x 18 mm OD, 2 mm Thick |
+| 3088A429 | `vn-rocker-thrust-washer` (MHA-VN-070; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 1/4" ID x 3/8" OD, 0.031" Thick |
 | 3606T118 | `vn-keeper-chain` (catalogue-only; no vendor model) | Bead Chain, Unfinished Brass, Trade Size 3 |
 | 3606T811 | `vn-keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
 | 6261K108 | `vn-chain-connecting-link` (the loop's one connecting link; catalogue-only, vendor model not downloaded) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
@@ -869,7 +876,7 @@ Catalog specifications checked on September 10, 2026:
   library's `Plain Carbon Steel`.
 - [9714K24](https://www.mcmaster.com/9714K24/) (`vn-rocker-bank-spring`,
   MHA-VN-053, one) sits on the MHA-CH-005 pivot shaft between the south
-  MHA-CH-009 washer and the south MHA-CH-008 ear, set by a 0.60 blade, and holds the
+  MHA-VN-070 washer and the south MHA-CH-008 ear, set by a 0.60 blade, and holds the
   20-hub stack north on its datum. Its page was read live on October 9, 2026:
   Wave Disc Spring, high-carbon steel, stackable; ID 0.265 in -0.02/+0.01, OD
   0.367 in -0.02/+0.01, thickness 0.006 in, height 0.03 in (free); compressed
@@ -883,6 +890,57 @@ Catalog specifications checked on September 10, 2026:
   SolidWorks model is offered on each page, but none was fetched or kept
   here, so both are catalogue-only: no replica gate, and their standalone
   diagnostics are catalog-only runs.
+- [3088A429](https://www.mcmaster.com/3088A429/) (`vn-rocker-thrust-washer`,
+  MHA-VN-070, two) rides the MHA-CH-005 pivot shaft at each end of the rocker
+  bank: the north one between hub 19 and the datum MHA-CH-008 ear, the south
+  one between hub 0 and the MHA-VN-053 spring. It replaced the custom
+  MHA-CH-009 sheet washer (owner, 2026-10-15: every washer is a purchased
+  part). The product page renders no spec table to a scraper, so the row was
+  read live on October 15, 2026 from the round-shim family table
+  (https://www.mcmaster.com/products/shims/shims-1~~/, Carbon Steel, 1/4" ID x
+  3/8" OD): thickness 0.031 in +/-0.002 in, ID tolerance 0 to +0.011 in, OD
+  tolerance -0.002 to +0.002 in, Rockwell B65 minimum, pack of 10. The
+  0.031 in nominal keeps the bank's stand-offs within 0.003 of the retired
+  0.79 washer; 3/8 OD is the only family OD under the Ø10.2 hub and the bar
+  foot's cheeks, and the bore's 1/4 in floor is the shaft's maximum, so the
+  shim slides on at worst line on line. The spring-steel 90482A512 (same size,
+  0.032 in, Rockwell C44) was read live the same day and passed over because
+  its 0.813 nominal moves both ears a further 0.023. `diag_build_3088A429.py`
+  extrudes the ID x OD annulus at the 0.031 in nominal, with the bore at its
+  band's middle (6.49) so the model does not sit line on line with the
+  shaft. The page's CAD download was refused (HTTP 403), so it is
+  catalogue-only: no replica gate, and its standalone diagnostic is a
+  catalog-only run.
+- 3088A006, 3088A026, 3088A066, 3088A086, 3088A106 and 3088A207
+  (`vn-crank-seat-shim`, MHA-VN-071, one pack) are the six thicknesses of
+  the 12 mm ID x 18 mm OD carbon-steel round shim. The fitter stacks one to
+  four of them on the MHA-DT-011 crankshaft between the collar's rear face
+  and the MHA-DT-005 crank boss, to within 0.10 under the measured gap. They
+  replaced the custom MHA-DT-036 faced washer (owner, 2026-10-15: every
+  washer is a purchased part). The product pages render no spec table to a
+  scraper. The 3088A006 row was re-read live on October 15, 2026 from the
+  metric carbon-steel view of the round-shim family table
+  (https://www.mcmaster.com/products/shims/shims-1~~/material~steel-2/system-of-measurement~metric/):
+  thickness 0.1 with -0.013 to 0.013 tolerance, ID -0.3 to 0.3, OD -0.5 to
+  0.5, Rockwell B40 minimum, pack of 5. On that view the 12 mm ID filter
+  offers 0.1/0.2/0.5/1/1.5/2 thicknesses at OD 18 only. The other five rows
+  come from the same day's family-table read
+  (https://www.mcmaster.com/products/shims/shims-1~~/), with the same ID, OD
+  and hardness: 3088A026 0.2 +/-0.045, 3088A066 0.5 +/-0.064, 3088A086 1
+  +/-0.105, 3088A106 1.5 +/-0.14, 3088A207 2 +/-0.21. The family's material
+  note reads "Best for dry environments since moisture will cause these
+  shims to rust", and its stacking note reads "stacking more than four may
+  cause them to shift". That second note sets
+  `vn_crank_seat_shim_spec.STACK_MAX`. With repeats allowed, four shims
+  reach every 0.1 step from 0.1 to 4.7. `dt_crank_seat_gap` asserts that
+  every gap in its 1.10-4.60 printed range takes a pack within 0.10 under
+  it, and that the 11.7 minimum bore clears the Ø11.388 journal land. The
+  proof uses catalogue nominals; the fitter mics the actual pack. The model
+  is the nominal-gap pack 2 + 0.5 + 0.2 + 0.1. Each
+  `diag_build_3088A<nnn>.py` adds one shim as a separate body through
+  `diagnostics/diag_shim_3088a_12x18.py`. The CAD download was refused
+  (HTTP 403), so every size is catalogue-only: no replica gate, and the
+  standalone diagnostics are catalog-only runs.
 
 - [92671A005](https://www.mcmaster.com/92671A005/) (`vn-wheel-axle-nut`,
   MHA-VN-025, two), [92916A480](https://www.mcmaster.com/92916A480/)
