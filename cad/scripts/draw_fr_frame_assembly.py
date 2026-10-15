@@ -674,9 +674,13 @@ def _visible_z_line_at_x(
     """The highest visible straight edge of ``component_stem`` running along
     machine Z at machine x = ``x_mm``: the one a plan view prints there."""
     candidates = []
-    for component, full in _frame_visible_components(view).get(component_stem, ()):
+    families = _frame_visible_components(view)
+    seen: list[tuple[float, ...]] = []
+    edge_count = 0
+    for component, full in families.get(component_stem, ()):
         transform = None
         for edge in visible_component_entities(view, component, 1):
+            edge_count += 1
             curve = _early_bound(_early_bound(edge, "IEdge").GetCurve(), "ICurve")
             if curve is None or not curve.IsLine():
                 continue
@@ -687,16 +691,22 @@ def _visible_z_line_at_x(
                 transform = _component_transform(full)
             start = _transform_point(transform, key[:3])
             end = _transform_point(transform, key[3:6])
+            seen.append(tuple(round(v * 1000.0, 3) for v in (*start, *end)))
             if (
-                max(abs(point[0] * 1000.0 - x_mm) for point in (start, end)) > 1e-4
-                or abs(start[1] - end[1]) > 1e-9
+                max(abs(point[0] * 1000.0 - x_mm) for point in (start, end)) > 0.01
+                or abs(start[1] - end[1]) > 1e-6
                 or abs(start[2] - end[2]) < 0.001
             ):
                 continue
             candidates.append(((start[1], abs(start[2] - end[2]), *key), edge))
     if not candidates:
+        # The nearest lines by x, so a miss names what the view did offer.
+        nearest = sorted(seen, key=lambda row: abs(row[0] - x_mm) + abs(row[3] - x_mm))
         raise RuntimeError(
-            f"{label}: no visible {component_stem!r} edge along Z at x {x_mm:g} mm"
+            f"{label}: no visible {component_stem!r} edge along Z at x {x_mm:g} mm; "
+            f"{len(families.get(component_stem, ()))} component(s), {edge_count} "
+            f"visible edge(s), {len(seen)} line(s), nearest (machine mm) "
+            f"{nearest[:8]}; visible stems {sorted(families)}"
         )
     return max(candidates, key=lambda row: row[0])[1]
 
