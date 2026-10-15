@@ -68,7 +68,8 @@ from _holes import wizard_holes
 from _visibility import blank_reference_geometry
 import _telemetry
 from _printed_tolerance import printed_deviations
-from sh_column_clamp_fit import EAR_STATION_BAND as BACK_ARC_TAP_BAND
+from sh_column_clamp_fit import EAR_HEIGHT_BAND as BACK_ARC_TAP_HEIGHT_BAND
+from sh_column_clamp_fit import EAR_STATION_BAND as BACK_ARC_TAP_STATION_BAND
 from vn_clamp_screw_spec import HEAD_H as CLAMP_HEAD_H
 from vn_clamp_screw_spec import SHANK_DIA as CLAMP_SCREW_MAJOR
 from pd_support_bar_spec import (
@@ -150,16 +151,18 @@ CLAMP_STATIONS = tuple(x - CLAMP_ROW_START_X for x in CLAMP_ROW_X)
 
 # The clamp holes' position band: a fixed-fastener stack, as the latch hook's
 # on this bar's own taps. Each #8-32 screw stands in its MHA-SH-002 back-arc
-# tap, whose station the clamp pair holds to ±BACK_ARC_TAP_BAND
-# (sh_column_clamp_fit; taken on both axes), and passes the bar's #8
-# clearance hole, whose least size (DRILLED HOLES minus 0) clears the basic
-# major by CLAMP_HOLE_FLOAT. A coordinate ±band is a diametral zone of
+# tap, which the clamp pair holds to ±BACK_ARC_TAP_STATION_BAND along the bar
+# and ±BACK_ARC_TAP_HEIGHT_BAND in height (sh_column_clamp_fit), and passes
+# the bar's #8 clearance hole, whose least size (DRILLED HOLES minus 0) clears
+# the basic major by CLAMP_HOLE_FLOAT. A coordinate ±band is a diametral zone of
 # 2·√2·band (the rounding to the printed places included), and the bar's
 # zone plus the tap's must stay inside the float. The row height and
 # stations, at .XX, take the widest band that does: ±0.18 (0.509 + 0.283 =
 # 0.792 of 0.812; ±0.19 needs 0.820; the title block's .X ±0.8 needed 2.546).
 CLAMP_HOLE_FLOAT = CLAMP_HOLE_DIA - CLAMP_SCREW_MAJOR
-BACK_ARC_TAP_ZONE = 2.0 * math.hypot(BACK_ARC_TAP_BAND, BACK_ARC_TAP_BAND)
+BACK_ARC_TAP_ZONE = 2.0 * math.hypot(
+    BACK_ARC_TAP_STATION_BAND, BACK_ARC_TAP_HEIGHT_BAND
+)
 
 
 def clamp_position_zone(band: float) -> float:

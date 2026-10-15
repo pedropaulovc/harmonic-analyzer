@@ -86,21 +86,22 @@ def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     """Review of PR #1471: the clamp row printed .X (±0.8), whose 2.263
     position zone over-runs the 0.812 the #8 clearance holes float on the
     #8-32 shanks. Fixed fastener: each screw threads into an MHA-SH-002
-    back-arc tap held ±0.1 (sh_column_clamp_fit), so the bar's zone
-    (2·√2·band) plus the tap's must stay inside the least hole's float; the
-    band is the widest .XX that does. A drift in the band, the hole, the
-    shank or the taps' band breaks one of these."""
+    back-arc tap held ±0.1 along the bar and in height (sh_column_clamp_fit),
+    so the bar's zone (2·√2·band) plus the tap's must stay inside the least
+    hole's float; the band is the widest .XX that does. A drift in the band,
+    the hole, the shank or the taps' bands breaks one of these."""
     import _config
     from _hole_spec import HoleSpec, blind_cut_dia_mm
     from _printed_tolerance import printed_band_mm
     from sh_column_clamp_back_geom import HOLE_SPEC as BACK_ARC_TAP
-    from sh_column_clamp_fit import EAR_STATION_BAND
+    from sh_column_clamp_fit import EAR_HEIGHT_BAND, EAR_STATION_BAND
     from vn_clamp_screw_spec import SHANK_DIA
 
-    # The mate: #8-32 taps in the back arc, located ±0.1 from its bore axis.
+    # The mate: #8-32 taps in the back arc, located ±0.1 on both axes.
     assert (BACK_ARC_TAP.kind, BACK_ARC_TAP.size) == ("tapped", "#8-32")
     assert _config.parts("sh-column-clamp-back")["number"] == "MHA-SH-002"
-    assert EAR_STATION_BAND == 0.1
+    assert EAR_STATION_BAND == EAR_HEIGHT_BAND == 0.1
+    tap_zone = 2.0 * math.hypot(EAR_STATION_BAND, EAR_HEIGHT_BAND)
     # The float: the least drilled #8 clearance hole over the basic major.
     assert part.CLAMP_THROUGH_HOLE_SPEC == HoleSpec("clearance", "#8")
     assert _config.title_block("drilled_hole")["minus_mm"] == 0.0
@@ -118,12 +119,12 @@ def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     band = part.CLAMP_POSITION_BAND
     assert band == pytest.approx(0.18)
     assert part.clamp_position_zone(band) == pytest.approx(zone(band))
-    assert part.BACK_ARC_TAP_ZONE == pytest.approx(zone(EAR_STATION_BAND))
-    assert zone(band) + zone(EAR_STATION_BAND) <= hole_float  # 0.792 <= 0.812
-    assert zone(band + 0.01) + zone(EAR_STATION_BAND) > hole_float
+    assert part.BACK_ARC_TAP_ZONE == pytest.approx(tap_zone)
+    assert zone(band) + tap_zone <= hole_float  # 0.792 <= 0.812
+    assert zone(band + 0.01) + tap_zone > hole_float
     # The title block's .X row (the finding) would not close; the band is
     # tighter than the .XX row, so the callout names the taps (rule 4).
-    assert zone(printed_band_mm(1)) + zone(EAR_STATION_BAND) > hole_float
+    assert zone(printed_band_mm(1)) + tap_zone > hole_float
     assert band < printed_band_mm(2)
     assert "MHA-SH-002" in sheet_spec.CLAMP_TAP_MATE
     assert sheet_spec.CLAMP_CBORE_CALLOUT.startswith(sheet_spec.CLAMP_TAP_MATE)
