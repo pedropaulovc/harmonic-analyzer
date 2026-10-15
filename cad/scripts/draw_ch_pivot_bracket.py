@@ -81,6 +81,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 PIVOT_SHAFT_NUMBER = str(_config.parts("ch-pivot-shaft")["number"])
 SUPPORT_NUMBER = str(_config.parts("fr-rocker-arm-support")["number"])
+THRUST_WASHER_NUMBER = str(_config.parts("ch-rocker-thrust-washer")["number"])
 
 SHEET_SCALE = (3.0, 1.0)  # 33.2 mm tall: 3:1 keeps the bore and the tap legible
 _S = SHEET_SCALE[0] / 1000.0  # sheet metres per model mm
@@ -138,23 +139,23 @@ TOP_KEEP = {
     "HoleStation": (_WEST_X - 0.031, _top_y(FOOT_Z0) - 0.0105),
     "SetScrewLocation": (_EAST_X + 0.021, _top_y(FOOT_Z0) + 0.009),
     "EarThick": (_EAST_X + 0.061, _top_y(0.0)),
-    "FootLen": (_EAST_X + 0.106, _top_y(FOOT_Z1) + 0.012),
+    "FootLen": (_EAST_X + 0.116, _top_y(FOOT_Z1) + 0.012),
     "HoleDia": (FRONT_CENTER[0] + 0.045, _top_y(HOLE_Z)),
     "HoleLateral": (FRONT_CENTER[0] - FOOT_W / 4.0 * _S, _top_y(FOOT_Z1) - 0.008),
     "FootW": (FRONT_CENTER[0], _top_y(FOOT_Z1) - 0.019),
 }
 # REAM marks a fit bore, so the callout names its mate (drawing-guidelines.md
-# rule 4); the drilled hold-down hole says drill and through. The four
+# rule 4); the drilled hold-down hole says drill and through. The three
 # lengths that carry their own band say what the band holds: the hold-down
-# hole lands on the support's tapped seat and keeps its wall to the foot end,
-# the ear's faces are the bank's thrust faces, and the apex screw's cup must
-# land on the pivot shaft's flat (ch_pivot_bracket_spec, rocker_bank_layout).
+# hole lands on the support's tapped seat, the ear's faces bear on the bank's
+# thrust washers and, with the tap's station, place the apex screw's cup on
+# the pivot shaft's flat (ch_pivot_bracket_spec, rocker_bank_layout). The
+# foot length rides the title block.
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": f"REAM THRU\nSLIP FIT ON\nPIVOT SHAFT {PIVOT_SHAFT_NUMBER}",
     "HoleDia": "DRILL THRU",
     "HoleStation": f"ON {SUPPORT_NUMBER} SEAT",
-    "FootLen": "HOLE END WALL",
-    "EarThick": "THRUST FACES",
+    "EarThick": f"THRUST FACES ON {THRUST_WASHER_NUMBER}\nSET SCREW TO SHAFT FLAT",
     "SetScrewLocation": "ON SHAFT FLAT",
 }
 # The apex tap runs down into the bore and stops there. Both native extents
