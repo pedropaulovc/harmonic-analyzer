@@ -12,7 +12,8 @@ turn their feet OUTBOARD, away from the rocker stack (user-approved sketch,
 north one IDENTITY. The ears sit 0.8 apart from mid-support, so the two
 support end faces lie at different distances from them; one part serves both
 sides (#1341, option A): its foot ``FOOT_Z1`` ends flush with the nearer end
-face -- the south one -- and 1.61 short of the north one. The bracket has
+face -- the south one -- and 1.61 short of the north one. The support is
+as long as that foot needs (``SUPPORT_LENGTH_MIN``). The bracket has
 one MHA-VN-032 hold-down hole in its foot's free run from the ear's outboard
 face to the foot end, its station ``HOLE_Z`` given +/-0.10 from the ear's
 inboard face, the face fit-up sets (``ch_pivot_bracket_spec`` holds the
@@ -39,55 +40,98 @@ MOUNT_Z = dict(zip(SIDES, PIVOT_BRACKET_Z, strict=True))
 OUTBOARD_SIGN = {
     name: (1.0 if mount_z > STACK_MID_Z else -1.0) for name, mount_z in MOUNT_Z.items()
 }
-# The support's end face on each side, in the part frame placed there.
-SUPPORT_END_Z = {
-    name: SUPPORT_HALF_MACHINE_Z + OUTBOARD_SIGN[name] * (SUPPORT_WORLD_Z - mount_z)
-    for name, mount_z in MOUNT_Z.items()
-}  # S 12.44, N 14.05
-# The foot ends flush with the nearer end face (the south), so it stays on the
-# support on both sides.
-FOOT_Z1 = min(SUPPORT_END_Z.values())  # 12.44
-FOOT_LEN = FOOT_Z1 - _bracket.FOOT_Z0  # 16.44
+
+
+# The support's end face on each side, in the part frame placed there, for a
+# support ``length`` long (centred on SUPPORT_WORLD_Z).
+def _support_end_z(length: float) -> dict[str, float]:
+    return {
+        name: length / 2.0 + OUTBOARD_SIGN[name] * (SUPPORT_WORLD_Z - mount_z)
+        for name, mount_z in MOUNT_Z.items()
+    }
+
 
 # The hole's window (part z). Low limit: the screw head touches the ear's
 # outboard face at the worst case of the ear-thickness and station bands
 # (``head_to_ear_face_min`` = 0). High limit: the seat's thread keeps
 # rocker_bracket_seat_layout's 2.0 end wall when the support's end face moves
-# by half its 177.8's title-block .X band and the hole by its station band,
+# by half its length's title-block .X band and the hole by its station band,
 # on whichever side that end face is nearer.
-SUPPORT_LENGTH_BAND = 0.8  # title-block .X on the support's 177.8
+SUPPORT_LENGTH_BAND = 0.8  # title-block .X on the support's length
 HOLE_Z_MIN = (
     _bracket.EAR_T / 2.0
     + SCREW_HEAD_DIA / 2.0
     + _bracket.EAR_T_BAND
     + _bracket.STATION_BAND
 )
-HOLE_Z_MAX = (
-    min(SUPPORT_END_Z.values())
-    - _bracket.LIGAMENT_TARGET
-    - THREAD_MAJOR_MM[SCREW_THREAD] / 2.0
-    - _bracket.STATION_BAND
-    - SUPPORT_LENGTH_BAND / 2.0
-)
+
+
+def _hole_z_max(foot_z1: float) -> float:
+    return (
+        foot_z1
+        - _bracket.LIGAMENT_TARGET
+        - THREAD_MAJOR_MM[SCREW_THREAD] / 2.0
+        - _bracket.STATION_BAND
+        - SUPPORT_LENGTH_BAND / 2.0
+    )
+
+
+def _hole_z(foot_z1: float) -> float:
+    """Centred in the free run where the centre lies in the window, else
+    mid-window."""
+    free_run_mid = (_bracket.EAR_T / 2.0 + foot_z1) / 2.0
+    if HOLE_Z_MIN <= free_run_mid <= _hole_z_max(foot_z1):
+        return free_run_mid
+    return (HOLE_Z_MIN + _hole_z_max(foot_z1)) / 2.0
+
+
+def _foot_end_wall_min(length: float) -> float:
+    """Worst-case foot-end wall of a foot flush with the nearer end face of a
+    support ``length`` long."""
+    foot_z1 = min(_support_end_z(length).values())
+    return _bracket.hole_ligaments_min(_hole_z(foot_z1), foot_z1)["foot end"]
+
+
+# The support's length is the shortest .X length, from the source casting's
+# 7 in up, whose nearer end face gives the foot a hold-down hole keeping the
+# 2.0 wall target to the foot end at the foot length's title-block band (user
+# ruling 2026-10-14 on the #954 machinist review: the foot length dropped its
+# +/-0.10 and the foot grew instead; the support widened with it so the foot
+# still ends flush with the south end face, #1341 option A). The support's
+# spec carries the length (its importers read no bracket data); this module
+# proves it is that shortest one.
+SOURCE_SUPPORT_LENGTH = 177.8  # the source casting's 7 in
+_LENGTH_STEP = 0.1  # the support's length prints at one place
+SUPPORT_LENGTH_MIN = next(
+    round(SOURCE_SUPPORT_LENGTH + step * _LENGTH_STEP, 1)
+    for step in range(100)
+    if _foot_end_wall_min(SOURCE_SUPPORT_LENGTH + step * _LENGTH_STEP)
+    >= _bracket.LIGAMENT_TARGET
+)  # 178.8
+if abs(2.0 * SUPPORT_HALF_MACHINE_Z - SUPPORT_LENGTH_MIN) > 1e-9:
+    raise AssertionError(
+        f"the rocker-arm support must be {SUPPORT_LENGTH_MIN:.1f} long for the"
+        f" pivot-bracket foot's end wall, not {2.0 * SUPPORT_HALF_MACHINE_Z:.1f}"
+    )
+SUPPORT_END_Z = _support_end_z(2.0 * SUPPORT_HALF_MACHINE_Z)  # S 12.94, N 14.55
+# The foot ends flush with the nearer end face (the south), so it stays on the
+# support on both sides.
+FOOT_Z1 = min(SUPPORT_END_Z.values())  # 12.94
+FOOT_LEN = FOOT_Z1 - _bracket.FOOT_Z0  # 16.94
+HOLE_Z_MAX = _hole_z_max(FOOT_Z1)
 if HOLE_Z_MAX <= HOLE_Z_MIN:
     raise AssertionError(
         "the foot has no hold-down station clearing both the ear and the"
         f" seat's end wall ({HOLE_Z_MIN:.2f} .. {HOLE_Z_MAX:.2f})"
     )
-# Centred in the free run where the centre lies in the window, else
-# mid-window.
-_FREE_RUN_MID = (_bracket.EAR_T / 2.0 + FOOT_Z1) / 2.0
-HOLE_Z = (
-    _FREE_RUN_MID
-    if HOLE_Z_MIN <= _FREE_RUN_MID <= HOLE_Z_MAX
-    else (HOLE_Z_MIN + HOLE_Z_MAX) / 2.0
-)
-# The printed station: the hole from the ear's inboard face (11.74).
+HOLE_Z = _hole_z(FOOT_Z1)
+# The printed station: the hole from the ear's inboard face (11.99).
 HOLE_STATION = HOLE_Z - _bracket.FOOT_Z0
 HOLE_MACHINE_Z = {name: MOUNT_Z[name] + OUTBOARD_SIGN[name] * HOLE_Z for name in SIDES}
 
-# The foot's free run is only 8.44: its hole keeps 2.41 to the foot end
-# nominal and 2.16 at the worst case of the +/-0.10 bands.
+# The foot's free run is only 8.94: its hole keeps 2.66 to the foot end
+# nominal and 2.00 at the worst case of the title-block foot length and the
+# station's +/-0.10.
 HOLE_LIGAMENTS_MIN = _bracket.hole_ligaments_min(HOLE_Z, FOOT_Z1)
 HEAD_TO_EAR_FACE_MIN = _bracket.head_to_ear_face_min(HOLE_Z, SCREW_HEAD_DIA)
 
@@ -101,11 +145,10 @@ for _where, _ligament in HOLE_LIGAMENTS_MIN.items():
             f"the hold-down hole leaves {_ligament:.2f} to the {_where} at worst"
             f" case, under the {_bracket.LIGAMENT_FLOOR} floor"
         )
-_END_NOMINAL = FOOT_Z1 - HOLE_Z - _bracket.HOLE_DIA / 2.0
-if _END_NOMINAL < _bracket.LIGAMENT_TARGET:
+if HOLE_LIGAMENTS_MIN["foot end"] < _bracket.LIGAMENT_TARGET:
     raise AssertionError(
-        f"the hold-down hole leaves {_END_NOMINAL:.2f} to the foot end, under the"
-        f" {_bracket.LIGAMENT_TARGET} target"
+        f"the hold-down hole leaves {HOLE_LIGAMENTS_MIN['foot end']:.2f} to the"
+        f" foot end at worst case, under the {_bracket.LIGAMENT_TARGET} target"
     )
 # The fillister head must seat on the foot clear of the ear at the worst case
 # of the bands.

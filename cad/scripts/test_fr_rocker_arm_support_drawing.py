@@ -454,25 +454,37 @@ def test_window_is_the_source_square_with_rails_as_deep_as_the_foot() -> None:
 
 
 def test_web_volume_deltas_are_the_closed_forms() -> None:
-    """The source casting's native targets plus the 9.525 web's deltas."""
+    """The source casting's native targets plus the 9.525 web's deltas and
+    the longer wall's (178.8 for the source's 177.8): the window and cavity
+    cut inside the side posts, so every stage gains the trapezoid's area
+    times the added length."""
     growth = support.WEB - support.SOURCE_WEB
     assert growth == pytest.approx(1.5875)
+    assert support.BOSS_DEPTH == pytest.approx(2.0 * placement.SUPPORT_HALF_MACHINE_Z)
+    assert support.SOURCE_BOSS_DEPTH == 177.8
+    wall = (
+        (support.WIDE + support.NARROW)
+        * 2.0
+        * support.HALF_Y
+        * (support.BOSS_DEPTH - support.SOURCE_BOSS_DEPTH)
+    )
+    assert support.WALL_GROWTH_VOLUME == pytest.approx(wall)
     band = ((2.0 * support.BIG) ** 2 - (2.0 * support.CAV) ** 2) * growth
     assert support.WINDOW_CUT1_VOLUME - support.SQUARE_WINDOW_CUT1_VOLUME == (
-        pytest.approx(band)
+        pytest.approx(band + wall)
     )
     assert support.WINDOW_CUT2_VOLUME - support.SQUARE_WINDOW_CUT2_VOLUME == (
-        pytest.approx(2.0 * band)
+        pytest.approx(2.0 * band + wall)
     )
     spandrel = 1.0 - math.pi / 4.0
     corner = 4.0 * spandrel * support.FILLET_R**2 * 2.0 * growth
     pocket = 8.0 * spandrel * support.POCKET_FILLET_R**2 * growth
     assert (
         support.CORNER_FILLET_VOLUME - support.SQUARE_CORNER_FILLET_VOLUME
-    ) == pytest.approx(2.0 * band + corner)
+    ) == pytest.approx(2.0 * band + corner + wall)
     assert (
         support.POCKET_FILLET_VOLUME - support.SQUARE_POCKET_FILLET_VOLUME
-    ) == pytest.approx(2.0 * band + corner - pocket)
+    ) == pytest.approx(2.0 * band + corner - pocket + wall)
     removal = support.FOOT_HOLED_VOLUME - support.RIM_CHAMFER_VOLUME
     assert removal == pytest.approx(support.SQUARE_RIM_CHAMFER_REMOVAL)
     assert support.BRACKET_SEATS_VOLUME < support.RIM_CHAMFER_VOLUME

@@ -105,7 +105,6 @@ from ch_pivot_bracket_spec import (
     EAR_TOP_Y,
     EAR_W,
     FOOT_H,
-    FOOT_LEN_BAND,
     FOOT_W,
     FOOT_Z0,
     HOLE_DIA,
@@ -501,13 +500,12 @@ async def build(adapter) -> dict[str, str]:
     # (drawing-simplicity-policy.md `How the repository implements the
     # guidelines`); the drawing reads them back instead of rewriting them.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # The four lengths along the foot carry +/-0.10 natively
-    # (ch_pivot_bracket_spec: the foot's short run cannot take title-block
-    # .XX): the foot length, the hold-down station and the apex tap's
-    # station, all from the ear's inboard face -- the face fit-up sets and
-    # the S4 hold touches Z0 on -- and the ear thickness. The reamed bore
+    # Three lengths carry +/-0.10 natively (ch_pivot_bracket_spec: the
+    # foot's short run cannot take title-block .XX on them): the hold-down
+    # station and the apex tap's station, both from the ear's inboard face --
+    # the face fit-up sets and the S4 hold touches Z0 on -- and the ear
+    # thickness. The foot length rides the title block. The reamed bore
     # holds the drilled-hole row's +0.10/0 its set-screw thread is counted at.
-    set_dimension_symmetric_tolerance(adapter, "FootProfile", "FootLen", FOOT_LEN_BAND)
     set_dimension_symmetric_tolerance(adapter, "Ear", "EarThick", EAR_T_BAND)
     set_dimension_symmetric_tolerance(adapter, "HoleProfile", "HoleStation", STATION_BAND)
     set_dimension_symmetric_tolerance(

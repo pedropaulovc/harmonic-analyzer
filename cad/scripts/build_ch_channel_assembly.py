@@ -368,7 +368,7 @@ CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
 # on the north ear's inner face, the bank's datum; the MHA-VN-053 spring
 # between the south ear and the south washer on hub 0 preloads the bank north
 # onto it. The plain shaft is held by one MHA-VN-034 set screw per ear on a
-# flat. Feet outboard to the rocker-arm-support's +-88.9 end faces (it is the
+# flat. Feet outboard to the rocker-arm-support's +-89.4 end faces (it is the
 # only stand; the old south "A-frame" is gone).
 from rocker_bank_layout import (  # noqa: E402
     NORTH_EAR_INNER_Z,
