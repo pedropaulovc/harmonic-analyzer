@@ -46,7 +46,6 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_centerline import add_view_centerline
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -158,14 +157,15 @@ DIMENSION_CALLOUTS = {
 # Model points (mm) the sheet picks project from, on the split face (X =
 # -GRIP_OFFSET).  The ear-hole height runs from the bottom-face edge, clear of
 # the holes and the relief, to ear 1's tap-drill rim; the tap callout lands on
-# ear 2's rim up and right of its centre; the centerline picks the relief's
-# cylindrical face inside the mouth.
+# ear 2's rim up and right of its centre; the bore centerline runs midway
+# between the two straight edges where the relief meets the split face.
 _TAP_R = TAP_DRILL_DIA / 2.0
 _SPLIT_X = -GRIP_OFFSET
 _BOTTOM_EDGE_MM = (_SPLIT_X, -ARC_HEIGHT / 2.0, 21.0)
 _EAR_1_RIM_MM = (_SPLIT_X, -0.6 * _TAP_R, EAR_HOLE_Z + 0.8 * _TAP_R)
 _EAR_2_RIM_MM = (_SPLIT_X, -0.6 * _TAP_R, -EAR_HOLE_Z - 0.8 * _TAP_R)
-_RELIEF_FACE_MM = (_SPLIT_X, 4.0, 6.0)
+_RELIEF_EDGE_Z = math.sqrt((COLUMN_BORE / 2.0) ** 2 - GRIP_OFFSET**2)
+_RELIEF_EDGES_MM = tuple((_SPLIT_X, 4.0, s * _RELIEF_EDGE_Z) for s in (1.0, -1.0))
 # The relief arc's far point on the top face, where its centre mark picks it.
 _RELIEF_ARC_MM = (-COLUMN_BORE / 2.0, ARC_HEIGHT / 2.0, 0.0)
 EAR_HEIGHT_TEXT_XY = (FACE_CENTER[0] + 0.008, 0.113)
@@ -258,6 +258,37 @@ def _set_dimension_prefixes(
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
 
 
+def _add_bore_axis_centerline(
+    adapter: Any, face: Any, edges_xy: list[tuple[float, float]]
+) -> None:
+    """Draw the bore axis midway between the relief's two split-face edges.
+
+    Round 2 (farm 20261015T010255283Z): ``InsertCenterLine2`` on the
+    half-cylinder relief face returned None on both arcs; an edge pair is
+    draw_dt_crank_arm's working recipe, and the edges sit symmetric about
+    the axis.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, face)):
+        raise RuntimeError("failed to activate the split-face view for the bore axis")
+    _early_bound(face, "IView").UpdateViewDisplayGeometry()
+    draw.ClearSelection2(True)
+    for index, (x, y) in enumerate(edges_xy):
+        if not draw.Extension.SelectByID2(
+            "", "EDGE", x, y, 0.0, index > 0, 0, null_callout(), 0
+        ):
+            raise RuntimeError("failed to select a relief edge for the bore axis")
+    centerline = ddoc.InsertCenterLine2()
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if centerline is None:
+        raise RuntimeError("failed to draw the bore axis between the relief edges")
+    count = int(_early_bound(face, "IView").GetCenterLineCount())
+    if count != 1:
+        raise RuntimeError(f"split-face view carries {count} centerlines, expected 1")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -324,7 +355,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
 
     _add_relief_center_mark(adapter, top)
-    bottom_edge, ear_1_rim, ear_2_rim, relief_face = model_points_in_view(
+    picks = model_points_in_view(
         adapter,
         face,
         [
@@ -333,14 +364,21 @@ async def build(adapter: Any) -> dict[str, str]:
                 _BOTTOM_EDGE_MM,
                 _EAR_1_RIM_MM,
                 _EAR_2_RIM_MM,
-                _RELIEF_FACE_MM,
+                *_RELIEF_EDGES_MM,
             )
         ],
         label="split-face picks",
-        names=("bottom edge", "ear 1 rim", "ear 2 rim", "relief face"),
+        names=(
+            "bottom edge",
+            "ear 1 rim",
+            "ear 2 rim",
+            "relief edge +Z",
+            "relief edge -Z",
+        ),
     )
+    bottom_edge, ear_1_rim, ear_2_rim, *relief_edges = picks
     # The ear-hole stations measure from the bore axis: draw it.
-    add_view_centerline(adapter, face, face_xy=relief_face, label="bore axis")
+    _add_bore_axis_centerline(adapter, face, relief_edges)
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the split-face view")
 
