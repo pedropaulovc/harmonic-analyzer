@@ -2849,9 +2849,10 @@
     {
       "id": 41,
       "name": "mg-lever-wire-rules",
-      "package": "mg_lever_wire",
+      "package": "vn_lever_wire",
       "kind": "part",
       "release": "v40",
+      "release_pdf": "mg-lever-wire.pdf",
       "prompt": "Blind machinist review of the mg-lever-wire part package.",
       "expected_output": "Rule-coverage case (rules 1, 15): reports each negative finding in the stated category and raises no positive-case item.",
       "expectations": [
