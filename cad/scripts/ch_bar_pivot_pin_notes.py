@@ -37,16 +37,16 @@ LEVER_NUMBER = "MHA-CH-002"  # runs in its #47 bar-pin hole
 # diameter carries the drill rod's own grind band natively at three places;
 # the installed length is the bar's width, printed as REFERENCE (the bar's
 # stock owns it). The blank's cut length lives on the blanked
-# ``BlankReference`` sketch on the same plane and carries its own band at two
-# places (the dressing stock in ch_bar_pivot_pin_spec.joint_budget is judged
-# at it).
+# ``BlankReference`` sketch on the same plane and prints at the spec's places
+# under the title block's band (the dressing stock in
+# ch_bar_pivot_pin_spec.joint_budget is judged at it).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia", "PinLen"},
     "BlankReference": {"BlankLen"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {"PinDia": 3, "PinLen": 2},
-    "BlankReference": {"BlankLen": 2},
+    "BlankReference": {"BlankLen": pin.PIN_BLANK_LENGTH_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: decimals
@@ -60,16 +60,19 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     raise AssertionError("every marked pin dimension needs authored places")
 
 # Descriptive text only; every value and band is the model's. The diameter
-# names the stock that holds its band and both mates (rule 4); its callout
-# stacks above it, the others hang below their values.
+# names the stock that holds its band and both mates (rule 4). Every callout
+# hangs under its value: SOLIDWORKS drops a multi-line callout stacked above a
+# value from the print (r1: the diameter's never reached the PDF). The
+# installed length's stays narrower than the 63.5 mm pin at 10:1, clear of
+# both length rows' witnesses; note 1 says the views are the installed pin.
 DIAMETER_CALLOUT = (
     "5/64 DRILL ROD, AS SUPPLIED\n"
     f"PRESS FIT IN {BAR_NUMBER}\n"
     f"RUNS IN {LEVER_NUMBER} #47 HOLE"
 )
-DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {"PinDia": DIAMETER_CALLOUT}
-DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
-    "PinLen": f"INSTALLED, FLUSH WITH {BAR_NUMBER}",
+DIMENSION_CALLOUTS: dict[str, str] = {
+    "PinDia": DIAMETER_CALLOUT,
+    "PinLen": f"FLUSH WITH {BAR_NUMBER}",
     "BlankLen": "BLANK",
 }
 

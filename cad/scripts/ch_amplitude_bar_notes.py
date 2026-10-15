@@ -13,6 +13,7 @@ from __future__ import annotations
 import math
 
 import ch_amplitude_bar_spec as bar
+from _printed_tolerance import printed_band_mm
 
 # Mating parts the callouts name (test_ch_amplitude_bar_drawing pins each to
 # the part registry).
@@ -94,6 +95,26 @@ def _far_cheek_min(notch_width: float, ledge: float) -> float:
 TOP_CHEEK_WALL_MIN = _far_cheek_min(bar.TOP_NOTCH_WIDTH, bar.TOP_NOTCH_OFFSET)
 BOTTOM_CHEEK_WALL_MIN = _far_cheek_min(bar.BOTTOM_NOTCH_WIDTH, bar.BOTTOM_NOTCH_OFFSET)
 
+
+def _pin_hole_wall_min() -> float:
+    """The reamed pin hole's wall to the nearer depth face at the worst case:
+    its offset at either end of the band its TopPinX places print, the hole
+    at its largest, on the narrowest stock; floored to one place. The tight
+    location exists for this wall (machinist round 1, #1293: the 3.175 read
+    as a three-place size with no function)."""
+    location = printed_band_mm(DRAWING_PRECISION["TopPinProfile"]["TopPinX"])
+    hole_max = bar.TOP_PIN_HOLE_DIA + bar.TOP_PIN_HOLE_BAND[0]
+    near = bar.BAR_DEPTH / 2.0 - location
+    far = (bar.BAR_DEPTH - bar.BAR_STOCK_UNDERSIZE) - (bar.BAR_DEPTH / 2.0 + location)
+    wall = min(near, far) - hole_max / 2.0
+    return math.floor(round(wall * 10.0, 9)) / 10.0
+
+
+# drawing-guidelines.md rule 17: the hole's wall holds the 2.0 target.
+PIN_HOLE_WALL_MIN = _pin_hole_wall_min()
+if PIN_HOLE_WALL_MIN < 2.0:
+    raise AssertionError("the top pin hole's face wall fell under 2.0")
+
 # "ROOTS R0.40 MAX" is a Main-ruled exception (2026-09-27): it limits the
 # cutter's corner at an unmodelled root, so it rides each notch's depth.
 ROOT_CALLOUT = "ROOTS R0.40 MAX"
@@ -111,6 +132,7 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     "TopNotchHeight": ROOT_CALLOUT,
     "BottomNotchHeight": ROOT_CALLOUT,
     "TopPinDia": f"THRU, REAM\nPRESS FIT {TOP_PIN_NUMBER}",
+    "TopPinX": f"HOLE WALL {PIN_HOLE_WALL_MIN:.1f} MIN",
     "BarSection": "1/4 SQ STOCK",
 }
 if not set(DIMENSION_CALLOUTS) <= set(DRAWING_PRECISION_BY_NAME):

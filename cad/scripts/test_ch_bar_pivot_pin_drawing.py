@@ -1,9 +1,10 @@
 """Offline contracts for the bar pivot pin (MHA-CH-011) part and drawing.
 
 The installed pressed pin under ``cad/docs/drawing-guidelines.md``: three
-native model dimensions whose places (and the diameter's and blank's bands)
-the PART owns, the installed length as REFERENCE, the mates and the stock
-named at the diameter, no GD&T, no roughness symbol, and one note line.
+native model dimensions whose places (and the diameter's band) the PART owns,
+the installed length as REFERENCE, the blank under the title block's band,
+the mates and the stock named at the diameter, no GD&T, no roughness symbol,
+and one note line.
 """
 
 from __future__ import annotations
@@ -76,16 +77,24 @@ def test_notes_module_is_the_single_source_of_the_marked_dimension_set() -> None
     assert not hasattr(drawing, "RIGHT_KEEP")
 
 
-def test_blank_length_is_a_banded_model_dimension_on_a_hidden_sketch() -> None:
+def test_blank_length_is_a_model_dimension_on_a_hidden_sketch() -> None:
     """Machinist round 1 (#1305): the blank length sat in a note. It prints
-    from the part's blanked BlankReference sketch (the rod-pin pattern)."""
+    from the part's blanked BlankReference sketch (the rod-pin pattern).
+    Round 2: its only job is to stand proud of both faces before dressing,
+    so it takes the title block's .XX band, not a tighter one of its own."""
+    from _printed_tolerance import printed_band_mm
+
     build = _build_source()
     assert notes.DRAWING_DIMENSIONS["BlankReference"] == {"BlankLen"}
     assert 'set_global(adapter, "BlankLen", f"{PIN_BLANK_LENGTH}mm")' in build
     assert 'blank.record("BlankLen", \'"BlankLen"\')' in build
     assert 'blank_reference_sketches(adapter, ("BlankReference",))' in build
     assert "hidden_sketches.curate_view_dimensions(" in _source()
-    assert spec.PIN_BLANK_LENGTH_BAND == (0.13, -0.13)
+    places = notes.DRAWING_PRECISION["BlankReference"]["BlankLen"]
+    assert places == spec.PIN_BLANK_LENGTH_PLACES == 2
+    band = printed_band_mm(places)
+    assert spec.PIN_BLANK_LENGTH_BAND == (band, -band)
+    assert spec.BUDGET["blank_excess_min"] > 0.0
     assert drawing.FRONT_KEEP["BlankLen"][1] < drawing.FRONT_KEEP["PinLen"][1] - 0.015
 
 
@@ -99,7 +108,6 @@ def test_precision_and_band_are_authored_on_the_part() -> None:
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
     assert model_toleranced_dimensions(part) == {
         ("PinProfile", "PinDia"): "PIN_DIA_TOLERANCE",
-        ("BlankReference", "BlankLen"): "blank_upper",
     }
 
 
@@ -130,18 +138,26 @@ def test_one_note_and_the_mates_at_their_dimensions() -> None:
         "1. VIEWS SHOW THE INSTALLED PIN; CUT THE BLANK SHOWN."
     ]
     assert "PUNCH" not in notes.DRAWING_NOTES and "DRESS" not in notes.DRAWING_NOTES
-    assert notes.DIMENSION_CALLOUTS_ABOVE == {
+    assert notes.DIMENSION_CALLOUTS == {
         "PinDia": "5/64 DRILL ROD, AS SUPPLIED\n"
         "PRESS FIT IN MHA-CH-001\n"
-        "RUNS IN MHA-CH-002 #47 HOLE"
-    }
-    assert notes.DIMENSION_CALLOUTS_BELOW == {
-        "PinLen": "INSTALLED, FLUSH WITH MHA-CH-001",
+        "RUNS IN MHA-CH-002 #47 HOLE",
+        "PinLen": "FLUSH WITH MHA-CH-001",
         "BlankLen": "BLANK",
     }
     source = _source()
-    assert 'location="above"' in source
-    assert source.count("set_dimension_callouts(") == 2
+    # r1: SOLIDWORKS printed nothing of a multi-line callout above a value.
+    assert 'location="above"' not in source
+    assert source.count("set_dimension_callouts(") == 1
+    # The installed length's callout stays inside the pin's 10:1 length
+    # (~2.5 mm a character at the sheet's text height), clear of both rows'
+    # witnesses.
+    pin_len_on_sheet = 2.0 * drawing.HALF_LEN
+    assert len(notes.DIMENSION_CALLOUTS["PinLen"]) * 0.0025 < pin_len_on_sheet - 0.006
+    # The diameter's three-line callout hangs clear of the pin's outline.
+    assert drawing.FRONT_KEEP["PinDia"][1] - 4 * 0.0045 > (
+        drawing.FRONT_CENTER[1] + drawing.HALF_DIA + 0.002
+    )
     assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
 

@@ -44,10 +44,14 @@ DRILLED_PLUS = 0.10
 PIN_DIA = 5.0 / 64.0 * MM_PER_IN  # 1.984
 PIN_DIA_TOLERANCE = 0.005  # +/-, drill-rod grind
 PIN_INSTALLED_LENGTH = _bar.BAR_WIDTH  # dressed flush with both bar faces
-# Cut length of the blank: the bar plus dressing stock at each end. 2-place,
-# printed on the pin sheet with its band.
-PIN_BLANK_LENGTH = 6.60
-PIN_BLANK_LENGTH_BAND = (0.13, -0.13)  # (upper, lower) deviations
+# Cut length of the blank: the bar plus dressing stock at each end. Its one
+# function is to stand proud of both faces before dressing, so it prints at
+# two places under the title block's .XX band (test_ch_bar_pivot_fit pins the
+# restatement to title_block.yaml); machinist round 1 (#1305) found the former
+# 6.60 +/-0.13 tighter than a dress-flush blank needs.
+PIN_BLANK_LENGTH = 7.00
+PIN_BLANK_LENGTH_PLACES = 2
+PIN_BLANK_LENGTH_BAND = (0.51, -0.51)  # (upper, lower) deviations: .XX
 # Dressed ends stand nothing proud of the bar faces: the top-notch stack
 # below leaves 0.1065 against the 0.10 running floor (#1038).
 PIN_END_PROUD_MAX = 0.0

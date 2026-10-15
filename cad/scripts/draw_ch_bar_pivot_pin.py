@@ -56,8 +56,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from ch_bar_pivot_pin_notes import (
-    DIMENSION_CALLOUTS_ABOVE,
-    DIMENSION_CALLOUTS_BELOW,
+    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     REFERENCE_DIMENSIONS,
@@ -91,11 +90,11 @@ HALF_DIA = PIN_DIA * VIEW_SCALE[0] / 2000.0  # 0.0099
 HALF_LEN = PIN_INSTALLED_LENGTH * VIEW_SCALE[0] / 2000.0  # 0.0318
 
 # Side view: the diameter above the view, its text left of centre so the
-# axis-centerline pick at the view's middle lands on bare face, its callout
-# stacked over it; the installed length below with its one-line callout, and
-# the blank's cut length below that.
+# axis-centerline pick at the view's middle lands on bare face, high enough
+# that its three-line callout hangs clear of the pin; the installed length
+# below with its one-line callout, and the blank's cut length below that.
 FRONT_KEEP = {
-    "PinDia": (FRONT_CENTER[0] - 0.020, FRONT_CENTER[1] + HALF_DIA + 0.016),
+    "PinDia": (FRONT_CENTER[0] - 0.020, FRONT_CENTER[1] + HALF_DIA + 0.032),
     "PinLen": (FRONT_CENTER[0], FRONT_CENTER[1] - HALF_DIA - 0.016),
     "BlankLen": (FRONT_CENTER[0], FRONT_CENTER[1] - HALF_DIA - 0.036),
 }
@@ -161,10 +160,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     assert_imported_precision(adapter, front_annotations, DRAWING_PRECISION_BY_NAME)
     # Descriptive text only; every value and band is the model's.
-    set_dimension_callouts(
-        adapter, front_annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
-    )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS_BELOW)
+    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
     # The installed length is the bar's width: a LINEAR reference. The plural
     # set_reference_dimensions forces a diameter glyph, printing "(Ø6.35)".
     for name in sorted(REFERENCE_DIMENSIONS):

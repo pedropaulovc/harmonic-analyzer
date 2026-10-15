@@ -79,6 +79,17 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
     assert notes.DIMENSION_CALLOUTS["TopPinDia"] == "THRU, REAM\nPRESS FIT MHA-CH-011"
     precision = notes.DRAWING_PRECISION["TopPinProfile"]
     assert precision == {"BarSection": 2, "TopPinX": 3, "TopPinDrop": 2, "TopPinDia": 3}
+    # Machinist round 1: the three-place location states its function, the
+    # hole's worst-case face wall, which the pin's joint budget holds too.
+    import ch_bar_pivot_pin_spec as pin
+
+    assert notes.DIMENSION_CALLOUTS["TopPinX"] == "HOLE WALL 2.0 MIN"
+    assert notes.PIN_HOLE_WALL_MIN == math.floor(
+        pin.BUDGET["hole_face_wall_min"] * 10.0
+    ) / 10.0
+    # r1 printed the band +0.01/0.00 under a 1.968: it takes the nominal's places.
+    source = Path(bar.__file__).read_text(encoding="utf-8")
+    assert 'places=DRAWING_PRECISION["TopPinProfile"]["TopPinDia"]' in source
 
 
 def test_pin_hole_is_a_native_sketch_located_from_the_top_edge() -> None:
@@ -156,6 +167,10 @@ def test_callouts_name_each_mate_at_its_dimension() -> None:
     assert drawing.CALLOUTS_ABOVE <= set(callouts)
     for text in callouts.values():
         assert all(len(line) <= 20 for line in text.splitlines()), text
+    # r1 (64ebba372): SOLIDWORKS printed nothing of the two-line callout set
+    # above TopNotchWidth; a callout over its value is one line.
+    for name in drawing.CALLOUTS_ABOVE:
+        assert "\n" not in callouts[name], name
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_callouts(") == 2
 
@@ -270,9 +285,12 @@ def test_cropped_views_frame_their_ends_and_place_text_outside_the_bar() -> None
                 assert math.hypot(across, y - fy) < view.radius_mm - 0.5, name
     depth_x, depth_y = drawing.DETAIL_A_KEEP["BottomNotchHeight"]
     assert depth_x < a.centre[0] - a.radius_mm * a.mm  # left of the fence
-    assert (
-        a.sheet_xy(0.0, 0.0)[1] < depth_y < a.sheet_xy(0.0, spec.BOTTOM_NOTCH_HEIGHT)[1]
-    )
+    # Over the floor's witness, outside the span: r1 printed the ROOTS line
+    # on that witness with the text inside it.
+    floor_y = a.sheet_xy(0.0, spec.BOTTOM_NOTCH_HEIGHT)[1]
+    assert depth_y - 1.5 * _LINE > floor_y
+    # Its stack (band, value, ROOTS line) stays under DETAIL B's label.
+    assert depth_y + 3.0 * _LINE < b.label_xy[1] - 2 * _LINE - 0.004
     # r743-6b (64fedd3cc): a width with its +0.3/0.0 stack prints ~20 mm
     # wide; centred on the ~12.4 mm mouth it straddled both extension lines.
     # Each width's text stands west of the bar, clear of it.
@@ -282,8 +300,20 @@ def test_cropped_views_frame_their_ends_and_place_text_outside_the_bar() -> None
     # The ledge's stack half-height, its one-line callout under it, and the
     # width stack's half-height.
     assert ledge_y - width_y >= 0.014
-    assert ledge_x < a.sheet_xy(0.0, 0.0)[0]
-    assert width_x + 0.010 < a.sheet_xy(0.0, 0.0)[0]
+    callouts = ch_amplitude_bar_notes.DIMENSION_CALLOUTS
+    # Each west text block (its widest callout line) ends short of the bar's
+    # edge, where the ledge's and the depth's witnesses stand (r1: both ran
+    # through their own text).
+    bar_left = a.sheet_xy(0.0, 0.0)[0]
+    for name, (x, _y) in drawing.DETAIL_A_KEEP.items():
+        half = max(map(len, callouts[name].splitlines())) * _CHAR / 2
+        assert x + half + 0.002 < bar_left, name
+    assert ledge_x < bar_left
+    # The width's right witness runs down to its row; DETAIL A's label stands
+    # east of it (r1: the centred label stood in its path).
+    right_wall = a.sheet_xy(_W - _O, 0.0)[0]
+    label_w = max(len(line) for line in a.label_text.splitlines()) * _CHAR
+    assert a.label_xy[0] - label_w / 2 > right_wall + 0.002
     # The top depth's ~36 mm ROOTS callout hangs clear of the bar.
     assert (
         drawing.DETAIL_B_KEEP["TopNotchHeight"][0] - 0.019
@@ -292,7 +322,8 @@ def test_cropped_views_frame_their_ends_and_place_text_outside_the_bar() -> None
     top_row = {drawing.DETAIL_B_KEEP[n][1] for n in ("TopRightLedge", "TopNotchWidth")}
     (row_y,) = top_row
     assert row_y > b.sheet_xy(0.0, spec.BAR_LENGTH)[1]
-    assert drawing.DETAIL_B_KEEP["TopNotchWidth"][0] + 0.010 < b.sheet_xy(0.0, 0.0)[0]
+    half = max(map(len, callouts["TopNotchWidth"].splitlines())) * _CHAR / 2
+    assert drawing.DETAIL_B_KEEP["TopNotchWidth"][0] + half + 0.002 < b.sheet_xy(0.0, 0.0)[0]
     assert (
         drawing.DETAIL_B_KEEP["TopRightLedge"][0] > b.sheet_xy(spec.BAR_WIDTH, 0.0)[0]
     )
@@ -304,7 +335,11 @@ def test_cropped_views_frame_their_ends_and_place_text_outside_the_bar() -> None
     pin_x, pin_y = side.sheet_xy(0.0, _PIN[1], _PIN[2])
     assert pin_x == pytest.approx(side.centre[0] + (side.fence_mm[2] - _PIN[2]) * side.mm)
     keep = drawing.TOP_SIDE_KEEP
-    assert pin_x < keep["TopPinX"][0] < back_x  # between its witnesses
+    # Outside the back face's witness, which the section shares (r1: inside
+    # the 12.7 mm span the text stood 0.7 mm from it).
+    wall_half = len(ch_amplitude_bar_notes.DIMENSION_CALLOUTS["TopPinX"]) * _CHAR / 2
+    assert keep["TopPinX"][0] - wall_half > back_x + 0.002
+    assert pin_x < back_x
     assert end_y < keep["TopPinX"][1] < keep["BarSection"][1] - 0.007
     assert keep["TopPinDrop"][0] > back_x and pin_y < keep["TopPinDrop"][1] < end_y
     assert keep["TopPinDia"][0] > back_x and keep["TopPinDia"][1] < pin_y
@@ -320,10 +355,10 @@ def _overlap(p: tuple[float, ...], q: tuple[float, ...]) -> bool:
     return p[0] < q[2] and q[0] < p[2] and p[1] < q[3] and q[1] < p[3]
 
 
-# 2.4 mm a character and 4.5 mm a line at the sheet's text height, measured on
-# the base render (808.30 ~14 mm; a notes line ~2.4 mm a character).
-_CHAR = 0.0024
-_LINE = 0.0045
+# ~2.6 mm a character and ~5.2 mm a line at the sheet's text height, measured
+# on the r1 PDF (CHEEK WALL 1.21 MIN 48.8 mm; the width block's rows 5.2 mm apart).
+_CHAR = 0.0026
+_LINE = 0.0052
 
 
 def test_views_labels_and_notes_stay_on_the_sheet_and_apart() -> None:
@@ -520,7 +555,9 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
     spec = _config.parts("ch-amplitude-bar")
     assert spec["material_specification"] == "AISI 1018 cold-rolled steel, 6.35 sq"
-    assert spec["finish"] == "bright chrome plated; dims after plating; mask pin hole"
+    # One line in the FINISH field (r1 wrapped at 50 characters).
+    assert spec["finish"] == "bright chrome; dims after plating; mask pin hole"
+    assert len(spec["finish"]) < 50
     assert int(spec["quantity"]) == 20
     assert "PLATING" not in ch_amplitude_bar_notes.DRAWING_NOTES
 

@@ -16,10 +16,10 @@ into the *Front side view (drawing-guidelines.md rule 11 (turned parts read like
 
 ``BlankReference`` (blanked, on the Front plane, on the pin axis): the blank's
 cut length, a construction line centred on the Right Plane whose one
-dimension carries the 2-place band (drawing-simplicity-policy.md `How the
-repository implements the guidelines`: the model, not a note, owns it); the
-side view prints it below the installed length (the ``build_ch_rod_pivot_pin``
-pattern).
+dimension prints at two places under the title block's band
+(drawing-simplicity-policy.md `How the repository implements the
+guidelines`: the model, not a note, owns it); the side view prints it below
+the installed length (the ``build_ch_rod_pivot_pin`` pattern).
 
 Run (SolidWorks already open)::
 
@@ -56,12 +56,10 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_tolerances import set_dimension_symmetric_tolerance
-from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from ch_bar_pivot_pin_notes import DRAWING_DIMENSIONS, DRAWING_NOTES, DRAWING_PRECISION
 from ch_bar_pivot_pin_spec import (
     PIN_BLANK_LENGTH,
-    PIN_BLANK_LENGTH_BAND,
     PIN_DIA,
     PIN_DIA_TOLERANCE,
     PIN_INSTALLED_LENGTH,
@@ -209,18 +207,10 @@ async def build(adapter) -> dict[str, str]:
 
     # The diameter carries the drill rod's grind band natively (drawing-guidelines.md rule 3 (decimal places carry the tolerance)); the
     # installed length is the bar's width, parenthesized as REFERENCE on the
-    # sheet; the blank's cut length carries its own band (the dressing stock,
-    # ch_bar_pivot_pin_spec.joint_budget blank_excess_min/max).
+    # sheet; the blank's cut length takes the title block's .XX band (the
+    # dressing stock, ch_bar_pivot_pin_spec.joint_budget blank_excess_min/max).
     set_dimension_symmetric_tolerance(
         adapter, "PinProfile", "PinDia", PIN_DIA_TOLERANCE
-    )
-    blank_lower, blank_upper = deviations(PIN_BLANK_LENGTH_BAND)
-    if blank_lower != -blank_upper:
-        raise AssertionError(
-            "ch_bar_pivot_pin_spec.PIN_BLANK_LENGTH_BAND must be symmetric"
-        )
-    set_dimension_symmetric_tolerance(
-        adapter, "BlankReference", "BlankLen", blank_upper
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

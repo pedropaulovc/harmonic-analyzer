@@ -401,9 +401,14 @@ async def build(adapter) -> dict[str, str]:
         adapter, "BarProfile", "TopRightLedge", NOTCH_OFFSET_TOLERANCE_MM
     )
     # The reamed press hole's band rides natively on its diameter, printed in
-    # the top end's right side view.
+    # the top end's right side view at the nominal's places (r1 printed
+    # +0.01/0.00 under a 1.968).
     set_dimension_bilateral_tolerance(
-        adapter, "TopPinProfile", "TopPinDia", *deviations(TOP_PIN_HOLE_BAND)
+        adapter,
+        "TopPinProfile",
+        "TopPinDia",
+        *deviations(TOP_PIN_HOLE_BAND),
+        places=DRAWING_PRECISION["TopPinProfile"]["TopPinDia"],
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

@@ -117,6 +117,7 @@ class CroppedView:
     radius_mm: float
     centre: tuple[float, float]
     letter: str | None = None
+    label_dx: float = 0.0
 
     @property
     def mm(self) -> float:
@@ -144,9 +145,10 @@ class CroppedView:
 
     @property
     def label_xy(self) -> tuple[float, float]:
-        """The view-owned label note's top centre, under the crop circle."""
+        """The view-owned label note's top centre, under the crop circle
+        (``label_dx`` east of its centre)."""
         return (
-            self.centre[0],
+            self.centre[0] + self.label_dx,
             self.centre[1] - self.radius_mm * self.mm - DETAIL_LABEL_DROP,
         )
 
@@ -197,6 +199,9 @@ DETAIL_A = CroppedView(
     7.5,
     (0.150, 0.100),
     letter="A",
+    # East of centre: the width row's right witness runs down past the
+    # circle, and a centred label stood in its path (r1, 64ebba372).
+    label_dx=0.016,
 )
 DETAIL_B = CroppedView(
     "B",
@@ -245,31 +250,35 @@ CROPPED_VIEWS = (DETAIL_A, DETAIL_B, TOP_SIDE, TOP_ISO, FOOT_ISO)
 # A callout's text stands this far outside the bar's edge, or outside
 # DETAIL A's fence; a ledge row this far outside the bar's end.
 DETAIL_TEXT_GAP = 0.010
-DETAIL_A_FENCE_TEXT_GAP = 0.014
+DETAIL_A_FENCE_TEXT_GAP = 0.020
 DETAIL_ROW_GAP = 0.012
 # DETAIL A's width row hangs under its ledge row and the ledge's one-line
 # callout.
-DETAIL_A_WIDTH_ROW_GAP = 0.028
-# A width with its +0.3/0.0 stack prints ~20 mm wide, wider than the 12.4 mm
-# mouth at 4:1: centred on the mouth it straddled both extension lines, and in
-# DETAIL A the Ra leader ran through it (r743-6b, 64fedd3cc). So each width's
-# text stands west of the bar, its centre this far out from the bar's edge,
-# and the dimension line runs out to it.
-WIDTH_TEXT_OFFSET = 0.014
-# A depth's ROOTS callout (~36 mm) hangs centred under its value; the top
+DETAIL_A_WIDTH_ROW_GAP = 0.032
+# A width's text block (value, +0.3/0.0 stack, two callout lines) prints
+# ~50 mm wide, far wider than the 12.4 mm mouth at 4:1: centred on the mouth it
+# straddled both extension lines, and in DETAIL A the Ra leader ran through it
+# (r743-6b, 64fedd3cc). So each width's text stands west of the bar, its centre
+# this far out from the bar's edge, clear of the bar and its own witnesses, and
+# the dimension line runs out to it.
+WIDTH_TEXT_OFFSET = 0.030
+# A depth's ROOTS callout (~40 mm) rides one line over its value; the top
 # notch's depth stands this far east of the bar so the callout clears it.
 DETAIL_B_DEPTH_TEXT_GAP = 0.022
+# The foot depth's text stands this far over the notch floor, outside its
+# 9.5 mm span: inside it, the ROOTS line sat on the floor's witness (r1).
+DETAIL_A_DEPTH_TEXT_RISE = 0.008
 _DETAIL_A_TEXT_X = (
     DETAIL_A.centre[0] - DETAIL_A.radius_mm * DETAIL_A.mm - DETAIL_A_FENCE_TEXT_GAP
 )
 _DETAIL_A_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_ROW_GAP
 _DETAIL_A_WIDTH_ROW_Y = DETAIL_A.sheet_xy(0.0, 0.0)[1] - DETAIL_A_WIDTH_ROW_GAP
 DETAIL_A_KEEP = {
-    # Left of the fence, level with the notch: the depth and its band, the
+    # Left of the fence, over the notch floor: the depth and its band, the
     # ROOTS callout above it.
     "BottomNotchHeight": (
         _DETAIL_A_TEXT_X,
-        DETAIL_A.sheet_xy(0.0, BOTTOM_NOTCH_HEIGHT / 2.0)[1],
+        DETAIL_A.sheet_xy(0.0, BOTTOM_NOTCH_HEIGHT)[1] + DETAIL_A_DEPTH_TEXT_RISE,
     ),
     # One row under the open end: the centring ledge, its text left of the
     # fence. The width two rows lower, its witnesses running down the walls
@@ -289,8 +298,8 @@ DETAIL_B_KEEP = {
         DETAIL_B.sheet_xy(0.0, BAR_LENGTH - TOP_NOTCH_HEIGHT / 2.0)[1],
     ),
     # One row over the open end, chained on the ledge's inner witness: the
-    # width's text west of the bar, the ledge's east of it, each callout over
-    # its value.
+    # width's text west of the bar with its callout under it, the ledge's east
+    # of it with its callout over it.
     "TopNotchWidth": (
         DETAIL_B.sheet_xy(0.0, 0.0)[0] - WIDTH_TEXT_OFFSET,
         _DETAIL_B_ROW_Y,
@@ -298,14 +307,16 @@ DETAIL_B_KEEP = {
     "TopRightLedge": (_DETAIL_B_TEXT_X, _DETAIL_B_ROW_Y),
 }
 # The top end's right side: the hole's offset from the back face one row over
-# the end, the section a row higher with its STOCK callout over it, the drop
-# east of the bar, and the diameter's leader out to the south-east with its
-# THRU / PRESS FIT callout under the value.
+# the end, its text east of the back face's witness (the section shares that
+# witness) by the half-width of its HOLE WALL callout over it, the section a
+# row higher with its STOCK callout over it, the drop east of the bar, and the
+# diameter's leader out to the south-east with its THRU / PRESS FIT callout
+# under the value.
 _TOP_SIDE_END_Y = TOP_SIDE.sheet_xy(0.0, BAR_LENGTH, 0.0)[1]
 _TOP_SIDE_BACK_X = TOP_SIDE.sheet_xy(0.0, 0.0, 0.0)[0]
 TOP_SIDE_KEEP = {
     "TopPinX": (
-        TOP_SIDE.sheet_xy(0.0, 0.0, BAR_DEPTH / 4.0)[0],
+        _TOP_SIDE_BACK_X + 0.026,
         _TOP_SIDE_END_Y + DETAIL_ROW_GAP - 0.002,
     ),
     "BarSection": (
@@ -321,9 +332,11 @@ TOP_SIDE_KEEP = {
         TOP_SIDE.sheet_xy(0.0, BAR_LENGTH - TOP_PIN_DROP, 0.0)[1] - 0.017,
     ),
 }
-# Callouts that stack over their value; the rest hang under it.
+# Callouts that stack over their value; the rest hang under it. SOLIDWORKS
+# drops a multi-line callout above a value from the print (r1: the two-line
+# TopNotchWidth callout never reached the PDF), so these are one line each.
 CALLOUTS_ABOVE = frozenset(
-    {"BottomNotchHeight", "TopNotchWidth", "TopRightLedge", "BarSection"}
+    {"BottomNotchHeight", "TopRightLedge", "BarSection", "TopPinX"}
 )
 
 # The foot notch floor's Ra (Main ruling B, 2026-09-27). The symbol is ~17 mm
