@@ -125,7 +125,16 @@ def test_plan_rows_stack_smallest_nearest():
         draw.FRONT_KEEP[name][0] for name in ("LeftZ", "RailWidth", "OverallWidth")
     ]
     assert draw.LEFT_EDGE_X > columns[0] > columns[1] > columns[2]
-    assert draw.FRONT_KEEP["SpringRailWidth"][0] == columns[1]
+    # Each text stands past its own span's end, so no other span's dimension
+    # line runs through it: the hole row's and the screw rail's below the
+    # plan, the screw rail's lower; the spring rail's and the overall
+    # width's above it, the spring rail's in its own column inside the
+    # overall width's.
+    assert draw.FRONT_KEEP["RailWidth"][1] < draw.FRONT_KEEP["LeftZ"][1]
+    assert draw.FRONT_KEEP["LeftZ"][1] < draw.BOTTOM_EDGE_Y
+    for name in ("SpringRailWidth", "OverallWidth"):
+        assert draw.FRONT_KEEP[name][1] > draw.TOP_EDGE_Y, name
+    assert columns[2] < draw.FRONT_KEEP["SpringRailWidth"][0] < draw.LEFT_EDGE_X
 
 
 def test_profile_station_rows_stack_smallest_nearest_between_the_views():

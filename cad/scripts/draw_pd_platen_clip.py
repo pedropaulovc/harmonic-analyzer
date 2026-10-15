@@ -74,7 +74,6 @@ from build_pd_platen_clip import (
     SCREW_RAIL_SLIT_RADIUS,
     SCREW_RAIL_WIDTH,
     SHEET_T,
-    SPRING_RAIL_WIDTH,
     SPRING_RAIL_Y0,
     TANGENT_STATIONS,
 )
@@ -103,11 +102,12 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0  # sheet m per model mm, 3:1
 # length above; the profile, third-angle above it, hangs its eight tangent
 # stations between the two and carries the developed finger and the bend
 # radius above itself; the 2:1 isometric runs down-right in the free field
-# bottom-left, clear of the title block, its note in the empty corner above it.
+# bottom-centre, clear of the title block and of the plan's left-side texts,
+# its note in the empty corner above it.
 FRONT_CENTER = (0.200, 0.140)
 TOP_CENTER = (0.200, 0.2405)
-ISO_CENTER = (0.090, 0.058)
-ISO_NOTE_XY = (0.125, 0.092)
+ISO_CENTER = (0.145, 0.058)
+ISO_NOTE_XY = (0.160, 0.092)
 # The profile's sheet-normal span (Top-plane s = -Z): the sheet's back face
 # at s = -SHEET_T up to the bows' crests at s = ARCH_RISE.
 _PROFILE_S_MID = (ARCH_RISE - SHEET_T) / 2.0
@@ -137,17 +137,22 @@ PROFILE_TOP_Y = _profile_y(ARCH_RISE)
 HOLE_FAR_X = CLIP_LENGTH - HOLE_INSET
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position.  Plan: the two hole stations stack below it from the near end;
-# above it the bridge's two ends and the overall length stack from the near
-# end (smallest nearest), the slit's text offset beneath them.  Left of it,
-# from the outer edge, the hole row's height, the screw rail's width and the
-# overall width stand in their own columns (smallest nearest), the spring
-# rail's width in the screw rail's column beside its own span; the outer and
-# the slit-side corner radii off the right end.
+# position (each text block's centre).  Plan: the two hole stations stack
+# below it from the near end; above it the bridge's two ends and the overall
+# length stack from the near end (smallest nearest), the slit's text offset
+# beneath them.  Left of it, from the outer edge, the hole row's height, the
+# screw rail's width and the overall width stand in their own columns
+# (smallest nearest), the spring rail's width in a column of its own beside
+# its span.  Each of those texts stands past its own span's end, so no
+# dimension or extension line runs through it: the hole row's below the
+# plan, the screw rail's below that and left of the hole row's text, the
+# spring rail's and the overall width's above the plan.  The outer and the
+# slit-side corner radii stand off the right end.
 _BELOW_PLAN_ROWS = (0.116, 0.110)
 _ABOVE_PLAN_ROWS = (0.172, 0.178, 0.184)
-_HOLE_ROW_COLUMN = 0.062
-_RAIL_COLUMN = 0.046
+_HOLE_ROW_COLUMN = 0.0585
+_RAIL_COLUMN = 0.042
+_SPRING_RAIL_COLUMN = 0.050
 _OVERALL_COLUMN = 0.024
 FRONT_KEEP = {
     "LeftX": (_plan_x(HOLE_INSET / 2.0), _BELOW_PLAN_ROWS[0]),
@@ -155,13 +160,10 @@ FRONT_KEEP = {
     "BridgeX0": (_plan_x(BRIDGE_X0 / 2.0), _ABOVE_PLAN_ROWS[0]),
     "BridgeX1": (_plan_x(BRIDGE_X1 / 2.0), _ABOVE_PLAN_ROWS[1]),
     "Length": (FRONT_CENTER[0], _ABOVE_PLAN_ROWS[2]),
-    "LeftZ": (_HOLE_ROW_COLUMN, _plan_y(HOLE_Y / 2.0)),
-    "RailWidth": (_RAIL_COLUMN, _plan_y(SCREW_RAIL_WIDTH * 0.75)),
-    "SpringRailWidth": (
-        _RAIL_COLUMN,
-        _plan_y(SPRING_RAIL_Y0 + SPRING_RAIL_WIDTH / 2.0),
-    ),
-    "OverallWidth": (_OVERALL_COLUMN, _plan_y(CLIP_WIDTH * 0.85)),
+    "LeftZ": (_HOLE_ROW_COLUMN, 0.1120),
+    "RailWidth": (_RAIL_COLUMN, 0.0930),
+    "SpringRailWidth": (_SPRING_RAIL_COLUMN, 0.1652),
+    "OverallWidth": (_OVERALL_COLUMN, 0.1625),
     # The slit's dimension line stands inside the slit just short of its
     # rounded end at the bridge; its text is offset above the plan.
     "SlitWidth": (
@@ -169,22 +171,26 @@ FRONT_KEEP = {
         _plan_y(SCREW_RAIL_WIDTH + (SPRING_RAIL_Y0 - SCREW_RAIL_WIDTH) / 2.0),
     ),
     "EndR1": (0.345, 0.112),
-    "SlitCornerR1": (0.352, 0.153),
+    "SlitCornerR1": (0.355, 0.158),
 }
 # Profile: the eight tangent stations stack below it from the near end,
 # smallest nearest, so no station's extension line crosses another's
-# dimension line; the developed finger stands above it, the bend radius above
-# the far crown, the rise off the far end and the sheet off the near end.
+# dimension line; each value stands just short of its own station, where no
+# other station's extension line and no neighbour's value reaches.  The
+# developed finger stands above it, the bend radius above the far crown (its
+# leader stops on the crown), the rise off the far end and the sheet off the
+# near end.
+_STATION_TEXT_INSET = 0.009
 _STATION_ROWS = tuple(
     PROFILE_BOTTOM_Y - 0.0075 - 0.0052 * index for index in range(len(TANGENT_STATIONS))
 )
 TOP_KEEP = {
     **{
-        name: (_plan_x(x / 2.0), row)
+        name: (_plan_x(x) - _STATION_TEXT_INSET, row)
         for (name, x, _drive), row in zip(TANGENT_STATIONS, _STATION_ROWS)
     },
     "CrestRise": (RIGHT_EDGE_X + 0.008, _profile_y(ARCH_RISE / 2.0)),
-    "FlatFinger": (_plan_x(BRIDGE_X0 - FLAT_FINGER_LENGTH / 2.0), 0.251),
+    "FlatFinger": (_plan_x(BRIDGE_X0 - FLAT_FINGER_LENGTH / 2.0), 0.2555),
     "BendR5": (_plan_x(FAR_CREST_X), 0.256),
     "SheetDepth": (LEFT_EDGE_X - 0.008, _profile_y(-SHEET_T / 2.0)),
 }
@@ -218,29 +224,38 @@ DIMENSION_AFFIXES = {
     )
     for name in sorted({*_COUNTS, *REFERENCE_DIMENSIONS})
 }
-# What each callout-bearing size is for: the screw rail's .XXX holds the
-# slit-side hole ligament; the sheet is the stock's; the slit and the spring
-# rail end in full rounds; the developed finger is the blank's, which forming
-# draws back flush with the rail end; the rise is each bow's crest height.
+# What each callout-bearing size is for: the hole row's and the screw rail's
+# .XXX keep the hole's walls to the edge and to the slit; the sheet is the
+# stock's; the slit and the spring rail end in full rounds; the developed
+# finger is measured along the bows from the bridge to the tip, not across
+# the formed profile (r2 read it as a span); the rise is each bow's crest
+# height.
 DIMENSION_CALLOUTS = {
-    "RailWidth": "HOLE LIGAMENT",
+    "LeftZ": "HOLE WALL\nTO EDGE",
+    "RailWidth": "HOLE WALL\nTO SLIT",
     "SheetDepth": "SHEET STOCK",
     "SpringRailWidth": "FULL R ENDS",
     "SlitWidth": "SLIT, FULL R END",
-    "FlatFinger": "FINGER BLANK; FORMED TIP FLUSH WITH END",
+    "FlatFinger": "DEVELOPED FINGER LENGTH\nBRIDGE TO TIP, ALONG BOWS",
     "CrestRise": "BOW RISE",
 }
+# The bend radius's arrow stands outside its arc with no line on to the
+# centre, which lies below the views: drawn to it, the leader crossed every
+# station and the plan (r2).
+RADIUS_LEADER_OUTSIDE = "BendR5"
 
-# The callout rides the far hole, its leader leaving the rim up-right over
-# the clip's right end to text clear of the corner radii; it names the
-# platen whose taps the .XXX hole pattern matches.
+# The callout rides the far hole, its leader dropping from the rim to text
+# below the clip's right end, left of the outer radius's centre so it
+# crosses neither that radius's line (r2) nor the overall length's
+# extension line up the right end; it names the platen whose taps the .XXX
+# hole pattern matches.
 _DIAG = math.sqrt(0.5)
 HOLE_R_SHEET = HOLE_DIA / 2.0 * _S
 HOLE_EDGE_XY = (
     _plan_x(HOLE_FAR_X) + HOLE_R_SHEET * _DIAG,
-    _plan_y(HOLE_Y) + HOLE_R_SHEET * _DIAG,
+    _plan_y(HOLE_Y) - HOLE_R_SHEET * _DIAG,
 )
-HOLE_CALLOUT_XY = (0.370, 0.132)
+HOLE_CALLOUT_XY = (0.345, 0.098)
 HOLE_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-002\nDRILL"
 # Where the slit-side corner radius lands (its leader target), for the layout
 # tests: the screw rail's top-right corner.
@@ -275,6 +290,24 @@ def _set_dimension_affixes(
             raise RuntimeError(f"dimension affixes {affix!r} read back {written!r}")
     if remaining:
         raise RuntimeError(f"dimension affixes not applied: {sorted(remaining)}")
+
+
+def _radius_leader_outside(adapter: Any, annotations: list[Any], name: str) -> None:
+    """Put a radius's arrow outside its arc, with no line on to its centre.
+
+    The arrow outside alone (swDimArrowsOutside) keeps the solid line from the
+    arrow to the centre (draw_dt_pinion_arbor); with the solid leader off as
+    well, the leader reaches the arc from its text and stops there.
+    """
+    matches = [a for a in annotations if dimension_name(adapter, a) == name]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.ArrowSide = 1  # swDimArrowsOutside
+    display.SolidLeader = False
+    if int(display.ArrowSide) != 1 or bool(display.SolidLeader):
+        raise RuntimeError(f"{name} kept its leader to the arc's centre")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -324,7 +357,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # seen edge-on needs no hidden lines.
     for view in (front, top, iso):
         set_hidden_lines_removed(adapter, view)
-
+    # The plan is the blank: the bows' tangent lines and the split between
+    # the bridge web and the spring rail read as cuts there (r2); the profile
+    # locates the tangents.
+    front.SetDisplayTangentEdges2(0)  # swTangentEdgesHidden
+    if int(front.GetDisplayTangentEdges2()) != 0:
+        raise RuntimeError("failed to hide the plan's tangent edges")
+    front.UpdateViewDisplayGeometry()
     # The overall width's and the profile references' owner sketches are
     # saved hidden (build_pd_platen_clip); each view shows its own to import
     # the dimensions.
@@ -347,6 +386,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_affixes(adapter, annotations, DIMENSION_AFFIXES)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _radius_leader_outside(adapter, annotations, RADIUS_LEADER_OUTSIDE)
     offset_dimension_text(adapter, annotations, OFFSET_TEXT)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
