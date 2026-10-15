@@ -138,23 +138,25 @@ def _back_x(model_x: float) -> float:
 # The hanger stations are baselines from the left end, stacked under the bar
 # shortest first (13 mm rows: each value carries its mate's line), the length
 # outermost; their texts step right so none crosses a longer row's extension
-# line. The row's height (from the top face, its rise on the right end)
-# stands off the right end. The section line's arrows and letters stand left
-# of the pivot, so its Ø (higher) and countersink (lower, further right, so
-# the Ø's leader passes left of it) stand up-right of it; the latch-hook
-# countersink stands right of the taps, under their callout.
+# line, and stand clear of the pivot station's. The row's height (from the
+# top face, its rise on the right end) stands off the right end. The section
+# line runs up through the pivot, its arrows and letters left of it, so the
+# pivot's Ø and countersink stand right of it, the Ø higher and further left
+# (its leader passes left of the countersink's text, slanting off the line);
+# the latch-hook taps' callout (high) and countersink (low) stand right of the
+# pivot's, their leaders between the two pairs.
 ROW_STEP = 0.013
 FRONT_KEEP = {
     "PivotTapStation": (LEFT_END + 0.042, FACE_BOTTOM - ROW_STEP),
-    "BracketTapStation1": (LEFT_END + 0.100, FACE_BOTTOM - 2.0 * ROW_STEP),
-    "BracketTapStation2": (LEFT_END + 0.125, FACE_BOTTOM - 3.0 * ROW_STEP),
+    "BracketTapStation1": (LEFT_END + 0.115, FACE_BOTTOM - 2.0 * ROW_STEP),
+    "BracketTapStation2": (LEFT_END + 0.118, FACE_BOTTOM - 3.0 * ROW_STEP),
     "Length": (FACE_CENTER[0], FACE_BOTTOM - 4.0 * ROW_STEP),
     "HangerRowHeight": (RIGHT_END + 0.022, FACE_BOTTOM - 0.010),
-    "PivotTapDrillDia": (_face_x(PIVOT_TAP_X) + 0.022, FACE_TOP + 0.030),
-    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.045, FACE_TOP + 0.014),
-    "BracketCskDia": (_face_x(BRACKET_TAP_X[0]) + 0.065, FACE_TOP + 0.014),
+    "PivotTapDrillDia": (_face_x(PIVOT_TAP_X) + 0.032, FACE_TOP + 0.030),
+    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.043, FACE_TOP + 0.014),
+    "BracketCskDia": (_face_x(BRACKET_TAP_X[0]) + 0.059, FACE_TOP + 0.014),
 }
-BRACKET_CALLOUT_XY = (_face_x(BRACKET_TAP_X[1]) + 0.010, FACE_TOP + 0.026)
+BRACKET_CALLOUT_XY = (_face_x(BRACKET_TAP_X[1]) + 0.056, FACE_TOP + 0.031)
 # The top face's slide roughness on its edge, left of the section line.
 TOP_FINISH_MODEL_X = -178.0
 TOP_FINISH_SYMBOL_XY = (LEFT_END + 0.030, FACE_TOP + 0.014)
@@ -170,10 +172,10 @@ BACK_KEEP = {
     "ClampStation2": (RIGHT_END - 0.012, BACK_BOTTOM - 0.018),
     "ClampStation3": (RIGHT_END - 0.150, BACK_BOTTOM - 0.026),
     "ClampStation4": (RIGHT_END - 0.170, BACK_BOTTOM - 0.034),
-    "Height": (RIGHT_END + 0.032, BACK_TOP + 0.016),
+    "Height": (RIGHT_END + 0.016, BACK_TOP + 0.016),
     "ClampRowHeight": (LEFT_END - 0.016, BACK_BOTTOM - 0.008),
 }
-CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROW_X)) + 0.020, BACK_TOP + 0.022)
+CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROW_X)) + 0.020, BACK_TOP + 0.016)
 # The front face's slide roughness, seen face-on: a leader to a point clear
 # of the holes, the symbol above the view.
 FRONT_FINISH_MODEL_XY = (-150.0, 6.0)
@@ -190,8 +192,8 @@ SECTION_KEEP_NAMES = ("Depth", "ThreadMin", "DrillDepth")
 SECTION_DEPTH_RISE = 0.010
 SECTION_DEPTH_SIDE = 0.028
 SECTION_DEPTH_TEXT_SIDE = 0.016
-SECTION_THREAD_DROP = 0.012
-SECTION_DRILL_DROP = 0.026
+SECTION_THREAD_DROP = 0.010
+SECTION_DRILL_DROP = 0.027
 CAPTION_DROP = 0.035
 SECTION_OVERRUN = 3.0  # mm the cutting line runs past each long edge
 

@@ -93,7 +93,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 _CSK = f"{TAP_CSK_ANGLE_DEG:.0f}\u00b0 CSK"
 _HOOK_TAPS = "MHA-PD-014 HOOK TAPS"
 DIMENSION_CALLOUTS = {
-    "Height": "MHA-PD-011 TOP RAIL HANGS ON IT,\nITS BOTTOM RAIL RUNS CLEAR",
+    "Height": "MHA-PD-011\nHANGS ON IT",
     "Depth": "PIVOT TAP FLOOR AND\nMHA-VN-043 SCREW TIPS",
     "HangerRowHeight": f"MHA-VN-041 PIVOT AND\n{_HOOK_TAPS}",
     "PivotTapStation": "MHA-VN-041 PIVOT",
