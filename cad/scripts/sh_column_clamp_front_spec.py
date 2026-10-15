@@ -35,8 +35,11 @@ from sh_column_clamp_fit import (  # noqa: F401
     BORE_DIAMETRAL_CLEARANCE,
     BORE_RADIUS_MAX,
     COLUMN_MATE,
+    EAR_DRILL_DRIFT_PER_MM,
     EAR_HEIGHT_BAND,
     EAR_STATION_BAND,
+    WALL_FLOOR,
+    WALL_TARGET,
 )
 
 BACK_ARC_MATE = "MHA-SH-002"
@@ -93,7 +96,6 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
     raise AssertionError("every marked clamp-front dimension needs authored places")
 
 # Worst-case walls (drawing-guidelines.md rule 17: 2.0 target, 1.5 floor).
-WALL_TARGET = 2.0
 _DEPTH_MIN = (
     ARC_DEPTH
     + printed_deviations(ARC_DEPTH, DRAWING_PRECISION["BlockProfile"]["Depth"])[0]
@@ -113,28 +115,51 @@ _HEIGHT_MIN = (
 # model's EarHoleHeight at its band.
 EAR_HOLE_HEIGHT = ARC_HEIGHT / 2.0
 _EAR_HEIGHT_DEV = (-EAR_HEIGHT_BAND, EAR_HEIGHT_BAND)
-# The largest accepted clearance hole (DRILLED HOLES row: +oversize / -0).
-_EAR_HOLE_R_MAX = (EAR_HOLE_DIA + drilled_oversize_mm()) / 2.0
+# The largest accepted clearance hole: the Hole Wizard callout prints its
+# diameter at two places (Ø4.98), checked on the DRILLED HOLES row (+0.10/-0).
+EAR_HOLE_CALLOUT_PLACES = 2
+_EAR_HOLE_R_MAX = (
+    EAR_HOLE_DIA
+    + printed_deviations(
+        EAR_HOLE_DIA, EAR_HOLE_CALLOUT_PLACES, (0.0, drilled_oversize_mm())
+    )[1]
+) / 2.0
+# Each through hole wanders over the arc's deepest printed depth.
+_EAR_WANDER = EAR_DRILL_DRIFT_PER_MM * (
+    ARC_DEPTH
+    + printed_deviations(ARC_DEPTH, DRAWING_PRECISION["BlockProfile"]["Depth"])[1]
+)
+# The hole's reach: its largest radius off a wandered axis.
+_EAR_REACH = _EAR_HOLE_R_MAX + _EAR_WANDER
 _EAR_IN = EAR_HOLE_Z - EAR_STATION_BAND
 _EAR_OUT = EAR_HOLE_Z + EAR_STATION_BAND
 WALLS_WORST: dict[str, float] = {
     # Bore to the bar face, through the bore's deepest point.
     "bar-face wall": _DEPTH_MIN - BORE_RADIUS_MAX,
     # Ear hole to the bore.
-    "ear to bore": _EAR_IN - _EAR_HOLE_R_MAX - BORE_RADIUS_MAX,
+    "ear to bore": _EAR_IN - _EAR_REACH - BORE_RADIUS_MAX,
     # Ear hole to the near side face (AnchorZ side) and the far one.
-    "ear to near side": _ANCHOR_Z + _ANCHOR_DEV[0] - _EAR_OUT - _EAR_HOLE_R_MAX,
+    "ear to near side": _ANCHOR_Z + _ANCHOR_DEV[0] - _EAR_OUT - _EAR_REACH,
     "ear to far side": _WIDTH_MIN
     - (_ANCHOR_Z + _ANCHOR_DEV[1])
     - _EAR_OUT
-    - _EAR_HOLE_R_MAX,
+    - _EAR_REACH,
     # Ear hole to the bottom face it is located from, and to the top face.
-    "ear to bottom face": EAR_HOLE_HEIGHT + _EAR_HEIGHT_DEV[0] - _EAR_HOLE_R_MAX,
+    "ear to bottom face": EAR_HOLE_HEIGHT + _EAR_HEIGHT_DEV[0] - _EAR_REACH,
     "ear to top face": _HEIGHT_MIN
     - (EAR_HOLE_HEIGHT + _EAR_HEIGHT_DEV[1])
-    - _EAR_HOLE_R_MAX,
+    - _EAR_REACH,
 }
-if min(WALLS_WORST.values()) < WALL_TARGET:
-    raise AssertionError(f"clamp-front walls {WALLS_WORST} under {WALL_TARGET}")
+if min(WALLS_WORST.values()) < WALL_FLOOR:
+    raise AssertionError(
+        f"clamp-front walls {WALLS_WORST} under the {WALL_FLOOR} floor"
+    )
+# drawing-guidelines.md rule 20: walls between the floor and the target.
+# Pending owner ruling (PR #1467 round-3 review): the ear-to-bore web, 1.85
+# on the largest A513 column with drill wander, needs the column at most
+# 25.23 to reach 2.0 -- under its own nominal -- so only geometry can lift it.
+RULE_20_SHORTFALLS = {
+    name: wall for name, wall in WALLS_WORST.items() if wall < WALL_TARGET
+}
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

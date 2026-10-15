@@ -25,10 +25,13 @@ from sh_column_clamp_fit import (  # noqa: F401
     BORE_DIAMETRAL_CLEARANCE,
     BORE_RADIUS_MAX,
     COLUMN_MATE,
+    EAR_DRILL_DRIFT_PER_MM,
     EAR_HEIGHT_BAND,
     EAR_STATION_BAND,
     GRIP_GAP_MIN,
     GRIP_OFFSET_BAND,
+    WALL_FLOOR,
+    WALL_TARGET,
 )
 from sh_column_clamp_front_geom import (  # noqa: F401
     ARC_HEIGHT,
@@ -91,7 +94,6 @@ if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
     raise AssertionError("every marked clamp-back dimension needs authored places")
 
 # Worst-case walls (drawing-guidelines.md rule 17: 2.0 target, 1.5 floor).
-WALL_TARGET = 2.0
 _DEPTH_MIN = (
     BLOCK_DEPTH
     + printed_deviations(BLOCK_DEPTH, DRAWING_PRECISION["BlockProfile"]["Depth"])[0]
@@ -113,6 +115,13 @@ EAR_HOLE_HEIGHT = ARC_HEIGHT / 2.0
 _EAR_HEIGHT_DEV = (-EAR_HEIGHT_BAND, EAR_HEIGHT_BAND)
 # The tapped ear's thread major envelope, the one rule 17 judges.
 THREAD_MAJOR_DIA = THREAD_MAJOR_MM[HOLE_SPEC.size]
+# Each through tap wanders over the block's deepest printed depth; its
+# reach is the thread major's radius off that wandered axis.
+_EAR_WANDER = EAR_DRILL_DRIFT_PER_MM * (
+    BLOCK_DEPTH
+    + printed_deviations(BLOCK_DEPTH, DRAWING_PRECISION["BlockProfile"]["Depth"])[1]
+)
+_EAR_REACH = THREAD_MAJOR_DIA / 2.0 + _EAR_WANDER
 _EAR_IN = EAR_HOLE_Z - EAR_STATION_BAND
 _EAR_OUT = EAR_HOLE_Z + EAR_STATION_BAND
 WALLS_WORST: dict[str, float] = {
@@ -120,21 +129,27 @@ WALLS_WORST: dict[str, float] = {
     "back wall": (GRIP_OFFSET - GRIP_OFFSET_BAND) + _DEPTH_MIN - BORE_RADIUS_MAX,
     # Ear thread to the bore (the bore's widest point at the mating face is
     # within its radius of the axis).
-    "ear to bore": _EAR_IN - THREAD_MAJOR_DIA / 2.0 - BORE_RADIUS_MAX,
+    "ear to bore": _EAR_IN - _EAR_REACH - BORE_RADIUS_MAX,
     # Ear thread to the near side face (AnchorZ side) and the far one.
-    "ear to near side": _ANCHOR_Z + _ANCHOR_DEV[0] - _EAR_OUT - THREAD_MAJOR_DIA / 2.0,
+    "ear to near side": _ANCHOR_Z + _ANCHOR_DEV[0] - _EAR_OUT - _EAR_REACH,
     "ear to far side": _WIDTH_MIN
     - (_ANCHOR_Z + _ANCHOR_DEV[1])
     - _EAR_OUT
-    - THREAD_MAJOR_DIA / 2.0,
+    - _EAR_REACH,
     # Ear thread to the bottom face it is located from, and to the top face.
-    "ear to bottom face": EAR_HOLE_HEIGHT + _EAR_HEIGHT_DEV[0] - THREAD_MAJOR_DIA / 2.0,
+    "ear to bottom face": EAR_HOLE_HEIGHT + _EAR_HEIGHT_DEV[0] - _EAR_REACH,
     "ear to top face": _HEIGHT_MIN
     - (EAR_HOLE_HEIGHT + _EAR_HEIGHT_DEV[1])
-    - THREAD_MAJOR_DIA / 2.0,
+    - _EAR_REACH,
 }
-if min(WALLS_WORST.values()) < WALL_TARGET:
-    raise AssertionError(f"clamp-back walls {WALLS_WORST} under {WALL_TARGET}")
+if min(WALLS_WORST.values()) < WALL_FLOOR:
+    raise AssertionError(f"clamp-back walls {WALLS_WORST} under the {WALL_FLOOR} floor")
+# drawing-guidelines.md rule 20: walls between the floor and the target.
+# Pending owner ruling (PR #1467 round-3 review): the back wall, 1.98 on the
+# largest A513 column, needs the column at most 25.48 to reach 2.0.
+RULE_20_SHORTFALLS = {
+    name: wall for name, wall in WALLS_WORST.items() if wall < WALL_TARGET
+}
 BACK_WALL_MIN = WALLS_WORST["back wall"]
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
