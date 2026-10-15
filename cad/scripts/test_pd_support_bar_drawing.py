@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 import math
 import re
 from pathlib import Path
@@ -171,6 +172,121 @@ def test_row_nominals_are_the_built_holes() -> None:
     assert sorted(part.CLAMP_ROW_X) == sorted(part.CLAMP_HOLE_X)
     assert part.CLAMP_STATIONS == (11.5, 46.5, 405.5, 440.5)
     assert part.CLAMP_ROW_HEIGHT == spec.BAR_HEIGHT / 2.0
+
+
+def _authored_row(monkeypatch, row) -> list[tuple[str, float, str | None]]:
+    """Run the builder's row author against a recording stub: each dimension
+    it creates as (name, built value, drive equation), in creation order."""
+    import _sketch
+
+    values: list[float] = []
+    names: list[str] = []
+    lines = iter(range(100))
+
+    class _Adapter:
+        async def create_sketch(self, plane):
+            return plane
+
+        async def add_line(self, *_points):
+            return f"line{next(lines)}"
+
+        async def add_sketch_constraint(self, *args):
+            return args
+
+        async def exit_sketch(self):
+            return None
+
+    async def anchor(_adapter, _point, x, y, _label):
+        values.extend(abs(c) for c in (x, y) if c != 0.0)
+
+    async def dimension(_adapter, _a, _b, _kind, value, _label):
+        values.append(value)
+
+    async def defined(_adapter, _label):
+        return None
+
+    monkeypatch.setattr(part, "check", lambda _label, result: result)
+    monkeypatch.setattr(part, "set_sketch_direct_db", lambda *_args: None)
+    monkeypatch.setattr(part, "_as_construction", lambda *_args: None)
+    monkeypatch.setattr(part, "anchor_point_to_origin", anchor)
+    monkeypatch.setattr(part, "dimension_between", dimension)
+    monkeypatch.setattr(part, "ensure_fully_defined", defined)
+    monkeypatch.setattr(part, "name_last_feature", lambda *_args: None)
+    monkeypatch.setattr(_sketch, "_feature_by_name", lambda _adapter, name: name)
+    monkeypatch.setattr(_sketch, "_display_dimensions", lambda _f, _n: list(values))
+    monkeypatch.setattr(
+        _sketch,
+        "_rename_dimensions",
+        lambda _dims, _f, recorded: names.extend(recorded),
+    )
+    jobs = dict(asyncio.run(part._author_row(_Adapter(), row)))
+    return [
+        (name, value, jobs.get(f"{name}@{row.feature}"))
+        for name, value in zip(names, values, strict=True)
+    ]
+
+
+def _evaluate(equation: str, globals_mm: dict[str, float]) -> float:
+    text = re.sub(r'"(\w+)"', lambda m: repr(globals_mm[m.group(1)]), equation)
+    text = re.sub(r"(\d)mm\b", r"\1", text)
+    return float(eval(text, {"__builtins__": {}}))  # noqa: S307 - literal arithmetic
+
+
+@pytest.mark.parametrize(
+    "globals_mm",
+    [
+        {"BarLength": 452.0, "BarHeight": 28.0},
+        {"BarLength": 500.0, "BarHeight": 30.0},
+        {"BarLength": 440.0, "BarHeight": 26.0},
+    ],
+)
+def test_reference_rows_follow_the_bar_globals_onto_the_holes(
+    monkeypatch, globals_mm
+) -> None:
+    """Review of PR #1471 (round 3): the row heights and stations were built
+    without equations, so a Tools > Equations edit of BarHeight or BarLength
+    moved the top face and the left end but left the old values, and the
+    reference rows' points drifted off the real holes. Every row dimension now
+    carries an equation; evaluated at any bar size it must land on the holes
+    the builder places, which stay put relative to the bar centre (the pivot
+    circle at PIVOT_TAP_X/HANGER_TAP_Y, the Hole Wizard taps at
+    BRACKET_TAP_X/HANGER_TAP_Y and the clamp counterbores at CLAMP_HOLE_X/0)."""
+    assert (spec.BAR_HEIGHT, part.BAR_LENGTH) == (28.0, 452.0)
+    built = {"BarLength": part.BAR_LENGTH, "BarHeight": spec.BAR_HEIGHT}
+    rows = (
+        (
+            part.HANGER_ROW,
+            sheet_spec.HANGER_STATION_NAMES,
+            [(x, spec.HANGER_TAP_Y) for x in (spec.PIVOT_TAP_X, *spec.BRACKET_TAP_X)],
+        ),
+        (
+            part.CLAMP_ROW,
+            sheet_spec.CLAMP_STATION_NAMES,
+            sorted((x, 0.0) for x in part.CLAMP_HOLE_X),
+        ),
+    )
+    length, height = globals_mm["BarLength"], globals_mm["BarHeight"]
+    for row, names, holes in rows:
+        # The row's points are the placed holes, one station name each.
+        assert list(row.holes) == [
+            (name, x) for name, (x, _y) in zip(names, holes, strict=True)
+        ]
+        (row_y,) = {y for _x, y in holes}
+        expected = {
+            f"{row.prefix}RiseX": length / 2.0,
+            f"{row.prefix}RiseY": height / 2.0,
+            row.height_name: height / 2.0 - row_y,
+            f"{row.prefix}StartX": length / 2.0,
+            # Each station runs from the moved left end to its unmoved hole.
+            **{name: x + length / 2.0 for name, (x, _y) in zip(names, holes)},
+        }
+        authored = _authored_row(monkeypatch, row)
+        assert [name for name, _value, _drive in authored] == list(expected)
+        for name, value, drive in authored:
+            assert drive is not None, name
+            # Neutral at the built size, tracking the holes at any other.
+            assert _evaluate(drive, built) == pytest.approx(value), name
+            assert _evaluate(drive, globals_mm) == pytest.approx(expected[name]), name
 
 
 def test_rows_stack_shortest_nearest_the_bar() -> None:

@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import math
 import sys
+from dataclasses import dataclass
 
 from _appearance import apply_material
 from _check import check
@@ -209,6 +210,63 @@ REFERENCE_SKETCHES = (
     "PivotThreadReference",
 )
 
+# The rows' equations. Every row hole stands at a fixed offset from the bar
+# centre (the Hole Wizard points, the pivot circle's undriven PivotTapX/Y),
+# while the bar's ends and top face follow the BarLength/BarHeight globals.
+# A station from the left end is therefore half the length plus the hole's
+# x, and a row's height from the top face is half the height less the hole's
+# y. With those equations, a Tools > Equations edit of either global keeps
+# every reference row on its real holes.
+BAR_HALF_LENGTH_EQUATION = '"BarLength" / 2'
+BAR_HALF_HEIGHT_EQUATION = '"BarHeight" / 2'
+
+
+@dataclass(frozen=True)
+class ReferenceRow:
+    """One hole row's hidden reference sketch: its feature name, the prefix of
+    its anchor dimensions, its height dimension's name, the holes' model y and
+    each hole's (station dimension name, model x)."""
+
+    feature: str
+    prefix: str
+    height_name: str
+    row_y: float
+    holes: tuple[tuple[str, float], ...]
+
+
+HANGER_ROW = ReferenceRow(
+    "HangerRowReference",
+    "Hanger",
+    "HangerRowHeight",
+    HANGER_TAP_Y,
+    tuple(zip(HANGER_STATION_NAMES, (PIVOT_TAP_X, *BRACKET_TAP_X), strict=True)),
+)
+CLAMP_ROW = ReferenceRow(
+    "ClampRowReference",
+    "Clamp",
+    "ClampRowHeight",
+    0.0,
+    tuple(zip(CLAMP_STATION_NAMES, CLAMP_ROW_X, strict=True)),
+)
+
+
+def _plus_mm(equation: str, offset_mm: float) -> str:
+    """``equation`` plus a fixed millimetre offset. The suffix is load-bearing:
+    the part is an INCH document, whose equations read bare numbers in inches."""
+    if offset_mm == 0.0:
+        return equation
+    sign = "+" if offset_mm > 0.0 else "-"
+    return f"{equation} {sign} {abs(offset_mm):.10g}mm"
+
+
+def row_equations(row: ReferenceRow) -> dict[str, str]:
+    """The row's height and stations by dimension name, each as the equation
+    that keeps it on the row's holes when BarLength or BarHeight changes."""
+    return {
+        row.height_name: _plus_mm(BAR_HALF_HEIGHT_EQUATION, -row.row_y),
+        **{name: _plus_mm(BAR_HALF_LENGTH_EQUATION, x) for name, x in row.holes},
+    }
+
 
 def _as_construction(adapter, entity_id: str, label: str) -> None:
     segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
@@ -217,26 +275,21 @@ def _as_construction(adapter, entity_id: str, label: str) -> None:
         raise RuntimeError(f"{label} did not take the construction flag")
 
 
-async def _author_row(
-    adapter,
-    feature: str,
-    *,
-    rise_x: float,
-    row_y: float,
-    start_x: float,
-    holes: tuple[tuple[str, float, float], ...],
-    height_name: str,
-    prefix: str,
-) -> list[tuple[str, str]]:
+async def _author_row(adapter, row: ReferenceRow) -> list[tuple[str, str]]:
     """One hole row as model dimensions on a hidden Front-plane sketch (the
     build_mg_wheel_bar BoreRowReference pattern): a construction chain on the
-    row from the bar end at ``start_x`` through each hole (``holes``: name,
-    model x, station from that end) to a rise at ``rise_x`` that drops from
-    the top face to the row, so the stations read from the end and the row's
-    height from the top face."""
+    row from the left bar end through each hole to a rise at the right end
+    that drops from the top face to the row, so the stations read from the
+    end and the row's height from the top face. Every dimension is driven
+    from the bar globals (``row_equations``)."""
+    feature = row.feature
+    rise_x = BAR_LENGTH / 2.0
+    row_y = row.row_y
+    start_x = LEFT_END_X
+    equations = row_equations(row)
     top_y = BAR_HEIGHT / 2.0
-    row_xs = (start_x, *(x for _, x, _ in holes), rise_x)
-    row = SketchDims()
+    row_xs = (start_x, *(x for _, x in row.holes), rise_x)
+    dims = SketchDims()
     check(f"create_sketch {feature}", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     rise = check(
@@ -267,8 +320,8 @@ async def _author_row(
     await anchor_point_to_origin(
         adapter, f"{rise}.start", rise_x, top_y, f"{feature} top corner"
     )
-    row.record(f"{prefix}RiseX", '"BarLength" / 2')
-    row.record(f"{prefix}RiseY", '"BarHeight" / 2')
+    dims.record(f"{row.prefix}RiseX", BAR_HALF_LENGTH_EQUATION)
+    dims.record(f"{row.prefix}RiseY", BAR_HALF_HEIGHT_EQUATION)
     await dimension_between(
         adapter,
         f"{rise}.start",
@@ -277,22 +330,22 @@ async def _author_row(
         top_y - row_y,
         f"{feature} height",
     )
-    row.record(height_name)
+    dims.record(row.height_name, equations[row.height_name])
     start = f"{legs[0]}.start"
     await dimension_between(
         adapter, start, "origin", "horizontal_distance", abs(start_x), f"{feature} end"
     )
-    row.record(f"{prefix}StartX", '"BarLength" / 2')
+    dims.record(f"{row.prefix}StartX", BAR_HALF_LENGTH_EQUATION)
     # Each hole ends one leg; the last leg runs on to the rise.
-    for leg, (name, _x, station) in zip(legs[:-1], holes, strict=True):
+    for leg, (name, x) in zip(legs[:-1], row.holes, strict=True):
         await dimension_between(
-            adapter, start, f"{leg}.end", "horizontal_distance", station, name
+            adapter, start, f"{leg}.end", "horizontal_distance", x - start_x, name
         )
-        row.record(name)
+        dims.record(name, equations[name])
     await ensure_fully_defined(adapter, f"{feature} sketch")
     check(f"exit_sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
-    return row.apply(adapter, feature)
+    return dims.apply(adapter, feature)
 
 
 def _model_to_sketch(
@@ -575,33 +628,8 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, PIVOT_SECTION_PLANE)
     drive_jobs += await _author_thread_reference(adapter)
-    drive_jobs += await _author_row(
-        adapter,
-        "HangerRowReference",
-        rise_x=BAR_LENGTH / 2.0,
-        row_y=HANGER_TAP_Y,
-        start_x=LEFT_END_X,
-        holes=tuple(
-            zip(
-                HANGER_STATION_NAMES,
-                (PIVOT_TAP_X, *BRACKET_TAP_X),
-                HANGER_STATIONS,
-                strict=True,
-            )
-        ),
-        height_name="HangerRowHeight",
-        prefix="Hanger",
-    )
-    drive_jobs += await _author_row(
-        adapter,
-        "ClampRowReference",
-        rise_x=BAR_LENGTH / 2.0,
-        row_y=0.0,
-        start_x=CLAMP_ROW_START_X,
-        holes=tuple(zip(CLAMP_STATION_NAMES, CLAMP_ROW_X, CLAMP_STATIONS, strict=True)),
-        height_name="ClampRowHeight",
-        prefix="Clamp",
-    )
+    drive_jobs += await _author_row(adapter, HANGER_ROW)
+    drive_jobs += await _author_row(adapter, CLAMP_ROW)
     blank_reference_geometry(
         adapter, (("BackFace", "PLANE"), (PIVOT_SECTION_PLANE, "PLANE"))
     )
