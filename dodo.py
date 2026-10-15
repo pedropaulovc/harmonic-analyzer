@@ -3044,7 +3044,10 @@ def task_check():
     # part script added/renamed without touching the config YAML must still
     # invalidate the stamp (codex review).
     part_script_deps = [str(p.resolve()) for p in part_scripts()]
-    pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
+    # These gates never use --lf/--ff. Disable the shared pytest cache: its
+    # atomic pytest-cache-files-* -> .pytest_cache rename races a sibling's
+    # Windows collection lstat when doit fans checks out under -n.
+    pytest_cmd = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
         SCRIPTS_DIR / "test_farm_admission.py",

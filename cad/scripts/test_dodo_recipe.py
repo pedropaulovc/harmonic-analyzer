@@ -3025,6 +3025,21 @@ def test_title_block_geometry_readers_keep_the_title_block_without_stamping(
     assert dodo._expand_title_block_token("assembly", channel) == []
 
 
+def test_check_pytest_commands_disable_the_shared_cache():
+    """Parallel offline gates must not create root-level cache temp directories."""
+    dodo = _load_dodo()
+    pytest_gates = {}
+    for task in dodo.task_check():
+        command = task["actions"][0][1][0]
+        if command[1:3] == ["-m", "pytest"]:
+            pytest_gates[task["name"]] = command
+    assert {"graph", "numerals", "recipe"} <= pytest_gates.keys()
+    for name, command in pytest_gates.items():
+        assert command[4:6] == ["-p", "no:cacheprovider"], (
+            f"check:{name} shares pytest's atomic cache-directory rename"
+        )
+
+
 def test_check_gates_depend_on_everything_they_execute():
     """Every ``check:*`` stamp must go stale when code or config it EXECUTES
     changes, or the gate reports green without running.
