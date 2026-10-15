@@ -114,14 +114,15 @@ def _face_xy(y_mm: float, z_mm: float) -> tuple[float, float]:
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Top view (the block and bore sketches lie on the Top plane): the
-# depth above the view, the width right of it, the bore axis to the near (+Z)
+# depth above the view (high enough for its two-line reason under the value),
+# the width right of it, the bore axis to the near (+Z)
 # side face on a dimension line left of the split face with its value on that
 # line, and the bore's reference Ø leadered in through the upper half of the
 # open mouth from above left, clear of that dimension.  Split-face view: the
 # height under the view and the ear-hole station from the bore centerline
 # left of it, its mate callout under the value.
 TOP_KEEP = {
-    "Depth": (TOP_CENTER[0], 0.240),
+    "Depth": (TOP_CENTER[0], 0.262),
     "Width": (0.262, TOP_CENTER[1]),
     "AnchorZ": (0.180, 0.151),
     "BoreDia": (0.155, 0.212),
@@ -136,15 +137,18 @@ DIMENSION_PREFIXES = {"EarHole1Z": "2X "}
 REFERENCE_DIMENSIONS = ("BoreDia",)
 # The bands tighter than the title block name their mate and why
 # (drawing-guidelines.md rule 4): the bore is matched to the purchased column
-# (sh_column_clamp_fit's grip budget), and the ear stations line up with the
-# back arc's taps.  All under the value: SOLIDWORKS prints nothing of an
+# (sh_column_clamp_fit's grip budget), the depth at two places sets the clamp
+# screws' engagement in the back arc's taps (sh_column_clamp_front_spec), and
+# the ear stations line up with those taps.  The bore callout also says where
+# the axis lies (on the split face; round-3 review).  All under the value: SOLIDWORKS prints nothing of an
 # above-callout holding a line break
 # (draw_dt_cone_gear_shaft._printable_above_callouts).
 DIMENSION_CALLOUTS = {
     "BoreDia": (
         f"{BORE_DIAMETRAL_CLEARANCE[0]:.2f}-{BORE_DIAMETRAL_CLEARANCE[1]:.2f} "
-        f"DIAMETRAL\nCLEARANCE ON\n{COLUMN_MATE}"
+        f"DIAMETRAL\nCLEARANCE ON\n{COLUMN_MATE}\nAXIS ON SPLIT FACE"
     ),
+    "Depth": f"SETS SCREW ENGAGEMENT\nIN {BACK_ARC_MATE}",
     "EarHole1Z": f"ALIGNS WITH\n{BACK_ARC_MATE} TAPS",
 }
 

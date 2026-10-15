@@ -84,6 +84,10 @@ def test_bore_prints_the_grip_budget_on_the_column() -> None:
     assert f"{spec.BORE_DIAMETRAL_CLEARANCE[1]:.2f}" in bore
     assert spec.BORE_DIAMETRAL_CLEARANCE[1] <= 0.30
     assert "MHA-SH-002" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
+    # The two-place depth says what it sets; the bore says where its axis is.
+    assert spec.DRAWING_PRECISION["BlockProfile"]["Depth"] == 2
+    assert "MHA-SH-002" in drawing.DIMENSION_CALLOUTS["Depth"]
+    assert "AXIS ON SPLIT FACE" in bore
     assert min(spec.WALLS_WORST.values()) >= spec.WALL_TARGET
 
 
