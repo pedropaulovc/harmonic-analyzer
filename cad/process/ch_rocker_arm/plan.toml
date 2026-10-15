@@ -162,51 +162,51 @@ retouch_after = []
 
 [[setups.zero.tool_touches]]
 tool = "center-drills-lms-4859/2"
-z_face = "hub_faces"
-edge_mm = 7.497
+z_face = "top"
+edge_mm = 7.9375
 # Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
 paper_mm = 0.05
-method = "spindle stopped; lower the tool on the hub faces through cigarette paper (0.05) until the paper drags, then Axis Set Z"
+method = "spindle stopped; lower the tool on the raw top over the X+60 shim stack (clear of the faced hub) through cigarette paper (0.05) until the paper drags, then Axis Set Z"
 after_op = 20
 before_ops = [30]
 
 [[setups.zero.tool_touches]]
 tool = "drill-index-115/D"
-z_face = "hub_faces"
-edge_mm = 7.497
+z_face = "top"
+edge_mm = 7.9375
 # Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
 paper_mm = 0.05
-method = "spindle stopped; lower the tool on the hub faces through cigarette paper (0.05) until the paper drags, then Axis Set Z"
+method = "spindle stopped; lower the tool on the raw top over the X+60 shim stack (clear of the faced hub) through cigarette paper (0.05) until the paper drags, then Axis Set Z"
 after_op = 30
 before_ops = [40]
 
 [[setups.zero.tool_touches]]
 tool = "reamers-metric/6.5mm"
-z_face = "hub_faces"
-edge_mm = 7.497
+z_face = "top"
+edge_mm = 7.9375
 # Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
 paper_mm = 0.05
-method = "spindle stopped; lower the tool on the hub faces through cigarette paper (0.05) until the paper drags, then Axis Set Z"
+method = "spindle stopped; lower the tool on the raw top over the X+60 shim stack (clear of the faced hub) through cigarette paper (0.05) until the paper drags, then Axis Set Z"
 after_op = 40
 before_ops = [50]
 
 [[setups.zero.tool_touches]]
 tool = "center-drills-lms-4859/2"
-z_face = "hub_faces"
-edge_mm = 7.497
+z_face = "top"
+edge_mm = 7.9375
 # Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
 paper_mm = 0.05
-method = "spindle stopped; lower the tool on the hub faces through cigarette paper (0.05) until the paper drags, then Axis Set Z"
+method = "spindle stopped; lower the tool on the raw top over the X+60 shim stack (clear of the faced hub) through cigarette paper (0.05) until the paper drags, then Axis Set Z"
 after_op = 50
 before_ops = [60]
 
 [[setups.zero.tool_touches]]
 tool = "drill-index-115/#47"
-z_face = "hub_faces"
-edge_mm = 7.497
+z_face = "top"
+edge_mm = 7.9375
 # Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
 paper_mm = 0.05
-method = "spindle stopped; lower the tool on the hub faces through cigarette paper (0.05) until the paper drags, then Axis Set Z"
+method = "spindle stopped; lower the tool on the raw top over the X+60 shim stack (clear of the faced hub) through cigarette paper (0.05) until the paper drags, then Axis Set Z"
 after_op = 60
 before_ops = [70]
 
@@ -447,21 +447,21 @@ retouch_after = []
 
 [[setups.zero.tool_touches]]
 tool = "drill-index-115/#33"
-z_face = "strap_datum_b"
-edge_mm = 5.21875
+z_face = "top"
+edge_mm = 7.9375
 # Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
 paper_mm = 0.05
-method = "spindle stopped; lower the tool on the strap datum b through cigarette paper (0.05) until the paper drags, then Axis Set Z"
+method = "spindle stopped; lower the tool on the raw top of the right blank end at X+158, between the op 10 facing and the clamp, through cigarette paper (0.05) until the paper drags, then Axis Set Z"
 after_op = 10
 before_ops = [20]
 
 [[setups.zero.tool_touches]]
 tool = "drill-index-115/#29"
-z_face = "strap_datum_b"
-edge_mm = 5.21875
+z_face = "top"
+edge_mm = 7.9375
 # Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
 paper_mm = 0.05
-method = "spindle stopped; lower the tool on the strap datum b through cigarette paper (0.05) until the paper drags, then Axis Set Z"
+method = "spindle stopped; lower the tool on the raw top of the right blank end at X+158, between the op 10 facing and the clamp, through cigarette paper (0.05) until the paper drags, then Axis Set Z"
 after_op = 20
 before_ops = [30]
 
@@ -599,10 +599,14 @@ contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep
 # S5: fitting bench, the work on the shop-made filing stand (two end blocks under the raw
 # blank ends, a pedestal under the lower hub face), a clamp across each blank end and one on
 # the upper hub face. Scribe the outline from the template (MHA-CH-006-TL-13) pinned in the
-# reamed bore by the 0.2558 in Class X minus pin gauge (gauges.vermont-class-x-2558-minus), break
-# out the chain-drill webs, hacksaw through the two taper-and-land tabs just outside the
-# scribed line and file the outline, tapers and tip lands included, to the line. The
-# clamped hub holds the arm and the clamped ends hold the frame when the tabs part.
+# reamed bore by the 0.2558 in Class X minus pin gauge (gauges.vermont-class-x-2558-minus)
+# (ops 10-20), break out the chain-drill webs (ops 30-40), hacksaw through the two
+# taper-and-land tabs just outside the scribed line (ops 50-60) and file the outline, tapers
+# and tip lands included, to the line (ops 70-100). The clamped hub holds the arm and the
+# clamped ends hold the frame when the tabs part. prechips 0.1.1 has no break-out or hand-saw
+# action (break-out phase: prechips#213; saw_cut needs a bandsaw and one cut plane, and any
+# action outside its bench set would put the DRO, zero and headroom screens back on this
+# bench setup), so ops 30-60 are bench `deburr` steps whose note is the printed instruction.
 [[setups]]
 id = "S5"
 machine = "fitting-bench"
@@ -647,24 +651,48 @@ guide = { template = "arm-outline-template" }
 
 [[setups.ops]]
 op = 30
+do = "deburr"
+feature = "profile_outer"
+note = "Break out the webs between the S3 op 20 chain-drill holes under the profile_outer arc: chisel along the hole centres from the scrap side, never toward the scribed line, until the scrap below the arc is free of the arm. This leaves stock for the file at op 80; do not file yet."
+
+[[setups.ops]]
+op = 40
+do = "deburr"
+feature = "top_edge"
+note = "Break out the webs between the S3 op 30 chain-drill holes above the top_edge line the same way, from the scrap side, until the scrap above the line is free of the arm. This leaves stock for the file at op 70; do not file yet."
+
+[[setups.ops]]
+op = 50
+do = "deburr"
+feature = "tip_land_pos_x"
+note = "Hacksaw through the +X taper-and-land tab with tools.hacksaw-starrett-k145 and a 24 TPI blade, just outside the scribed tip_land_pos_x line on the blank-end side, square to the work; the hub clamp holds the arm and the right blank-end clamp holds the frame as the tab parts. Leave the line for the file at op 90."
+
+[[setups.ops]]
+op = 60
+do = "deburr"
+feature = "tip_land_neg_x"
+note = "Hacksaw through the -X taper-and-land tab the same way, just outside the scribed tip_land_neg_x line on the blank-end side; the left blank-end clamp holds the frame as the tab parts and the arm is free. Leave the line for the file at op 100."
+
+[[setups.ops]]
+op = 70
 do = "file_to_line"
 feature = "top_edge"
 guide = { template = "arm-outline-template", gauge = "arm-outline-template" }
 
 [[setups.ops]]
-op = 40
+op = 80
 do = "file_to_line"
 feature = "profile_outer"
 guide = { template = "arm-outline-template", gauge = "arm-outline-template" }
 
 [[setups.ops]]
-op = 50
+op = 90
 do = "file_to_line"
 feature = "tip_land_pos_x"
 guide = { template = "arm-outline-template", gauge = "arm-outline-template" }
 
 [[setups.ops]]
-op = 60
+op = 100
 do = "file_to_line"
 feature = "tip_land_neg_x"
 guide = { template = "arm-outline-template", gauge = "arm-outline-template" }

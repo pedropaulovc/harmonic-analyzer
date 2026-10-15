@@ -640,6 +640,31 @@ def test_migrated_plans_name_faces_by_bare_labels_their_op_owns():
             assert match["feature"].lower() == feature, label
 
 
+def test_chain_drilled_features_are_broken_out_before_they_are_filed():
+    # prechips credits a chain_drill op's stock_removal_bounds as removed; its only
+    # break-out text is the drilling op's own "after drilling" sentence (prechips#213).
+    # Where the webs wait for the bench, the plan must carry that step itself (#1548): a
+    # noted bench step on the feature before its file_to_line.
+    for stem in dict.fromkeys((*MIGRATED_PLANS, *plans.TRAVELER_STEMS)):
+        plan = tomllib.loads(plans.plan_path(stem).read_text(encoding="utf-8"))
+        ops = [(setup["id"], op) for setup in plan["setups"] for op in setup["ops"]]
+        for index, (sid, op) in enumerate(ops):
+            if op.get("contour", {}).get("method") != "chain_drill":
+                continue
+            later = [
+                o for _, o in ops[index + 1 :] if o.get("feature") == op["feature"]
+            ]
+            filed = [i for i, o in enumerate(later) if o["do"] == "file_to_line"]
+            if not filed:
+                continue
+            assert any(
+                o["do"] == "deburr" and "break out" in o.get("note", "").lower()
+                for o in later[: filed[0]]
+            ), (
+                f"{stem} {sid} op {op['op']}: {op['feature']} is filed with no break-out step"
+            )
+
+
 def test_shop_without_cad_has_no_spec_dependencies(synthetic):
     _, out, _, shop = synthetic
     (shop / "inventory.toml").write_text(
