@@ -926,7 +926,8 @@ assert math.isclose(
 )
 # The machine reflection swaps the platen's two local edge rows.  The right
 # holder uses Rz(+90) from the lower end; the left holder uses Rz(-90) from the
-# upper end.  Thus both spring rails (local +Y) point inward over the paper.
+# upper end.  Thus both spring rails (local +Y) point inward, toward the paper,
+# and stop short of it (test_pd_platen_refit holds the gap).
 _CLIP_RIGHT_SX = PLATEN_SOCKET_XY[0][0]
 _CLIP_LEFT_SX = PLATEN_SOCKET_XY[2][0]
 _CLIP_BOTTOM_Y = PLATE_Y0 + _CLIP_Y0_LOCAL
@@ -2633,8 +2634,8 @@ async def build(adapter) -> dict[str, str]:
         )
         await _lock_to_platen(bot, f"guide-lock bottom x{x_c:.0f}")
     # Paper holders: mirrored one-piece brass sheets hugging the platen edges.
-    # Opposite Z rotations keep each 4 mm flat rail on its screw sockets while
-    # both adjacent spring rails point inward over the recording paper.
+    # Opposite Z rotations keep each flat screw rail on its screw sockets while
+    # both adjacent spring rails point inward, short of the recording paper.
     for _sx, clip_x, clip_y, rz in CLIP_PLACEMENTS:
         clip = await place_component(
             adapter,
