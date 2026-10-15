@@ -34,6 +34,9 @@ What it does, in order:
      labels and patch counts as the full STEPs, then copied intact under
      ``features/<stem>/`` with their own digest-bound adjacent STEP, and verified
      strict travelers for every enrolled plan under ``travelers/<stem>/``.
+     Every DXF a drawing note names by bundle path (``_release_artwork``, e.g.
+     ``pdf/fr-nameplate-outline.dxf``) is copied from its tracked source to that
+     path, beside the PDFs; an unresolved or ambiguous name fails the cut.
      Everything is staged and zipped into ONE bundle
      ``cad/out/release/harmonic-analyzer-<version>.zip`` (``solidworks/`` native +
      ``slddrw/`` + ``step/`` + ``stl/`` + ``gltf/`` + ``boxes/`` + ``png/`` +
@@ -75,6 +78,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import json
 import os
 import platform
@@ -86,6 +90,7 @@ import tempfile
 import time
 import traceback
 import zipfile
+from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -93,7 +98,9 @@ from _check import log
 from _paths import CAD_ROOT, OUT_SLDASM
 import _config
 import _process_plans
+from _buildgraph import module_deps_of, script_for
 from _drawing_registry import DRAWINGS
+from _release_artwork import ARTWORK_DIR, NOTED_ARTWORK
 from export_models import stage_release_neutral
 from features_bound import stage_bound_features
 
@@ -780,6 +787,104 @@ def stage_drawings(stage: Path) -> dict[str, str]:
     return staged
 
 
+def _module_strings(value: Any) -> list[str]:
+    """Every string held by one module-level value, through nested containers."""
+    found: list[str] = []
+    pending = [value]
+    seen: set[int] = set()
+    while pending:
+        item = pending.pop()
+        if isinstance(item, str):
+            found.append(item)
+        elif isinstance(item, (tuple, list, set, frozenset, dict)):
+            if id(item) in seen:
+                continue
+            seen.add(id(item))
+            pending.extend(
+                (*item.keys(), *item.values()) if isinstance(item, dict) else item
+            )
+    return found
+
+
+def drawing_note_texts() -> set[str]:
+    """Every string a registered drawing can print as a note.
+
+    A sheet's notes are module data: its draw script's own, or the part build
+    script's, which stamps them as custom properties the sheet links, or a
+    ``*_spec``/``*_notes`` module either script imports. Imports both scripts of
+    every drawing and returns every module-level string in their local import
+    closure (dunders such as docstrings excepted).
+    """
+    scripts_dir = Path(__file__).resolve().parent
+    stems: set[str] = set()
+    for drawing in DRAWINGS:
+        for script in (drawing.script, script_for(drawing.part)):
+            stems.add(script.stem)
+            stems.update(
+                Path(dep).stem
+                for dep in module_deps_of(script)
+                if Path(dep).parent == scripts_dir
+            )
+    texts: set[str] = set()
+    for stem in sorted(stems):
+        for name, value in vars(importlib.import_module(stem)).items():
+            if not name.startswith("__"):
+                texts.update(_module_strings(value))
+    return texts
+
+
+def noted_artwork(texts: Iterable[str]) -> list[str]:
+    """The bundle paths the notes name for artwork files, sorted and distinct.
+
+    A path whose directory is spelled other than ``ARTWORK_DIR``, or a file
+    named under two spellings, would print a path the bundle does not hold.
+    """
+    paths: set[str] = set()
+    for text in texts:
+        for match in NOTED_ARTWORK.finditer(text):
+            if match.group(1) != ARTWORK_DIR:
+                raise RuntimeError(
+                    f"a drawing note names {match.group(0)!r}, but noted artwork "
+                    f"ships under {ARTWORK_DIR}/ (print it with "
+                    f"_release_artwork.bundle_path)"
+                )
+            paths.add(match.group(0))
+    spellings: dict[str, list[str]] = {}
+    for path in paths:
+        spellings.setdefault(path.casefold(), []).append(path)
+    clashes = [sorted(names) for names in spellings.values() if len(names) > 1]
+    if clashes:
+        raise RuntimeError(f"drawing notes spell one artwork file two ways: {clashes}")
+    return sorted(paths)
+
+
+def stage_noted_artwork(stage: Path, texts: Iterable[str]) -> dict[str, str]:
+    """Copy every artwork file a drawing note names to the path it prints.
+
+    Each noted file name resolves, without regard to case, to exactly one
+    TRACKED file (so it is present at the tag); a name that matches none, or
+    several, fails the cut. Returns ``{bundle path: tracked source}``.
+    """
+    tracked = _git("ls-files", "--", ":(icase)*.dxf").splitlines()
+    staged: dict[str, str] = {}
+    for noted in noted_artwork(texts):
+        name = PurePosixPath(noted).name.casefold()
+        sources = [
+            path for path in tracked if PurePosixPath(path).name.casefold() == name
+        ]
+        if len(sources) != 1:
+            raise RuntimeError(
+                f"a drawing note names {noted}, which matches "
+                f"{len(sources)} tracked files {sources} -- it must match exactly one"
+            )
+        destination = stage / noted
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_ROOT / sources[0], destination)
+        staged[noted] = sources[0]
+    log(f"noted artwork: staged {len(staged)} DXF files under {ARTWORK_DIR}/")
+    return staged
+
+
 OPERATING_DOC = "device-operation.md"  # what READOUT.md's arithmetic is and why
 
 
@@ -979,6 +1084,9 @@ def bundle(
     ]
     facts["drawings"] = stage_drawings(stage)
     facts["drawings"].update(native_drawings)
+    # Artwork the sheets name by bundle path (e.g. the nameplate's contours),
+    # beside the PDFs that name it.
+    facts["artwork"] = stage_noted_artwork(stage, drawing_note_texts())
     facts["solidworks_files"] = sum(1 for path in sw_dir.iterdir() if path.is_file())
 
     # 3. Scene graph (mm): per-component transforms + mesh keys + colours. The

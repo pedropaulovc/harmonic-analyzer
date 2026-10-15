@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from _hole_spec import CLEARANCE_MM
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
+from _release_artwork import bundle_path
 from fr_nameplate_spec import PLATE_HEIGHT, PLATE_THICKNESS, PLATE_WIDTH, SCREW_XY
 
 # --- Model dimensions the print shows: feature -> parametric names. The slab's
@@ -126,15 +127,18 @@ ENGRAVING_DEPTH_CALLOUT = "ALL ENGRAVING"
 HOLE_CALLOUT_PROCESS = "DRILL"
 
 # The three vendored contours the build imports (cad/references), named on the
-# sheet. No digits, no method: the shop cuts them however it engraves.
-OUTLINE_DXF_NAME = "FR-NAMEPLATE-OUTLINE.DXF"
-FIELD_DXF_NAME = "FR-NAMEPLATE-FIELD.DXF"
-ENGRAVING_DXF_NAME = "FR-NAMEPLATE-ENGRAVING.DXF"
+# sheet by the path cut_release stages each at in the release bundle, spelled
+# exactly as the file is (lower case: the path must open as printed). No
+# digits, no method: the shop cuts them however it engraves.
+OUTLINE_DXF_NAME = "fr-nameplate-outline.dxf"
+FIELD_DXF_NAME = "fr-nameplate-field.dxf"
+ENGRAVING_DXF_NAME = "fr-nameplate-engraving.dxf"
 MANUFACTURING_NOTES = "\n".join(
     (
-        f"OUTLINE AND CORNERS PER {OUTLINE_DXF_NAME}",
-        f"SUNK FIELD PER {FIELD_DXF_NAME}",
-        f"ENGRAVING PER {ENGRAVING_DXF_NAME}",
+        f"OUTLINE AND CORNERS PER {bundle_path(OUTLINE_DXF_NAME)}",
+        f"SUNK FIELD PER {bundle_path(FIELD_DXF_NAME)}",
+        f"ENGRAVING PER {bundle_path(ENGRAVING_DXF_NAME)}",
+        "DXF PATHS ARE RELATIVE TO THE RELEASE BUNDLE",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
