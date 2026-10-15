@@ -2,7 +2,7 @@ r"""Create the curated machinist drawing for the rocker pivot bracket (MHA-CH-00
 
 One sheet, third-angle: the elevation (the ear face, the reamed cross-bore and
 the arch) with the plan above it (the foot, the hold-down hole and the apex
-set-screw tap), a 2:1 right view for the foot-to-ear corner's MAX radius, and
+set-screw tap), the left view for the foot-to-ear corner's MAX radius, and
 a shaded isometric. Every value is a native model dimension the part build
 marks, places and bands (``ch_pivot_bracket_drawing_spec``); the sheet only
 places them.
@@ -17,7 +17,6 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -109,17 +108,13 @@ TOP_CENTER = (FRONT_CENTER[0], 0.197)
 ISO_CENTER = (0.365, 0.170)
 _WEST_X = FRONT_CENTER[0] - FOOT_W / 2.0 * _S
 _EAST_X = FRONT_CENTER[0] + FOOT_W / 2.0 * _S
-# The right view (*Right: +Z runs LEFT, +Y up) shows the foot-to-ear inside
-# corner in profile, the one view where its radius is an arc. At 2:1 it is
-# 33.9 x 66.4 mm and stands right of the bore callout, x 0.275..0.309, y
-# 0.089..0.154: over the title block (top 0.066) with its caption under it,
-# 17 mm under the foot length's extension line (0.172) and 20 mm left of the
-# isometric (0.329). Its caption names it and its scale, as the fleet labels
-# a view off the sheet scale.
-RIGHT_SCALE = (2, 1)
-_SR = RIGHT_SCALE[0] / RIGHT_SCALE[1] / 1000.0  # sheet metres per model mm
-RIGHT_CENTER = (0.292, 0.122)
-RIGHT_CAPTION = f"RIGHT VIEW\nSCALE {RIGHT_SCALE[0]}:{RIGHT_SCALE[1]}"
+# The left view (*Left: +Z runs RIGHT, +Y up) shows the foot-to-ear inside
+# corner in profile, the one view where its radius is an arc. It is drawn at
+# the sheet scale and placed where third-angle projection puts it, level with
+# the elevation (the same model height, so the same centre height) and left
+# of it: 50.8 mm wide at x 0.021..0.071, the frame's 12.7 mm margin on its
+# left and the overall height's text (~0.082) on its right.
+SIDE_CENTER = (0.046, FRONT_CENTER[1])
 
 
 def _front_y(model_y: float) -> float:
@@ -133,26 +128,19 @@ def _top_y(model_z: float) -> float:
     return TOP_CENTER[1] - (model_z - _FOOT_MID_Z) * _S
 
 
-def _right_x(model_z: float) -> float:
-    """Sheet X of a model-Z station in the right view (+Z runs LEFT), the
+def _side_x(model_z: float) -> float:
+    """Sheet X of a model-Z station in the left view (+Z runs RIGHT), the
     view centred on the foot's mid-length like the plan."""
-    return RIGHT_CENTER[0] - (model_z - _FOOT_MID_Z) * _SR
+    return SIDE_CENTER[0] + (model_z - _FOOT_MID_Z) * _S
 
 
-def _right_y(model_y: float) -> float:
-    """Sheet Y of a model-Y point in the right view (seat at model y = 0)."""
-    return RIGHT_CENTER[1] + (model_y - _PART_MID_Y) * _SR
-
-
-# The caption's top-left anchor, under the right view's seat line.
-RIGHT_CAPTION_XY = (RIGHT_CENTER[0] - 0.013, _right_y(0.0) - 0.004)
 # The inside corner (the foot top meets the ear's outboard face) and where the
 # R MAX text stands off it, in sheet metres along the view's +Z and +Y: up
-# into the open corner and out past the foot end, so the radial leader runs
-# diagonally down to the arc over nothing but the corner's own air. Placed
-# off the corner the build PROJECTS, so the view's real frame governs.
+# into the open notch over the foot, right of the ear, so the radial leader
+# runs diagonally down to the arc over nothing but the corner's own air.
+# Placed off the corner the build PROJECTS, so the view's real frame governs.
 CORNER_MODEL_MM = (0.0, FOOT_H, EAR_T / 2.0)
-CORNER_TEXT_OFFSET = (0.022, 0.020)
+CORNER_TEXT_OFFSET = (0.014, 0.016)
 _CORNER_FRAME_TOL_M = 2.5e-4
 
 # The elevation carries the heights off the seat -- the one face a machinist
@@ -190,18 +178,18 @@ TOP_KEEP = {
 # rule 4); the drilled hold-down hole says drill and through. The three
 # lengths that carry their own band say what the band holds: the hold-down
 # hole lands on the support's tapped seat, the ear's faces bear on the bank's
-# thrust washers and, with the tap's station, place the apex screw's cup on
-# the pivot shaft's flat (ch_pivot_bracket_spec, rocker_bank_layout). The
-# foot length rides the title block.
+# thrust washers, and the tap's station puts the apex screw on the pivot
+# shaft's flat (ch_pivot_bracket_spec, rocker_bank_layout), each naming its
+# mate. The foot length rides the title block.
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": f"REAM THRU\nSLIP FIT ON\nPIVOT SHAFT {PIVOT_SHAFT_NUMBER}",
     "HoleDia": "DRILL THRU",
     "HoleStation": f"ON {SUPPORT_NUMBER} SEAT",
-    "EarThick": f"THRUST FACES ON {THRUST_WASHER_NUMBER}\nSET SCREW TO SHAFT FLAT",
-    "SetScrewLocation": "ON SHAFT FLAT",
+    "EarThick": f"THRUST FACES ON {THRUST_WASHER_NUMBER}",
+    "SetScrewLocation": f"SET SCREW ON FLAT OF\nPIVOT SHAFT {PIVOT_SHAFT_NUMBER}",
 }
-# The right view prints the one dimension it exists for.
-RIGHT_KEEP_NAMES = ("CornerRadius",)
+# The left view prints the one dimension it exists for.
+SIDE_KEEP_NAMES = ("CornerRadius",)
 # The apex tap runs down into the bore and stops there. Both native extents
 # ("<hw-thru>", the drill's and the thread's) say so in words; the thread
 # class is the title block's; the thread's full-thread shortfall (a plain
@@ -410,8 +398,8 @@ def _hide_diameter_leader_lines(
     raise RuntimeError(f"dimension {dimension!r} not found for {label}")
 
 
-@_telemetry.traced("drawing.pivot_bracket.right_keep")
-def _right_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
+@_telemetry.traced("drawing.pivot_bracket.side_keep")
+def _side_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
     """The R MAX text's sheet point, off the corner the view really shows.
 
     Projects the inside corner and one millimetre along model +Z and +Y, so
@@ -423,21 +411,21 @@ def _right_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
         adapter,
         view,
         [(x, y, z), (x, y, z + 0.001), (x, y + 0.001, z)],
-        label="right-view corner frame",
+        label="left-view corner frame",
         names=["corner", "corner +Z", "corner +Y"],
     )
     units = []
     for point in (along_z, along_y):
         length = math.dist(point, corner)
         if length <= 0.0:
-            raise RuntimeError("right view does not show the corner in profile")
+            raise RuntimeError("left view does not show the corner in profile")
         units.append(
             tuple((p - c) / length for p, c in zip(point, corner, strict=True))
         )
-    planned = (_right_x(CORNER_MODEL_MM[2]), _right_y(CORNER_MODEL_MM[1]))
+    planned = (_side_x(CORNER_MODEL_MM[2]), _front_y(CORNER_MODEL_MM[1]))
     if math.dist(corner, planned) > _CORNER_FRAME_TOL_M:
         _telemetry.warn(
-            f"right view corner at {corner!r}, planned {planned!r}; placing off "
+            f"left view corner at {corner!r}, planned {planned!r}; placing off "
             "the projected corner"
         )
     text = tuple(
@@ -446,13 +434,13 @@ def _right_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
         + CORNER_TEXT_OFFSET[1] * units[1][axis]
         for axis in range(2)
     )
-    _telemetry.info(f"right view corner {corner!r}, R MAX text {text!r}")
+    _telemetry.info(f"left view corner {corner!r}, R MAX text {text!r}")
     return {"CornerRadius": (text[0], text[1])}
 
 
 @_telemetry.traced("drawing.pivot_bracket.corner_radius")
 def _dress_corner_radius(adapter: Any, annotations: list[Any]) -> None:
-    """Prove the right view's CornerRadius prints the part's R MAX and stop
+    """Prove the left view's CornerRadius prints the part's R MAX and stop
     its leader at the arc (draw_pn_pen_rod's shoulder radius).
 
     Read back: radial, measuring CORNER_R_MAX, the native swTolMAX the part
@@ -466,7 +454,7 @@ def _dress_corner_radius(adapter: Any, annotations: list[Any]) -> None:
     ]
     if len(found) != 1:
         raise RuntimeError(
-            f"expected one CornerRadius on the right view, found {len(found)}"
+            f"expected one CornerRadius on the left view, found {len(found)}"
         )
     annotation = _early_bound(found[0], "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
@@ -552,14 +540,12 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(3, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(3, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=RIGHT_SCALE)
+    side = place_view(adapter, str(SOURCE), "*Left", *SIDE_CENTER, scale=(3, 1))
     # No view needs hidden lines: the elevation shows the bore in true circle,
     # both holes are fully defined by their callouts in the plan, and the
-    # right view is there for the corner's outline alone.
-    for view in (front, top, iso, right):
+    # left view is there for the corner's outline alone.
+    for view in (front, top, iso, side):
         set_hidden_lines_removed(adapter, view)
-    if add_note(adapter, RIGHT_CAPTION, *RIGHT_CAPTION_XY) is None:
-        raise RuntimeError("failed to caption the right view")
 
     # The lateral locations and the tap station are owned by reference
     # sketches the part saves blanked; the hidden-owner curate shows each in
@@ -578,17 +564,18 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    right_annotations = curate_view_dimensions(
+    side_annotations = curate_view_dimensions(
         adapter,
-        right,
-        keep=_right_keep(adapter, right),
-        view_label="right",
+        side,
+        keep=_side_keep(adapter, side),
+        view_label="left",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    imported_annotations = [*front_annotations, *top_annotations, *right_annotations]
+    imported_annotations = [*front_annotations, *top_annotations, *side_annotations]
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
-    _dress_corner_radius(adapter, right_annotations)
-    for view, label in ((front, "front"), (top, "plan")):
+    _dress_corner_radius(adapter, side_annotations)
+    # The left view's arch-to-block tangent line is no edge the shop cuts.
+    for view, label in ((front, "front"), (top, "plan"), (side, "left")):
         view.SetDisplayTangentEdges2(0)
         if int(view.GetDisplayTangentEdges2()) != 0:
             raise RuntimeError(f"failed to hide {label}-view tangent edges")
@@ -638,7 +625,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
     # unregenerated, and only a real mode change rebuilds it.
-    for view in (front, top, iso, right):
+    for view in (front, top, iso, side):
         set_hidden_lines_removed(adapter, view)
     # The part authored every imported dimension's decimal places; prove the
     # import kept them instead of falling back to the sheet's default.

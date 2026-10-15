@@ -47,7 +47,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     keeps = (
         set(drawing.FRONT_KEEP),
         set(drawing.TOP_KEEP),
-        set(drawing.RIGHT_KEEP_NAMES),
+        set(drawing.SIDE_KEEP_NAMES),
     )
     assert set().union(*keeps) == marked
     assert sum(len(names) for names in keeps) == len(marked)
@@ -176,10 +176,14 @@ def test_every_banded_length_says_what_its_band_holds() -> None:
     assert drawing.DIMENSION_CALLOUTS["HoleStation"] == f"ON {support} SEAT"
     washer = _config.parts("ch-rocker-thrust-washer")["number"]
     assert washer == "MHA-CH-009"
-    assert drawing.DIMENSION_CALLOUTS["EarThick"].startswith(
-        f"THRUST FACES ON {washer}\n"
+    assert drawing.DIMENSION_CALLOUTS["EarThick"] == f"THRUST FACES ON {washer}"
+    shaft = _config.parts("ch-pivot-shaft")["number"]
+    assert drawing.DIMENSION_CALLOUTS["SetScrewLocation"] == (
+        f"SET SCREW ON FLAT OF\nPIVOT SHAFT {shaft}"
     )
-    assert not re.search(r"\d", drawing.DIMENSION_CALLOUTS["SetScrewLocation"])
+    assert not re.search(
+        r"\d", drawing.DIMENSION_CALLOUTS["SetScrewLocation"].replace(shaft, "")
+    )
 
 
 # The native definitions of a through-next 4-40 Hole Wizard tap, as the
@@ -242,11 +246,11 @@ def test_projected_views_stay_aligned_and_ordered() -> None:
 
 
 def _planned_corner_text() -> tuple[float, float]:
-    """The R MAX text in the planned right-view frame (*Right: +Z left)."""
+    """The R MAX text in the planned left-view frame (*Left: +Z right)."""
     dz, dy = drawing.CORNER_TEXT_OFFSET
     return (
-        drawing._right_x(spec.EAR_T / 2.0) - dz,
-        drawing._right_y(spec.FOOT_H) + dy,
+        drawing._side_x(spec.EAR_T / 2.0) + dz,
+        drawing._front_y(spec.FOOT_H) + dy,
     )
 
 
@@ -260,8 +264,7 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
         "isometric view": drawing.ISO_CENTER,
         "set-screw callout": drawing.SET_SCREW_CALLOUT_XY,
         "overall height": drawing.OVERALL_HEIGHT_XY,
-        "right view": drawing.RIGHT_CENTER,
-        "right view caption": drawing.RIGHT_CAPTION_XY,
+        "left view": drawing.SIDE_CENTER,
         "corner radius (planned frame)": _planned_corner_text(),
     }
     for label, (x, y) in anchors.items():
@@ -352,34 +355,35 @@ def test_corner_radius_is_the_largest_the_screw_head_clears() -> None:
     )
 
 
-def test_right_view_shows_the_corner_radius_clear_of_its_neighbours() -> None:
-    template = DRAWING_TEMPLATES[DRAWINGS_BY_NAME["ch_pivot_bracket"].layout]
-    assert drawing.RIGHT_SCALE == (2, 1)
-    assert drawing.RIGHT_CAPTION == "RIGHT VIEW\nSCALE 2:1"
-    assert drawing.RIGHT_KEEP_NAMES == ("CornerRadius",)
-    left = drawing._right_x(FOOT_Z1)
-    right = drawing._right_x(spec.FOOT_Z0)
-    bottom = drawing._right_y(0.0)
-    top = drawing._right_y(spec.EAR_TOP_Y)
-    assert abs((left + right) / 2.0 - drawing.RIGHT_CENTER[0]) < 1e-12
-    assert abs((bottom + top) / 2.0 - drawing.RIGHT_CENTER[1]) < 1e-12
-    # Above the title block with room for its two-line caption.
-    assert drawing.RIGHT_CAPTION_XY[1] - 0.010 > template.title_block_top_m
-    assert drawing.RIGHT_CAPTION_XY[1] < bottom
-    # Under the foot length's extension line, left of the isometric (whose
-    # outline starts ~0.036 left of its centre), right of the bore callout.
-    assert top + 0.010 < drawing._top_y(FOOT_Z1)
-    assert right + 0.015 < drawing.ISO_CENTER[0] - 0.036
-    bore_text_right = drawing.FRONT_KEEP["ShaftBoreDia"][0] + 0.029
+def test_left_view_projects_the_corner_radius_clear_of_its_neighbours() -> None:
+    # Third-angle: the left view stands left of the elevation, level with it
+    # at the sheet scale (the two share _front_y), so it reads across.
+    assert drawing.SIDE_KEEP_NAMES == ("CornerRadius",)
+    assert drawing.SIDE_CENTER[1] == drawing.FRONT_CENTER[1]
+    left = drawing._side_x(spec.FOOT_Z0)
+    right = drawing._side_x(FOOT_Z1)
+    assert abs((left + right) / 2.0 - drawing.SIDE_CENTER[0]) < 1e-12
+    assert left > _FRAME_M + 0.005
+    # Clear of the overall height's text (~16 mm wide, centred on its lane).
+    assert right + 0.008 < drawing.OVERALL_HEIGHT_XY[0] - 0.008
     text_x, text_y = _planned_corner_text()
-    assert bore_text_right + 0.008 < text_x - 0.011
-    # The R MAX text stands over the open corner, above the foot top.
-    assert text_y > drawing._right_y(spec.FOOT_H) + 0.015
-    assert left - 0.011 < text_x < drawing._right_x(spec.EAR_T / 2.0)
+    # The R MAX text (~15 mm wide) stands in the notch over the foot: right
+    # of the ear's outboard face, inside the foot's end, short of the
+    # overall height's text, above the foot top and under the bore axis.
+    assert drawing._side_x(spec.EAR_T / 2.0) < text_x - 0.0075
+    assert text_x + 0.0075 < drawing.OVERALL_HEIGHT_XY[0] - 0.008
+    assert drawing._front_y(spec.FOOT_H) + 0.010 < text_y
+    assert text_y < drawing._front_y(spec.BORE_H)
     source = _drawing_source()
-    assert source.count("for view in (front, top, iso, right):") == 2
+    assert 'place_view(adapter, str(SOURCE), "*Left", *SIDE_CENTER, scale=(3, 1))' in (
+        source
+    )
+    assert source.count("for view in (front, top, iso, side):") == 2
+    assert 'for view, label in ((front, "front"), (top, "plan"), (side, "left")):' in (
+        source
+    )
     assert source.index("set_dimension_callouts(adapter, imported_annotations") < (
-        source.index("_dress_corner_radius(adapter, right_annotations)")
+        source.index("_dress_corner_radius(adapter, side_annotations)")
     )
 
 
