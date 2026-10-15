@@ -549,6 +549,39 @@ def test_short_balloon_restores_fit_when_zooming_or_positioning_fails(
     assert [span for _xy, span in placed_at] == expected
 
 
+def _step_lines(number: int) -> list[str]:
+    steps = drawing.ASSEMBLY_STEPS.splitlines()
+    start = next(i for i, line in enumerate(steps) if line.startswith(f"{number}. "))
+    end = next(
+        (i for i in range(start + 1, len(steps)) if re.match(r"\d+\. ", steps[i])),
+        len(steps),
+    )
+    return steps[start:end]
+
+
+def _step(number: int) -> str:
+    return " ".join(line.strip() for line in _step_lines(number))
+
+
+def test_assembly_steps_keep_their_crowded_sheet_3_footprint() -> None:
+    steps = drawing.ASSEMBLY_STEPS.splitlines()
+    assert len(steps) <= 39
+    assert max(map(len, steps)) <= 72
+
+
+def test_step_8_faces_the_support_windows_toward_the_short_ends() -> None:
+    # The builder turns MHA-FR-005 so its window normal (local Z, row 2)
+    # runs along machine X, the deck's length: the windows face the ends.
+    import build_fr_frame_assembly as frame
+    from fr_harmonic_base_spec import DECK_LENGTH, DECK_WIDTH
+
+    assert [abs(value) for value in frame.SUPPORT_ROWS[2]] == [1.0, 0.0, 0.0]
+    assert DECK_LENGTH > DECK_WIDTH
+    step = _step(8)
+    assert "WINDOWS FACING THE SHORT ENDS" in step
+    assert "LONG SIDES" not in step
+
+
 def test_step_9_sets_the_nameplate_then_spots_its_base_seats_through_it() -> None:
     # #628: the base sheet prints the four nameplate seats as TRANSFER FROM
     # MHA-FR-004 AT ASSEMBLY, so the step locates the plate on the deck, then
@@ -567,3 +600,69 @@ def test_step_9_sets_the_nameplate_then_spots_its_base_seats_through_it() -> Non
     assert step.index("CLAMP.") < spot < step.index("TRANSFER CALLOUT")
     assert step.index("TRANSFER CALLOUT") < step.index("SEAT ALL FOUR MHA-VN-006 HEADS")
     assert max(map(len, steps)) <= 72
+
+
+def test_check_3_accepts_the_caps_by_their_seats_alone() -> None:
+    checks = drawing.ASSEMBLY_CHECKS.splitlines()
+    start = next(i for i, line in enumerate(checks) if line.startswith("3. "))
+    assert checks[start].startswith(
+        "3. ALL FOUR MHA-VN-028 CAPS REACH THEIR INSIDE SEATS"
+    )
+    assert "TOPS ARE EVEN" not in drawing.ASSEMBLY_CHECKS
+
+
+class _TextDisplay:
+    """A display dimension whose text parts persist unless ``drops``."""
+
+    def __init__(self, *, drops: bool = False) -> None:
+        self.parts: dict[int, str] = {}
+        self.drops = drops
+
+    def SetText(self, part, text) -> None:  # noqa: N802
+        if not self.drops:
+            self.parts[part] = text
+
+    def GetText(self, part) -> str:  # noqa: N802
+        return self.parts.get(part, "")
+
+
+class _Rebuilds:
+    def __init__(self) -> None:
+        self.count = 0
+
+    def EditRebuild3(self) -> bool:  # noqa: N802
+        self.count += 1
+        return True
+
+
+def test_top_axis_height_names_itself_in_its_own_native_suffix() -> None:
+    # The tube-frame sheet sends the fitter to this height by name.
+    from fr_tube_frame_spec import DRAWING_NOTES
+
+    assert "TOP CROSS-BORE AXIS HEIGHT" in DRAWING_NOTES
+    assert drawing.TOP_AXIS_HEIGHT_SUFFIX == (
+        " TOP CROSS-BORE AXIS HEIGHT FROM BASE UNDERSIDE"
+    )
+    model = _Rebuilds()
+    display = _TextDisplay()
+    returned = drawing._set_dimension_suffix(
+        SimpleNamespace(currentModel=model),
+        display,
+        drawing.TOP_AXIS_HEIGHT_SUFFIX,
+        label="top axis",
+    )
+    assert returned is display
+    assert display.parts == {2: drawing.TOP_AXIS_HEIGHT_SUFFIX}  # suffix only
+    assert model.count == 1
+
+
+def test_a_suffix_that_does_not_persist_fails_the_sheet() -> None:
+    model = _Rebuilds()
+    with pytest.raises(RuntimeError, match="top axis: suffix"):
+        drawing._set_dimension_suffix(
+            SimpleNamespace(currentModel=model),
+            _TextDisplay(drops=True),
+            drawing.TOP_AXIS_HEIGHT_SUFFIX,
+            label="top axis",
+        )
+    assert model.count == 0
