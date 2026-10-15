@@ -2,10 +2,10 @@
 
 This directory holds HA-authored process plans (`<stem>/plan.toml`) and shared
 shop data (`shop/inventory.toml`, `shop/shop-policy.toml`,
-`shop/cutting-data.toml`). prechips is pinned to PyPI `prechips==0.1`.
+`shop/cutting-data.toml`). prechips is pinned to PyPI `prechips==0.1.1`.
 `cad/scripts/_process_plans.py:TRAVELER_STEMS` is the enrollment authority; it is
 currently empty. The legacy rocker, shaft and cone plans remain tracked as
-provenance, but are stale against 0.1 and are not run or shipped. Do not enroll
+provenance, but are stale against the pinned prechips and are not run or shipped. Do not enroll
 one merely because its plan file exists.
 
 ## Bind stable labels, not STEP entity numbers
