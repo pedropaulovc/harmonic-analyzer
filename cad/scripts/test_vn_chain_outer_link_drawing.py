@@ -11,7 +11,6 @@ import draw_pd_paper_drive_assembly as assembly_drawing
 import draw_vn_chain_outer_link as draw
 import joint_retention
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
-from _purchased_part_drawing import HiddenLineDisplay
 
 STEM = "vn-chain-outer-link"
 NAME = "vn_chain_outer_link"
@@ -28,14 +27,15 @@ def test_sheet_is_the_registered_purchased_part_reference(monkeypatch) -> None:
     assert spec.layout is DrawingLayout.LANDSCAPE
     calls = []
 
-    async def fake(adapter, drawn, *, hidden_lines=HiddenLineDisplay.VISIBLE):
-        calls.append((adapter, drawn, hidden_lines))
+    async def fake(adapter, drawn, *, item, cut_to_suit=False):
+        calls.append((adapter, drawn, item, cut_to_suit))
         return {"pdf": "x"}
 
     monkeypatch.setattr(draw, "build_purchased_part_drawing", fake)
     adapter = object()
     assert asyncio.run(draw.build(adapter)) == {"pdf": "x"}
-    assert calls == [(adapter, spec, HiddenLineDisplay.REMOVED)]
+    assert calls == [(adapter, spec, draw.ITEM, False)]
+    assert "OUTER LINK" in draw.ITEM
 
 
 def test_registry_row_is_the_bought_chain_not_a_machined_part() -> None:

@@ -17,11 +17,15 @@ from _purchased_fastener_drawing import build_purchased_spring_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["vn_counter_spring"]
+# The footer's ITEM row: the catalogue designation in plain text.
+ITEM = "EXTENSION SPRING, DOUBLE-LOOP ENDS, 1/2 OD x 0.063 WIRE"
 PART_STEM = SPEC.artifact_stem
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_spring_drawing(adapter, SPEC)
+    return await build_purchased_spring_drawing(
+        adapter, SPEC, item=ITEM
+    )
 
 
 def _parse_args() -> argparse.Namespace:

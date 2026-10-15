@@ -328,8 +328,9 @@ does not discharge the physical operating assumptions or the two waivers below.
 - **Spring-rate matching dominates the part budget.** Match all 20 rates within
   ±1.25% of their measured common mean and record each initial-tension intercept.
   The catalog's ±10% rate band alone is not acceptable for channel consistency.
-  Use the spec sheet's `SET QC` procedure; if a batch cannot supply a matched set,
-  select another batch rather than modifying the approved lever holes.
+  The MHA-VN channel-spring sheet's matched-set note orders 40 from one lot and
+  keeps the 20 that match; if a lot cannot supply a matched set, select another
+  lot rather than modifying the approved lever holes.
 - **The eccentricity limit is capability-driven, not accuracy-driven.** Accuracy alone allows
   ±0.047 mm; the drawing's ±0.025 (`dt_cylinder_gear_spec.DRAWING_NOTES`) is kept because an
   indicated offset in a 4-jaw reads to 0.01 mm and costs nothing extra. Relaxing to ±0.05 is a

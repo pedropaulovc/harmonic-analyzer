@@ -13,10 +13,14 @@ from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["vn_cylinder_bank_spring"]
+# The footer's ITEM row: the catalogue designation in plain text.
+ITEM = "WAVE DISC SPRING, ID 9.78 x OD 12.70, 1.27 FREE HEIGHT"
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_fastener_drawing(adapter, SPEC)
+    return await build_purchased_fastener_drawing(
+        adapter, SPEC, item=ITEM
+    )
 
 
 def _parse_args() -> argparse.Namespace:

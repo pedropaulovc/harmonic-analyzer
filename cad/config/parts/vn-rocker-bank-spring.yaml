@@ -8,9 +8,9 @@ vn-rocker-bank-spring:
   material_specification: "High-carbon steel wave disc spring, 0.265 ID x 0.367 OD; McMaster-Carr 9714K24"
   finish: plain; no coating
   installation_notes: |-
-    INSTALLATION - ON MHA-CH-005, BETWEEN THE MHA-CH-009 WASHER
-    AND THE SOUTH MHA-CH-008 EAR; SET BY A 0.60 BLADE.
-    SLIDE ON MHA-CH-005 FIRST; REJECT ONE THAT DOES NOT RUN FREE.
+    INSTALLATION - ON MHA-CH-005, BETWEEN THE MHA-CH-009 WASHER AND THE
+    SOUTH MHA-CH-008 EAR, SET OFF THE WASHER ON A 0.60 BLADE BESIDE THE
+    SPRING (MHA-CH-000). SLIDE ON MHA-CH-005 FIRST; REJECT ANY THAT BIND.
   quantity: 1
   tolerance_class: machined_block
   process: purchased

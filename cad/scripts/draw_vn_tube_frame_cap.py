@@ -13,10 +13,14 @@ from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["vn_tube_frame_cap"]
+# The footer's ITEM row: the catalogue designation in plain text.
+ITEM = "PUSH-ON ROUND CAP FOR 1 IN OD TUBE (ID 25.4 x 18.3 DEEP)"
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_fastener_drawing(adapter, SPEC)
+    return await build_purchased_fastener_drawing(
+        adapter, SPEC, item=ITEM
+    )
 
 
 def _parse_args() -> argparse.Namespace:

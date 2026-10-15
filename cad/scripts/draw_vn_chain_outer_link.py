@@ -1,4 +1,4 @@
-"""Create the four-view purchased-reference sheet for McMaster-Carr 6261K171, ANSI #25 roller-chain outer link.
+"""Create the four-view purchased-reference sheet for McMaster-Carr 6261K171 / 6261K108, ANSI #25 roller-chain outer link.
 
 Identification only: the part as installed, its stock and ordering SKU, and
 its cut-length or fitting note; no fabrication dimensions.
@@ -13,17 +13,18 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_part_drawing import HiddenLineDisplay, build_purchased_part_drawing
+from _purchased_part_drawing import build_purchased_part_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["vn_chain_outer_link"]
 PART_STEM = SPEC.artifact_stem
+# The footer's ITEM row: the catalogue designation in plain text.
+ITEM = "ANSI #25 ROLLER CHAIN, OUTER LINK (1/4 PITCH)"
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    # Undimensioned reference views: dashed bores and pins inform nothing.
     return await build_purchased_part_drawing(
-        adapter, SPEC, hidden_lines=HiddenLineDisplay.REMOVED
+        adapter, SPEC, item=ITEM, cut_to_suit=False
     )
 
 

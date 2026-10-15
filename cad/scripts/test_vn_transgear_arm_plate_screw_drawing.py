@@ -419,7 +419,9 @@ def test_sheet_states_the_cut_and_no_size_in_the_registry_names() -> None:
     proud = joints.PLATE_SCREW_CUT_PROUD_MAX
     assert f"FLUSH OR PROUD {proud:g} MAX" in flat
     assert f"CUT-END BREAK {screw.CUT_END_BREAK_TEXT}" in flat
-    assert "CUT OFF MECHANISM BEFORE GUIDE-LOCK SWEEP" in flat
+    assert "CUT TO FIT OFF THE MECHANISM BEFORE THE GUIDE-LOCK SWEEP" in flat
+    # The trim limit names the face it is measured from (machinist review).
+    assert f"PROUD {proud:g} MAX OF THE MHA-PD-018 ARM FRONT FACE" in flat
 
 
 def test_drawing_is_the_purchased_reference_sheet() -> None:
@@ -444,4 +446,4 @@ def test_drawing_uses_only_the_ordinary_purchased_reference_api(monkeypatch) -> 
         drawing, "build_purchased_fastener_drawing", reference_sheet
     )
     asyncio.run(drawing.build(None))
-    assert seen == {}
+    assert seen == {"item": drawing.ITEM, "cut_to_suit": True}

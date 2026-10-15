@@ -13,13 +13,13 @@ from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["vn_pen_rod_set_screw"]
+# The footer's ITEM row: the catalogue designation in plain text.
+ITEM = "#4-40 x 3/16 SOCKET SET SCREW, CUP POINT"
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    # The vn-fulcrum-set-screw ruling (machinist review r8): thread and socket
-    # hidden edges order and install nothing; the SKU defines the part.
     return await build_purchased_fastener_drawing(
-        adapter, SPEC, hidden_lines_removed=True
+        adapter, SPEC, item=ITEM
     )
 
 

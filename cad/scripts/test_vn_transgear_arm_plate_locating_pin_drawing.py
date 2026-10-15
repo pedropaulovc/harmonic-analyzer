@@ -89,4 +89,4 @@ def test_native_and_sheet_use_ordinary_catalogue_reference_apis(
     asyncio.run(part.build(None))
     asyncio.run(drawing.build(None))
     assert "reference_notes" not in native
-    assert sheet == {}
+    assert sheet == {"item": drawing.ITEM}
