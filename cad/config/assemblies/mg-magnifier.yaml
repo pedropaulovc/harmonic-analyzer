@@ -22,7 +22,7 @@ flip_invert:
   - mag lever depth @npn
   - mag lever knife line across @npn
 allowed_free_stems:
-  - mg-lever-wire
+  - vn-lever-wire
   - mg-magnifying-bracket
   - mg-magnifying-clamp
   - mg-magnifying-lever
@@ -43,7 +43,7 @@ allowed_free_stems:
 required_free_stems:
   - mg-magnifying-lever
   - mg-magnifying-wheel
-  - mg-lever-wire
+  - vn-lever-wire
   - mg-magnifying-bracket
 # The freed lever knife-rock + the articulated lever-wire's swing/spin; the
 # wheel is COUPLED by the WIRE-1 yoke (no DOF of its own).

@@ -1,17 +1,17 @@
 r"""Create the curated machinist drawing for the lever wire (WIRE 1).
 
-The lever wire is a Ø0.8 drawn-steel cylinder ~353 long -- a hair-thin
+The lever wire is a purchased Ø0.8 (0.031 in) music-wire run ~353 long -- a hair-thin
 silhouette with no flat face, no pickable end and no selectable silhouette edge,
 so the print is note-based: nothing is a marked dimension, and the diameter +
 straight rest-run length ride the notes (the build stamps the computed length).
-That chord is not represented as a developed cut length because the source model
-does not define the formed hook or hub-wrap allowance.
+That chord is not a cut length: the wire is cut overlength from the coil and
+hooked, wrapped and trimmed at assembly.
 The wire axis is local +Y, so the FRONT view is the straight run reduced to fit
 (1:5) and the isometric confirms it is a plain straight rod.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_mg_lever_wire.py mg-lever-wire
+    uv run python cad\scripts\draw_vn_lever_wire.py vn-lever-wire
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ from _session import run_build
 import _telemetry
 
 
-SPEC = DRAWINGS_BY_NAME["mg_lever_wire"]
+SPEC = DRAWINGS_BY_NAME["vn_lever_wire"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
 OUTPUTS = DrawingOutputs(
@@ -100,7 +100,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Lever Wire (WIRE 1) Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "lever wire; drawn steel wire; amplification chain",
+            3: "lever wire; purchased music wire; amplification chain",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

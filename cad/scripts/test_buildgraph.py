@@ -119,13 +119,13 @@ _INSERTED_SOURCES = {
     "ch_pivot_shaft ch_rocker_arm vn_rocker_bank_spring ch_rocker_thrust_washer ch_rod_pivot_pin vn_spring_hook "
     "vn_arbor_set_screw",
     "sm_summing": "vn_boss_hook vn_counter_spring sm_gooseneck sm_gooseneck_spring_screw vn_knife_hanger_stud vn_knife_hanger_washer vn_knife_mount_dowel sm_knife_mount sm_summing_lever",
-    "mg_magnifier": "vn_clamp_screw sh_column_clamp_back sh_column_clamp_front mg_lever_wire "
+    "mg_magnifier": "vn_clamp_screw sh_column_clamp_back sh_column_clamp_front vn_lever_wire "
     "mg_magnifying_bracket vn_magnifying_bracket_screw mg_magnifying_clamp mg_magnifying_lever mg_magnifying_vertical_rod "
     "mg_magnifying_wheel mg_output_fixture vn_thumb_screw mg_wheel_axle mg_wheel_axle_spacer vn_wheel_axle_back_washer "
     "vn_wheel_axle_front_washer vn_wheel_axle_nut mg_wheel_bar mg_wheel_drum",
     "pn_pen": "vn_hanger_screw pn_pen_adjust_screw vn_pen_adjust_nut pn_pen_frame pn_pen_hanger "
     "vn_pen_hanger_jam_nut vn_pen_hanger_nut vn_pen_marker "
-    "pn_pen_rod vn_pen_rod_set_screw vn_pen_set_screw pn_pen_v_block pn_pen_wire",
+    "pn_pen_rod vn_pen_rod_set_screw vn_pen_set_screw pn_pen_v_block vn_pen_wire",
     "pd_paper_drive": "vn_chain_inner_link vn_chain_outer_link vn_clamp_screw "
     "sh_column_clamp_back sh_column_clamp_front vn_fillister_screw pd_guide_lock vn_guide_lock_screw pd_latch_hook "
     "vn_latch_hook_bracket_screw vn_platen_clip_screw "

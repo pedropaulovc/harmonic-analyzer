@@ -29,7 +29,7 @@ from _assembly import (
 # (cad/config/assemblies/mg-magnifier.yaml), the assembly this probe mirrors.
 activate_assembly_contract("mg-magnifier")
 
-from mg_lever_wire_geom import WHEEL_BAR_Y, WHEEL_X  # noqa: E402
+from vn_lever_wire_geom import WHEEL_BAR_Y, WHEEL_X  # noqa: E402
 from mg_wheel_bar_geom import BAR_FRONT_Z  # noqa: E402
 from mg_wheel_group import WHEEL_MID_Z  # noqa: E402
 

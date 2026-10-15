@@ -1,7 +1,7 @@
 r"""Pen carriage layout + balance -- PURE DATA and math, no SolidWorks/COM.
 
 The single place the pen carriage's machine layout is derived, shared by
-``build_pn_pen_assembly`` (component placement), ``pn_pen_wire_geom`` (the wire's
+``build_pn_pen_assembly`` (component placement), ``vn_pen_wire_geom`` (the wire's
 bottom end), the hanger's engagement test and ``test_pn_pen_carriage_geom``.
 
 The carriage hangs from the rod (engineerguy 4/4, 9:15-10:34; design brief
@@ -64,7 +64,7 @@ _C = math.cos(math.radians(PEN_BLOCK_YAW_DEG))
 _S = math.sin(math.radians(PEN_BLOCK_YAW_DEG))
 # Images of the block's local axes (rows convention of place_component). Rows
 # only: the Euler angles are the assembly's business (_transforms is an
-# assembly helper, and pn_pen_wire_geom -- a leaf part's recipe -- imports this).
+# assembly helper, and vn_pen_wire_geom -- a leaf part's recipe -- imports this).
 BLOCK_ROWS = [[_S, 0.0, -_C], [0.0, 1.0, 0.0], [_C, 0.0, _S]]
 BORE_LOCAL = (vb.PIVOT_BORE_X, vb.DEPTH_MID_Z)  # (x, z) of the rod axis
 

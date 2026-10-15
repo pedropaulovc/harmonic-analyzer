@@ -696,7 +696,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "vn_knife_mount_dowel",  # MHA-VN-051 1/8 dowels, two pressed into each knife mount's reamed top-seat holes, slip in the crossbar hole and slot
         "vn_knife_hanger_washer",  # new 18-8 SAE washer (McMaster 96659A104), hex-head bearing on the crossbar spotface; no thread
         "pd_latch_hook",  # MHA-PD-014 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
-        "mg_lever_wire",  # wire, wrapped in the fixture's spigot groove; no thread
+        "vn_lever_wire",  # wire, wrapped in the fixture's spigot groove; no thread
         "mg_magnifying_bracket",  # 1018 steel MHA-MG-003 collar light-press seat with Loctite 638; flange has two counterbored normal #2 clearance holes, no thread
         "mg_magnifying_lever",  # Ø6 domed brass lever; press MHA-MG-001 collar onto its east cylinder while holding the rod near its end, then retain with Loctite 638
         "mg_magnifying_vertical_rod",  # plain Ø5 domed rod
@@ -707,7 +707,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "ms_stop_plate",  # MHA-MS-003 brass cover plate: 2 plain clearance holes for the #2-56 screws; no thread
         "fr_nameplate",  # brass plate, #4 clearance holes only
         "vn_pen_marker",  # purchased Sharpie Fine Point; plain barrel, the thumb-screw tip bears on it (no thread)
-        "pn_pen_wire",  # Ø0.80 wire, tied off (tie-off not modelled)
+        "vn_pen_wire",  # purchased 9666K56 music wire, tied off (tie-off not modelled)
         "dt_pinion_arbor",  # journal + grip head, crossrod bonded, collar spring-pinned
         "dt_pinion_arbor_collar",  # spring-pinned by MHA-VN-033 (arbor-collar-pinned)
         "dt_pinion_bracket",  # straps: plain bores, pinned to MHA-DT-019 by MHA-VN-033
@@ -777,6 +777,8 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_wheel_axle_back_washer": "plain washer loose on the wheel-axle pin; no thread",
     "vn_wheel_axle_front_washer": "plain washer loose on the wheel-axle's threaded end; no thread",
     "vn_pen_marker": "felt-tip marker; its barrel lies in the v-block groove under the thumb screw; no thread",
+    "vn_lever_wire": "music wire hooked in the fixture's spigot groove and wrapped on the drum; no thread",
+    "vn_pen_wire": "music wire seated in the rim groove and tied through the adjuster stud's eye; no thread",
 }
 
 JOINTS: tuple[Joint, ...] = (

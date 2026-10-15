@@ -11,7 +11,7 @@ the run is legible; the isometric matches.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pn_pen_wire.py pn-pen-wire
+    uv run python cad\scripts\draw_vn_pen_wire.py vn-pen-wire
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ from _session import run_build
 import _telemetry
 
 
-SPEC = DRAWINGS_BY_NAME["pn_pen_wire"]
+SPEC = DRAWINGS_BY_NAME["vn_pen_wire"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
 OUTPUTS = DrawingOutputs(

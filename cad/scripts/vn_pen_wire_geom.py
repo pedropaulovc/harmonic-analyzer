@@ -1,21 +1,25 @@
 r"""Pen-wire geometry nominals -- the prose-free import surface for assemblies.
 
 ``build_pn_pen_assembly`` needs the wire's endpoint anchors and run length, but
-importing ``build_pn_pen_wire`` for them folded the whole part build -- including
-``pn_pen_wire_spec``'s DRAWING_NOTES prose -- into the pen assembly recipe (codex
+importing ``build_vn_pen_wire`` for them folded the whole part build -- including
+``vn_pen_wire_spec``'s DRAWING_NOTES prose -- into the pen assembly recipe (codex
 #361): a text-only note edit escalated to a full COM re-insert of the assembly.
-Assemblies import THIS module; ``build_pn_pen_wire`` re-imports the same
+Assemblies import THIS module; ``build_vn_pen_wire`` re-imports the same
 constants so the two can never drift.
 """
 
 from __future__ import annotations
 
+from _mcmaster_9666k56 import DIA_MAX as _STOCK_DIA_MAX, DIA_MIN as _STOCK_DIA_MIN
 from mg_magnifying_wheel_geom import PEN_WIRE_DIA, RIM_WIRE_R
 from mg_wheel_bar_geom import WHEEL_X
 from paper_drive_geom import PEN_ROD_X, PEN_Z_MID
 from pn_pen_carriage_geom import STUD_HEAD_TOP_REST_Y
 
-WIRE_DIA = PEN_WIRE_DIA  # hair-thin in the photos; renderable stand-in (low)
+# Ø0.8 design nominal: inside the purchased 9666K56 0.031 +/-0.001 in band.
+WIRE_DIA = PEN_WIRE_DIA
+if not _STOCK_DIA_MIN <= WIRE_DIA <= _STOCK_DIA_MAX:
+    raise AssertionError("pen wire Ø must lie in the 9666K56 catalogue band")
 
 # --- endpoint anchors (machine frame; asserted by build_pn_pen_assembly) --------
 WHEEL_BAR_Y = 575.7  # wheel axis height = the vertical-tangent point's y

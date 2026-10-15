@@ -10,7 +10,7 @@ import pytest
 
 import build_mg_magnifying_wheel as part
 import draw_mg_magnifying_wheel as drawing
-import mg_lever_wire_geom
+import vn_lever_wire_geom
 import mg_magnifying_wheel_geom as geom
 import mg_magnifying_wheel_spec
 from _drawing_contract import model_toleranced_dimensions
@@ -73,12 +73,12 @@ def test_every_marked_dimension_has_model_places() -> None:
     print_shift = printed_band_mm(places) + abs(
         round(geom.HUB_FRONT_Z, places) - geom.HUB_FRONT_Z
     )
-    route_gaps = mg_lever_wire_geom.run_gaps(
-        mg_lever_wire_geom.WIRE_START, mg_lever_wire_geom.WIRE_END
+    route_gaps = vn_lever_wire_geom.run_gaps(
+        vn_lever_wire_geom.WIRE_START, vn_lever_wire_geom.WIRE_END
     )
     expected_gap = min(route_gaps["rim"], route_gaps["spokes"]) - print_shift
     assert spec.LEVER_WIRE_WEB_GAP == pytest.approx(expected_gap, abs=1e-9)
-    assert spec.LEVER_WIRE_WEB_GAP >= mg_lever_wire_geom.CLEARANCE
+    assert spec.LEVER_WIRE_WEB_GAP >= vn_lever_wire_geom.CLEARANCE
 
 
 def test_tight_bands_sit_on_the_model_dimensions() -> None:

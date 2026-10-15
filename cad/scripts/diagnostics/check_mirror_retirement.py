@@ -228,7 +228,7 @@ expect(
 # the post-rebuild pose diff.
 expect(
     "mg-magnifier",
-    "mg-lever-wire-1",
+    "vn-lever-wire-1",
     list(m.HUB_WIRE_END),
     m._HW_ROWS,
     "lever-wire (accepted 2c delta)",

@@ -69,6 +69,7 @@ recipes:
 | 94025A150 | — (diagnostic recipe; `vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 93600A189 | `vn-transgear-arm-plate-locating-pin` (catalogue-only; no vendor model) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
+| 9666K56 | `vn-lever-wire`, `vn-pen-wire` (cut from one coil; catalogue-only, no vendor model) | Lubricated 1080 Spring Steel Wire, 0.031 in, 1/4 lb coil |
 | 9714K24 | `vn-rocker-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9714K392 | `vn-cylinder-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9715K43 | `vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
@@ -900,6 +901,18 @@ Catalog specifications checked on September 10, 2026:
   committed. Neither nut has a solid used here: `diag_build_90480A009.py`
   and `diag_build_90760A009.py` extrude the hexagon with a plain bore at the
   #8-32 basic major, so both are catalogue-only.
+- [9666K56](https://www.mcmaster.com/9666K56/) supplies both amplification
+  wires, `vn-lever-wire` (MHA-VN-066) and `vn-pen-wire` (MHA-VN-067), each
+  cut overlength from one coil, then formed and trimmed at assembly. Read live
+  on October 14, 2026: lubricated 1080 spring steel music wire, ASTM A228,
+  cold drawn, spring temper, phosphate coated, 261,000 psi tensile, diameter
+  0.031 in with -0.001/+0.001 in tolerance, 110 ft in a 1/4 lb coil;
+  straightness is not rated. The models keep the Ø0.8 design nominal, which
+  lies inside that 0.762-0.813 band (`_mcmaster_9666k56.py`, asserted by
+  `vn_lever_wire_geom.py` and `vn_pen_wire_geom.py`). 8907K32, the same wire
+  in 1 ft straight lengths, was rejected: the lever wire's straight rest run
+  alone is about 353, longer than 304.8. McMaster offers no metric 0.8 music
+  wire. No vendor solid is used; the wire is a plain cylinder.
 - [90114A124](https://www.mcmaster.com/90114A124/)
   (`vn-ms-stop-plate-screw`, MHA-VN-054, two) retains the MHA-MS-003 plate
   on MHA-MS-002. The product table and 2-D PDF were read live on October 9,

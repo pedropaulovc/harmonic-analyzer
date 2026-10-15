@@ -61,7 +61,7 @@ STEMS = (
     "mg-magnifying-vertical-rod",
     "mg-output-fixture",
     "vn-thumb-screw",
-    "mg-lever-wire",
+    "vn-lever-wire",
     "mg-magnifying-wheel",
     "pn-pen-rod",
     "pn-pen-v-block",
@@ -71,7 +71,7 @@ STEMS = (
     "vn-pen-rod-set-screw",
     "pn-pen-adjust-screw",
     "vn-pen-adjust-nut",
-    "pn-pen-wire",
+    "vn-pen-wire",
 )
 PEN_STEMS = (
     "pn-pen-rod",
@@ -82,7 +82,7 @@ PEN_STEMS = (
     "vn-pen-rod-set-screw",
     "pn-pen-adjust-screw",
     "vn-pen-adjust-nut",
-    "pn-pen-wire",
+    "vn-pen-wire",
 )
 REPORT = ROOT / "cad/out/reports/stock-spring-gravity.json"
 
@@ -221,7 +221,7 @@ async def build(adapter):
         flexible_bound = 9.80665 * (
             20 * parts["vn-channel-spring-installed"]["mass_kg"] * channel_radius
             + parts["vn-counter-spring"]["mass_kg"] * counter_radius
-            + parts["mg-lever-wire"]["mass_kg"] * hook_radius
+            + parts["vn-lever-wire"]["mass_kg"] * hook_radius
         )
         arm = -s.COUNTER_REFERENCE_POSE.moment_arm_mm
         reference = s.counter_force_n(s.COUNTER_REFERENCE_POSE.length_mm)
@@ -245,7 +245,7 @@ async def build(adapter):
             "flexible_part_counts": {
                 "vn-channel-spring-installed": 20,
                 "vn-counter-spring": 1,
-                "mg-lever-wire": 1,
+                "vn-lever-wire": 1,
             },
             "pen_mass_kg": pen_mass,
             "pen_gravity_torque_bound_n_mm": pen_torque_bound,

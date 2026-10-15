@@ -1440,7 +1440,7 @@ sections:
       groove-root radius plus wire radius and 0.25 stand-off, preserving
       HOOK_Z −137.95 exactly as the accepted installation datum. Hook X,
       yaw, wire length, drum tangent and yoke offset are derived in
-      cad/scripts/mg_output_fixture_geom.py and mg_lever_wire_geom.py.
+      cad/scripts/mg_output_fixture_geom.py and vn_lever_wire_geom.py.
       The drum end is at z −173.51 (PEN_Z_MID −162.5 − 11.01) in the pressed brass drum's middle.
       The drawing-free route checks clearance behind the rim, spokes and boss.
       The straight rest wire
@@ -1523,11 +1523,12 @@ sections:
       Effective wire-centre ratio 49.2/9.85 = 4.995.
 
       Wires modeled (2026-07-04, re-derived rev 10): the two amplification wires are
-      geometry — straight rest-pose Ø0.8 steel rods (`mg-lever-wire` MHA-MG-009:
+      geometry — straight rest-pose Ø0.8 rods of purchased McMaster 9666K56 0.031 in
+      music wire (`vn-lever-wire` MHA-VN-066:
       fixture's derived spigot-groove front tangent → tangent to the drum at about
       2:25 seen from the front, on the pen side, at the drum mid-plane z −173.51;
       hook z −137.95 is retained by mg_output_fixture_geom.py;
-      `pn-pen-wire` MHA-PN-006: rim groove 3-o'clock tangent at x 3.8 → plumb
+      `vn-pen-wire` MHA-VN-067: rim groove 3-o'clock tangent at x 3.8 → plumb
       down 60.5 to the pen-rod adjuster stud's eye head at y 515.2). The lever-wire ARTICULATES (ball joint at the
       hook + axis-axis stand-off tangency to the drum) and carries the WIRE-1
       yoke coupling to the wheel; wraps/tie-offs and compliance stay unmodeled;
