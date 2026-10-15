@@ -46,6 +46,7 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import (
+    assert_imported_precision,
     offset_dimension_text,
     set_dimension_callouts,
     set_dimension_precision,
@@ -76,6 +77,7 @@ from build_fr_rocker_arm_support import (
     CAV,
     CHAMFER,
     DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
     HALF_Y,
     HOLE_DIA,
     HOLES,
@@ -172,8 +174,8 @@ DIMENSION_PRECISION = {
     # A chamfer never needs extra places (drawing-guidelines.md rule 3): no
     # stack reads RimChamferSize, so 1.27 prints as 1.3 on the .X band.
     "RimChamferSize": 1,
-    # A single limit, R0.8 MAX: no extra places on radii (rule 3).
-    "PocketFloorRadius": 1,
+    # PocketFloorRadius's R0.8 MAX places are the PART's
+    # (build_fr_rocker_arm_support.DRAWING_PRECISION): read back, not set.
     # The seats' REF stations off the end faces, at the seat stack's places
     # (rocker_bracket_seat_layout's 4.95 / 6.56 end walls).
     "SeatEastStation": 2,
@@ -193,6 +195,15 @@ def imported_precision(kept: Any) -> dict[str, int]:
     return {
         name: digits for name, digits in DIMENSION_PRECISION.items() if name in kept
     }
+
+
+def _assert_part_precision(adapter: Any, annotations: list[Any]) -> None:
+    """Read back the places the part build authored (PocketFloorRadius's R0.8
+    MAX, drawing-simplicity-policy.md): the sheet never rewrites them, and an
+    import that lost them fails here instead of printing the sheet default."""
+    assert_imported_precision(
+        adapter, annotations, DRAWING_PRECISION["PocketFloorFillet"]
+    )
 
 
 # The bracket seats print as ONE native Hole Wizard callout (Codex #936,
@@ -729,6 +740,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(
         adapter, dimensions, imported_precision(set(FRONT_KEEP) | set(RIGHT_KEEP))
     )
+    _assert_part_precision(adapter, right_dimensions)
     offset_dimension_text(
         adapter, front_dimensions, {"RimChamferSize": RIM_CHAMFER_TEXT_XY}
     )
