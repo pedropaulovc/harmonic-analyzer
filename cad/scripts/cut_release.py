@@ -522,6 +522,10 @@ def preflight(version: str, allow_dirty: bool) -> None:
             _process_plans.check_plan_revision(stem, CAD_ROOT / "out", revision=version)
         except _process_plans.PlanBindError as exc:
             raise SystemExit(f"!!  traveler plan {stem}: {exc}") from exc
+    try:
+        _process_plans.require_measured_release()
+    except (_process_plans.PlaceholderRelease, _process_plans.PlanBindError) as exc:
+        raise SystemExit(f"!!  {exc}") from exc
     if _git("tag", "--list", version):
         raise SystemExit(f"!!  tag {version} already exists -- pick another version")
 

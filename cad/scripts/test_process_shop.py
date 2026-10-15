@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import re
 import tomllib
 from collections.abc import Iterator
@@ -17,17 +18,42 @@ MODELS = {
     "shop-policy.toml": Policy,
     "cutting-data.toml": CuttingData,
 }
-# Shop-made rocker fixtures may carry the part's name; their TL CAD parts come
-# with the fixtures themselves. Every other part-named table is a plan input.
-SHOP_MADE_ROCKER_IDS = frozenset(
+# Every shop-made inventory record, enumerated: only these may name a part (their
+# TL CAD parts come with the fixtures themselves), and a new shop-made record is
+# a deliberate addition here. Every other part-named table is a plan input.
+SHOP_MADE_IDS = frozenset(
     {
-        "rocker-riser-blocks",
-        "rocker-filing-stand",
-        "rocker-trammel",
-        "rocker-trammel-setting-bar",
+        "fixtures.angle-plate",
+        "fixtures.hub-filing-buttons",
+        "fixtures.rocker-filing-stand",
+        "fixtures.rocker-riser-blocks",
+        "fixtures.strap-shim-stack",
+        "gauges.arm-outline-template",
+        "gauges.rocker-trammel-setting-bar",
+        "tools.ring-laps",
+        "tools.rocker-trammel",
     }
 )
-_PART_ID = re.compile(r"(?:^|[-_])(?:rocker|cone|bracket)(?:[-_]|$)")
+
+
+def _words(text: str) -> str:
+    return " " + " ".join(re.findall(r"[a-z0-9]+", text.lower())) + " "
+
+
+def _part_identities() -> frozenset[str]:
+    """Every registered part's stem (without system prefix) and drawing number."""
+    import _config
+
+    return frozenset(
+        _words(identity)
+        for stem, row in _config.parts().items()
+        for identity in (stem.split("-", 1)[1], str(row["number"]))
+    )
+
+
+def _names_part(item: str, record: dict[str, Any], identities: frozenset[str]) -> bool:
+    text = _words(f"{item} {record.get('name', '')}")
+    return any(identity in text for identity in identities)
 
 
 def _shop(name: str) -> dict[str, Any]:
@@ -90,20 +116,54 @@ def test_every_measured_record_names_who_measured(name):
     assert not missing, missing
 
 
+def test_placeholder_marker_is_the_shared_constant():
+    marker = plans.PLACEHOLDER_BY
+    assert plans.PLACEHOLDER_ISSUE in marker
+    # No variant spelling escapes the count: every #1413 `by` is the constant.
+    variants = {
+        str(measured["by"])
+        for name in MODELS
+        for _, measured in _measurements(_shop(name))
+        if isinstance(measured, dict)
+        and plans.PLACEHOLDER_ISSUE in str(measured.get("by", ""))
+    } - {marker}
+    assert not variants, variants
+    # Binding counts every occurrence: values, prose and comments in the tracked
+    # files, plus solids spliced from TL specs.
+    tracked = sum(
+        (plans.PROCESS_ROOT / "shop" / name).read_text(encoding="utf-8").count(marker)
+        for name in MODELS
+    )
+    spliced = sum(
+        repr(importlib.import_module(module).PRECHIPS_SOLIDS).count(marker)
+        for module in plans.shop_spec_modules()
+    )
+    assert len(plans.shop_placeholders()) == tracked + spliced > 0
+
+
+def _records() -> Iterator[tuple[str, str, dict[str, Any]]]:
+    for category, items in _shop("inventory.toml").items():
+        if isinstance(items, dict):
+            for item, record in items.items():
+                if isinstance(record, dict):
+                    yield f"{category}.{item}", item, record
+
+
+def test_shop_made_records_are_enumerated():
+    made = {qualified for qualified, _, record in _records() if record.get("shop_made")}
+    assert made == SHOP_MADE_IDS
+
+
+def test_part_identities_catch_a_part_named_gauge():
+    gauge = _shop("inventory.toml")["gauges"]["arm-outline-template"]
+    assert _names_part("arm-outline-template", gauge, _part_identities())
+
+
 def test_no_inventory_table_names_a_part():
-    inventory = _shop("inventory.toml")
+    identities = _part_identities()
     named = [
-        f"{category}.{item}"
-        for category, items in inventory.items()
-        if isinstance(items, dict)
-        for item in items
-        if _PART_ID.search(item) and item not in SHOP_MADE_ROCKER_IDS
+        qualified
+        for qualified, item, record in _records()
+        if _names_part(item, record, identities) and qualified not in SHOP_MADE_IDS
     ]
     assert not named, named
-    present = {
-        item
-        for items in inventory.values()
-        if isinstance(items, dict)
-        for item in items
-    }
-    assert SHOP_MADE_ROCKER_IDS <= present

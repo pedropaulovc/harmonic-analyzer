@@ -47,10 +47,22 @@ value merely to make a rule pass. The shop data seeded from the rocker trial
 marks each unmeasured fact as a realistic placeholder,
 `measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", … }`;
 these are test inputs, not shop metrology, and must be remeasured before shop use.
-`cad/scripts/test_process_shop.py` (in `check:recipe`) validates the three files
-under the pinned prechips models and through `bind_shop`, requires a `by` on every
-`measured` record, and rejects part-named inventory tables other than the
-shop-made rocker fixtures.
+Spell the `by` exactly as `_process_plans.PLACEHOLDER_BY`, in the inventory and in
+TL specs' `PRECHIPS_SOLIDS`: it keeps `status = "measured"` so travelers exercise
+every check, and it is the one marker binding counts. Binding counts every bound
+occurrence: `measured.by` values (spliced spec solids included), prose, and the
+comment-declared placeholders that schema-limited facts carry in the tracked
+files; `bind_shop` warns with the count. A traveler built on any placeholder is
+PROVISIONAL: `report.json` carries `ha_provisional = { provisional, placeholders,
+remeasure = "#1413" }`, and every sheet banner of `traveler.html` opens with
+`PROVISIONAL — <n> placeholder values, remeasure: #1413`. Builds and farm runs
+still produce and verify it. Release preflight and traveler staging refuse while
+any placeholder is bound to an enrolled stem, naming every one.
+`cad/scripts/test_process_shop.py` (in `check:recipe`) validates the three
+files under the pinned prechips models and through `bind_shop`, requires a `by`
+on every `measured` record and the shared placeholder spelling, enumerates every
+`shop_made` record, and rejects any other inventory table whose id or name names
+a registered part (stem or drawing number from `cad/config/parts`).
 
 ## Add or migrate a part
 
