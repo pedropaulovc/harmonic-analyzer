@@ -496,21 +496,24 @@ KEEPER_TAP_DRILL_WANDER_DEG = 0.3
 DRILL_DRIFT_PER_MM = tan(radians(KEEPER_TAP_DRILL_WANDER_DEG))  # 0.00524
 
 # The nominal socket geometry stays fixed; the assigned actual tube governs fit.
-# The C2 general break overrides the title block's 0.25 max break on the
-# convex casting edges the model chamfers; hole, bore, counterbore, tap and
-# slot mouths keep the title-block break (the counterbore and tap walls are
-# proved without a chamfer).  The edges too short, too close to a feature or
-# under a knife seat for C2 (build_fr_top_frame._external_edge_breaks) are
-# the "UNLESS NOTED": section E-E's note names the crossbar flange underside,
-# the hub side view's note the hub rib bottoms and V-gussets, the underside
-# locator's the bar and gusset bottoms at the knife seats; they keep the
-# title block break.  drawing-guidelines.md rule 7 (notes: few, flagged, never a method) caps this block at four lines of at most 70
+# User ruling 2026-10-14: the base's 1/16 in x 45 general break (printed at the
+# base rim break's one place, 1.6) overrides the title block's 0.25 max break
+# on the convex casting edges the model chamfers; hole, bore, counterbore, tap
+# and slot mouths keep the title-block break (the counterbore and tap walls are
+# proved without a chamfer).  The edges too close to a feature or under a knife
+# seat for it (build_fr_top_frame._external_edge_breaks) are the "UNLESS
+# NOTED": the hub side view's note names the hub rib's inner bottom and the
+# V-gussets, the underside locator's the bar and gusset bottoms at the knife
+# seats; they keep the title block break.  drawing-guidelines.md rule 7 (notes: few, flagged, never a method) caps this block at four lines of at most 70
 # characters.
+IN = 25.4
+EDGE_CHAMFER = 0.0625 * IN  # 1.5875 legs
 DRAWING_NOTES = (
     "MATCH EACH SOCKET TO ITS ASSIGNED ACTUAL MHA-FR-003 TUBE.\n"
     "CLOSE HAND-SLIP; NO PERCEPTIBLE ROCK.\n"
     "RETAIN CORNER AND ORIENTATION MATCH MARKS.\n"
-    "CONVEX CASTING EDGES C2 X 45 UNLESS NOTED; HOLE EDGES PER TITLE BLOCK."
+    f"CONVEX EDGES {EDGE_CHAMFER:.{DRAWING_REFERENCE_PRECISION['top rim chamfer']}f}"
+    " X 45 DEG UNLESS NOTED; HOLE EDGES PER TITLE BLOCK."
 )
 # User rulings 2026-10-11 and 2026-10-14: the whole top plane between the four
 # corner bosses is faced, so both keeper feet land on one flat right-rail face

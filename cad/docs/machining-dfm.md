@@ -224,7 +224,9 @@ The top-seat support proof charges full washer float over the sourced
 (0.1818–0.1890 in; [thread chart](https://www.engineersedge.com/screw_threads_chart.htm)).
 Washer-to-thread radial float is 0.57404 mm. The frame builder additionally
 charges hanger-pattern mismatch, through-hole drift and washer eccentricity
-against the actual top-face edge. No neck or radial-play inspection is added.
+against the actual top-face edge: each washer bears wholly on the faced top,
+inside the crossbar's 1/16 in × 45° top-rim break (printed 1.6 X 45 DEG),
+charged at its print-worst leg of 2.4 mm. No neck or radial-play inspection is added.
 The revised cut range is 46.55–46.85 mm; independently inspect the finished
 length, threaded tail and thread gauge acceptance rather
 than treating these as new SKU dimensions or vendor tolerances. Useful-tail

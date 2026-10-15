@@ -66,16 +66,17 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   at the bosses, hub rib and crossbar junctions.
 * Finishing (chamfer external, fillet internal): R3 cast fillets along
   the internal web/flange T-roots (both shelves of every rail and the
-  crossbar web, ch19 img04's panel blends), C2 x 45 breaks on the
-  top-face rims -- outer rail rim and both window rims -- then C2 x 45 on
-  every other external convex edge (flange undersides, web bottoms, lands,
-  crossbar, hub rib, boss rims), and C1 x 45 lead-ins on the bore TOP ends
+  crossbar web, ch19 img04's panel blends), 1/16 in x 45 breaks (the
+  base's, printed 1.6; user ruling 2026-10-14) on the top-face rims --
+  outer rail rim and both window rims -- then on every other external
+  convex edge (flange undersides, web bottoms, lands, crossbar, hub rib,
+  boss rims), and C1 x 45 lead-ins on the bore TOP ends
   only. The R22.5 bosses bulge 5.4 beyond the side rails and 3.5 beyond
   the front/rear rails, but do not reach the rectangular flange's plan
   corners (25.56 from their centres), so each corner is cropped back to its
   boss barrel (user ruling 2026-10-14): window corners remain square and
-  the outer rim runs die into the barrels. Edges too short, too close to
-  a feature or under a knife-mount seat for C2 stay sharp (listed in
+  the outer rim runs die into the barrels. Edges too close to a feature
+  or under a knife-mount seat for the printed worst break stay sharp (listed in
   _external_edge_breaks); hole and bore low ends stay sharp.
 
 Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
@@ -90,8 +91,8 @@ crops -> corner bosses (up/down pair) -> hub boss + V-gussets ->
 set-screw boss and spot face -> counterbores -> column bores -> gooseneck
 bore -> wizard holes (#10 loose hanger clearance holes) -> dowel slip holes -> wizard
 holes (side-screw taps, set-screw tap, keeper taps) -> internal T-root
-fillets (R3) -> external top-rim breaks (C2) -> C1 bore top lead-ins ->
-remaining external edge breaks (C2, one feature per connected chain: rail
+fillets (R3) -> external top-rim breaks (1/16 in) -> C1 bore top lead-ins ->
+remaining external edge breaks (1/16 in, one feature per connected chain: rail
 runs, crossbar, west window, hub rail, boss rims).
 Wizard holes come after the face cuts so every seat face is final; the
 edge breaks follow the solid features.
@@ -167,6 +168,7 @@ from fr_top_frame_spec import (
     DRAWING_NOTES_C,
     DRAWING_PRECISION,
     DRAWING_REFERENCE_PRECISION,
+    EDGE_CHAMFER,
     FLANGE_THICKNESS_MM,
     HANGER_CROSSBAR_WIDTH,
     HANGER_CROSSBAR_WIDTH_PLACES,
@@ -460,7 +462,7 @@ LAND_X1 = BAR_X1 + GUSSET + 6.0  # +21.5; front/rear inner faces (6 margin)
 # WEB_T web centred on the knife line, through the underside. Two flanking
 # pockets cut it out of the full-height bar; they stop 6 short of the gusset
 # legs (z +/-75) so the full-depth ends, which carry every hanger hole, keep
-# the whole knife-mount top seat clear of the pocket-end C2 breaks.
+# the whole knife-mount top seat clear of the pocket-end edge breaks.
 BAR_WEB_X0 = HANGER_X - WEB_T / 2.0  # -21.5
 BAR_WEB_X1 = HANGER_X + WEB_T / 2.0  # -8.5
 BAR_POCKET_Z = 69.0  # pocket length 138.0, centred on the crossbar
@@ -530,46 +532,63 @@ THROUGH_CUT_DEPTH = 110.0  # mid-plane total; > boss stack (47.3)
 
 # --- Edge finishing ----------------------------------------------------------
 # Convention (2026-08-03): CHAMFER external edges, FILLET internal wall
-# junctions. User ruling: C2 x 45 on EVERY external convex edge, top and
-# bottom, except where an edge cannot take it (_external_edge_breaks).
+# junctions. User ruling 2026-10-14: the base's 1/16 in x 45 (EDGE_CHAMFER,
+# the spec's) on EVERY external convex edge, top and bottom, except where an
+# edge cannot take it (_external_edge_breaks).
 ROOT_FILLET_R = 3.0  # internal web/flange T-root blends (cast root, ch19 img04)
-EDGE_CHAMFER = 2.0  # external edge breaks, 45 deg (one grinding pass)
-# Least land two separate C2 features may leave between their faces.
-C2_SLIVER_MIN = 0.1
-# Print-worst reach of a finished C2 band into the underside: the edge off
-# its nominal by two .X bands (as the pocket end) and the whole-mm note's
-# leg at the loosest printed row.
+# The sheet prints the leg at the top rim break's one place (1.6, the base's
+# rim break) under that row's band: every guard charges the printed worst leg
+# (2.4), never the model's 1.5875; picks and volumes use the model's.
+_EDGE_BREAK_PLACES = DRAWING_REFERENCE_PRECISION["top rim chamfer"]
+EDGE_BREAK_PRINTED = round(EDGE_CHAMFER, _EDGE_BREAK_PLACES)  # 1.6
+_EDGE_BREAK_LEG_BAND = PRINTED_LINEAR_BAND_MM[_EDGE_BREAK_PLACES]
+EDGE_BREAK_PRINTED_MAX = EDGE_BREAK_PRINTED + _EDGE_BREAK_LEG_BAND  # 2.4
+# Least land two separate edge-break features may leave between their faces.
+EDGE_BREAK_SLIVER_MIN = 0.1
+# Print-worst reach of a finished edge-break band into the underside: the
+# edge off its nominal by two .X bands (as the pocket end) and the printed
+# worst leg.
 _EDGE_LOCATION_BAND = 2.0 * PRINTED_LINEAR_BAND_MM[1]
-_C2_LEG_BAND = PRINTED_LINEAR_BAND_MM[1]
-KNIFE_SEAT_C2_MIN_CLEARANCE = 0.5
+KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE = 0.5
 BORE_CHAMFER = 1.0  # note 9: C1 x 45 TOP-end bore breaks; low ends stay sharp
-# The set boss's spot face keeps a land inside its cast face's C2 breaks at
+# The set boss's spot face keeps a land inside its cast face's edge breaks at
 # the print-worst corner (drawing-guidelines.md rule 17 (walls and webs)): the shallowest spot (its .X station
-# against the cast face) leaves the most of each break's leg, at its loosest
-# row, on the spot's floor; the widest .X spot then stands that far inside
+# against the cast face) leaves the most of each break's printed worst leg on
+# the spot's floor; the widest .X spot then stands that far inside
 # the narrowest .X boss and, up the boss, under the flange underside with the
 # 18.2 tap axis high and the 8.0 flange thick.  The O12 spot's 0.4 breakout
 # (local codex review of 4faacfab) is what this rejects.
-_SET_SPOT_BREAK_REACH = (
-    EDGE_CHAMFER
-    + _C2_LEG_BAND
-    - (HUB_SET_BOSS_FROM_AXIS - HUB_SET_SPOT_FROM_AXIS - PRINTED_LINEAR_BAND_MM[1])
-)  # 2.6
+_SET_SPOT_BREAK_REACH = EDGE_BREAK_PRINTED_MAX - (
+    HUB_SET_BOSS_FROM_AXIS - HUB_SET_SPOT_FROM_AXIS - PRINTED_LINEAR_BAND_MM[1]
+)  # 2.2
 _SET_SPOT_R_MAX = (HUB_SET_SPOT_DIA + PRINTED_LINEAR_BAND_MM[1]) / 2.0  # 5.4
 SET_SPOT_LAND_MIN = {
     "across the boss": (HUB_SET_BOSS_W - PRINTED_LINEAR_BAND_MM[1]) / 2.0
     - _SET_SPOT_BREAK_REACH
-    - _SET_SPOT_R_MAX,  # 0.6
+    - _SET_SPOT_R_MAX,  # 1.0
     "under the flange": (HALF_H - PRINTED_LINEAR_BAND_MM[1])
     - (FLANGE + PRINTED_LINEAR_BAND_MM[1])
     - _SET_SPOT_BREAK_REACH
-    - _SET_SPOT_R_MAX,  # 0.65
+    - _SET_SPOT_R_MAX,  # 1.05
 }
 for _label, _land in SET_SPOT_LAND_MIN.items():
-    if _land < C2_SLIVER_MIN:
+    if _land < EDGE_BREAK_SLIVER_MIN:
         raise AssertionError(
-            f"set-screw spot face breaks into the boss C2 {_label}: land {_land:.3f}"
+            f"set-screw spot face breaks into the boss edge break {_label}: "
+            f"land {_land:.3f}"
         )
+# The crossbar T flange's underside breaks stop short of the R3 web roots:
+# the 3.0 flat outboard of each root less the printed worst leg, on the
+# nominal section like the sliver rule (a native-modelling guard: on a real
+# casting the cast bands only move where the hand break blends).
+CROSSBAR_FLANGE_UNDERSIDE_LAND = (
+    BAR_WEB_X0 - ROOT_FILLET_R - BAR_X0 - EDGE_BREAK_PRINTED_MAX
+)  # 0.6
+if CROSSBAR_FLANGE_UNDERSIDE_LAND < EDGE_BREAK_SLIVER_MIN:
+    raise AssertionError(
+        "crossbar flange underside break runs into the web root: land "
+        f"{CROSSBAR_FLANGE_UNDERSIDE_LAND:.3f}"
+    )
 
 if abs(FRONT_COLUMN_Z + REAR_COLUMN_Z) > 1e-12 or abs(FRAME_CENTER_Z) > 1e-12:
     raise AssertionError("top-frame assumes a symmetric column span about z 0")
@@ -692,15 +711,12 @@ HANGER_WASHER_OFFSET_MAX = (
 )
 _HANGER_WASHER_REACH = HANGER_WASHER.OD_MAX / 2.0 + HANGER_WASHER_OFFSET_MAX
 # Each washer bears wholly on the faced top, inside the crossbar's top-rim
-# C2 at its widest printed leg: conservatively the plain bar's narrowest
+# break at its printed worst leg: conservatively the plain bar's narrowest
 # printed half width, ignoring the gusset spread at both stations.
 HANGER_WASHER_BAR_TOP_MARGIN = (
     HANGER_BAR_HALF_WIDTH_MIN
     - HANGER_CROSSBAR_CENTER_TOL
-    - (
-        round(EDGE_CHAMFER, DRAWING_REFERENCE_PRECISION["top rim chamfer"])
-        + PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["top rim chamfer"]]
-    )
+    - EDGE_BREAK_PRINTED_MAX
     - _HANGER_WASHER_REACH
 )
 _HANGER_WASHER_Z_REACH = PRINTED_LINEAR_BAND_MM[1] + _HANGER_WASHER_REACH
@@ -766,7 +782,7 @@ for _label, _value in BAR_POCKET_HOLE_WALLS.items():
 # axis and half the dowel slip; the block's +X face 5.65 (.XX) off its round
 # hole, its widest .X width, the worse .X row-to-face reach either side; the
 # whole turned through the title-block angle about the round dowel.
-# _external_edge_breaks keeps every finished C2 band 0.5 off both hulls.
+# _external_edge_breaks keeps every finished edge-break band 0.5 off both hulls.
 # The front hull overhangs the crossbar's sharp sides short of the gusset
 # legs (the 25.4-wide block on the 25-wide bar); that overhang is not a break.
 def _convex_hull(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
@@ -835,7 +851,7 @@ if HUB_GUSSET_T / 2.0 > WEB_T / 2.0:
     raise AssertionError("hub V-gussets escape the east-rail web")
 # The hub boss's chord at each rib side face stays inside the east-rail web,
 # so each rib-side bottom and its web bottom meet at one clean vertex that a
-# single C2 feature blends, with no boss-top sliver between their ends (at
+# single edge-break feature blends, with no boss-top sliver between their ends (at
 # 27 wide the boss poked 0.038 past the web there).  NOMINAL, on purpose:
 # this is a native-modelling guard on the CAD's topology, not a fit -- on a
 # real casting the printed bands only move where the hand-broken edges blend.
@@ -1044,7 +1060,7 @@ KEEPER_MAX_FOOT_WIDTH = (
 # The whole keeper-rail top between the bosses is faced (user ruling
 # 2026-10-11), so the ACTUAL foot, anywhere its printed fit-up band puts it,
 # must stand on that flat face: clear of the bosses (above) and of the
-# maximum printed C2 top-rim leg on either side of the rail.
+# printed worst top-rim break leg on either side of the rail.
 KEEPER_FOOT_PRINTED_FLAT_TOP_SIDE_MARGIN = (
     (
         round(RAIL_W_SIDE, DRAWING_REFERENCE_PRECISION["side flange width"])
@@ -1056,10 +1072,7 @@ KEEPER_FOOT_PRINTED_FLAT_TOP_SIDE_MARGIN = (
         + KEEPER_FITUP_LOCATION_BAND_MM
     )
     - KEEPER_MAX_FOOT_WIDTH / 2.0
-    - (
-        round(EDGE_CHAMFER, DRAWING_REFERENCE_PRECISION["top rim chamfer"])
-        + PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["top rim chamfer"]]
-    )
+    - EDGE_BREAK_PRINTED_MAX
 )
 if KEEPER_FOOT_PRINTED_FLAT_TOP_SIDE_MARGIN <= 0.0:
     raise AssertionError("keeper foot leaves the flat keeper-rail top")
@@ -1420,15 +1433,15 @@ def _fillet_section_area(r: float) -> float:
 
 
 def _top_rim_removal() -> tuple[float, float]:
-    """Exact (outer, window) C2 x 45 removals for the smaller-boss topology.
+    """Exact (outer, window) EDGE_CHAMFER x 45 removals for the smaller-boss topology.
 
     R22.5 < hypot(17.1, 19) = 25.56: neither window corner nor outer rail
     corner reaches a boss, and the flange corner crops leave no flange
     outside the barrels, so each outer face runs barrel to barrel: four
     runs, each the boss-centre to boss-centre strip less the half of each
     barrel's chamfer cap on its side. The window rims are uninterrupted up
-    to their square corners. Even their 2 mm expanded chamfer corners miss
-    the boss: hypot(15.1, 17) > R22.5. Outer strip areas exclude the proud
+    to their square corners. Even their 1.5875 expanded chamfer corners miss
+    the boss: hypot(15.5125, 17.4125) = 23.32 > R22.5. Outer strip areas exclude the proud
     cylinders analytically; the windows' 90/135-degree mitres are included.
     """
     radius = BOSS_DIA / 2.0
@@ -1501,12 +1514,12 @@ def _bore_chamfer_removal() -> float:
 
 
 def _casting_occupies(x: float, y: float, z: float) -> bool:
-    """Whether the solid casting, as the C2 breaks find it, holds (x, y, z).
+    """Whether the solid casting, as the edge breaks find it, holds (x, y, z).
 
     The rail T-ring with its flange corners cropped to the barrels, hub rib
     with its set-screw boss (spot face out), junction lands, crossbar with
     its gussets and T pockets, corner bosses and hub boss -- exact around
-    every C2 pick (bores, holes, V-gussets and the earlier top breaks lie
+    every edge-break pick (bores, holes, V-gussets and the earlier top breaks lie
     clear of them).
     """
     ax, az = abs(x), abs(z)
@@ -1653,45 +1666,48 @@ def _segment_gap(
 def _external_edge_breaks() -> tuple[
     dict[str, tuple[list[list[float]], float, int]], dict[str, float]
 ]:
-    """The C2 external edge breaks as one chamfer feature per edge group, in
-    build order (feature name -> picks, analytic removal, shared vertices),
-    and each knife seat's least clearance to them.
+    """The external edge breaks (EDGE_CHAMFER x 45) as one chamfer feature per
+    edge group, in build order (feature name -> picks, analytic removal,
+    shared vertices), and each knife seat's least clearance to them.
 
     Every external convex edge the top-rim and bore-top breaks left, once
-    the T-section crossbar exists: the flange undersides (outer and window;
-    the corner crops leave no outer-corner runs or vertical corners, every
-    outer run dying into a boss barrel at both ends), the web bottoms, the
-    junction lands' free edges, the crossbar web bottoms, pocket-end bottoms
-    and outer corners, the hub rib's free corners and side bottoms, and the
-    corner/hub boss rims.
+    the T-section crossbar exists: the flange undersides (outer, window and
+    the crossbar T's; the corner crops leave no outer-corner runs or vertical
+    corners, every outer run dying into a boss barrel at both ends), the web
+    bottoms, the junction lands' free edges, the crossbar web bottoms,
+    pocket-end bottoms and outer corners, the rear full-depth bar-side
+    bottoms, the hub rib's free corners, side bottoms and outer bottoms
+    either side of the set-screw boss, the boss's edges, and the corner/hub
+    boss rims.
     Straight edges remove ``c^2 sin(angle) / 2`` per mm over their run to the
-    face that ends them; outer rims remove ``pi c^2 (R - c/3)``. Corner
-    patches and the ends dying into boss barrels are left to the tolerance.
+    face that ends them; outer rims remove ``pi c^2 (R - c/3)`` (c the
+    model's EDGE_CHAMFER). Corner patches and the ends dying into boss
+    barrels are left to the tolerance.
 
     Groups are the connected chains of breaks, long simple runs first and
     the boss rims last, so a native failure names its
     chain and each chain's volume is proved on its own. Breaks that share a
     vertex must sit in one group (SolidWorks blends that corner only within
-    a feature); any other two breaks keep ``2c + C2_SLIVER_MIN`` apart, or
-    the module fails to import. ``shared`` counts the pairs of a group's
-    breaks that meet at a vertex.
+    a feature); any other two breaks keep ``2 EDGE_BREAK_PRINTED_MAX +
+    EDGE_BREAK_SLIVER_MIN`` apart and every straight break runs longer than
+    ``2 EDGE_BREAK_PRINTED_MAX``, or the module fails to import. ``shared``
+    counts the pairs of a group's breaks that meet at a vertex.
 
     Every pick must be the convex edge it claims: its solid angle, measured
     on ``_casting_occupies``, is below 180 degrees and equals the angle its
     removal uses, or the module fails to import. Every break reaching the
     underside keeps its print-worst band (``_EDGE_LOCATION_BAND`` off the
-    edge, ``EDGE_CHAMFER + _C2_LEG_BAND`` into the face) at least
-    ``KNIFE_SEAT_C2_MIN_CLEARANCE`` off both print-worst knife-seat hulls;
-    the returned dict is each seat's least clearance.
+    edge, ``EDGE_BREAK_PRINTED_MAX`` into the face) at least
+    ``KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE`` off both print-worst knife-seat
+    hulls; the returned dict is each seat's least clearance.
 
-    Not broken C2: the crossbar flange's underside edges (only a 1.5 flat
-    beside the R3 web root), the crossbar's full-depth side bottoms from
-    each pocket end to its gusset leg and the gusset hypotenuse bottoms
-    (both knife-mount seats sit over them at the printed bands), the hub
-    rib's outer and inner bottom edges (2.1 to the Ø30 hub boss, so C2
-    leaves a 0.1 land), the tapered hub V-gusset edges (they feather into
-    the underside), and every hole, bore, counterbore, spot-face, tap and
-    slot edge. The vertical junctions of the bar sides with
+    Not broken, each at the printed worst leg: the crossbar's front
+    full-depth side bottoms from the pocket end to the gusset leg and all
+    four gusset hypotenuse bottoms (a knife-mount seat sits over each: 0.0
+    clearance), the hub rib's inner bottom edge (2.1 to the Ø30 hub boss
+    barrel, so a 2.4 leg runs 0.3 into it), the tapered hub V-gusset edges
+    (they feather into the underside), and every hole, bore, counterbore,
+    spot-face, tap and slot edge. The vertical junctions of the bar sides with
     the gusset hypotenuses are re-entrant (225 degrees), not edges to break.
     """
     c = EDGE_CHAMFER
@@ -1718,13 +1734,13 @@ def _external_edge_breaks() -> tuple[
     underside_bands: list[
         tuple[tuple[float, float, float], list[tuple[float, float]]]
     ] = []
-    band_in = _EDGE_LOCATION_BAND + c + _C2_LEG_BAND
+    band_in = _EDGE_LOCATION_BAND + EDGE_BREAK_PRINTED_MAX
 
     def convex(point: tuple[float, float, float], axis, angle: float) -> None:
         measured = _interior_angle(point, axis)
         if measured >= 180.0 or abs(measured - angle) > 5.0:
             raise AssertionError(
-                f"C{c:g} pick at {point} claims a convex {angle:g}-degree edge;"
+                f"edge-break pick at {point} claims a convex {angle:g}-degree edge;"
                 f" the casting holds {measured:g} degrees round it"
             )
 
@@ -1734,9 +1750,10 @@ def _external_edge_breaks() -> tuple[
         angle: float,
         axis: tuple[float, float, float],
     ) -> None:
-        if length <= 2.0 * c:
+        if length <= 2.0 * EDGE_BREAK_PRINTED_MAX:
             raise AssertionError(
-                f"edge at {point} is too short for C{c:g}: {length:.3f}"
+                f"edge at {point} is too short for a {EDGE_BREAK_PRINTED_MAX:g}"
+                f" printed worst edge break at both ends: {length:.3f}"
             )
         convex(point, axis, angle)
         picks, volume, _ = groups[group]
@@ -1814,11 +1831,17 @@ def _external_edge_breaks() -> tuple[
     for sz in (-1.0, 1.0):
         along_x(sz * WEB_OUT_Z, y_bottom, -(COLUMN_X - web_cut), COLUMN_X - web_cut)
     start("CrossbarBreaks")
-    # Crossbar: web bottoms; per pocket end its bottom and its outer vertical
-    # corner. Beyond the pocket ends the knife-mount seats sit over the bar
-    # sides and gusset hypotenuses, whose bottoms stay sharp.
+    # Crossbar: web bottoms; the T flange's underside edges, 3.0 wide
+    # outboard of the R3 web roots (CROSSBAR_FLANGE_UNDERSIDE_LAND); per
+    # pocket end its bottom and its outer vertical corner; the rear
+    # full-depth side bottoms from the pocket ends to the gusset legs.  The
+    # knife-mount seats sit over the front side bottoms and every gusset
+    # hypotenuse, whose bottoms stay sharp.
     for x_web in (BAR_WEB_X0, BAR_WEB_X1):
         along_z(x_web, y_bottom, -BAR_POCKET_Z, BAR_POCKET_Z)
+    for x_bar in (BAR_X0, BAR_X1):
+        along_z(x_bar, y_under, -BAR_POCKET_Z, BAR_POCKET_Z)
+        along_z(x_bar, y_bottom, BAR_POCKET_Z, INNER_Z - GUSSET)
     for sz in (-1.0, 1.0):
         along_x(sz * BAR_POCKET_Z, y_bottom, BAR_X0, BAR_WEB_X0)
         along_x(sz * BAR_POCKET_Z, y_bottom, BAR_WEB_X1, BAR_X1)
@@ -1842,8 +1865,9 @@ def _external_edge_breaks() -> tuple[
     # undersides split by the hub rib, the rib's four free vertical
     # corners, its side bottoms out to the web faces (each meeting its web
     # bottom at one vertex: the boss chord stays inside the web), the east
-    # web bottoms, and the east window's front/rear runs, land edges and
-    # window web bottoms as on the west.
+    # web bottoms, the east window's front/rear runs, land edges and
+    # window web bottoms as on the west, and the set-screw boss proud of the
+    # rib's outer face.
     along_z(-OUTER_X, y_under, -(z_col - side_cut), rib_lo)
     along_z(-OUTER_X, y_under, rib_hi, z_col - side_cut)
     along_z(-INNER_X, y_under, -INNER_Z, rib_lo)
@@ -1862,13 +1886,14 @@ def _external_edge_breaks() -> tuple[
         along_z(LAND_X0, y_bottom, sz * INNER_Z, sz * WEB_IN_Z)
         along_x(sz * INNER_Z, y_bottom, LAND_X0, BAR_X0 - GUSSET)
         along_x(sz * WEB_IN_Z, y_bottom, -(COLUMN_X - web_cut), LAND_X0)
-    start("HubSetBossBreaks")
-    # The set-screw boss proud of the rib's outer face: the four edges of its
-    # cast face and its four runs back to the rib, meeting at the face's
-    # corners. The breaks leave the O10 spot face a 2.0 land across the
-    # boss and 3.25 under the flange (SET_SPOT_LAND_MIN: print-worst).
+    # The set-screw boss: the rib's outer bottom either side of it, which
+    # joins the boss's breaks to the rib's, the four edges of its cast face
+    # and its four runs back to the rib, meeting at the face's corners. The
+    # breaks leave the Ø10 spot face SET_SPOT_LAND_MIN (print-worst).
     boss_lo = GOOSENECK_Z - HUB_SET_BOSS_W / 2.0
     boss_hi = GOOSENECK_Z + HUB_SET_BOSS_W / 2.0
+    along_z(-OUTER_X, y_bottom, rib_lo, boss_lo)
+    along_z(-OUTER_X, y_bottom, boss_hi, rib_hi)
     for z_side in (boss_lo, boss_hi):
         along_y(SET_BOSS_FACE_X, z_side, y_bottom, y_under)
     for y_side in (y_bottom, y_under):
@@ -1895,26 +1920,27 @@ def _external_edge_breaks() -> tuple[
                 rim((sx * COLUMN_X, y_rim, z_world), r_boss, sx)
     rim((GOOSENECK_X, -(HALF_H + HUB_BOSS_DROP), GOOSENECK_Z), r_hub, -1.0)
     # Any two breaks either share a vertex -- then one feature must cut both,
-    # so SolidWorks blends that corner -- or stay 2c + C2_SLIVER_MIN apart, so
-    # no two C2 faces leave a sliver between them. Each group's shared
-    # vertices size its volume tolerance.
-    reach = 2.0 * c + C2_SLIVER_MIN
+    # so SolidWorks blends that corner -- or stay 2 EDGE_BREAK_PRINTED_MAX +
+    # EDGE_BREAK_SLIVER_MIN apart, so no two breaks at their printed worst
+    # legs leave a sliver between them. Each group's shared vertices size
+    # its volume tolerance.
+    reach = 2.0 * EDGE_BREAK_PRINTED_MAX + EDGE_BREAK_SLIVER_MIN
     for i, (group_a, p0, p1) in enumerate(segments):
         for group_b, q0, q1 in segments[i + 1 :]:
             gap = _segment_gap(p0, p1, q0, q1)
             if gap < 1e-9:
                 if group_a != group_b:
                     raise AssertionError(
-                        f"C{c:g} breaks in {group_a} and {group_b} meet at a vertex"
+                        f"edge breaks in {group_a} and {group_b} meet at a vertex"
                         f" near {p0}..{p1}; one feature must cut both"
                     )
                 picks, volume, shared = groups[group_a]
                 groups[group_a] = (picks, volume, shared + 1)
-            elif gap < reach:
+            elif gap < reach - 1e-9:
                 raise AssertionError(
-                    f"C{c:g} breaks {p0}..{p1} ({group_a}) and {q0}..{q1}"
-                    f" ({group_b}) stop {gap:.3f} mm apart; C{c:g} faces"
-                    f" would leave a sliver under {C2_SLIVER_MIN:g}"
+                    f"edge breaks {p0}..{p1} ({group_a}) and {q0}..{q1}"
+                    f" ({group_b}) stop {gap:.3f} mm apart; their printed worst"
+                    f" faces would leave a sliver under {EDGE_BREAK_SLIVER_MIN:g}"
                 )
         for centre, radius in rims:
             gap = min(
@@ -1925,28 +1951,28 @@ def _external_edge_breaks() -> tuple[
                 for k in range(201)
                 for p in [tuple(p0[j] + (p1[j] - p0[j]) * k / 200.0 for j in range(3))]
             )
-            if gap < reach:
+            if gap < reach - 1e-9:
                 raise AssertionError(
-                    f"C{c:g} break {p0}..{p1} comes {gap:.3f} mm from a boss rim"
+                    f"edge break {p0}..{p1} comes {gap:.3f} mm from a boss rim"
                 )
     # Neither knife-mount seat may sit on, or within the clearance of, a
-    # finished C2 band.
+    # finished edge-break band.
     seat_clearance = {}
     for mount, footprint in KNIFE_SEAT_FOOTPRINTS.items():
         gap, nearest = min(
             (_plan_gap(band, footprint), where) for where, band in underside_bands
         )
-        if gap < KNIFE_SEAT_C2_MIN_CLEARANCE:
+        if gap < KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE:
             raise AssertionError(
-                f"C{c:g} break at {nearest} comes within {gap:.3f} mm of the "
+                f"edge break at {nearest} comes within {gap:.3f} mm of the "
                 f"print-worst {mount} knife-mount seat (needs "
-                f"{KNIFE_SEAT_C2_MIN_CLEARANCE:g})"
+                f"{KNIFE_SEAT_EDGE_BREAK_MIN_CLEARANCE:g})"
             )
         seat_clearance[mount] = gap
     return groups, seat_clearance
 
 
-EXTERNAL_EDGE_BREAKS, KNIFE_SEAT_C2_CLEARANCE = _external_edge_breaks()
+EXTERNAL_EDGE_BREAKS, KNIFE_SEAT_EDGE_BREAK_CLEARANCE = _external_edge_breaks()
 
 
 def _open_underside_sketch(
@@ -2028,9 +2054,9 @@ def _model_to_sketch(adapter, sketch):
 
 # The finished solid's outermost point along each plan diagonal is its corner
 # boss barrel; a flange corner left outside the barrel reached 345.1 less its
-# C2 vertical break. IBody2::GetExtremePoint returns the solid's furthest point.
+# vertical edge break. IBody2::GetExtremePoint returns the solid's furthest point.
 CORNER_BOSS_SUPPORT = COLUMN_X + abs(FRONT_COLUMN_Z) + _BOSS_R * math.sqrt(2.0)
-CORNER_SUPPORT_TOL_MM = 1e-3  # far inside the nib's 2.28 mm excess
+CORNER_SUPPORT_TOL_MM = 1e-3  # far inside the nib's 2.69 mm excess
 
 
 def _corner_support_problems(
@@ -2928,7 +2954,7 @@ async def build(adapter) -> dict[str, str]:
     #      -- a wizard drill point would leave a cone where the reamer
     #      finishes), cut HangerPinHoleDepth up from the crossbar underside,
     #      HANGER_PIN_X +X of each screw axis. The rear circle owns the marked
-    #      HangerPinHoleDia: section F-F cuts the rear station.
+    #      HangerPinHoleDia, which the underside locator view dimensions.
     pins = SketchDims()
     pin_centres = [(PIN_HOLE_X, -HALF_H, z) for z in (STUD_Z_FRONT, STUD_Z_REAR)]
     sketch_centres, u_is_x, normal_out = _open_underside_sketch(adapter, pin_centres)
@@ -3197,7 +3223,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "T-root fillets", volume + v_root, 0.03 * v_root + 80.0
     )
 
-    # 17. External top-face rim breaks: C2 x 45 on the outer rail rim and
+    # 17. External top-face rim breaks: EDGE_CHAMFER x 45 on the outer rail rim and
     #     both windows' rims. The Ø45 bosses no longer reach the rail plan
     #     corners: window rims meet at real square corners, and the corner
     #     crops leave each outer face one run from barrel to barrel.
@@ -3256,7 +3282,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "bore top breaks", volume - v_breaks, 0.02 * v_breaks + 10.0
     )
 
-    # 18b. C2 x 45 on every remaining external convex edge (62 edges and 9
+    # 18b. EDGE_CHAMFER x 45 on every remaining external convex edge (68 edges and 9
     #      boss rims), one chamfer feature per connected chain so a native
     #      failure names its chain and each chain's volume is proved on its
     #      own (see _external_edge_breaks for the chains and the edges left
@@ -3297,19 +3323,23 @@ async def build(adapter) -> dict[str, str]:
         "CapRecessDepth",
         *deviations(CAP_RECESS_DEPTH_BAND),
     )
+    # The slip hole's and the slot's bands are equal either side, so each
+    # prints +/- on one row (ASME Y14.5 equal-bilateral form): the same limits
+    # as a stacked +0.03/-0.03, in callout blocks short enough for sheet 6's
+    # band over the plan.
+    pin_lower, pin_upper = deviations(HANGER_PIN_HOLE_DIA_BAND)
+    if pin_lower != -pin_upper:
+        raise AssertionError("fr_top_frame_spec.HANGER_PIN_HOLE_DIA_BAND must be symmetric")
     for pin_dia_name in ("HangerPinHoleDia", "HangerPinHole1Dia"):
-        set_dimension_bilateral_tolerance(
-            adapter,
-            "HangerPinProfile",
-            pin_dia_name,
-            *deviations(HANGER_PIN_HOLE_DIA_BAND),
+        set_dimension_symmetric_tolerance(
+            adapter, "HangerPinProfile", pin_dia_name, pin_upper
         )
+    slot_lower, slot_upper = deviations(HANGER_SLOT_WIDTH_BAND)
+    if slot_lower != -slot_upper:
+        raise AssertionError("fr_top_frame_spec.HANGER_SLOT_WIDTH_BAND must be symmetric")
     for slot_width_name in ("HangerSlotWidth", "HangerSlot1Width"):
-        set_dimension_bilateral_tolerance(
-            adapter,
-            "HangerSlotProfile",
-            slot_width_name,
-            *deviations(HANGER_SLOT_WIDTH_BAND),
+        set_dimension_symmetric_tolerance(
+            adapter, "HangerSlotProfile", slot_width_name, slot_upper
         )
     # The finished grip's band lives on the model's own driving dimension.
     set_dimension_symmetric_tolerance(adapter, "Crossbar", "HangerGrip", HANGER_GRIP_TOL)
