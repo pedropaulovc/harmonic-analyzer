@@ -934,13 +934,18 @@ GEOMETRY_TOP_KEEP = {
     "WinDepth": (0.059, GEOMETRY_TOP_CENTER[1] - 0.012),
     "GussetRunE": (GEOMETRY_TOP_CENTER[0], 0.2205),
 }
-# The front view carries no dimension: the finished top-to-underside
-# thickness is the model's toleranced HangerGrip, imported once in section
-# F-F, so no looser rail height competes with it.
+# The front view's one dimension is the rail's web depth: the web ring's own
+# driving extrude depth, imported from the model.  It is the same finished
+# top-to-underside thickness F-F prints as the toleranced HangerGrip, so it
+# prints as a reference with no band of its own (_reference_model_rail_height)
+# and never competes with the grip.  Right of the view as on main (r6 run
+# 20261014T055244900Z), its callout clear of E-E's left edge (285.4).
+GEOMETRY_FRONT_KEEP = {"RingHeight": (0.238, 0.091)}
 GEOMETRY_CALLOUTS = {
     "Width": "RAIL FLANGE EXTENT",
     "Depth": "RAIL FLANGE EXTENT",
     "GussetRunE": "4X 45 DEG GUSSET",
+    "RingHeight": "RAIL HEIGHT",
 }
 # Two plan widths are shorter on paper than their text (at 1:3 the 25.0
 # crossbar flange is 8.33 mm, the 18.0 gusset run 6.0), so text centred on
@@ -1278,6 +1283,39 @@ def _require_model_hanger_grip(adapter: Any, dimensions: list[Any]) -> Any:
     ):
         raise RuntimeError("F-F grip lost the model's symmetric band")
     return grips[0]
+
+
+def _reference_model_rail_height(adapter: Any, dimensions: list[Any]) -> Any:
+    """The geometry front view's imported RingHeight, marked a reference.
+
+    The model owns the dimension -- the web ring's driving extrude depth,
+    the same finished thickness as F-F's HangerGrip -- and authors no band
+    on it, so the sheet parenthesizes it and adds none.  A lost association,
+    a drifted value or a band of its own raises before the mark goes on.
+    """
+    rails = [
+        annotation for annotation in dimensions
+        if dimension_name(adapter, annotation) == "RingHeight"
+    ]
+    if len(rails) != 1:
+        raise RuntimeError(
+            f"geometry front imported {len(rails)} RingHeight dimensions, not 1"
+        )
+    display = _early_bound(rails[0].GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    owner = str(dimension.FullName).split("@")[:2]
+    if owner != ["RingHeight", "WebRing"]:
+        raise RuntimeError(
+            f"rail height is {dimension.FullName!r}, not the model's RingHeight"
+        )
+    value_mm = float(dimension.SystemValue) * 1000.0
+    if abs(value_mm - RING_HEIGHT) > 1e-5:
+        raise RuntimeError(f"rail height reads {value_mm:.6f} mm, not {RING_HEIGHT}")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(tolerance.Type) != 0:  # swTolType_e.swTolNONE
+        raise RuntimeError("rail height carries a band that competes with the grip's")
+    set_reference_dimension(adapter, rails[0], label="rail height")
+    return rails[0]
 
 
 def _crossbar_median_datum(adapter: Any, view: Any, width: Any) -> None:
@@ -2577,10 +2615,20 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="geometry top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    geometry_annotations = [*geometry_top_dimensions]
-    geometry_callouts = {name: "" for name in GEOMETRY_TOP_KEEP}
+    geometry_front_dimensions = curate_view_dimensions(
+        adapter,
+        geometry_front,
+        keep=GEOMETRY_FRONT_KEEP,
+        view_label="geometry front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    geometry_annotations = [*geometry_top_dimensions, *geometry_front_dimensions]
+    geometry_callouts = {
+        name: "" for name in (*GEOMETRY_TOP_KEEP, *GEOMETRY_FRONT_KEEP)
+    }
     geometry_callouts.update(GEOMETRY_CALLOUTS)
     set_dimension_callouts(adapter, geometry_annotations, geometry_callouts)
+    _reference_model_rail_height(adapter, geometry_front_dimensions)
     offset_dimension_text(
         adapter, geometry_top_dimensions, {"GussetRunE": GUSSET_RUN_TEXT_OFFSET_XY}
     )

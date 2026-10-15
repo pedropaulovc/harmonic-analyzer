@@ -307,6 +307,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "WebInnerWidth",
         "WebInnerDepth",
     },
+    # The rail height is the same finished thickness as the grip: the web
+    # ring's own depth, printed in the geometry front view as a reference.
+    "WebRing": {"RingHeight"},
     "Crossbar": {"HangerGrip"},
     "BossUpProfile": {"C0Dia"},
     "BossesUpper": {"BossTopExtent"},
@@ -359,10 +362,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # More places appear only where a fit lives there -- the cap recess diameter
 # and depth carry the bilateral bands above, the gooseneck bore prints the
 # clearance a purchased post is set into, the finished grip sets the hanger
-# bolt's thread engagement, and the dowel slip hole and slot width are reamed
-# to their own +/-0.03 band at three places.
+# bolt's thread engagement (the rail height, that same thickness, prints its
+# reference at the grip's places), and the dowel slip hole and slot width are
+# reamed to their own +/-0.03 band at three places.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OuterProfile": {"Width": 1, "Depth": 1, "WinWidth": 1, "WinDepth": 1},
+    "WebRing": {"RingHeight": HANGER_GRIP_PLACES},
     "Crossbar": {"HangerGrip": HANGER_GRIP_PLACES},
     "BossUpProfile": {"C0Dia": 1},
     "BoreProfile": {"B0Dia": 1},

@@ -1095,6 +1095,7 @@ def test_every_imported_drawing_dimension_has_part_authored_places() -> None:
     # sheet has nowhere left to say otherwise.
     kept = set().union(
         drawing.GEOMETRY_TOP_KEEP,
+        drawing.GEOMETRY_FRONT_KEEP,
         drawing.DETAIL_TOP_KEEP,
         drawing.DETAIL_FRONT_KEEP,
         drawing.DETAIL_SECTION_KEEP,
@@ -2729,8 +2730,10 @@ def test_finished_grip_is_the_crossbars_own_driving_depth() -> None:
     # The model owns the grip, its places and its band; the sheet imports it.
     assert spec.DRAWING_DIMENSIONS["Crossbar"] == {"HangerGrip"}
     assert spec.DRAWING_PRECISION_BY_NAME["HangerGrip"] == spec.HANGER_GRIP_PLACES
-    assert "RingHeight" not in spec.DRAWING_PRECISION_BY_NAME
-    assert not any("RingHeight" in names for names in spec.DRAWING_DIMENSIONS.values())
+    # The rail height is that same thickness, the web ring's own driving
+    # depth, marked at the grip's places for its reference in the front view.
+    assert spec.DRAWING_DIMENSIONS["WebRing"] == {"RingHeight"}
+    assert spec.DRAWING_PRECISION_BY_NAME["RingHeight"] == spec.HANGER_GRIP_PLACES
     # The hidden reference sketch and its depth equation are gone, not aliased.
     for name in ("HANGER_GRIP_SKETCH", "REFERENCE_SKETCHES"):
         assert not hasattr(spec, name)
@@ -2840,6 +2843,126 @@ def test_section_reads_the_model_grip_back_without_writing_it(monkeypatch) -> No
     ):
         with pytest.raises(RuntimeError, match=match):
             drawing._require_model_hanger_grip(None, dimensions)
+
+
+def test_geometry_front_prints_the_models_rail_height_as_a_reference() -> None:
+    """fd0350a85 dropped the geometry front view's only dimension, leaving
+    the rail web's depth undefined on sheet 2.  It is back as the model's own
+    RingHeight -- the web ring's driving extrude depth, the same finished
+    thickness F-F tolerances as the grip -- printed as a reference at the
+    grip's places, so no second band competes with 36.50 +/-0.05."""
+    import ast
+
+    from _drawing_dimension_import import _features_owning
+
+    assert drawing.GEOMETRY_FRONT_KEEP == {"RingHeight": (0.238, 0.091)}
+    assert drawing.GEOMETRY_CALLOUTS["RingHeight"] == "RAIL HEIGHT"
+    assert _features_owning(
+        spec.DRAWING_DIMENSIONS, drawing.GEOMETRY_FRONT_KEEP, view_label="geometry front"
+    ) == ("WebRing",)
+    assert spec.DRAWING_DIMENSIONS["WebRing"] == {"RingHeight"}
+    assert spec.DRAWING_PRECISION_BY_NAME["RingHeight"] == spec.HANGER_GRIP_PLACES == 2
+    assert part.RING_HEIGHT == spec.HANGER_GRIP == 36.5
+    # The model drives the depth and authors no band on it: no tolerance call
+    # in the build names the web ring or its dimension.
+    build = Path(part.__file__).read_text(encoding="utf-8")
+    for node in ast.walk(ast.parse(build)):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        called = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
+        if "tolerance" in called.lower():
+            literals = {arg.value for arg in node.args if isinstance(arg, ast.Constant)}
+            assert not literals & {"WebRing", "RingHeight"}, called
+    compact = "".join(build.split())
+    assert compact.count('ring_height_dim=name_dimensions(adapter,"WebRing",["RingHeight"])') == 1
+    assert compact.count("drive_jobs.append((ring_height_dim[0],'\"RingHeight\"'))") == 1
+    # The sheet imports it once, callouts it, marks it after the callout and
+    # reads its places back with every other import.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build("):]
+    steps = [
+        "keep=GEOMETRY_FRONT_KEEP,",
+        "geometry_annotations = [*geometry_top_dimensions, *geometry_front_dimensions]",
+        "set_dimension_callouts(adapter, geometry_annotations, geometry_callouts)",
+        "_reference_model_rail_height(adapter, geometry_front_dimensions)",
+        "imported_annotations = [*geometry_annotations]",
+    ]
+    assert all(body.count(step) == 1 for step in steps)
+    assert [body.index(step) for step in steps] == sorted(
+        body.index(step) for step in steps
+    )
+    # Never a free-text thickness: no string the print's modules author
+    # spells it, so the only 36.50s on paper are the model's dimensions.
+    for module in (spec, drawing):
+        tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+        assert not [
+            node.value for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and "36.5" in node.value
+        ], module.__name__
+
+
+def _imported_rail(**overrides):
+    fields = {
+        "full_name": "RingHeight@WebRing@fr-top-frame.Part",
+        "mm": 36.50, "kind": 0, "band_mm": 0.0, "name": "RingHeight",
+    }
+    fields.update(overrides)
+    return _imported_grip(**fields)
+
+
+def test_front_view_reads_the_model_rail_height_before_marking_it(monkeypatch) -> None:
+    marked = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    monkeypatch.setattr(
+        drawing, "set_reference_dimension",
+        lambda _adapter, annotation, *, label: marked.append((annotation, label)),
+    )
+    other = _imported_rail(name="Width", full_name="Width@OuterProfile@fr-top-frame.Part")
+    rail = _imported_rail()
+    assert drawing._reference_model_rail_height(None, [other, rail]) is rail
+    assert marked == [(rail, "rail height")]
+    marked.clear()
+    for dimensions, match in (
+        ([other], "imported 0 RingHeight"),
+        ([rail, _imported_rail()], "imported 2 RingHeight"),
+        ([_imported_rail(full_name="RingHeight@Drawing View4@x")], "not the model's"),
+        ([_imported_rail(full_name="HangerGrip@Crossbar@x")], "not the model's"),
+        ([_imported_rail(mm=36.45)], "reads"),
+        ([_imported_rail(kind=4, band_mm=0.05)], "competes"),
+    ):
+        with pytest.raises(RuntimeError, match=match):
+            drawing._reference_model_rail_height(None, dimensions)
+    assert not marked
+
+
+# Sheet 2's Section E-E outline starts at x 285.4 mm (c674 run
+# 20261015T003137335Z layout audit).
+_EE_OUTLINE_XMIN = 0.2854
+
+
+def test_rail_height_stands_between_its_arrows_right_of_the_front_view() -> None:
+    """The value row prints on its text point and RAIL HEIGHT one row pitch
+    under it (r6 run 20261014T055244900Z), both between the rail's top and
+    bottom, right of the corner-boss barrel, clear of E-E and the frame."""
+    ink = drawing.INK_CLEARANCE
+    s = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
+    x, y = drawing.GEOMETRY_FRONT_KEEP["RingHeight"]
+    rows = ("(36.50)", drawing.GEOMETRY_CALLOUTS["RingHeight"])
+    half_w = max(map(len, rows)) * _ROW_CHAR / 2.0
+    block = (x - half_w, y - _ROW_PITCH, x + half_w, y + _ROW_PITCH - _ROW_SLACK)
+    rail_bottom = _FRONT_VIEW_TOP_Y - part.RING_HEIGHT * s
+    assert block[1] > rail_bottom
+    assert _FRONT_VIEW_TOP_Y - block[3] >= ink
+    barrel_right = drawing.GEOMETRY_FRONT_CENTER[0] + drawing.PLAN_HALF_X * s
+    assert block[0] - barrel_right >= ink
+    assert _EE_OUTLINE_XMIN - block[2] >= ink
+    frame = drawing.SHEET_FRAME
+    assert frame[0] + ink <= block[0] and block[2] <= frame[2] - ink
+    assert _box_box_gap(block, TITLE_BLOCK) >= ink
 
 
 def test_section_imports_the_grip_and_depth_and_the_locator_the_slip_hole() -> None:
