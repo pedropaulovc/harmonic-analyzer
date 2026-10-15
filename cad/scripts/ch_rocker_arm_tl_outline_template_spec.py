@@ -61,8 +61,11 @@ if (
     )
 
 # Shop acceptance (inventory gauges.arm-outline-template, Pedro 2026-10-11):
-# within +/-0.03 of nominal about the pivot. On the sheet it is the band on
-# both apex heights, measured from the pin gauge in the hole.
+# DTI stations within +/-0.03 of nominal about the pivot. On the sheet it is
+# the band on both apex heights, measured from the pin gauge in the hole, and
+# on both radii: their centre sits on the pivot centreline, so each radius
+# band is the zone between two arcs +/-0.03 about the nominal one, at every
+# station.
 APEX_BAND = (0.03, -0.03)
 APEX_PLACES = 2
 for _low, _high, _nominal in (
@@ -209,6 +212,8 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     )
 # Bands other than the title block's, keyed (feature, dimension).
 DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
+    ("OutlineProfile", "TopRadius"): APEX_BAND,
+    ("OutlineProfile", "BottomRadius"): APEX_BAND,
     ("ApexReference", "TopAbovePivot"): APEX_BAND,
     ("ApexReference", "BottomBelowPivot"): APEX_BAND,
     ("PivotHoleProfile", "PivotDia"): PIVOT_HOLE_BAND,

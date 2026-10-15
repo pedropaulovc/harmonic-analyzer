@@ -151,7 +151,10 @@ requirement(
             "pivot_hole",
             (("draw_ch_rocker_arm_tl_outline_template", "build"),),
         ),
-        "radius": (limits(part_spec.R_TOP, _PRECISION["TopRadius"]), ("R_TOP",)),
+        "radius": (
+            limits(part_spec.R_TOP, _PRECISION["TopRadius"], part_spec.APEX_BAND),
+            ("R_TOP", "APEX_BAND"),
+        ),
         "radius_nominal": (part_spec.R_TOP, ("R_TOP",)),
         "arc_centre": ([0.0, part_spec.CENTER_Y, 0.0], ("CENTER_Y",)),
         "station": (
@@ -199,8 +202,8 @@ requirement(
             (("draw_ch_rocker_arm_tl_outline_template", "build"),),
         ),
         "radius": (
-            limits(part_spec.R_BOTTOM, _PRECISION["BottomRadius"]),
-            ("R_BOTTOM",),
+            limits(part_spec.R_BOTTOM, _PRECISION["BottomRadius"], part_spec.APEX_BAND),
+            ("R_BOTTOM", "APEX_BAND"),
         ),
         "radius_nominal": (part_spec.R_BOTTOM, ("R_BOTTOM",)),
         "arc_centre": ([0.0, part_spec.CENTER_Y, 0.0], ("CENTER_Y",)),

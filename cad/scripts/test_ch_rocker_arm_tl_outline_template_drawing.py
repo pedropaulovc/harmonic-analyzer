@@ -151,6 +151,34 @@ def test_inventory_record_binds_this_part_without_hand_solids() -> None:
     assert "solids" not in records[0]
 
 
+def test_sheet_prints_the_inventory_profile_acceptance_on_both_arcs() -> None:
+    """inventory accepts the template on profile, DTI stations within the
+    acceptance about the pivot: the sheet holds both apex heights and both
+    radii (arc centre on the pivot centreline) to that same band."""
+    inventory = tomllib.loads(
+        (CAD_ROOT / "process" / "shop" / "inventory.toml").read_text(encoding="utf-8")
+    )
+    note = inventory["gauges"]["arm-outline-template"]["note"]
+    match = re.search(
+        r"DTI within \+/-(\d+\.\d+) of nominal about the pivot at (\d+) stations", note
+    )
+    assert match, note
+    acceptance = float(match.group(1))
+    assert spec.APEX_BAND == (acceptance, -acceptance)
+    features = _features()
+    for feature, field, nominal in (
+        ("top_edge", "height_above_pivot", spec.TOP_ABOVE_PIVOT),
+        ("top_edge", "radius", spec.R_TOP),
+        ("bottom_edge", "depth", spec.BOTTOM_BELOW_PIVOT),
+        ("bottom_edge", "radius", spec.R_BOTTOM),
+    ):
+        assert features[feature][field] == pytest.approx(
+            [nominal - acceptance, nominal + acceptance], abs=1e-9
+        ), (feature, field)
+    for name in ("TopRadius", "BottomRadius"):
+        assert spec.DRAWING_BANDS[("OutlineProfile", name)] == spec.APEX_BAND
+
+
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:
     checked = 0
     for name, feature in _features().items():
