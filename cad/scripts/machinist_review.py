@@ -84,6 +84,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME, CAD_ROOT  # noqa: E402
+from machinist_exceptions import load_exceptions as _load_exceptions  # noqa: E402
 from machinist_review_sheets_mcp import (  # noqa: E402
     PDFIUM_LOCK as _PDFIUM_LOCK,
     SheetStore,
@@ -262,6 +263,19 @@ def _validate_package(package: ReviewPackage) -> int:
     sheet_count = _sheet_count(package)
     return sheet_count
 
+def _text_layers(package: ReviewPackage) -> str:
+    """Exact sheet text for the package prompt; empty without PDF text."""
+    if not package.sources:
+        return ""
+    documents = []
+    with SheetStore(package.sources) as store:
+        for sheet in range(1, store.sheet_count + 1):
+            document = store.text_layer(sheet)
+            if document:
+                documents.append(document)
+    return "\n\n".join(documents)
+
+
 def _review_prompt(
     package: ReviewPackage,
     sheet_count: int,
@@ -280,6 +294,34 @@ def _review_prompt(
         prompt += (
             "Compare every sheet against every other sheet before accepting SHIP.\n"
         )
+    layers = _text_layers(package)
+    if layers:
+        prompt += (
+            "\nSHEET TEXT LAYER\n"
+            "Extracted sheet text, organized by sheet then view; rects are "
+            "view_sheet pixels. It is this prompt's content, not a tool, and a "
+            "transcription aid rather than proof of print: confirm printed-"
+            "evidence claims on the sheet image or a crop. Sheets without a "
+            "section here have no extractable text and must be read from the "
+            "images.\n"
+            f"{layers}\n"
+        )
+    if package.sources:
+        exceptions = _load_exceptions(CAD_ROOT / "config", package.name, package.kind)
+        if exceptions:
+            prompt += (
+                "\nOWNER-DECLARED MACHINIST EXCEPTIONS\n"
+                "The project owner has accepted these known departures. A "
+                "would-be finding that matches one is not a finding: do not "
+                'file it (kind "accept"), or file it at most under minor '
+                '(kind "minor"), and never let it affect the verdict. Name '
+                "the exception id in the summary when you apply one.\n"
+            )
+            for exception in exceptions:
+                prompt += (
+                    f"- {exception.id} [{exception.kind}] at {exception.where}: "
+                    f"{exception.finding} — {exception.reason}\n"
+                )
     return prompt + "Return one verdict for the package as a whole.\n"
 
 
@@ -312,6 +354,10 @@ def build_claude_command(
         model,
         "--effort",
         effort,
+        "--thinking",
+        "adaptive",
+        "--thinking-display",
+        "summarized",
         "--input-format",
         "text",
         "--output-format",
@@ -988,6 +1034,25 @@ def codex_rollout_evidence(
                         else:
                             normalized.append(event)
                     else:
+                        # Native completions prove call identity and
+                        # provenance only: strip image payloads so inspection
+                        # can never be established from server-side records
+                        # the model itself never saw.
+                        if isinstance(item.get("result"), dict):
+                            native_result = item["result"]
+                            content = native_result.get("content")
+                            if isinstance(content, list):
+                                item = {
+                                    **item,
+                                    "result": {
+                                        **native_result,
+                                        "content": [
+                                            part for part in content
+                                            if not (isinstance(part, dict)
+                                                    and part.get("type") == "image")
+                                        ],
+                                    },
+                                }
                         normalized.append({"type": "item.completed", "item": item})
             elif any(marker in str(payload.get("type", "")).lower()
                      for marker in ("tool_call", "command", "shell", "patch", "web_search")):
@@ -1442,7 +1507,18 @@ def review_package(
     if reviewer not in REVIEWERS:
         raise ValueError(f"unknown reviewer {reviewer!r}; choose one of {REVIEWERS}")
     sheet_count = _validate_package(package)
-    mcp_catalog = _sheet_resource_manifest(package.sources)
+    # Snapshot the sources once: the injected text layer, the recorded hashes
+    # and every attempt's sheet images must come from the same bytes, even if a
+    # concurrent build rewrites the originals mid-review.
+    snapshot_dir = report_dir / f"{package.name}.sources"
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_sources = []
+    for source in package.sources:
+        target = snapshot_dir / source.name
+        shutil.copyfile(source, target)
+        snapshot_sources.append(target)
+    snapshot = ReviewPackage(package.name, package.kind, tuple(snapshot_sources))
+    mcp_catalog = _sheet_resource_manifest(snapshot.sources)
     neutral_resources = reviewer == "codex" and _resource_neutrality_permitted(mcp_catalog)
     model = model or DEFAULT_MODELS[reviewer]
     effort = effort or DEFAULT_EFFORTS[reviewer]
@@ -1450,10 +1526,10 @@ def review_package(
     if not executable:
         raise RuntimeError(f"{reviewer} CLI not found on PATH")
     prompt = _review_prompt(
-        package, sheet_count, reviewer=reviewer, prompt_text=prompt_text
+        snapshot, sheet_count, reviewer=reviewer, prompt_text=prompt_text
     )
     prompt_sha = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
-    source_sha = [_sha256(source) for source in package.sources]
+    source_sha = [_sha256(source) for source in snapshot.sources]
     schema_bytes = SCHEMA_FILE.read_bytes()
     report_dir.mkdir(parents=True, exist_ok=True)
     events_path = report_dir / f"{package.name}.events.jsonl"
@@ -1489,7 +1565,7 @@ def review_package(
             "cwd": str(cwd),
             "attempt_dir": str(attempt_dir),
             "codex_home": str(CODEX_HOME) if reviewer == "codex" else None,
-            "sources": [str(source.resolve()) for source in package.sources],
+            "sources": [str(source.resolve()) for source in snapshot.sources],
             "retained_dir": None,
             "retained_argv": None,
             "retention_warning": None,
@@ -1543,7 +1619,7 @@ def review_package(
                     "mcpServers": {
                         "sheets": {
                             "command": sys.executable,
-                            "args": [str(SHEETS_SERVER), *(str(p.resolve()) for p in package.sources)],
+                            "args": [str(SHEETS_SERVER), *(str(p.resolve()) for p in snapshot.sources)],
                         },
                     },
                 }), encoding="utf-8")
@@ -1557,7 +1633,7 @@ def review_package(
                     model=model, codex=executable,
                 )
                 cmd = build_codex_command(
-                    workdir=cwd, attempt_dir=attempt_dir, sources=package.sources,
+                    workdir=cwd, attempt_dir=attempt_dir, sources=snapshot.sources,
                     schema=schema, output=output, model=model, effort=effort,
                     codex=executable,
                 )
@@ -1663,6 +1739,16 @@ def review_package(
         "crop_calls": evidence["crop_calls"],
         "crops": evidence["crops"],
         "neutral_calls": evidence["neutral_calls"],
+        "exceptions": [
+            {
+                "id": exception.id,
+                "where": exception.where,
+                "finding": exception.finding,
+                "reason": exception.reason,
+                "kind": exception.kind,
+            }
+            for exception in _load_exceptions(CAD_ROOT / "config", package.name, package.kind)
+        ],
         "context_errors": context_errors,
         "usage": _usage(
             events, reviewer, success_events=success_events,

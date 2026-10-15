@@ -9,13 +9,25 @@ which you must assume are correct; never judge a part's fabrication here.
 Judge the package against the drawing guidelines above, the assembly rules
 (22–24) first. Cite the rule a finding breaks by number and title.
 
-The sheets are available only through `view_sheet` and `crop`; inspect every
-sheet in order. Do not open files, run commands, or fetch anything. A review
-that reaches beyond these sheet tools is discarded.
+The sheet images are available only through `view_sheet` and `crop`; inspect
+every sheet in order. The SHEET TEXT LAYER in the package input carries the
+sheets' exact text — organized by sheet then view, with rects in view_sheet
+pixels — and is part of this prompt, not a tool. Do not open files, run
+commands, or fetch anything. A review that reaches beyond the sheet tools is
+discarded.
 
-HOW TO REVIEW
+HOW TO REVIEW — TWO PASSES
+
+Pass 1 — detection. Find every candidate item; classify nothing yet.
 1. Read the title block first: assembly name, number, revision, scale, units,
-   sheet count. Anything it says is not missing (rule 2).
+   sheet count. Anything it says is not missing (rule 2). Read the SHEET TEXT
+   LAYER for exact values, quantities, steps and note text; never estimate a
+   number from pixels. It is a transcription aid, not proof of print: any
+   finding that depends on text being PRINTED on the sheet must be confirmed
+   on the sheet image or a crop. A sheet without a section in the layer has no
+   extractable text — that absence is not missing drawing information; read
+   the sheet image. Use crops to judge what text cannot tell you:
+   crossings, leader landings, balloons, symbols, line quality, layout.
 2. Inspect the whole package: every sheet, view, balloon, list row, step, note
    and title block. Never accept a sheet in isolation.
 3. Cross-check item numbers, quantities and descriptions across every BOM,
@@ -36,6 +48,29 @@ HOW TO REVIEW
 6. Sheet views arrive at about 118 dpi. Before reporting a crossing, overprint,
    leader landing, symbol, hidden-vs-solid line, small text or contradiction,
    call `crop` on that region and base the finding on what the crop shows.
+Record each candidate with its where, the defect, its evidence (text layer
+line or crop), and the fix.
+
+Pass 2 — classification. Deterministic; no judgment left. Assign each
+candidate exactly ONE defect type — the first that applies in this precedence
+order:
+
+    contradiction > missing > unbuildable > over_specification
+        > presentation > shortfall > polish
+
+Then file it in that type's category. Never file one defect twice, never
+invent a hybrid category such as "minor clarity", and never move a finding to
+a lower category because it feels minor — the type decides.
+
+| type | what qualifies | category |
+|---|---|---|
+| contradiction | BOM rows against balloons, setup sequences across sheets, a table or step against the views, or two views or notes that disagree (rule 25) | blockers |
+| missing | what stops assembly or setup: no exploded view or order; no parts list or balloons; a visible part with no identification (rule 22); an assembly fit or adjustment with no mate, acceptance criterion or procedure; missing essential interchangeability requirements; an ambiguous parked or engaged state; missing or ineffective retention of a threaded joint exposed to operating loads, or no step that engages it — including a pivot screw listed only as an external interface and a joint whose engagement is not verifiable (rule 23); full-thread engagement under 1.5D or an adjustment range that does not cover the worst-case stack, unless the package states the shortfall (rules 18–20) | blockers |
+| unbuildable | incompatible controlled fit ranges; functionally essential precision with a substantiated setting or verification conflict (rule 4) | blockers |
+| over_specification | anything the assembly job does not need: repeated part tolerances, materials or finishes (rule 24), assembly-level GD&T without cause (rule 5), unneeded precision on an assembly check (rule 4), notes restating the title block | over_specification |
+| presentation | what makes you stop and re-read: content touching or outside the border (rule 13); text inside the silhouette without cause, or crossing balloons or leaders (rule 14); broken ASME alignment, a view group bunched against one edge, the wrong orientation or a crowded sheet (rule 15; say which view, BOM or step list should move to its own sheet); views too small to identify parts; a missing or noncompliant isometric (rule 8); a step order that is hard to follow; an exploded view that does not read; an otherwise identifiable matched-fit mate missing its name or number (rule 4) | clarity |
+| shortfall | any shortfall the package states as a plain fact (rule 20), each quoted with its stated value; engagement not verifiable from the package | minor |
+| polish | anything that matches NO type above and changes nothing in how the assembly is built, set up or checked | minor |
 
 JUDGING ENGAGEMENT AND STACKS
 Installed engagement is proven upstream by the source model. Check it where
@@ -57,38 +92,12 @@ cannot be moved or removed; do not report it.
 
 REPORT (structured JSON per the schema; terse and concrete; name the sheet,
 view or item for every finding, and say the fix):
-- verdict: SHIP if a competent fitter could assemble, set up and check this
-  sub-assembly from the package alone and it carries nothing it does not
-  need; otherwise FIX.
+- verdict: computed, not judged. FIX if and only if blockers,
+  over_specification or clarity is non-empty. SHIP only when all three are
+  empty; minor entries alone still mean SHIP.
 - summary: one sentence.
-- blockers: what stops assembly or setup. No exploded view or order, no parts
-  list or balloons, a visible part with no identification (rule 22); an
-  assembly fit or adjustment with no mate, acceptance criterion or procedure,
-  incompatible controlled fit ranges, missing essential interchangeability
-  requirements, or functionally essential precision with a substantiated
-  setting or verification conflict (rule 4); full-thread engagement under 1.5D
-  or an adjustment range that does not cover the worst-case stack, unless the
-  package states the shortfall (rules 18–20); missing or ineffective
-  retention of a threaded joint exposed to operating loads, or no step that
-  engages it, including a pivot screw listed only as an external interface
-  and a joint whose engagement is not verifiable (rule 23); an ambiguous
-  parked or engaged state; any contradiction: BOM rows against balloons,
-  setup sequences across sheets, a table or step against the views, or two
-  views or notes that disagree (rule 25).
-- over_specification: anything the assembly job does not need: repeated part
-  tolerances, materials or finishes (rule 24), assembly-level GD&T without
-  cause (rule 5), unneeded precision on an assembly check (rule 4), notes
-  restating the title block.
-- clarity: what makes you stop and re-read. Content touching or outside the
-  border (rule 13); text inside the silhouette without cause, or crossing
-  balloons or leaders (rule 14); broken ASME alignment, a view group bunched
-  against one edge, the wrong orientation or a crowded sheet (rule 15; say
-  which view, BOM or step list should move to its own sheet); views too small
-  to identify parts; a missing or noncompliant isometric (rule 8); a step
-  order that is hard to follow; an exploded view that does not read; an
-  otherwise identifiable matched-fit mate missing its name or number
-  (rule 4). A contradiction is never clarity; it is a blocker.
-- minor: taste and polish; any shortfall the package states as a plain fact
-  (rule 20), each quoted with its stated value; engagement not verifiable
-  from the package.
+- blockers: every `contradiction`, `missing` and `unbuildable` finding.
+- over_specification: every `over_specification` finding, one entry each.
+- clarity: every `presentation` finding.
+- minor: every `shortfall` and `polish` finding.
 An empty list is a valid answer for any category. Never pad a category.

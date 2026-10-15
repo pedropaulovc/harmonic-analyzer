@@ -14,8 +14,10 @@ from __future__ import annotations
 import io
 import math
 import os
+import re
 import sys
 import threading
+from ctypes import byref, c_long
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
@@ -31,6 +33,43 @@ PDFIUM_LOCK = threading.RLock()
 VIEW_BOX = (1976, 1280)
 MAX_SCALE = 8
 CROP_BUDGET = 40
+
+# --- text layer (exact sheet strings, organized by view) --------------------
+VIEW_LABEL_RE = re.compile(
+    r"^(?:FRONT|TOP|RIGHT|LEFT|BOTTOM|SIDE|ISOMETRIC(?:\s+VIEW)?|"
+    r"DETAIL\s+[A-Z0-9]+|SECTION\s+[A-Z0-9]+(?:\s*[-–]\s*[A-Z0-9]+)?)"
+    r"(?:\s+SCALE)?(?:\s*[:：]?\s*\d+\s*[:：]\s*\d+)?\s*$",
+    re.IGNORECASE,
+)
+NOTES_RE = re.compile(r"^(NOTES?|NOTE)\b", re.IGNORECASE)
+WATERMARK_RE = re.compile(r"Maker Product|Personal Use Only", re.IGNORECASE)
+TITLE_KEYS = (
+    "UNLESS OTHERWISE SPECIFIED",
+    "DIMENSIONS ARE IN MILLIMETERS",
+    "THIRD ANGLE",
+    "MATERIAL",
+    "FINISH",
+    "WEIGHT",
+    "SCALE",
+    "DRAWN",
+    "CHECKED",
+    "APPROVED",
+    "SHEET",
+    "DO NOT SCALE",
+    "TOLERANCES",
+    "REV",
+    "SIZE",
+    "INTERPRET PER",
+    "DIMENSIONING PER",
+    "DRILLED HOLES",
+    "EDGE BREAK",
+    "SURFACE",
+    "DWG",
+    "BUILD",
+    "UNIT",
+)
+OP_ONLY = re.compile(r"^[+\-±ØR⌀()]$")
+NUM = re.compile(r"[\d.]")
 
 
 def _view_geometry(
@@ -221,6 +260,366 @@ class _Sheet:
     view_size: tuple[int, int]
 
 
+def _span_height(span: dict[str, Any]) -> float:
+    return max(span["y2"] - span["y1"], 1.0)
+
+
+ZONE_FURNITURE_RE = re.compile(r"^[A-Z0-9]$")
+WATERMARK_FRAGMENT_RE = re.compile(r"maker|personal|solidworks|(?:^|\s)ake$", re.IGNORECASE)
+# PDF text rendering modes that produce no ink (3 = invisible, 7 = clip only).
+INVISIBLE_RENDER_MODES = (3, 7)
+
+
+def _char_visibility(textpage: Any) -> list[tuple[tuple[float, float, float, float], bool]]:
+    """Per-character (page-space box, is_printing) flags, keyed by render mode."""
+    import pypdfium2.raw as raw
+
+    flags: list[tuple[tuple[float, float, float, float], bool]] = []
+    for index in range(textpage.count_chars()):
+        box = textpage.get_charbox(index)
+        if box is None:
+            continue
+        obj = textpage.get_textobj(index)
+        printing = (
+            obj is not None
+            and raw.FPDFTextObj_GetTextRenderMode(obj.raw) not in INVISIBLE_RENDER_MODES
+        )
+        left, bottom, right, top = box
+        flags.append(
+            (
+                (min(left, right), min(bottom, top), max(left, right), max(bottom, top)),
+                printing,
+            )
+        )
+    return flags
+
+
+def _text_spans(
+    page: Any, view_size: tuple[int, int]
+) -> list[dict[str, Any]]:
+    """Extract page text as spans in view_sheet pixels.
+
+    Rectangles are transformed through PDFium's own page-to-device mapping, so
+    text positions match the rendered view under page rotation and nonzero
+    crop-box origins exactly as view_sheet/crop draw them. Non-rendering text
+    (render mode 3 or 7) is excluded: it is not printed evidence. Border
+    furniture is dropped narrowly — zone labels and the licence watermark
+    only — so annotation text near an edge is preserved for rule 13 findings.
+    """
+    import pypdfium2.raw as raw
+
+    spans: list[dict[str, Any]] = []
+
+    def to_device(x: float, y: float) -> tuple[int, int]:
+        out_x, out_y = c_long(), c_long()
+        raw.FPDF_PageToDevice(
+            page.raw, 0, 0, view_size[0], view_size[1], 0, x, y,
+            byref(out_x), byref(out_y),
+        )
+        return out_x.value, out_y.value
+
+    textpage = page.get_textpage()
+    try:
+        visibility = _char_visibility(textpage)
+        textpage.count_rects()  # required before get_rect (pypdfium2 contract)
+        for index in range(textpage.count_rects()):
+            left, bottom, right, top = textpage.get_rect(index)
+            text = re.sub(
+                r"\s+", " ", (textpage.get_text_bounded(left, bottom, right, top) or "").strip()
+            )
+            if not text:
+                continue
+            in_span = [
+                printing
+                for box, printing in visibility
+                if (box[0] + box[2]) / 2 >= left
+                and (box[0] + box[2]) / 2 <= right
+                and (box[1] + box[3]) / 2 >= bottom
+                and (box[1] + box[3]) / 2 <= top
+            ]
+            if in_span and not any(in_span):
+                continue
+            corners = [
+                to_device(x, y)
+                for x, y in ((left, bottom), (right, bottom), (left, top), (right, top))
+            ]
+            x1 = min(p[0] for p in corners)
+            y1 = min(p[1] for p in corners)
+            x2 = max(p[0] for p in corners)
+            y2 = max(p[1] for p in corners)
+            if WATERMARK_RE.search(text) or WATERMARK_FRAGMENT_RE.search(text):
+                continue
+            if ZONE_FURNITURE_RE.match(text):
+                continue
+            spans.append({"x1": float(x1), "y1": float(y1), "x2": float(x2), "y2": float(y2), "text": text})
+    finally:
+        textpage.close()
+    return spans
+
+
+def _fold_operators(spans: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Fold operator-only spans (+, -, ±, Ø, parens) into their numeric neighbor."""
+    spans = list(spans)
+    changed = True
+    while changed:
+        changed = False
+        for index, span in enumerate(spans):
+            if not OP_ONLY.match(span["text"]):
+                continue
+            height = _span_height(span)
+            best: tuple[float, int] | None = None
+            for other_index, other in enumerate(spans):
+                if other_index == index or not NUM.search(other["text"]):
+                    continue
+                other_height = _span_height(other)
+                gap = max(
+                    0.0, max(span["x1"] - other["x2"], other["x1"] - span["x2"])
+                )
+                dy = abs(
+                    (span["y1"] + span["y2"]) / 2 - (other["y1"] + other["y2"]) / 2
+                )
+                if (
+                    dy > 0.4 * height
+                    or not (0.5 * height <= other_height <= 2 * height)
+                    or gap > 1.5 * height
+                ):
+                    continue
+                if best is None or gap < best[0]:
+                    best = (gap, other_index)
+            if best is not None:
+                other = spans[best[1]]
+                text = (
+                    span["text"] + other["text"]
+                    if span["x2"] <= other["x1"] + 2
+                    else other["text"] + span["text"]
+                )
+                merged = {
+                    "x1": min(span["x1"], other["x1"]),
+                    "y1": min(span["y1"], other["y1"]),
+                    "x2": max(span["x2"], other["x2"]),
+                    "y2": max(span["y2"], other["y2"]),
+                    "text": text,
+                }
+                spans = [
+                    value
+                    for i, value in enumerate(spans)
+                    if i not in (index, best[1])
+                ] + [merged]
+                changed = True
+                break
+    return spans
+
+
+STACK_LIMIT_RE = re.compile(r"^[+±\-]?\d[\d.]*$")
+
+
+def _stack_pairs(spans: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Join a positively identified tolerance stack as 'upper/lower'.
+
+    Only two spans ever join: the upper token carries an explicit +/± limit
+    sign, or the lower token is negative, and both are plain limit values of
+    similar size. Ordinary aligned rows (table cells, note lines, adjacent
+    dimensions) are never synthesized into a single value, and a joined pair
+    absorbs nothing further.
+    """
+    ordered = [dict(s) for s in sorted(spans, key=lambda s: (s["y1"], s["x1"]))]
+    merged: list[dict[str, Any]] = []
+    joined: set[int] = set()
+    for span in ordered:
+        target = None
+        for candidate in merged:
+            if id(candidate) in joined:
+                continue
+            if not (
+                STACK_LIMIT_RE.match(span["text"])
+                and STACK_LIMIT_RE.match(candidate["text"])
+            ):
+                continue
+            upper, lower = (
+                (candidate, span) if candidate["y1"] <= span["y1"] else (span, candidate)
+            )
+            if not (
+                upper["text"].startswith(("+", "±"))
+                or lower["text"].startswith("-")
+            ):
+                continue
+            heights = (_span_height(span), _span_height(candidate))
+            if max(heights) > 2 * min(heights):
+                continue
+            xoverlap = min(span["x2"], candidate["x2"]) - max(
+                span["x1"], candidate["x1"]
+            )
+            dy = max(0.0, span["y1"] - candidate["y2"], candidate["y1"] - span["y2"])
+            if (
+                xoverlap > 0.5 * min(span["x2"] - span["x1"], candidate["x2"] - candidate["x1"])
+                and dy <= 0.8 * min(heights)
+            ):
+                target = candidate
+                break
+        if target is not None:
+            top, bottom = (target, span) if target["y1"] <= span["y1"] else (span, target)
+            target["text"] = top["text"] + "/" + bottom["text"]
+            target["x1"] = min(target["x1"], span["x1"])
+            target["y1"] = min(target["y1"], span["y1"])
+            target["x2"] = max(target["x2"], span["x2"])
+            target["y2"] = max(target["y2"], span["y2"])
+            joined.add(id(target))
+        else:
+            merged.append(span)
+    return merged
+
+
+def _text_lines(spans: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Merge spans into text lines; stacked limits read as +0.03/0.00."""
+    spans = _stack_pairs(_fold_operators(spans))
+    spans = sorted(spans, key=lambda s: (s["y1"], s["x1"]))
+    lines: list[dict[str, Any]] = []
+    for span in spans:
+        height = _span_height(span)
+        placed = None
+        for line in lines:
+            dy = abs(
+                (span["y1"] + span["y2"]) / 2 - (line["y1"] + line["y2"]) / 2
+            )
+            gap = max(0.0, span["x1"] - line["x2"], line["x1"] - span["x2"])
+            band_hit = (line["y1"] <= (span["y1"] + span["y2"]) / 2 <= line["y2"]) or (
+                span["y1"] <= (line["y1"] + line["y2"]) / 2 <= span["y2"]
+            )
+            tight = min(height, _span_height(line))
+            if (dy <= 0.35 * height and gap <= 0.8 * tight) or (
+                band_hit and gap <= 1.2 * tight
+            ):
+                placed = line
+                break
+        if placed is not None:
+            gap_now = span["x1"] - placed["x2"]
+            separator = "" if 0 <= gap_now < 0.3 * height else " "
+            placed["text"] = (
+                (placed["text"] + separator + span["text"])
+                if span["x1"] >= placed["x1"]
+                else (span["text"] + separator + placed["text"])
+            )
+            placed["x1"] = min(placed["x1"], span["x1"])
+            placed["y1"] = min(placed["y1"], span["y1"])
+            placed["x2"] = max(placed["x2"], span["x2"])
+            placed["y2"] = max(placed["y2"], span["y2"])
+            continue
+        lines.append(dict(span))
+    return lines
+
+
+def _chain_groups(
+    lines: list[dict[str, Any]], gap: float
+) -> list[list[dict[str, Any]]]:
+    """Group lines into spatial clusters by nearest-neighbor chaining."""
+    remaining = sorted(lines, key=lambda line: (line["y1"], line["x1"]))
+    groups: list[list[dict[str, Any]]] = []
+    while remaining:
+        block = [remaining.pop(0)]
+        changed = True
+        while changed:
+            changed = False
+            for line in list(remaining):
+                for member in block:
+                    dx = max(0.0, max(line["x1"] - member["x2"], member["x1"] - line["x2"]))
+                    dy = max(0.0, max(line["y1"] - member["y2"], member["y1"] - line["y2"]))
+                    if (dx * dx + dy * dy) ** 0.5 <= gap:
+                        block.append(line)
+                        remaining.remove(line)
+                        changed = True
+                        break
+        groups.append(block)
+    return groups
+
+
+def sheet_text_document(
+    spans: list[dict[str, Any]],
+    *,
+    sheet: int,
+    sheet_count: int,
+    view_size: tuple[int, int],
+) -> str:
+    """One sheet's exact text, organized by view, in view_sheet pixels.
+
+    A view label names only its own spatial group; unlabeled groups keep
+    honest bbox names rather than guessed view ownership, and a cluster
+    carrying more than one view label stays unlabeled. The title block is
+    the bottom-right region; border furniture and the licence watermark are
+    excluded. A sheet without extractable text yields an empty document.
+    """
+    if not spans:
+        return ""
+    lines = _text_lines(spans)
+    view_w, view_h = view_size
+    title = [
+        line
+        for line in lines
+        if line["x1"] > 0.5 * view_w
+        and line["y1"] > 0.72 * view_h
+        and not VIEW_LABEL_RE.match(line["text"].strip())
+        and not NOTES_RE.match(line["text"].strip())
+    ]
+    notes = [
+        line
+        for line in lines
+        if line not in title and NOTES_RE.match(line["text"].strip())
+    ]
+    rest = [line for line in lines if line not in title and line not in notes]
+
+    groups: list[tuple[str, list[dict[str, Any]]]] = []
+    for block in _chain_groups(rest, gap=90):
+        labels = [
+            line["text"].strip()
+            for line in block
+            if VIEW_LABEL_RE.match(line["text"].strip())
+        ]
+        if len(labels) == 1:
+            groups.append((labels[0], block))
+            continue
+        x1 = min(line["x1"] for line in block)
+        y1 = min(line["y1"] for line in block)
+        x2 = max(line["x2"] for line in block)
+        y2 = max(line["y2"] for line in block)
+        kind = "unlabeled" if not labels else "multi-view"
+        groups.append((f"({kind}) @ ({x1:.0f},{y1:.0f})-({x2:.0f},{y2:.0f})", block))
+
+    out = [
+        f"Sheet text layer — sheet {sheet} of {sheet_count}.",
+        "Rects (x1,y1)-(x2,y2) are view_sheet pixels; crop with margin.",
+        "",
+    ]
+
+    def emit(header: str, members: list[dict[str, Any]]) -> None:
+        out.append(header)
+        for line in sorted(
+            members, key=lambda line: (round(line["y1"] / 14), line["x1"])
+        ):
+            out.append(
+                f'  ({line["x1"]:.0f},{line["y1"]:.0f})-({line["x2"]:.0f},{line["y2"]:.0f})'
+                f'  {line["text"]}'
+            )
+        out.append("")
+
+    groups.sort(
+        key=lambda group: (
+            min(line["y1"] for line in group[1]),
+            min(line["x1"] for line in group[1]),
+        )
+    )
+    for name, members in groups:
+        header = (
+            f'== view "{name}" =='
+            if not name.startswith("(unlabeled)")
+            else f"== view {name} =="
+        )
+        emit(header, members)
+    if notes:
+        emit("== notes ==", notes)
+    if title:
+        emit("== title block ==", title)
+    return "\n".join(out).rstrip()
+
+
 class SheetStore:
     """Open sources once, in order; own all native handles and memoized renders.
 
@@ -237,6 +636,8 @@ class SheetStore:
         self._sheets: list[_Sheet] = []
         self._views: dict[int, tuple[bytes, str]] = {}
         self._crops: dict[tuple[int, int, int, int, int], tuple[bytes, str]] = {}
+        self._texts: dict[int, str] = {}
+        self._spans: dict[int, list[dict[str, Any]]] = {}
         self._crop_calls = 0
         try:
             with PDFIUM_LOCK:
@@ -298,6 +699,8 @@ class SheetStore:
                 self._sheets.clear()
                 self._views.clear()
                 self._crops.clear()
+                self._texts.clear()
+                self._spans.clear()
 
     def _ensure_open(self) -> None:
         if self._closed:
@@ -352,6 +755,41 @@ class SheetStore:
             if key not in self._crops:
                 self._crops[key] = self._render(sheet, entry, rect)
             return self._crops[key]
+
+    def text_layer(self, sheet: int) -> str:
+        """One sheet's exact text organized by view; empty without extractable text."""
+        with self._lock:
+            entry = self._sheet(sheet)
+            if sheet in self._texts:
+                return self._texts[sheet]
+            spans = self._text_spans(sheet, entry)
+        # Grouping is pure Python on copied spans; keep it off the global lock.
+        document = sheet_text_document(
+            spans,
+            sheet=sheet,
+            sheet_count=self.sheet_count,
+            view_size=entry.view_size,
+        )
+        with self._lock:
+            self._texts[sheet] = document
+        return document
+
+    def _text_spans(self, sheet: int, entry: _Sheet) -> list[dict[str, Any]]:
+        """Memoized per-sheet spans; native extraction stays under the lock."""
+        with self._lock:
+            if sheet in self._spans:
+                return self._spans[sheet]
+            if entry.page_index is None:
+                self._spans[sheet] = []
+                return []
+            with PDFIUM_LOCK:
+                page = entry.source[entry.page_index]
+                try:
+                    spans = _text_spans(page, entry.view_size)
+                finally:
+                    page.close()
+            self._spans[sheet] = spans
+            return spans
 
 
 def create_server(store: SheetStore) -> FastMCP:

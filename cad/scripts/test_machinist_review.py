@@ -83,6 +83,38 @@ def _image(png: bytes) -> Image.Image:
     return image
 
 
+def _text_pdf(path: Path, lines: Sequence[tuple[float, float, str]]) -> Path:
+    """A one-page PDF with real Helvetica text at the given page coordinates."""
+    stream = "\n".join(
+        f"BT /F1 10 Tf {x} {y} Td ({text}) Tj ET" for x, y, text in lines
+    ).encode("ascii", "replace")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            b"/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"
+        ),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for index, obj in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += f"{index} 0 obj\n".encode() + obj + b"\nendobj\n"
+    startxref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n".encode() + b"0000000000 65535 f \n"
+    for offset in offsets:
+        out += f"{offset:010d} 00000 n \n".encode()
+    out += (
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{startxref}\n%%EOF"
+    ).encode()
+    path.write_bytes(bytes(out))
+    return path
+
+
 def _png_chunk_types(png: bytes) -> list[str]:
     assert png[:8] == b"\x89PNG\r\n\x1a\n"
     types: list[str] = []
@@ -852,6 +884,148 @@ def test_prompts_share_the_static_load_prompt_prefix_for_every_package() -> None
     override = "custom rubric\n"
     package = mr.ReviewPackage("crank_arm", "part", ())
     assert mr._review_prompt(package, 2, prompt_text=override).startswith(override)
+
+
+def test_text_layer_groups_by_view_and_drops_border_furniture(
+    tmp_path: Path,
+) -> None:
+    source = _text_pdf(
+        tmp_path / "sheet.pdf",
+        [
+            (100, 400, "FRONT 5:1"),
+            (300, 300, "9.550"),
+            (330, 312, "+0.03"),
+            (330, 300, "0.00"),
+            (300, 280, "REAM THRU"),
+            (450, 50, "MATERIAL"),
+            (450, 35, "SAE 1018 CF bar"),
+            (10, 10, "SOLIDWORKS Maker Product. For Personal Use Only."),
+        ],
+    )
+    with sheets.SheetStore([source]) as store:
+        document = store.text_layer(1)
+    assert document.startswith("Sheet text layer — sheet 1 of 1.")
+    assert '== view "FRONT 5:1" ==' in document
+    assert "9.550 +0.03/0.00" in document
+    assert "REAM THRU" in document
+    assert "== title block ==" in document
+    assert "MATERIAL" in document and "SAE 1018 CF bar" in document
+    assert "Maker Product" not in document
+    # Rects are view_sheet pixels the reviewer can crop directly.
+    assert re.search(r"\(\d+,\d+\)-\(\d+,\d+\)  9\.550", document)
+    # Cached per store; PNG sources have no text layer.
+    with sheets.SheetStore([source, _png_source(tmp_path / "blank.png")]) as store:
+        assert store.text_layer(1).startswith("Sheet text layer — sheet 1 of 2.")
+        assert store.text_layer(2) == ""
+        assert "9.550 +0.03/0.00" in store.text_layer(1)
+
+
+def test_review_prompt_injects_the_sheet_text_layer(tmp_path: Path) -> None:
+    source = _text_pdf(
+        tmp_path / "sheet.pdf",
+        [(100, 400, "FRONT 5:1"), (300, 300, "25.20")],
+    )
+    package = mr.ReviewPackage("crank_arm", "part", (source,))
+    prompt = mr._review_prompt(package, 1)
+    assert "SHEET TEXT LAYER" in prompt
+    assert "organized by sheet then view" in prompt
+    assert '== view "FRONT 5:1" ==' in prompt and "25.20" in prompt
+    lines = prompt.splitlines()
+    assert lines[-1] == "Return one verdict for the package as a whole."
+    # PNG-only packages get no text-layer section at all.
+    png = mr.ReviewPackage("crank_arm", "part", (_png_source(tmp_path / "blank.png"),))
+    png_prompt = mr._review_prompt(png, 1)
+    assert "SHEET TEXT LAYER" not in png_prompt[len(mr.load_prompt("part")) :]
+
+
+def test_prompts_define_the_classification_contract() -> None:
+    for kind in ("part", "assembly"):
+        prompt = re.sub(r"\s+", " ", mr.load_prompt(kind))
+        assert "contradiction > missing > unbuildable > over_specification" in prompt
+        assert "FIX if and only if blockers" in prompt
+        assert 'never invent a hybrid category such as "minor clarity"' in prompt
+        assert "the first that applies in this precedence" in prompt
+
+
+# --- owner-declared machinist exceptions -------------------------------------
+
+
+def _write_exceptions_config(root: Path, name: str, section: Any) -> Path:
+    dashed = name.replace("_", "-")
+    directory = root / "parts"
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{dashed}.yaml"
+    import yaml
+
+    path.write_text(
+        yaml.safe_dump({dashed: {"number": "MHA-XX-000", "machinist_exceptions": section}}),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_declared_exceptions_load_and_validate(tmp_path: Path) -> None:
+    import machinist_exceptions
+
+    section = [
+        {
+            "id": "RV-001",
+            "where": "sheet 1, front view, 25.20 overall length",
+            "finding": "tight clearance band with no named mate (rule 4)",
+            "reason": "CLEARS callout names the mate; owner accepts it",
+            "kind": "accept",
+        }
+    ]
+    _write_exceptions_config(tmp_path, "dt_crank_hub", section)
+    entries = machinist_exceptions.load_exceptions(tmp_path, "dt_crank_hub", "part")
+    assert [entry.id for entry in entries] == ["RV-001"]
+    assert entries[0].kind == "accept"
+    # A package that declares nothing (or has no config file) gets nothing.
+    assert machinist_exceptions.load_exceptions(tmp_path, "ms_stick", "part") == ()
+    assert machinist_exceptions.load_exceptions(tmp_path, "pn_pen_assembly", "assembly") == ()
+    # Malformed declarations fail loud: a typo must never silently widen
+    # or narrow what the reviewer ignores.
+    for bad in (
+        [dict(section[0], kind="ignore")],
+        [dict(section[0], reason="")],
+        [dict(section[0], extra="x")],
+        [section[0], section[0]],
+    ):
+        _write_exceptions_config(tmp_path, "dt_crank_hub", bad)
+        with pytest.raises(ValueError):
+            machinist_exceptions.load_exceptions(tmp_path, "dt_crank_hub", "part")
+
+
+def test_review_prompt_injects_declared_exceptions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _text_pdf(tmp_path / "sheet.pdf", [(100, 400, "FRONT 5:1")])
+    config_root = tmp_path / "config"
+    _write_exceptions_config(
+        config_root,
+        "crank_arm",
+        [
+            {
+                "id": "RV-007",
+                "where": "sheet 1, bore",
+                "finding": "REAM callout with no named mate (rule 4)",
+                "reason": "mate named in the gear data block; accepted",
+                "kind": "minor",
+            }
+        ],
+    )
+    monkeypatch.setattr(mr, "CAD_ROOT", tmp_path)
+    package = mr.ReviewPackage("crank_arm", "part", (source,))
+    prompt = mr._review_prompt(package, 1)
+    assert "OWNER-DECLARED MACHINIST EXCEPTIONS" in prompt
+    assert "RV-007 [minor] at sheet 1, bore" in prompt
+    assert "the exception id in the summary" in prompt
+    lines = prompt.splitlines()
+    assert lines[-1] == "Return one verdict for the package as a whole."
+    # Packages without sources never see config-derived exceptions, so the
+    # static tail contract holds regardless of what configs declare.
+    bare = mr.ReviewPackage("crank_arm", "part", ())
+    assert "OWNER-DECLARED MACHINIST EXCEPTIONS" not in mr._review_prompt(bare, 1)
 
 
 # --- blind evidence ----------------------------------------------------------
@@ -1784,7 +1958,11 @@ def test_attempt_dir_is_the_cwd_then_retained_without_sheet_images(
         else {"schema.json", "codex-models.json"}
     )
     assert set(seen["files"]) == expected_inputs  # no sheet PNGs, no stray context
-    server_sources = [str(source.resolve()) for source in sources]
+    # The MCP server reads the review's immutable source snapshot, never the
+    # mutable originals.
+    server_sources = [
+        str((report_dir / "package.sources" / source.name).resolve()) for source in sources
+    ]
     if reviewer == "claude":
         assert seen["config"] == {
             "mcpServers": {
@@ -2269,7 +2447,7 @@ def test_multi_sheet_assembly_is_one_cross_sheet_review(
     assert len(captured) == 1
     command, prompt = captured[0]
     assert _codex_overrides(command)["mcp_servers.sheets.args"][1:] == [
-        str(source.resolve())
+        str((tmp_path / "reports" / "gearbox.sources" / source.name).resolve())
     ]
     assert "Sheet count: 2" in prompt
     assert review.sheet_count == 2
