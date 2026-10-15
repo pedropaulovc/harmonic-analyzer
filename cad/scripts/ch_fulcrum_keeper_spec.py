@@ -347,22 +347,26 @@ if KEEPER_TAP_SPEC.depth_mm - _BAND_BY_PLACES[1] < (
 # the set-screw tap's station off the inner lug face and the foot screw's
 # stations off the foot tip and a side face are manufacturing dimensions no
 # feature measures (both holes are placed by point), so a one-line
-# construction sketch carries each. Three more: the bore's place across the
+# construction sketch carries each. Four more: the bore's place across the
 # width (a REFERENCE_DIMENSIONS entry: the pair-ream setup puts it there),
-# the overall length lug face to foot tip (a reference: the lug thickness and
-# foot length chain it) and the supplied blank's height (SUPPLY_HEIGHT_MIN).
+# the finished height seat to crown top and the overall length lug face to
+# foot tip (references: the bore height and crown, and the lug thickness and
+# foot length, chain them) and the supplied blank's height
+# (SUPPLY_HEIGHT_MIN), printed beside the finished one (MR-fleet r4: the
+# supply size alone left its extension line in empty space above the top).
 # The part saves them blanked; the drawing shows the tap's and the foot
-# screw's stations in the plan, the length and height in the front view and
+# screw's stations in the plan, the heights and length in the front view and
 # the bore's place in the end view.
 REFERENCE_SKETCHES = (
     "SetScrewReference",
     "FootScrewReference",
     "FootScrewSideReference",
     "BoreSideReference",
+    "OverallHeightReference",
     "SupplyHeightReference",
     "OverallLengthReference",
 )
-REFERENCE_DIMENSIONS = ("BoreFromSide", "OverallLength")
+REFERENCE_DIMENSIONS = ("BoreFromSide", "OverallHeight", "OverallLength")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. The wizard screw hole and the crown tap ship as native hole
@@ -378,6 +382,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootScrewReference": {"ScrewFromTip"},
     "FootScrewSideReference": {"ScrewFromSide"},
     "BoreSideReference": {"BoreFromSide"},
+    "OverallHeightReference": {"OverallHeight"},
     "SupplyHeightReference": {"SupplyHeight"},
     "OverallLengthReference": {"OverallLength"},
     "CornerFillet": {"CornerRadius"},
@@ -407,6 +412,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FootScrewReference": {"ScrewFromTip": 2},
     "FootScrewSideReference": {"ScrewFromSide": 3},
     "BoreSideReference": {"BoreFromSide": 1},
+    "OverallHeightReference": {"OverallHeight": 1},
     "SupplyHeightReference": {"SupplyHeight": 1},
     "OverallLengthReference": {"OverallLength": 1},
     "CornerFillet": {"CornerRadius": CORNER_R_PLACES},

@@ -138,10 +138,11 @@ V_CORNER = (1.0 - math.pi / 4.0) * CORNER_R_MAX**2 * KEEPER_WIDTH
 # side corner along the side face to the screw station and down the tip
 # face to the screw axis, so their extension lines leave the plan's outline
 # without crossing; the bore's runs on the Right plane
-# (the end view's frame) from a side face to the bore axis; the supplied
-# height's runs up the lug's inner face from the seat to the blank's least
-# top; the overall length's along the seat from the inner lug face to the
-# foot tip. ``drives`` binds the value dimension, then the start point's
+# (the end view's frame) from a side face to the bore axis; the finished and
+# supplied heights' run up the lug's inner face from the seat to the crown
+# top and to the blank's least top; the overall length's along the seat
+# from the inner lug face to the foot tip. ``drives`` binds the value
+# dimension, then the start point's
 # origin anchors, to the part's globals.
 REFERENCE_LINES = (
     (
@@ -183,6 +184,16 @@ REFERENCE_LINES = (
         "horizontal",
         KEEPER_WIDTH / 2.0,
         ('"KeeperWidth" / 2', '"KeeperWidth" / 2', '"ShaftAxisH"'),
+    ),
+    (
+        "OverallHeightReference",
+        "Front",
+        "OverallHeight",
+        (-LUG_HALF_T, 0.0),
+        (-LUG_HALF_T, CROWN_TOP_Y),
+        "vertical",
+        CROWN_TOP_Y,
+        ('"ShaftAxisH" + "CrownDia" / 2', '"LugT" / 2'),
     ),
     (
         "SupplyHeightReference",

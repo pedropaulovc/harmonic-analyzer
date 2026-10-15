@@ -176,14 +176,26 @@ def test_corner_round_prints_its_max_limit_in_the_open_corner() -> None:
         assert _box_gap(block, other) >= _AIR, other
 
 
-def test_overall_length_and_bore_station_print_as_references() -> None:
+def test_overall_sizes_and_bore_station_print_as_references() -> None:
     spec = ch_fulcrum_keeper_spec
-    assert spec.REFERENCE_DIMENSIONS == ("BoreFromSide", "OverallLength")
+    assert spec.REFERENCE_DIMENSIONS == (
+        "BoreFromSide",
+        "OverallHeight",
+        "OverallLength",
+    )
     assert spec.DRAWING_PRECISION["BoreSideReference"] == {"BoreFromSide": 1}
+    assert spec.DRAWING_PRECISION["OverallHeightReference"] == {"OverallHeight": 1}
     assert spec.DRAWING_PRECISION["OverallLengthReference"] == {"OverallLength": 1}
     assert spec.OVERALL_LENGTH == 2.0 * spec.LUG_HALF_T + spec.FOOT_L == 16.5
     assert "BoreFromSide" in drawing.RIGHT_KEEP
     assert "OverallLength" in drawing.FRONT_KEEP
+    # MR-fleet r4: the finished height stands beside the supplied one, the
+    # larger outermost.
+    assert (
+        drawing.FRONT_KEEP["SupplyHeight"][0]
+        < drawing.FRONT_KEEP["OverallHeight"][0]
+        < drawing._front_x(-spec.LUG_HALF_T)
+    )
 
 
 def test_supply_height_prints_the_blank_minimum() -> None:
@@ -218,6 +230,7 @@ def test_tap_and_foot_hole_station_reference_sketches() -> None:
         "FootScrewReference",
         "FootScrewSideReference",
         "BoreSideReference",
+        "OverallHeightReference",
         "SupplyHeightReference",
         "OverallLengthReference",
     ]
@@ -245,6 +258,11 @@ def test_tap_and_foot_hole_station_reference_sketches() -> None:
     assert (plane, dimension) == ("Right", "BoreFromSide")
     assert start == (spec.KEEPER_WIDTH / 2.0, spec.SHAFT_AXIS_H)
     assert end == (0.0, spec.SHAFT_AXIS_H)
+    _, plane, dimension, start, end, _, value, _ = rows["OverallHeightReference"]
+    assert (plane, dimension) == ("Front", "OverallHeight")
+    assert start == (-spec.LUG_HALF_T, 0.0)
+    assert end == (-spec.LUG_HALF_T, spec.CROWN_TOP_Y)
+    assert value == spec.CROWN_TOP_Y
     _, plane, dimension, start, end, _, value, _ = rows["SupplyHeightReference"]
     assert (plane, dimension) == ("Front", "SupplyHeight")
     assert start == (-spec.LUG_HALF_T, 0.0)
@@ -566,7 +584,9 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
         drawing.RIGHT_KEEP["CrownDia"],
         ["Ø14.0", *drawing.DIMENSION_CALLOUTS["CrownDia"].splitlines()],
     )
-    notes = Box(0.020, 0.062 - 5 * _PITCH, 0.182, 0.062)
+    notes_top = drawing.NOTES_TOP
+    notes = Box(0.020, notes_top - 5 * _PITCH, 0.182, notes_top)
+    overall_length = _text_block(drawing.FRONT_KEEP["OverallLength"], ["(16.5)"])
     foot_hole = Box(0.1035, 0.1964, 0.1469, 0.2055)  # r13 printed
     tap = _text_block(drawing.SET_SCREW_CALLOUT_XY, _tap_rows())
     keeps = {**drawing.FRONT_KEEP, **drawing.TOP_KEEP}
@@ -589,7 +609,8 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
         "notes": notes,
         "foot-hole callout": foot_hole,
         "tap callout": tap,
-        "overall length": _text_block(drawing.FRONT_KEEP["OverallLength"], ["(16.5)"]),
+        "overall length": overall_length,
+        "overall height": _text_block(drawing.FRONT_KEEP["OverallHeight"], ["(32.2)"]),
         "foot length": _text_block(drawing.FRONT_KEEP["FootLength"], ["10.5"]),
         "screw from tip": _text_block(drawing.TOP_KEEP["ScrewFromTip"], ["5.25"]),
         "corner radius": _text_block(drawing.FRONT_KEEP["CornerRadius"], ["R1.0 MAX"]),
@@ -624,6 +645,11 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
         for name in ("SetScrewLocation", "LugThickness"):
             assert segment_box_distance(line, blocks[name]) >= 0.003, (name, line)
         assert segment_box_distance(line, tap) >= 0.003, line
+    # r4: SolidWorks drew the (16.5)'s line ~2.7 mm off its text, onto the
+    # 6.000's arrows under that block's last row; either side, it stays clear
+    # of the 6.000's line and of the notes.
+    assert blocks["LugThickness"].ymin - (overall_length.ymax + 0.003) >= _AIR
+    assert overall_length.ymin - 0.003 - notes_top >= _AIR
     length_y = drawing.FRONT_KEEP["OverallLength"][1]
     for x in (lug.xmin, foot.xmax):
         line = Segment(x, seat, x, length_y - 0.003)

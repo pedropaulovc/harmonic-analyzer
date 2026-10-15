@@ -182,9 +182,12 @@ TOP_CALLOUTS = {
 # sheet position.  The front view carries the lug thickness chained left of
 # the foot length below the seat, its text and function out to the left
 # over the notes, and under both the overall length (a reference, MR-fleet
-# r3: the chain printed no overall), ~8 mm above the notes; the supplied
-# height (single limit MIN) left of the lug, its block ~10 mm off the lug's
-# inner face; the foot height right of the foot tip; the foot-to-lug
+# r3: the chain printed no overall), ~8 mm under the 6.000's dimension line
+# (r4: 3.6 mm under it, its own line sat on the 6.000's arrows) and above
+# the notes; the finished height (a reference) left of the lug and the
+# supplied height (single limit MIN) outside it, the larger size outermost
+# (r4: the supply size alone left its extension line in empty space above
+# the drawn top); the foot height right of the foot tip; the foot-to-lug
 # corner's R MAX up in the open corner, ~16 mm along the foot and up the lug
 # (the ch_pivot_bracket placement), so its leader runs through the round's
 # centre onto the arc.
@@ -200,11 +203,15 @@ TOP_CALLOUTS = {
 FRONT_KEEP = {
     "LugThickness": (0.066, 0.086),
     "FootLength": (_front_x(SCREW_X), 0.086),
-    "OverallLength": (FRONT_CENTER[0], 0.075),
+    "OverallLength": (FRONT_CENTER[0], 0.068),
     "FootRise": (0.140, 0.106),
-    "SupplyHeight": (0.064, FRONT_CENTER[1]),
+    "OverallHeight": (0.080, FRONT_CENTER[1]),
+    "SupplyHeight": (0.042, FRONT_CENTER[1]),
     "CornerRadius": (0.122, 0.130),
 }
+# The manufacturing notes' top-left corner's height (MR-fleet r4: 4 mm lower
+# to make room for the overall length above them).
+NOTES_TOP = 0.058
 TOP_KEEP = {
     "SetScrewLocation": (0.068, 0.2535),
     "ScrewFromTip": (_front_x((FOOT_TIP_X + SCREW_X) / 2.0), 0.252),
@@ -457,7 +464,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crown set-screw tap",
     )
     _set_tap_callout_text(tap_callout)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, NOTES_TOP)
     add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.150)
 
     return await finalize_drawing(
