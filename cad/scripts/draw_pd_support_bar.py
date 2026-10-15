@@ -9,12 +9,13 @@ carries the four counterbored clamp-screw holes.
   the hanger row's banded stations from the left end, each naming its mate,
   and its height from the top face (the part-hidden HangerRowReference
   sketch), the pivot drill's Ø with its tap, both countersinks' MAX Ø
-  (CountersinkReference), the latch-hook taps' native callout and the top
-  face's slide roughness.
+  (CountersinkReference), the latch-hook taps' native callout (its thread
+  class left to the title block) and the top face's slide roughness.
 * The lower view looks on the front face (``*Back``, so the left end is on
   the sheet's right): the banded height, the clamp row's stations from the
   same end and its height (ClampRowReference), the counterbores' native
-  callout (depth at .XXX) and the front face's slide roughness.
+  callout (depth at .XXX) and the front face's slide roughness. Each
+  roughness symbol has its reason beside it; the sheet has no general note.
 * Each face view carries its caption; section A-A cuts the pivot tap across
   the bar: the banded thickness, the drill's depth limits and the full
   thread's MIN (PivotThreadReference, in the cutting plane).
@@ -86,7 +87,9 @@ from pd_support_bar_drawing_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_VIEW_CAPTION,
+    FRONT_FINISH_REASON,
     SURFACE_FINISHES,
+    TOP_FINISH_REASON,
 )
 
 
@@ -114,7 +117,6 @@ FACE_CENTER = (0.170, 0.222)
 BACK_CENTER = (0.170, 0.122)
 SECTION_CENTER = (0.385, 0.200)
 ISO_CENTER = (0.365, 0.098)
-NOTES_XY = (0.020, 0.064)
 ISO_NOTE_XY = (0.300, 0.076)
 
 LEFT_END = FACE_CENTER[0] - BAR_LENGTH * _S / 2.0
@@ -160,6 +162,7 @@ BRACKET_CALLOUT_XY = (_face_x(BRACKET_TAP_X[1]) + 0.056, FACE_TOP + 0.031)
 # The top face's slide roughness on its edge, left of the section line.
 TOP_FINISH_MODEL_X = -178.0
 TOP_FINISH_SYMBOL_XY = (LEFT_END + 0.030, FACE_TOP + 0.014)
+TOP_REASON_TOP = (TOP_FINISH_SYMBOL_XY[0] + 0.003, FACE_TOP + 0.032)
 FACE_CAPTION_TOP = (0.200, FACE_BOTTOM - 4.0 * ROW_STEP - 0.008)
 
 # The clamp stations from the same left (x = -226) end, on the sheet's right
@@ -175,11 +178,15 @@ BACK_KEEP = {
     "Height": (RIGHT_END + 0.016, BACK_TOP + 0.016),
     "ClampRowHeight": (LEFT_END - 0.016, BACK_BOTTOM - 0.008),
 }
-CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROW_X)) + 0.020, BACK_TOP + 0.016)
+# The counterbores' callout stands wholly right of the hole it points at, so
+# its leader slants right, off the clamp row height's extension line.
+CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROW_X)) + 0.047, BACK_TOP + 0.016)
 # The front face's slide roughness, seen face-on: a leader to a point clear
 # of the holes, the symbol above the view.
 FRONT_FINISH_MODEL_XY = (-150.0, 6.0)
 FRONT_FINISH_SYMBOL_XY = (0.252, BACK_TOP + 0.014)
+# Its reason stands left of it, under the face view's caption.
+FRONT_REASON_TOP = (0.2175, BACK_TOP + 0.013)
 BACK_CAPTION_TOP = (BACK_CENTER[0], BACK_BOTTOM - 0.042)
 FINISH_CHAR_HEIGHT = 0.0025
 CAPTION_SETTLE_M = 0.0006
@@ -314,6 +321,28 @@ def _hole_rims(face: Any, back: Any) -> tuple[Any, Any]:
     return tap, cbore
 
 
+_THREAD_CLASS_TOKEN = " <hw-threadclass>"
+
+
+def _drop_thread_class(adapter: Any, display: Any) -> None:
+    """Drop the Hole Wizard's thread-class token from the native TAP
+    callout's definition (rule 2: the title block's THREADS row carries the
+    class); the other tokens stay live (draw_sm_knife_mount precedent)."""
+    display = _early_bound(display, "IDisplayDimension")
+    before = str(display.GetText(5) or "")  # swDimensionTextPrefixDefinition
+    if before.count(_THREAD_CLASS_TOKEN) != 1:
+        raise RuntimeError(
+            f"latch-hook tap callout has no lone class token: {before!r}"
+        )
+    wanted = before.replace(_THREAD_CLASS_TOKEN, "")
+    display.SetText(1, wanted)
+    if str(display.GetText(5) or "") != wanted:
+        raise RuntimeError(
+            f"latch-hook tap callout class did not drop: {display.GetText(5)!r}"
+        )
+    rebuild_drawing(adapter, label="latch-hook tap callout class")
+
+
 def _name_clamp_screws(display: Any) -> None:
     """Hang the screws' part number under the counterbores' native callout,
     and print its depth at the .XXX its head clearance needs."""
@@ -396,7 +425,6 @@ async def build(adapter: Any) -> dict[str, str]:
         "Material Specification",
         "Finish",
         "Quantity",
-        "Manufacturing Notes",
         "Isometric View Note",
     )
     read_required_properties(
@@ -477,13 +505,16 @@ async def build(adapter: Any) -> dict[str, str]:
     # the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     tap_edge, cbore_edge = _hole_rims(face, back)
-    add_native_hole_callout(
+    _drop_thread_class(
         adapter,
-        face,
-        edge=tap_edge,
-        callout_xy=BRACKET_CALLOUT_XY,
-        label="latch-hook base taps",
-        process="TAP",
+        add_native_hole_callout(
+            adapter,
+            face,
+            edge=tap_edge,
+            callout_xy=BRACKET_CALLOUT_XY,
+            label="latch-hook base taps",
+            process="TAP",
+        ),
     )
     _name_clamp_screws(
         add_native_hole_callout(
@@ -499,8 +530,9 @@ async def build(adapter: Any) -> dict[str, str]:
     _lower_caption(adapter, section, CAPTION_DROP)
     _place_caption(adapter, FACE_VIEW_CAPTION, FACE_CAPTION_TOP)
     _place_caption(adapter, BACK_VIEW_CAPTION, BACK_CAPTION_TOP)
+    _place_caption(adapter, TOP_FINISH_REASON, TOP_REASON_TOP)
+    _place_caption(adapter, FRONT_FINISH_REASON, FRONT_REASON_TOP)
 
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     # The native TAP callout restates the taps, so the Hole Wizard's own
