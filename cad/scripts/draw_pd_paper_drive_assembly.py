@@ -341,9 +341,12 @@ if {stem for stem, *_ in PIVOT_BALLOON_TIPS} != {
 }:
     raise AssertionError("the pivot section balloons exactly its shown families")
 # Balloon columns: centres BALLOON_MARGIN off the section's circle, as on the
-# other rings, at least one pitch apart within a column.
+# other rings, at least one pitch apart within a column. Farm run
+# 20261015T110833827Z: at 9 mm two balloons (3.5 mm tall boxes) stood 5.49
+# apart, under the layout audit's 5.53 mm row pitch, and read as one block
+# (merged-blocks); 12 mm leaves 8.4.
 PIVOT_BALLOON_GAP = BALLOON_MARGIN
-PIVOT_BALLOON_PITCH = 0.009
+PIVOT_BALLOON_PITCH = 0.012
 _SW_BALLOON_CIRCULAR = 1  # swBalloonStyle_e.swBS_Circular, the BOM balloons'
 _SW_BALLOON_FIT_2_CHARS = 2  # swBalloonFit_e, the BOM balloons' size
 
