@@ -124,14 +124,11 @@ def test_the_datum_chain_is_mic_compensated() -> None:
 
 
 def test_a_closed_slot_always_holds_the_whole_ring() -> None:
-    # #982: ring and shank 2.175, their two faces each located +/-0.05 from
-    # the fork's datum face, so the plate spans both faces' bands.
-    face_upper, face_lower = rod.RING_FACE_BAND
-    assert rod.RING_THICKNESS_BAND == pytest.approx(
-        (face_upper - face_lower, face_lower - face_upper)
-    )
-    ring_max = rod.RING_THICKNESS + face_upper - face_lower
-    assert ring_max == pytest.approx(2.275)
+    # #982: ring and shank one 2.175 plate, its thickness printed +/-0.05 at
+    # the ring (review r1).
+    upper, _lower = rod.RING_THICKNESS_BAND
+    ring_max = rod.RING_THICKNESS + upper
+    assert ring_max == pytest.approx(2.225)
     assert bank.RING_MAX == pytest.approx(ring_max)
     assert bank.SHANK_MAX == pytest.approx(ring_max)
     # d': the thinnest in-band gear, 7.0565 - 0.025, less FW + 0.05.

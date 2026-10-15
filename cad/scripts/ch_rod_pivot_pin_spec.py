@@ -217,6 +217,10 @@ if BUDGET["tine_bearing_land_min"] < RULE12_WALL_FLOOR - 1e-9:
     raise AssertionError("the pin's land in a tine is under the drawing-guidelines.md rule 17 (walls and webs) floor")
 if BUDGET["crotch_clearance_min"] < CROTCH_CLEARANCE_MIN - 1e-9:
     raise AssertionError("fork crotch can strike the arm's bottom edge")
+# The slot floor's corner radii stand no higher than the arm's least
+# clearance over the floor, so the arm never meets them.
+if _rod.INSIDE_CORNER_R >= BUDGET["crotch_clearance_min"]:
+    raise AssertionError("the slot floor's corner radii reach the arm's bottom edge")
 if BUDGET["bridge_min"] < BRIDGE_TARGET - 1e-9:
     raise AssertionError("fork bridge below the slot under the 2.0 target")
 if BUDGET["crown_wall_min"] < RULE12_WALL_TARGET - 1e-9:

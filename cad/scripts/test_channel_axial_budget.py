@@ -39,9 +39,10 @@ def _clear_window() -> tuple[float, float]:
     """Delta range (cam slot centre less rocker plate centre, deviations) a
     rigid flat rod spans without binding: its ring (or shank, the thicker)
     floats in the thinnest slot, its fork in the least side clearance on the
-    thickest arm, less what the rod's printed locations (#982: ring faces,
-    near tine and slot, all from the fork's datum face) and the strap-to-hub
-    symmetry control may offset the mid-planes."""
+    thickest arm, less what the rod's printed locations (#982: the plate's
+    near face, near tine and slot, all from the fork's datum face, and the
+    plate's thickness) and the strap-to-hub symmetry control may offset the
+    mid-planes."""
     assert rocker.ARM_MID_DZ == cam_plane.CAM_MID_DZ  # one nominal plane
     thickest = max(
         rod.RING_THICKNESS + rod.RING_THICKNESS_BAND[0],
@@ -49,9 +50,10 @@ def _clear_window() -> tuple[float, float]:
     )
     ring_float = (bank.SLOT_MIN - thickest) / 2.0
     fork_float = pin.BUDGET["side_clearance_min"] / 2.0
-    # Ring mid-plane from the datum face: both faces' band. Slot mid-plane
-    # from it: the near tine's band plus half the slot's.
-    ring_offset = rod.RING_FACE_BAND[0]
+    # Ring mid-plane from the datum face: the near face's band plus half the
+    # thickness's. Slot mid-plane from it: the near tine's band plus half the
+    # slot's.
+    ring_offset = rod.RING_FACE_BAND[0] + rod.RING_THICKNESS_BAND[0] / 2.0
     slot_offset = rod.TINE_BAND[0] + rod.FORK_SLOT_BAND[0] / 2.0
     offsets = ring_offset + slot_offset + arm.STRAP_HUB_SYMMETRY / 2.0
     half = ring_float + fork_float - offsets
@@ -82,12 +84,11 @@ def _station_delta(j: int) -> tuple[float, float]:
 def test_the_clear_window_is_the_flat_rods() -> None:
     low, high = _clear_window()
     assert (low, high) == pytest.approx((-0.72825, 0.72825), abs=1e-6)
-    # The ring and shank faces each print +/-RING_FACE_BAND from the fork's
-    # datum face, so the plate spans both (#982).
-    face_upper, face_lower = rod.RING_FACE_BAND
-    plate = (face_upper - face_lower, face_lower - face_upper)
-    assert rod.RING_THICKNESS_BAND == pytest.approx(plate)
-    assert rod.SHANK_THICKNESS_BAND == pytest.approx(plate)
+    # The plate's near face prints from the fork's datum face and its
+    # thickness at the ring (#982 review r1): the same window the two face
+    # ordinates (+/-0.05 each) spent.
+    assert rod.RING_FACE_BAND == rod.RING_THICKNESS_BAND == (0.05, -0.05)
+    assert rod.SHANK_THICKNESS_BAND == rod.RING_THICKNESS_BAND
 
 
 def test_the_worst_station_keeps_a_spare() -> None:

@@ -48,11 +48,13 @@ RING_WALL = 5.0  # radial strap wall
 # Ring and shank: one plate, 2.175 thick. Both pass between the same two
 # tooth discs of the closed cam slot (cylinder_bank_layout), and a flat rod
 # held by its fork on the arm needs the cam-vs-arm offset inside its float
-# there (test_channel_axial_budget). The plate's two faces print as locations
-# from the fork's datum face, each +/-RING_FACE_BAND, so the thickness is
-# their difference: 2.075 at its thinnest (drawing-guidelines.md rule 17).
-# 2.175 (was 2.200, #982) puts both faces on three-place ordinates from the
-# fork face (1.950 and 4.125) and widens the ring's float in the cam slot.
+# there (test_channel_axial_budget). The plate's near face prints as a
+# location from the fork's datum face (+/-RING_FACE_BAND) and its thickness
+# as a size at the ring (+/-RING_THICKNESS_BAND): 2.125 at its thinnest
+# (drawing-guidelines.md rule 17). The two bands spend the same axial window
+# the two face ordinates did (#982 review r1: the thickness prints directly).
+# 2.175 (was 2.200, #982) puts the near face on a three-place ordinate from
+# the fork face (1.950) and widens the ring's float in the cam slot.
 RING_THICKNESS = 2.175
 SHANK_WIDTH = 8.0
 SHANK_THICKNESS = RING_THICKNESS  # one plate thickness, ring to shank
@@ -87,15 +89,11 @@ FORK_THICKNESS_BAND = (
     2.0 * TINE_BAND[0] + FORK_SLOT_BAND[0],
     2.0 * TINE_BAND[1] + FORK_SLOT_BAND[1],
 )
-# The ring and shank faces from the fork's datum face (the near tine's outer
-# face): the plate centred on the fork, each face +/-RING_FACE_BAND.
+# The ring and shank's near face from the fork's datum face (the near tine's
+# outer face): the plate centred on the fork.
 RING_FACE_NEAR = (FORK_THICKNESS - RING_THICKNESS) / 2.0  # 1.950
-RING_FACE_FAR = RING_FACE_NEAR + RING_THICKNESS  # 4.125
 RING_FACE_BAND = (0.05, -0.05)  # (upper, lower) deviations
-RING_THICKNESS_BAND = (
-    RING_FACE_BAND[0] - RING_FACE_BAND[1],
-    RING_FACE_BAND[1] - RING_FACE_BAND[0],
-)  # (upper, lower): the two faces' bands
+RING_THICKNESS_BAND = (0.05, -0.05)  # (upper, lower) deviations, at the ring
 SHANK_THICKNESS_BAND = RING_THICKNESS_BAND
 RULE12_SECTION_MIN = 2.0  # drawing-guidelines.md rule 17 (walls and webs)
 if RING_THICKNESS + RING_THICKNESS_BAND[1] < RULE12_SECTION_MIN:
@@ -116,6 +114,18 @@ FORK_BASE_BELOW_PIN = 13.0
 # tine, so the tine's whole thickness is the pin's land.
 PIN_HOLE_DIA = 1.968
 PIN_HOLE_BAND = (0.010, 0.0)  # (upper, lower) deviations, reamed; native
+# Every inside corner -- the slot floor's two, the fork's root step onto the
+# shank (four) and the shank onto the ring (two) -- is one modelled fillet
+# printed as a single-limit R MAX (drawing-guidelines.md rule 16): the model
+# value IS the printed maximum (swTolMAX prints nominal + MAX). The slot
+# floor's caps the size: under the arm's least clearance over the floor
+# (ch_rod_pivot_pin_spec checks it), and well inside half the slot.
+INSIDE_CORNER_R = 0.5
+INSIDE_CORNER_BAND = (0.0, -INSIDE_CORNER_R)  # (upper, lower): sharp to MAX
+INSIDE_CORNER_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.5 MAX"
+INSIDE_CORNER_PLACES = 1
+if 2.0 * INSIDE_CORNER_R >= FORK_SLOT_WIDTH + FORK_SLOT_BAND[1]:
+    raise AssertionError("the slot floor's corner radii meet across the slot")
 
 # --- Derived spans (mirror build_ch_connecting_rod). ---
 RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4

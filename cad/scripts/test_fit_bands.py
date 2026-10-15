@@ -238,9 +238,9 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "air and the chain envelope's reach"
     ),
     ("ch_connecting_rod_spec", "RING_THICKNESS_BAND"): (
-        "the 2.175 plate between its two faces, each located +/-RING_FACE_BAND "
-        "from the fork face (#982), indexed by cylinder_bank_layout for the "
-        "thickest ring its cam slot holds"
+        "the 2.175 plate's thickness, printed at the ring (#982 review r1), "
+        "indexed by cylinder_bank_layout for the thickest ring its cam slot "
+        "holds"
     ),
     ("ch_connecting_rod_spec", "FORK_THICKNESS_BAND"): (
         "the fork over the tines, a reference: two TINE_BANDs and the "

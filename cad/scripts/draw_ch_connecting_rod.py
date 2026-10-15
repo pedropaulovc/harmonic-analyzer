@@ -5,10 +5,11 @@ views, dimension layout, callout text, and manufacturing notes;
 sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
-The rod is a tall thin lollipop (~190 mm ring-bottom to fork crown), so the
+The rod is a tall thin lollipop (~184 mm ring-bottom to fork crown), so the
 sheet runs at 1:1 with a 1:2 isometric; the fork's side profile (tines, slot
-and the ring/shank faces located from one fork face) prints in a 4:1 detail
-of the side view.
+and the plate's near face located from one fork face) prints in a 3:1 detail
+of the side view, and the side view carries the plate's thickness at the ring
+and the overall length as a reference.
 
 Run with SolidWorks open::
 
@@ -62,12 +63,14 @@ from ch_connecting_rod_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
     FORK_BASE_Y,
+    FORK_SLOT_WIDTH,
     FORK_THICKNESS,
     FORK_TOP_Y,
     GEOMETRIC_TOLERANCES_MM,
     PIN_HOLE_DIA,
     RING_BORE_DIA,
     RING_BOTTOM_Y,
+    SHANK_WIDTH,
     STRAP_DIAMETRAL_CLEARANCE,
     SURFACE_FINISHES,
 )
@@ -98,14 +101,17 @@ FRONT_CENTER = (0.180, 0.135)
 # thickness and carries the fork detail's circle.
 LEFT_CENTER = (0.080, FRONT_CENTER[1])
 ISO_CENTER = (0.398, 0.212)
-ISO_NOTE_XY = (0.355, 0.168)
-# The one-line note stands right of the detail's lower dimensions.
-NOTES_XY = (0.360, 0.097)
+# Over the isometric: below it, the detail's boss-length witness runs out.
+ISO_NOTE_XY = (0.352, 0.262)
+# The one-line note stands in the open field between the front view's shank
+# and the detail, clear of the bore's finish symbol.
+NOTES_XY = (0.205, 0.130)
 
 # The mates the tight bands name (drawing-guidelines.md rule 7).
 CAM_NUMBER = str(_config.parts("dt-cylinder-gear")["number"])
 ARM_NUMBER = str(_config.parts("ch-rocker-arm")["number"])
 PIN_NUMBER = str(_config.parts("ch-rod-pivot-pin")["number"])
+ROD_NUMBER = str(_config.parts("ch-connecting-rod")["number"])
 
 
 def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
@@ -127,8 +133,9 @@ def _left_xy(offset: float, my: float) -> tuple[float, float]:
 
 FRONT_KEEP = {
     # Both ring diameters stand outside the ring, down-left, their leaders
-    # meeting the rims (inside the ring the texts sat on the ring's ink).
-    "RingOuterDia": (0.135, 0.098),
+    # meeting the rims (inside the ring the texts sat on the ring's ink). The
+    # outer's text stands clear right of the centre distance's line (r1).
+    "RingOuterDia": (0.145, 0.100),
     "StrapBoreDia": (0.130, 0.040),
     # Right of the shank, so the flanks never strike the value.
     "ShankWidthDim": (0.198, 0.150),
@@ -136,6 +143,10 @@ FRONT_KEEP = {
     # The reamed pin hole's value stands right of the fork, below the position
     # FCF's level leader, so the two leaders cannot cross.
     "PinHoleDia": (0.218, 0.196),
+    # The inside corners' radius off the shank's +X flank onto the ring
+    # (build_ch_connecting_rod's first fillet edge), up-right in the open
+    # field right of the shank, above the bore's finish symbol.
+    "InsideCornerR": (0.225, 0.106),
 }
 # Descriptive text beneath each native value/band: the strap bore and its
 # cam; the fork's crown, a full round on the pin tangent to its sides; the
@@ -150,26 +161,45 @@ FRONT_CALLOUTS = {
         f" {_CLEARANCE_LEAST:.2f}-{_CLEARANCE_MOST:.2f}\nDIAMETRAL CLEARANCE"
     ),
     "ForkWidthDim": "FULL R",
+    "InsideCornerR": "ALL INSIDE CORNERS",
     "PinHoleDia": (
         f"THRU - REAM; PRESS\nFIT ON PIN {PIN_NUMBER},\n"
         f"{_PRESS_LEAST:.3f}-{_PRESS_MOST:.3f} INTERFERENCE"
     ),
 }
 
-# DETAIL C: the fork's side profile at 4:1. At 1:1 the tines, slot and ring
+# The side view at 1:1: the plate's thickness at the ring (#982 review r1),
+# its value out to the left below the ring so its witnesses drop from the
+# ring's bottom corners.
+LEFT_KEEP = {
+    "RingThick": (0.042, _left_xy(0.0, RING_BOTTOM_Y)[1] - 0.007),
+}
+LEFT_CALLOUTS = {
+    "RingThick": f"RING AND SHANK; RUNS IN\nCAM SLOT OF {CAM_NUMBER}",
+}
+# The overall length, ring bottom to crown top, as a reference (two
+# silhouettes of the side view: the ring's bottom and the far tine's top),
+# right of the side view, clear of the detail circle's letter on its left.
+OVERALL_BOTTOM_XY = _left_xy(0.0, RING_BOTTOM_Y)
+OVERALL_TOP_XY = _left_xy((FORK_THICKNESS + FORK_SLOT_WIDTH) / 4.0, FORK_TOP_Y)
+OVERALL_TEXT_XY = (0.100, 0.175)
+
+# DETAIL C: the fork's side profile at 3:1. At 1:1 the tines, slot and ring
 # faces are 1.7-2.7 mm features and their dimensions crowded the side view
 # (baseline review). The fence centres on the rod axis midway between the
 # crown top and the ring-face references' lower ends and takes in both.
-DETAIL_SCALE = (4, 1)
+DETAIL_SCALE = (3, 1)
 DETAIL_RADIUS_MM = 11.0
 DETAIL_FENCE_Y_MM = (FORK_TOP_Y + FORK_BASE_Y - 2.0) / 2.0
-DETAIL_CENTER = (0.312, 0.150)
+# Right of the front view's pin-hole callout and FCF, below the isometric,
+# above the title block.
+DETAIL_CENTER = (0.325, 0.135)
 _DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 _DETAIL_FENCE_R = DETAIL_RADIUS_MM * _DETAIL_MM
 if DETAIL_RADIUS_MM <= math.hypot(FORK_THICKNESS / 2.0, FORK_TOP_Y - DETAIL_FENCE_Y_MM):
     raise AssertionError("DETAIL C's fence must take in the whole crown top")
-# The label stands right of the fence, under the isometric's note.
-DETAIL_LABEL_XY = (0.375, 0.130)
+# The label stands right of the fence, between the boss length's witnesses.
+DETAIL_LABEL_XY = (0.395, 0.140)
 # The fence's letter on the side view, up-left of its circle.
 DETAIL_LETTER_XY = (
     LEFT_CENTER[0] - DETAIL_RADIUS_MM / 1000.0 - 0.006,
@@ -191,36 +221,45 @@ _FACE_X = _detail_xy(-FORK_THICKNESS / 2.0, FORK_TOP_Y)[0]
 _FAR_X = _detail_xy(FORK_THICKNESS / 2.0, FORK_TOP_Y)[0]
 _TINE_TOP_Y = _detail_xy(0.0, FORK_TOP_Y)[1]
 _ROOT_Y = _detail_xy(0.0, FORK_BASE_Y)[1]
+# The ring-face references' lower ends (build_ch_connecting_rod).
+_REF_END_Y = _detail_xy(0.0, FORK_BASE_Y - 2.0)[1]
 DETAIL_KEEP = {
     # Over the tines, nearest first: the near tine (text wholly left of the
     # datum face's witness), the slot (text right of the far face), the
     # reference thickness centred over the fork.
-    "TineNear": (_FACE_X - 0.028, _TINE_TOP_Y + 0.014),
-    "SlotWidth": (_FAR_X + 0.024, _TINE_TOP_Y + 0.028),
-    "ForkThick": (DETAIL_CENTER[0], _TINE_TOP_Y + 0.042),
+    "TineNear": (_FACE_X - 0.030, _TINE_TOP_Y + 0.010),
+    "SlotWidth": (_FAR_X + 0.030, _TINE_TOP_Y + 0.016),
+    "ForkThick": (DETAIL_CENTER[0], _TINE_TOP_Y + 0.028),
     # Down the right-hand side from the crown top: the slot depth inside, the
     # boss length outside.
-    "SlotDepth": (_FAR_X + 0.018, (_TINE_TOP_Y + _ROOT_Y) / 2.0 + 0.006),
-    "ForkBossLength": (_FAR_X + 0.044, (_TINE_TOP_Y + _ROOT_Y) / 2.0),
-    # Under the fork, from the datum face: the ring's near face (text left of
-    # the datum face), its far face (text right of the ring).
-    "RingFaceNear": (_FACE_X - 0.028, _ROOT_Y - 0.026),
-    "RingFaceFar": (_FAR_X + 0.024, _ROOT_Y - 0.040),
+    "SlotDepth": (_FAR_X + 0.016, (_TINE_TOP_Y + _ROOT_Y) / 2.0 + 0.004),
+    "ForkBossLength": (_FAR_X + 0.034, (_TINE_TOP_Y + _ROOT_Y) / 2.0),
+    # Under the fork, from the datum face: the plate's near face (text left
+    # of the datum face).
+    "RingFaceNear": (_FACE_X - 0.030, _REF_END_Y - 0.010),
 }
-_RING_FACE_CALLOUT = f"RING FACE; RUNS IN\nCAM SLOT OF {CAM_NUMBER}"
 DETAIL_CALLOUTS = {
-    "TineNear": f"2X TINE; CLEARS THE\nNEXT ROD ON {ARM_NUMBER}",
+    "TineNear": f"2X; CLEARS NEXT\nROD {ROD_NUMBER}",
     "SlotWidth": f"RUNS ON ARM\n{ARM_NUMBER}",
-    "RingFaceNear": _RING_FACE_CALLOUT,
-    "RingFaceFar": _RING_FACE_CALLOUT,
+    "RingFaceNear": f"PLATE FACE; RING IN\nCAM SLOT OF {CAM_NUMBER}",
 }
 
 BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
 BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.025, BORE_FINISH_EDGE[1] + 0.015)
+# Datum A on the strap bore at 5:30, its tag inside the bore: at 9 o'clock its
+# leader lay on the centre distance's witness (r1); inside the bore the leader
+# crosses no outline and stands clear of both diameters' leaders and of the
+# centre mark.
+_DATUM_A_ANGLE = math.radians(-75.0)
+DATUM_A_EDGE = _sheet_xy(
+    RING_BORE_DIA / 2.0 * math.cos(_DATUM_A_ANGLE),
+    RING_BORE_DIA / 2.0 * math.sin(_DATUM_A_ANGLE),
+)
+DATUM_A_SYMBOL = (DATUM_A_EDGE[0] + 0.003, DATUM_A_EDGE[1] + 0.008)
 # Datum B on the shank's left flank. The tag's edge attachment re-solves
 # square to the flank, so its leader runs level at the tag's height, 4.5 mm
 # above the shank width's dimension line (its text stands right of the shank).
-DATUM_B_EDGE = _sheet_xy(-4.0, 100.0)
+DATUM_B_EDGE = _sheet_xy(-SHANK_WIDTH / 2.0, 100.0)
 DATUM_B_SYMBOL = (DATUM_B_EDGE[0] - 0.016, FRONT_KEEP["ShankWidthDim"][1] + 0.0045)
 # The 4.00 BASIC (datum B to the pin axis) runs between the pin and the fork
 # root, its text out to the left: over the pin its line lay on the position
@@ -229,7 +268,7 @@ PIN_OFFSET_TEXT_XY = (0.150, _sheet_xy(0.0, (CENTER_DISTANCE + FORK_BASE_Y) / 2.
 
 
 def _fork_detail(adapter: Any, left: Any) -> Any:
-    """DETAIL C: a native 4:1 detail of the side view's fork."""
+    """DETAIL C: a native 3:1 detail of the side view's fork."""
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
     parent = _early_bound(left, "IView")
@@ -366,6 +405,13 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    left_annotations = curate_view_dimensions(
+        adapter,
+        left,
+        keep=LEFT_KEEP,
+        view_label="side",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     detail = _fork_detail(adapter, left)
     set_hidden_lines_removed(adapter, detail)
     detail_annotations = curate_view_dimensions(
@@ -378,14 +424,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # The bands import with their named model dimensions, at the part's
     # places; the drawing owns only the callout text beneath them.
     assert_imported_precision(
-        adapter, front_annotations, DRAWING_PRECISION["PinHoleProfile"]
+        adapter,
+        front_annotations,
+        {**DRAWING_PRECISION["PinHoleProfile"], **DRAWING_PRECISION["InsideCorners"]},
     )
+    assert_imported_precision(adapter, left_annotations, DRAWING_PRECISION["RingDisc"])
     assert_imported_precision(
         adapter,
         detail_annotations,
         {**DRAWING_PRECISION["ForkBoss"], **DRAWING_PRECISION["ForkSlotProfile"]},
     )
     set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
+    set_dimension_callouts(adapter, left_annotations, LEFT_CALLOUTS)
     set_dimension_callouts(adapter, detail_annotations, DETAIL_CALLOUTS)
     # Two tines and the slot set the fork over the tines: it prints as a
     # reference.
@@ -397,6 +447,20 @@ async def build(adapter: Any) -> dict[str, str]:
     if len(fork_thick) != 1:
         raise RuntimeError("fork detail does not carry exactly one fork thickness")
     set_reference_dimension(adapter, fork_thick[0], label="fork over the tines")
+    # Overall length, ring bottom to crown top: the side view's two
+    # horizontal silhouettes, so the dimension is their plain distance (two
+    # circle picks in the front view would dimension centre to centre).
+    overall = add_edge_dimension(
+        adapter,
+        left,
+        p0=OVERALL_BOTTOM_XY,
+        p1=OVERALL_TOP_XY,
+        text_xy=OVERALL_TEXT_XY,
+        label="overall length",
+        orientation="vertical",
+        entity_type="SILHOUETTE",
+    )
+    set_reference_dimension(adapter, overall, label="overall length")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -418,15 +482,14 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_basic_dimension(adapter, centre_distance, label="rod centre distance")
 
-    # Datum A on the strap bore axis (picked at 9 o'clock so the tag stands off
-    # to the LEFT), Ra on the bore at 6 o'clock, and a position FCF tying the
-    # rocker pin hole to A.
-    bore_left = _sheet_xy(-RING_BORE_DIA / 2.0, 0.0)
+    # Datum A on the strap bore axis (picked at 5:30, the tag inside the
+    # bore), Ra on the bore at 3 o'clock, and a position FCF tying the rocker
+    # pin hole to A.
     add_datum_feature(
         adapter,
         front,
-        edge_xy=bore_left,
-        symbol_xy=(bore_left[0] - 0.020, bore_left[1]),
+        edge_xy=DATUM_A_EDGE,
+        symbol_xy=DATUM_A_SYMBOL,
         datum="A",
         label="strap bore axis",
     )
