@@ -88,6 +88,7 @@ from pd_support_bar_drawing_spec import (
     DRAWING_PRECISION,
     FACE_VIEW_CAPTION,
     FRONT_FINISH_REASON,
+    STATION_END_LABEL,
     SURFACE_FINISHES,
     TOP_FINISH_REASON,
 )
@@ -108,16 +109,19 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1, 2)
 FACE_SCALE = (1, 2)
 SECTION_SCALE = (2, 1)
-ISO_SCALE = (1, 6)
+# 1:4 so the holes read in the pictorial (r5 review: a sliver at 1:6).
+ISO_SCALE = (1, 4)
 _S = FACE_SCALE[0] / FACE_SCALE[1] / 1000.0  # sheet metres per model mm
 
 # The back face above, the front face below, both at 1:2 with their ends
-# aligned; section A-A right of the back face's end, the isometric under it.
+# aligned; section A-A right of the back face's end, the isometric under it
+# (its 1:4 diagonal runs down-right, under the section's caption and above
+# the title block), its scale note clear of it to the lower left.
 FACE_CENTER = (0.170, 0.222)
 BACK_CENTER = (0.170, 0.122)
 SECTION_CENTER = (0.385, 0.200)
-ISO_CENTER = (0.365, 0.098)
-ISO_NOTE_XY = (0.300, 0.076)
+ISO_CENTER = (0.372, 0.093)
+ISO_NOTE_XY = (0.262, 0.076)
 
 LEFT_END = FACE_CENTER[0] - BAR_LENGTH * _S / 2.0
 RIGHT_END = FACE_CENTER[0] + BAR_LENGTH * _S / 2.0
@@ -125,6 +129,11 @@ FACE_TOP = FACE_CENTER[1] + BAR_HEIGHT * _S / 2.0
 FACE_BOTTOM = FACE_CENTER[1] - BAR_HEIGHT * _S / 2.0
 BACK_TOP = BACK_CENTER[1] + BAR_HEIGHT * _S / 2.0
 BACK_BOTTOM = BACK_CENTER[1] - BAR_HEIGHT * _S / 2.0
+# The -X end every station runs from, named beside it in both views: left of
+# the back face's left end, right of the front face's right end (inside the
+# bar height's extension lines, left of its dimension line).
+FACE_END_LABEL_TOP = (LEFT_END - 0.012, FACE_CENTER[1] + 0.002)
+BACK_END_LABEL_TOP = (RIGHT_END + 0.008, BACK_CENTER[1] + 0.002)
 
 
 def _face_x(model_x: float) -> float:
@@ -169,14 +178,16 @@ FACE_CAPTION_TOP = (0.200, FACE_BOTTOM - 4.0 * ROW_STEP - 0.008)
 # here, shortest nearest the bar; the first's 5.75 mm span is too short for
 # its text, which stands left of its hole between it and the second's. The
 # bar height reads off that end too (the BarProfile dimension's model edge),
-# the clamp row's height off the other end, where its rise is.
+# the clamp row's height off the other end, where its rise is: its text
+# stands left of its dimension line, so the line hugs the bar to keep the
+# text inside the border (r5 audit: outside-border).
 BACK_KEEP = {
     "ClampStation1": (RIGHT_END - 0.015, BACK_BOTTOM - 0.010),
     "ClampStation2": (RIGHT_END - 0.012, BACK_BOTTOM - 0.018),
     "ClampStation3": (RIGHT_END - 0.150, BACK_BOTTOM - 0.026),
     "ClampStation4": (RIGHT_END - 0.170, BACK_BOTTOM - 0.034),
-    "Height": (RIGHT_END + 0.016, BACK_TOP + 0.016),
-    "ClampRowHeight": (LEFT_END - 0.020, BACK_BOTTOM - 0.008),
+    "Height": (RIGHT_END + 0.022, BACK_TOP + 0.016),
+    "ClampRowHeight": (LEFT_END - 0.010, BACK_BOTTOM - 0.008),
 }
 # The counterbores' callout stands wholly right of the hole it points at, so
 # its leader slants right, off the clamp row height's extension line.
@@ -199,6 +210,8 @@ SECTION_KEEP_NAMES = ("Depth", "ThreadMin", "DrillDepth")
 SECTION_DEPTH_RISE = 0.010
 SECTION_DEPTH_SIDE = 0.028
 SECTION_DEPTH_TEXT_SIDE = 0.016
+# The full thread's text states its 1.5D shortfall, so it stands further out.
+SECTION_THREAD_TEXT_SIDE = 0.026
 SECTION_THREAD_DROP = 0.010
 SECTION_DRILL_DROP = 0.027
 CAPTION_DROP = 0.035
@@ -251,10 +264,14 @@ def _section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, float]]:
     bottom = point(0.0, -BAR_HEIGHT / 2.0)[1]
     mouth = point(BACK_FACE_Z)[0]
     front = point(-BACK_FACE_Z)[0]
-    outside = mouth + math.copysign(SECTION_DEPTH_TEXT_SIDE, mouth - front)
+    away = math.copysign(1.0, mouth - front)
+    outside = mouth + away * SECTION_DEPTH_TEXT_SIDE
     return {
         "Depth": (min(mouth, front) - SECTION_DEPTH_SIDE, top + SECTION_DEPTH_RISE),
-        "ThreadMin": (outside, bottom - SECTION_THREAD_DROP),
+        "ThreadMin": (
+            mouth + away * SECTION_THREAD_TEXT_SIDE,
+            bottom - SECTION_THREAD_DROP,
+        ),
         "DrillDepth": (outside, bottom - SECTION_DRILL_DROP),
     }
 
@@ -532,6 +549,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _place_caption(adapter, BACK_VIEW_CAPTION, BACK_CAPTION_TOP)
     _place_caption(adapter, TOP_FINISH_REASON, TOP_REASON_TOP)
     _place_caption(adapter, FRONT_FINISH_REASON, FRONT_REASON_TOP)
+    _place_caption(adapter, STATION_END_LABEL, FACE_END_LABEL_TOP)
+    _place_caption(adapter, STATION_END_LABEL, BACK_END_LABEL_TOP)
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 

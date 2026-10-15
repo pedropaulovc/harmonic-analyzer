@@ -27,12 +27,14 @@ bar length and the clamp-screw stations.
 from __future__ import annotations
 
 from _gtol_planar import PlanarFace
+from _hole_spec import THREAD_MAJOR_MM
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pd_support_bar_spec import (
     BAR_BAND_PLACES,
     BAR_DEPTH,
     BAR_HEIGHT,
     BRACKET_TAP_SPEC,
+    PIVOT_TAP_FULL_THREAD_MIN,
     PIVOT_TAP_THREAD,
     TAP_CSK_ANGLE_DEG,
 )
@@ -98,19 +100,21 @@ DIMENSION_CALLOUTS = {
     # The two rows print on one line at 1:2 though they are separate rows
     # (the hanger row from the machine layout, the clamp row at mid-height).
     "HangerRowHeight": f"MHA-VN-041 PIVOT AND\n{_HOOK_TAPS},\nNOT ON THE CLAMP ROW",
-    "ClampRowHeight": "BAR MID-HEIGHT",
+    "ClampRowHeight": "BAR\nMID-HEIGHT",
     "PivotTapStation": "MHA-VN-041 PIVOT",
     "BracketTapStation1": _HOOK_TAPS,
     "BracketTapStation2": _HOOK_TAPS,
     # The thread class is the title block's (rule 2).
     "PivotTapDrillDia": f"TAP {PIVOT_TAP_THREAD} UNC",
     "DrillDepth": "FLAT BOTTOM",
-    "ThreadMin": "FULL THREAD",
+    # Rule 20: the blind full thread falls short of rule 18's 1.5D; the
+    # sheet states the shortfall as a plain fact (the 9.0 bar's floor).
+    "ThreadMin": f"FULL THREAD ({PIVOT_TAP_FULL_THREAD_MIN / THREAD_MAJOR_MM[PIVOT_TAP_THREAD]:.2f}D)",
     "PivotCskDia": f"{_CSK}, MHA-VN-041\nSHOULDER BEARS OUTSIDE",
     "BracketCskDia": f"2X {_CSK}\nBOTH FACES, {BRACKET_TAP_SPEC.size} TAPS",
 }
 # Under the counterbores' native callout: the screws whose heads they sink,
-# and why the depth is held (.XXX, the heads' worst case stays sub-flush).
+# and why the depth has a floor (the heads' worst case stays sub-flush).
 CLAMP_CBORE_CALLOUT = "MHA-VN-021 HEADS BELOW SLIDE FACE"
 
 # The platen hangs by its top rail's underside on the top face and slides
@@ -128,8 +132,11 @@ SURFACE_FINISHES = (
 
 FACE_VIEW_CAPTION = "VIEW ON BACK FACE"
 BACK_VIEW_CAPTION = "VIEW ON FRONT FACE"
+# The face views mirror each other, so the end every station runs from is
+# named at that end in both views (rule 10: one end, plainly the same one).
+STATION_END_LABEL = "END A"
 # Each slide grade's reason, beside its symbol (rule 7: flagged where it
 # applies), so the sheet carries no general note.
 TOP_FINISH_REASON = "PLATEN HANGS HERE"
 FRONT_FINISH_REASON = "PLATEN SLIDES HERE"
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:6"
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

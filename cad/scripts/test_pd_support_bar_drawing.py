@@ -160,6 +160,7 @@ def test_sheet_texts_carry_no_dimensions_and_stay_short() -> None:
         sheet_spec.FRONT_FINISH_REASON,
         sheet_spec.FACE_VIEW_CAPTION,
         sheet_spec.BACK_VIEW_CAPTION,
+        sheet_spec.STATION_END_LABEL,
     ):
         assert len(text.splitlines()) == 1
         assert re.search(r"\d", text) is None
@@ -168,6 +169,9 @@ def test_sheet_texts_carry_no_dimensions_and_stay_short() -> None:
     assert sheet_spec.ISOMETRIC_VIEW_NOTE.endswith(
         f"{drawing.ISO_SCALE[0]}:{drawing.ISO_SCALE[1]}"
     )
+    # The station end is named in both mirrored face views.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("_place_caption(adapter, STATION_END_LABEL,") == 2
 
 
 def test_callouts_name_the_mates() -> None:
@@ -187,7 +191,9 @@ def test_callouts_name_the_mates() -> None:
     assert "2B" not in "".join(callouts.values())
     assert drawing._THREAD_CLASS_TOKEN == " <hw-threadclass>"
     assert callouts["DrillDepth"] == "FLAT BOTTOM"
-    assert callouts["ThreadMin"] == "FULL THREAD"
+    # Rule 20: the blind thread's shortfall against 1.5D, stated as a fact.
+    assert callouts["ThreadMin"] == "FULL THREAD (1.25D)"
+    assert spec.PIVOT_TAP_FULL_THREAD_MIN < 1.5 * spec.THREAD_MAJOR_MM["#8-32"]
     assert callouts["BracketCskDia"].startswith("2X 90\u00b0 CSK")
     for text in callouts.values():
         assert len(text.splitlines()) <= 3
