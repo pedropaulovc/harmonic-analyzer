@@ -6,16 +6,18 @@ carries the transgear pivot's flat-bottomed #8-32 tap and the latch hook's two
 carries the four counterbored clamp-screw holes.
 
 * The upper view looks on the back face (model +Z, ``*Front``): the length,
-  the banded height, the hanger row's banded stations from the left end and
-  its height from the top face (the part-hidden HangerRowReference sketch),
-  the pivot drill's Ø with its tap, both countersinks' MAX Ø
-  (CountersinkReference) and the latch-hook taps' native callout.
-* The lower view looks on the front face (``*Back``, so the +X end is on the
-  sheet's left): the clamp row's stations and height (ClampRowReference) and
-  the counterbores' native callout.
-* Section A-A cuts the pivot tap across the bar: the banded thickness, the
-  drill's depth limits and the full thread's MIN (PivotThreadReference, in
-  the cutting plane).
+  the hanger row's banded stations from the left end, each naming its mate,
+  and its height from the top face (the part-hidden HangerRowReference
+  sketch), the pivot drill's Ø with its tap, both countersinks' MAX Ø
+  (CountersinkReference), the latch-hook taps' native callout and the top
+  face's slide roughness.
+* The lower view looks on the front face (``*Back``, so the left end is on
+  the sheet's right): the banded height, the clamp row's stations from the
+  same end and its height (ClampRowReference), the counterbores' native
+  callout (depth at .XXX) and the front face's slide roughness.
+* Each face view carries its caption; section A-A cuts the pivot tap across
+  the bar: the banded thickness, the drill's depth limits and the full
+  thread's MIN (PivotThreadReference, in the cutting plane).
 
 Every value and band is a native model dimension authored by
 ``build_pd_support_bar``; the sheet only places and curates them.
@@ -32,10 +34,7 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
-)
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 from _check import check
 from _com import _early_bound
@@ -47,19 +46,23 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_annotation_extent import move_annotation
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import scan_view_edges
+from _drawing_finish import add_surface_finish
 import _drawing_hidden_sketches as hidden_sketches
-from _drawing_hole_callout import add_native_hole_callout
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _gtol_face_resolve import resolve_faces
 from _hole_spec import blind_cut_dia_mm
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from _surface_finish import surface_finish_by_key
 from build_pd_support_bar import (
     BAR_LENGTH,
     CLAMP_CBORE_DIA,
@@ -73,14 +76,17 @@ from pd_support_bar_spec import (
     BRACKET_TAP_SPEC,
     BRACKET_TAP_X,
     HANGER_TAP_Y,
-    PIVOT_TAP_DRILL_DEPTH,
-    PIVOT_TAP_FULL_THREAD_MIN,
     PIVOT_TAP_X,
 )
 from pd_support_bar_drawing_spec import (
+    BACK_VIEW_CAPTION,
+    CLAMP_CBORE_CALLOUT,
+    CLAMP_CBORE_DEPTH_PLACES,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    FACE_VIEW_CAPTION,
+    SURFACE_FINISHES,
 )
 
 
@@ -107,7 +113,7 @@ _S = FACE_SCALE[0] / FACE_SCALE[1] / 1000.0  # sheet metres per model mm
 FACE_CENTER = (0.170, 0.222)
 BACK_CENTER = (0.170, 0.122)
 SECTION_CENTER = (0.385, 0.200)
-ISO_CENTER = (0.350, 0.100)
+ISO_CENTER = (0.365, 0.098)
 NOTES_XY = (0.020, 0.064)
 ISO_NOTE_XY = (0.300, 0.076)
 
@@ -130,42 +136,62 @@ def _back_x(model_x: float) -> float:
 
 
 # The hanger stations are baselines from the left end, stacked under the bar
-# shortest first (9 mm rows), the length outermost; their texts step right so
-# none crosses a longer row's extension line. The row's height (from the top
-# face, its rise on the right end) and the bar's height stand off the right
-# end. The pivot's Ø and countersink stand up-left of it, clear of the
-# section line; the latch-hook countersink and tap callout up-right.
+# shortest first (13 mm rows: each value carries its mate's line), the length
+# outermost; their texts step right so none crosses a longer row's extension
+# line. The row's height (from the top face, its rise on the right end)
+# stands off the right end. The section line's arrows and letters stand left
+# of the pivot, so its Ø (higher) and countersink (lower, further right, so
+# the Ø's leader passes left of it) stand up-right of it; the latch-hook
+# countersink stands right of the taps, under their callout.
+ROW_STEP = 0.013
 FRONT_KEEP = {
-    "PivotTapStation": (LEFT_END + 0.042, FACE_BOTTOM - 0.010),
-    "BracketTapStation1": (LEFT_END + 0.100, FACE_BOTTOM - 0.019),
-    "BracketTapStation2": (LEFT_END + 0.120, FACE_BOTTOM - 0.028),
-    "Length": (FACE_CENTER[0], FACE_BOTTOM - 0.037),
-    "Height": (RIGHT_END + 0.045, FACE_TOP + 0.016),
+    "PivotTapStation": (LEFT_END + 0.042, FACE_BOTTOM - ROW_STEP),
+    "BracketTapStation1": (LEFT_END + 0.100, FACE_BOTTOM - 2.0 * ROW_STEP),
+    "BracketTapStation2": (LEFT_END + 0.125, FACE_BOTTOM - 3.0 * ROW_STEP),
+    "Length": (FACE_CENTER[0], FACE_BOTTOM - 4.0 * ROW_STEP),
     "HangerRowHeight": (RIGHT_END + 0.022, FACE_BOTTOM - 0.010),
-    "PivotTapDrillDia": (_face_x(PIVOT_TAP_X) - 0.040, FACE_TOP + 0.014),
-    "PivotCskDia": (_face_x(PIVOT_TAP_X) - 0.040, FACE_TOP + 0.030),
-    "BracketCskDia": (_face_x(BRACKET_TAP_X[0]) + 0.040, FACE_TOP + 0.014),
+    "PivotTapDrillDia": (_face_x(PIVOT_TAP_X) + 0.022, FACE_TOP + 0.030),
+    "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.045, FACE_TOP + 0.014),
+    "BracketCskDia": (_face_x(BRACKET_TAP_X[0]) + 0.065, FACE_TOP + 0.014),
 }
-BRACKET_CALLOUT_XY = (_face_x(BRACKET_TAP_X[1]) + 0.030, FACE_TOP + 0.034)
+BRACKET_CALLOUT_XY = (_face_x(BRACKET_TAP_X[1]) + 0.010, FACE_TOP + 0.026)
+# The top face's slide roughness on its edge, left of the section line.
+TOP_FINISH_MODEL_X = -178.0
+TOP_FINISH_SYMBOL_XY = (LEFT_END + 0.030, FACE_TOP + 0.014)
+FACE_CAPTION_TOP = (0.200, FACE_BOTTOM - 4.0 * ROW_STEP - 0.008)
 
-# The clamp stations from the sheet-left (+X) end, shortest nearest the bar;
-# the first's 11.5 span is too short for its text, which stands right of its
-# extension lines, short of the second hole's.
+# The clamp stations from the same left (x = -226) end, on the sheet's right
+# here, shortest nearest the bar; the first's 5.75 mm span is too short for
+# its text, which stands left of its hole between it and the second's. The
+# bar height reads off that end too (the BarProfile dimension's model edge),
+# the clamp row's height off the other end, where its rise is.
 BACK_KEEP = {
-    "ClampStation1": (LEFT_END + 0.040, BACK_BOTTOM - 0.010),
-    "ClampStation2": (LEFT_END + 0.012, BACK_BOTTOM - 0.018),
-    "ClampStation3": (LEFT_END + 0.150, BACK_BOTTOM - 0.026),
-    "ClampStation4": (LEFT_END + 0.170, BACK_BOTTOM - 0.034),
-    "ClampRowHeight": (RIGHT_END + 0.016, BACK_BOTTOM - 0.008),
+    "ClampStation1": (RIGHT_END - 0.015, BACK_BOTTOM - 0.010),
+    "ClampStation2": (RIGHT_END - 0.012, BACK_BOTTOM - 0.018),
+    "ClampStation3": (RIGHT_END - 0.150, BACK_BOTTOM - 0.026),
+    "ClampStation4": (RIGHT_END - 0.170, BACK_BOTTOM - 0.034),
+    "Height": (RIGHT_END + 0.032, BACK_TOP + 0.016),
+    "ClampRowHeight": (LEFT_END - 0.016, BACK_BOTTOM - 0.008),
 }
-CLAMP_CALLOUT_XY = (_back_x(CLAMP_ROW_X[0]) + 0.020, BACK_TOP + 0.022)
+CLAMP_CALLOUT_XY = (_back_x(max(CLAMP_ROW_X)) + 0.020, BACK_TOP + 0.022)
+# The front face's slide roughness, seen face-on: a leader to a point clear
+# of the holes, the symbol above the view.
+FRONT_FINISH_MODEL_XY = (-150.0, 6.0)
+FRONT_FINISH_SYMBOL_XY = (0.252, BACK_TOP + 0.014)
+BACK_CAPTION_TOP = (BACK_CENTER[0], BACK_BOTTOM - 0.042)
+FINISH_CHAR_HEIGHT = 0.0025
+CAPTION_SETTLE_M = 0.0006
 
-# Section A-A: the thickness above the cut bar, the full thread and the drill
-# depth below it (shorter nearer), the caption dropped under them.
+# Section A-A: the thickness up-left of the cut bar, the full thread and the
+# drill depth below it (shorter nearer). Each text stands outside its
+# extension lines, beyond the tap's mouth, since the 2:1 spans are narrower
+# than the texts. The caption drops under them.
 SECTION_KEEP_NAMES = ("Depth", "ThreadMin", "DrillDepth")
-SECTION_DEPTH_RISE = 0.016
+SECTION_DEPTH_RISE = 0.010
+SECTION_DEPTH_SIDE = 0.028
+SECTION_DEPTH_TEXT_SIDE = 0.016
 SECTION_THREAD_DROP = 0.012
-SECTION_DRILL_DROP = 0.028
+SECTION_DRILL_DROP = 0.026
 CAPTION_DROP = 0.035
 SECTION_OVERRUN = 3.0  # mm the cutting line runs past each long edge
 
@@ -205,21 +231,22 @@ def _turn_y_up(adapter: Any, view: Any, *, label: str) -> None:
 
 
 def _section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, float]]:
-    """Section A-A's text positions from its own projection: whichever way
-    the cut looks, each depth's text centres between its two faces."""
+    """Section A-A's text positions from its own projection, whichever way the
+    cut looks: the thickness left of the bar's left face, the depths beyond
+    the tap's mouth."""
 
     def point(z: float, y: float = HANGER_TAP_Y) -> tuple[float, float]:
         return _sheet(adapter, section, (PIVOT_TAP_X, y, z), "section A-A")
 
-    top = point(0.0, BAR_HEIGHT / 2.0)
+    top = point(0.0, BAR_HEIGHT / 2.0)[1]
     bottom = point(0.0, -BAR_HEIGHT / 2.0)[1]
     mouth = point(BACK_FACE_Z)[0]
-    thread_end = point(BACK_FACE_Z - PIVOT_TAP_FULL_THREAD_MIN)[0]
-    floor = point(BACK_FACE_Z - PIVOT_TAP_DRILL_DEPTH)[0]
+    front = point(-BACK_FACE_Z)[0]
+    outside = mouth + math.copysign(SECTION_DEPTH_TEXT_SIDE, mouth - front)
     return {
-        "Depth": (top[0], top[1] + SECTION_DEPTH_RISE),
-        "ThreadMin": ((mouth + thread_end) / 2.0, bottom - SECTION_THREAD_DROP),
-        "DrillDepth": ((mouth + floor) / 2.0, bottom - SECTION_DRILL_DROP),
+        "Depth": (min(mouth, front) - SECTION_DEPTH_SIDE, top + SECTION_DEPTH_RISE),
+        "ThreadMin": (outside, bottom - SECTION_THREAD_DROP),
+        "DrillDepth": (outside, bottom - SECTION_DRILL_DROP),
     }
 
 
@@ -274,7 +301,7 @@ def _hole_rims(face: Any, back: Any) -> tuple[Any, Any]:
     cbore = (
         scan_view_edges(back, label="support-bar front face")
         .circle_at(
-            (CLAMP_ROW_X[0], 0.0, -BAR_DEPTH / 2.0),
+            (max(CLAMP_ROW_X), 0.0, -BAR_DEPTH / 2.0),
             CLAMP_CBORE_DIA / 2.0,
             axis=(0.0, 0.0, 1.0),
             label="clamp counterbore rim",
@@ -283,6 +310,77 @@ def _hole_rims(face: Any, back: Any) -> tuple[Any, Any]:
         .edge
     )
     return tap, cbore
+
+
+def _name_clamp_screws(display: Any) -> None:
+    """Hang the screws' part number under the counterbores' native callout,
+    and print its depth at the .XXX its head clearance needs."""
+    set_hole_callout_precision(
+        display,
+        {"hw-cbdepth": CLAMP_CBORE_DEPTH_PLACES},
+        label="clamp-screw counterbores",
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(4, CLAMP_CBORE_CALLOUT)  # swDimensionTextCalloutBelow
+    if str(display.GetText(4) or "") != CLAMP_CBORE_CALLOUT:
+        raise RuntimeError("clamp counterbore callout's mate line did not persist")
+
+
+def _place_caption(adapter: Any, text: str, top_centre: tuple[float, float]) -> None:
+    """A view caption whose measured box's top centre lands on ``top_centre``
+    (INote.GetExtent; draw_pd_transgear_feed_pinion._place_rear_caption)."""
+    raw_note = add_note(adapter, text, *top_centre)
+    if raw_note is None:
+        raise RuntimeError(f"caption {text!r} was not inserted")
+    note = _early_bound(raw_note, "INote")
+    for _attempt in range(4):
+        extent = tuple(float(value) for value in note.GetExtent())
+        error = (
+            top_centre[0] - (extent[0] + extent[3]) / 2.0,
+            top_centre[1] - extent[4],
+        )
+        if max(abs(error[0]), abs(error[1])) < CAPTION_SETTLE_M:
+            break
+        move_annotation(adapter, note.GetAnnotation(), *error, label=text)
+    else:
+        raise RuntimeError(f"caption {text!r} stayed at {extent}, asked {top_centre}")
+    _telemetry.info(f"caption {text!r}: extent {extent}")
+
+
+def _add_slide_finishes(adapter: Any, face: Any, back: Any) -> None:
+    """The platen's two slide faces: the top face on its edge in the back-face
+    view, the front face seen face-on, a leader to a point on it."""
+    top = _sheet(
+        adapter, face, (TOP_FINISH_MODEL_X, BAR_HEIGHT / 2.0, BACK_FACE_Z), "top finish"
+    )
+    add_surface_finish(
+        adapter,
+        face,
+        edge_xy=top,
+        leader_attach_xy=top,
+        symbol_xy=TOP_FINISH_SYMBOL_XY,
+        control=surface_finish_by_key(SURFACE_FINISHES, "top_slide"),
+        label="top slide finish",
+        char_height=FINISH_CHAR_HEIGHT,
+    )
+    control = surface_finish_by_key(SURFACE_FINISHES, "front_slide")
+    front_face = resolve_faces(
+        _early_bound(_early_bound(back, "IView").ReferencedDocument, "IModelDoc2"),
+        {control.key: control.face},
+    )[control.key]
+    add_surface_finish(
+        adapter,
+        back,
+        entity=front_face,
+        entity_type="FACE",
+        leader_attach_xy=_sheet(
+            adapter, back, (*FRONT_FINISH_MODEL_XY, -BAR_DEPTH / 2.0), "front finish"
+        ),
+        symbol_xy=FRONT_FINISH_SYMBOL_XY,
+        control=control,
+        label="front slide finish",
+        char_height=FINISH_CHAR_HEIGHT,
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -376,10 +474,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's band or limit) are authored on the part;
     # the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    for view, label in ((face, "back face"), (back, "front face")):
-        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
-            raise RuntimeError(f"failed to add ASME center marks on the {label}")
-
     tap_edge, cbore_edge = _hole_rims(face, back)
     add_native_hole_callout(
         adapter,
@@ -389,25 +483,34 @@ async def build(adapter: Any) -> dict[str, str]:
         label="latch-hook base taps",
         process="TAP",
     )
-    add_native_hole_callout(
-        adapter,
-        back,
-        edge=cbore_edge,
-        callout_xy=CLAMP_CALLOUT_XY,
-        label="clamp-screw counterbores",
-        process="DRILL, C'BORE",
+    _name_clamp_screws(
+        add_native_hole_callout(
+            adapter,
+            back,
+            edge=cbore_edge,
+            callout_xy=CLAMP_CALLOUT_XY,
+            label="clamp-screw counterbores",
+            process="DRILL, C'BORE",
+        )
     )
+    _add_slide_finishes(adapter, face, back)
     _lower_caption(adapter, section, CAPTION_DROP)
+    _place_caption(adapter, FACE_VIEW_CAPTION, FACE_CAPTION_TOP)
+    _place_caption(adapter, BACK_VIEW_CAPTION, BACK_CAPTION_TOP)
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
+    # The native TAP callout restates the taps, so the Hole Wizard's own
+    # "Tapped Hole" note is the one redundant automatic note.
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Support Bar Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 

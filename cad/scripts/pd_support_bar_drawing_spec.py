@@ -15,8 +15,10 @@ height along Y with y = 0 at mid-height, and its depth along Z with the FRONT
   back face) and its height from the TOP face, which carries the platen's top
   rail: the pivot and the latch hook's base place the platen's arm and hook
   relative to it.
-* The clamp row's stations run from the bar's end on the sheet's left in the
-  front-face view (x = +226) and its height from the top face.
+* The clamp row's stations run from the same end (x = -226, the sheet's right
+  in the front-face view) and its height from the top face.
+* The platen hangs on the top face and slides across the front face: both
+  carry the slide roughness (``SURFACE_FINISHES``, drawing-guidelines rule 6).
 
 The rows' nominals are the build's (``build_pd_support_bar``), which owns the
 bar length and the clamp-screw stations.
@@ -24,8 +26,12 @@ bar length and the clamp-screw stations.
 
 from __future__ import annotations
 
+from _gtol_planar import PlanarFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pd_support_bar_spec import (
     BAR_BAND_PLACES,
+    BAR_DEPTH,
+    BAR_HEIGHT,
     BRACKET_TAP_SPEC,
     PIVOT_TAP_THREAD,
     TAP_CSK_ANGLE_DEG,
@@ -85,22 +91,37 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 
 # Below each value: what the band or limit is for, naming the mating part.
 _CSK = f"{TAP_CSK_ANGLE_DEG:.0f}\u00b0 CSK"
+_HOOK_TAPS = "MHA-PD-014 HOOK TAPS"
 DIMENSION_CALLOUTS = {
-    "Height": "RUNS BETWEEN MHA-PD-011\nRAILS UNDER MHA-PD-012",
+    "Height": "MHA-PD-011 TOP RAIL HANGS ON IT,\nITS BOTTOM RAIL RUNS CLEAR",
     "Depth": "PIVOT TAP FLOOR AND\nMHA-VN-043 SCREW TIPS",
-    "HangerRowHeight": "MHA-VN-041 PIVOT AND\nMHA-PD-014 HOOK TAPS",
+    "HangerRowHeight": f"MHA-VN-041 PIVOT AND\n{_HOOK_TAPS}",
+    "PivotTapStation": "MHA-VN-041 PIVOT",
+    "BracketTapStation1": _HOOK_TAPS,
+    "BracketTapStation2": _HOOK_TAPS,
     "PivotTapDrillDia": f"TAP {PIVOT_TAP_THREAD} UNC-2B",
     "DrillDepth": "FLAT BOTTOM",
     "ThreadMin": "FULL THREAD",
     "PivotCskDia": f"{_CSK}, MHA-VN-041\nSHOULDER BEARS OUTSIDE",
     "BracketCskDia": f"2X {_CSK}\nBOTH FACES, {BRACKET_TAP_SPEC.size} TAPS",
 }
+# Under the counterbores' native callout: the screws whose heads they sink.
+CLAMP_CBORE_CALLOUT = "MHA-VN-021 CLAMP SCREWS"
 
-DRAWING_NOTES = "\n".join(
-    (
-        "UPPER VIEW: BACK FACE, CARRYING THE TRANSGEAR PIVOT AND LATCH-HOOK TAPS.",
-        "LOWER VIEW: FRONT FACE. THE PLATEN SLIDES ON IT, SO THE CLAMP SCREW",
-        "HEADS MUST SIT BELOW IT.",
-    )
+# The platen hangs by its top rail's underside on the top face and slides
+# across the front face (build_pd_support_bar; pd_platen_guide_spec's own
+# "bar_slide" face is the mate of the top one): the slide grade, rule 6.
+# PlanarFace offsets run along the outward normal (point . normal).
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "top_slide", MACHINED_UM, PlanarFace((0, 1, 0), BAR_HEIGHT / 2.0)
+    ),
+    SurfaceFinishControl(
+        "front_slide", MACHINED_UM, PlanarFace((0, 0, -1), BAR_DEPTH / 2.0)
+    ),
 )
+
+FACE_VIEW_CAPTION = "VIEW ON BACK FACE"
+BACK_VIEW_CAPTION = "VIEW ON FRONT FACE"
+DRAWING_NOTES = "THE PLATEN HANGS ON THE TOP FACE AND SLIDES ACROSS THE FRONT FACE."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:6"
