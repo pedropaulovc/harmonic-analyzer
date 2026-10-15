@@ -15,8 +15,9 @@ at the printed worst case, and each sheet prints its share:
   screws are tightened (draw_pd_paper_drive_assembly step text), so each
   diametral clearance stays positive.
 * **Screw line.** Each screw threads into the back ear and must pass the
-  front ear's #8 clearance hole: the two ear stations' worst-case mismatch
-  must stay inside that hole's radial float on the screw's major diameter.
+  front ear's #8 clearance hole: the two ears' worst-case mismatch, station
+  and height together, must stay inside that hole's radial float on the
+  screw's major diameter.
 
 The column is purchased 1 in DOM tube with no band in the repository
 (``fr_tube_frame_spec.OUTER_DIA``), so the bores are MATCHED to the column
@@ -26,6 +27,8 @@ diametral-clearance acceptance on MHA-FR-003, never a free-standing size band
 """
 
 from __future__ import annotations
+
+import math
 
 from _hole_spec import blind_cut_dia_mm
 from fr_tube_frame_spec import OUTER_DIA as COLUMN_DIA
@@ -43,6 +46,10 @@ BORE_DIAMETRAL_CLEARANCE = (0.10, 0.30)
 GRIP_OFFSET_BAND = 0.1
 # +/- on each ear-hole station from its arc's bore axis (both arcs).
 EAR_STATION_BAND = 0.1
+# +/- on each ear-hole height off its arc's bottom face (both arcs): the
+# stations' fastener budget, so each tap's position zone is the same on both
+# axes.
+EAR_HEIGHT_BAND = 0.1
 
 _MODEL_CLEARANCE = COLUMN_BORE - COLUMN_DIA
 if not BORE_DIAMETRAL_CLEARANCE[0] < _MODEL_CLEARANCE < BORE_DIAMETRAL_CLEARANCE[1]:
@@ -70,6 +77,19 @@ EAR_STATION_MISMATCH_MAX = 2.0 * EAR_STATION_BAND
 if EAR_STATION_MISMATCH_MAX >= SCREW_FLOAT:
     raise AssertionError(
         f"ear-station mismatch {EAR_STATION_MISMATCH_MAX:.3f} uses all of the "
+        f"{SCREW_FLOAT:.3f} screw float"
+    )
+
+# Across the bar's height the arcs' bottom faces need not meet -- each slides
+# on the column -- but both screws share that one sliding offset, so a screw
+# sees at worst half the two arcs' ear-to-ear height spreads (2 bands each)
+# set against each other.  The station and height mismatches are square to
+# each other, so a screw spends their resultant of the float.
+EAR_HEIGHT_MISMATCH_MAX = (2.0 * EAR_HEIGHT_BAND + 2.0 * EAR_HEIGHT_BAND) / 2.0
+EAR_SCREW_MISMATCH_MAX = math.hypot(EAR_STATION_MISMATCH_MAX, EAR_HEIGHT_MISMATCH_MAX)
+if EAR_SCREW_MISMATCH_MAX >= SCREW_FLOAT:
+    raise AssertionError(
+        f"ear-hole mismatch {EAR_SCREW_MISMATCH_MAX:.3f} uses all of the "
         f"{SCREW_FLOAT:.3f} screw float"
     )
 

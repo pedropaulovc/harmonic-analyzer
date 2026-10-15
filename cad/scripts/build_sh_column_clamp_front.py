@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import sys
 
-from _clamp_arc import build_arc
+from _clamp_arc import EAR_HEIGHT_DIMENSION, EAR_HEIGHT_REFERENCE, build_arc
 from _part_save import save_part_and_images
 from _session import run_build
 from _drawing_marks import (
@@ -31,6 +31,7 @@ from sh_column_clamp_front_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     EAR_HOLE_SPEC,
+    EAR_HEIGHT_BAND,
     EAR_STATION_BAND,
     EAR_STATION_DIMENSIONS,
     ISOMETRIC_VIEW_NOTE,
@@ -53,13 +54,16 @@ async def build(adapter) -> dict[str, str]:
     )
     # Manufacturing drawing support, applied to the unsaved model the shared
     # builder leaves behind and saved ONCE below (as build_sh_column_clamp_back
-    # does): the ear stations' band (sh_column_clamp_fit) and every printed
-    # dimension's places live on the model, then mark exactly the print's
-    # dimensions and stamp the make-critical title-block properties.
+    # does): the ear stations' and the ears' height bands (sh_column_clamp_fit)
+    # and every printed dimension's places live on the model, then mark exactly
+    # the print's dimensions and stamp the make-critical title-block properties.
     for dimension_name in EAR_STATION_DIMENSIONS:
         set_dimension_symmetric_tolerance(
             adapter, "EarHoles", dimension_name, EAR_STATION_BAND
         )
+    set_dimension_symmetric_tolerance(
+        adapter, EAR_HEIGHT_REFERENCE, EAR_HEIGHT_DIMENSION, EAR_HEIGHT_BAND
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

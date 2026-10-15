@@ -117,12 +117,12 @@ def _face_xy(y_mm: float, z_mm: float) -> tuple[float, float]:
 # line, the grip offset (split face to bore axis) under the view, and the
 # bore's reference Ø leadered in through the upper half of the open mouth
 # from above right, clear of both (the axis witnesses run right and down from
-# the axis, so nothing crosses the leader).  Split-face view: the height
-# under the view, the ear-hole station from the bore centerline right of it,
-# its mate callout under the value, and the ears' shared height off the
-# bottom face just under the view (EarHoleHeight, from the part's hidden
-# EarHeightReference sketch: its witnesses leave the bottom face and ear 1's
-# centre).
+# the axis, so nothing crosses the leader).  Split-face view: the ear-hole
+# station from the bore centerline right of it, its mate callout under the
+# value; under the view, the ears' shared height off the bottom face
+# (EarHoleHeight, from the part's hidden EarHeightReference sketch: its
+# witnesses leave the bottom face and ear 1's centre) with its mate callout
+# under the value, and the height below that callout.
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0], 0.240),
     "GripOffset": (0.236, 0.104),
@@ -131,7 +131,7 @@ TOP_KEEP = {
     "BoreDia": (0.240, 0.205),
 }
 FACE_KEEP = {
-    "Height": (FACE_CENTER[0], 0.098),
+    "Height": (FACE_CENTER[0], 0.090),
     "EarHole1Z": (0.335, 0.1575),
     "EarHoleHeight": (FACE_CENTER[0] + 0.008, 0.113),
 }
@@ -143,9 +143,9 @@ REFERENCE_DIMENSIONS = ("BoreDia",)
 # The bands that are tighter than the title block name their mate and why
 # (drawing-guidelines.md rule 4): the bore is matched to the purchased column
 # (sh_column_clamp_fit), the bore axis stands off the split face so the clamp
-# faces stay apart once both bores seat, and the ear stations line up with the
-# front arc's clearance holes.  All under the value: SOLIDWORKS prints nothing
-# of an above-callout holding a line break
+# faces stay apart once both bores seat, and the ear stations and height line
+# up with the front arc's clearance holes.  All under the value: SOLIDWORKS
+# prints nothing of an above-callout holding a line break
 # (draw_dt_cone_gear_shaft._printable_above_callouts).
 DIMENSION_CALLOUTS = {
     "BoreDia": (
@@ -154,6 +154,7 @@ DIMENSION_CALLOUTS = {
     ),
     "GripOffset": f"BORE AXIS OUTSIDE\nSPLIT FACE\nGRIP GAP TO {FRONT_ARC_MATE}",
     "EarHole1Z": f"ALIGNS WITH\n{FRONT_ARC_MATE} EARS",
+    "EarHoleHeight": f"ALIGNS WITH\n{FRONT_ARC_MATE} EARS",
 }
 
 # Model points (mm) the sheet picks project from, on the split face (X =

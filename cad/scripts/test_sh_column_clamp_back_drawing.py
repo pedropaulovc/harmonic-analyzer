@@ -65,7 +65,7 @@ def test_both_ears_located_by_one_model_owned_height() -> None:
     feature = _clamp_arc.EAR_HEIGHT_REFERENCE
     name = _clamp_arc.EAR_HEIGHT_DIMENSION
     assert spec.DRAWING_DIMENSIONS[feature] == {name}
-    assert spec.DRAWING_PRECISION[feature] == {name: 2}
+    assert spec.DRAWING_PRECISION[feature] == {name: 1}
     assert drawing.DRAWING_PRECISION_BY_NAME is spec.DRAWING_PRECISION_BY_NAME
     assert not hasattr(spec, "EAR_HOLE_HEIGHT_PLACES")
     assert name in drawing.FACE_KEEP
@@ -112,6 +112,15 @@ def test_fit_budget_closes_at_the_printed_limits() -> None:
     assert fit.GRIP_GAP_MIN > 0.0
     # The ear stations' worst mismatch leaves screw float for drill wander.
     assert fit.EAR_STATION_MISMATCH_MAX < fit.SCREW_FLOAT
+    # So does the ears' worst mismatch with height and station together: the
+    # height takes the stations' band, so each tap's zone is the same both ways.
+    assert fit.EAR_HEIGHT_BAND == fit.EAR_STATION_BAND
+    assert math.isclose(fit.EAR_HEIGHT_MISMATCH_MAX, 2.0 * fit.EAR_HEIGHT_BAND)
+    assert math.isclose(
+        fit.EAR_SCREW_MISMATCH_MAX,
+        math.hypot(fit.EAR_STATION_MISMATCH_MAX, fit.EAR_HEIGHT_MISMATCH_MAX),
+    )
+    assert fit.EAR_SCREW_MISMATCH_MAX < fit.SCREW_FLOAT
 
 
 def test_walls_hold_the_rule_17_target_at_the_printed_worst_case() -> None:
@@ -126,10 +135,13 @@ def test_tight_bands_name_their_mate() -> None:
     assert f"{fit.BORE_DIAMETRAL_CLEARANCE[0]:.2f}" in bore
     assert "MHA-SH-001" in drawing.DIMENSION_CALLOUTS["GripOffset"]
     assert "MHA-SH-001" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
+    assert "MHA-SH-001" in drawing.DIMENSION_CALLOUTS["EarHoleHeight"]
     # The grip offset says what it locates: the bore axis, off the split face.
     assert "BORE AXIS" in drawing.DIMENSION_CALLOUTS["GripOffset"]
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "GRIP_OFFSET_BAND" in source and "EAR_STATION_BAND" in source
+    assert "EAR_HEIGHT_BAND" in source
+    assert spec.EAR_HEIGHT_BAND is fit.EAR_HEIGHT_BAND
 
 
 def test_sheet_has_no_gdt_notes_or_drawing_precision() -> None:
