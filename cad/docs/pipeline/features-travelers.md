@@ -237,9 +237,10 @@ missing spec file or correct the inventory's `cad` stem before retrying.
 ## Strict local travelers and enrollment
 
 `_process_plans.TRAVELER_STEMS` is the enrollment authority for the
-`prechips:<stem>` task family. It is **empty** in this infrastructure change.
-The legacy rocker, shaft and cone plans remain tracked but are stale against
-the pinned prechips; they are neither run nor shipped. A stem enrolls only after its
+`prechips:<stem>` task family. It is currently **empty**. The rocker plan is
+migrated but held until its traveler reaches exit 0; the legacy shaft and cone
+plans remain tracked but are stale against the pinned prechips; they are neither
+run nor shipped. A stem enrolls only after its
 migrated plan reaches exit 0 on real exported geometry. See
 [`cad/process/README.md`](../../process/README.md) for authoring and enrollment.
 
