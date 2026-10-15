@@ -57,7 +57,10 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 AXIS_Y = 0.212
-RIGHT_CENTER = (0.216, AXIS_Y)
+# Left of the sheet centre: the across-flat callout block starts at its
+# dimension line right of the right tip and runs ~35 mm right (r2 crossed
+# the border at 0.216); the left tip's 5.45 still clears the zone margin.
+RIGHT_CENTER = (0.198, AXIS_Y)
 # The isometric fills the free band over the title block at 1:1 (half the
 # sheet scale, hence its note): the shaft runs lower-left to upper-right
 # about 114 x 66 mm, so x 0.261-0.375, y 0.089-0.155.
@@ -91,7 +94,10 @@ _SHAFT_BOTTOM_Y = AXIS_Y - _on_sheet(SHAFT_DIA / 2.0)
 # of centre, its symbol below the shaft, clear of the Ø callout block (which
 # hangs left of mid-length) and of the across-flat callout at the right tip.
 FINISH_EDGE = (RIGHT_CENTER[0] + 0.060, _SHAFT_BOTTOM_Y)
-FINISH_SYMBOL = (RIGHT_CENTER[0] + 0.075, AXIS_Y - 0.030)
+FINISH_SYMBOL = (RIGHT_CENTER[0] + 0.075, AXIS_Y - 0.024)
+# The fleet's routine finish height, not the dimension height (r1: the
+# symbol was drawn far larger than the other annotation text).
+FINISH_CHAR_HEIGHT = 0.0025
 RIGHT_KEEP = {
     "FlatFromEnd": (_LEFT_TIP_X - 0.0065, _ROW_1),
     "FlatLength": (_RIGHT_FLAT_INNER_X - 0.0105, _ROW_1),
@@ -107,8 +113,9 @@ RIGHT_KEEP = {
     "DomeRadius": (_LEFT_TIP_X + 0.030, AXIS_Y - 0.018),
     # Below and right of the right tip, outside its extension lines, so the
     # dimension line stops at the value instead of running through the
-    # two-line callout under it (r1).
-    "AcrossFlat": (_RIGHT_TIP_X + 0.012, AXIS_Y - 0.022),
+    # two-line callout under it (r1). The block is left-aligned on the
+    # dimension line, so it ends ~35 mm right of the anchor.
+    "AcrossFlat": (_RIGHT_TIP_X + 0.010, AXIS_Y - 0.022),
 }
 
 
@@ -204,6 +211,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="fulcrum bearing finish",
+        char_height=FINISH_CHAR_HEIGHT,
     )
 
     # 0.020: the note is left-aligned on its anchor, so the ink starts here. The

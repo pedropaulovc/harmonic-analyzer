@@ -308,11 +308,13 @@ SHAFT_FIT_CLEARANCE_MM = (
     BORE_DIA_BAND[1] - SHAFT_DIA_BAND[0],
     BORE_DIA_BAND[0] - SHAFT_DIA_BAND[1],
 )  # (0.035, 0.070)
+# No line ends in punctuation: the widest row ends on the dimension's
+# vertical leader, and a trailing ';' touched it (machinist review r2).
 SHAFT_DIA_CALLOUT = "\n".join(
     (
-        "SLIDING FIT IN MHA-CH-007 BORES,",
+        "SLIDING FIT IN MHA-CH-007 BORES",
         f"{SHAFT_FIT_CLEARANCE_MM[0]:.3f}-{SHAFT_FIT_CLEARANCE_MM[1]:.3f} "
-        "DIAMETRAL CLEARANCE;",
+        "DIAMETRAL CLEARANCE",
         "MHA-CH-002 LEVERS RUN ON IT",
     )
 )
