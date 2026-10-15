@@ -803,6 +803,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rocker_arm_tl_trammel_setting_bar",
+        part="ch_rocker_arm_tl_trammel_setting_bar",
+        artifact_stem="ch-rocker-arm-tl-trammel-setting-bar",
+        script_name="draw_ch_rocker_arm_tl_trammel_setting_bar.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ch_rocker_arm_tl_diamond_pin",
         part="ch_rocker_arm_tl_diamond_pin",
         artifact_stem="ch-rocker-arm-tl-diamond-pin",
