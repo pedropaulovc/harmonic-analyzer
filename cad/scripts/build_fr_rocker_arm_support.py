@@ -34,8 +34,8 @@ Geometry (mm), source casting with the corrected top-down hold-down interface
 Z = wall thickness):
 
 * **Wall** -- trapezoid, wide foot ``Z ±31.75`` at ``Y=-88.9`` tapering to
-  ``Z ±8.4665`` at ``Y=+88.9``; mid-plane extrude 178.8 (``X ±89.4``): the
-  source's 177.8, widened 0.5 an end for the pivot brackets' feet
+  ``Z ±8.4665`` at ``Y=+88.9``; mid-plane extrude 180.5 (``X ±90.25``): the
+  source's 177.8, widened 1.35 an end for the pivot brackets' feet
   (``fr_rocker_arm_support_spec.SUPPORT_HALF_MACHINE_Z``).
 * **CavityCut** -- 127 mm cavity square (``±63.5``), Through-All-Both -> the
   central cavity, leaving 6.35 mm shell walls (whole ``CavityProfile``).
@@ -151,7 +151,7 @@ MATERIAL = "Gray Cast Iron"
 # fr_rocker_arm_support_section_spec's (pure data, so the base, frame, drive
 # train and drawing spec read them without importing this COM script). On the
 # Right plane: sketch-x -> model Z (taper), sketch-y -> model Y (height).
-BOSS_DEPTH = 2.0 * SUPPORT_HALF_MACHINE_Z  # mid-plane extrude along X (178.8)
+BOSS_DEPTH = 2.0 * SUPPORT_HALF_MACHINE_Z  # mid-plane extrude along X (180.5)
 # The source casting's length. The window and the cavity cut through the
 # wall's thickness inside the side posts, so the longer wall only thickens
 # both posts: every stage's measured volume gains the trapezoid's area times
@@ -904,7 +904,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # 1. Boss: trapezoid on the Right plane (sketch-x -> model Z, sketch-y ->
-    #    model Y, so the wide foot sits at Y=-88.9), mid-plane extruded 178.8
+    #    model Y, so the wide foot sits at Y=-88.9), mid-plane extruded 180.5
     #    along X. A polygon chain (two slanted sides) anchored at the foot's
     #    -Z corner; the six dims drive off FootHalf/TopHalf/HalfHeight.
     trap = SketchDims()

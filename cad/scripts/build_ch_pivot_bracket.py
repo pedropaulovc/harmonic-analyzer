@@ -6,7 +6,9 @@ the green rocker-arm support (ch14 page002_img01/img02, page002_img07
 at one END of the foot, and the foot is only as wide as the support's apex.
 #743 PR2 (Reading 1, user Q4): the bright dome on the ear is the pivot
 shaft's own domed end, not a brazed-on ball, so the ear is a plain plate
-arched EAR_W/2 about the O6.5 cross-bore. The north ear's inner face is the
+arched EAR_W/2 over the O6.5 cross-bore, its apex APEX_ABOVE_BORE over the
+bore axis (#1371: the arch's centre stands ARCH_LIFT over the bore so the
+apex tap keeps 1.5D of full thread). The north ear's inner face is the
 rocker bank's axial datum (the north thrust washer behind hub 19 bears on
 it); the south one is set off the MHA-VN-053 preload spring
 (``rocker_bank_layout``). One MHA-VN-034 #4-40 set screw
@@ -24,26 +26,27 @@ Layout (part frame; the section lives in ``ch_pivot_bracket_spec``): seat face
 at y = 0; origin under the bore, on the seat plane. Foot FOOT_W along X by
 FOOT_H tall by FOOT_Z0..FootZ1 along Z; ear EAR_W (= FOOT_W, so its sides run
 flush with the foot's) wide by EAR_T thick (Z), centred on the origin: a block
-from the foot top to the bore height plus a full O EAR_W boss on the bore
-axis, whose upper half is the arch (the arbor-pedestal crown idiom: no arcs,
-only proven primitives); O BORE_DIA cross-bore along Z; one #4-40 tap down
-through the arch apex (EAR_TOP_Y) on x = 0, z = 0 into the bore
-(``SetScrewTap``); one hold-down hole through the foot on x = 0 in the foot's
-free run (``ch_pivot_bracket_sides`` places it), its station
+from the foot top to the arch centre (BORE_H + ARCH_LIFT) plus a full
+O EAR_W boss on that centre, whose upper half is the arch (the arbor-pedestal
+crown idiom: no arcs, only proven primitives); O BORE_DIA cross-bore along Z;
+one #4-40 tap down through the arch apex (EAR_TOP_Y) on x = 0, z = 0 into
+the bore (``SetScrewTap``); one hold-down hole through the foot on x = 0 in
+the foot's free run (``ch_pivot_bracket_sides`` places it), its station
 (``HoleStation``) dimensioned from the ear's inboard face at FOOT_Z0; the
 foot-to-ear inside corner filleted at its MAX radius (``CornerFillet``).
 
-Drawing contract (``ch_pivot_bracket_drawing_spec``): three blanked
+Drawing contract (``ch_pivot_bracket_drawing_spec``): four blanked
 reference-line sketches carry the bore's and the hold-down hole's lateral
-locations off the west side face and the apex tap's station off the inboard
-face; the build marks the drawing dimensions, owns their decimal places and
-bands, and authors the foot seat's finish.
+locations off the west side face, the apex tap's station off the inboard
+face and the apex's height over the bore; the build marks the drawing
+dimensions, owns their decimal places and bands, and authors the foot seat's
+finish.
 
 Volume (``V_TOTAL``): foot FOOT_W * FOOT_H * FOOT_LEN, plus the ear block
-EAR_W * (BORE_H - FOOT_H) * EAR_T and the arch half-disc pi R^2 / 2 * EAR_T,
-less the bore, the apex tap's drill from the arch down to the bore
-(``V_TAP``) and the hold-down hole, plus the corner fillet's spandrel
-(``V_CORNER``).
+EAR_W * (BORE_H + ARCH_LIFT - FOOT_H) * EAR_T and the arch half-disc
+pi R^2 / 2 * EAR_T, less the bore, the apex tap's drill from the arch down to
+the bore (``V_TAP``) and the hold-down hole, plus the corner fillet's
+spandrel (``V_CORNER``).
 
 Run (SolidWorks already open)::
 
@@ -102,6 +105,8 @@ from ch_pivot_bracket_drawing_spec import (
 )
 from ch_pivot_bracket_sides import FOOT_LEN, FOOT_Z1, HOLE_STATION, HOLE_Z
 from ch_pivot_bracket_spec import (
+    APEX_ABOVE_BORE,
+    ARCH_LIFT,
     BORE_DIA,
     BORE_H,
     EAR_ARCH_R,
@@ -115,7 +120,6 @@ from ch_pivot_bracket_spec import (
     HOLE_DIA,
     SET_SCREW_HOLE_SPEC,
     SET_SCREW_STATION_BAND,
-    STATION_BAND,
 )
 
 
@@ -124,40 +128,47 @@ MATERIAL = "Plain Carbon Steel"  # black-finished steel (ch14 p.27)
 
 V_FOOT = FOOT_W * FOOT_H * FOOT_LEN
 # The ear block sits on the foot top, as wide as the foot: its sides merge
-# into the foot's, so the part stays one body and the volumes simply add.
-V_BLOCK = EAR_W * (BORE_H - FOOT_H) * EAR_T
+# into the foot's, so the part stays one body and the volumes simply add. It
+# rises to the arch's centre, ARCH_LIFT over the bore.
+ARCH_CENTER_Y = BORE_H + ARCH_LIFT
+V_BLOCK = EAR_W * (ARCH_CENTER_Y - FOOT_H) * EAR_T
 V_ARCH = 0.5 * math.pi * EAR_ARCH_R**2 * EAR_T  # the boss's upper half
 V_BORE = math.pi * (BORE_DIA / 2.0) ** 2 * EAR_T
 V_HOLE = math.pi * (HOLE_DIA / 2.0) ** 2 * FOOT_H
 # The apex tap's drill runs on x = 0 from the arch down to the bore: half of
-# each perpendicular cross-hole volume, arch minus bore (the arbor pedestal's
-# crown-minus-bore idiom; the two cylinders share the bore axis).
+# the arch's perpendicular cross-hole volume, the straight drill over the
+# ARCH_LIFT between the arch's centre and the bore's, less half of the bore's
+# (the arbor pedestal's crown-minus-bore idiom, its two axes ARCH_LIFT apart).
 TAP_DRILL_DIA = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC)
 V_TAP = (
     cross_hole_volume_mm3(TAP_DRILL_DIA, 2.0 * EAR_ARCH_R)
     - cross_hole_volume_mm3(TAP_DRILL_DIA, BORE_DIA)
-) / 2.0
+) / 2.0 + math.pi * (TAP_DRILL_DIA / 2.0) ** 2 * ARCH_LIFT
 # The foot-to-ear inside corner's fillet adds its spandrel, (1 - pi/4) R^2,
 # along the ear's width.
 V_CORNER = (1.0 - math.pi / 4.0) * CORNER_R_MAX**2 * EAR_W
 V_TOTAL = V_FOOT + V_BLOCK + V_ARCH - V_BORE - V_TAP - V_HOLE + V_CORNER
-if EAR_ARCH_R != EAR_W / 2.0 or BORE_H - EAR_ARCH_R <= FOOT_H:
+if EAR_ARCH_R != EAR_W / 2.0 or ARCH_CENTER_Y - EAR_ARCH_R <= FOOT_H:
     raise AssertionError("the ear boss must be the block's width and clear the foot")
 if EAR_W > FOOT_W:
     raise AssertionError("the ear must not overhang the foot's sides")
-if abs(BORE_H + EAR_ARCH_R - EAR_TOP_Y) > 1e-9:
+if abs(ARCH_CENTER_Y + EAR_ARCH_R - EAR_TOP_Y) > 1e-9:
     raise AssertionError("the arch apex must be the ear top the tap starts on")
+if not 0.0 < ARCH_LIFT < BORE_DIA / 2.0:
+    raise AssertionError("the arch centre must stand over the bore, inside it")
 
 # The drawing-reference lines (ch_pivot_bracket_drawing_spec.REFERENCE_SKETCHES):
 # (sketch, plane, dimension, start, end, orientation, value, drives). Points
 # are sketch coordinates -- the Top plane's sketch y is model -Z, the Front
-# plane's is model +Y. Every line lies on the part outline, so the view that
-# shows its sketch prints no extra line, and each starts on a FEATURE
-# (drawing-guidelines.md rule 10): the west side face for the lateral
-# locations, the ear's inboard face for the tap station. ``drives`` binds, in
-# creation order, the value dimension and then the start point's origin
-# anchors (x then y for a general point, one for a point on a sketch axis) to
-# the part's globals, so a global edit moves the line with the geometry.
+# plane's is model +Y. The lateral and station lines lie on the part outline,
+# so the view that shows their sketch prints no extra line, and each starts
+# on a FEATURE (drawing-guidelines.md rule 10): the west side face for the
+# lateral locations, the ear's inboard face for the tap station, the bore's
+# axis for the apex height (its line runs up the tap's axis, inside the tap).
+# ``drives`` binds, in creation order, the value dimension and then the start
+# point's origin anchors (x then y for a general point, one for a point on a
+# sketch axis) to the part's globals, so a global edit moves the line with the
+# geometry.
 REFERENCE_LINES = (
     (
         "BoreLateralReference",
@@ -190,6 +201,17 @@ REFERENCE_LINES = (
         "vertical",
         -FOOT_Z0,
         ('"EarT" / 2', '"FootW" / 2', '"EarT" / 2'),
+    ),
+    (
+        # Up the tap's axis, the bore's axis to the arch apex.
+        "ApexReference",
+        "Front",
+        "ApexAboveBore",
+        (0.0, BORE_H),
+        (0.0, EAR_TOP_Y),
+        "vertical",
+        APEX_ABOVE_BORE,
+        ('"ApexH"', '"BoreH"'),
     ),
 )
 if tuple(row[0] for row in REFERENCE_LINES) != REFERENCE_SKETCHES:
@@ -306,6 +328,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "EarW", f"{EAR_W}mm")
     await set_global(adapter, "EarT", f"{EAR_T}mm")
     await set_global(adapter, "BoreH", f"{BORE_H}mm")
+    await set_global(adapter, "ApexH", f"{APEX_ABOVE_BORE}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "HoleDia", f"{HOLE_DIA}mm")
     await set_global(adapter, "CornerR", f"{CORNER_R_MAX}mm")
@@ -346,24 +369,30 @@ async def build(adapter) -> dict[str, str]:
     expected = V_FOOT
     await volume_check(adapter, "foot", expected, 0.005 * expected)
 
-    # Ear block: Front-plane rectangle x +-EAR_W/2, y FOOT_H..BORE_H,
-    # extruded both ways (EAR_T total) -- its Z band is the bore's; its sides
-    # lie in the foot's, so the merge leaves one body. Emission:
-    # seg0 width, seg1 rise, then the (-EAR_W/2, FOOT_H) corner anchor (x, z).
+    # Ear block: Front-plane rectangle x +-EAR_W/2, y FOOT_H..the arch centre
+    # (ARCH_LIFT over the bore), extruded both ways (EAR_T total) -- its Z
+    # band is the bore's; its sides lie in the foot's, so the merge leaves one
+    # body. Emission: seg0 width, seg1 rise, then the (-EAR_W/2, FOOT_H)
+    # corner anchor (x, z).
     half_e = EAR_W / 2.0
     ear = SketchDims()
     check("create_sketch ear", await adapter.create_sketch("Front"))
     ear_rect = [
         (-half_e, FOOT_H),
         (half_e, FOOT_H),
-        (half_e, BORE_H),
-        (-half_e, BORE_H),
+        (half_e, ARCH_CENTER_Y),
+        (-half_e, ARCH_CENTER_Y),
     ]
     ear_lines = await add_line_chain(adapter, ear_rect)
     await define_rectilinear_chain(
         adapter, ear_lines, ear_rect, label="ear", dims=ear,
         names=["EarW", "EarRise", "EarAnchorX", "EarAnchorZ"],
-        drives=['"EarW"', '"BoreH" - "FootH"', '"EarW" / 2', '"FootH"'],
+        drives=[
+            '"EarW"',
+            '"BoreH" + "ApexH" - "EarW" / 2 - "FootH"',
+            '"EarW" / 2',
+            '"FootH"',
+        ],
     )
     await ensure_fully_defined(adapter, "ear sketch")
     check("exit_sketch ear", await adapter.exit_sketch())
@@ -383,17 +412,18 @@ async def build(adapter) -> dict[str, str]:
     expected += V_BLOCK
     await volume_check(adapter, "ear block", expected, 0.005 * V_BLOCK)
 
-    # Ear arch: a full O EAR_W boss on the bore axis, the block's own width,
-    # merged over the block's top -- its lower half lies inside the block, its
-    # upper half is the arch (the arbor-pedestal crown idiom). On-axis in X,
-    # so define_circle records the rise + size. The size is the RADIUS the
-    # print gives the arch (a sheet must never flip a model diameter radial).
+    # Ear arch: a full O EAR_W boss on the block's top edge (ARCH_LIFT over
+    # the bore), the block's own width, merged over it -- its lower half lies
+    # inside the block, its upper half is the arch (the arbor-pedestal crown
+    # idiom). On-axis in X, so define_circle records the rise + size. The size
+    # is the RADIUS the print gives the arch (a sheet must never flip a model
+    # diameter radial).
     arch = SketchDims()
     check("create_sketch arch", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, BORE_H, EAR_ARCH_R, "ear arch",
+        adapter, 0.0, ARCH_CENTER_Y, EAR_ARCH_R, "ear arch",
         dims=arch, names=("ArchCx", "ArchCz", "ArchRadius"),
-        drives=(None, '"BoreH"', '"EarW" / 2'),
+        drives=(None, '"BoreH" + "ApexH" - "EarW" / 2', '"EarW" / 2'),
         size_dimension="radius",
     )
     await ensure_fully_defined(adapter, "arch sketch")
@@ -437,8 +467,8 @@ async def build(adapter) -> dict[str, str]:
     # stopped at the next surface -- the shaft bore -- so it never runs on
     # into the ear below (build_dt_arbor_pedestal's apex-tap idiom). The arch is the
     # cylinder the wizard drills: its normal at the apex is -Y, through the
-    # shared arch/bore axis. Front Plane holds the point on z = 0, Right Plane
-    # clocks it to the apex.
+    # arch's axis and on down through the bore's, ARCH_LIFT below it. Front
+    # Plane holds the point on z = 0, Right Plane clocks it to the apex.
     wizard_hole_on_cylinder(
         adapter,
         SET_SCREW_HOLE_SPEC,
@@ -554,14 +584,12 @@ async def build(adapter) -> dict[str, str]:
     # guidelines`); the drawing reads them back instead of rewriting them.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _corner_radius_max_limit(adapter)
-    # Three lengths carry +/-0.10 natively (ch_pivot_bracket_spec: the
-    # foot's short run cannot take title-block .XX on them): the hold-down
-    # station and the apex tap's station, both from the ear's inboard face --
-    # the face fit-up sets and the S4 hold touches Z0 on -- and the ear
-    # thickness. The foot length rides the title block. The reamed bore
-    # holds the drilled-hole row's +0.10/0 its set-screw thread is counted at.
+    # Two lengths carry +/-0.10 natively (ch_pivot_bracket_spec): the apex
+    # tap's station from the ear's inboard face -- the face fit-up sets and
+    # the S4 hold touches Z0 on -- and the ear thickness. The foot length and
+    # the hold-down station ride the title block. The reamed bore holds the
+    # drilled-hole row's +0.10/0 its set-screw thread is counted at.
     set_dimension_symmetric_tolerance(adapter, "Ear", "EarThick", EAR_T_BAND)
-    set_dimension_symmetric_tolerance(adapter, "HoleProfile", "HoleStation", STATION_BAND)
     set_dimension_symmetric_tolerance(
         adapter, "SetScrewReference", "SetScrewLocation", SET_SCREW_STATION_BAND
     )

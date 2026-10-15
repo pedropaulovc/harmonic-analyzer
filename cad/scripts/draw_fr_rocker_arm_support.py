@@ -127,7 +127,7 @@ FRONT_KEEP = {
     # fix3 render), so the text sits up-right of that corner, on the arc's
     # own bisector. From the left column its leader crossed the whole cavity
     # and landed on the far side of the fillet's circle, off the arc.
-    "CavityRadius": (0.160, 0.240),
+    "CavityRadius": (0.161, 0.240),
     # Each stacked width prints its text just above its own dimension line,
     # so the lower one needs a full band: at 0.118 the 127.0 line ran
     # through "165.1" (fix3 render).
@@ -333,10 +333,10 @@ HOLE_TABLE_DATUM_XZ_MM = (-BOSS_DEPTH / 2.0, -WIDE)
 RIGHT_END_HOLE_TAGS = ("A3", "A4")
 HOLE_TAG_MIRROR_SHIFT = -0.0150
 EXPECTED_HOLE_TABLE_LOCATIONS_MM = (
-    (149.72, 49.21),
-    (29.08, 49.21),
-    (149.72, 14.29),
-    (29.08, 14.29),
+    (150.57, 49.21),
+    (29.93, 49.21),
+    (150.57, 14.29),
+    (29.93, 14.29),
 )
 
 

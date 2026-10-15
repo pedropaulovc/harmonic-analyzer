@@ -480,7 +480,7 @@ def test_window_is_the_source_square_with_rails_as_deep_as_the_foot() -> None:
 
 def test_web_volume_deltas_are_the_closed_forms() -> None:
     """The source casting's native targets plus the 9.525 web's deltas and
-    the longer wall's (178.8 for the source's 177.8): the window and cavity
+    the longer wall's (180.5 for the source's 177.8): the window and cavity
     cut inside the side posts, so every stage gains the trapezoid's area
     times the added length."""
     growth = support.WEB - support.SOURCE_WEB

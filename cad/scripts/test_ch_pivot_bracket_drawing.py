@@ -47,21 +47,22 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     keeps = (
         set(drawing.FRONT_KEEP),
         set(drawing.TOP_KEEP),
-        set(drawing.SIDE_KEEP_NAMES),
+        set(drawing.RIGHT_KEEP_NAMES),
     )
     assert set().union(*keeps) == marked
     assert sum(len(names) for names in keeps) == len(marked)
     # Every manufactured feature is sized and located: foot (width, length,
-    # height), ear (thickness; its width is the foot's), arch radius, bore
-    # (size, height, lateral), hold-down hole (size, station, lateral), the
-    # apex tap (native callout + station) and the foot-to-ear corner's MAX
-    # radius.
+    # height), ear (thickness; its width is the foot's), arch (radius, apex
+    # over the bore), bore (size, height, lateral), hold-down hole (size,
+    # station, lateral), the apex tap (native callout + station) and the
+    # foot-to-ear corner's MAX radius.
     assert marked == {
         "FootW",
         "FootLen",
         "FootHt",
         "EarThick",
         "ArchRadius",
+        "ApexAboveBore",
         "BoreCz",
         "ShaftBoreDia",
         "BoreLateral",
@@ -91,12 +92,15 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
 def test_model_bands_come_from_named_spec_constants() -> None:
     assert model_toleranced_dimensions(part) == {
         ("Ear", "EarThick"): "EAR_T_BAND",
-        ("HoleProfile", "HoleStation"): "STATION_BAND",
         ("SetScrewReference", "SetScrewLocation"): "SET_SCREW_STATION_BAND",
         ("ShaftBoreProfile", "ShaftBoreDia"): "*deviations(BORE_DIA_BAND)",
     }
-    assert part.EAR_T_BAND == part.STATION_BAND == 0.10
-    assert part.SET_SCREW_STATION_BAND == 0.10
+    assert part.EAR_T_BAND == part.SET_SCREW_STATION_BAND == 0.10
+    # The hold-down station rides the title block's .XX too (#1371 review: a
+    # band on a clearance hole's station holds nothing).
+    assert spec.STATION_BAND == spec.APEX_BAND == 0.508
+    assert "HoleStation" not in drawing.DIMENSION_CALLOUTS
+    assert round(HOLE_STATION, 1) == pytest.approx(HOLE_STATION)
     # The foot length rides the title block's .XX (its wall to the hold-down
     # hole is sized for it), so its sheet value carries no band of its own.
     assert spec.FOOT_LEN_BAND == spec.EDGE_BAND == 0.508
@@ -112,7 +116,13 @@ def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
     """Each line's value, and the origin anchors that place it on the outline,
     evaluate from the part's globals to the as-built value: the deferred
     equations are neutral, and a global edit moves the line."""
-    globals_mm = {"FootW": spec.FOOT_W, "FootZ1": FOOT_Z1, "EarT": spec.EAR_T}
+    globals_mm = {
+        "FootW": spec.FOOT_W,
+        "FootZ1": FOOT_Z1,
+        "EarT": spec.EAR_T,
+        "ApexH": spec.APEX_ABOVE_BORE,
+        "BoreH": spec.BORE_H,
+    }
 
     def evaluate(expression: str) -> float:
         text = re.sub(r'"(\w+)"', lambda m: repr(globals_mm[m.group(1)]), expression)
@@ -124,6 +134,8 @@ def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
         # The tap sits at z = 0, the bore axis plane; the station runs from
         # the ear's inboard face, the face every plan length starts on.
         "SetScrewLocation": 0.0 - spec.FOOT_Z0,
+        # The bore's axis up to the arch apex: the tap's thread length.
+        "ApexAboveBore": spec.EAR_TOP_Y - spec.BORE_H,
     }
     assert (
         tuple(row[0] for row in part.REFERENCE_LINES) == drawing_spec.REFERENCE_SKETCHES
@@ -138,13 +150,13 @@ def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
         value,
         drives,
     ) in part.REFERENCE_LINES:
-        assert value == expected[name], sketch
+        assert value == pytest.approx(expected[name]), sketch
         axis = 1 if orientation == "vertical" else 0
-        assert abs(end[axis] - start[axis]) == value
+        assert abs(end[axis] - start[axis]) == pytest.approx(value)
         assert end[1 - axis] == start[1 - axis]
         anchors = [abs(c) for c in start if abs(c) > 1e-9]
-        assert [evaluate(d) for d in drives] == [value, *anchors], sketch
-        assert plane == ("Front" if name == "BoreLateral" else "Top")
+        assert [evaluate(d) for d in drives] == pytest.approx([value, *anchors]), sketch
+        assert plane == ("Front" if name in {"BoreLateral", "ApexAboveBore"} else "Top")
     starts = {row[2]: row[3] for row in part.REFERENCE_LINES}
     # Laterals start on the west side face, the tap station on the inboard
     # face (Top-plane sketch y is model -Z).
@@ -168,22 +180,16 @@ def test_bore_callout_names_the_mating_pivot_shaft() -> None:
 
 
 def test_every_banded_length_says_what_its_band_holds() -> None:
-    """A band tighter than the title block names its reason at the dimension;
-    the hold-down station names the support it lands on."""
+    """A band tighter than the title block names its reason at the dimension,
+    one reason per dimension (#1371 review: the set-screw note belongs to the
+    tap's station, not the ear thickness)."""
     banded = {name for _feature, name in model_toleranced_dimensions(part)}
     assert banded <= set(drawing.DIMENSION_CALLOUTS)
-    support = _config.parts("fr-rocker-arm-support")["number"]
-    assert drawing.DIMENSION_CALLOUTS["HoleStation"] == f"ON {support} SEAT"
     washer = _config.parts("ch-rocker-thrust-washer")["number"]
     assert washer == "MHA-CH-009"
     assert drawing.DIMENSION_CALLOUTS["EarThick"] == f"THRUST FACES ON {washer}"
-    shaft = _config.parts("ch-pivot-shaft")["number"]
-    assert drawing.DIMENSION_CALLOUTS["SetScrewLocation"] == (
-        f"SET SCREW ON FLAT OF\nPIVOT SHAFT {shaft}"
-    )
-    assert not re.search(
-        r"\d", drawing.DIMENSION_CALLOUTS["SetScrewLocation"].replace(shaft, "")
-    )
+    assert drawing.DIMENSION_CALLOUTS["SetScrewLocation"] == "SET SCREW ON SHAFT FLAT"
+    assert sum("SET SCREW" in text for text in drawing.DIMENSION_CALLOUTS.values()) == 1
 
 
 # The native definitions of a through-next 4-40 Hole Wizard tap, as the
@@ -197,21 +203,17 @@ _NATIVE_TAP = {
 }
 
 
-def test_tap_callout_says_to_bore_and_states_its_engagement() -> None:
+def test_tap_callout_says_to_bore_and_states_no_shortfall() -> None:
     updated = drawing.set_screw_callout_definitions(dict(_NATIVE_TAP))
     assert updated[7] == "<MOD-DIAM><hw-thrutapdrldia> TO BORE"
-    assert updated[5] == (
-        f"TAP <hw-threaddesc> TO BORE\n{spec.SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT}"
-    )
+    assert updated[5] == "TAP <hw-threaddesc> TO BORE"
     joined = "\n".join(updated.values())
     # Every Hole Wizard size variable survives; the class and THRU are gone.
     assert "<hw-threaddesc>" in joined and "<hw-thrutapdrldia>" in joined
     assert "<hw-threadclass>" not in joined and "<hw-thru>" not in joined
-    # The engagement is the spec's own full-thread minimum, a plain fact.
-    fact = drawing.SET_SCREW_QUALIFIER
-    assert f"{spec.SET_SCREW_FULL_THREAD_MIN:.2f} MIN" in fact
-    for word in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY"):
-        assert word not in fact
+    # The lifted arch gives the tap rule 18's 1.5D, so nothing is stated.
+    assert "ENGAGEMENT" not in joined
+    assert spec.SET_SCREW_ENGAGEMENT_D >= spec.SET_SCREW_MIN_ENGAGEMENT_D == 1.5
 
 
 def test_apex_set_screw_shortfall_is_declared_and_stated() -> None:
@@ -259,8 +261,14 @@ def test_foot_seat_is_the_one_finish_controlled_face() -> None:
 
 
 def test_projected_views_stay_aligned_and_ordered() -> None:
-    assert drawing.SHEET_SCALE == (3.0, 1.0)
+    """One scale for every view; the right view stands level with the
+    elevation, the plan over it (#1371 review: third-angle alignment)."""
+    assert drawing.SHEET_SCALE == (2.0, 1.0)
+    assert drawing._VIEW_SCALE == (2, 1)
     assert drawing.TOP_CENTER[0] == drawing.FRONT_CENTER[0]
+    assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
+    for model_y in (0.0, spec.FOOT_H, spec.EAR_TOP_Y):
+        assert drawing._right_y(model_y) == pytest.approx(drawing._front_y(model_y))
     seat = drawing._front_y(0.0)
     apex = drawing._front_y(spec.EAR_TOP_Y)
     assert abs((seat + apex) / 2.0 - drawing.FRONT_CENTER[1]) < 1e-12
@@ -270,14 +278,17 @@ def test_projected_views_stay_aligned_and_ordered() -> None:
     # Room for the two lateral lanes between the elevation and the plan.
     lanes = (drawing.TOP_KEEP["HoleLateral"][1], drawing.TOP_KEEP["FootW"][1])
     assert plan_bottom > lanes[0] > lanes[1] > apex + 0.010
+    source = _drawing_source()
+    assert source.count("scale=_VIEW_SCALE") == 4
+    assert "add_note" not in source
 
 
 def _planned_corner_text() -> tuple[float, float]:
-    """The R MAX text in the planned left-view frame (*Left: +Z right)."""
+    """The R MAX text in the planned right-view frame (*Right: +Z left)."""
     dz, dy = drawing.CORNER_TEXT_OFFSET
     return (
-        drawing._side_x(spec.EAR_T / 2.0) + dz,
-        drawing._front_y(spec.FOOT_H) + dy,
+        drawing._right_x(spec.EAR_T / 2.0) - dz,
+        drawing._right_y(spec.FOOT_H) + dy,
     )
 
 
@@ -291,7 +302,7 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
         "isometric view": drawing.ISO_CENTER,
         "set-screw callout": drawing.SET_SCREW_CALLOUT_XY,
         "overall height": drawing.OVERALL_HEIGHT_XY,
-        "left view": drawing.SIDE_CENTER,
+        "right view": drawing.RIGHT_CENTER,
         "corner radius (planned frame)": _planned_corner_text(),
     }
     for label, (x, y) in anchors.items():
@@ -313,7 +324,7 @@ def test_apex_tap_callout_fits_above_the_plan_between_the_lanes() -> None:
     )
     thread = f"{drawing.SET_SCREW_PROCESS} 4-40 UNC {drawing.SET_SCREW_EXTENT}"
     box = estimate_text_box(
-        f"{drill}\n{thread}\n{drawing.SET_SCREW_QUALIFIER}",
+        f"{drill}\n{thread}",
         anchor=drawing.SET_SCREW_CALLOUT_XY,
         height=0.0035,
         reference=2,  # swCENTER
@@ -382,35 +393,31 @@ def test_corner_radius_is_the_largest_the_screw_head_clears() -> None:
     )
 
 
-def test_left_view_projects_the_corner_radius_clear_of_its_neighbours() -> None:
-    # Third-angle: the left view stands left of the elevation, level with it
-    # at the sheet scale (the two share _front_y), so it reads across.
-    assert drawing.SIDE_KEEP_NAMES == ("CornerRadius",)
-    assert drawing.SIDE_CENTER[1] == drawing.FRONT_CENTER[1]
-    left = drawing._side_x(spec.FOOT_Z0)
-    right = drawing._side_x(FOOT_Z1)
-    assert abs((left + right) / 2.0 - drawing.SIDE_CENTER[0]) < 1e-12
-    assert left > _FRAME_M + 0.005
-    # Clear of the overall height's text (~16 mm wide, centred on its lane).
-    assert right + 0.008 < drawing.OVERALL_HEIGHT_XY[0] - 0.008
+def test_right_view_shows_the_corner_radius_clear_of_its_neighbours() -> None:
+    template = DRAWING_TEMPLATES[DRAWINGS_BY_NAME["ch_pivot_bracket"].layout]
+    assert drawing.RIGHT_KEEP_NAMES == ("CornerRadius",)
+    left = drawing._right_x(FOOT_Z1)
+    right = drawing._right_x(spec.FOOT_Z0)
+    bottom = drawing._right_y(0.0)
+    top = drawing._right_y(spec.EAR_TOP_Y)
+    assert abs((left + right) / 2.0 - drawing.RIGHT_CENTER[0]) < 1e-12
+    assert abs((bottom + top) / 2.0 - drawing.RIGHT_CENTER[1]) < 1e-12
+    # Over the title block, under the foot length's extension line, left of
+    # the isometric (whose outline starts ~0.025 left of its centre at 2:1),
+    # right of the bore callout.
+    assert bottom - 0.010 > template.title_block_top_m
+    assert top + 0.010 < drawing._top_y(FOOT_Z1)
+    assert right + 0.015 < drawing.ISO_CENTER[0] - 0.025
+    bore_text_right = drawing.FRONT_KEEP["ShaftBoreDia"][0] + 0.029
     text_x, text_y = _planned_corner_text()
-    # The R MAX text (~15 mm wide) stands in the notch over the foot: right
-    # of the ear's outboard face, inside the foot's end, short of the
-    # overall height's text, above the foot top and under the bore axis.
-    assert drawing._side_x(spec.EAR_T / 2.0) < text_x - 0.0075
-    assert text_x + 0.0075 < drawing.OVERALL_HEIGHT_XY[0] - 0.008
-    assert drawing._front_y(spec.FOOT_H) + 0.010 < text_y
-    assert text_y < drawing._front_y(spec.BORE_H)
+    assert bore_text_right + 0.008 < text_x - 0.011
+    # The R MAX text stands over the open corner, above the foot top.
+    assert text_y > drawing._right_y(spec.FOOT_H) + 0.015
+    assert left - 0.011 < text_x < drawing._right_x(spec.EAR_T / 2.0)
     source = _drawing_source()
-    assert 'place_view(adapter, str(SOURCE), "*Left", *SIDE_CENTER, scale=(3, 1))' in (
-        source
-    )
-    assert source.count("for view in (front, top, iso, side):") == 2
-    assert 'for view, label in ((front, "front"), (top, "plan"), (side, "left")):' in (
-        source
-    )
+    assert source.count("for view in (front, top, iso, right):") == 2
     assert source.index("set_dimension_callouts(adapter, imported_annotations") < (
-        source.index("_dress_corner_radius(adapter, side_annotations)")
+        source.index("_dress_corner_radius(adapter, right_annotations)")
     )
 
 

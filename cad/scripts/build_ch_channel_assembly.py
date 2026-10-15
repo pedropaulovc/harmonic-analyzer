@@ -368,7 +368,7 @@ CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
 # on the north ear's inner face, the bank's datum; the MHA-VN-053 spring
 # between the south ear and the south washer on hub 0 preloads the bank north
 # onto it. The plain shaft is held by one MHA-VN-034 set screw per ear on a
-# flat. Feet outboard to the rocker-arm-support's +-89.4 end faces (it is the
+# flat. Feet outboard to the rocker-arm-support's +-90.25 end faces (it is the
 # only stand; the old south "A-frame" is gone).
 from rocker_bank_layout import (  # noqa: E402
     NORTH_EAR_INNER_Z,
@@ -455,11 +455,12 @@ if abs(SUPPORT_APEX_Y + _bracket_spec.BORE_H - PIVOT[1]) > 1e-9:
 # In service the screw drives the shaft down onto the bore's bottom, so the
 # installed cup sits this far below the modelled one.
 SET_SCREW_SHAFT_DROP = (_bracket_spec.BORE_DIA - _PIVOT_SHAFT_DIA) / 2.0
-# Each socket stands proud of its ear's arch top (modelled; installed less the
-# drop). Axially the screw lies inside its ear, the tap's worst-case walls to
-# both faces (ch_pivot_bracket_spec.SET_SCREW_WALLS_MIN) being positive, so the
-# ch0 / ch19 amplitude bars, which stay outside the ears' z bands, pass it as
-# they pass the ears.
+# Each socket's height over its ear's arch apex (modelled; installed less the
+# drop): negative since #1371 lifted the apex 1.30, so the socket sits 0.67
+# down the tap. Axially the screw lies inside its ear, the tap's worst-case
+# walls to both faces (ch_pivot_bracket_spec.SET_SCREW_WALLS_MIN) being
+# positive, so the ch0 / ch19 amplitude bars, which stay outside the ears' z
+# bands, pass it as they pass the ears.
 SET_SCREW_PROUD = SET_SCREW_TIP_Y + _SET_SCREW_LEN - (
     SUPPORT_APEX_Y + _bracket_spec.EAR_TOP_Y
 )

@@ -18,7 +18,7 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
   x +/-197, z +/-112, preserving the prior visible span.
 * rocker-arm-support x1 (the windowed trapezoidal NORTH support,
   build_fr_rocker_arm_support.py) at (X, Z) = (+72.9, 0), foot seated on the
-  base top. A 178.8 long x 177.8 tall cast plate, 63.5 thick (tapering to 16.94 at the
+  base top. A 180.5 long x 177.8 tall cast plate, 63.5 thick (tapering to 16.94 at the
   apex), with the central rounded window; its apex carries the north pivot ball
   mount (ch-channel.SLDASM, at machine z +116.915) and the rocker-pivot SHAFT runs
   along Z. This REPLACES the rocker-arm-portal casting (north + south unified

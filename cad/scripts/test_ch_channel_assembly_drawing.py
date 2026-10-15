@@ -389,14 +389,17 @@ def test_the_set_screw_shortfall_is_declared_on_the_assembly() -> None:
 
 
 def test_the_set_screw_interference_allowance_is_the_ear_tap() -> None:
-    """_interference_contracts restates the ear's arch radius and bore as
-    literals (every assembly imports it); they must be the bracket spec's,
-    and the screws' thread its apex tap's."""
+    """_interference_contracts restates the ear's apex height over the bore
+    and the bore as literals (every assembly imports it); they must be the
+    bracket spec's, and the screws' thread its apex tap's."""
     import _interference_contracts as ic
     import ch_pivot_bracket_spec as bracket_spec
     import vn_arbor_set_screw_spec as screw_spec
 
-    assert ic.PIVOT_EAR_ARCH_AND_BORE == (bracket_spec.EAR_ARCH_R, bracket_spec.BORE_DIA)
+    assert ic.PIVOT_EAR_APEX_AND_BORE == (
+        bracket_spec.APEX_ABOVE_BORE,
+        bracket_spec.BORE_DIA,
+    )
     assert screw_spec.THREAD == bracket_spec.SET_SCREW_THREAD
     pairs = ic.allowed_interference_pairs("ch-channel")
     for n in (1, 2):
