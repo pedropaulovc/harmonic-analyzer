@@ -68,9 +68,21 @@ ENGAGEMENT_MIN_D = 1.5
 # incomplete pitch: the 1.5D engagement plus that pitch, rounded up.
 THREAD_LENGTH_MIN = math.ceil((ENGAGEMENT_MIN_D * THREAD_MAJOR + PITCH) * 20.0) / 20.0
 FULL_FORM_TAIL_MIN = THREAD_LENGTH_MIN - INCOMPLETE_TIP_LEN_MAX
-# The 2A minor diameter's MAX (ASME B1.1 #8-32 UNC-2A, 0.1302 in): the cut-end
-# chamfer's least leg must reach under it so no feather edge is left.
-THREAD_MINOR_MAX = 0.1302 * 25.4
+# #8-32 UNC-2A external minor diameter, from the UNC class 2A/2B tables in
+# Kennametal's "Thread data - American UN" (read 2026-10-15,
+# https://kthreadmilling.kennametal.com/KThreadmillingWeb/help/UN%20standard.htm).
+# The previous 0.1302 in sits in the 2B INTERNAL minor band (0.130-0.139 in),
+# not on the screw's root.
+# The table publishes only the UNR reference MAXIMUM: the 2A major max
+# 0.1631 in (0.164 basic less the 0.0009 allowance) less 1.226869 P is
+# 0.1248 in = 3.170.  DERIVED ESTIMATE of the minimum, the repo's deepest-root
+# construction (sm_gooseneck_spring_screw_geom, dt_crank_handle_pivot_screw_spec):
+# a full basic half-depth 0.649519 P below the 2A pitch-diameter minimum
+# 0.1399 in is 0.1196 in = 3.038 (the UNR 0.108 P least root radius gives the
+# same 0.1196 in).
+THREAD_MINOR_UNR_2A_MAX = (0.1631 - 1.226869 / 32.0) * 25.4
+THREAD_PD_2A_MIN_IN = 0.1399
+THREAD_MINOR_2A_MIN_EST = (THREAD_PD_2A_MIN_IN - 0.649519 / 32.0) * 25.4
 # Radial leg from the native ChamferWidth, measured on the tip face: a MAX
 # (swTolMAX prints the nominal and "max."), so the model stands at the printed
 # maximum. Its callout asks for the chamfer past the thread root, which leaves
@@ -87,8 +99,23 @@ CHAMFER_AXIAL_MAX = CHAMFER_WIDTH_MAX * math.tan(
 )
 if not 0.0 < CHAMFER_AXIAL_MAX <= INCOMPLETE_TIP_LEN_MAX:
     raise AssertionError("cut-end chamfer exceeds the charged incomplete pitch")
-if not THREAD_MAJOR / 2.0 - CHAMFER_WIDTH_MAX < THREAD_MINOR_MAX / 2.0:
-    raise AssertionError("a chamfer past the thread root exceeds its maximum")
+
+
+def require_chamfer_past_root(chamfer_width_max: float) -> None:
+    """Refuse a cut-end chamfer band whose largest leg cannot reach under the
+    root of every conforming screw.
+
+    "Past the thread root" must be achievable for the worst screw: the largest
+    tip face (the basic major, at or above the 2A major max) against the
+    deepest root (the estimated 2A minor minimum).  A shallower root only makes
+    it easier, so checking the minor MAXIMUM would pass bands that leave a
+    feather edge on a deep-rooted screw.
+    """
+    if not THREAD_MAJOR - 2.0 * chamfer_width_max < THREAD_MINOR_2A_MIN_EST:
+        raise AssertionError("a chamfer past the thread root exceeds its maximum")
+
+
+require_chamfer_past_root(CHAMFER_WIDTH_MAX)
 # The faced length is shorter than every catalogue stock length's nominal and
 # its full thread clears the neck.
 if not FULL_THREAD_START + THREAD_LENGTH_MIN < FITTED_THREAD_LEN < THREAD_LEN:
