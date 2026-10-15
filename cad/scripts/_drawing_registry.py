@@ -810,6 +810,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rocker_arm_tl_filing_stand",
+        part="ch_rocker_arm_tl_filing_stand",
+        artifact_stem="ch-rocker-arm-tl-filing-stand",
+        script_name="draw_ch_rocker_arm_tl_filing_stand.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="dt_arbor_pedestal",
         part="dt_arbor_pedestal",
         artifact_stem="dt-arbor-pedestal",
