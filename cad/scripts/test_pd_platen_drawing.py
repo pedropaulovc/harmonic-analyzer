@@ -64,7 +64,7 @@ def test_registry_row_names_the_platen_sheet():
 
 
 def test_views_keep_exactly_the_marked_dimensions_once():
-    keeps = (draw.FRONT_KEEP, draw.RIGHT_KEEP, draw.BACK_KEEP)
+    keeps = (draw.FRONT_KEEP, draw.RIGHT_KEEP)
     names = [name for keep in keeps for name in keep]
     assert len(names) == len(set(names))
     assert set(names) == set().union(*spec.DRAWING_DIMENSIONS.values())
@@ -72,14 +72,57 @@ def test_views_keep_exactly_the_marked_dimensions_once():
     assert set(spec.DRAWING_PRECISION_BY_NAME) == set(names)
 
 
-def test_outline_prints_one_place_and_every_station_three():
+def test_places_follow_what_each_dimension_holds():
     places = spec.DRAWING_PRECISION_BY_NAME
     assert places["Width"] == places["Height"] == 1
     stations = (
         spec.DRAWING_DIMENSIONS["Sockets"] | spec.DRAWING_DIMENSIONS["GuideHoles"]
     )
     assert {places[name] for name in stations} == {3}
-    assert places["Depth"] == places["BossH"] == places["Boss1Dia"] == 3
+    # The thickness is spent by the disc-to-platen air and says so on the sheet.
+    assert places["Depth"] == 3
+    assert "Depth" in draw.DIMENSION_CALLOUTS_ABOVE
+    # The boss prints .X and still keeps its wall round the tap at that band.
+    assert places["BossH"] == places["Boss2Dia"] == 1
+    assert spec.SOCKET_BOSS_WALL_MIN == pytest.approx(
+        (spec.SOCKET_BOSS_DIA - printed_band_mm(1)) / 2.0 - 2.184 / 2.0
+    )
+    assert spec.SOCKET_BOSS_WALL_MIN >= 2.0
+
+
+def test_counterbore_floor_holds_the_user_accepted_worst_case():
+    # User ruling 2026-10-14: the thin floor is accepted at its 0.67 worst
+    # case and printed as a reference; nothing may thin it further.
+    depth_places = spec.DRAWING_PRECISION_BY_NAME["Depth"]
+    cbore_places = spec.GUIDE_CALLOUT_PRECISION["hw-cbdepth"]
+    worst = (
+        round(spec.PLATE_THICKNESS, depth_places)
+        - printed_band_mm(depth_places)
+        - round(spec.CBORE_DEPTH, cbore_places)
+        - printed_band_mm(cbore_places)
+    )
+    assert worst == pytest.approx(spec.CBORE_FLOOR_MIN)
+    assert worst >= 0.67
+    assert spec.CBORE_FLOOR == pytest.approx(spec.PLATE_THICKNESS - spec.CBORE_DEPTH)
+    # The reference line crosses the floor's annulus, clear of the through hole
+    # and inside the counterbore, so it measures metal.
+    offset = spec.CBORE_FLOOR_REFERENCE_Y - spec.GUIDE_HOLE_Y[0]
+    assert spec.GUIDE_HOLE_DIA / 2.0 < offset < spec.CBORE_DIA / 2.0
+    assert spec.DRAWING_DIMENSIONS["CboreFloorReference"] == {draw.REFERENCE_DIMENSION}
+    assert draw.REFERENCE_DIMENSION in draw.RIGHT_KEEP
+    assert draw.REFERENCE_DIMENSION in draw.DIMENSION_CALLOUTS_BELOW
+
+
+def test_one_centre_mark_per_hole_per_plan_view():
+    assert draw.CENTER_MARKS_PER_VIEW == len(spec.SOCKET_XY) + len(spec.GUIDE_HOLE_XY)
+
+
+def test_hole_callouts_name_their_mating_patterns():
+    assert "MHA-PD-011" in draw.GUIDE_CALLOUT_PROCESS
+    assert "MHA-PD-003" in draw.SOCKET_CALLOUT_PROCESS
+    # The through hole is DRILLED at .XX; the depth keeps .XXX to sink the head.
+    assert spec.GUIDE_CALLOUT_PRECISION["hw-thruholedia"] == 2
+    assert spec.HEAD_RECESS_MIN > 0.0
 
 
 def _placed_coordinates(points, placement, drives):
@@ -151,7 +194,6 @@ def test_views_and_annotations_stay_in_the_field():
     points = [
         *draw.FRONT_KEEP.values(),
         *draw.RIGHT_KEEP.values(),
-        *draw.BACK_KEEP.values(),
         draw.ISO_CENTER,
         draw.ISO_NOTE_XY,
         draw.RIGHT_NOTE_XY,
@@ -183,7 +225,7 @@ def test_x_stations_stack_smallest_nearest_below_the_front_view():
 def test_callout_picks_lie_on_their_hole_rims():
     guide = (draw._front_x(spec.GUIDE_HOLE_X[0]), draw._front_y(spec.GUIDE_HOLE_Y[1]))
     assert math.dist(draw.GUIDE_EDGE_XY, guide) == pytest.approx(
-        spec.CBORE_DIA / 2.0 * draw._S
+        spec.GUIDE_HOLE_DIA / 2.0 * draw._S
     )
     socket = (
         draw._front_x(max(x for x, _ in spec.SOCKET_XY)),
