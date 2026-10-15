@@ -44,7 +44,6 @@ from types import SimpleNamespace  # noqa: E402
 import pytest  # noqa: E402
 
 import _drawing_projection  # noqa: E402
-from _drawing_balloons import _ComponentLeaf  # noqa: E402
 import _telemetry  # noqa: E402
 
 GET_MATH_UTILITY = (132, 0, 1, (9, 0), ())
@@ -669,83 +668,12 @@ def test_a_suffix_that_does_not_persist_fails_the_sheet() -> None:
     assert model.count == 0
 
 
-def test_plan_pick_takes_the_nameplates_top_lower_edge_along_z(monkeypatch) -> None:
-    # The plate's real mount transform: local y -> machine -x, local z -> +y.
-    from fr_nameplate_spec import MOUNT_POS, MOUNT_ROWS, PLATE_HEIGHT, PLATE_THICKNESS
-
-    mount = (
-        *(value for row in MOUNT_ROWS for value in row),
-        *(value / 1000.0 for value in MOUNT_POS),
-        1.0,
-        0,
-        0,
-        0,
-    )
-    lower_back = _Edge(
-        (0.004, 0.0, -PLATE_THICKNESS / 1000.0, 0.096, 0.0, -PLATE_THICKNESS / 1000.0)
-    )
-    lower_front = _Edge((0.004, 0.0, 0.0, 0.096, 0.0, 0.0))
-    upper_front = _Edge(
-        (0.004, PLATE_HEIGHT / 1000.0, 0.0, 0.096, PLATE_HEIGHT / 1000.0, 0.0)
-    )
-    side = _Edge((0.0, 0.004, 0.0, 0.0, 0.041, 0.0))  # along machine x
-    corner = _Edge((0.004, 0.0, 0.0, 0.0, 0.004, 0.0), line=False)
-    entities = [corner, side, lower_back, upper_front, lower_front, _Edge(None)]
-    hidden_edge = _Edge((0.004, 0.0, 0.0, 0.096, 0.0, 0.0))
-    plate = _Full(mount)
-    hidden_plate = _Full(mount)
-    leaves = (
-        _ComponentLeaf("fr-harmonic-base-1", _Full(), frozenset({"fr-harmonic-base"})),
-        _ComponentLeaf(
-            "fr-nameplate-2", hidden_plate, frozenset({"fr-nameplate"}), visible=False
-        ),
-        _ComponentLeaf("fr-nameplate-1", plate, frozenset({"fr-nameplate"})),
-    )
-    # The B-B section's GetVisibleComponents returned nothing (r4); the
-    # instances come from the view's drawing-component tree instead.
-    monkeypatch.setattr(
-        drawing, "_view_component_leaves", lambda _adapter, _view, *, label: leaves
-    )
-    monkeypatch.setattr(
-        drawing,
-        "visible_component_entities",
-        lambda _view, component, _kind: (
-            entities
-            if component is plate
-            else [hidden_edge]
-            if component is hidden_plate
-            else []
-        ),
-    )
-    monkeypatch.setattr(drawing, "_edge_endpoint_key", lambda _adapter, edge: edge.key)
-
-    pick = drawing._visible_z_line_at_x(
-        None, None, component_stem="fr-nameplate", x_mm=MOUNT_POS[0], label="plate"
-    )
-
-    assert pick is lower_front
-    with pytest.raises(
-        RuntimeError,
-        match=r"no visible 'fr-harmonic-base' edge.*3 leaf component\(s\), "
-        r"1 shown 'fr-harmonic-base', 0 visible edge",
-    ):
-        drawing._visible_z_line_at_x(
-            None, None, component_stem="fr-harmonic-base", x_mm=167.0, label="deck"
-        )
-
-
 def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
     monkeypatch,
 ) -> None:
-    edges = {"fr-nameplate": object(), "fr-harmonic-base": object()}
     stations = {}
     added = {}
     checked = {}
-    monkeypatch.setattr(
-        drawing,
-        "_visible_z_line_at_x",
-        lambda _adapter, _view, *, component_stem, x_mm, label: edges[component_stem],
-    )
 
     def project(_adapter, _view, points, *, label, names):
         stations["points"] = points
@@ -769,7 +697,15 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
     plate_x, deck_x = (point[0] * 1000.0 for point in stations["points"])
     assert deck_x - plate_x == pytest.approx(drawing.NAMEPLATE_END_INSET)
     assert added["view"] == "B-B"
-    assert added["entities"] == (edges["fr-nameplate"], edges["fr-harmonic-base"])
+    # Coordinate picks: this assembly section lists no visible entity (r4, r5),
+    # and the value check below rejects a pick that lands on another line.
+    assert "entities" not in added
+    assert added["p0"] == pytest.approx(
+        (0.300 + plate_x / 3000.0, 0.180 - drawing.NAMEPLATE_INSET_LINE_Z_M / 3.0)
+    )
+    assert added["p1"] == pytest.approx(
+        (0.300 + deck_x / 3000.0, 0.180 - drawing.NAMEPLATE_INSET_LINE_Z_M / 3.0)
+    )
     # The text sits on the dimension line, past the deck end, away from the plate.
     deck_sheet = added["p1"]
     assert added["text_xy"] == pytest.approx(
