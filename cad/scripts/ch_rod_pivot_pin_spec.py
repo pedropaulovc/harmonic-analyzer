@@ -19,8 +19,8 @@ drives out with a punch.
 
 Frame (part): pin axis = part Z, axial mid-plane = Front Plane (z = 0); the
 model is the INSTALLED pin -- a Ø PIN_DIA cylinder FORK_THICKNESS long, flush
-with both tines. The shop cuts the blank PIN_BLANK_LENGTH long; the drawing
-states that.
+with both tines. The shop cuts the blank at least PIN_BLANK_LENGTH long; the
+drawing states that.
 """
 
 from __future__ import annotations
@@ -42,10 +42,12 @@ DRILLED_PLUS = 0.10
 PIN_DIA = 5.0 / 64.0 * MM_PER_IN  # 1.984
 PIN_DIA_TOLERANCE = 0.005  # +/-, drill-rod grind
 PIN_INSTALLED_LENGTH = _rod.FORK_THICKNESS  # dressed flush with both tines
-# Cut length of the blank: the fork plus dressing stock at each end. 2-place,
-# printed on the pin sheet with its band (the bar pin's pattern).
-PIN_BLANK_LENGTH = 6.40
-PIN_BLANK_LENGTH_BAND = (0.13, -0.13)  # (upper, lower) deviations
+# Cut length of the blank: the fork plus dressing stock at each end. Its only
+# job is to leave stock over the thickest fork, so it prints as a single MIN
+# limit (drawing-guidelines.md rule 4 (tighten only for function); machinist
+# review 2026-10-15, #1522): any longer blank just dresses back further.
+PIN_BLANK_LENGTH = 6.4
+PIN_BLANK_LENGTH_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "6.4 MIN"
 # Dressed ends stand nothing proud of the tine faces (the press-fit ruling).
 PIN_END_PROUD_MAX = 0.0
 
@@ -118,13 +120,12 @@ def joint_budget() -> dict[str, float]:
     the fork over the tines, their reference sum, spans FORK_THICKNESS_BAND),
     the hubs that set the pitch never shorter than nominal; the fork outline,
     slot depth and arm radii at the title block's .XX class, the arm's top
-    edge 8.0 +0.5/0 over its pivot.
+    edge 8.0 +0.5/0 over its pivot; the blank at its printed MIN length.
     """
     t_min, t_max = _band(_arm.ARM_THICKNESS, _arm.ARM_THICKNESS_BAND)
-    w_min, w_max = _band(_rod.FORK_THICKNESS, _rod.FORK_THICKNESS_BAND)
+    _w_min, w_max = _band(_rod.FORK_THICKNESS, _rod.FORK_THICKNESS_BAND)
     s_min, s_max = _band(_rod.FORK_SLOT_WIDTH, _rod.FORK_SLOT_BAND)
     tine_min, tine_max = _band(_rod.TINE_THICKNESS, _rod.TINE_BAND)
-    blank_min, blank_max = _band(PIN_BLANK_LENGTH, PIN_BLANK_LENGTH_BAND)
     hole_min, hole_max = _band(ROD_HOLE_DIA, ROD_HOLE_BAND)
     arm_hole_min = NUMBER_DRILL_MM[_arm.ROD_HOLE_SPEC.size]
     arm_hole_max = arm_hole_min + DRILLED_PLUS
@@ -197,8 +198,9 @@ def joint_budget() -> dict[str, float]:
             _rod.FORK_BASE_BELOW_PIN - _rod.FORK_CROTCH_BELOW_PIN - 2.0 * two_place
         ),
         "crown_wall_min": _rod.FORK_CROWN_RADIUS - crown_loss - hole_max / 2.0,
-        "blank_excess_min": blank_min - w_max,
-        "blank_excess_max": blank_max - w_min,
+        # The shortest blank the MIN limit allows over the thickest fork: the
+        # dressing stock both ends share (a longer blank dresses back further).
+        "blank_excess_min": PIN_BLANK_LENGTH - w_max,
     }
 
 

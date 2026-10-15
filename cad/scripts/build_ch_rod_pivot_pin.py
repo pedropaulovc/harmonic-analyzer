@@ -21,8 +21,9 @@ axis line's midpoint on the origin centres the pin on the Front Plane.
 
 ``BlankReference`` (blanked, on the Right plane, on the pin axis): the blank's
 cut length, a construction line centred on the Front Plane whose one
-dimension carries the 2-place band (drawing-simplicity-policy.md `How the repository implements the guidelines`: the model, not a note,
-owns it); the side view prints it below the installed length.
+dimension prints as a single MIN limit (drawing-simplicity-policy.md `How the
+repository implements the guidelines`: the model, not a note, owns it); the
+side view prints it below the installed length.
 
 Run (SolidWorks already open)::
 
@@ -52,19 +53,19 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _drawing_dimension_insert import add_diametric_linear_dimension
-from _drawing_precision import apply_drawing_precision
+from _com import _early_bound
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
 from _drawing_tolerances import set_dimension_symmetric_tolerance
-from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from ch_rod_pivot_pin_notes import DRAWING_DIMENSIONS, DRAWING_NOTES, DRAWING_PRECISION
 from ch_rod_pivot_pin_spec import (
     PIN_BLANK_LENGTH,
-    PIN_BLANK_LENGTH_BAND,
+    PIN_BLANK_LENGTH_TOL_TYPE,
     PIN_DIA,
     PIN_DIA_TOLERANCE,
     PIN_INSTALLED_LENGTH,
@@ -83,6 +84,27 @@ _SAVED_DRAWING_PROPERTIES = (
 PIN_R = PIN_DIA / 2.0
 HALF_LEN = PIN_INSTALLED_LENGTH / 2.0
 V_PIN = math.pi * PIN_R**2 * PIN_INSTALLED_LENGTH
+
+
+def _blank_min_limit(adapter) -> None:
+    """Print the blank's cut length as a single MIN limit: SOLIDWORKS prints
+    the nominal then "MIN", so the model value is the limit itself."""
+    label = "BlankLen@BlankReference"
+    _, dimension = _named_dimension(adapter, "BlankReference", "BlankLen")
+    if not math.isclose(
+        float(dimension.SystemValue), PIN_BLANK_LENGTH / 1000.0, abs_tol=1e-9
+    ):
+        raise RuntimeError(
+            f"{label}: nominal {float(dimension.SystemValue) * 1000.0:.7f} is not "
+            f"the limit {PIN_BLANK_LENGTH:.7f}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = PIN_BLANK_LENGTH_TOL_TYPE
+    if (
+        not tolerance.SetValues(0.0, 0.0)
+        or int(tolerance.Type) != PIN_BLANK_LENGTH_TOL_TYPE
+    ):
+        raise RuntimeError(f"{label}: cannot retain the MIN limit")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -205,19 +227,12 @@ async def build(adapter) -> dict[str, str]:
 
     # The journal carries the drill rod's grind band natively (drawing-guidelines.md rule 3 (decimal places carry the tolerance)); the
     # installed length is the fork's, parenthesized as REFERENCE on the sheet;
-    # the blank's cut length carries its own band (the dressing stock,
-    # ch_rod_pivot_pin_spec.joint_budget blank_excess_min/max).
+    # the blank's cut length is a single MIN limit (it only has to leave
+    # dressing stock, ch_rod_pivot_pin_spec.joint_budget blank_excess_min).
     set_dimension_symmetric_tolerance(
         adapter, "PinProfile", "PinDia", PIN_DIA_TOLERANCE
     )
-    blank_lower, blank_upper = deviations(PIN_BLANK_LENGTH_BAND)
-    if blank_lower != -blank_upper:
-        raise AssertionError(
-            "ch_rod_pivot_pin_spec.PIN_BLANK_LENGTH_BAND must be symmetric"
-        )
-    set_dimension_symmetric_tolerance(
-        adapter, "BlankReference", "BlankLen", blank_upper
-    )
+    _blank_min_limit(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
