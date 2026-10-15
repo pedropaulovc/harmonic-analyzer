@@ -235,6 +235,19 @@ DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
 
+# The #1413 placeholder provenance every solid carries: ``by`` is
+# _process_plans.PLACEHOLDER_BY verbatim (test_process_shop pins the spelling)
+# and bind_shop refuses a solid without a measured status (#1462).
+_MEASURED = {
+    "status": "measured",
+    "by": "placeholder (realistic, remeasure: #1413)",
+    "date": "2026-10-12",
+    "instrument": (
+        "digital calipers, height gauge and indicator; physical component sizes/fit only"
+    ),
+}
+
+
 def _hole(name: str, x: float, dia: float, y0: float, length: float) -> dict[str, Any]:
     return {
         "name": name,
@@ -245,6 +258,7 @@ def _hole(name: str, x: float, dia: float, y0: float, length: float) -> dict[str
         "length_mm": length,
         "void": True,
         "cuts": ["pivot plate"],
+        "measured": dict(_MEASURED),
     }
 
 
@@ -260,6 +274,7 @@ PRECHIPS_SOLIDS: list[dict[str, Any]] = [
             "MHA-CH-006-TL-19, 1018 3/4 x 1-1/2 bar offcut; No. 2 centre-drilled "
             "60 degree seat on the top face for the pivot point (MHA-CH-006-TL-18)"
         ),
+        "measured": dict(_MEASURED),
     },
     _hole("seat pilot", SEAT_X, PILOT_DIA, PLATE_HEIGHT - PILOT_DEPTH, PILOT_DEPTH),
     *(

@@ -222,6 +222,8 @@ same constants as the SolidWorks fixture in the fixture frame.
 `_process_plans.bind_shop(out)` writes the bound inventory under
 `cad/out/travelers/_shop/`, inserting those primitives and removing the HA-only
 `cad` key. Tracked shop files and plans are never rewritten by binding.
+Binding refuses a spec solid without an explicit `measured.status` (#1462),
+since prechips would otherwise trust it as installed nominal geometry.
 
 Task-graph loading validates that every inventory CAD fixture's
 `<fixture-stem>_spec.py` exists as a file. Malformed inventory and missing fixture

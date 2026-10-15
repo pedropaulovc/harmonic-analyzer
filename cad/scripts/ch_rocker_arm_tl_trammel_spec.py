@@ -164,6 +164,19 @@ if CENTER_DRILL_ANGLE != PIVOT_TIP_ANGLE:
     raise AssertionError("the pivot point does not match its centre-drilled seat")
 
 
+# The #1413 placeholder provenance every solid carries: ``by`` is
+# _process_plans.PLACEHOLDER_BY verbatim (test_process_shop pins the spelling)
+# and bind_shop refuses a solid without a measured status (#1462).
+_MEASURED = {
+    "status": "measured",
+    "by": "placeholder (realistic, remeasure: #1413)",
+    "date": "2026-10-12",
+    "instrument": (
+        "digital calipers, height gauge and indicator; physical component sizes/fit only"
+    ),
+}
+
+
 def _box(
     name: str,
     at: tuple[float, float, float],
@@ -176,6 +189,7 @@ def _box(
         "at_mm": list(at),
         "size_mm": list(size),
         **extra,
+        "measured": dict(_MEASURED),
     }
 
 
@@ -188,6 +202,7 @@ def _point(name: str, x: float, note: str) -> dict[str, Any]:
         "dia_mm": POINT_ROD_DIA,
         "length_mm": POINT_LENGTH,
         "note": note,
+        "measured": dict(_MEASURED),
     }
 
 
@@ -219,6 +234,7 @@ def _block_solids(
             "length_mm": BLOCK_HEIGHT,
             "void": True,
             "cuts": [name],
+            "measured": dict(_MEASURED),
         }
         for index, station in enumerate(hole_ls, start=1)
     ]

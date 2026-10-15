@@ -338,6 +338,17 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 _SEAT_Z = round(-(rocker.HUB_LENGTH + button.THICKNESS), 6)
 _O1_BUTTON = "O1 drill rod, hardened and tempered; bore, faces and O.D. lapped"
 _STUD_ROD = "4140 rod, HRC 32, left unhardened"
+# The #1413 placeholder provenance every solid carries: ``by`` is
+# _process_plans.PLACEHOLDER_BY verbatim (test_process_shop pins the spelling)
+# and bind_shop refuses a solid without a measured status (#1462).
+_MEASURED = {
+    "status": "measured",
+    "by": "placeholder (realistic, remeasure: #1413)",
+    "date": "2026-10-12",
+    "instrument": (
+        "digital calipers, height gauge and indicator; physical component sizes/fit only"
+    ),
+}
 PRECHIPS_SOLIDS: list[dict] = [
     {
         "name": "upper button",
@@ -349,6 +360,7 @@ PRECHIPS_SOLIDS: list[dict] = [
         "label": "hub buttons",
         "locates": "upper hub face (P02) and the file's stop for the upper hub OD",
         "note": _O1_BUTTON,
+        "measured": dict(_MEASURED),
     },
     {
         "name": "upper button bore",
@@ -359,6 +371,7 @@ PRECHIPS_SOLIDS: list[dict] = [
         "length_mm": button.THICKNESS + 1.0,
         "void": True,
         "cuts": ["upper button"],
+        "measured": dict(_MEASURED),
     },
     {
         "name": "lower button",
@@ -370,6 +383,7 @@ PRECHIPS_SOLIDS: list[dict] = [
         "label": "hub buttons",
         "locates": "lower hub face (P01) and the file's stop for the lower hub OD",
         "note": _O1_BUTTON,
+        "measured": dict(_MEASURED),
     },
     {
         "name": "lower button bore",
@@ -380,6 +394,7 @@ PRECHIPS_SOLIDS: list[dict] = [
         "length_mm": button.THICKNESS + 1.0,
         "void": True,
         "cuts": ["lower button"],
+        "measured": dict(_MEASURED),
     },
     {
         "name": "stud head",
@@ -389,6 +404,7 @@ PRECHIPS_SOLIDS: list[dict] = [
         "dia_mm": HEAD_DIA,
         "length_mm": HEAD_LENGTH,
         "note": _STUD_ROD,
+        "measured": dict(_MEASURED),
     },
     {
         "name": "stud pin",
@@ -400,6 +416,7 @@ PRECHIPS_SOLIDS: list[dict] = [
         "locates": "pivot bore (datum A)",
         "bears": "bore",
         "note": _STUD_ROD,
+        "measured": dict(_MEASURED),
     },
     {
         "name": "stud relief",
@@ -409,6 +426,7 @@ PRECHIPS_SOLIDS: list[dict] = [
         "dia_mm": RELIEF_DIA,
         "length_mm": RELIEF_WIDTH,
         "note": _STUD_ROD,
+        "measured": dict(_MEASURED),
     },
     {
         "name": "stud thread",
@@ -419,6 +437,7 @@ PRECHIPS_SOLIDS: list[dict] = [
         "length_mm": RELIEF_END_STATION,
         "fastener": THREAD,
         "note": _STUD_ROD,
+        "measured": dict(_MEASURED),
     },
     {
         "name": "stud tail",
@@ -428,6 +447,7 @@ PRECHIPS_SOLIDS: list[dict] = [
         "dia_mm": TAIL_DIA,
         "length_mm": TAIL_END - HEAD_LENGTH,
         "note": _STUD_ROD,
+        "measured": dict(_MEASURED),
     },
     {
         "name": "nut",
@@ -438,5 +458,6 @@ PRECHIPS_SOLIDS: list[dict] = [
         "axis": [0.0, 0.0, 1.0],
         "dia_mm": round(NUT_CORNER_DIA, 3),
         "length_mm": round(NUT_LENGTH, 3),
+        "measured": dict(_MEASURED),
     },
 ]
