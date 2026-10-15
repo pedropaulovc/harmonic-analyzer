@@ -184,11 +184,11 @@ from sh_column_clamp_back_geom import (  # noqa: E402
 
 COLUMN_X = 197.0
 COLUMN_Z = FRAME_FRONT_COLUMN_Z
-# Depth chain: the front arc's front face (-129.9) carries the bar's back
+# Depth chain: the front arc's front face (-129.4) carries the bar's back
 # face; the bar's front face (-138.9) carries the platen's back face.
-BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -129.9
+BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -129.4
 BAR_FRONT_Z = BAR_BACK_Z - BAR_DEPTH  # -138.9
-BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.4 bar centre
+BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.15 bar centre
 
 # --- platen (hangs on the bar) ----------------------------------------------
 from pd_platen_spec import (  # noqa: E402
@@ -317,8 +317,8 @@ if (
     raise AssertionError(
         "the support bar's bottom edge is off the bottom rail's clearance"
     )
-LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.9: lock plates on the guide backs,
-# 1.0 behind the bar's back face -- they bridge the bar so the platen cannot
+LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.7: lock plates on the guide backs,
+# 0.7 behind the bar's back face -- they bridge the bar so the platen cannot
 # fall off it.
 
 # Relocate the rack/backer on the platen to the shifted pitch-line distance,
@@ -362,6 +362,7 @@ import pd_transgear_pin_spec as PIN  # noqa: E402
 import vn_transgear_pivot_screw_spec as PIVOT_SCREW  # noqa: E402
 import pd_transgear_pivot_spacer_spec as SPACER  # noqa: E402
 import vn_transgear_pivot_spring_spec as PIVOT_SPRING  # noqa: E402
+import vn_transgear_pivot_shim_spec as PIVOT_SHIM  # noqa: E402
 import pd_transgear_rear_bushing_spec as REAR_BUSHING  # noqa: E402
 import vn_transgear_retaining_ring_spec as E_RING  # noqa: E402
 import vn_latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
@@ -411,15 +412,16 @@ if math.dist(KNOB_SHAFT_XY, _PLATE_BORE_XY) > 1e-3:
 # z stack of the hanger (front -Z -> back). It stands behind the bar's back
 # face on the pivot spacer, so the arm clears the sliding guide-lock stations
 # (_assert_lock_station_sweep).
-SPACER_Z0 = BAR_BACK_Z  # -129.9: spacer pressed flush on the shoulder's end
+SPACER_Z0 = BAR_BACK_Z  # -129.4: spacer pressed flush on the shoulder's end
 ARM_Z0 = ARM.FRONT_FACE_MACHINE_Z  # -124.4: arm front face on the spacer
 if abs(SPACER_Z0 + SPACER.LENGTH - ARM_Z0) > 1e-9:
     raise AssertionError("the arm's front face is off the pivot spacer's rear face")
 # Shoulder screw MHA-VN-041 (Rx+90: shank to -Z): the shoulder bottoms on the
-# bar's back face; under its head the MHA-VN-049 spring (identity: its O.D. rim
-# on the arm's spot-face floor, its I.D. rim under the head) holds the arm
-# on the spacer.
-PIVOT_SCREW_Z0 = BAR_BACK_Z + PIVOT_SCREW.SHOULDER_LEN  # -117.2 under the head
+# bar's back face; under its head the MHA-VN-069 shim and the MHA-VN-049
+# spring (identity: its O.D. rim on the arm's spot-face floor, its I.D. rim
+# under the shim) hold the arm on the spacer.
+PIVOT_SCREW_Z0 = BAR_BACK_Z + PIVOT_SCREW.SHOULDER_LEN  # -116.7 under the head
+PIVOT_SHIM_Z0 = PIVOT_SCREW_Z0 - PIVOT_SHIM.THICKNESS  # -117.2 on the spring
 PIVOT_SPRING_Z0 = ARM_Z0 + ARM.SPOT_FACE_FLOOR_FROM_FRONT  # -118.0
 # Arm plate (rows Rz(theta): local X along U): its mounting plane on
 # the arm's rear face; hub forward to the thrust ring, boss rearward.
@@ -1192,7 +1194,7 @@ def _assert_fastener_stacks() -> None:
 
     # Hanger joints: transgear_hanger_joints owns the stacks; re-prove them
     # against the placed stations.
-    spring_room = PIVOT_SCREW_Z0 - (ARM_Z0 + ARM.SPOT_FACE_FLOOR_FROM_FRONT)
+    spring_room = PIVOT_SHIM_Z0 - (ARM_Z0 + ARM.SPOT_FACE_FLOOR_FROM_FRONT)
     if abs(spring_room - HANGER.SPRING_ROOM_NOMINAL) > 1e-9:
         raise AssertionError(
             f"pivot spring room {spring_room:.4f} is not "
@@ -1200,8 +1202,20 @@ def _assert_fastener_stacks() -> None:
         )
     if abs(spring_room - PIVOT_SPRING.MODEL_HEIGHT) > 1e-9:
         raise AssertionError("the MHA-VN-049 spring is not modelled in its room")
-    if HANGER.PIVOT_ENGAGEMENT_WORST_D + 1e-9 < HANGER.PIVOT_ENGAGEMENT_APPROVED_MIN_D:
-        raise AssertionError("pivot screw engagement is under its approved minimum")
+    if HANGER.PIVOT_ENGAGEMENT_WORST_D + 1e-9 < HANGER.ENGAGEMENT_TARGET_D:
+        raise AssertionError(
+            f"pivot screw engagement {HANGER.PIVOT_ENGAGEMENT_WORST_D:.3f} D"
+            f" worst is under {HANGER.ENGAGEMENT_TARGET_D} D"
+        )
+    # The faced tip stands inside the bar's through tap, below the front face
+    # the platen slides on, within the fitted recess window.
+    pivot_tip_recess = (
+        PIVOT_SCREW_Z0 - PIVOT_SCREW.SHOULDER_LEN - PIVOT_SCREW.FITTED_THREAD_LEN
+    ) - BAR_FRONT_Z
+    if not PIVOT_SCREW.TIP_RECESS[0] <= pivot_tip_recess <= PIVOT_SCREW.TIP_RECESS[1]:
+        raise AssertionError(
+            f"pivot screw tip recess {pivot_tip_recess:.3f} leaves the fitted window"
+        )
     if HANGER.PLATE_SCREW_ENGAGEMENT_WORST_D + 1e-9 < HANGER.ENGAGEMENT_TARGET_D:
         raise AssertionError(
             f"plate-screw engagement {HANGER.PLATE_SCREW_ENGAGEMENT_WORST_D:.3f} D"
@@ -2813,13 +2827,21 @@ async def build(adapter) -> dict[str, str]:
         [90.0, 0.0, 0.0],
         ROT_X_POS90,
     )
-    # MHA-VN-049 (identity: +Z axial) in the arm's spot face, under the head.
+    # MHA-VN-049 (identity: +Z axial) in the arm's spot face, under the shim.
     await place_component(
         adapter,
         "vn-transgear-pivot-spring",
         [PIVOT_XY[0], PIVOT_XY[1], PIVOT_SPRING_Z0],
         [0.0, 0.0, 0.0],
         IDENTITY,
+    )
+    # MHA-VN-069 (Rx+90: local +Y axial to +Z) on the spring, under the head.
+    await place_component(
+        adapter,
+        "vn-transgear-pivot-shim",
+        [PIVOT_XY[0], PIVOT_XY[1], PIVOT_SHIM_Z0],
+        [90.0, 0.0, 0.0],
+        ROT_X_POS90,
     )
     plate_origin = [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], PLATE_Z0]
     arm_plate = await place_component(

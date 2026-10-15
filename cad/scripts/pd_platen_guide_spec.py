@@ -13,7 +13,7 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 TAPPED_HOLE_SPEC = HoleSpec("tapped", "#4-40")
 
 # The guide-lock screws' rear receivers (R9-48): #4-40 tapped THROUGH the
-# rail, so the full 10.00 depth carries thread and no depth band can starve
+# rail, so the full depth carries thread and no depth band can starve
 # the 3/8 in MHA-VN-046 screws (vn_guide_lock_screw_spec.ENGAGEMENT_WORST). The
 # tips stop inside the rail (build_pd_platen_guide asserts the reach).
 LOCK_TAP_SPEC = HoleSpec("tapped", "#4-40")
@@ -22,10 +22,12 @@ LOCK_TAP_SPEC = HoleSpec("tapped", "#4-40")
 # bar's back face the lock plates ride and how close their slotted pan heads
 # come to the hanger arm and its plate. Both sit inside the paper-drive
 # lock-station sweep, so the depth carries an explicit one-sided band, native
-# on Depth@Guide: never deeper than 10 (the heads keep 0.34 to the arm plate
-# at worst), and as loose as the .XX row on the shallow side (the plates keep
-# 0.37 to the bar). It prints at the document's two places.
-GUIDE_DEPTH_BAND = (0.0, -0.50)  # (upper, lower)
+# on Depth@Guide: never deeper than 10.2 (the heads keep 0.14 to the arm
+# plate at worst), and on the shallow side no shallower than the deepest bar
+# plus the fitted lock gap's max (R9-47: 9.90 against 9.88, so the seat facing
+# always cuts; the plates keep 0.27 to the bar). It prints at the document's
+# two places.
+GUIDE_DEPTH_BAND = (0.0, -0.30)  # (upper, lower)
 GUIDE_DEPTH_PLACES = 2
 
 # The print's dimensions, by owning feature (the build marks exactly these and

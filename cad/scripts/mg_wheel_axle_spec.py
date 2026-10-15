@@ -69,13 +69,13 @@ BACK_END_PROUD_MAX = (
     (SHANK_LEN + _SHANK_TOL)
     - (PRESS_GAUGE - PRESS_GAUGE_TOL)
     - (_bar.BAR_DEPTH + _bar.BAR_DEPTH_BAND[1])
-)  # 0.85
+)  # 0.35
 BACK_END_SUNK_MAX = (_bar.BAR_DEPTH + _bar.BAR_DEPTH_BAND[0]) - (
     (SHANK_LEN - _SHANK_TOL) - (PRESS_GAUGE + PRESS_GAUGE_TOL)
-)  # 1.05
+)  # 1.55
 
 STEP_Y = PRESS_GAUGE
-BACK_Y = STEP_Y - SHANK_LEN  # -8.9: 0.10 inside the bar's back face
+BACK_Y = STEP_Y - SHANK_LEN  # -8.9: 0.60 inside the 9.5 bar's back face
 THREAD_END_Y = STEP_Y + THREAD_LEN
 TIP_Y = THREAD_END_Y + DOME_H
 # Full thread runs from the die's runout at the step to one pitch short of

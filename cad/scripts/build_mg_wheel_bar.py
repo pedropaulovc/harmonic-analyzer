@@ -7,9 +7,9 @@ shows it clamped at ONE column (the machine +x / west one) with a
 free end just past the pen hanger; there is no second clamp on the far
 column at this height.
 
-Section 10 tall x 9 deep -- the support-bar stock (the front faces of
-both bars share the machine z -138.9 plane; the 9 depth puts the back
-face on the front clamp arc's face at -129.9, the same two-piece clamp
+Section 10 tall x 9.5 deep -- the support-bar stock (the front faces of
+both bars share the machine z -138.9 plane; the 9.5 depth puts the back
+face on the front clamp arc's face at -129.4, the same two-piece clamp
 seat as build_pd_support_bar.py). 234 long: the clamped end runs 29 past
 the west column line (the support-bar idiom -- the clamp-screw stack
 bar -> front arc -> back arc needs bar over BOTH ear holes), the free

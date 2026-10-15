@@ -88,7 +88,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø8.6 x 5.5 ring: 5:1 keeps the three sizes and both face finishes legible
+# A Ø8.6 x 5.0 ring: 5:1 keeps the three sizes and both face finishes legible
 # on the landscape sheet.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)

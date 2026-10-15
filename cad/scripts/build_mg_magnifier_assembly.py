@@ -144,7 +144,7 @@ WHEEL_BAR_Y = 575.7  # ch30 p002 front-view re-anchor (2026-07-17): the wheel
 COLUMN_X = 197.0  # the WEST column (machine +x is west; the crank side -x is east)
 COLUMN_Z = FRAME_FRONT_COLUMN_Z
 # Depth chain -- the SAME two-piece clamp seat as the platen support bar
-# (paper-drive PR #196 E2): the front arc's front face (-129.9) carries the
+# (paper-drive PR #196 E2): the front arc's front face (-129.4) carries the
 # bar's back face; the bar's front face lands on the shared -138.9 plane, so
 # the wheel/axle/wire/pen line is untouched by the clamp swap.
 from _clamp_arc import EAR_HOLE_Z as CLAMP_EAR_DX  # noqa: E402
@@ -156,9 +156,9 @@ from mg_wheel_bar_geom import (  # noqa: E402
     WHEEL_BAR_X0,
 )
 
-BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -129.9
+BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -129.4
 BAR_FRONT_Z = BAR_BACK_Z - WHEEL_BAR_DEPTH  # -138.9: bar front = platen-back plane
-BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.4 bar centre
+BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.15 bar centre
 # The wheel stack (mg_wheel_group) and the axle's gauge read the bar's front
 # face from mg_wheel_bar_geom: it must be the clamp chain's.
 assert math.isclose(BAR_FRONT_Z, WHEEL_BAR_FRONT_Z, abs_tol=1e-9), (

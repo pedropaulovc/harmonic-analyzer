@@ -313,7 +313,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Native datum reference frame and feature controls replace former notes 5-7.
-    # Right view shows the 10 mm depth: left edge is the platen-mating face A.
+    # Right view shows the 10.2 mm depth: left edge is the platen-mating face A.
     datum_a_edge = (0.365, 0.110)
     datum_b_entity = _bottom_surface_edge(front)
     datum_c_edge = (FRONT_LEFT_X_M, FRONT_HOLE_Y_M)

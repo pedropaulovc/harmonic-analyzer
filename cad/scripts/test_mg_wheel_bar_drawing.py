@@ -37,7 +37,7 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
     # FREE geom module, so a print-note edit cannot enter the assembly recipe.
     import mg_wheel_bar_geom as geom
 
-    assert (geom.BAR_SIDE, geom.BAR_DEPTH, geom.BAR_LENGTH) == (10.0, 9.0, 234.0)
+    assert (geom.BAR_SIDE, geom.BAR_DEPTH, geom.BAR_LENGTH) == (10.0, 9.5, 234.0)
     assert geom.CLAMP_HOLE_X == (70.5, 105.5)
     assembly = (
         Path(part.__file__)
@@ -178,7 +178,7 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
     assert drawing.DIMENSION_CALLOUTS["AxleBoreDia"] == (
         "REAM THRU\nPRESS FIT MG-WHEEL-AXLE\n0.010-0.030 INTERFERENCE"
     )
-    assert drawing.DIMENSION_CALLOUTS["BarDepth"].endswith("0.85 PROUD TO 1.05 SUNK")
+    assert drawing.DIMENSION_CALLOUTS["BarDepth"].endswith("0.35 PROUD TO 1.55 SUNK")
     assert model_toleranced_dimensions(part) == {
         ("BarProfile", "Side"): "*deviations(BAR_SIDE_BAND)",
         ("Bar", "BarDepth"): "*deviations(BAR_DEPTH_BAND)",
