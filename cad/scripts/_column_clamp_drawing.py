@@ -13,6 +13,7 @@ from typing import Any
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
 
+import _telemetry
 from _com import _early_bound
 
 
@@ -34,6 +35,7 @@ def set_dimension_prefixes(
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
 
 
+@_telemetry.traced("drawing.column_clamp.bore_axis_centerline")
 def add_bore_axis_centerline(
     adapter: Any, face: Any, edges_xy: list[tuple[float, float]]
 ) -> None:
