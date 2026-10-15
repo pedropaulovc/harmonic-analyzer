@@ -53,11 +53,13 @@ def test_references_print_parenthesised_with_counts_outside():
         assert ")" not in draw.DIMENSION_AFFIXES.get(name, ("", ""))[1], name
 
 
-def test_hole_stations_and_ligament_widths_print_three_places():
+def test_hole_pattern_prints_three_places_and_widths_two():
     places = clip.DRAWING_PRECISION_BY_NAME
-    for name in ("LeftX", "RightX", "LeftZ", "RailWidth"):
+    for name in ("LeftX", "RightX", "LeftZ"):
         assert places[name] == 3, name
-    for name in ("OverallWidth", "SlitWidth"):
+    # Owner ruling 2026-10-15 (default D), adjusted per rule 21: the screw
+    # rail's width drops to .XX; the hole row stays .XXX for pattern float.
+    for name in ("RailWidth", "OverallWidth", "SlitWidth"):
         assert places[name] == 2, name
     assert places["Length"] == 1
     # The bow stations that coincide with the hole stations spell them alike.
@@ -81,13 +83,12 @@ def test_slit_keeps_the_photographed_gap_at_the_printed_worst_case():
     narrowest = clip.NOTCH_WIDTH - printed_band_mm(clip.SLIT_PLACES)
     assert clip.SLIT_WIDTH_MIN == pytest.approx(narrowest)
     assert narrowest >= clip.PHOTO_SLIT_WIDTH - 1e-9
-    # The overall width stays the photographed lanes' beside the 6.6 rail.
+    # The lanes close to the overall width; the spring rail is what the 7.0
+    # screw rail and the slit leave of it.
     assert clip.SCREW_RAIL_WIDTH + clip.NOTCH_WIDTH + clip.SPRING_RAIL_WIDTH == (
         pytest.approx(clip.CLIP_WIDTH)
     )
-    assert clip.CLIP_WIDTH == pytest.approx(
-        clip.SCREW_RAIL_WIDTH + clip.PHOTO_SLIT_WIDTH + clip.PHOTO_SPRING_RAIL_WIDTH
-    )
+    assert clip.SPRING_RAIL_WIDTH == pytest.approx(3.35)
 
 
 def test_clip_screw_engages_one_and_a_half_diameters_worst_case():
@@ -137,13 +138,48 @@ def test_plan_rows_stack_smallest_nearest():
     assert columns[2] < draw.FRONT_KEEP["SpringRailWidth"][0] < draw.LEFT_EDGE_X
 
 
+# A printed text line's pitch (r7: the four-line screw-rail block stood
+# 19.8 mm tall) and width per character ("2X 3.300": 18.1 mm).
+_LINE_PITCH = 0.005
+_CHAR_WIDTH = 0.00226
+
+
+def _block(name: str) -> tuple[float, float, float]:
+    """(top, bottom, widest line) of a front-view text block, in metres."""
+    places = clip.DRAWING_PRECISION_BY_NAME[name]
+    value = f"{draw.DIMENSION_AFFIXES.get(name, ('', ''))[0]}{0:.{places}f}"
+    lines = [value, *draw.DIMENSION_CALLOUTS.get(name, "").splitlines()]
+    y = draw.FRONT_KEEP[name][1]
+    half = len(lines) * _LINE_PITCH / 2.0
+    return y + half, y - half, max(len(line) for line in lines) * _CHAR_WIDTH
+
+
 def test_hole_row_text_clears_the_near_hole_station_line():
     # r7 audit: the near hole station's dimension line (2.8 mm under its
     # text, its outside arrow running left of the plan's near end) crossed
-    # the hole row's 3.5 mm tall text by 2.7 mm.
-    station_line_y = draw.FRONT_KEEP["LeftX"][1] - 0.0028
-    hole_row_text_top = draw.FRONT_KEEP["LeftZ"][1] + 0.00175
-    assert hole_row_text_top < station_line_y - 0.001
+    # the hole row's text by 2.7 mm; r8a: its arrow (0.4 mm lower) stood
+    # 1.6 mm off the text, under the audit's 2.0.
+    arrow_y = draw.FRONT_KEEP["LeftX"][1] - 0.0028 - 0.0004
+    top, _bottom, _width = _block("LeftZ")
+    assert top < arrow_y - 0.002
+
+
+def test_length_line_clears_the_bridge_end_texts():
+    # r8a audit: the length's FORMED line above its value pushed its
+    # dimension line through the far bridge end's text.
+    length_line_y = draw.FRONT_KEEP["Length"][1] - 0.0056
+    bridge_text_top = draw.FRONT_KEEP["BridgeX1"][1] + 0.00175
+    assert length_line_y > bridge_text_top + 0.002
+
+
+def test_hole_row_names_the_tap_pattern_and_clears_the_rail_line():
+    # The .XXX hole row holds the pattern float with the platen's taps; it
+    # says so, and its widest line stays right of the screw rail's line.
+    assert "MHA-PD-002" in draw.DIMENSION_CALLOUTS["LeftZ"]
+    assert "MHA-PD-002" in draw.HOLE_CALLOUT_PROCESS
+    _top, _bottom, width = _block("LeftZ")
+    hole_row_left = draw.FRONT_KEEP["LeftZ"][0] - 0.0014 - width
+    assert hole_row_left > draw.FRONT_KEEP["RailWidth"][0] + 0.003
 
 
 def test_plan_length_says_formed_without_numbers():

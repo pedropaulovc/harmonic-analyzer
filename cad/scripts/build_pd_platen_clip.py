@@ -94,22 +94,29 @@ PHOTO_SLIT_WIDTH = PHOTO_CLIP_WIDTH * 4.0 / 68.0
 PHOTO_SPRING_RAIL_WIDTH = PHOTO_CLIP_WIDTH * 32.0 / 68.0
 # The photographed 32-px (4.23) screw rail cannot hold a #2 clearance hole
 # with the rule-17 1.5 mm ligament on both sides (user ruling 2026-10-14,
-# option A: widen the screw rail).  With the
-# hole centred at half the rail, its station and the rail width each printed
-# at .XXX and the hole DRILLED, the slit side is the binding ligament:
-# W - band - (W/2 + band) - r_max >= 1.5, so W >= 2 * (1.5 + r_max + 2 * band),
-# 6.570 for the #2 loose hole drilled at its printed Ø2.95; 6.6 holds it.
-SCREW_RAIL_WIDTH = 6.6
-# The overall width beside the widened rail is the photographed slit and
-# spring rail's: the platen's clip-socket station holds the clip-to-paper gap
-# against it (pd_platen_spec.SOCKET_X), so neither lane may grow it.
-CLIP_WIDTH = SCREW_RAIL_WIDTH + PHOTO_SLIT_WIDTH + PHOTO_SPRING_RAIL_WIDTH
+# option A: widen the screw rail).  Owner ruling 2026-10-15 (default D),
+# adjusted per rule 21: the hole row stays .XXX for pattern float (the hole
+# floats over the shank by both patterns' zones only at .XXX, below) and the
+# clip is held on the plate; the rail width prints .XX (RAIL_WIDTH_PLACES).
+# The hole row keeps its 3.3 station from the outer edge: the platen prints
+# its far sockets from its near edge through the .X overall width, and a
+# higher row would carry the far clip's outer edge past the plate's
+# (test_pd_platen_refit).  With the row at .XXX and the rail at .XX, the slit
+# side binds: W - band2 - (HOLE_Y + band3) - r_max >= 1.5, so W >= 6.965 for
+# the #2 loose hole drilled at its printed Ø2.95; 7.0 holds it.
+SCREW_RAIL_WIDTH = 7.0
+RAIL_WIDTH_PLACES = 2
+# The overall width is the widest 0.01 step whose inboard edge stays 2.0 off
+# the recording paper with the platen's clip sockets unchanged
+# (pd_platen_spec.SOCKET_X; test_pd_platen_refit asserts the gap): the spring
+# rail is what the screw rail and the slit leave of it (3.35, the photograph's
+# 4.23 short of the widened screw rail).
+CLIP_WIDTH = 11.39
 # The slit frees the spring rail to flex out of the sheet on its own while the
 # screw rail stays clamped; the book's clip does that through the photographed
 # 0.53 slit, so the print's narrowest slit keeps at least that open.  It
 # prints .XX (the title block's general band, +/-0.51): the nominal is the
-# floor plus the band, rounded up to the 0.01 grid, 1.04.  The spring rail
-# gives the widening up (3.72), the overall width stays.
+# floor plus the band, rounded up to the 0.01 grid, 1.04.
 SLIT_PLACES = 2
 SLIT_GAP_FLOOR = PHOTO_SLIT_WIDTH
 NOTCH_WIDTH = (
@@ -136,10 +143,10 @@ ARCH_RISE = 1.5  # shallow outward bow; editable as ArchRise in Tools > Equation
 
 # The brass #2-56 slotted pan-head screws (vn-platen-clip-screw; img03's heads
 # read ~2.6-3.0 mm, user ruling 2026-10-15 for the pan head's bearing land)
-# retain their lengthwise stations in the flat rail, centred across it; each
-# head lies wholly on the rail.
+# retain their lengthwise stations in the flat rail, 3.3 in from its outer
+# edge (above); each head lies wholly on the rail.
 HOLE_INSET = 7.1904  # ch30-p002 Pose Studio: 8 * 0.8988 from each end
-HOLE_Y = SCREW_RAIL_WIDTH / 2.0
+HOLE_Y = 3.3
 CLEARANCE_SIZE = THREAD.split("-")[0]  # "#2"
 # #2 LOOSE (user ruling 2026-10-14): the screws are fixed in the platen's
 # taps, so the hole's float over the shank must hold both patterns' printed
@@ -148,11 +155,12 @@ HOLE_FIT = "loose"
 HOLE_SPEC = HoleSpec("clearance", CLEARANCE_SIZE, fit=HOLE_FIT)
 HOLE_DIA = CLEARANCE_MM[(CLEARANCE_SIZE, HOLE_FIT)]
 HEAD_TO_SPRING_RAIL = SPRING_RAIL_Y0 - (HOLE_Y + HEAD_DIA / 2.0)
-HEAD_RAIL_MARGIN = (SCREW_RAIL_WIDTH - HEAD_DIA) / 2.0
+# The head stands nearer the rail's outer edge than its slit edge.
+HEAD_RAIL_MARGIN = min(HOLE_Y, SCREW_RAIL_WIDTH - HOLE_Y) - HEAD_DIA / 2.0
 
 # Worst case of the printed sheet (drawing-guidelines.md rule 17): the hole
-# stations and the screw-rail width print at .XXX, the holes are DRILLED at
-# the size their callout prints (HOLE_CALLOUT_PRECISION).
+# stations and the hole row print at .XXX, the screw-rail width at .XX, the
+# holes are DRILLED at the size their callout prints (HOLE_CALLOUT_PRECISION).
 POSITION_PLACES = 3
 _POSITION_BAND = printed_band_mm(POSITION_PLACES)
 HOLE_CALLOUT_PRECISION = {"hw-diam": 2}
@@ -161,7 +169,10 @@ HOLE_DIA_MAX = HOLE_DIA_PRINTED + drilled_oversize_mm()
 LIGAMENT_FLOOR = 1.5
 EDGE_LIGAMENT_MIN = HOLE_Y - _POSITION_BAND - HOLE_DIA_MAX / 2.0
 SLIT_LIGAMENT_MIN = (
-    SCREW_RAIL_WIDTH - _POSITION_BAND - (HOLE_Y + _POSITION_BAND) - HOLE_DIA_MAX / 2.0
+    SCREW_RAIL_WIDTH
+    - printed_band_mm(RAIL_WIDTH_PLACES)
+    - (HOLE_Y + _POSITION_BAND)
+    - HOLE_DIA_MAX / 2.0
 )
 END_LIGAMENT_MIN = HOLE_INSET - _POSITION_BAND - HOLE_DIA_MAX / 2.0
 # The far hole stands at its own .XXX station from the near end, so the far
@@ -307,18 +318,18 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "FlatFinger",
     },
 }
-# Places.  The hole stations (their pattern matches the platen's taps), the
-# hole row's height and the screw rail's width (between them they keep the
-# hole's walls to the edge and to the slit) print .XXX (POSITION_PLACES); the
-# bow tangent stations on the hole stations are references spelled as those
-# are, the rest as the bridge ends they meet.  The overall width and the slit
+# Places.  The hole stations and the hole row's height (their pattern matches
+# the platen's taps: the holes float over the shanks by both patterns' zones
+# only at .XXX) print .XXX (POSITION_PLACES); the bow tangent stations on the
+# hole stations are references spelled as those are, the rest as the bridge
+# ends they meet.  The screw rail's width, the overall width and the slit
 # print .XX; the outline, the bridge, the rise and the radii only shape the
 # spring.
 _TANGENT_PLACES = {"TangentX1": POSITION_PLACES, "TangentX8": POSITION_PLACES}
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FlatSheetProfile": {
         "Length": LENGTH_PLACES,
-        "RailWidth": POSITION_PLACES,
+        "RailWidth": RAIL_WIDTH_PLACES,
         "SlitWidth": SLIT_PLACES,
         "BridgeX0": 1,
         "BridgeX1": 1,
@@ -1023,7 +1034,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ScrewRailEndR", f"{SCREW_RAIL_END_RADIUS}mm")
     await set_global(adapter, "ScrewRailSlitR", f"{SCREW_RAIL_SLIT_RADIUS}mm")
     await set_global(adapter, "HoleInset", f"{HOLE_INSET}mm")
-    await set_global(adapter, "HoleY", '"ScrewRailW" / 2')
+    await set_global(adapter, "HoleY", f"{HOLE_Y}mm")
     await set_global(adapter, "HoleFarX", '"ClipLength" - "HoleInset"')
     await set_global(adapter, "ArchRise", f"{ARCH_RISE}mm")
     await set_global(adapter, "BowRun", '"BridgeX0" - "HoleInset"')

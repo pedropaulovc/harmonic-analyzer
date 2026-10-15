@@ -46,8 +46,8 @@ SOCKET_BOSS_FILLET_R = 0.5
 # (upper, lower) deviations: the nominal IS the limit, down to sharp.
 SOCKET_BOSS_FILLET_BAND = (0.0, -SOCKET_BOSS_FILLET_R)
 SOCKET_BOSS_FILLET_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "4X R0.5 MAX"
-# Each socket's distance in from its side edge, on both sides.  The 6.6 clip
-# screw rail (user ruling 2026-10-14) puts the clip's inboard edge at
+# Each socket's distance in from its side edge, on both sides.  The widened
+# clip screw rail (user ruling 2026-10-14) puts the clip's inboard edge at
 # SOCKET_X - HOLE_Y + CLIP_WIDTH; with the recording paper's 14.6 left inset
 # (paper_drive_geom) the photographed 5.3928 left that edge 1.15 off the
 # paper.  This is the largest 0.1-grid station that holds the 2.0 nominal
