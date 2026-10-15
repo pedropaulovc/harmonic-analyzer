@@ -4681,7 +4681,7 @@ cad = "ch_rocker_arm_tl_riser_block"
 
 # Dedicated trammel (Pedro 2026-10-11: not the amplitude bar). Bar used uncut and undrilled;
 # clamp-on pivot block (point 25 from the bar end) and scriber block (scribers at 825 and
-# 841, 16.000 +/-0.01 apart), both from the approved 1018 3/4 x 1-1/2 bar, slot 6.45
+# 841, 16.000 +/-0.025 apart), both from the approved 1018 3/4 x 1-1/2 bar, slot 6.45
 # +0.05/0, 10-24 set screws and a 10-24 SHCS split clamp; points from the 1/4 in O1 rod,
 # hardened (tools.map-torch-kit, consumables.quench-oil-canola). Set on the setting bar.
 [tools.rocker-trammel]

@@ -54,6 +54,7 @@ def test_shares_the_pivot_block_section() -> None:
         "Block",
         "SlotProfile",
         "SlitProfile",
+        "SlitReliefProfile",
         "SetScrewTaps",
     ):
         assert spec.DRAWING_DIMENSIONS[feature] == block.DRAWING_DIMENSIONS[feature]
@@ -66,11 +67,28 @@ def test_every_view_including_the_section_and_isometric_hides_hidden_lines() -> 
     )
 
 
-def test_section_cuts_the_near_end_pinch_screw_axis() -> None:
+def test_section_cuts_the_far_pinch_screw_axis() -> None:
+    """Farm r4: cut at the near pinch, the section letters landed on the
+    inner point-hole axis's extension lines."""
     source = inspect.getsource(drawing.build)
     assert "create_pinch_section(" in source
-    assert "part_spec.PINCH_X[0]," in source
-    assert spec.BLOCK_X0 < spec.PINCH_X[0] < spec.HOLE_X[0]
+    assert "part_spec.PINCH_X[1]," in source
+    assert spec.HOLE_X[0] < spec.PINCH_X[1] < spec.HOLE_X[1]
+
+
+def test_pinch_stations_print_on_staggered_rows() -> None:
+    """Farm r4: on one row each value sat inside the other's arrows."""
+    assert drawing.FRONT_KEEP["PinchX1"][1] != drawing.FRONT_KEEP["PinchX2"][1]
+
+
+def test_spacing_value_and_callout_stand_outside_its_extension_lines() -> None:
+    """Farm r4: centred between the holes, the checked-on callout straddled
+    both extension lines and the slit end's row."""
+    spacing_x = drawing.TOP_KEEP["ScriberSpacing"][0]
+    inner_x = drawing.SHEET.top(spec.HOLE_X[0], 0.0)[0]
+    assert spacing_x < inner_x
+    # The shorter row nearer the view (rows stack by span).
+    assert drawing.TOP_KEEP["ScriberSpacing"][1] > drawing.TOP_KEEP["SlitEnd"][1]
 
 
 def test_above_lane_callouts_are_single_lines() -> None:
@@ -106,7 +124,7 @@ def test_point_holes_are_the_reamed_fit_named_on_the_scriber_points() -> None:
 def test_spacing_is_the_kit_band_and_names_its_check() -> None:
     outer = _features()["point_hole_outer"]
     # The spacing is the outer hole's station from the inner hole's axis.
-    assert outer["station"] == [15.99, 16.01]
+    assert outer["station"] == [15.975, 16.025]
     assert "MHA-CH-006-TL-17" in outer["note"]
     assert "MHA-CH-006-TL-17" in spec.SCRIBER_SPACING_CALLOUT
     assert kit.TEMPLATE_RADII[1] - kit.TEMPLATE_RADII[0] == spec.SCRIBER_SPACING
@@ -123,6 +141,14 @@ def test_stations_agree_with_the_kit() -> None:
         < spec.HOLE_X[1]
     )
     assert spec.HOLE_X[1] < spec.SLIT_END_X < spec.BLOCK_X1
+
+
+def test_slit_ends_in_the_pivot_block_relief() -> None:
+    relief = _features()["slit_relief"]
+    assert relief["dia"] == [3.0, 3.1]
+    assert relief["station"] == [24.2, 25.8]
+    assert drawing.CALLOUTS_BELOW["SlitReliefDia"] == block.SLIT_RELIEF_CALLOUT
+    assert drawing.CALLOUTS_BELOW["BlockHeight"] == block.BLOCK_HEIGHT_CALLOUT
 
 
 def test_the_outer_point_lands_in_the_h816_pilot() -> None:

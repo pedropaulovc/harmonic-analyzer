@@ -15,11 +15,13 @@ X running left) beyond.
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import visible_component_entities
 
 import ch_rocker_arm_tl_trammel_spec as kit
@@ -230,8 +232,31 @@ def create_pinch_section(
             f"pinch section does not look along +X with the top face up "
             f"(+Z sheet dx {east}, +Y sheet dy {up})"
         )
+    # Reversing the cut mirrors the section about its position (farm r4: its
+    # ink landed a section width right of view_xy, over the isometric), so
+    # the view is recentred on its outline before the caption is placed.
+    _center_on_outline(adapter, section, view_xy, label="pinch section")
     position_section_caption(adapter, section, caption_xy, label="trammel block")
     return section
+
+
+def _center_on_outline(
+    adapter: Any, view: Any, target: tuple[float, float], *, label: str
+) -> None:
+    """Move ``view`` so its outline (its ink) is centred on ``target``
+    (draw_ch_rocker_arm_tl_profile_fixture's recipe)."""
+    view = _early_bound(view, "IView")
+    for _attempt in range(3):
+        outline = tuple(float(value) for value in view.GetOutline())
+        center = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
+        if math.dist(center, target) < 0.0002:
+            return
+        position = tuple(float(value) for value in view.Position)
+        moved = [position[axis] + target[axis] - center[axis] for axis in range(2)]
+        if not view.SetViewPosition(double_array(moved), False):
+            raise RuntimeError(f"failed to position {label}")
+        rebuild_drawing(adapter, label=f"center {label}")
+    raise RuntimeError(f"{label} outline did not settle on {target!r}")
 
 
 _THREAD_LABEL_LAYER = "TRAMMEL-BLOCK-THREAD-LABEL-HIDDEN"

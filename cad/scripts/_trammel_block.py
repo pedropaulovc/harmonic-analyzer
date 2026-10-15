@@ -12,9 +12,13 @@ Layout (the spec's frame: origin on the point-hole axis, top face, edge A):
   extruded down (-Y) by the stock height;
 * the bar slot is a Right-plane rectangle whose floor midpoint carries its
   distance from edge A and its depth, cut through the block's length;
-* the slit is a Top-plane rectangle whose inner end's midpoint carries its
-  end station and its distance from edge A, cut through the height;
 * the point hole(s) are Top-plane circles cut through the height;
+* the slit's relief is a Top-plane circle at the slit's end station (its
+  printed SlitEnd), cut through the height, its distance from edge A the
+  point hole's by equation;
+* the slit is a Top-plane rectangle from beyond the near end face into the
+  relief, cut through the height; its end and its distance from edge A are
+  the relief's and the point hole's by equation, so neither prints twice;
 * the 10-24 set-screw taps enter edge A (through to the slot); each #8-32
   pinch screw is tapped through both jaws from edge B and its edge-B jaw then
   opened to a close #8 clearance up to the slit (dt_cone_tip_block's pinch).
@@ -29,14 +33,17 @@ import ch_rocker_arm_tl_trammel_spec as kit
 from _appearance import apply_material
 from _check import check
 from _com import _early_bound
-from _dimensions import name_dimensions
+from _dimensions import drive_dimension, name_dimensions
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _feature_tree import name_last_feature
 from _fit_deviations import deviations
 from _holes import DRILL_POINT_H, SharedCoordinate, wizard_holes
@@ -71,6 +78,7 @@ from ch_rocker_arm_tl_trammel_pivot_block_spec import (
     SET_SCREW_DEPTH,
     SET_SCREW_SPEC,
     SET_SCREW_TAP_DRILL,
+    SLIT_RELIEF_DIA,
     SLIT_WIDTH,
     SLIT_Z,
     SLOT_CUT_RISE,
@@ -261,15 +269,19 @@ async def build_block(adapter, part: ModuleType, part_name: str) -> dict[str, st
     check("create_part", await adapter.create_part())
 
     # Block: Top plane (sketch x = model X, sketch y = model -Z), anchored at
-    # the end face's edge-A corner from the point-hole axis.
+    # the near end's edge-A corner from the point-hole axis. The chain starts
+    # at the far end so its width dimension is the near end's: printed left
+    # of the top view, its extension lines stop at the near end (r5: from the
+    # far end they ran the block's length, across the slit relief's leader).
     profile = SketchDims()
     check("create_sketch block", await adapter.create_sketch("Top"))
-    points = [(x0, 0.0), (x1, 0.0), (x1, -BLOCK_WIDTH), (x0, -BLOCK_WIDTH)]
+    points = [(x1, 0.0), (x0, 0.0), (x0, -BLOCK_WIDTH), (x1, -BLOCK_WIDTH)]
     lines = await add_line_chain(adapter, points)
     await define_rectilinear_chain(
         adapter,
         lines,
         points,
+        anchor=1,
         label="block profile",
         dims=profile,
         names=["BlockLength", "BlockWidth", "HoleFromEnd"],
@@ -325,7 +337,9 @@ async def build_block(adapter, part: ModuleType, part_name: str) -> dict[str, st
         raise AssertionError("bar slot sketch is not centred on its printed station")
 
     # Slit: Top plane, from beyond the near end face to its end station, on
-    # the point-hole axis, cut through the height.
+    # the point-hole axis, cut through the height. Its end station and its
+    # distance from edge A are driven (below) from the relief and the point
+    # hole, so only those print.
     slit = SketchDims()
     check("create_sketch slit", await adapter.create_sketch("Top"))
     z_near, z_far = SLIT_Z - SLIT_WIDTH / 2.0, SLIT_Z + SLIT_WIDTH / 2.0
@@ -336,12 +350,16 @@ async def build_block(adapter, part: ModuleType, part_name: str) -> dict[str, st
         edge=1,
         label="slit",
         dims=slit,
-        names=("SlitCutLength", "SlitWidth", "SlitEnd", "SlitFromEdgeA"),
+        names=("SlitCutLength", "SlitWidth", "SlitCutEnd", "SlitFromEdgeA"),
     )
     await ensure_fully_defined(adapter, "slit")
     check("exit_sketch slit", await adapter.exit_sketch())
     name_last_feature(adapter, "SlitProfile")
     slit.apply(adapter, "SlitProfile")
+    drive_jobs = [
+        ("SlitCutEnd@SlitProfile", '"SlitEnd@SlitReliefProfile"'),
+        ("SlitFromEdgeA@SlitProfile", '"PointFromEdgeA@PointHoleProfile"'),
+    ]
     check(
         "cut slit",
         await adapter.create_cut_extrude(
@@ -376,6 +394,41 @@ async def build_block(adapter, part: ModuleType, part_name: str) -> dict[str, st
     )
     volume = await volume_check(
         adapter, "point holes", volume - v_holes, 0.01 * v_holes
+    )
+
+    # Slit relief: a Top plane circle centred on the slit's end (the printed
+    # SlitEnd station), its distance from edge A the point hole's by equation.
+    # The slit has already taken half a strip through it.
+    relief = SketchDims()
+    check("create_sketch slit relief", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter,
+        end,
+        -SLIT_Z,
+        SLIT_RELIEF_DIA / 2.0,
+        "slit relief",
+        dims=relief,
+        names=("SlitEnd", "SlitReliefFromEdgeA", "SlitReliefDia"),
+        drives=(None, '"PointFromEdgeA@PointHoleProfile"', None),
+    )
+    await ensure_fully_defined(adapter, "slit relief")
+    check("exit_sketch slit relief", await adapter.exit_sketch())
+    name_last_feature(adapter, "SlitReliefProfile")
+    drive_jobs += relief.apply(adapter, "SlitReliefProfile")
+    check(
+        "cut slit relief",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * (BLOCK_HEIGHT + 1.0), both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "SlitRelief")
+    relief_r = SLIT_RELIEF_DIA / 2.0
+    v_relief = BLOCK_HEIGHT * (
+        math.pi * relief_r * relief_r
+        - _strip_overlap_area(relief_r, SLIT_WIDTH / 2.0) / 2.0
+    )
+    volume = await volume_check(
+        adapter, "slit relief", volume - v_relief, 0.01 * v_relief
     )
 
     # Set screws: 10-24 taps from edge A (outward normal -Z) through to the slot.
@@ -448,6 +501,8 @@ async def build_block(adapter, part: ModuleType, part_name: str) -> dict[str, st
     )
     _require_one_solid_body(adapter, label="trammel block")
 
+    for dimension_name, expression in drive_jobs:
+        await drive_dimension(adapter, dimension_name, expression)
     await force_rebuild(adapter)
     await volume_check(adapter, "rebuilt trammel block", volume, 0.002 * v_block)
     _require_one_solid_body(adapter, label="rebuilt trammel block")
@@ -461,11 +516,12 @@ async def build_block(adapter, part: ModuleType, part_name: str) -> dict[str, st
         adapter, "PointHoleProfile", "PointHoleDia", *deviations(POINT_HOLE_BAND)
     )
     if len(part.HOLE_X) > 1:
-        set_dimension_bilateral_tolerance(
-            adapter,
-            "PointHoleProfile",
-            "ScriberSpacing",
-            *deviations(kit.SCRIBER_SPACING_BAND),
+        # +/-0.025 prints on one line (16.000+/-0.025).
+        upper, lower = kit.SCRIBER_SPACING_BAND
+        if abs(upper + lower) > 1e-12:
+            raise AssertionError("the scriber spacing band is not symmetric")
+        set_dimension_symmetric_tolerance(
+            adapter, "PointHoleProfile", "ScriberSpacing", upper
         )
     apply_drawing_precision(adapter, part.DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

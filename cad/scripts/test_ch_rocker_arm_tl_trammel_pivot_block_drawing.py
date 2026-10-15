@@ -122,6 +122,28 @@ def test_stations_agree_with_the_kit() -> None:
     assert spec.BLOCK_X0 < spec.PINCH_X[0] < 0.0 < spec.SLIT_END_X < spec.BLOCK_X1
 
 
+def test_slit_ends_in_a_drilled_relief_one_line_callout() -> None:
+    """Round 5: the hacksaw cut runs into a drilled hole, located by the slit
+    end's station alone; its callout is one line."""
+    relief = _features()["slit_relief"]
+    assert relief["dia"] == [3.0, 3.1]
+    assert relief["station"] == [7.2, 8.8]
+    assert spec.SLIT_WIDTH < spec.SLIT_RELIEF_DIA
+    assert drawing.CALLOUTS_BELOW["SlitReliefDia"] == spec.SLIT_RELIEF_CALLOUT
+    assert "\n" not in spec.SLIT_RELIEF_CALLOUT
+    assert spec.DRAWING_DIMENSIONS["SlitReliefProfile"] == {"SlitEnd", "SlitReliefDia"}
+    # The slit's end and its distance from edge A ride equations
+    # (one SlitEnd and one 28.0 print).
+    assert spec.DRAWING_DIMENSIONS["SlitProfile"] == {"SlitWidth"}
+    source = inspect.getsource(_trammel_block.build_block)
+    assert '"SlitEnd@SlitReliefProfile"' in source
+    assert source.count('"PointFromEdgeA@PointHoleProfile"') == 2
+
+
+def test_stock_height_reads_stock() -> None:
+    assert drawing.CALLOUTS_BELOW["BlockHeight"] == spec.BLOCK_HEIGHT_CALLOUT == "STOCK"
+
+
 def test_walls_and_threads_hold_at_the_worst_case() -> None:
     """Rules 17 and 18 at the printed bands; rule 20 names every wall
     between the 1.5 floor and the 2.0 target."""

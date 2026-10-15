@@ -13,11 +13,11 @@ lying on its 38.1 face, slides onto the bought 1/4 in square trammel bar:
   reamed with the shop's 0.251 in reamer, 28.0 from edge A and 25 from the
   block's end, the end that sits flush with the bar's pivot-end face;
 * a 1.0 slit on the point-hole axis runs from the near end face, through the
-  point hole, to 8 past it (the remaining 17 is the hinge), and one #8-32
-  socket head cap screw crossing under the slot floor pinches the slit shut on
-  the point: head on edge B, clearance through the edge-B jaw, threaded in the
-  slot-side jaw (Fx1cTrammel ruling: the 3/4 in stock stays, the screw runs
-  below the slot floor).
+  point hole, into a 3.0 drilled relief 8 past it (the remaining 17 is the
+  hinge), and one #8-32 socket head cap screw crossing under the slot floor
+  pinches the slit shut on the point: head on edge B, clearance through the
+  edge-B jaw, threaded in the slot-side jaw (Fx1cTrammel ruling: the 3/4 in
+  stock stays, the screw runs below the slot floor).
 
 The scriber block (``ch_rocker_arm_tl_trammel_scriber_block_spec``) is the
 same block with two point holes; it imports this module's shared section.
@@ -68,8 +68,10 @@ BLOCK_HEIGHT = kit.BLOCK_HEIGHT
 # LOW-CARBON STEEL FLAT; the stock named in material_specification stays
 # 1018 cold-rolled for the same reason: drawn flat holds its 3/4 in thickness
 # well inside that .XX band as supplied, so the budgeted walls need no
-# machining of the broad faces.
+# machining of the broad faces. The sheet says so: 19.05 STOCK (the pivot
+# plate's convention).
 BLOCK_HEIGHT_PLACES = 2
+BLOCK_HEIGHT_CALLOUT = "STOCK"
 HOLE_FROM_END = kit.PIVOT_HOLE_L  # 25.0: the end face to the point-hole axis
 BLOCK_X0 = -HOLE_FROM_END
 BLOCK_X1 = BLOCK_X0 + BLOCK_LENGTH
@@ -135,8 +137,9 @@ def point_hole_callout(count: int, mate_number: str) -> str:
 POINT_HOLE_CALLOUT = point_hole_callout(len(HOLE_X), POINT_MATE_NUMBER)
 
 # --- Slit ------------------------------------------------------------------------
-# On the point-hole axis, from the end face at X0 to SLIT_END_X; the pinch
-# closes it on the point. Full block height.
+# On the point-hole axis, from the end face at X0 into the relief hole at
+# SLIT_END_X; the pinch closes it on the point. Full block height. The slit's
+# distance from edge A is the point hole's by equation, so one 28.0 prints.
 SLIT_WIDTH = 1.0
 SLIT_Z = POINT_FROM_EDGE_A
 SLIT_END_X = 33.0 - HOLE_FROM_END  # L33: 8 past the point-hole axis
@@ -144,6 +147,19 @@ SLIT_Z0 = SLIT_Z - SLIT_WIDTH / 2.0  # slot-side jaw face
 SLIT_Z1 = SLIT_Z + SLIT_WIDTH / 2.0  # edge-B jaw face
 SLIT_START_X = BLOCK_X0 - 1.0  # the slit sketch starts beyond the end face
 SLIT_CALLOUT = "SLIT THRU"
+# The slit ends in a drilled relief hole through the height (Fx1cTrammel
+# round 5, option b), centred on the slit's end station: the relief, not a
+# saw's arc, ends the slit, so the end is one printed station on every face.
+# The 1.0 slit is a hacksaw (tools.hacksaw-starrett-k145) or slitting cut run
+# from the end face into the hole: the shop's 3 in slitting saws
+# (tools.slitting-saws) on the R8 arbor's 45 flange reach (76.2 - 45) / 2 =
+# 15.6 deep, short of the 19.05 stock, so no single pass cuts it THRU. The
+# 3.0 drill is tools.drills-metric's; the title block's DRILLED HOLES row
+# governs its size (DRILLED_BAND below).
+SLIT_RELIEF_DIA = 3.0
+SLIT_RELIEF_CALLOUT = "DRILL THRU"
+if SLIT_RELIEF_DIA <= SLIT_WIDTH:
+    raise AssertionError("the slit relief does not end the slit in a round hole")
 
 # --- Set screws (kit: 10-24 UNC x 1/2 cup point, from edge A) ------------------
 SET_SCREW_SIZE = "#10-24"
@@ -217,6 +233,7 @@ _SLIT_HALF_MAX = (SLIT_WIDTH + _X) / 2.0
 _SLIT_FAR_FACE_MIN = SLIT_Z - _X - _SLIT_HALF_MAX  # slot-side jaw face, lowest Z
 _EDGE_B_MIN = BLOCK_WIDTH - _X
 _EDGE_B_MAX = BLOCK_WIDTH + _X
+_SLIT_RELIEF_R_MAX = (SLIT_RELIEF_DIA + DRILLED_BAND[0]) / 2.0
 
 
 def worst_walls(
@@ -257,8 +274,8 @@ def worst_walls(
         # Slot-side jaw between the slot and the slit; the edge-B jaw.
         "slot to slit jaw": _SLIT_FAR_FACE_MIN - _SLOT_FAR_WALL_MAX,
         "edge B jaw": _EDGE_B_MIN - (SLIT_Z + _X + _SLIT_HALF_MAX),
-        # The slit's hinge ligament past its end.
-        "slit hinge": (x1 - slit_end_x) - 2.0 * _X,
+        # The hinge ligament past the slit's relief hole.
+        "slit hinge": (x1 - slit_end_x) - 2.0 * _X - _SLIT_RELIEF_R_MAX,
         # The edge-A wall the set screws thread through.
         "edge A wall": _SLOT_NEAR_WALL_MIN,
         # The slot floor web over the block bottom.
@@ -274,12 +291,19 @@ def worst_walls(
         for x in hole_x
         for end in (x0, x1)
     )
-    walls["slit end past point hole"] = min(
+    walls["slit relief to point hole"] = min(
         slit_end_x
         - _X
         - (x + (0.0 if x == first else hole_spacing_band))
         - POINT_HOLE_R_MAX
+        - _SLIT_RELIEF_R_MAX
         for x in hole_x
+    )
+    # The relief (on the slit, Z 28) to each pinch hole crossing that Z: the
+    # edge-B jaw's clearance is the larger radius.
+    walls["slit relief to pinch hole"] = min(
+        abs(slit_end_x - p) - 2.0 * _X - _SLIT_RELIEF_R_MAX - PINCH_CLEARANCE_R_MAX
+        for p in pinch_x
     )
     walls["set screw thread to end face"] = min(
         abs(x - end) - 2.0 * _X - _SET_MAJOR_R for x in set_screw_x for end in (x0, x1)
@@ -359,7 +383,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"BlockLength", "BlockWidth", "HoleFromEnd"},
     "Block": {"BlockHeight"},
     "SlotProfile": {"SlotWidth", "SlotFromEdgeA", "SlotDepth"},
-    "SlitProfile": {"SlitWidth", "SlitFromEdgeA", "SlitEnd"},
+    "SlitProfile": {"SlitWidth"},
+    "SlitReliefProfile": {"SlitEnd", "SlitReliefDia"},
     "PointHoleProfile": {"PointHoleDia", "PointFromEdgeA"},
     "SetScrewTaps": {"SetScrewX1", "SetScrewX2", "SetScrewDepth"},
     "PinchTaps": {"PinchX", "PinchDepth"},
@@ -368,7 +393,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"BlockLength": 1, "BlockWidth": 1, "HoleFromEnd": 1},
     "Block": {"BlockHeight": BLOCK_HEIGHT_PLACES},
     "SlotProfile": {"SlotWidth": 2, "SlotFromEdgeA": 1, "SlotDepth": SLOT_DEPTH_PLACES},
-    "SlitProfile": {"SlitWidth": 1, "SlitFromEdgeA": 1, "SlitEnd": 1},
+    "SlitProfile": {"SlitWidth": 1},
+    "SlitReliefProfile": {"SlitEnd": 1, "SlitReliefDia": 1},
     "PointHoleProfile": {"PointHoleDia": 3, "PointFromEdgeA": 1},
     "SetScrewTaps": {"SetScrewX1": 1, "SetScrewX2": 1, "SetScrewDepth": 1},
     "PinchTaps": {"PinchX": 1, "PinchDepth": PINCH_PLACES},

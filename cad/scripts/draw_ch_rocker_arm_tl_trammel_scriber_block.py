@@ -1,9 +1,10 @@
 r"""Create the drawing for the rocker template trammel's scriber block (MHA-CH-006-TL-15).
 
 The pivot block's sheet (``draw_ch_rocker_arm_tl_trammel_pivot_block``) for
-the block with two reamed point holes 16.000 apart, the longer slit and two
-pinch screws; section A-A cuts the near-end pinch. Every station along the
-block is dimensioned from the inner (R800) point hole's axis.
+the block with two reamed point holes 16.000 apart, the longer slit ending in
+its drilled relief and two pinch screws; section A-A cuts the far pinch.
+Every station along the block is dimensioned from the inner (R800) point
+hole's axis.
 """
 
 from __future__ import annotations
@@ -70,40 +71,45 @@ SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 ISO_SCALE = (1, 1)
 SHEET = TrammelBlockSheet(part_spec.BLOCK_X0, part_spec.BLOCK_X1)
-# The pivot block's sheet: the reamed holes' callout, section A-A (caption
-# below it, clear of edge A's callouts) and the isometric, upper right.
+# The pivot block's sheet: the reamed holes' callout, section A-A (recentred
+# on its outline; caption below it, clear of edge A's callouts) and the
+# isometric right of it, upper right.
 SECTION_CENTER = (0.285, 0.192)
-SECTION_CAPTION_XY = (0.285, 0.168)
-ISO_CENTER = (0.375, 0.225)
+SECTION_CAPTION_XY = (0.285, 0.1695)
+ISO_CENTER = (0.380, 0.225)
 ISO_NOTE_XY = (0.345, 0.262)
 NOTES_XY = (0.020, 0.060)
 
 # Top face (edge A at the view's top, edge B toward the edge-B view below).
-# As the pivot block's: the distances from edge A left of the view, the two
-# 28.0s apart; the reamed holes' leader rises from the inner hole up and
-# right, passing over the outer one, to its callout beside the view.
+# As the pivot block's: one 28.0 left of the view (the slit's is the point
+# holes' by equation); the reamed holes' leader rises from the inner hole up
+# and right, passing over the outer one, to its callout beside the view; the
+# relief's diameter hangs below edge B right of the slit end's station.
 TOP_KEEP = {
     "BlockLength": SHEET.top(0.5 * (part_spec.BLOCK_X0 + part_spec.BLOCK_X1), -10.0),
     "HoleFromEnd": SHEET.top(0.5 * part_spec.BLOCK_X0, -4.5),
     "BlockWidth": SHEET.top(part_spec.BLOCK_X0 - 17.0, 19.0),
     "PointFromEdgeA": SHEET.top(part_spec.BLOCK_X0 - 11.0, 8.0),
-    "SlitFromEdgeA": SHEET.top(part_spec.BLOCK_X0 - 5.0, 17.0),
     "SlitWidth": SHEET.top(part_spec.BLOCK_X1 + 6.0, 31.0),
-    # Below the view: the slit end next to the edge, its value right of the
-    # outer hole's extension line; the spacing row under it hangs its
-    # checked-on callout clear of section A-A's upper letter.
-    "SlitEnd": SHEET.top(21.0, 40.3),
-    "ScriberSpacing": SHEET.top(0.5 * part_spec.SCRIBER_SPACING, 46.05),
+    # Below the view, the shorter row nearer it: the spacing's value and its
+    # callout left of the inner hole's extension line (farm r4: centred, the
+    # callout straddled both extension lines and the slit end's row), then
+    # the slit end, its value between the outer hole's and the relief's
+    # extension lines. Both rows stay above section A-A's upper letter.
+    "ScriberSpacing": SHEET.top(-20.0, 44.4),
+    "SlitEnd": SHEET.top(20.5, 47.65),
+    "SlitReliefDia": SHEET.top(part_spec.SLIT_END_X + 16.0, 42.05),
     "PointHoleDia": SHEET.top(part_spec.BLOCK_X1 + 26.0, -5.5),
 }
-# Edge B (pinch screw head side): the pinch stations below, their row low
-# enough to clear section A-A's lower letter; the pinch depth and, outside
-# it, the height right of the view (the pivot block's: farm r2's height left
-# of the view ran its extension lines across the clearance callout's leader).
+# Edge B (pinch screw head side): the pinch stations below, staggered (farm
+# r4: on one row each value sat inside the other's outside arrows), the far
+# pinch's row nearer the view and both clear of section A-A's lower letter;
+# the pinch depth and, outside it, the stock height right of the view (the
+# pivot block's).
 FRONT_KEEP = {
-    "BlockHeight": SHEET.front(part_spec.BLOCK_X1 + 10.0, -16.5),
+    "BlockHeight": SHEET.front(part_spec.BLOCK_X1 + 10.5, -14.5),
     "PinchX1": SHEET.front(0.5 * part_spec.PINCH_X[0], -29.0),
-    "PinchX2": SHEET.front(0.5 * part_spec.PINCH_X[1], -29.0),
+    "PinchX2": SHEET.front(0.5 * part_spec.PINCH_X[1], -24.85),
     "PinchDepth": SHEET.front(part_spec.BLOCK_X1 + 5.5, -7.0),
 }
 # The end view: the bar slot from edge A (edge A on the view's right), the
@@ -126,6 +132,8 @@ CALLOUTS_BELOW = {
     "PointHoleDia": part_spec.POINT_HOLE_CALLOUT,
     "ScriberSpacing": part_spec.SCRIBER_SPACING_CALLOUT,
     "SlitWidth": block.SLIT_CALLOUT,
+    "SlitReliefDia": block.SLIT_RELIEF_CALLOUT,
+    "BlockHeight": block.BLOCK_HEIGHT_CALLOUT,
 }
 SET_SCREW_CALLOUT_XY = (0.345, 0.140)
 # The set-screw leader runs from the callout's right end down to the tap
@@ -143,7 +151,7 @@ PINCH_CLEARANCE_CALLOUT_XY = (0.042, 0.074)
 WALL_FINISH_XY = (0.170, 0.195)
 FLOOR_FINISH_XY = (0.172, 0.208)
 WALL_FINISH_X = part_spec.BLOCK_X1 - 2.5
-SLOT_CORNER_NOTE_XY = (0.205, 0.229)
+SLOT_CORNER_NOTE_XY = (0.2765, 0.2247)
 
 
 _KIT = "ch_rocker_arm_tl_trammel_spec"
@@ -268,24 +276,61 @@ requirement(
     },
 )
 
+# The slit runs in from the near end through both point holes and ends in
+# the drilled relief; its edge-B jaw face beside the relief names it. Its
+# distance from edge A is the point holes' by equation (one 28.0 prints).
 requirement(
     "slit",
     kind="slot",
-    faces=(PlanarFace((-1.0, 0.0, 0.0), -part_spec.SLIT_END_X),),
-    requirements=("width", "height", "station"),
+    faces=(
+        PlanarFace(
+            (0.0, 0.0, -1.0),
+            -block.SLIT_Z1,
+            contains_x_mm=part_spec.SLIT_END_X - block.SLIT_RELIEF_DIA,
+        ),
+    ),
+    requirements=("width", "height"),
     fields={
-        "normal": ([-1.0, 0.0, 0.0], ("__frame__",)),
+        "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
         "width": (limits(block.SLIT_WIDTH, 1), ((_BLOCK, "SLIT_WIDTH"),)),
         "width_nominal": (block.SLIT_WIDTH, ((_BLOCK, "SLIT_WIDTH"),)),
-        "height": (limits(block.SLIT_Z, 1), ((_BLOCK, "SLIT_Z"),)),
-        "height_nominal": (block.SLIT_Z, ((_BLOCK, "SLIT_Z"),)),
+        "height": (
+            limits(block.SLIT_Z, 1),
+            ((_BLOCK, "SLIT_Z"), (_BLOCK, "POINT_FROM_EDGE_A")),
+        ),
+        "height_nominal": (
+            block.SLIT_Z,
+            ((_BLOCK, "SLIT_Z"), (_BLOCK, "POINT_FROM_EDGE_A")),
+        ),
         "height_from": _FROM_EDGE_A,
-        # The slit's inner end, from the inner point-hole axis.
-        "station": (limits(part_spec.SLIT_END_X, 1), ("SLIT_END_X",)),
-        "station_nominal": (part_spec.SLIT_END_X, ("SLIT_END_X",)),
         "thru": (True, ((_BLOCK, "SLIT_CALLOUT"),)),
     },
-    precision={"width": 1, "height": 1, "station": 1},
+    precision={"width": 1, "height": 1},
+)
+
+# The relief that ends the slit: its station from the inner point-hole axis.
+requirement(
+    "slit_relief",
+    kind="hole",
+    faces=(CylinderFace(block.SLIT_RELIEF_DIA, contains_x_mm=part_spec.SLIT_END_X),),
+    requirements=("station", "dia", "thru"),
+    fields={
+        "at": (
+            [part_spec.SLIT_END_X, 0.0, block.SLIT_Z],
+            ("__frame__", "SLIT_END_X", (_BLOCK, "SLIT_Z")),
+        ),
+        "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "station": (limits(part_spec.SLIT_END_X, 1), ("SLIT_END_X",)),
+        "station_nominal": (part_spec.SLIT_END_X, ("SLIT_END_X",)),
+        "dia": (
+            limits(block.SLIT_RELIEF_DIA, 1, block.DRILLED_BAND),
+            ((_BLOCK, "SLIT_RELIEF_DIA"), (_BLOCK, "DRILLED_BAND")),
+        ),
+        "dia_nominal": (block.SLIT_RELIEF_DIA, ((_BLOCK, "SLIT_RELIEF_DIA"),)),
+        "thru": (True, ((_BLOCK, "SLIT_RELIEF_CALLOUT"),)),
+        "parent": ("slit", ("SLIT_END_X", _BUILD)),
+    },
+    precision={"station": 1, "dia": 1},
 )
 
 requirement(
@@ -528,10 +573,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # finalize_drawing shades the pictorial isometric with edges.
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    # The far pinch (farm r4: cut at the near one, the letters landed on the
+    # point-hole axis's extension lines); its arrows and letters fall right
+    # of the pinch stations, clear of the rows below the top view.
     section = create_pinch_section(
         adapter,
         front,
-        part_spec.PINCH_X[0],
+        part_spec.PINCH_X[1],
         view_xy=SECTION_CENTER,
         caption_xy=SECTION_CAPTION_XY,
         scale=VIEW_SCALE,
@@ -692,8 +740,8 @@ async def build(adapter: Any) -> dict[str, str]:
             section,
             "slot floor in section A-A",
             lambda a, b: (
-                near(a[0], part_spec.PINCH_X[0])
-                and near(b[0], part_spec.PINCH_X[0])
+                near(a[0], part_spec.PINCH_X[1])
+                and near(b[0], part_spec.PINCH_X[1])
                 and near(a[1], -block.SLOT_DEPTH)
                 and near(b[1], -block.SLOT_DEPTH)
                 and near(a[2], block.SLOT_Z0)

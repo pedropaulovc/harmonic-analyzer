@@ -1,13 +1,13 @@
 r"""Create the drawing for the rocker template trammel's pivot block (MHA-CH-006-TL-14).
 
 Four orthographic views at 2:1, section A-A and a 1:1 shaded isometric: the
-top face (length, width, the reamed point hole, the slit and the bar-contact
-finishes), edge B below it (the height and the pinch screw's clearance), the
-end view to its right (the bar slot), edge A beyond (the set-screw taps and
-the pinch taps' exits) and the section through the pinch screw's axis (the
-clearance, the slit and the tapped jaw together, and the slot floor's
-corners). Every station along the block is dimensioned from the point-hole
-axis.
+top face (length, width, the reamed point hole, the slit and its drilled
+relief, and the bar-contact finishes), edge B below it (the stock height and
+the pinch screw's clearance), the end view to its right (the bar slot), edge
+A beyond (the set-screw taps and the pinch taps' exits) and the section
+through the pinch screw's axis (the clearance, the slit and the tapped jaw
+together, and the slot floor's corners). Every station along the block is
+dimensioned from the point-hole axis.
 """
 
 from __future__ import annotations
@@ -74,37 +74,43 @@ VIEW_SCALE = (2, 1)
 ISO_SCALE = (1, 1)
 SHEET = TrammelBlockSheet(part_spec.BLOCK_X0, part_spec.BLOCK_X1)
 # Upper right, from the top view out: the reamed hole's callout, section A-A
-# (caption below it, clear of edge A's callouts) and the isometric.
+# (recentred on its outline; caption below it, clear of edge A's callouts)
+# and the isometric right of it (farm r4: the section's ink landed over the
+# isometric).
 SECTION_CENTER = (0.285, 0.192)
-SECTION_CAPTION_XY = (0.285, 0.168)
-ISO_CENTER = (0.375, 0.225)
+SECTION_CAPTION_XY = (0.285, 0.1695)
+ISO_CENTER = (0.380, 0.225)
 ISO_NOTE_XY = (0.345, 0.262)
 NOTES_XY = (0.020, 0.060)
 
 # Top face (edge A at the view's top, edge B toward the edge-B view below).
-# The distances from edge A stand left of the view, the two 28.0s on their
-# own lines with their values at different heights (two sketches, two
-# features: the slit's and the reamed hole's); the right side keeps only the
-# slit width, so the reamed hole's leader rises up and right to its callout
-# beside the top view, clear of the 50.0 and inside the border.
+# The distance from edge A stands left of the view (one 28.0: the slit's is
+# the point hole's by equation); the right side keeps only the slit width, so
+# the reamed hole's leader rises up and right to its callout beside the top
+# view, clear of the 50.0 and inside the border. The relief's diameter hangs
+# below edge B, right of the slit end's station, its leader rising up-left
+# (the 38.1 dimensions the near end, so its extension lines stop short of
+# the leader).
 TOP_KEEP = {
     "BlockLength": SHEET.top(0.5 * (part_spec.BLOCK_X0 + part_spec.BLOCK_X1), -10.0),
     "HoleFromEnd": SHEET.top(0.5 * part_spec.BLOCK_X0, -4.5),
     "BlockWidth": SHEET.top(part_spec.BLOCK_X0 - 17.0, 19.0),
     "PointFromEdgeA": SHEET.top(part_spec.BLOCK_X0 - 11.0, 8.0),
-    "SlitFromEdgeA": SHEET.top(part_spec.BLOCK_X0 - 5.0, 17.0),
     "SlitWidth": SHEET.top(part_spec.BLOCK_X1 + 6.0, 31.0),
     "SlitEnd": SHEET.top(0.5 * part_spec.SLIT_END_X, 44.0),
+    "SlitReliefDia": SHEET.top(part_spec.SLIT_END_X + 16.0, 42.05),
     "PointHoleDia": SHEET.top(part_spec.BLOCK_X1 + 26.0, -5.5),
 }
 # Edge B (pinch screw head side): the pinch station below, its row low enough
 # to clear section A-A's lower letter; the pinch depth and, outside it, the
-# height right of the view, where their extension lines are short (its value
-# below the pinch depth's extension line, clear of the end view's outline).
-# Farm r2: the height left of the view ran its extension lines the block's
-# length, across the pinch clearance callout's leader.
+# stock height right of the view, where their extension lines are short (the
+# height's two rows past the end of the pinch depth's lower extension line,
+# above the height's own lower one and left of the end view, whose padded
+# outline starts 1.6 right of farm r4's "19.05"). Farm r2: the height left
+# of the view ran its extension lines the block's length, across the pinch
+# clearance callout's leader.
 FRONT_KEEP = {
-    "BlockHeight": SHEET.front(part_spec.BLOCK_X1 + 10.0, -16.5),
+    "BlockHeight": SHEET.front(part_spec.BLOCK_X1 + 10.5, -14.5),
     "PinchX": SHEET.front(0.5 * part_spec.PINCH_X[0], -29.0),
     "PinchDepth": SHEET.front(part_spec.BLOCK_X1 + 5.5, -7.0),
 }
@@ -128,6 +134,8 @@ CALLOUTS_ABOVE = {"SlotWidth": part_spec.SLOT_WIDTH_CALLOUT}
 CALLOUTS_BELOW = {
     "PointHoleDia": part_spec.POINT_HOLE_CALLOUT,
     "SlitWidth": part_spec.SLIT_CALLOUT,
+    "SlitReliefDia": part_spec.SLIT_RELIEF_CALLOUT,
+    "BlockHeight": part_spec.BLOCK_HEIGHT_CALLOUT,
 }
 # The set-screw leader runs from the callout's right end down to the tap
 # right in the view (farm r2: to the left tap it crossed the set-screw depth's
@@ -144,9 +152,10 @@ PINCH_CLEARANCE_CALLOUT_XY = (0.042, 0.074)
 WALL_FINISH_XY = (0.170, 0.195)
 FLOOR_FINISH_XY = (0.172, 0.208)
 WALL_FINISH_X = part_spec.BLOCK_X1 - 2.5
-# The floor-corner note: above-left of section A-A, its leader down through
-# the slot opening to the floor beside the edge-B wall.
-SLOT_CORNER_NOTE_XY = (0.205, 0.229)
+# The floor-corner note: above section A-A, right of its slot, its leader down
+# through the slot opening to the floor's edge-A corner (farm r4 landed it
+# there).
+SLOT_CORNER_NOTE_XY = (0.2765, 0.2247)
 
 
 _KIT = "ch_rocker_arm_tl_trammel_spec"
@@ -271,24 +280,57 @@ requirement(
     },
 )
 
+# The slit runs in from the near end through the point hole and ends in the
+# drilled relief; its edge-B jaw face beside the relief names it. Its
+# distance from edge A is the point hole's by equation (one 28.0 prints).
 requirement(
     "slit",
     kind="slot",
-    faces=(PlanarFace((-1.0, 0.0, 0.0), -part_spec.SLIT_END_X),),
-    requirements=("width", "height", "station"),
+    faces=(
+        PlanarFace(
+            (0.0, 0.0, -1.0),
+            -part_spec.SLIT_Z1,
+            contains_x_mm=part_spec.SLIT_END_X - part_spec.SLIT_RELIEF_DIA,
+        ),
+    ),
+    requirements=("width", "height"),
     fields={
-        "normal": ([-1.0, 0.0, 0.0], ("__frame__",)),
+        "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
         "width": (limits(part_spec.SLIT_WIDTH, 1), ("SLIT_WIDTH",)),
         "width_nominal": (part_spec.SLIT_WIDTH, ("SLIT_WIDTH",)),
-        "height": (limits(part_spec.SLIT_Z, 1), ("SLIT_Z",)),
-        "height_nominal": (part_spec.SLIT_Z, ("SLIT_Z",)),
+        "height": (limits(part_spec.SLIT_Z, 1), ("SLIT_Z", "POINT_FROM_EDGE_A")),
+        "height_nominal": (part_spec.SLIT_Z, ("SLIT_Z", "POINT_FROM_EDGE_A")),
         "height_from": _FROM_EDGE_A,
-        # The slit's inner end, from the point-hole axis.
-        "station": (limits(part_spec.SLIT_END_X, 1), ("SLIT_END_X",)),
-        "station_nominal": (part_spec.SLIT_END_X, ("SLIT_END_X",)),
         "thru": (True, ("SLIT_CALLOUT",)),
     },
-    precision={"width": 1, "height": 1, "station": 1},
+    precision={"width": 1, "height": 1},
+)
+
+# The relief that ends the slit: its station from the point-hole axis.
+requirement(
+    "slit_relief",
+    kind="hole",
+    faces=(
+        CylinderFace(part_spec.SLIT_RELIEF_DIA, contains_x_mm=part_spec.SLIT_END_X),
+    ),
+    requirements=("station", "dia", "thru"),
+    fields={
+        "at": (
+            [part_spec.SLIT_END_X, 0.0, part_spec.SLIT_Z],
+            ("__frame__", "SLIT_END_X", "SLIT_Z"),
+        ),
+        "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
+        "station": (limits(part_spec.SLIT_END_X, 1), ("SLIT_END_X",)),
+        "station_nominal": (part_spec.SLIT_END_X, ("SLIT_END_X",)),
+        "dia": (
+            limits(part_spec.SLIT_RELIEF_DIA, 1, part_spec.DRILLED_BAND),
+            ("SLIT_RELIEF_DIA", "DRILLED_BAND"),
+        ),
+        "dia_nominal": (part_spec.SLIT_RELIEF_DIA, ("SLIT_RELIEF_DIA",)),
+        "thru": (True, ("SLIT_RELIEF_CALLOUT",)),
+        "parent": ("slit", ("SLIT_END_X", _BUILD)),
+    },
+    precision={"station": 1, "dia": 1},
 )
 
 requirement(

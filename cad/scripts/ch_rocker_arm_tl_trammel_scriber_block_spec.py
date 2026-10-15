@@ -5,13 +5,14 @@ second clamp-on block of the rocker outline-template trammel kit
 (``ch_rocker_arm_tl_trammel_spec``, trial route ``rocker-template-route.md``
 section 2.1): the pivot block's body, bar slot, set screws and pinch screw
 (``ch_rocker_arm_tl_trammel_pivot_block_spec``, the shared section) with two
-point holes 16.000 +/-0.01 apart for the two scriber points
+point holes 16.000 +/-0.025 apart for the two scriber points
 (MHA-CH-006-TL-16): the inner one scribes R800, the outer one R816. Both holes
 are reamed in one setting; the setting bar's H800/H816 cones
 (MHA-CH-006-TL-17) prove the spacing.
 
-The slit runs from the block's near end face through both point holes to 9
-past the outer one, leaving an 8 hinge. Two #8-32 socket head cap screws
+The slit runs from the block's near end face through both point holes into
+the pivot block's 3.0 drilled relief, 9 past the outer one (an 8 hinge less
+the relief's radius). Two #8-32 socket head cap screws
 pinch it: one between the near end and the inner hole, one midway between the
 holes.
 
@@ -34,10 +35,11 @@ SCRIBER_SPACING = kit.SCRIBER_SPACING
 HOLE_X = (0.0, SCRIBER_SPACING)
 POINT_MATE_NUMBER = "MHA-CH-006-TL-16"
 POINT_HOLE_CALLOUT = block.point_hole_callout(len(HOLE_X), POINT_MATE_NUMBER)
-# drawing-guidelines.md rule 4: the tight spacing names what checks it.
-SCRIBER_SPACING_CALLOUT = "SETS R800 AND R816\nCHECKED ON MHA-CH-006-TL-17"
+# drawing-guidelines.md rule 4: the tight spacing names what checks it, in
+# one line (round 5).
+SCRIBER_SPACING_CALLOUT = "CHECKED ON MHA-CH-006-TL-17"
 
-SLIT_END_X = 42.0 - HOLE_FROM_END  # L42: 9 past the outer hole, an 8 hinge
+SLIT_END_X = 42.0 - HOLE_FROM_END  # L42: the relief, 9 past the outer hole
 SLIT_START_X = BLOCK_X0 - 1.0  # the slit sketch starts beyond the end face
 SET_SCREW_X = tuple(station - HOLE_FROM_END for station in kit.SET_SCREW_L)
 # L8 (between the near end and the inner hole) and L25 (midway between the
@@ -82,7 +84,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"BlockLength", "BlockWidth", "HoleFromEnd"},
     "Block": {"BlockHeight"},
     "SlotProfile": {"SlotWidth", "SlotFromEdgeA", "SlotDepth"},
-    "SlitProfile": {"SlitWidth", "SlitFromEdgeA", "SlitEnd"},
+    "SlitProfile": {"SlitWidth"},
+    "SlitReliefProfile": {"SlitEnd", "SlitReliefDia"},
     "PointHoleProfile": {"PointHoleDia", "PointFromEdgeA", "ScriberSpacing"},
     "SetScrewTaps": {"SetScrewX1", "SetScrewX2", "SetScrewDepth"},
     "PinchTaps": {"PinchX1", "PinchX2", "PinchDepth"},
@@ -95,7 +98,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "SlotFromEdgeA": 1,
         "SlotDepth": block.SLOT_DEPTH_PLACES,
     },
-    "SlitProfile": {"SlitWidth": 1, "SlitFromEdgeA": 1, "SlitEnd": 1},
+    "SlitProfile": {"SlitWidth": 1},
+    "SlitReliefProfile": {"SlitEnd": 1, "SlitReliefDia": 1},
     "PointHoleProfile": {"PointHoleDia": 3, "PointFromEdgeA": 1, "ScriberSpacing": 3},
     "SetScrewTaps": {"SetScrewX1": 1, "SetScrewX2": 1, "SetScrewDepth": 1},
     "PinchTaps": {"PinchX1": 1, "PinchX2": 1, "PinchDepth": block.PINCH_PLACES},

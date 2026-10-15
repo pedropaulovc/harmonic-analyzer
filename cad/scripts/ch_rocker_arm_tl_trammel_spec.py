@@ -96,9 +96,9 @@ SCRIBER_BLOCK_X = 808.0
 PIVOT_HOLE_L = PIVOT_POINT_X - PIVOT_BLOCK_X  # 25, the block's middle
 SCRIBER_HOLE_L = (INNER_SCRIBER_X - SCRIBER_BLOCK_X, OUTER_SCRIBER_X - SCRIBER_BLOCK_X)
 SCRIBER_SPACING = SCRIBER_HOLE_L[1] - SCRIBER_HOLE_L[0]  # 16.000
-# Route 2.1: the scriber holes are 16.000 +/-0.01 apart, drilled (here
-# reamed) in one DRO setting; the setting bar's H800/H816 proves it.
-SCRIBER_SPACING_BAND = (0.01, -0.01)
+# Route 2.1's 16.000 apart, reamed in one DRO setting; +/-0.025, no tighter than
+# a point's float in its reamed hole (0.051 max diametral clearance).
+SCRIBER_SPACING_BAND = (0.025, -0.025)
 for _station in (PIVOT_HOLE_L, *SCRIBER_HOLE_L):
     if not 0.0 < _station < BLOCK_LENGTH:
         raise AssertionError("a trammel point hole falls outside its block")
