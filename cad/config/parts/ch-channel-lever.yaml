@@ -15,3 +15,8 @@ ch-channel-lever:
       where: "the one position control carried on this sheet"
       finding: "position frame over-specified on a channel part (rule 5)"
       reason: "a coordinate plus/minus would let the 20 channels scatter; at most one control per channel part (owner-accepted channel-consistency class)"
+    - id: "RV-02"
+      kind: "accept"
+      where: "the hub width 7.06 +0.03/0 (20 HUBS STACK; SETS STATION PITCH)"
+      finding: "20-hub face-to-face stack with no fit-up allowance or shim (rule 19)"
+      reason: "the hubs set the station pitch with no shim by design; the stack's end float is proven at the channel assembly, not on this part (owner-accepted)"
