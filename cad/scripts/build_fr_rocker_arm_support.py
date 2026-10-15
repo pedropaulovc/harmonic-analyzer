@@ -17,8 +17,9 @@ source's tree STRUCTURE and sketch construction but with SEMANTIC feature names
 (the convention of the other tracked parts) rather than the source's generic
 auto-names. The tree is Wall (``Boss-Extrude1``) -> CavityCut/WindowCut1/
 WindowCut2 (``Cut-Extrude2/3/4``) -> CornerFillet (``Fillet3``) ->
-PocketCornerFillet -> FootClearanceHoles (5/16 DRILL THRU, HoleWzd) ->
-RimChamfer (``Chamfer2``) -> BracketSeats (#743, HoleWzd). The trapezoid lives
+PocketCornerFillet -> PocketFloorFillet -> FootClearanceHoles (5/16 DRILL
+THRU, HoleWzd) -> RimChamfer (``Chamfer2``) -> BracketSeats (#743, HoleWzd)
+-> SeatStationReference (hidden drawing-reference sketch). The trapezoid lives
 on the **Right plane** (sketch-x -> model Z taper, sketch-y -> model Y height,
 mid-plane extrude along X); the window/cavity cuts use SINGLE origin-centred
 squares on the **Front plane** (matching the source's window/cavity sketches).
@@ -49,19 +50,25 @@ Z = wall thickness):
   2026-10-09).
 * **CornerFillet** -- R12.7 on the four cavity corner edges.
 * **PocketCornerFillet** -- R6.35 on the four corners of each opposed pocket.
+* **PocketFloorFillet** -- R0.8 around each pocket's floor-to-wall corner,
+  modelled AT the printed limit ``R0.8 MAX`` (a sharp corner is in band).
 * **FootClearanceHoles** -- a single Hole Wizard (``HoleWzd``) feature, 4x
   5/16 in clearance drills through the 6.35 mm foot from its top seat
   (Y=-82.55) at ``(X ±60.32, Z ±17.46)``. One feature carries all four
   placement points; the visible 1/4-20 hex-head screws install from the top
   into blind tapped seats in the harmonic base.
-* **RimChamfer** -- 1.27 mm / 45° on the 12 inner-frame opening edges plus the
-  two slant faces, the two trapezoid (±X) faces, and one fillet face, with
-  tangent propagation -- i.e. the whole window rim.
+* **RimChamfer** -- 1.27 mm / 45° on the 12 inner-frame opening edges, the +X
+  end face's foot and top edges, the two slant faces, the -X end face, and one
+  fillet face, with tangent propagation -- i.e. the whole window rim and all
+  twelve outside edges.
 * **BracketSeats** -- one Hole Wizard feature, 2x #8-32 bottoming-tapped seats
   down from the top face on the centreline, under the MHA-CH-008 pivot
   brackets' hold-down holes, each over a window side edge: the post outboard,
   the web inboard (``rocker_bracket_seat_layout`` owns their stack; the print
   transfers them from the set brackets at assembly).
+* **SeatStationReference** -- a blanked Top-plane sketch of two construction
+  lines, each end face to its seat's centre, whose dimensions VIEW B prints as
+  REF (the transfer stays the method; the REF says where the seats land).
 
 Like the 71 tracked parts, this is **equation-driven and self-naming**: six
 equation-manager globals (``FootHalf``/``TopHalf``/``HalfHeight``/``CavHalf``/
@@ -95,7 +102,11 @@ from _session import run_build
 from _sketch import (
     SketchDims,
     add_line_chain,
+    anchor_point_to_origin,
+    blank_reference_sketches,
+    dimension_between,
     ensure_fully_defined,
+    set_sketch_direct_db,
 )
 from _sketch_chains import define_polygon_chain
 from _sketch_rectangle import define_centered_rectangle
@@ -105,6 +116,9 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _drawing_precision import _named_dimension
+from _fit_deviations import deviations
+import _telemetry
 from _hole_spec import blind_cut_dia_mm
 from _part_pmi import author_part_pmi
 from fr_rocker_arm_support_drawing_spec import SURFACE_FINISHES
@@ -210,6 +224,35 @@ POCKET_FILLET_VOLUME = (
     + WALL_GROWTH_VOLUME
 )
 
+# PocketFloorFillet: each pocket's floor (the web face) meets its four walls
+# and four R6.35 corners in one tangent loop. The r7 machinist review asked
+# what that corner may be; Main ruled R0.8 MAX (r8), modelled AT the printed
+# limit as the V-block rule does (swTolMAX prints the nominal, so nominal =
+# limit and the band runs from sharp up to it). Its spandrel
+# ((1 - pi/4) R^2) runs the four straight walls and, by Pappus, the four
+# corner quarter-turns at the R6.35 wall radius less the spandrel's centroid
+# offset R (10 - 3 pi) / (3 (4 - pi)). The fillet sits at |Z| >= WEB, clear
+# of the seats (thread inside the web) and of the clearance holes' heads.
+POCKET_FLOOR_R_MAX = 0.8
+POCKET_FLOOR_R_BAND = (0.0, -POCKET_FLOOR_R_MAX)  # (upper, lower)
+POCKET_FLOOR_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.8 MAX"
+POCKET_FLOOR_R_PLACES = 1
+# One point per pocket on its top-rail floor edge (Z = -WEB first: its size
+# lands on that corner, the section's upper-left); tangent propagation takes
+# the rest of each loop.
+POCKET_FLOOR_FILLET_EDGES = [[0.0, BIG, -WEB], [0.0, BIG, WEB]]
+_FLOOR_SPANDREL = (1.0 - math.pi / 4.0) * POCKET_FLOOR_R_MAX**2
+_FLOOR_CENTROID = POCKET_FLOOR_R_MAX * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi))
+POCKET_FLOOR_FILLET_GROWTH = (
+    2.0
+    * _FLOOR_SPANDREL
+    * (
+        4.0 * (2.0 * BIG - 2.0 * POCKET_FILLET_R)
+        + 2.0 * math.pi * (POCKET_FILLET_R - _FLOOR_CENTROID)
+    )
+)
+POCKET_FLOOR_FILLET_VOLUME = POCKET_FILLET_VOLUME + POCKET_FLOOR_FILLET_GROWTH
+
 HOLES = [(60.32, 17.46), (-60.32, 17.46), (60.32, -17.46), (-60.32, -17.46)]
 
 # The manufacturing print's dimension set (draw_fr_rocker_arm_support.py imports
@@ -222,12 +265,27 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CavityProfile": {"CavWidth"},
     "CornerFillet": {"CavityRadius"},
     "PocketCornerFillet": {"PocketRadius"},
+    "PocketFloorFillet": {"PocketFloorRadius"},
     "RimChamfer": {"RimChamferSize"},
+    "SeatStationReference": {"SeatEastStation", "SeatWestStation"},
 }
 
-# PocketCornerFillet volume minus four through clearance drills.
+# The seats' REF stations (r7 machinist review: the seats print with no
+# location, and read as crowding the end wall). Two construction lines on the
+# Top plane (sketch x = model X, sketch y = model -Z), on the centreline, each
+# from an end face to its seat's centre, so VIEW B shows the end-wall stock
+# the seat leaves. The part saves the sketch blanked; VIEW B shows it through
+# the hidden-owner import. Rows: (dimension, end face X, seat X).
+REFERENCE_SKETCHES = ("SeatStationReference",)
+SEAT_STATION_LINES = (
+    ("SeatEastStation", BOSS_DEPTH / 2.0, max(SEAT_LOCAL_X)),
+    ("SeatWestStation", -BOSS_DEPTH / 2.0, min(SEAT_LOCAL_X)),
+)
+
+# PocketFloorFillet volume minus four through clearance drills.
 FOOT_HOLED_VOLUME = (
-    POCKET_FILLET_VOLUME - len(HOLES) * math.pi / 4.0 * HOLE_DIA**2 * FOOT_THICKNESS
+    POCKET_FLOOR_FILLET_VOLUME
+    - len(HOLES) * math.pi / 4.0 * HOLE_DIA**2 * FOOT_THICKNESS
 )
 
 CHAMFER = 1.27  # leg, 45°
@@ -243,7 +301,17 @@ SEAT_POINTS = [[x, HALF_Y, 0.0] for x in SEAT_LOCAL_X]
 BRACKET_SEATS_VOLUME = RIM_CHAMFER_VOLUME - len(SEAT_POINTS) * blind_hole_volume_mm3(
     blind_cut_dia_mm(SEAT_SPEC), SEAT_SPEC.depth_mm
 )
-CHAMFER_EDGES = [  # 12 inner-frame opening edges, both web faces (Z = ±WEB)
+# The chamfer's ONE size dimension lands on the first selected edge, and a
+# chamfer size prints only where its edge is seen end-on. The +X end face's
+# foot edge (along Z) goes first, so the front view shows the size at the
+# view's bottom-right outside corner (r7 machinist review: the size sat on a
+# cavity rim no view shows plainly). That end face is therefore selected as
+# its two edges the slant faces do not already own (foot and top), not as a
+# face: same edges, same chamfer, same volume.
+CHAMFER_EDGES = [
+    [BOSS_DEPTH / 2.0, -HALF_Y, 0.0],  # +X end face's foot edge (sized)
+    [BOSS_DEPTH / 2.0, HALF_Y, 0.0],  # +X end face's top edge
+    # 12 inner-frame opening edges, both web faces (Z = ±WEB)
     [0.0, -63.5, -WEB],
     [63.5, 0.0, -WEB],
     [59.78, 59.78, -WEB],
@@ -260,10 +328,80 @@ CHAMFER_EDGES = [  # 12 inner-frame opening edges, both web faces (Z = ±WEB)
 CHAMFER_FACES = [  # whole faces whose every edge is chamfered (tangent-propagated)
     [0.0, -85.0, 31.24],
     [0.0, -85.0, -31.24],  # ±Z slant window surrounds
-    [BOSS_DEPTH / 2.0, 0.0, 0.0],
-    [-BOSS_DEPTH / 2.0, 0.0, 0.0],  # front / back trapezoid (±X) faces
+    [-BOSS_DEPTH / 2.0, 0.0, 0.0],  # back trapezoid (-X) face
     [59.78, -59.78, 0.0],  # one inner fillet face
 ]
+
+
+def _pocket_floor_radius_max_limit(adapter) -> None:
+    """PocketFloorRadius as the single limit "R0.8 MAX" carrying the band's
+    deviations (build_ch_pivot_bracket._corner_radius_max_limit's recipe)."""
+    lower, upper = deviations(POCKET_FLOOR_R_BAND)
+    _, dimension = _named_dimension(adapter, "PocketFloorFillet", "PocketFloorRadius")
+    label = "PocketFloorRadius@PocketFloorFillet"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, POCKET_FLOOR_R_MAX / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
+            f"{POCKET_FLOOR_R_MAX}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = POCKET_FLOOR_R_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != POCKET_FLOOR_R_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {POCKET_FLOOR_R_MAX:g} MAX")
+
+
+async def _seat_station_reference(adapter) -> list[tuple[str, str]]:
+    """The blanked REF sketch: per seat, a construction line on the Top
+    plane's x axis from the end face to the seat centre, its length the
+    station; returns the anchors' drive jobs (the end faces follow
+    WallWidth). The seats are Hole Wizard points with no global, so the
+    stations themselves stay undriven: a REF reports, it does not control."""
+    sketch = REFERENCE_SKETCHES[0]
+    dims = SketchDims()
+    check(f"create_sketch {sketch}", await adapter.create_sketch("Top"))
+    for name, end_x, seat_x in SEAT_STATION_LINES:
+        # Direct-to-DB: both lines lie on the sketch's x axis, so creation-
+        # time inference would snap in the relations added below.
+        set_sketch_direct_db(adapter, True)
+        line = check(f"{name} line", await adapter.add_line(end_x, 0.0, seat_x, 0.0))
+        set_sketch_direct_db(adapter, False)
+        segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"{name} line did not take the construction flag")
+        check(
+            f"{name} horizontal",
+            await adapter.add_sketch_constraint(line, None, "horizontal"),
+        )
+        await anchor_point_to_origin(
+            adapter, f"{line}.start", end_x, 0.0, f"{name} end face"
+        )
+        dims.record(f"{name}Anchor", '"WallWidth" / 2')
+        await dimension_between(
+            adapter,
+            f"{line}.start",
+            f"{line}.end",
+            "horizontal_distance",
+            abs(end_x - seat_x),
+            f"{name} from the end face",
+        )
+        dims.record(name)
+    await ensure_fully_defined(adapter, f"{sketch} sketch")
+    check(f"exit_sketch {sketch}", await adapter.exit_sketch())
+    name_last_feature(adapter, sketch)
+    return dims.apply(adapter, sketch)
 
 
 def _add_construction_diagonals(adapter, half_mm: float) -> None:
@@ -547,6 +685,17 @@ async def build(adapter) -> dict[str, str]:
     name_dimensions(adapter, "PocketCornerFillet", ["PocketRadius"])
     await volume_check(adapter, "PocketCornerFillet", POCKET_FILLET_VOLUME, 20)
 
+    # 6b. PocketFloorFillet: R0.8 (the printed MAX) around both pocket floors.
+    check(
+        "fillet pocket floors",
+        await adapter.add_fillet(
+            POCKET_FLOOR_R_MAX, POCKET_FLOOR_FILLET_EDGES, propagate=True
+        ),
+    )
+    name_last_feature(adapter, "PocketFloorFillet")
+    name_dimensions(adapter, "PocketFloorFillet", ["PocketFloorRadius"])
+    await volume_check(adapter, "PocketFloorFillet", POCKET_FLOOR_FILLET_VOLUME, 20)
+
     # 7. FootClearanceHoles: one native Hole Wizard feature, four 5/16 drills.
     wizard_holes(
         adapter,
@@ -559,9 +708,10 @@ async def build(adapter) -> dict[str, str]:
     )
     await volume_check(adapter, "FootClearanceHoles", FOOT_HOLED_VOLUME, 200)
 
-    # 8. RimChamfer: 1.27 mm / 45° around the whole window rim -- the 12 inner-
-    #    frame opening edges plus the slant/trapezoid/fillet faces, tangent-
-    #    propagated.
+    # 8. RimChamfer: 1.27 mm / 45° around the whole window rim and every
+    #    outside edge -- the +X end face's foot edge first (it carries the
+    #    size), its top edge, the 12 inner-frame opening edges, plus the
+    #    slant/back-end/fillet faces, tangent-propagated.
     check(
         "chamfer",
         await adapter.add_chamfer(
@@ -585,6 +735,9 @@ async def build(adapter) -> dict[str, str]:
     )
     await volume_check(adapter, "BracketSeats", BRACKET_SEATS_VOLUME, 200)
 
+    # 10. SeatStationReference: the seats' REF stations for VIEW B.
+    drive_jobs += await _seat_station_reference(adapter)
+
     # Apply the deferred drive equations now that the whole model + a rebuild
     # exist, so every named-dim target resolves. Each equation evaluates to the
     # value just built, so the geometry must not move -- the re-check below is
@@ -596,6 +749,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven part (equations neutral)", BRACKET_SEATS_VOLUME, 200
     )
+    _pocket_floor_radius_max_limit(adapter)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
@@ -603,6 +757,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(

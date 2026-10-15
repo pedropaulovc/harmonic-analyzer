@@ -33,10 +33,13 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
         "CavWidth",
         "PocketRadius",
         "CavityRadius",
+        "PocketFloorRadius",
         "RimChamferSize",
+        "SeatEastStation",
+        "SeatWestStation",
     }
     marked = set().union(*support.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.VIEW_B_KEEP)
     assert kept == marked == expected
     assert drawing.DIMENSION_CALLOUTS == {
         "WinWidth": "SQ POCKET BOTH SIDES",
@@ -44,10 +47,12 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
         "CavityRadius": "4X",
         "CavWidth": "SQ CAVITY THRU",
         "RimChamferSize": RIM_CHAMFER_CALLOUT,
+        "PocketFloorRadius": "POCKET FLOOR\nCORNERS",
     }
+    two_places = {"PocketRadius", "SeatEastStation", "SeatWestStation"}
     assert drawing.DIMENSION_PRECISION == {
-        **dict.fromkeys(expected - {"PocketRadius"}, 1),
-        "PocketRadius": 2,
+        **dict.fromkeys(expected - two_places, 1),
+        **dict.fromkeys(two_places, 2),
         "WebThickness": 2,
         "FootThickness": 2,
     }
@@ -493,6 +498,66 @@ def test_web_volume_deltas_are_the_closed_forms() -> None:
     assert support.BRACKET_SEATS_VOLUME < support.RIM_CHAMFER_VOLUME
 
 
+def _floor_spandrel_quarter_turn_volume(r: float, wall_radius: float) -> float:
+    """The R ``r`` floor spandrel swept a quarter turn round a corner whose
+    wall has radius ``wall_radius``, by midpoint integration (u from the
+    wall toward the corner's axis, v up from the floor)."""
+    steps = 400
+    cell = r / steps
+    total = 0.0
+    for i in range(steps):
+        u = (i + 0.5) * cell
+        for j in range(steps):
+            v = (j + 0.5) * cell
+            if (u - r) ** 2 + (v - r) ** 2 >= r**2:
+                total += math.pi / 2.0 * (wall_radius - u) * cell * cell
+    return total
+
+
+def test_pocket_floor_fillet_is_the_printed_max_and_its_volume_closed_form() -> None:
+    """Main's r8 ruling on the r7 review's unstated pocket floor corner: R0.8
+    MAX, modelled AT the limit (swTolMAX) on both pockets' floor loops."""
+    assert support.POCKET_FLOOR_R_MAX == 0.8
+    assert support.POCKET_FLOOR_R_BAND == (0.0, -0.8)
+    assert support.POCKET_FLOOR_R_TOL_TYPE == 6
+    assert f"{support.POCKET_FLOOR_R_MAX:.{support.POCKET_FLOOR_R_PLACES}f}" == "0.8"
+    # One edge per pocket, on the top rail's floor corner, -Z first (its
+    # size lands there: the section's upper left).
+    assert support.POCKET_FLOOR_FILLET_EDGES == [
+        [0.0, support.BIG, -support.WEB],
+        [0.0, support.BIG, support.WEB],
+    ]
+    r = support.POCKET_FLOOR_R_MAX
+    straight = 4.0 * (2.0 * support.BIG - 2.0 * support.POCKET_FILLET_R)
+    per_pocket = (1.0 - math.pi / 4.0) * r**2 * straight + 4.0 * (
+        _floor_spandrel_quarter_turn_volume(r, support.POCKET_FILLET_R)
+    )
+    assert support.POCKET_FLOOR_FILLET_GROWTH == pytest.approx(
+        2.0 * per_pocket, rel=1e-4
+    )
+    assert (
+        support.POCKET_FLOOR_FILLET_VOLUME - support.POCKET_FILLET_VOLUME
+        == pytest.approx(support.POCKET_FLOOR_FILLET_GROWTH)
+    )
+    holes = (
+        len(support.HOLES)
+        * math.pi
+        / 4.0
+        * support.HOLE_DIA**2
+        * (support.FOOT_THICKNESS)
+    )
+    assert support.FOOT_HOLED_VOLUME == pytest.approx(
+        support.POCKET_FLOOR_FILLET_VOLUME - holes
+    )
+    # The fillet stands outside the web, clear of the seats' threads inside
+    # it and of the clearance holes in the foot.
+    floor_reach = support.WEB + r
+    assert seats.SCREW_MAJOR_DIA / 2.0 < support.WEB
+    assert min(abs(z) for _, z in support.HOLES) - support.HOLE_DIA / 2.0 > (
+        floor_reach + 5.0
+    )
+
+
 def test_bracket_seats_sit_under_the_bracket_holes() -> None:
     import ch_pivot_bracket_sides as sides
 
@@ -525,17 +590,30 @@ def test_bracket_screw_stack_holds_at_the_printed_worst_case() -> None:
     assert seats.WEB_WALL_MIN >= 2.0
 
 
-def test_rim_chamfer_is_placed_on_the_section_by_a_targeted_import() -> None:
-    """#743: the front view only ever got RimChamferSize from the entire-model
-    import, and the rail took it away (r743-diag-a/b). A targeted RimChamfer
-    import into the section delivers it (r743-diag-c), so the section owns it
-    and its curate imports only the features that own its kept dimensions."""
+def test_rim_chamfer_size_lands_on_an_outside_corner_of_the_front_view() -> None:
+    """r7 machinist review (clarity): the size sat on a cavity rim inside the
+    section. A chamfer's size lands on its first selected edge and prints
+    only where that edge is seen end-on, so the +X end face's foot edge goes
+    first and the front view, which sees it end-on at its bottom-right
+    corner, carries the size. The section keeps its targeted import."""
     import ast
 
-    assert "RimChamferSize" in drawing.RIGHT_KEEP
-    assert "RimChamferSize" not in drawing.FRONT_KEEP
-    owned = set().union(*support.DRAWING_DIMENSIONS.values())
-    assert set(drawing.RIGHT_KEEP) <= owned
+    first, second = support.CHAMFER_EDGES[:2]
+    assert first == [support.BOSS_DEPTH / 2.0, -support.HALF_Y, 0.0]
+    assert second == [support.BOSS_DEPTH / 2.0, support.HALF_Y, 0.0]
+    assert "RimChamferSize" in drawing.FRONT_KEEP
+    assert "RimChamferSize" not in drawing.RIGHT_KEEP
+    scale = drawing.VIEW_SCALE / 1000
+    corner = (
+        drawing.FRONT_CENTER[0] + support.BOSS_DEPTH / 2.0 * scale,
+        drawing.FRONT_CENTER[1] - support.HALF_Y * scale,
+    )
+    line_x, line_y = drawing.FRONT_KEEP["RimChamferSize"]
+    assert 0.0 < line_x - corner[0] <= 0.003
+    assert 0.0 < corner[1] - line_y <= 0.003
+    # The text's leader stays short: the text is in the lane just up-right.
+    text_x, text_y = drawing.RIM_CHAMFER_TEXT_XY
+    assert math.dist((text_x, text_y), (line_x, line_y)) < 0.060
 
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     curates = {
@@ -543,25 +621,37 @@ def test_rim_chamfer_is_placed_on_the_section_by_a_targeted_import() -> None:
         for call in ast.walk(tree)
         if isinstance(call, ast.Call)
         and isinstance(call.func, ast.Name)
-        and call.func.id == "curate_view_dimensions"
+        and call.func.id in {"curate_view_dimensions", "curate_hidden_owner_dimensions"}
     }
-    section = curates["right"]
-    assert isinstance(section["keep"], ast.Name) and section["keep"].id == "RIGHT_KEEP"
-    by_feature = section.get("dimensions_by_feature")
-    assert isinstance(by_feature, ast.Name) and by_feature.id == "DRAWING_DIMENSIONS"
+    for view, keep in (("right", "RIGHT_KEEP"), ("view_b", "VIEW_B_KEEP")):
+        curate = curates[view]
+        assert isinstance(curate["keep"], ast.Name) and curate["keep"].id == keep
+        by_feature = curate.get("dimensions_by_feature")
+        assert isinstance(by_feature, ast.Name)
+        assert by_feature.id == "DRAWING_DIMENSIONS"
     assert drawing.DRAWING_DIMENSIONS is support.DRAWING_DIMENSIONS
+    offsets = [
+        call
+        for call in ast.walk(tree)
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Name)
+        and call.func.id == "offset_dimension_text"
+    ]
+    assert [call.args[1].id for call in offsets] == ["front_dimensions"]
 
 
 def test_precision_reaches_every_dimension_exactly_once() -> None:
     """r743-rocker-fix (53cb9ad5b) failed "dimension precision not applied:
-    ['RailDepth']": the bulk call covers only imported dimensions, and the
-    sheet-made ones (web, foot) set their own after the import. Every
-    DIMENSION_PRECISION name goes through exactly one of the two."""
+    ['RailDepth']": each bulk call covers only the dimensions its curate pass
+    kept, and the sheet-made ones (web, foot) set their own after the import.
+    Every DIMENSION_PRECISION name goes through exactly one of them."""
     import ast
 
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
-    bulk = drawing.imported_precision()
+    bulk = drawing.imported_precision(kept)
     assert set(bulk) == kept & set(drawing.DIMENSION_PRECISION)
+    view_b = drawing.imported_precision(drawing.VIEW_B_KEEP)
+    assert view_b == {"SeatEastStation": 2, "SeatWestStation": 2}
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     own = {
         node.slice.value
@@ -572,8 +662,80 @@ def test_precision_reaches_every_dimension_exactly_once() -> None:
         and isinstance(node.slice, ast.Constant)
     }
     assert own == {"WebThickness", "FootThickness"}
-    assert not own & set(bulk)
-    assert own | set(bulk) == set(drawing.DIMENSION_PRECISION)
+    assert not own & set(bulk) and not set(bulk) & set(view_b)
+    assert own | set(bulk) | set(view_b) == set(drawing.DIMENSION_PRECISION)
+
+
+def test_seat_stations_print_as_ref_from_the_real_end_faces() -> None:
+    """r7 machinist review (blocker): the seats printed with no location and
+    read as crowding the end wall. Main's r8 ruling: REF stations from the
+    end faces in VIEW B, the transfer staying the method."""
+    lines = {name: (end, seat) for name, end, seat in support.SEAT_STATION_LINES}
+    assert lines == {
+        "SeatEastStation": (support.BOSS_DEPTH / 2.0, max(seats.SEAT_LOCAL_X)),
+        "SeatWestStation": (-support.BOSS_DEPTH / 2.0, min(seats.SEAT_LOCAL_X)),
+    }
+    printed = {
+        name: f"{abs(end - seat):.{drawing.DIMENSION_PRECISION[name]}f}"
+        for name, (end, seat) in lines.items()
+    }
+    assert printed == {"SeatEastStation": "4.95", "SeatWestStation": "6.56"}
+    assert support.REFERENCE_SKETCHES == ("SeatStationReference",)
+    assert support.DRAWING_DIMENSIONS["SeatStationReference"] == set(lines)
+    assert set(drawing.VIEW_B_KEEP) == set(lines)
+    # The transfer instruction stays on the seat callout.
+    assert "AT ASSEMBLY;" in drawing.SEAT_CALLOUT_PROCESS
+
+
+def test_seat_station_texts_stand_above_view_b_outboard_of_its_ends() -> None:
+    scale = drawing.VIEW_SCALE / 1000
+    centre_x, centre_y = drawing.VIEW_B_CENTER
+    fence_top = centre_y + drawing.VIEW_B_CROP_HALF_Z_MM * scale
+    end_run = support.BOSS_DEPTH / 2.0 * scale
+    east = _text_box(
+        f"({support.BOSS_DEPTH / 2.0 - max(seats.SEAT_LOCAL_X):.2f})",
+        drawing.VIEW_B_KEEP["SeatEastStation"],
+    )
+    west = _text_box(
+        f"({support.BOSS_DEPTH / 2.0 + min(seats.SEAT_LOCAL_X):.2f})",
+        drawing.VIEW_B_KEEP["SeatWestStation"],
+    )
+    for box in (east, west):
+        assert box[1] > fence_top + 0.002
+    assert drawing.VIEW_B_KEEP["SeatEastStation"][0] > centre_x + end_run
+    assert drawing.VIEW_B_KEEP["SeatWestStation"][0] < centre_x - end_run
+    # East: left of the hole table. West: right of the front view's pocket
+    # width extension line and clear of the stacked width texts.
+    assert east[2] < drawing.HOLE_TABLE_ANCHOR[0] - 0.002
+    pocket_x = drawing.FRONT_CENTER[0] + support.BIG * scale
+    assert west[0] > pocket_x + 0.003
+    pocket = _text_box("165.1\nSQ POCKET BOTH SIDES", drawing.FRONT_KEEP["WinWidth"])
+    assert _boxes_clear(west, pocket, 0.003)
+
+
+def test_pocket_floor_radius_text_sits_in_the_lane_above_the_chamfer() -> None:
+    scale = drawing.VIEW_SCALE / 1000
+    radius = _text_box(
+        "R0.8 MAX\nPOCKET FLOOR\nCORNERS", drawing.RIGHT_KEEP["PocketFloorRadius"]
+    )
+    front_right = drawing.FRONT_CENTER[0] + support.BOSS_DEPTH / 2 * scale
+    assert radius[0] > front_right + 0.003
+    for y in (
+        radius[1],
+        min(radius[3], drawing.RIGHT_CENTER[1] + support.HALF_Y * scale),
+    ):
+        local_y = (y - drawing.RIGHT_CENTER[1]) / scale
+        wall_x = drawing.RIGHT_CENTER[0] - support._wall_half_z_at(local_y) * scale
+        assert radius[2] < wall_x - 0.002
+    for other in (
+        _text_box("R12.7\n4X", drawing.FRONT_KEEP["CavityRadius"]),
+        _text_box("16.9", drawing.RIGHT_KEEP["TopSpan"]),
+        _rim_chamfer_box(),
+    ):
+        assert _boxes_clear(radius, other, 0.003)
+    # The text is level with the upper floor corner its leader lands on.
+    corner_y = drawing.RIGHT_CENTER[1] + support.BIG * scale
+    assert radius[1] < corner_y < radius[3] + 0.003
 
 
 def _z_line(y_mm: float, z0_mm: float, z1_mm: float, *, direction=(0.0, 0.0, 1.0)):
@@ -641,13 +803,21 @@ def test_rim_chamfer_callout_names_every_edge_the_feature_breaks() -> None:
     assert "OUTSIDE" in caption and "POCKET" in caption and "CAVITY" in caption
     assert not any(char.isdigit() for char in caption)
     # The faces whose every edge the feature breaks: both slant faces (the
-    # pocket rims and the outside edges they share) and both end faces.
-    assert len(support.CHAMFER_FACES) == 5
-    assert {face[0] for face in support.CHAMFER_FACES[2:4]} == {
-        support.BOSS_DEPTH / 2.0,
-        -support.BOSS_DEPTH / 2.0,
+    # pocket rims and the outside edges they share), the -X end face and one
+    # cavity fillet face. The +X end face is selected as its two edges the
+    # slant faces do not own (foot and top), so its size can go first.
+    assert len(support.CHAMFER_FACES) == 4
+    assert [face[0] for face in support.CHAMFER_FACES].count(
+        -support.BOSS_DEPTH / 2.0
+    ) == 1
+    assert all(face[0] != support.BOSS_DEPTH / 2.0 for face in support.CHAMFER_FACES)
+    end_edges, rim_edges = support.CHAMFER_EDGES[:2], support.CHAMFER_EDGES[2:]
+    assert {(edge[0], edge[1]) for edge in end_edges} == {
+        (support.BOSS_DEPTH / 2.0, -support.HALF_Y),
+        (support.BOSS_DEPTH / 2.0, support.HALF_Y),
     }
-    assert {abs(edge[2]) for edge in support.CHAMFER_EDGES} == {support.WEB}
+    assert len(rim_edges) == 12
+    assert {abs(edge[2]) for edge in rim_edges} == {support.WEB}
 
 
 def test_rim_chamfer_callout_sits_between_the_front_view_and_the_section() -> None:
@@ -669,57 +839,6 @@ def test_rim_chamfer_callout_sits_between_the_front_view_and_the_section() -> No
         foot[3],
     )
     assert _boxes_clear(chamfer, foot, 0.003)
-
-
-def test_rim_chamfer_dimension_line_stands_beside_its_rim() -> None:
-    """r4 machinist review (rule 14): the extension lines ran from the cavity
-    rim on the web out past the slant wall. The dimension line now stands just
-    left of the web face, inside the pocket void, and only the leader runs out
-    to the text."""
-    scale = drawing.VIEW_SCALE / 1000
-    line_x, line_y = drawing.RIGHT_KEEP["RimChamferSize"]
-    web_face_x = drawing.RIGHT_CENTER[0] - support.WEB * scale
-    rim_y = drawing.RIGHT_CENTER[1] - support.CAV * scale
-    assert 0.0 < web_face_x - line_x <= 0.003
-    assert rim_y - support.CHAMFER * scale < line_y < rim_y
-    wall_x = (
-        drawing.RIGHT_CENTER[0]
-        - support._wall_half_z_at((line_y - drawing.RIGHT_CENTER[1]) / scale) * scale
-    )
-    assert line_x > wall_x + 0.003
-    # The line stays above the foot, whose top bounds the pocket void.
-    assert line_y > drawing.RIGHT_CENTER[1] - support.BIG * scale + 0.005
-
-
-# Measured on the pc-pivot-r6 layout audit (run 20261015T064814104Z): the
-# 9.53 line ran 2.8 mm under its text, its left arrow reached 6.3 mm left of
-# the web face, and the chamfer leader left its text 14.8 mm right of and
-# 16.7 mm under the text point, landing on the chamfer's dimension line.
-WEB_LINE_DROP = 0.0028
-WEB_ARROW_REACH = 0.0063
-CHAMFER_LEADER_START = (0.0148, -0.0167)
-
-
-def test_web_thickness_line_clears_the_chamfer_dimension_and_leader() -> None:
-    """r6 machinist review (rule 14): the chamfer leader crossed the 9.53
-    line beside its arrowhead, and the two dimensions' arrows crowded the web
-    at the cavity rim. The 9.53 line runs well above the chamfer's arrows and
-    passes right of the leader."""
-    scale = drawing.VIEW_SCALE / 1000
-    web_line_y = drawing.WEB_TEXT_XY[1] - WEB_LINE_DROP
-    rim_y = drawing.RIGHT_CENTER[1] - support.CAV * scale
-    assert web_line_y > rim_y + 0.012
-    start = (
-        drawing.RIM_CHAMFER_TEXT_XY[0] + CHAMFER_LEADER_START[0],
-        drawing.RIM_CHAMFER_TEXT_XY[1] + CHAMFER_LEADER_START[1],
-    )
-    end = drawing.RIGHT_KEEP["RimChamferSize"]
-    assert end[1] < web_line_y < start[1]
-    leader_x = start[0] + (end[0] - start[0]) * (start[1] - web_line_y) / (
-        start[1] - end[1]
-    )
-    arrow_tail_x = drawing.RIGHT_CENTER[0] - support.WEB * scale - WEB_ARROW_REACH
-    assert leader_x < arrow_tail_x - 0.003
 
 
 def test_web_thickness_text_clears_the_wall_and_the_height_dimension() -> None:
@@ -1045,7 +1164,9 @@ class _CropSeat:
             ActivateView=lambda _name: True,
             ClearSelection2=lambda _all: None,
             EditRebuild3=lambda: True,
-            SketchManager=SimpleNamespace(CreateCornerRectangle=self._rectangle),
+            SketchManager=SimpleNamespace(
+                AddToDB=False, CreateCornerRectangle=self._rectangle
+            ),
             SelectionManager=SimpleNamespace(
                 GetSelectedObjectCount2=lambda _mark: len(self.selected)
             ),
@@ -1071,6 +1192,7 @@ class _CropSeat:
 
     def _rectangle(self, *coords):
         self.rectangle = coords
+        self.rectangle_add_to_db = self.model.SketchManager.AddToDB
         return tuple(
             SimpleNamespace(
                 Select4=lambda append, _data, i=i: self.selected.append(i) or True
@@ -1124,6 +1246,10 @@ def test_view_b_crop_fence_is_the_rail_strip_across_the_whole_rail(monkeypatch) 
     assert seat.rebuilds == ["VIEW B placement"]
     # Crop2 is handed the whole closed fence.
     assert seat.selected_at_crop == [0, 1, 2, 3]
+    # The fence went straight to the database, past inference, and the
+    # sketch manager was handed back as found.
+    assert seat.rectangle_add_to_db is True
+    assert seat.model.SketchManager.AddToDB is False
     scale = drawing.VIEW_SCALE / 1000
     x1, y1, _z1, x2, y2, _z2 = seat.rectangle
     cx, cy = drawing.VIEW_B_CENTER

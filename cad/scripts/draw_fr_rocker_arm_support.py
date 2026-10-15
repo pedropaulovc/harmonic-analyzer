@@ -27,6 +27,7 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
+    dimension_name,
     place_view,
     view_name,
     visible_component_entities,
@@ -48,9 +49,13 @@ from _drawing_dimensions import (
     offset_dimension_text,
     set_dimension_callouts,
     set_dimension_precision,
+    set_reference_dimension,
 )
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_finish import add_surface_finish
+from _drawing_hidden_sketches import (
+    curate_view_dimensions as curate_hidden_owner_dimensions,
+)
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view
@@ -75,6 +80,8 @@ from build_fr_rocker_arm_support import (
     HOLE_DIA,
     HOLES,
     NARROW,
+    POCKET_FLOOR_R_MAX,
+    POCKET_FLOOR_R_TOL_TYPE,
     WEB,
     WIDE,
 )
@@ -123,15 +130,25 @@ FRONT_KEEP = {
     # through "165.1" (fix3 render).
     "WinWidth": (0.105, 0.110),
     "CavWidth": (0.105, 0.128),
+    # RimChamfer's size lands on its first edge, the +X end face's foot edge,
+    # which the front view sees end-on at its bottom-right outside corner
+    # (build_fr_rocker_arm_support.CHAMFER_EDGES). The dimension line stands
+    # just outside that corner; the text rides an OffsetText leader up into
+    # the lane between the front view and the section.
+    "RimChamferSize": (
+        FRONT_CENTER[0] + BOSS_DEPTH / 2.0 * VIEW_SCALE / 1000.0 + 0.0025,
+        FRONT_CENTER[1] - HALF_Y * VIEW_SCALE / 1000.0 - 0.0025,
+    ),
 }
 # The cavity corner CornerFillet's dimension attaches to, as sheet signs.
 CAVITY_RADIUS_CORNER = (1, 1)
 # RimChamfer is ONE model feature: 1.27 x 45 on every edge of the two slant
 # faces and the two end faces (all twelve outside edges plus both pocket
-# rims) and on the cavity rims on both web faces. The import attaches its
-# size to one cavity rim, so the caption names everything it governs; drawn
+# rims) and on the cavity rims on both web faces. Its one size sits on an
+# outside corner, so the caption names everything else it governs; drawn
 # outside chamfers with no size read as breaks past the title block's 0.25
-# MAX (machinist review, MHA-FR-005).
+# MAX (machinist review, MHA-FR-005). The r7 review's "delete the chamfer"
+# (over_spec) was rejected by Main: the callout stays.
 DIMENSION_CALLOUTS = {
     "PocketRadius": "8X",
     "CavityRadius": "4X",
@@ -140,6 +157,8 @@ DIMENSION_CALLOUTS = {
     "WinWidth": "SQ POCKET BOTH SIDES",
     "CavWidth": "SQ CAVITY THRU",
     "RimChamferSize": " X 45 DEG\nALL OUTSIDE\nEDGES AND\nPOCKET AND\nCAVITY RIMS",
+    # One fillet loop per pocket floor (r7 review: the corner was unstated).
+    "PocketFloorRadius": "POCKET FLOOR\nCORNERS",
 }
 DIMENSION_PRECISION = {
     "Depth": 1,
@@ -153,6 +172,12 @@ DIMENSION_PRECISION = {
     # A chamfer never needs extra places (drawing-guidelines.md rule 3): no
     # stack reads RimChamferSize, so 1.27 prints as 1.3 on the .X band.
     "RimChamferSize": 1,
+    # A single limit, R0.8 MAX: no extra places on radii (rule 3).
+    "PocketFloorRadius": 1,
+    # The seats' REF stations off the end faces, at the seat stack's places
+    # (rocker_bracket_seat_layout's 4.95 / 6.56 end walls).
+    "SeatEastStation": 2,
+    "SeatWestStation": 2,
     # A held thickness, 9.525 at the routine ±0.51: the seats' thread-wall
     # stack reads the same places (rocker_bracket_seat_layout).
     "WebThickness": WEB_PLACES,
@@ -160,12 +185,11 @@ DIMENSION_PRECISION = {
 }
 
 
-def imported_precision() -> dict[str, int]:
-    """Precision for the imported model dimensions the sheet still sets. The
+def imported_precision(kept: Any) -> dict[str, int]:
+    """Precision for the imported model dimensions one curate pass keeps. The
     sheet-made ones (web, foot) set their own when they are created, after the
     import; set_dimension_precision fails on a name it cannot find, which
     is how the #743 rail's RailDepth entry broke r743-rocker-fix."""
-    kept = set(FRONT_KEEP) | set(RIGHT_KEEP)
     return {
         name: digits for name, digits in DIMENSION_PRECISION.items() if name in kept
     }
@@ -202,6 +226,23 @@ VIEW_B_CAPTION_XY = (
     VIEW_B_CENTER[1] - VIEW_B_CROP_HALF_Z_MM * VIEW_SCALE / 1000.0 - 0.004,
 )
 SEAT_CALLOUT_XY = (0.300, 0.081)
+# The seats' REF stations (SeatStationReference, blanked in the part): each
+# text stands just above VIEW B's fence, outboard of its end face, so its
+# dimension line runs from the seat's centre mark out past the end line. The
+# east text clears the hole table's left edge; the west one the front view's
+# pocket-width extension lines and the section label.
+VIEW_B_REF_RISE = 0.0055
+VIEW_B_REF_OUTBOARD = 0.0045
+VIEW_B_KEEP = {
+    name: (
+        VIEW_B_CENTER[0]
+        + sign * (BOSS_DEPTH / 2.0 * VIEW_SCALE / 1000.0 + VIEW_B_REF_OUTBOARD),
+        VIEW_B_CENTER[1]
+        + VIEW_B_CROP_HALF_Z_MM * VIEW_SCALE / 1000.0
+        + VIEW_B_REF_RISE,
+    )
+    for name, sign in (("SeatEastStation", 1), ("SeatWestStation", -1))
+}
 # The letter matches the section's A (~5 mm) and stands square above its
 # tip, clear of the section line (the cone-tip-block pattern). VIEW_B_ARROW
 # is (note upper-left, leader tip) in sheet metres.
@@ -215,9 +256,7 @@ VIEW_B_ARROW = (
 )
 # The web thickness text sits right of the section, clear of the slanted
 # wall and of the 177.8 dimension line at x 0.240; at x 0.221 it printed
-# across the wall line (fix3 render). Its dimension line (about 2.8 mm under
-# the text) runs above the cavity rim's chamfer dimension and the chamfer
-# leader: at y 0.157 it crossed both beside the web (r6 render).
+# across the wall line (fix3 render).
 WEB_TEXT_XY = (RIGHT_CENTER[0] + 0.026, RIGHT_CENTER[1] - 0.0122)
 # The foot's 6.35 spans only 3.2 mm of sheet, too little for its text: at
 # y 0.142 the text sat between the extension lines with its own dimension
@@ -225,28 +264,21 @@ WEB_TEXT_XY = (RIGHT_CENTER[0] + 0.026, RIGHT_CENTER[1] - 0.0122)
 # extension line instead, in the gap between the front view and the
 # section's slanted wall.
 FOOT_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] - 0.0365)
-# The section cuts the window rim in profile, and it is the one view where a
-# targeted import of RimChamfer delivers RimChamferSize (r743-diag-c, leaf
-# 20260926T100550Z-1-829fb125). The front view only ever got it as a side
-# effect of the entire-model import, which the #743 rail took away. The import
-# binds the size to the cavity rim on the web's left face, inside the
-# section, so the dimension line stands just left of that face (short
-# extension lines across the pocket void, not from the web out past the slant
-# wall: r4 machinist review, rule 14) and the text rides an OffsetText leader
-# out to the lane between the front view and the section, beside the
-# section's chamfered outside edges. With OffsetText the text centres on its
-# point.
-RIM_CHAMFER_LINE_GAP = 0.0025
+# PocketFloorFillet's R0.8 MAX lands on its first edge, the -Z pocket's
+# top-rail floor corner (build_fr_rocker_arm_support.POCKET_FLOOR_FILLET_EDGES),
+# which the section shows in profile at its upper left. The text stands in
+# the lane left of the section's top, under the cavity's R12.7 and above the
+# chamfer callout.
 RIGHT_KEEP = {
     "WallHeight": (0.240, 0.185),
     "FootSpan": (0.205, 0.133),
     "TopSpan": (0.205, 0.238),
-    "RimChamferSize": (
-        RIGHT_CENTER[0] - WEB * VIEW_SCALE / 1000.0 - RIM_CHAMFER_LINE_GAP,
-        RIGHT_CENTER[1] - (CAV + CHAMFER / 2.0) * VIEW_SCALE / 1000.0,
-    ),
+    "PocketFloorRadius": (0.176, 0.224),
 }
-RIM_CHAMFER_TEXT_XY = (0.1717, 0.200)
+# The chamfer text on its OffsetText leader (the text centres on its point),
+# in the lane between the front view and the section, low enough that the
+# leader down to the front view's corner stays short.
+RIM_CHAMFER_TEXT_XY = (0.1717, 0.190)
 
 # Top-left anchor; the native four-row table grows down and right while
 # remaining clear of the isometric and title block.
@@ -306,6 +338,39 @@ def _seat_entry_edge(view: Any) -> Any:
     return matches[0]
 
 
+@_telemetry.traced("drawing.rocker_support.pocket_floor_radius")
+def _dress_pocket_floor_radius(adapter: Any, annotations: list[Any]) -> None:
+    """Prove the section's PocketFloorRadius prints the part's R0.8 MAX and
+    stop its leader at the arc (draw_ch_pivot_bracket's corner radius)."""
+    found = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "PocketFloorRadius"
+    ]
+    if len(found) != 1:
+        raise RuntimeError(
+            f"expected one PocketFloorRadius on the section, found {len(found)}"
+        )
+    annotation = _early_bound(found[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric):
+        raise RuntimeError("the imported pocket floor radius is not radial")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(tolerance.Type) != POCKET_FLOOR_R_TOL_TYPE:
+        raise RuntimeError(
+            f"PocketFloorRadius lost its native MAX type: {int(tolerance.Type)}"
+        )
+    if not math.isclose(
+        float(dimension.SystemValue), POCKET_FLOOR_R_MAX / 1000.0, abs_tol=1e-9
+    ):
+        raise RuntimeError("PocketFloorRadius does not measure the floor fillet")
+    display.ArcExtensionLineOrOppositeSide = False
+    if bool(display.ArcExtensionLineOrOppositeSide):
+        raise RuntimeError("PocketFloorRadius leader still runs to the opposite side")
+    _telemetry.info(f"pocket floor radius: text {display.GetText(1)!r}, MAX type")
+
+
 def _crop_view_b_to_rail(adapter: Any, view: Any) -> None:
     """Crop VIEW B to the rail strip: the whole rail length and the rail top
     with the upper slopes, not the full 63.5 mm foot width."""
@@ -361,9 +426,18 @@ def _crop_view_b_to_rail(adapter: Any, view: Any) -> None:
         f"fence corners in view-sketch space={corners!r}"
     )
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    segments = tuple(
-        sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]) or ()
-    )
+    # Direct to the database, past sketch inference: the fence's east corner
+    # stands 1 mm of sheet off the rail's end, and r7 printed VIEW B with no
+    # east end line (its west end, drawn first, kept it) -- the signature of
+    # a corner snapped onto the end edge, which the crop then trims away.
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        segments = tuple(
+            sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]) or ()
+        )
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
     if len(segments) != 4:
         raise RuntimeError(f"VIEW B crop fence has {len(segments)} segments, not 4")
     # Crop2 consumes the selected closed profile. A circle stays selected once
@@ -652,10 +726,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     dimensions = [*front_dimensions, *right_dimensions]
     set_dimension_callouts(adapter, dimensions, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, dimensions, imported_precision())
-    offset_dimension_text(
-        adapter, right_dimensions, {"RimChamferSize": RIM_CHAMFER_TEXT_XY}
+    set_dimension_precision(
+        adapter, dimensions, imported_precision(set(FRONT_KEEP) | set(RIGHT_KEEP))
     )
+    offset_dimension_text(
+        adapter, front_dimensions, {"RimChamferSize": RIM_CHAMFER_TEXT_XY}
+    )
+    _dress_pocket_floor_radius(adapter, right_dimensions)
     _create_view_centerline(
         adapter,
         front,
@@ -788,6 +865,18 @@ async def build(adapter: Any) -> dict[str, str]:
     _crop_view_b_to_rail(adapter, view_b)
     if not auto_center_marks(adapter, view_b, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to VIEW B")
+    # The seats' stations off the end faces, as REF: the part saves their
+    # sketch blanked, so the hidden-owner curate shows it in this view only.
+    view_b_dimensions = curate_hidden_owner_dimensions(
+        adapter,
+        view_b,
+        keep=VIEW_B_KEEP,
+        view_label="VIEW B",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    set_dimension_precision(adapter, view_b_dimensions, imported_precision(VIEW_B_KEEP))
+    for annotation in view_b_dimensions:
+        set_reference_dimension(adapter, annotation, label="VIEW B seat station")
     if add_note(adapter, VIEW_B_CAPTION, *VIEW_B_CAPTION_XY) is None:
         raise RuntimeError("failed to caption VIEW B")
     _add_view_b_arrow(adapter, front)
