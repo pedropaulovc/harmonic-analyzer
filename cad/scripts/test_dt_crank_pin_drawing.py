@@ -90,8 +90,10 @@ def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
     import pytest
 
     # The round ring's wire arc, centred in the straight cross-hole, keeps air
-    # to the hole wall across the whole pin section.
+    # to the hole wall across the whole pin section, at nominal and with the
+    # smallest printed ring through the fattest printed pin section.
     assert ring.HOLE_AIR >= ring.RING_HOLE_AIR
+    assert ring.HOLE_AIR_WORST >= ring.RING_HOLE_AIR
     # The side web is a named exception (under the 2.0 target): at the printed
     # worst case it holds the 1.5 floor, and the sheet states that value.
     worst_web = (

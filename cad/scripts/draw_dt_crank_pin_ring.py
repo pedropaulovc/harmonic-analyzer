@@ -13,7 +13,7 @@ so every value takes the title block's one-place band.
 The decimal places are the PART's (``dt_crank_pin_ring_notes``, applied
 natively by ``build_dt_crank_pin_ring``); this script only reads them back.
 
-Drawn 5:1 -- an Ø11 ring of Ø1 wire is a speck on a B sheet at anything less.
+Drawn 5:1 -- an Ø13 ring of Ø1 wire is a speck on a B sheet at anything less.
 """
 
 from __future__ import annotations
@@ -78,8 +78,8 @@ ISO_CENTER = (0.335, 0.175)
 NOTES_XY = (0.020, 0.080)  # left of the title block, below the views
 
 # Printed half-sizes in sheet metres, which every dimension is placed clear of.
-HALF_OD = (MEAN_R + WIRE_DIA / 2.0) * _S  # 0.0275
-HALF_ID = RING_ID / 2.0 * _S  # 0.0225
+HALF_OD = (MEAN_R + WIRE_DIA / 2.0) * _S  # 0.0325
+HALF_ID = RING_ID / 2.0 * _S  # 0.0275
 HALF_WIRE = WIRE_DIA / 2.0 * _S  # 0.0025
 
 # Top view: the inside diameter's text up and left of the ring; the bead,
