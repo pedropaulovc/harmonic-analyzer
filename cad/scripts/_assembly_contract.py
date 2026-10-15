@@ -28,7 +28,14 @@ CONTRACT_DIR = Path(__file__).resolve().parent.parent / "config" / "assemblies"
 _REQUIRED_KEYS = frozenset(
     {"number", "flip_invert", "allowed_free_stems", "required_free_stems", "free_dof"}
 )
-_KNOWN_KEYS = _REQUIRED_KEYS | {"free_dof_per_active_channel", "carries_chain"}
+# The assembly drawing's owner-declared machinist-review exceptions share the
+# file (drawing-simplicity-policy.md "Named exceptions"); machinist_exceptions
+# reads them and the build ignores them.
+_KNOWN_KEYS = _REQUIRED_KEYS | {
+    "free_dof_per_active_channel",
+    "carries_chain",
+    "machinist_exceptions",
+}
 
 
 @dataclass(frozen=True)

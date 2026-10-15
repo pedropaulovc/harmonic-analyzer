@@ -1,9 +1,10 @@
 """Owner-declared machinist-review exceptions, stored per package config.
 
 Known, owner-accepted departures live next to the thing they concern — in
-``cad/config/parts/<dashed-name>.yaml`` or
-``cad/config/assemblies/<dashed-stem>.yaml`` under the package's key — never
-in one central list:
+``cad/config/parts/<dashed-name>.yaml`` under the part's key, or in the
+assembly's contract ``cad/config/assemblies/<dashed-stem>.yaml`` at top level
+(an assembly drawing ``<stem>_assembly`` reads its ``<stem>`` contract, the
+BUILDING.md naming) — never in one central list:
 
     dt-crank-hub:
       number: MHA-DT-031
@@ -66,15 +67,20 @@ def load_exceptions(config_root: Path, name: str, kind: str) -> tuple[MachinistE
     or narrow what the reviewer ignores.
     """
     dashed = name.replace("_", "-")
-    subdir = "parts" if kind == "part" else "assemblies"
-    path = config_root / subdir / f"{dashed}.yaml"
+    if kind == "part":
+        subdir, stem = "parts", dashed
+    else:
+        # Assembly drawings keep the "-assembly" suffix; their config is the
+        # assembly's contract, named by the bare stem (BUILDING.md).
+        subdir, stem = "assemblies", dashed.removesuffix("-assembly")
+    path = config_root / subdir / f"{stem}.yaml"
     if not path.is_file():
         return ()
     doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(doc, dict):
         raise ValueError(f"{path}: config must be a mapping")
     section = None
-    for holder in (doc.get(dashed), doc):
+    for holder in (doc.get(stem), doc):
         if isinstance(holder, dict) and "machinist_exceptions" in holder:
             section = holder["machinist_exceptions"]
             break
