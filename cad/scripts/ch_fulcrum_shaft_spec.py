@@ -26,13 +26,13 @@ from ch_fulcrum_keeper_spec import (
     BORE_DIA_BAND,
     BORE_RUNNING_MIN_CLEARANCE_MM,
     BORE_SEAT_ALLOWANCE_MM,
-    CROWN_LEAST_R,
     CROWN_R,
     KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_Z_OFF,
     LUG_HALF_T,
     SET_SCREW_MIN_ENGAGEMENT_D,
     SET_SCREW_PITCH,
+    crown_least_height,
 )
 from ch_fulcrum_keeper_spec import DRAWING_PRECISION as KEEPER_PRECISION
 from vn_fulcrum_set_screw_spec import CUP_DIA as SET_SCREW_CUP_DIA
@@ -96,9 +96,10 @@ if KEEPER_Z_OFF + FLAT_LENGTH / 2.0 >= CYLINDER_HALF:
 # case). Heights are above the keeper bore axis: the set screw pulls the shaft
 # down onto the bore wall, so its flat sits AcrossFlat - bore radius up. The
 # tap's full thread runs from the bore top (plus the keeper spec's
-# conservative bore sag) to the crown's least radius less its sag and one
-# entry-chamfer pitch; the screw's full thread starts one cup chamfer above
-# its seat on the flat.
+# conservative bore sag) to the crown's least height across the thread (the
+# least full round over a bore off the width's centre plane,
+# crown_least_height) less one entry-chamfer pitch; the screw's full thread
+# starts one cup chamfer above its seat on the flat.
 _SCREW_HALF_MAJOR = SET_SCREW_MAJOR_DIA / 2.0
 
 
@@ -106,10 +107,9 @@ def _sag(radius: float) -> float:
     return radius - sqrt(radius**2 - _SCREW_HALF_MAJOR**2)
 
 
-_CROWN_LEAST_R = CROWN_LEAST_R  # the full round at half the least width
 _BORE_R_MAX = (BORE_DIA + BORE_DIA_BAND[0]) / 2.0
 _BORE_R_MIN = (BORE_DIA + BORE_DIA_BAND[1]) / 2.0
-_TAP_FULL_TOP = _CROWN_LEAST_R - _sag(_CROWN_LEAST_R) - SET_SCREW_PITCH
+_TAP_FULL_TOP = crown_least_height(_SCREW_HALF_MAJOR) - SET_SCREW_PITCH
 _TAP_FULL_BOTTOM = _BORE_R_MAX + _sag(_BORE_R_MAX)
 _SEAT_LOW = ACROSS_FLAT - _BAND_BY_PLACES[3] - _BORE_R_MAX
 _SEAT_HIGH = ACROSS_FLAT + _BAND_BY_PLACES[3] - _BORE_R_MIN
@@ -124,11 +124,12 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
         f"installed set screw engages {SET_SCREW_ENGAGEMENT_D:.2f}D of full "
         f"thread at the worst case (< {SET_SCREW_MIN_ENGAGEMENT_D}D)"
     )
-# Socket face above the crown apex: below it at nominal; the ruling lets it
-# stand up to 0.4 proud in free air at the worst case (Main ruling A,
-# 2026-10-10; vn_fulcrum_set_screw_spec).
+# Socket face above the crown over the tap axis: below it at nominal; the
+# ruling lets it stand up to 0.4 proud in free air at the worst case (Main
+# ruling A, 2026-10-10; vn_fulcrum_set_screw_spec), the least round over a
+# bore off the width's centre plane.
 SET_SCREW_PROUD_NOMINAL = FLAT_HEIGHT + SET_SCREW_LENGTH - CROWN_R
-SET_SCREW_PROUD_WORST = _SEAT_HIGH + SET_SCREW_LENGTH - _CROWN_LEAST_R
+SET_SCREW_PROUD_WORST = _SEAT_HIGH + SET_SCREW_LENGTH - crown_least_height(0.0)
 if SET_SCREW_PROUD_NOMINAL >= 0.0 or SET_SCREW_PROUD_WORST > 0.4:
     raise AssertionError("set screw stands proud of the keeper crown past the ruling")
 

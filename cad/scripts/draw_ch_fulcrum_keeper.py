@@ -56,17 +56,17 @@ from _session import run_build
 import _telemetry
 import ch_channel_assembly_steps as steps
 from ch_fulcrum_keeper_spec import (
+    BORE_CENTRE_CALLOUT,
     BORE_PAIR_CALLOUT,
     CBORE_DIA_MM,
     CORNER_R_MAX,
     CORNER_R_TOL_TYPE,
-    CROWN_ABOUT_BORE_CALLOUT,
     CROWN_R,
+    CROWN_ROUND_CALLOUT,
     CROWN_TOP_Y,
     DRAWING_DIMENSIONS,
     FOOT_SCREW_SIDE_CALLOUT,
     FOOT_TIP_X,
-    KEEPER_WIDTH,
     LUG_HALF_T,
     LUG_THICKNESS_CALLOUT,
     OVERALL_LENGTH,
@@ -162,12 +162,16 @@ _THREAD_CLASS = re.compile(r"\s*(?:-\s*)?<hw-threadclass>\s*", re.IGNORECASE)
 FOOT_HOLE_PROCESS = "DRILL\n"
 # The two keepers' bores are drilled and reamed through in one pass at their
 # installed spacing (one straight line whatever LugRise prints) and each crown
-# is then rounded about its own bore: bench instructions of the pair-ream
-# step, so each rides its own dimension.
+# is then rounded, a full round tangent to both sides at the bore's height:
+# bench instructions of the pair-ream step, so each rides its own dimension.
+# The bore's (7.0) reference station off the side face states its place on
+# the width's centre plane and why it is held there (owner ruling Q10-B: the
+# crown tap's depth under the full round).
 _PAIR_REAM_STEP = steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)
 DIMENSION_CALLOUTS = {
     "BoreDia": f"{BORE_PAIR_CALLOUT},\nPER {_PAIR_REAM_STEP}",
-    "CrownRadius": f"{CROWN_ABOUT_BORE_CALLOUT},\nPER {_PAIR_REAM_STEP}",
+    "CrownRadius": f"{CROWN_ROUND_CALLOUT},\nPER {_PAIR_REAM_STEP}",
+    "BoreFromSide": BORE_CENTRE_CALLOUT,
 }
 # Each three-place size states the function that holds it there (rule 4,
 # machinist review baseline: 6.000 / 3.000 / 7.000 printed with neither a
@@ -206,7 +210,8 @@ TOP_CALLOUTS = {
 # foot tip (above the plan) and off the -Z side face, the latter's text and
 # function under its extension lines right of the foot tip, clear of the
 # foot-hole callout.  The end view carries the width plus the shaft-axis /
-# crown stack, the reamed bore and the bore's place off a side face above it.
+# crown stack, the reamed bore and the bore's reference place off a side face
+# with its centre-plane band above it.
 FRONT_KEEP = {
     "LugThickness": (0.066, 0.086),
     "FootLength": (_front_x(SCREW_X), 0.086),
@@ -248,13 +253,13 @@ RIGHT_KEEP = {
     "LugRise": (0.196, 0.126),
     "CrownRadius": (0.168, 0.180),
     "BoreDia": (0.304, 0.1225),
-    # Above the crown, between the bore axis and the sheet-right side face
-    # (the Right plane's +u): clear of the crown leader, which leaves the
-    # arc up-left.
-    "BoreFromSide": (
-        RIGHT_CENTER[0] + KEEPER_WIDTH * SHEET_SCALE[0] / 4000.0,
-        0.172,
-    ),
+    # Above the crown, right of the crown block (the 3.000's precedent: a
+    # horizontal dimension's block centres on its requested point, the
+    # dimension line under its last row): its three rows are wider than the
+    # 14 mm span, so the block sits over the sheet-right side face, ~8 mm
+    # right of the crown block and ~10 mm over the crown top, clear of the
+    # crown leader, which leaves the arc up-left.
+    "BoreFromSide": (0.243, 0.180),
 }
 NEAR_SIDE_DIAMETERS = ("BoreDia",)
 _ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside

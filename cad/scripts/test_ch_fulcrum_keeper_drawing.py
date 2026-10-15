@@ -58,8 +58,8 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     )
     assert f"(NOTE {spec.QUANTITY_NOTE}) AT INSTALLED SPACING" in pair_ream
     assert "AT INSTALLED SPACING; THE MHA-CH-004 SHAFT SLIDES THROUGH BOTH" in pair_ream
-    assert " ".join(spec.CROWN_ABOUT_BORE_CALLOUT.split()) == (
-        "FULL ROUND ABOUT THE REAMED BORE, TANGENT TO BOTH SIDES"
+    assert " ".join(spec.CROWN_ROUND_CALLOUT.split()) == (
+        "FULL ROUND TANGENT TO BOTH SIDES, CENTER AT BORE HEIGHT"
     )
     notes = spec.DRAWING_NOTES.splitlines()
     quantity = [line for line in notes if "2 REQUIRED" in line]
@@ -89,10 +89,10 @@ def test_rule_12_worst_case_walls_and_thread() -> None:
     assert spec.SET_SCREW_WEB_MM >= 1.5
     assert spec.FOOT_TIP_WALL_MM >= 2.0
     assert spec.FOOT_SIDE_WALL_MM >= 2.0
-    # MR-fleet r5: the bore's station across the width prints .X, so both
-    # side walls hold 2.0 with the width's .X band too.
+    # Owner ruling Q10-B: the bore stands within +-0.3 of the width's centre
+    # plane, so each side wall is half the least .X width less that band.
     assert spec.BORE_SIDE_WALL_MM >= 2.0
-    assert round(spec.BORE_SIDE_WALL_MM, 3) == 2.2
+    assert round(spec.BORE_SIDE_WALL_MM, 3) == 3.1
     assert round(spec.SET_SCREW_WEB_MM, 3) == 1.813
     assert round(spec.FOOT_TIP_WALL_MM, 3) == 2.79
     assert round(spec.FOOT_CBORE_LUG_CLEARANCE_MM, 3) == 1.99
@@ -182,13 +182,25 @@ def test_corner_round_prints_its_max_limit_in_the_open_corner() -> None:
         assert _box_gap(block, other) >= _AIR, other
 
 
-def test_overall_sizes_print_as_references_and_the_bore_station_banded() -> None:
+def test_overall_sizes_print_as_references_and_the_bore_centred_on_the_width() -> None:
     # MR-fleet r5: "(7.0)" across the width left the builder no lateral
-    # error for the pair-ream layout; the station now prints at the .X band.
+    # error for the pair-ream layout. Owner ruling Q10-B: the full round
+    # follows the width, so the bore's place is held to the width's centre
+    # plane, stated on the (7.0) reference with its function, not as a
+    # station off a side face (which would carry the width's own band too).
     spec = ch_fulcrum_keeper_spec
-    assert spec.REFERENCE_DIMENSIONS == ("OverallHeight", "OverallLength")
+    assert spec.REFERENCE_DIMENSIONS == (
+        "OverallHeight",
+        "OverallLength",
+        "BoreFromSide",
+    )
     assert spec.DRAWING_PRECISION["BoreSideReference"] == {"BoreFromSide": 1}
     assert spec.BORE_FROM_SIDE == spec.KEEPER_WIDTH / 2.0
+    assert spec.BORE_CENTRE_BAND_MM == 0.3
+    assert (
+        spec.BORE_CENTRE_CALLOUT == "ON WIDTH CENTER \u00b10.3,\nHOLDS CROWN TAP DEPTH"
+    )
+    assert drawing.DIMENSION_CALLOUTS["BoreFromSide"] is spec.BORE_CENTRE_CALLOUT
     assert spec.DRAWING_PRECISION["OverallHeightReference"] == {"OverallHeight": 1}
     assert spec.DRAWING_PRECISION["OverallLengthReference"] == {"OverallLength": 1}
     assert spec.OVERALL_LENGTH == 2.0 * spec.LUG_HALF_T + spec.FOOT_L == 16.5
@@ -249,10 +261,33 @@ def test_crown_prints_a_full_round_reference_radius() -> None:
     assert spec.CROWN_R == spec.KEEPER_WIDTH / 2.0 == 7.0
     assert spec.CROWN_LEAST_R == pytest.approx(6.6)
     assert spec.CROWN_MOST_R == pytest.approx(7.4)
-    at_x_band = sum(spec.set_screw_wall_terms(spec.CROWN_R - 0.8).values())
-    assert at_x_band / 1.8542 < 1.5
-    assert round(spec.SET_SCREW_ENGAGEMENT_D, 2) == 1.53
+    major = 1.8542
+    at_x_band = sum(spec.set_screw_wall_terms(spec.CROWN_R - 0.8, 0.0).values())
+    assert at_x_band / major < 1.5
     assert not hasattr(spec, "CROWN_R_MIN")
+    # Owner ruling Q10-B: the round is centred on the width, so the tap on the
+    # bore axis loses crown to the bore's offset from the width's centre
+    # plane. A station off a side face adds the width's half band (0.4) to
+    # its own: .X (the r9 print) or .XX both leave the tap short of 1.5D;
+    # the +-0.3 centre-plane band keeps it, with the least round consumed.
+    half_width_band = 0.4
+    for station_band in (0.8, 0.51):
+        off_side = spec.set_screw_wall_terms(
+            spec.CROWN_LEAST_R, half_width_band + station_band
+        )
+        assert sum(off_side.values()) / major < 1.5, station_band
+    terms = spec.set_screw_wall_terms(spec.CROWN_LEAST_R, spec.BORE_CENTRE_BAND_MM)
+    assert sum(terms.values()) == pytest.approx(spec.SET_SCREW_FULL_THREAD_MM)
+    assert terms["least crown over the bore axis"] == pytest.approx(
+        math.sqrt(6.6**2 - 0.3**2)
+    )
+    assert terms["least crown over the bore axis"] + terms[
+        "crown fall across the thread"
+    ] == pytest.approx(spec.crown_least_height(spec._THREAD_HALF_MAJOR))
+    assert round(spec.SET_SCREW_ENGAGEMENT_D, 3) == 1.508
+    assert (
+        sum(spec.set_screw_wall_terms(spec.CROWN_LEAST_R, 0.38).values()) / major < 1.5
+    )
     source = " ".join(Path(part.__file__).read_text(encoding="utf-8").split())
     assert 'names=("CrownCz", "ShaftAxisH", "CrownRadius")' in source
     assert 'size_dimension="radius"' in source
@@ -530,6 +565,11 @@ def test_end_view_callouts_stand_clear_of_the_part_and_each_other() -> None:
             keep["BoreDia"], ["Ø6.350 +0.035", *callouts["BoreDia"].splitlines()], stack=True
         ),
         "Depth": _text_block(keep["Depth"], ["14.0"]),
+        # Owner ruling Q10-B: the reference station carries its centre-plane
+        # band and function, three rows wider than the 14 mm span.
+        "BoreFromSide": _value_block(
+            keep["BoreFromSide"], "(7.0)", callouts["BoreFromSide"]
+        ),
     }
     leaders = {
         "CrownRadius": _shoulder_leader(blocks["CrownRadius"], centre, crown_r),
@@ -581,12 +621,11 @@ def test_end_view_callouts_stand_clear_of_the_part_and_each_other() -> None:
             assert _segment_crossing(leader, line) is None, (name, line)
     # The width stands under the foot, its text clear of the outline.
     assert blocks["Depth"].ymax <= bottom - _AIR
-    # The bore's 7.0 station stands above the crown, between the bore axis
-    # and the sheet-right side face, clear of the crown block and leader.
-    bore_side = _text_block(keep["BoreFromSide"], ["7.0"])
+    # The bore's (7.0) station stands above the crown, over the sheet-right
+    # side face, clear of the crown block and leader.
+    bore_side = blocks["BoreFromSide"]
     assert bore_side.ymin >= bottom + spec.CROWN_TOP_Y * scale + _AIR
-    assert cx < keep["BoreFromSide"][0] < cx + half
-    assert _box_gap(bore_side, blocks["CrownRadius"]) >= _AIR
+    assert cx < keep["BoreFromSide"][0] < cx + half + 0.005
     assert segment_box_distance(leaders["CrownRadius"], bore_side) >= 0.003
 
 
