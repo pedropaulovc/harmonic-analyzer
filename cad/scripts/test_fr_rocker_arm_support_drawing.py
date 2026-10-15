@@ -52,18 +52,21 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
         "RimChamferSize": RIM_CHAMFER_CALLOUT,
         "PocketFloorRadius": "POCKET FLOOR\nCORNERS",
     }
-    two_places = {"PocketRadius", "SeatEastStation", "SeatWestStation"}
-    part_owned = {"PocketFloorRadius"}
+    part_owned = {
+        "PocketFloorRadius",
+        "RimChamferSize",
+        "SeatEastStation",
+        "SeatWestStation",
+    }
+    assert set(drawing.PART_PRECISION) == part_owned
     assert drawing.DIMENSION_PRECISION == {
-        **dict.fromkeys(expected - two_places - part_owned, 1),
-        **dict.fromkeys(two_places, 2),
+        **dict.fromkeys(expected - part_owned - {"PocketRadius"}, 1),
+        "PocketRadius": 2,
         "WebThickness": 2,
         "FootThickness": 2,
     }
     # The chamfer leg rounds to one place: 1.27 prints as 1.3 (rule 3).
-    assert (
-        f"{support.CHAMFER:.{drawing.DIMENSION_PRECISION['RimChamferSize']}f}" == "1.3"
-    )
+    assert f"{support.CHAMFER:.{drawing.PART_PRECISION['RimChamferSize']}f}" == "1.3"
 
 
 def test_pocket_and_cavity_reliefs_are_distinct() -> None:
@@ -648,14 +651,15 @@ def test_precision_reaches_every_dimension_exactly_once() -> None:
     """r743-rocker-fix (53cb9ad5b) failed "dimension precision not applied:
     ['RailDepth']": each bulk call covers only the dimensions its curate pass
     kept, and the sheet-made ones (web, foot) set their own after the import.
-    Every DIMENSION_PRECISION name goes through exactly one of them."""
+    Every DIMENSION_PRECISION name goes through exactly one of them, and every
+    part-owned name is read back by exactly one curate pass."""
     import ast
 
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     bulk = drawing.imported_precision(kept)
     assert set(bulk) == kept & set(drawing.DIMENSION_PRECISION)
-    view_b = drawing.imported_precision(drawing.VIEW_B_KEEP)
-    assert view_b == {"SeatEastStation": 2, "SeatWestStation": 2}
+    # VIEW B shows only part-owned places: the sheet sets none there.
+    assert drawing.imported_precision(drawing.VIEW_B_KEEP) == {}
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     own = {
         node.slice.value
@@ -666,58 +670,83 @@ def test_precision_reaches_every_dimension_exactly_once() -> None:
         and isinstance(node.slice, ast.Constant)
     }
     assert own == {"WebThickness", "FootThickness"}
-    assert not own & set(bulk) and not set(bulk) & set(view_b)
-    assert own | set(bulk) | set(view_b) == set(drawing.DIMENSION_PRECISION)
+    assert not own & set(bulk)
+    assert own | set(bulk) == set(drawing.DIMENSION_PRECISION)
+    part = set(drawing.PART_PRECISION)
+    assert not part & set(drawing.DIMENSION_PRECISION)
+    read_main, read_view_b = part & kept, part & set(drawing.VIEW_B_KEEP)
+    assert not read_main & read_view_b
+    assert read_main | read_view_b == part
 
 
-def test_pocket_floor_radius_places_are_the_parts_and_the_sheet_reads_them_back(
-    monkeypatch: pytest.MonkeyPatch,
+def _imported(name: str, places: int) -> SimpleNamespace:
+    """An imported dimension annotation the sheet may read but never set."""
+    display = SimpleNamespace(
+        GetPrimaryPrecision2=lambda: places,
+        SetPrecision3=lambda *_: pytest.fail("the part owns these places"),
+    )
+    return SimpleNamespace(name=name, GetSpecificAnnotation=lambda: display)
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["PocketFloorRadius", "RimChamferSize", "SeatEastStation", "SeatWestStation"],
+)
+def test_part_owned_places_are_the_parts_and_the_sheet_reads_them_back(
+    monkeypatch: pytest.MonkeyPatch, name: str
 ) -> None:
-    """Review finding: the R0.8 MAX's places were rewritten on the sheet. The
-    part build authors POCKET_FLOOR_R_PLACES; the sheet reads them back, never
-    SetPrecision3, and fails closed when the import lost them."""
+    """Review findings: the R0.8 MAX's, the chamfer's and the seat REF
+    stations' places were rewritten on the sheet. The part build authors
+    them; the sheet reads them back, never SetPrecision3, and fails closed
+    when the import lost them."""
     import ast
     import inspect
 
     import _drawing_dimensions
 
     assert support.DRAWING_PRECISION == {
-        "PocketFloorFillet": {"PocketFloorRadius": support.POCKET_FLOOR_R_PLACES}
+        "PocketFloorFillet": {"PocketFloorRadius": support.POCKET_FLOOR_R_PLACES},
+        "RimChamfer": {"RimChamferSize": support.RIM_CHAMFER_PLACES},
+        "SeatStationReference": {
+            "SeatEastStation": support.SEAT_STATION_PLACES,
+            "SeatWestStation": support.SEAT_STATION_PLACES,
+        },
     }
+    assert (
+        support.POCKET_FLOOR_R_PLACES,
+        support.RIM_CHAMFER_PLACES,
+        support.SEAT_STATION_PLACES,
+    ) == (1, 1, 2)
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in inspect.getsource(
         support.build
     )
-    assert "PocketFloorRadius" not in drawing.DIMENSION_PRECISION
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.VIEW_B_KEEP)
-    assert "PocketFloorRadius" not in drawing.imported_precision(kept)
+    assert name not in drawing.DIMENSION_PRECISION
+    all_kept = (
+        set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.VIEW_B_KEEP)
+    )
+    assert name not in drawing.imported_precision(all_kept)
     calls = [
         node.func.id
         for node in ast.walk(ast.parse(inspect.getsource(drawing.build)))
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     ]
-    assert calls.count("_assert_part_precision") == 1
-
-    def fake(places: int) -> SimpleNamespace:
-        display = SimpleNamespace(
-            GetPrimaryPrecision2=lambda: places,
-            SetPrecision3=lambda *_: pytest.fail("the part owns these places"),
-        )
-        return SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    assert calls.count("_assert_part_precision") == 2
 
     adapter = SimpleNamespace(_attempt=lambda fn: fn())
     monkeypatch.setattr(
         _drawing_dimensions._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
     )
     monkeypatch.setattr(
-        _drawing_dimensions, "dimension_name", lambda *_: "PocketFloorRadius"
+        _drawing_dimensions, "dimension_name", lambda _adapter, ann: ann.name
     )
-    drawing._assert_part_precision(adapter, [fake(support.POCKET_FLOOR_R_PLACES)])
-    with pytest.raises(RuntimeError, match="PocketFloorRadius"):
-        drawing._assert_part_precision(
-            adapter, [fake(support.POCKET_FLOOR_R_PLACES + 1)]
-        )
+    places = drawing.PART_PRECISION[name]
+    drawing._assert_part_precision(adapter, [_imported(name, places)], {name})
+    with pytest.raises(RuntimeError, match=name):
+        drawing._assert_part_precision(adapter, [_imported(name, places + 1)], {name})
     with pytest.raises(RuntimeError, match="never reached the sheet"):
-        drawing._assert_part_precision(adapter, [])
+        drawing._assert_part_precision(adapter, [], {name})
+    # A pass that did not keep the dimension does not demand it.
+    drawing._assert_part_precision(adapter, [], set())
 
 
 def test_seat_stations_print_as_ref_from_the_real_end_faces() -> None:
@@ -732,7 +761,7 @@ def test_seat_stations_print_as_ref_from_the_real_end_faces() -> None:
         "SeatWestStation": (-support.BOSS_DEPTH / 2.0, min(seats.SEAT_LOCAL_X)),
     }
     printed = {
-        name: f"{abs(end - seat):.{drawing.DIMENSION_PRECISION[name]}f}"
+        name: f"{abs(end - seat):.{drawing.PART_PRECISION[name]}f}"
         for name, (end, seat) in lines.items()
     }
     assert printed == {"SeatEastStation": "4.95", "SeatWestStation": "6.56"}
