@@ -4533,6 +4533,7 @@ note = 'Illustrative metric leaf radius gauge, including R7.0; compare the upper
 [gauges.arm-outline-template]
 name = "arm outline template (MHA-CH-006), shop-made: ch_rocker_arm_tl_outline_template"
 kind = "profile_gauge"
+cad = "ch_rocker_arm_tl_outline_template"
 # Basis: gauges.arm-outline-template.range_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1920 (gauges.arm-outline-template.range_mm) authored profile_gauge geometry baseline [8, 817] mm, offset [+0, +0] mm = [8, 817] mm. Range endpoints are not extended beyond the declared source span; lower endpoint is a minimum, upper endpoint a maximum.
 # Measurement: status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "marked gauge range and comparison against size or roughness reference"; scalar/vector-only schema.
 range_mm = [8.0, 817.0]
@@ -4934,13 +4935,6 @@ solids = [
 name = "1/4 in drive torque wrench"
 kind = "torque_wrench"
 note = "illustrative example item: 1/4 in square-drive click torque wrench, 2-24 N·m (example range, not measured), with 10 mm and 9/16 in sockets"
-
-# A thin outline template the rocker's top edge and bottom arc are scribed from: it
-# drops over the ground shoulder-screw head (coaxial with bore A) in the S4 fixture.
-# It is a layout template only, distinct from the rocker-profile-template inspection
-# gauge (whose blades sit 1.00 outside the outline). AUTHOR'S CHOICE: made to order by
-# an outside wire-EDM shop to the outline dimensions printed at S4 op 10 (from the bore
-# A axis), because no machine here holds an R800 line to 0.02; the shop bonds in the bush.
 
 # A 6 in horizontal rotary table for arcs cut by turning the work under a fixed cutter.
 # Local frame: table top Z0 on its axis; one hole of a 6 in table T-slot pattern along X.
@@ -5353,6 +5347,25 @@ pieces = 2
 dia_in = { value = 0.0782, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "outside micrometer or digital calipers, physical cutting or body diameter" } }
 # Basis: gauges.vermont-class-x-0782-plus.length_in: catalogue-valued placeholder; source nominal 2 in, offset +0 in = 2 in. Source b757b5a76 cad/process/shop/inventory.toml:2673 (gauges.vermont-class-x-0782-plus.length_in); retained item source https://www.judgetool.com/products/vermomt-class-x-pin-gages-in-0001-increments-000040-tolerance/. No invented catalogue deviation or actual installed-machine/gauge metrology is claimed.
 length_in = { value = 2, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "calipers" } }
+
+# Bought gauge pin that locates the arm outline template (MHA-CH-006-TL-13) in the
+# rocker's pivot bore (ch_rocker_arm_tl_outline_template_spec PIN_GAUGE_*): the 0.2550 Class
+# ZZ pin from gauges.pin-gauges left 0.0505 of registration play across both bores.
+# Auto-selected 2026-10-15 after review timeout (Codex 4280365386); Pedro may revisit.
+[gauges.vermont-class-x-2558-minus]
+name = "Class X gauge pin 0.2558 in minus (Vermont Gage)"
+kind = "pin_gauge"
+make = "Vermont Gage"
+sku = "141225580"
+source = "https://www.mscdirect.com/product/details/85912335"
+purchase = "Vermont Gage 141225580 Class X minus plug gage 0.2558 in x 2 in, MSC 85912335, $20.30 (MSC listing read live 2026-10-15; auto-selected 2026-10-15 after review timeout, Pedro may revisit)"
+note = "illustrative example item: one Vermont Gage Class X minus pin, 0.2558 in, tolerance -0.000040 in (0.25576-0.25580 in = 6.4963-6.4973 mm), tool steel, 2 in long, with certificate. Locates the arm outline template's reamed 6.500-6.515 hole in the rocker's 6.500-6.530 pivot bore: worst-case registration 0.0262 (0.0094 template + 0.0169 rocker)."
+# measured = { by = "example (plausible, not measured)", date = "2026-10-15", instrument = "count of pins" } (pieces is a plain number in the schema)
+pieces = 1
+# Basis: gauges.vermont-class-x-2558-minus.dia_in: catalogue-valued placeholder; source nominal 0.2558 in, offset +0 in = 0.2558 in. Source MSC listing for Vermont Gage 141225580 (https://www.mscdirect.com/product/details/85912335, read live 2026-10-15). No invented catalogue deviation or actual installed-machine/gauge metrology is claimed.
+dia_in = { value = 0.2558, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "outside micrometer or digital calipers, physical cutting or body diameter" } }
+# Basis: gauges.vermont-class-x-2558-minus.length_in: catalogue-valued placeholder; source nominal 2 in, offset +0 in = 2 in. Source MSC listing for Vermont Gage 141225580 (https://www.mscdirect.com/product/details/85912335, read live 2026-10-15). No invented catalogue deviation or actual installed-machine/gauge metrology is claimed.
+length_in = { value = 2, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-15", instrument = "calipers" } }
 
 # Threading for shop-made fixtures (Main ruling, 2026-10: ANSI inch UNC, 2B internal;
 # M4 -> #8-32, M5 -> #10-24, M6 -> 1/4-20, larger as needed up to 3/8-16). Taps and dies are

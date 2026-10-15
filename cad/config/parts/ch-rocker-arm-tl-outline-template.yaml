@@ -1,0 +1,10 @@
+ch-rocker-arm-tl-outline-template:
+  title: Rocker Arm Outline Template
+  # Shop gauge: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-13
+  material: AISI O1 tool steel
+  material_specification: AISI O1 precision ground flat stock, 1/8 x 2-1/2 x 18 in (Abrams), as supplied (annealed)
+  finish: annealed as supplied; protect with ISO VG 32 machine-oil film
+  quantity: 1
+  tolerance_class: machined_block
+  process: "lay out and scribe the arcs; drill and ream the pivot hole; saw outside the lines and file to them"
