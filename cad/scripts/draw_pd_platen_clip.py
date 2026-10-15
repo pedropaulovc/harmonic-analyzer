@@ -259,7 +259,7 @@ DIMENSION_AFFIXES = {
 # measured along the bows from the bridge to the tip, not across the formed
 # profile (r2 read it as a span); the rise is each bow's crest height.
 DIMENSION_CALLOUTS = {
-    "LeftZ": "MATCHES\nMHA-PD-002",
+    "LeftZ": "MATCHES\nMHA-PD-002",  # pd-platen-clip RV-01
     "RailWidth": "SCREW RAIL",
     "SheetDepth": "SHEET STOCK",
     "SpringRailWidth": "FULL R ENDS",
@@ -288,7 +288,7 @@ HOLE_EDGE_XY = (
     _plan_y(HOLE_Y) - HOLE_R_SHEET * _DIAG,
 )
 HOLE_CALLOUT_XY = (0.360, 0.098)
-HOLE_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-002\nDRILL"
+HOLE_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-002\nDRILL"  # pd-platen-clip RV-01
 # Where the slit-side corner radius lands (its leader target), for the layout
 # tests: the screw rail's top-right corner.
 SLIT_CORNER_XY = (
