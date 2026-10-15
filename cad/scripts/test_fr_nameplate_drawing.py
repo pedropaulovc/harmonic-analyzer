@@ -166,6 +166,33 @@ def test_section_a_crop_holds_the_border_the_groove_and_the_field() -> None:
     assert dxf.point_in_ring(field, end) and not engraved(x1)
 
 
+def test_section_a_break_line_closes_the_crops_open_end() -> None:
+    # r4 review: the fragment's right end needs a break line. It stands on the
+    # crop's right edge, from above the field floor to below the back face,
+    # with one Z mid-thickness whose tips sit either side of that edge.
+    (x0, z0), (x1, z1) = drawing.SECTION_CROP
+    points = drawing.SECTION_BREAK
+    assert points[0][0] == points[1][0] == points[-2][0] == points[-1][0] == x1
+    assert points[0][1] > -print_spec.FIELD_DEPTH
+    assert points[-1][1] < -spec.PLATE_THICKNESS
+    assert z0 > points[0][1] and points[-1][1] > z1
+    zs = [z for _x, z in points]
+    assert zs == sorted(zs, reverse=True)
+    tips = sorted(x for x, _z in points[2:4])
+    assert tips[0] < x1 < tips[1]
+    assert all(
+        -spec.PLATE_THICKNESS < z < -print_spec.FIELD_DEPTH for _x, z in points[1:5]
+    )
+    # The break draws after the crop, once A-A sits on its centre.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    order = [
+        source.index("    _crop_section(adapter, view)\n"),
+        source.index("    _place_crop_on_center(adapter, view)\n"),
+        source.index("    _sketch_section_break(adapter, view)\n"),
+    ]
+    assert order == sorted(order)
+
+
 def test_section_a_dimensions_each_depth_on_its_own_line() -> None:
     # r2 review C2: the two depths shared one face arrow; each now stands on
     # its own station, both from the decorated face (z = 0).
@@ -191,13 +218,15 @@ def test_section_a_dimensions_each_depth_on_its_own_line() -> None:
 def test_section_a_texts_and_caption_clear_each_other() -> None:
     # Measured r2 text blocks (8:1): a two-row value and callout is about
     # 8 mm tall and its callout row about 2.85 mm a character wide. Each
-    # block is boxed both left-aligned on its dimension line (as r2 printed)
-    # and centred on it, so neither SOLIDWORKS placement can collide.
+    # block is boxed left-aligned on its dimension line (as r2 printed),
+    # right-aligned on it (as r4 printed the floor reference) and centred on
+    # it, so no SOLIDWORKS placement can collide.
     def boxes(pick: dict) -> list[tuple[float, float, float, float]]:
         x, y = pick["text_xy"]
         width = 0.00285 * len(pick["callout"])
         return [
             (x, y - 0.004, x + width, y + 0.004),
+            (x - width, y - 0.004, x, y + 0.004),
             (x - width / 2.0, y - 0.004, x + width / 2.0, y + 0.004),
         ]
 
@@ -262,6 +291,7 @@ def test_notes_and_callouts_carry_no_numbers_and_stay_short() -> None:
         print_spec.FIELD_DEPTH_CALLOUT,
         print_spec.ENGRAVING_DEPTH_CALLOUT,
         print_spec.FLOOR_UNDER_ENGRAVING_CALLOUT,
+        drawing.SCREW_HEAD_NOTE,
         *print_spec.DIMENSION_CALLOUTS.values(),
     ]
     assert not any(re.search(r"\d", text) for text in texts), texts
@@ -278,6 +308,7 @@ def test_texts_stand_inside_the_border_and_off_the_title_block() -> None:
         *(pick["text_xy"] for pick in drawing.SECTION_PICKS.values()),
         drawing.HOLE_CALLOUT_XY,
         drawing.NOTES_XY,
+        drawing.SCREW_HEAD_NOTE_XY,
         drawing.ISO_NOTE_XY,
         drawing.SECTION_CENTER,
         drawing.SECTION_CAPTION_XY,
