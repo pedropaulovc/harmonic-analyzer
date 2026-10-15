@@ -33,12 +33,28 @@ from __future__ import annotations
 import math
 
 from _hole_spec import blind_cut_dia_mm
+from _printed_tolerance import printed_deviations
 from fr_tube_frame_spec import MM_PER_IN, OUTER_DIA as COLUMN_DIA
-from sh_column_clamp_back_geom import GRIP_OFFSET
-from sh_column_clamp_front_geom import COLUMN_BORE, EAR_HOLE_SPEC
+from sh_column_clamp_back_geom import BLOCK_DEPTH, GRIP_OFFSET
+from sh_column_clamp_front_geom import ARC_DEPTH, COLUMN_BORE, EAR_HOLE_SPEC
 from vn_clamp_screw_spec import SHANK_DIA as CLAMP_SCREW_MAJOR
 
 COLUMN_MATE = "MHA-FR-003 COLUMN"
+
+# Owner rulings 2026-10-15 (PR #1467 round-3 review), drawing-guidelines.md
+# rule 20, each ACCEPTED as a stated shortfall with no geometry change:
+# * the front arc's ear-to-bore web, 1.850 against the 2.0 wall target
+#   (sh_column_clamp_front_spec.RULE_20_SHORTFALLS);
+# * the back arc's back wall, 1.9765 against the 2.0 wall target
+#   (sh_column_clamp_back_spec.RULE_20_SHORTFALLS);
+# * the screw line, which can come up to 0.053 short of the front hole's
+#   screw float once both ear holes' drill wander is added
+#   (SCREW_LINE_SHORTFALL below).
+
+# Both arcs print Depth at two places; the front ear holes' Hole Wizard
+# callout prints its diameter at two places (Ø4.98).
+DEPTH_PLACES = 2
+EAR_HOLE_CALLOUT_PLACES = 2
 
 # (min, max) diametral clearance of EITHER arc's bore on its column. Centred
 # on the model's own 0.2 (COLUMN_BORE on COLUMN_DIA); the 0.1 floor keeps the
@@ -70,13 +86,17 @@ if GRIP_GAP_MIN <= 0.0:
         f"clamp faces close before the bores grip ({GRIP_GAP_MIN:.3f})"
     )
 
-# Radial float of the screw major in the front ear's clearance hole (least
-# hole: the DRILLED HOLES row's minus is 0), and what the two printed ear
-# stations spend of it at worst (one arc's +band against the other's -band).
-# The remainder (0.12 after the height mismatch below) is under the 0.18 the
-# two ear holes' full-depth EAR_DRILL_WANDER_DEG can add: pending owner ruling
-# with the walls (PR #1467 round-3 review).
-SCREW_FLOAT = (blind_cut_dia_mm(EAR_HOLE_SPEC) - CLAMP_SCREW_MAJOR) / 2.0
+# Radial float of the screw major in the front ear's clearance hole (the least
+# printed hole, Ø4.98: the DRILLED HOLES row's minus is 0), and what the two
+# printed ear stations spend of it at worst (one arc's +band against the
+# other's -band).  The ears' drill wander is charged on top in
+# SCREW_LINE_DEMAND below.
+_EAR_HOLE_DIA = blind_cut_dia_mm(EAR_HOLE_SPEC)
+EAR_HOLE_DIA_MIN = (
+    _EAR_HOLE_DIA
+    + printed_deviations(_EAR_HOLE_DIA, EAR_HOLE_CALLOUT_PLACES, (0.0, 0.0))[0]
+)
+SCREW_FLOAT = (EAR_HOLE_DIA_MIN - CLAMP_SCREW_MAJOR) / 2.0  # 0.407
 EAR_STATION_MISMATCH_MAX = 2.0 * EAR_STATION_BAND
 if EAR_STATION_MISMATCH_MAX >= SCREW_FLOAT:
     raise AssertionError(
@@ -116,6 +136,29 @@ BORE_RADIUS_MAX = (COLUMN_OD_MAX + BORE_DIAMETRAL_CLEARANCE[1]) / 2.0  # 12.9135
 # full printed depth in every direction: the shop may enter from either face.
 EAR_DRILL_WANDER_DEG = 0.3
 EAR_DRILL_DRIFT_PER_MM = math.tan(math.radians(EAR_DRILL_WANDER_DEG))  # 0.00524
+# Each ear hole runs through its arc: the front's clearance hole over the
+# arc's deepest printed Depth, the back's tap over the block's.
+FRONT_EAR_WANDER = EAR_DRILL_DRIFT_PER_MM * (
+    ARC_DEPTH + printed_deviations(ARC_DEPTH, DEPTH_PLACES)[1]
+)  # 0.096
+BACK_EAR_WANDER = EAR_DRILL_DRIFT_PER_MM * (
+    BLOCK_DEPTH + printed_deviations(BLOCK_DEPTH, DEPTH_PLACES)[1]
+)  # 0.081
+
+# The screw line at its worst: the printed ear mismatch plus both holes'
+# wander, in any direction, against the front hole's float.  Accepted short
+# (owner ruling 2026-10-15, above): 0.283 + 0.096 + 0.081 = 0.460 against
+# 0.407, i.e. 0.053 at the ruling's three places.  The floor still holds --
+# the printed bands alone never bind the screw (EAR_SCREW_MISMATCH_MAX <
+# SCREW_FLOAT above) -- and the shortfall may not grow past the accepted value.
+SCREW_LINE_DEMAND = EAR_SCREW_MISMATCH_MAX + FRONT_EAR_WANDER + BACK_EAR_WANDER
+SCREW_LINE_SHORTFALL = SCREW_LINE_DEMAND - SCREW_FLOAT  # 0.0532
+SCREW_LINE_SHORTFALL_ACCEPTED = 0.053
+if not 0.0 < round(SCREW_LINE_SHORTFALL, 3) <= SCREW_LINE_SHORTFALL_ACCEPTED:
+    raise AssertionError(
+        f"screw-line shortfall {SCREW_LINE_SHORTFALL:.4f} is not the accepted "
+        f"(0, {SCREW_LINE_SHORTFALL_ACCEPTED}]"
+    )
 
 # drawing-guidelines.md rule 17: wall target and hard floor.
 WALL_TARGET = 2.0

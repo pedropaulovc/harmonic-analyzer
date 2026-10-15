@@ -110,7 +110,7 @@ def test_fit_budget_closes_at_the_printed_limits() -> None:
     # Faces stay apart with both bores at their loosest and the offset least.
     assert math.isclose(fit.GRIP_GAP_MIN, 0.4 - 0.3)
     assert fit.GRIP_GAP_MIN > 0.0
-    # The ear stations' worst mismatch leaves screw float for drill wander.
+    # The ear stations' worst mismatch alone never binds the screw.
     assert fit.EAR_STATION_MISMATCH_MAX < fit.SCREW_FLOAT
     # So does the ears' worst mismatch with height and station together: the
     # height takes the stations' band, so each tap's zone is the same both ways.
@@ -146,11 +146,30 @@ def test_walls_at_the_largest_column_and_drill_wander() -> None:
     assert math.isclose(spec.WALLS_WORST["ear to far side"], 47.2 - 24.8 - 17.6 - reach)
     assert min(spec.WALLS_WORST.values()) >= 1.5
     # The back wall reaches the 2.0 target only on a column of at most 25.48;
-    # A513 admits 25.527, so it is a rule-20 shortfall pending an owner ruling.
+    # A513 admits 25.527: a rule-20 shortfall, accepted (owner, 2026-10-15).
     column_at_target = 2.0 * (0.4 + 14.49 - 2.0) - 0.30
     assert math.isclose(column_at_target, 25.48)
     assert column_at_target < fit.COLUMN_OD_MAX
     assert set(spec.RULE_20_SHORTFALLS) == {"back wall"}
+    assert spec.RULE_20_ACCEPTED == {"back wall"}
+
+
+def test_screw_line_shortfall_is_the_accepted_one() -> None:
+    # Independent oracle from literals: the printed Ø4.98 front hole at its
+    # least on the #8 screw major 4.1656, against the printed station/height
+    # mismatch hypot(0.2, 0.2) plus 0.3 deg of wander down both through holes
+    # (front 17.9 + 0.51, back 15.0 + 0.51), in any direction.
+    float_ = (4.98 - 4.1656) / 2.0  # 0.407
+    drift = math.tan(math.radians(0.3))
+    demand = math.hypot(0.2, 0.2) + (18.41 + 15.51) * drift  # 0.460
+    assert math.isclose(fit.SCREW_FLOAT, float_)
+    assert math.isclose(fit.SCREW_LINE_DEMAND, demand)
+    assert math.isclose(fit.SCREW_LINE_SHORTFALL, demand - float_)  # 0.0532
+    # Accepted under rule 20 (owner, 2026-10-15) as 0.053 at three places;
+    # the printed bands alone still leave the screw float.
+    assert fit.SCREW_LINE_SHORTFALL_ACCEPTED == 0.053
+    assert round(demand - float_, 3) == 0.053
+    assert math.hypot(0.2, 0.2) < float_
 
 
 def test_tight_bands_name_their_mate() -> None:

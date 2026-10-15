@@ -25,7 +25,8 @@ from sh_column_clamp_fit import (  # noqa: F401
     BORE_DIAMETRAL_CLEARANCE,
     BORE_RADIUS_MAX,
     COLUMN_MATE,
-    EAR_DRILL_DRIFT_PER_MM,
+    BACK_EAR_WANDER,
+    DEPTH_PLACES,
     EAR_HEIGHT_BAND,
     EAR_STATION_BAND,
     GRIP_GAP_MIN,
@@ -76,7 +77,12 @@ EAR_STATION_DIMENSIONS = ("EarHole1Z", "EarHole2Z")
 #   front arc's clearance holes across the bar's height too
 #   (sh_column_clamp_fit.EAR_SCREW_MISMATCH_MAX); the walls below take it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "BlockProfile": {"Depth": 2, "Width": 1, "GripOffset": 1, "AnchorZ": 1},
+    "BlockProfile": {
+        "Depth": DEPTH_PLACES,
+        "Width": 1,
+        "GripOffset": 1,
+        "AnchorZ": 1,
+    },
     "Block": {"Height": 1},
     "BoreProfile": {"BoreDia": 1},
     "EarHoles": {"EarHole1Z": 1},
@@ -115,13 +121,10 @@ EAR_HOLE_HEIGHT = ARC_HEIGHT / 2.0
 _EAR_HEIGHT_DEV = (-EAR_HEIGHT_BAND, EAR_HEIGHT_BAND)
 # The tapped ear's thread major envelope, the one rule 17 judges.
 THREAD_MAJOR_DIA = THREAD_MAJOR_MM[HOLE_SPEC.size]
-# Each through tap wanders over the block's deepest printed depth; its
-# reach is the thread major's radius off that wandered axis.
-_EAR_WANDER = EAR_DRILL_DRIFT_PER_MM * (
-    BLOCK_DEPTH
-    + printed_deviations(BLOCK_DEPTH, DRAWING_PRECISION["BlockProfile"]["Depth"])[1]
-)
-_EAR_REACH = THREAD_MAJOR_DIA / 2.0 + _EAR_WANDER
+# Its reach is the thread major's radius off the tap's wandered axis (the
+# through tap wanders over the block's deepest printed Depth,
+# sh_column_clamp_fit).
+_EAR_REACH = THREAD_MAJOR_DIA / 2.0 + BACK_EAR_WANDER
 _EAR_IN = EAR_HOLE_Z - EAR_STATION_BAND
 _EAR_OUT = EAR_HOLE_Z + EAR_STATION_BAND
 WALLS_WORST: dict[str, float] = {
@@ -145,11 +148,19 @@ WALLS_WORST: dict[str, float] = {
 if min(WALLS_WORST.values()) < WALL_FLOOR:
     raise AssertionError(f"clamp-back walls {WALLS_WORST} under the {WALL_FLOOR} floor")
 # drawing-guidelines.md rule 20: walls between the floor and the target.
-# Pending owner ruling (PR #1467 round-3 review): the back wall, 1.98 on the
-# largest A513 column, needs the column at most 25.48 to reach 2.0.
+# Accepted, owner ruling 2026-10-15 (PR #1467 round-3 review; recorded in
+# sh_column_clamp_fit): the back wall, 1.9765 on the largest A513 column.  It
+# would need a column of at most 25.48 to reach 2.0.  Any other wall falling
+# short is a new shortfall.
+RULE_20_ACCEPTED = frozenset({"back wall"})
 RULE_20_SHORTFALLS = {
     name: wall for name, wall in WALLS_WORST.items() if wall < WALL_TARGET
 }
+if not set(RULE_20_SHORTFALLS) <= RULE_20_ACCEPTED:
+    raise AssertionError(
+        f"clamp-back walls {sorted(set(RULE_20_SHORTFALLS) - RULE_20_ACCEPTED)} "
+        f"under {WALL_TARGET} without a ruling"
+    )
 BACK_WALL_MIN = WALLS_WORST["back wall"]
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
