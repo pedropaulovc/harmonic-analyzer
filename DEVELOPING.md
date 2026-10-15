@@ -1178,9 +1178,10 @@ recipes share the pure `_socket_head_dimensions` record; each SKU still owns
 its `DIMS` declaration. The current knife-hanger hex-bolt, #10 washer and
 knife-mount-dowel specs import their own pure per-SKU `DIMS`, not a socket-head,
 washer or dowel COM recipe. Production replays 92314A253 as modified stock:
-retain the hex head, cut the under-head length to 45.70 ±0.15 mm and apply
+retain the hex head, cut the under-head length to 46.70 ±0.15 mm and apply
 the finished thread-tail and end-prep requirements, without new head-minimum
-inspection. The ordinary hex head seats on its SAE washer. The new
+inspection. The ordinary hex head seats on its SAE washer on the frame's
+whole faced top, 36.50 ±0.05 mm above the finished underside. The new
 96659A104 washer supplies MHA-VN-060; it does not revive the retired VN-026
 washer. These inputs remain file-granular rather than depending on the
 obsolete production socket-head hanger route.

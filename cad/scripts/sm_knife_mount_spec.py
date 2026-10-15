@@ -91,12 +91,12 @@ KNIFE_BORE_ORIENTATION_TOL = float(
 # bolt axis the crossbar's #10 clearance hole must float round
 # (``build_sm_summing_assembly``'s knife-hanger stack).  Its 0.075 zone radius
 # is one term of HANGER_SCREW_MISMATCH (hypot(0.316, 0.264) = 0.412) inside
-# the hole's 0.6095 radial float with the drill drift's 0.195, 0.0024 spare.
+# the hole's 0.6095 radial float with the drill drift's 0.191, 0.0064 spare.
 # A screw through a clearance hole needs no tighter zone than that float
 # admits (drawing-guidelines.md rule 5), and Ø0.15 is the largest two-place
-# zone it admits: the float closes at Ø0.1534; Ø0.16 leaves -0.0046 and
-# Ø0.25 -0.068.  Plain face dimensions instead, even at .XXX (+/-0.13 each
-# way, not 0.075), give hypot(0.371, 0.319) = 0.489 and -0.075: the frame is
+# zone it admits: the float closes at Ø0.1590; Ø0.16 leaves -0.0007 and
+# Ø0.25 -0.064.  Plain face dimensions instead, even at .XXX (+/-0.13 each
+# way, not 0.075), give hypot(0.371, 0.319) = 0.489 and -0.071: the frame is
 # functional.
 STUD_TAP_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger tap position"])
 
@@ -154,7 +154,7 @@ KNIFE_FREE_ROCK_DEG = free_rock_deg(0.0)
 BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
 # MHA-VN-024, a #10-24 plain hex bolt cut from stock to its under-head length
 # (``vn_knife_hanger_stud_spec``), drops through a washer on the crossbar's
-# spotface and its #10 clearance hole and threads into a bottoming tap on the
+# faced top and its #10 clearance hole and threads into a bottoming tap on the
 # bore's vertical centreline at mid-depth.  The full thread's shallowest
 # limit, 9.52, must take the bolt's longest reach, 9.4856
 # (``build_sm_summing_assembly.HANGER_TIP_CLEARANCE``), and hold 1.5 D of

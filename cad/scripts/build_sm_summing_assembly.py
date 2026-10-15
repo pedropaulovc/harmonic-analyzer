@@ -12,10 +12,10 @@ boss-hook / counter-spring / gooseneck chain.
   ``SUMMING_Z`` and separated by ``+/-HEX_Z_MID``; each top seat is clamped
   to the crossbar underside (``MOUNT_GAP`` 0).
 * knife-hanger-stud x2 -- McMaster 92314A253 #10-24 plain hex bolts,
-  cut from 2 in stock to 45.70 +/-0.15 mm under the head; each passes the
+  cut from 2 in stock to 46.70 +/-0.15 mm under the head; each passes the
   crossbar's #10 loose clearance hole and threads into the knife-mount tap.
 * knife-hanger-washer x2 -- new McMaster 96659A104 18-8 SAE washers,
-  one beneath each hex head, seated on the shallow crossbar spotface.
+  one beneath each hex head, seated on the crossbar's faced top.
 * knife-mount-dowel x4 -- McMaster 98381A473 1/8 x 3/4 dowels, two per
   knife mount either side of its screw, each pressed to the floor of its
   top-seat hole; one slips into the crossbar underside's blind round hole,
@@ -37,7 +37,7 @@ Cross-subassembly fits (checked at the top level): the channel springs
 (ch-channel.SLDASM) thread the summing-lever plate's O4.5 holes -- gated
 analytically by build_ch_channel_assembly._assert_plate_threading; the knife-
 hanger bolts pass the top-frame crossbar's O6.045 clearance holes and clamp
-through their washers on its spotfaces; the knife-mount dowels slip into its
+through their washers on its faced top; the knife-mount dowels slip into its
 blind round holes and slots (fr-frame.SLDASM); the gooseneck post drops
 through the casting's rail-hub bore, gripped by its 1/4-20 set screw.
 
@@ -111,15 +111,14 @@ HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 # The top-frame, knife-mount and purchased hardware specs own every term.
 # The bolt frame has its cut tip at local Y=0, axis +Y. Its under-head face
 # bears on the washer's upper face; the washer's local Y=0 lower bearing face
-# seats on the spotface floor, HANGER_GRIP above the finished underside.
+# seats on the crossbar's faced top, HANGER_GRIP above the finished underside.
 # The knife mount remains clamped face-to-face to that underside, gap 0,
 # with no bedding allowance. Each dowel's pressed end (local Y=0, axis +Y)
 # sits on the floor of the knife mount's top-seat hole.
 KNIFE_MOUNT_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP  # 999.7: clamped, gap 0
-CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + top_frame.RING_HEIGHT
-HANGER_SPOTFACE_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP  # 1035.2
-HANGER_WASHER_Y = HANGER_SPOTFACE_Y  # washer lower bearing face, local Y=0
-HANGER_UNDERHEAD_Y = HANGER_WASHER_Y + hanger_washer.THICKNESS  # 1036.4827
+CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + top_frame.RING_HEIGHT  # 1036.2, faced
+HANGER_WASHER_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP  # 1036.2, local Y=0
+HANGER_UNDERHEAD_Y = HANGER_WASHER_Y + hanger_washer.THICKNESS  # 1037.4827
 HANGER_STUD_Y = HANGER_UNDERHEAD_Y - hanger_screw.LENGTH  # 990.7827 (cut tip)
 HANGER_REACH = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y  # 8.9173
 # Worst-case stack (drawing-guidelines.md rules 18–19): cut length +/-0.15,
@@ -183,11 +182,12 @@ HANGER_SCREW_MISMATCH_Z = (
 )  # 0.26373
 HANGER_SCREW_MISMATCH = math.hypot(HANGER_SCREW_MISMATCH_X, HANGER_SCREW_MISMATCH_Z)
 # The hole is drilled from the finished underside. Prove drift over the FULL
-# crossbar body through its as-cast top, not only to the shallow spotface:
-# tan(0.3 deg) * (36.5 + 0.8) = 0.19530413. The #10 loose hole's 0.6095
-# radial float covers this plus the station mismatch, with 0.00242539 spare.
+# crossbar body to the hole's top end at the faced top, at the longest
+# finished grip: tan(0.3 deg) * (36.50 + 0.05) = 0.19137710. The #10 loose
+# hole's 0.6095 radial float covers this plus the station mismatch, with
+# 0.00635242 spare.
 HANGER_SCREW_DRIFT = top_frame.DRILL_DRIFT_PER_MM * (
-    top_frame.RING_HEIGHT + top_frame.PRINTED_LINEAR_BAND_MM[1]
+    top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL
 )
 HANGER_SCREW_FLOAT_SPARE = top_frame.HANGER_SCREW_FLOAT - (
     HANGER_SCREW_MISMATCH + HANGER_SCREW_DRIFT
@@ -244,10 +244,10 @@ def _assert_hanger_seat_placement(
         raise RuntimeError(f"{screw}: axis off the intended knife station")
     if abs(washer_o[0] - screw_o[0]) > 1e-6 or abs(washer_o[2] - screw_o[2]) > 1e-6:
         raise RuntimeError(f"{washer}: washer is not coaxial with {screw}")
-    if abs(washer_o[1] - HANGER_SPOTFACE_Y) > 1e-6:
+    if abs(washer_o[1] - HANGER_WASHER_Y) > 1e-6:
         raise RuntimeError(
-            f"{washer}: lower-face/spotface-floor gap "
-            f"{washer_o[1] - HANGER_SPOTFACE_Y:.6f} mm"
+            f"{washer}: lower-face/faced-top gap "
+            f"{washer_o[1] - HANGER_WASHER_Y:.6f} mm"
         )
     under_head_y = screw_o[1] + hanger_screw.UNDERHEAD_LEN
     washer_top_y = washer_o[1] + hanger_washer.THICKNESS
@@ -269,16 +269,11 @@ def _assert_knife_hanger_stack() -> None:
         raise RuntimeError(
             f"knife-mount top seat must be clamped to the casting: MOUNT_GAP {MOUNT_GAP}"
         )
-    spotface_floor_y = CROSSBAR_TOP_Y - top_frame.HANGER_SPOTFACE_DEPTH
-    if abs(spotface_floor_y - HANGER_SPOTFACE_Y) > 1e-9:
+    if abs(HANGER_WASHER_Y - CROSSBAR_TOP_Y) > 1e-9:
         raise RuntimeError(
-            f"knife-hanger spotface floor y {spotface_floor_y:.4f} is not the "
-            f"finished-underface HANGER_GRIP seat y {HANGER_SPOTFACE_Y:.4f}"
-        )
-    if abs(HANGER_WASHER_Y - spotface_floor_y) > 1e-9:
-        raise RuntimeError(
-            f"knife-hanger washer lower face {HANGER_WASHER_Y:.4f} is not on "
-            f"the spotface floor {spotface_floor_y:.4f}"
+            f"knife-hanger washer lower face {HANGER_WASHER_Y:.4f}, the "
+            f"finished-underface HANGER_GRIP seat, is not on the faced crossbar "
+            f"top {CROSSBAR_TOP_Y:.4f}"
         )
     under_head_y = HANGER_STUD_Y + hanger_screw.UNDERHEAD_LEN
     washer_top_y = HANGER_WASHER_Y + hanger_washer.THICKNESS
@@ -508,7 +503,7 @@ async def build(adapter) -> dict[str, str]:
         label="knife-mount (back)",
     )
     # One cut #10-24 hex bolt and one SAE washer per mount: washer lower
-    # face on the crossbar spotface, bolt under-head on the washer upper face.
+    # face on the crossbar's faced top, bolt under-head on the washer upper face.
     # The two dowels stand proud into the underside slot (-X) and round hole
     # (+X), their pressed ends on the block's top-seat hole floors. Every
     # hardware instance is independently fixed; no operational DOF is added.
@@ -572,7 +567,7 @@ async def build(adapter) -> dict[str, str]:
             )
 
     # Read back both physical stacks: each washer's lower bearing face on
-    # the spotface, each bolt's head on its own washer, coaxial at the
+    # the faced top, each bolt's head on its own washer, coaxial at the
     # intended knife station. Check each dowel's offset and hole-floor seat.
     per_mount = knife_dowel.PER_MOUNT
     dowel_pairs = [

@@ -2,7 +2,7 @@ r"""Reproduction script: knife bearing support (book ch. 18, pp. 42-43).
 
 The hardened-steel bearing block that suspends the summing lever's knife edge from the
 top-frame casting's integral crossbar (clamped to its underside by the MHA-VN-024
-#10-24 plain hex bolt, through a washer on the crossbar's spotface, threaded into
+#10-24 plain hex bolt, through a washer on the crossbar's faced top, threaded into
 a bottoming tap in the block top, and keyed against turning by the two
 MHA-VN-051 dowels pressed into the top seat).
 The lever rocks as a FIRST-CLASS LEVER on the **top vertex line

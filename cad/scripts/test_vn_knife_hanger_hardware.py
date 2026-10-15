@@ -62,10 +62,10 @@ def test_catalogue_inputs_are_pure_and_isolated_from_diagnostics() -> None:
 def test_modified_bolt_nominals_and_inspection_are_separate() -> None:
     assert BOLT_DIMS.part_no == bolt.SKU == "92314A253"
     assert bolt.CATALOG_LENGTH == BOLT_DIMS.length == pytest.approx(50.8)
-    assert bolt.LENGTH == bolt.UNDERHEAD_LEN == pytest.approx(45.70)
+    assert bolt.LENGTH == bolt.UNDERHEAD_LEN == pytest.approx(46.70)
     assert bolt.LENGTH_BAND == (0.15, -0.15)
-    assert bolt.LENGTH_MIN == pytest.approx(45.55)
-    assert bolt.LENGTH_MAX == pytest.approx(45.85)
+    assert bolt.LENGTH_MIN == pytest.approx(46.55)
+    assert bolt.LENGTH_MAX == pytest.approx(46.85)
     assert bolt.THREAD == "#10-24" and bolt.THREAD_FIT == "UNC-2A"
     # The stock stays class 2A; the title block's thread row prints the class.
     assert bolt.PRINTED_THREAD == "#10-24 UNC"
@@ -92,7 +92,7 @@ def test_modified_bolt_nominals_and_inspection_are_separate() -> None:
     assert bolt.FULL_FORM_TAIL_MIN == pytest.approx(9.561666666666666)
     assert not hasattr(bolt, "HEAD_DIA")  # No socket-head compatibility alias.
     assert bolt.TIP_Y == 0.0
-    assert bolt.HEAD_UNDERFACE_Y == bolt.LENGTH == pytest.approx(45.70)
+    assert bolt.HEAD_UNDERFACE_Y == bolt.LENGTH == pytest.approx(46.70)
     assert bolt.HEAD_TOP_Y == bolt.LENGTH + bolt.HEAD_H
     assert bolt.ENGAGEMENT_MIN_D == 1.5
 
@@ -215,7 +215,7 @@ def test_complete_stock_is_positioned_before_production_cut(monkeypatch) -> None
     (dims,) = seen
     assert dims.length == bolt.CATALOG_LENGTH
     assert dims.underside_y == bolt.HEAD_UNDERFACE_Y
-    assert dims.tip_y == pytest.approx(-5.10)
+    assert dims.tip_y == pytest.approx(-4.10)
     assert dims.top_y == bolt.HEAD_TOP_Y
     # Retain a modeled runout; never infer full-form thread flush to the head.
     assert dims.runout_r > bolt.SHANK_DIA / 2
@@ -293,7 +293,7 @@ def test_native_controls_are_owned_and_printed_without_precision_rewrites() -> N
     )
     assert bolt.DIMENSION_TOLERANCE_TYPES["ChamferWidth"] == 4
     assert bolt_drawing.EXPECTED_CONTROLS["CutLength"] == pytest.approx(
-        (0.04570, -0.00015, 0.00015)
+        (0.04670, -0.00015, 0.00015)
     )
     assert bolt.DIMENSION_TOLERANCE_TYPES["CutLength"] == 4
     assert bolt.DIMENSION_PRECISION["CutLength"] == 2
@@ -413,6 +413,11 @@ def test_modified_stock_route_is_complete_not_the_old_socket_recipe() -> None:
         assert restated not in note
     assert "MHA-VN-060" in row["installation_notes"]
     assert "COUNTERBORE" not in row["installation_notes"]
+    assert "SPOTFACE" not in row["installation_notes"]
+    assert "FACED TOP" in row["installation_notes"]
+    washer_notes = _config.parts(washer_part.PART_NAME)["installation_notes"]
+    assert "SPOTFACE" not in washer_notes
+    assert "SEATS ON THE FACED CROSSBAR TOP" in washer_notes
     for module in ("build_vn_knife_hanger_stud", "draw_vn_knife_hanger_stud"):
         tree = ast.parse((SCRIPTS / f"{module}.py").read_text(encoding="utf-8"))
         imports = {
@@ -830,7 +835,7 @@ def test_production_cut_positions_complete_stock_at_finished_head_pose(monkeypat
     monkeypatch.setattr(bolt_part, "_early_bound", lambda value, _kind: value)
     result = asyncio.run(bolt_part._cut_to_length(SimpleNamespace(currentModel=model)))
     assert result is receipt
-    assert seen["stock"] == (None, {"bearing_y_mm": 45.70})
+    assert seen["stock"] == (None, {"bearing_y_mm": 46.70})
     assert seen["equation"] == (
         "CutterRadius@StockDeburrProfile",
         '"StockMajorRadius@StockDeburrProfile" + "ChamferWidth@StockDeburrProfile"',

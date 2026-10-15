@@ -20,7 +20,7 @@ this static clamp needs one 18-8 grade. ``_fastener_catalog`` keeps AISI 304
 only as the SOLIDWORKS library stand-in for rendering and mass; it is not a
 supplier grade.
 
-Part frame: finished tip Y=0, axis +Y, bearing face Y=45.70.
+Part frame: finished tip Y=0, axis +Y, bearing face Y=46.70.
 """
 
 import math
@@ -44,7 +44,13 @@ SHANK_DIA_MIN = THREAD_MAJOR_MIN
 SHANK_DIA_MAX = THREAD_MAJOR_MAX
 PITCH = DIMS.pitch
 CATALOG_LENGTH = DIMS.length
-LENGTH = 45.70
+# Under-head length that holds the cut tip at assembly Y 990.7827: the
+# MHA-FR-002 grip 36.50 (finished underside to the faced top the washer
+# bears on), plus the 96659A104 nominal thickness 1.2827, plus the 8.9173
+# nominal reach into the MHA-SM-002 tap. A literal, so this purchased-part
+# spec stays free of the frame spec that imports it;
+# build_sm_summing_assembly asserts the stack and its worst-case reach.
+LENGTH = 46.70
 UNDERHEAD_LEN = LENGTH
 LENGTH_BAND = (0.15, -0.15)  # Finished part, (upper, lower), mm.
 LENGTH_MIN = LENGTH + LENGTH_BAND[1]

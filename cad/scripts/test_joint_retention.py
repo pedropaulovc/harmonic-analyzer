@@ -296,8 +296,11 @@ def test_the_knife_hanger_is_a_threadlocked_clamp_keyed_by_its_two_dowels() -> N
     assert "two pressed MHA-VN-051 dowels" in row.exposure_reason
     assert "92314A253" in row.axial_capture
     assert "96659A104" in row.axial_capture
-    assert "spotface" in row.axial_capture
-    assert "45.70 +/-0.15" in row.axial_capture
+    assert "crossbar's faced top" in row.axial_capture
+    assert "spotface" not in row.axial_capture
+    assert "46.70 +/-0.15" in row.axial_capture
+    assert "36.50 +/-0.05" in row.axial_capture
+    assert "HANGER_SPOTFACE" not in row.evidence
     assert "8.9173 nominal (8.349..9.4856 worst case)" in row.axial_capture
     assert "9.65 +/-0.13" in row.axial_capture
     assert "0.0760667 spare" in row.axial_capture

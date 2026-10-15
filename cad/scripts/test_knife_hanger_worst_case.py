@@ -162,9 +162,9 @@ def test_the_retired_half_inch_tap_fails_the_same_web_formula() -> None:
 def test_the_screw_reach_holds_engagement_and_stays_in_the_thread() -> None:
     asm._assert_knife_hanger_stack()
     assert asm.MOUNT_GAP == 0.0
-    assert asm.HANGER_SPOTFACE_Y == pytest.approx(1035.2)
-    assert asm.HANGER_WASHER_Y == pytest.approx(1035.2)
-    assert asm.HANGER_UNDERHEAD_Y == pytest.approx(1036.4827)
+    assert asm.CROSSBAR_TOP_Y == pytest.approx(1036.2)
+    assert asm.HANGER_WASHER_Y == pytest.approx(1036.2)
+    assert asm.HANGER_UNDERHEAD_Y == pytest.approx(1037.4827)
     assert asm.HANGER_STUD_Y == pytest.approx(990.7827)
     assert asm.HANGER_REACH == pytest.approx(8.9173)
     assert asm.HANGER_REACH_MIN == pytest.approx(8.349)
@@ -234,15 +234,15 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
     assert asm.HANGER_SCREW_MISMATCH_X == pytest.approx(0.31623)
     assert asm.HANGER_SCREW_MISMATCH_Z == pytest.approx(0.26373)
     assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.4117704770864468, abs=1e-12)
-    # Drift reaches the full as-cast top, at the longest .X body thickness;
-    # using the shorter machined grip would miss the hole's top endpoint.
+    # Drift reaches the hole's top end at the faced top, over the longest
+    # finished grip (36.50 + 0.05), not the retired one-place cast band.
     assert asm.HANGER_SCREW_DRIFT == pytest.approx(
         math.tan(math.radians(top_frame.KEEPER_TAP_DRILL_WANDER_DEG))
-        * (top_frame.RING_HEIGHT + top_frame.PRINTED_LINEAR_BAND_MM[1])
+        * (top_frame.HANGER_GRIP + top_frame.HANGER_GRIP_TOL)
     )
-    assert asm.HANGER_SCREW_DRIFT == pytest.approx(0.19530412809261474, abs=1e-12)
+    assert asm.HANGER_SCREW_DRIFT == pytest.approx(0.19137710138833963, abs=1e-12)
     assert asm.HANGER_SCREW_FLOAT_SPARE == pytest.approx(
-        0.0024253948209385645, abs=1e-12
+        0.006352421525213647, abs=1e-12
     )
     assert (
         asm.HANGER_SCREW_MISMATCH + asm.HANGER_SCREW_DRIFT
@@ -251,7 +251,7 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
 
     # The tap zone is the largest two-place zone the float admits (R4 asked
     # Ø0.25): the stack, each mismatch carrying the zone's radius, closes at
-    # Ø0.1534; Ø0.16 and Ø0.25 overrun the float.
+    # Ø0.1590; Ø0.16 and Ø0.25 overrun the float.
     def spare_at(zone: float) -> float:
         shift = (zone - knife_mount.STUD_TAP_POSITION_TOL) / 2.0
         mismatch = math.hypot(
@@ -260,8 +260,8 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
         return top_frame.HANGER_SCREW_FLOAT - mismatch - asm.HANGER_SCREW_DRIFT
 
     assert spare_at(0.15) == pytest.approx(asm.HANGER_SCREW_FLOAT_SPARE, abs=1e-12)
-    assert spare_at(0.16) == pytest.approx(-0.004617363079285064, abs=1e-12)
-    assert spare_at(0.25) == pytest.approx(-0.06803947084550743, abs=1e-12)
+    assert spare_at(0.16) == pytest.approx(-0.0006903363750100366, abs=1e-12)
+    assert spare_at(0.25) == pytest.approx(-0.0641124441412324, abs=1e-12)
     assert spare_at(0.16) < 0.0 and spare_at(0.25) < 0.0
     x0 = asm.HANGER_SCREW_MISMATCH_X - knife_mount.STUD_TAP_POSITION_TOL / 2.0
     z0 = asm.HANGER_SCREW_MISMATCH_Z - knife_mount.STUD_TAP_POSITION_TOL / 2.0
@@ -269,7 +269,7 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
     half_zone_max = (
         -(x0 + z0) + math.sqrt((x0 + z0) ** 2 - 2.0 * (x0**2 + z0**2 - reach**2))
     ) / 2.0
-    assert 2.0 * half_zone_max == pytest.approx(0.1534439686274326, abs=1e-12)
+    assert 2.0 * half_zone_max == pytest.approx(0.15901985253048656, abs=1e-12)
     assert spare_at(2.0 * half_zone_max) == pytest.approx(0.0, abs=1e-12)
     assert 0.15 <= 2.0 * half_zone_max < 0.16
     # Negative control: inheriting the general symmetric .XXX hole band
@@ -334,7 +334,8 @@ def test_the_crossbar_webs_hold_round_the_hole_and_the_slot() -> None:
         build_fr_top_frame.SLOT_SCREW_WALL,
     ):
         assert wall >= 2.0
-    assert build_fr_top_frame.SLOT_FLOOR_MARGIN == pytest.approx(22.65)
+    # Shortest finished grip (36.50 - 0.05) less the deepest slot floor 12.8.
+    assert build_fr_top_frame.SLOT_FLOOR_MARGIN == pytest.approx(23.65)
 
 
 def test_the_slot_length_band_is_functional() -> None:
