@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import math
 import re
 import tomllib
 from collections.abc import Iterator
@@ -151,12 +152,18 @@ def _nested(
 
 
 def _records() -> Iterator[tuple[str, str, dict[str, Any]]]:
-    """Every inventory record, including nested ones such as a kit's members."""
+    """Every inventory record: tables, array-of-tables rows such as `[[stock]]`,
+    and nested ones such as a kit's members."""
     for category, items in _shop("inventory.toml").items():
         if isinstance(items, dict):
-            for item, record in items.items():
-                if isinstance(record, dict):
-                    yield from _nested(f"{category}.{item}", item, record)
+            rows = items.items()
+        elif isinstance(items, list):
+            rows = ((str(index), row) for index, row in enumerate(items))
+        else:
+            continue
+        for item, record in rows:
+            if isinstance(record, dict):
+                yield from _nested(f"{category}.{item}", item, record)
 
 
 def test_shop_made_records_are_enumerated():
@@ -177,3 +184,83 @@ def test_no_inventory_table_names_a_part():
         if _names_part(item, record, identities) and qualified not in SHOP_MADE_IDS
     ]
     assert not named, named
+
+
+def test_records_cover_array_of_table_rows():
+    assert any(qualified.startswith("stock.") for qualified, _, _ in _records())
+
+
+# A parenthesised list of record ids (three or more kebab words) in a note, e.g.
+# "(rocker-hub-strap, rocker-rail-clamp)": the make tables a record is bought for.
+_ID = r"[a-z][a-z0-9]*(?:-[a-z0-9]+){2,}"
+_CITED_TABLES = re.compile(rf"\(({_ID}(?:, {_ID})*)\)")
+
+
+def test_no_inventory_record_supplies_a_table_outside_the_shop():
+    """A record bought for a make table the shared shop does not hold is that part's
+    plan input, not shared inventory (it returns with the part's migration)."""
+    items = {item for _, item, _ in _records()}
+    dangling = [
+        (qualified, table)
+        for qualified, _, record in _records()
+        for cited in _CITED_TABLES.findall(str(record.get("note", "")))
+        for table in cited.split(", ")
+        if table not in items
+    ]
+    assert not dangling, dangling
+
+
+def _rows(kind: str) -> dict[tuple[str, ...], list[dict[str, Any]]]:
+    """`[[cut]]` rows by (material, tool material, operation); `[[plunge]]` as "plunge"."""
+    groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    for row in _shop("cutting-data.toml")[kind]:
+        key = (row["material_class"], row["tool_material"], row.get("operation", kind))
+        groups.setdefault(key, []).append(row)
+    return groups
+
+
+CUTTING_GROUPS = {**_rows("cut"), **_rows("plunge")}
+
+
+@pytest.mark.parametrize("key", list(CUTTING_GROUPS), ids="/".join)
+def test_cutting_rows_tile_their_diameter_span(key):
+    """prechips matches lo <= d <= hi; a row below its neighbour ends on the float just
+    under the neighbour's lo, so the rows are half-open [lo, hi) with no gap or overlap."""
+    bands = sorted(tuple(row["diameter_range"]) for row in CUTTING_GROUPS[key])
+    for (lo, hi), (next_lo, _) in zip(bands, bands[1:]):
+        assert lo <= hi
+        assert hi == math.nextafter(next_lo, -math.inf), (hi, next_lo)
+
+
+# Inventory kit (or member) kinds whose cutters each cutting-data operation feeds.
+_OPERATION_KINDS = {
+    "face": {"endmill_set"},
+    "profile": {"endmill_set"},
+    "plunge": {"endmill_set"},
+    "drill": {"drill_index", "drill_set", "drill"},
+    "spot": {"center_drill_set"},
+    "ream": {"reamers"},
+}
+
+
+def _cutters(operation: str) -> Iterator[tuple[str, float]]:
+    for kit_id, kit in _shop("inventory.toml")["tools"].items():
+        for member_id, member in kit.get("members", {}).items():
+            dia = member.get("dia_mm")
+            kind = member.get("kind", kit.get("kind"))
+            if kind in _OPERATION_KINDS[operation] and dia:
+                value = dia["value"] if isinstance(dia, dict) else dia
+                yield f"{kit_id}.{member_id}", value
+
+
+@pytest.mark.parametrize("key", list(CUTTING_GROUPS), ids="/".join)
+def test_every_inventory_cutter_in_span_matches_one_row(key):
+    bands = [row["diameter_range"] for row in CUTTING_GROUPS[key]]
+    span = (min(lo for lo, _ in bands), max(hi for _, hi in bands))
+    unresolved = [
+        (cutter, dia, hits)
+        for cutter, dia in _cutters(key[2])
+        if span[0] <= dia <= span[1]
+        and (hits := sum(lo <= dia <= hi for lo, hi in bands)) != 1
+    ]
+    assert not unresolved, unresolved
