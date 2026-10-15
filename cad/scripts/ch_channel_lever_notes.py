@@ -19,6 +19,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LeverBody": {"LeverThick"},
     "HubProfile": {"HubDia"},
     "Hub": {"HubLength"},
+    # The plate's near face from the hub face the levers stack on: a hidden
+    # reference line (no metal) from the hub face to the plate face.
+    "PlateOffsetReference": {"PlateOffset"},
     "FulcrumProfile": {"FulcrumDia"},
     # Both arms from the fulcrum bore (the part origin): the Hole Wizard
     # placement dimensions themselves.
@@ -33,6 +36,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LeverBody": {"LeverThick": 2},
     "HubProfile": {"HubDia": 1},
     "Hub": {"HubLength": 2},
+    "PlateOffsetReference": {"PlateOffset": 2},
     "FulcrumProfile": {"FulcrumDia": 2},
     "BarPinHole": {"BarPinCx": 2},
     "SpringHole": {"SpringCx": 2},

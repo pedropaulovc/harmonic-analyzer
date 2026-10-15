@@ -35,7 +35,8 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
+# The plate offset is owned by a reference sketch the part saves hidden.
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     set_arc_endpoints_to_max,
@@ -103,6 +104,8 @@ def _sheet_x(mx: float) -> float:
 # --- Mates and functions named on the bands' own callouts (rules 4 and 7). ---
 SHAFT_NUMBER = _config.parts("ch-fulcrum-shaft")["number"]
 BAR_NUMBER = _config.parts("ch-amplitude-bar")["number"]
+PIN_NUMBER = _config.parts("ch-bar-pivot-pin")["number"]
+SPRING_NUMBER = _config.parts("vn-channel-spring-installed")["number"]
 STATIONS = _config.machine("channels", "count")
 _CLEARANCE_LEAST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]) - (SHAFT_DIA + SHAFT_DIA_BAND[0])
 _CLEARANCE_MOST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) - (SHAFT_DIA + SHAFT_DIA_BAND[1])
@@ -113,11 +116,12 @@ FRONT_CALLOUTS = {
         f" {_CLEARANCE_LEAST:.2f}-{_CLEARANCE_MOST:.2f}\nDIAMETRAL CLEARANCE"
     ),
     "BarHeight": "FULL R AT TIP",
-    "BarPinCx": "SETS LEVER RATIO",
-    "SpringCx": "SETS LEVER RATIO",
+    "BarPinCx": f"SETS LEVER RATIO;\nRUNS ON PIN {PIN_NUMBER}",
+    "SpringCx": f"SETS LEVER RATIO;\nHOOKS SPRING {SPRING_NUMBER}",
 }
 TOP_CALLOUTS = {
-    "LeverThick": f"STRADDLED BY NOTCH\nOF {BAR_NUMBER}",
+    "LeverThick": f"SLIDING FIT IN NOTCH\nOF {BAR_NUMBER}",
+    "PlateOffset": f"LOCATES {BAR_NUMBER} NOTCH;\nSETS GAP TO NEXT BAR",
     "HubLength": f"{STATIONS} HUBS STACK;\nSETS STATION PITCH",
 }
 
@@ -125,19 +129,22 @@ FRONT_KEEP = {
     "HubDia": (0.030, 0.135),
     "FulcrumDia": (0.050, 0.190),
     "BarHeight": (0.262, FRONT_CENTER[1]),
-    "BarPinCx": (_sheet_x(BAR_PIN_X / 2.0), 0.128),
-    "SpringCx": (_sheet_x(LEVER_SPRING_X / 2.0 + 25.0), 0.115),
+    "BarPinCx": (_sheet_x(BAR_PIN_X / 2.0), 0.126),
+    "SpringCx": (_sheet_x(LEVER_SPRING_X / 2.0 + 25.0), 0.104),
 }
 TOP_KEEP = {
     "LeverThick": (0.264, TOP_CENTER[1] + 0.006),
-    # Above the hub: a vertical dimension's text sits left of its line, and
-    # left of the hub there is no room inside the border.
-    "HubLength": (0.045, TOP_CENTER[1] + 0.020),
+    # Both above the hub, their lines just right of it: a vertical
+    # dimension's text sits left of its line, and left of the hub there is no
+    # room inside the border.  The plate offset is the inner, lower one, so
+    # neither dimension line runs through the other's text.
+    "PlateOffset": (0.075, TOP_CENTER[1] + 0.014),
+    "HubLength": (0.095, TOP_CENTER[1] + 0.034),
 }
-OVERALL_TEXT_XY = (FRONT_CENTER[0], 0.102)
+OVERALL_TEXT_XY = (FRONT_CENTER[0], 0.082)
 BAR_PIN_CALLOUT_XY = (0.170, 0.188)
 SPRING_CALLOUT_XY = (0.240, 0.188)
-BORE_FINISH_SYMBOL = (0.030, 0.112)
+BORE_FINISH_SYMBOL = (0.070, 0.134)
 FINISH_CHAR_HEIGHT = 0.0025
 
 
@@ -218,7 +225,11 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(
         adapter,
         top_annotations,
-        {**DRAWING_PRECISION["LeverBody"], **DRAWING_PRECISION["Hub"]},
+        {
+            **DRAWING_PRECISION["LeverBody"],
+            **DRAWING_PRECISION["Hub"],
+            **DRAWING_PRECISION["PlateOffsetReference"],
+        },
     )
     set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
     set_dimension_callouts(adapter, top_annotations, TOP_CALLOUTS)
@@ -288,11 +299,12 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to front view")
 
     # The reamed fulcrum bore is the one running surface (rule 6): Ra on its
-    # lower-left rim, the symbol below-left of the hub, clear of the bar.
+    # lower-right rim, the symbol below the hub, right of the arms' extension
+    # line and clear of the hub's own leader.
     bore_rim = model_point_in_view(
         adapter,
         front,
-        (-PIVOT_HOLE_DIA / 2000.0 * 0.7071, -PIVOT_HOLE_DIA / 2000.0 * 0.7071, 0.0),
+        (PIVOT_HOLE_DIA / 2000.0 * 0.7071, -PIVOT_HOLE_DIA / 2000.0 * 0.7071, 0.0),
         label="fulcrum bore rim",
     )
     add_surface_finish(

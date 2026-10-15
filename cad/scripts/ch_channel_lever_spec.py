@@ -69,6 +69,11 @@ LEVER_SPRING_X_TOLERANCE = 0.10
 # at its nominal minimum), and twenty of them at the band's top must still
 # leave float at the keeper lugs (test_ch_channel_lever_drawing pins it).
 HUB_LENGTH_BAND = (0.03, 0.0)
+# The plate sits central on the hub, located from ONE hub face: each bar rides
+# its lever's plate, so the plate's offset in the hub shifts the bar toward its
+# neighbour's (ch_bar_pivot_pin_spec's bar-to-bar gap; the stack is #1038).
+PLATE_OFFSET = (HUB_LENGTH - LEVER_THICKNESS) / 2.0  # 2.028 hub face -> plate face
+PLATE_OFFSET_TOLERANCE = 0.05
 
 # drawing-guidelines.md rule 17 (walls and webs): every wall the holes leave,
 # at the worst case of the printed bands (the bar height and the hub both

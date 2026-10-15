@@ -49,6 +49,7 @@ def test_bands_are_native_on_the_model_from_named_constants() -> None:
         ("FulcrumProfile", "FulcrumDia"): "*deviations(PIVOT_HOLE_BAND)",
         ("Hub", "HubLength"): "*deviations(HUB_LENGTH_BAND)",
         ("LeverBody", "LeverThick"): "LEVER_THICKNESS_TOLERANCE",
+        ("PlateOffsetReference", "PlateOffset"): "PLATE_OFFSET_TOLERANCE",
         ("BarPinHole", "BarPinCx"): "BAR_PIN_X_TOLERANCE",
         ("SpringHole", "SpringCx"): "LEVER_SPRING_X_TOLERANCE",
     }
@@ -56,11 +57,21 @@ def test_bands_are_native_on_the_model_from_named_constants() -> None:
 
 def test_every_tight_band_names_its_mate_or_function() -> None:
     callouts = {**drawing.FRONT_CALLOUTS, **drawing.TOP_CALLOUTS}
-    for name in ("FulcrumDia", "LeverThick", "HubLength", "BarPinCx", "SpringCx"):
+    for name in (
+        "FulcrumDia",
+        "LeverThick",
+        "PlateOffset",
+        "HubLength",
+        "BarPinCx",
+        "SpringCx",
+    ):
         assert callouts[name]
     assert drawing.SHAFT_NUMBER in callouts["FulcrumDia"]
     assert "REAM" in callouts["FulcrumDia"]
     assert drawing.BAR_NUMBER in callouts["LeverThick"]
+    assert drawing.BAR_NUMBER in callouts["PlateOffset"]
+    assert drawing.PIN_NUMBER in callouts["BarPinCx"]
+    assert drawing.SPRING_NUMBER in callouts["SpringCx"]
     assert drawing._CLEARANCE_LEAST == pytest.approx(0.15)
     assert drawing._CLEARANCE_MOST == pytest.approx(0.20)
 
@@ -85,6 +96,16 @@ def test_twenty_long_hubs_still_float_between_the_keepers() -> None:
 
 def test_plate_band_is_the_notch_allowance() -> None:
     assert ch_amplitude_bar_spec.LEVER_THICKNESS_TOLERANCE == spec.LEVER_THICKNESS_TOLERANCE
+
+
+def test_plate_is_located_from_one_hub_face() -> None:
+    assert spec.PLATE_OFFSET == pytest.approx((spec.HUB_LENGTH - spec.LEVER_THICKNESS) / 2.0)
+    assert notes.DRAWING_PRECISION["PlateOffsetReference"] == {"PlateOffset": 2}
+    assert lever.PLATE_OFFSET_SKETCH == "PlateOffsetReference"
+    # The line runs from the hub face to the plate face on the hub silhouette.
+    start, end = lever._PLATE_OFFSET_START, lever._PLATE_OFFSET_END
+    assert start[0] == end[0] == spec.HUB_DIA / 2.0
+    assert start[1] - end[1] == pytest.approx(spec.PLATE_OFFSET)
 
 
 def test_draw_view_math_matches_the_spec() -> None:

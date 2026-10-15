@@ -57,6 +57,7 @@ from _sketch import (
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
+    blank_reference_sketches,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
@@ -98,6 +99,8 @@ from ch_channel_lever_spec import (
     LEVER_THICKNESS_TOLERANCE,
     PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA,
+    PLATE_OFFSET,
+    PLATE_OFFSET_TOLERANCE,
     SPRING_EYE_HOLE_SPEC,
     SURFACE_FINISHES,
     TIP_ARC_CX,
@@ -112,12 +115,82 @@ MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
 # amplitude-bar pin and spring eye are part-owned by the spec as well.
 if abs(HUB_LENGTH - _config.machine("channels", "station_pitch_mm")) > 1e-6:
     raise AssertionError("ch_channel_lever_spec.HUB_LENGTH must equal the channel station pitch")
-HUB_PROUD = (HUB_LENGTH - LEVER_THICKNESS) / 2.0  # 2.028 each face
+if abs(PLATE_OFFSET - (HUB_LENGTH - LEVER_THICKNESS) / 2.0) > 1e-9:
+    raise AssertionError("the plate must sit central on the hub (both are mid-plane)")
 
 HALF_BAR = BAR_TALL / 2.0
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > extrude width
 if TIP_ARC_CX != LEVER_SPRING_X:
     raise AssertionError("the full-round tip must be concentric with the spring hole")
+
+
+# The plate's location from one hub face prints from a hidden reference line
+# (the ch_fulcrum_keeper pattern; no metal): on the Top plane (sketch u = model
+# X, v = -model Z) at the hub's +X silhouette, from the hub's -Z face, which
+# the top view shows uppermost (v = HUB_LENGTH/2), to the plate's -Z face
+# (v = LEVER_THICKNESS/2). The plate and hub stay mid-plane extrudes, so its
+# value is driven from their own globals.
+PLATE_OFFSET_SKETCH = "PlateOffsetReference"
+_PLATE_OFFSET_START = (HUB_DIA / 2.0, HUB_LENGTH / 2.0)
+_PLATE_OFFSET_END = (HUB_DIA / 2.0, LEVER_THICKNESS / 2.0)
+
+
+async def plate_offset_reference(adapter) -> list[tuple[str, str]]:
+    """Sketch the hub-face -> plate-face reference line; return its drives."""
+    check(
+        f"create_sketch {PLATE_OFFSET_SKETCH}", await adapter.create_sketch("Top")
+    )
+    # Direct-to-DB: the line lies on the hub silhouette along the sketch's v
+    # axis, so creation-time inference would over-define the sketch.
+    set_sketch_direct_db(adapter, True)
+    line = check(
+        f"{PLATE_OFFSET_SKETCH} line",
+        await adapter.add_line(*_PLATE_OFFSET_START, *_PLATE_OFFSET_END),
+    )
+    set_sketch_direct_db(adapter, False)
+    # ConstructionGeometry is declared on ISketchSegment, not the ISketchLine
+    # the registry binds.
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{line} did not take the construction flag")
+    check(
+        f"{PLATE_OFFSET_SKETCH} vertical",
+        await adapter.add_sketch_constraint(line, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "vertical_distance",
+        PLATE_OFFSET,
+        PLATE_OFFSET_SKETCH,
+    )
+    await anchor_point_to_origin(
+        adapter, f"{line}.start", *_PLATE_OFFSET_START, PLATE_OFFSET_SKETCH
+    )
+    await ensure_fully_defined(adapter, f"{PLATE_OFFSET_SKETCH} sketch")
+    check(f"exit_sketch {PLATE_OFFSET_SKETCH}", await adapter.exit_sketch())
+    name_last_feature(adapter, PLATE_OFFSET_SKETCH)
+    full = name_dimensions(
+        adapter,
+        PLATE_OFFSET_SKETCH,
+        ["PlateOffset", "PlateOffsetAnchorX", "PlateOffsetAnchorZ"],
+    )
+    measured = (
+        float(_early_bound(adapter.currentModel.Parameter(full[0]), "IDimension").SystemValue)
+        * 1000.0
+    )
+    if abs(measured - PLATE_OFFSET) > 1e-6:
+        raise RuntimeError(
+            f"{full[0]} measures {measured:g} mm, expected {PLATE_OFFSET:g} mm"
+        )
+    drives = (
+        '("HubLength" - "LeverThickness") / 2',
+        '"HubDia" / 2',
+        '"HubLength" / 2',
+    )
+    return list(zip(full, drives, strict=True))
 
 
 def tolerance_at_value_places(adapter, feature_name: str, dimension_name: str) -> int:
@@ -335,6 +408,8 @@ async def build(adapter) -> dict[str, str]:
     expected -= math.pi * (spring_dia / 2.0) ** 2 * LEVER_THICKNESS
     await volume_check(adapter, "spring-eye hole", expected, 0.005 * expected)
 
+    drive_jobs += await plate_offset_reference(adapter)
+
     # Named bore axes for assembly mates (view-independent name selection):
     # Axis1 = fulcrum bore (origin, rides the fulcrum shaft), Axis2 = bar-pin
     # bore (127, 0, the amplitude bar's top pin).
@@ -358,6 +433,8 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven channel lever (equations neutral)", expected, 0.005 * expected)
+    # Saved shown, the reference line would print in every assembly render.
+    blank_reference_sketches(adapter, ("PlateOffsetReference",))
 
     # Bands ride natively on the model dimensions the print imports
     # (drawing-simplicity-policy.md): the reamed fulcrum bore, the plate the
@@ -372,6 +449,9 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "LeverBody", "LeverThick", LEVER_THICKNESS_TOLERANCE
     )
+    set_dimension_symmetric_tolerance(
+        adapter, "PlateOffsetReference", "PlateOffset", PLATE_OFFSET_TOLERANCE
+    )
     set_dimension_symmetric_tolerance(adapter, "BarPinHole", "BarPinCx", BAR_PIN_X_TOLERANCE)
     set_dimension_symmetric_tolerance(
         adapter, "SpringHole", "SpringCx", LEVER_SPRING_X_TOLERANCE
@@ -381,6 +461,7 @@ async def build(adapter) -> dict[str, str]:
         ("FulcrumProfile", "FulcrumDia"),
         ("Hub", "HubLength"),
         ("LeverBody", "LeverThick"),
+        ("PlateOffsetReference", "PlateOffset"),
         ("BarPinHole", "BarPinCx"),
         ("SpringHole", "SpringCx"),
     ):
