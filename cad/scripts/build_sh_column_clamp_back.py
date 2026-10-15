@@ -31,6 +31,7 @@ from _session import run_build
 from sh_column_clamp_back_spec import (
     DEPTH,
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION,
     EAR_HEIGHT_BAND,
     EAR_STATION_BAND,
@@ -73,7 +74,12 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(
-        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
     )
     return await save_part_and_images(adapter, PART_NAME)
 

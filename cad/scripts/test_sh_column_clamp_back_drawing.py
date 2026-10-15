@@ -15,6 +15,8 @@ import sh_column_clamp_back_geom as geom
 import sh_column_clamp_back_spec as spec
 import sh_column_clamp_fit as fit
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
+from _paths import CAD_ROOT
+from machinist_exceptions import load_exceptions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 from fr_tube_frame_spec import OUTER_DIA
@@ -141,20 +143,53 @@ def test_walls_at_the_largest_column_and_drill_wander() -> None:
     r_bore = (25.527 + 0.30) / 2.0
     wander = 15.51 * math.tan(math.radians(0.3))
     reach = 4.166 / 2.0 + wander
-    assert math.isclose(spec.BACK_WALL_MIN, 0.4 + 14.49 - r_bore)  # 1.9765
+    assert math.isclose(spec.WALLS_WORST["back wall"], 0.4 + 14.49 - r_bore)  # 1.9765
     assert math.isclose(spec.WALLS_WORST["ear to bore"], 17.4 - reach - r_bore)
     assert math.isclose(spec.WALLS_WORST["ear to far side"], 47.2 - 24.8 - 17.6 - reach)
     assert min(spec.WALLS_WORST.values()) >= 1.5
     # The back wall reaches the 2.0 target only on a column of at most 25.48;
-    # A513 admits 25.527: a rule-20 shortfall, accepted (owner, 2026-10-15).
+    # A513 admits 25.527: the one owner-ruled shortfall (sh-column-clamp-back
+    # RV-01), and the part's least wall.
     column_at_target = 2.0 * (0.4 + 14.49 - 2.0) - 0.30
     assert math.isclose(column_at_target, 25.48)
     assert column_at_target < fit.COLUMN_OD_MAX
-    assert set(spec.RULE_20_SHORTFALLS) == {"back wall"}
-    assert spec.RULE_20_ACCEPTED == {"back wall"}
+    short = {name for name, wall in spec.WALLS_WORST.items() if wall < 2.0}
+    assert short == {"back wall"}
+    assert min(spec.WALLS_WORST.values()) == spec.WALLS_WORST["back wall"]
 
 
-def test_screw_line_shortfall_is_the_accepted_one() -> None:
+def test_owner_ruled_shortfall_is_declared_and_stated() -> None:
+    # drawing-simplicity-policy.md "Named exceptions": the stated shortfall
+    # matches a kind-minor declaration under the package's own key, whose
+    # `where` names the printed note, at the value the spec computes.
+    entries = load_exceptions(CAD_ROOT / "config", "sh_column_clamp_back", "part")
+    assert [entry.id for entry in entries] == ["RV-01"]
+    (entry,) = entries
+    assert entry.kind == "minor"
+    assert entry.reason.endswith("(owner-ruled shortfall)")
+    assert entry.where.endswith(spec.BACK_WALL_NOTE)
+    # The printed value: the computed worst case at the sheet's two places,
+    # rounded down (never overstating a minimum).
+    assert spec.BACK_WALL_NOTE == "MIN BACK WALL 1.97"
+    assert 1.97 <= spec.WALLS_WORST["back wall"] < 1.98
+    assert spec.DRAWING_NOTES == f"1. {spec.BACK_WALL_NOTE}."
+    assert part.DRAWING_NOTES is spec.DRAWING_NOTES
+
+
+def test_shortfall_note_stands_in_the_open_lower_left_field() -> None:
+    # 3.5 mm Century Gothic: ~2.65 mm per character, ~5.5 mm per line.  The
+    # block stays left of the title block (x 0.216, up to y 0.070), above the
+    # border (0.012) and under every kept dimension by at least 10 mm.
+    x, y = drawing.NOTES_XY
+    lines = spec.DRAWING_NOTES.split("\n")
+    assert x + max(len(line) for line in lines) * 0.00265 < 0.216 - 0.003
+    assert y - len(lines) * 0.0055 > 0.012 + 0.003
+    kept = (*drawing.TOP_KEEP.values(), *drawing.FACE_KEEP.values())
+    assert y < min(text_y for _, text_y in kept) - 0.010
+    assert drawing.HOLE_CALLOUT_XY[1] > y and drawing.ISO_NOTE_XY[0] > 0.216
+
+
+def test_screw_line_shortfall_is_the_owner_ruled_one() -> None:
     # Independent oracle from literals: the printed Ø4.98 front hole at its
     # least on the #8 screw major 4.1656, against the printed station/height
     # mismatch hypot(0.2, 0.2) plus 0.3 deg of wander down both through holes
@@ -165,9 +200,9 @@ def test_screw_line_shortfall_is_the_accepted_one() -> None:
     assert math.isclose(fit.SCREW_FLOAT, float_)
     assert math.isclose(fit.SCREW_LINE_DEMAND, demand)
     assert math.isclose(fit.SCREW_LINE_SHORTFALL, demand - float_)  # 0.0532
-    # Accepted under rule 20 (owner, 2026-10-15) as 0.053 at three places;
+    # Owner-ruled (sh-column-clamp-front RV-02) as 0.053 at three places;
     # the printed bands alone still leave the screw float.
-    assert fit.SCREW_LINE_SHORTFALL_ACCEPTED == 0.053
+    assert fit.SCREW_LINE_SHORTFALL_RULED == 0.053
     assert round(demand - float_, 3) == 0.053
     assert math.hypot(0.2, 0.2) < float_
 
@@ -192,7 +227,6 @@ def test_sheet_has_no_gdt_notes_or_drawing_precision() -> None:
     assert "add_feature_control_frame(" not in source
     assert "add_datum_feature(" not in source
     assert "set_dimension_precision" not in source
-    assert '"Manufacturing Notes"' not in source
     assert "add_native_hole_callout(" in source
     assert "assert_imported_precision(" in source
 

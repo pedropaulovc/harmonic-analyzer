@@ -40,8 +40,12 @@ from sh_column_clamp_fit import (  # noqa: F401
     FRONT_EAR_WANDER,
     EAR_HEIGHT_BAND,
     EAR_STATION_BAND,
+    NOTE_PLACES,
+    SCREW_LINE_SHORTFALL,
     WALL_FLOOR,
     WALL_TARGET,
+    stated_max,
+    stated_min,
 )
 
 BACK_ARC_MATE = "MHA-SH-002"
@@ -151,19 +155,31 @@ if min(WALLS_WORST.values()) < WALL_FLOOR:
     raise AssertionError(
         f"clamp-front walls {WALLS_WORST} under the {WALL_FLOOR} floor"
     )
-# drawing-guidelines.md rule 20: walls between the floor and the target.
-# Accepted, owner ruling 2026-10-15 (PR #1467 round-3 review; recorded in
-# sh_column_clamp_fit): the ear-to-bore web, 1.850 on the largest A513 column
-# with drill wander.  It would need a column of at most 25.23 -- under its own
-# nominal -- to reach 2.0.  Any other wall falling short is a new shortfall.
-RULE_20_ACCEPTED = frozenset({"ear to bore"})
-RULE_20_SHORTFALLS = {
-    name: wall for name, wall in WALLS_WORST.items() if wall < WALL_TARGET
-}
-if not set(RULE_20_SHORTFALLS) <= RULE_20_ACCEPTED:
+# drawing-guidelines.md rule 20: walls between the floor and the target.  The
+# ear-to-bore web, 1.850 on the largest A513 column with drill wander, is the
+# only one and the part's least wall: it would need a column of at most 25.23
+# -- under its own nominal -- to reach 2.0.  Owner-ruled shortfall, declared
+# as sh-column-clamp-front RV-01 (cad/config/parts/sh-column-clamp-front.yaml)
+# and stated by EAR_WALL_NOTE; any other wall falling short needs its own.
+_SHORT_WALLS = {name for name, wall in WALLS_WORST.items() if wall < WALL_TARGET}
+if _SHORT_WALLS != {"ear to bore"} or WALLS_WORST["ear to bore"] != min(
+    WALLS_WORST.values()
+):
     raise AssertionError(
-        f"clamp-front walls {sorted(set(RULE_20_SHORTFALLS) - RULE_20_ACCEPTED)} "
-        f"under {WALL_TARGET} without a ruling"
+        f"clamp-front walls under {WALL_TARGET}: {sorted(_SHORT_WALLS)}; only the "
+        "ear-to-bore web is declared (sh-column-clamp-front RV-01)"
     )
+EAR_WALL_MIN = stated_min(WALLS_WORST["ear to bore"])  # 1.85
+# sh-column-clamp-front RV-01
+EAR_WALL_NOTE = f"MIN EAR WALL {EAR_WALL_MIN:.{NOTE_PLACES}f}"
+# The screw line (sh_column_clamp_fit): the worst ear-to-tap offset passes the
+# #8 screw's radial clearance in this sheet's hole, rounded up.
+SCREW_LINE_SHORT_MAX = stated_max(SCREW_LINE_SHORTFALL)  # 0.06
+# sh-column-clamp-front RV-02
+SCREW_LINE_NOTE = (
+    f"EAR TO {BACK_ARC_MATE} TAP OFFSET UP TO "
+    f"{SCREW_LINE_SHORT_MAX:.{NOTE_PLACES}f} OVER #8 SCREW CLEARANCE"
+)
+DRAWING_NOTES = "\n".join((f"1. {EAR_WALL_NOTE}.", f"2. {SCREW_LINE_NOTE}."))
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

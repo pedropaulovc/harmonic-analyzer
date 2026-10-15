@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 
 import sh_column_clamp_front_spec as spec
+import sh_column_clamp_fit as fit
 import draw_sh_column_clamp_front as drawing
 import build_sh_column_clamp_front as part
 import _clamp_arc
@@ -13,6 +14,8 @@ import _column_clamp_drawing
 import _drawing_hidden_sketches
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
+from _paths import CAD_ROOT
+from machinist_exceptions import load_exceptions
 from _hole_spec import blind_cut_dia_mm
 
 
@@ -166,12 +169,58 @@ def test_walls_at_the_largest_column_and_drill_wander() -> None:
     assert math.isclose(spec.WALLS_WORST["ear to far side"], 47.2 - 24.8 - 17.6 - reach)
     assert min(spec.WALLS_WORST.values()) >= 1.5
     # The web reaches the 2.0 target only on a column under its own Ø25.4
-    # nominal, so no column acceptance can lift it: a rule-20 shortfall,
-    # accepted (owner, 2026-10-15).
+    # nominal, so no column acceptance can lift it: the one owner-ruled
+    # shortfall (sh-column-clamp-front RV-01), and the part's least wall.
     column_at_target = 2.0 * (17.4 - reach - 2.0) - 0.30
     assert column_at_target < 25.4
-    assert set(spec.RULE_20_SHORTFALLS) == {"ear to bore"}
-    assert spec.RULE_20_ACCEPTED == {"ear to bore"}
+    short = {name for name, wall in spec.WALLS_WORST.items() if wall < 2.0}
+    assert short == {"ear to bore"}
+    assert min(spec.WALLS_WORST.values()) == spec.WALLS_WORST["ear to bore"]
+
+
+def test_owner_ruled_shortfalls_are_declared_and_stated() -> None:
+    # drawing-simplicity-policy.md "Named exceptions": each stated shortfall
+    # matches a kind-minor declaration under the package's own key, whose
+    # `where` names the printed note, at the value the spec computes.
+    entries = {
+        entry.id: entry
+        for entry in load_exceptions(
+            CAD_ROOT / "config", "sh_column_clamp_front", "part"
+        )
+    }
+    assert set(entries) == {"RV-01", "RV-02"}
+    for entry in entries.values():
+        assert entry.kind == "minor"
+        assert entry.reason.endswith("(owner-ruled shortfall)")
+    assert entries["RV-01"].where.endswith(spec.EAR_WALL_NOTE)
+    assert entries["RV-02"].where.endswith(spec.SCREW_LINE_NOTE)
+    # The printed values, from the computed worst cases at the sheet's two
+    # places, rounded never in the part's favour: the least wall down, the
+    # screw line's excess up.
+    assert spec.EAR_WALL_NOTE == "MIN EAR WALL 1.85"
+    assert 1.85 <= spec.WALLS_WORST["ear to bore"] < 1.86
+    assert spec.SCREW_LINE_NOTE == (
+        "EAR TO MHA-SH-002 TAP OFFSET UP TO 0.06 OVER #8 SCREW CLEARANCE"
+    )
+    assert 0.05 < fit.SCREW_LINE_SHORTFALL <= 0.06
+    assert spec.DRAWING_NOTES.split("\n") == [
+        f"1. {spec.EAR_WALL_NOTE}.",
+        f"2. {spec.SCREW_LINE_NOTE}.",
+    ]
+    assert part.DRAWING_NOTES is spec.DRAWING_NOTES
+
+
+def test_shortfall_notes_stand_in_the_open_lower_left_field() -> None:
+    # 3.5 mm Century Gothic: ~2.65 mm per character, ~5.5 mm per line.  The
+    # block stays left of the title block (x 0.216, up to y 0.070), above the
+    # border (0.012) and under every kept dimension by at least 10 mm.
+    x, y = drawing.NOTES_XY
+    lines = spec.DRAWING_NOTES.split("\n")
+    assert x + max(len(line) for line in lines) * 0.00265 < 0.216 - 0.003
+    assert y - len(lines) * 0.0055 > 0.012 + 0.003
+    kept = (*drawing.TOP_KEEP.values(), *drawing.FACE_KEEP.values())
+    assert y < min(text_y for _, text_y in kept) - 0.010
+    assert drawing.HOLE_CALLOUT_XY[1] > y and drawing.ISO_NOTE_XY[0] > 0.216
 
 
 def test_sheet_has_no_gdt_notes_or_drawing_precision() -> None:
@@ -182,8 +231,6 @@ def test_sheet_has_no_gdt_notes_or_drawing_precision() -> None:
     assert "add_feature_control_frame(" not in source
     assert "set_basic_dimension(" not in source
     assert "set_dimension_precision" not in source
-    assert '"Manufacturing Notes"' not in source
-    assert not hasattr(spec, "DRAWING_NOTES")
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
     assert "add_native_hole_callout(" in source
 

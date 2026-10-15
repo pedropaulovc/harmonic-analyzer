@@ -42,14 +42,32 @@ from vn_clamp_screw_spec import SHANK_DIA as CLAMP_SCREW_MAJOR
 COLUMN_MATE = "MHA-FR-003 COLUMN"
 
 # Owner rulings 2026-10-15 (PR #1467 round-3 review), drawing-guidelines.md
-# rule 20, each ACCEPTED as a stated shortfall with no geometry change:
+# rule 20, each a stated shortfall with no geometry change, declared as kind
+# "minor" machinist_exceptions in the package's config YAML:
 # * the front arc's ear-to-bore web, 1.850 against the 2.0 wall target
-#   (sh_column_clamp_front_spec.RULE_20_SHORTFALLS);
+#   (sh-column-clamp-front RV-01, sh_column_clamp_front_spec.EAR_WALL_NOTE);
 # * the back arc's back wall, 1.9765 against the 2.0 wall target
-#   (sh_column_clamp_back_spec.RULE_20_SHORTFALLS);
+#   (sh-column-clamp-back RV-01, sh_column_clamp_back_spec.BACK_WALL_NOTE);
 # * the screw line, which can come up to 0.053 short of the front hole's
 #   screw float once both ear holes' drill wander is added
-#   (SCREW_LINE_SHORTFALL below).
+#   (sh-column-clamp-front RV-02, SCREW_LINE_SHORTFALL below and
+#   sh_column_clamp_front_spec.SCREW_LINE_NOTE).
+
+# Places a stated shortfall prints at (the sheets' .XX class).
+NOTE_PLACES = 2
+
+
+def stated_min(value: float) -> float:
+    """A minimum as the sheet states it: rounded DOWN, never overstated."""
+    scale = 10**NOTE_PLACES
+    return math.floor(value * scale + 1e-9) / scale
+
+
+def stated_max(value: float) -> float:
+    """A maximum as the sheet states it: rounded UP, never understated."""
+    scale = 10**NOTE_PLACES
+    return math.ceil(value * scale - 1e-9) / scale
+
 
 # Both arcs print Depth at two places; the front ear holes' Hole Wizard
 # callout prints its diameter at two places (Ø4.98).
@@ -146,18 +164,19 @@ BACK_EAR_WANDER = EAR_DRILL_DRIFT_PER_MM * (
 )  # 0.081
 
 # The screw line at its worst: the printed ear mismatch plus both holes'
-# wander, in any direction, against the front hole's float.  Accepted short
-# (owner ruling 2026-10-15, above): 0.283 + 0.096 + 0.081 = 0.460 against
-# 0.407, i.e. 0.053 at the ruling's three places.  The floor still holds --
+# wander, in any direction, against the front hole's float.  Owner-ruled
+# short (above, sh-column-clamp-front RV-02): 0.283 + 0.096 + 0.081 = 0.460
+# against 0.407, i.e. 0.053 at the ruling's three places; the front sheet
+# states it as 0.06 at its own two (rounded up).  The floor still holds --
 # the printed bands alone never bind the screw (EAR_SCREW_MISMATCH_MAX <
-# SCREW_FLOAT above) -- and the shortfall may not grow past the accepted value.
+# SCREW_FLOAT above) -- and the shortfall may not grow past the ruled value.
 SCREW_LINE_DEMAND = EAR_SCREW_MISMATCH_MAX + FRONT_EAR_WANDER + BACK_EAR_WANDER
 SCREW_LINE_SHORTFALL = SCREW_LINE_DEMAND - SCREW_FLOAT  # 0.0532
-SCREW_LINE_SHORTFALL_ACCEPTED = 0.053
-if not 0.0 < round(SCREW_LINE_SHORTFALL, 3) <= SCREW_LINE_SHORTFALL_ACCEPTED:
+SCREW_LINE_SHORTFALL_RULED = 0.053
+if not 0.0 < round(SCREW_LINE_SHORTFALL, 3) <= SCREW_LINE_SHORTFALL_RULED:
     raise AssertionError(
-        f"screw-line shortfall {SCREW_LINE_SHORTFALL:.4f} is not the accepted "
-        f"(0, {SCREW_LINE_SHORTFALL_ACCEPTED}]"
+        f"screw-line shortfall {SCREW_LINE_SHORTFALL:.4f} is not the owner-ruled "
+        f"(0, {SCREW_LINE_SHORTFALL_RULED}]"
     )
 
 # drawing-guidelines.md rule 17: wall target and hard floor.
