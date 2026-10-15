@@ -7,13 +7,14 @@ the engraving, whose places live in ``DRAWING_REFERENCE_PRECISION``. Kept
 apart from ``fr_nameplate_spec`` on purpose: that module feeds the base and
 the frame assembly, so a print-only edit here must not rebuild them.
 
-Fit (Main ruling, 2026-10-14): the base's four #4-40 seats are spotted through
-the finished plate at assembly (drawing-guidelines.md rule 19 (absorb stacks
-at fit-up)), so the plate's holes need only keep their head on the raised
-border and a real edge ligament. Each hole locates from its two adjacent plate
-edges at the title block's one-place grade; the corner profile, the sunk field
-and the engraving are the vendored DXF contours the build imports, named on
-the sheet rather than redrawn as dimensions.
+Fit (owner-ratified 2026-10-15, fr-harmonic-base RV-01): the base's four
+#4-40 seats are spotted through the finished plate at assembly
+(drawing-guidelines.md rule 19 (absorb stacks at fit-up)), so the plate's
+holes need only keep their head on the raised border and a real edge
+ligament. Each hole locates from its two adjacent plate edges at the title
+block's one-place grade; the corner profile, the sunk field and the engraving
+are the vendored DXF contours the build imports, named on the sheet rather
+than redrawn as dimensions.
 """
 
 from __future__ import annotations
