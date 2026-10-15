@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import sh_column_clamp_front_spec as spec
@@ -120,6 +121,21 @@ def test_split_face_view_projects_beside_the_plan() -> None:
     ear_1 = drawing._face_xy(0.0, spec.EAR_HOLE_Z)
     assert ear_1[0] == drawing.FACE_CENTER[0]
     assert ear_1[1] < drawing.FACE_CENTER[1]  # +Z runs down, as in the plan
+
+
+def test_ear_height_text_stands_outside_its_witnesses() -> None:
+    # Farm round 20261015T1724 (audit + machinist review, rule 14): the 16 mm
+    # between the ear-height witnesses cannot hold its callout block, so the
+    # block stands past the bottom-face witness (shared with the height),
+    # away from ear 1's witness and centreline, clear by at least 3 mm.
+    # 3.5 mm Century Gothic measured ~2.65 mm per character on that sheet.
+    bottom_x = drawing._face_xy(-spec.ARC_HEIGHT / 2.0, spec.EAR_HOLE_Z)[0]
+    ear_x = drawing._face_xy(0.0, spec.EAR_HOLE_Z)[0]
+    text_x = drawing.FACE_KEEP["EarHoleHeight"][0]
+    outward = math.copysign(1.0, bottom_x - ear_x)
+    lines = ["2X 8.0 ±0.1", *drawing.DIMENSION_CALLOUTS["EarHoleHeight"].split("\n")]
+    half_block = max(len(line) for line in lines) * 0.00265 / 2.0
+    assert outward * (text_x - bottom_x) >= half_block + 0.003
 
 
 def test_bore_prints_the_grip_budget_on_the_column() -> None:
