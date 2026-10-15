@@ -331,7 +331,8 @@ def test_bore_chamfer_clears_the_seat_fillet_at_the_tightest_fit() -> None:
     margin = leg_min + (bore_min - body_max) / 2.0 - stud.SEAT_FILLET_RADIUS
     assert margin > 0
     assert stud.SEAT_FILLET_CLEARANCE_MIN == pytest.approx(margin)
-    assert button.BORE_FIT_CALLOUT[0] == "0.24-0.26 X 45\u00b0 BOTH ENDS"
+    assert button.BORE_CHAMFER_MIN == 0.20
+    assert button.BORE_FIT_CALLOUT[0] == "0.20-0.26 X 45\u00b0 BOTH ENDS"
     assert _features(BUTTON)["bore"]["note"].startswith(button.BORE_FIT_CALLOUT[0])
 
 
@@ -345,8 +346,8 @@ def test_bore_chamfer_band_keeps_the_rule_17_rim_wall() -> None:
     from _printed_tolerance import angular_band_deg
 
     low, high = button.BORE_CHAMFER_MIN, button.BORE_CHAMFER_MAX
-    assert high - low >= 0.02 - 1e-9
-    assert button.BORE_CHAMFER == pytest.approx((low + high) / 2.0)
+    assert (low, high) == (0.20, 0.26)
+    assert button.BORE_CHAMFER == pytest.approx((low + high) / 2.0) == 0.23
     leg_max = high * math.tan(
         math.radians(button.BORE_CHAMFER_ANGLE_DEG + angular_band_deg())
     )

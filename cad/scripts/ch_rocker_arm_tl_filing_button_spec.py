@@ -62,7 +62,7 @@ BORE_PLACES = 3
 # bore callout: the stud spec asserts its MIN clears the fillet, and the rim
 # wall below holds rule 17's floor at its MAX. Each leg is taken at the
 # title block's angular band (shorter leg at the MIN, longer at the MAX).
-BORE_CHAMFER_MIN = 0.24
+BORE_CHAMFER_MIN = 0.20
 BORE_CHAMFER_MAX = 0.26
 BORE_CHAMFER = round((BORE_CHAMFER_MIN + BORE_CHAMFER_MAX) / 2.0, 12)  # modelled
 BORE_CHAMFER_PLACES = 2
