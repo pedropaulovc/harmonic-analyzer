@@ -4,7 +4,7 @@ vn-transgear-pivot-shim:
   stock_name: DIN 988 Spring Steel Shim
   supplier: McMaster-Carr
   supplier_skus: [98055A098]
-  material: Plain Carbon Steel
+  material: SPRING STEEL (AS SUPPLIED)
   material_specification: "Stress-resistant spring steel DIN 988 shim, 5 ID x 10 OD x 0.5; McMaster-Carr 98055A098"
   finish: AS SUPPLIED
   installation_notes: |-

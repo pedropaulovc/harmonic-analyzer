@@ -575,6 +575,34 @@ def test_an_uncrossed_ring_keeps_its_slots() -> None:
     assert drawing.uncrossed_ring_slots(centres[:2], attachments[1::-1]) == [1, 0]
 
 
+def test_the_isometric_ring_pair_from_run_082822_swaps() -> None:
+    """Run 20261015T082822796Z's audit: isometric balloons 14 and 16, leaders
+    (circle edge -> attachment), crossed at (372.9, 178.4) mm. Their slots
+    swap, and the swapped leaders cross nothing."""
+    centres = [(0.4017, 0.1595), (0.4032, 0.1753)]
+    attachments = [(0.3703, 0.1801), (0.3639, 0.1793)]
+
+    def crossings(slots: list[int]) -> list:
+        return find_leader_leader_crossings(
+            [
+                LeaderSegment(
+                    label=str(index),
+                    kind="balloon",
+                    x0=centres[slot][0],
+                    y0=centres[slot][1],
+                    x1=attach[0],
+                    y1=attach[1],
+                )
+                for index, (slot, attach) in enumerate(zip(slots, attachments))
+            ]
+        )
+
+    assert crossings([0, 1])
+    slots = drawing.uncrossed_ring_slots(centres, attachments)
+    assert slots == [1, 0]
+    assert not crossings(slots)
+
+
 # These families were assigned to the inner view after farm run
 # 20261001T051043622Z found no reachable isometric ink for the sleeve.
 # Native balloon landings, not old diameters or centres, defend the selection.
