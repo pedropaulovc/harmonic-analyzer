@@ -969,10 +969,10 @@ UNDERSIDE_BOTTOM_CALLOUTS = {
 # it makes. Every height -- the ceiling, the 3.0 rib relief and the two levels
 # -- reads outside the underside, level with what it measures; inside the
 # pocket a boss outline ran through the ceiling height's text (plate-r1
-# review). The ceiling's Z sits midway between the rib relief's single row
-# and the shallow level's three-row block (centred on its keep, its line under
-# it near Z -107), over the pocket's open air between the long rib and the
-# block pads.
+# review). The ceiling's Z sits midway between the rib relief's three-row
+# block and the shallow level's three-row block (each centred on its keep, its
+# line under it near Z -107), over the pocket's open air between the long rib
+# and the block pads.
 UNDERSIDE_OUTSIDE_Y_MM = -24.0
 UNDERSIDE_SECTION_TEXT_MM = {
     "PocketDepth": (UNDERSIDE_OUTSIDE_Y_MM, -40.0),
@@ -980,9 +980,13 @@ UNDERSIDE_SECTION_TEXT_MM = {
     "DeepBossBottom": (UNDERSIDE_OUTSIDE_Y_MM, FOOT_SCREW_XZ[0][1]),
     "RibRelief": (UNDERSIDE_OUTSIDE_Y_MM, 0.0),
 }
+# B-B cuts only the long rib, but the cross rib's relief is the same
+# "RibRelief" by equation, so its one height names both ribs (plate-r5
+# review: the cross rib's level was in no view, and the 3.0 was unlabelled).
 UNDERSIDE_SECTION_CALLOUTS = {
     "DeepBossBottom": "DEEP\nLEVEL",
     "ShallowBossBottom": "SHALLOW\nLEVEL",
+    "RibRelief": "BOTH\nRIBS",
 }
 
 # Sheet 4, the underside pads (Codex P2 on #1310). The rect pads, the
