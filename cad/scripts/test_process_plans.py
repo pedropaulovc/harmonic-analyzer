@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
+import itertools
 import json
+import math
+import re
 import sys
 import time
 import tomllib
@@ -663,6 +667,100 @@ def test_chain_drilled_features_are_broken_out_before_they_are_filed():
             ), (
                 f"{stem} {sid} op {op['op']}: {op['feature']} is filed with no break-out step"
             )
+
+
+# A touch spot printed in a plan's prose: "at X+157.0 Y+6.65", setup-frame millimetres.
+_TOUCH_SPOT = re.compile(r"\bat X([+-]\d+(?:\.\d+)?) Y([+-]\d+(?:\.\d+)?)")
+
+
+def _tool_radius(tools: dict, ref: str) -> float:
+    """Half the widest of a member's cutting and shank diameters, in mm."""
+    kit, member = ref.split("/", 1)
+    record = tools[kit]["members"][member]
+
+    def value(key: str) -> float:
+        field = record.get(key, 0.0)
+        return float(field["value"] if isinstance(field, dict) else field)
+
+    return max(value("dia_mm"), value("shank_mm"), value("shank_in") * 25.4) / 2
+
+
+def _hold_solids(fixtures: dict, ref: str) -> list[dict]:
+    kit, _, member = ref.partition("/")
+    record = fixtures[kit]["members"][member] if member else fixtures[kit]
+    if "cad" in record:
+        return importlib.import_module(f"{record['cad']}_spec").PRECHIPS_SOLIDS
+    return record["solids"]
+
+
+def _posed_box(solid: dict, pose: dict) -> tuple[list[float], list[float]]:
+    """The setup-frame bounding box of a fixture-local box solid placed by a pose."""
+    x, z = pose["x"], pose["z"]
+    y = [
+        z[1] * x[2] - z[2] * x[1],
+        z[2] * x[0] - z[0] * x[2],
+        z[0] * x[1] - z[1] * x[0],
+    ]
+    at, size = solid["at_mm"], solid["size_mm"]
+    corners = [
+        [
+            pose["origin_mm"][axis]
+            + sum((at[k] + size[k] * corner[k]) * (x, y, z)[k][axis] for k in range(3))
+            for axis in range(3)
+        ]
+        for corner in itertools.product((0, 1), repeat=3)
+    ]
+    return [min(c[a] for c in corners) for a in range(3)], [
+        max(c[a] for c in corners) for a in range(3)
+    ]
+
+
+def test_every_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm():
+    # A paper touch lowers the tool onto the work's top face at a spot the plan names in
+    # prose (prechips 0.1.1 has no touch-position field). The tool's widest diameter must
+    # clear, in plan view, every hold solid standing above that face (the strap clamps) by
+    # 1 mm; solids wholly under it (table, riser blocks, shim stacks) cannot meet a tool
+    # that stops on it, and a touch over a support is the stiffest spot.
+    shop = tomllib.loads(
+        (plans.PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
+    )
+    for stem in dict.fromkeys((*MIGRATED_PLANS, *plans.TRAVELER_STEMS)):
+        plan = tomllib.loads(plans.plan_path(stem).read_text(encoding="utf-8"))
+        for setup in plan["setups"]:
+            zero = setup.get("zero", {})
+            touches = [
+                (touch["tool"], touch["method"])
+                for touch in zero.get("tool_touches", ())
+            ]
+            if zero.get("z", {}).get("method") == "paper":
+                touches.append((zero["z"]["tool"], zero["z"].get("edge", "")))
+            if not touches:
+                continue
+            hold = setup["hold"]
+            top = setup["stock_state"]["top_z"]
+            placed = [(hold["fixture"], hold["pose"])] + [
+                (clamp["ref"], clamp["pose"]) for clamp in hold.get("clamps", ())
+            ]
+            boxes = [
+                (ref, solid.get("name", "?"), box)
+                for ref, pose in placed
+                for solid in _hold_solids(shop["fixtures"], ref)
+                for box in [_posed_box(solid, pose)]
+                if box[1][2] > top
+            ]
+            for tool, prose in touches:
+                where = f"{stem} {setup['id']} {tool} touch"
+                spot = _TOUCH_SPOT.search(prose)
+                assert spot, f"{where}: no 'at X.. Y..' spot in {prose!r}"
+                sx, sy = float(spot[1]), float(spot[2])
+                need = _tool_radius(shop["tools"], tool) + 1.0
+                for ref, name, (low, high) in boxes:
+                    dx = max(low[0] - sx, 0.0, sx - high[0])
+                    dy = max(low[1] - sy, 0.0, sy - high[1])
+                    assert math.hypot(dx, dy) >= need, (
+                        f"{where} at X{sx:+} Y{sy:+}: {ref} {name} is "
+                        f"{math.hypot(dx, dy):.2f} away, needs {need:.2f}"
+                    )
 
 
 def test_shop_without_cad_has_no_spec_dependencies(synthetic):
