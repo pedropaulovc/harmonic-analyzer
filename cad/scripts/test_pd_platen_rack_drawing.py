@@ -226,8 +226,6 @@ def test_sheet_has_aligned_clean_views_and_a_legible_stepped_end() -> None:
     )
     assert drawing.ISO_SCALE == (1, 2)
     assert drawing.curate_view_dimensions.__module__ == "_drawing_hidden_sketches"
-    # Main precedent: test_ch_rocker_arm_tl_profile_fixture_drawing (registry
-    # membership and the drawing-specification purity scan).
     assert "draw_pd_platen_rack.py" in PRECISION_MIGRATED_DRAWINGS
     assert not drawing_specification_violations(
         Path(drawing.__file__).read_text(encoding="utf-8"),
