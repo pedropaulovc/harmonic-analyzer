@@ -12,6 +12,7 @@ import build_fr_harmonic_base as part
 import cone_line
 import dt_cone_pivot_post_installation
 import dt_cone_swing_platform_geometry as platform
+from dt_drive_train_steps import step_ref
 import fr_harmonic_base_fasteners
 import fr_harmonic_base_spec
 from vn_cone_lock_knob_spec import HEAD_DIA as KNOB_HEAD_DIA
@@ -461,7 +462,7 @@ def test_socket_bore_leader_lands_on_bore_clear_of_the_cross_tap() -> None:
 
 def test_transferred_pinion_block_seats_print_no_station() -> None:
     # Codex #855 P1: the four block seats are spotted THROUGH MHA-DT-018 at
-    # assembly (U28 corollary; the drive-train RIG_SET_STEP, "BEFORE SPOTTING
+    # assembly (U28 corollary; the drive-train rig-set step, "BEFORE SPOTTING
     # THE TRANSFER SEATS"), so they leave the hole table and their one callout
     # names the transfer.  Codex #854 P1: the model seats themselves sit at the
     # fit-up stations, so the modelled holes match the transferred ones.
@@ -473,9 +474,11 @@ def test_transferred_pinion_block_seats_print_no_station() -> None:
     assert set(sheet.TRANSFER_BLOCK_HOLES) == block_seats
     assert not block_seats & set(sheet.TABLE_HOLES)
     # User ruling P1-2: nothing in the frame fixes the rig along the bank
-    # until the fitter sets it, so both rig callouts name the RIG SET note that
-    # states it (the drum's back end on leaf D off the north gear).
-    assert sheet.TRANSFER_BLOCK_CALLOUT == "TRANSFER FROM MHA-DT-018\nAFTER RIG SET;\n"
+    # until the fitter sets it, so both rig callouts cite the drive-train step
+    # that sets it (the drum's back end on leaf D off the north gear).
+    assert sheet.TRANSFER_BLOCK_CALLOUT == (
+        f"TRANSFER FROM MHA-DT-018\nAFTER {step_ref('rig-set')};\n"
+    )
     # The front pair sits one feeler off the fit-up stack, with no pose air.
     front_seat = rig.BACK_BLOCK_Z0 - rig.INNER_SPAN - BLOCK_DEPTH / 2.0
     assert rig.BLOCK_SEAT_Z[0] == pytest.approx(front_seat, abs=1e-9)
@@ -496,7 +499,9 @@ def test_transferred_pedestal_and_spring_seats_print_no_station() -> None:
     assert sheet.TRANSFER_SPRING_HOLE[:2] == part.FOOT_SCREW_XZ[0]
     assert not (pedestal_seats | {sheet.TRANSFER_SPRING_HOLE}) & set(sheet.TABLE_HOLES)
     assert sheet.TRANSFER_PEDESTAL_CALLOUT == "TRANSFER FROM MHA-DT-002\nAT ASSEMBLY;\n"
-    assert sheet.TRANSFER_SPRING_CALLOUT == "TRANSFER FROM MHA-DT-024\nAFTER RIG SET;"
+    assert sheet.TRANSFER_SPRING_CALLOUT == (
+        f"TRANSFER FROM MHA-DT-024\nAFTER {step_ref('rig-set')};\n"
+    )
     assert not any(tag.startswith("G") for tag in sheet.HOLE_TAG_POSITIONS)
 
 
@@ -957,22 +962,24 @@ def test_only_notes_that_reach_the_final_sheet_are_obstacles() -> None:
     assert "if not note_reaches_final_sheet(text):" in source
 
 
-# The fake sheet's RIG SET note, clear of its table, view and callout.
-_FAKE_RIG_SET_BOX = (0.150, 0.020, 0.180, 0.040)
+# The fake sheet's C1 pivot seat note, clear of its table, view and callout.
+_FAKE_PIVOT_SEAT_BOX = (0.150, 0.020, 0.180, 0.040)
 
 
 def _drive_hole_sheet_callout_check(
-    monkeypatch, note_box, rig_set_box: tuple[float, float, float, float] | None = _FAKE_RIG_SET_BOX
+    monkeypatch,
+    note_box,
+    pivot_seat_box: tuple[float, float, float, float] | None = _FAKE_PIVOT_SEAT_BOX,
 ) -> None:
     """Run _check_hole_sheet_callouts on fakes: one callout, one sheet note at
-    ``note_box``, the RIG SET note at ``rig_set_box`` (None: absent) and a
-    display dimension, which _iter_view_annotations yields as
+    ``note_box``, the C1 pivot seat note at ``pivot_seat_box`` (None: absent)
+    and a display dimension, which _iter_view_annotations yields as
     ``(None, annotation)`` since #902 (a5563c7a0)."""
     from types import SimpleNamespace
 
     import draw_fr_harmonic_base as sheet
 
-    texts = {"note": "D1", "rig set": sheet.RIG_SET_STEP.replace("\n", "\r\n")}
+    texts = {"note": "D1", "pivot seat": sheet.PIVOT_SEAT_STEP.replace("\n", "\r\n")}
 
     def annotations(_adapter, view):
         if view != "sheet":
@@ -981,8 +988,8 @@ def _drive_hole_sheet_callout_check(
             (None, "display dimension"),
             (SimpleNamespace(kind="note", label="D1", box=note_box), "note"),
         ]
-        if rig_set_box is not None:
-            rows.append((SimpleNamespace(kind="note", label="RS", box=rig_set_box), "rig set"))
+        if pivot_seat_box is not None:
+            rows.append((SimpleNamespace(kind="note", label="PS", box=pivot_seat_box), "pivot seat"))
         return iter(rows)
 
     for name, value in {
@@ -1027,17 +1034,17 @@ def test_hole_sheet_callout_check_still_measures_notes_beside_dimensions(
         _drive_hole_sheet_callout_check(monkeypatch, (0.110, 0.102, 0.120, 0.108))
 
 
-def test_hole_sheet_callout_check_measures_the_rig_set_note_against_obstacles(
+def test_hole_sheet_callout_check_measures_the_pivot_seat_note_against_obstacles(
     monkeypatch,
 ) -> None:
-    """Fail-first: the RIG SET note is measured like a callout, so the note
-    landing on the hole table fails the build -- a plain note obstacle is
+    """Fail-first: the C1 pivot seat note is measured like a callout, so the
+    note landing on the hole table fails the build -- a plain note obstacle is
     never compared with the table -- and a sheet without it fails too."""
     clear = (0.200, 0.200, 0.220, 0.210)
-    with pytest.raises(RuntimeError, match="callout RIG SET note vs table holes"):
-        _drive_hole_sheet_callout_check(monkeypatch, clear, rig_set_box=(0.030, 0.030, 0.060, 0.050))
-    with pytest.raises(RuntimeError, match="no RIG SET note"):
-        _drive_hole_sheet_callout_check(monkeypatch, clear, rig_set_box=None)
+    with pytest.raises(RuntimeError, match="callout pivot seat note vs table holes"):
+        _drive_hole_sheet_callout_check(monkeypatch, clear, pivot_seat_box=(0.030, 0.030, 0.060, 0.050))
+    with pytest.raises(RuntimeError, match="no pivot seat note"):
+        _drive_hole_sheet_callout_check(monkeypatch, clear, pivot_seat_box=None)
 
 
 def test_section_line_boxes_cover_arrows_and_labels_in_sheet_space() -> None:
@@ -1179,9 +1186,9 @@ def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> Non
 @pytest.mark.parametrize(
     ("process_name", "expected_process_rows"),
     [
-        ("TRANSFER_BLOCK_CALLOUT", "TRANSFER FROM MHA-DT-018\nAFTER RIG SET;\n"),
+        ("TRANSFER_BLOCK_CALLOUT", f"TRANSFER FROM MHA-DT-018\nAFTER {step_ref('rig-set')};\n"),
         ("TRANSFER_PEDESTAL_CALLOUT", "TRANSFER FROM MHA-DT-002\nAT ASSEMBLY;\n"),
-        ("TRANSFER_SPRING_CALLOUT", "TRANSFER FROM MHA-DT-024\nAFTER RIG SET; "),
+        ("TRANSFER_SPRING_CALLOUT", f"TRANSFER FROM MHA-DT-024\nAFTER {step_ref('rig-set')};\n"),
         ("CROSS_TAP_PROCESS", "THRU BOTH WALLS, SINGLE CONTINUOUS THREAD\n"),
     ],
 )
@@ -1190,8 +1197,8 @@ def test_base_callout_prefix_is_the_shared_helpers(
 ) -> None:
     # Main's hb-notes-2 ruling (a): the block and pedestal callouts end their
     # process text with a newline so the 8-32 thread gets its own fourth line;
-    # the cross-tap thread gets its own row the same way. The spring callout
-    # joins its thread with one space. add_native_hole_callout writes exactly
+    # the cross-tap thread gets its own row the same way, and so does the
+    # spring's since its step citation outgrew a joined row. add_native_hole_callout writes exactly
     # compose_hole_callout_prefix's result into the prefix DEFINITION.
     import draw_fr_harmonic_base as sheet
 
@@ -1283,19 +1290,26 @@ def test_cross_tap_callout_carries_hole_facts_only() -> None:
     assert part.BASE_SPOTFACE_PLANE_Z - part.BASE_SPOTFACE_DEPTH == part.BASE_SCREW_SEAT_Z
 
 
-def test_cross_tap_x_is_a_chained_model_dimension_on_the_front_view() -> None:
+def test_cross_tap_xs_are_baselines_from_the_flange_edge_on_the_front_view() -> None:
+    # plate-r1 review (rule 10): the far pair was chained from the near one;
+    # both now run from the table's X0 edge, the far one on the outer row.
     import draw_fr_harmonic_base as sheet
 
     assert fr_harmonic_base_spec.DRAWING_DIMENSIONS["CrossTapReference"] == {
-        "CrossTapX", "CrossTapPitch"
-    }
-    assert fr_harmonic_base_spec.DRAWING_PRECISION["CrossTapReference"] == {
-        "CrossTapX": 1, "CrossTapPitch": 1
+        "CrossTapX", "CrossTapFarX"
     }
     assert "CrossTapReference" in part.REFERENCE_SKETCHES
-    assert {"CrossTapX", "CrossTapPitch"} <= set(sheet.HOLE_SIDE_KEEP)
-    # 31.6 is also the table's A1/A2 X LOC from the same flange edge.
+    keep = sheet.HOLE_SIDE_KEEP
+    assert {"CrossTapX", "CrossTapFarX"} <= set(keep)
+    assert "CrossTapPitch" not in keep
+    # Shortest innermost: the near tap's row sits between the view and the
+    # far tap's.
+    view_bottom = sheet.HOLE_SIDE_CENTER[1] - fr_harmonic_base_spec.STACK_HEIGHT * sheet.VIEW_SCALE / 2000.0
+    assert keep["CrossTapFarX"][1] < keep["CrossTapX"][1] < view_bottom
+    # 31.6 and 425.6 are also the table's A1/A2 and A3/A4 X LOCs from the same
+    # flange edge.
     assert part.BOTTOM_LENGTH / 2.0 - part.COLUMN_X == pytest.approx(31.6)
+    assert part.BOTTOM_LENGTH / 2.0 + part.COLUMN_X == pytest.approx(425.6)
 
 
 def test_deck_land_worst_case_is_proven_instead_of_noted() -> None:
@@ -1407,7 +1421,7 @@ def test_stamped_id_leader_clears_the_socket_bores() -> None:
 
     # The reviewed sheet: through A3, to the serial on the old +X rim.
     assert clearance((0.125, 0.130), (218.75, 62.0)) < 0.0
-    assert sheet.SERIAL_NOTE_XY == (0.100, 0.135)
+    assert sheet.SERIAL_NOTE_XY == (0.098, 0.132)
     assert clearance(sheet.SERIAL_NOTE_XY, part.SERIAL_XZ) >= 0.004
     # The serial sits in the deck's NW corner, so the leader climbs across the
     # flange, pad and deck lower edges. Each width dimension right of the plan
@@ -1606,8 +1620,11 @@ def test_flange_finish_fits_sheet_1_left_of_the_plan_with_named_margins() -> Non
     margins = {
         "sheet frame": box[0] - SHEET_FRAME_INNER_X_M,
         "plan west flange edge": west_edge_x - box[2],
-        # The deck Ra symbol below it at (0.040, 0.138) carries no target text.
-        "deck Ra symbol": box[1] - (0.138 + sheet.FINISH_SYMBOL_TOP_M),
+        # The deck Ra symbol above it carries no target text; its own
+        # symbol box stands between this row and the R22.2 callout.
+        "deck Ra symbol": sheet.DECK_FINISH_XY[1] - box[3],
+        "deck Ra symbol to flange corner radius callout": 0.2104
+        - (sheet.DECK_FINISH_XY[1] + sheet.FINISH_SYMBOL_TOP_M),
         # R22.2 FLANGE corner callout above it: its two-row block hangs from
         # (0.040, 0.215) down to ~0.2104 (hb-render-5 sheet 1).
         "flange corner radius callout": 0.2104 - box[3],
@@ -1648,36 +1665,46 @@ def test_underside_section_cuts_both_boss_heights_clear_of_every_bore() -> None:
 
 
 def test_underside_section_texts_sit_in_open_air() -> None:
-    # drawing-guidelines.md rule 14 (keep text off the part): dimension text outside silhouettes. The ceiling height sits in
-    # the pocket's open air at the cut; the others left of the underside,
-    # each level caption (DEEP/SHALLOW LEVEL) clear of the bench face.
+    # drawing-guidelines.md rule 14 (keep text off the part): dimension text outside silhouettes. Every height reads left
+    # of the underside, each level caption (DEEP/SHALLOW LEVEL) clear of the
+    # bench face; inside the pocket a boss outline ran through the ceiling
+    # height's text (plate-r1 review).
     import draw_fr_harmonic_base as sheet
 
-    x = sheet.UNDERSIDE_CUT_X
-    spec = fr_harmonic_base_spec
-    bottoms = (
-        *((s, 0.0) for s in part.SOCKET_BOSS_SHAPES),
-        (part.LONG_RIB_SHAPE, spec.RIB_RELIEF),
-        (part.CROSS_RIB_SHAPE, spec.RIB_RELIEF),
-        *((s, spec.DEEP_BOSS_BOTTOM_Y) for s in part.DEEP_BOSS_SHAPES),
-        *((s, spec.SHALLOW_BOSS_BOTTOM_Y) for s in part.SHALLOW_BOSS_SHAPES),
-        *((s, spec.SHALLOW_BOSS_BOTTOM_Y) for s in part.CROSS_TAP_LUG_SHAPES),
-    )
-    for name in ("PocketDepth",):
-        y, z = sheet.UNDERSIDE_SECTION_TEXT_MM[name]
-        assert 0.0 < y < fr_harmonic_base_spec.POCKET_CEILING_Y, name
-        # A 2.5 mm text row is 5 mm of model at 1:2; keep 3 mm either side.
-        assert abs(z) + 3.0 < fr_harmonic_base_spec.POCKET_HALF_Z, name
-        for dz in (-3.0, 0.0, 3.0):
-            covering = [b for s, b in bottoms if _pocket_shape_covers(s, x, z + dz)]
-            assert all(y + 3.0 < b for b in covering), (name, dz, covering)
     num, den = sheet.UNDERSIDE_SECTION_SCALE
-    for name in ("DeepBossBottom", "RibRelief", "ShallowBossBottom"):
-        y = sheet.UNDERSIDE_SECTION_TEXT_MM[name][0]
-        rows = ["00.0", *sheet.UNDERSIDE_SECTION_CALLOUTS.get(name, "").split("\n")]
-        half_w_mm = max(map(len, rows)) * _DIM_CHAR_M * 1000.0 / 2.0
+    texts = sheet.UNDERSIDE_SECTION_TEXT_MM
+    assert set(texts) == {"PocketDepth", "DeepBossBottom", "RibRelief", "ShallowBossBottom"}
+
+    def rows(name: str) -> list[str]:
+        return ["00.0", *sheet.UNDERSIDE_SECTION_CALLOUTS.get(name, "").split("\n")]
+
+    for name, (y, _z) in texts.items():
+        half_w_mm = max(map(len, rows(name))) * _DIM_CHAR_M * 1000.0 / 2.0
         assert half_w_mm + 2.0 < -y * num / den, name
-    assert set(sheet.UNDERSIDE_SECTION_CALLOUTS) <= set(sheet.UNDERSIDE_SECTION_TEXT_MM)
+    # SolidWorks centres a callout's rows on the keep (5.8 mm a row on paper),
+    # its line under the last; the ceiling's text keeps a 3.5 mm row, 2 mm of
+    # air and that line's half-row clear of every other block.
+    z = texts["PocketDepth"][1]
+    assert abs(z) + 3.0 < fr_harmonic_base_spec.POCKET_HALF_Z
+    # Its dimension line crosses the cut at that Z: in the pocket's open air,
+    # through no rib, boss, pad or lug, 3 mm of model either side.
+    hanging = (
+        *part.SOCKET_BOSS_SHAPES,
+        part.LONG_RIB_SHAPE,
+        part.CROSS_RIB_SHAPE,
+        *part.DEEP_BOSS_SHAPES,
+        *part.SHALLOW_BOSS_SHAPES,
+        *part.CROSS_TAP_LUG_SHAPES,
+    )
+    for dz in (-3.0, 0.0, 3.0):
+        covering = [s for s in hanging if _pocket_shape_covers(s, sheet.UNDERSIDE_CUT_X, z + dz)]
+        assert covering == [], (dz, covering)
+    for name, (_y, other_z) in texts.items():
+        if name == "PocketDepth":
+            continue
+        reach_mm = len(rows(name)) * 5.8 / 2.0 + 0.6 + 2.0 + 3.5 / 2.0
+        assert abs(z - other_z) * num / den > reach_mm, name
+    assert set(sheet.UNDERSIDE_SECTION_CALLOUTS) <= set(texts)
 
 
 def test_underside_sheet_views_fit_the_border_clear_of_each_other() -> None:
@@ -1805,6 +1832,74 @@ def test_drawing_keeps_partition_the_part_precision_map() -> None:
     assert len(names) == len(set(names))
     assert set(names) == set(fr_harmonic_base_spec.DRAWING_PRECISION_BY_NAME)
     assert set(sheet.UNDERSIDE_BOTTOM_CALLOUTS) <= set(sheet.UNDERSIDE_BOTTOM_KEEP)
+
+
+def test_pad_deck_and_pocket_are_placed_from_x0_y0_as_baselines() -> None:
+    # plate-r1 review (rule 10): the pad, deck and pocket were located only by
+    # the word CENTERED. PlanReference places each from X0 Y0, the flange's
+    # outer sharp corner: pad and deck on sheet 1's plan, pocket on sheet 3's
+    # bottom view, each pair shortest innermost.
+    import draw_fr_harmonic_base as sheet
+
+    spec = fr_harmonic_base_spec
+    assert "PlanReference" in part.REFERENCE_SKETCHES
+    assert spec.DRAWING_DIMENSIONS["PlanReference"] == {"PadX", "PadY", "DeckX", "DeckY", "PocketX", "PocketY"}
+    words = " ".join((*sheet.GEOMETRY_CALLOUTS.values(), *sheet.UNDERSIDE_BOTTOM_CALLOUTS.values()))
+    assert "CENTERED" not in words
+
+    def box(xy: tuple[float, float], value: str) -> tuple[float, float, float, float]:
+        half_w = len(value) * _DIM_CHAR_M / 2.0
+        return (xy[0] - half_w, xy[1] - _DIM_TEXT_H_M / 2.0, xy[0] + half_w, xy[1] + _DIM_TEXT_H_M / 2.0)
+
+    # Sheet 1: X0 Y0 is the plan's bottom-left (rear-west) corner.
+    x0, y0 = sheet._plan_xy(-spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_REAR_Z)
+    keep = sheet.GEOMETRY_TOP_KEEP
+    texts = {
+        name: box(keep[name], value)
+        for name, value in (("PadX", "6.35"), ("DeckX", "61.6"), ("PadY", "6.35"), ("DeckY", "13.35"))
+    }
+    assert y0 > keep["PadX"][1] > keep["DeckX"][1]
+    assert x0 > keep["PadY"][0] > keep["DeckY"][0]
+    deck_witness_x = sheet._plan_xy(-spec.DECK_HALF_X, 0.0)[0]
+    pad_witness_x = sheet._plan_xy(-spec.TOP_LENGTH / 2.0, 0.0)[0]
+    # Both X texts read right of X0's witness line; the 6.35 past its own
+    # span and short of DeckX's witness line, the 61.6 inside its span.
+    assert pad_witness_x + 0.0015 < texts["PadX"][0] and texts["PadX"][2] < deck_witness_x - 0.0015
+    assert x0 + 0.0015 < texts["DeckX"][0] and texts["DeckX"][2] < deck_witness_x
+    # Both Y texts read left of X0's witness line: the inner one below the
+    # corner, the outer one above its span.
+    deck_y = sheet._plan_xy(0.0, spec.DECK_HALF_Z)[1]
+    assert texts["PadY"][2] < x0 - 0.0015 and texts["PadY"][3] < y0 - 0.001
+    assert texts["DeckY"][1] > deck_y + 0.001
+    for a in texts:
+        for b in texts:
+            if a < b:
+                assert _box_gap(texts[a], texts[b]) > 0.0015, (a, b)
+    # The DeckX line runs ~2.8 mm under its text (plate-r1 render); its
+    # witness lines end 0.5 mm past it, clear above the stamped-ID note's top
+    # row (which reads ~0.6 mm above the note's anchor).
+    assert keep["DeckX"][1] - 0.0028 - 0.0005 > sheet.SERIAL_NOTE_XY[1] + 0.0006 + 0.0015
+    # The deck Ra symbol and its leader stay above the corner group.
+    assert sheet.DECK_FINISH_XY[1] > max(text[3] for text in texts.values()) + 0.020
+
+    # Sheet 3: X0 Y0 is the bottom view's top-left corner.
+    x0, y0 = sheet._bottom_xy(-spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_REAR_Z)
+    keep = sheet.UNDERSIDE_BOTTOM_KEEP
+    pocket_x = box(keep["PocketX"], "18.35")
+    pocket_y = box(keep["PocketY"], "18.35")
+    wall_x = sheet._bottom_xy(-spec.POCKET_HALF_X, 0.0)[0]
+    wall_y = sheet._bottom_xy(0.0, spec.POCKET_HALF_Z)[1]
+    # Above the rear edge, right of its span; the dimension line ~2.8 mm under
+    # the text still clears the outline.
+    assert pocket_x[1] - 0.0028 + _DIM_TEXT_H_M / 2.0 > y0 + 0.002
+    assert pocket_x[0] > wall_x + 0.0015
+    # Section arrow B and its letter reach 19 mm west of the cut line
+    # (plate-r1 render).
+    cut_x = sheet._bottom_xy(sheet.UNDERSIDE_CUT_X, 0.0)[0]
+    assert pocket_x[2] < cut_x - 0.019 - 0.005
+    # Left of the west edge, below its span.
+    assert pocket_y[2] < x0 - 0.0015 and pocket_y[3] < wall_y - 0.001
+    assert _box_gap(pocket_x, pocket_y) > 0.0015
 
 
 # Sheet text as boxes: 3.5 mm rows, and a generous 2.5 mm a character.
@@ -2196,8 +2291,9 @@ def test_nameplate_callout_reads_in_the_top_band_its_leader_clear_of_the_tags() 
     assert box[3] < _BORDER_INNER_M[3] - 0.003
     assert box[2] < _BORDER_INNER_M[2] - 0.005
     # Its top row level with the four-row block callout's beside it, 10 mm
-    # or more clear of that block's widest row, "TRANSFER FROM MHA-DT-018".
-    block_half_w = len("TRANSFER FROM MHA-DT-018") * _DIM_CHAR_M * 1.08 / 2.0
+    # or more clear of that block's widest prefix row.
+    block_chars = max(map(len, sheet.TRANSFER_BLOCK_CALLOUT.rstrip("\n").split("\n")))
+    block_half_w = block_chars * _DIM_CHAR_M * 1.08 / 2.0
     assert box[0] - (sheet.BLOCK_CALLOUT_XY[0] + block_half_w) > 0.010
     block_top = sheet.BLOCK_CALLOUT_XY[1] - 0.001 + 2 * half_h * 4 / 3 / 2.0
     assert abs(box[3] - block_top) < 0.0015
@@ -2218,112 +2314,87 @@ def test_nameplate_callout_reads_in_the_top_band_its_leader_clear_of_the_tags() 
     assert max(leader[0][0], leader[1][0]) < section_x - 0.004
 
 
-def test_rig_callouts_name_the_rig_set_note() -> None:
-    # User ruling P1-2 (pc-p1 eye pass): printed on the callouts, the RIG SET
-    # step ran the block callout through the top border and over the TOP VIEW
-    # caption. Each rig callout keeps its first line and swaps "AT ASSEMBLY;"
-    # for the note's name; the pedestal seats are not rig seats. Where the note
-    # lands is proved by the test below and measured at build time.
-    import draw_fr_harmonic_base as sheet
-    import pinion_rig_fitup as fitup
+def test_rig_callouts_cite_the_drive_train_rig_set_step() -> None:
+    # User ruling P1-2: the rig seats are spotted only after the rig is set.
+    # plate-r1 review (over-specification): the five-line RIG SET procedure
+    # was an assembly set-up for other parts, so it lives on MHA-DT-000 and
+    # each rig callout cites that step by key, never a typed number. The
+    # pedestal seats are not rig seats.
+    import inspect
 
+    import draw_fr_harmonic_base as sheet
+    import dt_drive_train_steps as steps
+
+    cite = f"AFTER {step_ref('rig-set')};"
+    assert cite == f"AFTER MHA-DT-000 STEP {steps.step_number('rig-set')};"
+    assert steps.step_number("rig-set") < steps.step_number("rig-seats-transferred")
     for text in (sheet.TRANSFER_BLOCK_CALLOUT, sheet.TRANSFER_SPRING_CALLOUT):
         lines = text.rstrip("\n").split("\n")
         assert len(lines) == 2, text
-        assert lines[1] == sheet.TRANSFER_AFTER_RIG_SET
-        assert fitup.RIG_SET_NAME in lines[1]
-    assert sheet.TRANSFER_AFTER_RIG_SET == "AFTER RIG SET;"
-    assert "RIG SET" not in sheet.TRANSFER_PEDESTAL_CALLOUT
-    note = fitup.RIG_SET_STEP.split("\n")
-    assert note[0].startswith(fitup.RIG_SET_NAME + ",")
-    # The note carries every setting the transfers need, the front block's
-    # feeler included: it fixes FRONT_BLOCK_Z0, so the front seats with it
-    # (Codex #858, PRRT_kwDOPHDy386mUjhS).
-    feeler = f"FRONT MHA-DT-018 {fitup.FRONT_BLOCK_FEELER:.2f} LEAF OFF FRONT MHA-DT-014;"
-    assert feeler in note
-    assert note.index(feeler) == 1
-    assert "1.00 + 0.25 LEAVES OFF" in fitup.RIG_SET_STEP
-    assert "BANK PUSHED NORTH" in fitup.RIG_SET_STEP
-    assert "MHA-DT-024 PAD 0.65 LEAF OFF MHA-DT-018." in fitup.RIG_SET_STEP
+        assert lines[1] == cite
+    assert "STEP" not in sheet.TRANSFER_PEDESTAL_CALLOUT
+    # The sheet carries no copy of the procedure.
+    source = inspect.getsource(sheet)
+    assert "RIG_SET_STEP" not in source and "pinion_rig_fitup" not in source
 
 
 # The note's printed character advance and line pitch at the sheet's 3.5 text
-# height (read off the pc-p1 render of the same note).
+# height (read off the pc-p1 render of the old RIG SET note).
 _NOTE_CHAR_MM = 2.69
 _NOTE_LINE_MM = 4.58
 
 
-def _rig_set_note_box(xy: tuple[float, float]) -> tuple[float, float, float, float]:
-    import pinion_rig_fitup as fitup
+def _pivot_seat_note_box(xy: tuple[float, float]) -> tuple[float, float, float, float]:
+    import draw_fr_harmonic_base as sheet
 
-    lines = fitup.RIG_SET_STEP.split("\n")
+    lines = sheet.PIVOT_SEAT_STEP.split("\n")
     width = max(len(line) for line in lines) * _NOTE_CHAR_MM / 1000.0
     height = len(lines) * _NOTE_LINE_MM / 1000.0
     return (xy[0], xy[1] - height, xy[0] + width, xy[1])
 
 
-def test_rig_set_note_clears_the_sheet_2_callouts_table_and_views() -> None:
-    """The pc-p1 eye pass read the RIG SET text over the hole table's column,
-    the cross-tap callout and section arrow A.  The note's estimated box at
-    RIG_SET_NOTE_XY clears hb-render-4's callouts and e0e287c83's table,
-    views and labels; fail-first, the same box collides once moved onto the
-    table or across to the cross-tap callout.  The build measures the note's
-    read-back ink against every callout and obstacle the same way."""
-    import inspect
-
-    import draw_fr_harmonic_base as sheet
-
-    obstacles = dict(E0E287C83_OBSTACLES)
-    obstacles.update((f"callout {name}", box) for name, box in HB_RENDER_4_BOXES.items())
-
-    def clashes(xy: tuple[float, float]) -> list[str]:
-        return sheet.find_callout_clashes({sheet.RIG_SET_NOTE_LABEL: _rig_set_note_box(xy)}, obstacles)
-
-    assert clashes(sheet.RIG_SET_NOTE_XY) == []
-    on_table = clashes((sheet.RIG_SET_NOTE_XY[0], 0.140))
-    assert any("table DetailItem460" in finding for finding in on_table), on_table
-    on_cross_tap = clashes((0.120, sheet.RIG_SET_NOTE_XY[1]))
-    assert any("MHA-VN-027 cross-tap" in finding for finding in on_cross_tap), on_cross_tap
-    # The build check boxes the note's own ink, found by its text as read back.
-    assert sheet.is_rig_set_note(sheet.RIG_SET_STEP.replace("\n", "\r\n") + "\r\n")
-    assert not sheet.is_rig_set_note(sheet.TRANSFER_SPRING_CALLOUT)
-    source = inspect.getsource(sheet._check_hole_sheet_callouts)
-    assert "boxes[RIG_SET_NOTE_LABEL] = element.box" in source
-
-
 def test_pivot_seat_note_locates_it_from_the_near_pedestal_seat() -> None:
     """The pivot seat is held +-0.05 to the MHA-DT-002 seats, in one setup with
     them (cone_set_stack); the note's offsets are the model's, measured from
-    the nearer seat in table axes (X right, Y = -z), and its box hangs under
-    the RIG SET note clear of the table, views and callouts."""
+    the nearer seat in table axes (X right, Y = -z). plate-r1 review: the note
+    names C1 and says its table location is reference, so the two cannot read
+    as competing. Its box heads the notes column clear of the table, views and
+    callouts; fail-first, the same box collides once moved onto the table. The
+    build measures the note's read-back ink against every callout and
+    obstacle the same way."""
+    import inspect
     import math
 
+    import cone_set_stack
     import draw_fr_harmonic_base as sheet
+    import fr_harmonic_base_spec as base_spec
 
     near = min(sheet.PEDESTAL_SCREW_XZ, key=lambda xz: math.dist(xz, sheet.PIVOT_SCREW_XZ))
     dx = sheet.PIVOT_SCREW_XZ[0] - near[0]
     dy = near[1] - sheet.PIVOT_SCREW_XZ[1]
-    import cone_set_stack
-    import fr_harmonic_base_spec as base_spec
-
     band = base_spec.PIVOT_SEAT_POSITION_BAND_MM
     assert band == cone_set_stack.PIVOT_SEAT_POSITION_MM
     assert f"X {dx:.2f}, Y {dy:.2f} <MOD-PM>{band:.2f}" in sheet.PIVOT_SEAT_STEP
     assert "ONE SETUP" in sheet.PIVOT_SEAT_STEP
     assert "MHA-DT-002" in sheet.PIVOT_SEAT_STEP
     lines = sheet.PIVOT_SEAT_STEP.split("\n")
-    x, y = sheet.PIVOT_SEAT_NOTE_XY
-    box = (
-        x,
-        y - len(lines) * _NOTE_LINE_MM / 1000.0,
-        x + max(len(line) for line in lines) * _NOTE_CHAR_MM / 1000.0,
-        y,
-    )
+    assert lines[0].startswith("C1 PIVOT SEAT:")
+    assert lines[-1] == "THIS GOVERNS C1; ITS TABLE X/Y ARE REFERENCE."
     obstacles = dict(E0E287C83_OBSTACLES)
     obstacles.update((f"callout {name}", b) for name, b in HB_RENDER_4_BOXES.items())
-    obstacles["note RIG SET"] = _rig_set_note_box(sheet.RIG_SET_NOTE_XY)
-    assert sheet.find_callout_clashes({"pivot seat note": box}, obstacles) == []
-    assert box[1] > 0.02  # above the frame's inner border
+
+    def clashes(xy: tuple[float, float]) -> list[str]:
+        return sheet.find_callout_clashes({sheet.PIVOT_SEAT_NOTE_LABEL: _pivot_seat_note_box(xy)}, obstacles)
+
+    assert clashes(sheet.PIVOT_SEAT_NOTE_XY) == []
+    on_table = clashes((sheet.PIVOT_SEAT_NOTE_XY[0], 0.140))
+    assert any("table DetailItem460" in finding for finding in on_table), on_table
+    assert _pivot_seat_note_box(sheet.PIVOT_SEAT_NOTE_XY)[1] > 0.02  # above the frame's inner border
+    # The build check boxes the note's own ink, found by its text as read back.
+    assert sheet.is_pivot_seat_note(sheet.PIVOT_SEAT_STEP.replace("\n", "\r\n") + "\r\n")
+    assert not sheet.is_pivot_seat_note(sheet.TRANSFER_SPRING_CALLOUT)
+    source = inspect.getsource(sheet._check_hole_sheet_callouts)
+    assert "boxes[PIVOT_SEAT_NOTE_LABEL] = element.box" in source
 
 
 def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
@@ -2337,5 +2408,5 @@ def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
     blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
     assert "def _hide_reference_sketches" not in source
     assert source.count(blank) == 1
-    assert part.REFERENCE_SKETCHES == ("HeightReference", "CrossTapReference")
+    assert part.REFERENCE_SKETCHES == ("HeightReference", "CrossTapReference", "PlanReference")
     assert hasattr(_sketch.blank_reference_sketches, "__wrapped__")

@@ -236,7 +236,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "DeckCorners": {"DeckCornerRadius"},
     "DeckEdgeBreak": {"DeckEdgeChamfer"},
     "HeightReference": {"FlangeToDeck"},
-    "CrossTapReference": {"CrossTapX", "CrossTapPitch"},
+    "CrossTapReference": {"CrossTapX", "CrossTapFarX"},
+    "PlanReference": {"PadX", "PadY", "DeckX", "DeckY", "PocketX", "PocketY"},
     "TopRimBreaks": {"TopRimChamfer"},
     "BottomEdgeBreak": {"BottomEdgeChamfer"},
     "BaseSpotFaceRearProfile": {"SpotFaceDia", "Spot0Y"},
@@ -290,7 +291,17 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "DeckCorners": {"DeckCornerRadius": 1},
     "DeckEdgeBreak": {"DeckEdgeChamfer": 1},
     "HeightReference": {"FlangeToDeck": 1},
-    "CrossTapReference": {"CrossTapX": 1, "CrossTapPitch": 1},
+    "CrossTapReference": {"CrossTapX": 1, "CrossTapFarX": 1},
+    # The plan stations from X0 Y0 print their modelled nominal: the 1/4 in
+    # flange reveal makes 6.35, 13.35 and 18.35, which one place would misstate.
+    "PlanReference": {
+        "PadX": 2,
+        "PadY": 2,
+        "DeckX": 1,
+        "DeckY": 2,
+        "PocketX": 2,
+        "PocketY": 2,
+    },
     "TopRimBreaks": {"TopRimChamfer": 1},
     "BottomEdgeBreak": {"BottomEdgeChamfer": 1},
     "BaseSpotFaceRearProfile": {"SpotFaceDia": 1, "Spot0Y": 1},
