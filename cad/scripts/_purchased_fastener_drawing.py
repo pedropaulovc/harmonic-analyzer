@@ -167,13 +167,16 @@ def fastener_view_cells(caption_y: float) -> tuple:
 
     Front and Right fill the band from their captions (``caption_y``) up to the
     Top/Isometric captions; Top and Isometric fill the band under the border.
+    The Isometric's cell reaches 6 mm lower, its caption ending on the Right
+    cell's top, so a 1:1 pictorial of a long part (the 67 mm keeper chain)
+    is not shrunk to 1:2, where small round features show their facets.
     """
     bottom = caption_y + _CAPTION_TO_CELL
     return (
         _cell("*Front", 0.025, bottom, 0.205, 0.182),
         _cell("*Top", 0.025, 0.198, 0.205, 0.262),
         _cell("*Right", 0.225, bottom, 0.405, 0.182),
-        _cell(_ISOMETRIC, 0.225, 0.198, 0.415, 0.262),
+        _cell(_ISOMETRIC, 0.225, 0.192, 0.415, 0.262),
     )
 
 
