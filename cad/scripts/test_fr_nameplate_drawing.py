@@ -616,6 +616,19 @@ def test_engraving_floor_at_the_printed_worst_case() -> None:
     assert floor > 0.5
 
 
+def test_screw_full_thread_is_the_accepted_rule_20_shortfall() -> None:
+    # PR #1468 r3 (owner ruling 2026-10-15, option C): the #4-40 x 1/4 inch
+    # (6.35) fillister, 0.02 inch (0.508) short per ASME B18.6.3, through the
+    # plate at 1.500 + 0.13, less 0.75 of the 40 TPI (0.635) pitch at its tip.
+    worst = 6.35 - 0.508 - (1.500 + 0.13) - 0.75 * 0.635
+    assert worst == pytest.approx(3.736, abs=5e-4)
+    assert print_spec.SCREW_FULL_THREAD_MIN == pytest.approx(worst, abs=1e-9)
+    assert 0.0 < print_spec.SCREW_FULL_THREAD_ACCEPTED <= round(worst, 3)
+    # Still short of 1.5D of the 2.8448 major (4.267): the ruling is live.
+    assert worst < 1.5 * 2.8448
+    assert worst / 2.8448 == pytest.approx(1.31, abs=5e-3)
+
+
 def test_notes_and_callouts_carry_no_numbers_and_stay_short() -> None:
     notes = print_spec.MANUFACTURING_NOTES.splitlines()
     # The note block's rows fit the left half above the title band.
